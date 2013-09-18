@@ -54,6 +54,19 @@ IterTy safe_advance(IterTy b, IterTy e, Distance n) {
   return safe_advance_dispatch(b,e,n,category);
 }
 
+/**
+ * Lie std::copy_n
+ */
+template<class InputIterator, class Size, class OutputIterator>
+OutputIterator safe_copy_n (InputIterator first, InputIterator last, 
+                            Size n, OutputIterator result) {
+  while (n > 0 && first != last) {
+    *result = *first;
+    ++result; ++first;
+    --n;
+  }
+  return result;
+}
 
 /**
  * Finds the midpoint of a range.  The first half is always be bigger than

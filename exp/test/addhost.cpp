@@ -5,7 +5,6 @@
 
 using namespace std;
 using namespace Galois::Runtime;
-using namespace Galois::Runtime::Distributed;
 
 typedef vector<int>::iterator IterTy;
 
@@ -15,7 +14,7 @@ struct R : public Galois::Runtime::Lockable {
   R() :i(0) {}
 
   void add(int v) {
-    std::cerr << "In Host " << networkHostID << " and thread " << LL::getTID() << " processing number " << v << " old value " << i << "\n";
+    std::cerr << "In Host " << NetworkInterface::ID << " and thread " << LL::getTID() << " processing number " << v << " old value " << i << "\n";
     i += v;
     return;
   }
@@ -58,7 +57,7 @@ int main(int argc, char *argv[])
    LonestarStart(argc, argv, name, desc, url);
 
    // check the host id and initialise the network
-   Galois::Runtime::networkStart();
+   getSystemNetworkInterface().start();
 
    vector<int> myvec;
    typedef Galois::WorkList::LIFO<int,true> chunk;
@@ -72,7 +71,7 @@ int main(int argc, char *argv[])
    std::cerr << "sum is " << f.r->i << "\n";
    std::cerr << "sum should be " << std::accumulate(myvec.begin(), myvec.end(), 0) << "\n";
    // master_terminate();
-   Galois::Runtime::networkTerminate();
+   getSystemNetworkInterface().terminate();
 
    return 0;
 }

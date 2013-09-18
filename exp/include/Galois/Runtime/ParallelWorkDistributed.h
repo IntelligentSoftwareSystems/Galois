@@ -140,10 +140,8 @@ void do_all_local_landing_pad(RecvBuffer& buf) {
 
   NetworkInterface& net = getSystemNetworkInterface();
 
-  inDoAllDistributed = true;
   //Start locally
   do_all_impl(Galois::Runtime::makeLocalRange(data),f,r,needsReduce);
-  inDoAllDistributed = false;
 
   // place a MPI barrier here for all the hosts to synchronize
   //net.systemBarrier();
@@ -259,10 +257,8 @@ void do_all_impl_dist(T& c, FunctionTy f, ReducerTy r, bool needsReduce) {
     net.sendLoop (i, &do_all_local_landing_pad<T,FunctionTy,ReducerTy>, buf);
   }
   net.handleReceives();
-  inDoAllDistributed = true;
   //Start locally
   do_all_impl(Galois::Runtime::makeLocalRange(c),f,r,needsReduce);
-  inDoAllDistributed = false;
 
   // place a MPI barrier here for all the hosts to synchronize
   //  net.systemBarrier();

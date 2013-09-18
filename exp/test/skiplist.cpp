@@ -47,13 +47,14 @@ void testSerial1() {
 }
 
 struct Process {
-  Galois::ConcurrentSkipListMap<int,int>& map;
+  Galois::ConcurrentSkipListMap<int,int>* map;
   int dummy;
-  Process(Galois::ConcurrentSkipListMap<int,int>& m) : map(m) { }
+  Process(Galois::ConcurrentSkipListMap<int,int>& m) : map(&m) { }
+  Process() = default;
 
   template<typename Context>
   void operator()(int& item, Context& ctx) {
-    map.put(item, &dummy);
+    map->put(item, &dummy);
   }
 };
 

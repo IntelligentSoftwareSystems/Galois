@@ -24,6 +24,7 @@
 
 
 #include "Galois/Runtime/Network.h"
+#include "Galois/Runtime/NetworkBackend.h"
 #include "Galois/Runtime/ll/SimpleLock.h"
 #include "Galois/Runtime/ll/gio.h"
 #include "Galois/Runtime/ll/TID.h"
@@ -36,8 +37,6 @@
 using namespace Galois::Runtime;
 
 #define INFLIGHT_LIMIT 100000
-
-bool Galois::Runtime::inDoAllDistributed = false;
 
 namespace {
 
@@ -178,3 +177,99 @@ NetworkInterface& Galois::Runtime::getSystemNetworkInterface() {
   return net;
 }
 #endif
+
+
+
+
+
+
+
+namespace {
+
+class NetworkBackendMPI : public NetworkBackend {
+
+  LL::SimpleLock<true> lock;
+  std::deque<std::pair<MPI_Request, SendBlock*>> pending_sends;
+
+  //! requires lock be held
+  void update_pending_sends() {
+    int flag = true;
+    while (flag && !pending_sends.empty()) {
+      MPI_Status s;
+      int rv = MPI_Test(&pending_sends.front().first, &flag, &s);
+      handleError(rv);
+      if (flag)
+        pending_sends.pop_front();
+    }
+  }
+
+  static const unsigned msgSize = 1024*4;
+
+public:
+  using NetworkBackend::ID;
+  using NetworkBackend::Num;
+
+
+  NetworkBackendMPI() : NetworkBackend(msgSize) {
+    int provided;
+    int rc = MPI_Init_thread (NULL, NULL, MPI_THREAD_SERIALIZED, &provided);
+    handleError(rc);
+
+    int numTasks, taskRank;
+    MPI_Comm_size(MPI_COMM_WORLD, &numTasks);
+    MPI_Comm_rank(MPI_COMM_WORLD, &taskRank);
+    
+    ID = taskRank;
+    Num = numTasks;
+    
+    if (taskRank == 0) {
+      //master
+      //printing on lead host doesn't require this object to be fully initialized
+      switch (provided) {
+      case MPI_THREAD_SINGLE: 
+      case MPI_THREAD_FUNNELED:
+      default:
+        assert(0 && "Insufficient mpi support");
+        abort();
+        break;
+      case MPI_THREAD_SERIALIZED: Galois::Runtime::LL::gInfo("MPI Supports: Serialized"); break;
+      case MPI_THREAD_MULTIPLE: Galois::Runtime::LL::gInfo("MPI Supports: Multiple"); break;
+      }
+    }
+  }
+
+  virtual ~NetworkBackendMPI() {
+    MPI_Finalize();
+  }
+
+  virtual bool send(SendBlock* data) {
+    std::lock_guard<decltype(lock)> lg(lock);
+    pending_sends.emplace_back(MPI_REQUEST_NULL, data);
+    auto & com = pending_sends.back();
+    int rv = MPI_Isend(data.buf, data.size, MPI_BYTE, data.dest, FuncTag, MPI_COMM_WORLD, &com.first);
+    handleError(rv);
+    update_pending_sends();
+  }
+
+  virtual SendBlock* recv() {
+    std::lock_guard<decltype(lock)> lg(lock);
+    update_pending_sends();
+    SendBlock* retval = nullptr;
+    MPI_Status status;
+    //async probe
+    int flag, rv;
+    rv = MPI_Iprobe(MPI_ANY_SOURCE, FuncTag, MPI_COMM_WORLD, &flag, &status);
+    handleError(rv);
+    if (flag) {
+      int count;
+      MPI_Get_count(&status, MPI_BYTE, &count);
+      retval = allocSendBlock();
+      retval->size = count;
+      tv = MPI_Recv(retval->buf, count, MPI_BYTE, MPI_ANY_SOURCE, FuncTag, MPI_COMM_WORLD, &status);
+      handleError(rv);
+    }
+    return retval;
+  }
+};
+
+}

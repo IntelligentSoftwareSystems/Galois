@@ -60,7 +60,7 @@ int main(int argc, char** argv) {
   LonestarStart(argc, argv, nullptr, nullptr, nullptr);
 
   // check the host id and initialise the network
-  Galois::Runtime::networkStart();
+  Galois::Runtime::getSystemNetworkInterface().start();
 
   Gptr Gr = G::allocate();
 
@@ -80,7 +80,7 @@ int main(int argc, char** argv) {
   std::cout << "\nDone Remote Check\n";
 
   // master_terminate();
-  Galois::Runtime::networkTerminate();
+  Galois::Runtime::getSystemNetworkInterface().terminate();
 
   return 0;
 }

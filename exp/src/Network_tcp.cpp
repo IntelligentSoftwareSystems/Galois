@@ -23,6 +23,7 @@
 
 #include "Galois/Runtime/Network.h"
 #include "Galois/Runtime/ll/EnvCheck.h"
+#include "Galois/gstl.h"
 
 #include <sys/types.h>
 #include <sys/socket.h>
@@ -47,47 +48,58 @@ class NetworkInterfaceTCP : public NetworkInterface {
   };
 
   struct recvIP {
-    header h;
-    DeSerializeBuffer buf;
-    uint32_t h_offset;
-    uintptr_t buf_offset;;
+    int socket;
     LL::SimpleLock<true> lock;
-    recvIP() :buf(0), h_offset (0), buf_offset(0) {}
-    void reset() { h_offset = 0; buf_offset = 0; buf.reset(0); }
-    bool ready() const { return h_offset == sizeof(header) && buf_offset == h.size; }
-    void doRead(int socket) {
-      if (h_offset < sizeof(header)) {
-        int r = read(socket, (char*)&h + h_offset, sizeof(header) - h_offset);
-        if (r < 0)
-          abort(); //error("ERROR in read");
-        h_offset += r;
-        if (h_offset == sizeof(header))
-          buf.reset(h.size);
+    std::deque<unsigned char> buffer;
+
+    void doRead() {
+      std::lock_guard<LL::SimpleLock<true>> lg(lock);
+      unsigned char data[256];
+      int r = read(socket, data, sizeof(data));
+      if (r > 0)
+        std::copy(&data[0], &data[r], std::back_inserter(buffer));
+    }
+
+    bool recvMessage(recvFuncTy& recv, RecvBuffer& buf) {
+      std::lock_guard<LL::SimpleLock<true>> lg(lock);
+      if (buffer.size() < sizeof(header))
+        return false;
+      header h;
+      gDeserializeRaw(buffer.begin(), h);
+      if (h.size - sizeof(header) >= buffer.size()) {
+        recv = (recvFuncTy)h.func;
+        buf.reset(h.size);
+        std::copy(buffer.begin()+sizeof(header), buffer.begin() + h.size + sizeof(header),
+                  (unsigned char*)buf.linearData());
+        buffer.erase(buffer.begin(), buffer.begin() + h.size + sizeof(header));
+        return true;
       }
-      if (h_offset == sizeof(header) && buf_offset < h.size) {
-        int r = read(socket, (char*)buf.linearData() + buf_offset, h.size - buf_offset);
-        if (r < 0)
-          abort(); //error("ERROR in read");
-        buf_offset += r;
-      }
+      return false;
     }
   };
 
   struct sendIP {
+    int socket;
     LL::SimpleLock<true> lock;
-    void sendMessage(int sock, recvFuncTy recv, SendBuffer& buf) {
-      std::lock_guard<LL::SimpleLock<true>> lg(lock);
-      //std::cerr << "Sending on " << sock << " func " << (void*)recv << " datasize " << buf.size() << "\n";
-      // char* p = (char*)buf.linearData();
-      // for (int x = 0; x < buf.size(); ++x)
-      //   std::cerr << (int)p[x] << " ";
-      // std::cerr << "\n";
+    std::deque<unsigned char> buffer;
 
+    void doSend() {
+      std::lock_guard<LL::SimpleLock<true>> lg(lock);
+      if (!buffer.empty()) {
+        unsigned char data[256];
+        int num = std::copy(buffer.begin(), Galois::safe_advance(buffer.begin(), buffer.end(), sizeof(data)), data) - data;
+        int r = write(socket, data, num);
+        if (r > 0)
+          buffer.erase(buffer.begin(), buffer.begin() + r);
+      }
+    }
+
+    void sendMessage(recvFuncTy recv, SendBuffer& buf) {
+      std::lock_guard<LL::SimpleLock<true>> lg(lock);
       header h = {(uint32_t)buf.size(), (uintptr_t)recv};
-      if (write(sock, &h, sizeof(header)) != sizeof(header))
-        abort();
-      if (write(sock, buf.linearData(), buf.size()) != buf.size())
-        abort();
+      unsigned char* ch = (unsigned char*)&h;
+      std::copy(ch, ch + sizeof(header), std::back_inserter(buffer));
+      std::copy((unsigned char*)buf.linearData(), (unsigned char*)buf.linearData() + buf.size(), std::back_inserter(buffer));
     }
   };
 
@@ -99,9 +111,6 @@ class NetworkInterfaceTCP : public NetworkInterface {
   std::vector<recvIP> recvState;
   std::vector<sendIP> sendState;
 
-  int listensocket;
-  int portno;
-  std::string strportno;
   int id;
   int numhosts;
   fd_set readfds;
@@ -112,7 +121,14 @@ class NetworkInterfaceTCP : public NetworkInterface {
     abort();
   }
 
-  void connectToMaster() {
+  void setNoDelay(int socket) {
+    int flag = 1;
+    int ret = setsockopt( socket, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(flag) );
+    if (ret == -1)
+      std::cout << "Couldn't setsockopt(TCP_NODELAY)\n";
+  }
+
+  void connectToMaster(std::string& strportno) {
     sockets.resize(1);
 
     std::string master;
@@ -143,26 +159,14 @@ class NetworkInterfaceTCP : public NetworkInterface {
     if (sockets[0] == -1)
       error("ERROR connecting");
 
-    int flag = 1;
-    int ret = setsockopt( sockets[0], IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(flag) );
-    if (ret == -1)
-      std::cout << "Couldn't setsockopt(TCP_NODELAY)\n";
-
-    if (read(sockets[0], &id, sizeof(int)) < sizeof(int))
-      error("ERROR reading id");
-    if (read(sockets[0], &numhosts, sizeof(int)) < sizeof(int))
-      error("ERROR reading numhosts");
-    std::cerr << "Read " << id << " of " << numhosts << "\n";
+    setNoDelay(sockets[0]);
   }
 
-  void setupListenSocket() {
-    listensocket = socket(AF_INET, SOCK_STREAM, 0);
+  int setupListenSocket(int portno, std::string& strportno) {
+    int listensocket = socket(AF_INET, SOCK_STREAM, 0);
     if (listensocket < 0)
       error("ERROR opening socket");
-    int flag = 1;
-    int ret = setsockopt( listensocket, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(flag) );
-    if (ret == -1)
-      std::cout << "Couldn't setsockopt(TCP_NODELAY)\n";
+    setNoDelay(listensocket);
     sockaddr_in serv_addr;
     bzero((char *) &serv_addr, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
@@ -173,9 +177,10 @@ class NetworkInterfaceTCP : public NetworkInterface {
     if (listen(listensocket, numhosts) < 0)
       error("ERROR on listening");
     std::cerr << "Listening on " << portno << "(as " << strportno << ")\n";
+    return listensocket;
   }
 
-  void connectToChildren() {
+  void connectToChildren(int listensocket) {
     id = 0;
     sockets.resize(numhosts);
     clients.resize(numhosts);
@@ -197,7 +202,7 @@ class NetworkInterfaceTCP : public NetworkInterface {
     }
   }
 
-  void connectToPeers() {
+  void connectToPeers(int listensocket, int portno) {
     sockets.resize(numhosts);
     for (int i = 1; i < numhosts; ++i) {
       if (i == id) { //connect
@@ -220,34 +225,46 @@ class NetworkInterfaceTCP : public NetworkInterface {
         
 public:
   NetworkInterfaceTCP() {
+    int listensocket;
+    int portno;
+    std::string strportno;
+
     if (!LL::EnvCheck("GALOIS_TCP_PORT", portno))
       portno = 95863;
     if (!LL::EnvCheck("GALOIS_TCP_PORT", strportno))
       strportno = "95863";
 
-    setupListenSocket();
+    listensocket = setupListenSocket(portno, strportno);
+
     if (LL::EnvCheck("GALOIS_TCP_MASTER", numhosts)) {
       //get connection to all children
-      connectToChildren();
+      connectToChildren(listensocket);
       //send address to everyone
       for (int i = 1; i < numhosts; ++i)
         if (write(sockets.at(i), &clients.at(0) , sizeof(sockaddr_in) * numhosts) < 0)
           error("ERROR in writing clientlist");
       //carry on
     } else { //client
-      connectToMaster();
+      connectToMaster(strportno);
+      if (read(sockets[0], &id, sizeof(int)) < sizeof(int))
+        error("ERROR reading id");
+      if (read(sockets[0], &numhosts, sizeof(int)) < sizeof(int))
+        error("ERROR reading numhosts");
+      std::cerr << "Read " << id << " of " << numhosts << "\n";
+
       //read address of everyone
       clients.resize(numhosts);
       if (read(sockets.at(0), &clients.at(0), sizeof(sockaddr_in) * numhosts) < 0)
         error("ERROR in reading clientlist");
       //connect to everyone
-      connectToPeers();
+      connectToPeers(listensocket, portno);
     }
 
     recvState.resize(numhosts);
     sendState.resize(numhosts);
     FD_ZERO(&readfds);
     for (int x = 0; x < numhosts; ++x) {
+      recvState[x].socket = sendState[x].socket = sockets[x];
       if (x != id)
         FD_SET(sockets.at(x), &readfds);
     }
@@ -268,45 +285,35 @@ public:
   }
 
   virtual void send(uint32_t dest, recvFuncTy recv, SendBuffer& buf) {
-    sendState[dest].sendMessage(sockets[dest], recv, buf);
+    sendState[dest].sendMessage(recv, buf);
   }
 
   virtual bool handleReceives() {
     if (debugRecv)
       assert(!inRecv);
-    fd_set check = readfds;
+    fd_set rcheck = readfds;
+    fd_set wcheck = readfds;
     timeval t = {0,0};
-    int retval = select(1 + maxsocket, &check, NULL, NULL, &t);
+    int retval = select(1 + maxsocket, &rcheck, &wcheck, NULL, &t);
     if (retval == -1)
       error("ERROR in select");
     if (retval) {
       for (int x = 0; x < numhosts; ++x) {
         if (x != id) {
-          if (FD_ISSET(sockets.at(x), &check)) {
+          if (FD_ISSET(sockets.at(x), &wcheck))
+            sendState[x].doSend();
+          if (FD_ISSET(sockets.at(x), &rcheck)) {
             recvIP& state = recvState[x];
-            if (state.lock.try_lock()) {
-              //std::lock_guard<LL::SimpleLock<true>> lg(state.lock, std::adopt_lock_t());
-              state.doRead(sockets[x]);
-              //keep lock for recv, since it only blocks other threads from recieves from that host
-              if (state.ready()) {
-                // DeSerializeBuffer b = std::move(state.buf);
-                // header h = state.h;
-                // state.reset();
-                // state.lock.unlock();
-                // ((recvFuncTy)h.func)(b);
-                // std::cerr << "recieved func " << (void*) state.h.func << " with " << state.h.size << " bytes\n";
-                // char* p = (char*)state.buf.linearData();
-                // for (int x = 0; x < state.buf.size(); ++x)
-                //   std::cerr << (int)p[x] << " ";
-                // std::cerr << "\n";
-                if (debugRecv)
-                  inRecv = true;
-                ((recvFuncTy)state.h.func)(state.buf);
-                if (debugRecv)
-                  inRecv = false;
-                state.reset();
-              }
-              state.lock.unlock();
+            state.doRead();
+            //keep lock for recv, since it only blocks other threads from recieves from that host
+            recvFuncTy func;
+            RecvBuffer buf(0);
+            if (state.recvMessage(func, buf)) {
+              if (debugRecv)
+                inRecv = true;
+              func(buf);
+              if (debugRecv)
+                inRecv = false;
             }
           }
         }

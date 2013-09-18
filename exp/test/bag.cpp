@@ -31,7 +31,7 @@ struct PrintInt : public Galois::Runtime::Lockable {
 
   template<typename Context>
   void operator()(int i, Context& cnx) {
-    Galois::Runtime::LL::gPrint("i: ", i, " host: ", Galois::Runtime::networkHostID, "\n");
+    Galois::Runtime::LL::gPrint("i: ", i, " host: ", Galois::Runtime::NetworkInterface::ID, "\n");
     //    std::stringstream ss;
     //    ss << "i: " << i << " host: " << Galois::Runtime::Distributed::networkHostID << "\n";
     //    std::cout << ss.str();
@@ -47,7 +47,7 @@ int main(int argc, char** argv) {
   LonestarStart(argc, argv, nullptr, nullptr, nullptr);
 
   // check the host id and initialise the network
-  Galois::Runtime::networkStart();
+  Galois::Runtime::getSystemNetworkInterface().start();
 
   IntPtrs pBodies = Galois::Graph::Bag<int>::allocate();
   Galois::for_each<>(boost::counting_iterator<unsigned>(0), boost::counting_iterator<unsigned>(10), InsertBody(pBodies));
@@ -55,7 +55,7 @@ int main(int argc, char** argv) {
   Galois::for_each_local<>(pBodies,PrintInt());
 
   // master_terminate();
-  Galois::Runtime::networkTerminate();
+  Galois::Runtime::getSystemNetworkInterface().terminate();
 
   return 0;
 }

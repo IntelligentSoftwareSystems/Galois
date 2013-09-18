@@ -222,7 +222,7 @@ public:
 };
 
 
-  //Deserialize support
+//Deserialize support
 
 template<typename T>
 bool gDeserialize(DeSerializeBuffer& buf, T& data, typename std::enable_if<std::is_trivially_copyable<T>::value>::type* = 0) {
@@ -328,6 +328,13 @@ inline bool gSerialize(SerializeBuffer& buf, const DeSerializeBuffer& rbuf) {
   return true;
 }
 
+template<typename Iter, typename T>                                            
+Iter gDeserializeRaw(Iter iter, T& data, typename std::enable_if<std::is_trivially_copyable<T>::value>::type* = 0) {
+  unsigned char* pdata = (unsigned char*)&data;
+  for (size_t i = 0; i < sizeof(T); ++i)
+    pdata[i] = *iter++;
+  return iter;
+}
 
 } //Runtime
 } //Galois

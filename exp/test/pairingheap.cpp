@@ -108,12 +108,13 @@ void testParallel1() {
 }
 
 struct Process2 {
-  Galois::FCPairingHeap<int>& heap;
-  Process2(Galois::FCPairingHeap<int>& h) : heap(h) { }
+  Galois::FCPairingHeap<int>* heap;
+  Process2(Galois::FCPairingHeap<int>& h) : heap(&h) { }
+  Process2() = default;
 
   template<typename Context>
   void operator()(int& item, Context& ctx) {
-    heap.add(item);
+    heap->add(item);
   }
 };
 

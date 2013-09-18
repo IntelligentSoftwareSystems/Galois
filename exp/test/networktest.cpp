@@ -19,11 +19,11 @@ struct sayHi : public Galois::Runtime::Lockable {
 void landingPad(RecvBuffer& foo) {
   int val;
   gDeserialize(foo,val);
-  std::cout << "Landed on " << networkHostID << " from " << val << "\n";
+  std::cout << "Landed on " << NetworkInterface::ID << " from " << val << "\n";
   if (!didbcast) {
     didbcast = true;
     SendBuffer buf;
-    gSerialize(buf,(int) networkHostID);
+    gSerialize(buf,(int) NetworkInterface::ID);
     getSystemNetworkInterface().broadcast(&landingPad, buf);
   }
 }
@@ -42,9 +42,9 @@ void lp3(unsigned x, unsigned y) {
 int main(int argc, char** argv) {
   NetworkInterface& net = getSystemNetworkInterface();
   
-  std::cout << "testing " << networkHostID << " " << networkHostNum << "\n";
+  std::cout << "testing " << NetworkInterface::ID << " " << NetworkInterface::Num << "\n";
 
-  if (networkHostID == 0) {
+  if (NetworkInterface::ID == 0) {
     net.sendAlt(1, lp3, 4U, 5U);
     Galois::Runtime::PerHost<sayHi> p = Galois::Runtime::PerHost<sayHi>::allocate();
     p.remote(1).dump(std::cout);
@@ -53,11 +53,11 @@ int main(int argc, char** argv) {
 
   std::cout << "Begin loop classic\n";
 
-  if (networkHostID == 0) {
+  if (NetworkInterface::ID == 0) {
     Galois::Timer T;
     T.start();
     SendBuffer buf;
-    gSerialize(buf,(int) networkHostID);
+    gSerialize(buf,(int) NetworkInterface::ID);
     //net.broadcastMessage(&landingPad, buf);
     for (unsigned int i = 0; i < 1000000; ++i) {
       net.handleReceives();

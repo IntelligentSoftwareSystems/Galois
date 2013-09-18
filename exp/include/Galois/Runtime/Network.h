@@ -34,7 +34,6 @@
 
 namespace Galois {
 namespace Runtime {
-extern bool inDoAllDistributed;
 
 typedef SerializeBuffer SendBuffer;
 typedef DeSerializeBuffer RecvBuffer;
@@ -57,7 +56,7 @@ public:
   //!send a message to all hosts.  A message is simply a
   //!landing pad (recv) and some data (buf)
   //! buf is invalidated by this operation
-  virtual void broadcast(recvFuncTy recv, SendBuffer& buf, bool self = false);
+  void broadcast(recvFuncTy recv, SendBuffer& buf, bool self = false);
 
   //! send a message letting the network handle the serialization and deserialization
   //! slightly slower
@@ -74,19 +73,16 @@ public:
   //!it is only valid for that thread to call this function
   virtual bool handleReceives() = 0;
 
-  //! does this network layer need a dedicated thread?
-  //! if false, then any thread can call send or receive and work will get done.
-  //! if true, then only the master thread can process sends and receives
-  //! if true, handleReceives will process pending sends
-  virtual bool needsDedicatedThread() = 0;
-
   //! start a listen loop if not the lead process
+  //! FIXME: should this be split out?
   static void start();
 
   //! terminate all processes
+  //! FIXME: should this be split out?
   static void terminate();
 
   //! send a top level loop item (executed in the top level event loop)
+  //! FIXME: Why does this exist?
   static void sendLoop(uint32_t dest, recvFuncTy recv, SendBuffer& buf);
 };
 

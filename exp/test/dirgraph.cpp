@@ -50,7 +50,7 @@ int main(int argc, char** argv) {
   LonestarStart(argc, argv, nullptr, nullptr, nullptr);
 
   // check the host id and initialise the network
-  Galois::Runtime::networkStart();
+  getSystemNetworkInterface().start();
 
   G::pointer Gr = G::allocate();
 
@@ -85,7 +85,7 @@ int main(int argc, char** argv) {
   Galois::for_each_local(Gr,checking(Gr));
 
   // master_terminate();
-  Galois::Runtime::networkTerminate();
+  getSystemNetworkInterface().terminate();
 
   return 0;
 }

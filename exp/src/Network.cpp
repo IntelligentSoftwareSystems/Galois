@@ -96,7 +96,7 @@ static unsigned getRID(unsigned eID, unsigned srcID) {
 static void bcastLandingPad(Galois::Runtime::RecvBuffer& buf);
 
 //forward message along tree
-static void bcastForward(unsigned source, Galois::Runtime::RecvBuffer& buf) {
+static void bcastForward(Galois::Runtime::NetworkInterface& net, unsigned source, Galois::Runtime::RecvBuffer& buf) {
   static const int width = 2;
 
   unsigned eid = getEID(Galois::Runtime::NetworkInterface::ID, source);
@@ -106,7 +106,7 @@ static void bcastForward(unsigned source, Galois::Runtime::RecvBuffer& buf) {
     if (ndst < Galois::Runtime::NetworkInterface::Num) {
       Galois::Runtime::SendBuffer sbuf;
       Galois::Runtime::gSerialize(sbuf, source, buf);
-      Galois::Runtime::getSystemNetworkInterface().send(getRID(ndst, source), &bcastLandingPad, sbuf);
+      net.send(getRID(ndst, source), &bcastLandingPad, sbuf);
     }
   }
 }
@@ -116,7 +116,7 @@ static void bcastLandingPad(Galois::Runtime::RecvBuffer& buf) {
   unsigned source;
   Galois::Runtime::gDeserialize(buf, source);
   Galois::Runtime::trace_bcast_recv(source);
-  bcastForward(source, buf);
+  bcastForward(Galois::Runtime::getSystemNetworkInterface(), source, buf);
   //deliver locally
   Galois::Runtime::recvFuncTy recv;
   Galois::Runtime::gDeserialize(buf, recv);
@@ -128,7 +128,7 @@ void Galois::Runtime::NetworkInterface::broadcast(recvFuncTy recv, SendBuffer& b
   Galois::Runtime::trace_bcast_recv(source);
   buf.serialize_header((void*)recv);
   Galois::Runtime::RecvBuffer rbuf(std::move(buf));
-  bcastForward(source, rbuf);
+  bcastForward(*this, source, rbuf);
   if (self)
     recv(rbuf);
 }

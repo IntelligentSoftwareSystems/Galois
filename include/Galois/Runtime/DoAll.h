@@ -146,9 +146,9 @@ class DoAllWork {
 
   void doReduce(PrivateState& mytld) {
     if (needsReduce) {
-      if(!inDoAllDistributed) reduceLock.lock();
+      reduceLock.lock();
       RF(outputF, mytld.F);
-      if(!inDoAllDistributed) reduceLock.unlock();
+      reduceLock.unlock();
     }
   }
 
