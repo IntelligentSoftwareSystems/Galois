@@ -40,6 +40,7 @@ public:
 
   struct SendBlock {
     uint32_t dest, size;
+    SendBlock* next;
     unsigned char* data;
   };
 

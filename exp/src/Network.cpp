@@ -143,6 +143,7 @@ NetworkBackend::SendBlock* NetworkBackend::allocSendBlock() {
   SendBlock* retval = (SendBlock*)data;
   retval->size = 0;
   retval->dest = ~0;
+  retval->next = nullptr;
   retval->data = data + sizeof(SendBlock);
   return retval;
 }

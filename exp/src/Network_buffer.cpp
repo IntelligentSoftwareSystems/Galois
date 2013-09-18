@@ -41,11 +41,15 @@ class NetworkInterfaceBuffer : public NetworkInterface {
   };
 
   struct state {
-    Galois::Runtime::LL::SimpleLock<true> lock;
-    NetworkBackend::SendBlock* cur;
+    LL::SimpleLock<true> lock_out;
+    LL::SimpleLock<true> lock_in;
+    NetworkBackend::SendBlock* cur_out;
+    NetworkBackend::SendBlock* cur_in;
+    state() :cur_out(nullptr), cur_in(nullptr) {}
   };
 
   std::vector<state> states;
+  LL::SimpleLock<true> orderingLock;
 
   //returns number of unwritten bytes
   unsigned writeInternal(NetworkBackend::SendBlock* buf, char* data, unsigned len) {
@@ -56,21 +60,21 @@ class NetworkInterfaceBuffer : public NetworkInterface {
   }
     
   void writeBuffer(state& s, char* data, unsigned len) {
-    if (!s.cur)
-      s.cur = net.allocSendBlock();
+    if (!s.cur_out)
+      s.cur_out = net.allocSendBlock();
     do {
-      unsigned c = writeInternal(s.cur, data, len);
+      unsigned c = writeInternal(s.cur_out, data, len);
       data += c;
       len -= c;
       if (c) {
-        net.send(s.cur);
-        s.cur = net.allocSendBlock();
+        net.send(s.cur_out);
+        s.cur_out = net.allocSendBlock();
       }
     } while (len);
   }
 
   void sendInternal(state& s, recvFuncTy recv, SendBuffer& buf) {
-    std::lock_guard<LL::SimpleLock<true>> lg(s.lock);
+    std::lock_guard<LL::SimpleLock<true>> lg(s.lock_out);
     header h = {(uint32_t)buf.size(), (uintptr_t)recv};
     writeBuffer(s, (char*)&h, sizeof(header));
     writeBuffer(s, (char*)buf.linearData(), buf.size());
@@ -81,13 +85,32 @@ public:
   NetworkInterfaceBuffer()
     :net(getSystemNetworkBackend())
   {
+    states.resize(net.Num());
+    ID = net.ID();
+    Num = net.Num();
   }
 
   virtual void send(uint32_t dest, recvFuncTy recv, SendBuffer& buf) {
     sendInternal(states[dest], recv, buf);
   }
 
-  virtual bool handleReceives() { return false; }
+  virtual bool handleReceives() {
+    orderingLock.lock();
+    //empty network
+    NetworkBackend::SendBlock* b = net.recv();
+    while (b) {
+      //append
+      NetworkBackend::SendBlock** head = &states[b->dest].cur_in;
+      while (*head) head = &((*head)->next);
+      *head = b;
+      b = net.recv();
+    }
+    orderingLock.unlock();
+
+    //deliver messages
+
+    return false;
+  }
 
 };
 
