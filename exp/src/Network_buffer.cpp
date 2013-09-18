@@ -87,9 +87,15 @@ public:
     sendInternal(states[dest], recv, buf);
   }
 
-  virtual bool handleReceives() = 0;
+  virtual bool handleReceives() { return false; }
 
 };
 
 }
 
+#ifdef USE_BUF
+NetworkInterface& Galois::Runtime::getSystemNetworkInterface() {
+  static NetworkInterfaceBuffer net;
+  return net;
+}
+#endif

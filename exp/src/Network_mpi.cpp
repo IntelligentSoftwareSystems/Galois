@@ -255,11 +255,12 @@ public:
 
 }
 
-
+#ifdef USE_MPI
 NetworkInterface& Galois::Runtime::getSystemNetworkInterface() {
   static NetworkInterfaceAsyncMPI net;
   return net;
 }
+#endif
 
 NetworkBackend& Galois::Runtime::getSystemNetworkBackend() {
   static NetworkBackendMPI net;

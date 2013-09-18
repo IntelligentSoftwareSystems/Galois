@@ -329,10 +329,9 @@ public:
 
 }
 
-#if 1
+#ifdef USE_TCP
 NetworkInterface& Galois::Runtime::getSystemNetworkInterface() {
   static NetworkInterfaceTCP net;
   return net;
 }
 #endif
-
