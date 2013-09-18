@@ -55,7 +55,7 @@ IterTy safe_advance(IterTy b, IterTy e, Distance n) {
 }
 
 /**
- * Lie std::copy_n
+ * Like std::copy_n
  */
 template<class InputIterator, class Size, class OutputIterator>
 OutputIterator safe_copy_n (InputIterator first, InputIterator last, 

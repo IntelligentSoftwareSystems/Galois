@@ -189,9 +189,6 @@ class NetworkBackendMPI : public NetworkBackend {
   static const unsigned msgSize = 1024*4;
 
 public:
-  using NetworkBackend::ID;
-  using NetworkBackend::Num;
-
 
   NetworkBackendMPI() : NetworkBackend(msgSize) {
     int provided;
@@ -202,8 +199,8 @@ public:
     MPI_Comm_size(MPI_COMM_WORLD, &numTasks);
     MPI_Comm_rank(MPI_COMM_WORLD, &taskRank);
     
-    ID = taskRank;
-    Num = numTasks;
+    NetworkBackend::_ID  = taskRank;
+    NetworkBackend::_Num = numTasks;
     
     if (taskRank == 0) {
       //master

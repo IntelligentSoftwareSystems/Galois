@@ -33,8 +33,6 @@ using namespace Galois::Runtime;
 
 uint32_t NetworkInterface::ID = 0;
 uint32_t NetworkInterface::Num = 1;
-uint32_t NetworkBackend::ID = 0;
-uint32_t NetworkBackend::Num = 1;
 
 static bool ourexit = false;
 static std::deque<std::pair<recvFuncTy, RecvBuffer>> loopwork;
@@ -152,5 +150,7 @@ NetworkBackend::SendBlock* NetworkBackend::allocSendBlock() {
 void NetworkBackend::freeSendBlock(SendBlock* sb) {
   free(sb);
 }
+
+NetworkBackend::~NetworkBackend() {}
 
 NetworkBackend::NetworkBackend(unsigned size) :sz(size) {}

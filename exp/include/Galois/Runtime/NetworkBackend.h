@@ -31,19 +31,15 @@ namespace Runtime {
 
 class NetworkBackend {
 
-  unsigned sz;
-
 protected:
+  uint32_t sz, _ID, _Num;
   NetworkBackend(unsigned size);
 
 public:
-
-  static uint32_t ID;
-  static uint32_t Num;
+  virtual ~NetworkBackend();
 
   struct SendBlock {
-    uint32_t dest;
-    unsigned size;
+    uint32_t dest, size;
     unsigned char* data;
   };
 
@@ -57,9 +53,12 @@ public:
   //1 and must be returned to this class
   virtual SendBlock* recv() = 0;
 
-
   //! returns size used by network
-  unsigned size() const { return sz; }
+  uint32_t size() const { return sz; }
+
+  uint32_t ID() const { return _ID; }
+  uint32_t Num() const { return _Num; }
+
 };
 
 

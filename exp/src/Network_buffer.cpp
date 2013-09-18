@@ -22,6 +22,7 @@
  */
 
 #include "Galois/Runtime/Network.h"
+#include "Galois/Runtime/NetworkBackend.h"
 #include "Galois/Runtime/mm/Mem.h"
 #include "Galois/gstl.h"
 
@@ -32,8 +33,8 @@ namespace {
 
 class NetworkInterfaceBuffer : public NetworkInterface {
 
-  typedef std::pair<char*, unsigned> bufEntry;
-  
+  NetworkBackend& net;
+
   struct header {
     uint32_t size;
     uintptr_t func;
@@ -41,35 +42,29 @@ class NetworkInterfaceBuffer : public NetworkInterface {
 
   struct state {
     Galois::Runtime::LL::SimpleLock<true> lock;
-    std::deque<bufEntry> buffers;
+    NetworkBackend::SendBlock* cur;
   };
 
   std::vector<state> states;
-  MM::FixedSizeAllocator alloc;
-
-  unsigned sizeBuffer() const;
-  char* allocBuffer() { return (char*)alloc.allocate(sizeBuffer()); }
-  void freeBuffer(char* b) { alloc.deallocate(b); }
 
   //returns number of unwritten bytes
-  unsigned writeInternal(bufEntry& buf, char* data, unsigned len) {
-    auto eiter = safe_copy_n(data, data + len, buf.second,
-                             buf.first + (sizeBuffer() - buf.second));
-    unsigned copyLen = eiter - data;
-    buf.second -= copyLen;
+  unsigned writeInternal(NetworkBackend::SendBlock* buf, char* data, unsigned len) {
+    auto eiter = safe_copy_n(data, data + len, net.size() - buf->size, buf->data + buf->size);
+    unsigned copyLen = eiter - (buf->data + buf->size);
+    buf->size += copyLen;
     return len - copyLen;
   }
     
   void writeBuffer(state& s, char* data, unsigned len) {
-    if (s.buffers.empty())
-      s.buffers.push_back(std::make_pair(allocBuffer(), sizeBuffer()));
+    if (!s.cur)
+      s.cur = net.allocSendBlock();
     do {
-      bufEntry& b = s.buffers.back();
-      unsigned c = writeInternal(b, data, len);
+      unsigned c = writeInternal(s.cur, data, len);
       data += c;
       len -= c;
       if (c) {
-        s.buffers.push_back(std::make_pair(allocBuffer(), sizeBuffer()));
+        net.send(s.cur);
+        s.cur = net.allocSendBlock();
       }
     } while (len);
   }
@@ -82,6 +77,11 @@ class NetworkInterfaceBuffer : public NetworkInterface {
   }
 
 public:
+
+  NetworkInterfaceBuffer()
+    :net(getSystemNetworkBackend())
+  {
+  }
 
   virtual void send(uint32_t dest, recvFuncTy recv, SendBuffer& buf) {
     sendInternal(states[dest], recv, buf);
