@@ -28,6 +28,8 @@ set(USE_SUBVERSION_REVISION ON CACHE BOOL "Embed subversion numbers")
 ###### Configure (users don't need to go beyond here) ######
 enable_testing()
 
+message(STATUS "Using ${CMAKE_CXX_COMPILER_ID}")
+
 #ICC
 if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -wd68 -wd981 -wd383 -wd869 -wd2196 -wd279 -wd2504 -wd2943")
@@ -40,7 +42,6 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
   endif()
 endif()
 
-message(STATUS "Using ${CMAKE_CXX_COMPILER_ID}")
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
 #   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -isystem=/net/faraday/workspace/local/modules/gcc-4.7")
 endif()
@@ -100,7 +101,7 @@ find_package(Boost 1.36.0 COMPONENTS ${BOOST_LIBS} REQUIRED)
 include_directories(${Boost_INCLUDE_DIRS})
 
 if(USE_VTUNE)
-  find_package(VTUNE)
+  find_package(VTune)
   if (VTUNE_FOUND)
     add_definitions(-DGALOIS_USE_VTUNE)
     include_directories(${VTUNE_INCLUDE_DIRS})
