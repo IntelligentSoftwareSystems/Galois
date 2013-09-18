@@ -24,29 +24,46 @@
 #ifndef GALOIS_RUNTIME_NETWORKBACKEND_H
 #define GALOIS_RUNTIME_NETWORKBACKEND_H
 
+#include <cstdint>
+
 namespace Galois {
 namespace Runtime {
 
 class NetworkBackend {
+
+  unsigned sz;
 
 protected:
   NetworkBackend(unsigned size);
 
 public:
 
-  struct SendBlock;
+  static uint32_t ID;
+  static uint32_t Num;
+
+  struct SendBlock {
+    uint32_t dest;
+    unsigned size;
+    unsigned char* data;
+  };
 
   SendBlock* allocSendBlock();
   void freeSendBlock(SendBlock*);
 
   //! send a block.  data is now owned by the Backend
-  virtual bool send(SendBlock* data) = 0;
+  virtual void send(SendBlock* data) = 0;
   
   //! recieve a message, data is owned by the caller
   //1 and must be returned to this class
   virtual SendBlock* recv() = 0;
+
+
+  //! returns size used by network
+  unsigned size() const { return sz; }
 };
 
+
+NetworkBackend& getSystemNetworkBackend();
 
 }
 }

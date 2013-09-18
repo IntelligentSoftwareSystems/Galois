@@ -169,23 +169,6 @@ public:
 
 };
 
-}
-
-#if 0
-NetworkInterface& Galois::Runtime::getSystemNetworkInterface() {
-  static NetworkInterfaceAsyncMPI net;
-  return net;
-}
-#endif
-
-
-
-
-
-
-
-namespace {
-
 class NetworkBackendMPI : public NetworkBackend {
 
   LL::SimpleLock<true> lock;
@@ -242,11 +225,11 @@ public:
     MPI_Finalize();
   }
 
-  virtual bool send(SendBlock* data) {
+  virtual void send(SendBlock* data) {
     std::lock_guard<decltype(lock)> lg(lock);
     pending_sends.emplace_back(MPI_REQUEST_NULL, data);
     auto & com = pending_sends.back();
-    int rv = MPI_Isend(data.buf, data.size, MPI_BYTE, data.dest, FuncTag, MPI_COMM_WORLD, &com.first);
+    int rv = MPI_Isend(data->data, data->size, MPI_BYTE, data->dest, FuncTag, MPI_COMM_WORLD, &com.first);
     handleError(rv);
     update_pending_sends();
   }
@@ -261,15 +244,27 @@ public:
     rv = MPI_Iprobe(MPI_ANY_SOURCE, FuncTag, MPI_COMM_WORLD, &flag, &status);
     handleError(rv);
     if (flag) {
-      int count;
+      int count = 0;
       MPI_Get_count(&status, MPI_BYTE, &count);
       retval = allocSendBlock();
+      rv = MPI_Recv(retval->data, count, MPI_BYTE, MPI_ANY_SOURCE, FuncTag, MPI_COMM_WORLD, &status);
       retval->size = count;
-      tv = MPI_Recv(retval->buf, count, MPI_BYTE, MPI_ANY_SOURCE, FuncTag, MPI_COMM_WORLD, &status);
+      retval->dest = status.MPI_SOURCE;
       handleError(rv);
     }
     return retval;
   }
 };
 
+}
+
+
+NetworkInterface& Galois::Runtime::getSystemNetworkInterface() {
+  static NetworkInterfaceAsyncMPI net;
+  return net;
+}
+
+NetworkBackend& Galois::Runtime::getSystemNetworkBackend() {
+  static NetworkBackendMPI net;
+  return net;
 }

@@ -24,29 +24,35 @@
 #include "Galois/Runtime/Tracer.h"
 #include "Galois/Runtime/Barrier.h"
 #include "Galois/Runtime/Directory.h"
+#include "Galois/Runtime/Network.h"
+#include "Galois/Runtime/NetworkBackend.h"
 
 #include <cassert>
 
-uint32_t Galois::Runtime::NetworkInterface::ID = 0;
-uint32_t Galois::Runtime::NetworkInterface::Num = 1;
+using namespace Galois::Runtime;
+
+uint32_t NetworkInterface::ID = 0;
+uint32_t NetworkInterface::Num = 1;
+uint32_t NetworkBackend::ID = 0;
+uint32_t NetworkBackend::Num = 1;
 
 static bool ourexit = false;
-static std::deque<std::pair<Galois::Runtime::recvFuncTy, Galois::Runtime::RecvBuffer>> loopwork;
+static std::deque<std::pair<recvFuncTy, RecvBuffer>> loopwork;
 
 //!landing pad for worker hosts
 static void networkExit() {
-  assert(Galois::Runtime::NetworkInterface::Num > 1);
-  assert(Galois::Runtime::NetworkInterface::ID > 0);
+  assert(NetworkInterface::Num > 1);
+  assert(NetworkInterface::ID > 0);
   ourexit = true;
 }
 
-static void loop_pad(Galois::Runtime::RecvBuffer& b) {
+static void loop_pad(::RecvBuffer& b) {
   uintptr_t f;
   gDeserialize(b, f);
-  loopwork.push_back(std::make_pair((Galois::Runtime::recvFuncTy)f, b));
+  loopwork.push_back(std::make_pair((recvFuncTy)f, b));
 }
 
-void Galois::Runtime::NetworkInterface::start() {
+void NetworkInterface::start() {
   getSystemBarrier(); // initialize barrier before anyone might be at it
   getSystemNetworkInterface();
   getSystemDirectory();
@@ -63,7 +69,7 @@ void Galois::Runtime::NetworkInterface::start() {
   }
 }
 
-void Galois::Runtime::NetworkInterface::terminate() {
+void NetworkInterface::terminate() {
   //return if just one host is running
   if (NetworkInterface::Num == 1)
     return;
@@ -74,62 +80,77 @@ void Galois::Runtime::NetworkInterface::terminate() {
   return;
 }
 
-void Galois::Runtime::NetworkInterface::sendLoop(uint32_t dest, recvFuncTy recv, SendBuffer& buf) {
+void NetworkInterface::sendLoop(uint32_t dest, recvFuncTy recv, SendBuffer& buf) {
   buf.serialize_header((void*)recv);
-  Galois::Runtime::getSystemNetworkInterface().send(dest, &loop_pad, buf);
+  getSystemNetworkInterface().send(dest, &loop_pad, buf);
 }
 
 //anchor vtable
-Galois::Runtime::NetworkInterface::~NetworkInterface() {}
+NetworkInterface::~NetworkInterface() {}
 
 //RealID -> effective ID for the broadcast tree
 static unsigned getEID(unsigned realID, unsigned srcID) {
-  return (realID + Galois::Runtime::NetworkInterface::Num - srcID) % Galois::Runtime::NetworkInterface::Num;
+  return (realID + NetworkInterface::Num - srcID) % NetworkInterface::Num;
 }
 
 //Effective id in the broadcast tree -> realID
 static unsigned getRID(unsigned eID, unsigned srcID) {
-  return (eID + srcID) % Galois::Runtime::NetworkInterface::Num;
+  return (eID + srcID) % NetworkInterface::Num;
 }
 
 //forward decl
-static void bcastLandingPad(Galois::Runtime::RecvBuffer& buf);
+static void bcastLandingPad(::RecvBuffer& buf);
 
 //forward message along tree
-static void bcastForward(Galois::Runtime::NetworkInterface& net, unsigned source, Galois::Runtime::RecvBuffer& buf) {
+static void bcastForward(NetworkInterface& net, unsigned source, ::RecvBuffer& buf) {
   static const int width = 2;
 
-  unsigned eid = getEID(Galois::Runtime::NetworkInterface::ID, source);
+  unsigned eid = getEID(NetworkInterface::ID, source);
   
   for (int i = 0; i < width; ++i) {
     unsigned ndst = eid * width + i + 1;
-    if (ndst < Galois::Runtime::NetworkInterface::Num) {
-      Galois::Runtime::SendBuffer sbuf;
-      Galois::Runtime::gSerialize(sbuf, source, buf);
+    if (ndst < NetworkInterface::Num) {
+      SendBuffer sbuf;
+      gSerialize(sbuf, source, buf);
       net.send(getRID(ndst, source), &bcastLandingPad, sbuf);
     }
   }
 }
 
 //recieve broadcast message over the network
-static void bcastLandingPad(Galois::Runtime::RecvBuffer& buf) {
+static void bcastLandingPad(RecvBuffer& buf) {
   unsigned source;
-  Galois::Runtime::gDeserialize(buf, source);
-  Galois::Runtime::trace_bcast_recv(source);
-  bcastForward(Galois::Runtime::getSystemNetworkInterface(), source, buf);
+  gDeserialize(buf, source);
+  trace_bcast_recv(source);
+  bcastForward(getSystemNetworkInterface(), source, buf);
   //deliver locally
-  Galois::Runtime::recvFuncTy recv;
-  Galois::Runtime::gDeserialize(buf, recv);
+  recvFuncTy recv;
+  gDeserialize(buf, recv);
   recv(buf);
 }
 
-void Galois::Runtime::NetworkInterface::broadcast(recvFuncTy recv, SendBuffer& buf, bool self) {
-  unsigned source = Galois::Runtime::NetworkInterface::ID;
-  Galois::Runtime::trace_bcast_recv(source);
+void NetworkInterface::broadcast(recvFuncTy recv, SendBuffer& buf, bool self) {
+  unsigned source = NetworkInterface::ID;
+  trace_bcast_recv(source);
   buf.serialize_header((void*)recv);
-  Galois::Runtime::RecvBuffer rbuf(std::move(buf));
+  RecvBuffer rbuf(std::move(buf));
   bcastForward(*this, source, rbuf);
   if (self)
     recv(rbuf);
 }
 
+NetworkBackend::SendBlock* NetworkBackend::allocSendBlock() {
+  //FIXME: review for TBAA rules
+  unsigned char* data = (unsigned char*)malloc(sizeof(SendBlock) + size());
+  SendBlock* retval = (SendBlock*)data;
+  retval->size = 0;
+  retval->dest = ~0;
+  retval->data = data + sizeof(SendBlock);
+  return retval;
+}
+
+void NetworkBackend::freeSendBlock(SendBlock* sb) {
+  free(sb);
+}
+
+NetworkBackend::NetworkBackend(unsigned size) :sz(size) {}
