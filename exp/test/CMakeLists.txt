@@ -21,4 +21,4 @@ makeTest(pairingheap)
 makeTest(skiplist)
 makeTest(twoleveliteratora)
 makeTest(networkbe)
-
+makeTest(networkfe)
