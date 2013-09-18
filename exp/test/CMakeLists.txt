@@ -20,4 +20,5 @@ makeTest(bag)
 makeTest(pairingheap)
 makeTest(skiplist)
 makeTest(twoleveliteratora)
+makeTest(networkbe)
 
