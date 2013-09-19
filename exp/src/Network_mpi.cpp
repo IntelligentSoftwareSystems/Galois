@@ -181,8 +181,10 @@ class NetworkBackendMPI : public NetworkBackend {
       MPI_Status s;
       int rv = MPI_Test(&pending_sends.front().first, &flag, &s);
       handleError(rv);
-      if (flag)
+      if (flag) {
+        freeSendBlock(pending_sends.front().second);
         pending_sends.pop_front();
+      }
     }
   }
 

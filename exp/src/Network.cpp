@@ -137,6 +137,9 @@ void NetworkInterface::broadcast(recvFuncTy recv, SendBuffer& buf, bool self) {
     recv(rbuf);
 }
 
+void NetworkInterface::flush() {
+}
+
 NetworkBackend::SendBlock* NetworkBackend::allocSendBlock() {
   //FIXME: review for TBAA rules
   unsigned char* data = (unsigned char*)malloc(sizeof(SendBlock) + size());

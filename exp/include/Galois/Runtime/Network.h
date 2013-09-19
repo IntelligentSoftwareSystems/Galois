@@ -77,6 +77,8 @@ public:
   //!it is only valid for that thread to call this function
   virtual bool handleReceives() = 0;
 
+  virtual void flush();
+
   //! start a listen loop if not the lead process
   //! FIXME: should this be split out?
   static void start();
