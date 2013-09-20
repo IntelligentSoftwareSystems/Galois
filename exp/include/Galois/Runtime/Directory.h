@@ -300,9 +300,12 @@ Directory& getSystemDirectory();
 //! Make progress in the network
 inline void doNetworkWork() {
   if ((NetworkInterface::Num > 1)) {// && (LL::getTID() == 0)) {
-    while (getSystemNetworkInterface().handleReceives()) {}
+    auto& net = getSystemNetworkInterface();
+    net.flush();
+    while (net.handleReceives()) { net.flush(); }
     getSystemDirectory().makeProgress();
-    while (getSystemNetworkInterface().handleReceives()) {}
+    net.flush();
+    while (getSystemNetworkInterface().handleReceives()) { net.flush(); }
   }
 }
 

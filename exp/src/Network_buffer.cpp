@@ -189,7 +189,6 @@ public:
         s.cur = net.allocSendBlock();
       }
     }
-    std::cout << "Flushed\n";
   }
 
 };

@@ -195,6 +195,7 @@ void for_each_dist(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
     //send data
     net.sendLoop (i, &for_each_landing_pad<WLTy,ItemTy,FunctionTy>, buf);
   }
+  net.flush();
   net.handleReceives();
   //now get our data
   auto myblk = block_range(allData.begin(), allData.end(), 0, NetworkInterface::Num);
@@ -227,6 +228,7 @@ void for_each_local_dist(T& c, FunctionTy f, const char* loopname) {
     //send data
     net.sendLoop (i, &for_each_local_landing_pad<WLTy,T,FunctionTy>, buf);
   }
+  net.flush();
   net.handleReceives();
   //Start locally
   for_each_impl<WLTy>(Galois::Runtime::makeLocalRange(c), f, loopname);
@@ -283,6 +285,7 @@ void on_each_impl_dist(FunctionTy f, const char* loopname) {
     //send data
     net.sendLoop (i, &on_each_impl_landing_pad<FunctionTy>, buf);
   }
+  net.flush();
   net.handleReceives();
   //Start locally
   on_each_impl(f, loopname);
