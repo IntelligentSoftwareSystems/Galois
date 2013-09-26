@@ -10,27 +10,25 @@ module purge
 
 module load sl6
 module use /net/faraday/workspace/local/modules/modulefiles
-module load boost/1.52
 module load lapack
 module load vtune
-module load eigen
 
 if [ "$1" == "intel" ]; then
   module load intel
-  module load tbb
-
 else 
-  module load gcc/4.7.2-scale
+  module load gcc/4.8.1-scale
 fi
 
-# cmake apparently has a dependence on compiler
 module load cmake
+module load tbb
+module load boost
+module load eigen
 
 if [ "$1" != "min" ]; then
-  module load gdb/7.5
+  module load clang/3.3-noconflict
+  module load gdb
   module load mkl
   module load mpich2
-  module load llvm
 fi
 
 
