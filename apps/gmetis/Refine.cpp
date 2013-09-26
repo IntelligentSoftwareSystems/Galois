@@ -97,13 +97,15 @@ struct findBoundaryAndProject {
 template<bool balance>
 struct refine_BKL2 {
   unsigned meanSize;
+  unsigned minSize;
+  unsigned maxSize;
   GGraph& cg;
   GGraph* fg;
   std::vector<partInfo>& parts;
 
   typedef int tt_needs_per_iter_alloc;
 
-  refine_BKL2(unsigned ms, GGraph& _cg, GGraph* _fg, std::vector<partInfo>& _p) : meanSize(ms), cg(_cg), fg(_fg), parts(_p) {}
+  refine_BKL2(unsigned mis, unsigned mas, GGraph& _cg, GGraph* _fg, std::vector<partInfo>& _p) : minSize(mis), maxSize(mas), cg(_cg), fg(_fg), parts(_p) {}
 
   //Find the partition n is most connected to
   template<typename Context>
@@ -113,7 +115,7 @@ struct refine_BKL2 {
     for (auto ii = cg.edge_begin(n), ee = cg.edge_end(n); ii != ee; ++ii) {
       GNode neigh = cg.getEdgeDst(ii);
       auto& nd = cg.getData(neigh);
-      if (parts[nd.getPart()].partWeight < ( int)((double)meanSize*1.1)
+      if (parts[nd.getPart()].partWeight < maxSize
           || nd.getPart() == P)
         edges[nd.getPart()] += cg.getEdgeData(ii);
     }
@@ -143,7 +145,7 @@ struct refine_BKL2 {
     auto& nd = cg.getData(n);
     unsigned curpart = nd.getPart();
     unsigned newpart = balance ? pickPartitionMP(n, cnx) : pickPartitionEC(n, cnx);
-    if(parts[curpart].partWeight< meanSize/10 *9) return;
+    if(parts[curpart].partWeight < minSize) return;
     if (curpart != newpart) {
       nd.setPart(newpart);
       __sync_fetch_and_sub(&parts[curpart].partWeight, nd.getWeight());
@@ -166,7 +168,7 @@ struct refine_BKL2 {
     }
   }
 
-  static void go(unsigned ms, GGraph& cg, GGraph* fg,  std::vector<partInfo>& p) {
+  static void go(unsigned mins, unsigned maxs, GGraph& cg, GGraph* fg,  std::vector<partInfo>& p) {
     typedef Galois::WorkList::dChunkedFIFO<8> Chunk;
     typedef Galois::WorkList::OrderedByIntegerMetric<gainIndexer, Chunk, 10> pG;
     gainIndexer::g = &cg;
@@ -175,7 +177,13 @@ struct refine_BKL2 {
       Galois::do_all_local(cg, findBoundaryAndProject(boundary, cg, *fg), "boundary");
     else
       Galois::do_all_local(cg, findBoundary(boundary, cg), "boundary");
-    Galois::for_each_local<pG>(boundary, refine_BKL2(ms, cg, fg, p), "refine");
+    Galois::for_each_local<pG>(boundary, refine_BKL2(mins, maxs, cg, fg, p), "refine");
+    if (false) {
+      Galois::InsertBag<GNode> boundary;
+      Galois::do_all_local(cg, findBoundary(boundary, cg), "boundary");
+      Galois::for_each_local<pG>(boundary, refine_BKL2(mins, maxs, cg, fg, p), "refine");
+    }
+
   }
 };
 
@@ -414,33 +422,31 @@ void GraclusRefining(GGraph* graph, int nbParti, int nbIter)
 
 
 
-void refine(MetisGraph* coarseGraph, std::vector<partInfo>& parts, unsigned meanSize, refinementMode refM) {
-  switch (refM) {
-    case BKL2: std::cout<< "\n  Sarting refinnement with BKL2\n"; break;
-    case BKL: std::cout<< "\n  Sarting refinnement with BKL\n";  break;
-    case ROBO: std::cout<< "\n  Sarting refinnement with ROBO\n"; break;
-    case GRACLUS: std::cout<< "\n  Sarting refinnement with GRACLUS\n";; break;
-    default: abort();
-  }
+void refine(MetisGraph* coarseGraph, std::vector<partInfo>& parts, unsigned minSize, unsigned maxSize,
+            refinementMode refM, bool verbose) {
   MetisGraph* tGraph = coarseGraph;
   int nbIter=1;
-  while ((tGraph = tGraph->getFinerGraph()))nbIter*=2;
-  nbIter /=4;
+  if (refM == GRACLUS) {
+    while ((tGraph = tGraph->getFinerGraph())) nbIter*=2;
+    nbIter /=4;
+  }
   MetisGraph* oldGraph = NULL;
   do {
-
     MetisGraph* fineGraph = coarseGraph->getFinerGraph();
     bool doProject = true;
+    if (verbose) { 
+      std::cout << "Cut " << computeCut(*coarseGraph->getGraph()) << " Weights ";
+      printPartStats(parts);
+      std::cout << "\n";
+    }
     //refine nparts times
     switch (refM) {
-    case BKL2: refine_BKL2<false>::go(meanSize, *coarseGraph->getGraph(), fineGraph ? fineGraph->getGraph() : nullptr, parts); doProject = false; break;
+    case BKL2: refine_BKL2<false>::go(minSize, maxSize, *coarseGraph->getGraph(), fineGraph ? fineGraph->getGraph() : nullptr, parts); doProject = false; break;
     case BKL: refine_BKL(*coarseGraph->getGraph(), parts); break;
     case ROBO: refineOneByOne(*coarseGraph->getGraph(), parts); break;
     case GRACLUS: GraclusRefining(coarseGraph->getGraph(), parts.size(), nbIter);nbIter =(nbIter+1)/2;break;
     default: abort();
     }
-    //std::cout << "Refinement of " << coarseGraph->getGraph() << "\n";
-    //printPartStats(parts);
     //project up
     if (fineGraph && doProject) {
       projectPart::go(coarseGraph, parts);

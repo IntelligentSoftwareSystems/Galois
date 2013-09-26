@@ -184,18 +184,19 @@ std::ostream& operator<<(std::ostream& os, const partInfo& p);
 
 //Metrics
 void printPartStats(std::vector<partInfo>&);
-void graphStat(GGraph* graph);
+unsigned graphStat(GGraph* graph);
 std::vector<unsigned> edgeCut(GGraph& g, unsigned nparts);
 void printCuts(const char* str, MetisGraph* g, unsigned numPartitions);
+unsigned computeCut(GGraph& g);
 
 //Coarsening
-MetisGraph* coarsen(MetisGraph* fineMetisGraph, unsigned coarsenTo);
+MetisGraph* coarsen(MetisGraph* fineMetisGraph, unsigned coarsenTo, bool verbose);
 
 //Partitioning
 std::vector<partInfo> partition(MetisGraph* coarseMetisGraph, unsigned numPartitions, InitialPartMode partMode);
 std::vector<partInfo> BisectAll(MetisGraph* mcg, unsigned numPartitions, unsigned maxSize);
 //Refinement
-void refine(MetisGraph* coarseGraph, std::vector<partInfo>& parts, unsigned maxSize, refinementMode refM);
+void refine(MetisGraph* coarseGraph, std::vector<partInfo>& parts, unsigned minSize, unsigned maxSize, refinementMode refM, bool verbose);
 //void refinePart(GGraph& g, std::vector<partInfo>& parts, unsigned maxSize);
 //Balancing
 void balance(MetisGraph* Graph, std::vector<partInfo>& parts, unsigned maxSize);

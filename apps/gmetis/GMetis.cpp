@@ -54,31 +54,18 @@ static cll::opt<refinementMode> refineMode(cll::desc("Choose a refinement mode:"
       clEnumVal(BKL, "BKL"),
       clEnumVal(BKL2, "BKL2, default."),
       clEnumVal(ROBO, "ROBO"),
-     clEnumVal(GRACLUS, "GRACLUS"),
+      clEnumVal(GRACLUS, "GRACLUS"),
       clEnumValEnd), cll::init(BKL2));
 
 static cll::opt<bool> mtxInput("mtxinput", cll::desc("Use text mtx files instead binary based ones"), cll::init(false));
 static cll::opt<bool> weighted("weighted", cll::desc("weighted"), cll::init(false));
+static cll::opt<bool> verbose("verbose", cll::desc("verbose output (debugging mode, takes extra time)"), cll::init(false));
+static cll::opt<std::string> outfile("output", cll::desc("output file name"));
+
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<int> numPartitions(cll::Positional, cll::desc("<Number of partitions>"), cll::Required);
-
+static cll::opt<double> imbalance("balance", cll::desc("Fraction deviated from mean partition size"), cll::init(0.01));
 const double COARSEN_FRACTION = 0.9;
-
-
-int computeCut(GGraph& g) {
-  int cuts=0;
-  for (auto nn = g.begin(), en = g.end(); nn != en; ++nn) {
-    unsigned gPart = g.getData(*nn).getPart();
-    for (auto ii = g.edge_begin(*nn), ee = g.edge_end(*nn); ii != ee; ++ii) {
-      auto& m = g.getData(g.getEdgeDst(ii));
-      if (m.getPart() != gPart) 
-        cuts += g.getEdgeData(ii);
-    }
-  }
-  return cuts/2;
-}
-
-
 
 /**
  * KMetis Algorithm
@@ -88,42 +75,50 @@ void Partition(MetisGraph* metisGraph, unsigned nparts) {
   TM.start();
   unsigned meanWeight = ( (double)metisGraph->getTotalWeight()) / (double)nparts;
   //unsigned coarsenTo = std::max(metisGraph->getNumNodes() / (40 * intlog2(nparts)), 20 * (nparts));
-  unsigned coarsenTo = 100 * nparts;
+  unsigned coarsenTo = 20 * nparts;
 
-  std::cout << "\n  Starting coarsening: \n";
+  if (verbose) std::cout << "Starting coarsening: \n";
   Galois::StatTimer T("Coarsen");
   T.start();
-  MetisGraph* mcg = coarsen(metisGraph, coarsenTo);
+  MetisGraph* mcg = coarsen(metisGraph, coarsenTo, verbose);
   T.stop();
-  std::cout << "Time coarsen:  "<<T.get()<< " Size of final graph: " <<  mcg->getNumNodes()<<'\n';
+  if (verbose) std::cout << "Time coarsen: " << T.get() << "\n";
    
   Galois::StatTimer T2("Partition");
   T2.start();
   std::vector<partInfo> parts;
-  switch (partMode) {
-    case GGP:parts = partition(mcg, nparts, GGP); break;
-    case GGGP: parts = partition(mcg, nparts, GGGP); break;
-    case MGGGP: parts = BisectAll(mcg, nparts, meanWeight); break;
-    default: abort();
-  }
+  parts = partition(mcg, nparts, partMode);
   T2.stop();
 
-  //std::cout << "Init edge cut : " << computeCut(*mcg->getGraph()) << "\n\n";
+  if (verbose) std::cout << "Init edge cut : " << computeCut(*mcg->getGraph()) << "\n\n";
 
   std::vector<partInfo> initParts = parts;
   std::cout << "Time clustering:  "<<T2.get()<<'\n';
+
+  if (verbose)
+    switch (refineMode) {
+    case BKL2:    std::cout<< "Sarting refinnement with BKL2\n";    break;
+    case BKL:     std::cout<< "Sarting refinnement with BKL\n";     break;
+    case ROBO:    std::cout<< "Sarting refinnement with ROBO\n";    break;
+    case GRACLUS: std::cout<< "Sarting refinnement with GRACLUS\n"; break;
+    default: abort();
+    }
+
   Galois::StatTimer T3("Refine");
   T3.start();
-  refinementMode refM =refineMode;
-  refine(mcg, parts, meanWeight, refM);
+  refine(mcg, parts, 
+         meanWeight - (unsigned)(meanWeight * imbalance), 
+         meanWeight + (unsigned)(meanWeight * imbalance), 
+         refineMode, verbose);
   T3.stop();
+  if (verbose) std::cout << "Time refinement: " << T3.get() << "\n";
 
   TM.stop();
+
   std::cout << "Initial dist\n";
   printPartStats(initParts);
   std::cout << "Refined dist\n";
   printPartStats(parts);
-  std::cout << "Time refinement:  "<<T3.get()<<"\n\n";
 
   std::cout << "\nTime:  " << TM.get() << '\n';
   return;
@@ -154,57 +149,31 @@ int main(int argc, char** argv) {
 
   graph->structureFromFile(filename);
 
-  if (0)  {
-    std::ofstream dot("dump.dot");
-    graph->dump(dot);
-  }
-
   Galois::do_all_local(*graph, parallelInitMorphGraph(*graph));
 
-  unsigned numEdges = 0;
-  std::map<unsigned, unsigned> hist;
-  for (auto ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
-    unsigned val = std::distance(graph->edge_begin(*ii), graph->edge_end(*ii));
-    numEdges += val;
-    ++hist[val];
-  }
-
-  std::cout << "Nodes " << std::distance(graph->begin(), graph->end()) << "| Edges " << numEdges << std::endl;
- // for (auto pp = hist.begin(), ep = hist.end(); pp != ep; ++pp)
-  //std::cout << pp->first << " : " << pp->second << "\n";
+  graphStat(graph);
+  std::cout << "\n";
 
 //printGraphBeg(*graph);
 
   Galois::reportPageAlloc("MeminfoPre");
   Galois::preAlloc(Galois::Runtime::MM::numPageAllocTotal() * 5);
-
   Partition(&metisGraph, numPartitions);
-
-  std::cout << "Total edge cut : " << computeCut(*graph) << "\n\n";
   Galois::reportPageAlloc("MeminfoPost");
 
-  MetisGraph* coarseGraph = &metisGraph;
-  while (coarseGraph->getCoarserGraph())
-    coarseGraph = coarseGraph->getCoarserGraph();
-  std::ostringstream outfileName;
-  outfileName << filename << ".part"<< numPartitions;
-  std::ofstream outFile(outfileName.str().c_str());
+  std::cout << "Total edge cut: " << computeCut(*graph) << "\n";
 
-  /*for (auto nn = graph->begin(), en = graph->end(); nn != en; ++nn) {
-    unsigned gPart = graph->getData(*nn).getPart();
-    outFile<< gPart<< '\n';
-  }*/
-
-  for (auto it = graph->begin(), ie = graph->end(); it!=ie; it++)
-  {
-    unsigned gPart = graph->getData(*it).getPart();
-    outFile<< gPart<< '\n';
+  if (outfile != "") {   
+    MetisGraph* coarseGraph = &metisGraph;
+    while (coarseGraph->getCoarserGraph())
+      coarseGraph = coarseGraph->getCoarserGraph();
+    std::ofstream outFile(outfile.c_str());
+    for (auto it = graph->begin(), ie = graph->end(); it!=ie; it++)
+      {
+        unsigned gPart = graph->getData(*it).getPart();
+        outFile<< gPart<< '\n';
+      }
   }
-  std::cout<< "Part saved in : "<<  outfileName<< '\n';
-  
-  //printCuts("Initial", coarseGraph, numPartitions);
-  //printCuts("Final", &metisGraph, numPartitions);
-  
   return 0;
 }
 

@@ -28,18 +28,53 @@
 #include <iostream>
 #include <numeric>
 
-void graphStat(GGraph* graph) {
-  unsigned numEdges = 0;
-  std::map<unsigned, unsigned> hist;
+struct onlineStat {
+  unsigned num;
+  unsigned val;
+  double valSQ;
+  unsigned mmin;
+  unsigned mmax;
+
+  onlineStat() :num(0), val(0), valSQ(0), mmin(std::numeric_limits<unsigned>::max()), mmax(0) {}
+
+  void add(unsigned v) {
+    ++num;
+    val += v;
+    valSQ += (double)v*(double)v;
+    mmin = std::min(v, mmin);
+    mmax = std::max(v, mmax);
+  }
+
+  double mean() {
+    return (double)val / (double)num;
+  }
+
+  double variance() {
+    double t = valSQ / (double)num;
+    double m = mean();
+    return t - m*m;
+  }
+
+  unsigned count() { return num; }
+  unsigned total() { return val; }
+  unsigned min() { return mmin; }
+  unsigned max() { return mmax; }
+};
+    
+
+unsigned  graphStat(GGraph* graph) {
+  onlineStat e;
   for (auto ii = graph->begin(), ee = graph->end(); ii != ee; ++ii) {
     unsigned val = std::distance(graph->edge_begin(*ii), graph->edge_end(*ii));
-    numEdges += val;
-    ++hist[val];
+    e.add(val);
   }
- 
-  std::cout<<"Nodes "<<std::distance(graph->begin(), graph->end())<<"| Edges " << numEdges << std::endl;
- // for (auto pp = hist.begin(), ep = hist.end(); pp != ep; ++pp)
- //   std::cout << pp->first << " : " << pp->second << "\n";
+  std::cout << "Nodes " << e.count()
+            << " Edges(total, var, min, max) " 
+            << e.total() << " "
+            << e.variance() << " "
+            << e.min() << " "
+            << e.max();
+  return e.count();
 }
 
 std::vector<unsigned> edgeCut(GGraph& g, unsigned nparts) {
@@ -55,30 +90,29 @@ std::vector<unsigned> edgeCut(GGraph& g, unsigned nparts) {
       }
     }
   }
-
   return cuts;
 }
 
-void printPartStats(std::vector<partInfo>& parts) {
-  unsigned tW = 0;
-  for (unsigned x = 0; x < parts.size(); ++x) {
-    //std::cout << parts[x] << "\n";
-    tW += parts[x].partWeight;
+unsigned computeCut(GGraph& g) {
+  unsigned cuts=0;
+  for (auto nn = g.begin(), en = g.end(); nn != en; ++nn) {
+    unsigned gPart = g.getData(*nn).getPart();
+    for (auto ii = g.edge_begin(*nn), ee = g.edge_end(*nn); ii != ee; ++ii) {
+      auto& m = g.getData(g.getEdgeDst(ii));
+      if (m.getPart() != gPart) 
+        cuts += g.getEdgeData(ii);
+    }
   }
-  unsigned target = tW / parts.size();
-  //  std::cout << "Total Weight: " << tW << "\n";
-  //  std::cout << "Target Weight: " << target << "\n";
+  return cuts/2;
+}
 
-  std::map<double, unsigned> hist;
+
+void printPartStats(std::vector<partInfo>& parts) {
+  onlineStat e;
   for (unsigned x = 0; x < parts.size(); ++x) {
-    double pdiff = 10.0 * ((double)parts[x].partWeight - (double)target) / (double)target;
-    hist[round(pdiff)]++;
+    e.add(parts[x].partWeight);
   }
-  std::cout << "Size in decade percentages: ";
-  for(auto ii = hist.begin(), ee = hist.end(); ii != ee; ++ii)
-    std::cout << " " << ii->first << "," << ii->second;
-  std::cout << "\n";
-    
+  std::cout << "target " << e.total() / e.count() << " var " << e.variance() << " min " << e.min() << " max " << e.max();
 }
 
 std::ostream& operator<<(std::ostream& os, const partInfo& p) {
