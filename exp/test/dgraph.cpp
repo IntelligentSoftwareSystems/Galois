@@ -73,8 +73,6 @@ int main(int argc, char** argv) {
     if (!check(x, Gr, r))
       std::cout << "Mismatch " << x << " " << num - x << " " << r << "\n";
   std::cout << "\nDone Local Check\n";
-  volatile int brx = 1;
-  while (brx) {}
   Galois::for_each<>(boost::counting_iterator<unsigned>(0), boost::counting_iterator<unsigned>(num), op(Gr));
 
   std::cout << "\nDone Remote Check\n";

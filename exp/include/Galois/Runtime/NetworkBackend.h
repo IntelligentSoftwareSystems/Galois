@@ -24,25 +24,34 @@
 #ifndef GALOIS_RUNTIME_NETWORKBACKEND_H
 #define GALOIS_RUNTIME_NETWORKBACKEND_H
 
+#include "Galois/Runtime/ll/SimpleLock.h"
+
 #include <cstdint>
+
+#include <boost/intrusive/list.hpp>
 
 namespace Galois {
 namespace Runtime {
 
 class NetworkBackend {
+public:
+  struct SendBlock : public boost::intrusive::list_base_hook<> {
+    SendBlock(unsigned char* d) :dest(~0), size(0), data(d) {}
+    uint32_t dest, size;
+    unsigned char* data;
+  };
+
+  typedef boost::intrusive::list<SendBlock> BlockList;
 
 protected:
   uint32_t sz, _ID, _Num;
+  LL::SimpleLock<true> flLock;
+  BlockList freelist;
+
   NetworkBackend(unsigned size);
 
 public:
   virtual ~NetworkBackend();
-
-  struct SendBlock {
-    uint32_t dest, size;
-    SendBlock* next;
-    unsigned char* data;
-  };
 
   SendBlock* allocSendBlock();
   void freeSendBlock(SendBlock*);
@@ -53,6 +62,9 @@ public:
   //! recieve a message, data is owned by the caller
   //1 and must be returned to this class
   virtual SendBlock* recv() = 0;
+
+  //! make progress
+  virtual void flush(bool block = false) = 0;
 
   //! returns size used by network
   uint32_t size() const { return sz; }

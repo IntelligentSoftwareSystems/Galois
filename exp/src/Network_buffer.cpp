@@ -40,14 +40,13 @@ class NetworkInterfaceBuffer : public NetworkInterface {
 
   struct state_in {
     LL::SimpleLock<true> lock;
-    NetworkBackend::SendBlock* cur;
+    NetworkBackend::BlockList cur;
     unsigned offset;
-    state_in() :cur(nullptr), offset(0) {}
+    state_in() :offset(0) {}
   };
   struct state_out {
     LL::SimpleLock<true> lock;
-    NetworkBackend::SendBlock* cur;
-    state_out() :cur(nullptr) {}
+    NetworkBackend::BlockList cur;
   };
   struct state {
     state_in in;
@@ -59,14 +58,13 @@ class NetworkInterfaceBuffer : public NetworkInterface {
   LL::SimpleLock<true> orderingLock;
 
   void writeBuffer(state_out& s, char* data, unsigned len) {
-    if (!s.cur)
-      s.cur = net.allocSendBlock();
-    auto ptr = s.cur;
+    if (s.cur.empty())
+      s.cur.push_back(*net.allocSendBlock());
+    auto* ptr = &s.cur.back();
     while (len) {
-      while (ptr->size == net.size()) {
-        if (!ptr->next)
-          ptr->next = net.allocSendBlock();
-        ptr = ptr->next;
+      if (ptr->size == net.size()) {
+        s.cur.push_back(*net.allocSendBlock());
+        ptr = &s.cur.back();
       }
       unsigned toCopy = std::min(len, net.size() - ptr->size);
       std::copy_n(data, toCopy, ptr->data + ptr->size);
@@ -82,26 +80,26 @@ class NetworkInterfaceBuffer : public NetworkInterface {
     writeBuffer(s, (char*)&h, sizeof(header));
     writeBuffer(s, (char*)buf.linearData(), buf.size());
     //write out to network
-    while (s.cur && s.cur->size == net.size()) {
-      auto ptr = s.cur;
-      s.cur = ptr->next;
+    while (!s.cur.empty() && s.cur.front().size == net.size()) {
+      auto* ptr = &s.cur.front();
+      s.cur.pop_front();
       ptr->dest = dest;
       net.send(ptr);
     }
   }
 
 
-  //non advancing read form offset of len into data
+  //non-advancing read form offset of len into data
   void readBuffer(state_in& s, unsigned offset, char* data, unsigned len) {
-    auto ptr = s.cur;
+    auto iter = s.cur.begin();
     unsigned off = offset + s.offset;
     while (len) {
-      while (off >= ptr->size) { // may be in next block
-        off -= ptr->size;
-        ptr = ptr->next;
+      while (off >= iter->size) { // may be in next block
+        off -= iter->size;
+        ++iter;
       }
-      unsigned toCopy = std::min(len, ptr->size - off);
-      std::copy_n(ptr->data + off, toCopy, data);
+      unsigned toCopy = std::min(len, iter->size - off);
+      std::copy_n(iter->data + off, toCopy, data);
       data += toCopy;
       off += toCopy;
       len -= toCopy;
@@ -109,21 +107,17 @@ class NetworkInterfaceBuffer : public NetworkInterface {
   }
 
   unsigned readLen(state_in& s) {
-    unsigned sum = 0;
-    NetworkBackend::SendBlock* h = s.cur;
-    while (h) {
-      sum += h->size;
-      h = h->next;
-    }
+    unsigned sum = std::accumulate(s.cur.begin(), s.cur.end(), 0, 
+      [] (unsigned s, const NetworkBackend::SendBlock& r) { return r.size + s; });
     return sum - s.offset;
   }
 
   void advBuffer(state_in& s, unsigned len) {
     s.offset += len;
-    while (s.offset && s.offset >= s.cur->size) {
-      auto old = s.cur;
-      s.cur = old->next;
-      s.offset -= old->size;
+    while (s.offset && s.offset >= s.cur.front().size) {
+      s.offset -= s.cur.front().size;
+      NetworkBackend::SendBlock* old = &s.cur.front();
+      s.cur.pop_front();
       net.freeSendBlock(old);
     }
  }
@@ -146,9 +140,8 @@ class NetworkInterfaceBuffer : public NetworkInterface {
 public:
 
   NetworkInterfaceBuffer()
-    :net(getSystemNetworkBackend())
+    :net(getSystemNetworkBackend()), states(getSystemNetworkBackend().Num())
   {
-    states.resize(net.Num());
     ID = net.ID();
     Num = net.Num();
   }
@@ -165,9 +158,7 @@ public:
       while ((b = net.recv())) {
         //append
         std::lock_guard<LL::SimpleLock<true>> lg(states[b->dest].in.lock);
-        NetworkBackend::SendBlock** head = &states[b->dest].in.cur;
-        while (*head) head = &((*head)->next);
-        *head = b;
+        states[b->dest].in.cur.push_back(*b);
       }
     }
 
@@ -183,12 +174,14 @@ public:
     for (int i = 0; i < states.size(); ++i) {
       state_out& s = states[i].out;
       std::lock_guard<LL::SimpleLock<true>> lg(s.lock);
-      if (s.cur && s.cur->size) {
-        s.cur->dest = i;
-        net.send(s.cur);
-        s.cur = net.allocSendBlock();
+      if (!s.cur.empty() && s.cur.front().size) {
+        s.cur.front().dest = i;
+        net.send(&s.cur.front());
+        s.cur.pop_front();
+        s.cur.push_back(*net.allocSendBlock());
       }
     }
+    net.flush();
   }
 
 };

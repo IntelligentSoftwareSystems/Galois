@@ -169,24 +169,50 @@ public:
 
 };
 
+static const int numslots = 16;
 class NetworkBackendMPI : public NetworkBackend {
 
   LL::SimpleLock<true> lock;
-  std::deque<std::pair<MPI_Request, SendBlock*>> pending_sends;
+  std::pair<MPI_Request, SendBlock*> pending_sends[numslots];
+  int pending_start;
+  int pending_end;
+  BlockList waiting;
 
   //! requires lock be held
-  void update_pending_sends() {
+  //! clear completed requests from the queue
+  void clear_sends() {
     int flag = true;
-    while (flag && !pending_sends.empty()) {
+    while (pending_start != pending_end && flag) {
       MPI_Status s;
-      int rv = MPI_Test(&pending_sends.front().first, &flag, &s);
+      int rv = MPI_Test(&pending_sends[pending_start].first, &flag, &s);
       handleError(rv);
       if (flag) {
-        freeSendBlock(pending_sends.front().second);
-        pending_sends.pop_front();
+        freeSendBlock(pending_sends[pending_start].second);
+        pending_sends[pending_start].second = nullptr;
+        pending_start = (pending_start + 1) % numslots;
       }
     }
   }
+ 
+  //! requires lock be held
+  //! if slots allow, initialize more sends
+  void do_more_sends() {
+    while (!waiting.empty() && ((pending_end + 1) % numslots) != pending_start) {
+      auto& com = pending_sends[pending_end];
+      com.first = MPI_REQUEST_NULL;
+      com.second = &waiting.front();
+      waiting.pop_front();
+      pending_end = (pending_end + 1) % numslots;
+      int rv = MPI_Isend(com.second->data, com.second->size, MPI_BYTE, com.second->dest, FuncTag, MPI_COMM_WORLD, &com.first);
+      handleError(rv);
+    }
+  }
+
+    void update_pending_sends() {
+      clear_sends();
+      do_more_sends();
+      clear_sends();
+    }
 
   static const unsigned msgSize = 1024*4;
 
@@ -226,10 +252,7 @@ public:
 
   virtual void send(SendBlock* data) {
     std::lock_guard<decltype(lock)> lg(lock);
-    pending_sends.emplace_back(MPI_REQUEST_NULL, data);
-    auto & com = pending_sends.back();
-    int rv = MPI_Isend(data->data, data->size, MPI_BYTE, data->dest, FuncTag, MPI_COMM_WORLD, &com.first);
-    handleError(rv);
+    waiting.push_back(*data);
     update_pending_sends();
   }
 
@@ -253,6 +276,17 @@ public:
     }
     return retval;
   }
+
+  virtual void flush(bool block) {
+    bool cont = true;
+    do {
+      std::lock_guard<decltype(lock)> lg(lock);
+      update_pending_sends();
+      cont = !waiting.empty();
+      //This order let's us release the lock for a moment
+    } while (block && cont);
+  }
+
 };
 
 }
