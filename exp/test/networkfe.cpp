@@ -5,11 +5,15 @@
 
 using namespace Galois::Runtime;
 
+unsigned count = 0;
+
 void testFunc(uint32_t src) {
   std::cout << "Called at " << getSystemNetworkInterface().ID << " by " << src << "\n";
+  ++count;
 }
 void testFunc2(uint32_t src, uint32_t x) {
   std::cout << "Called at " << getSystemNetworkInterface().ID << " by " << src << " with " << x << "\n";
+  ++count;
 }
 
 int main(int argc, char** argv) {
@@ -26,7 +30,7 @@ int main(int argc, char** argv) {
 
   do {
     net.handleReceives();
-  } while (true);
+  } while (count < net.Num * 2 - 2);
 
   return 0;
 }

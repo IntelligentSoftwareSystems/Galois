@@ -175,9 +175,10 @@ public:
       state_out& s = states[i].out;
       std::lock_guard<LL::SimpleLock<true>> lg(s.lock);
       if (!s.cur.empty() && s.cur.front().size) {
-        s.cur.front().dest = i;
-        net.send(&s.cur.front());
+        auto* pkt = &s.cur.front();
         s.cur.pop_front();
+        pkt->dest = i;
+        net.send(pkt);
         s.cur.push_back(*net.allocSendBlock());
       }
     }
