@@ -60,7 +60,7 @@ static const char* desc =
 static const char* url = "breadth_first_search";
 
 //****** Command Line Options ******
-enum class Algo {
+enum Algo {
   async,
   barrier,
   barrierWithCas,
@@ -75,7 +75,7 @@ enum class Algo {
   serial
 };
 
-enum class DetAlgo {
+enum DetAlgo {
   none,
   base,
   disjoint
@@ -85,6 +85,8 @@ namespace cll = llvm::cl;
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input graph>"), cll::Required);
 static cll::opt<std::string> transposeGraphName("graphTranspose", cll::desc("Transpose of input graph"));
 static cll::opt<bool> symmetricGraph("symmetricGraph", cll::desc("Input graph is symmetric"));
+static cll::opt<bool> useDetBase("detBase", cll::desc("Deterministic"));
+static cll::opt<bool> useDetDisjoint("detDisjoint", cll::desc("Deterministic with disjoint optimization"));
 static cll::opt<unsigned int> startNode("startNode", cll::desc("Node to start search from"), cll::init(0));
 static cll::opt<unsigned int> reportNode("reportNode", cll::desc("Node to report distance to"), cll::init(1));
 static cll::opt<unsigned int> memoryLimit("memoryLimit",
@@ -94,8 +96,8 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
       clEnumValN(Algo::async, "async", "Asynchronous"),
       clEnumValN(Algo::barrier, "barrier", "Parallel optimized with barrier (default)"),
       clEnumValN(Algo::barrierWithCas, "barrierWithCas", "Use compare-and-swap to update nodes"),
-      clEnumValN(Algo::deterministic, "deterministic", "Deterministic"),
-      clEnumValN(Algo::deterministicDisjoint, "deterministicDisjoint", "Deterministic with disjoint optimization"),
+      clEnumValN(Algo::deterministic, "detBase", "Deterministic"),
+      clEnumValN(Algo::deterministicDisjoint, "detDisjoint", "Deterministic with disjoint optimization"),
       clEnumValN(Algo::graphlab, "graphlab", "Use GraphLab programming model"),
       clEnumValN(Algo::highCentrality, "highCentrality", "Optimization for graphs with many shortest paths"),
       clEnumValN(Algo::hybrid, "hybrid", "Hybrid of barrier and high centrality algorithms"),
@@ -242,7 +244,8 @@ void readInOutGraph(Graph& graph) {
 
 //! Serial BFS using optimized flags based off asynchronous algo
 struct SerialAlgo {
-  typedef Galois::Graph::LC_CSR_Graph<SNode,void>::with_no_lockable<true> Graph;
+  typedef Galois::Graph::LC_CSR_Graph<SNode,void>
+    ::with_no_lockable<true>::type Graph;
   typedef Graph::GraphNode GNode;
 
   std::string name() const { return "Serial"; }
@@ -277,7 +280,9 @@ struct SerialAlgo {
 
 //! Galois BFS using optimized flags
 struct AsyncAlgo {
-  typedef Galois::Graph::LC_CSR_Graph<SNode,void>::with_no_lockable<true>::with_numa_alloc<true> Graph;
+  typedef Galois::Graph::LC_CSR_Graph<SNode,void>
+    ::with_no_lockable<true>::type
+    ::with_numa_alloc<true>::type Graph;
   typedef Graph::GraphNode GNode;
 
   std::string name() const { return "Asynchronous"; }
@@ -337,8 +342,8 @@ struct AsyncAlgo {
 template<bool UseGraphChi>
 struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
   typedef typename Galois::Graph::LC_CSR_Graph<SNode,void>
-    ::template with_no_lockable<true> 
-    ::template with_numa_alloc<true> InnerGraph;
+    ::template with_no_lockable<true>::type
+    ::template with_numa_alloc<true>::type InnerGraph;
   typedef typename boost::mpl::if_c<UseGraphChi,
           Galois::Graph::OCImmutableEdgeGraph<SNode,void>,
           Galois::Graph::LC_InOut_Graph<InnerGraph>>::type
@@ -396,8 +401,8 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
 
 struct GraphLabAlgo {
   typedef typename Galois::Graph::LC_CSR_Graph<SNode,void>
-    ::with_no_lockable<true> 
-    ::with_numa_alloc<true> InnerGraph;
+    ::with_no_lockable<true>::type
+    ::with_numa_alloc<true>::type InnerGraph;
   typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
 
@@ -475,9 +480,9 @@ struct GraphLabAlgo {
  * search. In Supercomputing. 2012.
  */
 struct HighCentralityAlgo {
-  typedef typename Galois::Graph::LC_CSR_Graph<SNode,void>
-    ::with_no_lockable<true> 
-    ::with_numa_alloc<true> InnerGraph;
+  typedef Galois::Graph::LC_CSR_Graph<SNode,void>
+    ::with_no_lockable<true>::type 
+    ::with_numa_alloc<true>::type InnerGraph;
   typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
   
@@ -607,8 +612,8 @@ struct HighCentralityAlgo {
 template<typename WL, bool useCas>
 struct BarrierAlgo {
   typedef Galois::Graph::LC_CSR_Graph<SNode,void>
-    ::template with_numa_alloc<true>
-    ::template with_no_lockable<true> 
+    ::template with_numa_alloc<true>::type
+    ::template with_no_lockable<true>::type
     Graph;
   typedef Graph::GraphNode GNode;
   typedef std::pair<GNode,Dist> WorkItem;
@@ -662,9 +667,9 @@ struct HybridAlgo: public HybridBFS<SNode,Dist> {
 
 template<DetAlgo Version>
 struct DeterministicAlgo {
-  typedef Galois::Graph::LC_CSR_Graph<SNode,void>::template with_numa_alloc<true> Graph;
+  typedef Galois::Graph::LC_CSR_Graph<SNode,void>
+    ::template with_numa_alloc<true>::type Graph;
   typedef Graph::GraphNode GNode;
-
 
   std::string name() const { return "Deterministic"; }
   void readGraph(Graph& graph) { Galois::Graph::readGraph(graph, filename); }
@@ -680,7 +685,8 @@ struct DeterministicAlgo {
     Process(Graph& g): graph(g) { }
 
     struct LocalState {
-      typedef std::deque<GNode,Galois::PerIterAllocTy> Pending;
+      typedef typename Galois::PerIterAllocTy::rebind<GNode>::other Alloc;
+      typedef std::deque<GNode,Alloc> Pending;
       Pending pending;
       LocalState(Process& self, Galois::PerIterAllocTy& alloc): pending(alloc) { }
     };
@@ -823,6 +829,10 @@ int main(int argc, char **argv) {
 #else
   typedef BSWL BSInline;
 #endif
+  if (useDetDisjoint)
+    algo = Algo::deterministicDisjoint;
+  else if (useDetBase)
+    algo = Algo::deterministic;
 
   Galois::StatTimer T("TotalTime");
   T.start();

@@ -24,6 +24,7 @@
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
+#include "Galois/config.h"
 #include "Galois/Galois.h"
 #include "Galois/Bag.h"
 #include "Galois/Accumulator.h"
@@ -42,8 +43,7 @@
 
 #include "HybridBFS.h"
 
-#include <boost/random/mersenne_twister.hpp>
-#include <boost/random/uniform_01.hpp>
+#include GALOIS_CXX11_STD_HEADER(random)
 #include <deque>
 #include <string>
 #include <limits>
@@ -54,7 +54,7 @@ static const char* desc = "Estimates the diameter of a graph";
 static const char* url = 0;
 
 //****** Command Line Options ******
-enum class Algo {
+enum Algo {
   graphlab,
   ligra,
   ligraChi,
@@ -93,7 +93,7 @@ struct min_degree {
   Graph& graph;
   min_degree(Graph& g): graph(g) { }
 
-  boost::optional<GNode> operator()(const boost::optional<GNode>& a, const boost::optional<GNode>& b) const {
+  Galois::optional<GNode> operator()(const Galois::optional<GNode>& a, const Galois::optional<GNode>& b) const {
     if (!a) return b;
     if (!b) return a;
     if (std::distance(graph.edge_begin(*a), graph.edge_end(*a))
@@ -137,10 +137,10 @@ struct has_dist {
   Graph& graph;
   Dist dist;
   has_dist(Graph& g, Dist d): graph(g), dist(d) { }
-  boost::optional<GNode> operator()(const GNode& a) const {
+  Galois::optional<GNode> operator()(const GNode& a) const {
     if (graph.getData(a).dist == dist)
-      return boost::optional<GNode>(a);
-    return boost::optional<GNode>();
+      return Galois::optional<GNode>(a);
+    return Galois::optional<GNode>();
   }
 };
 
@@ -230,7 +230,7 @@ struct SimpleAlgo {
     size_t ecc = counts.size() - 1;
     //size_t maxWidth = *std::max_element(counts.begin(), counts.end());
     GNode candidate = *Galois::ParallelSTL::map_reduce(graph.begin(), graph.end(),
-        has_dist<Graph>(graph, ecc), boost::optional<GNode>(), min_degree<Graph>(graph));
+        has_dist<Graph>(graph, ecc), Galois::optional<GNode>(), min_degree<Graph>(graph));
     resetGraph<SimpleAlgo>(graph);
     return Result(ecc, candidate);
   }
@@ -364,7 +364,7 @@ struct PickKAlgo {
   }
 
   size_t operator()(Graph& graph, GNode source) {
-    boost::optional<size_t> terminal;
+    Galois::optional<size_t> terminal;
 
     Result v = search(graph, source, ~0, true);
 
@@ -384,11 +384,11 @@ struct PickKAlgo {
           continue;
         } else if (u.ecc > v.ecc) {
           v = u;
-          terminal = boost::optional<size_t>();
+          terminal = Galois::optional<size_t>();
           break;
         } else if (u.maxWidth < last) {
           last = u.maxWidth;
-          terminal = boost::optional<size_t>(u.ecc);
+          terminal = Galois::optional<size_t>(u.ecc);
         }
       }
 
@@ -429,8 +429,8 @@ struct GraphLabAlgo {
   };
 
   typedef typename Galois::Graph::LC_CSR_Graph<LNode,void>
-    ::template with_no_lockable<true> 
-    ::template with_numa_alloc<true> InnerGraph;
+    ::template with_no_lockable<true>::type
+    ::template with_numa_alloc<true>::type InnerGraph;
   typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
   typedef typename Graph::GraphNode GNode;
 
@@ -438,14 +438,18 @@ struct GraphLabAlgo {
 
   struct Initialize {
     Graph& graph;
-    boost::optional<boost::random::mt19937> gen;
-    boost::random::uniform_01<float> dist;
+    Galois::optional<std::mt19937> gen;
+#if __cplusplus >= 201103L || defined(HAVE_CXX11_UNIFORM_REAL_DISTRIBUTION)
+    std::uniform_real_distribution<float> dist;
+#else
+    std::uniform_real<float> dist;
+#endif
 
     Initialize(Graph& g): graph(g) { }
 
     size_t hash_value() {
       if (!gen) {
-        gen = boost::random::mt19937();
+        gen = std::mt19937();
         gen->seed(Galois::Runtime::LL::getTID());
       }
       size_t ret = 0;
@@ -620,8 +624,8 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi>  {
   };
 
   typedef typename Galois::Graph::LC_CSR_Graph<LNode,void>
-    ::template with_no_lockable<true> 
-    ::template with_numa_alloc<true> InnerGraph;
+    ::template with_no_lockable<true>::type
+    ::template with_numa_alloc<true>::type InnerGraph;
   typedef typename boost::mpl::if_c<UseGraphChi,
           Galois::Graph::OCImmutableEdgeGraph<LNode,void>,
           Galois::Graph::LC_InOut_Graph<InnerGraph> >::type

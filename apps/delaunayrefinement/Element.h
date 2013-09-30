@@ -25,6 +25,8 @@
 #ifndef _ELEMENT_H
 #define _ELEMENT_H
 
+#include "Galois/Runtime/ll/gio.h"
+
 #include <cassert>
 #include <stdlib.h>
 
@@ -196,8 +198,8 @@ public:
       else if (i == 2)
 	return Edge(coords[2], coords[0]);
     }
-    assert(0 && "unknown edge");
-    abort();
+    GALOIS_DIE("unknown edge");
+    return Edge(coords[0], coords[0]);
   }
 
   Edge getOppositeObtuse() const {
@@ -211,8 +213,8 @@ public:
     case 3:
       return getEdge(0);
     }
-    assert(0 && "no obtuse edge");
-    abort();
+    GALOIS_DIE("no obtuse edge");
+    return getEdge(0);
   }
 
   //! Should the node be processed?

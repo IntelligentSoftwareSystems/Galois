@@ -28,9 +28,9 @@
 
 #include "Element.h"
 
+#include "Galois/optional.h"
 #include "Galois/Graph/Graph.h"
 
-#include <boost/optional.hpp>
 #include <vector>
 #include <deque>
 
@@ -41,10 +41,11 @@ typedef Graph::GraphNode GNode;
 template<typename Alloc=std::allocator<char> >
 struct Searcher: private boost::noncopyable {
   typedef Alloc allocator_type;
-  typedef std::vector<GNode, Alloc> GNodeVector;
+  typedef typename Alloc::template rebind<GNode>::other GNodeVectorAlloc;
+  typedef std::vector<GNode, GNodeVectorAlloc> GNodeVector;
 
   struct Marker {
-    std::vector<GNode,Alloc> seen;
+    GNodeVector seen;
     Marker(Graph&, const Alloc& a): seen(a) { }
     void mark(GNode n) { 
       seen.push_back(n);
@@ -88,10 +89,11 @@ struct Searcher: private boost::noncopyable {
 
   template<typename Pred>
   void find_(const GNode& start, const Pred& pred, bool all) {
-    typedef boost::optional<GNode> SomeGNode;
-    typedef std::deque<std::pair<GNode,SomeGNode>, Alloc> WorklistTy;
+    typedef Galois::optional<GNode> SomeGNode;
+    typedef typename Alloc::template rebind<std::pair<GNode,SomeGNode>>::other WorklistAlloc;
+    typedef std::deque<std::pair<GNode,SomeGNode>, WorklistAlloc> Worklist;
 
-    WorklistTy wl(alloc);
+    Worklist wl(alloc);
     wl.push_back(std::make_pair(start, SomeGNode()));
 
     Marker marker(graph, alloc);

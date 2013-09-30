@@ -66,7 +66,7 @@ static Galois::Graph::SpatialTree2d<Point*> tree;
 //! Our main functor
 struct Process {
   typedef int tt_needs_per_iter_alloc;
-  typedef int tt_does_not_need_parallel_push;
+  typedef int tt_does_not_need_push;
   typedef Galois::PerIterAllocTy Alloc;
 
   struct ContainsTuple {
@@ -99,7 +99,7 @@ struct Process {
     Tuple origin = p->t() - center;
 //        double length2 = origin.x() * origin.x() + origin.y() * origin.y();
     bestP1 = bestP2 = NULL;
-    double bestVal;
+    double bestVal = 0.0;
     for (int i = 0; i < 3; ++i) {
       int next = i + 1;
       if (next > 2) next -= 3;
@@ -132,7 +132,8 @@ struct Process {
         }
       }
     }
-    abort();
+    GALOIS_DIE("unreachable");
+    return start;
   }
 
   bool planarSearch(const Point* p, GNode start, GNode& node) {
@@ -169,7 +170,7 @@ struct Process {
 
     // Not in mesh yet
     if (!someNode) {
-      abort();
+      GALOIS_DIE("unreachable");
       return false;
     }
 
@@ -188,8 +189,7 @@ struct Process {
       // a semi-consistent state
       // ctx.push(p);
       // Current version is safe with locking so this shouldn't happen
-      std::cerr << "Should not happen\n";
-      abort();
+      GALOIS_DIE("unreachable");
       return;
     }
   
@@ -293,8 +293,7 @@ public:
   void from(const std::string& name) {
     std::ifstream scanner(name.c_str());
     if (!scanner.good()) {
-      std::cerr << "Couldn't open file: " << name << "\n";
-      abort();
+      GALOIS_DIE("Could not open file: ", name);
     }
     if (name.find(".node") == name.size() - 5) {
       fromTriangle(scanner);
@@ -306,8 +305,7 @@ public:
     if (points.size())
       addBoundaryPoints();
     else {
-      std::cerr << "No points found in file: " << name << "\n";
-      abort();
+      GALOIS_DIE("No points found in file: ", name);
     }
   }
 };
@@ -505,9 +503,7 @@ int main(int argc, char** argv) {
   if (!skipVerify) {
     Verifier verifier;
     if (!verifier.verify(&graph)) {
-      std::cerr << "Triangulation failed.\n";
-      assert(0 && "Triangulation failed");
-      abort();
+      GALOIS_DIE("Triangulation failed");
     }
     std::cout << "Triangulation OK\n";
   }

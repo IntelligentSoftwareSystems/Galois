@@ -52,7 +52,7 @@ const char* name = "Connected Components";
 const char* desc = "Computes the connected components of a graph";
 const char* url = 0;
 
-enum class Algo {
+enum Algo {
   async,
   asyncOc,
   graphchi,
@@ -61,10 +61,10 @@ enum class Algo {
   ligra,
   ligraChi,
   serial,
-  sync
+  synchronous
 };
 
-enum class WriteType {
+enum WriteType {
   none,
   largest
 };
@@ -91,7 +91,7 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
       clEnumValN(Algo::ligraChi, "ligraChi", "Using Ligra and GraphChi programming model"),
       clEnumValN(Algo::ligra, "ligra", "Using Ligra programming model"),
       clEnumValN(Algo::serial, "serial", "Serial"),
-      clEnumValN(Algo::sync, "sync", "Synchronous"),
+      clEnumValN(Algo::synchronous, "sync", "Synchronous"),
       clEnumValEnd), cll::init(Algo::async));
 
 struct Node: public Galois::UnionFindNode<Node> {
@@ -117,7 +117,8 @@ void readInOutGraph(Graph& graph) {
  * Serial connected components algorithm. Just use union-find.
  */
 struct SerialAlgo {
-  typedef Galois::Graph::LC_CSR_Graph<Node,void>::with_no_lockable<true> Graph;
+  typedef Galois::Graph::LC_CSR_Graph<Node,void>
+    ::with_no_lockable<true>::type Graph;
   typedef Graph::GraphNode GNode;
 
   void readGraph(Graph& graph) { Galois::Graph::readGraph(graph, inputFilename); }
@@ -153,7 +154,9 @@ struct SerialAlgo {
  * component.
  */
 struct SynchronousAlgo {
-  typedef Galois::Graph::LC_CSR_Graph<Node,void>::with_no_lockable<true>::with_numa_alloc<true> Graph;
+  typedef Galois::Graph::LC_CSR_Graph<Node,void>
+    ::with_no_lockable<true>::type
+    ::with_numa_alloc<true>::type Graph;
   typedef Graph::GraphNode GNode;
 
   void readGraph(Graph& graph) { Galois::Graph::readGraph(graph, inputFilename); }
@@ -202,7 +205,7 @@ struct SynchronousAlgo {
 
   struct Find {
     typedef int tt_does_not_need_aborts;
-    typedef int tt_does_not_need_parallel_push;
+    typedef int tt_does_not_need_push;
     typedef int tt_does_not_need_stats;
 
     Graph& graph;
@@ -265,8 +268,8 @@ struct LabelPropAlgo {
   };
 
   typedef Galois::Graph::LC_CSR_Graph<LNode,void>
-    ::with_no_lockable<true> 
-    ::with_numa_alloc<true> InnerGraph;
+    ::with_no_lockable<true>::type
+    ::with_numa_alloc<true>::type InnerGraph;
   typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
   typedef LNode::component_type component_type;
@@ -310,17 +313,29 @@ struct LabelPropAlgo {
       }
     }
 
+    struct BackwardUpdate {
+      Graph& graph;
+      BackwardUpdate(Graph& g): graph(g) { }
+      GNode operator()(typename Graph::in_edge_iterator ii) { return graph.getInEdgeDst(ii); }
+    };
+
+    struct ForwardUpdate {
+      Graph& graph;
+      ForwardUpdate(Graph& g): graph(g) { }
+      GNode operator()(typename Graph::edge_iterator ii) { return graph.getEdgeDst(ii); }
+    };
+
     //! Add the next edge between components to the worklist
     void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) {
       LNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
       
       if (Backward) {
         update(sdata, graph.in_edge_begin(src, Galois::MethodFlag::NONE), graph.in_edge_end(src, Galois::MethodFlag::NONE),
-            [&](typename Graph::in_edge_iterator ii) { return graph.getInEdgeDst(ii); }, ctx);
+            BackwardUpdate(graph), ctx);
       } 
       if (Forward) {
         update(sdata, graph.edge_begin(src, Galois::MethodFlag::NONE), graph.edge_end(src, Galois::MethodFlag::NONE),
-            [&](typename Graph::edge_iterator ii) { return graph.getEdgeDst(ii); }, ctx);
+            ForwardUpdate(graph), ctx);
       }
     }
   };
@@ -351,8 +366,8 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi>  {
   };
 
   typedef typename Galois::Graph::LC_CSR_Graph<LNode,void>
-    ::template with_no_lockable<true> 
-    ::template with_numa_alloc<true> InnerGraph;
+    ::template with_no_lockable<true>::type
+    ::template with_numa_alloc<true>::type InnerGraph;
   typedef typename boost::mpl::if_c<UseGraphChi,
           Galois::Graph::OCImmutableEdgeGraph<LNode,void>,
           Galois::Graph::LC_InOut_Graph<InnerGraph>>::type
@@ -458,7 +473,7 @@ struct GraphChiAlgo: public Galois::LigraGraphChi::ChooseExecutor<true> {
 
   struct Process {
     typedef int tt_does_not_need_aborts;
-    typedef int tt_does_not_need_parallel_push;
+    typedef int tt_does_not_need_push;
 
     typedef BagPair::bag_type bag_type;
     bag_type& next;
@@ -531,8 +546,8 @@ struct GraphLabAlgo {
   };
 
   typedef Galois::Graph::LC_CSR_Graph<LNode,void>
-    ::with_no_lockable<true> 
-    ::with_numa_alloc<true> InnerGraph;
+    ::with_no_lockable<true>::type 
+    ::with_numa_alloc<true>::type InnerGraph;
   typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
 
@@ -622,7 +637,7 @@ struct AsyncOCAlgo {
 
   struct Merge {
     typedef int tt_does_not_need_aborts;
-    typedef int tt_does_not_need_parallel_push;
+    typedef int tt_does_not_need_push;
 
     Galois::Statistic& emptyMerges;
     Merge(Galois::Statistic& e): emptyMerges(e) { }
@@ -660,8 +675,8 @@ struct AsyncOCAlgo {
  */
 struct AsyncAlgo {
   typedef Galois::Graph::LC_CSR_Graph<Node,void>
-    ::with_numa_alloc<true>
-    ::with_no_lockable<true> 
+    ::with_numa_alloc<true>::type
+    ::with_no_lockable<true>::type
     Graph;
   typedef Graph::GraphNode GNode;
 
@@ -669,7 +684,7 @@ struct AsyncAlgo {
 
   struct Merge {
     typedef int tt_does_not_need_aborts;
-    typedef int tt_does_not_need_parallel_push;
+    typedef int tt_does_not_need_push;
 
     Graph& graph;
     Galois::Statistic& emptyMerges;
@@ -966,7 +981,7 @@ int main(int argc, char** argv) {
     case Algo::ligra: run<LigraAlgo<false> >(); break;
 #endif
     case Algo::serial: run<SerialAlgo>(); break;
-    case Algo::sync: run<SynchronousAlgo>(); break;
+    case Algo::synchronous: run<SynchronousAlgo>(); break;
     default: std::cerr << "Unknown algorithm\n"; abort();
   }
   T.stop();

@@ -84,7 +84,7 @@ protected:
   struct Update {
     AVI* avi;
     double ts;
-    explicit Update(AVI* a, double t): avi(a), ts(t) { }
+    Update(AVI* a, double t): avi(a), ts(t) { }
 
     Update updatedCopy () const {
       return Update (avi, avi->getNextTimeStamp ());

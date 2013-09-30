@@ -57,7 +57,7 @@ struct EdgeCtx: public Edge {
 
   bool srcFail;
   bool dstFail;
-
+  
   EdgeCtx (const Edge& e)
     : Edge (e)
       , srcFail (false), dstFail(false)
@@ -103,7 +103,7 @@ struct EdgeCtx: public Edge {
 
 struct FindLoop {
 
-  // typedef char tt_does_not_need_parallel_push;
+  // typedef char tt_does_not_need_push;
 
   VecRep_ty& repVec;
   VecAtomicCtxPtr& repOwnerCtxVec;
@@ -175,7 +175,7 @@ struct FindLoop {
 
 template <bool usingOrderedRuntime=false>
 struct LinkUpLoop {
-  // typedef char tt_does_not_need_parallel_push;
+  // typedef char tt_does_not_need_push;
 
   VecRep_ty& repVec;
   VecAtomicCtxPtr& repOwnerCtxVec;
@@ -228,7 +228,7 @@ struct LinkUpLoop {
         ctx.resetStatus ();
 
         if (usingOrderedRuntime) {
-          Galois::Runtime::signalConflict (nullptr);
+          Galois::Runtime::signalConflict (NULL);
 
         } else {
           nextWL.get ().push_back (ctx);

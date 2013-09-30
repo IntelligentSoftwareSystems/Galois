@@ -58,9 +58,10 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
 
 struct Node: public Galois::UnionFindNode<Node> {
   Node* component;
+  Node(): component(this) { }
 };
 
-typedef Galois::Graph::LC_Linear_Graph<Node,void>::with_numa_alloc<true> Graph;
+typedef Galois::Graph::LC_Linear_Graph<Node,void>::with_numa_alloc<true>::type Graph;
 
 typedef Graph::GraphNode GNode;
 
@@ -113,7 +114,7 @@ struct DemoAlgo {
 struct AsynchronousAlgo {
   struct Merge {
     typedef int tt_does_not_need_aborts;
-    typedef int tt_does_not_need_parallel_push;
+    typedef int tt_does_not_need_push;
     typedef int tt_does_not_need_stats;
 
     Galois::Statistic& emptyMerges;

@@ -35,8 +35,6 @@
 
 #include "Lonestar/BoilerPlate.h"
 
-#include "boost/optional.hpp"
-
 #include <utility>
 #include <vector>
 #include <algorithm>
@@ -48,6 +46,7 @@ const char* url = "independent_set";
 
 enum Algo {
   serial,
+  pull,
   nondet,
   detBase,
   detPrefix,
@@ -60,6 +59,7 @@ static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>")
 static cll::opt<Algo> algo(cll::desc("Choose an algorithm:"),
     cll::values(
       clEnumVal(serial, "Serial"),
+      clEnumVal(pull, "Pull-based (deterministic)"),
       clEnumVal(nondet, "Non-deterministic"),
       clEnumVal(detBase, "Base deterministic execution"),
       clEnumVal(detPrefix, "Prefix deterministic execution"),
@@ -72,23 +72,66 @@ enum MatchFlag {
 };
 
 struct Node {
-  unsigned int id;
   MatchFlag flag; 
   MatchFlag pendingFlag; 
   Node() : flag(UNMATCHED), pendingFlag(UNMATCHED) { }
 };
 
-typedef Galois::Graph::LC_InlineEdge_Graph<Node,void>::with_numa_alloc<true>::with_compressed_node_ptr<true> Graph;
 
-typedef Graph::GraphNode GNode;
+struct SerialAlgo {
+  typedef Galois::Graph::LC_InlineEdge_Graph<Node,void>
+    ::with_numa_alloc<true>::type
+    ::with_no_lockable<true>::type
+    ::with_compressed_node_ptr<true>::type Graph;
+  typedef Graph::GraphNode GNode;
 
-Graph graph;
+  void operator()(Graph& graph) {
+    for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+      if (findUnmatched(graph, *ii))
+        match(graph, *ii);
+    }
+  }
+
+  bool findUnmatched(Graph& graph, GNode src) {
+    Node& me = graph.getData(src);
+    if (me.flag != UNMATCHED)
+      return false;
+
+    for (Graph::edge_iterator ii = graph.edge_begin(src),
+        ei = graph.edge_end(src); ii != ei; ++ii) {
+      GNode dst = graph.getEdgeDst(ii);
+      Node& data = graph.getData(dst);
+      if (data.flag == MATCHED)
+        return false;
+    }
+
+    return true;
+  }
+
+  void match(Graph& graph, GNode src) {
+    Node& me = graph.getData(src);
+    for (Graph::edge_iterator ii = graph.edge_begin(src),
+        ei = graph.edge_end(src); ii != ei; ++ii) {
+      GNode dst = graph.getEdgeDst(ii);
+      Node& data = graph.getData(dst);
+      data.flag = OTHER_MATCHED;
+    }
+
+    me.flag = MATCHED;
+  }
+};
 
 //! Basic operator for default and deterministic scheduling
 template<int Version=detBase>
 struct Process {
-  typedef int tt_does_not_need_parallel_push;
+  typedef int tt_does_not_need_push;
   typedef int tt_needs_per_iter_alloc; // For LocalState
+
+  typedef Galois::Graph::LC_InlineEdge_Graph<Node,void>
+    ::with_numa_alloc<true>::type
+    ::with_compressed_node_ptr<true>::type Graph;
+
+  typedef Graph::GraphNode GNode;
 
   struct LocalState {
     bool mod;
@@ -96,6 +139,10 @@ struct Process {
   };
   typedef LocalState GaloisDeterministicLocalState;
   static_assert(Galois::has_deterministic_local_state<Process>::value, "Oops");
+
+  Graph& graph;
+
+  Process(Graph& g): graph(g) { }
 
   template<Galois::MethodFlag Flag>
   bool build(GNode src) {
@@ -124,12 +171,6 @@ struct Process {
     }
 
     me.flag = MATCHED;
-  }
-
-  //! Serial operator
-  void operator()(GNode src) {
-    if (build<Galois::MethodFlag::NONE>(src))
-      modify(src);
   }
 
   void operator()(GNode src, Galois::UserContext<GNode>& ctx) {
@@ -161,9 +202,15 @@ struct Process {
 
 template<bool prefix>
 struct OrderedProcess {
-  typedef int tt_does_not_need_parallel_push;
+  typedef int tt_does_not_need_push;
 
+  typedef typename Process<>::Graph Graph;
+  typedef Graph::GraphNode GNode;
+
+  Graph& graph;
   Process<> process;
+
+  OrderedProcess(Graph& g): graph(g), process(g) { }
 
   template<typename C>
   void operator()(GNode src, C& ctx) {
@@ -180,53 +227,163 @@ struct OrderedProcess {
   }
 };
 
+template<typename Graph>
 struct Compare {
+  typedef typename Graph::GraphNode GNode;
+  Graph& graph;
+
+  Compare(Graph& g): graph(g) { }
+  
   bool operator()(const GNode& a, const GNode& b) const {
-    return graph.getData(a, Galois::MethodFlag::NONE).id < graph.getData(b, Galois::MethodFlag::NONE).id;
+    return &graph.getData(a, Galois::MethodFlag::NONE)< &graph.getData(b, Galois::MethodFlag::NONE);
   }
 };
 
-struct GaloisAlgo {
-  void operator()() {
+
+template<Algo algo>
+struct DefaultAlgo {
+  typedef typename Process<>::Graph Graph;
+
+  void operator()(Graph& graph) {
 #ifdef GALOIS_USE_EXP
     typedef Galois::WorkList::BulkSynchronousInline<> WL;
 #else
     typedef Galois::WorkList::dChunkedFIFO<256> WL;
 #endif
-
     switch (algo) {
       case nondet: 
-        Galois::for_each<WL>(graph.begin(), graph.end(), Process<>());
+        Galois::for_each<WL>(graph.begin(), graph.end(), Process<>(graph));
         break;
       case detBase:
-        Galois::for_each_det(graph.begin(), graph.end(), Process<>());
+        Galois::for_each_det(graph.begin(), graph.end(), Process<>(graph));
         break;
       case detPrefix:
-        Galois::for_each_det(graph.begin(), graph.end(), Process<detPrefix>(), Process<>());
+        Galois::for_each_det(graph.begin(), graph.end(), Process<detPrefix>(graph), Process<>(graph));
         break;
       case detDisjoint:
-        Galois::for_each_det(graph.begin(), graph.end(), Process<detDisjoint>());
+        Galois::for_each_det(graph.begin(), graph.end(), Process<detDisjoint>(graph));
         break;
       case orderedBase:
-        Galois::for_each_ordered(graph.begin(), graph.end(), Compare(),
-            OrderedProcess<true>(), OrderedProcess<false>());
+        Galois::for_each_ordered(graph.begin(), graph.end(), Compare<Graph>(graph),
+            OrderedProcess<true>(graph), OrderedProcess<false>(graph));
         break;
       default: std::cerr << "Unknown algorithm" << algo << "\n"; abort();
     }
   }
 };
 
-struct SerialAlgo {
-  void operator()() {
-    std::for_each(graph.begin(), graph.end(), Process<>());
+struct PullAlgo {
+  typedef Galois::Graph::LC_CSR_Graph<Node,void>
+    ::with_numa_alloc<true>::type
+    ::with_no_lockable<true>::type
+    Graph;
+  typedef Graph::GraphNode GNode;
+
+  struct Pull {
+    typedef int tt_does_not_need_push;
+    typedef int tt_does_not_need_aborts;
+
+    typedef Galois::InsertBag<GNode> Bag;
+
+    Graph& graph;
+    Bag& tcur;
+    Bag& next;
+
+    void operator()(GNode src, Galois::UserContext<GNode>&) {
+      (*this)(src);
+    }
+
+    void operator()(GNode src) {
+      Node& n = graph.getData(src, Galois::MethodFlag::NONE);
+
+      MatchFlag f = MATCHED;
+      for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::NONE),
+          ei = graph.edge_end(src, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+        GNode dst = graph.getEdgeDst(ii);
+        Node& other = graph.getData(dst, Galois::MethodFlag::NONE);
+        if (dst >= src)
+          continue;
+        if (other.flag == MATCHED) {
+          f = OTHER_MATCHED;
+          break;
+        } else if (other.flag == UNMATCHED) {
+          f = UNMATCHED;
+        }
+      }
+
+      if (f == UNMATCHED) {
+        next.push_back(src);
+        return;
+      }
+
+      n.pendingFlag = f;
+      tcur.push_back(src);
+    }
+  };
+
+  struct Take {
+    Graph& graph;
+    void operator()(GNode src) {
+      Node& n = graph.getData(src, Galois::MethodFlag::NONE);
+      n.flag = n.pendingFlag;
+    }
+  };
+
+  void operator()(Graph& graph) {
+    Galois::Statistic rounds("Rounds");
+
+    typedef Galois::InsertBag<GNode> Bag;
+    Bag bags[3];
+    Bag *cur = &bags[0];
+    Bag *tcur = &bags[1];
+    Bag *next = &bags[2];
+    uint64_t size = graph.size();
+    uint64_t delta = graph.size() / 25;
+
+    typename Graph::iterator ii = graph.begin();
+    typename Graph::iterator ei = graph.begin();
+    uint64_t remaining = std::min(size, delta);
+    std::advance(ei, remaining);
+    size -= remaining;
+
+    while (ii != ei) {
+      Pull pull = { graph, *tcur, *next };
+
+      Galois::do_all(ii, ei, pull);
+      Take take = { graph };
+      Galois::do_all_local(*tcur, take);
+      rounds += 1;
+      
+      while (!next->empty()) {
+        cur->clear();
+        tcur->clear();
+        std::swap(cur, next);
+        
+        Pull pull = { graph, *tcur, *next };
+        Galois::do_all_local(*cur, pull);
+        Galois::do_all_local(*tcur, take);
+        rounds += 1;
+      }
+      ii = ei;
+
+      remaining = std::min(size, delta);
+      std::advance(ei, remaining);
+      size -= remaining;
+    }
   }
 };
 
+template<typename Graph>
 struct is_bad {
+  typedef typename Graph::GraphNode GNode;
+  Graph& graph;
+
+  is_bad(Graph& g): graph(g) { }
+
   bool operator()(GNode n) const {
     Node& me = graph.getData(n);
     if (me.flag == MATCHED) {
-      for (Graph::edge_iterator ii = graph.edge_begin(n),
+      for (typename Graph::edge_iterator ii = graph.edge_begin(n),
           ei = graph.edge_end(n); ii != ei; ++ii) {
         GNode dst = graph.getEdgeDst(ii);
         Node& data = graph.getData(dst);
@@ -237,7 +394,7 @@ struct is_bad {
       }
     } else if (me.flag == UNMATCHED) {
       bool ok = false;
-      for (Graph::edge_iterator ii = graph.edge_begin(n),
+      for (typename Graph::edge_iterator ii = graph.edge_begin(n),
           ei = graph.edge_end(n); ii != ei; ++ii) {
         GNode dst = graph.getEdgeDst(ii);
         Node& data = graph.getData(dst);
@@ -254,47 +411,66 @@ struct is_bad {
   }
 };
 
+template<typename Graph>
 struct is_matched {
+  typedef typename Graph::GraphNode GNode;
+  Graph& graph;
+  is_matched(Graph& g): graph(g) { }
+
   bool operator()(const GNode& n) const {
     return graph.getData(n).flag == MATCHED;
   }
 };
 
-bool verify() {
-  return Galois::ParallelSTL::find_if(graph.begin(), graph.end(), is_bad()) == graph.end();
+template<typename Graph>
+bool verify(Graph& graph) {
+  return Galois::ParallelSTL::find_if(
+      graph.begin(), graph.end(), is_bad<Graph>(graph))
+    == graph.end();
+}
+
+template<typename Algo>
+void run() {
+  typedef typename Algo::Graph Graph;
+
+  Algo algo;
+  Graph graph;
+  Galois::Graph::readGraph(graph, filename);
+
+  // XXX Test if this matters
+  Galois::preAlloc(numThreads + (graph.size() * sizeof(Node) * numThreads / 8) / Galois::Runtime::MM::pageSize);
+
+  Galois::reportPageAlloc("MeminfoPre");
+  Galois::StatTimer T;
+  T.start();
+  algo(graph);
+  T.stop();
+  Galois::reportPageAlloc("MeminfoPost");
+
+  std::cout << "Cardinality of maximal independent set: " 
+    << Galois::ParallelSTL::count_if(graph.begin(), graph.end(), is_matched<Graph>(graph)) 
+    << "\n";
+
+  if (!skipVerify && !verify(graph)) {
+    std::cerr << "verification failed\n";
+    assert(0 && "verification failed");
+    abort();
+  }
 }
 
 int main(int argc, char** argv) {
   Galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
-
-  Galois::Graph::readGraph(graph, filename);
-
-  unsigned int id = 0;
-  for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii, ++id)
-    graph.getData(*ii).id = id;
   
-  // XXX Test if this matters
-  Galois::preAlloc(numThreads + (graph.size() * sizeof(Node) * numThreads / 8) / Galois::Runtime::MM::pageSize);
-  Galois::reportPageAlloc("MeminfoPre");
-  Galois::StatTimer T;
-  T.start();
   switch (algo) {
-    case serial: SerialAlgo()(); break;
-    default: GaloisAlgo()(); break;
+    case serial: run<SerialAlgo>(); break;
+    case nondet: run<DefaultAlgo<nondet> >(); break;
+    case detBase: run<DefaultAlgo<detBase> >(); break;
+    case detPrefix: run<DefaultAlgo<detPrefix> >(); break;
+    case detDisjoint: run<DefaultAlgo<detDisjoint> >(); break;
+    case orderedBase: run<DefaultAlgo<orderedBase> >(); break;
+    case pull: run<PullAlgo>(); break;
+    default: std::cerr << "Unknown algorithm" << algo << "\n"; abort();
   }
-  T.stop();
-  Galois::reportPageAlloc("MeminfoPost");
-
-  std::cout << "Cardinality of maximal independent set: " 
-    << Galois::ParallelSTL::count_if(graph.begin(), graph.end(), is_matched()) 
-    << "\n";
-
-  if (!skipVerify && !verify()) {
-    std::cerr << "verification failed\n";
-    assert(0 && "verification failed");
-    abort();
-  }
-
   return 0;
 }

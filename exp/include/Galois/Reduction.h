@@ -36,9 +36,6 @@
 
 namespace Galois {
 
-using Runtime::networkHostID;
-using Runtime::networkHostNum;
-
 template<typename T, typename BinFunc>
 class DGReducible : public Runtime::Lockable {
   BinFunc m_func;
@@ -57,9 +54,9 @@ class DGReducible : public Runtime::Lockable {
 
   static int expected() {
     int retval = 0;
-    if (networkHostID * 2 + 1 < networkHostNum)
+    if (NetworkInterface::networkHostID * 2 + 1 < NetworkInterface::networkHostNum)
       ++retval;
-    if (networkHostID * 2 + 2 < networkHostNum)
+    if (NetworkInterface::networkHostID * 2 + 2 < NetworkInterface::networkHostNum)
       ++retval;
     return retval;
   }

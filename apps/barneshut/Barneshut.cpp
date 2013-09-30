@@ -21,6 +21,7 @@
  * @author Martin Burtscher <burtscher@txstate.edu>
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
+#include "Galois/config.h"
 #include "Galois/Galois.h"
 #include "Galois/Statistic.h"
 #include "Galois/Graphs/Bag.h"
@@ -31,10 +32,11 @@
 #include <boost/math/constants/constants.hpp>
 #include <boost/iterator/transform_iterator.hpp>
 
+#include GALOIS_CXX11_STD_HEADER(array)
 #include <limits>
 #include <iostream>
 #include <strings.h>
-#include <deque>
+#include GALOIS_CXX11_STD_HEADER(deque)
 
 const char* name = "Barnshut N-Body Simulator";
 const char* desc =

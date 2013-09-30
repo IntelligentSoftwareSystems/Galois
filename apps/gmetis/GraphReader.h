@@ -29,7 +29,30 @@ using namespace std;
 typedef Galois::Graph::LC_CSR_Graph<int, unsigned int> InputGraph;
 typedef Galois::Graph::LC_CSR_Graph<int, unsigned int>::GraphNode InputGNode;
 
+void readMetisGraph(MetisGraph* metisGraph, const char* filename){
+  std::ifstream file(filename);
+  string line;
+  std::getline(file, line);
+  while(line.find('%')!=string::npos){
+    std::getline(file, line);
+  }
 
+  int numNodes, numEdges;
+  sscanf(line.c_str(), "%d %d", &numNodes, &numEdges);
+  cout<<numNodes<<" "<<numEdges<<endl;
+  GGraph* graph = metisGraph->getGraph();
+  vector<GNode> nodes(numNodes);
+  for (int i = 0; i < numNodes; i++) {
+    GNode n = graph->createNode(100, 1); //FIXME: edge numbers
+    nodes[i] = n;
+    //graph->addNode(n);
+  }
+  int countEdges = 0;
+  for (int i = 0; i < numNodes; i++) {
+    std::getline(file, line);
+    char const * items = line.c_str();
+    char* remaining;
+    GNode n1 = nodes[i];
 
     while (true) {
       int index = strtol(items, &remaining,10) - 1;
@@ -39,14 +62,24 @@ typedef Galois::Graph::LC_CSR_Graph<int, unsigned int>::GraphNode InputGNode;
       if(n1==n2){
         continue;
       }
-      graph->addEdge(n1, n2, Galois::MethodFlag::ALL, 1);
+      graph->getEdgeData(graph->addEdge(n1, n2)) = 1;
       graph->getData(n1).setEdgeWeight(graph->getData(n1).getEdgeWeight() + 1);
       graph->getData(n1).setNumEdges(graph->getData(n1).getNumEdges() + 1);
       countEdges++;
     }
   }
 
+  assert(countEdges == numEdges*2);
+  // metisGraph->setNumEdges(numEdges);
+  // metisGraph->setNumNodes(numNodes);
+  cout<<"finshied reading graph " << metisGraph->getNumNodes() << " " << /* FIXME metisGraph->getNumEdges()*/ "Unknown" <<endl;
+}
 
+struct parallelMakeNodes {
+  GGraph *graph;
+  InputGraph *inputGraph;
+  vector <GNode>  &gnodes;
+  Galois::GAccumulator<int> &pnumNodes;
 
 parallelMakeNodes(GGraph *g,vector <GNode> &gn,InputGraph *in,Galois::GAccumulator<int> &numNodes):
   graph(g),inputGraph(in),gnodes(gn),pnumNodes(numNodes) {}
@@ -85,7 +118,7 @@ struct parallelMakeEdges {
       if(weighted){
         weight = inputGraph->getEdgeData(jj);
       }
-      graph->addEdge(node, gnodes[neighId], Galois::MethodFlag::ALL, weight);
+      graph->getEdgeData(graph->addEdge(node, gnodes[neighId])) = weight;//
       nodeData.setNumEdges(nodeData.getNumEdges() + 1);
       nodeData.setEdgeWeight(nodeData.getEdgeWeight() + weight);
       /*if(!directed){

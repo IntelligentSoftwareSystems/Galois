@@ -15,13 +15,18 @@ file(GLOB Sources
   dummy.f90
 )
 
-find_package(ZLIB)
-set(BOOST_LIBS system iostreams filesystem)
-find_package(Boost 1.36.0 COMPONENTS ${BOOST_LIBS})
-enable_language(Fortran)
+enable_language(Fortran OPTIONAL)
 find_package(LAPACK)
+find_package(ZLIB)
+# TODO(ddn): CMake Boost module on BG/Q cannot be called multiple times. Skip
+# avi althogether for now.
+if(CMAKE_SYSTEM_NAME MATCHES "BlueGeneQ")
+  set(Boost_FOUND off)
+else()
+  find_package(Boost 1.36.0 COMPONENTS system iostreams filesystem)
+endif()
 
-if(ZLIB_FOUND AND Boost_FOUND)
+if(CMAKE_Fortran_COMPILER_WORKS AND LAPACK_FOUND AND ZLIB_FOUND AND Boost_FOUND)
   include_directories(${ZLIB_INCLUDE_DIRS})
   add_library(AVI ${Sources})
   target_link_libraries(AVI ${ZLIB_LIBRARIES})
@@ -30,42 +35,42 @@ if(ZLIB_FOUND AND Boost_FOUND)
 endif()
 
 app(AVIorderedSerial main/AVIorderedSerial.cpp
-  REQUIRES LAPACK_FOUND AVI_FOUND
+  REQUIRES AVI_FOUND
   EXTLIBS AVI ${LAPACK_LIBRARIES})
 
 app(AVIodgOrdered main/AVIodgOrdered.cpp 
-  REQUIRES LAPACK_FOUND AVI_FOUND 
+  REQUIRES AVI_FOUND 
   EXTLIBS AVI ${LAPACK_LIBRARIES})
 
 app(AVIodgExplicit main/AVIodgExplicit.cpp 
-  REQUIRES LAPACK_FOUND AVI_FOUND
+  REQUIRES AVI_FOUND
   EXTLIBS AVI ${LAPACK_LIBRARIES})
 
 app(AVIodgExplicitNoLock main/AVIodgExplicitNoLock.cpp
-  REQUIRES LAPACK_FOUND AVI_FOUND
+  REQUIRES AVI_FOUND
   EXTLIBS AVI ${LAPACK_LIBRARIES})
 
 # the files may be removed from the release without causing error in cmake
 #if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/exp)
 if(0)
   app(AVIodgReadonly exp/AVIodgReadonly.cpp 
-    REQUIRES LAPACK_FOUND AVI_FOUND USE_EXP
+    REQUIRES AVI_FOUND USE_EXP
     EXTLIBS AVI ${LAPACK_LIBRARIES})
 
   app(AVIodgImplicit exp/AVIodgImplicit.cpp 
-    REQUIRES LAPACK_FOUND AVI_FOUND USE_EXP
+    REQUIRES AVI_FOUND USE_EXP
     EXTLIBS AVI ${LAPACK_LIBRARIES})
 
   app(AVIodgAutoPriLock exp/AVIodgAutoPriLock.cpp 
-    REQUIRES LAPACK_FOUND AVI_FOUND USE_EXP
+    REQUIRES AVI_FOUND USE_EXP
     EXTLIBS AVI ${LAPACK_LIBRARIES})
 
   app(AVIodgAutoShare exp/AVIodgAutoShare.cpp 
-    REQUIRES LAPACK_FOUND AVI_FOUND USE_EXP
+    REQUIRES AVI_FOUND USE_EXP
     EXTLIBS AVI ${LAPACK_LIBRARIES})
 
   app(AVIodgNB exp/AVIodgNB.cpp 
-    REQUIRES LAPACK_FOUND AVI_FOUND USE_EXP
+    REQUIRES AVI_FOUND USE_EXP
     EXTLIBS AVI ${LAPACK_LIBRARIES})
 endif()
 

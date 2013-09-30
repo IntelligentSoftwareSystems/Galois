@@ -28,6 +28,7 @@
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 #include "Galois/Galois.h"
+#include "Galois/Timer.h"
 #include "Galois/Graph/Graph.h"
 #include <iostream>
 

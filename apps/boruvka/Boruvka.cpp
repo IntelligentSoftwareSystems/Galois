@@ -23,6 +23,7 @@
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
+#include "Galois/config.h"
 #include "Galois/Galois.h"
 #include "Galois/Accumulator.h"
 #include "Galois/Bag.h"
@@ -38,6 +39,7 @@
 
 #include "Lonestar/BoilerPlate.h"
 
+#include GALOIS_CXX11_STD_HEADER(atomic)
 #include <utility>
 #include <algorithm>
 #include <iostream>
@@ -66,10 +68,12 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
 typedef int EdgeData;
 
 struct Node: public Galois::UnionFindNode<Node> {
-  const EdgeData* lightest;
+  std::atomic<EdgeData*> lightest;
 };
 
-typedef Galois::Graph::LC_CSR_Graph<Node,EdgeData>::with_numa_alloc<true>::with_no_lockable<true> Graph;
+typedef Galois::Graph::LC_CSR_Graph<Node,EdgeData>
+  ::with_numa_alloc<true>::type
+  ::with_no_lockable<true>::type Graph;
 
 typedef Graph::GraphNode GNode;
 
@@ -127,7 +131,7 @@ struct ParallelAlgo {
     for (; ii != ei; ++ii, ++cur) {
       GNode dst = graph.getEdgeDst(ii);
       Node& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
-      const EdgeData& weight = graph.getEdgeData(ii);
+      EdgeData& weight = graph.getEdgeData(ii);
       if (useLimit && weight > self->limit) {
         pending.push(WorkItem(src, dst, &weight, cur));
         return;
@@ -135,15 +139,11 @@ struct ParallelAlgo {
       Node* rep;
       if ((rep = sdata.findAndCompress()) != ddata.findAndCompress()) {
         //const EdgeData& weight = graph.getEdgeData(ii);
-        const EdgeData* old;
+        EdgeData* old;
         ctx.push(WorkItem(src, dst, &weight, cur));
         while (weight < *(old = rep->lightest)) {
-          if (__sync_bool_compare_and_swap(
-                reinterpret_cast<uintptr_t*>(&rep->lightest),
-                reinterpret_cast<uintptr_t>(old),
-                reinterpret_cast<uintptr_t>(&weight))) {
+          if (rep->lightest.compare_exchange_strong(old, &weight))
             break;
-          }
         }
         return;
       }
@@ -269,7 +269,7 @@ struct ParallelAlgo {
     }
   }
 
-#ifdef GALOIS_USE_EXP
+#if defined(GALOIS_USE_EXP) && !defined(GALOIS_HAS_NO_BULKSYNCHRONOUS_EXECUTOR)
   void processExp() {
     typedef boost::fusion::vector<WorkItem,WorkItem> Items;
 
@@ -388,7 +388,7 @@ struct get_weight {
 };
 
 template<typename Algo>
-typename std::result_of<Algo()>::type run() {
+void run() {
   Algo algo;
 
   return algo();
@@ -397,7 +397,8 @@ typename std::result_of<Algo()>::type run() {
 bool verify() {
   if (Galois::ParallelSTL::find_if(graph.begin(), graph.end(), is_bad_graph()) == graph.end()) {
     if (Galois::ParallelSTL::find_if(mst.begin(), mst.end(), is_bad_mst()) == mst.end()) {
-      return run<CheckAcyclic>();
+      CheckAcyclic c;
+      return c();
     }
   }
   return false;
@@ -417,7 +418,8 @@ void initializeGraph() {
   
   Galois::StatTimer Tsort("InitializeSortTime");
   Tsort.start();
-  heaviest = run<SortEdges>();
+  SortEdges sortEdges;
+  heaviest = sortEdges();
   if (heaviest == std::numeric_limits<EdgeData>::max() || 
       heaviest == std::numeric_limits<EdgeData>::min()) {
     std::cerr << "Edge weights of graph out of range\n";

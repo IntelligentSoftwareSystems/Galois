@@ -166,12 +166,9 @@ int main(int argc, char** argv) {
     m.read(graph, filename.c_str());
     Verifier v;
     if (!skipVerify && !v.verify(graph)) {
-      std::cerr << "bad input mesh\n";
-      assert(0 && "Refinement failed");
-      abort();
+      GALOIS_DIE("bad input mesh");
     }
   }
-
   //  std::cout << "start configuration: " << NThirdGraphSize(graph) << " total triangles, ";
   //  std::cout << Galois::ParallelSTL::count_if_local(graph, is_bad(graph)) << " bad triangles\n";
   //ThirdGraphSize(graph);
@@ -188,7 +185,8 @@ int main(int argc, char** argv) {
   Tprealloc.start();
   std::cerr << "\nbeginning prealloc\n";
   Galois::reportPageAlloc("MeminfoPre1");
-  Galois::preAlloc(15 * numThreads + Galois::Runtime::MM::numPageAllocTotal() * 10);
+  Galois::preAlloc(Galois::Runtime::MM::numPageAllocTotal() * 10);
+  //Galois::preAlloc(15 * numThreads + Galois::Runtime::MM::numPageAllocTotal() * 10);
   Galois::reportPageAlloc("MeminfoPre2");
   Tprealloc.stop();
 
@@ -224,16 +222,13 @@ int main(int argc, char** argv) {
   if (!skipVerify) {
     int size = Galois::ParallelSTL::count_if_local(graph, is_bad(graph));
     if (size != 0) {
-      std::cerr << size << " bad triangles remaining.\n";
-      assert(0 && "Refinement failed");
-      abort();
+      GALOIS_DIE("Bad triangles remaining");
     }
     Verifier v;
     if (!v.verify(graph)) {
-      std::cerr << "Refinement failed.\n";
-      assert(0 && "Refinement failed");
-      abort();
+      GALOIS_DIE("Refinement failed");
     }
+    std::cout << std::distance(graph->begin(), graph->end()) << " total triangles\n";
     std::cout << "Refinement OK\n";
   }
 
