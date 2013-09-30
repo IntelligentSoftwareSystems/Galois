@@ -220,7 +220,7 @@ class OwnerComputeChunkedMaster : private boost::noncopyable {
   typedef QT<Chunk, concurrent> LevelItem;
 
   Runtime::PerThreadStorage<p> data;
-  squeues<distributed, LevelItem> Q;
+  squeue<distributed, Runtime::PerPackageStorage, LevelItem> Q;
 
   Chunk* mkChunk() {
     return new (heap.allocate(sizeof(Chunk))) Chunk();
