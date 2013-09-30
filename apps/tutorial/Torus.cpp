@@ -26,6 +26,7 @@
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 #include "Galois/Galois.h"
+#include "Galois/Statistic.h"
 #include "Galois/Graph/Graph.h"
 #include <iostream>
 
@@ -97,12 +98,12 @@ int main(int argc, char** argv) {
   int n = atoi(argv[2]);
 
   numThreads = Galois::setActiveThreads(numThreads);
-  std::cout << "Using " << numThreads << " threads and " << n << " x " << n << " torus\n";
+  std::cout << "Using " << numThreads << " thread(s) and " << n << " x " << n << " torus\n";
 
   Graph graph;
   constructTorus(graph, n, n);
 
-  Galois::Timer T;
+  Galois::StatTimer T;
   T.start();
   Galois::for_each(graph.begin(), graph.end(), IncrementNeighbors(graph));
   T.stop();

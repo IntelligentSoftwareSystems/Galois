@@ -287,7 +287,7 @@ void convert_mtx2gr(const std::string& infilename, const std::string& outfilenam
 
     for (size_t edge_num = 0; edge_num < nedges; ++edge_num) {
       uint32_t cur_id, neighbor_id;
-      edge_value_type weight;
+      edge_value_type weight = 1;
 
       infile >> cur_id >> neighbor_id >> weight;
       if (cur_id == 0 || cur_id > nnodes) {
