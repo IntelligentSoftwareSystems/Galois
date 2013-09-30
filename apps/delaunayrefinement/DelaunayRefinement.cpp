@@ -177,40 +177,43 @@ int main(int argc, char** argv) {
   //ThirdGraphSize(graph);
 
   // call prefetch to get the nodes to the owner
-  std::cerr << "prefetch\n";
+  Galois::StatTimer Tprefetch;
+  Tprefetch.start();
+  std::cerr << "\nbeginning prefetch\n";
   Galois::for_each_local<Galois::WorkList::AltChunkedLIFO<32>>(graph, Prefetch(graph), "prefetch");
   Galois::Runtime::setTrace(true);
+  Tprefetch.stop();
 
-  std::cerr << "prealloc\n";
+  Galois::StatTimer Tprealloc;
+  Tprealloc.start();
+  std::cerr << "\nbeginning prealloc\n";
   Galois::reportPageAlloc("MeminfoPre1");
   Galois::preAlloc(15 * numThreads + Galois::Runtime::MM::numPageAllocTotal() * 10);
   Galois::reportPageAlloc("MeminfoPre2");
+  Tprealloc.stop();
 
   Galois::Graph::Bag<GNode>::pointer gwl = Galois::Graph::Bag<GNode>::allocate();
 
   Galois::StatTimer T;
-  //  T.start();
-  std::cerr << "findbad\n";
+  T.start();
+  std::cerr << "\nbeginning findbad\n";
   Galois::for_each_local<Galois::WorkList::AltChunkedLIFO<32>>(graph, Preprocess(graph,gwl), "findbad");
 
   Galois::reportPageAlloc("MeminfoMid");
 
   Galois::StatTimer Trefine("refine");
   Trefine.start();
-  T.start();
   using namespace Galois::WorkList;
   
   typedef LocalQueue<dChunkedLIFO<256>, ChunkedLIFO<256> > BQ;
   typedef AltChunkedLIFO<32> Chunked;
 
-  std::cerr << "refine\n";
-  volatile int foo = 1;
-  //  while (foo) {}
+  std::cerr << "\nbeginning refine\n";
   Galois::for_each_local<Chunked>(gwl, Process(graph), "refine");
   Trefine.stop();
   T.stop();
 
-  std::cerr << "verify\n";
+  std::cerr << "\nbeginning verify\n";
   Galois::for_each_local<Chunked>(graph, Verification(graph), "verification");
 
   //  std::cout << "final configuration: " << NThirdGraphSize(graph) << " total triangles, ";
