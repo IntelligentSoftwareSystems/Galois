@@ -526,7 +526,7 @@ void run(Bodies& bodies, BodyPtrs& pBodies) {
 
   for (int step = 0; step < ntimesteps; step++) {
     // Do tree building sequentially
-    BoundingBox box = Galois::Runtime::do_all_impl(Galois::Runtime::makeLocalRange(pBodies), ReduceBoxes(), mergeBox(), true).initial;
+    BoundingBox box = Galois::Runtime::do_all_impl(Galois::Runtime::makeLocalRange(pBodies), ReduceBoxes(), mergeBox(), "reduceBoxes", true).initial;
     //std::for_each(bodies.begin(), bodies.end(), ReduceBoxes(box));
 
     Tree t;
@@ -534,7 +534,7 @@ void run(Bodies& bodies, BodyPtrs& pBodies) {
 
     Galois::StatTimer T_build("BuildTime");
     T_build.start();
-    Galois::do_all_local(pBodies, BuildOctree(&top, t, box.radius()));
+    Galois::do_all_local(pBodies, BuildOctree(&top, t, box.radius()), "BuildTree");
     T_build.stop();
 
     //update centers of mass in tree

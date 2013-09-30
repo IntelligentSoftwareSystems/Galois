@@ -29,9 +29,11 @@
 #define GALOIS_RUNTIME_DOALL_H
 
 #include "Galois/gstl.h"
+#include "Galois/Statistic.h"
 #include "Galois/Runtime/Barrier.h"
 #include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/Range.h"
+#include "Galois/Runtime/ForEachTraits.h"
 
 #include <algorithm>
 
@@ -155,29 +157,36 @@ public:
 };
 
 template<typename RangeTy, typename FunctionTy, typename ReducerTy>
-FunctionTy do_all_dispatch(RangeTy range, FunctionTy f, ReducerTy r, bool doReduce, bool Steal) {
+FunctionTy do_all_dispatch(RangeTy range, FunctionTy f, ReducerTy r, bool doReduce, const char* loopname, bool Steal) {
   if (Galois::Runtime::inGaloisForEach) {
     return std::for_each(range.begin(), range.end(), f);
   } else {
+
+    StatTimer LoopTimer("LoopTime", loopname);
+    if (ForEachTraits<FunctionTy>::NeedsStats)
+      LoopTimer.start();
+
     inGaloisForEach = true;
 
     DoAllWork<FunctionTy, ReducerTy, RangeTy> W(f, r, doReduce, range, Steal);
     RunCommand w[2] = {std::ref(W),
 		       std::ref(getSystemBarrier())};
     getSystemThreadPool().run(&w[0], &w[2],activeThreads);
+    if (ForEachTraits<FunctionTy>::NeedsStats)  
+      LoopTimer.stop();
     inGaloisForEach = false;
     return W.getFn();
   }
 }
 
 template<typename RangeTy, typename FunctionTy>
-FunctionTy do_all_impl(RangeTy range, FunctionTy f, bool steel = false) {
-  return do_all_dispatch(range, f, EmptyFn(), false, steel);
+FunctionTy do_all_impl(RangeTy range, FunctionTy f, const char* loopname = 0, bool steel = false) {
+  return do_all_dispatch(range, f, EmptyFn(), false, loopname, steel);
 }
 
 template<typename RangeTy, typename FunctionTy, typename ReduceTy>
-FunctionTy do_all_impl(RangeTy range, FunctionTy f, ReduceTy r, bool Steal = false) {
-  return do_all_dispatch(range, f, r, true, Steal);
+FunctionTy do_all_impl(RangeTy range, FunctionTy f, ReduceTy r, const char* loopname = 0, bool Steal = false) {
+  return do_all_dispatch(range, f, r, true, loopname, Steal);
 }
 
 } // end namespace Runtime

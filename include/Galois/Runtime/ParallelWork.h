@@ -29,6 +29,7 @@
 #define GALOIS_RUNTIME_PARALLELWORK_H
 
 #include "Galois/Mem.h"
+#include "Galois/Statistic.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/ForEachTraits.h"
 #include "Galois/Runtime/Support.h"
@@ -312,6 +313,10 @@ void for_each_impl(const RangeTy& range, FunctionTy f, const char* loopname) {
   if (inGaloisForEach)
     GALOIS_DIE("Nested for_each not supported");
 
+  StatTimer LoopTimer("LoopTime", loopname);
+  if (ForEachTraits<FunctionTy>::NeedsStats)
+    LoopTimer.start();
+
   inGaloisForEach = true;
 
   typedef typename RangeTy::value_type T;
@@ -330,6 +335,8 @@ void for_each_impl(const RangeTy& range, FunctionTy f, const char* loopname) {
     std::ref(barrier)
   };
   getSystemThreadPool().run(&w[0], &w[5], activeThreads);
+  if (ForEachTraits<FunctionTy>::NeedsStats)  
+    LoopTimer.stop();
   inGaloisForEach = false;
 }
 

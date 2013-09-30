@@ -101,7 +101,8 @@ public:
   StatTimer(const char* n, const char* l = 0): name(n), loopname(l), main(false) { }
 
   ~StatTimer() {
-    Galois::Runtime::reportStat(loopname, name, get());
+    if (get()) // only report non-zero stat
+      Galois::Runtime::reportStat(loopname, name, get());
     if (main)
       Galois::Runtime::reportSampling(loopname);
   }

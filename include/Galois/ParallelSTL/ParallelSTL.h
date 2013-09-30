@@ -55,7 +55,7 @@ template<class InputIterator, class Predicate>
 ptrdiff_t count_if(InputIterator first, InputIterator last, Predicate pred)
 {
   return Runtime::do_all_impl(Runtime::makeStandardRange(first, last),
-			      count_if_helper<Predicate>(pred), count_if_reducer()).ret;
+			      count_if_helper<Predicate>(pred), count_if_reducer(), "count_if").ret;
 }
 
 template<typename InputIterator, class Predicate>
@@ -287,7 +287,7 @@ template <class InputIterator, class T, typename BinaryOperation>
 T accumulate (InputIterator first, InputIterator last, T init, BinaryOperation binary_op) {
   return Runtime::do_all_impl(Runtime::makeStandardRange(first, last),
       accumulate_helper<T,BinaryOperation>(init, binary_op),
-      accumulate_helper_reduce<BinaryOperation>(binary_op)).init;
+      accumulate_helper_reduce<BinaryOperation>(binary_op), "accumulate").init;
 }
 
 template<class InputIterator, class T>
@@ -311,7 +311,7 @@ template<class InputIterator, class MapFn, class T, class ReduceFn>
 T map_reduce(InputIterator first, InputIterator last, MapFn fn, T init, ReduceFn reduce) {
   return Runtime::do_all_impl(Runtime::makeStandardRange(first, last),
       map_reduce_helper<T,MapFn,ReduceFn>(init, fn, reduce),
-      accumulate_helper_reduce<ReduceFn>(reduce)).init;
+      accumulate_helper_reduce<ReduceFn>(reduce), "map_reduce").init;
 }
 
 }
