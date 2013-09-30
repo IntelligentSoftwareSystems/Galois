@@ -20,6 +20,7 @@
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
+#include "Galois/config.h"
 #include "Galois/Galois.h"
 #include "Galois/Accumulator.h"
 #include "Galois/Bag.h"
@@ -28,7 +29,6 @@
 #include "Galois/Graph/TypeTraits.h"
 #ifdef GALOIS_USE_EXP
 #include <boost/mpl/if.hpp>
-#include "Galois/Graph/ReplicatedGraph.h"
 #include "Galois/Graph/OCGraph.h"
 #include "Galois/Graph/GraphNodeBag.h"
 #include "Galois/DomainSpecificExecutors.h"
@@ -36,6 +36,7 @@
 
 #include "Lonestar/BoilerPlate.h"
 
+#include GALOIS_CXX11_STD_HEADER(atomic)
 #include <string>
 #include <sstream>
 #include <limits>
@@ -45,10 +46,10 @@
 namespace cll = llvm::cl;
 
 static const char* name = "Page Rank";
-static const char* desc = "Computes page ranks a la Page and Brin\n";
+static const char* desc = "Computes page ranks a la Page and Brin";
 static const char* url = 0;
 
-enum class Algo {
+enum Algo {
   graphlab,
   graphlabAsync,
   ligra,
@@ -66,10 +67,10 @@ static cll::opt<unsigned int> memoryLimit("memoryLimit",
     cll::desc("Memory limit for out-of-core algorithms (in MB)"), cll::init(~0U));
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
     cll::values(
-      clEnumValN(Algo::graphlab, "graphlab", "Using GraphLab programming model"),
-      clEnumValN(Algo::graphlabAsync, "graphlabAsync", "Using GraphLab-Asynchronous programming model"),
-      clEnumValN(Algo::ligra, "ligra", "Using Ligra programming model"),
-      clEnumValN(Algo::ligraChi, "ligraChi", "Using Ligra and GraphChi programming model"),
+      clEnumValN(Algo::graphlab, "graphlab", "Use GraphLab programming model"),
+      clEnumValN(Algo::graphlabAsync, "graphlabAsync", "Use GraphLab-Asynchronous programming model"),
+      clEnumValN(Algo::ligra, "ligra", "Use Ligra programming model"),
+      clEnumValN(Algo::ligraChi, "ligraChi", "Use Ligra and GraphChi programming model"),
       clEnumValN(Algo::pull, "pull", "Use precomputed data perform pull-based algorithm"),
       clEnumValN(Algo::serial, "serial", "Compute PageRank in serial"),
       clEnumValEnd), cll::init(Algo::pull));
@@ -80,27 +81,54 @@ static const float alpha = 1.0 - 0.85;
 //! maximum relative change until we deem convergence
 static const float tolerance = 0.01;
 
+//ICC v13.1 doesn't yet support std::atomic<float> completely, emmulate its
+//behavor with std::atomic<int>
+struct atomic_float : public std::atomic<int> {
+  static_assert(sizeof(int) == sizeof(float), "int and float must be the same size");
+
+  float atomicIncrement(float value) {
+    while (true) {
+      union { float as_float; int as_int; } oldValue = { read() };
+      union { float as_float; int as_int; } newValue = { oldValue.as_float + value };
+      if (this->compare_exchange_strong(oldValue.as_int, newValue.as_int))
+        return newValue.as_float;
+    }
+  }
+
+  float read() {
+    union { int as_int; float as_float; } caster = { this->load(std::memory_order_relaxed) };
+    return caster.as_float;
+  }
+
+  void write(float v) {
+    union { float as_float; int as_int; } caster = { v };
+    this->store(caster.as_int, std::memory_order_relaxed);
+  }
+};
+
 struct PNode {
   float value;
-  float accum;
+  atomic_float accum;
+  PNode() { }
 
   float getPageRank() { return value; }
 };
 
 struct SerialAlgo {
-  typedef Galois::Graph::LC_CSR_Graph<PNode,void> Graph;
+  typedef Galois::Graph::LC_CSR_Graph<PNode,void>
+    ::with_no_lockable<true>::type Graph;
   typedef Graph::GraphNode GNode;
 
   std::string name() const { return "Serial"; }
   
-  void readGraph(Graph& graph) { graph.structureFromFile(filename); }
+  void readGraph(Graph& graph) { Galois::Graph::readGraph(graph, filename); }
 
   struct Initialize {
     Graph& g;
     Initialize(Graph& g): g(g) { }
     void operator()(typename Graph::GraphNode n) {
       g.getData(n).value = 1.0;
-      g.getData(n).accum = 0.0;
+      g.getData(n).accum.write(0.0);
     }
   };
 
@@ -119,20 +147,20 @@ struct SerialAlgo {
           GNode dst = graph.getEdgeDst(edge);
           PNode& ddata = graph.getData(dst);
           float delta =  sdata.value / neighbors;
-          ddata.accum += delta;
+          ddata.accum.write(ddata.accum.read() + delta);
         }
       }
 
       for (GNode src : graph) {
         PNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
-        float value = (1.0 - alpha) * sdata.accum + alpha;
+        float value = (1.0 - alpha) * sdata.accum.read() + alpha;
         float diff = std::fabs(value - sdata.value);
         if (diff <= tolerance)
           ++small_delta;
         if (diff > max_delta)
           max_delta = diff;
         sdata.value = value;
-        sdata.accum = 0;
+        sdata.accum.write(0);
       }
 
       iteration += 1;
@@ -161,14 +189,18 @@ struct GraphLabAlgo {
     float getPageRank() { return data; }
   };
 
-  typedef Galois::Graph::ReplicatedGraph<LNode,void> Graph;
+  typedef typename Galois::Graph::LC_CSR_Graph<LNode,void>
+    ::template with_numa_alloc<true>::type
+    ::template with_no_lockable<true>::type
+    InnerGraph;
+  typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
   typedef typename Graph::GraphNode GNode;
 
   std::string name() const { return "GraphLab"; }
 
   void readGraph(Graph& graph) {
     // Using dense forward option, so we don't need in-edge information
-    graph.structureFromFile(filename, true); 
+    Galois::Graph::readGraph(graph, filename); 
   }
 
   struct Initialize {
@@ -229,10 +261,10 @@ struct GraphLabAlgo {
       Galois::GraphLab::AsyncEngine<Graph,Program<true> > engine(graph, Program<true>());
       engine.execute();
     } else if (UseDelta) {
-      Galois::GraphLab::SyncEngine<Graph,Program<true> > engine(&graph);
+      Galois::GraphLab::SyncEngine<Graph,Program<true> > engine(graph, Program<true>());
       engine.execute();
     } else {
-      Galois::GraphLab::SyncEngine<Graph,Program<false> > engine(&graph);
+      Galois::GraphLab::SyncEngine<Graph,Program<false> > engine(graph, Program<false>());
       for (unsigned i = 0; i < maxIterations; ++i)
         engine.execute();
     }
@@ -241,9 +273,13 @@ struct GraphLabAlgo {
 
 template<bool UseGraphChi>
 struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
+  typedef typename Galois::Graph::LC_CSR_Graph<PNode,void>
+    ::template with_numa_alloc<true>::type
+    ::template with_no_lockable<true>::type
+    InnerGraph;
   typedef typename boost::mpl::if_c<UseGraphChi,
           Galois::Graph::OCImmutableEdgeGraph<PNode,void>,
-          Galois::Graph::LC_CSR_InOutGraph<PNode,void,true> >::type
+          Galois::Graph::LC_InOut_Graph<InnerGraph>>::type
           Graph;
   typedef typename Graph::GraphNode GNode;
 
@@ -254,7 +290,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
 
   void readGraph(Graph& graph) {
     // Using dense forward option, so we don't need in-edge information
-    graph.structureFromFile(filename, true); 
+    Galois::Graph::readGraph(graph, filename); 
     this->checkIfInMemoryGraph(graph, memoryLimit);
   }
 
@@ -264,7 +300,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
     void operator()(typename Graph::GraphNode n) {
       PNode& data = g.getData(n, Galois::MethodFlag::NONE);
       data.value = 1.0;
-      data.accum = 0.0;
+      data.accum.write(0.0);
     }
   };
 
@@ -280,14 +316,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
       PNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
       float delta =  sdata.value / neighbors;
       
-      while (true) {
-        float oldValue = ddata.accum;
-        float newValue = oldValue + delta;
-        int *ptr = reinterpret_cast<int*>(&ddata.accum);
-        static_assert(sizeof(int) == sizeof(float), "Oops");
-        if (__sync_bool_compare_and_swap(ptr, *reinterpret_cast<int*>(&oldValue), *reinterpret_cast<int*>(&newValue)))
-          break;
-      }
+      ddata.accum.atomicIncrement(delta);
       return false; // Topology-driven
     }
   };
@@ -298,13 +327,13 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
     UpdateNode(LigraAlgo* s, Graph& g): self(s), graph(g) { }
     void operator()(GNode src) {
       PNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
-      float value = (1.0 - alpha) * sdata.accum + alpha;
+      float value = (1.0 - alpha) * sdata.accum.read() + alpha;
       float diff = std::fabs(value - sdata.value);
       if (diff <= tolerance)
         self->small_delta += 1;
       self->max_delta.update(diff);
       sdata.value = value;
-      sdata.accum = 0;
+      sdata.accum.write(0);
     }
   };
 
@@ -352,8 +381,12 @@ struct PullAlgo {
     float getPageRank(unsigned int it) { return value[it & 1]; }
     void setPageRank(unsigned it, float v) { value[(it+1) & 1] = v; }
   };
-  typedef Galois::Graph::LC_InlineEdge_Graph<LNode,float,true> Graph;
-  typedef Graph::GraphNode GNode;;
+  typedef Galois::Graph::LC_InlineEdge_Graph<LNode,float>
+    ::with_compressed_node_ptr<true>::type
+    ::with_no_lockable<true>::type
+    ::with_numa_alloc<true>::type
+    Graph;
+  typedef Graph::GraphNode GNode;
 
   std::string name() const { return "Pull"; }
 
@@ -362,7 +395,7 @@ struct PullAlgo {
 
   void readGraph(Graph& graph) {
     if (transposeGraphName.size()) {
-      graph.structureFromFile(transposeGraphName); 
+      Galois::Graph::readGraph(graph, transposeGraphName); 
     } else {
       std::cerr << "Need to pass precomputed graph through -graphTranspose option\n";
       abort();
@@ -457,14 +490,15 @@ struct PullAlgo {
 
 //! Transpose in-edges to out-edges
 static void precomputePullData() {
-  typedef Galois::Graph::LC_CSR_Graph<size_t, void> InputGraph;
+  typedef Galois::Graph::LC_CSR_Graph<size_t, void>
+    ::with_no_lockable<true>::type InputGraph;
   typedef InputGraph::GraphNode InputNode;
   typedef Galois::Graph::FileGraphWriter OutputGraph;
   typedef OutputGraph::GraphNode OutputNode;
 
   InputGraph input;
   OutputGraph output;
-  input.structureFromFile(filename);
+  Galois::Graph::readGraph(input, filename); 
 
   size_t node_id = 0;
   for (InputNode src : input) {
@@ -544,7 +578,7 @@ static void printTop(Graph& graph, int topn) {
   Top top;
 
   for (GNode src : graph) {
-    node_data_reference& n = graph.getData(src);
+    node_data_reference n = graph.getData(src);
     float value = n.getPageRank();
     Pair key(value, src);
 
@@ -576,7 +610,7 @@ void run() {
   algo.readGraph(graph);
 
   Galois::preAlloc(numThreads + (graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::MM::pageSize);
-  Galois::Statistic("MeminfoPre", Galois::Runtime::MM::pageAllocInfo());
+  Galois::reportPageAlloc("MeminfoPre");
 
   Galois::StatTimer T;
   std::cout << "Running " << algo.name() << " version\n";
@@ -586,7 +620,7 @@ void run() {
   algo(graph);
   T.stop();
   
-  Galois::Statistic("MeminfoPost", Galois::Runtime::MM::pageAllocInfo());
+  Galois::reportPageAlloc("MeminfoPost");
 
   if (!skipVerify)
     printTop(graph, 10);
@@ -595,8 +629,6 @@ void run() {
 int main(int argc, char **argv) {
   LonestarStart(argc, argv, name, desc, url);
   Galois::StatManager statManager;
-
-  Galois::Runtime::Distributed::networkStart();
 
   if (outputPullFilename.size()) {
     precomputePullData();
@@ -617,8 +649,6 @@ int main(int argc, char **argv) {
     default: std::cerr << "Unknown algorithm\n"; abort();
   }
   T.stop();
-
-  Galois::Runtime::Distributed::networkTerminate();
 
   return 0;
 }

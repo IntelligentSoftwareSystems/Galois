@@ -92,7 +92,7 @@ public:
 
   // It can be shown for basic operations that after truncation, the 
   // relative error remains within a small constant factor of TRUNCATE_PRECISION
-  static inline const double FP_ERR_LIM () {
+  static inline double FP_ERR_LIM () {
     return 128.0 / (TRUNCATE_PRECISION);
   } 
 

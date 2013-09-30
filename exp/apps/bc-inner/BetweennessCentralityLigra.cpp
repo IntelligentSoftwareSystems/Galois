@@ -24,6 +24,7 @@
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
+#include "Galois/config.h"
 #include "Galois/Galois.h"
 #include "Galois/Accumulator.h"
 #include "Galois/Timer.h"
@@ -39,6 +40,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 
+#include GALOIS_CXX11_STD_HEADER(atomic)
 #include <string>
 #include <deque>
 #include <iostream>
@@ -49,7 +51,7 @@ static const char* desc = 0;
 static const char* url = 0;
 
 //****** Command Line Options ******
-enum class Algo {
+enum Algo {
   ligra,
   ligraChi
 };
@@ -98,31 +100,46 @@ void readInOutGraph(Graph& graph) {
   }
 }
 
-float atomicIncrement(float* ptr, float delta) {
-  static_assert(sizeof(int) == sizeof(float), "Oops");
-  while (true) {
-    float oldValue = *ptr;
-    float newValue = oldValue + delta;
-    int *p = reinterpret_cast<int*>(ptr);
-    int oldV = *reinterpret_cast<int*>(&oldValue);
-    int newV = *reinterpret_cast<int*>(&newValue);
-    if (__sync_bool_compare_and_swap(p, oldV, newV))
-      return oldValue;
-  }
-}
-
 #ifdef GALOIS_USE_EXP
 template<bool UseGraphChi>
 struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
+
+  //ICC v13.1 doesn't yet support std::atomic<float> completely, emmulate its
+  //behavor with std::atomic<int>
+  struct atomic_float : public std::atomic<int> {
+  private:
+    operator int() const;
+    static_assert(sizeof(int) == sizeof(float), "int and float must be the same size");
+  public:
+    float atomicIncrement(float value) {
+      while (true) {
+        union { float as_float; int as_int; } oldValue = { read() };
+        union { float as_float; int as_int; } newValue = { oldValue.as_float + value };
+        if (this->compare_exchange_strong(oldValue.as_int, newValue.as_int))
+          return oldValue.as_float;
+      }
+    }
+
+    float read() {
+      union { int as_int; float as_float; } caster = { this->load(std::memory_order_relaxed) };
+      return caster.as_float;
+    }
+
+    void write(float v) {
+      union { float as_float; int as_int; } caster = { v };
+      this->store(caster.as_int, std::memory_order_relaxed);
+    }
+  };
+
   struct SNode {
-    float numPaths;
-    float dependencies;
+    atomic_float numPaths;
+    atomic_float dependencies;
     bool visited;
   };
 
   typedef typename Galois::Graph::LC_CSR_Graph<SNode,void>
-    ::template with_no_lockable<true> 
-    ::template with_numa_alloc<true> InnerGraph;
+    ::template with_no_lockable<true>::type 
+    ::template with_numa_alloc<true>::type InnerGraph;
 
   typedef typename boost::mpl::if_c<UseGraphChi,
           Galois::Graph::OCImmutableEdgeGraph<SNode,void>,
@@ -143,8 +160,8 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
     Initialize(Graph& g): g(g) { }
     void operator()(typename Graph::GraphNode n) {
       SNode& data = g.getData(n, Galois::MethodFlag::NONE);
-      data.numPaths = 0.0;
-      data.dependencies = 0.0;
+      data.numPaths.write(0.0);
+      data.dependencies.write(0.0);
       data.visited = false;
     }
   };
@@ -159,7 +176,8 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
     bool operator()(GTy& graph, typename GTy::GraphNode src, typename GTy::GraphNode dst, typename GTy::edge_data_reference) {
       SNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
       SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
-      float oldValue = atomicIncrement(&ddata.numPaths, sdata.numPaths);
+
+      float oldValue = ddata.numPaths.atomicIncrement(sdata.numPaths.read());
       return oldValue == 0.0;
     }
   };
@@ -174,7 +192,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
     bool operator()(GTy& graph, typename GTy::GraphNode src, typename GTy::GraphNode dst, typename GTy::edge_data_reference) {
       SNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
       SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
-      float oldValue = atomicIncrement(&ddata.dependencies, sdata.dependencies);
+      float oldValue = ddata.dependencies.atomicIncrement(sdata.dependencies.read());
       return oldValue == 0.0;
     }
   };
@@ -184,7 +202,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
     std::deque<Bag*> levels;
 
     graph.getData(source).visited = true;
-    graph.getData(source).numPaths = 1;
+    graph.getData(source).numPaths.write(1);
     Bag* frontier = new Bag(graph.size());
     frontier->push(source, 1);
     levels.push_back(frontier);
@@ -208,7 +226,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
 
     Galois::do_all_local(graph, [&](GNode n) {
         SNode& d = graph.getData(n, Galois::MethodFlag::NONE);
-        d.numPaths = 1.0/d.numPaths;
+        d.numPaths.write(1.0/d.numPaths.read());
         d.visited = false;
     });
 
@@ -218,7 +236,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
     Galois::for_each_local<WL>(*frontier, [&](size_t id, Galois::UserContext<size_t>&) {
       SNode& d = graph.getData(graph.nodeFromId(id), Galois::MethodFlag::NONE);
       d.visited = true;
-      d.dependencies += d.numPaths;
+      d.dependencies.write(d.dependencies.read() + d.numPaths.read());
     });
 
     for (int r = round - 2; r >= 0; --r) {
@@ -230,7 +248,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
       Galois::for_each_local<WL>(*frontier, [&](size_t id, Galois::UserContext<size_t>&) {
         SNode& d = graph.getData(graph.nodeFromId(id), Galois::MethodFlag::NONE);
         d.visited = true;
-        d.dependencies += d.numPaths;
+        d.dependencies.write(d.dependencies.read() + d.numPaths.read());
       });
     }
 
@@ -238,7 +256,8 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
 
     Galois::do_all_local(graph, [&](GNode n) {
       SNode& d = graph.getData(n, Galois::MethodFlag::NONE);
-      d.dependencies = (d.dependencies - d.numPaths) / d.numPaths;
+      d.dependencies.write((d.dependencies.read() - d.numPaths.read())
+          / d.numPaths.read());
     });
   }
 };
@@ -269,11 +288,16 @@ void run() {
 
   if (!skipVerify) {
     int count = 0;
-    for (typename Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei && count < 10; ++ii, ++count) {
+    for (typename Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei && count < 20; ++ii, ++count) {
       std::cout << count << ": "
-        << std::setiosflags(std::ios::fixed) << std::setprecision(6) << graph.getData(*ii).dependencies
-        << "\n";
+        << std::setiosflags(std::ios::fixed) << std::setprecision(6) << graph.getData(*ii).dependencies.read()
+                << " " << (int)round(1.0 / graph.getData(*ii).numPaths.read())
+                << "\n";
     }
+    count = 0;
+    // for (typename Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii, ++count)
+    //   std::cout << ((count % 128 == 0) ? "\n" : " ") << (int)round(1.0 / graph.getData(*ii).numPaths.read());
+    std::cout << "\n";
   }
 }
 

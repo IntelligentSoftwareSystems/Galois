@@ -99,7 +99,9 @@ std::ostream& operator<<(std::ostream& out, const SNode& n) {
   return out;
 }
 
-typedef Galois::Graph::LC_Linear_Graph<SNode, void>::with_no_lockable<true>::with_numa_alloc<true> Graph;
+typedef Galois::Graph::LC_Linear_Graph<SNode, void>
+  ::with_no_lockable<true>::type
+  ::with_numa_alloc<true>::type Graph;
 typedef Graph::GraphNode GNode;
 
 Graph graph;
@@ -368,10 +370,10 @@ struct SimplePseudoPeripheral {
   struct has_dist {
     DistType dist;
     explicit has_dist(DistType d): dist(d) { }
-    boost::optional<GNode> operator()(const GNode& a) const {
+    Galois::optional<GNode> operator()(const GNode& a) const {
       if (graph.getData(a).dist == dist)
-        return boost::optional<GNode>(a);
-      return boost::optional<GNode>();
+        return Galois::optional<GNode>(a);
+      return Galois::optional<GNode>();
     }
   };
 
@@ -379,7 +381,7 @@ struct SimplePseudoPeripheral {
     BFS::Result res = BFS::go(start, false);
     GNode candidate =
       *Galois::ParallelSTL::map_reduce(graph.begin(), graph.end(),
-          has_dist(res.ecc()), boost::optional<GNode>(), min_degree());
+          has_dist(res.ecc()), Galois::optional<GNode>(), min_degree());
     return std::make_pair(res, candidate);
   }
 
@@ -521,7 +523,7 @@ struct PseudoPeripheral {
   static std::pair<BFS::Result,GNode> go(GNode source) {
     int skips = 0;
     int searches = 0;
-    boost::optional<BFS::Result> terminal;
+    Galois::optional<BFS::Result> terminal;
 
     ++searches;
     std::pair<BFS::Result, std::deque<GNode> > v = search(source, ~0, true);
@@ -544,11 +546,11 @@ struct PseudoPeripheral {
           continue;
         } else if (u.first.ecc() > v.first.ecc()) {
           v = u;
-          terminal = boost::optional<BFS::Result>();
+          terminal = Galois::optional<BFS::Result>();
           break;
         } else if (u.first.max_width < last) {
           last = u.first.max_width;
-          terminal = boost::optional<BFS::Result>(u.first);
+          terminal = Galois::optional<BFS::Result>(u.first);
         }
       }
 
@@ -645,7 +647,7 @@ struct Permutation {
 Permutation perm;
 
 //debugging 
-static void printAccess(std::string msg){
+void printAccess(std::string msg){
   std::cerr << msg << " Access Pattern:\n";
 
   std::vector<unsigned int> temp;
@@ -681,7 +683,7 @@ static void printAccess(std::string msg){
   std::cerr << "\n";
 }
 
-static void findStartingNode(GNode& starting) {
+void findStartingNode(GNode& starting) {
   unsigned int mindegree = DIST_INFINITY; 
 
   for (Graph::iterator src = graph.begin(), ei =
@@ -863,7 +865,7 @@ struct banddiff {
 			GNode dst = graph.getEdgeDst(ii);
 			SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
 
-			unsigned long int diff = abs(sdata.id - ddata.id);
+			long int diff = abs(sdata.id - ddata.id);
 			//long int diff = (long int) sdata.id - (long int) ddata.id;
 			maxdiff = diff > maxdiff ? diff : maxdiff;
 		}
@@ -962,7 +964,7 @@ static void resetGraph() {
   perm.reset();
 }
 
-static void printDegreeDistribution() {
+void printDegreeDistribution() {
   std::map<unsigned int, unsigned int> distr;
 
   for (Graph::iterator n = graph.begin(), ei = graph.end(); n != ei; ++n) {
@@ -984,8 +986,8 @@ static void readGraph() {
   std::cout << "Read " << nnodes << " nodes\n";
   
   size_t id = 0;
-  bool foundTerminal = false;
-  bool foundSource = false;
+  //bool foundTerminal = false;
+  //bool foundSource = false;
 
   perm.init(nnodes);
 

@@ -24,6 +24,7 @@
  */
 #include "Galois/Galois.h"
 #include "Galois/Atomic.h"
+#include "Galois/Accumulator.h"
 #include "Galois/Bag.h"
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
@@ -35,6 +36,7 @@
 #include <sstream>
 #include <limits>
 #include <iostream>
+#include <fstream>
 #include <deque>
 #include <numeric>
 
@@ -50,10 +52,10 @@ enum PseudoAlgo {
   fullPseudo
 };
 
-enum class WriteType {
+enum WriteType {
   none,
-  graph,
-  perm
+  permutedgraph,
+  permutation
 };
 
 typedef unsigned int DistType;
@@ -65,8 +67,8 @@ static cll::opt<std::string> outputFilename(cll::Positional, cll::desc("[output 
 static cll::opt<WriteType> writeType("output", cll::desc("Output type:"),
     cll::values(
       clEnumValN(WriteType::none, "none", "None (default)"),
-      clEnumValN(WriteType::graph, "graph", "Permuted graph"),
-      clEnumValN(WriteType::perm, "perm", "Permutation"),
+      clEnumValN(WriteType::permutedgraph, "graph", "Permuted graph"),
+      clEnumValN(WriteType::permutation, "perm", "Permutation"),
       clEnumValEnd), cll::init(WriteType::none));
 static cll::opt<PseudoAlgo> pseudoAlgo(cll::desc("Psuedo-Peripheral algorithm:"),
     cll::values(
@@ -93,7 +95,9 @@ struct SNode {
   bool done;
 };
 
-typedef Galois::Graph::LC_CSR_Graph<SNode, void>::with_no_lockable<true>::with_numa_alloc<true> Graph;
+typedef Galois::Graph::LC_CSR_Graph<SNode, void>
+  ::with_no_lockable<true>::type
+  ::with_numa_alloc<true>::type Graph;
 typedef Graph::GraphNode GNode;
 
 Graph graph;
@@ -469,10 +473,10 @@ struct SimplePseudoPeripheral {
   struct has_dist {
     DistType dist;
     explicit has_dist(DistType d): dist(d) { }
-    boost::optional<GNode> operator()(const GNode& a) const {
+    Galois::optional<GNode> operator()(const GNode& a) const {
       if (graph.getData(a).dist == dist)
-        return boost::optional<GNode>(a);
-      return boost::optional<GNode>();
+        return Galois::optional<GNode>(a);
+      return Galois::optional<GNode>();
     }
   };
 
@@ -480,7 +484,7 @@ struct SimplePseudoPeripheral {
     BFS::Result res = BFS::go(start, false);
     GNode candidate =
       *Galois::ParallelSTL::map_reduce(graph.begin(), graph.end(),
-          has_dist(res.ecc()), boost::optional<GNode>(), min_degree());
+          has_dist(res.ecc()), Galois::optional<GNode>(), min_degree());
     return std::make_pair(res, candidate);
   }
 
@@ -601,7 +605,7 @@ struct PseudoPeripheral {
     BFS::Result res;
     std::deque<GNode> candidates;
 
-    if (limit == ~0 || pseudoAlgo == fullPseudo) {
+    if (limit == (size_t)-1 || pseudoAlgo == fullPseudo) {
       res = BFS::go(start, false);
       if (computeCandidates)
         candidates = select_candidates::go(5, res.ecc());
@@ -621,7 +625,7 @@ struct PseudoPeripheral {
   static BFS::Result go(GNode source) {
     int skips = 0;
     int searches = 0;
-    boost::optional<BFS::Result> terminal;
+    Galois::optional<BFS::Result> terminal;
 
     ++searches;
     std::pair<BFS::Result, std::deque<GNode> > v = search(source, ~0, true);
@@ -644,11 +648,11 @@ struct PseudoPeripheral {
           continue;
         } else if (u.first.ecc() > v.first.ecc()) {
           v = u;
-          terminal = boost::optional<BFS::Result>();
+          terminal = Galois::optional<BFS::Result>();
           break;
         } else if (u.first.max_width < last) {
           last = u.first.max_width;
-          terminal = boost::optional<BFS::Result>(u.first);
+          terminal = Galois::optional<BFS::Result>(u.first);
         }
       }
 
@@ -915,8 +919,8 @@ int main(int argc, char **argv) {
 
   switch (writeType) {
     case WriteType::none: break;
-    case WriteType::perm: writePermutation(); break;
-    case WriteType::graph: if (useFloatEdgeWeights) writeGraph<float>(); else writeGraph<double>(); break;
+    case WriteType::permutation: writePermutation(); break;
+    case WriteType::permutedgraph: if (useFloatEdgeWeights) writeGraph<float>(); else writeGraph<double>(); break;
     default: abort();
   }
 

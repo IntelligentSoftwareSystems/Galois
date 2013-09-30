@@ -164,13 +164,13 @@ struct InnerLoopDoAll {
 template <bool doLock> 
 struct LoopFlags {
   typedef int tt_does_not_need_stats; // disable stats in Galois::Runtime
-  typedef int tt_does_not_need_parallel_push;
+  typedef int tt_does_not_need_push;
 };
 
 template <>
 struct LoopFlags<false> { // more when no locking
   typedef int tt_does_not_need_stats; // disable stats in Galois::Runtime
-  typedef char tt_does_not_need_parallel_push;
+  typedef char tt_does_not_need_push;
   typedef double tt_does_not_need_aborts;
 };
 

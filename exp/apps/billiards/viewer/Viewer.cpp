@@ -31,7 +31,8 @@ void Viewer::drawTime() {
   font.setPointSize(25);
   glDisable(GL_LIGHTING);
   glColor3f(0.0, 1.0, 1.0);
-  drawText(width() - 300, height() - 20, buf, font);
+  // drawText(width() - 300, height() - 20, buf, font);
+  drawText (100, 25, buf, font);
   glEnable(GL_LIGHTING);
 }
 
@@ -93,7 +94,7 @@ void Viewer::init() {
   setSceneCenter(sceneDim / 2);
   camera()->showEntireScene();
   
-  setAnimationPeriod(100);
+  setAnimationPeriod(refdelay);
   //help();
   //startAnimation();
 }

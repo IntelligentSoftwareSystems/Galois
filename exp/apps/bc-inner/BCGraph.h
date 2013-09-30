@@ -93,6 +93,8 @@ class BCGraph {
     }
 
     BCGraph(const char * filename)  {
+      std::cout << "Node Size " << sizeof(ND) << " uses " << sizeof(Galois::Runtime::LL::CacheLineStorage<ND>) << "\n";
+      std::cout << "Edge Size " << sizeof(ED) << "\n";
       std::string tmp(filename);
       std::string fname1 = tmp + "1.gr";
       std::string fname2 = tmp + "2.gr"; 
@@ -288,7 +290,7 @@ class BCGraph {
   ND * getNode(int id) {
 	return &nodes[id].data;
   }
-  Galois::Runtime::LL::CacheLineStorage<ND> * const getNodes() const {
+  Galois::Runtime::LL::CacheLineStorage<ND> * getNodes() const {
 		return nodes;
 	}
  
@@ -418,7 +420,7 @@ class BCGraph {
     for (int i=0; i<nnodes; ++i) {
 			ND & n = nodes[i].data;
 			int nOutNbrs = inNeighborsSize(&n);
-			n.preds.reserve(nOutNbrs);
+			//n.preds.reserve(std::min(2, nOutNbrs));
 /*      if (maxInNbrs < nOutNbrs) {
         maxInNbrs = nOutNbrs;
         maxId = n.id;
@@ -428,10 +430,6 @@ class BCGraph {
       if (maxOutNbrs < oos) {
         maxOutNbrs = oos;
       }*/
-			for (int j=0; j<nOutNbrs; ++j) {
-				n.preds.push_back(0);
-			}
-			n.preds.resize(0);
 		}
 //    std::cerr << "Node " << maxId << " has " << maxInNbrs << " in-nbrs Sum is " << sumInNbrs << "\n";
 //    std::cerr << " Max " << maxOutNbrs << " out-nbrs \n";
@@ -441,7 +439,7 @@ class BCGraph {
 		for (int i=start; i<end; ++i) {
 			ND & n = nodes[i].data;
 			int nOutNbrs = inNeighborsSize(&n);
-			n.preds.reserve(nOutNbrs);
+			//n.preds.reserve(std::min(2, nOutNbrs));
 		}
 	}
 

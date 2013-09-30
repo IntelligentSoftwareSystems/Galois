@@ -1,0 +1,73 @@
+Cholesky factorization (implemented as a graph algorithm)
+
+To run Cholesky on a matrix, it must be converted to a graph in
+Galois's binary GR format. Currently, graph-convert only supports
+Matrix Market as an input matrix format.
+
+  graph-convert -mtx2doublegr matrix.mtx matrix.mtx.gr
+  Cholesky matrix.mtx.gr
+
+You can specify the node traversal order on the command-line:
+
+  Cholesky -ordering=sequential matrix.mtx.gr
+
+If you can run cholesky.py (see below) and your matrix is in a simple
+whitespace-delimited file (e.g. tab-separated values), you can convert
+it to a binary .gr file using matrix2gr.py.
+
+If you have an edge-list file with the expected result, you can use
+diff_edgelists.py to verify:
+
+  python diff_edgelists.py choleskyedges.txt matrix.mtx.choleskyedges
+
+Where diff_edgelists.py compares two edgelists with floating-point
+edge weights and verifies that the same edges appear in the same order
+with edge weights differing by no more than some small tolerance.
+
+===============================================================================
+
+There is also NumericCholesky, which implements only the second
+portion of the algorithm (the numeric factorization). It accepts as
+input the filled graph and dependency ordering files, which are output
+by the Python version, cholesky.py.
+
+The filled graph and dependency ordering files are included (in
+../../inputs/cholesky) for two matrices (matrix1 and very-sparse). The
+filled graphs should be converted to a .gr using graph-convert:
+
+  graph-convert -doubleedgelist2gr matrix1.txt.filled matrix1.txt.filled.gr
+
+To perform numeric factorization:
+
+  NumericCholesky matrix1.txt.filled.gr matrix1.txt.dep
+  python diff_edgelists.py choleskyedges.txt matrix1.txt.choleskyedges 
+
+===============================================================================
+
+The Python version, cholesky.py, implements the full Cholesky
+factorization algorithm. (It is single-threaded.)
+
+It requires the NetworkX graph library: https://pypi.python.org/pypi/networkx/
+
+  wget http://pypi.python.org/packages/source/n/networkx/networkx-1.7.tar.gz
+  tar xf networkx-1.7.tar.gz; (cd networkx-1.7; python setup.py build)
+  ln -s networkx-1.7/build/lib/networkx
+
+When run on a matrix, cholesky.py will save the graph representation
+of the matrix (as both an edgelist and a Galois .gr file), the filled
+graph, and dependency ordering. These files can be used as input to
+Cholesky or NumericCholesky. cholesky.py will also save a copy of the
+answer (as an edge list) for comparison against the answer produced by
+NumericCholesky. diff_edgelists.py is useful for comparing the two.
+
+===============================================================================
+
+For automated testing of Cholesky or NumericCholesky, use test.py:
+
+  python test.py ../../../build/debug/exp/apps/cholesky/NumericCholesky
+  python test.py ../../../build/debug/exp/apps/cholesky/Cholesky
+
+test.py will generate random sparse symmetric positive definite
+matrices, and compare the results from cholesky.py and either Cholesky
+or NumericCholesky.
+

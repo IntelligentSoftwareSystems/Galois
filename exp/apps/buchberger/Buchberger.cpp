@@ -897,12 +897,12 @@ struct Coef {
   typedef boost::variant<char,char> Sign;
   Sign sign;
   typedef boost::variant<fusion::vector<int,int>, int> Rational;
-  boost::optional<Rational> rational;
+  Galois::optional<Rational> rational;
 };
 
 struct Mono {
   std::string id;
-  boost::optional<int> expo;
+  Galois::optional<int> expo;
 };
 
 struct Term {
@@ -920,13 +920,13 @@ struct Poly {
 BOOST_FUSION_ADAPT_STRUCT(
     parser::Coef,
     (parser::Coef::Sign, sign)
-    (boost::optional<parser::Coef::Rational>, rational)
+    (Galois::optional<parser::Coef::Rational>, rational)
 )
 
 BOOST_FUSION_ADAPT_STRUCT(
     parser::Mono,
     (std::string, id)
-    (boost::optional<int>, expo)
+    (Galois::optional<int>, expo)
 )
 
 BOOST_FUSION_ADAPT_STRUCT(

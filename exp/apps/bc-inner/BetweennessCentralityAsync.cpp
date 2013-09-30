@@ -107,10 +107,10 @@ struct firstForEachNodeBased {
           A->nsuccs++;
           const double ASigma = A->sigma;
           if (CONCURRENT) { A->unlock(); }
-          std::vector<ND*> & Bpreds = B->preds;
+          ND::predTY & Bpreds = B->preds;
           bool bpredsNotEmpty = !Bpreds.empty();
           //if (bpredsNotEmpty) std::cerr << Bpreds.size() << std::endl;
-          Bpreds.resize(0);
+          Bpreds.clear();
           Bpreds.push_back(A);
           B->distance = ADist + 1;
           //int newBDist = ADist + 1;
@@ -411,10 +411,10 @@ struct firstForEach {
       const double ASigma = A->sigma;
       if (CONCURRENT) { A->unlock(); }
 			
-	  		std::vector<ND*> & Bpreds = B->preds;
+	  		ND::predTY & Bpreds = B->preds;
 	  		bool bpredsNotEmpty = !Bpreds.empty();
 			//Bpreds.clear();
-			Bpreds.resize(0);
+			Bpreds.clear();//resize(0);
 			Bpreds.push_back(A);
 			B->distance = ADist + 1;
 			int newBDist = ADist + 1;
@@ -508,8 +508,6 @@ struct firstForEach {
 //    struct does_not_need_aborts<firstForEach> : public boost::true_type {};
 //}
 
-
-
 struct secondForEach {
 
   typedef int tt_does_not_need_stats;
@@ -529,7 +527,7 @@ struct secondForEach {
         //const double ATerm = (1.0 + Adelta)/A->sigma;
         if (CONCURRENT) { A->unlock(); }
 
-        std::vector<ND*> & Apreds = A->preds;
+        ND::predTY & Apreds = A->preds;
         int sz = Apreds.size();
         for (int i=0; i<sz; ++i) {
           ND *pd = Apreds[i];
@@ -583,7 +581,7 @@ struct secondForEachWithInline {
         A->bc += Adelta;
 //        if (CONCURRENT) { A->unlock(); }
 
-        std::vector<ND*> & Apreds = A->preds;
+        ND::predTY & Apreds = A->preds;
         int sz = Apreds.size();
         for (int i=0; i<sz; ++i) {
           ND *pd = Apreds[i];
@@ -596,7 +594,7 @@ struct secondForEachWithInline {
             const double pdDelta = pd->delta;
             pd->bc += pdDelta;
             if (CONCURRENT) { pd->unlock(); }
-            std::vector<ND*> & pdPreds = pd->preds;
+            ND::predTY & pdPreds = pd->preds;
             int sz = pdPreds.size();
             for (int j=0; j<sz; ++j) {
               ND *pd2 = pdPreds[j];
@@ -609,7 +607,7 @@ struct secondForEachWithInline {
                 const double pd2Delta = pd2->delta;
                 pd2->bc += pd2Delta;
                 if (CONCURRENT) { pd2->unlock(); }
-                std::vector<ND*> & pd2Preds = pd2->preds;
+                ND::predTY & pd2Preds = pd2->preds;
                 int sz = pd2Preds.size();
                 for (int k=0; k<sz; ++k) {
                   ND *pd3 = pd2Preds[k];
@@ -801,16 +799,16 @@ struct fringeFindDOALL2NoInline {
 
 
 struct initCapDOALL {
-	void inline operator()(int i) {
+  void inline operator()(int i) {
     std::pair<int,int> p1 = nodeArrayRanges[i];
-		int start = p1.first;
-		int end = p1.second;
-		for (int j=start; j<end; ++j) {
-			ND * n = &(gnodes[j].data);
-			int nOutNbrs = graph->inNeighborsSize(n);
-			n->preds.reserve(nOutNbrs);
-		}
-	}
+    int start = p1.first;
+    int end = p1.second;
+    for (int j=start; j<end; ++j) {
+      ND * n = &(gnodes[j].data);
+      int nOutNbrs = graph->inNeighborsSize(n);
+      n->preds.reserve(nOutNbrs);
+    }
+  }
 };
 
 struct fourthForEach {
@@ -935,15 +933,15 @@ int main(int argc, char** argv) {
   createCleanupChunks(nnodes, nedges, numThreads);
 
 	gnodes = graph->getNodes();
-  firstForEach feach1;
+  //firstForEach feach1;
   firstForEachNodeBased feach1NodeBased;
   //secondForEachWithInline feach2;
   secondForEach feach2;
-  fourthForEach feach4;
-	//fringeFindDOALL2 findFringe;
-	fringeFindDOALL2NoInline findFringe;
-	cleanupGraphDOALL cleanupGloop;
-	initCapDOALL setPredCapacitiesloop;
+  //fourthForEach feach4;
+  //fringeFindDOALL2 findFringe;
+  fringeFindDOALL2NoInline findFringe;
+  //cleanupGraphDOALL cleanupGloop;
+  //initCapDOALL setPredCapacitiesloop;
 
   int stepCnt = 0;
   Galois::TimeAccumulator firstLoopTimer;
@@ -1034,7 +1032,7 @@ int main(int argc, char** argv) {
 
 		//std::list<ED*> wl;
 #if USE_NODE_BASED
-		std::vector<ND*> wl;
+         std::vector<ND*>  wl;
     wl2.push_back(active);
 #else
 		std::vector<ED*> wl;
@@ -1185,7 +1183,7 @@ int main(int argc, char** argv) {
   std::cout<< "Second Loop: " << secondLoopTimer.get() << std::endl;
   std::cout<< "Third Loop: " << thirdLoopTimer.get() << std::endl;
   std::cout<< "Fourth Loop: " << fourthLoopTimer.get() << std::endl;
-  
+ 
 #ifdef COUNT_ACTIONS
   unsigned long sum1 = 0, sum2 = 0, sum2ex = 0, sum3 = 0, sum4 = 0, sum555 = 0, sumNone = 0;
   for (int i=0; i<numThreads; ++i) {

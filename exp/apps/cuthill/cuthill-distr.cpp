@@ -114,7 +114,9 @@ static cll::opt<std::string> filename(cll::Positional,
 struct SNode;
 // Hack: Resolve circular definition of Graph and SNode.parent with fact that
 // all LC_CSR_Graph::GraphNodes have the same type.
-typedef Galois::Graph::LC_CSR_Graph<void, void>::with_no_lockable<true>::with_numa_alloc<true> DummyGraph;
+typedef Galois::Graph::LC_CSR_Graph<void, void>
+  ::with_no_lockable<true>::type
+  ::with_numa_alloc<true>::type DummyGraph;
 typedef DummyGraph::GraphNode GNode;
 
 //****** Work Item and Node Data Defintions ******
@@ -137,7 +139,7 @@ struct SNode {
 	//Galois::Runtime::LL::SimpleLock<true> mutex;
 };
 
-typedef DummyGraph::with_node_data<SNode> Graph;
+typedef DummyGraph::with_node_data<SNode>::type Graph;
 
 // Check hack above
 struct CheckAssertion {
@@ -321,7 +323,7 @@ struct LocalPrefix {
 
 	void operator()(unsigned int me, unsigned int tot) {
 
-		unsigned int len = initial[round].size();
+		//unsigned int len = initial[round].size();
 		//unsigned int start = me * ceil((double) len / tot);
 		//unsigned int end = (me+1) * ceil((double) len / tot);
 		unsigned int start = me * chunk;
@@ -370,7 +372,7 @@ struct DistrPrefix {
 		if(me > 0){
 			if(me != tot-1){
 
-				unsigned int len = initial[round].size();
+				//unsigned int len = initial[round].size();
 				unsigned int start = me * chunk;
 				unsigned int end = (me+1) * chunk - 1;
 				unsigned int val = graph.getData(initial[round][start-1], Galois::MethodFlag::NONE).numChildren;
@@ -603,7 +605,7 @@ static bool verify(GNode& source) {
     return false;
   }
   
-  size_t id = 0;
+  //size_t id = 0;
   
 #ifdef GALOIS_JUNE
   bool okay = Galois::find_if(graph.begin(), graph.end(), not_consistent()) == graph.end()
@@ -652,7 +654,7 @@ struct banddiff {
 			GNode dst = graph.getEdgeDst(ii);
 			SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
 
-			unsigned long int diff = abs(sdata.id - ddata.id);
+			long int diff = abs(sdata.id - ddata.id);
 			//long int diff = (long int) sdata.id - (long int) ddata.id;
 			maxdiff = diff > maxdiff ? diff : maxdiff;
 		}
@@ -777,7 +779,7 @@ struct resetNode {
 	}
 };
 
-static void resetGraph() {
+void resetGraph() {
 	initial[0].clear();
 	initial[1].clear();
 	bucket.clear();
@@ -904,6 +906,7 @@ struct BarrierNoDup {
 		//unsigned int depth = 0;
 		unsigned int thr = Galois::getActiveThreads();
 		//Galois::Runtime::PthreadBarrier barrier(thr);
+                __attribute__((unused))
 		Galois::Runtime::Barrier& barrier = Galois::Runtime::getSystemBarrier();
 
 		while (true) {

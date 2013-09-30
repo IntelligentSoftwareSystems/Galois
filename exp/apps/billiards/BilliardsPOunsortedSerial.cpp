@@ -26,7 +26,7 @@
  * @author <ahassaan@ices.utexas.edu>
  */
 
-#include "BilliardsPartOrd.h"
+#include "BilliardsPartOrdSerial.h"
 
 int main (int argc, char* argv[]) {
   BilliardsPOunsortedSerial s;
