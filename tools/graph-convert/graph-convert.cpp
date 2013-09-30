@@ -21,18 +21,19 @@
  * @author Dimitrios Prountzos <dprountz@cs.utexas.edu>
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
+#include "Galois/config.h"
 #include "Galois/LargeArray.h"
 #include "Galois/Graph/FileGraph.h"
 
 #include "llvm/Support/CommandLine.h"
-#include <boost/random/mersenne_twister.hpp>
-#include <boost/random/uniform_int_distribution.hpp>
 
 #include <iostream>
+#include <fstream>
 #include <vector>
-#include <string>
+#include GALOIS_CXX11_STD_HEADER(random)
 
 #include <fcntl.h>
+#include <cstdlib>
 
 namespace cll = llvm::cl;
 
@@ -40,6 +41,7 @@ enum ConvertMode {
   dimacs2gr,
   edgelist2vgr,
   floatedgelist2gr,
+  doubleedgelist2gr,
   gr2bsml,
   gr2cintgr,
   gr2dimacs,
@@ -53,6 +55,7 @@ enum ConvertMode {
   gr2partsrcintgr,
   gr2randintgr,
   gr2sorteddstintgr,
+  gr2sortedweightintgr,
   gr2ringintgr,
   gr2rmat,
   gr2sintgr,
@@ -85,6 +88,7 @@ static cll::opt<ConvertMode> convertMode(cll::desc("Choose a conversion mode:"),
       clEnumVal(dimacs2gr, "Convert dimacs to binary gr"),
       clEnumVal(edgelist2vgr, "Convert edge list to binary void gr"),
       clEnumVal(floatedgelist2gr, "Convert weighted (float) edge list to binary gr"),
+      clEnumVal(doubleedgelist2gr, "Convert weighted (double) edge list to binary gr"),
       clEnumVal(gr2bsml, "Convert binary gr to binary sparse MATLAB matrix"),
       clEnumVal(gr2cintgr, "Clean up binary weighted (int) gr: remove self edges and multi-edges"),
       clEnumVal(gr2dimacs, "Convert binary gr to dimacs"),
@@ -101,6 +105,7 @@ static cll::opt<ConvertMode> convertMode(cll::desc("Choose a conversion mode:"),
       clEnumVal(gr2rmat, "Convert binary gr to RMAT graph"),
       clEnumVal(gr2sintgr, "Convert binary gr to symmetric graph by adding reverse edges"),
       clEnumVal(gr2sorteddstintgr, "Sort outgoing edges of binary weighted (int) gr by edge destination"),
+      clEnumVal(gr2sortedweightintgr, "Sort outgoing edges of binary weighted (int) gr by edge weight"),
       clEnumVal(gr2tintgr, "Transpose binary weighted (int) gr"),
       clEnumVal(gr2treeintgr, "Convert binary gr to strongly connected graph by adding tree overlay"),
       clEnumVal(intedgelist2gr, "Convert weighted (int) edge list to binary gr"),
@@ -271,8 +276,11 @@ void convert_mtx2gr(const std::string& infilename, const std::string& outfilenam
     if (tokens.size() != 3) {
       GALOIS_DIE("Unknown problem specification line: ", line.str());
     }
-    nnodes = std::stoull(tokens[0]);
-    nedges = std::stoull(tokens[2]);
+    // Prefer C functions for maximum compatibility
+    //nnodes = std::stoull(tokens[0]);
+    //nedges = std::stoull(tokens[2]);
+    nnodes = strtoull(tokens[0].c_str(), NULL, 0);
+    nedges = strtoull(tokens[2].c_str(), NULL, 0);
 
     // Parse edges
     if (phase == 0) {
@@ -447,11 +455,24 @@ void convert_gr2edgelist(const std::string& infilename, const std::string& outfi
   printStatus(graph.size(), graph.sizeEdges());
 }
 
+//! Wrap generator into form form std::random_shuffle
+template<typename T,typename Gen,template<typename> class Dist>
+struct UniformDist {
+  Gen& gen;
+  
+  UniformDist(Gen& g): gen(g) { }
+  T operator()(T m) {
+    Dist<T> r(0, m - 1);
+    return r(gen);
+  }
+};
+
 template<typename EdgeTy>
 void convert_gr2rand(const std::string& infilename, const std::string& outfilename) {
   typedef Galois::Graph::FileGraph Graph;
   typedef Graph::GraphNode GNode;
   typedef Galois::LargeArray<GNode> Permutation;
+  typedef typename std::iterator_traits<typename Permutation::iterator>::difference_type difference_type;
 
   Graph graph;
   graph.structureFromFile(infilename);
@@ -459,8 +480,13 @@ void convert_gr2rand(const std::string& infilename, const std::string& outfilena
   Permutation perm;
   perm.create(graph.size());
   std::copy(boost::counting_iterator<GNode>(0), boost::counting_iterator<GNode>(graph.size()), perm.begin());
-  boost::random::mt19937 gen;
-  std::shuffle(perm.begin(), perm.end(), gen);
+  std::mt19937 gen;
+#if __cplusplus >= 201103L || defined(HAVE_CXX11_UNIFORM_INT_DISTRIBUTION)
+  UniformDist<difference_type,std::mt19937,std::uniform_int_distribution> dist(gen);
+#else
+  UniformDist<difference_type,std::mt19937,std::uniform_int> dist(gen);
+#endif
+  std::random_shuffle(perm.begin(), perm.end(), dist);
 
   Graph out;
   Galois::Graph::permute<EdgeTy>(graph, perm, out);
@@ -480,9 +506,12 @@ void add_weights(const std::string& infilename, const std::string& outfilename, 
   OutEdgeTy* edgeData = outgraph.structureFromGraph<OutEdgeTy>(graph);
   OutEdgeTy* edgeDataEnd = edgeData + graph.sizeEdges();
 
-  boost::random::mt19937 gen;
-  boost::random::uniform_int_distribution<OutEdgeTy> dist(1, maxvalue);
-  //boost::random::negative_binomial_distribution<OutEdgeTy> dist(10, 0.1);
+  std::mt19937 gen;
+#if __cplusplus >= 201103L || defined(HAVE_CXX11_UNIFORM_INT_DISTRIBUTION)
+  std::uniform_int_distribution<OutEdgeTy> dist(1, maxvalue);
+#else
+  std::uniform_int<OutEdgeTy> dist(1, maxvalue);
+#endif
   for (; edgeData != edgeDataEnd; ++edgeData) {
     *edgeData = dist(gen);
   }
@@ -827,8 +856,8 @@ template<typename GraphTy, typename InDegree>
 static void compute_indegree(GraphTy& graph, InDegree& inDegree) {
   inDegree.create(graph.size());
 
-  for (auto n : graph) {
-    for (auto jj : graph.out_edges(n)) {
+  for (auto nn = graph.begin(), en = graph.end(); nn != en; ++nn) {
+    for (auto jj = graph.edge_begin(*nn), ej = graph.edge_end(*nn); jj != ej; ++jj) {
       auto dst = graph.getEdgeDst(jj);
       inDegree[dst] += 1;
     }
@@ -973,6 +1002,13 @@ struct IdLess {
   }
 };
 
+template<typename GraphNode,typename EdgeTy>
+struct WeightLess {
+  bool operator()(const Galois::Graph::EdgeSortValue<GraphNode,EdgeTy>& e1, const Galois::Graph::EdgeSortValue<GraphNode,EdgeTy>& e2) const {
+    return e1.get() < e2.get();
+  }
+};
+
 /**
  * Removes self and multi-edges from a graph.
  */
@@ -1068,11 +1104,8 @@ void convert_gr2cgr(const std::string& infilename, const std::string& outfilenam
   printStatus(graph.size(), graph.sizeEdges(), p.size(), p.sizeEdges());
 }
 
-/**
- * Removes self and multi-edges from a graph.
- */
-template<typename EdgeTy>
-void sort_destinations(const std::string& infilename, const std::string& outfilename) {
+template<typename EdgeTy,template<typename,typename> class SortBy>
+void sort_edges(const std::string& infilename, const std::string& outfilename) {
   typedef Galois::Graph::FileGraph Graph;
   typedef Graph::GraphNode GNode;
   typedef Galois::Graph::FileGraphWriter Writer;
@@ -1089,7 +1122,7 @@ void sort_destinations(const std::string& infilename, const std::string& outfile
   for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
     GNode src = *ii;
 
-    graph.sortEdges<EdgeTy>(src, IdLess<GNode,EdgeTy>());
+    graph.sortEdges<EdgeTy>(src, SortBy<GNode,EdgeTy>());
   }
 
   graph.structureToFile(outfilename);
@@ -1185,7 +1218,7 @@ void convert_sgr2gr(const std::string& infilename, const std::string& outfilenam
 void convert_dimacs2gr(const std::string& infilename, const std::string& outfilename) { 
   typedef Galois::Graph::FileGraphWriter Writer;
   typedef Galois::LargeArray<int32_t> EdgeData;
-  typedef typename EdgeData::value_type edge_value_type;
+  typedef EdgeData::value_type edge_value_type;
 
   Writer p;
   EdgeData edgeData;
@@ -1218,8 +1251,11 @@ void convert_dimacs2gr(const std::string& infilename, const std::string& outfile
     if (tokens.size() < 3 || tokens[0].compare("p") != 0) {
       GALOIS_DIE("Unknown problem specification line: ", line.str());
     }
-    nnodes = std::stoull(tokens[tokens.size() - 2]);
-    nedges = std::stoull(tokens[tokens.size() - 1]);
+    // Prefer C functions for maximum compatibility
+    //nnodes = std::stoull(tokens[tokens.size() - 2]);
+    //nedges = std::stoull(tokens[tokens.size() - 1]);
+    nnodes = strtoull(tokens[tokens.size() - 2].c_str(), NULL, 0);
+    nedges = strtoull(tokens[tokens.size() - 1].c_str(), NULL, 0);
 
     // Parse edges
     if (phase == 0) {
@@ -1437,12 +1473,14 @@ void convert_gr2vbinpbbs(const std::string& infilename, const std::string& outfi
   graph.structureFromFile(infilename);
 
   {
-    std::ofstream configFile(outfilename + ".config");
+    std::string configName = outfilename + ".config";
+    std::ofstream configFile(configName.c_str());
     configFile << graph.size() << "\n";
   }
 
   {
-    std::ofstream idxFile(outfilename + ".idx");
+    std::string idxName = outfilename + ".idx";
+    std::ofstream idxFile(idxName.c_str());
     // edgeid[i] is the end of i in FileGraph while it is the beginning of i in pbbs graph
     size_t last = std::distance(graph.edge_id_begin(), graph.edge_id_end());
     size_t count = 0;
@@ -1457,7 +1495,8 @@ void convert_gr2vbinpbbs(const std::string& infilename, const std::string& outfi
   }
 
   {
-    std::ofstream adjFile(outfilename + ".adj");
+    std::string adjName = outfilename + ".adj";
+    std::ofstream adjFile(adjName.c_str());
     for (Graph::node_id_iterator ii = graph.node_id_begin(), ei = graph.node_id_end(); ii != ei; ++ii) {
       NodeIdx nodeIdx = *ii;
       adjFile.write(reinterpret_cast<char*>(&nodeIdx), sizeof(nodeIdx));
@@ -1618,19 +1657,26 @@ int main(int argc, char** argv) {
     case dimacs2gr: convert_dimacs2gr(inputfilename, outputfilename); break;
     case edgelist2vgr: convert_edgelist2gr<void>(inputfilename, outputfilename); break;
     case floatedgelist2gr: convert_edgelist2gr<float>(inputfilename, outputfilename); break;
+    case doubleedgelist2gr: convert_edgelist2gr<double>(inputfilename, outputfilename); break;
     case gr2bsml: convert_gr2bsml<int32_t>(inputfilename, outputfilename); break;
     case gr2cintgr: convert_gr2cgr<int32_t>(inputfilename, outputfilename); break;
     case gr2dimacs: convert_gr2dimacs<int32_t>(inputfilename, outputfilename); break;
     case gr2doublemtx: convert_gr2mtx<double>(inputfilename, outputfilename); break;
     case gr2floatmtx: convert_gr2mtx<float>(inputfilename, outputfilename); break;
     case gr2floatpbbsedges: convert_gr2pbbsedges<float>(inputfilename, outputfilename); break;
+#if !defined(__IBMCPP__) || __IBMCPP__ > 1210
     case gr2intpbbs: convert_gr2pbbs<int32_t,int32_t>(inputfilename, outputfilename); break;
+#endif
     case gr2intpbbsedges: convert_gr2pbbsedges<int32_t>(inputfilename, outputfilename); break;
     case gr2lowdegreeintgr: remove_high_degree<int32_t>(inputfilename, outputfilename, maxDegree); break;
+// XXX(ddn): The below triggers some internal XLC bug
+#if !defined(__IBMCPP__) || __IBMCPP__ > 1210
     case gr2partdstintgr: partition_by_destination<int32_t>(inputfilename, outputfilename, numParts); break;
+#endif
     case gr2partsrcintgr: partition_by_source<int32_t>(inputfilename, outputfilename, numParts); break;
     case gr2randintgr: convert_gr2rand<int32_t>(inputfilename, outputfilename); break;
-    case gr2sorteddstintgr: sort_destinations<int32_t>(inputfilename, outputfilename); break;
+    case gr2sorteddstintgr: sort_edges<int32_t,IdLess>(inputfilename, outputfilename); break;
+    case gr2sortedweightintgr: sort_edges<int32_t,WeightLess>(inputfilename, outputfilename); break;
     case gr2ringintgr: add_ring<int32_t>(inputfilename, outputfilename, maxValue); break;
     case gr2rmat: convert_gr2rmat<int32_t,int32_t>(inputfilename, outputfilename); break;
     case gr2sintgr: convert_gr2sgr<int32_t>(inputfilename, outputfilename); break;
@@ -1646,14 +1692,18 @@ int main(int argc, char** argv) {
     case vgr2edgelist: convert_gr2edgelist<void>(inputfilename, outputfilename); break;
     case vgr2intgr: add_weights<void,int32_t>(inputfilename, outputfilename, maxValue); break;
     case vgr2lowdegreevgr: remove_high_degree<void>(inputfilename, outputfilename, maxDegree); break;
+#if !defined(__IBMCPP__) || __IBMCPP__ > 1210
     case vgr2pbbs: convert_gr2pbbs<void,void>(inputfilename, outputfilename); break;
+#endif
     case vgr2ringvgr: add_ring<void>(inputfilename, outputfilename, maxValue); break;
     case vgr2svgr: convert_gr2sgr<void>(inputfilename, outputfilename); break;
     case vgr2treevgr: add_tree<void>(inputfilename, outputfilename, maxValue); break;
     case vgr2trivgr: convert_sgr2gr<void>(inputfilename, outputfilename); break;
     case vgr2tvgr: transpose<void>(inputfilename, outputfilename); break;
+#if !defined(__IBMCPP__) || __IBMCPP__ > 1210
     case vgr2vbinpbbs32: convert_gr2vbinpbbs<uint32_t,uint32_t>(inputfilename, outputfilename); break;
     case vgr2vbinpbbs64: convert_gr2vbinpbbs<uint32_t,uint64_t>(inputfilename, outputfilename); break;
+#endif
     default: abort();
   }
   return 0;
