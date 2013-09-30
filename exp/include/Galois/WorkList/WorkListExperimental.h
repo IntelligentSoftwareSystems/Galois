@@ -34,6 +34,7 @@
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/Termination.h"
 #include "Galois/Runtime/ThreadPool.h"
+#include "Galois/Runtime/ll/SimpleLock.h"
 #include "Galois/Runtime/ll/PaddedLock.h"
 
 #include "llvm/Support/CommandLine.h"
@@ -1649,20 +1650,21 @@ class BarrierOBIM : private boost::noncopyable {
 };
 
 template<typename T = int, bool concurrent = true>
-  class Random : private boost::noncopyable, private Galois::Runtime::LL::PaddedLock<concurrent>  {
-  std::vector<T> wl;
-  unsigned int seed;
-  using Galois::Runtime::LL::PaddedLock<concurrent>::lock;
-  using Galois::Runtime::LL::PaddedLock<concurrent>::try_lock;
-  using Galois::Runtime::LL::PaddedLock<concurrent>::unlock;
+class Random : private boost::noncopyable {
+  std::pair<Runtime::LL::SimpleLock<concurrent>, std::deque<T> > wl[128];
+  struct rstate { unsigned short d[3]; };
+  Runtime::PerThreadStorage<rstate > seeds;
 
   unsigned int nextRand() {
-    seed = 214013*seed + 2531011; 
-    return (seed >> 16) & 0x7FFF;
+    return nrand48(seeds.getLocal()->d);
+  }
+
+  unsigned int pickBucket() {
+    return nrand48(seeds.getLocal()->d) % 128;
   }
 
 public:
-  Random(): seed(0xDEADBEEF) { }
+  Random() { }
 
   template<bool newconcurrent>
   struct rethread { typedef Random<T, newconcurrent> type; };
@@ -1673,9 +1675,10 @@ public:
   typedef T value_type;
 
   void push(value_type val) {
-    lock();
-    wl.push_back(val);
-    unlock();
+    auto& entry = wl[pickBucket()];
+    entry.first.lock();
+    entry.second.push_back(val);
+    entry.first.unlock();
   }
 
   template<typename ItTy>
@@ -1690,19 +1693,23 @@ public:
   }
 
   Galois::optional<value_type> pop() {
-    lock();
-    if (wl.empty()) {
-      unlock();
-      return Galois::optional<value_type>();
-    } else {
-      size_t size = wl.size();
-      unsigned int index = nextRand() % size;
-      value_type retval = wl[index];
-      std::swap(wl[index], wl[size-1]);
-      wl.pop_back();
-      unlock();
-      return Galois::optional<value_type>(retval);
+    unsigned b = pickBucket();
+    for (int i = 0; i < 128; ++i) {
+      auto& entry = wl[(i + b) % 128];
+      entry.first.lock();
+      if (entry.second.empty()) {
+        entry.first.unlock();
+      } else {
+        size_t size = entry.second.size();
+        unsigned int index = nextRand() % size;
+        value_type retval = entry.second[index];
+        std::swap(entry.second[index], entry.second[size-1]);
+        entry.second.pop_back();
+        entry.first.unlock();
+        return Galois::optional<value_type>(retval);
+      }
     }
+    return Galois::optional<value_type>();
   }
 };
 GALOIS_WLCOMPILECHECK(Random)
