@@ -23,10 +23,23 @@
 #ifndef GALOIS_WORKLIST_LOCALQUEUE_H
 #define GALOIS_WORKLIST_LOCALQUEUE_H
 
+#include "Galois/config.h"
+#include <boost/mpl/if.hpp>
+#include GALOIS_CXX11_STD_HEADER(type_traits)
+
 namespace Galois {
 namespace WorkList {
 
-template<typename Global = FIFO<>, typename Local = FIFO<>, typename T = int>
+template<typename T = int>
+struct NoGlobalQueue {
+  template<bool _concurrent>
+  struct rethread { typedef NoGlobalQueue<T> type; };
+
+  template<typename _T>
+  struct retype { typedef NoGlobalQueue<_T> type; };
+};
+
+template<typename Global = NoGlobalQueue<>, typename Local = FIFO<>, typename T = int>
 struct LocalQueue : private boost::noncopyable {
   template<bool _concurrent>
   struct rethread { typedef LocalQueue<Global, Local, T> type; };
@@ -45,6 +58,27 @@ private:
   Runtime::PerThreadStorage<lWLTy> local;
   Global global;
 
+  template<typename RangeTy, bool Enable = std::is_same<Global,NoGlobalQueue<T> >::value>
+  void pushGlobal(const RangeTy& range, typename std::enable_if<Enable>::type* = 0) {
+    auto rp = range.local_pair();
+    local.getLocal()->push(rp.first, rp.second);
+  }
+
+  template<typename RangeTy, bool Enable = std::is_same<Global,NoGlobalQueue<T> >::value>
+  void pushGlobal(const RangeTy& range, typename std::enable_if<!Enable>::type* = 0) {
+    global.push_initial(range);
+  }
+
+  template<bool Enable = std::is_same<Global,NoGlobalQueue<T> >::value>
+  Galois::optional<T> popGlobal(typename std::enable_if<Enable>::type* = 0) {
+    return Galois::optional<value_type>();
+  }
+
+  template<bool Enable = std::is_same<Global,NoGlobalQueue<T> >::value>
+  Galois::optional<T> popGlobal(typename std::enable_if<!Enable>::type* = 0) {
+    return global.pop();
+  }
+
 public:
   typedef T value_type;
 
@@ -59,14 +93,14 @@ public:
 
   template<typename RangeTy>
   void push_initial(const RangeTy& range) {
-    global.push_initial(range);
+    pushGlobal(range);
   }
 
   Galois::optional<value_type> pop() {
     Galois::optional<value_type> ret = local.getLocal()->pop();
     if (ret)
       return ret;
-    return global.pop();
+    return popGlobal();
   }
 };
 GALOIS_WLCOMPILECHECK(LocalQueue)
