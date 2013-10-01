@@ -135,7 +135,7 @@ public:
       onWL (false) 
   {}
 
-  virtual void sub_acquire (Lockable* l) {
+  virtual void subAcquire (Lockable* l) {
     NItem& nitem = nhmgr.getNhoodItem (l);
 
     assert (nitem.getLockable () == l);

@@ -17,10 +17,10 @@
 #cmakedefine GALOIS_USE_NUMA_OLD
 #cmakedefine GALOIS_USE_VTUNE
 #cmakedefine GALOIS_USE_PAPI
+#cmakedefine GALOIS_USE_HTM
 #cmakedefine GALOIS_USE_SEQ_ONLY
 #cmakedefine GALOIS_USE_CXX11_COMPAT
 #cmakedefine GALOIS_USE_LONGJMP
-#cmakedefine GALOIS_USE_TINYSTM
 
 #ifdef GALOIS_USE_CXX11_COMPAT
 #define GALOIS_CXX11_STD_HEADER(name) <Galois/c++11-compat/name.h>

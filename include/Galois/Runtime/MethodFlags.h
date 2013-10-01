@@ -24,6 +24,7 @@
 #ifndef GALOIS_RUNTIME_METHODFLAGS_H
 #define GALOIS_RUNTIME_METHODFLAGS_H
 
+#include "Galois/config.h"
 #include "Galois/MethodFlags.h"
 
 namespace Galois {
@@ -36,8 +37,10 @@ inline bool isWriteMethod(Galois::MethodFlag m, bool write) {
 }
 
 inline void checkWrite(Galois::MethodFlag m, bool write) {
+#ifndef GALOIS_USE_HTM
   if (isWriteMethod(m, write))
     doCheckWrite();
+#endif
 }
 
 }

@@ -88,20 +88,47 @@ void Galois::Runtime::doCheckWrite() {
   }
 }
 
-void Galois::Runtime::setThreadContext(Galois::Runtime::SimpleRuntimeContext* n) {
-  thread_cnx = n;
+void Galois::Runtime::setThreadContext(Galois::Runtime::SimpleRuntimeContext* ctx) {
+  thread_cnx = ctx;
 }
 
 Galois::Runtime::SimpleRuntimeContext* Galois::Runtime::getThreadContext() {
   return thread_cnx;
 }
 
-void Galois::Runtime::doAcquire(Galois::Runtime::Lockable* C) {
+void Galois::Runtime::doAcquire(Galois::Runtime::Lockable* lockable) {
   SimpleRuntimeContext* cnx = getThreadContext();
   if (cnx)
-    cnx->acquire(C);
+    cnx->acquire(lockable);
 }
 
+void Galois::Runtime::breakLoop() {
+#ifdef GALOIS_USE_LONGJMP
+  if (releasableHead) releasableHead->releaseAll();
+  longjmp(hackjmp, Galois::Runtime::BREAK);
+#else
+  throw Galois::Runtime::BREAK;
+#endif
+}
+
+void Galois::Runtime::signalConflict(Lockable* lockable) {
+#ifdef GALOIS_USE_LONGJMP
+  if (releasableHead) releasableHead->releaseAll();
+  longjmp(hackjmp, Galois::Runtime::CONFLICT);
+#else
+  throw Galois::Runtime::CONFLICT; // Conflict
+#endif
+}
+
+void Galois::Runtime::forceAbort() {
+  signalConflict(NULL);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Runtime Context
+////////////////////////////////////////////////////////////////////////////////
+
+#if !defined(GALOIS_USE_SEQ_ONLY)
 unsigned Galois::Runtime::SimpleRuntimeContext::cancel_iteration() {
   return commit_iteration();
 }
@@ -121,67 +148,40 @@ unsigned Galois::Runtime::SimpleRuntimeContext::commit_iteration() {
   return numLocks;
 }
 
-void Galois::Runtime::breakLoop() {
-#ifdef GALOIS_USE_LONGJMP
-  if (releasableHead) releasableHead->releaseAll();
-  longjmp(hackjmp, Galois::Runtime::BREAK);
-#else
-  throw Galois::Runtime::BREAK;
-#endif
-}
-
-void Galois::Runtime::signalConflict(Lockable* L) {
-#ifdef GALOIS_USE_LONGJMP
-  if (releasableHead) releasableHead->releaseAll();
-  longjmp(hackjmp, Galois::Runtime::CONFLICT);
-#else
-  throw Galois::Runtime::CONFLICT; // Conflict
-#endif
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// Simple Runtime Context
-////////////////////////////////////////////////////////////////////////////////
-
-int Galois::Runtime::SimpleRuntimeContext::try_acquire(Galois::Runtime::Lockable* L) {
-  assert(L);
-  if (L->Owner.try_lock()) {
-    assert(!L->Owner.getValue());
-    L->Owner.setValue(this);
+int Galois::Runtime::SimpleRuntimeContext::tryAcquire(Galois::Runtime::Lockable* lockable) {
+  assert(lockable);
+  if (tryLockOwner(lockable)) {
+    setOwner(lockable);
     return 1;
-  } else if (L->Owner.getValue() == this) {
+  } else if (getOwner(lockable) == this) {
     return 2;
   }
   return 0;
 }
 
-void Galois::Runtime::SimpleRuntimeContext::release(Galois::Runtime::Lockable* L) {
-  assert(L);
+void Galois::Runtime::SimpleRuntimeContext::release(Galois::Runtime::Lockable* lockable) {
+  assert(lockable);
   // The deterministic executor, for instance, steals locks from other
   // iterations
-  assert(customAcquire || L->Owner.getValue() == this);
-  assert(!L->next);
-  L->Owner.unlock_and_clear();
+  assert(customAcquire || getOwner(lockable) == this);
+  assert(!lockable->next);
+  lockable->owner.unlock_and_clear();
 }
 
-void Galois::Runtime::SimpleRuntimeContext::acquire(Galois::Runtime::Lockable* L) {
+void Galois::Runtime::SimpleRuntimeContext::acquire(Galois::Runtime::Lockable* lockable) {
   int i;
   if (customAcquire) {
-    sub_acquire(L);
-  } else if ((i = try_acquire(L))) {
-    if (i == 1) {
-      L->next = locks;
-      locks = L;
-    }
+    this->subAcquire(lockable);
+  } else if ((i = tryAcquire(lockable))) {
+    if (i == 1)
+      insertLockable(lockable);
   } else {
-    Galois::Runtime::signalConflict(L);
+    Galois::Runtime::signalConflict(lockable);
   }
 }
+#endif
 
-void Galois::Runtime::SimpleRuntimeContext::sub_acquire(Galois::Runtime::Lockable* L) {
+void Galois::Runtime::SimpleRuntimeContext::subAcquire(Galois::Runtime::Lockable* lockable) {
   GALOIS_DIE("Shouldn't get here");
 }
 
-void Galois::Runtime::forceAbort() {
-  signalConflict(NULL);
-}

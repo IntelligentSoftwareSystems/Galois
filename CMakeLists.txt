@@ -34,17 +34,20 @@ foreach(p LIB BIN INCLUDE CMAKE)
   endif()
 endforeach()
 
-#Enable iss specific options; should be OFF in the general release; all guarded by USE_EXP
+# Enable iss specific options; should be OFF in the general release; all guarded by USE_EXP
 set(USE_EXP OFF CACHE BOOL "Use experimental features") 
+set(USE_HTM OFF CACHE BOOL "Use HTM")
 set(EXP_DOALL "PTHREAD" CACHE STRING "Which type of implementation of parallel_doall")
 set(USE_PROF OFF CACHE BOOL "Use profiling specific features")
 set(USE_SUBVERSION_REVISION ON CACHE BOOL "Embed subversion numbers")
 
-
 ###### Configure (users don't need to go beyond here) ######
+
 enable_testing()
 
-#ICC
+###### Configure compiler ######
+
+# ICC
 if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
   execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion
                   OUTPUT_VARIABLE ICC_VERSION)
@@ -56,7 +59,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -wd68 -wd981 -wd383 -wd869 -wd2196 -wd279 -wd2504 -wd2943")
 endif()
 
-#XL
+# XL
 if(CMAKE_CXX_COMPILER_ID MATCHES "XL")
   execute_process(COMMAND ${CMAKE_CXX_COMPILER} -qversion
                   COMMAND sed 1d
@@ -71,13 +74,13 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "XL")
   #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -qsuppress=1540-0724 -qmaxmem=-1")
 endif()
 
-#clang 
+# clang 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   #iss hack
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -isystem=/net/faraday/workspace/local/modules/gcc-4.7")
 endif()
 
-#check for incompatible GCC
+# check for incompatible GCC
 if(CMAKE_COMPILER_IS_GNUCC)
   execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion
                   OUTPUT_VARIABLE GCC_VERSION)
@@ -88,41 +91,39 @@ if(CMAKE_COMPILER_IS_GNUCC)
   endif()
 endif()
 
-#PThreads
-find_package(Threads REQUIRED)
-
-#NUMA (linux)
-find_package(NUMA)
-if(NUMA_FOUND)
-  set(GALOIS_USE_NUMA on)
-elseif(USE_STRICT_CONFIG)
-  message(FATAL_ERROR "Need libnuma")
+# solaris
+if(CMAKE_SYSTEM MATCHES "SunOS.*")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -m64 -mcpu=niagara2 -lposix4")
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -m64 -lposix4")
 endif()
 
-#CILK
-include(CheckCilk)
+# Always include debug symbols
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g")
 
-#HugePages
-include(CheckHugePages)
-if(NOT HAVE_HUGEPAGES AND USE_STRICT_CONFIG)
-  message(FATAL_ERROR "Need huge pages")
+# Enable architecture-specific optimizations
+if(CMAKE_BUILD_TYPE MATCHES "Release" AND CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
 endif()
 
-if(USE_LONGJMP)
-  set(GALOIS_USE_LONGJMP on)
+# More warnings
+if(CMAKE_BUILD_TYPE MATCHES "Debug")
+  if(NOT CMAKE_CXX_COMPILER_ID MATCHES "XL")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
+  endif()
 endif()
 
-#Boost
-#not needed now but will be needed for newer version of Boost after 1.4X ish
-set(Boost_ADDITIONAL_VERSIONS "1.40" "1.40.0" "1.47" "1.47.0" "1.49" "1.49.0" "1.51.0")
-#set(Boost_USE_MULTITHREADED OFF) # newer boost builds don't use -mt extension
+# GNU profiling
+if(USE_GPROF)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pg")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pg")
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pg")
+endif(USE_GPROF)
 
-if(NOT "$ENV{BOOST_DIR}" STREQUAL "") 
-  set(BOOST_ROOT $ENV{BOOST_DIR})
-endif()
-find_package(Boost 1.38.0 REQUIRED)
-include_directories(${Boost_INCLUDE_DIR})
+###### Configure features ######
 
+# Experimental features
 if(USE_EXP)
   set(USE_VTUNE ON)
   add_definitions(-DGALOIS_USE_EXP)
@@ -138,40 +139,63 @@ if(USE_EXP)
     include(GetSVNVersion)
     set(GALOIS_USE_SVNVERSION on)
   endif()
-endif()
 
-# c++11 features
-find_package(CXX11)
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CXX11_FLAGS}")
+  if(USE_HTM)
+    if(CMAKE_CXX_COMPILER_ID MATCHES "XL")
+      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -qtm -qsmp=speculative")
+      set(GALOIS_USE_HTM on)
+      set(GALOIS_USE_SEQ_ONLY on)
+      set(GALOIS_USE_LONGJMP on)
+    else()
+      message(FATAL_ERROR "Hardware transactional memory not supported")
+    endif()
+  endif()
 
-if(USE_GPROF)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pg")
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pg")
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pg")
-endif(USE_GPROF)
-
-#solaris
-if(CMAKE_SYSTEM MATCHES "SunOS.*")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -m64 -mcpu=niagara2 -lposix4")
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -m64 -lposix4")
-endif()
-
-#Always include debug symbols
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g")
-
-#Enable architecture-specific optimizations
-if(CMAKE_BUILD_TYPE MATCHES "Release" AND CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
-endif()
-
-#more warnings
-if(CMAKE_BUILD_TYPE MATCHES "Debug")
-  if(NOT CMAKE_CXX_COMPILER_ID MATCHES "XL")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
+  # Experimental Deterministic features
+  if(USE_DET_INORDER)
+    add_definitions(-DGALOIS_USE_DET_INORDER)
+  endif()
+  if(USE_DET_FIXED_WINDOW)
+    add_definitions(-DGALOIS_USE_DET_FIXED_WINDOW)
   endif()
 endif()
+
+# PThreads
+find_package(Threads REQUIRED)
+
+# NUMA (linux)
+find_package(NUMA)
+if(NUMA_FOUND)
+  set(GALOIS_USE_NUMA on)
+elseif(USE_STRICT_CONFIG)
+  message(FATAL_ERROR "Need libnuma")
+endif()
+
+# CILK
+include(CheckCilk)
+
+# HugePages
+include(CheckHugePages)
+if(NOT HAVE_HUGEPAGES AND USE_STRICT_CONFIG)
+  message(FATAL_ERROR "Need huge pages")
+endif()
+
+# Longjmp
+if(USE_LONGJMP)
+  set(GALOIS_USE_LONGJMP on)
+endif()
+
+# Boost
+set(Boost_ADDITIONAL_VERSIONS "1.40" "1.40.0" "1.47" "1.47.0" "1.49" "1.49.0" "1.51.0")
+if(NOT "$ENV{BOOST_DIR}" STREQUAL "") 
+  set(BOOST_ROOT $ENV{BOOST_DIR})
+endif()
+find_package(Boost 1.38.0 REQUIRED)
+include_directories(${Boost_INCLUDE_DIR})
+
+# C++11 features
+find_package(CXX11)
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CXX11_FLAGS}")
 
 include(CheckEndian)
 
@@ -182,7 +206,7 @@ include(llvm-extras)
 
 ###### Build Hacks ######
 
-#XXX(ddn): Hack for lonestar machines
+# XXX(ddn): Hack for lonestar machines
 if(NUMA_FOUND)
   if(NUMA_OLD)
     set(GALOIS_USE_NUMA_OLD on)
@@ -228,10 +252,10 @@ add_subdirectory(lib)
 add_subdirectory(src)
 add_subdirectory(tools)
 add_subdirectory(inputs)
-add_subdirectory(test)
 add_subdirectory(scripts)
 if(NOT SKIP_COMPILE_APPS)
   add_subdirectory(apps)
+  add_subdirectory(test)
 endif()
 if(USE_EXP)
   add_subdirectory(exp)
