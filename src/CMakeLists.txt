@@ -88,10 +88,13 @@ if(USE_HPCTOOLKIT)
 endif()
 
 if(USE_PAPI)
+  # Sadly, none of our machines places papi in a well-known place or provides
+  # a method for finding papi automatically. Hardcode some constants.
+  set(PAPI_ROOT "/h1/lenharth/papi;/usr/global/tools/papi/bgqos_0/papi-5.0.1-V1R1M2")
   find_package(PAPI)
   if (PAPI_FOUND)
     set(GALOIS_USE_PAPI on)
-    include_directories(${PAPI_INCLUDE_DIR})
+    include_directories(${PAPI_INCLUDE_DIRS})
     target_link_libraries(galois ${PAPI_LIBRARIES})
   else()
     message(WARNING "PAPI required but not found")
