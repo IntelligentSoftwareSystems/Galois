@@ -25,8 +25,8 @@
 
 
 #include "Metis.h"
+#include "Galois/Accumulator.h"
 #include "Galois/Runtime/PerThreadStorage.h"
-//#include "Galois/WorkList/WorkListExperimental.h"
 
 namespace {
 
