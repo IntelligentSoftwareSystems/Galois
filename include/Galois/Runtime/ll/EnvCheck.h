@@ -35,6 +35,7 @@ namespace LL {
 //Sampling.cpp: "GALOIS_EXIT_AFTER_SAMPLING"
 //gIO.cpp: "GALOIS_DEBUG_TO_FILE"
 //gIO.cpp: "GALOIS_DEBUG_SKIP"
+//DeterministicWork.h: "GALOIS_FIXED_DET_WINDOW_SIZE"
 //! Return true if the Enviroment variable is set
 bool EnvCheck(const char* parm);
 bool EnvCheck(const char* parm, int& val);

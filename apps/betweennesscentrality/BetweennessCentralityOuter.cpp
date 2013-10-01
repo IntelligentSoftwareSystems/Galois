@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -20,13 +20,11 @@
  *
  * @author Dimitrios Prountzos <dprountz@cs.utexas.edu>
  */
-
+#include "Galois/Galois.h"
 #include "Galois/Accumulator.h"
 #include "Galois/Statistic.h"
-#include "Galois/Galois.h"
 #include "Galois/UserContext.h"
 #include "Galois/Graph/LCGraph.h"
-#include "Galois/WorkList/WorkList.h"
 
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
@@ -110,7 +108,7 @@ struct process {
     // T.stop();
     // Galois::Timer T2;
     // T2.start();
-    while(SQ.size()) {
+    while (SQ.size()) {
       int w = SQ.back();
       SQ.pop_back();
 
@@ -232,7 +230,8 @@ int main(int argc, char** argv) {
       double bc = (*CB.getRemote(0))[i];
       for (unsigned int j = 1; j < Galois::getActiveThreads(); ++j)
 	bc += (*CB.getRemote(j))[i];
-      std::cout << i << ": " << std::setiosflags(std::ios::fixed) << std::setprecision(6) << bc << "\n";
+      std::cout << i << ": " 
+        << std::setiosflags(std::ios::fixed) << std::setprecision(6) << bc << "\n";
     }
 #if SHOULD_PRODUCE_CERTIFICATE
     printBCcertificate();

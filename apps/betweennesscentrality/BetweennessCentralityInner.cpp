@@ -33,7 +33,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 #include "Galois/Graph/GraphNodeBag.h"
-#include "../../../apps/bfs/HybridBFS.h"
+#include "HybridBFS.h"
 
 #include GALOIS_CXX11_STD_HEADER(atomic)
 #include <string>
@@ -46,8 +46,8 @@ static const char* desc = 0;
 static const char* url = 0;
 
 enum Algo {
-  adl,
-  adlLevel
+  async,
+  leveled
 };
 
 namespace cll = llvm::cl;
@@ -57,9 +57,9 @@ static cll::opt<bool> symmetricGraph("symmetricGraph", cll::desc("Input graph is
 static cll::opt<unsigned int> startNode("startNode", cll::desc("Node to start search from"), cll::init(0));
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
     cll::values(
-      clEnumValN(Algo::adl, "adl", "Async Algorithm"),
-      clEnumValN(Algo::adlLevel, "adlLevel", "Leveled Algorithm"),
-      clEnumValEnd), cll::init(Algo::adl));
+      clEnumValN(Algo::async, "async", "Async Algorithm"),
+      clEnumValN(Algo::leveled, "leveled", "Leveled Algorithm"),
+      clEnumValEnd), cll::init(Algo::async));
 
 template<typename Algo>
 void initialize(Algo& algo,
@@ -95,8 +95,7 @@ void readInOutGraph(Graph& graph) {
 static const int ChunkSize = 128;
 static const int bfsChunkSize = 32+64;
 
-struct ADLAlgo {
-
+struct AsyncAlgo {
   struct SNode {
     float numPaths;
     float dependencies;
@@ -111,7 +110,7 @@ struct ADLAlgo {
 //typedef Galois::Graph::LC_CSR_Graph<SNode, void> Graph;
   typedef typename Graph::GraphNode GNode;
 
-  std::string name() const { return "ADL"; }
+  std::string name() const { return "async"; }
 
   void readGraph(Graph& graph) { 
     readInOutGraph(graph);
@@ -246,7 +245,7 @@ struct ADLAlgo {
             if (ddata.dependencies != std::numeric_limits<float>::lowest()) {
               newDep += ((float)sdata.numPaths / (float)ddata.numPaths) * (1 + ddata.dependencies);
             } else {
-              allready =false;
+              allready = false;
               // ctx.push(n);
               // return;
             }
@@ -284,12 +283,10 @@ struct ADLAlgo {
   }
 };
 
-ADLAlgo::Graph* ADLAlgo::CountPaths::Indexer::g;
-ADLAlgo::Graph* ADLAlgo::ComputeDep::Indexer::g;
+AsyncAlgo::Graph* AsyncAlgo::CountPaths::Indexer::g;
+AsyncAlgo::Graph* AsyncAlgo::ComputeDep::Indexer::g;
 
-
-struct LevelAlgo {
-
+struct LeveledAlgo {
   struct SNode {
     std::atomic<unsigned long> numPaths;
     float dependencies;
@@ -305,7 +302,7 @@ struct LevelAlgo {
   typedef typename Graph::GraphNode GNode;
   typedef Galois::InsertBag<GNode> Bag;
 
-  std::string name() const { return "ADLEdge"; }
+  std::string name() const { return "Leveled"; }
 
   void readGraph(Graph& graph) { 
     readInOutGraph(graph);
@@ -396,7 +393,9 @@ struct LevelAlgo {
   };
 
   void operator()(Graph& graph, GNode source) {
-    Galois::StatTimer Tinit("InitTime"), Tlevel("LevelTime"), Tbfs("BFSTime"), Tcount("CountTime"), Tdep("DepTime");
+    Galois::StatTimer 
+      Tinit("InitTime"), Tlevel("LevelTime"), Tbfs("BFSTime"),
+      Tcount("CountTime"), Tdep("DepTime");
     Tinit.start();
     Galois::do_all_local(graph, Initialize(graph), "INIT");
     Tinit.stop();
@@ -459,8 +458,10 @@ void run() {
     int count = 0;
     for (typename Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei && count < 20; ++ii, ++count) {
       std::cout << count << ": "
-        << std::setiosflags(std::ios::fixed) << std::setprecision(6) << graph.getData(*ii).dependencies
-                << " " << graph.getData(*ii).numPaths << " " << graph.getData(*ii).dist
+        << std::setiosflags(std::ios::fixed) << std::setprecision(6) 
+          << graph.getData(*ii).dependencies
+        << " " << graph.getData(*ii).numPaths 
+        << " " << graph.getData(*ii).dist
         << "\n";
     }
     count = 0;
@@ -477,8 +478,8 @@ int main(int argc, char **argv) {
   Galois::StatTimer T("TotalTime");
   T.start();
   switch (algo) {
-    case Algo::adl:      run<ADLAlgo>();   break;
-    case Algo::adlLevel: run<LevelAlgo>(); break;
+    case Algo::async: run<AsyncAlgo>();   break;
+    case Algo::leveled: run<LeveledAlgo>(); break;
   }
   T.stop();
 

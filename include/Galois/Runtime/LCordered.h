@@ -752,7 +752,7 @@ void for_each_ordered_lc (AI abeg, AI aend, Cmp cmp, NhoodFunc nhoodVisitor, Ope
   typedef PtrBasedNhoodMgr<T, Cmp> NhoodMgr;
 
   typedef typename NhoodMgr::Ctxt Ctxt;
-  typedef typename NhoodMgr::NItem NItem;
+  //typedef typename NhoodMgr::NItem NItem;
   typedef StableSourceTest<Ctxt> SourceTest;
 
   typedef LCorderedExec<OperFunc, NhoodFunc, Ctxt, SourceTest> Exec;
@@ -773,7 +773,7 @@ void for_each_ordered_lc (AI abeg, AI aend, Cmp cmp, NhoodFunc nhoodVisitor, Ope
   typedef PtrBasedNhoodMgr<T, Cmp> NhoodMgr;
 
   typedef typename NhoodMgr::Ctxt Ctxt;
-  typedef typename NhoodMgr::NItem NItem;
+  //typedef typename NhoodMgr::NItem NItem;
   typedef UnstableSourceTest<Ctxt, StableTest> SourceTest;
 
   typedef LCorderedExec<OperFunc, NhoodFunc, Ctxt, SourceTest> Exec;

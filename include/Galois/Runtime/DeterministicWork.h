@@ -551,8 +551,9 @@ private:
 
   void initialWindow(size_t dist, size_t atleast, size_t base = 0) {
     size_t w = std::max(dist / 100, atleast) + base;
+    // XXX(ddn): use !LL::EnvCheck("GALOIS_FIXED_DET_WINDOW_SIZE", defaultDelta)
     if (OptionsTy::hasFixedWindow)
-      w = 100; // XXX
+      w = 100;
     window = delta = w;
   }
 
