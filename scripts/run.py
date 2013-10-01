@@ -85,10 +85,13 @@ def run(cmd, values, envs, options):
 
   new_env = dict(os.environ)
   new_env.update(envs)
+  is_tty = sys.stdout.isatty()
 
   for R in range(options.runs):
-    print('RUN: Start')
-    print_bright('RUN: Start')
+    if is_tty:
+      print_bright('RUN: Start')
+    else:
+      print('RUN: Start')
     print("RUN: CommandLine %s" % ' '.join(cmd))
     print("RUN: Variable Hostname = %s" % socket.gethostname())
     print("RUN: Variable Timestamp = %f" % time.time())
