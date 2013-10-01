@@ -95,25 +95,28 @@ class StatTimer : public TimeAccumulator {
   const char* name;
   const char* loopname;
   bool main;
+  bool valid;
 
 public:
-  StatTimer(): name("Time"), loopname(0), main(true) { }
-  StatTimer(const char* n, const char* l = 0): name(n), loopname(l), main(false) { }
+  StatTimer(): name("Time"), loopname(0), main(true), valid(false) { }
+  StatTimer(const char* n, const char* l = 0): name(n), loopname(l), main(false), valid(false) { }
 
   ~StatTimer() {
+    if (valid)
+      stop();
     if (get()) // only report non-zero stat
       Galois::Runtime::reportStat(loopname, name, get());
-    if (main)
-      Galois::Runtime::reportSampling(loopname);
   }
 
   void start() {
     if (main)
       Galois::Runtime::beginSampling();
     TimeAccumulator::start();
+    valid = true;
   }
 
   void stop() {
+    valid = false;
     TimeAccumulator::stop();
     if (main)
       Galois::Runtime::endSampling();
