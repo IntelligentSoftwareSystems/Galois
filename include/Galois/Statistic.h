@@ -90,6 +90,9 @@ public:
   }
 };
 
+struct start_now_t {};
+constexpr start_now_t start_now = start_now_t();
+
 //! Provides statistic interface around timer
 class StatTimer : public TimeAccumulator {
   const char* name;
@@ -97,9 +100,19 @@ class StatTimer : public TimeAccumulator {
   bool main;
   bool valid;
 
+  StatTimer(const char* n, const char* l, bool m, bool s)
+    :name(n), loopname(l), main(m), valid(false) 
+  { if (s) start(); }
+
 public:
-  StatTimer(): name("Time"), loopname(0), main(true), valid(false) { }
-  StatTimer(const char* n, const char* l = 0): name(n), loopname(l), main(false), valid(false) { }
+  StatTimer(const char* n) :StatTimer(n,0,false,false) {}
+  StatTimer(const char* n, start_now_t t) :StatTimer(n,0,false,true) {}
+
+  StatTimer(const char* n, const char* l) :StatTimer(n,l,false,false) {}
+  StatTimer(const char* n, const char* l, start_now_t t) :StatTimer(n,l,false,true) {}
+
+  StatTimer() :StatTimer("Time", 0, true, false) {}
+  StatTimer(start_now_t t) :StatTimer("Time", 0, true, true) {}
 
   ~StatTimer() {
     if (valid)
