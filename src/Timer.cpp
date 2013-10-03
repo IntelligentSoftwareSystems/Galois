@@ -27,6 +27,7 @@
 
 using namespace Galois;
 
+#ifndef USE_STD_TIMER
 Timer::Timer()
   :_start_hi(0), _start_low(0), _stop_hi(0), _stop_low(0)
 {}
@@ -68,6 +69,7 @@ unsigned long Timer::get_usec() const {
   }
   return usec;
 }
+#endif
 
 TimeAccumulator::TimeAccumulator()
   :ltimer(), acc(0)
