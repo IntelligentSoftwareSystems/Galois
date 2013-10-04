@@ -23,6 +23,8 @@ module load cmake
 module load tbb
 module load boost
 module load eigen
+module load neon
+module load subversion
 
 if [ "$1" != "min" ]; then
   module load clang/3.3-noconflict
