@@ -41,6 +41,7 @@
 #include <boost/iterator/transform_iterator.hpp>
 
 #include "Galois/Threads.h"
+#include "Galois/PriorityQueue.h"
 #include "Galois/TwoLevelIterator.h"
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/ThreadPool.h"
@@ -56,7 +57,7 @@ enum GlobalPos {
   GLOBAL_BEGIN, GLOBAL_END
 };
 
-#define ADAPTOR_BASED_OUTER_ITER
+// #define ADAPTOR_BASED_OUTER_ITER
 
 // XXX: use a combination of boost::transform_iterator and
 // boost::counting_iterator to implement the following OuterPerThreadWLIter
@@ -67,7 +68,7 @@ struct WLindexer:
   public std::unary_function<unsigned, typename PerThrdWL::Cont_ty&> 
 {
 
-  typedef typename PerThrdWL::Cont_ty Ret_ty;
+  using Ret_ty = typename PerThrdWL::Cont_ty;
 
   PerThrdWL* wl;
 
@@ -84,20 +85,14 @@ struct WLindexer:
 
 template <typename PerThrdWL>
 struct TypeFactory {
-  typedef boost::transform_iterator<WLindexer<PerThrdWL>, boost::counting_iterator<unsigned> > OuterIter;
+  using OuterIter = boost::transform_iterator<WLindexer<PerThrdWL>, boost::counting_iterator<unsigned> >;
 
-  typedef std::reverse_iterator<OuterIter> RvrsOuterIter;
+  using RvrsOuterIter = std::reverse_iterator<OuterIter>;
 };
 
 
 template <typename PerThrdWL>
 typename TypeFactory<PerThrdWL>::OuterIter make_outer_begin (PerThrdWL& wl) {
-
-  typename TypeFactory<PerThrdWL>::OuterIter outer = boost::make_transform_iterator (boost::counting_iterator<unsigned> (0), WLindexer<PerThrdWL> (wl));
-
-  outer->begin ();
-  (*outer).begin ();
-
   return boost::make_transform_iterator (
       boost::counting_iterator<unsigned> (0), WLindexer<PerThrdWL> (wl));
 }
@@ -123,9 +118,9 @@ typename TypeFactory<PerThrdWL>::RvrsOuterIter make_outer_rend (PerThrdWL& wl) {
 template <typename PerThrdWL>
 class OuterPerThreadWLIter: public std::iterator<std::random_access_iterator_tag, typename PerThrdWL::Cont_ty> {
 
-  typedef typename PerThrdWL::Cont_ty Cont_ty;
-  typedef std::iterator<std::random_access_iterator_tag, Cont_ty> Super_ty;
-  typedef typename Super_ty::difference_type Diff_ty;
+  using Cont_ty = typename PerThrdWL::Cont_ty;
+  using Super_ty = std::iterator<std::random_access_iterator_tag, Cont_ty>;
+  using Diff_ty = typename Super_ty::difference_type;
 
   PerThrdWL* workList;
   // using Diff_ty due to reverse iterator, whose 
@@ -278,14 +273,14 @@ OuterPerThreadWLIter<PerThrdWL> make_outer_end (PerThrdWL& wl) {
 template <typename PerThrdWL>
 std::reverse_iterator<OuterPerThreadWLIter<PerThrdWL> > 
   make_outer_rbegin (PerThrdWL& wl) {
-  typedef std::reverse_iterator<OuterPerThreadWLIter<PerThrdWL> > Ret_ty;
+  using Ret_ty = std::reverse_iterator<OuterPerThreadWLIter<PerThrdWL> >;
   return Ret_ty (make_outer_end (wl));
 }
 
 template <typename PerThrdWL>
 std::reverse_iterator<OuterPerThreadWLIter<PerThrdWL> > 
   make_outer_rend (PerThrdWL& wl) {
-  typedef std::reverse_iterator<OuterPerThreadWLIter<PerThrdWL> > Ret_ty;
+  using Ret_ty = std::reverse_iterator<OuterPerThreadWLIter<PerThrdWL> >;
   return Ret_ty (make_outer_begin (wl));
 }
 
@@ -298,38 +293,38 @@ template <typename Cont_tp>
 class PerThreadWorkList {
 
 public:
-  typedef Cont_tp Cont_ty;
-  typedef typename Cont_ty::value_type value_type;
-  typedef typename Cont_ty::reference reference;
-  typedef typename Cont_ty::pointer pointer;
-  typedef typename Cont_ty::size_type size_type;
+  using Cont_ty = Cont_tp;
+  using value_type = typename Cont_ty::value_type;
+  using reference = typename Cont_ty::reference;
+  using pointer = typename Cont_ty::pointer;
+  using size_type = typename Cont_ty::size_type;
 
-  typedef typename Cont_ty::iterator local_iterator;
-  typedef typename Cont_ty::const_iterator local_const_iterator;
-  typedef typename Cont_ty::reverse_iterator local_reverse_iterator;
-  typedef typename Cont_ty::const_reverse_iterator local_const_reverse_iterator;
+  using local_iterator = typename Cont_ty::iterator;
+  using local_const_iterator = typename Cont_ty::const_iterator;
+  using local_reverse_iterator = typename Cont_ty::reverse_iterator;
+  using local_const_reverse_iterator = typename Cont_ty::const_reverse_iterator;
 
-  typedef PerThreadWorkList This_ty;
+  using This_ty = PerThreadWorkList;
 
 #ifdef ADAPTOR_BASED_OUTER_ITER
 
-  typedef typename TypeFactory<This_ty>::OuterIter OuterIter;
-  typedef typename TypeFactory<This_ty>::RvrsOuterIter RvrsOuterIter;
+  using OuterIter = typename TypeFactory<This_ty>::OuterIter;
+  using RvrsOuterIter = typename TypeFactory<This_ty>::RvrsOuterIter;
 
 #else
 
-  typedef OuterPerThreadWLIter<This_ty> OuterIter;
-  typedef std::reverse_iterator<OuterIter> RvrsOuterIter;
+  using OuterIter = OuterPerThreadWLIter<This_ty>;
+  using RvrsOuterIter = std::reverse_iterator<OuterIter>;
 
 #endif
 
-  typedef typename Galois::ChooseStlTwoLevelIterator<OuterIter, typename Cont_ty::iterator>::type global_iterator;
+  using global_iterator = typename Galois::ChooseStlTwoLevelIterator<OuterIter, typename Cont_ty::iterator>::type;
 
-  typedef typename Galois::ChooseStlTwoLevelIterator<OuterIter, typename Cont_ty::const_iterator>::type global_const_iterator;
+  using global_const_iterator = typename Galois::ChooseStlTwoLevelIterator<OuterIter, typename Cont_ty::const_iterator>::type;
 
-  typedef typename Galois::ChooseStlTwoLevelIterator<RvrsOuterIter, typename Cont_ty::reverse_iterator>::type global_reverse_iterator;
+  using global_reverse_iterator = typename Galois::ChooseStlTwoLevelIterator<RvrsOuterIter, typename Cont_ty::reverse_iterator>::type;
 
-  typedef typename Galois::ChooseStlTwoLevelIterator<RvrsOuterIter, typename Cont_ty::const_reverse_iterator>::type global_const_reverse_iterator;
+  using global_const_reverse_iterator = typename Galois::ChooseStlTwoLevelIterator<RvrsOuterIter, typename Cont_ty::const_reverse_iterator>::type;
 
 
 
@@ -362,7 +357,7 @@ private:
 
 
   // typedef FakePTS PerThrdCont_ty;
-  typedef Galois::Runtime::PerThreadStorage<Cont_ty*> PerThrdCont_ty;
+  using PerThrdCont_ty = Galois::Runtime::PerThreadStorage<Cont_ty*>;
   PerThrdCont_ty perThrdCont;
 
   void destroy () {
@@ -414,7 +409,7 @@ public:
 
   global_iterator end_all () { 
     return Galois::stl_two_level_end (
-        make_outer_end (*this), make_outer_end (*this)); 
+        make_outer_begin (*this), make_outer_end (*this)); 
   }
 
   global_const_iterator begin_all () const { 
@@ -423,6 +418,16 @@ public:
   }
 
   global_const_iterator end_all () const { 
+    return Galois::stl_two_level_cend (
+        make_outer_begin (*this), make_outer_end (*this));
+  }
+
+  global_const_iterator cbegin_all () const { 
+    return Galois::stl_two_level_cbegin (
+        make_outer_begin (*this), make_outer_end (*this));
+  }
+
+  global_const_iterator cend_all () const { 
     return Galois::stl_two_level_cend (
         make_outer_begin (*this), make_outer_end (*this));
   }
@@ -443,6 +448,16 @@ public:
   }
 
   global_const_reverse_iterator rend_all () const { 
+    return Galois::stl_two_level_crend (
+        make_outer_rbegin (*this), make_outer_rend (*this));
+  }
+
+  global_const_reverse_iterator crbegin_all () const { 
+    return Galois::stl_two_level_crbegin (
+        make_outer_rbegin (*this), make_outer_rend (*this));
+  }
+
+  global_const_reverse_iterator crend_all () const { 
     return Galois::stl_two_level_crend (
         make_outer_rbegin (*this), make_outer_rend (*this));
   }
@@ -483,7 +498,7 @@ public:
 
     const unsigned P = Galois::getActiveThreads ();
 
-    typedef typename std::iterator_traits<Iter>::difference_type Diff_ty;
+    using Diff_ty = typename std::iterator_traits<Iter>::difference_type;
 
     // integer division, where we want to round up. So adding P-1
     Diff_ty block_size = (std::distance (begin, end) + (P-1) ) / P;
@@ -517,31 +532,47 @@ public:
 };
 
 
-// TODO: rename to per thread heap factory, move outside
-template <typename T>
-struct PerThreadAllocatorFactory {
+namespace PerThreadFactory {
 
+  using BasicHeap =  MM::SimpleBumpPtrWithMallocFallback<MM::FreeListHeap<MM::SystemBaseAlloc> >;
+  
+  using Heap = MM::ThreadAwarePrivateHeap<BasicHeap>;
 
-  typedef MM::SimpleBumpPtrWithMallocFallback<MM::FreeListHeap<MM::SystemBaseAlloc> > BasicHeap;
+  template <typename T>
+  using Alloc = MM::ExternRefGaloisAllocator<T, Heap>;
 
-  typedef MM::ThreadAwarePrivateHeap<BasicHeap> PerThreadHeap;
+  template <typename T>
+  using FSBAlloc = MM::FSBGaloisAllocator<T>;
 
-  typedef MM::ExternRefGaloisAllocator<T, PerThreadHeap> PerThreadAllocator;
+  template <typename T>
+  using Vector =  std::vector<T, Alloc<T> >;
+
+  template <typename T>
+  using Deque = std::deque<T, Alloc<T> >;
+
+  template <typename T>
+  using List = std::list<T, FSBAlloc<T> >;
+
+  template <typename T, typename C>
+  using Set = std::set<T, C, FSBAlloc<T> >;
+
+  template <typename T, typename C>
+  using PQ = MinHeap<T, C, Vector<T> >;
 
 };
 
-// TODO: remove code reuse here.
+
 template <typename T>
 class PerThreadVector: 
-  public PerThreadWorkList<std::vector<T, typename PerThreadAllocatorFactory<T>::PerThreadAllocator> > {
+  public PerThreadWorkList<PerThreadFactory::Vector<T> > {
 
 public:
-  typedef typename PerThreadAllocatorFactory<T>::PerThreadHeap Heap_ty;
-  typedef typename PerThreadAllocatorFactory<T>::PerThreadAllocator Alloc_ty;
-  typedef std::vector<T, Alloc_ty> Cont_ty;
+  using Heap_ty = PerThreadFactory::Heap;
+  using Alloc_ty = PerThreadFactory::Alloc<T>;
 
 protected:
-  typedef PerThreadWorkList<Cont_ty> Super_ty;
+  using Cont_ty = PerThreadFactory::Vector<T>;
+  using Super_ty = PerThreadWorkList<Cont_ty>;
 
   Heap_ty heap;
   Alloc_ty alloc;
@@ -567,15 +598,15 @@ public:
 
 template <typename T>
 class PerThreadDeque: 
-  public PerThreadWorkList<std::deque<T, typename PerThreadAllocatorFactory<T>::PerThreadAllocator> > {
+  public PerThreadWorkList<PerThreadFactory::Deque<T> > {
 
 public:
-  typedef typename PerThreadAllocatorFactory<T>::PerThreadHeap Heap_ty;
-  typedef typename PerThreadAllocatorFactory<T>::PerThreadAllocator Alloc_ty;
-  typedef std::deque<T, Alloc_ty> Cont_ty;
+  using Heap_ty = PerThreadFactory::Heap;
+  using Alloc_ty = PerThreadFactory::Alloc<T>;
 
 protected:
-  typedef PerThreadWorkList<Cont_ty> Super_ty;
+  using Cont_ty = PerThreadFactory::Deque<T>;
+  using Super_ty = PerThreadWorkList<Cont_ty>;
 
   Heap_ty heap;
   Alloc_ty alloc;
@@ -591,15 +622,15 @@ public:
 
 template <typename T>
 class PerThreadList:
-  public PerThreadWorkList<std::list<T, typename PerThreadAllocatorFactory<T>::PerThreadAllocator> > {
+  public PerThreadWorkList<PerThreadFactory::List<T> > {
 
 public:
-  typedef typename PerThreadAllocatorFactory<T>::PerThreadHeap Heap_ty;
-  typedef typename PerThreadAllocatorFactory<T>::PerThreadAllocator Alloc_ty;
-  typedef std::list<T, Alloc_ty> Cont_ty;
+  using Heap_ty = PerThreadFactory::Heap;
+  using Alloc_ty = PerThreadFactory::Alloc<T>;
 
 protected:
-  typedef PerThreadWorkList<Cont_ty> Super_ty;
+  using Cont_ty = PerThreadFactory::List<T>;
+  using Super_ty = PerThreadWorkList<Cont_ty>;
 
   Heap_ty heap;
   Alloc_ty alloc;
@@ -615,26 +646,72 @@ public:
 
 template <typename T, typename C=std::less<T> >
 class PerThreadSet: 
-  public PerThreadWorkList<std::set<T, C, typename PerThreadAllocatorFactory<T>::PerThreadAllocator> > {
+  public PerThreadWorkList<PerThreadFactory::Set<T, C> > {
 
 public:
-  typedef typename PerThreadAllocatorFactory<T>::PerThreadHeap Heap_ty;
-  typedef typename PerThreadAllocatorFactory<T>::PerThreadAllocator Alloc_ty;
-  typedef std::set<T, C, Alloc_ty> Cont_ty;
+  using Alloc_ty = PerThreadFactory::FSBAlloc<T>;
 
 protected:
-  typedef PerThreadWorkList<Cont_ty> Super_ty;
+  using Cont_ty = PerThreadFactory::Set<T, C>;
+  using Super_ty = PerThreadWorkList<Cont_ty>;
+
+  Alloc_ty alloc;
+
+public:
+  explicit PerThreadSet (const C& cmp = C ()): Super_ty (), alloc () {
+
+    Super_ty::init (Cont_ty (cmp, alloc));
+  }
+
+  using typename Super_ty::global_const_iterator;
+  using typename Super_ty::global_const_reverse_iterator;
+
+  // hiding non-const (and const) versions in Super_ty
+  global_const_iterator begin_all () const { return Super_ty::cbegin_all (); }
+  global_const_iterator end_all () const { return Super_ty::cend_all (); }
+
+  // hiding non-const (and const) versions in Super_ty
+  global_const_reverse_iterator rbegin_all () const { return Super_ty::crbegin_all (); }
+  global_const_reverse_iterator rend_all () const { return Super_ty::crend_all (); }
+
+};
+
+
+template <typename T, typename C=std::less<T> >
+class PerThreadMinHeap:
+  public PerThreadWorkList<PerThreadFactory::PQ<T, C> > {
+
+public:
+  using Heap_ty = PerThreadFactory::Heap;
+  using Alloc_ty = PerThreadFactory::Alloc<T>;
+
+protected:
+  using Vec_ty = PerThreadFactory::Vector<T>;
+  using Cont_ty = PerThreadFactory::PQ<T, C>;
+  using Super_ty = PerThreadWorkList<Cont_ty>;
 
   Heap_ty heap;
   Alloc_ty alloc;
 
 public:
-  explicit PerThreadSet (const C& cmp=C ()): Super_ty (), heap (), alloc (&heap) {
-
-    Super_ty::init (Cont_ty (cmp, alloc));
+  explicit PerThreadMinHeap (const C& cmp = C ()): Super_ty (), heap (), alloc (&heap) {
+    Super_ty::init (Cont_ty (cmp, Vec_ty (alloc)));
   }
 
+  using typename Super_ty::global_const_iterator;
+  using typename Super_ty::global_const_reverse_iterator;
+
+  // hiding non-const (and const) versions in Super_ty
+  global_const_iterator begin_all () const { return Super_ty::cbegin_all (); }
+  global_const_iterator end_all () const { return Super_ty::cend_all (); }
+
+  // hiding non-const (and const) versions in Super_ty
+  global_const_reverse_iterator rbegin_all () const { return Super_ty::crbegin_all (); }
+  global_const_reverse_iterator rend_all () const { return Super_ty::crend_all (); }
+
+
 };
+
 
 }
 } // end namespace Galois
