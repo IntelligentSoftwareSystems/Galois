@@ -129,7 +129,7 @@ my $sdir = "-search-dir all=$symbol";
 my $maxsec = 100000;
 
 system("rm -rf $dire");
-system("mkdir $dire");
+system("mkdir -p $dire");
 # system("set -x ; $vtune $collect $rdir $sdir -- $cmdline"); 
 system("$vtune $collect $rdir -- $cmdline");
 report_function $vtune, $report, $rdir, $threads, $outfile, $maxsec;
