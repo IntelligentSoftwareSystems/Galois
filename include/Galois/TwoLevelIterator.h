@@ -448,11 +448,17 @@ protected:
       return -(that.compute_dist (*this));
 
     } else if (this->m_outer == that.m_outer) {
-      return std::distance (this->m_inner, that.m_inner);
+      if (!BiDirBase::outerAtEnd ()) { 
+        return std::distance (this->m_inner, that.m_inner);
+
+      } else { 
+        return 0;
+      }
 
     } else { 
 
       assert (std::distance (this->m_outer, that.m_outer) > 0); // this->m_outer < that.m_outer;
+      assert (!BiDirBase::outerAtEnd ());
 
       TwoLevelRandIter tmp (*this);
 
