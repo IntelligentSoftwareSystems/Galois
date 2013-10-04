@@ -27,6 +27,7 @@
 
 #include "Galois/config.h"
 #include "Galois/Threads.h"
+
 #include "Galois/ParallelSTL/ParallelSTL.h"
 #include "Galois/TwoLevelIterator.h"
 #include "Galois/Runtime/ll/gio.h"
@@ -58,14 +59,15 @@ struct DItem {
 
 template<typename T, typename CompareTy>
 struct DeterministicContext: public SimpleRuntimeContext {
-  typedef DItem<T> Item;
+  using Base = SimpleRuntimeContext;
+  using Item = DItem<T>;
 
   Item item;
   const CompareTy* comp;
   bool not_ready;
 
   DeterministicContext(const Item& _item, const CompareTy& _comp): 
-      SimpleRuntimeContext(true), 
+      Base(true), 
       item(_item),
       comp(&_comp),
       not_ready(false)
@@ -79,24 +81,24 @@ struct DeterministicContext: public SimpleRuntimeContext {
     if (getPending() == COMMITTING)
       return;
 
-    if (this->tryLockOwner(lockable)) {
-      this->insertLockable(lockable);
+    if (Base::tryLock (lockable)) {
+      this->addToNhood(lockable);
     }
 
     DeterministicContext* other;
     do {
-      other = static_cast<DeterministicContext*>(this->getOwner(lockable));
+      other = static_cast<DeterministicContext*>(Base::getOwner(lockable));
       if (other == this)
         return;
       if (other) {
-        bool conflict = other->item.id < this->item.id;
+        bool conflict = (*comp)(*other, *this); // *other < *this
         if (conflict) {
           // A lock that I want but can't get
           not_ready = true;
           return; 
         }
       }
-    } while (!this->stealingCasOwner(lockable, other));
+    } while (!this->stealByCAS(lockable, other));
 
     // Disable loser
     if (other) {
@@ -1377,7 +1379,7 @@ bool Executor<OptionsTy>::pendingLoop(ThreadLocalData& tld)
       mlocal.assertLimits(ctx->item.val, tld.options.comp);
     }
 
-    ctx->start_iteration();
+    ctx->startIteration();
     tld.stat.inc_iterations();
     setThreadContext(ctx);
 
@@ -1486,9 +1488,9 @@ bool Executor<OptionsTy>::commitLoop(ThreadLocalData& tld)
     }
 
     if (commit) {
-      ctx->commit_iteration();
+      ctx->commitIteration();
     } else {
-      ctx->cancel_iteration();
+      ctx->cancelIteration();
     }
 
     if (ForEachTraits<typename OptionsTy::Function2Ty>::NeedsPIA && !useLocalState)

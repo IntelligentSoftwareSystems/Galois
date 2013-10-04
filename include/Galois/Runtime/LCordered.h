@@ -53,7 +53,9 @@ namespace Runtime {
 static const bool debug = false;
 
 template <typename Ctxt, typename CtxtCmp>
-class NhoodItem {
+class NhoodItem: public LockManagerBase {
+
+  using Base = LockManagerBase;
 
 public:
   // typedef Galois::ThreadSafeMinHeap<Ctxt*, CtxtCmp> PQ;
@@ -67,16 +69,14 @@ public:
   template <typename Cmp>
   NhoodItem (Lockable* l, const Cmp& cmp):  sharers (CtxtCmp (cmp)), lockable (l) {}
 
-  Lockable* getLockable () const { return lockable; }
+  void add (const Ctxt* ctx) {
 
-  void add (const Ctxt* ctxt) {
-
-    assert (!sharers.find (const_cast<Ctxt*> (ctxt)));
-    sharers.push (const_cast<Ctxt*> (ctxt));
+    assert (!sharers.find (const_cast<Ctxt*> (ctx)));
+    sharers.push (const_cast<Ctxt*> (ctx));
   }
 
-  bool isHighestPriority (const Ctxt* ctxt) const {
-    return !sharers.empty () && (sharers.top () == ctxt);
+  bool isHighestPriority (const Ctxt* ctx) const {
+    return !sharers.empty () && (sharers.top () == ctx);
   }
 
   Ctxt* getHighestPriority () const {
@@ -88,21 +88,39 @@ public:
     }
   }
 
-  void remove (const Ctxt* ctxt) {
-    sharers.remove (const_cast<Ctxt*> (ctxt));
+  void remove (const Ctxt* ctx) {
+    sharers.remove (const_cast<Ctxt*> (ctx));
     // XXX: may fail in parallel execution
-    assert (!sharers.find (const_cast<Ctxt*> (ctxt)));
+    assert (!sharers.find (const_cast<Ctxt*> (ctx)));
   }
 
   void print () const { 
     // TODO
+  }
+  
+  bool tryMappingTo (Lockable* l) {
+    return Base::stealByCAS (l, NULL);
+  }
+
+  void clearMapping () {
+    Base::release (lockable);
+  }
+
+  // just for debugging
+  const Lockable* getMapping () const {
+    return lockable;
+  }
+
+  static NhoodItem* getOwner (Lockable* l) {
+    LockManagerBase* o = LockManagerBase::getOwner (l);
+    // assert (dynamic_cast<NhoodItem*> (o) != nullptr);
+    return static_cast<NhoodItem*> (o);
   }
 };
 
 
 template <typename T, typename Cmp, typename NhoodMgr_tp>
 class LCorderedContext: public SimpleRuntimeContext {
-
 
 public:
   struct Comparator;
@@ -112,8 +130,8 @@ public:
   typedef LCorderedContext MyType;
   typedef NhoodItem<MyType, typename MyType::Comparator> NItem;
   typedef Galois::GAtomic<bool> AtomicBool;
-  typedef llvm::SmallVector<NItem*, 4> NhoodList;
-  // typedef Galois::gdeque<NItem*, 4> NhoodList;
+  typedef Galois::gdeque<NItem*, 4> NhoodList;
+  // typedef llvm::SmallVector<NItem*, 4> NhoodList;
   // typedef std::vector<NItem*> NhoodList;
 
   // TODO: fix visibility below
@@ -122,7 +140,6 @@ public:
   NhoodList nhood;
   NhoodMgr& nhmgr;
   GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE AtomicBool onWL;
-
 
 public:
 
@@ -138,7 +155,7 @@ public:
   virtual void subAcquire (Lockable* l) {
     NItem& nitem = nhmgr.getNhoodItem (l);
 
-    assert (nitem.getLockable () == l);
+    assert (NItem::getOwner (l) == &nitem);
 
     nhood.push_back (&nitem);
     nitem.add (this);
@@ -243,107 +260,106 @@ public:
   typedef Galois::Runtime::PerThreadVector<NItem*> NItemWL;
 
 
+protected:
   Cmp cmp;
   NItemAlloc niAlloc;
   NItemWL allNItems;
   
+public:
 
   PtrBasedNhoodMgr (const Cmp& cmp): cmp (cmp) {}
 
+  NItem* create (Lockable* l) {
+    NItem* ni = niAlloc.allocate (1);
+    assert (ni != nullptr);
+    // XXX(ddn): Forwarding still wonky on XLC
+#if !defined(__IBMCPP__) || __IBMCPP__ > 1210
+    niAlloc.construct (ni, l, cmp);
+#else
+    niAlloc.construct (ni, NItem(l, cmp));
+#endif
+
+    return ni;
+  }
+
   NItem& getNhoodItem (Lockable* l) {
 
-    if (l->auxPtr.getValue () == NULL) {
-      NItem* nv = niAlloc.allocate (1);
-      assert (nv != NULL);
-// XXX(ddn): Forwarding still wonky on XLC
-#if !defined(__IBMCPP__) || __IBMCPP__ > 1210
-      niAlloc.construct (nv, l, cmp);
-#else
-      niAlloc.construct (nv, NItem(l, cmp));
-#endif
-      // NItem* nv = new NItem (l, cmp);
+    if (NItem::getOwner (l) == NULL) {
+      // NItem* ni = new NItem (l, cmp);
+      NItem* ni = create (l);
 
-      if (l->auxPtr.CAS (NULL, nv)) {
-        allNItems.get ().push_back (nv);
+      if (ni->tryMappingTo (l)) {
+        allNItems.get ().push_back (ni);
+
       } else {
-        // delete nv; nv = NULL;
-        niAlloc.destroy (nv);
-        niAlloc.deallocate (nv, 1);
-        nv = NULL;
+        // delete ni; ni = NULL;
+        niAlloc.destroy (ni);
+        niAlloc.deallocate (ni, 1);
+        ni = NULL;
       }
 
-
-      assert (l->auxPtr.getValue () != NULL);
+      assert (NItem::getOwner (l) != NULL);
     }
 
-    NItem* ret = static_cast<NItem*> (l->auxPtr.getValue ());
+    NItem* ret = NItem::getOwner (l);
     assert (ret != NULL);
     return *ret;
   }
 
-private:
-
-  struct Reset {
-    NItemAlloc& niAlloc;
-
-    Reset (NItemAlloc& niAlloc): niAlloc (niAlloc) {}
-
-    void operator () (NItem* ni) {
-      ni->getLockable ()->auxPtr.setValue (NULL);
-      niAlloc.destroy (ni);
-      niAlloc.deallocate (ni, 1);
-    }
-  };
-
-  void resetAll () {
-    do_all_impl(makeStandardRange(allNItems.begin_all (), allNItems.end_all ()),
-        Reset (niAlloc));
-  }
-
-public:
   ~PtrBasedNhoodMgr () {
-    resetAll ();
+    resetAllNItems ();
   }
 
+protected:
+  void resetAllNItems () {
 
+    do_all_impl (makeStandardRange(allNItems.begin_all (), allNItems.end_all ()),
+        [this] (NItem* ni) {
+          ni->clearMapping ();
+          niAlloc.destroy (ni);
+          niAlloc.deallocate (ni, 1);
+          
+        });
+  }
 
 };
 
-
-
 template <typename T, typename Cmp>
-class MapBasedNhoodMgr {
+class MapBasedNhoodMgr: public PtrBasedNhoodMgr<T, Cmp> {
 public:
   typedef MapBasedNhoodMgr MyType;
   typedef LCorderedContext<T, Cmp, MyType> Ctxt;
   typedef typename Ctxt::NItem NItem;
+
   // typedef std::tr1::unordered_map<Lockable*, NItem> NhoodMap; 
   //
   typedef MM::SimpleBumpPtrWithMallocFallback<MM::FreeListHeap<MM::SystemBaseAlloc> > BasicHeap;
   typedef MM::ThreadAwarePrivateHeap<BasicHeap> PerThreadHeap;
-  typedef MM::ExternRefGaloisAllocator<std::pair<Lockable*, NItem>, PerThreadHeap> PerThreadAllocator;
+  typedef MM::ExternRefGaloisAllocator<std::pair<Lockable*, NItem*>, PerThreadHeap> PerThreadAllocator;
 
   typedef std::unordered_map<
       Lockable*,
-      NItem,
+      NItem*,
       std::hash<Lockable*>,
       std::equal_to<Lockable*>,
       PerThreadAllocator
     > NhoodMap;
 
   typedef Galois::Runtime::LL::ThreadRWlock Lock_ty;
+  typedef Galois::Runtime::MM::FSBGaloisAllocator<NItem> NItemAlloc;
+  typedef Galois::Runtime::PerThreadVector<NItem*> NItemWL;
+
+  using Base = PtrBasedNhoodMgr<T, Cmp>;
 
 protected:
-  Cmp cmp;
   PerThreadHeap heap;
   NhoodMap nhoodMap;
-
   Lock_ty map_mutex;
 
 public:
 
   MapBasedNhoodMgr (const Cmp& cmp): 
-    cmp (cmp),
+    Base (cmp),
     heap (),
     nhoodMap (8, std::hash<Lockable*> (), std::equal_to<Lockable*> (), PerThreadAllocator (&heap))
 
@@ -362,7 +378,10 @@ public:
         map_mutex.writeLock ();
           // check again to avoid over-writing existing entry
           if (nhoodMap.find (l) == nhoodMap.end ()) {
-            nhoodMap.insert (std::make_pair (l, NItem (l, cmp)));
+            NItem* ni = Base::create (l);
+            Base::allNItems.get ().push_back (ni);
+            nhoodMap.insert (std::make_pair (l, ni));
+
           }
         map_mutex.writeUnlock ();
 
@@ -372,8 +391,10 @@ public:
       }
 
     map_mutex.readUnlock ();
+    assert (i != nhoodMap.end ());
+    assert (i->second != nullptr);
 
-    return i->second;
+    return *(i->second);
     
   }
 
@@ -392,11 +413,13 @@ public:
     // return i->second;
 // 
   // }
+  //
+
+  ~MapBasedNhoodMgr () {
+    Base::resetAllNItems ();
+  }
 
 };
-
-
-
 
 template <typename Ctxt, typename StableTest>
 struct UnstableSourceTest {
@@ -406,20 +429,19 @@ struct UnstableSourceTest {
   explicit UnstableSourceTest (const StableTest& stabilityTest)
     : stabilityTest (stabilityTest) {}
 
-  bool operator () (const Ctxt* ctxt) const {
-    assert (ctxt != NULL);
-    return ctxt->isSrc () && stabilityTest (ctxt->active);
+  bool operator () (const Ctxt* ctx) const {
+    assert (ctx != NULL);
+    return ctx->isSrc () && stabilityTest (ctx->active);
   }
 };
 
 template <typename Ctxt>
 struct StableSourceTest {
-  bool operator () (const Ctxt* ctxt) const {
-    assert (ctxt != NULL);
-    return ctxt->isSrc ();
+  bool operator () (const Ctxt* ctx) const {
+    assert (ctx != NULL);
+    return ctx->isSrc ();
   }
 };
-
 
 // TODO: remove template parameters that can be passed to execute
 template <typename OperFunc, typename NhoodFunc, typename Ctxt, typename SourceTest>
@@ -452,13 +474,13 @@ class LCorderedExec {
   typedef Galois::GAccumulator<size_t> Accumulator;
 
   struct CreateCtxtExpandNhood {
-    NhoodFunc nhoodVisitor;
+    NhoodFunc& nhoodVisitor;
     NhoodMgr& nhmgr;
     CtxtAlloc& ctxtAlloc;
     CtxtWL& ctxtWL;
 
     CreateCtxtExpandNhood (
-        const NhoodFunc& nhoodVisitor,
+        NhoodFunc& nhoodVisitor,
         NhoodMgr& nhmgr,
         CtxtAlloc& ctxtAlloc,
         CtxtWL& ctxtWL)
@@ -470,26 +492,26 @@ class LCorderedExec {
     {}
 
     void operator () (const T& active) {
-      Ctxt* ctxt = ctxtAlloc.allocate (1);
-      assert (ctxt != NULL);
-      // new (ctxt) Ctxt (active, nhmgr);
-      //ctxtAlloc.construct (ctxt, Ctxt (active, nhmgr));
-      ctxtAlloc.construct (ctxt, active, nhmgr);
+      Ctxt* ctx = ctxtAlloc.allocate (1);
+      assert (ctx != NULL);
+      // new (ctx) Ctxt (active, nhmgr);
+      //ctxtAlloc.construct (ctx, Ctxt (active, nhmgr));
+      ctxtAlloc.construct (ctx, active, nhmgr);
 
-      ctxtWL.get ().push_back (ctxt);
+      ctxtWL.get ().push_back (ctx);
 
-      Galois::Runtime::setThreadContext (ctxt);
+      Galois::Runtime::setThreadContext (ctx);
       int tmp=0;
       // TODO: nhoodVisitor should take only one arg, 
       // 2nd arg being passed due to compatibility with Deterministic executor
-      nhoodVisitor (ctxt->active, tmp); 
+      nhoodVisitor (ctx->active, tmp); 
       Galois::Runtime::setThreadContext (NULL);
     }
 
   };
 
   struct FindInitSources {
-    SourceTest sourceTest;
+    const SourceTest& sourceTest;
     CtxtWL& initSrc;
     Accumulator& nsrc;
 
@@ -503,18 +525,18 @@ class LCorderedExec {
         nsrc (nsrc)
     {}
 
-    void operator () (Ctxt* ctxt) {
-      assert (ctxt != NULL);
-      // assume nhood of ctxt is already expanded
+    void operator () (Ctxt* ctx) {
+      assert (ctx != NULL);
+      // assume nhood of ctx is already expanded
 
-      // if (ctxt->isSrc ()) {
-        // std::cout << "Testing source: " << ctxt->str () << std::endl;
+      // if (ctx->isSrc ()) {
+        // std::cout << "Testing source: " << ctx->str () << std::endl;
       // }
-      // if (sourceTest (ctxt)) {
-        // std::cout << "Initial source: " << ctxt->str () << std::endl;
+      // if (sourceTest (ctx)) {
+        // std::cout << "Initial source: " << ctx->str () << std::endl;
       // }
-      if (sourceTest (ctxt) && ctxt->onWL.cas (false, true)) {
-        initSrc.get ().push_back (ctxt);
+      if (sourceTest (ctx) && ctx->onWL.cas (false, true)) {
+        initSrc.get ().push_back (ctx);
         nsrc += 1;
       }
     }
@@ -522,10 +544,10 @@ class LCorderedExec {
 
 
   struct ApplyOperator {
-    OperFunc op;
-    NhoodFunc nhoodVisitor;
+    OperFunc& op;
+    NhoodFunc& nhoodVisitor;
     NhoodMgr& nhmgr;
-    SourceTest sourceTest;
+    const SourceTest& sourceTest;
     CtxtAlloc& ctxtAlloc;
     CtxtWL& addCtxtWL;
     CtxtLocalQ& ctxtLocalQ;
@@ -534,8 +556,8 @@ class LCorderedExec {
     Accumulator& niter;
 
     ApplyOperator (
-        const OperFunc& op,
-        const NhoodFunc& nhoodVisitor,
+        OperFunc& op,
+        NhoodFunc& nhoodVisitor,
         NhoodMgr& nhmgr,
         const SourceTest& sourceTest,
         CtxtAlloc& ctxtAlloc,
@@ -646,18 +668,18 @@ class LCorderedExec {
 
     explicit DelCtxt (CtxtAlloc& ctxtAlloc): ctxtAlloc (ctxtAlloc) {}
 
-    void operator () (Ctxt* ctxt) {
-      ctxtAlloc.destroy (ctxt);
-      ctxtAlloc.deallocate (ctxt, 1);
+    void operator () (Ctxt* ctx) {
+      ctxtAlloc.destroy (ctx);
+      ctxtAlloc.deallocate (ctx, 1);
     }
   };
 
 private:
-  const NhoodFunc& nhoodVisitor;
-  const OperFunc& operFunc;
+  NhoodFunc nhoodVisitor;
+  OperFunc operFunc;
   // TODO: make cmp function of nhmgr thread local as well.
   NhoodMgr& nhmgr;
-  const SourceTest& sourceTest;
+  SourceTest sourceTest;
 
 
 public:
@@ -744,7 +766,7 @@ public:
 };
 
 template <typename AI, typename Cmp, typename OperFunc, typename NhoodFunc>
-void for_each_ordered_lc (AI abeg, AI aend, Cmp cmp, NhoodFunc nhoodVisitor, OperFunc operFunc, const char* loopname) {
+void for_each_ordered_lc (AI abeg, AI aend, const Cmp& cmp, const NhoodFunc& nhoodVisitor, const OperFunc& operFunc, const char* loopname) {
 
   typedef typename std::iterator_traits<AI>::value_type T;
 
@@ -765,7 +787,7 @@ void for_each_ordered_lc (AI abeg, AI aend, Cmp cmp, NhoodFunc nhoodVisitor, Ope
 }
 
 template <typename AI, typename Cmp, typename OperFunc, typename NhoodFunc, typename StableTest>
-void for_each_ordered_lc (AI abeg, AI aend, Cmp cmp, NhoodFunc nhoodVisitor, OperFunc operFunc, StableTest stabilityTest, const char* loopname) {
+void for_each_ordered_lc (AI abeg, AI aend, const Cmp& cmp, const NhoodFunc& nhoodVisitor, const OperFunc& operFunc, const StableTest& stabilityTest, const char* loopname) {
 
   typedef typename std::iterator_traits<AI>::value_type T;
 

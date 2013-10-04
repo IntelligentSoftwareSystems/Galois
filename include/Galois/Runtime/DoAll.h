@@ -157,7 +157,7 @@ public:
 };
 
 template<typename RangeTy, typename FunctionTy, typename ReducerTy>
-FunctionTy do_all_dispatch(RangeTy range, FunctionTy f, ReducerTy r, bool doReduce, const char* loopname, bool Steal) {
+FunctionTy do_all_dispatch(RangeTy range, FunctionTy f, ReducerTy r, bool doReduce, const char* loopname, bool steal) {
   if (Galois::Runtime::inGaloisForEach) {
     return std::for_each(range.begin(), range.end(), f);
   } else {
@@ -168,7 +168,7 @@ FunctionTy do_all_dispatch(RangeTy range, FunctionTy f, ReducerTy r, bool doRedu
 
     inGaloisForEach = true;
 
-    DoAllWork<FunctionTy, ReducerTy, RangeTy> W(f, r, doReduce, range, Steal);
+    DoAllWork<FunctionTy, ReducerTy, RangeTy> W(f, r, doReduce, range, steal);
     RunCommand w[2] = {std::ref(W),
 		       std::ref(getSystemBarrier())};
     getSystemThreadPool().run(&w[0], &w[2],activeThreads);
@@ -180,13 +180,13 @@ FunctionTy do_all_dispatch(RangeTy range, FunctionTy f, ReducerTy r, bool doRedu
 }
 
 template<typename RangeTy, typename FunctionTy>
-FunctionTy do_all_impl(RangeTy range, FunctionTy f, const char* loopname = 0, bool steel = false) {
-  return do_all_dispatch(range, f, EmptyFn(), false, loopname, steel);
+FunctionTy do_all_impl(RangeTy range, FunctionTy f, const char* loopname = 0, bool steal = false) {
+  return do_all_dispatch(range, f, EmptyFn(), false, loopname, steal);
 }
 
 template<typename RangeTy, typename FunctionTy, typename ReduceTy>
-FunctionTy do_all_impl(RangeTy range, FunctionTy f, ReduceTy r, const char* loopname = 0, bool Steal = false) {
-  return do_all_dispatch(range, f, r, true, loopname, Steal);
+FunctionTy do_all_impl(RangeTy range, FunctionTy f, ReduceTy r, const char* loopname = 0, bool steal = false) {
+  return do_all_dispatch(range, f, r, true, loopname, steal);
 }
 
 } // end namespace Runtime

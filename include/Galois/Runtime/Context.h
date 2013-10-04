@@ -87,29 +87,41 @@ public:
 static inline void clearReleasable() { }
 #endif
 
-class SimpleRuntimeContext;
+class LockManagerBase; 
 
 #if defined(GALOIS_USE_SEQ_ONLY)
 class Lockable { };
 
-class SimpleRuntimeContext: private boost::noncopyable {
+class LockManagerBase: private boost::noncopyable {
 protected:
+  enum AcquireStatus {
+    FAIL, NEW_OWNER, ALREADY_OWNER
+  };
+
+  AcquireStatus tryAcquire(Lockable* lockable) { return FAIL; }
+  bool stealByCAS(Lockable* lockable, LockManagerBase* other) { return false; }
+  void ownByForce(Lockable* lockable) { }
+  void release (Lockable* lockable) {}
+  static bool tryLock(Lockable* lockable) { return false; }
+  static LockManagerBase* getOwner(Lockable* lockable) { return 0; }
+
+};
+
+class SimpleRuntimeContext: public LockManagerBase {
+protected:
+  void acquire(Lockable* lockable) { }
+  void release (Lockable* lockable) {}
   virtual void subAcquire(Lockable* lockable);
-  int tryAcquire(Lockable* lockable) { return 0; }
-  void insertLockable(Lockable* lockable) { }
-  bool tryLockOwner(Lockable* lockable) { return false; }
-  bool stealingCasOwner(Lockable* lockable, SimpleRuntimeContext* other) { return false; }
-  void setOwner(Lockable* lockable) { }
-  SimpleRuntimeContext* getOwner(Lockable* lockable) { return 0; }
+  void addToNhood(Lockable* lockable) { }
+  static SimpleRuntimeContext* getOwner(Lockable* lockable) { return 0; }
 
 public:
-  SimpleRuntimeContext(bool child = false) { }
+  SimpleRuntimeContext(bool child = false): LockManagerBase () { }
   virtual ~SimpleRuntimeContext() { }
-  void start_iteration() { }
+  void startIteration() { }
   
-  unsigned cancel_iteration() { return 0; }
-  unsigned commit_iteration() { return 0; }
-  void acquire(Lockable* L) { }
+  unsigned cancelIteration() { return 0; }
+  unsigned commitIteration() { return 0; }
 };
 #else
 /**
@@ -117,63 +129,91 @@ public:
  * Lockable. 
  */
 class Lockable {
-  LL::PtrLock<SimpleRuntimeContext, true> owner;
-  //! Use an intrusive list to track objects in a context without allocation overhead.
+  LL::PtrLock<LockManagerBase, true> owner;
+  //! Use an intrusive list to track neighborhood of a context without allocation overhead.
+  //! Works for cases where a Lockable needs to be only in one context's neighborhood list
   Lockable* next;
-
+  friend class LockManagerBase;
   friend class SimpleRuntimeContext;
 public:
-  // TODO(ddn): delete this field
-  LL::PtrLock<void, true> auxPtr;
   Lockable() :next(0) {}
 };
 
-class SimpleRuntimeContext: private boost::noncopyable {
+class LockManagerBase: private boost::noncopyable {
+protected:
+  enum AcquireStatus {
+    FAIL, NEW_OWNER, ALREADY_OWNER
+  };
+
+  AcquireStatus tryAcquire (Lockable* lockable);
+
+  bool stealByCAS(Lockable* lockable, LockManagerBase* other) {
+    assert (lockable != nullptr);
+    return lockable->owner.stealing_CAS(other, this);
+  }
+
+  void ownByForce(Lockable* lockable) {
+    assert (lockable != nullptr);
+    assert(!lockable->owner.getValue());
+    lockable->owner.setValue(this);
+  }
+
+  void release (Lockable* lockable) {
+    assert (lockable != nullptr);
+    assert (getOwner (lockable) == this);
+    lockable->owner.unlock_and_clear ();
+  }
+
+  static bool tryLock(Lockable* lockable) {
+    assert (lockable != nullptr);
+    return lockable->owner.try_lock();
+  }
+
+  static LockManagerBase* getOwner (Lockable* lockable) {
+    assert (lockable != nullptr);
+    return lockable->owner.getValue ();
+  }
+
+
+
+};
+
+class SimpleRuntimeContext: public LockManagerBase {
+
   //! The locks we hold
   Lockable* locks;
   bool customAcquire;
 
 protected:
+
+  static SimpleRuntimeContext* getOwner (Lockable* lockable) {
+    LockManagerBase* owner = LockManagerBase::getOwner (lockable);
+    // assert (dynamic_cast<SimpleRuntimeContext*> (owner) != nullptr);
+    return static_cast<SimpleRuntimeContext*> (owner);
+  }
   virtual void subAcquire(Lockable* lockable);
 
-  //! returns  0 if fail, 1 if new owner, 2 if already owner
-  int tryAcquire(Lockable* lockable);
-  void release(Lockable* lockable);
-
-  void insertLockable(Lockable* lockable) {
+  void addToNhood (Lockable* lockable) {
     assert(!lockable->next);
     lockable->next = locks;
     locks = lockable;
   }
 
-  bool tryLockOwner(Lockable* lockable) {
-    return lockable->owner.try_lock();
-  }
+  void acquire(Lockable* lockable);
+  // XXX: overriding LockManagerBase version due to extra checks
+  void release(Lockable* lockable);
 
-  bool stealingCasOwner(Lockable* lockable, SimpleRuntimeContext* other) {
-    return lockable->owner.stealing_CAS(other, this);
-  }
-
-  void setOwner(Lockable* lockable) {
-    assert(!lockable->owner.getValue());
-    lockable->owner.setValue(this);
-  }
-
-  SimpleRuntimeContext* getOwner(Lockable* lockable) {
-    return lockable->owner.getValue();
-  }
-
+  friend void doAcquire (Lockable*);
 public:
   SimpleRuntimeContext(bool child = false): locks(0), customAcquire(child) { }
   virtual ~SimpleRuntimeContext() { }
 
-  void start_iteration() {
+  void startIteration() {
     assert(!locks);
   }
   
-  unsigned cancel_iteration();
-  unsigned commit_iteration();
-  void acquire(Lockable* L);
+  unsigned cancelIteration();
+  unsigned commitIteration();
 };
 #endif
 
@@ -204,33 +244,31 @@ inline bool shouldLock(const Galois::MethodFlag g) {
 }
 
 //! actual locking function.  Will always lock.
-void doAcquire(Lockable* L);
-
-inline void acquire(Lockable* L, SimpleRuntimeContext* cnx, const Galois::MethodFlag m) {
-  if (shouldLock(m) && cnx)
-    cnx->acquire(L);
+inline void doAcquire(Lockable* lockable) {
+  SimpleRuntimeContext* ctx = getThreadContext();
+  if (ctx)
+    ctx->acquire(lockable);
 }
 
 //! Master function which handles conflict detection
 //! used to acquire a lockable thing
-inline void acquire(Lockable* L, Galois::MethodFlag m) {
+inline void acquire(Lockable* lockable, Galois::MethodFlag m) {
   if (shouldLock(m)) {
-    SimpleRuntimeContext* cnx = getThreadContext();
-    acquire(L, cnx, m);
+    doAcquire (lockable);
   }
 }
 
 struct AlwaysLockObj {
-  void operator()(Lockable* L) const {
-    doAcquire(L);
+  void operator()(Lockable* lockable) const {
+    doAcquire(lockable);
   }
 };
 
 struct CheckedLockObj {
   Galois::MethodFlag m;
   CheckedLockObj(Galois::MethodFlag _m) :m(_m) {}
-  void operator()(Lockable* L) const {
-    acquire(L, m);
+  void operator()(Lockable* lockable) const {
+    acquire(lockable, m);
   }
 };
 

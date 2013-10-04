@@ -222,7 +222,7 @@ protected:
   struct ThreadLocalData {
     FunctionTy function;
     UserContextAccess<value_type> facing;
-    SimpleRuntimeContext cnx;
+    SimpleRuntimeContext ctx;
     LoopStatistics<ForEachTraits<FunctionTy>::NeedsStats> stat;
     ThreadLocalData(const FunctionTy& fn, const char* ln): function(fn), stat(ln) {}
   };
@@ -249,14 +249,14 @@ protected:
     if (ForEachTraits<FunctionTy>::NeedsPIA)
       tld.facing.resetAlloc();
     if (ForEachTraits<FunctionTy>::NeedsAborts)
-      tld.cnx.commit_iteration();
+      tld.ctx.commitIteration();
   }
 
   template<typename Item>
   GALOIS_ATTRIBUTE_NOINLINE
   void abortIteration(const Item& item, ThreadLocalData& tld) {
     assert(ForEachTraits<FunctionTy>::NeedsAborts);
-    tld.cnx.cancel_iteration();
+    tld.ctx.cancelIteration();
     tld.stat.inc_conflicts(); //Class specialization handles opt
     aborted.push(item);
     //clear push buffer
@@ -312,7 +312,7 @@ protected:
   inline void doProcess(value_type& val, ThreadLocalData& tld) {
     tld.stat.inc_iterations();
     if (ForEachTraits<FunctionTy>::NeedsAborts)
-      tld.cnx.start_iteration();
+      tld.ctx.startIteration();
 
     runFunction(val, tld);
     clearReleasable();
@@ -401,7 +401,7 @@ protected:
     // Thread-local data goes on the local stack to be NUMA friendly
     ThreadLocalData tld(origFunction, loopname);
     if (couldAbort)
-      setThreadContext(&tld.cnx);
+      setThreadContext(&tld.ctx);
     if (ForEachTraits<FunctionTy>::NeedsPush && !couldAbort)
       tld.facing.setFastPushBack(
           std::bind(&ForEachWork::fastPushBack, std::ref(*this), std::placeholders::_1));
