@@ -24,7 +24,7 @@ struct GraphLabAlgo {
   struct Initialize {
     Graph& g;
     Initialize(Graph& g): g(g) { }
-    void operator()(typename Graph::GraphNode n) {
+    void operator()(Graph::GraphNode n) {
       g.getData(n).dist = DIST_INFINITY;
     }
   };
@@ -64,7 +64,7 @@ struct GraphLabAlgo {
     }
     
     void scatter(Graph& graph, GNode node, GNode src, GNode dst,
-        Galois::GraphLab::Context<Graph,Program>& ctx, typename Graph::edge_data_reference edgeValue) {
+        Galois::GraphLab::Context<Graph,Program>& ctx, Graph::edge_data_reference edgeValue) {
       SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
       SNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
       Dist newDist = sdata.dist + edgeValue;
@@ -73,7 +73,7 @@ struct GraphLabAlgo {
       }
     }
 
-    void gather(Graph& graph, GNode node, GNode src, GNode dst, gather_type&, typename Graph::edge_data_reference) { }
+    void gather(Graph& graph, GNode node, GNode src, GNode dst, gather_type&, Graph::edge_data_reference) { }
   };
 
   void operator()(Graph& graph, const GNode& source) {

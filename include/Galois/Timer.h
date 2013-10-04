@@ -20,16 +20,22 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-
 #ifndef GALOIS_TIMER_H
 #define GALOIS_TIMER_H
 
+#include "Galois/config.h"
+
+#ifndef GALOIS_USE_CXX11_COMPAT
+#define GALOIS_USE_STD_TIMER
+#endif
+
+#ifdef GALOIS_USE_STD_TIMER
 #include <chrono>
+#endif
 
 namespace Galois {
 
-#define USE_STD_TIMER
-#ifdef USE_STD_TIMER
+#ifdef GALOIS_USE_STD_TIMER
 class Timer {
   typedef std::chrono::steady_clock clockTy;
   //typedef std::chrono::high_resolution_clock clockTy;

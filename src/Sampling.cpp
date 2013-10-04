@@ -24,6 +24,7 @@
 #include "Galois/Runtime/Sampling.h"
 #include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/ll/EnvCheck.h"
+#include "Galois/Runtime/ll/TID.h"
 #include "Galois/Runtime/ll/gio.h"
 #include <cstdlib>
 

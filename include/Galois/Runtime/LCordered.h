@@ -249,7 +249,7 @@ public:
 };
 
 
-template <typename T, typename Cmp>
+template<typename T, typename Cmp>
 class PtrBasedNhoodMgr {
 public:
   typedef PtrBasedNhoodMgr MyType;
@@ -259,15 +259,13 @@ public:
   typedef Galois::Runtime::MM::FSBGaloisAllocator<NItem> NItemAlloc;
   typedef Galois::Runtime::PerThreadVector<NItem*> NItemWL;
 
-
 protected:
   Cmp cmp;
   NItemAlloc niAlloc;
   NItemWL allNItems;
   
 public:
-
-  PtrBasedNhoodMgr (const Cmp& cmp): cmp (cmp) {}
+  PtrBasedNhoodMgr(const Cmp& cmp): cmp (cmp) {}
 
   NItem* create (Lockable* l) {
     NItem* ni = niAlloc.allocate (1);
@@ -306,22 +304,24 @@ public:
     return *ret;
   }
 
-  ~PtrBasedNhoodMgr () {
-    resetAllNItems ();
+  ~PtrBasedNhoodMgr() {
+    resetAllNItems();
   }
 
 protected:
-  void resetAllNItems () {
+  struct Reset {
+    PtrBasedNhoodMgr* self; 
+    void operator()(NItem* ni) {
+      ni->clearMapping();
+      self->niAlloc.destroy(ni);
+      self->niAlloc.deallocate(ni, 1);
+    }
+  };
 
-    do_all_impl (makeStandardRange(allNItems.begin_all (), allNItems.end_all ()),
-        [this] (NItem* ni) {
-          ni->clearMapping ();
-          niAlloc.destroy (ni);
-          niAlloc.deallocate (ni, 1);
-          
-        });
+  void resetAllNItems() {
+    Reset fn = { this };
+    do_all_impl(makeStandardRange(allNItems.begin_all(), allNItems.end_all()), fn);
   }
-
 };
 
 template <typename T, typename Cmp>

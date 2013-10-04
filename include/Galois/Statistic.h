@@ -23,6 +23,7 @@
 #ifndef GALOIS_STATISTIC_H
 #define GALOIS_STATISTIC_H
 
+#include "Galois/config.h"
 #include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/Sampling.h"
@@ -30,7 +31,7 @@
 
 #include "boost/utility.hpp"
 
-#include <list>
+#include GALOIS_CXX11_STD_HEADER(deque)
 
 namespace Galois {
 
@@ -74,11 +75,11 @@ public:
 
 //! Controls lifetime of stats. Users usually instantiate an instance in main.
 class StatManager: private boost::noncopyable {
-  std::list<Statistic*> stats;
+  std::deque<Statistic*> stats;
 
 public:
   ~StatManager() {
-    for (std::list<Statistic*>::iterator ii = stats.begin(), ei = stats.end(); ii != ei; ++ii) {
+    for (std::deque<Statistic*>::iterator ii = stats.begin(), ei = stats.end(); ii != ei; ++ii) {
       (*ii)->report();
     }
     Galois::Runtime::printStats();
@@ -91,7 +92,11 @@ public:
 };
 
 struct start_now_t {};
+#if defined(__IBMCPP__) && __IBMCPP__ <= 1210
+static const start_now_t start_now = start_now_t();
+#else
 constexpr start_now_t start_now = start_now_t();
+#endif
 
 //! Provides statistic interface around timer
 class StatTimer : public TimeAccumulator {

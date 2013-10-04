@@ -19,6 +19,28 @@ class GraphNodeBag {
   size_t size;
   bool isDense;
 
+  struct InitializeSmall {
+    GraphNodeBag* self;
+    void operator()(size_t n) {
+      self->bitmask[n] = 0;
+    }
+  };
+
+  struct InitializeBig {
+    GraphNodeBag* self;
+    void operator()(unsigned id, unsigned total) {
+      typedef typename Bitmask::iterator It;
+      std::pair<It,It> p = Galois::block_range(self->bitmask.begin(), self->bitmask.end(), id, total);
+      std::fill(p.first, p.second, 0);
+    }
+  };
+
+  struct Densify {
+    GraphNodeBag* self;
+    void operator()(size_t n) {
+      self->bitmask[n] = true;
+    }
+  };
 public:
   GraphNodeBag(size_t n): size(n), isDense(false) { }
 
@@ -52,15 +74,11 @@ public:
   void clear() { 
     if (isDense) {
       if (numNodes.reduce() < bitmask.size() / 4) {
-        Galois::do_all_local(bag, [&](size_t n) {
-          bitmask[n] = 0;
-        });
+        InitializeSmall fn = { this };
+        Galois::do_all_local(bag, fn);
       } else {
-        Galois::on_each([&](unsigned id, unsigned total) {
-          typedef typename Bitmask::iterator It;
-          std::pair<It,It> p = Galois::block_range(bitmask.begin(), bitmask.end(), id, total);
-          std::fill(p.first, p.second, 0);
-        });
+        InitializeBig fn = { this };
+        Galois::on_each(fn);
       }
     }
     bag.clear();
@@ -83,10 +101,8 @@ public:
       bitmask.create(size);
     }
 
-    Galois::do_all_local(bag, [&](size_t n) {
-      bitmask[n] = true;
-    });
-    //Galois::do_all(bag.begin(), bag.end(), Densify(this));
+    Densify fn = { this };
+    Galois::do_all_local(bag, fn);
   }
 };
 

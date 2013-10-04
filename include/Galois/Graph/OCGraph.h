@@ -25,6 +25,7 @@
 #ifndef GALOIS_GRAPH_OCGRAPH_H
 #define GALOIS_GRAPH_OCGRAPH_H
 
+#include "Galois/config.h"
 #include "Galois/optional.h"
 #include "Galois/LazyObject.h"
 #include "Galois/LargeArray.h"
@@ -33,8 +34,8 @@
 
 #include <boost/iterator/counting_iterator.hpp>
 #include <boost/utility.hpp>
-#include <type_traits>
-#include <list>
+
+#include GALOIS_CXX11_STD_HEADER(type_traits)
 #include <string>
 
 namespace Galois {
@@ -45,7 +46,7 @@ namespace Graph {
  * place of a non out-of-core graph.
  */
 template<typename Graph>
-class BindSegmentGraph: boost::noncopyable {
+class BindSegmentGraph: private boost::noncopyable {
   typedef typename Graph::segment_type segment_type;
 
   Graph& graph;
@@ -134,7 +135,7 @@ public:
 };
 
 //! Like {@link FileGraph} but allows partial loading of the graph.
-class OCFileGraph: boost::noncopyable {
+class OCFileGraph: private boost::noncopyable {
 public:
   typedef uint32_t GraphNode;
   typedef boost::counting_iterator<uint32_t> iterator;
@@ -242,26 +243,33 @@ template<typename NodeTy, typename EdgeTy,
   //bool UseNumaAlloc=false, // XXX: implement this
   bool HasOutOfLineLockable=false>
 class OCImmutableEdgeGraph:
-    detail::LocalIteratorFeature<false>,
-    detail::OutOfLineLockableFeature<HasOutOfLineLockable && !HasNoLockable> {
+    private detail::LocalIteratorFeature<false>,
+    private detail::OutOfLineLockableFeature<HasOutOfLineLockable && !HasNoLockable> {
 public:
   template<bool _has_id>
-  using with_id = OCImmutableEdgeGraph;
+  struct with_id {
+    typedef OCImmutableEdgeGraph type;
+  };
 
   template<typename _node_data>
-  using with_node_data =
-    OCImmutableEdgeGraph<_node_data,EdgeTy,HasNoLockable,HasOutOfLineLockable>;
+  struct with_node_data {
+    typedef OCImmutableEdgeGraph<_node_data,EdgeTy,HasNoLockable,HasOutOfLineLockable> type;
+  };
 
   template<bool _has_no_lockable>
-  using with_no_lockable =
-    OCImmutableEdgeGraph<NodeTy,EdgeTy,_has_no_lockable,HasOutOfLineLockable>;
+  struct with_no_lockable {
+    typedef OCImmutableEdgeGraph<NodeTy,EdgeTy,_has_no_lockable,HasOutOfLineLockable> type;
+  };
 
   template<bool _use_numa_alloc>
-  using with_numa_alloc = OCImmutableEdgeGraph;
+  struct with_numa_alloc { 
+    typedef OCImmutableEdgeGraph type;
+  };
 
   template<bool _has_out_of_line_lockable>
-  using with_out_of_line_lockable =
-    OCImmutableEdgeGraph<NodeTy,EdgeTy,HasNoLockable,_has_out_of_line_lockable>;
+  struct with_out_of_line_lockable {
+    typedef OCImmutableEdgeGraph<NodeTy,EdgeTy,HasNoLockable,_has_out_of_line_lockable> type;
+  };
 
   typedef read_oc_immutable_edge_graph_tag read_tag;
 

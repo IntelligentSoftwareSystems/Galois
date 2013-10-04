@@ -539,9 +539,12 @@ int main(int argc, char **argv) {
     case Algo::async: run<AsyncAlgo<false> >(); break;
     case Algo::asyncWithCas: run<AsyncAlgo<true> >(); break;
     case Algo::asyncPP: run<AsyncAlgoPP>(); break;
+#if defined(__IBMCPP__) && __IBMCPP__ <= 1210
+#else
     case Algo::ligra: run<LigraAlgo<false> >(); break;
     case Algo::ligraChi: run<LigraAlgo<true> >(false); break;
     case Algo::graphlab: run<GraphLabAlgo>(); break;
+#endif
     default: std::cerr << "Unknown algorithm\n"; abort();
   }
   T.stop();

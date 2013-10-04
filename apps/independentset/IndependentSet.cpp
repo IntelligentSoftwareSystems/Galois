@@ -340,8 +340,8 @@ struct PullAlgo {
     uint64_t size = graph.size();
     uint64_t delta = graph.size() / 25;
 
-    typename Graph::iterator ii = graph.begin();
-    typename Graph::iterator ei = graph.begin();
+    Graph::iterator ii = graph.begin();
+    Graph::iterator ei = graph.begin();
     uint64_t remaining = std::min(size, delta);
     std::advance(ei, remaining);
     size -= remaining;

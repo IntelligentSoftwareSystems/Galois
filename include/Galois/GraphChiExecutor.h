@@ -160,8 +160,7 @@ size_t computeEdgeLimit(Graph& graph, size_t memoryLimit) {
   bytes *= 1024 * 1024;
   size_t sizeNodes = graph.size() * sizeof(uint64_t);
   if (bytes < sizeNodes) {
-    std::cerr << "Cannot limit graph in memory allotted\n";
-    abort();
+    GALOIS_DIE("Cannot limit graph in memory allotted");
   }
   bytes -= sizeNodes;
   // double-buffering (2), in and out edges (2)

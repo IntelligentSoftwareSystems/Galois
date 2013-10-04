@@ -46,3 +46,9 @@ template<class _Tp>
 _Tp __atomic_fetch_add(volatile _Tp* __a, _Tp __i, std::memory_order _m) {
   return __sync_fetch_and_add(__a, __i);
 }
+
+template<class _Tp>
+_Tp __atomic_exchange(volatile _Tp* __a, _Tp __i, std::memory_order _m) {
+  // XXX built-in assumes memory_order_acquire
+  return __sync_lock_test_and_set(__a, __i);
+}

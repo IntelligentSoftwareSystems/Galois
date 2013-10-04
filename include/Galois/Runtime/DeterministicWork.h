@@ -59,8 +59,8 @@ struct DItem {
 
 template<typename T, typename CompareTy>
 struct DeterministicContext: public SimpleRuntimeContext {
-  using Base = SimpleRuntimeContext;
-  using Item = DItem<T>;
+  typedef SimpleRuntimeContext Base;
+  typedef DItem<T> Item;
 
   Item item;
   const CompareTy* comp;

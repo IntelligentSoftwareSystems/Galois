@@ -88,7 +88,7 @@ struct SerialAlgo {
   struct Initialize {
     Graph& g;
     Initialize(Graph& g): g(g) { }
-    void operator()(typename Graph::GraphNode n) {
+    void operator()(Graph::GraphNode n) {
       g.getData(n).value = 1.0;
       g.getData(n).accum.write(0.0);
     }
@@ -102,18 +102,20 @@ struct SerialAlgo {
       float max_delta = std::numeric_limits<float>::min();
       unsigned int small_delta = 0;
 
-      for (GNode src : graph) {
+      for (auto ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+        GNode src = *ii;
         PNode& sdata = graph.getData(src);
         int neighbors = std::distance(graph.edge_begin(src), graph.edge_end(src));
-        for (Graph::edge_iterator edge : graph.out_edges(src)) {
-          GNode dst = graph.getEdgeDst(edge);
+        for (auto jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj) {
+          GNode dst = graph.getEdgeDst(jj);
           PNode& ddata = graph.getData(dst);
           float delta =  sdata.value / neighbors;
           ddata.accum.write(ddata.accum.read() + delta);
         }
       }
 
-      for (GNode src : graph) {
+      for (auto ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+        GNode src = *ii;
         PNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
         float value = (1.0 - alpha) * sdata.accum.read() + alpha;
         float diff = std::fabs(value - sdata.value);
@@ -175,7 +177,7 @@ struct PullAlgo {
   struct Initialize {
     Graph& g;
     Initialize(Graph& g): g(g) { }
-    void operator()(typename Graph::GraphNode n) {
+    void operator()(Graph::GraphNode n) {
       LNode& data = g.getData(n, Galois::MethodFlag::NONE);
       data.value[0] = 1.0;
       data.value[1] = 1.0;
@@ -185,7 +187,7 @@ struct PullAlgo {
   struct Copy {
     Graph& g;
     Copy(Graph& g): g(g) { }
-    void operator()(typename Graph::GraphNode n) {
+    void operator()(Graph::GraphNode n) {
       LNode& data = g.getData(n, Galois::MethodFlag::NONE);
       data.value[1] = data.value[0];
     }
@@ -206,9 +208,9 @@ struct PullAlgo {
       LNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
       double sum = 0;
 
-      for (Graph::edge_iterator edge : graph.out_edges(src, Galois::MethodFlag::NONE)) {
-        GNode dst = graph.getEdgeDst(edge);
-        float w = graph.getEdgeData(edge);
+      for (auto jj = graph.edge_begin(src, Galois::MethodFlag::NONE), ej = graph.edge_end(src, Galois::MethodFlag::NONE); jj != ej; ++jj) {
+        GNode dst = graph.getEdgeDst(jj);
+        float w = graph.getEdgeData(jj);
 
         LNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
         sum += ddata.getPageRank(iteration) * w;
@@ -271,7 +273,8 @@ static void precomputePullData() {
   Galois::Graph::readGraph(input, filename); 
 
   size_t node_id = 0;
-  for (InputNode src : input) {
+  for (auto ii = input.begin(), ei = input.end(); ii != ei; ++ii) {
+    InputNode src = *ii;
     input.getData(src) = node_id++;
   }
 
@@ -280,14 +283,15 @@ static void precomputePullData() {
   output.setSizeofEdgeData(sizeof(float));
   output.phase1();
 
-  for (InputNode src : input) {
+  for (auto ii = input.begin(), ei = input.end(); ii != ei; ++ii) {
+    InputNode src = *ii;
     size_t sid = input.getData(src);
     assert(sid < input.size());
 
     //size_t num_neighbors = std::distance(input.edge_begin(src), input.edge_end(src));
 
-    for (InputGraph::edge_iterator edge : input.out_edges(src)) {
-      InputNode dst = input.getEdgeDst(edge);
+    for (auto jj = input.edge_begin(src), ej = input.edge_end(src); jj != ej; ++jj) {
+      InputNode dst = input.getEdgeDst(jj);
       size_t did = input.getData(dst);
       assert(did < input.size());
 
@@ -299,15 +303,16 @@ static void precomputePullData() {
   std::vector<float> edgeData;
   edgeData.resize(input.sizeEdges());
 
-  for (InputNode src : input) {
+  for (auto ii = input.begin(), ei = input.end(); ii != ei; ++ii) {
+    InputNode src = *ii;
     size_t sid = input.getData(src);
     assert(sid < input.size());
 
     size_t num_neighbors = std::distance(input.edge_begin(src), input.edge_end(src));
 
     float w = 1.0/num_neighbors;
-    for (InputGraph::edge_iterator edge : input.out_edges(src)) {
-      InputNode dst = input.getEdgeDst(edge);
+    for (auto jj = input.edge_begin(src), ej = input.edge_end(src); jj != ej; ++jj) {
+      InputNode dst = input.getEdgeDst(jj);
       size_t did = input.getData(dst);
       assert(did < input.size());
 
@@ -347,7 +352,8 @@ static void printTop(Graph& graph, int topn) {
 
   Top top;
 
-  for (GNode src : graph) {
+  for (auto ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+    GNode src = *ii;
     node_data_reference n = graph.getData(src);
     float value = n.getPageRank();
     Pair key(value, src);

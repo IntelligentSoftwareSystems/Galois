@@ -100,15 +100,15 @@ struct AsyncAlgo {
     float numPaths;
     float dependencies;
     int dist;
-    SNode() :numPaths(std::numeric_limits<float>::lowest()), dependencies(std::numeric_limits<float>::lowest()), dist(std::numeric_limits<int>::max()) { }
+    SNode() :numPaths(-std::numeric_limits<float>::max()), dependencies(-std::numeric_limits<float>::max()), dist(std::numeric_limits<int>::max()) { }
   };
 
-  typedef typename Galois::Graph::LC_CSR_Graph<SNode,void>
-  ::with_no_lockable<true>::type 
-  ::with_numa_alloc<true>::type InnerGraph;
+  typedef Galois::Graph::LC_CSR_Graph<SNode,void>
+    ::with_no_lockable<true>::type 
+    ::with_numa_alloc<true>::type InnerGraph;
   typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
 //typedef Galois::Graph::LC_CSR_Graph<SNode, void> Graph;
-  typedef typename Graph::GraphNode GNode;
+  typedef Graph::GraphNode GNode;
 
   std::string name() const { return "async"; }
 
@@ -119,10 +119,10 @@ struct AsyncAlgo {
   struct Initialize {
     Graph& g;
     Initialize(Graph& g): g(g) { }
-    void operator()(typename Graph::GraphNode n) {
+    void operator()(Graph::GraphNode n) {
       SNode& data = g.getData(n, Galois::MethodFlag::NONE);
-      data.numPaths = std::numeric_limits<float>::lowest();
-      data.dependencies = std::numeric_limits<float>::lowest();
+      data.numPaths = -std::numeric_limits<float>::max();
+      data.dependencies = -std::numeric_limits<float>::max();
       data.dist = std::numeric_limits<int>::max();
     }
   };
@@ -189,7 +189,7 @@ struct AsyncAlgo {
 
     void operator()(GNode& n, Galois::UserContext<GNode>& ctx) const {
       SNode& sdata = g.getData(n, Galois::MethodFlag::NONE);
-      while (sdata.numPaths == std::numeric_limits<float>::lowest()) {
+      while (sdata.numPaths == -std::numeric_limits<float>::max()) {
         unsigned long np = 0;
         bool allready = true;
         for (Graph::in_edge_iterator ii = g.in_edge_begin(n, Galois::MethodFlag::NONE),
@@ -197,7 +197,7 @@ struct AsyncAlgo {
           GNode dst = g.getInEdgeDst(ii);
           SNode& ddata = g.getData(dst, Galois::MethodFlag::NONE);
           if (ddata.dist + 1 == sdata.dist) {
-            if (ddata.numPaths != std::numeric_limits<float>::lowest()) {
+            if (ddata.numPaths != -std::numeric_limits<float>::max()) {
               np += ddata.numPaths;
             } else {
               allready = false;
@@ -234,7 +234,7 @@ struct AsyncAlgo {
 
     void operator()(GNode& n, Galois::UserContext<GNode>& ctx) const {
       SNode& sdata = g.getData(n, Galois::MethodFlag::NONE);
-      while (sdata.dependencies == std::numeric_limits<float>::lowest()) {
+      while (sdata.dependencies == -std::numeric_limits<float>::max()) {
         float newDep = 0.0;
         bool allready = true;
         for (Graph::edge_iterator ii = g.edge_begin(n, Galois::MethodFlag::NONE),
@@ -242,7 +242,7 @@ struct AsyncAlgo {
           GNode dst = g.getEdgeDst(ii);
           SNode& ddata = g.getData(dst, Galois::MethodFlag::NONE);
           if (ddata.dist == sdata.dist + 1) {
-            if (ddata.dependencies != std::numeric_limits<float>::lowest()) {
+            if (ddata.dependencies != -std::numeric_limits<float>::max()) {
               newDep += ((float)sdata.numPaths / (float)ddata.numPaths) * (1 + ddata.dependencies);
             } else {
               allready = false;
@@ -291,15 +291,15 @@ struct LeveledAlgo {
     std::atomic<unsigned long> numPaths;
     float dependencies;
     std::atomic<int> dist;
-    SNode() :numPaths(~0UL), dependencies(std::numeric_limits<float>::lowest()), dist(std::numeric_limits<int>::max()) { }
+    SNode() :numPaths(~0UL), dependencies(-std::numeric_limits<float>::max()), dist(std::numeric_limits<int>::max()) { }
   };
 
-  typedef typename Galois::Graph::LC_CSR_Graph<SNode,void>
-  ::with_no_lockable<true>::type 
-  ::with_numa_alloc<true>::type InnerGraph;
+  typedef Galois::Graph::LC_CSR_Graph<SNode,void>
+    ::with_no_lockable<true>::type 
+    ::with_numa_alloc<true>::type InnerGraph;
   typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
 //typedef Galois::Graph::LC_CSR_Graph<SNode, void> Graph;
-  typedef typename Graph::GraphNode GNode;
+  typedef Graph::GraphNode GNode;
   typedef Galois::InsertBag<GNode> Bag;
 
   std::string name() const { return "Leveled"; }
@@ -311,7 +311,7 @@ struct LeveledAlgo {
   struct Initialize {
     Graph& g;
     Initialize(Graph& g): g(g) { }
-    void operator()(typename Graph::GraphNode n) {
+    void operator()(Graph::GraphNode n) {
       SNode& data = g.getData(n, Galois::MethodFlag::NONE);
       data.numPaths = 0;
       data.dependencies = 0.0; //std::numeric_limits<float>::lowest();
@@ -338,10 +338,10 @@ struct LeveledAlgo {
           if (std::numeric_limits<int>::max() == ddata.dist.exchange(sdata.dist + 1))
             b.push_back(dst);
           if (doCount)
-            ddata.numPaths += sdata.numPaths;
+            ddata.numPaths = ddata.numPaths + sdata.numPaths;
         } else if (ddata.dist == sdata.dist + 1) {
           if (doCount)
-            ddata.numPaths += sdata.numPaths;
+            ddata.numPaths = ddata.numPaths + sdata.numPaths;
         }
       }
       // for (Graph::in_edge_iterator ii = g.in_edge_begin(n, Galois::MethodFlag::NONE),
@@ -371,7 +371,7 @@ struct LeveledAlgo {
         if (ddata.dist + 1 == sdata.dist)
           np += ddata.numPaths;
       }
-      sdata.numPaths += np;
+      sdata.numPaths = sdata.numPaths + np;
     }
   };
 

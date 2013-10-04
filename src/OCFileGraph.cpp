@@ -26,15 +26,13 @@
 #include "Galois/Graph/OCGraph.h"
 #include "Galois/Runtime/ll/gio.h"
 
+#include <cassert>
+
+#include <fcntl.h>
+#include <unistd.h>
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <fcntl.h>
-#include <unistd.h>
-#include <cassert>
-#ifdef __linux__
-#include <linux/mman.h>
-#endif
 
 using namespace Galois::Graph;
 

@@ -8,7 +8,7 @@ namespace Galois {
 namespace LigraGraphChi {
 
 template<bool Forward,typename Graph,typename EdgeOperator,typename Bag>
-void edgeMap(Graph& graph, EdgeOperator op, Bag& output, size_t size) {
+void edgeMap(size_t size, Graph& graph, EdgeOperator op, Bag& output) {
   typedef Galois::Graph::BindSegmentGraph<Graph> WrappedGraph;
   WrappedGraph wgraph(graph);
   
@@ -20,7 +20,7 @@ void edgeMap(Graph& graph, EdgeOperator op, Bag& output, size_t size) {
 }
 
 template<bool Forward,typename Graph, typename EdgeOperator,typename Bag>
-void edgeMap(Graph& graph, EdgeOperator op, Bag& input, Bag& output, bool denseForward, size_t size) {
+void edgeMap(size_t size, Graph& graph, EdgeOperator op, Bag& input, Bag& output, bool denseForward) {
   typedef Galois::Graph::BindSegmentGraph<Graph> WrappedGraph;
   WrappedGraph wgraph(graph);
 
@@ -50,10 +50,10 @@ void edgeMap(Graph& graph, EdgeOperator op, Bag& input, Bag& output, bool denseF
 }
 
 template<bool Forward,typename Graph, typename EdgeOperator,typename Bag>
-void edgeMap(Graph& graph, EdgeOperator op, typename Graph::GraphNode single, Bag& output, size_t size) {
+void edgeMap(size_t size, Graph& graph, EdgeOperator op, typename Graph::GraphNode single, Bag& output) {
   Bag input(graph.size());
   input.push(graph.idFromNode(single), 1);
-  edgeMap<Forward>(graph, op, input, output, false, size);
+  edgeMap<Forward>(size, graph, op, input, output, false);
 }
 
 template<typename... Args>
@@ -70,12 +70,12 @@ template<bool UseGraphChi>
 struct ChooseExecutor {
   template<typename... Args>
   void inEdgeMap(size_t size, Args&&... args) {
-    edgeMap<false>(std::forward<Args>(args)..., size);
+    edgeMap<false>(size, std::forward<Args>(args)...);
   }
 
   template<typename... Args>
   void outEdgeMap(size_t size, Args&&... args) {
-    edgeMap<true>(std::forward<Args>(args)..., size);
+    edgeMap<true>(size, std::forward<Args>(args)...);
   }
 
   template<typename Graph>

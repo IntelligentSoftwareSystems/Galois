@@ -57,6 +57,12 @@ public:
     __atomic_load(&_M_i, &tmp, _m);
     return tmp;
   }
+  _Tp exchange(_Tp __i, memory_order _m = memory_order_seq_cst) { 
+    return __atomic_exchange(&_M_i, __i, _m);
+  }
+  _Tp exchange(_Tp __i, memory_order _m = memory_order_seq_cst) volatile { 
+    return __atomic_exchange(&_M_i, __i, _m);
+  }
   bool compare_exchange_weak(_Tp& __e, _Tp __i, memory_order _m1, memory_order _m2) {
     return __atomic_compare_exchange(&_M_i, &__e, &__i, true, _m1, _m2);
   }
@@ -107,7 +113,6 @@ public:
   _Tp operator++() volatile {
     return fetch_add(1) + 1;
   }
-
 };
 
 }

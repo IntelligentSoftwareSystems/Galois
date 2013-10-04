@@ -27,7 +27,7 @@
 
 using namespace Galois;
 
-#ifndef USE_STD_TIMER
+#ifndef GALOIS_USE_STD_TIMER
 Timer::Timer()
   :_start_hi(0), _start_low(0), _stop_hi(0), _stop_low(0)
 {}

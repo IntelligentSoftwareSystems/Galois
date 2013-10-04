@@ -48,10 +48,14 @@ private:
   Galois::InsertBag<GNode>* next;
   Messages* messages;
 
+  Context(Galois::UserContext<WorkItem>* c): ctx(c) { }
+
+#if defined(__IBMCPP__) && __IBMCPP__ <= 1210
+public:
+#endif
   Context(Graph* g, Galois::LargeArray<int>* s, Galois::InsertBag<GNode>* n, Messages* m):
     graph(g), scoreboard(s), next(n), messages(m) { }
 
-  Context(Galois::UserContext<WorkItem>* c): ctx(c) { }
 public:
 
   void push(GNode node, const message_type& message) {
@@ -234,7 +238,9 @@ class SyncEngine {
     Context<Graph,Operator> context;
 
     Scatter(SyncEngine* s, Container& next):
-      self(s), context(&self->graph, &self->scoreboard, &next, NeedMessages ? &self->messages : 0) { }
+      self(s),
+      context(&self->graph, &self->scoreboard, &next, NeedMessages ? &self->messages : 0) 
+      { }
 
     void operator()(GNode node, Galois::UserContext<GNode>&) {
       size_t id = self->graph.idFromNode(node);
