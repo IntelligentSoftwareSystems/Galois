@@ -238,7 +238,7 @@ class BSInlineExecutor {
 
   struct ThreadLocalData {
     Galois::Runtime::UserContextAccess<value_type> facing;
-    SimpleRuntimeContext cnx;
+    SimpleRuntimeContext ctx;
     LoopStatistics<ForEachTraits<FunctionTy>::NeedsStats> stat;
     ThreadLocalData(const char* ln): stat(ln) { }
   };
@@ -255,7 +255,7 @@ class BSInlineExecutor {
 
   GALOIS_ATTRIBUTE_NOINLINE
   void abortIteration(ThreadLocalData& tld, const WID& wid, WLTy* cur, WLTy* next) {
-    tld.cnx.cancel_iteration();
+    tld.ctx.cancelIteration();
     tld.stat.inc_conflicts();
     if (ForEachTraits<FunctionTy>::NeedsPush) {
       tld.facing.resetPushBuffer();
@@ -303,14 +303,14 @@ class BSInlineExecutor {
         tld.facing.resetPushBuffer();
       }
       if (ForEachTraits<FunctionTy>::NeedsAborts)
-        tld.cnx.commit_iteration();
+        tld.ctx.commitIteration();
       cur->pop(wid);
     }
   }
 
   void go() {
     ThreadLocalData tld(loopname);
-    setThreadContext(&tld.cnx);
+    setThreadContext(&tld.ctx);
     unsigned tid = LL::getTID();
     WID wid;
 

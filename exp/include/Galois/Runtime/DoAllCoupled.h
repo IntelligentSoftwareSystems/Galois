@@ -739,7 +739,8 @@ public:
 };
 
 namespace HIDDEN {
-  size_t calc_chunk_size (size_t totalDist) {
+  template <typename S>
+  size_t calc_chunk_size (S totalDist) {
     size_t numT = Galois::getActiveThreads ();
 
     size_t num_chunks = std::max (CHUNK_FACTOR * numT, numT * numT);

@@ -402,7 +402,7 @@ class Executor {
   struct ThreadLocalData: private boost::noncopyable {
     RuntimeTaskContext<PipelineTy> facing;
     WorklistPipeline<PipelineTy> ins;
-    SimpleRuntimeContext cnx;
+    SimpleRuntimeContext ctx;
     LoopStatistics<true> stat;
     
     ThreadLocalData(const char* ln): stat(ln) { }
@@ -421,7 +421,7 @@ class Executor {
   GALOIS_ATTRIBUTE_NOINLINE
   void processWithAborts(ThreadLocalData& tld, WLTy& wl, bool& didWork) {
     assert(TaskTraits<TaskTy>::needsAbort);
-    setThreadContext(&tld.cnx);
+    setThreadContext(&tld.ctx);
 
     int count;
     Galois::optional<typename TaskTraits<TaskTy>::GTaskType*> p;
@@ -436,13 +436,13 @@ class Executor {
 #endif
     for (count = 0; count < workSize && (p = wl.pop()); ++count) {
  //   for (count = 0; p = wl.pop(); ++count) {
-      tld.cnx.start_iteration();
+      tld.ctx.startIteration();
       tld.stat.inc_iterations();
       inspect((*p)->task);
       call((*p)->task, tld.facing.data());
       tld.facing.commit(&(**p), wls);
       tld.facing.reset();
-      tld.cnx.commit_iteration();
+      tld.ctx.commitIteration();
     }
 #if GALOIS_USE_LONGJMP
     } else { clearConflictLock(); }
@@ -456,7 +456,7 @@ class Executor {
         tld.facing.abort();
         tld.facing.reset();
         tld.stat.inc_conflicts();
-        tld.cnx.cancel_iteration();
+        tld.ctx.cancelIteration();
         wl.push(*p);
         didWork = true;
         break;
