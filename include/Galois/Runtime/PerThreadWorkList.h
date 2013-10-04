@@ -24,8 +24,8 @@
  *
  * @author <ahassaan@ices.utexas.edu>
  */
-#ifndef GALOIS_RUNTIME_PER_THREAD_WORK_LIST_H_
-#define GALOIS_RUNTIME_PER_THREAD_WORK_LIST_H_
+#ifndef GALOIS_RUNTIME_PERTHREADWORKLIST_H
+#define GALOIS_RUNTIME_PERTHREADWORKLIST_H
 
 #include <vector>
 #include <deque>
@@ -569,9 +569,9 @@ class PerThreadVector:
 public:
   using Heap_ty = PerThreadFactory::Heap;
   using Alloc_ty = PerThreadFactory::Alloc<T>;
+  using Cont_ty = PerThreadFactory::Vector<T>;
 
 protected:
-  using Cont_ty = PerThreadFactory::Vector<T>;
   using Super_ty = PerThreadWorkList<Cont_ty>;
 
   Heap_ty heap;
