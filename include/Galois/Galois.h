@@ -217,7 +217,7 @@ static inline void reportPageAlloc(const char* label) {
  * @param loopname string to identity loop in statistics output
  */
 template<typename Iter, typename Cmp, typename NhFunc, typename OpFunc>
-void for_each_ordered(Iter b, Iter e, Cmp cmp, NhFunc nhFunc, OpFunc fn, const char* loopname=0) {
+void for_each_ordered(Iter b, Iter e, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& fn, const char* loopname=0) {
   Runtime::for_each_ordered_impl(b, e, cmp, nhFunc, fn, loopname);
 }
 
@@ -240,7 +240,7 @@ void for_each_ordered(Iter b, Iter e, Cmp cmp, NhFunc nhFunc, OpFunc fn, const c
  * @param loopname string to identity loop in statistics output
  */
 template<typename Iter, typename Cmp, typename NhFunc, typename OpFunc, typename StableTest>
-void for_each_ordered(Iter b, Iter e, Cmp cmp, NhFunc nhFunc, OpFunc fn, StableTest stabilityTest, const char* loopname=0) {
+void for_each_ordered(Iter b, Iter e, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& fn, const StableTest& stabilityTest, const char* loopname=0) {
   Runtime::for_each_ordered_impl(b, e, cmp, nhFunc, fn, stabilityTest, loopname);
 }
 
