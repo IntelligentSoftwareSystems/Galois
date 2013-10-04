@@ -123,7 +123,7 @@ struct sort_helper {
 
   template <class RandomAccessIterator, class Context>
   void operator()(std::pair<RandomAccessIterator,RandomAccessIterator> bounds, 
-		  Context& cnx) {
+		  Context& ctx) {
     if (std::distance(bounds.first, bounds.second) <= 1024) {
       std::sort(bounds.first, bounds.second, comp);
     } else {
@@ -134,13 +134,13 @@ struct sort_helper {
           std::bind(comp, std::placeholders::_1, pv));
       //push the lower bit
       if (bounds.first != pivot)
-	cnx.push(std::make_pair(bounds.first, pivot));
+	ctx.push(std::make_pair(bounds.first, pivot));
       //adjust the upper bit
       pivot = std::find_if(pivot, bounds.second, 
           std::bind(neq_to<VT>(comp), std::placeholders::_1, pv));
       //push the upper bit
       if (bounds.second != pivot)
-	cnx.push(std::make_pair(pivot, bounds.second)); 
+	ctx.push(std::make_pair(pivot, bounds.second)); 
     }
   }
 };
