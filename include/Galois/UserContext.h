@@ -29,6 +29,10 @@
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/MethodFlags.h"
 
+#ifdef GALOIS_USE_EXP
+#include "Galois/BoundedVector.h"
+#endif 
+
 namespace Galois {
 
 /** 
@@ -38,6 +42,19 @@ namespace Galois {
 template<typename T>
 class UserContext: private boost::noncopyable {
 protected:
+
+
+// TODO: move to a separate class for dedicated for sepculative executors
+#ifdef GALOIS_USE_EXP
+
+  using Closure = std::function<void (void)>;
+  using UndoLog = Galois::BoundedVector<Closure, 8>; // TODO: make unlimited
+  using CommitLog = UndoLog;
+
+  UndoLog undoLog;
+  CommitLog commitLog;
+#endif 
+
   //! Allocator stuff
   IterAllocBaseTy IterationAllocatorBase;
   PerIterAllocTy PerIterationAllocator;
@@ -46,6 +63,35 @@ protected:
     IterationAllocatorBase.clear();
   }
 
+#ifdef GALOIS_USE_EXP
+  void __rollback () {
+    for (auto i = undoLog.end ()
+        , endi = undoLog.begin (); i != endi; ) {
+
+      --i;
+      (*i) ();
+    }
+  }
+
+  void __commit () {
+    for (auto i = commitLog.begin (), endi = commitLog.end ();
+        i != endi; ++i) {
+
+      (*i) ();
+    }
+  }
+
+  void __resetUndoLog () {
+    //undoLog.clear ();
+    while (!undoLog.empty ()) { undoLog.pop_back (); }
+  }
+
+  void __resetCommitLog () {
+    while (!commitLog.empty ()) { commitLog.pop_back (); }
+  }
+
+
+#endif 
   //! push stuff
   typedef gdeque<T> PushBufferTy;
   PushBufferTy pushBuffer;
@@ -103,6 +149,16 @@ public:
 
   //! Store and retrieve local state for deterministic
   void* getLocalState(bool& used) { used = localStateUsed; return localState; }
+ 
+#ifdef GALOIS_USE_EXP
+  void addUndoAction (const Closure& f) {
+    undoLog.push_back (f);
+  }
+
+  void addCommitAction (const Closure& f) {
+    commitLog.push_back (f);
+  }
+#endif 
 };
 
 }
