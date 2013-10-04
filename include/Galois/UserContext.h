@@ -41,7 +41,7 @@ protected:
 // TODO: move to a separate class for dedicated for sepculative executors
 #ifdef GALOIS_USE_EXP
   using Closure = std::function<void (void)>;
-  using UndoLog = Galois::gdeque<Closure>;
+  using UndoLog = Galois::gdeque<Closure, 8>;
   using CommitLog = UndoLog;
 
   UndoLog undoLog;
