@@ -31,6 +31,7 @@ if [ "$1" != "min" ]; then
   module load gdb
   module load mkl
   module load mpich2
+  module load git
 fi
 
 
