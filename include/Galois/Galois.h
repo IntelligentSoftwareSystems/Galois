@@ -36,12 +36,84 @@
 #include "Galois/Runtime/ParaMeter.h"
 #endif
 
+#include <utility>
+#include <type_traits>
+#include <tuple>
+
 /**
  * Main Galois namespace. All the core Galois functionality will be found in here.
  */
 namespace Galois {
 
-static const unsigned GALOIS_DEFAULT_CHUNK_SIZE = 32;
+static constexpr unsigned GALOIS_DEFAULT_CHUNK_SIZE = 32;
+typedef WorkList::dChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> defaultWL;
+
+struct loopname {
+  const char* n;
+  loopname(const char* n = 0) :n(n) {}
+};
+
+struct doall_steal {
+  bool b;
+  doall_steal(bool b = false) :b(b) {}
+};
+
+struct wl_tag {};
+
+template<typename WLTy>
+struct wl : public wl_tag {
+  typedef WLTy WL;
+};
+
+
+namespace HIDDEN {
+
+template <typename T, typename S, int i = std::tuple_size<T>::value - 1>
+struct tuple_index {
+  enum {
+    value = std::is_base_of<S, typename std::tuple_element<i, T>::type>::value ?
+    i : tuple_index<T, S, i-1>::value
+  };
+};
+
+template <typename T, typename S>
+struct tuple_index<T, S, -1> {
+  enum { value = -1 };
+};
+
+template<typename RangeTy, typename FunctionTy, typename... Args>
+void for_each_alt_gen(RangeTy r, FunctionTy fn, std::tuple<Args...> tpl) {
+  typedef std::tuple<Args...> tupleType;
+  constexpr unsigned iloopname = tuple_index<tupleType, loopname>::value;
+  constexpr unsigned iwl = tuple_index<tupleType, wl_tag>::value;
+  const char* ln = std::get<iloopname>(tpl).n;
+  typedef typename std::tuple_element<iwl,tupleType>::type::WL WLTy;
+  std::cout << "iloopname " << iloopname << " iwl " << iwl << "\n";
+  Runtime::for_each_impl<WLTy>(r, fn, ln); //extract_loopname(args...));
+}
+
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Foreach ALT
+////////////////////////////////////////////////////////////////////////////////
+/**
+ * Galois unordered set iterator.
+ * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item is a value from the iteration
+ * range and T is the type of item.
+ *
+ * @param b begining of range of initial items
+ * @param e end of range of initial items
+ * @param fn operator
+ */
+template<typename IterTy, typename FunctionTy, typename... Args>
+void for_each_alt(IterTy b, IterTy e, FunctionTy fn, Args... args) {
+  HIDDEN::for_each_alt_gen(Runtime::makeStandardRange(b,e), fn, std::make_tuple(loopname(), wl<defaultWL>(), args...));
+}
+template<typename ConTy, typename FunctionTy, typename... Args>
+void for_each_local_alt(ConTy& c, FunctionTy fn, Args... args) {
+  HIDDEN::for_each_alt_gen(Runtime::makeLocalRange(c), fn, std::make_tuple(loopname(), wl<defaultWL>(), args...));
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // Foreach

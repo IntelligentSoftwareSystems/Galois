@@ -171,7 +171,10 @@ int main(int argc, char** argv) {
   
   switch (detAlgo) {
     case nondet: 
-      Galois::for_each_local<Chunked>(initialBad, Process<>(), "refine"); break;
+      Galois::for_each_local_alt(initialBad, Process<>(),
+                                 Galois::loopname("refine"), 
+                                 Galois::wl<Chunked>());
+      //Galois::for_each_local<Chunked>(initialBad, Process<>(), "refine"); break;
     case detBase:
       Galois::for_each_det(initialBad.begin(), initialBad.end(), Process<>()); break;
     case detPrefix:
