@@ -80,7 +80,7 @@ T* transientAcquire(const gptr<T>& p) {
     obj = robj->getObj();
   }
 
-  while (!getTransCnx().try_acquire(obj)) {
+  while (!getTransCnx().tryAcquire(obj)) {
     if (isAcquiredBy(obj, &getSystemDirectory()))
       getSystemDirectory().fetch(ptr, static_cast<T*>(obj));
     doNetworkWork();
@@ -93,7 +93,7 @@ template <typename T>
 T* transientAcquireNonBlocking(const gptr<T>& p) {
   fatPointer ptr = p;
   if (ptr.first == NetworkInterface::ID) {
-    if (!getTransCnx().try_acquire(ptr.second)) {
+    if (!getTransCnx().tryAcquire(ptr.second)) {
       getSystemLocalDirectory().recall<T>(ptr);
       return NULL;
     }
@@ -101,7 +101,7 @@ T* transientAcquireNonBlocking(const gptr<T>& p) {
   } else { // REMOTE
     T* rptr = getSystemRemoteDirectory().resolve<T>(ptr);
     //DATA RACE with delete
-    if (getTransCnx().try_acquire(rptr))
+    if (getTransCnx().tryAcquire(rptr))
       return rptr;
     return NULL;
   }

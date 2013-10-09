@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -37,14 +37,14 @@
 #include "Galois/Graph/Details.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/ll/CacheLineStorage.h"
+#include "Galois/Runtime/ll/CompilerSpecific.h"
 
 #include <boost/iterator/counting_iterator.hpp>
 #include <boost/iterator/transform_iterator.hpp>
 #include <boost/utility.hpp>
 
-#include <map>
-#include <vector>
-#include <fstream>
+#include GALOIS_CXX11_STD_HEADER(type_traits)
+//#include <fstream>
 
 #include <string.h>
 
@@ -52,7 +52,8 @@ namespace Galois {
 namespace Graph {
 
 //! Graph serialized to a file
-class FileGraph: boost::noncopyable {
+class FileGraph: private boost::noncopyable {
+  friend class FileGraphAllocator;
 public:
   typedef uint32_t GraphNode;
 
@@ -76,13 +77,13 @@ protected:
 
   struct Convert32: public std::unary_function<uint32_t, uint32_t> {
     uint32_t operator()(uint32_t x) const {
-      return le32toh(x);
+      return convert_le32(x);
     }
   };
   
   struct Convert64: public std::unary_function<uint64_t,uint64_t> {
     uint64_t operator()(uint64_t x) const {
-      return le64toh(x);
+      return convert_le64(x);
     }
   };
 

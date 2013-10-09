@@ -33,14 +33,18 @@ Timer::Timer()
 
 void Timer::start() {
   timeval start;
+  asm volatile("" ::: "memory");
   gettimeofday(&start, 0);
+  asm volatile("" ::: "memory");
   _start_hi = start.tv_sec;
   _start_low = start.tv_usec;
 }
 
 void Timer::stop() {
   timeval stop;
+  asm volatile("" ::: "memory");
   gettimeofday(&stop, 0);
+  asm volatile("" ::: "memory");
   _stop_hi = stop.tv_sec;
   _stop_low = stop.tv_usec;
 }

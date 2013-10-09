@@ -28,22 +28,24 @@
 #include "Galois/Runtime/ll/CacheLineStorage.h"
 
 //! Global thread context for each active thread
-static __thread Galois::Runtime::SimpleRuntimeContext* thread_cnx = 0;
+static __thread Galois::Runtime::SimpleRuntimeContext* thread_ctx = 0;
 
 namespace {
+
 struct PendingStatus {
   Galois::Runtime::LL::CacheLineStorage<Galois::Runtime::PendingFlag> flag;
   PendingStatus(): flag(Galois::Runtime::NON_DET) { }
 };
 
 PendingStatus pendingStatus;
+
 }
 
 void Galois::Runtime::setPending(Galois::Runtime::PendingFlag value) {
   pendingStatus.flag.data = value;
 }
 
-Galois::Runtime::PendingFlag Galois::Runtime::getPending () {
+Galois::Runtime::PendingFlag Galois::Runtime::getPending() {
   return pendingStatus.flag.data;
 }
 
@@ -53,117 +55,85 @@ void Galois::Runtime::doCheckWrite() {
   }
 }
 
-void Galois::Runtime::setThreadContext(Galois::Runtime::SimpleRuntimeContext* n) {
-  thread_cnx = n;
+void Galois::Runtime::setThreadContext(Galois::Runtime::SimpleRuntimeContext* ctx) {
+  thread_ctx = ctx;
 }
 
 Galois::Runtime::SimpleRuntimeContext* Galois::Runtime::getThreadContext() {
-  return thread_cnx;
+  return thread_ctx;
 }
 
-void Galois::Runtime::doAcquire(Galois::Runtime::Lockable* C) {
-  SimpleRuntimeContext* cnx = getThreadContext();
-  if (cnx)
-    cnx->acquire(C);
+
+
+void Galois::Runtime::signalConflict(Lockable* lockable) {
+  throw conflict_ex{lockable}; // Conflict
 }
 
-unsigned Galois::Runtime::SimpleRuntimeContext::cancel_iteration() {
-  //FIXME: not handled yet
-  return commit_iteration();
+void Galois::Runtime::forceAbort() {
+  signalConflict(NULL);
 }
 
-unsigned Galois::Runtime::SimpleRuntimeContext::commit_iteration() {
+////////////////////////////////////////////////////////////////////////////////
+// LockManagerBase & SimpleRuntimeContext
+////////////////////////////////////////////////////////////////////////////////
+
+#if !defined(GALOIS_USE_SEQ_ONLY)
+
+Galois::Runtime::LockManagerBase::AcquireStatus Galois::Runtime::LockManagerBase::tryAcquire (Galois::Runtime::Lockable* lockable) {
+  assert(lockable);
+  if (tryLock (lockable)) {
+    assert(!getOwner (lockable));
+    ownByForce (lockable);
+    return NEW_OWNER;
+  } else if (getOwner (lockable) == this) {
+    return ALREADY_OWNER;
+  }
+  return FAIL;
+}
+
+void Galois::Runtime::SimpleRuntimeContext::acquire(Galois::Runtime::Lockable* lockable) {
+  AcquireStatus i;
+  if (customAcquire) {
+    subAcquire(lockable);
+  } else if ((i = tryAcquire(lockable)) != AcquireStatus::FAIL) {
+    if (i == AcquireStatus::NEW_OWNER) {
+      addToNhood (lockable);
+    }
+  } else {
+    Galois::Runtime::signalConflict(lockable);
+  }
+}
+
+void Galois::Runtime::SimpleRuntimeContext::release(Galois::Runtime::Lockable* lockable) {
+  assert(lockable);
+  // The deterministic executor, for instance, steals locks from other
+  // iterations
+  assert(customAcquire || getOwner(lockable) == this);
+  assert(!lockable->next);
+  lockable->owner.unlock_and_clear();
+}
+
+unsigned Galois::Runtime::SimpleRuntimeContext::commitIteration() {
   unsigned numLocks = 0;
   while (locks) {
     //ORDER MATTERS!
-    Lockable* L = locks;
-    locks = L->next;
-    L->next = 0;
+    Lockable* lockable = locks;
+    locks = lockable->next;
+    lockable->next = 0;
     LL::compilerBarrier();
-    release(L);
+    release(lockable);
     ++numLocks;
-  }
-
-  // XXX not_ready = false;
-
-  return numLocks;
-}
-
-void Galois::Runtime::signalConflict(Lockable* L) {
-  throw conflict_ex{L}; // Conflict
-}
-
-////////////////////////////////////////////////////////////////////////////////
-// Simple Runtime Context
-////////////////////////////////////////////////////////////////////////////////
-
-using namespace Galois::Runtime;
-
-int SimpleRuntimeContext::try_acquire(Lockable* L) {
-  assert(L);
-  if (L->Owner.try_lock()) {
-    assert(!L->Owner.getValue());
-    L->Owner.setValue(this);
-    return 1;
-  } else if (L->Owner.getValue() == this) {
-    return 2;
-  }
-  return 0;
-}
-
-void SimpleRuntimeContext::release(Lockable* L) {
-  assert(L);
-  assert(L->Owner.getValue() == this);
-  assert(L->Owner.is_locked());
-  assert(!L->next);
-  L->Owner.unlock_and_clear();
-}
-
-bool SimpleRuntimeContext::swap_lock(Lockable* L, SimpleRuntimeContext* nptr) {
-  assert(L);
-  if (L->next) return false;
-  return L->Owner.stealing_CAS(this,nptr);
-}
-
-// Should allow the lock to be taken even if lock has magic value
-void SimpleRuntimeContext::acquire(Lockable* L) {
-  int i;
-  if (customAcquire) {
-    sub_acquire(L);
-  } else if ((i = try_acquire(L))) {
-    if (i == 1) {
-      L->next = locks;
-      locks = L;
-    }
-  } else {
-    signalConflict(L);
-  }
-}
-
-bool SimpleRuntimeContext::swap_acquire(Lockable* L, SimpleRuntimeContext* nptr) {
-  if (swap_lock(L,nptr)) {
-    L->next = nptr->locks;
-    nptr->locks = L;
-    return true;
-  }
-  return false;
-}
-
-unsigned SimpleRuntimeContext::count_locks() {
-  unsigned numLocks = 0;
-  Lockable* L = locks;
-  while (L) {
-    ++numLocks;
-    L = L->next;
   }
 
   return numLocks;
 }
 
-void SimpleRuntimeContext::sub_acquire(Lockable* L) {
-  assert(0 && "Shouldn't get here");
-  abort();
+unsigned Galois::Runtime::SimpleRuntimeContext::cancelIteration() {
+  return commitIteration();
+}
+#endif
+
+void Galois::Runtime::SimpleRuntimeContext::subAcquire(Galois::Runtime::Lockable* lockable) {
+  GALOIS_DIE("Shouldn't get here");
 }
 
-//anchor vtable
-Galois::Runtime::SimpleRuntimeContext::~SimpleRuntimeContext() {}

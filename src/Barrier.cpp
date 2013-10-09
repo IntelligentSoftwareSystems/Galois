@@ -260,62 +260,46 @@ static StupidDistBarrier& getDistBarrier();
 
 class StupidDistBarrier : public Galois::Runtime::Barrier {
 
-  std::atomic<unsigned> gsense;
-  Galois::Runtime::PerThreadStorage<unsigned> sense;
+  TopoBarrier localBarrier;
+
   std::atomic<int> count;
+
+  static void barrierLandingPad(Galois::Runtime::RecvBuffer&) {
+    --getDistBarrier().count;
+  }
 
 public:
   
-  StupidDistBarrier() : gsense(0), count(0) {
-    for (unsigned x = 0; x < sense.size(); ++x)
-      *sense.getRemote(x) = 1;
-  }
+  StupidDistBarrier() : count(0) {}
   
   void reinit(unsigned val) {
-    for (unsigned x = 0; x < sense.size(); ++x)
-      *sense.getRemote(x) = 1;
-    assert(count == 0);
-    gsense = 0;
+    localBarrier.reinit(val);
+    count = 0;
   }
   
   void wait() {
-    assert(*sense.getLocal() == gsense + 1);
-    //notify the world
-    Galois::Runtime::SendBuffer b;
-    Galois::Runtime::getSystemNetworkInterface().broadcast(broadcastLandingPad, b);
-    //broadcast skips us
-    --count;
-    
-    //wait for barrier
-    if (Galois::Runtime::LL::getTID() == 0) {
-      count += Galois::Runtime::NetworkInterface::Num * Galois::Runtime::activeThreads;
-      while (count > 0)
-        Galois::Runtime::doNetworkWork();
-      //passed barrier, notify local
-      ++gsense;
-    } else {
-      while (*sense.getLocal() != gsense)
-        Galois::Runtime::LL::asmPause();
-    }
-    //continue
-    ++(*sense.getLocal());
-    // there's a possibility that one of the thread's broadcast
-    // message wasn't communicated
     if (Galois::Runtime::LL::getTID() == 0)
-      Galois::Runtime::doNetworkWork();
-  }
+      count += Galois::Runtime::NetworkInterface::Num;
+    
+    //wait at local barrier
+    localBarrier.wait();
 
-  static void broadcastLandingPad(Galois::Runtime::RecvBuffer&) {
-    --getDistBarrier().count;
-    //    std::cout << "BLP: " << Galois::Runtime::networkHostID << " " << getDistBarrier().count << "\n";
-  }
-  
-  void dump() {
-    printf("sense");
-    for (unsigned x = 0; x < sense.size(); ++x)
-      printf(" %d", *sense.getRemote(x));
-    printf("\n");
-    printf("count %d, gsense %d\n", (int)count, (unsigned)gsense);
+    auto& net = Galois::Runtime::getSystemNetworkInterface();
+    if (Galois::Runtime::LL::getTID() == 0) {
+      //notify global and wait on global
+      Galois::Runtime::SendBuffer b;
+      net.broadcast(barrierLandingPad, b);
+      --count;
+    }
+    
+    while (count > 0) {
+      Galois::Runtime::getSystemDirectory().makeProgress();
+      net.handleReceives();
+      net.flush();
+    }
+    
+    //wait at local barrier
+    localBarrier.wait();
   }
   
 };

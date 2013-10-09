@@ -253,7 +253,7 @@ public:
   PtrBasedNhoodMgr (const Cmp& cmp): cmp (cmp) {}
 
   NItem& getNhoodItem (Lockable* l) {
-
+#if 0
     if ((void*)l->auxData == NULL) {
       NItem* nv = niAlloc.allocate (1);
       assert (nv != NULL);
@@ -276,6 +276,8 @@ public:
     NItem* ret = static_cast<NItem*> (l->auxData);
     assert (ret != NULL);
     return *ret;
+#endif
+    return NItem();
   }
 
 private:

@@ -137,9 +137,9 @@ struct Prefetch : public Galois::Runtime::Lockable {
   void operator()(GNode item, Galois::UserContext<GNode>& ctx) const {
     //std::cerr << Galois::Runtime::networkHostID;
     (void)graph->getData(item).isBad();
-    unsigned x = __sync_fetch_and_add(&yy, 1);
-    if (x % 1024 == 0)
-      std::cerr << ".";
+    // unsigned x = __sync_fetch_and_add(&yy, 1);
+    // if (x % 1024 == 0)
+    //      std::cerr << ".";
   }
 
   // serialization functions
@@ -192,10 +192,15 @@ int main(int argc, char** argv) {
 
   Galois::Graph::Bag<GNode>::pointer gwl = Galois::Graph::Bag<GNode>::allocate();
 
+  Galois::StatTimer Tb("BIGGER");
+  Tb.start();
   Galois::StatTimer T;
+  Galois::StatTimer Tfindbad("findbad");
   T.start();
+  Tfindbad.start();
   std::cerr << "\nbeginning findbad\n";
   Galois::for_each_local<Galois::WorkList::AltChunkedLIFO<32>>(graph, Preprocess(graph,gwl), "findbad");
+  Tfindbad.stop();
 
   Galois::reportPageAlloc("MeminfoMid");
 
@@ -210,6 +215,7 @@ int main(int argc, char** argv) {
   Galois::for_each_local<Chunked>(gwl, Process(graph), "refine");
   Trefine.stop();
   T.stop();
+  Tb.stop();
 
   std::cerr << "\nbeginning verify\n";
   Galois::for_each_local<Chunked>(graph, Verification(graph), "verification");

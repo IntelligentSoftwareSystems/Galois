@@ -80,8 +80,11 @@ def product(args):
     yield tuple(prod)
 
 
-def run(cmd, values, options):
+def run(cmd, values, envs, options):
   import subprocess, datetime, os, time, signal, socket
+
+  new_env = dict(os.environ)
+  new_env.update(envs)
 
   for R in range(options.runs):
     print('RUN: Start')
@@ -95,7 +98,7 @@ def run(cmd, values, options):
 
     if options.timeout:
       start = datetime.datetime.now()
-      process = subprocess.Popen(cmd)
+      process = subprocess.Popen(cmd, env=new_env)
       while process.poll() is None:
         time.sleep(5)
         now = datetime.datetime.now()
@@ -108,7 +111,7 @@ def run(cmd, values, options):
           break
       retcode = process.returncode
     else:
-      retcode = subprocess.call(cmd)
+      retcode = subprocess.call(cmd, env=new_env)
     if retcode != 0:
       # print command line just in case child process should be died before doing it
       print("RUN: Error %s" % retcode)
@@ -140,26 +143,34 @@ def parse_extra(extra):
 def main(args, options):
   variables = []
   ranges = []
-  for extra in options.extra:
+  extras = [(e, False) for e in options.extra]
+  extras += [(e, True) for e in options.extra_env]
+  for (extra, env) in extras:
     (name, arg, r) = parse_extra(extra)
-    variables.append((name, arg))
+    variables.append((name, arg, env))
     ranges.append(parse_range(r))
 
-  if not ranges and options.no_default_thread:
-    run(args, [], options)
-  else:
-    for prod in product(ranges):
-      cmd = [args[0]]
-      values = []
-      for ((name, arg), value) in zip(variables, prod):
+  for prod in product(ranges):
+    params = []
+    values = []
+    envs = {}
+    for ((name, arg, env), value) in zip(variables, prod):
+      if env:
         if arg:
-          cmd.extend([arg, str(value)])
+          envs[arg] = str(value)
         else:
-          cmd.extend([str(value)])
-        values.append((name, str(value)))
-      cmd.extend(args[1:])
-
-      run(cmd, values, options)
+          envs[str(value)] = ''
+      else:
+        if arg:
+          params.extend([arg, str(value)])
+        else:
+          params.extend([str(value)])
+      values.append((name, str(value)))
+    if options.append_arguments:
+      cmd = args + params
+    else:
+      cmd = [args[0]] + params + args[1:]
+    run(cmd, values, envs, options)
 
 
 if __name__ == '__main__':
@@ -173,11 +184,15 @@ if __name__ == '__main__':
   parser.add_option('-r', '--runs', default=1, type='int',
       help='set number of runs')
   parser.add_option('-x', '--extra', dest="extra", default=[], action='append',
-      help='add another parameter to range over (format: <name>::<arg>::<range> or ::<arg>::<range> or <name>::<range>). E.g., delta::-delta::1,5 or ::-delta::1,5 or schedule::-useFIFO,-useLIFO')
+      help='add commandline parameter to range over (format: <name>::<arg>::<range> or ::<arg>::<range> or <name>::<range>). E.g., delta::-delta::1,5 or ::-delta::1,5 or schedule::-useFIFO,-useLIFO')
+  parser.add_option('-e', '--extra-env', dest="extra_env", default=[], action='append',
+      help='add environment variable to range over (format: <name>::<arg>::<range> or ::<arg>::<range> or <name>::<range>). E.g., delta::-delta::1,5 or ::-delta::1,5 or schedule::-useFIFO,-useLIFO')
   parser.add_option('-o', '--timeout', dest="timeout", default=0, type='int',
       help="timeout a run after SEC seconds", metavar='SEC')
   parser.add_option('--no-default-thread', dest='no_default_thread', default=False, action='store_true',
-      help='run command default thread parameter')
+      help='supress run command default thread argument')
+  parser.add_option('--append-arguments', dest='append_arguments', default=False, action='store_true',
+      help='append instead of prepend additional command line arguments')
   (options, args) = parser.parse_args()
   if not args:
     parser.error('need command to run')

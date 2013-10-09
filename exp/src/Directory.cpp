@@ -109,7 +109,7 @@ void Directory::processObj(LL::SLguard& lg, fatPointer ptr, Lockable* obj) {
       return;
     }
     //figure out to whom to send it 
-    switch (SimpleRuntimeContext::try_acquire(obj)) {
+    switch (SimpleRuntimeContext::tryAcquire(obj)) {
     case 0: // Local iteration has the lock
       addPending(ptr);
       return; // delay processing

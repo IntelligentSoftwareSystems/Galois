@@ -25,13 +25,15 @@
 #ifndef GALOIS_RUNTIME_CONTEXT_H
 #define GALOIS_RUNTIME_CONTEXT_H
 
+#include "Galois/config.h"
 #include "Galois/MethodFlags.h"
 #include "Galois/Runtime/ll/PtrLock.h"
 #include "Galois/Runtime/ll/gio.h"
+
+#include <boost/utility.hpp>
+
 #include <cassert>
 #include <cstdlib>
-
-//! Throwing exceptions can be a scalability bottleneck.
 
 namespace Galois {
 namespace Runtime {
@@ -54,69 +56,146 @@ enum PendingFlag {
 void setPending(PendingFlag value);
 PendingFlag getPending ();
 
-#define CHK_LOCK ((Galois::Runtime::SimpleRuntimeContext*)0x422)
-#define USE_LOCK ((Galois::Runtime::SimpleRuntimeContext*)0x423)
+//! used to release lock over exception path
+static inline void clearConflictLock() { }
 
+
+class LockManagerBase; 
 class SimpleRuntimeContext;
-namespace Distributed {
-class LocalDirectory;
-class RemoteDirectory;
-}
 
-namespace DeterministicImpl {
-template <typename, typename>
-struct DeterministicContext;
-}
+#if defined(GALOIS_USE_SEQ_ONLY)
+class Lockable { };
 
-//! All objects that may be locked (nodes primarily) must inherit from Lockable.
-//! Use an intrusive list to track objects in a context without allocation overhead
-class Lockable {
-  LL::PtrLock<SimpleRuntimeContext, true> Owner;
-  Lockable* next;
+class LockManagerBase: private boost::noncopyable {
+protected:
+  enum AcquireStatus {
+    FAIL, NEW_OWNER, ALREADY_OWNER
+  };
 
-  //Lots of friends!
-  friend class SimpleRuntimeContext;
-  friend class Distributed::LocalDirectory;
-  friend class Distributed::RemoteDirectory;
-  template <typename, typename>
-  friend struct Galois::Runtime::DeterministicImpl::DeterministicContext;
-  friend bool isAcquired(Lockable*);
-  friend bool isAcquiredBy(Lockable*, SimpleRuntimeContext*);
+  AcquireStatus tryAcquire(Lockable* lockable) { return FAIL; }
+  bool stealByCAS(Lockable* lockable, LockManagerBase* other) { return false; }
+  void ownByForce(Lockable* lockable) { }
+  void release (Lockable* lockable) {}
+  static bool tryLock(Lockable* lockable) { return false; }
+  static LockManagerBase* getOwner(Lockable* lockable) { return 0; }
+
+};
+
+class SimpleRuntimeContext: public LockManagerBase {
+protected:
+  void acquire(Lockable* lockable) { }
+  void release (Lockable* lockable) {}
+  virtual void subAcquire(Lockable* lockable);
+  void addToNhood(Lockable* lockable) { }
+  static SimpleRuntimeContext* getOwner(Lockable* lockable) { return 0; }
+
 public:
-  uintptr_t auxData;
+  SimpleRuntimeContext(bool child = false): LockManagerBase () { }
+  virtual ~SimpleRuntimeContext() { }
+  void startIteration() { }
+  
+  unsigned cancelIteration() { return 0; }
+  unsigned commitIteration() { return 0; }
+};
+#else
+/**
+ * All objects that may be locked (nodes primarily) must inherit from
+ * Lockable. 
+ */
+class Lockable {
+  LL::PtrLock<LockManagerBase, true> owner;
+  //! Use an intrusive list to track neighborhood of a context without allocation overhead.
+  //! Works for cases where a Lockable needs to be only in one context's neighborhood list
+  Lockable* next;
+  friend class LockManagerBase;
+  friend class SimpleRuntimeContext;
+  friend class LocalDirectory;
+  friend class RemoteDirectory;
+  friend bool isAcquired(Lockable*);                                                       
+  friend bool isAcquiredBy(Lockable*, SimpleRuntimeContext*);                              
+
+public:
   Lockable() :next(0) {}
 };
 
-class SimpleRuntimeContext {
-protected:
+class LockManagerBase: private boost::noncopyable {
+public:
+  //protected:
+  enum AcquireStatus {
+    FAIL, NEW_OWNER, ALREADY_OWNER
+  };
+
+  AcquireStatus tryAcquire (Lockable* lockable);
+
+  bool stealByCAS(Lockable* lockable, LockManagerBase* other) {
+    assert (lockable != nullptr);
+    return lockable->owner.stealing_CAS(other, this);
+  }
+
+  void ownByForce(Lockable* lockable) {
+    assert (lockable != nullptr);
+    assert(!lockable->owner.getValue());
+    lockable->owner.setValue(this);
+  }
+
+  void release (Lockable* lockable) {
+    assert (lockable != nullptr);
+    assert (getOwner (lockable) == this);
+    lockable->owner.unlock_and_clear ();
+  }
+
+  static bool tryLock(Lockable* lockable) {
+    assert (lockable != nullptr);
+    return lockable->owner.try_lock();
+  }
+
+  static LockManagerBase* getOwner (Lockable* lockable) {
+    assert (lockable != nullptr);
+    return lockable->owner.getValue ();
+  }
+
+
+
+};
+
+class SimpleRuntimeContext: public LockManagerBase {
+public:
   //! The locks we hold
   Lockable* locks;
   bool customAcquire;
 
-  virtual void sub_acquire(Lockable* L);
+  //protected:
 
-public:
-  //0: fail, 1: new owner, 2: already owner
-  int try_acquire(Lockable* L);
-  void release(Lockable* L);
-  unsigned count_locks();
-
-  public:
-  SimpleRuntimeContext(bool child = false): locks(0), customAcquire(child) {
-    //    LL::gDebug("SRC: ", this);
+  static SimpleRuntimeContext* getOwner (Lockable* lockable) {
+    LockManagerBase* owner = LockManagerBase::getOwner (lockable);
+    // assert (dynamic_cast<SimpleRuntimeContext*> (owner) != nullptr);
+    return static_cast<SimpleRuntimeContext*> (owner);
   }
-  virtual ~SimpleRuntimeContext();
+  virtual void subAcquire(Lockable* lockable);
 
-  void start_iteration() {
+  void addToNhood (Lockable* lockable) {
+    assert(!lockable->next);
+    lockable->next = locks;
+    locks = lockable;
+  }
+
+  void acquire(Lockable* lockable);
+  // XXX: overriding LockManagerBase version due to extra checks
+  void release(Lockable* lockable);
+
+  friend void doAcquire (Lockable*);
+public:
+  SimpleRuntimeContext(bool child = false): locks(0), customAcquire(child) { }
+  virtual ~SimpleRuntimeContext() { }
+
+  void startIteration() {
     assert(!locks);
   }
   
-  unsigned cancel_iteration();
-  unsigned commit_iteration();
-  void acquire(Lockable* L);
-  bool swap_lock(Lockable* L, SimpleRuntimeContext* nptr);
-  bool swap_acquire(Lockable* L, SimpleRuntimeContext* nptr);
+  unsigned cancelIteration();
+  unsigned commitIteration();
 };
+#endif
 
 //! get the current conflict detection class, may be null if not in parallel region
 SimpleRuntimeContext* getThreadContext();
@@ -124,9 +203,11 @@ SimpleRuntimeContext* getThreadContext();
 //! used by the parallel code to set up conflict detection per thread
 void setThreadContext(SimpleRuntimeContext* n);
 
-
 //! Helper function to decide if the conflict detection lock should be taken
 inline bool shouldLock(const Galois::MethodFlag g) {
+#ifdef GALOIS_USE_SEQ_ONLY
+  return false;
+#else
   // Mask out additional "optional" flags
   switch (g & MethodFlag::ALL) {
   case MethodFlag::NONE:
@@ -139,48 +220,49 @@ inline bool shouldLock(const Galois::MethodFlag g) {
     GALOIS_DIE("shouldn't get here");
     return false;
   }
+#endif
 }
 
 //! actual locking function.  Will always lock.
-void doAcquire(Lockable* C);
-
-inline void acquire(Lockable* C, SimpleRuntimeContext* cnx, const Galois::MethodFlag m) {
-  if (shouldLock(m) && cnx)
-    cnx->acquire(C);
+inline void doAcquire(Lockable* lockable) {
+  SimpleRuntimeContext* ctx = getThreadContext();
+  if (ctx)
+    ctx->acquire(lockable);
 }
 
 //! Master function which handles conflict detection
 //! used to acquire a lockable thing
-inline void acquire(Lockable* C, Galois::MethodFlag m) {
+inline void acquire(Lockable* lockable, Galois::MethodFlag m) {
   if (shouldLock(m)) {
-    SimpleRuntimeContext* cnx = getThreadContext();
-    acquire(C, cnx, m);
+    doAcquire (lockable);
   }
 }
 
-inline bool isAcquired(Lockable* C) {
-  return C->Owner.is_locked();
+inline bool isAcquired(Lockable* C) {                                                      
+  return C->owner.is_locked();                                                             
 }
 
 inline bool isAcquiredBy(Lockable* C, SimpleRuntimeContext* cnx) {
-  return C->Owner.getValue() == cnx;
+  return C->owner.getValue() == cnx;
 }
 
 struct AlwaysLockObj {
-  void operator()(Lockable* C) const {
-    doAcquire(C);
+  void operator()(Lockable* lockable) const {
+    doAcquire(lockable);
   }
 };
 
 struct CheckedLockObj {
   Galois::MethodFlag m;
   CheckedLockObj(Galois::MethodFlag _m) :m(_m) {}
-  void operator()(Lockable* C) const {
-    acquire(C, m);
+  void operator()(Lockable* lockable) const {
+    acquire(lockable, m);
   }
 };
 
 void signalConflict(Lockable*);
+
+void forceAbort();
 
 }
 } // end namespace Galois

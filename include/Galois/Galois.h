@@ -37,13 +37,12 @@
 #include "Galois/Runtime/ParaMeter.h"
 #endif
 
-
 /**
  * Main Galois namespace. All the core Galois functionality will be found in here.
  */
 namespace Galois {
 
-static const unsigned GALOIS_DEFAULT_CHUNK_SIZE = 32;
+static constexpr unsigned GALOIS_DEFAULT_CHUNK_SIZE = 32;
 
 ////////////////////////////////////////////////////////////////////////////////
 // Foreach
@@ -62,25 +61,25 @@ static const unsigned GALOIS_DEFAULT_CHUNK_SIZE = 32;
  */
 #if GALOIS_USE_EXP
 template<typename WLTy, typename IterTy, typename FunctionTy>
-void for_each(IterTy b, IterTy e, FunctionTy f, const char* loopname = "(NULL)",
+void for_each(IterTy b, IterTy e, FunctionTy fn, const char* loopname = "(NULL)",
     typename std::enable_if<
       Runtime::is_serializable<FunctionTy>::value
       && Runtime::is_serializable<typename std::iterator_traits<IterTy>::value_type>::value
       >::type* = 0) {
-  Runtime::for_each_dist<WLTy>(b, e, f, loopname);
+  Runtime::for_each_dist<WLTy>(b, e, fn, loopname);
 }
 template<typename WLTy, typename IterTy, typename FunctionTy>
-void for_each(IterTy b, IterTy e, FunctionTy f, const char* loopname = "(NULL)", 
+void for_each(IterTy b, IterTy e, FunctionTy fn, const char* loopname = "(NULL)", 
     typename std::enable_if<
       !Runtime::is_serializable<FunctionTy>::value
       || !Runtime::is_serializable<typename std::iterator_traits<IterTy>::value_type>::value
       >::type* = 0) {
-  Runtime::for_each_impl<WLTy>(Runtime::makeStandardRange(b, e), f, loopname);
+  Runtime::for_each_impl<WLTy>(Runtime::makeStandardRange(b, e), fn, loopname);
 }
 #else
 template<typename WLTy, typename IterTy, typename FunctionTy>
-void for_each(IterTy b, IterTy e, FunctionTy f, const char* loopname = "(NULL)") {
-  Runtime::for_each_impl<WLTy>(Runtime::makeStandardRange(b, e), f, loopname);
+void for_each(IterTy b, IterTy e, FunctionTy fn, const char* loopname = "(NULL)") {
+  Runtime::for_each_impl<WLTy>(Runtime::makeStandardRange(b, e), fn, loopname);
 }
 #endif
 
@@ -95,7 +94,7 @@ void for_each(IterTy b, IterTy e, FunctionTy f, const char* loopname = "(NULL)")
  * @param loopname string to identity loop in statistics output
  */
 template<typename IterTy, typename FunctionTy>
-void for_each(IterTy b, IterTy e, FunctionTy fn, const char* loopname = "(NULL)") {
+void for_each(IterTy b, IterTy e, FunctionTy fn, const char* loopname = 0) {
   typedef WorkList::dChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> WLTy;
   for_each<WLTy, IterTy, FunctionTy>(b, e, fn, loopname);
 }
@@ -111,7 +110,7 @@ void for_each(IterTy b, IterTy e, FunctionTy fn, const char* loopname = "(NULL)"
  * @param loopname string to identity loop in statistics output
  */
 template<typename WLTy, typename InitItemTy, typename FunctionTy>
-void for_each(InitItemTy i, FunctionTy fn, const char* loopname = "(NULL)") {
+void for_each(InitItemTy i, FunctionTy fn, const char* loopname = 0) {
   InitItemTy wl[1] = {i};
   for_each<WLTy>(&wl[0], &wl[1], fn, loopname);
 }
@@ -126,7 +125,7 @@ void for_each(InitItemTy i, FunctionTy fn, const char* loopname = "(NULL)") {
  * @param loopname string to identity loop in statistics output
  */
 template<typename InitItemTy, typename FunctionTy>
-void for_each(InitItemTy i, FunctionTy fn, const char* loopname = "(NULL)") {
+void for_each(InitItemTy i, FunctionTy fn, const char* loopname = 0) {
   typedef WorkList::dChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> WLTy;
   for_each<WLTy, InitItemTy, FunctionTy>(i, fn, loopname);
 }
@@ -143,7 +142,7 @@ void for_each(InitItemTy i, FunctionTy fn, const char* loopname = "(NULL)") {
  */
 #if GALOIS_USE_EXP
 template<typename WLTy, typename ConTy, typename FunctionTy>
-void for_each_local(ConTy c, FunctionTy fn, const char* loopname = "(NULL)",
+void for_each_local(ConTy c, FunctionTy fn, const char* loopname = 0,
     typename std::enable_if<Runtime::is_serializable<FunctionTy>::value>::type* = 0) {
   Runtime::for_each_local_dist<WLTy>(c, fn, loopname);
 }
@@ -156,7 +155,7 @@ void for_each_local(ConTy c, FunctionTy fn, const char* loopname = "(NULL)",
 }
 #else
 template<typename WLTy, typename ConTy, typename FunctionTy>
-void for_each_local(ConTy c, FunctionTy fn, const char* loopname = "(NULL)") {
+void for_each_local(ConTy c, FunctionTy fn, const char* loopname = 0) {
   Runtime::for_each_impl<WLTy>(Runtime::makeLocalRange(c), fn, loopname);
 }
 #endif
@@ -171,7 +170,7 @@ void for_each_local(ConTy c, FunctionTy fn, const char* loopname = "(NULL)") {
  * @param loopname string to identity loop in statistics output
  */
 template<typename ConTy, typename FunctionTy>
-void for_each_local(ConTy c, FunctionTy fn, const char* loopname = "(NULL)") {
+void for_each_local(ConTy& c, FunctionTy fn, const char* loopname = 0) {
   typedef WorkList::dChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> WLTy;
   for_each_local<WLTy, ConTy, FunctionTy>(c, fn, loopname);
 }
@@ -187,8 +186,8 @@ void for_each_local(ConTy c, FunctionTy fn, const char* loopname = "(NULL)") {
  * @returns fn
  */
 template<typename IterTy,typename FunctionTy>
-FunctionTy do_all(const IterTy& b, const IterTy& e, FunctionTy fn, const char* loopname = "(NULL)") {
-  return Runtime::do_all_impl(Runtime::makeStandardRange(b, e), fn);
+FunctionTy do_all(const IterTy& b, const IterTy& e, FunctionTy fn, const char* loopname = 0) {
+  return Runtime::do_all_impl(Runtime::makeStandardRange(b, e), fn, loopname);
 }
 
 /**
@@ -201,8 +200,8 @@ FunctionTy do_all(const IterTy& b, const IterTy& e, FunctionTy fn, const char* l
  * @returns fn
  */
 template<typename ConTy,typename FunctionTy>
-FunctionTy do_all_local(ConTy c, FunctionTy fn, const char* loopname = "(NULL)") {
-  return Runtime::do_all_impl(Runtime::makeLocalRange(c), fn);
+FunctionTy do_all_local(ConTy& c, FunctionTy fn, const char* loopname = 0, bool steel = false) {
+  return Runtime::do_all_impl(Runtime::makeLocalRange(c), fn, loopname, steel);
 }
 
 /**
@@ -215,12 +214,12 @@ FunctionTy do_all_local(ConTy c, FunctionTy fn, const char* loopname = "(NULL)")
  */
 #if GALOIS_USE_EXP
 template<typename FunctionTy>
-static inline void on_each(FunctionTy fn, const char* loopname = "(NULL)",
+static inline void on_each(FunctionTy fn, const char* loopname = 0,
     typename std::enable_if<Runtime::is_serializable<FunctionTy>::value>::type* = 0) {
   Runtime::on_each_impl_dist(fn, loopname);
 }
 template<typename FunctionTy>
-static inline void on_each(FunctionTy fn, const char* loopname = "(NULL)",
+static inline void on_each(FunctionTy fn, const char* loopname = 0,
     typename std::enable_if<!Runtime::is_serializable<FunctionTy>::value>::type* = 0) {
   Runtime::on_each_impl(fn, loopname);
 }

@@ -22,11 +22,58 @@
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
+#include "Galois/Runtime/ParallelWork.h"
 #include "Galois/Graph/FileGraph.h"
-#include "Galois/Galois.h"
+
 #include <pthread.h>
 
-using namespace Galois::Graph;
+namespace Galois {
+namespace Graph {
+
+struct FileGraphAllocator {
+  pthread_mutex_t& lock;
+  pthread_cond_t& cond;
+  FileGraph* self;
+  size_t sizeofEdgeData;
+  unsigned maxPackages;
+  volatile unsigned& count;
+
+  FileGraphAllocator(pthread_mutex_t& l, pthread_cond_t& c, FileGraph* s, size_t ss, unsigned m, volatile unsigned& cc): 
+    lock(l), cond(c), self(s), sizeofEdgeData(ss), maxPackages(m), count(cc) { }
+
+  void operator()(unsigned tid, unsigned total) {
+    int pret_t;
+    if ((pret_t = pthread_mutex_lock(&lock)))
+      GALOIS_DIE("pthread error: ", pret_t);
+
+    if (Galois::Runtime::LL::isPackageLeaderForSelf(tid)) {
+      auto r = self->divideBy(
+        sizeof(uint64_t),
+        sizeofEdgeData + sizeof(uint32_t),
+        Galois::Runtime::LL::getPackageForThread(tid), maxPackages);
+      
+      size_t edge_begin = *self->edge_begin(*r.first);
+      size_t edge_end = edge_begin;
+      if (r.first != r.second)
+        edge_end = *self->edge_end(*r.second - 1);
+      Galois::Runtime::MM::pageIn(self->outIdx + *r.first, std::distance(r.first, r.second) * sizeof(*self->outIdx));
+      Galois::Runtime::MM::pageIn(self->outs + edge_begin, (edge_end - edge_begin) * sizeof(*self->outs));
+      Galois::Runtime::MM::pageIn(self->edgeData + edge_begin * sizeofEdgeData, (edge_end - edge_begin) * sizeofEdgeData);
+      if (--count == 0) {
+        if ((pret_t = pthread_cond_broadcast(&cond)))
+          GALOIS_DIE("pthread error: ", pret_t);
+      }
+    } else {
+      while (count > 0) {
+        if ((pret_t = pthread_cond_wait(&cond, &lock)))
+          GALOIS_DIE("pthread error: ", pret_t);
+      }
+    }
+
+    if ((pret_t = pthread_mutex_unlock(&lock)))
+      GALOIS_DIE("pthread error: ", pret_t);
+  }
+};
 
 void FileGraph::structureFromFileInterleaved(const std::string& filename, size_t sizeofEdgeData) {
   structureFromFile(filename, false);
@@ -46,43 +93,11 @@ void FileGraph::structureFromFileInterleaved(const std::string& filename, size_t
   if ((pret = pthread_cond_init(&cond, NULL)))
     GALOIS_DIE("pthread error: ", pret);
 
-  FileGraph* self = this;
   // NB(ddn): Use on_each_simple_impl because we are fiddling with the
   // number of active threads after this loop. Otherwise, the main
   // thread might change the number of active threads while some threads
   // are still in on_each_impl.
-  Galois::Runtime::on_each_impl/*_simple_impl*/([&](unsigned tid, unsigned total) {
-    int pret_t;
-    if ((pret_t = pthread_mutex_lock(&lock)))
-      GALOIS_DIE("pthread error: ", pret_t);
-
-    if (Runtime::LL::isPackageLeaderForSelf(tid)) {
-      auto r = self->divideBy(
-        sizeof(uint64_t),
-        sizeofEdgeData + sizeof(uint32_t),
-        Runtime::LL::getPackageForThread(tid), maxPackages);
-      
-      size_t edge_begin = *self->edge_begin(*r.first);
-      size_t edge_end = edge_begin;
-      if (r.first != r.second)
-        edge_end = *self->edge_end(*r.second - 1);
-      Runtime::MM::pageIn(self->outIdx + *r.first, std::distance(r.first, r.second) * sizeof(*self->outIdx));
-      Runtime::MM::pageIn(self->outs + edge_begin, (edge_end - edge_begin) * sizeof(*self->outs));
-      Runtime::MM::pageIn(self->edgeData + edge_begin * sizeofEdgeData, (edge_end - edge_begin) * sizeofEdgeData);
-      if (--count == 0) {
-        if ((pret_t = pthread_cond_broadcast(&cond)))
-          GALOIS_DIE("pthread error: ", pret_t);
-      }
-    } else {
-      while (count > 0) {
-        if ((pret_t = pthread_cond_wait(&cond, &lock)))
-          GALOIS_DIE("pthread error: ", pret_t);
-      }
-    }
-
-    if ((pret_t = pthread_mutex_unlock(&lock)))
-      GALOIS_DIE("pthread error: ", pret_t);
-  });
+  Galois::Runtime::on_each_simple_impl(FileGraphAllocator(lock, cond, this, sizeofEdgeData, maxPackages, count));
 
   if ((pret = pthread_mutex_destroy(&lock)))
     GALOIS_DIE("pthread error: ", pret);
@@ -90,4 +105,7 @@ void FileGraph::structureFromFileInterleaved(const std::string& filename, size_t
     GALOIS_DIE("pthread error: ", pret);
 
   setActiveThreads(oldActive);
+}
+
+}
 }

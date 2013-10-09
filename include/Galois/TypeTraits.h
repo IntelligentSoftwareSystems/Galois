@@ -53,7 +53,9 @@
 #ifndef GALOIS_TYPETRAITS_H
 #define GALOIS_TYPETRAITS_H
 
+#include "Galois/Runtime/ll/CompilerSpecific.h"
 #include <boost/mpl/has_xxx.hpp>
+
 namespace Galois {
 
 #define GALOIS_HAS_MEM_FUNC(func, name) \
@@ -136,14 +138,14 @@ struct has_deterministic_id : public has_tf_deterministic_id<T> {};
  *  struct T {
  *    struct GaloisDeteministicLocalState {
  *      int x, y, z; // Local state
- *      GaloisDeteministicLocalState(T& self, Galois::PerIterAllocTy& alloc) {
+ *      GaloisDeterministicLocalState(T& self, Galois::PerIterAllocTy& alloc) {
  *        // initialize local state
  *      }
  *    };
  *
  *    void operator()(const A& item, Galois::UserContext<A>&) { 
  *      // An example of using local state
- *      typedef GaloisDeteministicLocalState LS;
+ *      typedef GaloisDeterministicLocalState LS;
  *      bool used;
  *      LS* p = (LS*) ctx.getLocalState(used);
  *      if (used) {
@@ -223,6 +225,14 @@ struct does_not_need_aborts : public has_tt_does_not_need_aborts<T> {};
 BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_has_fixed_neighborhood)
 template <typename T>
 struct has_fixed_neighborhood: public has_tt_has_fixed_neighborhood<T> {};
+
+/**
+ * Temporary type trait for pre-C++11 compilers, which don't support exact
+ * std::is_trivially_constructible. 
+ */
+BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_has_known_trivial_constructor)
+template <typename T>
+struct has_known_trivial_constructor: public has_tt_has_known_trivial_constructor<T> { };
 
 }
 #endif

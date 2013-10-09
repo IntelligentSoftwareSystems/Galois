@@ -91,11 +91,15 @@ def main(options):
   
   matcher = [(re.compile(s), fn) for (s,fn) in table.iteritems()]
   for line in sys.stdin:
-    for (regex, fn) in matcher:
-      m = regex.match(line)
-      if m:
-        fn(m)
-        break
+    try:
+      for (regex, fn) in matcher:
+        m = regex.match(line)
+        if m:
+          fn(m)
+          break
+    except:
+      sys.stderr.write('Error parsing line: %s' % line)
+      raise
   if row.r:
     rows.append(row.r)
   
@@ -117,7 +121,7 @@ if __name__ == '__main__':
       help='column to include in output. Multiple columns can be specified '
            + 'with multiple options or a comma separated list of columns.')
   parser.add_option('--sum-duplicates',
-      dest="sum_duplicates", default=False,
+      dest="sum_duplicates", default=False, action='store_true',
       help='sum duplicate keys together')
   parser.add_option('-e', '--exclude',
       dest="exclude", default=[], action='append',

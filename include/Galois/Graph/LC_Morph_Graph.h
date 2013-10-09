@@ -53,7 +53,7 @@ protected:
 
   struct NodeInfo: public Galois::Runtime::Lockable {
     NodeTy data;
-    unsigned debugEdges;
+    //    unsigned debugEdges;
     EITy* edgeBegin;
     EITy* edgeEnd;
     template<typename... Args>
@@ -85,8 +85,6 @@ public:
   typedef typename EITy::reference edge_data_reference;
   typedef EITy* edge_iterator;
     
-  std::vector<GraphNode> trackingG;//FIXE ME: keep the real order of the graph, usefull for output the partitioning. Need to be removed.
-
   NodeTy& getData(const GraphNode& N, MethodFlag mflag = MethodFlag::ALL) {
     Galois::Runtime::checkWrite(mflag, false);
     Galois::Runtime::acquire(N, mflag);
@@ -152,7 +150,11 @@ public:
       local_edges->next = old;
       char* estart = newblock + sizeof(EdgeHolder);
       if ((uintptr_t)estart % sizeof(EITy)) //not aligned
+#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
+        estart += sizeof(EITy) - ((uintptr_t)estart % 8);
+#else
         estart += sizeof(EITy) - ((uintptr_t)estart % alignof(EITy));
+#endif
 
       local_edges->begin = (EITy*)estart;
       char* eend = newblock + Runtime::MM::pageSize;
@@ -161,7 +163,7 @@ public:
     }
     N->edgeBegin = N->edgeEnd = local_edges->begin;
     local_edges->begin += nedges;
-    N->debugEdges = nedges;
+    //    N->debugEdges = nedges;
     return GraphNode(N);
   }
 
@@ -169,13 +171,13 @@ public:
   edge_iterator addEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag, Args&&... args) {
     Galois::Runtime::checkWrite(mflag, true);
     Galois::Runtime::acquire(src, mflag);
-    assert(std::distance(src->edgeBegin, src->edgeEnd) < src->debugEdges);
+    //    assert(std::distance(src->edgeBegin, src->edgeEnd) < src->debugEdges);
     auto it = std::find_if(src->edgeBegin, src->edgeEnd, first_equals(dst));
     if (it == src->edgeEnd) {
       new (it) EITy(dst, 0, std::forward<Args>(args)...);
       src->edgeEnd++;
     }
-    assert(std::distance(src->edgeBegin, src->edgeEnd) <= src->debugEdges);
+    //    assert(std::distance(src->edgeBegin, src->edgeEnd) <= src->debugEdges);
     return it;
   }
 
@@ -183,11 +185,11 @@ public:
   edge_iterator addEdgeWithoutCheck(GraphNode src, GraphNode dst, Galois::MethodFlag mflag, Args&&... args) {
     Galois::Runtime::checkWrite(mflag, true);
     Galois::Runtime::acquire(src, mflag);
-    assert(std::distance(src->edgeBegin, src->edgeEnd) < src->debugEdges);
+    //    assert(std::distance(src->edgeBegin, src->edgeEnd) < src->debugEdges);
     auto it = src->edgeEnd;
     new (it) EITy(dst, 0, std::forward<Args>(args)...);
     src->edgeEnd++;
-    assert(std::distance(src->edgeBegin, src->edgeEnd) <= src->debugEdges);
+    //    assert(std::distance(src->edgeBegin, src->edgeEnd) <= src->debugEdges);
     return it;
   }
   
@@ -241,14 +243,14 @@ public:
 
     //if we can keep the node order we should delete trackingG and turn tracking into a vector and not a ref.
     //std::vector<GraphNode> tracking;
-    std::vector<GraphNode>& tracking = trackingG;
+    std::vector<GraphNode> tracking;
 
     tracking.resize(graph.size());
 
     std::atomic<unsigned> nEdges(0), nNodes(0);
     Galois::do_all(graph.begin(), graph.end(), CreateNodes(this, tracking, graph, nNodes));
     Galois::do_all(graph.begin(), graph.end(), CreateEdges(this, tracking, graph, nEdges));
-    std::cout << "Created Graph with " << nNodes << " nodes and " << nEdges << " edges\n";
+    //std::cout << "Created Graph with " << nNodes << " nodes and " << nEdges << " edges\n";
 
   }
 

@@ -88,7 +88,7 @@ struct DeterministicContext: public SimpleRuntimeContext {
     if (getPending() == COMMITTING)
       return;
 
-    if (L->Owner.try_lock()) {
+    if (L->owner.try_lock()) {
       assert(!L->next);
       L->next = locks;
       locks = L;
@@ -96,7 +96,7 @@ struct DeterministicContext: public SimpleRuntimeContext {
 
     DeterministicContext* other;
     do {
-      other = static_cast<DeterministicContext*>(L->Owner.getValue());
+      other = static_cast<DeterministicContext*>(L->owner.getValue());
       if (other == this)
         return;
       if (other) {
@@ -108,7 +108,7 @@ struct DeterministicContext: public SimpleRuntimeContext {
           return; 
         }
       }
-    } while (!L->Owner.stealing_CAS(other, this));
+    } while (!L->owner.stealing_CAS(other, this));
 
     // Disable loser
     if (other)

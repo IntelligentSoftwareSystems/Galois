@@ -313,12 +313,15 @@ triangles<point2d> refine(triangles<point2d> Tri) {
 
   int failed = 0;
   int rounds = 0;
+  int totalWork = 0;
 
   // Each iteration processes all bad triangles from the workQ while
   // adding new bad triangles to a new queue
   while (1) {
     _seq<tri*> badTT = workQ.entries();
     workQ.del();
+
+    totalWork += badTT.n;
 
     // packs out triangles that are no longer bad
     bool* flags = newA(bool, badTT.n);
@@ -364,6 +367,7 @@ triangles<point2d> refine(triangles<point2d> Tri) {
 
   cout << "failed = " << failed << "\n";
   cout << "rounds = " << rounds << "\n";
+  cout << "totalWork = " << totalWork << "\n";
 
   nextTime("refinement");
 

@@ -40,20 +40,25 @@ class TerminationDetection {
 protected:
   LL::CacheLineStorage<volatile bool> globalTerm;
 public:
-  //Initializes the per-thread state.  All threads must call this
-  //before any call localTermination
+  /**
+   * Initializes the per-thread state.  All threads must call this
+   * before any call localTermination.
+   */
   virtual void initializeThread() = 0;
 
-  //Process termination locally.  May be called as often as needed
-  //workHappened signals that since last time it was called, some
-  //progress was made that should prevent termination. All threads
-  //must call initializeThread() before any thread calls this
-  //function.  This function should not be on the fast path (this is
-  //why it takes a flag, to allow the caller to buffer up work status
-  //changes).
+  /**
+   * Process termination locally.  May be called as often as needed.  The
+   * argument workHappened signals that since last time it was called, some
+   * progress was made that should prevent termination. All threads must call
+   * initializeThread() before any thread calls this function.  This function
+   * should not be on the fast path (this is why it takes a flag, to allow the
+   * caller to buffer up work status changes).
+   */
   virtual void localTermination(bool workHappened) = 0;
 
-  //Returns whether global termination is detected
+  /**
+   * Returns whether global termination is detected.
+   */
   bool globalTermination() const {
     return globalTerm.data;
   }

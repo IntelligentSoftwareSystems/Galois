@@ -361,7 +361,7 @@ Galois::Runtime::remoteObjImpl<T>* Galois::Runtime::CacheManager::resolve(fatPoi
     auto t = new remoteObjImpl<T>();
     retval = t;
     auto& dir = getSystemDirectory();
-    dir.try_acquire(t->getObj());
+    dir.tryAcquire(t->getObj());
   }
   return static_cast<remoteObjImpl<T>*>(retval);
 }

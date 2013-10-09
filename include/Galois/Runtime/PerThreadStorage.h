@@ -24,15 +24,18 @@
 #ifndef GALOIS_RUNTIME_PERTHREADSTORAGE_H
 #define GALOIS_RUNTIME_PERTHREADSTORAGE_H
 
+#include "Galois/config.h"
+#include "Galois/Runtime/ll/TID.h"
+#include "Galois/Runtime/ll/HWTopo.h"
+#include "Galois/Runtime/ThreadPool.h"
+#include "Galois/Runtime/ActiveThreads.h"
+
+#include <boost/utility.hpp>
+
 #include <cassert>
 #include <vector>
 
-#include "ll/TID.h"
-#include "ll/HWTopo.h"
-#include "ThreadPool.h"
-#include "ActiveThreads.h"
-
-#include <boost/utility.hpp>
+#include GALOIS_CXX11_STD_HEADER(utility)
 
 namespace Galois {
 namespace Runtime {
@@ -76,7 +79,9 @@ protected:
   PerBackend& b;
 
 public:
-  PerThreadStorage() :b(getPTSBackend()) {
+#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
+  // ICC 13.1 doesn't detect the other constructor as the default constructor
+  PerThreadStorage(): b(getPTSBackend()) {
     //in case we make one of these before initializing the thread pool
     //This will call initPTS for each thread if it hasn't already
     Galois::Runtime::getSystemThreadPool();
@@ -84,6 +89,18 @@ public:
     offset = b.allocOffset(sizeof(T));
     for (unsigned n = 0; n < LL::getMaxThreads(); ++n)
       new (b.getRemote(n, offset)) T();
+  }
+#endif
+
+  template<typename... Args>
+  PerThreadStorage(Args&&... args) :b(getPTSBackend()) {
+    //in case we make one of these before initializing the thread pool
+    //This will call initPTS for each thread if it hasn't already
+    Galois::Runtime::getSystemThreadPool();
+
+    offset = b.allocOffset(sizeof(T));
+    for (unsigned n = 0; n < LL::getMaxThreads(); ++n)
+      new (b.getRemote(n, offset)) T(std::forward<Args>(args)...);
   }
 
   ~PerThreadStorage() {
@@ -120,7 +137,9 @@ protected:
   PerBackend& b;
 
 public:
-  PerPackageStorage() :b(getPPSBackend()) {
+#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
+  // ICC 13.1 doesn't detect the other constructor as the default constructor
+  PerPackageStorage(): b(getPPSBackend()) {
     //in case we make one of these before initializing the thread pool
     //This will call initPTS for each thread if it hasn't already
     Galois::Runtime::getSystemThreadPool();
@@ -128,6 +147,18 @@ public:
     offset = b.allocOffset(sizeof(T));
     for (unsigned n = 0; n < LL::getMaxPackages(); ++n)
       new (b.getRemote(LL::getLeaderForPackage(n), offset)) T();
+  }
+#endif
+
+  template<typename... Args>
+  PerPackageStorage(Args&&... args) :b(getPPSBackend()) {
+    //in case we make one of these before initializing the thread pool
+    //This will call initPTS for each thread if it hasn't already
+    Galois::Runtime::getSystemThreadPool();
+
+    offset = b.allocOffset(sizeof(T));
+    for (unsigned n = 0; n < LL::getMaxPackages(); ++n)
+      new (b.getRemote(LL::getLeaderForPackage(n), offset)) T(std::forward<Args>(args)...);
   }
 
   ~PerPackageStorage() {

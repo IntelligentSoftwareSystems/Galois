@@ -77,15 +77,15 @@ class DoAllWork {
   void processRange(PrivateState& tld) {
     while(tld.begin != tld.end) {
       try {
-        tld.cnx.start_iteration();
+        tld.cnx.startIteration();
         if ((NetworkInterface::Num > 1) && (!LL::getTID()))
           doNetworkWork();
         tld.F(*tld.begin);
       } catch (const remote_ex& ex) {
-        tld.cnx.cancel_iteration();
+        tld.cnx.cancelIteration();
         continue;
       } catch (const conflict_ex& ex) {
-        tld.cnx.cancel_iteration();
+        tld.cnx.cancelIteration();
         continue;
       }
       // make sure the increment occurs before proceeding
@@ -101,7 +101,7 @@ class DoAllWork {
         }
         break;
       } while(true);
-      tld.cnx.commit_iteration();
+      tld.cnx.commitIteration();
     }
   }
 

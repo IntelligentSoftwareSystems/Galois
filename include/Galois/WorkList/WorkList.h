@@ -23,7 +23,7 @@
 #ifndef GALOIS_RUNTIME_WORKLIST_H
 #define GALOIS_RUNTIME_WORKLIST_H
 
-#include <boost/optional.hpp>
+#include "Galois/optional.h"
 
 #include "AltChunked.h"
 #include "BulkSynchronous.h"
@@ -33,6 +33,7 @@
 #include "Lifo.h"
 #include "LocalQueue.h"
 #include "Obim.h"
+#include "OrderedList.h"
 #include "OwnerComputes.h"
 #include "StableIterator.h"
 
