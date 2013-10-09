@@ -193,26 +193,6 @@ public:
   AbortedList* getQueue() { return queues.getLocal(); }
 };
 
-template<typename FunctionTy>
-class BreakHandler {
-  LL::CacheLineStorage<bool> broke;
-
-public:
-  BreakHandler(): broke(false) { }
-
-  void updateBreak() { 
-    if (ForEachTraits<FunctionTy>::NeedsBreak)
-      broke.data = true; 
-  }
-
-  bool checkBreak() {
-    if (ForEachTraits<FunctionTy>::NeedsBreak)
-      return broke.data;
-    else
-      return false;
-  }
-};
-
 template<class WorkListTy, class T, class FunctionTy>
 class ForEachWork {
 protected:
@@ -230,12 +210,12 @@ protected:
   // NB: Place dynamically growing wl after fixed-size PerThreadStorage
   // members to give higher likelihood of reclaiming PerThreadStorage
   AbortHandler<value_type> aborted; 
-  BreakHandler<FunctionTy> breakHandler;
   TerminationDetection& term;
 
   WLTy wl;
   FunctionTy& origFunction;
   const char* loopname;
+  bool broke;
 
   inline void commitIteration(ThreadLocalData& tld) {
     if (ForEachTraits<FunctionTy>::NeedsPush) {
@@ -286,7 +266,7 @@ protected:
       break;
     case BREAK:
       handleBreak(tld);
-      throw result;
+      break;
     default:
       GALOIS_DIE("unknown conflict type");
     }
@@ -322,7 +302,7 @@ protected:
   GALOIS_ATTRIBUTE_NOINLINE
   void handleBreak(ThreadLocalData& tld) {
     commitIteration(tld);
-    breakHandler.updateBreak();
+    broke = true;
   }
 
   bool runQueueSimple(ThreadLocalData& tld) {
@@ -379,7 +359,7 @@ protected:
       break;
     case BREAK:
       handleBreak(tld);
-      throw result;
+      break;
     default:
       GALOIS_DIE("unknown conflict type");
     }
@@ -406,36 +386,33 @@ protected:
       tld.facing.setFastPushBack(
           std::bind(&ForEachWork::fastPushBack, std::ref(*this), std::placeholders::_1));
     bool didWork;
-    try {
-      do {
-        didWork = false;
-        // Run some iterations
-        if (couldAbort || ForEachTraits<FunctionTy>::NeedsBreak) {
-          if (isLeader)
-            didWork = runQueue<32>(tld, wl);
-          else
-            didWork = runQueue<ForEachTraits<FunctionTy>::NeedsBreak ? 32 : 0>(tld, wl);
-          // Check for abort
-          if (couldAbort)
-            didWork |= handleAborts(tld);
-        } else { // No try/catch
-          didWork = runQueueSimple(tld);
-        }
-        // Update node color and prop token
-        term.localTermination(didWork);
-      } while (!term.globalTermination());
-    } catch (int flag) { 
-    }
+    do {
+      didWork = false;
+      // Run some iterations
+      if (couldAbort || ForEachTraits<FunctionTy>::NeedsBreak) {
+        if (isLeader)
+          didWork = runQueue<32>(tld, wl);
+        else
+          didWork = runQueue<ForEachTraits<FunctionTy>::NeedsBreak ? 32 : 0>(tld, wl);
+        // Check for abort
+        if (couldAbort)
+          didWork |= handleAborts(tld);
+      } else { // No try/catch
+        didWork = runQueueSimple(tld);
+      }
+      // Update node color and prop token
+      term.localTermination(didWork);
+    } while (!term.globalTermination() && (!ForEachTraits<FunctionTy>::NeedsBreak || !broke));
 
     if (couldAbort)
       setThreadContext(0);
   }
 
 public:
-  ForEachWork(FunctionTy& f, const char* l): term(getSystemTermination()), origFunction(f), loopname(l) { }
+  ForEachWork(FunctionTy& f, const char* l): term(getSystemTermination()), origFunction(f), loopname(l), broke(false) { }
   
   template<typename W>
-  ForEachWork(W& w, FunctionTy& f, const char* l): term(getSystemTermination()), wl(w), origFunction(f), loopname(l) { }
+  ForEachWork(W& w, FunctionTy& f, const char* l): term(getSystemTermination()), wl(w), origFunction(f), loopname(l), broke(false) { }
 
   template<typename RangeTy>
   void AddInitialWork(const RangeTy& range) {
