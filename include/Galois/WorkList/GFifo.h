@@ -47,6 +47,7 @@ private:
   using Runtime::LL::PaddedLock<Concurrent>::unlock;
 
 public:
+  GFIFO() {} //required for apparent bug in clang
   typedef T value_type;
 
   void push(const value_type& val) {
