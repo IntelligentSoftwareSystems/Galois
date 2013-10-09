@@ -337,7 +337,7 @@ protected:
     return workHappened;
   }
 
-  template<bool limit, typename WL>
+  template<int limit, typename WL>
   bool runQueue(ThreadLocalData& tld, WL& lwl) {
     bool workHappened = false;
     Galois::optional<typename WL::value_type> p = lwl.pop();
