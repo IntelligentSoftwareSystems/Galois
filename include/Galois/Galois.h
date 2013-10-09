@@ -23,6 +23,7 @@
 #ifndef GALOIS_GALOIS_H
 #define GALOIS_GALOIS_H
 
+#include "Galois/config.h"
 #include "Galois/WorkList/WorkList.h"
 #include "Galois/UserContext.h"
 #include "Galois/Threads.h"
@@ -36,9 +37,9 @@
 #include "Galois/Runtime/ParaMeter.h"
 #endif
 
-#include <utility>
-#include <type_traits>
-#include <tuple>
+#include GALOIS_CXX11_STD_HEADER(utility)
+#include GALOIS_CXX11_STD_HEADER(type_traits)
+#include GALOIS_CXX11_STD_HEADER(tuple)
 
 /**
  * Main Galois namespace. All the core Galois functionality will be found in here.
@@ -81,9 +82,9 @@ struct tuple_index<T, S, -1> {
   enum { value = -1 };
 };
 
-template<typename RangeTy, typename FunctionTy, typename... Args>
-void for_each_alt_gen(RangeTy r, FunctionTy fn, std::tuple<Args...> tpl) {
-  typedef std::tuple<Args...> tupleType;
+template<typename RangeTy, typename FunctionTy, typename Tuple>
+void for_each_alt_gen(RangeTy r, FunctionTy fn, Tuple tpl) {
+  typedef Tuple tupleType;
   constexpr unsigned iloopname = tuple_index<tupleType, loopname>::value;
   constexpr unsigned iwl = tuple_index<tupleType, wl_tag>::value;
   const char* ln = std::get<iloopname>(tpl).n;
