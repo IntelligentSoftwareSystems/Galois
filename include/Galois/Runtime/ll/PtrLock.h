@@ -59,12 +59,12 @@ class PtrLock<T, true> {
   void slow_lock() {
     uintptr_t oldval;
     do {
-      while (((oldval = _lock.load(std::memory_order_acquire)) & 1) != 0) {
-	asmPause();
+      while ((_lock.load(std::memory_order_acquire) & 1) != 0) {
+        asmPause();
       }
-      assert((oldval & 1) == 0);
-    } while (!_lock.compare_exchange_weak(oldval, oldval | 1, std::memory_order_acq_rel, std::memory_order_relaxed));
-    assert(is_locked());
+      oldval = _lock.fetch_or(1, std::memory_order_acq_rel);
+    } while (oldval & 1);
+    assert(_lock);
   }
 
 public:
@@ -72,7 +72,7 @@ public:
   //relaxed order for copy
   PtrLock(const PtrLock& p) : _lock(p._lock.load(std::memory_order_relaxed)) {}
 
-  PtrLock& operator= (const PtrLock& p) {
+  PtrLock& operator=(const PtrLock& p) {
     if (&p == this) return *this;
     //relaxed order for initialization
     _lock.store(p._lock.load(std::memory_order_relaxed), std::memory_order_relaxed);
@@ -94,7 +94,7 @@ public:
 
   inline void unlock() {
     assert(is_locked());
-    _lock.fetch_xor(1, std::memory_order_release);
+    _lock.store(_lock.load(std::memory_order_relaxed) & ~(uintptr_t)1, std::memory_order_release);
   }
 
   inline void unlock_and_clear() {
@@ -120,13 +120,11 @@ public:
   }
 
   inline bool try_lock() {
-    uintptr_t oldval = _lock.load(std::memory_order_acquire);
+    uintptr_t oldval = _lock.load(std::memory_order_relaxed);
     if ((oldval & 1) != 0)
       return false;
-    if (!_lock.compare_exchange_weak(oldval, oldval | 1, std::memory_order_acq_rel))
-      return false;
-    assert(is_locked());
-    return true;
+    oldval = _lock.fetch_or(1, std::memory_order_acq_rel);
+    return !(oldval & 1);
   }
 
   inline bool is_locked() const {
@@ -139,7 +137,6 @@ public:
     assert(!((uintptr_t)oldval & 1) && !((uintptr_t)newval & 1));
     uintptr_t old = (uintptr_t)oldval;
     return _lock.compare_exchange_strong(old, (uintptr_t)newval);
-    //return __sync_bool_compare_and_swap(&_lock, (uintptr_t)oldval, (uintptr_t)newval);
   }
 
   //! CAS that works on locked values; this can be very dangerous
@@ -147,7 +144,6 @@ public:
   inline bool stealing_CAS(T* oldval, T* newval) {
     uintptr_t old = 1 | (uintptr_t)oldval;
     return _lock.compare_exchange_strong(old, 1 | (uintptr_t)newval);
-    //return __sync_bool_compare_and_swap(&_lock, (uintptr_t)oldval|1, (uintptr_t)newval|1);
   }
 };
 

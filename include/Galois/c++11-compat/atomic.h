@@ -98,6 +98,15 @@ public:
   }
 
   template<bool Enable = std::is_integral<_Tp>::value>
+  _Tp fetch_or(_Tp __i, memory_order _m = memory_order_seq_cst, typename std::enable_if<Enable>::type* = 0) {
+    return __atomic_fetch_or(&_M_i, __i, _m);
+  }
+  template<bool Enable = std::is_integral<_Tp>::value>
+  _Tp fetch_or(_Tp __i, memory_order _m = memory_order_seq_cst, typename std::enable_if<Enable>::type* = 0) volatile {
+    return __atomic_fetch_or(&_M_i, __i, _m);
+  }
+
+  template<bool Enable = std::is_integral<_Tp>::value>
   _Tp fetch_add(_Tp __i, memory_order _m = memory_order_seq_cst, typename std::enable_if<Enable>::type* = 0) {
     return __atomic_fetch_add(&_M_i, __i, _m);
   }

@@ -43,6 +43,11 @@ _Tp __atomic_fetch_xor(volatile _Tp* __a, _Tp __i, std::memory_order _m) {
 }
 
 template<class _Tp>
+_Tp __atomic_fetch_or(volatile _Tp* __a, _Tp __i, std::memory_order _m) {
+  return __sync_fetch_and_or(__a, __i);
+}
+
+template<class _Tp>
 _Tp __atomic_fetch_add(volatile _Tp* __a, _Tp __i, std::memory_order _m) {
   return __sync_fetch_and_add(__a, __i);
 }
