@@ -124,15 +124,25 @@ class AbortHandler {
 
   typedef WorkList::GFIFO<Item> AbortedList;
   PerThreadStorage<AbortedList> queues;
+  bool useBasicPolicy;
+  
+  /**
+   * Policy: serialize via tree over packages.
+   */
+  void basicPolicy(const Item& item) {
+    unsigned tid = LL::getTID();
+    unsigned package = LL::getPackageForSelf(tid);
+    queues.getRemote(LL::getLeaderForPackage(package / 2))->push(item);
+  }
 
   /**
    * Policy: retry work 2X locally, then serialize via tree on package (trying
    * twice at each level), then serialize via tree over packages.
    */
   void doublePolicy(const Item& item) {
-    Item newitem = { item.val, item.retries + 1 };
-    if ((item.retries & 1) == 1) {
-      queues.getLocal()->push(newitem);
+    int retries = item.retries - 1;
+    if ((retries & 1) == 1) {
+      queues.getLocal()->push(item);
       return;
     } 
     
@@ -141,9 +151,9 @@ class AbortHandler {
     unsigned leader = LL::getLeaderForPackage(package);
     if (tid != leader) {
       unsigned next = leader + (tid - leader) / 2;
-      queues.getRemote(next)->push(newitem);
+      queues.getRemote(next)->push(item);
     } else {
-      queues.getRemote(LL::getLeaderForPackage(package / 2))->push(newitem);
+      queues.getRemote(LL::getLeaderForPackage(package / 2))->push(item);
     }
   }
 
@@ -152,20 +162,20 @@ class AbortHandler {
    * try at most 3 levels, then serialize via tree over packages.
    */
   void boundedPolicy(const Item& item) {
-    Item newitem = { item.val, item.retries + 1 };
-    if (item.retries < 2) {
-      queues.getLocal()->push(newitem);
+    int retries = item.retries - 1;
+    if (retries < 2) {
+      queues.getLocal()->push(item);
       return;
     } 
     
     unsigned tid = LL::getTID();
     unsigned package = LL::getPackageForSelf(tid);
     unsigned leader = LL::getLeaderForPackage(package);
-    if (item.retries < 5 && tid != leader) {
+    if (retries < 5 && tid != leader) {
       unsigned next = leader + (tid - leader) / 2;
-      queues.getRemote(next)->push(newitem);
+      queues.getRemote(next)->push(item);
     } else {
-      queues.getRemote(LL::getLeaderForPackage(package / 2))->push(newitem);
+      queues.getRemote(LL::getLeaderForPackage(package / 2))->push(item);
     }
   }
 
@@ -173,11 +183,15 @@ class AbortHandler {
    * Retry locally only.
    */
   void eagerPolicy(const Item& item) {
-    Item newitem = { item.val, item.retries + 1 };
-    queues.getLocal()->push(newitem);
+    queues.getLocal()->push(item);
   }
 
 public:
+  AbortHandler() {
+    // XXX(ddn): Implement smarter adaptive policy
+    useBasicPolicy = LL::getMaxPackages() > 2;
+  }
+
   value_type& value(Item& item) const { return item.val; }
   value_type& value(value_type& val) const { return val; }
 
@@ -187,7 +201,11 @@ public:
   }
 
   void push(const Item& item) {
-    doublePolicy(item);
+    Item newitem = { item.val, item.retries + 1 };
+    if (useBasicPolicy)
+      basicPolicy(newitem);
+    else
+      doublePolicy(newitem);
   }
 
   AbortedList* getQueue() { return queues.getLocal(); }
@@ -209,6 +227,7 @@ protected:
 
   // NB: Place dynamically growing wl after fixed-size PerThreadStorage
   // members to give higher likelihood of reclaiming PerThreadStorage
+
   AbortHandler<value_type> aborted; 
   TerminationDetection& term;
 
