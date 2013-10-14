@@ -362,7 +362,7 @@ struct AsyncAlgo {
         graph.out_edges(source, Galois::MethodFlag::NONE).begin(),
         graph.out_edges(source, Galois::MethodFlag::NONE).end(),
         InitialProcess(this, graph, initial, graph.getData(source)));
-    Galois::for_each_local<OBIM>(initial, Process(this, graph));
+    Galois::for_each_local(initial, Process(this, graph), Galois::wl<OBIM>());
   }
 };
 
@@ -472,7 +472,7 @@ struct AsyncAlgoPP {
         graph.out_edges(source, Galois::MethodFlag::NONE).begin(),
         graph.out_edges(source, Galois::MethodFlag::NONE).end(),
         InitialProcess(this, graph, initial));
-    Galois::for_each_local<OBIM>(initial, Process(this, graph));
+    Galois::for_each_local(initial, Process(this, graph), Galois::wl<OBIM>());
   }
 };
 

@@ -156,7 +156,7 @@ int main(int argc, char** argv) {
   Galois::InsertBag<GNode> initialBad;
 
   if (detAlgo == nondet)
-    Galois::do_all_local(*graph, Preprocess(initialBad), "findbad");
+    Galois::do_all_local(*graph, Preprocess(initialBad), Galois::loopname("findbad"));
   else
     std::for_each(graph->begin(), graph->end(), Preprocess(initialBad));
 
@@ -171,10 +171,7 @@ int main(int argc, char** argv) {
   
   switch (detAlgo) {
     case nondet: 
-      Galois::for_each_local_alt(initialBad, Process<>(),
-                                 Galois::loopname("refine"), 
-                                 Galois::wl<Chunked>());
-      //Galois::for_each_local<Chunked>(initialBad, Process<>(), "refine"); break;
+      Galois::for_each_local(initialBad, Process<>(), Galois::loopname("refine"), Galois::wl<Chunked>());
     case detBase:
       Galois::for_each_det(initialBad.begin(), initialBad.end(), Process<>()); break;
     case detPrefix:

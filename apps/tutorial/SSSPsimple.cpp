@@ -93,7 +93,7 @@ int main(int argc, char **argv) {
   Galois::StatTimer T;
   T.start();
   graph.getData(*graph.begin()) = 0;
-  Galois::for_each<OBIM>(std::make_pair(0U, *graph.begin()), SSSP());
+  Galois::for_each(std::make_pair(0U, *graph.begin()), SSSP(), Galois::wl<OBIM>());
   T.stop();
   return 0;
 }

@@ -240,15 +240,15 @@ void edgeMap(Graph& graph, EdgeOperator op, Bag& input, Bag& output, bool denseF
       abort(); // Never executed
       output.densify();
       typedef dChunkedFIFO<256*4> WL;
-      Galois::for_each_local<WL>(graph, hidden::DenseForwardOperator<Graph,Bag,EdgeOperator,Forward,false>(graph, input, output, op));
+      Galois::for_each_local(graph, hidden::DenseForwardOperator<Graph,Bag,EdgeOperator,Forward,false>(graph, input, output, op), Galois::wl<WL>());
     } else {
       typedef dChunkedFIFO<256> WL;
-      Galois::for_each_local<WL>(graph, hidden::DenseOperator<Graph,Bag,EdgeOperator,Forward>(graph, input, output, op));
+      Galois::for_each_local(graph, hidden::DenseOperator<Graph,Bag,EdgeOperator,Forward>(graph, input, output, op), Galois::wl<WL>());
     }
   } else {
     //std::cout << "(S) Count " << count << "\n"; // XXX
     typedef dChunkedFIFO<64> WL;
-    Galois::for_each_local<WL>(input, hidden::SparseOperator<Graph,Bag,EdgeOperator,Forward>(graph, output, op));
+    Galois::for_each_local(input, hidden::SparseOperator<Graph,Bag,EdgeOperator,Forward>(graph, output, op), Galois::wl<WL>());
   }
 }
 

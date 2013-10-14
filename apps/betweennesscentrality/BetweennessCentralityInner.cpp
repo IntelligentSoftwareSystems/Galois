@@ -265,19 +265,19 @@ struct AsyncAlgo {
     std::cout << "INIT DONE " << Tinit.get() << "\n";
     Tbfs.start();
     graph.getData(source).dist = 0;
-    //Galois::for_each<BFS::OBIM>(BFS::WorkItem(source, 1), BFS(graph), "BFS");
+    //Galois::for_each(BFS::WorkItem(source, 1), BFS(graph), Galois::loopname("BFS"), Galois::wl<BFS::OBIM>());
     HybridBFS<SNode, int> H;
     H(graph,source);
     Tbfs.stop();
     std::cout << "BFS DONE " << Tbfs.get() << "\n";
     Tcount.start();
     graph.getData(source).numPaths = 1;
-    Galois::for_each_local<CountPaths::OBIM>(graph, CountPaths(graph), "COUNT");
+    Galois::for_each_local(graph, CountPaths(graph), Galois::loopname("COUNT"), Galois::wl<CountPaths::OBIM>());
     Tcount.stop();
     std::cout << "COUNT DONE " << Tcount.get() << "\n";
     Tdep.start();
     graph.getData(source).dependencies = 0.0;
-    Galois::for_each<ComputeDep::OBIM>(graph.begin(), graph.end(), ComputeDep(graph), "DEP");
+    Galois::for_each(graph.begin(), graph.end(), ComputeDep(graph), Galois::loopname("DEP"), Galois::wl<ComputeDep::OBIM>());
     Tdep.stop();
     std::cout << "DEP DONE " << Tdep.get() << "\n";
   }

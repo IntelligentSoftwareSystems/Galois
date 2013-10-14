@@ -458,7 +458,7 @@ struct AsyncAlgo {
         count = 0;
       }
 
-      Galois::for_each_local<OBIM>(bags[cur], Process(this, graph, rangeScale, cur, next, bags));
+      Galois::for_each_local(bags[cur], Process(this, graph, rangeScale, cur, next, bags), Galois::wl<OBIM>());
       rounds += 1;
 
       if (!WithPartitioning)
@@ -591,7 +591,7 @@ struct Algo2 {
             self->relaxEdge(graph, sourceData, ii, bag);
         });
 
-    Galois::for_each_local<OBIM>(bag, Process(this, graph));
+    Galois::for_each_local(bag, Process(this, graph), Galois::wl<OBIM>());
   }
 };
 
@@ -726,9 +726,9 @@ struct Algo3 {
           break;
         std::cout << std::distance(cur->begin(), cur->end()) << " ";
         if (i == 0)
-          Galois::for_each_local<OBIM>(*cur, Process<true>(this, graph, i, innerNext, next));
+          Galois::for_each_local(*cur, Process<true>(this, graph, i, innerNext, next), Galois::wl<OBIM>());
         else
-          Galois::for_each_local<OBIM>(*cur, Process<false>(this, graph, i, innerNext, next));
+          Galois::for_each_local(*cur, Process<false>(this, graph, i, innerNext, next), Galois::wl<OBIM>());
         clearTime.start();
         cur->clear();
         clearTime.stop();
@@ -878,7 +878,7 @@ struct Algo4 {
             self->relaxEdge(graph, source, graph.getEdgeDst(ii), sourceData.dist + graph.getEdgeData(ii), *cur);
         });
 
-    Galois::for_each_local<OBIM>(*cur, Process(this, graph, next));
+    Galois::for_each_local(*cur, Process(this, graph, next), Galois::wl<OBIM>());
   }
 };
 
@@ -1021,7 +1021,7 @@ struct Algo5 {
             self->relaxEdge(graph, source, graph.getEdgeDst(ii), sourceData.dist + graph.getEdgeData(ii), *cur);
         });
 
-    Galois::for_each_local<OBIM>(*cur, Process(this, graph, next));
+    Galois::for_each_local(*cur, Process(this, graph, next), Galois::wl<OBIM>());
     //Galois::for_each_local<Part>(*cur, Process(this, graph, next));
   }
 };
@@ -1198,7 +1198,7 @@ struct Algo6 {
 
       wholeTime.start();
       mainTime.start();
-      Galois::for_each_local<OBIM>(*cur, Process(this, parts[0], next));
+      Galois::for_each_local(*cur, Process(this, parts[0], next), Galois::wl<OBIM>());
       mainTime.stop();
       //std::cout << "(" << std::distance(cur->begin(), cur->end()) << ", " << mainTime.get() << ") ";
 
@@ -1215,7 +1215,7 @@ struct Algo6 {
           }
         });
         mainTime.start();
-        Galois::for_each_local<OBIM>(*cur, Process(this, parts[i], next));
+        Galois::for_each_local(*cur, Process(this, parts[i], next), Galois::wl<OBIM>());
         mainTime.stop();
         //std::cout << "(" << std::distance(cur->begin(), cur->end()) << ", " << mainTime.get() << ") ";
       }
@@ -1415,8 +1415,8 @@ struct Algo7 {
         [&](Graph::edge_iterator ii) {
             self->relaxEdge(graph, ii, sourceData.dist + graph.getEdgeData(ii), initial);
         });
-    Galois::for_each_local<OBIM>(initial, Process(this, graph, &next), "A1");
-    Galois::for_each_local<OBIM>(next, Process(this, graph, nullptr), "A2");
+    Galois::for_each_local(initial, Process(this, graph, &next), Galois::loopname("A1"), Galois::wl<OBIM>());
+    Galois::for_each_local(next, Process(this, graph, nullptr), Galois::loopname("A2"), Galois::wl<OBIM>());
   }
 };
 

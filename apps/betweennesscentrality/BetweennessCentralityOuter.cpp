@@ -222,7 +222,7 @@ int main(int argc, char** argv) {
   typedef Galois::WorkList::StableIterator< std::vector<GNode>::iterator, true> WLL;
   Galois::StatTimer T;
   T.start();
-  Galois::for_each<WLL>(v.begin(), v.end(), process());
+  Galois::for_each(v.begin(), v.end(), process(), Galois::wl<WLL>());
   T.stop();
 
   if (!skipVerify) {

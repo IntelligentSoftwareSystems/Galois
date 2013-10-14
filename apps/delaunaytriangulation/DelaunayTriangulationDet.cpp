@@ -644,7 +644,7 @@ static void generateMesh() {
     Galois::InsertBag<Point*>& pptrs = rounds[i];
     switch (detAlgo) {
       case nondet:
-        Galois::for_each_local<Chunked>(pptrs, Process<>(&tree)); break;
+        Galois::for_each_local(pptrs, Process<>(&tree), Galois::wl<Chunked>()); break;
       case detBase:
         Galois::for_each_det(pptrs.begin(), pptrs.end(), Process<>(&tree)); break;
       case detPrefix:

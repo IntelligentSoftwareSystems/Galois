@@ -483,7 +483,7 @@ static void writeMesh(const std::string& filename) {
 
 static void generateMesh() {
   typedef Galois::WorkList::AltChunkedLIFO<32> CA;
-  Galois::for_each_local<CA>(ptrPoints, Process());
+  Galois::for_each_local(ptrPoints, Process(), Galois::wl<CA>());
 }
 
 int main(int argc, char** argv) {

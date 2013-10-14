@@ -348,9 +348,9 @@ struct LabelPropAlgo {
 
     Galois::do_all_local(graph, Initialize(graph));
     if (symmetricGraph) {
-      Galois::for_each_local<WL>(graph, Process<true,false>(graph));
+      Galois::for_each_local(graph, Process<true,false>(graph), Galois::wl<WL>());
     } else {
-      Galois::for_each_local<WL>(graph, Process<true,true>(graph));
+      Galois::for_each_local(graph, Process<true,true>(graph), Galois::wl<WL>());
     }
   }
 };

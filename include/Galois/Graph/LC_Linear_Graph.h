@@ -78,7 +78,7 @@ public:
   typedef read_lc_linear_graph_tag read_tag;
 
 protected:
-  struct NodeInfo;
+  class NodeInfo;
   typedef detail::EdgeInfoBase<NodeInfo*,EdgeTy> EdgeInfo;
   typedef LargeArray<NodeInfo*> Nodes;
 

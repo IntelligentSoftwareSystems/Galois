@@ -46,17 +46,18 @@
  */
 namespace Galois {
 
-static constexpr unsigned GALOIS_DEFAULT_CHUNK_SIZE = 32;
-typedef WorkList::dChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> defaultWL;
+/**
+ * Optional arguments to loops
+ */
 
 struct loopname {
   const char* n;
   loopname(const char* n = 0) :n(n) {}
 };
 
-struct doall_steal {
+struct do_all_steal {
   bool b;
-  doall_steal(bool b = false) :b(b) {}
+  do_all_steal(bool b = false) :b(b) {}
 };
 
 struct wl_tag {};
@@ -68,6 +69,9 @@ struct wl : public wl_tag {
 
 
 namespace HIDDEN {
+
+static constexpr unsigned GALOIS_DEFAULT_CHUNK_SIZE = 32;
+typedef WorkList::dChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> defaultWL;
 
 template <typename T, typename S, int i = std::tuple_size<T>::value - 1>
 struct tuple_index {
@@ -83,38 +87,29 @@ struct tuple_index<T, S, -1> {
 };
 
 template<typename RangeTy, typename FunctionTy, typename Tuple>
-void for_each_alt_gen(RangeTy r, FunctionTy fn, Tuple tpl) {
+void for_each_gen(RangeTy r, FunctionTy fn, Tuple tpl) {
   typedef Tuple tupleType;
+  static_assert(-1 == tuple_index<tupleType, char*>::value, "old loopname");
+  static_assert(-1 == tuple_index<tupleType, const char*>::value, "old loopname");
+  static_assert(-1 == tuple_index<tupleType, bool>::value, "old steal");
   constexpr unsigned iloopname = tuple_index<tupleType, loopname>::value;
   constexpr unsigned iwl = tuple_index<tupleType, wl_tag>::value;
   const char* ln = std::get<iloopname>(tpl).n;
   typedef typename std::tuple_element<iwl,tupleType>::type::WL WLTy;
-  std::cout << "iloopname " << iloopname << " iwl " << iwl << "\n";
   Runtime::for_each_impl<WLTy>(r, fn, ln); //extract_loopname(args...));
 }
 
+template<typename RangeTy, typename FunctionTy, typename Tuple>
+FunctionTy do_all_gen(RangeTy r, FunctionTy fn, Tuple tpl) {
+  typedef Tuple tupleType;
+  constexpr unsigned iloopname = tuple_index<tupleType, loopname>::value;
+  constexpr unsigned isteal = tuple_index<tupleType, do_all_steal>::value;
+  const char* ln = std::get<iloopname>(tpl).n;
+  bool steal = std::get<isteal>(tpl).b;
+  return Runtime::do_all_impl(r, fn, ln, steal);
 }
 
-////////////////////////////////////////////////////////////////////////////////
-// Foreach ALT
-////////////////////////////////////////////////////////////////////////////////
-/**
- * Galois unordered set iterator.
- * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item is a value from the iteration
- * range and T is the type of item.
- *
- * @param b begining of range of initial items
- * @param e end of range of initial items
- * @param fn operator
- */
-template<typename IterTy, typename FunctionTy, typename... Args>
-void for_each_alt(IterTy b, IterTy e, FunctionTy fn, Args... args) {
-  HIDDEN::for_each_alt_gen(Runtime::makeStandardRange(b,e), fn, std::make_tuple(loopname(), wl<defaultWL>(), args...));
-}
-template<typename ConTy, typename FunctionTy, typename... Args>
-void for_each_local_alt(ConTy& c, FunctionTy fn, Args... args) {
-  HIDDEN::for_each_alt_gen(Runtime::makeLocalRange(c), fn, std::make_tuple(loopname(), wl<defaultWL>(), args...));
-}
+} // namespace HIDDEN
 
 ////////////////////////////////////////////////////////////////////////////////
 // Foreach
@@ -131,25 +126,9 @@ void for_each_local_alt(ConTy& c, FunctionTy fn, Args... args) {
  * @param fn operator
  * @param loopname string to identity loop in statistics output
  */
-template<typename WLTy, typename IterTy, typename FunctionTy>
-void for_each(IterTy b, IterTy e, FunctionTy fn, const char* loopname = 0) {
-  Runtime::for_each_impl<WLTy>(Runtime::makeStandardRange(b, e), fn, loopname);
-}
-
-/**
- * Galois unordered set iterator with default worklist policy.
- * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item is a value from the iteration
- * range and T is the type of item.
- *
- * @param b begining of range of initial items
- * @param e end of range of initial items
- * @param fn operator
- * @param loopname string to identity loop in statistics output
- */
-template<typename IterTy, typename FunctionTy>
-void for_each(IterTy b, IterTy e, FunctionTy fn, const char* loopname = 0) {
-  typedef WorkList::dChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> WLTy;
-  for_each<WLTy, IterTy, FunctionTy>(b, e, fn, loopname);
+template<typename IterTy, typename FunctionTy, typename... Args>
+void for_each(IterTy b, IterTy e, FunctionTy fn, Args... args) {
+  HIDDEN::for_each_gen(Runtime::makeStandardRange(b,e), fn, std::make_tuple(loopname(), wl<HIDDEN::defaultWL>(), args...));
 }
 
 /**
@@ -162,25 +141,10 @@ void for_each(IterTy b, IterTy e, FunctionTy fn, const char* loopname = 0) {
  * @param fn operator
  * @param loopname string to identity loop in statistics output
  */
-template<typename WLTy, typename InitItemTy, typename FunctionTy>
-void for_each(InitItemTy i, FunctionTy fn, const char* loopname = 0) {
-  InitItemTy wl[1] = {i};
-  for_each<WLTy>(&wl[0], &wl[1], fn, loopname);
-}
-
-/**
- * Galois unordered set iterator with default worklist policy.
- * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item is i and T 
- * is the type of item.
- *
- * @param i initial item
- * @param fn operator
- * @param loopname string to identity loop in statistics output
- */
-template<typename InitItemTy, typename FunctionTy>
-void for_each(InitItemTy i, FunctionTy fn, const char* loopname = 0) {
-  typedef WorkList::dChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> WLTy;
-  for_each<WLTy, InitItemTy, FunctionTy>(i, fn, loopname);
+template<typename ItemTy, typename FunctionTy, typename... Args>
+void for_each(ItemTy i, FunctionTy fn, Args... args) {
+  ItemTy iwl[1] = {i};
+  HIDDEN::for_each_gen(Runtime::makeStandardRange(&iwl[0], &iwl[1]), fn, std::make_tuple(loopname(), wl<HIDDEN::defaultWL>(), args...));
 }
 
 /**
@@ -193,24 +157,9 @@ void for_each(InitItemTy i, FunctionTy fn, const char* loopname = 0) {
  * @param fn operator
  * @param loopname string to identity loop in statistics output
  */
-template<typename WLTy, typename ConTy, typename FunctionTy>
-void for_each_local(ConTy& c, FunctionTy fn, const char* loopname = 0) {
-  Runtime::for_each_impl<WLTy>(Runtime::makeLocalRange(c), fn, loopname);
-}
-
-/**
- * Galois unordered set iterator with locality-aware container and default worklist policy.
- * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item is an element of c and T 
- * is the type of item.
- *
- * @param c locality-aware container
- * @param fn operator
- * @param loopname string to identity loop in statistics output
- */
-template<typename ConTy, typename FunctionTy>
-void for_each_local(ConTy& c, FunctionTy fn, const char* loopname = 0) {
-  typedef WorkList::dChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> WLTy;
-  for_each_local<WLTy, ConTy, FunctionTy>(c, fn, loopname);
+template<typename ConTy, typename FunctionTy, typename... Args>
+void for_each_local(ConTy& c, FunctionTy fn, Args... args) {
+  HIDDEN::for_each_gen(Runtime::makeLocalRange(c), fn, std::make_tuple(loopname(), wl<HIDDEN::defaultWL>(), args...));
 }
 
 /**
@@ -223,9 +172,9 @@ void for_each_local(ConTy& c, FunctionTy fn, const char* loopname = 0) {
  * @param loopname string to identify loop in statistics output
  * @returns fn
  */
-template<typename IterTy,typename FunctionTy>
-FunctionTy do_all(const IterTy& b, const IterTy& e, FunctionTy fn, const char* loopname = 0) {
-  return Runtime::do_all_impl(Runtime::makeStandardRange(b, e), fn, loopname);
+template<typename IterTy,typename FunctionTy, typename... Args>
+FunctionTy do_all(const IterTy& b, const IterTy& e, FunctionTy fn, Args... args) {
+  return HIDDEN::do_all_gen(Runtime::makeStandardRange(b, e), fn, std::make_tuple(loopname(), do_all_steal(), args...));
 }
 
 /**
@@ -237,9 +186,9 @@ FunctionTy do_all(const IterTy& b, const IterTy& e, FunctionTy fn, const char* l
  * @param loopname string to identify loop in statistics output
  * @returns fn
  */
-template<typename ConTy,typename FunctionTy>
-FunctionTy do_all_local(ConTy& c, FunctionTy fn, const char* loopname = 0, bool steel = false) {
-  return Runtime::do_all_impl(Runtime::makeLocalRange(c), fn, loopname, steel);
+template<typename ConTy,typename FunctionTy, typename... Args>
+FunctionTy do_all_local(ConTy& c, FunctionTy fn, Args... args) {
+  return HIDDEN::do_all_gen(Runtime::makeLocalRange(c), fn, std::make_tuple(loopname(), do_all_steal(), args...));
 }
 
 /**

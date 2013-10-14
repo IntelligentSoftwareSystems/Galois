@@ -534,7 +534,7 @@ void run(Bodies& bodies, BodyPtrs& pBodies) {
 
     Galois::StatTimer T_build("BuildTime");
     T_build.start();
-    Galois::do_all_local(pBodies, BuildOctree(&top, t, box.radius()), "BuildTree");
+    Galois::do_all_local(pBodies, BuildOctree(&top, t, box.radius()), Galois::loopname("BuildTree"));
     T_build.stop();
 
     //update centers of mass in tree
@@ -544,14 +544,14 @@ void run(Bodies& bodies, BodyPtrs& pBodies) {
 
     Galois::StatTimer T_compute("ComputeTime");
     T_compute.start();
-    Galois::for_each_local<WLL>(pBodies, ComputeForces(&top, box.diameter()), "compute");
+    Galois::for_each_local(pBodies, ComputeForces(&top, box.diameter()), Galois::loopname("compute"), Galois::wl<WLL>());
     T_compute.stop();
 
     if (!skipVerify) {
       std::cout << "MSE (sampled) " << checkAllPairs(bodies, std::min((int) nbodies, 100)) << "\n";
     }
     //Done in compute forces
-    Galois::do_all_local(pBodies, AdvanceBodies());//, "advance");
+    Galois::do_all_local(pBodies, AdvanceBodies(), Galois::loopname("advance"));
 
     std::cout << "Timestep " << step << " Center of Mass = ";
     std::ios::fmtflags flags = 

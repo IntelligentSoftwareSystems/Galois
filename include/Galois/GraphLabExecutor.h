@@ -175,7 +175,7 @@ public:
 
     Galois::InsertBag<WorkItem> bag;
     Galois::do_all_local(graph, Initialize(this, bag));
-    Galois::for_each_local<WL>(bag, Process(this));
+    Galois::for_each_local(bag, Process(this), Galois::wl<WL>());
   }
 };
 
@@ -328,14 +328,14 @@ class SyncEngine {
 
   template<bool IsFirst,typename Container1, typename Container2>
   void executeStep(Container1& cur, Container2& next) {
-    Galois::for_each_local<WL>(cur, Initialize<IsFirst>(this));
+    Galois::for_each_local(cur, Initialize<IsFirst>(this), Galois::wl<WL>());
     
     if (needs_gather_in_edges<Operator>::value || needs_gather_out_edges<Operator>::value) {
-      Galois::for_each_local<WL>(cur, Gather(this));
+      Galois::for_each_local(cur, Gather(this), Galois::wl<WL>());
     }
 
     if (needs_scatter_in_edges<Operator>::value || needs_scatter_out_edges<Operator>::value) {
-      Galois::for_each_local<WL>(cur, Scatter<Container2>(this, next));
+      Galois::for_each_local(cur, Scatter<Container2>(this, next), Galois::wl<WL>());
     }
   }
 

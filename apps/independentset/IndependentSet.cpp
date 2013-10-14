@@ -252,7 +252,7 @@ struct DefaultAlgo {
 #endif
     switch (algo) {
       case nondet: 
-        Galois::for_each<WL>(graph.begin(), graph.end(), Process<>(graph));
+        Galois::for_each(graph.begin(), graph.end(), Process<>(graph), Galois::wl<WL>());
         break;
       case detBase:
         Galois::for_each_det(graph.begin(), graph.end(), Process<>(graph));

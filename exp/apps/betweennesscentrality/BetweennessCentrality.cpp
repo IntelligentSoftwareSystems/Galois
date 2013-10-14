@@ -272,7 +272,7 @@ int main(int argc, char** argv) {
   //typedef Galois::WorkList::AltChunkedLIFO<32> CA;
   Galois::StatTimer T;
   T.start();
-  Galois::for_each<WL>(tmp.begin(), tmp.end(), process());
+  Galois::for_each(tmp.begin(), tmp.end(), process(), Galois::wl<WL>());
   T.stop();
 
   if (forceVerify || !skipVerify) {

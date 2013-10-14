@@ -325,7 +325,7 @@ struct AsyncAlgo {
     
     graph.getData(source).dist = 0;
 
-    Galois::for_each<OBIM>(WorkItem(source, 1), Process(graph));
+    Galois::for_each(WorkItem(source, 1), Process(graph), Galois::wl<OBIM>());
   }
 };
 
@@ -459,7 +459,7 @@ struct HighCentralityAlgo {
       if (nextSize > graph.sizeEdges() / 20)
         Galois::do_all_local(graph, BackwardProcess(graph, &bags[next], newDist));
       else
-        Galois::for_each_local<WL>(bags[cur].wl, ForwardProcess(graph, &bags[next], newDist));
+        Galois::for_each_local(bags[cur].wl, ForwardProcess(graph, &bags[next], newDist), Galois::wl<WL>());
       bags[cur].clear();
     }
   }
@@ -512,7 +512,7 @@ struct BarrierAlgo {
 
   void operator()(Graph& graph, const GNode& source) const {
     graph.getData(source).dist = 0;
-    Galois::for_each<WL>(WorkItem(source, 1), Process(graph));
+    Galois::for_each(WorkItem(source, 1), Process(graph), Galois::wl<WL>());
   }
 };
 
@@ -630,7 +630,7 @@ struct DeterministicAlgo {
     graph.getData(source).dist = 0;
 
     switch (Version) {
-      case DetAlgo::none: Galois::for_each<WL>(WorkItem(source, 1), Process(graph)); break; 
+    case DetAlgo::none: Galois::for_each(WorkItem(source, 1), Process(graph),Galois::wl<WL>()); break; 
       case DetAlgo::base: Galois::for_each_det(WorkItem(source, 1), Process(graph)); break;
       case DetAlgo::disjoint: Galois::for_each_det(WorkItem(source, 1), Process(graph)); break;
       default: std::cerr << "Unknown algorithm " << int(Version) << "\n"; abort();

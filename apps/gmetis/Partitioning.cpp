@@ -187,11 +187,11 @@ std::vector<partInfo> partition(MetisGraph* mcg, unsigned numPartitions, Initial
   switch (partMode) {
     case GGP:
       std::cout <<"\n  Sarting initial partitioning using GGP:\n";
-      Galois::for_each<Galois::WorkList::ChunkedLIFO<1> >(&parts[0], parallelBisect<bisect_GGP>(mcg, numPartitions, parts));
+      Galois::for_each(&parts[0], parallelBisect<bisect_GGP>(mcg, numPartitions, parts), Galois::wl<Galois::WorkList::ChunkedLIFO<1>>());
       break;
     case GGGP:
       std::cout <<"\n  Sarting initial partitioning using GGGP:\n";
-      Galois::for_each<Galois::WorkList::ChunkedLIFO<1> >(&parts[0], parallelBisect<bisect_GGGP>(mcg, numPartitions, parts));
+      Galois::for_each(&parts[0], parallelBisect<bisect_GGGP>(mcg, numPartitions, parts), Galois::wl<Galois::WorkList::ChunkedLIFO<1>>());
       break;
     default: abort();
   }

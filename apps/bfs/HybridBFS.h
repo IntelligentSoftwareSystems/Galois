@@ -171,13 +171,13 @@ struct HybridBFS {
         numBackward += 1;
       } else if (numForward < 10 && numBackward == 0) {
         //std::cout << "Sparse " << nextSize << "\n";
-        Galois::for_each_local<WL>(bags[cur], ForwardProcess(graph, this, &bags[next], newDist));
+        Galois::for_each_local(bags[cur], ForwardProcess(graph, this, &bags[next], newDist), Galois::wl<WL>());
         numForward += 1;
       } else {
         //std::cout << "Async " << nextSize << "\n";
         WorkItemBag asyncBag;
-        Galois::for_each_local<WL>(bags[cur], PopulateAsync(asyncBag, newDist));
-        Galois::for_each_local<BSWL>(asyncBag, ForwardProcess(graph, this));
+        Galois::for_each_local(bags[cur], PopulateAsync(asyncBag, newDist), Galois::wl<WL>());
+        Galois::for_each_local(asyncBag, ForwardProcess(graph, this), Galois::wl<BSWL>());
         break;
       }
       bags[cur].clear();

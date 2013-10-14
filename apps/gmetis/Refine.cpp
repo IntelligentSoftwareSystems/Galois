@@ -174,14 +174,14 @@ struct refine_BKL2 {
     gainIndexer::g = &cg;
     Galois::InsertBag<GNode> boundary;
     if (fg)
-      Galois::do_all_local(cg, findBoundaryAndProject(boundary, cg, *fg), "boundary");
+      Galois::do_all_local(cg, findBoundaryAndProject(boundary, cg, *fg), Galois::loopname("boundary"));
     else
-      Galois::do_all_local(cg, findBoundary(boundary, cg), "boundary");
-    Galois::for_each_local<pG>(boundary, refine_BKL2(mins, maxs, cg, fg, p), "refine");
+      Galois::do_all_local(cg, findBoundary(boundary, cg), Galois::loopname("boundary"));
+    Galois::for_each_local(boundary, refine_BKL2(mins, maxs, cg, fg, p), Galois::loopname("refine"), Galois::wl<pG>());
     if (false) {
       Galois::InsertBag<GNode> boundary;
-      Galois::do_all_local(cg, findBoundary(boundary, cg), "boundary");
-      Galois::for_each_local<pG>(boundary, refine_BKL2(mins, maxs, cg, fg, p), "refine");
+      Galois::do_all_local(cg, findBoundary(boundary, cg), Galois::loopname("boundary"));
+      Galois::for_each_local(boundary, refine_BKL2(mins, maxs, cg, fg, p), Galois::loopname("refine"), Galois::wl<pG>());
     }
 
   }
@@ -202,7 +202,7 @@ struct projectPart {
   }
 
   static void go(MetisGraph* Graph, std::vector<partInfo>& p) {
-    Galois::do_all_local(*Graph->getGraph(), projectPart(Graph, p), "project");
+    Galois::do_all_local(*Graph->getGraph(), projectPart(Graph, p), Galois::loopname("project"));
   }
 };
 
@@ -243,7 +243,7 @@ void refineOneByOne(GGraph& g, std::vector<partInfo>& parts) {
   meanWeight /= parts.size();
   Galois::InsertBag<GNode> boundaryBag;
   parallelBoundary pB(boundaryBag, g);
-  Galois::for_each(g.begin(), g.end(), pB, "Get Boundary" );
+  Galois::for_each(g.begin(), g.end(), pB, Galois::loopname("Get Boundary"));
 
   for (auto ii = boundaryBag.begin(), ie =boundaryBag.end(); ii!=ie;ii++){
       GNode n = (*ii) ;
@@ -276,7 +276,7 @@ void refine_BKL(GGraph& g, std::vector<partInfo>& parts) {
   //find boundary nodes with positive gain
   Galois::InsertBag<GNode> boundaryBag;
   parallelBoundary pB(boundaryBag, g);
-  Galois::for_each(g.begin(), g.end(), pB, "Get Boundary" );
+  Galois::for_each(g.begin(), g.end(), pB, Galois::loopname("Get Boundary"));
   for (auto ii = boundaryBag.begin(), ie =boundaryBag.end(); ii!=ie;ii++ ){
     boundary.insert(*ii);}
 
@@ -396,7 +396,7 @@ void GraclusRefining(GGraph* graph, int nbParti, int nbIter)
     Galois::StatTimer T3("1st loop");
     T3.start();
     ComputeClusterDist comp(*graph, nbParti);
-    Galois::for_each(graph->begin(), graph->end(), comp,"compute dists");
+    Galois::for_each(graph->begin(), graph->end(), comp, Galois::loopname("compute dists"));
     T3.stop();
     //std::cout << "Time calc:  "<<T3.get()<<'\n';
 
@@ -409,7 +409,7 @@ void GraclusRefining(GGraph* graph, int nbParti, int nbIter)
     Galois::StatTimer T4("2nd loop");
     T4.start();
 
-    Galois::for_each(graph->begin(), graph->end(), ChangePart(*graph, nbParti, Dist, card), "make moves");
+    Galois::for_each(graph->begin(), graph->end(), ChangePart(*graph, nbParti, Dist, card), Galois::loopname("make moves"));
     T4.stop();
     //std::cout << "Time move:  "<<T4.get()<<'\n';
   }

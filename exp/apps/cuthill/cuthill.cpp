@@ -256,7 +256,7 @@ private:
     res.source = source;
 
     graph.getData(source).dist = 0;
-    Galois::for_each<dChunk>(source, UnorderedProcess());
+    Galois::for_each(source, UnorderedProcess(), Galois::wl<dChunk>());
 
     res.counts = Galois::Runtime::do_all_impl(Galois::Runtime::makeLocalRange(graph),
         CountLevels(reset), default_reduce()).counts;

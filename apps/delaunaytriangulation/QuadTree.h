@@ -372,7 +372,7 @@ public:
     WorkTy work;
     std::back_insert_iterator<WorkTy> it(work);
     divideWork(points.begin(), points.end(), m_root, m_center, m_radius, it, 4);
-    Galois::for_each<WL>(work.begin(), work.end(), PAdd<PointsBufTy::iterator>());
+    Galois::for_each(work.begin(), work.end(), PAdd<PointsBufTy::iterator>(), Galois::wl<WL>());
   }
 
   ~PQuadTree() {

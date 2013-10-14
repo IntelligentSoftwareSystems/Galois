@@ -319,7 +319,7 @@ struct AsyncAlgo {
       initial.push_back(dst);
     }
 
-    Galois::for_each<OBIM>(initial.begin(), initial.end(), *this);
+    Galois::for_each(initial.begin(), initial.end(), *this, Galois::wl<OBIM>());
   }
 
   void operator()(GNode& n, Galois::UserContext<GNode>& ctx) const {
@@ -374,7 +374,7 @@ struct BarrierAlgo {
       ddata.dist = 1;
       initial.push_back(ItemTy(dst, 2));
     }
-    Galois::for_each<WL>(initial.begin(), initial.end(), *this);
+    Galois::for_each(initial.begin(), initial.end(), *this, Galois::wl<WL>());
   }
 
   void operator()(const ItemTy& item, Galois::UserContext<ItemTy>& ctx) const {
@@ -509,7 +509,7 @@ struct DetBarrierAlgo {
     }
     switch (Version) {
       case nondet: 
-        Galois::for_each<WL>(initial.begin(), initial.end(), *this); break;
+        Galois::for_each(initial.begin(), initial.end(), *this, Galois::wl<WL>()); break;
       case detBase:
         Galois::for_each_det(initial.begin(), initial.end(), *this); break;
       case detDisjoint:

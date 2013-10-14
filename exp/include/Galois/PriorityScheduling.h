@@ -66,7 +66,7 @@ struct PriAuto {
 	gInfo("WorkList %s\n", #__x);					\
 	printed = true;							\
       }									\
-      Galois::for_each<__x>(b,e,f,loopname);				\
+      Galois::for_each(b,e,f,Galois::loopname(loopname), Galois::wl<__x>()); \
     } else
 #include "PrioritySchedulers.h"
 #undef WLFOO2
@@ -76,7 +76,7 @@ struct PriAuto {
 	gInfo("WorkList %s\n", "NI_" #__x);				\
 	printed = true;							\
       }									\
-      Galois::for_each<NoInlineFilter<__x> >(b,e,f,loopname);		\
+      Galois::for_each(b,e,f,Galois::loopname(loopname), Galois::wl<NoInlineFilter<__x>>()); \
     } else
 #include "PrioritySchedulers.h"
 #undef WLFOO2
@@ -88,7 +88,7 @@ struct PriAuto {
   template<typename InitItemTy,typename FunctionTy>
   static void for_each(InitItemTy i, FunctionTy f, const char* loopname = 0) {
     InitItemTy wl[1] = {i};
-    for_each(&wl[0], &wl[1], f, loopname);
+    for_each(&wl[0], &wl[1], f, Galois::loopname(loopname));
   }
 };
 

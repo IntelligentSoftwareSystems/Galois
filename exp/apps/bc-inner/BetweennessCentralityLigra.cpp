@@ -214,10 +214,10 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
       this->outEdgeMap(memoryLimit, graph, ForwardPass(), *frontier, *output, false);
       //Galois::do_all_local(*output, [&](GNode n) {
       //Galois::do_all(output->begin(), output->end(), [&](GNode n) {
-      Galois::for_each_local<WL>(*output, [&](size_t id, Galois::UserContext<size_t>&) {
+      Galois::for_each_local(*output, [&](size_t id, Galois::UserContext<size_t>&) {
         SNode& d = graph.getData(graph.nodeFromId(id), Galois::MethodFlag::NONE);
         d.visited = true;
-      }); 
+        },Galois::wl<WL>()); 
       levels.push_back(output);
       frontier = output;
     }
@@ -233,11 +233,11 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
     frontier = levels[round-1];
 
     //Galois::do_all_local(*frontier, [&](GNode n) {
-    Galois::for_each_local<WL>(*frontier, [&](size_t id, Galois::UserContext<size_t>&) {
+    Galois::for_each_local(*frontier, [&](size_t id, Galois::UserContext<size_t>&) {
       SNode& d = graph.getData(graph.nodeFromId(id), Galois::MethodFlag::NONE);
       d.visited = true;
       d.dependencies.write(d.dependencies.read() + d.numPaths.read());
-    });
+      }, Galois::wl<WL>());
 
     for (int r = round - 2; r >= 0; --r) {
       Bag output(graph.size());
@@ -245,11 +245,11 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
       delete frontier;
       frontier = levels[r];
       //Galois::do_all_local(*frontier, [&](GNode n) {
-      Galois::for_each_local<WL>(*frontier, [&](size_t id, Galois::UserContext<size_t>&) {
+      Galois::for_each_local(*frontier, [&](size_t id, Galois::UserContext<size_t>&) {
         SNode& d = graph.getData(graph.nodeFromId(id), Galois::MethodFlag::NONE);
         d.visited = true;
         d.dependencies.write(d.dependencies.read() + d.numPaths.read());
-      });
+        }, Galois::wl<WL>());
     }
 
     delete frontier;

@@ -97,7 +97,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi>  {
     Galois::do_all_local(graph, Initialize<typename BagPair::bag_type>(graph, bags.next()));
     while (!bags.next().empty()) {
       bags.swap();
-      Galois::for_each_local<WL>(bags.cur(), Copy(graph));
+      Galois::for_each_local(bags.cur(), Copy(graph), Galois::wl<WL>());
       this->outEdgeMap(memoryLimit, graph, EdgeOperator(), bags.cur(), bags.next(), false);
     } 
   }

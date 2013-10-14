@@ -240,7 +240,7 @@ public:
 
     Process p (graph, inDegVec, meshInit, g, perIterLocalVec, createSyncFiles, iter);
 
-    Galois::for_each<AVIWorkList> (initWL.begin (), initWL.end (), p);
+    Galois::for_each(initWL.begin (), initWL.end (), p, Galois::wl<AVIWorkList>());
 
     printf ("iterations = %zd\n", iter.reduce ());
 
