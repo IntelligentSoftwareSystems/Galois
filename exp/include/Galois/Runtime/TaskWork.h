@@ -444,7 +444,7 @@ class Executor {
       tld.facing.reset();
       tld.ctx.commitIteration();
     }
-#if GALOIS_USE_LONGJMP
+#ifdef GALOIS_USE_LONGJMP
     } else { clearConflictLock(); }
 #else
     } catch (ConflictFlag const& flag) { clearConflictLock(); result = flag; }
