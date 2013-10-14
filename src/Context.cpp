@@ -123,14 +123,23 @@ void Galois::Runtime::forceAbort() {
 ////////////////////////////////////////////////////////////////////////////////
 
 #if !defined(GALOIS_USE_SEQ_ONLY)
-
-Galois::Runtime::LockManagerBase::AcquireStatus Galois::Runtime::LockManagerBase::tryAcquire (Galois::Runtime::Lockable* lockable) {
+Galois::Runtime::LockManagerBase::AcquireStatus
+Galois::Runtime::LockManagerBase::tryAcquire(Galois::Runtime::Lockable* lockable) 
+{
   assert(lockable);
-  if (tryLock (lockable)) {
-    assert(!getOwner (lockable));
-    ownByForce (lockable);
+  // XXX(ddn): Hand inlining this code makes a difference on at least
+  // GCC 4.7.2
+#if 0
+  if (tryLock(lockable)) {
+    assert(!getOwner(lockable));
+    ownByForce(lockable);
     return NEW_OWNER;
-  } else if (getOwner (lockable) == this) {
+#else
+  if (lockable->owner.try_lock()) {
+    lockable->owner.setValue(this);
+    return NEW_OWNER;
+#endif
+  } else if (getOwner(lockable) == this) {
     return ALREADY_OWNER;
   }
   return FAIL;
@@ -142,7 +151,7 @@ void Galois::Runtime::SimpleRuntimeContext::acquire(Galois::Runtime::Lockable* l
     subAcquire(lockable);
   } else if ((i = tryAcquire(lockable)) != AcquireStatus::FAIL) {
     if (i == AcquireStatus::NEW_OWNER) {
-      addToNhood (lockable);
+      addToNhood(lockable);
     }
   } else {
     Galois::Runtime::signalConflict(lockable);
