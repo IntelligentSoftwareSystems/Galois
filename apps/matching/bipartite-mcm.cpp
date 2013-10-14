@@ -558,7 +558,7 @@ struct MatchingABMP {
     Exp::PriAuto<1024,Indexer,OBIM,Less,Greater>::for_each(
 	 initial.begin(), initial.end(), Process(*this, g, maxLayer, size));
 #else
-    Galois::for_each<OBIM>(initial.begin(), initial.end(), Process(*this, g, maxLayer, size));
+    Galois::for_each(initial.begin(), initial.end(), Process(*this, g, maxLayer, size), Galois::wl<OBIM>());
 #endif
     
     t.start();

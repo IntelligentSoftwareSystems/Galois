@@ -383,7 +383,7 @@ void SP_algorithm() {
 #ifdef GALOIS_USE_EXP
   Exp::PriAuto<64, EIndexer, WLWL, ELess, EGreater >::for_each(clauses.begin(), clauses.end(), update_eta(), "update_eta");
 #else
-  Galois::for_each<WLWL>(clauses.begin(), clauses.end(), update_eta(), "update_eta");
+  Galois::for_each(clauses.begin(), clauses.end(), update_eta(), Galois::loopname("update_eta"), Galois::wl<WLWL>());
 #endif
 
   maxBias.reset();

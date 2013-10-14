@@ -291,8 +291,7 @@ EdgeDataType runBodyParallel() {
 #ifdef GALOIS_USE_EXP
    Exp::PriAuto<64, Indexer, OBIM, seq_less, seq_gt>::for_each(graph.begin(), graph.end(), process());
 #else
-//   Galois::for_each<dChunk>(graph.begin(), graph.end(), process());
-   Galois::for_each<OBIM>(graph.begin(), graph.end(), process());
+   Galois::for_each_local(graph, process(), Galois::wl<OBIM>());
 #endif
    T.stop();
 
