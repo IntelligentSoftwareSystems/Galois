@@ -176,29 +176,28 @@ protected:
 };
 
 class SimpleRuntimeContext: public LockManagerBase {
-
   //! The locks we hold
   Lockable* locks;
   bool customAcquire;
 
 protected:
+  friend void doAcquire(Lockable*);
+
   static SimpleRuntimeContext* getOwner(Lockable* lockable) {
     LockManagerBase* owner = LockManagerBase::getOwner (lockable);
     return static_cast<SimpleRuntimeContext*>(owner);
   }
+
   virtual void subAcquire(Lockable* lockable);
 
-  void addToNhood (Lockable* lockable) {
+  void addToNhood(Lockable* lockable) {
     assert(!lockable->next);
     lockable->next = locks;
     locks = lockable;
   }
 
   void acquire(Lockable* lockable);
-  // XXX: overriding LockManagerBase version due to extra checks
   void release(Lockable* lockable);
-
-  friend void doAcquire (Lockable*);
 
 public:
   SimpleRuntimeContext(bool child = false): locks(0), customAcquire(child) { }
@@ -253,7 +252,7 @@ inline void doAcquire(Lockable* lockable) {
 //! used to acquire a lockable thing
 inline void acquire(Lockable* lockable, Galois::MethodFlag m) {
   if (shouldLock(m)) {
-    doAcquire (lockable);
+    doAcquire(lockable);
   }
 }
 
