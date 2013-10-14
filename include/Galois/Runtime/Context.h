@@ -145,37 +145,34 @@ protected:
     FAIL, NEW_OWNER, ALREADY_OWNER
   };
 
-  AcquireStatus tryAcquire (Lockable* lockable);
+  AcquireStatus tryAcquire(Lockable* lockable);
 
-  bool stealByCAS(Lockable* lockable, LockManagerBase* other) {
-    assert (lockable != nullptr);
+  inline bool stealByCAS(Lockable* lockable, LockManagerBase* other) {
+    assert(lockable != nullptr);
     return lockable->owner.stealing_CAS(other, this);
   }
 
-  void ownByForce(Lockable* lockable) {
-    assert (lockable != nullptr);
+  inline void ownByForce(Lockable* lockable) {
+    assert(lockable != nullptr);
     assert(!lockable->owner.getValue());
     lockable->owner.setValue(this);
   }
 
-  void release (Lockable* lockable) {
-    assert (lockable != nullptr);
-    assert (getOwner (lockable) == this);
-    lockable->owner.unlock_and_clear ();
+  inline void release(Lockable* lockable) {
+    assert(lockable != nullptr);
+    assert(getOwner(lockable) == this);
+    lockable->owner.unlock_and_clear();
   }
 
-  static bool tryLock(Lockable* lockable) {
-    assert (lockable != nullptr);
+  inline static bool tryLock(Lockable* lockable) {
+    assert(lockable != nullptr);
     return lockable->owner.try_lock();
   }
 
-  static LockManagerBase* getOwner (Lockable* lockable) {
-    assert (lockable != nullptr);
-    return lockable->owner.getValue ();
+  inline static LockManagerBase* getOwner(Lockable* lockable) {
+    assert(lockable != nullptr);
+    return lockable->owner.getValue();
   }
-
-
-
 };
 
 class SimpleRuntimeContext: public LockManagerBase {
@@ -185,11 +182,9 @@ class SimpleRuntimeContext: public LockManagerBase {
   bool customAcquire;
 
 protected:
-
-  static SimpleRuntimeContext* getOwner (Lockable* lockable) {
+  static SimpleRuntimeContext* getOwner(Lockable* lockable) {
     LockManagerBase* owner = LockManagerBase::getOwner (lockable);
-    // assert (dynamic_cast<SimpleRuntimeContext*> (owner) != nullptr);
-    return static_cast<SimpleRuntimeContext*> (owner);
+    return static_cast<SimpleRuntimeContext*>(owner);
   }
   virtual void subAcquire(Lockable* lockable);
 
@@ -204,6 +199,7 @@ protected:
   void release(Lockable* lockable);
 
   friend void doAcquire (Lockable*);
+
 public:
   SimpleRuntimeContext(bool child = false): locks(0), customAcquire(child) { }
   virtual ~SimpleRuntimeContext() { }
@@ -237,9 +233,12 @@ inline bool shouldLock(const Galois::MethodFlag g) {
   case CHECK_CONFLICT:
     return true;
   default:
-    GALOIS_DIE("shouldn't get here");
-    return false;
+    // XXX(ddn): Adding error checking code here either upsets the inlining
+    // heuristics or icache behavior. Avoid complex code if possible.
+    //GALOIS_DIE("shouldn't get here");
+    assert(false);
   }
+  return false;
 #endif
 }
 
