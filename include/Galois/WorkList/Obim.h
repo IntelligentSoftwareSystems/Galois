@@ -113,37 +113,27 @@ private:
   Runtime::LL::PaddedLock<Concurrent> masterLock;
   MasterLog masterLog;
 
-  volatile unsigned int masterVersion;
+  std::atomic<unsigned int> masterVersion;
   Indexer indexer;
 
   bool updateLocal(perItem& p) {
-    if (p.lastMasterVersion != masterVersion) {
+    if (p.lastMasterVersion != masterVersion.load(std::memory_order_relaxed)) {
       //masterLock.lock();
-      for (; p.lastMasterVersion < masterVersion; ++p.lastMasterVersion)
+      for (; p.lastMasterVersion < masterVersion.load(std::memory_order_relaxed); ++p.lastMasterVersion) {
+        // XXX(ddn): Somehow the second block is better than
+        // the first for bipartite matching (GCC 4.7.2)
+#if 0
         p.local.insert(masterLog[p.lastMasterVersion]);
+#else
+        std::pair<Index, CTy*> logEntry = masterLog[p.lastMasterVersion];
+        p.local[logEntry.first] = logEntry.second;
+        assert(logEntry.second);
+#endif
+      }
       //masterLock.unlock();
       return true;
     }
     return false;
-  }
-
-  GALOIS_ATTRIBUTE_NOINLINE
-  bool betterBucket(perItem& p) {
-    updateLocal(p);
-    unsigned myID = Runtime::LL::getTID();
-    bool localLeader = Runtime::LL::isPackageLeaderForSelf(myID);
-
-    Index msS = std::numeric_limits<Index>::min();
-    if (BSP) {
-      msS = p.scanStart;
-      if (localLeader)
-	for (unsigned i = 0; i <  Runtime::activeThreads; ++i)
-	  msS = std::min(msS, current.getRemote(i)->scanStart);
-      else
-	msS = std::min(msS, current.getRemote(Runtime::LL::getLeaderForThread(myID))->scanStart);
-    }
-
-    return p.curIndex != msS;
   }
 
   GALOIS_ATTRIBUTE_NOINLINE
@@ -156,20 +146,21 @@ private:
     Index msS = std::numeric_limits<Index>::min();
     if (BSP) {
       msS = p.scanStart;
-      if (localLeader)
-	for (unsigned i = 0; i < Runtime::activeThreads; ++i)
-	  msS = std::min(msS, current.getRemote(i)->scanStart);
-      else
-	msS = std::min(msS, current.getRemote(Runtime::LL::getLeaderForThread(myID))->scanStart);
+      if (localLeader) {
+        for (unsigned i = 0; i < Runtime::activeThreads; ++i)
+          msS = std::min(msS, current.getRemote(i)->scanStart);
+      } else {
+        msS = std::min(msS, current.getRemote(Runtime::LL::getLeaderForThread(myID))->scanStart);
+      }
     }
 
     for (auto ii = p.local.lower_bound(msS), ee = p.local.end(); ii != ee; ++ii) {
       Galois::optional<T> retval;
       if ((retval = ii->second->pop())) {
-	p.current = ii->second;
-	p.curIndex = ii->first;
-	p.scanStart = ii->first;
-	return retval;
+        p.current = ii->second;
+        p.curIndex = ii->first;
+        p.scanStart = ii->first;
+        return retval;
       }
     }
     return Galois::optional<value_type>();
@@ -182,16 +173,16 @@ private:
       CTy* lC;
       updateLocal(p);
       if ((lC = p.local[i]))
-	return lC;
+        return lC;
     } while (!masterLock.try_lock());
     //we have the write lock, update again then create
     updateLocal(p);
     CTy*& lC2 = p.local[i];
     if (!lC2) {
       lC2 = new CTy();
-      p.lastMasterVersion = masterVersion + 1;
+      p.lastMasterVersion = masterVersion.load(std::memory_order_relaxed) + 1;
       masterLog.push_back(std::make_pair(i, lC2));
-      __sync_fetch_and_add(&masterVersion, 1);
+      masterVersion.fetch_add(1);
     }
     masterLock.unlock();
     return lC2;
@@ -212,7 +203,7 @@ public:
   ~OrderedByIntegerMetric() {
     // Deallocate in LIFO order to give opportunity for simple garbage
     // collection
-    for (typename MasterLog::reverse_iterator ii = masterLog.rbegin(), ei = masterLog.rend(); ii != ei; ++ii) {
+    for (auto ii = masterLog.rbegin(), ei = masterLog.rend(); ii != ei; ++ii) {
       delete ii->second;
     }
   }
@@ -220,17 +211,17 @@ public:
   void push(const value_type& val) {
     Index index = indexer(val);
     perItem& p = *current.getLocal();
-    //fastpath
+    // Fast path
     if (index == p.curIndex && p.current) {
       p.current->push(val);
       return;
     }
 
-    //slow path
+    // Slow path
     CTy* lC = updateLocalOrCreate(p, index);
     if (BSP && index < p.scanStart)
       p.scanStart = index;
-    //opportunistically move to higher priority work
+    // Opportunistically move to higher priority work
     if (index < p.curIndex) {
       p.curIndex = index;
       p.current = lC;
@@ -251,17 +242,17 @@ public:
   }
 
   Galois::optional<value_type> pop() {
-    //Find a successful pop
+    // Find a successful pop
     perItem& p = *current.getLocal();
     CTy* C = p.current;
-    if (BlockPeriod && (p.numPops++ & ((1<<BlockPeriod)-1)) == 0 && betterBucket(p))
+    if (BlockPeriod && (p.numPops++ & ((1<<BlockPeriod)-1)) == 0)
       return slowPop(p);
 
     Galois::optional<value_type> retval;
     if (C && (retval = C->pop()))
       return retval;
 
-    //failed: slow path
+    // Slow path
     return slowPop(p);
   }
 };

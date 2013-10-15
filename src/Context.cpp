@@ -127,8 +127,8 @@ Galois::Runtime::LockManagerBase::AcquireStatus
 Galois::Runtime::LockManagerBase::tryAcquire(Galois::Runtime::Lockable* lockable) 
 {
   assert(lockable);
-  // XXX(ddn): Hand inlining this code makes a difference on at least
-  // GCC 4.7.2
+  // XXX(ddn): Hand inlining this code makes a difference on 
+  // delaunaytriangulation (GCC 4.7.2)
 #if 0
   if (tryLock(lockable)) {
     assert(!getOwner(lockable));
