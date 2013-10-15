@@ -390,7 +390,7 @@ void SP_algorithm() {
   numBias.reset();
   sumBias.reset();
   nontrivial.reset();
-  Galois::do_all(literals.begin(), literals.end(), update_biases(), "update_biases");
+  Galois::do_all(literals.begin(), literals.end(), update_biases(), Galois::loopname("update_biases"));
 }
 
 struct fix_variables {
@@ -421,7 +421,7 @@ void decimate() {
   double average = num > 0 ? sumBias.reduce() / num : 0.0;
   std::cout << "NonTrivial " << n << " MaxBias " << m << " Average Bias " << average << "\n";
   double d = ((m - average) * 0.25) + average;
-  Galois::do_all(literals.begin(), literals.end(), fix_variables(d), "fix_variables");
+  Galois::do_all(literals.begin(), literals.end(), fix_variables(d), Galois::loopname("fix_variables"));
 }
 
 bool survey_inspired_decimation() {

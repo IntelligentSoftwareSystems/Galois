@@ -311,7 +311,7 @@ protected:
       Galois::do_all (
       // Galois::Runtime::do_all_coupled (
           sobjInfoVec.begin (), sobjInfoVec.end (),
-          FindReady (readyEvents, findIter), "find_ready_events");
+          FindReady (readyEvents, findIter), Galois::loopname("find_ready_events"));
       t_find.stop ();
 
       // std::cout << "Number of ready events found: " << readyEvents.size_all () << std::endl;
@@ -337,7 +337,7 @@ protected:
       Galois::do_all (
       // Galois::Runtime::do_all_coupled (
           readyEvents.begin_all (), readyEvents.end_all (),
-          ProcessEvents (graph, sobjInfoVec, newEvents, nevents), "process_ready_events");
+          ProcessEvents (graph, sobjInfoVec, newEvents, nevents), Galois::loopname("process_ready_events"));
       t_simulate.stop ();
     }
 

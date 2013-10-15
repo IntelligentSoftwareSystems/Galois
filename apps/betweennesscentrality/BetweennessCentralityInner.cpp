@@ -260,7 +260,7 @@ struct AsyncAlgo {
   void operator()(Graph& graph, GNode source) {
     Galois::StatTimer Tinit("InitTime"), Tlevel("LevelTime"), Tbfs("BFSTime"), Tcount("CountTime"), Tdep("DepTime");
     Tinit.start();
-    Galois::do_all_local(graph, Initialize(graph), "INIT");
+    Galois::do_all_local(graph, Initialize(graph), Galois::loopname("INIT"));
     Tinit.stop();
     std::cout << "INIT DONE " << Tinit.get() << "\n";
     Tbfs.start();
@@ -397,7 +397,7 @@ struct LeveledAlgo {
       Tinit("InitTime"), Tlevel("LevelTime"), Tbfs("BFSTime"),
       Tcount("CountTime"), Tdep("DepTime");
     Tinit.start();
-    Galois::do_all_local(graph, Initialize(graph), "INIT");
+    Galois::do_all_local(graph, Initialize(graph), Galois::loopname("INIT"));
     Tinit.stop();
     std::cout << "INIT DONE " << Tinit.get() << "\n";
 
@@ -410,7 +410,7 @@ struct LeveledAlgo {
     while (!levels.back()->empty()) {
       Bag* b = levels.back();
       levels.push_back(new Bag());
-      Galois::do_all_local(*b, BFS<>(graph, *levels.back()), "BFS", true);
+      Galois::do_all_local(*b, BFS<>(graph, *levels.back()), Galois::loopname("BFS"), Galois::do_all_steal(true));
       //Galois::do_all_local(*levels.back(), Counter(graph), "COUNTER", true);
     }
     delete levels.back();
@@ -420,7 +420,7 @@ struct LeveledAlgo {
 
     Tdep.start();
     for (int i = levels.size() - 1; i > 0; --i)
-      Galois::do_all_local(*levels[i-1], ComputeDep(graph), "DEPS", true);
+      Galois::do_all_local(*levels[i-1], ComputeDep(graph), Galois::loopname("DEPS"), Galois::do_all_steal(true));
     Tdep.stop();
     std::cout << "DEP DONE " << Tdep.get() << "\n";
     while (!levels.empty()) {

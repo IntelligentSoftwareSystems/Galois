@@ -492,7 +492,7 @@ struct UnionFindWindow {
       findTimer.start ();
       Galois::do_all (currWL->begin_all (), currWL->end_all (),
           FindLoop (repVec, repOwnerCtxVec, findIter),
-          "find_loop");
+                      Galois::loopname("find_loop"));
       findTimer.stop ();
       // Galois::Runtime::endSampling ();
 
@@ -501,7 +501,7 @@ struct UnionFindWindow {
       linkUpTimer.start ();
       Galois::do_all (currWL->begin_all (), currWL->end_all (),
           LinkUpLoop<false> (repVec, repOwnerCtxVec, *nextWL, mstSum, linkUpIter),
-          "link_up_loop");
+                      Galois::loopname("link_up_loop"));
       linkUpTimer.stop ();
       // Galois::Runtime::endSampling ();
 
@@ -567,7 +567,7 @@ void runMSTsimple (const size_t numNodes, const VecEdge& edges,
     initWL[i].reserve ((edges.size () + numT - 1) / numT);
   }
 
-  Galois::do_all (edges.begin (), edges.end (), FillUp (initWL), "fill_init");
+  Galois::do_all (edges.begin (), edges.end (), FillUp (initWL), Galois::loopname("fill_init"));
 
   fillUpTimer.stop ();
 

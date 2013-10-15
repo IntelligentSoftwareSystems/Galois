@@ -777,7 +777,7 @@ struct AnyBFSUnordered {
 
   template<typename C, typename RO, typename WO>
   static void place_nodes(C& c, RO& read_offset, WO& write_offset) {
-    Galois::do_all(graph.begin(), graph.end(), PlaceFn<C,WO>(c, write_offset), "place");
+    Galois::do_all(graph.begin(), graph.end(), PlaceFn<C,WO>(c, write_offset), Galois::loopname("place"));
   }
 
   template<typename C>

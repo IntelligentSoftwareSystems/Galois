@@ -364,7 +364,7 @@ template<typename IncomingWL>
 void globalRelabel(IncomingWL& incoming) {
   Galois::StatTimer T1("ResetHeightsTime");
   T1.start();
-  Galois::do_all_local(app.graph, ResetHeights(), "ResetHeights");
+  Galois::do_all_local(app.graph, ResetHeights(), Galois::loopname("ResetHeights"));
   T1.stop();
 
   Galois::StatTimer T("UpdateHeightsTime");

@@ -918,14 +918,14 @@ struct BarrierNoDup {
 
 			//std::cerr << "Depth: " << ++depth << " "; 
 			//std::cerr << "Parents: " << initial[round].size() << "\n"; 
-			Galois::do_all<>(initial[round].begin(), initial[round].end(), Expand(next), "expand");
+			Galois::do_all(initial[round].begin(), initial[round].end(), Expand(next), Galois::loopname("expand"));
 			#ifdef FINE_GRAIN_TIMING
 			vTmain[1].stop();
 			vTmain[2].start();
 			#endif
 
 			//std::cerr << "Children: " << bucket.size() << "\n"; 
-			Galois::do_all<>(bucket.begin(), bucket.end(), Children(), "reduction");
+			Galois::do_all(bucket.begin(), bucket.end(), Children(), Galois::loopname("reduction"));
 /*
 			for(Galois::InsertBag<GNode>::iterator ii = bucket.begin(), ei = bucket.end(); ii != ei; ++ii){
 				SNode& cdata = graph.getData(*ii, Galois::MethodFlag::NONE);
@@ -1024,7 +1024,7 @@ struct BarrierNoDup {
 			}
 #else
 			added = graph.getData(initial[round][seglen-1], Galois::MethodFlag::NONE).numChildren;
-			Galois::do_all<>(initial[round].begin(), initial[round].end(), Swap(), "swap");
+			Galois::do_all(initial[round].begin(), initial[round].end(), Swap(), Galois::loopname("swap"));
 #endif
 
 /*
@@ -1087,10 +1087,10 @@ struct BarrierNoDup {
 			vTmain[4].start();
 			#endif
 			//Galois::for_each<WL>(initial[round].begin(), initial[round].end(), Place(next));
-			Galois::do_all<>(bucket.begin(), bucket.end(), Place(next), "placement");
+			Galois::do_all(bucket.begin(), bucket.end(), Place(next), Galois::loopname("placement"));
 			#ifndef NO_SORT
 			Galois::GReduceMax<unsigned int> maxlen;
-			Galois::do_all<>(initial[round].begin(), initial[round].end(), SortChildren(next, maxlen), "sort");
+			Galois::do_all(initial[round].begin(), initial[round].end(), SortChildren(next, maxlen), Galois::loopname("sort"));
 			//Galois::do_all<>(initial[round].begin(), initial[round].end(), IndexChildren(next, maxlen), "index");
 			//std::cout << "max sorting len: " << maxlen.get() << "\n";
 			#endif
