@@ -18,7 +18,7 @@ set(USE_VTUNE OFF CACHE BOOL "Use VTune for profiling")
 set(USE_PAPI OFF CACHE BOOL "Use PAPI counters for profiling")
 set(USE_HPCTOOLKIT OFF CACHE BOOL "Use HPCToolKit for profiling")
 set(USE_STRICT_CONFIG OFF CACHE BOOL "Instead of falling back gracefully, fail")
-set(USE_LONGJMP OFF CACHE BOOL "Use longjmp instead of exceptions to signal aborts")
+set(USE_LONGJMP ON CACHE BOOL "Use longjmp instead of exceptions to signal aborts")
 set(INSTALL_APPS OFF CACHE BOOL "Install apps as well as library")
 set(SKIP_COMPILE_APPS OFF CACHE BOOL "Skip compilation of applications using Galois library")
 
