@@ -1,8 +1,8 @@
 /**
  * Common support for worklist experiments.
  */
-#ifndef PRIORITYSCHEDULING_WORKLIST_H
-#define PRIORITYSCHEDULING_WORKLIST_H
+#ifndef GALOIS_PRIORITYSCHEDULING_WORKLIST_H
+#define GALOIS_PRIORITYSCHEDULING_WORKLIST_H
 
 #include "Galois/WorkList/WorkList.h"
 #include "Galois/WorkList/WorkListExperimental.h"
@@ -55,15 +55,13 @@ struct PriAuto {
   typedef SkipListQueue<Less> SLQ;
   typedef SetQueue<Less> SETQ;
 
-
-
   template<typename IterTy,typename FunctionTy>
   static void for_each(IterTy b, IterTy e, FunctionTy f, const char* loopname = 0) {
     static bool printed = false;
 #define WLFOO2(__x)							\
     if (WorklistName == #__x) {						\
       if (!printed) {							\
-	gInfo("WorkList %s\n", #__x);					\
+	gInfo("WorkList ", #__x, "\n");					\
 	printed = true;							\
       }									\
       Galois::for_each(b,e,f,Galois::loopname(loopname), Galois::wl<__x>()); \
@@ -73,7 +71,7 @@ struct PriAuto {
 #define WLFOO2(__x)							\
     if (WorklistName == "NI_" #__x) {					\
       if (!printed) {							\
-	gInfo("WorkList %s\n", "NI_" #__x);				\
+	gInfo("WorkList ", "NI_" #__x, "\n");				\
 	printed = true;							\
       }									\
       Galois::for_each(b,e,f,Galois::loopname(loopname), Galois::wl<NoInlineFilter<__x>>()); \
@@ -82,7 +80,7 @@ struct PriAuto {
 #undef WLFOO2
 
     {
-      GALOIS_ERROR(true, "unknown Worklist [%s]", WorklistName.c_str());
+      GALOIS_ERROR(true, "unknown worklist: ", WorklistName.c_str(), "\n");
     }
   }
   template<typename InitItemTy,typename FunctionTy>
