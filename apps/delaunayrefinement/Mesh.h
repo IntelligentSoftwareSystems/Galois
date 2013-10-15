@@ -382,7 +382,7 @@ private:
     divide(elements.begin(), elements.end());
 
     if (parallelAllocate) 
-      Galois::do_all(elements.begin(), elements.end(), create_nodes(mesh));
+      Galois::do_all(elements.begin(), elements.end(), create_nodes(mesh), Galois::loopname("allocate"));
     else
       std::for_each(elements.begin(), elements.end(), create_nodes(mesh));
 

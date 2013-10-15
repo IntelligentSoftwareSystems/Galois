@@ -76,8 +76,9 @@ typedef WorkList::dChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> defaultWL;
 template <typename T, typename S, int i = std::tuple_size<T>::value - 1>
 struct tuple_index {
   enum {
-    value = std::is_base_of<S, typename std::tuple_element<i, T>::type>::value ?
-    i : tuple_index<T, S, i-1>::value
+    value = std::is_base_of<S, typename std::tuple_element<i, T>::type>::value 
+    || std::is_same<S, typename std::tuple_element<i, T>::type>::value
+    ? i : tuple_index<T, S, i-1>::value
   };
 };
 
@@ -90,8 +91,10 @@ template<typename RangeTy, typename FunctionTy, typename Tuple>
 void for_each_gen(RangeTy r, FunctionTy fn, Tuple tpl) {
   typedef Tuple tupleType;
   static_assert(-1 == tuple_index<tupleType, char*>::value, "old loopname");
-  static_assert(-1 == tuple_index<tupleType, const char*>::value, "old loopname");
+  static_assert(-1 == tuple_index<tupleType, char const*>::value, "old loopname");
   static_assert(-1 == tuple_index<tupleType, bool>::value, "old steal");
+  // std::cout << tuple_index<tupleType, char*>::value << " "
+  //           << tuple_index<tupleType, char const*>::value << "\n";
   constexpr unsigned iloopname = tuple_index<tupleType, loopname>::value;
   constexpr unsigned iwl = tuple_index<tupleType, wl_tag>::value;
   const char* ln = std::get<iloopname>(tpl).n;
@@ -102,6 +105,11 @@ void for_each_gen(RangeTy r, FunctionTy fn, Tuple tpl) {
 template<typename RangeTy, typename FunctionTy, typename Tuple>
 FunctionTy do_all_gen(RangeTy r, FunctionTy fn, Tuple tpl) {
   typedef Tuple tupleType;
+  static_assert(-1 == tuple_index<tupleType, char*>::value, "old loopname");
+  static_assert(-1 == tuple_index<tupleType, char const*>::value, "old loopname");
+  static_assert(-1 == tuple_index<tupleType, bool>::value, "old steal");
+  // std::cout << tuple_index<tupleType, char*>::value << " "
+  //           << tuple_index<tupleType, char const*>::value << "\n";
   constexpr unsigned iloopname = tuple_index<tupleType, loopname>::value;
   constexpr unsigned isteal = tuple_index<tupleType, do_all_steal>::value;
   const char* ln = std::get<iloopname>(tpl).n;
