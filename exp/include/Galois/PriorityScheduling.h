@@ -61,7 +61,7 @@ struct PriAuto {
 #define WLFOO2(__x)							\
     if (WorklistName == #__x) {						\
       if (!printed) {							\
-	gInfo("WorkList ", #__x, "\n");					\
+	gInfo("WorkList ", #__x);					\
 	printed = true;							\
       }									\
       Galois::for_each(b,e,f,Galois::loopname(loopname), Galois::wl<__x>()); \
@@ -71,7 +71,7 @@ struct PriAuto {
 #define WLFOO2(__x)							\
     if (WorklistName == "NI_" #__x) {					\
       if (!printed) {							\
-	gInfo("WorkList ", "NI_" #__x, "\n");				\
+	gInfo("WorkList ", "NI_" #__x);					\
 	printed = true;							\
       }									\
       Galois::for_each(b,e,f,Galois::loopname(loopname), Galois::wl<NoInlineFilter<__x>>()); \
