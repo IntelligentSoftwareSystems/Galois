@@ -51,7 +51,7 @@ run apps/clustering/clustering -numPoints 10000
 run apps/delaunayrefinement/delaunayrefinement "$BASEINPUT/meshes/r5M"
 run apps/delaunaytriangulation/delaunaytriangulation "$BASEINPUT/meshes/r5M.node"
 run apps/des/DESunordered "$BASEINPUT/des/koggeStone64bit.net"
-#run apps/gmetis/gmetis -mtxinput "$BASEINPUT/fl/cage15/cage15.mtx" 256
+run apps/gmetis/gmetis "$BASEINPUT/road/USA-road-d.USA.gr" 256
 run apps/kruskal/KruskalHand -maxRounds 600 -lowThresh 16 -preAlloc 32 "$BASEINPUT/random/r4-2e24.gr"
 run apps/independentset/independentset "$BASEINPUT/random/r4-2e26.gr"
 run apps/matching/bipartite-mcm 1000000 100000000 10000 0
