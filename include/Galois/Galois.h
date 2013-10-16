@@ -99,7 +99,7 @@ void for_each_gen(RangeTy r, FunctionTy fn, Tuple tpl) {
   constexpr unsigned iwl = tuple_index<tupleType, wl_tag>::value;
   const char* ln = std::get<iloopname>(tpl).n;
   typedef typename std::tuple_element<iwl,tupleType>::type::WL WLTy;
-  Runtime::for_each_impl<WLTy>(r, fn, ln); //extract_loopname(args...));
+  Runtime::for_each_impl<WLTy>(r, fn, ln);
 }
 
 template<typename RangeTy, typename FunctionTy, typename Tuple>

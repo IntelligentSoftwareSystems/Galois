@@ -106,15 +106,18 @@ protected:
     fastPushBack = f;
   }
 
+  bool* didBreak;
+
 public:
-  UserContext()
+  UserContext(bool* broke = 0)
     :IterationAllocatorBase(), 
-     PerIterationAllocator(&IterationAllocatorBase)
+     PerIterationAllocator(&IterationAllocatorBase),
+     didBreak(0)
   { }
 
   //! Signal break in parallel loop
   void breakLoop() {
-    Galois::Runtime::breakLoop();
+    *didBreak = true;
   }
 
   //! Acquire a per-iteration allocator

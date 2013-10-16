@@ -222,7 +222,7 @@ protected:
     UserContextAccess<value_type> facing;
     SimpleRuntimeContext ctx;
     LoopStatistics<ForEachTraits<FunctionTy>::NeedsStats> stat;
-    ThreadLocalData(const FunctionTy& fn, const char* ln): function(fn), stat(ln) {}
+    ThreadLocalData(const FunctionTy& fn, const char* ln, bool* broke): function(fn), stat(ln), ctx(broke) {}
   };
 
   // NB: Place dynamically growing wl after fixed-size PerThreadStorage
@@ -270,42 +270,6 @@ protected:
 # ifndef GALOIS_USE_LONGJMP
 #  error "HTM must be used with GALOIS_USE_LONGJMP"
 # endif
-
-  inline void runFunctionWithHTMandBreak(value_type& val, ThreadLocalData& tld) {
-    int result;
-#pragma tm_atomic
-    {
-      if ((result = setjmp(hackjmp)) == 0) {
-        tld.function(val, tld.facing.data());
-      } else { clearConflictLock(); }
-      clearReleasable();
-    }
-    switch (result) {
-    case 0:
-      break;
-    case BREAK:
-      handleBreak(tld);
-      break;
-    default:
-      GALOIS_DIE("unknown conflict type");
-    }
-  }
-
-  inline void runFunction(value_type& val, ThreadLocalData& tld) {
-    int flag = 0;
-    if (ForEachTraits<FunctionTy>::NeedsBreak) {
-      runFunctionWithHTMandBreak(val, tld);
-    } else {
-#pragma tm_atomic
-      {
-        tld.function(val, tld.facing.data());
-      }
-    }
-  }
-#else
-  inline void runFunction(value_type& val, ThreadLocalData& tld) {
-    tld.function(val, tld.facing.data());
-  }
 #endif
 
   inline void doProcess(value_type& val, ThreadLocalData& tld) {
@@ -313,15 +277,20 @@ protected:
     if (ForEachTraits<FunctionTy>::NeedsAborts)
       tld.ctx.startIteration();
 
-    runFunction(val, tld);
+#ifdef GALOIS_USE_HTM
+# ifndef GALOIS_USE_LONGJMP
+#  error "HTM must be used with GALOIS_USE_LONGJMP"
+# endif
+#pragma tm_atomic
+    {
+#endif
+      tld.function(val, tld.facing.data());
+#ifdef GALOIS_USE_HTM
+    }
+#endif
+
     clearReleasable();
     commitIteration(tld);
-  }
-
-  GALOIS_ATTRIBUTE_NOINLINE
-  void handleBreak(ThreadLocalData& tld) {
-    commitIteration(tld);
-    broke = true;
   }
 
   bool runQueueSimple(ThreadLocalData& tld) {
@@ -376,9 +345,6 @@ protected:
     case CONFLICT:
       abortIteration(*p, tld);
       break;
-    case BREAK:
-      handleBreak(tld);
-      break;
     default:
       GALOIS_DIE("unknown conflict type");
     }
@@ -398,7 +364,7 @@ protected:
   template<bool couldAbort, bool isLeader>
   void go() {
     // Thread-local data goes on the local stack to be NUMA friendly
-    ThreadLocalData tld(origFunction, loopname);
+    ThreadLocalData tld(origFunction, loopname, &broke);
     if (couldAbort)
       setThreadContext(&tld.ctx);
     if (ForEachTraits<FunctionTy>::NeedsPush && !couldAbort)
