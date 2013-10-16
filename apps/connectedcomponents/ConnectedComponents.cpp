@@ -56,6 +56,7 @@ const char* url = 0;
 enum Algo {
   async,
   asyncOc,
+  blockedasync,
   graphchi,
   graphlab,
   labelProp,
@@ -85,6 +86,7 @@ static cll::opt<WriteType> writeType("output", cll::desc("Output type:"),
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
     cll::values(
       clEnumValN(Algo::async, "async", "Asynchronous (default)"),
+      clEnumValN(Algo::blockedasync, "blockedasync", "Blocked asynchronous"),
       clEnumValN(Algo::asyncOc, "asyncOc", "Asynchronous out-of-core memory"),
       clEnumValN(Algo::labelProp, "labelProp", "Using label propagation algorithm"),
       clEnumValN(Algo::serial, "serial", "Serial"),
@@ -445,6 +447,79 @@ struct AsyncAlgo {
   }
 };
 
+/**
+ * Improve performance of async algorithm by following machine topology.
+ */
+struct BlockedAsyncAlgo {
+  typedef Galois::Graph::LC_CSR_Graph<Node,void>
+    ::with_numa_alloc<true>::type
+    ::with_no_lockable<true>::type
+    Graph;
+  typedef Graph::GraphNode GNode;
+
+  struct WorkItem {
+    GNode src;
+    Graph::edge_iterator start;
+  };
+
+  void readGraph(Graph& graph) { Galois::Graph::readGraph(graph, inputFilename); }
+
+  struct Merge {
+    typedef int tt_does_not_need_aborts;
+
+    Graph& graph;
+    Galois::InsertBag<WorkItem>& items;
+
+    //! Add the next edge between components to the worklist
+    template<bool MakeContinuation, int Limit, typename Pusher>
+    void process(const GNode& src, const Graph::edge_iterator& start, Pusher& pusher) {
+      Node& sdata = graph.getData(src, Galois::MethodFlag::NONE);
+      int count = 1;
+      for (Graph::edge_iterator ii = start, ei = graph.edge_end(src, Galois::MethodFlag::NONE);
+          ii != ei; 
+          ++ii, ++count) {
+        GNode dst = graph.getEdgeDst(ii);
+        Node& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+
+        if (symmetricGraph && src >= dst)
+          continue;
+
+        if (sdata.merge(&ddata)) {
+          if (Limit == 0 || count != Limit)
+            continue;
+        }
+
+        if (MakeContinuation || (Limit != 0 && count == Limit)) {
+          WorkItem item = { src, ii + 1 };
+          pusher.push(item);
+          break;
+        }
+      }
+    }
+
+    void operator()(const GNode& src) {
+      Graph::edge_iterator start = graph.edge_begin(src, Galois::MethodFlag::NONE);
+      if (Galois::Runtime::LL::getPackageForSelf(Galois::Runtime::LL::getTID()) == 0) {
+        process<true, 0>(src, start, items);
+      } else {
+        process<true, 1>(src, start, items);
+      }
+    }
+
+    void operator()(const WorkItem& item, Galois::UserContext<WorkItem>& ctx) {
+      process<true, 0>(item.src, item.start, ctx);
+    }
+  };
+
+  void operator()(Graph& graph) {
+    Galois::InsertBag<WorkItem> items;
+    Merge merge = { graph, items };
+    Galois::do_all_local(graph, merge, Galois::loopname("Initialize"), Galois::do_all_steal(false));
+    Galois::for_each_local(items, merge,
+        Galois::loopname("Merge"), Galois::wl<Galois::WorkList::dChunkedFIFO<128> >());
+  }
+};
+
 template<typename Graph>
 struct is_bad {
   typedef typename Graph::GraphNode GNode;
@@ -699,6 +774,7 @@ int main(int argc, char** argv) {
   switch (algo) {
     case Algo::asyncOc: run<AsyncOCAlgo>(); break;
     case Algo::async: run<AsyncAlgo>(); break;
+    case Algo::blockedasync: run<BlockedAsyncAlgo>(); break;
     case Algo::labelProp: run<LabelPropAlgo>(); break;
     case Algo::serial: run<SerialAlgo>(); break;
     case Algo::synchronous: run<SynchronousAlgo>(); break;
