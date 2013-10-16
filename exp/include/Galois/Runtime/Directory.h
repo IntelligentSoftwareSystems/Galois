@@ -33,6 +33,7 @@
 #include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/ll/SimpleLock.h"
 #include "Galois/Runtime/ll/gio.h"
+#include "Galois/Runtime/FatPointer.h"
 #include "Galois/Runtime/CacheManager.h"
 
 #include <boost/utility.hpp>
@@ -49,7 +50,6 @@ namespace Runtime {
 
 SimpleRuntimeContext& getAbortCnx();
 
-typedef std::pair<uint32_t, Lockable*> fatPointer;
 struct remote_ex { fatPointer ptr; };
 
 // requests for objects go to owner first
@@ -152,7 +152,7 @@ class Directory : public SimpleRuntimeContext, private boost::noncopyable {
   template<typename T>
   friend class typeHelperImpl;
 
-  std::unordered_map<fatPointer, tracking, boost::hash<fatPointer> > tracks;
+  std::unordered_map<fatPointer, tracking, std::hash<fatPointer> > tracks;
   LL::SimpleLock<true> trackLock;
 
   tracking& getTracking(LL::SLguard& lg, fatPointer ptr) {
@@ -233,14 +233,14 @@ class Directory : public SimpleRuntimeContext, private boost::noncopyable {
 
   enum { numLocks = 1024 };
   std::array<LL::SimpleLock<true>, numLocks> objLocks;
-  boost::hash<fatPointer> lockhash;
+  std::hash<fatPointer> lockhash;
   LL::SimpleLock<true>& getLock(fatPointer ptr) {
     return objLocks[lockhash(ptr) % numLocks];
   }
 
   template<typename T>
   static void sendObject(fatPointer ptr, Lockable* obj, uint32_t dest) {
-    trace_obj_send(ptr.first, ptr.second, dest);
+    trace_obj_send(ptr.getHost(), ptr.getObj(), dest);
     SendBuffer sbuf;
     gSerialize(sbuf, ptr, *static_cast<T*>(obj));
     getSystemNetworkInterface().send(dest, recvObj<T>, sbuf);
@@ -248,7 +248,7 @@ class Directory : public SimpleRuntimeContext, private boost::noncopyable {
 
   template<typename T>
   static void sendRequest(fatPointer ptr, uint32_t dest, uint32_t reqFor) {
-    trace_req_send(ptr.first, ptr.second, dest, reqFor);
+    trace_req_send(ptr.getHost(), ptr.getObj(), dest, reqFor);
     SendBuffer sbuf;
     gSerialize(sbuf, ptr, reqFor);
     getSystemNetworkInterface().send(dest, recvRequest<T>, sbuf);
@@ -275,8 +275,8 @@ public:
       auto& ptrlock = getLock(ptr);
       if (ptrlock.try_lock()) {
         LL::SLguard lg(getLock(ptr), std::adopt_lock_t());
-        if (ptr.first == NetworkInterface::ID) {
-          processObj(lg, ptr, ptr.second);
+        if (ptr.getHost() == NetworkInterface::ID) {
+          processObj(lg, ptr, ptr.getObj());
         } else {
           remoteObj* obj = cm.weakResolve(ptr);
           if (obj)
@@ -317,10 +317,10 @@ template<typename T>
 void Galois::Runtime::Directory::recvObj(RecvBuffer& buf) {
   fatPointer ptr;
   gDeserialize(buf, ptr);
-  trace_obj_recv(ptr.first, ptr.second);
+  trace_obj_recv(ptr.getHost(), ptr.getObj());
   T* obj = nullptr;
-  if (ptr.first == NetworkInterface::ID) {
-    obj = static_cast<T*>(ptr.second);
+  if (ptr.getHost() == NetworkInterface::ID) {
+    obj = static_cast<T*>(ptr.getObj());
   } else {
     obj = static_cast<T*>(getCacheManager().resolve<T>(ptr)->getObj());
   }
@@ -338,7 +338,7 @@ void Galois::Runtime::Directory::recvRequest(RecvBuffer& buf) {
   fatPointer ptr;
   uint32_t remoteHost;
   gDeserialize(buf, ptr, remoteHost);
-  trace_req_recv(ptr.first, ptr.second, remoteHost);
+  trace_req_recv(ptr.getHost(), ptr.getObj(), remoteHost);
   getSystemDirectory().doRequest(ptr, typeHelperImpl<T>::get(), remoteHost);
 }
 
@@ -354,7 +354,7 @@ void Galois::Runtime::typeHelperImpl<T>::sendRequest(fatPointer ptr, uint32_t de
 
 template<typename T>
 Galois::Runtime::remoteObjImpl<T>* Galois::Runtime::CacheManager::resolve(fatPointer ptr) {
-  assert(ptr.first != NetworkInterface::ID);
+  assert(ptr.getHost() != NetworkInterface::ID);
   LL::SLguard lgr(Lock);
   remoteObj*& retval = remoteObjects[ptr];
   if (!retval) {

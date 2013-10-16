@@ -144,7 +144,7 @@ public:
     LL::gDebug("RAQ: waiting size ", waiting.size(), ", holding size ", holding.size(), ", queue size ", queues.size());
     if (waiting.size() < 10) {
       for (auto& k : waiting)
-        LL::gDebug("RAQ waiting on: ", k.first.first, ",", k.first.second);
+        LL::gDebug("RAQ waiting on: ", k.first.getHost(), ",", k.first.getObj());
       for (auto& k : waiting)
         getSystemDirectory().queryObj(k.first);
     }

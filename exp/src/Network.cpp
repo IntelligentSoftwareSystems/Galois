@@ -27,6 +27,7 @@
 #include "Galois/Runtime/Network.h"
 #include "Galois/Runtime/NetworkBackend.h"
 
+#include <type_traits>
 #include <cassert>
 
 using namespace Galois::Runtime;
@@ -171,3 +172,4 @@ NetworkBackend::~NetworkBackend() {
 }
 
 NetworkBackend::NetworkBackend(unsigned size) :sz(size) {}
+

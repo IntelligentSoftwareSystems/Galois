@@ -86,7 +86,7 @@ void Directory::processObj(LL::SLguard& lg, fatPointer ptr, Lockable* obj) {
     if (tr.hasRequest()) {
       uint32_t wanter = tr.getRequest();
       if (!tr.isRecalled() || wanter < tr.getRecalled()) {
-        tr.getHelper()->sendRequest(ptr, ptr.first == NetworkInterface::ID ? tr.getCurLoc() : ptr.first, wanter);
+        tr.getHelper()->sendRequest(ptr, ptr.getHost() == NetworkInterface::ID ? tr.getCurLoc() : ptr.getHost(), wanter);
         tr.setRecalled(wanter);
       }
     }
@@ -98,7 +98,7 @@ void Directory::processObj(LL::SLguard& lg, fatPointer ptr, Lockable* obj) {
     uint32_t wanter = tr.getRequest();
     //check if existential lock overwrites transfer
     if (wanter > NetworkInterface::ID && tr.isContended()) {
-      LL::gDebug("Contended Protection of [", ptr.first, ",", ptr.second, "] from ", wanter);
+      LL::gDebug("Contended Protection of [", ptr.getHost(), ",", ptr.getObj(), "] from ", wanter);
       return;
     }
     //Don't need to move object if requestor is local
@@ -116,9 +116,9 @@ void Directory::processObj(LL::SLguard& lg, fatPointer ptr, Lockable* obj) {
     case 1: { //now owner (was free and on this host)
       //compute who to send the object too
       //non-owner sends back to owner
-      uint32_t dest = ptr.first == NetworkInterface::ID ? wanter : ptr.first;
+      uint32_t dest = ptr.getHost() == NetworkInterface::ID ? wanter : ptr.getHost();
       tr.getHelper()->sendObject(ptr, obj, dest);
-      if (ptr.first == NetworkInterface::ID) {
+      if (ptr.getHost() == NetworkInterface::ID) {
         //remember who has it
         tr.setCurLoc(dest);
         //we handled this request
@@ -156,19 +156,19 @@ void Directory::dump() {
   if (fetches.size() < 10) {
     std::set<fatPointer> r = fetches.getAllRequests();
     for (auto k : r)
-      LL::gDebug("Directory pending fetch: ", k.first, ",", k.second);
+      LL::gDebug("Directory pending fetch: ", k.getHost(), ",", k.getObj());
   }
   if (remoteObjects.size() < 10) {
     for (auto& k : remoteObjects)
-      LL::gDebug("Directory remote object: ", k.first.first, ",", k.first.second);
+      LL::gDebug("Directory remote object: ", k.first.getHost(), ",", k.fist.getObj());
   }
   if (notifiers.size() < 10) {
     for (auto& k : notifiers)
-      LL::gDebug("Directory notification: ", k.first.first, ",", k.first.second);
+      LL::gDebug("Directory notification: ", k.first.getHost(), ",", k.first.getObj());
   }
   if (delayed.size() < 10) {
     for (auto k : delayed)
-      LL::gDebug("Directory delayed: ", k.first, ",", k.second);
+      LL::gDebug("Directory delayed: ", k.getHost(), ",", k.getObj());
   }
 #endif
 }
@@ -178,18 +178,18 @@ void Directory::queryObj(fatPointer ptr, bool forward) {
   tracking* tr = nullptr;
   if (hasTracking(lg, ptr))
     tr = &getExistingTracking(lg, ptr);
-  LL::gDebug("Directory query for ", ptr.first, ",", ptr.second,
-             ptr.first == NetworkInterface::ID ? " Mine" : " Other",
+  LL::gDebug("Directory query for ", ptr.getHost(), ",", ptr.getObj(),
+             ptr.getHost() == NetworkInterface::ID ? " Mine" : " Other",
              tr ? " Tracked" : " **Untracked**",
              tr && tr->isRecalled() ? " Recalled" : "",
              tr && tr->isContended() ? " Contended" : "",
              "");
 
   if (forward) {
-    if (ptr.first == NetworkInterface::ID && tr && tr->getCurLoc() != NetworkInterface::ID)
+    if (ptr.getHost() == NetworkInterface::ID && tr && tr->getCurLoc() != NetworkInterface::ID)
       getSystemNetworkInterface().sendAlt(tr->getCurLoc(), queryObjRemote, ptr, false);
-    else if (ptr.first != NetworkInterface::ID)
-      getSystemNetworkInterface().sendAlt(ptr.first, queryObjRemote, ptr, false);
+    else if (ptr.getHost() != NetworkInterface::ID)
+      getSystemNetworkInterface().sendAlt(ptr.getHost(), queryObjRemote, ptr, false);
   }
 }
 
@@ -209,3 +209,7 @@ CacheManager& Galois::Runtime::getCacheManager() {
   return obj;
 }
 
+
+//Misc error checking
+static_assert(std::is_trivially_copyable<fatPointer>::value, "fatPointer should be trivially serializable");
+static_assert(std::is_trivially_copyable<gptr<int>>::value, "RemotePointer should be trivially serializable");

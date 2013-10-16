@@ -24,7 +24,7 @@
 #ifndef GALOIS_RUNTIME_CACHEMANAGER_H
 #define GALOIS_RUNTIME_CACHEMANAGER_H
 
-#include  <boost/functional/hash.hpp>
+#include "Galois/Runtime/Context.h"
 
 namespace Galois {
 namespace Runtime {
@@ -43,11 +43,9 @@ public:
   virtual Lockable* getObj()    { return &obj; }
 };
 
-typedef std::pair<uint32_t, Lockable*> fatPointer;
-
 class CacheManager {
 
-  std::unordered_map<fatPointer, remoteObj*, boost::hash<fatPointer> > remoteObjects;
+  std::unordered_map<fatPointer, remoteObj*> remoteObjects;
   LL::SimpleLock<true> Lock;
 
 public:
@@ -56,7 +54,7 @@ public:
   remoteObjImpl<T>* resolve(fatPointer ptr);
 
   remoteObj* weakResolve(fatPointer ptr) {
-    assert(ptr.first != NetworkInterface::ID);
+    assert(ptr.getHost() != NetworkInterface::ID);
     LL::SLguard lgr(Lock);
     return remoteObjects[ptr];
   }

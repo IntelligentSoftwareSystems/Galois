@@ -40,8 +40,8 @@ T* resolve(const gptr<T>& p) {
   //   return nullptr;
 
   remoteObjImpl<T>* robj = nullptr;
-  Lockable* obj = ptr.second;
-  if (ptr.first != NetworkInterface::ID) {
+  Lockable* obj = ptr.getObj();
+  if (ptr.getHost() != NetworkInterface::ID) {
     robj = getCacheManager().resolve<T>(ptr);
     obj = robj->getObj();
   }
@@ -70,12 +70,12 @@ T* resolve(const gptr<T>& p) {
 template <typename T>
 T* transientAcquire(const gptr<T>& p) {
   fatPointer ptr = p;
-  if (!ptr.second)
+  if (!ptr.getObj())
     return nullptr;
   
   remoteObjImpl<T>* robj = nullptr;
-  Lockable* obj = ptr.second;
-  if (ptr.first != NetworkInterface::ID) {
+  Lockable* obj = ptr.getObj();
+  if (ptr.getHost() != NetworkInterface::ID) {
     robj = getCacheManager().resolve<T>(ptr);
     obj = robj->getObj();
   }
@@ -92,12 +92,12 @@ T* transientAcquire(const gptr<T>& p) {
 template <typename T>
 T* transientAcquireNonBlocking(const gptr<T>& p) {
   fatPointer ptr = p;
-  if (ptr.first == NetworkInterface::ID) {
-    if (!getTransCnx().tryAcquire(ptr.second)) {
+  if (ptr.getHost() == NetworkInterface::ID) {
+    if (!getTransCnx().tryAcquire(ptr.getObj())) {
       getSystemLocalDirectory().recall<T>(ptr);
       return NULL;
     }
-    return ptr.second;
+    return ptr.getObj();
   } else { // REMOTE
     T* rptr = getSystemRemoteDirectory().resolve<T>(ptr);
     //DATA RACE with delete
@@ -112,8 +112,8 @@ template<typename T>
 void transientRelease(const gptr<T>& p) {
   fatPointer ptr = p;
   remoteObjImpl<T>* robj = nullptr;
-  Lockable* rptr = ptr.second;
-  if (ptr.first != NetworkInterface::ID) {
+  Lockable* rptr = ptr.getObj();
+  if (ptr.getHost() != NetworkInterface::ID) {
     robj = getCacheManager().resolve<T>(ptr);
     rptr = robj->getObj();
   }

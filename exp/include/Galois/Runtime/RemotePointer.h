@@ -25,12 +25,10 @@
 
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/Serialize.h"
-#include "Galois/Runtime/Directory.h"
+//#include "Galois/Runtime/Directory.h"
 
 namespace Galois {
 namespace Runtime {
-
-typedef std::pair<uint32_t, Lockable*> fatPointer;
 
 template<typename T>
 class gptr;
@@ -70,32 +68,23 @@ public:
   bool operator!=(const gptr& rhs) const {
     return ptr != rhs.ptr;
   }
-  explicit operator bool() const { return ptr.second != 0; }
+  explicit operator bool() const { return ptr.getObj() != 0; }
 
   bool isLocal() const {
-    return ptr.first == Galois::Runtime::NetworkInterface::ID;
+    return ptr.getHost() == Galois::Runtime::NetworkInterface::ID;
   }
 
   bool sameHost(const gptr& rhs) const {
-    return ptr.first == rhs.ptr.first;
+    return ptr.getHost() == rhs.ptr.getHost();
   }
 
   void initialize(T* p) {
-    ptr.second = p;
-    ptr.first = ptr.second ? NetworkInterface::ID : 0;
-  }
-
-  //serialize
-  typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::SerializeBuffer& s) const {
-    gSerialize(s, ptr);
-  }
-  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
-    gDeserialize(s, ptr);
+    ptr.setObj(p);
+    ptr.setHost(p ? NetworkInterface::ID : 0);
   }
 
   void dump(std::ostream& os) const {
-    os << "[" << ptr.first << "," << ptr.second << "]";
+    os << "[" << ptr.getHost() << "," << ptr.getObj() << "]";
   }
 };
 

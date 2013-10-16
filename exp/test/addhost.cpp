@@ -18,14 +18,6 @@ struct R : public Galois::Runtime::Lockable {
     i += v;
     return;
   }
-
-  typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::SerializeBuffer& s) const {
-    gSerialize(s,i);
-  }
-  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
-    gDeserialize(s,i);
-  }
 };
 
 struct f1 {
@@ -37,15 +29,6 @@ struct f1 {
       r->add(data);
       return;
    }
-
-  // serialization functions
-  typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::SerializeBuffer& s) const {
-    gSerialize(s,r);
-  }
-  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
-    gDeserialize(s,r);
-  }
 };
 
 static const char *name = "addhost distributed testcase";

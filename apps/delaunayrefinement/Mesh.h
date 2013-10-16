@@ -407,6 +407,8 @@ private:
 
     Galois::for_each<Galois::WorkList::StableIterator<std::deque<Element>::iterator > > (elements.begin(), elements.end(), create_nodes(mesh), "create");
 
+    std::cout << "\nDone Create, now adding edges\n";
+
     std::map<Edge, GNode> edge_map;
     unsigned x = 0;
     for (Graph::iterator ii = mesh->begin(), ee = mesh->end(); ii != ee; ++ii) {
@@ -423,9 +425,13 @@ public:
 
   void read(Graphp mesh, std::string basename) {
     std::vector<Tuple> tuples;
+    std::cout << "\nReadNodes\n";
     readNodes(basename, tuples);
+    std::cout << "\nReadElements\n";
     readElements(basename, tuples);
+    std::cout << "\nreadPoly\n";
     readPoly(basename, tuples);
+    std::cout << "\nMakeGraph\n";
     makeGraph(mesh);
   }
 };

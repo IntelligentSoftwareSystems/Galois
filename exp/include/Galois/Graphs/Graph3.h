@@ -154,14 +154,6 @@ public:
 
   NHTy getDst() { return dst; }
 
-  typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::SerializeBuffer& s) const {
-    gSerialize(s,dst);
-  }
-  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
-    gDeserialize(s,dst);
-  }
-
   void dump(std::ostream& os) const {
     os << "<{Edge: dst: ";
     dst.dump(os);
