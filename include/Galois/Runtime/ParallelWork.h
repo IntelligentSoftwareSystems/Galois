@@ -222,7 +222,7 @@ protected:
     UserContextAccess<value_type> facing;
     SimpleRuntimeContext ctx;
     LoopStatistics<ForEachTraits<FunctionTy>::NeedsStats> stat;
-    ThreadLocalData(const FunctionTy& fn, const char* ln, bool* broke): function(fn), stat(ln), ctx(broke) {}
+    ThreadLocalData(const FunctionTy& fn, const char* ln, bool* broke): function(fn), ctx(broke), stat(ln) {}
   };
 
   // NB: Place dynamically growing wl after fixed-size PerThreadStorage
