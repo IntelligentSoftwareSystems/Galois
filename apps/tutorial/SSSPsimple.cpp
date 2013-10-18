@@ -84,7 +84,7 @@ int main(int argc, char **argv) {
   LonestarStart(argc, argv, 0,0,0);
 
   Galois::Graph::readGraph(graph, filename);
-  Galois::for_each<>(graph.begin(), graph.end(), Init());
+  Galois::for_each(graph.begin(), graph.end(), Init());
 
   using namespace Galois::WorkList;
   typedef dChunkedLIFO<16> dChunk;
