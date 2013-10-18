@@ -222,7 +222,7 @@ protected:
     UserContextAccess<value_type> facing;
     SimpleRuntimeContext ctx;
     LoopStatistics<ForEachTraits<FunctionTy>::NeedsStats> stat;
-    ThreadLocalData(const FunctionTy& fn, const char* ln, bool* broke): function(fn), ctx(broke), stat(ln) {}
+    ThreadLocalData(const FunctionTy& fn, const char* ln): function(fn), stat(ln) {}
   };
 
   // NB: Place dynamically growing wl after fixed-size PerThreadStorage
@@ -364,7 +364,8 @@ protected:
   template<bool couldAbort, bool isLeader>
   void go() {
     // Thread-local data goes on the local stack to be NUMA friendly
-    ThreadLocalData tld(origFunction, loopname, &broke);
+    ThreadLocalData tld(origFunction, loopname);
+    tld.facing.setBreakFlag(&broke);
     if (couldAbort)
       setThreadContext(&tld.ctx);
     if (ForEachTraits<FunctionTy>::NeedsPush && !couldAbort)

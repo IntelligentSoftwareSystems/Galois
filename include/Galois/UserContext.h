@@ -109,7 +109,7 @@ protected:
   bool* didBreak;
 
 public:
-  UserContext(bool* broke = 0)
+  UserContext()
     :IterationAllocatorBase(), 
      PerIterationAllocator(&IterationAllocatorBase),
      didBreak(0)

@@ -43,6 +43,7 @@ public:
   SuperTy& data() { return *static_cast<SuperTy*>(this); }
   void setLocalState(void *p, bool used) { SuperTy::__setLocalState(p, used); }
   void setFastPushBack(FastPushBack f) { SuperTy::__setFastPushBack(f); }
+  void setBreakFlag(bool *b) { SuperTy::didBreak = b; }
 
 // TODO: move to a separate class dedicated for speculative executors
 #ifdef GALOIS_USE_EXP

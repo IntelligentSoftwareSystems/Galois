@@ -96,15 +96,6 @@ Galois::Runtime::SimpleRuntimeContext* Galois::Runtime::getThreadContext() {
   return thread_ctx;
 }
 
-void Galois::Runtime::breakLoop() {
-#ifdef GALOIS_USE_LONGJMP
-  if (releasableHead) releasableHead->releaseAll();
-  longjmp(hackjmp, Galois::Runtime::BREAK);
-#else
-  throw Galois::Runtime::BREAK;
-#endif
-}
-
 void Galois::Runtime::signalConflict(Lockable* lockable) {
 #ifdef GALOIS_USE_LONGJMP
   if (releasableHead) releasableHead->releaseAll();
