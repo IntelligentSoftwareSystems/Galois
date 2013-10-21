@@ -648,7 +648,7 @@ struct CountLargest {
 
   struct Accums {
     Galois::GMapElementAccumulator<Map> map;
-    Galois::GAccumulator<size_t> trivial;
+    Galois::GAccumulator<size_t> reps;
   };
 
   Graph& graph;
@@ -658,12 +658,12 @@ struct CountLargest {
   
   void operator()(const GNode& x) {
     typename Graph::node_data_reference n = graph.getData(x, Galois::MethodFlag::NONE);
-    // Ignore trivial components
     if (n.isRep()) {
-      accums.trivial += 1;
+      accums.reps += 1;
       return;
     }
 
+    // Don't add reps to table to avoid adding components of size 1
     accums.map.update(n.component(), 1);
   }
 };
@@ -709,20 +709,20 @@ typename Graph::node_data_type::component_type findLargest(Graph& graph) {
   typename CL::Accums accums;
   Galois::do_all_local(graph, CL(graph, accums));
   typename CL::Map& map = accums.map.reduce();
-  size_t trivialComponents = accums.trivial.reduce();
+  size_t reps = accums.reps.reduce();
 
   typename RM::Accum accumMax;
   Galois::do_all(map.begin(), map.end(), RM(accumMax));
   ComponentSizePair<Graph>& largest = accumMax.reduce();
 
-  // Compensate for dropping trivial entries of components
-  double ratio = graph.size() - trivialComponents + map.size();
+  // Compensate for dropping representative node of components
+  double ratio = graph.size() - reps + map.size();
   size_t largestSize = largest.size + 1;
   if (ratio)
     ratio = largestSize / ratio;
 
-  std::cout << "Number of components: " << map.size() << " (largest: " << largestSize << " [" << ratio << "])\n";
-  std::cout << "Trivial components: " << (trivialComponents - 1) << "\n";
+  std::cout << "Number of non-trivial components: " << map.size() << " (largest: " << largestSize << " [" << ratio << "])\n";
+  std::cout << "Total components: " << reps << "\n";
 
   return largest.component;
 }
