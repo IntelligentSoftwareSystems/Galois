@@ -84,7 +84,7 @@ struct findBoundaryAndProject {
       cn.setmaybeBoundary(isBoundary(cg,n));
 
     //project part and maybe boundary
-    unsigned part = cn.getPart();
+    //unsigned part = cn.getPart();
     for (unsigned x = 0; x < cn.numChildren(); ++x) {
       fg.getData(cn.getChild(x), Galois::MethodFlag::NONE).initRefine(cn.getPart(), cn.getmaybeBoundary());
     }
@@ -430,7 +430,6 @@ void refine(MetisGraph* coarseGraph, std::vector<partInfo>& parts, unsigned minS
     while ((tGraph = tGraph->getFinerGraph())) nbIter*=2;
     nbIter /=4;
   }
-  MetisGraph* oldGraph = NULL;
   do {
     MetisGraph* fineGraph = coarseGraph->getFinerGraph();
     bool doProject = true;
@@ -451,12 +450,13 @@ void refine(MetisGraph* coarseGraph, std::vector<partInfo>& parts, unsigned minS
     if (fineGraph && doProject) {
       projectPart::go(coarseGraph, parts);
     }
-    oldGraph = coarseGraph;
   } while ((coarseGraph = coarseGraph->getFinerGraph()));
 }
 
-/*void balance(MetisGraph* coarseGraph, std::vector<partInfo>& parts, unsigned meanSize) {
+/*
+void balance(MetisGraph* coarseGraph, std::vector<partInfo>& parts, unsigned meanSize) {
     MetisGraph* fineGraph = coarseGraph->getFinerGraph();
     refine_BKL2<true>::go(meanSize, *coarseGraph->getGraph(), fineGraph ? fineGraph->getGraph() : nullptr, parts);
-}*/
+}
+*/
 

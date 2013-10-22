@@ -424,7 +424,7 @@ void run() {
 
   Algo algo;
   Graph graph;
-  GNode source, report;
+  GNode source;
 
   initialize(algo, graph, source);
 
