@@ -195,12 +195,15 @@ std::vector<partInfo> partition(MetisGraph* mcg, unsigned numPartitions, Initial
       break;
     default: abort();
   }
-    printPartStats(parts);
+  printPartStats(parts);
+#if 0
   if (!multiSeed) {
     printPartStats(parts);
     unsigned maxWeight = 1.01 * mcg->getTotalWeight() / numPartitions;
     balance(mcg, parts, maxWeight);
   }
+#endif
+  static_assert(multiSeed, "not yet implemented");
 
   return parts;
 }
@@ -323,6 +326,3 @@ std::vector<partInfo> BisectAll(MetisGraph* mcg, unsigned numPartitions, unsigne
 
   return bestPartInfos;
 }
-
-
-
