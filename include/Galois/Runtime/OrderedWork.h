@@ -26,7 +26,7 @@
 #define GALOIS_RUNTIME_ORDERED_WORK_H
 
 #include "Galois/Runtime/DeterministicWork.h"
-#include "Galois/Runtime/LCordered.h"
+//#include "Galois/Runtime/LCordered.h"
 
 namespace Galois {
 namespace Runtime {
