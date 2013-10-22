@@ -273,7 +273,7 @@ void printPointsToInfo(PointsToInfo &result) {
 	for (PointsToInfo::iterator ii = result.begin(); ii != result.end(); ++ii) {
 		std::cout << prefix << ii - result.begin() << ": ";
 		unsigned repr = ocd.getFinalRepresentative(ii - result.begin());
-		result[repr].print(prefix);
+		result[repr].print(std::cout, prefix);
 	}
 }
 void processLoadStoreSerial(PointsToConstraints &constraints, WorkList &worklist, Galois::MethodFlag flag = Galois::MethodFlag::NONE) {

@@ -33,7 +33,6 @@
 #include <set>
 #include <limits>
 #include <iterator>
-#include <iostream>
 
 #include <cstdio>
 
@@ -159,11 +158,11 @@ public:
 
   typename Super_ty::reference operator*() { return getWL(); }
 
-  const typename Super_ty::reference operator*() const { return getWL(); }
+  typename Super_ty::reference operator*() const { return getWL(); }
 
   typename Super_ty::pointer operator->() { return &(getWL()); }
 
-  const typename Super_ty::value_type* operator->() const { return &(getWL()); }
+  typename Super_ty::value_type* operator->() const { return &(getWL()); }
 
   OuterPerThreadWLIter& operator++() {
     ++row;

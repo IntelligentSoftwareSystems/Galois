@@ -28,6 +28,8 @@
 #include "Galois/Accumulator.h"
 #include "Galois/Runtime/PerThreadStorage.h"
 
+#include <iostream>
+
 namespace {
 
 void assertAllMatched(GNode node, GGraph* graph) {
