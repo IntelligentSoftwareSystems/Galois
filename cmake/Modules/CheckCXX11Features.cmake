@@ -23,7 +23,7 @@ set(CheckChrono
 "
 #include <chrono>
 int main(){
-  std::chrono::steady_clock Clock;
+  typedef  std::chrono::steady_clock Clock;
   std::chrono::time_point<Clock> start, stop;
   start = Clock::now();
   stop = Clock::now();
