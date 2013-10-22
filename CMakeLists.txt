@@ -57,6 +57,9 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
     message(FATAL_ERROR "ICC must be 13.0 or higher found: ${ICC_VERSION}")
   endif()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -wd68 -wd981 -wd383 -wd869 -wd2196 -wd279 -wd2504 -wd2943")
+  #iss hack
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -gxx-name=/net/faraday/workspace/local/modules/gcc-4.7/bin/g++")
+
 endif()
 
 # XL
@@ -77,7 +80,7 @@ endif()
 # clang 
 if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   #iss hack
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -isystem=/net/faraday/workspace/local/modules/gcc-4.7")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -isystem=/net/faraday/workspace/local/modules/gcc-4.8")
 endif()
 
 # check for incompatible GCC
@@ -195,6 +198,9 @@ include_directories(${Boost_INCLUDE_DIR})
 
 # C++11 features
 find_package(CXX11)
+if (${CXX11_FLAGS} STREQUAL "")
+   message( FATAL_ERROR "Needs C++11")
+endif()
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CXX11_FLAGS}")
 
 include(CheckEndian)
