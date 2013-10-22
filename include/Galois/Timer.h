@@ -25,17 +25,13 @@
 
 #include "Galois/config.h"
 
-#ifndef GALOIS_USE_CXX11_COMPAT
-#define GALOIS_USE_STD_TIMER
-#endif
-
-#ifdef GALOIS_USE_STD_TIMER
+#ifdef HAVE_CXX11_CHRONO
 #include <chrono>
 #endif
 
 namespace Galois {
 
-#ifdef GALOIS_USE_STD_TIMER
+#ifdef HAVE_CXX11_CHRONO
 class Timer {
   typedef std::chrono::steady_clock clockTy;
   //typedef std::chrono::high_resolution_clock clockTy;

@@ -105,19 +105,25 @@ class StatTimer : public TimeAccumulator {
   bool main;
   bool valid;
 
-  StatTimer(const char* n, const char* l, bool m, bool s)
-    :name(n), loopname(l), main(m), valid(false) 
-  { if (s) start(); }
+protected:
+  void init(const char* n, const char* l, bool m, bool s) {
+    name = n;
+    loopname = l;
+    main = m;
+    valid = false;
+    if (s)
+      start();
+  }
 
 public:
-  StatTimer(const char* n) :StatTimer(n,0,false,false) {}
-  StatTimer(const char* n, start_now_t t) :StatTimer(n,0,false,true) {}
+  StatTimer(const char* n) { init(n, 0, false, false); }
+  StatTimer(const char* n, start_now_t t) { init(n, 0, false, true); }
 
-  StatTimer(const char* n, const char* l) :StatTimer(n,l,false,false) {}
-  StatTimer(const char* n, const char* l, start_now_t t) :StatTimer(n,l,false,true) {}
+  StatTimer(const char* n, const char* l) { init(n, l, false, false); }
+  StatTimer(const char* n, const char* l, start_now_t t) { init(n, l, false, true); }
 
-  StatTimer() :StatTimer("Time", 0, true, false) {}
-  StatTimer(start_now_t t) :StatTimer("Time", 0, true, true) {}
+  StatTimer() { init("Time", 0, true, false); }
+  StatTimer(start_now_t t) { init("Time", 0, true, true); }
 
   ~StatTimer() {
     if (valid)

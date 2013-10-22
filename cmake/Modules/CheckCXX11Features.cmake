@@ -19,8 +19,25 @@ int main(){
 }
 ")
 
+set(CheckChrono
+"
+#include <chrono>
+int main(){
+  std::chrono::steady_clock Clock;
+  std::chrono::time_point<Clock> start, stop;
+  start = Clock::now();
+  stop = Clock::now();
+  unsigned long res = 
+     std::chrono::duration_cast<std::chrono::milliseconds>(stop-start).count();
+  return res < 1000 ? 0 : 1;
+}
+")
+
+
 set(CMAKE_REQUIRED_FLAGS ${CXX11_FLAGS})
 CHECK_CXX_SOURCE_COMPILES("${CheckUniformIntDistribution}"
   HAVE_CXX11_UNIFORM_INT_DISTRIBUTION)
 CHECK_CXX_SOURCE_COMPILES("${CheckUniformRealDistribution}"
   HAVE_CXX11_UNIFORM_REAL_DISTRIBUTION)
+CHECK_CXX_SOURCE_COMPILES("${CheckChrono}"
+  HAVE_CXX11_CHRONO)
