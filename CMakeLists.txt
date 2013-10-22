@@ -77,12 +77,6 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "XL")
   #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -qsuppress=1540-0724 -qmaxmem=-1")
 endif()
 
-# clang 
-if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  #iss hack
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -isystem=/net/faraday/workspace/local/modules/gcc-4.8")
-endif()
-
 # check for incompatible GCC
 if(CMAKE_COMPILER_IS_GNUCC)
   execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion
