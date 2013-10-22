@@ -1,4 +1,6 @@
 include(CheckCXXSourceCompiles)
+include(CMakePushCheckState)
+
 set(CheckUniformIntDistribution
 "
 #include <random>
@@ -33,6 +35,7 @@ int main(){
 }
 ")
 
+cmake_push_check_state()
 
 set(CMAKE_REQUIRED_FLAGS ${CXX11_FLAGS})
 CHECK_CXX_SOURCE_COMPILES("${CheckUniformIntDistribution}"
@@ -41,3 +44,5 @@ CHECK_CXX_SOURCE_COMPILES("${CheckUniformRealDistribution}"
   HAVE_CXX11_UNIFORM_REAL_DISTRIBUTION)
 CHECK_CXX_SOURCE_COMPILES("${CheckChrono}"
   HAVE_CXX11_CHRONO)
+
+cmake_pop_check_state()
