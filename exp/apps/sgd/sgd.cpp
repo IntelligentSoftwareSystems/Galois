@@ -24,24 +24,21 @@
 #include <cmath>
 
 #include "Galois/Galois.h"
-#include "Galois/Graphs/Graph.h"
-#include "Galois/Graphs/LCGraph.h"
+#include "Galois/Graph/Graph.h"
+#include "Galois/Graph/LCGraph.h"
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
 
-//forward declare Node - required for the typedef of Graph
-struct Node;
+typedef struct Node
+{
+  double* latent_vector; //latent vector to be learned
+  unsigned int updates; //number of updates made to this node (only used by movie nodes)
+  unsigned int edge_offset; //if a movie's update is interrupted, where to start when resuming
+} Node;
 
 //local computation graph (can't add nodes/edges at runtime)
 //node data is Node, edge data is unsigned int
 typedef Galois::Graph::LC_CSR_Graph<Node, unsigned int> Graph;
-
-typedef struct Node
-{
-	double* latent_vector; //latent vector to be learned
-	unsigned int updates; //number of updates made to this node (only used by movie nodes)
-	Graph::edge_iterator edge_it; //if a movie's update is interrupted, where to start when resuming
-} Node;
 
 unsigned int LATENT_VECTOR_SIZE = 100;
 double LEARNING_RATE = 0.01;
@@ -62,12 +59,13 @@ struct sgd
 		double* movie_latent = movie_data.latent_vector;
 		double step_size = LEARNING_RATE * 1.5 / (1.0 + DECAY_RATE * pow(movie_data.updates + 1, 1.5));
 		
-		Graph::GraphNode user = g.getEdgeDst(movie_data.edge_it);
+                Graph::edge_iterator edge_it = g.edge_begin(movie, Galois::NONE) + movie_data.edge_offset;
+		Graph::GraphNode user = g.getEdgeDst(edge_it);
 		//abort operation if conflict detected (Galois::ALL)
 		Node& user_data = g.getData(user, Galois::ALL);
 		double* user_latent = user_data.latent_vector;
 		//abort operation if conflict detected (Galois::ALL)
-		unsigned int edge_rating = g.getEdgeData(movie_data.edge_it, Galois::ALL);	
+		unsigned int edge_rating = g.getEdgeData(edge_it, Galois::ALL);	
 
 		//calculate error
 		double cur_error = - edge_rating;
@@ -85,13 +83,13 @@ struct sgd
 			user_latent[i] -= step_size * (cur_error * prev_movie_val + LAMBDA * user_latent[i]);
 		}
 		
-		++movie_data.edge_it;
+		++edge_it;
 		
 		//we just looked at the last user
-		if(movie_data.edge_it == g.edge_end(movie, Galois::NONE))
+		if(edge_it == g.edge_end(movie, Galois::NONE))
 		{
 			//start back at the first edge
-			movie_data.edge_it = g.edge_begin(movie, Galois::NONE);
+                  movie_data.edge_offset = 0;
 
 			//push movie node onto worklist if it's not updated enough
 			movie_data.updates++;
@@ -136,7 +134,7 @@ unsigned int initializeGraphData(Graph& g)
 		if(num_edges > 0)
 			num_movie_nodes++;
 		
-		data.edge_it = g.edge_begin(gnode, Galois::NONE);
+		data.edge_offset = 0;
 	}
 
 	return num_movie_nodes;
@@ -173,8 +171,8 @@ int main(int argc, char** argv)
 	g_ptr = &g;
 
 	//read structure of graph & edge weights; nodes not initialized
-	g.structureFromFile(inputFile);
-	
+        Galois::Graph::readGraph(g, inputFile);
+
 	//fill each node's id & initialize the latent vectors
 	unsigned int num_movie_nodes = initializeGraphData(g);
 	
@@ -191,10 +189,9 @@ int main(int argc, char** argv)
 	//the projCount functor provides the priority function on each node
 	Graph::iterator ii = g.begin();
 	std::advance(ii,(g.size() - num_movie_nodes)); //advance moves passed in iterator
-	Galois::for_each
-		<GaloisRuntime::WorkList::OrderedByIntegerMetric
-		<projCount, GaloisRuntime::WorkList::dChunkedLIFO<32>>>
-		(ii, g.end(), sgd(g));
+	Galois::for_each(ii, g.end(), sgd(g),
+                         Galois::wl<Galois::WorkList::OrderedByIntegerMetric
+                         <projCount, Galois::WorkList::dChunkedLIFO<32>>>());
 
 	timer.stop();
 
