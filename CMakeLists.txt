@@ -47,6 +47,7 @@ enable_testing()
 
 ###### Configure compiler ######
 
+
 # ICC
 if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
   execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion
@@ -57,8 +58,13 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
     message(FATAL_ERROR "ICC must be 13.0 or higher found: ${ICC_VERSION}")
   endif()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -wd68 -wd981 -wd383 -wd869 -wd2196 -wd279 -wd2504 -wd2943 -wd32013")
+
   #iss hack
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -gxx-name=/net/faraday/workspace/local/modules/gcc-4.7/bin/g++")
+  if("$ENV{GCC_BIN}" STREQUAL "") 
+    message (WARNING "Set environment variable GCC_BIN to directory containing g++, to help ICC")
+  else ()
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -gxx-name=$ENV{GCC_BIN}/g++")
+  endif ()
 
 endif()
 
