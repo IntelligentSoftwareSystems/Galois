@@ -84,7 +84,7 @@ struct sgd
 		}
 		
 		++edge_it;
-		
+		movie_data.edge_offset++;
 		//we just looked at the last user
 		if(edge_it == g.edge_end(movie, Galois::NONE))
 		{
