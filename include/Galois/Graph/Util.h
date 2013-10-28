@@ -26,7 +26,7 @@
 #define GALOIS_GRAPH_UTIL_H
 
 #include "Galois/Galois.h"
-#include "Galois/Graph/LCGraph.h"
+#include "Galois/Graph/Details.h"
 
 namespace Galois {
 namespace Graph {
@@ -50,32 +50,34 @@ void readGraphDispatch(GraphTy& graph, read_default_graph_tag tag, const std::st
 }
 
 template<typename GraphTy>
-struct ReadGraphDispatchHelper1 {
+struct ReadGraphConstructFrom {
   GraphTy& graph;
   FileGraph& f;
-  ReadGraphDispatchHelper1(GraphTy& g, FileGraph& _f): graph(g), f(_f) { }
+  ReadGraphConstructFrom(GraphTy& g, FileGraph& _f): graph(g), f(_f) { }
   void operator()(unsigned tid, unsigned total) {
     graph.constructFrom(f, tid, total);
   }
 };
 
-template<typename GraphTy>
-struct ReadGraphDispatchHelper2 {
+template<typename GraphTy, typename Aux>
+struct ReadGraphConstructNodesFrom {
   GraphTy& graph;
   FileGraph& f;
-  ReadGraphDispatchHelper2(GraphTy& g, FileGraph& _f): graph(g), f(_f) { }
+  Aux& aux;
+  ReadGraphConstructNodesFrom(GraphTy& g, FileGraph& _f, Aux& a): graph(g), f(_f), aux(a) { }
   void operator()(unsigned tid, unsigned total) {
-    graph.constructNodesFrom(f, tid, total);
+    graph.constructNodesFrom(f, tid, total, aux);
   }
 };
 
-template<typename GraphTy>
-struct ReadGraphDispatchHelper3 {
+template<typename GraphTy, typename Aux>
+struct ReadGraphConstructEdgesFrom {
   GraphTy& graph;
   FileGraph& f;
-  ReadGraphDispatchHelper3(GraphTy& g, FileGraph& _f): graph(g), f(_f) { }
+  Aux& aux;
+  ReadGraphConstructEdgesFrom(GraphTy& g, FileGraph& _f, Aux& a): graph(g), f(_f), aux(a) { }
   void operator()(unsigned tid, unsigned total) {
-    graph.constructEdgesFrom(f, tid, total);
+    graph.constructEdgesFrom(f, tid, total, aux);
   }
 };
 
@@ -84,23 +86,25 @@ template<typename GraphTy>
 void readGraphDispatch(GraphTy& graph, read_default_graph_tag, FileGraph& f) {
   graph.allocateFrom(f);
 
-  Galois::on_each(ReadGraphDispatchHelper1<GraphTy>(graph, f));
+  Galois::on_each(ReadGraphConstructFrom<GraphTy>(graph, f));
 }
 
 template<typename GraphTy>
-void readGraphDispatch(GraphTy& graph, read_lc_linear_graph_tag tag, const std::string& filename) {
+void readGraphDispatch(GraphTy& graph, read_with_aux_graph_tag tag, const std::string& filename) {
   FileGraph f;
   f.structureFromFileInterleaved<typename GraphTy::edge_data_type>(filename);
   readGraphDispatch(graph, tag, f);
 }
 
 template<typename GraphTy>
-void readGraphDispatch(GraphTy& graph, read_lc_linear_graph_tag, FileGraph& f) {
-  graph.allocateFrom(f);
+void readGraphDispatch(GraphTy& graph, read_with_aux_graph_tag, FileGraph& f) {
+  typedef typename GraphTy::ReadGraphAuxData Aux;
 
-  Galois::on_each(ReadGraphDispatchHelper2<GraphTy>(graph, f));
+  Aux aux;
+  graph.allocateFrom(f, aux);
 
-  Galois::on_each(ReadGraphDispatchHelper3<GraphTy>(graph, f));
+  Galois::on_each(ReadGraphConstructNodesFrom<GraphTy, Aux>(graph, f, aux));
+  Galois::on_each(ReadGraphConstructEdgesFrom<GraphTy, Aux>(graph, f, aux));
 }
 
 template<typename GraphTy>

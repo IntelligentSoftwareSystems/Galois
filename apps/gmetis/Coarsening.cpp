@@ -25,6 +25,7 @@
 
 
 #include "Metis.h"
+#include "Galois/Galois.h"
 #include "Galois/Accumulator.h"
 #include "Galois/Runtime/PerThreadStorage.h"
 
@@ -51,7 +52,7 @@ struct HEMmatch {
     for (auto jj = graph->edge_begin(node, Galois::MethodFlag::NONE), eejj = graph->edge_end(node);
          jj != eejj; ++jj) {
       //      ++checked;
-      GNode neighbor = graph->getEdgeDst(jj, Galois::MethodFlag::NONE);
+      GNode neighbor = graph->getEdgeDst(jj);
       MetisNode& neighMNode = graph->getData(neighbor, Galois::MethodFlag::NONE);
       int edgeData = graph->getEdgeData(jj, Galois::MethodFlag::NONE);
       if (!neighMNode.isMatched() && neighbor != node && maxwgt < edgeData) {
@@ -71,7 +72,7 @@ struct RMmatch {
   GNode operator()(GNode node, GGraph* graph) {
     for (auto jj = graph->edge_begin(node, Galois::MethodFlag::NONE), eejj = graph->edge_end(node);
          jj != eejj; ++jj) {
-      GNode neighbor = graph->getEdgeDst(jj, Galois::MethodFlag::NONE);
+      GNode neighbor = graph->getEdgeDst(jj);
       if (!graph->getData(neighbor, Galois::MethodFlag::NONE).isMatched() && neighbor != node)
         return neighbor;
     }
@@ -90,7 +91,7 @@ struct TwoHopMatcher {
     std::pair<GNode, int> retval(node, std::numeric_limits<int>::min());
     for (auto jj = graph->edge_begin(node, Galois::MethodFlag::NONE), eejj = graph->edge_end(node);
          jj != eejj; ++jj) {
-      GNode neighbor = graph->getEdgeDst(jj, Galois::MethodFlag::NONE);
+      GNode neighbor = graph->getEdgeDst(jj);
       std::pair<GNode, int> tval = matcher(neighbor, graph, true);
       if (tval.first != node && tval.first != neighbor && tval.second > retval.second)
         retval = tval;
@@ -208,7 +209,7 @@ struct parallelPopulateEdges {
 
     for (unsigned x = 0; x < nodeData.numChildren(); ++x)
       for (auto ii = fineGGraph->edge_begin(nodeData.getChild(x), Galois::MethodFlag::NONE), ee = fineGGraph->edge_end(nodeData.getChild(x)); ii != ee; ++ii) {
-        GNode dst = fineGGraph->getEdgeDst(ii, Galois::MethodFlag::NONE);
+        GNode dst = fineGGraph->getEdgeDst(ii);
         GNode p = fineGGraph->getData(dst, Galois::MethodFlag::NONE).getParent();
         edges.emplace_back(p, fineGGraph->getEdgeData(ii, Galois::MethodFlag::NONE));
       }

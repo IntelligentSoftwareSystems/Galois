@@ -38,6 +38,7 @@
 #include <iostream>
 #include <array>
 #include <deque>
+#include <list>
 #include <strings.h>
 
 const char* name = "Barnshut N-Body Simulator";

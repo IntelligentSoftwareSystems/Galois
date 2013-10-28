@@ -34,8 +34,6 @@
 namespace Galois {
 namespace Graph {
 
-struct read_lc_inout_graph_tag { };
-
 /**
  * Modify a LC_Graph to have in and out edges. In edges are stored by value, so
  * modifying them does not modify the corresponding out edge.

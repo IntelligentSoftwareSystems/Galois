@@ -86,6 +86,8 @@ protected:
   class NodeInfo;
   typedef detail::EdgeInfoBase<typename boost::mpl::if_c<HasCompressedNodePtr,uint32_t,NodeInfo*>::type,EdgeTy> EdgeInfo;
   typedef LargeArray<EdgeInfo> EdgeData;
+  typedef LargeArray<NodeInfo> NodeData;
+  typedef detail::NodeInfoBaseTypes<NodeTy,!HasNoLockable && !HasOutOfLineLockable> NodeInfoTypes;
 
   class NodeInfo: public detail::NodeInfoBase<NodeTy,!HasNoLockable && !HasOutOfLineLockable> {
     EdgeInfo* m_edgeBegin;
@@ -95,14 +97,12 @@ protected:
     EdgeInfo*& edgeEnd() { return m_edgeEnd; }
   };
 
-  typedef LargeArray<NodeInfo> NodeData;
-
 public:
   typedef NodeInfo* GraphNode;
   typedef EdgeTy edge_data_type;
   typedef NodeTy node_data_type;
   typedef typename EdgeInfo::reference edge_data_reference;
-  typedef typename NodeInfo::reference node_data_reference;
+  typedef typename NodeInfoTypes::reference node_data_reference;
   typedef EdgeInfo* edge_iterator;
   typedef Galois::NoDerefIterator<NodeInfo*> iterator;
   typedef Galois::NoDerefIterator<const NodeInfo*> const_iterator;

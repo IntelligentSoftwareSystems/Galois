@@ -22,9 +22,10 @@
  * @author Nikunj Yadav <nikunj@cs.utexas.edu>
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
+#include "Galois/Galois.h"
+#include "Galois/Accumulator.h"
 #include "Galois/Statistic.h"
 #include "Metis.h"
-#include "Galois/Accumulator.h"
 #include <set>
 #include <iostream>
 
@@ -38,7 +39,7 @@ struct gainIndexer : public std::unary_function<GNode, int> {
     Galois::MethodFlag flag = Galois::NONE;
     unsigned int nPart = g->getData(n, flag).getPart();
     for (auto ii = g->edge_begin(n, flag), ee = g->edge_end(n); ii != ee; ++ii) {
-      GNode neigh = g->getEdgeDst(ii, flag);
+      GNode neigh = g->getEdgeDst(ii);
       if (g->getData(neigh, flag).getPart() == nPart)
         retval -= g->getEdgeData(ii, flag);
       else
@@ -323,7 +324,7 @@ struct ChangePart {//move each node to its nearest cluster
     std::map <int, int> degreein;
     degreein[g.getData(n, Galois::MethodFlag::NONE).getOldPart()] +=1;
     for (GGraph::edge_iterator ii = g.edge_begin(n, Galois::MethodFlag::NONE), ei = g.edge_end(n, Galois::MethodFlag::NONE); ii != ei; ++ii){
-      int nclust = g.getData(g.getEdgeDst(ii, Galois::MethodFlag::NONE), Galois::MethodFlag::NONE).getOldPart();
+      int nclust = g.getData(g.getEdgeDst(ii), Galois::MethodFlag::NONE).getOldPart();
       degreein[nclust] += (int) g.getEdgeData(ii, Galois::MethodFlag::NONE);
     }
 
@@ -365,7 +366,7 @@ struct ComputeClusterDist {
 
     g.getData(n, Galois::MethodFlag::NONE).OldPartCpyNew();
     for (GGraph::edge_iterator ii = g.edge_begin(n, Galois::MethodFlag::NONE), ei = g.edge_end(n, Galois::MethodFlag::NONE); ii != ei; ++ii)
-      if( g.getData(g.getEdgeDst(ii, Galois::MethodFlag::NONE), Galois::MethodFlag::NONE).getPart() == clust)
+      if (g.getData(g.getEdgeDst(ii), Galois::MethodFlag::NONE).getPart() == clust)
         degreet+=(int) g.getEdgeData(ii, Galois::MethodFlag::NONE);
     card[clust]+=g.getData(n, Galois::MethodFlag::NONE).getWeight();
     degreeIn[clust] += degreet;

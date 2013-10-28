@@ -173,4 +173,3 @@ struct LazyObject<void> {
 
 }
 #endif
-

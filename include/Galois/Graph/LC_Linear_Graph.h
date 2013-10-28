@@ -38,8 +38,6 @@
 namespace Galois {
 namespace Graph {
 
-struct read_lc_linear_graph_tag { };
-
 /**
  * Local computation graph (i.e., graph structure does not change). The data
  * representation is a modification of {@link LC_CSR_Graph} where the edge data
@@ -75,14 +73,15 @@ public:
   template<bool _has_out_of_line_lockable>
   struct with_out_of_line_lockable { typedef LC_Linear_Graph<NodeTy,EdgeTy,HasNoLockable,UseNumaAlloc,_has_out_of_line_lockable,_has_out_of_line_lockable||HasId> type; };
 
-  typedef read_lc_linear_graph_tag read_tag;
+  typedef read_with_aux_graph_tag read_tag;
 
 protected:
   class NodeInfo;
   typedef detail::EdgeInfoBase<NodeInfo*,EdgeTy> EdgeInfo;
   typedef LargeArray<NodeInfo*> Nodes;
+  typedef detail::NodeInfoBaseTypes<NodeTy,!HasNoLockable && !HasOutOfLineLockable> NodeInfoTypes;
 
-  class NodeInfo :
+  class NodeInfo:
       public detail::NodeInfoBase<NodeTy,!HasNoLockable && !HasOutOfLineLockable>,
       public detail::IntrusiveId<typename boost::mpl::if_c<HasId,uint32_t,void>::type> {
     friend class LC_Linear_Graph;
@@ -113,13 +112,14 @@ public:
   typedef NodeInfo* GraphNode;
   typedef EdgeTy edge_data_type;
   typedef NodeTy node_data_type;
-  typedef typename NodeInfo::reference node_data_reference;
+  typedef typename NodeInfoTypes::reference node_data_reference;
   typedef typename EdgeInfo::reference edge_data_reference;
   typedef EdgeInfo* edge_iterator;
   typedef NodeInfo** iterator;
   typedef NodeInfo*const * const_iterator;
   typedef iterator local_iterator;
   typedef const_iterator const_local_iterator;
+  typedef int ReadGraphAuxData;
 
 protected:
   LargeArray<char> data;
@@ -239,7 +239,7 @@ public:
     std::sort(N->edgeBegin(), N->edgeEnd(), comp);
   }
 
-  void allocateFrom(FileGraph& graph) {
+  void allocateFrom(FileGraph& graph, const ReadGraphAuxData&) {
     numNodes = graph.size();
     numEdges = graph.sizeEdges();
     if (UseNumaAlloc) {
@@ -253,7 +253,7 @@ public:
     }
   }
 
-  void constructNodesFrom(FileGraph& graph, unsigned tid, unsigned total) {
+  void constructNodesFrom(FileGraph& graph, unsigned tid, unsigned total, const ReadGraphAuxData&) {
     auto r = graph.divideBy(
         Nodes::sizeof_value + 2 * sizeof(NodeInfo) + LC_Linear_Graph::sizeof_out_of_line_value,
         sizeof(EdgeInfo),
@@ -277,7 +277,7 @@ public:
     }
   }
 
-  void constructEdgesFrom(FileGraph& graph, unsigned tid, unsigned total) {
+  void constructEdgesFrom(FileGraph& graph, unsigned tid, unsigned total, const ReadGraphAuxData&) {
     typedef typename EdgeInfo::value_type EDV;
     auto r = graph.divideBy(
         Nodes::sizeof_value + 2 * sizeof(NodeInfo) + LC_Linear_Graph::sizeof_out_of_line_value,

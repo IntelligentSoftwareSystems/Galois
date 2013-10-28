@@ -121,6 +121,7 @@ public:
 protected:
   typedef LargeArray<EdgeTy> EdgeData;
   typedef LargeArray<uint32_t> EdgeDst;
+  typedef detail::NodeInfoBaseTypes<NodeTy,!HasNoLockable && !HasOutOfLineLockable> NodeInfoTypes;
   typedef detail::NodeInfoBase<NodeTy,!HasNoLockable && !HasOutOfLineLockable> NodeInfo;
   typedef LargeArray<uint64_t> EdgeIndData;
   typedef LargeArray<NodeInfo> NodeData;
@@ -130,7 +131,7 @@ public:
   typedef EdgeTy edge_data_type;
   typedef NodeTy node_data_type;
   typedef typename EdgeData::reference edge_data_reference;
-  typedef typename NodeInfo::reference node_data_reference;
+  typedef typename NodeInfoTypes::reference node_data_reference;
   typedef boost::counting_iterator<typename EdgeIndData::value_type> edge_iterator;
   typedef boost::counting_iterator<typename EdgeDst::value_type> iterator;
   typedef iterator const_iterator;

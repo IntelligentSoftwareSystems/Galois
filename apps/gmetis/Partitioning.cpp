@@ -23,8 +23,10 @@
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
 
-#include "Metis.h"
+#include "Galois/Galois.h"
 #include "Galois/Statistic.h"
+#include "Metis.h"
+#include <set>
 #include <cstdlib>
 #include <iostream>
 
@@ -37,7 +39,7 @@ int gain_limited(GGraph& g, GNode n, unsigned newpart, Galois::MethodFlag flag) 
   int retval = 0;
   unsigned nPart = g.getData(n,flag).getPart();
   for (auto ii = g.edge_begin(n,flag), ee =g.edge_end(n,flag); ii != ee; ++ii) {
-    GNode neigh = g.getEdgeDst(ii,flag);
+    GNode neigh = g.getEdgeDst(ii);
     if (g.getData(neigh,flag).getPart() == nPart)
       retval -= g.getEdgeData(ii,flag);
     else if (g.getData(neigh,flag).getPart() == newpart)
@@ -85,8 +87,8 @@ struct bisect_GGP {
         newWeight += g.getData(n, flag).getWeight();
         g.getData(n, flag).setPart(newPart.partNum);
         for (auto ii = g.edge_begin(n, flag), ee = g.edge_end(n, flag); ii != ee; ++ii)
-          if (g.getData(g.getEdgeDst(ii, flag), flag).getPart() == oldPart.partNum)
-            boundary.push_back(g.getEdgeDst(ii, flag));
+          if (g.getData(g.getEdgeDst(ii), flag).getPart() == oldPart.partNum)
+            boundary.push_back(g.getEdgeDst(ii));
       }
     } while (newWeight < targetWeight && multiSeed);
 
@@ -123,7 +125,7 @@ struct bisect_GGGP {
         newWeight += g.getData(n, flag).getWeight();
         g.getData(n, flag).setPart(newPart.partNum);
         for (auto ii = g.edge_begin(n, flag), ee = g.edge_end(n, flag); ii != ee; ++ii) {
-          GNode dst = g.getEdgeDst(ii, flag);
+          GNode dst = g.getEdgeDst(ii);
           auto gi = gains.find(dst);
           if (gi != gains.end()) { //update
             boundary[gi->second].erase(dst);
@@ -261,7 +263,7 @@ std::vector<partInfo> BisectAll(MetisGraph* mcg, unsigned numPartitions, unsigne
       for(unsigned int j=0; j<i && k <50; j++){
         goodseed = goodseed && (*boundary[j][0].begin() != n);
         for (auto ii = g.edge_begin(n, flag), ee = g.edge_end(n, flag); ii != ee; ++ii)
-          goodseed = goodseed && (*boundary[j][0].begin() !=  g.getEdgeDst(ii, flag));
+          goodseed = goodseed && (*boundary[j][0].begin() !=  g.getEdgeDst(ii));
       }
       if (!goodseed){
         k++;
@@ -305,7 +307,7 @@ std::vector<partInfo> BisectAll(MetisGraph* mcg, unsigned numPartitions, unsigne
       partitions[partInfos[partToMod].partWeight].insert(partToMod);
       g.getData(n, flag).setPart(partToMod);
       for (auto ii = g.edge_begin(n, flag), ee = g.edge_end(n, flag); ii != ee; ++ii) {
-        GNode dst = g.getEdgeDst(ii, flag);
+        GNode dst = g.getEdgeDst(ii);
         int newgain= gain_limited(g, dst, partToMod, flag);
         boundary[partToMod][newgain].insert(dst);
       }
