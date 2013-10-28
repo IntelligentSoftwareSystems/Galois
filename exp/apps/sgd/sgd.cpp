@@ -29,9 +29,15 @@
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
 
+const unsigned int LATENT_VECTOR_SIZE = 100;
+const double LEARNING_RATE = 0.01;
+const double DECAY_RATE = 0.1;
+const double LAMBDA = 1.0;
+const unsigned int MAX_MOVIE_UPDATES = 5;
+
 typedef struct Node
 {
-  double* latent_vector; //latent vector to be learned
+  double latent_vector[LATENT_VECTOR_SIZE]; //latent vector to be learned
   unsigned int updates; //number of updates made to this node (only used by movie nodes)
   unsigned int edge_offset; //if a movie's update is interrupted, where to start when resuming
 } Node;
@@ -40,11 +46,30 @@ typedef struct Node
 //node data is Node, edge data is unsigned int
 typedef Galois::Graph::LC_CSR_Graph<Node, unsigned int> Graph;
 
-unsigned int LATENT_VECTOR_SIZE = 100;
-double LEARNING_RATE = 0.01;
-double DECAY_RATE = 0.1;
-double LAMBDA = 1.0;
-unsigned int MAX_MOVIE_UPDATES = 5;
+void updateEdge(Node& user_data, Node& movie_data, unsigned int edge_rating) {
+
+  double step_size = LEARNING_RATE * 1.5 / (1.0 + DECAY_RATE * pow(movie_data.updates + 1, 1.5));
+  
+  double* __restrict__ user_latent = user_data.latent_vector;
+  double* __restrict__ movie_latent = movie_data.latent_vector;
+
+  //calculate error
+  double cur_error = - edge_rating;
+  double tmp_error[2] = {0,0};
+  for(unsigned int i = 0; i < LATENT_VECTOR_SIZE; i+=2) {
+    tmp_error[0] += user_latent[i] * movie_latent[i];
+    tmp_error[1] += user_latent[i+1] * movie_latent[i+1];
+  }
+  cur_error += tmp_error[0] + tmp_error[1];
+
+  //take gradient step
+  for(unsigned int i = 0; i < LATENT_VECTOR_SIZE; i++) {
+    double prev_movie_val = movie_latent[i];
+    
+    movie_latent[i] -= step_size * (cur_error * user_latent[i] + LAMBDA * prev_movie_val);
+    user_latent[i] -= step_size * (cur_error * prev_movie_val + LAMBDA * user_latent[i]);
+  }
+}
 
 struct sgd
 {
@@ -56,32 +81,14 @@ struct sgd
 	void operator()(Graph::GraphNode movie, Galois::UserContext<Graph::GraphNode>& ctx)
 	{	
 		Node& movie_data = g.getData(movie);
-		double* movie_latent = movie_data.latent_vector;
-		double step_size = LEARNING_RATE * 1.5 / (1.0 + DECAY_RATE * pow(movie_data.updates + 1, 1.5));
 		
                 Graph::edge_iterator edge_it = g.edge_begin(movie, Galois::NONE) + movie_data.edge_offset;
 		Graph::GraphNode user = g.getEdgeDst(edge_it);
 		//abort operation if conflict detected (Galois::ALL)
 		Node& user_data = g.getData(user, Galois::ALL);
-		double* user_latent = user_data.latent_vector;
-		//abort operation if conflict detected (Galois::ALL)
-		unsigned int edge_rating = g.getEdgeData(edge_it, Galois::ALL);	
 
-		//calculate error
-		double cur_error = - edge_rating;
-		for(unsigned int i = 0; i < LATENT_VECTOR_SIZE; i++)
-		{
-			cur_error += user_latent[i] * movie_latent[i];
-		}
-
-		//take gradient step
-		for(unsigned int i = 0; i < LATENT_VECTOR_SIZE; i++)
-		{
-			double prev_movie_val = movie_latent[i];
-
-			movie_latent[i] -= step_size * (cur_error * user_latent[i] + LAMBDA * prev_movie_val);
-			user_latent[i] -= step_size * (cur_error * prev_movie_val + LAMBDA * user_latent[i]);
-		}
+                //process sgd on edge
+                updateEdge(user_data, movie_data, g.getEdgeData(edge_it));
 		
 		++edge_it;
 		movie_data.edge_offset++;
@@ -121,12 +128,11 @@ unsigned int initializeGraphData(Graph& g)
 		data.updates = 0;
 
 		//fill latent vectors with random values
-		double* lv = new double[LATENT_VECTOR_SIZE];
+		//data.latent_vector = new double[LATENT_VECTOR_SIZE];
 		for(int i = 0; i < LATENT_VECTOR_SIZE; i++)
 		{
-			lv[i] = random_lv_value(eng);
+			data.latent_vector[i] = random_lv_value(eng);
 		}
-		data.latent_vector = lv;
 		
 		//count number of movies we've seen; only movies nodes have edges
 		unsigned int num_edges = 
@@ -140,13 +146,14 @@ unsigned int initializeGraphData(Graph& g)
 	return num_movie_nodes;
 }
 
-Graph* g_ptr;
-
 struct projCount : public std::unary_function<unsigned, Graph::GraphNode&> {
+  static Graph* g_ptr;
 	unsigned operator()(const Graph::GraphNode& node) const {
 		return g_ptr->getData(node, Galois::NONE).updates;
 	}
 };
+
+Graph* projCount::g_ptr = nullptr;
 
 int main(int argc, char** argv) {	
 	if(argc < 3)
@@ -167,13 +174,13 @@ int main(int argc, char** argv) {
 
 	//allocate local computation graph
 	Graph g;
-	g_ptr = &g;
+        projCount::g_ptr = &g;
 
 	//read structure of graph & edge weights; nodes not initialized
         Galois::Graph::readGraph(g, inputFile);
 
 	//fill each node's id & initialize the latent vectors
-	unsigned int num_movie_nodes = initializeGraphData(g);
+	unsigned int num_movie_nodes = initializeGraphData(g);// ? g.size() / 2 : g.size() / 2;
 	
 	std::cout << "Movies, " << num_movie_nodes << ",Users, " << g.size() - num_movie_nodes <<
 		",Ratings, " << g.sizeEdges() << ",Threads, " << threadCount << std::endl;
