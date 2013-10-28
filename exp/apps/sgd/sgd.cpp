@@ -74,7 +74,8 @@ void updateEdge(Node& user_data, Node& movie_data, unsigned int edge_rating) {
 struct sgd
 {
 	Graph& g;
-	sgd(Graph& g) : g(g) {}
+  bool iterup;
+  sgd(Graph& g,  bool iu) : g(g), iterup(iu) {}
 	
 	//perform SGD update on all edges of a movie
 	//perform update on one user at a time
@@ -100,8 +101,8 @@ struct sgd
 
 			//push movie node onto worklist if it's not updated enough
 			movie_data.updates++;
-			if(movie_data.updates < MAX_MOVIE_UPDATES)
-				ctx.push(movie);
+                        if(iterup && movie_data.updates < MAX_MOVIE_UPDATES)
+                          ctx.push(movie);
 		}
 		else //haven't looked at all the users this iteration
 		{
@@ -180,7 +181,9 @@ int main(int argc, char** argv) {
         Galois::Graph::readGraph(g, inputFile);
 
 	//fill each node's id & initialize the latent vectors
-	unsigned int num_movie_nodes = initializeGraphData(g);// ? g.size() / 2 : g.size() / 2;
+	unsigned int num_movie_nodes = initializeGraphData(g);
+        //handle arbitrary graphs for good measure
+        if (num_movie_nodes == g.size()) num_movie_nodes /= 2;
 	
 	std::cout << "Movies, " << num_movie_nodes << ",Users, " << g.size() - num_movie_nodes <<
 		",Ratings, " << g.sizeEdges() << ",Threads, " << threadCount << std::endl;
@@ -195,10 +198,12 @@ int main(int argc, char** argv) {
 	//the projCount functor provides the priority function on each node
 	Graph::iterator ii = g.begin();
 	std::advance(ii,(g.size() - num_movie_nodes)); //advance moves passed in iterator
-	Galois::for_each(ii, g.end(), sgd(g),
-                         Galois::wl<Galois::WorkList::OrderedByIntegerMetric
-                         <projCount, Galois::WorkList::dChunkedLIFO<32>>>());
-
+	// Galois::for_each(ii, g.end(), sgd(g, true),
+        //                  Galois::wl<Galois::WorkList::OrderedByIntegerMetric
+        //                  <projCount, Galois::WorkList::dChunkedLIFO<32>>>());
+        for (int i = 0; i < MAX_MOVIE_UPDATES; ++i)
+          Galois::for_each(ii, g.end(), sgd(g, false));
+ 
 	timer.stop();
 
 	return 0;
