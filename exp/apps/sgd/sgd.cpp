@@ -84,6 +84,10 @@ struct sgd
 		Node& movie_data = g.getData(movie);
 		
                 Graph::edge_iterator edge_it = g.edge_begin(movie, Galois::NONE) + movie_data.edge_offset;
+                //handle no-edge movies
+                if (edge_it == g.edge_end(movie, Galois::NONE))
+                    return;
+
 		Graph::GraphNode user = g.getEdgeDst(edge_it);
 		//abort operation if conflict detected (Galois::ALL)
 		Node& user_data = g.getData(user, Galois::ALL);
@@ -136,8 +140,7 @@ unsigned int initializeGraphData(Graph& g)
 		}
 		
 		//count number of movies we've seen; only movies nodes have edges
-		unsigned int num_edges = 
-			g.edge_end(gnode, Galois::NONE) - g.edge_begin(gnode, Galois::NONE);
+		unsigned int num_edges = std::distance(g.edge_begin(gnode), g.edge_end(gnode));
 		if(num_edges > 0)
 			num_movie_nodes++;
 		
@@ -202,7 +205,8 @@ int main(int argc, char** argv) {
         //                  Galois::wl<Galois::WorkList::OrderedByIntegerMetric
         //                  <projCount, Galois::WorkList::dChunkedLIFO<32>>>());
         for (int i = 0; i < MAX_MOVIE_UPDATES; ++i)
-          Galois::for_each(ii, g.end(), sgd(g, false));
+          Galois::for_each(ii, g.end(), sgd(g, false), 
+                           Galois::wl<Galois::WorkList::dChunkedLIFO<32>>());
  
 	timer.stop();
 
