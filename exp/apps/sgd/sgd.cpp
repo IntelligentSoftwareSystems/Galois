@@ -148,8 +148,8 @@ struct projCount : public std::unary_function<unsigned, Graph::GraphNode&> {
 	}
 };
 
-int main(int argc, char** argv)
-{	
+int main(int argc, char** argv) {	
+  Galois::StatManager statManager;
 	if(argc < 3)
 	{
 		std::cout << "Usage: <input binary gr file> <thread count>" << std::endl;
