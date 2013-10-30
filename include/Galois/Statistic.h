@@ -128,7 +128,7 @@ public:
   ~StatTimer() {
     if (valid)
       stop();
-    if (get()) // only report non-zero stat
+    if (TimeAccumulator::get()) // only report non-zero stat
       Galois::Runtime::reportStat(loopname, name, get());
   }
 

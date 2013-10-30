@@ -30,6 +30,8 @@
 #include <iostream>
 #include <fstream>
 #include <vector>
+#include <set>
+#include <stdint.h>
 #include GALOIS_CXX11_STD_HEADER(random)
 
 #include <fcntl.h>
@@ -61,6 +63,7 @@ enum ConvertMode {
   gr2sintgr,
   gr2tintgr,
   gr2treeintgr,
+  gr2orderdeg,
   intedgelist2gr,
   mtx2doublegr,
   mtx2floatgr,
@@ -108,6 +111,7 @@ static cll::opt<ConvertMode> convertMode(cll::desc("Choose a conversion mode:"),
       clEnumVal(gr2sortedweightintgr, "Sort outgoing edges of binary weighted (int) gr by edge weight"),
       clEnumVal(gr2tintgr, "Transpose binary weighted (int) gr"),
       clEnumVal(gr2treeintgr, "Convert binary gr to strongly connected graph by adding tree overlay"),
+      clEnumVal(gr2orderdeg, "Order by neighbor degree"),
       clEnumVal(intedgelist2gr, "Convert weighted (int) edge list to binary gr"),
       clEnumVal(mtx2doublegr, "Convert matrix market format to binary gr"),
       clEnumVal(mtx2floatgr, "Convert matrix market format to binary gr"),
@@ -692,6 +696,76 @@ void convert_gr2sgr(const std::string& infilename, const std::string& outfilenam
   outgraph.structureToFile(outfilename);
   printStatus(ingraph.size(), ingraph.sizeEdges(), outgraph.size(), outgraph.sizeEdges());
 }
+
+template<typename EdgeTy>
+void order_by_high_degree(const std::string& infilename, const std::string& outfilename, int numSort) {
+  typedef Galois::Graph::FileGraph Graph;
+  typedef Graph::GraphNode GNode;
+  typedef Galois::LargeArray<GNode> Permutation;
+  typedef typename std::iterator_traits<typename Permutation::iterator>::difference_type difference_type;
+
+  Graph graph;
+  graph.structureFromFile(infilename);
+
+  Permutation perm;
+  perm.create(graph.size());
+  std::copy(boost::counting_iterator<GNode>(0), boost::counting_iterator<GNode>(graph.size()), perm.begin());
+
+  std::map<GNode,uint64_t> weights;
+
+  std::set<GNode> done;
+  for (int z = 0; z < numSort; ++z) {
+    //find the next biggest node
+    unsigned deg = 0;
+    GNode n;
+    for (Graph::iterator ii = graph.begin(), ee = graph.end(); ii != ee; ++ii) {
+      unsigned d = std::distance(graph.edge_begin(*ii), graph.edge_end(*ii));
+      if (d >= deg && !done.count(*ii)) {
+        deg = d;
+        n = *ii;
+      }
+    }
+
+    done.insert(n);
+    std::cout << "First " << n << " deg " << deg << "\n";
+
+    //shift all keys
+    for (std::map<GNode, uint64_t>::iterator ii = weights.begin(), ee = weights.end(); ii != ee; ++ii) {
+      ii->second <<= 1;
+    }
+
+    //add to sort keys
+    for (Graph::edge_iterator ii = graph.edge_begin(n), ee = graph.edge_end(n);
+         ii != ee; ++ii) {
+      weights[graph.getEdgeDst(ii)] |= 1;
+    }
+    weights[n] |= 1;
+  }
+
+  //compute inverse
+  std::stable_sort(perm.begin(), perm.end(), [&weights] (const GNode& a, const GNode& b) {
+      uint64_t wa = weights.count(a) ? weights[a] : ~0;
+      uint64_t wb = weights.count(b) ? weights[b] : ~0;
+      return wa < wb;
+    });
+
+  Permutation perm2;
+  perm2.create(graph.size());
+  //compute permutation
+  for (unsigned x = 0; x < perm.size(); ++x)
+    perm2[perm[x]] = x;
+
+  for (unsigned x = 0; x < perm2.size(); ++x)
+    if (perm2[x] == 0)
+      std::cout << "Zero is at " << x << "\n";
+
+  Graph out;
+  Galois::Graph::permute<EdgeTy>(graph, perm2, out);
+
+  out.structureToFile(outfilename);
+  printStatus(graph.size(), graph.sizeEdges());
+}
+
 
 template<typename EdgeTy>
 void remove_high_degree(const std::string& infilename, const std::string& outfilename, int degree) {
@@ -1682,6 +1756,7 @@ int main(int argc, char** argv) {
     case gr2sintgr: convert_gr2sgr<int32_t>(inputfilename, outputfilename); break;
     case gr2tintgr: transpose<int32_t>(inputfilename, outputfilename); break;
     case gr2treeintgr: add_tree<int32_t>(inputfilename, outputfilename, maxValue); break;
+    case gr2orderdeg: order_by_high_degree<void>(inputfilename, outputfilename, maxValue); break;
     case intedgelist2gr: convert_edgelist2gr<int>(inputfilename, outputfilename); break;
     case mtx2doublegr: convert_mtx2gr<double>(inputfilename, outputfilename); break;
     case mtx2floatgr: convert_mtx2gr<float>(inputfilename, outputfilename); break;

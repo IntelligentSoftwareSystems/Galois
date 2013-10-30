@@ -329,6 +329,7 @@ typedef Galois::Graph::LC_CCSR_Graph<unsigned, void> GraphC;
 namespace cll = llvm::cl;
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<std::string> outfilename(cll::Positional, cll::desc("<output file>"), cll::Optional);
+static cll::opt<unsigned> sourcearg("source", cll::init(0), cll::desc("source for bfs"), cll::Optional);
 bool dostat;
 
 std::vector<unsigned int> raw, delta;
@@ -608,12 +609,10 @@ int main(int argc, char **argv) {
   std::cout << graph.size() << ":" << graphc.size() << "\n";
 
   std::cout << "BFS CSR\n";
-  AsyncBFS<Graph>()(graph, 0, "CSR");
+  AsyncBFS<Graph>()(graph, sourcearg, "CSR");
   std::cout << "BFS CCSR\n";
-  AsyncBFS<GraphC>()(graphc, 0, "CCSR");
+  AsyncBFS<GraphC>()(graphc, sourcearg, "CCSR");
   std::cout << "Done BFS\n";
-
-  return 0;
 
   auto size = graph.size();
   raw.resize(size);
@@ -636,6 +635,8 @@ int main(int argc, char **argv) {
   std::cout << "Ratio (BW32bit): " << (double)total_bytesBW / ((double)total_elem * 4) << "\n";
 
   dumphist(std::cout, "BW", lenBW);
+
+  return 0;
 
   auto p = tryHuffDeltaOnly();
   auto hlen = (p.first + 7) / 8;
