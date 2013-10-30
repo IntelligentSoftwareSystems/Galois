@@ -68,6 +68,16 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
 
 endif()
 
+# Clang
+if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  #iss hack
+  if("$ENV{GCC_BIN}" STREQUAL "") 
+    message (WARNING "Set environment variable GCC_BIN to directory containing g++, to help Clang")
+  else ()
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -gcc-toolchain $ENV{GCC_BIN}/..")
+  endif ()
+endif ()
+
 # XL
 if(CMAKE_CXX_COMPILER_ID MATCHES "XL")
   execute_process(COMMAND ${CMAKE_CXX_COMPILER} -qversion
