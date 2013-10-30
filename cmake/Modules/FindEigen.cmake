@@ -10,7 +10,7 @@ if(Eigen_INCLUDE_DIR)
   set(Eigen_FIND_QUIETLY TRUE)
 endif()
 
-find_path(EIGEN_INCLUDE_DIRS NAMES Eigen/Eigen PATHS ${EIGEN_DIR} ${EIGEN_HOME})
+find_path(Eigen_INCLUDE_DIRS NAMES Eigen/Eigen PATHS ENV EIGEN_HOME)
 
 include(FindPackageHandleStandardArgs)
 # handle the QUIETLY and REQUIRED arguments and set Eigen_FOUND to TRUE
