@@ -218,7 +218,7 @@ if(NOT "$ENV{BOOST_DIR}" STREQUAL "")
   set(BOOST_ROOT $ENV{BOOST_DIR})
 endif()
 set(BOOST_LIBS system iostreams filesystem)
-find_package(Boost 1.38.0 COMPONENT ${BOOST_LIBS} REQUIRED)
+find_package(Boost 1.38.0 COMPONENTS ${BOOST_LIBS} REQUIRED)
 include_directories(${Boost_INCLUDE_DIR})
 
 # C++11 features
