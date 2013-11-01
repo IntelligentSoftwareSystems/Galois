@@ -592,11 +592,6 @@ public:
     numActive = getActiveThreads();
   }
 
-  ~DMergeManagerBase() {
-    Galois::optional<NewItem> p;
-    assert(!(p = new_.pop()));
-  }
-
   MergeLocal& get() {
     return *data.getLocal();
   }
