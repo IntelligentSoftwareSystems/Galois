@@ -252,8 +252,8 @@ public:
     typedef typename EdgeInfo::value_type EDV;
     // XXX
     auto r = graph.divideBy(
-        NodeData::sizeof_value + LC_PartitionedInlineEdge_Graph::sizeof_out_of_line_value,
-        EdgeData::sizeof_value,
+        NodeData::size_of::value + LC_PartitionedInlineEdge_Graph::size_of_out_of_line::value,
+        EdgeData::size_of::value,
         tid, total);
 
     EdgeInfo* curEdge = edgeData.data() + *graph.edge_begin(*r.first);

@@ -186,7 +186,7 @@ void convert_edgelist2gr(const std::string& infilename, const std::string& outfi
   numNodes++;
   p.setNumNodes(numNodes);
   p.setNumEdges(numEdges);
-  p.setSizeofEdgeData(EdgeData::sizeof_value);
+  p.setSizeofEdgeData(EdgeData::size_of::value);
   edgeData.create(numEdges);
 
   infile.clear();
@@ -290,7 +290,7 @@ void convert_mtx2gr(const std::string& infilename, const std::string& outfilenam
     if (phase == 0) {
       p.setNumNodes(nnodes);
       p.setNumEdges(nedges);
-      p.setSizeofEdgeData(EdgeData::sizeof_value);
+      p.setSizeofEdgeData(EdgeData::size_of::value);
       edgeData.create(nedges);
       p.phase1();
     } else {
@@ -554,7 +554,7 @@ void add_ring(const std::string& infilename, const std::string& outfilename, int
 
   p.setNumNodes(size);
   p.setNumEdges(graph.sizeEdges() + size);
-  p.setSizeofEdgeData(EdgeData::sizeof_value);
+  p.setSizeofEdgeData(EdgeData::size_of::value);
   edgeData.create(graph.sizeEdges() + size);
   edgeValue.create(1);
   //edgeValue.set(0, maxValue + 1);
@@ -624,7 +624,7 @@ void add_tree(const std::string& infilename, const std::string& outfilename, int
 
   p.setNumNodes(size);
   p.setNumEdges(graph.sizeEdges() + newEdges);
-  p.setSizeofEdgeData(EdgeData::sizeof_value);
+  p.setSizeofEdgeData(EdgeData::size_of::value);
   edgeData.create(graph.sizeEdges() + newEdges);
   edgeValue.create(1);
   //edgeValue.set(0, maxValue + 1);
@@ -697,6 +697,17 @@ void convert_gr2sgr(const std::string& infilename, const std::string& outfilenam
   printStatus(ingraph.size(), ingraph.sizeEdges(), outgraph.size(), outgraph.sizeEdges());
 }
 
+template<typename GNode, typename Weights>
+struct order_by_degree {
+  Weights& weights;
+
+  bool operator()(const GNode& a, const GNode& b) {
+    uint64_t wa = weights.count(a) ? weights[a] : ~0;
+    uint64_t wb = weights.count(b) ? weights[b] : ~0;
+    return wa < wb;
+  }
+};
+
 template<typename EdgeTy>
 void order_by_high_degree(const std::string& infilename, const std::string& outfilename, int numSort) {
   typedef Galois::Graph::FileGraph Graph;
@@ -711,7 +722,8 @@ void order_by_high_degree(const std::string& infilename, const std::string& outf
   perm.create(graph.size());
   std::copy(boost::counting_iterator<GNode>(0), boost::counting_iterator<GNode>(graph.size()), perm.begin());
 
-  std::map<GNode,uint64_t> weights;
+  typedef std::map<GNode,uint64_t> Weights;
+  Weights weights;
 
   std::set<GNode> done;
   for (int z = 0; z < numSort; ++z) {
@@ -730,7 +742,7 @@ void order_by_high_degree(const std::string& infilename, const std::string& outf
     std::cout << "First " << n << " deg " << deg << "\n";
 
     //shift all keys
-    for (std::map<GNode, uint64_t>::iterator ii = weights.begin(), ee = weights.end(); ii != ee; ++ii) {
+    for (Weights::iterator ii = weights.begin(), ee = weights.end(); ii != ee; ++ii) {
       ii->second <<= 1;
     }
 
@@ -742,12 +754,9 @@ void order_by_high_degree(const std::string& infilename, const std::string& outf
     weights[n] |= 1;
   }
 
+  order_by_degree<GNode,Weights> fn = { weights };
   //compute inverse
-  std::stable_sort(perm.begin(), perm.end(), [&weights] (const GNode& a, const GNode& b) {
-      uint64_t wa = weights.count(a) ? weights[a] : ~0;
-      uint64_t wb = weights.count(b) ? weights[b] : ~0;
-      return wa < wb;
-    });
+  std::stable_sort(perm.begin(), perm.end(), fn);
 
   Permutation perm2;
   perm2.create(graph.size());
@@ -808,7 +817,7 @@ void remove_high_degree(const std::string& infilename, const std::string& outfil
 
   p.setNumNodes(numNodes);
   p.setNumEdges(numEdges);
-  p.setSizeofEdgeData(EdgeData::sizeof_value);
+  p.setSizeofEdgeData(EdgeData::size_of::value);
   edgeData.create(numEdges);
 
   p.phase1();
@@ -875,7 +884,7 @@ void partition_by_source(const std::string& infilename, const std::string& outfi
 
     p.setNumNodes(graph.size());
     p.setNumEdges(numEdges);
-    p.setSizeofEdgeData(EdgeData::sizeof_value);
+    p.setSizeofEdgeData(EdgeData::size_of::value);
     edgeData.create(numEdges);
 
     p.phase1();
@@ -973,7 +982,7 @@ void partition_by_destination(const std::string& infilename, const std::string& 
 
     p.setNumNodes(graph.size());
     p.setNumEdges(numEdges);
-    p.setSizeofEdgeData(EdgeData::sizeof_value);
+    p.setSizeofEdgeData(EdgeData::size_of::value);
     edgeData.create(numEdges);
 
     p.phase1();
@@ -1034,7 +1043,7 @@ void transpose(const std::string& infilename, const std::string& outfilename) {
 
   p.setNumNodes(graph.size());
   p.setNumEdges(graph.sizeEdges());
-  p.setSizeofEdgeData(EdgeData::sizeof_value);
+  p.setSizeofEdgeData(EdgeData::size_of::value);
   edgeData.create(graph.sizeEdges());
 
   p.phase1();
@@ -1133,7 +1142,7 @@ void convert_gr2cgr(const std::string& infilename, const std::string& outfilenam
 
   p.setNumNodes(graph.size());
   p.setNumEdges(numEdges);
-  p.setSizeofEdgeData(EdgeData::sizeof_value);
+  p.setSizeofEdgeData(EdgeData::size_of::value);
   edgeData.create(numEdges);
 
   p.phase1();
@@ -1244,7 +1253,7 @@ void convert_sgr2gr(const std::string& infilename, const std::string& outfilenam
 
   p.setNumNodes(graph.size());
   p.setNumEdges(numEdges);
-  p.setSizeofEdgeData(EdgeData::sizeof_value);
+  p.setSizeofEdgeData(EdgeData::size_of::value);
   edgeData.create(numEdges);
 
   p.phase1();
@@ -1335,7 +1344,7 @@ void convert_dimacs2gr(const std::string& infilename, const std::string& outfile
     if (phase == 0) {
       p.setNumNodes(nnodes);
       p.setNumEdges(nedges);
-      p.setSizeofEdgeData(EdgeData::sizeof_value);
+      p.setSizeofEdgeData(EdgeData::size_of::value);
       edgeData.create(nedges);
       p.phase1();
     } else {

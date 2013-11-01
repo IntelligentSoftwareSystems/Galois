@@ -59,7 +59,11 @@ public:
   typedef pointer iterator;
   typedef const_pointer const_iterator;
   const static bool has_value = true;
-  const static size_t sizeof_value = sizeof(T);
+
+  // Extra indirection to support incomplete T's
+  struct size_of {
+    const static size_t value = sizeof(T);
+  };
 
 protected:
   void allocate(size_type n, bool interleave, bool prefault) {
@@ -174,7 +178,9 @@ public:
   typedef pointer iterator;
   typedef const_pointer const_iterator;
   const static bool has_value = false;
-  const static size_t sizeof_value = 0;
+  struct size_of {
+    const static size_t value = 0;
+  };
 
   const_reference at(difference_type x) const { return 0; }
   reference at(difference_type x) { return 0; }

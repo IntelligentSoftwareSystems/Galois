@@ -239,7 +239,10 @@ class OutOfLineLockableFeature {
   typedef NodeInfoBase<void,true> OutOfLineLock;
   LargeArray<OutOfLineLock> outOfLineLocks;
 public:
-  static const size_t sizeof_out_of_line_value = sizeof(OutOfLineLock);
+  struct size_of_out_of_line {
+    static const size_t value = sizeof(OutOfLineLock);
+  };
+
   void outOfLineAcquire(size_t n, MethodFlag mflag) {
     Galois::Runtime::acquire(&outOfLineLocks[n], mflag);
   }
@@ -257,7 +260,9 @@ public:
 template<>
 class OutOfLineLockableFeature<false> {
 public:
-  static const size_t sizeof_out_of_line_value = 0;
+  struct size_of_out_of_line {
+    static const size_t value = 0;
+  };
   void outOfLineAcquire(size_t n, MethodFlag mflag) { }
   void outOfLineAllocateLocal(size_t numNodes, bool preFault) { }
   void outOfLineAllocateInterleaved(size_t numNodes) { }

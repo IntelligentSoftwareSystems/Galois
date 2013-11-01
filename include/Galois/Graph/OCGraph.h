@@ -380,7 +380,7 @@ public:
 
   void keepInMemory() {
     memorySegment = Galois::optional<segment_type>(computeSegment(0, numEdges));
-    load(*memorySegment, LazyObject<EdgeTy>::sizeof_value);
+    load(*memorySegment, LazyObject<EdgeTy>::size_of::value);
   }
 
   /**
@@ -406,7 +406,7 @@ public:
     if (memorySegment)
       return;
 
-    load(seg, LazyObject<EdgeTy>::sizeof_value);
+    load(seg, LazyObject<EdgeTy>::size_of::value);
   }
 
   void unload(segment_type& seg) {

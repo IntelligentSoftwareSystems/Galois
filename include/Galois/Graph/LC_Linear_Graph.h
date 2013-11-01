@@ -255,7 +255,7 @@ public:
 
   void constructNodesFrom(FileGraph& graph, unsigned tid, unsigned total, const ReadGraphAuxData&) {
     auto r = graph.divideBy(
-        Nodes::sizeof_value + 2 * sizeof(NodeInfo) + LC_Linear_Graph::sizeof_out_of_line_value,
+        Nodes::size_of::value + 2 * sizeof(NodeInfo) + LC_Linear_Graph::size_of_out_of_line::value,
         sizeof(EdgeInfo),
         tid, total);
 
@@ -280,7 +280,7 @@ public:
   void constructEdgesFrom(FileGraph& graph, unsigned tid, unsigned total, const ReadGraphAuxData&) {
     typedef typename EdgeInfo::value_type EDV;
     auto r = graph.divideBy(
-        Nodes::sizeof_value + 2 * sizeof(NodeInfo) + LC_Linear_Graph::sizeof_out_of_line_value,
+        Nodes::size_of::value + 2 * sizeof(NodeInfo) + LC_Linear_Graph::size_of_out_of_line::value,
         sizeof(EdgeInfo),
         tid, total);
 

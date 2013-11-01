@@ -259,8 +259,8 @@ public:
   void constructFrom(FileGraph& graph, unsigned tid, unsigned total) {
     typedef typename EdgeInfo::value_type EDV;
     auto r = graph.divideBy(
-        NodeData::sizeof_value + LC_InlineEdge_Graph::sizeof_out_of_line_value,
-        EdgeData::sizeof_value,
+        NodeData::size_of::value + LC_InlineEdge_Graph::size_of_out_of_line::value,
+        EdgeData::size_of::value,
         tid, total);
 
     EdgeInfo* curEdge = edgeData.data() + *graph.edge_begin(*r.first);
