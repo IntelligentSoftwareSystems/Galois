@@ -12,7 +12,7 @@ file(GLOB Sources
   libMeshInit/femap/*.cpp
   libMeshInit/dgmechanics/*.cpp
   libMeshInit/*.cpp
-  dummy.f90
+  #dummy.f90
 )
 
 enable_language(Fortran OPTIONAL)
@@ -42,7 +42,7 @@ app(AVIodgOrdered main/AVIodgOrdered.cpp
   REQUIRES AVI_FOUND 
   EXTLIBS AVI ${LAPACK_LIBRARIES})
 
-app(AVIodgExplicit main/AVIodgExplicit.cpp 
+app(AVIodgExplicit main/AVIodgExplicit.cpp
   REQUIRES AVI_FOUND
   EXTLIBS AVI ${LAPACK_LIBRARIES})
 
@@ -51,7 +51,6 @@ app(AVIodgExplicitNoLock main/AVIodgExplicitNoLock.cpp
   EXTLIBS AVI ${LAPACK_LIBRARIES})
 
 # the files may be removed from the release without causing error in cmake
-#if(EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/exp)
 if(0)
   app(AVIodgReadonly exp/AVIodgReadonly.cpp 
     REQUIRES AVI_FOUND USE_EXP

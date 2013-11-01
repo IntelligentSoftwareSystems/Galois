@@ -54,9 +54,9 @@ inline void* alloc() {
 #endif
 #undef MORE_MEM_HACK
 
-unsigned Galois::Runtime::PerBackend::nextPow2 (unsigned size) {
+unsigned Galois::Runtime::PerBackend::nextLog2(unsigned size) {
   unsigned i = MIN_SIZE;
-  while (unsigned (1<<i) < size) {
+  while ((1<<i) < size) {
     ++i;
   }
   if (i >= MAX_SIZE) { 
@@ -68,76 +68,55 @@ unsigned Galois::Runtime::PerBackend::nextPow2 (unsigned size) {
 unsigned Galois::Runtime::PerBackend::allocOffset(const unsigned sz) {
   unsigned retval = allocSize;
 
-  unsigned size = (1 << nextPow2 (sz));
+  unsigned size = (1 << nextLog2(sz));
 
   if ((nextLoc + size) <= allocSize) {
     // simple path, where we allocate bump ptr style
     retval = __sync_fetch_and_add (&nextLoc, size);
-
   } else {
     // find a free offset
-    unsigned pow2 = nextPow2(sz);
-    if (!freeOffsets[pow2].empty ()) {
-      retval = freeOffsets[pow2].back ();
-      freeOffsets[pow2].pop_back ();
+    unsigned index = nextLog2(sz);
+    if (!freeOffsets[index].empty()) {
+      retval = freeOffsets[index].back();
+      freeOffsets[index].pop_back();
     } else {
       // find a bigger size 
-      unsigned next = pow2;
+      for (; (index < MAX_SIZE) && (freeOffsets[index].empty()); ++index)
+        ;
 
-      for (; (next < MAX_SIZE) && (freeOffsets[next].empty ()); ++next) {}
-
-      if (next == MAX_SIZE) {
-        GALOIS_DIE ("PTS out of memory error");
-
+      if (index == MAX_SIZE) {
+        GALOIS_DIE("PTS out of memory error");
       } else {
-        // found a bigger free offset
-        // we used the first piece equal to required size and produce 
-        // vending machine change for the rest
-        assert (!freeOffsets[next].empty ());
-        retval = freeOffsets[next].back ();
-        freeOffsets[next].pop_back ();
+        // Found a bigger free offset. Use the first piece equal to required
+        // size and produce vending machine change for the rest.
+        assert(!freeOffsets[index].empty());
+        retval = freeOffsets[index].back();
+        freeOffsets[index].pop_back();
 
         // remaining chunk
-        unsigned end = retval + (1 << next);
+        unsigned end = retval + (1 << index);
         unsigned start = retval + size; 
-        for (unsigned i = next - 1; (start < end) && (i >= 0); --i) {
-          freeOffsets[i].push_back (start);
+        for (unsigned i = index - 1; start < end; --i) {
+          freeOffsets[i].push_back(start);
           start += (1 << i);
         }
       }
     }
   }
 
-  assert (retval != allocSize);
+  assert(retval != allocSize);
 
-  return retval;
-
-  
-  // size = (size + 15) & ~15;
-  // unsigned retval = __sync_fetch_and_add(&nextLoc, size);
-  // if (retval + size > allocSize) {
-    // GALOIS_DIE("no more memory");
-  // }
   return retval;
 }
 
 void Galois::Runtime::PerBackend::deallocOffset(const unsigned offset, const unsigned sz) {
-
-  unsigned size = (1 << nextPow2 (sz));
+  unsigned size = (1 << nextLog2(sz));
   if (__sync_bool_compare_and_swap(&nextLoc, offset + size, offset)) {
     ; // allocation was at the end , so recovered some memory
   } else {
     // allocation not at the end
-    freeOffsets[nextPow2 (sz)].push_back (offset);
+    freeOffsets[nextLog2(sz)].push_back(offset);
   }
-
-  // Simplest way to recover memory; relies on mostly stack-like nature of
-  // allocations
-  // size = (size + 15) & ~15;
-  // Should only be executed by main thread but make lock-free for fun
-  // if (__sync_bool_compare_and_swap(&nextLoc, offset + size, offset)) {
-    // ; // Recovered some memory
-  // }
 }
 
 void* Galois::Runtime::PerBackend::getRemote(unsigned thread, unsigned offset) {

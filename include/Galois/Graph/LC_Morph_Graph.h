@@ -68,7 +68,7 @@ public:
   typedef read_with_aux_graph_tag read_tag;
 
 protected:
-  struct NodeInfo;
+  class NodeInfo;
   typedef detail::EdgeInfoBase<NodeInfo*, EdgeTy> EdgeInfo;
   typedef Galois::InsertBag<NodeInfo> Nodes;
   typedef detail::NodeInfoBaseTypes<NodeTy,!HasNoLockable && !HasOutOfLineLockable> NodeInfoTypes;

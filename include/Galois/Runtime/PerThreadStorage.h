@@ -50,11 +50,11 @@ class PerBackend {
 
   void initCommon();
 
-  static unsigned nextPow2 (unsigned size);
+  static unsigned nextLog2(unsigned size);
 
 public:
   PerBackend(): nextLoc(0) {
-    freeOffsets.resize (MAX_SIZE);
+    freeOffsets.resize(MAX_SIZE);
   }
 
   char* initPerThread();

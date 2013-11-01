@@ -219,7 +219,7 @@ private:
     bool operator()(const T2& ii) const { return !ii.first() || !ii.first()->active; }
   };
   
-  struct gNode;
+  class gNode;
   struct gNodeTypes: public detail::NodeInfoBaseTypes<NodeTy, !HasNoLockable> {
     //! The storage type for an edge
     typedef FirstGraphImpl::UEdgeInfoBase<gNode, EdgeTy, Directional> EdgeInfo;

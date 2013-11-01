@@ -213,7 +213,7 @@ void convert_edgelist2gr(const std::string& infilename, const std::string& outfi
   while (infile) {
     size_t src;
     size_t dst;
-    edge_value_type data;
+    edge_value_type data = 0;
 
     infile >> src >> dst;
 

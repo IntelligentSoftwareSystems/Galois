@@ -47,7 +47,6 @@ enable_testing()
 
 ###### Configure compiler ######
 
-
 # ICC
 if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
   execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion
@@ -59,24 +58,21 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
   endif()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -wd68 -wd981 -wd383 -wd869 -wd2196 -wd279 -wd2504 -wd2943 -wd32013")
 
-  #iss hack
   if("$ENV{GCC_BIN}" STREQUAL "") 
-    message (WARNING "Set environment variable GCC_BIN to directory containing g++, to help ICC")
-  else ()
+    message(STATUS "Using default GCC toolchain; set environment variable GCC_BIN to override")
+  else()
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -gxx-name=$ENV{GCC_BIN}/g++")
-  endif ()
-
+  endif()
 endif()
 
 # Clang
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  #iss hack
   if("$ENV{GCC_BIN}" STREQUAL "") 
-    message (WARNING "Set environment variable GCC_BIN to directory containing g++, to help Clang")
-  else ()
+    message(STATUS "Using default GCC toolchain; set environment variable GCC_BIN to override")
+  else()
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -gcc-toolchain $ENV{GCC_BIN}/..")
-  endif ()
-endif ()
+  endif()
+endif()
 
 # XL
 if(CMAKE_CXX_COMPILER_ID MATCHES "XL")
@@ -90,7 +86,6 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "XL")
     message(FATAL_ERROR "XLC must be higher than 12.0")
   endif()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -qsuppress=1540-0724 -qsuppress=1500-029 -qmaxmem=-1 -qalias=noansi -qsmp=omp")
-  #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -qsuppress=1540-0724 -qmaxmem=-1")
 endif()
 
 # check for incompatible GCC

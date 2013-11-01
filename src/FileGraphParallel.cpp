@@ -30,7 +30,7 @@
 namespace Galois {
 namespace Graph {
 
-struct FileGraphAllocator {
+class FileGraphAllocator {
   pthread_mutex_t& lock;
   pthread_cond_t& cond;
   FileGraph* self;
@@ -38,6 +38,7 @@ struct FileGraphAllocator {
   unsigned maxPackages;
   volatile unsigned& count;
 
+public:
   FileGraphAllocator(pthread_mutex_t& l, pthread_cond_t& c, FileGraph* s, size_t ss, unsigned m, volatile unsigned& cc): 
     lock(l), cond(c), self(s), sizeofEdgeData(ss), maxPackages(m), count(cc) { }
 
