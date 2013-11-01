@@ -29,9 +29,9 @@ run() {
   fi
 }
 
-run apps/avi/AVIodgOrdered -n 0 -d 2 -f "${BASE}/inputs/avi/squareCoarse.NEU.gz"
+run apps/avi/AVIodgExplicitNoLock -n 0 -d 2 -f "${BASE}/inputs/avi/squareCoarse.NEU.gz"
 run apps/barneshut/barneshut -n 1000 -steps 1 -seed 0
-run apps/betweennesscentrality/betweennesscentrality "${BASE}/inputs/structured/torus5.gr" -forceVerify
+run apps/betweennesscentrality/betweennesscentrality-outer "${BASE}/inputs/structured/torus5.gr" -forceVerify
 run apps/bfs/bfs "${BASE}/inputs/structured/rome99.gr"
 run apps/boruvka/boruvka "${BASE}/inputs/structured/rome99.gr"
 run apps/clustering/clustering -numPoints 1000
