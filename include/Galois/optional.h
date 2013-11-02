@@ -18,7 +18,7 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  *
- * Replacement for {@code boost::optional} using {@link Galois::LazyObject},
+ * Replacement for <code>boost::optional</code> using {@link Galois::LazyObject},
  * which conforms to a more strict aliasing policy.
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>

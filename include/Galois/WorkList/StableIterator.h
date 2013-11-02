@@ -18,7 +18,7 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  *
- * @description
+ * @section description
  * This dereferences iterators lazily.  This is only safe if they are not
  * invalidated by the operator
  *

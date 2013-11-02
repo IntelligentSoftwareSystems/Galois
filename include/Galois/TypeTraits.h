@@ -156,7 +156,7 @@ struct has_deterministic_id : public has_tf_deterministic_id<T> {};
  *      }
  *    }
  *  };
- * that 
+ * \endcode 
  */
 GALOIS_HAS_MEM_TYPE(GaloisDeterministicLocalState, tf_deterministic_local_state);
 template<typename T>

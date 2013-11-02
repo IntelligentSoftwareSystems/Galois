@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -76,15 +76,15 @@ int numNumaNodes();
  * threads.
  */
 void* largeInterleavedAlloc(size_t bytes, bool full = true);
-//! Frees memory allocated by {@link largeInterleavedAlloc}
+//! Frees memory allocated by {@link largeInterleavedAlloc()}
 void  largeInterleavedFree(void* mem, size_t bytes);
 
 //! Allocates a large block of memory
 void* largeAlloc(size_t bytes, bool preFault = true);
-//! Frees memory allocated by {@link largeAlloc}
+//! Frees memory allocated by {@link largeAlloc()}
 void  largeFree(void* mem, size_t bytes);
 
-//! Print lines from /proc/<pid>/numa_maps that contain at least n small pages
+//! Print lines from /proc/pid/numa_maps that contain at least n small pages
 void printInterleavedStats(int minPages = 16*1024);
 
 //! Per-thread heaps using Galois thread aware construct

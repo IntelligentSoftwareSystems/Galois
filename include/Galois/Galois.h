@@ -132,7 +132,7 @@ FunctionTy do_all_gen(RangeTy r, FunctionTy fn, Tuple tpl) {
  * @param b begining of range of initial items
  * @param e end of range of initial items
  * @param fn operator
- * @param loopname string to identity loop in statistics output
+ * @param args optional arguments to loop, e.g., {@see loopname}, {@see wl}
  */
 template<typename IterTy, typename FunctionTy, typename... Args>
 void for_each(IterTy b, IterTy e, FunctionTy fn, Args... args) {
@@ -147,7 +147,7 @@ void for_each(IterTy b, IterTy e, FunctionTy fn, Args... args) {
  * @tparam WLTy Worklist policy {@link Galois::WorkList}
  * @param i initial item
  * @param fn operator
- * @param loopname string to identity loop in statistics output
+ * @param args optional arguments to loop
  */
 template<typename ItemTy, typename FunctionTy, typename... Args>
 void for_each(ItemTy i, FunctionTy fn, Args... args) {
@@ -163,7 +163,7 @@ void for_each(ItemTy i, FunctionTy fn, Args... args) {
  * @tparam WLTy Worklist policy {@link Galois::WorkList}
  * @param c locality-aware container
  * @param fn operator
- * @param loopname string to identity loop in statistics output
+ * @param args optional arguments to loop
  */
 template<typename ConTy, typename FunctionTy, typename... Args>
 void for_each_local(ConTy& c, FunctionTy fn, Args... args) {
@@ -177,7 +177,7 @@ void for_each_local(ConTy& c, FunctionTy fn, Args... args) {
  * @param b beginning of range of items
  * @param e end of range of items
  * @param fn operator
- * @param loopname string to identify loop in statistics output
+ * @param args optional arguments to loop
  * @returns fn
  */
 template<typename IterTy,typename FunctionTy, typename... Args>
@@ -191,7 +191,7 @@ FunctionTy do_all(const IterTy& b, const IterTy& e, FunctionTy fn, Args... args)
  *
  * @param c locality-aware container
  * @param fn operator
- * @param loopname string to identify loop in statistics output
+ * @param args optional arguments to loop
  * @returns fn
  */
 template<typename ConTy,typename FunctionTy, typename... Args>

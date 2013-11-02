@@ -106,8 +106,9 @@ public:
   void allocateInterleaved(size_type n) { allocate(n, true, true); }
 
   /**
-   * Allocates using default memory policy, which is place on first touch.
+   * Allocates using default memory policy (usually first-touch) 
    *
+   * @param  n         number of elements to allocate 
    * @param  prefault  Prefault/touch memory to place it local to the currently executing
    *                   thread. By default, true because concurrent page-faulting can be a
    *                   scalability bottleneck.

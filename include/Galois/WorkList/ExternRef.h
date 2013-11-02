@@ -18,7 +18,7 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  *
- * @description
+ * @section Description
  * This let's you use an external worklist by reference
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
