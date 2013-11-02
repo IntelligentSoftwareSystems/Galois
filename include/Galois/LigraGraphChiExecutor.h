@@ -5,6 +5,7 @@
 #include "GraphChiExecutor.h"
 
 namespace Galois {
+//! Implementation of combination of Ligra and GraphChi DSL in Galois
 namespace LigraGraphChi {
 
 template<bool Forward,typename Graph,typename EdgeOperator,typename Bag>

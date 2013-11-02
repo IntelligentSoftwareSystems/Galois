@@ -6,6 +6,7 @@
 #include <boost/mpl/has_xxx.hpp>
 
 namespace Galois {
+//! Implementation of GraphLab v2/PowerGraph DSL in Galois
 namespace GraphLab {
 
 BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_needs_gather_in_edges)

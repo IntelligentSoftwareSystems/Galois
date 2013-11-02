@@ -8,6 +8,7 @@
 #include <boost/utility.hpp>
 
 namespace Galois {
+//! Implementation of GraphChi DSL in Galois
 namespace GraphChi {
 
 namespace hidden {

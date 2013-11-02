@@ -4,6 +4,7 @@
 #include "Galois/Galois.h"
 
 namespace Galois {
+//! Implementation of Ligra DSL in Galois
 namespace Ligra {
 
 namespace hidden {
