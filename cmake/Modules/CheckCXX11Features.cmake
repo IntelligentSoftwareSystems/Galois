@@ -35,6 +35,13 @@ int main(){
 }
 ")
 
+set(CheckAlignof
+"
+int main(){
+  return alignof(int) != 0;
+}
+")
+
 cmake_push_check_state()
 
 set(CMAKE_REQUIRED_FLAGS ${CXX11_FLAGS})
@@ -44,5 +51,7 @@ CHECK_CXX_SOURCE_COMPILES("${CheckUniformRealDistribution}"
   HAVE_CXX11_UNIFORM_REAL_DISTRIBUTION)
 CHECK_CXX_SOURCE_COMPILES("${CheckChrono}"
   HAVE_CXX11_CHRONO)
+CHECK_CXX_SOURCE_COMPILES("${CheckAlignof}"
+  HAVE_CXX11_ALIGNOF)
 
 cmake_pop_check_state()

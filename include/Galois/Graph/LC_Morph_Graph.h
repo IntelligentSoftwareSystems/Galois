@@ -217,10 +217,10 @@ public:
       local_edges->next = old;
       char* estart = newblock + sizeof(EdgeHolder);
       if ((uintptr_t)estart % sizeof(EdgeInfo)) // Not aligned
-#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
-        estart += sizeof(EdgeInfo) - ((uintptr_t)estart % 8);
-#else
+#ifdef HAVE_CXX11_ALIGNOF
         estart += sizeof(EdgeInfo) - ((uintptr_t)estart % alignof(EdgeInfo));
+#else
+        estart += sizeof(EdgeInfo) - ((uintptr_t)estart % 8);
 #endif
 
       local_edges->begin = (EdgeInfo*)estart;
