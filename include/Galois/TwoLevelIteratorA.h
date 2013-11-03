@@ -38,6 +38,9 @@
 
 namespace Galois {
 
+/**
+ * Alternate implementation of {@link ChooseTwoLevelIterator}.
+ */
 template<class OuterIter, class InnerIter, class CategoryOrTraversal, class InnerBeginFn, class InnerEndFn>
 class TwoLevelIteratorA : 
   public boost::iterator_adaptor<
@@ -342,11 +345,13 @@ public:
   }
 };
 
+//! Helper functor, returns <code>t.end()</code>
 struct GetBegin {
   template<class T> 
   auto operator()(T&& x) const -> decltype(std::forward<T>(x).begin()) { return std::forward<T>(x).begin(); }
 };
 
+//! Helper functor, returns <code>t.end()</code>
 struct GetEnd {
   template<class T> 
   auto operator()(T&& x) const -> decltype(std::forward<T>(x).end()) { return std::forward<T>(x).end(); }

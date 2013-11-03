@@ -31,6 +31,9 @@
 
 namespace Galois {
 
+/**
+ * Galois version of <code>boost::optional</code>.
+ */
 template<typename T>
 class optional {
   LazyObject<T> data_;

@@ -35,6 +35,9 @@
 
 namespace Galois {
 
+/**
+ * Basic per-thread statistics counter.
+ */
 class Statistic {
   std::string statname;
   std::string loopname;
@@ -73,7 +76,10 @@ public:
   }
 };
 
-//! Controls lifetime of stats. Users usually instantiate an instance in main.
+/**
+ * Controls lifetime of stats. Users usually instantiate in main to print out
+ * statistics at program exit.
+ */
 class StatManager: private boost::noncopyable {
   std::deque<Statistic*> stats;
 
@@ -91,6 +97,7 @@ public:
   }
 };
 
+//! Flag type for {@link StatTimer}
 struct start_now_t {};
 #if defined(__IBMCPP__) && __IBMCPP__ <= 1210
 static const start_now_t start_now = start_now_t();
@@ -148,5 +155,4 @@ public:
 };
 
 }
-
 #endif

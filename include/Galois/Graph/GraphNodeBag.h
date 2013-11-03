@@ -7,6 +7,9 @@
 
 namespace Galois {
 
+/**
+ * Stores graph nodes to execute for {@link Ligra} executor.
+ */
 template<unsigned int BlockSize = 0>
 class GraphNodeBag {
   typedef Galois::InsertBag<size_t, BlockSize> Bag;
@@ -106,6 +109,11 @@ public:
   }
 };
 
+/**
+ * Stores graph nodes to execute for {@link Ligra} executor. Unlike {@link
+ * GraphNodeBag}, this class stores two bags to facilitate bulk-synchronous
+ * processing.
+ */
 template<unsigned int BlockSize = 0>
 class GraphNodeBagPair {
   GraphNodeBag<BlockSize> bag1;

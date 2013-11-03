@@ -34,6 +34,7 @@
 
 namespace Galois {
 
+//! Simple map data structure, based off a single array.
 template<
   class _Key,
   class _Tp,

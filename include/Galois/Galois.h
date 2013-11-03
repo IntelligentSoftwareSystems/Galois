@@ -47,14 +47,18 @@
 namespace Galois {
 
 /**
- * Optional arguments to loops
+ * Specify name to appear in statistics. Optional argument to {@link do_all()}
+ * and {@link for_each()} loops.
  */
-
 struct loopname {
   const char* n;
   loopname(const char* n = 0) :n(n) {}
 };
 
+/**
+ * Specify whether @{link do_all()} loops should perform work-stealing. Optional
+ * argument to {@link do_all()} loops.
+ */
 struct do_all_steal {
   bool b;
   do_all_steal(bool b = false) :b(b) {}
@@ -62,6 +66,9 @@ struct do_all_steal {
 
 struct wl_tag {};
 
+/**
+ * Specify worklist to use. Optional argument to {@link for_each()} loops.
+ */
 template<typename WLTy>
 struct wl : public wl_tag {
   typedef WLTy WL;

@@ -90,6 +90,7 @@ namespace Galois {
     static const bool value = sizeof(test<T>(0)) == sizeof(yes); \
   }
 
+GALOIS_HAS_MEM_FUNC(galoisDeterministicParallelBreak, tf_deterministic_parallel_break);
 /**
  * Indicates the operator has a member function that allows a {@link Galois::for_each}
  * loop to be exited deterministically.
@@ -108,10 +109,10 @@ namespace Galois {
  * UserContext::breakLoop}, but unlike that function, these breaks are
  * deterministic.
  */
-GALOIS_HAS_MEM_FUNC(galoisDeterministicParallelBreak, tf_deterministic_parallel_break);
 template<typename T>
 struct has_deterministic_parallel_break : public has_tf_deterministic_parallel_break<T, bool(T::*)()> {};
 
+GALOIS_HAS_MEM_FUNC_ANY(galoisDeterministicId, tf_deterministic_id);
 /**
  * Indicates the operator has a member function that optimizes the generation
  * of unique ids for active elements. This function should be thread-safe.
@@ -125,10 +126,10 @@ struct has_deterministic_parallel_break : public has_tf_deterministic_parallel_b
  *  };
  * \endcode
  */
-GALOIS_HAS_MEM_FUNC_ANY(galoisDeterministicId, tf_deterministic_id);
 template<typename T>
 struct has_deterministic_id : public has_tf_deterministic_id<T> {};
 
+GALOIS_HAS_MEM_TYPE(GaloisDeterministicLocalState, tf_deterministic_local_state);
 /**
  * Indicates the operator has a member type that encapsulates state that is passed between 
  * the suspension and resumpsion of an operator during deterministic scheduling.
@@ -158,7 +159,6 @@ struct has_deterministic_id : public has_tf_deterministic_id<T> {};
  *  };
  * \endcode 
  */
-GALOIS_HAS_MEM_TYPE(GaloisDeterministicLocalState, tf_deterministic_local_state);
 template<typename T>
 struct has_deterministic_local_state : public has_tf_deterministic_local_state<T> {};
 
