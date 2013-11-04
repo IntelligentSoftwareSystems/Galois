@@ -59,7 +59,7 @@ void relax_edge(unsigned src_data, Graph::edge_iterator ii,
 struct SSSP {
   void operator()(UpdateRequest& req, Galois::UserContext<UpdateRequest>& ctx) const {
     unsigned& data = graph.getData(req.second);
-    if (req.first > data) return;
+    if (req.first >= data) return;
     
     for (Graph::edge_iterator ii = graph.edge_begin(req.second),
            ee = graph.edge_end(req.second); ii != ee; ++ii)
