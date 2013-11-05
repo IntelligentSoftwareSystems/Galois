@@ -40,8 +40,6 @@
 #include <deque>
 #include <cstdlib>
 
-#define SHOULD_PRODUCE_CERTIFICATE 0
-
 static const char* name = "Betweenness Centrality";
 static const char* desc = "Computes the betweenness centrality of all nodes in a graph";
 static const char* url  = "betweenness_centrality";
@@ -50,6 +48,7 @@ static llvm::cl::opt<std::string> filename(llvm::cl::Positional, llvm::cl::desc(
 static llvm::cl::opt<int> iterLimit("limit", llvm::cl::desc("Limit number of iterations to value (0 is all nodes)"), llvm::cl::init(0));
 static llvm::cl::opt<unsigned int> startNode("startNode", llvm::cl::desc("Node to start search from"), llvm::cl::init(0));
 static llvm::cl::opt<bool> forceVerify("forceVerify", llvm::cl::desc("Abort if not verified, only makes sense for torus graphs"));
+static llvm::cl::opt<bool> printAll("printAll", llvm::cl::desc("Print betweenness values for all nodes"));
 
 typedef Galois::Graph::LC_CSR_Graph<void, void>::with_no_lockable<true>::type
   ::with_numa_alloc<true>::type Graph;
@@ -59,6 +58,10 @@ Graph* G;
 int NumNodes;
 
 Galois::Runtime::PerThreadStorage<double*> CB;
+Galois::Runtime::PerThreadStorage<double*> perThreadSigma;
+Galois::Runtime::PerThreadStorage<int*> perThreadD;
+Galois::Runtime::PerThreadStorage<double*> perThreadDelta;
+Galois::Runtime::PerThreadStorage<Galois::gdeque<GNode>*> perThreadSucc;
 
 template<typename T>
 struct PerIt {  
@@ -67,16 +70,22 @@ struct PerIt {
 
 struct process {
   typedef int tt_does_not_need_aborts;
-  typedef int tt_needs_per_iter_alloc;
+  //typedef int tt_needs_per_iter_alloc;
   typedef int tt_does_not_need_push;
 
   void operator()(GNode& _req, Galois::UserContext<GNode>& lwl) {
-    typedef std::deque<GNode, PerIt<GNode>::Ty> GNdeque;
-    GNdeque SQ(lwl.getPerIterAlloc());
+    Galois::gdeque<GNode> SQ;
+    double* sigma = *perThreadSigma.getLocal();
+    int* d = *perThreadD.getLocal();
+    double* delta = *perThreadDelta.getLocal();
+    Galois::gdeque<GNode>* succ = *perThreadSucc.getLocal();
+
+#if 0
     std::deque<double, PerIt<double>::Ty> sigma(NumNodes, 0.0, lwl.getPerIterAlloc());
     std::deque<int, PerIt<int>::Ty> d(NumNodes, 0, lwl.getPerIterAlloc());
     std::deque<double, PerIt<double>::Ty> delta(NumNodes, 0.0, lwl.getPerIterAlloc());
     std::deque<GNdeque, PerIt<GNdeque>::Ty> succ(NumNodes, GNdeque(lwl.getPerIterAlloc()), lwl.getPerIterAlloc());
+#endif    
     unsigned int QAt = 0;
     
     int req = _req;
@@ -85,10 +94,8 @@ struct process {
     d[req] = 1;
     
     SQ.push_back(_req);
-    // Galois::Timer T;
-    // T.start();
-    while (QAt != SQ.size()) {
-      GNode _v = SQ[QAt++];
+    for (auto qq = SQ.begin(), eq = SQ.end(); qq != eq; ++qq) {
+      GNode _v = *qq;
       int v = _v;
       for (Graph::edge_iterator
           ii = G->edge_begin(_v, Galois::MethodFlag::NONE),
@@ -105,16 +112,13 @@ struct process {
 	}
       }
     }
-    // T.stop();
-    // Galois::Timer T2;
-    // T2.start();
-    while (SQ.size()) {
+    while (SQ.size() > 1) {
       int w = SQ.back();
       SQ.pop_back();
 
       double sigma_w = sigma[w];
       double delta_w = delta[w];
-      auto slist = succ[w];
+      auto& slist = succ[w];
       for (auto ii = slist.begin(), ee = slist.end(); ii != ee; ++ii) {
 	//std::cerr << "Processing node " << w << std::endl;
 	GNode v = *ii;
@@ -123,37 +127,39 @@ struct process {
       delta[w] = delta_w;
     }
     double* Vec = *CB.getLocal();
-    for (unsigned int i = 0; i < delta.size(); ++i) {
+    for (unsigned int i = 0; i < NumNodes; ++i) {
       Vec[i] += delta[i];
+      delta[i] = 0;
+      sigma[i] = 0;
+      d[i] = 0;
+      succ[i].clear();
     }
-    // T2.stop();
-    // std::cout << T.get() << " " << T2.get() << "\n";
   }
 };
 
 // Verification for reference torus graph inputs. 
 // All nodes should have the same betweenness value.
 void verify() {
-    double sampleBC = 0.0;
-    bool firstTime = true;
-    for (int i=0; i<NumNodes; ++i) {
-      double bc = (*CB.getRemote(0))[i];
-      for (unsigned int j = 1; j < Galois::getActiveThreads(); ++j)
-	bc += (*CB.getRemote(j))[i];
-      if (firstTime) {
-        sampleBC = bc;
-        std::cerr << "BC: " << sampleBC << std::endl;
-        firstTime = false;
-      } else {
-        if (!((bc - sampleBC) <= 0.0001)) {
-          std::cerr << "If torus graph, verification failed " << (bc - sampleBC) << "\n";
-          if (forceVerify)
-            abort();
-	  assert ((bc - sampleBC) <= 0.0001);
-	  return;
-	}
+  double sampleBC = 0.0;
+  bool firstTime = true;
+  for (int i=0; i<NumNodes; ++i) {
+    double bc = (*CB.getRemote(0))[i];
+    for (unsigned int j = 1; j < Galois::getActiveThreads(); ++j)
+      bc += (*CB.getRemote(j))[i];
+    if (firstTime) {
+      sampleBC = bc;
+      std::cerr << "BC: " << sampleBC << std::endl;
+      firstTime = false;
+    } else {
+      if (!((bc - sampleBC) <= 0.0001)) {
+        std::cerr << "If torus graph, verification failed " << (bc - sampleBC) << "\n";
+        if (forceVerify)
+          abort();
+        assert ((bc - sampleBC) <= 0.0001);
+        return;
       }
     }
+  }
 }
 
 void printBCcertificate() {
@@ -180,9 +186,31 @@ struct HasOut: public std::unary_function<GNode,bool> {
 };
 
 struct InitializeLocal {
+  template<typename T>
+  void initArray(T** addr) {
+    T* a = new T[NumNodes];
+    *addr = a;
+  }
   void operator()(unsigned, unsigned) {
-    *CB.getLocal() = (double*)malloc(NumNodes * sizeof(double));
-    std::fill(&(*CB.getLocal())[0], &(*CB.getLocal())[NumNodes], 0.0);
+    initArray(CB.getLocal());
+    initArray(perThreadSigma.getLocal());
+    initArray(perThreadD.getLocal());
+    initArray(perThreadDelta.getLocal());
+    initArray(perThreadSucc.getLocal());
+  }
+};
+
+struct DeleteLocal {
+  template<typename T>
+  void deleteArray(T** addr) {
+    delete [] *addr;
+  }
+  void operator()(unsigned, unsigned) {
+    deleteArray(CB.getLocal());
+    deleteArray(perThreadSigma.getLocal());
+    deleteArray(perThreadD.getLocal());
+    deleteArray(perThreadDelta.getLocal());
+    deleteArray(perThreadSucc.getLocal());
   }
 };
 
@@ -196,7 +224,6 @@ int main(int argc, char** argv) {
 
   NumNodes = G->size();
 
-  //CB.resize(NumNodes);
   Galois::on_each(InitializeLocal());
 
   Galois::reportPageAlloc("MeminfoPre");
@@ -233,17 +260,18 @@ int main(int argc, char** argv) {
       std::cout << i << ": " 
         << std::setiosflags(std::ios::fixed) << std::setprecision(6) << bc << "\n";
     }
-#if SHOULD_PRODUCE_CERTIFICATE
-    printBCcertificate();
-#endif
   }
+  if (printAll)
+    printBCcertificate();
 
   Galois::reportPageAlloc("MeminfoPost");
 
   if (forceVerify || !skipVerify) {
     verify();
   }
-  std::cerr << "Application done...\n";
+
+  // XXX(ddn): Could use unique_ptr but not supported on all our platforms :(
+  Galois::on_each(DeleteLocal());
 
   return 0;
 }
