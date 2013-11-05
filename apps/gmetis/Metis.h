@@ -48,11 +48,6 @@ class MetisNode {
     unsigned oldPartition;
     bool maybeBoundary;
   };
-  struct partitionData {
-    bool locked;
-  };
-
-  partitionData pd;
 
   void initCoarsen(){
     data.cd.matched = false;
@@ -61,24 +56,19 @@ class MetisNode {
   }
 
 public:
-  void initPartition() {
-    pd.locked = false;
-  }
   //int num;
   explicit MetisNode(int weight) :_weight(weight) {
     initCoarsen();
-    initPartition();
   }
   
   MetisNode(unsigned weight, GNode child0, GNode child1 = NULL)
     : _weight(weight) {
     initCoarsen();
-    initPartition();
     children[0] = child0;
     children[1] = child1;
   }
 
-  MetisNode():_weight(1) { initCoarsen(); initPartition();}
+  MetisNode():_weight(1) { initCoarsen(); }
 
   //call to switch data to refining
   void initRefine(unsigned part = 0, bool bound = false) {
@@ -109,9 +99,6 @@ public:
 
   bool getmaybeBoundary() const {return data.rd.maybeBoundary; }
   void setmaybeBoundary(bool val){ data.rd.maybeBoundary = val; }
-
-  void setLocked(bool locked) { pd.locked = locked;}
-  bool isLocked() { return pd.locked;}
 
 private:
   union {
