@@ -26,7 +26,9 @@
 
 #include "Galois/Runtime/ll/PaddedLock.h"
 #include "WLCompileCheck.h"
+
 #include <deque>
+#include <mutex>
 
 namespace Galois {
 namespace WorkList {
@@ -74,7 +76,7 @@ public:
     //guard against self stealing
     if (&victim == this) return retval;
     //Ordered lock to preent deadlock
-    if (!Runtime::LL::TryLockPairOrdered(*this, victim)) return retval;
+    if (-1 != std::try_lock(*this, victim)) return retval;
     if (half) {
       typename std::deque<T>::iterator split = split_range(victim.wl.begin(), victim.wl.end());
       wl.insert(wl.end(), victim.wl.begin(), split);
@@ -91,7 +93,8 @@ public:
       retval = wl.back();
       wl.pop_back();
     }
-    UnLockPairOrdered(*this, victim);
+    this->unlock();
+    victim.unlock();
     return retval;
   }
 

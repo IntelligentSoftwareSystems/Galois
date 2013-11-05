@@ -247,9 +247,9 @@ public:
 
   bool checkBreak(typename OptionsTy::function1_type& fn) {
     if (LL::getTID() == 0)
-      done.data = fn.galoisDeterministicParallelBreak();
+      done.get() = fn.galoisDeterministicParallelBreak();
     barrier.wait();
-    return done.data;
+    return done.get();
   }
 };
 
@@ -936,7 +936,7 @@ void Executor<OptionsTy>::go() {
       std::swap(tld.wlcur, tld.wlnext);
       setPending(PENDING);
       bool nextPending = pendingLoop(tld);
-      innerDone.data = true;
+      innerDone.get() = true;
 
       barrier.wait();
 
@@ -944,13 +944,13 @@ void Executor<OptionsTy>::go() {
 
       setPending(COMMITTING);
       bool nextCommit = commitLoop(tld);
-      outerDone.data = true;
+      outerDone.get() = true;
       if (nextPending || nextCommit)
-        innerDone.data = false;
+        innerDone.get() = false;
 
       barrier.wait();
 
-      if (innerDone.data)
+      if (innerDone.get())
         break;
 
       mergeManager.calculateWindow(tld.options, true);
@@ -962,10 +962,10 @@ void Executor<OptionsTy>::go() {
     }
 
     if (!mlocal.emptyReserve())
-      outerDone.data = false;
+      outerDone.get() = false;
 
     if (tld.hasNewWork)
-      hasNewWork.data = true;
+      hasNewWork.get() = true;
 
     if (breakManager.checkBreak(tld.options.fn1))
       break;
@@ -974,14 +974,14 @@ void Executor<OptionsTy>::go() {
 
     barrier.wait();
 
-    if (outerDone.data) {
+    if (outerDone.get()) {
       if (!OptionsTy::needsPush)
         break;
-      if (!hasNewWork.data) // (1)
+      if (!hasNewWork.get()) // (1)
         break;
       tld.hasNewWork = mergeManager.distributeNewWork(tld.wlnext);
       // NB: assumes that distributeNewWork has a barrier otherwise checking at (1) is erroneous
-      hasNewWork.data = false;
+      hasNewWork.get() = false;
     } else {
       mlocal.nextWindow(tld.wlnext);
     }

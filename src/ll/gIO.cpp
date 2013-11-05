@@ -44,7 +44,7 @@
 #include GALOIS_CXX11_STD_HEADER(mutex)
 
 static void printString(bool error, bool newline, const std::string prefix, const std::string s) {
-  static Galois::Runtime::LL::SimpleLock<true> IOLock;
+  static Galois::Runtime::LL::SimpleLock IOLock;
 //  if (Galois::Runtime::networkHostID == 0) {
     std::lock_guard<decltype(IOLock)> lock(IOLock);
     std::ostream& o = error ? std::cerr : std::cout;
@@ -73,7 +73,7 @@ void Galois::Runtime::LL::gDebugStr(const std::string& s) {
   os << "[" << time_str << " " << std::setw(3) << getTID() << "] " << s;
 
   if (EnvCheck("GALOIS_DEBUG_TO_FILE")) {
-    static Galois::Runtime::LL::SimpleLock<true> dIOLock;
+    static Galois::Runtime::LL::SimpleLock dIOLock;
     std::lock_guard<decltype(dIOLock)> lock(dIOLock);
     static std::ofstream debugOut;
     if (!debugOut.is_open()) {

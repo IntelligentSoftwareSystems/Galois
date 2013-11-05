@@ -56,7 +56,7 @@ inline void* alloc() {
 
 unsigned Galois::Runtime::PerBackend::nextLog2(unsigned size) {
   unsigned i = MIN_SIZE;
-  while ((1<<i) < size) {
+  while ((1U<<i) < size) {
     ++i;
   }
   if (i >= MAX_SIZE) { 

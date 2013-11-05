@@ -81,7 +81,7 @@ private:
     auto rp = range.local_pair();
     push(rp.first, rp.second);
     tlds.getLocal()->round = 1;
-    some.data = true;
+    some.get() = true;
   }
 
   Galois::optional<value_type> pop() {
@@ -98,16 +98,16 @@ private:
 
       barrier.wait();
       if (Runtime::LL::getTID() == 0) {
-        if (!some.data)
+        if (!some.get())
           empty = true;
-        some.data = false; 
+        some.get() = false; 
       }
       tld.round = (tld.round + 1) & 1;
       barrier.wait();
 
       r = wls[tld.round].pop();
       if (r) {
-        some.data = true;
+        some.get() = true;
         return r;
       }
     }

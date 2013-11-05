@@ -24,8 +24,6 @@
 #ifndef AVI_ODG_EXPLICIT_H
 #define AVI_ODG_EXPLICIT_H
 
-
-#include "Galois/Atomic.h"
 #include "Galois/Accumulator.h"
 #include "Galois/Galois.h"
 #include "Galois/Graph/Graph.h"

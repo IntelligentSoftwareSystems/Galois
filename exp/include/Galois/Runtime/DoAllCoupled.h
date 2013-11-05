@@ -173,7 +173,7 @@ class DoAllCoupledExec {
 
     typedef Range<Iter> Range_ty;
 
-    GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE LL::SimpleLock<true> range_mutex;
+    GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE LL::SimpleLock range_mutex;
     unsigned id;
 
     Range_ty range;

@@ -56,7 +56,7 @@ typedef Galois::Runtime::PerThreadVector<TypeHelper::Event_ty> AddList_ty;
 
 struct SimObjInfo: public TypeHelper {
 
-  typedef Galois::Runtime::LL::SimpleLock<true> Lock_ty;
+  typedef Galois::Runtime::LL::SimpleLock Lock_ty;
   typedef des::AbstractMain<SimInit_ty>::GNode GNode;
   typedef std::set<Event_ty, Cmp_ty
     , Galois::Runtime::MM::FSBGaloisAllocator<Event_ty> > PQ;

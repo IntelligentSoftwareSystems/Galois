@@ -115,7 +115,8 @@ public:
      didBreak(0)
   { }
 
-  //! Signal break in parallel loop
+  //! Signal break in parallel loop, current iteration continues
+  //! untill natural termination
   void breakLoop() {
     *didBreak = true;
   }
@@ -149,6 +150,12 @@ public:
     commitLog.push_back(f);
   }
 #endif 
+
+  //! declare that the operator has crossed the cautious point.  This
+  //! implies all data has been touched thus no new locks will be
+  //! acquired.
+  void cautiousPoint();
+
 };
 
 }

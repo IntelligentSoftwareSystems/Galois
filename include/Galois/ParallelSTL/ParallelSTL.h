@@ -168,7 +168,7 @@ struct partition_helper {
   struct partition_helper_state {
     RandomAccessIterator first, last;
     RandomAccessIterator rfirst, rlast;
-    Runtime::LL::SimpleLock<true> Lock;
+    Runtime::LL::SimpleLock Lock;
     Predicate pred;
     typename std::iterator_traits<RandomAccessIterator>::difference_type BlockSize() { return 1024; }
 

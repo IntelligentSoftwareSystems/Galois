@@ -38,53 +38,27 @@ namespace Galois {
 namespace Runtime {
 namespace LL {
 
-template<typename T, int REM>
-struct CacheLineImpl {
-  GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE T data;
-  char pad[REM];
-  
-  CacheLineImpl() :data() {}
-
-  CacheLineImpl(const T& v) :data(v) {}
-  
-  template<typename A>
-  explicit CacheLineImpl(A&& v) :data(std::forward<A>(v)) {}
-
-  explicit operator T() { return data; }
-};
-
-template<typename T>
-struct CacheLineImpl<T, 0> {
-  GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE T data;
-  
-  CacheLineImpl() :data() {}
-
-  CacheLineImpl(const T& v) :data(v) {}
-
-  template<typename A>
-  explicit CacheLineImpl(A&& v) :data(std::forward<A>(v)) {}
-
-  explicit operator T() { return data; }
-};
-
 // Store an item with padding
 template<typename T>
-struct CacheLineStorage : public CacheLineImpl<T, GALOIS_CACHE_LINE_SIZE % sizeof(T)> {
-  typedef CacheLineImpl<T, GALOIS_CACHE_LINE_SIZE % sizeof(T)> PTy;
-  
-  CacheLineStorage() :PTy() {}
+struct CacheLineStorage {
+  alignas(GALOIS_CACHE_LINE_SIZE) T data;
+  char buffer[GALOIS_CACHE_LINE_SIZE - sizeof(T)];
+  static_assert(sizeof(T) < GALOIS_CACHE_LINE_SIZE, "Too large a type");
 
-  CacheLineStorage(const T& v) :PTy(v) {}
+  CacheLineStorage() :data() {}
+  CacheLineStorage(const T& v) :data(v) {}
 
 // XXX(ddn): Forwarding is still wonky in XLC
 #if !defined(__IBMCPP__) || __IBMCPP__ > 1210
   template<typename A>
-  explicit CacheLineStorage(A&& v) :PTy(std::forward<A>(v)) {}
+  explicit CacheLineStorage(A&& v) :data(std::forward<A>(v)) {}
 #endif
 
-  explicit operator T() { return this->data; }
+  explicit operator T() { return data; }
 
-  CacheLineStorage& operator=(const T& v) { this->data = v; return *this; }
+  T& get() { return data; }
+  template<typename V>
+  CacheLineStorage& operator=(const V& v) { data = v; return *this; }
 };
 
 }

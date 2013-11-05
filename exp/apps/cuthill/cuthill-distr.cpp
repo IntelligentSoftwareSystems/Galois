@@ -136,7 +136,7 @@ struct SNode {
 	GNode parent;
 	//std::vector<Galois::Graph::LC_CSR_Graph<SNode, void>::GraphNode> bucket;
 	//Galois::gdeque<Galois::Graph::LC_CSR_Graph<SNode, void>::GraphNode>* bucket;
-	//Galois::Runtime::LL::SimpleLock<true> mutex;
+	//Galois::Runtime::LL::SimpleLock mutex;
 };
 
 typedef DummyGraph::with_node_data<SNode>::type Graph;
@@ -187,7 +187,7 @@ GNode source, report;
 //std::vector< std::vector<GNode> > bucket;
 //Galois::gdeque<GNode> bucket;
 Galois::InsertBag<GNode> bucket;
-Galois::Runtime::LL::SimpleLock<true> dbglock;
+Galois::Runtime::LL::SimpleLock dbglock;
 
 std::vector< std::map<GNode, unsigned int> > redbuck;
 

@@ -50,7 +50,7 @@ struct EmptyFn {
 template<class FunctionTy, class ReduceFunTy, class RangeTy>
 class DoAllWork {
   typedef typename RangeTy::local_iterator local_iterator;
-  LL::SimpleLock<true> reduceLock;
+  LL::SimpleLock reduceLock;
   FunctionTy origF;
   FunctionTy outputF;
   ReduceFunTy RF;
@@ -62,7 +62,7 @@ class DoAllWork {
   struct SharedState {
     local_iterator stealBegin;
     local_iterator stealEnd;
-    LL::SimpleLock<true> stealLock;
+    LL::SimpleLock stealLock;
   };
 
   struct PrivateState {

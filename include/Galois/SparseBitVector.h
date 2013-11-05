@@ -38,7 +38,7 @@ namespace Galois {
  */
 struct SparseBitVector {
   typedef unsigned long WORD;
-  typedef Galois::Runtime::LL::SimpleLock<true> LockType;
+  typedef Galois::Runtime::LL::SimpleLock LockType;
   static const unsigned wordsize = sizeof(WORD)*8;
 
   struct OneWord {

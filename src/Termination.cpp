@@ -56,7 +56,7 @@ class LocalTerminationDetection : public TerminationDetection {
   }
 
   void propGlobalTerm() {
-    globalTerm.data = true;
+    globalTerm = true;
   }
 
   bool isSysMaster() const {
@@ -72,14 +72,14 @@ public:
     th.tokenIsBlack = false;
     th.processIsBlack = true;
     th.lastWasWhite = true;
-    globalTerm.data = false;
+    globalTerm = false;
     if (isSysMaster()) {
       th.hasToken = true;
     }
   }
 
   virtual void localTermination(bool workHappened) {
-    assert(!(workHappened && globalTerm.data));
+    assert(!(workHappened && globalTerm.get()));
     TokenHolder& th = *data.getLocal();
     th.processIsBlack |= workHappened;
     if (th.hasToken) {
@@ -94,7 +94,7 @@ public:
 	th.lastWasWhite = !failed;
       }
       //Normal thread or recirc by master
-      assert (!globalTerm.data && "no token should be in progress after globalTerm");
+      assert (!globalTerm.get() && "no token should be in progress after globalTerm");
       bool taint = th.processIsBlack || th.tokenIsBlack;
       th.processIsBlack = th.tokenIsBlack = false;
       th.hasToken = false;
@@ -174,7 +174,7 @@ class TreeTerminationDetection : public TerminationDetection {
   }
 
   void propGlobalTerm() {
-    globalTerm.data = true;
+    globalTerm = true;
   }
 
   bool isSysMaster() const {
@@ -192,7 +192,7 @@ public:
     th.processIsBlack = true;
     th.hasToken = false;
     th.lastWasWhite = false;
-    globalTerm.data = false;
+    globalTerm = false;
     th.parent = (LL::getTID() - 1) / num;
     th.parent_offset = (LL::getTID() - 1) % num;
     for (int i = 0; i < num; ++i) {
@@ -208,7 +208,7 @@ public:
   }
 
   virtual void localTermination(bool workHappened) {
-    assert(!(workHappened && globalTerm.data));
+    assert(!(workHappened && globalTerm.get()));
     TokenHolder& th = *data.getLocal();
     th.processIsBlack |= workHappened;
     processToken();

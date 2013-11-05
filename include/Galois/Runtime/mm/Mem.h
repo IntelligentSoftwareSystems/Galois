@@ -117,7 +117,7 @@ public:
 //! Apply a lock to a heap
 template<class RealHeap>
 class LockedHeap : public RealHeap {
-  LL::SimpleLock<true> lock;
+  LL::SimpleLock lock;
 public :
   enum { AllocSize = RealHeap::AllocSize };
 
@@ -265,7 +265,7 @@ public:
   }
 
   inline void* allocate(size_t size) {
-    static LL::SimpleLock<true> lock;
+    static LL::SimpleLock lock;
 
     lock.lock();
     FreeNode* OH = 0;
@@ -521,7 +521,7 @@ private:
   static LL::PtrLock<SizedAllocatorFactory, true> instance;
   typedef std::map<size_t, SizedAlloc*> AllocatorsMap;
   AllocatorsMap allocators;
-  LL::SimpleLock<true> lock;
+  LL::SimpleLock lock;
 
   SizedAlloc* getAllocForSize(const size_t);
 

@@ -199,7 +199,7 @@ class SyncEngine {
   Messages messages;
   Galois::LargeArray<int> scoreboard;
   Galois::InsertBag<GNode> wls[2];
-  Galois::Runtime::LL::SimpleLock<true> lock;
+  Galois::Runtime::LL::SimpleLock lock;
 
   struct Gather {
     SyncEngine* self;

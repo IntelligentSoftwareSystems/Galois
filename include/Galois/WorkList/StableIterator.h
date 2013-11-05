@@ -54,7 +54,7 @@ private:
   struct shared_state {
     Iterator stealBegin;
     Iterator stealEnd;
-    Runtime::LL::SimpleLock<true> stealLock;
+    Runtime::LL::SimpleLock stealLock;
     bool stealAvail;
     void resetAvail() {
       if (stealBegin != stealEnd)

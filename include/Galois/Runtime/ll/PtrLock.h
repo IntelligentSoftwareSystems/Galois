@@ -68,7 +68,7 @@ class PtrLock<T, true> {
   }
 
 public:
-  PtrLock() : _lock(0) {}
+  constexpr PtrLock() : _lock(0) {}
   //relaxed order for copy
   PtrLock(const PtrLock& p) : _lock(p._lock.load(std::memory_order_relaxed)) {}
 

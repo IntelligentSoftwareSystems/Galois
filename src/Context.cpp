@@ -70,11 +70,11 @@ PendingStatus pendingStatus;
 }
 
 void Galois::Runtime::setPending(Galois::Runtime::PendingFlag value) {
-  pendingStatus.flag.data = value;
+  pendingStatus.flag = value;
 }
 
 Galois::Runtime::PendingFlag Galois::Runtime::getPending() {
-  return pendingStatus.flag.data;
+  return pendingStatus.flag.get();
 }
 
 void Galois::Runtime::doCheckWrite() {

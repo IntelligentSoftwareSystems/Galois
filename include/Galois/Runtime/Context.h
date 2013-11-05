@@ -136,7 +136,7 @@ class Lockable {
   friend class LockManagerBase;
   friend class SimpleRuntimeContext;
 public:
-  Lockable() :next(0) {}
+  constexpr Lockable() :next(0) {}
 };
 
 class LockManagerBase: private boost::noncopyable {

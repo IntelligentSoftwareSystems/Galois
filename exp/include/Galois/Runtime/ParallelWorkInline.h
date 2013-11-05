@@ -334,12 +334,12 @@ class BSInlineExecutor {
 
       if (tid == 0) {
         if (empty(cur))
-          done.data = true;
+          done.get() = true;
       }
       
       barrier.wait();
 
-      if (done.data)
+      if (done.get())
         break;
     }
 

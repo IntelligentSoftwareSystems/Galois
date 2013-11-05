@@ -1651,7 +1651,8 @@ class BarrierOBIM : private boost::noncopyable {
 
 template<typename T = int, bool concurrent = true>
 class Random : private boost::noncopyable {
-  std::pair<Runtime::LL::SimpleLock<concurrent>, std::deque<T> > wl[128];
+  typedef typename std::conditional<concurrent, Runtime::LL::SimpleLock, Runtime::LL::DummyLock>::type LockTy;
+  std::pair<LockTy, std::deque<T> > wl[128];
   struct rstate { unsigned short d[3]; };
   Runtime::PerThreadStorage<rstate > seeds;
 

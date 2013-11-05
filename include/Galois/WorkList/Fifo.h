@@ -25,7 +25,9 @@
 
 #include "Galois/Runtime/ll/PaddedLock.h"
 #include "WLCompileCheck.h"
+
 #include <deque>
+#include <mutex>
 
 namespace Galois {
 namespace WorkList {
@@ -69,12 +71,13 @@ public:
   }
 
   void steal(FIFO& victim) {
-    if (!Runtime::LL::TryLockPairOrdered(*this, victim))
+    if (-1 != std::try_lock(*this, victim))
       return;
     typename std::deque<T>::iterator split = split_range(victim.wl.begin(), wl.victim.end());
     wl.insert(wl.end(), victim.wl.begin(), split);
     victim.wl.erase(victim.wl.begin(), split);
-    UnLockPairOrdered(*this, victim);
+    this->unlock();
+    victim.unlock();
   }
 
   Galois::optional<value_type> pop() {
