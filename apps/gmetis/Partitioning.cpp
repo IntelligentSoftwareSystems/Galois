@@ -27,9 +27,13 @@
 #include "Galois/Statistic.h"
 #include "Metis.h"
 #include <set>
+#include "Galois/Galois.h"
+#include <map>
+#include <set>
 #include <cstdlib>
 #include <iostream>
-
+#include <stack>
+#include <climits>
 const bool multiSeed = true;
 
 namespace {
@@ -40,9 +44,10 @@ int gain_limited(GGraph& g, GNode n, unsigned newpart, Galois::MethodFlag flag) 
   unsigned nPart = g.getData(n,flag).getPart();
   for (auto ii = g.edge_begin(n,flag), ee =g.edge_end(n,flag); ii != ee; ++ii) {
     GNode neigh = g.getEdgeDst(ii);
-    if (g.getData(neigh,flag).getPart() == nPart)
+    auto nData = g.getData(neigh,flag);
+    if (nData.getPart() == nPart)
       retval -= g.getEdgeData(ii,flag);
-    else if (g.getData(neigh,flag).getPart() == newpart)
+    else if (nData.getPart() == newpart)
       retval += g.getEdgeData(ii,flag);
   }
   return retval;
@@ -51,9 +56,19 @@ int gain_limited(GGraph& g, GNode n, unsigned newpart, Galois::MethodFlag flag) 
 
 GNode findSeed(GGraph& g, unsigned partNum, int partWeight, Galois::MethodFlag flag) {
   //pick a seed
+  
   int rWeight = (int)(drand48()*(partWeight));
   GNode seed;
-
+  /*std::vector<std::pair<int,GNode> > nodeEd;
+  for (auto ii = g.begin(), ee = g.end(); ii != ee; ++ii) {
+    if (g.getData(*ii, flag).getPart() == partNum) {
+      seed = *ii;
+      nodeEd.push_back(std::make_pair(std::distance(g.edge_begin(*ii),g.edge_end(*ii)),*ii));
+    }
+  }
+  std::sort(nodeEd.begin(),nodeEd.end());
+  return nodeEd[nodeEd.size()-1].second;
+  */
   for (auto ii = g.begin(), ee = g.end(); ii != ee; ++ii) {
     if (g.getData(*ii, flag).getPart() == partNum) {
       seed = *ii;
@@ -67,7 +82,7 @@ GNode findSeed(GGraph& g, unsigned partNum, int partWeight, Galois::MethodFlag f
 
 
 struct bisect_GGP {
-  partInfo operator()(GGraph& g, partInfo& oldPart, std::pair<unsigned, unsigned> ratio) {
+  partInfo operator()(GGraph& g, partInfo& oldPart, std::pair<unsigned, unsigned> ratio,std::vector<GNode> *b = NULL, int oldWeight = 0) {
     partInfo newPart = oldPart.split();
     std::deque<GNode> boundary;
     unsigned& newWeight = newPart.partWeight = 0;
@@ -77,7 +92,6 @@ struct bisect_GGP {
 
     do {
       boundary.push_back(findSeed(g, oldPart.partNum, oldPart.partWeight, flag));
-
       //grow partition
       while (newWeight < targetWeight && !boundary.empty()) {
         GNode n =  boundary.front();
@@ -86,6 +100,7 @@ struct bisect_GGP {
           continue;
         newWeight += g.getData(n, flag).getWeight();
         g.getData(n, flag).setPart(newPart.partNum);
+        if(b) b->push_back(n);
         for (auto ii = g.edge_begin(n, flag), ee = g.edge_end(n, flag); ii != ee; ++ii)
           if (g.getData(g.getEdgeDst(ii), flag).getPart() == oldPart.partNum)
             boundary.push_back(g.getEdgeDst(ii));
@@ -99,19 +114,21 @@ struct bisect_GGP {
 
 
 struct bisect_GGGP {
-  partInfo operator()(GGraph& g, partInfo& oldPart, std::pair<unsigned, unsigned> ratio) {
+  partInfo operator()(GGraph& g, partInfo& oldPart, std::pair<unsigned, unsigned> ratio,std::vector<GNode> *b = NULL, int oldWeight = 0) {
     partInfo newPart = oldPart.split();
     std::map<GNode, int> gains;
     std::map<int, std::set<GNode>> boundary;
 
-    unsigned& newWeight = newPart.partWeight = 0;
+    unsigned& newWeight = newPart.partWeight = oldWeight;
     unsigned targetWeight = oldPart.partWeight * ratio.second / (ratio.first + ratio.second);
     //pick a seed
 
     auto flag = Galois::MethodFlag::NONE;
 
     do {
-      boundary[0].insert(findSeed(g, oldPart.partNum, oldPart.partWeight, flag));
+      //boundary[0].insert(findSeed(g, oldPart.partNum, oldPart.partWeight, flag));
+      GNode bNode = findSeed(g, oldPart.partNum, oldPart.partWeight, flag);
+      boundary[gain_limited(g,bNode, newPart.partNum, flag)].insert(bNode);
 
       //grow partition
       while (newWeight < targetWeight && !boundary.empty()) {
@@ -124,6 +141,7 @@ struct bisect_GGGP {
           continue;
         newWeight += g.getData(n, flag).getWeight();
         g.getData(n, flag).setPart(newPart.partNum);
+        if(b) b->push_back(n);
         for (auto ii = g.edge_begin(n, flag), ee = g.edge_end(n, flag); ii != ee; ++ii) {
           GNode dst = g.getEdgeDst(ii);
           auto gi = gains.find(dst);
@@ -132,7 +150,7 @@ struct bisect_GGGP {
             if (boundary[gi->second].empty())
               boundary.erase(gi->second);
             gains.erase(dst);
-          }
+          } 
           if (g.getData(dst, flag).getPart() == oldPart.partNum) {
             int newgain = gains[dst] = gain_limited(g, dst, newPart.partNum, flag);
             boundary[newgain].insert(dst);
@@ -143,6 +161,230 @@ struct bisect_GGGP {
 
     oldPart.partWeight -= newWeight;
     return newPart;
+  }
+};
+
+int computeEdgeCut(GGraph& g) {
+  int cuts=0;
+  for (auto nn = g.begin(), en = g.end(); nn != en; ++nn) {
+    unsigned gPart = g.getData(*nn).getPart();
+    for (auto ii = g.edge_begin(*nn), ee = g.edge_end(*nn); ii != ee; ++ii) {
+      auto& m = g.getData(g.getEdgeDst(ii));
+      if (m.getPart() != gPart) {
+        cuts += g.getEdgeData(ii);
+      }
+    }
+  }
+
+  return cuts/2;
+}
+int node_gain(GGraph &graph, GNode node) {
+  auto nData = graph.getData(node,Galois::MethodFlag::NONE); 
+  int gain = 0;
+  for (auto ei = graph.edge_begin(node),ee=graph.edge_begin(node);ei!=ee;ei++) { 
+    auto neigh = graph.getEdgeDst(ei); 
+    int ew = graph.getEdgeData(ei); 
+    auto neighData = graph.getData(neigh,Galois::MethodFlag::NONE);
+    if (nData.getPart() != neighData.getPart()) { 
+      gain += ew;
+    } else {
+      gain -= ew;
+    }
+  }
+  return gain;
+}
+
+typedef std::pair<int,std::pair<GNode,GNode> > PartMatch;
+typedef Galois::Runtime::PerThreadStorage<PartMatch > PerThreadPartInfo;
+struct KLMatch {
+  GGraph &graph;
+  PerThreadPartInfo &threadInfo;
+  int oldPartNum;
+  int newPartNum;
+  KLMatch(GGraph &g,PerThreadPartInfo &ti, 
+    int oldPartNum, int newPartNum):graph(g),threadInfo(ti) {
+    this->oldPartNum = oldPartNum;
+    this->newPartNum = newPartNum;
+  }
+  bool isPartOk(int partNum) { 
+    return (partNum == oldPartNum || partNum == newPartNum);
+  }
+  bool isNodeOk(MetisNode &node) { 
+    return !node.isLocked() && isPartOk(node.getPart());
+  }
+  template<typename Context>
+  void operator()(GNode node, Context& lwl) {
+    auto flag = Galois::MethodFlag::NONE;
+    PartMatch *localInfo = threadInfo.getLocal();
+    int gain = localInfo->first;
+    auto& srcData = graph.getData(node,flag);
+    int srcGain = 0;
+    if (!isNodeOk(srcData)) {
+      return;
+    }
+    
+    for (auto ei = graph.edge_begin(node,flag), 
+      ee = graph.edge_end(node,flag); ei != ee; ei++) {
+      int ew = graph.getEdgeData(ei,flag);
+      GNode n = graph.getEdgeDst(ei);
+      auto& nData = graph.getData(n,flag);
+      if (!isNodeOk(nData)) {
+        continue;
+      }
+      if (nData.getPart() == srcData.getPart()) {
+        srcGain -= ew;
+      } else {
+        srcGain += ew;
+      }
+    }
+    for (auto ei = graph.edge_begin(node,flag), 
+      ee = graph.edge_end(node,flag); ei != ee; ei++) {
+      GNode n = graph.getEdgeDst(ei);
+      auto nData = graph.getData(n,flag);
+      int nw = graph.getEdgeData(ei,flag);
+      int neighGain = 0;
+      if (!isNodeOk(nData) || nData.getPart() == srcData.getPart()) {
+        continue;
+      }
+      for (auto nei = graph.edge_begin(n,flag),
+        nee = graph.edge_end(n,flag); nei != nee; nei++) {
+        int ew = graph.getEdgeData(nei,flag);
+        GNode nn = graph.getEdgeDst(nei);
+        auto nnData = graph.getData(nn,flag);
+        if (!isNodeOk(nnData)) {
+          continue;
+        }
+        if (nnData.getPart() == nData.getPart()) {
+          neighGain -= ew;
+        } else {
+          neighGain += ew;
+        }
+      }
+      int totalGain = srcGain + neighGain - 2 * nw;
+      if ( totalGain > gain) { 
+        gain = totalGain;
+        localInfo->first = gain;
+        localInfo->second.first = node;
+        localInfo->second.second = n;
+      }
+    }
+    
+  }
+};
+void refine_kl(GGraph &graph,std::vector<GNode> &boundary,int oldPartNum, int newPartNum,std::vector<partInfo>& parts) {
+  std::vector<GNode> swappedNodes;
+  std::vector<PartMatch> foundNodes;
+  int iter = 0;
+  do {
+    std::vector<PartMatch> matches;
+    for (int j = 0; j < boundary.size(); j++) {
+      PerThreadPartInfo iterationInfo;
+      for (int i = 0; i < iterationInfo.size(); i++) {
+        iterationInfo.getRemote(i)->first = INT_MIN;
+        iterationInfo.getRemote(i)->second.first = NULL; 
+        iterationInfo.getRemote(i)->second.second = NULL; 
+      }
+      KLMatch matchIter(graph,iterationInfo,oldPartNum,newPartNum);
+      Galois::for_each(boundary.begin(),boundary.end(), matchIter,Galois::wl<Galois::WorkList::ChunkedLIFO<32> >());
+      PartMatch bestMatch;
+      bestMatch.first = INT_MIN;
+      for ( int i = 0; i < iterationInfo.size(); i++) {
+        PartMatch match = *iterationInfo.getRemote(i);
+        if (match.first > bestMatch.first) {
+          bestMatch = match;
+        }
+      }
+      if (bestMatch.second.first == NULL || bestMatch.second.second == NULL) 
+        break;
+      auto& m1 = graph.getData(bestMatch.second.first);
+      auto& m2 = graph.getData(bestMatch.second.second);
+      m1.setLocked(true);
+      m2.setLocked(true);
+      matches.push_back(bestMatch);
+      foundNodes.push_back(bestMatch);
+    }
+    if (matches.size() == 0) {
+      break;
+    }
+    int g_max = 0;
+    int temp = 0;
+    int index = -1;
+    for (int k = 0; k < matches.size(); k++) { 
+      g_max+= matches[k].first;
+      if ( g_max > temp) { 
+        temp = g_max; 
+        index = k;
+      }
+    }
+    g_max = temp;
+
+    if (g_max <=0 || index < 0) 
+      break;
+    
+    for (int i= 0; i <= index; i++) { 
+      PartMatch match = matches[i];
+      GNode n1 = match.second.first; 
+      GNode n2 = match.second.second;
+      auto& n1Data = graph.getData(n1); 
+      auto& n2Data = graph.getData(n2);
+      int p1 = n1Data.getPart(); 
+      int p2 = n2Data.getPart();
+      parts[p1].partWeight += (n2Data.getWeight() - n1Data.getWeight());
+      parts[p2].partWeight += (n1Data.getWeight() - n2Data.getWeight());
+      n1Data.setPart(p2);
+      n2Data.setPart(p1);
+      swappedNodes.push_back(n1);
+      swappedNodes.push_back(n2);
+    }
+    for (int i = index+1; i<matches.size(); i++) { 
+      auto& m1 = graph.getData(matches[i].second.first);
+      auto& m2 = graph.getData(matches[i].second.second);
+      m1.setLocked(false);
+      m2.setLocked(false);
+    }
+  }while(true);
+  for (PartMatch match : foundNodes) {
+    graph.getData(match.second.first).setLocked(false);
+    graph.getData(match.second.second).setLocked(false);
+  }
+}
+
+template<typename bisector>
+struct serialBisect {
+  unsigned totalWeight;
+  unsigned nparts;
+  GGraph* graph;
+  bisector bisect;
+  std::vector<partInfo>& parts;
+  std::stack<partInfo*> workList;
+  MetisGraph *mcg;
+  serialBisect(MetisGraph* mg, unsigned parts, std::vector<partInfo>& pb, bisector b = bisector())
+    :totalWeight(mg->getTotalWeight()), nparts(parts), graph(mg->getGraph()), bisect(b), parts(pb)
+  {
+    workList.push(&(this->parts[0]));
+    mcg = mg;
+  }
+  void operator()() {
+    while(!workList.empty())  {
+     partInfo *item = workList.top();
+     workList.pop();
+     if (item->splitID() >= nparts) //when to stop
+      continue;
+     std::pair<unsigned, unsigned> ratio = item->splitRatio(nparts);
+     std::vector<GNode> newNodes;
+     int iter = 0;
+     partInfo newPart;
+     newPart.partWeight = 0;
+     newPart = bisect(*graph, *item, ratio,&newNodes,newPart.partWeight);
+     parts[newPart.partNum] = newPart;
+     refine_kl(*graph,newNodes,item->partNum,newPart.partNum,parts);
+     newPart.partWeight = parts[newPart.partNum].partWeight; 
+     item->partWeight = parts[item->partNum].partWeight;
+     //unsigned targetWeight = item->partWeight * ratio.second / (ratio.first + ratio.second);
+     item->partWeight = parts[item->partNum].partWeight; 
+     workList.push(&(parts[newPart.partNum]));
+     workList.push(item);
+    }
   }
 };
 
@@ -176,6 +418,7 @@ struct initPart {
   initPart(GGraph& _g): g(_g) {}
   void operator()(GNode item) {
     g.getData(item, Galois::MethodFlag::NONE).initRefine(0,true);
+    g.getData(item, Galois::MethodFlag::NONE).initPartition();
   }
 };
 
@@ -186,18 +429,25 @@ std::vector<partInfo> partition(MetisGraph* mcg, unsigned numPartitions, Initial
   std::vector<partInfo> parts(numPartitions);
   parts[0] = partInfo(mcg->getTotalWeight());
   Galois::do_all_local(*mcg->getGraph(), initPart(*mcg->getGraph()));
-  switch (partMode) {
-    case GGP:
-      std::cout <<"\n  Sarting initial partitioning using GGP:\n";
-      Galois::for_each(&parts[0], parallelBisect<bisect_GGP>(mcg, numPartitions, parts), Galois::wl<Galois::WorkList::ChunkedLIFO<1>>());
-      break;
-    case GGGP:
-      std::cout <<"\n  Sarting initial partitioning using GGGP:\n";
-      Galois::for_each(&parts[0], parallelBisect<bisect_GGGP>(mcg, numPartitions, parts), Galois::wl<Galois::WorkList::ChunkedLIFO<1>>());
-      break;
-    default: abort();
+  bool serialPartition = false;
+  if (serialPartition) {
+  serialBisect<bisect_GGGP>(mcg, numPartitions, parts)();
+  } else {
+    switch (partMode) {
+      case GGP:
+        std::cout <<"\n  Sarting initial partitioning using GGP:\n";
+        Galois::for_each(&parts[0], parallelBisect<bisect_GGP>(mcg, numPartitions, parts), Galois::wl<Galois::WorkList::ChunkedLIFO<1>>());
+        break;
+      case GGGP:
+        std::cout <<"\n  Sarting initial partitioning using GGGP:\n";
+        Galois::for_each(&parts[0], parallelBisect<bisect_GGGP>(mcg, numPartitions, parts), Galois::wl<Galois::WorkList::ChunkedLIFO<1>>());
+        break;
+      default: abort();
+    }
   }
+  std::cout<<computeEdgeCut(*(mcg->getGraph()))<<std::endl;
   printPartStats(parts);
+  // XXX(ddn): Leave commented out until we have balance() defined.
 #if 0
   if (!multiSeed) {
     printPartStats(parts);
@@ -206,25 +456,9 @@ std::vector<partInfo> partition(MetisGraph* mcg, unsigned numPartitions, Initial
   }
 #endif
   static_assert(multiSeed, "not yet implemented");
-
   return parts;
 }
 namespace {
-int computeEdgeCut(GGraph& g) {
-  int cuts=0;
-  for (auto nn = g.begin(), en = g.end(); nn != en; ++nn) {
-    unsigned gPart = g.getData(*nn).getPart();
-    for (auto ii = g.edge_begin(*nn), ee = g.edge_end(*nn); ii != ee; ++ii) {
-      auto& m = g.getData(g.getEdgeDst(ii));
-      if (m.getPart() != gPart) {
-        cuts += g.getEdgeData(ii);
-      }
-    }
-  }
-
-  return cuts/2;
-}
-
 int edgeCount(GGraph& g) {
   int count=0;
   for (auto nn = g.begin(), en = g.end(); nn != en; ++nn) {
