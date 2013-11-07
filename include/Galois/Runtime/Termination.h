@@ -30,10 +30,11 @@
 #ifndef GALOIS_RUNTIME_TERMINATION_H
 #define GALOIS_RUNTIME_TERMINATION_H
 
+#include "Galois/config.h"
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/ll/CacheLineStorage.h"
 
-#include <atomic>
+#include GALOIS_CXX11_STD_HEADER(atomic)
 
 namespace Galois {
 namespace Runtime {

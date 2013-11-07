@@ -41,7 +41,12 @@ namespace LL {
 // Store an item with padding
 template<typename T>
 struct CacheLineStorage {
-  alignas(GALOIS_CACHE_LINE_SIZE) T data;
+#if !defined(__IBMCPP__) || __IBMCPP__ > 1210
+  alignas(GALOIS_CACHE_LINE_SIZE) 
+#else
+  GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE
+#endif
+    T data;
   char buffer[GALOIS_CACHE_LINE_SIZE - sizeof(T)];
   static_assert(sizeof(T) < GALOIS_CACHE_LINE_SIZE, "Too large a type");
 

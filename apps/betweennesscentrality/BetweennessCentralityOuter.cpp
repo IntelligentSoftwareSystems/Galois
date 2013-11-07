@@ -108,7 +108,7 @@ struct process {
 	}
 	if (d[w] == d[v] + 1) {
 	  sigma[w] = sigma[w] + sigma[v];
-	  succ[v].push_back(w);
+	  succ[v].push_back(_w);
 	}
       }
     }
