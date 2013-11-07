@@ -24,11 +24,12 @@
 #ifndef GALOIS_WORKLIST_LIFO_H
 #define GALOIS_WORKLIST_LIFO_H
 
+#include "Galois/config.h"
 #include "Galois/Runtime/ll/PaddedLock.h"
 #include "WLCompileCheck.h"
 
 #include <deque>
-#include <mutex>
+#include GALOIS_CXX11_STD_HEADER(mutex)
 
 namespace Galois {
 namespace WorkList {
