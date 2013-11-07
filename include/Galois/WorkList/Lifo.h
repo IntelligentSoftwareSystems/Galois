@@ -28,6 +28,7 @@
 #include "WLCompileCheck.h"
 
 #include <deque>
+#include <mutex>
 
 namespace Galois {
 namespace WorkList {
