@@ -33,6 +33,60 @@
 
 #include <fstream>
 
+class decompIterator {
+  uint8_t* base;
+  uint32_t state;
+  bool done;
+  
+  uint32_t decodeOne(uint8_t* b) {
+    uint32_t rd = *b++;
+    auto num = __builtin_clz(rd) - 24;
+    while (num--) {
+      rd <<= 8;
+      rd |= *b++;
+    }
+    return rd;
+  }
+
+  uint8_t* skipOne(uint8_t* b) {
+    uint32_t val = *b;
+    auto num = 1 + __builtin_clz(val) - 24;
+    b += num;
+    return b;
+  }
+
+  void updateState() {
+    if (run) {
+      state += delta;
+      --run;
+    } else {
+      delta = decodeOne(base);
+      state += delta;
+      if (rd <= 1) {
+	base = skipOne(base);
+	run = decodeOne(base);
+      }
+    }
+    done = true;
+  }
+
+public:
+  decompIterator(uint8_t* b = nullptr) :base(b), state(0), done(false) {}
+  
+  uint32_t operator*() {
+    if (!done)
+      updateState();
+    return state;
+  }
+
+  decompIterator& operator++() {
+    if (!done)
+      updateState();
+    base = skipOne(base);
+    done = false;
+  }
+};
+
 template<typename Iter>
 void deltaCode(Iter b, Iter e) {
   if (b == e) return;
@@ -52,31 +106,30 @@ std::deque<uint8_t> varCodeBW(Iter b, Iter e) {
   while (b != e) {
     uint32_t tmp = *b++;
     int numbits = 32 - __builtin_clz(tmp|1);
-    //    auto oldsz = retval.size();
     if (numbits <= 7) {
       assert((0x7F & tmp) == tmp);
       retval.push_back(0x80 | tmp);
     } else if (numbits <= 14) {
       assert((0x3FFF & tmp) == tmp);
-      retval.push_back(0x80 | (tmp >> 7));
-      retval.push_back((tmp & 0x7F));
+      retval.push_back(0x40 | (tmp >> 8));
+      retval.push_back((tmp & 0xFF));
     } else if (numbits <= 21) {
       assert((0x1FFFFF & tmp) == tmp);
-      retval.push_back(0x80 | (tmp >> 14));
-      retval.push_back((tmp >> 7) & 0x7F);
-      retval.push_back((tmp & 0x7F));
+      retval.push_back(0x20 | (tmp >> 16));
+      retval.push_back((tmp >> 8) & 0xFF);
+      retval.push_back((tmp & 0xFF));
     } else if (numbits <= 28) {
       assert((0x0FFFFFFF & tmp) == tmp);
-      retval.push_back(0x80 | (tmp >> 21));
-      retval.push_back((tmp >> 14) & 0x7F);
-      retval.push_back((tmp >>  7) & 0x7F);
-      retval.push_back((tmp & 0x7F));
+      retval.push_back(0x10 | (tmp >> 24));
+      retval.push_back((tmp >> 16) & 0xFF);
+      retval.push_back((tmp >>  8) & 0xFF);
+      retval.push_back((tmp & 0xFF));
     } else {
-      retval.push_back(0x80 | (tmp >> 28));
-      retval.push_back((tmp >> 21) & 0x7F);
-      retval.push_back((tmp >> 14) & 0x7F);
-      retval.push_back((tmp >>  7) & 0x7F);
-      retval.push_back((tmp & 0x7F));
+      retval.push_back(0x08);
+      retval.push_back((tmp >> 24) & 0xFF);
+      retval.push_back((tmp >> 16) & 0xFF);
+      retval.push_back((tmp >>  8) & 0xFF);
+      retval.push_back((tmp & 0xFF));
     }
     // auto sz = retval.size();
     // auto oldsz2 = oldsz;

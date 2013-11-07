@@ -202,7 +202,10 @@ void initialize(Algo& algo,
     typename Algo::Graph::GraphNode& source,
     typename Algo::Graph::GraphNode& report) {
 
+  Galois::StatTimer T("Load");
+  T.start();
   algo.readGraph(graph);
+  T.stop();
   std::cout << "Read " << graph.size() << " nodes\n";
 
   if (startNode >= graph.size() || reportNode >= graph.size()) {
