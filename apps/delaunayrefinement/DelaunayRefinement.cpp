@@ -172,13 +172,16 @@ int main(int argc, char** argv) {
   switch (detAlgo) {
     case nondet: 
       Galois::for_each_local(initialBad, Process<>(), Galois::loopname("refine"), Galois::wl<Chunked>());
+      break;
     case detBase:
-      Galois::for_each_det(initialBad.begin(), initialBad.end(), Process<>()); break;
+      Galois::for_each_det(initialBad.begin(), initialBad.end(), Process<>());
+      break;
     case detPrefix:
       Galois::for_each_det(initialBad.begin(), initialBad.end(), Process<detPrefix>(), Process<>());
       break;
     case detDisjoint:
-      Galois::for_each_det(initialBad.begin(), initialBad.end(), Process<detDisjoint>()); break;
+      Galois::for_each_det(initialBad.begin(), initialBad.end(), Process<detDisjoint>());
+      break;
     default: std::cerr << "Unknown algorithm" << detAlgo << "\n"; abort();
   }
   Trefine.stop();
