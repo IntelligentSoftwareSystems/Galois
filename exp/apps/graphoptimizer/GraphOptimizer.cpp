@@ -33,138 +33,232 @@
 
 #include <fstream>
 
-class decompIterator {
-  uint8_t* base;
-  uint32_t state;
-  bool done;
-  
-  uint32_t decodeOne(uint8_t* b) {
-    uint32_t rd = *b++;
-    auto num = __builtin_clz(rd) - 24;
-    while (num--) {
-      rd <<= 8;
-      rd |= *b++;
-    }
-    return rd;
-  }
-
-  uint8_t* skipOne(uint8_t* b) {
-    uint32_t val = *b;
-    auto num = 1 + __builtin_clz(val) - 24;
-    b += num;
-    return b;
-  }
-
-  void updateState() {
-    if (run) {
-      state += delta;
-      --run;
-    } else {
-      delta = decodeOne(base);
-      state += delta;
-      if (rd <= 1) {
-	base = skipOne(base);
-	run = decodeOne(base);
-      }
-    }
-    done = true;
-  }
-
-public:
-  decompIterator(uint8_t* b = nullptr) :base(b), state(0), done(false) {}
-  
-  uint32_t operator*() {
-    if (!done)
-      updateState();
-    return state;
-  }
-
-  decompIterator& operator++() {
-    if (!done)
-      updateState();
-    base = skipOne(base);
-    done = false;
-  }
-};
-
 template<typename Iter>
-void deltaCode(Iter b, Iter e) {
-  if (b == e) return;
-  auto val = *b++;
-  while (b != e) {
-    auto tmp = *b;
-    assert (tmp >= val);
-    *b = tmp - val;
-    val = tmp;
-    ++b;
+Iter vByteEnc(uint32_t tmp, Iter out) {
+  int numbits = 32 - __builtin_clz(tmp|1);
+  if (numbits <= 7) {
+    *out++ = tmp;
+  } else if (numbits <= 14) {
+    *out++ = (0x80 | (0x7F & (tmp >> 7)));
+    *out++ = (       (0x7F & (tmp >> 0)));
+  } else if (numbits <= 21) {
+    *out++ = (0x80 | (0x7F & (tmp >> 14)));
+    *out++ = (0x80 | (0x7F & (tmp >> 7)));
+    *out++ = (       (0x7F & (tmp >> 0)));
+  } else if (numbits <= 28) {
+    *out++ = (0x80 | (0x7F & (tmp >> 21)));
+    *out++ = (0x80 | (0x7F & (tmp >> 14)));
+    *out++ = (0x80 | (0x7F & (tmp >> 7)));
+    *out++ = (       (0x7F & (tmp >> 0)));
+  } else {
+    *out++ = (0x80 | (0x7F & (tmp >> 28)));
+    *out++ = (0x80 | (0x7F & (tmp >> 21)));
+    *out++ = (0x80 | (0x7F & (tmp >> 14)));
+    *out++ = (0x80 | (0x7F & (tmp >> 7)));
+    *out++ = (       (0x7F & (tmp >> 0)));
   }
+  return out;
 }
 
-template<typename Iter>
-std::deque<uint8_t> varCodeBW(Iter b, Iter e) {
-  std::deque<uint8_t> retval;
-  while (b != e) {
-    uint32_t tmp = *b++;
-    int numbits = 32 - __builtin_clz(tmp|1);
-    if (numbits <= 7) {
-      assert((0x7F & tmp) == tmp);
-      retval.push_back(0x80 | tmp);
-    } else if (numbits <= 14) {
-      assert((0x3FFF & tmp) == tmp);
-      retval.push_back(0x40 | (tmp >> 8));
-      retval.push_back((tmp & 0xFF));
-    } else if (numbits <= 21) {
-      assert((0x1FFFFF & tmp) == tmp);
-      retval.push_back(0x20 | (tmp >> 16));
-      retval.push_back((tmp >> 8) & 0xFF);
-      retval.push_back((tmp & 0xFF));
-    } else if (numbits <= 28) {
-      assert((0x0FFFFFFF & tmp) == tmp);
-      retval.push_back(0x10 | (tmp >> 24));
-      retval.push_back((tmp >> 16) & 0xFF);
-      retval.push_back((tmp >>  8) & 0xFF);
-      retval.push_back((tmp & 0xFF));
-    } else {
-      retval.push_back(0x08);
-      retval.push_back((tmp >> 24) & 0xFF);
-      retval.push_back((tmp >> 16) & 0xFF);
-      retval.push_back((tmp >>  8) & 0xFF);
-      retval.push_back((tmp & 0xFF));
+template<typename IterIn, typename IterOut>
+void vByteEncode(IterIn b, IterIn e, IterOut o) {
+  while (b != e)
+    o = vByteEnc(*b++, o);
+}
+
+uint32_t vByteDec(uint8_t* in) {
+  uint8_t rd = *in++;
+  uint32_t retval = rd & 0x7F;
+  if (rd & 0x80) {
+    rd = *in++;
+    retval <<= 7;
+    retval |= rd & 0x7F;
+    if (rd & 0x80) {
+      rd = *in++;
+      retval <<= 7;
+      retval |= rd & 0x7F;
+      if (rd & 0x80) {
+        rd = *in++;
+        retval <<= 7;
+        retval |= rd & 0x7F;
+        if (rd & 0x80) {
+          rd = *in;
+          retval <<= 7;
+          retval |= rd & 0x7F;
+        }
+      }
     }
-    // auto sz = retval.size();
-    // auto oldsz2 = oldsz;
-    // printf("0x%x %d 0x", tmp, numbits);
-    // while (oldsz < sz)
-    //   printf("%x", retval[oldsz++]);
-    // printf("\t");
-
-    // for (int i = 31; i >= 0; --i)
-    //   printf("%d%s", ((tmp >> i) & 1), (i % 7) == 0 ? " " : "" );
-    // printf("\t");
-    // while (oldsz2 < sz) {
-    //   printf(" ");
-    //   uint8_t v = retval[oldsz2++];
-    //   for (int i = 7; i >= 0; --i)
-    //     printf("%d", ((v >> i) & 1) );
-    // }
-    // printf("\n");
-
   }
   return retval;
 }
 
-std::pair<uint32_t, uint8_t*> decodeOne(uint8_t* b, uint32_t state) {
-  uint32_t retval = *b++;
-  retval &= 0x7F;
-  uint8_t rd = *b;
-  while (!(rd & 0x80)) {
-    b++;
-    retval <<= 7;
-    retval |= rd;
-    rd = *b;
+uint8_t* vByteSkip(uint8_t* in) {
+  uint8_t rd = *in++;
+  if (rd & 0x80) {
+    rd = *in++;
+    if (rd & 0x80) {
+      rd = *in++;
+      if (rd & 0x80) {
+        rd = *in++;
+        if (rd & 0x80) {
+          in++;
+        }
+      }
+    }
   }
-  return std::make_pair(state+retval, b);
+  return in;
 }
+
+template<typename Iter>
+Iter v2ByteEnc(uint32_t tmp, Iter out) {
+  int numbits = 32 - __builtin_clz(tmp|1);
+  tmp <<= 2;
+  if (numbits <= 6) {
+    *out++ = 0xFF & tmp;
+  } else if (numbits <= 14) {
+    *out++ = 0xFF & (tmp | 0x01);
+    *out++ = 0xFF & (tmp >> 8);
+  } else if (numbits <= 22) {
+    *out++ = 0xFF & (tmp | 0x02);
+    *out++ = 0xFF & (tmp >>  8);
+    *out++ = 0xFF & (tmp >> 16);
+  } else if (numbits <= 30) {
+    *out++ = 0xFF & (tmp | 0x03);
+    *out++ = 0xFF & (tmp >>  8);
+    *out++ = 0xFF & (tmp >> 16);
+    *out++ = 0xFF & (tmp >> 24);
+  } else {
+    abort();
+  }
+  return out;
+}
+
+template<typename IterIn, typename IterOut>
+void v2ByteEncode(IterIn b, IterIn e, IterOut o) {
+  while (b != e)
+    o = v2ByteEnc(*b++, o);
+}
+
+uint32_t v2ByteDec(uint8_t* in) {
+  uint32_t rd = *reinterpret_cast<uint32_t*>(in);
+  auto num = rd & 0x03;
+  static uint32_t shiftTbl[4] = {0x000000FF, 0x0000FFFF, 0x00FFFFFF, 0xFFFFFFFF};
+  return (rd & shiftTbl[num]) >> 2;
+}
+
+uint8_t* v2ByteSkip(uint8_t* in) {
+  uint8_t rd = *in;
+  auto num = rd & 0x03;
+  return in + num + 1;
+}
+
+
+class vByteIterator : public std::iterator<std::forward_iterator_tag, uint32_t> {
+  uint8_t* base;
+
+public:
+  vByteIterator(uint8_t* b = nullptr) :base(b) {}
+  
+  uint32_t operator*() {
+    return vByteDec(base);
+  }
+
+  vByteIterator& operator++() {
+    base = vByteSkip(base);
+    return *this;
+  }
+
+  vByteIterator operator++(int) {
+    vByteIterator retval(*this);
+    ++(*this);
+    return retval;
+  }
+
+  bool operator==(const vByteIterator& rhs) const { return base == rhs.base; }
+  bool operator!=(const vByteIterator& rhs) const { return base != rhs.base; }
+};
+
+class v2ByteIterator : public std::iterator<std::forward_iterator_tag, uint32_t> {
+  uint8_t* base;
+
+public:
+  v2ByteIterator(uint8_t* b = nullptr) :base(b) {}
+  
+  uint32_t operator*() {
+    return v2ByteDec(base);
+  }
+
+  v2ByteIterator& operator++() {
+    base = v2ByteSkip(base);
+    return *this;
+  }
+
+  v2ByteIterator operator++(int) {
+    v2ByteIterator retval(*this);
+    ++(*this);
+    return retval;
+  }
+
+  bool operator==(const v2ByteIterator& rhs) const { return base == rhs.base; }
+  bool operator!=(const v2ByteIterator& rhs) const { return base != rhs.base; }
+};
+
+class v2DeltaIterator : public std::iterator<std::forward_iterator_tag, uint32_t> {
+  uint8_t* base;
+  uint32_t state;
+
+public:
+  v2DeltaIterator(uint8_t* b = nullptr) :base(b), state(0) {}
+  
+  uint32_t operator*() {
+    return state + v2ByteDec(base);
+  }
+
+  v2DeltaIterator& operator++() {
+    state += v2ByteDec(base);
+    base = v2ByteSkip(base);
+    return *this;
+  }
+
+  v2DeltaIterator operator++(int) {
+    v2DeltaIterator retval(*this);
+    ++(*this);
+    return retval;
+  }
+
+  bool operator==(const v2DeltaIterator& rhs) const { return base == rhs.base; }
+  bool operator!=(const v2DeltaIterator& rhs) const { return base != rhs.base; }
+};
+
+
+
+template<typename Iter, typename Iter2>
+void deltaCode(Iter b, Iter e, Iter2 out) {
+  auto val = 0;
+  while (b != e) {
+    auto tmp = *b++;
+    assert (tmp >= val);
+    *out++ = tmp - val;
+    val = tmp;
+  }
+}
+
+template<typename Iter, typename Iter2>
+void rleCode(Iter b, Iter e, Iter2 out) {
+  while (b != e) {
+    auto val = *b++;
+    *out++ = val;
+    if (val <= 1) {
+      decltype(val) run = 0;
+      while (b != e && *b == val) {
+        ++run;
+        ++b;
+      }
+      *out++ = run;
+    }
+  }
+}
+
 
 namespace Galois {
 namespace Graph {
@@ -212,25 +306,7 @@ public:
   typedef NodeTy node_data_type;
   typedef typename EdgeData::reference edge_data_reference;
   typedef typename NodeInfo::reference node_data_reference;
-  struct edge_iterator {
-    uint8_t* base;
-    uint32_t state;
-    edge_iterator& operator++() { 
-      auto tmp = decodeOne(base, state);
-      base = tmp.second;
-      state = tmp.first;
-      return *this;
-    }
-
-    bool operator==(edge_iterator& rhs) const {
-      return base == rhs.base;
-    }
-    bool operator!=(edge_iterator& rhs) const {
-      return base != rhs.base;
-    }
-
-    constexpr edge_iterator(uint8_t* b = nullptr) :base(b), state(0) {}
-  };
+  typedef v2DeltaIterator edge_iterator;
   typedef boost::counting_iterator<unsigned> iterator;
   typedef iterator const_iterator;
   typedef iterator local_iterator;
@@ -290,7 +366,7 @@ public:
   }
 
   GraphNode getEdgeDst(edge_iterator ni) {
-    return decodeOne(ni.base, ni.state).first;
+    return *ni;
   }
 
   uint64_t size() const { return numNodes; }
@@ -308,7 +384,7 @@ public:
     acquireNode(N, mflag);
     if (Galois::Runtime::shouldLock(mflag)) {
       for (edge_iterator ii = raw_begin(N), ee = raw_end(N); ii != ee; ++ii) {
-        acquireNode(decodeOne(ii.base, ii.state).first, mflag);
+        acquireNode(*ii, mflag);
       }
     }
     return raw_begin(N);
@@ -348,26 +424,29 @@ public:
         tid, total);
     this->setLocalRange(*r.first, *r.second);
     if (tid == 0) {
-    uint64_t offset = 0;
-    for (FileGraph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
-      nodeData.constructAt(*ii);
-      this->outOfLineConstructAt(*ii);
-      std::vector<uint32_t> dsts;
-      for (FileGraph::edge_iterator nn = graph.edge_begin(*ii), en = graph.edge_end(*ii); nn != en; ++nn) {
-        if (EdgeData::has_value)
-          edgeData.set(*nn, graph.getEdgeData<typename EdgeData::value_type>(nn));
-        dsts.push_back(graph.getEdgeDst(nn));
+      uint64_t offset = 0;
+      for (FileGraph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+        nodeData.constructAt(*ii);
+        this->outOfLineConstructAt(*ii);
+        std::vector<uint32_t> dsts, dsts2, dsts3;
+        for (FileGraph::edge_iterator nn = graph.edge_begin(*ii), en = graph.edge_end(*ii); nn != en; ++nn) {
+          if (EdgeData::has_value)
+            edgeData.set(*nn, graph.getEdgeData<typename EdgeData::value_type>(nn));
+          dsts.push_back(graph.getEdgeDst(nn));
+        }
+        std::sort(dsts.begin(), dsts.end());
+        deltaCode(dsts.begin(), dsts.end(), std::back_inserter(dsts2));
+        //rleCode(dsts2.begin(), dsts2.end(), std::back_inserter(dsts3));
+        std::vector<uint8_t> bw;
+        v2ByteEncode(dsts2.begin(), dsts2.end(), std::back_inserter(bw));
+        std::copy(bw.begin(), bw.end(), &edgeDst[offset]);
+        offset += bw.size();
+        edgeIndData[*ii] = offset;
+        // auto foo = decodeOne(&*bw.begin(), 0);
+        // std::cout << "\n" << *dsts.begin() << " " << foo.first << " " << (foo.second - &*bw.begin()) << "\n\n";
       }
-      std::sort(dsts.begin(), dsts.end());
-      deltaCode(dsts.begin(), dsts.end());
-      std::deque<uint8_t> bw = varCodeBW(dsts.begin(), dsts.end());
-      std::copy(bw.begin(), bw.end(), &edgeDst[offset]);
-      offset += bw.size();
-      edgeIndData[*ii] = offset;
-      // auto foo = decodeOne(&*bw.begin(), 0);
-      // std::cout << "\n" << *dsts.begin() << " " << foo.first << " " << (foo.second - &*bw.begin()) << "\n\n";
-    }
-    edgeDst[offset] = 0x80;
+      edgeDst[offset] = 0x00;
+      std::cout << "Final Offset " << offset << "\n";
     }
   }
 };
@@ -389,7 +468,7 @@ std::vector<unsigned int> raw, delta;
 std::vector<unsigned int> lenBW;
 
 unsigned long int total_elem = 0;
-unsigned long int total_bytesBW = 0;
+unsigned long int total_bytesBW = 0, total_bytesBW2 = 0;
 
 Graph graph;
 GraphC graphc;
@@ -474,21 +553,25 @@ void dumphist(std::ostream& of, std::string name, std::vector<unsigned int>& hva
 struct ComputeRatio {
   template<typename GNode>
   void operator()(const GNode& n) {
-    std::deque<unsigned int> IDs;
-    std::deque<unsigned char> var;
+    std::deque<unsigned int> IDs, IDs2, IDs3;
+    std::vector<uint8_t> var;
     for (Graph::edge_iterator ii = graph.edge_begin(n),
            ee = graph.edge_end(n); ii != ee; ++ii)
       IDs.push_back(graph.getEdgeDst(ii));
     std::sort(IDs.begin(), IDs.end());
     if (dostat)
       hist(IDs.begin(), IDs.end(), raw);
-    deltaCode(IDs.begin(), IDs.end());
+    deltaCode(IDs.begin(), IDs.end(), std::back_inserter(IDs2));
     if (dostat)
       hist(IDs.begin(), IDs.end(), delta);
-
+    rleCode(IDs2.begin(), IDs2.end(), std::back_inserter(IDs3));
     __sync_fetch_and_add(&total_elem, IDs.size());
-    var = varCodeBW(IDs.begin(), IDs.end());
+    vByteEncode(IDs3.begin(), IDs3.end(), std::back_inserter(var));
     __sync_fetch_and_add(&total_bytesBW, var.size());
+    var.clear();
+    v2ByteEncode(IDs3.begin(), IDs3.end(), std::back_inserter(var));
+    __sync_fetch_and_add(&total_bytesBW2, var.size());
+
   }
 };
 
@@ -557,13 +640,13 @@ std::pair<unsigned long, unsigned> tryHuff() {
   std::deque<uint32_t> data;
 
   for (auto ni = graph.begin(), ne = graph.end(); ni != ne; ++ni) {
-    std::deque<uint32_t> local;
+    std::deque<uint32_t> local, local2;;
     for (auto ei = graph.edge_begin(*ni), ee = graph.edge_end(*ni); ei != ee; ++ei) {
       local.push_back(graph.getEdgeDst(ei));
     }
     std::sort(local.begin(), local.end());
-    deltaCode(local.begin(), local.end());
-    std::copy(local.begin(), local.end(), std::back_inserter(data));
+    deltaCode(local.begin(), local.end(), std::back_inserter(local2));
+    std::copy(local2.begin(), local2.end(), std::back_inserter(data));
     for (auto ii = local.begin(), ee = local.end(); ii != ee; ++ii) {
       HNode*& n = hyst[*ii];
       if (!n) {
@@ -595,13 +678,13 @@ std::pair<unsigned long, unsigned> tryHuffDeltaOnly() {
   unsigned long total = 0;
 
   for (auto ni = graph.begin(), ne = graph.end(); ni != ne; ++ni) {
-    std::deque<uint32_t> local;
+    std::deque<uint32_t> local, local2;
     for (auto ei = graph.edge_begin(*ni), ee = graph.edge_end(*ni); ei != ee; ++ei) {
       local.push_back(graph.getEdgeDst(ei));
     }
     std::sort(local.begin(), local.end());
-    deltaCode(local.begin(), local.end());
-    std::copy(local.begin() + 1, local.end(), std::back_inserter(data));
+    deltaCode(local.begin(), local.end(), std::back_inserter(local2));
+    std::copy(local2.begin() + 1, local2.end(), std::back_inserter(data));
     total += 4 * 8;
     for (auto ii = local.begin() + 1, ee = local.end(); ii != ee; ++ii) {
       HNode*& n = hyst[*ii];
@@ -630,6 +713,85 @@ std::pair<unsigned long, unsigned> tryHuffDeltaOnly() {
 int main(int argc, char **argv) {
   Galois::StatManager statManager;
   LonestarStart(argc, argv, 0,0,0);
+
+  if (false) {
+    std::cout << std::hex;
+    std::ostream_iterator<int> out_it (std::cout,", ");
+
+    for (uint32_t x = 0; x < ~0; ++x) {
+      std::vector<uint32_t> src;
+      std::vector<uint8_t> dv1, dv2;
+      src.push_back(x);
+      vByteEncode(src.begin(), src.end(), std::back_inserter(dv1));
+      v2ByteEncode(src.begin(), src.end(), std::back_inserter(dv2));
+ 
+      if (vByteDec(&dv1[0]) != v2ByteDec(&dv2[0])) {
+        std::copy ( src.begin(), src.end(), out_it );
+        std::cout << "\t";
+        std::copy ( dv1.begin(), dv1.end(), out_it );
+        std::cout << "\t";
+        std::copy ( dv2.begin(), dv2.end(), out_it );
+        std::cout << "\t" << vByteDec(&dv1[0]) << "\t" << v2ByteDec(&dv2[0]) << "\n";
+        return 1;
+      }
+    }
+
+    std::vector<uint32_t> src[3];
+    std::vector<uint8_t> dsts[6];
+
+    for (int i = 0; i < 32; ++i)
+      src[0].push_back(i);
+    for (int i = 250; i < 270; ++i)
+      src[0].push_back(i);
+    for (int i = 16777206; i < 16777226; ++i)
+      src[0].push_back(i);
+    
+    deltaCode(src[0].begin(), src[0].end(), std::back_inserter(src[1]));
+    rleCode(src[1].begin(), src[1].end(), std::back_inserter(src[2]));
+
+    for (int x = 0; x < 3; ++x) {
+      std::cout << x << ":" << std::distance(src[x].begin(), src[x].end()) << " ";
+      std::copy ( src[x].begin(), src[x].end(), out_it );
+      std::cout << "\n";
+    }
+    std::cout << "\n";
+
+    vByteEncode(src[0].begin(), src[0].end(), std::back_inserter(dsts[0]));
+    v2ByteEncode(src[0].begin(), src[0].end(), std::back_inserter(dsts[1]));
+    vByteEncode(src[1].begin(), src[1].end(), std::back_inserter(dsts[2]));
+    v2ByteEncode(src[1].begin(), src[1].end(), std::back_inserter(dsts[3]));
+    vByteEncode(src[2].begin(), src[2].end(), std::back_inserter(dsts[4]));
+    v2ByteEncode(src[2].begin(), src[2].end(), std::back_inserter(dsts[5]));
+
+    for (int x = 0; x < 6; ++x) {
+      std::cout << x << ":" << std::distance(dsts[x].begin(), dsts[x].end()) << " ";
+      std::copy ( dsts[x].begin(), dsts[x].end(), out_it );
+      std::cout << "\n";
+    }
+    std::cout << "\n";
+
+    std::copy ( vByteIterator(&dsts[0][0]), vByteIterator(&dsts[0][dsts[0].size()]), out_it );
+    std::cout << "\n";
+    std::copy ( v2ByteIterator(&dsts[1][0]), v2ByteIterator(&dsts[1][dsts[1].size()]), out_it );
+    std::cout << "\n";
+    std::copy ( vByteIterator(&dsts[2][0]), vByteIterator(&dsts[2][dsts[2].size()]), out_it );
+    std::cout << "\n";
+    std::copy ( v2ByteIterator(&dsts[3][0]), v2ByteIterator(&dsts[3][dsts[3].size()]), out_it );
+    std::cout << "\n";
+    std::copy ( vByteIterator(&dsts[4][0]), vByteIterator(&dsts[4][dsts[4].size()]), out_it );
+    std::cout << "\n";
+    std::copy ( v2ByteIterator(&dsts[5][0]), v2ByteIterator(&dsts[5][dsts[5].size()]), out_it );
+    std::cout << "\n";
+
+    // rleCode(dsts2.begin(), dsts2.end(), std::back_inserter(dsts3));
+    // std::vector<uint8_t> bw = varCodeBW(dsts3.begin(), dsts3.end());
+    // bw.push_back(0x00);
+    // for (decompIterator ii(&bw.front()), ee(&bw.back()); ii != ee; ++ii)
+    //   std::cout << *ii << " ";
+    // std::cout << "\n";
+    
+    std::cout << std::dec;
+  }
 
   dostat = outfilename.size() > 1;
   if (dostat)
@@ -661,11 +823,11 @@ int main(int argc, char **argv) {
   std::cout << std::distance(graph.begin(), graph.end()) << ":" << std::distance(graphc.begin(), graphc.end()) << "\n";
   std::cout << graph.size() << ":" << graphc.size() << "\n";
 
-  std::cout << "BFS CSR\n";
+  std::cout << "BFS CSR " << sourcearg << "\n";
   AsyncBFS<Graph>()(graph, sourcearg, "CSR");
-  std::cout << "BFS CCSR\n";
+  std::cout << "BFS CSSR " << sourcearg << "\n";
   AsyncBFS<GraphC>()(graphc, sourcearg, "CCSR");
-  std::cout << "Done BFS\n";
+  std::cout << "Done BFS " << sourcearg << "\n";
 
   auto size = graph.size();
   raw.resize(size);
@@ -675,6 +837,7 @@ int main(int argc, char **argv) {
   Galois::do_all(graph.begin(), graph.end(), ComputeRatio(), Galois::do_all_steal(true));
 
   if (dostat) {
+    std::cout << "Writing to " << outfilename.c_str() << "\n";
     std::ofstream of(outfilename.c_str());
     of << "Type,Ind,Val\n";
     dumphist(of, "raw",raw);
@@ -684,6 +847,7 @@ int main(int argc, char **argv) {
   std::cout << "Total Size (64bit): " << total_elem * 8 << "\n";
   std::cout << "Total Size (32bit): " << total_elem * 4 << "\n";
   std::cout << "Compressed Size (BW): " << total_bytesBW << "\n";
+  std::cout << "Compressed Size (BW2): " << total_bytesBW2 << "\n";
   std::cout << "Ratio (BW64bit): " << (double)total_bytesBW / ((double)total_elem * 8) << "\n";
   std::cout << "Ratio (BW32bit): " << (double)total_bytesBW / ((double)total_elem * 4) << "\n";
 
