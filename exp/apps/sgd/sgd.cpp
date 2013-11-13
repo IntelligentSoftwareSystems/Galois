@@ -29,15 +29,9 @@
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
 
-const unsigned int LATENT_VECTOR_SIZE = 100;
-const double LEARNING_RATE = 0.01;
-const double DECAY_RATE = 0.1;
-const double LAMBDA = 1.0;
-const unsigned int MAX_MOVIE_UPDATES = 5;
-
 typedef struct Node
 {
-  double latent_vector[LATENT_VECTOR_SIZE]; //latent vector to be learned
+  double* latent_vector; //latent vector to be learned
   unsigned int updates; //number of updates made to this node (only used by movie nodes)
   unsigned int edge_offset; //if a movie's update is interrupted, where to start when resuming
 } Node;
@@ -46,54 +40,48 @@ typedef struct Node
 //node data is Node, edge data is unsigned int
 typedef Galois::Graph::LC_CSR_Graph<Node, unsigned int> Graph;
 
-void updateEdge(Node& user_data, Node& movie_data, unsigned int edge_rating) {
-
-  double step_size = LEARNING_RATE * 1.5 / (1.0 + DECAY_RATE * pow(movie_data.updates + 1, 1.5));
-  
-  double* __restrict__ user_latent = user_data.latent_vector;
-  double* __restrict__ movie_latent = movie_data.latent_vector;
-
-  //calculate error
-  double cur_error = - edge_rating;
-  double tmp_error[2] = {0,0};
-  for(unsigned int i = 0; i < LATENT_VECTOR_SIZE; i+=2) {
-    tmp_error[0] += user_latent[i] * movie_latent[i];
-    tmp_error[1] += user_latent[i+1] * movie_latent[i+1];
-  }
-  cur_error += tmp_error[0] + tmp_error[1];
-
-  //take gradient step
-  for(unsigned int i = 0; i < LATENT_VECTOR_SIZE; i++) {
-    double prev_movie_val = movie_latent[i];
-    
-    movie_latent[i] -= step_size * (cur_error * user_latent[i] + LAMBDA * prev_movie_val);
-    user_latent[i] -= step_size * (cur_error * prev_movie_val + LAMBDA * user_latent[i]);
-  }
-}
+unsigned int LATENT_VECTOR_SIZE = 100;
+double LEARNING_RATE = 0.01;
+double DECAY_RATE = 0.1;
+double LAMBDA = 1.0;
+unsigned int MAX_MOVIE_UPDATES = 5;
 
 struct sgd
 {
 	Graph& g;
-  bool iterup;
-  sgd(Graph& g,  bool iu) : g(g), iterup(iu) {}
+	sgd(Graph& g) : g(g) {}
 	
 	//perform SGD update on all edges of a movie
 	//perform update on one user at a time
 	void operator()(Graph::GraphNode movie, Galois::UserContext<Graph::GraphNode>& ctx)
 	{	
 		Node& movie_data = g.getData(movie);
+		double* movie_latent = movie_data.latent_vector;
+		double step_size = LEARNING_RATE * 1.5 / (1.0 + DECAY_RATE * pow(movie_data.updates + 1, 1.5));
 		
                 Graph::edge_iterator edge_it = g.edge_begin(movie, Galois::NONE) + movie_data.edge_offset;
-                //handle no-edge movies
-                if (edge_it == g.edge_end(movie, Galois::NONE))
-                    return;
-
 		Graph::GraphNode user = g.getEdgeDst(edge_it);
 		//abort operation if conflict detected (Galois::ALL)
 		Node& user_data = g.getData(user, Galois::ALL);
+		double* user_latent = user_data.latent_vector;
+		//abort operation if conflict detected (Galois::ALL)
+		unsigned int edge_rating = g.getEdgeData(edge_it, Galois::ALL);	
 
-                //process sgd on edge
-                updateEdge(user_data, movie_data, g.getEdgeData(edge_it));
+		//calculate error
+		double cur_error = - edge_rating;
+		for(unsigned int i = 0; i < LATENT_VECTOR_SIZE; i++)
+		{
+			cur_error += user_latent[i] * movie_latent[i];
+		}
+
+		//take gradient step
+		for(unsigned int i = 0; i < LATENT_VECTOR_SIZE; i++)
+		{
+			double prev_movie_val = movie_latent[i];
+
+			movie_latent[i] -= step_size * (cur_error * user_latent[i] + LAMBDA * prev_movie_val);
+			user_latent[i] -= step_size * (cur_error * prev_movie_val + LAMBDA * user_latent[i]);
+		}
 		
 		++edge_it;
 		movie_data.edge_offset++;
@@ -105,8 +93,8 @@ struct sgd
 
 			//push movie node onto worklist if it's not updated enough
 			movie_data.updates++;
-                        if(iterup && movie_data.updates < MAX_MOVIE_UPDATES)
-                          ctx.push(movie);
+			if(movie_data.updates < MAX_MOVIE_UPDATES)
+				ctx.push(movie);
 		}
 		else //haven't looked at all the users this iteration
 		{
@@ -133,14 +121,16 @@ unsigned int initializeGraphData(Graph& g)
 		data.updates = 0;
 
 		//fill latent vectors with random values
-		//data.latent_vector = new double[LATENT_VECTOR_SIZE];
+		double* lv = new double[LATENT_VECTOR_SIZE];
 		for(int i = 0; i < LATENT_VECTOR_SIZE; i++)
 		{
-			data.latent_vector[i] = random_lv_value(eng);
+			lv[i] = random_lv_value(eng);
 		}
+		data.latent_vector = lv;
 		
 		//count number of movies we've seen; only movies nodes have edges
-		unsigned int num_edges = std::distance(g.edge_begin(gnode), g.edge_end(gnode));
+		unsigned int num_edges = 
+			g.edge_end(gnode, Galois::NONE) - g.edge_begin(gnode, Galois::NONE);
 		if(num_edges > 0)
 			num_movie_nodes++;
 		
@@ -150,16 +140,16 @@ unsigned int initializeGraphData(Graph& g)
 	return num_movie_nodes;
 }
 
+Graph* g_ptr;
+
 struct projCount : public std::unary_function<unsigned, Graph::GraphNode&> {
-  static Graph* g_ptr;
 	unsigned operator()(const Graph::GraphNode& node) const {
 		return g_ptr->getData(node, Galois::NONE).updates;
 	}
 };
 
-Graph* projCount::g_ptr = nullptr;
-
-int main(int argc, char** argv) {	
+int main(int argc, char** argv)
+{	
 	if(argc < 3)
 	{
 		std::cout << "Usage: <input binary gr file> <thread count>" << std::endl;
@@ -178,19 +168,14 @@ int main(int argc, char** argv) {
 
 	//allocate local computation graph
 	Graph g;
-        projCount::g_ptr = &g;
+	g_ptr = &g;
 
 	//read structure of graph & edge weights; nodes not initialized
         Galois::Graph::readGraph(g, inputFile);
 
 	//fill each node's id & initialize the latent vectors
 	unsigned int num_movie_nodes = initializeGraphData(g);
-        //handle arbitrary graphs for good measure
-        if (num_movie_nodes == g.size()) num_movie_nodes /= 2;
 	
-	std::cout << "Movies, " << num_movie_nodes << ",Users, " << g.size() - num_movie_nodes <<
-		",Ratings, " << g.sizeEdges() << ",Threads, " << threadCount << std::endl;
-
 	Galois::StatTimer timer;
 	timer.start();
 
@@ -200,15 +185,19 @@ int main(int argc, char** argv) {
 	//the worklist is a priority queue ordered by the number of updates done to a movie
 	//the projCount functor provides the priority function on each node
 	Graph::iterator ii = g.begin();
-	std::advance(ii,(g.size() - num_movie_nodes)); //advance moves passed in iterator
-	// Galois::for_each(ii, g.end(), sgd(g, true),
-        //                  Galois::wl<Galois::WorkList::OrderedByIntegerMetric
-        //                  <projCount, Galois::WorkList::dChunkedLIFO<32>>>());
-        for (int i = 0; i < MAX_MOVIE_UPDATES; ++i)
-          Galois::for_each(ii, g.end(), sgd(g, false), 
-                           Galois::wl<Galois::WorkList::dChunkedLIFO<32>>());
- 
+	std::advance(ii,num_movie_nodes); //advance moves passed in iterator
+	Galois::for_each(g.begin(), ii, sgd(g),
+                         Galois::wl<Galois::WorkList::OrderedByIntegerMetric
+                         <projCount, Galois::WorkList::dChunkedLIFO<32>>>());
+
 	timer.stop();
+	
+	std::cout << "SUMMARY Movies " << num_movie_nodes << 
+		" Users " << g.size() - num_movie_nodes <<
+		" Ratings " << g.sizeEdges() << 
+		" Threads " << threadCount << 
+		" Time " << timer.get()/1000.0 << std::endl;
+
 
 	return 0;
 }
