@@ -242,6 +242,9 @@ void AVIabstractMain::run (int argc, char* argv[]) {
   printf ("PAVI %s version\n", getVersion ().c_str ());
   printf ("input mesh: %d elements, %d nodes\n", meshInit->getNumElements (), meshInit->getNumNodes ());
 
+  Galois::preAlloc (2*Galois::getActiveThreads ());
+
+  Galois::reportPageAlloc("MeminfoPre");
 
   Galois::StatTimer t;
   t.start ();
@@ -252,6 +255,8 @@ void AVIabstractMain::run (int argc, char* argv[]) {
   Galois::Runtime::endSampling ();
 
   t.stop ();
+
+  Galois::reportPageAlloc("MeminfoPost");
 
   if (!skipVerify) {
     verify (input, *meshInit, g);

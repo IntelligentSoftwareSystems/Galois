@@ -146,8 +146,13 @@ int main(int argc, char** argv) {
 	    << " total triangles, " << std::count_if(graph->begin(), graph->end(), is_bad(graph)) << " bad triangles\n";
 
   Galois::reportPageAlloc("MeminfoPre1");
-  Galois::preAlloc(Galois::Runtime::MM::numPageAllocTotal() * 10);
-  //Galois::preAlloc(15 * numThreads + Galois::Runtime::MM::numPageAllocTotal() * 10);
+  // Galois::preAlloc(Galois::Runtime::MM::numPageAllocTotal() * 10);
+  // Tighter upper bound for pre-alloc, useful for machines with limited memory,
+  // e.g., Intel MIC. May not be enough for deterministic execution
+  const size_t NODE_SIZE = sizeof(**graph->begin());
+  Galois::preAlloc (5 * Galois::getActiveThreads () + NODE_SIZE * 8 * graph->size () / Galois::Runtime::MM::pageSize);
+  // Relaxed upper bound
+  // Galois::preAlloc(15 * numThreads + Galois::Runtime::MM::numPageAllocTotal() * 10);
   Galois::reportPageAlloc("MeminfoPre2");
 
   Galois::StatTimer T;
