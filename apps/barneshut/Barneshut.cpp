@@ -519,12 +519,16 @@ double checkAllPairs(Bodies& bodies, int N) {
       std::plus<double>()) / N;
 }
 
-void run(Bodies& bodies, BodyPtrs& pBodies) {
+void run(Bodies& bodies, BodyPtrs& pBodies, size_t nbodies) {
   typedef Galois::WorkList::dChunkedLIFO<256> WL_;
   typedef Galois::WorkList::AltChunkedLIFO<32> WL;
   typedef Galois::WorkList::StableIterator<decltype(pBodies.local_begin()), true> WLL;
 
+  Galois::preAlloc (Galois::getActiveThreads () + (3*sizeof (Octree) + 2*sizeof (Body))*nbodies/Galois::Runtime::MM::pageSize);
+  Galois::reportPageAlloc("MeminfoPre");
+
   for (int step = 0; step < ntimesteps; step++) {
+
     // Do tree building sequentially
     BoundingBox box = Galois::Runtime::do_all_impl(Galois::Runtime::makeLocalRange(pBodies), ReduceBoxes(), mergeBox(), "reduceBoxes", true).initial;
     //std::for_each(bodies.begin(), bodies.end(), ReduceBoxes(box));
@@ -560,6 +564,8 @@ void run(Bodies& bodies, BodyPtrs& pBodies) {
     std::cout.flags(flags);
     std::cout << "\n";
   }
+
+  Galois::reportPageAlloc("MeminfoPost");
 }
 
 int main(int argc, char** argv) {
@@ -576,6 +582,6 @@ int main(int argc, char** argv) {
 
   Galois::StatTimer T;
   T.start();
-  run(bodies, pBodies);
+  run(bodies, pBodies, nbodies);
   T.stop();
 }
