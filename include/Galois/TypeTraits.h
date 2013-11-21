@@ -75,7 +75,8 @@ namespace Galois {
     typedef char yes[1]; \
     typedef char no[2]; \
     template<typename U, U> struct type_check; \
-    template<typename W> static yes& test(type_check<decltype(&W::func), &W::func>*); \
+    template<typename V> struct Sig { typedef V type; };\
+    template<typename W> static yes& test(type_check<typename Sig<decltype(&W::func)>::type, &W::func>*); \
     template<typename  > static no&  test(...); \
     static const bool value = sizeof(test<T>(0)) == sizeof(yes); \
   }

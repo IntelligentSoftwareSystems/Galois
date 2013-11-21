@@ -29,6 +29,8 @@
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/MethodFlags.h"
 
+#include <functional>
+
 namespace Galois {
 
 /** 
@@ -40,9 +42,9 @@ class UserContext: private boost::noncopyable {
 protected:
 // TODO: move to a separate class for dedicated for sepculative executors
 #ifdef GALOIS_USE_EXP
-  using Closure = std::function<void (void)>;
-  using UndoLog = Galois::gdeque<Closure, 8>;
-  using CommitLog = UndoLog;
+  typedef std::function<void (void)> Closure;
+  typedef Galois::gdeque<Closure, 8> UndoLog;
+  typedef UndoLog CommitLog;
 
   UndoLog undoLog;
   CommitLog commitLog;

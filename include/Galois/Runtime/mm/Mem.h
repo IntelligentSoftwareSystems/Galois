@@ -50,7 +50,17 @@ namespace Runtime {
 namespace MM {
 
 const size_t smallPageSize = 4*1024;
+
+#ifdef GALOIS_ARCH_MIC
 const size_t pageSize = 2*1024*1024;
+
+// const size_t pageSize = 16*4*1024;
+#else 
+const size_t pageSize = 2*1024*1024;
+
+// const size_t pageSize = 16*4*1024;
+#endif
+
 void* pageAlloc();
 void  pageFree(void*);
 //! Preallocate numpages large pages for each thread
