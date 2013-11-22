@@ -1,4 +1,4 @@
-#include "Galois/Runtime/FatPointer.h"
+#include "Galois/Runtime/RemotePointer.h"
 
 int main() {
   Galois::Runtime::fatPointer ptr;
@@ -9,6 +9,11 @@ int main() {
     assert(ptr.getHost() == h);
     assert(ptr.getObj() == oldobj);
   }
+
+//Misc error checking
+static_assert(std::is_trivially_copyable<fatPointer>::value, "fatPointer should be trivially serializable");
+static_assert(std::is_trivially_copyable<gptr<int>>::value, "RemotePointer should be trivially serializable");
+
 
   return 0;
 }

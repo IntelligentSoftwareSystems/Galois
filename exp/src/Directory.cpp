@@ -209,7 +209,3 @@ CacheManager& Galois::Runtime::getCacheManager() {
   return obj;
 }
 
-
-//Misc error checking
-static_assert(std::is_trivially_copyable<fatPointer>::value, "fatPointer should be trivially serializable");
-static_assert(std::is_trivially_copyable<gptr<int>>::value, "RemotePointer should be trivially serializable");

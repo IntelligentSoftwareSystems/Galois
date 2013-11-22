@@ -23,14 +23,15 @@
 #ifndef GALOIS_RUNTIME_FATPOINTER_H
 #define GALOIS_RUNTIME_FATPOINTER_H
 
-#include "Galois/Runtime/Context.h"
-
 #include  <boost/functional/hash.hpp>
 
 #define LONGPTR 0
 
 namespace Galois {
 namespace Runtime {
+
+//forward declaration
+class Lockable;
 
 #if LONGPTR
 
@@ -40,8 +41,8 @@ class fatPointer {
   Lockable* ptr;
 
 public:
-  fatPointer() = default;
-  fatPointer(uint32_t h, Lockable* p) :host(h), ptr(p) {}
+  constexpr fatPointer() noexcept :host(0), ptr(nullptr) {}
+  fatPointer(uint32_t h, Lockable* p) noexcept :host(h), ptr(p) {}
   uint32_t getHost() const { return host; }
   void setHost(uint32_t h) { host = h; }
   Lockable* getObj() const { return ptr; }
@@ -56,16 +57,17 @@ public:
 class fatPointer {
   uintptr_t val;
 
+  uintptr_t compute(uint32_t h, Lockable* p) const {
+    return ((uintptr_t)h << 47) | ((uintptr_t)p & 0x80007FFFFFFFFFFF);
+  }
+
   void set(uint32_t h, Lockable* p) {
-    uintptr_t hval = h;
-    uintptr_t pval = (uintptr_t)p;
-    hval <<= 47;
-    pval &= 0x80007FFFFFFFFFFF;
-    val = pval | hval;
+    val = compute(h,p);
   }
 
 public:
-  fatPointer(uint32_t h = 0, Lockable* p = nullptr) { set(h,p); }
+  constexpr fatPointer() noexcept :val(0) {}
+  fatPointer(uint32_t h, Lockable* p) noexcept :val(compute(h,p)) {}
   uint32_t getHost() const {
     uintptr_t hval = val;
     hval >>= 47;

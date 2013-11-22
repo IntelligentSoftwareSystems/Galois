@@ -56,6 +56,7 @@ endif()
 
 if(USE_EXP)
 	target_link_libraries(galois ${MPI_LIBRARIES})
+        target_link_libraries(galois ${GASNET_LIBRARIES})
 endif()
 
 if(USE_SUBVERSION_REVISION)

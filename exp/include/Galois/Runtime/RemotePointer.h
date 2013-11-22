@@ -23,12 +23,13 @@
 #ifndef GALOIS_RUNTIME_REMOTEPOINTER_H
 #define GALOIS_RUNTIME_REMOTEPOINTER_H
 
-#include "Galois/Runtime/Context.h"
-#include "Galois/Runtime/Serialize.h"
-//#include "Galois/Runtime/Directory.h"
+#include "Galois/Runtime/FatPointer.h"
 
 namespace Galois {
 namespace Runtime {
+
+//forward declaration
+class Lockable;
 
 template<typename T>
 class gptr;
@@ -43,9 +44,9 @@ class gptr {
 public:
   typedef T element_type;
   
-  constexpr gptr() noexcept :ptr({0, nullptr}) {}
-  explicit gptr(T* p) noexcept :ptr({NetworkInterface::ID, p}) {}
-  gptr(uint32_t o, T* p) :ptr({o, static_cast<Lockable*>(p)}) {}
+  constexpr gptr() noexcept :ptr(0, nullptr) {}
+  explicit constexpr  gptr(T* p) noexcept :ptr(NetworkInterface::ID, p) {}
+  gptr(uint32_t o, T* p) :ptr(o, static_cast<Lockable*>(p)) {}
   
   operator fatPointer() const { return ptr; }
 
@@ -68,7 +69,9 @@ public:
   bool operator!=(const gptr& rhs) const {
     return ptr != rhs.ptr;
   }
-  explicit operator bool() const { return ptr.getObj() != 0; }
+  explicit operator bool() const {
+    return ptr.getObj() != 0;
+  }
 
   bool isLocal() const {
     return ptr.getHost() == Galois::Runtime::NetworkInterface::ID;

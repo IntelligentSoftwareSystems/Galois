@@ -42,6 +42,15 @@
  */
 namespace Galois {
 
+/**
+ * Initialize Galois
+ * Call before any other galois function
+ * This may modify argc and argv inline
+ **/
+void init(int& argc char**& argv);
+
+
+
 static constexpr unsigned GALOIS_DEFAULT_CHUNK_SIZE = 32;
 
 ////////////////////////////////////////////////////////////////////////////////

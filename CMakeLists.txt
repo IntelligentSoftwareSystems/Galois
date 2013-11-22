@@ -148,9 +148,12 @@ if(USE_EXP)
   include_directories("exp/include")
 
   find_package(MPI REQUIRED) # for distributed
+  find_package(GASNET REQUIRED) # for distributed
   set(CMAKE_CXX_COMPILE_FLAGS ${CMAKE_CXX_COMPILE_FLAGS} ${MPI_COMPILE_FLAGS})
   set(CMAKE_CXX_LINK_FLAGS ${CMAKE_CXX_LINK_FLAGS} ${MPI_LINK_FLAGS})
   include_directories(${MPI_INCLUDE_PATH})
+  include_directories(${GASNET_INCLUDE_DIRS})
+  include_directories(${GASNET_INCLUDE_DIRS}/udp-conduit)
 
   find_package(OpenMP)
   if (OPENMP_FOUND) 
