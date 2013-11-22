@@ -26,9 +26,22 @@ sub find_kernel_sym () {
   return $symbol;
 }
 
+sub arch_is_knc ()  {
+  if (exists $ENV{'GALOIS_ARCH_MIC'} and $ENV{'GALOIS_ARCH_MIC'} ne '') {
+    return 1;
+  }
+  return 0;
+}
+
 sub find_analysis_type () {
   my $type = "nehalem-memory-access";
+  # my $type = "snb-general-exploration";
   # my $type = "nehalem-general-exploration";
+
+  if (arch_is_knc ()) {
+    $type = 'knc-general-exploration';
+    # $type = 'knc-bandwidth';
+  }
 
   my $sys = `hostname`;
   chomp($sys);
@@ -82,8 +95,8 @@ sub report_function ($$$$$$) {
 my $vtune = find_vtune;
 my $symbol = find_kernel_sym;
 my $type = find_analysis_type;
-my $uname = `whoami`;
-chomp($uname);
+my $user = `whoami`;
+chomp($user);
 
 die("Run as: runvtune.pl [-t N] output app args*") unless ($#ARGV >= 1);
 
@@ -102,17 +115,36 @@ if ($found_threads) {
   $cmdline = $cmdline . " -t $threads";
 }
 
+if (arch_is_knc ()) {
+  $cmdline = "ssh -t mic0 $cmdline";
+}
+
 print "RUN: CommandLine $cmdline\n";
 
-# my $dire = "/tmp/$uname.vtune.r$threads";
-my $dire = "/workspace/$uname/tmp/vtune--r$threads";
+# my $dire = "/tmp/$user.vtune.r$threads";
+my $dire = "/workspace/$user/tmp/vtune--r$threads";
+if (system ("mkdir -p $dire") != 0) {
+  print "failed to use '$dire' for storing vtune data, trying /tmp\n";
+  $dire = "/tmp/$user/vtune--r$threads";
+
+  if (system ("mkdir -p $dire") != 0) {
+    die "failed to use '$dire' for storing vtune data, quitting\n";
+  }
+}
+
 my $rdir = "-result-dir=$dire";
+
 my $report = "-R hw-events -format csv -csv-delimiter tab";
 # my $type = "hotspots";
 
 my $collect;
 if (1) {
-  $collect = "-analyze-system -collect $type -start-paused";
+  if (arch_is_knc ()) {
+    $collect = "-analyze-system -collect $type ";
+
+  } else {
+    $collect = "-analyze-system -collect $type -start-paused";
+  }
 } else {
   # Manual counter configuration
   my @counters = qw(
@@ -130,7 +162,10 @@ my $maxsec = 100000;
 
 system("rm -rf $dire");
 system("mkdir -p $dire");
+
+my $vtune_run_cmd = "$vtune $collect $rdir -- $cmdline";
+print "Running: '$vtune_run_cmd'\n";
 # system("set -x ; $vtune $collect $rdir $sdir -- $cmdline"); 
-system("$vtune $collect $rdir -- $cmdline");
+system("$vtune_run_cmd");
 report_function $vtune, $report, $rdir, $threads, $outfile, $maxsec;
 report_line $vtune, $report, $rdir, $threads, $outfile, $maxsec;

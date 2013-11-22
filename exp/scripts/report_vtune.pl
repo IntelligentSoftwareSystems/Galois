@@ -18,6 +18,11 @@ my %Stats = ();
 my %Thread_keys = ();
 my $TOTAL = "TOTAL";
 
+my $DEBUG=0;
+sub debug {
+  print STDERR ">>>DEBUG: @_\n" if $DEBUG;
+}
+
 sub show {
   my ($tmap, $lk, $tk) = @_;
 
@@ -49,29 +54,35 @@ while (<>) {
   chomp;
   my @line = split /\t/;
 
-  # print "line:@line\n";
+  debug "line:@line\n";
   # print "line:$line[0],$line[1]\n";
 
   if ($line[0] =~ /^THREADS$/) {
-    # print "Threads line: @line\n";
+    debug "Threads line: @line\n";
     $newSet = 1;
     $curThread = $line[1];
     $Thread_keys{$curThread} = 1;
   } elsif ($newSet) {
     $newSet = 0;
     @heads = @line;
-    # print "headers:@heads\n";
+    debug "headers:@heads\n";
   } else {
     my $ind;
     my $offset = 0;
+
+    debug "line=@line, length=$#line\n";
 
     if ($InType eq "line") {
       my $file = shift @line;
       my $ln = shift @line;
       my $module = shift @line;
-      my $path = shift @line;
 
-      $offset = 4;
+      $offset = 3;
+      if ($heads[$offset] =~ /file path/i) {
+        my $path = shift @line;
+        $offset += 1;
+      } 
+
       $ind = "$module:$file:$ln";
 
     } elsif ($InType eq "function") {
@@ -82,8 +93,11 @@ while (<>) {
       $ind = "$module:$function";
     }
 
-    for (my $i = 0; $i < $#line; $i++) {
+    debug "line=@line, length=$#line\n";
+
+    for (my $i = 0; $i <= $#line; $i++) {
       my $nk = $heads[$i + $offset];
+      debug "nk=$nk\n";
       $Stats{$nk}{$curThread}{$ind} += $line[$i];
       $Stats{$nk}{$curThread}{$TOTAL} += $line[$i];
     }
