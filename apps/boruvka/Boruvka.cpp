@@ -291,7 +291,7 @@ struct ParallelAlgo {
     }
   }
 #else
-  void processExp() { abort(); }
+  void processExp() { GALOIS_DIE("not supported"); }
 #endif
 
   void operator()() {
@@ -422,8 +422,7 @@ void initializeGraph() {
   heaviest = sortEdges();
   if (heaviest == std::numeric_limits<EdgeData>::max() || 
       heaviest == std::numeric_limits<EdgeData>::min()) {
-    std::cerr << "Edge weights of graph out of range\n";
-    abort();
+    GALOIS_DIE("Edge weights of graph out of range");
   }
   inf = heaviest + 1;
   
@@ -465,9 +464,7 @@ int main(int argc, char** argv) {
     << ")\n";
 
   if (!skipVerify && !verify()) {
-    std::cerr << "verification failed\n";
-    assert(0 && "verification failed");
-    abort();
+    GALOIS_DIE("verification failed");
   }
 
   return 0;

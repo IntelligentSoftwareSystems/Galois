@@ -40,6 +40,7 @@ namespace Runtime {
 
 //forward declaration for throw list
 class Lockable;
+class SimpleRuntimeContext;
 
 //Things we can throw:
 struct conflict_ex { Lockable* obj; };
@@ -59,9 +60,14 @@ PendingFlag getPending ();
 //! used to release lock over exception path
 static inline void clearConflictLock() { }
 
+class Releasable {
+public:
+  virtual ~Releasable() { }
+  virtual void release() = 0;
+};
+static inline void clearReleasable() { }
 
 class LockManagerBase; 
-class SimpleRuntimeContext;
 
 #if defined(GALOIS_USE_SEQ_ONLY)
 class Lockable { };
@@ -115,75 +121,71 @@ class Lockable {
   friend bool isAcquiredBy(Lockable*, SimpleRuntimeContext*);                              
 
 public:
-  Lockable() :next(0) {}
+  constexpr Lockable() :next(0) {}
 };
 
 class LockManagerBase: private boost::noncopyable {
-public:
-  //protected:
+protected:
+public: //FIXME
   enum AcquireStatus {
     FAIL, NEW_OWNER, ALREADY_OWNER
   };
 
-  AcquireStatus tryAcquire (Lockable* lockable);
+  AcquireStatus tryAcquire(Lockable* lockable);
 
-  bool stealByCAS(Lockable* lockable, LockManagerBase* other) {
-    assert (lockable != nullptr);
+  inline bool stealByCAS(Lockable* lockable, LockManagerBase* other) {
+    assert(lockable != nullptr);
     return lockable->owner.stealing_CAS(other, this);
   }
 
-  void ownByForce(Lockable* lockable) {
-    assert (lockable != nullptr);
+  inline void ownByForce(Lockable* lockable) {
+    assert(lockable != nullptr);
     assert(!lockable->owner.getValue());
     lockable->owner.setValue(this);
   }
 
-  void release (Lockable* lockable) {
-    assert (lockable != nullptr);
-    assert (getOwner (lockable) == this);
-    lockable->owner.unlock_and_clear ();
+  inline void release(Lockable* lockable) {
+    assert(lockable != nullptr);
+    assert(getOwner(lockable) == this);
+    lockable->owner.unlock_and_clear();
   }
 
-  static bool tryLock(Lockable* lockable) {
-    assert (lockable != nullptr);
+  inline static bool tryLock(Lockable* lockable) {
+    assert(lockable != nullptr);
     return lockable->owner.try_lock();
   }
 
-  static LockManagerBase* getOwner (Lockable* lockable) {
-    assert (lockable != nullptr);
-    return lockable->owner.getValue ();
+  inline static LockManagerBase* getOwner(Lockable* lockable) {
+    assert(lockable != nullptr);
+    return lockable->owner.getValue();
   }
-
-
-
 };
 
 class SimpleRuntimeContext: public LockManagerBase {
-public:
+public: //FIXME
   //! The locks we hold
   Lockable* locks;
   bool customAcquire;
 
   //protected:
+  friend void doAcquire(Lockable*);
 
-  static SimpleRuntimeContext* getOwner (Lockable* lockable) {
+  static SimpleRuntimeContext* getOwner(Lockable* lockable) {
     LockManagerBase* owner = LockManagerBase::getOwner (lockable);
-    // assert (dynamic_cast<SimpleRuntimeContext*> (owner) != nullptr);
-    return static_cast<SimpleRuntimeContext*> (owner);
+    return static_cast<SimpleRuntimeContext*>(owner);
   }
+
   virtual void subAcquire(Lockable* lockable);
 
-  void addToNhood (Lockable* lockable) {
+  void addToNhood(Lockable* lockable) {
     assert(!lockable->next);
     lockable->next = locks;
     locks = lockable;
   }
 
   void acquire(Lockable* lockable);
-  // XXX: overriding LockManagerBase version due to extra checks
   void release(Lockable* lockable);
 
-  friend void doAcquire (Lockable*);
 public:
   SimpleRuntimeContext(bool child = false): locks(0), customAcquire(child) { }
   virtual ~SimpleRuntimeContext() { }
@@ -209,17 +211,20 @@ inline bool shouldLock(const Galois::MethodFlag g) {
   return false;
 #else
   // Mask out additional "optional" flags
-  switch (g & MethodFlag::ALL) {
-  case MethodFlag::NONE:
-  case MethodFlag::SAVE_UNDO:
+  switch (g & ALL) {
+  case NONE:
+  case SAVE_UNDO:
     return false;
-  case MethodFlag::ALL:
-  case MethodFlag::CHECK_CONFLICT:
+  case ALL:
+  case CHECK_CONFLICT:
     return true;
   default:
-    GALOIS_DIE("shouldn't get here");
-    return false;
+    // XXX(ddn): Adding error checking code here either upsets the inlining
+    // heuristics or icache behavior. Avoid complex code if possible.
+    //GALOIS_DIE("shouldn't get here");
+    assert(false);
   }
+  return false;
 #endif
 }
 
@@ -238,8 +243,8 @@ inline void acquire(Lockable* lockable, Galois::MethodFlag m) {
   }
 }
 
-inline bool isAcquired(Lockable* C) {                                                      
-  return C->owner.is_locked();                                                             
+inline bool isAcquired(Lockable* C) {
+  return C->owner.is_locked();
 }
 
 inline bool isAcquiredBy(Lockable* C, SimpleRuntimeContext* cnx) {

@@ -893,8 +893,8 @@ void run(int nbodies, int ntimesteps, int seed, TreeSummMethod summMethod) {
 
 
     t_bbox.start ();
-    Galois::for_each<WL>(wrap(bodies.begin()), wrap(bodies.end()),
-        ReduceBoxes(box));
+    Galois::for_each(wrap(bodies.begin()), wrap(bodies.end()),
+                     ReduceBoxes(box), Galois::wl<WL>());
     t_bbox.stop ();
 
 
@@ -902,8 +902,8 @@ void run(int nbodies, int ntimesteps, int seed, TreeSummMethod summMethod) {
     Galois::StatTimer t_tree_build ("Time taken by Octree building: " );
 
     t_tree_build.start ();
-    Galois::for_each<WL>(wrap(bodies.begin()), wrap(bodies.end()),
-        BuildOctree(top, box.radius()));
+    Galois::for_each(wrap(bodies.begin()), wrap(bodies.end()),
+                     BuildOctree(top, box.radius()), Galois::wl<WL>());
     t_tree_build.stop ();
 
     // reset the number of threads
@@ -941,10 +941,10 @@ void run(int nbodies, int ntimesteps, int seed, TreeSummMethod summMethod) {
       Galois::StatTimer T_parallel("ParallelTime");
       T_parallel.start();
 
-      Galois::for_each<WL>(wrap(bodies.begin()), wrap(bodies.end()),
-          ComputeForces(top, box.diameter()));
-      Galois::for_each<WL>(wrap(bodies.begin()), wrap(bodies.end()),
-          AdvanceBodies());
+      Galois::for_each(wrap(bodies.begin()), wrap(bodies.end()),
+                       ComputeForces(top, box.diameter()), Galois::wl<WL>());
+      Galois::for_each(wrap(bodies.begin()), wrap(bodies.end()),
+                       AdvanceBodies(), Galois::wl<WL>());
       T_parallel.stop();
     }
 

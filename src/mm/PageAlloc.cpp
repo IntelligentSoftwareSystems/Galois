@@ -27,14 +27,10 @@
 #include "Galois/Runtime/ll/gio.h"
 #include "Galois/Runtime/ll/StaticInstance.h"
 
+#include <sys/mman.h>
 #include <map>
 #include <vector>
-#include <algorithm>
-
-#ifdef __linux__
-#include <linux/mman.h>
-#endif
-#include <sys/mman.h>
+#include <numeric>
 
 // mmap flags
 static const int _PROT = PROT_READ | PROT_WRITE;
@@ -67,12 +63,11 @@ struct PAState {
 static Galois::Runtime::LL::StaticInstance<PAState> PA;
 
 #ifdef __linux__
-#define DoAllocLock true
+  static Galois::Runtime::LL::SimpleLock allocLock;
 #else
-#define DoAllocLock false
+  static Galois::Runtime::LL::DummyLock allocLock;
 #endif
-static Galois::Runtime::LL::SimpleLock<DoAllocLock> allocLock;
-static Galois::Runtime::LL::SimpleLock<true> dataLock;
+static Galois::Runtime::LL::SimpleLock dataLock;
 static __thread HeadPtr* head = 0;
 
 void* allocFromOS() {

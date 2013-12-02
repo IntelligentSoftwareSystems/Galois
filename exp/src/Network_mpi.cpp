@@ -51,13 +51,13 @@ static const int FuncTag = 1;
 
 class NetworkInterfaceAsyncMPI : public NetworkInterface {
 
-  Galois::Runtime::LL::SimpleLock<true> lock;
+  Galois::Runtime::LL::SimpleLock lock;
   std::deque<std::pair<MPI_Request, SendBuffer>> pending_sends;
 
-  boost::optional<RecvBuffer> doOneRecv() {
+  Galois::optional<RecvBuffer> doOneRecv() {
     std::lock_guard<decltype(lock)> lg(lock);
     update_pending_sends();
-    boost::optional<RecvBuffer> retval;
+    Galois::optional<RecvBuffer> retval;
     MPI_Status status;
     //async probe
     int flag, rv;
@@ -140,7 +140,7 @@ public:
   }
 
   virtual bool handleReceives() {
-    boost::optional<RecvBuffer> data;
+    Galois::optional<RecvBuffer> data;
     bool retval = false;
     while ((data = doOneRecv())) {
       retval = true;
@@ -172,7 +172,7 @@ public:
 static const int numslots = 16;
 class NetworkBackendMPI : public NetworkBackend {
 
-  LL::SimpleLock<true> lock;
+  LL::SimpleLock lock;
   std::pair<MPI_Request, SendBlock*> pending_sends[numslots];
   int pending_start;
   int pending_end;

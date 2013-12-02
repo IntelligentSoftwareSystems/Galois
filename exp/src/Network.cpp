@@ -143,7 +143,7 @@ void NetworkInterface::flush() {
 
 NetworkBackend::SendBlock* NetworkBackend::allocSendBlock() {
   //FIXME: review for TBAA rules
-  std::lock_guard<LL::SimpleLock<true>> lg(flLock);
+  std::lock_guard<LL::SimpleLock> lg(flLock);
   SendBlock* retval = nullptr;
   if (freelist.empty()) {
     unsigned char* data = (unsigned char*)malloc(sizeof(SendBlock) + size());
@@ -158,7 +158,7 @@ NetworkBackend::SendBlock* NetworkBackend::allocSendBlock() {
 }
 
 void NetworkBackend::freeSendBlock(SendBlock* sb) {
-  std::lock_guard<LL::SimpleLock<true>> lg(flLock);
+  std::lock_guard<LL::SimpleLock> lg(flLock);
   freelist.push_front(*sb);
 }
 

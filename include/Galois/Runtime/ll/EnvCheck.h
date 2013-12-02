@@ -41,6 +41,7 @@ namespace LL {
 //Tracer.cpp: "GALOIS_TRACE_LOCAL"
 //Network_tcp.cpp: "GALOIS_TCP_HOST"
 //Network_tcp.cpp: "GALOIS_TCP_PORT"
+//DeterministicWork.h: "GALOIS_FIXED_DET_WINDOW_SIZE"
 
 //! Return true if the Enviroment variable is set
 bool EnvCheck(const char* parm);

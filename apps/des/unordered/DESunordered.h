@@ -189,7 +189,7 @@ class DESunordered: public DESunorderedBase {
     typedef Galois::WorkList::dChunkedFIFO<CHUNK_SIZE, GNode> WL_ty;
     // typedef Galois::Runtime::WorkList::GFIFO<GNode> WL_ty;
 
-    Galois::for_each<WL_ty>(initialActive.begin (), initialActive.end (), p);
+    Galois::for_each(initialActive.begin (), initialActive.end (), p, Galois::wl<WL_ty>());
 
     std::cout << "Number of events processed = " << numEvents.reduce () << std::endl;
     std::cout << "Number of iterations performed = " << numIter.reduce () << std::endl;

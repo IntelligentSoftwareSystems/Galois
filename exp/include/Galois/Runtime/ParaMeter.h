@@ -88,7 +88,7 @@ class ForEachWork<Galois::WorkList::ParaMeter<ContainerTy>,T,FunctionTy> {
 
   struct IterationContext {
     UserContextTy facing;
-    SimpleRuntimeContext cnx;
+    SimpleRuntimeContext ctx;
 
     void resetUserCtx() {
       if (ForEachTraits<FunctionTy>::NeedsPIA) {
@@ -113,7 +113,7 @@ class ForEachWork<Galois::WorkList::ParaMeter<ContainerTy>,T,FunctionTy> {
     WorkListTy* next;
 
     void copyWL(WorkListTy& wl) {
-      for (boost::optional<value_type> item = wl.pop(); item; item = wl.pop()) {
+      for (Galois::optional<value_type> item = wl.pop(); item; item = wl.pop()) {
         curr->push(*item);
       }
     }
@@ -187,7 +187,7 @@ class ForEachWork<Galois::WorkList::ParaMeter<ContainerTy>,T,FunctionTy> {
       //
       size_t numIter = 0;
 
-      boost::optional<value_type> item;
+      Galois::optional<value_type> item;
       while ((item = workList.getCurr().pop())) {
         IterationContext& it = newIteration();
 
@@ -254,7 +254,7 @@ class ForEachWork<Galois::WorkList::ParaMeter<ContainerTy>,T,FunctionTy> {
     IterationContext* it = new IterationContext();
     
     it->resetUserCtx();
-    setThreadContext(&(it->cnx));
+    setThreadContext(&(it->ctx));
 
     return *it;
   }
@@ -265,9 +265,9 @@ class ForEachWork<Galois::WorkList::ParaMeter<ContainerTy>,T,FunctionTy> {
 
     unsigned numLocks = 0;
     if (abort) {
-      numLocks = it.cnx.cancel_iteration();
+      numLocks = it.ctx.cancelIteration();
     } else {
-      numLocks = it.cnx.commit_iteration();
+      numLocks = it.ctx.commitIteration();
     }
 
     delete &it;

@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -29,6 +29,8 @@
 #include "Galois/Runtime/MethodFlags.h"
 #include "Galois/Runtime/Context.h" //for signal conflict
 
+#include <functional>
+
 namespace Galois {
 
 namespace Runtime {
@@ -42,6 +44,16 @@ struct break_ex {};
 template<typename T>
 class UserContext: private boost::noncopyable {
 protected:
+// TODO: move to a separate class for dedicated for sepculative executors
+#ifdef GALOIS_USE_EXP
+  typedef std::function<void (void)> Closure;
+  typedef Galois::gdeque<Closure, 8> UndoLog;
+  typedef UndoLog CommitLog;
+
+  UndoLog undoLog;
+  CommitLog commitLog;
+#endif 
+
   //! Allocator stuff
   IterAllocBaseTy IterationAllocatorBase;
   PerIterAllocTy PerIterationAllocator;
@@ -49,6 +61,29 @@ protected:
   void __resetAlloc() {
     IterationAllocatorBase.clear();
   }
+
+#ifdef GALOIS_USE_EXP
+  void __rollback() {
+    for (auto ii = undoLog.end (), ei = undoLog.begin(); ii != ei; ) {
+      --ii;
+      (*ii)();
+    }
+  }
+
+  void __commit() {
+    for (auto ii = commitLog.begin (), ei = commitLog.end(); ii != ei; ++ii) {
+      (*ii)();
+    }
+  }
+
+  void __resetUndoLog() {
+    undoLog.clear();
+  }
+
+  void __resetCommitLog() {
+    commitLog.clear();
+  }
+#endif 
 
   //! push stuff
   typedef gdeque<T> PushBufferTy;
@@ -69,9 +104,7 @@ protected:
     localStateUsed = used;
   }
 
-  unsigned fastPushBackLimit() const {
-    return 64;
-  }
+  static const unsigned int fastPushBackLimit = 64;
 
   typedef std::function<void(PushBufferTy&)> FastPushBack; 
   FastPushBack fastPushBack;
@@ -79,15 +112,19 @@ protected:
     fastPushBack = f;
   }
 
+  bool* didBreak;
+
 public:
   UserContext()
     :IterationAllocatorBase(), 
-     PerIterationAllocator(&IterationAllocatorBase)
+     PerIterationAllocator(&IterationAllocatorBase),
+     didBreak(0)
   { }
 
-  //! Signal break in parallel loop
+  //! Signal break in parallel loop, current iteration continues
+  //! untill natural termination
   void breakLoop() {
-    throw Runtime::break_ex {};
+    *didBreak = true;
   }
 
   //! Acquire a per-iteration allocator
@@ -100,7 +137,7 @@ public:
   void push(Args&&... args) {
     Galois::Runtime::checkWrite(MethodFlag::WRITE, true);
     pushBuffer.emplace_back(std::forward<Args>(args)...);
-    if (fastPushBack && pushBuffer.size() > fastPushBackLimit())
+    if (fastPushBack && pushBuffer.size() > fastPushBackLimit)
       fastPushBack(pushBuffer);
   }
 
@@ -109,6 +146,22 @@ public:
 
   //! Store and retrieve local state for deterministic
   void* getLocalState(bool& used) { used = localStateUsed; return localState; }
+ 
+#ifdef GALOIS_USE_EXP
+  void addUndoAction(const Closure& f) {
+    undoLog.push_back(f);
+  }
+
+  void addCommitAction(const Closure& f) {
+    commitLog.push_back(f);
+  }
+#endif 
+
+  //! declare that the operator has crossed the cautious point.  This
+  //! implies all data has been touched thus no new locks will be
+  //! acquired.
+  void cautiousPoint();
+
 };
 
 }

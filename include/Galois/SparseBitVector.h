@@ -25,8 +25,8 @@ kind.
 #include "Galois/Runtime/ll/SimpleLock.h"
 
 #include <vector>
-#include <iostream>
 #include <string>
+#include <ostream>
 
 namespace Galois {
 
@@ -38,7 +38,7 @@ namespace Galois {
  */
 struct SparseBitVector {
   typedef unsigned long WORD;
-  typedef Galois::Runtime::LL::SimpleLock<true> LockType;
+  typedef Galois::Runtime::LL::SimpleLock LockType;
   static const unsigned wordsize = sizeof(WORD)*8;
 
   struct OneWord {
@@ -251,14 +251,14 @@ struct SparseBitVector {
     }
     return nnodes;
   }
-  void print(std::string prefix = std::string("")) {
+  void print(std::ostream& out, std::string prefix = std::string("")) {
     std::vector<unsigned> setbits;
     unsigned nnodes = getAllSetBits(setbits);
-    std::cout << "Elements(" << nnodes << "): ";
+    out << "Elements(" << nnodes << "): ";
     for (std::vector<unsigned>::iterator ii = setbits.begin(); ii != setbits.end(); ++ii) {
-      std::cout << prefix << *ii << ", ";
+      out << prefix << *ii << ", ";
     }
-    std::cout << std::endl;
+    out << "\n";
   }
 };
 }

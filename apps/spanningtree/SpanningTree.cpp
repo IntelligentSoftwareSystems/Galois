@@ -46,7 +46,8 @@ const char* url = NULL;
 
 enum Algo {
   demo,
-  asynchronous
+  asynchronous,
+  blockedasync
 };
 
 static cll::opt<std::string> inputFilename(cll::Positional, cll::desc("<input file>"), cll::Required);
@@ -54,14 +55,15 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
     cll::values(
       clEnumVal(demo, "Demonstration algorithm"),
       clEnumVal(asynchronous, "Asynchronous"),
-      clEnumValEnd), cll::init(asynchronous));
+      clEnumVal(blockedasync, "Blocked Asynchronous"),
+      clEnumValEnd), cll::init(blockedasync));
 
 struct Node: public Galois::UnionFindNode<Node> {
-  Node* component;
-  Node(): component(this) { }
+  Node*& component() { return m_component; }
 };
 
-typedef Galois::Graph::LC_Linear_Graph<Node,void>::with_numa_alloc<true>::type Graph;
+typedef Galois::Graph::LC_Linear_Graph<Node,void>
+  ::with_numa_alloc<true>::type Graph;
 
 typedef Graph::GraphNode GNode;
 
@@ -91,9 +93,9 @@ struct DemoAlgo {
 	   ei = graph.edge_end(src, Galois::MethodFlag::ALL); ii != ei; ++ii) {
       GNode dst = graph.getEdgeDst(ii);
       Node& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
-      if (ddata.component == root)
+      if (ddata.component() == root)
         continue;
-      ddata.component = root;
+      ddata.component() = root;
       mst.push(std::make_pair(src, dst));
       ctx.push(dst);
     }
@@ -111,19 +113,10 @@ struct DemoAlgo {
 /**
  * Like asynchronous connected components algorithm. 
  */
-struct AsynchronousAlgo {
+struct AsyncAlgo {
   struct Merge {
-    typedef int tt_does_not_need_aborts;
-    typedef int tt_does_not_need_push;
-    typedef int tt_does_not_need_stats;
-
     Galois::Statistic& emptyMerges;
     Merge(Galois::Statistic& e): emptyMerges(e) { }
-
-    //! Add the next edge between components to the worklist
-    void operator()(const GNode& src, Galois::UserContext<GNode>&) const {
-      (*this)(src);
-    }
 
     void operator()(const GNode& src) const {
       Node& sdata = graph.getData(src, Galois::MethodFlag::NONE);
@@ -144,14 +137,85 @@ struct AsynchronousAlgo {
   struct Normalize {
     void operator()(const GNode& src) const {
       Node& sdata = graph.getData(src, Galois::MethodFlag::NONE);
-      sdata.component = sdata.findAndCompress();
+      sdata.component() = sdata.findAndCompress();
     }
   };
 
   void operator()() {
     Galois::Statistic emptyMerges("EmptyMerges");
-    Galois::for_each_local(graph, Merge(emptyMerges));
-    Galois::do_all_local(graph, Normalize());
+    Galois::do_all_local(graph, Merge(emptyMerges),
+        Galois::loopname("Merge"), Galois::do_all_steal(true));
+    Galois::do_all_local(graph, Normalize(), Galois::loopname("Normalize"));
+  }
+};
+
+/**
+ * Improve performance of async algorithm by following machine topology.
+ */
+struct BlockedAsyncAlgo {
+  struct WorkItem {
+    GNode src;
+    Graph::edge_iterator start;
+  };
+
+  struct Merge {
+    typedef int tt_does_not_need_aborts;
+
+    Galois::InsertBag<WorkItem>& items;
+
+    //! Add the next edge between components to the worklist
+    template<bool MakeContinuation, int Limit, typename Pusher>
+    void process(const GNode& src, const Graph::edge_iterator& start, Pusher& pusher) {
+      Node& sdata = graph.getData(src, Galois::MethodFlag::NONE);
+      int count = 1;
+      for (Graph::edge_iterator ii = start, ei = graph.edge_end(src, Galois::MethodFlag::NONE);
+          ii != ei; 
+          ++ii, ++count) {
+        GNode dst = graph.getEdgeDst(ii);
+        Node& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+        if (sdata.merge(&ddata)) {
+          mst.push(std::make_pair(src, dst));
+          if (Limit == 0 || count != Limit)
+            continue;
+        }
+
+        if (MakeContinuation || (Limit != 0 && count == Limit)) {
+          WorkItem item = { src, ii + 1 };
+          pusher.push(item);
+          break;
+        }
+      }
+    }
+
+    void operator()(const GNode& src) {
+      Graph::edge_iterator start = graph.edge_begin(src, Galois::MethodFlag::NONE);
+      if (Galois::Runtime::LL::getPackageForSelf(Galois::Runtime::LL::getTID()) == 0) {
+        process<true, 0>(src, start, items);
+      } else {
+        process<true, 1>(src, start, items);
+      }
+    }
+
+    void operator()(const WorkItem& item, Galois::UserContext<WorkItem>& ctx) {
+      process<true, 0>(item.src, item.start, ctx);
+    }
+  };
+
+  //! Normalize component by doing find with path compression
+  struct Normalize {
+    void operator()(const GNode& src) const {
+      Node& sdata = graph.getData(src, Galois::MethodFlag::NONE);
+      sdata.component() = sdata.findAndCompress();
+    }
+  };
+
+  void operator()() {
+    Galois::InsertBag<WorkItem> items;
+    Merge merge = { items };
+    Galois::do_all_local(graph, merge, Galois::loopname("Initialize"), Galois::do_all_steal(false));
+    Galois::for_each_local(items, merge,
+        Galois::loopname("Merge"), Galois::wl<Galois::WorkList::dChunkedFIFO<128> >());
+    Galois::do_all_local(graph, Normalize(), Galois::loopname("Normalize"));
   }
 };
 
@@ -161,7 +225,7 @@ struct is_bad_graph {
     for (Graph::edge_iterator ii = graph.edge_begin(n), ei = graph.edge_end(n); ii != ei; ++ii) {
       GNode dst = graph.getEdgeDst(ii);
       Node& data = graph.getData(dst);
-      if (me.component != data.component) {
+      if (me.component() != data.component()) {
         std::cerr << "not in same component: " << me << " and " << data << "\n";
         return true;
       }
@@ -172,7 +236,7 @@ struct is_bad_graph {
 
 struct is_bad_mst {
   bool operator()(const Edge& e) const {
-    return graph.getData(e.first).component != graph.getData(e.second).component;
+    return graph.getData(e.first).component() != graph.getData(e.second).component();
   }
 };
 
@@ -185,7 +249,7 @@ struct CheckAcyclic {
 
   void operator()(const GNode& n) {
     Node& data = graph.getData(n);
-    if (data.component == &data)
+    if (data.component() == &data)
       accum->roots += 1;
   }
 
@@ -238,11 +302,12 @@ int main(int argc, char** argv) {
   std::cout << "Num nodes: " << graph.size() << "\n";
   Tinitial.stop();
 
-  //Galois::preAlloc(numThreads);
+  //Galois::preAlloc(numThreads + graph.size() / Galois::Runtime::MM::pageSize * 60);
   Galois::reportPageAlloc("MeminfoPre");
   switch (algo) {
     case demo: run<DemoAlgo>(); break;
-    case asynchronous: run<AsynchronousAlgo>(); break;
+    case asynchronous: run<AsyncAlgo>(); break;
+    case blockedasync: run<BlockedAsyncAlgo>(); break;
     default: std::cerr << "Unknown algo: " << algo << "\n";
   }
   Galois::reportPageAlloc("MeminfoPost");

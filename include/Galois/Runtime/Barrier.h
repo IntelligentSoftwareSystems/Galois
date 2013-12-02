@@ -50,7 +50,7 @@ public:
  * is modified after using this barrier: some threads may still
  * be in the barrier while the main thread reinitializes this
  * barrier to the new number of active threads. If that may
- * happen, use {@link createSimpleBarrier} instead. 
+ * happen, use {@link createSimpleBarrier()} instead. 
  */
 Barrier& getSystemBarrier();
 
@@ -58,7 +58,7 @@ Barrier& getSystemBarrier();
  * Creates a new simple barrier. This barrier is not designed to be fast but
  * does gaurantee that all threads have left the barrier before returning
  * control. Useful when the number of active threads is modified to avoid a
- * race in {@link getSystemBarrier}.  Client is reponsible for deallocating
+ * race in {@link getSystemBarrier()}.  Client is reponsible for deallocating
  * returned barrier.
  */
 Barrier* createSimpleBarrier();

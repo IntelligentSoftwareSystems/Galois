@@ -24,10 +24,10 @@
  *
  * @author <ahassaan@ices.utexas.edu>
  */
-
 #ifndef GALOIS_RUNTIME_LC_ORDERED_H
 #define GALOIS_RUNTIME_LC_ORDERED_H
 
+#include "Galois/config.h"
 #include "Galois/Accumulator.h"
 #include "Galois/Atomic.h"
 #include "Galois/gdeque.h"
@@ -45,7 +45,7 @@
 #include "llvm/ADT/SmallVector.h"
 
 #include <iostream>
-#include <tr1/unordered_map>
+#include GALOIS_CXX11_STD_HEADER(unordered_map)
 
 namespace Galois {
 namespace Runtime {
@@ -64,7 +64,6 @@ protected:
   Lockable* lockable;
 
 public:
-
   template <typename Cmp>
   NhoodItem (Lockable* l, const Cmp& cmp):  sharers (CtxtCmp (cmp)), lockable (l) {}
 
@@ -98,7 +97,6 @@ public:
   void print () const { 
     // TODO
   }
-
 };
 
 
@@ -257,7 +255,12 @@ public:
     if ((void*)l->auxData == NULL) {
       NItem* nv = niAlloc.allocate (1);
       assert (nv != NULL);
+// XXX(ddn): Forwarding still wonky on XLC
+#if !defined(__IBMCPP__) || __IBMCPP__ > 1210
       niAlloc.construct (nv, l, cmp);
+#else
+      niAlloc.construct (nv, NItem(l, cmp));
+#endif
       // NItem* nv = new NItem (l, cmp);
 
       if (__sync_bool_compare_and_swap(&l->auxData, 0, (uintptr_t)nv)) {
@@ -322,10 +325,10 @@ public:
   typedef MM::ThreadAwarePrivateHeap<BasicHeap> PerThreadHeap;
   typedef MM::ExternRefGaloisAllocator<std::pair<Lockable*, NItem>, PerThreadHeap> PerThreadAllocator;
 
-  typedef std::tr1::unordered_map<
+  typedef std::unordered_map<
       Lockable*,
       NItem,
-      std::tr1::hash<Lockable*>,
+      std::hash<Lockable*>,
       std::equal_to<Lockable*>,
       PerThreadAllocator
     > NhoodMap;
@@ -344,7 +347,7 @@ public:
   MapBasedNhoodMgr (const Cmp& cmp): 
     cmp (cmp),
     heap (),
-    nhoodMap (8, std::tr1::hash<Lockable*> (), std::equal_to<Lockable*> (), PerThreadAllocator (&heap))
+    nhoodMap (8, std::hash<Lockable*> (), std::equal_to<Lockable*> (), PerThreadAllocator (&heap))
 
   {}
 
@@ -472,7 +475,8 @@ class LCorderedExec {
       Ctxt* ctxt = ctxtAlloc.allocate (1);
       assert (ctxt != NULL);
       // new (ctxt) Ctxt (active, nhmgr);
-      ctxtAlloc.construct (ctxt, Ctxt (active, nhmgr));
+      //ctxtAlloc.construct (ctxt, Ctxt (active, nhmgr));
+      ctxtAlloc.construct (ctxt, active, nhmgr);
 
       ctxtWL.get ().push_back (ctxt);
 

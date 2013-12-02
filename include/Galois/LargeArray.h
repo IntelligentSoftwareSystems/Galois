@@ -25,12 +25,13 @@
 #ifndef GALOIS_LARGEARRAY_H
 #define GALOIS_LARGEARRAY_H
 
+#include "Galois/config.h"
 #include "Galois/gstl.h"
 #include "Galois/Runtime/ll/gio.h"
 #include "Galois/Runtime/mm/Mem.h"
 
 #include <boost/utility.hpp>
-#include <type_traits>
+#include GALOIS_CXX11_STD_HEADER(utility)
 
 namespace Galois {
 
@@ -41,7 +42,7 @@ namespace Galois {
  * @tparam T value type of container
  */
 template<typename T>
-class LargeArray: boost::noncopyable {
+class LargeArray: private boost::noncopyable {
   T* m_data;
   size_t m_size;
   int allocated;
@@ -58,7 +59,11 @@ public:
   typedef pointer iterator;
   typedef const_pointer const_iterator;
   const static bool has_value = true;
-  const static size_t sizeof_value = sizeof(T);
+
+  // Extra indirection to support incomplete T's
+  struct size_of {
+    const static size_t value = sizeof(T);
+  };
 
 protected:
   void allocate(size_type n, bool interleave, bool prefault) {
@@ -101,8 +106,9 @@ public:
   void allocateInterleaved(size_type n) { allocate(n, true, true); }
 
   /**
-   * Allocates using default memory policy, which is place on first touch.
+   * Allocates using default memory policy (usually first-touch) 
    *
+   * @param  n         number of elements to allocate 
    * @param  prefault  Prefault/touch memory to place it local to the currently executing
    *                   thread. By default, true because concurrent page-faulting can be a
    *                   scalability bottleneck.
@@ -157,7 +163,7 @@ public:
 
 //! Void specialization
 template<>
-class LargeArray<void>: boost::noncopyable {
+class LargeArray<void>: private boost::noncopyable {
 public:
   LargeArray(void* d, size_t s) { }
   LargeArray() { }
@@ -173,7 +179,9 @@ public:
   typedef pointer iterator;
   typedef const_pointer const_iterator;
   const static bool has_value = false;
-  const static size_t sizeof_value = 0;
+  struct size_of {
+    const static size_t value = 0;
+  };
 
   const_reference at(difference_type x) const { return 0; }
   reference at(difference_type x) { return 0; }

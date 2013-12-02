@@ -43,6 +43,21 @@ public:
   SuperTy& data() { return *static_cast<SuperTy*>(this); }
   void setLocalState(void *p, bool used) { SuperTy::__setLocalState(p, used); }
   void setFastPushBack(FastPushBack f) { SuperTy::__setFastPushBack(f); }
+  void setBreakFlag(bool *b) { SuperTy::didBreak = b; }
+
+// TODO: move to a separate class dedicated for speculative executors
+#ifdef GALOIS_USE_EXP
+  void rollback () { SuperTy::__rollback (); }
+
+  void commit () { SuperTy::__commit (); }
+
+  void reset () {
+    SuperTy::__resetPushBuffer ();
+    SuperTy::__resetUndoLog ();
+    SuperTy::__resetCommitLog ();
+    SuperTy::__resetAlloc ();
+  }
+#endif
 };
 
 }

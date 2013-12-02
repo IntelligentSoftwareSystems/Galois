@@ -32,6 +32,7 @@
 #include <fstream>
 
 #include "Metis.h"
+#include "Galois/Graph/Util.h"
 #include "Galois/Statistic.h"
 //#include "GraphReader.h"
 #include "Lonestar/BoilerPlate.h"
@@ -147,7 +148,7 @@ int main(int argc, char** argv) {
   MetisGraph metisGraph;
   GGraph* graph = metisGraph.getGraph();
 
-  graph->structureFromFile(filename);
+  Galois::Graph::readGraph(*graph, filename);
 
   Galois::do_all_local(*graph, parallelInitMorphGraph(*graph));
 

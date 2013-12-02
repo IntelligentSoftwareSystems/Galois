@@ -39,6 +39,7 @@
 #include <vector>
 #include <algorithm>
 #include <iostream>
+#include <type_traits>
 
 const char* name = "Maximal Independent Set";
 const char* desc = "Computes a maximal independent set (not maximum) of nodes in a graph";
@@ -252,7 +253,7 @@ struct DefaultAlgo {
 #endif
     switch (algo) {
       case nondet: 
-        Galois::for_each<WL>(graph.begin(), graph.end(), Process<>(graph));
+        Galois::for_each(graph.begin(), graph.end(), Process<>(graph), Galois::wl<WL>());
         break;
       case detBase:
         Galois::for_each_det(graph.begin(), graph.end(), Process<>(graph));
@@ -340,8 +341,8 @@ struct PullAlgo {
     uint64_t size = graph.size();
     uint64_t delta = graph.size() / 25;
 
-    typename Graph::iterator ii = graph.begin();
-    typename Graph::iterator ei = graph.begin();
+    Graph::iterator ii = graph.begin();
+    Graph::iterator ei = graph.begin();
     uint64_t remaining = std::min(size, delta);
     std::advance(ei, remaining);
     size -= remaining;
@@ -437,8 +438,14 @@ void run() {
   Graph graph;
   Galois::Graph::readGraph(graph, filename);
 
-  // XXX Test if this matters
-  Galois::preAlloc(numThreads + (graph.size() * sizeof(Node) * numThreads / 8) / Galois::Runtime::MM::pageSize);
+  // Galois::preAlloc(numThreads + (graph.size() * sizeof(Node) * numThreads / 8) / Galois::Runtime::MM::pageSize);
+  // Tighter upper bound
+  if(std::is_same<Algo, DefaultAlgo<nondet> >::value) {
+    Galois::preAlloc (numThreads + 8*graph.size()/Galois::Runtime::MM::pageSize);
+
+  } else {
+    Galois::preAlloc (numThreads + 32*graph.size()/Galois::Runtime::MM::pageSize);
+  }
 
   Galois::reportPageAlloc("MeminfoPre");
   Galois::StatTimer T;

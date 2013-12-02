@@ -25,16 +25,17 @@
 #ifndef GALOIS_RUNTIME_WORKLISTEXPERIMENTAL_H
 #define GALOIS_RUNTIME_WORKLISTEXPERIMENTAL_H
 
+#include "Galois/Bag.h"
+#include "Galois/optional.h"
+#include "Galois/Queue.h"
+
 #include "Galois/WorkList/WorkList.h"
 #include "Galois/WorkList/WorkListDebug.h"
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/Termination.h"
 #include "Galois/Runtime/ThreadPool.h"
+#include "Galois/Runtime/ll/SimpleLock.h"
 #include "Galois/Runtime/ll/PaddedLock.h"
-
-#include "Galois/Bag.h"
-#include "Galois/Queue.h"
-//#include "Galois/SkipList.h"
 
 #include "llvm/Support/CommandLine.h"
 
@@ -46,9 +47,7 @@
 #endif
 
 #include <boost/utility.hpp>
-#include <boost/optional.hpp>
 #include <cstdlib>
-//#include <ostream>
 #include <set>
 
 namespace Galois {
@@ -56,7 +55,7 @@ namespace WorkList {
 
 template<class T, class Indexer = DummyIndexer<T>, typename ContainerTy = FIFO<T>, bool concurrent=true >
 class ApproxOrderByIntegerMetric : private boost::noncopyable {
-  typename ContainerTy::template rethread<concurrent> data[2048];
+  typename ContainerTy::template rethread<concurrent>::type data[2048];
   
   Indexer I;
   Runtime::PerThreadStorage<unsigned int> cursor;
@@ -69,7 +68,7 @@ public:
   typedef T value_type;
   template<bool newconcurrent>
   struct rethread {
-    typedef ApproxOrderByIntegerMetric<T, Indexer, ContainerTy, newconcurrent> WL;
+    typedef ApproxOrderByIntegerMetric<T, Indexer, ContainerTy, newconcurrent> type;
   };
   
   ApproxOrderByIntegerMetric(const Indexer& x = Indexer())
@@ -97,9 +96,9 @@ public:
     push(range.local_begin(), range.local_end());
   }
 
-  boost::optional<value_type> pop() {
+  Galois::optional<value_type> pop() {
     unsigned int& cur = concurrent ? *cursor.getLocal() : *cursor.getRemote(0);
-    boost::optional<value_type> ret = data[cur].pop();
+    Galois::optional<value_type> ret = data[cur].pop();
     if (ret)
       return ret;
 
@@ -110,14 +109,14 @@ public:
       if (ret.first)
 	return ret;
     }
-    return boost::optional<value_type>();
+    return Galois::optional<value_type>();
   }
 };
 GALOIS_WLCOMPILECHECK(ApproxOrderByIntegerMetric)
 
 template<class T, class Indexer = DummyIndexer<T>, typename ContainerTy = FIFO<T>, bool concurrent=true >
 class LogOrderByIntegerMetric : private boost::noncopyable {
-  typename ContainerTy::template rethread<concurrent> data[sizeof(unsigned int)*8 + 1];
+  typename ContainerTy::template rethread<concurrent>::type data[sizeof(unsigned int)*8 + 1];
   
   Indexer I;
   Runtime::PerThreadStorage<unsigned int> cursor;
@@ -135,7 +134,7 @@ public:
   typedef T value_type;
   template<bool newconcurrent>
   struct rethread {
-    typedef LogOrderByIntegerMetric<T, Indexer, ContainerTy, newconcurrent> WL;
+    typedef LogOrderByIntegerMetric<T, Indexer, ContainerTy, newconcurrent> type;
   };
   
   LogOrderByIntegerMetric(const Indexer& x = Indexer())
@@ -162,9 +161,9 @@ public:
     push(range.local_begin(), range.local_end());
   }
 
-  boost::optional<value_type> pop() {
+  Galois::optional<value_type> pop() {
     unsigned int& cur = concurrent ? *cursor.getLocal() : *cursor.getRemote(0);
-    boost::optional<value_type> ret = data[cur].pop();
+    Galois::optional<value_type> ret = data[cur].pop();
     if (ret)
       return ret;
 
@@ -175,7 +174,7 @@ public:
 	return ret;
     }
     cur = 0;
-    return boost::optional<value_type>();
+    return Galois::optional<value_type>();
   }
 };
 GALOIS_WLCOMPILECHECK(LogOrderByIntegerMetric)
@@ -185,7 +184,7 @@ class LocalFilter {
   GlobalTy globalQ;
 
   struct p {
-    typename LocalTy::template rethread<false> Q;
+    typename LocalTy::template rethread<false>::type Q;
     unsigned int current;
   };
   Runtime::PerThreadStorage<p> localQs;
@@ -202,7 +201,7 @@ public:
   //! change the concurrency flag
   template<bool newconcurrent>
   struct rethread {
-    typedef LocalFilter WL;
+    typedef LocalFilter type;
   };
 
   //! push a value onto the queue
@@ -226,8 +225,8 @@ public:
     push(range.local_begin(), range.local_end());
   }
 
-  boost::optional<value_type> pop() {
-    boost::optional<value_type> r = localQs.get().Q.pop();
+  Galois::optional<value_type> pop() {
+    Galois::optional<value_type> r = localQs.get().Q.pop();
     if (r)
       return r;
     
@@ -323,7 +322,7 @@ public:
   typedef T value_type;
 
 private:
-  Runtime::PerThreadStorage<typename LocalWL::template rethread<false>> localQueues;
+  Runtime::PerThreadStorage<typename LocalWL::template rethread<false>::type> localQueues;
   Runtime::PerPackageStorage<GlobalWL> sharedQueues;
   Runtime::PerPackageStorage<unsigned long> starvingFlags;
   GlobalWL gwl;
@@ -357,9 +356,9 @@ public:
     push(range.local_begin(), range.local_end());
   }
 
-  boost::optional<value_type> pop() {
+  Galois::optional<value_type> pop() {
     //Try the local queue first
-    boost::optional<value_type> ret = localQueues.getLocal()->pop();
+    Galois::optional<value_type> ret = localQueues.getLocal()->pop();
     if (ret)
       return ret;
 
@@ -425,9 +424,9 @@ public:
     push(range.local_begin(), range.local_end());
   }
 
-  boost::optional<value_type> pop() {
+  Galois::optional<value_type> pop() {
     int myIsland = DistPolicy::getThreadIsland();
-    boost::optional<value_type> val = WL[myIsland].data.pop();
+    Galois::optional<value_type> val = WL[myIsland].data.pop();
     if (val || !DistPolicy::isThreadMaster())
       return val;
 
@@ -1151,12 +1150,12 @@ public:
     push(range.local_begin(), range.local_end());
   }
 
-  boost::optional<value_type> pop() {
+  Galois::optional<value_type> pop() {
     bool Empty;
     T retval = take(Empty);
     return !Empty ? 
-      boost::optional<value_type>(retval) :
-      boost::optional<value_type>();
+      Galois::optional<value_type>(retval) :
+      Galois::optional<value_type>();
   }
     
   //This can be called by any thread
@@ -1179,7 +1178,7 @@ class PartitionedWL : private boost::noncopyable {
 public:
   template<bool newconcurrent>
   struct rethread {
-    typedef PartitionedWL<T, Partitioner, ChildWLTy, newconcurrent> WL;
+    typedef PartitionedWL<T, Partitioner, ChildWLTy, newconcurrent> type;
   };
 
   typedef T value_type;
@@ -1205,15 +1204,15 @@ public:
     push(range.local_begin(), range.local_end());
   }
 
-  boost::optional<value_type> pop() {
-    boost::optional<value_type> r = Items.get().pop();
+  Galois::optional<value_type> pop() {
+    Galois::optional<value_type> r = Items.get().pop();
     // std::cerr << "{" << Items.myEffectiveID() << "}";
     // if (r.first)
     //   std::cerr << r.first;
     return r;
   }
   
-  boost::optional<value_type> try_pop() {
+  Galois::optional<value_type> try_pop() {
     return pop();
   }
 };
@@ -1227,9 +1226,10 @@ class SkipListQueue : private boost::noncopyable {
 
 public:
   template<bool newconcurrent>
-  using rethread = SkipListQueue<Compare, T>;
+  struct rethread { typedef SkipListQueue<Compare, T> type; };
+
   template<typename Tnew>
-  using retype = SkipListQueue<Compare, Tnew>;
+  struct retype { typedef SkipListQueue<Compare, Tnew> type; };
 
   typedef T value_type;
 
@@ -1250,7 +1250,7 @@ public:
     push(range.local_begin(), range.local_end());
   }
 
-  boost::optional<value_type> pop() {
+  Galois::optional<value_type> pop() {
     return wl.pollFirstKey();
   }
 };
@@ -1267,9 +1267,10 @@ class SetQueue : private boost::noncopyable, private Runtime::LL::PaddedLock<con
 
 public:
   template<bool newconcurrent>
-  using rethread = SetQueue<Compare, T, newconcurrent>;
+  struct rethread { typedef SetQueue<Compare, T, newconcurrent> type; };
+
   template<typename Tnew>
-  using retype = SetQueue<Compare, Tnew, concurrent>;
+  struct retype { typedef SetQueue<Compare, Tnew, concurrent> type; };
 
   typedef T value_type;
 
@@ -1293,16 +1294,16 @@ public:
       push(range.begin(), range.end());
   }
 
-  boost::optional<value_type> pop() {
+  Galois::optional<value_type> pop() {
     lock();
     if (wl.empty()) {
       unlock();
-      return boost::optional<value_type>();
+      return Galois::optional<value_type>();
     }
     value_type r = *wl.begin();
     wl.erase(wl.begin());
     unlock();
-    return boost::optional<value_type>(r);
+    return Galois::optional<value_type>(r);
   }
 };
 GALOIS_WLCOMPILECHECK(SetQueue)
@@ -1313,9 +1314,10 @@ class FCPairingHeapQueue : private boost::noncopyable {
 
 public:
   template<bool newconcurrent>
-  using rethread = FCPairingHeapQueue<Compare, T>;
+  struct rethread { typedef FCPairingHeapQueue<Compare, T> type; };
+
   template<typename Tnew>
-  using retype = FCPairingHeapQueue<Compare, Tnew>;
+  struct retype { typedef FCPairingHeapQueue<Compare, Tnew> type; };
 
   typedef T value_type;
 
@@ -1336,7 +1338,7 @@ public:
     push(range.local_begin(), range.local_end());
   }
 
-  boost::optional<value_type> pop() {
+  Galois::optional<value_type> pop() {
     return wl.pollMin();
   }
 };
@@ -1374,9 +1376,10 @@ class SimpleOrderedByIntegerMetric : private boost::noncopyable, private Galois:
 
  public:
   template<bool newconcurrent>
-  using rethread = SimpleOrderedByIntegerMetric<Indexer,ContainerTy,T,newconcurrent>;
+  struct rethread { typedef SimpleOrderedByIntegerMetric<Indexer,ContainerTy,T,newconcurrent> type; };
+
   template<typename Tnew>
-  using retype = SimpleOrderedByIntegerMetric<Indexer,typename ContainerTy::template retype<Tnew>,Tnew,concurrent>;
+  struct retype { typedef SimpleOrderedByIntegerMetric<Indexer,typename ContainerTy::template retype<Tnew>::type,Tnew,concurrent> type; };
   
   typedef T value_type;
   
@@ -1402,10 +1405,10 @@ class SimpleOrderedByIntegerMetric : private boost::noncopyable, private Galois:
     push(range.local_begin(), range.local_end());
   }
 
-  boost::optional<value_type> pop() {
+  Galois::optional<value_type> pop() {
     //Fastpath
     CTy* c = current;
-    boost::optional<value_type> retval;
+    Galois::optional<value_type> retval;
     if (c && (retval = c->pop()))
       return retval;
 
@@ -1431,8 +1434,7 @@ class SimpleOrderedByIntegerMetric : private boost::noncopyable, private Galois:
 
 template<class Indexer, typename ContainerTy = Galois::WorkList::ChunkedLIFO<16>, bool BSP = true, typename T = int, bool concurrent = true>
 class CTOrderedByIntegerMetric : private boost::noncopyable {
-
-  typedef typename ContainerTy::template rethread<concurrent> CTy;
+  typedef typename ContainerTy::template rethread<concurrent>::type CTy;
 
   struct perItem {
     CTy* current;
@@ -1469,9 +1471,10 @@ class CTOrderedByIntegerMetric : private boost::noncopyable {
 
  public:
   template<bool newconcurrent>
-  using rethread = CTOrderedByIntegerMetric<Indexer,ContainerTy,BSP,T,newconcurrent>;
+  struct rethread { typedef CTOrderedByIntegerMetric<Indexer,ContainerTy,BSP,T,newconcurrent> type; };
+
   template<typename Tnew>
-  using retype = CTOrderedByIntegerMetric<Indexer,typename ContainerTy::template retype<Tnew>,BSP,Tnew,concurrent>;
+  struct retype { typedef CTOrderedByIntegerMetric<Indexer,typename ContainerTy::template retype<Tnew>::type,BSP,Tnew,concurrent> type; };
 
   typedef T value_type;
 
@@ -1514,11 +1517,11 @@ class CTOrderedByIntegerMetric : private boost::noncopyable {
     push(range.local_begin(), range.local_end());
   }
 
-  boost::optional<value_type> pop() {
+  Galois::optional<value_type> pop() {
     //Find a successful pop
     perItem& pI = *current.getLocal();
     CTy*& C = pI.current;
-    boost::optional<value_type> retval;
+    Galois::optional<value_type> retval;
     if (C && (retval = C->pop()))
       return retval;
 
@@ -1548,7 +1551,7 @@ class CTOrderedByIntegerMetric : private boost::noncopyable {
 	  return retval;
       }
     }
-    return boost::optional<value_type>();
+    return Galois::optional<value_type>();
   }
 };
 GALOIS_WLCOMPILECHECK(CTOrderedByIntegerMetric)
@@ -1556,7 +1559,7 @@ GALOIS_WLCOMPILECHECK(CTOrderedByIntegerMetric)
 
 template<class Indexer, typename ContainerTy, bool concurrent = true, int binmax = 1024*1024 >
 class BarrierOBIM : private boost::noncopyable {
-  typedef typename ContainerTy::template rethread<concurrent> CTy;
+  typedef typename ContainerTy::template rethread<concurrent>::type CTy;
 
   volatile unsigned int current;
   volatile unsigned int pushmax;
@@ -1571,9 +1574,10 @@ class BarrierOBIM : private boost::noncopyable {
 
  public:
   template<bool newconcurrent>
-  using rethread = BarrierOBIM<Indexer,ContainerTy,newconcurrent,binmax>;
+  struct rethread { typedef BarrierOBIM<Indexer,ContainerTy,newconcurrent,binmax> type; };
+
   template<typename Tnew>
-  using retype = BarrierOBIM<Indexer,typename ContainerTy::template retype<Tnew>,concurrent, binmax>;
+  struct retype { typedef BarrierOBIM<Indexer,typename ContainerTy::template retype<Tnew>::type,concurrent, binmax> type; };
 
   typedef typename CTy::value_type value_type;
 
@@ -1618,13 +1622,13 @@ class BarrierOBIM : private boost::noncopyable {
     push(range.local_begin(), range.local_end());
   }
 
-  boost::optional<value_type> pop() {
+  Galois::optional<value_type> pop() {
     do {
       if (current > pushmax)
-	return boost::optional<value_type>();
+	return Galois::optional<value_type>();
       do {
 	//Find a successful pop
-	boost::optional<value_type> retval = B[current].pop();
+	Galois::optional<value_type> retval = B[current].pop();
 	if (retval) {
 	  term.localTermination(true);
 	  return retval;
@@ -1646,32 +1650,36 @@ class BarrierOBIM : private boost::noncopyable {
 };
 
 template<typename T = int, bool concurrent = true>
-  class Random : private boost::noncopyable, private Galois::Runtime::LL::PaddedLock<concurrent>  {
-  std::vector<T> wl;
-  unsigned int seed;
-  using Galois::Runtime::LL::PaddedLock<concurrent>::lock;
-  using Galois::Runtime::LL::PaddedLock<concurrent>::try_lock;
-  using Galois::Runtime::LL::PaddedLock<concurrent>::unlock;
+class Random : private boost::noncopyable {
+  typedef typename std::conditional<concurrent, Runtime::LL::SimpleLock, Runtime::LL::DummyLock>::type LockTy;
+  std::pair<LockTy, std::deque<T> > wl[128];
+  struct rstate { unsigned short d[3]; };
+  Runtime::PerThreadStorage<rstate > seeds;
 
   unsigned int nextRand() {
-    seed = 214013*seed + 2531011; 
-    return (seed >> 16) & 0x7FFF;
+    return nrand48(seeds.getLocal()->d);
+  }
+
+  unsigned int pickBucket() {
+    return nrand48(seeds.getLocal()->d) % 128;
   }
 
 public:
-  Random(): seed(0xDEADBEEF) { }
+  Random() { }
 
   template<bool newconcurrent>
-  using rethread = Random<T, newconcurrent>;
+  struct rethread { typedef Random<T, newconcurrent> type; };
+
   template<typename Tnew>
-  using retype = Random<Tnew, concurrent>;
+  struct retype { typedef Random<Tnew, concurrent> type; };
 
   typedef T value_type;
 
   void push(value_type val) {
-    lock();
-    wl.push_back(val);
-    unlock();
+    auto& entry = wl[pickBucket()];
+    entry.first.lock();
+    entry.second.push_back(val);
+    entry.first.unlock();
   }
 
   template<typename ItTy>
@@ -1685,20 +1693,24 @@ public:
     push(range.local_begin(), range.local_end());
   }
 
-  boost::optional<value_type> pop() {
-    lock();
-    if (wl.empty()) {
-      unlock();
-      return boost::optional<value_type>();
-    } else {
-      size_t size = wl.size();
-      unsigned int index = nextRand() % size;
-      value_type retval = wl[index];
-      std::swap(wl[index], wl[size-1]);
-      wl.pop_back();
-      unlock();
-      return boost::optional<value_type>(retval);
+  Galois::optional<value_type> pop() {
+    unsigned b = pickBucket();
+    for (int i = 0; i < 128; ++i) {
+      auto& entry = wl[(i + b) % 128];
+      entry.first.lock();
+      if (entry.second.empty()) {
+        entry.first.unlock();
+      } else {
+        size_t size = entry.second.size();
+        unsigned int index = nextRand() % size;
+        value_type retval = entry.second[index];
+        std::swap(entry.second[index], entry.second[size-1]);
+        entry.second.pop_back();
+        entry.first.unlock();
+        return Galois::optional<value_type>(retval);
+      }
     }
+    return Galois::optional<value_type>();
   }
 };
 GALOIS_WLCOMPILECHECK(Random)
@@ -1723,9 +1735,10 @@ class TbbFIFO : private boost::noncopyable  {
 
 public:
   template<bool newconcurrent>
-  using rethread = TbbFIFO<T>;
+  struct rethread { typedef TbbFIFO<T> type; };
+
   template<typename Tnew>
-  using retype = TbbFIFO<Tnew>;
+  struct retype { typedef TbbFIFO<Tnew> type; };
 
   typedef T value_type;
 
@@ -1744,11 +1757,11 @@ public:
     wl.push(range.local_begin(), range.local_end());
   }
 
-  boost::optional<value_type> pop() {
+  Galois::optional<value_type> pop() {
     T V = T();
     return wl.try_pop(V) ?
-      boost::optional<value_type>(V) :
-      boost::optional<value_type>();
+      Galois::optional<value_type>(V) :
+      Galois::optional<value_type>();
   }
 };
 GALOIS_WLCOMPILECHECK(TbbFIFO)
@@ -1767,7 +1780,7 @@ class PTbb : private boost::noncopyable {
   Galois::Runtime::PerThreadStorage<PTD> tld;
 
   void pull_in(PTD* N) {
-    boost::optional<T> r;
+    Galois::optional<T> r;
     while ((r = N->inq.pop()))
       N->wl.push(*r);
   }
@@ -1780,9 +1793,10 @@ public:
   }
 
   template<bool newconcurrent>
-  using rethread = PTbb<Compare, T>;
+  struct rethread { typedef PTbb<Compare, T> type; };
+
   template<typename Tnew>
-  using retype = PTbb<Compare, Tnew>;
+  struct retype { typedef PTbb<Compare, Tnew> type; };
   
   typedef T value_type;
   
@@ -1825,14 +1839,14 @@ public:
     push(range.local_begin(), range.local_end());
   }
 
-  boost::optional<value_type> pop() {
+  Galois::optional<value_type> pop() {
     value_type retval;
     PTD* N = tld.getLocal();
     pull_in(N);
     if (N->wl.try_pop(retval)) {
-      return boost::optional<value_type>(retval);
+      return Galois::optional<value_type>(retval);
     } else {
-      return boost::optional<value_type>();
+      return Galois::optional<value_type>();
     }
   }
 };
@@ -1846,9 +1860,10 @@ class STbb : private boost::noncopyable {
 
 public:
   template<bool newconcurrent>
-  using rethread = STbb<Compare, T>;
+  struct rethread { typedef STbb<Compare, T> type; };
+
   template<typename Tnew>
-  using retype = STbb<Compare, Tnew>;
+  struct retype { typedef STbb<Compare, Tnew> type; };
   
   typedef T value_type;
   
@@ -1867,7 +1882,7 @@ public:
     push(range.local_begin(), range.local_end());
   }
 
-  boost::optional<value_type> pop() {
+  Galois::optional<value_type> pop() {
     value_type retval;
     if (tld.getLocal()->try_pop(retval))
       return retval;
@@ -1875,7 +1890,7 @@ public:
       if (tld.getRemote(i)->try_pop(retval))
 	return retval;
     }
-    return boost::optional<value_type>();
+    return Galois::optional<value_type>();
   }
 };
 
@@ -1885,9 +1900,10 @@ class TbbPriQueue : private boost::noncopyable {
 
 public:
   template<bool newconcurrent>
-  using rethread = TbbPriQueue<Compare, T>;
+  struct rethread { typedef TbbPriQueue<Compare, T> type; };
+
   template<typename Tnew>
-  using retype = TbbPriQueue<Compare, Tnew>;
+  struct retype { typedef TbbPriQueue<Compare, Tnew> type; };
 
   typedef T value_type;
 
@@ -1906,12 +1922,12 @@ public:
     push(range.local_begin(), range.local_end());
   }
 
-  boost::optional<value_type> pop() {
+  Galois::optional<value_type> pop() {
     value_type retval;
     if (wl.try_pop(retval)) {
-      return boost::optional<value_type>(retval);
+      return Galois::optional<value_type>(retval);
     } else {
-      return boost::optional<value_type>();
+      return Galois::optional<value_type>();
     }
   }
 };
@@ -1944,11 +1960,11 @@ class Chunk : public ChunkHeader {
   int num;
 public:
   Chunk() :num(0) {}
-  boost::optional<T> pop() {
+  Galois::optional<T> pop() {
     if (num)
-      return boost::optional<T>(data[--num]);
+      return Galois::optional<T>(data[--num]);
     else
-      return boost::optional<T>();
+      return Galois::optional<T>();
   }
   bool push(T val) {
     if (num < chunksize) {
@@ -2125,7 +2141,7 @@ class ChunkedAdaptor : private boost::noncopyable {
 
 public:
   template<typename Tnew>
-  using retype = ChunkedAdaptor<gWL, chunksize, Tnew>;
+  struct retype { typedef ChunkedAdaptor<gWL, chunksize, Tnew> type; };
 
   typedef T value_type;
 
@@ -2175,9 +2191,9 @@ public:
     }
   }
 
-  boost::optional<value_type> pop() {
+  Galois::optional<value_type> pop() {
     ChunkTy*& n = data.get();
-    boost::optional<value_type> retval;
+    Galois::optional<value_type> retval;
     //simple case, things in current chunk
     if (n && (retval = n->pop()))
       return retval;
@@ -2189,7 +2205,7 @@ public:
     if (n) {
       return n->pop();
     } else {
-      return boost::optional<value_type>();
+      return Galois::optional<value_type>();
     }
   }
 };

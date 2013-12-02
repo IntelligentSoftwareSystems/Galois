@@ -26,25 +26,18 @@
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 #include "Galois/Galois.h"
-#include "Galois/Bag.h"
 #include "Galois/Accumulator.h"
-#include "Galois/Timer.h"
+#include "Galois/Bag.h"
 #include "Galois/Statistic.h"
+#include "Galois/Timer.h"
 #include "Galois/Graph/LCGraph.h"
-#include "Galois/ParallelSTL/ParallelSTL.h"
 #include "Galois/Graph/TypeTraits.h"
+#include "Galois/ParallelSTL/ParallelSTL.h"
 #ifdef GALOIS_USE_EXP
-#include <boost/mpl/if.hpp>
-#include "Galois/PriorityScheduling.h"
-#include "Galois/Graph/OCGraph.h"
-#include "Galois/Graph/GraphNodeBag.h"
-#include "Galois/DomainSpecificExecutors.h"
 #include "Galois/Runtime/ParallelWorkInline.h"
 #endif
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
-
-#include "HybridBFS.h"
 
 #include <string>
 #include <deque>
@@ -52,6 +45,12 @@
 #include <limits>
 #include <iostream>
 
+#include "HybridBFS.h"
+#ifdef GALOIS_USE_EXP
+#include "LigraAlgo.h"
+#include "GraphLabAlgo.h"
+#endif
+#include "BFS.h"
 
 static const char* name = "Breadth-first Search";
 static const char* desc =
@@ -89,7 +88,7 @@ static cll::opt<bool> useDetBase("detBase", cll::desc("Deterministic"));
 static cll::opt<bool> useDetDisjoint("detDisjoint", cll::desc("Deterministic with disjoint optimization"));
 static cll::opt<unsigned int> startNode("startNode", cll::desc("Node to start search from"), cll::init(0));
 static cll::opt<unsigned int> reportNode("reportNode", cll::desc("Node to report distance to"), cll::init(1));
-static cll::opt<unsigned int> memoryLimit("memoryLimit",
+cll::opt<unsigned int> memoryLimit("memoryLimit",
     cll::desc("Memory limit for out-of-core algorithms (in MB)"), cll::init(~0U));
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
     cll::values(
@@ -98,24 +97,16 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
       clEnumValN(Algo::barrierWithCas, "barrierWithCas", "Use compare-and-swap to update nodes"),
       clEnumValN(Algo::deterministic, "detBase", "Deterministic"),
       clEnumValN(Algo::deterministicDisjoint, "detDisjoint", "Deterministic with disjoint optimization"),
-      clEnumValN(Algo::graphlab, "graphlab", "Use GraphLab programming model"),
       clEnumValN(Algo::highCentrality, "highCentrality", "Optimization for graphs with many shortest paths"),
       clEnumValN(Algo::hybrid, "hybrid", "Hybrid of barrier and high centrality algorithms"),
-      clEnumValN(Algo::ligraChi, "ligraChi", "Use Ligra and GraphChi programming model"),
-      clEnumValN(Algo::ligra, "ligra", "Use Ligra programming model"),
       clEnumValN(Algo::serial, "serial", "Serial"),
 #ifdef GALOIS_USE_EXP
       clEnumValN(Algo::barrierWithInline, "barrierWithInline", "Optimized with inlined workset"),
+      clEnumValN(Algo::graphlab, "graphlab", "Use GraphLab programming model"),
+      clEnumValN(Algo::ligraChi, "ligraChi", "Use Ligra and GraphChi programming model"),
+      clEnumValN(Algo::ligra, "ligra", "Use Ligra programming model"),
 #endif
       clEnumValEnd), cll::init(Algo::barrier));
-
-typedef unsigned int Dist;
-static const Dist DIST_INFINITY = std::numeric_limits<Dist>::max() - 1;
-
-//! Standard data type on nodes
-struct SNode {
-  Dist dist;
-};
 
 template<typename Graph, typename Enable = void>
 struct not_consistent {
@@ -211,7 +202,10 @@ void initialize(Algo& algo,
     typename Algo::Graph::GraphNode& source,
     typename Algo::Graph::GraphNode& report) {
 
+  Galois::StatTimer T("Load");
+  T.start();
   algo.readGraph(graph);
+  T.stop();
   std::cout << "Read " << graph.size() << " nodes\n";
 
   if (startNode >= graph.size() || reportNode >= graph.size()) {
@@ -329,148 +323,14 @@ struct AsyncAlgo {
   void operator()(Graph& graph, const GNode& source) const {
     using namespace Galois::WorkList;
     typedef dChunkedFIFO<64> dChunk;
-    typedef ChunkedFIFO<64> Chunk;
+    //typedef ChunkedFIFO<64> Chunk;
     typedef OrderedByIntegerMetric<Indexer,dChunk> OBIM;
     
     graph.getData(source).dist = 0;
 
-    Galois::for_each<OBIM>(WorkItem(source, 1), Process(graph));
+    Galois::for_each(WorkItem(source, 1), Process(graph), Galois::wl<OBIM>());
   }
 };
-
-#ifdef GALOIS_USE_EXP
-template<bool UseGraphChi>
-struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
-  typedef typename Galois::Graph::LC_CSR_Graph<SNode,void>
-    ::template with_no_lockable<true>::type
-    ::template with_numa_alloc<true>::type InnerGraph;
-  typedef typename boost::mpl::if_c<UseGraphChi,
-          Galois::Graph::OCImmutableEdgeGraph<SNode,void>,
-          Galois::Graph::LC_InOut_Graph<InnerGraph>>::type
-          Graph;
-  typedef typename Graph::GraphNode GNode;
-
-  std::string name() const { return UseGraphChi ? "LigraChi" : "Ligra"; }
-
-  void readGraph(Graph& graph) { 
-    readInOutGraph(graph);
-    this->checkIfInMemoryGraph(graph, memoryLimit);
-  }
-
-  struct EdgeOperator {
-    Dist newDist;
-    EdgeOperator(Dist d): newDist(d) { }
-
-    template<typename GTy>
-    bool cond(GTy& graph, typename GTy::GraphNode n) { 
-      return graph.getData(n, Galois::MethodFlag::NONE).dist == DIST_INFINITY;
-    }
-
-    template<typename GTy>
-    bool operator()(GTy& graph, typename GTy::GraphNode src, typename GTy::GraphNode dst, typename GTy::edge_data_reference) {
-      SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
-
-      Dist oldDist;
-      while (true) {
-        oldDist = ddata.dist;
-        if (oldDist <= newDist)
-          return false;
-        if (__sync_bool_compare_and_swap(&ddata.dist, oldDist, newDist)) {
-          return true;
-        }
-      }
-      return false;
-    }
-  };
-
-  void operator()(Graph& graph, const GNode& source) {
-    Galois::GraphNodeBagPair<> bags(graph.size());
-
-    Dist newDist = 1;
-    graph.getData(source).dist = 0;
-
-    this->outEdgeMap(memoryLimit, graph, EdgeOperator(newDist), source, bags.next());
-    
-    while (!bags.next().empty()) {
-      bags.swap();
-      newDist++;
-      this->outEdgeMap(memoryLimit, graph, EdgeOperator(newDist), bags.cur(), bags.next(), false);
-    }
-  }
-};
-
-struct GraphLabAlgo {
-  typedef typename Galois::Graph::LC_CSR_Graph<SNode,void>
-    ::with_no_lockable<true>::type
-    ::with_numa_alloc<true>::type InnerGraph;
-  typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
-  typedef Graph::GraphNode GNode;
-
-  void readGraph(Graph& graph) {
-    readInOutGraph(graph);
-  }
-
-  std::string name() const { return "GraphLab"; }
-
-  struct Program {
-    typedef size_t gather_type;
-
-    struct message_type {
-      size_t value;
-      message_type(): value(std::numeric_limits<size_t>::max()) { }
-      explicit message_type(size_t v): value(v) { }
-      message_type& operator+=(const message_type& other) {
-        value = std::min<size_t>(value, other.value);
-        return *this;
-      }
-    };
-
-    typedef int tt_needs_scatter_out_edges;
-
-  private:
-    size_t received_dist;
-    bool changed;
-
-  public:
-    Program(): received_dist(DIST_INFINITY), changed(false) { }
-
-    void init(Graph& graph, GNode node, const message_type& msg) {
-      received_dist = msg.value;
-    }
-
-    void apply(Graph& graph, GNode node, const gather_type&) {
-      changed = false;
-      SNode& sdata = graph.getData(node, Galois::MethodFlag::NONE);
-      if (sdata.dist > received_dist) {
-        changed = true;
-        sdata.dist = received_dist;
-      }
-    }
-
-    bool needsScatter(Graph& graph, GNode node) {
-      return changed;
-    }
-
-    void gather(Graph& graph, GNode node, GNode src, GNode dst, gather_type&, typename Graph::edge_data_reference) { }
-
-    void scatter(Graph& graph, GNode node, GNode src, GNode dst,
-        Galois::GraphLab::Context<Graph,Program>& ctx, typename Graph::edge_data_reference) {
-      SNode& sdata = graph.getData(node, Galois::MethodFlag::NONE);
-      Dist newDist = sdata.dist + 1;
-
-      if (graph.getData(dst, Galois::MethodFlag::NONE).dist > newDist) {
-        ctx.push(dst, message_type(newDist));
-      }
-    }
-  };
-
-  void operator()(Graph& graph, const GNode& source) {
-    Galois::GraphLab::SyncEngine<Graph,Program> engine(graph, Program());
-    engine.signal(source, Program::message_type(0));
-    engine.execute();
-  }
-};
-#endif
 
 /**
  * Alternate between processing outgoing edges or incoming edges. Best for
@@ -600,9 +460,9 @@ struct HighCentralityAlgo {
       newDist++;
       std::cout << nextSize << " " << (nextSize > graph.sizeEdges() / 20) << "\n";
       if (nextSize > graph.sizeEdges() / 20)
-        Galois::do_all_local(&graph, BackwardProcess(graph, &bags[next], newDist));
+        Galois::do_all_local(graph, BackwardProcess(graph, &bags[next], newDist));
       else
-        Galois::for_each_local<WL>(&bags[cur].wl, ForwardProcess(graph, &bags[next], newDist));
+        Galois::for_each_local(bags[cur].wl, ForwardProcess(graph, &bags[next], newDist), Galois::wl<WL>());
       bags[cur].clear();
     }
   }
@@ -655,7 +515,7 @@ struct BarrierAlgo {
 
   void operator()(Graph& graph, const GNode& source) const {
     graph.getData(source).dist = 0;
-    Galois::for_each<WL>(WorkItem(source, 1), Process(graph));
+    Galois::for_each(WorkItem(source, 1), Process(graph), Galois::wl<WL>());
   }
 };
 
@@ -773,7 +633,7 @@ struct DeterministicAlgo {
     graph.getData(source).dist = 0;
 
     switch (Version) {
-      case DetAlgo::none: Galois::for_each<WL>(WorkItem(source, 1), Process(graph)); break; 
+    case DetAlgo::none: Galois::for_each(WorkItem(source, 1), Process(graph),Galois::wl<WL>()); break; 
       case DetAlgo::base: Galois::for_each_det(WorkItem(source, 1), Process(graph)); break;
       case DetAlgo::disjoint: Galois::for_each_det(WorkItem(source, 1), Process(graph)); break;
       default: std::cerr << "Unknown algorithm " << int(Version) << "\n"; abort();
@@ -798,7 +658,7 @@ void run() {
   Galois::StatTimer T;
   std::cout << "Running " << algo.name() << " version\n";
   T.start();
-  Galois::do_all_local(&graph, Initialize<typename Algo::Graph>(graph));
+  Galois::do_all_local(graph, Initialize<typename Algo::Graph>(graph));
   algo(graph, source);
   T.stop();
   
@@ -845,9 +705,9 @@ int main(int argc, char **argv) {
     case Algo::highCentrality: run<HighCentralityAlgo>(); break;
     case Algo::hybrid: run<HybridAlgo>(); break;
 #ifdef GALOIS_USE_EXP
-    case Algo::ligra: run<LigraAlgo<false> >(); break;
-    case Algo::ligraChi: run<LigraAlgo<true> >(); break;
-    case Algo::graphlab: run<GraphLabAlgo>(); break;
+    case Algo::graphlab: run<GraphLabBFS>(); break;
+    case Algo::ligraChi: run<LigraBFS<true> >(); break;
+    case Algo::ligra: run<LigraBFS<false> >(); break;
 #endif
     case Algo::deterministic: run<DeterministicAlgo<DetAlgo::base> >(); break;
     case Algo::deterministicDisjoint: run<DeterministicAlgo<DetAlgo::disjoint> >(); break;

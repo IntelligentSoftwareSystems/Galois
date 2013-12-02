@@ -18,7 +18,7 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  *
- * @description
+ * @section description
  * This dereferences iterators lazily.  This is only safe if they are not
  * invalidated by the operator
  *
@@ -38,23 +38,23 @@ struct StableIterator {
 
   //! change the concurrency flag
   template<bool _concurrent>
-  using rethread = StableIterator<Iterator, Steal>;
+  struct rethread { typedef StableIterator<Iterator, Steal> type; };
   
   //! change the type the worklist holds
   template<typename _T>
-  using retype = StableIterator<Iterator, Steal>;
+  struct retype { typedef StableIterator<Iterator, Steal> type; };
 
   template<typename _iterator>
-  using with_iterator = StableIterator<_iterator, Steal>;
+  struct with_iterator { typedef StableIterator<_iterator, Steal> type; };
 
   template<bool _steal>
-  using with_steal = StableIterator<Iterator, _steal>;
+  struct with_steal { typedef StableIterator<Iterator, _steal> type; };
 
 private:
   struct shared_state {
     Iterator stealBegin;
     Iterator stealEnd;
-    Runtime::LL::SimpleLock<true> stealLock;
+    Runtime::LL::SimpleLock stealLock;
     bool stealAvail;
     void resetAvail() {
       if (stealBegin != stealEnd)
@@ -63,10 +63,10 @@ private:
   };
 
   struct state {
+    Runtime::LL::CacheLineStorage<shared_state> stealState;
     Iterator localBegin;
     Iterator localEnd;
     unsigned int nextVictim;
-    Runtime::LL::CacheLineStorage<shared_state> stealState;
     
     void populateSteal() {
       if (Steal && localBegin != localEnd) {
@@ -82,10 +82,14 @@ private:
 
   Runtime::PerThreadStorage<state> TLDS;
 
-  bool doSteal(state& dst, state& src) {
+  bool doSteal(state& dst, state& src, bool wait) {
     shared_state& s = src.stealState.data;
     if (s.stealAvail) {
-      s.stealLock.lock();
+      if (wait) {
+        s.stealLock.lock();
+      } else if (!s.stealLock.try_lock()) {
+        return false;
+      }
       if (s.stealBegin != s.stealEnd) {
 	dst.localBegin = s.stealBegin;
 	s.stealBegin = dst.localEnd = Galois::split_range(s.stealBegin, s.stealEnd);
@@ -97,12 +101,12 @@ private:
   }
 
   //pop already failed, try again with stealing
-  boost::optional<value_type> pop_steal(state& data) {
+  Galois::optional<value_type> pop_steal(state& data) {
     //always try stealing self
-    if (doSteal(data, data))
+    if (doSteal(data, data, true))
       return *data.localBegin++;
     //only try stealing one other
-    if (doSteal(data, *TLDS.getRemote(data.nextVictim))) {
+    if (doSteal(data, *TLDS.getRemote(data.nextVictim), false)) {
       //share the wealth
       if (data.nextVictim != Runtime::LL::getTID())
 	data.populateSteal();
@@ -110,7 +114,7 @@ private:
     }
     ++data.nextVictim;
     data.nextVictim %= Runtime::activeThreads;
-    return boost::optional<value_type>();
+    return Galois::optional<value_type>();
   }
 
 public:
@@ -126,13 +130,13 @@ public:
   }
 
   //! pop a value from the queue.
-  boost::optional<value_type> pop() {
+  Galois::optional<value_type> pop() {
     state& data = *TLDS.getLocal();
     if (data.localBegin != data.localEnd)
       return *data.localBegin++;
     if (Steal)
       return pop_steal(data);
-    return boost::optional<value_type>();
+    return Galois::optional<value_type>();
   }
 
   void push(const value_type& val) {

@@ -1048,7 +1048,7 @@ int main(int argc, char** argv) {
 #if USE_NODE_BASED
 
 #if CONCURRENT
-		Galois::for_each<wl2ty>(wl2.begin(), wl2.end(), feach1NodeBased);
+    Galois::for_each(wl2.begin(), wl2.end(), feach1NodeBased, Galois::wl<wl2ty>());
     wl2.clear();
 //		Galois::for_each<wl2ty>(active, feach1NodeBased);
 #else
@@ -1069,7 +1069,7 @@ int main(int argc, char** argv) {
 #if CONCURRENT
     Galois::Timer firstLT;
     firstLT.start();
-		Galois::for_each<wl2ty>(wl2.begin(), wl2.end(), feach1);
+    Galois::for_each(wl2.begin(), wl2.end(), feach1, Galois::wl<wl2ty>());
     firstLT.stop();
     std::cerr << "FLTime: " << firstLT.get() << std::endl;
 #else
@@ -1146,7 +1146,7 @@ int main(int argc, char** argv) {
 		thirdLoopTimer.start();
 		double backupSrcBC = currSrcNode->bc;
 #if CONCURRENT	 
-    Galois::for_each_local<wl4ty>(wl4, feach2);
+                Galois::for_each_local(wl4, feach2, Galois::wl<wl4ty>());
 #else
     while (!wl4.empty()) {
       ND *nn = wl4.pop().second;

@@ -47,7 +47,23 @@ enable_testing()
 
 ###### Configure compiler ######
 
+# mic
+if(ARCH STREQUAL "mic") 
+  if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mmic")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mmic")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -mmic")
+  endif()
 
+  if(CMAKE_COMPILER_IS_GNUCC)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=knc")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=knc")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -march=knc")
+  endif()
+
+  set(GALOIS_ARCH_MIC TRUE)
+  add_definitions(-DGALOIS_ARCH_MIC)
+endif()
 # ICC
 if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
   execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion
@@ -59,24 +75,21 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
   endif()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -wd68 -wd981 -wd383 -wd869 -wd2196 -wd279 -wd2504 -wd2943 -wd32013")
 
-  #iss hack
   if("$ENV{GCC_BIN}" STREQUAL "") 
-    message (WARNING "Set environment variable GCC_BIN to directory containing g++, to help ICC")
-  else ()
+    message(STATUS "Using default GCC toolchain; set environment variable GCC_BIN to override")
+  else()
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -gxx-name=$ENV{GCC_BIN}/g++")
-  endif ()
-
+  endif()
 endif()
 
 # Clang
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  #iss hack
   if("$ENV{GCC_BIN}" STREQUAL "") 
-    message (WARNING "Set environment variable GCC_BIN to directory containing g++, to help Clang")
-  else ()
+    message(STATUS "Using default GCC toolchain; set environment variable GCC_BIN to override")
+  else()
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -gcc-toolchain $ENV{GCC_BIN}/..")
-  endif ()
-endif ()
+  endif()
+endif()
 
 # XL
 if(CMAKE_CXX_COMPILER_ID MATCHES "XL")
@@ -90,7 +103,12 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "XL")
     message(FATAL_ERROR "XLC must be higher than 12.0")
   endif()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -qsuppress=1540-0724 -qsuppress=1500-029 -qmaxmem=-1 -qalias=noansi -qsmp=omp")
-  #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -qsuppress=1540-0724 -qmaxmem=-1")
+endif()
+
+#clang 
+if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  #iss hack
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -isystem=/net/faraday/workspace/local/modules/gcc-4.7")
 endif()
 
 # check for incompatible GCC
@@ -110,34 +128,28 @@ if(CMAKE_SYSTEM MATCHES "SunOS.*")
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -m64 -lposix4")
 endif()
 
+
 # Always include debug symbols
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g")
 
 # Enable architecture-specific optimizations
-if(CMAKE_BUILD_TYPE MATCHES "Release" AND CMAKE_CXX_COMPILER_ID MATCHES "GNU")
+if(CMAKE_BUILD_TYPE MATCHES "Release" 
+    AND NOT GALOIS_ARCH_MIC
+    AND CMAKE_CXX_COMPILER_ID MATCHES "GNU")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
 endif()
 
-# More warnings
-if(CMAKE_BUILD_TYPE MATCHES "Debug")
-  if(NOT CMAKE_CXX_COMPILER_ID MATCHES "XL")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
-  endif()
-  if(CMAKE_COMPILER_IS_GNUCC)
-    if(GCC_VERSION VERSION_GREATER 4.8 OR GCC_VERSION VERSION_EQUAL 4.8)
-      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-local-typedefs")
-    endif()
-  endif()
-endif()
+#Boost
+#not needed now but will be needed for newer version of Boost after 1.4X ish
+set(Boost_ADDITIONAL_VERSIONS "1.40" "1.40.0" "1.47" "1.47.0" "1.49" "1.49.0" "1.51.0")
+#set(Boost_USE_MULTITHREADED OFF) # newer boost builds don't use -mt extension
 
-# GNU profiling
-if(USE_GPROF)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pg")
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pg")
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pg")
-endif(USE_GPROF)
+if(NOT "$ENV{BOOST_DIR}" STREQUAL "") 
+  set(BOOST_ROOT $ENV{BOOST_DIR})
+endif()
+find_package(Boost 1.38.0 REQUIRED)
+include_directories(${Boost_INCLUDE_DIR})
 
 ###### Configure features ######
 
@@ -194,11 +206,14 @@ endif()
 find_package(Threads REQUIRED)
 
 # NUMA (linux)
-find_package(NUMA)
-if(NUMA_FOUND)
-  set(GALOIS_USE_NUMA on)
-elseif(USE_STRICT_CONFIG)
-  message(FATAL_ERROR "Need libnuma")
+# currently not available on MIC (and not helpful either)
+if(NOT GALOIS_ARCH_MIC) 
+  find_package(NUMA)
+  if(NUMA_FOUND)
+    set(GALOIS_USE_NUMA on)
+  elseif(USE_STRICT_CONFIG)
+    message(FATAL_ERROR "Need libnuma")
+  endif()
 endif()
 
 # CILK
@@ -224,10 +239,12 @@ set(BOOST_LIBS system iostreams filesystem)
 find_package(Boost 1.38.0 COMPONENTS ${BOOST_LIBS} REQUIRED)
 include_directories(${Boost_INCLUDE_DIR})
 
-# C++11 features
-find_package(CXX11)
-if ("${CXX11_FLAGS}" STREQUAL "")
-   message( FATAL_ERROR "Needs C++11")
+#more warnings
+if(CMAKE_BUILD_TYPE MATCHES "Debug")
+  if(NOT CMAKE_CXX_COMPILER_ID MATCHES "XL")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
+  endif()
 endif()
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CXX11_FLAGS}")
 

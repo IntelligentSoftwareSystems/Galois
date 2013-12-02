@@ -1,8 +1,8 @@
 /**
  * Common support for worklist experiments.
  */
-#ifndef PRIORITYSCHEDULING_WORKLIST_H
-#define PRIORITYSCHEDULING_WORKLIST_H
+#ifndef GALOIS_PRIORITYSCHEDULING_WORKLIST_H
+#define GALOIS_PRIORITYSCHEDULING_WORKLIST_H
 
 #include "Galois/WorkList/WorkList.h"
 #include "Galois/WorkList/WorkListExperimental.h"
@@ -55,40 +55,38 @@ struct PriAuto {
   typedef SkipListQueue<Less> SLQ;
   typedef SetQueue<Less> SETQ;
 
-
-
   template<typename IterTy,typename FunctionTy>
   static void for_each(IterTy b, IterTy e, FunctionTy f, const char* loopname = 0) {
     static bool printed = false;
 #define WLFOO2(__x)							\
     if (WorklistName == #__x) {						\
       if (!printed) {							\
-	gInfo("WorkList %s\n", #__x);					\
+	gInfo("WorkList ", #__x);					\
 	printed = true;							\
       }									\
-      Galois::for_each<__x>(b,e,f,loopname);				\
+      Galois::for_each(b,e,f,Galois::loopname(loopname), Galois::wl<__x>()); \
     } else
 #include "PrioritySchedulers.h"
 #undef WLFOO2
 #define WLFOO2(__x)							\
     if (WorklistName == "NI_" #__x) {					\
       if (!printed) {							\
-	gInfo("WorkList %s\n", "NI_" #__x);				\
+	gInfo("WorkList ", "NI_" #__x);					\
 	printed = true;							\
       }									\
-      Galois::for_each<NoInlineFilter<__x> >(b,e,f,loopname);		\
+      Galois::for_each(b,e,f,Galois::loopname(loopname), Galois::wl<NoInlineFilter<__x>>()); \
     } else
 #include "PrioritySchedulers.h"
 #undef WLFOO2
 
     {
-      GALOIS_ERROR(true, "unknown Worklist [%s]", WorklistName.c_str());
+      GALOIS_ERROR(true, "unknown worklist: ", WorklistName.c_str(), "\n");
     }
   }
   template<typename InitItemTy,typename FunctionTy>
   static void for_each(InitItemTy i, FunctionTy f, const char* loopname = 0) {
     InitItemTy wl[1] = {i};
-    for_each(&wl[0], &wl[1], f, loopname);
+    for_each(&wl[0], &wl[1], f, Galois::loopname(loopname));
   }
 };
 

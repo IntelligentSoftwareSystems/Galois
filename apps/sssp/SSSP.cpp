@@ -24,8 +24,6 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#include "SSSP.h"
-
 #include "Galois/Galois.h"
 #include "Galois/Accumulator.h"
 #include "Galois/Bag.h"
@@ -34,18 +32,15 @@
 #include "Galois/Graph/LCGraph.h"
 #include "Galois/Graph/TypeTraits.h"
 #include "llvm/Support/CommandLine.h"
-#ifdef GALOIS_USE_EXP
-#include <boost/mpl/if.hpp>
-#include "Galois/Graph/OCGraph.h"
-#include "Galois/Graph/GraphNodeBag.h"
-#include "Galois/DomainSpecificExecutors.h"
-#include "Galois/PriorityScheduling.h"
-#endif
-
 #include "Lonestar/BoilerPlate.h"
+
 #include <iostream>
 #include <deque>
 #include <set>
+
+#include "SSSP.h"
+#include "GraphLabAlgo.h"
+#include "LigraAlgo.h"
 
 namespace cll = llvm::cl;
 
@@ -71,17 +66,17 @@ static cll::opt<bool> symmetricGraph("symmetricGraph", cll::desc("Input graph is
 static cll::opt<unsigned int> startNode("startNode", cll::desc("Node to start search from"), cll::init(0));
 static cll::opt<unsigned int> reportNode("reportNode", cll::desc("Node to report distance to"), cll::init(1));
 static cll::opt<int> stepShift("delta", cll::desc("Shift value for the deltastep"), cll::init(10));
-static cll::opt<unsigned int> memoryLimit("memoryLimit",
+cll::opt<unsigned int> memoryLimit("memoryLimit",
     cll::desc("Memory limit for out-of-core algorithms (in MB)"), cll::init(~0U));
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
     cll::values(
       clEnumValN(Algo::async, "async", "Asynchronous"),
-      clEnumValN(Algo::asyncWithCas, "asyncWithCas", "Use compare-and-swap to update nodes"),
       clEnumValN(Algo::asyncPP, "asyncPP", "Async, CAS, push-pull"),
+      clEnumValN(Algo::asyncWithCas, "asyncWithCas", "Use compare-and-swap to update nodes"),
+      clEnumValN(Algo::serial, "serial", "Serial"),
       clEnumValN(Algo::graphlab, "graphlab", "Use GraphLab programming model"),
       clEnumValN(Algo::ligraChi, "ligraChi", "Use Ligra and GraphChi programming model"),
       clEnumValN(Algo::ligra, "ligra", "Use Ligra programming model"),
-      clEnumValN(Algo::serial, "serial", "Serial"),
       clEnumValEnd), cll::init(Algo::asyncWithCas));
 
 static const bool trackWork = true;
@@ -367,7 +362,7 @@ struct AsyncAlgo {
         graph.out_edges(source, Galois::MethodFlag::NONE).begin(),
         graph.out_edges(source, Galois::MethodFlag::NONE).end(),
         InitialProcess(this, graph, initial, graph.getData(source)));
-    Galois::for_each_local<OBIM>(initial, Process(this, graph));
+    Galois::for_each_local(initial, Process(this, graph), Galois::wl<OBIM>());
   }
 };
 
@@ -477,7 +472,7 @@ struct AsyncAlgoPP {
         graph.out_edges(source, Galois::MethodFlag::NONE).begin(),
         graph.out_edges(source, Galois::MethodFlag::NONE).end(),
         InitialProcess(this, graph, initial));
-    Galois::for_each_local<OBIM>(initial, Process(this, graph));
+    Galois::for_each_local(initial, Process(this, graph), Galois::wl<OBIM>());
   }
 };
 
@@ -487,171 +482,6 @@ struct does_not_need_aborts<AsyncAlgo<true>::Process> : public boost::true_type 
 }
 
 static_assert(Galois::does_not_need_aborts<AsyncAlgo<true>::Process>::value, "Oops");
-
-
-#ifdef GALOIS_USE_EXP
-struct GraphLabAlgo {
-  typedef Galois::Graph::LC_CSR_Graph<SNode,uint32_t>
-    ::with_no_lockable<true>::type
-    ::with_numa_alloc<true>::type InnerGraph;
-  typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
-  typedef Graph::GraphNode GNode;
-
-  std::string name() const { return "GraphLab"; }
-
-  void readGraph(Graph& graph) { readInOutGraph(graph); }
-
-  struct Initialize {
-    Graph& g;
-    Initialize(Graph& g): g(g) { }
-    void operator()(typename Graph::GraphNode n) {
-      g.getData(n).dist = DIST_INFINITY;
-    }
-  };
-
-  struct Program {
-    Dist min_dist;
-    bool changed;
-
-    struct gather_type { };
-    typedef int tt_needs_scatter_out_edges;
-
-    struct message_type {
-      Dist dist;
-      message_type(Dist d = DIST_INFINITY): dist(d) { }
-
-      message_type& operator+=(const message_type& other) {
-        dist = std::min(dist, other.dist);
-        return *this;
-      }
-    };
-
-    void init(Graph& graph, GNode node, const message_type& msg) {
-      min_dist = msg.dist;
-    }
-
-    void apply(Graph& graph, GNode node, const gather_type&) {
-      changed = false;
-      SNode& data = graph.getData(node, Galois::MethodFlag::NONE);
-      if (data.dist > min_dist) {
-        changed = true;
-        data.dist = min_dist;
-      }
-    }
-
-    bool needsScatter(Graph& graph, GNode node) {
-      return changed;
-    }
-    
-    void scatter(Graph& graph, GNode node, GNode src, GNode dst,
-        Galois::GraphLab::Context<Graph,Program>& ctx, typename Graph::edge_data_reference edgeValue) {
-      SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
-      SNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
-      Dist newDist = sdata.dist + edgeValue;
-      if (ddata.dist > newDist) {
-        ctx.push(dst, message_type(newDist));
-      }
-    }
-
-    void gather(Graph& graph, GNode node, GNode src, GNode dst, gather_type&, typename Graph::edge_data_reference) { }
-  };
-
-  void operator()(Graph& graph, const GNode& source) {
-    Galois::GraphLab::SyncEngine<Graph,Program> engine(graph, Program());
-    engine.signal(source, Program::message_type(0));
-    engine.execute();
-  }
-};
-
-template<bool UseGraphChi>
-struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
-  struct LNode: public SNode {
-    bool visited;
-  };
-
-  typedef typename Galois::Graph::LC_InlineEdge_Graph<LNode,uint32_t>
-    ::template with_compressed_node_ptr<true>::type
-    ::template with_no_lockable<true>::type
-    ::template with_numa_alloc<true>::type InnerGraph;
-  typedef typename boost::mpl::if_c<UseGraphChi,
-          Galois::Graph::OCImmutableEdgeGraph<LNode,uint32_t>,
-          Galois::Graph::LC_InOut_Graph<InnerGraph>>::type
-          Graph;
-  typedef typename Graph::GraphNode GNode;
-
-  std::string name() const { return UseGraphChi ? "LigraChi" : "Ligra"; }
-
-  void readGraph(Graph& graph) { 
-    readInOutGraph(graph); 
-    this->checkIfInMemoryGraph(graph, memoryLimit);
-  }
-
-  struct Initialize {
-    Graph& graph;
-    Initialize(Graph& g): graph(g) { }
-    void operator()(GNode n) {
-      LNode& data = graph.getData(n);
-      data.dist = DIST_INFINITY;
-      data.visited = false;
-    }
-  };
-
-  struct EdgeOperator {
-    template<typename GTy>
-    bool cond(GTy& graph, typename GTy::GraphNode) { return true; }
-
-    template<typename GTy>
-    bool operator()(GTy& graph, typename GTy::GraphNode src, typename GTy::GraphNode dst, typename GTy::edge_data_reference weight) {
-      LNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
-      LNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
-      
-      while (true) {
-        Dist newDist = sdata.dist + weight;
-        Dist oldDist = ddata.dist;
-        if (oldDist <= newDist)
-          return false;
-        if (__sync_bool_compare_and_swap(&ddata.dist, oldDist, newDist)) {
-          return __sync_bool_compare_and_swap(&ddata.visited, false, true);
-        }
-      }
-      return false;
-    }
-  };
-
-  struct ResetVisited {
-    Graph& graph;
-    ResetVisited(Graph& g): graph(g) { }
-    void operator()(size_t n) {
-      graph.getData(graph.nodeFromId(n)).visited = false;
-    }
-  };
-
-  void operator()(Graph& graph, const GNode& source) {
-    Galois::Statistic roundStat("Rounds");
-
-    Galois::GraphNodeBagPair<> bags(graph.size());
-
-    graph.getData(source).dist = 0;
-
-    this->outEdgeMap(memoryLimit, graph, EdgeOperator(), source, bags.next());
-    Galois::do_all_local(bags.next(), ResetVisited(graph));
-    
-    unsigned rounds = 0;
-    while (!bags.next().empty()) {
-      if (++rounds == graph.size()) {
-        std::cout << "Negative weight cycle\n";
-        break;
-      }
-         
-      bags.swap();
-      this->outEdgeMap(memoryLimit, graph, EdgeOperator(), bags.cur(), bags.next(), true);
-      Galois::do_all_local(bags.next(), ResetVisited(graph));
-    }
-
-    roundStat += rounds + 1;
-  }
-};
-#endif
 
 template<typename Algo>
 void run(bool prealloc = true) {
@@ -709,7 +539,8 @@ int main(int argc, char **argv) {
     case Algo::async: run<AsyncAlgo<false> >(); break;
     case Algo::asyncWithCas: run<AsyncAlgo<true> >(); break;
     case Algo::asyncPP: run<AsyncAlgoPP>(); break;
-#ifdef GALOIS_USE_EXP
+#if defined(__IBMCPP__) && __IBMCPP__ <= 1210
+#else
     case Algo::ligra: run<LigraAlgo<false> >(); break;
     case Algo::ligraChi: run<LigraAlgo<true> >(false); break;
     case Algo::graphlab: run<GraphLabAlgo>(); break;

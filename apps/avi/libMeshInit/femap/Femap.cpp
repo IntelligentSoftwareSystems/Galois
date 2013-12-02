@@ -8,15 +8,19 @@
 //   Searches for "-1" indicator, identifies following record,
 //   and calls appropriate function to deal with the record.
 //
-FemapInput::FemapInput(const char* fileName) : _ifs() {
+
+#ifdef GALOIS_HAS_ZLIB
+FemapInput::FemapInput(const char* fileName) : m_ifs() {
 
   std::ifstream gzfile (fileName, std::ios_base::in | std::ios_base::binary);
+  m_ifs.push (boost::iostreams::gzip_decompressor ());
+  m_ifs.push (gzfile);
+#else
+FemapInput::FemapInput(const char* fileName) : m_ifs(fileName) {
+#endif
 
-  _ifs.push (boost::iostreams::gzip_decompressor ());
-  _ifs.push (gzfile);
 
-
-  if (_ifs) {
+  if (m_ifs) {
     std::cout << std::endl
 	 << "Femap Neutral file " << fileName << " is open for input."
 	 << std::endl
@@ -31,7 +35,7 @@ FemapInput::FemapInput(const char* fileName) : _ifs() {
   std::string s;
   int id;
 
-  for ( _ifs >> s; ( _ifs >> id ) && ( s == "-1" ) ; _ifs >> s ) {
+  for ( m_ifs >> s; ( m_ifs >> id ) && ( s == "-1" ) ; m_ifs >> s ) {
     nextLine();
     switch ( id ) {
     case 100: _readHeader();      break;
@@ -45,7 +49,7 @@ FemapInput::FemapInput(const char* fileName) : _ifs() {
     case 999:                     break;
     default:
       //std::cout << "Skipping Data Block " << id << ".  Not supported.\n";
-      do { getline( _ifs, s ); s.assign(s,0,5); } while ( s != "   -1" );
+      do { getline( m_ifs, s ); s.assign(s,0,5); } while ( s != "   -1" );
     }
   }
   std::cout << "\nDone reading Neutral File input.  Closing file " << fileName << ".\n\n";
@@ -62,17 +66,17 @@ FemapInput::FemapInput(const char* fileName) : _ifs() {
 void FemapInput::_readHeader()
 {
   std::string s;
-  _ifs >> s;
+  m_ifs >> s;
   if (s=="<NULL>") s="";
   std::cout << "Database Title: " << s <<std::endl;
 
-  _ifs >> s;
+  m_ifs >> s;
   std::cout << "Created with version: " << s <<std::endl;
 
-  _ifs >> s;
+  m_ifs >> s;
   if (s!="-1") {
     std::cerr << "Too many records in Data Block 100.\n";
-    while (s!="-1") _ifs >> s;
+    while (s!="-1") m_ifs >> s;
   }
 
   return;
@@ -89,41 +93,41 @@ void FemapInput::_readProperty()
   femapProperty p;
 
   // read prop id, etc.
-  getline( _ifs, s );
+  getline( m_ifs, s );
 
   do{
     sscanf(s.c_str(), "%zd,%*d,%zd,%zd,%*d,%*d", &(p.id), &(p.matId), &(p.type));
     
     // read & print title
-    _ifs >> p.title;
+    m_ifs >> p.title;
     if (p.title=="<NULL>") p.title="";
     std::cout << "Id: " << p.id << " Title: " << p.title << std::endl;
     
     nextLine();
     
     // read flag[0,3]
-    getline( _ifs, s );
+    getline( m_ifs, s );
     sscanf(s.c_str(), "%d,%d,%d,%d", p.flag, p.flag+1, p.flag+2, p.flag+3);
     
     // skip laminate data
     int i;
-    _ifs >> i;
+    m_ifs >> i;
     nextLine();
     nextLine(i/8);
     if (i%8) nextLine();
     
     // get # of prop values & size value std::vector accordingly
-    _ifs >> p.num_val;
+    m_ifs >> p.num_val;
     p.value.resize(p.num_val);
     
     // get values
     nextLine();
     for (i=0; i<p.num_val; i++) 
-      { char dumm; _ifs >> p.value[i]; _ifs >> dumm; }    
+      { char dumm; m_ifs >> p.value[i]; m_ifs >> dumm; }    
     
     // read num_outline
     int num_outline;
-    _ifs >> num_outline;
+    m_ifs >> num_outline;
     nextLine();
 
     // skip outline point definitions
@@ -134,7 +138,7 @@ void FemapInput::_readProperty()
     
 
     // Look for more properties
-    getline( _ifs, s );
+    getline( m_ifs, s );
     
   }  while ( sdumm.assign(s,0,5) != "   -1" ); 
     
@@ -149,14 +153,14 @@ void FemapInput::_readNodes()
   std::string s;
   std::cout << "Reading Nodes.\n";
   femapNode n;
-  getline( _ifs, s ); 
+  getline( m_ifs, s ); 
   while ( sscanf(s.c_str(), "%zd,%*d,%*d,%*d,%*d,%d,%d,%d,%d,%d,%d,%lg,%lg,%lg,%*d,",
 		 &(n.id), &(n.permBc[0]), &(n.permBc[1]), &(n.permBc[2]), &(n.permBc[3]),
 		 &(n.permBc[4]), &(n.permBc[5]), &(n.x[0]), &(n.x[1]), &(n.x[2]) ) == 10 ) 
   {
     _nodes.push_back(n);
     _nodeIdMap[n.id] = _nodes.size() - 1;
-    getline( _ifs, s );
+    getline( m_ifs, s );
   }
 
   std::cout << "Read " << _nodes.size() << " nodes.\n" << std::flush;
@@ -172,7 +176,7 @@ void FemapInput::_readElements()
   std::cout << "Reading Elements.\n";
 
   int nd[20];
-  getline( _ifs, s );
+  getline( m_ifs, s );
   int id, propId, type, topology, geomId, formulation;
 
   while ( sscanf(s.c_str(), "%d,%*d,%d,%d,%d,%*d,%*d,%*d,%d,%d,%*d,%*d,",
@@ -187,12 +191,12 @@ void FemapInput::_readElements()
     e.geomId      = geomId;
     e.formulation = formulation;
 
-    getline( _ifs, s ); 
+    getline( m_ifs, s ); 
     sscanf(s.c_str(), "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,",
 	   &(nd[0]),&(nd[1]),&(nd[2]),&(nd[3]),&(nd[4]),
 	   &(nd[5]),&(nd[6]),&(nd[7]),&(nd[8]),&(nd[9]) );
 
-    getline( _ifs, s ); 
+    getline( m_ifs, s ); 
     sscanf(s.c_str(), "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d,",
 	   &(nd[10]),&(nd[11]),&(nd[12]),&(nd[13]),&(nd[14]),
 	   &(nd[15]),&(nd[16]),&(nd[17]),&(nd[18]),&(nd[19]) );
@@ -202,7 +206,7 @@ void FemapInput::_readElements()
 
     nextLine(3);
     
-    getline( _ifs, s );
+    getline( m_ifs, s );
     int flg[4];
     sscanf(s.c_str(), "%*d,%*d,%*d,%*d,%*d,%*d,%*d,%*d,%*d,%*d,%*d,%*d,%d,%d,%d,%d,", 
 	   &(flg[0]), &(flg[1]), &(flg[2]), &(flg[3]) );
@@ -215,7 +219,7 @@ void FemapInput::_readElements()
 
     _elementIdMap[e.id] = _elements.size() - 1;
 
-    getline( _ifs, s );
+    getline( m_ifs, s );
   }
       
   std::cout << "Read " << _elements.size() << " elements.\n";
@@ -232,17 +236,17 @@ void FemapInput::_readConstraints()
   std::string s;
   femapConstraintSet cs;
 
-  _ifs >> cs.id;
+  m_ifs >> cs.id;
 
   if ( static_cast<long> (cs.id) != -1 ) {
-    _ifs >> cs.title;
+    m_ifs >> cs.title;
 
 
     const size_t NDOF = 6;
     int dofread[NDOF];
 
     constraint c;
-    getline( _ifs, s );
+    getline( m_ifs, s );
     while ( sscanf(s.c_str(), "%zd,%*d,%*d,%d,%d,%d,%d,%d,%d,%d",
           &(c.id), &(dofread[0]), &(dofread[1]), &(dofread[2]), 
           &(dofread[3]), &(dofread[4]), &(dofread[5]), &(c.ex_geom) ) == 8
@@ -258,7 +262,7 @@ void FemapInput::_readConstraints()
     _constraintSets.push_back(cs);
   }
   // skip other types of constraints (geom., etc.)
-  do { getline( _ifs, s ); s.assign(s,0,5); } while ( s != "   -1" );
+  do { getline( m_ifs, s ); s.assign(s,0,5); } while ( s != "   -1" );
 
   return;
 }
@@ -272,15 +276,15 @@ void FemapInput::_readLoads()
   std::string s;
   femapLoadSet ls;
 
-  //_ifs >> ls.id;
-  getline( _ifs, s );
+  //m_ifs >> ls.id;
+  getline( m_ifs, s );
   sscanf( s.c_str(), "%zd,", &(ls.id) );  
 
   if ( static_cast<long> (ls.id) != -1 ) {
-    getline( _ifs, ls.title );
+    getline( m_ifs, ls.title );
     std::cout << ls.title << std::endl << std::flush;
     
-    getline( _ifs, s ); 
+    getline( m_ifs, s ); 
 
     int tempOn_int, gravOn_int, omegaOn_int;
     sscanf(s.c_str(), "%*d,%lg,%d,%d,%d,",
@@ -290,26 +294,26 @@ void FemapInput::_readLoads()
     ls.gravOn = !(gravOn_int == 0); // 0-> false, non-zero -> true
     ls.omegaOn = !(omegaOn_int == 0); // 0-> false, non-zero -> true
 
-    getline( _ifs, s ); 
+    getline( m_ifs, s ); 
     sscanf(s.c_str(), "%lg,%lg,%lg,",
 	   &(ls.grav[0]), &(ls.grav[1]), &(ls.grav[2]) );
 
-    getline( _ifs, s ); 
+    getline( m_ifs, s ); 
     sscanf(s.c_str(), "%lg,%lg,%lg,",
 	   &(ls.grav[3]), &(ls.grav[4]), &(ls.grav[5]) );
 
-    getline( _ifs, s ); 
+    getline( m_ifs, s ); 
     sscanf(s.c_str(), "%lg,%lg,%lg,",
 	   &(ls.origin[0]), &(ls.origin[1]), &(ls.origin[2]) );
 
-    getline( _ifs, s ); 
+    getline( m_ifs, s ); 
     sscanf(s.c_str(), "%lg,%lg,%lg,",
 	   &(ls.omega[0]), &(ls.omega[1]), &(ls.omega[2]) );
     
     nextLine(14); // skip some junk we won't use 
     
     int id, type, exp;
-    getline( _ifs, s ); 
+    getline( m_ifs, s ); 
     sscanf( s.c_str(), "%d,%d,%*d,%*d,%*d,%*d,%d,", &id, &type, &exp );
     while ( id != -1 ) 
       {
@@ -318,16 +322,16 @@ void FemapInput::_readLoads()
 	l.type = type;
 	l.is_expanded = exp;
 
-	getline( _ifs, s );
+	getline( m_ifs, s );
 	sscanf(s.c_str(), "%d,%d,%d",
 	       &(l.dof_face[0]), &(l.dof_face[1]), &(l.dof_face[2]) );
-	getline( _ifs, s );
+	getline( m_ifs, s );
 	sscanf(s.c_str(), "%lg,%lg,%lg,%*g,%*g,",
 	       &(l.value[0]), &(l.value[1]), &(l.value[2]) );
 	nextLine(4);
 	ls.loads.push_back(l);
 
-	getline( _ifs, s ); 
+	getline( m_ifs, s ); 
 	sscanf( s.c_str(), "%d,%d,%*d,%*d,%*d,%*d,%d,", &id, &type, &exp );
       }
     
@@ -336,7 +340,7 @@ void FemapInput::_readLoads()
   }
   
   // skip geometry-based and non-structural loads
-  do { getline( _ifs, s ); s.assign(s,0,5); } while ( s != "   -1" );
+  do { getline( m_ifs, s ); s.assign(s,0,5); } while ( s != "   -1" );
 
   return;
 }
@@ -353,21 +357,21 @@ void FemapInput::_readMaterial()
 
   int functioncount;
   // read mat id, etc.
-  getline( _ifs, s );
+  getline( m_ifs, s );
   
   do{
     sscanf( s.c_str(), "%zd,%*d,%*d,%zd,%zd,%*d,%d", 
                       &(m.id), &(m.type), &(m.subtype), &functioncount);
     
     // read & print title
-    _ifs >> m.title;
+    m_ifs >> m.title;
     if (m.title=="<NULL>") m.title="";
     std::cout << "Id: " << m.id << " Title: " << m.title << std::endl;
     
     nextLine(2);
     
     // get bval[0,9]
-    getline( _ifs, s );
+    getline( m_ifs, s );
     sscanf(s.c_str(), "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d",
 	   &(m.bval[0]), &(m.bval[1]), &(m.bval[2]), &(m.bval[3]), &(m.bval[4]), 
 	   &(m.bval[5]), &(m.bval[6]), &(m.bval[7]), &(m.bval[8]), &(m.bval[9]));
@@ -376,13 +380,13 @@ void FemapInput::_readMaterial()
     
     // get ival[0,24]; 2 rows of 10 and 1 row of 5.
     for (i=0; i<2; i++) {
-      getline( _ifs, s );
+      getline( m_ifs, s );
       sscanf(s.c_str(), "%d,%d,%d,%d,%d,%d,%d,%d,%d,%d",
 	     &(m.ival[10*i+0]), &(m.ival[10*i+1]), &(m.ival[10*i+2]), 
 	     &(m.ival[10*i+3]), &(m.ival[10*i+4]), &(m.ival[10*i+5]), 
 	     &(m.ival[10*i+6]), &(m.ival[10*i+7]), &(m.ival[10*i+8]), &(m.ival[10*i+9]));
     }    
-    getline( _ifs, s );
+    getline( m_ifs, s );
     sscanf(s.c_str(), "%d,%d,%d,%d,%d",
 	   &(m.ival[10*i+0]),&(m.ival[10*i+1]),
 	   &(m.ival[10*i+2]),&(m.ival[10*i+3]),&(m.ival[10*i+4]));
@@ -391,7 +395,7 @@ void FemapInput::_readMaterial()
     
     // get mval[0,199]; 20 rows of 10.
     for (i=0; i<20; i++) {
-      getline( _ifs, s );
+      getline( m_ifs, s );
       sscanf(s.c_str(), "%lg,%lg,%lg,%lg,%lg,%lg,%lg,%lg,%lg,%lg",
 	     &(m.mval[10*i+0]), &(m.mval[10*i+1]), &(m.mval[10*i+2]), 
 	     &(m.mval[10*i+3]), &(m.mval[10*i+4]), &(m.mval[10*i+5]), 
@@ -405,7 +409,7 @@ void FemapInput::_readMaterial()
     _materialIdMap[m.id] = _materials.size() - 1;
 
     // Look for more materials
-    getline( _ifs, s );
+    getline( m_ifs, s );
     
   } while ( sdumm.assign(s,0,5) != "   -1" );
   
@@ -421,7 +425,7 @@ void FemapInput::_readGroups () {
 
   int id, need_eval;
 
-  getline (_ifs, s);
+  getline (m_ifs, s);
   sscanf (s.c_str (), "%d,%d,%*d,", &id, &need_eval);
 
   while (id != -1) {
@@ -431,10 +435,10 @@ void FemapInput::_readGroups () {
     g.id = id;
     g.need_eval = need_eval;
 
-    getline (_ifs, g.title);
+    getline (m_ifs, g.title);
     std::cout << g.title << std::endl << std::flush;
 
-    getline (_ifs, s);
+    getline (m_ifs, s);
     sscanf (s.c_str (), "%d,%d,%d,",
         &(g.layer[0]), &(g.layer[1]), &(g.layer_method));
 
@@ -442,45 +446,45 @@ void FemapInput::_readGroups () {
 
     // read group rules
     size_t max;
-    getline (_ifs, s);
+    getline (m_ifs, s);
     sscanf (s.c_str (), "%zd,", &max);
 
-    getline (_ifs, s);
+    getline (m_ifs, s);
     groupRule r;
     sscanf (s.c_str (), "%zd,", &(r.type));
     while (static_cast<long> (r.type) != -1) {
       if (r.type < max) {
-        getline (_ifs, s);
+        getline (m_ifs, s);
         sscanf (s.c_str (), "%zd,%zd,%zd,%zd,",
             &(r.startID), &(r.stopID), &(r.incID), &(r.include));
         while (static_cast<long> (r.startID) != -1) {
           g.rules.push_back (r);
-          getline (_ifs, s);
+          getline (m_ifs, s);
           sscanf (s.c_str (), "%zd,%zd,%zd,%zd,",
               &(r.startID), &(r.stopID), &(r.incID), &(r.include));
         }
       } else
         nextLine ();
 
-      getline (_ifs, s);
+      getline (m_ifs, s);
       sscanf (s.c_str (), "%zd,", &(r.type));
     }
 
     // read group lists
-    getline (_ifs, s);
+    getline (m_ifs, s);
     sscanf (s.c_str (), "%zd,", &max);
 
     groupList l;
-    getline (_ifs, s);
+    getline (m_ifs, s);
     sscanf (s.c_str (), "%zd,", &(l.type));
 
     while (static_cast<long> (l.type) != -1) {
       if (l.type < max) {
-        getline (_ifs, s);
+        getline (m_ifs, s);
         sscanf (s.c_str (), "%d,", &id);
         while (id != -1) {
           l.entityID.push_back (id);
-          getline (_ifs, s);
+          getline (m_ifs, s);
           sscanf (s.c_str (), "%d,", &id);
         }
         g.lists.push_back (l);
@@ -488,18 +492,18 @@ void FemapInput::_readGroups () {
         nextLine ();
       }
 
-      getline (_ifs, s);
+      getline (m_ifs, s);
       sscanf (s.c_str (), "%zd,", &(l.type));
     }
 
     _groups.push_back (g);
     _groupIdMap[g.id] = _groups.size () - 1;
 
-    getline (_ifs, s);
+    getline (m_ifs, s);
     sscanf (s.c_str (), "%d,%d,%*d,", &id, &need_eval);
   }
 
-  //  do { getline( _ifs, s ); s.assign(s,0,5); } 
+  //  do { getline( m_ifs, s ); s.assign(s,0,5); } 
   //  while ( s != "   -1" );
 
   return;
@@ -509,7 +513,7 @@ void FemapInput::_readGroups () {
 inline void FemapInput::nextLine(int n=1)
 {
 std::string s;
-  for (int i = 0; i < n; i++) getline( _ifs, s );
+  for (int i = 0; i < n; i++) getline( m_ifs, s );
   return;
 }
 */
@@ -517,14 +521,14 @@ inline void FemapInput::nextLine(int n)
 {
   std::string s;
   for (int i = 0; i < n; i++) {
-    getline( _ifs, s );
+    getline( m_ifs, s );
   }
   return;
 }
 inline void FemapInput::nextLine()
 {
   std::string s;
-  getline( _ifs, s );
+  getline( m_ifs, s );
   return;
 }
 //  MO 1/9/01 end

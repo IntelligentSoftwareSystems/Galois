@@ -47,3 +47,9 @@ void Galois::Runtime::LL::initTID() {
   TID = next.next();
   assert(TID < getMaxThreads());
 }
+
+#ifdef GALOIS_USE_EXP
+void Galois::Runtime::LL::initTID_cilk () {
+  TID = next.next () % getMaxThreads ();
+}
+#endif // GALOIS_USE_EXP

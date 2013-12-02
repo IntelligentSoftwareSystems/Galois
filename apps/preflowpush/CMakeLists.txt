@@ -1,1 +1,1 @@
-app(preflowpush)
+app(preflowpush Preflowpush.cpp)

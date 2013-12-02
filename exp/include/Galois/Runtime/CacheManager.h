@@ -46,7 +46,7 @@ public:
 class CacheManager {
 
   std::unordered_map<fatPointer, remoteObj*> remoteObjects;
-  LL::SimpleLock<true> Lock;
+  LL::SimpleLock Lock;
 
 public:
 

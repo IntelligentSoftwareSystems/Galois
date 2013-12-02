@@ -30,7 +30,8 @@
 #include "Galois/Galois.h"
 #include "Galois/Graph/FileGraph.h"
 
-#include "Lonestar/CommandLine.h"
+#include "llvm/Support/CommandLine.h"
+#include "Lonestar/BoilerPlate.h"
 
 #include <pthread.h>
 #include <string>
@@ -43,8 +44,17 @@
 
 //#define _DEBUG
 
-static const char* help =
-  "<input file> <startnode> <reportnode> [-delta <deltaShift>] [-bfs]";
+static const char* name = "Delta-Stepping";
+static const char* desc =
+  "Computes the shortest path from a source node to all nodes in a directed "
+  "graph using the Delta-Stepping algorithm";
+static const char* url = NULL;
+
+namespace cll = llvm::cl;
+static cll::opt<std::string> filename(cll::Positional, cll::desc("<input graph>"), cll::Required);
+static cll::opt<unsigned int> startNode("startNode", cll::desc("Node to start search from"), cll::init(0));
+static cll::opt<unsigned int> reportNode("reportNode", cll::desc("Node to report distance to"), cll::init(1));
+static cll::opt<int> stepShift("delta", cll::desc("Shift value for the deltastep"), cll::init(10));
 
 struct Node {
   unsigned dist;
@@ -279,9 +289,9 @@ public:
 
             // Relax each light edge. 
             unsigned u_dist = g.getData(u, Galois::NONE).dist;
-            for (Graph::neighbor_iterator ii = g.neighbor_begin(u, Galois::NONE),
-                ei = g.neighbor_end(u, Galois::NONE); ii != ei; ++ii) {
-              unsigned w = g.getEdgeData(u, *ii, Galois::NONE);
+            for (Graph::edge_iterator ii = g.edge_begin(u, Galois::NONE),
+                ei = g.edge_end(u, Galois::NONE); ii != ei; ++ii) {
+              unsigned w = g.getEdgeData(ii);
               if (w <= delta) // light edge
                 relax(u, *ii, u_dist + w);
             }
@@ -308,9 +318,9 @@ public:
         // Relax each heavy edge. 
         GNode u = *iter;
         unsigned u_dist = g.getData(u, Galois::NONE).dist;
-        for (Graph::neighbor_iterator ii = g.neighbor_begin(u, Galois::NONE),
-            ei = g.neighbor_end(u, Galois::NONE); ii != ei; ++ii) {
-          unsigned w = g.getEdgeData(u, *ii);
+        for (Graph::edge_iterator ii = g.edge_begin(u, Galois::NONE),
+            ei = g.edge_end(u, Galois::NONE); ii != ei; ++ii) {
+          unsigned w = g.getEdgeData(ii);
           if (w > delta) // heavy edge
             relax(u, *ii, u_dist + w);
         }
@@ -422,33 +432,12 @@ public:
 };
 
 int main(int argc, char **argv) {
-  std::vector<char*> args = parse_command_line(argc, argv, help);
-
-  if (args.size() < 3) {
-    std::cerr << "not enough arguments, use -help for usage information\n";
-    return 1;
-  }
-  
-  const char* inputfile = args[0];
-  unsigned int startNode = atoi(args[1]);
-  unsigned int reportNode = atoi(args[2]);
-  bool do_bfs = false;
-  unsigned stepShift = 10;
-  for (unsigned i = 3; i < args.size(); ++i) {
-    if (strcmp(args[i], "-delta") == 0 && i + 1 < args.size()) {
-      stepShift = atoi(args[i+1]);
-      ++i;
-    } else if (strcmp(args[i], "-bfs") == 0) {
-      do_bfs = true;
-    } else {
-      std::cerr << "unknown argument, use -help for usage information\n";
-      return 1;
-    }
-  }
+  Galois::StatManager statManager;
+  LonestarStart(argc, argv, name, desc, url);
 
   Graph g;
   
-  Galois::Graph::readGraph(g, inputfile);
+  Galois::Graph::readGraph(g, filename);
   std::cout << "Read " << g.size() << " nodes\n";
   std::cout << "Using delta-step of " << (1 << stepShift) << "\n";
   std::cout << "Using " << numThreads << " threads\n";

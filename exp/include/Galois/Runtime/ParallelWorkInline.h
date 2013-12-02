@@ -32,35 +32,6 @@ namespace Galois {
 namespace Runtime {
 namespace {
 
-template <bool Enabled>
-class LoopStatistics {
-  unsigned long conflicts;
-  unsigned long iterations;
-  const char* loopname;
-
-public:
-  explicit LoopStatistics(const char* ln) :conflicts(0), iterations(0), loopname(ln) { }
-  ~LoopStatistics() {
-    reportStat(loopname, "Conflicts", conflicts);
-    reportStat(loopname, "Iterations", iterations);
-  }
-  inline void inc_iterations(int amount = 1) {
-    iterations += amount;
-  }
-  inline void inc_conflicts() {
-    ++conflicts;
-  }
-};
-
-
-template <>
-class LoopStatistics<false> {
-public:
-  explicit LoopStatistics(const char* ln) {}
-  inline void inc_iterations(int amount = 1) const { }
-  inline void inc_conflicts() const { }
-};
-
 template<typename T, bool isLIFO, unsigned ChunkSize>
 struct FixedSizeRingAdaptor: public Galois::FixedSizeRing<T,ChunkSize> {
   typedef typename FixedSizeRingAdaptor::reference reference;
@@ -267,7 +238,7 @@ class BSInlineExecutor {
 
   struct ThreadLocalData {
     Galois::Runtime::UserContextAccess<value_type> facing;
-    SimpleRuntimeContext cnx;
+    SimpleRuntimeContext ctx;
     LoopStatistics<ForEachTraits<FunctionTy>::NeedsStats> stat;
     ThreadLocalData(const char* ln): stat(ln) { }
   };
@@ -284,7 +255,7 @@ class BSInlineExecutor {
 
   GALOIS_ATTRIBUTE_NOINLINE
   void abortIteration(ThreadLocalData& tld, const WID& wid, WLTy* cur, WLTy* next) {
-    tld.cnx.cancel_iteration();
+    tld.ctx.cancelIteration();
     tld.stat.inc_conflicts();
     if (ForEachTraits<FunctionTy>::NeedsPush) {
       tld.facing.resetPushBuffer();
@@ -315,14 +286,14 @@ class BSInlineExecutor {
         tld.facing.resetPushBuffer();
       }
       if (ForEachTraits<FunctionTy>::NeedsAborts)
-        tld.cnx.commit_iteration();
+        tld.ctx.commitIteration();
       cur->pop(wid);
     }
   }
 
   void go() {
     ThreadLocalData tld(loopname);
-    setThreadContext(&tld.cnx);
+    setThreadContext(&tld.ctx);
     unsigned tid = LL::getTID();
     WID wid;
 
@@ -346,12 +317,12 @@ class BSInlineExecutor {
 
       if (tid == 0) {
         if (empty(cur))
-          done.data = true;
+          done.get() = true;
       }
       
       barrier.wait();
 
-      if (done.data)
+      if (done.get())
         break;
     }
 

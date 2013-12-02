@@ -1,11 +1,12 @@
 // std_tr1__type_traits__is_pod.cpp 
 
-#include <type_traits> 
-#include <iostream> 
-
+#include "Galois/config.h"
 #include "Galois/Runtime/ll/PtrLock.h"
 #include "Galois/Runtime/ll/SimpleLock.h"
 #include "Galois/Runtime/ll/StaticInstance.h"
+
+#include GALOIS_CXX11_STD_HEADER(type_traits)
+#include <iostream> 
 
 using namespace Galois::Runtime;
 using namespace Galois::Runtime::LL;
@@ -17,10 +18,10 @@ int main()
   std::cout << "is_pod PtrLock<int, false> == " << std::boolalpha 
 	    << std::is_pod<PtrLock<int, false> >::value << std::endl; 
 
-  std::cout << "is_pod SimpleLock<true> == " << std::boolalpha 
-	    << std::is_pod<SimpleLock<true> >::value << std::endl; 
-  std::cout << "is_pod SimpleLock<false> == " << std::boolalpha 
-	    << std::is_pod<SimpleLock<false> >::value << std::endl; 
+  std::cout << "is_pod SimpleLock == " << std::boolalpha 
+	    << std::is_pod<SimpleLock >::value << std::endl; 
+  std::cout << "is_pod DummyLock == " << std::boolalpha 
+	    << std::is_pod<DummyLock >::value << std::endl; 
 
   std::cout << "is_pod StaticInstance<int> == " << std::boolalpha 
 	    << std::is_pod<StaticInstance<int> >::value << std::endl; 

@@ -55,6 +55,39 @@ namespace Runtime {
 
 namespace {
 
+template<bool Enabled> 
+class LoopStatistics {
+  unsigned long conflicts;
+  unsigned long iterations;
+  const char* loopname;
+
+  void init() { }
+  void report() { }
+
+public:
+  explicit LoopStatistics(const char* ln) :conflicts(0), iterations(0), loopname(ln) { init(); }
+  ~LoopStatistics() {
+    reportStat(loopname, "Conflicts", conflicts);
+    reportStat(loopname, "Iterations", iterations);
+    report();
+  }
+  inline void inc_iterations(int amount = 1) {
+    iterations += amount;
+  }
+  inline void inc_conflicts() {
+    ++conflicts;
+  }
+};
+
+
+template <>
+class LoopStatistics<false> {
+public:
+  explicit LoopStatistics(const char* ln) {}
+  inline void inc_iterations(int amount = 1) const { }
+  inline void inc_conflicts() const { }
+};
+
 template<typename value_type>
 class AbortHandler {
   typedef WorkList::GFIFO<value_type> AbortedList;
@@ -68,7 +101,7 @@ public:
       queues.getLocal()->push(val);
   }
 
-  boost::optional<value_type> pop() {
+  optional<value_type> pop() {
     return queues.getLocal()->pop();
   }
 };
@@ -76,13 +109,13 @@ public:
 template<typename value_type>
 class RemoteAbortHandler {
   std::deque<value_type> queues;
-  LL::SimpleLock<true> Lock;
+  LL::SimpleLock Lock;
   std::map<fatPointer, std::set<value_type> > waiting;
   std::map<value_type, std::set<fatPointer> > holding;
 
   void arrive(fatPointer ptr) {
     //    assert(waiting.count(ptr));
-    std::lock_guard<LL::SimpleLock<true>> lg(Lock);
+    std::lock_guard<LL::SimpleLock> lg(Lock);
     //LL::gDebug("Arrive notification ", ptr.first, ",", ptr.second, ": ", waiting.count(ptr));
     for (auto ii = waiting.lower_bound(ptr), ee = waiting.upper_bound(ptr); ii != ee; ++ii)
       queues.push(ii->second);
@@ -116,8 +149,8 @@ public:
     //      dir.notifyWhenAvailable(ptr, std::bind(&RemoteAbortHandler::arrive, this, std::placeholders::_1));
   }
 
-  boost::optional<value_type> pop() {
-    boost::optional<value_type> retval;
+  optional<value_type> pop() {
+    optional<value_type> retval;
     if (!queues.empty()) {
       retval = queues.front();
       queues.pop_front();
@@ -153,7 +186,7 @@ public:
   //doesn't check queue, just hidden work
   bool empty() {
     static std::chrono::system_clock::time_point oldtime = std::chrono::system_clock::now();
-    std::lock_guard<LL::SimpleLock<true>> lg(Lock);
+    std::lock_guard<LL::SimpleLock> lg(Lock);
     // unsigned num = getSystemDirectory().countContended();
     // if (!waiting.empty() || num) {
     //   std::unordered_set<fatPointer, ptrHash> items;
@@ -266,7 +299,7 @@ template<class WorkListTy, class T, class FunctionTy>
 class ForEachWork {
 protected:
   typedef T value_type;
-  typedef typename WorkListTy::template retype<value_type> WLTy;
+  typedef typename WorkListTy::template retype<value_type>::type WLTy;
   typedef ThreadLocalExec<value_type, FunctionTy, WLTy> ThreadLocalData;
 
   WLTy wl;
@@ -281,7 +314,7 @@ protected:
   template<unsigned limit, typename WL>
   GALOIS_ATTRIBUTE_NOINLINE
   bool runQueue(ThreadLocalData& tld, WL& lwl, bool recursiveAbort, bool remoteAbort) {
-    boost::optional<value_type> p = lwl.pop();
+    optional<value_type> p = lwl.pop();
     if (p) {
       if (ForEachTraits<FunctionTy>::NeedsAborts) {
         unsigned runlimit = limit;

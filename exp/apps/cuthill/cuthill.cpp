@@ -256,7 +256,7 @@ private:
     res.source = source;
 
     graph.getData(source).dist = 0;
-    Galois::for_each<dChunk>(source, UnorderedProcess());
+    Galois::for_each(source, UnorderedProcess(), Galois::wl<dChunk>());
 
     res.counts = Galois::Runtime::do_all_impl(Galois::Runtime::makeLocalRange(graph),
         CountLevels(reset), default_reduce()).counts;
@@ -777,7 +777,7 @@ struct AnyBFSUnordered {
 
   template<typename C, typename RO, typename WO>
   static void place_nodes(C& c, RO& read_offset, WO& write_offset) {
-    Galois::do_all(graph.begin(), graph.end(), PlaceFn<C,WO>(c, write_offset), "place");
+    Galois::do_all(graph.begin(), graph.end(), PlaceFn<C,WO>(c, write_offset), Galois::loopname("place"));
   }
 
   template<typename C>

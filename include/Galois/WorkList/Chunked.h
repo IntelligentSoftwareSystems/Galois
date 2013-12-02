@@ -33,20 +33,17 @@ namespace Galois {
 namespace WorkList {
 
 //This overly complex specialization avoids a pointer indirection for non-distributed WL when accessing PerLevel
-template<bool d, typename TQ>
-struct squeues;
-
-template<typename TQ>
-struct squeues<true,TQ> {
-  Runtime::PerPackageStorage<TQ> queues;
+template<bool, template<typename> class PS, typename TQ>
+struct squeue {
+  PS<TQ> queues;
   TQ& get(int i) { return *queues.getRemote(i); }
   TQ& get() { return *queues.getLocal(); }
   int myEffectiveID() { return Runtime::LL::getTID(); }
   int size() { return Runtime::activeThreads; }
 };
 
-template<typename TQ>
-struct squeues<false,TQ> {
+template<template<typename> class PS, typename TQ>
+struct squeue<false, PS, TQ> {
   TQ queue;
   TQ& get(int i) { return queue; }
   TQ& get() { return queue; }
@@ -58,14 +55,13 @@ struct squeues<false,TQ> {
 template<typename T, template<typename, bool> class QT, bool Distributed, bool IsStack, int ChunkSize, bool Concurrent>
 struct ChunkedMaster : private boost::noncopyable {
   template<bool _concurrent>
-  using rethread = ChunkedMaster<T, QT, Distributed, IsStack, ChunkSize, _concurrent>;
+  struct rethread { typedef ChunkedMaster<T, QT, Distributed, IsStack, ChunkSize, _concurrent> type; };
 
   template<typename _T>
-  using retype = ChunkedMaster<_T, QT, Distributed, IsStack, ChunkSize, Concurrent>;
+  struct retype { typedef ChunkedMaster<_T, QT, Distributed, IsStack, ChunkSize, Concurrent> type; };
 
   template<int _chunk_size>
-  using with_chunk_size = ChunkedMaster<T, QT, Distributed, IsStack, _chunk_size, Concurrent>;
-
+  struct with_chunk_size { typedef ChunkedMaster<T, QT, Distributed, IsStack, _chunk_size, Concurrent> type; };
 
 private:
   class Chunk : public FixedSizeRing<T, ChunkSize>, public QT<Chunk, Concurrent>::ListNode {};
@@ -75,12 +71,13 @@ private:
   struct p {
     Chunk* cur;
     Chunk* next;
+    p(): cur(0), next(0) { }
   };
 
   typedef QT<Chunk, Concurrent> LevelItem;
 
-  Runtime::PerThreadStorage<p> data;
-  squeues<Distributed, LevelItem> Q;
+  squeue<Concurrent, Runtime::PerThreadStorage, p> data;
+  squeue<Distributed, Runtime::PerPackageStorage, LevelItem> Q;
 
   Chunk* mkChunk() {
     return new (heap.allocate(sizeof(Chunk))) Chunk();
@@ -122,15 +119,15 @@ private:
     return 0;
   }
 
-  T* pushi(const T& val, p* n)  {
+  template<typename... Args>
+  T* emplacei(p& n, Args&&... args)  {
     T* retval = 0;
-
-    if (n->next && (retval = n->next->push_back(val)))
+    if (n.next && (retval = n.next->emplace_back(std::forward<Args>(args)...)))
       return retval;
-    if (n->next)
-      pushChunk(n->next);
-    n->next = mkChunk();
-    retval = n->next->push_back(val);
+    if (n.next)
+      pushChunk(n.next);
+    n.next = mkChunk();
+    retval = n.next->emplace_back(std::forward<Args>(args)...);
     assert(retval);
     return retval;
   }
@@ -141,25 +138,83 @@ public:
   ChunkedMaster() : heap(sizeof(Chunk)) { }
 
   void flush() {
-    p& n = *data.getLocal();
+    p& n = data.get();
     if (n.next)
       pushChunk(n.next);
     n.next = 0;
   }
   
-  //! Most worklists have void return value for push. This push returns address
-  //! of placed item to facilitate some internal runtime uses. The address is
-  //! generally not safe to use in the presence of concurrent pops.
-  value_type* push(const value_type& val)  {
-    p* n = data.getLocal();
-    return pushi(val, n);
+  /**
+   * Construct an item on the worklist and return a pointer to its value.
+   *
+   * This pointer facilitates some internal runtime uses and is not designed
+   * to be used by general clients. The address is generally not safe to use
+   * in the presence of concurrent pops.
+   */
+  template<typename... Args>
+  value_type* emplace(Args&&... args) {
+    p& n = data.get();
+    return emplacei(n, std::forward<Args>(args)...);
+  }
+
+  /**
+   * Return pointer to next value to be returned by pop.
+   *
+   * For internal runtime use.
+   */
+  value_type* peek() {
+    p& n = data.get();
+    if (IsStack) {
+      if (n.next && !n.next->empty())
+	return &n.next->back();
+      if (n.next)
+	delChunk(n.next);
+      n.next = popChunk();
+      if (n.next && !n.next->empty())
+	return &n.next->back();
+      return NULL;
+    } else {
+      if (n.cur && !n.cur->empty())
+	return &n.cur->front();
+      if (n.cur)
+	delChunk(n.cur);
+      n.cur = popChunk();
+      if (!n.cur) {
+	n.cur = n.next;
+	n.next = 0;
+      }
+      if (n.cur && !n.cur->empty())
+	return &n.cur->front();
+      return NULL;
+    }
+  }
+
+  /**
+   * Remove the value returned from peek() from the worklist. 
+   *
+   * For internal runtime use.
+   */
+  void pop_peeked() {
+    p& n = data.get();
+    if (IsStack) {
+      n.next->pop_back();
+      return;
+    } else {
+      n.cur->pop_front();
+      return;
+    }
+  }
+
+  void push(const value_type& val)  {
+    p& n = data.get();
+    emplacei(n, val);
   }
 
   template<typename Iter>
   void push(Iter b, Iter e) {
-    p* n = data.getLocal();
+    p& n = data.get();
     while (b != e)
-      pushi(*b++, n);
+      emplacei(n, *b++);
   }
 
   template<typename RangeTy>
@@ -168,9 +223,9 @@ public:
     push(rp.first, rp.second);
   }
 
-  boost::optional<value_type> pop()  {
-    p& n = *data.getLocal();
-    boost::optional<value_type> retval;
+  Galois::optional<value_type> pop()  {
+    p& n = data.get();
+    Galois::optional<value_type> retval;
     if (IsStack) {
       if (n.next && (retval = n.next->extract_back()))
 	return retval;
@@ -179,7 +234,7 @@ public:
       n.next = popChunk();
       if (n.next)
 	return n.next->extract_back();
-      return boost::optional<value_type>();
+      return Galois::optional<value_type>();
     } else {
       if (n.cur && (retval = n.cur->extract_front()))
 	return retval;
@@ -192,7 +247,7 @@ public:
       }
       if (n.cur)
 	return n.cur->extract_front();
-      return boost::optional<value_type>();
+      return Galois::optional<value_type>();
     }
   }
 };

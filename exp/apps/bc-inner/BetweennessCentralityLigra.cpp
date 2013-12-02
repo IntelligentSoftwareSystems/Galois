@@ -107,16 +107,14 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
   //ICC v13.1 doesn't yet support std::atomic<float> completely, emmulate its
   //behavor with std::atomic<int>
   struct atomic_float : public std::atomic<int> {
-  private:
-    operator int() const;
     static_assert(sizeof(int) == sizeof(float), "int and float must be the same size");
-  public:
+
     float atomicIncrement(float value) {
       while (true) {
         union { float as_float; int as_int; } oldValue = { read() };
         union { float as_float; int as_int; } newValue = { oldValue.as_float + value };
         if (this->compare_exchange_strong(oldValue.as_int, newValue.as_int))
-          return oldValue.as_float;
+          return newValue.as_float;
       }
     }
 
@@ -135,6 +133,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
     atomic_float numPaths;
     atomic_float dependencies;
     bool visited;
+    SNode() { }
   };
 
   typedef typename Galois::Graph::LC_CSR_Graph<SNode,void>
@@ -177,7 +176,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
       SNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
       SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
 
-      float oldValue = ddata.numPaths.atomicIncrement(sdata.numPaths.read());
+      float oldValue = ddata.numPaths.atomicIncrement(sdata.numPaths);
       return oldValue == 0.0;
     }
   };
@@ -192,7 +191,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
     bool operator()(GTy& graph, typename GTy::GraphNode src, typename GTy::GraphNode dst, typename GTy::edge_data_reference) {
       SNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
       SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
-      float oldValue = ddata.dependencies.atomicIncrement(sdata.dependencies.read());
+      float oldValue = ddata.dependencies.atomicIncrement(sdata.dependencies);
       return oldValue == 0.0;
     }
   };
@@ -214,10 +213,10 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
       this->outEdgeMap(memoryLimit, graph, ForwardPass(), *frontier, *output, false);
       //Galois::do_all_local(*output, [&](GNode n) {
       //Galois::do_all(output->begin(), output->end(), [&](GNode n) {
-      Galois::for_each_local<WL>(*output, [&](size_t id, Galois::UserContext<size_t>&) {
+      Galois::for_each_local(*output, [&](size_t id, Galois::UserContext<size_t>&) {
         SNode& d = graph.getData(graph.nodeFromId(id), Galois::MethodFlag::NONE);
         d.visited = true;
-      }); 
+        },Galois::wl<WL>()); 
       levels.push_back(output);
       frontier = output;
     }
@@ -233,11 +232,11 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
     frontier = levels[round-1];
 
     //Galois::do_all_local(*frontier, [&](GNode n) {
-    Galois::for_each_local<WL>(*frontier, [&](size_t id, Galois::UserContext<size_t>&) {
+    Galois::for_each_local(*frontier, [&](size_t id, Galois::UserContext<size_t>&) {
       SNode& d = graph.getData(graph.nodeFromId(id), Galois::MethodFlag::NONE);
       d.visited = true;
       d.dependencies.write(d.dependencies.read() + d.numPaths.read());
-    });
+      }, Galois::wl<WL>());
 
     for (int r = round - 2; r >= 0; --r) {
       Bag output(graph.size());
@@ -245,11 +244,11 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
       delete frontier;
       frontier = levels[r];
       //Galois::do_all_local(*frontier, [&](GNode n) {
-      Galois::for_each_local<WL>(*frontier, [&](size_t id, Galois::UserContext<size_t>&) {
+      Galois::for_each_local(*frontier, [&](size_t id, Galois::UserContext<size_t>&) {
         SNode& d = graph.getData(graph.nodeFromId(id), Galois::MethodFlag::NONE);
         d.visited = true;
         d.dependencies.write(d.dependencies.read() + d.numPaths.read());
-      });
+        }, Galois::wl<WL>());
     }
 
     delete frontier;
@@ -288,16 +287,11 @@ void run() {
 
   if (!skipVerify) {
     int count = 0;
-    for (typename Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei && count < 20; ++ii, ++count) {
+    for (typename Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei && count < 10; ++ii, ++count) {
       std::cout << count << ": "
-        << std::setiosflags(std::ios::fixed) << std::setprecision(6) << graph.getData(*ii).dependencies.read()
-                << " " << (int)round(1.0 / graph.getData(*ii).numPaths.read())
-                << "\n";
+        << std::setiosflags(std::ios::fixed) << std::setprecision(6) << graph.getData(*ii).dependencies
+        << "\n";
     }
-    count = 0;
-    // for (typename Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii, ++count)
-    //   std::cout << ((count % 128 == 0) ? "\n" : " ") << (int)round(1.0 / graph.getData(*ii).numPaths.read());
-    std::cout << "\n";
   }
 }
 

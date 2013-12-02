@@ -9,7 +9,11 @@ if(VTune_INCLUDE_DIRS AND VTune_LIBRARIES)
 endif()
 
 find_path(VTune_INCLUDE_DIRS ittnotify.h PATHS ${VTune_ROOT} PATH_SUFFIXES include)
-find_library(VTune_LIBRARY NAMES ittnotify PATHS ${VTune_ROOT} PATH_SUFFIXES lib lib64 lib32)
+if(GALOIS_ARCH_MIC) 
+  find_library(VTune_LIBRARY NAMES ittnotify PATHS ${VTune_ROOT} PATH_SUFFIXES bin64/k1om bin32/k1om)
+else()
+  find_library(VTune_LIBRARY NAMES ittnotify PATHS ${VTune_ROOT} PATH_SUFFIXES lib lib64 lib32)
+endif()
 find_library(VTune_LIBRARIES NAMES dl PATH_SUFFIXES lib lib64 lib32)
 
 include(FindPackageHandleStandardArgs)

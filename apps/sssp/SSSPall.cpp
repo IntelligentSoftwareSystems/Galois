@@ -118,7 +118,7 @@ void runBodyParallel(const GNode src[NUM], int n) {
   for (int i = 0; i < n; ++i)
     one[i] = UpdateRequest(src[i], 0, i);
   T.start();
-  Galois::for_each<OBIM>(&one[0], &one[n], process());
+  Galois::for_each(&one[0], &one[n], process(), Galois::wl<OBIM>());
   T.stop();
 }
 

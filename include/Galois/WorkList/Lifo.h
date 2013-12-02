@@ -24,9 +24,12 @@
 #ifndef GALOIS_WORKLIST_LIFO_H
 #define GALOIS_WORKLIST_LIFO_H
 
+#include "Galois/config.h"
 #include "Galois/Runtime/ll/PaddedLock.h"
 #include "WLCompileCheck.h"
+
 #include <deque>
+#include GALOIS_CXX11_STD_HEADER(mutex)
 
 namespace Galois {
 namespace WorkList {
@@ -35,10 +38,10 @@ namespace WorkList {
 template<typename T = int, bool Concurrent = true>
 struct LIFO : private boost::noncopyable, private Runtime::LL::PaddedLock<Concurrent> {
   template<bool _concurrent>
-  using rethread = LIFO<T, _concurrent>;
+  struct rethread { typedef LIFO<T, _concurrent> type; };
 
   template<typename _T>
-  using retype = LIFO<_T, Concurrent>;
+  struct retype { typedef LIFO<_T, Concurrent> type; };
 
 private:
   std::deque<T> wl;
@@ -69,12 +72,12 @@ public:
       push(range.begin(), range.end());
   }
 
-  boost::optional<value_type> steal(LIFO& victim, bool half, bool pop) {
-    boost::optional<value_type> retval;
+  Galois::optional<value_type> steal(LIFO& victim, bool half, bool pop) {
+    Galois::optional<value_type> retval;
     //guard against self stealing
     if (&victim == this) return retval;
     //Ordered lock to preent deadlock
-    if (!Runtime::LL::TryLockPairOrdered(*this, victim)) return retval;
+    if (-1 != std::try_lock(*this, victim)) return retval;
     if (half) {
       typename std::deque<T>::iterator split = split_range(victim.wl.begin(), victim.wl.end());
       wl.insert(wl.end(), victim.wl.begin(), split);
@@ -91,12 +94,13 @@ public:
       retval = wl.back();
       wl.pop_back();
     }
-    UnLockPairOrdered(*this, victim);
+    this->unlock();
+    victim.unlock();
     return retval;
   }
 
-  boost::optional<value_type> pop()  {
-    boost::optional<value_type> retval;
+  Galois::optional<value_type> pop()  {
+    Galois::optional<value_type> retval;
     lock();
     if (!wl.empty()) {
       retval = wl.back();

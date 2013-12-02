@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -40,6 +40,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <map>
+#include <cstddef>
 
 #include <memory.h>
 
@@ -49,7 +50,17 @@ namespace Runtime {
 namespace MM {
 
 const size_t smallPageSize = 4*1024;
+
+#ifdef GALOIS_ARCH_MIC
 const size_t pageSize = 2*1024*1024;
+
+// const size_t pageSize = 16*4*1024;
+#else 
+const size_t pageSize = 2*1024*1024;
+
+// const size_t pageSize = 16*4*1024;
+#endif
+
 void* pageAlloc();
 void  pageFree(void*);
 //! Preallocate numpages large pages for each thread
@@ -75,15 +86,15 @@ int numNumaNodes();
  * threads.
  */
 void* largeInterleavedAlloc(size_t bytes, bool full = true);
-//! Frees memory allocated by {@link largeInterleavedAlloc}
+//! Frees memory allocated by {@link largeInterleavedAlloc()}
 void  largeInterleavedFree(void* mem, size_t bytes);
 
 //! Allocates a large block of memory
 void* largeAlloc(size_t bytes, bool preFault = true);
-//! Frees memory allocated by {@link largeAlloc}
+//! Frees memory allocated by {@link largeAlloc()}
 void  largeFree(void* mem, size_t bytes);
 
-//! Print lines from /proc/<pid>/numa_maps that contain at least n small pages
+//! Print lines from /proc/pid/numa_maps that contain at least n small pages
 void printInterleavedStats(int minPages = 16*1024);
 
 //! Per-thread heaps using Galois thread aware construct
@@ -116,7 +127,7 @@ public:
 //! Apply a lock to a heap
 template<class RealHeap>
 class LockedHeap : public RealHeap {
-  LL::SimpleLock<true> lock;
+  LL::SimpleLock lock;
 public :
   enum { AllocSize = RealHeap::AllocSize };
 
@@ -264,7 +275,7 @@ public:
   }
 
   inline void* allocate(size_t size) {
-    static LL::SimpleLock<true> lock;
+    static LL::SimpleLock lock;
 
     lock.lock();
     FreeNode* OH = 0;
@@ -520,7 +531,7 @@ private:
   static LL::PtrLock<SizedAllocatorFactory, true> instance;
   typedef std::map<size_t, SizedAlloc*> AllocatorsMap;
   AllocatorsMap allocators;
-  LL::SimpleLock<true> lock;
+  LL::SimpleLock lock;
 
   SizedAlloc* getAllocForSize(const size_t);
 
@@ -573,7 +584,7 @@ public:
 
 template<typename Ty>
 class FSBGaloisAllocator {
-  inline void destruct(char*) const {}
+  inline void destruct(char*) const { }
   inline void destruct(wchar_t*) const { }
   template<typename T> inline void destruct(T* t) const { t->~T(); }
 
@@ -607,7 +618,7 @@ public:
     Alloc.deallocate(ptr);
   }
   
-  template<class U, class... Args >
+  template<class U, class... Args>
   inline void construct(U* p, Args&&... args ) const {
     ::new((void*)p) U(std::forward<Args>(args)...);
   }

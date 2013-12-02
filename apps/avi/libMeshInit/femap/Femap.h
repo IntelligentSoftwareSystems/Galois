@@ -37,10 +37,11 @@
 #include <cstdio>
 #include <cmath>
 
-// #include <boost/iostreams/filtering_streambuf.hpp>
+#ifdef GALOIS_HAS_ZLIB
 #include <boost/iostreams/filtering_stream.hpp>
 #include <boost/iostreams/copy.hpp>
 #include <boost/iostreams/filter/gzip.hpp>
+#endif
 
 
 #include "FemapData.h"  
@@ -113,11 +114,13 @@ class FemapInput : public Femap {
  public:
   FemapInput(const char* fileName);
 
-
-
  private:
-  boost::iostreams::filtering_istream _ifs;
-  // std::ifstream _ifs;
+
+#ifdef GALOIS_HAS_ZLIB
+  boost::iostreams::filtering_istream m_ifs;
+#else 
+  std::ifstream m_ifs;
+#endif
 
   void _readHeader();
   void _readProperty();
@@ -127,11 +130,8 @@ class FemapInput : public Femap {
   void _readConstraints();
   void _readLoads();
   void _readMaterial();
-// MO 1/9/01 begin
-//void nextLine(int=1);
   void nextLine(int);
   void nextLine();
-// MO 1/9/01 end
 };
 
 class FemapOutput : public Femap {

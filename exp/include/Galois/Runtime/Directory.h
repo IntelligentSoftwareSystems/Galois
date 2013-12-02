@@ -153,7 +153,7 @@ class Directory : public SimpleRuntimeContext, private boost::noncopyable {
   friend class typeHelperImpl;
 
   std::unordered_map<fatPointer, tracking, std::hash<fatPointer> > tracks;
-  LL::SimpleLock<true> trackLock;
+  LL::SimpleLock trackLock;
 
   tracking& getTracking(LL::SLguard& lg, fatPointer ptr) {
     LL::SLguard lgt(trackLock);
@@ -187,7 +187,7 @@ class Directory : public SimpleRuntimeContext, private boost::noncopyable {
   }
 
   std::deque<fatPointer> pending;
-  LL::SimpleLock<true> pendingLock;
+  LL::SimpleLock pendingLock;
 
   void addPending(fatPointer ptr) {
     LL::SLguard lgp(pendingLock);
@@ -232,9 +232,9 @@ class Directory : public SimpleRuntimeContext, private boost::noncopyable {
 
 
   enum { numLocks = 1024 };
-  std::array<LL::SimpleLock<true>, numLocks> objLocks;
+  std::array<LL::SimpleLock, numLocks> objLocks;
   std::hash<fatPointer> lockhash;
-  LL::SimpleLock<true>& getLock(fatPointer ptr) {
+  LL::SimpleLock& getLock(fatPointer ptr) {
     return objLocks[lockhash(ptr) % numLocks];
   }
 

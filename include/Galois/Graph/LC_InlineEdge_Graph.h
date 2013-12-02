@@ -26,13 +26,14 @@
 #ifndef GALOIS_GRAPH_LC_INLINEEDGE_GRAPH_H
 #define GALOIS_GRAPH_LC_INLINEEDGE_GRAPH_H
 
+#include "Galois/config.h"
 #include "Galois/LargeArray.h"
 #include "Galois/Graph/FileGraph.h"
 #include "Galois/Graph/Details.h"
 #include "Galois/Runtime/MethodFlags.h"
 
 #include <boost/mpl/if.hpp>
-#include <type_traits>
+#include GALOIS_CXX11_STD_HEADER(type_traits)
 
 namespace Galois {
 namespace Graph {
@@ -51,45 +52,42 @@ template<typename NodeTy, typename EdgeTy,
   bool HasOutOfLineLockable=false,
   bool HasCompressedNodePtr=false>
 class LC_InlineEdge_Graph:
-    boost::noncopyable,
-    detail::LocalIteratorFeature<UseNumaAlloc>,
-    detail::OutOfLineLockableFeature<HasOutOfLineLockable && !HasNoLockable> {
+    private boost::noncopyable,
+    private detail::LocalIteratorFeature<UseNumaAlloc>,
+    private detail::OutOfLineLockableFeature<HasOutOfLineLockable && !HasNoLockable> {
   template<typename Graph> friend class LC_InOut_Graph;
 
 public:
   template<bool _has_id>
-  using with_id = LC_InlineEdge_Graph;
+  struct with_id { typedef LC_InlineEdge_Graph type; };
 
   template<typename _node_data>
-  using with_node_data =
-    LC_InlineEdge_Graph<_node_data,EdgeTy,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,HasCompressedNodePtr>;
+  struct with_node_data { typedef LC_InlineEdge_Graph<_node_data,EdgeTy,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,HasCompressedNodePtr> type; };
 
   template<bool _has_no_lockable>
-  using with_no_lockable =
-    LC_InlineEdge_Graph<NodeTy,EdgeTy,_has_no_lockable,UseNumaAlloc,HasOutOfLineLockable,HasCompressedNodePtr>;
+  struct with_no_lockable { typedef LC_InlineEdge_Graph<NodeTy,EdgeTy,_has_no_lockable,UseNumaAlloc,HasOutOfLineLockable,HasCompressedNodePtr> type; };
 
   template<bool _use_numa_alloc>
-  using with_numa_alloc =
-    LC_InlineEdge_Graph<NodeTy,EdgeTy,HasNoLockable,_use_numa_alloc,HasOutOfLineLockable,HasCompressedNodePtr>;
+  struct with_numa_alloc { typedef LC_InlineEdge_Graph<NodeTy,EdgeTy,HasNoLockable,_use_numa_alloc,HasOutOfLineLockable,HasCompressedNodePtr> type; };
 
   template<bool _has_out_of_line_lockable>
-  using with_out_of_line_lockable =
-    LC_InlineEdge_Graph<NodeTy,EdgeTy,HasNoLockable,UseNumaAlloc,_has_out_of_line_lockable,HasCompressedNodePtr>;
+  struct with_out_of_line_lockable { typedef LC_InlineEdge_Graph<NodeTy,EdgeTy,HasNoLockable,UseNumaAlloc,_has_out_of_line_lockable,HasCompressedNodePtr> type; };
 
   /**
    * Compress representation of graph at the expense of one level of indirection on accessing
    * neighbors of a node
    */
   template<bool _has_compressed_node_ptr>
-  using with_compressed_node_ptr =
-    LC_InlineEdge_Graph<NodeTy,EdgeTy,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,_has_compressed_node_ptr>;
+  struct with_compressed_node_ptr { typedef  LC_InlineEdge_Graph<NodeTy,EdgeTy,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,_has_compressed_node_ptr> type; };
 
   typedef read_default_graph_tag read_tag;
 
 protected:
-  struct NodeInfo;
+  class NodeInfo;
   typedef detail::EdgeInfoBase<typename boost::mpl::if_c<HasCompressedNodePtr,uint32_t,NodeInfo*>::type,EdgeTy> EdgeInfo;
   typedef LargeArray<EdgeInfo> EdgeData;
+  typedef LargeArray<NodeInfo> NodeData;
+  typedef detail::NodeInfoBaseTypes<NodeTy,!HasNoLockable && !HasOutOfLineLockable> NodeInfoTypes;
 
   class NodeInfo: public detail::NodeInfoBase<NodeTy,!HasNoLockable && !HasOutOfLineLockable> {
     EdgeInfo* m_edgeBegin;
@@ -99,14 +97,12 @@ protected:
     EdgeInfo*& edgeEnd() { return m_edgeEnd; }
   };
 
-  typedef LargeArray<NodeInfo> NodeData;
-
 public:
   typedef NodeInfo* GraphNode;
   typedef EdgeTy edge_data_type;
   typedef NodeTy node_data_type;
   typedef typename EdgeInfo::reference edge_data_reference;
-  typedef typename NodeInfo::reference node_data_reference;
+  typedef typename NodeInfoTypes::reference node_data_reference;
   typedef EdgeInfo* edge_iterator;
   typedef Galois::NoDerefIterator<NodeInfo*> iterator;
   typedef Galois::NoDerefIterator<const NodeInfo*> const_iterator;
@@ -263,8 +259,8 @@ public:
   void constructFrom(FileGraph& graph, unsigned tid, unsigned total) {
     typedef typename EdgeInfo::value_type EDV;
     auto r = graph.divideBy(
-        NodeData::sizeof_value + LC_InlineEdge_Graph::sizeof_out_of_line_value,
-        EdgeData::sizeof_value,
+        NodeData::size_of::value + LC_InlineEdge_Graph::size_of_out_of_line::value,
+        EdgeData::size_of::value,
         tid, total);
 
     EdgeInfo* curEdge = edgeData.data() + *graph.edge_begin(*r.first);

@@ -24,6 +24,7 @@
 #define GALOIS_RUNTIME_REMOTEPOINTER_H
 
 #include "Galois/Runtime/FatPointer.h"
+#include "Galois/Runtime/Network.h"
 
 namespace Galois {
 namespace Runtime {

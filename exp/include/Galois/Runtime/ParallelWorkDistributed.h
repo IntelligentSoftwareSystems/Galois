@@ -33,66 +33,6 @@
 #include "Galois/Runtime/PerHostStorage.h"
 
 namespace Galois {
-namespace ParallelSTL {
-struct count_if_R : public Galois::Runtime::Lockable {
-  ptrdiff_t i;
-  count_if_R() :i(0) { }
-  void add(ptrdiff_t v) {
-    i += v;
-    return;
-  }
-  typedef int tt_dir_blocking;
-  // serialization functions
-  typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::SerializeBuffer& s) const {
-    gSerialize(s,i);
-  }
-  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
-    gDeserialize(s,i);
-  }
-};
-
-template<typename Predicate>
-struct count_if_helper_dist : public Galois::Runtime::Lockable {
-  Predicate f;
-  ptrdiff_t ret;
-  count_if_helper_dist(): ret(0) { }
-  count_if_helper_dist(Predicate p): f(p), ret(0) { }
-  template<typename T>
-  void operator()(const T& v) {
-    if (f(v)) ++ret;
-  }
-  // serialization functions
-  typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::SerializeBuffer& s) const {
-    gSerialize(s,f);
-  }
-  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
-    gDeserialize(s,f);
-  }
-};
-
-struct count_if_reducer_dist : public Galois::Runtime::Lockable {
-  Runtime::gptr<count_if_R> r;
-  count_if_reducer_dist(count_if_R* _r = nullptr) :r(_r) {}
-  template<typename CIH>
-  void operator()(CIH& dest, const CIH& src) {
-    count_if_R* transient_r = transientAcquire(r);
-    transient_r->add(dest.ret+src.ret);
-    transientRelease(r);
-  }
-  // serialization functions
-  typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::SerializeBuffer& s) const {
-    gSerialize(s,r);
-  }
-  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
-    gDeserialize(s,r);
-  }
-};
-
-}
-
 namespace Runtime {
 
 template<typename WLTy, typename ItemTy, typename FunctionTy>
@@ -129,19 +69,33 @@ void for_each_local_landing_pad(RecvBuffer& buf) {
   //net.systemBarrier();
 }
 
+template<typename ItemTy, typename FunctionTy>
+void do_all_landing_pad(RecvBuffer& buf) {
+  //extract stuff
+  FunctionTy f;
+  std::deque<ItemTy> data;
+  std::string lname;
+  bool       steal;
+  gDeserialize(buf,f,data,lname,steal);
+
+  //Start locally
+  do_all_impl(Galois::Runtime::makeStandardRange(data.begin(), data.end()),f,lname,steal);
+
+  // place a MPI barrier here for all the hosts to synchronize
+  //net.systemBarrier();
+}
+
 template<typename T, typename FunctionTy, typename ReducerTy>
 void do_all_local_landing_pad(RecvBuffer& buf) {
   //extract stuff
   FunctionTy f;
-  ReducerTy  r;
-  bool       needsReduce;
-  T    data;
-  gDeserialize(buf,f,r,needsReduce,data);
-
-  NetworkInterface& net = getSystemNetworkInterface();
+  LocalRange<T> lr;
+  std::string lname;
+  bool steal;
+  gDeserialize(buf,f,lr,lname,steal);
 
   //Start locally
-  do_all_impl(Galois::Runtime::makeLocalRange(data),f,r,needsReduce);
+  do_all_impl(lr, f, lname, steal);
 
   // place a MPI barrier here for all the hosts to synchronize
   //net.systemBarrier();
@@ -165,7 +119,7 @@ void on_each_impl_landing_pad(RecvBuffer& buf) {
 namespace {
 
 template<typename WLTy, typename IterTy, typename FunctionTy>
-void for_each_dist(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
+void for_each_dist(StandardRange<IterTy> r, FunctionTy f, const char* loopname) {
   // Get a handle to the network interface
   //  Don't move as NetworkInterface::Num and NetworkInterface::ID have to be initialized first
   NetworkInterface& net = getSystemNetworkInterface();
@@ -174,15 +128,13 @@ void for_each_dist(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
 
   //fast path for non-distributed
   if (NetworkInterface::Num == 1) {
-    std::deque<ItemTy> allData;
-    allData.insert(allData.end(), b,e);
-    for_each_impl<WLTy>(Galois::Runtime::makeStandardRange(allData.begin(), allData.end()),f,loopname);
+    for_each_impl<WLTy>(r,f,loopname);
     return;
   }
 
   //copy out all data
   std::deque<ItemTy> allData;
-  allData.insert(allData.end(), b,e);
+  allData.insert(allData.end(), r.begin(), r.end());
 
   std::string lname(loopname);
 
@@ -208,14 +160,14 @@ void for_each_dist(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
 }
 
 template<typename WLTy, typename T, typename FunctionTy>
-void for_each_local_dist(T& c, FunctionTy f, const char* loopname) {
+void for_each_dist(LocalRange<T>& r, FunctionTy f, const char* loopname) {
   // Get a handle to the network interface
   //  Don't move as NetworkInterface::Num and NetworkInterface::ID have to be initialized first
   NetworkInterface& net = getSystemNetworkInterface();
 
   //fast path for non-distributed
   if (NetworkInterface::Num == 1) {
-    for_each_impl<WLTy>(Galois::Runtime::makeLocalRange(c),f,loopname);
+    for_each_impl<WLTy>(r,f,loopname);
     return;
   }
 
@@ -224,21 +176,21 @@ void for_each_local_dist(T& c, FunctionTy f, const char* loopname) {
   for (unsigned i = 1; i < NetworkInterface::Num; i++) {
     SendBuffer buf;
     // serialize function and data
-    gSerialize(buf,f,c, lname);
+    gSerialize(buf,f,r,lname);
     //send data
     net.sendLoop (i, &for_each_local_landing_pad<WLTy,T,FunctionTy>, buf);
   }
   net.flush();
   net.handleReceives();
   //Start locally
-  for_each_impl<WLTy>(Galois::Runtime::makeLocalRange(c), f, loopname);
+  for_each_impl<WLTy>(r, f, loopname);
 
   // place a MPI barrier here for all the hosts to synchronize
   //  net.systemBarrier();
 }
 
 template<typename T, typename FunctionTy, typename ReducerTy>
-void do_all_impl_dist(T& c, FunctionTy f, ReducerTy r, bool needsReduce) {
+void do_all_impl_dist(LocalRange<T>& lr, FunctionTy f, ReducerTy r, bool needsReduce) {
   // Get a handle to the network interface
   NetworkInterface& net = getSystemNetworkInterface();
 
@@ -247,20 +199,92 @@ void do_all_impl_dist(T& c, FunctionTy f, ReducerTy r, bool needsReduce) {
 
   //fast path for non-distributed
   if (NetworkInterface::Num == 1) {
-    do_all_impl(Galois::Runtime::makeLocalRange(c),f,r,needsReduce);
+    do_all_impl(lr,f,r,needsReduce);
     return;
   }
 
   for (unsigned i = 1; i < NetworkInterface::Num; i++) {
     SendBuffer buf;
     // serialize function and data
-    gSerialize(buf,f,r,needsReduce,c);
+    gSerialize(buf,lr,f,r,needsReduce);
     //send data
-    net.sendLoop (i, &do_all_local_landing_pad<T,FunctionTy,ReducerTy>, buf);
+    net.sendLoop (i, &do_all_local_landing_pad<T,FunctionTy>, buf);
   }
   net.handleReceives();
   //Start locally
-  do_all_impl(Galois::Runtime::makeLocalRange(c),f,r,needsReduce);
+  do_all_impl(lr,f,r,needsReduce);
+
+  // place a MPI barrier here for all the hosts to synchronize
+  //  net.systemBarrier();
+}
+
+
+template<typename WLTy, typename IterTy, typename FunctionTy>
+void do_all_dist(StandardRange<IterTy> r, FunctionTy f, const char* loopname, bool steal) {
+  // Get a handle to the network interface
+  //  Don't move as NetworkInterface::Num and NetworkInterface::ID have to be initialized first
+  NetworkInterface& net = getSystemNetworkInterface();
+
+  typedef typename std::iterator_traits<IterTy>::value_type ItemTy;
+
+  //fast path for non-distributed
+  if (NetworkInterface::Num == 1) {
+    do_all_impl<WLTy>(r,f,loopname,steal);
+    return;
+  }
+
+  //copy out all data
+  std::deque<ItemTy> allData;
+  allData.insert(allData.end(), r.begin(), r.end());
+
+  std::string lname(loopname);
+
+  for (unsigned i = 1; i < NetworkInterface::Num; i++) {
+    auto blk = block_range(allData.begin(), allData.end(), i, NetworkInterface::Num);
+    std::deque<ItemTy> data(blk.first, blk.second);
+    SendBuffer buf;
+    // serialize function and data
+    gSerialize(buf,f,data, lname, steal);
+    //send data
+    net.sendLoop (i, &do_all_landing_pad<ItemTy,FunctionTy>, buf);
+  }
+  net.flush();
+  net.handleReceives();
+  //now get our data
+  auto myblk = block_range(allData.begin(), allData.end(), 0, NetworkInterface::Num);
+
+  //Start locally
+  do_all_impl(Galois::Runtime::makeStandardRange(myblk.first, myblk.second), f, loopname);
+
+  // place a MPI barrier here for all the hosts to synchronize
+  // net.systemBarrier();
+}
+
+template<typename WLTy, typename T, typename FunctionTy>
+void do_all_dist(LocalRange<T>& r, FunctionTy f, const char* loopname, bool steal) {
+  // Get a handle to the network interface
+  //  Don't move as NetworkInterface::Num and NetworkInterface::ID have to be initialized first
+  NetworkInterface& net = getSystemNetworkInterface();
+
+  //fast path for non-distributed
+  if (NetworkInterface::Num == 1) {
+    do_all_impl<WLTy>(r,f,loopname, steal);
+    return;
+  }
+
+  std::string lname(loopname);
+
+  for (unsigned i = 1; i < NetworkInterface::Num; i++) {
+    SendBuffer buf;
+    // serialize function and data
+    gSerialize(buf,f,r,lname,steal);
+    //send data
+    net.sendLoop (i, &do_all_local_landing_pad<T,FunctionTy>, buf);
+  }
+  net.flush();
+  net.handleReceives();
+  //Start locally
+  do_all_impl(r, f, loopname, steal);
 
   // place a MPI barrier here for all the hosts to synchronize
   //  net.systemBarrier();

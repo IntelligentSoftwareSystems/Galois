@@ -59,7 +59,7 @@ void relax_edge(unsigned src_data, Graph::edge_iterator ii,
 struct SSSP {
   void operator()(UpdateRequest& req, Galois::UserContext<UpdateRequest>& ctx) const {
     unsigned& data = graph.getData(req.second);
-    if (req.first > data) return;
+    if (req.first >= data) return;
     
     for (Graph::edge_iterator ii = graph.edge_begin(req.second),
            ee = graph.edge_end(req.second); ii != ee; ++ii)
@@ -84,7 +84,7 @@ int main(int argc, char **argv) {
   LonestarStart(argc, argv, 0,0,0);
 
   Galois::Graph::readGraph(graph, filename);
-  Galois::for_each<>(graph.begin(), graph.end(), Init());
+  Galois::for_each(graph.begin(), graph.end(), Init());
 
   using namespace Galois::WorkList;
   typedef dChunkedLIFO<16> dChunk;
@@ -93,7 +93,7 @@ int main(int argc, char **argv) {
   Galois::StatTimer T;
   T.start();
   graph.getData(*graph.begin()) = 0;
-  Galois::for_each<OBIM>(std::make_pair(0U, *graph.begin()), SSSP());
+  Galois::for_each(std::make_pair(0U, *graph.begin()), SSSP(), Galois::wl<OBIM>());
   T.stop();
   return 0;
 }

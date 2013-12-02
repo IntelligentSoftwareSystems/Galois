@@ -403,8 +403,9 @@ protected:
 
       typedef Galois::WorkList::dChunkedFIFO<CHUNK_SIZE> WL_ty;
 
-      Galois::for_each<WL_ty> (initWL.begin (), initWL.end (), 
-          OpFuncSet (graph, sobjInfoVec, newEvents,  nevents));
+      Galois::for_each(initWL.begin (), initWL.end (), 
+                       OpFuncSet (graph, sobjInfoVec, newEvents,  nevents),
+                       Galois::wl<WL_ty>());
 
       initWL.clear ();
 

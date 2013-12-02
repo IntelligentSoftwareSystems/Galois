@@ -40,7 +40,7 @@ class PerBackend_v2 {
 		     boost::hash<std::pair<uint64_t, uint32_t>>> remoteCache;
 
   uint32_t nextID;
-  LL::SimpleLock<true> lock;
+  LL::SimpleLock lock;
 
   void* releaseAt_i(uint64_t);
   void* resolve_i(uint64_t);
@@ -161,7 +161,7 @@ class PerBackend_v3 {
   std::vector<bool> freelist;
   std::vector<void**> heads;
   std::map<std::tuple<uint64_t, uint32_t, uint32_t>, void*> remoteCache;
-  LL::SimpleLock<true> lock;
+  LL::SimpleLock lock;
 
   void* resolveRemote_i(uint64_t, uint32_t, uint32_t);
   void addRemote(void* ptr, uint32_t srcID, uint64_t off, uint32_t threadID);

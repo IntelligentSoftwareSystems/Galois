@@ -28,7 +28,7 @@ struct op {
 
   template<typename Context>
   void operator()(unsigned x, Context& cnx) const {
-    static Galois::Runtime::LL::SimpleLock<true> L;
+    static Galois::Runtime::LL::SimpleLock L;
     unsigned r;
     if (!check(x, Gr, r)) {
       L.lock();

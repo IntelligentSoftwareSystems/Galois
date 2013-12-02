@@ -23,6 +23,7 @@
 #ifndef GALOIS_GALOIS_H
 #define GALOIS_GALOIS_H
 
+#include "Galois/config.h"
 #include "Galois/WorkList/WorkList.h"
 #include "Galois/UserContext.h"
 #include "Galois/Threads.h"
@@ -37,6 +38,10 @@
 #include "Galois/Runtime/ParaMeter.h"
 #endif
 
+#include GALOIS_CXX11_STD_HEADER(utility)
+#include GALOIS_CXX11_STD_HEADER(type_traits)
+#include GALOIS_CXX11_STD_HEADER(tuple)
+
 /**
  * Main Galois namespace. All the core Galois functionality will be found in here.
  */
@@ -47,11 +52,89 @@ namespace Galois {
  * Call before any other galois function
  * This may modify argc and argv inline
  **/
-void init(int& argc char**& argv);
+void init(int& argc, char**& argv);
+
+/**
+ * Specify name to appear in statistics. Optional argument to {@link do_all()}
+ * and {@link for_each()} loops.
+ */
+struct loopname {
+  const char* n;
+  loopname(const char* n = 0) :n(n) {}
+};
+
+/**
+ * Specify whether @{link do_all()} loops should perform work-stealing. Optional
+ * argument to {@link do_all()} loops.
+ */
+struct do_all_steal {
+  bool b;
+  do_all_steal(bool b = false) :b(b) {}
+};
+
+struct wl_tag {};
+
+/**
+ * Specify worklist to use. Optional argument to {@link for_each()} loops.
+ */
+template<typename WLTy>
+struct wl : public wl_tag {
+  typedef WLTy WL;
+};
 
 
+namespace HIDDEN {
 
 static constexpr unsigned GALOIS_DEFAULT_CHUNK_SIZE = 32;
+typedef WorkList::dChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> defaultWL;
+
+template <typename T, typename S, int i = std::tuple_size<T>::value - 1>
+struct tuple_index {
+  enum {
+    value = std::is_base_of<S, typename std::tuple_element<i, T>::type>::value 
+    || std::is_same<S, typename std::tuple_element<i, T>::type>::value
+    ? i : tuple_index<T, S, i-1>::value
+  };
+};
+
+template <typename T, typename S>
+struct tuple_index<T, S, -1> {
+  enum { value = -1 };
+};
+
+template<typename RangeTy, typename FunctionTy, typename Tuple>
+void for_each_gen(RangeTy r, FunctionTy fn, Tuple tpl) {
+  typedef Tuple tupleType;
+  static_assert(-1 == tuple_index<tupleType, char*>::value, "old loopname");
+  static_assert(-1 == tuple_index<tupleType, char const*>::value, "old loopname");
+  static_assert(-1 == tuple_index<tupleType, bool>::value, "old steal");
+  // std::cout << tuple_index<tupleType, char*>::value << " "
+  //           << tuple_index<tupleType, char const*>::value << "\n";
+  constexpr unsigned iloopname = tuple_index<tupleType, loopname>::value;
+  constexpr unsigned iwl = tuple_index<tupleType, wl_tag>::value;
+  const char* ln = std::get<iloopname>(tpl).n;
+  typedef typename std::tuple_element<iwl,tupleType>::type::WL WLTy;
+//  Runtime::for_each_impl<WLTy>(r, fn, ln);
+  Runtime::for_each_dist<WLTy>(r, fn, ln);
+}
+
+template<typename RangeTy, typename FunctionTy, typename Tuple>
+FunctionTy do_all_gen(RangeTy r, FunctionTy fn, Tuple tpl) {
+  typedef Tuple tupleType;
+  static_assert(-1 == tuple_index<tupleType, char*>::value, "old loopname");
+  static_assert(-1 == tuple_index<tupleType, char const*>::value, "old loopname");
+  static_assert(-1 == tuple_index<tupleType, bool>::value, "old steal");
+  // std::cout << tuple_index<tupleType, char*>::value << " "
+  //           << tuple_index<tupleType, char const*>::value << "\n";
+  constexpr unsigned iloopname = tuple_index<tupleType, loopname>::value;
+  constexpr unsigned isteal = tuple_index<tupleType, do_all_steal>::value;
+  const char* ln = std::get<iloopname>(tpl).n;
+  bool steal = std::get<isteal>(tpl).b;
+  return Runtime::do_all_dist(r, fn, ln, steal);
+  //return Runtime::do_all_impl(r, fn, ln, steal);
+}
+
+} // namespace HIDDEN
 
 ////////////////////////////////////////////////////////////////////////////////
 // Foreach
@@ -66,46 +149,11 @@ static constexpr unsigned GALOIS_DEFAULT_CHUNK_SIZE = 32;
  * @param b begining of range of initial items
  * @param e end of range of initial items
  * @param fn operator
- * @param loopname string to identity loop in statistics output
+ * @param args optional arguments to loop, e.g., {@see loopname}, {@see wl}
  */
-#if GALOIS_USE_EXP
-template<typename WLTy, typename IterTy, typename FunctionTy>
-void for_each(IterTy b, IterTy e, FunctionTy fn, const char* loopname = "(NULL)",
-    typename std::enable_if<
-      Runtime::is_serializable<FunctionTy>::value
-      && Runtime::is_serializable<typename std::iterator_traits<IterTy>::value_type>::value
-      >::type* = 0) {
-  Runtime::for_each_dist<WLTy>(b, e, fn, loopname);
-}
-template<typename WLTy, typename IterTy, typename FunctionTy>
-void for_each(IterTy b, IterTy e, FunctionTy fn, const char* loopname = "(NULL)", 
-    typename std::enable_if<
-      !Runtime::is_serializable<FunctionTy>::value
-      || !Runtime::is_serializable<typename std::iterator_traits<IterTy>::value_type>::value
-      >::type* = 0) {
-  Runtime::for_each_impl<WLTy>(Runtime::makeStandardRange(b, e), fn, loopname);
-}
-#else
-template<typename WLTy, typename IterTy, typename FunctionTy>
-void for_each(IterTy b, IterTy e, FunctionTy fn, const char* loopname = "(NULL)") {
-  Runtime::for_each_impl<WLTy>(Runtime::makeStandardRange(b, e), fn, loopname);
-}
-#endif
-
-/**
- * Galois unordered set iterator with default worklist policy.
- * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item is a value from the iteration
- * range and T is the type of item.
- *
- * @param b begining of range of initial items
- * @param e end of range of initial items
- * @param fn operator
- * @param loopname string to identity loop in statistics output
- */
-template<typename IterTy, typename FunctionTy>
-void for_each(IterTy b, IterTy e, FunctionTy fn, const char* loopname = 0) {
-  typedef WorkList::dChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> WLTy;
-  for_each<WLTy, IterTy, FunctionTy>(b, e, fn, loopname);
+template<typename IterTy, typename FunctionTy, typename... Args>
+void for_each(IterTy b, IterTy e, FunctionTy fn, Args... args) {
+  HIDDEN::for_each_gen(Runtime::makeStandardRange(b,e), fn, std::make_tuple(loopname(), wl<HIDDEN::defaultWL>(), args...));
 }
 
 /**
@@ -116,27 +164,12 @@ void for_each(IterTy b, IterTy e, FunctionTy fn, const char* loopname = 0) {
  * @tparam WLTy Worklist policy {@link Galois::WorkList}
  * @param i initial item
  * @param fn operator
- * @param loopname string to identity loop in statistics output
+ * @param args optional arguments to loop
  */
-template<typename WLTy, typename InitItemTy, typename FunctionTy>
-void for_each(InitItemTy i, FunctionTy fn, const char* loopname = 0) {
-  InitItemTy wl[1] = {i};
-  for_each<WLTy>(&wl[0], &wl[1], fn, loopname);
-}
-
-/**
- * Galois unordered set iterator with default worklist policy.
- * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item is i and T 
- * is the type of item.
- *
- * @param i initial item
- * @param fn operator
- * @param loopname string to identity loop in statistics output
- */
-template<typename InitItemTy, typename FunctionTy>
-void for_each(InitItemTy i, FunctionTy fn, const char* loopname = 0) {
-  typedef WorkList::dChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> WLTy;
-  for_each<WLTy, InitItemTy, FunctionTy>(i, fn, loopname);
+template<typename ItemTy, typename FunctionTy, typename... Args>
+void for_each(ItemTy i, FunctionTy fn, Args... args) {
+  ItemTy iwl[1] = {i};
+  HIDDEN::for_each_gen(Runtime::makeStandardRange(&iwl[0], &iwl[1]), fn, std::make_tuple(loopname(), wl<HIDDEN::defaultWL>(), args...));
 }
 
 /**
@@ -147,41 +180,11 @@ void for_each(InitItemTy i, FunctionTy fn, const char* loopname = 0) {
  * @tparam WLTy Worklist policy {@link Galois::WorkList}
  * @param c locality-aware container
  * @param fn operator
- * @param loopname string to identity loop in statistics output
+ * @param args optional arguments to loop
  */
-#if GALOIS_USE_EXP
-template<typename WLTy, typename ConTy, typename FunctionTy>
-void for_each_local(ConTy c, FunctionTy fn, const char* loopname = 0,
-    typename std::enable_if<Runtime::is_serializable<FunctionTy>::value>::type* = 0) {
-  Runtime::for_each_local_dist<WLTy>(c, fn, loopname);
-}
-
-template<typename WLTy, typename ConTy, typename FunctionTy>
-void for_each_local(ConTy c, FunctionTy fn, const char* loopname = "(NULL)",
-    typename std::enable_if<!Runtime::is_serializable<FunctionTy>::value>::type* = 0) {
-  assert(Galois::Runtime::NetworkInterface::Num == 1);
-  Runtime::for_each_impl<WLTy>(Runtime::makeLocalRange(c), fn, loopname);
-}
-#else
-template<typename WLTy, typename ConTy, typename FunctionTy>
-void for_each_local(ConTy c, FunctionTy fn, const char* loopname = 0) {
-  Runtime::for_each_impl<WLTy>(Runtime::makeLocalRange(c), fn, loopname);
-}
-#endif
-
-/**
- * Galois unordered set iterator with locality-aware container and default worklist policy.
- * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item is an element of c and T 
- * is the type of item.
- *
- * @param c locality-aware container
- * @param fn operator
- * @param loopname string to identity loop in statistics output
- */
-template<typename ConTy, typename FunctionTy>
-void for_each_local(ConTy& c, FunctionTy fn, const char* loopname = 0) {
-  typedef WorkList::dChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> WLTy;
-  for_each_local<WLTy, ConTy, FunctionTy>(c, fn, loopname);
+template<typename ConTy, typename FunctionTy, typename... Args>
+void for_each_local(ConTy& c, FunctionTy fn, Args... args) {
+  HIDDEN::for_each_gen(Runtime::makeLocalRange(c), fn, std::make_tuple(loopname(), wl<HIDDEN::defaultWL>(), args...));
 }
 
 /**
@@ -191,12 +194,12 @@ void for_each_local(ConTy& c, FunctionTy fn, const char* loopname = 0) {
  * @param b beginning of range of items
  * @param e end of range of items
  * @param fn operator
- * @param loopname string to identify loop in statistics output
+ * @param args optional arguments to loop
  * @returns fn
  */
-template<typename IterTy,typename FunctionTy>
-FunctionTy do_all(const IterTy& b, const IterTy& e, FunctionTy fn, const char* loopname = 0) {
-  return Runtime::do_all_impl(Runtime::makeStandardRange(b, e), fn, loopname);
+template<typename IterTy,typename FunctionTy, typename... Args>
+FunctionTy do_all(const IterTy& b, const IterTy& e, FunctionTy fn, Args... args) {
+  return HIDDEN::do_all_gen(Runtime::makeStandardRange(b, e), fn, std::make_tuple(loopname(), do_all_steal(), args...));
 }
 
 /**
@@ -205,12 +208,12 @@ FunctionTy do_all(const IterTy& b, const IterTy& e, FunctionTy fn, const char* l
  *
  * @param c locality-aware container
  * @param fn operator
- * @param loopname string to identify loop in statistics output
+ * @param args optional arguments to loop
  * @returns fn
  */
-template<typename ConTy,typename FunctionTy>
-FunctionTy do_all_local(ConTy& c, FunctionTy fn, const char* loopname = 0, bool steel = false) {
-  return Runtime::do_all_impl(Runtime::makeLocalRange(c), fn, loopname, steel);
+template<typename ConTy,typename FunctionTy, typename... Args>
+FunctionTy do_all_local(ConTy& c, FunctionTy fn, Args... args) {
+  return HIDDEN::do_all_gen(Runtime::makeLocalRange(c), fn, std::make_tuple(loopname(), do_all_steal(), args...));
 }
 
 /**
@@ -221,23 +224,10 @@ FunctionTy do_all_local(ConTy& c, FunctionTy fn, const char* loopname = 0, bool 
  * @param fn operator
  * @param loopname string to identify loop in statistics output
  */
-#if GALOIS_USE_EXP
 template<typename FunctionTy>
-static inline void on_each(FunctionTy fn, const char* loopname = 0,
-    typename std::enable_if<Runtime::is_serializable<FunctionTy>::value>::type* = 0) {
+static inline void on_each(FunctionTy fn, const char* loopname = 0) {
   Runtime::on_each_impl_dist(fn, loopname);
 }
-template<typename FunctionTy>
-static inline void on_each(FunctionTy fn, const char* loopname = 0,
-    typename std::enable_if<!Runtime::is_serializable<FunctionTy>::value>::type* = 0) {
-  Runtime::on_each_impl(fn, loopname);
-}
-#else
-template<typename FunctionTy>
-static inline void on_each(FunctionTy fn, const char* loopname = "(NULL)") {
-  Runtime::on_each_impl(fn, loopname);
-}
-#endif
 
 /**
  * Preallocates pages on each thread.
@@ -245,11 +235,7 @@ static inline void on_each(FunctionTy fn, const char* loopname = "(NULL)") {
  * @param num number of pages to allocate of size {@link Galois::Runtime::MM::pageSize}
  */
 static inline void preAlloc(int num) {
-#if GALOIS_USE_EXP
   Runtime::preAlloc_impl_dist(num);
-#else
-  Runtime::preAlloc_impl(num);
-#endif
 }
 
 /**
@@ -278,7 +264,7 @@ static inline void reportPageAlloc(const char* label) {
  * @param loopname string to identity loop in statistics output
  */
 template<typename Iter, typename Cmp, typename NhFunc, typename OpFunc>
-void for_each_ordered(Iter b, Iter e, Cmp cmp, NhFunc nhFunc, OpFunc fn, const char* loopname=0) {
+void for_each_ordered(Iter b, Iter e, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& fn, const char* loopname=0) {
   Runtime::for_each_ordered_impl(b, e, cmp, nhFunc, fn, loopname);
 }
 
@@ -301,7 +287,7 @@ void for_each_ordered(Iter b, Iter e, Cmp cmp, NhFunc nhFunc, OpFunc fn, const c
  * @param loopname string to identity loop in statistics output
  */
 template<typename Iter, typename Cmp, typename NhFunc, typename OpFunc, typename StableTest>
-void for_each_ordered(Iter b, Iter e, Cmp cmp, NhFunc nhFunc, OpFunc fn, StableTest stabilityTest, const char* loopname=0) {
+void for_each_ordered(Iter b, Iter e, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& fn, const StableTest& stabilityTest, const char* loopname=0) {
   Runtime::for_each_ordered_impl(b, e, cmp, nhFunc, fn, stabilityTest, loopname);
 }
 

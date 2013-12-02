@@ -272,7 +272,7 @@ private:
     res.source = source;
 
     graph.getData(source).dist = 0;
-    Galois::for_each<dChunk>(source, UnorderedProcess());
+    Galois::for_each(source, UnorderedProcess(), Galois::wl<dChunk>());
 
     res.counts = Galois::Runtime::do_all_impl(Galois::Runtime::makeLocalRange(graph),
         CountLevels(reset), default_reduce()).counts;
@@ -1035,7 +1035,7 @@ struct Sloan {
       typedef OrderedByIntegerMetric<GNodeIndexer,dChunk> OBIM;
 
       graph.getData(source).dist = 0;
-      Galois::for_each<OBIM>(source, bfsFn(), "BFS");
+      Galois::for_each(source, bfsFn(), Galois::loopname("BFS"), Galois::wl<OBIM>());
     }
   };
   
@@ -1133,7 +1133,7 @@ struct Sloan {
 
       graph.getData(source).status = PREACTIVE;
 
-      Galois::for_each<OBIM>(UpdateRequest(source, graph.getData(source).prio), sloanFn(), "Sloan");
+      Galois::for_each(UpdateRequest(source, graph.getData(source).prio), sloanFn(), Galois::loopname("Sloan"), Galois::wl<OBIM>());
     }
   };
 

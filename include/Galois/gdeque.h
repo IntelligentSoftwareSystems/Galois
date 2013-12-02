@@ -23,9 +23,14 @@
 #ifndef GALOIS_GDEQUE_H
 #define GALOIS_GDEQUE_H
 
-#include "Galois/Runtime/mm/Mem.h"
+#include "Galois/config.h"
 #include "Galois/FixedSizeRing.h"
+#include "Galois/Runtime/mm/Mem.h"
+
 #include <boost/iterator/iterator_facade.hpp>
+
+#include GALOIS_CXX11_STD_HEADER(algorithm)
+#include GALOIS_CXX11_STD_HEADER(utility)
 
 namespace Galois {
 
@@ -37,29 +42,6 @@ protected:
     Block* next;
     Block* prev;
     Block(): next(), prev() {}
-  };
-
-  template<typename U>
-  class Iterator: public boost::iterator_facade<Iterator<U>, U, boost::forward_traversal_tag> {
-    friend class boost::iterator_core_access;
-
-    Block* b;
-    unsigned offset;
-
-    void increment() {
-      if (!b) return;
-      ++offset;
-      if (offset == b->size()) {
-	b = b->next;
-	offset = 0;
-      }
-    }
-
-    bool equal(const Iterator& o) const { return b == o.b && offset == o.offset; }
-    U& dereference() const { return b->getAt(offset); }
-
-  public:
-    Iterator(Block* _b = 0, unsigned _off = 0) :b(_b), offset(_off) { }
   };
 
   Block* first;
@@ -125,6 +107,35 @@ private:
   }
 
 public:
+  template<typename U>
+  struct Iterator: public boost::iterator_facade<Iterator<U>, U, boost::forward_traversal_tag> {
+    friend class boost::iterator_core_access;
+
+    Block* b;
+    unsigned offset;
+
+  private:
+    void increment() {
+      if (!b) return;
+      ++offset;
+      if (offset == b->size()) {
+	b = b->next;
+	offset = 0;
+      }
+    }
+
+    template<typename OtherTy>
+    bool equal(const Iterator<OtherTy>& o) const { return b == o.b && offset == o.offset; }
+
+    U& dereference() const { return b->getAt(offset); }
+
+  public:
+    Iterator(Block* _b = 0, unsigned _off = 0) :b(_b), offset(_off) { }
+    
+    template<typename OtherTy>
+    Iterator(const Iterator<OtherTy>& o): b(o.b), offset(o.offset) { }
+  };
+
   typedef T value_type;
   typedef T* pointer;
   typedef T& reference;
@@ -201,6 +212,19 @@ public:
     num = 0;
   }
 
+  //FIXME: support alternate insert locations
+  iterator insert(iterator position, size_t n, const value_type& val) {
+    assert(position == end());
+    if (!n)
+      return end();
+
+    push_back(val);
+    iterator retval = iterator(last, last->size()-1);
+    for (size_t x = 1; x < n; ++x)
+      push_back(val);
+    return retval;
+  }
+
   template<typename... Args>
   void emplace_back(Args&&... args) {
     assert(precondition());
@@ -241,5 +265,4 @@ public:
 };
 
 }
-
 #endif

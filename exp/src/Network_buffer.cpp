@@ -39,13 +39,13 @@ class NetworkInterfaceBuffer : public NetworkInterface {
   };
 
   struct state_in {
-    LL::SimpleLock<true> lock;
+    LL::SimpleLock lock;
     NetworkBackend::BlockList cur;
     unsigned offset;
     state_in() :offset(0) {}
   };
   struct state_out {
-    LL::SimpleLock<true> lock;
+    LL::SimpleLock lock;
     NetworkBackend::BlockList cur;
   };
   struct state {
@@ -55,7 +55,7 @@ class NetworkInterfaceBuffer : public NetworkInterface {
 
   std::vector<state> states;
   //! preserves recieve ordering from the network and ensures serialized access
-  LL::SimpleLock<true> orderingLock;
+  LL::SimpleLock orderingLock;
 
   void writeBuffer(state_out& s, char* data, unsigned len) {
     if (s.cur.empty())
@@ -75,7 +75,7 @@ class NetworkInterfaceBuffer : public NetworkInterface {
   }
 
   void sendInternal(state_out& s, unsigned dest, recvFuncTy recv, SendBuffer& buf) {
-    std::lock_guard<LL::SimpleLock<true>> lg(s.lock);
+    std::lock_guard<LL::SimpleLock> lg(s.lock);
     header h = {(uint32_t)buf.size(), (uintptr_t)recv};
     writeBuffer(s, (char*)&h, sizeof(header));
     writeBuffer(s, (char*)buf.linearData(), buf.size());
@@ -124,7 +124,7 @@ class NetworkInterfaceBuffer : public NetworkInterface {
 
   void recvInternal(state_in& s) {
     if (s.lock.try_lock()) {
-      std::lock_guard<LL::SimpleLock<true>> lg(s.lock, std::adopt_lock);
+      std::lock_guard<LL::SimpleLock> lg(s.lock, std::adopt_lock);
       header h;
       if (readLen(s) < sizeof(header)) return;
       readBuffer(s, 0, (char*)&h, sizeof(header));
@@ -152,12 +152,12 @@ public:
 
   virtual bool handleReceives() {
     if (orderingLock.try_lock()) {
-      std::lock_guard<LL::SimpleLock<true>> lg(orderingLock, std::adopt_lock);
+      std::lock_guard<LL::SimpleLock> lg(orderingLock, std::adopt_lock);
       //empty network
       NetworkBackend::SendBlock* b = nullptr;
       while ((b = net.recv())) {
         //append
-        std::lock_guard<LL::SimpleLock<true>> lg(states[b->dest].in.lock);
+        std::lock_guard<LL::SimpleLock> lg(states[b->dest].in.lock);
         states[b->dest].in.cur.push_back(*b);
       }
     }
@@ -173,7 +173,7 @@ public:
   virtual void flush() {
     for (int i = 0; i < states.size(); ++i) {
       state_out& s = states[i].out;
-      std::lock_guard<LL::SimpleLock<true>> lg(s.lock);
+      std::lock_guard<LL::SimpleLock> lg(s.lock);
       if (!s.cur.empty() && s.cur.front().size) {
         auto* pkt = &s.cur.front();
         s.cur.pop_front();

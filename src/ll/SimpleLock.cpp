@@ -28,77 +28,14 @@
 */
 
 #include "Galois/Runtime/ll/SimpleLock.h"
-#include "Galois/Runtime/ll/PaddedLock.h"
 
-void Galois::Runtime::LL::LockPairOrdered(SimpleLock<true>& L1, SimpleLock<true>& L2) {
-  assert(&L1 != &L2);
-  if (&L1 < &L2) {
-    L1.lock();
-    L2.lock();
-  } else {
-    L2.lock();
-    L1.lock();
-  }   
-}
-
-bool Galois::Runtime::LL::TryLockPairOrdered(SimpleLock<true>& L1, SimpleLock<true>& L2) {
-  assert(&L1 != &L2);
-  bool T1, T2;
-  if (&L1 < &L2) {
-    T1 = L1.try_lock();
-    T2 = L2.try_lock();
-  } else {
-    T2 = L2.try_lock();
-    T1 = L1.try_lock();
-  }
-  if (T1 && T2)
-    return true;
-  if (T1)
-    L1.unlock();
-  if (T2)
-    L2.unlock();
-  return false;
-}
-
-void Galois::Runtime::LL::UnLockPairOrdered(SimpleLock<true>& L1, SimpleLock<true>& L2) {
-  assert(&L1 != &L2);
-  if (&L1 < &L2) {
-    L1.unlock();
-    L2.unlock();
-  } else {
-    L2.unlock();
-    L1.unlock();
-  }   
-}
-
-void Galois::Runtime::LL::LockPairOrdered(SimpleLock<false>& L1, SimpleLock<false>& L2) {
-}
-
-bool Galois::Runtime::LL::TryLockPairOrdered(SimpleLock<false>& L1, SimpleLock<false>& L2) {
-  return true;
-}
-
-void Galois::Runtime::LL::UnLockPairOrdered(SimpleLock<false>& L1, SimpleLock<false>& L2) {
-}
-
-void Galois::Runtime::LL::LockPairOrdered(PaddedLock<true>& L1, PaddedLock<true>& L2) {
-  LockPairOrdered(L1.Lock.data, L2.Lock.data);
-}
-
-bool Galois::Runtime::LL::TryLockPairOrdered(PaddedLock<true>& L1, PaddedLock<true>& L2) {
-  return TryLockPairOrdered(L1.Lock.data, L2.Lock.data);
-}
-
-void Galois::Runtime::LL::UnLockPairOrdered(PaddedLock<true>& L1, PaddedLock<true>& L2) {
-  UnLockPairOrdered(L1.Lock.data, L2.Lock.data);
-}
-
-void Galois::Runtime::LL::LockPairOrdered(PaddedLock<false>& L1, PaddedLock<false>& L2) {
-}
-
-bool Galois::Runtime::LL::TryLockPairOrdered(PaddedLock<false>& L1, PaddedLock<false>& L2) {
-  return true;
-}
-
-void Galois::Runtime::LL::UnLockPairOrdered(PaddedLock<false>& L1, PaddedLock<false>& L2) {
+void Galois::Runtime::LL::SimpleLock::slow_lock() const {
+  int oldval = 0;
+  do {
+    while (_lock.load(std::memory_order_acquire) != 0) {
+      asmPause();
+    }
+    oldval = 0;
+  } while (!_lock.compare_exchange_weak(oldval, 1, std::memory_order_acq_rel, std::memory_order_relaxed));
+  assert(is_locked());
 }

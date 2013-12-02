@@ -106,7 +106,7 @@ private:
   char* nextTokPtr;
 
   /** ptr to current token, returned on  a call to nextToken () */
-  char* currTokPtr;
+  //char* currTokPtr;
 
 private:
 
@@ -171,7 +171,7 @@ public:
    * @param comments: a string that contains beginning of a comment
    */
   NetlistTokenizer (const char* fileName, const char* delim, const char* comments)
-    : ifs(fileName), delim (delim), comments(comments), linePtr (NULL), currTokPtr (NULL)  {
+    : ifs(fileName), delim (delim), comments(comments), linePtr (NULL)  {
 
     if (!ifs.good ()) {
       std::cerr << "Failed to open this file for reading: " << fileName << std::endl; 

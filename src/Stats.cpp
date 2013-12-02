@@ -47,7 +47,7 @@ class StatCollector {
   uint32_t maxTID;
   uint32_t maxHost;
 
-  SimpleLock<true> StatLock;
+  SimpleLock StatLock;
 
   KeyTy mkKey(const std::string& loop, const std::string& category) {
     return std::make_pair(loop,category);
@@ -66,14 +66,14 @@ public:
   StatCollector() :maxTID(0), maxHost(0) {}
 
   void addToStat(const std::string& loop, const std::string& category, uint32_t host, uint32_t tid, size_t value) {
-    std::lock_guard<SimpleLock<true>> lock(StatLock);
+    std::lock_guard<SimpleLock> lock(StatLock);
     Stats[mkKey(loop, category)][host][tid] += value;
     if (maxHost < host) maxHost = host;
     if (maxTID < tid) maxTID = tid;
   }
 
   void printStats() {
-    std::lock_guard<SimpleLock<true>> lock(StatLock);
+    std::lock_guard<SimpleLock> lock(StatLock);
     //print header
     gPrint("STATTYPE,LOOP,CATEGORY,n,sum");
     for (unsigned x = 0; x <= maxHost; ++x)

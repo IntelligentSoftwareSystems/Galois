@@ -23,6 +23,7 @@
 #ifndef GALOIS_STATISTIC_H
 #define GALOIS_STATISTIC_H
 
+#include "Galois/config.h"
 #include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/Sampling.h"
@@ -30,10 +31,13 @@
 
 #include "boost/utility.hpp"
 
-#include <list>
+#include GALOIS_CXX11_STD_HEADER(deque)
 
 namespace Galois {
 
+/**
+ * Basic per-thread statistics counter.
+ */
 class Statistic {
   std::string statname;
   std::string loopname;
@@ -41,7 +45,7 @@ class Statistic {
   bool valid;
 
 public:
-  Statistic(const std::string& _sn, const std::string& _ln = "(NULL)"): statname(_sn), loopname(_ln), valid(true) { }
+  Statistic(const std::string& _sn, std::string _ln = "(NULL)"): statname(_sn), loopname(_ln), valid(true) { }
 
   ~Statistic() {
     report();
@@ -72,13 +76,16 @@ public:
   }
 };
 
-//! Controls lifetime of stats. Users usually instantiate an instance in main.
+/**
+ * Controls lifetime of stats. Users usually instantiate in main to print out
+ * statistics at program exit.
+ */
 class StatManager: private boost::noncopyable {
-  std::list<Statistic*> stats;
+  std::deque<Statistic*> stats;
 
 public:
   ~StatManager() {
-    for (std::list<Statistic*>::iterator ii = stats.begin(), ei = stats.end(); ii != ei; ++ii) {
+    for (std::deque<Statistic*>::iterator ii = stats.begin(), ei = stats.end(); ii != ei; ++ii) {
       (*ii)->report();
     }
     Galois::Runtime::printStats();
@@ -90,29 +97,57 @@ public:
   }
 };
 
+//! Flag type for {@link StatTimer}
+struct start_now_t {};
+#if defined(__IBMCPP__) && __IBMCPP__ <= 1210
+static const start_now_t start_now = start_now_t();
+#else
+constexpr start_now_t start_now = start_now_t();
+#endif
+
 //! Provides statistic interface around timer
 class StatTimer : public TimeAccumulator {
   const char* name;
   const char* loopname;
   bool main;
+  bool valid;
+
+protected:
+  void init(const char* n, const char* l, bool m, bool s) {
+    name = n;
+    loopname = l;
+    main = m;
+    valid = false;
+    if (s)
+      start();
+  }
 
 public:
-  StatTimer(): name("Time"), loopname(0), main(true) { }
-  StatTimer(const char* n, const char* l = 0): name(n), loopname(l), main(false) { }
+  StatTimer(const char* n) { init(n, 0, false, false); }
+  StatTimer(const char* n, start_now_t t) { init(n, 0, false, true); }
+
+  StatTimer(const char* n, const char* l) { init(n, l, false, false); }
+  StatTimer(const char* n, const char* l, start_now_t t) { init(n, l, false, true); }
+
+  StatTimer() { init("Time", 0, true, false); }
+  StatTimer(start_now_t t) { init("Time", 0, true, true); }
 
   ~StatTimer() {
-    Galois::Runtime::reportStat(loopname, name, get());
-    if (main)
-      Galois::Runtime::reportSampling(loopname);
+    if (valid)
+      stop();
+    if (TimeAccumulator::get()) // only report non-zero stat
+      Galois::Runtime::reportStat(loopname, name, get());
   }
 
   void start() {
     if (main)
       Galois::Runtime::beginSampling();
     TimeAccumulator::start();
+    valid = true;
   }
 
   void stop() {
+    valid = false;
     TimeAccumulator::stop();
     if (main)
       Galois::Runtime::endSampling();
@@ -120,5 +155,4 @@ public:
 };
 
 }
-
 #endif

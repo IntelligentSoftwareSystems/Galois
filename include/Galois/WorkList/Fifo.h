@@ -23,9 +23,12 @@
 #ifndef GALOIS_WORKLIST_FIFO_H
 #define GALOIS_WORKLIST_FIFO_H
 
+#include "Galois/config.h"
 #include "Galois/Runtime/ll/PaddedLock.h"
 #include "WLCompileCheck.h"
+
 #include <deque>
+#include GALOIS_CXX11_STD_HEADER(mutex)
 
 namespace Galois {
 namespace WorkList {
@@ -34,10 +37,10 @@ namespace WorkList {
 template<typename T = int, bool Concurrent = true>
 struct FIFO : private boost::noncopyable, private Runtime::LL::PaddedLock<Concurrent>  {
   template<bool _concurrent>
-  using rethread = FIFO<T, _concurrent>;
+  struct rethread { typedef FIFO<T, _concurrent> type; };
 
   template<typename _T>
-  using retype = FIFO<_T, Concurrent>;
+  struct retype { typedef FIFO<_T, Concurrent> type; };
 
 private:
   std::deque<T> wl;
@@ -69,16 +72,17 @@ public:
   }
 
   void steal(FIFO& victim) {
-    if (!Runtime::LL::TryLockPairOrdered(*this, victim))
+    if (-1 != std::try_lock(*this, victim))
       return;
     typename std::deque<T>::iterator split = split_range(victim.wl.begin(), wl.victim.end());
     wl.insert(wl.end(), victim.wl.begin(), split);
     victim.wl.erase(victim.wl.begin(), split);
-    UnLockPairOrdered(*this, victim);
+    this->unlock();
+    victim.unlock();
   }
 
-  boost::optional<value_type> pop() {
-    boost::optional<value_type> retval;
+  Galois::optional<value_type> pop() {
+    Galois::optional<value_type> retval;
     lock();
     if (!wl.empty()) {
       retval = wl.front();

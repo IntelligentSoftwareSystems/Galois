@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -23,11 +23,14 @@
 #ifndef GALOIS_FIXEDSIZERING_H
 #define GALOIS_FIXEDSIZERING_H
 
+#include "Galois/config.h"
+#include "Galois/optional.h"
 #include "Galois/LazyArray.h"
 
 #include <boost/iterator/iterator_facade.hpp>
-#include <boost/optional.hpp>
 #include <boost/utility.hpp>
+
+#include GALOIS_CXX11_STD_HEADER(utility)
 
 namespace Galois {
 
@@ -105,7 +108,7 @@ public:
 
   reference front() { return back(); }
   const_reference front() const { return back(); }
-  boost::optional<value_type> extract_front() { return extract_back(); }
+  Galois::optional<value_type> extract_front() { return extract_back(); }
 
   void pop_front() {
     pop_back();
@@ -123,13 +126,13 @@ public:
     return *at(count - 1);
   }
 
-  boost::optional<value_type> extract_back() {
+  Galois::optional<value_type> extract_back() {
     if (!empty()) {
-      boost::optional<value_type> retval(back());
+      Galois::optional<value_type> retval(back());
       pop_back();
       return retval;
     }
-    return boost::optional<value_type>();
+    return Galois::optional<value_type>();
   }
 
   void pop_back() {
@@ -291,13 +294,13 @@ public:
     return *at(start);
   }
 
-  boost::optional<value_type> extract_front() {
+  Galois::optional<value_type> extract_front() {
     if (!empty()) {
-      boost::optional<value_type> retval(front());
+      Galois::optional<value_type> retval(front());
       pop_front();
       return retval;
     }
-    return boost::optional<value_type>();
+    return Galois::optional<value_type>();
   }
 
   void pop_front() {
@@ -320,13 +323,13 @@ public:
     return *at((start + count - 1) % chunksize); 
   }
 
-  boost::optional<value_type> extract_back() {
+  Galois::optional<value_type> extract_back() {
     if (!empty()) {
-      boost::optional<value_type> retval(back());
+      Galois::optional<value_type> retval(back());
       pop_back();
       return retval;
     }
-    return boost::optional<value_type>();
+    return Galois::optional<value_type>();
   }
 
   void pop_back() {

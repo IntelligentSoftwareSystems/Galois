@@ -56,7 +56,7 @@ typedef Galois::Runtime::PerThreadVector<TypeHelper::Event_ty> AddList_ty;
 
 struct SimObjInfo: public TypeHelper {
 
-  typedef Galois::Runtime::LL::SimpleLock<true> Lock_ty;
+  typedef Galois::Runtime::LL::SimpleLock Lock_ty;
   typedef des::AbstractMain<SimInit_ty>::GNode GNode;
   typedef std::set<Event_ty, Cmp_ty
     , Galois::Runtime::MM::FSBGaloisAllocator<Event_ty> > PQ;
@@ -311,7 +311,7 @@ protected:
       Galois::do_all (
       // Galois::Runtime::do_all_coupled (
           sobjInfoVec.begin (), sobjInfoVec.end (),
-          FindReady (readyEvents, findIter), "find_ready_events");
+          FindReady (readyEvents, findIter), Galois::loopname("find_ready_events"));
       t_find.stop ();
 
       // std::cout << "Number of ready events found: " << readyEvents.size_all () << std::endl;
@@ -337,7 +337,7 @@ protected:
       Galois::do_all (
       // Galois::Runtime::do_all_coupled (
           readyEvents.begin_all (), readyEvents.end_all (),
-          ProcessEvents (graph, sobjInfoVec, newEvents, nevents), "process_ready_events");
+          ProcessEvents (graph, sobjInfoVec, newEvents, nevents), Galois::loopname("process_ready_events"));
       t_simulate.stop ();
     }
 
@@ -475,8 +475,9 @@ protected:
 
       typedef Galois::WorkList::dChunkedFIFO<16> WL_ty;
 
-      Galois::for_each<WL_ty> (initWL.begin (), initWL.end (), 
-          OpFuncEagerAdd (graph, sobjInfoVec, newEvents, niter, nevents));
+      Galois::for_each(initWL.begin (), initWL.end (), 
+                       OpFuncEagerAdd (graph, sobjInfoVec, newEvents, niter, nevents),
+                       Galois::wl<WL_ty>());
 
       initWL.clear ();
 

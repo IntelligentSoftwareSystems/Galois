@@ -25,8 +25,11 @@
 
 
 #include "Metis.h"
+#include "Galois/Galois.h"
+#include "Galois/Accumulator.h"
 #include "Galois/Runtime/PerThreadStorage.h"
-//#include "Galois/WorkList/WorkListExperimental.h"
+
+#include <iostream>
 
 namespace {
 
@@ -49,7 +52,7 @@ struct HEMmatch {
     for (auto jj = graph->edge_begin(node, Galois::MethodFlag::NONE), eejj = graph->edge_end(node);
          jj != eejj; ++jj) {
       //      ++checked;
-      GNode neighbor = graph->getEdgeDst(jj, Galois::MethodFlag::NONE);
+      GNode neighbor = graph->getEdgeDst(jj);
       MetisNode& neighMNode = graph->getData(neighbor, Galois::MethodFlag::NONE);
       int edgeData = graph->getEdgeData(jj, Galois::MethodFlag::NONE);
       if (!neighMNode.isMatched() && neighbor != node && maxwgt < edgeData) {
@@ -69,7 +72,7 @@ struct RMmatch {
   GNode operator()(GNode node, GGraph* graph) {
     for (auto jj = graph->edge_begin(node, Galois::MethodFlag::NONE), eejj = graph->edge_end(node);
          jj != eejj; ++jj) {
-      GNode neighbor = graph->getEdgeDst(jj, Galois::MethodFlag::NONE);
+      GNode neighbor = graph->getEdgeDst(jj);
       if (!graph->getData(neighbor, Galois::MethodFlag::NONE).isMatched() && neighbor != node)
         return neighbor;
     }
@@ -88,7 +91,7 @@ struct TwoHopMatcher {
     std::pair<GNode, int> retval(node, std::numeric_limits<int>::min());
     for (auto jj = graph->edge_begin(node, Galois::MethodFlag::NONE), eejj = graph->edge_end(node);
          jj != eejj; ++jj) {
-      GNode neighbor = graph->getEdgeDst(jj, Galois::MethodFlag::NONE);
+      GNode neighbor = graph->getEdgeDst(jj);
       std::pair<GNode, int> tval = matcher(neighbor, graph, true);
       if (tval.first != node && tval.first != neighbor && tval.second > retval.second)
         retval = tval;
@@ -206,7 +209,7 @@ struct parallelPopulateEdges {
 
     for (unsigned x = 0; x < nodeData.numChildren(); ++x)
       for (auto ii = fineGGraph->edge_begin(nodeData.getChild(x), Galois::MethodFlag::NONE), ee = fineGGraph->edge_end(nodeData.getChild(x)); ii != ee; ++ii) {
-        GNode dst = fineGGraph->getEdgeDst(ii, Galois::MethodFlag::NONE);
+        GNode dst = fineGGraph->getEdgeDst(ii);
         GNode p = fineGGraph->getData(dst, Galois::MethodFlag::NONE).getParent();
         edges.emplace_back(p, fineGGraph->getEdgeData(ii, Galois::MethodFlag::NONE));
       }
@@ -334,7 +337,7 @@ unsigned findMatching(MetisGraph* coarseMetisGraph, bool useRM, bool use2Hop, bo
   //typedef Galois::WorkList::Random<> WL;
   if(useRM) {
     parallelMatchAndCreateNodes<RMmatch> pRM(coarseMetisGraph, pc, bagOfLoners, !use2Hop);
-    Galois::for_each_local<WL>(*fineMetisGraph->getGraph(), pRM, "match");
+    Galois::for_each_local(*fineMetisGraph->getGraph(), pRM, Galois::loopname("match"), Galois::wl<WL>());
   } else {
     //FIXME: use obim for SHEM matching
     typedef Galois::WorkList::dChunkedLIFO<16> Chunk;
@@ -345,9 +348,9 @@ unsigned findMatching(MetisGraph* coarseMetisGraph, bool useRM, bool use2Hop, bo
     HighDegreeIndexer::indexgraph = fineMetisGraph->getGraph();
     parallelMatchAndCreateNodes<HEMmatch> pHEM(coarseMetisGraph, pc, bagOfLoners, !use2Hop);
     if (useOBIM)
-      Galois::for_each_local<pLD>(*fineMetisGraph->getGraph(), pHEM, "match");
+      Galois::for_each_local(*fineMetisGraph->getGraph(), pHEM, Galois::loopname("match"), Galois::wl<pLD>());
     else
-      Galois::for_each_local<WL>(*fineMetisGraph->getGraph(), pHEM, "match");
+      Galois::for_each_local(*fineMetisGraph->getGraph(), pHEM, Galois::loopname("match"), Galois::wl<WL>());
   }
   unsigned c = fixupLoners(bagOfLoners, coarseMetisGraph->getGraph(), fineMetisGraph->getGraph());
   if (verbose && c)
@@ -362,9 +365,9 @@ unsigned findMatching(MetisGraph* coarseMetisGraph, bool useRM, bool use2Hop, bo
     Pcounter pc2;
     parallelMatchAndCreateNodes<TwoHopMatcher<HEMmatch> > p2HEM(coarseMetisGraph, pc2, bagOfLoners, true);
     if (useOBIM)
-      Galois::for_each_local<pLD>(*fineMetisGraph->getGraph(), p2HEM, "match");
+      Galois::for_each_local(*fineMetisGraph->getGraph(), p2HEM, Galois::loopname("match"), Galois::wl<pLD>());
     else
-      Galois::for_each_local<WL>(*fineMetisGraph->getGraph(), p2HEM, "match");
+      Galois::for_each_local(*fineMetisGraph->getGraph(), p2HEM, Galois::loopname("match"), Galois::wl<WL>());
     return pc2.reduce();
   }
   return pc.reduce();
@@ -375,7 +378,7 @@ void createCoarseEdges(MetisGraph *coarseMetisGraph) {
   GGraph* fineGGraph = fineMetisGraph->getGraph();
   typedef Galois::WorkList::StableIterator<decltype(fineGGraph->local_begin()), true> WL;
   parallelPopulateEdges pPE(coarseMetisGraph);
-  Galois::for_each_local<WL>(*coarseMetisGraph->getGraph(), pPE, "popedge");
+  Galois::for_each_local(*coarseMetisGraph->getGraph(), pPE, Galois::loopname("popedge"), Galois::wl<WL>());
 }
 
 MetisGraph* coarsenOnce(MetisGraph *fineMetisGraph, unsigned& rem, bool useRM, bool with2Hop, bool verbose) {

@@ -173,7 +173,7 @@ class DoAllCoupledExec {
 
     typedef Range<Iter> Range_ty;
 
-    GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE LL::SimpleLock<true> range_mutex;
+    GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE LL::SimpleLock range_mutex;
     unsigned id;
 
     Range_ty range;
@@ -739,7 +739,8 @@ public:
 };
 
 namespace HIDDEN {
-  size_t calc_chunk_size (size_t totalDist) {
+  template <typename S>
+  size_t calc_chunk_size (S totalDist) {
     size_t numT = Galois::getActiveThreads ();
 
     size_t num_chunks = std::max (CHUNK_FACTOR * numT, numT * numT);

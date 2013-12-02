@@ -28,6 +28,7 @@
 #include <iostream>
 
 #include "StressWork.h"
+#include "Galois/Runtime/ll/gio.h"
 
 StressWork::PerCPUtmpVecTy StressWork::perCPUtmpVec;
 
@@ -142,7 +143,7 @@ bool StressWork::getDValIntern (const MatDouble &argval, MatDouble& funcval, Fou
     }
 
     if (!material.getConstitutiveResponse(F, P, A, SimpleMaterial::SKIP_TANGENTS)) {
-      std::cerr << "StressWork.cpp: Error in the constitutive response\n";
+      GALOIS_DIE("StressWork.cpp: Error in the constitutive response\n");
       return false;
     }
 

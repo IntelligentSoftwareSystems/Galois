@@ -23,27 +23,61 @@
 #ifndef GALOIS_WORKLIST_LOCALQUEUE_H
 #define GALOIS_WORKLIST_LOCALQUEUE_H
 
+#include "Galois/config.h"
+#include <boost/mpl/if.hpp>
+#include GALOIS_CXX11_STD_HEADER(type_traits)
+
 namespace Galois {
 namespace WorkList {
 
-template<typename Global = FIFO<>, typename Local = FIFO<>, typename T = int>
-struct LocalQueue : private boost::noncopyable {
+template<typename T = int>
+struct NoGlobalQueue {
   template<bool _concurrent>
-  using rethread = LocalQueue<Global, Local, T>;
+  struct rethread { typedef NoGlobalQueue<T> type; };
 
   template<typename _T>
-  using retype = LocalQueue<typename Global::template retype<_T>, typename Local::template retype<_T>, _T>;
+  struct retype { typedef NoGlobalQueue<_T> type; };
+};
+
+template<typename Global = NoGlobalQueue<>, typename Local = FIFO<>, typename T = int>
+struct LocalQueue : private boost::noncopyable {
+  template<bool _concurrent>
+  struct rethread { typedef LocalQueue<Global, Local, T> type; };
+
+  template<typename _T>
+  struct retype { typedef LocalQueue<typename Global::template retype<_T>::type, typename Local::template retype<_T>::type, _T> type; };
 
   template<typename _global>
-  using with_global = LocalQueue<_global, Local, T>;
+  struct with_global { typedef LocalQueue<_global, Local, T> type; };
 
   template<typename _local>
-  using with_local = LocalQueue<Global, _local, T>;
+  struct with_local { typedef LocalQueue<Global, _local, T> type; };
 
 private:
-  typedef typename Local::template rethread<false> lWLTy;
+  typedef typename Local::template rethread<false>::type lWLTy;
   Runtime::PerThreadStorage<lWLTy> local;
   Global global;
+
+  template<typename RangeTy, bool Enable = std::is_same<Global,NoGlobalQueue<T> >::value>
+  void pushGlobal(const RangeTy& range, typename std::enable_if<Enable>::type* = 0) {
+    auto rp = range.local_pair();
+    local.getLocal()->push(rp.first, rp.second);
+  }
+
+  template<typename RangeTy, bool Enable = std::is_same<Global,NoGlobalQueue<T> >::value>
+  void pushGlobal(const RangeTy& range, typename std::enable_if<!Enable>::type* = 0) {
+    global.push_initial(range);
+  }
+
+  template<bool Enable = std::is_same<Global,NoGlobalQueue<T> >::value>
+  Galois::optional<T> popGlobal(typename std::enable_if<Enable>::type* = 0) {
+    return Galois::optional<value_type>();
+  }
+
+  template<bool Enable = std::is_same<Global,NoGlobalQueue<T> >::value>
+  Galois::optional<T> popGlobal(typename std::enable_if<!Enable>::type* = 0) {
+    return global.pop();
+  }
 
 public:
   typedef T value_type;
@@ -59,14 +93,14 @@ public:
 
   template<typename RangeTy>
   void push_initial(const RangeTy& range) {
-    global.push_initial(range);
+    pushGlobal(range);
   }
 
-  boost::optional<value_type> pop() {
-    boost::optional<value_type> ret = local.getLocal()->pop();
+  Galois::optional<value_type> pop() {
+    Galois::optional<value_type> ret = local.getLocal()->pop();
     if (ret)
       return ret;
-    return global.pop();
+    return popGlobal();
   }
 };
 GALOIS_WLCOMPILECHECK(LocalQueue)

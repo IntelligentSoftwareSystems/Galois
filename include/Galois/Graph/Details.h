@@ -27,13 +27,13 @@
 #ifndef GALOIS_GRAPH_DETAILS_H
 #define GALOIS_GRAPH_DETAILS_H
 
+#include "Galois/LargeArray.h"
 #include "Galois/LazyObject.h"
 #include "Galois/NoDerefIterator.h"
 #include "Galois/Threads.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/MethodFlags.h"
 #include "Galois/Runtime/PerThreadStorage.h"
-#include "Galois/Runtime/mm/Mem.h"
 
 #include <boost/mpl/if.hpp>
 #include <algorithm>
@@ -42,6 +42,8 @@ namespace Galois {
 namespace Graph {
 
 struct read_default_graph_tag { };
+struct read_with_aux_graph_tag { };
+struct read_lc_inout_graph_tag { };
 
 //! Proxy object for {@link detail::EdgeSortIterator}
 template<typename GraphNode, typename EdgeTy>
@@ -199,27 +201,37 @@ public:
 //! Empty class for HasLockable optimization
 class NoLockable { };
 
-//! Specializations for void node data
+//! Separate types from definitions to allow incomplete types as NodeTy
 template<typename NodeTy, bool HasLockable>
-class NodeInfoBase: public boost::mpl::if_c<HasLockable,Galois::Runtime::Lockable,NoLockable>::type {
-  NodeTy data;
-public:
+struct NodeInfoBaseTypes {
   typedef NodeTy& reference;
-  reference getData() { return data; } 
-  void destruct() {
-    (&data)->~NodeTy();
-  }
-  void construct() { 
-    new (&data) NodeTy;
-  }
 };
 
 template<bool HasLockable>
-struct NodeInfoBase<void, HasLockable>: public boost::mpl::if_c<HasLockable,Galois::Runtime::Lockable,NoLockable>::type {
+struct NodeInfoBaseTypes<void, HasLockable> {
   typedef void* reference;
-  reference getData() { return 0; }
-  void destruct() { }
-  void construct() { }
+};
+
+//! Specializations for void node data
+template<typename NodeTy, bool HasLockable>
+class NodeInfoBase:
+  public boost::mpl::if_c<HasLockable,Galois::Runtime::Lockable,NoLockable>::type,
+  public NodeInfoBaseTypes<NodeTy, HasLockable> 
+{
+  NodeTy data;
+public:
+  template<typename... Args>
+  NodeInfoBase(Args&&... args): data(std::forward<Args>(args)...) { }
+
+  typename NodeInfoBase::reference getData() { return data; } 
+};
+
+template<bool HasLockable>
+struct NodeInfoBase<void, HasLockable>:
+  public boost::mpl::if_c<HasLockable,Galois::Runtime::Lockable,NoLockable>::type,
+  public NodeInfoBaseTypes<void, HasLockable> 
+{
+  typename NodeInfoBase::reference getData() { return 0; }
 };
 
 template<bool Enable>
@@ -227,7 +239,10 @@ class OutOfLineLockableFeature {
   typedef NodeInfoBase<void,true> OutOfLineLock;
   LargeArray<OutOfLineLock> outOfLineLocks;
 public:
-  static const size_t sizeof_out_of_line_value = sizeof(OutOfLineLock);
+  struct size_of_out_of_line {
+    static const size_t value = sizeof(OutOfLineLock);
+  };
+
   void outOfLineAcquire(size_t n, MethodFlag mflag) {
     Galois::Runtime::acquire(&outOfLineLocks[n], mflag);
   }
@@ -245,22 +260,19 @@ public:
 template<>
 class OutOfLineLockableFeature<false> {
 public:
-  static const size_t sizeof_out_of_line_value = 0;
+  struct size_of_out_of_line {
+    static const size_t value = 0;
+  };
   void outOfLineAcquire(size_t n, MethodFlag mflag) { }
   void outOfLineAllocateLocal(size_t numNodes, bool preFault) { }
   void outOfLineAllocateInterleaved(size_t numNodes) { }
   void outOfLineConstructAt(size_t n) { }
 };
 
-
 //! Edge specialization for void edge data
 template<typename NodeInfoPtrTy,typename EdgeTy>
-struct EdgeInfoBase: public LazyObject<EdgeTy> {
-  typedef LazyObject<EdgeTy> Super;
-  typedef typename Super::reference reference;
-  typedef typename Super::value_type value_type;
-  const static bool has_value = Super::has_value;
-
+struct EdgeInfoBase: public LazyObject<EdgeTy> 
+{
   NodeInfoPtrTy dst;
 };
 
@@ -312,6 +324,14 @@ public:
   iterator begin() { return make_no_deref_iterator(g.edge_begin(n)); }
   iterator end() { return make_no_deref_iterator(g.edge_end(n)); }
 };
+
+template<typename GN, typename EI, typename EdgeData,typename Data>
+void swap(EdgeSortReference<GN,EI,EdgeData,Data> a, EdgeSortReference<GN,EI,EdgeData,Data> b) {
+  auto aa = *a;
+  auto bb = *b;
+  a = bb;
+  b = aa;
+}
 
 } // end namespace
 } // end namespace

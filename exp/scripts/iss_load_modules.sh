@@ -5,19 +5,35 @@ if [ "$(basename -- $0)" == "iss_load_modules.sh" ]; then
   exit 1
 fi
 
+# first up remove everything
+module purge
+
 module load sl6
-module load cmake
 module use /net/faraday/workspace/local/modules/modulefiles
-module load boost/1.52
 module load lapack
+module load vtune
+
+if [ "$1" == "intel" ]; then
+  module load intel
+else 
+  module load gcc/4.8.1-scale
+fi
+
+module load cmake
+module load tbb
+module load boost
 module load eigen
+module load neon
+module load subversion
 
 if [ "$1" != "min" ]; then
-  module load gdb/7.5
-  module load gcc/4.7.2-scale
-  #module load tbb
-  module load vtune
+  module load clang/3.3-noconflict
+  module load gdb
   module load mkl
   module load mpich2
-  module load llvm
+  module load git
 fi
+
+
+
+

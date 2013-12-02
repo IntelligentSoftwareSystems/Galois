@@ -51,9 +51,10 @@ class WorkListTracker {
 
 public:
   template<bool newconcurrent>
-  using rethread = WorkListTracker<Indexer, typename realWL::template rethread<newconcurrent>, T>;
+  struct rethread { typedef WorkListTracker<Indexer, typename realWL::template rethread<newconcurrent>::type, T> type; };
+
   template<typename Tnew>
-  using retype = WorkListTracker<Indexer, typename realWL::template retype<Tnew>, Tnew>;
+  struct retype { typedef WorkListTracker<Indexer, typename realWL::template retype<Tnew>::type, Tnew> type; };
 
   typedef T value_type;
 
@@ -119,8 +120,8 @@ public:
     wl.push_initial(range);
   }
 
-  boost::optional<value_type> pop() {
-    boost::optional<value_type> ret = wl.pop();
+  Galois::optional<value_type> pop() {
+    Galois::optional<value_type> ret = wl.pop();
     if (!ret) return ret;
     p& P = *tracking.getRemote();
     unsigned int cclock = clock.data;
@@ -184,9 +185,10 @@ class LoadBalanceTracker {
 
 public:
   template<bool newconcurrent>
-  using rethread = LoadBalanceTracker<typename realWL::template rethread<newconcurrent>, perEpoch>;
+  struct rethread { typedef LoadBalanceTracker<typename realWL::template rethread<newconcurrent>::type, perEpoch> type; };
+
   template<typename Tnew>
-  using retype = LoadBalanceTracker<typename realWL::template retype<Tnew>, perEpoch>;
+  struct retype { typedef LoadBalanceTracker<typename realWL::template retype<Tnew>::type, perEpoch> type; };
 
   typedef typename realWL::value_type value_type;
 
@@ -233,13 +235,13 @@ public:
     wl.push_initial(range);
   }
 
-  boost::optional<value_type> pop() {
+  Galois::optional<value_type> pop() {
     p& P = *tracking.getLocal();
 
     if (P.epoch != P.newEpoch)
       updateEpoch(P);
 
-    boost::optional<value_type> ret = wl.pop();
+    Galois::optional<value_type> ret = wl.pop();
     if (!ret) return ret;
     unsigned num = ++P.values[P.epoch];
     if (num >= perEpoch)
@@ -256,9 +258,10 @@ public:
   typedef typename iWL::value_type value_type;
   
   template<bool concurrent>
-  using rethread = NoInlineFilter<typename iWL::template rethread<concurrent> >;
+  struct rethread { typedef NoInlineFilter<typename iWL::template rethread<concurrent>::type> type; };
+
   template<typename Tnew>
-  using retype = NoInlineFilter<typename iWL::template retype<Tnew> >;
+  struct retype { typedef NoInlineFilter<typename iWL::template retype<Tnew>::type > type; };
 
   //! push a value onto the queue
   GALOIS_ATTRIBUTE_NOINLINE
@@ -281,7 +284,7 @@ public:
   }
 
   GALOIS_ATTRIBUTE_NOINLINE
-  boost::optional<value_type> pop()  {
+  Galois::optional<value_type> pop()  {
     return wl.pop();
   }
 };

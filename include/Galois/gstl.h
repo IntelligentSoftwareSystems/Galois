@@ -23,10 +23,9 @@
 #ifndef GALOIS_GSTL_H
 #define GALOIS_GSTL_H
 
+#include <algorithm>
 #include <iterator>
-#include <set>
-#include <map>
-#include <vector>
+#include <utility>
 
 namespace Galois {
 
@@ -54,19 +53,6 @@ IterTy safe_advance(IterTy b, IterTy e, Distance n) {
   return safe_advance_dispatch(b,e,n,category);
 }
 
-/**
- * Like std::copy_n
- */
-template<class InputIterator, class Size, class OutputIterator>
-OutputIterator safe_copy_n (InputIterator first, InputIterator last, 
-                            Size n, OutputIterator result) {
-  while (n > 0 && first != last) {
-    *result = *first;
-    ++result; ++first;
-    --n;
-  }
-  return result;
-}
 
 /**
  * Finds the midpoint of a range.  The first half is always be bigger than
@@ -105,23 +91,6 @@ void uninitialized_destroy ( InputIterator first, InputIterator last )
   for (; first!=last; ++first)
     (&*first)->~T();
 }
-
-template<typename T, typename K>
-std::vector<T> extractValues(std::multimap<K, T>& m, const K& k) {
-  std::vector<T> r;
-  for (auto ii = m.lower_bound(k), ee = m.upper_bound(k); ii != ee; ++ii)
-    r.push_back(ii->second);
-  return r;
-}
-
-template<typename T, typename K>
-std::set<K> extractKeys(std::multimap<K, T>& m) {
-  std::set<K> r;
-  for (auto ii = m.begin(), ee = m.end(); ii != ee; ++ii)
-    r.insert(ii->first);
-  return r;
-}
-
 
 }
 #endif

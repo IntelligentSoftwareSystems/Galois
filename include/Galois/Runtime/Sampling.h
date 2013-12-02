@@ -28,7 +28,8 @@ namespace Runtime {
 
 void beginSampling();
 void endSampling();
-void reportSampling(const char* loopname);
+void beginThreadSampling();
+void endThreadSampling();
 
 }
 } // end namespace Galois

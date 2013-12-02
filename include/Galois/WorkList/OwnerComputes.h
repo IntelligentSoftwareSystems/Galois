@@ -31,19 +31,19 @@ namespace WorkList {
 template<typename OwnerFn=DummyIndexer<int>, typename Container=ChunkedLIFO<>, typename T = int>
 struct OwnerComputes : private boost::noncopyable {
   template<bool _concurrent>
-  using rethread = OwnerComputes<OwnerFn, typename Container::template rethread<_concurrent>, T>;
+  struct rethread { typedef OwnerComputes<OwnerFn, typename Container::template rethread<_concurrent>::type, T> type; };
 
   template<typename _T>
-  using retype = OwnerComputes<OwnerFn, typename Container::template retype<_T>, _T>;
+  struct retype { typedef OwnerComputes<OwnerFn, typename Container::template retype<_T>::type, _T> type; };
 
   template<typename _container>
-  using with_container = OwnerComputes<OwnerFn, _container, T>;
+  struct with_container { typedef OwnerComputes<OwnerFn, _container, T> type; };
 
   template<typename _indexer>
-  using with_indexer = OwnerComputes<_indexer, Container, T>;
+  struct with_indexer { typedef OwnerComputes<_indexer, Container, T> type; };
 
 private:
-  typedef typename Container::template retype<T> lWLTy;
+  typedef typename Container::template retype<T>::type lWLTy;
 
   typedef lWLTy cWL;
   typedef lWLTy pWL;
@@ -80,9 +80,9 @@ public:
       pushBuffer.getRemote(x)->flush();
   }
 
-  boost::optional<value_type> pop() {
+  Galois::optional<value_type> pop() {
     cWL& wl = *items.getLocal();
-    boost::optional<value_type> retval = wl.pop();
+    Galois::optional<value_type> retval = wl.pop();
     if (retval)
       return retval;
     pWL& p = *pushBuffer.getLocal();

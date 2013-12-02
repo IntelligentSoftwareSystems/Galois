@@ -23,9 +23,14 @@
 #ifndef GALOIS_WORKLIST_OBIM_H
 #define GALOIS_WORKLIST_OBIM_H
 
-//#include <map>
-#include <type_traits>
+#include "Galois/config.h"
 #include "Galois/FlatMap.h"
+#include "Galois/Runtime/PerThreadStorage.h"
+#include "Galois/WorkList/Fifo.h"
+#include "Galois/WorkList/WorkListHelpers.h"
+
+#include GALOIS_CXX11_STD_HEADER(type_traits)
+#include <limits>
 
 namespace Galois {
 namespace WorkList {
@@ -62,27 +67,27 @@ template<class Indexer = DummyIndexer<int>, typename Container = FIFO<>,
   bool Concurrent=true>
 struct OrderedByIntegerMetric : private boost::noncopyable {
   template<bool _concurrent>
-  using rethread = OrderedByIntegerMetric<Indexer, typename Container::template rethread<_concurrent>, BlockPeriod, BSP, T, Index, _concurrent>;
+  struct rethread { typedef OrderedByIntegerMetric<Indexer, typename Container::template rethread<_concurrent>::type, BlockPeriod, BSP, T, Index, _concurrent> type; };
 
   template<typename _T>
-  using retype = OrderedByIntegerMetric<Indexer, typename Container::template retype<_T>, BlockPeriod, BSP, _T, typename std::result_of<Indexer(_T)>::type, Concurrent>;
+  struct retype { typedef OrderedByIntegerMetric<Indexer, typename Container::template retype<_T>::type, BlockPeriod, BSP, _T, typename std::result_of<Indexer(_T)>::type, Concurrent> type; };
 
   template<unsigned _period>
-  using with_block_period = OrderedByIntegerMetric<Indexer, Container, _period, BSP, T, Index, Concurrent>;
+  struct with_block_period { typedef OrderedByIntegerMetric<Indexer, Container, _period, BSP, T, Index, Concurrent> type; };
 
   template<typename _container>
-  using with_container = OrderedByIntegerMetric<Indexer, _container, BlockPeriod, BSP, T, Index, Concurrent>;
+  struct with_container { typedef OrderedByIntegerMetric<Indexer, _container, BlockPeriod, BSP, T, Index, Concurrent> type; };
 
   template<typename _indexer>
-  using with_indexer = OrderedByIntegerMetric<_indexer, Container, BlockPeriod, BSP, T, Index, Concurrent>;
+  struct with_indexer { typedef OrderedByIntegerMetric<_indexer, Container, BlockPeriod, BSP, T, Index, Concurrent> type; };
 
   template<bool _bsp>
-  using with_back_scan_prevention = OrderedByIntegerMetric<Indexer, Container, BlockPeriod, _bsp, T, Index, Concurrent>;
+  struct with_back_scan_prevention { typedef OrderedByIntegerMetric<Indexer, Container, BlockPeriod, _bsp, T, Index, Concurrent> type; };
 
   typedef T value_type;
 
 private:
-  typedef typename Container::template rethread<Concurrent> CTy;
+  typedef typename Container::template rethread<Concurrent>::type CTy;
   typedef Galois::flat_map<Index, CTy*> LMapTy;
   //typedef std::map<Index, CTy*> LMapTy;
 
@@ -108,14 +113,23 @@ private:
   Runtime::LL::PaddedLock<Concurrent> masterLock;
   MasterLog masterLog;
 
-  volatile unsigned int masterVersion;
+  std::atomic<unsigned int> masterVersion;
   Indexer indexer;
 
   bool updateLocal(perItem& p) {
-    if (p.lastMasterVersion != masterVersion) {
+    if (p.lastMasterVersion != masterVersion.load(std::memory_order_relaxed)) {
       //masterLock.lock();
-      for (; p.lastMasterVersion < masterVersion; ++p.lastMasterVersion)
+      for (; p.lastMasterVersion < masterVersion.load(std::memory_order_relaxed); ++p.lastMasterVersion) {
+        // XXX(ddn): Somehow the second block is better than
+        // the first for bipartite matching (GCC 4.7.2)
+#if 0
         p.local.insert(masterLog[p.lastMasterVersion]);
+#else
+        std::pair<Index, CTy*> logEntry = masterLog[p.lastMasterVersion];
+        p.local[logEntry.first] = logEntry.second;
+        assert(logEntry.second);
+#endif
+      }
       //masterLock.unlock();
       return true;
     }
@@ -123,26 +137,7 @@ private:
   }
 
   GALOIS_ATTRIBUTE_NOINLINE
-  bool betterBucket(perItem& p) {
-    updateLocal(p);
-    unsigned myID = Runtime::LL::getTID();
-    bool localLeader = Runtime::LL::isPackageLeaderForSelf(myID);
-
-    Index msS = std::numeric_limits<Index>::min();
-    if (BSP) {
-      msS = p.scanStart;
-      if (localLeader)
-	for (unsigned i = 0; i <  Runtime::activeThreads; ++i)
-	  msS = std::min(msS, current.getRemote(i)->scanStart);
-      else
-	msS = std::min(msS, current.getRemote(Runtime::LL::getLeaderForThread(myID))->scanStart);
-    }
-
-    return p.curIndex != msS;
-  }
-
-  GALOIS_ATTRIBUTE_NOINLINE
-  boost::optional<T> slowPop(perItem& p) {
+  Galois::optional<T> slowPop(perItem& p) {
     //Failed, find minimum bin
     updateLocal(p);
     unsigned myID = Runtime::LL::getTID();
@@ -151,23 +146,24 @@ private:
     Index msS = std::numeric_limits<Index>::min();
     if (BSP) {
       msS = p.scanStart;
-      if (localLeader)
-	for (unsigned i = 0; i < Runtime::activeThreads; ++i)
-	  msS = std::min(msS, current.getRemote(i)->scanStart);
-      else
-	msS = std::min(msS, current.getRemote(Runtime::LL::getLeaderForThread(myID))->scanStart);
+      if (localLeader) {
+        for (unsigned i = 0; i < Runtime::activeThreads; ++i)
+          msS = std::min(msS, current.getRemote(i)->scanStart);
+      } else {
+        msS = std::min(msS, current.getRemote(Runtime::LL::getLeaderForThread(myID))->scanStart);
+      }
     }
 
     for (auto ii = p.local.lower_bound(msS), ee = p.local.end(); ii != ee; ++ii) {
-      boost::optional<T> retval;
+      Galois::optional<T> retval;
       if ((retval = ii->second->pop())) {
-	p.current = ii->second;
-	p.curIndex = ii->first;
-	p.scanStart = ii->first;
-	return retval;
+        p.current = ii->second;
+        p.curIndex = ii->first;
+        p.scanStart = ii->first;
+        return retval;
       }
     }
-    return boost::optional<value_type>();
+    return Galois::optional<value_type>();
   }
 
   GALOIS_ATTRIBUTE_NOINLINE
@@ -177,16 +173,16 @@ private:
       CTy* lC;
       updateLocal(p);
       if ((lC = p.local[i]))
-	return lC;
+        return lC;
     } while (!masterLock.try_lock());
     //we have the write lock, update again then create
     updateLocal(p);
     CTy*& lC2 = p.local[i];
     if (!lC2) {
       lC2 = new CTy();
-      p.lastMasterVersion = masterVersion + 1;
+      p.lastMasterVersion = masterVersion.load(std::memory_order_relaxed) + 1;
       masterLog.push_back(std::make_pair(i, lC2));
-      __sync_fetch_and_add(&masterVersion, 1);
+      masterVersion.fetch_add(1);
     }
     masterLock.unlock();
     return lC2;
@@ -207,7 +203,7 @@ public:
   ~OrderedByIntegerMetric() {
     // Deallocate in LIFO order to give opportunity for simple garbage
     // collection
-    for (typename MasterLog::reverse_iterator ii = masterLog.rbegin(), ei = masterLog.rend(); ii != ei; ++ii) {
+    for (auto ii = masterLog.rbegin(), ei = masterLog.rend(); ii != ei; ++ii) {
       delete ii->second;
     }
   }
@@ -215,17 +211,17 @@ public:
   void push(const value_type& val) {
     Index index = indexer(val);
     perItem& p = *current.getLocal();
-    //fastpath
+    // Fast path
     if (index == p.curIndex && p.current) {
       p.current->push(val);
       return;
     }
 
-    //slow path
+    // Slow path
     CTy* lC = updateLocalOrCreate(p, index);
     if (BSP && index < p.scanStart)
       p.scanStart = index;
-    //opportunistically move to higher priority work
+    // Opportunistically move to higher priority work
     if (index < p.curIndex) {
       p.curIndex = index;
       p.current = lC;
@@ -245,18 +241,18 @@ public:
     push(rp.first, rp.second);
   }
 
-  boost::optional<value_type> pop() {
-    //Find a successful pop
+  Galois::optional<value_type> pop() {
+    // Find a successful pop
     perItem& p = *current.getLocal();
     CTy* C = p.current;
-    if (BlockPeriod && (p.numPops++ & ((1<<BlockPeriod)-1)) == 0 && betterBucket(p))
+    if (BlockPeriod && (p.numPops++ & ((1<<BlockPeriod)-1)) == 0)
       return slowPop(p);
 
-    boost::optional<value_type> retval;
+    Galois::optional<value_type> retval;
     if (C && (retval = C->pop()))
       return retval;
 
-    //failed: slow path
+    // Slow path
     return slowPop(p);
   }
 };

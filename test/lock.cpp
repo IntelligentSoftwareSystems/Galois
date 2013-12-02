@@ -3,7 +3,7 @@
 volatile int V;
 
 int main(int argc, char** argv) {
-  Galois::Runtime::LL::SimpleLock<true> L;
+  Galois::Runtime::LL::SimpleLock L;
   for (unsigned x = 0; x < 1000000000; ++x) {
     V = 0;
     L.lock();

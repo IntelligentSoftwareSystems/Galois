@@ -87,8 +87,7 @@ struct process {
     d[req] = 1;
     
     SQ.push_back(_req);
-    // Galois::Timer T;
-    // T.start();
+    
     while (QAt != SQ.size()) {
       GNode _v = SQ[QAt++];
       int v = _v;
@@ -107,9 +106,7 @@ struct process {
 	}
       }
     }
-    // T.stop();
-    // Galois::Timer T2;
-    // T2.start();
+
     while(SQ.size()) {
       int w = SQ.back();
       SQ.pop_back();
@@ -128,8 +125,6 @@ struct process {
     for (unsigned int i = 0; i < delta.size(); ++i) {
       Vec[i] += delta[i];
     }
-    // T2.stop();
-    // std::cout << T.get() << " " << T2.get() << "\n";
   }
 };
 
@@ -183,7 +178,7 @@ struct HasOut: public std::unary_function<GNode,bool> {
 
 struct InitializeLocal {
   void operator()(unsigned, unsigned) {
-    *CB.getLocal() = (double*)malloc(NumNodes * sizeof(double));
+    *CB.getLocal() = (double*)Galois::Runtime::MM::pageAlloc(); 
     std::fill(&(*CB.getLocal())[0], &(*CB.getLocal())[NumNodes], 0.0);
   }
 };
@@ -199,10 +194,12 @@ int main(int argc, char** argv) {
   NumNodes = G->size();
 
   //CB.resize(NumNodes);
+  //FIXME
+  assert(Galois::Runtime::MM::pageSize >= NumNodes * sizeof(double));
   Galois::on_each(InitializeLocal());
 
   Galois::reportPageAlloc("MeminfoPre");
-  Galois::preAlloc(numThreads * NumNodes / 1650);
+  Galois::preAlloc(numThreads * Galois::Runtime::MM::numPageAllocTotal() / 3);
   Galois::reportPageAlloc("MeminfoMid");
 
   boost::filter_iterator<HasOut,Graph::iterator>

@@ -34,10 +34,10 @@ namespace WorkList {
 template<typename T = int, bool Concurrent = true>
 struct GFIFO : private boost::noncopyable, private Runtime::LL::PaddedLock<Concurrent>  {
   template<bool _concurrent>
-  using rethread = GFIFO<T, _concurrent>;
+  struct rethread { typedef GFIFO<T, _concurrent> type; };
 
   template<typename _T>
-  using retype = GFIFO<_T, Concurrent>;
+  struct retype { typedef GFIFO<_T, Concurrent> type; };
 
 private:
   gdeque<T> wl;
@@ -47,6 +47,7 @@ private:
   using Runtime::LL::PaddedLock<Concurrent>::unlock;
 
 public:
+  GFIFO() {} //required for apparent bug in clang
   typedef T value_type;
 
   void push(const value_type& val) {
@@ -69,8 +70,8 @@ public:
       push(range.begin(), range.end());
   }
 
-  boost::optional<value_type> pop() {
-    boost::optional<value_type> retval;
+  Galois::optional<value_type> pop() {
+    Galois::optional<value_type> retval;
     lock();
     if (!wl.empty()) {
       retval = wl.front();

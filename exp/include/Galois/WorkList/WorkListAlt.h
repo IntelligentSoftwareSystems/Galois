@@ -29,13 +29,13 @@ namespace Galois {
 namespace WorkList {
 
 template<typename QueueTy>
-boost::optional<typename QueueTy::value_type>
+Galois::optional<typename QueueTy::value_type>
 stealHalfInPackage(Runtime::PerThreadStorage<QueueTy>& queues) {
   unsigned id = Runtime::LL::getTID();
   unsigned pkg = Runtime::LL::getPackageForSelf(id);
   unsigned num = Galois::getActiveThreads();
   QueueTy* me = queues.getLocal();
-  boost::optional<typename QueueTy::value_type> retval;
+  Galois::optional<typename QueueTy::value_type> retval;
   
   //steal from this package
   //Having 2 loops avoids a modulo, though this is a slow path anyway
@@ -51,13 +51,13 @@ stealHalfInPackage(Runtime::PerThreadStorage<QueueTy>& queues) {
 }
 
 template<typename QueueTy>
-boost::optional<typename QueueTy::value_type>
+Galois::optional<typename QueueTy::value_type>
 stealRemote(Runtime::PerThreadStorage<QueueTy>& queues) {
   unsigned id = Runtime::LL::getTID();
   //  unsigned pkg = Runtime::LL::getPackageForThread(id);
   unsigned num = Galois::getActiveThreads();
   QueueTy* me = queues.getLocal();
-  boost::optional<typename QueueTy::value_type> retval;
+  Galois::optional<typename QueueTy::value_type> retval;
   
   //steal from this package
   //Having 2 loops avoids a modulo, though this is a slow path anyway
@@ -78,8 +78,8 @@ public:
 private:
   Runtime::PerThreadStorage<QueueTy> local;
 
-  boost::optional<value_type> doSteal() {
-    boost::optional<value_type> retval = stealHalfInPackage(local);
+  Galois::optional<value_type> doSteal() {
+    Galois::optional<value_type> retval = stealHalfInPackage(local);
     if (retval)
       return retval;
     return stealRemote(local);
@@ -143,9 +143,10 @@ private:
 
 public:
   template<typename Tnew>
-  using retype = PerThreadQueues<typename QueueTy::template retype<Tnew>::WL>;
+  struct retype { typedef PerThreadQueues<typename QueueTy::template retype<Tnew>::type> type; };
+
   template<bool newConcurrent>
-  using rethread = PerThreadQueues<typename QueueTy::template rethread<newConcurrent>::WL>;
+  struct rethread { typedef PerThreadQueues<typename QueueTy::template rethread<newConcurrent>::type> type; };
 
   void push(const value_type& val) {
     local.getLocal()->push(val);
@@ -161,8 +162,8 @@ public:
     fill_work_l1(range.begin(), range.end());
   }
 
-  boost::optional<value_type> pop() {
-    boost::optional<value_type> retval = local.getLocal()->pop();
+  Galois::optional<value_type> pop() {
+    Galois::optional<value_type> retval = local.getLocal()->pop();
     if (retval)
       return retval;
     return doSteal();// stealHalfInPackage(local);
@@ -172,14 +173,15 @@ public:
 
 template<typename WLTy = FIFO<>, typename T = int>
 class LocalWorklist : private boost::noncopyable {
-  typedef typename WLTy::template rethread<false>::WL lWLTy;
+  typedef typename WLTy::template rethread<false>::type lWLTy;
   Runtime::PerThreadStorage<lWLTy> local;
 
 public:
   template<bool newconcurrent>
-  using rethread = LocalWorklist<typename WLTy::template rethread<newconcurrent>::WL, T>;
+  struct rethread { typedef LocalWorklist<typename WLTy::template rethread<newconcurrent>::type, T> type; };
+
   template<typename Tnew>
-  using retype = LocalWorklist<typename WLTy::template retype<Tnew>::WL, Tnew>;
+  struct retype { typedef LocalWorklist<typename WLTy::template retype<Tnew>::type, Tnew> type; };
 
   typedef T value_type;
 
@@ -197,7 +199,7 @@ public:
     local.getLocal()->push(range.local_begin(), range.local_end());
   }
 
-  boost::optional<value_type> pop() {
+  Galois::optional<value_type> pop() {
     return local.getLocal()->pop();
   }
 };
@@ -218,7 +220,7 @@ class OwnerComputeChunkedMaster : private boost::noncopyable {
   typedef QT<Chunk, concurrent> LevelItem;
 
   Runtime::PerThreadStorage<p> data;
-  squeues<distributed, LevelItem> Q;
+  squeue<distributed, Runtime::PerPackageStorage, LevelItem> Q;
 
   Chunk* mkChunk() {
     return new (heap.allocate(sizeof(Chunk))) Chunk();
@@ -285,9 +287,10 @@ public:
   typedef T value_type;
 
   template<bool newconcurrent>
-  using rethread = OwnerComputeChunkedMaster<T, OwnerFn,QT, distributed, isStack, chunksize, newconcurrent>;
+  struct rethread { typedef OwnerComputeChunkedMaster<T, OwnerFn,QT, distributed, isStack, chunksize, newconcurrent> type; };
+
   template<typename Tnew>
-  using retype = OwnerComputeChunkedMaster<Tnew, OwnerFn, QT, distributed, isStack, chunksize, concurrent>;
+  struct retype { typedef OwnerComputeChunkedMaster<Tnew, OwnerFn, QT, distributed, isStack, chunksize, concurrent> type; };
 
   OwnerComputeChunkedMaster() : heap(sizeof(Chunk)) { }
 
@@ -318,9 +321,9 @@ public:
     push(range.local_begin(), range.local_end());
   }
 
-  boost::optional<value_type> pop()  {
+  Galois::optional<value_type> pop()  {
     p& n = *data.getLocal();
-    boost::optional<value_type> retval;
+    Galois::optional<value_type> retval;
     if (isStack) {
       if (n.next && (retval = n.next->extract_back()))
 	return retval;
@@ -329,7 +332,7 @@ public:
       n.next = popChunk();
       if (n.next)
 	return n.next->extract_back();
-      return boost::optional<value_type>();
+      return Galois::optional<value_type>();
     } else {
       if (n.cur && (retval = n.cur->extract_front()))
 	return retval;
@@ -342,7 +345,7 @@ public:
       }
       if (n.cur)
 	return n.cur->extract_front();
-      return boost::optional<value_type>();
+      return Galois::optional<value_type>();
     }
   }
 };

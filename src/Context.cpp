@@ -1,4 +1,4 @@
- /** simple galois context and contention manager -*- C++ -*-
+/** simple galois context and contention manager -*- C++ -*-
  * @file
  * @section License
  *
@@ -42,11 +42,11 @@ PendingStatus pendingStatus;
 }
 
 void Galois::Runtime::setPending(Galois::Runtime::PendingFlag value) {
-  pendingStatus.flag.data = value;
+  pendingStatus.flag = value;
 }
 
 Galois::Runtime::PendingFlag Galois::Runtime::getPending() {
-  return pendingStatus.flag.data;
+  return pendingStatus.flag.get();
 }
 
 void Galois::Runtime::doCheckWrite() {
@@ -63,8 +63,6 @@ Galois::Runtime::SimpleRuntimeContext* Galois::Runtime::getThreadContext() {
   return thread_ctx;
 }
 
-
-
 void Galois::Runtime::signalConflict(Lockable* lockable) {
   throw conflict_ex{lockable}; // Conflict
 }
@@ -78,14 +76,23 @@ void Galois::Runtime::forceAbort() {
 ////////////////////////////////////////////////////////////////////////////////
 
 #if !defined(GALOIS_USE_SEQ_ONLY)
-
-Galois::Runtime::LockManagerBase::AcquireStatus Galois::Runtime::LockManagerBase::tryAcquire (Galois::Runtime::Lockable* lockable) {
+Galois::Runtime::LockManagerBase::AcquireStatus
+Galois::Runtime::LockManagerBase::tryAcquire(Galois::Runtime::Lockable* lockable) 
+{
   assert(lockable);
-  if (tryLock (lockable)) {
-    assert(!getOwner (lockable));
-    ownByForce (lockable);
+  // XXX(ddn): Hand inlining this code makes a difference on 
+  // delaunaytriangulation (GCC 4.7.2)
+#if 0
+  if (tryLock(lockable)) {
+    assert(!getOwner(lockable));
+    ownByForce(lockable);
     return NEW_OWNER;
-  } else if (getOwner (lockable) == this) {
+#else
+  if (lockable->owner.try_lock()) {
+    lockable->owner.setValue(this);
+    return NEW_OWNER;
+#endif
+  } else if (getOwner(lockable) == this) {
     return ALREADY_OWNER;
   }
   return FAIL;
@@ -97,7 +104,7 @@ void Galois::Runtime::SimpleRuntimeContext::acquire(Galois::Runtime::Lockable* l
     subAcquire(lockable);
   } else if ((i = tryAcquire(lockable)) != AcquireStatus::FAIL) {
     if (i == AcquireStatus::NEW_OWNER) {
-      addToNhood (lockable);
+      addToNhood(lockable);
     }
   } else {
     Galois::Runtime::signalConflict(lockable);

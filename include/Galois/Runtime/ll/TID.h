@@ -46,6 +46,10 @@ static inline unsigned getTID() {
 //initializing it
 void initTID();
 
+#ifdef GALOIS_USE_EXP
+void initTID_cilk();
+#endif // GALOIS_USE_EXP
+
 }
 }
 }

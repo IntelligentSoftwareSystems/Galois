@@ -1,12 +1,13 @@
 /** Appendable semi-LC graphs -*- C++ -*-
  * @file
  * @section License
- *Graph which is like LC graphs but it is appendable only
+ *
+ * Graph which is like other LC graphs but allows adding edges.
  *
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -21,113 +22,179 @@
  *
  * @author Nikunj Yadav nikunj@cs.utexas.edu
  */
+#ifndef GALOIS_GRAPH_LC_MORPH_GRAPH_H
+#define GALOIS_GRAPH_LC_MORPH_GRAPH_H
 
-#ifndef LC_MORPH_GRAPH_H_
-#define LC_MORPH_GRAPH_H_
-
-#include "Galois/Galois.h"
+#include "Galois/config.h"
+#include "Galois/Bag.h"
 #include "Galois/LargeArray.h"
 #include "Galois/Graph/FileGraph.h"
-#include "Galois/Graph/Graph.h"
-#include "Galois/Graph/Util.h"
+#include "Galois/Graph/Details.h"
 #include "Galois/Runtime/MethodFlags.h"
-#include "Galois/Runtime/Context.h"
-#include "Galois/Runtime/mm/Mem.h"
+
+#include <boost/mpl/if.hpp>
+#include GALOIS_CXX11_STD_HEADER(type_traits)
 
 namespace Galois {
 namespace Graph {
+
 //! Local computation graph (i.e., graph structure does not change)
-//! Specialization of LC_Linear_Graph for NUMA architectures
-template<typename NodeTy, typename EdgeTy>
-class LC_Morph_Graph: private boost::noncopyable {
+template<typename NodeTy, typename EdgeTy,
+  bool HasNoLockable=false,
+  bool UseNumaAlloc=false,
+  bool HasOutOfLineLockable=false,
+  bool HasId=false>
+class LC_Morph_Graph:
+    private boost::noncopyable,
+    private detail::OutOfLineLockableFeature<HasOutOfLineLockable && !HasNoLockable> {
+  template<typename Graph> friend class LC_InOut_Graph;
+
+public:
+  template<bool _has_id>
+  struct with_id { typedef LC_Morph_Graph<NodeTy,EdgeTy,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,_has_id> type; };
+
+  template<typename _node_data>
+  struct with_node_data { typedef  LC_Morph_Graph<_node_data,EdgeTy,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,HasId> type; };
+
+  template<bool _has_no_lockable>
+  struct with_no_lockable { typedef LC_Morph_Graph<NodeTy,EdgeTy,_has_no_lockable,UseNumaAlloc,HasOutOfLineLockable,HasId> type; };
+
+  template<bool _use_numa_alloc>
+  struct with_numa_alloc { typedef LC_Morph_Graph<NodeTy,EdgeTy,HasNoLockable,_use_numa_alloc,HasOutOfLineLockable,HasId> type; };
+
+  template<bool _has_out_of_line_lockable>
+  struct with_out_of_line_lockable { typedef LC_Morph_Graph<NodeTy,EdgeTy,HasNoLockable,UseNumaAlloc,_has_out_of_line_lockable,_has_out_of_line_lockable||HasId> type; };
+
+  typedef read_with_aux_graph_tag read_tag;
+
 protected:
-  struct NodeInfo;
-  typedef GraphImpl::EdgeItem<NodeInfo, EdgeTy, true> EITy;
-  //typedef Galois::gdeque<NodeInfo,64> NodeListTy;
+  class NodeInfo;
+  typedef detail::EdgeInfoBase<NodeInfo*, EdgeTy> EdgeInfo;
+  typedef Galois::InsertBag<NodeInfo> Nodes;
+  typedef detail::NodeInfoBaseTypes<NodeTy,!HasNoLockable && !HasOutOfLineLockable> NodeInfoTypes;
   
   struct EdgeHolder {
-    EITy* begin;
-    EITy* end;
+    EdgeInfo* begin;
+    EdgeInfo* end;
     EdgeHolder* next;
   };
 
-  struct NodeInfo: public Galois::Runtime::Lockable {
-    NodeTy data;
-    //    unsigned debugEdges;
-    EITy* edgeBegin;
-    EITy* edgeEnd;
-    template<typename... Args>
-    NodeInfo(Args&& ...args):data(std::forward<Args>(args)...){
-    }
-  };
+  class NodeInfo: public detail::NodeInfoBase<NodeTy,!HasNoLockable && !HasOutOfLineLockable> {
+    typedef detail::NodeInfoBase<NodeTy,!HasNoLockable && !HasOutOfLineLockable> Super;
+    friend class LC_Morph_Graph;
 
-  typedef Galois::InsertBag<NodeInfo> NodeListTy;
-  NodeListTy nodes;
-  Galois::Runtime::PerThreadStorage<EdgeHolder*> edges;
+    EdgeInfo* edgeBegin;
+    EdgeInfo* edgeEnd;
+
+  public:
+    template<typename... Args>
+    NodeInfo(Args&&... args): Super(std::forward<Args>(args)...) { }
+  };
 
   struct makeGraphNode: public std::unary_function<NodeInfo&, NodeInfo*> {
     NodeInfo* operator()(NodeInfo& data) const { return &data; }
   };
   
-  struct first_equals {
+  struct dst_equals {
     NodeInfo* dst;
-    first_equals(NodeInfo* d): dst(d) { }
-    bool operator()(const EITy& edge) { return edge.first() == dst; }
+    dst_equals(NodeInfo* d): dst(d) { }
+    bool operator()(const EdgeInfo& edge) { return edge.dst == dst; }
   };
 
 public:
-
-  typedef boost::transform_iterator<makeGraphNode,typename NodeListTy::iterator > iterator;
-  typedef iterator local_iterator;
   typedef NodeInfo* GraphNode;
   typedef EdgeTy edge_data_type;
   typedef NodeTy node_data_type;
-  typedef typename EITy::reference edge_data_reference;
-  typedef EITy* edge_iterator;
-    
-  NodeTy& getData(const GraphNode& N, MethodFlag mflag = MethodFlag::ALL) {
-    Galois::Runtime::checkWrite(mflag, false);
+  typedef typename NodeInfoTypes::reference node_data_reference;
+  typedef typename EdgeInfo::reference edge_data_reference;
+  typedef EdgeInfo* edge_iterator;
+  typedef boost::transform_iterator<makeGraphNode,typename Nodes::iterator> iterator;
+  typedef boost::transform_iterator<makeGraphNode,typename Nodes::const_iterator> const_iterator;
+  typedef iterator local_iterator;
+  typedef const_iterator const_local_iterator;
+  typedef LargeArray<GraphNode> ReadGraphAuxData;
+
+protected:
+  Nodes nodes;
+  Galois::Runtime::PerThreadStorage<EdgeHolder*> edges;
+
+  template<bool _A1 = HasNoLockable, bool _A2 = HasOutOfLineLockable>
+  void acquireNode(GraphNode N, MethodFlag mflag, typename std::enable_if<!_A1 && !_A2>::type* = 0) {
     Galois::Runtime::acquire(N, mflag);
-    return N->data;
   }
 
-  edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::ALL) const {
-    Galois::Runtime::checkWrite(mflag, false);
-    Galois::Runtime::acquire(ni->first(), mflag);
-    return *ni->second();
+  template<bool _A1 = HasOutOfLineLockable, bool _A2 = HasNoLockable>
+  void acquireNode(GraphNode N, MethodFlag mflag, typename std::enable_if<_A1 && !_A2>::type* = 0) {
+    this->outOfLineAcquire(getId(N), mflag);
   }
 
-  GraphNode getEdgeDst(edge_iterator ni, MethodFlag mflag = MethodFlag::ALL) const {
+  template<bool _A1 = HasOutOfLineLockable, bool _A2 = HasNoLockable>
+  void acquireNode(GraphNode N, MethodFlag mflag, typename std::enable_if<_A2>::type* = 0) { }
+
+  template<bool _Enable = HasId>
+  size_t getId(GraphNode N, typename std::enable_if<_Enable>::type* = 0) {
+    return N->getId();
+  }
+
+public:
+  ~LC_Morph_Graph() {
+    for (typename Nodes::iterator ii = nodes.begin(), ei = nodes.end(); ii != ei; ++ii) {
+      NodeInfo& n = *ii;
+      EdgeInfo* edgeBegin = n.edgeBegin;
+      EdgeInfo* edgeEnd = n.edgeEnd;
+
+      if (EdgeInfo::has_value) {
+        while (edgeBegin != edgeEnd) {
+          edgeBegin->destroy();
+          ++edgeBegin;
+        }
+      }
+    }
+  }
+
+  node_data_reference getData(const GraphNode& N, MethodFlag mflag = MethodFlag::ALL) {
     Galois::Runtime::checkWrite(mflag, false);
-    Galois::Runtime::acquire(ni->first(), mflag);
-    return GraphNode(ni->first());
+    acquireNode(N, mflag);
+    return N->getData();
+  }
+
+  edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::NONE) {
+    Galois::Runtime::checkWrite(mflag, false);
+    acquireNode(ni->dst, mflag);
+    return ni->get();
+  }
+
+  GraphNode getEdgeDst(edge_iterator ni) {
+    //Galois::Runtime::checkWrite(mflag, false);
+    //acquireNode(ni->dst, mflag);
+    return GraphNode(ni->dst);
   }
 
   /**
    * Returns an iterator to all the nodes in the graph. Not thread-safe.
    */
   iterator begin() {
-    return boost::make_transform_iterator(nodes.begin(),makeGraphNode());
+    return boost::make_transform_iterator(nodes.begin(), makeGraphNode());
   }
 
   //! Returns the end of the node iterator. Not thread-safe.
   iterator end() {
-    return boost::make_transform_iterator(nodes.end(),makeGraphNode());
+    return boost::make_transform_iterator(nodes.end(), makeGraphNode());
   }
 
   local_iterator local_begin() {
-    return boost::make_transform_iterator(nodes.local_begin(),makeGraphNode());
+    return boost::make_transform_iterator(nodes.local_begin(), makeGraphNode());
   }
   
   local_iterator local_end() {
-    return boost::make_transform_iterator(nodes.local_end(),makeGraphNode());
+    return boost::make_transform_iterator(nodes.local_end(), makeGraphNode());
   }
 
   edge_iterator edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
-    Galois::Runtime::acquire(N, mflag);
+    acquireNode(N, mflag);
     if (Galois::Runtime::shouldLock(mflag)) {
       for (edge_iterator ii = N->edgeBegin, ee = N->edgeEnd; ii != ee; ++ii) {
-        Galois::Runtime::acquire(ii->first(), mflag);
+        acquireNode(ii->dst, mflag);
       }
     }
     return N->edgeBegin;
@@ -140,8 +207,8 @@ public:
   template<typename... Args>
   GraphNode createNode(int nedges, Args&&... args) {
     Galois::Runtime::checkWrite(MethodFlag::ALL, true);
-    NodeInfo* N = &(nodes.emplace(std::forward<Args>(args)...));
-    Galois::Runtime::acquire(N, MethodFlag::ALL);
+    NodeInfo* N = &nodes.emplace(std::forward<Args>(args)...);
+    acquireNode(N, MethodFlag::ALL);
     EdgeHolder*& local_edges = *edges.getLocal();
     if (!local_edges || std::distance(local_edges->begin, local_edges->end) < nedges) {
       EdgeHolder* old = local_edges;
@@ -149,127 +216,96 @@ public:
       local_edges = (EdgeHolder*)newblock;
       local_edges->next = old;
       char* estart = newblock + sizeof(EdgeHolder);
-      if ((uintptr_t)estart % sizeof(EITy)) //not aligned
-#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
-        estart += sizeof(EITy) - ((uintptr_t)estart % 8);
+      if ((uintptr_t)estart % sizeof(EdgeInfo)) // Not aligned
+#ifdef HAVE_CXX11_ALIGNOF
+        estart += sizeof(EdgeInfo) - ((uintptr_t)estart % alignof(EdgeInfo));
 #else
-        estart += sizeof(EITy) - ((uintptr_t)estart % alignof(EITy));
+        estart += sizeof(EdgeInfo) - ((uintptr_t)estart % 8);
 #endif
 
-      local_edges->begin = (EITy*)estart;
+      local_edges->begin = (EdgeInfo*)estart;
       char* eend = newblock + Runtime::MM::pageSize;
-      eend -= (uintptr_t)eend % sizeof(EITy);
-      local_edges->end = (EITy*)eend;
+      eend -= (uintptr_t)eend % sizeof(EdgeInfo);
+      local_edges->end = (EdgeInfo*)eend;
     }
     N->edgeBegin = N->edgeEnd = local_edges->begin;
     local_edges->begin += nedges;
-    //    N->debugEdges = nedges;
     return GraphNode(N);
   }
 
   template<typename... Args>
   edge_iterator addEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag, Args&&... args) {
     Galois::Runtime::checkWrite(mflag, true);
-    Galois::Runtime::acquire(src, mflag);
-    //    assert(std::distance(src->edgeBegin, src->edgeEnd) < src->debugEdges);
-    auto it = std::find_if(src->edgeBegin, src->edgeEnd, first_equals(dst));
+    acquireNode(src, mflag);
+    auto it = std::find_if(src->edgeBegin, src->edgeEnd, dst_equals(dst));
     if (it == src->edgeEnd) {
-      new (it) EITy(dst, 0, std::forward<Args>(args)...);
+      it->dst = dst;
+      it->construct(std::forward<Args>(args)...);
       src->edgeEnd++;
     }
-    //    assert(std::distance(src->edgeBegin, src->edgeEnd) <= src->debugEdges);
     return it;
   }
 
   template<typename... Args>
   edge_iterator addEdgeWithoutCheck(GraphNode src, GraphNode dst, Galois::MethodFlag mflag, Args&&... args) {
     Galois::Runtime::checkWrite(mflag, true);
-    Galois::Runtime::acquire(src, mflag);
-    //    assert(std::distance(src->edgeBegin, src->edgeEnd) < src->debugEdges);
+    acquireNode(src, mflag);
     auto it = src->edgeEnd;
-    new (it) EITy(dst, 0, std::forward<Args>(args)...);
+    it->dst = dst;
+    it->construct(std::forward<Args>(args)...);
     src->edgeEnd++;
-    //    assert(std::distance(src->edgeBegin, src->edgeEnd) <= src->debugEdges);
     return it;
   }
   
   edge_iterator findEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = MethodFlag::ALL) {
     Galois::Runtime::checkWrite(mflag, true);
-    Galois::Runtime::acquire(src, mflag);
-    return std::find_if(src->edgeBegin, src->edgeEnd, first_equals(dst)); 
+    acquireNode(src, mflag);
+    return std::find_if(src->edgeBegin, src->edgeEnd, dst_equals(dst)); 
   }
   
-  void structureFromFile(const std::string& fname) { Graph::structureFromFile(*this, fname); }
-  
-  struct CreateNodes {
-    LC_Morph_Graph* self;
-    std::vector<GraphNode>& tracking;
-    FileGraph& graph;
-    std::atomic<unsigned>& nNodes;
+  void allocateFrom(FileGraph& graph, ReadGraphAuxData& aux) {
+    size_t numNodes = graph.size();
     
-    CreateNodes(
-      LC_Morph_Graph* _self,
-      std::vector<GraphNode>& _tracking,
-      FileGraph& _graph,
-      std::atomic<unsigned>& _nNodes): self(_self), tracking(_tracking), graph(_graph), nNodes(_nNodes) { }
-
-    void operator()(FileGraph::GraphNode gn) {
-       tracking[gn] = self->createNode(std::distance(graph.edge_begin(gn), graph.edge_end(gn))); 
-       ++nNodes;
+    if (UseNumaAlloc) {
+      aux.allocateLocal(numNodes, false);
+      this->outOfLineAllocateLocal(numNodes, false);
+    } else {
+      aux.allocateInterleaved(numNodes);
+      this->outOfLineAllocateInterleaved(numNodes);
     }
-  };
-
-  struct CreateEdges {
-    LC_Morph_Graph* self;
-    std::vector<GraphNode>& tracking;
-    FileGraph& graph;
-    std::atomic<unsigned>& nEdges;
-    
-    CreateEdges(
-      LC_Morph_Graph* _self,
-      std::vector<GraphNode>& _tracking,
-      FileGraph& _graph,
-      std::atomic<unsigned>& _nEdges): self(_self), tracking(_tracking), graph(_graph), nEdges(_nEdges) { }
-
-    void operator()(FileGraph::GraphNode gn) {
-       for (auto ii = graph.edge_begin(gn), ee = graph.edge_end(gn); ii != ee; ++ii) {
-         self->addEdgeWithoutCheck(tracking[gn], tracking[graph.getEdgeDst(ii)], Galois::MethodFlag::NONE, graph.getEdgeData<uint32_t>(ii));
-         ++nEdges;
-       }
-    }
-  };
-
-  void structureFromGraph(FileGraph& graph) {
-
-    //if we can keep the node order we should delete trackingG and turn tracking into a vector and not a ref.
-    //std::vector<GraphNode> tracking;
-    std::vector<GraphNode> tracking;
-
-    tracking.resize(graph.size());
-
-    std::atomic<unsigned> nEdges(0), nNodes(0);
-    Galois::do_all(graph.begin(), graph.end(), CreateNodes(this, tracking, graph, nNodes));
-    Galois::do_all(graph.begin(), graph.end(), CreateEdges(this, tracking, graph, nEdges));
-    //std::cout << "Created Graph with " << nNodes << " nodes and " << nEdges << " edges\n";
-
   }
 
-  void dump(std::ostream& out) {
-    out << "digraph {\n";
-    for (auto nn = begin(), en = end(); nn != en; ++nn) {
-      out << '"' << *nn << "\" [shape=box];\n";
-    }
-    for (auto nn = begin(), en = end(); nn != en; ++nn) {
-      for (auto ii = edge_begin(*nn), ee = edge_end(*nn); ii != ee; ++ii)
-        out << '"' << *nn << "\" -> \"" << getEdgeDst(ii) << "\";\n";
-    }
+  void constructNodesFrom(FileGraph& graph, unsigned tid, unsigned total, ReadGraphAuxData& aux) {
+    auto r = graph.divideBy(
+        sizeof(NodeInfo) + LC_Morph_Graph::size_of_out_of_line::value,
+        sizeof(EdgeInfo),
+        tid, total);
 
-    out << "}\n";
+    size_t id = *r.first;
+    for (FileGraph::iterator ii = r.first, ei = r.second; ii != ei; ++ii, ++id) {
+      aux[id] = createNode(std::distance(graph.edge_begin(*ii), graph.edge_end(*ii)));
+    }
+  }
+  
+  void constructEdgesFrom(FileGraph& graph, unsigned tid, unsigned total, const ReadGraphAuxData& aux) {
+    auto r = graph.divideBy(
+        sizeof(NodeInfo) + LC_Morph_Graph::size_of_out_of_line::value,
+        sizeof(EdgeInfo),
+        tid, total);
+
+    for (FileGraph::iterator ii = r.first, ei = r.second; ii != ei; ++ii) {
+      for (FileGraph::edge_iterator nn = graph.edge_begin(*ii), en = graph.edge_end(*ii); nn != en; ++nn) {
+        if (EdgeInfo::has_value) {
+          addEdgeWithoutCheck(aux[*ii], aux[graph.getEdgeDst(nn)], Galois::MethodFlag::NONE, graph.getEdgeData<uint32_t>(nn));
+        } else {
+          addEdgeWithoutCheck(aux[*ii], aux[graph.getEdgeDst(nn)], Galois::MethodFlag::NONE);
+        }
+      }
+    }
   }
 };
 
 } // end namespace
 } // end namespace
-
 
 #endif /* LC_MORPH_GRAPH_H_ */

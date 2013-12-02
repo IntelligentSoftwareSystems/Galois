@@ -45,7 +45,7 @@ public:
 
 protected:
   uint32_t sz, _ID, _Num;
-  LL::SimpleLock<true> flLock;
+  LL::SimpleLock flLock;
   BlockList freelist;
 
   NetworkBackend(unsigned size);

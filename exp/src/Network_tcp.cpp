@@ -49,11 +49,11 @@ class NetworkInterfaceTCP : public NetworkInterface {
 
   struct recvIP {
     int socket;
-    LL::SimpleLock<true> lock;
+    LL::SimpleLock lock;
     std::deque<unsigned char> buffer;
 
     void doRead() {
-      std::lock_guard<LL::SimpleLock<true>> lg(lock);
+      std::lock_guard<LL::SimpleLock> lg(lock);
       unsigned char data[256];
       int r = read(socket, data, sizeof(data));
       if (r > 0)
@@ -61,7 +61,7 @@ class NetworkInterfaceTCP : public NetworkInterface {
     }
 
     bool recvMessage(recvFuncTy& recv, RecvBuffer& buf) {
-      std::lock_guard<LL::SimpleLock<true>> lg(lock);
+      std::lock_guard<LL::SimpleLock> lg(lock);
       if (buffer.size() < sizeof(header))
         return false;
       header h;
@@ -80,11 +80,11 @@ class NetworkInterfaceTCP : public NetworkInterface {
 
   struct sendIP {
     int socket;
-    LL::SimpleLock<true> lock;
+    LL::SimpleLock lock;
     std::deque<unsigned char> buffer;
 
     void doSend() {
-      std::lock_guard<LL::SimpleLock<true>> lg(lock);
+      std::lock_guard<LL::SimpleLock> lg(lock);
       if (!buffer.empty()) {
         unsigned char data[256];
         int num = std::copy(buffer.begin(), Galois::safe_advance(buffer.begin(), buffer.end(), sizeof(data)), data) - data;
@@ -95,7 +95,7 @@ class NetworkInterfaceTCP : public NetworkInterface {
     }
 
     void sendMessage(recvFuncTy recv, SendBuffer& buf) {
-      std::lock_guard<LL::SimpleLock<true>> lg(lock);
+      std::lock_guard<LL::SimpleLock> lg(lock);
       header h = {(uint32_t)buf.size(), (uintptr_t)recv};
       unsigned char* ch = (unsigned char*)&h;
       std::copy(ch, ch + sizeof(header), std::back_inserter(buffer));

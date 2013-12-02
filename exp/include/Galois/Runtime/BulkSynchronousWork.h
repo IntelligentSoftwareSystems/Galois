@@ -27,6 +27,12 @@
 
 #include "Galois/Runtime/ParallelWork.h"
 
+#include <boost/version.hpp>
+
+#if BOOST_VERSION < 104300
+// Bug in boost fusion fixed in version 1.43
+# define GALOIS_HAS_NO_BULKSYNCHRONOUS_EXECUTOR
+#else
 #include <boost/fusion/adapted/mpl.hpp>
 #include <boost/fusion/algorithm/iteration/fold.hpp>
 #include <boost/fusion/algorithm/iteration/for_each.hpp>
@@ -553,5 +559,7 @@ static inline void do_all_bs(IterTy b, IterTy e, FnsTy fns, InitFnTy initFn) {
       Galois::Runtime::makeStandardRange(b, e), fns, initFn, 0);
 }
 }
+
+#endif
 
 #endif

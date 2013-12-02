@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -29,9 +29,15 @@
 #ifndef GALOIS_LAZYARRAY_H
 #define GALOIS_LAZYARRAY_H
 
+#include "Galois/config.h"
+#include "Galois/LazyObject.h"
+
 #include <iterator>
 #include <stdexcept>
-#include <memory>
+#include <cstddef>
+#include GALOIS_CXX11_STD_HEADER(algorithm)
+#include GALOIS_CXX11_STD_HEADER(utility)
+#include GALOIS_CXX11_STD_HEADER(type_traits)
 
 namespace Galois {
 
@@ -42,14 +48,12 @@ namespace Galois {
  */
 template<typename _Tp, unsigned _Size>
 class LazyArray {
-  char __datac[sizeof(_Tp[(_Size > 0 ? _Size : 1)])];
+  typedef typename std::aligned_storage<sizeof(_Tp), std::alignment_of<_Tp>::value>::type CharData;
 
-  _Tp* get(size_t __n) {
-    return &(reinterpret_cast<_Tp*>(&__datac[0]))[__n];
-  }
-  const _Tp* get(size_t __n) const {
-    return &(reinterpret_cast<_Tp*>(&__datac[0]))[__n];
-  }
+  LazyObject<_Tp> data_[(_Size > 0 ? _Size : 1)];
+
+  _Tp* get(size_t __n) { return &data_[__n].get(); }
+  const _Tp* get(size_t __n) const { return &data_[__n].get(); }
 
 public:
   typedef _Tp value_type;
@@ -97,20 +101,20 @@ public:
     if (__n >= _Size)
       throw std::out_of_range("lazyArray::at");
     return get(__n);
-  }
+  }  
 
   reference front() { return *get(0); }
   const_reference front() const { return *get(0); }
   reference back() { return *get(_Size > 0 ? _Size - 1 : 0); }
   const_reference back() const { return *get(_Size > 0 ? _Size - 1 : 0); }
 
-  pointer data() { return &get(0); }
-  const_pointer data() const { return &get(0); }
+  pointer data() { return get(0); }
+  const_pointer data() const { return get(0); }
 
   //missing: fill swap
 
   template<typename... Args>
-  pointer emplace(size_type __n, Args&&... args) { return new ((void *)get(__n)) _Tp(std::forward<Args>(args)...); }
+  pointer emplace(size_type __n, Args&&... args) { return new (get(__n)) _Tp(std::forward<Args>(args)...); }
 
   pointer construct(size_type __n, const _Tp& val) { return emplace(__n, val); }
   pointer construct(size_type __n, _Tp&& val) { return emplace(__n, std::move(val)); }

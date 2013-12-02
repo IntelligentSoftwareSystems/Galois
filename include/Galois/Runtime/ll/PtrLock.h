@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in
  * irregular programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights
+ * Copyright (C) 2013, The University of Texas at Austin. All rights
  * reserved.  UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES
  * CONCERNING THIS SOFTWARE AND DOCUMENTATION, INCLUDING ANY
  * WARRANTIES OF MERCHANTABILITY, FITNESS FOR ANY PARTICULAR PURPOSE,
@@ -30,15 +30,15 @@
  *
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
-
 #ifndef GALOIS_RUNTIME_LL_PTRLOCK_H
 #define GALOIS_RUNTIME_LL_PTRLOCK_H
 
+#include "Galois/config.h"
+#include "Galois/Runtime/ll/CompilerSpecific.h"
+
 #include <stdint.h>
 #include <cassert>
-#include <atomic>
-
-#include "CompilerSpecific.h"
+#include GALOIS_CXX11_STD_HEADER(atomic)
 
 namespace Galois {
 namespace Runtime {
@@ -59,20 +59,20 @@ class PtrLock<T, true> {
   void slow_lock() {
     uintptr_t oldval;
     do {
-      while (((oldval = _lock.load(std::memory_order_acquire)) & 1) != 0) {
-	asmPause();
+      while ((_lock.load(std::memory_order_acquire) & 1) != 0) {
+        asmPause();
       }
-      assert((oldval & 1) == 0);
-    } while (!_lock.compare_exchange_weak(oldval, oldval | 1, std::memory_order_acq_rel, std::memory_order_relaxed));
-    assert(is_locked());
+      oldval = _lock.fetch_or(1, std::memory_order_acq_rel);
+    } while (oldval & 1);
+    assert(_lock);
   }
 
 public:
-  PtrLock() : _lock(0) {}
+  constexpr PtrLock() : _lock(0) {}
   //relaxed order for copy
   PtrLock(const PtrLock& p) : _lock(p._lock.load(std::memory_order_relaxed)) {}
 
-  PtrLock& operator= (const PtrLock& p) {
+  PtrLock& operator=(const PtrLock& p) {
     if (&p == this) return *this;
     //relaxed order for initialization
     _lock.store(p._lock.load(std::memory_order_relaxed), std::memory_order_relaxed);
@@ -87,13 +87,14 @@ public:
       goto slow_path;
     assert(is_locked());
     return;
+
   slow_path:
     slow_lock();
   }
 
   inline void unlock() {
     assert(is_locked());
-    _lock.fetch_xor(1, std::memory_order_release);
+    _lock.store(_lock.load(std::memory_order_relaxed) & ~(uintptr_t)1, std::memory_order_release);
   }
 
   inline void unlock_and_clear() {
@@ -104,7 +105,7 @@ public:
   inline void unlock_and_set(T* val) {
     assert(is_locked());
     assert(!((uintptr_t)val & 1));
-    _lock.store((uintptr_t)val, std::memory_order_release);
+    _lock.store((uintptr_t) val, std::memory_order_release);
   }
   
   inline T* getValue() const {
@@ -119,13 +120,11 @@ public:
   }
 
   inline bool try_lock() {
-    uintptr_t oldval = _lock.load(std::memory_order_acquire);
+    uintptr_t oldval = _lock.load(std::memory_order_relaxed);
     if ((oldval & 1) != 0)
       return false;
-    if (!_lock.compare_exchange_weak(oldval, oldval | 1, std::memory_order_acq_rel))
-      return false;
-    assert(is_locked());
-    return true;
+    oldval = _lock.fetch_or(1, std::memory_order_acq_rel);
+    return !(oldval & 1);
   }
 
   inline bool is_locked() const {
@@ -138,7 +137,6 @@ public:
     assert(!((uintptr_t)oldval & 1) && !((uintptr_t)newval & 1));
     uintptr_t old = (uintptr_t)oldval;
     return _lock.compare_exchange_strong(old, (uintptr_t)newval);
-    //return __sync_bool_compare_and_swap(&_lock, (uintptr_t)oldval, (uintptr_t)newval);
   }
 
   //! CAS that works on locked values; this can be very dangerous
@@ -146,7 +144,6 @@ public:
   inline bool stealing_CAS(T* oldval, T* newval) {
     uintptr_t old = 1 | (uintptr_t)oldval;
     return _lock.compare_exchange_strong(old, 1 | (uintptr_t)newval);
-    //return __sync_bool_compare_and_swap(&_lock, (uintptr_t)oldval|1, (uintptr_t)newval|1);
   }
 };
 

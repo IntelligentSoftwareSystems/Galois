@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in
  * irregular programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights
+ * Copyright (C) 2013, The University of Texas at Austin. All rights
  * reserved.  UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES
  * CONCERNING THIS SOFTWARE AND DOCUMENTATION, INCLUDING ANY
  * WARRANTIES OF MERCHANTABILITY, FITNESS FOR ANY PARTICULAR PURPOSE,
@@ -23,49 +23,34 @@
  * @section Description
  *
  * This contains the basic spinlock used in Galois.  We use a
- * test-and-test-and-set approach, with pause instructions on x86 and
- * compiler barriers on unlock.
+ * test-and-test-and-set approach, with pause instructions on x86.
+ * This implements C++11 lockable and try lockable concept
  *
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
-
 #ifndef GALOIS_RUNTIME_LL_SIMPLE_LOCK_H
 #define GALOIS_RUNTIME_LL_SIMPLE_LOCK_H
 
-#include <cassert>
-#include <atomic>
-#include <mutex>
+#include "Galois/config.h"
+#include "Galois/Runtime/ll/CompilerSpecific.h"
 
-#include "CompilerSpecific.h"
+#include <cassert>
+#include GALOIS_CXX11_STD_HEADER(atomic)
+#include <mutex>
 
 namespace Galois {
 namespace Runtime {
 namespace LL {
 
-/// SimpleLock is a spinlock.  If the template parameter is
-/// false, the lock is a noop.
+/// SimpleLock is a spinlock.
 /// Copying a lock is unsynchronized (relaxed ordering)
 
-template<bool isALock>
-class SimpleLock;
-
-template<>
-class SimpleLock<true> {
+class SimpleLock {
   mutable std::atomic<int> _lock;
-  GALOIS_ATTRIBUTE_NOINLINE
-  void slow_lock() const {
-    int oldval = 0;
-    do {
-      while (_lock.load(std::memory_order_acquire) != 0) {
-	asmPause();
-      }
-      oldval = 0;
-    } while (!_lock.compare_exchange_weak(oldval, 1, std::memory_order_acq_rel, std::memory_order_relaxed));
-    assert(is_locked());
-  }
+  void slow_lock() const;
 
 public:
-  SimpleLock() : _lock(0) {  }
+  constexpr SimpleLock() : _lock(0) {  }
   //relaxed order for copy
   SimpleLock(const SimpleLock& p) :_lock(p._lock.load(std::memory_order_relaxed)) {}
 
@@ -75,7 +60,6 @@ public:
     _lock.store(p._lock.load(std::memory_order_relaxed), std::memory_order_relaxed);
     return *this;
   }
-
 
   inline void lock() const {
     int oldval = 0;
@@ -111,24 +95,17 @@ public:
   }
 };
 
-template<>
-class SimpleLock<false> {
+  //Dummy Lock implements the lock interface without a lock
+
+class DummyLock {
 public:
   inline void lock() const {}
   inline void unlock() const {}
-  inline bool try_lock() const { return true; }
-  inline bool is_locked() const { return false; }
+  //  inline bool try_lock() const { return true; }
+  //inline bool is_locked() const { }
 };
 
-
-void LockPairOrdered(SimpleLock<true>& L1, SimpleLock<true>& L2);
-bool TryLockPairOrdered(SimpleLock<true>& L1, SimpleLock<true>& L2);
-void UnLockPairOrdered(SimpleLock<true>& L1, SimpleLock<true>& L2);
-void LockPairOrdered(SimpleLock<false>& L1, SimpleLock<false>& L2);
-bool TryLockPairOrdered(SimpleLock<false>& L1, SimpleLock<false>& L2);
-void UnLockPairOrdered(SimpleLock<false>& L1, SimpleLock<false>& L2);
-
-typedef std::lock_guard<LL::SimpleLock<true> > SLguard;
+typedef std::lock_guard<LL::SimpleLock> SLguard;
 
 }
 }

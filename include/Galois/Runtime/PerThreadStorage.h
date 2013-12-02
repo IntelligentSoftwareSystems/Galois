@@ -41,18 +41,32 @@ namespace Galois {
 namespace Runtime {
 
 class PerBackend {
+  static const unsigned MAX_SIZE = 30;
+  static const unsigned MIN_SIZE = 3; // 8 bytes
+
   unsigned int nextLoc;
   std::vector<char*> heads;
+  std::vector<std::vector<unsigned> > freeOffsets;
 
   void initCommon();
 
+  static unsigned nextLog2(unsigned size);
+
 public:
-  PerBackend(): nextLoc(0) { }
+  PerBackend(): nextLoc(0) {
+    freeOffsets.resize(MAX_SIZE);
+  }
 
   char* initPerThread();
   char* initPerPackage();
-  unsigned allocOffset(unsigned size);
-  void deallocOffset(unsigned offset, unsigned size);
+
+#ifdef GALOIS_USE_EXP
+  char* initPerThread_cilk ();
+  char* initPerPackage_cilk ();
+#endif // GALOIS_USE_EXP
+
+  unsigned allocOffset(const unsigned size);
+  void deallocOffset(const unsigned offset, const unsigned size);
   void* getRemote(unsigned thread, unsigned offset);
   void* getLocal(unsigned offset, char* base) {
     return &base[offset];
@@ -71,6 +85,11 @@ extern __thread char* ppsBase;
 PerBackend& getPPSBackend();
 
 void initPTS();
+
+#ifdef GALOIS_USE_EXP
+void initPTS_cilk ();
+#endif // GALOIS_USE_EXP
+
 
 template<typename T>
 class PerThreadStorage: private boost::noncopyable {

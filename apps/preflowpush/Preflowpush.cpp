@@ -364,7 +364,7 @@ template<typename IncomingWL>
 void globalRelabel(IncomingWL& incoming) {
   Galois::StatTimer T1("ResetHeightsTime");
   T1.start();
-  Galois::do_all_local(app.graph, ResetHeights(), "ResetHeights");
+  Galois::do_all_local(app.graph, ResetHeights(), Galois::loopname("ResetHeights"));
   T1.stop();
 
   Galois::StatTimer T("UpdateHeightsTime");
@@ -373,9 +373,9 @@ void globalRelabel(IncomingWL& incoming) {
   switch (detAlgo) {
     case nondet:
 #ifdef GALOIS_USE_EXP
-      Galois::for_each<Galois::WorkList::BulkSynchronousInline<> >(app.sink, UpdateHeights<nondet>(), "UpdateHeights");
+      Galois::for_each(app.sink, UpdateHeights<nondet>(), Galois::loopname("UpdateHeights"), Galois::wl<Galois::WorkList::BulkSynchronousInline<>>());
 #else
-      Galois::for_each(app.sink, UpdateHeights<nondet>(), "UpdateHeights");
+      Galois::for_each(app.sink, UpdateHeights<nondet>(), Galois::loopname("UpdateHeights"));
 #endif
       break;
     case detBase:
@@ -390,7 +390,7 @@ void globalRelabel(IncomingWL& incoming) {
 
   Galois::StatTimer T2("FindWorkTime");
   T2.start();
-  Galois::do_all_local(app.graph, FindWork<IncomingWL>(incoming), "FindWork");
+  Galois::do_all_local(app.graph, FindWork<IncomingWL>(incoming), Galois::loopname("FindWork"));
   T2.stop();
 }
 
@@ -734,9 +734,9 @@ void run() {
     switch (detAlgo) {
       case nondet:
         if (useHLOrder) {
-          Galois::for_each_local<OBIM>(initial, Process<nondet>(counter), "Discharge");
+          Galois::for_each_local(initial, Process<nondet>(counter), Galois::loopname("Discharge"), Galois::wl<OBIM>());
         } else {
-          Galois::for_each_local(initial, Process<nondet>(counter), "Discharge");
+          Galois::for_each_local(initial, Process<nondet>(counter), Galois::loopname("Discharge"));
         }
         break;
       case detBase:

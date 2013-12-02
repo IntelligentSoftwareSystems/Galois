@@ -32,6 +32,7 @@ namespace cll = llvm::cl;
 
 enum StatMode {
   summary,
+  sortedoffsethist,
   degrees,
   degreehist,
   indegreehist
@@ -42,6 +43,7 @@ static cll::list<StatMode> statModeList(cll::desc("Available stats:"),
     cll::values(
       clEnumVal(summary, "Graph summary"),
       clEnumVal(degrees, "Node degrees"),
+      clEnumVal(sortedoffsethist, "Histogram of node offsets with sorted edges"),
       clEnumVal(degreehist, "Histogram of degrees"),
       clEnumVal(indegreehist, "Histogram of indegrees"),
       clEnumValEnd));
@@ -71,11 +73,10 @@ void do_hist() {
     ++hist[val];
   }
   for (auto pp = hist.begin(), ep = hist.end(); pp != ep; ++pp)
-    std::cout << pp->first << " : " << pp->second << "\n";
+    std::cout << pp->first << " , " << pp->second << "\n";
 }
 
 void do_inhist() {
-  //unsigned numEdges = 0;
   std::map<GNode, unsigned> inv;
   std::map<unsigned, unsigned> hist;
   for (auto ii = graph.begin(), ee = graph.end(); ii != ee; ++ii)
@@ -84,7 +85,49 @@ void do_inhist() {
   for (auto pp = inv.begin(), ep = inv.end(); pp != ep; ++pp)
     ++hist[pp->second];
   for (auto pp = hist.begin(), ep = hist.end(); pp != ep; ++pp)
-    std::cout << pp->first << " : " << pp->second << "\n";
+    std::cout << pp->first << " , " << pp->second << "\n";
+}
+
+struct EdgeComp {
+  typedef Galois::Graph::EdgeSortValue<GNode, void> Edge;
+  bool operator()(const Edge& a, const Edge& b) const {
+    return a.dst < b.dst;
+  }
+};
+
+int getLogIndex(ptrdiff_t x) {
+  int logvalue = 0;
+  int sign = x < 0 ? -1 : 1;
+
+  if (x < 0)
+    x = -x;
+  while (x >>= 1)
+    ++logvalue;
+  return sign * logvalue;
+}
+
+void do_sortedoffsethist() {
+  Graph copy;
+  {
+    // Original FileGraph is immutable because it is backed by a file
+    copy.cloneFrom(graph);
+  }
+
+  std::map<int, size_t> hist;
+  for (auto ii = graph.begin(), ee = graph.end(); ii != ee; ++ii) {
+    copy.sortEdges<void>(*ii, EdgeComp());
+
+    GNode last = *ii;
+    for (auto jj = copy.edge_begin(*ii), ej = copy.edge_end(*ii); jj != ej; ++jj) {
+      GNode dst = copy.getEdgeDst(jj);
+      ptrdiff_t diff = dst - (ptrdiff_t) last;
+      int index = getLogIndex(diff);
+      ++hist[index];
+      last = dst;
+    }
+  }
+  for (auto pp = hist.begin(), ep = hist.end(); pp != ep; ++pp)
+    std::cout << pp->first << " , " << pp->second << "\n";
 }
 
 int main(int argc, char** argv) {
@@ -96,6 +139,7 @@ int main(int argc, char** argv) {
     case summary: do_summary(); break;
     case degrees: do_degrees(); break;
     case degreehist: do_hist(); break;
+    case sortedoffsethist: do_sortedoffsethist(); break;
     case indegreehist: do_inhist(); break;
     default: abort(); break;
     }

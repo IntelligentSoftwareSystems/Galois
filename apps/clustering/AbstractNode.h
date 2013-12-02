@@ -139,7 +139,7 @@ public:
 					int index = (int) (j + 1) * (inc*(double) rand())
 							/ (std::numeric_limits<int>::max());
 					if (index > j) {
-						assert(false && "Badness : " + index);
+                                                GALOIS_DIE("Badness :", index);
 					}
 					double temp = (*ranVec)[j];
 					(*ranVec)[j] = (*ranVec)[index];

@@ -39,16 +39,16 @@ template<class Container=dChunkedFIFO<>, class T=int, bool Concurrent = true>
 class BulkSynchronous : private boost::noncopyable {
 public:
   template<bool _concurrent>
-  using rethread = BulkSynchronous<Container, T, _concurrent>;
+  struct rethread { typedef BulkSynchronous<Container, T, _concurrent> type; };
 
   template<typename _T>
-  using retype = BulkSynchronous<typename Container::template retype<_T>, _T, Concurrent>;
+  struct retype { typedef BulkSynchronous<typename Container::template retype<_T>::type, _T, Concurrent> type; };
 
   template<typename _container>
-  using with_container = BulkSynchronous<_container, T, Concurrent>;
+  struct with_container { typedef BulkSynchronous<_container, T, Concurrent> type; };
 
 private:
-  typedef typename Container::template rethread<Concurrent> CTy;
+  typedef typename Container::template rethread<Concurrent>::type CTy;
 
   struct TLD {
     unsigned round;
@@ -81,12 +81,12 @@ private:
     auto rp = range.local_pair();
     push(rp.first, rp.second);
     tlds.getLocal()->round = 1;
-    some.data = true;
+    some.get() = true;
   }
 
-  boost::optional<value_type> pop() {
+  Galois::optional<value_type> pop() {
     TLD& tld = *tlds.getLocal();
-    boost::optional<value_type> r;
+    Galois::optional<value_type> r;
     
     while (true) {
       if (empty)
@@ -98,16 +98,16 @@ private:
 
       barrier.wait();
       if (Runtime::LL::getTID() == 0) {
-        if (!some.data)
+        if (!some.get())
           empty = true;
-        some.data = false; 
+        some.get() = false; 
       }
       tld.round = (tld.round + 1) & 1;
       barrier.wait();
 
       r = wls[tld.round].pop();
       if (r) {
-        some.data = true;
+        some.get() = true;
         return r;
       }
     }

@@ -360,13 +360,13 @@ public:
 template<bool IsLocallyLIFO, int ChunkSize, typename Container, typename T>
 struct AltChunkedMaster : private boost::noncopyable {
   template<typename _T>
-  using retype = AltChunkedMaster<IsLocallyLIFO, ChunkSize, Container, _T>;
+  struct retype { typedef AltChunkedMaster<IsLocallyLIFO, ChunkSize, Container, _T> type; };
 
   template<bool _concurrent>
-  using rethread = AltChunkedMaster<IsLocallyLIFO, ChunkSize, Container, T>;
+  struct rethread { typedef AltChunkedMaster<IsLocallyLIFO, ChunkSize, Container, T> type; };
 
   template<int _chunk_size>
-  using with_chunk_size = AltChunkedMaster<IsLocallyLIFO, _chunk_size, Container, T>;
+  struct with_chunk_size { typedef AltChunkedMaster<IsLocallyLIFO, _chunk_size, Container, T> type; };
 
 private:
   class Chunk : public ChunkHeader, public Galois::FixedSizeRing<T, ChunkSize> {};
@@ -404,7 +404,7 @@ private:
     return c->push_back(val);
   }
 
-  boost::optional<T> doPop(Chunk* c) {
+  Galois::optional<T> doPop(Chunk* c) {
     if (!IsLocallyLIFO)
       return c->extract_front();
     else
@@ -449,10 +449,10 @@ public:
     push(rp.first, rp.second);
   }
 
-  boost::optional<value_type> pop() {
+  Galois::optional<value_type> pop() {
     std::pair<Chunk*, Chunk*>& tld = *data.getLocal();
     Chunk*& n = getPopChunk(tld);
-    boost::optional<value_type> retval;
+    Galois::optional<value_type> retval;
     //simple case, things in current chunk
     if (n && (retval = doPop(n)))
       return retval;

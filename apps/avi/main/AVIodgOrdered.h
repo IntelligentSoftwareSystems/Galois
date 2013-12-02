@@ -28,6 +28,8 @@
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/WorkList/WorkList.h"
 
+#include "Galois/Runtime/KDGtwoPhase.h"
+
 #include <boost/iterator/transform_iterator.hpp>
 
 #include <string>
@@ -134,6 +136,10 @@ protected:
   };
 
   struct Process {
+
+    static const size_t CHUNK_SIZE = 32;
+
+
     MeshInit& meshInit;
     GlobalVec& g;
     Galois::Runtime::PerThreadStorage<LocalVec>& perIterLocalVec;
@@ -192,7 +198,8 @@ public:
             Comparator(), nhVisitorAddRem, p);
         break;
       case useTwoPhase:
-        Galois::for_each_ordered (
+        // Galois::for_each_ordered (
+        Galois::Runtime::for_each_ordered_2p_win (
             boost::make_transform_iterator(elems.begin(), MakeUpdate()),
             boost::make_transform_iterator(elems.end(), MakeUpdate()), 
             Comparator(), nhVisitor, p);

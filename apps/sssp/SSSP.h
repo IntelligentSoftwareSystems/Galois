@@ -24,8 +24,10 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#ifndef SSSP_H
-#define SSSP_H
+#ifndef APPS_SSSP_SSSP_H
+#define APPS_SSSP_SSSP_H
+
+#include "llvm/Support/CommandLine.h"
 
 #include <limits>
 #include <string>
@@ -69,5 +71,11 @@ struct UpdateRequestCommon {
 struct SNode {
   Dist dist;
 };
+
+template<typename Graph>
+void readInOutGraph(Graph& graph);
+
+extern llvm::cl::opt<unsigned int> memoryLimit;
+
 
 #endif

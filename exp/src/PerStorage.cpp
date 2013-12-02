@@ -113,7 +113,7 @@ Galois::Runtime::PerBackend_v2& Galois::Runtime::getPerHostBackend() {
 
 uint64_t PerBackend_v3::allocateOffset() {
   if (NetworkInterface::ID == 0) {
-    std::lock_guard<LL::SimpleLock<true>> lg(lock);
+    std::lock_guard<LL::SimpleLock> lg(lock);
     auto ii = std::find(freelist.begin(), freelist.end(), false);
     if (ii == freelist.end()) {
       assert(0 && "out of dyn slots");
@@ -130,7 +130,7 @@ uint64_t PerBackend_v3::allocateOffset() {
 
 void PerBackend_v3::deallocateOffset(uint64_t off) {
   if (NetworkInterface::ID == 0) {
-    std::lock_guard<LL::SimpleLock<true>> lg(lock);
+    std::lock_guard<LL::SimpleLock> lg(lock);
     assert(freelist[off] && "not allocated");
     freelist[off] = false;
   } else {

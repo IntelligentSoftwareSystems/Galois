@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -22,11 +22,14 @@
  */
 #include "Galois/Timer.h"
 
+#ifndef HAVE_CXX11_CHRONO
 // This is linux/bsd specific
 #include <sys/time.h>
+#endif
 
 using namespace Galois;
 
+#ifndef HAVE_CXX11_CHRONO
 Timer::Timer()
   :_start_hi(0), _start_low(0), _stop_hi(0), _stop_low(0)
 {}
@@ -72,6 +75,7 @@ unsigned long Timer::get_usec() const {
   }
   return usec;
 }
+#endif
 
 TimeAccumulator::TimeAccumulator()
   :ltimer(), acc(0)
@@ -99,4 +103,3 @@ TimeAccumulator& TimeAccumulator::operator+=(const Timer& rhs) {
   acc += rhs.get_usec();
   return *this;
 }
-

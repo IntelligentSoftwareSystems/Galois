@@ -43,14 +43,13 @@ int main(int argc, char *argv[])
    getSystemNetworkInterface().start();
 
    vector<int> myvec;
-   typedef Galois::WorkList::LIFO<int,true> chunk;
    R r;
    f1 f(&r);
    for (int i=1; i<=40; i++) myvec.push_back(i);
 
    std::cerr << "stating\n";
 
-   Galois::for_each<chunk,IterTy,f1> (myvec.begin(), myvec.end(), f);
+   Galois::for_each(myvec.begin(), myvec.end(), f, Galois::wl<Galois::WorkList::LIFO<>>());
    std::cerr << "sum is " << f.r->i << "\n";
    std::cerr << "sum should be " << std::accumulate(myvec.begin(), myvec.end(), 0) << "\n";
    // master_terminate();
