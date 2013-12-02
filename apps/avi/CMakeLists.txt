@@ -12,7 +12,7 @@ file(GLOB Sources
   libMeshInit/femap/*.cpp
   libMeshInit/dgmechanics/*.cpp
   libMeshInit/*.cpp
-  #dummy.f90
+  dummy.f90
 )
 
 enable_language(Fortran OPTIONAL)
@@ -48,9 +48,9 @@ app(AVIorderedSerial main/AVIorderedSerial.cpp
   REQUIRES AVI_FOUND
   EXTLIBS AVI ${LAPACK_LIBRARIES})
 
-app(AVIodgOrdered main/AVIodgOrdered.cpp 
-  REQUIRES AVI_FOUND 
-  EXTLIBS AVI ${LAPACK_LIBRARIES})
+#app(AVIodgOrdered main/AVIodgOrdered.cpp 
+#  REQUIRES AVI_FOUND 
+#  EXTLIBS AVI ${LAPACK_LIBRARIES})
 
 app(AVIodgExplicit main/AVIodgExplicit.cpp
   REQUIRES AVI_FOUND
