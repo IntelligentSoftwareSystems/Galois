@@ -92,6 +92,32 @@ uint32_t vByteDec(uint8_t* in) {
   return retval;
 }
 
+uint32_t vByteDecSkip(uint8_t*& in) {
+  uint8_t rd = *in++;
+  uint32_t retval = rd & 0x7F;
+  if (rd & 0x80) {
+    rd = *in++;
+    retval <<= 7;
+    retval |= rd & 0x7F;
+    if (rd & 0x80) {
+      rd = *in++;
+      retval <<= 7;
+      retval |= rd & 0x7F;
+      if (rd & 0x80) {
+        rd = *in++;
+        retval <<= 7;
+        retval |= rd & 0x7F;
+        if (rd & 0x80) {
+          rd = *in++;
+          retval <<= 7;
+          retval |= rd & 0x7F;
+        }
+      }
+    }
+  }
+  return retval;
+}
+
 uint8_t* vByteSkip(uint8_t* in) {
   uint8_t rd = *in++;
   if (rd & 0x80) {
@@ -152,6 +178,13 @@ uint8_t* v2ByteSkip(uint8_t* in) {
   return in + num + 1;
 }
 
+uint32_t v2ByteDecSkip(uint8_t*& in) {
+  uint32_t rd = *reinterpret_cast<uint32_t*>(in);
+  auto num = rd & 0x03;
+  in += num + 1;
+  static uint32_t shiftTbl[4] = {0x000000FF, 0x0000FFFF, 0x00FFFFFF, 0xFFFFFFFF};
+  return (rd & shiftTbl[num]) >> 2;
+}
 
 class vByteIterator : public std::iterator<std::forward_iterator_tag, uint32_t> {
   uint8_t* base;
@@ -215,8 +248,8 @@ public:
   }
 
   v2DeltaIterator& operator++() {
-    state += v2ByteDec(base);
-    base = v2ByteSkip(base);
+    state += v2ByteDecSkip(base);
+    //base = v2ByteSkip(base);
     return *this;
   }
 
@@ -230,6 +263,59 @@ public:
   bool operator!=(const v2DeltaIterator& rhs) const { return base != rhs.base; }
 };
 
+class vDeltaIterator : public std::iterator<std::forward_iterator_tag, uint32_t> {
+  uint8_t* base;
+  uint32_t state;
+
+public:
+  vDeltaIterator(uint8_t* b = nullptr) :base(b), state(0) {}
+  
+  uint32_t operator*() {
+    return state + vByteDec(base);
+  }
+
+  vDeltaIterator& operator++() {
+    state += vByteDecSkip(base);
+    //base = vByteSkip(base);
+    return *this;
+  }
+
+  vDeltaIterator operator++(int) {
+    vDeltaIterator retval(*this);
+    ++(*this);
+    return retval;
+  }
+
+  bool operator==(const vDeltaIterator& rhs) const { return base == rhs.base; }
+  bool operator!=(const vDeltaIterator& rhs) const { return base != rhs.base; }
+};
+
+class deltaIterator : public std::iterator<std::forward_iterator_tag, uint32_t> {
+  uint32_t* base;
+  uint32_t state;
+
+public:
+  deltaIterator(uint32_t* b = nullptr) :base(b), state(0) {}
+  
+  uint32_t operator*() {
+    return state + *base;
+  }
+
+  deltaIterator& operator++() {
+    state += *base;
+    ++base;
+    return *this;
+  }
+
+  deltaIterator operator++(int) {
+    deltaIterator retval(*this);
+    ++(*this);
+    return retval;
+  }
+
+  bool operator==(const deltaIterator& rhs) const { return base == rhs.base; }
+  bool operator!=(const deltaIterator& rhs) const { return base != rhs.base; }
+};
 
 
 template<typename Iter, typename Iter2>
@@ -258,7 +344,6 @@ void rleCode(Iter b, Iter e, Iter2 out) {
     }
   }
 }
-
 
 namespace Galois {
 namespace Graph {
@@ -441,6 +526,8 @@ public:
         v2ByteEncode(dsts2.begin(), dsts2.end(), std::back_inserter(bw));
         std::copy(bw.begin(), bw.end(), &edgeDst[offset]);
         offset += bw.size();
+        // std::copy(dsts2.begin(), dsts2.end(), &edgeDst[offset]);
+        // offset += dsts2.size();
         edgeIndData[*ii] = offset;
         // auto foo = decodeOne(&*bw.begin(), 0);
         // std::cout << "\n" << *dsts.begin() << " " << foo.first << " " << (foo.second - &*bw.begin()) << "\n\n";
@@ -798,36 +885,38 @@ int main(int argc, char **argv) {
     std::cout << "Collecting All Histograms\n";
 
   Galois::Graph::readGraph(graph, filename);
-  Galois::Graph::readGraph(graphc, filename);
+  //Galois::Graph::readGraph(graphc, filename);
 
-  for (unsigned int x = 0; x < 0; ++x) {
-    auto ii = graph.edge_begin(x);
-    auto iic = graphc.edge_begin(x);
-    auto ee = graph.edge_end(x);
-    auto eec = graphc.edge_end(x);
-    int count = 0;
-    while (ii != ee && iic != eec) {
-      if (graph.getEdgeDst(ii) != graphc.getEdgeDst(iic)) {
-        std::cout << "Mismatch at " << x << "," << count << " : " << graph.getEdgeDst(ii) << " " <<  graphc.getEdgeDst(iic) << "\n";
-      }
-      ++count;
-      ++ii;
-      ++iic;
-    }
-    if (ii != ee) 
-      std::cout << "edge mismatch\n";
-    if (iic != eec)
-      std::cout << "edge mismatch c\n";
-  }
+  // for (unsigned int x = 0; x < 0; ++x) {
+  //   auto ii = graph.edge_begin(x);
+  //   auto iic = graphc.edge_begin(x);
+  //   auto ee = graph.edge_end(x);
+  //   auto eec = graphc.edge_end(x);
+  //   int count = 0;
+  //   while (ii != ee && iic != eec) {
+  //     if (graph.getEdgeDst(ii) != graphc.getEdgeDst(iic)) {
+  //       std::cout << "Mismatch at " << x << "," << count << " : " << graph.getEdgeDst(ii) << " " <<  graphc.getEdgeDst(iic) << "\n";
+  //     }
+  //     ++count;
+  //     ++ii;
+  //     ++iic;
+  //   }
+  //   if (ii != ee) 
+  //     std::cout << "edge mismatch\n";
+  //   if (iic != eec)
+  //     std::cout << "edge mismatch c\n";
+  // }
 
-  std::cout << std::distance(graph.begin(), graph.end()) << ":" << std::distance(graphc.begin(), graphc.end()) << "\n";
-  std::cout << graph.size() << ":" << graphc.size() << "\n";
+  // std::cout << std::distance(graph.begin(), graph.end()) << ":" << std::distance(graphc.begin(), graphc.end()) << "\n";
+  // std::cout << graph.size() << ":" << graphc.size() << "\n";
 
   std::cout << "BFS CSR " << sourcearg << "\n";
   AsyncBFS<Graph>()(graph, sourcearg, "CSR");
-  std::cout << "BFS CSSR " << sourcearg << "\n";
-  AsyncBFS<GraphC>()(graphc, sourcearg, "CCSR");
+  // std::cout << "BFS CSSR " << sourcearg << "\n";
+  // AsyncBFS<GraphC>()(graphc, sourcearg, "CCSR");
   std::cout << "Done BFS " << sourcearg << "\n";
+
+  return 0;
 
   auto size = graph.size();
   raw.resize(size);
