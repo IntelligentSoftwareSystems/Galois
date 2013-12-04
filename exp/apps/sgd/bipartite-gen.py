@@ -8,15 +8,15 @@ def main(num_users, num_movies, num_edges, options):
 	num_nodes = num_users + num_movies
 	adj = collections.defaultdict(set)
 	
-	print('p sp %d %d' % (num_nodes, num_edges))
+	#print('p sp %d %d' % (num_nodes, num_edges))
 
 	user_set = set(xrange(1, num_users+1))
 
 	def randUser():
-		x = random.randint(1, num_users)
+		x = random.randint(num_movies+1, num_movies + num_users)
 		return x	
 	def randMovie():
-		x =random.randint(num_users+1, num_users + num_movies)
+		x =random.randint(1, num_movies)
 		return x	
 	def randRating():
 		return random.randint(1, 5)
@@ -28,14 +28,14 @@ def main(num_users, num_movies, num_edges, options):
 		return True
 	
 	edges_emitted = num_movies
-	for movie in xrange(num_users+1, num_users + num_movies +1):
+	for movie in xrange(1, num_movies+1):
 		user = randUser()
 		addEdge(movie, user, randRating())
 		user_set.discard(user)
 	
 	edges_emitted = edges_emitted + len(user_set)
 	for user in user_set:
-		while not addEdge(randMovie(), user, randRating()):
+		while not addEdge(randMovie(), num_movies + user, randRating()):
 			pass
 
 	for i in xrange(num_edges - edges_emitted):
@@ -43,7 +43,7 @@ def main(num_users, num_movies, num_edges, options):
 			pass
 
 if __name__ == '__main__':
-	usage = 'usage: %prog <num users> <num movies>'
+	usage = 'usage: %prog <num users> <num movies> <num edges>'
 	parser = optparse.OptionParser(usage=usage)
 	(options, args) = parser.parse_args()
 	if len(args) != 3:
