@@ -31,6 +31,8 @@
 #include <fstream>
 #include <vector>
 #include <set>
+#include <unordered_set>
+#include <deque>
 #include <stdint.h>
 #include GALOIS_CXX11_STD_HEADER(random)
 
@@ -213,7 +215,7 @@ void convert_edgelist2gr(const std::string& infilename, const std::string& outfi
   while (infile) {
     size_t src;
     size_t dst;
-    edge_value_type data = 0;
+    edge_value_type data;
 
     infile >> src >> dst;
 
@@ -697,19 +699,9 @@ void convert_gr2sgr(const std::string& infilename, const std::string& outfilenam
   printStatus(ingraph.size(), ingraph.sizeEdges(), outgraph.size(), outgraph.sizeEdges());
 }
 
-template<typename GNode, typename Weights>
-struct order_by_degree {
-  Weights& weights;
-
-  bool operator()(const GNode& a, const GNode& b) {
-    uint64_t wa = weights.count(a) ? weights[a] : ~0;
-    uint64_t wb = weights.count(b) ? weights[b] : ~0;
-    return wa < wb;
-  }
-};
 
 template<typename EdgeTy>
-void order_by_high_degree(const std::string& infilename, const std::string& outfilename, int numSort) {
+void order_by_high_degree(const std::string& infilename, const std::string& outfilename) {
   typedef Galois::Graph::FileGraph Graph;
   typedef Graph::GraphNode GNode;
   typedef Galois::LargeArray<GNode> Permutation;
@@ -718,58 +710,72 @@ void order_by_high_degree(const std::string& infilename, const std::string& outf
   Graph graph;
   graph.structureFromFile(infilename);
 
+  auto sz = graph.size();
+
   Permutation perm;
-  perm.create(graph.size());
-  std::copy(boost::counting_iterator<GNode>(0), boost::counting_iterator<GNode>(graph.size()), perm.begin());
+  perm.create(sz);
+  std::copy(boost::counting_iterator<GNode>(0), boost::counting_iterator<GNode>(sz), perm.begin());
 
-  typedef std::map<GNode,uint64_t> Weights;
-  Weights weights;
+  std::cout << "Done setting up perm\n";
 
-  std::set<GNode> done;
-  for (int z = 0; z < numSort; ++z) {
-    //find the next biggest node
-    unsigned deg = 0;
-    GNode n;
-    for (Graph::iterator ii = graph.begin(), ee = graph.end(); ii != ee; ++ii) {
-      unsigned d = std::distance(graph.edge_begin(*ii), graph.edge_end(*ii));
-      if (d >= deg && !done.count(*ii)) {
-        deg = d;
-        n = *ii;
-      }
-    }
-
-    done.insert(n);
-    std::cout << "First " << n << " deg " << deg << "\n";
-
-    //shift all keys
-    for (Weights::iterator ii = weights.begin(), ee = weights.end(); ii != ee; ++ii) {
-      ii->second <<= 1;
-    }
-
-    //add to sort keys
-    for (Graph::edge_iterator ii = graph.edge_begin(n), ee = graph.edge_end(n);
-         ii != ee; ++ii) {
-      weights[graph.getEdgeDst(ii)] |= 1;
-    }
-    weights[n] |= 1;
+  std::deque<std::deque<std::pair<unsigned, GNode> > > Inv(sz);
+  unsigned count = 0;
+  for(auto ii = graph.begin(), ee = graph.end(); ii != ee; ++ii) {
+    if (!(++count % 1024)) std::cerr << static_cast<double>(count * 100) / sz << "\r";
+    unsigned dist = std::distance(graph.edge_begin(*ii), graph.edge_end(*ii));
+    for (auto dsti = graph.edge_begin(*ii), dste = graph.edge_end(*ii); dsti != dste; ++dsti)
+      Inv[graph.getEdgeDst(dsti)].push_back(std::make_pair(dist,*ii));
   }
 
-  order_by_degree<GNode,Weights> fn = { weights };
-  //compute inverse
-  std::stable_sort(perm.begin(), perm.end(), fn);
+  std::cout << "Found Inverse\n";
+
+  count = 0;
+  for (auto ii = Inv.begin(), ee = Inv.end(); ii != ee; ++ii) {
+    if (!(++count % 1024)) std::cerr << count << " of " << sz << "\r";
+    std::sort(ii->begin(), ii->end(), std::greater<std::pair<unsigned, GNode>>());
+  }
+
+  std::cout << "Done Sorting\n";
+
+  std::sort(perm.begin(), perm.end(), [&Inv, &graph] (GNode lhs, GNode rhs) 
+            {
+              auto lhsi = Inv[lhs].begin(), 
+                lhse = Inv[lhs].end(),
+                rhsi = Inv[rhs].begin(),
+                rhse = Inv[rhs].end();
+              while (lhsi != lhse && rhsi != rhse) {
+                if (*lhsi > *rhsi) return true;
+                if (*lhsi < *rhsi) return false;
+                ++lhsi;
+                ++rhsi;
+              }
+              if (lhsi != lhse) return true;
+              else return false;
+            } );
+
+  std::cout << "Done sorting\n";
 
   Permutation perm2;
-  perm2.create(graph.size());
+  perm2.create(sz);
   //compute permutation
-  for (unsigned x = 0; x < perm.size(); ++x)
+  for (unsigned x = 0; x < perm.size(); ++x) 
     perm2[perm[x]] = x;
 
+  std::cout << "Done inverting\n";
+
   for (unsigned x = 0; x < perm2.size(); ++x)
-    if (perm2[x] == 0)
+    if (perm[x] == 0) {
       std::cout << "Zero is at " << x << "\n";
+      break;
+    }
+  std::cout << "Zero is at " << perm2[0] << "\n";
 
   Graph out;
   Galois::Graph::permute<EdgeTy>(graph, perm2, out);
+
+  // std::cout << "Biggest was " << first << " now " << perm2[first] << " with "
+  //           << std::distance(out.edge_begin(perm2[first]), out.edge_end(perm2[first]))
+  //           << "\n";
 
   out.structureToFile(outfilename);
   printStatus(graph.size(), graph.sizeEdges());
@@ -1765,7 +1771,7 @@ int main(int argc, char** argv) {
     case gr2sintgr: convert_gr2sgr<int32_t>(inputfilename, outputfilename); break;
     case gr2tintgr: transpose<int32_t>(inputfilename, outputfilename); break;
     case gr2treeintgr: add_tree<int32_t>(inputfilename, outputfilename, maxValue); break;
-    case gr2orderdeg: order_by_high_degree<void>(inputfilename, outputfilename, maxValue); break;
+    case gr2orderdeg: order_by_high_degree<void>(inputfilename, outputfilename); break;
     case intedgelist2gr: convert_edgelist2gr<int>(inputfilename, outputfilename); break;
     case mtx2doublegr: convert_mtx2gr<double>(inputfilename, outputfilename); break;
     case mtx2floatgr: convert_mtx2gr<float>(inputfilename, outputfilename); break;
