@@ -4,3 +4,6 @@ LINKS = -I$(BOOST_LIB) -L./../../../build/release/src -lgalois -pthread /opt/int
 
 all:
 	g++ -g -O3 -ffast-math -std=c++11 sgd.cpp -o sgd $(INCLUDES) $(LINKS)
+
+alamere:
+	g++ -g -O3 -ffast-math -std=c++11 sgdAlamere.cpp -o sgd $(INCLUDES) $(LINKS) -D __STDC_LIMIT_MACROS=1
