@@ -540,41 +540,12 @@ void runBlockSlices(Graph& g, unsigned int threadCount, unsigned int usersPerBlo
 	}
 }
 
-typedef struct spinlock
-{
-	//1 if someone holds the lock
-	//0 if someone doesn't hold the lock
-	volatile short lockvar;
-} spinlock;
-
-__attribute__((noinline)) void spinlock_lock(spinlock& lock)
-{
-	//keep looping while someone else has the lock
-	while( lock.lockvar == 1 ||
-			__sync_bool_compare_and_swap(&lock.lockvar, 0, 1) == false);
-
-	//returns when lock has been acquired
-}
-
-__attribute__((noinline)) bool try_lock(spinlock& lock)
-{
-	//keep looping while someone else has the lock
-	return __sync_bool_compare_and_swap(&lock.lockvar, 0, 1);
-
-	//returns when lock has been acquired
-}
-
-__attribute__((noinline)) void spinlock_unlock(spinlock& lock)
-{
-	//if lock is held, release it
-	//__sync_bool_compare_and_swap(&lock.lockvar, 0xffff, 0);
-	lock.lockvar = 0;
-}
+typedef Galois::Runtime::LL::SimpleLock spinlock;
 
 struct sgd_march
 {
 	Graph& g;
-	spinlock* locks; 
+        spinlock* locks; 
 	sgd_march(Graph& g, spinlock* locks) : g(g), locks(locks) {}
 	
 	void operator()(ThreadWorkItem& workItem)
@@ -595,10 +566,10 @@ struct sgd_march
 		{
 			//spinlock_lock(locks[currentSliceId]);
 
-			if(!try_lock(locks[currentSliceId]))
+                  if(!locks[currentSliceId].try_lock())
 			{
 				conflicts++;
-				spinlock_lock(locks[currentSliceId]);
+				locks[currentSliceId].lock();
 			}
 			
 			//if(workItem.id == 0)
@@ -662,7 +633,7 @@ struct sgd_march
 				}
 			}
 
-			spinlock_unlock(locks[currentSliceId]);
+			locks[currentSliceId].unlock();
 			
 			currentSliceId++;
 			sliceUpdates++;
@@ -694,7 +665,6 @@ void runSliceMarch(Graph& g, unsigned int threadCount, unsigned int usersPerBloc
 	
 	unsigned int numSlices = NUM_USER_NODES / usersPerBlockSlice;
 	spinlock* locks = new spinlock[numSlices];
-	memset(locks, 0, sizeof(spinlock) * numSlices);
 	unsigned int slicesPerThread = numSlices / threadCount;
 	printf("numSlices: %d slicesPerThread: %d\n", numSlices, slicesPerThread);
 
@@ -768,11 +738,12 @@ int main(int argc, char** argv)
 	//fill each node's id & initialize the latent vectors
 	unsigned int numMovieNodes = initializeGraphData(g);
 	unsigned int numUserNodes = g.size() - numMovieNodes;
+
+	std::cout << "Input initialized, num users = " << numUserNodes 
+		<< ", num movies = " << numMovieNodes << std::endl;
+
 	NUM_MOVIE_NODES = numMovieNodes;
 	NUM_USER_NODES = numUserNodes;
-
-	//count_ratings(g, threadCount);
-	//exit(-1);
 
 	Galois::StatTimer timer;
 	timer.start();

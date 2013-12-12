@@ -43,6 +43,15 @@ static const char* const name = "Stochastic Gradient Descent";
 static const char* const desc = "Computes Matrix Decomposition using Stochastic Gradient Descent";
 static const char* const url = "sgd";
 
+static const unsigned int LATENT_VECTOR_SIZE = 20;
+static const unsigned int MAX_MOVIE_UPDATES = 5;
+static const double MINVAL = -1e+100;
+static const double MAXVAL = 1e+100;
+
+static const double LEARNING_RATE = 0.001; // GAMMA
+static const double DECAY_RATE = 0.9; // STEP_DEC
+static const double LAMBDA = 0.001;
+
 enum Algo {
 	block,
 	blockAndSliceUsers,
@@ -65,9 +74,16 @@ static cll::opt<Algo> algo(cll::desc("Choose an algorithm:"),
 		cll::init(blockAndSliceBoth));
 
 struct Node {
-	double* latent_vector; //latent vector to be learned
-	unsigned int updates; //number of updates made to this node (only used by movie nodes)
-	unsigned int edge_offset; //if a movie's update is interrupted, where to start when resuming
+  double latent_vector[LATENT_VECTOR_SIZE]; //latent vector to be learned
+  unsigned int updates; //number of updates made to this node (only used by movie nodes)
+  unsigned int edge_offset; //if a movie's update is interrupted, where to start when resuming
+
+  void dump(std::ostream& os) {
+    os << "{" << latent_vector[0];
+    for (int i = 1; i < LATENT_VECTOR_SIZE; ++i)
+      os << ", " << latent_vector[i];
+    os << "}";
+  }
 };
 
 //local computation graph (can't add nodes/edges at runtime)
@@ -100,75 +116,62 @@ unsigned int NUM_MOVIE_NODES = 0;
 unsigned int NUM_USER_NODES = 0;
 unsigned int NUM_RATINGS = 0;
 
-static const unsigned int LATENT_VECTOR_SIZE = 20;
-static const unsigned int MAX_MOVIE_UPDATES = 5;
-static const double MINVAL = -1e+100;
-static const double MAXVAL = 1e+100;
+//possibly over-typed
+double vector_dot(const Node& movie_data, const Node& user_data) {
+  //Could just specify restrict on parameters since vector is built in
+  const double* __restrict__ movie_latent = movie_data.latent_vector;
+  const double* __restrict__ user_latent = user_data.latent_vector;
 
-static const double LEARNING_RATE = 0.001; // GAMMA
-static const double DECAY_RATE = 0.9; // STEP_DEC
-static const double LAMBDA = 0.001;
-
-void print_latent(double* vec)
-{
-	for(unsigned i = 0; i < LATENT_VECTOR_SIZE; i++)
-	{
-		printf("%f ", vec[i]);
-	}
-	printf("\n");
+  double dp = 0.0;
+  for (int i = 0; i < LATENT_VECTOR_SIZE; ++i)
+    dp += user_latent[i] * movie_latent[i];
+  assert(std::isnormal(pred));
+  return dp;
 }
 
 double calcPrediction (const Node& movie_data, const Node& user_data) {
-	// XXX: __restrict__ may not be necessary here
-	const double* __restrict__ movie_latent = movie_data.latent_vector;
-	const double* __restrict__ user_latent = user_data.latent_vector;
-
-	double pred = 0.0;
-	for(unsigned int i = 0; i < LATENT_VECTOR_SIZE; i++)
-	{
-		pred += user_latent[i] * movie_latent[i];
-	}
-
-	pred = std::min (MAXVAL, pred);
-	pred = std::max (MINVAL, pred);
-
-	return pred;
+  double pred = vector_dot(movie_data, user_data);
+  pred = std::min (MAXVAL, pred);
+  pred = std::max (MINVAL, pred);
+  return pred;
 }
 
-/*inline*/ void doGradientUpdate(Node& movie_data, Node& user_data, unsigned int edge_rating)
+struct PurdueLearnFN {
+  static double step_size(const Node& movie_data) {
+    return LEARNING_RATE * 1.5 / (1.0 + DECAY_RATE * pow(movie_data.updates + 1, 1.5));
+  }
+};
+
+struct IntelLearnFN {
+  static double step_size(const Node& movie_data) {
+    return LEARNING_RATE * pow (DECAY_RATE, movie_data.updates);
+  }
+};
+
+template<typename LearnFN>
+void doGradientUpdate(Node& movie_data, Node& user_data, unsigned int edge_rating)
 {
-	//Purdue folks' learning function:
-	//double step_size = LEARNING_RATE * 1.5 / (1.0 + DECAY_RATE * pow(movie_data.updates + 1, 1.5));
-	//Intel folks' learning function:
-	double step_size = LEARNING_RATE * pow (DECAY_RATE, movie_data.updates);
+  double step_size = LearnFN::step_size(movie_data);
 	
-	double* __restrict__ movie_latent = movie_data.latent_vector;
-	double* __restrict__ user_latent = user_data.latent_vector;
-
-	//calculate error using calcPrediction -> leads to some slowdown
-	//  double pred = calcPrediction (movie_data, user_data);
-	//  double cur_error = pred - edge_rating;
-	
-	//calculate error
-	double cur_error = 0;
-	for(unsigned int i = 0; i < LATENT_VECTOR_SIZE; i++)
-	{
-		cur_error += user_latent[i] * movie_latent[i];
-	}
-	cur_error -= edge_rating;
-
-	//take gradient step
-	for(unsigned int i = 0; i < LATENT_VECTOR_SIZE; i++)
-	{
-		double prev_movie_val = movie_latent[i];
-		
-		double a = step_size * (cur_error * user_latent[i] + LAMBDA * prev_movie_val);
-		movie_latent[i] -= a;
-		double b = step_size * (cur_error * prev_movie_val + LAMBDA * user_latent[i]);
-		user_latent[i] -= b;
-	}
-
-	++movie_data.updates;
+  double* __restrict__ movie_latent = movie_data.latent_vector;
+  double* __restrict__ user_latent = user_data.latent_vector;
+  
+  //calculate error
+  double cur_error = vector_dot(movie_data, user_data);
+  cur_error -= edge_rating;
+  
+  //take gradient step
+  for(unsigned int i = 0; i < LATENT_VECTOR_SIZE; i++)
+    {
+      double prev_movie_val = movie_latent[i];
+      
+      double a = step_size * (cur_error * user_latent[i] + LAMBDA * prev_movie_val);
+      movie_latent[i] -= a;
+      double b = step_size * (cur_error * prev_movie_val + LAMBDA * user_latent[i]);
+      user_latent[i] -= b;
+    }
+  
+  ++movie_data.updates;
 }
 
 void verify (Graph& g) {
@@ -243,7 +246,7 @@ struct sgd_block
 				unsigned int edge_rating = g.getEdgeData(edge_it, Galois::NONE);	
 
 				//do gradient step
-				doGradientUpdate(movie_data, user_data, edge_rating);
+				doGradientUpdate<IntelLearnFN>(movie_data, user_data, edge_rating);
 
 				updates++;
 			}
@@ -318,7 +321,7 @@ struct sgd_block_users
 					unsigned int edge_rating = g.getEdgeData(edge_it, Galois::NONE);	
 
 					//do gradient step
-					doGradientUpdate(movie_data, user_data, edge_rating);
+					doGradientUpdate<IntelLearnFN>(movie_data, user_data, edge_rating);
 
 					updates++;
 				}
@@ -401,7 +404,7 @@ struct sgd_block_users_movies
 						unsigned int edge_rating = g.getEdgeData(edge_it, Galois::NONE);	
 
 						//do gradient step
-						doGradientUpdate(movie_data, user_data, edge_rating);
+						doGradientUpdate<IntelLearnFN>(movie_data, user_data, edge_rating);
 
 						updates++;
 					}
@@ -695,7 +698,7 @@ struct sgd_march
 					unsigned int edge_rating = g.getEdgeData(edge_it, Galois::NONE);	
 
 					//do gradient step
-					doGradientUpdate(movie_data, user_data, edge_rating);
+					doGradientUpdate<IntelLearnFN>(movie_data, user_data, edge_rating);
 
 					updates++;
 					//if(workItem.id == 0) printf("yoookay user %d\n", user - NUM_MOVIE_NODES);
@@ -817,12 +820,8 @@ unsigned int initializeGraphData(Graph& g)
 		data.updates = 0;
 
 		//fill latent vectors with random values
-		double* lv = new double[LATENT_VECTOR_SIZE];
 		for(int i = 0; i < LATENT_VECTOR_SIZE; i++)
-		{
-			lv[i] = genRand();
-		}
-		data.latent_vector = lv;
+			data.latent_vector[i] = genRand();
 
 		//count number of movies we've seen; only movies nodes have edges
 		unsigned int num_edges = 
