@@ -53,6 +53,7 @@ static const double DECAY_RATE = 0.9; // STEP_DEC
 static const double LAMBDA = 0.001;
 
 enum Algo {
+  nodeMovie,
 	block,
 	blockAndSliceUsers,
 	blockAndSliceBoth,
@@ -63,9 +64,11 @@ namespace cll = llvm::cl;
 static cll::opt<std::string> inputFile (cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<unsigned> usersPerBlockSlice ("usersPerBlk", cll::desc ("[users per block slice]"), cll::init (2048));
 static cll::opt<unsigned> moviesPerBlockSlice ("moviesPerBlk", cll::desc ("[movies per block slice]"), cll::init (512));
+static cll::opt<bool> verifyPerIter ("verifyPerIter", cll::desc ("compute RMS every iter"), cll::init (false));
 
 static cll::opt<Algo> algo(cll::desc("Choose an algorithm:"),
 		cll::values(
+                            clEnumVal(nodeMovie, "Node by Movies"),
 			clEnumVal(block, "Block by Users and Movies"),
 			clEnumVal(blockAndSliceUsers, "Block by Users and Movies, Slice by Users"),
 			clEnumVal(blockAndSliceBoth, "Block by Users and Movies, Slice by Users and Movies (default)"),
@@ -125,7 +128,7 @@ double vector_dot(const Node& movie_data, const Node& user_data) {
   double dp = 0.0;
   for (int i = 0; i < LATENT_VECTOR_SIZE; ++i)
     dp += user_latent[i] * movie_latent[i];
-  assert(std::isnormal(pred));
+  assert(std::isnormal(dp));
   return dp;
 }
 
@@ -137,38 +140,41 @@ double calcPrediction (const Node& movie_data, const Node& user_data) {
 }
 
 struct PurdueLearnFN {
-  static double step_size(const Node& movie_data) {
-    return LEARNING_RATE * 1.5 / (1.0 + DECAY_RATE * pow(movie_data.updates + 1, 1.5));
+  static double step_size(unsigned int round) {
+    return LEARNING_RATE * 1.5 / (1.0 + DECAY_RATE * pow(round + 1, 1.5));
   }
 };
 
 struct IntelLearnFN {
-  static double step_size(const Node& movie_data) {
-    return LEARNING_RATE * pow (DECAY_RATE, movie_data.updates);
+  static double step_size(unsigned int round) {
+    return LEARNING_RATE * pow (DECAY_RATE, round);
+  }
+};
+
+struct ConstLearnFN {
+  static double step_size(unsigned int round) {
+    return (double)1 / (double)(round + 2);
   }
 };
 
 template<typename LearnFN>
 void doGradientUpdate(Node& movie_data, Node& user_data, unsigned int edge_rating)
 {
-  double step_size = LearnFN::step_size(movie_data);
+  double step_size = LearnFN::step_size(movie_data.updates);
 	
   double* __restrict__ movie_latent = movie_data.latent_vector;
   double* __restrict__ user_latent = user_data.latent_vector;
   
   //calculate error
-  double cur_error = vector_dot(movie_data, user_data);
-  cur_error -= edge_rating;
+  double cur_error = edge_rating - vector_dot(movie_data, user_data);
   
   //take gradient step
   for(unsigned int i = 0; i < LATENT_VECTOR_SIZE; i++)
     {
       double prev_movie_val = movie_latent[i];
-      
-      double a = step_size * (cur_error * user_latent[i] + LAMBDA * prev_movie_val);
-      movie_latent[i] -= a;
-      double b = step_size * (cur_error * prev_movie_val + LAMBDA * user_latent[i]);
-      user_latent[i] -= b;
+      double prev_user_val = user_latent[i];
+      movie_latent[i] += step_size * (cur_error * prev_user_val  - LAMBDA * prev_movie_val);
+      user_latent[i]  += step_size * (cur_error * prev_movie_val - LAMBDA * prev_user_val);
     }
   
   ++movie_data.updates;
@@ -191,6 +197,9 @@ void verify (Graph& g) {
 			double pred = calcPrediction (g.getData (n, Galois::NONE), g.getData (m, Galois::NONE));
 			double rating = g.getEdgeData (e, Galois::NONE);
 			
+                        if (!std::isnormal(pred))
+                          std::cout << "denormal warning\n";
+
 			rms += ((pred - rating) * (pred - rating));
 			}
 			});
@@ -200,6 +209,28 @@ void verify (Graph& g) {
 	
 	std::cout << "Root Mean Square Error after training: " << total_rms << " " << final_rms << std::endl;
 }
+
+template<typename LearnFN>
+struct sgd_node_movie {
+  Graph& g;
+  sgd_node_movie(Graph& g) :g(g) {}
+
+  template<typename Context>
+  void operator()(GNode node, Context& cnx) {
+    for (auto ii = g.edge_begin (node), ee = g.edge_end (node);
+         ii != ee; ++ii)
+      doGradientUpdate<LearnFN>(g.getData(node), g.getData(g.getEdgeDst(ii)), g.getEdgeData(ii));
+  }
+
+  static void go(Graph& g) {
+    for (int i = 0; i < 10; ++i) {
+      if (verifyPerIter)
+        verify(g);
+      std::cout << "Step Size: " << LearnFN::step_size(i) << "\n";
+      Galois::for_each_local(g, sgd_node_movie(g));
+    }
+  }
+};
 
 struct sgd_block
 {
@@ -524,7 +555,7 @@ void count_ratings(Graph& g) {
 	//std::cout << "Num zeroes " << num_zeroes << std::endl;
 }
 
-template<typename BlockFn>
+template<typename BlockFn, typename LearnFN>
 void runBlockSlices(Graph& g) {
 
 	const unsigned threadCount = Galois::getActiveThreads ();
@@ -583,8 +614,11 @@ void runBlockSlices(Graph& g) {
 	//update all movies/users MAX_MOVIE_UPDATES times
 	for(unsigned int update = 0; update < MAX_MOVIE_UPDATES; update++)
 	{	
-		//std::cout << "Iteration " << update << std::endl;
-		//verify (g);
+          //std::cout << "Iteration " << update << std::endl;
+          if (verifyPerIter) {
+            std::cout << "Step size: " << LearnFN::step_size(update) << "\n";
+            verify (g);
+          }
 
 		//work on the current blocks, move the block a thread works on to the right
 		for(unsigned int j = 0; j < numWorkItems; j++)
@@ -797,11 +831,11 @@ void runSliceMarch(Graph& g) {
 
 static double genRand () {
 	// generate a random double in (-1,1)
-	return double (2 * std::rand ()) / double (RAND_MAX) - 1;
+  return 2.0 * ((double)std::rand () / (double)RAND_MAX) - 1.0;
 }
 
 // Initializes latent vector and id for each node
-unsigned int initializeGraphData(Graph& g)
+std::pair<unsigned int, unsigned int> initializeGraphData(Graph& g)
 {
 	// unsigned int seed = 42;
 	// std::default_random_engine eng(seed);
@@ -810,6 +844,7 @@ unsigned int initializeGraphData(Graph& g)
 	std::srand (SEED);
 
 	unsigned int numMovieNodes = 0;
+        unsigned int numUserNodes = 0;
 	unsigned int numRatings = 0;
 
 	//for all movie and user nodes in the graph
@@ -828,14 +863,16 @@ unsigned int initializeGraphData(Graph& g)
 			g.edge_end(gnode, Galois::NONE) - g.edge_begin(gnode, Galois::NONE);
 		numRatings += num_edges;
 		if(num_edges > 0)
-			numMovieNodes++;
+                  numMovieNodes++;
+                else
+                  numUserNodes++;
 
 		data.edge_offset = 0;
 	}
 
 	NUM_RATINGS = numRatings;
 
-	return numMovieNodes;
+	return std::make_pair(numMovieNodes, numUserNodes);
 }
 
 
@@ -852,8 +889,8 @@ int main(int argc, char** argv) {
 	Galois::Graph::readGraph(g, inputFile);
 
 	//fill each node's id & initialize the latent vectors
-	unsigned int numMovieNodes = initializeGraphData(g);
-	unsigned int numUserNodes = g.size() - numMovieNodes;
+	unsigned int numMovieNodes, numUserNodes;
+        std::tie(numMovieNodes, numUserNodes) = initializeGraphData(g);
 
 	std::cout << "Input initialized, num users = " << numUserNodes 
 		<< ", num movies = " << numMovieNodes << std::endl;
@@ -866,16 +903,20 @@ int main(int argc, char** argv) {
 
 	switch (algo) {
 
+        case Algo::nodeMovie:
+          sgd_node_movie<IntelLearnFN>::go(g);
+          break;
+
 		case Algo::block:
-			runBlockSlices<sgd_block>(g);
+                  runBlockSlices<sgd_block, IntelLearnFN>(g);
 			break;
 
 		case Algo::blockAndSliceUsers:
-			runBlockSlices<sgd_block_users>(g);
+                  runBlockSlices<sgd_block_users, IntelLearnFN>(g);
 			break;
 
 		case Algo::blockAndSliceBoth:
-			runBlockSlices<sgd_block_users_movies>(g);
+                  runBlockSlices<sgd_block_users_movies, IntelLearnFN>(g);
 			break;
 
 		case Algo::sliceMarch:
