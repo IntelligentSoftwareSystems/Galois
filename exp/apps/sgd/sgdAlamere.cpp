@@ -139,29 +139,30 @@ double calcPrediction (const Node& movie_data, const Node& user_data) {
   return pred;
 }
 
-struct PurdueLearnFN {
-  static double step_size(unsigned int round) {
+struct LearnFN {
+  virtual double step_size(unsigned int round) const = 0;
+};
+
+struct PurdueLearnFN : public LearnFN {
+  virtual double step_size(unsigned int round) const {
     return LEARNING_RATE * 1.5 / (1.0 + DECAY_RATE * pow(round + 1, 1.5));
   }
 };
 
-struct IntelLearnFN {
-  static double step_size(unsigned int round) {
+struct IntelLearnFN : public LearnFN {
+  virtual double step_size(unsigned int round) const {
     return LEARNING_RATE * pow (DECAY_RATE, round);
   }
 };
 
-struct ConstLearnFN {
-  static double step_size(unsigned int round) {
-    return (double)1 / (double)(round + 2);
+struct ConstLearnFN : public LearnFN {
+  virtual double step_size(unsigned int round) const {
+    return (double)1 / (double)(round + 1);
   }
 };
 
-template<typename LearnFN>
-void doGradientUpdate(Node& movie_data, Node& user_data, unsigned int edge_rating)
+void doGradientUpdate(Node& movie_data, Node& user_data, unsigned int edge_rating, double step_size)
 {
-  double step_size = LearnFN::step_size(movie_data.updates);
-	
   double* __restrict__ movie_latent = movie_data.latent_vector;
   double* __restrict__ user_latent = user_data.latent_vector;
   
@@ -176,8 +177,6 @@ void doGradientUpdate(Node& movie_data, Node& user_data, unsigned int edge_ratin
       movie_latent[i] += step_size * (cur_error * prev_user_val  - LAMBDA * prev_movie_val);
       user_latent[i]  += step_size * (cur_error * prev_movie_val - LAMBDA * prev_user_val);
     }
-  
-  ++movie_data.updates;
 }
 
 void verify (Graph& g) {
@@ -210,32 +209,40 @@ void verify (Graph& g) {
 	std::cout << "Root Mean Square Error after training: " << total_rms << " " << final_rms << std::endl;
 }
 
-template<typename LearnFN>
 struct sgd_node_movie {
   Graph& g;
-  sgd_node_movie(Graph& g) :g(g) {}
+  double step_size;
+  sgd_node_movie(Graph& g, double ss) :g(g), step_size(ss) {}
 
   template<typename Context>
   void operator()(GNode node, Context& cnx) {
     for (auto ii = g.edge_begin (node), ee = g.edge_end (node);
          ii != ee; ++ii)
-      doGradientUpdate<LearnFN>(g.getData(node), g.getData(g.getEdgeDst(ii)), g.getEdgeData(ii));
+      doGradientUpdate(g.getData(node), g.getData(g.getEdgeDst(ii)), g.getEdgeData(ii), step_size);
   }
 
-  static void go(Graph& g) {
+  static void go(Graph& g, unsigned int numMovieNodes, unsigned int numUserNodes, const LearnFN* lf) {
+    std::deque<GNode> Movies;
+    for (auto ii = g.begin(), ee = g.end(); ii != ee; ++ii)
+      if (g.edge_begin(*ii) != g.edge_end(*ii))
+        Movies.push_back(*ii);
     for (int i = 0; i < 10; ++i) {
       if (verifyPerIter)
         verify(g);
-      std::cout << "Step Size: " << LearnFN::step_size(i) << "\n";
-      Galois::for_each_local(g, sgd_node_movie(g));
+      double step_size = lf->step_size(i);
+      std::cout << "Step Size: " << step_size << "\n";
+      if (i != 0)
+        std::random_shuffle(Movies.begin(), Movies.end());
+      Galois::for_each(Movies.begin(), Movies.end(), sgd_node_movie(g, step_size));
     }
   }
 };
 
 struct sgd_block
 {
-	Graph& g;
-	sgd_block(Graph& g) : g(g) {}
+  Graph& g;
+  double step_size;
+  sgd_block(Graph& g, double ss) : g(g), step_size(ss) {}
 
 	void operator()(ThreadWorkItem& workItem)
 	{
@@ -277,7 +284,8 @@ struct sgd_block
 				unsigned int edge_rating = g.getEdgeData(edge_it, Galois::NONE);	
 
 				//do gradient step
-				doGradientUpdate<IntelLearnFN>(movie_data, user_data, edge_rating);
+				doGradientUpdate(movie_data, user_data, edge_rating, step_size);
+                                ++movie_data.updates;
 
 				updates++;
 			}
@@ -299,8 +307,9 @@ struct sgd_block
 
 struct sgd_block_users
 {
-	Graph& g;
-	sgd_block_users(Graph& g) : g(g) {}
+  Graph& g;
+  double step_size;
+  sgd_block_users(Graph& g, double ss) : g(g), step_size(ss) {}
 
 	void operator()(ThreadWorkItem& workItem)
 	{
@@ -352,7 +361,8 @@ struct sgd_block_users
 					unsigned int edge_rating = g.getEdgeData(edge_it, Galois::NONE);	
 
 					//do gradient step
-					doGradientUpdate<IntelLearnFN>(movie_data, user_data, edge_rating);
+					doGradientUpdate(movie_data, user_data, edge_rating, step_size);
+                                        ++movie_data.updates;
 
 					updates++;
 				}
@@ -376,8 +386,9 @@ struct sgd_block_users
 //movies blocked also
 struct sgd_block_users_movies
 {
-	Graph& g;
-	sgd_block_users_movies(Graph& g) : g(g) {}
+  Graph& g;
+  double step_size;
+  sgd_block_users_movies(Graph& g, double ss) : g(g), step_size(ss) {}
 
 	void operator()(ThreadWorkItem& workItem)
 	{
@@ -435,7 +446,8 @@ struct sgd_block_users_movies
 						unsigned int edge_rating = g.getEdgeData(edge_it, Galois::NONE);	
 
 						//do gradient step
-						doGradientUpdate<IntelLearnFN>(movie_data, user_data, edge_rating);
+						doGradientUpdate(movie_data, user_data, edge_rating, step_size);
+                                                ++movie_data.updates;
 
 						updates++;
 					}
@@ -555,8 +567,8 @@ void count_ratings(Graph& g) {
 	//std::cout << "Num zeroes " << num_zeroes << std::endl;
 }
 
-template<typename BlockFn, typename LearnFN>
-void runBlockSlices(Graph& g) {
+template<typename BlockFn>
+void runBlockSlices(Graph& g, const LearnFN* lf) {
 
 	const unsigned threadCount = Galois::getActiveThreads ();
 
@@ -616,7 +628,7 @@ void runBlockSlices(Graph& g) {
 	{	
           //std::cout << "Iteration " << update << std::endl;
           if (verifyPerIter) {
-            std::cout << "Step size: " << LearnFN::step_size(update) << "\n";
+            std::cout << "Step size: " << lf->step_size(update) << "\n";
             verify (g);
           }
 
@@ -625,7 +637,7 @@ void runBlockSlices(Graph& g) {
 		{	
 			// std::cout << "Update " << update << " Block " << j << std::endl;
 			//assign one ThreadWorkItem to each thread statically
-			Galois::do_all(workItems + 0, workItems + numWorkItems, BlockFn(g));
+                        Galois::do_all(workItems + 0, workItems + numWorkItems, BlockFn(g, lf->step_size(update)));
 			//Galois::do_all(workItems + 0, workItems + numWorkItems, sgd_block_users_movies(g));
 
 			//move each thread's assignment of work one block to the right
@@ -660,9 +672,10 @@ typedef Galois::Runtime::LL::PaddedLock<true> SpinLock;
 
 struct sgd_march
 {
-	Graph& g;
-	SpinLock* locks; 
-	sgd_march(Graph& g, SpinLock* locks) : g(g), locks(locks) {}
+  Graph& g;
+  SpinLock* locks; 
+  double step_size;
+  sgd_march(Graph& g, SpinLock* locks, double ss) : g(g), locks(locks), step_size(ss) {}
 
 	void operator()(ThreadWorkItem& workItem)
 	{
@@ -732,7 +745,8 @@ struct sgd_march
 					unsigned int edge_rating = g.getEdgeData(edge_it, Galois::NONE);	
 
 					//do gradient step
-					doGradientUpdate<IntelLearnFN>(movie_data, user_data, edge_rating);
+					doGradientUpdate(movie_data, user_data, edge_rating, step_size);
+                                        ++movie_data.updates;
 
 					updates++;
 					//if(workItem.id == 0) printf("yoookay user %d\n", user - NUM_MOVIE_NODES);
@@ -772,7 +786,7 @@ struct sgd_march
 };
 
 
-void runSliceMarch(Graph& g) {
+void runSliceMarch(Graph& g, const LearnFN* lf) {
 
 	const unsigned threadCount = Galois::getActiveThreads ();
 	unsigned numWorkItems = threadCount;
@@ -815,11 +829,13 @@ void runSliceMarch(Graph& g) {
 		workItems[i] = wi;
 	}
 
+        double step_size = lf->step_size(1); // FIXME
+
 	//move the edge iterators of each movie to the start of the current block
 	//advances the edge iterator until it reaches the userRangeStart field of the ThreadWorkItem
 	//userRangeStart isn't needed after this point
 	Galois::do_all(workItems + 0, workItems + numWorkItems, advance_edge_iterators(g));
-	Galois::do_all(workItems + 0, workItems + numWorkItems, sgd_march(g, locks));
+	Galois::do_all(workItems + 0, workItems + numWorkItems, sgd_march(g, locks, step_size));
 
 
 	/*for(unsigned int i = 0; i < numWorkItems; i++)
@@ -901,29 +917,25 @@ int main(int argc, char** argv) {
 	Galois::StatTimer timer;
 	timer.start();
 
+        std::unique_ptr<LearnFN> lf(new IntelLearnFN);
+
 	switch (algo) {
-
         case Algo::nodeMovie:
-          sgd_node_movie<IntelLearnFN>::go(g);
+          sgd_node_movie::go(g, numMovieNodes, numUserNodes, lf.get());
           break;
-
-		case Algo::block:
-                  runBlockSlices<sgd_block, IntelLearnFN>(g);
-			break;
-
-		case Algo::blockAndSliceUsers:
-                  runBlockSlices<sgd_block_users, IntelLearnFN>(g);
-			break;
-
-		case Algo::blockAndSliceBoth:
-                  runBlockSlices<sgd_block_users_movies, IntelLearnFN>(g);
-			break;
-
-		case Algo::sliceMarch:
-			runSliceMarch(g);
-			break;
-
-	}
+        case Algo::block:
+          runBlockSlices<sgd_block>(g, lf.get());
+          break;
+        case Algo::blockAndSliceUsers:
+          runBlockSlices<sgd_block_users>(g, lf.get());
+          break;
+        case Algo::blockAndSliceBoth:
+          runBlockSlices<sgd_block_users_movies>(g, lf.get());
+          break;
+        case Algo::sliceMarch:
+          runSliceMarch(g, lf.get());
+          break;
+        }
 
 	timer.stop();
 
