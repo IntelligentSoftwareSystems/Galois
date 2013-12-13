@@ -51,13 +51,22 @@ static const double MAXVAL = 1e+100;
 static const double LEARNING_RATE = 0.001; // GAMMA
 static const double DECAY_RATE = 0.9; // STEP_DEC
 static const double LAMBDA = 0.001;
+static const double BottouInit = 0.1;
 
 enum Algo {
   nodeMovie,
-	block,
-	blockAndSliceUsers,
-	blockAndSliceBoth,
-	sliceMarch
+  edgeMovie,
+  block,
+  blockAndSliceUsers,
+  blockAndSliceBoth,
+  sliceMarch
+};
+
+enum Learn {
+  Intel,
+  Purdue,
+  Bottou,
+  Inv
 };
 
 namespace cll = llvm::cl;
@@ -67,14 +76,26 @@ static cll::opt<unsigned> moviesPerBlockSlice ("moviesPerBlk", cll::desc ("[movi
 static cll::opt<bool> verifyPerIter ("verifyPerIter", cll::desc ("compute RMS every iter"), cll::init (false));
 
 static cll::opt<Algo> algo(cll::desc("Choose an algorithm:"),
-		cll::values(
-                            clEnumVal(nodeMovie, "Node by Movies"),
-			clEnumVal(block, "Block by Users and Movies"),
-			clEnumVal(blockAndSliceUsers, "Block by Users and Movies, Slice by Users"),
-			clEnumVal(blockAndSliceBoth, "Block by Users and Movies, Slice by Users and Movies (default)"),
-			clEnumVal(sliceMarch, "Marching Slices version"),
-			clEnumValEnd), 
-		cll::init(blockAndSliceBoth));
+                           cll::values(
+                                       clEnumVal(nodeMovie, "Node by Movies"),
+                                       clEnumVal(edgeMovie, "Edge by Movies"),
+                                       clEnumVal(block, "Block by Users and Movies"),
+                                       clEnumVal(blockAndSliceUsers, "Block by Users and Movies, Slice by Users"),
+                                       clEnumVal(blockAndSliceBoth, "Block by Users and Movies, Slice by Users and Movies (default)"),
+                                       clEnumVal(sliceMarch, "Marching Slices version"),
+                                       clEnumValEnd), 
+                           cll::init(blockAndSliceBoth));
+
+static cll::opt<Learn> learn(cll::desc("Choose a learning function:"),
+                             cll::values(
+                                         clEnumVal(Intel, "Intel"),
+                                         clEnumVal(Purdue, "Perdue"),
+                                         clEnumVal(Bottou, "Bottou"),
+                                         clEnumVal(Inv, "Simple Inverse"),
+                                         clEnumValEnd), 
+                             cll::init(Intel));
+
+
 
 struct Node {
   double latent_vector[LATENT_VECTOR_SIZE]; //latent vector to be learned
@@ -155,7 +176,13 @@ struct IntelLearnFN : public LearnFN {
   }
 };
 
-struct ConstLearnFN : public LearnFN {
+struct BottouLearnFN : public LearnFN {
+  virtual double step_size(unsigned int round) const {
+    return BottouInit / (1 + BottouInit*LAMBDA*round);
+  }
+};
+
+struct InvLearnFN : public LearnFN {
   virtual double step_size(unsigned int round) const {
     return (double)1 / (double)(round + 1);
   }
@@ -209,6 +236,7 @@ void verify (Graph& g) {
 	std::cout << "Root Mean Square Error after training: " << total_rms << " " << final_rms << std::endl;
 }
 
+//Simple by-movie node-based
 struct sgd_node_movie {
   Graph& g;
   double step_size;
@@ -231,9 +259,46 @@ struct sgd_node_movie {
         verify(g);
       double step_size = lf->step_size(i);
       std::cout << "Step Size: " << step_size << "\n";
+      // if (i != 0)
+      //   std::random_shuffle(Movies.begin(), Movies.end());
+      Galois::for_each(Movies.begin(), Movies.end(), sgd_node_movie(g, step_size));
+    }
+  }
+};
+
+//Simple by-edge grouped by movie (only one edge per movie on the WL at any time)
+struct sgd_edge_movie {
+  Graph& g;
+  double step_size;
+  sgd_edge_movie(Graph& g, double ss) :g(g), step_size(ss) {}
+
+  template<typename Context>
+  void operator()(GNode node, Context& cnx) {
+    auto ii = g.edge_begin (node, Galois::NONE), ee = g.edge_end (node, Galois::NONE);
+    if (ii == ee) return;
+    auto& nd = g.getData(node);
+    std::advance(ii, nd.edge_offset);
+    auto& no = g.getData(g.getEdgeDst(ii));
+    doGradientUpdate(nd, no, g.getEdgeData(ii), step_size);
+    ++nd.edge_offset;
+    ++ii;
+    if (ii == ee) { nd.edge_offset = 0; return; }
+    else { cnx.push(node); }
+  }
+
+  static void go(Graph& g, unsigned int numMovieNodes, unsigned int numUserNodes, const LearnFN* lf) {
+    std::deque<GNode> Movies;
+    for (auto ii = g.begin(), ee = g.end(); ii != ee; ++ii)
+      if (g.edge_begin(*ii) != g.edge_end(*ii))
+        Movies.push_back(*ii);
+    for (int i = 0; i < 10; ++i) {
+      if (verifyPerIter)
+        verify(g);
+      double step_size = lf->step_size(i);
+      std::cout << "Step Size: " << step_size << "\n";
       if (i != 0)
         std::random_shuffle(Movies.begin(), Movies.end());
-      Galois::for_each(Movies.begin(), Movies.end(), sgd_node_movie(g, step_size));
+      Galois::for_each(Movies.begin(), Movies.end(), sgd_edge_movie(g, step_size), Galois::wl<Galois::WorkList::dChunkedLIFO<8>>());
     }
   }
 };
@@ -917,11 +982,28 @@ int main(int argc, char** argv) {
 	Galois::StatTimer timer;
 	timer.start();
 
-        std::unique_ptr<LearnFN> lf(new IntelLearnFN);
+        std::unique_ptr<LearnFN> lf;
+        switch (learn) {
+        case Intel:
+          lf.reset(new IntelLearnFN);
+          break;
+        case Purdue:
+          lf.reset(new PurdueLearnFN);
+          break;
+        case Bottou:
+          lf.reset(new BottouLearnFN);
+          break;
+        case Inv:
+          lf.reset(new InvLearnFN);
+          break;
+        }
 
 	switch (algo) {
         case Algo::nodeMovie:
           sgd_node_movie::go(g, numMovieNodes, numUserNodes, lf.get());
+          break;
+        case Algo::edgeMovie:
+          sgd_edge_movie::go(g, numMovieNodes, numUserNodes, lf.get());
           break;
         case Algo::block:
           runBlockSlices<sgd_block>(g, lf.get());
