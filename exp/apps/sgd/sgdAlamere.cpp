@@ -22,8 +22,6 @@
 #include <iostream>
 #include <random>
 #include <algorithm>
-
-
 #include <cmath>
 #include <cstdlib>
 
@@ -43,23 +41,24 @@ static const char* const name = "Stochastic Gradient Descent";
 static const char* const desc = "Computes Matrix Decomposition using Stochastic Gradient Descent";
 static const char* const url = "sgd";
 
-static const unsigned int LATENT_VECTOR_SIZE = 20;
-static const unsigned int MAX_MOVIE_UPDATES = 5;
+static const unsigned int LATENT_VECTOR_SIZE = 20; //Prad's default: 100, Intel: 20
+static const unsigned int MAX_MOVIE_UPDATES = 5; //Prad's default: 5
 static const double MINVAL = -1e+100;
 static const double MAXVAL = 1e+100;
 
-static const double LEARNING_RATE = 0.001; // GAMMA
-static const double DECAY_RATE = 0.9; // STEP_DEC
-static const double LAMBDA = 0.001;
+static const double LEARNING_RATE = 0.001; // GAMMA, Purdue: 0.01 Intel: 0.001
+static const double DECAY_RATE = 0.9; // STEP_DEC, Purdue: 0.1 Intel: 0.9
+static const double LAMBDA = 0.001; // Purdue: 1.0 Intel: 0.001
 static const double BottouInit = 0.1;
 
 enum Algo {
   nodeMovie,
   edgeMovie,
-  block,
-  blockAndSliceUsers,
-  blockAndSliceBoth,
-  sliceMarch
+	block,
+	blockAndSliceUsers,
+	blockAndSliceBoth,
+	sliceMarch,
+	sliceJump
 };
 
 enum Learn {
@@ -72,7 +71,7 @@ enum Learn {
 namespace cll = llvm::cl;
 static cll::opt<std::string> inputFile (cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<unsigned> usersPerBlockSlice ("usersPerBlk", cll::desc ("[users per block slice]"), cll::init (2048));
-static cll::opt<unsigned> moviesPerBlockSlice ("moviesPerBlk", cll::desc ("[movies per block slice]"), cll::init (512));
+static cll::opt<unsigned> moviesPerBlockSlice ("moviesPerBlk", cll::desc ("[movies per block slice]"), cll::init (350));
 static cll::opt<bool> verifyPerIter ("verifyPerIter", cll::desc ("compute RMS every iter"), cll::init (false));
 
 static cll::opt<Algo> algo(cll::desc("Choose an algorithm:"),
@@ -83,6 +82,7 @@ static cll::opt<Algo> algo(cll::desc("Choose an algorithm:"),
                                        clEnumVal(blockAndSliceUsers, "Block by Users and Movies, Slice by Users"),
                                        clEnumVal(blockAndSliceBoth, "Block by Users and Movies, Slice by Users and Movies (default)"),
                                        clEnumVal(sliceMarch, "Marching Slices version"),
+										clEnumVal(sliceJump, "Jumping Slices version"),
                                        clEnumValEnd), 
                            cll::init(blockAndSliceBoth));
 
@@ -231,9 +231,9 @@ void verify (Graph& g) {
 			});
 
 	double total_rms = rms.reduce ();
-	double final_rms = sqrt(total_rms/NUM_RATINGS);
+	double normalized_rms = sqrt(total_rms/NUM_RATINGS);
 	
-	std::cout << "Root Mean Square Error after training: " << total_rms << " " << final_rms << std::endl;
+	std::cout << "RMSE Total: " << total_rms << " Normalized: " << normalized_rms << std::endl;
 }
 
 //Simple by-movie node-based
@@ -910,6 +910,282 @@ void runSliceMarch(Graph& g, const LearnFN* lf) {
 	  }*/
 }
 
+typedef struct SliceInfo
+{
+	unsigned id;
+	unsigned x;
+	unsigned y;
+	unsigned userStart;
+	unsigned userEnd;
+	unsigned movieStart;
+	unsigned movieEnd;
+	unsigned numMovies;
+	unsigned updates;
+	int* userOffsets;
+
+	void print()
+	{
+		printf("id: %d x: %d y: %d userStart: %d userEnd: %d movieStart: %d movieEnd: %d updates: %d\n", 
+				id, x, y, userStart, userEnd, movieStart, movieEnd, updates);
+	}
+} SliceInfo;
+
+
+struct calculate_user_offsets
+{
+	Graph& g;
+	SliceInfo* slices;
+	unsigned moviesPerSlice, numXSlices, numYSlices, numSlices;
+	calculate_user_offsets(Graph& _g, SliceInfo* _slices, unsigned _mps, unsigned _nxs, unsigned _nys) : 
+		g(_g), slices(_slices), moviesPerSlice(_mps), numXSlices(_nxs), numYSlices(_nys), numSlices(_nxs * _nys) {}
+
+	void operator()(GNode movie)
+	{
+		unsigned sliceY = std::min(movie / moviesPerSlice, numYSlices - 1);
+		SliceInfo* s = &slices[sliceY * numXSlices];
+		
+		assert(movie >= s->movieStart && movie < s->movieEnd);
+		unsigned pos = movie - s->movieStart;
+
+		/*if(movie == 15123)
+		{
+			printf("movie: %d val: %d numXSlices: %d sliceY: %d\n", movie, sliceY * numXSlices, numXSlices, sliceY);
+		}*/
+		
+		//for each edge in the range
+		Graph::edge_iterator edge_it = g.edge_begin(movie, Galois::NONE), 
+							 edge_end = g.edge_end(movie, Galois::NONE);
+
+		for(int i = 0, offset = 0; i < numXSlices; i++, s++)
+		{
+			GNode user = g.getEdgeDst(edge_it);
+
+			//in the slice's range
+			if(user >= userIdToUserNode(s->userStart) && user < userIdToUserNode(s->userEnd))
+			{
+				s->userOffsets[pos] = offset;
+				
+				//move the edge_it beyond slice's range
+				while(edge_it != edge_end && g.getEdgeDst(edge_it) < userIdToUserNode(s->userEnd))
+				{
+					++edge_it;
+					++offset;
+				}
+			}
+			else
+			{
+				s->userOffsets[pos] = -1;
+			}
+			
+			/*if(movie == 15123)
+				printf("%d ", s->userOffsets[pos]);*/
+		}
+
+		/*if(movie == 15123)
+			printf("\n");*/
+
+	}
+};
+
+struct sgd_slice_jump
+{
+	Graph& g;
+	SpinLock *xLocks, *yLocks;
+	SliceInfo* slices;
+	unsigned numXSlices, numYSlices, numSlices;
+	double step_size;
+	sgd_slice_jump(Graph& g, SpinLock* _xLocks, SpinLock* _yLocks, SliceInfo* _slices, 
+			unsigned _numXSlices, unsigned _numYSlices, double _step_size) : 
+		g(g), xLocks(_xLocks), yLocks(_yLocks), slices(_slices), 
+		numXSlices(_numXSlices), numYSlices(_numYSlices), numSlices(_numXSlices * _numYSlices),
+		step_size(_step_size) {}
+	
+	//Preconditions: row and column of slice are locked
+	//Postconditions: increments update count, does sgd update on each movie and user in the slice
+	inline unsigned runSlice(SliceInfo* sp)
+	{
+		SliceInfo& si = *sp;
+		sp->updates++; //number of times slice has been updated
+		unsigned edges_seen = 0;
+
+		//set up movie iterators
+		unsigned movie_num = 0;
+		Graph::iterator movie_it = g.begin();
+		std::advance(movie_it, si.movieStart);
+		Graph::iterator end_movie_it = g.begin();
+		std::advance(end_movie_it, si.movieEnd);
+		
+		//for each movie in the range
+		for(; movie_it != end_movie_it; ++movie_it, ++movie_num)
+		{	
+			if(si.userOffsets[movie_num] < 0)
+				continue;
+
+			//get movie data
+			GNode movie = *movie_it;
+			Node& movie_data = g.getData(movie);
+
+			unsigned int currentBlockSliceEndUserId = si.userEnd + NUM_MOVIE_NODES;
+
+			//for each edge in the range
+			Graph::edge_iterator edge_it = g.edge_begin(movie, Galois::NONE) + si.userOffsets[movie_num];
+			Graph::edge_iterator edge_end = g.edge_end(movie, Galois::NONE);
+			for(;edge_it != edge_end; ++edge_it, ++movie_data.edge_offset)
+			{
+				GNode user = g.getEdgeDst(edge_it);
+
+				//stop when you're outside the current block's user range
+				if(user > currentBlockSliceEndUserId)
+					break;
+
+				Node& user_data = g.getData(user, Galois::NONE);
+				unsigned int edge_rating = g.getEdgeData(edge_it, Galois::NONE);	
+
+				//do gradient step
+				doGradientUpdate(movie_data, user_data, edge_rating, step_size);
+
+				++edges_seen;
+			}
+		}
+		
+		//printf("Slice (%d,%d) Edges Seen: %d\n", si.x, si.y, edges_seen);
+		return edges_seen;
+	}
+	
+	//determines the next slice to work on
+	//returns: slice id to work on, x and y locks are held on the slice
+	inline int getNextSlice(SliceInfo* sp)
+	{
+		bool foundWork = false;
+		unsigned workSearchTries = 0;
+		unsigned nextSliceId = sp->id;
+		while(foundWork || workSearchTries < 2 * numSlices)
+		{
+			workSearchTries++;
+
+			nextSliceId++;
+			if(nextSliceId == numSlices) nextSliceId = 0; //wrap around
+
+			SliceInfo& nextSlice = slices[nextSliceId];
+
+			if(nextSlice.updates < MAX_MOVIE_UPDATES && xLocks[nextSlice.x].try_lock())
+			{
+				if(yLocks[nextSlice.y].try_lock())
+				{
+					foundWork = true;
+					break; //break while holding x and y locks
+				}
+				else
+				{
+					xLocks[nextSlice.x].unlock();
+				}
+			}
+		}
+
+		/*if(foundWork)
+			printf("Found work after %d tries\n", workSearchTries);
+		else
+			printf("Didn't find work after %d tries\n", workSearchTries);
+		*/
+
+		return foundWork ? nextSliceId : -1;
+	}
+
+	void operator()(SliceInfo* startSlice)
+	{
+		Galois::Timer timer;
+		timer.start();
+
+		SliceInfo* sp = startSlice;
+		bool go = false;
+		unsigned tot_updates = 0;
+		unsigned slices_updated = 0;
+
+		do {
+			//x and y are taken for sp at this point
+			int edges_visited = runSlice(sp);
+			tot_updates += edges_visited;
+			slices_updated++;
+
+			xLocks[sp->x].unlock();
+			yLocks[sp->y].unlock();
+	
+			int nextWorkId = getNextSlice(sp);
+			if(nextWorkId >= 0)
+			{
+				go = true; //keep going if we found some work
+				sp = &slices[nextWorkId]; //set next work
+			}
+			else
+				go = false;
+
+		} while(go);
+
+		timer.stop();
+		printf("Slice: (%d, %d) Edges: %d Slices: %d Time: %f\n", startSlice->x, startSlice->y, tot_updates, slices_updated, timer.get_usec()/1000000.0);
+
+	}
+};
+
+
+void runSliceJump(Graph& g, const LearnFN* lf)
+{
+	//set up parameters
+	const unsigned threadCount = Galois::getActiveThreads();
+	//threadCount + 1 so free slices are always available
+	const unsigned numXSlices = std::max(NUM_USER_NODES/ usersPerBlockSlice, threadCount + 1);
+	const unsigned numYSlices  = std::max(NUM_MOVIE_NODES/ moviesPerBlockSlice, threadCount + 1);
+	const unsigned numSlices = numXSlices * numYSlices;
+	const unsigned moviesPerSlice = NUM_MOVIE_NODES / numYSlices;
+	const unsigned usersPerSlice = NUM_USER_NODES / numXSlices;
+
+	SpinLock* xLocks = new SpinLock[numXSlices];
+	SpinLock* yLocks = new SpinLock[numYSlices];
+	
+	printf("numSlices: %d numXSlices %d numYSlices %d\n", numSlices, numXSlices, numYSlices);
+	
+	//initialize slice infos
+	SliceInfo* slices = new SliceInfo[numSlices];
+	for(unsigned i = 0; i < numSlices; i++)
+	{
+		SliceInfo& si = slices[i];
+		si.id = i;
+		si.x = i % numXSlices;
+		si.y = i / numXSlices;
+		si.userStart = si.x * usersPerSlice;
+		si.userEnd = si.x == numXSlices - 1 ? NUM_USER_NODES : (si.x + 1) * usersPerSlice;
+		si.movieStart = si.y * moviesPerSlice;
+		si.movieEnd = si.y == numYSlices -1 ? NUM_MOVIE_NODES : (si.y + 1) * moviesPerSlice;
+		si.updates = 0;
+		
+		si.numMovies = si.movieEnd - si.movieStart;
+		si.userOffsets = new int[si.numMovies];
+	}
+
+	//generate indexes for user ids into graph
+	Galois::do_all(g.begin(), g.begin() + NUM_MOVIE_NODES, 
+			calculate_user_offsets(g, slices, moviesPerSlice, numXSlices, numYSlices));
+	
+	//stagger the starting slices for each thread
+	SliceInfo** startSlices = new SliceInfo*[threadCount];
+	float xSliceGap = numXSlices / (float) threadCount;
+	float ySliceGap = numYSlices / (float) threadCount;
+	//printf("xgap: %f ygap: %f\n", xSliceGap, ySliceGap);
+	for(unsigned i = 0; i < threadCount; i++)
+	{
+		unsigned xSlice = (unsigned) (xSliceGap * i);
+		unsigned ySlice = (unsigned) (ySliceGap * i);
+		xLocks[xSlice].lock();
+		yLocks[ySlice].lock();
+		//printf("slices: %d %d\n", xSlice, ySlice);
+		startSlices[i] = &slices[ xSlice + ySlice * numXSlices];
+	}
+	
+	double step_size = lf->step_size(1); //FIXME
+	Galois::do_all(&startSlices[0], &startSlices[threadCount], 
+			sgd_slice_jump(g, xLocks, yLocks, slices, numXSlices, numYSlices, step_size));
+}
+
 static double genRand () {
 	// generate a random double in (-1,1)
   return 2.0 * ((double)std::rand () / (double)RAND_MAX) - 1.0;
@@ -956,8 +1232,6 @@ std::pair<unsigned int, unsigned int> initializeGraphData(Graph& g)
 	return std::make_pair(numMovieNodes, numUserNodes);
 }
 
-
-
 int main(int argc, char** argv) {	
 
 	LonestarStart (argc, argv, name, desc, url);
@@ -978,7 +1252,7 @@ int main(int argc, char** argv) {
 
 	NUM_MOVIE_NODES = numMovieNodes;
 	NUM_USER_NODES = numUserNodes;
-
+	
 	Galois::StatTimer timer;
 	timer.start();
 
@@ -1017,11 +1291,14 @@ int main(int argc, char** argv) {
         case Algo::sliceMarch:
           runSliceMarch(g, lf.get());
           break;
+		case Algo::sliceJump:
+			runSliceJump(g, lf.get());
+			break;
         }
 
 	timer.stop();
 
-	verify (g);
+	//verify (g);
 
 	std::cout << "SUMMARY Movies " << numMovieNodes << 
 		" Users " << numUserNodes <<
