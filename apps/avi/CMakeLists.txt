@@ -29,7 +29,8 @@ endif()
 if(CMAKE_SYSTEM_NAME MATCHES "BlueGeneQ")
   set(Boost_FOUND off)
 else()
-  find_package(Boost 1.36.0 COMPONENTS system iostreams filesystem)
+  # Needs a slightly higher version than other Galois apps
+  find_package(Boost 1.50.0 COMPONENTS system iostreams filesystem)
 endif()
 
 if(CMAKE_Fortran_COMPILER_WORKS AND LAPACK_FOUND AND Boost_FOUND)

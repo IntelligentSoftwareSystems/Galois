@@ -11,40 +11,18 @@ set(include_dirs ${include_dirs} "${PROJECT_BINARY_DIR}/include/")
 
 include(ParseArguments)
 
-if(CMAKE_VERSION VERSION_GREATER 2.8.8 OR CMAKE_VERSION VERSION_EQUAL 2.8.8)
-  function(add_internal_library name)
-    add_library(${name} OBJECT ${ARGN})
-  endfunction()
+function(add_internal_library name)
+  add_library(${name} OBJECT ${ARGN})
+endfunction()
 
-  function(add_galois_library name)
-    PARSE_ARGUMENTS(X "LIBS" "" ${ARGN})
-    set(objects)
-    foreach(lib ${X_LIBS})
-      list(APPEND objects "$<TARGET_OBJECTS:${lib}>")
-    endforeach()
-    add_library(${name} ${X_DEFAULT_ARGS} ${objects})
-  endfunction()
-else()
-  function(add_internal_library name)
-    add_library(${name} ${ARGN})
-    install(TARGETS ${name}
-      EXPORT GaloisTargets
-      RUNTIME DESTINATION "${INSTALL_BIN_DIR}" COMPONENT bin
-      LIBRARY DESTINATION "${INSTALL_LIB_DIR}" COMPONENT shlib
-      ARCHIVE DESTINATION "${INSTALL_LIB_DIR}" COMPONENT dev
-      )
-    export(TARGETS ${name} APPEND FILE
-      "${PROJECT_BINARY_DIR}/GaloisTargets.cmake")
-  endfunction()
-
-  function(add_galois_library name)
-    PARSE_ARGUMENTS(X "LIBS" "" ${ARGN})
-    add_library(${name} ${X_DEFAULT_ARGS})
-    foreach(lib ${X_LIBS})
-      target_link_libraries(${name} ${lib})
-    endforeach()
-  endfunction()
-endif()
+function(add_galois_library name)
+  PARSE_ARGUMENTS(X "LIBS" "" ${ARGN})
+  set(objects)
+  foreach(lib ${X_LIBS})
+    list(APPEND objects "$<TARGET_OBJECTS:${lib}>")
+  endforeach()
+  add_library(${name} ${X_DEFAULT_ARGS} ${objects})
+endfunction()
 
 add_galois_library(galois ${sources} LIBS llvm mm ll)
 add_galois_library(galois-nothreads FileGraph.cpp LIBS llvm mm-nonuma ll)
