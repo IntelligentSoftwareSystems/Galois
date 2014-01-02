@@ -58,6 +58,12 @@ enum WriteType {
   permutation
 };
 
+enum WriteEdgeType {
+  void_,
+  int32,
+  int64
+};
+
 typedef unsigned int DistType;
 static const DistType DIST_INFINITY = std::numeric_limits<DistType>::max() - 1;
 
@@ -70,6 +76,12 @@ static cll::opt<WriteType> writeType("output", cll::desc("Output type:"),
       clEnumValN(WriteType::permutedgraph, "graph", "Permuted graph"),
       clEnumValN(WriteType::permutation, "perm", "Permutation"),
       clEnumValEnd), cll::init(WriteType::none));
+static cll::opt<WriteEdgeType> writeEdgeType("edgeType", cll::desc("Input/Output edge type:"),
+    cll::values(
+      clEnumValN(WriteEdgeType::void_, "void", "no edge values"),
+      clEnumValN(WriteEdgeType::int32, "int32", "32 bit edge values"),
+      clEnumValN(WriteEdgeType::int64, "int64", "64 bit edge values"),
+      clEnumValEnd), cll::init(WriteEdgeType::void_));
 static cll::opt<PseudoAlgo> pseudoAlgo(cll::desc("Psuedo-Peripheral algorithm:"),
     cll::values(
       clEnumVal(simplePseudo, "Simple"),
@@ -77,9 +89,7 @@ static cll::opt<PseudoAlgo> pseudoAlgo(cll::desc("Psuedo-Peripheral algorithm:")
       clEnumVal(fullPseudo, "Full algorithm"),
       clEnumValEnd), cll::init(fullPseudo));
 static cll::opt<bool> anyBFS("anyBFS", cll::desc("Use Any BFS ordering"), cll::init(false));
-static cll::opt<bool> useFloatEdgeWeights("useFloatEdgeWeights", 
-    cll::desc("Input and output graph edge weights are floats. By default, assume that they are doubles."), 
-    cll::init(false));
+static cll::opt<bool> printBandwidth("printBandwidth", cll::desc("Print bandwidth"), cll::init(false));
 static cll::opt<unsigned int> startNode("startnode",
     cll::desc("Node to start search from. Overrides pseudo-peripheral search."), cll::init(DIST_INFINITY));
 static cll::opt<unsigned int> pseudoStartNode("pseudoStartNode",
@@ -830,7 +840,10 @@ void writeGraph() {
     for (Graph::edge_iterator ii : graph.out_edges(n)) {
       GNode dst = graph.getEdgeDst(ii);
       size_t did = graph.getData(dst).id;
-      edgeData.set(p.addNeighbor(sid, did), origGraph.getEdgeData<EdgeTy>(n, dst));
+      if (EdgeData::has_value)
+        edgeData.set(p.addNeighbor(sid, did), origGraph.getEdgeData<edge_value_type>(ii));
+      else
+        p.addNeighbor(sid, did);
     }
   }
 
@@ -883,7 +896,8 @@ int main(int argc, char **argv) {
   std::cout << "Read " << std::distance(graph.begin(), graph.end()) << " nodes\n";
   perm.resize(std::distance(graph.begin(), graph.end()));
 
-  BFS::bandwidth("Initial");
+  if (printBandwidth)
+    BFS::bandwidth("Initial");
 
   Galois::StatTimer T;
   T.start();
@@ -915,12 +929,20 @@ int main(int argc, char **argv) {
   T.stop();
 
   BFS::permute(perm);
-  BFS::bandwidth("Permuted");
+  if (printBandwidth)
+    BFS::bandwidth("Permuted");
 
   switch (writeType) {
     case WriteType::none: break;
     case WriteType::permutation: writePermutation(); break;
-    case WriteType::permutedgraph: if (useFloatEdgeWeights) writeGraph<float>(); else writeGraph<double>(); break;
+    case WriteType::permutedgraph:
+      switch (writeEdgeType) {
+        case WriteEdgeType::void_: writeGraph<void>(); break;
+        case WriteEdgeType::int32: writeGraph<uint32_t>(); break;
+        case WriteEdgeType::int64: writeGraph<uint64_t>(); break;
+        default: abort();
+      }
+      break;
     default: abort();
   }
 
