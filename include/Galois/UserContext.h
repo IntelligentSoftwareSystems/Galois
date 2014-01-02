@@ -60,14 +60,13 @@ protected:
 
 #ifdef GALOIS_USE_EXP
   void __rollback() {
-    for (auto ii = undoLog.end (), ei = undoLog.begin(); ii != ei; ) {
-      --ii;
+    for (auto ii = undoLog.begin(), ei = undoLog.end(); ii != ei; ++ii) {
       (*ii)();
     }
   }
 
   void __commit() {
-    for (auto ii = commitLog.begin (), ei = commitLog.end(); ii != ei; ++ii) {
+    for (auto ii = commitLog.begin(), ei = commitLog.end(); ii != ei; ++ii) {
       (*ii)();
     }
   }
@@ -145,7 +144,7 @@ public:
  
 #ifdef GALOIS_USE_EXP
   void addUndoAction(const Closure& f) {
-    undoLog.push_back(f);
+    undoLog.push_front(f);
   }
 
   void addCommitAction(const Closure& f) {

@@ -19,16 +19,17 @@
  * Author: Prad Nelluru <pradn@cs.utexas.edu>
 */
 
-#include <iostream>
-#include <random>
-#include <cmath>
-#include <algorithm>
-
+#include "Galois/config.h"
 #include "Galois/Galois.h"
 #include "Galois/Graph/Graph.h"
 #include "Galois/Graph/LCGraph.h"
-#include "Galois/Timer.h"
 #include "Galois/Statistic.h"
+#include "Galois/Timer.h"
+
+#include <algorithm>
+#include <cmath>
+#include <iostream>
+#include <random>
 
 typedef struct Node
 {
@@ -418,8 +419,13 @@ void count_ratings(Graph& g, unsigned threadCount)
 unsigned int initializeGraphData(Graph& g)
 {
 	unsigned int seed = 42;
-	std::default_random_engine eng(seed);
+	//std::default_random_engine eng(seed);
+	std::mt19937 eng(seed);
+#if __cplusplus >= 201103L || defined(HAVE_CXX11_UNIFORM_INT_DISTRIBUTION)
 	std::uniform_real_distribution<double> random_lv_value(0, 0.1);
+#else
+	std::uniform_real<double> random_lv_value(0, 0.1);
+#endif
 	
 	unsigned int numMovieNodes = 0;
 

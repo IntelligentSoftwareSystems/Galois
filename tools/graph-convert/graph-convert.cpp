@@ -737,7 +737,7 @@ void order_by_high_degree(const std::string& infilename, const std::string& outf
 
   std::cout << "Done Sorting\n";
 
-  std::sort(perm.begin(), perm.end(), [&Inv, &graph] (GNode lhs, GNode rhs) 
+  std::sort(perm.begin(), perm.end(), [&Inv, &graph] (GNode lhs, GNode rhs) -> bool
             {
               auto lhsi = Inv[lhs].begin(), 
                 lhse = Inv[lhs].end(),
@@ -750,7 +750,7 @@ void order_by_high_degree(const std::string& infilename, const std::string& outf
                 ++rhsi;
               }
               if (lhsi != lhse) return true;
-              else return false;
+              return false;
             } );
 
   std::cout << "Done sorting\n";

@@ -1599,7 +1599,7 @@ struct DoComputeForce<ComputeForceTy,WLTy,typename boost::enable_if<has_task<Com
     
     Galois::StatTimer computeTime("ParallelComputeForceTime");
     computeTime.start();
-    Galois::on_each(Wrapper<Outs>(W, outs), "MakeComputeForce");
+    Galois::on_each(Wrapper<Outs>(W, outs), Galois::loopname("MakeComputeForce"));
     computeTime.stop();
   }
 };

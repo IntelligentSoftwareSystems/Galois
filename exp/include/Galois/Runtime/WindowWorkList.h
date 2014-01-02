@@ -62,7 +62,7 @@ public:
           m_wl.get ().push_back (x);
           count += 1;
         }
-        , "initfill");
+        , Galois::loopname("initfill"));
 
     init_sz = count.reduce ();
 
@@ -70,7 +70,7 @@ public:
         [this] (const unsigned tid, const unsigned numT) {
           std::sort (m_wl[tid].begin (), m_wl[tid].end (), cmp);
         }
-        , "initsort");
+        , Galois::loopname("initsort"));
 
     for (unsigned i = 0; i < m_wl.numRows (); ++i) {
       *(wlRange.getRemote (i)) = std::make_pair (m_wl[i].begin (), m_wl[i].end ());
@@ -174,7 +174,7 @@ public:
                 workList.get ().push_back (ctxtMaker (*(r.first)));
             }
           }
-          , "poll");
+          , Galois::loopname("poll"));
 
     } else {
 

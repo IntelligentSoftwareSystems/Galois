@@ -292,7 +292,7 @@ struct PreSort {
 template <typename WL>
 void presort (WL& wl, Galois::TimeAccumulator& sortTimer) {
   sortTimer.start ();
-  Galois::on_each (PreSort<WL> (wl), "pre_sort");
+  Galois::on_each (PreSort<WL> (wl), Galois::loopname("pre_sort"));
   sortTimer.stop ();
 }
 
@@ -394,7 +394,7 @@ void refillWorkList (WL& wl, typename Range<I>::PTS& ranges, const size_t window
   if (windowLimit != NULL) {
     Galois::Runtime::LL::gDebug("new window limit: ", windowLimit->str ().c_str ());
 
-    Galois::on_each (RefillWorkList<T, I, WL> (windowLimit, ranges, wl), "refill");
+    Galois::on_each (RefillWorkList<T, I, WL> (windowLimit, ranges, wl), Galois::loopname("refill"));
 
     for (unsigned i = 0; i < ranges.size (); ++i) {
       Range<I>& r = *ranges.getRemote (i);

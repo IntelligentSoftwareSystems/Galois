@@ -699,7 +699,7 @@ HNode* buildTree(std::deque<HNode>& symbols) {
   while (Q.size() > 1) {
     HNode* n1 = Q.top(); Q.pop();
     HNode* n2 = Q.top(); Q.pop();
-    symbols.push_back({n1,n2,0,n1->freq + n2->freq});
+    symbols.push_back(HNode {n1,n2,0,n1->freq + n2->freq});
     Q.push(&symbols.back());
   }
   return Q.top();
@@ -707,8 +707,8 @@ HNode* buildTree(std::deque<HNode>& symbols) {
 
 void buildTableInternal(codeEntry e, HNode* n, std::deque<codeEntry>& codes) {
   if (n->left) {
-    buildTableInternal({0, e.nbits + 1, e.code << 1}, n->left, codes);
-    buildTableInternal({0, e.nbits + 1, 1 | (e.code << 1)}, n->right, codes);
+    buildTableInternal(codeEntry {0, e.nbits + 1, e.code << 1}, n->left, codes);
+    buildTableInternal(codeEntry {0, e.nbits + 1, 1 | (e.code << 1)}, n->right, codes);
   } else {
     e.val = n->val;
     codes.push_back(e);
@@ -717,7 +717,7 @@ void buildTableInternal(codeEntry e, HNode* n, std::deque<codeEntry>& codes) {
 
 std::deque<codeEntry> buildTable(HNode* root) {
   std::deque<codeEntry> retval;
-  buildTableInternal({0,0,0}, root, retval);
+  buildTableInternal(codeEntry {0,0,0}, root, retval);
   return retval;
 }
 
@@ -737,7 +737,7 @@ std::pair<unsigned long, unsigned> tryHuff() {
     for (auto ii = local.begin(), ee = local.end(); ii != ee; ++ii) {
       HNode*& n = hyst[*ii];
       if (!n) {
-        symbols.push_back({nullptr, nullptr, *ii, 0});
+        symbols.push_back(HNode {nullptr, nullptr, *ii, 0});
         n = &symbols.back();
       }
       n->freq++;
@@ -776,7 +776,7 @@ std::pair<unsigned long, unsigned> tryHuffDeltaOnly() {
     for (auto ii = local.begin() + 1, ee = local.end(); ii != ee; ++ii) {
       HNode*& n = hyst[*ii];
       if (!n) {
-        symbols.push_back({nullptr, nullptr, *ii, 0});
+        symbols.push_back(HNode {nullptr, nullptr, *ii, 0});
         n = &symbols.back();
       }
       n->freq++;

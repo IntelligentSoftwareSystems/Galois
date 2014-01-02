@@ -124,6 +124,16 @@ FunctionTy do_all_gen(RangeTy r, FunctionTy fn, Tuple tpl) {
   return Runtime::do_all_impl(r, fn, ln, steal);
 }
 
+template<typename FunctionTy, typename Tuple>
+void on_each_gen(FunctionTy fn, Tuple tpl) {
+  typedef Tuple tupleType;
+  static_assert(-1 == tuple_index<tupleType, char*>::value, "old loopname");
+  static_assert(-1 == tuple_index<tupleType, char const*>::value, "old loopname");
+  constexpr unsigned iloopname = tuple_index<tupleType, loopname>::value;
+  const char* ln = std::get<iloopname>(tpl).n;
+  Runtime::on_each_impl(fn, ln);
+}
+
 } // namespace HIDDEN
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -193,8 +203,9 @@ FunctionTy do_all(const IterTy& b, const IterTy& e, FunctionTy fn, Args... args)
 }
 
 /**
- * Standard do-all loop with locality-aware container. All iterations should be independent.
- * Operator should conform to <code>fn(item)</code> where item is an element of c.
+ * Standard do-all loop with locality-aware container. All iterations should
+ * be independent.  Operator should conform to <code>fn(item)</code> where
+ * item is an element of c.
  *
  * @param c locality-aware container
  * @param fn operator
@@ -207,16 +218,17 @@ FunctionTy do_all_local(ConTy& c, FunctionTy fn, Args... args) {
 }
 
 /**
- * Low-level parallel loop. Operator is applied for each running thread. Operator
- * should confirm to <code>fn(tid, numThreads)</code> where tid is the id of the current thread and
- * numThreads is the total number of running threads.
+ * Low-level parallel loop. Operator is applied for each running thread.
+ * Operator should confirm to <code>fn(tid, numThreads)</code> where tid is
+ * the id of the current thread and numThreads is the total number of running
+ * threads.
  *
  * @param fn operator
- * @param loopname string to identify loop in statistics output
+ * @param args optional arguments to loop (only loopname supported)
  */
-template<typename FunctionTy>
-static inline void on_each(FunctionTy fn, const char* loopname = 0) {
-  Runtime::on_each_impl(fn, loopname);
+template<typename FunctionTy, typename... Args>
+void on_each(FunctionTy fn, Args... args) {
+  HIDDEN::on_each_gen(fn, std::make_tuple(loopname(), args...));
 }
 
 /**

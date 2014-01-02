@@ -64,7 +64,7 @@ static cll::opt<int> seed("seed", cll::desc("Random seed"), cll::init(7));
 
 
 enum TreeSummMethod {
-  SERIAL, KDG_HAND, KDG_SEMI, LEVEL_HAND, SPEC, TWO_PHASE, LEVEL_EXEC
+  SERIAL, KDG_HAND, KDG_SEMI, LEVEL_HAND, SPEC, TWO_PHASE, LEVEL_EXEC, CILK
 };
 
 cll::opt<TreeSummMethod> treeSummOpt (
@@ -77,6 +77,7 @@ cll::opt<TreeSummMethod> treeSummOpt (
       clEnumVal (SPEC, "using speculative ordered executor"),
       clEnumVal (TWO_PHASE, "using two phase window ordered executor"),
       clEnumVal (LEVEL_EXEC, "using level-by-level executor"),
+      clEnumVal (CILK, "using cilk executor"),
       clEnumValEnd),
     cll::init (SERIAL));
 
@@ -256,6 +257,10 @@ int main(int argc, char** argv) {
 
     case bh::LEVEL_EXEC:
       pos = bh::run (bh::nbodies, bh::ntimesteps, bh::seed, bh::TreeSummarizeLevelExec ());
+      break;
+
+    case bh::CILK:
+      pos = bh::run (bh::nbodies, bh::ntimesteps, bh::seed, bh::TreeSummarizeCilk ());
       break;
 
     default:

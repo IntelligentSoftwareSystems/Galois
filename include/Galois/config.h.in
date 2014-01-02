@@ -14,6 +14,7 @@
 #cmakedefine HAVE_CXX11_UNIFORM_REAL_DISTRIBUTION
 #cmakedefine HAVE_CXX11_CHRONO
 #cmakedefine HAVE_CXX11_ALIGNOF
+#cmakedefine HAVE_CILK
 #cmakedefine GALOIS_USE_SVNVERSION
 #cmakedefine GALOIS_USE_NUMA
 #cmakedefine GALOIS_USE_NUMA_OLD

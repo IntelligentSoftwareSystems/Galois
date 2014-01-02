@@ -111,6 +111,8 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
     operator int() const;
     static_assert(sizeof(int) == sizeof(float), "int and float must be the same size");
   public:
+    atomic_float() { }
+
     float atomicIncrement(float value) {
       while (true) {
         union { float as_float; int as_int; } oldValue = { read() };

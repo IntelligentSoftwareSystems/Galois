@@ -42,7 +42,7 @@ static const char* const desc = "Computes Matrix Decomposition using Stochastic 
 static const char* const url = "sgd";
 
 static const unsigned int LATENT_VECTOR_SIZE = 20; //Prad's default: 100, Intel: 20
-static const unsigned int MAX_MOVIE_UPDATES = 5; //Prad's default: 5
+static const unsigned int MAX_MOVIE_UPDATES = 1; //Prad's default: 5
 static const double MINVAL = -1e+100;
 static const double MAXVAL = 1e+100;
 
@@ -1093,6 +1093,8 @@ struct sgd_slice_jump
 
 	void operator()(SliceInfo* startSlice)
 	{
+                Galois::Statistic edgesVisited("EdgesVisited");
+
 		Galois::Timer timer;
 		timer.start();
 
@@ -1123,7 +1125,7 @@ struct sgd_slice_jump
 
 		timer.stop();
 		printf("Slice: (%d, %d) Edges: %d Slices: %d Time: %f\n", startSlice->x, startSlice->y, tot_updates, slices_updated, timer.get_usec()/1000000.0);
-
+                edgesVisited += tot_updates;
 	}
 };
 

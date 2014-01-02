@@ -1,13 +1,15 @@
 #ifndef BH_TREE_SUM_H
 #define BH_TREE_SUM_H
 
-#include <boost/iterator/transform_iterator.hpp>
-
 #include "Point.h"
 #include "Octree.h"
+
+#include "Galois/config.h"
 #include "Galois/Runtime/ROBexecutor.h"
 #include "Galois/Runtime/LevelExecutor.h"
 #include "Galois/Runtime/KDGtwoPhase.h"
+
+#include <boost/iterator/transform_iterator.hpp>
 
 namespace bh {
 
@@ -70,6 +72,64 @@ private:
   }
 };
 
+#ifdef HAVE_CILK
+struct TreeSummarizeCilk: public TypeDefHelper<SerialNodeBase> {
+
+  template <typename I>
+  void operator () (InterNode* root, I bodbeg, I bodend) const {
+    root->mass = recurse(root);
+  }
+
+private:
+  double recurse(InterNode* node) const {
+    double mass = 0.0;
+    Point accum;
+
+    node->compactChildren ();
+    
+    for (int i = 0; i < 8; i++) {
+      TreeNode* child = node->getChild (i);
+      if (child == NULL)
+        break;
+
+      double m;
+      const Point* p;
+      if (child->isLeaf()) {
+        Leaf* n = static_cast<Leaf*>(child);
+        m = n->mass;
+        p = &n->pos;
+      } else {
+        InterNode* n = static_cast<InterNode*>(child);
+        m = recurse(n);
+        p = &n->pos;
+      }
+
+      mass += m;
+      for (int j = 0; j < 3; j++) 
+        accum[j] += (*p)[j] * m;
+    }
+
+    node->mass = mass;
+    
+    if (mass > 0.0) {
+      double inv_mass = 1.0 / mass;
+      for (int j = 0; j < 3; j++)
+        node->pos[j] = accum[j] * inv_mass;
+    }
+
+    return mass;
+  }
+};
+#else
+struct TreeSummarizeCilk: public TypeDefHelper<SerialNodeBase> {
+
+  template <typename I>
+  void operator () (InterNode* root, I bodbeg, I bodend) const {
+    GALOIS_DIE("not implemented due to missing cilk support");
+  }
+};
+
+#endif
 
 template<typename B>
 GALOIS_ATTRIBUTE_PROF_NOINLINE static void treeCompute (OctreeInternal<B>* node) {
@@ -579,7 +639,7 @@ struct TreeSummarizeKDGsemi: public TypeDefHelper<KDGNodeBase> {
             wl.push (p);
           }
         },
-        "fill_init_wl");
+        Galois::loopname("fill_init_wl"));
     t_fill_wl.stop ();
 
     Galois::StatTimer t_feach ("Time taken by for_each in tree summarization");

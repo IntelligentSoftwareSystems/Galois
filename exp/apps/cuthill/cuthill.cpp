@@ -741,7 +741,7 @@ struct CuthillUnordered {
 
   template<typename C, typename RO, typename WO>
   static void place_nodes(C& c, RO& read_offset, WO& write_offset) {
-    Galois::on_each(PlaceFn<C,RO,WO>(c, read_offset, write_offset), "place");
+    Galois::on_each(PlaceFn<C,RO,WO>(c, read_offset, write_offset), Galois::loopname("place"));
   }
 
   template<typename C>

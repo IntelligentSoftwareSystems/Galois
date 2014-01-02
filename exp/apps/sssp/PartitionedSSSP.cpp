@@ -54,7 +54,7 @@ static const char* desc =
   "graph using a modified chaotic iteration algorithm";
 static const char* url = "single_source_shortest_path";
 
-enum class Algo {
+enum Algo {
   normal,
   part,
   part2,

@@ -46,7 +46,7 @@
 #include "Galois/Runtime/ll/gio.h"
 #include "Galois/Runtime/ll/ThreadRWlock.h"
 #include "Galois/Runtime/ll/CompilerSpecific.h"
-#include "Galois/Runtime/ll/PthreadLock.h"
+//#include "Galois/Runtime/ll/PthreadLock.h"
 #include "Galois/Runtime/mm/Mem.h"
 
 #include <iostream>
@@ -335,7 +335,7 @@ class ROBexecutor: private boost::noncopyable {
   using PerThrdPendingQ = PerThreadMinHeap<T, Cmp>;
   using ROB = Galois::MinHeap<Ctxt*, typename Ctxt::PtrComparator>;
 
-  using Lock_ty = Galois::Runtime::LL::SimpleLock<true>;
+  using Lock_ty = Galois::Runtime::LL::SimpleLock;
   // using Lock_ty = Galois::Runtime::LL::PthreadLock<true>;
 
 
