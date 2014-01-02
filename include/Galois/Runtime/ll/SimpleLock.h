@@ -81,7 +81,7 @@ public:
 
   inline bool try_lock() const {
     int oldval = 0;
-    if (_lock.load(std::memory_order_acquire))
+    if (_lock.load(std::memory_order_relaxed))
       return false;
     if (!_lock.compare_exchange_weak(oldval, 1, std::memory_order_acq_rel))
       return false;
