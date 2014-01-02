@@ -24,6 +24,7 @@
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/ll/StaticInstance.h"
+#include "Galois/Runtime/ll/PaddedLock.h"
 #include "Galois/Runtime/ll/gio.h"
 #include "Galois/Runtime/mm/Mem.h"
 
@@ -32,6 +33,7 @@
 #include <vector>
 #include <string>
 #include <cmath>
+#include <mutex>
 
 using Galois::Runtime::LL::gPrint;
 
@@ -39,10 +41,11 @@ namespace {
 
 class StatManager {
   typedef std::pair<std::string, std::string> KeyTy;
+  typedef Galois::Runtime::LL::PaddedLock<true> Lock;
 
   Galois::Runtime::PerThreadStorage<std::map<KeyTy, unsigned long> > Stats;
-
   volatile unsigned maxID;
+  Lock lock;
 
   void updateMax(unsigned n) {
     unsigned c;
@@ -71,23 +74,27 @@ public:
   StatManager() :maxID(0) {}
 
   void addToStat(const std::string& loop, const std::string& category, size_t value) {
+    std::lock_guard<Lock> llock(lock);
     (*Stats.getLocal())[mkKey(loop, category)] += value;
     updateMax(Galois::Runtime::activeThreads);
   }
 
   void addToStat(Galois::Statistic* value) {
+    std::lock_guard<Lock> llock(lock);
     for (unsigned x = 0; x < Galois::Runtime::activeThreads; ++x)
       (*Stats.getRemote(x))[mkKey(value->getLoopname(), value->getStatname())] += value->getValue(x);
     updateMax(Galois::Runtime::activeThreads);
   }
 
   void addPageAllocToStat(const std::string& loop, const std::string& category) {
+    std::lock_guard<Lock> llock(lock);
     for (unsigned x = 0; x < Galois::Runtime::activeThreads; ++x)
       (*Stats.getRemote(x))[mkKey(loop, category)] += Galois::Runtime::MM::numPageAllocForThread(x);
     updateMax(Galois::Runtime::activeThreads);
   }
 
   void addNumaAllocToStat(const std::string& loop, const std::string& category) {
+    std::lock_guard<Lock> llock(lock);
     int nodes = Galois::Runtime::MM::numNumaNodes();
     for (int x = 0; x < nodes; ++x)
       (*Stats.getRemote(x))[mkKey(loop, category)] += Galois::Runtime::MM::numNumaAllocForNode(x);
