@@ -28,7 +28,8 @@ struct GraphChiAlgo: public Galois::LigraGraphChi::ChooseExecutor<true> {
   typedef Graph::GraphNode GNode;
   typedef Galois::GraphNodeBagPair<> BagPair;
 
-  void readGraph(Graph& graph) {
+  template<typename G>
+  void readGraph(G& graph) {
     readInOutGraph(graph);
     this->checkIfInMemoryGraph(graph, memoryLimit);
   }

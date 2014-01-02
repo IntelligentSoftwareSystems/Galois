@@ -71,6 +71,12 @@ enum WriteType {
   largest
 };
 
+enum WriteEdgeType {
+  void_,
+  int32,
+  int64
+};
+
 namespace cll = llvm::cl;
 static cll::opt<std::string> inputFilename(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<std::string> outputFilename(cll::Positional, cll::desc("[output file]"), cll::init("largest.gr"));
@@ -83,6 +89,12 @@ static cll::opt<WriteType> writeType("output", cll::desc("Output type:"),
       clEnumValN(WriteType::none, "none", "None (default)"),
       clEnumValN(WriteType::largest, "largest", "Write largest component"),
       clEnumValEnd), cll::init(WriteType::none));
+static cll::opt<WriteEdgeType> writeEdgeType("edgeType", cll::desc("Input/Output edge type:"),
+    cll::values(
+      clEnumValN(WriteEdgeType::void_, "void", "no edge values"),
+      clEnumValN(WriteEdgeType::int32, "int32", "32 bit edge values"),
+      clEnumValN(WriteEdgeType::int64, "int64", "64 bit edge values"),
+      clEnumValEnd), cll::init(WriteEdgeType::void_));
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
     cll::values(
       clEnumValN(Algo::async, "async", "Asynchronous (default)"),
@@ -126,7 +138,8 @@ struct SerialAlgo {
     ::with_no_lockable<true>::type Graph;
   typedef Graph::GraphNode GNode;
 
-  void readGraph(Graph& graph) { Galois::Graph::readGraph(graph, inputFilename); }
+  template<typename G>
+  void readGraph(G& graph) { Galois::Graph::readGraph(graph, inputFilename); }
 
   struct Merge {
     Graph& graph;
@@ -164,7 +177,8 @@ struct SynchronousAlgo {
     ::with_numa_alloc<true>::type Graph;
   typedef Graph::GraphNode GNode;
 
-  void readGraph(Graph& graph) { Galois::Graph::readGraph(graph, inputFilename); }
+  template<typename G>
+  void readGraph(G& graph) { Galois::Graph::readGraph(graph, inputFilename); }
 
   struct Edge {
     GNode src;
@@ -279,7 +293,8 @@ struct LabelPropAlgo {
   typedef Graph::GraphNode GNode;
   typedef LNode::component_type component_type;
 
-  void readGraph(Graph& graph) {
+  template<typename G>
+  void readGraph(G& graph) {
     readInOutGraph(graph);
   }
 
@@ -361,7 +376,8 @@ struct AsyncOCAlgo {
   typedef Galois::Graph::OCImmutableEdgeGraph<Node,void> Graph;
   typedef Graph::GraphNode GNode;
 
-  void readGraph(Graph& graph) {
+  template<typename G>
+  void readGraph(G& graph) {
     readInOutGraph(graph);
   }
 
@@ -409,7 +425,8 @@ struct AsyncAlgo {
     Graph;
   typedef Graph::GraphNode GNode;
 
-  void readGraph(Graph& graph) { Galois::Graph::readGraph(graph, inputFilename); }
+  template<typename G>
+  void readGraph(G& graph) { Galois::Graph::readGraph(graph, inputFilename); }
 
   struct Merge {
     typedef int tt_does_not_need_aborts;
@@ -462,7 +479,8 @@ struct BlockedAsyncAlgo {
     Graph::edge_iterator start;
   };
 
-  void readGraph(Graph& graph) { Galois::Graph::readGraph(graph, inputFilename); }
+  template<typename G>
+  void readGraph(G& graph) { Galois::Graph::readGraph(graph, inputFilename); }
 
   struct Merge {
     typedef int tt_does_not_need_aborts;
@@ -559,37 +577,59 @@ bool verify(Graph& graph,
   return Galois::ParallelSTL::find_if(graph.begin(), graph.end(), is_bad<Graph>(graph)) == graph.end();
 }
 
-template<typename Graph>
-void writeComponent(Graph& graph, typename Graph::node_data_type::component_type component,
-    typename std::enable_if<Galois::Graph::is_segmented<Graph>::value>::type* = 0) {
-  std::cerr << "Writing component not supported for this graph\n";
-  abort();
+template<typename EdgeTy, typename Algo, typename CGraph>
+void writeComponent(Algo& algo, CGraph& cgraph, typename CGraph::node_data_type::component_type component) {
+  typedef typename CGraph::template with_edge_data<EdgeTy>::type Graph;
+
+  if (std::is_same<Graph,CGraph>::value) {
+    doWriteComponent(cgraph, component);
+  } else {
+    // copy node data from cgraph
+    Graph graph;
+    algo.readGraph(graph);
+    typename Graph::iterator cc = graph.begin();
+    for (typename CGraph::iterator ii = cgraph.begin(), ei = cgraph.end(); ii != ei; ++ii, ++cc) {
+      graph.getData(*cc) = cgraph.getData(*ii);
+    }
+    doWriteComponent(graph, component);
+  }
 }
 
 template<typename Graph>
-void writeComponent(Graph& graph, typename Graph::node_data_type::component_type component,
+void doWriteComponent(Graph& graph, typename Graph::node_data_type::component_type component,
+    typename std::enable_if<Galois::Graph::is_segmented<Graph>::value>::type* = 0) {
+  GALOIS_DIE("Writing component not supported for this graph");
+}
+
+template<typename Graph>
+void doWriteComponent(Graph& graph, typename Graph::node_data_type::component_type component,
     typename std::enable_if<!Galois::Graph::is_segmented<Graph>::value>::type* = 0) {
   typedef typename Graph::GraphNode GNode;
   typedef typename Graph::node_data_reference node_data_reference;
 
-  // id == 1 if node is in component
+  // set id to 1 if node is in component
   size_t numEdges = 0;
   size_t numNodes = 0;
   for (typename Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
     node_data_reference data = graph.getData(*ii);
     data.id = data.component() == component ? 1 : 0;
     if (data.id) {
-      size_t degree = 
-        std::distance(graph.edge_begin(*ii, Galois::MethodFlag::NONE), graph.edge_end(*ii, Galois::MethodFlag::NONE));
+      size_t degree = std::distance(graph.edge_begin(*ii), graph.edge_end(*ii));
       numEdges += degree;
       numNodes += 1;
     }
   }
 
   typedef Galois::Graph::FileGraphWriter Writer;
+  typedef Galois::LargeArray<typename Graph::edge_data_type> EdgeData;
+  typedef typename EdgeData::value_type edge_value_type;
+
   Writer p;
+  EdgeData edgeData;
   p.setNumNodes(numNodes);
   p.setNumEdges(numEdges);
+  p.setSizeofEdgeData(EdgeData::has_value ? sizeof(edge_value_type) : 0); 
+  edgeData.create(numEdges);
 
   p.phase1();
   // partial sums of ids: id == new_index + 1
@@ -599,8 +639,7 @@ void writeComponent(Graph& graph, typename Graph::node_data_type::component_type
     if (prev)
       data.id = prev->id + data.id;
     if (data.component() == component) {
-      size_t degree = 
-        std::distance(graph.edge_begin(*ii, Galois::MethodFlag::NONE), graph.edge_end(*ii, Galois::MethodFlag::NONE));
+      size_t degree = std::distance(graph.edge_begin(*ii), graph.edge_end(*ii));
       size_t sid = data.id - 1;
       assert(sid < numNodes);
       p.incrementDegree(sid, degree);
@@ -619,19 +658,24 @@ void writeComponent(Graph& graph, typename Graph::node_data_type::component_type
 
     size_t sid = data.id - 1;
 
-    for (typename Graph::edge_iterator jj = graph.edge_begin(*ii, Galois::MethodFlag::NONE),
-        ej = graph.edge_end(*ii, Galois::MethodFlag::NONE); jj != ej; ++jj) {
+    for (typename Graph::edge_iterator jj = graph.edge_begin(*ii),
+        ej = graph.edge_end(*ii); jj != ej; ++jj) {
       GNode dst = graph.getEdgeDst(jj);
-      node_data_reference ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+      node_data_reference ddata = graph.getData(dst);
       size_t did = ddata.id - 1;
 
       //assert(ddata.component == component);
       assert(sid < numNodes && did < numNodes);
-      p.addNeighbor(sid, did);
+      if (EdgeData::has_value)
+        edgeData.set(p.addNeighbor(sid, did), graph.getEdgeData(jj));
+      else
+        p.addNeighbor(sid, did);
     }
   }
 
-  p.finish<void>();
+  edge_value_type* rawEdgeData = p.finish<edge_value_type>();
+  if (EdgeData::has_value)
+    std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
 
   std::cout
     << "Writing largest component to " << outputFilename
@@ -721,8 +765,9 @@ typename Graph::node_data_type::component_type findLargest(Graph& graph) {
   if (ratio)
     ratio = largestSize / ratio;
 
-  std::cout << "Number of non-trivial components: " << map.size() << " (largest: " << largestSize << " [" << ratio << "])\n";
   std::cout << "Total components: " << reps << "\n";
+  std::cout << "Number of non-trivial components: " << map.size()
+    << " (largest size: " << largestSize << " [" << ratio << "])\n";
 
   return largest.component;
 }
@@ -755,12 +800,15 @@ void run() {
   if (!skipVerify || writeType == WriteType::largest) {
     auto component = findLargest(graph);
     if (!verify(graph)) {
-      std::cerr << "verification failed\n";
-      assert(0 && "verification failed");
-      abort();
+      GALOIS_DIE("verification failed");
     }
     if (writeType == WriteType::largest && component) {
-      writeComponent(graph, component);
+      switch (writeEdgeType) {
+        case WriteEdgeType::void_: writeComponent<void>(algo, graph, component); break;
+        case WriteEdgeType::int32: writeComponent<uint32_t>(algo, graph, component); break;
+        case WriteEdgeType::int64: writeComponent<uint64_t>(algo, graph, component); break;
+        default: abort();
+      }
     }
   }
 }
