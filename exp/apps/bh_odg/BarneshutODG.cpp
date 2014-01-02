@@ -64,7 +64,7 @@ static cll::opt<int> seed("seed", cll::desc("Random seed"), cll::init(7));
 
 
 enum TreeSummMethod {
-  SERIAL, KDG_HAND, KDG_SEMI, LEVEL_HAND, SPEC, TWO_PHASE, LEVEL_EXEC, CILK
+  SERIAL, KDG_HAND, KDG_SEMI, LEVEL_HAND, SPEC, TWO_PHASE, LEVEL_EXEC, CILK_EXEC
 };
 
 cll::opt<TreeSummMethod> treeSummOpt (
@@ -77,7 +77,7 @@ cll::opt<TreeSummMethod> treeSummOpt (
       clEnumVal (SPEC, "using speculative ordered executor"),
       clEnumVal (TWO_PHASE, "using two phase window ordered executor"),
       clEnumVal (LEVEL_EXEC, "using level-by-level executor"),
-      clEnumVal (CILK, "using cilk executor"),
+      clEnumVal (CILK_EXEC, "using cilk executor"),
       clEnumValEnd),
     cll::init (SERIAL));
 
@@ -133,7 +133,20 @@ void generateInput(std::vector<Body<B>*>& bodies, int nbodies, int seed) {
   }
 }
 
-template <typename SM>
+template<bool IsOn>
+struct ToggleTime: public Galois::StatTimer {
+  ToggleTime(const char* name): Galois::StatTimer(name) { }
+};
+
+template<>
+struct ToggleTime<false> {
+  ToggleTime(const char* name) { }
+  void start() { }
+  void stop() { }
+};
+
+
+template <bool TrackTime, typename SM>
 Point run(int nbodies, int ntimesteps, int seed, const SM& summMethod) {
   using B = typename SM::Base_ty;
   using Bodies = std::vector<Body<B>*>;
@@ -141,21 +154,21 @@ Point run(int nbodies, int ntimesteps, int seed, const SM& summMethod) {
   Config config;
   Bodies bodies;
 
-  Galois::StatTimer t_input_gen ("Time taken by input generation: ");
+  ToggleTime<TrackTime> t_input_gen ("Time taken by input generation: ");
 
   t_input_gen.start ();
   generateInput<B>(bodies, nbodies, seed);
   t_input_gen.stop ();
 
-  typedef Galois::WorkList::dChunkedLIFO<256> WL;
-
   Point ret;
   for (int step = 0; step < ntimesteps; step++) {
+    typedef Galois::WorkList::dChunkedLIFO<256> WL;
+
     // Do tree building sequentially
     Galois::setActiveThreads(1);
 
     BoundingBox box;
-    Galois::StatTimer t_bbox ("Time taken by Bounding Box computation: ");
+    ToggleTime<TrackTime> t_bbox ("Time taken by Bounding Box computation: ");
 
 
     t_bbox.start ();
@@ -165,7 +178,7 @@ Point run(int nbodies, int ntimesteps, int seed, const SM& summMethod) {
 
 
     OctreeInternal<B>* top = new OctreeInternal<B>(box.center());
-    Galois::StatTimer t_tree_build ("Time taken by Octree building: " );
+    ToggleTime<TrackTime> t_tree_build ("Time taken by Octree building: ");
 
     t_tree_build.start ();
     Galois::for_each(bodies.begin(), bodies.end(),
@@ -175,8 +188,7 @@ Point run(int nbodies, int ntimesteps, int seed, const SM& summMethod) {
     // reset the number of threads
     Galois::setActiveThreads(numThreads);
 
-
-    Galois::StatTimer t_tree_summ ("Time taken by Tree Summarization: ");
+    ToggleTime<TrackTime> t_tree_summ ("Time taken by Tree Summarization: ");
 
     t_tree_summ.start ();
     summMethod (top, bodies.begin (), bodies.end ());
@@ -184,8 +196,7 @@ Point run(int nbodies, int ntimesteps, int seed, const SM& summMethod) {
 
 
     if (false) { // disabling remaining phases
-
-      Galois::StatTimer T_parallel("ParallelTime");
+      ToggleTime<TrackTime> T_parallel("ParallelTime");
       T_parallel.start();
 
       Galois::for_each(bodies.begin(), bodies.end(),
@@ -232,35 +243,35 @@ int main(int argc, char** argv) {
   T.start();
   switch (bh::treeSummOpt) {
     case bh::SERIAL:
-      pos = bh::run (bh::nbodies, bh::ntimesteps, bh::seed, bh::TreeSummarizeSerial ());
+      pos = bh::run<true> (bh::nbodies, bh::ntimesteps, bh::seed, bh::TreeSummarizeSerial ());
       break;
       
     case bh::KDG_HAND:
-      pos = bh::run (bh::nbodies, bh::ntimesteps, bh::seed, bh::TreeSummarizeODG ());
+      pos = bh::run<true> (bh::nbodies, bh::ntimesteps, bh::seed, bh::TreeSummarizeODG ());
       break;
 
     case bh::KDG_SEMI:
-      pos = bh::run (bh::nbodies, bh::ntimesteps, bh::seed, bh::TreeSummarizeKDGsemi ());
+      pos = bh::run<true> (bh::nbodies, bh::ntimesteps, bh::seed, bh::TreeSummarizeKDGsemi ());
       break;
 
     case bh::LEVEL_HAND:
-      pos = bh::run (bh::nbodies, bh::ntimesteps, bh::seed, bh::TreeSummarizeLevelByLevel ());
+      pos = bh::run<true> (bh::nbodies, bh::ntimesteps, bh::seed, bh::TreeSummarizeLevelByLevel ());
       break;
 
     case bh::SPEC:
-      pos = bh::run (bh::nbodies, bh::ntimesteps, bh::seed, bh::TreeSummarizeSpeculative ());
+      pos = bh::run<true> (bh::nbodies, bh::ntimesteps, bh::seed, bh::TreeSummarizeSpeculative ());
       break;
 
     case bh::TWO_PHASE:
-      pos = bh::run (bh::nbodies, bh::ntimesteps, bh::seed, bh::TreeSummarizeTwoPhase ());
+      pos = bh::run<true> (bh::nbodies, bh::ntimesteps, bh::seed, bh::TreeSummarizeTwoPhase ());
       break;
 
     case bh::LEVEL_EXEC:
-      pos = bh::run (bh::nbodies, bh::ntimesteps, bh::seed, bh::TreeSummarizeLevelExec ());
+      pos = bh::run<true> (bh::nbodies, bh::ntimesteps, bh::seed, bh::TreeSummarizeLevelExec ());
       break;
 
-    case bh::CILK:
-      pos = bh::run (bh::nbodies, bh::ntimesteps, bh::seed, bh::TreeSummarizeCilk ());
+    case bh::CILK_EXEC:
+      pos = bh::run<true> (bh::nbodies, bh::ntimesteps, bh::seed, bh::TreeSummarizeCilk ());
       break;
 
     default:
@@ -272,7 +283,7 @@ int main(int argc, char** argv) {
 
   if (!skipVerify) {
     std::cout << "Running serial tree summarization for verification" << std::endl;
-    bh::Point serPos = run (bh::nbodies, bh::ntimesteps, bh::seed, bh::TreeSummarizeSerial ());
+    bh::Point serPos = bh::run<false> (bh::nbodies, bh::ntimesteps, bh::seed, bh::TreeSummarizeSerial ());
 
     double EPS = 1e-9;
     bool equal = true;
@@ -288,7 +299,7 @@ int main(int argc, char** argv) {
       abort ();
 
     } else {
-      std::cout << ">>> OK, resutls verified" << std::endl;
+      std::cout << ">>> OK, results verified" << std::endl;
     }
 
   }

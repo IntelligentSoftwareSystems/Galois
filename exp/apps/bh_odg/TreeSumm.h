@@ -11,6 +11,10 @@
 
 #include <boost/iterator/transform_iterator.hpp>
 
+#ifdef HAVE_CILK
+#include <cilk/reducer_opadd.h>
+#endif
+
 namespace bh {
 
 template <typename B>
@@ -74,6 +78,11 @@ private:
 
 #ifdef HAVE_CILK
 struct TreeSummarizeCilk: public TypeDefHelper<SerialNodeBase> {
+  TreeSummarizeCilk() {
+    if (!Galois::Runtime::LL::EnvCheck("GALOIS_DO_NOT_BIND_MAIN_THREAD")) {
+      GALOIS_DIE("set environment variable GALOIS_DO_NOT_BIND_MAIN_THREAD");
+    }
+  }
 
   template <typename I>
   void operator () (InterNode* root, I bodbeg, I bodend) const {
@@ -82,15 +91,15 @@ struct TreeSummarizeCilk: public TypeDefHelper<SerialNodeBase> {
 
 private:
   double recurse(InterNode* node) const {
-    double mass = 0.0;
-    Point accum;
+    cilk::reducer_opadd<double> mass;
+    cilk::reducer_opadd<Point> accum;
 
     node->compactChildren ();
     
-    for (int i = 0; i < 8; i++) {
+    cilk_for (int i = 0; i < 8; i++) {
       TreeNode* child = node->getChild (i);
       if (child == NULL)
-        break;
+        continue;
 
       double m;
       const Point* p;
@@ -105,24 +114,22 @@ private:
       }
 
       mass += m;
-      for (int j = 0; j < 3; j++) 
-        accum[j] += (*p)[j] * m;
+      accum += (*p * m);
     }
 
-    node->mass = mass;
-    
-    if (mass > 0.0) {
-      double inv_mass = 1.0 / mass;
-      for (int j = 0; j < 3; j++)
-        node->pos[j] = accum[j] * inv_mass;
+    node->mass = mass.get_value();
+
+    if (node->mass > 0.0) {
+      Point a = accum.get_value();
+      a *= 1.0 / node->mass;
+      node->pos = a;
     }
 
-    return mass;
+    return node->mass;
   }
 };
 #else
 struct TreeSummarizeCilk: public TypeDefHelper<SerialNodeBase> {
-
   template <typename I>
   void operator () (InterNode* root, I bodbeg, I bodend) const {
     GALOIS_DIE("not implemented due to missing cilk support");
