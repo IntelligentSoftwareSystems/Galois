@@ -522,7 +522,7 @@ public:
 class SizedAllocatorFactory: private boost::noncopyable {
 public:
   typedef ThreadAwarePrivateHeap<
-    FreeListHeap<SimpleBumpPtr<SystemBaseAlloc> > > SizedAlloc;
+    SimpleBumpPtr<FreeListHeap<SystemBaseAlloc> > > SizedAlloc;
 
   static SizedAlloc* getAllocatorForSize(const size_t);
 

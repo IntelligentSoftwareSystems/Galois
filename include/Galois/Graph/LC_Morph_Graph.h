@@ -56,6 +56,9 @@ public:
   template<typename _node_data>
   struct with_node_data { typedef  LC_Morph_Graph<_node_data,EdgeTy,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,HasId> type; };
 
+  template<typename _edge_data>
+  struct with_edge_data { typedef  LC_Morph_Graph<NodeTy,_edge_data,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,HasId> type; };
+
   template<bool _has_no_lockable>
   struct with_no_lockable { typedef LC_Morph_Graph<NodeTy,EdgeTy,_has_no_lockable,UseNumaAlloc,HasOutOfLineLockable,HasId> type; };
 

@@ -203,6 +203,15 @@ public:
   template<bool _has_no_lockable>
   struct with_no_lockable { typedef FirstGraph<NodeTy,EdgeTy,Directional,_has_no_lockable> type; };
 
+  template<typename _node_data>
+  struct with_node_data { typedef FirstGraph<_node_data,EdgeTy,Directional,HasNoLockable> type; };
+
+  template<typename _edge_data>
+  struct with_edge_data { typedef FirstGraph<NodeTy,_edge_data,Directional,HasNoLockable> type; };
+
+  template<bool _directional>
+  struct with_directional { typedef FirstGraph<NodeTy,EdgeTy,_directional,HasNoLockable> type; };
+
 private:
   template<typename T>
   struct first_eq_and_valid {

@@ -256,6 +256,11 @@ public:
     typedef OCImmutableEdgeGraph<_node_data,EdgeTy,HasNoLockable,HasOutOfLineLockable> type;
   };
 
+  template<typename _edge_data>
+  struct with_edge_data {
+    typedef OCImmutableEdgeGraph<NodeTy,_edge_data,HasNoLockable,HasOutOfLineLockable> type;
+  };
+
   template<bool _has_no_lockable>
   struct with_no_lockable {
     typedef OCImmutableEdgeGraph<NodeTy,EdgeTy,_has_no_lockable,HasOutOfLineLockable> type;

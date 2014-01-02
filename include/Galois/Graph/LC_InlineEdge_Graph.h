@@ -64,6 +64,9 @@ public:
   template<typename _node_data>
   struct with_node_data { typedef LC_InlineEdge_Graph<_node_data,EdgeTy,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,HasCompressedNodePtr> type; };
 
+  template<typename _edge_data>
+  struct with_edge_data { typedef LC_InlineEdge_Graph<NodeTy,_edge_data,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,HasCompressedNodePtr> type; };
+
   template<bool _has_no_lockable>
   struct with_no_lockable { typedef LC_InlineEdge_Graph<NodeTy,EdgeTy,_has_no_lockable,UseNumaAlloc,HasOutOfLineLockable,HasCompressedNodePtr> type; };
 

@@ -104,6 +104,9 @@ public:
   template<typename _node_data>
   struct with_node_data { typedef LC_CSR_Graph<_node_data,EdgeTy,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable> type; };
 
+  template<typename _edge_data>
+  struct with_edge_data { typedef LC_CSR_Graph<NodeTy,_edge_data,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable> type; };
+
   //! If true, do not use abstract locks in graph
   template<bool _has_no_lockable>
   struct with_no_lockable { typedef LC_CSR_Graph<NodeTy,EdgeTy,_has_no_lockable,UseNumaAlloc,HasOutOfLineLockable> type; };

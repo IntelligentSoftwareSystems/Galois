@@ -62,7 +62,10 @@ public:
   struct with_id { typedef LC_Linear_Graph<NodeTy,EdgeTy,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,_has_id> type; };
 
   template<typename _node_data>
-  struct with_node_data { typedef  LC_Linear_Graph<_node_data,EdgeTy,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,HasId> type; };
+  struct with_node_data { typedef LC_Linear_Graph<_node_data,EdgeTy,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,HasId> type; };
+
+  template<typename _edge_data>
+  struct with_edge_data { typedef LC_Linear_Graph<NodeTy,_edge_data,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,HasId> type; };
 
   template<bool _has_no_lockable>
   struct with_no_lockable { typedef LC_Linear_Graph<NodeTy,EdgeTy,_has_no_lockable,UseNumaAlloc,HasOutOfLineLockable,HasId> type; };
