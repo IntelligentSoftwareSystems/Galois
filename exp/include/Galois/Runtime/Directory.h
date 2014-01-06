@@ -18,8 +18,8 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  *
- * @author Manoj Dhanapal <madhanap@cs.utexas.edu>
  * @author Andrew Lenharth <andrewl@lenharth.org>
+ * @author Manoj Dhanapal <madhanap@cs.utexas.edu>
  */
 
 #ifndef GALOIS_RUNTIME_DIRECTORY_H
@@ -47,6 +47,158 @@
 
 namespace Galois {
 namespace Runtime {
+
+enum ResolveFlag {INV=0, RO=1, RW=2};
+
+class DirectoryNG {
+
+  struct metadata {
+    enum StateFlag {
+      INVALID=0,    //Not present and not requested
+      PENDING_RO=1, //Not present and requested RO
+      PENDING_RW=2, //Not present and requested RW
+      RO=3,         //present as RO
+      RW=4,         //present as RW
+      UPGRADE=5     //present as RO and requested RW
+    };
+    LL::SimpleLock lock;
+    StateFlag state;
+    Lockable* obj;
+
+    metadata() :state(INVALID), obj(0) {}
+
+    void dump(std::ostream& os) const {
+      static const char* StateFlagNames[] = {"I", "PR", "PW", "RO", "RW", "UW"};
+      os << "{" << StateFlagNames[state] << "," << obj << "}";
+    }
+  };
+
+  std::unordered_map<fatPointer, metadata> md;
+  LL::SimpleLock md_lock;
+
+  metadata* getMD(fatPointer ptr) {
+    LL::SLguard lg(md_lock);
+    return &md[ptr];
+  }
+
+  template<typename T>
+  void request(fatPointer ptr, ResolveFlag flag) {}
+
+public:
+
+  template<typename T>
+  T* resolve(fatPointer ptr, ResolveFlag flag) {
+    metadata* md = getMD(ptr);
+    LL::SLguard lg(md->lock);
+    switch (md->state) {
+    case metadata::INVALID:
+      //request object
+      request<T>(ptr, flag);
+      md->state = flag == RO ? metadata::PENDING_RO : metadata::PENDING_RW;
+      return nullptr;
+    case metadata::PENDING_RO:
+      if (flag == RW) {
+        request<T>(ptr, flag);
+        md->state = metadata::PENDING_RW;
+      }
+      return nullptr;
+    case metadata::PENDING_RW:
+      return nullptr;
+    case metadata::RO:
+      if (flag == RW) { // upgrade
+        request<T>(ptr, flag);
+        md->state = metadata::UPGRADE;
+        return nullptr;
+      } else {
+        return static_cast<T*>(md->obj);
+      }
+    case metadata::RW:
+      return static_cast<T*>(md->obj);
+    case metadata::UPGRADE:
+      if (flag == RW) {
+        return nullptr;
+      } else {
+        return static_cast<T*>(md->obj);
+      }
+    default:
+      abort();
+    } //switch
+    abort();
+    return nullptr;
+  }
+
+  void recvObj(fatPointer ptr, Lockable* actual, ResolveFlag flag) {
+    metadata* md = getMD(ptr);
+    LL::SLguard lg(md->lock);
+    switch (md->state) {
+    case metadata::INVALID:
+      abort();
+      break;
+    case metadata::PENDING_RO:
+      if (flag == RO) {
+        md->state = metadata::RO;
+      } else if (flag == RW) {
+        md->state = metadata::RW;
+      } else {
+        abort();
+      }
+      md->obj = actual;
+      break;
+    case metadata::PENDING_RW:
+      if (flag == RO) {
+        md->state = metadata::UPGRADE;
+      } else if (flag == RW) {
+        md->state = metadata::RW;
+      } else {
+        abort();
+      }
+      md->obj = actual;
+      break;
+    case metadata::RO:
+      if (flag == RO) {
+        abort();
+      } else if (flag == RW) {
+        md->state = metadata::RW;
+      } else if (flag == INV) {
+        md->state = metadata::INVALID;
+        md->obj = nullptr;
+      } else {
+        abort();
+      }
+      break;
+    case metadata::RW:
+      if (flag == INV) {
+        md->state = metadata::INVALID;
+        md->obj = nullptr;
+      } else {
+        abort();
+      }
+      break;
+    case metadata::UPGRADE:
+      if (flag == RW) {
+        md->state = metadata::RW;
+      } else if (flag == RO) {
+        abort();
+      } else if (flag == INV) {
+        md->state = metadata::PENDING_RW;
+        md->obj = nullptr;
+      } else {
+        abort();
+      }
+      break;
+    default:
+      abort();
+    }
+    assert(md->obj == actual);
+  }
+
+  void dump(std::ostream& os, fatPointer ptr) {
+    metadata* md = getMD(ptr);
+    LL::SLguard lg(md->lock);
+    md->dump(os);
+  }
+  
+};
 
 SimpleRuntimeContext& getAbortCnx();
 
@@ -276,7 +428,7 @@ public:
       if (ptrlock.try_lock()) {
         LL::SLguard lg(getLock(ptr), std::adopt_lock_t());
         if (ptr.getHost() == NetworkInterface::ID) {
-          processObj(lg, ptr, ptr.getObj());
+          processObj(lg, ptr, static_cast<Lockable*>(ptr.getObj()));
         } else {
           remoteObj* obj = cm.weakResolve(ptr);
           if (obj)
@@ -352,6 +504,7 @@ void Galois::Runtime::typeHelperImpl<T>::sendRequest(fatPointer ptr, uint32_t de
   Directory::sendRequest<T>(ptr, dest, reqFor);
 }
 
+#if 0
 template<typename T>
 Galois::Runtime::remoteObjImpl<T>* Galois::Runtime::CacheManager::resolve(fatPointer ptr) {
   assert(ptr.getHost() != NetworkInterface::ID);
@@ -365,5 +518,6 @@ Galois::Runtime::remoteObjImpl<T>* Galois::Runtime::CacheManager::resolve(fatPoi
   }
   return static_cast<remoteObjImpl<T>*>(retval);
 }
+#endif
 
 #endif

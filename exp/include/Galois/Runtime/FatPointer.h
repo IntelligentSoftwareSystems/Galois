@@ -23,102 +23,134 @@
 #ifndef GALOIS_RUNTIME_FATPOINTER_H
 #define GALOIS_RUNTIME_FATPOINTER_H
 
-#include  <boost/functional/hash.hpp>
-
-#define LONGPTR 0
+#include <boost/functional/hash.hpp>
+#include <ostream>
 
 namespace Galois {
 namespace Runtime {
 
-//forward declaration
-class Lockable;
-
-#if LONGPTR
+namespace detail {
 
 //Really fat pointer
-class fatPointer {
+class simpleFatPointer {
   uint32_t host;
-  Lockable* ptr;
+  void* ptr;
+
+  void set(uint32_t h, void* p) {
+    host = h;
+    ptr = p;
+  }
+
+protected:
+
+  constexpr simpleFatPointer() noexcept :host(0), ptr(nullptr) {}
+
+  typedef std::pair<uint32_t, void*> rawType;
+  rawType rawCopy() const { return std::make_pair(host,ptr); }
 
 public:
-  constexpr fatPointer() noexcept :host(0), ptr(nullptr) {}
-  fatPointer(uint32_t h, Lockable* p) noexcept :host(h), ptr(p) {}
+
   uint32_t getHost() const { return host; }
   void setHost(uint32_t h) { host = h; }
-  Lockable* getObj() const { return ptr; }
-  void setObj(Lockable* p) { ptr = p; }
-  
-  typedef std::pair<uint32_t, Lockable*> rawType;
-  rawType rawCopy() const { return std::make_pair(host,ptr); }
+  void* getObj() const { return ptr; }
+  void setObj(void* p) { ptr = p; }
 };
 
-#else
 //Fat pointer taking advantage of unused bits in AMD64 addresses
-class fatPointer {
+class amd64FatPointer {
   uintptr_t val;
 
-  uintptr_t compute(uint32_t h, Lockable* p) const {
+  uintptr_t compute(uint32_t h, void* p) const {
     return ((uintptr_t)h << 47) | ((uintptr_t)p & 0x80007FFFFFFFFFFF);
   }
 
-  void set(uint32_t h, Lockable* p) {
+  void set(uint32_t h, void* p) {
+    assert(h < (1U << 17));
     val = compute(h,p);
   }
 
+protected:
+
+  amd64FatPointer(uint32_t h, void* p) noexcept :val(compute(h,p)) {}
+
+  typedef uintptr_t rawType;
+  rawType rawCopy() const { return val; }
+
 public:
-  constexpr fatPointer() noexcept :val(0) {}
-  fatPointer(uint32_t h, Lockable* p) noexcept :val(compute(h,p)) {}
   uint32_t getHost() const {
     uintptr_t hval = val;
     hval >>= 47;
     hval &= 0x0000FFFF;
     return hval;
   }
-  Lockable* getObj() const {
+  void* getObj() const {
     uintptr_t hval = val;
     hval &= 0x80007FFFFFFFFFFF;
-    return (Lockable*)hval;
+    return (void*)hval;
   }
   void setHost(uint32_t h) {
     set(h, getObj());
   }
-  void setObj(Lockable* p) {
+  void setObj(void* p) {
     set(getHost(), p);
   }
-
-  typedef uintptr_t rawType;
-  rawType rawCopy() const { return val; }
-
 };
-#endif
 
-inline bool operator==(const fatPointer& lhs, const fatPointer& rhs) {
-  return lhs.rawCopy() == rhs.rawCopy();
+
+template< typename fatPointerBase>
+class fatPointerImpl : public fatPointerBase {
+  using fatPointerBase::rawCopy;
+
+public:
+
+  constexpr fatPointerImpl() noexcept :fatPointerBase(0, nullptr) {}
+  constexpr fatPointerImpl(uint32_t h, void* p) noexcept :fatPointerBase(h,p) {}
+
+  void dump(std::ostream& os) const {
+    os << "[" << fatPointerBase::getHost() << "," << fatPointerBase::getObj << "]";
+  }
+
+  size_t hash_value() const {
+    boost::hash<typename fatPointerBase::rawType> ih;
+    return ih(rawCopy());
+  }
+
+  inline bool operator==(const fatPointerImpl& rhs) const {
+    return rawCopy() == rhs.rawCopy();
+  }
+  inline bool operator!=(const fatPointerImpl& rhs) const {
+    return rawCopy() != rhs.rawCopy();
+  }
+  inline bool operator<=(const fatPointerImpl& rhs) const {
+    return rawCopy() <= rhs.rawCopy();
+  }
+  inline bool operator>=(const fatPointerImpl& rhs) const {
+    return rawCopy() >= rhs.rawCopy();
+  }
+  inline bool operator<(const fatPointerImpl& rhs) const {
+    return rawCopy() < rhs.rawCopy();
+  }
+  inline bool operator>(const fatPointerImpl& rhs) const {
+    return rawCopy() > rhs.rawCopy();
+  }
+};
+
+template<typename T>
+size_t hash_value(const fatPointerImpl<T>& v) {
+  return v.hash_value();
 }
-inline bool operator!=(const fatPointer& lhs, const fatPointer& rhs) {
-  return lhs.rawCopy() != rhs.rawCopy();
-}
-inline bool operator<=(const fatPointer& lhs, const fatPointer& rhs) {
-  return lhs.rawCopy() <= rhs.rawCopy();
-}
-inline bool operator>=(const fatPointer& lhs, const fatPointer& rhs) {
-  return lhs.rawCopy() >= rhs.rawCopy();
-}
-inline bool operator<(const fatPointer& lhs, const fatPointer& rhs) {
-  return lhs.rawCopy() < rhs.rawCopy();
-}
-inline bool operator>(const fatPointer& lhs, const fatPointer& rhs) {
-  return lhs.rawCopy() > rhs.rawCopy();
-}
+
+} // namespace detail
+
+typedef detail::fatPointerImpl<detail::amd64FatPointer> fatPointer;
 
 } // namespace Runtime
 } // namespace Galois
 
 template<>
 struct std::hash<Galois::Runtime::fatPointer> {
-  boost::hash<Galois::Runtime::fatPointer::rawType> ih;
   size_t operator()(const Galois::Runtime::fatPointer& ptr) const {
-    return ih(ptr.rawCopy());
+    return ptr.hash_value();
   }
 };
 

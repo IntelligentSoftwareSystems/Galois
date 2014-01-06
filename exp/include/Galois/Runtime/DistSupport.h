@@ -31,7 +31,10 @@
 namespace Galois {
 namespace Runtime {
 
+
 SimpleRuntimeContext& getTransCnx();
+
+#if 0
 
 template<typename T>
 T* resolve(const gptr<T>& p) {
@@ -119,6 +122,8 @@ void transientRelease(const gptr<T>& p) {
   }
   getTransCnx().release(rptr);
 }
+
+#endif
 
 } //namespace Runtime
 } //namespace Galois

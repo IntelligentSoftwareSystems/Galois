@@ -18,7 +18,6 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  *
- * @author Manoj Dhanapal <madhanap@cs.utexas.edu>
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 #ifndef GALOIS_RUNTIME_CACHEMANAGER_H
@@ -51,7 +50,14 @@ class CacheManager {
 public:
 
   template<typename T>
-  remoteObjImpl<T>* resolve(fatPointer ptr);
+  remoteObjImpl<T>* resolve(fatPointer ptr) {
+    assert(ptr.getHost() != NetworkInterface::ID);
+    LL::SLguard lgr(Lock);
+    remoteObj*& retval = remoteObjects[ptr];
+    if (!retval)
+      retval = new remoteObjImpl<T>();
+    return retval;
+  }
 
   remoteObj* weakResolve(fatPointer ptr) {
     assert(ptr.getHost() != NetworkInterface::ID);

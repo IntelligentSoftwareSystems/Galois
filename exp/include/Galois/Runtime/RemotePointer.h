@@ -29,33 +29,32 @@
 namespace Galois {
 namespace Runtime {
 
-//forward declaration
-class Lockable;
-
-template<typename T>
-class gptr;
-
-template<typename T>
-T* resolve(const gptr<T>& p);
-
 template<typename T>
 class gptr {
   fatPointer ptr;
 
+  T* inner_resolve() const {
+    if (!ptr)
+      return nullptr;
+    if (ptr.getHost() == NetworkInterface::ID)
+      return ptr.getObj();
+    return getCacheManager().resolve<T>(ptr);
+  }
+
 public:
   typedef T element_type;
   
-  constexpr gptr() noexcept :ptr(0, nullptr) {}
-  explicit constexpr  gptr(T* p) noexcept :ptr(NetworkInterface::ID, p) {}
-  gptr(uint32_t o, T* p) :ptr(o, static_cast<Lockable*>(p)) {}
+  constexpr gptr() noexcept :gptr(0, nullptr) {}
+  explicit constexpr  gptr(T* p) noexcept :gptr(NetworkInterface::ID, p) {}
+  gptr(uint32_t o, T* p) noexcept :ptr(o, static_cast<void*>(p)) {}
   
-  operator fatPointer() const { return ptr; }
+  //operator fatPointer() const { return ptr; }
 
   T& operator*() const {
-    return *resolve(*this);
+    return *inner_resolve();
   }
   T* operator->() const {
-    return resolve(*this);
+    return inner_resolve();
   }
 
   bool operator<(const gptr& rhs) const {
@@ -88,6 +87,7 @@ public:
   }
 
   void dump(std::ostream& os) const {
+    ptr.dump(os);
     os << "[" << ptr.getHost() << "," << ptr.getObj() << "]";
   }
 };
