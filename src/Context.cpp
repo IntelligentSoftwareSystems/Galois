@@ -30,29 +30,10 @@
 //! Global thread context for each active thread
 static __thread Galois::Runtime::SimpleRuntimeContext* thread_ctx = 0;
 
-namespace {
-
-struct PendingStatus {
-  Galois::Runtime::LL::CacheLineStorage<Galois::Runtime::PendingFlag> flag;
-  PendingStatus(): flag(Galois::Runtime::NON_DET) { }
-};
-
-PendingStatus pendingStatus;
-
-}
-
-void Galois::Runtime::setPending(Galois::Runtime::PendingFlag value) {
-  pendingStatus.flag = value;
-}
-
-Galois::Runtime::PendingFlag Galois::Runtime::getPending() {
-  return pendingStatus.flag.get();
-}
-
 void Galois::Runtime::doCheckWrite() {
-  if (getPending () == PENDING) {
-    throw failsafe_ex();
-  }
+  // if (getPending () == PENDING) {
+  //   throw failsafe_ex();
+  // }
 }
 
 void Galois::Runtime::setThreadContext(Galois::Runtime::SimpleRuntimeContext* ctx) {
@@ -72,31 +53,8 @@ void Galois::Runtime::forceAbort() {
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-// LockManagerBase & SimpleRuntimeContext
+// SimpleRuntimeContext
 ////////////////////////////////////////////////////////////////////////////////
-
-#if !defined(GALOIS_USE_SEQ_ONLY)
-Galois::Runtime::LockManagerBase::AcquireStatus
-Galois::Runtime::LockManagerBase::tryAcquire(Galois::Runtime::Lockable* lockable) 
-{
-  assert(lockable);
-  // XXX(ddn): Hand inlining this code makes a difference on 
-  // delaunaytriangulation (GCC 4.7.2)
-#if 0
-  if (tryLock(lockable)) {
-    assert(!getOwner(lockable));
-    ownByForce(lockable);
-    return NEW_OWNER;
-#else
-  if (lockable->owner.try_lock()) {
-    lockable->owner.setValue(this);
-    return NEW_OWNER;
-#endif
-  } else if (getOwner(lockable) == this) {
-    return ALREADY_OWNER;
-  }
-  return FAIL;
-}
 
 void Galois::Runtime::SimpleRuntimeContext::acquire(Galois::Runtime::Lockable* lockable) {
   AcquireStatus i;
@@ -138,7 +96,6 @@ unsigned Galois::Runtime::SimpleRuntimeContext::commitIteration() {
 unsigned Galois::Runtime::SimpleRuntimeContext::cancelIteration() {
   return commitIteration();
 }
-#endif
 
 void Galois::Runtime::SimpleRuntimeContext::subAcquire(Galois::Runtime::Lockable* lockable) {
   GALOIS_DIE("Shouldn't get here");
