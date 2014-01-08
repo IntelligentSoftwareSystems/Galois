@@ -68,8 +68,10 @@ void t_foreach() {
    
     Galois::Timer t;
     t.start();
-    for (unsigned x = 0; x < iter; ++x)
-      Galois::for_each(V.begin(), V.end(), emp(), Galois::wl<Galois::WorkList::StableIterator<std::vector<unsigned>::iterator>>());
+    for (unsigned x = 0; x < iter; ++x) {
+      //FIXME: distributed iterator type
+      //Galois::for_each(V.begin(), V.end(), emp(), Galois::wl<Galois::WorkList::StableIterator<std::vector<unsigned>::iterator>>());
+    }
     t.stop();
 
     std::cout << "Galois(" << iter << "x" << V.size() << "): " << t.get() << "\n";

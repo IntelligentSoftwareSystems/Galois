@@ -65,6 +65,30 @@ LockManagerBase* LockManagerBase::forceAcquire(Galois::Runtime::Lockable* lockab
   } while (true);
 }
 
+bool LockManagerBase::isAcquired(const Lockable* lockable) const {
+  assert(lockable);
+  return lockable->owner.getValue() == this;
+}
+
+bool LockManagerBase::empty() const {
+  return locks.empty();
+}
+
+bool LockManagerBase::emptyChecked() {
+  if (locks.empty()) return true;
+  for (auto ii = locks.begin(), ee = locks.end(); ii != ee; ++ii)
+    if ((*ii)->owner.getValue() == this)
+      return false;
+  return true;
+}
+
+void LockManagerBase::releaseOne(Lockable* lockable) {
+  assert(lockable);
+  assert(lockable->owner.getValue() == this);
+  //FIXME: race condition with forceAcquire
+  lockable->owner.unlock_and_clear();
+}
+
 unsigned LockManagerBase::releaseAll() {
   unsigned retval = 0;
   for (auto ii = locks.begin(), ee = locks.end(); ii != ee; ++ii) {

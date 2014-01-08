@@ -8,12 +8,13 @@ int main(int argc, char** argv) {
   Galois::Runtime::SimpleRuntimeContext S;
   Galois::Runtime::Lockable L;
 
+  Galois::Runtime::setThreadContext(&S);
 
   Galois::Timer t;
   t.start();
   
   for (int x = 0; x < 1024*1024*1024; ++x)
-    Galois::Runtime::doAcquire(&L);
+    Galois::Runtime::acquire(&L, Galois::ALL);
   
   t.stop();
   std::cout << "Locking: " << t.get() << '\n';

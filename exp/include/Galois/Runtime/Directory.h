@@ -299,7 +299,7 @@ public:
 };
 
 
-class Directory : public SimpleRuntimeContext, private boost::noncopyable {
+class Directory : public LockManagerBase, private boost::noncopyable {
 
   template<typename T>
   friend class typeHelperImpl;
@@ -407,7 +407,6 @@ class Directory : public SimpleRuntimeContext, private boost::noncopyable {
   }
 
 public:
-  Directory() : SimpleRuntimeContext(false) {}
   
   template<typename T>
   void fetch(fatPointer ptr, T* obj) {
@@ -480,7 +479,7 @@ void Galois::Runtime::Directory::recvObj(RecvBuffer& buf) {
   auto& dir = getSystemDirectory();
   if (dir.doObj(ptr, typeHelperImpl<T>::get())) {
     assert(isAcquiredBy(obj, &dir));
-    dir.release(obj);
+    dir.releaseOne(obj);
   }
 }
 

@@ -107,13 +107,15 @@ public:
   constexpr fatPointerImpl(uint32_t h, void* p) noexcept :fatPointerBase(h,p) {}
 
   void dump(std::ostream& os) const {
-    os << "[" << fatPointerBase::getHost() << "," << fatPointerBase::getObj << "]";
+    os << "[" << fatPointerBase::getHost() << "," << fatPointerBase::getObj() << "]";
   }
 
   size_t hash_value() const {
     boost::hash<typename fatPointerBase::rawType> ih;
     return ih(rawCopy());
   }
+
+  inline explicit operator bool() const { return fatPointerBase::getObj(); }
 
   inline bool operator==(const fatPointerImpl& rhs) const {
     return rawCopy() == rhs.rawCopy();

@@ -23,8 +23,6 @@
 #ifndef GALOIS_RUNTIME_CACHEMANAGER_H
 #define GALOIS_RUNTIME_CACHEMANAGER_H
 
-#include "Galois/Runtime/Context.h"
-
 namespace Galois {
 namespace Runtime {
 
@@ -39,7 +37,8 @@ class remoteObjImpl : public remoteObj {
   T obj;
 public:
   virtual size_t getTypeHash() const { return typeid(T).hash_code(); }
-  virtual Lockable* getObj()    { return &obj; }
+  virtual Lockable* getObj() { return &obj; }
+  T* getObjTyped() { return &obj; }
 };
 
 class CacheManager {
@@ -56,7 +55,7 @@ public:
     remoteObj*& retval = remoteObjects[ptr];
     if (!retval)
       retval = new remoteObjImpl<T>();
-    return retval;
+    return static_cast<remoteObjImpl<T>*>(retval);
   }
 
   remoteObj* weakResolve(fatPointer ptr) {

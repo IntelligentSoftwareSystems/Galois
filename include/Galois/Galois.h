@@ -29,8 +29,6 @@
 #include "Galois/Threads.h"
 #include "Galois/Runtime/ParallelWork.h"
 #include "Galois/Runtime/DoAll.h"
-#include "Galois/Runtime/DeterministicWork.h"
-#include "Galois/Runtime/OrderedWork.h"
 
 #ifdef GALOIS_USE_EXP
 #include "Galois/Runtime/ParallelWorkDistributed.h"
@@ -60,7 +58,7 @@ void init(int& argc, char**& argv);
  */
 struct loopname {
   const char* n;
-  loopname(const char* n = 0) :n(n) {}
+  loopname(const char* n = "(NULL)") :n(n) {}
 };
 
 /**
@@ -246,49 +244,6 @@ static inline void preAlloc(int num) {
  */
 static inline void reportPageAlloc(const char* label) {
   Runtime::reportPageAlloc(label);
-}
-
-/**
- * Galois ordered set iterator for stable source algorithms.
- *
- * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item is a value from the iteration
- * range and T is the type of item. Comparison function should conform to <code>bool r = cmp(item1, item2)</code>
- * where r is true if item1 is less than or equal to item2. Neighborhood function should conform to
- * <code>nhFunc(item)</code> and should visit every element in the neighborhood of active element item.
- *
- * @param b begining of range of initial items
- * @param e end of range of initial items
- * @param cmp comparison function
- * @param nhFunc neighborhood function
- * @param fn operator
- * @param loopname string to identity loop in statistics output
- */
-template<typename Iter, typename Cmp, typename NhFunc, typename OpFunc>
-void for_each_ordered(Iter b, Iter e, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& fn, const char* loopname=0) {
-  Runtime::for_each_ordered_impl(b, e, cmp, nhFunc, fn, loopname);
-}
-
-/**
- * Galois ordered set iterator for unstable source algorithms.
- *
- * Operator should conform to <code>fn(item, UserContext<T>&)</code> where item is a value from the iteration
- * range and T is the type of item. Comparison function should conform to <code>bool r = cmp(item1, item2)</code>
- * where r is true if item1 is less than or equal to item2. Neighborhood function should conform to
- * <code>nhFunc(item)</code> and should visit every element in the neighborhood of active element item.
- * The stability test should conform to <code>bool r = stabilityTest(item)</code> where r is true if
- * item is a stable source.
- *
- * @param b begining of range of initial items
- * @param e end of range of initial items
- * @param cmp comparison function
- * @param nhFunc neighborhood function
- * @param fn operator
- * @param stabilityTest stability test
- * @param loopname string to identity loop in statistics output
- */
-template<typename Iter, typename Cmp, typename NhFunc, typename OpFunc, typename StableTest>
-void for_each_ordered(Iter b, Iter e, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& fn, const StableTest& stabilityTest, const char* loopname=0) {
-  Runtime::for_each_ordered_impl(b, e, cmp, nhFunc, fn, stabilityTest, loopname);
 }
 
 } //namespace Galois

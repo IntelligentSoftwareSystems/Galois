@@ -17,32 +17,6 @@ struct R : public Galois::Runtime::Lockable {
 };
 
 
-struct f1 {
-   dptr<R> r;
-
-   void operator()(int& data, Galois::UserContext<int>& lwl) {
-      r->add(data);
- //printf ("data: %d\t sum so far: %d\n", data, r->i);
-      return;
-   }
-
-   void marshall (char *data) {
-      memcpy (data, this, sizeof(f1));
-      return;
-   }
-
-   static void rstart (char *f, int count, char *data) {
-      using namespace Galois::Runtime::WorkList;
-      typedef LIFO<int,true> chunk;
-  //  typedef ChunkedFIFO<16> chunk;
-      int *beg = (int*)data;
-      int *end = (beg + count);
-      f1 *fptr = (f1*)f;
-      Galois::for_each<chunk>(beg,end,*fptr);
-      return;
-   }
-};
-
 int main(int argc, char *argv[])
 {
  /*

@@ -24,6 +24,7 @@ struct run_local_helper {
   size_t seed;
   size_t size;
   run_local_helper(int* b, size_t s, size_t ss): block(b), seed(s), size(ss) { }
+  run_local_helper() {}
   void operator()(unsigned int tid, unsigned int num) {
     std::mt19937 gen(seed + tid);
 #if __cplusplus >= 201103L || defined(HAVE_CXX11_UNIFORM_INT_DISTRIBUTION)
@@ -51,6 +52,7 @@ struct run_interleaved_helper {
   size_t seed;
   size_t size;
   run_interleaved_helper(int* b, size_t s, size_t ss): block(b), seed(s), size(ss) { }
+  run_interleaved_helper() {}
   void operator()(unsigned int tid, unsigned int num) {
     std::mt19937 gen(seed + tid);
 #if __cplusplus >= 201103L || defined(HAVE_CXX11_UNIFORM_INT_DISTRIBUTION)

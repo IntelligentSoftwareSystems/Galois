@@ -65,11 +65,22 @@ public:
   //to release the object, a normal release will disrupt meta-data
   LockManagerBase* forceAcquire(Lockable* lockable);
 
+  bool isAcquired(const Lockable* lockable) const;
+
+  //Release one object.  This manager must use releaseChecked after this.
+  void releaseOne(Lockable* lockable);
+
   //Release all objects.  Returns number of objects
   unsigned  releaseAll();
 
   //Release all objects which haven't been stolen.  Returns number of objects
   unsigned releaseAllChecked();
+
+  //Have objects ever been acquired? (release objects don't count as this being empty)
+  bool empty() const;
+
+  //Are objects actually present? (released objects are skipped)  More expensive.
+  bool emptyChecked();
 
   //dump objects and owners
   void dump(std::ostream& os);

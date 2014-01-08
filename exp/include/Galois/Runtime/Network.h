@@ -26,7 +26,6 @@
 #define GALOIS_RUNTIME_NETWORK_H
 
 #include "Galois/Runtime/Serialize.h"
-#include "Galois/Runtime/Context.h"
 
 #include <cstdint>
 #include <tuple>

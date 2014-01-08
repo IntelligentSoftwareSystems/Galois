@@ -82,7 +82,7 @@ void Directory::processObj(LL::SLguard& lg, fatPointer ptr, Lockable* obj) {
   tracking& tr = getTracking(lg, ptr);
 
   //invalid objects just need requests
-  if (isAcquiredBy(obj, this)) {
+  if (LockManagerBase::isAcquired(obj)) {
     if (tr.hasRequest()) {
       uint32_t wanter = tr.getRequest();
       if (!tr.isRecalled() || wanter < tr.getRecalled()) {
@@ -109,11 +109,11 @@ void Directory::processObj(LL::SLguard& lg, fatPointer ptr, Lockable* obj) {
       return;
     }
     //figure out to whom to send it 
-    switch (SimpleRuntimeContext::tryAcquire(obj)) {
-    case 0: // Local iteration has the lock
+    switch (LockManagerBase::tryAcquire(obj)) {
+    case LockManagerBase::FAIL: // Local iteration has the lock
       addPending(ptr);
       return; // delay processing
-    case 1: { //now owner (was free and on this host)
+    case LockManagerBase::NEW_OWNER: { //now owner (was free and on this host)
       //compute who to send the object too
       //non-owner sends back to owner
       uint32_t dest = ptr.getHost() == NetworkInterface::ID ? wanter : ptr.getHost();
@@ -131,7 +131,7 @@ void Directory::processObj(LL::SLguard& lg, fatPointer ptr, Lockable* obj) {
       }
       break;
     }
-    case 2: //already owner, should have been caught above
+    case LockManagerBase::ALREADY_OWNER: //already owner, should have been caught above
     default: //unknown
       abort();
     }

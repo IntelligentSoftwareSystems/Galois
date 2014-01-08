@@ -246,6 +246,9 @@ if(CMAKE_BUILD_TYPE MATCHES "Debug")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
   endif()
 endif()
+
+find_package(CXX11 REQUIRED)
+
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CXX11_FLAGS}")
 
 include(CheckEndian)

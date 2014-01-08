@@ -37,8 +37,8 @@ class gptr {
     if (!ptr)
       return nullptr;
     if (ptr.getHost() == NetworkInterface::ID)
-      return ptr.getObj();
-    return getCacheManager().resolve<T>(ptr);
+      return static_cast<T*>(ptr.getObj());
+    return nullptr; //getCacheManager().resolve<T>(ptr);
   }
 
 public:
@@ -50,12 +50,9 @@ public:
   
   //operator fatPointer() const { return ptr; }
 
-  T& operator*() const {
-    return *inner_resolve();
-  }
-  T* operator->() const {
-    return inner_resolve();
-  }
+  T& operator*()  const { return *inner_resolve(); }
+  T* operator->() const { return  inner_resolve(); }
+  T* resolve()    const { return  inner_resolve(); }
 
   bool operator<(const gptr& rhs) const {
     return ptr < rhs.ptr;
@@ -72,9 +69,12 @@ public:
   explicit operator bool() const {
     return ptr.getObj() != 0;
   }
+  explicit operator fatPointer() const {
+    return ptr;
+  }
 
   bool isLocal() const {
-    return ptr.getHost() == Galois::Runtime::NetworkInterface::ID;
+    return ptr.getHost() == NetworkInterface::ID;
   }
 
   bool sameHost(const gptr& rhs) const {
@@ -88,7 +88,6 @@ public:
 
   void dump(std::ostream& os) const {
     ptr.dump(os);
-    os << "[" << ptr.getHost() << "," << ptr.getObj() << "]";
   }
 };
 

@@ -79,7 +79,7 @@ void do_all_landing_pad(RecvBuffer& buf) {
   gDeserialize(buf,f,data,lname,steal);
 
   //Start locally
-  do_all_impl(Galois::Runtime::makeStandardRange(data.begin(), data.end()),f,lname,steal);
+  do_all_impl(makeStandardRange(data.begin(), data.end()),f,lname.c_str(),steal);
 
   // place a MPI barrier here for all the hosts to synchronize
   //net.systemBarrier();
@@ -219,8 +219,8 @@ void do_all_impl_dist(LocalRange<T>& lr, FunctionTy f, ReducerTy r, bool needsRe
 }
 
 
-template<typename WLTy, typename IterTy, typename FunctionTy>
-void do_all_dist(StandardRange<IterTy> r, FunctionTy f, const char* loopname, bool steal) {
+template<typename IterTy, typename FunctionTy>
+FunctionTy do_all_dist(StandardRange<IterTy> r, FunctionTy f, const char* loopname, bool steal) {
   // Get a handle to the network interface
   //  Don't move as NetworkInterface::Num and NetworkInterface::ID have to be initialized first
   NetworkInterface& net = getSystemNetworkInterface();
@@ -229,8 +229,7 @@ void do_all_dist(StandardRange<IterTy> r, FunctionTy f, const char* loopname, bo
 
   //fast path for non-distributed
   if (NetworkInterface::Num == 1) {
-    do_all_impl<WLTy>(r,f,loopname,steal);
-    return;
+    return do_all_impl(r,f,loopname,steal);
   }
 
   //copy out all data
@@ -254,22 +253,22 @@ void do_all_dist(StandardRange<IterTy> r, FunctionTy f, const char* loopname, bo
   auto myblk = block_range(allData.begin(), allData.end(), 0, NetworkInterface::Num);
 
   //Start locally
-  do_all_impl(Galois::Runtime::makeStandardRange(myblk.first, myblk.second), f, loopname);
+  //FIXME: reduce r
+  return do_all_impl(Galois::Runtime::makeStandardRange(myblk.first, myblk.second), f, loopname);
 
   // place a MPI barrier here for all the hosts to synchronize
   // net.systemBarrier();
 }
 
-template<typename WLTy, typename T, typename FunctionTy>
-void do_all_dist(LocalRange<T>& r, FunctionTy f, const char* loopname, bool steal) {
+template<typename T, typename FunctionTy>
+FunctionTy  do_all_dist(LocalRange<T>& r, FunctionTy f, const char* loopname, bool steal) {
   // Get a handle to the network interface
   //  Don't move as NetworkInterface::Num and NetworkInterface::ID have to be initialized first
   NetworkInterface& net = getSystemNetworkInterface();
 
   //fast path for non-distributed
   if (NetworkInterface::Num == 1) {
-    do_all_impl<WLTy>(r,f,loopname, steal);
-    return;
+    return do_all_impl(r,f,loopname, steal);
   }
 
   std::string lname(loopname);
@@ -284,7 +283,8 @@ void do_all_dist(LocalRange<T>& r, FunctionTy f, const char* loopname, bool stea
   net.flush();
   net.handleReceives();
   //Start locally
-  do_all_impl(r, f, loopname, steal);
+  //FIXME: reduce r
+  return do_all_impl(r, f, loopname, steal);
 
   // place a MPI barrier here for all the hosts to synchronize
   //  net.systemBarrier();
