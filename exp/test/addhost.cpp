@@ -28,13 +28,7 @@ struct f1 {
   void operator()(int& data, Galois::UserContext<int>& lwl) {
     //    r.dump(std::cerr);
     acquire(r, Galois::ALL);
-
-    if (r.isLocal()) {
-      r->add(data);
-    } else {
-      auto holder = getCacheManager().resolve<R>((fatPointer)r);
-      holder->getObjTyped()->add(data);
-    }
+    r->add(data);
     return;
   }
 };

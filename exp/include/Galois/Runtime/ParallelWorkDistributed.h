@@ -43,8 +43,6 @@ void for_each_landing_pad(RecvBuffer& buf) {
   std::string loopname;
   gDeserialize(buf,f,data,loopname);
 
-  NetworkInterface& net = getSystemNetworkInterface();
-
   //Start locally
   Galois::Runtime::for_each_impl<WLTy>(Galois::Runtime::makeStandardRange(data.begin(), data.end()), f, loopname.c_str());
 
@@ -59,8 +57,6 @@ void for_each_local_landing_pad(RecvBuffer& buf) {
   T data;
   std::string loopname;
   gDeserialize(buf,f,data,loopname);
-
-  NetworkInterface& net = getSystemNetworkInterface();
 
   //Start locally
   Galois::Runtime::for_each_impl<WLTy>(Galois::Runtime::makeLocalRange(data), f, loopname.c_str());
@@ -106,8 +102,6 @@ void on_each_impl_landing_pad(RecvBuffer& buf) {
   //extract stuff
   FunctionTy f;
   gDeserialize(buf,f);
-
-  NetworkInterface& net = getSystemNetworkInterface();
 
   //Start locally
   on_each_impl(f);

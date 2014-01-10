@@ -33,13 +33,8 @@ template<typename T>
 class gptr {
   fatPointer ptr;
 
-  T* inner_resolve() const {
-    if (!ptr)
-      return nullptr;
-    if (ptr.getHost() == NetworkInterface::ID)
-      return static_cast<T*>(ptr.getObj());
-    return nullptr; //getCacheManager().resolve<T>(ptr);
-  }
+  //MethodFlag::NONE here means non-change, but obj must be present
+  T* inner_resolve(Galois::MethodFlag m) const;
 
 public:
   typedef T element_type;
@@ -50,9 +45,9 @@ public:
   
   //operator fatPointer() const { return ptr; }
 
-  T& operator*()  const { return *inner_resolve(); }
-  T* operator->() const { return  inner_resolve(); }
-  T* resolve()    const { return  inner_resolve(); }
+  T& operator*()  const { return *inner_resolve(MethodFlag::NONE); }
+  T* operator->() const { return  inner_resolve(MethodFlag::NONE); }
+  T* resolve(MethodFlag m) const { return  inner_resolve(m); }
 
   bool operator<(const gptr& rhs) const {
     return ptr < rhs.ptr;

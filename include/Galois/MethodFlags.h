@@ -37,7 +37,8 @@ enum MethodFlag {
   CHECK_CONFLICT = 1,
   SAVE_UNDO = 2,
   ALL = 3,
-  WRITE = 4
+  WRITE = 5,
+  READ = 7
 };
 
 //! Bitwise & for method flags

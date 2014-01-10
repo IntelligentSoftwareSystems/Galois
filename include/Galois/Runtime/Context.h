@@ -131,11 +131,15 @@ inline void acquire(Lockable* lockable, Galois::MethodFlag m) {
 
 template<typename T>
 inline void acquire(gptr<T> ptr, Galois::MethodFlag m) {
-  if (ptr.isLocal()) {
-    acquire(ptr.resolve(), m);
+  acquire(ptr.resolve(m), m);
+}
+
+template<typename T>
+T* gptr<T>::inner_resolve(Galois::MethodFlag m) const {
+  if (isLocal()) {
+    return static_cast<T*>(ptr.getObj());
   } else {
-    auto holder = getCacheManager().resolve<T>((fatPointer)ptr);
-    acquire(holder->getObj(), m);
+    return static_cast<T*>(getCacheManager().resolve<T>(ptr, true)->getObj());
   }
 }
 

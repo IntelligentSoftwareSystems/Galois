@@ -49,7 +49,7 @@ class CacheManager {
 public:
 
   template<typename T>
-  remoteObjImpl<T>* resolve(fatPointer ptr) {
+  remoteObjImpl<T>* resolve(fatPointer ptr, bool write) {
     assert(ptr.getHost() != NetworkInterface::ID);
     LL::SLguard lgr(Lock);
     remoteObj*& retval = remoteObjects[ptr];
