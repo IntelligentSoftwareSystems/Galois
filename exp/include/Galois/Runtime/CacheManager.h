@@ -23,6 +23,8 @@
 #ifndef GALOIS_RUNTIME_CACHEMANAGER_H
 #define GALOIS_RUNTIME_CACHEMANAGER_H
 
+#include "Galois/Runtime/Lockable.h"
+
 namespace Galois {
 namespace Runtime {
 
@@ -53,7 +55,7 @@ public:
     assert(ptr.getHost() != NetworkInterface::ID);
     LL::SLguard lgr(Lock);
     remoteObj*& retval = remoteObjects[ptr];
-    if (!retval)
+    if (!retval) 
       retval = new remoteObjImpl<T>();
     return static_cast<remoteObjImpl<T>*>(retval);
   }

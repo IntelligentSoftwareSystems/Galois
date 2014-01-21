@@ -27,7 +27,7 @@
 
 #include "Galois/gstl.h"
 #include "Galois/Runtime/ll/TID.h"
-#include "Galois/Runtime/Context.h"
+//#include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/Network.h"
 #include "Galois/Runtime/Tracer.h"
 #include "Galois/Runtime/Support.h"
@@ -82,52 +82,22 @@ class DirectoryNG {
   }
 
   template<typename T>
-  void request(fatPointer ptr, ResolveFlag flag) {}
-
-public:
-
-  template<typename T>
-  T* resolve(fatPointer ptr, ResolveFlag flag) {
-    metadata* md = getMD(ptr);
-    LL::SLguard lg(md->lock);
-    switch (md->state) {
-    case metadata::INVALID:
-      //request object
-      request<T>(ptr, flag);
-      md->state = flag == RO ? metadata::PENDING_RO : metadata::PENDING_RW;
-      return nullptr;
-    case metadata::PENDING_RO:
-      if (flag == RW) {
-        request<T>(ptr, flag);
-        md->state = metadata::PENDING_RW;
-      }
-      return nullptr;
-    case metadata::PENDING_RW:
-      return nullptr;
-    case metadata::RO:
-      if (flag == RW) { // upgrade
-        request<T>(ptr, flag);
-        md->state = metadata::UPGRADE;
-        return nullptr;
-      } else {
-        return static_cast<T*>(md->obj);
-      }
-    case metadata::RW:
-      return static_cast<T*>(md->obj);
-    case metadata::UPGRADE:
-      if (flag == RW) {
-        return nullptr;
-      } else {
-        return static_cast<T*>(md->obj);
-      }
-    default:
-      abort();
-    } //switch
-    abort();
-    return nullptr;
+  void request(fatPointer ptr, ResolveFlag flag) {
+    SendBuffer sbuf;
+    gSerialize(sbuf, ptr, NetworkInterface::ID, flag);
+    getSystemNetworkInterface().send(ptr.getHost(), recvRequest<T>, sbuf);
+    std::cerr << "\nREQEST SENT\n";
   }
 
-  void recvObj(fatPointer ptr, Lockable* actual, ResolveFlag flag) {
+  //Generic landing pad for objects
+  template<typename T>
+  static void recvObj(RecvBuffer& buf);
+
+  //Generic landing pad for requests
+  template<typename T>
+  static void recvRequest(RecvBuffer& buf);
+
+  void recvObjImpl(fatPointer ptr, Lockable* actual, ResolveFlag flag) {
     metadata* md = getMD(ptr);
     LL::SLguard lg(md->lock);
     switch (md->state) {
@@ -192,6 +162,49 @@ public:
     assert(md->obj == actual);
   }
 
+public:
+
+  template<typename T>
+  T* resolve(fatPointer ptr, ResolveFlag flag) {
+    metadata* md = getMD(ptr);
+    LL::SLguard lg(md->lock);
+    switch (md->state) {
+    case metadata::INVALID:
+      //request object
+      request<T>(ptr, flag);
+      md->state = flag == RO ? metadata::PENDING_RO : metadata::PENDING_RW;
+      return nullptr;
+    case metadata::PENDING_RO:
+      if (flag == RW) {
+        request<T>(ptr, flag);
+        md->state = metadata::PENDING_RW;
+      }
+      return nullptr;
+    case metadata::PENDING_RW:
+      return nullptr;
+    case metadata::RO:
+      if (flag == RW) { // upgrade
+        request<T>(ptr, flag);
+        md->state = metadata::UPGRADE;
+        return nullptr;
+      } else {
+        return static_cast<T*>(md->obj);
+      }
+    case metadata::RW:
+      return static_cast<T*>(md->obj);
+    case metadata::UPGRADE:
+      if (flag == RW) {
+        return nullptr;
+      } else {
+        return static_cast<T*>(md->obj);
+      }
+    default:
+      abort();
+    } //switch
+    abort();
+    return nullptr;
+  }
+
   void dump(std::ostream& os, fatPointer ptr) {
     metadata* md = getMD(ptr);
     LL::SLguard lg(md->lock);
@@ -200,7 +213,36 @@ public:
   
 };
 
-SimpleRuntimeContext& getAbortCnx();
+DirectoryNG& getSystemDirectoryNG();
+
+//Generic landing pad for objects
+template<typename T>
+void DirectoryNG::recvObj(RecvBuffer& buf) {
+  fatPointer ptr;
+  ResolveFlag flag;
+  T* actual = new T();
+  gDeserialize(buf, ptr, flag, *actual);
+  std::cerr << "\nObjRecv\n";
+  getSystemDirectoryNG().recvObjImpl(ptr, actual, flag);
+}
+
+//Generic landing pad for requests
+template<typename T>
+void DirectoryNG::recvRequest(RecvBuffer& buf) {
+  fatPointer ptr;
+  uint32_t dest;
+  ResolveFlag flag;
+  gDeserialize(buf, ptr, dest, flag);
+  std::cerr << "\n REQUEST RECV\n";
+  SendBuffer sbuf;
+  gSerialize(sbuf, ptr, flag, *static_cast<T*>(static_cast<Lockable*>(ptr.getObj())));
+  getSystemNetworkInterface().send(dest, recvObj<T>, sbuf);
+}
+
+
+
+
+//SimpleRuntimeContext& getAbortCnx();
 
 struct remote_ex { fatPointer ptr; };
 
@@ -364,12 +406,11 @@ class Directory : public LockManagerBase, private boost::noncopyable {
 
   //main request processor
   void processObj(LL::SLguard& lg, fatPointer ptr, Lockable* obj);
-
-
+ 
   //Generic landing pad for requests
   template<typename T>
   static void recvRequest(RecvBuffer&);
-
+  
   //update requests simply notify of a higher priority requestor.  If
   // the object has already been sent away, this does nothing
   void doRequest(fatPointer ptr, typeHelper* th, uint32_t remoteHost);

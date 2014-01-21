@@ -18,6 +18,14 @@ struct R : public Galois::Runtime::Lockable {
     i += v;
     return;
   }
+
+  typedef int tt_has_serialize;
+  void deserialize(RecvBuffer& buf) {
+    gDeserialize(buf, i);
+  }
+  void serialize(SendBuffer& buf) const {
+    gSerialize(buf, i);
+  }
 };
 
 struct f1 {
@@ -50,6 +58,18 @@ int main(int argc, char *argv[])
   f1 f(&r);
   for (int i=1; i<=40; i++) myvec.push_back(i);
   
+  static_assert(Galois::Runtime::is_serializable<R>::value, "R not serializable");
+
+  int i1{42}, i2;
+  SendBuffer sbuf;
+  Galois::Runtime::gSerialize(sbuf, f.r, i1);
+  gptr<R> e;
+  RecvBuffer rbuf(std::move(sbuf));
+  Galois::Runtime::gDeserialize(rbuf, e, i2);
+  f.r.dump(std::cerr);
+  e.dump(std::cerr);
+  std::cerr << " " << i1 << " " << i2 << "\n";
+
   std::cerr << "stating\n";
   
   Galois::for_each(myvec.begin(), myvec.end(), f, Galois::wl<Galois::WorkList::LIFO<>>());

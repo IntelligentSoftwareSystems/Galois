@@ -35,10 +35,10 @@ SimpleRuntimeContext& Galois::Runtime::getTransCnx() {
   return *obj.getLocal();
 }
 
-SimpleRuntimeContext& Galois::Runtime::getAbortCnx() {
-  static Galois::Runtime::SimpleRuntimeContext obj;
-  return obj;
-}
+// SimpleRuntimeContext& Galois::Runtime::getAbortCnx() {
+//   static Galois::Runtime::SimpleRuntimeContext obj;
+//   return obj;
+// }
 
 
 
@@ -201,6 +201,11 @@ void Directory::queryObjRemote(fatPointer ptr, bool forward) {
 
 Directory& Galois::Runtime::getSystemDirectory() {
   static Directory obj;
+  return obj;
+}
+
+DirectoryNG& Galois::Runtime::getSystemDirectoryNG() {
+  static DirectoryNG obj;
   return obj;
 }
 
