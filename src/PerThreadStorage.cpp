@@ -24,6 +24,7 @@
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/ll/gio.h"
 #include "Galois/Runtime/mm/Mem.h"
+#include <mutex>
 
 __thread char* Galois::Runtime::ptsBase;
 
@@ -75,6 +76,8 @@ unsigned Galois::Runtime::PerBackend::allocOffset(const unsigned sz) {
     retval = __sync_fetch_and_add (&nextLoc, size);
   } else {
     // find a free offset
+    std::lock_guard<Lock> llock(freeOffsetsLock);
+
     unsigned index = nextLog2(sz);
     if (!freeOffsets[index].empty()) {
       retval = freeOffsets[index].back();
@@ -112,9 +115,10 @@ unsigned Galois::Runtime::PerBackend::allocOffset(const unsigned sz) {
 void Galois::Runtime::PerBackend::deallocOffset(const unsigned offset, const unsigned sz) {
   unsigned size = (1 << nextLog2(sz));
   if (__sync_bool_compare_and_swap(&nextLoc, offset + size, offset)) {
-    ; // allocation was at the end , so recovered some memory
+    ; // allocation was at the end, so recovered some memory
   } else {
     // allocation not at the end
+    std::lock_guard<Lock> llock(freeOffsetsLock);
     freeOffsets[nextLog2(sz)].push_back(offset);
   }
 }
@@ -165,28 +169,28 @@ void Galois::Runtime::initPTS() {
 }
 
 #ifdef GALOIS_USE_EXP
-char* Galois::Runtime::PerBackend::initPerThread_cilk () {
-  assert (heads.size () == LL::getMaxThreads ());
-  unsigned id = LL::getTID ();
-  assert (heads[id] != nullptr);
+char* Galois::Runtime::PerBackend::initPerThread_cilk() {
+  assert (heads.size () == LL::getMaxThreads());
+  unsigned id = LL::getTID();
+  assert(heads[id] != nullptr);
 
   return heads[id];
 }
 
-char* Galois::Runtime::PerBackend::initPerPackage_cilk () {
-  assert (heads.size () == LL::getMaxThreads ());
-  unsigned id = LL::getTID ();
-  assert (heads[id] != nullptr);
+char* Galois::Runtime::PerBackend::initPerPackage_cilk() {
+  assert(heads.size() == LL::getMaxThreads());
+  unsigned id = LL::getTID();
+  assert(heads[id] != nullptr);
 
   return heads[id];
 }
 
-void Galois::Runtime::initPTS_cilk () {
+void Galois::Runtime::initPTS_cilk() {
   if (!Galois::Runtime::ptsBase) {
-    Galois::Runtime::ptsBase = getPTSBackend ().initPerThread_cilk ();
+    Galois::Runtime::ptsBase = getPTSBackend().initPerThread_cilk ();
   }
   if (!Galois::Runtime::ppsBase) {
-    Galois::Runtime::ppsBase = getPPSBackend ().initPerPackage_cilk ();
+    Galois::Runtime::ppsBase = getPPSBackend().initPerPackage_cilk();
   }
 }
 #endif // GALOIS_USE_EXP

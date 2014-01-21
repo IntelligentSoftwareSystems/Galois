@@ -25,10 +25,11 @@
 #define GALOIS_RUNTIME_PERTHREADSTORAGE_H
 
 #include "Galois/config.h"
-#include "Galois/Runtime/ll/TID.h"
-#include "Galois/Runtime/ll/HWTopo.h"
-#include "Galois/Runtime/ThreadPool.h"
 #include "Galois/Runtime/ActiveThreads.h"
+#include "Galois/Runtime/ThreadPool.h"
+#include "Galois/Runtime/ll/HWTopo.h"
+#include "Galois/Runtime/ll/PaddedLock.h"
+#include "Galois/Runtime/ll/TID.h"
 
 #include <boost/utility.hpp>
 
@@ -43,9 +44,11 @@ namespace Runtime {
 class PerBackend {
   static const unsigned MAX_SIZE = 30;
   static const unsigned MIN_SIZE = 3; // 8 bytes
+  typedef Galois::Runtime::LL::SimpleLock Lock;
 
   unsigned int nextLoc;
   std::vector<char*> heads;
+  Lock freeOffsetsLock;
   std::vector<std::vector<unsigned> > freeOffsets;
 
   void initCommon();
