@@ -1,3 +1,5 @@
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ftree-vectorizer-verbose=3 -ffast-math")
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ffast-math")
 app(sgd-old sgd-old.cpp)
 app(sgd sgd.cpp)
 app(sgd-ddn sgd-ddn.cpp)

@@ -19,72 +19,79 @@
  * Author: Prad Nelluru <pradn@cs.utexas.edu>
  * Author: Donald Nguyen <ddn@cs.utexas.edu>
  */
-#include <iostream>
-#include <random>
-#include <algorithm>
-#include <cmath>
-#include <cstdlib>
-#include <type_traits>
-
+#include "Galois/config.h"
 #include "Galois/Accumulator.h"
 #include "Galois/Galois.h"
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
-
 #include "Galois/Graph/Graph.h"
 #include "Galois/Graph/LCGraph.h"
-
 #include "Galois/Runtime/ll/PaddedLock.h"
-
 #include "Lonestar/BoilerPlate.h"
+
+#include <algorithm>
+#include <cmath>
+#include <cstdlib>
+#include <iostream>
+#include <random>
+#include <type_traits>
 
 static const char* const name = "Stochastic Gradient Descent";
 static const char* const desc = "Computes Matrix Decomposition using Stochastic Gradient Descent";
 static const char* const url = "sgd";
 
-static const int LATENT_VECTOR_SIZE = 20; //Prad's default: 100, Intel: 20
-static const double MINVAL = -1e+100;
-static const double MAXVAL = 1e+100;
-
-static const double LEARNING_RATE = 0.001; // GAMMA, Purdue: 0.01 Intel: 0.001
-static const double DECAY_RATE = 0.9; // STEP_DEC, Purdue: 0.1 Intel: 0.9
-static const double LAMBDA = 0.001; // Purdue: 1.0 Intel: 0.001
-static const double BottouInit = 0.1;
+typedef float LatentValue;
+static const int LATENT_VECTOR_SIZE = 100; // Purdue, CSGD: 100; Intel: 20
 
 enum Algo {
   edgeMovie,
   blockJump
 };
 
-enum Learn {
+enum Step {
   Intel,
   Purdue,
   Bottou,
+  Bold,
   Inv
 };
 
 namespace cll = llvm::cl;
 static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
-static cll::opt<int> maxUpdatesPerEdge("maxUpdatesPerEdge", cll::desc("maximum number of updates per edge"), cll::init(5));
+// (Purdue, Netflix): 0.05, (Purdue, Yahoo Music): 1.0, (Purdue, HugeWiki): 0.01
+// Intel: 0.001 
+static cll::opt<float> lambda("lambda", cll::desc("regularization parameter [lambda]"), cll::init(0.05));
+// (Purdue, Neflix): 0.012, (Purdue, Yahoo Music): 0.00075, (Purdue, HugeWiki): 0.001
+// Intel: 0.001
+// Bottou: 0.1
+static cll::opt<float> learningRate("learningRate",
+    cll::desc("learning rate parameter [alpha] for Bold, Bottou, Intel and Purdue step size function"),
+    cll::init(0.012));
+// (Purdue, Netflix): 0.015, (Purdue, Yahoo Music): 0.01, (Purdue, HugeWiki): 0.0
+// Intel: 0.9
+static cll::opt<float> decayRate("decayRate", 
+    cll::desc("decay rate parameter [beta] for Intel and Purdue step size function"), 
+    cll::init(0.015));
+static cll::opt<int> updatesPerEdge("updatesPerEdge", cll::desc("number of updates per edge"), cll::init(5));
 static cll::opt<int> usersPerBlock("usersPerBlock", cll::desc("users per block"), cll::init(2048));
 static cll::opt<int> moviesPerBlock("moviesPerBlock", cll::desc("movies per block"), cll::init(350));
-static cll::opt<bool> verifyPerIter("verifyPerIter", cll::desc("compute RMS every iter"), cll::init(false));
-
+static cll::opt<int> fixedRounds("fixedRounds", cll::desc("run for a fixed number of rounds"), cll::init(-1));
+static cll::opt<bool> useExactError("useExactError", cll::desc("use exact error for testing convergence"), cll::init(false));
 static cll::opt<Algo> algo(cll::desc("Choose an algorithm:"),
   cll::values(
     clEnumVal(edgeMovie, "Edgewise"),
-    clEnumVal(blockJump, "Block jumping version"),
+    clEnumVal(blockJump, "Block jumping (default)"),
   clEnumValEnd), 
   cll::init(blockJump));
-
-static cll::opt<Learn> learn(cll::desc("Choose a learning function:"),
+static cll::opt<Step> learningRateFunction("learningRateFunction", cll::desc("Choose learning rate function:"),
   cll::values(
-    clEnumVal(Intel, "Intel (default)"),
-    clEnumVal(Purdue, "Perdue"),
+    clEnumVal(Intel, "Intel"),
+    clEnumVal(Purdue, "Purdue (default)"),
     clEnumVal(Bottou, "Bottou"),
-    clEnumVal(Inv, "Simple Inverse"),
+    clEnumVal(Bold, "Bold"),
+    clEnumVal(Inv, "Inverse"),
   clEnumValEnd), 
-  cll::init(Intel));
+  cll::init(Purdue));
 
 typedef Galois::Runtime::LL::PaddedLock<true> SpinLock;
 
@@ -92,107 +99,384 @@ size_t NUM_MOVIE_NODES = 0;
 size_t NUM_USER_NODES = 0;
 size_t NUM_RATINGS = 0;
 
-
-double dotProduct(
-    double* __restrict__ movieLatent,
-    double* __restrict__ userLatent)
-{
-  double dp = 0.0;
+// like std::inner_product but rewritten here to check vectorization
+template<typename T>
+T innerProduct(
+    T* __restrict__ first1,
+    T* __restrict__ last1,
+    T* __restrict__ first2,
+    T init) {
+  assert(first1 + LATENT_VECTOR_SIZE == last1);
   for (int i = 0; i < LATENT_VECTOR_SIZE; ++i)
-    dp += userLatent[i] * movieLatent[i];
-  assert(std::isnormal(dp));
-  return dp;
+    init += first1[i] * first2[i];
+  return init;
 }
 
-double calcPrediction(
-    double* __restrict__ movieLatent,
-    double* __restrict__ userLatent)
+template<typename T>
+T calcPrediction(
+    T* __restrict__ movieLatent,
+    T* __restrict__ userLatent)
 {
-  double pred = dotProduct(movieLatent, userLatent);
-  return std::min(MAXVAL, std::max(MINVAL, pred));
+  return innerProduct(movieLatent, movieLatent + LATENT_VECTOR_SIZE, userLatent, static_cast<LatentValue>(0.0));
 }
 
-void doGradientUpdate(
-    double* __restrict__ movieLatent,
-    double* __restrict__ userLatent,
-    unsigned int edgeRating,
-    double stepSize) 
+// Objective: squared loss with weighted-square-norm regularization
+template<typename T>
+T doGradientUpdate(
+    T* __restrict__ movieLatent,
+    T* __restrict__ userLatent,
+    T edgeRating,
+    T stepSize) 
 {
-  double error = edgeRating - dotProduct(movieLatent, userLatent);
+  T error = innerProduct(movieLatent, movieLatent + LATENT_VECTOR_SIZE, userLatent, -edgeRating);
   
   // Take gradient step
   for (int i = 0; i < LATENT_VECTOR_SIZE; i++) {
-      double prevMovie = movieLatent[i];
-      double prevUser = userLatent[i];
-      movieLatent[i] += stepSize * (error * prevUser  - LAMBDA * prevMovie);
-      userLatent[i]  += stepSize * (error * prevMovie - LAMBDA * prevUser);
+      T prevMovie = movieLatent[i];
+      T prevUser = userLatent[i];
+      movieLatent[i] -= stepSize * (error * prevUser  + lambda * prevMovie);
+      userLatent[i]  -= stepSize * (error * prevMovie + lambda * prevUser);
   }
+
+  return error;
 }
 
 size_t userIdToUserNode(size_t userId) {
   return userId + NUM_MOVIE_NODES;
 }
 
-struct LearningFunction {
-  virtual double stepSize(int round) const = 0;
+struct StepFunction {
+  virtual LatentValue stepSize(int round) const = 0;
+  virtual std::string name() const = 0;
+  virtual bool isBold() const { return false; }
 };
 
-struct PurdueLearningFunction: public LearningFunction {
-  virtual double stepSize(int round) const {
-    return LEARNING_RATE * 1.5 / (1.0 + DECAY_RATE * pow(round + 1, 1.5));
+struct PurdueStepFunction: public StepFunction {
+  virtual std::string name() const { return "Purdue"; }
+  virtual LatentValue stepSize(int round) const {
+    return learningRate * 1.5 / (1.0 + decayRate * pow(round + 1, 1.5));
   }
 };
 
-struct IntelLearningFunction: public LearningFunction {
-  virtual double stepSize(int round) const {
-    return LEARNING_RATE * pow(DECAY_RATE, round);
+struct IntelStepFunction: public StepFunction {
+  virtual std::string name() const { return "Intel"; }
+  virtual LatentValue stepSize(int round) const {
+    return learningRate * pow(decayRate, round);
   }
 };
 
-struct BottouLearningFunction: public LearningFunction {
-  virtual double stepSize(int round) const {
-    return BottouInit / (1.0 + BottouInit*LAMBDA*round);
+struct BottouStepFunction: public StepFunction {
+  virtual std::string name() const { return "Bottou"; }
+  virtual LatentValue stepSize(int round) const {
+    return learningRate / (1.0 + learningRate*lambda*round);
   }
 };
 
-struct InvLearningFunction: public LearningFunction {
-  virtual double stepSize(int round) const {
+struct InvStepFunction: public StepFunction {
+  virtual std::string name() const { return "Inverse"; }
+  virtual LatentValue stepSize(int round) const {
     return 1.0 / (round + 1);
   }
 };
 
-template<typename Graph>
-void verify(Graph& g) {
+struct BoldStepFunction: public StepFunction {
+  virtual std::string name() const { return "Bold"; }
+  virtual bool isBold() const { return true; }
+  virtual LatentValue stepSize(int round) const { return 0.0; }
+};
+
+template<typename Graph, bool UseLocks>
+class Fixed2DGraphTiledExecutor {
   typedef typename Graph::GraphNode GNode;
+  typedef typename Graph::iterator iterator;
+  typedef typename Graph::edge_iterator edge_iterator;
+
+  /**
+   * Tasks are 2D ranges [start1, end1) x [start2, end2]
+   */
+  struct Task {
+    iterator start1;
+    GNode start2;
+    iterator end1;
+    GNode end2;
+    size_t id;
+    size_t d1;
+    size_t d2;
+    std::atomic<size_t> updates;
+  };
+
+  Graph& g;
+  std::vector<SpinLock> locks1;
+  std::vector<SpinLock> locks2;
+  std::vector<Task> tasks;
+  size_t maxUpdates;
+
+  struct GetDst: public std::unary_function<edge_iterator, GNode> {
+    Graph* g;
+    GetDst() { }
+    GetDst(Graph* _g): g(_g) { }
+    GNode operator()(edge_iterator ii) const {
+      return g->getEdgeDst(ii);
+    }
+  };
+
+  typedef Galois::NoDerefIterator<edge_iterator> no_deref_iterator;
+  typedef boost::transform_iterator<GetDst, no_deref_iterator> edge_dst_iterator;
+
+  template<typename Function>
+  void executeBlock(Function& fn, Task& task) {
+    GetDst getDst { &g };
+
+    for (auto ii = task.start1; ii != task.end1; ++ii) {
+      auto& src = g.getData(*ii);
+      edge_iterator begin = g.edge_begin(*ii);
+      no_deref_iterator nbegin(begin);
+      no_deref_iterator nend(g.edge_end(*ii));
+      edge_dst_iterator dbegin(nbegin, getDst);
+      edge_dst_iterator dend(nend, getDst);
+      for (auto jj = std::lower_bound(dbegin, dend, task.start2); jj != dend; ++jj) {
+        edge_iterator edge = *jj.base();
+
+        if (g.getEdgeDst(edge) > task.end2)
+          break;
+
+        auto& dst = g.getData(g.getEdgeDst(edge));
+        fn(src, dst, g.getEdgeData(edge));
+      }
+    }
+  }
+
+  template<typename Function>
+  void executeLoop(Function fn, unsigned tid, unsigned total) {
+    const size_t numBlocks1 = locks1.size();
+    const size_t numBlocks2 = locks2.size();
+    const size_t numBlocks = numBlocks1 * numBlocks2;
+    const size_t block1 = (numBlocks1 + total - 1) / total;
+    const size_t start1 = std::min(block1 * tid, numBlocks1 - 1);
+    const size_t block2 = (numBlocks2 + total - 1) / total;
+    const size_t start2 = std::min(block2 * tid, numBlocks2 - 1);
+
+    Task* t = &tasks[start1 + start2 + numBlocks1];
+
+    while (true) {
+      t = &tasks[getNextBlock(t, numBlocks)];
+      if (t == &tasks[numBlocks])
+        break;
+      executeBlock(fn, *t);
+
+      locks1[t->d1].unlock();
+      locks2[t->d2].unlock();
+    }
+  }
+
+  size_t probeBlock(size_t start, size_t by, size_t n, size_t numBlocks) {
+    for (size_t i = 0; i < n; ++i, start += by) {
+      if (start >= numBlocks)
+        start -= numBlocks;
+      Task& b = tasks[start];
+
+      if (b.updates < maxUpdates) {
+        if (UseLocks) {
+          if (std::try_lock(locks1[b.d1], locks2[b.d2]) < 0) {
+            // Return while holding locks
+            b.updates += 1;
+            return start;
+          }
+        } else {
+          if (b.updates.fetch_add(1) < maxUpdates)
+            return start;
+        }
+      }
+    }
+    return numBlocks;
+  }
+
+  // Nested dim1 then dim2
+  size_t getNextBlock(Task* t, size_t numBlocks) {
+    const size_t delta2 = locks1.size();
+    const size_t delta1 = 1;
+    size_t b;
+
+    for (int times = 0; times < 2; ++times) {
+      size_t limit2 = locks2.size();
+      size_t limit1 = locks1.size();
+      size_t start = t->id;
+      // First iteration is exclusive of start
+      if ((b = probeBlock(start + delta1, delta1, limit1 - 1, numBlocks)) != numBlocks)
+        return b;
+      if ((b = probeBlock(start + delta2, delta2, limit2 - 1, numBlocks)) != numBlocks)
+        return b;
+      start += delta1 + delta2;
+      while (limit1 > 0 || limit2 > 0) {
+        // Subsequent iterations are inclusive of start
+        if (limit1 > 0 && (b = probeBlock(start, delta1, limit1 - 1, numBlocks)) != numBlocks)
+          return b;
+        if (limit2 > 0 && (b = probeBlock(start, delta2, limit2 - 1, numBlocks)) != numBlocks)
+          return b;
+        if (limit1 > 0) {
+          limit1--;
+          start += delta1;
+        }
+        if (limit2 > 0) {
+          limit2--;
+          start += delta2;
+        }
+      }
+    }
+
+    return numBlocks;
+  }
+
+  void initializeTasks(iterator first1, iterator last1, iterator first2, iterator last2, size_t size1, size_t size2) {
+    const size_t numBlocks1 = (std::distance(first1, last1) + size1 - 1) / size1;
+    const size_t numBlocks2 = (std::distance(first2, last2) + size2 - 1) / size2;
+    const size_t numBlocks = numBlocks1 * numBlocks2;
+
+    locks1.resize(numBlocks1);
+    locks2.resize(numBlocks2);
+    tasks.resize(numBlocks);
+
+    GetDst fn { &g };
+
+    for (size_t i = 0; i < numBlocks; ++i) {
+      Task& task = tasks[i];
+      task.d1 = i % numBlocks1;
+      task.d2 = i / numBlocks1;
+      task.id = i;
+      task.updates = 0;
+      std::tie(task.start1, task.end1) = Galois::block_range(first1, last1, task.d1, numBlocks1);
+      // XXX: Works for CSR graphs
+      task.start2 = task.d2 * size2 + *first2;
+      task.end2 = (task.d2 + 1) * size2 + *first2 - 1;
+    }
+  }
+
+  template<typename Function>
+  struct Process {
+    Fixed2DGraphTiledExecutor* self;
+    Function fn;
+
+    void operator()(unsigned tid, unsigned total) {
+      self->executeLoop(fn, tid, total);
+    }
+  };
+
+public:
+  Fixed2DGraphTiledExecutor(Graph& _g): g(_g) { }
+
+  template<typename Function>
+  void execute(iterator first1, iterator last1, iterator first2, iterator last2, size_t size1, size_t size2, Function fn, size_t numIterations = 1) {
+    initializeTasks(first1, last1, first2, last2, size1, size2);
+    maxUpdates = numIterations;
+    Process<Function> p = { this, fn };
+    Galois::on_each(p);
+  }
+};
+
+template<typename Graph>
+double sumSquaredError(Graph& g) {
+  typedef typename Graph::GraphNode GNode;
+  typedef typename Graph::node_data_type NodeData;
   // computing Root Mean Square Error
   // Assuming only movie nodes have edges
-  Galois::GAccumulator<double> rms;
+  Galois::GAccumulator<double> error;
 
-  Galois::do_all_local(g, [&](GNode n) {
+  // Save for performance testing
+#if 0
+  Galois::do_all(g.begin(), g.begin() + NUM_MOVIE_NODES, [&](GNode n) {
     for (auto ii = g.edge_begin(n), ei = g.edge_end(n); ii != ei; ++ii) {
       GNode dst = g.getEdgeDst(ii);
-      double pred = calcPrediction(g.getData(n).latentVector, g.getData(dst).latentVector);
-      double rating = g.getEdgeData(ii);
-    
-      if (!std::isnormal(pred))
-        std::cout << "denormal warning\n";
+      LatentValue pred = calcPrediction(g.getData(n).latentVector, g.getData(dst).latentVector);
+      LatentValue rating = g.getEdgeData(ii);
 
-      rms += ((pred - rating) * (pred - rating));
+      error += ((pred - rating) * (pred - rating));
     }
   });
+#else
+  Fixed2DGraphTiledExecutor<Graph,false> executor(g);
+  executor.execute(g.begin(), g.begin() + NUM_MOVIE_NODES, g.begin() + NUM_MOVIE_NODES, g.end(),
+      moviesPerBlock, usersPerBlock, [&](NodeData& nn, NodeData& mm, unsigned int edgeData) {
+    LatentValue pred = calcPrediction(nn.latentVector, mm.latentVector);
+    LatentValue rating = edgeData;
 
-  double totalRms = rms.reduce();
-  double normalizedRms = sqrt(totalRms/NUM_RATINGS);
-  
-  std::cout << "RMSE Total: " << totalRms << " Normalized: " << normalizedRms << "\n";
+    error += ((pred - rating) * (pred - rating));
+  });
+#endif
+  return error.reduce();
+}
+
+template<typename Graph>
+void verify(Graph& g) {
+  double error = sumSquaredError(g);
+  double rmse = std::sqrt(error/NUM_RATINGS);
+
+  std::cout << "Final RMSE: " << rmse << "\n";
+}
+
+
+template<typename Graph, typename Fn>
+void executeUntilConverged(const StepFunction& sf, Graph& g, Fn fn) {
+  Galois::GAccumulator<double> errorAccum;
+  std::vector<LatentValue> steps(updatesPerEdge);
+  LatentValue last = -1.0;
+  int deltaRound = updatesPerEdge;
+  LatentValue rate = learningRate;
+
+  for (int round = 0; ; round += deltaRound) {
+    if (fixedRounds > 0 && round >= fixedRounds)
+      break;
+    if (fixedRounds > 0) 
+      deltaRound = std::min(deltaRound, fixedRounds - round);
+    
+    for (int i = 0; i < updatesPerEdge; ++i) {
+      // Assume that loss decreases
+      if (sf.isBold())
+        steps[i] = i == 0 ? rate : steps[i-1] * 1.05;
+      else
+        steps[i] = sf.stepSize(round + i);
+    }
+
+    //Galois::StatTimer timer;
+    //timer.start();
+    fn(&steps[0], round + deltaRound, errorAccum);
+    //timer.stop();
+
+    // Check convergence, adaptively change step value (if necessary)
+    if (true) {
+      double error = errorAccum.reduce();
+      int curRound = round + deltaRound;
+      std::cout 
+        << "R " << curRound << ":" 
+        << " Approx. RMSE (R " << (curRound - 1) 
+        << ".5): " << std::sqrt(error/NUM_RATINGS);
+      if (useExactError) {
+        error = sumSquaredError(g);
+        std::cout << " RMSE (R " << curRound << "): " << std::sqrt(error/NUM_RATINGS);
+      }
+      std::cout << "\n";
+
+      if (fixedRounds <= 0 && last >= 0.0 && std::abs((last - error) / last) < 0.01)
+        break;
+      if (sf.isBold()) {
+        // Assume that loss decreases first round
+        if (last >= 0.0 && last < error)
+          rate = steps[deltaRound - 1] * 0.5;
+        else
+          rate = steps[deltaRound - 1] * 1.05;
+      }
+      last = error;
+    }
+  }
 }
 
 //! Simple edge-wise operator
 struct EdgeAlgo {
   static const bool makeSerializable = false;
 
+  std::string name() const { return "EdgeAlgo"; }
+
   struct Node {
-    double latentVector[LATENT_VECTOR_SIZE];
+    LatentValue latentVector[LATENT_VECTOR_SIZE];
   };
 
   typedef typename Galois::Graph::LC_CSR_Graph<Node, unsigned int>
@@ -215,6 +499,7 @@ struct EdgeAlgo {
     size_t id;
     size_t x;
     size_t y;
+    double error;
     int updates;
   };
 
@@ -232,35 +517,75 @@ struct EdgeAlgo {
 
   struct Process {
     Graph& g;
-    double stepSize;
     Galois::Statistic& edgesVisited;
     std::vector<SpinLock>& xLocks;
     std::vector<SpinLock>& yLocks;
     std::vector<Task>& tasks;
+    LatentValue* steps;
+    int maxUpdates;
+    Galois::GAccumulator<double>& errorAccum;
 
     void updateBlock(Task& task) {
+      const int innerCount = std::numeric_limits<int>::max(); // XXX
+      const LatentValue stepSize = steps[updatesPerEdge - maxUpdates + task.updates];
       GetDst fn { &g };
+      std::array<no_deref_iterator,1024> starts;
+      double error = 0.0;
 
+      // TODO add round blocking -- Added by not very useful
+      // TODO modify edge data to support agnostic edge blocking
       for (int phase = makeSerializable ? 0 : 1; phase < 2; ++phase) {
         Galois::MethodFlag flag = phase == 0 ? Galois::ALL : Galois::NONE;
-        for (auto ii = task.start1; ii != task.end1; ++ii) {
-          Node& nn = g.getData(*ii, flag);
-          edge_dst_iterator start(no_deref_iterator(g.edge_begin(*ii, Galois::NONE)), fn);
-          edge_dst_iterator end(no_deref_iterator(g.edge_end(*ii, Galois::NONE)), fn);
+        int numWorking;
+        int round = 0;
+        int limit = 0;
+        do {
+          numWorking = 0;
+          int index = 0;
+          for (auto ii = task.start1; ii != task.end1; ++ii, ++index) {
+            Node& nn = g.getData(*ii, round == 0 ? flag : Galois::NONE);
+            Graph::edge_iterator begin = g.edge_begin(*ii, Galois::NONE);
+            no_deref_iterator nbegin(round == 0 ? no_deref_iterator(begin) : starts[index]);
+            no_deref_iterator nend(no_deref_iterator(g.edge_end(*ii, Galois::NONE)));
+            edge_dst_iterator dbegin(nbegin, fn);
+            edge_dst_iterator dend(nend, fn);
+            edge_dst_iterator jj = round == 0 ? std::lower_bound(dbegin, dend, task.start2) : dbegin;
+            int i = 0;
+            bool done = false;
+            //for (i = 0; jj != dend && i < innerCount; ++jj, ++i) { // XXX
+            for (i = 0; jj != dend; ++jj, ++i) {
+              Graph::edge_iterator edge = *jj.base();
 
-          for (auto jj = std::lower_bound(start, end, task.start2); jj != end; ++jj) {
-            Graph::edge_iterator edge = *jj.base();
-            if (g.getEdgeDst(edge) > task.end2)
-              break;
-            Node& mm = g.getData(g.getEdgeDst(edge), flag);
-            if (phase == 1) {
-              doGradientUpdate(nn.latentVector, mm.latentVector, g.getEdgeData(edge), stepSize);
-              edgesVisited += 1;
+              if (g.getEdgeDst(edge) > task.end2) {
+                done = true;
+                break;
+              }
+              if (g.getEdgeDst(edge) > task.start2 + limit)
+                break;
+
+              Node& mm = g.getData(g.getEdgeDst(edge), flag);
+              if (phase == 1) {
+                LatentValue e = doGradientUpdate(nn.latentVector, mm.latentVector, static_cast<LatentValue>(g.getEdgeData(edge)), stepSize);
+                error += e * e;
+                edgesVisited += 1;
+              }
             }
+            if (done)
+              starts[index] = nend;
+            else
+              starts[index] = jj.base();
+
+            //if (!done && jj != dend && i == innerCount)
+            if (!done && jj != dend)
+              numWorking += 1;
           }
-        }
+          round += 1;
+          limit += innerCount;
+        } while (numWorking > 0);
       }
       task.updates += 1;
+      errorAccum += (error - task.error);
+      task.error = error;
     }
 
     void operator()(Task& task) {
@@ -276,7 +601,7 @@ struct EdgeAlgo {
       }
 #endif
       updateBlock(task);
-      if (task.updates < maxUpdatesPerEdge)
+      if (task.updates < maxUpdates)
         ctx.push(task);
 
 #if 1
@@ -285,55 +610,52 @@ struct EdgeAlgo {
 #endif
     }
 
+    size_t probeBlock(size_t start, size_t by, size_t n, size_t numBlocks) {
+      for (size_t i = 0; i < n; ++i, start += by) {
+        if (start >= numBlocks)
+          start -= numBlocks;
+        Task& b = tasks[start];
+
+        if (b.updates < maxUpdates) {
+          if (std::try_lock(xLocks[b.x], yLocks[b.y]) < 0) {
+            // Return while holding locks
+            return start;
+          }
+        }
+      }
+      return numBlocks;
+    }
+
+    // Nested Y then X
     size_t getNextBlock(Task* t, size_t numBlocks) {
-      size_t nextBlockId;
-      
-      if (false) {
-      // X direction
-      nextBlockId = t->id + 1;
-      for (size_t i = 0; i < xLocks.size() - 1; ++i, nextBlockId += 1) {
-        // Wrap around
-        if (nextBlockId >= numBlocks)
-          nextBlockId -= numBlocks;
-        Task& nextBlock = tasks[nextBlockId];
+      const size_t yDelta = xLocks.size();
+      const size_t xDelta = 1;
+      size_t b;
 
-        if (nextBlock.updates < maxUpdatesPerEdge) {
-          if (std::try_lock(xLocks[nextBlock.x], yLocks[nextBlock.y]) < 0) {
-            // Return while holding locks
-            return nextBlockId;
+      // TODO: Add x-then-y and all-x schedules back to show performance impact
+      for (int times = 0; times < 2; ++times) {
+        size_t yLimit = yLocks.size();
+        size_t xLimit = xLocks.size();
+        size_t start = t->id;
+        // First iteration is exclusive of start
+        if ((b = probeBlock(start + yDelta, yDelta, yLimit - 1, numBlocks)) != numBlocks)
+          return b;
+        if ((b = probeBlock(start + xDelta, xDelta, xLimit - 1, numBlocks)) != numBlocks)
+          return b;
+        start += yDelta + xDelta;
+        while (yLimit > 0 || xLimit > 0) {
+          // Subsequent iterations are inclusive of start
+          if (yLimit > 0 && (b = probeBlock(start, yDelta, yLimit - 1, numBlocks)) != numBlocks)
+            return b;
+          if (xLimit > 0 && (b = probeBlock(start, xDelta, xLimit - 1, numBlocks)) != numBlocks)
+            return b;
+          if (yLimit > 0) {
+            yLimit--;
+            start += yDelta;
           }
-        }
-      }
-      }
-
-      // Y direction
-      nextBlockId = t->id + xLocks.size();
-      for (size_t i = 0; i < yLocks.size() - 1; ++i, nextBlockId += xLocks.size()) {
-        // Wrap around
-        if (nextBlockId >= numBlocks)
-          nextBlockId -= numBlocks;
-        Task& nextBlock = tasks[nextBlockId];
-
-        if (nextBlock.updates < maxUpdatesPerEdge) {
-          if (std::try_lock(xLocks[nextBlock.x], yLocks[nextBlock.y]) < 0) {
-            // Return while holding locks
-            return nextBlockId;
-          }
-        }
-      }
-
-      nextBlockId = t->id + 1; //+ xLocks.size();
-      for (size_t i = 0; i < 2 * numBlocks; ++i, ++nextBlockId) {
-        // Wrap around
-        if (nextBlockId >= numBlocks)
-          nextBlockId -= numBlocks;
-
-        Task& nextBlock = tasks[nextBlockId];
-
-        if (nextBlock.updates < maxUpdatesPerEdge) {
-          if (std::try_lock(xLocks[nextBlock.x], yLocks[nextBlock.y]) < 0) {
-            // Return while holding locks
-            return nextBlockId;
+          if (xLimit > 0) {
+            xLimit--;
+            start += xDelta;
           }
         }
       }
@@ -342,13 +664,20 @@ struct EdgeAlgo {
     }
 
     void operator()(unsigned tid, unsigned total) {
+      // TODO see if just randomly picking different starting points is enough
       const size_t numYBlocks = yLocks.size();
       const size_t numXBlocks = xLocks.size();
       const size_t numBlocks = numXBlocks * numYBlocks;
       const size_t xBlock = (numXBlocks + total - 1) / total;
-      const size_t xStart = std::min(xBlock * tid, numXBlocks - 1);
+      size_t xStart = std::min(xBlock * tid, numXBlocks - 1);
       const size_t yBlock = (numYBlocks + total - 1) / total;
-      const size_t yStart = std::min(yBlock * tid, numYBlocks - 1);
+      size_t yStart = std::min(yBlock * tid, numYBlocks - 1);
+
+      //std::uniform_int_distribution<size_t> distY(0, numYBlocks - 1);
+      //std::uniform_int_distribution<size_t> distX(0, numXBlocks - 1);
+      //xStart = distX(gen);
+      //yStart = distY(gen);
+
       Task* t = &tasks[xStart + yStart + numXBlocks];
 
       while (true) {
@@ -409,17 +738,67 @@ struct EdgeAlgo {
       yLocks.resize(numYBlocks);
       tasks.resize(numBlocks);
 
+      GetDst fn { &g };
+      int maxNnz = std::numeric_limits<int>::min();
+      int minNnz = std::numeric_limits<int>::max();
+      int maxFloats = std::numeric_limits<int>::min();
+      int minFloats = std::numeric_limits<int>::max();
+
       for (size_t i = 0; i < numBlocks; ++i) {
         Task& task = tasks[i];
         task.x = i % numXBlocks;
         task.y = i / numXBlocks;
         task.id = i;
         task.updates = 0;
+        task.error = 0.0;
         task.start1 = g.begin();
         std::tie(task.start1, task.end1) = Galois::block_range(g.begin(), g.begin() + NUM_MOVIE_NODES, task.y, numYBlocks);
         task.start2 = task.x * usersPerBlock + NUM_MOVIE_NODES;
         task.end2 = (task.x + 1) * usersPerBlock + NUM_MOVIE_NODES - 1;
+
+        if (false) {
+          int nnz = 0;
+          std::set<uint64_t> uniqueMovies;
+          for (auto ii = task.start1; ii != task.end1; ++ii) {
+            edge_dst_iterator start(no_deref_iterator(g.edge_begin(*ii)), fn);
+            edge_dst_iterator end(no_deref_iterator(g.edge_end(*ii)), fn);
+            for (auto jj = std::lower_bound(start, end, task.start2); jj != end; ++jj) {
+              if (g.getEdgeDst(*jj.base()) > task.end2)
+                break;
+              nnz += 1;
+              uniqueMovies.insert(g.getEdgeDst(*jj.base()) - task.start2);
+            }
+          }
+          int floats = nnz + 2* std::distance(task.start1, task.end1) * LATENT_VECTOR_SIZE + 2*uniqueMovies.size() * LATENT_VECTOR_SIZE;
+          if (nnz > maxNnz)
+            maxNnz = nnz;
+          if (nnz < minNnz)
+            minNnz = nnz;
+          if (floats > maxFloats)
+            maxFloats = floats;
+          if (floats < minFloats)
+            minFloats = floats;
+        }
+
         initial.push(task);
+      }
+
+      if (false) {
+        for (size_t i = 0; i < numYBlocks; ++i) {
+          std::mt19937 gen;
+          std::cout << (i * numXBlocks) << " " << (i+1) * numXBlocks << " " << numBlocks << "\n";
+          std::shuffle(&tasks[i * numXBlocks], &tasks[(i+1) * numXBlocks], gen);
+        }
+      }
+
+
+      if (false) {
+        std::cout 
+          << "Max NNZ: " << maxNnz 
+          << " Min NNZ: " << minNnz
+          << " Max floats: " << maxFloats
+          << " Min floats: " << minFloats
+          << "\n";
       }
     }
 
@@ -562,7 +941,7 @@ struct EdgeAlgo {
     }
   };
 
-  void operator()(const LearningFunction& lf) {
+  void operator()(const StepFunction& sf) {
     std::cout
       << "targetSize: " << (usersPerBlock * (size_t) moviesPerBlock)
       << "\n";
@@ -581,13 +960,14 @@ struct EdgeAlgo {
 
     Galois::StatTimer execute("ExecuteTime");
     execute.start();
-    // FIXME: No straightforward mapping to "rounds"
-    double stepSize = lf.stepSize(0);
-    Process fn2 { g, stepSize, edgesVisited, xLocks, yLocks, tasks };
-    //Galois::for_each(initial.begin(), initial.end(), fn2, Galois::wl<Galois::WorkList::dChunkedFIFO<1>>());
-    //Galois::for_each_local(initial, fn2, Galois::wl<Galois::WorkList::dChunkedFIFO<1>>());
-    //Galois::do_all_local(initial, fn2, Galois::wl<Galois::WorkList::dChunkedLIFO<1>>());
-    Galois::on_each(fn2);
+    executeUntilConverged(sf, g, [&](LatentValue* steps, int maxUpdates, Galois::GAccumulator<double>& errorAccum) {
+      Process fn2 { g, edgesVisited, xLocks, yLocks, tasks, steps, maxUpdates, errorAccum };
+      // Testing sufficient optimizations by moving towards BlockJump
+      //Galois::for_each(initial.begin(), initial.end(), fn2, Galois::wl<Galois::WorkList::dChunkedFIFO<1>>());
+      //Galois::for_each_local(initial, fn2, Galois::wl<Galois::WorkList::dChunkedFIFO<1>>());
+      //Galois::do_all_local(initial, fn2, Galois::wl<Galois::WorkList::dChunkedLIFO<1>>());
+      Galois::on_each(fn2);
+    });
     execute.stop();
   }
 };
@@ -595,8 +975,10 @@ struct EdgeAlgo {
 struct BlockJumpAlgo {
   static const bool precomputeOffsets = false;
 
+  std::string name() const { return "BlockAlgo"; }
+
   struct Node {
-    double latentVector[LATENT_VECTOR_SIZE];
+    LatentValue latentVector[LATENT_VECTOR_SIZE];
   };
 
   typedef Galois::Graph::LC_CSR_Graph<Node, unsigned int>
@@ -616,6 +998,7 @@ struct BlockJumpAlgo {
     size_t movieEnd;
     size_t numMovies;
     size_t updates;
+    double error;
     int* userOffsets;
 
     std::ostream& print(std::ostream& os) {
@@ -638,7 +1021,9 @@ struct BlockJumpAlgo {
     SpinLock *xLocks, *yLocks;
     BlockInfo* blocks;
     size_t numXBlocks, numYBlocks;
-    double stepSize;
+    LatentValue* steps;
+    int maxUpdates;
+    Galois::GAccumulator<double>& errorAccum;
     
     struct GetDst: public std::unary_function<Graph::edge_iterator, GNode> {
       Graph* g;
@@ -660,8 +1045,9 @@ struct BlockJumpAlgo {
       typedef Galois::NoDerefIterator<Graph::edge_iterator> no_deref_iterator;
       typedef boost::transform_iterator<GetDst, no_deref_iterator> edge_dst_iterator;
 
-      si.updates++;
+      LatentValue stepSize = steps[si.updates - maxUpdates + updatesPerEdge];
       size_t seen = 0;
+      double error = 0.0;
 
       // Set up movie iterators
       size_t movieId = 0;
@@ -687,18 +1073,24 @@ struct BlockJumpAlgo {
           if (user >= lastUser)
             break;
 
-          doGradientUpdate(movieData.latentVector, g.getData(user).latentVector, g.getEdgeData(*ii.base()), stepSize);
+          LatentValue e = doGradientUpdate(movieData.latentVector, g.getData(user).latentVector, static_cast<LatentValue>(g.getEdgeData(*ii.base())), stepSize);
+          error += e * e;
           ++seen;
         }
       }
+
+      si.updates += 1;
+      errorAccum += (error - si.error);
+      si.error = error;
       
       return seen;
     }
 
     template<bool Enable = precomputeOffsets>
     size_t runBlock(BlockInfo& si, typename std::enable_if<Enable>::type* = 0) {
-      si.updates++;
+      LatentValue stepSize = steps[si.updates - maxUpdates + updatesPerEdge];
       size_t seen = 0;
+      double error = 0.0;
 
       // Set up movie iterators
       size_t movieId = 0;
@@ -722,10 +1114,15 @@ struct BlockJumpAlgo {
           if (user >= lastUser)
             break;
 
-          doGradientUpdate(movieData.latentVector, g.getData(user).latentVector, g.getEdgeData(ii), stepSize);
+          LatentValue e = doGradientUpdate(movieData.latentVector, g.getData(user).latentVector, static_cast<LatentValue>(g.getEdgeData(ii)), stepSize);
+          error += e * e;
           ++seen;
         }
       }
+
+      si.updates += 1;
+      errorAccum += (error - si.error);
+      si.error = error;
       
       return seen;
     }
@@ -745,7 +1142,7 @@ struct BlockJumpAlgo {
 
         BlockInfo& nextBlock = blocks[nextBlockId];
 
-        if (nextBlock.updates < maxUpdatesPerEdge && xLocks[nextBlock.x].try_lock()) {
+        if (nextBlock.updates < maxUpdates && xLocks[nextBlock.x].try_lock()) {
           if (yLocks[nextBlock.y].try_lock()) {
             // Return while holding locks
             return nextBlockId;
@@ -786,7 +1183,7 @@ struct BlockJumpAlgo {
     }
   };
 
-  void operator()(const LearningFunction& lf) {
+  void operator()(const StepFunction& sf) {
     const size_t numYBlocks = (NUM_MOVIE_NODES + moviesPerBlock - 1) / moviesPerBlock;
     const size_t numXBlocks = (NUM_USER_NODES + usersPerBlock - 1) / usersPerBlock;
     const size_t numBlocks = numXBlocks * numYBlocks;
@@ -809,6 +1206,7 @@ struct BlockJumpAlgo {
       si.x = i % numXBlocks;
       si.y = i / numXBlocks;
       si.updates = 0;
+      si.error = 0.0;
       si.userStart = si.x * usersPerBlock;
       si.userEnd = std::min((si.x + 1) * usersPerBlock, NUM_USER_NODES);
       si.movieStart = si.y * moviesPerBlock;
@@ -845,37 +1243,34 @@ struct BlockJumpAlgo {
       });
     }
     
-    // FIXME: No straightforward mapping to "rounds"
-    double stepSize = lf.stepSize(0); // FIXME: was lf.stepSize(1)
-    Process fn { g, xLocks, yLocks, blocks, numXBlocks, numYBlocks, stepSize };
-    Galois::on_each(fn);
+    executeUntilConverged(sf, g, [&](LatentValue* steps, int maxUpdates, Galois::GAccumulator<double>& errorAccum) {
+      Process fn { g, xLocks, yLocks, blocks, numXBlocks, numYBlocks, steps, maxUpdates, errorAccum };
+      Galois::on_each(fn);
+    });
   }
 };
-
-
-//! Generates a random double in (-1,1)
-static double genRand() {
-  return 2.0 * (std::rand() / (double)RAND_MAX) - 1.0;
-}
 
 
 //! Initializes latent vector with random values and returns basic graph parameters
 template<typename Graph>
 std::pair<size_t, size_t> initializeGraphData(Graph& g) {
-  // unsigned int seed = 42;
-  // std::default_random_engine eng(seed);
-  // std::uniform_real_distribution<double> random_lv_value(0, 0.1);
-  const unsigned SEED = 4562727;
-  std::srand(SEED);
+  double top = 1.0/std::sqrt(LATENT_VECTOR_SIZE);
 
+  std::mt19937 gen;
+#if __cplusplus >= 201103L || defined(HAVE_CXX11_UNIFORM_INT_DISTRIBUTION)
+  std::uniform_real_distribution<LatentValue> dist(0, top);
+#else
+  std::uniform_real<LatentValue> dist(0, top);
+#endif
+
+  // TODO: parallelize
   size_t numMovieNodes = 0;
-
   // for all movie and user nodes in the graph
   for (typename Graph::iterator ii = g.begin(), ei = g.end(); ii != ei; ++ii) {
     auto& data = g.getData(*ii);
 
     for (int i = 0; i < LATENT_VECTOR_SIZE; i++)
-      data.latentVector[i] = genRand();
+      data.latentVector[i] = dist(gen);
 
     // count number of movies we've seen; only movies nodes have edges
     if (std::distance(g.edge_begin(*ii), g.edge_end(*ii)))
@@ -886,14 +1281,15 @@ std::pair<size_t, size_t> initializeGraphData(Graph& g) {
 }
 
 
-LearningFunction* newLearningFunction(Learn l) {
-  switch (l) {
-    case Intel: return new IntelLearningFunction;
-    case Purdue: return new PurdueLearningFunction;
-    case Bottou: return new BottouLearningFunction;
-    case Inv: return new InvLearningFunction;
+StepFunction* newStepFunction(Step s) {
+  switch (s) {
+    case Intel: return new IntelStepFunction;
+    case Purdue: return new PurdueStepFunction;
+    case Bottou: return new BottouStepFunction;
+    case Inv: return new InvStepFunction;
+    case Bold: return new BoldStepFunction;
   }
-  GALOIS_DIE("unknown learning function");
+  GALOIS_DIE("unknown step function");
 }
 
 
@@ -910,18 +1306,26 @@ void run() {
   std::tie(NUM_MOVIE_NODES, NUM_USER_NODES) = initializeGraphData(g);
   NUM_RATINGS = g.sizeEdges();
 
+  std::unique_ptr<StepFunction> sf { newStepFunction(learningRateFunction) };
+  Algo algo { g };
+
   std::cout 
     << "num users: " << NUM_USER_NODES 
     << " num movies: " << NUM_MOVIE_NODES 
     << " num ratings: " << NUM_RATINGS
     << "\n";
-  
-  std::unique_ptr<LearningFunction> lf { newLearningFunction(learn) };
-  Algo algo { g };
-
+  std::cout
+    << "latent vector size: " << LATENT_VECTOR_SIZE
+    << " lambda: " << lambda
+    << " learning rate: " << learningRate
+    << " decay rate: " << decayRate
+    << " algo: " << algo.name()
+    << " step function: " << sf->name()
+    << "\n";
+    
   Galois::StatTimer timer;
   timer.start();
-  algo(*lf);
+  algo(*sf);
   timer.stop();
 
   if (!skipVerify)
