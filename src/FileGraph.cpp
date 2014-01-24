@@ -64,12 +64,12 @@ FileGraph::~FileGraph() {
 void FileGraph::parse(void* m) {
   //parse file
   uint64_t* fptr = (uint64_t*)m;
-  uint64_t version = convert_le64(*fptr++);
+  uint64_t version = convert_le64toh(*fptr++);
   if (version != 1)
     GALOIS_DIE("unknown file version ", version);
-  sizeofEdge = convert_le64(*fptr++);
-  numNodes = convert_le64(*fptr++);
-  numEdges = convert_le64(*fptr++);
+  sizeofEdge = convert_le64toh(*fptr++);
+  numNodes = convert_le64toh(*fptr++);
+  numEdges = convert_le64toh(*fptr++);
   outIdx = fptr;
   fptr += numNodes;
   uint32_t* fptr32 = (uint32_t*)fptr;
@@ -116,7 +116,7 @@ void* FileGraph::structureFromGraph(FileGraph& g, size_t sizeof_edge_data) {
   }
   memcpy(m, g.masterMapping, common);
   uint64_t* fptr = (uint64_t*)m;
-  fptr[1] = convert_le64(sizeof_edge_data);
+  fptr[1] = convert_le64toh(sizeof_edge_data);
   structureFromMem(m, len, false);
 
   return edgeData;
@@ -144,16 +144,16 @@ void* FileGraph::structureFromArrays(uint64_t* out_idx, uint64_t num_nodes,
   }
   
   uint64_t* fptr = (uint64_t*) base;
-  *fptr++ = convert_le64(1);
-  *fptr++ = convert_le64(sizeof_edge_data);
-  *fptr++ = convert_le64(num_nodes);
-  *fptr++ = convert_le64(num_edges);
+  *fptr++ = convert_le64toh(1);
+  *fptr++ = convert_le64toh(sizeof_edge_data);
+  *fptr++ = convert_le64toh(num_nodes);
+  *fptr++ = convert_le64toh(num_edges);
 
   for (size_t i = 0; i < num_nodes; ++i)
-    *fptr++ = convert_le64(out_idx[i]);
+    *fptr++ = convert_le64toh(out_idx[i]);
   uint32_t* fptr32 = (uint32_t*) fptr;
   for (size_t i = 0; i < num_edges; ++i)
-    *fptr32++ = convert_le32(outs[i]);
+    *fptr32++ = convert_le32toh(outs[i]);
 
   structureFromMem(base, nBytes, false);
   return edgeData;
@@ -260,29 +260,29 @@ void FileGraph::cloneFrom(FileGraph& other) {
 uint64_t FileGraph::getEdgeIdx(GraphNode src, GraphNode dst) const {
   for (uint32_t* ii = raw_neighbor_begin(src),
 	 *ee = raw_neighbor_end(src); ii != ee; ++ii)
-    if (convert_le32(*ii) == dst)
+    if (convert_le32toh(*ii) == dst)
       return std::distance(outs, ii);
   return ~static_cast<uint64_t>(0);
 }
 
 uint32_t* FileGraph::raw_neighbor_begin(GraphNode N) const {
-  return (N == 0) ? &outs[0] : &outs[convert_le64(outIdx[N-1])];
+  return (N == 0) ? &outs[0] : &outs[convert_le64toh(outIdx[N-1])];
 }
 
 uint32_t* FileGraph::raw_neighbor_end(GraphNode N) const {
-  return &outs[convert_le64(outIdx[N])];
+  return &outs[convert_le64toh(outIdx[N])];
 }
 
 FileGraph::edge_iterator FileGraph::edge_begin(GraphNode N) const {
-  return edge_iterator(N == 0 ? 0 : convert_le64(outIdx[N-1]));
+  return edge_iterator(N == 0 ? 0 : convert_le64toh(outIdx[N-1]));
 }
 
 FileGraph::edge_iterator FileGraph::edge_end(GraphNode N) const {
-  return edge_iterator(convert_le64(outIdx[N]));
+  return edge_iterator(convert_le64toh(outIdx[N]));
 }
 
 FileGraph::GraphNode FileGraph::getEdgeDst(edge_iterator it) const {
-  return convert_le32(outs[*it]);
+  return convert_le32toh(outs[*it]);
 }
 
 FileGraph::node_id_iterator FileGraph::node_id_begin() const {

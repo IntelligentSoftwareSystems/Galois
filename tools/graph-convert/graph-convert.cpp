@@ -42,10 +42,12 @@
 namespace cll = llvm::cl;
 
 enum ConvertMode {
+  bipartitegr2bigpetsc,
+  bipartitegr2littlepetsc,
   dimacs2gr,
+  doubleedgelist2gr,
   edgelist2vgr,
   floatedgelist2gr,
-  doubleedgelist2gr,
   gr2bsml,
   gr2cintgr,
   gr2dimacs,
@@ -55,17 +57,17 @@ enum ConvertMode {
   gr2intpbbs,
   gr2intpbbsedges,
   gr2lowdegreeintgr,
+  gr2orderdeg,
   gr2partdstintgr,
   gr2partsrcintgr,
   gr2randintgr,
-  gr2sorteddstintgr,
-  gr2sortedweightintgr,
   gr2ringintgr,
   gr2rmat,
   gr2sintgr,
+  gr2sorteddstintgr,
+  gr2sortedweightintgr,
   gr2tintgr,
   gr2treeintgr,
-  gr2orderdeg,
   intedgelist2gr,
   mtx2doublegr,
   mtx2floatgr,
@@ -90,10 +92,12 @@ static cll::opt<std::string> inputfilename(cll::Positional, cll::desc("<input fi
 static cll::opt<std::string> outputfilename(cll::Positional, cll::desc("<output file>"), cll::Required);
 static cll::opt<ConvertMode> convertMode(cll::desc("Choose a conversion mode:"),
     cll::values(
+      clEnumVal(bipartitegr2bigpetsc, "Convert bipartite binary gr to big-endian PETSc format"),
+      clEnumVal(bipartitegr2littlepetsc, "Convert bipartite binary gr to little-endian PETSc format"),
       clEnumVal(dimacs2gr, "Convert dimacs to binary gr"),
+      clEnumVal(doubleedgelist2gr, "Convert weighted (double) edge list to binary gr"),
       clEnumVal(edgelist2vgr, "Convert edge list to binary void gr"),
       clEnumVal(floatedgelist2gr, "Convert weighted (float) edge list to binary gr"),
-      clEnumVal(doubleedgelist2gr, "Convert weighted (double) edge list to binary gr"),
       clEnumVal(gr2bsml, "Convert binary gr to binary sparse MATLAB matrix"),
       clEnumVal(gr2cintgr, "Clean up binary weighted (int) gr: remove self edges and multi-edges"),
       clEnumVal(gr2dimacs, "Convert binary gr to dimacs"),
@@ -103,6 +107,7 @@ static cll::opt<ConvertMode> convertMode(cll::desc("Choose a conversion mode:"),
       clEnumVal(gr2intpbbs, "Convert binary gr to weighted (int) pbbs graph"),
       clEnumVal(gr2intpbbsedges, "Convert binary gr to weighted (int) pbbs edge list"),
       clEnumVal(gr2lowdegreeintgr, "Remove high degree nodes from binary gr"),
+      clEnumVal(gr2orderdeg, "Order by neighbor degree"),
       clEnumVal(gr2partdstintgr, "Partition binary weighted (int) gr by destination nodes into N pieces"),
       clEnumVal(gr2partsrcintgr, "Partition binary weighted (int) gr by source nodes into N pieces"),
       clEnumVal(gr2randintgr, "Randomize binary weighted (int) gr"),
@@ -113,7 +118,6 @@ static cll::opt<ConvertMode> convertMode(cll::desc("Choose a conversion mode:"),
       clEnumVal(gr2sortedweightintgr, "Sort outgoing edges of binary weighted (int) gr by edge weight"),
       clEnumVal(gr2tintgr, "Transpose binary weighted (int) gr"),
       clEnumVal(gr2treeintgr, "Convert binary gr to strongly connected graph by adding tree overlay"),
-      clEnumVal(gr2orderdeg, "Order by neighbor degree"),
       clEnumVal(intedgelist2gr, "Convert weighted (int) edge list to binary gr"),
       clEnumVal(mtx2doublegr, "Convert matrix market format to binary gr"),
       clEnumVal(mtx2floatgr, "Convert matrix market format to binary gr"),
@@ -454,6 +458,71 @@ void convert_gr2edgelist(const std::string& infilename, const std::string& outfi
       } else {
         file << src << " " << dst << "\n";
       }
+    }
+  }
+  file.close();
+
+  printStatus(graph.size(), graph.sizeEdges());
+}
+
+template<bool LittleEndian, typename T>
+void writePetsc(std::ofstream& out, T value) {
+  static_assert(sizeof(T) == 4 || sizeof(T) == 8, "unknown data size");
+  switch ((sizeof(T) == 4 ? 0 : 2) + (LittleEndian ? 0 : 1)) {
+    case 3: value = Galois::convert_htobe64(value); break;
+    case 2: value = Galois::convert_htole64(value); break;
+    case 1: value = Galois::convert_htobe32(value); break;
+    case 0: value = Galois::convert_htole32(value); break;
+    default: abort();
+  }
+
+  out.write(reinterpret_cast<char *>(&value), sizeof(value));
+}
+
+template<typename InEdgeTy,typename OutEdgeTy,bool LittleEndian>
+void convert_bipartitegr2petsc(const std::string& infilename, const std::string& outfilename) {
+  typedef Galois::Graph::FileGraph Graph;
+  typedef Graph::GraphNode GNode;
+  typedef Galois::LargeArray<InEdgeTy> EdgeData;
+  typedef typename EdgeData::value_type edge_value_type;
+
+  Graph graph;
+  graph.structureFromFile(infilename);
+
+  size_t partition = 0;
+  for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii, ++partition) {
+    GNode src = *ii;
+    if (graph.edge_begin(src) == graph.edge_end(src)) {
+      break;
+    }
+  }
+
+  std::ofstream file(outfilename.c_str());
+  writePetsc<LittleEndian, int32_t>(file, 1211216);
+  writePetsc<LittleEndian, int32_t>(file, partition); // rows
+  writePetsc<LittleEndian, int32_t>(file, graph.size() - partition); // columns
+  writePetsc<LittleEndian, int32_t>(file, graph.sizeEdges());
+
+  // number of nonzeros in each row
+  for (Graph::iterator ii = graph.begin(), ei = ii + partition; ii != ei; ++ii) {
+    GNode src = *ii;
+    writePetsc<LittleEndian, int32_t>(file, std::distance(graph.edge_begin(src), graph.edge_end(src)));
+  }
+  
+  // column indices 
+  for (Graph::iterator ii = graph.begin(), ei = ii + partition; ii != ei; ++ii) {
+    GNode src = *ii;
+    for (Graph::edge_iterator jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj) {
+      GNode dst = graph.getEdgeDst(jj);
+      writePetsc<LittleEndian, int32_t>(file, dst - partition);
+    }
+  }
+
+  // values
+  for (Graph::iterator ii = graph.begin(), ei = ii + partition; ii != ei; ++ii) {
+    GNode src = *ii;
+    for (Graph::edge_iterator jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj) {
+      writePetsc<LittleEndian, OutEdgeTy>(file, graph.getEdgeData<InEdgeTy>(jj));
     }
   }
   file.close();
@@ -1691,26 +1760,19 @@ void convert_gr2bsml(const std::string& infilename, const std::string& outfilena
   uint32_t nnodes = graph.size();
   uint32_t nedges = graph.sizeEdges(); 
 
-  mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
-  int fd = open(outfilename.c_str(), O_WRONLY | O_CREAT | O_TRUNC, mode);
-  if (fd == -1) { GALOIS_SYS_DIE(""); }
-  int retval;
+  std::ofstream file(outfilename.c_str());
 
   // Write header
-  retval = write(fd, &nnodes, sizeof(nnodes));
-  if (retval == -1) { GALOIS_SYS_DIE(""); }
-  retval = write(fd, &nnodes, sizeof(nnodes));
-  if (retval == -1) { GALOIS_SYS_DIE(""); }
-  retval = write(fd, &nedges, sizeof(nedges));
-  if (retval == -1) { GALOIS_SYS_DIE(""); }
+  file.write(reinterpret_cast<char*>(&nnodes), sizeof(nnodes));
+  file.write(reinterpret_cast<char*>(&nnodes), sizeof(nnodes));
+  file.write(reinterpret_cast<char*>(&nedges), sizeof(nedges));
 
   // Write row adjacency
   for (typename Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
     GNode src = *ii;
     uint32_t sid = src;
     for (typename Graph::edge_iterator jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj) {
-      retval = write(fd, &sid, sizeof(sid));
-      if (retval == -1) { GALOIS_SYS_DIE(""); }
+      file.write(reinterpret_cast<char *>(&sid), sizeof(sid));
     }
   }
 
@@ -1720,8 +1782,7 @@ void convert_gr2bsml(const std::string& infilename, const std::string& outfilena
     for (typename Graph::edge_iterator jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj) {
       GNode dst = graph.getEdgeDst(jj);
       uint32_t did = dst;
-      retval = write(fd, &did, sizeof(did));
-      if (retval == -1) { GALOIS_SYS_DIE(""); }
+      file.write(reinterpret_cast<char *>(&did), sizeof(did));
     }
   }
 
@@ -1731,22 +1792,24 @@ void convert_gr2bsml(const std::string& infilename, const std::string& outfilena
     GNode src = *ii;
     for (typename Graph::edge_iterator jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj) {
       double weight = convert(graph, jj);
-      retval = write(fd, &weight, sizeof(weight));
-      if (retval == -1) { GALOIS_SYS_DIE(""); }
+      file.write(reinterpret_cast<char *>(&weight), sizeof(weight));
     }
   }
 
-  close(fd);
+  file.close();
   printStatus(nnodes, nedges);
 }
 
 int main(int argc, char** argv) {
   llvm::cl::ParseCommandLineOptions(argc, argv);
+  std::ios_base::sync_with_stdio(false);
   switch (convertMode) {
+    case bipartitegr2bigpetsc: convert_bipartitegr2petsc<int32_t,double,false>(inputfilename, outputfilename); break;
+    case bipartitegr2littlepetsc: convert_bipartitegr2petsc<int32_t,double,true>(inputfilename, outputfilename); break;
     case dimacs2gr: convert_dimacs2gr(inputfilename, outputfilename); break;
+    case doubleedgelist2gr: convert_edgelist2gr<double>(inputfilename, outputfilename); break;
     case edgelist2vgr: convert_edgelist2gr<void>(inputfilename, outputfilename); break;
     case floatedgelist2gr: convert_edgelist2gr<float>(inputfilename, outputfilename); break;
-    case doubleedgelist2gr: convert_edgelist2gr<double>(inputfilename, outputfilename); break;
     case gr2bsml: convert_gr2bsml<int32_t>(inputfilename, outputfilename); break;
     case gr2cintgr: convert_gr2cgr<int32_t>(inputfilename, outputfilename); break;
     case gr2dimacs: convert_gr2dimacs<int32_t>(inputfilename, outputfilename); break;
