@@ -36,11 +36,14 @@
 #include <random>
 #include <type_traits>
 
+#include <ostream>
+#include <fstream>
+
 static const char* const name = "Stochastic Gradient Descent";
 static const char* const desc = "Computes Matrix Decomposition using Stochastic Gradient Descent";
 static const char* const url = "sgd";
 
-typedef float LatentValue;
+typedef double LatentValue;
 static const int LATENT_VECTOR_SIZE = 100; // Purdue, CSGD: 100; Intel: 20
 
 enum Algo {
@@ -56,8 +59,19 @@ enum Step {
   Inv
 };
 
+enum OutputType {
+  binary,
+  ascii
+};
+
 namespace cll = llvm::cl;
-static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
+static cll::opt<std::string> inputFilename(cll::Positional, cll::desc("<input file>"), cll::Required);
+static cll::opt<std::string> outputFilename(cll::Positional, cll::desc("[output file]"), cll::init(""));
+static cll::opt<OutputType> outputType("output", cll::desc("Output type:"),
+    cll::values(
+      clEnumValN(OutputType::binary, "binary", "Binary"),
+      clEnumValN(OutputType::ascii, "ascii", "ASCII"),
+      clEnumValEnd), cll::init(OutputType::binary));
 // (Purdue, Netflix): 0.05, (Purdue, Yahoo Music): 1.0, (Purdue, HugeWiki): 0.01
 // Intel: 0.001 
 static cll::opt<float> lambda("lambda", cll::desc("regularization parameter [lambda]"), cll::init(0.05));
@@ -72,7 +86,7 @@ static cll::opt<float> learningRate("learningRate",
 static cll::opt<float> decayRate("decayRate", 
     cll::desc("decay rate parameter [beta] for Intel and Purdue step size function"), 
     cll::init(0.015));
-static cll::opt<int> updatesPerEdge("updatesPerEdge", cll::desc("number of updates per edge"), cll::init(5));
+static cll::opt<int> updatesPerEdge("updatesPerEdge", cll::desc("number of updates per edge"), cll::init(1));
 static cll::opt<int> usersPerBlock("usersPerBlock", cll::desc("users per block"), cll::init(2048));
 static cll::opt<int> moviesPerBlock("moviesPerBlock", cll::desc("movies per block"), cll::init(350));
 static cll::opt<int> fixedRounds("fixedRounds", cll::desc("run for a fixed number of rounds"), cll::init(-1));
@@ -113,11 +127,12 @@ T innerProduct(
 }
 
 template<typename T>
-T calcPrediction(
+T predictionError(
     T* __restrict__ movieLatent,
-    T* __restrict__ userLatent)
+    T* __restrict__ userLatent,
+    T init)
 {
-  return innerProduct(movieLatent, movieLatent + LATENT_VECTOR_SIZE, userLatent, static_cast<LatentValue>(0.0));
+  return innerProduct(movieLatent, movieLatent + LATENT_VECTOR_SIZE, userLatent, init);
 }
 
 // Objective: squared loss with weighted-square-norm regularization
@@ -129,7 +144,7 @@ T doGradientUpdate(
     T stepSize) 
 {
   T error = innerProduct(movieLatent, movieLatent + LATENT_VECTOR_SIZE, userLatent, -edgeRating);
-  
+
   // Take gradient step
   for (int i = 0; i < LATENT_VECTOR_SIZE; i++) {
       T prevMovie = movieLatent[i];
@@ -186,10 +201,19 @@ struct BoldStepFunction: public StepFunction {
 };
 
 template<typename Graph, bool UseLocks>
-class Fixed2DGraphTiledExecutor {
+class TestFixed2DGraphTiledExecutor {
   typedef typename Graph::GraphNode GNode;
   typedef typename Graph::iterator iterator;
   typedef typename Graph::edge_iterator edge_iterator;
+
+  template<typename T>
+  struct SimpleAtomic {
+    std::atomic<T> value;
+    SimpleAtomic(): value(0) { }
+    SimpleAtomic(const SimpleAtomic& o): value(o.value.load()) { }
+    T relaxedLoad() { return value.load(std::memory_order_relaxed); }
+    void relaxedAdd(T delta) { value.store(relaxedLoad() + delta, std::memory_order_relaxed); }
+  };
 
   /**
    * Tasks are 2D ranges [start1, end1) x [start2, end2]
@@ -202,7 +226,7 @@ class Fixed2DGraphTiledExecutor {
     size_t id;
     size_t d1;
     size_t d2;
-    std::atomic<size_t> updates;
+    SimpleAtomic<size_t> updates;
   };
 
   Graph& g;
@@ -210,6 +234,7 @@ class Fixed2DGraphTiledExecutor {
   std::vector<SpinLock> locks2;
   std::vector<Task> tasks;
   size_t maxUpdates;
+  Galois::Statistic failures;
 
   struct GetDst: public std::unary_function<edge_iterator, GNode> {
     Graph* g;
@@ -234,14 +259,30 @@ class Fixed2DGraphTiledExecutor {
       no_deref_iterator nend(g.edge_end(*ii));
       edge_dst_iterator dbegin(nbegin, getDst);
       edge_dst_iterator dend(nend, getDst);
+      if (std::distance(g.edge_begin(*ii), g.edge_end(*ii)) > 1024)
+        continue;
+
       for (auto jj = std::lower_bound(dbegin, dend, task.start2); jj != dend; ++jj) {
-        edge_iterator edge = *jj.base();
+        bool done = false;
+        for (int times = 0; times < 5; ++times) {
+          for (int i = 0; i < 5; ++i) {
+            edge_iterator edge = *(jj+i).base();
+            if (g.getEdgeDst(edge) > task.end2) {
+              done = true;
+              break;
+            }
 
-        if (g.getEdgeDst(edge) > task.end2)
+            auto& dst = g.getData(g.getEdgeDst(edge));
+              
+            fn(src, dst, g.getEdgeData(edge));
+          }
+        }
+        if (done)
           break;
-
-        auto& dst = g.getData(g.getEdgeDst(edge));
-        fn(src, dst, g.getEdgeData(edge));
+        for (int i = 0; jj != dend && i < 5; ++jj, ++i)
+          ;
+        if (jj == dend)
+          break;
       }
     }
   }
@@ -256,10 +297,13 @@ class Fixed2DGraphTiledExecutor {
     const size_t block2 = (numBlocks2 + total - 1) / total;
     const size_t start2 = std::min(block2 * tid, numBlocks2 - 1);
 
-    Task* t = &tasks[start1 + start2 + numBlocks1];
+    //size_t start = start1 + start2 * numBlocks1; // XXX
+    //size_t start = block1 * 10 * (tid / 10) + start2 * numBlocks1;
+    size_t start = start1 + block2 * 10 * (tid / 10) * numBlocks1;
 
-    while (true) {
-      t = &tasks[getNextBlock(t, numBlocks)];
+    for (int i = 0; ; ++i) {
+      start = nextBlock(start, numBlocks, i == 0);
+      Task* t = &tasks[start];
       if (t == &tasks[numBlocks])
         break;
       executeBlock(fn, *t);
@@ -271,28 +315,28 @@ class Fixed2DGraphTiledExecutor {
 
   size_t probeBlock(size_t start, size_t by, size_t n, size_t numBlocks) {
     for (size_t i = 0; i < n; ++i, start += by) {
-      if (start >= numBlocks)
+      while (start >= numBlocks)
         start -= numBlocks;
       Task& b = tasks[start];
-
-      if (b.updates < maxUpdates) {
+      if (b.updates.relaxedLoad() < maxUpdates) {
         if (UseLocks) {
           if (std::try_lock(locks1[b.d1], locks2[b.d2]) < 0) {
             // Return while holding locks
-            b.updates += 1;
+            b.updates.relaxedAdd(1);
             return start;
           }
         } else {
-          if (b.updates.fetch_add(1) < maxUpdates)
+          if (b.updates.value.fetch_add(1) < maxUpdates)
             return start;
         }
       }
     }
     return numBlocks;
+    failures += 1;
   }
 
   // Nested dim1 then dim2
-  size_t getNextBlock(Task* t, size_t numBlocks) {
+  size_t nextBlock(size_t origStart, size_t numBlocks, bool origInclusive) {
     const size_t delta2 = locks1.size();
     const size_t delta1 = 1;
     size_t b;
@@ -300,14 +344,17 @@ class Fixed2DGraphTiledExecutor {
     for (int times = 0; times < 2; ++times) {
       size_t limit2 = locks2.size();
       size_t limit1 = locks1.size();
-      size_t start = t->id;
+      size_t start = origStart;
+      bool inclusive = origInclusive && times == 0;
       // First iteration is exclusive of start
-      if ((b = probeBlock(start + delta1, delta1, limit1 - 1, numBlocks)) != numBlocks)
+      if ((b = probeBlock(start + (inclusive ? 0 : delta1), delta1, limit1 - (inclusive ? 0 : 1), numBlocks)) != numBlocks)
         return b;
-      if ((b = probeBlock(start + delta2, delta2, limit2 - 1, numBlocks)) != numBlocks)
+      if ((b = probeBlock(start + (inclusive ? 0 : delta2), delta2, limit2 - (inclusive ? 0 : 1), numBlocks)) != numBlocks)
         return b;
       start += delta1 + delta2;
       while (limit1 > 0 || limit2 > 0) {
+        while (start >= numBlocks)
+          start -= numBlocks;
         // Subsequent iterations are inclusive of start
         if (limit1 > 0 && (b = probeBlock(start, delta1, limit1 - 1, numBlocks)) != numBlocks)
           return b;
@@ -343,7 +390,214 @@ class Fixed2DGraphTiledExecutor {
       task.d1 = i % numBlocks1;
       task.d2 = i / numBlocks1;
       task.id = i;
-      task.updates = 0;
+      std::tie(task.start1, task.end1) = Galois::block_range(first1, last1, task.d1, numBlocks1);
+      // XXX: Works for CSR graphs
+      task.start2 = task.d2 * size2 + *first2;
+      task.end2 = (task.d2 + 1) * size2 + *first2 - 1;
+    }
+  }
+
+  template<typename Function>
+  struct Process {
+    TestFixed2DGraphTiledExecutor* self;
+    Function fn;
+
+    void operator()(unsigned tid, unsigned total) {
+      self->executeLoop(fn, tid, total);
+    }
+  };
+
+public:
+  TestFixed2DGraphTiledExecutor(Graph& _g): g(_g), failures("PopFailures") { }
+
+  template<typename Function>
+  void execute(iterator first1, iterator last1, iterator first2, iterator last2, size_t size1, size_t size2, Function fn, size_t numIterations = 1) {
+    initializeTasks(first1, last1, first2, last2, size1, size2);
+    maxUpdates = numIterations;
+    Process<Function> p = { this, fn };
+    Galois::on_each(p);
+  }
+};
+
+template<typename Graph, bool UseLocks>
+class Fixed2DGraphTiledExecutor {
+  typedef typename Graph::GraphNode GNode;
+  typedef typename Graph::iterator iterator;
+  typedef typename Graph::edge_iterator edge_iterator;
+
+  template<typename T>
+  struct SimpleAtomic {
+    std::atomic<T> value;
+    SimpleAtomic(): value(0) { }
+    SimpleAtomic(const SimpleAtomic& o): value(o.value.load()) { }
+    T relaxedLoad() { return value.load(std::memory_order_relaxed); }
+    void relaxedAdd(T delta) { value.store(relaxedLoad() + delta, std::memory_order_relaxed); }
+  };
+
+  /**
+   * Tasks are 2D ranges [start1, end1) x [start2, end2]
+   */
+  struct Task {
+    iterator start1;
+    GNode start2;
+    iterator end1;
+    GNode end2;
+    size_t id;
+    size_t d1;
+    size_t d2;
+    SimpleAtomic<size_t> updates;
+  };
+
+  Graph& g;
+  std::vector<SpinLock> locks1;
+  std::vector<SpinLock> locks2;
+  std::vector<Task> tasks;
+  size_t maxUpdates;
+  Galois::Statistic failures;
+
+  struct GetDst: public std::unary_function<edge_iterator, GNode> {
+    Graph* g;
+    GetDst() { }
+    GetDst(Graph* _g): g(_g) { }
+    GNode operator()(edge_iterator ii) const {
+      return g->getEdgeDst(ii);
+    }
+  };
+
+  typedef Galois::NoDerefIterator<edge_iterator> no_deref_iterator;
+  typedef boost::transform_iterator<GetDst, no_deref_iterator> edge_dst_iterator;
+
+  template<typename Function>
+  void executeBlock(Function& fn, Task& task) {
+    GetDst getDst { &g };
+
+    for (auto ii = task.start1; ii != task.end1; ++ii) {
+      auto& src = g.getData(*ii);
+      edge_iterator begin = g.edge_begin(*ii);
+      no_deref_iterator nbegin(begin);
+      no_deref_iterator nend(g.edge_end(*ii));
+      edge_dst_iterator dbegin(nbegin, getDst);
+      edge_dst_iterator dend(nend, getDst);
+
+      for (auto jj = std::lower_bound(dbegin, dend, task.start2); jj != dend; ++jj) {
+        edge_iterator edge = *jj.base();
+        if (g.getEdgeDst(edge) > task.end2)
+          break;
+
+        auto& dst = g.getData(g.getEdgeDst(edge));
+          
+        fn(src, dst, g.getEdgeData(edge));
+      }
+    }
+  }
+
+  template<typename Function>
+  void executeLoop(Function fn, unsigned tid, unsigned total) {
+    const size_t numBlocks1 = locks1.size();
+    const size_t numBlocks2 = locks2.size();
+    const size_t numBlocks = numBlocks1 * numBlocks2;
+    const size_t block1 = (numBlocks1 + total - 1) / total;
+    const size_t start1 = std::min(block1 * tid, numBlocks1 - 1);
+    const size_t block2 = (numBlocks2 + total - 1) / total;
+    const size_t start2 = std::min(block2 * tid, numBlocks2 - 1);
+
+    // TODO get actual cores per package
+    size_t start;
+    if (UseLocks)
+      //start = block1 * 10 * (tid / 10) + start2 * numBlocks1;
+      start = start1 + block2 * 10 * (tid / 10) * numBlocks1;
+    else
+      start = start1 + start2 * numBlocks1;
+
+    for (int i = 0; ; ++i) {
+      start = nextBlock(start, numBlocks, i == 0);
+      Task* t = &tasks[start];
+      if (t == &tasks[numBlocks])
+        break;
+      executeBlock(fn, *t);
+
+      locks1[t->d1].unlock();
+      locks2[t->d2].unlock();
+    }
+  }
+
+  size_t probeBlock(size_t start, size_t by, size_t n, size_t numBlocks) {
+    for (size_t i = 0; i < n; ++i, start += by) {
+      while (start >= numBlocks)
+        start -= numBlocks;
+      Task& b = tasks[start];
+      if (b.updates.relaxedLoad() < maxUpdates) {
+        if (UseLocks) {
+          if (std::try_lock(locks1[b.d1], locks2[b.d2]) < 0) {
+            // Return while holding locks
+            b.updates.relaxedAdd(1);
+            return start;
+          }
+        } else {
+          if (b.updates.value.fetch_add(1) < maxUpdates)
+            return start;
+        }
+      }
+    }
+    return numBlocks;
+    failures += 1;
+  }
+
+  // Nested dim1 then dim2
+  size_t nextBlock(size_t origStart, size_t numBlocks, bool origInclusive) {
+    const size_t delta2 = locks1.size();
+    const size_t delta1 = 1;
+    size_t b;
+
+    for (int times = 0; times < 2; ++times) {
+      size_t limit2 = locks2.size();
+      size_t limit1 = locks1.size();
+      size_t start = origStart;
+      bool inclusive = origInclusive && times == 0;
+      // First iteration is exclusive of start
+      if ((b = probeBlock(start + (inclusive ? 0 : delta1), delta1, limit1 - (inclusive ? 0 : 1), numBlocks)) != numBlocks)
+        return b;
+      if ((b = probeBlock(start + (inclusive ? 0 : delta2), delta2, limit2 - (inclusive ? 0 : 1), numBlocks)) != numBlocks)
+        return b;
+      start += delta1 + delta2;
+      while (limit1 > 0 || limit2 > 0) {
+        while (start >= numBlocks)
+          start -= numBlocks;
+        // Subsequent iterations are inclusive of start
+        if (limit1 > 0 && (b = probeBlock(start, delta1, limit1 - 1, numBlocks)) != numBlocks)
+          return b;
+        if (limit2 > 0 && (b = probeBlock(start, delta2, limit2 - 1, numBlocks)) != numBlocks)
+          return b;
+        if (limit1 > 0) {
+          limit1--;
+          start += delta1;
+        }
+        if (limit2 > 0) {
+          limit2--;
+          start += delta2;
+        }
+      }
+    }
+
+    return numBlocks;
+  }
+
+  void initializeTasks(iterator first1, iterator last1, iterator first2, iterator last2, size_t size1, size_t size2) {
+    const size_t numBlocks1 = (std::distance(first1, last1) + size1 - 1) / size1;
+    const size_t numBlocks2 = (std::distance(first2, last2) + size2 - 1) / size2;
+    const size_t numBlocks = numBlocks1 * numBlocks2;
+
+    locks1.resize(numBlocks1);
+    locks2.resize(numBlocks2);
+    tasks.resize(numBlocks);
+
+    GetDst fn { &g };
+
+    for (size_t i = 0; i < numBlocks; ++i) {
+      Task& task = tasks[i];
+      task.d1 = i % numBlocks1;
+      task.d2 = i / numBlocks1;
+      task.id = i;
       std::tie(task.start1, task.end1) = Galois::block_range(first1, last1, task.d1, numBlocks1);
       // XXX: Works for CSR graphs
       task.start2 = task.d2 * size2 + *first2;
@@ -362,7 +616,7 @@ class Fixed2DGraphTiledExecutor {
   };
 
 public:
-  Fixed2DGraphTiledExecutor(Graph& _g): g(_g) { }
+  Fixed2DGraphTiledExecutor(Graph& _g): g(_g), failures("PopFailures") { }
 
   template<typename Function>
   void execute(iterator first1, iterator last1, iterator first2, iterator last2, size_t size1, size_t size2, Function fn, size_t numIterations = 1) {
@@ -386,33 +640,118 @@ double sumSquaredError(Graph& g) {
   Galois::do_all(g.begin(), g.begin() + NUM_MOVIE_NODES, [&](GNode n) {
     for (auto ii = g.edge_begin(n), ei = g.edge_end(n); ii != ei; ++ii) {
       GNode dst = g.getEdgeDst(ii);
-      LatentValue pred = calcPrediction(g.getData(n).latentVector, g.getData(dst).latentVector);
-      LatentValue rating = g.getEdgeData(ii);
+      LatentValue e = predictionError(g.getData(n).latentVector, g.getData(dst).latentVector, -static_cast<LatentValue>(g.getEdgeData(ii)));
 
-      error += ((pred - rating) * (pred - rating));
+      error += (e * e);
     }
   });
 #else
   Fixed2DGraphTiledExecutor<Graph,false> executor(g);
   executor.execute(g.begin(), g.begin() + NUM_MOVIE_NODES, g.begin() + NUM_MOVIE_NODES, g.end(),
       moviesPerBlock, usersPerBlock, [&](NodeData& nn, NodeData& mm, unsigned int edgeData) {
-    LatentValue pred = calcPrediction(nn.latentVector, mm.latentVector);
-    LatentValue rating = edgeData;
+    LatentValue e = predictionError(nn.latentVector, mm.latentVector, -static_cast<LatentValue>(edgeData));
 
-    error += ((pred - rating) * (pred - rating));
+    error += (e * e);
   });
 #endif
   return error.reduce();
 }
 
 template<typename Graph>
+size_t countEdges(Graph& g) {
+  typedef typename Graph::GraphNode GNode;
+  typedef typename Graph::node_data_type NodeData;
+  Galois::GAccumulator<size_t> edges;
+  Fixed2DGraphTiledExecutor<Graph,false> executor(g);
+  executor.execute(g.begin(), g.begin() + NUM_MOVIE_NODES, g.begin() + NUM_MOVIE_NODES, g.end(),
+      moviesPerBlock, usersPerBlock, [&](NodeData& nn, NodeData& mm, unsigned int edgeData) {
+    edges += 1;
+  });
+  return edges.reduce();
+}
+
+template<typename Graph>
 void verify(Graph& g) {
+  if (countEdges(g) != NUM_RATINGS) {
+    GALOIS_DIE("Error: edge list of input graph probably not sorted");
+  }
+
   double error = sumSquaredError(g);
   double rmse = std::sqrt(error/NUM_RATINGS);
 
   std::cout << "Final RMSE: " << rmse << "\n";
 }
 
+template<typename T, unsigned Size>
+struct ExplicitFiniteChecker { };
+
+template<typename T>
+struct ExplicitFiniteChecker<T,4U> {
+  static_assert(std::numeric_limits<T>::is_iec559, "Need IEEE floating point");
+  bool isFinite(T v) {
+    union { T value; uint32_t bits; } a = { v };
+    if (a.bits == 0x7F800000) {
+      return false; // +inf
+    } else if (a.bits == 0xFF800000) {
+      return false; // -inf
+    } else if (a.bits >= 0x7F800001 && a.bits <= 0x7FBFFFFF) {
+      return false; // signaling NaN
+    } else if (a.bits >= 0xFF800001 && a.bits <= 0xFFBFFFFF) {
+      return false; // signaling NaN
+    } else if (a.bits >= 0x7FC00000 && a.bits <= 0x7FFFFFFF) {
+      return false; // quiet NaN
+    } else if (a.bits >= 0xFFC00000 && a.bits <= 0xFFFFFFFF) {
+      return false; // quiet NaN
+    }
+    return true;
+  }
+};
+
+template<typename T>
+struct ExplicitFiniteChecker<T,8U> {
+  static_assert(std::numeric_limits<T>::is_iec559, "Need IEEE floating point");
+  bool isFinite(T v) {
+    union { T value; uint64_t bits; } a = { v };
+    if (a.bits == 0x7FF0000000000000) {
+      return false; // +inf
+    } else if (a.bits == 0xFFF0000000000000) {
+      return false; // -inf
+    } else if (a.bits >= 0x7FF0000000000001 && a.bits <= 0x7FF7FFFFFFFFFFFF) {
+      return false; // signaling NaN
+    } else if (a.bits >= 0xFFF0000000000001 && a.bits <= 0xFFF7FFFFFFFFFFFF) {
+      return false; // signaling NaN
+    } else if (a.bits >= 0x7FF8000000000000 && a.bits <= 0x7FFFFFFFFFFFFFFF) {
+      return false; // quiet NaN
+    } else if (a.bits >= 0xFFF8000000000000 && a.bits <= 0xFFFFFFFFFFFFFFFF) {
+      return false; // quiet NaN
+    }
+    return true;
+  }
+};
+
+
+template<typename T>
+bool isFinite(T v) {
+#ifdef __FAST_MATH__
+  return ExplicitFiniteChecker<T,sizeof(T)>().isFinite(v);
+#else
+  return std::isfinite(v);
+#endif
+}
+
+double countFlops(size_t nnz, int rounds, int k) {
+  double flop = 0;
+  if (useExactError) {
+    // dotProduct = 2K, square = 1, sum = 1
+    flop += nnz * (2.0 * k + 1 + 1);
+  } else {
+    // Computed during gradient update: square = 1, sum = 1
+    flop += nnz * (1 + 1);
+  }
+  // dotProduct = 2K, gradient = 10K, 
+  flop += rounds * (nnz * (12.0 * k));
+  return flop;
+}
 
 template<typename Graph, typename Fn>
 void executeUntilConverged(const StepFunction& sf, Graph& g, Fn fn) {
@@ -421,6 +760,10 @@ void executeUntilConverged(const StepFunction& sf, Graph& g, Fn fn) {
   LatentValue last = -1.0;
   int deltaRound = updatesPerEdge;
   LatentValue rate = learningRate;
+  Galois::TimeAccumulator elapsed;
+
+  elapsed.start();
+  unsigned long lastTime = 0;
 
   for (int round = 0; ; round += deltaRound) {
     if (fixedRounds > 0 && round >= fixedRounds)
@@ -436,36 +779,40 @@ void executeUntilConverged(const StepFunction& sf, Graph& g, Fn fn) {
         steps[i] = sf.stepSize(round + i);
     }
 
-    //Galois::StatTimer timer;
-    //timer.start();
-    fn(&steps[0], round + deltaRound, errorAccum);
-    //timer.stop();
+    fn(&steps[0], round + deltaRound, useExactError ? NULL : &errorAccum);
+    double error = useExactError ? sumSquaredError(g) : errorAccum.reduce();
 
-    // Check convergence, adaptively change step value (if necessary)
-    if (true) {
-      double error = errorAccum.reduce();
-      int curRound = round + deltaRound;
-      std::cout 
-        << "R " << curRound << ":" 
-        << " Approx. RMSE (R " << (curRound - 1) 
-        << ".5): " << std::sqrt(error/NUM_RATINGS);
-      if (useExactError) {
-        error = sumSquaredError(g);
-        std::cout << " RMSE (R " << curRound << "): " << std::sqrt(error/NUM_RATINGS);
-      }
-      std::cout << "\n";
+    elapsed.stop();
+    unsigned long curElapsed = elapsed.get();
+    elapsed.start();
+    unsigned long millis = curElapsed - lastTime;
+    lastTime = curElapsed;
 
-      if (fixedRounds <= 0 && last >= 0.0 && std::abs((last - error) / last) < 0.01)
-        break;
-      if (sf.isBold()) {
-        // Assume that loss decreases first round
-        if (last >= 0.0 && last < error)
-          rate = steps[deltaRound - 1] * 0.5;
-        else
-          rate = steps[deltaRound - 1] * 1.05;
-      }
-      last = error;
+    double gflops = countFlops(NUM_RATINGS, deltaRound, LATENT_VECTOR_SIZE) / millis / 1e6;
+
+    int curRound = round + deltaRound;
+    std::cout
+      << "R: " << curRound
+      << " elapsed (ms): " << curElapsed
+      << " GFLOP/s: " << gflops;
+    if (useExactError) {
+      std::cout << " RMSE (R " << curRound << "): " << std::sqrt(error/NUM_RATINGS);
+    } else {
+      std::cout << " Approx. RMSE (R " << (curRound - 1) << ".5): " << std::sqrt(error/NUM_RATINGS);
     }
+    std::cout << "\n";
+    if (!isFinite(error))
+      break;
+    if (fixedRounds <= 0 && last >= 0.0 && std::abs((last - error) / last) < 0.01)
+      break;
+    if (sf.isBold()) {
+      // Assume that loss decreases first round
+      if (last >= 0.0 && last < error)
+        rate = steps[deltaRound - 1] * 0.5;
+      else
+        rate = steps[deltaRound - 1] * 1.05;
+    }
+    last = error;
   }
 }
 
@@ -518,17 +865,20 @@ struct EdgeAlgo {
   struct Process {
     Graph& g;
     Galois::Statistic& edgesVisited;
+    Galois::Statistic& failures;
     std::vector<SpinLock>& xLocks;
     std::vector<SpinLock>& yLocks;
     std::vector<Task>& tasks;
     LatentValue* steps;
     int maxUpdates;
-    Galois::GAccumulator<double>& errorAccum;
+    Galois::GAccumulator<double>* errorAccum;
 
+#if 0
     void updateBlock(Task& task) {
       const int innerCount = std::numeric_limits<int>::max(); // XXX
       const LatentValue stepSize = steps[updatesPerEdge - maxUpdates + task.updates];
       GetDst fn { &g };
+      no_deref_iterator xxx;
       std::array<no_deref_iterator,1024> starts;
       double error = 0.0;
 
@@ -587,6 +937,43 @@ struct EdgeAlgo {
       errorAccum += (error - task.error);
       task.error = error;
     }
+#endif
+    void updateBlock(Task& task) {
+      const int innerCount = std::numeric_limits<int>::max(); // XXX
+      const LatentValue stepSize = steps[updatesPerEdge - maxUpdates + task.updates];
+      GetDst fn { &g };
+      double error = 0.0;
+
+      // TODO modify edge data to support agnostic edge blocking
+      for (int phase = makeSerializable ? 0 : 1; phase < 2; ++phase) {
+        Galois::MethodFlag flag = phase == 0 ? Galois::ALL : Galois::NONE;
+        for (auto ii = task.start1; ii != task.end1; ++ii) {
+          Node& nn = g.getData(*ii, round == 0 ? flag : Galois::NONE);
+          Graph::edge_iterator begin = g.edge_begin(*ii, Galois::NONE);
+          no_deref_iterator nbegin(begin);
+          no_deref_iterator nend(g.edge_end(*ii, Galois::NONE));
+          edge_dst_iterator dbegin(nbegin, fn);
+          edge_dst_iterator dend(nend, fn);
+          for (auto jj = std::lower_bound(dbegin, dend, task.start2); jj != dend; ++jj) {
+            Graph::edge_iterator edge = *jj.base();
+            if (g.getEdgeDst(edge) > task.end2)
+              break;
+            Node& mm = g.getData(g.getEdgeDst(edge), flag);
+            if (phase == 1) {
+              LatentValue e = doGradientUpdate(nn.latentVector, mm.latentVector, static_cast<LatentValue>(g.getEdgeData(edge)), stepSize);
+              if (errorAccum)
+                error += e * e;
+              edgesVisited += 1;
+            }
+          }
+        }
+      }
+      task.updates += 1;
+      if (errorAccum) {
+        *errorAccum += (error - task.error);
+        task.error = error;
+      }
+    }
 
     void operator()(Task& task) {
       updateBlock(task);
@@ -612,7 +999,7 @@ struct EdgeAlgo {
 
     size_t probeBlock(size_t start, size_t by, size_t n, size_t numBlocks) {
       for (size_t i = 0; i < n; ++i, start += by) {
-        if (start >= numBlocks)
+        while (start >= numBlocks)
           start -= numBlocks;
         Task& b = tasks[start];
 
@@ -623,11 +1010,12 @@ struct EdgeAlgo {
           }
         }
       }
+      failures += 1;
       return numBlocks;
     }
 
     // Nested Y then X
-    size_t getNextBlock(Task* t, size_t numBlocks) {
+    size_t nextBlock(size_t start, size_t numBlocks, bool inclusive) {
       const size_t yDelta = xLocks.size();
       const size_t xDelta = 1;
       size_t b;
@@ -636,14 +1024,15 @@ struct EdgeAlgo {
       for (int times = 0; times < 2; ++times) {
         size_t yLimit = yLocks.size();
         size_t xLimit = xLocks.size();
-        size_t start = t->id;
         // First iteration is exclusive of start
-        if ((b = probeBlock(start + yDelta, yDelta, yLimit - 1, numBlocks)) != numBlocks)
+        if ((b = probeBlock(start + (inclusive ? 0 : yDelta), yDelta, yLimit - (inclusive ? 0 : 1), numBlocks)) != numBlocks)
           return b;
-        if ((b = probeBlock(start + xDelta, xDelta, xLimit - 1, numBlocks)) != numBlocks)
+        if ((b = probeBlock(start + (inclusive ? 0 : xDelta), xDelta, xLimit - (inclusive ? 0 : 1), numBlocks)) != numBlocks)
           return b;
         start += yDelta + xDelta;
         while (yLimit > 0 || xLimit > 0) {
+          while (start >= numBlocks)
+            start -= numBlocks;
           // Subsequent iterations are inclusive of start
           if (yLimit > 0 && (b = probeBlock(start, yDelta, yLimit - 1, numBlocks)) != numBlocks)
             return b;
@@ -678,10 +1067,11 @@ struct EdgeAlgo {
       //xStart = distX(gen);
       //yStart = distY(gen);
 
-      Task* t = &tasks[xStart + yStart + numXBlocks];
+      size_t start = xStart + yStart * numXBlocks;
 
-      while (true) {
-        t = &tasks[getNextBlock(t, numBlocks)];
+      for (int i = 0; ; ++i) {
+        start = nextBlock(start, numBlocks, i == 0);
+        Task* t = &tasks[start];
         if (t == &tasks[numBlocks])
           break;
         updateBlock(*t);
@@ -942,11 +1332,9 @@ struct EdgeAlgo {
   };
 
   void operator()(const StepFunction& sf) {
-    std::cout
-      << "targetSize: " << (usersPerBlock * (size_t) moviesPerBlock)
-      << "\n";
-
-    Galois::Statistic edgesVisited("EdgesVisited");
+    //std::cout
+    //  << "targetSize: " << (usersPerBlock * (size_t) moviesPerBlock)
+    //  << "\n";
 
     Galois::StatTimer inspect("InspectTime");
     inspect.start();
@@ -958,10 +1346,12 @@ struct EdgeAlgo {
     Galois::on_each(fn1);
     inspect.stop();
 
+    Galois::Statistic edgesVisited("EdgesVisited");
+    Galois::Statistic failures("PopFailures");
     Galois::StatTimer execute("ExecuteTime");
     execute.start();
-    executeUntilConverged(sf, g, [&](LatentValue* steps, int maxUpdates, Galois::GAccumulator<double>& errorAccum) {
-      Process fn2 { g, edgesVisited, xLocks, yLocks, tasks, steps, maxUpdates, errorAccum };
+    executeUntilConverged(sf, g, [&](LatentValue* steps, int maxUpdates, Galois::GAccumulator<double>* errorAccum) {
+      Process fn2 { g, edgesVisited, failures, xLocks, yLocks, tasks, steps, maxUpdates, errorAccum };
       // Testing sufficient optimizations by moving towards BlockJump
       //Galois::for_each(initial.begin(), initial.end(), fn2, Galois::wl<Galois::WorkList::dChunkedFIFO<1>>());
       //Galois::for_each_local(initial, fn2, Galois::wl<Galois::WorkList::dChunkedFIFO<1>>());
@@ -1023,7 +1413,7 @@ struct BlockJumpAlgo {
     size_t numXBlocks, numYBlocks;
     LatentValue* steps;
     int maxUpdates;
-    Galois::GAccumulator<double>& errorAccum;
+    Galois::GAccumulator<double>* errorAccum;
     
     struct GetDst: public std::unary_function<Graph::edge_iterator, GNode> {
       Graph* g;
@@ -1074,14 +1464,17 @@ struct BlockJumpAlgo {
             break;
 
           LatentValue e = doGradientUpdate(movieData.latentVector, g.getData(user).latentVector, static_cast<LatentValue>(g.getEdgeData(*ii.base())), stepSize);
-          error += e * e;
+          if (errorAccum)
+            error += e * e;
           ++seen;
         }
       }
 
       si.updates += 1;
-      errorAccum += (error - si.error);
-      si.error = error;
+      if (errorAccum) {
+        *errorAccum += (error - si.error);
+        si.error = error;
+      }
       
       return seen;
     }
@@ -1115,14 +1508,17 @@ struct BlockJumpAlgo {
             break;
 
           LatentValue e = doGradientUpdate(movieData.latentVector, g.getData(user).latentVector, static_cast<LatentValue>(g.getEdgeData(ii)), stepSize);
-          error += e * e;
+          if (errorAccum)
+            error += e * e;
           ++seen;
         }
       }
 
       si.updates += 1;
-      errorAccum += (error - si.error);
-      si.error = error;
+      if (errorAccum) {
+        *errorAccum += (error - si.error);
+        si.error = error;
+      }
       
       return seen;
     }
@@ -1243,7 +1639,7 @@ struct BlockJumpAlgo {
       });
     }
     
-    executeUntilConverged(sf, g, [&](LatentValue* steps, int maxUpdates, Galois::GAccumulator<double>& errorAccum) {
+    executeUntilConverged(sf, g, [&](LatentValue* steps, int maxUpdates, Galois::GAccumulator<double>* errorAccum) {
       Process fn { g, xLocks, yLocks, blocks, numXBlocks, numYBlocks, steps, maxUpdates, errorAccum };
       Galois::on_each(fn);
     });
@@ -1262,6 +1658,7 @@ std::pair<size_t, size_t> initializeGraphData(Graph& g) {
 #else
   std::uniform_real<LatentValue> dist(0, top);
 #endif
+  //std::ofstream file("out.csv");
 
   // TODO: parallelize
   size_t numMovieNodes = 0;
@@ -1275,6 +1672,7 @@ std::pair<size_t, size_t> initializeGraphData(Graph& g) {
     // count number of movies we've seen; only movies nodes have edges
     if (std::distance(g.edge_begin(*ii), g.edge_end(*ii)))
       numMovieNodes++;
+    //file << std::distance(g.edge_begin(*ii), g.edge_end(*ii)) << "\n";
   }
 
   return std::make_pair(numMovieNodes, g.size() - numMovieNodes);
@@ -1293,6 +1691,68 @@ StepFunction* newStepFunction(Step s) {
 }
 
 
+template<typename Graph>
+void testOut(Graph& g) {
+  const size_t numYBlocks = (NUM_MOVIE_NODES + moviesPerBlock - 1) / moviesPerBlock;
+  const size_t numXBlocks = (NUM_USER_NODES + usersPerBlock - 1) / usersPerBlock;
+  const size_t numBlocks = numXBlocks * numYBlocks;
+
+  std::cout
+    << "moviesPerBlock: " << moviesPerBlock
+    << " usersPerBlock: " << usersPerBlock
+    << " numBlocks: " << numBlocks
+    << " numXBlocks: " << numXBlocks
+    << " numYBlocks: " << numYBlocks << "\n";
+
+  Galois::Timer timer;
+  timer.start();
+  typedef typename Graph::GraphNode GNode;
+  typedef typename Graph::node_data_type NodeData;
+  // computing Root Mean Square Error
+  // Assuming only movie nodes have edges
+  Galois::GAccumulator<double> error;
+  Galois::GAccumulator<size_t> visited;
+  TestFixed2DGraphTiledExecutor<Graph,false> executor(g);
+  //executor.execute(g.begin(), g.begin() + NUM_MOVIE_NODES, g.begin() + NUM_MOVIE_NODES, g.end(),
+  executor.execute(g.begin() + NUM_MOVIE_NODES, g.end(), g.begin(), g.begin() + NUM_MOVIE_NODES,
+      moviesPerBlock, usersPerBlock, [&](NodeData& nn, NodeData& mm, unsigned int edgeData) {
+    LatentValue e = predictionError(nn.latentVector, mm.latentVector, -static_cast<LatentValue>(edgeData));
+
+    error += (e * e);
+    visited += 1;
+  });
+  timer.stop();
+  std::cout 
+    << "ERROR: " << error.reduce()
+    << " Time: " << timer.get() 
+    << " GFLOP/s: " << (visited.reduce() * (2.0 * LATENT_VECTOR_SIZE + 2)) / timer.get() / 1e6 << "\n";
+}
+
+template<typename Graph>
+void writeBinaryLatentVectors(Graph& g, const std::string& filename) {
+  std::ofstream file(filename);
+  for (auto ii = g.begin(), ei = g.end(); ii != ei; ++ii) {
+    auto& v = g.getData(*ii).latentVector;
+    for (int i = 0; i < LATENT_VECTOR_SIZE; ++i) {
+      file.write(reinterpret_cast<char*>(&v[i]), sizeof(v[i]));
+    }
+  }
+  file.close();
+}
+
+template<typename Graph>
+void writeAsciiLatentVectors(Graph& g, const std::string& filename) {
+  std::ofstream file(filename);
+  for (auto ii = g.begin(), ei = g.end(); ii != ei; ++ii) {
+    auto& v = g.getData(*ii).latentVector;
+    for (int i = 0; i < LATENT_VECTOR_SIZE; ++i) {
+      file << v[i] << " ";
+    }
+    file << "\n";
+  }
+  file.close();
+}
+
 template<typename Algo>
 void run() {
   typename Algo::Graph g;
@@ -1301,7 +1761,7 @@ void run() {
   //  * movies are the first m nodes
   //  * users are the next n nodes
   //  * only movies have outedges
-  Galois::Graph::readGraph(g, inputFile);
+  Galois::Graph::readGraph(g, inputFilename);
 
   std::tie(NUM_MOVIE_NODES, NUM_USER_NODES) = initializeGraphData(g);
   NUM_RATINGS = g.sizeEdges();
@@ -1322,14 +1782,28 @@ void run() {
     << " algo: " << algo.name()
     << " step function: " << sf->name()
     << "\n";
-    
-  Galois::StatTimer timer;
-  timer.start();
-  algo(*sf);
-  timer.stop();
+      
+  if (true) {
+    Galois::StatTimer timer;
+    timer.start();
+    algo(*sf);
+    timer.stop();
 
-  if (!skipVerify)
-    verify(g);
+    if (!skipVerify) {
+      verify(g);
+    }
+  } else {
+    testOut(g);
+  }
+
+  if (outputFilename != "") {
+    std::cout << "Writing latent vectors to " << outputFilename << "\n";
+    switch (outputType) {
+      case OutputType::binary: writeBinaryLatentVectors(g, outputFilename); break;
+      case OutputType::ascii: writeAsciiLatentVectors(g, outputFilename); break;
+      default: abort();
+    }
+  }
 }
 
 int main(int argc, char** argv) {
