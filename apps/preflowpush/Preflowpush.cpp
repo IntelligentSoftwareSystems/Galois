@@ -633,7 +633,7 @@ void writePfpGraph(const std::string& inputFile, const std::string& outputFile) 
 
   EdgeTy one = 1;
   static_assert(sizeof(one) == sizeof(uint32_t), "Unexpected edge data size");
-  one = Galois::convert_le32(one);
+  one = Galois::convert_le32toh(one);
 
   p.phase2();
   edgeData.create(numEdges);
@@ -681,7 +681,7 @@ void initializeGraph(std::string inputFile, uint32_t sourceId, uint32_t sinkId, 
       for (Graph::edge_iterator ii = newApp->graph.edge_begin(*ss), ei = newApp->graph.edge_end(*ss); ii != ei; ++ii) {
         Graph::edge_data_type& cap = newApp->graph.getEdgeData(ii);
         static_assert(sizeof(cap) == sizeof(uint32_t), "Unexpected edge data size");
-        cap = Galois::convert_le32(cap);
+        cap = Galois::convert_le32toh(cap);
       }
     }
 #endif
