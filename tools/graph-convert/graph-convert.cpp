@@ -54,10 +54,11 @@ enum ConvertMode {
   gr2doublemtx,
   gr2floatmtx,
   gr2floatpbbsedges,
+  gr2intedgelist,
   gr2intpbbs,
   gr2intpbbsedges,
   gr2lowdegreeintgr,
-  gr2orderdeg,
+  gr2orderdegintgr,
   gr2partdstintgr,
   gr2partsrcintgr,
   gr2randintgr,
@@ -78,6 +79,7 @@ enum ConvertMode {
   vgr2edgelist,
   vgr2intgr,
   vgr2lowdegreevgr,
+  vgr2orderdegvgr,
   vgr2pbbs,
   vgr2ringvgr,
   vgr2svgr,
@@ -104,10 +106,11 @@ static cll::opt<ConvertMode> convertMode(cll::desc("Choose a conversion mode:"),
       clEnumVal(gr2doublemtx, "Convert binary gr to matrix market format"),
       clEnumVal(gr2floatmtx, "Convert binary gr to matrix market format"),
       clEnumVal(gr2floatpbbsedges, "Convert binary gr to weighted (float) pbbs edge list"),
+      clEnumVal(gr2intedgelist, "Convert binary gr to (int) edge list"),
       clEnumVal(gr2intpbbs, "Convert binary gr to weighted (int) pbbs graph"),
       clEnumVal(gr2intpbbsedges, "Convert binary gr to weighted (int) pbbs edge list"),
       clEnumVal(gr2lowdegreeintgr, "Remove high degree nodes from binary gr"),
-      clEnumVal(gr2orderdeg, "Order by neighbor degree"),
+      clEnumVal(gr2orderdegintgr, "Order by neighbor degree"),
       clEnumVal(gr2partdstintgr, "Partition binary weighted (int) gr by destination nodes into N pieces"),
       clEnumVal(gr2partsrcintgr, "Partition binary weighted (int) gr by source nodes into N pieces"),
       clEnumVal(gr2randintgr, "Randomize binary weighted (int) gr"),
@@ -128,6 +131,7 @@ static cll::opt<ConvertMode> convertMode(cll::desc("Choose a conversion mode:"),
       clEnumVal(vgr2edgelist, "Convert binary void gr to edgelist"),
       clEnumVal(vgr2intgr, "Convert void binary gr to weighted (int) gr by adding random edge weights"),
       clEnumVal(vgr2lowdegreevgr, "Remove high degree nodes from binary gr"),
+      clEnumVal(vgr2orderdegvgr, "Order by neighbor degree"),
       clEnumVal(vgr2pbbs, "Convert binary gr to unweighted pbbs graph"),
       clEnumVal(vgr2ringvgr, "Convert binary gr to strongly connected graph by adding ring overlay"),
       clEnumVal(vgr2svgr, "Convert binary void gr to symmetric graph by adding reverse edges"),
@@ -796,7 +800,7 @@ void order_by_high_degree(const std::string& infilename, const std::string& outf
       Inv[graph.getEdgeDst(dsti)].push_back(std::make_pair(dist,*ii));
   }
 
-  std::cout << "Found Inverse\n";
+  std::cout << "Found inverse\n";
 
   count = 0;
   for (auto ii = Inv.begin(), ee = Inv.end(); ii != ee; ++ii) {
@@ -804,7 +808,7 @@ void order_by_high_degree(const std::string& infilename, const std::string& outf
     std::sort(ii->begin(), ii->end(), std::greater<std::pair<unsigned, GNode>>());
   }
 
-  std::cout << "Done Sorting\n";
+  std::cout << "Done sorting\n";
 
   std::sort(perm.begin(), perm.end(), [&Inv, &graph] (GNode lhs, GNode rhs) -> bool
             {
@@ -1825,16 +1829,17 @@ int main(int argc, char** argv) {
 #if !defined(__IBMCPP__) || __IBMCPP__ > 1210
     case gr2partdstintgr: partition_by_destination<int32_t>(inputfilename, outputfilename, numParts); break;
 #endif
+    case gr2intedgelist: convert_gr2edgelist<int32_t>(inputfilename, outputfilename); break;
+    case gr2orderdegintgr: order_by_high_degree<int32_t>(inputfilename, outputfilename); break;
     case gr2partsrcintgr: partition_by_source<int32_t>(inputfilename, outputfilename, numParts); break;
     case gr2randintgr: convert_gr2rand<int32_t>(inputfilename, outputfilename); break;
-    case gr2sorteddstintgr: sort_edges<int32_t,IdLess>(inputfilename, outputfilename); break;
-    case gr2sortedweightintgr: sort_edges<int32_t,WeightLess>(inputfilename, outputfilename); break;
     case gr2ringintgr: add_ring<int32_t>(inputfilename, outputfilename, maxValue); break;
     case gr2rmat: convert_gr2rmat<int32_t,int32_t>(inputfilename, outputfilename); break;
     case gr2sintgr: convert_gr2sgr<int32_t>(inputfilename, outputfilename); break;
+    case gr2sorteddstintgr: sort_edges<int32_t,IdLess>(inputfilename, outputfilename); break;
+    case gr2sortedweightintgr: sort_edges<int32_t,WeightLess>(inputfilename, outputfilename); break;
     case gr2tintgr: transpose<int32_t>(inputfilename, outputfilename); break;
     case gr2treeintgr: add_tree<int32_t>(inputfilename, outputfilename, maxValue); break;
-    case gr2orderdeg: order_by_high_degree<void>(inputfilename, outputfilename); break;
     case intedgelist2gr: convert_edgelist2gr<int>(inputfilename, outputfilename); break;
     case mtx2doublegr: convert_mtx2gr<double>(inputfilename, outputfilename); break;
     case mtx2floatgr: convert_mtx2gr<float>(inputfilename, outputfilename); break;
@@ -1845,6 +1850,7 @@ int main(int argc, char** argv) {
     case vgr2edgelist: convert_gr2edgelist<void>(inputfilename, outputfilename); break;
     case vgr2intgr: add_weights<void,int32_t>(inputfilename, outputfilename, maxValue); break;
     case vgr2lowdegreevgr: remove_high_degree<void>(inputfilename, outputfilename, maxDegree); break;
+    case vgr2orderdegvgr: order_by_high_degree<void>(inputfilename, outputfilename); break;
 #if !defined(__IBMCPP__) || __IBMCPP__ > 1210
     case vgr2pbbs: convert_gr2pbbs<void,void>(inputfilename, outputfilename); break;
 #endif
