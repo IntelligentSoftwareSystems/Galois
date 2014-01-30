@@ -66,12 +66,11 @@ enum Algo {
   synchronous
 };
 
-enum WriteType {
-  none,
+enum OutputType {
   largest
 };
 
-enum WriteEdgeType {
+enum OutputEdgeType {
   void_,
   int32,
   int64
@@ -79,22 +78,21 @@ enum WriteEdgeType {
 
 namespace cll = llvm::cl;
 static cll::opt<std::string> inputFilename(cll::Positional, cll::desc("<input file>"), cll::Required);
-static cll::opt<std::string> outputFilename(cll::Positional, cll::desc("[output file]"), cll::init("largest.gr"));
+static cll::opt<std::string> outputFilename(cll::Positional, cll::desc("[output file]"), cll::init(""));
 static cll::opt<std::string> transposeGraphName("graphTranspose", cll::desc("Transpose of input graph"));
 static cll::opt<bool> symmetricGraph("symmetricGraph", cll::desc("Input graph is symmetric"), cll::init(false));
 cll::opt<unsigned int> memoryLimit("memoryLimit",
     cll::desc("Memory limit for out-of-core algorithms (in MB)"), cll::init(~0U));
-static cll::opt<WriteType> writeType("output", cll::desc("Output type:"),
+static cll::opt<OutputType> writeType("output", cll::desc("Output type:"),
     cll::values(
-      clEnumValN(WriteType::none, "none", "None (default)"),
-      clEnumValN(WriteType::largest, "largest", "Write largest component"),
-      clEnumValEnd), cll::init(WriteType::none));
-static cll::opt<WriteEdgeType> writeEdgeType("edgeType", cll::desc("Input/Output edge type:"),
+      clEnumValN(OutputType::largest, "largest", "Write largest component (default)"),
+      clEnumValEnd), cll::init(OutputType::largest));
+static cll::opt<OutputEdgeType> writeEdgeType("edgeType", cll::desc("Input/Output edge type:"),
     cll::values(
-      clEnumValN(WriteEdgeType::void_, "void", "no edge values"),
-      clEnumValN(WriteEdgeType::int32, "int32", "32 bit edge values"),
-      clEnumValN(WriteEdgeType::int64, "int64", "64 bit edge values"),
-      clEnumValEnd), cll::init(WriteEdgeType::void_));
+      clEnumValN(OutputEdgeType::void_, "void", "no edge values"),
+      clEnumValN(OutputEdgeType::int32, "int32", "32 bit edge values"),
+      clEnumValN(OutputEdgeType::int64, "int64", "64 bit edge values"),
+      clEnumValEnd), cll::init(OutputEdgeType::void_));
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
     cll::values(
       clEnumValN(Algo::async, "async", "Asynchronous (default)"),
@@ -797,16 +795,16 @@ void run() {
 
   Galois::reportPageAlloc("MeminfoPost");
 
-  if (!skipVerify || writeType == WriteType::largest) {
+  if (!skipVerify || outputFilename != "") {
     auto component = findLargest(graph);
     if (!verify(graph)) {
       GALOIS_DIE("verification failed");
     }
-    if (writeType == WriteType::largest && component) {
+    if (outputFilename != "" && writeType == OutputType::largest && component) {
       switch (writeEdgeType) {
-        case WriteEdgeType::void_: writeComponent<void>(algo, graph, component); break;
-        case WriteEdgeType::int32: writeComponent<uint32_t>(algo, graph, component); break;
-        case WriteEdgeType::int64: writeComponent<uint64_t>(algo, graph, component); break;
+        case OutputEdgeType::void_: writeComponent<void>(algo, graph, component); break;
+        case OutputEdgeType::int32: writeComponent<uint32_t>(algo, graph, component); break;
+        case OutputEdgeType::int64: writeComponent<uint64_t>(algo, graph, component); break;
         default: abort();
       }
     }

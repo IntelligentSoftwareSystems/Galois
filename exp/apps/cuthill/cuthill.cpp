@@ -52,13 +52,12 @@ enum PseudoAlgo {
   fullPseudo
 };
 
-enum WriteType {
-  none,
+enum OutputType {
   permutedgraph,
   permutation
 };
 
-enum WriteEdgeType {
+enum OutputEdgeType {
   void_,
   int32,
   int64
@@ -69,19 +68,18 @@ static const DistType DIST_INFINITY = std::numeric_limits<DistType>::max() - 1;
 
 namespace cll = llvm::cl;
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
-static cll::opt<std::string> outputFilename(cll::Positional, cll::desc("[output file]"), cll::init("permuted"));
-static cll::opt<WriteType> writeType("output", cll::desc("Output type:"),
+static cll::opt<std::string> outputFilename(cll::Positional, cll::desc("[output file]"), cll::init(""));
+static cll::opt<OutputType> writeType("output", cll::desc("Output type:"),
     cll::values(
-      clEnumValN(WriteType::none, "none", "None (default)"),
-      clEnumValN(WriteType::permutedgraph, "graph", "Permuted graph"),
-      clEnumValN(WriteType::permutation, "perm", "Permutation"),
-      clEnumValEnd), cll::init(WriteType::none));
-static cll::opt<WriteEdgeType> writeEdgeType("edgeType", cll::desc("Input/Output edge type:"),
+      clEnumValN(OutputType::permutedgraph, "graph", "Permuted graph"),
+      clEnumValN(OutputType::permutation, "perm", "Permutation (default)"),
+      clEnumValEnd), cll::init(OutputType::permutation));
+static cll::opt<OutputEdgeType> writeEdgeType("edgeType", cll::desc("Input/Output edge type:"),
     cll::values(
-      clEnumValN(WriteEdgeType::void_, "void", "no edge values"),
-      clEnumValN(WriteEdgeType::int32, "int32", "32 bit edge values"),
-      clEnumValN(WriteEdgeType::int64, "int64", "64 bit edge values"),
-      clEnumValEnd), cll::init(WriteEdgeType::void_));
+      clEnumValN(OutputEdgeType::void_, "void", "no edge values"),
+      clEnumValN(OutputEdgeType::int32, "int32", "32 bit edge values"),
+      clEnumValN(OutputEdgeType::int64, "int64", "64 bit edge values"),
+      clEnumValEnd), cll::init(OutputEdgeType::void_));
 static cll::opt<PseudoAlgo> pseudoAlgo(cll::desc("Psuedo-Peripheral algorithm:"),
     cll::values(
       clEnumVal(simplePseudo, "Simple"),
@@ -932,18 +930,19 @@ int main(int argc, char **argv) {
   if (printBandwidth)
     BFS::bandwidth("Permuted");
 
-  switch (writeType) {
-    case WriteType::none: break;
-    case WriteType::permutation: writePermutation(); break;
-    case WriteType::permutedgraph:
-      switch (writeEdgeType) {
-        case WriteEdgeType::void_: writeGraph<void>(); break;
-        case WriteEdgeType::int32: writeGraph<uint32_t>(); break;
-        case WriteEdgeType::int64: writeGraph<uint64_t>(); break;
-        default: abort();
-      }
-      break;
-    default: abort();
+  if (outputFilename != "") {
+    switch (writeType) {
+      case OutputType::permutation: writePermutation(); break;
+      case OutputType::permutedgraph:
+        switch (writeEdgeType) {
+          case OutputEdgeType::void_: writeGraph<void>(); break;
+          case OutputEdgeType::int32: writeGraph<uint32_t>(); break;
+          case OutputEdgeType::int64: writeGraph<uint64_t>(); break;
+          default: abort();
+        }
+        break;
+      default: abort();
+    }
   }
 
   std::cout << "done!\n";
