@@ -48,6 +48,10 @@ void Galois::Runtime::LL::initTID() {
   assert(TID < getMaxThreads());
 }
 
+void Galois::Runtime::LL::initTID(unsigned tid) {
+  TID = tid;
+}
+
 #ifdef GALOIS_USE_EXP
 void Galois::Runtime::LL::initTID_cilk () {
   TID = next.next () % getMaxThreads ();
