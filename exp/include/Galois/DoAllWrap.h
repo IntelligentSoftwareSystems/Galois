@@ -149,8 +149,8 @@ struct DoAllImpl<CILK> {
   static bool initialized;
 
 
-  static void initOne (BusyBarrier& busybarrier) {
-        Runtime::LL::initTID_cilk ();
+  static void initOne (BusyBarrier& busybarrier, unsigned tid) {
+    Runtime::LL::initTID(tid % Runtime::getMaxThreads());
         Runtime::initPTS_cilk ();
 
         unsigned id = Runtime::LL::getTID ();
@@ -195,7 +195,7 @@ struct DoAllImpl<CILK> {
       BusyBarrier busybarrier (numT);
 
       for (unsigned i = 0; i < numT; ++i) {
-        cilk_spawn initOne (busybarrier);
+        cilk_spawn initOne (busybarrier, i);
       } // end for
     }
   }

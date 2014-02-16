@@ -96,6 +96,7 @@ public:
   void acquire(int n = 1) {
     while (started < n) { }
   }
+  void reset() { started = 0; }
 };
 
 
@@ -108,14 +109,13 @@ class ThreadPool_pthread : public ThreadPool {
   volatile RunCommand* workBegin; // Begin iterator for work commands
   volatile RunCommand* workEnd; // End iterator for work commands
 
-  void initThread() {
+  void initThread(unsigned tid) {
     // Initialize TID
-    Galois::Runtime::LL::initTID();
-    unsigned id = Galois::Runtime::LL::getTID();
+    Galois::Runtime::LL::initTID(tid);
     Galois::Runtime::initPTS();
     if (!LL::EnvCheck("GALOIS_DO_NOT_BIND_THREADS"))
-      if (id != 0 || !LL::EnvCheck("GALOIS_DO_NOT_BIND_MAIN_THREAD"))
-	Galois::Runtime::LL::bindThreadToProcessor(id);
+      if (tid != 0 || !LL::EnvCheck("GALOIS_DO_NOT_BIND_MAIN_THREAD"))
+	Galois::Runtime::LL::bindThreadToProcessor(tid);
     // Use a simple pthread or atomic to avoid depending on Galois
     // too early in the initialization process
     started.release();
@@ -130,16 +130,13 @@ class ThreadPool_pthread : public ThreadPool {
     }
   }
 
-  void doWork(unsigned tid) {
-    cascade(tid);
+  void doWork() {
     RunCommand* workPtr = (RunCommand*)workBegin;
     RunCommand* workEndL = (RunCommand*)workEnd;
-    prefixThreadWork(tid);
     while (workPtr != workEndL) {
       (*workPtr)();
       ++workPtr;
     }
-    suffixThreadWork(tid);
   }
 
   void prefixThreadWork(unsigned tid) {
@@ -152,18 +149,23 @@ class ThreadPool_pthread : public ThreadPool {
       Galois::Runtime::endThreadSampling();
   }
 
-  void launch() {
-    unsigned tid = Galois::Runtime::LL::getTID();
+  void launch(unsigned tid) {
     while (!shutdown) {
       starts[tid].acquire();
-      doWork(tid);
+      cascade(tid);
+      prefixThreadWork(tid);
+      doWork();
+      suffixThreadWork(tid);
+      started.release();
     }
   }
 
   static void* slaunch(void* V) {
     ThreadPool_pthread* TP = (ThreadPool_pthread*)V;
-    TP->initThread();
-    TP->launch();
+    static unsigned next = 0;
+    unsigned tid = __sync_add_and_fetch(&next, 1);
+    TP->initThread(tid);
+    TP->launch(tid);
     return 0;
   }
   
@@ -172,7 +174,7 @@ public:
     ThreadPool(Galois::Runtime::LL::getMaxThreads()),
     started(0), shutdown(false), workBegin(0), workEnd(0)
   {
-    initThread();
+    initThread(0);
 
     starts = new Semaphore[maxThreads];
     threads = new pthread_t[maxThreads];
@@ -200,16 +202,19 @@ public:
 
   virtual void run(RunCommand* begin, RunCommand* end, unsigned num) {
     // Sanitize num
-    num = std::min(num, maxThreads);
-    num = std::max(num, 1U);
+    num = std::min(std::max(num,1U), maxThreads);
     starting = num;
     // Setup work
     workBegin = begin;
     workEnd = end;
     // Ensure stores happen before children are spawned
     __sync_synchronize();
+    started.reset();
+    cascade(0);
     // Do master thread work
-    doWork(0);
+    doWork();
+    //wait for children
+    started.acquire(num - 1);
     // Clean up
     workBegin = workEnd = 0;
   }
@@ -217,8 +222,11 @@ public:
 
 } // end namespace
 
+#if 0
 //! Implement the global threadpool
 ThreadPool& Galois::Runtime::getSystemThreadPool() {
   static ThreadPool_pthread pool;
   return pool;
 }
+#endif
+

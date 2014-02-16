@@ -1,6 +1,7 @@
 set(sources Barrier.cpp Context.cpp FileGraph.cpp FileGraphParallel.cpp
   OCFileGraph.cpp PerThreadStorage.cpp PreAlloc.cpp Sampling.cpp Support.cpp
-  Termination.cpp Threads.cpp ThreadPool_pthread.cpp Timer.cpp)
+  Termination.cpp Threads.cpp ThreadPool_pthread.cpp ThreadPool_cpp11.cpp 
+  Timer.cpp)
 set(include_dirs "${PROJECT_SOURCE_DIR}/include/")
 if(USE_EXP)
   file(GLOB exp_sources ../exp/src/*.cpp)

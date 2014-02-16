@@ -20,11 +20,11 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#include "Galois/Runtime/Sampling.h"
 #include "Galois/Runtime/ThreadPool.h"
 #include "Galois/Runtime/ll/EnvCheck.h"
 #include "Galois/Runtime/ll/HWTopo.h"
 #include "Galois/Runtime/ll/TID.h"
+#include "Galois/Runtime/ll/CompilerSpecific.h"
 
 #include "boost/utility.hpp"
 
@@ -112,6 +112,7 @@ class ThreadPool_cpp11 : public ThreadPool {
       starts[tid].acquire();
       cascade(tid);
       doWork();
+      --started;
     }
   }
 
@@ -150,10 +151,12 @@ public:
     workEnd = end;
     //atomic ensures seq consistency for workBegin,End
     //launch threads
+    started = num - 1;
     cascade(0);
     // Do master thread work
     doWork();
-    //Race condition.  Explicit barrier?
+    //wait for children
+    while (started) { LL::asmPause(); }
     // Clean up
     workBegin = 0;
     workEnd = 0;
@@ -162,8 +165,10 @@ public:
 
 } // end namespace
 
+#if 1
 //! Implement the global threadpool
 ThreadPool& Galois::Runtime::getSystemThreadPool() {
   static ThreadPool_cpp11 pool;
   return pool;
 }
+#endif

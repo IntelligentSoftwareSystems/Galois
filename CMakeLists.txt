@@ -211,6 +211,9 @@ if(NOT GALOIS_ARCH_MIC)
   endif()
 endif()
 
+#llvm ADT and command line parser
+#find_package(LLVM)
+
 # CILK
 include(CheckCilk)
 

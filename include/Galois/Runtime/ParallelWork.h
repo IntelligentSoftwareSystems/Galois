@@ -452,7 +452,7 @@ void for_each_impl(const RangeTy& range, FunctionTy f, const char* loopname) {
     std::ref(W),
     std::ref(barrier)
   };
-  getSystemThreadPool().run(&w[0], &w[5], activeThreads);
+  getSystemThreadPool().run(&w[0], &w[4], activeThreads);
   if (ForEachTraits<FunctionTy>::NeedsStats)  
     LoopTimer.stop();
   inGaloisForEach = false;
@@ -476,7 +476,7 @@ void on_each_impl(FunctionTy fn, const char* loopname = 0) {
   inGaloisForEach = true;
   RunCommand w[2] = {WOnEach<FunctionTy>(fn),
 		     std::ref(getSystemBarrier())};
-  getSystemThreadPool().run(&w[0], &w[2], activeThreads);
+  getSystemThreadPool().run(&w[0], &w[1], activeThreads);
   inGaloisForEach = false;
 }
 
@@ -491,7 +491,7 @@ void on_each_simple_impl(FunctionTy fn, const char* loopname = 0) {
   b->reinit(activeThreads);
   RunCommand w[2] = {WOnEach<FunctionTy>(fn),
 		     std::ref(*b)};
-  getSystemThreadPool().run(&w[0], &w[2], activeThreads);
+  getSystemThreadPool().run(&w[0], &w[1], activeThreads);
   delete b;
   inGaloisForEach = false;
 }

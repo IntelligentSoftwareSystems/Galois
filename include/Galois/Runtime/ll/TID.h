@@ -42,14 +42,7 @@ static inline unsigned getTID() {
   return TID;
 }
 
-//uninitialized TIDs are 0, and only thread 0 accesses TID before
-//initializing it
-void initTID();
 void initTID(unsigned tid);
-
-#ifdef GALOIS_USE_EXP
-void initTID_cilk();
-#endif // GALOIS_USE_EXP
 
 }
 }
