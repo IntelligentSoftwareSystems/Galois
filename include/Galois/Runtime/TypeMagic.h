@@ -43,7 +43,7 @@ struct Cons<T, std::tuple<Args...>>
 };
 
 //Filter types into a tuple
-template <template <typename> class Pred, typename...> struct typeFilter;
+template <template <typename> class, typename...> struct typeFilter;
 
 template<template< typename> class Pred> struct typeFilter<Pred> { using type = std::tuple<>; };
 
@@ -54,6 +54,21 @@ struct typeFilter<Pred, Head, Tail...>
 					 typename Cons<Head, typename typeFilter<Pred,Tail...>::type>::type,
 					 typename typeFilter<Pred,Tail...>::type
 					 >::type;
+};
+
+//apply a map to types
+template < template <typename> class fMap, typename... Types>
+struct typeMap
+{
+  using type = std::tuple<typename fMap<Types>::type...>;
+};
+
+//apply a map to types in a tuple
+template < template <typename> class, typename...> struct typeTupleMap;
+template < template <typename> class fMap, typename... Types>
+struct typeTupleMap<fMap, std::tuple<Types...>>
+{
+  using type = typename typeMap<fMap, Types...>::type;
 };
 
 
