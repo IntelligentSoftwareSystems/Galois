@@ -1,5 +1,6 @@
 #set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ftree-vectorizer-verbose=3 -ffast-math")
+find_package(Boost 1.50.0 COMPONENTS system)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ffast-math")
 app(sgd-old sgd-old.cpp)
 app(sgd sgd.cpp)
-app(sgd-ddn sgd-ddn.cpp)
+app(sgd-ddn sgd-ddn.cpp REQUIRES Boost_FOUND EXTLIBS ${Boost_LIBRARIES})
