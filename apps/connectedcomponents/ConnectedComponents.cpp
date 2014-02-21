@@ -49,6 +49,9 @@
 #include "GraphChiAlgo.h"
 #endif
 
+#include <ostream>
+#include <fstream>
+
 const char* name = "Connected Components";
 const char* desc = "Computes the connected components of a graph";
 const char* url = 0;
@@ -66,10 +69,6 @@ enum Algo {
   synchronous
 };
 
-enum OutputType {
-  largest
-};
-
 enum OutputEdgeType {
   void_,
   int32,
@@ -78,15 +77,12 @@ enum OutputEdgeType {
 
 namespace cll = llvm::cl;
 static cll::opt<std::string> inputFilename(cll::Positional, cll::desc("<input file>"), cll::Required);
-static cll::opt<std::string> outputFilename(cll::Positional, cll::desc("[output file]"), cll::init(""));
+static cll::opt<std::string> largestComponentFilename("outputLargestComponent", cll::desc("[output graph file]"), cll::init(""));
+static cll::opt<std::string> permutationFilename("outputNodePermutation", cll::desc("[output node permutation file]"), cll::init(""));
 static cll::opt<std::string> transposeGraphName("graphTranspose", cll::desc("Transpose of input graph"));
 static cll::opt<bool> symmetricGraph("symmetricGraph", cll::desc("Input graph is symmetric"), cll::init(false));
 cll::opt<unsigned int> memoryLimit("memoryLimit",
     cll::desc("Memory limit for out-of-core algorithms (in MB)"), cll::init(~0U));
-static cll::opt<OutputType> writeType("output", cll::desc("Output type:"),
-    cll::values(
-      clEnumValN(OutputType::largest, "largest", "Write largest component (default)"),
-      clEnumValEnd), cll::init(OutputType::largest));
 static cll::opt<OutputEdgeType> writeEdgeType("edgeType", cll::desc("Input/Output edge type:"),
     cll::values(
       clEnumValN(OutputEdgeType::void_, "void", "no edge values"),
@@ -648,38 +644,56 @@ void doWriteComponent(Graph& graph, typename Graph::node_data_type::component_ty
 
   assert(!prev || prev->id == numNodes);
 
-  p.phase2();
-  for (typename Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
-    node_data_reference data = graph.getData(*ii);
-    if (data.component() != component)
-      continue;
+  if (largestComponentFilename != "") {
+    p.phase2();
+    for (typename Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+      node_data_reference data = graph.getData(*ii);
+      if (data.component() != component)
+        continue;
 
-    size_t sid = data.id - 1;
+      size_t sid = data.id - 1;
 
-    for (typename Graph::edge_iterator jj = graph.edge_begin(*ii),
-        ej = graph.edge_end(*ii); jj != ej; ++jj) {
-      GNode dst = graph.getEdgeDst(jj);
-      node_data_reference ddata = graph.getData(dst);
-      size_t did = ddata.id - 1;
+      for (typename Graph::edge_iterator jj = graph.edge_begin(*ii),
+          ej = graph.edge_end(*ii); jj != ej; ++jj) {
+        GNode dst = graph.getEdgeDst(jj);
+        node_data_reference ddata = graph.getData(dst);
+        size_t did = ddata.id - 1;
 
-      //assert(ddata.component == component);
-      assert(sid < numNodes && did < numNodes);
-      if (EdgeData::has_value)
-        edgeData.set(p.addNeighbor(sid, did), graph.getEdgeData(jj));
-      else
-        p.addNeighbor(sid, did);
+        //assert(ddata.component == component);
+        assert(sid < numNodes && did < numNodes);
+        if (EdgeData::has_value)
+          edgeData.set(p.addNeighbor(sid, did), graph.getEdgeData(jj));
+        else
+          p.addNeighbor(sid, did);
+      }
     }
+
+    edge_value_type* rawEdgeData = p.finish<edge_value_type>();
+    if (EdgeData::has_value)
+      std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+
+    std::cout
+      << "Writing largest component to " << largestComponentFilename
+      << " (nodes: " << numNodes << " edges: " << numEdges << ")\n";
+
+    p.structureToFile(largestComponentFilename);
   }
 
-  edge_value_type* rawEdgeData = p.finish<edge_value_type>();
-  if (EdgeData::has_value)
-    std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
-
-  std::cout
-    << "Writing largest component to " << outputFilename
-    << " (nodes: " << numNodes << " edges: " << numEdges << ")\n";
-
-  p.structureToFile(outputFilename);
+  if (permutationFilename != "") {
+    std::ofstream out(permutationFilename);
+    size_t oid = 0;
+    std::cout << "Writing permutation to " << permutationFilename << "\n";
+    for (typename Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii, ++oid) {
+      node_data_reference data = graph.getData(*ii);
+      out << oid << ",";
+      if (data.component() != component) {
+        ;
+      } else {
+        out << data.id - 1;
+      }
+      out << "\n";
+    }
+  }
 }
 
 template<typename Graph>
@@ -795,12 +809,12 @@ void run() {
 
   Galois::reportPageAlloc("MeminfoPost");
 
-  if (!skipVerify || outputFilename != "") {
+  if (!skipVerify || largestComponentFilename != "" || permutationFilename != "") {
     auto component = findLargest(graph);
     if (!verify(graph)) {
       GALOIS_DIE("verification failed");
     }
-    if (outputFilename != "" && writeType == OutputType::largest && component) {
+    if (component && (largestComponentFilename != "" || permutationFilename != "")) {
       switch (writeEdgeType) {
         case OutputEdgeType::void_: writeComponent<void>(algo, graph, component); break;
         case OutputEdgeType::int32: writeComponent<uint32_t>(algo, graph, component); break;
