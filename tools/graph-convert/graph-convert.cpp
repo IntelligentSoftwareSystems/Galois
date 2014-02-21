@@ -45,6 +45,7 @@ namespace cll = llvm::cl;
 enum ConvertMode {
   bipartitegr2bigpetsc,
   bipartitegr2littlepetsc,
+  bipartitegr2sorteddegreegr,
   dimacs2gr,
   edgelist2gr,
   gr2binarypbbs32,
@@ -64,6 +65,7 @@ enum ConvertMode {
   gr2ringgr,
   gr2rmat,
   gr2sgr,
+  gr2sorteddegreegr,
   gr2sorteddstgr,
   gr2sortedparentdegreegr,
   gr2sortedweightgr,
@@ -85,22 +87,29 @@ enum EdgeType {
   void_
 };
 
-static cll::opt<std::string> inputfilename(cll::Positional, cll::desc("<input file>"), cll::Required);
-static cll::opt<std::string> outputfilename(cll::Positional, cll::desc("<output file>"), cll::Required);
+static cll::opt<std::string> inputFilename(cll::Positional, 
+    cll::desc("<input file>"), cll::Required);
+static cll::opt<std::string> outputFilename(cll::Positional,
+    cll::desc("<output file>"), cll::Required);
+static cll::opt<std::string> transposeFilename("graphTranspose",
+    cll::desc("[transpose graph file]"), cll::init(""));
+static cll::opt<std::string> outputPermutationFilename("outputNodePermutation",
+    cll::desc("[output node permutation file]"), cll::init(""));
 static cll::opt<EdgeType> edgeType("edgeType", cll::desc("Input/Output edge type:"),
     cll::values(
       clEnumValN(EdgeType::float32, "float32", "32 bit floating point edge values"),
       clEnumValN(EdgeType::float64, "float64", "64 bit floating point edge values"),
       clEnumValN(EdgeType::int32, "int32", "32 bit int edge values"),
       clEnumValN(EdgeType::int64, "int64", "64 bit int edge values"),
-      clEnumValN(EdgeType::uint32, "int32", "32 bit unsigned int edge values"),
-      clEnumValN(EdgeType::uint64, "int64", "64 bit unsigned int edge values"),
+      clEnumValN(EdgeType::uint32, "uint32", "32 bit unsigned int edge values"),
+      clEnumValN(EdgeType::uint64, "uint64", "64 bit unsigned int edge values"),
       clEnumValN(EdgeType::void_, "void", "no edge values"),
       clEnumValEnd), cll::init(EdgeType::void_));
 static cll::opt<ConvertMode> convertMode(cll::desc("Conversion mode:"),
     cll::values(
       clEnumVal(bipartitegr2bigpetsc, "Convert bipartite binary gr to big-endian PETSc format"),
       clEnumVal(bipartitegr2littlepetsc, "Convert bipartite binary gr to little-endian PETSc format"),
+      clEnumVal(bipartitegr2sorteddegreegr, "Sort nodes of bipartite binary gr by degree"),
       clEnumVal(dimacs2gr, "Convert dimacs to binary gr"),
       clEnumVal(edgelist2gr, "Convert edge list to binary gr"),
       clEnumVal(gr2binarypbbs32, "Convert binary gr to unweighted binary pbbs graph"),
@@ -121,6 +130,7 @@ static cll::opt<ConvertMode> convertMode(cll::desc("Conversion mode:"),
       clEnumVal(gr2ringgr, "Convert binary gr to strongly connected graph by adding ring overlay"),
       clEnumVal(gr2rmat, "Convert binary gr to RMAT graph"),
       clEnumVal(gr2sgr, "Convert binary gr to symmetric graph by adding reverse edges"),
+      clEnumVal(gr2sorteddegreegr, "Sort nodes by degree"),
       clEnumVal(gr2sorteddstgr, "Sort outgoing edges of binary gr by edge destination"),
       clEnumVal(gr2sortedparentdegreegr, "Sort nodes by degree of parent"),
       clEnumVal(gr2sortedweightgr, "Sort outgoing edges of binary gr by edge weight"),
@@ -141,17 +151,17 @@ static cll::opt<int> maxDegree("maxDegree",
     cll::desc("maximum degree to keep"), cll::init(2*1024));
 
 struct Conversion { };
-struct HasOnlyVoidSpecialization: Conversion { };
-struct HasNoVoidSpecialization: Conversion { };
+struct HasOnlyVoidSpecialization { };
+struct HasNoVoidSpecialization { };
 
 template<typename EdgeTy, typename C>
 void convert(C& c, Conversion) {
-  c.template convert<EdgeTy>(inputfilename, outputfilename);
+  c.template convert<EdgeTy>(inputFilename, outputFilename);
 }
 
 template<typename EdgeTy, typename C>
 void convert(C& c, HasOnlyVoidSpecialization, typename std::enable_if<std::is_same<EdgeTy,void>::value>::type* = 0) {
-  c.template convert<EdgeTy>(inputfilename, outputfilename);
+  c.template convert<EdgeTy>(inputFilename, outputFilename);
 }
 
 template<typename EdgeTy, typename C>
@@ -161,7 +171,7 @@ void convert(C& c, HasOnlyVoidSpecialization, typename std::enable_if<!std::is_s
 
 template<typename EdgeTy, typename C>
 void convert(C& c, HasNoVoidSpecialization, typename std::enable_if<!std::is_same<EdgeTy,void>::value>::type* = 0) {
-  c.template convert<EdgeTy>(inputfilename, outputfilename);
+  c.template convert<EdgeTy>(inputFilename, outputFilename);
 }
 
 template<typename EdgeTy, typename C>
@@ -198,13 +208,13 @@ void convert() {
   };
 }
 
-static void printStatus(size_t in_nodes, size_t in_edges, size_t out_nodes, size_t out_edges) {
-  std::cout << "InGraph : |V| = " << in_nodes << ", |E| = " << in_edges << "\n";
-  std::cout << "OutGraph: |V| = " << out_nodes << ", |E| = " << out_edges << "\n";
+static void printStatus(size_t inNodes, size_t inEdges, size_t outNodes, size_t outEdges) {
+  std::cout << "InGraph : |V| = " << inNodes << ", |E| = " << inEdges << "\n";
+  std::cout << "OutGraph: |V| = " << outNodes << ", |E| = " << outEdges << "\n";
 }
 
-static void printStatus(size_t in_nodes, size_t in_edges) {
-  printStatus(in_nodes, in_edges, in_nodes, in_edges);
+static void printStatus(size_t inNodes, size_t inEdges) {
+  printStatus(inNodes, inEdges, inNodes, inEdges);
 }
 
 template<typename EdgeValues,bool Enable>
@@ -225,7 +235,14 @@ int getEdgeValue(Galois::Graph::FileGraph& g, Galois::Graph::FileGraph::edge_ite
   return 1;
 }
 
-// TODO void edge specializations
+template<typename T>
+void outputPermutation(const T& perm) {
+  size_t oid = 0;
+  std::ofstream out(outputPermutationFilename);
+  for (auto ii = perm.begin(), ei = perm.end(); ii != ei; ++ii, ++oid) {
+    out << oid << "," << *ii << "\n";
+  }
+}
 
 /**
  * Just a bunch of pairs or triples:
@@ -652,6 +669,7 @@ struct RandomizeNodes: public Conversion {
 
     Graph out;
     Galois::Graph::permute<EdgeTy>(graph, perm, out);
+    outputPermutation(perm);
 
     out.structureToFile(outfilename);
     printStatus(graph.size(), graph.sizeEdges());
@@ -880,6 +898,92 @@ struct MakeSymmetric: public Conversion {
   }
 };
 
+/**
+ * Like SortByDegree but (1) take into account bipartite representation splits
+ * symmetric relation over two graphs (a graph and its transpose) and (2)
+ * normalize representation by placing all nodes from bipartite graph set A
+ * before set B.
+ */
+struct BipartiteSortByDegree: public Conversion {
+  template<typename EdgeTy>
+  void convert(const std::string& infilename, const std::string& outfilename) {
+    typedef Galois::Graph::FileGraph Graph;
+    typedef Graph::GraphNode GNode;
+    typedef Galois::LargeArray<GNode> Permutation;
+
+    Graph ingraph, outgraph, transposegraph;
+    ingraph.structureFromFile(infilename);
+    transposegraph.structureFromFile(transposeFilename);
+
+    Permutation perm;
+    perm.create(ingraph.size());
+
+    auto hasOutEdge = [&](GNode x) {
+      return ingraph.edge_begin(x) != ingraph.edge_end(x);
+    };
+    ptrdiff_t numSetA = std::count_if(ingraph.begin(), ingraph.end(), hasOutEdge);
+    auto getDistance = [&](GNode x) {
+      if (ingraph.edge_begin(x) == ingraph.edge_end(x))
+        return numSetA + std::distance(transposegraph.edge_begin(x), transposegraph.edge_end(x));
+      else
+        return std::distance(ingraph.edge_begin(x), ingraph.edge_end(x));
+    };
+
+    std::copy(ingraph.begin(), ingraph.end(), perm.begin());
+    std::sort(perm.begin(), perm.end(), [&](GNode lhs, GNode rhs) -> bool {
+      return getDistance(lhs) < getDistance(rhs);
+    });
+
+    // Finalize by taking the transpose/inverse
+    Permutation inverse;
+    inverse.create(ingraph.size());
+    size_t idx = 0;
+    for (auto n : perm) {
+      inverse[n] = idx++;
+    }
+
+    Galois::Graph::permute<EdgeTy>(ingraph, inverse, outgraph);
+    outputPermutation(inverse);
+    outgraph.structureToFile(outfilename);
+    printStatus(ingraph.size(), ingraph.sizeEdges());
+  }
+};
+
+
+struct SortByDegree: public Conversion {
+  template<typename EdgeTy>
+  void convert(const std::string& infilename, const std::string& outfilename) {
+    typedef Galois::Graph::FileGraph Graph;
+    typedef Graph::GraphNode GNode;
+    typedef Galois::LargeArray<GNode> Permutation;
+
+    Graph ingraph, outgraph;
+    ingraph.structureFromFile(infilename);
+
+    Permutation perm;
+    perm.create(ingraph.size());
+
+    std::copy(ingraph.begin(), ingraph.end(), perm.begin());
+    std::sort(perm.begin(), perm.end(), [&](GNode lhs, GNode rhs) -> bool {
+      return std::distance(ingraph.edge_begin(lhs), ingraph.edge_end(lhs)) 
+        < std::distance(ingraph.edge_begin(rhs), ingraph.edge_end(rhs));
+    });
+
+    // Finalize by taking the transpose/inverse
+    Permutation inverse;
+    inverse.create(ingraph.size());
+    size_t idx = 0;
+    for (auto n : perm) {
+      inverse[n] = idx++;
+    }
+
+    Galois::Graph::permute<EdgeTy>(ingraph, inverse, outgraph);
+    outputPermutation(inverse);
+    outgraph.structureToFile(outfilename);
+    printStatus(ingraph.size(), ingraph.sizeEdges());
+  }
+};
+
 struct SortByHighDegreeParent: public Conversion {
   template<typename EdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) {
@@ -944,6 +1048,7 @@ struct SortByHighDegreeParent: public Conversion {
 
     Graph out;
     Galois::Graph::permute<EdgeTy>(graph, perm2, out);
+    outputPermutation(perm2);
 
     // std::cout << "Biggest was " << first << " now " << perm2[first] << " with "
     //           << std::distance(out.edge_begin(perm2[first]), out.edge_end(perm2[first]))
@@ -1935,6 +2040,7 @@ int main(int argc, char** argv) {
   switch (convertMode) {
     case bipartitegr2bigpetsc: convert<Bipartitegr2Petsc<double,false> >(); break;
     case bipartitegr2littlepetsc: convert<Bipartitegr2Petsc<double,true> >(); break;
+    case bipartitegr2sorteddegreegr: convert<BipartiteSortByDegree>(); break;
     case dimacs2gr: convert<Dimacs2Gr>(); break;
     case edgelist2gr: convert<Edgelist2Gr>(); break;
     case gr2binarypbbs32: convert<Gr2BinaryPbbs<uint32_t,uint32_t> >(); break;
@@ -1954,6 +2060,7 @@ int main(int argc, char** argv) {
     case gr2ringgr: convert<AddRing>(); break;
     case gr2rmat: convert<Gr2Rmat<int32_t> >(); break;
     case gr2sgr: convert<MakeSymmetric>(); break;
+    case gr2sorteddegreegr: convert<SortByDegree>(); break;
     case gr2sorteddstgr: convert<SortEdges<IdLess, false> >(); break; 
     case gr2sortedparentdegreegr: convert<SortByHighDegreeParent>(); break;
     case gr2sortedweightgr: convert<SortEdges<WeightLess, true> >(); break;

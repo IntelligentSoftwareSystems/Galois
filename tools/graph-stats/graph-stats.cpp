@@ -31,22 +31,26 @@
 namespace cll = llvm::cl;
 
 enum StatMode {
-  summary,
-  sortedoffsethist,
-  degrees,
   degreehist,
-  indegreehist
+  degrees,
+  dsthist,
+  indegreehist,
+  sortedlogoffsethist,
+  summary
 };
 
 static cll::opt<std::string> inputfilename(cll::Positional, cll::desc("<graph file>"), cll::Required);
 static cll::list<StatMode> statModeList(cll::desc("Available stats:"),
     cll::values(
-      clEnumVal(summary, "Graph summary"),
-      clEnumVal(degrees, "Node degrees"),
-      clEnumVal(sortedoffsethist, "Histogram of node offsets with sorted edges"),
       clEnumVal(degreehist, "Histogram of degrees"),
+      clEnumVal(degrees, "Node degrees"),
+      clEnumVal(dsthist, "Histogram of destinations"),
       clEnumVal(indegreehist, "Histogram of indegrees"),
+      clEnumVal(sortedlogoffsethist, "Histogram of neighbor offsets with sorted edges"),
+      clEnumVal(summary, "Graph summary"),
       clEnumValEnd));
+static cll::opt<int> numHist("numHist", cll::desc("Number of histograms to bin input over"), cll::init(1));
+static cll::opt<int> numDstBins("numDstBins", cll::desc("Number of bins to place destinations in"), cll::init(100));
 
 typedef Galois::Graph::FileGraph Graph;
 typedef Graph::GraphNode GNode;
@@ -64,28 +68,71 @@ void do_degrees() {
   }
 }
 
-void do_hist() {
-  unsigned numEdges = 0;
-  std::map<unsigned, unsigned> hist;
-  for (auto ii = graph.begin(), ee = graph.end(); ii != ee; ++ii) {
-    unsigned val = std::distance(graph.neighbor_begin(*ii), graph.neighbor_end(*ii));
-    numEdges += val;
-    ++hist[val];
+template<typename HistsTy>
+void print_hists(const std::string& name, HistsTy& hists) {
+  typedef typename HistsTy::value_type::key_type KeyType;
+
+  int width = 0;
+  for (auto ii = hists.begin(), ei = hists.end(); ii != ei; ++ii) {
+    if (ii->rbegin() != ii->rend()) {
+      KeyType most = ii->rbegin()->first;
+      if (most)
+        width = std::max(width, (int) std::ceil(std::log10(most)));
+    }
   }
-  for (auto pp = hist.begin(), ep = hist.end(); pp != ep; ++pp)
-    std::cout << pp->first << " , " << pp->second << "\n";
+  int bin = 0;
+  int bwidth = (int) std::ceil(std::log10((int) numHist));
+  std::cout << "Hist," << name << ",Count\n";
+  for (auto ii = hists.begin(), ei = hists.end(); ii != ei; ++ii, ++bin) {
+    for (auto pp = ii->begin(), ep = ii->end(); pp != ep; ++pp) {
+      std::cout.width(bwidth);
+      std::cout << bin << ",";
+      if (width)
+        std::cout.width(width);
+      std::cout << pp->first << "," << pp->second << "\n";
+    }
+  }
 }
 
-void do_inhist() {
-  std::map<GNode, unsigned> inv;
-  std::map<unsigned, unsigned> hist;
-  for (auto ii = graph.begin(), ee = graph.end(); ii != ee; ++ii)
-    for (auto ei = graph.edge_begin(*ii), eie = graph.edge_end(*ii); ei != eie; ++ei)
-      ++inv[graph.getEdgeDst(ei)];
-  for (auto pp = inv.begin(), ep = inv.end(); pp != ep; ++pp)
-    ++hist[pp->second];
-  for (auto pp = hist.begin(), ep = hist.end(); pp != ep; ++pp)
-    std::cout << pp->first << " , " << pp->second << "\n";
+void do_degreehist() {
+  unsigned numEdges = 0;
+
+  std::vector<std::map<unsigned, unsigned> > hists;
+  for (int i = 0; i < numHist; ++i) {
+    auto p = Galois::block_range(graph.begin(), graph.end(), i, numHist);
+
+    hists.emplace_back();
+    auto& hist = hists.back();
+    for (auto ii = p.first, ee = p.second; ii != ee; ++ii) {
+      unsigned val = std::distance(graph.neighbor_begin(*ii), graph.neighbor_end(*ii));
+      numEdges += val;
+      ++hist[val];
+    }
+  }
+
+  print_hists("Degree", hists);
+}
+
+void do_indegreehist() {
+  std::vector<std::map<GNode, unsigned> > invs;
+  std::vector<std::map<unsigned, unsigned> > hists;
+
+  for (int i = 0; i < numHist; ++i) {
+    auto p = Galois::block_range(graph.begin(), graph.end(), i, numHist);
+
+    hists.emplace_back();
+    invs.emplace_back();
+    auto& hist = hists.back();
+    auto& inv = invs.back();
+    for (auto ii = p.first, ee = p.second; ii != ee; ++ii) {
+      for (auto jj = graph.edge_begin(*ii), ej = graph.edge_end(*ii); jj != ej; ++jj)
+        ++inv[graph.getEdgeDst(jj)];
+    for (auto pp = inv.begin(), ep = inv.end(); pp != ep; ++pp)
+      ++hist[pp->second];
+    }
+  }
+
+  print_hists("InDegree", hists);
 }
 
 struct EdgeComp {
@@ -106,28 +153,83 @@ int getLogIndex(ptrdiff_t x) {
   return sign * logvalue;
 }
 
-void do_sortedoffsethist() {
+void do_sortedlogoffsethist() {
   Graph copy;
   {
     // Original FileGraph is immutable because it is backed by a file
     copy.cloneFrom(graph);
   }
 
-  std::map<int, size_t> hist;
+  std::vector<std::map<int, size_t> > hists;
+  hists.emplace_back();
+  auto hist = &hists.back();
+  int curHist = 0;
+  auto p = Galois::block_range(
+      boost::counting_iterator<size_t>(0),
+      boost::counting_iterator<size_t>(graph.sizeEdges()),
+      curHist,
+      numHist);
   for (auto ii = graph.begin(), ee = graph.end(); ii != ee; ++ii) {
     copy.sortEdges<void>(*ii, EdgeComp());
 
-    GNode last = *ii;
+    GNode last = 0;
+    bool first = true;
     for (auto jj = copy.edge_begin(*ii), ej = copy.edge_end(*ii); jj != ej; ++jj) {
       GNode dst = copy.getEdgeDst(jj);
       ptrdiff_t diff = dst - (ptrdiff_t) last;
-      int index = getLogIndex(diff);
-      ++hist[index];
+
+      if (!first) {
+        int index = getLogIndex(diff);
+        ++(*hist)[index];
+      }
+      first = false;
       last = dst;
+      if (++p.first == p.second) {
+        hists.emplace_back();
+        hist = &hists.back();
+        curHist += 1;
+        p = Galois::block_range(
+            boost::counting_iterator<size_t>(0),
+            boost::counting_iterator<size_t>(graph.sizeEdges()),
+            curHist,
+            numHist);
+      }
     }
   }
-  for (auto pp = hist.begin(), ep = hist.end(); pp != ep; ++pp)
-    std::cout << pp->first << " , " << pp->second << "\n";
+
+  print_hists("LogOffset", hists);
+}
+
+void do_dsthist() {
+  std::vector<std::map<unsigned, size_t> > hists;
+  hists.emplace_back();
+  auto hist = &hists.back();
+  int curHist = 0;
+  auto p = Galois::block_range(
+      boost::counting_iterator<size_t>(0),
+      boost::counting_iterator<size_t>(graph.sizeEdges()),
+      curHist,
+      numHist);
+  size_t blockSize = (graph.size() + numDstBins - 1) / numDstBins;
+  for (auto ii = graph.begin(), ee = graph.end(); ii != ee; ++ii) {
+    for (auto jj = graph.edge_begin(*ii), ej = graph.edge_end(*ii); jj != ej; ++jj) {
+      GNode dst = graph.getEdgeDst(jj);
+      ++(*hist)[dst / blockSize];
+
+      if (++p.first == p.second) {
+        hists.emplace_back();
+        hist = &hists.back();
+        curHist += 1;
+        p = Galois::block_range(
+            boost::counting_iterator<size_t>(0),
+            boost::counting_iterator<size_t>(graph.sizeEdges()),
+            curHist,
+            numHist);
+      }
+    }
+  }
+
+  print_hists("DestinationBin", hists);
 }
 
 int main(int argc, char** argv) {
@@ -136,11 +238,12 @@ int main(int argc, char** argv) {
   
   for (unsigned i = 0; i != statModeList.size(); ++i) {
     switch (statModeList[i]) {
-    case summary: do_summary(); break;
+    case degreehist: do_degreehist(); break;
     case degrees: do_degrees(); break;
-    case degreehist: do_hist(); break;
-    case sortedoffsethist: do_sortedoffsethist(); break;
-    case indegreehist: do_inhist(); break;
+    case dsthist: do_dsthist(); break;
+    case indegreehist: do_indegreehist(); break;
+    case sortedlogoffsethist: do_sortedlogoffsethist(); break;
+    case summary: do_summary(); break;
     default: abort(); break;
     }
   }
