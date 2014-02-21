@@ -42,6 +42,7 @@
 
 #include <algorithm>
 #include <functional>
+#include <memory>
 
 #ifdef GALOIS_USE_HTM
 #include <speculation.h>
@@ -487,12 +488,11 @@ void on_each_simple_impl(FunctionTy fn, const char* loopname = 0) {
     GALOIS_DIE("Nested for_each not supported");
 
   inGaloisForEach = true;
-  Barrier* b = createSimpleBarrier();
+  std::unique_ptr<Barrier> b { createSimpleBarrier() };
   b->reinit(activeThreads);
   RunCommand w[2] = {WOnEach<FunctionTy>(fn),
 		     std::ref(*b)};
   getSystemThreadPool().run(&w[0], &w[1], activeThreads);
-  delete b;
   inGaloisForEach = false;
 }
 

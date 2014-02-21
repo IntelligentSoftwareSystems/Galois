@@ -23,7 +23,12 @@
 #include "Scene.h"
 #include "Viewer.h"
 
+#ifdef __APPLE__
+#include <OpenGL/gl.h>
+#else
 #include <GL/gl.h>
+#endif
+
 #include <cmath>
 #include <fstream>
 #include <limits>

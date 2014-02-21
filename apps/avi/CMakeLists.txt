@@ -15,14 +15,18 @@ file(GLOB Sources
   dummy.f90
 )
 
-enable_language(Fortran OPTIONAL)
+if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
+  # OSX borks uncontrolably 
+else()
+  enable_language(Fortran OPTIONAL)
+endif()
+
 find_package(LAPACK)
 find_package(ZLIB)
 
 if(ZLIB_FOUND AND NOT GALOIS_ARCH_MIC)
   add_definitions(-DGALOIS_HAS_ZLIB)
 endif()
-
 
 # TODO(ddn): CMake Boost module on BG/Q cannot be called multiple times. Skip
 # avi althogether for now.

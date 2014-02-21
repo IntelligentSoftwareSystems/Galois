@@ -37,6 +37,20 @@
 
 using namespace Galois::Graph;
 
+#if defined(MAP_ANONYMOUS)
+static const int _MAP_ANON = MAP_ANONYMOUS;
+#elif defined(MAP_ANON)
+static const int _MAP_ANON = MAP_ANON;
+#else
+// fail
+#endif
+#ifdef MAP_POPULATE
+static const int _MAP_POP  = MAP_POPULATE;
+#else
+static const int _MAP_POP  = 0;
+#endif
+static const int _MAP_BASE = _MAP_ANON | _MAP_POP | MAP_PRIVATE;
+
 //File format V1:
 //version (1) {uint64_t LE}
 //EdgeType size {uint64_t LE}
@@ -84,11 +98,6 @@ void FileGraph::structureFromMem(void* mem, size_t len, bool clone) {
   masterLength = len;
 
   if (clone) {
-    int _MAP_BASE = MAP_ANONYMOUS | MAP_PRIVATE;
-#ifdef MAP_POPULATE
-    _MAP_BASE |= MAP_POPULATE;
-#endif
-    
     void* m = mmap(0, masterLength, PROT_READ | PROT_WRITE, _MAP_BASE, -1, 0);
     if (m == MAP_FAILED) {
       GALOIS_SYS_DIE("failed copying graph");
@@ -106,10 +115,6 @@ void* FileGraph::structureFromGraph(FileGraph& g, size_t sizeof_edge_data) {
   // Allocate
   size_t common = g.masterLength - (g.sizeofEdge * g.numEdges);
   size_t len = common + (sizeof_edge_data * g.numEdges);
-  int _MAP_BASE = MAP_ANONYMOUS | MAP_PRIVATE;
-#ifdef MAP_POPULATE
-  _MAP_BASE |= MAP_POPULATE;
-#endif
   void* m = mmap(0, len, PROT_READ | PROT_WRITE, _MAP_BASE, -1, 0);
   if (m == MAP_FAILED) {
     GALOIS_SYS_DIE("failed copying graph");
@@ -132,11 +137,6 @@ void* FileGraph::structureFromArrays(uint64_t* out_idx, uint64_t num_nodes,
     nBytes += sizeof(uint32_t); // padding
   nBytes += sizeof_edge_data * num_edges;
  
-  int _MAP_BASE = MAP_ANONYMOUS | MAP_PRIVATE;
-#ifdef MAP_POPULATE
-  _MAP_BASE |= MAP_POPULATE;
-#endif
-  
   char* base = (char*) mmap(0, nBytes, PROT_READ | PROT_WRITE, _MAP_BASE, -1, 0);
   if (base == MAP_FAILED) {
     base = 0;
@@ -172,13 +172,7 @@ void FileGraph::structureFromFile(const std::string& filename, bool preFault) {
   }
   masterLength = buf.st_size;
 
-  int _MAP_BASE = MAP_PRIVATE;
-#ifdef MAP_POPULATE
-  if (preFault)
-    _MAP_BASE |= MAP_POPULATE;
-#endif
-  
-  void* m = mmap(0, masterLength, PROT_READ, _MAP_BASE, masterFD, 0);
+  void* m = mmap(0, masterLength, PROT_READ, preFault ? (MAP_PRIVATE | _MAP_POP) : MAP_PRIVATE, masterFD, 0);
   if (m == MAP_FAILED) {
     m = 0;
     GALOIS_SYS_DIE("failed reading ", filename);

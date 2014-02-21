@@ -25,6 +25,7 @@
 #include "Galois/Runtime/ll/EnvCheck.h"
 #include "Galois/Runtime/ll/HWTopo.h"
 #include "Galois/Runtime/ll/TID.h"
+#include "Galois/Runtime/ll/gio.h"
 
 #include "boost/utility.hpp"
 
@@ -47,32 +48,26 @@ extern void initPTS();
 
 using namespace Galois::Runtime;
 
-//! Generic check for pthread functions
-static void checkResults(int val) {
-  if (val) {
-    perror("PTHREAD: ");
-    assert(0 && "PThread check");
-    abort();
-  }
-}
- 
 namespace {
 
 class Semaphore: private boost::noncopyable {
   sem_t sem;
 public:
   explicit Semaphore(int val = 0) {
-    checkResults(sem_init(&sem, 0, val));
+    if (sem_init(&sem, 0, val))
+      GALOIS_DIE("PTHREAD");
   }
 
   ~Semaphore() {
-    checkResults(sem_destroy(&sem));
+    if (sem_destroy(&sem))
+      GALOIS_DIE("PTHREAD");
   }
 
   void release(int n = 1) {
     while (n) {
       --n;
-      checkResults(sem_post(&sem));
+      if (sem_post(&sem))
+        GALOIS_DIE("PTHREAD");
     }
   }
 
@@ -81,7 +76,8 @@ public:
       --n;
       int rc;
       while (((rc = sem_wait(&sem)) < 0) && (errno == EINTR)) { }
-      checkResults(rc);
+      if (rc)
+        GALOIS_DIE("PTHREAD");
     }
   }
 };
@@ -180,8 +176,8 @@ public:
     threads = new pthread_t[maxThreads];
 
     for (unsigned i = 1; i < maxThreads; ++i) {
-      int rc = pthread_create(&threads[i], 0, &slaunch, this);
-      checkResults(rc);
+      if (pthread_create(&threads[i], 0, &slaunch, this))
+        GALOIS_DIE("PTHREAD");
     }
     started.acquire(maxThreads);
   }
@@ -193,8 +189,8 @@ public:
     for (unsigned i = 1; i < maxThreads; ++i)
       starts[i].release();
     for (unsigned i = 1; i < maxThreads; ++i) {
-      int rc = pthread_join(threads[i], NULL);
-      checkResults(rc);
+      if (pthread_join(threads[i], NULL))
+        GALOIS_DIE("PTHREAD");
     }
     delete [] starts;
     delete [] threads;

@@ -1,11 +1,11 @@
-/** Machine Descriptions on BlueGeneQ -*- C++ -*-
+/** Machine Descriptions on Darwin -*- C++ -*-
  * @file
  * @section License
  *
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2014, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS SOFTWARE
  * AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY, FITNESS FOR ANY
  * PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF PERFORMANCE, AND ANY
@@ -21,51 +21,29 @@
  * @section Description
  *
  * See HWTopoLinux.cpp.
- *
+ * 
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 #include "Galois/Runtime/ll/HWTopo.h"
 #include "Galois/Runtime/ll/gio.h"
-
-#include <vector>
-#include <sched.h>
+#include <sys/types.h>
+#include <sys/sysctl.h>
 
 using namespace Galois::Runtime::LL;
 
 namespace {
 
-static bool bindToProcessor(int proc) {
-  cpu_set_t mask;
-  /* CPU_ZERO initializes all the bits in the mask to zero. */
-  CPU_ZERO(&mask);
-  
-  /* CPU_SET sets only the bit corresponding to cpu. */
-  // void to cancel unused result warning
-  (void)CPU_SET(proc, &mask);
-  
-  /* sched_setaffinity returns 0 in success */
-  if (sched_setaffinity(0, sizeof(mask), &mask) == -1) {
-    gWarn("Could not set CPU affinity for thread ", proc, "(", strerror(errno), ")");
-    return false;
-  }
-  return true;
-}
-
-//! Flat machine with the correct number of threads and binding
 struct Policy {
-  std::vector<int> procmap; //Galois id -> cpu id
-
-  unsigned numThreads, numCores, numPackages;
+  //number of "real" processors
+  uint32_t numCpus;
 
   Policy() {
-    for (int i = 0; i < 16; ++i) {
-      for (int j = 0; j < 4; ++j) {
-        procmap.push_back(j*16 + i);
-      }
+    size_t bufSize = sizeof(numCpus);
+    if (sysctlbyname("hw.activecpu", &numCpus, &bufSize, NULL, 0) == -1) {
+      GALOIS_SYS_DIE("Error querying number of cpus");
+    } else if (bufSize != sizeof(numCpus)) {
+      GALOIS_SYS_DIE("Error querying number of cpus");
     }
-    numThreads = procmap.size();
-    numCores = procmap.size();
-    numPackages = 1;
   }
 };
 
@@ -77,41 +55,41 @@ static Policy& getPolicy() {
 } //namespace
 
 bool Galois::Runtime::LL::bindThreadToProcessor(int id) {
-  return bindToProcessor(getPolicy().procmap[id]);
+  return false;
 }
 
 unsigned Galois::Runtime::LL::getProcessorForThread(int id) {
-  return getPolicy().procmap[id];
+  return id;
 }
 
 unsigned Galois::Runtime::LL::getMaxThreads() {
-  return getPolicy().numThreads;
+  return getPolicy().numCpus;
 }
 
 unsigned Galois::Runtime::LL::getMaxCores() {
-  return getPolicy().numCores;
+  return getPolicy().numCpus;
 }
 
 unsigned Galois::Runtime::LL::getMaxPackages() {
-  return getPolicy().numPackages;
-}
-
-unsigned Galois::Runtime::LL::getMaxPackageForThread(int id) {
-  return getPolicy().numPackages - 1;
+  return getPolicy().numCpus;
 }
 
 unsigned Galois::Runtime::LL::getPackageForThread(int id) {
-  return 0;
+  return id;
+}
+
+unsigned Galois::Runtime::LL::getMaxPackageForThread(int id) {
+  return id;
 }
 
 bool Galois::Runtime::LL::isPackageLeader(int id) {
-  return id == 0;
+  return true;
 }
 
 unsigned Galois::Runtime::LL::getLeaderForThread(int id) {
-  return 0;
+  return id;
 }
 
 unsigned Galois::Runtime::LL::getLeaderForPackage(int id) {
-  return 0;
+  return id;
 }

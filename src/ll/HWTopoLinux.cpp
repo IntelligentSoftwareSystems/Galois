@@ -28,7 +28,7 @@
  * package.  SMT hardware contexts are bound after all real cores (int x86).
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
-*/
+ */
 #include "Galois/Runtime/ll/HWTopo.h"
 #include "Galois/Runtime/ll/EnvCheck.h"
 #include "Galois/Runtime/ll/gio.h"
@@ -58,17 +58,17 @@ struct cpuinfo {
 static const char* sProcInfo = "/proc/cpuinfo";
 static const char* sCPUSet   = "/proc/self/cpuset";
 
-static bool linuxBindToProcessor(int proc) {
+static bool bindToProcessor(int proc) {
   cpu_set_t mask;
   /* CPU_ZERO initializes all the bits in the mask to zero. */
-  CPU_ZERO( &mask );
+  CPU_ZERO(&mask);
   
   /* CPU_SET sets only the bit corresponding to cpu. */
   // void to cancel unused result warning
-  (void)CPU_SET( proc, &mask );
+  (void)CPU_SET(proc, &mask);
   
   /* sched_setaffinity returns 0 in success */
-  if( sched_setaffinity( 0, sizeof(mask), &mask ) == -1 ) {
+  if (sched_setaffinity(0, sizeof(mask), &mask ) == -1) {
     gWarn("Could not set CPU affinity for thread ", proc, "(", strerror(errno), ")");
     return false;
   }
@@ -115,7 +115,7 @@ static std::vector<cpuinfo> parseCPUInfo() {
 }
 
 //! Returns physical ids in current cpuset
-std::vector<int> parseCPUSet() {
+static std::vector<int> parseCPUSet() {
   std::vector<int> vals;
   vals.reserve(64);
 
@@ -189,7 +189,7 @@ std::vector<int> parseCPUSet() {
   return vals;
 }
 
-struct AutoLinuxPolicy {
+struct Policy {
   //number of hw supported threads
   unsigned numThreads, numThreadsRaw;
   
@@ -233,7 +233,7 @@ struct AutoLinuxPolicy {
     }
   };
 
-  AutoLinuxPolicy() {
+  Policy() {
     std::vector<cpuinfo> vals = parseCPUInfo();
     virtmap = parseCPUSet();
 
@@ -376,8 +376,8 @@ struct AutoLinuxPolicy {
   }
 };
 
-AutoLinuxPolicy& getPolicy() {
-  static AutoLinuxPolicy A;
+static Policy& getPolicy() {
+  static Policy A;
   return A;
 }
 
@@ -385,7 +385,7 @@ AutoLinuxPolicy& getPolicy() {
 
 bool Galois::Runtime::LL::bindThreadToProcessor(int id) {
   assert(id < (int)getPolicy().virtmap.size());
-  return linuxBindToProcessor(getPolicy().virtmap[id]);
+  return bindToProcessor(getPolicy().virtmap[id]);
 }
 
 unsigned Galois::Runtime::LL::getProcessorForThread(int id) {

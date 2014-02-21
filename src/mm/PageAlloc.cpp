@@ -33,8 +33,15 @@
 #include <numeric>
 
 // mmap flags
+#if defined(MAP_ANONYMOUS)
+static const int _MAP_ANON = MAP_ANONYMOUS;
+#elif defined(MAP_ANON)
+static const int _MAP_ANON = MAP_ANON;
+#else
+// fail
+#endif
 static const int _PROT = PROT_READ | PROT_WRITE;
-static const int _MAP_BASE = MAP_ANONYMOUS | MAP_PRIVATE;
+static const int _MAP_BASE = _MAP_ANON | MAP_PRIVATE;
 #ifdef MAP_POPULATE
 static const int _MAP_POP  = MAP_POPULATE | _MAP_BASE;
 #endif

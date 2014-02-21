@@ -64,8 +64,8 @@ public:
   char* initPerPackage();
 
 #ifdef GALOIS_USE_EXP
-  char* initPerThread_cilk ();
-  char* initPerPackage_cilk ();
+  char* initPerThread_cilk();
+  char* initPerPackage_cilk();
 #endif // GALOIS_USE_EXP
 
   unsigned allocOffset(const unsigned size);
@@ -90,7 +90,7 @@ PerBackend& getPPSBackend();
 void initPTS();
 
 #ifdef GALOIS_USE_EXP
-void initPTS_cilk ();
+void initPTS_cilk();
 #endif // GALOIS_USE_EXP
 
 

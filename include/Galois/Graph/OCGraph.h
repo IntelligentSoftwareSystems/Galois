@@ -148,6 +148,14 @@ public:
   };
 
 private:
+#ifdef HAVE_MMAP64
+  typedef off64_t offset_t;
+#else
+  typedef off_t offset_t;
+#endif
+
+  struct PageSizeConf;
+
   class Block {
     friend class OCFileGraph;
     void* m_mapping;
@@ -157,7 +165,7 @@ private:
     size_t m_sizeof_data;
 
     void unload();
-    void load(int fd, off64_t offset, size_t begin, size_t len, size_t sizeof_data); 
+    void load(int fd, offset_t offset, size_t begin, size_t len, size_t sizeof_data); 
 
   public:
     Block(): m_mapping(0) { }

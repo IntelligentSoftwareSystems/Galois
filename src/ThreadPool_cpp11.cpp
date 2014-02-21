@@ -32,6 +32,7 @@
 #include <condition_variable>
 #include <algorithm>
 #include <atomic>
+#include <vector>
 
 // Forward declare this to avoid including PerThreadStorage.
 // We avoid this to stress that the thread Pool MUST NOT depend on PTS.

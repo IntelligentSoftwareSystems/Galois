@@ -214,8 +214,8 @@ endif()
 #llvm ADT and command line parser
 #find_package(LLVM)
 
-# CILK
 include(CheckCilk)
+include(CheckMmap)
 
 # HugePages
 include(CheckHugePages)
@@ -270,7 +270,7 @@ function(compileApp name)
     file(GLOB Sources *.cpp)
   endif()
   add_executable(${name} ${Sources})
-endfunction (compileApp)
+endfunction(compileApp)
 
 function(app name)
   PARSE_ARGUMENTS(APP "REQUIRES;EXTLIBS" "" ${ARGN})
