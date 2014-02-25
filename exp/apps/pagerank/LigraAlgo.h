@@ -26,6 +26,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
   
   Galois::GReduceMax<float> max_delta;
   Galois::GAccumulator<size_t> small_delta;
+  Galois::GAccumulator<double> sum_delta;
 
   void readGraph(Graph& graph) {
     // Using dense forward option, so we don't need in-edge information
@@ -53,7 +54,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
       int neighbors = std::distance(graph.edge_begin(src, Galois::MethodFlag::NONE),
           graph.edge_end(src, Galois::MethodFlag::NONE));
       PNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
-      float delta =  sdata.value / neighbors;
+      float delta = sdata.value / neighbors;
       
       ddata.accum.atomicIncrement(delta);
       return false; // Topology-driven
@@ -71,6 +72,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
       if (diff <= tolerance)
         self->small_delta += 1;
       self->max_delta.update(diff);
+      self->sum_delta.update(diff);
       sdata.value = value;
       sdata.accum.write(0);
     }
@@ -90,6 +92,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
       float delta = max_delta.reduce();
       size_t sdelta = small_delta.reduce();
       std::cout << "iteration: " << iteration
+                << " sum delta: " << sum_delta.reduce()
                 << " max delta: " << delta
                 << " small delta: " << sdelta
                 << " (" << sdelta / (float) graph.size() << ")"
@@ -98,11 +101,12 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
         break;
       max_delta.reset();
       small_delta.reset();
+      sum_delta.reset();
       //bags.swap();
 
       //this->outEdgeMap(memoryLimit, graph, EdgeOperator(), bags.cur(), bags.next(), true);
       this->outEdgeMap(memoryLimit, graph, EdgeOperator(), bags.next());
-      Galois::do_all_local(bags.cur(), UpdateNode(this, graph));
+      Galois::do_all_local(graph, UpdateNode(this, graph));
     }
     
     if (iteration >= maxIterations) {

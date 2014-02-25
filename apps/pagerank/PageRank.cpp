@@ -101,6 +101,7 @@ struct SerialAlgo {
     while (true) {
       float max_delta = std::numeric_limits<float>::min();
       unsigned int small_delta = 0;
+      double sum_delta = 0;
 
       for (auto ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
         GNode src = *ii;
@@ -123,6 +124,7 @@ struct SerialAlgo {
           ++small_delta;
         if (diff > max_delta)
           max_delta = diff;
+        sum_delta += diff;
         sdata.value = value;
         sdata.accum.write(0);
       }
@@ -130,6 +132,7 @@ struct SerialAlgo {
       iteration += 1;
 
       std::cout << "iteration: " << iteration
+                << " sum delta: " << sum_delta
                 << " max delta: " << max_delta
                 << " small delta: " << small_delta
                 << " (" << small_delta / (float) numNodes << ")"
@@ -163,7 +166,8 @@ struct PullAlgo {
   std::string name() const { return "Pull"; }
 
   Galois::GReduceMax<double> max_delta;
-  Galois::GAccumulator<unsigned int> small_delta;
+  Galois::GAccumulator<size_t> small_delta;
+  Galois::GAccumulator<double> sum_delta;
 
   void readGraph(Graph& graph) {
     if (transposeGraphName.size()) {
@@ -222,6 +226,7 @@ struct PullAlgo {
       if (diff <= tolerance)
         self->small_delta += 1;
       self->max_delta.update(diff);
+      self->sum_delta.update(diff);
       sdata.setPageRank(iteration, value);
     }
   };
@@ -237,6 +242,7 @@ struct PullAlgo {
       size_t sdelta = small_delta.reduce();
 
       std::cout << "iteration: " << iteration
+                << " sum delta: " << sum_delta.reduce()
                 << " max delta: " << delta
                 << " small delta: " << sdelta
                 << " (" << sdelta / (float) graph.size() << ")"
@@ -246,6 +252,7 @@ struct PullAlgo {
         break;
       max_delta.reset();
       small_delta.reset();
+      sum_delta.reset();
     }
 
     if (iteration >= maxIterations) {
