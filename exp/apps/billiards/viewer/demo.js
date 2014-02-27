@@ -1,9 +1,9 @@
 function assert(expression, msg) {  
    if (!expression) {  
       if (msg === undefined) {
-         window.alert("Assertion failed.");
+         console.log("Assertion failed.");
       } else {
-         window.alert("Assertion failed: " + msg);
+         console.log("Assertion failed: " + msg);
       }
    }
 };
@@ -73,7 +73,6 @@ Ball.prototype = {
   advanceUpto: function (endTime) {
     assert (endTime >= this.time, "can't advance back in time");
     this.advanceBy (endTime - this.time);
-
   },
 
   applyUpdate: function (up) {
@@ -83,7 +82,6 @@ Ball.prototype = {
     this.pos.copy (up.pos);
     this.vel.copy (up.vel);
     this.time = up.time;
-
 
     this.updateShapePos ();
     this.updateShapeVel ();
@@ -155,14 +153,12 @@ UpdateStep.prototype = {
 };
 
 
-
 ArrayIterator = function (array) {
   this.index = 0;
   this.array = array;
 };
 
 ArrayIterator.prototype = {
-
   constructor: ArrayIterator,
 
   hasMore: function () {
@@ -176,7 +172,6 @@ ArrayIterator.prototype = {
   increment: function () {
     ++this.index;
   }
-
 };
 
 readCSVfile = function (fname) {
@@ -207,11 +202,10 @@ readConfig = function (configFile) {
 };
 
 readInitState = function (config, balls, ballsFile) {
-
   var tokens = readCSVfile (ballsFile);
 
-  console.log (tokens.length);
-  console.log (config.numBalls);
+  //console.log (tokens.length);
+  //console.log (config.numBalls);
   assert (tokens.length - 1 == config.numBalls, "initial state token count error");
   
 
@@ -223,28 +217,32 @@ readInitState = function (config, balls, ballsFile) {
     var b = new Ball (id, pos, vel, config.radius);
     balls.push (b);
   }
-
 };
 
 readSimLog = function (updateSteps, simLogFile) {
 
   var tokens = readCSVfile (simLogFile);
-  
-  for (var row = 1; row < tokens.length; ++row) { // ignore header row
+  var maxStepID = 0;
 
+  for (var row = 1; row < tokens.length; ++row) { // ignore header row
     var stepID = parseInt (tokens[row][0]);
     var time = parseFloat (tokens[row][1]);
     var ballID = parseInt (tokens[row][2]);
     var pos = new THREE.Vector2 (parseFloat (tokens[row][3]), parseFloat (tokens[row][4])); 
     var vel = new THREE.Vector2 (parseFloat (tokens[row][5]), parseFloat (tokens[row][6]));
-
     var up = new BallUpdate (ballID, pos, vel, time);
+    maxStepID = Math.max(maxStepID, stepID);
 
     if (updateSteps[stepID] == undefined) {
       updateSteps[stepID] = new UpdateStep (stepID);
     }
     updateSteps[stepID].updates.push (up);
-    
+  }
+
+  for (var i = 0; i < maxStepID; ++i) {
+    if (updateSteps[i] === undefined) {
+      updateSteps[i] = new UpdateStep(i);
+    }
   }
 };
 
@@ -256,7 +254,7 @@ var updateStepsIterator;
 var endTime = 0;
 var deltaT = 0.01;
 var timer = 0;
-
+var reinitScene;
 
 populateScene = function (scene, configFile, ballsFile, simLogFile) {
   config = undefined;
@@ -282,7 +280,6 @@ populateScene = function (scene, configFile, ballsFile, simLogFile) {
 
   scene.add (border);
 
-  
   readInitState (config, balls, ballsFile);
   readSimLog (updateSteps, simLogFile);
   assert (updateSteps.length > 0, "no updates read?");
@@ -291,9 +288,7 @@ populateScene = function (scene, configFile, ballsFile, simLogFile) {
     balls[b].addToScene (scene);
   }
 
-
   // console.log (balls);
-
   updateStepsIterator = new ArrayIterator (updateSteps);
 };
 
@@ -316,7 +311,6 @@ function initRenderer (docElement) {
   renderer.setSize( window.innerWidth, window.innerHeight);
 
   docElement.appendChild (renderer.domElement);
-
 }
 
 function initScene (configFile, ballsFile, simLogFile) {
@@ -332,8 +326,8 @@ function initScene (configFile, ballsFile, simLogFile) {
 
   // camera = new THREE.OrthographicCamera (-window.innerWidth/10, window.innerWidth/10, -window.innerHeight/10, window.innerHeight/10);
 
-  camera = new THREE.OrthographicCamera (0, window.innerWidth/8, 0, window.innerHeight/8);
-
+  //camera = new THREE.OrthographicCamera (0, window.innerWidth/8, 0, window.innerHeight/8);
+  camera = new THREE.OrthographicCamera (0, window.innerWidth/3, 0, window.innerHeight/3);
   camera.position.set(0, 0, 100);
   camera.lookAt(new THREE.Vector3(0, 0, 0));
 
@@ -380,30 +374,24 @@ function animate() {
       if (endTime > up.time) { 
         // up should be applied now
         balls[up.id].applyUpdate (up);
-
       } else { 
         // this step still has updates that need to be applied
         allDone = false; 
-
       }
-
     }
 
     if (allDone) { 
       updateStepsIterator.increment ();
-
     } else { 
       break;
-
     }
-
   }
 
+  //reinitScene();
 
   for (var b in balls) {
     balls[b].advanceUpto (endTime);
   }
-
 
   renderer.render (scene, camera);
 }
@@ -417,7 +405,6 @@ function animateEvents () {
 
   if (updateStepsIterator.hasMore ()) {
     var upStep = updateStepsIterator.get ();
-
     var allDone = true;
 
     for (var i in upStep.updates) {
@@ -434,7 +421,6 @@ function animateEvents () {
         }
 
         b.advanceBy (up.delta);
-
       } else {
         b.applyUpdate (up);
         b.restoreColor ();
@@ -444,7 +430,8 @@ function animateEvents () {
     if (allDone) {
       updateStepsIterator.increment ();
     }
-    
+  } else {
+    reinitScene();
   }
 
   renderer.render (scene, camera);
@@ -463,28 +450,19 @@ function animateEvents () {
 // initRenderer ();
 
 function billiardsDemo (demoType) {
-
-  console.log (demoType);
-
   switch (demoType) {
     case "SYNCHRONOUS":
-      console.log ("in SYNCHRONOUS");
-      initScene ("config.csv", "balls.csv", "simLogSer.csv");
-      animate ();
+      reinitScene = function() { initScene ("config.csv", "balls.csv", "simLogSer.csv"); animate(); }
+      reinitScene();
       break;
-
     case "ASYNC_SERIAL":
-      console.log ("in ASYNC_SERIAL");
-      initScene ("config.csv", "balls.csv", "simLogSer.csv");
-      animateEvents ();
+      reinitScene = function () { initScene ("config.csv", "balls.csv", "simLogSer.csv"); animateEvents(); }
+      reinitScene();
       break;
-
     case "ASYNC_PARALLEL":
-      console.log ("in ASYNC_PARALLEL");
-      initScene ("config.csv", "balls.csv", "simLogPar.csv");
-      animateEvents ();
+      reinitScene = function() { initScene ("config.csv", "balls.csv", "simLogPar.csv"); animateEvents(); }
+      reinitScene();
       break;
-
     default:
       alert ("unknown demoType: " + demoType);
       break;
