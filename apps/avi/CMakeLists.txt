@@ -15,9 +15,8 @@ file(GLOB Sources
   dummy.f90
 )
 
-if(CMAKE_SYSTEM_NAME MATCHES "Darwin")
-  # OSX borks uncontrolably 
-else()
+find_package(Fortran)
+if(Fortran_FOUND)
   enable_language(Fortran OPTIONAL)
 endif()
 
