@@ -1,7 +1,12 @@
 set(sources Barrier.cpp Context.cpp FileGraph.cpp FileGraphParallel.cpp
   OCFileGraph.cpp PerThreadStorage.cpp PreAlloc.cpp Sampling.cpp Support.cpp
-  Termination.cpp Threads.cpp ThreadPool_cpp11.cpp 
-  Timer.cpp)
+  Termination.cpp Threads.cpp Timer.cpp)
+if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
+  set(sources ${sources} ThreadPool_pthread.cpp)
+else()
+  set(sources ${sources} ThreadPool_cpp11.cpp)
+endif()
+
 set(include_dirs "${PROJECT_SOURCE_DIR}/include/")
 if(USE_EXP)
   file(GLOB exp_sources ../exp/src/*.cpp)

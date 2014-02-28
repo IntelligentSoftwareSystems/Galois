@@ -452,9 +452,9 @@ class NewWorkManager {
     MergeOuterIt bbegin(boost::make_counting_iterator(begin), fn);
     MergeOuterIt mmid(boost::make_counting_iterator(mid), fn);
     MergeOuterIt eend(boost::make_counting_iterator(end), fn);
-    auto aa = make_two_level_iterator(bbegin, mmid);
-    auto bb = make_two_level_iterator(mmid, eend);
-    auto cc = make_two_level_iterator(bbegin, eend);
+    auto aa = make_two_level_iterator<std::forward_iterator_tag, MergeOuterIt, NewItemsTy::iterator, GetBegin, GetEnd>(bbegin, mmid);
+    auto bb = make_two_level_iterator<std::forward_iterator_tag, MergeOuterIt, NewItemsTy::iterator, GetBegin, GetEnd>(mmid, eend);
+    auto cc = make_two_level_iterator<std::forward_iterator_tag, MergeOuterIt, NewItemsTy::iterator, GetBegin, GetEnd>(bbegin, eend);
 
     while (aa.first != aa.second && bb.first != bb.second) {
       if (*aa.first < *bb.first)
@@ -598,7 +598,7 @@ class NewWorkManager {
       GetNewItem fn(this);
       MergeOuterIt bbegin(boost::make_counting_iterator(0), fn);
       MergeOuterIt eend(boost::make_counting_iterator((int) numActive), fn);
-      auto ii = make_two_level_iterator(bbegin, eend);
+      auto ii = make_two_level_iterator<std::forward_iterator_tag, MergeOuterIt, NewItemsTy::iterator, GetBegin, GetEnd>(bbegin, eend);
 
       size_t window = wm.initialWindow(local.size, MinDelta);
       copyMineAfterRedistribute(boost::make_transform_iterator(ii.first, typename NewItem::GetValue()),

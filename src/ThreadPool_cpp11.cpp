@@ -166,10 +166,8 @@ public:
 
 } // end namespace
 
-#if 1
 //! Implement the global threadpool
 ThreadPool& Galois::Runtime::getSystemThreadPool() {
   static ThreadPool_cpp11 pool;
   return pool;
 }
-#endif

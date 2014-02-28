@@ -218,11 +218,8 @@ public:
 
 } // end namespace
 
-#if 0
 //! Implement the global threadpool
 ThreadPool& Galois::Runtime::getSystemThreadPool() {
   static ThreadPool_pthread pool;
   return pool;
 }
-#endif
-

@@ -922,7 +922,7 @@ struct BipartiteSortByDegree: public Conversion {
       return ingraph.edge_begin(x) != ingraph.edge_end(x);
     };
     ptrdiff_t numSetA = std::count_if(ingraph.begin(), ingraph.end(), hasOutEdge);
-    auto getDistance = [&](GNode x) {
+    auto getDistance = [&](GNode x) -> ptrdiff_t {
       if (ingraph.edge_begin(x) == ingraph.edge_end(x))
         return numSetA + std::distance(transposegraph.edge_begin(x), transposegraph.edge_end(x));
       else
