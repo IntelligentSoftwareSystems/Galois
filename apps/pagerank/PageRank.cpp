@@ -54,6 +54,7 @@ enum Algo {
   ligra,
   ligraChi,
   pull,
+  pull2,
   serial
 };
 
@@ -67,6 +68,7 @@ cll::opt<unsigned int> memoryLimit("memoryLimit",
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
     cll::values(
       clEnumValN(Algo::pull, "pull", "Use precomputed data perform pull-based algorithm"),
+      clEnumValN(Algo::pull2, "pull2", "Use pull-based algorithm"),
       clEnumValN(Algo::serial, "serial", "Compute PageRank in serial"),
 #ifdef GALOIS_USE_EXP
       clEnumValN(Algo::graphlab, "graphlab", "Use GraphLab programming model"),
@@ -267,6 +269,119 @@ struct PullAlgo {
   }
 };
 
+struct PullAlgo2 {
+  struct LNode {
+    float value[2];
+    unsigned int nout;
+    float getPageRank() { return value[1]; }
+    float getPageRank(unsigned int it) { return value[it & 1]; }
+    void setPageRank(unsigned it, float v) { value[(it+1) & 1] = v; }
+  };
+
+  typedef typename Galois::Graph::LC_InlineEdge_Graph<LNode,void>
+    ::template with_numa_alloc<true>::type
+    ::template with_no_lockable<true>::type
+    InnerGraph;
+  typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  typedef typename Graph::GraphNode GNode;
+
+  std::string name() const { return "Pull2"; }
+
+  Galois::GReduceMax<double> max_delta;
+  Galois::GAccumulator<unsigned int> small_delta;
+
+  void readGraph(Graph& graph) {
+    Galois::Graph::readGraph(graph, filename);
+  }
+
+  struct Initialize {
+    Graph& g;
+    Initialize(Graph& g): g(g) { }
+    void operator()(Graph::GraphNode n) {
+      LNode& data = g.getData(n, Galois::MethodFlag::NONE);
+      data.value[0] = 1.0;
+      data.value[1] = 1.0;
+      int outs = std::distance(g.edge_begin(n, Galois::MethodFlag::NONE), g.edge_end(n, Galois::MethodFlag::NONE));
+      data.nout = outs;
+    }
+  };
+
+  struct Copy {
+    Graph& g;
+    Copy(Graph& g): g(g) { }
+    void operator()(Graph::GraphNode n) {
+      LNode& data = g.getData(n, Galois::MethodFlag::NONE);
+      data.value[1] = data.value[0];
+    }
+  };
+
+  struct Process {
+    PullAlgo2* self;
+    Graph& graph;
+    unsigned int iteration;
+
+    Process(PullAlgo2* s, Graph& g, unsigned int i): self(s), graph(g), iteration(i) { }
+
+    void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) {
+      (*this)(src);
+    }
+
+    void operator()(const GNode& src) {
+
+      LNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
+
+      double sum = 0;
+      for (auto jj = graph.in_edge_begin(src, Galois::MethodFlag::NONE), ej = graph.in_edge_end(src, Galois::MethodFlag::NONE);
+          jj != ej; ++jj) {
+        GNode dst = graph.getInEdgeDst(jj);
+        LNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+        sum += ddata.getPageRank(iteration) / ddata.nout;
+      }
+
+      float value = (1.0 - alpha) * sum + alpha;
+      float diff = std::fabs(value - sdata.getPageRank(iteration));
+      sdata.setPageRank(iteration, value);
+      if (diff <= tolerance)
+        self->small_delta += 1;
+      self->max_delta.update(diff);
+    }
+  };
+
+  void operator()(Graph& graph) {
+    unsigned int iteration = 0;
+
+    while (true) {
+      Galois::for_each_local(graph, Process(this, graph, iteration));
+      iteration += 1;
+
+      float delta = max_delta.reduce();
+      size_t sdelta = small_delta.reduce();
+
+      std::cout << "iteration: " << iteration
+        << " max delta: " << delta
+        << " small delta: " << sdelta
+        << " (" << sdelta / (float) graph.size() << ")"
+        << "\n";
+
+      if (delta <= tolerance || iteration >= maxIterations) {
+        break;
+      }
+      max_delta.reset();
+      small_delta.reset();
+    }
+
+    if (iteration >= maxIterations) {
+      std::cout << "Failed to converge\n";
+    }
+
+    if (iteration & 1) {
+      // Result already in right place
+    } else {
+      Galois::do_all_local(graph, Copy(graph));
+    }
+  }
+};
+
 //! Transpose in-edges to out-edges
 static void precomputePullData() {
   typedef Galois::Graph::LC_CSR_Graph<size_t, void>
@@ -422,6 +537,7 @@ int main(int argc, char **argv) {
   T.start();
   switch (algo) {
     case Algo::pull: run<PullAlgo>(); break;
+    case Algo::pull2: run<PullAlgo2>(); break;
 #ifdef GALOIS_USE_EXP
     case Algo::ligra: run<LigraAlgo<false> >(); break;
     case Algo::ligraChi: run<LigraAlgo<true> >(); break;
