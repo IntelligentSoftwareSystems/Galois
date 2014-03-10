@@ -39,8 +39,16 @@ public:
   virtual ~ThreadPool() { }
 
   //!execute work on all threads
-  //!preWork and postWork are executed only on the master thread
   virtual void run(RunCommand* begin, RunCommand* end, unsigned num) = 0;
+
+  //! execute work on all threads
+  //! a simple wrapper for run
+  template<typename... Args>
+  void run(unsigned num, Args... args) {
+    const auto numArgs = sizeof...(args);
+    std::array<RunCommand, numArgs> cmds({args...});
+    run(&cmds[0], &cmds[numArgs], num);
+  }
 
   //!return the number of threads supported by the thread pool on the current machine
   unsigned getMaxThreads() const { return maxThreads; }
