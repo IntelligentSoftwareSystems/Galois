@@ -169,9 +169,7 @@ FunctionTy do_all_dispatch(RangeTy range, FunctionTy f, ReducerTy r, bool doRedu
     inGaloisForEach = true;
 
     DoAllWork<FunctionTy, ReducerTy, RangeTy> W(f, r, doReduce, range, steal);
-    RunCommand w[2] = {std::ref(W),
-		       std::ref(getSystemBarrier())};
-    getSystemThreadPool().run(&w[0], &w[2],activeThreads);
+    getSystemThreadPool().run(activeThreads, std::ref(W));
     if (ForEachTraits<FunctionTy>::NeedsStats)  
       LoopTimer.stop();
     inGaloisForEach = false;

@@ -432,12 +432,6 @@ void for_each_impl(const RangeTy& range, FunctionTy f, const char* loopname) {
   if (inGaloisForEach)
     GALOIS_DIE("Nested for_each not supported");
 
-  StatTimer LoopTimer("LoopTime", loopname);
-  if (ForEachTraits<FunctionTy>::NeedsStats)
-    LoopTimer.start();
-
-  inGaloisForEach = true;
-
   typedef typename RangeTy::value_type T;
   typedef ForEachWork<WLTy, T, FunctionTy> WorkTy;
 
@@ -446,17 +440,21 @@ void for_each_impl(const RangeTy& range, FunctionTy f, const char* loopname) {
   Barrier& barrier = getSystemBarrier();
 
   WorkTy W(f, loopname);
-  RunCommand w[5] = {
-    std::bind(&WorkTy::initThread, std::ref(W)),
-    std::bind(&WorkTy::template AddInitialWork<RangeTy>, std::ref(W), range), 
-    std::ref(barrier),
-    std::ref(W),
-    std::ref(barrier)
-  };
-  getSystemThreadPool().run(&w[0], &w[4], activeThreads);
+
+  StatTimer LoopTimer("LoopTime", loopname);
+  if (ForEachTraits<FunctionTy>::NeedsStats)
+    LoopTimer.start();
+
+  inGaloisForEach = true;
+  getSystemThreadPool().run(activeThreads,
+                            std::bind(&WorkTy::initThread, std::ref(W)),
+                            std::bind(&WorkTy::template AddInitialWork<RangeTy>, std::ref(W), range), 
+                            std::ref(barrier),
+                            std::ref(W));
+  inGaloisForEach = false;
+
   if (ForEachTraits<FunctionTy>::NeedsStats)  
     LoopTimer.stop();
-  inGaloisForEach = false;
 }
 
 template<typename FunctionTy>
@@ -475,13 +473,12 @@ void on_each_impl(FunctionTy fn, const char* loopname = 0) {
     GALOIS_DIE("Nested for_each not supported");
 
   inGaloisForEach = true;
-  RunCommand w[2] = {WOnEach<FunctionTy>(fn),
-		     std::ref(getSystemBarrier())};
-  getSystemThreadPool().run(&w[0], &w[1], activeThreads);
+  getSystemThreadPool().run(activeThreads, WOnEach<FunctionTy>(fn));
   inGaloisForEach = false;
 }
 
 //! on each executor with simple barrier.
+//FIXME: Why do we have this?
 template<typename FunctionTy>
 void on_each_simple_impl(FunctionTy fn, const char* loopname = 0) {
   if (inGaloisForEach)
@@ -490,9 +487,7 @@ void on_each_simple_impl(FunctionTy fn, const char* loopname = 0) {
   inGaloisForEach = true;
   std::unique_ptr<Barrier> b { createSimpleBarrier() };
   b->reinit(activeThreads);
-  RunCommand w[2] = {WOnEach<FunctionTy>(fn),
-		     std::ref(*b)};
-  getSystemThreadPool().run(&w[0], &w[1], activeThreads);
+  getSystemThreadPool().run(activeThreads, WOnEach<FunctionTy>(fn), std::ref(*b));
   inGaloisForEach = false;
 }
 
