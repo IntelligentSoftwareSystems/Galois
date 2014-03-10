@@ -27,7 +27,7 @@ module load neon
 module load subversion
 
 if [ "$1" != "min" ]; then
-  module load clang/3.3-noconflict
+  module load clang/3.4-noconflict
   module load gdb
   module load mkl
   module load mpich2
