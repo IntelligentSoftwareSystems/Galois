@@ -25,7 +25,7 @@
  */
 #include "Galois/Galois.h"
 #include "Galois/Bag.h"
-#include "Galois/SparseBitVector.h"
+#include "SparseBitVector.h"
 #include "Galois/Statistic.h"
 #include "Galois/Graph/Graph.h"
 #include "Galois/Graph/FileGraph.h"
