@@ -72,10 +72,8 @@ protected:
     m_size = n;
     if (interleave)
       m_data = reinterpret_cast<T*>(Galois::Runtime::MM::largeInterleavedAlloc(sizeof(T) * n));
-    else if (prefault)
-      m_data = reinterpret_cast<T*>(Galois::Runtime::MM::largeAlloc(sizeof(T) * n, true));
-    else
-      m_data = reinterpret_cast<T*>(Galois::Runtime::MM::largeAlloc(sizeof(T) * n, false));
+    else 
+      m_data = reinterpret_cast<T*>(Galois::Runtime::MM::largeAlloc(sizeof(T) * n, prefault));
   }
 
 public:
@@ -102,7 +100,7 @@ public:
   iterator end() { return m_data + m_size; }
   const_iterator end() const { return m_data + m_size; }
   
-  //! Allocates interleaved across NUMA (memory) nodes. Must 
+  //! Allocates interleaved across NUMA (memory) nodes.
   void allocateInterleaved(size_type n) { allocate(n, true, true); }
 
   /**

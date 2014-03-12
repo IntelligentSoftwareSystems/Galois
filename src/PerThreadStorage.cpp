@@ -42,13 +42,13 @@ Galois::Runtime::PerBackend& Galois::Runtime::getPPSBackend() {
 
 #define MORE_MEM_HACK
 #ifdef MORE_MEM_HACK
-const size_t allocSize = Galois::Runtime::MM::pageSize * 10;
+const size_t allocSize = Galois::Runtime::MM::hugePageSize * 10;
 inline void* alloc() {
   return malloc(allocSize);
 }
 
 #else
-const size_t allocSize = Galois::Runtime::MM::pageSize;
+const size_t allocSize = Galois::Runtime::MM::hugePageSize;
 inline void* alloc() {
   return Galois::Runtime::MM::pageAlloc();
 }
@@ -61,7 +61,7 @@ unsigned Galois::Runtime::PerBackend::nextLog2(unsigned size) {
     ++i;
   }
   if (i >= MAX_SIZE) { 
-    GALOIS_DIE ("PTS size too big");
+    GALOIS_DIE("PTS size too big");
   }
   return i;
 }

@@ -211,7 +211,9 @@ FileGraph::divideBy(size_t nodeSize, size_t edgeSize, unsigned id, unsigned tota
     eb = numNodes;
   else
     eb = findIndex(nodeSize, edgeSize, block * (id + 1), bb, numNodes);
-  //Runtime::LL::gInfo("(", id, "/", total, ") ", bb, " ", eb, " ", numNodes);
+  if (false) {
+    Runtime::LL::gInfo("(", id, "/", total, ") ", bb, " ", eb, " ", eb - bb);
+  }
   return std::make_pair(iterator(bb), iterator(eb));
 }
 

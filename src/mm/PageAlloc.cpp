@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2014, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -27,10 +27,17 @@
 #include "Galois/Runtime/ll/gio.h"
 #include "Galois/Runtime/ll/StaticInstance.h"
 
-#include <sys/mman.h>
+#include <unistd.h>
 #include <map>
 #include <vector>
 #include <numeric>
+#include <fstream>
+#include <sstream>
+
+#ifdef __linux__
+#include <linux/mman.h>
+#endif
+#include <sys/mman.h>
 
 // mmap flags
 #if defined(MAP_ANONYMOUS)
@@ -49,6 +56,8 @@ static const int _MAP_POP  = MAP_POPULATE | _MAP_BASE;
 static const int _MAP_HUGE_POP = MAP_HUGETLB | _MAP_POP;
 static const int _MAP_HUGE = MAP_HUGETLB;
 #endif
+
+size_t Galois::Runtime::MM::pageSize;
 
 namespace {
 struct FreeNode {
@@ -84,18 +93,18 @@ void* allocFromOS() {
   void* ptr = 0;
 #ifdef MAP_HUGETLB
   //First try huge
-  ptr = mmap(0, Galois::Runtime::MM::pageSize, _PROT, _MAP_HUGE_POP, -1, 0);
+  ptr = mmap(0, Galois::Runtime::MM::hugePageSize, _PROT, _MAP_HUGE_POP, -1, 0);
 #endif
 
-  //FIXME: improve failure case to ensure pageSize alignment
+  //FIXME: improve failure case to ensure hugePageSize alignment
 #ifdef MAP_POPULATE
   //Then try populate
   if (!ptr || ptr == MAP_FAILED)
-    ptr = mmap(0, Galois::Runtime::MM::pageSize, _PROT, _MAP_POP, -1, 0);
+    ptr = mmap(0, Galois::Runtime::MM::hugePageSize, _PROT, _MAP_POP, -1, 0);
 #endif
   //Then try normal
   if (!ptr || ptr == MAP_FAILED) {
-    ptr = mmap(0, Galois::Runtime::MM::pageSize, _PROT, _MAP_BASE, -1, 0);
+    ptr = mmap(0, Galois::Runtime::MM::hugePageSize, _PROT, _MAP_BASE, -1, 0);
   }
   
   allocLock.unlock();
@@ -116,11 +125,51 @@ void* allocFromOS() {
   return ptr;
 }
 
+class PageSizeConf {
+#ifdef MAP_HUGETLB
+  void checkHuge() {
+    std::ifstream f("/proc/meminfo");
+
+    if (!f) 
+      return;
+
+    char line[2048];
+    size_t hugePageSizeKb = 0;
+    while (f.getline(line, sizeof(line)/sizeof(*line))) {
+      if (strstr(line, "Hugepagesize:") != line)
+        continue;
+      std::stringstream ss(line + strlen("Hugepagesize:"));
+      std::string kb;
+      ss >> hugePageSizeKb >> kb;
+      if (kb != "kB")
+        Galois::Runtime::LL::gWarn("error parsing meminfo");
+      break;
+    }
+    if (hugePageSizeKb * 1024 != Galois::Runtime::MM::hugePageSize)
+      Galois::Runtime::LL::gWarn("System HugePageSize does not match compiled HugePageSize");
+  }
+#else
+  void checkHuge() { }
+#endif
+
+public:
+  PageSizeConf() {
+#ifdef _POSIX_PAGESIZE
+    Galois::Runtime::MM::pageSize = _POSIX_PAGESIZE;
+#else
+    Galois::Runtime::MM::pageSize = sysconf(_SC_PAGESIZE);
+#endif
+    checkHuge();
+  }
+};
+
 } // end anon namespace
+
+static PageSizeConf pageSizeConf;
 
 void Galois::Runtime::MM::pageIn(void* buf, size_t len) {
   volatile char* ptr = reinterpret_cast<volatile char*>(buf);
-  for (size_t i = 0; i < len; i += smallPageSize)
+  for (size_t i = 0; i < len; i += pageSize)
     ptr[i];
 }
 
@@ -164,7 +213,7 @@ int Galois::Runtime::MM::numPageAllocForThread(unsigned tid) {
 }
 
 void* Galois::Runtime::MM::largeAlloc(size_t len, bool preFault) {
-  size_t size = (len + pageSize - 1) & (~(size_t)(pageSize - 1));
+  size_t size = (len + hugePageSize - 1) & ~static_cast<size_t>(hugePageSize - 1);
   void * ptr = 0;
 
   allocLock.lock();
@@ -194,7 +243,7 @@ void* Galois::Runtime::MM::largeAlloc(size_t len, bool preFault) {
 }
 
 void Galois::Runtime::MM::largeFree(void* m, size_t len) {
-  size_t size = (len + pageSize - 1) & (~(size_t)(pageSize - 1));
+  size_t size = (len + hugePageSize - 1) & ~static_cast<size_t>(hugePageSize - 1);
   allocLock.lock();
   munmap(m, size);
   allocLock.unlock();

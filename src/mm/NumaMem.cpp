@@ -26,6 +26,8 @@
 #include "Galois/Runtime/mm/Mem.h"
 #include "Galois/Runtime/ll/gio.h"
 
+#include <fstream>
+
 #if defined(GALOIS_USE_NUMA) && !defined(GALOIS_FORCE_NO_NUMA)
 #define USE_NUMA
 #endif
@@ -40,19 +42,17 @@ static int is_numa_available;
 
 // TODO Remove dependency on USE_NUMA for non-interleaved functionality because
 // libnuma dev is not widely available
-
-static const char* sNumaStat = "/proc/self/numa_maps";
-
 void Galois::Runtime::MM::printInterleavedStats(int minPages) {
-  FILE* f = fopen(sNumaStat, "r");
+  std::ifstream f("/proc/self/numa_maps");
+
   if (!f) {
     LL::gInfo("No NUMA support");
-    return; //GALOIS_SYS_DIE("failed opening ", sNumaStat);
+    return;
   }
 
   char line[2048];
   LL::gInfo("INTERLEAVED STATS BEGIN");
-  while (fgets(line, sizeof(line)/sizeof(*line), f)) {
+  while (f.getline(line, sizeof(line)/sizeof(*line))) { 
     // Chomp \n
     size_t len = strlen(line);
     if (len && line[len-1] == '\n')
@@ -74,14 +74,11 @@ void Galois::Runtime::MM::printInterleavedStats(int minPages) {
     }
   }
   LL::gInfo("INTERLEAVED STATS END");
-
-  fclose(f);
 }
 
 static int num_numa_pages_for(unsigned nodeid) {
-  FILE* f = fopen(sNumaStat, "r");
+  std::ifstream f("/proc/self/numa_maps");
   if (!f) {
-    //Galois::Runtime::LL::gInfo("No NUMA support");
     return 0;
   }
 
@@ -95,7 +92,7 @@ static int num_numa_pages_for(unsigned nodeid) {
 
   char line[2048];
   int totalPages = 0;
-  while (fgets(line, sizeof(line)/sizeof(*line), f)) {
+  while (f.getline(line, sizeof(line)/sizeof(*line))) {
     char* start;
     if ((start = strstr(line, search)) != 0) {
       int pages;
@@ -105,12 +102,10 @@ static int num_numa_pages_for(unsigned nodeid) {
     }
   }
 
-  fclose(f);
-
   return totalPages;
 }
 
-static int check_numa() {
+static int checkNuma() {
 #ifdef USE_NUMA
   if (is_numa_available == 0) {
     is_numa_available = numa_available() == -1 ? -1 : 1;
@@ -128,7 +123,7 @@ int Galois::Runtime::MM::numNumaAllocForNode(unsigned nodeid) {
 }
 
 int Galois::Runtime::MM::numNumaNodes() {
-  if (!check_numa())
+  if (!checkNuma())
     return 1;
 #ifdef USE_NUMA
   return numa_num_configured_nodes();
@@ -138,7 +133,7 @@ int Galois::Runtime::MM::numNumaNodes() {
 }
 
 #ifdef USE_NUMA
-static void *alloc_interleaved_subset(size_t len) {
+static void *allocInterleavedSubset(size_t len) {
   void* data = 0;
 # if defined(GALOIS_USE_NUMA_OLD) && !defined(GALOIS_FORCE_NO_NUMA)
   nodemask_t nm = numa_no_nodes;
@@ -167,17 +162,58 @@ static void *alloc_interleaved_subset(size_t len) {
 }
 #endif
 
+#ifdef USE_NUMA
+static void countPages(void* data, size_t len) {
+  union { void* as_vptr; char* as_cptr; uintptr_t as_uint; } d = { data };
+  unsigned pageMask = Galois::Runtime::MM::pageSize - 1;
+  size_t numPages = (len + Galois::Runtime::MM::pageSize - 1) / Galois::Runtime::MM::pageSize;
+
+  if (d.as_uint & pageMask)
+    GALOIS_DIE("not page aligned");
+
+  std::vector<void*> pages;
+  std::vector<int> status;
+  pages.resize(numPages);
+  status.resize(numPages);
+  for (size_t i = 0; i < numPages; ++i)
+    pages[i] = d.as_cptr + i * Galois::Runtime::MM::pageSize;
+
+  int s;
+  if ((s = numa_move_pages(0, numPages, pages.data(), NULL, status.data(), 0)) != 0)
+    GALOIS_DIE("move_pages: ", strerror(s));
+
+  std::array<size_t, 128> hist {};
+  int i = 0;
+  for (int s : status) {
+    if (s < 0) {
+      Galois::Runtime::LL::gInfo("unknown status[", i, "]: ", strerror(-s));
+      //GALOIS_DIE("unknown status[", i, "]: ", strerror(-s));
+    } else if (s >= 128) {
+      GALOIS_DIE("numa node out of range[", i , "]: " , s);
+    } else {
+      hist[s] += 1;
+    }
+    i += 1;
+  }
+  for (unsigned i = 0; i < hist.size(); ++i) {
+    if (hist[i])
+      Galois::Runtime::LL::gInfo(i, ": ", hist[i]);
+  }
+}
+#endif
+
 void* Galois::Runtime::MM::largeInterleavedAlloc(size_t len, bool full) {
   void* data = 0;
 #ifdef USE_NUMA
-  if (check_numa()) {
+  if (checkNuma()) {
     if (full) 
       data = numa_alloc_interleaved(len);
     else 
-      data = alloc_interleaved_subset(len);
+      data = allocInterleavedSubset(len);
     // NB(ddn): Some strange bugs when empty interleaved mappings are
     // coalesced. Eagerly fault in interleaved pages to circumvent.
     pageIn(data, len);
+    //countPages(data, len);
   } else {
     data = largeAlloc(len);
   }
@@ -190,7 +226,7 @@ void* Galois::Runtime::MM::largeInterleavedAlloc(size_t len, bool full) {
 }
 
 void Galois::Runtime::MM::largeInterleavedFree(void* m, size_t len) {
-  if (!check_numa())
+  if (!checkNuma())
     largeFree(m, len);
 #ifdef USE_NUMA
   numa_free(m, len);

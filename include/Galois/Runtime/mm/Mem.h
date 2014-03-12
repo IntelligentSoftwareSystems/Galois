@@ -34,7 +34,6 @@
 #include "Galois/Runtime/ll/SimpleLock.h"
 #include "Galois/Runtime/ll/PtrLock.h"
 #include "Galois/Runtime/ll/CacheLineStorage.h"
-//#include "Galois/Runtime/ll/ThreadRWlock.h"
 
 #include <boost/utility.hpp>
 #include <cstdlib>
@@ -49,20 +48,11 @@ namespace Runtime {
 //! Memory management functionality.
 namespace MM {
 
-const size_t smallPageSize = 4*1024;
-
-#ifdef GALOIS_ARCH_MIC
-const size_t pageSize = 2*1024*1024;
-
-// const size_t pageSize = 16*4*1024;
-#else 
-const size_t pageSize = 2*1024*1024;
-
-// const size_t pageSize = 16*4*1024;
-#endif
+extern size_t pageSize;
+const size_t hugePageSize = 2*1024*1024;
 
 void* pageAlloc();
-void  pageFree(void*);
+void pageFree(void*);
 //! Preallocate numpages large pages for each thread
 void pagePreAlloc(int numpages);
 //! Forces the given block to be paged into physical memory
@@ -87,14 +77,14 @@ int numNumaNodes();
  */
 void* largeInterleavedAlloc(size_t bytes, bool full = true);
 //! Frees memory allocated by {@link largeInterleavedAlloc()}
-void  largeInterleavedFree(void* mem, size_t bytes);
+void largeInterleavedFree(void* mem, size_t bytes);
 
 //! Allocates a large block of memory
 void* largeAlloc(size_t bytes, bool preFault = true);
 //! Frees memory allocated by {@link largeAlloc()}
-void  largeFree(void* mem, size_t bytes);
+void largeFree(void* mem, size_t bytes);
 
-//! Print lines from /proc/pid/numa_maps that contain at least n small pages
+//! Print lines from /proc/pid/numa_maps that contain at least n (non-huge) pages
 void printInterleavedStats(int minPages = 16*1024);
 
 //! Per-thread heaps using Galois thread aware construct
@@ -243,7 +233,6 @@ public:
     NH->next = head;
     head = NH;
   }
-
 };
 
 //! Maintain a freelist using a lock which doesn't cover SourceHeap
@@ -373,7 +362,6 @@ public:
   }
 
   inline void deallocate(void* ptr) {}
-
 };
 
 //! This implements a bump pointer though chunks of memory
@@ -505,7 +493,7 @@ public:
 //! It maintains a freelist of hunks acquired from the system
 class SystemBaseAlloc {
 public:
-  enum { AllocSize = pageSize };
+  enum { AllocSize = hugePageSize };
 
   SystemBaseAlloc();
   ~SystemBaseAlloc();

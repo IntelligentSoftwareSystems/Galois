@@ -232,16 +232,16 @@ void on_each(FunctionTy fn, Args... args) {
 }
 
 /**
- * Preallocates pages on each thread.
+ * Preallocates hugepages on each thread.
  *
- * @param num number of pages to allocate of size {@link Galois::Runtime::MM::pageSize}
+ * @param num number of pages to allocate of size {@link Galois::Runtime::MM::hugePageSize}
  */
 static inline void preAlloc(int num) {
   Runtime::preAlloc_impl(num);
 }
 
 /**
- * Reports number of pages allocated by the Galois system so far. The value is printing using
+ * Reports number of hugepages allocated by the Galois system so far. The value is printing using
  * the statistics infrastructure. 
  *
  * @param label Label to associated with report at this program point

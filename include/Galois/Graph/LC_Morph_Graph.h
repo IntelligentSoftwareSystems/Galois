@@ -227,7 +227,7 @@ public:
 #endif
 
       local_edges->begin = (EdgeInfo*)estart;
-      char* eend = newblock + Runtime::MM::pageSize;
+      char* eend = newblock + Runtime::MM::hugePageSize;
       eend -= (uintptr_t)eend % sizeof(EdgeInfo);
       local_edges->end = (EdgeInfo*)eend;
     }
