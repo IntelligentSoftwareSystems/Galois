@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2014, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -21,12 +21,16 @@
  * @section Description
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
+ * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 #include "Galois/config.h"
+#include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/mm/Mem.h"
 #include "Galois/Runtime/ll/gio.h"
 
 #include <fstream>
+#include <limits>
+#include <vector>
 
 #if defined(GALOIS_USE_NUMA) && !defined(GALOIS_FORCE_NO_NUMA)
 #define USE_NUMA
@@ -34,14 +38,13 @@
 
 #ifdef USE_NUMA
 #include <numa.h>
+#include <numaif.h>
 #endif
 
 #ifdef USE_NUMA
-static int is_numa_available;
+static int isNumaAvailable;
 #endif
 
-// TODO Remove dependency on USE_NUMA for non-interleaved functionality because
-// libnuma dev is not widely available
 void Galois::Runtime::MM::printInterleavedStats(int minPages) {
   std::ifstream f("/proc/self/numa_maps");
 
@@ -76,7 +79,7 @@ void Galois::Runtime::MM::printInterleavedStats(int minPages) {
   LL::gInfo("INTERLEAVED STATS END");
 }
 
-static int num_numa_pages_for(unsigned nodeid) {
+static int numNumaPagesFor(unsigned nodeid) {
   std::ifstream f("/proc/self/numa_maps");
   if (!f) {
     return 0;
@@ -107,19 +110,19 @@ static int num_numa_pages_for(unsigned nodeid) {
 
 static int checkNuma() {
 #ifdef USE_NUMA
-  if (is_numa_available == 0) {
-    is_numa_available = numa_available() == -1 ? -1 : 1;
-    if (is_numa_available == -1)
-      Galois::Runtime::LL::gWarn("NUMA not available");
+  if (isNumaAvailable == 0) {
+    isNumaAvailable = numa_available() == -1 ? -1 : 1;
+    if (isNumaAvailable == -1)
+      Galois::Runtime::LL::gWarn("NUMA configured but not available");
   }
-  return is_numa_available == 1;
+  return isNumaAvailable == 1;
 #else
   return false;
 #endif
 }
 
 int Galois::Runtime::MM::numNumaAllocForNode(unsigned nodeid) {
-  return num_numa_pages_for(nodeid);
+  return numNumaPagesFor(nodeid);
 }
 
 int Galois::Runtime::MM::numNumaNodes() {
@@ -132,105 +135,176 @@ int Galois::Runtime::MM::numNumaNodes() {
 #endif
 }
 
+static inline int getNumaNode(unsigned tid) {
+  if (!checkNuma())
+    return 0;
+
+  unsigned proc = Galois::Runtime::LL::getProcessorForThread(tid);
+#ifdef GALOIS_USE_NUMA_OLD
+  // Assume block distribution from physical processors to numa nodes
+  int numNodes = numa_num_configured_nodes();
+  return proc / numNodes;
+#else 
+  return numa_node_of_cpu(proc);
+#endif
+}
+
 #ifdef USE_NUMA
-static void *allocInterleavedSubset(size_t len) {
+static void *allocInterleaved(size_t len, unsigned num) {
   void* data = 0;
 # if defined(GALOIS_USE_NUMA_OLD) && !defined(GALOIS_FORCE_NO_NUMA)
   nodemask_t nm = numa_no_nodes;
-  unsigned int num = Galois::Runtime::activeThreads;
-  int num_nodes = numa_num_configured_nodes();
-  for (unsigned y = 0; y < num; ++y) {
-    unsigned proc = Galois::Runtime::LL::getProcessorForThread(y);
-    // Assume block distribution from physical processors to numa nodes
-    nodemask_set(&nm, proc/num_nodes);
+  for (unsigned i = 0; i < num; ++i) {
+    nodemask_set(&nm, getNumaNode(i));
   }
   data = numa_alloc_interleaved_subset(len, &nm);
+  // NB(ddn): Some strange bugs when empty interleaved mappings are
+  // coalesced. Eagerly fault in interleaved pages to circumvent.
+  if (data)
+    Galois::Runtime::MM::pageIn(data, len, Galois::Runtime::MM::pageSize);
 # elif defined(GALOIS_USE_NUMA) && !defined(GALOIS_FORCE_NO_NUMA)
   bitmask* nm = numa_allocate_nodemask();
-  unsigned int num = Galois::Runtime::activeThreads;
-  for (unsigned y = 0; y < num; ++y) {
-    unsigned proc = Galois::Runtime::LL::getProcessorForThread(y);
-    int node = numa_node_of_cpu(proc);
-    numa_bitmask_setbit(nm, node);
+  for (unsigned i = 0; i < num; ++i) {
+    numa_bitmask_setbit(nm, getNumaNode(i));
   }
   data = numa_alloc_interleaved_subset(len, nm);
   numa_free_nodemask(nm);
+  // NB(ddn): Some strange bugs when empty interleaved mappings are
+  // coalesced. Eagerly fault in interleaved pages to circumvent.
+  if (data)
+    Galois::Runtime::MM::pageIn(data, len, Galois::Runtime::MM::pageSize);
 # else
-  data = Galois::Runtime::MM::largeAlloc(len);
+  data = Galois::Runtime::MM::largeAlloc(len, false);
 # endif
   return data;
 }
 #endif
 
 #ifdef USE_NUMA
-static void countPages(void* data, size_t len) {
+static bool checkIfInterleaved(void* data, size_t len, unsigned total) {
+  // Assume small allocations are interleaved properly
+  if (len < Galois::Runtime::MM::hugePageSize * Galois::Runtime::MM::numNumaNodes())
+    return true;
+
   union { void* as_vptr; char* as_cptr; uintptr_t as_uint; } d = { data };
-  unsigned pageMask = Galois::Runtime::MM::pageSize - 1;
-  size_t numPages = (len + Galois::Runtime::MM::pageSize - 1) / Galois::Runtime::MM::pageSize;
+  size_t pageSize = Galois::Runtime::MM::pageSize;
+  int numNodes = Galois::Runtime::MM::numNumaNodes();
 
-  if (d.as_uint & pageMask)
-    GALOIS_DIE("not page aligned");
-
-  std::vector<void*> pages;
-  std::vector<int> status;
-  pages.resize(numPages);
-  status.resize(numPages);
-  for (size_t i = 0; i < numPages; ++i)
-    pages[i] = d.as_cptr + i * Galois::Runtime::MM::pageSize;
-
-  int s;
-  if ((s = numa_move_pages(0, numPages, pages.data(), NULL, status.data(), 0)) != 0)
-    GALOIS_DIE("move_pages: ", strerror(s));
-
-  std::array<size_t, 128> hist {};
-  int i = 0;
-  for (int s : status) {
-    if (s < 0) {
-      Galois::Runtime::LL::gInfo("unknown status[", i, "]: ", strerror(-s));
-      //GALOIS_DIE("unknown status[", i, "]: ", strerror(-s));
-    } else if (s >= 128) {
-      GALOIS_DIE("numa node out of range[", i , "]: " , s);
+  std::vector<size_t> hist(numNodes);
+  for (size_t i = 0; i < len; i += pageSize) {
+    int node;
+    char *mem = d.as_cptr + i;
+    if (get_mempolicy(&node, NULL, 0, mem, MPOL_F_NODE|MPOL_F_ADDR) < 0) {
+      //Galois::Runtime::LL::gInfo("unknown status[", mem, "]: ", strerror(errno));
     } else {
-      hist[s] += 1;
+      hist[node] += 1;
     }
-    i += 1;
   }
-  for (unsigned i = 0; i < hist.size(); ++i) {
-    if (hist[i])
-      Galois::Runtime::LL::gInfo(i, ": ", hist[i]);
+
+  size_t least = std::numeric_limits<size_t>::max();
+  size_t greatest = std::numeric_limits<size_t>::min();
+  for (unsigned i = 0; i < total; ++i) {
+    int node = getNumaNode(i);
+    least = std::min(least, hist[node]);
+    greatest = std::max(greatest, hist[node]);
   }
+
+  return !total || least / (double) greatest > 0.5;
 }
 #endif
 
-void* Galois::Runtime::MM::largeInterleavedAlloc(size_t len, bool full) {
-  void* data = 0;
-#ifdef USE_NUMA
-  if (checkNuma()) {
-    if (full) 
-      data = numa_alloc_interleaved(len);
-    else 
-      data = allocInterleavedSubset(len);
-    // NB(ddn): Some strange bugs when empty interleaved mappings are
-    // coalesced. Eagerly fault in interleaved pages to circumvent.
-    pageIn(data, len);
-    //countPages(data, len);
-  } else {
-    data = largeAlloc(len);
+// Figure out which subset of threads will participate in pageInInterleaved
+static void createMapping(std::vector<int>& mapping, unsigned& uniqueNodes) {
+  std::vector<bool> hist(Galois::Runtime::MM::numNumaNodes());
+  uniqueNodes = 0;
+  for (int i = 0; i < mapping.size(); ++i) {
+    int node = getNumaNode(i);
+    if (hist[node])
+      continue;
+    hist[node] = true;
+    uniqueNodes += 1;
+    mapping[i] = node + 1;
   }
+}
+
+static void pageInInterleaved(void* data, size_t len, std::vector<int>& mapping, unsigned numNodes) {
+  // XXX Don't know whether memory is backed by hugepages or not, so stick with
+  // smaller page size
+  size_t blockSize = Galois::Runtime::MM::pageSize;
+  unsigned tid = Galois::Runtime::LL::getTID();
+  int id = mapping[tid] - 1;
+  if (id < 0)
+    return;
+  size_t start = id * blockSize;
+  size_t stride = numNodes * blockSize;
+  if (len <= start)
+    return;
+  union { void* as_vptr; char* as_cptr; } d = { data };
+
+  Galois::Runtime::MM::pageIn(d.as_cptr + start, len - start, stride);
+}
+
+static inline bool isNumaAlloc(void* data, size_t len) {
+  union { void* as_vptr; char* as_cptr; } d = { data };
+  return d.as_cptr[len-1] != 0;
+}
+
+static inline void setNumaAlloc(void* data, size_t len, bool isNuma) {
+  union { void* as_vptr; char* as_cptr; } d = { data };
+  d.as_cptr[len-1] = isNuma;
+}
+
+void* Galois::Runtime::MM::largeInterleavedAlloc(size_t len, bool full) {
+  void* data;
+  unsigned total = full ? Galois::Runtime::LL::getMaxCores() : activeThreads;
+  bool numaAlloc = false;
+
+  len += 1; // space for allocation metadata
+
+  if (inGaloisForEach) {
+    if (checkNuma()) {
+#ifdef USE_NUMA
+      data = allocInterleaved(len, total);
+      numaAlloc = true;
 #else
-  data = largeAlloc(len);
+      data = largeAlloc(len, false);
 #endif
+    } else {
+      data = largeAlloc(len, false);
+    }
+  } else {
+    // DDN: Depend on first-touch policy to place memory rather than libnuma
+    // calls because numa_alloc_interleaved seems to have issues properly
+    // interleaving memory.
+    data = largeAlloc(len, false);
+    unsigned uniqueNodes;
+    std::vector<int> mapping(total);
+    createMapping(mapping, uniqueNodes);
+    getSystemThreadPool().run(total, std::bind(pageInInterleaved, data, len, std::ref(mapping), uniqueNodes));
+  }
+
   if (!data)
     abort();
+
+  setNumaAlloc(data, len, numaAlloc);
+
+#ifdef USE_NUMA
+  // numa_alloc_interleaved sometimes fails to interleave pages
+  if (numaAlloc && !checkIfInterleaved(data, len, total))
+    Galois::Runtime::LL::gWarn("NUMA interleaving failed: ", data, " size: ", len);
+#endif
+
   return data;
 }
 
-void Galois::Runtime::MM::largeInterleavedFree(void* m, size_t len) {
-  if (!checkNuma())
-    largeFree(m, len);
+void Galois::Runtime::MM::largeInterleavedFree(void* data, size_t len) {
+  len += 1; // space for allocation metadata
+
 #ifdef USE_NUMA
-  numa_free(m, len);
-#else
-  largeFree(m, len);
+  if (isNumaAlloc(data, len)) {
+    numa_free(data, len);
+    return;
+  }
 #endif
+  largeFree(data, len);
 }

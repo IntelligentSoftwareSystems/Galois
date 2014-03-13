@@ -385,7 +385,7 @@ class BlockedEdgeAlgo {
 
 public:
   typedef typename Galois::Graph::LC_CSR_Graph<Node, unsigned int>
-    ::template with_numa_alloc<true>::type
+//    ::template with_numa_alloc<true>::type
     ::template with_out_of_line_lockable<true>::type
     ::template with_no_lockable<!makeSerializable>::type Graph;
 
@@ -909,6 +909,7 @@ size_t initializeGraphData(Graph& g) {
 #endif
 
   Galois::do_all_local(g, [&](typename Graph::GraphNode n) {
+  //std::for_each(g.begin(), g.end(), [&](typename Graph::GraphNode n) {
     auto& data = g.getData(n);
 
     if (useSameLatentVector) {
@@ -971,13 +972,19 @@ void run() {
   typename Algo::Graph g;
   Algo algo;
 
+  Galois::Runtime::reportNumaAlloc("NumaAlloc0");
+
   // Represent bipartite graph in general graph data structure:
   //  * items are the first m nodes
   //  * users are the next n nodes
   //  * only items have outedges
   algo.readGraph(g);
 
+  Galois::Runtime::reportNumaAlloc("NumaAlloc1");
+
   NUM_ITEM_NODES = initializeGraphData(g);
+
+  Galois::Runtime::reportNumaAlloc("NumaAlloc2");
 
   std::cout 
     << "num users: " << g.size() - NUM_ITEM_NODES 
@@ -1021,6 +1028,8 @@ void run() {
   if (serverPort >= 0) {
     startServer(algo, g, serverPort, std::cerr);
   }
+
+  Galois::Runtime::reportNumaAlloc("NumaAlloc");
 }
 
 int main(int argc, char** argv) {
