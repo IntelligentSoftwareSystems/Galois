@@ -587,12 +587,7 @@ static inline void for_each_task(IterTy b, IterTy e, const char* loopname = 0) {
   assert(!inGaloisForEach);
 
   inGaloisForEach = true;
-  RunCommand w[3] = {
-    std::bind(&WorkTy::initThread, std::ref(W)),
-    std::ref(W),
-    std::ref(getSystemBarrier())
-  };
-  getSystemThreadPool().run(&w[0], &w[3], activeThreads);
+  getSystemThreadPool().run(activeThreads, std::bind(&WorkTy::initThread, std::ref(W)), std::ref(W));
   inGaloisForEach = false;
 }
 

@@ -56,7 +56,9 @@ void pageFree(void*);
 //! Preallocate numpages large pages for each thread
 void pagePreAlloc(int numpages);
 //! Forces the given block to be paged into physical memory
-void pageIn(void *buf, size_t len);
+void pageIn(void *buf, size_t len, size_t stride);
+//! Forces the given readonly block to be paged into physical memory
+void pageInReadOnly(void *buf, size_t len, size_t stride);
 
 //! Returns total large pages allocated by Galois memory management subsystem
 int numPageAllocTotal();

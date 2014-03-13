@@ -25,6 +25,7 @@
 
 #include "Galois/config.h"
 #include GALOIS_CXX11_STD_HEADER(functional)
+#include <array>
 
 namespace Galois {
 namespace Runtime {
@@ -34,12 +35,13 @@ typedef std::function<void (void)> RunCommand;
 class ThreadPool {
 protected:
   unsigned maxThreads;
-  ThreadPool(unsigned m) :maxThreads(m) {}
-public:
-  virtual ~ThreadPool() { }
+  ThreadPool(unsigned m): maxThreads(m) { }
 
   //!execute work on all threads
-  virtual void run(RunCommand* begin, RunCommand* end, unsigned num) = 0;
+  virtual void runInternal(unsigned num, RunCommand* begin, RunCommand* end) = 0;
+
+public:
+  virtual ~ThreadPool() { }
 
   //! execute work on all threads
   //! a simple wrapper for run
@@ -47,7 +49,7 @@ public:
   void run(unsigned num, Args... args) {
     const auto numArgs = sizeof...(args);
     std::array<RunCommand, numArgs> cmds({args...});
-    run(&cmds[0], &cmds[numArgs], num);
+    runInternal(num, &cmds[0], &cmds[numArgs]);
   }
 
   //!return the number of threads supported by the thread pool on the current machine

@@ -25,27 +25,27 @@
 #include "Galois/Runtime/ParallelWork.h"
 #include "Galois/Graph/FileGraph.h"
 
-#include <pthread.h>
+#include <mutex>
+#include <condition_variable>
 
 namespace Galois {
 namespace Graph {
 
 class FileGraphAllocator {
-  pthread_mutex_t& lock;
-  pthread_cond_t& cond;
+  std::mutex& lock;
+  std::condition_variable& cond;
   FileGraph* self;
   size_t sizeofEdgeData;
   unsigned maxPackages;
-  volatile unsigned& count;
+  unsigned& count;
 
 public:
-  FileGraphAllocator(pthread_mutex_t& l, pthread_cond_t& c, FileGraph* s, size_t ss, unsigned m, volatile unsigned& cc): 
+  FileGraphAllocator(std::mutex& l, std::condition_variable& c, FileGraph* s, size_t ss, unsigned m, unsigned& cc): 
     lock(l), cond(c), self(s), sizeofEdgeData(ss), maxPackages(m), count(cc) { }
 
-  void operator()(unsigned tid, unsigned total) {
-    int pret_t;
-    if ((pret_t = pthread_mutex_lock(&lock)))
-      GALOIS_DIE("pthread error: ", pret_t);
+  void operator()() {
+    unsigned tid = Galois::Runtime::LL::getTID();
+    std::unique_lock<std::mutex> lk(lock);
 
     if (Galois::Runtime::LL::isPackageLeaderForSelf(tid)) {
       auto r = self->divideBy(
@@ -57,55 +57,29 @@ public:
       size_t edge_end = edge_begin;
       if (r.first != r.second)
         edge_end = *self->edge_end(*r.second - 1);
-      Galois::Runtime::MM::pageIn(self->outIdx + *r.first, std::distance(r.first, r.second) * sizeof(*self->outIdx));
-      Galois::Runtime::MM::pageIn(self->outs + edge_begin, (edge_end - edge_begin) * sizeof(*self->outs));
-      Galois::Runtime::MM::pageIn(self->edgeData + edge_begin * sizeofEdgeData, (edge_end - edge_begin) * sizeofEdgeData);
+      Galois::Runtime::MM::pageInReadOnly(self->outIdx + *r.first, std::distance(r.first, r.second) * sizeof(*self->outIdx), Galois::Runtime::MM::pageSize);
+      Galois::Runtime::MM::pageInReadOnly(self->outs + edge_begin, (edge_end - edge_begin) * sizeof(*self->outs), Galois::Runtime::MM::pageSize);
+      Galois::Runtime::MM::pageInReadOnly(self->edgeData + edge_begin * sizeofEdgeData, (edge_end - edge_begin) * sizeofEdgeData, Galois::Runtime::MM::pageSize);
       if (--count == 0) {
-        if ((pret_t = pthread_cond_broadcast(&cond)))
-          GALOIS_DIE("pthread error: ", pret_t);
+        cond.notify_all();
       }
     } else {
-      while (count > 0) {
-        if ((pret_t = pthread_cond_wait(&cond, &lock)))
-          GALOIS_DIE("pthread error: ", pret_t);
-      }
+      cond.wait(lk, [&]{ return count == 0; });
     }
-
-    if ((pret_t = pthread_mutex_unlock(&lock)))
-      GALOIS_DIE("pthread error: ", pret_t);
   }
 };
 
 void FileGraph::structureFromFileInterleaved(const std::string& filename, size_t sizeofEdgeData) {
   structureFromFile(filename, false);
 
-  // Interleave across all NUMA nodes
-  unsigned oldActive = getActiveThreads();
-  setActiveThreads(std::numeric_limits<unsigned int>::max());
-
-  // Manually coarsen synchronization granularity, otherwise it would be at page granularity
-  int pret;
+  std::mutex lock;
+  std::condition_variable cond;
   unsigned maxPackages = Runtime::LL::getMaxPackages();
-  volatile unsigned count = maxPackages;
-  pthread_mutex_t lock;
-  if ((pret = pthread_mutex_init(&lock, NULL)))
-    GALOIS_DIE("pthread error: ", pret);
-  pthread_cond_t cond;
-  if ((pret = pthread_cond_init(&cond, NULL)))
-    GALOIS_DIE("pthread error: ", pret);
+  unsigned count = maxPackages;
 
-  // NB(ddn): Use on_each_simple_impl because we are fiddling with the
-  // number of active threads after this loop. Otherwise, the main
-  // thread might change the number of active threads while some threads
-  // are still in on_each_impl.
-  Galois::Runtime::on_each_simple_impl(FileGraphAllocator(lock, cond, this, sizeofEdgeData, maxPackages, count));
-
-  if ((pret = pthread_mutex_destroy(&lock)))
-    GALOIS_DIE("pthread error: ", pret);
-  if ((pret = pthread_cond_destroy(&cond)))
-    GALOIS_DIE("pthread error: ", pret);
-
-  setActiveThreads(oldActive);
+  // Interleave across all NUMA nodes
+  FileGraphAllocator fn { lock, cond, this, sizeofEdgeData, maxPackages, count };
+  Galois::Runtime::getSystemThreadPool().run(std::numeric_limits<unsigned int>::max(), std::ref(fn));
 }
 
 }

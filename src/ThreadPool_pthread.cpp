@@ -196,7 +196,7 @@ public:
     delete [] threads;
   }
 
-  virtual void run(RunCommand* begin, RunCommand* end, unsigned num) {
+  virtual void runInternal(unsigned num, RunCommand* begin, RunCommand* end) {
     // Sanitize num
     num = std::min(std::max(num,1U), maxThreads);
     starting = num;

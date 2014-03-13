@@ -167,10 +167,16 @@ public:
 
 static PageSizeConf pageSizeConf;
 
-void Galois::Runtime::MM::pageIn(void* buf, size_t len) {
+void Galois::Runtime::MM::pageInReadOnly(void* buf, size_t len, size_t stride) {
   volatile char* ptr = reinterpret_cast<volatile char*>(buf);
-  for (size_t i = 0; i < len; i += pageSize)
+  for (size_t i = 0; i < len; i += stride)
     ptr[i];
+}
+
+void Galois::Runtime::MM::pageIn(void* buf, size_t len, size_t stride) {
+  volatile char* ptr = reinterpret_cast<volatile char*>(buf);
+  for (size_t i = 0; i < len; i += stride)
+    ptr[i] = 0;
 }
 
 void* Galois::Runtime::MM::pageAlloc() {
@@ -221,7 +227,7 @@ void* Galois::Runtime::MM::largeAlloc(size_t len, bool preFault) {
   ptr = mmap(0, size, _PROT, preFault ? _MAP_HUGE_POP : _MAP_HUGE, -1, 0);
 # ifndef MAP_POPULATE
   if (ptr != MAP_FAILED && ptr && preFault) {
-    pageIn(ptr, size); // XXX should use hugepage stride
+    pageIn(ptr, size, hugePageSize);
   }
 # endif
 #endif
@@ -232,7 +238,7 @@ void* Galois::Runtime::MM::largeAlloc(size_t len, bool preFault) {
   if (!ptr || ptr == MAP_FAILED) {
     ptr = mmap(0, size, _PROT, _MAP_BASE, -1, 0);
     if (ptr != MAP_FAILED && ptr && preFault) {
-      pageIn(ptr, size);
+      pageIn(ptr, size, pageSize);
     }
   }
   allocLock.unlock();

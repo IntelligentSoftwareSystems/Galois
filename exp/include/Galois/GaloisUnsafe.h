@@ -36,16 +36,10 @@ static inline void for_each_wl_impl (ExecutorTy& exec, const bool isParallel) {
   assert(!Galois::Runtime::inGaloisForEach);
 
   Galois::Runtime::inGaloisForEach = true;
-
-  Galois::Runtime::RunCommand w[4] = { 
+  Galois::Runtime::getSystemThreadPool().run(Galois::Runtime::activeThreads, 
     std::bind(&ExecutorTy::initThread, std::ref(exec)),
-    std::ref (Galois::Runtime::getSystemBarrier ()),
-    std::ref (exec), 
-    std::ref (Galois::Runtime::getSystemBarrier ())
-  };
-
-  Galois::Runtime::getSystemThreadPool().run(&w[0], &w[4], Galois::Runtime::activeThreads);
-
+    std::ref(Galois::Runtime::getSystemBarrier()),
+    std::ref(exec));
   Galois::Runtime::inGaloisForEach = false;
 }
 

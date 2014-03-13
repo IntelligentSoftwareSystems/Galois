@@ -477,20 +477,6 @@ void on_each_impl(FunctionTy fn, const char* loopname = 0) {
   inGaloisForEach = false;
 }
 
-//! on each executor with simple barrier.
-//FIXME: Why do we have this?
-template<typename FunctionTy>
-void on_each_simple_impl(FunctionTy fn, const char* loopname = 0) {
-  if (inGaloisForEach)
-    GALOIS_DIE("Nested for_each not supported");
-
-  inGaloisForEach = true;
-  std::unique_ptr<Barrier> b { createSimpleBarrier() };
-  b->reinit(activeThreads);
-  getSystemThreadPool().run(activeThreads, WOnEach<FunctionTy>(fn), std::ref(*b));
-  inGaloisForEach = false;
-}
-
 } // end namespace anonymous
 
 void preAlloc_impl(int num);
