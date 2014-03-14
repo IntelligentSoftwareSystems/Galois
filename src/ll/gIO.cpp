@@ -43,14 +43,16 @@
 #include <iomanip>
 #include GALOIS_CXX11_STD_HEADER(mutex)
 
-static void printString(bool error, bool newline, const std::string prefix, const std::string s) {
+static void printString(bool error, bool newline, const std::string& prefix, const std::string& s) {
   static Galois::Runtime::LL::SimpleLock IOLock;
 //  if (Galois::Runtime::networkHostID == 0) {
     std::lock_guard<decltype(IOLock)> lock(IOLock);
     std::ostream& o = error ? std::cerr : std::cout;
-    if (prefix.length()) o << prefix << ": ";
+    if (prefix.length()) 
+      o << prefix << ": ";
     o << s;
-    if (newline) o << "\n";
+    if (newline) 
+      o << "\n";
 //  } else {
 //    Galois::Runtime::getSystemNetworkInterface().sendAlt(0, printString, error, newline, host, prefix, s);
 //  }
@@ -103,7 +105,7 @@ void Galois::Runtime::LL::gWarnStr(const std::string& s) {
 }
 
 void Galois::Runtime::LL::gErrorStr(const std::string& s) {
-  printString(false, true, "ERROR", s);
+  printString(true, true, "ERROR", s);
 }
 
 void Galois::Runtime::LL::gFlush() {
