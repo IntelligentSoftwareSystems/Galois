@@ -31,17 +31,18 @@ function(add_galois_library name)
 endfunction()
 
 add_galois_library(galois ${sources} LIBS llvm mm ll)
-add_galois_library(galois-nothreads FileGraph.cpp LIBS llvm mm-nonuma ll)
+add_galois_library(galois-nothreads FileGraph.cpp LIBS llvm mm-standalone ll)
 
 add_subdirectory(ll)
 add_subdirectory(llvm)
 add_subdirectory(mm)
-add_subdirectory(mm-nonuma)
+add_subdirectory(mm-standalone)
 
 target_link_libraries(galois ${CMAKE_THREAD_LIBS_INIT})
 
 if(NUMA_FOUND)
   target_link_libraries(galois ${NUMA_LIBRARIES})
+  target_link_libraries(galois-nothreads ${NUMA_LIBRARIES})
 endif()
 
 if(USE_VTUNE)
