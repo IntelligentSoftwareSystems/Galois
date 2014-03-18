@@ -182,7 +182,7 @@ void FileGraph::structureFromFile(const std::string& filename, bool preFault) {
 
 #ifndef MAP_POPULATE
   if (preFault) {
-    Runtime::MM::pageIn(m, masterLength);
+    Runtime::MM::pageIn(m, masterLength, Galois::Runtime::MM::pageSize);
   }
 #endif
 }
