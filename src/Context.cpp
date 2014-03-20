@@ -22,6 +22,7 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
+#include "Galois/config.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/MethodFlags.h"
 #include "Galois/Runtime/ll/SimpleLock.h"

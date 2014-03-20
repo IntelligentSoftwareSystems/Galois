@@ -221,7 +221,7 @@ static bool checkIfInterleaved(void* data, size_t len, unsigned total) {
 static void createMapping(std::vector<int>& mapping, unsigned& uniqueNodes) {
   std::vector<bool> hist(Galois::Runtime::MM::numNumaNodes());
   uniqueNodes = 0;
-  for (int i = 0; i < mapping.size(); ++i) {
+  for (unsigned i = 0; i < mapping.size(); ++i) {
     int node = getNumaNode(i);
     if (hist[node])
       continue;
