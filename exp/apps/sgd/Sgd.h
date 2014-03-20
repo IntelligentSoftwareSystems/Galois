@@ -22,18 +22,18 @@ T innerProduct(
 
 template<typename T>
 T predictionError(
-    T* __restrict__ movieLatent,
+    T* __restrict__ itemLatent,
     T* __restrict__ userLatent,
     double actual)
 {
   T v = actual;
-  return innerProduct(movieLatent, movieLatent + LATENT_VECTOR_SIZE, userLatent, -v);
+  return innerProduct(itemLatent, itemLatent + LATENT_VECTOR_SIZE, userLatent, -v);
 }
 
 // Objective: squared loss with weighted-square-norm regularization
 template<typename T>
 T doGradientUpdate(
-    T* __restrict__ movieLatent,
+    T* __restrict__ itemLatent,
     T* __restrict__ userLatent,
     double lambda,
     double edgeRating,
@@ -42,14 +42,14 @@ T doGradientUpdate(
   T l = lambda;
   T step = stepSize;
   T rating = edgeRating;
-  T error = innerProduct(movieLatent, movieLatent + LATENT_VECTOR_SIZE, userLatent, -rating);
+  T error = innerProduct(itemLatent, itemLatent + LATENT_VECTOR_SIZE, userLatent, -rating);
 
   // Take gradient step
   for (int i = 0; i < LATENT_VECTOR_SIZE; i++) {
-      T prevMovie = movieLatent[i];
+      T prevItem = itemLatent[i];
       T prevUser = userLatent[i];
-      movieLatent[i] -= step * (error * prevUser  + l * prevMovie);
-      userLatent[i]  -= step * (error * prevMovie + l * prevUser);
+      itemLatent[i] -= step * (error * prevUser + l * prevItem);
+      userLatent[i] -= step * (error * prevItem + l * prevUser);
   }
 
   return error;

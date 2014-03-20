@@ -1,228 +1,72 @@
-template<typename Graph, bool UseLocks>
-class TestFixed2DTiledExecutor {
-  typedef typename Graph::GraphNode GNode;
-  typedef typename Graph::iterator iterator;
-  typedef typename Graph::edge_iterator edge_iterator;
-  typedef Galois::Runtime::LL::PaddedLock<true> SpinLock;
-
-  template<typename T>
-  struct SimpleAtomic {
-    std::atomic<T> value;
-    SimpleAtomic(): value(0) { }
-    SimpleAtomic(const SimpleAtomic& o): value(o.value.load()) { }
-    T relaxedLoad() { return value.load(std::memory_order_relaxed); }
-    void relaxedAdd(T delta) { value.store(relaxedLoad() + delta, std::memory_order_relaxed); }
+struct DotProductFixedTilingAlgo {
+  std::string name() const { return "DotProductFixedTiling"; }
+  struct Node {
+    LatentValue latentVector[LATENT_VECTOR_SIZE];
   };
+  typedef typename Galois::Graph::LC_CSR_Graph<Node, unsigned int>
+    ::with_no_lockable<true>::type Graph;
+  typedef Graph::GraphNode GNode;
 
-  /**
-   * Tasks are 2D ranges [start1, end1) x [start2, end2]
-   */
-  struct Task {
-    iterator start1;
-    GNode start2;
-    iterator end1;
-    GNode end2;
-    size_t id;
-    size_t d1;
-    size_t d2;
-    SimpleAtomic<size_t> updates;
-  };
+  void readGraph(Graph& g) { Galois::Graph::readGraph(g, inputFilename); }
 
-  Graph& g;
-  std::vector<SpinLock> locks1;
-  std::vector<SpinLock> locks2;
-  std::vector<Task> tasks;
-  size_t maxUpdates;
-  Galois::Statistic failures;
+  void operator()(Graph& g, const StepFunction&) {
+    const size_t numUsers = g.size() - NUM_ITEM_NODES;
+    const size_t numBlocks0 = (NUM_ITEM_NODES + itemsPerBlock - 1) / itemsPerBlock;
+    const size_t numBlocks1 = (numUsers + usersPerBlock - 1) / usersPerBlock;
+    const size_t numBlocks = numBlocks0 * numBlocks1;
 
-  struct GetDst: public std::unary_function<edge_iterator, GNode> {
-    Graph* g;
-    GetDst() { }
-    GetDst(Graph* _g): g(_g) { }
-    GNode operator()(edge_iterator ii) const {
-      return g->getEdgeDst(ii);
-    }
-  };
+    std::cout
+      << "itemsPerBlock: " << itemsPerBlock
+      << " usersPerBlock: " << usersPerBlock
+      << " numBlocks: " << numBlocks
+      << " numBlocks0: " << numBlocks0
+      << " numBlocks1: " << numBlocks1 << "\n";
 
-  typedef Galois::NoDerefIterator<edge_iterator> no_deref_iterator;
-  typedef boost::transform_iterator<GetDst, no_deref_iterator> edge_dst_iterator;
+    typedef typename Graph::GraphNode GNode;
+    typedef typename Graph::node_data_type NodeData;
+    // computing Root Mean Square Error
+    // Assuming only item nodes have edges
+    Galois::GAccumulator<double> error;
+    Galois::GAccumulator<size_t> visited;
+    Galois::Statistic svisited("EdgesVisited");
 
-  template<typename Function>
-  void executeBlock(Function& fn, Task& task) {
-    GetDst getDst { &g };
-
-    for (auto ii = task.start1; ii != task.end1; ++ii) {
-      auto& src = g.getData(*ii);
-      edge_iterator begin = g.edge_begin(*ii);
-      no_deref_iterator nbegin(begin);
-      no_deref_iterator nend(g.edge_end(*ii));
-      edge_dst_iterator dbegin(nbegin, getDst);
-      edge_dst_iterator dend(nend, getDst);
-      if (cutoff < 0 && std::distance(g.edge_begin(*ii), g.edge_end(*ii)) >= -cutoff)
-        continue;
-      else if (cutoff > 0 && std::distance(g.edge_begin(*ii), g.edge_end(*ii)) < -cutoff)
-        continue;
-
-      for (auto jj = std::lower_bound(dbegin, dend, task.start2); jj != dend; ) {
-        bool done = false;
-        for (int times = 0; times < 5; ++times) {
-          for (int i = 0; i < 5; ++i) {
-            edge_iterator edge = *(jj+i).base();
-            if (g.getEdgeDst(edge) > task.end2) {
-              done = true;
-              break;
-            }
-
-            auto& dst = g.getData(g.getEdgeDst(edge));
-              
-            fn(src, dst, g.getEdgeData(edge));
-          }
-        }
-        if (done)
-          break;
-        for (int i = 0; jj != dend && i < 5; ++jj, ++i)
-          ;
-        if (jj == dend)
-          break;
-      }
-    }
-  }
-
-  template<typename Function>
-  void executeLoop(Function fn, unsigned tid, unsigned total) {
-    const size_t numBlocks1 = locks1.size();
-    const size_t numBlocks2 = locks2.size();
-    const size_t numBlocks = numBlocks1 * numBlocks2;
-    const size_t block1 = (numBlocks1 + total - 1) / total;
-    const size_t start1 = std::min(block1 * tid, numBlocks1 - 1);
-    const size_t block2 = (numBlocks2 + total - 1) / total;
-    const size_t start2 = std::min(block2 * tid, numBlocks2 - 1);
-
-    //size_t start = start1 + start2 * numBlocks1; // XXX
-    //size_t start = block1 * 10 * (tid / 10) + start2 * numBlocks1;
-    size_t start = start1 + block2 * 10 * (tid / 10) * numBlocks1;
-
-    for (int i = 0; ; ++i) {
-      start = nextBlock(start, numBlocks, i == 0);
-      Task* t = &tasks[start];
-      if (t == &tasks[numBlocks])
-        break;
-      executeBlock(fn, *t);
-
-      locks1[t->d1].unlock();
-      locks2[t->d2].unlock();
-    }
-  }
-
-  size_t probeBlock(size_t start, size_t by, size_t n, size_t numBlocks) {
-    for (size_t i = 0; i < n; ++i, start += by) {
-      while (start >= numBlocks)
-        start -= numBlocks;
-      Task& b = tasks[start];
-      if (b.updates.relaxedLoad() < maxUpdates) {
-        if (UseLocks) {
-          if (std::try_lock(locks1[b.d1], locks2[b.d2]) < 0) {
-            // Return while holding locks
-            b.updates.relaxedAdd(1);
-            return start;
-          }
-        } else {
-          if (b.updates.value.fetch_add(1) < maxUpdates)
-            return start;
-        }
-      }
-    }
-    return numBlocks;
-    failures += 1;
-  }
-
-  // Nested dim1 then dim2
-  size_t nextBlock(size_t origStart, size_t numBlocks, bool origInclusive) {
-    const size_t delta2 = locks1.size();
-    const size_t delta1 = 1;
-    size_t b;
-
-    for (int times = 0; times < 2; ++times) {
-      size_t limit2 = locks2.size();
-      size_t limit1 = locks1.size();
-      size_t start = origStart;
-      bool inclusive = origInclusive && times == 0;
-      // First iteration is exclusive of start
-      if ((b = probeBlock(start + (inclusive ? 0 : delta1), delta1, limit1 - (inclusive ? 0 : 1), numBlocks)) != numBlocks)
-        return b;
-      if ((b = probeBlock(start + (inclusive ? 0 : delta2), delta2, limit2 - (inclusive ? 0 : 1), numBlocks)) != numBlocks)
-        return b;
-      start += delta1 + delta2;
-      while (limit1 > 0 || limit2 > 0) {
-        while (start >= numBlocks)
-          start -= numBlocks;
-        // Subsequent iterations are inclusive of start
-        if (limit1 > 0 && (b = probeBlock(start, delta1, limit1 - 1, numBlocks)) != numBlocks)
-          return b;
-        if (limit2 > 0 && (b = probeBlock(start, delta2, limit2 - 1, numBlocks)) != numBlocks)
-          return b;
-        if (limit1 > 0) {
-          limit1--;
-          start += delta1;
-        }
-        if (limit2 > 0) {
-          limit2--;
-          start += delta2;
-        }
-      }
-    }
-
-    return numBlocks;
-  }
-
-  void initializeTasks(iterator first1, iterator last1, iterator first2, iterator last2, size_t size1, size_t size2) {
-    const size_t numBlocks1 = (std::distance(first1, last1) + size1 - 1) / size1;
-    const size_t numBlocks2 = (std::distance(first2, last2) + size2 - 1) / size2;
-    const size_t numBlocks = numBlocks1 * numBlocks2;
-
-    locks1.resize(numBlocks1);
-    locks2.resize(numBlocks2);
-    tasks.resize(numBlocks);
-
-    GetDst fn { &g };
-
-    for (size_t i = 0; i < numBlocks; ++i) {
-      Task& task = tasks[i];
-      task.d1 = i % numBlocks1;
-      task.d2 = i / numBlocks1;
-      task.id = i;
-      std::tie(task.start1, task.end1) = Galois::block_range(first1, last1, task.d1, numBlocks1);
-      // XXX: Works for CSR graphs
-      task.start2 = task.d2 * size2 + *first2;
-      task.end2 = (task.d2 + 1) * size2 + *first2 - 1;
-    }
-  }
-
-  template<typename Function>
-  struct Process {
-    TestFixed2DTiledExecutor* self;
-    Function fn;
-
-    void operator()(unsigned tid, unsigned total) {
-      self->executeLoop(fn, tid, total);
-    }
-  };
-
-public:
-  TestFixed2DTiledExecutor(Graph& _g): g(_g), failures("PopFailures") { }
-
-  template<typename Function>
-  size_t execute(iterator first1, iterator last1, iterator first2, iterator last2, size_t size1, size_t size2, Function fn, size_t numIterations = 1) {
+    constexpr bool useExp = true;
+    constexpr bool useDot = false;
     Galois::Timer timer;
+    Fixed2DGraphTiledExecutor<Graph, useExp> executor(g, cutoff);
     timer.start();
-    initializeTasks(first1, last1, first2, last2, size1, size2);
+    executor.execute(
+        g.begin(), g.begin() + NUM_ITEM_NODES,
+        g.begin() + NUM_ITEM_NODES, g.end(),
+        itemsPerBlock, usersPerBlock,
+        [&](GNode src, GNode dst, typename Graph::edge_iterator edge) {
+      LatentValue e;
+      if (useDot) {
+        e = predictionError(g.getData(src).latentVector, g.getData(dst).latentVector, g.getEdgeData(edge));
+      } else {
+        e = doGradientUpdate(g.getData(src).latentVector, g.getData(dst).latentVector, lambda, g.getEdgeData(edge), learningRate);
+      }
+      error += (e * e);
+      visited += 1;
+      svisited += 1;
+    }, !useDot);
     timer.stop();
-    maxUpdates = numIterations;
-    Process<Function> p = { this, fn };
-    Galois::on_each(p);
-    return timer.get();
+    size_t millis = timer.get();
+    size_t numVisited = visited.reduce();
+    double flop;
+    if (useDot) {
+      flop = (numVisited * (2.0 * LATENT_VECTOR_SIZE + 2));
+    } else {
+      flop = countFlops(numVisited, 1, LATENT_VECTOR_SIZE);
+    }
+    std::cout 
+      << "ERROR: " << error.reduce()
+      << " Time: " << millis
+      << " numIterations: " << numVisited
+      << " GFLOP/s: " << flop / millis / 1e6 << "\n";
   }
 };
+
 
 template<typename Graph, bool UseLocks>
 class Recursive2DExecutor {
@@ -261,6 +105,7 @@ class Recursive2DExecutor {
   std::vector<Task> tasks;
   size_t maxUpdates;
   Galois::Statistic failures;
+  Galois::Statistic successes;
   std::mt19937 gen;
 
   struct GetDst: public std::unary_function<edge_iterator, GNode> {
@@ -288,6 +133,9 @@ class Recursive2DExecutor {
 
   template<typename Function>
   void executeBlock(Function& fn, Task& task) {
+    constexpr int numTimes = 1;
+    constexpr int width = 1;
+
     GetDst getDst { &g };
 
     for (auto ii = task.start1; ii != task.end1; ++ii) {
@@ -300,8 +148,8 @@ class Recursive2DExecutor {
 
       for (auto jj = std::lower_bound(dbegin, dend, task.start2); jj != dend; ) {
         bool done = false;
-        for (int times = 0; times < 5; ++times) {
-          for (int i = 0; i < 5; ++i) {
+        for (int times = 0; times < numTimes; ++times) {
+          for (int i = 0; i < width; ++i) {
             edge_iterator edge = *(jj+i).base();
             if (g.getEdgeDst(edge) > task.end2) {
               done = true;
@@ -315,7 +163,7 @@ class Recursive2DExecutor {
         }
         if (done)
           break;
-        for (int i = 0; jj != dend && i < 5; ++jj, ++i)
+        for (int i = 0; jj != dend && i < width; ++jj, ++i)
           ;
         if (jj == dend)
           break;
@@ -342,6 +190,7 @@ class Recursive2DExecutor {
       Task* t = &tasks[start];
       if (t == &tasks[numBlocks])
         break;
+      successes += 1;
       executeBlock(fn, *t);
 
       locks1[t->d1].unlock();
@@ -367,8 +216,8 @@ class Recursive2DExecutor {
         }
       }
     }
-    return numBlocks;
     failures += 1;
+    return numBlocks;
   }
 
   // Nested dim1 then dim2
@@ -628,7 +477,7 @@ class Recursive2DExecutor {
   };
 
 public:
-  Recursive2DExecutor(Graph& _g): g(_g), failures("PopFailures") { }
+  Recursive2DExecutor(Graph& _g): g(_g), failures("PopFailures"), successes("PopSuccesses") { }
 
   template<typename Function>
   size_t execute(iterator first1, iterator last1, iterator first2, iterator last2, size_t size1, size_t size2, Function fn, size_t numIterations = 1) {
@@ -643,58 +492,6 @@ public:
   }
 };
 
-struct DotProductFixedTilingAlgo {
-  std::string name() const { return "DotProductFixedTiling"; }
-  struct Node {
-    LatentValue latentVector[LATENT_VECTOR_SIZE];
-  };
-  typedef typename Galois::Graph::LC_CSR_Graph<Node, unsigned int>
-    ::with_numa_alloc<true>::type
-    ::with_out_of_line_lockable<true>::type
-    ::with_no_lockable<true>::type Graph;
-  typedef Graph::GraphNode GNode;
-
-  void readGraph(Graph& g) { Galois::Graph::readGraph(g, inputFilename); }
-
-  void operator()(Graph& g, const StepFunction&) {
-    const size_t numUsers = g.size() - NUM_ITEM_NODES;
-    const size_t numYBlocks = (NUM_ITEM_NODES + itemsPerBlock - 1) / itemsPerBlock;
-    const size_t numXBlocks = (numUsers + usersPerBlock - 1) / usersPerBlock;
-    const size_t numBlocks = numXBlocks * numYBlocks;
-
-    std::cout
-      << "itemsPerBlock: " << itemsPerBlock
-      << " usersPerBlock: " << usersPerBlock
-      << " numBlocks: " << numBlocks
-      << " numXBlocks: " << numXBlocks
-      << " numYBlocks: " << numYBlocks << "\n";
-
-    Galois::Timer timer;
-    timer.start();
-    typedef typename Graph::GraphNode GNode;
-    typedef typename Graph::node_data_type NodeData;
-    // computing Root Mean Square Error
-    // Assuming only item nodes have edges
-    Galois::GAccumulator<double> error;
-    Galois::GAccumulator<size_t> visited;
-    TestFixed2DTiledExecutor<Graph,false> executor(g);
-    //executor.execute(g.begin(), g.begin() + NUM_ITEM_NODES, g.begin() + NUM_ITEM_NODES, g.end(),
-    size_t inspectTime = executor.execute(g.begin(), g.begin() + NUM_ITEM_NODES, g.begin()+NUM_ITEM_NODES, g.end(),
-        itemsPerBlock, usersPerBlock, [&](NodeData& nn, NodeData& mm, unsigned int edgeData) {
-      LatentValue e = predictionError(nn.latentVector, mm.latentVector, edgeData);
-
-      error += (e * e);
-      visited += 1;
-    });
-    timer.stop();
-    std::cout 
-      << "ERROR: " << error.reduce()
-      << " Time: " << timer.get() - inspectTime
-      << " Iterations: " << visited.reduce()
-      << " GFLOP/s: " << (visited.reduce() * (2.0 * LATENT_VECTOR_SIZE + 2)) / (timer.get() - inspectTime) / 1e6 << "\n";
-  }
-};
-
 struct DotProductRecursiveTilingAlgo {
   std::string name() const { return "DotProductRecursiveTiling"; }
   struct Node {
@@ -702,7 +499,7 @@ struct DotProductRecursiveTilingAlgo {
   };
 
   typedef typename Galois::Graph::LC_CSR_Graph<Node, unsigned int>
-    ::with_numa_alloc<true>::type
+//    ::with_numa_alloc<true>::type
     ::with_no_lockable<true>::type InnerGraph;
   typedef typename Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
@@ -778,7 +575,7 @@ struct BlockJumpAlgo {
   };
 
   typedef Galois::Graph::LC_CSR_Graph<Node, unsigned int>
-    ::with_numa_alloc<true>::type
+//    ::with_numa_alloc<true>::type
     ::with_no_lockable<true>::type Graph;
   typedef Graph::GraphNode GNode;
 

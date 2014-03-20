@@ -573,6 +573,7 @@ private:
           start -= numBlocks;
         Task& b = tasks[start];
 
+        // TODO racy
         if (b.updates < maxUpdates) {
           if (std::try_lock(xLocks[b.x], yLocks[b.y]) < 0) {
             // Return while holding locks
@@ -644,6 +645,7 @@ private:
         Task* t = &tasks[start];
         if (t == &tasks[numBlocks])
           break;
+        //Galois::Runtime::LL::gInfo("XXX ", tid, " ", t->x, " ", t->y);
         updateBlock(*t);
 
         xLocks[t->x].unlock();
@@ -669,7 +671,7 @@ private:
      * graph in M^1/2 by M^1/2 tiles
      *
      * Since it is sparse *and* we want to minimize number of graph
-     * traversals, we read a small square of M^1/4 movies by M^1/4 users/out
+     * traversals, we read a small square of M^1/4 items by M^1/4 users/out
      * edges under the assumption that the graph is dense. Then, we figure out
      * the actual number of edges in the region and extrapolate that out to
      * figure out the dimensions of whole tile.
@@ -683,19 +685,19 @@ private:
       if (tid != 0)
         return;
       const size_t numUsers = g.size() - NUM_ITEM_NODES;
-      const size_t numYBlocks = (NUM_ITEM_NODES + itemsPerBlock - 1) / itemsPerBlock;
-      const size_t numXBlocks = (numUsers + usersPerBlock - 1) / usersPerBlock;
-      const size_t numBlocks = numXBlocks * numYBlocks;
+      const size_t numBlocks0 = (NUM_ITEM_NODES + itemsPerBlock - 1) / itemsPerBlock;
+      const size_t numBlocks1 = (numUsers + usersPerBlock - 1) / usersPerBlock;
+      const size_t numBlocks = numBlocks0 * numBlocks1;
 
       std::cout
         << "itemsPerBlock: " << itemsPerBlock
         << " usersPerBlock: " << usersPerBlock
         << " numBlocks: " << numBlocks
-        << " numXBlocks: " << numXBlocks
-        << " numYBlocks: " << numYBlocks << "\n";
+        << " numBlocks0: " << numBlocks0
+        << " numBlocks1: " << numBlocks1 << "\n";
 
-      xLocks.resize(numXBlocks);
-      yLocks.resize(numYBlocks);
+      xLocks.resize(numBlocks0);
+      yLocks.resize(numBlocks1);
       tasks.resize(numBlocks);
 
       GetDst fn { &g };
@@ -706,24 +708,24 @@ private:
 
       for (size_t i = 0; i < numBlocks; ++i) {
         Task& task = tasks[i];
-        task.x = i % numXBlocks;
-        task.y = i / numXBlocks;
+        task.x = i % numBlocks0;
+        task.y = i / numBlocks0;
         task.id = i;
         task.updates = 0;
         task.error = 0.0;
         task.start1 = g.begin();
-        std::tie(task.start1, task.end1) = Galois::block_range(g.begin(), g.begin() + NUM_ITEM_NODES, task.y, numYBlocks);
-        task.start2 = task.x * usersPerBlock + NUM_ITEM_NODES;
-        task.end2 = (task.x + 1) * usersPerBlock + NUM_ITEM_NODES - 1;
+        std::tie(task.start1, task.end1) = Galois::block_range(g.begin(), g.begin() + NUM_ITEM_NODES, task.x, numBlocks0);
+        task.start2 = task.y * usersPerBlock + NUM_ITEM_NODES;
+        task.end2 = (task.y + 1) * usersPerBlock + NUM_ITEM_NODES - 1;
 
         initial.push(task);
       }
 
       if (false) {
-        for (size_t i = 0; i < numYBlocks; ++i) {
+        for (size_t i = 0; i < numBlocks1; ++i) {
           std::mt19937 gen;
-          std::cout << (i * numXBlocks) << " " << (i+1) * numXBlocks << " " << numBlocks << "\n";
-          std::shuffle(&tasks[i * numXBlocks], &tasks[(i+1) * numXBlocks], gen);
+          std::cout << (i * numBlocks0) << " " << (i+1) * numBlocks0 << " " << numBlocks << "\n";
+          std::shuffle(&tasks[i * numBlocks0], &tasks[(i+1) * numBlocks0], gen);
         }
       }
     }
@@ -890,6 +892,9 @@ public:
       //Galois::for_each_local(initial, fn2, Galois::wl<Galois::WorkList::dChunkedFIFO<1>>());
       //Galois::do_all_local(initial, fn2, Galois::wl<Galois::WorkList::dChunkedLIFO<1>>());
       Galois::on_each(fn2);
+      //TODO: delete when racy fix is in
+      if (!std::all_of(tasks.begin(), tasks.end(), [maxUpdates](Task& t) { return t.updates == maxUpdates; }))
+        std::cerr << "WARNING: Missing tasks\n";
     });
     execute.stop();
   }
