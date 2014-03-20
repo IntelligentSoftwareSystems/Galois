@@ -34,6 +34,7 @@
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
 #include "Galois/Graph/Graph.h"
+#include "Galois/Graph/LCGraph.h"
 #include "Galois/Graph/FileGraph.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
@@ -41,10 +42,11 @@
 #include "Galois/PriorityScheduling.h"
 #endif
 
-#include <string>
-#include <vector>
 #include <algorithm>
 #include <iostream>
+#include <random>
+#include <string>
+#include <vector>
 
 namespace cll = llvm::cl;
 
@@ -94,28 +96,24 @@ static cll::opt<int> seed("seed", cll::desc("Random seed for generated input"), 
 static cll::opt<std::string> inputFilename("file", cll::desc("Input graph"), cll::init(""));
 static cll::opt<bool> runIteratively("runIteratively", cll::desc("After finding matching, removed matched edges and repeat"), cll::init(false));
 
+// TODO(ddn): switch to this graph for FF and ABMP algos when we fix reading
+// graphs
 template<typename NodeTy,typename EdgeTy>
-struct BipartiteGraph: public Galois::Graph::FirstGraph<NodeTy,EdgeTy,true> {
-  typedef Galois::Graph::FirstGraph<NodeTy,EdgeTy,true> Super;
+struct BipartiteGraph: public Galois::Graph::LC_Morph_Graph<NodeTy,EdgeTy> {
+  typedef Galois::Graph::LC_Morph_Graph<NodeTy,EdgeTy> Super;
   typedef std::vector<typename Super::GraphNode> NodeList;
-  typedef NodeTy node_data_type;
-  typedef EdgeTy edge_data_type;
 
   NodeList A;
   NodeList B;
+};
 
-  void addNode(const typename Super::GraphNode& n, bool isA, Galois::MethodFlag mflag = Galois::MethodFlag::ALL) {
-    if (isA) {
-      A.push_back(n);
-    } else {
-      B.push_back(n);
-    }
-    Super::addNode(n, mflag);
-  }
+template<typename NodeTy,typename EdgeTy>
+struct MFBipartiteGraph: public Galois::Graph::FirstGraph<NodeTy,EdgeTy,true> {
+  typedef Galois::Graph::FirstGraph<NodeTy,EdgeTy,true> Super;
+  typedef std::vector<typename Super::GraphNode> NodeList;
 
-  void addNode(const typename Super::GraphNode& n, Galois::MethodFlag mflag = Galois::MethodFlag::ALL) {
-    Super::addNode(n, mflag);
-  }
+  NodeList A;
+  NodeList B;
 };
 
 //******************************** Common ************************
@@ -138,8 +136,13 @@ struct BaseNode {
   bool covered;
   bool free;
   bool reachable;  // for preparing node cover
-  BaseNode(): id(-1) { }
-  BaseNode(size_t i): id(i), degree(0), covered(false), free(true), reachable(false) { }
+  BaseNode(size_t i = -1): id(i), degree(0), covered(false), free(true), reachable(false) { }
+  void reset() {
+    degree = 0;
+    covered = false;
+    free = true;
+    reachable = false;
+  }
 };
 
 template<typename G>
@@ -207,8 +210,12 @@ struct PrepareForVerifier {
 struct FFNode: public BaseNode {
   int pred;
   bool reached;
-  FFNode(): BaseNode() { }
-  FFNode(size_t i): BaseNode(i), pred(-1), reached(false)  { }
+  FFNode(size_t i = -1): BaseNode(i), pred(-1), reached(false) { }
+  void reset() {
+    BaseNode::reset();
+    reached = false;
+    pred = -1;
+  }
 };
 
 //! Switch between concurrent and serial instances
@@ -265,6 +272,8 @@ struct MatchingFF {
   typedef std::vector<GraphNode, typename Galois::PerIterAllocTy::rebind<GraphNode>::other> Preds;
   
   static const Galois::MethodFlag flag = Concurrent ? Galois::MethodFlag::CHECK_CONFLICT : Galois::MethodFlag::NONE;
+
+  static const bool canRunIteratively = true;
 
   std::string name() { return std::string(Concurrent ? "Concurrent" : "Serial") + " Ford-Fulkerson"; }
 
@@ -329,7 +338,7 @@ struct MatchingFF {
     G& g;
     typename ReachedWrapper::Type& reached;
 
-    ReachedCleanup(G& _g, typename ReachedWrapper::Type& r): g(_g), reached(r) { }
+    ReachedCleanup(G& g, typename ReachedWrapper::Type& r): g(g), reached(r) { }
     
     ~ReachedCleanup() {
       cleanup();
@@ -362,7 +371,9 @@ struct MatchingFF {
 
       // Reverse edges in augmenting path
       for (typename RevsWrapper::Type::iterator jj = revs.begin(), ej = revs.end(); jj != ej; ++jj) {
-        g.removeEdge(jj->first, g.findEdge(jj->first, jj->second, Galois::MethodFlag::NONE), Galois::MethodFlag::NONE);
+        auto edge = g.findEdge(jj->first, jj->second, Galois::MethodFlag::NONE);
+        assert(edge != g.edge_end(jj->first));
+        g.removeEdge(jj->first, edge, Galois::MethodFlag::NONE);
         g.addEdge(jj->second, jj->first, Galois::MethodFlag::NONE);
       }
       revs.clear();
@@ -410,8 +421,12 @@ struct MatchingFF {
 struct ABMPNode: public FFNode {
   unsigned layer;
   int next;
-  ABMPNode(): FFNode() { }
-  ABMPNode(size_t i): FFNode(i), layer(0), next(0) { }
+  ABMPNode(size_t i = -1): FFNode(i), layer(0), next(0) { }
+  void reset() {
+    FFNode::reset();
+    layer = 0;
+    next = 0;
+  }
 };
 
 //! Matching algorithm of Alt, Blum, Mehlhorn and Paul
@@ -426,6 +441,8 @@ struct MatchingABMP {
   typedef std::pair<GraphNode,unsigned> WorkItem;
 
   static const Galois::MethodFlag flag = Concurrent ? Galois::MethodFlag::CHECK_CONFLICT : Galois::MethodFlag::NONE;
+
+  static const bool canRunIteratively = true;
 
   struct Indexer: public std::unary_function<const WorkItem&,unsigned> {
     unsigned operator()(const WorkItem& n) const {
@@ -459,8 +476,9 @@ struct MatchingABMP {
 
     // Start search where we last left off
     edge_iterator ii = g.edge_begin(src, flag);
-    std::advance(ii, dsrc.next);
     edge_iterator ei = g.edge_end(src, flag);
+    assert(dsrc.next <= std::distance(ii, ei));
+    std::advance(ii, dsrc.next);
     for (; ii != ei && g.getData(g.getEdgeDst(ii), Galois::MethodFlag::NONE).layer != l;
         ++ii, ++dsrc.next) {
       ;
@@ -480,6 +498,8 @@ struct MatchingABMP {
 
     GraphNode cur = root;
 
+    g.getData(root, flag);
+
     while (true) {
       GraphNode next;
       if (g.getData(cur, Galois::MethodFlag::NONE).free && g.getData(cur, Galois::MethodFlag::NONE).layer == 0) {
@@ -489,7 +509,9 @@ struct MatchingABMP {
         
         // Reverse edges in augmenting path
         for (typename Revs::iterator ii = revs.begin(), ei = revs.end(); ii != ei; ++ii) {
-          g.removeEdge(ii->first, g.findEdge(ii->first, ii->second, Galois::MethodFlag::NONE), Galois::MethodFlag::NONE);
+          auto edge = g.findEdge(ii->first, ii->second, Galois::MethodFlag::NONE);
+          assert(edge != g.edge_end(ii->first));
+          g.removeEdge(ii->first, edge, Galois::MethodFlag::NONE);
           g.addEdge(ii->second, ii->first, Galois::MethodFlag::NONE);
         }
         //revs.clear();
@@ -531,7 +553,7 @@ struct MatchingABMP {
     void operator()(const WorkItem& item, Galois::UserContext<WorkItem>& ctx) {
       unsigned curLayer = item.second;
       if (curLayer > maxLayer) {
-        std::cout << "Reached max layer: " << curLayer << "\n";
+        //std::cout << "Reached max layer: " << curLayer << "\n";
         ctx.breakLoop();
         return;
       }
@@ -556,7 +578,7 @@ struct MatchingABMP {
     }
     t.stop();
 
-    unsigned maxLayer = (unsigned) (0.1*sqrt(g.size()));
+    unsigned maxLayer = (unsigned) (0.1*sqrt(std::distance(g.begin(), g.end())));
     size_t size = initial.size();
     Galois::setActiveThreads(Concurrent ? numThreads : 1);
     
@@ -575,7 +597,7 @@ struct MatchingABMP {
     
     t.start();
     MatchingFF<G,false> algo;
-    std::cout << "Switching to " << algo.name() << "\n";
+    //std::cout << "Switching to " << algo.name() << "\n";
     algo(g);
     t.stop();
   }
@@ -586,8 +608,13 @@ struct MFNode: public BaseNode {
   size_t excess;
   unsigned height;
   int current;
-  MFNode(): BaseNode() { }
-  MFNode(size_t i): BaseNode(i), excess(0), height(1), current(0) { }
+  MFNode(size_t i = -1): BaseNode(i), excess(0), height(1), current(0) { }
+  void reset() {
+    BaseNode::reset();
+    excess = 0;
+    height = 1;
+    current = 0;
+  }
 };
 
 struct MFEdge {
@@ -595,7 +622,6 @@ struct MFEdge {
   MFEdge(): cap(1) { }
   MFEdge(int c): cap(c) { }
 };
-
 
 //! Matching via reduction to maxflow
 template<typename G, bool Concurrent>
@@ -607,6 +633,8 @@ struct MatchingMF {
   typedef typename G::node_data_type node_data_type;
   typedef typename G::edge_data_type edge_data_type;
   static const Galois::MethodFlag flag = Concurrent ? Galois::MethodFlag::CHECK_CONFLICT : Galois::MethodFlag::NONE;
+  static const bool canRunIteratively = false;
+
   /**
    * Beta parameter the original Goldberg algorithm to control when global
    * relabeling occurs. For comparison purposes, we keep them the same as
@@ -820,12 +848,12 @@ struct MatchingMF {
     }
   }
 
-  //! Adds reverse edges,
+  //! Adds reverse edges
   void initializeGraph(G& g, GraphNode& source, GraphNode& sink, unsigned& numNodes,
       unsigned& interval) {
     size_t numEdges = 0;
 
-    numNodes = g.size();
+    numNodes = std::distance(g.begin(), g.end());
     source = g.createNode(node_data_type(numNodes++));
     sink = g.createNode(node_data_type(numNodes++));
     g.getData(source).height = numNodes;
@@ -987,10 +1015,6 @@ struct Verifier {
 };
 
 
-static double nextRand() {
-  return rand() / (double) RAND_MAX;
-}
-
 /**
  * Generate a random bipartite graph as used in LEDA evaluation and
  * refererenced in [CGM+97]. Nodes are divided into numGroups groups of size
@@ -1000,60 +1024,73 @@ static double nextRand() {
  * B.
  */
 template<typename G>
-void generateRandomInput(int numA, int numB, int numEdges, int numGroups, int seed, G* g) {
-  typedef typename G::node_data_type node_data_type;
+void generateRandomInput(int numA, int numB, int numEdges, int numGroups, int seed, G& g) {
+  typedef typename G::edge_data_type edge_data_type;
   typedef typename G::GraphNode GNode;
-
+  
   std::cout 
-    << "numA: " << numA
-    << " numB: " << numB
-    << " numEdges: " << numEdges 
-    << " numGroups: " << numGroups
+    << "numGroups: " << numGroups
     << " seed: " << seed
     << "\n";
 
-  srand(seed);
+  Galois::Graph::FileGraphWriter p;
+  p.setNumNodes(numA + numB);
+  p.setNumEdges(numEdges);
+  p.setSizeofEdgeData(Galois::LargeArray<edge_data_type>::size_of::value);
 
-  assert(numA > 0 && numB > 0);
+  for (int phase = 0; phase < 2; ++phase) {
+    if (phase == 0)
+      p.phase1();
+    else
+      p.phase2();
 
-  size_t id = 0;
+    std::mt19937 gen(seed);
+    std::uniform_int_distribution<> dist(0, 1);
 
-  for (int i = 0; i < numA; ++i)
-    g->addNode(g->createNode(node_data_type(id++)), true);
-  for (int i = 0; i < numB; ++i)
-    g->addNode(g->createNode(node_data_type(id++)), false);
+    assert(numA > 0 && numB > 0);
 
-  int d = numEdges/numA;
-  if (numGroups > numA)
-    numGroups = numA;
-  if (numGroups > numB)
-    numGroups = numB;
+    int d = numEdges/numA;
+    if (numGroups > numA)
+      numGroups = numA;
+    if (numGroups > numB)
+      numGroups = numB;
 
-  int count = 0;
-  if (numGroups > 0) {
-    int aSize = numA/numGroups;
-    int bSize = numB/numGroups;
+    int count = 0;
+    if (numGroups > 0) {
+      int aSize = numA/numGroups;
+      int bSize = numB/numGroups;
 
-    for (auto ii = g->A.begin(), ei = g->A.end(); ii != ei; ++ii, ++count) {
-      int group = count/aSize;
-      if (group == numGroups)
-        break;
-      int base1 = group == 0 ? (numGroups-1)*bSize : (group-1)*bSize;
-      int base2 = group == numGroups-1 ? 0 : (group+1)*bSize;
-      for (int i = 0; i < d; ++i) {
-        int b = nextRand() < 0.5 ? base1 : base2;
-        int off = (int)(nextRand() * (bSize-1));
-        g->addEdge(*ii, g->B[b+off]);
+      for (int ii = 0; ii < numA; ++ii, ++count) {
+        int group = count/aSize;
+        if (group == numGroups)
+          break;
+        int base1 = group == 0 ? (numGroups-1)*bSize : (group-1)*bSize;
+        int base2 = group == numGroups-1 ? 0 : (group+1)*bSize;
+        for (int i = 0; i < d; ++i) {
+          int b = dist(gen) < 0.5 ? base1 : base2;
+          int off = (int)(dist(gen) * (bSize-1));
+          if (phase == 0)
+            p.incrementDegree(ii);
+          else
+            p.addNeighbor(ii, b+off+numA);
+        }
       }
+    }
+
+    int r = numEdges - count*d;
+    while (r--) {
+      int ind_a = (int)(dist(gen)*(numA-1));
+      int ind_b = (int)(dist(gen)*(numB-1));
+      if (phase == 0)
+        p.incrementDegree(ind_a);
+      else
+        p.addNeighbor(ind_a, ind_b + numA);
     }
   }
 
-  int r = numEdges - count*d;
-  while (r--) {
-    int ind_a = (int)(nextRand()*(numA-1));
-    int ind_b = (int)(nextRand()*(numB-1));
-    g->addEdge(g->A[ind_a], g->B[ind_b]);
-  }
+  // Leave edge data uninitialized
+  p.finish<edge_data_type>();
+  Galois::Graph::readGraph(g, p);
 }
 
 /**
@@ -1064,68 +1101,96 @@ void generateRandomInput(int numA, int numB, int numEdges, int numGroups, int se
  *  (2) nodes in set A are the first numA nodes (followed by nodes in set B)
  */
 template<typename G>
-void readInput(const std::string& filename, G* g) {
-  typedef typename G::node_data_type node_data_type;
-
-  Galois::Graph::LC_CSR_Graph<void,void> inG;
-  Galois::Graph::readGraph(inG, filename);
-  
-  size_t id = 0;
-  int numA = 0;
-  int numB = 0;
-  for (auto n : inG) {
-    bool inA = std::distance(inG.edge_begin(n), inG.edge_end(n)) > 0;
-    g->addNode(g->createNode(node_data_type(id++)), inA);
-    if (inA)
-      numA++;
-    else
-      numB++;
-  }
-
-  for (auto n : inG) {
-    for (auto edge : inG.out_edges(n)) {
-      g->addEdge(g->A[n], g->B[inG.getEdgeDst(edge) - numA]);
-    }
-  }
-
-  std::cout 
-    << "numA: " << numA
-    << " numB: " << numB
-    << " numEdges: " << inG.sizeEdges() 
-    << "\n";
+void readInput(const std::string& filename, G& g) {
+  Galois::Graph::readGraph(g, filename);
 }
 
+template<template<typename,bool> class Algo, typename G>
+size_t countMatching(G& g) {
+  Exists<G,Algo> exists;
+  size_t count = 0;
+  for (auto n : g.B) {
+    for (auto edge : g.out_edges(n)) {
+      if (exists(g, edge)) {
+        count += 1;
+      }
+    }
+  }
+  return count;
+}
+
+template<template<typename,bool> class Algo, typename G>
+void removeMatchedEdges(G& g) {
+  Exists<G,Algo> exists;
+  for (auto n : g.B) {
+    assert(std::distance(g.edge_begin(n), g.edge_end(n)) <= 1);
+    for (auto edge : g.out_edges(n)) {
+      if (exists(g, edge)) {
+        g.removeEdge(n, edge);
+        break;
+      }
+    }
+  }
+}
 
 template<template<typename,bool> class Algo, typename G, bool Concurrent>
 void start(int N, int numEdges, int numGroups) {
   typedef Algo<G,Concurrent> A;
 
+  A algo;
   G g;
 
+  if (runIteratively && !algo.canRunIteratively)
+    GALOIS_DIE("algo does not support iterative execution");
+
   switch (inputType) {
-    case generated: generateRandomInput(N, N, numEdges, numGroups, seed, &g); break;
-    case fromFile: readInput(inputFilename, &g); break;
+    case generated: generateRandomInput(N, N, numEdges, numGroups, seed, g); break;
+    case fromFile: readInput(inputFilename, g); break;
     default: GALOIS_DIE("unknown input type");
   }
 
-  A algo;
+  size_t id = 0;
+  for (auto n : g) {
+    g.getData(n).id = id++;
+    if (g.edge_begin(n) != g.edge_end(n))
+      g.A.push_back(n);
+    else
+      g.B.push_back(n);
+  }
+
+  std::cout 
+    << "numA: " << g.A.size()
+    << " numB: " << g.B.size()
+    << "\n";
+
   std::cout << "Starting " << algo.name() << "\n";
 
   Galois::StatTimer t;
 
-  t.start();
-  algo(g);
-  t.stop();
+  while (true) {
+    t.start();
+    algo(g);
+    t.stop();
 
-  if (!skipVerify) {
-    typename GraphTypes<G>::Matching matching;
-    PrepareForVerifier<G,Algo>()(g, &matching);
-    if (!Verifier<G>()(g, matching)) {
-      GALOIS_DIE("Verification failed");
-    } else {
-      std::cout << "Verification successful.\n";
+    if (!skipVerify) {
+      typename GraphTypes<G>::Matching matching;
+      PrepareForVerifier<G,Algo>()(g, &matching);
+      if (!Verifier<G>()(g, matching)) {
+        GALOIS_DIE("Verification failed");
+      } else {
+        std::cout << "Verification successful.\n";
+      }
     }
-    std::cout << "Matching of cardinality: " << matching.size() << "\n";
+
+    size_t matchingSize = countMatching<Algo>(g);
+    std::cout << "Matching of cardinality: " << matchingSize << "\n";
+
+    if (!runIteratively || matchingSize == 0)
+      break;
+
+    removeMatchedEdges<Algo>(g);
+    for (auto n : g)
+      g.getData(n).reset();
   }
 }
 
@@ -1133,13 +1198,14 @@ void start(int N, int numEdges, int numGroups) {
 template<bool Concurrent>
 void start() {
   switch (algo) {
-    case pfpAlgo:
-      start<MatchingMF, BipartiteGraph<MFNode,MFEdge>, Concurrent>(N, numEdges, numGroups); break;
-    case ffAlgo:
-      start<MatchingFF, BipartiteGraph<FFNode,void>, Concurrent>(N, numEdges, numGroups); break;
-    default:
     case abmpAlgo:
-      start<MatchingABMP, BipartiteGraph<ABMPNode,void>, Concurrent>(N, numEdges, numGroups); break;
+      start<MatchingABMP, MFBipartiteGraph<ABMPNode,void>, Concurrent>(N, numEdges, numGroups); break;
+    case pfpAlgo:
+      start<MatchingMF, MFBipartiteGraph<MFNode,MFEdge>, Concurrent>(N, numEdges, numGroups); break;
+    case ffAlgo:
+      start<MatchingFF, MFBipartiteGraph<FFNode,void>, Concurrent>(N, numEdges, numGroups); break;
+    default:
+      GALOIS_DIE("unknown algo");
   }
 }
 
