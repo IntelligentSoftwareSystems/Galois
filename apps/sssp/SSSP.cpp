@@ -516,9 +516,7 @@ void run(bool prealloc = true) {
     if (verify(graph, source)) {
       std::cout << "Verification successful.\n";
     } else {
-      std::cerr << "Verification failed.\n";
-      assert(0 && "Verification failed");
-      abort();
+      GALOIS_DIE("Verification failed");
     }
   }
 }

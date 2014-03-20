@@ -66,6 +66,11 @@ enum ExecutionType {
   parallel
 };
 
+enum InputType {
+  generated,
+  fromFile
+};
+
 static cll::opt<MatchingAlgo> algo(cll::desc("Choose an algorithm:"),
     cll::values(
       clEnumVal(pfpAlgo, "Preflow-push"),
@@ -77,17 +82,24 @@ static cll::opt<ExecutionType> executionType(cll::desc("Choose execution type:")
       clEnumVal(serial, "Serial"),
       clEnumVal(parallel, "Parallel"),
       clEnumValEnd), cll::init(parallel));
-static cll::opt<int> N(cll::Positional, cll::desc("<N>"), cll::Required);
-static cll::opt<int> numEdges(cll::Positional, cll::desc("<numEdges>"), cll::Required);
-static cll::opt<int> numGroups(cll::Positional, cll::desc("<numGroups>"), cll::Required);
-static cll::opt<int> seed(cll::Positional, cll::desc("<seed>"), cll::Required);
+static cll::opt<InputType> inputType("inputType", cll::desc("Input type:"),
+    cll::values(
+      clEnumVal(generated, "Generated"),
+      clEnumVal(fromFile, "From file"),
+      clEnumValEnd), cll::init(fromFile));
+static cll::opt<int> N("n", cll::desc("Size of each set of nodes in generated input"), cll::init(100));
+static cll::opt<int> numEdges("numEdges", cll::desc("Number of edges in generated input"), cll::init(1000));
+static cll::opt<int> numGroups("numGroups", cll::desc("Number of groups in generated input"), cll::init(10));
+static cll::opt<int> seed("seed", cll::desc("Random seed for generated input"), cll::init(0));
+static cll::opt<std::string> inputFilename("file", cll::desc("Input graph"), cll::init(""));
+static cll::opt<bool> runIteratively("runIteratively", cll::desc("After finding matching, removed matched edges and repeat"), cll::init(false));
 
 template<typename NodeTy,typename EdgeTy>
 struct BipartiteGraph: public Galois::Graph::FirstGraph<NodeTy,EdgeTy,true> {
   typedef Galois::Graph::FirstGraph<NodeTy,EdgeTy,true> Super;
   typedef std::vector<typename Super::GraphNode> NodeList;
-  typedef NodeTy node_type;
-  typedef EdgeTy edge_type;
+  typedef NodeTy node_data_type;
+  typedef EdgeTy edge_data_type;
 
   NodeList A;
   NodeList B;
@@ -159,7 +171,7 @@ struct PrepareForVerifier {
   typedef typename GraphTypes<G>::Matching Matching;
   typedef typename G::GraphNode GraphNode;
   typedef typename G::NodeList NodeList;
-  typedef typename G::node_type node_type;
+  typedef typename G::node_data_type node_data_type;
   typedef typename G::edge_iterator edge_iterator;
 
   void operator()(G& g, Matching* matching) {
@@ -235,7 +247,7 @@ template<typename G, bool Concurrent>
 struct MatchingFF {
   typedef typename G::GraphNode GraphNode;
   typedef typename G::NodeList NodeList;
-  typedef typename G::node_type node_type;
+  typedef typename G::node_data_type node_data_type;
   typedef typename G::edge_iterator edge_iterator;
   typedef typename GraphTypes<G>::Edge Edge;
 
@@ -273,7 +285,7 @@ struct MatchingFF {
 
       for (edge_iterator ii = g.edge_begin(src, flag), ei = g.edge_end(src, flag); ii != ei; ++ii) {
         GraphNode dst = g.getEdgeDst(ii);
-        node_type& ddst = g.getData(dst, Galois::MethodFlag::NONE);
+        node_data_type& ddst = g.getData(dst, Galois::MethodFlag::NONE);
         if (ddst.reached)
           continue;
         
@@ -408,7 +420,7 @@ struct MatchingABMP {
   typedef typename G::NodeList NodeList;
   typedef typename G::GraphNode GraphNode;
   typedef typename G::edge_iterator edge_iterator;
-  typedef typename G::node_type node_type;
+  typedef typename G::node_data_type node_data_type;
   typedef typename GraphTypes<G>::Edge Edge;
   typedef std::vector<Edge, typename Galois::PerIterAllocTy::rebind<Edge>::other> Revs;
   typedef std::pair<GraphNode,unsigned> WorkItem;
@@ -442,7 +454,7 @@ struct MatchingABMP {
   }
 
   bool nextEdge(G& g, const GraphNode& src, GraphNode& next) {
-    node_type& dsrc = g.getData(src, Galois::MethodFlag::NONE);
+    node_data_type& dsrc = g.getData(src, Galois::MethodFlag::NONE);
     unsigned l = dsrc.layer - 1;
 
     // Start search where we last left off
@@ -592,8 +604,8 @@ struct MatchingMF {
   typedef typename G::GraphNode GraphNode;
   typedef typename G::edge_iterator edge_iterator;
   typedef typename G::iterator iterator;
-  typedef typename G::node_type node_type;
-  typedef typename G::edge_type edge_type;
+  typedef typename G::node_data_type node_data_type;
+  typedef typename G::edge_data_type edge_data_type;
   static const Galois::MethodFlag flag = Concurrent ? Galois::MethodFlag::CHECK_CONFLICT : Galois::MethodFlag::NONE;
   /**
    * Beta parameter the original Goldberg algorithm to control when global
@@ -612,14 +624,14 @@ struct MatchingMF {
 
   std::string name() { return std::string(Concurrent ? "Concurrent" : "Serial") + " Max Flow"; }
 
-  void reduceCapacity(edge_type& edge1, edge_type& edge2, int amount) {
+  void reduceCapacity(edge_data_type& edge1, edge_data_type& edge2, int amount) {
     edge1.cap -= amount;
     edge2.cap += amount;
   }
 
   bool discharge(G& g, const GraphNode& src, Galois::UserContext<GraphNode>& ctx,
       const GraphNode& source, const GraphNode& sink, unsigned numNodes) {
-    node_type& node = g.getData(src, flag);
+    node_data_type& node = g.getData(src, flag);
     //unsigned prevHeight = node.height;
     bool relabeled = false;
 
@@ -634,11 +646,11 @@ struct MatchingMF {
 
       for (edge_iterator ii = g.edge_begin(src, f), ei = g.edge_end(src, f); ii != ei; ++ii, ++current) {
         GraphNode dst = g.getEdgeDst(ii);
-        edge_type& edge = g.getEdgeData(ii);
+        edge_data_type& edge = g.getEdgeData(ii);
         if (edge.cap == 0 || current < node.current) 
           continue;
 
-        node_type& dnode = g.getData(dst, Galois::MethodFlag::NONE);
+        node_data_type& dnode = g.getData(dst, Galois::MethodFlag::NONE);
         if (node.height - 1 != dnode.height) 
           continue;
 
@@ -681,7 +693,7 @@ struct MatchingMF {
       GraphNode dst = g.getEdgeDst(ii);
       int cap = g.getEdgeData(ii).cap;
       if (cap > 0) {
-        node_type& dnode = g.getData(dst, Galois::MethodFlag::NONE);
+        node_data_type& dnode = g.getData(dst, Galois::MethodFlag::NONE);
         if (dnode.height < minHeight) {
           minHeight = dnode.height;
           minEdge = current;
@@ -692,7 +704,7 @@ struct MatchingMF {
     assert(minHeight != std::numeric_limits<unsigned>::max());
     ++minHeight;
 
-    node_type& node = g.getData(src, Galois::MethodFlag::NONE);
+    node_data_type& node = g.getData(src, Galois::MethodFlag::NONE);
     node.height = minHeight;
     node.current = minEdge;
   }
@@ -748,7 +760,7 @@ struct MatchingMF {
           ii != ei; ++ii) {
         GraphNode dst = g.getEdgeDst(ii);
         if (g.getEdgeData(g.findEdge(dst, src, Galois::MethodFlag::NONE)).cap > 0) {
-          node_type& node = g.getData(dst, Galois::MethodFlag::NONE);
+          node_data_type& node = g.getData(dst, Galois::MethodFlag::NONE);
           unsigned newHeight = g.getData(src, Galois::MethodFlag::NONE).height + 1;
           if (useCAS) {
             unsigned oldHeight;
@@ -774,7 +786,7 @@ struct MatchingMF {
 
     for (iterator ii = g.begin(), ei = g.end(); ii != ei; ++ii) {
       GraphNode src = *ii;
-      node_type& node = g.getData(src, Galois::MethodFlag::NONE);
+      node_data_type& node = g.getData(src, Galois::MethodFlag::NONE);
       node.height = numNodes;
       node.current = 0;
       if (src == sink)
@@ -788,7 +800,7 @@ struct MatchingMF {
 
     for (iterator ii = g.begin(), ei = g.end(); ii != ei; ++ii) {
       GraphNode src = *ii;
-      node_type& node = g.getData(src, Galois::MethodFlag::NONE);
+      node_data_type& node = g.getData(src, Galois::MethodFlag::NONE);
       if (src == sink || src == source)
         continue;
       if (node.excess > 0) 
@@ -799,7 +811,7 @@ struct MatchingMF {
   void initializePreflow(G& g, const GraphNode& source, std::vector<GraphNode>& initial) {
     for (edge_iterator ii = g.edge_begin(source), ei = g.edge_end(source); ii != ei; ++ii) {
       GraphNode dst = g.getEdgeDst(ii);
-      edge_type& edge = g.getEdgeData(ii);
+      edge_data_type& edge = g.getEdgeData(ii);
       int cap = edge.cap;
       if (cap > 0)
         initial.push_back(dst);
@@ -814,8 +826,8 @@ struct MatchingMF {
     size_t numEdges = 0;
 
     numNodes = g.size();
-    source = g.createNode(node_type(numNodes++));
-    sink = g.createNode(node_type(numNodes++));
+    source = g.createNode(node_data_type(numNodes++));
+    sink = g.createNode(node_data_type(numNodes++));
     g.getData(source).height = numNodes;
     g.addNode(source);
     g.addNode(sink);
@@ -825,22 +837,22 @@ struct MatchingMF {
       for (edge_iterator ii = g.edge_begin(*src), ei = g.edge_end(*src);
           ii != ei; ++ii) {
         GraphNode dst = g.getEdgeDst(ii);
-        g.getEdgeData(g.addMultiEdge(dst, *src, Galois::MethodFlag::ALL)) = edge_type(0);
+        g.getEdgeData(g.addMultiEdge(dst, *src, Galois::MethodFlag::ALL)) = edge_data_type(0);
         ++numEdges;
       }
     }
 
     // Add edge from source to each node in A
     for (typename NodeList::iterator src = g.A.begin(), esrc = g.A.end(); src != esrc; ++src) {
-      g.getEdgeData(g.addMultiEdge(source, *src, Galois::MethodFlag::ALL)) = edge_type();
-      g.getEdgeData(g.addMultiEdge(*src, source, Galois::MethodFlag::ALL)) = edge_type(0);
+      g.getEdgeData(g.addMultiEdge(source, *src, Galois::MethodFlag::ALL)) = edge_data_type();
+      g.getEdgeData(g.addMultiEdge(*src, source, Galois::MethodFlag::ALL)) = edge_data_type(0);
       ++numEdges;
     }
 
     // Add edge to sink from each node in B
     for (typename NodeList::iterator src = g.B.begin(), esrc = g.B.end(); src != esrc; ++src) {
-      g.getEdgeData(g.addMultiEdge(*src, sink, Galois::MethodFlag::ALL)) = edge_type();
-      g.getEdgeData(g.addMultiEdge(sink, *src, Galois::MethodFlag::ALL)) = edge_type(0);
+      g.getEdgeData(g.addMultiEdge(*src, sink, Galois::MethodFlag::ALL)) = edge_data_type();
+      g.getEdgeData(g.addMultiEdge(sink, *src, Galois::MethodFlag::ALL)) = edge_data_type(0);
       ++numEdges;
     }
 
@@ -916,7 +928,7 @@ struct Exists<G,MatchingMF> {
 template<typename G>
 struct Verifier {
   typedef typename G::GraphNode GraphNode;
-  typedef typename G::node_type node_type;
+  typedef typename G::node_data_type node_data_type;
   typedef typename G::edge_iterator edge_iterator;
   typedef typename G::NodeList NodeList;
   typedef typename GraphTypes<G>::Matching Matching;
@@ -933,7 +945,7 @@ struct Verifier {
   void check(G& g, typename NodeList::iterator ii, typename NodeList::iterator ei,
       size_t& count, bool& retval) {
     for (; ii != ei; ++ii) {
-      node_type& dii = g.getData(*ii);
+      node_data_type& dii = g.getData(*ii);
       if (dii.degree > 1) {
         std::cerr << "Error: not a matching, node " << dii.id << " incident to " << dii.degree << " edges\n";
         retval = false;
@@ -988,17 +1000,28 @@ static double nextRand() {
  * B.
  */
 template<typename G>
-void generateInput(int numA, int numB, int numEdges, int numGroups, G* g) {
-  typedef typename G::node_type node_type;
+void generateRandomInput(int numA, int numB, int numEdges, int numGroups, int seed, G* g) {
+  typedef typename G::node_data_type node_data_type;
+  typedef typename G::GraphNode GNode;
+
+  std::cout 
+    << "numA: " << numA
+    << " numB: " << numB
+    << " numEdges: " << numEdges 
+    << " numGroups: " << numGroups
+    << " seed: " << seed
+    << "\n";
+
+  srand(seed);
 
   assert(numA > 0 && numB > 0);
 
   size_t id = 0;
 
   for (int i = 0; i < numA; ++i)
-    g->addNode(g->createNode(node_type(id++)), true);
+    g->addNode(g->createNode(node_data_type(id++)), true);
   for (int i = 0; i < numB; ++i)
-    g->addNode(g->createNode(node_type(id++)), false);
+    g->addNode(g->createNode(node_data_type(id++)), false);
 
   int d = numEdges/numA;
   if (numGroups > numA)
@@ -1011,8 +1034,7 @@ void generateInput(int numA, int numB, int numEdges, int numGroups, G* g) {
     int aSize = numA/numGroups;
     int bSize = numB/numGroups;
 
-    for (typename G::NodeList::iterator ii = g->A.begin(), ei = g->A.end();
-        ii != ei; ++ii, ++count) {
+    for (auto ii = g->A.begin(), ei = g->A.end(); ii != ei; ++ii, ++count) {
       int group = count/aSize;
       if (group == numGroups)
         break;
@@ -1034,18 +1056,63 @@ void generateInput(int numA, int numB, int numEdges, int numGroups, G* g) {
   }
 }
 
+/**
+ * Read bipartite graph from file.
+ *
+ * Assumes
+ *  (1) nodes in set A have edges while nodes in set B don't
+ *  (2) nodes in set A are the first numA nodes (followed by nodes in set B)
+ */
+template<typename G>
+void readInput(const std::string& filename, G* g) {
+  typedef typename G::node_data_type node_data_type;
+
+  Galois::Graph::LC_CSR_Graph<void,void> inG;
+  Galois::Graph::readGraph(inG, filename);
+  
+  size_t id = 0;
+  int numA = 0;
+  int numB = 0;
+  for (auto n : inG) {
+    bool inA = std::distance(inG.edge_begin(n), inG.edge_end(n)) > 0;
+    g->addNode(g->createNode(node_data_type(id++)), inA);
+    if (inA)
+      numA++;
+    else
+      numB++;
+  }
+
+  for (auto n : inG) {
+    for (auto edge : inG.out_edges(n)) {
+      g->addEdge(g->A[n], g->B[inG.getEdgeDst(edge) - numA]);
+    }
+  }
+
+  std::cout 
+    << "numA: " << numA
+    << " numB: " << numB
+    << " numEdges: " << inG.sizeEdges() 
+    << "\n";
+}
+
 
 template<template<typename,bool> class Algo, typename G, bool Concurrent>
 void start(int N, int numEdges, int numGroups) {
   typedef Algo<G,Concurrent> A;
 
   G g;
-  generateInput(N, N, numEdges, numGroups, &g);
+
+  switch (inputType) {
+    case generated: generateRandomInput(N, N, numEdges, numGroups, seed, &g); break;
+    case fromFile: readInput(inputFilename, &g); break;
+    default: GALOIS_DIE("unknown input type");
+  }
 
   A algo;
   std::cout << "Starting " << algo.name() << "\n";
 
   Galois::StatTimer t;
+
   t.start();
   algo(g);
   t.stop();
@@ -1054,13 +1121,11 @@ void start(int N, int numEdges, int numGroups) {
     typename GraphTypes<G>::Matching matching;
     PrepareForVerifier<G,Algo>()(g, &matching);
     if (!Verifier<G>()(g, matching)) {
-      std::cerr << "Verification failed.\n";
-      //assert(0 && "Verification failed");
-      //abort();
+      GALOIS_DIE("Verification failed");
     } else {
-      std::cout << "Verification succeeded.\n";
+      std::cout << "Verification successful.\n";
     }
-    std::cout << "Algorithm produced matching of cardinality: " << matching.size() << "\n";
+    std::cout << "Matching of cardinality: " << matching.size() << "\n";
   }
 }
 
@@ -1082,17 +1147,11 @@ int main(int argc, char** argv) {
   Galois::StatManager M;
   LonestarStart(argc, argv, name, desc, url);
 
-  std::cout << "N: " << N 
-    << " numEdges: " << numEdges 
-    << " numGroups: " << numGroups
-    << " seed: " << seed << "\n";
-
-  srand(seed);
-
   switch (executionType) {
     case serial: start<false>(); break;
-    default:
     case parallel: start<true>(); break;
+    default:
+      GALOIS_DIE("unknown execution type");
   }
 
   return 0;

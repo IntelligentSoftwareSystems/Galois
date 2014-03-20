@@ -446,8 +446,8 @@ struct GBP {
 template<typename Graph>
 struct GenerateInput {
   typedef typename Graph::GraphNode GraphNode;
-  typedef typename Graph::node_type node_type;
-  typedef typename Graph::edge_type edge_type;
+  typedef typename Graph::node_data_type node_data_type;
+  typedef typename Graph::edge_data_type edge_data_type;
 
   Graph& graph;
   int hardness;
@@ -462,10 +462,10 @@ struct GenerateInput {
     GraphNode& n2 = graph.variables[var2];
     
     double lambda = nextRand() - 0.5;
-    edge_type edge;
+    edge_data_type edge;
     double p00 = exp(lambda*hardness);
     double p01 = exp(-lambda*hardness);
-    GraphNode new_n = graph.createNode(node_type(p00, p01, p01, p00));
+    GraphNode new_n = graph.createNode(node_data_type(p00, p01, p01, p00));
     graph.addNode(new_n, true);
     graph.getEdgeData(graph.addEdge(new_n, n1)) = edge;
     graph.getEdgeData(graph.addEdge(new_n, n2)) = edge;
@@ -477,8 +477,8 @@ struct GenerateInput {
   void addFactor(int var) {
     GraphNode& n = graph.variables[var];
     double h = nextRand();
-    edge_type edge;
-    GraphNode new_n = graph.createNode(node_type(exp(-h), exp(h)));
+    edge_data_type edge;
+    GraphNode new_n = graph.createNode(node_data_type(exp(-h), exp(h)));
     graph.addNode(new_n, true);
     graph.getEdgeData(graph.addEdge(new_n, n)) = edge;
     graph.getEdgeData(graph.addEdge(n, new_n)) = edge;
@@ -489,7 +489,7 @@ struct GenerateInput {
 
     // Create variables
     for (int i = 0; i < N*N; ++i) {
-      GraphNode n = graph.createNode(node_type());
+      GraphNode n = graph.createNode(node_data_type());
       graph.addNode(n, false);
     }
 

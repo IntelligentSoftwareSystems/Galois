@@ -41,7 +41,7 @@ run apps/des/DESunordered "${BASE}/inputs/des/multTree6bit.net"
 run apps/gmetis/gmetis "${BASE}/inputs/structured/rome99.gr" 4
 run apps/kruskal/KruskalHand "${BASE}/inputs/structured/rome99.gr"
 run apps/independentset/independentset "${BASE}/inputs/structured/rome99.gr"
-run apps/matching/bipartite-mcm 100 1000 10 0
+run apps/matching/bipartite-mcm -inputType generated -n 100 -numEdges 1000 -numGroups 10 -seed 0
 run apps/preflowpush/preflowpush "${BASE}/inputs/structured/srome99.gr" 0 100
 run apps/sssp/sssp "${BASE}/inputs/structured/rome99.gr"
 run apps/surveypropagation/surveypropagation 9 100 300 3

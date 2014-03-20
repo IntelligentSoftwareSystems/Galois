@@ -162,20 +162,20 @@ void* FileGraph::structureFromArrays(uint64_t* out_idx, uint64_t num_nodes,
 void FileGraph::structureFromFile(const std::string& filename, bool preFault) {
   masterFD = open(filename.c_str(), O_RDONLY);
   if (masterFD == -1) {
-    GALOIS_SYS_DIE("failed opening ", filename);
+    GALOIS_SYS_DIE("failed opening ", "'", filename, "'");
   }
 
   struct stat buf;
   int f = fstat(masterFD, &buf);
   if (f == -1) {
-    GALOIS_SYS_DIE("failed reading ", filename);
+    GALOIS_SYS_DIE("failed reading ", "'", filename, "'");
   }
   masterLength = buf.st_size;
 
   void* m = mmap(0, masterLength, PROT_READ, preFault ? (MAP_PRIVATE | _MAP_POP) : MAP_PRIVATE, masterFD, 0);
   if (m == MAP_FAILED) {
     m = 0;
-    GALOIS_SYS_DIE("failed reading ", filename);
+    GALOIS_SYS_DIE("failed reading ", "'", filename, "'");
   }
   parse(m);
   masterMapping = m;
@@ -229,7 +229,7 @@ void FileGraph::structureToFile(const std::string& file) {
     if (retval == -1) {
       GALOIS_SYS_DIE("failed writing to ", file);
     } else if (retval == 0) {
-      GALOIS_DIE("ran out of space writing to ", file);
+      GALOIS_DIE("ran out of space writing to ", "'", file, "'");
     }
     total -= retval;
     ptr += retval;

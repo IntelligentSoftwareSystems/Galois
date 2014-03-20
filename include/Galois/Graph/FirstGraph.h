@@ -323,9 +323,9 @@ public:
   //! Graph node handle
   typedef gNode* GraphNode;
   //! Edge data type
-  typedef EdgeTy edge_type;
+  typedef EdgeTy edge_data_type;
   //! Node data type
-  typedef NodeTy node_type;
+  typedef NodeTy node_data_type;
   //! Edge iterator
   typedef typename boost::filter_iterator<is_edge, typename gNodeTypes::iterator> edge_iterator;
   //! Reference to edge data
