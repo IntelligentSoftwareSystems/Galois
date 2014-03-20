@@ -227,7 +227,7 @@ struct parallelPopulateEdges {
           sum += pp->second;
           ++pp;
         }
-        coarseGGraph->addEdgeWithoutCheck(node, dst, Galois::MethodFlag::NONE, sum);
+        coarseGGraph->addMultiEdge(node, dst, Galois::MethodFlag::NONE, sum);
       }
     }
     //    assert(e);

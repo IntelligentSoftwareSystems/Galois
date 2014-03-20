@@ -26,6 +26,7 @@
 #define GALOIS_GRAPH_FIRSTGRAPH_H
 
 #include "Galois/Bag.h"
+#include "Galois/Graph/FileGraph.h"
 #include "Galois/Graph/Details.h"
 #include "Galois/Runtime/MethodFlags.h"
 
@@ -38,6 +39,7 @@
 #include <algorithm>
 #include <map>
 #include <set>
+#include <type_traits>
 #include <vector>
 
 namespace Galois {
@@ -137,7 +139,8 @@ struct EdgeFactory {
 
 template<>
 struct EdgeFactory<void> {
-  void* mkEdge() { return static_cast<void*>(NULL); }
+  template<typename... Args>
+  void* mkEdge(Args&&... args) { return static_cast<void*>(NULL); }
   void delEdge(void*) {}
   bool mustDel() const { return false; }
 };
@@ -211,6 +214,8 @@ public:
 
   template<bool _directional>
   struct with_directional { typedef FirstGraph<NodeTy,EdgeTy,_directional,HasNoLockable> type; };
+
+  typedef read_with_aux_graph_tag read_tag;
 
 private:
   template<typename T>
@@ -336,6 +341,7 @@ public:
   typedef boost::transform_iterator<makeGraphNode,
           boost::filter_iterator<is_node,
                    typename NodeListTy::iterator> > iterator;
+  typedef LargeArray<GraphNode> ReadGraphAuxData;
 
 private:
   template<typename... Args>
@@ -581,6 +587,34 @@ public:
   //! Returns the size of edge data.
   size_t sizeOfEdgeData() const {
     return gNode::EdgeInfo::sizeOfSecond();
+  }
+
+  void allocateFrom(FileGraph& graph, ReadGraphAuxData& aux) { 
+    size_t numNodes = graph.size();
+    aux.allocateInterleaved(numNodes);
+  }
+
+  void constructNodesFrom(FileGraph& graph, unsigned tid, unsigned total, ReadGraphAuxData& aux) {
+    auto r = graph.divideBy(sizeof(gNode), sizeof(typename gNode::EdgeInfo), tid, total);
+    for (FileGraph::iterator ii = r.first, ei = r.second; ii != ei; ++ii) {
+      aux[*ii] = createNode();
+      addNode(aux[*ii], Galois::MethodFlag::NONE);
+    }
+  }
+
+  void constructEdgesFrom(FileGraph& graph, unsigned tid, unsigned total, const ReadGraphAuxData& aux) {
+    typedef typename std::decay<typename gNode::EdgeInfo::reference>::type value_type;
+    auto r = graph.divideBy(sizeof(gNode), sizeof(typename gNode::EdgeInfo), tid, total);
+
+    for (FileGraph::iterator ii = r.first, ei = r.second; ii != ei; ++ii) {
+      for (FileGraph::edge_iterator nn = graph.edge_begin(*ii), en = graph.edge_end(*ii); nn != en; ++nn) {
+        if (gNode::EdgeInfo::sizeOfSecond()) {
+          addMultiEdge(aux[*ii], aux[graph.getEdgeDst(nn)], Galois::MethodFlag::NONE, graph.getEdgeData<value_type>(nn));
+        } else {
+          addMultiEdge(aux[*ii], aux[graph.getEdgeDst(nn)], Galois::MethodFlag::NONE);
+        }
+      }
+    }
   }
 };
 
