@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-sub find_vtune () {
+sub find_vtune() {
   my $vtune = `which amplxe-cl 2> /dev/null`;
   chomp($vtune);
   if (not -e $vtune) {
@@ -19,21 +19,21 @@ sub find_vtune () {
   return $vtune;
 }
 
-sub find_kernel_sym () {
+sub find_kernel_sym() {
   # TODO: fix this path when kernel and library debug symbols get installed
   my $symbol = "/usr/lib/debug/boot/" . `uname -r`;
   chomp($symbol);
   return $symbol;
 }
 
-sub arch_is_knc ()  {
-  if (exists $ENV{'GALOIS_ARCH_MIC'} and $ENV{'GALOIS_ARCH_MIC'} ne '') {
+sub arch_is_knc()  {
+  if ($ENV{'GALOIS_ARCH_MIC'}) {
     return 1;
   }
   return 0;
 }
 
-sub find_analysis_type () {
+sub find_analysis_type() {
   my $type = "nehalem-memory-access";
   # my $type = "snb-general-exploration";
   # my $type = "nehalem-general-exploration";
@@ -51,7 +51,7 @@ sub find_analysis_type () {
   return $type;
 }
 
-sub report_line ($$$$$$) {
+sub report_line($$$$$$) {
   my ($vtune, $report, $rdir, $threads, $outfile, $maxsec) = @_;
 
   system("echo \"THREADS\t$threads\" >>$outfile.line.log");
@@ -85,7 +85,7 @@ sub report_line ($$$$$$) {
   close $output;
 }
 
-sub report_function ($$$$$$) {
+sub report_function($$$$$$) {
   my ($vtune, $report, $rdir, $threads, $outfile, $maxsec) = @_;
 
   system("echo \"THREADS\t$threads\" >>$outfile.function.log");
@@ -133,18 +133,11 @@ if (system ("mkdir -p $dire") != 0) {
 }
 
 my $rdir = "-result-dir=$dire";
-
 my $report = "-R hw-events -format csv -csv-delimiter tab";
-# my $type = "hotspots";
 
-my $collect;
+my $collect = "-analyze-system";
 if (1) {
-  if (arch_is_knc ()) {
-    $collect = "-analyze-system -collect $type ";
-
-  } else {
-    $collect = "-analyze-system -collect $type -start-paused";
-  }
+  $collect .= " -collect $type";
 } else {
   # Manual counter configuration
   my @counters = qw(
@@ -154,7 +147,11 @@ if (1) {
     OFFCORE_RESPONSE_0.ANY_DATA.LOCAL_CACHE
     OFFCORE_RESPONSE_0.ANY_DATA.LOCAL_DRAM
     );
-  $collect = "-collect-with runsa -start-paused -knob event-config=" . join(',', @counters);
+  $collect .= " -collect-with runsa -start-paused -knob event-config=" . join(',', @counters);
+}
+
+unless (arch_is_knc()) {
+  $collect .= " -start-paused";
 }
 
 my $sdir = "-search-dir all=$symbol";
