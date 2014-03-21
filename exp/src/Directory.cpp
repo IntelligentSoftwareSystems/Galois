@@ -27,8 +27,11 @@
 #include "Galois/Runtime/ll/TID.h"
 
 #include <mutex>
+#include <iostream>
 
 using namespace Galois::Runtime;
+
+#if 0
 
 SimpleRuntimeContext& Galois::Runtime::getTransCnx() {
   static PerThreadStorage<Galois::Runtime::SimpleRuntimeContext> obj;
@@ -197,15 +200,182 @@ void Directory::queryObjRemote(fatPointer ptr, bool forward) {
   getSystemDirectory().queryObj(ptr, forward);
 }
 
+#endif
+
 ////////////////////////////////////////////////////////////////////////////////
 
-Directory& Galois::Runtime::getSystemDirectory() {
-  static Directory obj;
+void RemoteDirectory::makeProgress() {
+  //FIXME: write
+}
+
+void RemoteDirectory::dump() {
+  //FIXME: write
+  std::lock_guard<LL::SimpleLock> lg(md_lock);
+  for(auto& pair : md) {
+    std::lock_guard<LL::SimpleLock> mdlg(pair.second.lock);
+    std::cout << pair.first << ": ";
+    pair.second.dump(std::cout);
+    std::cout << "\n";
+  }
+}
+
+void RemoteDirectory::dump(fatPointer ptr) {
+  //FIXME: write
+}
+
+void RemoteDirectory::setContended(fatPointer ptr) {
+  //FIXME: write
+  trace("RemoteDirectory::setContended %\n", ptr);
+}
+
+void RemoteDirectory::clearContended(fatPointer ptr) {
+  //FIXME: write
+  trace("RemoteDirectory::clearContended %\n", ptr);
+}
+
+RemoteDirectory::metadata* RemoteDirectory::getMD(fatPointer ptr) {
+  std::lock_guard<LL::SimpleLock> lg(md_lock);
+  assert(ptr.getHost() != NetworkInterface::ID);
+  return &md[ptr];
+}
+
+//Recieve OK to upgrade RO -> RW
+void RemoteDirectory::recvUpgrade(fatPointer ptr) {
+  trace("RemoteDirectory::recvUpgrade %\n", ptr);
+  metadata* md = getMD(ptr);
+  std::lock_guard<LL::SimpleLock> lg(md->lock);
+  assert(md->state == metadata::UPGRADE);
+  md->state = metadata::HERE_RW;
+}
+
+//Recieve request to invalidate object
+void RemoteDirectory::recvInvalidate(fatPointer ptr) {
+  trace("RemoteDirectory::recvInvalidate %\n", ptr);
+  metadata* md = getMD(ptr);
+  std::lock_guard<LL::SimpleLock> lg(md->lock);
+  assert(md->state == metadata::HERE_RO || md->state == metadata::HERE_RW);
+  if (md->state == metadata::HERE_RW)
+    writeback.push_back({ptr, md->obj});
+  md->state = metadata::INVALID;
+  md->obj = nullptr;
+}
+
+//Recieve request to transition from RW -> RO
+void RemoteDirectory::recvDemote(fatPointer ptr, typeHelper* th) {
+  trace("RemoteDirectory::recvDemote % %\n", ptr, th);
+  metadata* md = getMD(ptr);
+  std::lock_guard<LL::SimpleLock> lg(md->lock);
+  assert(md->state == metadata::HERE_RW);
+  writeback.push_back({ptr, md->obj});
+  //duplicate object so writeback can delete RW copy
+  md->obj = th->duplicate(md->obj);
+  md->state = metadata::HERE_RO;
+}
+
+void RemoteDirectory::recvRequestImpl(fatPointer ptr, ResolveFlag flag, typeHelper* th) {
+  switch (flag) {
+  case INV:
+    recvInvalidate(ptr);
+    break;
+  case RO:
+    recvDemote(ptr, th);
+    break;
+  default:
+    abort();
+  }
+}
+
+void RemoteDirectory::recvObjectImpl(fatPointer ptr, ResolveFlag flag, Lockable* obj) {
+  trace("RemoteDirectory::recvObject % % %\n", ptr, flag, obj);
+  metadata* md = getMD(ptr);
+  std::lock_guard<LL::SimpleLock> lg(md->lock);
+  assert(md->obj == nullptr);
+  assert((md->state == metadata::PENDING_RO && flag == RO)
+         || (md->state == metadata::PENDING_RW && flag == RW));
+  md->state = flag == RW ? metadata::HERE_RW : metadata::HERE_RO;
+  md->obj = obj;
+}
+
+//! precondition: md is locked
+void RemoteDirectory::resolveNotPresent(fatPointer ptr, ResolveFlag flag, metadata* md, typeHelper* th) {
+  if ((flag == RW && (md->state == metadata::UPGRADE || md->state == metadata::PENDING_RW)) ||
+      (flag == RO && (md->state == metadata::PENDING_RO)))
+    return;
+  if (flag == RW) {
+    switch(md->state) {
+    case metadata::INVALID:
+    case metadata::PENDING_RO:
+      md->state = metadata::PENDING_RW;
+      break;
+    case metadata::PENDING_RW:
+    case metadata::UPGRADE:
+      return;
+    default:
+      abort();
+    };
+  } else if (flag == RO) {
+    switch(md->state) {
+    case metadata::INVALID:
+      md->state = metadata::PENDING_RO;
+      break;
+    case metadata::PENDING_RO:
+      return;
+    default:
+      abort();
+    };
+  }
+
+  SendBuffer buf;
+  gSerialize(buf, ptr, flag, NetworkInterface::ID);
+  getSystemNetworkInterface().send(ptr.getHost(), th->localRequestPad, buf);
+}
+
+void RemoteDirectory::metadata::dump(std::ostream& os) const {
+  static const char* StateFlagNames[] = {"I", "PR", "PW", "RO", "RW", "UW"};
+  os << "{" << StateFlagNames[state] << " " << obj << "}";
+}
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+
+void LocalDirectory::recvRequestImpl(fatPointer ptr, ResolveFlag flag, uint32_t dest, typeHelper* th) {
+  std::lock_guard<LL::SimpleLock> lg(reqs_lock);
+  assert(ptr.getHost() == NetworkInterface::ID);
+  trace("LocalDirectory::recvRequestImpl % % %\n", ptr, flag, dest);
+  reqs.insert(std::make_pair(static_cast<Lockable*>(ptr.getObj()), std::make_pair(dest, flag)));
+}
+
+void LocalDirectory::recvObjectImpl(fatPointer ptr) {
+  metadata* md = getMD(static_cast<Lockable*>(ptr.getObj()));
+  uint32_t self = NetworkInterface::ID;
+  assert(ptr.getHost() == self);
+  assert(md);
+  assert(md->locRW != self);
+  assert(md->locRO.empty());
+  std::lock_guard<LL::SimpleLock> lg(md->lock);
+  md->locRW = self;
+}
+
+
+void LocalDirectory::makeProgress() {
+  //FIXME: write
+  
+}
+
+void LocalDirectory::dump() {
+  //FIXME: write
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+LocalDirectory& Galois::Runtime::getLocalDirectory() {
+  static LocalDirectory obj;
   return obj;
 }
 
-DirectoryNG& Galois::Runtime::getSystemDirectoryNG() {
-  static DirectoryNG obj;
+RemoteDirectory& Galois::Runtime::getRemoteDirectory() {
+  static RemoteDirectory obj;
   return obj;
 }
 

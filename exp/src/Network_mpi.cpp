@@ -25,6 +25,7 @@
 
 #include "Galois/Runtime/Network.h"
 #include "Galois/Runtime/NetworkBackend.h"
+#include "Galois/Runtime/Tracer.h"
 #include "Galois/Runtime/ll/SimpleLock.h"
 #include "Galois/Runtime/ll/gio.h"
 #include "Galois/Runtime/ll/TID.h"
@@ -124,6 +125,7 @@ public:
   }
 
   virtual void send(uint32_t dest, recvFuncTy recv, SendBuffer& buf) {
+    trace("NetworkInterfaceAsyncMPI::send % %\n", dest, recv);
     lock.lock();
     //wait for a send slot
     // while (pending_sends.size() >= 128)
@@ -148,6 +150,7 @@ public:
       recvFuncTy f;
       uintptr_t fp;
       gDeserialize(*data,fp);
+      trace("NetworkInterfaceAsyncMPI::handleRecieves %\n", fp);
       assert(fp);
       f = (recvFuncTy)fp;
       //Call deserialized function

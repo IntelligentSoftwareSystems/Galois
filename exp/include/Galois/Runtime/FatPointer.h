@@ -23,7 +23,12 @@
 #ifndef GALOIS_RUNTIME_FATPOINTER_H
 #define GALOIS_RUNTIME_FATPOINTER_H
 
+//std::hash is mixed class and struct in gcc's standard library
+#pragma clang diagnostic ignored "-Wmismatched-tags"
+
 #include <boost/functional/hash.hpp>
+#include "Galois/Runtime/Network.h"
+
 #include <ostream>
 
 namespace Galois {
@@ -60,14 +65,8 @@ public:
 class amd64FatPointer {
   uintptr_t val;
 
-  uintptr_t compute(uint32_t h, void* p) const {
-    return ((uintptr_t)h << 47) | ((uintptr_t)p & 0x80007FFFFFFFFFFF);
-  }
-
-  void set(uint32_t h, void* p) {
-    assert(h < (1U << 17));
-    val = compute(h,p);
-  }
+  uintptr_t compute(uint32_t h, void* p) const;
+  void set(uint32_t h, void* p);
 
 protected:
 
@@ -88,12 +87,8 @@ public:
     hval &= 0x80007FFFFFFFFFFF;
     return (void*)hval;
   }
-  void setHost(uint32_t h) {
-    set(h, getObj());
-  }
-  void setObj(void* p) {
-    set(getHost(), p);
-  }
+  void setHost(uint32_t h);
+  void setObj(void* p);
 };
 
 
@@ -103,12 +98,11 @@ class fatPointerImpl : public fatPointerBase {
 
 public:
 
+  struct thisHost {};
+
   constexpr fatPointerImpl() noexcept :fatPointerBase(0, nullptr) {}
   constexpr fatPointerImpl(uint32_t h, void* p) noexcept :fatPointerBase(h,p) {}
-
-  void dump(std::ostream& os) const {
-    os << "[" << fatPointerBase::getHost() << "," << fatPointerBase::getObj() << "]";
-  }
+  fatPointerImpl(void* p, thisHost th) noexcept : fatPointerBase(NetworkInterface::ID,p) {}
 
   size_t hash_value() const {
     boost::hash<typename fatPointerBase::rawType> ih;
@@ -117,23 +111,15 @@ public:
 
   inline explicit operator bool() const { return fatPointerBase::getObj(); }
 
-  inline bool operator==(const fatPointerImpl& rhs) const {
-    return rawCopy() == rhs.rawCopy();
-  }
-  inline bool operator!=(const fatPointerImpl& rhs) const {
-    return rawCopy() != rhs.rawCopy();
-  }
-  inline bool operator<=(const fatPointerImpl& rhs) const {
-    return rawCopy() <= rhs.rawCopy();
-  }
-  inline bool operator>=(const fatPointerImpl& rhs) const {
-    return rawCopy() >= rhs.rawCopy();
-  }
-  inline bool operator<(const fatPointerImpl& rhs) const {
-    return rawCopy() < rhs.rawCopy();
-  }
-  inline bool operator>(const fatPointerImpl& rhs) const {
-    return rawCopy() > rhs.rawCopy();
+  inline bool operator==(const fatPointerImpl& rhs) const { return rawCopy() == rhs.rawCopy(); }
+  inline bool operator!=(const fatPointerImpl& rhs) const { return rawCopy() != rhs.rawCopy(); }
+  inline bool operator<=(const fatPointerImpl& rhs) const { return rawCopy() <= rhs.rawCopy(); }
+  inline bool operator>=(const fatPointerImpl& rhs) const { return rawCopy() >= rhs.rawCopy(); }
+  inline bool operator< (const fatPointerImpl& rhs) const { return rawCopy() <  rhs.rawCopy(); }
+  inline bool operator> (const fatPointerImpl& rhs) const { return rawCopy() >  rhs.rawCopy(); }
+
+  inline bool isLocal() const {
+    return fatPointerBase::getHost() == NetworkInterface::ID;
   }
 };
 
@@ -141,6 +127,12 @@ template<typename T>
 size_t hash_value(const fatPointerImpl<T>& v) {
   return v.hash_value();
 }
+
+template<typename T>
+std::ostream& operator<<(std::ostream& os, const fatPointerImpl<T>& v) {
+  return os <<  "[" << v.getHost() << "," << v.getObj() << "]";
+}
+
 
 } // namespace detail
 

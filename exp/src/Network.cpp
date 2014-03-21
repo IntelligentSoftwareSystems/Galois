@@ -29,13 +29,17 @@
 
 #include <type_traits>
 #include <cassert>
+#include <iostream>
 
 using namespace Galois::Runtime;
 
 uint32_t NetworkInterface::ID = 0;
 uint32_t NetworkInterface::Num = 1;
 
+//FIXME: move top level loop out of network interface
+
 static bool ourexit = false;
+//FIXME: synchronize this
 static std::deque<std::pair<recvFuncTy, RecvBuffer>> loopwork;
 
 //!landing pad for worker hosts
@@ -53,12 +57,14 @@ static void loop_pad(::RecvBuffer& b) {
 
 void NetworkInterface::start() {
   getSystemBarrier(); // initialize barrier before anyone might be at it
-  getSystemNetworkInterface();
-  getSystemDirectory();
+  auto& net = getSystemNetworkInterface();
+  auto& ldir = getLocalDirectory();
+  auto& rdir = getRemoteDirectory();
   if (NetworkInterface::ID != 0) {
     while (!ourexit) {
       doNetworkWork();
       if (!loopwork.empty()) {
+        std::cout << "Loop Recieved\n";
         auto p = loopwork.front();
         loopwork.pop_front();
         p.first(p.second);
@@ -120,7 +126,7 @@ static void bcastForward(NetworkInterface& net, unsigned source, ::RecvBuffer& b
 static void bcastLandingPad(RecvBuffer& buf) {
   unsigned source;
   gDeserialize(buf, source);
-  trace_bcast_recv(source);
+  trace("::bcastLandingPad %\n", source);
   bcastForward(getSystemNetworkInterface(), source, buf);
   //deliver locally
   recvFuncTy recv;
@@ -130,7 +136,7 @@ static void bcastLandingPad(RecvBuffer& buf) {
 
 void NetworkInterface::broadcast(recvFuncTy recv, SendBuffer& buf, bool self) {
   unsigned source = NetworkInterface::ID;
-  trace_bcast_recv(source);
+  trace("NetworkInterface::broadcast %\n", source);
   buf.serialize_header((void*)recv);
   RecvBuffer rbuf(std::move(buf));
   bcastForward(*this, source, rbuf);

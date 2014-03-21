@@ -50,9 +50,6 @@ int main(int argc, char *argv[])
   Galois::StatManager M;
   LonestarStart(argc, argv, name, desc, url);
   
-  // check the host id and initialise the network
-  getSystemNetworkInterface().start();
-  
   vector<int> myvec;
   R r;
   f1 f(&r);
@@ -66,9 +63,7 @@ int main(int argc, char *argv[])
   gptr<R> e;
   RecvBuffer rbuf(std::move(sbuf));
   Galois::Runtime::gDeserialize(rbuf, e, i2);
-  f.r.dump(std::cerr);
-  e.dump(std::cerr);
-  std::cerr << " " << i1 << " " << i2 << "\n";
+  std::cerr << f.r << " " << e << " " << i1 << " " << i2 << "\n";
 
   std::cerr << "stating\n";
   

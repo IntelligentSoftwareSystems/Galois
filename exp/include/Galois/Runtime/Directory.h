@@ -50,31 +50,260 @@ namespace Runtime {
 
 enum ResolveFlag {INV=0, RO=1, RW=2};
 
-class DirectoryNG {
+//These wrap type information for various dispatching purposes.  This
+//let's us keep vtables out of user objects
+class typeHelper {
+protected:
+  typeHelper(recvFuncTy rRP, recvFuncTy rOP, recvFuncTy lRP, recvFuncTy lOP)
+    : remoteRequestPad(rRP), remoteObjectPad(rOP), localRequestPad(lRP), localObjectPad(lOP)
+  {}
+public:
+  recvFuncTy remoteRequestPad;
+  recvFuncTy remoteObjectPad;
+  recvFuncTy localRequestPad;
+  recvFuncTy localObjectPad;
 
+  virtual Lockable* duplicate(Lockable* obj) const = 0;
+};
+
+template<typename T>
+class typeHelperImpl : public typeHelper {
+  typeHelperImpl();
+public:
+  virtual Lockable* duplicate(Lockable* obj) const {
+    return new T(*static_cast<T*>(obj));
+  }
+
+  static typeHelperImpl* get() {
+    static typeHelperImpl th;
+    return &th;
+  }
+};
+
+
+//handle local objects
+class LocalDirectory {
+  struct metadata {
+    //Lock protecting this structure
+    LL::SimpleLock lock;
+    //Locations which have the object in RO state
+    std::set<uint32_t> locRO;
+    //Location which has the object in RW state
+    uint32_t locRW;
+    //outstanding requests
+    std::set<uint32_t> reqsRO;
+    std::set<uint32_t> reqsRW;
+    //Type aware helper functions
+    typeHelper* t;
+  };
+
+
+  std::unordered_map<Lockable*, metadata> md;
+  LL::SimpleLock md_lock;
+  
+  std::unordered_multimap<Lockable*, std::pair<uint32_t, ResolveFlag>> reqs;
+  LL::SimpleLock reqs_lock;
+
+  metadata* getMD(Lockable* ptr) {
+    std::lock_guard<LL::SimpleLock> lg(md_lock);
+    auto ii = md.find(ptr);
+    if (ii == md.end())
+      return nullptr;
+    return &ii->second;
+  }
+
+
+  void recvRequestImpl(fatPointer ptr, ResolveFlag flag, uint32_t dest, typeHelper* th);
+
+  void recvObjectImpl(fatPointer ptr);
+
+public:
+  //Recieve a request
+  template<typename T>
+  static void recvRequest(RecvBuffer& buf);
+  //Recieve an object
+  template<typename T>
+  static void recvObject(RecvBuffer& buf);
+
+  void makeProgress();
+  void dump();
+};
+
+LocalDirectory& getLocalDirectory();
+
+////////////////////////////////////////////////////////////////////////////////
+// Implementation
+////////////////////////////////////////////////////////////////////////////////
+
+//Generic landing pad for requests
+template<typename T>
+void LocalDirectory::recvRequest(RecvBuffer& buf) {
+  fatPointer ptr;
+  ResolveFlag flag;
+  uint32_t dest;
+  gDeserialize(buf, ptr, flag, dest);
+  //std::cerr << "REQUEST RECV on " << NetworkInterface::ID << " for " << ptr.getObj() << "\n";
+  getLocalDirectory().recvRequestImpl(ptr, flag, dest, typeHelperImpl<T>::get());
+}
+
+template<typename T>
+void LocalDirectory::recvObject(RecvBuffer& buf) {
+  fatPointer ptr;
+  gDeserialize(buf, ptr);
+  T* obj = static_cast<T*>(static_cast<Lockable*>(ptr.getObj()));
+  //FIXME: assert object is locked by directory
+  gDeserialize(buf, *obj);
+  //std::cerr << "ObjRecv on " << NetworkInterface::ID << " getting " << ptr.getObj() << "\n";
+  getLocalDirectory().recvObjectImpl(ptr);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+
+class RemoteDirectory {
+
+  //metadata for an object.
   struct metadata {
     enum StateFlag {
       INVALID=0,    //Not present and not requested
       PENDING_RO=1, //Not present and requested RO
       PENDING_RW=2, //Not present and requested RW
-      RO=3,         //present as RO
-      RW=4,         //present as RW
+      HERE_RO=3,         //present as RO
+      HERE_RW=4,         //present as RW
       UPGRADE=5     //present as RO and requested RW
     };
     LL::SimpleLock lock;
     StateFlag state;
     Lockable* obj;
 
-    metadata() :state(INVALID), obj(0) {}
+    metadata() :state(INVALID), obj(nullptr) {}
 
-    void dump(std::ostream& os) const {
-      static const char* StateFlagNames[] = {"I", "PR", "PW", "RO", "RW", "UW"};
-      os << "{" << StateFlagNames[state] << "," << obj << "}";
-    }
+    void dump(std::ostream& os) const;
   };
 
   std::unordered_map<fatPointer, metadata> md;
   LL::SimpleLock md_lock;
+
+  std::deque<std::pair<fatPointer, Lockable*>> writeback;
+
+  //get metadata for pointer
+  metadata* getMD(fatPointer ptr);
+
+  //Recieve OK to upgrade RO -> RW
+  void recvUpgrade(fatPointer ptr);
+
+  //Recieve request to invalidate object
+  void recvInvalidate(fatPointer ptr);
+
+  //Recieve request to transition from RW -> RO
+  void recvDemote(fatPointer ptr, typeHelper* th);
+
+  //Dispatch request
+  void recvRequestImpl(fatPointer ptr, ResolveFlag flag, typeHelper* th);
+
+  //handle object ariving
+  void recvObjectImpl(fatPointer ptr, ResolveFlag flag, Lockable* obj);
+
+  //handle missing objects (or needing to upgrade)
+  void resolveNotPresent(fatPointer ptr, ResolveFlag flag, metadata* md, typeHelper* th);
+
+public:
+  //Remote portion of API
+
+  //Recieve a request
+  template<typename T>
+  static void recvRequest(RecvBuffer& buf);
+  //Recieve an object
+  template<typename T>
+  static void recvObject(RecvBuffer& buf);
+
+  //Local portion of API
+
+  void makeProgress();
+
+  template<typename T>
+  T* resolve(fatPointer ptr, ResolveFlag flag);
+
+  void setContended(fatPointer ptr);
+  void clearContended(fatPointer ptr);
+  void dump(fatPointer ptr); //dump one object info
+  void dump(); //dump direcotry status
+};
+
+RemoteDirectory& getRemoteDirectory();
+
+////////////////////////////////////////////////////////////////////////////////
+// Implementation
+////////////////////////////////////////////////////////////////////////////////
+
+template<typename T>
+T* RemoteDirectory::resolve(fatPointer ptr, ResolveFlag flag) {
+  trace("RemoteDirectory::resolve % %\n", ptr, flag);
+  metadata* md = getMD(ptr);
+  std::lock_guard<LL::SimpleLock> lg(md->lock);
+  if ((flag == RO && (md->state == metadata::HERE_RO || md->state == metadata::UPGRADE)) ||
+      (flag == RW &&  md->state == metadata::HERE_RW)) {
+    assert(md->obj);
+    return static_cast<T*>(md->obj);
+  } else {
+    resolveNotPresent(ptr, flag, md, typeHelperImpl<T>::get());
+    return nullptr;
+  }
+}
+
+//Generic landing pad for requests
+template<typename T>
+void RemoteDirectory::recvRequest(RecvBuffer& buf) {
+  fatPointer ptr;
+  ResolveFlag flag;
+  gDeserialize(buf, ptr, flag);
+  getRemoteDirectory().recvRequestImpl(ptr, flag, typeHelperImpl<T>::get());
+}
+
+template<typename T>
+void RemoteDirectory::recvObject(RecvBuffer& buf) {
+  fatPointer ptr;
+  ResolveFlag flag;
+  gDeserialize(buf, ptr, flag);
+  assert(flag == RW || flag == RO);
+  //T* obj = new T(buf);
+  T* obj = new T();
+  gDeserialize(buf, *obj);
+  getRemoteDirectory().recvObjectImpl(ptr, flag, static_cast<Lockable*>(obj));
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+template<typename T>
+typeHelperImpl<T>::typeHelperImpl()
+  : typeHelper(&RemoteDirectory::recvRequest<T>,
+               &RemoteDirectory::recvObject<T>,
+               &LocalDirectory::recvRequest<T>,
+               &LocalDirectory::recvObject<T>)
+{}
+
+////////////////////////////////////////////////////////////////////////////////
+
+struct remote_ex { fatPointer ptr; };
+
+////////////////////////////////////////////////////////////////////////////////
+
+
+
+#if 0
+
+
+
+  LockManagerBase loaned;
+
+  struct pendingRecv {
+    fatPointer ptr;
+    uint32_t dest;
+    ResolveFlag flag;
+    std::function<void(Directory*,fatPointer,uint32_t,ResolveFlag)> func;
+    std::set<uint32_t> waiting;
+  };
+  std::deque<pendingRecv> pending;
 
   metadata* getMD(fatPointer ptr) {
     LL::SLguard lg(md_lock);
@@ -83,10 +312,15 @@ class DirectoryNG {
 
   template<typename T>
   void request(fatPointer ptr, ResolveFlag flag) {
+    request<T>(ptr, flag, ptr.getHost());
+  }
+
+  template<typename T>
+  void request(fatPointer ptr, ResolveFlag flag, uint32_t reqTo) {
     SendBuffer sbuf;
     gSerialize(sbuf, ptr, NetworkInterface::ID, flag);
-    getSystemNetworkInterface().send(ptr.getHost(), recvRequest<T>, sbuf);
-    std::cerr << "\nREQEST SENT\n";
+    getSystemNetworkInterface().send(reqTo, recvRequest<T>, sbuf);
+    std::cerr << "REQUEST SENT on " << NetworkInterface::ID << " to " << reqTo << " for " << ptr.getObj() << "\n";
   }
 
   //Generic landing pad for objects
@@ -96,6 +330,9 @@ class DirectoryNG {
   //Generic landing pad for requests
   template<typename T>
   static void recvRequest(RecvBuffer& buf);
+
+  template<typename T>
+  void recvRequestImpl(fatPointer ptr, uint32_t dest, ResolveFlag flag);
 
   void recvObjImpl(fatPointer ptr, Lockable* actual, ResolveFlag flag) {
     metadata* md = getMD(ptr);
@@ -164,6 +401,10 @@ class DirectoryNG {
 
 public:
 
+  bool isRemote(Lockable* ptr) {
+    return loaned.isAcquired(ptr);
+  }
+
   template<typename T>
   T* resolve(fatPointer ptr, ResolveFlag flag) {
     metadata* md = getMD(ptr);
@@ -205,6 +446,19 @@ public:
     return nullptr;
   }
 
+  void setContended(fatPointer)   {}
+  void clearContended(fatPointer) {}
+  void queryObj(fatPointer ptr, bool forward = true) {}
+  void dump() {}
+  void makeProgress() {
+    if (!pending.empty()) {
+      auto& foo = pending.front();
+      //std::cerr << "Pending " << foo.ptr.getObj() << "\n";
+      foo.func(this,foo.ptr, foo.dest, foo.flag);
+      pending.pop_front();
+    }
+  }
+
   void dump(std::ostream& os, fatPointer ptr) {
     metadata* md = getMD(ptr);
     LL::SLguard lg(md->lock);
@@ -213,38 +467,91 @@ public:
   
 };
 
-DirectoryNG& getSystemDirectoryNG();
+Directory& getSystemDirectory();
 
 //Generic landing pad for objects
 template<typename T>
-void DirectoryNG::recvObj(RecvBuffer& buf) {
+void Directory::recvObj(RecvBuffer& buf) {
   fatPointer ptr;
   ResolveFlag flag;
   T* actual = new T();
   gDeserialize(buf, ptr, flag, *actual);
-  std::cerr << "\nObjRecv\n";
-  getSystemDirectoryNG().recvObjImpl(ptr, actual, flag);
+  std::cerr << "ObjRecv on " << NetworkInterface::ID << " getting " << ptr.getObj() << "\n";
+  getSystemDirectory().recvObjImpl(ptr, actual, flag);
 }
 
 //Generic landing pad for requests
 template<typename T>
-void DirectoryNG::recvRequest(RecvBuffer& buf) {
+void Directory::recvRequest(RecvBuffer& buf) {
   fatPointer ptr;
   uint32_t dest;
   ResolveFlag flag;
   gDeserialize(buf, ptr, dest, flag);
-  std::cerr << "\n REQUEST RECV\n";
-  SendBuffer sbuf;
-  gSerialize(sbuf, ptr, flag, *static_cast<T*>(static_cast<Lockable*>(ptr.getObj())));
-  getSystemNetworkInterface().send(dest, recvObj<T>, sbuf);
+  std::cerr << "REQUEST RECV on " << NetworkInterface::ID << " for " << ptr.getObj() << "\n";
+  getSystemDirectory().recvRequestImpl<T>(ptr, dest, flag);
+}
+
+template<typename T>
+void Directory::recvRequestImpl(fatPointer ptr, uint32_t dest, ResolveFlag flag) {
+  auto thisfunc = std::mem_fn(&Directory::recvRequestImpl<T>);
+  metadata* md = getMD(ptr);
+  if (ptr.getHost() == NetworkInterface::ID) { //local obj
+    auto aq = loaned.tryAcquire(static_cast<T*>(ptr.getObj()));
+    switch (aq) {
+    case LockManagerBase::FAIL: {
+      pending.push_back(pendingRecv{ptr, dest, flag, thisfunc});
+      break;
+    }
+    case LockManagerBase::NEW_OWNER: {
+      SendBuffer sbuf;
+      gSerialize(sbuf, ptr, flag, *static_cast<T*>(static_cast<Lockable*>(ptr.getObj())));
+      getSystemNetworkInterface().send(dest, recvObj<T>, sbuf);
+      md->location = dest;
+      break;
+    }
+    case LockManagerBase::ALREADY_OWNER: {
+      if (md->location != dest) {
+        request<T>(ptr, flag, md->location);
+        pending.push_back(pendingRecv{ptr, dest, flag, thisfunc});
+      }
+      break;
+    }
+    }
+  } else { //remote obj
+    //Lookup obj pointer
+    metadata* md = getMD(ptr);
+    Lockable* lptr = md->obj;
+    auto aq = loaned.tryAcquire(lptr);
+    //try locking
+    switch (aq) {
+    case LockManagerBase::FAIL: {
+      pending.push_back(pendingRecv{ptr, dest, flag, thisfunc});
+      break;
+    }
+    case LockManagerBase::NEW_OWNER: {
+      SendBuffer sbuf;
+      gSerialize(sbuf, ptr, flag, *static_cast<T*>(lptr));
+      getSystemNetworkInterface().send(dest, recvObj<T>, sbuf);
+      break;
+    }
+    case LockManagerBase::ALREADY_OWNER: {
+      //A request for an object which already was sent away or isn't here yet
+      //FIXME:
+      pending.push_back(pendingRecv{ptr, dest, flag, thisfunc});
+      break;
+    }
+    }
+  }
 }
 
 
 
+} //Runtime
+} //Galois
+
+#if 0
 
 //SimpleRuntimeContext& getAbortCnx();
-
-struct remote_ex { fatPointer ptr; };
 
 // requests for objects go to owner first
 // owner forwards a request to current owner to recall object
@@ -559,5 +866,27 @@ Galois::Runtime::remoteObjImpl<T>* Galois::Runtime::CacheManager::resolve(fatPoi
   return static_cast<remoteObjImpl<T>*>(retval);
 }
 #endif
+
+#endif
+
+#endif
+
+//! Make progress in the network
+inline void doNetworkWork() {
+  if ((NetworkInterface::Num > 1)) {// && (LL::getTID() == 0)) {
+    auto& net = getSystemNetworkInterface();
+    net.flush();
+    while (net.handleReceives()) { net.flush(); }
+    getRemoteDirectory().makeProgress();
+    getLocalDirectory().makeProgress();
+    net.flush();
+    while (getSystemNetworkInterface().handleReceives()) { net.flush(); }
+  }
+}
+
+
+} // namespace Runtime
+
+} // namespace Galois
 
 #endif

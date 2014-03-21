@@ -293,9 +293,7 @@ public:
     }
     
     while (count > 0) {
-      Galois::Runtime::getSystemDirectory().makeProgress();
-      net.handleReceives();
-      net.flush();
+      Galois::Runtime::doNetworkWork();
     }
     
     //wait at local barrier

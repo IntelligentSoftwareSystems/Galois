@@ -136,7 +136,7 @@ public:
   void push(value_type val, fatPointer ptr) {
     //    std::cerr << "pushing " << val << " to " << ptr.first << " " << ptr.second << " with " << waiting.size() << "\n";
     bool skipNotify;
-    auto& dir = getSystemDirectory();
+    auto& dir = getRemoteDirectory();
     { //limit scope of guard
       LL::SLguard lg(Lock);
       skipNotify =  waiting[ptr].size();
@@ -168,7 +168,7 @@ public:
       }
     }
     //std::cerr << "commit remote " << val << "\n";
-    auto& dir = getSystemDirectory();
+    auto& dir = getRemoteDirectory();
     for (auto key : held)
       dir.clearContended(key);
   }
@@ -179,7 +179,7 @@ public:
       for (auto& k : waiting)
         LL::gDebug("RAQ waiting on: ", k.first.getHost(), ",", k.first.getObj());
       for (auto& k : waiting)
-        getSystemDirectory().queryObj(k.first);
+        getRemoteDirectory().dump(k.first);
     }
   }
 
@@ -199,7 +199,7 @@ public:
     std::chrono::duration<int> onesec(1);
     if (std::chrono::system_clock::now() - oldtime > onesec) {
       oldtime = std::chrono::system_clock::now();
-      getSystemDirectory().dump();
+      getRemoteDirectory().dump();
       dump();
     }
     return holding.empty();
@@ -325,13 +325,16 @@ protected:
               remote_aborted.commit(*p);
           } catch (const conflict_ex& ex) {
             if (remoteAbort) //if in the remote queue, stay in the remote queue
-              remote_aborted.push(*p);
+              //remote_aborted.push(*p);
+              aborted.push(false, *p);
             else
               aborted.push(recursiveAbort, *p);
           } catch (const remote_ex& ex) {
+            //            getSystemDirectory().resolve(ex.ptr, RW);
             tld.inc_stat_remote();
             //aborted.push(recursiveAbort, *p);
-            remote_aborted.push(*p, ex.ptr);
+            //remote_aborted.push(*p, ex.ptr);
+            aborted.push(false, *p);
           }
           if (limit)
             --runlimit;
@@ -373,6 +376,8 @@ protected:
             while (getSystemNetworkInterface().handleReceives()) {}
           }
         }
+        getRemoteDirectory().makeProgress();
+        getLocalDirectory().makeProgress();
         // update node color and prop token
         term.localTermination(didWork);
       } while (!term.globalTermination());
@@ -429,9 +434,9 @@ void for_each_impl(const RangeTy& range, FunctionTy f, const char* loopname) {
     std::ref(W),
     std::ref(getSystemBarrier())
   };
-  trace_loop_start(loopname);
+  trace("Loop start %\n", loopname);
   getSystemThreadPool().run(&w[0], &w[5], activeThreads);
-  trace_loop_end(loopname);
+  trace("Loop end %\n", loopname);
   inGaloisForEach = false;
 }
 

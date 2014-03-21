@@ -133,22 +133,12 @@ inline void acquire(Lockable* lockable, Galois::MethodFlag m) {
 template<typename T>
 inline void acquire(gptr<T> ptr, Galois::MethodFlag m) {
   T* obj = ptr.resolve(m);
-  if (!obj)
+  if (!obj) {
+    getRemoteDirectory().resolve<T>(static_cast<fatPointer>(ptr), ResolveFlag::RW);
     throw remote_ex{static_cast<fatPointer>(ptr)};
+  }
   acquire(obj, m);
 }
-
-template<typename T>
-T* gptr<T>::inner_resolve(Galois::MethodFlag m) const {
-  if (isLocal()) {
-    return static_cast<T*>(ptr.getObj());
-  } else {
-    T* retval = Galois::Runtime::getSystemDirectoryNG().resolve<T>(ptr, ResolveFlag::RW);
-    return retval;
-    //return static_cast<T*>(getCacheManager().resolve<T>(ptr, true)->getObj());
-  }
-}
-
 // inline bool isAcquired(Lockable* C) {
 //   return C->owner.is_locked();
 // }
