@@ -295,7 +295,7 @@ void* Galois::Runtime::MM::largeInterleavedAlloc(size_t len, bool full) {
     unsigned uniqueNodes;
     std::vector<int> mapping(total);
     createMapping(mapping, uniqueNodes);
-    getSystemThreadPool().run(total, std::bind(pageInInterleaved, data, len, std::ref(mapping), uniqueNodes));
+    getSystemThreadPool().run(total, RunCommand(std::bind(pageInInterleaved, data, len, std::ref(mapping), uniqueNodes)));
 #endif
   }
 
