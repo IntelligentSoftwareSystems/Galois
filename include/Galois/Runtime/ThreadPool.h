@@ -48,7 +48,7 @@ public:
   template<typename... Args>
   void run(unsigned num, Args... args) {
     const auto numArgs = sizeof...(args);
-    std::array<RunCommand, numArgs> cmds({args...});
+    std::array<RunCommand, numArgs> cmds{args...};
     runInternal(num, &cmds[0], &cmds[numArgs]);
   }
 
