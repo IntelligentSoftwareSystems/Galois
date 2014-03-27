@@ -34,9 +34,10 @@
 #include "Galois/Runtime/Network.h"
 #include "Galois/Graphs/Graph3.h"
 #include "Galois/Runtime/DistSupport.h"
+#include "Galois/Graph/FileGraph.h"
 
 #include <boost/iterator/transform_iterator.hpp>
-#include <Eigen/Dense>
+//#include <Eigen/Dense>
 #include <utility>
 #include <vector>
 #include <algorithm>
@@ -57,9 +58,15 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
       clEnumValN(Algo::nodeiterator, "nodeiterator", "Node Iterator (default)"),
       clEnumValEnd), cll::init(Algo::nodeiterator));
 
-typedef Galois::Graph::LC_Numa_Graph<uint32_t,void> Graph;
+//typedef Galois::Graph::LC_Numa_Graph<uint32_t,void> Graph;
+typedef Galois::Graph::LC_CSR_Graph<uint32_t,void>::with_no_lockable<true> Graph;
 typedef Graph::GraphNode GNode;
 Graph graph;
+
+
+typedef Galois::Graph::FileGraph FGraph;
+typedef FGraph::GraphNode FGNode;
+FGraph fgraph; 
 
 // DistGraph nodes
 typedef Galois::Graph::ThirdGraph<uint32_t,void,Galois::Graph::EdgeDirection::Un> DGraph;
@@ -81,10 +88,10 @@ struct element: public Galois::Runtime::Lockable {
   element(GNode _g,unsigned _v): g(_g), v(_v) { }
   // serialization functions
   typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+  void serialize(Galois::Runtime::SerializeBuffer& s) const {
     gSerialize(s,g,v);
   }
-  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
     gDeserialize(s,g,v);
   }
 };
@@ -179,10 +186,10 @@ struct NodeIteratorAlgo {
 
     // serialization functions
     typedef int tt_has_serialize;
-    void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+    void serialize(Galois::Runtime::SerializeBuffer& s) const {
       gSerialize(s,g);
     }
-    void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+    void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
       gDeserialize(s,g);
     }
   };
@@ -204,15 +211,16 @@ void run() {
 }
 
 using namespace Galois::Runtime;
-using namespace Galois::Runtime::Distributed;
+//using namespace Galois::Runtime;
 
 typedef  Galois::Runtime::LL::SimpleLock<true> SLock;
 SLock slock;
 
-struct create_nodes {
+struct create_nodes  {
   Graphp g;
-  SLock& l;
-  create_nodes(Graphp _g, SLock& _l): g(_g), l(_l) {}
+  SLock l;
+  create_nodes() = default;
+  create_nodes(Graphp _g, SLock _l): g(_g), l(_l) {}
 
   void operator()(GNode& item, Galois::UserContext<GNode>& ctx) {
     unsigned val = graph.getData(item,Galois::MethodFlag::NONE);
@@ -223,52 +231,67 @@ struct create_nodes {
     llookup[lookup[item]] = n;
     l.unlock();
   }
+  typedef int tt_has_serialize;
+  void serialize(Galois::Runtime::SerializeBuffer& s) const {
+    gSerialize(s,g,l);
+  }
+  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
+    gDeserialize(s,g,l);
+  }
+
 };
 
-static void recvRemoteNode_landing_pad(Distributed::RecvBuffer& buf) {
+static void recvRemoteNode_landing_pad(RecvBuffer& buf) {
   DGNode n;
   unsigned num;
   uint32_t host;
-  Distributed::gDeserialize(buf,host,num,n);
+  gDeserialize(buf,host,num,n);
   slock.lock();
   rlookup[num] = n;
   slock.unlock();
 }
 
-static void getRemoteNode_landing_pad(Distributed::RecvBuffer& buf) {
+static void getRemoteNode_landing_pad(RecvBuffer& buf) {
   unsigned num;
   uint32_t host;
-  Distributed::gDeserialize(buf,host,num);
-  Distributed::SendBuffer b;
+  gDeserialize(buf,host,num);
+  SendBuffer b;
   slock.lock();
-  Distributed::gSerialize(b, networkHostID, num, llookup[num]);
+  gSerialize(b, networkHostID, num, llookup[num]);
   slock.unlock();
-  Distributed::getSystemNetworkInterface().send(host,recvRemoteNode_landing_pad,b);
+  getSystemNetworkInterface().send(host,recvRemoteNode_landing_pad,b);
 }
 
-static void progBarrier_landing_pad(Distributed::RecvBuffer& buf) {
+static void progBarrier_landing_pad(RecvBuffer& buf) {
   ++prog_barrier;
 }
 
 static void program_barrier() {
-  Distributed::SendBuffer b;
-  Distributed::getSystemNetworkInterface().broadcast(progBarrier_landing_pad, b);
+  SendBuffer b;
+  getSystemNetworkInterface().broadcast(progBarrier_landing_pad, b);
   ++prog_barrier;
   do {
-    getSystemLocalDirectory().makeProgress();
-    getSystemRemoteDirectory().makeProgress();
-    Distributed::getSystemNetworkInterface().handleReceives();
+    getSystemDirectory().makeProgress();
+    //getSystemDirectory().makeProgress();
+    getSystemNetworkInterface().handleReceives();
   } while (prog_barrier != networkHostNum);
   prog_barrier = 0;
 }
+void readGraph() { 
 
+fgraph.structureFromFile(inputFilename);
+Galois::Graph::readGraph(graph, fgraph); 
+}
 static void create_dist_graph(Graphp dgraph, std::string triangleFilename) {
   SLock lk;
   uint64_t block, f, l;
   Graph::iterator first, last;
 
   prog_barrier = 0;
-  graph.structureFromFile(triangleFilename);
+  readGraph();
+  //fgraph.structureFromFile(triangleFilename);
+
+  //graph.structureFromGraph(fgraph);   
   unsigned size = 0;
   for (auto ii = graph.begin(); ii != graph.end(); ++ii) {
     lookup[*ii] = size;
@@ -308,10 +331,10 @@ static void create_dist_graph(Graphp dgraph, std::string triangleFilename) {
           printf("ERROR Wrong host ID: %u\n", host);
           abort();
         }
-        Distributed::SendBuffer b;
-        Distributed::gSerialize(b, networkHostID, num);
-        Distributed::getSystemNetworkInterface().send(host,getRemoteNode_landing_pad,b);
-        Distributed::getSystemNetworkInterface().handleReceives();
+        SendBuffer b;
+        gSerialize(b, networkHostID, num);
+        getSystemNetworkInterface().send(host,getRemoteNode_landing_pad,b);
+        getSystemNetworkInterface().handleReceives();
         requested.insert(num);
         ++rcount;
       }
@@ -322,7 +345,7 @@ static void create_dist_graph(Graphp dgraph, std::string triangleFilename) {
   uint64_t recvsize, reqsize;
   reqsize = requested.size();
   do {
-    Distributed::getSystemNetworkInterface().handleReceives();
+    getSystemNetworkInterface().handleReceives();
     slock.lock();
     recvsize = rlookup.size();
     slock.unlock();
@@ -349,19 +372,19 @@ static void create_dist_graph(Graphp dgraph, std::string triangleFilename) {
   program_barrier();
 }
 
-static void readInputGraph_landing_pad(Distributed::RecvBuffer& buf) {
+static void readInputGraph_landing_pad(RecvBuffer& buf) {
   Graphp dgraph;
   std::string triangleFilename;
-  Distributed::gDeserialize(buf, triangleFilename, dgraph);
+  gDeserialize(buf, triangleFilename, dgraph);
   create_dist_graph(dgraph,triangleFilename);
 }
 
 void readInputGraph(Graphp dgraph, std::string triangleFilename) {
-  if (Distributed::networkHostNum > 1) {
-    Distributed::SendBuffer b;
-    Distributed::gSerialize(b, triangleFilename, dgraph);
-    Distributed::getSystemNetworkInterface().broadcast(readInputGraph_landing_pad, b);
-    Distributed::getSystemNetworkInterface().handleReceives();
+  if (networkHostNum > 1) {
+    SendBuffer b;
+    gSerialize(b, triangleFilename, dgraph);
+    getSystemNetworkInterface().broadcast(readInputGraph_landing_pad, b);
+    getSystemNetworkInterface().handleReceives();
   }
   create_dist_graph(dgraph,triangleFilename);
 }
@@ -396,14 +419,14 @@ int main(int argc, char** argv) {
   LonestarStart(argc, argv, name, desc, url);
 
   // check the host id and initialise the network
-  Galois::Runtime::Distributed::networkStart();
+  Galois::Runtime::networkStart();
 
   Graphp dgraph = DGraph::allocate();
 
   // XXX Test if preallocation matters
-  Galois::Statistic("MeminfoPre", Galois::Runtime::MM::pageAllocInfo());
-  Galois::preAlloc(numThreads + 8 * Galois::Runtime::MM::pageAllocInfo());
-  Galois::Statistic("MeminfoMid", Galois::Runtime::MM::pageAllocInfo());
+  //Galois::Statistic("MeminfoPre");
+  //Galois::preAlloc(numThreads + 8 * Galois::Runtime::MM::pageAllocInfo());
+  //Galois::Statistic("MeminfoMid");
 
   Galois::StatTimer Tinitial("InitializeTime");
   Tinitial.start();
@@ -414,12 +437,12 @@ int main(int argc, char** argv) {
   T.start();
   NodeIteratorAlgo()(dgraph);
   T.stop();
-  Galois::Statistic("MeminfoPost", Galois::Runtime::MM::pageAllocInfo());
+  //Galois::Statistic("MeminfoPost");
 
   // TODO Print num triangles
 
   // master_terminate();
-  Galois::Runtime::Distributed::networkTerminate();
+  Galois::Runtime::networkTerminate();
 
   return 0;
 }

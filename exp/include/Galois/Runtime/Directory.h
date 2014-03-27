@@ -194,12 +194,21 @@ class Directory : public SimpleRuntimeContext, private boost::noncopyable {
     pending.push_back(ptr);
   }
 
-  std::deque<fatPointer> getPending() {
+  fatPointer popPending() {
     LL::SLguard lgp(pendingLock);
-    std::deque<fatPointer> retval;
-    retval.swap(pending);
+    if (pending.empty())
+      return fatPointer(0,0);
+    fatPointer retval = pending.front();
+    pending.pop_front();
     return retval;
   }
+
+  // std::deque<fatPointer> getPending() {
+  //   LL::SLguard lgp(pendingLock);
+  //   std::deque<fatPointer> retval;
+  //   retval.swap(pending);
+  //   return retval;
+  // }
 
   //main request processor
   void processObj(LL::SLguard& lg, fatPointer ptr, Lockable* obj);
@@ -259,17 +268,24 @@ public:
   void notifyWhenAvailable(fatPointer ptr, std::function<void(fatPointer)> func);
 
   void makeProgress() {
-    std::deque<fatPointer> outstanding = getPending();
     auto& cm = getCacheManager();
-    for (auto ptr : outstanding) {
-      LL::SLguard lg(getLock(ptr));
-      if (ptr.first == networkHostID) {
-        processObj(lg, ptr, ptr.second);
+    auto& net = getSystemNetworkInterface();
+    fatPointer ptr;
+    while ((ptr = popPending()) != fatPointer(0,0)) {
+      auto& ptrlock = getLock(ptr);
+      if (ptrlock.try_lock()) {
+        LL::SLguard lg(getLock(ptr), std::adopt_lock_t());
+        if (ptr.first == networkHostID) {
+          processObj(lg, ptr, ptr.second);
+        } else {
+          remoteObj* obj = cm.weakResolve(ptr);
+          if (obj)
+            processObj(lg, ptr, obj->getObj());
+        }
       } else {
-        remoteObj* obj = cm.weakResolve(ptr);
-        if (obj)
-          processObj(lg, ptr, obj->getObj());
+        addPending(ptr);
       }
+      while (net.handleReceives()) {}
     }
   }
 
@@ -283,10 +299,10 @@ Directory& getSystemDirectory();
 
 //! Make progress in the network
 inline void doNetworkWork() {
-  if ((networkHostNum > 1) && (LL::getTID() == 0)) {
-    getSystemNetworkInterface().handleReceives();
+  if ((networkHostNum > 1)) {// && (LL::getTID() == 0)) {
+    while (getSystemNetworkInterface().handleReceives()) {}
     getSystemDirectory().makeProgress();
-    getSystemNetworkInterface().handleReceives();
+    while (getSystemNetworkInterface().handleReceives()) {}
   }
 }
 
