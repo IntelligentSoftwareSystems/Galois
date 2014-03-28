@@ -324,7 +324,7 @@ void RemoteDirectory::resolveNotPresent(fatPointer ptr, ResolveFlag flag, metada
       abort();
     };
   }
-
+  trace("RemoteDirectory::resolveNotPresent Sending Message % % %\n", ptr, flag, md->state);
   SendBuffer buf;
   gSerialize(buf, ptr, flag, NetworkInterface::ID);
   getSystemNetworkInterface().send(ptr.getHost(), th->localRequestPad, buf);
@@ -339,11 +339,41 @@ void RemoteDirectory::metadata::dump(std::ostream& os) const {
 
 ////////////////////////////////////////////////////////////////////////////////
 
+LocalDirectory::metadata* LocalDirectory::getMD(Lockable* ptr) {
+  std::lock_guard<LL::SimpleLock> lg(dir_lock);
+  auto ii = dir.find(ptr);
+  if (ii == dir.end())
+    return nullptr;
+  ii->second.lock.lock();
+  return &ii->second;
+}
+
+LocalDirectory::metadata& LocalDirectory::getOrCreateMD(Lockable* ptr) {
+  std::lock_guard<LL::SimpleLock> lg(dir_lock);
+  metadata& md = dir[ptr];
+  md.lock.lock();
+  return md;
+}
+
+
 void LocalDirectory::recvRequestImpl(fatPointer ptr, ResolveFlag flag, uint32_t dest, typeHelper* th) {
-  std::lock_guard<LL::SimpleLock> lg(reqs_lock);
   assert(ptr.getHost() == NetworkInterface::ID);
   trace("LocalDirectory::recvRequestImpl % % %\n", ptr, flag, dest);
-  reqs.insert(std::make_pair(static_cast<Lockable*>(ptr.getObj()), std::make_pair(dest, flag)));
+  metadata& md = getOrCreateMD(static_cast<Lockable*>(ptr.getObj()));
+  std::lock_guard<LL::SimpleLock> lg(md.lock, std::adopt_lock);
+  md.t = th;
+  switch(flag) {
+  case RW:
+    md.reqsRW.insert(dest);
+    break;
+  case RO:
+    md.reqsRO.insert(dest);
+    break;
+  default:
+    assert(0 && "Unexpected flag");
+    abort();
+  }
+  outstandingReqs = 1;
 }
 
 void LocalDirectory::recvObjectImpl(fatPointer ptr) {
@@ -358,9 +388,48 @@ void LocalDirectory::recvObjectImpl(fatPointer ptr) {
 }
 
 
+void LocalDirectory::updateObjState(Lockable* ptr, metadata& md) {
+  //fast exit
+  if (reqsRO.empty() && reqsRW.empty())
+    return;
+  //Either we have the object or it is shared or it is remote
+  if (locsRO.empty() && locRW == ~0) { // Currently Local
+    //object may be available, try to lock and send it
+    if (dirAcquire(ptr)) {
+      //favor writers
+      if (!reqsRW.empty()) {
+        //send object
+        uint32_t dest = *reqsRW.begin();
+        reqsRW.erase(reqsRW.begin());
+        md.locRW = dest;
+        md.t->sendObj(ptr, dest, RW);
+      } else {
+        //send to all readers
+        for (auto d : md.reqsRO) {
+          md.locRO.insert(d);
+          md.t->sendObj(ptr, d, RO);
+        }
+        md.reqsRO.clear();
+      }
+    } else {
+      //Object is locked locally
+    }
+  } else {
+    
+  }
+}
+
 void LocalDirectory::makeProgress() {
   //FIXME: write
-  
+  if (outstandingReqs) {
+    outstandingReqs = 0; // clear flag before examining requests
+    //inefficient, long held lock? (JUST A GUESS)
+    std::lock_guard<LL::SimpleLock> lg(dir_lock);
+    for (auto ii = dir.begin(), ee = dir.end(); ii != ee; ++ii) {
+      std::lock_guard<LL::SimpleLock> obj_lg(ii->second.lock);
+      updateObjState(ii->first, ii->second);
+    }
+  }
 }
 
 void LocalDirectory::dump() {

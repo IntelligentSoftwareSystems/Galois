@@ -90,28 +90,24 @@ class LocalDirectory {
     std::set<uint32_t> locRO;
     //Location which has the object in RW state
     uint32_t locRW;
+    //Lowest if for which a recall has been sent
+    uint32_t recalledFor;
     //outstanding requests
     std::set<uint32_t> reqsRO;
     std::set<uint32_t> reqsRW;
     //Type aware helper functions
     typeHelper* t;
+
+    metadata() :locRW(~0), recalledFor(~0), t(nullptr) {}
   };
 
-
-  std::unordered_map<Lockable*, metadata> md;
-  LL::SimpleLock md_lock;
+  std::unordered_map<Lockable*, metadata> dir;
+  LL::SimpleLock dir_lock;
   
-  std::unordered_multimap<Lockable*, std::pair<uint32_t, ResolveFlag>> reqs;
-  LL::SimpleLock reqs_lock;
+  metadata* getMD(Lockable*);
+  metadata& getOrCreateMD(Lockable*);
 
-  metadata* getMD(Lockable* ptr) {
-    std::lock_guard<LL::SimpleLock> lg(md_lock);
-    auto ii = md.find(ptr);
-    if (ii == md.end())
-      return nullptr;
-    return &ii->second;
-  }
-
+  std::atomic<int> outstandingReqs;
 
   void recvRequestImpl(fatPointer ptr, ResolveFlag flag, uint32_t dest, typeHelper* th);
 
@@ -142,7 +138,6 @@ void LocalDirectory::recvRequest(RecvBuffer& buf) {
   ResolveFlag flag;
   uint32_t dest;
   gDeserialize(buf, ptr, flag, dest);
-  //std::cerr << "REQUEST RECV on " << NetworkInterface::ID << " for " << ptr.getObj() << "\n";
   getLocalDirectory().recvRequestImpl(ptr, flag, dest, typeHelperImpl<T>::get());
 }
 
