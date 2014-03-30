@@ -141,12 +141,14 @@ typedef detail::fatPointerImpl<detail::amd64FatPointer> fatPointer;
 } // namespace Runtime
 } // namespace Galois
 
+namespace std {
 template<>
-struct std::hash<Galois::Runtime::fatPointer> {
+struct hash<Galois::Runtime::fatPointer> {
   size_t operator()(const Galois::Runtime::fatPointer& ptr) const {
     return ptr.hash_value();
   }
 };
+} // namespace std
 
 
 #endif

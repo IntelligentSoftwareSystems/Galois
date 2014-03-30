@@ -59,7 +59,7 @@ public:
   bool operator<=(const gptr& rhs) const { return ptr <= rhs.ptr; }
   bool operator>=(const gptr& rhs) const { return ptr >= rhs.ptr; }
 
-  explicit operator bool()         const { return bool()(ptr); }
+  explicit operator bool()         const { return bool(ptr); }
   explicit operator fatPointer()   const { return ptr; }
 
   bool isLocal() const { return ptr.isLocal(); }
