@@ -98,11 +98,12 @@ class fatPointerImpl : public fatPointerBase {
 
 public:
 
-  struct thisHost {};
+  struct thisHost_t {};
+  static thisHost_t thisHost;
 
   constexpr fatPointerImpl() noexcept :fatPointerBase(0, nullptr) {}
   constexpr fatPointerImpl(uint32_t h, void* p) noexcept :fatPointerBase(h,p) {}
-  fatPointerImpl(void* p, thisHost th) noexcept : fatPointerBase(NetworkInterface::ID,p) {}
+  fatPointerImpl(void* p, thisHost_t th) noexcept : fatPointerBase(NetworkInterface::ID,p) {}
 
   size_t hash_value() const {
     boost::hash<typename fatPointerBase::rawType> ih;

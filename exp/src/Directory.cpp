@@ -18,7 +18,6 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  *
- * @author Manoj Dhanapal <madhanap@cs.utexas.edu>
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
@@ -30,177 +29,6 @@
 #include <iostream>
 
 using namespace Galois::Runtime;
-
-#if 0
-
-SimpleRuntimeContext& Galois::Runtime::getTransCnx() {
-  static PerThreadStorage<Galois::Runtime::SimpleRuntimeContext> obj;
-  return *obj.getLocal();
-}
-
-// SimpleRuntimeContext& Galois::Runtime::getAbortCnx() {
-//   static Galois::Runtime::SimpleRuntimeContext obj;
-//   return obj;
-// }
-
-
-
-void Directory::doRequest(fatPointer ptr, typeHelper* th, uint32_t remoteHost) {
-  LL::SLguard lg(getLock(ptr));
-  tracking& tr = getTracking(lg, ptr);
-  tr.addRequest(remoteHost, th);
-  addPending(ptr);
-}
-
-bool Directory::doObj(fatPointer ptr, typeHelper* th) {
-  LL::SLguard lg(getLock(ptr));
-  tracking& tr = getExistingTracking(lg, ptr);
-  tr.setLocal();
-  addPending(ptr);
-  return true;
-}
-
-void Directory::setContended(fatPointer ptr) {
-  LL::SLguard lg(getLock(ptr));
-  tracking& tr = getTracking(lg, ptr);
-  tr.setContended();
-  addPending(ptr);
-}
-
-void Directory::clearContended(fatPointer ptr) {
-  LL::SLguard lg(getLock(ptr));
-  tracking& tr = getTracking(lg, ptr);
-  tr.clearContended();
-  addPending(ptr);
-}
-
-
-void Directory::notifyWhenAvailable(fatPointer ptr, std::function<void(fatPointer)> func) {
-  LL::SLguard lg(getLock(ptr));
-  tracking& tr = getExistingTracking(lg, ptr);
-  tr.addNotify(func);
-}
-
-void Directory::processObj(LL::SLguard& lg, fatPointer ptr, Lockable* obj) {
-  tracking& tr = getTracking(lg, ptr);
-
-  //invalid objects just need requests
-  if (LockManagerBase::isAcquired(obj)) {
-    if (tr.hasRequest()) {
-      uint32_t wanter = tr.getRequest();
-      if (!tr.isRecalled() || wanter < tr.getRecalled()) {
-        tr.getHelper()->sendRequest(ptr, ptr.getHost() == NetworkInterface::ID ? tr.getCurLoc() : ptr.getHost(), wanter);
-        tr.setRecalled(wanter);
-      }
-    }
-    return;
-  }
-
-  //only worry about objects with outstanding requests
-  if (tr.hasRequest()) {
-    uint32_t wanter = tr.getRequest();
-    //check if existential lock overwrites transfer
-    if (wanter > NetworkInterface::ID && tr.isContended()) {
-      LL::gDebug("Contended Protection of [", ptr.getHost(), ",", ptr.getObj(), "] from ", wanter);
-      return;
-    }
-    //Don't need to move object if requestor is local
-    if (wanter == NetworkInterface::ID) {
-      tr.delRequest(NetworkInterface::ID); //eat local request
-      if (tr.hasRequest())
-        addPending(ptr);
-      return;
-    }
-    //figure out to whom to send it 
-    switch (LockManagerBase::tryAcquire(obj)) {
-    case LockManagerBase::FAIL: // Local iteration has the lock
-      addPending(ptr);
-      return; // delay processing
-    case LockManagerBase::NEW_OWNER: { //now owner (was free and on this host)
-      //compute who to send the object too
-      //non-owner sends back to owner
-      uint32_t dest = ptr.getHost() == NetworkInterface::ID ? wanter : ptr.getHost();
-      tr.getHelper()->sendObject(ptr, obj, dest);
-      if (ptr.getHost() == NetworkInterface::ID) {
-        //remember who has it
-        tr.setCurLoc(dest);
-        //we handled this request
-        tr.delRequest(dest);
-        if (tr.hasRequest())
-          addPending(ptr);
-      } else {
-        //don't need to track pending requests for remote objects
-        tr.clearRequest();
-      }
-      break;
-    }
-    case LockManagerBase::ALREADY_OWNER: //already owner, should have been caught above
-    default: //unknown
-      abort();
-    }
-  } else {
-    //no outstanding requests? might be able to kill record
-    assert(!tr.isRecalled());
-    if (!tr.isContended())
-      delTracking(lg ,ptr);
-    return;
-  }
-}
-
-
-
-void Directory::dump() {
-#if 0
-  LL::gDebug("Directory has ",
-             delayed.size(), " delayed requests, ",
-             notifiers.size(), " registered notifcations, ",
-             fetches.size(), " pending fetches, ",
-             remoteObjects.size(), " remote objects");
-  if (fetches.size() < 10) {
-    std::set<fatPointer> r = fetches.getAllRequests();
-    for (auto k : r)
-      LL::gDebug("Directory pending fetch: ", k.getHost(), ",", k.getObj());
-  }
-  if (remoteObjects.size() < 10) {
-    for (auto& k : remoteObjects)
-      LL::gDebug("Directory remote object: ", k.first.getHost(), ",", k.fist.getObj());
-  }
-  if (notifiers.size() < 10) {
-    for (auto& k : notifiers)
-      LL::gDebug("Directory notification: ", k.first.getHost(), ",", k.first.getObj());
-  }
-  if (delayed.size() < 10) {
-    for (auto k : delayed)
-      LL::gDebug("Directory delayed: ", k.getHost(), ",", k.getObj());
-  }
-#endif
-}
-
-void Directory::queryObj(fatPointer ptr, bool forward) {
-  LL::SLguard lg(getLock(ptr));
-  tracking* tr = nullptr;
-  if (hasTracking(lg, ptr))
-    tr = &getExistingTracking(lg, ptr);
-  LL::gDebug("Directory query for ", ptr.getHost(), ",", ptr.getObj(),
-             ptr.getHost() == NetworkInterface::ID ? " Mine" : " Other",
-             tr ? " Tracked" : " **Untracked**",
-             tr && tr->isRecalled() ? " Recalled" : "",
-             tr && tr->isContended() ? " Contended" : "",
-             "");
-
-  if (forward) {
-    if (ptr.getHost() == NetworkInterface::ID && tr && tr->getCurLoc() != NetworkInterface::ID)
-      getSystemNetworkInterface().sendAlt(tr->getCurLoc(), queryObjRemote, ptr, false);
-    else if (ptr.getHost() != NetworkInterface::ID)
-      getSystemNetworkInterface().sendAlt(ptr.getHost(), queryObjRemote, ptr, false);
-  }
-}
-
-void Directory::queryObjRemote(fatPointer ptr, bool forward) {
-  getSystemDirectory().queryObj(ptr, forward);
-}
-
-#endif
 
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -240,7 +68,7 @@ RemoteDirectory::metadata* RemoteDirectory::getMD(fatPointer ptr) {
 }
 
 //Recieve OK to upgrade RO -> RW
-void RemoteDirectory::recvUpgrade(fatPointer ptr) {
+void RemoteDirectory::recvUpgrade(fatPointer ptr, typeHelper* th) {
   trace("RemoteDirectory::recvUpgrade %\n", ptr);
   metadata* md = getMD(ptr);
   std::lock_guard<LL::SimpleLock> lg(md->lock);
@@ -249,10 +77,11 @@ void RemoteDirectory::recvUpgrade(fatPointer ptr) {
 }
 
 //Recieve request to invalidate object
-void RemoteDirectory::recvInvalidate(fatPointer ptr) {
+//FIXME: deal with cause and local priority control
+void RemoteDirectory::recvInvalidate(fatPointer ptr, uint32_t cause, typeHelper* th) {
   trace("RemoteDirectory::recvInvalidate %\n", ptr);
   metadata* md = getMD(ptr);
-  std::lock_guard<LL::SimpleLock> lg(md->lock);
+  std::lock_guard<LL::SimpleLock> lg(md->lock); //FIXME: transfer lock
   assert(md->state == metadata::HERE_RO || md->state == metadata::HERE_RW);
   if (md->state == metadata::HERE_RW)
     writeback.push_back({ptr, md->obj});
@@ -260,26 +89,13 @@ void RemoteDirectory::recvInvalidate(fatPointer ptr) {
   md->obj = nullptr;
 }
 
-//Recieve request to transition from RW -> RO
-void RemoteDirectory::recvDemote(fatPointer ptr, typeHelper* th) {
-  trace("RemoteDirectory::recvDemote % %\n", ptr, th);
-  metadata* md = getMD(ptr);
-  std::lock_guard<LL::SimpleLock> lg(md->lock);
-  assert(md->state == metadata::HERE_RW);
-  writeback.push_back({ptr, md->obj});
-  //duplicate object so writeback can delete RW copy
-  md->obj = th->duplicate(md->obj);
-  md->state = metadata::HERE_RO;
-}
-
-void RemoteDirectory::recvRequestImpl(fatPointer ptr, ResolveFlag flag, typeHelper* th) {
+void RemoteDirectory::recvRequestImpl(fatPointer ptr, ResolveFlag flag, uint32_t cause, typeHelper* th) {
   switch (flag) {
   case INV:
-    recvInvalidate(ptr);
+    recvInvalidate(ptr, cause, th);
     break;
-  case RO:
-    recvDemote(ptr, th);
-    break;
+  case RW:
+    recvUpgrade(ptr, th);
   default:
     abort();
   }
@@ -325,9 +141,7 @@ void RemoteDirectory::resolveNotPresent(fatPointer ptr, ResolveFlag flag, metada
     };
   }
   trace("RemoteDirectory::resolveNotPresent Sending Message % % %\n", ptr, flag, md->state);
-  SendBuffer buf;
-  gSerialize(buf, ptr, flag, NetworkInterface::ID);
-  getSystemNetworkInterface().send(ptr.getHost(), th->localRequestPad, buf);
+  th->requestObj(ptr, flag);
 }
 
 void RemoteDirectory::metadata::dump(std::ostream& os) const {
@@ -376,58 +190,127 @@ void LocalDirectory::recvRequestImpl(fatPointer ptr, ResolveFlag flag, uint32_t 
   outstandingReqs = 1;
 }
 
-void LocalDirectory::recvObjectImpl(fatPointer ptr) {
-  metadata* md = getMD(static_cast<Lockable*>(ptr.getObj()));
+void LocalDirectory::recvObjectImpl(fatPointer fptr) {
+  Lockable* ptr = static_cast<Lockable*>(fptr.getObj());
+  metadata* md = getMD(ptr);
   uint32_t self = NetworkInterface::ID;
   assert(ptr.getHost() == self);
   assert(md);
-  assert(md->locRW != self);
+  assert(md->locRW != self && md->locRW != ~0);
   assert(md->locRO.empty());
-  std::lock_guard<LL::SimpleLock> lg(md->lock);
-  md->locRW = self;
+  assert(hasAcquired(ptr));
+  std::lock_guard<LL::SimpleLock> lg(md->lock, std::adopt_lock);
+  md->locRW = ~0;
+  md->recalledFor = ~0;
+  dirRelease(ptr);
+  outstandingReqs = 1; // reprocess outstanding reqs now that some may go forward
 }
 
+bool LocalDirectory::dirAcquire(Lockable* ptr) {
+  std::lock_guard<LL::SimpleLock> lg(dirContext_lock);
+  auto rv = dirContext.tryAcquire(ptr);
+  switch (rv) {
+  case LockManagerBase::FAIL:      return false;
+  case LockManagerBase::NEW_OWNER: return true;
+  case LockManagerBase::ALREADY_OWNER: assert(0 && "Already owner?"); abort();
+  }
+}
 
-void LocalDirectory::updateObjState(Lockable* ptr, metadata& md) {
+void LocalDirectory::dirRelease(Lockable* ptr) {
+  std::lock_guard<LL::SimpleLock> lg(dirContext_lock);
+  dirContext.releaseOne(ptr);
+}
+
+bool LocalDirectory::updateObjState(Lockable* ptr, metadata& md) {
   //fast exit
-  if (reqsRO.empty() && reqsRW.empty())
-    return;
-  //Either we have the object or it is shared or it is remote
-  if (locsRO.empty() && locRW == ~0) { // Currently Local
-    //object may be available, try to lock and send it
-    if (dirAcquire(ptr)) {
-      //favor writers
-      if (!reqsRW.empty()) {
-        //send object
-        uint32_t dest = *reqsRW.begin();
-        reqsRW.erase(reqsRW.begin());
-        md.locRW = dest;
-        md.t->sendObj(ptr, dest, RW);
-      } else {
-        //send to all readers
-        for (auto d : md.reqsRO) {
-          md.locRO.insert(d);
-          md.t->sendObj(ptr, d, RO);
+  if (md.reqsRO.empty() && md.reqsRW.empty())
+    return true;
+
+  //Is currently remote writer-only
+  //recall for either next writer or first reader
+  if (md.locRW != ~0) {
+    uint32_t requester = ~0;
+    if (!md.reqsRW.empty())
+      requester = *md.reqsRW.begin();
+    else 
+      requester = *md.reqsRO.begin();
+    //don't send duplicate recalls
+    if (requester < md.recalledFor) {
+      //send recall
+      md.recalledFor = requester;
+      md.t->invalidate(ptr, md.locRW, requester);
+    }
+    return true; //nothing left to do while still in remote Write
+  }
+
+  //Is currently remote read-only
+  if (!md.locRO.empty()) {
+    if (!md.reqsRW.empty()) {
+      //invalidate remote reads and send obj to writer
+      //bonus: check if this is an upgrade and ack that
+      uint32_t requester = *md.reqsRW.begin();
+      md.reqsRW.erase(md.reqsRW.begin());
+      for (auto d : md.locRO) {
+        if (d == requester) {
+          //upgrade
+          requester = ~0;
+          md.t->upgrade(ptr, d);
+        } else {
+          //invalidate
+          md.t->invalidate(ptr, d);
         }
-        md.reqsRO.clear();
+      }
+      md.locRO.clear();
+      //Didn't upgrade, so send
+      if (requester != ~0) {
+        md.t->sendObj(ptr, requester, RW);
       }
     } else {
-      //Object is locked locally
+      assert(!md.reqsRO.empty());
+      for (auto d : md.reqsRO)
+        md.t->sendObj(ptr, d, RO);
+      md.locRO.insert(md.reqsRO.begin(), md.reqsRO.end());
+      md.reqsRO.clear();
     }
+    return true; //nothing left to do
+  }
+
+  //object is currently local
+  assert(md.locsRO.empty() && md.locRW == ~0);
+  //object may be available, try to lock and send it
+  if (dirAcquire(ptr)) {
+    //favor writers
+    if (!md.reqsRW.empty()) {
+      //send object
+      uint32_t dest = *md.reqsRW.begin();
+      md.reqsRW.erase(md.reqsRW.begin());
+      md.locRW = dest;
+      md.t->sendObj(ptr, dest, RW);
+    } else {
+      //send to all readers
+      for (auto d : md.reqsRO) {
+        md.locRO.insert(d);
+        md.t->sendObj(ptr, d, RO);
+      }
+      md.reqsRO.clear();
+    }
+    return true;
   } else {
-    
+    //Object is locked locally
+    //revisit later
+    return false;
   }
 }
 
 void LocalDirectory::makeProgress() {
-  //FIXME: write
   if (outstandingReqs) {
     outstandingReqs = 0; // clear flag before examining requests
     //inefficient, long held lock? (JUST A GUESS)
     std::lock_guard<LL::SimpleLock> lg(dir_lock);
     for (auto ii = dir.begin(), ee = dir.end(); ii != ee; ++ii) {
       std::lock_guard<LL::SimpleLock> obj_lg(ii->second.lock);
-      updateObjState(ii->first, ii->second);
+      if (!updateObjState(ii->first, ii->second))
+        outstandingReqs = 1;
     }
   }
 }
