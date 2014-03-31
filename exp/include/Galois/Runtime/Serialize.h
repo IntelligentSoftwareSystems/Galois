@@ -38,10 +38,15 @@
 
 //from libc++, clang specific
 namespace std {
+#ifdef __clang__
 template <class T> struct is_trivially_copyable;
 template <class _Tp> struct is_trivially_copyable
   : public std::integral_constant<bool, __is_trivially_copyable(_Tp)>
 {};
+#else
+template<class T>
+using is_trivially_copyable = is_trivial<T>;
+#endif
 }
 
 namespace Galois {
@@ -129,7 +134,7 @@ inline bool gSerialize(SerializeBuffer& buf, const std::string& data) {
   typename std::string::size_type size;
   size = data.size();
   gSerialize(buf, size);
-  for (auto x = 0 ; x < size; ++x)
+  for (decltype(size) x = 0 ; x < size; ++x)
     gSerialize(buf, data.at(x));
   return true;
 }
@@ -313,6 +318,7 @@ bool gDeserialize1(DeSerializeBuffer& buf, T1& a1, T2& a2, U&... an) {
   gDeserialize(buf,a1);
   gDeserialize(buf,a2);
   gDeserialize(buf,an...);
+  return true;
 }
 
 template<typename... Args>
