@@ -92,6 +92,7 @@ public:
 };
 
 NetworkInterface& getSystemNetworkInterface();
+uint32_t getHostID();
 
 ////////////////////////////////////////////////////////////////////////////////
 // Implementations

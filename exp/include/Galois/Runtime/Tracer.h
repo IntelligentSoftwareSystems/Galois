@@ -25,28 +25,42 @@
 #define GALOIS_RUNTIME_TRACER_H
 
 #include <iostream>
+#include <sstream>
 
 namespace Galois {
 namespace Runtime {
+uint32_t getHostID();
 
-const bool doTrace = true;
+namespace detail {
 
-static inline void trace(const char* format) {
-  if (doTrace)
-    std::cerr << format;
+static inline void traceImpl(std::ostringstream& os, const char* format) {
+  os << format;
 }
 
 template<typename T, typename... Args>
-static inline void trace(const char* format, T value, Args... args) {
-  if (doTrace) {
-    for (; *format != '\0'; format++) {
-      if (*format == '%') {
-        std::cerr << value;
-        trace(format + 1, args...);
-        return;
-      }
-      std::cerr << *format;
+static inline void traceImpl(std::ostringstream& os, const char* format, T value, Args... args) {
+  for (; *format != '\0'; format++) {
+    if (*format == '%') {
+      os << value;
+      traceImpl(os, format + 1, args...);
+      return;
     }
+    os << *format;
+  }
+}
+
+} // namespace detail
+
+const bool doTrace = true;
+
+//FIXME use better forwarding
+template<typename... Args>
+static inline void trace(const char* format, Args... args) {
+  if (doTrace) {
+    std::ostringstream os;
+    os << "<" << getHostID() << "> ";
+    detail::traceImpl(os, format, args...);
+    std::cerr << os.str();
   }
 }
 

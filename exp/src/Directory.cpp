@@ -31,9 +31,75 @@
 using namespace Galois::Runtime;
 
 ////////////////////////////////////////////////////////////////////////////////
+// Base Directory
+////////////////////////////////////////////////////////////////////////////////
+
+
+void BaseDirectory::typeHelper::invalidate(Lockable* ptr, uint32_t dest, uint32_t cause) const {
+  SendBuffer buf;
+  fatPointer fptr(ptr, fatPointer::thisHost);
+  gSerialize(buf, fptr, ResolveFlag::INV, cause);
+  getSystemNetworkInterface().send(dest, remoteRequestPad, buf);
+}
+void BaseDirectory::typeHelper::sendObj(Lockable* ptr, uint32_t dest, ResolveFlag flag) const {
+  SendBuffer buf;
+  fatPointer fptr(ptr, fatPointer::thisHost);
+  gSerialize(buf, fptr, flag);
+  vSerialize(buf, ptr);
+  getSystemNetworkInterface().send(dest, remoteObjectPad, buf);
+}
+void BaseDirectory::typeHelper::upgrade(Lockable* ptr, uint32_t dest) const {
+  SendBuffer buf;
+  fatPointer fptr(ptr, fatPointer::thisHost);
+  uint32_t dummy = ~0;
+  gSerialize(buf, fptr, ResolveFlag::RW, dummy);
+  getSystemNetworkInterface().send(dest, remoteRequestPad, buf);
+}
+
+void BaseDirectory::typeHelper::requestObj(fatPointer ptr, ResolveFlag flag) {
+  SendBuffer buf;
+  gSerialize(buf, ptr, flag, NetworkInterface::ID);
+  getSystemNetworkInterface().send(ptr.getHost(), localRequestPad, buf);
+}
+void BaseDirectory::typeHelper::writebackObj(fatPointer ptr, Lockable* obj) {
+  SendBuffer buf;
+  gSerialize(buf, ptr);
+  vSerialize(buf, obj);
+  getSystemNetworkInterface().send(ptr.getHost(), localObjectPad, buf);
+}
+
+bool BaseDirectory::dirAcquire(Lockable* ptr) {
+  std::lock_guard<LL::SimpleLock> lg(dirContext_lock);
+  auto rv = dirContext.tryAcquire(ptr);
+  switch (rv) {
+  case LockManagerBase::FAIL:      return false;
+  case LockManagerBase::NEW_OWNER: return true;
+  case LockManagerBase::ALREADY_OWNER: assert(0 && "Already owner?"); abort();
+  }
+}
+
+void BaseDirectory::dirRelease(Lockable* ptr) {
+  std::lock_guard<LL::SimpleLock> lg(dirContext_lock);
+  dirContext.releaseOne(ptr);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Remote Directory
+////////////////////////////////////////////////////////////////////////////////
 
 void RemoteDirectory::makeProgress() {
-  //FIXME: write
+  //FIXME: make safe
+  decltype(writeback) q;
+  q.swap(writeback);
+  for (auto& wb : q) {
+    if (dirAcquire(std::get<1>(wb))) {
+      std::get<2>(wb)->writebackObj(std::get<0>(wb), std::get<1>(wb));
+      dirRelease(std::get<1>(wb));
+      delete std::get<1>(wb);
+    } else {
+      writeback.push_back(wb);
+    }
+  }
 }
 
 void RemoteDirectory::dump() {
@@ -84,7 +150,7 @@ void RemoteDirectory::recvInvalidate(fatPointer ptr, uint32_t cause, typeHelper*
   std::lock_guard<LL::SimpleLock> lg(md->lock); //FIXME: transfer lock
   assert(md->state == metadata::HERE_RO || md->state == metadata::HERE_RW);
   if (md->state == metadata::HERE_RW)
-    writeback.push_back({ptr, md->obj});
+    writeback.emplace_back(ptr, md->obj, th);
   md->state = metadata::INVALID;
   md->obj = nullptr;
 }
@@ -104,7 +170,7 @@ void RemoteDirectory::recvRequestImpl(fatPointer ptr, ResolveFlag flag, uint32_t
 void RemoteDirectory::recvObjectImpl(fatPointer ptr, ResolveFlag flag, Lockable* obj) {
   trace("RemoteDirectory::recvObject % % %\n", ptr, flag, obj);
   metadata* md = getMD(ptr);
-  std::lock_guard<LL::SimpleLock> lg(md->lock);
+  std::lock_guard<LL::SimpleLock> lg(md->lock); //FIXME: transfer lock
   assert(md->obj == nullptr);
   assert((md->state == metadata::PENDING_RO && flag == RO)
          || (md->state == metadata::PENDING_RW && flag == RW));
@@ -151,6 +217,8 @@ void RemoteDirectory::metadata::dump(std::ostream& os) const {
 
 
 
+////////////////////////////////////////////////////////////////////////////////
+// Local Directory
 ////////////////////////////////////////////////////////////////////////////////
 
 LocalDirectory::metadata* LocalDirectory::getMD(Lockable* ptr) {
@@ -204,21 +272,6 @@ void LocalDirectory::recvObjectImpl(fatPointer fptr) {
   md->recalledFor = ~0;
   dirRelease(ptr);
   outstandingReqs = 1; // reprocess outstanding reqs now that some may go forward
-}
-
-bool LocalDirectory::dirAcquire(Lockable* ptr) {
-  std::lock_guard<LL::SimpleLock> lg(dirContext_lock);
-  auto rv = dirContext.tryAcquire(ptr);
-  switch (rv) {
-  case LockManagerBase::FAIL:      return false;
-  case LockManagerBase::NEW_OWNER: return true;
-  case LockManagerBase::ALREADY_OWNER: assert(0 && "Already owner?"); abort();
-  }
-}
-
-void LocalDirectory::dirRelease(Lockable* ptr) {
-  std::lock_guard<LL::SimpleLock> lg(dirContext_lock);
-  dirContext.releaseOne(ptr);
 }
 
 bool LocalDirectory::updateObjState(Lockable* ptr, metadata& md) {

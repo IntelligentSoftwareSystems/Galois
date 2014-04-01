@@ -49,71 +49,63 @@ namespace Runtime {
 
 enum ResolveFlag {INV=0, RO=1, RW=2};
 
-//These wrap type information for various dispatching purposes.  This
-//let's us keep vtables out of user objects
-class typeHelper {
+//Base class for common directory operations
+class BaseDirectory {
+
 protected:
-  typeHelper(recvFuncTy rRP, recvFuncTy rOP, recvFuncTy lRP, recvFuncTy lOP)
-    : remoteRequestPad(rRP), remoteObjectPad(rOP), localRequestPad(lRP), localObjectPad(lOP)
-  {}
-  virtual void vSerialize(SendBuffer&, Lockable*) const = 0;
 
-  recvFuncTy remoteRequestPad;
-  recvFuncTy remoteObjectPad;
-  recvFuncTy localRequestPad;
-  recvFuncTy localObjectPad;
+  //These wrap type information for various dispatching purposes.  This
+  //let's us keep vtables out of user objects
+  class typeHelper {
+  protected:
+    typeHelper(recvFuncTy rRP, recvFuncTy rOP, recvFuncTy lRP, recvFuncTy lOP)
+      : remoteRequestPad(rRP), remoteObjectPad(rOP), localRequestPad(lRP), localObjectPad(lOP)
+    {}
+    virtual void vSerialize(SendBuffer&, Lockable*) const = 0;
+    
+    recvFuncTy remoteRequestPad;
+    recvFuncTy remoteObjectPad;
+    recvFuncTy localRequestPad;
+    recvFuncTy localObjectPad;
+    
+  public:
+    
+    //Send Local -> Remote messages
+    void invalidate(Lockable* ptr, uint32_t dest, uint32_t cause = ~0) const;
+    void sendObj(Lockable* ptr, uint32_t dest, ResolveFlag flag) const;
+    void upgrade(Lockable* ptr, uint32_t dest) const;
+    
+    //Send Remote -> Local messages
+    void requestObj(fatPointer ptr, ResolveFlag flag);
+    void writebackObj(fatPointer ptr, Lockable* obj);
+  };
+  
+  template<typename T>
+  class typeHelperImpl : public typeHelper {
+    typeHelperImpl();
+    virtual void vSerialize(SendBuffer&, Lockable*) const;
+  public:
+    virtual Lockable* duplicate(Lockable* obj) const {
+      return new T(*static_cast<T*>(obj));
+    }
+    
+    static typeHelperImpl* get() {
+      static typeHelperImpl th;
+      return &th;
+    }
+  };
+    
+  LockManagerBase dirContext;
+  LL::SimpleLock dirContext_lock;
 
-public:
+  bool dirAcquire(Lockable*);
+  void dirRelease(Lockable*);
 
-  virtual Lockable* duplicate(Lockable* obj) const = 0;
-  //Send Local -> Remote messages
-  void invalidate(Lockable* ptr, uint32_t dest, uint32_t cause = ~0) const {
-    SendBuffer buf;
-    fatPointer fptr(ptr, fatPointer::thisHost);
-    gSerialize(buf, fptr, ResolveFlag::INV, cause);
-    getSystemNetworkInterface().send(dest, remoteRequestPad, buf);
-  }
-  void sendObj(Lockable* ptr, uint32_t dest, ResolveFlag flag) const {
-    SendBuffer buf;
-    fatPointer fptr(ptr, fatPointer::thisHost);
-    gSerialize(buf, fptr, flag);
-    vSerialize(buf, ptr);
-    getSystemNetworkInterface().send(dest, remoteObjectPad, buf);
-  }
-  void upgrade(Lockable* ptr, uint32_t dest) const {
-    SendBuffer buf;
-    fatPointer fptr(ptr, fatPointer::thisHost);
-    uint32_t dummy = ~0;
-    gSerialize(buf, fptr, ResolveFlag::RW, dummy);
-    getSystemNetworkInterface().send(dest, remoteRequestPad, buf);
-  }
 
-  //Send Remote -> Local messages
-  void requestObj(fatPointer ptr, ResolveFlag flag) {
-    SendBuffer buf;
-    gSerialize(buf, ptr, flag, NetworkInterface::ID);
-    getSystemNetworkInterface().send(ptr.getHost(), localRequestPad, buf);
-  }
 };
-
-template<typename T>
-class typeHelperImpl : public typeHelper {
-  typeHelperImpl();
-  virtual void vSerialize(SendBuffer&, Lockable*) const;
-public:
-  virtual Lockable* duplicate(Lockable* obj) const {
-    return new T(*static_cast<T*>(obj));
-  }
-
-  static typeHelperImpl* get() {
-    static typeHelperImpl th;
-    return &th;
-  }
-};
-
 
 //handle local objects
-class LocalDirectory {
+class LocalDirectory : public BaseDirectory {
   struct metadata {
     //Lock protecting this structure
     LL::SimpleLock lock;
@@ -140,15 +132,9 @@ class LocalDirectory {
 
   std::atomic<int> outstandingReqs;
 
-  LockManagerBase dirContext;
-  LL::SimpleLock dirContext_lock;
-
   bool updateObjState(Lockable*, metadata&);
-  bool dirAcquire(Lockable*);
-  void dirRelease(Lockable*);
 
   void recvRequestImpl(fatPointer ptr, ResolveFlag flag, uint32_t dest, typeHelper* th);
-
   void recvObjectImpl(fatPointer ptr);
 
 public:
@@ -191,7 +177,7 @@ void LocalDirectory::recvObject(RecvBuffer& buf) {
 ////////////////////////////////////////////////////////////////////////////////
 
 
-class RemoteDirectory {
+class RemoteDirectory : public BaseDirectory {
 
   //metadata for an object.
   struct metadata {
@@ -215,7 +201,7 @@ class RemoteDirectory {
   std::unordered_map<fatPointer, metadata> md;
   LL::SimpleLock md_lock;
 
-  std::deque<std::pair<fatPointer, Lockable*>> writeback;
+  std::deque<std::tuple<fatPointer, Lockable*, typeHelper*>> writeback;
 
   //get metadata for pointer
   metadata* getMD(fatPointer ptr);
@@ -304,7 +290,7 @@ void RemoteDirectory::recvObject(RecvBuffer& buf) {
 ////////////////////////////////////////////////////////////////////////////////
 
 template<typename T>
-typeHelperImpl<T>::typeHelperImpl()
+BaseDirectory::typeHelperImpl<T>::typeHelperImpl()
   : typeHelper(&RemoteDirectory::recvRequest<T>,
                &RemoteDirectory::recvObject<T>,
                &LocalDirectory::recvRequest<T>,
@@ -312,7 +298,7 @@ typeHelperImpl<T>::typeHelperImpl()
 {}
 
 template<typename T>
-void typeHelperImpl<T>::vSerialize(SendBuffer& buf, Lockable* ptr) const {
+void BaseDirectory::typeHelperImpl<T>::vSerialize(SendBuffer& buf, Lockable* ptr) const {
   gSerialize(buf, *static_cast<T*>(ptr));
 }
 

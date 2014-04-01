@@ -36,6 +36,8 @@ using namespace Galois::Runtime;
 uint32_t NetworkInterface::ID = 0;
 uint32_t NetworkInterface::Num = 1;
 
+uint32_t Galois::Runtime::getHostID() { return NetworkInterface::ID; }
+
 //FIXME: move top level loop out of network interface
 
 static bool ourexit = false;
