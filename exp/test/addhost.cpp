@@ -68,10 +68,12 @@ int main(int argc, char *argv[])
   std::cerr << "stating\n";
   
   Galois::for_each(myvec.begin(), myvec.end(), f, Galois::wl<Galois::WorkList::LIFO<>>());
-  std::cerr << "sum is " << f.r->i << "\n";
-  std::cerr << "sum should be " << std::accumulate(myvec.begin(), myvec.end(), 0) << "\n";
+  acquire(f.r, Galois::ALL);
+  auto val_is = f.r->i, val_sb = std::accumulate(myvec.begin(), myvec.end(), 0);
+  std::cerr << "sum is " << val_is << "\n";
+  std::cerr << "sum should be " << val_sb << "\n";
   // master_terminate();
   getSystemNetworkInterface().terminate();
   
-  return 0;
+  return val_is != val_sb; // false is success
 }

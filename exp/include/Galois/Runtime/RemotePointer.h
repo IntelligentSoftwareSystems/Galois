@@ -79,14 +79,26 @@ public:
 template<typename T>
 T* gptr<T>::inner_resolve(Galois::MethodFlag m) const {
   T* retval = nullptr;
-  if (isLocal()) {
-    retval = static_cast<T*>(ptr.getObj());
-    // if (dir.isRemote(retval))
-    //   retval = nullptr;  
-  } else {
-    retval = getRemoteDirectory().resolve<T>(ptr, ResolveFlag::RW);
-  }
-  return retval;
+  do {
+    if (isLocal()) {
+      retval = static_cast<T*>(ptr.getObj());
+      // if (dir.isRemote(retval))
+      //   retval = nullptr;  
+    } else {
+      retval = getRemoteDirectory().resolve<T>(ptr, ResolveFlag::RW);
+    }
+    if (inGaloisForEach)
+      return retval;
+    
+    if (isLocal()) {
+      if (getLocalDirectory().fetch(static_cast<Lockable*>(ptr.getObj())))
+        return retval;
+    } else {
+      if (retval)
+        return retval;
+    }
+    doNetworkWork();
+  } while (true);
 }
 
 

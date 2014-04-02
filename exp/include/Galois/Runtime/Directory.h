@@ -121,6 +121,9 @@ class LocalDirectory : public BaseDirectory {
     typeHelper* t;
 
     metadata() :locRW(~0), recalledFor(~0), t(nullptr) {}
+    bool here() {
+      return locRO.empty() && locRW == ~0;
+    }
   };
 
   std::unordered_map<Lockable*, metadata> dir;
@@ -137,13 +140,16 @@ class LocalDirectory : public BaseDirectory {
   void recvObjectImpl(fatPointer ptr);
 
 public:
-  void fetch(Lockable* ptr) {
+  bool fetch(Lockable* ptr) {
     metadata* md = getMD(ptr);
     if (!md)
-      return;
+      return true;
     std::lock_guard<LL::SimpleLock> lg(md->lock, std::adopt_lock);
+    if (md->here())
+      return true;
     md->reqsRW.insert(NetworkInterface::ID);
     outstandingReqs = 1;
+    return false;
   }
 
   //Recieve a request
