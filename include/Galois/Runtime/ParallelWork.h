@@ -29,25 +29,20 @@
 #define GALOIS_RUNTIME_PARALLELWORK_H
 
 #include "Galois/Mem.h"
+#include "Galois/Statistic.h"
+#include "Galois/Runtime/Barrier.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/ForEachTraits.h"
-#include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/Range.h"
+#include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/Termination.h"
 #include "Galois/Runtime/ThreadPool.h"
 #include "Galois/Runtime/UserContextAccess.h"
-#include "Galois/Runtime/ActiveThreads.h"
-#include "Galois/Runtime/Network.h"
-#include "Galois/Runtime/Barrier.h"
 #include "Galois/WorkList/GFifo.h"
-#include "Galois/Runtime/DistSupport.h"
-
-#include <boost/utility/enable_if.hpp>
 
 #include <algorithm>
 #include <functional>
-#include <unordered_set>
-//#include <iostream>
+#include <memory>
 
 namespace Galois {
 //! Internal Galois functionality - Use at your own risk.
@@ -61,15 +56,11 @@ class LoopStatistics {
   unsigned long iterations;
   const char* loopname;
 
-  void init() { }
-  void report() { }
-
 public:
-  explicit LoopStatistics(const char* ln) :conflicts(0), iterations(0), loopname(ln) { init(); }
+  explicit LoopStatistics(const char* ln) :conflicts(0), iterations(0), loopname(ln) { }
   ~LoopStatistics() {
     reportStat(loopname, "Conflicts", conflicts);
     reportStat(loopname, "Iterations", iterations);
-    report();
   }
   inline void inc_iterations(int amount = 1) {
     iterations += amount;
@@ -90,209 +81,95 @@ public:
 
 template<typename value_type>
 class AbortHandler {
-  typedef WorkList::GFIFO<value_type> AbortedList;
-  PerPackageStorage<AbortedList> queues;
+  struct Item { value_type val; int retries; };
 
-public:
-  void push(bool recursiveAbort, value_type val) {
-    if (recursiveAbort)
-      queues.getRemote(LL::getLeaderForPackage(LL::getPackageForSelf(LL::getTID()) / 2))->push(val);
-    else
-      queues.getLocal()->push(val);
+  typedef WorkList::GFIFO<Item> AbortedList;
+  PerThreadStorage<AbortedList> queues;
+  bool useBasicPolicy;
+  
+  /**
+   * Policy: serialize via tree over packages.
+   */
+  void basicPolicy(const Item& item) {
+    unsigned tid = LL::getTID();
+    unsigned package = LL::getPackageForSelf(tid);
+    queues.getRemote(LL::getLeaderForPackage(package / 2))->push(item);
   }
 
-  optional<value_type> pop() {
-    return queues.getLocal()->pop();
-  }
-};
-
-template<typename value_type>
-class RemoteAbortHandler {
-  std::deque<value_type> queues;
-  LL::SimpleLock Lock;
-  std::map<fatPointer, std::set<value_type> > waiting;
-  std::map<value_type, std::set<fatPointer> > holding;
-
-  void arrive(fatPointer ptr) {
-    //    assert(waiting.count(ptr));
-    std::lock_guard<LL::SimpleLock> lg(Lock);
-    //LL::gDebug("Arrive notification ", ptr.first, ",", ptr.second, ": ", waiting.count(ptr));
-    for (auto ii = waiting.lower_bound(ptr), ee = waiting.upper_bound(ptr); ii != ee; ++ii)
-      queues.push(ii->second);
-    waiting.erase(ptr);
-  }
-
-  int size() {
-    return waiting.size();
-  }
-
-public:
-
-  void push(value_type val) {
-    LL::SLguard lg(Lock);
-    queues.push_back(val);
-  }
-
-  void push(value_type val, fatPointer ptr) {
-    //    std::cerr << "pushing " << val << " to " << ptr.first << " " << ptr.second << " with " << waiting.size() << "\n";
-    bool skipNotify;
-    auto& dir = getRemoteDirectory();
-    { //limit scope of guard
-      LL::SLguard lg(Lock);
-      skipNotify =  waiting[ptr].size();
-      waiting[ptr].insert(val);
-      if (holding[val].insert(ptr).second) //first insert, inc contended
-        dir.setContended(ptr);
-      queues.push_back(val);
-    }
-    //    if (!skipNotify)
-    //      dir.notifyWhenAvailable(ptr, std::bind(&RemoteAbortHandler::arrive, this, std::placeholders::_1));
-  }
-
-  optional<value_type> pop() {
-    optional<value_type> retval;
-    if (!queues.empty()) {
-      retval = queues.front();
-      queues.pop_front();
-    }
-    return retval;
-  }
-
-  void commit(value_type val) {
-    std::set<fatPointer> held;
-    { //bound lock
-      LL::SLguard lg(Lock);
-      if (holding.count(val)) {
-        holding[val].swap(held);
-        holding.erase(val);
-      }
-    }
-    //std::cerr << "commit remote " << val << "\n";
-    auto& dir = getRemoteDirectory();
-    for (auto key : held)
-      dir.clearContended(key);
-  }
-
-  void dump() {
-    LL::gDebug("RAQ: waiting size ", waiting.size(), ", holding size ", holding.size(), ", queue size ", queues.size());
-    if (waiting.size() < 10) {
-      for (auto& k : waiting)
-        LL::gDebug("RAQ waiting on: ", k.first.getHost(), ",", k.first.getObj());
-      for (auto& k : waiting)
-        getRemoteDirectory().dump(k.first);
-    }
-  }
-
-  //doesn't check queue, just hidden work
-  bool empty() {
-    static std::chrono::system_clock::time_point oldtime = std::chrono::system_clock::now();
-    std::lock_guard<LL::SimpleLock> lg(Lock);
-    // unsigned num = getSystemDirectory().countContended();
-    // if (!waiting.empty() || num) {
-    //   std::unordered_set<fatPointer, ptrHash> items;
-    //   if (num < 200) {
-    //     for (auto& a : waiting)
-    //       items.insert(a.first);
-    //   }
-    //   std::cerr << NetworkInterface::ID << " Waiting on " << items.size() << " holding " << num << "\n";
-    // }
-    std::chrono::duration<int> onesec(1);
-    if (std::chrono::system_clock::now() - oldtime > onesec) {
-      oldtime = std::chrono::system_clock::now();
-      getRemoteDirectory().dump();
-      dump();
-    }
-    return holding.empty();
-  }
-};
-
-
-template<typename value_type, typename FunctionTy, typename WLTy>
-class ThreadLocalExec {
-  SimpleRuntimeContext context;
-  UserContextAccess<value_type> facing;
-  FunctionTy func;
-  WLTy& wl;
-  unsigned long conflicts; // all conflicts
-  unsigned long iterations; // all iterations
-  unsigned long remote; // remote conflicts
-
-  const char* loopname;
-
-  const bool NeedsStats  = ForEachTraits<FunctionTy>::NeedsStats;
-  const bool NeedsPIA    = ForEachTraits<FunctionTy>::NeedsPIA;
-  const bool NeedsPush   = ForEachTraits<FunctionTy>::NeedsPush;
-  const bool NeedsAborts = ForEachTraits<FunctionTy>::NeedsAborts;
-
-
-  inline void resetAlloc() { if (NeedsPIA) facing.resetAlloc(); }
-  inline void inc_stat_iterations() { if (NeedsStats) ++iterations; }
-  inline void inc_stat_conflicts()  { if (NeedsStats) ++conflicts;  }
-  inline void context_start()  { if (NeedsAborts) context.startIteration();  }
-  inline void context_commit() { if (NeedsAborts) context.commitIteration(); }
-  inline void context_abort() { context.cancelIteration(); }
-
-  inline void push_work() {
-    if (NeedsPush) {
-      auto ii = facing.getPushBuffer().begin();
-      auto ee = facing.getPushBuffer().end();
-      if (ii != ee) {
-        wl.push(ii,ee);
-        facing.resetPushBuffer();
-      }
-    }
-  }
-
-  inline void push_reset() { if (NeedsPush) facing.resetPushBuffer(); }
-
-  void fastPushBack(typename UserContextAccess<value_type>::PushBufferTy& x) {
-    wl.push(x.begin(), x.end());
-    x.clear();
-  }
-
-public:
-  ThreadLocalExec(FunctionTy& _func, WLTy& _wl, const char* ln)
-    : func(_func), wl(_wl), 
-      conflicts(0), iterations(0), remote(0), loopname(ln) {
-    if (NeedsAborts)
-      setThreadContext(&context);
-    if (false && NeedsPush && !NeedsAborts)
-      facing.setFastPushBack(std::bind(&ThreadLocalExec::fastPushBack, this, std::placeholders::_1));
-  }
-
-  ~ThreadLocalExec() {
-    if (NeedsAborts)
-      setThreadContext(nullptr);
-    if (NeedsStats) {
-      reportStat(loopname, "Conflicts", conflicts);
-      reportStat(loopname, "Iterations", iterations);
-      reportStat(loopname, "RemoteEx", remote);
-    }
-  }
-
-  inline void inc_stat_remote()     { if (NeedsStats) ++remote;     }
-
-  inline void execItem(value_type& p) {
-    inc_stat_iterations();
-    context_start();
-    if (NeedsAborts) {
-      try {
-        func(p, facing.data());
-      } catch (...) {
-        context_abort();
-        inc_stat_conflicts();
-        push_reset();
-        resetAlloc();
-        throw;
-      }
+  /**
+   * Policy: retry work 2X locally, then serialize via tree on package (trying
+   * twice at each level), then serialize via tree over packages.
+   */
+  void doublePolicy(const Item& item) {
+    int retries = item.retries - 1;
+    if ((retries & 1) == 1) {
+      queues.getLocal()->push(item);
+      return;
+    } 
+    
+    unsigned tid = LL::getTID();
+    unsigned package = LL::getPackageForSelf(tid);
+    unsigned leader = LL::getLeaderForPackage(package);
+    if (tid != leader) {
+      unsigned next = leader + (tid - leader) / 2;
+      queues.getRemote(next)->push(item);
     } else {
-      func(p, facing.data());
+      queues.getRemote(LL::getLeaderForPackage(package / 2))->push(item);
     }
-    push_work();
-    context_commit();
-    resetAlloc();
-    //remote_aborted.commit(*p);
   }
+
+  /**
+   * Policy: retry work 2X locally, then serialize via tree on package but
+   * try at most 3 levels, then serialize via tree over packages.
+   */
+  void boundedPolicy(const Item& item) {
+    int retries = item.retries - 1;
+    if (retries < 2) {
+      queues.getLocal()->push(item);
+      return;
+    } 
+    
+    unsigned tid = LL::getTID();
+    unsigned package = LL::getPackageForSelf(tid);
+    unsigned leader = LL::getLeaderForPackage(package);
+    if (retries < 5 && tid != leader) {
+      unsigned next = leader + (tid - leader) / 2;
+      queues.getRemote(next)->push(item);
+    } else {
+      queues.getRemote(LL::getLeaderForPackage(package / 2))->push(item);
+    }
+  }
+
+  /**
+   * Retry locally only.
+   */
+  void eagerPolicy(const Item& item) {
+    queues.getLocal()->push(item);
+  }
+
+public:
+  AbortHandler() {
+    // XXX(ddn): Implement smarter adaptive policy
+    useBasicPolicy = LL::getMaxPackages() > 2;
+  }
+
+  value_type& value(Item& item) const { return item.val; }
+  value_type& value(value_type& val) const { return val; }
+
+  void push(const value_type& val) {
+    Item item = { val, 1 };
+    queues.getLocal()->push(item);
+  }
+
+  void push(const Item& item) {
+    Item newitem = { item.val, item.retries + 1 };
+    if (useBasicPolicy)
+      basicPolicy(newitem);
+    else
+      doublePolicy(newitem);
+  }
+
+  AbortedList* getQueue() { return queues.getLocal(); }
 };
 
 template<class WorkListTy, class T, class FunctionTy>
@@ -300,119 +177,177 @@ class ForEachWork {
 protected:
   typedef T value_type;
   typedef typename WorkListTy::template retype<value_type>::type WLTy;
-  typedef ThreadLocalExec<value_type, FunctionTy, WLTy> ThreadLocalData;
+  struct ThreadLocalData {
+    FunctionTy function;
+    UserContextAccess<value_type> facing;
+    SimpleRuntimeContext ctx;
+    LoopStatistics<ForEachTraits<FunctionTy>::NeedsStats> stat;
+    ThreadLocalData(const FunctionTy& fn, const char* ln): function(fn), stat(ln) {}
+  };
+
+  // NB: Place dynamically growing wl after fixed-size PerThreadStorage
+  // members to give higher likelihood of reclaiming PerThreadStorage
+
+  AbortHandler<value_type> aborted; 
+  TerminationDetection& term;
 
   WLTy wl;
   FunctionTy& origFunction;
   const char* loopname;
+  bool broke;
 
-  TerminationDetection& term;
-  AbortHandler<value_type> aborted;
-  RemoteAbortHandler<value_type> remote_aborted;
-  LL::CacheLineStorage<bool> broke;
-
-  template<unsigned limit, typename WL>
-  GALOIS_ATTRIBUTE_NOINLINE
-  bool runQueue(ThreadLocalData& tld, WL& lwl, bool recursiveAbort, bool remoteAbort) {
-    optional<value_type> p = lwl.pop();
-    if (p) {
-      if (ForEachTraits<FunctionTy>::NeedsAborts) {
-        unsigned runlimit = limit;
-        do {
-          try {
-            tld.execItem(*p);
-            if (remoteAbort)
-              remote_aborted.commit(*p);
-          } catch (const conflict_ex& ex) {
-            if (remoteAbort) //if in the remote queue, stay in the remote queue
-              //remote_aborted.push(*p);
-              aborted.push(false, *p);
-            else
-              aborted.push(recursiveAbort, *p);
-          } catch (const remote_ex& ex) {
-            //            getSystemDirectory().resolve(ex.ptr, RW);
-            tld.inc_stat_remote();
-            //aborted.push(recursiveAbort, *p);
-            //remote_aborted.push(*p, ex.ptr);
-            aborted.push(false, *p);
-          }
-          if (limit)
-            --runlimit;
-        } while ((limit == 0 || runlimit != 0) && (p = lwl.pop()));
-        return true;
-      } else {
-        do {
-          tld.execItem(*p);
-        } while ((p = lwl.pop()));
-        return true;
+  inline void commitIteration(ThreadLocalData& tld) {
+    if (ForEachTraits<FunctionTy>::NeedsPush) {
+      auto ii = tld.facing.getPushBuffer().begin();
+      auto ee = tld.facing.getPushBuffer().end();
+      if (ii != ee) {
+	wl.push(ii, ee);
+	tld.facing.resetPushBuffer();
       }
     }
-    return false;
+    if (ForEachTraits<FunctionTy>::NeedsPIA)
+      tld.facing.resetAlloc();
+    if (ForEachTraits<FunctionTy>::NeedsAborts)
+      tld.ctx.commitIteration();
   }
 
-  template<bool checkAbort>
+  template<typename Item>
+  GALOIS_ATTRIBUTE_NOINLINE
+  void abortIteration(const Item& item, ThreadLocalData& tld) {
+    assert(ForEachTraits<FunctionTy>::NeedsAborts);
+    tld.ctx.cancelIteration();
+    tld.stat.inc_conflicts(); //Class specialization handles opt
+    aborted.push(item);
+    //clear push buffer
+    if (ForEachTraits<FunctionTy>::NeedsPush)
+      tld.facing.resetPushBuffer();
+    //reset allocator
+    if (ForEachTraits<FunctionTy>::NeedsPIA)
+      tld.facing.resetAlloc();
+  }
+
+  inline void doProcess(value_type& val, ThreadLocalData& tld) {
+    tld.stat.inc_iterations();
+    if (ForEachTraits<FunctionTy>::NeedsAborts)
+      tld.ctx.startIteration();
+    tld.function(val, tld.facing.data());
+    commitIteration(tld);
+  }
+
+  bool runQueueSimple(ThreadLocalData& tld) {
+    bool workHappened = false;
+    Galois::optional<value_type> p = wl.pop();
+    if (p)
+      workHappened = true;
+    while (p) {
+      doProcess(*p, tld);
+      p = wl.pop();
+    }
+    return workHappened;
+  }
+
+  template<int limit, typename WL>
+  bool runQueue(ThreadLocalData& tld, WL& lwl) {
+    bool workHappened = false;
+    Galois::optional<typename WL::value_type> p = lwl.pop();
+    unsigned num = 0;
+    if (p)
+      workHappened = true;
+    try {
+      while (p) {
+	doProcess(aborted.value(*p), tld);
+	if (limit) {
+	  ++num;
+	  if (num == limit)
+	    break;
+          }
+	p = lwl.pop();
+      }
+    } catch (const remote_ex& ex) {
+      //getRemoteDirectory().(ex.ptr);
+      abortIteration(*p, tld);
+    } catch (const conflict_ex& ex) {
+      getLocalDirectory().fetch(ex.ptr);
+      abortIteration(*p, tld);
+    }
+    return workHappened;
+  }
+
+  GALOIS_ATTRIBUTE_NOINLINE
+  bool handleAborts(ThreadLocalData& tld) {
+    return runQueue<0>(tld, *aborted.getQueue());
+  }
+
+  void fastPushBack(typename UserContextAccess<value_type>::PushBufferTy& x) {
+    wl.push(x.begin(), x.end());
+    x.clear();
+  }
+
+  template<bool couldAbort, bool isLeader>
   void go() {
-    //Thread Local Data goes on the local stack
-    //to be NUMA friendly
-    ThreadLocalData tld(origFunction, wl, loopname);
+    // Thread-local data goes on the local stack to be NUMA friendly
+    ThreadLocalData tld(origFunction, loopname);
+    tld.facing.setBreakFlag(&broke);
+    if (couldAbort)
+      setThreadContext(&tld.ctx);
+    if (ForEachTraits<FunctionTy>::NeedsPush && !couldAbort)
+      tld.facing.setFastPushBack(
+          std::bind(&ForEachWork::fastPushBack, std::ref(*this), std::placeholders::_1));
 
     bool didWork;
-    try {
-      do {
-        didWork = false;
-        //Run some iterations
-        didWork = runQueue<checkAbort ? 1 /*32*/ : 0>(tld, wl, false, false);
-        //Check for break
-        if (ForEachTraits<FunctionTy>::NeedsBreak && broke.data)
-          break;
-        //Check for abort, also guards random network work
-        if (checkAbort) {
-          didWork |= runQueue<1>(tld, aborted, true, false);
-          if (LL::getTID() == 0) {
-            didWork |= runQueue<1>(tld, remote_aborted, true, true);
-            didWork |= !remote_aborted.empty();
-            doNetworkWork();
-          } else {
-            while (getSystemNetworkInterface().handleReceives()) {}
-          }
-        }
-        getRemoteDirectory().makeProgress();
-        getLocalDirectory().makeProgress();
-        // update node color and prop token
-        term.localTermination(didWork);
-      } while (!term.globalTermination());
-    } catch (const break_ex& ex) {
-      broke.data = true;
-    }
+    do {
+      didWork = false;
+      //Run some iterations
+      if (couldAbort || ForEachTraits<FunctionTy>::NeedsBreak) {
+        if (isLeader)
+          didWork = runQueue<8>(tld, wl);
+        else
+          didWork = runQueue<ForEachTraits<FunctionTy>::NeedsBreak ? 32 : 0>(tld, wl);
+        // Check for abort
+        if (couldAbort)
+          didWork |= handleAborts(tld);
+        if (isLeader)
+          doNetworkWork();
+      } else { // No try/catch
+        didWork = runQueueSimple(tld);
+      }
+      // Update node color and prop token
+      term.localTermination(didWork);
+      doNetworkWork();
+    } while (!term.globalTermination() && (!ForEachTraits<FunctionTy>::NeedsBreak || !broke));
+
+    if (couldAbort)
+      setThreadContext(0);
   }
 
 public:
-  ForEachWork(FunctionTy& f, const char* l): origFunction(f), loopname(l), term(getSystemTermination()), broke(false) {
-    //LL::gDebug("Type traits stats ", ForEachTraits<FunctionTy>::NeedsStats, " break ", ForEachTraits<FunctionTy>::NeedsBreak, " push ", ForEachTraits<FunctionTy>::NeedsPush, " PIA ", ForEachTraits<FunctionTy>::NeedsPIA, "Aborts ", ForEachTraits<FunctionTy>::NeedsAborts);
-  }
+  ForEachWork(FunctionTy& f, const char* l): term(getSystemTermination()), origFunction(f), loopname(l), broke(false) { }
   
   template<typename W>
-  ForEachWork(W& w, FunctionTy& f, const char* l): wl(w), origFunction(f), loopname(l), term(getSystemTermination()), broke(false) { }
+  ForEachWork(W& w, FunctionTy& f, const char* l): term(getSystemTermination()), wl(w), origFunction(f), loopname(l), broke(false) { }
 
   template<typename RangeTy>
-  void AddInitialWork(const RangeTy& range) { wl.push_initial(range); }
+  void AddInitialWork(const RangeTy& range) {
+    wl.push_initial(range);
+  }
 
-  void initThread(void) { term.initializeThread(); }
+  void initThread(void) {
+    term.initializeThread();
+  }
 
   // in the distributed case even with 1 thread there can be aborts
   void operator()() {
-    // if ((LL::isPackageLeaderForSelf(LL::getTID()) &&
-    //      activeThreads > 1 && 
-    //      ForEachTraits<FunctionTy>::NeedsAborts)
-    //     ||
-    //     (NetworkInterface::Num > 1 && LL::getTID() == 0))
-    if (LL::isPackageLeaderForSelf(LL::getTID()) &&
-        ((activeThreads > 1 && ForEachTraits<FunctionTy>::NeedsAborts)
-         ||
-         (NetworkInterface::Num > 1)))
-      go<true>();
+    bool isLeader = LL::isPackageLeaderForSelf(LL::getTID());
+    bool couldAbort = ForEachTraits<FunctionTy>::NeedsAborts && activeThreads > 1;
+    couldAbort = true;
+    if (couldAbort && isLeader)
+      go<true, true>();
+    else if (couldAbort && !isLeader)
+      go<true, false>();
+    else if (!couldAbort && isLeader)
+      go<false, true>();
     else
-      go<false>();
+      go<false, false>();
   }
 };
 
@@ -457,7 +392,7 @@ void on_each_impl(FunctionTy fn, const char* loopname = 0) {
 
   inGaloisForEach = true;
   RunCommand w[2] = {WOnEach<FunctionTy>(fn),
-		     std::ref(getSystemBarrier())};
+                     std::ref(getSystemBarrier())};
   getSystemThreadPool().run(&w[0], &w[2], activeThreads);
   inGaloisForEach = false;
 }
@@ -472,7 +407,7 @@ void on_each_simple_impl(FunctionTy fn, const char* loopname = 0) {
   Barrier* b = createSimpleBarrier();
   b->reinit(activeThreads);
   RunCommand w[2] = {WOnEach<FunctionTy>(fn),
-		     std::ref(*b)};
+                     std::ref(*b)};
   getSystemThreadPool().run(&w[0], &w[2], activeThreads);
   delete b;
   inGaloisForEach = false;

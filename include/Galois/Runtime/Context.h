@@ -43,7 +43,7 @@ namespace Galois {
 namespace Runtime {
 
 //Things we can throw:
-struct conflict_ex { Lockable* obj; };
+struct conflict_ex { Lockable* ptr; };
 struct failsafe_ex{};
 //struct remote_ex { fatPointer ptr; };
 

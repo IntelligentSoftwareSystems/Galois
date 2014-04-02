@@ -58,9 +58,8 @@ protected:
   //let's us keep vtables out of user objects
   class typeHelper {
   protected:
-    typeHelper(recvFuncTy rRP, recvFuncTy rOP, recvFuncTy lRP, recvFuncTy lOP)
-      : remoteRequestPad(rRP), remoteObjectPad(rOP), localRequestPad(lRP), localObjectPad(lOP)
-    {}
+    typeHelper(recvFuncTy rRP, recvFuncTy rOP, recvFuncTy lRP, recvFuncTy lOP);
+
     virtual void vSerialize(SendBuffer&, Lockable*) const = 0;
     
     recvFuncTy remoteRequestPad;
@@ -100,7 +99,7 @@ protected:
 
   bool dirAcquire(Lockable*);
   void dirRelease(Lockable*);
-
+  bool dirOwns(Lockable*);
 
 };
 
@@ -138,6 +137,15 @@ class LocalDirectory : public BaseDirectory {
   void recvObjectImpl(fatPointer ptr);
 
 public:
+  void fetch(Lockable* ptr) {
+    metadata* md = getMD(ptr);
+    if (!md)
+      return;
+    std::lock_guard<LL::SimpleLock> lg(md->lock, std::adopt_lock);
+    md->reqsRW.insert(NetworkInterface::ID);
+    outstandingReqs = 1;
+  }
+
   //Recieve a request
   template<typename T>
   static void recvRequest(RecvBuffer& buf);
@@ -252,7 +260,7 @@ RemoteDirectory& getRemoteDirectory();
 
 template<typename T>
 T* RemoteDirectory::resolve(fatPointer ptr, ResolveFlag flag) {
-  trace("RemoteDirectory::resolve % %\n", ptr, flag);
+  //  trace("RemoteDirectory::resolve for % flag %\n", ptr, flag);
   metadata* md = getMD(ptr);
   std::lock_guard<LL::SimpleLock> lg(md->lock);
   if ((flag == RO && (md->state == metadata::HERE_RO || md->state == metadata::UPGRADE)) ||
