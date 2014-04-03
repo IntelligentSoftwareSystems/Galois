@@ -353,6 +353,8 @@ bool LocalDirectory::updateObjState(Lockable* ptr, metadata& md) {
   if (!md.reqsRW.empty() && *md.reqsRW.begin() == NetworkInterface::ID) {
     //leave the object unlocked so local iteration can handle it
     //but set the outstanding request flag
+    //remove it from the request queue to allow progress
+    md.reqsRW.erase(md.reqsRW.begin());
     return false;
   }
 
@@ -398,6 +400,9 @@ void LocalDirectory::makeProgress() {
 
 void LocalDirectory::dump() {
   //FIXME: write
+  std::lock_guard<LL::SimpleLock> lg(dir_lock);
+  trace("LocalDirectory::dump % outstandingReqs\n");
+  
 }
 
 ////////////////////////////////////////////////////////////////////////////////
