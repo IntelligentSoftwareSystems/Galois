@@ -248,12 +248,12 @@ int main(int argc, char** argv) {
     PerThreadDegInfo threadDegInfo; 
     OrderGraph og(*graph,threadDegInfo);
     std::vector<int> parts(numPartitions);
-    for (int i=0;i<parts.size();i++){ 
+    for (unsigned int i=0;i<parts.size();i++){ 
       parts[i] = i;
     } 
     Galois::for_each(parts.begin(),parts.end(), og, Galois::loopname("Order Graph"));
     std::map<GNode,uint64_t> globalMap;
-    for (int i = 0; i < threadDegInfo.size(); i++) { 
+    for (unsigned int i = 0; i < threadDegInfo.size(); i++) { 
       std::map<GNode,uint64_t> &localMap(*threadDegInfo.getRemote(i));
       for (auto mb = localMap.begin(), me = localMap.end(); mb != me; mb++) { 
         globalMap[mb->first] = mb->second;

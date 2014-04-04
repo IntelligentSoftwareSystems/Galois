@@ -690,7 +690,7 @@ struct Algo3 {
 
   void operator()(Graph& graph, GNode source) {
     using namespace Galois::WorkList;
-    const int blockPeriod = 10;
+    //const int blockPeriod = 10;
     const int maxValue = 128;
     typedef dChunkedFIFO<128> Chunk;
     typedef OrderedByIntegerMetric<UpdateRequestIndexer<UpdateRequest>, Chunk, 0> OBIM;
@@ -994,8 +994,8 @@ struct Algo5 {
 
   void operator()(Graph& graph, GNode source) {
     using namespace Galois::WorkList;
-    const int blockPeriod = 10;
-    const int maxValue = 8;
+    //const int blockPeriod = 10;
+    //const int maxValue = 8;
     typedef dChunkedFIFO<128> Chunk;
     typedef ThreadPartitioned<Partitioner, Chunk> Part;
     typedef OrderedByIntegerMetric<UpdateRequestIndexer<UpdateRequest>, Part, 10> OBIM;
@@ -1202,7 +1202,7 @@ struct Algo6 {
       mainTime.stop();
       //std::cout << "(" << std::distance(cur->begin(), cur->end()) << ", " << mainTime.get() << ") ";
 
-      for (int i = 1; i < parts.size(); ++i) {
+      for (unsigned int i = 1; i < parts.size(); ++i) {
         cur->clear();
         // XXX for dst range add outgoing 
         Galois::do_all_local(self->parts[i], [&](GNode nn) {

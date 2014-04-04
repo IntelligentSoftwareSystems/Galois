@@ -18,11 +18,11 @@ struct AuxData {
   typedef typename Graph::GraphNode GNode;
 
   Graph& graph;
+  size_t numItems;
   std::vector<std::pair<double, size_t> > margins;
   std::ostream& out;
   std::map<int, size_t> itemCount;
   std::map<int, size_t> userCount;
-  size_t numItems;
   size_t numDeletedItems;
   size_t numDeletedUsers;
   
@@ -323,8 +323,8 @@ class TcpServer {
   typedef TcpConnection<Algo, Graph> Connection;
   typedef std::shared_ptr<Connection> tpointer;
   boost::asio::ip::tcp::acceptor acceptor;
-  Algo& algo;
   Graph& graph;
+  Algo& algo;
   AuxData<Graph>& auxData;
   std::ostream& out;
 

@@ -505,7 +505,7 @@ private:
 #endif
 
     void updateBlock(Task& task) {
-      const int innerCount = std::numeric_limits<int>::max(); // XXX
+//      const int innerCount = std::numeric_limits<int>::max(); // XXX
       const LatentValue stepSize = steps[updatesPerEdge - maxUpdates + task.updates];
       GetDst fn { &g };
       double error = 0.0;
@@ -514,7 +514,7 @@ private:
       for (int phase = makeSerializable ? 0 : 1; phase < 2; ++phase) {
         Galois::MethodFlag flag = phase == 0 ? Galois::ALL : Galois::NONE;
         for (auto ii = task.start1; ii != task.end1; ++ii) {
-          Node& nn = g.getData(*ii, round == 0 ? flag : Galois::NONE);
+          Node& nn = g.getData(*ii, phase == 0 ? flag : Galois::NONE);
           if (deleted(nn))
             continue;
           edge_iterator begin = g.edge_begin(*ii, Galois::NONE);
@@ -701,10 +701,10 @@ private:
       tasks.resize(numBlocks);
 
       GetDst fn { &g };
-      int maxNnz = std::numeric_limits<int>::min();
-      int minNnz = std::numeric_limits<int>::max();
-      int maxFloats = std::numeric_limits<int>::min();
-      int minFloats = std::numeric_limits<int>::max();
+      //int maxNnz = std::numeric_limits<int>::min();
+      //int minNnz = std::numeric_limits<int>::max();
+      //int maxFloats = std::numeric_limits<int>::min();
+      //int minFloats = std::numeric_limits<int>::max();
 
       for (size_t i = 0; i < numBlocks; ++i) {
         Task& task = tasks[i];
