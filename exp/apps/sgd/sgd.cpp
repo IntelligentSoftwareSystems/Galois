@@ -41,7 +41,7 @@ static const char* const name = "Stochastic Gradient Descent";
 static const char* const desc = "Computes Matrix Decomposition using Stochastic Gradient Descent";
 static const char* const url = "sgd";
 
-static const unsigned int LATENT_VECTOR_SIZE = 20; //Prad's default: 100, Intel: 20
+static const int LATENT_VECTOR_SIZE = 20; //Prad's default: 100, Intel: 20
 static const unsigned int MAX_MOVIE_UPDATES = 1; //Prad's default: 5
 static const double MINVAL = -1e+100;
 static const double MAXVAL = 1e+100;
@@ -662,14 +662,14 @@ void count_ratings(Graph& g) {
 	//std::cout << "Num zeroes " << num_zeroes << std::endl;
 
 	unsigned int per = NUM_USER_NODES/threadCount;
-	for(int i = 0; i < threadCount; i++)
+	for(unsigned int i = 0; i < threadCount; i++)
 	{
 		unsigned start = per * i;
 		unsigned end = per * (i+1);
 		if(i == threadCount - 1) end = NUM_USER_NODES;
 
 		unsigned count = 0;
-		for(int j = start; j < end; j++)
+		for(unsigned int j = start; j < end; j++)
 			count += ratings_per_user[j];
 		std::cout << i << ": " << count << std::endl;
 	}

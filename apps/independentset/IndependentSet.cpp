@@ -294,7 +294,7 @@ struct PullAlgo {
 
     void operator()(GNode src) {
       numProcessed += 1;
-      Node& n = graph.getData(src, Galois::MethodFlag::NONE);
+      //Node& n = graph.getData(src, Galois::MethodFlag::NONE);
 
       MatchFlag f = MATCHED;
       for (auto edge : graph.out_edges(src, Galois::MethodFlag::NONE)) {

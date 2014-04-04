@@ -179,7 +179,7 @@ class Recursive2DExecutor {
     const size_t block1 = (numBlocks1 + total - 1) / total;
     const size_t start1 = std::min(block1 * tid, numBlocks1 - 1);
     const size_t block2 = (numBlocks2 + total - 1) / total;
-    const size_t start2 = std::min(block2 * tid, numBlocks2 - 1);
+    //const size_t start2 = std::min(block2 * tid, numBlocks2 - 1);
 
     //size_t start = start1 + start2 * numBlocks1; // XXX
     //size_t start = block1 * 10 * (tid / 10) + start2 * numBlocks1;
@@ -619,7 +619,7 @@ struct BlockJumpAlgo {
     BlockInfo* blocks;
     size_t numXBlocks, numYBlocks;
     LatentValue* steps;
-    int maxUpdates;
+    size_t maxUpdates;
     Galois::GAccumulator<double>* errorAccum;
     
     struct GetDst: public std::unary_function<Graph::edge_iterator, GNode> {
@@ -847,7 +847,7 @@ struct BlockJumpAlgo {
       });
     }
     
-    executeUntilConverged(sf, g, [&](LatentValue* steps, int maxUpdates, Galois::GAccumulator<double>* errorAccum) {
+    executeUntilConverged(sf, g, [&](LatentValue* steps, size_t maxUpdates, Galois::GAccumulator<double>* errorAccum) {
       Process fn { g, xLocks, yLocks, blocks, numXBlocks, numYBlocks, steps, maxUpdates, errorAccum };
       Galois::on_each(fn);
     });

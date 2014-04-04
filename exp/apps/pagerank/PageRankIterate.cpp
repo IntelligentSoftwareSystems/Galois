@@ -543,7 +543,7 @@ static void transposeGraph() {
     size_t sid = input.getData(src);
     assert(sid < input.size());
 
-    size_t num_neighbors = std::distance(input.edge_begin(src), input.edge_end(src));
+    //size_t num_neighbors = std::distance(input.edge_begin(src), input.edge_end(src));
 
     for (InputGraph::edge_iterator edge : input.out_edges(src)) {
       InputNode dst = input.getEdgeDst(edge);

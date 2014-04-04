@@ -76,7 +76,7 @@ struct Process {
     double* delta = *perThreadDelta.getLocal();
     Galois::gdeque<GNode>* succ = *perThreadSucc.getLocal();
 
-    unsigned int QAt = 0;
+    //unsigned int QAt = 0;
     
     int req = _req;
     
@@ -117,7 +117,7 @@ struct Process {
       delta[w] = delta_w;
     }
     double* Vec = *CB.getLocal();
-    for (unsigned int i = 0; i < NumNodes; ++i) {
+    for (int i = 0; i < NumNodes; ++i) {
       Vec[i] += delta[i];
       delta[i] = 0;
       sigma[i] = 0;
@@ -134,7 +134,7 @@ void verify() {
   bool firstTime = true;
   for (int i = 0; i < NumNodes; ++i) {
     double bc = (*CB.getRemote(0))[i];
-    for (unsigned int j = 1; j < numThreads; ++j)
+    for (int j = 1; j < numThreads; ++j)
       bc += (*CB.getRemote(j))[i];
     if (firstTime) {
       sampleBC = bc;
@@ -154,7 +154,7 @@ void verify() {
 void printBCValues(int begin, int end, std::ostream& out, int precision = 6) {
   for (; begin != end; ++begin) {
     double bc = (*CB.getRemote(0))[begin];
-    for (unsigned j = 1; j < numThreads; ++j)
+    for (int j = 1; j < numThreads; ++j)
       bc += (*CB.getRemote(j))[begin];
     out << begin << " " << std::setiosflags(std::ios::fixed) << std::setprecision(precision) << bc << "\n"; 
   }

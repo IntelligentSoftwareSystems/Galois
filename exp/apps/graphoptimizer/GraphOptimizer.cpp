@@ -805,7 +805,7 @@ int main(int argc, char **argv) {
     std::cout << std::hex;
     std::ostream_iterator<int> out_it (std::cout,", ");
 
-    for (uint32_t x = 0; x < ~0; ++x) {
+    for (uint32_t x = 0; x < ~0U; ++x) {
       std::vector<uint32_t> src;
       std::vector<uint8_t> dv1, dv2;
       src.push_back(x);

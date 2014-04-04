@@ -1779,7 +1779,7 @@ int main(int argc, char** argv) {
   Galois::StatManager M;
   LonestarStart(argc, argv, name, desc, url);
 
-  FixThreads fixThreads;
+  // FixThreads fixThreads;
   // tbb::task_scheduler_init iii(tbb::task_scheduler_init::default_num_threads()); XXX
 
   if (blockSizeX > MaxBlockSizeX) {

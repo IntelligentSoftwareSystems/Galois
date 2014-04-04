@@ -217,6 +217,7 @@ static bool checkIfInterleaved(void* data, size_t len, unsigned total) {
 }
 #endif
 
+#ifndef GALOIS_FORCE_STANDALONE
 // Figure out which subset of threads will participate in pageInInterleaved
 static void createMapping(std::vector<int>& mapping, unsigned& uniqueNodes) {
   std::vector<bool> hist(Galois::Runtime::MM::numNumaNodes());
@@ -230,7 +231,9 @@ static void createMapping(std::vector<int>& mapping, unsigned& uniqueNodes) {
     mapping[i] = node + 1;
   }
 }
+#endif
 
+#ifndef GALOIS_FORCE_STANDALONE
 static void pageInInterleaved(void* data, size_t len, std::vector<int>& mapping, unsigned numNodes) {
   // XXX Don't know whether memory is backed by hugepages or not, so stick with
   // smaller page size
@@ -251,6 +254,7 @@ static void pageInInterleaved(void* data, size_t len, std::vector<int>& mapping,
 
   Galois::Runtime::MM::pageIn(d.as_cptr + start, len - start, stride);
 }
+#endif
 
 static inline bool isNumaAlloc(void* data, size_t len) {
   union { void* as_vptr; char* as_cptr; } d = { data };
@@ -295,7 +299,7 @@ void* Galois::Runtime::MM::largeInterleavedAlloc(size_t len, bool full) {
     unsigned uniqueNodes;
     std::vector<int> mapping(total);
     createMapping(mapping, uniqueNodes);
-    getSystemThreadPool().run(total, std::bind(pageInInterleaved, data, len, std::ref(mapping), uniqueNodes));
+    getSystemThreadPool().run(total, RunCommand(std::bind(pageInInterleaved, data, len, std::ref(mapping), uniqueNodes)));
 #endif
   }
 

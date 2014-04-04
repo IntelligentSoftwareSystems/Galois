@@ -285,7 +285,7 @@ class Fixed2DGraphTiledExecutor {
   }
 
   Task* probeBlockWithLock(Point& start, int dim, size_t n) {
-    Task* t = getTask(start);
+    //Task* t = getTask(start);
     Point p = start;
 
     for (size_t i = 0; i < n; ++i) {
@@ -339,7 +339,7 @@ class Fixed2DGraphTiledExecutor {
       for (int i = 0; i < numDims; ++i) {
         Point p = start;
         nextPoint(p, i, inclusiveDelta);
-        if (t = probeBlock(p, i, limit[i] - inclusiveDelta)) {
+        if ((t = probeBlock(p, i, limit[i] - inclusiveDelta))) {
           start = p;
           return t;
         }

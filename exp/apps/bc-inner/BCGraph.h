@@ -416,7 +416,7 @@ class BCGraph {
 //    int maxId;
 //    int sumInNbrs = 0;
       //int maxOutNbrs = 0;
-      
+#if 0
     for (int i=0; i<nnodes; ++i) {
 			ND & n = nodes[i].data;
 			int nOutNbrs = inNeighborsSize(&n);
@@ -431,16 +431,19 @@ class BCGraph {
         maxOutNbrs = oos;
       }*/
 		}
+#endif
 //    std::cerr << "Node " << maxId << " has " << maxInNbrs << " in-nbrs Sum is " << sumInNbrs << "\n";
 //    std::cerr << " Max " << maxOutNbrs << " out-nbrs \n";
 	}
 
 	void fixNodepredsCapacities(int start, int end) {
+#if 0
 		for (int i=start; i<end; ++i) {
 			ND & n = nodes[i].data;
 			int nOutNbrs = inNeighborsSize(&n);
 			//n.preds.reserve(std::min(2, nOutNbrs));
 		}
+#endif
 	}
 
 	int inline inNeighborsSize(const ND *src) {

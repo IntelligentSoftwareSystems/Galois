@@ -492,7 +492,7 @@ class NewWorkManager {
    */
   template<typename InputIteratorTy>
   void redistribute(InputIteratorTy ii, InputIteratorTy ei, size_t dist, size_t window, unsigned tid) {
-    ThreadLocalData& local = *data.getLocal();
+    //ThreadLocalData& local = *data.getLocal();
     size_t blockSize = window;
     size_t numBlocks = dist / blockSize;
     

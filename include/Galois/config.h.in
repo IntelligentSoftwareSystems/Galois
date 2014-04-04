@@ -20,7 +20,7 @@
 #cmakedefine HAVE_CXX11_ALIGNOF
 #cmakedefine HAVE_CILK
 #cmakedefine HAVE_MMAP64
-#cmakedefine GALOIS_USE_SVNVERSION
+#cmakedefine GALOIS_USE_EMBEDDED_REVISION
 #cmakedefine GALOIS_USE_NUMA
 #cmakedefine GALOIS_USE_NUMA_OLD
 #cmakedefine GALOIS_USE_VTUNE

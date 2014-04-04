@@ -103,7 +103,7 @@ add_custom_target(more-suites-inputs)
 
 add_subdirectory(pbbs-0.1)
 #add_subdirectory(splash2)
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/parsec-2.1")
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/parsec-2.1/CMakeLists.txt")
   add_subdirectory(parsec-2.1)
 else()
   message("Missing parsec-2.1 suite; run download_external.sh to download")
