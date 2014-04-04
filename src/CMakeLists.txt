@@ -86,8 +86,8 @@ if(USE_PAPI)
   endif()
 endif()
 
-if(USE_SUBVERSION_REVISION)
-  add_dependencies(galois svnversion)
+if(USE_EMBEDDED_REVISION)
+  add_dependencies(galois revision)
 endif()
 
 configure_file("${PROJECT_SOURCE_DIR}/include/Galois/config.h.in" "${PROJECT_BINARY_DIR}/include/Galois/config.h")

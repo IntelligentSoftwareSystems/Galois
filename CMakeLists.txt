@@ -39,7 +39,7 @@ set(USE_EXP OFF CACHE BOOL "Use experimental features")
 set(USE_HTM OFF CACHE BOOL "Use HTM")
 set(EXP_DOALL "PTHREAD" CACHE STRING "Which type of implementation of parallel_doall")
 set(USE_PROF OFF CACHE BOOL "Use profiling specific features")
-set(USE_SUBVERSION_REVISION ON CACHE BOOL "Embed subversion numbers")
+set(USE_EMBEDDED_REVISION ON CACHE BOOL "Embed revision numbers")
 
 ###### Configure (users don't need to go beyond here) ######
 
@@ -177,9 +177,9 @@ if(USE_EXP)
     add_definitions(-DGALOIS_USE_PROF)
   endif()
 
-  if(USE_SUBVERSION_REVISION)
-    include(GetSVNVersion)
-    set(GALOIS_USE_SVNVERSION on)
+  if(USE_EMBEDDED_REVISION)
+    include(GetGitVersion)
+    set(GALOIS_USE_EMBEDDED_REVISION on)
   endif()
 
   if(USE_HTM)

@@ -39,7 +39,7 @@ static void LonestarStart(int argc, char** argv, const char* app, const char* de
   using namespace Galois::Runtime::LL;
 
   // display the name only if mater host
-  gPrint("Galois Benchmark Suite v", GALOIS_VERSION_STRING, " (r", GALOIS_SVNVERSION, ")\n");
+  gPrint("Galois Benchmark Suite v", GALOIS_VERSION_STRING, " (", GALOIS_REVISION, ")\n");
   gPrint("Copyright (C) ", GALOIS_COPYRIGHT_YEAR_STRING, " The University of Texas at Austin\n");
   gPrint("http://iss.ices.utexas.edu/galois/\n\n");
   gPrint("application: ", app ? app : "unspecified", "\n");
