@@ -66,9 +66,9 @@ static cll::opt<refinementMode> refineMode(cll::desc("Choose a refinement mode:"
 static cll::opt<bool> mtxInput("mtxinput", cll::desc("Use text mtx files instead binary based ones"), cll::init(false));
 static cll::opt<bool> weighted("weighted", cll::desc("weighted"), cll::init(false));
 static cll::opt<bool> verbose("verbose", cll::desc("verbose output (debugging mode, takes extra time)"), cll::init(false));
-static cll::opt<std::string> outfile("output", cll::desc("output file name"));
-static cll::opt<std::string> orderedfile("ordered", cll::desc("ordered graph file name"));
-
+static cll::opt<std::string> outfile("output", cll::desc("output partition file name"));
+static cll::opt<std::string> orderedfile("ordered", cll::desc("output ordered graph file name"));
+static cll::opt<std::string> permutationfile("permutation", cll::desc("output permutation file name"));
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<int> numPartitions(cll::Positional, cll::desc("<Number of partitions>"), cll::Required);
 static cll::opt<double> imbalance("balance", cll::desc("Fraction deviated from mean partition size"), cll::init(0.01));
@@ -238,7 +238,7 @@ int main(int argc, char** argv) {
     }
   }
   
-  if (orderedfile != "") { 
+  if (orderedfile != "" || permutationfile != "") { 
     Galois::Graph::FileGraph g;
     g.structureFromFile(filename);
     typedef Galois::LargeArray<GNode> Permutation;
@@ -251,7 +251,7 @@ int main(int argc, char** argv) {
     for (unsigned int i=0;i<parts.size();i++){ 
       parts[i] = i;
     } 
-    Galois::for_each(parts.begin(),parts.end(), og, Galois::loopname("Order Graph"));
+    Galois::for_each(parts.begin(), parts.end(), og, Galois::loopname("Order Graph"));
     std::map<GNode,uint64_t> globalMap;
     for (unsigned int i = 0; i < threadDegInfo.size(); i++) { 
       std::map<GNode,uint64_t> &localMap(*threadDegInfo.getRemote(i));
@@ -262,7 +262,7 @@ int main(int argc, char** argv) {
     order_by_degree<GNode,std::map<GNode,uint64_t> > fn(*graph,globalMap);
     std::map<GNode,int> nodeIdMap; 
     int id = 0;
-    for (auto nb = graph->begin(),ne = graph->end(); nb != ne; nb++) { 
+    for (auto nb = graph->begin(), ne = graph->end(); nb != ne; nb++) { 
       nodeIdMap[*nb] = id; 
       id++;
     }
@@ -280,7 +280,18 @@ int main(int argc, char** argv) {
     }
     Galois::Graph::FileGraph out;
     Galois::Graph::permute<int>(g, perm2, out);
-    out.structureToFile(orderedfile);
+    if (orderedfile != "")
+      out.structureToFile(orderedfile);
+    if (permutationfile != "") {
+      std::ofstream file(permutationfile.c_str());
+      Galois::LargeArray<uint64_t> transpose;
+      transpose.create(g.size());
+      uint64_t id = 0;
+      for (auto ii = perm2.begin(), ei = perm2.end(); ii != ei; ++ii)
+        transpose[*ii] = id++;
+      for (auto ii = transpose.begin(), ei = transpose.end(); ii != ei; ++ii)
+        file << *ii << "\n";
+    }
   }
   return 0;
 }

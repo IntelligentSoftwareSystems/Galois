@@ -813,58 +813,30 @@ struct AnyBFSUnordered {
 
 template<typename EdgeTy>
 void writeGraph() {
-  typedef Galois::Graph::FileGraphWriter Writer;
-  typedef Galois::LargeArray<EdgeTy> EdgeData;
-  typedef typename EdgeData::value_type edge_value_type;
-  
   Galois::Graph::FileGraph origGraph;
-  EdgeData edgeData;
-  Writer p;
-
   origGraph.structureFromFileInterleaved<EdgeTy>(filename);
-  p.setNumNodes(graph.size());
-  p.setNumEdges(graph.sizeEdges());
-  p.setSizeofEdgeData(EdgeData::has_value ? sizeof(edge_value_type) : 0); 
-  edgeData.create(graph.sizeEdges());
+  std::vector<size_t> perm;
+  perm.resize(graph.size());
+  for (GNode n : graph)
+    perm[n] = graph.getData(n).id;
 
-  p.phase1();
-  for (GNode n : graph) {
-    p.incrementDegree(graph.getData(n).id, std::distance(graph.edge_begin(n), graph.edge_end(n)));
-  }
-  
-  p.phase2();
-  for (GNode n : graph) {
-    size_t sid = graph.getData(n).id;
-    for (Graph::edge_iterator ii : graph.out_edges(n)) {
-      GNode dst = graph.getEdgeDst(ii);
-      size_t did = graph.getData(dst).id;
-      if (EdgeData::has_value)
-        edgeData.set(p.addNeighbor(sid, did), origGraph.getEdgeData<edge_value_type>(ii));
-      else
-        p.addNeighbor(sid, did);
-    }
-  }
-
-  edge_value_type* rawEdgeData = p.finish<edge_value_type>();
-  if (EdgeData::has_value)
-    std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+  Galois::Graph::FileGraph out;
+  Galois::Graph::permute<EdgeTy>(origGraph, perm, out);
   std::cout 
     << "Writing permuted graph to " << outputFilename 
-    << " (nodes: " << p.size() << " edges: " << p.sizeEdges() << ")\n";
-  p.structureToFile(outputFilename);
+    << " (nodes: " << out.size() << " edges: " << out.sizeEdges() << ")\n";
+  out.structureToFile(outputFilename);
 }
 
 void writePermutation() {
   std::ofstream file(outputFilename.c_str());
   std::vector<unsigned int> transpose;
   transpose.resize(graph.size());
-  for (GNode n : graph) {
+  for (GNode n : graph)
     transpose[graph.getData(n).id] = n;
-  }
+  std::cout << "Writing permutation to " << outputFilename << "\n";
   for (unsigned int id : transpose)
     file << id << "\n";
-
-  std::cout << "Writing permutation to " << outputFilename << "\n";
   file.close();
 }
 
