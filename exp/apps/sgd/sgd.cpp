@@ -50,6 +50,8 @@
 #include <boost/iterator/transform_iterator.hpp>
 #define LATENT_VECTOR_SIZE 2
 typedef int EdgeData;
+unsigned int num_user_nodes = 0;
+uint64_t idCount = Galois::Runtime::networkHostID*(num_user_nodes)+1;
 typedef struct Node
 {
   //double* latent_vector; //latent vector to be learned
@@ -63,6 +65,7 @@ typedef struct Node
       updates=0;
       number_of_edges=0;
       edge_offset=0;
+      ID = idCount++;
       unsigned int seed = 42;
       std::default_random_engine eng(seed);
       std::uniform_real_distribution<double> random_lv_value(0, 0.1);
@@ -147,8 +150,7 @@ uint64_t Processed_movie_nodes = 0;
 volatile unsigned prog_barrier = 0;
 //std::atomic<unsigned> prog_barrier;
 //unsigned int num_movie_nodes = 0;
-unsigned int num_movie_nodes = 1000;
-
+unsigned int num_movie_nodes = 0;
 using namespace Galois::Runtime;
 typedef Galois::Runtime::LL::SimpleLock<true> SLock;
 SLock slock;
@@ -183,7 +185,7 @@ double calcPrediction (const Node& movie_data, const Node& user_data) {
   return pred;
 }
 
-inline void doGradientUpdate(Node& movie_data, Node& user_data, unsigned int edge_rating)
+inline void doGradientUpdate(Node& movie_data, Node& user_data, uint64_t edge_rating)
 {
   double* __restrict__ movie_latent = movie_data.latent_vector;
         double step_size = LEARNING_RATE * 1.5 / (1.0 + DECAY_RATE * pow(movie_data.updates + 1, 1.5));
@@ -290,7 +292,9 @@ void verify(Graphp g){
 			
 			    DGNode m = g->getEdgeDst(ii);
 			    double pred = calcPrediction(g->getData(*ni), g->getData(m));
-			    double rating = ii->getValue();
+			    unsigned int rating = ii->getValue();
+			    rating = rating%10;
+		
 			    if(!std::isnormal(pred))
 				std::cout << "Denormal Warning\n";
 			    rms += ((pred - rating)*(pred - rating));
@@ -305,19 +309,8 @@ void verify(Graphp g){
     std::cout << "RMSE Total: " << total_rms << " Normalized: " << normalized_rms << std::endl;
  //   cout<<"Number of nodes seen = "<<count<<endl;
 
-}/*
-struct dummy_func2 {
-    dummy_func2(){} 
-    void operator()(const DGNode& item, Galois::UserContext<DGNode>& ctx){
-	    cout<<"Host:"<<networkHostID<<" is doing tp..\n";
-    
-    }
-};
-struct dummy_func {
-    dummy_func(){} 
-    void operator()(GNode& item, Galois::UserContext<GNode>& ctx){}
-};
-*/
+}
+
 void printNode(const Node& t) {
     cout<<"ID: "<<t.ID<<endl;
     cout<<"Edge_offset: "<<t.edge_offset<<endl;
@@ -377,40 +370,19 @@ struct sgd_algo {
 struct Process : public Galois::Runtime::Lockable {
     Graphp g;
     sgd_algo* self;
+    int iteration;
+    unsigned int startRange;
+    unsigned int endRange;
     Process(){ }
     // sgd(Graphp _g) : g(_g) {}
-    Process(sgd_algo* s, Graphp _g) : g(_g), self(s) { }
+    Process(sgd_algo* s, Graphp _g, unsigned int _start, unsigned int _end) : g(_g), self(s), startRange(_start), endRange(_end) { }
     //void operator()(const DGNode& n, Galois::UserContext<DGNode>&) {(*this)(n);} 
     void operator()(const DGNode& movie, Galois::UserContext<DGNode>& ctx)
     {
-
-     /* For checking if graph is correct  */
-   /*   DGraph::edge_iterator edge_begin = g->edge_begin(movie);
-      DGraph::edge_iterator edge_end = g->edge_end(movie);
-    
-      Node& movie_data = g->getData(movie);
-      std::cout << "Movie : " << movie_data.ID <<"\t";
-
-      for(auto ii = edge_begin; ii != edge_end; ++ii)
-      {
-	    DGNode user = g->getEdgeDst(ii);
-	    Node& user_data = g->getData(user);
-	    unsigned int egde_data = ii->getValue();
-	    std::cout << "User : " <<  user_data.ID <<"\t";
-	    
-      }	
-	std::cout << "\n";
- */   
-    //cout<<"Entered Process..\n"<<endl;
-//   if(HostIDMap[movie] == networkHostID) {
-     Node& movie_data = g->getData(movie); 
-	//printf("local \n");
-	//
-	
-
+     Node& movie_data = g->getData(movie);
+     //cout <<"ID of movie: "<<movie_data.ID<<endl;
     //printNode(movie_data);
 
- //    std::cout << "host id = " << networkHostID << "\n";
      DGraph::edge_iterator edge_it = g->edge_begin(movie);
      DGraph::edge_iterator edge_end = g->edge_end(movie);
 /**********************************************************
@@ -418,7 +390,7 @@ struct Process : public Galois::Runtime::Lockable {
 * in one go.
 * ********************************************************/ 	
     //uint32_t edges = std::distance(edge_end,edge_it);
-    	
+   /* 	
     if(movie_data.edge_offset < movie_data.number_of_edges)
 	std::advance(edge_it, movie_data.edge_offset);
     else if(movie_data.edge_offset == movie_data.number_of_edges){
@@ -446,46 +418,60 @@ struct Process : public Galois::Runtime::Lockable {
     if(movie_data.updates < MAX_MOVIE_UPDATES)
 	ctx.push(movie);
 
+*/
 
-
-/*   std::advance(edge_it,  movie_data.edge_offset);
-     DGNode user = g->getEdgeDst(edge_it);
-     Node& user_data = g->getData(user);
-
+     //std::advance(edge_it,  movie_data.edge_offset);
+     //std::advance(edge_it,  startRange);
+     //cout<<networkHostID<<" checking if multiple edges..\n"<<endl;
+     assert(edge_it != edge_end);
      unsigned int edge_rating = edge_it->getValue();
-     
-    // Call the gradient routine
-    doGradientUpdate(movie_data, user_data, edge_rating);
-     
-     ++edge_it;
-     ++movie_data.edge_offset;
+     unsigned int dstID = edge_rating/10;
+     //cout<<"Iterating till start.."<<endl;
+     while(dstID < startRange && edge_it != edge_end){
+	edge_rating = edge_it->getValue();
+	dstID = edge_rating/10;
+	++edge_it;
+    }
+    //cout<<networkHostID<<" reached range start...\n"<<endl;
+     //else if(dstID >= endRange)
+    //	return;
+     while((dstID < endRange) && (edge_it != edge_end)) {
 
+	 edge_rating = edge_it->getValue();
+	 dstID = edge_rating/10;
+	 DGNode user = g->getEdgeDst(edge_it);
+	 Node& user_data = g->getData(user);
+
+	 edge_rating = edge_rating%10;
+	 //cout<<"Value of rating: "<<edge_rating<<endl;
+
+	 // Call the gradient routine
+	 doGradientUpdate(movie_data, user_data, edge_rating);
+	 ++edge_it;
+	 //++movie_data.edge_offset;
+	 //assert(startRange<=dstID && dstID <= endRange);
+     }
+    //cout<<networkHostID<<" reached range end...\n"<<endl;
 	   // This is the last user
-     if(edge_it == g->edge_end(movie))// Galois::MethodFlag::NONE))
+     if(edge_it == edge_end)// Galois::MethodFlag::NONE))
      {
-    //start back at the first edge again
-
+	//start back at the first edge again
 	movie_data.edge_offset = 0;
 	numNodes += 1;
 	++Processed_movie_nodes;
 	
-	printf("Processed = %lu\t , hostID = %d\n", Processed_movie_nodes, networkHostID);
+	//printf("Processed = %lu\t , hostID = %d\n", Processed_movie_nodes, networkHostID);
 	movie_data.updates++;
 	//cout<<"Done with this movie.. count = "<<++count_done<<" host = "<<networkHostID<<endl;
 	if(movie_data.updates < MAX_MOVIE_UPDATES)
 	    ctx.push(movie);
      }            
-     else
+     /*else
      {
 	    ctx.push(movie);
 
-     }
-*/
-/*}else {
-    printf("remote node ..pushing\n");
-	ctx.push(movie);
-}
-*/
+     }*/
+
 }
 
 
@@ -533,7 +519,17 @@ void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
 
 //	std::cout<< "movie_host0 = " << movie_host0 << " moveie_host1 = " << movie_host1 <<std::endl;
 	//Galois::for_each_local(g, Process(this,g), "Process");
-	Galois::for_each(g->begin(), ii, Process(this,g), "SGD Process");
+	unsigned int blockSize = num_user_nodes/networkHostNum;
+	for(int i=0;i<networkHostNum;i++) {
+	    int blockNum = (networkHostID+i)%networkHostNum;
+	    unsigned int startRange = blockSize*blockNum;
+	    unsigned int endRange = blockSize*(blockNum+1);
+	    if(blockNum == networkHostNum-1)	endRange = num_user_nodes+1;
+	    startRange += num_movie_nodes+1;
+	    endRange += num_movie_nodes+1;
+	    cout<<"Iteration: "<<i<<endl;
+	    Galois::for_each(g->begin(), ii, Process(this,g,startRange,endRange), "SGD Process");
+	}
 	//Galois::for_each(g->begin(), ii, verify_before(g), "Verifying");
     
         // Verification routine
@@ -694,7 +690,7 @@ static void getRemoteNode_landing_pad(RecvBuffer& buf) {
 
 */
 
-
+uint64_t countEdgeData=0;
 static void create_remote_graph_edges(Graphp dgraph)
 {
   printf ("creating all edges on HOST =>%u\n", networkHostID);
@@ -709,23 +705,33 @@ static void create_remote_graph_edges(Graphp dgraph)
 	mapping[*ii] = *dg_it;
 	++dg_it;	
     } 
+    idCount = 1;
     for(auto ii = fgraph.begin(); ii != fgraph.end(); ++ii) {
 	FGraph::edge_iterator vv = fgraph.edge_begin(*ii);
 	FGraph::edge_iterator ev = fgraph.edge_end(*ii);
 	scount++;
 	Node& n = dgraph->getData(mapping[*ii]);
+	n.ID = idCount++;
 //	cout << "n ID = "<< n.ID<<endl;
 	for (FGraph::edge_iterator jj = vv; jj != ev; ++jj) {
 	   // cout<<"Getting edges..\n";
-	    unsigned int edge_data = 0;//fgraph.getEdgeData(jj);
+	    Node& dst = dgraph->getData(mapping[fgraph.getEdgeDst(jj)]);
+	    unsigned int dstID = dst.ID;
+	    //cout<<"Value of ID = "<<dstID<<endl;
+	    //cout<<"Value of edge data = "<<fgraph.getEdgeData<unsigned int>(jj)<<endl;
+	    unsigned int edge_data = dstID*10+fgraph.getEdgeData<unsigned int>(jj);
+	    //cout<<"Value of edge data again: "<<edge_data%10<<endl;
+	    countEdgeData += edge_data;
 	    dgraph->addEdge(mapping[*ii],mapping[fgraph.getEdgeDst(jj)], edge_data);
 	    count++;
 	    n.number_of_edges+=1;
 	}
+	if(n.number_of_edges > 0)
+	    ++num_movie_nodes;
+	else
+	    ++num_user_nodes;
 	NUM_RATINGS += n.number_of_edges;
   }
-
-
   /*  auto uu = dgraph->begin();
     std::advance(uu, num_movie_nodes+2);
 
@@ -921,6 +927,9 @@ int main(int argc, char** argv)
 	cout<<"Verifying after SGD\n";
 	verify(dgraph);
 	T2.stop();
+	printf("NUMBER OF MOVIE NODES = %d\n", num_movie_nodes);
+	cout<<"Sum of edge data values = "<<countEdgeData<<endl;
 	Galois::Runtime::networkTerminate();
 	return 0;
+
 }
