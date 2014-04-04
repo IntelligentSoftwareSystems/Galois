@@ -424,8 +424,12 @@ struct Process : public Galois::Runtime::Lockable {
      //std::advance(edge_it,  startRange);
      //cout<<networkHostID<<" checking if multiple edges..\n"<<endl;
      assert(edge_it != edge_end);
-     unsigned int edge_rating = edge_it->getValue();
-     unsigned int dstID = edge_rating/10;
+     unsigned int edge_rating;
+     unsigned int dstID;
+     if(edge_it != edge_end) {
+	edge_rating = edge_it->getValue();
+	dstID = edge_rating/10;
+    }
      //cout<<"Iterating till start.."<<endl;
      while(dstID < startRange && edge_it != edge_end){
 	edge_rating = edge_it->getValue();
@@ -451,7 +455,7 @@ struct Process : public Galois::Runtime::Lockable {
 	 //++movie_data.edge_offset;
 	 //assert(startRange<=dstID && dstID <= endRange);
      }
-    //cout<<networkHostID<<" reached range end...\n"<<endl;
+   //cout<<networkHostID<<" reached range end...\n"<<endl;
 	   // This is the last user
      if(edge_it == edge_end)// Galois::MethodFlag::NONE))
      {
