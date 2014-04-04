@@ -53,6 +53,7 @@ static const double BottouInit = 0.1;
 
 enum Algo {
   nodeMovie,
+  nodeMoviePri,
   edgeMovie,
 	block,
 	blockAndSliceUsers,
@@ -74,10 +75,13 @@ static cll::opt<unsigned> usersPerBlockSlice ("usersPerBlk", cll::desc ("[users 
 static cll::opt<unsigned> moviesPerBlockSlice ("moviesPerBlk", cll::desc ("[movies per block slice]"), cll::init (350));
 static cll::opt<bool> verifyPerIter ("verifyPerIter", cll::desc ("compute RMS every iter"), cll::init (false));
 
+static cll::opt<int> shiftFactor("shiftRating", cll::desc("Shift ratings down by"), cll::init(0));
+
 static cll::opt<Algo> algo(cll::desc("Choose an algorithm:"),
                            cll::values(
                                        clEnumVal(nodeMovie, "Node by Movies"),
                                        clEnumVal(edgeMovie, "Edge by Movies"),
+                                       clEnumVal(nodeMoviePri, "Node delta error"),
                                        clEnumVal(block, "Block by Users and Movies"),
                                        clEnumVal(blockAndSliceUsers, "Block by Users and Movies, Slice by Users"),
                                        clEnumVal(blockAndSliceBoth, "Block by Users and Movies, Slice by Users and Movies (default)"),
@@ -114,7 +118,7 @@ struct Node {
 //node data is Node, edge data is unsigned int
 // typedef Galois::Graph::LC_CSR_Graph<Node, unsigned int> Graph;
 
-typedef typename Galois::Graph::LC_CSR_Graph<Node, unsigned>
+typedef typename Galois::Graph::LC_CSR_Graph<Node, int>
 ::with_numa_alloc<true>::type
 ::with_no_lockable<false>::type Graph;
 typedef Graph::GraphNode GNode;
@@ -155,8 +159,11 @@ double vector_dot(const Node& movie_data, const Node& user_data) {
 
 double calcPrediction (const Node& movie_data, const Node& user_data) {
   double pred = vector_dot(movie_data, user_data);
+  double p = pred;
   pred = std::min (MAXVAL, pred);
   pred = std::max (MINVAL, pred);
+  if (p != pred)
+    std::cerr << "clamped " << p << " to " << pred << "\n";
   return pred;
 }
 
@@ -188,13 +195,15 @@ struct InvLearnFN : public LearnFN {
   }
 };
 
-void doGradientUpdate(Node& movie_data, Node& user_data, unsigned int edge_rating, double step_size)
+double doGradientUpdate(Node& movie_data, Node& user_data, int edge_rating, double step_size)
 {
   double* __restrict__ movie_latent = movie_data.latent_vector;
   double* __restrict__ user_latent = user_data.latent_vector;
   
   //calculate error
-  double cur_error = edge_rating - vector_dot(movie_data, user_data);
+  double old_dp = vector_dot(movie_data, user_data);
+  double cur_error = edge_rating - old_dp;
+  assert(cur_error < 1000 && cur_error > -1000);
   
   //take gradient step
   for(unsigned int i = 0; i < LATENT_VECTOR_SIZE; i++)
@@ -202,8 +211,11 @@ void doGradientUpdate(Node& movie_data, Node& user_data, unsigned int edge_ratin
       double prev_movie_val = movie_latent[i];
       double prev_user_val = user_latent[i];
       movie_latent[i] += step_size * (cur_error * prev_user_val  - LAMBDA * prev_movie_val);
+      assert(std::isnormal(movie_latent[i]));
       user_latent[i]  += step_size * (cur_error * prev_movie_val - LAMBDA * prev_user_val);
+      assert(std::isnormal(user_latent[i]));
     }
+  return cur_error;
 }
 
 void verify (Graph& g) {
@@ -225,6 +237,8 @@ void verify (Graph& g) {
 			
                         if (!std::isnormal(pred))
                           std::cout << "denormal warning\n";
+                        if (pred > 100.0 || pred < -100.0)
+                          std::cout << "Big difference " << pred << " should be " << rating << "\n";
 
 			rms += ((pred - rating) * (pred - rating));
 			}
@@ -266,6 +280,43 @@ struct sgd_node_movie {
   }
 };
 
+//priority by-movie node-based
+struct sgd_node_movie_pri {
+  Graph& g;
+  double step_size;
+  sgd_node_movie_pri(Graph& g, double ss) :g(g), step_size(ss) {}
+
+  template<typename Context>
+  void operator()(GNode node, Context& cnx) {
+    for (auto ii = g.edge_begin (node), ee = g.edge_end (node);
+         ii != ee; ++ii) {
+      double e1 = doGradientUpdate(g.getData(node), g.getData(g.getEdgeDst(ii)), g.getEdgeData(ii), step_size);
+      double e2 = g.getEdgeData(ii) - calcPrediction(g.getData(node), g.getData(g.getEdgeDst(ii)));
+      if (abs(e1 - e2) > 20) {
+        std::cerr << "A" << abs(e1 - e2);
+        cnx.push(g.getEdgeDst(ii));
+      }
+    }
+  }
+
+  static void go(Graph& g, unsigned int numMovieNodes, unsigned int numUserNodes, const LearnFN* lf) {
+    std::deque<GNode> Movies;
+    for (auto ii = g.begin(), ee = g.end(); ii != ee; ++ii)
+      if (std::distance(g.edge_begin(*ii), g.edge_end(*ii)) > 100)
+        Movies.push_back(*ii);
+    for (int i = 0; i < 10; ++i) {
+      if (verifyPerIter)
+        verify(g);
+      double step_size = lf->step_size(i);
+      std::cout << "Step Size: " << step_size << "\n";
+      // if (i != 0)
+      //   std::random_shuffle(Movies.begin(), Movies.end());
+      Galois::for_each(Movies.begin(), Movies.end(), sgd_node_movie_pri(g, step_size), 
+                       Galois::wl<Galois::WorkList::dChunkedFIFO<>>());
+    }
+  }
+};
+
 //Simple by-edge grouped by movie (only one edge per movie on the WL at any time)
 struct sgd_edge_movie {
   Graph& g;
@@ -291,7 +342,7 @@ struct sgd_edge_movie {
     for (auto ii = g.begin(), ee = g.end(); ii != ee; ++ii)
       if (g.edge_begin(*ii) != g.edge_end(*ii))
         Movies.push_back(*ii);
-    for (int i = 0; i < 10; ++i) {
+    for (int i = 0; i < 20; ++i) {
       if (verifyPerIter)
         verify(g);
       double step_size = lf->step_size(i);
@@ -346,7 +397,7 @@ struct sgd_block
 					break;
 
 				Node& user_data = g.getData(user, Galois::NONE);
-				unsigned int edge_rating = g.getEdgeData(edge_it, Galois::NONE);	
+				int edge_rating = g.getEdgeData(edge_it, Galois::NONE);	
 
 				//do gradient step
 				doGradientUpdate(movie_data, user_data, edge_rating, step_size);
@@ -423,7 +474,7 @@ struct sgd_block_users
 						break;
 
 					Node& user_data = g.getData(user, Galois::NONE);
-					unsigned int edge_rating = g.getEdgeData(edge_it, Galois::NONE);	
+					int edge_rating = g.getEdgeData(edge_it, Galois::NONE);	
 
 					//do gradient step
 					doGradientUpdate(movie_data, user_data, edge_rating, step_size);
@@ -508,7 +559,7 @@ struct sgd_block_users_movies
 							break;
 
 						Node& user_data = g.getData(user, Galois::NONE);
-						unsigned int edge_rating = g.getEdgeData(edge_it, Galois::NONE);	
+						int edge_rating = g.getEdgeData(edge_it, Galois::NONE);	
 
 						//do gradient step
 						doGradientUpdate(movie_data, user_data, edge_rating, step_size);
@@ -807,7 +858,7 @@ struct sgd_march
 					//printf("okay user %d\n", user - NUM_MOVIE_NODES);
 
 					Node& user_data = g.getData(user, Galois::NONE);
-					unsigned int edge_rating = g.getEdgeData(edge_it, Galois::NONE);	
+					int edge_rating = g.getEdgeData(edge_it, Galois::NONE);	
 
 					//do gradient step
 					doGradientUpdate(movie_data, user_data, edge_rating, step_size);
@@ -1039,7 +1090,7 @@ struct sgd_slice_jump
 					break;
 
 				Node& user_data = g.getData(user, Galois::NONE);
-				unsigned int edge_rating = g.getEdgeData(edge_it, Galois::NONE);	
+				int edge_rating = g.getEdgeData(edge_it, Galois::NONE);	
 
 				//do gradient step
 				doGradientUpdate(movie_data, user_data, edge_rating, step_size);
@@ -1254,6 +1305,11 @@ int main(int argc, char** argv) {
 
 	NUM_MOVIE_NODES = numMovieNodes;
 	NUM_USER_NODES = numUserNodes;
+
+        if (shiftFactor != 0)
+          for (auto ii = g.begin(), ee = g.end(); ii != ee; ++ii)
+            for (auto eii = g.edge_begin(*ii), eee = g.edge_end(*ii); eii != eee; ++eii)
+              g.getEdgeData(eii) -= shiftFactor;
 	
 	Galois::StatTimer timer;
 	timer.start();
@@ -1277,6 +1333,9 @@ int main(int argc, char** argv) {
 	switch (algo) {
         case Algo::nodeMovie:
           sgd_node_movie::go(g, numMovieNodes, numUserNodes, lf.get());
+          break;
+        case Algo::nodeMoviePri:
+          sgd_node_movie_pri::go(g, numMovieNodes, numUserNodes, lf.get());
           break;
         case Algo::edgeMovie:
           sgd_edge_movie::go(g, numMovieNodes, numUserNodes, lf.get());
