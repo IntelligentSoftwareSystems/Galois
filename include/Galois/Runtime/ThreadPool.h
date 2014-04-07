@@ -30,7 +30,19 @@
 namespace Galois {
 namespace Runtime {
 
-typedef std::function<void (void)> RunCommand;
+namespace detail {
+template<typename tpl, int s, int r>
+struct exTupleImpl {
+  static inline void execute(tpl& cmds) {
+    std::get<s>(cmds)();
+    exTupleImpl<tpl,s+1,r-1>::execute(cmds);
+  }
+};
+template<typename tpl, int s>
+struct exTupleImpl<tpl, s, 0> {
+  static inline void execute(tpl& f) { }
+};
+}
 
 class ThreadPool {
 protected:
@@ -38,7 +50,7 @@ protected:
   ThreadPool(unsigned m): maxThreads(m) { }
 
   //!execute work on all threads
-  virtual void runInternal(unsigned num, RunCommand* begin, RunCommand* end) = 0;
+  virtual void runInternal(unsigned num, std::function<void (void)>* cmd) = 0;
 
 public:
   virtual ~ThreadPool() { }
@@ -46,10 +58,19 @@ public:
   //! execute work on all threads
   //! a simple wrapper for run
   template<typename... Args>
-  void run(unsigned num, Args... args) {
-    const auto numArgs = sizeof...(args);
-    std::array<RunCommand, numArgs> cmds{args...};
-    runInternal(num, &cmds[0], &cmds[numArgs]);
+  void run(unsigned num, Args&&... args) {
+    struct exTuple {
+      using Ty = std::tuple<Args...>;
+      Ty cmds;
+
+      void operator() () {
+        detail::exTupleImpl<Ty, 0, std::tuple_size<Ty>::value>::execute(cmds);
+      }
+      exTuple(Args&&... args) :cmds(std::forward<Args>(args)...) {}
+    };
+    std::function<void(void)> pf(exTuple(std::forward<Args>(args)...));
+    //    std::function<void(void)> pf(std::ref(f));
+    runInternal(num, &pf);
   }
 
   //!return the number of threads supported by the thread pool on the current machine

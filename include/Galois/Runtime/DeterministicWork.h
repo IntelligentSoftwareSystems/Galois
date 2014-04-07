@@ -1019,7 +1019,7 @@ static inline void for_each_det_impl(const RangeTy& range, WorkTy& W) {
   assert(!inGaloisForEach);
 
   inGaloisForEach = true;
-  RunCommand init(std::bind(&WorkTy::template AddInitialWork<RangeTy>, std::ref(W), std::ref(range)));
+  auto init = std::bind(&WorkTy::template AddInitialWork<RangeTy>, std::ref(W), std::ref(range));
   getSystemThreadPool().run(activeThreads, std::ref(init), std::ref(getSystemBarrier()), std::ref(W));
   inGaloisForEach = false;
 }
