@@ -25,7 +25,6 @@
 
 #include "Galois/config.h"
 #include GALOIS_CXX11_STD_HEADER(functional)
-#include <array>
 
 namespace Galois {
 namespace Runtime {
