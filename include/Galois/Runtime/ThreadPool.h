@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2014, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -24,7 +24,12 @@
 #define GALOIS_RUNTIME_THREADPOOL_H
 
 #include "Galois/config.h"
-#include GALOIS_CXX11_STD_HEADER(functional)
+
+#include "Galois/Runtime/ll/CacheLineStorage.h"
+
+#include <functional>
+#include <atomic>
+#include <vector>
 
 namespace Galois {
 namespace Runtime {
@@ -46,18 +51,42 @@ struct exTupleImpl<tpl, s, 0> {
 class ThreadPool {
 protected:
   unsigned maxThreads;
-  ThreadPool(unsigned m): maxThreads(m) { }
+  ThreadPool(unsigned m);
 
-  //!execute work on all threads
-  virtual void runInternal(unsigned num, std::function<void (void)>& cmd) = 0;
+  //!destroy all threads
+  void destroyCommon();
+
+  //! sleep this thread
+  virtual void threadWait(unsigned tid) = 0;
+
+  //! wake up thread
+  virtual void threadWakeup(unsigned tid) = 0;
 
   //Common implementation stuff
 
+  //Data passed to threads through run
+  std::function<void(void)> work; //active work command
+  std::atomic<unsigned> starting; // number of threads
+
+  //Data used in run loop
+  std::vector<LL::CacheLineStorage<std::atomic<int>>> done; // signal loop done
+
+  struct shutdown_ty {}; //! type for shutting down thread
+
   //! Initialize TID and PTS
-  void initThreadCommon(unsigned tid);
+  void initThread(unsigned tid);
+
+  //!main thread loop
+  void threadLoop(unsigned tid);
+
+  //! spin up for run
+  void cascade(int tid);
+
+  //! spin down after run
+  void decascade(int tid);
 
 public:
-  virtual ~ThreadPool() { }
+  virtual ~ThreadPool();
 
   //! execute work on all threads
   //! a simple wrapper for run
@@ -72,9 +101,18 @@ public:
       }
       exTuple(Args&&... args) :cmds(std::forward<Args>(args)...) {}
     };
-    std::function<void(void)> pf(exTuple(std::forward<Args>(args)...));
-    //    std::function<void(void)> pf(std::ref(f));
-    runInternal(num, pf);
+    work = std::function<void(void)>(exTuple(std::forward<Args>(args)...));
+    //sanitize num
+    //seq write to starting should make work safe
+    starting = std::min(std::max(1U,num), maxThreads);
+    //launch threads
+    cascade(0);
+    // Do master thread work
+    work();
+    //wait for children
+    decascade(0);
+    // Clean up
+    work = nullptr;
   }
 
   //!return the number of threads supported by the thread pool on the current machine
