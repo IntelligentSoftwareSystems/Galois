@@ -47,7 +47,8 @@
 #include <algorithm>
 #include <functional>
 #include <unordered_set>
-//#include <iostream>
+#include <iostream>
+
 
 namespace Galois {
 //! Internal Galois functionality - Use at your own risk.
@@ -378,6 +379,7 @@ void for_each_impl(const RangeTy& range, FunctionTy f, const char* loopname) {
   typedef typename RangeTy::value_type T;
   typedef ForEachWork<WLTy, T, FunctionTy> WorkTy;
 
+  std::cout << "for_each_impl 1->2->3 on Host = > " << networkHostID<< " Loop name is : " << loopname<<"\n";
   assert(!inGaloisForEach);
 
   inGaloisForEach = true;
@@ -396,6 +398,34 @@ void for_each_impl(const RangeTy& range, FunctionTy f, const char* loopname) {
   trace_loop_end(loopname);
   inGaloisForEach = false;
 }
+
+
+//Gill: New variant to handle iteration number.
+template<typename WLTy, typename RangeTy,  typename Iter_num, typename FunctionTy>
+void for_each_impl(const RangeTy& range, Iter_num i, FunctionTy f, const char* loopname) {
+  typedef typename RangeTy::value_type T;
+  typedef ForEachWork<WLTy, T, FunctionTy> WorkTy;
+
+  std::cout << " NEW for_each_impl 1->2->3  and i =>" << i <<"\n";
+  assert(!inGaloisForEach);
+
+  inGaloisForEach = true;
+
+  WorkTy W(f, loopname);
+  //RunCommand init(std::bind(&WorkTy::template AddInitialWork<RangeTy>, std::ref(W), range));
+  RunCommand w[5] = {
+    std::bind(&WorkTy::initThread, std::ref(W)),
+    std::bind(&WorkTy::template AddInitialWork<RangeTy>, std::ref(W), range), 
+    std::ref(getSystemBarrier()),
+    std::ref(W),
+    std::ref(getSystemBarrier())
+  };
+  trace_loop_start(loopname);
+  getSystemThreadPool().run(&w[0], &w[5], activeThreads);
+  trace_loop_end(loopname);
+  inGaloisForEach = false;
+}
+
 
 template<typename FunctionTy>
 struct WOnEach {
