@@ -447,8 +447,10 @@ void for_each_impl(const RangeTy& range, FunctionTy f, const char* loopname) {
 
   inGaloisForEach = true;
   getSystemThreadPool().run(activeThreads,
-                            std::bind(&WorkTy::initThread, std::ref(W)),
-                            std::bind(&WorkTy::template AddInitialWork<RangeTy>, std::ref(W), range), 
+                            [&W] () {W.initThread();},
+                            //std::bind(&WorkTy::initThread, std::ref(W)),
+                            [&W, &range] {W.AddInitialWork(range);},
+                            //std::bind(&WorkTy::template AddInitialWork<RangeTy>, std::ref(W), range), 
                             std::ref(barrier),
                             std::ref(W));
   inGaloisForEach = false;
