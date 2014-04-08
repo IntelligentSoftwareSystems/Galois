@@ -6,8 +6,9 @@
 
 #include "Galois/config.h"
 #include "Galois/Runtime/ROBexecutor.h"
-#include "Galois/Runtime/LevelExecutor.h"
+// #include "Galois/Runtime/LevelExecutor.h"
 #include "Galois/Runtime/KDGtwoPhase.h"
+#include "Galois/Runtime/DAG.h"
 
 #include <boost/iterator/transform_iterator.hpp>
 
@@ -114,7 +115,10 @@ private:
       }
 
       mass += m;
-      accum += (*p * m);
+
+      Point tmp (*p);
+      tmp *= m;
+      accum += tmp;
     }
 
     node->mass = mass.get_value();
@@ -421,6 +425,7 @@ struct TreeSummarizeLevelByLevel: public TypeDefHelper<SerialNodeBase> {
 };
 
 
+
 struct TreeSummarizeSpeculative: public TypeDefHelper<SpecNodeBase> {
 
   struct VisitNhood {
@@ -445,20 +450,26 @@ struct TreeSummarizeSpeculative: public TypeDefHelper<SpecNodeBase> {
   };
 
 
+  template <bool useSpec>
   struct OpFunc {
+    typedef char tt_does_not_need_push;
+    static const unsigned CHUNK_SIZE = 1024;
+
 
     template <typename C>
     void operator () (InterNode* node, C& ctx) {
 
-      double orig_mass = node->mass;
-      Point orig_pos = node->pos;
+      if (useSpec) {
+        double orig_mass = node->mass;
+        Point orig_pos = node->pos;
 
-      auto restore = [node, orig_mass, orig_pos] (void) {
-        node->pos = orig_pos;
-        node->mass = orig_mass;
-      };
+        auto restore = [node, orig_mass, orig_pos] (void) {
+          node->pos = orig_pos;
+          node->mass = orig_mass;
+        };
 
-      ctx.addUndoAction (restore);
+        ctx.addUndoAction (restore);
+      }
 
       treeCompute (node);
 
@@ -481,7 +492,7 @@ struct TreeSummarizeSpeculative: public TypeDefHelper<SpecNodeBase> {
     t_feach.start ();
     Galois::Runtime::for_each_ordered_rob (
         nodes.begin (), nodes.end (),
-        LevelComparator<TreeNode> (), VisitNhood (), OpFunc ());
+        LevelComparator<TreeNode> (), VisitNhood (), OpFunc<true> ());
     t_feach.stop ();
 
   }
@@ -491,17 +502,6 @@ struct TreeSummarizeSpeculative: public TypeDefHelper<SpecNodeBase> {
 struct TreeSummarizeTwoPhase: public TreeSummarizeSpeculative {
 
   using Base = TreeSummarizeSpeculative;
-
-  struct OpFunc {
-    
-    typedef char tt_does_not_need_push;
-    static const unsigned CHUNK_SIZE = 1024;
-
-    template <typename C>
-    void operator () (InterNode* node, C& ctx) {
-      treeCompute (node);
-    }
-  };
 
   template <typename I>
   void operator () (InterNode* root, I bodbeg, I bodend) const {
@@ -519,11 +519,38 @@ struct TreeSummarizeTwoPhase: public TreeSummarizeSpeculative {
     t_feach.start ();
     Galois::Runtime::for_each_ordered_2p_win (
         nodes.begin (), nodes.end (),
-        LevelComparator<TreeNode> (), Base::VisitNhood (), OpFunc ());
+        LevelComparator<TreeNode> (), Base::VisitNhood (), Base::OpFunc<false> ());
     t_feach.stop ();
 
   }
 };
+
+struct TreeSummarizeDAG: public TreeSummarizeTwoPhase {
+  using Base = TreeSummarizeTwoPhase;
+
+  template <typename I>
+  void operator () (InterNode* root, I bodbeg, I bodend) const {
+
+    Galois::StatTimer t_copy_to_vec ("time for copying nodes into a vector");
+
+    VecInterNode nodes;
+
+    t_copy_to_vec.start ();
+    copyToVecInterNodes (root, nodes);
+    t_copy_to_vec.stop ();
+
+    Galois::StatTimer t_feach ("time for data dependend DAG based for_each");
+
+    t_feach.start ();
+    Galois::Runtime::for_each_ordered_dag (
+        Galois::Runtime::makeStandardRange (nodes.begin (), nodes.end ()), 
+        LevelComparator<TreeNode> (), Base::VisitNhood (), Base::OpFunc<false> ());
+    t_feach.stop ();
+
+  }
+
+};
+
 
 struct TreeSummarizeLevelExec: public TypeDefHelper<LevelNodeBase> {
 
@@ -536,6 +563,8 @@ struct TreeSummarizeLevelExec: public TypeDefHelper<LevelNodeBase> {
 
   struct OpFunc {
 
+    typedef int tt_does_not_need_push;
+    typedef char tt_does_not_need_aborts;
     static const unsigned CHUNK_SIZE = 512;
 
     template <typename C>
@@ -564,9 +593,9 @@ struct TreeSummarizeLevelExec: public TypeDefHelper<LevelNodeBase> {
     Galois::StatTimer t_feach ("time for level-by-level for_each");
 
     t_feach.start ();
-    Galois::Runtime::for_each_ordered_level (
-        nodes.begin (), nodes.end (),
-        GetLevel (), std::greater<unsigned> (), VisitNhood (), OpFunc ());
+    // Galois::Runtime::for_each_ordered_level (
+        // Galois::Runtime::makeStandardRange (nodes.begin (), nodes.end ()),
+        // GetLevel (), std::greater<unsigned> (), VisitNhood (), OpFunc ());
     t_feach.stop ();
 
   }
@@ -574,6 +603,7 @@ struct TreeSummarizeLevelExec: public TypeDefHelper<LevelNodeBase> {
 
 struct TreeSummarizeKDGsemi: public TypeDefHelper<KDGNodeBase> {
 
+  // TODO: add flags here for no-conflicts
   struct OpFunc {
     InterNode* root;
 

@@ -72,8 +72,8 @@ struct ReduceBoxes {
   ReduceBoxes(BoundingBox& _initial): initial(_initial) { }
 
   template<typename Context>
-  void operator()(Body<B>* b, Context&) {
-    initial.merge(b->pos);
+  void operator()(const Point& p, Context&) {
+    initial.merge(p);
   }
 };
 

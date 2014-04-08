@@ -830,7 +830,13 @@ void for_each_ordered_rob (Iter beg, Iter end, Cmp cmp, NhFunc nhFunc, OpFunc op
 
   exec.push_initial (beg, end);
 
-  getSystemThreadPool ().run (activeThreads, std::ref(exec));
+  Barrier& barrier = getSystemBarrier ();
+  RunCommand w[] = {
+    std::ref (exec),
+    std::ref (barrier)
+  };
+
+  getSystemThreadPool ().run (&w[0], &w[2], activeThreads);
 
   Galois::Runtime::endSampling ();
 
@@ -979,10 +985,10 @@ public:
 
       ++steps;
       std::swap (currPending, nextPending);
-      nextPending.clear ();
+      nextPending->clear ();
       execRcrd.push_back (0); // create record entry for current step;
 
-      while (!currPending.empty ()) {
+      while (!currPending->empty ()) {
         Ctxt* ctx = schedule ();
         assert (ctx != nullptr);
 
