@@ -106,14 +106,7 @@ class ThreadPool_pthread : public ThreadPool {
   volatile RunCommand* workEnd; // End iterator for work commands
 
   void initThread(unsigned tid) {
-    // Initialize TID
-    Galois::Runtime::LL::initTID(tid);
-    Galois::Runtime::initPTS();
-    if (!LL::EnvCheck("GALOIS_DO_NOT_BIND_THREADS"))
-      if (tid != 0 || !LL::EnvCheck("GALOIS_DO_NOT_BIND_MAIN_THREAD"))
-	Galois::Runtime::LL::bindThreadToProcessor(tid);
-    // Use a simple pthread or atomic to avoid depending on Galois
-    // too early in the initialization process
+    ThreadPool::initThreadCommon(tid);
     started.release();
   }
 

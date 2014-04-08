@@ -49,7 +49,12 @@ protected:
   ThreadPool(unsigned m): maxThreads(m) { }
 
   //!execute work on all threads
-  virtual void runInternal(unsigned num, std::function<void (void)>* cmd) = 0;
+  virtual void runInternal(unsigned num, std::function<void (void)>& cmd) = 0;
+
+  //Common implementation stuff
+
+  //! Initialize TID and PTS
+  void initThreadCommon(unsigned tid);
 
 public:
   virtual ~ThreadPool() { }
@@ -69,7 +74,7 @@ public:
     };
     std::function<void(void)> pf(exTuple(std::forward<Args>(args)...));
     //    std::function<void(void)> pf(std::ref(f));
-    runInternal(num, &pf);
+    runInternal(num, pf);
   }
 
   //!return the number of threads supported by the thread pool on the current machine

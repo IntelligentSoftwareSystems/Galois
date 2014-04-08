@@ -1,4 +1,4 @@
-/** pthread thread pool implementation -*- C++ -*-
+/** std::thread thread pool implementation -*- C++ -*-
  * @file
  * @section License
  *
@@ -21,11 +21,9 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 #include "Galois/Runtime/ThreadPool.h"
-#include "Galois/Runtime/ll/EnvCheck.h"
-#include "Galois/Runtime/ll/HWTopo.h"
-#include "Galois/Runtime/ll/TID.h"
 #include "Galois/Runtime/ll/CompilerSpecific.h"
 #include "Galois/Runtime/ll/CacheLineStorage.h"
+#include "Galois/Runtime/ll/HWTopo.h"
 
 #include "boost/utility.hpp"
 
@@ -34,14 +32,6 @@
 #include <algorithm>
 #include <atomic>
 #include <vector>
-
-// Forward declare this to avoid including PerThreadStorage.
-// We avoid this to stress that the thread Pool MUST NOT depend on PTS.
-namespace Galois {
-namespace Runtime {
-extern void initPTS();
-}
-}
 
 using namespace Galois::Runtime;
 
@@ -73,19 +63,15 @@ class ThreadPool_cpp11 : public ThreadPool {
   std::vector<std::thread> threads;
   std::vector<Semaphore> starts;  // Signal to release threads to run
   std::atomic<unsigned> starting; // Each run call uses this to control num threads
-  std::atomic<std::function<void(void)>*> work; // active work command
+  std::function<void(void)> work; // active work command
   std::vector<LL::CacheLineStorage<std::atomic<int>>> done; // signal loop done
 
   struct shutdown_ty {};
 
-  void initThread(unsigned tid) {
-    // Initialize TID
-    Galois::Runtime::LL::initTID(tid);
-    Galois::Runtime::initPTS();
-    if (!LL::EnvCheck("GALOIS_DO_NOT_BIND_THREADS"))
-      if (tid != 0 || !LL::EnvCheck("GALOIS_DO_NOT_BIND_MAIN_THREAD"))
-	Galois::Runtime::LL::bindThreadToProcessor(tid);
-    decascade(tid);
+  void initThread(unsigned tid, bool wait = true) {
+    ThreadPool::initThreadCommon(tid);
+    if (wait)
+      decascade(tid);
   }
 
   void cascade(int tid) {
@@ -116,7 +102,7 @@ class ThreadPool_cpp11 : public ThreadPool {
       while (true) {
         starts[tid].acquire();
         cascade(tid);
-        (*work)();
+        work();
         decascade(tid);
       }
     } catch (const shutdown_ty&) {
@@ -127,25 +113,27 @@ public:
   ThreadPool_cpp11():
     ThreadPool(Galois::Runtime::LL::getMaxThreads()),
     starts(maxThreads), starting(maxThreads),
-    work(nullptr), done(maxThreads)
+    work(), done(maxThreads)
   {   
+    initThread(0, false);
+
     for (unsigned i = 1; i < maxThreads; ++i) {
       std::thread t(&ThreadPool_cpp11::mlaunch, this, i);
       threads.emplace_back(std::move(t));
     }
-    initThread(0);
+    decascade(0);
   }
 
   virtual ~ThreadPool_cpp11() {
     std::function<void(void)> f = []() { throw shutdown_ty(); };
-    work = &f;
+    work = f;
     starting = starts.size();
     cascade(0);
     for(auto& t : threads)
       t.join();
   }
 
-  virtual void runInternal(unsigned num, std::function<void(void)>* cmd) {
+  virtual void runInternal(unsigned num, std::function<void(void)>& cmd) {
     // Sanitize num
     num = std::min(std::max(num,1U), maxThreads);
     starting = num;
@@ -155,7 +143,7 @@ public:
     //launch threads
     cascade(0);
     // Do master thread work
-    (*cmd)();
+    cmd();
     //wait for children
     decascade(0);
     // Clean up

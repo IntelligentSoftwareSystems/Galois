@@ -1,6 +1,6 @@
 set(sources Barrier.cpp Context.cpp FileGraph.cpp FileGraphParallel.cpp
   OCFileGraph.cpp PerThreadStorage.cpp PreAlloc.cpp Sampling.cpp Support.cpp
-  Termination.cpp Threads.cpp Timer.cpp)
+  Termination.cpp Threads.cpp Timer.cpp ThreadPool.cpp)
 if(HAVE_CXX11_THREAD_YIELD)
   set(sources ${sources} ThreadPool_cpp11.cpp)
 else()
