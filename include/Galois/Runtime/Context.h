@@ -100,6 +100,7 @@ protected:
 
   AcquireStatus tryAcquire(Lockable* lockable) { return FAIL; }
   bool stealByCAS(Lockable* lockable, LockManagerBase* other) { return false; }
+  bool CASowner(Lockable* lockable, LockManagerBase* other) { return false; }
   void ownByForce(Lockable* lockable) { }
   void release (Lockable* lockable) {}
   static bool tryLock(Lockable* lockable) { return false; }
@@ -150,6 +151,11 @@ protected:
   inline bool stealByCAS(Lockable* lockable, LockManagerBase* other) {
     assert(lockable != nullptr);
     return lockable->owner.stealing_CAS(other, this);
+  }
+
+  inline bool CASowner(Lockable* lockable, LockManagerBase* other) {
+    assert(lockable != nullptr);
+    return lockable->owner.CAS(other, this);
   }
 
   inline void ownByForce(Lockable* lockable) {
