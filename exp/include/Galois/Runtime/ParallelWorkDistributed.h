@@ -32,6 +32,9 @@
 #include "Galois/Runtime/DistSupport.h"
 #include "Galois/Runtime/PerHostStorage.h"
 
+#include <iostream>
+#include <iterator>
+
 namespace Galois {
 namespace ParallelSTL {
 struct count_if_R : public Galois::Runtime::Lockable {
@@ -112,6 +115,47 @@ void for_each_landing_pad(RecvBuffer& buf) {
   net.systemBarrier();
 }
 
+//:Gill: new landing pad.
+template<typename WLTy, typename ItemTy, typename FunctionTy, typename ValueTy>
+void for_each_landing_pad(RecvBuffer& buf) {
+  //extract stuff
+  FunctionTy f;
+  std::deque<ItemTy> data;
+  std::string loopname;
+  ValueTy iterations, node_num, total_nodes;
+  gDeserialize(buf,iterations, node_num, total_nodes,f,data,loopname);
+
+  NetworkInterface& net = getSystemNetworkInterface();
+
+   uint32_t blockSize = node_num/networkHostNum; //user nodes divided for sgd.
+   std::cout << "starting for loop on host = " << networkHostID  << "\n";
+//	net.systemBarrier();
+   for(int i = 0; i < iterations; ++i) {
+	uint32_t blockNum = (networkHostID + i)%networkHostNum;
+	uint32_t startRange = blockSize*blockNum;
+	uint32_t endRange = blockSize*(blockNum + 1);
+	if(blockNum == (networkHostNum - 1)) endRange = (node_num + 1); 
+	
+	startRange += (total_nodes + 1);
+	endRange += (total_nodes + 1);
+	f.startRange = startRange;
+	f.endRange = endRange;
+	
+	std::cout << "i" << i <<"[" << f.startRange << "," << f.endRange<< "]"  << " on host = " << networkHostID <<"\n";
+	//Start locally
+	Galois::Runtime::for_each_impl<WLTy>(Galois::Runtime::makeStandardRange(data.begin(), data.end()), f, loopname.c_str());
+	net.systemBarrier();
+    }
+
+  //Start locally
+  //Galois::Runtime::for_each_impl<WLTy>(Galois::Runtime::makeStandardRange(data.begin(), data.end()), f, loopname.c_str());
+
+  // place a MPI barrier here for all the hosts to synchronize
+  //net.systemBarrier();
+}
+
+
+
 template<typename WLTy, typename T, typename FunctionTy>
 void for_each_local_landing_pad(RecvBuffer& buf) {
   //extract stuff
@@ -172,6 +216,7 @@ void for_each_dist(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
   //  Don't move as networkHostNum and networkHostID have to be initialized first
   NetworkInterface& net = getSystemNetworkInterface();
 
+  std::cout << "inside for_each_dist OLD  " << networkHostID  << "\n";
   typedef typename std::iterator_traits<IterTy>::value_type ItemTy;
 
   //fast path for non-distributed
@@ -206,6 +251,74 @@ void for_each_dist(IterTy b, IterTy e, FunctionTy f, const char* loopname) {
 
   // place a MPI barrier here for all the hosts to synchronize
   net.systemBarrier();
+}
+
+
+//Gill: New Variant to handle iteration number.
+template<typename WLTy, typename IterTy, typename ValueTy, typename FunctionTy>
+void for_each_dist(IterTy b, IterTy e, ValueTy iterations, ValueTy node_num, FunctionTy f, const char* loopname) {
+  // Get a handle to the network interface
+  //  Don't move as networkHostNum and networkHostID have to be initialized first
+  NetworkInterface& net = getSystemNetworkInterface();
+
+  std::cout << "inside for_each_dist  " << networkHostID  << "\n";
+  typedef typename std::iterator_traits<IterTy>::value_type ItemTy;
+
+  uint32_t total_nodes = std::distance(b,e); // total movie nodes to be divided.
+  //std::cout << "new for_each_dist i = " << iterations << "\n"; 
+  //fast path for non-distributed
+  if (networkHostNum == 1) {
+    std::deque<ItemTy> allData;
+    allData.insert(allData.end(), b,e);
+    std::cout << "should not go here\n";
+    f.startRange +=(total_nodes + 1);
+    f.endRange += (total_nodes + 1 + node_num + 1 );  
+    for_each_impl<WLTy>(Galois::Runtime::makeStandardRange(allData.begin(), allData.end()),f,loopname);
+    return;
+  }
+
+  //copy out all data
+  std::deque<ItemTy> allData;
+  allData.insert(allData.end(), b,e);
+
+  std::string lname(loopname);
+
+  for (unsigned i = 1; i < networkHostNum; i++) {
+    auto blk = block_range(allData.begin(), allData.end(), i, networkHostNum);
+    std::deque<ItemTy> data(blk.first, blk.second);
+    SendBuffer buf;
+    // serialize function and data
+    gSerialize(buf,iterations,node_num,total_nodes,f,data, lname);
+    //send data
+    net.send (i, &for_each_landing_pad<WLTy,ItemTy,FunctionTy,ValueTy>, buf);
+  }
+  net.handleReceives();
+  //now get our data
+  auto myblk = block_range(allData.begin(), allData.end(), 0, networkHostNum);
+
+    
+   // Using Iteration number to call for_each_impl number of times.
+   uint32_t blockSize = node_num/networkHostNum; //user nodes divided for sgd.
+   std::cout << "starting for loop on host = " << networkHostID  << "\n";
+//	net.systemBarrier();
+   for(int i = 0; i < iterations; ++i) {
+	uint32_t blockNum = (networkHostID + i)%networkHostNum;
+	uint32_t startRange = blockSize*blockNum;
+	uint32_t endRange = blockSize*(blockNum + 1);
+	if(blockNum == (networkHostNum - 1)) endRange = (node_num + 1); 
+	
+	startRange += (total_nodes + 1);
+	endRange += (total_nodes + 1);
+	f.startRange = startRange;
+	f.endRange = endRange;
+	
+	std::cout << "i" << i <<"[" << f.startRange << "," << f.endRange<< "]"  << " on host = " << networkHostID <<"\n";
+	//Start locally
+	for_each_impl<WLTy>(Galois::Runtime::makeStandardRange(myblk.first, myblk.second),  f, loopname);
+	net.systemBarrier();
+    }
+  // place a MPI barrier here for all the hosts to synchronize
+ // net.systemBarrier();
 }
 
 template<typename WLTy, typename T, typename FunctionTy>
