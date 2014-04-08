@@ -478,6 +478,9 @@ struct Process : public Galois::Runtime::Lockable {
 
 }
 
+void print(){
+    std::cout << "hello\n";
+}
 
 typedef int tt_has_serialize;
 void serialize(Galois::Runtime::SerializeBuffer& s) const {
@@ -523,7 +526,7 @@ void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
 
 //	std::cout<< "movie_host0 = " << movie_host0 << " moveie_host1 = " << movie_host1 <<std::endl;
 	//Galois::for_each_local(g, Process(this,g), "Process");
-	unsigned int blockSize = num_user_nodes/networkHostNum;
+/*	unsigned int blockSize = num_user_nodes/networkHostNum;
 	for(int i=0;i<networkHostNum;i++) {
 	    int blockNum = (networkHostID+i)%networkHostNum;
 	    unsigned int startRange = blockSize*blockNum;
@@ -532,8 +535,12 @@ void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
 	    startRange += num_movie_nodes+1;
 	    endRange += num_movie_nodes+1;
 	    cout<<"Iteration: "<<i<<endl;
-	    Galois::for_each(g->begin(), ii, Process(this,g,startRange,endRange), "SGD Process");
-	}
+*/
+	    uint32_t startRange = 0;
+	    uint32_t endRange = 0;
+	    uint32_t t = networkHostNum;
+	    Galois::for_each<>(g->begin(), ii, t, num_user_nodes, Process(this,g,startRange,endRange), "SGD Process");
+//	}
 	//Galois::for_each(g->begin(), ii, verify_before(g), "Verifying");
     
         // Verification routine
