@@ -80,6 +80,7 @@ void t_foreach() {
 
 int main() {
   t_stl();
+  Galois::Runtime::getSystemThreadPool().burnPower();
   t_doall();
   t_foreach();
   return 0;

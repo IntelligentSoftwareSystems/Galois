@@ -67,9 +67,10 @@ protected:
   //Data passed to threads through run
   std::function<void(void)> work; //active work command
   std::atomic<unsigned> starting; // number of threads
-
+  std::atomic<unsigned> fastmode; // use fastmode
   //Data used in run loop
   std::vector<LL::CacheLineStorage<std::atomic<int>>> done; // signal loop done
+  std::vector<LL::CacheLineStorage<std::atomic<int>>> fastRelease; // signal fast start
 
   struct shutdown_ty {}; //! type for shutting down thread
 
@@ -113,6 +114,16 @@ public:
     decascade(0);
     // Clean up
     work = nullptr;
+  }
+
+  void burnPower() {
+    fastmode = 1;
+    run(maxThreads, [] () {} );
+    fastmode = 2;
+  }
+  void beKind() {
+    fastmode = 0;
+    run(maxThreads, [] () {} );
   }
 
   //!return the number of threads supported by the thread pool on the current machine

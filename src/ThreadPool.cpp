@@ -36,7 +36,7 @@ extern void initPTS();
 
 using namespace Galois::Runtime;
 
-ThreadPool::ThreadPool(unsigned m): maxThreads(m), starting(m), done(m) {
+ThreadPool::ThreadPool(unsigned m): maxThreads(m), starting(m), done(m), fastRelease(m) {
   initThread(0);
 }
 
@@ -63,7 +63,12 @@ void ThreadPool::threadLoop(unsigned tid) {
   decascade(tid);
   try {
     while (true) {
-      threadWait(tid);
+      if (fastmode) {
+        while (!fastRelease[tid].get()) { LL::asmPause(); }
+        fastRelease[tid].get() = 0;
+      } else {
+        threadWait(tid);
+      }
       cascade(tid);
       work();
       decascade(tid);
@@ -88,7 +93,10 @@ void ThreadPool::cascade(int tid) {
     unsigned n = tid * multiple + i;
     if (n < starting) {
       done[n].get() = 0;
-      threadWakeup(n);
+      if (fastmode == 2)
+        fastRelease[n].get() = 1;
+      else
+        threadWakeup(n);
     }
   }
 }
