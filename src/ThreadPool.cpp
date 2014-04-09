@@ -36,17 +36,24 @@ extern void initPTS();
 
 using namespace Galois::Runtime;
 
-ThreadPool::ThreadPool(unsigned m): maxThreads(m), starting(m), done(m), fastRelease(m) {
+ThreadPool::ThreadPool(unsigned m): maxThreads(m), starting(m), masterFastmode(false), signals(m) {
   initThread(0);
 }
 
 ThreadPool::~ThreadPool() { }
 
 void ThreadPool::destroyCommon() {
-  std::function<void(void)> f = []() { throw shutdown_ty(); };
-  work = f;
-  starting = maxThreads;
-  cascade(0);
+  run(maxThreads, []() { throw shutdown_ty(); });
+}
+
+void ThreadPool::burnPower() {
+  if (!masterFastmode)
+    run(maxThreads, []() { throw fastmode_ty{true}; });
+}
+
+void ThreadPool::beKind() {
+  if (masterFastmode)
+    run(maxThreads, []() { throw fastmode_ty{false}; });
 }
 
 void ThreadPool::initThread(unsigned tid) {
@@ -61,20 +68,26 @@ void ThreadPool::initThread(unsigned tid) {
 void ThreadPool::threadLoop(unsigned tid) {
   initThread(tid);
   decascade(tid);
-  try {
-    while (true) {
-      if (fastmode) {
-        while (!fastRelease[tid].get()) { LL::asmPause(); }
-        fastRelease[tid].get() = 0;
-      } else {
-        threadWait(tid);
-      }
-      cascade(tid);
-      work();
-      decascade(tid);
+  bool cont = true;
+  bool fastmode = false;
+  do {
+    if (fastmode) {
+      while (!signals[tid].get().fastRelease) { LL::asmPause(); }
+      signals[tid].get().fastRelease = 0;
+    } else {
+      threadWait(tid);
     }
-  } catch (const shutdown_ty&) {
-  }
+    cascade(tid, fastmode);
+    try {
+      work();
+    } catch (const shutdown_ty&) {
+      cont = false;
+    } catch (const fastmode_ty& fm) {
+      cont = true;
+      fastmode = fm.mode;
+    }
+    decascade(tid);
+  } while (cont);
 }
 
 void ThreadPool::decascade(int tid) {
@@ -82,19 +95,19 @@ void ThreadPool::decascade(int tid) {
   for (unsigned i = 1; i <= multiple; ++i) {
     unsigned n = tid * multiple + i;
     if (n < starting)
-      while (!done[n].get()) { LL::asmPause(); }
+      while (!signals[n].get().done) { LL::asmPause(); }
   }
-  done[tid].get() = 1;
+  signals[tid].get().done = 1;
 }
 
-void ThreadPool::cascade(int tid) {
+void ThreadPool::cascade(int tid, bool fastmode) {
   const unsigned multiple = 2;
   for (unsigned i = 1; i <= multiple; ++i) {
     unsigned n = tid * multiple + i;
     if (n < starting) {
-      done[n].get() = 0;
-      if (fastmode == 2)
-        fastRelease[n].get() = 1;
+      signals[n].get().done = 0;
+      if (fastmode)
+        signals[n].get().fastRelease = 1;
       else
         threadWakeup(n);
     }

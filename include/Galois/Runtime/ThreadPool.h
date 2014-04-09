@@ -67,12 +67,17 @@ protected:
   //Data passed to threads through run
   std::function<void(void)> work; //active work command
   std::atomic<unsigned> starting; // number of threads
-  std::atomic<unsigned> fastmode; // use fastmode
+  bool masterFastmode; // use fastmode
+
   //Data used in run loop
-  std::vector<LL::CacheLineStorage<std::atomic<int>>> done; // signal loop done
-  std::vector<LL::CacheLineStorage<std::atomic<int>>> fastRelease; // signal fast start
+  struct per_signal {
+    std::atomic<int> done;
+    std::atomic<int> fastRelease;
+  };
+  std::vector<LL::CacheLineStorage<per_signal>> signals; // signal loop
 
   struct shutdown_ty {}; //! type for shutting down thread
+  struct fastmode_ty {bool mode;}; //! type for setting fastmode
 
   //! Initialize TID and PTS
   void initThread(unsigned tid);
@@ -81,7 +86,7 @@ protected:
   void threadLoop(unsigned tid);
 
   //! spin up for run
-  void cascade(int tid);
+  void cascade(int tid, bool fastmode);
 
   //! spin down after run
   void decascade(int tid);
@@ -107,24 +112,22 @@ public:
     //seq write to starting should make work safe
     starting = std::min(std::max(1U,num), maxThreads);
     //launch threads
-    cascade(0);
+    cascade(0, masterFastmode);
     // Do master thread work
-    work();
+    try {
+      work();
+    } catch (const shutdown_ty&) {
+    } catch (const fastmode_ty& fm) {
+      masterFastmode = fm.mode;
+    }
     //wait for children
     decascade(0);
     // Clean up
     work = nullptr;
   }
 
-  void burnPower() {
-    fastmode = 1;
-    run(maxThreads, [] () {} );
-    fastmode = 2;
-  }
-  void beKind() {
-    fastmode = 0;
-    run(maxThreads, [] () {} );
-  }
+  void burnPower();
+  void beKind();
 
   //!return the number of threads supported by the thread pool on the current machine
   unsigned getMaxThreads() const { return maxThreads; }
