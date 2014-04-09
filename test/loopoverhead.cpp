@@ -31,7 +31,7 @@ void t_stl() {
   std::cout << "STL(" << iter << "x" << V.size() << "): " << t.get() << "\n";
 }
 
-void t_doall() {
+void t_doall(bool burn) {
 
   std::vector<unsigned> V(1024);
   unsigned M = Galois::Runtime::LL::getMaxThreads();
@@ -40,6 +40,8 @@ void t_doall() {
 
   while (M) {
     Galois::setActiveThreads(M); //Galois::Runtime::LL::getMaxThreads());
+    if (burn)
+      Galois::Runtime::getSystemThreadPool().burnPower(M);
     std::cout << "Using " << M << " threads\n";
    
     Galois::Timer t;
@@ -54,7 +56,7 @@ void t_doall() {
   }
 }
 
-void t_foreach() {
+void t_foreach(bool burn) {
 
   std::vector<unsigned> V(1024);
   unsigned M = Galois::Runtime::LL::getMaxThreads();
@@ -64,6 +66,9 @@ void t_foreach() {
   while (M) {
     
     Galois::setActiveThreads(M); //Galois::Runtime::LL::getMaxThreads());
+    if (burn)
+      Galois::Runtime::getSystemThreadPool().burnPower(M);
+
     std::cout << "Using " << M << " threads\n";
    
     Galois::Timer t;
@@ -80,10 +85,9 @@ void t_foreach() {
 
 int main() {
   t_stl();
-  t_doall();
-  t_foreach();
-  Galois::Runtime::getSystemThreadPool().burnPower();
-  t_doall();
-  t_foreach();
+  t_doall(false);
+  t_foreach(false);
+  t_doall(true);
+  t_foreach(true);
   return 0;
 }

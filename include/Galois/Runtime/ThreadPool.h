@@ -30,6 +30,7 @@
 #include <functional>
 #include <atomic>
 #include <vector>
+#include <cassert>
 
 namespace Galois {
 namespace Runtime {
@@ -67,7 +68,7 @@ protected:
   //Data passed to threads through run
   std::function<void(void)> work; //active work command
   std::atomic<unsigned> starting; // number of threads
-  bool masterFastmode; // use fastmode
+  unsigned masterFastmode; // use fastmode
 
   //Data used in run loop
   struct per_signal {
@@ -111,6 +112,7 @@ public:
     //sanitize num
     //seq write to starting should make work safe
     starting = std::min(std::max(1U,num), maxThreads);
+    assert(!masterFastmode || masterFastmode == num);
     //launch threads
     cascade(0, masterFastmode);
     // Do master thread work
@@ -118,7 +120,6 @@ public:
       work();
     } catch (const shutdown_ty&) {
     } catch (const fastmode_ty& fm) {
-      masterFastmode = fm.mode;
     }
     //wait for children
     decascade(0);
@@ -126,7 +127,7 @@ public:
     work = nullptr;
   }
 
-  void burnPower();
+  void burnPower(unsigned num);
   void beKind();
 
   //!return the number of threads supported by the thread pool on the current machine

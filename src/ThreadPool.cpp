@@ -43,17 +43,25 @@ ThreadPool::ThreadPool(unsigned m): maxThreads(m), starting(m), masterFastmode(f
 ThreadPool::~ThreadPool() { }
 
 void ThreadPool::destroyCommon() {
+  beKind(); // reset fastmode
   run(maxThreads, []() { throw shutdown_ty(); });
 }
 
-void ThreadPool::burnPower() {
-  if (!masterFastmode)
-    run(maxThreads, []() { throw fastmode_ty{true}; });
+void ThreadPool::burnPower(unsigned num) {
+  //changing number of threads?  just do a reset
+  if (masterFastmode && masterFastmode != num)
+    beKind();
+  if (!masterFastmode) {
+    run(num, []() { throw fastmode_ty{true}; });
+    masterFastmode = num;
+  }
 }
 
 void ThreadPool::beKind() {
-  if (masterFastmode)
-    run(maxThreads, []() { throw fastmode_ty{false}; });
+  if (masterFastmode) {
+    run(masterFastmode, []() { throw fastmode_ty{false}; });
+    masterFastmode = 0;
+  }
 }
 
 void ThreadPool::initThread(unsigned tid) {
