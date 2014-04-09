@@ -14,6 +14,25 @@ struct emp {
   void operator()(const T& t, const C& c) { Galois::Runtime::LL::compilerBarrier(); }
 };
 
+void t_inline() {
+  std::vector<unsigned> V(1024);
+  //unsigned M = Galois::Runtime::LL::getMaxThreads();
+
+  std::cout << "inline:\nIterxSize\n";
+
+  std::cout << "Using " << 1 << " threads\n";
+   
+  Galois::Timer t;
+  t.start();
+  emp e;
+  for (unsigned x = 0; x < iter; ++x)
+    for (auto i : V)
+      e(i);
+  t.stop();
+  
+  std::cout << "Inline(" << iter << "x" << V.size() << "): " << t.get() << "\n";
+}
+
 void t_stl() {
   std::vector<unsigned> V(1024);
   //unsigned M = Galois::Runtime::LL::getMaxThreads();
@@ -84,6 +103,7 @@ void t_foreach(bool burn) {
 }
 
 int main() {
+  t_inline();
   t_stl();
   t_doall(false);
   t_foreach(false);
