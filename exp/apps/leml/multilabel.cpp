@@ -1,3 +1,4 @@
+#include "Galois/Galois.h"
 
 #include "multilabel.h"
 #include "smat.h"
@@ -103,8 +104,15 @@ void multilabel_train(multilabel_problem *prob, multilabel_parameter *param, dou
 	printf("threshold %.2g\n", threshold);
 	bilinear_eval_result eval_result(param->top_p, threshold);
 
-
 	omp_set_num_threads(param->threads);
+        //hack to force omp threads to be created before galois stuff
+#pragma omp parallel for schedule(dynamic,50) shared(X,H,W)
+	for(size_t i = 0; i < 1000; i++) {
+          sleep(0);
+        }
+
+
+        Galois::setActiveThreads(param->threads);
 	printf("threads %d\n", omp_get_max_threads());
 
 	//printf("|W| (%d %ld) = %.10g |H| (%d %ld)= %.10g\n",k, X.cols, norm(W,X.cols*k), k, Y.cols, norm(H,Y.cols*k));

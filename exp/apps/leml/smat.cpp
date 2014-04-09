@@ -5,6 +5,7 @@
 #include <algorithm>
 #include <vector>
 #include <cmath>
+#include "Galois/Galois.h"
 
 #include "smat.h"
 #include "zlib_util.h"
@@ -302,13 +303,17 @@ rate_t smat_subset_iterator_t::next() {
 	return ret;
 }
 
+
+static const bool useGalois = true;
+
+
 /*
    H = X*W 
    X is an m*n
    W is an n*k, row-majored array
    H is an m*k, row-majored array
    */
-void smat_x_dmat(const smat_t &X, const double* W, size_t _k, double *H)
+void smat_x_dmat_O(const smat_t &X, const double* W, size_t _k, double *H)
 {
 	size_t m = X.rows;
 	const size_t k = 64;
@@ -317,7 +322,7 @@ void smat_x_dmat(const smat_t &X, const double* W, size_t _k, double *H)
 	for(size_t i = 0; i < m; i++) {
 		double * __restrict__ Hi = &H[k*i];
 		memset(Hi,0,sizeof(double)*k);
-		for(long idx = X.row_ptr[i]; idx < X.row_ptr[i+1]; idx++) {
+		for(long idx = X.row_ptr[i], e = X.row_ptr[i+1]; idx < e; idx++) {
 			const double Xij = X.val_t[idx];
 			const double * __restrict__ Wj = &W[X.col_idx[idx]*k];
 			for(unsigned t = 0; t < k; t++)
@@ -325,6 +330,33 @@ void smat_x_dmat(const smat_t &X, const double* W, size_t _k, double *H)
 		}
 	}
 }
+void smat_x_dmat_G(const smat_t &X, const double* W, size_t _k, double *H)
+{
+	size_t m = X.rows;
+	const size_t k = 64;
+        if (_k != k) abort();
+        Galois::do_all(boost::counting_iterator<size_t>(0),
+                       boost::counting_iterator<size_t>(m),
+                       [&X, W, _k, H] (size_t i) {
+		double * __restrict__ Hi = &H[k*i];
+		memset(Hi,0,sizeof(double)*k);
+		for(long idx = X.row_ptr[i], e = X.row_ptr[i+1]; idx < e; idx++) {
+			const double Xij = X.val_t[idx];
+			const double * __restrict__ Wj = &W[X.col_idx[idx]*k];
+			for(unsigned t = 0; t < k; t++)
+				Hi[t] += Xij*Wj[t];
+		}
+                       });
+}
+void smat_x_dmat(const smat_t &X, const double* W, size_t _k, double *H) {
+  if (useGalois) {
+    smat_x_dmat_G(X,W,_k,H);
+  } else {
+    smat_x_dmat_O(X,W,_k,H);
+  }
+}
+
+
 
 /*
    H = a*X*W + H0
@@ -332,7 +364,8 @@ void smat_x_dmat(const smat_t &X, const double* W, size_t _k, double *H)
    W is an n*k, row-majored array
    H is an m*k, row-majored array
    */
-void smat_x_dmat(const double a, const smat_t &X, const double* W, const size_t _k, const double *H0, double *H)
+
+static void smat_x_dmat_O(const double a, const smat_t &X, const double* W, const size_t _k, const double *H0, double *H)
 {
 	size_t m = X.rows;
 	const size_t k = 64;
@@ -342,11 +375,39 @@ void smat_x_dmat(const double a, const smat_t &X, const double* W, const size_t 
 		double * __restrict__ Hi = &H[k*i];
 		if(H != H0)
 			memcpy(Hi, &H0[k*i], sizeof(double)*k);
-		for(long idx = X.row_ptr[i]; idx < X.row_ptr[i+1]; idx++) {
-			const double Xij = X.val_t[idx];
+		for(long idx = X.row_ptr[i], e = X.row_ptr[i+1]; idx < e; idx++) {
+			const double Xij = a*X.val_t[idx];
 			const double * __restrict__ Wj = &W[X.col_idx[idx]*k];
 			for(unsigned t = 0; t < k; t++)
-				Hi[t] += a*Xij*Wj[t];
+				Hi[t] += Xij*Wj[t];
 		}
 	}
+}
+
+static void smat_x_dmat_G(const double a, const smat_t &X, const double* W, const size_t _k, const double *H0, double *H)
+{
+	size_t m = X.rows;
+	const size_t k = 64;
+        if (_k != k) abort();
+        Galois::do_all(boost::counting_iterator<size_t>(0),
+                       boost::counting_iterator<size_t>(m),
+                       [&X, W, H, H0, a] (size_t i) {
+		double * __restrict__ Hi = &H[k*i];
+		if(H != H0)
+			memcpy(Hi, &H0[k*i], sizeof(double)*k);
+		for(long idx = X.row_ptr[i], e = X.row_ptr[i+1]; idx < e; idx++) {
+			const double Xij = a * X.val_t[idx];
+			const double * __restrict__ Wj = &W[X.col_idx[idx]*k];
+			for(unsigned t = 0; t < k; t++)
+				Hi[t] += Xij*Wj[t];
+		}
+                       });
+}
+
+void smat_x_dmat(const double a, const smat_t &X, const double* W, const size_t _k, const double *H0, double *H) {
+  if (useGalois) {
+    smat_x_dmat_G(a,X,W,_k,H0,H);
+  } else {
+    smat_x_dmat_O(a,X,W,_k,H0,H);
+  }
 }
