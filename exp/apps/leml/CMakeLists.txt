@@ -18,5 +18,4 @@ target_link_libraries(test-blas ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES})
 add_executable(train-ml train-ml.cpp multilabel.cpp wsabie.cpp 
   bilinear.cpp multiple_linear.cpp smat.cpp dmat.cpp zlib_util.cpp tron.cpp)
 target_link_libraries(train-ml ${ZLIB_LIBRARIES} ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES})
-target_link_libraries(train-ml galois)
-target_link_libraries(test-smat galois)
+add_subdirectory(galois)

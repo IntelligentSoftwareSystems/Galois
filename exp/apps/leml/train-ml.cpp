@@ -7,6 +7,10 @@
 #include "multilabel.h"
 #include "bilinear.h"
 
+#ifdef EXP_DOALL_GALOIS
+#include "Galois/Galois.h"
+#endif
+
 #define Malloc(type,n) (type *)malloc((n)*sizeof(type))
 void exit_with_help()
 {
@@ -166,6 +170,10 @@ void run_multilabel_train(multilabel_parameter param, smat_t &Y, smat_t &X, smat
 	bilinear_problem test_set(&Yt, &Xt, H, k);
 	multilabel_problem prob(&training_set, &test_set);
 	omp_set_num_threads(param.threads);
+#ifdef EXP_DOALL_GALOIS
+        Galois::setActiveThreads(param.threads);
+        //Galois::Runtime::getSystemThreadPool().burnPower();
+#endif
 	std::vector<int> subset = subsample((int)(0.01*(double)Y.rows), (int)Y.rows);
 	smat_t subX = X.row_subset(subset);
 	smat_t subY = Y.row_subset(subset);
