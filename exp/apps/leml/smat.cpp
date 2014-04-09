@@ -346,7 +346,7 @@ void smat_x_dmat_G(const smat_t &X, const double* W, size_t _k, double *H)
 			for(unsigned t = 0; t < k; t++)
 				Hi[t] += Xij*Wj[t];
 		}
-                       });
+                       }, Galois::do_all_steal(true));
 }
 void smat_x_dmat(const smat_t &X, const double* W, size_t _k, double *H) {
   if (useGalois) {
@@ -401,7 +401,7 @@ static void smat_x_dmat_G(const double a, const smat_t &X, const double* W, cons
 			for(unsigned t = 0; t < k; t++)
 				Hi[t] += Xij*Wj[t];
 		}
-                       });
+                       }, Galois::do_all_steal(true));
 }
 
 void smat_x_dmat(const double a, const smat_t &X, const double* W, const size_t _k, const double *H0, double *H) {
