@@ -9,7 +9,7 @@
 
 #include "smat.h"
 #include "zlib_util.h"
-
+#include "emmintrin.h"
 
 #define MALLOC(type, size) (type*)malloc(sizeof(type)*(size))
 
@@ -316,7 +316,7 @@ static const bool useGalois = true;
 void smat_x_dmat_O(const smat_t &X, const double* W, size_t _k, double *H)
 {
 	size_t m = X.rows;
-	const size_t k = 64;
+        const size_t k = 64;
         if (_k != k) abort();
 #pragma omp parallel for schedule(dynamic,50) shared(X,H,W)
 	for(size_t i = 0; i < m; i++) {
@@ -333,18 +333,28 @@ void smat_x_dmat_O(const smat_t &X, const double* W, size_t _k, double *H)
 void smat_x_dmat_G(const smat_t &X, const double* W, size_t _k, double *H)
 {
 	size_t m = X.rows;
-	const size_t k = 64;
-        if (_k != k) abort();
+        // const size_t k = 64;
+        // if (_k != k) abort();
+        size_t k = _k;
         Galois::do_all(boost::counting_iterator<size_t>(0),
                        boost::counting_iterator<size_t>(m),
-                       [&X, W, _k, H] (size_t i) {
+                       [&X, W, H, k] (size_t i) {
 		double * __restrict__ Hi = &H[k*i];
 		memset(Hi,0,sizeof(double)*k);
 		for(long idx = X.row_ptr[i], e = X.row_ptr[i+1]; idx < e; idx++) {
 			const double Xij = X.val_t[idx];
 			const double * __restrict__ Wj = &W[X.col_idx[idx]*k];
-			for(unsigned t = 0; t < k; t++)
-				Hi[t] += Xij*Wj[t];
+                        __m128d vXij = _mm_load1_pd(&Xij);
+                        for (size_t t = 0; t < k; t += 2) {
+                          __m128d vHi = _mm_load_pd(&Hi[t]);
+                          __m128d vWj = _mm_load_pd(&Wj[t]);
+                          _mm_store_pd(&Hi[t], _mm_add_pd(vHi, _mm_mul_pd(vWj, vXij)));
+                        }
+                        if (k & 1) //odd length
+                          Hi[k-1] += Xij*Wj[k-1];
+
+			// for(unsigned t = 0; t < k; t++)
+                        //   Hi[t] += Xij*Wj[t];
 		}
                        }, Galois::do_all_steal(true));
 }
@@ -387,19 +397,29 @@ static void smat_x_dmat_O(const double a, const smat_t &X, const double* W, cons
 static void smat_x_dmat_G(const double a, const smat_t &X, const double* W, const size_t _k, const double *H0, double *H)
 {
 	size_t m = X.rows;
-	const size_t k = 64;
-        if (_k != k) abort();
+        // const size_t k = 64;
+        // if (_k != k) abort();
+        size_t k = _k;
         Galois::do_all(boost::counting_iterator<size_t>(0),
                        boost::counting_iterator<size_t>(m),
-                       [&X, W, H, H0, a] (size_t i) {
-		double * __restrict__ Hi = &H[k*i];
+                       [&X, W, H, H0, a, k] (size_t i) {
+                         double * __restrict__ Hi = &H[k*i];
 		if(H != H0)
 			memcpy(Hi, &H0[k*i], sizeof(double)*k);
 		for(long idx = X.row_ptr[i], e = X.row_ptr[i+1]; idx < e; idx++) {
 			const double Xij = a * X.val_t[idx];
 			const double * __restrict__ Wj = &W[X.col_idx[idx]*k];
-			for(unsigned t = 0; t < k; t++)
-				Hi[t] += Xij*Wj[t];
+                        __m128d vXij = _mm_load1_pd(&Xij);
+                        for (size_t t = 0; t < k; t+= 2) {
+                          __m128d vHi = _mm_load_pd(&Hi[t]);
+                          __m128d vWj = _mm_load_pd(&Wj[t]);
+                          _mm_store_pd(&Hi[t], _mm_add_pd(vHi, _mm_mul_pd(vWj, vXij)));
+                        }
+                        if (k & 1) //odd length
+                          Hi[k-1] += Xij*Wj[k-1];
+                          
+			//for(unsigned t = 0; t < k; t++)
+                        //Hi[t] += Xij*Wj[t];
 		}
                        }, Galois::do_all_steal(true));
 }
