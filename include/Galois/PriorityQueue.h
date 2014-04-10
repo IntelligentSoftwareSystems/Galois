@@ -106,10 +106,11 @@ public:
     return ret;
   }
 
-  void push(const value_type& x) {
+  bool push(const value_type& x) {
     mutex.lock();
-    orderedSet.insert(x);
+    auto p = orderedSet.insert(x);
     mutex.unlock();
+    return p.second;
   }
 
   value_type pop() {
@@ -134,6 +135,12 @@ public:
     mutex.unlock();
 
     return ret;
+  }
+
+  void clear () {
+    mutex.lock ();
+    orderedSet.clear ();
+    mutex.unlock ();
   }
 
   const_iterator begin() const { return orderedSet.begin(); }
@@ -247,6 +254,10 @@ public:
     return (std::find(begin(), end(), x) != end());
   }
 
+  void clear () { 
+    container.clear ();
+  }
+
   const_iterator begin() const { return container.begin(); }
   const_iterator end() const { return container.end(); }
 
@@ -345,6 +356,12 @@ public:
     mutex.unlock();
 
     return ret;
+  }
+
+  void clear () { 
+    mutex.lock ();
+    heap.clear ();
+    mutex.unlock ();
   }
 
   // TODO: can't use in parallel context

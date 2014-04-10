@@ -830,13 +830,7 @@ void for_each_ordered_rob (Iter beg, Iter end, Cmp cmp, NhFunc nhFunc, OpFunc op
 
   exec.push_initial (beg, end);
 
-  Barrier& barrier = getSystemBarrier ();
-  RunCommand w[] = {
-    std::ref (exec),
-    std::ref (barrier)
-  };
-
-  getSystemThreadPool ().run (&w[0], &w[2], activeThreads);
+  getSystemThreadPool ().run (activeThreads, std::ref(exec));
 
   Galois::Runtime::endSampling ();
 
