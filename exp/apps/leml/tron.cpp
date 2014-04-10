@@ -5,6 +5,9 @@
 #include <stddef.h>
 #include "tron.h"
 #include <omp.h>
+#ifdef EXP_DOALL_GALOIS
+#include "Galois/Galois.h"
+#endif
 
 #ifndef min
 template <class T> static inline T min(T x,T y) { return (x<y)?x:y; }
@@ -194,13 +197,21 @@ int TRON::trcg(double delta, double *g, double *s, double *r)
 	double *Hd = new double[n];
 	double rTr, rnewTrnew, alpha, beta, cgtol;
 
+#ifdef EXP_DOALL_GALOIS
+	Galois::do_all(boost::counting_iterator<int>(0), boost::counting_iterator<int>(n),
+            [&](int i) {
+#else
 #pragma omp parallel for 
-	for (i=0; i<n; i++)
-	{
+	for (i=0; i<n; i++) {
+#endif
 		s[i] = 0;
 		r[i] = -g[i];
 		d[i] = r[i];
+#ifdef EXP_DOALL_GALOIS
+        }, Galois::do_all_steal(false));
+#else
 	}
+#endif
 	//cgtol = 0.1*dnrm2_(&n, g, &inc);
 	cgtol = 0.1*sqrt(ddot_(&n, g, &inc, g, &inc));
 

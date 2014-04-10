@@ -2,6 +2,9 @@
 #include "wsabie.h"
 
 #include <map>
+#ifdef EXP_DOALL_GALOIS
+#include "Galois/Galois.h"
+#endif
 
 using namespace std;
 
@@ -46,12 +49,32 @@ double get_wsabieC(const multilabel_parameter *param) {
 }
 
 void wsabie_model_projection(double *W, double *H, long nr_feats, long nr_labels, long k, double wsabieC) {
+#ifdef EXP_DOALL_GALOIS
+	Galois::do_all(boost::counting_iterator<int>(0), boost::counting_iterator<int>(nr_feats),
+            [&](int s) {
+#else
 #pragma omp parallel for schedule(static,50) shared(W)
-	for(int s = 0; s < nr_feats; s++) 
+	for(int s = 0; s < nr_feats; s++) {
+#endif
 		project_with_len(W+s*k, k, wsabieC);
+#ifdef EXP_DOALL_GALOIS
+        }, Galois::do_all_steal(false));
+#else
+        }
+#endif
+#ifdef EXP_DOALL_GALOIS
+	Galois::do_all(boost::counting_iterator<int>(0), boost::counting_iterator<int>(nr_labels),
+            [&](int j) {
+#else
 #pragma omp parallel for schedule(static,50) shared(H)
-	for(int j = 0; j < nr_labels; j++)
+	for(int j = 0; j < nr_labels; j++) {
+#endif
 		project_with_len(H+j*k, k, wsabieC);
+#ifdef EXP_DOALL_GALOIS
+        }, Galois::do_all_steal(false));
+#else
+        }
+#endif
 }
 
 void wsabie_updates(multilabel_problem *prob, multilabel_parameter *param, double *W, double *H, long nr_samples){
@@ -104,14 +127,23 @@ void wsabie_updates(multilabel_problem *prob, multilabel_parameter *param, doubl
 			// Update W
 			for(int t = 0; t < k; t++) 
 				hdiff[t] = steplength*(Hybar[t]-Hy[t]);
+#ifdef EXP_DOALL_GALOIS
+                      Galois::do_all(boost::counting_iterator<long>(X.row_ptr[i]), boost::counting_iterator<long>(X.row_ptr[i+1]),
+                          [&](long idx) {
+#else
 #pragma omp parallel for schedule(static,50) shared(X,hdiff)
 			for(long idx = X.row_ptr[i]; idx < X.row_ptr[i+1]; idx++) {
+#endif
 				double *Ws = W+X.col_idx[idx]*k;
 				for(int t = 0; t < k; t++) {
 					Ws[t] -= X.val_t[idx]*hdiff[t];
 				}
 				project_with_len(Ws, k, wsabieC);
+#ifdef EXP_DOALL_GALOIS
+                        }, Galois::do_all_steal(false));
+#else
 			}
+#endif
 
 			// Update H_ybar
 			do_axpy(-steplength, Wxi, Hybar, k);
@@ -194,14 +226,23 @@ void wsabie_updates_new_old(multilabel_problem *prob, multilabel_parameter *para
 			// Update W
 			for(int t = 0; t < k; t++) 
 				hdiff[t] = steplength*(Hybar[t]-Hy[t]);
+#ifdef EXP_DOALL_GALOIS
+                      Galois::do_all(boost::counting_iterator<long>(X.row_ptr[i]), boost::counting_iterator<long>(X.row_ptr[i+1]),
+                          [&](long idx) {
+#else
 #pragma omp parallel for schedule(static,50) shared(X,hdiff)
 			for(long idx = X.row_ptr[i]; idx < X.row_ptr[i+1]; idx++) {
+#endif
 				double *Ws = W+X.col_idx[idx]*k;
 				for(int t = 0; t < k; t++) {
 					Ws[t] -= X.val_t[idx]*hdiff[t];
 				}
 				project_with_len(Ws, k, wsabieC);
+#ifdef EXP_DOALL_GALOIS
+                        }, Galois::do_all_steal(false));
+#else
 			}
+#endif
 
 			// Update H_ybar
 			do_axpy(-steplength, Wxi, Hybar, k);
@@ -302,14 +343,23 @@ void wsabie_updates_new(multilabel_problem *prob, multilabel_parameter *param, d
 				// Update W
 				for(int t = 0; t < k; t++) 
 					hdiff[t] = steplength*(Hybar[t]-Hy[t]);
+#ifdef EXP_DOALL_GALOIS
+                                Galois::do_all(boost::counting_iterator<long>(X.row_ptr[i]), boost::counting_iterator<long>(X.row_ptr[i+1]),
+                                    [&](long idx) {
+#else
 #pragma omp parallel for schedule(static,50) shared(X,hdiff)
 				for(long idx = X.row_ptr[i]; idx < X.row_ptr[i+1]; idx++) {
+#endif
 					double *Ws = W+X.col_idx[idx]*k;
 					for(int t = 0; t < k; t++) {
 						Ws[t] -= X.val_t[idx]*hdiff[t];
 					}
 					project_with_len(Ws, k, wsabieC);
+#ifdef EXP_DOALL_GALOIS
+                                }, Galois::do_all_steal(false));
+#else
 				}
+#endif
 
 				// Update H_ybar
 				do_axpy(-steplength, Wxi, Hybar, k);
@@ -445,14 +495,23 @@ void wsabie_updates_new2(multilabel_problem *prob, multilabel_parameter *param, 
 			do_axpy(-eta*sum_Lj, Wxi, Hybar, k);
 			project_with_len(Hybar, k, wsabieC);
 
+#ifdef EXP_DOALL_GALOIS
+                        Galois::do_all(boost::counting_iterator<long>(X.row_ptr[i]), boost::counting_iterator<long>(X.row_ptr[i+1]),
+                            [&](long idx) {
+#else
 #pragma omp parallel for schedule(static,50) shared(X,hdiff)
 			for(long idx = X.row_ptr[i]; idx < X.row_ptr[i+1]; idx++) {
+#endif
 				double *Ws = W+X.col_idx[idx]*k;
 				for(int t = 0; t < k; t++) {
 					Ws[t] -= eta*X.val_t[idx]*hdiff[t];
 				}
 				project_with_len(Ws, k, wsabieC);
+#ifdef EXP_DOALL_GALOIS
+                        }, Galois::do_all_steal(false));
+#else
 			}
+#endif
 		}
 	}
 	free(hdiff);
@@ -579,14 +638,23 @@ void wsabie_updates_new4(multilabel_problem *prob, multilabel_parameter *param, 
 			do_axpy(-eta*sum_Lj, Wxi, Hybar, k);
 			project_with_len(Hybar, k, wsabieC);
 
+#ifdef EXP_DOALL_GALOIS
+                        Galois::do_all(boost::counting_iterator<long>(X.row_ptr[i]), boost::counting_iterator<long>(X.row_ptr[i+1]),
+                            [&](long idx) {
+#else
 #pragma omp parallel for schedule(static,50) shared(X,hdiff)
 			for(long idx = X.row_ptr[i]; idx < X.row_ptr[i+1]; idx++) {
+#endif
 				double *Ws = W+X.col_idx[idx]*k;
 				for(int t = 0; t < k; t++) {
 					Ws[t] -= eta*X.val_t[idx]*hdiff[t];
 				}
 				project_with_len(Ws, k, wsabieC);
+#ifdef EXP_DOALL_GALOIS
+                        }, Galois::do_all_steal(false));
+#else
 			}
+#endif
 
 		}
 	}
@@ -719,14 +787,23 @@ void wsabie_updates_new3(multilabel_problem *prob, multilabel_parameter *param, 
 				project_with_len(Hy, k, wsabieC);
 			}
 
+#ifdef EXP_DOALL_GALOIS
+                        Galois::do_all(boost::counting_iterator<long>(X.row_ptr[i]), boost::counting_iterator<long>(X.row_ptr[i+1]),
+                            [&](long idx) {
+#else
 #pragma omp parallel for schedule(static,50) shared(X,hdiff)
 			for(long idx = X.row_ptr[i]; idx < X.row_ptr[i+1]; idx++) {
+#endif
 				double *Ws = W+X.col_idx[idx]*k;
 				for(int t = 0; t < k; t++) {
 					Ws[t] -= eta*X.val_t[idx]*hdiff[t];
 				}
 				project_with_len(Ws, k, wsabieC);
+#ifdef EXP_DOALL_GALOIS
+                        }, Galois::do_all_steal(false));
+#else
 			}
+#endif
 		}
 	}
 	free(hdiff);
@@ -865,14 +942,23 @@ void wsabie_updates_2(multilabel_problem *prob, multilabel_parameter *param, dou
 			// Update W
 			for(int t = 0; t < k; t++) 
 				hdiff[t] = steplength*(Hybar[t]-Hy[t]);
+#ifdef EXP_DOALL_GALOIS
+                        Galois::do_all(boost::counting_iterator<long>(X.row_ptr[i]), boost::counting_iterator<long>(X.row_ptr[i+1]),
+                            [&](long idx) {
+#else
 #pragma omp parallel for schedule(static,50) shared(X,hdiff)
 			for(long idx = X.row_ptr[i]; idx < X.row_ptr[i+1]; idx++) {
+#endif
 				double *Ws = W+X.col_idx[idx]*k;
 				for(int t = 0; t < k; t++) {
 					Ws[t] *= (1-lambda*eta);
 					Ws[t] -= X.val_t[idx]*hdiff[t];
 				}
+#ifdef EXP_DOALL_GALOIS
+                        }, Galois::do_all_steal(false));
+#else
 			}
+#endif
 
 			// Update H_ybar
 			do_axpy(-lambda*eta, Hybar, Hybar, k);

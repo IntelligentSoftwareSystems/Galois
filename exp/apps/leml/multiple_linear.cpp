@@ -6,7 +6,9 @@
 #include "multiple_linear.h"
 #include "tron.h"
 #include "dmat.h"
-
+#ifdef EXP_DOALL_GALOIS
+#include "Galois/Galois.h"
+#endif
 
 static void print_string_stdout(const char *s)
 {
@@ -329,28 +331,42 @@ int multiple_l2r_ls_chol_full_weight(multiple_linear_problem *prob, multiple_lin
 	for(int i = 0; i < nr_threads; i++)
 		Hessian_set[i] = MALLOC(double, k*k);
 
+#ifdef EXP_DOALL_GALOIS
+	Galois::do_all(boost::counting_iterator<size_t>(0), boost::counting_iterator<size_t>(Y.cols),
+            [&](size_t j) {
+#else
 #pragma omp parallel for schedule(dynamic,50) shared(Y,W,X)
 	for(size_t j = 0; j < Y.cols; ++j) {
+#endif
 		long nnz_j = Y.col_ptr[j+1] - Y.col_ptr[j];
-		if(!nnz_j) continue;
-		int tid = omp_get_thread_num(); // thread ID
-		double *Wj = &W[j*k];
-		double *Hessian = Hessian_set[tid];
-		memcpy(Hessian, fixed_Hessian, sizeof(double)*k*k);
+		if(nnz_j) {
+#ifdef EXP_DOALL_GALOIS
+                        int tid = Galois::Runtime::LL::getTID();
+#else
+                        int tid = omp_get_thread_num(); // thread ID
+#endif
+                        double *Wj = &W[j*k];
+                        double *Hessian = Hessian_set[tid];
+                        memcpy(Hessian, fixed_Hessian, sizeof(double)*k*k);
 
-		// Update Hessian 
-		for(long idx = Y.col_ptr[j]; idx < Y.col_ptr[j+1]; ++idx){
-			const double *Xi = &X[k*Y.row_idx[idx]];
-			for(int s = 0; s < k; ++s) {
-				for(int t = s; t < k; ++t)
-					Hessian[s*k+t]+=2*alpha*Xi[s]*Xi[t];
-			}
-		}
-		for(int s = 0; s < k; ++s)
-			for(int t = 0; t < s; ++t)
-				Hessian[s*k+t] = Hessian[t*k+s];
-		ls_solve_chol_matrix(Hessian, Wj, k);
+                        // Update Hessian 
+                        for(long idx = Y.col_ptr[j]; idx < Y.col_ptr[j+1]; ++idx){
+                                const double *Xi = &X[k*Y.row_idx[idx]];
+                                for(int s = 0; s < k; ++s) {
+                                        for(int t = s; t < k; ++t)
+                                                Hessian[s*k+t]+=2*alpha*Xi[s]*Xi[t];
+                                }
+                        }
+                        for(int s = 0; s < k; ++s)
+                                for(int t = 0; t < s; ++t)
+                                        Hessian[s*k+t] = Hessian[t*k+s];
+                        ls_solve_chol_matrix(Hessian, Wj, k);
+                }
+#ifdef EXP_DOALL_GALOIS
+        }, Galois::do_all_steal(false));
+#else
 	}
+#endif
 
 	printf("half-als: %lg secs\n", omp_get_wtime() - time);
 
@@ -406,33 +422,47 @@ int multiple_l2r_ls_chol(multiple_linear_problem *prob, multiple_linear_paramete
 	for(int i = 0; i < nr_threads; i++)
 		Hessian_set[i] = MALLOC(double, k*k);
 
+#ifdef EXP_DOALL_GALOIS
+	Galois::do_all(boost::counting_iterator<size_t>(0), boost::counting_iterator<size_t>(Y.cols),
+            [&](size_t j) {
+#else
 #pragma omp parallel for schedule(dynamic,50) shared(Y,W,X)
 	for(size_t j = 0; j < Y.cols; ++j) {
+#endif
 		long nnz_j = Y.col_ptr[j+1] - Y.col_ptr[j];
-		if(!nnz_j) continue;
-		int tid = omp_get_thread_num(); // thread ID
-		double *Wj = &W[j*k];
-		double *Hessian = Hessian_set[tid]; 
-		double *y = Wj; //MALLOC(double,k);
-		memset(Hessian, 0, sizeof(double)*k*k);
-		memset(y, 0, sizeof(double)*k);
+		if(nnz_j) {
+#ifdef EXP_DOALL_GALOIS
+                        int tid = Galois::Runtime::LL::getTID();
+#else
+                        int tid = omp_get_thread_num(); // thread ID
+#endif
+                        double *Wj = &W[j*k];
+                        double *Hessian = Hessian_set[tid]; 
+                        double *y = Wj; //MALLOC(double,k);
+                        memset(Hessian, 0, sizeof(double)*k*k);
+                        memset(y, 0, sizeof(double)*k);
 
-		// Construct k*k Hessian and k*1 y
-		for(long idx = Y.col_ptr[j]; idx < Y.col_ptr[j+1]; ++idx){
-			const double *Xi = &X[k*Y.row_idx[idx]];
-			for(int s = 0; s < k; ++s) {
-				y[s] += C[idx]*Y.val[idx]*Xi[s];
-				for(int t = s; t < k; ++t)
-					Hessian[s*k+t] += C[idx]*Xi[s]*Xi[t];
-			}
-		}
-		for(int s = 0; s < k; ++s) {
-			for(int t = 0; t < s; ++t)
-				Hessian[s*k+t] = Hessian[t*k+s];
-			Hessian[s*k+s] += lambda;
-		}
-		ls_solve_chol_matrix(Hessian, y, k);
+                        // Construct k*k Hessian and k*1 y
+                        for(long idx = Y.col_ptr[j]; idx < Y.col_ptr[j+1]; ++idx){
+                                const double *Xi = &X[k*Y.row_idx[idx]];
+                                for(int s = 0; s < k; ++s) {
+                                        y[s] += C[idx]*Y.val[idx]*Xi[s];
+                                        for(int t = s; t < k; ++t)
+                                                Hessian[s*k+t] += C[idx]*Xi[s]*Xi[t];
+                                }
+                        }
+                        for(int s = 0; s < k; ++s) {
+                                for(int t = 0; t < s; ++t)
+                                        Hessian[s*k+t] = Hessian[t*k+s];
+                                Hessian[s*k+s] += lambda;
+                        }
+                        ls_solve_chol_matrix(Hessian, y, k);
+                }
+#ifdef EXP_DOALL_GALOIS
+        }, Galois::do_all_steal(false));
+#else
 	}
+#endif
 	printf("half-als: %lg secs\n", omp_get_wtime() - time);
 	for(int i = 0; i < nr_threads; i++)
 		free(Hessian_set[i]);
@@ -460,19 +490,29 @@ int multiple_l2r_ls_tron(multiple_linear_problem *prob, multiple_linear_paramete
 	if(!param->verbose) 
 		liblinear_print_string = print_null;
 
+#ifdef EXP_DOALL_GALOIS
+	Galois::do_all(boost::counting_iterator<unsigned>(0), boost::counting_iterator<unsigned>(Y.cols),
+            [&](unsigned j) {
+#else
 #pragma omp parallel for schedule(dynamic,50) shared(Y,W,X)
 	for(unsigned j = 0; j < Y.cols; ++j) {
+#endif
 		long nnz_j = Y.col_ptr[j+1] - Y.col_ptr[j];
-		if(!nnz_j) continue;
-		double *Wj = &W[j*k];
-		double *Cj = &C[Y.col_ptr[j]];
-		double primal_solver_classification_tol = param->eps*(double)std::max(std::min(pos,neg),1UL)/(double)nnz_j;
-		primal_solver_classification_tol = param->eps;
-		l2r_dense_ls_fun fun_obj = l2r_dense_ls_fun(Y, X, k, j, Cj);
-		TRON tron_obj(&fun_obj, primal_solver_classification_tol, param->max_tron_iter, param->max_cg_iter); 
-		tron_obj.set_print_string(liblinear_print_string);
-		tron_obj.tron(Wj, false); 
+		if(nnz_j) {
+                        double *Wj = &W[j*k];
+                        double *Cj = &C[Y.col_ptr[j]];
+                        double primal_solver_classification_tol = param->eps*(double)std::max(std::min(pos,neg),1UL)/(double)nnz_j;
+                        primal_solver_classification_tol = param->eps;
+                        l2r_dense_ls_fun fun_obj = l2r_dense_ls_fun(Y, X, k, j, Cj);
+                        TRON tron_obj(&fun_obj, primal_solver_classification_tol, param->max_tron_iter, param->max_cg_iter); 
+                        tron_obj.set_print_string(liblinear_print_string);
+                        tron_obj.tron(Wj, false); 
+                }
+#ifdef EXP_DOALL_GALOIS
+        }, Galois::do_all_steal(false));
+#else
 	}
+#endif
 	printf("half-least-squre: %lg secs\n", omp_get_wtime() - time);
 
 	return 0;
@@ -497,19 +537,29 @@ int multiple_l2r_lr_tron(multiple_linear_problem *prob, multiple_linear_paramete
 	if(!param->verbose) 
 		liblinear_print_string = print_null;
 
+#ifdef EXP_DOALL_GALOIS
+	Galois::do_all(boost::counting_iterator<unsigned>(0), boost::counting_iterator<unsigned>(Y.cols),
+            [&](unsigned j) {
+#else
 #pragma omp parallel for schedule(dynamic,50) shared(Y,W,X)
 	for(unsigned j = 0; j < Y.cols; ++j) {
+#endif
 		long nnz_j = Y.col_ptr[j+1] - Y.col_ptr[j];
-		if(!nnz_j) continue;
-		double *Wj = &W[j*k];
-		double *Cj = &C[Y.col_ptr[j]];
-		double primal_solver_classification_tol = param->eps*(double)std::max(std::min(pos,neg),1UL)/(double)nnz_j;
-		primal_solver_classification_tol = param->eps;
-		l2r_dense_lr_fun fun_obj = l2r_dense_lr_fun(Y, X, k, j, Cj);
-		TRON tron_obj(&fun_obj, primal_solver_classification_tol, param->max_tron_iter, param->max_cg_iter); 
-		tron_obj.set_print_string(liblinear_print_string);
-		tron_obj.tron(Wj, false); 
+		if(nnz_j) {
+                        double *Wj = &W[j*k];
+                        double *Cj = &C[Y.col_ptr[j]];
+                        double primal_solver_classification_tol = param->eps*(double)std::max(std::min(pos,neg),1UL)/(double)nnz_j;
+                        primal_solver_classification_tol = param->eps;
+                        l2r_dense_lr_fun fun_obj = l2r_dense_lr_fun(Y, X, k, j, Cj);
+                        TRON tron_obj(&fun_obj, primal_solver_classification_tol, param->max_tron_iter, param->max_cg_iter); 
+                        tron_obj.set_print_string(liblinear_print_string);
+                        tron_obj.tron(Wj, false); 
+                }
+#ifdef EXP_DOALL_GALOIS
+        }, Galois::do_all_steal(false));
+#else
 	}
+#endif
 	printf("half-logistic-regression: %lg secs\n", omp_get_wtime() - time);
 
 	return 0;
@@ -535,19 +585,29 @@ int multiple_l2r_l2svc_tron(multiple_linear_problem *prob, multiple_linear_param
 	if(!param->verbose) 
 		liblinear_print_string = print_null;
 
+#ifdef EXP_DOALL_GALOIS
+	Galois::do_all(boost::counting_iterator<unsigned>(0), boost::counting_iterator<unsigned>(Y.cols),
+            [&](unsigned j) {
+#else
 #pragma omp parallel for schedule(dynamic,50) shared(Y,W,X)
 	for(unsigned j = 0; j < Y.cols; ++j) {
+#endif
 		long nnz_j = Y.col_ptr[j+1] - Y.col_ptr[j];
-		if(!nnz_j) continue;
-		double *Wj = &W[j*k];
-		double *Cj = &C[Y.col_ptr[j]];
-		double primal_solver_classification_tol = param->eps*(double)std::max(std::min(pos,neg),1UL)/(double)nnz_j;
-		primal_solver_classification_tol = param->eps;
-		l2r_dense_l2svc_fun fun_obj = l2r_dense_l2svc_fun(Y, X, k, j, Cj);
-		TRON tron_obj(&fun_obj, primal_solver_classification_tol, param->max_tron_iter, param->max_cg_iter); 
-		tron_obj.set_print_string(liblinear_print_string);
-		tron_obj.tron(Wj, false); 
+		if(nnz_j) {
+                        double *Wj = &W[j*k];
+                        double *Cj = &C[Y.col_ptr[j]];
+                        double primal_solver_classification_tol = param->eps*(double)std::max(std::min(pos,neg),1UL)/(double)nnz_j;
+                        primal_solver_classification_tol = param->eps;
+                        l2r_dense_l2svc_fun fun_obj = l2r_dense_l2svc_fun(Y, X, k, j, Cj);
+                        TRON tron_obj(&fun_obj, primal_solver_classification_tol, param->max_tron_iter, param->max_cg_iter); 
+                        tron_obj.set_print_string(liblinear_print_string);
+                        tron_obj.tron(Wj, false); 
+                }
+#ifdef EXP_DOALL_GALOIS
+        }, Galois::do_all_steal(false));
+#else
 	}
+#endif
 	printf("half-svm: %lg secs\n", omp_get_wtime() - time);
 
 	return 0;

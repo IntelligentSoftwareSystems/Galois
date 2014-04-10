@@ -7,7 +7,9 @@
 #include "tron.h"
 #include "smat.h"
 #include "dmat.h"
-
+#ifdef EXP_DOALL_GALOIS
+#include "Galois/Galois.h"
+#endif
 
 /*
 typedef signed char schar;
@@ -152,8 +154,13 @@ public:
 		long k = prob->k;
 
 		// barXv(i,j) = (XV)(i,:) * H(j,:)', forall (i,j) in \Omega
+#ifdef EXP_DOALL_GALOIS
+	Galois::do_all(boost::counting_iterator<size_t>(0), boost::counting_iterator<size_t>(Y.rows),
+            [&](size_t i) {
+#else
 #pragma omp parallel for schedule(dynamic,50) shared(Y,barXv)
 		for(size_t i = 0; i < Y.rows; ++i) {
+#endif
 			size_t j = 0;
 			for(long idx=Y.row_ptr[i]; idx < Y.row_ptr[i+1]; ++idx) {
 				barXv[idx] = 0;
@@ -161,7 +168,11 @@ public:
 				for(long s = 0; s < k; ++s)
 					barXv[idx] += XV[i*k+s]*H[j*k+s];
 			}
-		}
+#ifdef EXP_DOALL_GALOIS
+                }, Galois::do_all_steal(false));
+#else
+                }
+#endif
 	}
 
 	double fun(double *w) {
@@ -355,8 +366,13 @@ public:
 		smat_x_dmat(X, v, k, XV);
 
 		// barXv(i,j) = (XV)(i,:) * H(j,:)', forall (i,j) in \Omega
+#ifdef EXP_DOALL_GALOIS
+	Galois::do_all(boost::counting_iterator<size_t>(0), boost::counting_iterator<size_t>(Y.rows),
+            [&](size_t i) {
+#else
 #pragma omp parallel for schedule(dynamic,50) shared(X,Y,barXv)
 		for(size_t i = 0; i < Y.rows; ++i) {
+#endif
 			size_t j = 0;
 			for(long idx=Y.row_ptr[i]; idx < Y.row_ptr[i+1]; ++idx) {
 				barXv[idx] = 0;
@@ -364,7 +380,11 @@ public:
 				for(long s = 0; s < k; ++s)
 					barXv[idx] += XV[i*k+s]*H[j*k+s];
 			}
+#ifdef EXP_DOALL_GALOIS
+                }, Galois::do_all_steal(false));
+#else
 		}
+#endif
 	}
 
 	// barXTu = a * barXT * u + W0
@@ -403,16 +423,37 @@ public:
 		// Assume fun has been called before this function call
 		// z = barX*w-y
 		long nnz_Y = prob->Y->nnz;
+#ifdef EXP_DOALL_GALOIS
+	Galois::do_all(boost::counting_iterator<long>(0), boost::counting_iterator<long>(nnz_Y),
+            [&](long i) {
+#else
 #pragma omp parallel for schedule(static)
-		for(long i=0;i<nnz_Y;++i)
+		for(long i=0;i<nnz_Y;++i) {
+#endif
 			z[i] = C[i]*z[i];
+#ifdef EXP_DOALL_GALOIS
+                }, Galois::do_all_steal(false));
+#else
+                }
+#endif
 		barXTu(z, 2, w, g);
 	}
 	void Hv(double *s, double *Hs){
 		long nnz_Y =prob->Y->nnz;
 		barXv(s, D);
+#ifdef EXP_DOALL_GALOIS
+	Galois::do_all(boost::counting_iterator<long>(0), boost::counting_iterator<long>(nnz_Y),
+            [&](long i) {
+#else
 #pragma omp parallel for schedule(static)
-		for(long i=0;i<nnz_Y;++i) D[i]*=C[i];
+		for(long i=0;i<nnz_Y;++i) {
+#endif
+                        D[i]*=C[i];
+#ifdef EXP_DOALL_GALOIS
+                }, Galois::do_all_steal(false));
+#else
+                }
+#endif
 		barXTu(D, 2, s, Hs);
 	}
 };
@@ -455,8 +496,13 @@ public:
 		smat_x_dmat(X, v, k, XV);
 
 		// barXv(i,j) = (XV)(i,:) * H(j,:)', forall (i,j) in \Omega
+#ifdef EXP_DOALL_GALOIS
+	Galois::do_all(boost::counting_iterator<size_t>(0), boost::counting_iterator<size_t>(Y.rows),
+            [&](size_t i) {
+#else
 #pragma omp parallel for schedule(dynamic,50) shared(X,Y,barXv)
 		for(size_t i = 0; i < Y.rows; ++i) {
+#endif
 			size_t j = 0;
 			for(long idx=Y.row_ptr[i]; idx < Y.row_ptr[i+1]; ++idx) {
 				barXv[idx] = 0;
@@ -464,7 +510,11 @@ public:
 				for(long s = 0; s < k; ++s)
 					barXv[idx] += XV[i*k+s]*H[j*k+s];
 			}
+#ifdef EXP_DOALL_GALOIS
+                }, Galois::do_all_steal(false));
+#else
 		}
+#endif
 	}
 
 	// barXTu = a * barXT * u + W0
@@ -505,12 +555,21 @@ public:
 		const double *y=prob->Y->val_t;
 		long nnz_Y = prob->Y->nnz;
 
+#ifdef EXP_DOALL_GALOIS
+	Galois::do_all(boost::counting_iterator<long>(0), boost::counting_iterator<long>(nnz_Y),
+            [&](long i) {
+#else
 #pragma omp parallel for schedule(static)
 		for(long i=0;i<nnz_Y;++i) {
+#endif
 			z[i] = 1/(1 + exp(-y[i]*z[i]));
 			D[i] = C[i]*z[i]*(1-z[i]);
 			z[i] = C[i]*(z[i]-1)*y[i];
+#ifdef EXP_DOALL_GALOIS
+                }, Galois::do_all_steal(false));
+#else
 		}
+#endif
 
 		barXTu(z, 1, w, g);
 	}
@@ -518,8 +577,19 @@ public:
 		long nnz_Y =prob->Y->nnz;
 
 		barXv(s, wa);
+#ifdef EXP_DOALL_GALOIS
+	Galois::do_all(boost::counting_iterator<long>(0), boost::counting_iterator<long>(nnz_Y),
+            [&](long i) {
+#else
 #pragma omp parallel for schedule(static)
-		for(long i=0;i<nnz_Y;++i) wa[i]*=D[i];
+		for(long i=0;i<nnz_Y;++i) {
+#endif
+                        wa[i]*=D[i];
+#ifdef EXP_DOALL_GALOIS
+                }, Galois::do_all_steal(false));
+#else
+                }
+#endif
 		barXTu(wa, 1, s, Hs);
 	}
 };
@@ -563,8 +633,13 @@ public:
 		smat_x_dmat(X, v, k, XV);
 
 		// barXv(i,j) = (XV)(i,:) * H(j,:)', forall (i,j) in \Omega
+#ifdef EXP_DOALL_GALOIS
+	Galois::do_all(boost::counting_iterator<size_t>(0), boost::counting_iterator<size_t>(Y.rows),
+            [&](size_t i) {
+#else
 #pragma omp parallel for schedule(dynamic,50) shared(X,Y,barXv)
 		for(size_t i = 0; i < Y.rows; ++i) {
+#endif
 			size_t j = 0;
 			for(long idx=Y.row_ptr[i]; idx < Y.row_ptr[i+1]; ++idx) {
 				barXv[idx] = 0;
@@ -572,7 +647,11 @@ public:
 				for(long s = 0; s < k; ++s)
 					barXv[idx] += XV[i*k+s]*H[j*k+s];
 			}
+#ifdef EXP_DOALL_GALOIS
+                }, Galois::do_all_steal(false));
+#else
 		}
+#endif
 	}
 
 	void subbarXv(double *v, double *barXv) {
@@ -585,8 +664,13 @@ public:
 		smat_x_dmat(X, v, k, XV);
 
 		// barXv(i,j) = (XV)(i,:) * H(j,:)', forall (i,j) in \Omega
+#ifdef EXP_DOALL_GALOIS
+	Galois::do_all(boost::counting_iterator<size_t>(0), boost::counting_iterator<size_t>(Y.rows),
+            [&](size_t i) {
+#else
 #pragma omp parallel for schedule(dynamic,50) shared(X,Y,barXv)
 		for(size_t i = 0; i < Y.rows; ++i) {
+#endif
 			size_t j = 0;
 			for(long idx=Y.row_ptr[i]; idx < Y.row_ptr[i+1]; ++idx) {
 				if (I[idx] != 0) {
@@ -596,7 +680,11 @@ public:
 						barXv[idx] += XV[i*k+s]*H[j*k+s];
 				} else barXv[idx] = 0;
 			}
+#ifdef EXP_DOALL_GALOIS
+                }, Galois::do_all_steal(false));
+#else
 		}
+#endif
 	}
 
 	// barXTu = a * barXT * u + W0
@@ -647,8 +735,19 @@ public:
 	void Hv(double *s, double *Hs){
 		long nnz_Y = prob->Y->nnz;
 		subbarXv(s, D);
+#ifdef EXP_DOALL_GALOIS
+	Galois::do_all(boost::counting_iterator<long>(0), boost::counting_iterator<long>(nnz_Y),
+            [&](long i) {
+#else
 #pragma omp parallel for schedule(static)
-		for(long i=0;i<nnz_Y;++i) D[i]*=C[i];
+		for(long i=0;i<nnz_Y;++i) {
+#endif
+                          D[i]*=C[i];
+#ifdef EXP_DOALL_GALOIS
+                }, Galois::do_all_steal(false));
+#else
+                }
+#endif
 		barXTu(D, 2.0, s, Hs);
 	}
 };
@@ -656,9 +755,19 @@ public:
 static void construct_C_array(double *C, smat_t *Y, double Cp, double Cn){
 	double *y = Y->val_t;
 	size_t nnz_Y = Y->nnz;
+#ifdef EXP_DOALL_GALOIS
+	Galois::do_all(boost::counting_iterator<size_t>(0), boost::counting_iterator<size_t>(nnz_Y),
+            [&](size_t i) {
+#else
 #pragma omp parallel for 
-	for(size_t i = 0; i < nnz_Y; ++i)
+	for(size_t i = 0; i < nnz_Y; ++i) {
+#endif
 		C[i] = y[i] > 0 ? Cp:Cn;
+#ifdef EXP_DOALL_GALOIS
+        }, Galois::do_all_steal(false));
+#else
+        }
+#endif
 }
 
 // sample K numbers from 0 ~ N-1
@@ -836,9 +945,18 @@ void bilinear_predict_full(const bilinear_problem* prob, const double *H, biline
 	smat_x_dmat(X, W, nr_labels, XW);
 
 	//size_t true_insts = 0;
+#ifdef EXP_DOALL_GALOIS
+	Galois::do_all(boost::counting_iterator<size_t>(0), boost::counting_iterator<size_t>(nr_insts),
+            [&](size_t inst) {
+#else
 #pragma omp parallel for 
 	for(size_t inst = 0; inst < nr_insts; ++inst){
+#endif
+#ifdef EXP_DOALL_GALOIS
+		int tid = Galois::Runtime::LL::getTID();
+#else
 		int tid = omp_get_thread_num(); // thread ID
+#endif
 		ivec_t &trueY = trueY_set[tid];
 		ivec_t &indices = indices_set[tid];
 		dvec_t &predY = predY_set[tid];
@@ -874,7 +992,11 @@ void bilinear_predict_full(const bilinear_problem* prob, const double *H, biline
 				top_acc[p] += 1.0;
 			top_real_acc[p] += correct_cnt;
 		}
+#ifdef EXP_DOALL_GALOIS
+        }, Galois::do_all_steal(false));
+#else
 	}
+#endif
 
 	size_t &numerator = micro_F_numerator[0];
 	size_t &denom1 = micro_F_denom1[0], &denom2 = micro_F_denom2[0];
@@ -931,9 +1053,18 @@ void bilinear_predict(const bilinear_problem* prob, const double *W, const doubl
 	smat_x_dmat(X, W, rank, XW);
 
 	//size_t true_insts = 0;
+#ifdef EXP_DOALL_GALOIS
+	Galois::do_all(boost::counting_iterator<size_t>(0), boost::counting_iterator<size_t>(nr_insts),
+            [&](size_t inst) {
+#else
 #pragma omp parallel for 
 	for(size_t inst = 0; inst < nr_insts; ++inst){
+#endif
+#ifdef EXP_DOALL_GALOIS
+		int tid = Galois::Runtime::LL::getTID();
+#else
 		int tid = omp_get_thread_num(); // thread ID
+#endif
 		ivec_t &trueY = trueY_set[tid];
 		ivec_t &indices = indices_set[tid];
 		dvec_t &predY = predY_set[tid];
@@ -969,7 +1100,11 @@ void bilinear_predict(const bilinear_problem* prob, const double *W, const doubl
 				top_acc[p] += 1.0;
 			top_real_acc[p] += correct_cnt;
 		}
+#ifdef EXP_DOALL_GALOIS
+        }, Galois::do_all_steal(false));
+#else
 	}
+#endif
 
 	size_t &numerator = micro_F_numerator[0];
 	size_t &denom1 = micro_F_denom1[0], &denom2 = micro_F_denom2[0];
