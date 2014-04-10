@@ -979,10 +979,10 @@ public:
 
       ++steps;
       std::swap (currPending, nextPending);
-      nextPending.clear ();
+      nextPending->clear ();
       execRcrd.push_back (0); // create record entry for current step;
 
-      while (!currPending.empty ()) {
+      while (!currPending->empty ()) {
         Ctxt* ctx = schedule ();
         assert (ctx != nullptr);
 

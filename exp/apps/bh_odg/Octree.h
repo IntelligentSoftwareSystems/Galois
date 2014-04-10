@@ -2,6 +2,7 @@
 #define BH_OCTREE_H
 
 #include "Point.h"
+#include "BoundingBox.h"
 
 namespace bh {
 
@@ -184,55 +185,190 @@ inline void updateCenter(Point& p, int index, double radius) {
   }
 }
 
+#if 0 // disabling for now
+template <typename B>
+struct BuildOctreeTopDown {
+
+  typedef Galois::gdeque<B*,4096> PartList;
+  typedef Galois::Runtime::MM::FSBGaloisAllocator<PartList> PartListAlloc;
+
+  template <typename I>
+  struct WorkItem {
+    OctreeInternal<B>* node;
+    BoundingBox box;
+    I beg;
+    I end;
+  };
+
+  BoundingBox box;
+
+  BuildOctreeTopDown (const BoundingBox& _box): box (_box) {
+  }
+
+  template <typename WL>
+  void operator () (WorkItem& r, WL& wl) {
+
+    WorkItem child[8];
+
+    I next = r.beg;
+    ++next;
+
+    assert (r.beg != r.end);
+    assert (next != r.end);
+
+    Point center = r.box.center ();
+
+    partitionMultiPass (r, center, child);
+
+    for (unsigned i = 0; i < 8; ++i) {
+      if (distOne (child[i].beg, child[i].end)) {
+
+        r.node->setChild (i, *(child[i].beg));
+
+      } else {
+        if (child[i].beg != child[i].end) {
+          wl.push (child[i]);
+        }
+      }
+    }
+  }
+
+  void partitionSinglePass (const WorkItem& r, const Point& center, WorkItem* child) {
+
+    for (unsigned i = 0; i < 8; ++i) {
+      PartList* list = partListAlloc.allocate (1);
+      new (list) PartList ();
+      child[i].partList = list;
+    }
+
+    for (I i = r.beg; i != r.end; ++i) {
+      unsigned index = getIndex (*i, center);
+      child[index].partList->push_back (*i);
+    }
+
+    for (unsigned i = 0; i < 8; ++i) {
+      child[i].beg = child[i].partList->begin ();
+      child[i].end = child[i].partList->end ();
+    }
+
+    // delete the old list
+    partListAlloc.destroy (r.partList);
+    partList.deallocate (r.partList, 1);
+
+  }
+
+  template <typename F0, typename F1, typename F2>
+  void partitionMultiPassImpl (WorkItem& r, const Point& center, WorkItem* child, const F0& f0, const F1& f1, const F2& f2) {
+
+    typedef std::pair<typename WorkItem::I> Range;
+
+    Range x[2];
+    auto m_x = std::paritition (r.beg, r.end, f0);
+
+    x[0] = Range (r.beg, m_x);
+    x[1] = Range (m_x, r.end);
+
+    Range y[4];
+
+    Range z[8];
+
+    for (unsigned i = 0; i < 2; ++i) {
+      auto m_y = std::paritition (x[i].first, x[i].second, f1);
+
+      y[i*2 + 0] = Range (x[i].first, m_y);
+      y[i*2 + 1] = Range (m_y, x[i].second);
+
+      for (unsigned j = 0; j < 2; ++j) {
+
+        Range curr_y = y[i*2 + j];
+        auto m_z = std::paritition (curr_y.first, curr_y.second, f2);
+
+        z[i*4 + j*2 + 0] = Range (curr_y.first, m_z);
+        z[i*4 + j*2 + 1] = Range (m_z, curr_y.second);
+      }
+    }
+
+
+    for (unsigned c = 0; c < 8; ++c) {
+      child[c]  = WorkItem (z[i].first, z[i].second);
+    }
+
+  }
+
+};
+
+#endif
+
 
 template <typename B>
-struct BuildOctree {
-  // NB: only correct when run sequentially
-  typedef int tt_does_not_need_stats;
+struct BuildOctreeSerial {
 
-  OctreeInternal<B>* root;
-  double root_radius;
+  struct BuildOperator {
+    // NB: only correct when run sequentially
+    typedef int tt_does_not_need_stats;
 
-  BuildOctree(OctreeInternal<B>* _root, double radius) :
-    root(_root),
-    root_radius(radius) { }
+    OctreeInternal<B>* root;
+    double root_radius;
 
-  template<typename Context>
-  void operator()(Body<B>* b, Context&) {
-    insert(b, root, root_radius);
-  }
+    BuildOperator(OctreeInternal<B>* _root, double radius) :
+      root(_root),
+      root_radius(radius) { }
 
-  void insert(Body<B>* b, OctreeInternal<B>* node, double radius) {
-    int index = getIndex(node->pos, b->pos);
-
-    assert(!node->isLeaf());
-
-    Octree<B>* child = node->getChild (index);
-    
-    if (child == NULL) {
-      node->setChild (index, b);
-      return;
+    void operator () (Body<B>* b) {
+      insert(b, root, root_radius);
     }
-    
-    radius *= 0.5;
-    if (child->isLeaf()) {
-      // Expand leaf
-      Body<B>* n = static_cast<Body<B>*>(child);
-      Point new_pos(node->pos);
-      updateCenter(new_pos, index, radius);
-      OctreeInternal<B>* new_node = new OctreeInternal<B>(new_pos);
 
-      assert(n->pos != b->pos);
+    template<typename Context>
+    void operator()(Body<B>* b, Context&) {
+      (*this) (b);
+    }
+
+    static void insert(Body<B>* b, OctreeInternal<B>* node, double radius) {
+      int index = getIndex(node->pos, b->pos);
+
+      assert(!node->isLeaf());
+
+      Octree<B>* child = node->getChild (index);
       
-      node->setChild (index, new_node);
-      insert(b, new_node, radius);
-      insert(n, new_node, radius);
-    } else {
-      OctreeInternal<B>* n = static_cast<OctreeInternal<B>*>(child);
-      insert(b, n, radius);
-    }
-  }
+      if (child == NULL) {
+        node->setChild (index, b);
+        return;
+      }
+      
+      radius *= 0.5;
+      if (child->isLeaf()) {
+        // Expand leaf
+        Body<B>* n = static_cast<Body<B>*>(child);
+        Point new_pos(node->pos);
+        updateCenter(new_pos, index, radius);
+        OctreeInternal<B>* new_node = new OctreeInternal<B>(new_pos);
 
+        assert(n->pos != b->pos);
+        
+        node->setChild (index, new_node);
+        insert(b, new_node, radius);
+        insert(n, new_node, radius);
+      } else {
+        OctreeInternal<B>* n = static_cast<OctreeInternal<B>*>(child);
+        insert(b, n, radius);
+      }
+    }
+
+
+  };
+
+  // template <typename A, typename I>
+  // OctreeInternal<B>* operator () (A& treeAlloc, const BoundingBox& _box, I beg, I end) {
+  // }
+
+  template <typename I>
+  OctreeInternal<B>* operator () (const BoundingBox& _box, I beg, I end) {
+    OctreeInternal<B>* root = new OctreeInternal<B> (_box.center ());
+
+    std::for_each (beg, end, BuildOperator (root, _box.radius ()));
+
+    return root;
+  }
 
 };
 

@@ -306,6 +306,10 @@ public:
   typedef typename Galois::ChooseStlTwoLevelIterator<RvrsOuterIter, typename Cont_ty::reverse_iterator>::type global_reverse_iterator;
   typedef typename Galois::ChooseStlTwoLevelIterator<RvrsOuterIter, typename Cont_ty::const_reverse_iterator>::type global_const_reverse_iterator;
 
+  typedef global_iterator iterator;
+  typedef global_const_iterator const_iterator;
+  typedef global_reverse_iterator reverse_iterator;
+  typedef global_const_reverse_iterator const_reverse_iterator;
 private:
 
   // XXX: for testing only
@@ -395,6 +399,15 @@ public:
         make_outer_begin(*this), make_outer_end(*this));
   }
 
+  // for compatibility with Range.h
+  global_iterator begin () { return begin_all (); }
+
+  global_iterator end () { return end_all (); }
+
+  global_const_iterator begin () const { return begin_all (); }
+
+  global_const_iterator end () const { return end_all (); }
+
   global_const_iterator cbegin_all() const { 
     return Galois::stl_two_level_cbegin(
         make_outer_begin(*this), make_outer_end(*this));
@@ -434,6 +447,22 @@ public:
     return Galois::stl_two_level_crend(
         make_outer_rbegin(*this), make_outer_rend(*this));
   }
+
+  local_iterator local_begin () { return get ().begin (); }
+  local_iterator local_end () { return get ().end (); }
+
+  // legacy STL
+  local_const_iterator local_begin () const { return get ().begin (); }
+  local_const_iterator local_end () const { return get ().end (); }
+
+  local_const_iterator local_cbegin () const { return get ().cbegin (); }
+  local_const_iterator local_cend () const { return get ().cend (); }
+
+  local_reverse_iterator local_rbegin () { return get ().rbegin (); }
+  local_reverse_iterator local_rend () { return get ().rend (); }
+
+  local_const_reverse_iterator local_crbegin () const { return get ().crbegin (); }
+  local_const_reverse_iterator local_crend () const { return get ().crend (); }
 
   size_type size_all() const {
     size_type sz = 0;
