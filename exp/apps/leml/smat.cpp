@@ -352,7 +352,7 @@ void smat_x_dmat(const smat_t &X, const double* W, size_t k, double *H)
    W is an n*k, row-majored array
    H is an m*k, row-majored array
    */
-static void smat_x_dmat_G(const double a, const smat_t &X, const double* W, const size_t k, const double *H0, double *H)
+void smat_x_dmat(const double a, const smat_t &X, const double* W, const size_t k, const double *H0, double *H)
 {
 	size_t m = X.rows;
 #ifdef EXP_DOALL_GALOIS

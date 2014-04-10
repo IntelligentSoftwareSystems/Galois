@@ -170,6 +170,13 @@ void run_multilabel_train(multilabel_parameter param, smat_t &Y, smat_t &X, smat
 	bilinear_problem test_set(&Yt, &Xt, H, k);
 	multilabel_problem prob(&training_set, &test_set);
 	omp_set_num_threads(param.threads);
+
+        //hack to force omp threads to be created before galois stuff
+#pragma omp parallel for
+	for(size_t i = 0; i < 1000; i++) {
+          sleep(0);
+        }
+
 #ifdef EXP_DOALL_GALOIS
         Galois::setActiveThreads(param.threads);
         Galois::Runtime::getSystemThreadPool().burnPower(param.threads);
