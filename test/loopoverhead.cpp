@@ -50,12 +50,12 @@ void t_stl() {
   std::cout << "STL(" << iter << "x" << V.size() << "): " << t.get() << "\n";
 }
 
-void t_doall(bool burn) {
+void t_doall(bool burn, bool steal) {
 
   std::vector<unsigned> V(1024);
   unsigned M = Galois::Runtime::LL::getMaxThreads();
 
-  std::cout << "doall:\nIterxSize\n";
+  std::cout << "doall " << steal << ":\nIterxSize\n";
 
   while (M) {
     Galois::setActiveThreads(M); //Galois::Runtime::LL::getMaxThreads());
@@ -66,7 +66,7 @@ void t_doall(bool burn) {
     Galois::Timer t;
     t.start();
     for (unsigned x = 0; x < iter; ++x)
-      Galois::do_all(V.begin(), V.end(), emp());
+      Galois::do_all(V.begin(), V.end(), emp(), Galois::do_all_steal(steal));
     t.stop();
 
     std::cout << "Galois(" << iter << "x" << V.size() << "): " << t.get() << "\n";
@@ -105,9 +105,11 @@ void t_foreach(bool burn) {
 int main() {
   t_inline();
   t_stl();
-  t_doall(false);
+  t_doall(false,false);
+  t_doall(false,true);
   t_foreach(false);
-  t_doall(true);
+  t_doall(true,false);
+  t_doall(true,true);
   t_foreach(true);
   return 0;
 }
