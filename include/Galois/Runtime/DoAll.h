@@ -45,112 +45,106 @@ struct EmptyFn {
   void operator()(T a, T b) {}
 };
 
+
+template<bool doSteal, typename iterator>
+struct doAllStealer;
+
+template<typename iterator>
+struct doAllStealer<false, iterator> {
+  void populateSteal(iterator&, iterator&) {}
+  bool trySteal(iterator&, iterator&) { return false; }
+};
+
+template<typename iterator>
+struct doAllStealer<true, iterator> {
+
+  struct state {
+    iterator stealBegin;
+    iterator stealEnd;
+    LL::SimpleLock stealLock;
+    state() { stealLock.lock(); }
+  };
+
+  PerThreadStorage<state> TLDS;
+
+  // bool doSteal(SharedState& source, PrivateState& dest) {
+  //   //This may not be safe for iterators with complex state
+  //   if (source.stealBegin != source.stealEnd) {
+  //     source.stealLock.lock();
+  //     if (source.stealBegin != source.stealEnd) {
+  //       dest.begin = source.stealBegin;
+  //       source.stealBegin = dest.end = Galois::split_range(source.stealBegin, source.stealEnd);
+  //     }
+  //     source.stealLock.unlock();
+  //   }
+  //   return dest.begin != dest.end;
+  // }
+
+  void populateSteal(iterator& begin, iterator& end) {
+    state& tld = *TLDS.getLocal();
+    if (std::distance(begin, end) > 1) {
+      tld.stealEnd = end;
+      tld.stealBegin = end = Galois::split_range(begin, end);
+      tld.stealLock.unlock();
+    }
+  }
+
+  GALOIS_ATTRIBUTE_NOINLINE
+  bool trySteal(iterator& begin, iterator& end) {
+    // //First try stealing from self
+    // if (doSteal(*TLDS.getLocal(), mytld))
+    //   return true;
+    // //Then try stealing from neighbors
+    // unsigned myID = LL::getTID();
+    // for (unsigned x = 1; x < activeThreads; x += x) {
+    //   SharedState& r = *TLDS.getRemote((myID + x) % activeThreads);
+    //   if (doSteal(r, mytld)) {
+    //     //populateSteal(mytld);
+    //     return true;
+    //   }
+    // }
+    return false;
+  }
+
+};
+
+
 // TODO(ddn): Tune stealing. DMR suffers when stealing is on
 // TODO: add loopname + stats
-template<class FunctionTy, class ReduceFunTy, class RangeTy>
+template<class FunctionTy, class ReduceFunTy, class RangeTy, bool useStealing>
 class DoAllWork {
-  typedef typename RangeTy::local_iterator local_iterator;
+  typedef typename RangeTy::local_iterator iterator;
   LL::SimpleLock reduceLock;
   FunctionTy origF;
   FunctionTy outputF;
   ReduceFunTy RF;
   RangeTy range;
-  Barrier& barrier;
   bool needsReduce;
-  bool useStealing;
 
-  struct SharedState {
-    local_iterator stealBegin;
-    local_iterator stealEnd;
-    LL::SimpleLock stealLock;
-  };
-
-  struct PrivateState {
-    local_iterator begin;
-    local_iterator end;
-    FunctionTy F;
-    PrivateState(FunctionTy& o) :F(o) {}
-  };
-
-  PerThreadStorage<SharedState> TLDS;
-
-  //! Master execution function for this loop type
-  void processRange(PrivateState& tld) {
-    for (; tld.begin != tld.end; ++tld.begin)
-      tld.F(*tld.begin);
-  }
-
-  bool doSteal(SharedState& source, PrivateState& dest) {
-    //This may not be safe for iterators with complex state
-    if (source.stealBegin != source.stealEnd) {
-      source.stealLock.lock();
-      if (source.stealBegin != source.stealEnd) {
-	dest.begin = source.stealBegin;
-	source.stealBegin = dest.end = Galois::split_range(source.stealBegin, source.stealEnd);
-      }
-      source.stealLock.unlock();
-    }
-    return dest.begin != dest.end;
-  }
-
-  void populateSteal(PrivateState& tld, SharedState& tsd) {
-    if (tld.begin != tld.end && std::distance(tld.begin, tld.end) > 1) {
-      tsd.stealLock.lock();
-      tsd.stealEnd = tld.end;
-      tsd.stealBegin = tld.end = Galois::split_range(tld.begin, tld.end);
-      tsd.stealLock.unlock();
-    }
-  }
-
-  GALOIS_ATTRIBUTE_NOINLINE
-  bool trySteal(PrivateState& mytld) {
-    //First try stealing from self
-    if (doSteal(*TLDS.getLocal(), mytld))
-      return true;
-    //Then try stealing from neighbors
-    unsigned myID = LL::getTID();
-    for (unsigned x = 1; x < activeThreads; x += x) {
-      SharedState& r = *TLDS.getRemote((myID + x) % activeThreads);
-      if (doSteal(r, mytld)) {
-	//populateSteal(mytld);
-	return true;
-      }
-    }
-    return false;
-  }
-
-  void doReduce(PrivateState& mytld) {
-    if (needsReduce) {
-      reduceLock.lock();
-      RF(outputF, mytld.F);
-      reduceLock.unlock();
-    }
-  }
+  doAllStealer<useStealing, iterator> stealing;
 
 public:
-  DoAllWork(const FunctionTy& F, const ReduceFunTy& R, bool needsReduce, RangeTy r, bool steal)
-    : origF(F), outputF(F), RF(R), range(r), barrier(getSystemBarrier()), needsReduce(needsReduce), useStealing(steal)
+  DoAllWork(const FunctionTy& F, const ReduceFunTy& R, bool needsReduce, RangeTy r)
+    : origF(F), outputF(F), RF(R), range(r), needsReduce(needsReduce)
   { }
 
   void operator()() {
     //Assume the copy constructor on the functor is readonly
-    PrivateState thisTLD(origF);
-    thisTLD.begin = range.local_begin();
-    thisTLD.end = range.local_end();
+    FunctionTy lFn(origF);
+    iterator begin = range.local_begin();
+    iterator end = range.local_end();
 
-    if (useStealing) {
-      populateSteal(thisTLD, *TLDS.getLocal());
-
-      // threads could start stealing from other threads whose
-      // range has not been initialized yet
-      barrier.wait();
-    }
+    stealing.populateSteal(begin,end);
 
     do {
-      processRange(thisTLD);
-    } while (useStealing && trySteal(thisTLD));
+      while (begin != end)
+        lFn(*begin++);
+    } while (stealing.trySteal(begin,end));
 
-    doReduce(thisTLD);
+    if (needsReduce) {
+      std::lock_guard<LL::SimpleLock> lg(reduceLock);
+      RF(outputF, lFn);
+    }
   }
 
   FunctionTy getFn() const { return outputF; }
@@ -167,13 +161,21 @@ FunctionTy do_all_dispatch(RangeTy range, FunctionTy f, ReducerTy r, bool doRedu
       LoopTimer.start();
 
     inGaloisForEach = true;
+    FunctionTy retval;
+    if (steal) {
+      DoAllWork<FunctionTy, ReducerTy, RangeTy, true> W(f, r, doReduce, range);
+      getSystemThreadPool().run(activeThreads, std::ref(W));
+      retval = W.getFn();
+    } else {
+      DoAllWork<FunctionTy, ReducerTy, RangeTy, false> W(f, r, doReduce, range);
+      getSystemThreadPool().run(activeThreads, std::ref(W));
+      retval = W.getFn();
+    }
 
-    DoAllWork<FunctionTy, ReducerTy, RangeTy> W(f, r, doReduce, range, steal);
-    getSystemThreadPool().run(activeThreads, std::ref(W));
     if (ForEachTraits<FunctionTy>::NeedsStats)  
       LoopTimer.stop();
     inGaloisForEach = false;
-    return W.getFn();
+    return retval;
   }
 }
 
