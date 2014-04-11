@@ -162,14 +162,18 @@ FunctionTy do_all_dispatch(RangeTy range, FunctionTy f, ReducerTy r, bool doRedu
 
     inGaloisForEach = true;
     FunctionTy retval;
-    if (steal) {
+    if (steal || doReduce) {
       DoAllWork<FunctionTy, ReducerTy, RangeTy, true> W(f, r, doReduce, range);
       getSystemThreadPool().run(activeThreads, std::ref(W));
       retval = W.getFn();
     } else {
-      DoAllWork<FunctionTy, ReducerTy, RangeTy, false> W(f, r, doReduce, range);
-      getSystemThreadPool().run(activeThreads, std::ref(W));
-      retval = W.getFn();
+      getSystemThreadPool().run(activeThreads, [&f, &range] () {
+          auto begin = range.local_begin();
+          auto end = range.local_end();
+          while (begin != end)
+            f(*begin++);
+        });
+      retval = f;
     }
 
     if (ForEachTraits<FunctionTy>::NeedsStats)  
