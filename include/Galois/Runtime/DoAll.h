@@ -127,10 +127,6 @@ void do_all_impl(RangeTy range, FunctionTy f, const char* loopname = 0, bool ste
   if (Galois::Runtime::inGaloisForEach) {
     std::for_each(range.begin(), range.end(), f);
   } else {
-    StatTimer LoopTimer("LoopTime", loopname);
-    if (ForEachTraits<FunctionTy>::NeedsStats)
-      LoopTimer.start();
-
     inGaloisForEach = true;
     if (steal) {
       DoAllWork<FunctionTy, RangeTy> W(f, range);
@@ -143,9 +139,6 @@ void do_all_impl(RangeTy range, FunctionTy f, const char* loopname = 0, bool ste
             f(*begin++);
         });
     }
-
-    if (ForEachTraits<FunctionTy>::NeedsStats)  
-      LoopTimer.stop();
     inGaloisForEach = false;
   }
 }
