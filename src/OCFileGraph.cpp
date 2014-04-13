@@ -30,6 +30,9 @@
 #include <cassert>
 
 #include <fcntl.h>
+#ifdef __linux__
+#include <linux/mman.h>
+#endif
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
