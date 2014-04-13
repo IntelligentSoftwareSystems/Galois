@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <cstdlib>
+#include <omp.h>
 
 int RandomNumber () { return (rand()%1000000); }
 const unsigned iter = 16*1024;
@@ -50,12 +51,40 @@ void t_stl() {
   std::cout << "STL(" << iter << "x" << V.size() << "): " << t.get() << "\n";
 }
 
-void t_doall(bool burn) {
+void t_omp() {
 
   std::vector<unsigned> V(1024);
   unsigned M = Galois::Runtime::LL::getMaxThreads();
 
-  std::cout << "doall:\nIterxSize\n";
+  std::cout << "omp:\nIterxSize\n";
+
+  while (M) {
+    
+    omp_set_num_threads(M); //Galois::Runtime::LL::getMaxThreads());
+    std::cout << "Using " << M << " threads\n";
+   
+    Galois::Timer t;
+    t.start();
+    for (unsigned x = 0; x < iter; ++x) {
+      emp f;
+#pragma omp parallel for
+      for (int n = 0; n < V.size(); ++n)
+        f(n);
+    }
+    t.stop();
+
+    std::cout << "OMP(" << iter << "x" << V.size() << "): " << t.get() << "\n";
+
+    M >>= 1;
+  }
+}
+
+void t_doall(bool burn, bool steal) {
+
+  std::vector<unsigned> V(1024);
+  unsigned M = Galois::Runtime::LL::getMaxThreads();
+
+  std::cout << "doall " << steal << ":\nIterxSize\n";
 
   while (M) {
     Galois::setActiveThreads(M); //Galois::Runtime::LL::getMaxThreads());
@@ -66,7 +95,7 @@ void t_doall(bool burn) {
     Galois::Timer t;
     t.start();
     for (unsigned x = 0; x < iter; ++x)
-      Galois::do_all(V.begin(), V.end(), emp());
+      Galois::do_all(V.begin(), V.end(), emp(), Galois::do_all_steal(steal));
     t.stop();
 
     std::cout << "Galois(" << iter << "x" << V.size() << "): " << t.get() << "\n";
@@ -103,11 +132,17 @@ void t_foreach(bool burn) {
 }
 
 int main() {
+#pragma omp parallel for
+  for (int x = 0; x< 100; ++x)
+    {}
   t_inline();
   t_stl();
-  t_doall(false);
+  t_omp();
+  t_doall(false,false);
+  t_doall(false,true);
   t_foreach(false);
-  t_doall(true);
+  t_doall(true,false);
+  t_doall(true,true);
   t_foreach(true);
   return 0;
 }
