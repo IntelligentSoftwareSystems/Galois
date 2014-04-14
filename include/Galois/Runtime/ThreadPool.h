@@ -68,7 +68,7 @@ protected:
   //Data passed to threads through run
   std::function<void(void)> work; //active work command
   std::atomic<unsigned> starting; // number of threads
-  unsigned masterFastmode; // use fastmode
+  unsigned masterFastmode; // use fastmode //only seen by thread 0
 
   //Data used in run loop
   struct per_signal {
@@ -92,6 +92,9 @@ protected:
   //! spin down after run
   void decascade(int tid);
 
+  //! execute work on num threads
+  void runInternal(unsigned num);
+
 public:
   virtual ~ThreadPool();
 
@@ -109,22 +112,7 @@ public:
       exTuple(Args&&... args) :cmds(std::forward<Args>(args)...) {}
     };
     work = std::function<void(void)>(exTuple(std::forward<Args>(args)...));
-    //sanitize num
-    //seq write to starting should make work safe
-    starting = std::min(std::max(1U,num), maxThreads);
-    assert(!masterFastmode || masterFastmode == num);
-    //launch threads
-    cascade(0, masterFastmode);
-    // Do master thread work
-    try {
-      work();
-    } catch (const shutdown_ty&) {
-    } catch (const fastmode_ty& fm) {
-    }
-    //wait for children
-    decascade(0);
-    // Clean up
-    work = nullptr;
+    runInternal(num);
   }
 
   void burnPower(unsigned num);
