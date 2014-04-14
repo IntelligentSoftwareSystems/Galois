@@ -33,7 +33,7 @@ struct DotProductFixedTilingAlgo {
     constexpr bool useExp = true;
     constexpr bool useDot = false;
     Galois::Timer timer;
-    Fixed2DGraphTiledExecutor<Graph, useExp> executor(g, cutoff);
+    Galois::Runtime::Fixed2DGraphTiledExecutor<Graph, useExp> executor(g, cutoff);
     timer.start();
     executor.execute(
         g.begin(), g.begin() + NUM_ITEM_NODES,

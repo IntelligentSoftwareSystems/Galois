@@ -21,7 +21,6 @@
  */
 #include "Sgd.h"
 #include "TcpServer.h"
-#include "TiledExecutor.h"
 
 #include "Galois/config.h"
 #include "Galois/Accumulator.h"
@@ -32,6 +31,7 @@
 #include "Galois/Graph/LCGraph.h"
 #include "Galois/ParallelSTL/ParallelSTL.h"
 #include "Galois/Runtime/ll/PaddedLock.h"
+#include "Galois/Runtime/TiledExecutor.h"
 #include "Lonestar/BoilerPlate.h"
 
 #include <algorithm>
@@ -176,7 +176,7 @@ double sumSquaredError(Graph& g) {
     }
   });
 #else
-  Fixed2DGraphTiledExecutor<Graph> executor(g);
+  Galois::Runtime::Fixed2DGraphTiledExecutor<Graph> executor(g);
   executor.execute(
       g.begin(), g.begin() + NUM_ITEM_NODES,
       g.begin() + NUM_ITEM_NODES, g.end(),
@@ -193,7 +193,7 @@ template<typename Graph>
 size_t countEdges(Graph& g) {
   typedef typename Graph::GraphNode GNode;
   Galois::GAccumulator<size_t> edges;
-  Fixed2DGraphTiledExecutor<Graph> executor(g);
+  Galois::Runtime::Fixed2DGraphTiledExecutor<Graph> executor(g);
   executor.execute(
       g.begin(), g.begin() + NUM_ITEM_NODES,
       g.begin() + NUM_ITEM_NODES, g.end(),
