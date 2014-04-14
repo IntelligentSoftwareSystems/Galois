@@ -102,7 +102,7 @@ void ThreadPool::threadLoop(unsigned tid) {
 
 void ThreadPool::decascade(int tid) {
   assert(signals.at(tid).get().done == 0);
-  const unsigned multiple = 2;
+  const unsigned multiple = 3;
   unsigned limit = starting;
   for (unsigned i = 1; i <= multiple; ++i) {
     unsigned n = tid * multiple + i;
@@ -114,7 +114,7 @@ void ThreadPool::decascade(int tid) {
 
 void ThreadPool::cascade(int tid, bool fastmode) {
   unsigned limit = starting;
-  const unsigned multiple = 2;
+  const unsigned multiple = 3;
   for (unsigned i = 1; i <= multiple; ++i) {
     unsigned n = tid * multiple + i;
     if (n < limit) {

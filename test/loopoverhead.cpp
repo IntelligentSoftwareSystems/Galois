@@ -42,7 +42,7 @@ unsigned t_omp(std::vector<unsigned>& V, unsigned num, unsigned th) {
   t.start();
   for (unsigned x = 0; x < iter; ++x) {
     emp f;
-#pragma omp parallel for
+#pragma omp parallel for schedule(guided)
     for (unsigned n = 0; n < num; ++n)
       f(n);
   }
@@ -84,7 +84,7 @@ void test(std::string header, unsigned maxThreads, unsigned minVec, unsigned max
   std::cout << "\n";
   std::vector<unsigned> V(maxVec);
   for (unsigned v = minVec; v < maxVec; v <<= 2) {
-    std::cout << v;
+    std::cout << v << "\t";
     for (unsigned M = maxThreads; M; M >>= 1) {
       std::cout << ",\t" << func(V, v, M);
     }
@@ -98,10 +98,10 @@ int main() {
 #pragma omp parallel for
   for (int x = 0; x< 100; ++x)
     {}
-  unsigned M = Galois::Runtime::LL::getMaxThreads();
-  test("inline",    1, 16, 1024*1024, [] (std::vector<unsigned>& V, unsigned num, unsigned th) { return t_inline(V, num); });
-  test("stl",       1, 16, 1024*1024, [] (std::vector<unsigned>& V, unsigned num, unsigned th) { return t_stl(V, num); });
-  test("omp",       M, 16, 1024*1024, t_omp);
+  unsigned M = Galois::Runtime::LL::getMaxThreads() / 2;
+  test("inline\t",    1, 16, 1024*1024, [] (std::vector<unsigned>& V, unsigned num, unsigned th) { return t_inline(V, num); });
+  test("stl\t",       1, 16, 1024*1024, [] (std::vector<unsigned>& V, unsigned num, unsigned th) { return t_stl(V, num); });
+  test("omp\t",       M, 16, 1024*1024, t_omp);
   test("doall N W", M, 16, 1024*1024, std::bind(t_doall,false,false,_1,_2,_3));
   test("doall N S", M, 16, 1024*1024, std::bind(t_doall,false,true,_1,_2,_3));
   test("foreach N", M, 16, 1024*1024, std::bind(t_foreach,false,_1,_2,_3));
