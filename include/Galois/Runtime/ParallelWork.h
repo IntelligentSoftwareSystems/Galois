@@ -44,10 +44,6 @@
 #include <functional>
 #include <memory>
 
-#ifdef GALOIS_USE_HTM
-#include <speculation.h>
-#endif
-
 namespace Galois {
 //! Internal Galois functionality - Use at your own risk.
 namespace Runtime {
@@ -59,63 +55,25 @@ class LoopStatistics {
   unsigned long iterations;
   const char* loopname;
 
-#ifdef GALOIS_USE_HTM
-  TmReport_s start;
-  void init() { 
-    if (LL::getTID()) return;
-
-    // Dummy transaction to ensure that tm_get_all_stats doesn't return
-    // garbage 
-#pragma tm_atomic
-    {
-      conflicts = 0;
-    }
-
-    tm_get_all_stats(&start);
-  }
-
-  void report() { 
-    if (LL::getTID()) return;
-    TmReport_s stop;
-    tm_get_all_stats(&stop);
-    reportStat(loopname, "HTMTransactions", 
-        stop.totalTransactions - start.totalTransactions);
-    reportStat(loopname, "HTMRollbacks", 
-        stop.totalRollbacks - start.totalRollbacks);
-    reportStat(loopname, "HTMSerializedJMV", 
-        stop.totalSerializedJMV - start.totalSerializedJMV);
-    reportStat(loopname, "HTMSerializedMAXRB", 
-        stop.totalSerializedMAXRB - start.totalSerializedMAXRB);
-    reportStat(loopname, "HTMSerializedOTHER", 
-        stop.totalSerializedOTHER - start.totalSerializedOTHER);
-    tm_print_stats();
-  }
-#else
-  void init() { }
-  void report() { }
-#endif
-
 public:
-  explicit LoopStatistics(const char* ln) :conflicts(0), iterations(0), loopname(ln) { init(); }
+  explicit LoopStatistics(const char* ln) :conflicts(0), iterations(0), loopname(ln) { }
   ~LoopStatistics() {
     reportStat(loopname, "Conflicts", conflicts);
     reportStat(loopname, "Iterations", iterations);
-    report();
   }
-  inline void inc_iterations(int amount = 1) {
-    iterations += amount;
+  inline void inc_iterations() {
+    ++iterations;
   }
   inline void inc_conflicts() {
     ++conflicts;
   }
 };
 
-
 template <>
 class LoopStatistics<false> {
 public:
   explicit LoopStatistics(const char* ln) {}
-  inline void inc_iterations(int amount = 1) const { }
+  inline void inc_iterations() const { }
   inline void inc_conflicts() const { }
 };
 
@@ -216,7 +174,6 @@ template<class WorkListTy, class T, class FunctionTy>
 class ForEachWork {
 protected:
   typedef T value_type;
-  typedef typename WorkListTy::template retype<value_type>::type WLTy;
 
   struct ThreadLocalData {
     FunctionTy function;
@@ -232,7 +189,7 @@ protected:
   AbortHandler<value_type> aborted; 
   TerminationDetection& term;
 
-  WLTy wl;
+  WorkListTy wl;
   FunctionTy& origFunction;
   const char* loopname;
   bool broke;
@@ -267,29 +224,11 @@ protected:
       tld.facing.resetAlloc();
   }
 
-#ifdef GALOIS_USE_HTM
-# ifndef GALOIS_USE_LONGJMP
-#  error "HTM must be used with GALOIS_USE_LONGJMP"
-# endif
-#endif
-
   inline void doProcess(value_type& val, ThreadLocalData& tld) {
     tld.stat.inc_iterations();
     if (ForEachTraits<FunctionTy>::NeedsAborts)
       tld.ctx.startIteration();
-
-#ifdef GALOIS_USE_HTM
-# ifndef GALOIS_USE_LONGJMP
-#  error "HTM must be used with GALOIS_USE_LONGJMP"
-# endif
-#pragma tm_atomic
-    {
-#endif
-      tld.function(val, tld.facing.data());
-#ifdef GALOIS_USE_HTM
-    }
-#endif
-
+    tld.function(val, tld.facing.data());
     clearReleasable();
     commitIteration(tld);
   }
@@ -413,9 +352,6 @@ public:
   void operator()() {
     bool isLeader = LL::isPackageLeaderForSelf(LL::getTID());
     bool couldAbort = ForEachTraits<FunctionTy>::NeedsAborts && activeThreads > 1;
-#ifdef GALOIS_USE_HTM
-    couldAbort = false;
-#endif
     if (couldAbort && isLeader)
       go<true, true>();
     else if (couldAbort && !isLeader)
@@ -433,7 +369,7 @@ void for_each_impl(const RangeTy& range, FunctionTy f, const char* loopname) {
     GALOIS_DIE("Nested for_each not supported");
 
   typedef typename RangeTy::value_type T;
-  typedef ForEachWork<WLTy, T, FunctionTy> WorkTy;
+  typedef ForEachWork<typename WLTy::template retype<T>::type, T, FunctionTy> WorkTy;
 
   // NB: Initialize barrier before creating WorkTy to increase
   // PerThreadStorage reclaimation likelihood
@@ -441,9 +377,9 @@ void for_each_impl(const RangeTy& range, FunctionTy f, const char* loopname) {
 
   WorkTy W(f, loopname);
 
-  StatTimer LoopTimer("LoopTime", loopname);
-  if (ForEachTraits<FunctionTy>::NeedsStats)
-    LoopTimer.start();
+  // StatTimer LoopTimer("LoopTime", loopname);
+  // if (ForEachTraits<FunctionTy>::NeedsStats)
+  //   LoopTimer.start();
 
   inGaloisForEach = true;
   getSystemThreadPool().run(activeThreads,
@@ -455,8 +391,8 @@ void for_each_impl(const RangeTy& range, FunctionTy f, const char* loopname) {
                             std::ref(W));
   inGaloisForEach = false;
 
-  if (ForEachTraits<FunctionTy>::NeedsStats)  
-    LoopTimer.stop();
+  // if (ForEachTraits<FunctionTy>::NeedsStats)  
+  //   LoopTimer.stop();
 }
 
 template<typename FunctionTy>
