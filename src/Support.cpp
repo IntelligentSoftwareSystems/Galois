@@ -23,6 +23,7 @@
 #include "Galois/Statistic.h"
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/Support.h"
+#include "Galois/gdeque.h"
 #include "Galois/Runtime/ll/StaticInstance.h"
 #include "Galois/Runtime/ll/PaddedLock.h"
 #include "Galois/Runtime/ll/gio.h"
@@ -35,115 +36,90 @@
 #include <cmath>
 #include <mutex>
 
-using Galois::Runtime::LL::gPrint;
+using namespace Galois;
+using namespace Galois::Runtime;
 
 namespace {
 
 class StatManager {
-  typedef std::pair<std::string, std::string> KeyTy;
-  typedef Galois::Runtime::LL::SimpleLock Lock;
+  typedef std::tuple<std::string, std::string, unsigned long> RecordTy;
 
-  Galois::Runtime::PerThreadStorage<std::pair<Lock, std::map<KeyTy, unsigned long> > > Stats;
-  volatile unsigned maxID;
-
-  void updateMax(unsigned n) {
-    unsigned c;
-    while (n > (c = maxID))
-      __sync_bool_compare_and_swap(&maxID, c, n);
-  }
-
-  KeyTy mkKey(const std::string& loop, const std::string& category) {
-    return std::make_pair(loop,category);
-  }
-
-  void gather(const std::string& s1, const std::string& s2, unsigned m, 
-	      std::vector<unsigned long>& v) {
-    for (unsigned x = 0; x < m; ++x)
-      v.push_back(Stats.getRemote(x)->second[mkKey(s1,s2)]);
-  }
-
-  unsigned long getSum(std::vector<unsigned long>& Values, unsigned maxThreadID) {
-    unsigned long R = 0;
-    for (unsigned x = 0; x < maxThreadID; ++x)
-      R += Values[x];
-    return R;
-  }
+  Galois::Runtime::PerThreadStorage<std::pair<LL::SimpleLock, gdeque<RecordTy> > > Stats;
 
 public:
-  StatManager() :maxID(0) {}
+  StatManager() {}
 
   void addToStat(const std::string& loop, const std::string& category, size_t value) {
-    auto myStat = Stats.getLocal();
-    std::lock_guard<Lock> lg(myStat->first);
-    myStat->second[mkKey(loop, category)] += value;
-    updateMax(Galois::Runtime::activeThreads);
+    auto lStat = Stats.getLocal();
+    std::lock_guard<LL::SimpleLock> lg(lStat->first);
+    lStat->second.emplace_back(loop, category, value);
   }
 
   void addToStat(Galois::Statistic* value) {
     for (unsigned x = 0; x < Galois::Runtime::activeThreads; ++x) {
       auto rStat = Stats.getRemote(x);
-      std::lock_guard<Lock> lg(rStat->first);
-      rStat->second[mkKey(value->getLoopname(), value->getStatname())] += value->getValue(x);
+      std::lock_guard<LL::SimpleLock> lg(rStat->first);
+      rStat->second.emplace_back(value->getLoopname(), value->getStatname(), value->getValue(x));
     }
-    updateMax(Galois::Runtime::activeThreads);
   }
 
   void addPageAllocToStat(const std::string& loop, const std::string& category) {
     for (unsigned x = 0; x < Galois::Runtime::activeThreads; ++x) {
       auto rStat = Stats.getRemote(x);
-      std::lock_guard<Lock> lg(rStat->first);
-      rStat->second[mkKey(loop, category)] += Galois::Runtime::MM::numPageAllocForThread(x);
+      std::lock_guard<LL::SimpleLock> lg(rStat->first);
+      rStat->second.emplace_back(loop, category, MM::numPageAllocForThread(x));
     }
-    updateMax(Galois::Runtime::activeThreads);
   }
 
   void addNumaAllocToStat(const std::string& loop, const std::string& category) {
     int nodes = Galois::Runtime::MM::numNumaNodes();
     for (int x = 0; x < nodes; ++x) {
       auto rStat = Stats.getRemote(x);
-      std::lock_guard<Lock> lg(rStat->first);
-      rStat->second[mkKey(loop, category)] += Galois::Runtime::MM::numNumaAllocForNode(x);
+      std::lock_guard<LL::SimpleLock> lg(rStat->first);
+      rStat->second.emplace_back(loop, category, MM::numNumaAllocForNode(x));
     }
-    updateMax(nodes);
   }
 
   //Assume called serially
   void printStats() {
-    std::set<KeyTy> LKs;
-    unsigned maxThreadID = maxID;
+    std::map<std::pair<std::string, std::string>, std::vector<unsigned long> > LKs;
+    
+    unsigned maxThreadID = 0;
     //Find all loops and keys
-    for (unsigned x = 0; x < maxThreadID; ++x) {
+    for (unsigned x = 0; x < Stats.size(); ++x) {
       auto rStat = Stats.getRemote(x);
-      std::lock_guard<Lock> lg(rStat->first);
+      std::lock_guard<LL::SimpleLock> lg(rStat->first);
       for (auto ii = rStat->second.begin(), ee = rStat->second.end();
 	   ii != ee; ++ii) {
-	LKs.insert(ii->first);
+        maxThreadID = x;
+	auto& v = LKs[std::make_pair(std::get<0>(*ii), std::get<1>(*ii))];
+        if (v.size() <= x)
+          v.resize(x+1);
+        v[x] += std::get<2>(*ii);
       }
     }
     //print header
-    gPrint("STATTYPE,LOOP,CATEGORY,n,sum");
-    for (unsigned x = 0; x < maxThreadID; ++x)
-      gPrint(",T", x);
-    gPrint("\n");
+    LL::gPrint("STATTYPE,LOOP,CATEGORY,n,sum");
+    for (unsigned x = 0; x <= maxThreadID; ++x)
+      LL::gPrint(",T", x);
+    LL::gPrint("\n");
     //print all values
     for (auto ii = LKs.begin(), ee = LKs.end(); ii != ee; ++ii) {
-      std::vector<unsigned long> Values;
-      gather(ii->first, ii->second, maxThreadID, Values);
-      gPrint("STAT,",
-	     ii->first.c_str(), ",",
-	     ii->second.c_str(), ",",
-	     maxThreadID, ",",
-	     getSum(Values, maxThreadID)
-	     );
-      for (unsigned x = 0; x < maxThreadID; ++x) {
-	gPrint(",", Values[x]);
-      }
-      gPrint("\n");
+      std::vector<unsigned long>& Values = ii->second;
+      LL::gPrint("STAT,",
+                 ii->first.first.c_str(), ",",
+                 ii->first.second.c_str(), ",",
+                 maxThreadID, ",",
+                 std::accumulate(Values.begin(), Values.end(), 0)
+                 );
+      for (unsigned x = 0; x <= maxThreadID; ++x)
+        LL::gPrint(",", Values.at(x));
+      LL::gPrint("\n");
     }
   }
 };
 
-static Galois::Runtime::LL::StaticInstance<StatManager> SM;
+static LL::StaticInstance<StatManager> SM;
 
 }
 
