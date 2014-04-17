@@ -407,7 +407,7 @@ void acquire(const GNode& src) {
 
 void relabel(const GNode& src) {
   int minHeight = std::numeric_limits<int>::max();
-  int minEdge;
+  int minEdge = 0;
 
   int current = 0;
   for (Graph::edge_iterator 
