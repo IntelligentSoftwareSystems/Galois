@@ -311,7 +311,7 @@ struct Edgelist2Gr: public Conversion {
     while (infile) {
       size_t src;
       size_t dst;
-      edge_value_type data;
+      edge_value_type data{};
 
       infile >> src >> dst;
 
