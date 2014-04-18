@@ -34,13 +34,16 @@ namespace Galois {
 namespace Runtime {
 namespace {
 template<typename FunctionTy>
-struct ForEachTraits {
+class ForEachTraits {
+  // special_decay of std::ref(t) is T& so apply twice
+  typedef typename special_decay<typename special_decay<FunctionTy>::type>::type Fn;
+public:
   enum {
-    NeedsStats = !Galois::does_not_need_stats<FunctionTy>::value,
-    NeedsBreak = Galois::needs_parallel_break<FunctionTy>::value,
-    NeedsPush = !Galois::does_not_need_push<FunctionTy>::value,
-    NeedsPIA = Galois::needs_per_iter_alloc<FunctionTy>::value,
-    NeedsAborts = !Galois::does_not_need_aborts<FunctionTy>::value
+    NeedsStats = !Galois::does_not_need_stats<Fn>::value,
+    NeedsBreak = Galois::needs_parallel_break<Fn>::value,
+    NeedsPush = !Galois::does_not_need_push<Fn>::value,
+    NeedsPIA = Galois::needs_per_iter_alloc<Fn>::value,
+    NeedsAborts = !Galois::does_not_need_aborts<Fn>::value
   };
 };
 
