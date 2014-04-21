@@ -385,7 +385,7 @@ class BlockedEdgeAlgo {
 
 public:
   typedef typename Galois::Graph::LC_CSR_Graph<Node, unsigned int>
-//    ::template with_numa_alloc<true>::type
+    //::template with_numa_alloc<true>::type
     ::template with_out_of_line_lockable<true>::type
     ::template with_no_lockable<!makeSerializable>::type Graph;
 
@@ -885,6 +885,32 @@ public:
     Galois::Statistic failures("PopFailures");
     Galois::StatTimer execute("ExecuteTime");
     execute.start();
+
+#if 1
+    executeUntilConverged(sf, g, [&](LatentValue* steps, int maxUpdates, Galois::GAccumulator<double>* errorAccum) {
+      if (errorAccum)
+        GALOIS_DIE("not yet implemented");
+
+      Galois::Runtime::Fixed2DGraphTiledExecutor<Graph> executor(g);
+      executor.execute(
+          g.begin(), g.begin() + NUM_ITEM_NODES,
+          g.begin() + NUM_ITEM_NODES, g.end(),
+          itemsPerBlock, usersPerBlock,
+          [&](GNode src, GNode dst, typename Graph::edge_iterator edge) {
+        if (deleted(g.getData(src)))
+          return;
+        // const LatentValue stepSize = steps[updatesPerEdge - maxUpdates + task.updates]; XXX
+        //const LatentValue stepSize = steps[1 - maxUpdates + 0];
+        const LatentValue stepSize = steps[0];
+
+        LatentValue e = doGradientUpdate(g.getData(src).latentVector, g.getData(dst).latentVector, lambda, g.getEdgeData(edge), stepSize);
+        // XXX non exact error
+        //error += (e * e);
+        edgesVisited += 1;
+      }, true);
+    });
+#endif
+#if 0
     executeUntilConverged(sf, g, [&](LatentValue* steps, int maxUpdates, Galois::GAccumulator<double>* errorAccum) {
       Process fn2 { g, edgesVisited, failures, xLocks, yLocks, tasks, steps, maxUpdates, errorAccum };
       // Testing sufficient optimizations by moving towards BlockJump
@@ -896,6 +922,7 @@ public:
       if (!std::all_of(tasks.begin(), tasks.end(), [maxUpdates](Task& t) { return t.updates == maxUpdates; }))
         std::cerr << "WARNING: Missing tasks\n";
     });
+#endif
     execute.stop();
   }
 };

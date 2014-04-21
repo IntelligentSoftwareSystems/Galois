@@ -53,7 +53,6 @@ static cll::opt<std::string> inputGraphFilename(cll::Positional, cll::desc("<gra
 static cll::opt<std::string> inputLabelFilename(cll::Positional, cll::desc("<label input file>"), cll::Required);
 static cll::opt<double> CREG("c", cll::desc("the regularization parameter C"), cll::init(1.0));
 static cll::opt<bool> NO_LOCKS("nl", cll::desc("do not lock feature nodes"), cll::init(false));
-static cll::opt<bool> BOUNDED_STALENESS("bs", cll::desc("use bounded staleness looking back 1 iteration"), cll::init(false));
 static cll::opt<bool> SHUFFLE("s", cll::desc("shuffle samples between iterations"), cll::init(false));
 static cll::opt<double> TRAINING_FRACTION("tr", cll::desc("fraction of samples to use for training"), cll::init(0.8));
 static cll::opt<double> ACCURACY_GOAL("ag", cll::desc("accuracy at which to stop running"), cll::init(0.95));
@@ -435,8 +434,6 @@ int main(int argc, char** argv)
                                 {
                                         threadw[i] += (*thread_accum.getRemote(j))[i];
                                 }
-                                //if (num_packages > 1)
-                                //        packagew[i] /= num_packages;
 				GNode variable_node = (GNode) (i + NUM_SAMPLES);
 				Node& var_data = g.getData(variable_node, Galois::NONE);
                                 var_data.w = threadw[i];

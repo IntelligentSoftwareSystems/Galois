@@ -258,7 +258,7 @@ class Fixed2DGraphTiledExecutor {
       block[i] = (numBlocks[i] + total - 1) / total;
       start[i] = std::min(block[i] * tid, numBlocks[i] - 1);
     }
-    unsigned coresPerPackage = 10; // TODO: get actual cores per package
+    unsigned coresPerPackage = 8; // TODO: get actual cores per package
     if (useLocks)
       start = { start[0], std::min(block[1] * coresPerPackage * (tid / coresPerPackage), numBlocks[1] - 1) };
 
