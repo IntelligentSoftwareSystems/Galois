@@ -42,6 +42,12 @@ static const char* const name = "Stochastic Gradient Descent for Linear Support 
 static const char* const desc = "Implements a linear support vector machine using stochastic gradient descent";
 static const char* const url = "sgdsvm";
 
+enum class UpdateType {
+        Wild,
+        ThreadStaleness,
+        PackageStaleness
+};
+
 namespace cll = llvm::cl;
 static cll::opt<std::string> inputGraphFilename(cll::Positional, cll::desc("<graph input file>"), cll::Required);
 static cll::opt<std::string> inputLabelFilename(cll::Positional, cll::desc("<label input file>"), cll::Required);
@@ -52,6 +58,13 @@ static cll::opt<bool> SHUFFLE("s", cll::desc("shuffle samples between iterations
 static cll::opt<double> TRAINING_FRACTION("tr", cll::desc("fraction of samples to use for training"), cll::init(0.8));
 static cll::opt<double> ACCURACY_GOAL("ag", cll::desc("accuracy at which to stop running"), cll::init(0.95));
 static cll::opt<unsigned> ITER("i", cll::desc("how many iterations to run for, ignoring accuracy the goal"), cll::init(0));
+static cll::opt<UpdateType> UPDATE_TYPE("algo", cll::desc("Update type:"),
+        cll::values(
+                clEnumValN(UpdateType::Wild, "wild", "unsynchronized (default)"),
+                clEnumValN(UpdateType::ThreadStaleness, "threadStaleness", "thread staleness"),
+                clEnumValN(UpdateType::PackageStaleness, "packageStaleness", "package staleness"),
+                clEnumValEnd), cll::init(UpdateType::Wild));
+
 
 /**                      DATA TYPES                    **/
 
@@ -59,7 +72,9 @@ typedef struct Node
 {
 	double w; //weight - relevant for variable nodes
 	int field; //variable nodes - variable count, sample nodes - label
+        Node(): w(0.0), field(0) { }
 } Node;
+
 
 using Graph = Galois::Graph::LC_CSR_Graph<Node, double>;
 using GNode = Graph::GraphNode;
@@ -73,14 +88,11 @@ unsigned variableNodeToId(GNode variable_node)
 	return ((unsigned) variable_node) - NUM_SAMPLES;
 }
 
-double w_at(Graph& g, unsigned windex)
-{
-	return g.getData(windex + NUM_SAMPLES).w; 
-}
+Galois::Runtime::PerPackageStorage<double*> package_weights;
+Galois::LargeArray<double> old_weights;
+Galois::Runtime::PerThreadStorage<double*> thread_accum;
 
-double* old_weights;
-
-template <bool USE_BOUNDED_STALENESS = false>
+template <UpdateType UT>
 struct linearSVM
 {	
 	Graph& g;
@@ -95,6 +107,8 @@ struct linearSVM
 	void operator()(GNode gnode, Galois::UserContext<GNode>& ctx)
 	{	
 		double dot = 0.0;
+                double *packagew = *package_weights.getLocal();
+                double *accum = *thread_accum.getLocal();
 		Galois::MethodFlag mode = lock_mode;
 		for(auto edge_it : g.out_edges(gnode, mode))
 		{
@@ -103,10 +117,18 @@ struct linearSVM
 			Node& var_data = g.getData(variable_node, mode);
 
 			double weight;
-			if(!USE_BOUNDED_STALENESS)
-				weight = var_data.w; //normal algorithm
-			else 
-				weight = old_weights[variableNodeToId(variable_node)]; //bounded staleness
+                        switch (UT) {
+                                case UpdateType::Wild:
+                                        weight = var_data.w; //normal algorithm
+                                        break;
+                                case UpdateType::ThreadStaleness:
+                                        weight = old_weights[variableNodeToId(variable_node)]; //bounded staleness
+                                        break;
+                                case UpdateType::PackageStaleness:
+                                        weight = packagew[variableNodeToId(variable_node)];
+                                        break;
+                                default: abort();
+                        }
 
 			dot += weight * g.getEdgeData(edge_it, mode);
 		}
@@ -122,10 +144,18 @@ struct linearSVM
 			int varCount = var_data.field;
 			
 			double weight;
-			if(!USE_BOUNDED_STALENESS)
-				weight = var_data.w; //normal algorithm
-			else
-				weight = old_weights[variableNodeToId(variable_node)]; //bounded staleness
+                        switch (UT) {
+                                case UpdateType::Wild:
+                                        weight = var_data.w; //normal algorithm
+                                        break;
+                                case UpdateType::ThreadStaleness:
+                                        weight = old_weights[variableNodeToId(variable_node)]; //bounded staleness
+                                        break;
+                                case UpdateType::PackageStaleness:
+                                        weight = packagew[variableNodeToId(variable_node)];
+                                        break;
+                                default: abort();
+                        }
 			
 			double delta;
 			if(update_type)
@@ -133,45 +163,58 @@ struct linearSVM
 			else
 				delta = weight/( CREG * varCount);
 
-			//printf("%f\n", delta);
-			var_data.w -= delta;
+                        switch (UT) {
+                                case UpdateType::Wild:
+                                        var_data.w -= delta;
+                                        break;
+                                case UpdateType::ThreadStaleness:
+                                        accum[variableNodeToId(variable_node)] -= delta;
+                                        break;
+                                case UpdateType::PackageStaleness:
+                                        packagew[variableNodeToId(variable_node)] -= delta;
+                                        break;
+                                default: abort();
+                        }
 		}
 	}
 };
 
 void printParameters()
 {
-	std::cout << "Input graph file: " << inputGraphFilename << std::endl;
-	std::cout << "Input label file: " << inputLabelFilename << std::endl;
-	std::cout << "Threads: " << Galois::getActiveThreads() << std::endl;
-	std::cout << "Samples: " << NUM_SAMPLES << std::endl;
-	std::cout << "Variables: " << NUM_VARIABLES << std::endl;
-}
-
-void initializeGraphData(Graph& g)
-{
-	for (auto gnode : g) 
-	{
-		Node& data = g.getData(gnode);
-		data.w = 0.0;
-		data.field = 0;
-	}
+	std::cout << "Input graph file: " << inputGraphFilename << "\n";
+	std::cout << "Input label file: " << inputLabelFilename << "\n";
+	std::cout << "Threads: " << Galois::getActiveThreads() << "\n";
+	std::cout << "Samples: " << NUM_SAMPLES << "\n";
+	std::cout << "Variables: " << NUM_VARIABLES << "\n";
+        switch (UPDATE_TYPE) {
+                case UpdateType::Wild:
+                        std::cout << "Update type: wild\n";
+                        break;
+                case UpdateType::ThreadStaleness:
+                        std::cout << "Update type: thread staleness\n";
+                        break;
+                case UpdateType::PackageStaleness:
+                        std::cout << "Update type: package staleness\n";
+                        break;
+                default: abort();
+        }
 }
 
 void initializeVariableCounts(Graph& g)
 {
-	for (auto gnode : g) {
-		Galois::MethodFlag mode = Galois::NONE;
-		for(auto edge_it : g.out_edges(gnode))
-		{
-			GNode variable_node = g.getEdgeDst(edge_it);
-			Node& data = g.getData(variable_node);
-			data.field++; //increase count of variable occurrences
-		}
-	}
+        for (auto gnode : g) 
+        {
+                for(auto edge_it : g.out_edges(gnode))
+                {
+                        GNode variable_node = g.getEdgeDst(edge_it);
+                        Node& data = g.getData(variable_node);
+                        data.field++; //increase count of variable occurrences
+                }
+        }
 }
 
-void loadLabels(Graph& g, std::string filename)
+
+unsigned loadLabels(Graph& g, std::string filename)
 {
 	std::ifstream infile(filename);
 
@@ -184,7 +227,7 @@ void loadLabels(Graph& g, std::string filename)
 		++num_labels;
 	}
 	
-	NUM_SAMPLES = num_labels;
+	return num_labels;
 }
 
 double getAccuracy(Graph& g, std::vector<GNode>& testing_samples)
@@ -289,7 +332,7 @@ void analyze(Graph& g)
 	for(auto count : badnode2s)
 		std::cout << count << std::endl;
 
-	exit(-1);
+	exit(1);
 }
 
 int main(int argc, char** argv)
@@ -298,12 +341,8 @@ int main(int argc, char** argv)
 	Galois::StatManager statManager;
 	
 	Graph g;
-	std::cout << "done with loading 0" << std::endl;
 	Galois::Graph::readGraph(g, inputGraphFilename);
-	std::cout << "done with loading 1" << std::endl;
-	
-	initializeGraphData(g);
-	loadLabels(g, inputLabelFilename); //also sets NUM_SAMPLES
+	NUM_SAMPLES = loadLabels(g, inputLabelFilename);
 	initializeVariableCounts(g);
 	
 	//analyze(g);
@@ -318,18 +357,32 @@ int main(int argc, char** argv)
 	//copy a fraction of the samples to the training samples list
 	unsigned num_training_samples = NUM_SAMPLES * TRAINING_FRACTION;
 	std::vector<GNode> training_samples(all_samples.begin(), all_samples.begin() + num_training_samples);
-	std::cout << "Training samples: " << training_samples.size() << std::endl;
+	std::cout << "Training samples: " << training_samples.size() << "\n";
 	
 	//the remainder of samples go into the testing samples list
 	std::vector<GNode> testing_samples(all_samples.begin() + num_training_samples, all_samples.end());
-	std::cout << "Testing samples: " << testing_samples.size() << std::endl;
+	std::cout << "Testing samples: " << testing_samples.size() << "\n";
 	
 	//allocate storage for weights from previous iteration
-	if(BOUNDED_STALENESS)
+        if(UPDATE_TYPE == UpdateType::ThreadStaleness) 
 	{
-		old_weights = new double[NUM_VARIABLES]; //global
-		std::fill(old_weights, old_weights + NUM_VARIABLES, 0);
+                Galois::on_each([](unsigned tid, unsigned total) {
+                        double *p = new double[NUM_VARIABLES];
+                        *thread_accum.getLocal() = p;
+                        std::fill(p, p + NUM_VARIABLES, 0);
+                });
+                old_weights.create(NUM_VARIABLES);
 	}
+        if(UPDATE_TYPE == UpdateType::PackageStaleness)
+        {
+                Galois::on_each([](unsigned tid, unsigned total) {
+                        if (Galois::Runtime::LL::isPackageLeader(tid)) {
+                                double *p = new double[NUM_VARIABLES];
+                                *package_weights.getLocal() = p;
+                                std::fill(p, p + NUM_VARIABLES, 0);
+                        }
+                });
+        }
 
 	printParameters();
 	getAccuracy(g, testing_samples);
@@ -352,17 +405,75 @@ int main(int argc, char** argv)
 		double learning_rate = 30/(100.0 + iter);
 		auto ts_begin = training_samples.begin();
 		auto ts_end = training_samples.end();
-		auto loopname = Galois::loopname("Linear SVM");
-		auto worklist = Galois::wl<Galois::WorkList::dChunkedFIFO<32>>();
-		if(!BOUNDED_STALENESS)
-			Galois::for_each(ts_begin, ts_end, linearSVM<false>(g, learning_rate), loopname, worklist);
-		else
-			Galois::for_each(ts_begin, ts_end, linearSVM<true>(g, learning_rate), loopname, worklist);
+		auto ln = Galois::loopname("LinearSVM");
+		auto wl = Galois::wl<Galois::WorkList::dChunkedFIFO<32>>();
+
+                switch (UPDATE_TYPE) {
+                        case UpdateType::Wild:
+                                Galois::for_each(ts_begin, ts_end, linearSVM<UpdateType::Wild>(g, learning_rate), ln, wl);
+                                break;
+                        case UpdateType::ThreadStaleness:
+                                Galois::for_each(ts_begin, ts_end, linearSVM<UpdateType::ThreadStaleness>(g, learning_rate), ln, wl);
+                                break;
+                        case UpdateType::PackageStaleness:
+                                Galois::for_each(ts_begin, ts_end, linearSVM<UpdateType::PackageStaleness>(g, learning_rate), ln, wl);
+                                break;
+                        default: abort();
+                }
 
 		timer.stop();
 
+		//swap weights from past iteration and this iteration
+		if(UPDATE_TYPE == UpdateType::ThreadStaleness) 
+                {
+                        double *threadw = *thread_accum.getLocal();
+			for(unsigned i = 0; i < NUM_VARIABLES; i++)
+			{
+                                //unsigned num_packages = Galois::Runtime::LL::getMaxPackages();
+                                unsigned num_threads = Galois::getActiveThreads();
+                                for (unsigned j = 1; j < num_threads; j++)
+                                {
+                                        threadw[i] += (*thread_accum.getRemote(j))[i];
+                                }
+                                //if (num_packages > 1)
+                                //        packagew[i] /= num_packages;
+				GNode variable_node = (GNode) (i + NUM_SAMPLES);
+				Node& var_data = g.getData(variable_node, Galois::NONE);
+                                var_data.w = threadw[i];
+				old_weights[i] = threadw[i];
+			}
+                        Galois::on_each([](unsigned tid, unsigned total) {
+                                double *threadw = *thread_accum.getLocal();
+                                std::fill(threadw, threadw + NUM_VARIABLES, 0);
+                        });
+                }
+                if(UPDATE_TYPE == UpdateType::PackageStaleness)
+                {
+                        double *packagew = *package_weights.getLocal();
+                        for(unsigned i = 0; i < NUM_VARIABLES; i++)
+                        {
+                                //unsigned num_packages = Galois::Runtime::LL::getMaxPackages();
+                                unsigned num_packages = (Galois::getActiveThreads() + 10 - 1) / 10;
+                                for (unsigned j = 1; j < num_packages; j++)
+                                {
+                                        packagew[i] += (*package_weights.getRemoteByPkg(j))[i];
+                                }
+                                //if (num_packages > 1)
+                                //        packagew[i] /= num_packages;
+				GNode variable_node = (GNode) (i + NUM_SAMPLES);
+				Node& var_data = g.getData(variable_node, Galois::NONE);
+                                var_data.w = packagew[i];
+                        }
+                        Galois::on_each([](unsigned tid, unsigned total) {
+                                double *packagew = *package_weights.getLocal();
+                                double *packagel = *package_weights.getRemoteByPkg(0);
+                                if (Galois::Runtime::LL::isPackageLeader(tid) && Galois::Runtime::LL::getPackageForSelf(tid)) {
+                                        std::copy(packagel, packagel + NUM_VARIABLES, packagew);
+                                }
+                        });
+                }
+
 		std::cout << iter << " ";
-		
 		accuracy = getAccuracy(g, testing_samples);
 		if(use_accuracy_goal && accuracy > ACCURACY_GOAL)
 		{
@@ -370,16 +481,6 @@ int main(int argc, char** argv)
 				iter << " iterations."<< std::endl;
 			break;
 		}
-		
-		//swap weights from past iteration and this iteration
-		if(BOUNDED_STALENESS)
-			for(unsigned i = 0; i < NUM_SAMPLES; i++)
-			{
-				GNode variable_node = (GNode) (i + NUM_SAMPLES);
-				Node& var_data = g.getData(variable_node, Galois::NONE);
-				double weight = var_data.w;
-				old_weights[variableNodeToId(variable_node)] = weight;
-			}
 	}
 	
 	double timeTaken = timer.get()/1000.0;
@@ -387,3 +488,4 @@ int main(int argc, char** argv)
 
 	return 0;
 }
+// vim: ts=8 sw=8
