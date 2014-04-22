@@ -6,13 +6,18 @@
 #include <omp.h>
 
 int RandomNumber () { return (rand()%1000000); }
-unsigned iter = 16*1024;
+const unsigned iter = 16*1024;
 
 struct emp {
   template<typename T>
-  void operator()(const T& t) { Galois::Runtime::LL::compilerBarrier(); }
+  void operator()(const T& t) { 
+    Galois::Runtime::LL::compilerBarrier(); 
+  }
   template<typename T, typename C>
   void operator()(const T& t, const C& c) { Galois::Runtime::LL::compilerBarrier(); }
+  typedef int tt_does_not_need_push;
+  typedef int tt_does_not_need_stats;
+  typedef int tt_does_not_need_aborts;
 };
 
 unsigned t_inline(std::vector<unsigned>& V, unsigned num) {

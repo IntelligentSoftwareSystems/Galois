@@ -49,34 +49,6 @@ namespace Galois {
 namespace Runtime {
 namespace {
 
-template<bool Enabled> 
-class LoopStatistics {
-  unsigned long conflicts;
-  unsigned long iterations;
-  const char* loopname;
-
-public:
-  explicit LoopStatistics(const char* ln) :conflicts(0), iterations(0), loopname(ln) { }
-  ~LoopStatistics() {
-    reportStat(loopname, "Conflicts", conflicts);
-    reportStat(loopname, "Iterations", iterations);
-  }
-  inline void inc_iterations() {
-    ++iterations;
-  }
-  inline void inc_conflicts() {
-    ++conflicts;
-  }
-};
-
-template <>
-class LoopStatistics<false> {
-public:
-  explicit LoopStatistics(const char* ln) {}
-  inline void inc_iterations() const { }
-  inline void inc_conflicts() const { }
-};
-
 template<typename value_type>
 class AbortHandler {
   struct Item { value_type val; int retries; };
@@ -179,8 +151,22 @@ protected:
     FunctionTy function;
     UserContextAccess<value_type> facing;
     SimpleRuntimeContext ctx;
-    LoopStatistics<ForEachTraits<FunctionTy>::NeedsStats> stat;
-    ThreadLocalData(const FunctionTy& fn, const char* ln): function(fn), stat(ln) {}
+    unsigned long stat_conflicts;
+    unsigned long stat_commits;
+    unsigned long stat_pushs;
+    const char* loopname;
+    ThreadLocalData(const FunctionTy& fn, const char* ln)
+      : function(fn), stat_conflicts(0), stat_commits(0), stat_pushs(0), 
+        loopname(ln)
+    {}
+    ~ThreadLocalData() {
+      if (ForEachTraits<FunctionTy>::NeedsStats) {
+        reportStat(loopname, "Conflicts", stat_conflicts);
+        reportStat(loopname, "Commits", stat_commits);
+        reportStat(loopname, "Pushs", stat_pushs);
+        reportStat(loopname, "Iterations", stat_commits + stat_conflicts);
+      }
+    }
   };
 
   // NB: Place dynamically growing wl after fixed-size PerThreadStorage
@@ -198,15 +184,19 @@ protected:
     if (ForEachTraits<FunctionTy>::NeedsPush) {
       auto ii = tld.facing.getPushBuffer().begin();
       auto ee = tld.facing.getPushBuffer().end();
-      if (ii != ee) {
-	wl.push(ii, ee);
-	tld.facing.resetPushBuffer();
+      auto& pb = tld.facing.getPushBuffer();
+      auto n = pb.size();
+      if (n) {
+	tld.stat_pushs += n;
+        wl.push(pb.begin(), pb.end());
+        pb.clear();
       }
     }
     if (ForEachTraits<FunctionTy>::NeedsPIA)
       tld.facing.resetAlloc();
     if (ForEachTraits<FunctionTy>::NeedsAborts)
       tld.ctx.commitIteration();
+    ++tld.stat_commits;
   }
 
   template<typename Item>
@@ -214,7 +204,7 @@ protected:
   void abortIteration(const Item& item, ThreadLocalData& tld) {
     assert(ForEachTraits<FunctionTy>::NeedsAborts);
     tld.ctx.cancelIteration();
-    tld.stat.inc_conflicts(); //Class specialization handles opt
+    ++tld.stat_conflicts;
     aborted.push(item);
     //clear push buffer
     if (ForEachTraits<FunctionTy>::NeedsPush)
@@ -225,75 +215,35 @@ protected:
   }
 
   inline void doProcess(value_type& val, ThreadLocalData& tld) {
-    tld.stat.inc_iterations();
     if (ForEachTraits<FunctionTy>::NeedsAborts)
       tld.ctx.startIteration();
     tld.function(val, tld.facing.data());
-    clearReleasable();
     commitIteration(tld);
   }
 
-  bool runQueueSimple(ThreadLocalData& tld) {
-    bool workHappened = false;
-    Galois::optional<value_type> p = wl.pop();
-    if (p)
-      workHappened = true;
-    while (p) {
+  void runQueueSimple(ThreadLocalData& tld) {
+    Galois::optional<value_type> p;
+    while ((p = wl.pop())) {
       doProcess(*p, tld);
-      p = wl.pop();
     }
-    return workHappened;
   }
 
   template<int limit, typename WL>
-  bool runQueue(ThreadLocalData& tld, WL& lwl) {
-    bool workHappened = false;
-    Galois::optional<typename WL::value_type> p = lwl.pop();
+  void runQueue(ThreadLocalData& tld, WL& lwl) {
+    Galois::optional<typename WL::value_type> p;
     unsigned num = 0;
-    int result = 0;
-    if (p)
-      workHappened = true;
-#ifdef GALOIS_USE_LONGJMP
-    if ((result = setjmp(hackjmp)) == 0) {
-#else
     try {
-#endif
-      while (p) {
+      while ((!limit || num++ < limit) && (p = lwl.pop())) {
 	doProcess(aborted.value(*p), tld);
-	if (limit) {
-	  ++num;
-	  if (num == limit)
-	    break;
-	}
-	p = lwl.pop();
       }
-#ifdef GALOIS_USE_LONGJMP
-    } else { 
-      clearReleasable();
-      clearConflictLock(); 
-    }
-#else
     } catch (ConflictFlag const& flag) {
-      clearReleasable();
-      clearConflictLock();
-      result = flag;
-    }
-#endif
-    switch (result) {
-    case 0:
-      break;
-    case CONFLICT:
       abortIteration(*p, tld);
-      break;
-    default:
-      GALOIS_DIE("unknown conflict type");
     }
-    return workHappened;
   }
 
   GALOIS_ATTRIBUTE_NOINLINE
-  bool handleAborts(ThreadLocalData& tld) {
-    return runQueue<0>(tld, *aborted.getQueue());
+  void handleAborts(ThreadLocalData& tld) {
+    runQueue<0>(tld, *aborted.getQueue());
   }
 
   void fastPushBack(typename UserContextAccess<value_type>::PushBufferTy& x) {
@@ -305,30 +255,30 @@ protected:
   void go() {
     // Thread-local data goes on the local stack to be NUMA friendly
     ThreadLocalData tld(origFunction, loopname);
-    tld.facing.setBreakFlag(&broke);
+    if (ForEachTraits<FunctionTy>::NeedsBreak)
+      tld.facing.setBreakFlag(&broke);
     if (couldAbort)
       setThreadContext(&tld.ctx);
     if (ForEachTraits<FunctionTy>::NeedsPush && !couldAbort)
       tld.facing.setFastPushBack(
-          std::bind(&ForEachWork::fastPushBack, std::ref(*this), std::placeholders::_1));
-    bool didWork;
+          std::bind(&ForEachWork::fastPushBack, this, std::placeholders::_1));
+    unsigned old_commit = 0;
     do {
-      didWork = false;
       // Run some iterations
       if (couldAbort || ForEachTraits<FunctionTy>::NeedsBreak) {
-        if (isLeader)
-          didWork = runQueue<32>(tld, wl);
-        else
-          didWork = runQueue<ForEachTraits<FunctionTy>::NeedsBreak ? 32 : 0>(tld, wl);
+        constexpr int NUM = (ForEachTraits<FunctionTy>::NeedsBreak || isLeader) ? 32 : 0;
+        runQueue<NUM>(tld, wl);
         // Check for abort
         if (couldAbort)
-          didWork |= handleAborts(tld);
+          handleAborts(tld);
       } else { // No try/catch
-        didWork = runQueueSimple(tld);
+        runQueueSimple(tld);
       }
       // Update node color and prop token
-      term.localTermination(didWork);
-    } while (!term.globalTermination() && (!ForEachTraits<FunctionTy>::NeedsBreak || !broke));
+      //term.localTermination(old_commit != tld.stat_commits);
+      old_commit = tld.stat_commits;
+      LL::asmPause(); // Let token propagate
+    } while (false); //!term.globalTermination() && (!ForEachTraits<FunctionTy>::NeedsBreak || !broke));
 
     if (couldAbort)
       setThreadContext(0);
@@ -346,7 +296,7 @@ public:
   }
 
   void initThread(void) {
-    term.initializeThread();
+    //    term.initializeThread();
   }
 
   void operator()() {
@@ -384,9 +334,7 @@ void for_each_impl(const RangeTy& range, FunctionTy f, const char* loopname) {
   inGaloisForEach = true;
   getSystemThreadPool().run(activeThreads,
                             [&W] () {W.initThread();},
-                            //std::bind(&WorkTy::initThread, std::ref(W)),
                             [&W, &range] {W.AddInitialWork(range);},
-                            //std::bind(&WorkTy::template AddInitialWork<RangeTy>, std::ref(W), range), 
                             std::ref(barrier),
                             std::ref(W));
   inGaloisForEach = false;

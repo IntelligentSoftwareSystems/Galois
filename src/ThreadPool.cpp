@@ -106,8 +106,10 @@ void ThreadPool::decascade(int tid) {
   unsigned limit = starting;
   for (unsigned i = 1; i <= multiple; ++i) {
     unsigned n = tid * multiple + i;
-    if (n < limit)
-      while (!signals.at(n).get().done) { LL::asmPause(); }
+    if (n < limit) {
+      auto& done_flag = signals.at(n).get().done;
+      while (!done_flag) { LL::asmPause(); }
+    }
   }
   signals.at(tid).get().done = 1;
 }
