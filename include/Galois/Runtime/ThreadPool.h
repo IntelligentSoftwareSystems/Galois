@@ -111,7 +111,10 @@ public:
       }
       exTuple(Args&&... args) :cmds(std::forward<Args>(args)...) {}
     };
-    work = std::function<void(void)>(exTuple(std::forward<Args>(args)...));
+    //paying for an indirection in work allows small-object optimization in std::function to kick in and avoid a heap allocation
+    exTuple lwork(std::forward<Args>(args)...);
+    work = std::ref(lwork);
+    //work = std::function<void(void)>(exTuple(std::forward<Args>(args)...));
     runInternal(num);
   }
 
