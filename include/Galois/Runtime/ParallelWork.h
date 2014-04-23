@@ -275,10 +275,10 @@ protected:
         runQueueSimple(tld);
       }
       // Update node color and prop token
-      //term.localTermination(old_commit != tld.stat_commits);
+      term.localTermination(old_commit != tld.stat_commits);
       old_commit = tld.stat_commits;
       LL::asmPause(); // Let token propagate
-    } while (false); //!term.globalTermination() && (!ForEachTraits<FunctionTy>::NeedsBreak || !broke));
+    } while (!term.globalTermination() && (!ForEachTraits<FunctionTy>::NeedsBreak || !broke));
 
     if (couldAbort)
       setThreadContext(0);
@@ -296,7 +296,7 @@ public:
   }
 
   void initThread(void) {
-    //    term.initializeThread();
+    term.initializeThread();
   }
 
   void operator()() {
