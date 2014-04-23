@@ -74,7 +74,8 @@ enum ConvertMode {
   gr2trigr,
   mtx2gr,
   nodelist2gr,
-  pbbs2gr
+  pbbs2gr,
+  svmlight2gr
 };
 
 enum EdgeType {
@@ -95,6 +96,8 @@ static cll::opt<std::string> transposeFilename("graphTranspose",
     cll::desc("[transpose graph file]"), cll::init(""));
 static cll::opt<std::string> outputPermutationFilename("outputNodePermutation",
     cll::desc("[output node permutation file]"), cll::init(""));
+static cll::opt<std::string> labelsFilename("labels",
+    cll::desc("[labels file]"), cll::init(""));
 static cll::opt<EdgeType> edgeType("edgeType", cll::desc("Input/Output edge type:"),
     cll::values(
       clEnumValN(EdgeType::float32, "float32", "32 bit floating point edge values"),
@@ -140,6 +143,7 @@ static cll::opt<ConvertMode> convertMode(cll::desc("Conversion mode:"),
       clEnumVal(mtx2gr, "Convert matrix market format to binary gr"),
       clEnumVal(nodelist2gr, "Convert node list to binary gr"),
       clEnumVal(pbbs2gr, "Convert pbbs graph to binary gr"),
+      clEnumVal(svmlight2gr, "Convert svmlight file to binary gr"),
       clEnumValEnd), cll::Required);
 static cll::opt<int> numParts("numParts", 
     cll::desc("number of parts to partition graph into"), cll::init(64));
@@ -311,7 +315,7 @@ struct Edgelist2Gr: public Conversion {
     while (infile) {
       size_t src;
       size_t dst;
-      edge_value_type data{};
+      edge_value_type data {};
 
       infile >> src >> dst;
 
@@ -2030,6 +2034,123 @@ struct Gr2Bsml: public Conversion {
   }
 };
 
+/**
+ * SVMLight format.
+ *
+ * <line> .=. <target> <feature>:<value> <feature>:<value> ... <feature>:<value> # <info>
+ * <target> .=. +1 | -1 | 0 | <float> 
+ * <feature> .=. <integer> | "qid"
+ * <value> .=. <float>
+ * <info> .=. <string> 
+ *
+ */
+struct Svmlight2Gr: public HasNoVoidSpecialization {
+  template<typename EdgeTy>
+  void convert(const std::string& infilename, const std::string& outfilename) {
+    typedef Galois::Graph::FileGraphWriter Writer;
+    typedef Galois::LargeArray<EdgeTy> EdgeData;
+    typedef typename EdgeData::value_type edge_value_type;
+
+    Writer p;
+    EdgeData edgeData;
+    std::ifstream infile(infilename.c_str());
+    std::ofstream outlabels(labelsFilename.c_str());
+
+    if (!outlabels) {
+      GALOIS_DIE("unable to create labels file");
+    }
+
+    size_t featureOffset = 0;
+    size_t numEdges = 0;
+    long maxFeature = -1;
+
+    for (int phase = 0; phase < 3; ++phase) {
+      infile.clear();
+      infile.seekg(0, std::ios::beg);
+      size_t numNodes = 0;
+      while (infile) {
+        if (phase == 2) {
+          float label;
+          infile >> label;
+          if (!infile)
+            break;
+          outlabels << numNodes << " " << label << "\n";
+        } else {
+          infile.ignore(std::numeric_limits<std::streamsize>::max(), ' ');
+          if (!infile)
+            break;
+        }
+
+        const int maxLength = 1024;
+        char buffer[maxLength];
+        int idx = 0;
+
+        while (infile) {
+          char c = infile.get();
+          if (!infile)
+            break;
+          if (c == ' ' || c == '\n' || c == '#') {
+            buffer[idx] = '\0';
+            // Parse "feature:value" pairs
+            if (idx) {
+              char *delim = strchr(buffer, ':');
+              if (!delim)
+                GALOIS_DIE("unknown feature format: '", buffer, "'");
+              *delim = '\0';
+              if (phase == 0) {
+                long feature = strtol(buffer, NULL, 10);
+                maxFeature = std::max(maxFeature, feature);
+                numEdges += 1;
+              } else if (phase == 1) {
+                p.incrementDegree(numNodes);
+              } else {
+                long feature = strtol(buffer, NULL, 10);
+                double value = strtod(delim + 1, NULL);
+                edge_value_type data = value;
+                edgeData.set(p.addNeighbor(numNodes, feature + featureOffset), data); 
+              }
+            }
+
+            idx = 0;
+          } else {
+            buffer[idx++] = c;
+            if (idx == maxLength)
+              GALOIS_DIE("token too long");
+            continue;
+          }
+          if (c == '#') {
+            infile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+          }
+          if (c == '#' || c == '\n') {
+            break;
+          }
+        }
+
+        numNodes += 1;
+      }
+
+      if (phase == 0) {
+        featureOffset = numNodes;
+        numNodes += maxFeature + 1;
+        p.setNumNodes(numNodes);
+        p.setNumEdges(numEdges);
+        p.setSizeofEdgeData(EdgeData::size_of::value);
+        edgeData.create(numEdges);
+        p.phase1();
+      } else if (phase == 1) {
+        p.phase2();
+      } else {
+        edge_value_type* rawEdgeData = p.finish<edge_value_type>();
+        if (EdgeData::has_value)
+          std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+        numNodes += maxFeature + 1;
+        p.structureToFile(outfilename);
+        printStatus(numNodes, numEdges);
+      }
+    }
+  }
+};
+
 // TODO: retest which conversions don't work with xlc
 #if !defined(__IBMCPP__) || __IBMCPP__ > 1210
 #endif
@@ -2070,6 +2191,7 @@ int main(int argc, char** argv) {
     case mtx2gr: convert<Mtx2Gr>(); break;
     case nodelist2gr: convert<Nodelist2Gr>(); break;
     case pbbs2gr: convert<Pbbs2Gr>(); break;
+    case svmlight2gr: convert<Svmlight2Gr>(); break;
     default: abort();
   }
   return 0;
