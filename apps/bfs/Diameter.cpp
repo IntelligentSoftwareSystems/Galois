@@ -428,7 +428,7 @@ void run() {
 
   initialize(algo, graph, source);
 
-  //Galois::preAlloc((numThreads + (graph.size() * sizeof(SNode) * 2) / Galois::Runtime::MM::pageSize)*8);
+  //Galois::preAlloc((numThreads + (graph.size() * sizeof(SNode) * 2) / Galois::Runtime::MM::hugePageSize)*8);
   Galois::reportPageAlloc("MeminfoPre");
 
   Galois::StatTimer T;

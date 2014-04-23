@@ -33,6 +33,7 @@
 #include <numeric>
 #include <fstream>
 #include <sstream>
+#include <mutex>
 
 #ifdef __linux__
 #include <linux/mman.h>
@@ -79,50 +80,52 @@ struct PAState {
 static Galois::Runtime::LL::StaticInstance<PAState> PA;
 
 #ifdef __linux__
-  static Galois::Runtime::LL::SimpleLock allocLock;
+typedef Galois::Runtime::LL::SimpleLock AllocLock;
 #else
-  static Galois::Runtime::LL::DummyLock allocLock;
+typedef Galois::Runtime::LL::DummyLock AllocLock;
 #endif
+static AllocLock allocLock;
 static Galois::Runtime::LL::SimpleLock dataLock;
 static __thread HeadPtr* head = 0;
 
 void* allocFromOS() {
   //linux mmap can introduce unbounded sleep!
-  allocLock.lock();
-
   void* ptr = 0;
+  {
+    std::lock_guard<AllocLock> ll(allocLock);
+
 #ifdef MAP_HUGETLB
-  //First try huge
-  ptr = mmap(0, Galois::Runtime::MM::hugePageSize, _PROT, _MAP_HUGE_POP, -1, 0);
+    //First try huge
+    ptr = mmap(0, Galois::Runtime::MM::hugePageSize, _PROT, _MAP_HUGE_POP, -1, 0);
 #endif
 
-  //FIXME: improve failure case to ensure hugePageSize alignment
+    //FIXME: improve failure case to ensure hugePageSize alignment
 #ifdef MAP_POPULATE
-  //Then try populate
-  if (!ptr || ptr == MAP_FAILED)
-    ptr = mmap(0, Galois::Runtime::MM::hugePageSize, _PROT, _MAP_POP, -1, 0);
+    //Then try populate
+    if (!ptr || ptr == MAP_FAILED)
+      ptr = mmap(0, Galois::Runtime::MM::hugePageSize, _PROT, _MAP_POP, -1, 0);
 #endif
-  //Then try normal
-  if (!ptr || ptr == MAP_FAILED) {
-    ptr = mmap(0, Galois::Runtime::MM::hugePageSize, _PROT, _MAP_BASE, -1, 0);
+    //Then try normal
+    if (!ptr || ptr == MAP_FAILED) {
+      ptr = mmap(0, Galois::Runtime::MM::hugePageSize, _PROT, _MAP_BASE, -1, 0);
+    }
+    if (!ptr || ptr == MAP_FAILED) {
+      GALOIS_SYS_DIE("Out of Memory");
+    }
   }
   
-  allocLock.unlock();
-  if (!ptr || ptr == MAP_FAILED) {
-    GALOIS_SYS_DIE("Out of Memory");
-  }
-
   //protect the tracking structures
-  dataLock.lock();
-  HeadPtr*& h = head;
-  if (!h) { //first allocation
-    h = &((new HeadPtrStorage())->data);
+  {
+    std::lock_guard<Galois::Runtime::LL::SimpleLock> ll(dataLock);
+    HeadPtr*& h = head;
+    if (!h) { //first allocation
+      h = &((new HeadPtrStorage())->data);
+    }
+    PAState& p = *PA.get();
+    p.ownerMap[ptr] = h;
+    p.counts[Galois::Runtime::LL::getTID()] += 1;
+    return ptr;
   }
-  PAState& p = *PA.get();
-  p.ownerMap[ptr] = h;
-  p.counts[Galois::Runtime::LL::getTID()] += 1;
-  dataLock.unlock();
-  return ptr;
 }
 
 class PageSizeConf {

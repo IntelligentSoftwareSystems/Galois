@@ -497,7 +497,7 @@ void run(bool prealloc = true) {
   size_t approxNodeData = graph.size() * 64;
   //size_t approxEdgeData = graph.sizeEdges() * sizeof(typename Graph::edge_data_type) * 2;
   if (prealloc)
-    Galois::preAlloc(numThreads + approxNodeData / Galois::Runtime::MM::pageSize);
+    Galois::preAlloc(numThreads + approxNodeData / Galois::Runtime::MM::hugePageSize);
   Galois::reportPageAlloc("MeminfoPre");
 
   Galois::StatTimer T;

@@ -443,7 +443,7 @@ void run() {
   initialize(algo, graph, source);
 
   Galois::reportPageAlloc("MeminfoPre");
-  Galois::preAlloc(numThreads + (3*graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::MM::pageSize);
+  Galois::preAlloc(numThreads + (3*graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::MM::hugePageSize);
   Galois::reportPageAlloc("MeminfoMid");
 
   Galois::StatTimer T;
