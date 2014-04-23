@@ -1275,7 +1275,7 @@ class VersionPrinter {
 public:
   void print() {
     //ADL: GALOIS CHANGE
-    std::cout << "Galois Runtime 2.1";
+    //std::cout << "Galois Runtime 2.1\n";
   }
   void operator=(bool OptionWasSpecified) {
     if (!OptionWasSpecified) return;
