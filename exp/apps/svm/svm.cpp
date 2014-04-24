@@ -175,22 +175,17 @@ struct linearSVM
 		Node& sample_data = g.getData(gnode);
 		int label = sample_data.field;
 
-                cur = 0;
 		bool update_type = label * dot < 1;
                 if (update_type)
                         bigUpdates += size;
-		for(auto edge_it : g.out_edges(gnode))
+		for(cur = 0; cur < size; ++cur)
 		{
-			GNode variable_node = g.getEdgeDst(edge_it);
-			Node& var_data = g.getData(variable_node);
-			
 			double delta;
 			if(update_type)
 				delta = learningRate * (rfactors[cur] - label * dweights[cur]);
 			else
 				delta = rfactors[cur];
                         *wptrs[cur] = mweights[cur] - delta;
-                        cur += 1;
 		}
 	}
 };
