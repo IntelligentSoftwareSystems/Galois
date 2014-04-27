@@ -31,6 +31,7 @@ struct emp {
 void test(Galois::Runtime::Barrier& b) {
 
   unsigned M = Galois::Runtime::LL::getMaxThreads();
+  if (M > 16) M /= 2;
   while (M) {   
     Galois::setActiveThreads(M); //Galois::Runtime::LL::getMaxThreads());
     b.reinit(M);

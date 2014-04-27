@@ -33,29 +33,35 @@
 namespace {
 
 class CountingBarrier: public Galois::Runtime::Barrier {
-  std::atomic<unsigned> count[2];
-  Galois::Runtime::PerThreadStorage<unsigned> sense;
+  std::atomic<unsigned> count;
+  std::atomic<bool> sense;
+  Galois::Runtime::PerThreadStorage<bool> local_sense;
+  unsigned num;
+
+  void _reinit(unsigned val) {
+    count = num = val;
+    sense = false;
+    for (unsigned i = 0; i < local_sense.size(); ++i)
+      *local_sense.getRemote(i) = false;
+  }
 
 public:
-  CountingBarrier() { }
-  
-  CountingBarrier(unsigned int val) {
-    count[0] = count[1] = 0;
-  }
+  CountingBarrier() { _reinit(0); }
+  CountingBarrier(unsigned int val) { _reinit(val); }
 
   virtual ~CountingBarrier() {}
 
-  virtual void reinit(unsigned val) {
-    count[0] = count[1] = val;
-    for (unsigned i = 0; i < sense.size(); ++i)
-      *sense.getRemote(i) = 0;
-  }
+  virtual void reinit(unsigned val) { _reinit(val); }
 
   virtual void wait() {
-    unsigned& lsense = *sense.getLocal();
-    --count[lsense];
-    while (count[lsense]) { Galois::Runtime::LL::asmPause(); }
-    lsense ^= 1;
+    bool& lsense = *local_sense.getLocal();
+    lsense = !lsense;
+    if (--count == 0) {
+      count = num;
+      sense = lsense;
+    } else {
+      while (sense != lsense) { Galois::Runtime::LL::asmPause(); }
+    }
   }
 
   virtual const char* name() const { return "CountingBarrier"; }
