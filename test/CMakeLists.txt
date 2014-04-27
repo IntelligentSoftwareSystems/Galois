@@ -6,6 +6,7 @@ endfunction()
 
 makeTest(acquire)
 makeTest(bandwidth)
+makeTest(barriers)
 makeTest(empty-member-lcgraph)
 makeTest(flatmap)
 makeTest(gdeque)
