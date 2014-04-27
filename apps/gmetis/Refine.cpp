@@ -319,7 +319,7 @@ struct ChangePart {//move each node to its nearest cluster
   }
 
   void operator()(GNode n, Galois::UserContext<GNode>& ctx) {
-    double dmin;
+    double dmin = std::numeric_limits<double>::min();
     int partition =-1;
     std::map <int, int> degreein;
     degreein[g.getData(n, Galois::MethodFlag::NONE).getOldPart()] +=1;

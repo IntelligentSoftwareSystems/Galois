@@ -36,6 +36,7 @@
 #include "LC_Linear_Graph.h"
 #include "LC_Morph_Graph.h"
 #include "LC_InOut_Graph.h"
+#include "LC_Adaptor_Graph.h"
 #include "Util.h"
 
 #endif

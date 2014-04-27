@@ -1,5 +1,5 @@
-#ifndef TILEDEXECUTOR_H
-#define TILEDEXECUTOR_H
+#ifndef GALOIS_RUNTIME_TILEDEXECUTOR_H
+#define GALOIS_RUNTIME_TILEDEXECUTOR_H
 
 #include "Galois/Galois.h"
 #include "Galois/LargeArray.h"
@@ -15,6 +15,8 @@
 #include <cstddef>
 #include <functional>
 #include <mutex>
+
+namespace Galois { namespace Runtime {
 
 template<typename Graph, bool UseExp = false>
 class Fixed2DGraphTiledExecutor {
@@ -81,7 +83,10 @@ class Fixed2DGraphTiledExecutor {
   }
 
   Task* getTask(const Point& p) {
-    return &tasks[p[0] + p[1] * locks[0].size()];
+    Task *t = &tasks[p[0] + p[1] * locks[0].size()];
+    assert(t < &tasks[numTasks]);
+    assert(t >= &tasks[0]);
+    return t;
   }
 
   template<typename Function>
@@ -255,7 +260,7 @@ class Fixed2DGraphTiledExecutor {
     }
     unsigned coresPerPackage = 10; // TODO: get actual cores per package
     if (useLocks)
-      start = { start[0], block[1] * coresPerPackage * (tid / coresPerPackage) };
+      start = { start[0], std::min(block[1] * coresPerPackage * (tid / coresPerPackage), numBlocks[1] - 1) };
 
     Point p = start; 
 
@@ -290,6 +295,10 @@ class Fixed2DGraphTiledExecutor {
 
     for (size_t i = 0; i < n; ++i) {
       Task* t = getTask(p);
+      assert(p[0] == t->coord[0]);
+      assert(p[1] == t->coord[1]);
+      assert(t->coord[0] < locks[0].size());
+      assert(t->coord[1] < locks[1].size());
       if (t->updates.relaxedLoad() >= maxUpdates) {
         ;
       } else if (std::try_lock(locks[0][t->coord[0]], locks[1][t->coord[1]]) < 0) {
@@ -442,4 +451,6 @@ public:
       Galois::Runtime::LL::gWarn("Missing tasks");
   }
 };
+
+} } // end namespace
 #endif

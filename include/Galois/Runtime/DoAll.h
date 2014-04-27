@@ -52,24 +52,30 @@ class DoAllWork {
     iterator stealBegin;
     iterator stealEnd;
     LL::SimpleLock stealLock;
+    std::atomic<bool> avail;
 
     state() { stealLock.lock(); }
 
     void populateSteal(iterator& begin, iterator& end) {
       if (std::distance(begin, end) > 1) {
+        avail = true;
         stealEnd = end;
         stealBegin = end = Galois::split_range(begin, end);
       }
       stealLock.unlock();
     }
 
-    bool doSteal(iterator& begin, iterator& end) {
-      //This may not be safe for iterators with complex state
-      if (stealBegin != stealEnd) {
+    bool doSteal(iterator& begin, iterator& end, size_t minSteal) {
+      if (avail) {
         std::lock_guard<LL::SimpleLock> lg(stealLock);
         if (stealBegin != stealEnd) {
           begin = stealBegin;
-          stealBegin = end = Galois::split_range(stealBegin, stealEnd);
+          if (std::distance(stealBegin, stealEnd) < 2*minSteal)
+            end = stealBegin = stealEnd;
+          else
+            end = stealBegin = Galois::split_range(stealBegin, stealEnd);
+          if (stealBegin == stealEnd)
+            avail = false;
           return begin != end;
         }
       }
@@ -80,18 +86,24 @@ class DoAllWork {
   PerThreadStorage<state> TLDS;
 
   GALOIS_ATTRIBUTE_NOINLINE
-  bool trySteal(state& local, iterator& begin, iterator& end) {
+  bool trySteal(state& local, iterator& begin, iterator& end, size_t minSteal) {
     //First try stealing from self
-    if (local.doSteal(begin, end))
+    if (local.doSteal(begin, end, minSteal))
       return true;
     //Then try stealing from neighbors
     unsigned myID = LL::getTID();
-    //try neighbors
-    if (TLDS.getRemote((myID + 1) % activeThreads)->doSteal(begin, end) ||
-        TLDS.getRemote((activeThreads + myID - 1) % activeThreads)->doSteal(begin, end)) {
-      local.stealLock.lock();
-      local.populateSteal(begin,end);
-      return true;
+    unsigned myPkg = LL::getPackageForThread(myID);
+    //try package neighbors
+    for (int x = 0; x < activeThreads; ++x) {
+      if (x != myID && LL::getPackageForThread(x) == myPkg) {
+        if (TLDS.getRemote(x)->doSteal(begin, end, minSteal)) {
+          if (std::distance(begin, end) > minSteal) {
+            local.stealLock.lock();
+            local.populateSteal(begin,end);
+          }
+          return true;
+        }
+      }
     }
     //try some random
     // auto num = (activeThreads + 7) / 8;
@@ -111,6 +123,7 @@ public:
     //Assume the copy constructor on the functor is readonly
     iterator begin = range.local_begin();
     iterator end = range.local_end();
+    int minSteal = std::distance(begin,end) / 8;
     state& tld = *TLDS.getLocal();
 
     tld.populateSteal(begin,end);
@@ -118,7 +131,7 @@ public:
     do {
       while (begin != end)
         F(*begin++);
-    } while (trySteal(tld,begin,end));
+    } while (trySteal(tld,begin,end, minSteal));
   }
 };
 

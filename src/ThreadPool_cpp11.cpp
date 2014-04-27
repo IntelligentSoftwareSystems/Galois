@@ -50,21 +50,21 @@ public:
 
   void acquire() {
     std::unique_lock<std::mutex> lg(m);
-    cv.wait(lg, [=]{ return 0 != count; });
+    cv.wait(lg, [=]{ return 0 < count; });
     --count;
   }
 };
 
 class ThreadPool_cpp11 : public ThreadPool {
   std::vector<std::thread> threads;
-  std::vector<Semaphore> starts;  // Signal to release threads to run
+  std::vector<LL::CacheLineStorage<Semaphore>> starts;  // Signal to release threads to run
 
   virtual void threadWakeup(unsigned n) {
-    starts[n].release();
+    starts[n].get().release();
   }
 
   virtual void threadWait(unsigned tid) {
-    starts[tid].acquire();
+    starts[tid].get().acquire();
   }
 
 public:
