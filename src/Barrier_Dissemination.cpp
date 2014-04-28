@@ -39,13 +39,14 @@ namespace {
 class DisseminationBarrier: public Galois::Runtime::Barrier {
 
   struct node {
-    bool flag[2];
+    std::atomic<int> flag[2];
     node* partner;
+    node() :partner(nullptr) {}
   };
 
   struct LocalData {
     int parity;
-    bool sense;
+    int sense;
     std::array<node,32> myflags;
   };
 
@@ -57,9 +58,9 @@ class DisseminationBarrier: public Galois::Runtime::Barrier {
     for (unsigned i = 0; i < P; ++i) {
       auto& lhs = *nodes.getRemote(i);
       lhs.parity = 0;
-      lhs.sense = true;
+      lhs.sense = 1;
       for (auto& n : lhs.myflags)
-        n.flag[0] = n.flag[1] = false;
+        n.flag[0] = n.flag[1] = 0;
       int d = 1;
       for (unsigned j = 0; j < LogP; ++j) {
         auto& rhs = *nodes.getRemote((i+d) % P);
@@ -87,7 +88,7 @@ public:
       while (ld.myflags[r].flag[parity] != sense) { Galois::Runtime::LL::asmPause(); }
     }
     if (parity == 1)
-      sense = !ld.sense;
+      sense = 1 - ld.sense;
     parity = 1 - parity;
   }
 
