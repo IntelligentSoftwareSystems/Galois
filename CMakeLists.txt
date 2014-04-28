@@ -35,7 +35,7 @@ foreach(p LIB BIN INCLUDE CMAKE)
 endforeach()
 
 # Enable iss specific options; should be OFF in the general release; all guarded by USE_EXP
-set(USE_EXP OFF CACHE BOOL "Use experimental features") 
+set(USE_EXP OFF CACHE BOOL "Use experimental features")
 set(USE_HTM OFF CACHE BOOL "Use HTM")
 set(EXP_DOALL "PTHREAD" CACHE STRING "Which type of implementation of parallel_doall")
 set(USE_PROF OFF CACHE BOOL "Use profiling specific features")
@@ -48,7 +48,7 @@ enable_testing()
 ###### Configure compiler ######
 
 # mic
-if(ARCH STREQUAL "mic") 
+if(ARCH STREQUAL "mic")
   if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mmic")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mmic")
@@ -75,7 +75,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
   endif()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -wd68 -wd981 -wd383 -wd869 -wd2196 -wd279 -wd2504 -wd2943 -wd32013")
 
-  if("$ENV{GCC_BIN}" STREQUAL "") 
+  if("$ENV{GCC_BIN}" STREQUAL "")
     message(STATUS "Using default GCC toolchain; set environment variable GCC_BIN to override")
   else()
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -gxx-name=$ENV{GCC_BIN}/g++")
@@ -84,7 +84,7 @@ endif()
 
 # Clang
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  if("$ENV{GCC_BIN}" STREQUAL "") 
+  if("$ENV{GCC_BIN}" STREQUAL "")
     message(STATUS "Using default GCC toolchain; set environment variable GCC_BIN to override")
   else()
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -gcc-toolchain $ENV{GCC_BIN}/..")
@@ -133,7 +133,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g")
 
 # Enable architecture-specific optimizations
-if(CMAKE_BUILD_TYPE MATCHES "Release" 
+if(CMAKE_BUILD_TYPE MATCHES "Release"
     AND NOT GALOIS_ARCH_MIC
     AND CMAKE_CXX_COMPILER_ID MATCHES "GNU")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
@@ -168,12 +168,12 @@ if(USE_EXP)
   include_directories("exp/include")
 
   find_package(OpenMP)
-  if(OPENMP_FOUND) 
+  if(OPENMP_FOUND)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
   endif()
 
-  if(USE_PROF) 
+  if(USE_PROF)
     add_definitions(-DGALOIS_USE_PROF)
   endif()
 
@@ -207,7 +207,7 @@ find_package(Threads REQUIRED)
 
 # NUMA (linux)
 # currently not available on MIC (and not helpful either)
-if(NOT GALOIS_ARCH_MIC) 
+if(NOT GALOIS_ARCH_MIC)
   find_package(NUMA)
   if(NUMA_FOUND)
     set(GALOIS_USE_NUMA on)
@@ -235,7 +235,7 @@ endif()
 
 # Boost
 set(Boost_ADDITIONAL_VERSIONS "1.40" "1.40.0" "1.47" "1.47.0" "1.49" "1.49.0" "1.51.0")
-if(NOT "$ENV{BOOST_DIR}" STREQUAL "") 
+if(NOT "$ENV{BOOST_DIR}" STREQUAL "")
   set(BOOST_ROOT $ENV{BOOST_DIR})
 endif()
 find_package(Boost 1.38.0 REQUIRED)
@@ -268,7 +268,7 @@ endif()
 
 include(ParseArguments)
 
-function(compileApp name) 
+function(compileApp name)
   if(ARGN)
     set(Sources ${ARGN})
   else()
@@ -364,14 +364,14 @@ set(GALOIS_FLAGS "${galois_defs} ${CMAKE_CXX_FLAGS} ${CMAKE_CXX_FLAGS_${upper_bu
 set(GALOIS_CXX_COMPILER "${CMAKE_CXX_COMPILER}")
 
 # Generate appropriate CMake files for installation and build trees
-configure_file("${PROJECT_SOURCE_DIR}/cmake/Modules/GaloisConfig.cmake.in" 
+configure_file("${PROJECT_SOURCE_DIR}/cmake/Modules/GaloisConfig.cmake.in"
   "${PROJECT_BINARY_DIR}/GaloisConfig.cmake" @ONLY)
 set(GALOIS_INCLUDE_DIR "\${GALOIS_CMAKE_DIR}/${rel_include_dir}")
-configure_file("${PROJECT_SOURCE_DIR}/cmake/Modules/GaloisConfig.cmake.in" 
+configure_file("${PROJECT_SOURCE_DIR}/cmake/Modules/GaloisConfig.cmake.in"
   "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/GaloisConfig.cmake" @ONLY)
 configure_file("${PROJECT_SOURCE_DIR}/cmake/Modules/GaloisConfigVersion.cmake.in"
   "${PROJECT_BINARY_DIR}/GaloisConfigVersion.cmake" @ONLY)
-install(FILES 
+install(FILES
   "${PROJECT_BINARY_DIR}${CMAKE_FILES_DIRECTORY}/GaloisConfig.cmake"
   "${PROJECT_BINARY_DIR}/GaloisConfigVersion.cmake"
   DESTINATION "${INSTALL_CMAKE_DIR}" COMPONENT dev)
