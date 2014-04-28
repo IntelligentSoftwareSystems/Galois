@@ -38,34 +38,33 @@ namespace {
 
 class DisseminationBarrier: public Galois::Runtime::Barrier {
 
-  struct flags {
-    std::array<int,32> myflags[2];
-    std::array<int*,32> partnerflags[2];
+  struct node {
+    bool flag[2];
+    node* partner;
   };
 
   struct LocalData {
     int parity;
     bool sense;
-    flags* localflags;
+    std::array<node,32> myflags;
   };
 
-  Galois::Runtime::PerThreadStorage<flags> allnodes;
-  Galois::Runtime::PerThreadStorage<LocalData> local;
-  int LogP;
-
+  Galois::Runtime::PerThreadStorage<LocalData> nodes;
+  unsigned LogP;
 
   void _reinit(unsigned P) {
     LogP = FAST_LOG2_UP(P);
-    for (int i = 0; i < P; ++i) {
-      auto& rd = *allnodes.getRemote(i);
-      local.getRemote(i)->parity = 0;
-      local.getRemote(i)->sense = true;
-      local.getRemote(i)->localflags = &rd;
-      rd.myflags[0].fill(0); rd.myflags[1].fill(0);
-      for (int k = 0; k < 32; ++k) {
-        int j = (i + (1 << k)) % P;
-        for (int r = 0; r < 2; ++r)
-          rd.partnerflags[r][k] = &(allnodes.getRemote(i)->myflags[r][k]);
+    for (unsigned i = 0; i < P; ++i) {
+      auto& lhs = *nodes.getRemote(i);
+      lhs.parity = 0;
+      lhs.sense = true;
+      for (auto& n : lhs.myflags)
+        n.flag[0] = n.flag[1] = false;
+      int d = 1;
+      for (unsigned j = 0; j < LogP; ++j) {
+        auto& rhs = *nodes.getRemote((i+d) % P);
+        lhs.myflags[j].partner = &rhs.myflags[j];
+        d *= 2;
       }
     }
   }
@@ -80,17 +79,19 @@ public:
   }
 
   virtual void wait() {
-    LocalData& ld = *local.getLocal();
-    for (int instance = 0; instance < LogP-1; ++instance) {
-      *(ld.localflags->partnerflags[ld.parity][instance]) = ld.sense;
-      while (ld.localflags->myflags[ld.parity][instance] != ld.sense) { Galois::Runtime::LL::asmPause(); }
+    auto& ld = *nodes.getLocal();
+    auto& sense = ld.sense;
+    auto& parity = ld.parity;
+    for (unsigned r = 0; r < LogP; ++r) {
+      ld.myflags[r].partner->flag[parity] = sense;
+      while (ld.myflags[r].flag[parity] != sense) { Galois::Runtime::LL::asmPause(); }
     }
-    if (ld.parity == 1)
-      ld.sense = !ld.sense;
-    ld.parity = 1 - ld.parity;
+    if (parity == 1)
+      sense = !ld.sense;
+    parity = 1 - parity;
   }
 
-  virtual const char* name() const { return "DiseminationBarrier"; }
+  virtual const char* name() const { return "DisseminationBarrier"; }
 };
 
 }
