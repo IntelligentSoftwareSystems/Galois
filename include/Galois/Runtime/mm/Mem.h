@@ -549,6 +549,10 @@ public:
   inline bool operator!=(const FixedSizeAllocator& rhs) const {
     return alloc != rhs.alloc;
   }
+  
+  inline bool operator==(const FixedSizeAllocator& rhs) const {
+    return alloc == rhs.alloc;
+  }
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -622,6 +626,11 @@ public:
   template<typename T1>
   inline bool operator!=(const FSBGaloisAllocator<T1>& rhs) const {
     return Alloc != rhs.Alloc;
+  }
+
+  template<typename T1>
+  inline bool operator==(const FSBGaloisAllocator<T1>& rhs) const {
+    return Alloc == rhs.Alloc;
   }
 };
 
