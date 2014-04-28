@@ -39,7 +39,7 @@ namespace {
 class DisseminationBarrier: public Galois::Runtime::Barrier {
 
   struct node {
-    bool flag[2];
+    std::atomic<int> flag[2];
     node* partner;
   };
 
