@@ -9,7 +9,7 @@ set(GALOIS_COPYRIGHT_YEAR "2014") # Also in COPYRIGHT
 
 if(NOT CMAKE_BUILD_TYPE)
   message(STATUS "No build type selected, default to Release")
-  set(CMAKE_BUILD_TYPE "Release")
+  set(CMAKE_BUILD_TYPE "Release") 
 endif()
 
 ###### Options (alternatively pass as options to cmake -DName=Value) ######
