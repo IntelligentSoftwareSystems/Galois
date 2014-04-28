@@ -1,4 +1,5 @@
-set(sources Barrier.cpp Barrier_MCS.cpp Barrier_Topo.cpp Barrier_Pthread.cpp Barrier_Counting.cpp
+set(sources Barrier.cpp Barrier_MCS.cpp Barrier_Topo.cpp Barrier_Pthread.cpp
+  Barrier_Counting.cpp Barrier_Dissemination.cpp
   Context.cpp FileGraph.cpp FileGraphParallel.cpp
   OCFileGraph.cpp PerThreadStorage.cpp PreAlloc.cpp Sampling.cpp Support.cpp
   Termination.cpp Threads.cpp Timer.cpp ThreadPool.cpp)

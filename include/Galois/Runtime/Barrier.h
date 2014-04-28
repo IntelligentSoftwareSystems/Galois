@@ -66,6 +66,7 @@ Barrier& getPthreadBarrier();
 Barrier& getMCSBarrier();
 Barrier& getTopoBarrier();
 Barrier& getCountingBarrier();
+Barrier& getDisseminationBarrier();
 }
 
 /**

@@ -13,8 +13,12 @@ struct emp {
   Galois::Runtime::Barrier& b;
 
   void go() {
-    for (int i = 0; i < iter; ++i)
+    for (unsigned i = 0; i < iter; ++i) {
+      // if (Galois::Runtime::LL::getTID() == 0)
+      //   usleep(100);
       b.wait();
+    }
+    // std::cout << Galois::Runtime::LL::getTID() << " ";
   }
 
   template<typename T>
@@ -51,5 +55,6 @@ int main() {
   test(getCountingBarrier());
   test(getMCSBarrier());
   test(getTopoBarrier());
+  test(getDisseminationBarrier());
   return 0;
 }
