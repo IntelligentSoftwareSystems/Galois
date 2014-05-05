@@ -31,6 +31,7 @@
 #include "Galois/Runtime/ll/PaddedLock.h"
 #include "Galois/Runtime/ll/TID.h"
 
+#include <cstddef>
 #include <boost/utility.hpp>
 
 #include <cassert>
