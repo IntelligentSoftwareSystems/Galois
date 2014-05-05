@@ -399,15 +399,19 @@ public:
 } // end runtime
 
 namespace WorkList {
-  template<class T=int>
-  class BulkSynchronousInline { };
+  struct BulkSynchronousInline {
+    template<typename T>
+    struct retype {
+      typedef BulkSynchronousInline type;
+    };
+  };
 }
 
 namespace Runtime {
 namespace {
 
 template<class T,class FunctionTy>
-struct ForEachWork<WorkList::BulkSynchronousInline<>,T,FunctionTy>:
+struct ForEachWork<WorkList::BulkSynchronousInline,T,FunctionTy>:
   public BSInlineExecutor<T,FunctionTy> {
   typedef BSInlineExecutor<T,FunctionTy> SuperTy;
   ForEachWork(FunctionTy& f, const char* ln): SuperTy(f, ln) { }
