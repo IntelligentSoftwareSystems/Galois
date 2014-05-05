@@ -266,8 +266,8 @@ protected:
     do {
       // Run some iterations
       if (couldAbort || ForEachTraits<FunctionTy>::NeedsBreak) {
-        constexpr int NUM = (ForEachTraits<FunctionTy>::NeedsBreak || isLeader) ? 32 : 0;
-        runQueue<NUM>(tld, wl);
+        constexpr int __NUM = (ForEachTraits<FunctionTy>::NeedsBreak || isLeader) ? 32 : 0;
+        runQueue<__NUM>(tld, wl);
         // Check for abort
         if (couldAbort)
           handleAborts(tld);
