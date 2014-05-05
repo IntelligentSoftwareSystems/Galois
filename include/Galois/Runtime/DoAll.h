@@ -36,6 +36,7 @@
 #include "Galois/Runtime/ForEachTraits.h"
 
 #include <algorithm>
+#include <mutex>
 
 namespace Galois {
 namespace Runtime {
@@ -115,7 +116,7 @@ class DoAllWork {
 
 
 public:
-  DoAllWork(FunctionTy& _F, RangeTy r)
+  DoAllWork(FunctionTy& _F, RangeTy& r)
     :F(_F), range(r)
   { }
 
