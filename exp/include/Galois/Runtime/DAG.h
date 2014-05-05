@@ -98,23 +98,14 @@ public:
     NItemAlloc niAlloc;
 
     NItem* create (Lockable* l) {
-      NItem* ni = niAlloc.allocate (1);
+      NItem* ni = niAlloc.allocAndConstruct (ni, l);
       assert (ni != nullptr);
-      // XXX(ddn): Forwarding still wonky on XLC
-#if !defined(__IBMCPP__) || __IBMCPP__ > 1210
-      niAlloc.construct (ni, l);
-#else
-      niAlloc.construct (ni, NItem(l));
-#endif
-
       return ni;
     }
 
     void destroy (NItem* ni) {
       // delete ni; ni = NULL;
-      niAlloc.destroy (ni);
-      niAlloc.deallocate (ni, 1);
-      ni = NULL;
+      niAlloc.destroyAndFree (ni);
     }
   };
   
@@ -273,9 +264,8 @@ public:
   ~DAGexecutor (void) {
     Galois::Runtime::do_all_impl (makeLocalRange (allCtxts),
         [this] (Ctxt* ctx) {
-          ctxtAlloc.destroy (ctx);
-          ctxtAlloc.deallocate (ctx, 1);
-        }, "free_ctx", true);
+          ctxtAlloc.destroyAndFree (ctx);
+        }, "free_ctx");
   }
 
   void createEdge (Ctxt* a, Ctxt* b) {
@@ -308,11 +298,8 @@ public:
     t_init.start ();
     Galois::Runtime::do_all_impl (range,
         [this] (const T& x) {
-          Ctxt* ctx = ctxtAlloc.allocate (1);
+          Ctxt* ctx = ctxtAlloc.allocAndConstruct (x, nhmgr);
           assert (ctx != NULL);
-          // new (ctx) Ctxt (x, nhmgr);
-          //ctxtAlloc.construct (ctx, Ctxt (x, nhmgr));
-          ctxtAlloc.construct (ctx, x, nhmgr);
 
           allCtxts.get ().push_back (ctx);
 
@@ -402,6 +389,252 @@ void for_each_ordered_dag (const R& range, const Cmp& cmp, const NhoodFunc& nhVi
 
   exec.execute ();
 
+}
+
+template <typename T, typename DivFunc, typename ConqFunc>
+class DivideAndConquerExecutor {
+
+protected:
+
+
+  class Task {
+
+  protected:
+    std::atomic<unsigned> numChild;
+    T active;
+    Task* parent;
+
+  public:
+    Task (const T& a, const Task* p)
+      : numChild (0), active (a), parent (p)
+    {}
+
+    void setNumChildren (unsigned c) {
+      assert (c > 0);
+      numChild = c;
+    }
+
+    bool removedLastChild (void) {
+      assert (numChild > 0);
+      return (--numChild == 0);
+    }
+
+    Task* getParent () { 
+      return parent;
+    }
+
+    const T& getActive () const { return active; }
+    T& getActive () { return active; }
+
+  };
+
+  struct BiModalTask: public Task {
+    enum Mode { DIVIDE, CONQUER };
+    Mode mode;
+
+    BiModalTask (const T& a, const BiModalTask* p, const Mode& m)
+      : Task (a, p), mode (m)
+    {}
+
+    BiModalTask* getParent () {
+      return static_cast<BiModalTask> (Task::getParent ());
+    }
+
+  };
+
+  template <typename A, typename... Args> 
+
+
+  typedef Galois::Runtime::MM::FSBGaloisAllocator<Task> TaskAlloc;
+  typedef Galois::Runtime::MM::FSBGaloisAllocator<BiModalTask> BiModalTaskAlloc;
+  typedef Galois::Runtime::UserContextAccess<T> UserCtx;
+  typedef Galois::Runtime::PerThreadStorage<UserCtx> PerThreadUserCtx;
+
+  struct ApplyOperatorSinglePhase {
+    BiModalTaskAlloc& taskAlloc;
+    PerThreadUserCtx& userCtxts;
+    DivFunc& divFunc;
+    ConqFunc& conqFunc;
+
+    ApplyOperatorSinglePhase (
+        BiModalTaskAlloc& taskAlloc,
+        PerThreadUserCtx& userCtxts,
+        DivFunc& divFunc,
+        ConqFunc& conqFunc)
+      :
+        taskAlloc (taskAlloc),
+        userCtxts (userCtxts),
+        divFunc (divFunc),
+        conqFunc (conqFunc)
+    {}
+
+    template <typename C>
+    void operator () (Task* t, C& ctx) {
+
+      if (t->mode == BiModalTask::DIVIDE) {
+        UserCtx& uctx = *userCtxts.getLocal ();
+        uctx.reset ();
+        divFunc (t->getActive (), uctx);
+
+        bool hasChildren = uctx.getPushBuffer().begin () == uctx.getPushBuffer ().end ();
+
+        if (hasChildren) {
+          ptrdiff_t numChild = std::distance (uctx.getPushBuffer ().begin (), uctx.getPushBuffer ().end ());
+
+          t->setNumChildren (numChild);
+
+          unsigned i = 0;
+          for (auto c = uctx.getPushBuffer ().begin (), c_end = uctx.getPushBuffer ().end (); 
+              c != c_end; ++c, ++i) {
+
+            Task* child = taskAlloc.allocAndConstruct (*c, BiModalTask::DIVIDE, t);
+          }
+        } else { 
+          // no children, so t is a leaf task
+          t.mode = BiModalTask::CONQUER;
+        }
+      } // end outer if
+
+      if (task.mode == BiModalTask::CONQUER) {
+        conqFunc (t->active, uctx);
+
+        Task* parent = t->getParent ();
+        if (parent != nullptr && parent.removedLastChild()) {
+          parent.mode = BiModalTask::CONQUER;
+          ctx.push (parent);
+        }
+
+        // task can be deallocated now
+        taskAlloc.destroyAndFree (t);
+      }
+
+    }
+  };
+
+  struct ApplyDivide {
+
+    template <typename C>
+    void operator () (Task* t, C& ctx) {
+
+      UserCtx& uctx = *userCtxts.getLocal ();
+      uctx.reset ();
+      divFunc (t->active, uctx);
+
+      bool hasChildren = uctx.getPushBuffer().begin () == uctx.getPushBuffer ().end ();
+
+      if (hasChildren) {
+        ptrdiff_t numChild = std::distance (uctx.getPushBuffer ().begin (), uctx.getPushBuffer ().end ());
+
+        t->setNumChildren (numChild);
+
+        unsigned i = 0;
+        for (auto c = uctx.getPushBuffer ().begin (), c_end = uctx.getPushBuffer ().end (); 
+            c != c_end; ++c, ++i) {
+
+          Task* child = taskAlloc.allocAndConstruct (*c, t);
+        }
+      } else { 
+        conqWL.push (t);
+      }
+    }
+
+
+  };
+
+  struct ApplyConquer {
+    template <typename C>
+    void operator () (Task* t, C& ctx) {
+      UserCtx& uctx = *userCtxts.getLocal ();
+      uctx.reset ();
+      conqFunc (t->active, uctx);
+
+      Task* parent = t->getParent ();
+      if (parent != nullptr && parent.removedLastChild()) {
+        ctx.push (parent);
+      }
+    }
+  };
+
+
+
+  DivFunc divFunc;
+  ConqFunc conqFunc;
+  std::string loopname;
+  PerThreadUserCtx userCtxts;
+
+  static const unsigned CHUNK_SIZE = 1;
+public:
+
+  DivideAndConquerExecutor (const DivFunc& divFunc, const ConqFunc& conqFunc, const char* loopname)
+    : 
+      divFunc (divFunc),
+      conqFunc (conqFunc),
+      loopname (loopname)
+  {}
+
+  void execute_1p (const R& range) {
+
+    typedef Galois::Runtime::PerThreadVector<BiModalTask*> TaskWL;
+    typedef Galois::WorkList::dChunkedFIFO<CHUNK_SIZE, BiModalTask*> WL_ty;
+
+    BiModalTaskAlloc taskAlloc;
+    TaskWL initialTasks;
+
+    Galois::Runtime::do_all_impl (range, 
+        [&] (const T& a) {
+          BiModalTask* t = taskAlloc.allocAndConstruct (a, nullptr, BiModalTask::DIVIDE);
+          initialTasks.get ().push_back (t);
+
+        },
+        "initial_tasks_gen");
+
+    Galois::Runtime::for_each_impl<WL_ty> (makeLocalRange (initialTasks), 
+        ApplyOperatorSinglePhase (taskAlloc, userCtxts, divFunc, conqFunc), loopname.c_str ());
+
+    Galois::Runtime::do_all_impl (makeLocalRange (initialTasks),
+        [&] (BiModalTask* t) {
+          taskAlloc.destroyAndFree (t);
+        }, "initial_tasks_destroy");
+  }
+
+  void execute_2p (const R& range) {
+    typedef Galois::Runtime::PerThreadVector<Task*> TaskWL;
+    typedef Galois::WorkList::dChunkedFIFO<CHUNK_SIZE, Task*> WL_ty;
+
+    TaskAlloc taskAlloc;
+    TaskWL initialTasks;
+
+    Galois::Runtime::do_all_impl (range, 
+        [&] (const T& a) {
+          Task* t = taskAlloc.allocAndConstruct (a, nullptr);
+          initialTasks.get ().push_back (t);
+
+        },
+        "initial_tasks_gen");
+
+
+    std::string div_loop_name = loopname + ":divide_phase";
+
+    Galois::Runtime::for_each_impl<WL_ty> (range,
+        ApplyDivide (taskAlloc, userCtxts, conqWL, divFunc), div_loop_name.c_str ());
+
+    std::string conq_loop_name = loopname + ":conquer_phase";
+
+    Galois::for_each_wl (conqWL, ApplyConquer (taskAlloc, userCtxts, conqFunc), conq_loop_name.c_str ());
+
+    Galois::Runtime::do_all_impl (makeLocalRange (initialTasks),
+        [&] (Task* t) {
+          taskAlloc.destroyAndFree (t);
+        }, "initial_tasks_destroy");
+  }
+
+};
+
+template <typename R, typename DivFunc, ConqFunc>
+void for_each_ordered_tree_1p (const R& range, const DivFunc& divFunc, const ConqFunc& conqFunc, const char* loopname=nullptr) {
+}
+
+void for_each_ordered_tree_2p (const R& range, const DivFunc& divFunc, const ConqFunc& conqFunc, const char* loopname=nullptr) {
 }
 
 } // end namespace Runtime
