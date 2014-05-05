@@ -167,9 +167,9 @@ struct PullAlgo {
 
   std::string name() const { return "Pull"; }
 
-  Galois::GReduceMax<double> max_delta;
+  Galois::GReduceMax<float> max_delta;
   Galois::GAccumulator<size_t> small_delta;
-  Galois::GAccumulator<double> sum_delta;
+  Galois::GAccumulator<float> sum_delta;
 
   void readGraph(Graph& graph) {
     if (transposeGraphName.size()) {
@@ -287,7 +287,7 @@ struct PullAlgo2 {
 
   std::string name() const { return "Pull2"; }
 
-  Galois::GReduceMax<double> max_delta;
+  Galois::GReduceMax<float> max_delta;
   Galois::GAccumulator<unsigned int> small_delta;
 
   void readGraph(Graph& graph) {
