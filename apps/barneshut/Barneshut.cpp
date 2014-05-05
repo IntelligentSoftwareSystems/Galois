@@ -25,7 +25,7 @@
 #include "Galois/Galois.h"
 #include "Galois/Statistic.h"
 #include "Galois/Bag.h"
-#include "llvm/Support/CommandLine.h"
+#include "Galois/Accumulator.h"
 #include "Lonestar/BoilerPlate.h"
 
 #include <boost/math/constants/constants.hpp>
@@ -366,21 +366,6 @@ struct AdvanceBodies {
   }
 };
 
-struct ReduceBoxes {
-  // NB: only correct when run sequentially or tree-like reduction
-  typedef int tt_does_not_need_stats;
-  BoundingBox initial;
-
-  void operator()(const Body* b) {
-    initial.merge(b->pos);
-  }
-};
-
-struct mergeBox {
-  void operator()(ReduceBoxes& lhs, ReduceBoxes& rhs) {
-    return lhs.initial.merge(rhs.initial);
-  }
-};
 
 double nextDouble() {
   return rand() / (double) RAND_MAX;
@@ -529,8 +514,13 @@ void run(Bodies& bodies, BodyPtrs& pBodies, size_t nbodies) {
 
   for (int step = 0; step < ntimesteps; step++) {
 
+    auto MB = [] (BoundingBox& lhs, const Point& rhs) { lhs.merge(rhs); };
+
     // Do tree building sequentially
-    BoundingBox box = Galois::Runtime::do_all_impl(Galois::Runtime::makeLocalRange(pBodies), ReduceBoxes(), mergeBox(), "reduceBoxes", true).initial;
+    Galois::GReducible<BoundingBox, decltype(MB)> boxes(MB);
+    Galois::do_all_local(pBodies, [&boxes] (const Body* b) {boxes.update(b->pos);},
+                         Galois::loopname("reduceBoxes"), Galois::do_all_steal(true));
+    BoundingBox box = boxes.reduce([] (BoundingBox& lhs, BoundingBox& rhs) {lhs.merge(rhs);});
     //std::for_each(bodies.begin(), bodies.end(), ReduceBoxes(box));
 
     Tree t;
