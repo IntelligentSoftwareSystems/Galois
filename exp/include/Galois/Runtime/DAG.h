@@ -275,7 +275,7 @@ public:
         [this] (Ctxt* ctx) {
           ctxtAlloc.destroy (ctx);
           ctxtAlloc.deallocate (ctx, 1);
-        }, "free_ctx");
+                                  }, "free_ctx", true);
   }
 
   void createEdge (Ctxt* a, Ctxt* b) {
@@ -324,7 +324,7 @@ public:
         }, "create_ctxt");
 
 
-    Galois::Runtime::do_all_impl (nhmgr.getAllRange (),
+    Galois::Runtime::do_all_impl(nhmgr.getAllRange(),
         [this] (NItem* nitem) {
           for (auto i = nitem->sharers.begin ()
             , i_end = nitem->sharers.end (); i != i_end; ++i) {
@@ -335,7 +335,7 @@ public:
               createEdge (*i, *j);
             }
           }
-        }, "create_ctxt_edges");
+        }, "create_ctxt_edges", true);
 
     Galois::Runtime::do_all_impl (makeLocalRange (allCtxts),
         [this] (Ctxt* ctx) {
@@ -343,7 +343,7 @@ public:
           if (ctx->isSrc ()) {
             initSources.get ().push_back (ctx);
           }
-        }, "finalize");
+        }, "finalize", true);
 
     t_init.stop ();
   }
@@ -373,7 +373,7 @@ public:
         [] (Ctxt* ctx) {
           ctx->reset();
         },
-        "reset_dag");
+       "reset_dag", true);
     t_reset.stop ();
   }
 

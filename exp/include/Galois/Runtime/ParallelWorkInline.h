@@ -32,6 +32,34 @@ namespace Galois {
 namespace Runtime {
 namespace {
 
+template<bool Enabled>
+class LoopStatistics {
+  unsigned long conflicts;
+  unsigned long iterations;
+  const char* loopname;
+
+public:
+  explicit LoopStatistics(const char* ln) :conflicts(0), iterations(0), loopname(ln) { }
+  ~LoopStatistics() {
+    reportStat(loopname, "Conflicts", conflicts);
+    reportStat(loopname, "Iterations", iterations);
+  }
+  inline void inc_iterations() {
+    ++iterations;
+  }
+  inline void inc_conflicts() {
+    ++conflicts;
+  }
+};
+
+template <>
+class LoopStatistics<false> {
+public:
+  explicit LoopStatistics(const char* ln) {}
+  inline void inc_iterations() const { }
+  inline void inc_conflicts() const { }
+};
+
 template<typename T, bool isLIFO, unsigned ChunkSize>
 struct FixedSizeRingAdaptor: public Galois::FixedSizeRing<T,ChunkSize> {
   typedef typename FixedSizeRingAdaptor::reference reference;
@@ -371,15 +399,19 @@ public:
 } // end runtime
 
 namespace WorkList {
-  template<class T=int>
-  class BulkSynchronousInline { };
+  struct BulkSynchronousInline {
+    template<typename T>
+    struct retype {
+      typedef BulkSynchronousInline type;
+    };
+  };
 }
 
 namespace Runtime {
 namespace {
 
 template<class T,class FunctionTy>
-struct ForEachWork<WorkList::BulkSynchronousInline<>,T,FunctionTy>:
+struct ForEachWork<WorkList::BulkSynchronousInline,T,FunctionTy>:
   public BSInlineExecutor<T,FunctionTy> {
   typedef BSInlineExecutor<T,FunctionTy> SuperTy;
   ForEachWork(FunctionTy& f, const char* ln): SuperTy(f, ln) { }

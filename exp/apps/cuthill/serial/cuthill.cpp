@@ -297,8 +297,8 @@ public:
 
 //Compute mean distance from the source
 struct avg_dist {
-  GReduceAverage<unsigned long int>& m;
-  avg_dist(GReduceAverage<unsigned long int>& _m): m(_m) { }
+  GReduceAverage<unsigned int>& m;
+  avg_dist(GReduceAverage<unsigned int>& _m): m(_m) { }
 
   void operator()(const GNode& n) const {
 		if(graph.getData(n).dist < DIST_INFINITY)
@@ -354,8 +354,8 @@ struct not_visited {
 };
 
 struct max_dist {
-  Galois::GReduceMax<unsigned long int>& m;
-  max_dist(Galois::GReduceMax<unsigned long int>& _m): m(_m) { }
+  Galois::GReduceMax<unsigned int>& m;
+  max_dist(Galois::GReduceMax<unsigned int>& _m): m(_m) { }
 
   void operator()(const GNode& n) const {
 		if(graph.getData(n).dist < DIST_INFINITY)
@@ -410,9 +410,9 @@ static bool verify(GNode& source) {
 #endif
 
   //if (okay) {
-    Galois::GReduceMax<unsigned long int> m;
-    GReduceAverage<unsigned long int> mean;
-    Galois::do_all(graph.begin(), graph.end(), max_dist(m));
+    Galois::GReduceMax<unsigned int> m;
+    GReduceAverage<unsigned int> mean;
+    Galois::do_all(graph.begin(), graph.end(), max_dist{m});
 #ifdef GALOIS_JUNE
     std::cout << "max dist: " << m.get() << "\n";
 #else
@@ -480,7 +480,7 @@ struct banddiff {
 		if(maxdiff > globalmax){
 			while(!maxband.cas(globalmax, maxdiff)){
 				globalmax = maxband;
-				if(!maxdiff > globalmax)
+				if(!(maxdiff > globalmax))
 					break;
 			}
 		}
@@ -1103,7 +1103,7 @@ int main(int argc, char **argv) {
   typedef BulkSynchronous<dChunkedLIFO<256> > BSWL;
 
 #ifdef GALOIS_USE_EXP
-  typedef BulkSynchronousInline<> BSInline;
+  typedef BulkSynchronousInline BSInline;
 #else
   typedef BSWL BSInline;
 #endif

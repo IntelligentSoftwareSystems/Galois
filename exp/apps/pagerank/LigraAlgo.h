@@ -26,7 +26,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
   
   Galois::GReduceMax<float> max_delta;
   Galois::GAccumulator<size_t> small_delta;
-  Galois::GAccumulator<double> sum_delta;
+  Galois::GAccumulator<float> sum_delta;
 
   void readGraph(Graph& graph) {
     // Using dense forward option, so we don't need in-edge information

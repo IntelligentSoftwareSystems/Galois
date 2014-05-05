@@ -110,7 +110,7 @@ void for_each_gen(RangeTy r, FunctionTy fn, Tuple tpl) {
 }
 
 template<typename RangeTy, typename FunctionTy, typename Tuple>
-FunctionTy do_all_gen(RangeTy r, FunctionTy fn, Tuple tpl) {
+void do_all_gen(RangeTy r, FunctionTy fn, Tuple tpl) {
   typedef Tuple tupleType;
   static_assert(-1 == tuple_index<tupleType, char*>::value, "old loopname");
   static_assert(-1 == tuple_index<tupleType, char const*>::value, "old loopname");
@@ -121,7 +121,7 @@ FunctionTy do_all_gen(RangeTy r, FunctionTy fn, Tuple tpl) {
   constexpr unsigned isteal = tuple_index<tupleType, do_all_steal>::value;
   const char* ln = std::get<iloopname>(tpl).n;
   bool steal = std::get<isteal>(tpl).b;
-  return Runtime::do_all_impl(r, fn, ln, steal);
+  Runtime::do_all_impl(r, fn, ln, steal);
 }
 
 template<typename FunctionTy, typename Tuple>
@@ -198,8 +198,8 @@ void for_each_local(ConTy& c, FunctionTy fn, Args... args) {
  * @returns fn
  */
 template<typename IterTy,typename FunctionTy, typename... Args>
-FunctionTy do_all(const IterTy& b, const IterTy& e, FunctionTy fn, Args... args) {
-  return HIDDEN::do_all_gen(Runtime::makeStandardRange(b, e), fn, std::make_tuple(loopname(), do_all_steal(), args...));
+void do_all(const IterTy& b, const IterTy& e, FunctionTy fn, Args... args) {
+  HIDDEN::do_all_gen(Runtime::makeStandardRange(b, e), fn, std::make_tuple(loopname(), do_all_steal(), args...));
 }
 
 /**
@@ -213,8 +213,8 @@ FunctionTy do_all(const IterTy& b, const IterTy& e, FunctionTy fn, Args... args)
  * @returns fn
  */
 template<typename ConTy,typename FunctionTy, typename... Args>
-FunctionTy do_all_local(ConTy& c, FunctionTy fn, Args... args) {
-  return HIDDEN::do_all_gen(Runtime::makeLocalRange(c), fn, std::make_tuple(loopname(), do_all_steal(), args...));
+void do_all_local(ConTy& c, FunctionTy fn, Args... args) {
+  HIDDEN::do_all_gen(Runtime::makeLocalRange(c), fn, std::make_tuple(loopname(), do_all_steal(), args...));
 }
 
 /**
