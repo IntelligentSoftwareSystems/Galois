@@ -112,8 +112,8 @@ public:
                  maxThreadID, ",",
                  std::accumulate(Values.begin(), Values.end(), 0)
                  );
-      for (unsigned x = 0; x <= maxThreadID; ++x)
-        LL::gPrint(",", Values.at(x));
+      for (int x = 0; x <= maxThreadID; ++x)
+        LL::gPrint(",", x < Values.size() ? Values.at(x) : 0);
       LL::gPrint("\n");
     }
   }
