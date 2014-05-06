@@ -84,9 +84,9 @@ protected:
     typeHelperImpl();
     virtual void vSerialize(SendBuffer&, Lockable*) const;
   public:
-    virtual Lockable* duplicate(Lockable* obj) const {
-      return new T(*static_cast<T*>(obj));
-    }
+    // virtual Lockable* duplicate(Lockable* obj) const {
+    //   return new T(*static_cast<T*>(obj));
+    // }
     
     static typeHelperImpl* get() {
       static typeHelperImpl th;
