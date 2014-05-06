@@ -14,7 +14,7 @@ struct R : public Galois::Runtime::Lockable {
   R() :i(0) {}
 
   void add(int v) {
-    std::cerr << "In Host " << NetworkInterface::ID << " and thread " << LL::getTID() << " processing number " << v << " old value " << i << "\n";
+    std::cout << "In Host " << NetworkInterface::ID << " and thread " << LL::getTID() << " processing number " << v << " old value " << i << std::endl; //endl for the flush
     i += v;
     return;
   }
