@@ -27,6 +27,7 @@
 #define GALOIS_GRAPH_BAG_H
 
 #include "Galois/Runtime/PerHostStorage.h"
+#include "Galois/TwoLevelIterator.h"
 
 namespace Galois {
 namespace Graph {
