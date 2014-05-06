@@ -437,7 +437,7 @@ public:
     return N->getActive();
   }
 
-  size_t size() const { return 0; }
+  size_t size() const { assert(0 && "Not implemented"); abort(); return 0; }
 
   typedef Runtime::PerThreadDist<ThirdGraph> pointer;
   static pointer allocate() {
@@ -467,77 +467,6 @@ public:
     gSerialize(buf, localStateStore, localStatePtr);
   }
 };
-
-// used to find the size of the graph
-struct R : public Galois::Runtime::Lockable {
-  unsigned i;
-
-  R(): i(0) {}
-
-  void add(unsigned v) {
-    i += v;
-    return;
-  }
-
-  typedef int tt_dir_blocking;
-
-  // serialization functions
-  typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::SerializeBuffer& s) const {
-    gSerialize(s,i);
-  }
-  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
-    gDeserialize(s,i);
-  }
-};
-
-template <typename GTy>
-struct f {
-  GTy graph;
-  Runtime::gptr<R> r;
-
-  f(const Runtime::gptr<R>& p, GTy g): graph(g), r(p) {}
-  f() {}
-
-  template<typename Context>
-  void operator()(unsigned x, Context& cnx) const {
-    unsigned size = std::distance(graph->local_begin(),graph->local_end());
-    r->add(size);
-  }
-
-  // serialization functions
-  typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::SerializeBuffer& s) const {
-    gSerialize(s,r);
-    gSerialize(s,graph);
-  }
-  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
-    gDeserialize(s,r);
-    gDeserialize(s,graph);
-  }
-};
-
-template <typename GraphTy>
-unsigned ThirdGraphSize(GraphTy g) {
-  // should only be called from outside the for_each
-  assert(!Galois::Runtime::inGaloisForEach);
-  R tmp;
-  Runtime::gptr<R> r(&tmp);
-  Galois::on_each(f<GraphTy>(r,g));
-  return r->i;
-}
-
-struct ThirdGraph_for_size {
-  template<typename T>
-  bool operator()(T& n) const { return true; }
-};
-
-template <typename GraphTy>
-ptrdiff_t NThirdGraphSize(GraphTy g) {
-  // should only be called from outside the for_each
-  assert(!Galois::Runtime::inGaloisForEach);
-  return Galois::ParallelSTL::count_if_local(g,ThirdGraph_for_size());
-}
 
 } //namespace Graph
 } //namespace Galois
