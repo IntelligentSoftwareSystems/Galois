@@ -624,8 +624,8 @@ make_two_level_begin (Outer beg, Outer end, InnerBegFn innerBegFn, InnerEndFn in
 template <typename Outer, typename InnerBegFn, typename InnerEndFn>
 typename ChooseTwoLevelIterator<Outer, typename InnerBegFn::result_type, InnerBegFn, InnerEndFn>::type
 make_two_level_end (Outer beg, Outer end, InnerBegFn innerBegFn, InnerEndFn innerEndFn) {
-  const bool V = std::is_same<typename InnerBegFn::result_type, typename InnerEndFn::result_type>::value;
-  assert (V);
+  constexpr bool V = std::is_same<typename InnerBegFn::result_type, typename InnerEndFn::result_type>::value;
+  //static_assert (V);
 
   typedef typename InnerBegFn::result_type Inner;
   typedef typename ChooseTwoLevelIterator<Outer, Inner, InnerBegFn, InnerEndFn>::type Ret_ty;
