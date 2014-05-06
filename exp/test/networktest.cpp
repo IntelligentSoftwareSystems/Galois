@@ -10,8 +10,8 @@ using namespace Galois::Runtime;
 bool didbcast = false;
 
 struct sayHi : public Galois::Runtime::Lockable {
-  sayHi(Galois::Runtime::PerHost<sayHi> ptr, DeSerializeBuffer& b) { std::cout << "Hi " << this << "\n"; }
-  sayHi(Galois::Runtime::PerHost<sayHi> ptr) { std::cout << "Hi " << this << "\n"; }
+  sayHi(Galois::Runtime::PerHost<sayHi> ptr, DeSerializeBuffer& b) { std::cout << "Hi_r " << this << "\n"; }
+  sayHi(Galois::Runtime::PerHost<sayHi> ptr) { std::cout << "Hi_l " << this << "\n"; }
   ~sayHi() { std::cout << "Bye\n"; }
   void getInitData(SerializeBuffer& b) {}
 };
@@ -44,16 +44,21 @@ int main(int argc, char** argv) {
   
   std::cout << "testing " << NetworkInterface::ID << " " << NetworkInterface::Num << "\n";
 
-  if (NetworkInterface::ID == 0) {
-    net.sendAlt(1, lp3, 4U, 5U);
-    Galois::Runtime::PerHost<sayHi> p = Galois::Runtime::PerHost<sayHi>::allocate();
-    p.remote(1).dump(std::cout);
-    Galois::Runtime::PerHost<sayHi>::deallocate(p);
+  if (NetworkInterface::Num != 2) {
+    std::cout << "Need two hosts, aborting\n";
+    return 1;
   }
 
-  std::cout << "Begin loop classic\n";
+  if (NetworkInterface::ID == 1) {
+    getSystemNetworkInterface().start();
+  } else {
+    net.sendAlt(1, lp3, 4U, 5U);
+    Galois::Runtime::PerHost<sayHi> p = Galois::Runtime::PerHost<sayHi>::allocate();
+    std::cout << p.remote(1) << "\n";
+    Galois::Runtime::PerHost<sayHi>::deallocate(p);
 
-  if (NetworkInterface::ID == 0) {
+    std::cout << "Begin loop classic\n";
+
     Galois::Timer T;
     T.start();
     SendBuffer buf;
@@ -76,11 +81,7 @@ int main(int argc, char** argv) {
     }
     T2.stop();
     std::cout << "Time " << T2.get() << "\n";
-
-
-  }
-  while (true) {
-    net.handleReceives();
+    getSystemNetworkInterface().terminate();
   }
 
   return 0;
