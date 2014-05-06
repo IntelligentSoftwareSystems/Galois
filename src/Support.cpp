@@ -109,7 +109,7 @@ public:
       LL::gPrint("STAT,",
                  ii->first.first.c_str(), ",",
                  ii->first.second.c_str(), ",",
-                 maxThreadID, ",",
+                 maxThreadID + 1, ",",
                  std::accumulate(Values.begin(), Values.end(), 0)
                  );
       for (int x = 0; x <= maxThreadID; ++x)
