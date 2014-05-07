@@ -1,11 +1,11 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 2.8.8)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 project(Galois)
 set(GALOIS_VERSION_MAJOR "2")
 set(GALOIS_VERSION_MINOR "2")
 set(GALOIS_VERSION_PATCH "0")
 set(GALOIS_VERSION ${GALOIS_VERSION_MAJOR}.${GALOIS_VERSION_MINOR}.${GALOIS_VERSION_PATCH})
-set(GALOIS_COPYRIGHT_YEAR "2013") # Also in COPYRIGHT
+set(GALOIS_COPYRIGHT_YEAR "2014") # Also in COPYRIGHT
 
 if(NOT CMAKE_BUILD_TYPE)
   message(STATUS "No build type selected, default to Release")
@@ -39,7 +39,7 @@ set(USE_EXP OFF CACHE BOOL "Use experimental features")
 set(USE_HTM OFF CACHE BOOL "Use HTM")
 set(EXP_DOALL "PTHREAD" CACHE STRING "Which type of implementation of parallel_doall")
 set(USE_PROF OFF CACHE BOOL "Use profiling specific features")
-set(USE_SUBVERSION_REVISION ON CACHE BOOL "Embed subversion numbers")
+set(USE_EMBEDDED_REVISION ON CACHE BOOL "Embed revision numbers")
 
 ###### Configure (users don't need to go beyond here) ######
 
@@ -105,10 +105,9 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "XL")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -qsuppress=1540-0724 -qsuppress=1500-029 -qmaxmem=-1 -qalias=noansi -qsmp=omp")
 endif()
 
-#clang 
-if (CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  #iss hack
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -isystem=/net/faraday/workspace/local/modules/gcc-4.7")
+if(CYGWIN)
+  message(STATUS "On Cygwin")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -U__STRICT_ANSI__")
 endif()
 
 # check for incompatible GCC
@@ -177,9 +176,9 @@ if(USE_EXP)
     add_definitions(-DGALOIS_USE_PROF)
   endif()
 
-  if(USE_SUBVERSION_REVISION)
-    include(GetSVNVersion)
-    set(GALOIS_USE_SVNVERSION on)
+  if(USE_EMBEDDED_REVISION)
+    include(GetGitVersion)
+    set(GALOIS_USE_EMBEDDED_REVISION on)
   endif()
 
   if(USE_HTM)
