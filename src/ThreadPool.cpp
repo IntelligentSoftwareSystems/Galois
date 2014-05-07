@@ -24,6 +24,7 @@
 #include "Galois/Runtime/ll/EnvCheck.h"
 #include "Galois/Runtime/ll/HWTopo.h"
 #include "Galois/Runtime/ll/TID.h"
+#include "Galois/Runtime/ll/gio.h" //XXX
 
 // Forward declare this to avoid including PerThreadStorage.
 // We avoid this to stress that the thread Pool MUST NOT depend on PTS.
@@ -66,8 +67,10 @@ void ThreadPool::beKind() {
 
 void ThreadPool::initThread(unsigned tid) {
   // Initialize TID
+  LL::gInfo("old ", LL::getTID());
   LL::initTID(tid);
   initPTS();
+  LL::gInfo("new ", LL::getTID());
   if (!LL::EnvCheck("GALOIS_DO_NOT_BIND_THREADS"))
     if (tid != 0 || !LL::EnvCheck("GALOIS_DO_NOT_BIND_MAIN_THREAD"))
       LL::bindThreadToProcessor(tid);
