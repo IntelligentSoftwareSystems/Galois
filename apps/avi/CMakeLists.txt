@@ -23,7 +23,7 @@ endif()
 find_package(LAPACK)
 find_package(ZLIB)
 
-if(ZLIB_FOUND AND NOT GALOIS_ARCH_MIC)
+if(ZLIB_FOUND AND NOT ARCH STREQUAL "mic")
   add_definitions(-DGALOIS_HAS_ZLIB)
 endif()
 
@@ -40,7 +40,7 @@ if(CMAKE_Fortran_COMPILER_WORKS AND LAPACK_FOUND AND Boost_FOUND)
   include_directories(${ZLIB_INCLUDE_DIRS})
   add_library(AVI ${Sources})
 
-  if (ZLIB_FOUND AND NOT GALOIS_ARCH_MIC) 
+  if (ZLIB_FOUND AND NOT ARCH STREQUAL "mic") 
     target_link_libraries(AVI ${ZLIB_LIBRARIES})
     target_link_libraries(AVI ${Boost_LIBRARIES})
   endif()

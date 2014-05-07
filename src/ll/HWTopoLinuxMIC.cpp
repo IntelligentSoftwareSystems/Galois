@@ -40,11 +40,7 @@
 
 #include <sched.h>
 
-#ifdef GALOIS_ARCH_MIC
 #define GALOIS_USE_MIC_TOPO
-#endif
-
-
 
 using namespace Galois::Runtime::LL;
 
