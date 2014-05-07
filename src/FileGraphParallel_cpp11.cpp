@@ -64,7 +64,7 @@ public:
         cond.notify_all();
       }
     } else {
-      cond.wait(lk, [&]{ return count == 0; });
+      cond.wait(lk, [&](){ return count == 0; });
     }
   }
 };
