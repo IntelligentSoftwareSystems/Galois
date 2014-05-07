@@ -182,8 +182,8 @@ protected:
 
   inline void commitIteration(ThreadLocalData& tld) {
     if (ForEachTraits<FunctionTy>::NeedsPush) {
-      auto ii = tld.facing.getPushBuffer().begin();
-      auto ee = tld.facing.getPushBuffer().end();
+      //auto ii = tld.facing.getPushBuffer().begin();
+      //auto ee = tld.facing.getPushBuffer().end();
       auto& pb = tld.facing.getPushBuffer();
       auto n = pb.size();
       if (n) {

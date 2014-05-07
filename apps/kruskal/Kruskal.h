@@ -103,7 +103,8 @@ struct InEdge {
 
     // hash function purely based on src and dst to find and remove duplicates
     size_t operator () (const InEdge& edge) const {
-      return (size_t (edge.src) << 32) ^ size_t(edge.dst);
+      constexpr unsigned shift = sizeof(size_t) >> 1;
+      return (static_cast<size_t>(edge.src) << shift) ^ static_cast<size_t>(edge.dst);
     }
   };
 
