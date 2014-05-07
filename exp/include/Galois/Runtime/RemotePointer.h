@@ -23,6 +23,7 @@
 #ifndef GALOIS_RUNTIME_REMOTEPOINTER_H
 #define GALOIS_RUNTIME_REMOTEPOINTER_H
 
+#include "Galois/MethodFlags.h"
 #include "Galois/Runtime/Directory.h"
 
 namespace Galois {

@@ -74,14 +74,10 @@ int main(int argc, char** argv) {
     D.print(std::cout);
     std::cout << "\n";
     
-    oldB.dump(std::cout);
-    std::cout << "\n";
-    foo.dump(std::cout);
-    std::cout << "\n";
-    (*oldB).dump(std::cout);
-    std::cout << "\n";
-    (*bar).dump(std::cout);
-    std::cout << "\n";
+    std::cout << oldB << "\n"
+              << foo << "\n"
+              << (*oldB) << "\n"
+              << (*bar) << "\n";
   }
   return 0;
 }

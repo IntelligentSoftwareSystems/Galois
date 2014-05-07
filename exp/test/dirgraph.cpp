@@ -60,10 +60,9 @@ int main(int argc, char** argv) {
     std::cout << (*ii)->getData() << " " << std::distance((*ii)->begin(), (*ii)->end()) << " ";
   std::cout << "\n";
 
-  std::cout << "\n" << "Dumping the graph of size " << NThirdGraphSize(Gr) << std::endl;
+  //std::cout << "\n" << "Dumping the graph of size " << NThirdGraphSize(Gr) << std::endl;
   for (auto ii = Gr->begin(), ee = Gr->end(); ii != ee; ++ii) {
-    (*ii)->dump(std::cout);
-    std::cout << "\n";
+    std::cout << *ii << "\n";
   }
 
   std::cout << "\n" << "Using edge_iterator:\n";
@@ -73,14 +72,14 @@ int main(int argc, char** argv) {
     std::cout << std::distance(Gr->edge_begin(N), Gr->edge_end(N)) << " edges ";
     for (auto jj = Gr->edge_begin(N), ff = Gr->edge_end(N); jj != ff; ++jj) {
       G::NodeHandle N = jj->getDst();
-      N.dump(std::cout);
+      std::cout << N << " ";
     }
     std::cout << std::endl;
   }
 
-  if (NThirdGraphSize(Gr) != 29) {
-    printf ("ERROR in the no of nodes!\n");
-  }
+  // if (NThirdGraphSize(Gr) != 29) {
+  //   printf ("ERROR in the no of nodes!\n");
+  // }
 
   Galois::for_each_local(Gr,checking(Gr));
 

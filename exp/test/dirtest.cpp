@@ -1,4 +1,3 @@
-#include <vector>
 #include "Galois/Galois.h"
 #include "Galois/Runtime/Directory.h"
 

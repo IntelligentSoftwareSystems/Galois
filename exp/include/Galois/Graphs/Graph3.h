@@ -63,10 +63,8 @@ protected:
   }
 
   void dump(std::ostream& os) const {
-    os << "next: ";
-    nextNode.dump(os);
-    os << " active: ";
-    os << active;
+    os << "next: " << nextNode 
+       << " active: " << active;
   }
 
 public:
@@ -135,13 +133,10 @@ public:
   }
 
   void dump(std::ostream& os) const {
-    os << "<{Edge: dst: ";
-    dst.dump(os);
-    os << " dst active: ";
-    os << dst->getActive();
-    os << " val: ";
-    os << val;
-    os << "}>";
+    os << "<{Edge: dst: " << dst
+       << " dst active: " << dst->getActive()
+       << " val: " << val
+       << "}>";
   }
 };
 
@@ -307,6 +302,11 @@ public:
     os << " ";
     GraphNodeEdges<SHORTHAND, EdgeDataTy, EDir>::dump(os);
     os << "}>";
+  }
+
+  friend std::ostream& operator<<(std::ostream& os, GraphNode& n) {
+    n.dump(os);
+    return os;
   }
 };
 
