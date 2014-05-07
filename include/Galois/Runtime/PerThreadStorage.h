@@ -94,7 +94,6 @@ void initPTS();
 void initPTS_cilk();
 #endif // GALOIS_USE_EXP
 
-
 template<typename T>
 class PerThreadStorage: private boost::noncopyable {
 protected:
