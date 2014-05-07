@@ -23,6 +23,7 @@
 
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/mm/Mem.h"
+#include "Galois/Runtime/ll/gio.h"
 #include <mutex>
 
 __thread char* Galois::Runtime::ptsBase;

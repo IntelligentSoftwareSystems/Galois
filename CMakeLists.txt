@@ -47,21 +47,6 @@ enable_testing()
 
 ###### Configure compiler ######
 
-# mic
-if(ARCH STREQUAL "mic")
-  if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mmic")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mmic")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -mmic")
-  endif()
-
-  if(CMAKE_COMPILER_IS_GNUCC)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=knc")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=knc")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -march=knc")
-  endif()
-endif()
-
 # ICC
 if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
   execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion
