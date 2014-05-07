@@ -30,6 +30,7 @@
 
 #include <sstream>
 #include <cerrno>
+#include <string.h>
 
 //FIXME: move to Runtime
 

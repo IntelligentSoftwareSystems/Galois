@@ -79,12 +79,12 @@ enum ConvertMode {
 };
 
 enum EdgeType {
-  float32,
-  float64,
-  int32,
-  int64,
-  uint32,
-  uint64,
+  float32_,
+  float64_,
+  int32_,
+  int64_,
+  uint32_,
+  uint64_,
   void_
 };
 
@@ -100,12 +100,12 @@ static cll::opt<std::string> labelsFilename("labels",
     cll::desc("[labels file]"), cll::init(""));
 static cll::opt<EdgeType> edgeType("edgeType", cll::desc("Input/Output edge type:"),
     cll::values(
-      clEnumValN(EdgeType::float32, "float32", "32 bit floating point edge values"),
-      clEnumValN(EdgeType::float64, "float64", "64 bit floating point edge values"),
-      clEnumValN(EdgeType::int32, "int32", "32 bit int edge values"),
-      clEnumValN(EdgeType::int64, "int64", "64 bit int edge values"),
-      clEnumValN(EdgeType::uint32, "uint32", "32 bit unsigned int edge values"),
-      clEnumValN(EdgeType::uint64, "uint64", "64 bit unsigned int edge values"),
+      clEnumValN(EdgeType::float32_, "float32", "32 bit floating point edge values"),
+      clEnumValN(EdgeType::float64_, "float64", "64 bit floating point edge values"),
+      clEnumValN(EdgeType::int32_, "int32", "32 bit int edge values"),
+      clEnumValN(EdgeType::int64_, "int64", "64 bit int edge values"),
+      clEnumValN(EdgeType::uint32_, "uint32", "32 bit unsigned int edge values"),
+      clEnumValN(EdgeType::uint64_, "uint64", "64 bit unsigned int edge values"),
       clEnumValN(EdgeType::void_, "void", "no edge values"),
       clEnumValEnd), cll::init(EdgeType::void_));
 static cll::opt<ConvertMode> convertMode(cll::desc("Conversion mode:"),
@@ -185,12 +185,12 @@ void convert(C& c, HasNoVoidSpecialization, typename std::enable_if<std::is_same
 
 static std::string edgeTypeToName(EdgeType e) {
   switch (e) {
-    case EdgeType::float32: return "float32";
-    case EdgeType::float64: return "float64";
-    case EdgeType::int32: return "int32";
-    case EdgeType::int64: return "int64";
-    case EdgeType::uint32: return "uint32";
-    case EdgeType::uint64: return "uint64";
+    case EdgeType::float32_: return "float32";
+    case EdgeType::float64_: return "float64";
+    case EdgeType::int32_: return "int32";
+    case EdgeType::int64_: return "int64";
+    case EdgeType::uint32_: return "uint32";
+    case EdgeType::uint64_: return "uint64";
     case EdgeType::void_: return "void";
     default: abort();
   }
@@ -201,12 +201,12 @@ void convert() {
   C c;
   std::cout << "Graph type: " << edgeTypeToName(edgeType) << "\n";
   switch (edgeType) {
-    case EdgeType::float32: convert<float>(c, c); break;
-    case EdgeType::float64: convert<double>(c, c); break;
-    case EdgeType::int32: convert<int32_t>(c, c); break;
-    case EdgeType::int64: convert<int64_t>(c, c); break;
-    case EdgeType::uint32: convert<uint32_t>(c, c); break;
-    case EdgeType::uint64: convert<uint64_t>(c, c); break;
+    case EdgeType::float32_: convert<float>(c, c); break;
+    case EdgeType::float64_: convert<double>(c, c); break;
+    case EdgeType::int32_: convert<int32_t>(c, c); break;
+    case EdgeType::int64_: convert<int64_t>(c, c); break;
+    case EdgeType::uint32_: convert<uint32_t>(c, c); break;
+    case EdgeType::uint64_: convert<uint64_t>(c, c); break;
     case EdgeType::void_: convert<void>(c, c); break;
     default: abort();
   };
