@@ -44,6 +44,7 @@ static const char* const url = "sgdsvm";
 
 enum class UpdateType {
         Wild,
+        WildOrig,
         ReplicateByThread,
         ReplicateByPackage,
         Staleness
@@ -55,11 +56,13 @@ static cll::opt<std::string> inputLabelFilename(cll::Positional, cll::desc("<lab
 static cll::opt<double> CREG("c", cll::desc("the regularization parameter C"), cll::init(1.0));
 static cll::opt<bool> SHUFFLE("s", cll::desc("shuffle samples between iterations"), cll::init(false));
 static cll::opt<double> TRAINING_FRACTION("tr", cll::desc("fraction of samples to use for training"), cll::init(0.8));
+static cll::opt<size_t> TRAINING_NUMBER("tn", cll::desc("number of samples to use for training"), cll::init(0));
 static cll::opt<double> ACCURACY_GOAL("ag", cll::desc("accuracy at which to stop running"), cll::init(0.95));
 static cll::opt<unsigned> ITER("i", cll::desc("how many iterations to run for, ignoring accuracy the goal"), cll::init(0));
 static cll::opt<UpdateType> UPDATE_TYPE("algo", cll::desc("Update type:"),
         cll::values(
                 clEnumValN(UpdateType::Wild, "wild", "unsynchronized (default)"),
+                clEnumValN(UpdateType::WildOrig, "wildorig", "unsynchronized"),
                 clEnumValN(UpdateType::ReplicateByThread, "replicateByThread", "thread replication"),
                 clEnumValN(UpdateType::ReplicateByPackage, "replicateByPackage", "package replication"),
                 clEnumValN(UpdateType::Staleness, "staleness", "stale reads"),
@@ -171,6 +174,7 @@ struct linearSVM
 #ifdef DENSE
                         switch (UT) {
                                 default:
+                                case UpdateType::WildOrig:
                                 case UpdateType::Wild:
                                         weight = baseNodeData[cur].w;
                                         break;
@@ -187,6 +191,7 @@ struct linearSVM
 #else
                         switch (UT) {
                                 default:
+                                case UpdateType::WildOrig:
                                 case UpdateType::Wild:
                                         wptrs[cur] = &var_data.w;
                                         weight = *wptrs[cur];
@@ -211,7 +216,11 @@ struct linearSVM
 #else
                         dweights[cur] = g.getEdgeData(edge_it);
 #endif
-                        rfactors[cur] = mweights[cur] / (CREG * varCount);
+                        if (UT == UpdateType::WildOrig) {
+                                rfactors[cur] = (CREG * varCount);
+                        } else {
+                                rfactors[cur] = mweights[cur] / (CREG * varCount);
+                        }
 			dot += mweights[cur] * dweights[cur];
                         cur += 1;
 		}
@@ -227,13 +236,21 @@ struct linearSVM
 		for(cur = 0; cur < size; ++cur)
 		{
 			double delta;
-			if(update_type)
-				delta = learningRate * (rfactors[cur] - label * dweights[cur]);
-			else
-				delta = rfactors[cur];
+                        if (UT == UpdateType::WildOrig) {
+                                if(update_type)
+                                        delta = learningRate * (*wptrs[cur]/rfactors[cur] - label * dweights[cur]);
+                                else
+                                        delta = *wptrs[cur]/rfactors[cur];
+                        } else {
+                                if(update_type)
+                                        delta = learningRate * (rfactors[cur] - label * dweights[cur]);
+                                else
+                                        delta = rfactors[cur];
+                        }
 #ifdef DENSE
                         switch (UT) {
                                 default:
+                                case UpdateType::WildOrig:
                                 case UpdateType::Wild:
                                         baseNodeData[cur].w = mweights[cur] - delta;
                                         break;
@@ -248,7 +265,11 @@ struct linearSVM
                                         break;
                         }
 #else
-                        *wptrs[cur] = mweights[cur] - delta;
+                        if (UT == UpdateType::WildOrig) {
+                                *wptrs[cur] -= delta;
+                        } else {
+                                *wptrs[cur] = mweights[cur] - delta;
+                        }
 #endif
 		}
 	}
@@ -264,6 +285,9 @@ void printParameters()
         switch (UPDATE_TYPE) {
                 case UpdateType::Wild:
                         std::cout << "Update type: wild\n";
+                        break;
+                case UpdateType::WildOrig:
+                        std::cout << "Update type: wild orig\n";
                         break;
                 case UpdateType::ReplicateByThread:
                         std::cout << "Update type: replicate by thread\n";
@@ -363,17 +387,23 @@ int main(int argc, char** argv)
 	initializeVariableCounts(g);
 	
         Galois::StatTimer timer;
+        Galois::TimeAccumulator accumTimer;
+        accumTimer.start();
         timer.start();
 
 	NUM_VARIABLES = g.size() - NUM_SAMPLES;
 	assert(NUM_SAMPLES > 0 && NUM_VARIABLES > 0);
 	
+	printParameters();
+
 	//put samples in a list and shuffle them
 	std::vector<GNode> all_samples(g.begin(), g.begin() + NUM_SAMPLES);
 	std::random_shuffle(all_samples.begin(), all_samples.end());
 
 	//copy a fraction of the samples to the training samples list
-	unsigned num_training_samples = NUM_SAMPLES * TRAINING_FRACTION;
+	unsigned num_training_samples = TRAINING_NUMBER;
+        if (num_training_samples == 0 || num_training_samples >= NUM_SAMPLES) 
+                num_training_samples = NUM_SAMPLES * TRAINING_FRACTION;
 	std::vector<GNode> training_samples(all_samples.begin(), all_samples.begin() + num_training_samples);
 	std::cout << "Training samples: " << training_samples.size() << "\n";
 	
@@ -402,7 +432,6 @@ int main(int argc, char** argv)
                 });
         }
 
-	printParameters();
 	//getAccuracy(g, testing_samples);
 	
 	Galois::StatTimer sgdTime("SgdTime");
@@ -435,6 +464,9 @@ int main(int argc, char** argv)
                         case UpdateType::Wild:
                                 Galois::for_each(ts_begin, ts_end, linearSVM<UpdateType::Wild>(g, learning_rate, bigUpdates), ln, wl);
                                 break;
+                        case UpdateType::WildOrig:
+                                Galois::for_each(ts_begin, ts_end, linearSVM<UpdateType::WildOrig>(g, learning_rate, bigUpdates), ln, wl);
+                                break;
                         case UpdateType::ReplicateByPackage:
                                 Galois::for_each(ts_begin, ts_end, linearSVM<UpdateType::ReplicateByPackage>(g, learning_rate, bigUpdates), ln, wl);
                                 break;
@@ -456,12 +488,12 @@ int main(int argc, char** argv)
                 double gflops = flop / flopTimer.get() / 1e6;
 
 		//swap weights from past iteration and this iteration
-		if(type != UpdateType::Wild) 
+		if(type != UpdateType::Wild && type != UpdateType::WildOrig) 
                 {
                         bool byThread = type == UpdateType::ReplicateByThread || type == UpdateType::Staleness;
                         double *localw = byThread ? *thread_weights.getLocal() : *package_weights.getLocal();
                         unsigned num_threads = Galois::getActiveThreads();
-                        unsigned num_packages = Galois::Runtime::LL::getMaxPackageForThread(num_threads-1);
+                        unsigned num_packages = Galois::Runtime::LL::getMaxPackageForThread(num_threads-1) + 1;
                         Galois::do_all(boost::counting_iterator<unsigned>(0), boost::counting_iterator<unsigned>(NUM_VARIABLES), [&](unsigned i) {
                                 unsigned n = byThread ? num_threads : num_packages;
                                 for (unsigned j = 1; j < n; j++)
@@ -493,10 +525,13 @@ int main(int argc, char** argv)
                         });
                 }
 
+                accumTimer.stop();
 		std::cout 
                         << iter << " GFLOP/s " << gflops << " "
-                        << "seconds " << flopTimer.get() / 1000.0 << " "
+                        << "(" << flopTimer.get() / 1000.0 << " s) "
+                        << "AccumTime " << accumTimer.get() / 1000.0 << " ";
                         ;
+                accumTimer.start();
 		accuracy = getAccuracy(g, testing_samples);
 		if(use_accuracy_goal && accuracy > ACCURACY_GOAL)
 		{

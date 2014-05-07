@@ -373,7 +373,7 @@ void globalRelabel(IncomingWL& incoming) {
   switch (detAlgo) {
     case nondet:
 #ifdef GALOIS_USE_EXP
-      Galois::for_each(app.sink, UpdateHeights<nondet>(), Galois::loopname("UpdateHeights"), Galois::wl<Galois::WorkList::BulkSynchronousInline<>>());
+      Galois::for_each(app.sink, UpdateHeights<nondet>(), Galois::loopname("UpdateHeights"), Galois::wl<Galois::WorkList::BulkSynchronousInline>());
 #else
       Galois::for_each(app.sink, UpdateHeights<nondet>(), Galois::loopname("UpdateHeights"));
 #endif

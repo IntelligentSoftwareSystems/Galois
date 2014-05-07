@@ -16,7 +16,7 @@ module load vtune
 if [ "$1" == "intel" ]; then
   module load intel
 else 
-  module load gcc/4.8.1-scale
+  module load gcc/4.9.0-scale
 fi
 
 module load cmake

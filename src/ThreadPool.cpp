@@ -76,48 +76,76 @@ void ThreadPool::initThread(unsigned tid) {
 void ThreadPool::threadLoop(unsigned tid) {
   initThread(tid);
   decascade(tid);
-  bool cont = true;
   bool fastmode = false;
   do {
     if (fastmode) {
-      while (!signals[tid].get().fastRelease) { LL::asmPause(); }
-      signals[tid].get().fastRelease = 0;
+      while (!signals.at(tid).get().fastRelease) { LL::asmPause(); }
+      signals.at(tid).get().fastRelease = 0;
     } else {
       threadWait(tid);
     }
     cascade(tid, fastmode);
+    
     try {
       work();
     } catch (const shutdown_ty&) {
-      cont = false;
+      return;
     } catch (const fastmode_ty& fm) {
-      cont = true;
       fastmode = fm.mode;
+    } catch (...) {
+      abort();
     }
     decascade(tid);
-  } while (cont);
+  } while (true);
 }
 
+
 void ThreadPool::decascade(int tid) {
-  const unsigned multiple = 2;
+  assert(signals.at(tid).get().done == 0);
+  const unsigned multiple = 3;
+  unsigned limit = starting;
   for (unsigned i = 1; i <= multiple; ++i) {
     unsigned n = tid * multiple + i;
-    if (n < starting)
-      while (!signals[n].get().done) { LL::asmPause(); }
+    if (n < limit) {
+      auto& done_flag = signals.at(n).get().done;
+      while (!done_flag) { LL::asmPause(); }
+    }
   }
-  signals[tid].get().done = 1;
+  signals.at(tid).get().done = 1;
 }
 
 void ThreadPool::cascade(int tid, bool fastmode) {
-  const unsigned multiple = 2;
+  unsigned limit = starting;
+  const unsigned multiple = 3;
   for (unsigned i = 1; i <= multiple; ++i) {
     unsigned n = tid * multiple + i;
-    if (n < starting) {
+    if (n < limit) {
       signals[n].get().done = 0;
       if (fastmode)
-        signals[n].get().fastRelease = 1;
+        signals.at(n).get().fastRelease = 1;
       else
         threadWakeup(n);
     }
   }
+}
+
+void ThreadPool::runInternal(unsigned num) {
+  //sanitize num
+  //seq write to starting should make work safe
+  num = std::min(std::max(1U,num), maxThreads);
+  starting = num;
+  assert(!masterFastmode || masterFastmode == num);
+  //launch threads
+  cascade(0, masterFastmode);
+  // Do master thread work
+  try {
+    work();
+  } catch (const shutdown_ty&) {
+    return;
+  } catch (const fastmode_ty& fm) {
+  }
+  //wait for children
+  decascade(0);
+  // Clean up
+  work = nullptr;
 }

@@ -139,8 +139,27 @@ struct has_dist {
 
 template<typename Graph>
 struct CountLevels {
+  // Reduce function
+  struct reducer {
+    template<typename G>
+    void operator()(G& a, G& b) {
+      if (a.size() < b.size())
+        a.resize(b.size());
+      std::transform(b.begin(), b.end(), a.begin(), a.begin(), std::plus<size_t>());
+    }
+  };
+
+  struct updater {
+    void operator()(std::deque<size_t>& lhs, size_t rhs) {
+      if (lhs.size() <= rhs)
+        lhs.resize(rhs + 1);
+      ++lhs[rhs];
+    }
+  };
+
+
   Graph& graph;
-  std::deque<size_t> counts;
+  Galois::GReducible<std::deque<size_t>, updater>* counts;
   
   CountLevels(Graph& g): graph(g) { }
 
@@ -148,21 +167,14 @@ struct CountLevels {
     Dist d = graph.getData(n).dist;
     if (d == DIST_INFINITY)
       return;
-    if (counts.size() <= d)
-      counts.resize(d + 1);
-    ++counts[d];
-  }
-
-  // Reduce function
-  template<typename G>
-  void operator()(CountLevels<G>& a, CountLevels<G>& b) {
-    if (a.counts.size() < b.counts.size())
-      a.counts.resize(b.counts.size());
-    std::transform(b.counts.begin(), b.counts.end(), a.counts.begin(), a.counts.begin(), std::plus<size_t>());
+    counts->update(d);
   }
 
   std::deque<size_t> count() {
-    return Galois::Runtime::do_all_impl(Galois::Runtime::makeLocalRange(graph), *this, *this).counts;
+    Galois::GReducible<std::deque<size_t>, updater> C{updater()};
+    counts = &C;
+    Galois::do_all_local(graph, *this);
+    return C.reduce(reducer());
   }
 };
 

@@ -226,11 +226,12 @@ private:
   typedef Process<false, BagWorklist, AccumUpdate> OrderedProcess;
 
   //! Compute histogram of levels
+  template<typename GR>
   struct CountLevels {
-    std::deque<size_t> counts;
+    GR& counts;
     bool reset;
 
-    explicit CountLevels(bool r): reset(r) { }
+    explicit CountLevels(bool r, GR& c): counts(c), reset(r) { }
 
     void operator()(const GNode& n) {
       SNode& data = graph.getData(n, Galois::MethodFlag::NONE);
@@ -238,19 +239,16 @@ private:
       assert(data.dist != DIST_INFINITY);
       if (data.dist == DIST_INFINITY)
         return;
-
-      if (counts.size() <= data.dist)
-        counts.resize(data.dist + 1);
-      ++counts[data.dist];
+      counts.update(data.dist);
       if (reset)
         data.dist = DIST_INFINITY;
     }
 
-    static void reduce(CountLevels& dest, CountLevels& src) {
-      if (dest.counts.size() < src.counts.size())
-        dest.counts.resize(src.counts.size());
-      std::transform(src.counts.begin(), src.counts.end(),
-          dest.counts.begin(), dest.counts.begin(), std::plus<size_t>());
+    static void reduce(std::deque<size_t>& dest, std::deque<size_t>& src) {
+      if (dest.size() < src.size())
+        dest.resize(src.size());
+      std::transform(src.begin(), src.end(),
+          dest.begin(), dest.begin(), std::plus<size_t>());
     }
   };
 
@@ -266,8 +264,16 @@ private:
     graph.getData(source).dist = 0;
     Galois::for_each(source, UnorderedProcess(), Galois::wl<dChunk>());
 
-    res.counts = Galois::Runtime::do_all_impl(Galois::Runtime::makeLocalRange(graph),
-        CountLevels(reset), default_reduce()).counts;
+    struct updater {
+      void operator()(std::deque<size_t>& lhs, size_t rhs) {
+        if (lhs.size() <= rhs)
+          lhs.resize(rhs + 1);
+        ++lhs[rhs];
+      }
+    };
+    Galois::GReducible<std::deque<size_t>, updater> counts{updater()};
+    Galois::do_all_local(graph, CountLevels<decltype(counts)>(reset, counts));
+    res.counts = counts.reduce(CountLevels<decltype(counts)>::reduce);
     res.max_width = *std::max_element(res.counts.begin(), res.counts.end());
     res.complete = true;
     return res;
@@ -352,7 +358,7 @@ public:
       if (maxdiff > globalmax){
         while (!maxband.cas(globalmax, maxdiff)){
           globalmax = maxband;
-          if (!maxdiff > globalmax)
+          if (!(maxdiff > globalmax))
             break;
         }
       }

@@ -261,7 +261,7 @@ class Fixed2DGraphTiledExecutor {
 
     unsigned coresPerPackage = LL::getMaxCores() / LL::getMaxPackages();
     if (useLocks)
-      start = { start[0], std::min(block[1] * coresPerPackage * (tid / coresPerPackage), numBlocks[1] - 1) };
+      start = { start[0], std::min(block[1] * LL::getPackageForThread(tid) * coresPerPackage, numBlocks[1] - 1) };
 
     Point p = start; 
 

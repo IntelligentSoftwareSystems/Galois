@@ -243,7 +243,7 @@ struct DefaultAlgo {
 
   void operator()(Graph& graph) {
 #ifdef GALOIS_USE_EXP
-    typedef Galois::WorkList::BulkSynchronousInline<> WL;
+    typedef Galois::WorkList::BulkSynchronousInline WL;
 #else
     typedef Galois::WorkList::dChunkedFIFO<256> WL;
 #endif

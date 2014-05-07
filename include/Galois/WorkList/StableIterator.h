@@ -123,8 +123,9 @@ public:
   template<typename RangeTy>
   void push_initial(const RangeTy& r) {
     state& data = *TLDS.getLocal();
-    data.localBegin = r.local_begin();
-    data.localEnd = r.local_end();
+    auto lp = r.local_pair();
+    data.localBegin = lp.first;
+    data.localEnd = lp.second;
     data.nextVictim = Runtime::LL::getTID();
     data.populateSteal();
   }
