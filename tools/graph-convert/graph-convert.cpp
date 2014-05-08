@@ -48,6 +48,7 @@ enum ConvertMode {
   bipartitegr2sorteddegreegr,
   dimacs2gr,
   edgelist2gr,
+  gr2biggr,
   gr2binarypbbs32,
   gr2binarypbbs64,
   gr2bsml,
@@ -115,10 +116,10 @@ static cll::opt<ConvertMode> convertMode(cll::desc("Conversion mode:"),
       clEnumVal(bipartitegr2sorteddegreegr, "Sort nodes of bipartite binary gr by degree"),
       clEnumVal(dimacs2gr, "Convert dimacs to binary gr"),
       clEnumVal(edgelist2gr, "Convert edge list to binary gr"),
+      clEnumVal(gr2biggr, "Convert binary gr with little-endian edge data to big-endian edge data"),
       clEnumVal(gr2binarypbbs32, "Convert binary gr to unweighted binary pbbs graph"),
       clEnumVal(gr2binarypbbs64, "Convert binary gr to unweighted binary pbbs graph"),
       clEnumVal(gr2bsml, "Convert binary gr to binary sparse MATLAB matrix"),
-      clEnumVal(gr2bsml, "Convert binary void gr to binary sparse MATLAB matrix"),
       clEnumVal(gr2cgr, "Clean up binary gr: remove self edges and multi-edges"),
       clEnumVal(gr2dimacs, "Convert binary gr to dimacs"),
       clEnumVal(gr2edgelist, "Convert binary gr to edgelist"),
@@ -570,7 +571,21 @@ struct Gr2Edgelist: public Conversion {
 };
 
 template<bool LittleEndian, typename T>
-void writePetsc(std::ofstream& out, T value) {
+void writeEndian(T* out, T value) {
+  static_assert(sizeof(T) == 4 || sizeof(T) == 8, "unknown data size");
+  switch ((sizeof(T) == 4 ? 0 : 2) + (LittleEndian ? 0 : 1)) {
+    case 3: value = Galois::convert_htobe64(value); break;
+    case 2: value = Galois::convert_htole64(value); break;
+    case 1: value = Galois::convert_htobe32(value); break;
+    case 0: value = Galois::convert_htole32(value); break;
+    default: abort();
+  }
+
+  *out = value;
+}
+
+template<bool LittleEndian, typename T>
+void writeEndian(std::ofstream& out, T value) {
   static_assert(sizeof(T) == 4 || sizeof(T) == 8, "unknown data size");
   switch ((sizeof(T) == 4 ? 0 : 2) + (LittleEndian ? 0 : 1)) {
     case 3: value = Galois::convert_htobe64(value); break;
@@ -604,15 +619,15 @@ struct Bipartitegr2Petsc: public HasNoVoidSpecialization {
     }
 
     std::ofstream file(outfilename.c_str());
-    writePetsc<LittleEndian, int32_t>(file, 1211216);
-    writePetsc<LittleEndian, int32_t>(file, partition); // rows
-    writePetsc<LittleEndian, int32_t>(file, graph.size() - partition); // columns
-    writePetsc<LittleEndian, int32_t>(file, graph.sizeEdges());
+    writeEndian<LittleEndian, int32_t>(file, 1211216);
+    writeEndian<LittleEndian, int32_t>(file, partition); // rows
+    writeEndian<LittleEndian, int32_t>(file, graph.size() - partition); // columns
+    writeEndian<LittleEndian, int32_t>(file, graph.sizeEdges());
 
     // number of nonzeros in each row
     for (Graph::iterator ii = graph.begin(), ei = ii + partition; ii != ei; ++ii) {
       GNode src = *ii;
-      writePetsc<LittleEndian, int32_t>(file, std::distance(graph.edge_begin(src), graph.edge_end(src)));
+      writeEndian<LittleEndian, int32_t>(file, std::distance(graph.edge_begin(src), graph.edge_end(src)));
     }
     
     // column indices 
@@ -620,7 +635,7 @@ struct Bipartitegr2Petsc: public HasNoVoidSpecialization {
       GNode src = *ii;
       for (Graph::edge_iterator jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj) {
         GNode dst = graph.getEdgeDst(jj);
-        writePetsc<LittleEndian, int32_t>(file, dst - partition);
+        writeEndian<LittleEndian, int32_t>(file, dst - partition);
       }
     }
 
@@ -628,7 +643,7 @@ struct Bipartitegr2Petsc: public HasNoVoidSpecialization {
     for (Graph::iterator ii = graph.begin(), ei = ii + partition; ii != ei; ++ii) {
       GNode src = *ii;
       for (Graph::edge_iterator jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj) {
-        writePetsc<LittleEndian, OutEdgeTy>(file, graph.getEdgeData<InEdgeTy>(jj));
+        writeEndian<LittleEndian, OutEdgeTy>(file, graph.getEdgeData<InEdgeTy>(jj));
       }
     }
     file.close();
@@ -983,6 +998,25 @@ struct SortByDegree: public Conversion {
 
     Galois::Graph::permute<EdgeTy>(ingraph, inverse, outgraph);
     outputPermutation(inverse);
+    outgraph.structureToFile(outfilename);
+    printStatus(ingraph.size(), ingraph.sizeEdges());
+  }
+};
+
+struct ToBigEndian: public HasNoVoidSpecialization {
+  template<typename EdgeTy>
+  void convert(const std::string& infilename, const std::string& outfilename) {
+    typedef Galois::Graph::FileGraph Graph;
+    typedef Graph::GraphNode GNode;
+    typedef Galois::LargeArray<GNode> Permutation;
+
+    Graph ingraph, outgraph;
+    ingraph.structureFromFile(infilename);
+    EdgeTy* out = outgraph.structureFromGraph<EdgeTy>(ingraph);
+
+    for (auto ii = ingraph.edge_data_begin<EdgeTy>(), ei = ingraph.edge_data_end<EdgeTy>(); ii != ei; ++ii, ++out) {
+      writeEndian<false>(out, *ii);
+    }
     outgraph.structureToFile(outfilename);
     printStatus(ingraph.size(), ingraph.sizeEdges());
   }
@@ -2164,6 +2198,7 @@ int main(int argc, char** argv) {
     case bipartitegr2sorteddegreegr: convert<BipartiteSortByDegree>(); break;
     case dimacs2gr: convert<Dimacs2Gr>(); break;
     case edgelist2gr: convert<Edgelist2Gr>(); break;
+    case gr2biggr: convert<ToBigEndian>(); break;
     case gr2binarypbbs32: convert<Gr2BinaryPbbs<uint32_t,uint32_t> >(); break;
     case gr2binarypbbs64: convert<Gr2BinaryPbbs<uint32_t,uint64_t> >(); break;
     case gr2bsml: convert<Gr2Bsml>(); break;
