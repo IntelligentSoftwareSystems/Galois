@@ -10,7 +10,9 @@ if [[ ! -e COPYRIGHT ]]; then
 fi
 
 touch "$NAME.tar.gz" # Prevent . from changing during tar
-(svn status | grep '^\?' | sed -e 's/^\? *//'; \
+#(svn status | grep '^\?' | sed -e 's/^\? *//'; \
+( \
+  echo ".git"; \
   echo "*.swp"; \
   echo "*~"; \
   echo "exp"; \
