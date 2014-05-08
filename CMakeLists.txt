@@ -8,8 +8,8 @@ set(GALOIS_VERSION ${GALOIS_VERSION_MAJOR}.${GALOIS_VERSION_MINOR}.${GALOIS_VERS
 set(GALOIS_COPYRIGHT_YEAR "2014") # Also in COPYRIGHT
 
 if(NOT CMAKE_BUILD_TYPE)
-  message(STATUS "No build type selected, default to Release")
-  set(CMAKE_BUILD_TYPE "Release") 
+  message(STATUS "No build type selected, default to release with debug info")
+  set(CMAKE_BUILD_TYPE "relwithdebinfo") 
 endif()
 
 ###### Options (alternatively pass as options to cmake -DName=Value) ######
@@ -47,23 +47,6 @@ enable_testing()
 
 ###### Configure compiler ######
 
-# mic
-if(ARCH STREQUAL "mic")
-  if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -mmic")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mmic")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -mmic")
-  endif()
-
-  if(CMAKE_COMPILER_IS_GNUCC)
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=knc")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -march=knc")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -march=knc")
-  endif()
-
-  set(GALOIS_ARCH_MIC TRUE)
-  add_definitions(-DGALOIS_ARCH_MIC)
-endif()
 # ICC
 if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
   execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion
@@ -127,16 +110,12 @@ if(CMAKE_SYSTEM MATCHES "SunOS.*")
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -m64 -lposix4")
 endif()
 
-
-# Always include debug symbols
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g")
-
 # Enable architecture-specific optimizations
-if(CMAKE_BUILD_TYPE MATCHES "Release"
-    AND NOT GALOIS_ARCH_MIC
-    AND CMAKE_CXX_COMPILER_ID MATCHES "GNU")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -march=native")
+find_package(ArchFlags)
+if(ARCH_FLAGS_FOUND)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${ARCH_CXX_FLAGS}")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${ARCH_C_FLAGS}")
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${ARCH_EXE_FLAGS}")
 endif()
 
 # More warnings
@@ -207,14 +186,14 @@ find_package(Threads REQUIRED)
 
 # NUMA (linux)
 # currently not available on MIC (and not helpful either)
-if(NOT GALOIS_ARCH_MIC)
+#if(NOT ARCH STREQUAL "mic")
   find_package(NUMA)
   if(NUMA_FOUND)
     set(GALOIS_USE_NUMA on)
   elseif(USE_STRICT_CONFIG)
     message(FATAL_ERROR "Need libnuma")
   endif()
-endif()
+#endif()
 
 #llvm ADT and command line parser
 #find_package(LLVM)

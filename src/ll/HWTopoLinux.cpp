@@ -21,11 +21,11 @@
  * @section Description
  *
  * This contains descriptions of machine topologies.  These describes levels in
- * the machine.  The lowest level is a package.
+ * the machine. SMT Threads &lt; Cores &lt; Packages.
  *
  * This also matches OS cpu numbering to galois thread numbering and binds threads
- * to processors.  Threads are assigned densly in each package before the next 
- * package.  SMT hardware contexts are bound after all real cores (int x86).
+ * to processors.  Galois threads are assigned densely in each package before the next 
+ * package.  SMT threads are bound after all real cores (assuming x86).
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */

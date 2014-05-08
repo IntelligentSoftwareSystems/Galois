@@ -22,8 +22,8 @@
  */
 
 #include "Galois/Runtime/PerThreadStorage.h"
-#include "Galois/Runtime/ll/gio.h"
 #include "Galois/Runtime/mm/Mem.h"
+#include "Galois/Runtime/ll/gio.h"
 #include <mutex>
 
 __thread char* Galois::Runtime::ptsBase;
@@ -130,8 +130,9 @@ void* Galois::Runtime::PerBackend::getRemote(unsigned thread, unsigned offset) {
 }
 
 void Galois::Runtime::PerBackend::initCommon() {
-  if (heads.empty())
+  if (heads.empty()) {
     heads.resize(LL::getMaxThreads());
+  }
 }
 
 char* Galois::Runtime::PerBackend::initPerThread() {
@@ -158,13 +159,13 @@ char* Galois::Runtime::PerBackend::initPerPackage() {
 }
 
 void Galois::Runtime::initPTS() {
-  if (!Galois::Runtime::ptsBase) {
+  if (!ptsBase) {
     //unguarded initialization as initPTS will run in the master thread
     //before any other threads are generated
-    Galois::Runtime::ptsBase = getPTSBackend().initPerThread();
+    ptsBase = getPTSBackend().initPerThread();
   }
-  if (!Galois::Runtime::ppsBase) {
-    Galois::Runtime::ppsBase = getPPSBackend().initPerPackage();
+  if (!ppsBase) {
+    ppsBase = getPPSBackend().initPerPackage();
   }
 }
 
@@ -187,7 +188,7 @@ char* Galois::Runtime::PerBackend::initPerPackage_cilk() {
 
 void Galois::Runtime::initPTS_cilk() {
   if (!Galois::Runtime::ptsBase) {
-    Galois::Runtime::ptsBase = getPTSBackend().initPerThread_cilk ();
+    Galois::Runtime::ptsBase = getPTSBackend().initPerThread_cilk();
   }
   if (!Galois::Runtime::ppsBase) {
     Galois::Runtime::ppsBase = getPPSBackend().initPerPackage_cilk();

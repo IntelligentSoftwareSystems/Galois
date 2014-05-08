@@ -148,7 +148,8 @@ static inline int getNumaNode(unsigned tid) {
 #elif defined(GALOIS_USE_NUMA)
   return numa_node_of_cpu(proc);
 #else
-  return 0;
+  proc = 0; // get rid of unused warning
+  return proc;
 #endif
 }
 
