@@ -169,8 +169,8 @@ struct Policy {
     int id = 0;
     for (unsigned i = 0; i < levels[0].size(); ++i) {
       if (levels[0][i] >= 0) {
-        levels[l][i] = 0;
-        levels[l+1][i] = id++;
+        levels[l][i] = id++;
+        levels[l+1][i] = 0;
       }
     }
   }
