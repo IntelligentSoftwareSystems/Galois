@@ -15,11 +15,14 @@ module load vtune
 
 if [ "$1" == "intel" ]; then
   module load intel
+  module load cmake
 else 
+  # Load system gcc first so that cmake can be found
+  module load gcc/4.8
+  module load cmake
   module load gcc/4.9.0-scale
 fi
 
-module load cmake
 module load tbb
 module load boost
 module load eigen
@@ -33,7 +36,3 @@ if [ "$1" != "min" ]; then
   module load mpich2
   module load git
 fi
-
-
-
-
