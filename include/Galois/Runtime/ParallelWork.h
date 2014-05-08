@@ -232,6 +232,17 @@ protected:
   void runQueue(ThreadLocalData& tld, WL& lwl) {
     Galois::optional<typename WL::value_type> p;
     unsigned num = 0;
+#ifdef GALOIS_USE_LONGJMP
+    if (setjmp(hackjmp) == 0) {
+      while ((!limit || num++ < limit) && (p = lwl.pop())) {
+	doProcess(aborted.value(*p), tld);
+      }
+    } else {
+      clearReleasable();
+      clearConflictLock();
+      abortIteration(*p, tld);
+    }
+#else
     try {
       while ((!limit || num++ < limit) && (p = lwl.pop())) {
 	doProcess(aborted.value(*p), tld);
@@ -239,7 +250,8 @@ protected:
     } catch (ConflictFlag const& flag) {
       abortIteration(*p, tld);
     }
-  }
+#endif
+}
 
   GALOIS_ATTRIBUTE_NOINLINE
   void handleAborts(ThreadLocalData& tld) {
