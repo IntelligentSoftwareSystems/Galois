@@ -675,7 +675,8 @@ void initializeGraph(std::string inputFile, uint32_t sourceId, uint32_t sinkId, 
     }
     Galois::Graph::readGraph(newApp->graph, inputFile);
 
-#ifdef HAVE_BIG_ENDIAN
+    // Assume that input edge data has already been converted instead
+#if 0//def HAVE_BIG_ENDIAN
     // Convert edge data to host ordering
     for (Graph::iterator ss = newApp->graph.begin(), es = newApp->graph.end(); ss != es; ++ss) {
       for (Graph::edge_iterator ii = newApp->graph.edge_begin(*ss), ei = newApp->graph.edge_end(*ss); ii != ei; ++ii) {
