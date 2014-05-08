@@ -48,17 +48,30 @@ class PerBackend {
   typedef Galois::Runtime::LL::SimpleLock Lock;
 
   unsigned int nextLoc;
-  std::vector<char*> heads;
+  char** heads;
   Lock freeOffsetsLock;
   std::vector<std::vector<unsigned> > freeOffsets;
+  /**
+   * Guards access to non-POD objects that can be accessed after PerBackend
+   * is destroyed. Access can occur through destroying PerThread/PerPackage
+   * objects with static storage duration, which have a reference to a
+   * PerBackend object, which may have be destroyed before the PerThread
+   * object itself.
+   */
+  bool invalid; 
 
   void initCommon();
-
   static unsigned nextLog2(unsigned size);
 
 public:
-  PerBackend(): nextLoc(0) {
+  PerBackend(): nextLoc(0), heads(0), invalid(false) {
     freeOffsets.resize(MAX_SIZE);
+  }
+
+  ~PerBackend() {
+    // Intentionally leak heads so that other PerThread operations are
+    // still valid after we are gone
+    invalid = true;
   }
 
   char* initPerThread();
