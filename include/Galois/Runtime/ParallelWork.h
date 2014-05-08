@@ -153,17 +153,17 @@ protected:
     SimpleRuntimeContext ctx;
     unsigned long stat_conflicts;
     unsigned long stat_commits;
-    unsigned long stat_pushs;
+    unsigned long stat_pushes;
     const char* loopname;
     ThreadLocalData(const FunctionTy& fn, const char* ln)
-      : function(fn), stat_conflicts(0), stat_commits(0), stat_pushs(0), 
+      : function(fn), stat_conflicts(0), stat_commits(0), stat_pushes(0), 
         loopname(ln)
     {}
     ~ThreadLocalData() {
       if (ForEachTraits<FunctionTy>::NeedsStats) {
         reportStat(loopname, "Conflicts", stat_conflicts);
         reportStat(loopname, "Commits", stat_commits);
-        reportStat(loopname, "Pushs", stat_pushs);
+        reportStat(loopname, "Pushes", stat_pushes);
         reportStat(loopname, "Iterations", stat_commits + stat_conflicts);
       }
     }
@@ -187,7 +187,7 @@ protected:
       auto& pb = tld.facing.getPushBuffer();
       auto n = pb.size();
       if (n) {
-	tld.stat_pushs += n;
+	tld.stat_pushes += n;
         wl.push(pb.begin(), pb.end());
         pb.clear();
       }
