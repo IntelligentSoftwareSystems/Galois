@@ -40,6 +40,7 @@
 #ifdef GALOIS_USE_EXP
 #include "GraphLabAlgo.h"
 #include "LigraAlgo.h"
+#include "PagerankDelta.h"
 #endif
 
 namespace cll = llvm::cl;
@@ -55,6 +56,7 @@ enum Algo {
   ligraChi,
   pull,
   pull2,
+  pagerankWorklist,
   serial
 };
 
@@ -75,6 +77,7 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
       clEnumValN(Algo::graphlabAsync, "graphlabAsync", "Use GraphLab-Asynchronous programming model"),
       clEnumValN(Algo::ligra, "ligra", "Use Ligra programming model"),
       clEnumValN(Algo::ligraChi, "ligraChi", "Use Ligra and GraphChi programming model"),
+      clEnumValN(Algo::pagerankWorklist, "pagerankWorklist", "Use worklist-based algorithm"),
 #endif
       clEnumValEnd), cll::init(Algo::pull));
 
@@ -543,6 +546,7 @@ int main(int argc, char **argv) {
     case Algo::ligraChi: run<LigraAlgo<true> >(); break;
     case Algo::graphlab: run<GraphLabAlgo<false,false> >(); break;
     case Algo::graphlabAsync: run<GraphLabAlgo<true,true> >(); break;
+    case Algo::pagerankWorklist: run<PagerankDelta>(); break;
 #endif
     case Algo::serial: run<SerialAlgo>(); break;
     default: std::cerr << "Unknown algorithm\n"; abort();
