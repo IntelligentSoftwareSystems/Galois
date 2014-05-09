@@ -81,10 +81,16 @@ public:
   T& back() { return items.front(); }
 
   struct InnerBegFnL : std::unary_function<Runtime::gptr<Bag>, local_iterator> {
-    local_iterator operator()(Runtime::gptr<Bag> d) { return d->local_begin(); }
+    local_iterator operator()(Runtime::gptr<Bag> d) {
+      acquire(d, MethodFlag::ALL);
+      return d->local_begin();
+    }
   };
   struct InnerEndFnL : std::unary_function<Runtime::gptr<Bag>, local_iterator> {
-    local_iterator operator()(Runtime::gptr<Bag> d) { return d->local_end(); }
+    local_iterator operator()(Runtime::gptr<Bag> d) {
+      acquire(d, MethodFlag::ALL);
+      return d->local_end();
+    }
   };
   typedef TwoLevelFwdIter<typename Runtime::PerThreadDist<Bag>::iterator, local_iterator, InnerBegFnL, InnerEndFnL> iterator;
   iterator begin() { return iterator(basePtr.begin(), basePtr.end(), InnerBegFnL(), InnerEndFnL()); }
