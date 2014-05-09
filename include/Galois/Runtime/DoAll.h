@@ -66,7 +66,7 @@ class DoAllWork {
       stealLock.unlock();
     }
 
-    bool doSteal(iterator& begin, iterator& end, size_t minSteal) {
+    bool doSteal(iterator& begin, iterator& end, int minSteal) {
       if (avail) {
         std::lock_guard<LL::SimpleLock> lg(stealLock);
         if (stealBegin != stealEnd) {
@@ -87,7 +87,7 @@ class DoAllWork {
   PerThreadStorage<state> TLDS;
 
   GALOIS_ATTRIBUTE_NOINLINE
-  bool trySteal(state& local, iterator& begin, iterator& end, size_t minSteal) {
+  bool trySteal(state& local, iterator& begin, iterator& end, int minSteal) {
     //First try stealing from self
     if (local.doSteal(begin, end, minSteal))
       return true;
@@ -95,7 +95,7 @@ class DoAllWork {
     unsigned myID = LL::getTID();
     unsigned myPkg = LL::getPackageForThread(myID);
     //try package neighbors
-    for (int x = 0; x < activeThreads; ++x) {
+    for (unsigned x = 0; x < activeThreads; ++x) {
       if (x != myID && LL::getPackageForThread(x) == myPkg) {
         if (TLDS.getRemote(x)->doSteal(begin, end, minSteal)) {
           if (std::distance(begin, end) > minSteal) {

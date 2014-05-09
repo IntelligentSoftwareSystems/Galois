@@ -302,7 +302,7 @@ T map_reduce(InputIterator first, InputIterator last, MapFn fn, T init, ReduceFn
   do_all(first, last,
          map_reduce_helper<T,MapFn,ReduceFn>(reduced, fn, reduce));
   //         Galois::loopname("map_reduce"));
-  for (int i = 0; i < reduced.size(); ++i)
+  for (unsigned i = 0; i < reduced.size(); ++i)
     init = reduce(init, *reduced.getRemote(i));
   return init;
 }

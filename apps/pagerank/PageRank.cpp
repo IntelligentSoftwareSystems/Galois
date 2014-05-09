@@ -279,8 +279,8 @@ struct PullAlgo2 {
   };
 
   typedef typename Galois::Graph::LC_InlineEdge_Graph<LNode,void>
-    ::template with_numa_alloc<true>::type
-    ::template with_no_lockable<true>::type
+    ::with_numa_alloc<true>::type
+    ::with_no_lockable<true>::type
     InnerGraph;
   typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
   typedef typename Graph::GraphNode GNode;

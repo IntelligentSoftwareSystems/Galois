@@ -47,7 +47,8 @@ class DisseminationBarrier: public Galois::Runtime::Barrier {
   struct LocalData {
     int parity;
     int sense;
-    std::array<node,32> myflags;
+    node myflags[32];
+    //std::array<node, 32> myflags;
   };
 
   Galois::Runtime::PerThreadStorage<LocalData> nodes;
@@ -56,14 +57,15 @@ class DisseminationBarrier: public Galois::Runtime::Barrier {
   void _reinit(unsigned P) {
     LogP = FAST_LOG2_UP(P);
     for (unsigned i = 0; i < P; ++i) {
-      auto& lhs = *nodes.getRemote(i);
+      LocalData& lhs = *nodes.getRemote(i);
       lhs.parity = 0;
       lhs.sense = 1;
-      for (auto& n : lhs.myflags)
-        n.flag[0] = n.flag[1] = 0;
+      for (unsigned j = 0; j < sizeof(lhs.myflags)/sizeof(*lhs.myflags); ++i)
+        lhs.myflags[j].flag[0] = lhs.myflags[j].flag[1] = 0;
+
       int d = 1;
       for (unsigned j = 0; j < LogP; ++j) {
-        auto& rhs = *nodes.getRemote((i+d) % P);
+        LocalData& rhs = *nodes.getRemote((i+d) % P);
         lhs.myflags[j].partner = &rhs.myflags[j];
         d *= 2;
       }

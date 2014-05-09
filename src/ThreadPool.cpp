@@ -25,6 +25,8 @@
 #include "Galois/Runtime/ll/HWTopo.h"
 #include "Galois/Runtime/ll/TID.h"
 
+#include <cstdlib>
+
 // Forward declare this to avoid including PerThreadStorage.
 // We avoid this to stress that the thread Pool MUST NOT depend on PTS.
 namespace Galois {

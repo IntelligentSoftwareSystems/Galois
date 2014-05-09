@@ -180,7 +180,7 @@ struct OrderGraph {
     for (auto nb = graph.begin(), ne = graph.end(); nb != ne; nb++) { 
       GNode n = *nb; 
       auto &nd = graph.getData(n,flag); 
-      if (nd.getPart() == part) {
+      if (static_cast<int>(nd.getPart()) == part) {
         int edges = std::distance(graph.edge_begin(n,flag), graph.edge_end(n,flag));
         orderedNodes.push_back(std::make_pair(edges,n));
       }
@@ -194,7 +194,7 @@ struct OrderGraph {
       for (auto eb = graph.edge_begin(n,flag), ee = graph.edge_end(n,flag); eb != ee; eb++) {
         GNode neigh = graph.getEdgeDst(eb);
         auto &nd = graph.getData(neigh,flag);
-        if (nd.getPart() == part) { 
+        if (static_cast<int>(nd.getPart()) == part) { 
           threadMap[neigh] += index;
         }
       }
