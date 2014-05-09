@@ -332,7 +332,10 @@ class ThirdGraph { //: public Galois::Runtime::DistBase<ThirdGraph> {
     bool operator()(typename gNode::EdgeType& n) const { return n.getDst()->getActive(); }
   };
   struct is_node: public std::unary_function<Runtime::gptr<gNode>&, bool>{
-    bool operator() (const Runtime::gptr<gNode>& g) const { return g->getActive(); }
+    bool operator() (const Runtime::gptr<gNode>& g) const {
+      acquire(g, MethodFlag::ALL);
+      return g->getActive();
+    }
   };
   struct makePtrLocal: public std::unary_function<gNode&, Runtime::gptr<gNode>> {
     Runtime::gptr<gNode> operator()(gNode& data) const { return Runtime::gptr<gNode>(&data); }
