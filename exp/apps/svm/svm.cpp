@@ -73,8 +73,7 @@ static cll::opt<UpdateType> UPDATE_TYPE("algo", cll::desc("Update type:"),
 
 /**          DATA TYPES        **/
 
-typedef struct Node
-{
+typedef struct Node {
   double w; //weight - relevant for variable nodes
   int field; //variable nodes - variable count, sample nodes - label
   Node(): w(0.0), field(0) { }
@@ -88,8 +87,7 @@ using GNode = Graph::GraphNode;
 unsigned NUM_SAMPLES = 0;
 unsigned NUM_VARIABLES = 0;
 
-unsigned variableNodeToId(GNode variable_node)
-{
+unsigned variableNodeToId(GNode variable_node) {
   return ((unsigned) variable_node) - NUM_SAMPLES;
 }
 
@@ -102,8 +100,7 @@ Galois::LargeArray<double> old_weights;
 //#define DENSE_NUM_FEATURES 500
 
 template<UpdateType UT>
-struct linearSVM
-{  
+struct linearSVM {  
   typedef int tt_needs_per_iter_alloc;
   typedef int tt_does_not_need_aborts;
 
@@ -117,8 +114,7 @@ struct linearSVM
   ptrdiff_t edgeOffset;
   double* baseEdgeData;
 #endif
-  linearSVM(Graph& _g, double _lr, Galois::GAccumulator<size_t>& b) : g(_g), learningRate(_lr), bigUpdates(b) 
-  {
+  linearSVM(Graph& _g, double _lr, Galois::GAccumulator<size_t>& b) : g(_g), learningRate(_lr), bigUpdates(b) {
     has_other = Galois::Runtime::LL::getMaxPackageForThread(Galois::getActiveThreads() - 1) > 1;
 #ifdef DENSE
     baseNodeData = &g.getData(g.getEdgeDst(g.edge_begin(0)));
@@ -127,15 +123,13 @@ struct linearSVM
 #endif
   }
   
-  void operator()(GNode gnode, Galois::UserContext<GNode>& ctx)
-  {  
+  void operator()(GNode gnode, Galois::UserContext<GNode>& ctx) {  
     double *packagew = *package_weights.getLocal();
     double *threadw = *thread_weights.getLocal();
     double *otherw = NULL;
     Galois::PerIterAllocTy& alloc = ctx.getPerIterAlloc();
 
-    if (has_other) 
-    {
+    if (has_other) {
       unsigned tid = Galois::Runtime::LL::getTID();
       unsigned my_package = Galois::Runtime::LL::getPackageForSelf(tid);
       unsigned next = my_package + 1;
@@ -163,10 +157,10 @@ struct linearSVM
     double dot = 0.0;
 #ifdef DENSE
     double* myEdgeData = &baseEdgeData[size * gnode];
-    for(cur = 0; cur < size; ) {
+    for (cur = 0; cur < size; ) {
       int varCount = baseNodeData[cur].field;
 #else
-    for(auto edge_it : g.out_edges(gnode)) {
+    for (auto edge_it : g.out_edges(gnode)) {
       GNode variable_node = g.getEdgeDst(edge_it);
       Node& var_data = g.getData(variable_node);
       int varCount = var_data.field;
@@ -233,8 +227,7 @@ struct linearSVM
     bool update_type = label * dot < 1;
     if (update_type)
       bigUpdates += size;
-    for(cur = 0; cur < size; ++cur)
-    {
+    for (cur = 0; cur < size; ++cur) {
       double delta;
       if (UT == UpdateType::WildOrig) {
         if(update_type)
@@ -302,12 +295,9 @@ void printParameters()
   }
 }
 
-void initializeVariableCounts(Graph& g)
-{
-  for (auto gnode : g) 
-  {
-    for(auto edge_it : g.out_edges(gnode))
-    {
+void initializeVariableCounts(Graph& g) {
+  for (auto gnode : g) {
+    for (auto edge_it : g.out_edges(gnode)) {
       GNode variable_node = g.getEdgeDst(edge_it);
       Node& data = g.getData(variable_node);
       data.field++; //increase count of variable occurrences
@@ -315,16 +305,13 @@ void initializeVariableCounts(Graph& g)
   }
 }
 
-
-unsigned loadLabels(Graph& g, std::string filename)
-{
+unsigned loadLabels(Graph& g, std::string filename) {
   std::ifstream infile(filename);
 
   unsigned sample_id;
   int label;
   int num_labels = 0;
-  while (infile >> sample_id >> label)
-  {
+  while (infile >> sample_id >> label) {
     g.getData(sample_id).field = label;
     ++num_labels;
   }
@@ -332,8 +319,7 @@ unsigned loadLabels(Graph& g, std::string filename)
   return num_labels;
 }
 
-double getAccuracy(Graph& g, std::vector<GNode>& testing_samples)
-{
+double getAccuracy(Graph& g, std::vector<GNode>& testing_samples) {
   Galois::GAccumulator<size_t> correct;
   // 0.5 * norm(w)^2 + C * sum_i [max(0, 1 - y_i * w * x_i)]
   Galois::GAccumulator<double> objective;
@@ -342,20 +328,16 @@ double getAccuracy(Graph& g, std::vector<GNode>& testing_samples)
     double sum = 0.0;
     Node& data = g.getData(gnode);
     int label = data.field;
-    for(auto edge_it : g.out_edges(gnode))
-    {
+    for (auto edge_it : g.out_edges(gnode)) {
       GNode variable_node = g.getEdgeDst(edge_it);
       Node& data = g.getData(variable_node);
       double weight = g.getEdgeData(edge_it);
       sum += data.w * weight;
     }
 
-    if(sum <= 0.0 && label == -1)
-    {
+    if (sum <= 0.0 && label == -1) {
       correct += 1;
-    }
-    else if(sum > 0.0 && label == 1)
-    {
+    } else if (sum > 0.0 && label == 1) {
       correct += 1;
     }
     objective += std::max(0.0, 1 - label * sum);
@@ -376,8 +358,7 @@ double getAccuracy(Graph& g, std::vector<GNode>& testing_samples)
   return accuracy;
 }
 
-int main(int argc, char** argv)
-{
+int main(int argc, char** argv) {
   LonestarStart(argc, argv, name, desc, url);
   Galois::StatManager statManager;
   
@@ -413,16 +394,14 @@ int main(int argc, char** argv)
   
   //allocate storage for weights from previous iteration
   old_weights.create(NUM_VARIABLES);
-  if(UPDATE_TYPE == UpdateType::ReplicateByThread || UPDATE_TYPE == UpdateType::Staleness) 
-  {
+  if (UPDATE_TYPE == UpdateType::ReplicateByThread || UPDATE_TYPE == UpdateType::Staleness) {
     Galois::on_each([](unsigned tid, unsigned total) {
       double *p = new double[NUM_VARIABLES];
       *thread_weights.getLocal() = p;
       std::fill(p, p + NUM_VARIABLES, 0);
     });
   }
-  if(UPDATE_TYPE == UpdateType::ReplicateByPackage)
-  {
+  if (UPDATE_TYPE == UpdateType::ReplicateByPackage) {
     Galois::on_each([](unsigned tid, unsigned total) {
       if (Galois::Runtime::LL::isPackageLeader(tid)) {
         double *p = new double[NUM_VARIABLES];
@@ -440,8 +419,7 @@ int main(int argc, char** argv)
   //  otherwise, run specified iterations
   const bool use_accuracy_goal = ITER == 0;
   double accuracy = -1.0; //holds most recent accuracy stat
-  for(unsigned iter = 1; iter <= ITER || use_accuracy_goal; iter++)
-  {
+  for (unsigned iter = 1; iter <= ITER || use_accuracy_goal; iter++) {
     sgdTime.start();
     
     //include shuffling time in the time taken per iteration
@@ -488,16 +466,14 @@ int main(int argc, char** argv)
     double gflops = flop / flopTimer.get() / 1e6;
 
     //swap weights from past iteration and this iteration
-    if(type != UpdateType::Wild && type != UpdateType::WildOrig) 
-    {
+    if (type != UpdateType::Wild && type != UpdateType::WildOrig) {
       bool byThread = type == UpdateType::ReplicateByThread || type == UpdateType::Staleness;
       double *localw = byThread ? *thread_weights.getLocal() : *package_weights.getLocal();
       unsigned num_threads = Galois::getActiveThreads();
       unsigned num_packages = Galois::Runtime::LL::getMaxPackageForThread(num_threads-1) + 1;
       Galois::do_all(boost::counting_iterator<unsigned>(0), boost::counting_iterator<unsigned>(NUM_VARIABLES), [&](unsigned i) {
         unsigned n = byThread ? num_threads : num_packages;
-        for (unsigned j = 1; j < n; j++)
-        {
+        for (unsigned j = 1; j < n; j++) {
           double o = byThread ?
             (*thread_weights.getRemote(j))[i] :
             (*package_weights.getRemoteByPkg(j))[i];
@@ -532,8 +508,7 @@ int main(int argc, char** argv)
       << "AccumTime " << accumTimer.get() / 1000.0 << " ";
     accumTimer.start();
     accuracy = getAccuracy(g, testing_samples);
-    if(use_accuracy_goal && accuracy > ACCURACY_GOAL)
-    {
+    if (use_accuracy_goal && accuracy > ACCURACY_GOAL) {
       std::cout << "Accuracy goal of " << ACCURACY_GOAL << " reached after " <<
         iter << " iterations."<< std::endl;
       break;
