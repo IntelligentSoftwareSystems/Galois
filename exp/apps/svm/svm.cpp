@@ -1,7 +1,8 @@
-/* 
- * License:
+/** SVM with SGD -*- C++ -*-
+ * @file
+ * @section License
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2014, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -14,18 +15,13 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  *
+ * @section Description
+ *
  * Stochastic gradient descent for solving linear SVM, implemented with Galois.
  *
- * Author: Prad Nelluru <pradn@cs.utexas.edu>
-*/
-
-#include <iostream>
-#include <cassert>
-#include <algorithm>
-#include <fstream>
-#include <vector>
-
-#include "Galois/config.h"
+ * @author Prad Nelluru <pradn@cs.utexas.edu>
+ * @author Donald Nguyen <ddn@cs.utexas.edu>
+ */
 #include "Galois/Galois.h"
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
@@ -36,18 +32,24 @@
 #include "Galois/Runtime/ll/PaddedLock.h"
 #include "Lonestar/BoilerPlate.h"
 
-/**                       CONFIG                       **/
+#include <iostream>
+#include <cassert>
+#include <algorithm>
+#include <fstream>
+#include <vector>
+
+/**           CONFIG           **/
 
 static const char* const name = "Stochastic Gradient Descent for Linear Support Vector Machines";
 static const char* const desc = "Implements a linear support vector machine using stochastic gradient descent";
 static const char* const url = "sgdsvm";
 
 enum class UpdateType {
-        Wild,
-        WildOrig,
-        ReplicateByThread,
-        ReplicateByPackage,
-        Staleness
+  Wild,
+  WildOrig,
+  ReplicateByThread,
+  ReplicateByPackage,
+  Staleness
 };
 
 namespace cll = llvm::cl;
@@ -60,35 +62,35 @@ static cll::opt<size_t> TRAINING_NUMBER("tn", cll::desc("number of samples to us
 static cll::opt<double> ACCURACY_GOAL("ag", cll::desc("accuracy at which to stop running"), cll::init(0.95));
 static cll::opt<unsigned> ITER("i", cll::desc("how many iterations to run for, ignoring accuracy the goal"), cll::init(0));
 static cll::opt<UpdateType> UPDATE_TYPE("algo", cll::desc("Update type:"),
-        cll::values(
-                clEnumValN(UpdateType::Wild, "wild", "unsynchronized (default)"),
-                clEnumValN(UpdateType::WildOrig, "wildorig", "unsynchronized"),
-                clEnumValN(UpdateType::ReplicateByThread, "replicateByThread", "thread replication"),
-                clEnumValN(UpdateType::ReplicateByPackage, "replicateByPackage", "package replication"),
-                clEnumValN(UpdateType::Staleness, "staleness", "stale reads"),
-                clEnumValEnd), cll::init(UpdateType::Wild));
+  cll::values(
+    clEnumValN(UpdateType::Wild, "wild", "unsynchronized (default)"),
+    clEnumValN(UpdateType::WildOrig, "wildorig", "unsynchronized"),
+    clEnumValN(UpdateType::ReplicateByThread, "replicateByThread", "thread replication"),
+    clEnumValN(UpdateType::ReplicateByPackage, "replicateByPackage", "package replication"),
+    clEnumValN(UpdateType::Staleness, "staleness", "stale reads"),
+    clEnumValEnd), cll::init(UpdateType::Wild));
 
 
-/**                      DATA TYPES                    **/
+/**          DATA TYPES        **/
 
 typedef struct Node
 {
-	double w; //weight - relevant for variable nodes
-	int field; //variable nodes - variable count, sample nodes - label
-        Node(): w(0.0), field(0) { }
+  double w; //weight - relevant for variable nodes
+  int field; //variable nodes - variable count, sample nodes - label
+  Node(): w(0.0), field(0) { }
 } Node;
 
 
 using Graph = Galois::Graph::LC_CSR_Graph<Node, double>::with_out_of_line_lockable<true>::type;
 using GNode = Graph::GraphNode;
 
-/**               CONSTANTS AND PARAMETERS             **/
+/**         CONSTANTS AND PARAMETERS       **/
 unsigned NUM_SAMPLES = 0;
 unsigned NUM_VARIABLES = 0;
 
 unsigned variableNodeToId(GNode variable_node)
 {
-	return ((unsigned) variable_node) - NUM_SAMPLES;
+  return ((unsigned) variable_node) - NUM_SAMPLES;
 }
 
 Galois::Runtime::PerThreadStorage<double*> thread_weights;
@@ -101,448 +103,444 @@ Galois::LargeArray<double> old_weights;
 
 template<UpdateType UT>
 struct linearSVM
-{	
-        typedef int tt_needs_per_iter_alloc;
-        typedef int tt_does_not_need_aborts;
+{  
+  typedef int tt_needs_per_iter_alloc;
+  typedef int tt_does_not_need_aborts;
 
-	Graph& g;
-	double learningRate;
-        Galois::GAccumulator<size_t>& bigUpdates;
-        bool has_other;
+  Graph& g;
+  double learningRate;
+  Galois::GAccumulator<size_t>& bigUpdates;
+  bool has_other;
 
 #ifdef DENSE
-        Node* baseNodeData;
-        ptrdiff_t edgeOffset;
-        double* baseEdgeData;
+  Node* baseNodeData;
+  ptrdiff_t edgeOffset;
+  double* baseEdgeData;
 #endif
-	linearSVM(Graph& _g, double _lr, Galois::GAccumulator<size_t>& b) : g(_g), learningRate(_lr), bigUpdates(b) 
-	{
-                has_other = Galois::Runtime::LL::getMaxPackageForThread(Galois::getActiveThreads() - 1) > 1;
+  linearSVM(Graph& _g, double _lr, Galois::GAccumulator<size_t>& b) : g(_g), learningRate(_lr), bigUpdates(b) 
+  {
+    has_other = Galois::Runtime::LL::getMaxPackageForThread(Galois::getActiveThreads() - 1) > 1;
 #ifdef DENSE
-                baseNodeData = &g.getData(g.getEdgeDst(g.edge_begin(0)));
-                edgeOffset = std::distance(&g.getData(NUM_SAMPLES), baseNodeData);
-                baseEdgeData = &g.getEdgeData(g.edge_begin(0));
+    baseNodeData = &g.getData(g.getEdgeDst(g.edge_begin(0)));
+    edgeOffset = std::distance(&g.getData(NUM_SAMPLES), baseNodeData);
+    baseEdgeData = &g.getEdgeData(g.edge_begin(0));
 #endif
-	}
-	
-	void operator()(GNode gnode, Galois::UserContext<GNode>& ctx)
-	{	
-                double *packagew = *package_weights.getLocal();
-                double *threadw = *thread_weights.getLocal();
-                double *otherw = NULL;
-                Galois::PerIterAllocTy& alloc = ctx.getPerIterAlloc();
+  }
+  
+  void operator()(GNode gnode, Galois::UserContext<GNode>& ctx)
+  {  
+    double *packagew = *package_weights.getLocal();
+    double *threadw = *thread_weights.getLocal();
+    double *otherw = NULL;
+    Galois::PerIterAllocTy& alloc = ctx.getPerIterAlloc();
 
-                if (has_other) 
-                {
-                        unsigned tid = Galois::Runtime::LL::getTID();
-                        unsigned my_package = Galois::Runtime::LL::getPackageForSelf(tid);
-                        unsigned next = my_package + 1;
-                        if (next >= 4)
-                                next -= 4;
-                        otherw = *package_weights.getRemoteByPkg(next);
-                }
-                // Store edge data in iteration-local temporary to reduce cache misses
+    if (has_other) 
+    {
+      unsigned tid = Galois::Runtime::LL::getTID();
+      unsigned my_package = Galois::Runtime::LL::getPackageForSelf(tid);
+      unsigned next = my_package + 1;
+      if (next >= 4)
+        next -= 4;
+      otherw = *package_weights.getRemoteByPkg(next);
+    }
+    // Store edge data in iteration-local temporary to reduce cache misses
 #ifdef DENSE
-                const ptrdiff_t size = DENSE_NUM_FEATURES;
+    const ptrdiff_t size = DENSE_NUM_FEATURES;
 #else
-                ptrdiff_t size = std::distance(g.edge_begin(gnode), g.edge_end(gnode));
+    ptrdiff_t size = std::distance(g.edge_begin(gnode), g.edge_end(gnode));
 #endif
-                // regularized factors
-                double* rfactors = (double*) alloc.allocate(sizeof(double) * size);
-                // document weights
-                double* dweights = (double*) alloc.allocate(sizeof(double) * size);
-                // model weights
-                double* mweights = (double*) alloc.allocate(sizeof(double) * size);
-                // write destinations
-                double** wptrs = (double**) alloc.allocate(sizeof(double*) * size);
+    // regularized factors
+    double* rfactors = (double*) alloc.allocate(sizeof(double) * size);
+    // document weights
+    double* dweights = (double*) alloc.allocate(sizeof(double) * size);
+    // model weights
+    double* mweights = (double*) alloc.allocate(sizeof(double) * size);
+    // write destinations
+    double** wptrs = (double**) alloc.allocate(sizeof(double*) * size);
 
-                // Gather
-                size_t cur = 0;
-		double dot = 0.0;
+    // Gather
+    size_t cur = 0;
+    double dot = 0.0;
 #ifdef DENSE
-                double* myEdgeData = &baseEdgeData[size * gnode];
-		for(cur = 0; cur < size; ) {
-			int varCount = baseNodeData[cur].field;
+    double* myEdgeData = &baseEdgeData[size * gnode];
+    for(cur = 0; cur < size; ) {
+      int varCount = baseNodeData[cur].field;
 #else
-		for(auto edge_it : g.out_edges(gnode)) {
-			GNode variable_node = g.getEdgeDst(edge_it);
-			Node& var_data = g.getData(variable_node);
-			int varCount = var_data.field;
+    for(auto edge_it : g.out_edges(gnode)) {
+      GNode variable_node = g.getEdgeDst(edge_it);
+      Node& var_data = g.getData(variable_node);
+      int varCount = var_data.field;
 #endif
 
-			double weight;
+      double weight;
 #ifdef DENSE
-                        switch (UT) {
-                                default:
-                                case UpdateType::WildOrig:
-                                case UpdateType::Wild:
-                                        weight = baseNodeData[cur].w;
-                                        break;
-                                case UpdateType::ReplicateByThread:
-                                        weight = threadw[cur+edgeOffset];
-                                        break;
-                                case UpdateType::ReplicateByPackage:
-                                        weight = packagew[cur+edgeOffset];
-                                        break;
-                                case UpdateType::Staleness:
-                                        weight = old_weights[cur+edgeOffset]; 
-                                        break;
-                        }
+      switch (UT) {
+        default:
+        case UpdateType::WildOrig:
+        case UpdateType::Wild:
+          weight = baseNodeData[cur].w;
+          break;
+        case UpdateType::ReplicateByThread:
+          weight = threadw[cur+edgeOffset];
+          break;
+        case UpdateType::ReplicateByPackage:
+          weight = packagew[cur+edgeOffset];
+          break;
+        case UpdateType::Staleness:
+          weight = old_weights[cur+edgeOffset]; 
+          break;
+      }
 #else
-                        switch (UT) {
-                                default:
-                                case UpdateType::WildOrig:
-                                case UpdateType::Wild:
-                                        wptrs[cur] = &var_data.w;
-                                        weight = *wptrs[cur];
-                                        break;
-                                case UpdateType::ReplicateByThread:
-                                        wptrs[cur] = &threadw[variableNodeToId(variable_node)];
-                                        weight = *wptrs[cur];
-                                        break;
-                                case UpdateType::ReplicateByPackage:
-                                        wptrs[cur] = &packagew[variableNodeToId(variable_node)];
-                                        weight = *wptrs[cur];
-                                        break;
-                                case UpdateType::Staleness:
-                                        wptrs[cur] = &threadw[variableNodeToId(variable_node)];
-                                        weight = old_weights[variableNodeToId(variable_node)]; 
-                                        break;
-                        }
+      switch (UT) {
+        default:
+        case UpdateType::WildOrig:
+        case UpdateType::Wild:
+          wptrs[cur] = &var_data.w;
+          weight = *wptrs[cur];
+          break;
+        case UpdateType::ReplicateByThread:
+          wptrs[cur] = &threadw[variableNodeToId(variable_node)];
+          weight = *wptrs[cur];
+          break;
+        case UpdateType::ReplicateByPackage:
+          wptrs[cur] = &packagew[variableNodeToId(variable_node)];
+          weight = *wptrs[cur];
+          break;
+        case UpdateType::Staleness:
+          wptrs[cur] = &threadw[variableNodeToId(variable_node)];
+          weight = old_weights[variableNodeToId(variable_node)]; 
+          break;
+      }
 #endif
-                        mweights[cur] = weight;
+      mweights[cur] = weight;
 #ifdef DENSE
-                        dweights[cur] = myEdgeData[cur];
+      dweights[cur] = myEdgeData[cur];
 #else
-                        dweights[cur] = g.getEdgeData(edge_it);
+      dweights[cur] = g.getEdgeData(edge_it);
 #endif
-                        if (UT == UpdateType::WildOrig) {
-                                rfactors[cur] = (CREG * varCount);
-                        } else {
-                                rfactors[cur] = mweights[cur] / (CREG * varCount);
-                        }
-			dot += mweights[cur] * dweights[cur];
-                        cur += 1;
-		}
-		
-		Node& sample_data = g.getData(gnode);
-		int label = sample_data.field;
+      if (UT == UpdateType::WildOrig) {
+        rfactors[cur] = (CREG * varCount);
+      } else {
+        rfactors[cur] = mweights[cur] / (CREG * varCount);
+      }
+      dot += mweights[cur] * dweights[cur];
+      cur += 1;
+    }
+    
+    Node& sample_data = g.getData(gnode);
+    int label = sample_data.field;
 
-		bool update_type = label * dot < 1;
-                if (update_type)
-                        bigUpdates += size;
-                //else
-                //        return;
-		for(cur = 0; cur < size; ++cur)
-		{
-			double delta;
-                        if (UT == UpdateType::WildOrig) {
-                                if(update_type)
-                                        delta = learningRate * (*wptrs[cur]/rfactors[cur] - label * dweights[cur]);
-                                else
-                                        delta = *wptrs[cur]/rfactors[cur];
-                        } else {
-                                if(update_type)
-                                        delta = learningRate * (rfactors[cur] - label * dweights[cur]);
-                                else
-                                        delta = rfactors[cur];
-                        }
+    bool update_type = label * dot < 1;
+    if (update_type)
+      bigUpdates += size;
+    for(cur = 0; cur < size; ++cur)
+    {
+      double delta;
+      if (UT == UpdateType::WildOrig) {
+        if(update_type)
+          delta = learningRate * (*wptrs[cur]/rfactors[cur] - label * dweights[cur]);
+        else
+          delta = *wptrs[cur]/rfactors[cur];
+      } else {
+        if(update_type)
+          delta = learningRate * (rfactors[cur] - label * dweights[cur]);
+        else
+          delta = rfactors[cur];
+      }
 #ifdef DENSE
-                        switch (UT) {
-                                default:
-                                case UpdateType::WildOrig:
-                                case UpdateType::Wild:
-                                        baseNodeData[cur].w = mweights[cur] - delta;
-                                        break;
-                                case UpdateType::ReplicateByThread:
-                                        threadw[cur+edgeOffset] = mweights[cur] - delta;
-                                        break;
-                                case UpdateType::ReplicateByPackage:
-                                        packagew[cur+edgeOffset] = mweights[cur] - delta;
-                                        break;
-                                case UpdateType::Staleness:
-                                        threadw[cur+edgeOffset] = mweights[cur] - delta;
-                                        break;
-                        }
+      switch (UT) {
+        default:
+        case UpdateType::WildOrig:
+        case UpdateType::Wild:
+          baseNodeData[cur].w = mweights[cur] - delta;
+          break;
+        case UpdateType::ReplicateByThread:
+          threadw[cur+edgeOffset] = mweights[cur] - delta;
+          break;
+        case UpdateType::ReplicateByPackage:
+          packagew[cur+edgeOffset] = mweights[cur] - delta;
+          break;
+        case UpdateType::Staleness:
+          threadw[cur+edgeOffset] = mweights[cur] - delta;
+          break;
+      }
 #else
-                        if (UT == UpdateType::WildOrig) {
-                                *wptrs[cur] -= delta;
-                        } else {
-                                *wptrs[cur] = mweights[cur] - delta;
-                        }
+      if (UT == UpdateType::WildOrig) {
+        *wptrs[cur] -= delta;
+      } else {
+        *wptrs[cur] = mweights[cur] - delta;
+      }
 #endif
-		}
-	}
+    }
+  }
 };
 
 void printParameters()
 {
-	std::cout << "Input graph file: " << inputGraphFilename << "\n";
-	std::cout << "Input label file: " << inputLabelFilename << "\n";
-	std::cout << "Threads: " << Galois::getActiveThreads() << "\n";
-	std::cout << "Samples: " << NUM_SAMPLES << "\n";
-	std::cout << "Variables: " << NUM_VARIABLES << "\n";
-        switch (UPDATE_TYPE) {
-                case UpdateType::Wild:
-                        std::cout << "Update type: wild\n";
-                        break;
-                case UpdateType::WildOrig:
-                        std::cout << "Update type: wild orig\n";
-                        break;
-                case UpdateType::ReplicateByThread:
-                        std::cout << "Update type: replicate by thread\n";
-                        break;
-                case UpdateType::ReplicateByPackage:
-                        std::cout << "Update type: replicate by package\n";
-                        break;
-                case UpdateType::Staleness:
-                        std::cout << "Update type: stale reads\n";
-                        break;
-                default: abort();
-        }
+  std::cout << "Input graph file: " << inputGraphFilename << "\n";
+  std::cout << "Input label file: " << inputLabelFilename << "\n";
+  std::cout << "Threads: " << Galois::getActiveThreads() << "\n";
+  std::cout << "Samples: " << NUM_SAMPLES << "\n";
+  std::cout << "Variables: " << NUM_VARIABLES << "\n";
+  switch (UPDATE_TYPE) {
+    case UpdateType::Wild:
+      std::cout << "Update type: wild\n";
+      break;
+    case UpdateType::WildOrig:
+      std::cout << "Update type: wild orig\n";
+      break;
+    case UpdateType::ReplicateByThread:
+      std::cout << "Update type: replicate by thread\n";
+      break;
+    case UpdateType::ReplicateByPackage:
+      std::cout << "Update type: replicate by package\n";
+      break;
+    case UpdateType::Staleness:
+      std::cout << "Update type: stale reads\n";
+      break;
+    default: abort();
+  }
 }
 
 void initializeVariableCounts(Graph& g)
 {
-        for (auto gnode : g) 
-        {
-                for(auto edge_it : g.out_edges(gnode))
-                {
-                        GNode variable_node = g.getEdgeDst(edge_it);
-                        Node& data = g.getData(variable_node);
-                        data.field++; //increase count of variable occurrences
-                }
-        }
+  for (auto gnode : g) 
+  {
+    for(auto edge_it : g.out_edges(gnode))
+    {
+      GNode variable_node = g.getEdgeDst(edge_it);
+      Node& data = g.getData(variable_node);
+      data.field++; //increase count of variable occurrences
+    }
+  }
 }
 
 
 unsigned loadLabels(Graph& g, std::string filename)
 {
-	std::ifstream infile(filename);
+  std::ifstream infile(filename);
 
-	unsigned sample_id;
-	int label;
-	int num_labels = 0;
-	while (infile >> sample_id >> label)
-	{
-		g.getData(sample_id).field = label;
-		++num_labels;
-	}
-	
-	return num_labels;
+  unsigned sample_id;
+  int label;
+  int num_labels = 0;
+  while (infile >> sample_id >> label)
+  {
+    g.getData(sample_id).field = label;
+    ++num_labels;
+  }
+  
+  return num_labels;
 }
 
 double getAccuracy(Graph& g, std::vector<GNode>& testing_samples)
 {
-        Galois::GAccumulator<size_t> correct;
-        // 0.5 * norm(w)^2 + C * sum_i [max(0, 1 - y_i * w * x_i)]
-        Galois::GAccumulator<double> objective;
+  Galois::GAccumulator<size_t> correct;
+  // 0.5 * norm(w)^2 + C * sum_i [max(0, 1 - y_i * w * x_i)]
+  Galois::GAccumulator<double> objective;
 
-        Galois::do_all(testing_samples.begin(), testing_samples.end(), [&](GNode gnode) {
-		double sum = 0.0;
-		Node& data = g.getData(gnode);
-		int label = data.field;
-                for(auto edge_it : g.out_edges(gnode))
-                {
-                        GNode variable_node = g.getEdgeDst(edge_it);
-                        Node& data = g.getData(variable_node);
-                        double weight = g.getEdgeData(edge_it);
-                        sum += data.w * weight;
-                }
+  Galois::do_all(testing_samples.begin(), testing_samples.end(), [&](GNode gnode) {
+    double sum = 0.0;
+    Node& data = g.getData(gnode);
+    int label = data.field;
+    for(auto edge_it : g.out_edges(gnode))
+    {
+      GNode variable_node = g.getEdgeDst(edge_it);
+      Node& data = g.getData(variable_node);
+      double weight = g.getEdgeData(edge_it);
+      sum += data.w * weight;
+    }
 
-                if(sum <= 0.0 && label == -1)
-                {
-                        correct += 1;
-                }
-                else if(sum > 0.0 && label == 1)
-                {
-                        correct += 1;
-                }
-                objective += std::max(0.0, 1 - label * sum);
-	});
-	
-        Galois::GAccumulator<double> norm;
-        Galois::do_all(boost::counting_iterator<size_t>(0), boost::counting_iterator<size_t>(NUM_VARIABLES), [&](size_t i) {
-                double v = g.getData(i + NUM_SAMPLES).w;
-                norm += v * v;
-        });
-        double obj = objective.reduce() * CREG + 0.5 * norm.reduce();
-        size_t c = correct.reduce();
-	double accuracy = c / (testing_samples.size() + 0.0);
-	std::cout 
-                << "Accuracy: " << accuracy << " "
-                << "(" << c <<  "/" << testing_samples.size() << ")" << " "
-                << "obj: " << obj << "\n";
-	return accuracy;
+    if(sum <= 0.0 && label == -1)
+    {
+      correct += 1;
+    }
+    else if(sum > 0.0 && label == 1)
+    {
+      correct += 1;
+    }
+    objective += std::max(0.0, 1 - label * sum);
+  });
+  
+  Galois::GAccumulator<double> norm;
+  Galois::do_all(boost::counting_iterator<size_t>(0), boost::counting_iterator<size_t>(NUM_VARIABLES), [&](size_t i) {
+    double v = g.getData(i + NUM_SAMPLES).w;
+    norm += v * v;
+  });
+  double obj = objective.reduce() * CREG + 0.5 * norm.reduce();
+  size_t c = correct.reduce();
+  double accuracy = c / (testing_samples.size() + 0.0);
+  std::cout 
+    << "Accuracy: " << accuracy << " "
+    << "(" << c <<  "/" << testing_samples.size() << ")" << " "
+    << "obj: " << obj << "\n";
+  return accuracy;
 }
 
 int main(int argc, char** argv)
 {
-	LonestarStart(argc, argv, name, desc, url);
-	Galois::StatManager statManager;
-	
-	Graph g;
-	Galois::Graph::readGraph(g, inputGraphFilename);
-	NUM_SAMPLES = loadLabels(g, inputLabelFilename);
-	initializeVariableCounts(g);
-	
-        Galois::StatTimer timer;
-        Galois::TimeAccumulator accumTimer;
-        accumTimer.start();
-        timer.start();
+  LonestarStart(argc, argv, name, desc, url);
+  Galois::StatManager statManager;
+  
+  Graph g;
+  Galois::Graph::readGraph(g, inputGraphFilename);
+  NUM_SAMPLES = loadLabels(g, inputLabelFilename);
+  initializeVariableCounts(g);
+  
+  Galois::StatTimer timer;
+  Galois::TimeAccumulator accumTimer;
+  accumTimer.start();
+  timer.start();
 
-	NUM_VARIABLES = g.size() - NUM_SAMPLES;
-	assert(NUM_SAMPLES > 0 && NUM_VARIABLES > 0);
-	
-	printParameters();
+  NUM_VARIABLES = g.size() - NUM_SAMPLES;
+  assert(NUM_SAMPLES > 0 && NUM_VARIABLES > 0);
+  
+  printParameters();
 
-	//put samples in a list and shuffle them
-	std::vector<GNode> all_samples(g.begin(), g.begin() + NUM_SAMPLES);
-	std::random_shuffle(all_samples.begin(), all_samples.end());
+  //put samples in a list and shuffle them
+  std::vector<GNode> all_samples(g.begin(), g.begin() + NUM_SAMPLES);
+  std::random_shuffle(all_samples.begin(), all_samples.end());
 
-	//copy a fraction of the samples to the training samples list
-	unsigned num_training_samples = TRAINING_NUMBER;
-        if (num_training_samples == 0 || num_training_samples >= NUM_SAMPLES) 
-                num_training_samples = NUM_SAMPLES * TRAINING_FRACTION;
-	std::vector<GNode> training_samples(all_samples.begin(), all_samples.begin() + num_training_samples);
-	std::cout << "Training samples: " << training_samples.size() << "\n";
-	
-	//the remainder of samples go into the testing samples list
-	std::vector<GNode> testing_samples(all_samples.begin() + num_training_samples, all_samples.end());
-	std::cout << "Testing samples: " << testing_samples.size() << "\n";
-	
-	//allocate storage for weights from previous iteration
-        old_weights.create(NUM_VARIABLES);
-        if(UPDATE_TYPE == UpdateType::ReplicateByThread || UPDATE_TYPE == UpdateType::Staleness) 
-	{
-                Galois::on_each([](unsigned tid, unsigned total) {
-                        double *p = new double[NUM_VARIABLES];
-                        *thread_weights.getLocal() = p;
-                        std::fill(p, p + NUM_VARIABLES, 0);
-                });
-	}
-        if(UPDATE_TYPE == UpdateType::ReplicateByPackage)
+  //copy a fraction of the samples to the training samples list
+  unsigned num_training_samples = TRAINING_NUMBER;
+  if (num_training_samples == 0 || num_training_samples >= NUM_SAMPLES) 
+    num_training_samples = NUM_SAMPLES * TRAINING_FRACTION;
+  std::vector<GNode> training_samples(all_samples.begin(), all_samples.begin() + num_training_samples);
+  std::cout << "Training samples: " << training_samples.size() << "\n";
+  
+  //the remainder of samples go into the testing samples list
+  std::vector<GNode> testing_samples(all_samples.begin() + num_training_samples, all_samples.end());
+  std::cout << "Testing samples: " << testing_samples.size() << "\n";
+  
+  //allocate storage for weights from previous iteration
+  old_weights.create(NUM_VARIABLES);
+  if(UPDATE_TYPE == UpdateType::ReplicateByThread || UPDATE_TYPE == UpdateType::Staleness) 
+  {
+    Galois::on_each([](unsigned tid, unsigned total) {
+      double *p = new double[NUM_VARIABLES];
+      *thread_weights.getLocal() = p;
+      std::fill(p, p + NUM_VARIABLES, 0);
+    });
+  }
+  if(UPDATE_TYPE == UpdateType::ReplicateByPackage)
+  {
+    Galois::on_each([](unsigned tid, unsigned total) {
+      if (Galois::Runtime::LL::isPackageLeader(tid)) {
+        double *p = new double[NUM_VARIABLES];
+        *package_weights.getLocal() = p;
+        std::fill(p, p + NUM_VARIABLES, 0);
+      }
+    });
+  }
+
+  //getAccuracy(g, testing_samples);
+  
+  Galois::StatTimer sgdTime("SgdTime");
+  
+  //if no iteration count is specified, keep going until the accuracy goal is hit
+  //  otherwise, run specified iterations
+  const bool use_accuracy_goal = ITER == 0;
+  double accuracy = -1.0; //holds most recent accuracy stat
+  for(unsigned iter = 1; iter <= ITER || use_accuracy_goal; iter++)
+  {
+    sgdTime.start();
+    
+    //include shuffling time in the time taken per iteration
+    //also: not parallel
+    if(SHUFFLE)
+      std::random_shuffle(training_samples.begin(), training_samples.end());
+    
+    double learning_rate = 30/(100.0 + iter);
+    auto ts_begin = training_samples.begin();
+    auto ts_end = training_samples.end();
+    auto ln = Galois::loopname("LinearSVM");
+    auto wl = Galois::wl<Galois::WorkList::dChunkedFIFO<32>>();
+    Galois::GAccumulator<size_t> bigUpdates;
+
+    Galois::Timer flopTimer;
+    flopTimer.start();
+
+    UpdateType type = UPDATE_TYPE;
+    switch (type) {
+      case UpdateType::Wild:
+        Galois::for_each(ts_begin, ts_end, linearSVM<UpdateType::Wild>(g, learning_rate, bigUpdates), ln, wl);
+        break;
+      case UpdateType::WildOrig:
+        Galois::for_each(ts_begin, ts_end, linearSVM<UpdateType::WildOrig>(g, learning_rate, bigUpdates), ln, wl);
+        break;
+      case UpdateType::ReplicateByPackage:
+        Galois::for_each(ts_begin, ts_end, linearSVM<UpdateType::ReplicateByPackage>(g, learning_rate, bigUpdates), ln, wl);
+        break;
+      case UpdateType::ReplicateByThread:
+        Galois::for_each(ts_begin, ts_end, linearSVM<UpdateType::ReplicateByThread>(g, learning_rate, bigUpdates), ln, wl);
+        break;
+      case UpdateType::Staleness:
+        Galois::for_each(ts_begin, ts_end, linearSVM<UpdateType::Staleness>(g, learning_rate, bigUpdates), ln, wl);
+        break;
+      default: abort();
+    }
+    flopTimer.stop();
+    sgdTime.stop();
+
+    size_t numBigUpdates = bigUpdates.reduce();
+    double flop = 4*g.sizeEdges() + 2 + 3*numBigUpdates + g.sizeEdges();
+    if (type == UpdateType::ReplicateByPackage)
+      flop += numBigUpdates;
+    double gflops = flop / flopTimer.get() / 1e6;
+
+    //swap weights from past iteration and this iteration
+    if(type != UpdateType::Wild && type != UpdateType::WildOrig) 
+    {
+      bool byThread = type == UpdateType::ReplicateByThread || type == UpdateType::Staleness;
+      double *localw = byThread ? *thread_weights.getLocal() : *package_weights.getLocal();
+      unsigned num_threads = Galois::getActiveThreads();
+      unsigned num_packages = Galois::Runtime::LL::getMaxPackageForThread(num_threads-1) + 1;
+      Galois::do_all(boost::counting_iterator<unsigned>(0), boost::counting_iterator<unsigned>(NUM_VARIABLES), [&](unsigned i) {
+        unsigned n = byThread ? num_threads : num_packages;
+        for (unsigned j = 1; j < n; j++)
         {
-                Galois::on_each([](unsigned tid, unsigned total) {
-                        if (Galois::Runtime::LL::isPackageLeader(tid)) {
-                                double *p = new double[NUM_VARIABLES];
-                                *package_weights.getLocal() = p;
-                                std::fill(p, p + NUM_VARIABLES, 0);
-                        }
-                });
+          double o = byThread ?
+            (*thread_weights.getRemote(j))[i] :
+            (*package_weights.getRemoteByPkg(j))[i];
+          localw[i] += o;
         }
+        localw[i] /= n;
+        GNode variable_node = (GNode) (i + NUM_SAMPLES);
+        Node& var_data = g.getData(variable_node, Galois::NONE);
+        var_data.w = localw[i];
+        old_weights[i] = var_data.w;
+      });
+      Galois::on_each([&](unsigned tid, unsigned total) {
+        switch (type) {
+          case UpdateType::Staleness:
+          case UpdateType::ReplicateByThread:
+            if (tid)
+              std::copy(localw, localw + NUM_VARIABLES, *thread_weights.getLocal());
+          break;
+          case UpdateType::ReplicateByPackage:
+            if (tid && Galois::Runtime::LL::isPackageLeader(tid))
+              std::copy(localw, localw + NUM_VARIABLES, *package_weights.getLocal());
+          break;
+          default: abort();
+        }
+      });
+    }
 
-	//getAccuracy(g, testing_samples);
-	
-	Galois::StatTimer sgdTime("SgdTime");
-	
-	//if no iteration count is specified, keep going until the accuracy goal is hit
-	//	otherwise, run specified iterations
-	const bool use_accuracy_goal = ITER == 0;
-	double accuracy = -1.0; //holds most recent accuracy stat
-	for(unsigned iter = 1; iter <= ITER || use_accuracy_goal; iter++)
-	{
-		sgdTime.start();
-		
-		//include shuffling time in the time taken per iteration
-		//also: not parallel
-		if(SHUFFLE)
-			std::random_shuffle(training_samples.begin(), training_samples.end());
-		
-		double learning_rate = 30/(100.0 + iter);
-		auto ts_begin = training_samples.begin();
-		auto ts_end = training_samples.end();
-		auto ln = Galois::loopname("LinearSVM");
-		auto wl = Galois::wl<Galois::WorkList::dChunkedFIFO<32>>();
-                Galois::GAccumulator<size_t> bigUpdates;
+    accumTimer.stop();
+    std::cout 
+      << iter << " GFLOP/s " << gflops << " "
+      << "(" << flopTimer.get() / 1000.0 << " s) "
+      << "AccumTime " << accumTimer.get() / 1000.0 << " ";
+    accumTimer.start();
+    accuracy = getAccuracy(g, testing_samples);
+    if(use_accuracy_goal && accuracy > ACCURACY_GOAL)
+    {
+      std::cout << "Accuracy goal of " << ACCURACY_GOAL << " reached after " <<
+        iter << " iterations."<< std::endl;
+      break;
+    }
+  }
+  
+  timer.stop();
 
-                Galois::Timer flopTimer;
-                flopTimer.start();
-
-                UpdateType type = UPDATE_TYPE;
-                switch (type) {
-                        case UpdateType::Wild:
-                                Galois::for_each(ts_begin, ts_end, linearSVM<UpdateType::Wild>(g, learning_rate, bigUpdates), ln, wl);
-                                break;
-                        case UpdateType::WildOrig:
-                                Galois::for_each(ts_begin, ts_end, linearSVM<UpdateType::WildOrig>(g, learning_rate, bigUpdates), ln, wl);
-                                break;
-                        case UpdateType::ReplicateByPackage:
-                                Galois::for_each(ts_begin, ts_end, linearSVM<UpdateType::ReplicateByPackage>(g, learning_rate, bigUpdates), ln, wl);
-                                break;
-                        case UpdateType::ReplicateByThread:
-                                Galois::for_each(ts_begin, ts_end, linearSVM<UpdateType::ReplicateByThread>(g, learning_rate, bigUpdates), ln, wl);
-                                break;
-                        case UpdateType::Staleness:
-                                Galois::for_each(ts_begin, ts_end, linearSVM<UpdateType::Staleness>(g, learning_rate, bigUpdates), ln, wl);
-                                break;
-                        default: abort();
-                }
-                flopTimer.stop();
-		sgdTime.stop();
-
-                size_t numBigUpdates = bigUpdates.reduce();
-                double flop = 4*g.sizeEdges() + 2 + 3*numBigUpdates + g.sizeEdges();
-                if (type == UpdateType::ReplicateByPackage)
-                        flop += numBigUpdates;
-                double gflops = flop / flopTimer.get() / 1e6;
-
-		//swap weights from past iteration and this iteration
-		if(type != UpdateType::Wild && type != UpdateType::WildOrig) 
-                {
-                        bool byThread = type == UpdateType::ReplicateByThread || type == UpdateType::Staleness;
-                        double *localw = byThread ? *thread_weights.getLocal() : *package_weights.getLocal();
-                        unsigned num_threads = Galois::getActiveThreads();
-                        unsigned num_packages = Galois::Runtime::LL::getMaxPackageForThread(num_threads-1) + 1;
-                        Galois::do_all(boost::counting_iterator<unsigned>(0), boost::counting_iterator<unsigned>(NUM_VARIABLES), [&](unsigned i) {
-                                unsigned n = byThread ? num_threads : num_packages;
-                                for (unsigned j = 1; j < n; j++)
-                                {
-                                        double o = byThread ?
-                                                (*thread_weights.getRemote(j))[i] :
-                                                (*package_weights.getRemoteByPkg(j))[i];
-                                        localw[i] += o;
-                                }
-                                localw[i] /= n;
-				GNode variable_node = (GNode) (i + NUM_SAMPLES);
-				Node& var_data = g.getData(variable_node, Galois::NONE);
-                                var_data.w = localw[i];
-				old_weights[i] = var_data.w;
-			});
-                        Galois::on_each([&](unsigned tid, unsigned total) {
-                                switch (type) {
-                                        case UpdateType::Staleness:
-                                        case UpdateType::ReplicateByThread:
-                                                if (tid)
-                                                        std::copy(localw, localw + NUM_VARIABLES, *thread_weights.getLocal());
-                                        break;
-                                        case UpdateType::ReplicateByPackage:
-                                                if (tid && Galois::Runtime::LL::isPackageLeader(tid))
-                                                        std::copy(localw, localw + NUM_VARIABLES, *package_weights.getLocal());
-                                        break;
-                                        default: abort();
-                                }
-                        });
-                }
-
-                accumTimer.stop();
-		std::cout 
-                        << iter << " GFLOP/s " << gflops << " "
-                        << "(" << flopTimer.get() / 1000.0 << " s) "
-                        << "AccumTime " << accumTimer.get() / 1000.0 << " ";
-                        ;
-                accumTimer.start();
-		accuracy = getAccuracy(g, testing_samples);
-		if(use_accuracy_goal && accuracy > ACCURACY_GOAL)
-		{
-			std::cout << "Accuracy goal of " << ACCURACY_GOAL << " reached after " <<
-				iter << " iterations."<< std::endl;
-			break;
-		}
-	}
-	
-        timer.stop();
-
-	return 0;
+  return 0;
 }
-// vim: ts=8 sw=8
