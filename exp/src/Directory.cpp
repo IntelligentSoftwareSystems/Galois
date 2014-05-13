@@ -417,8 +417,4 @@ RemoteDirectory& Galois::Runtime::getRemoteDirectory() {
   return obj;
 }
 
-CacheManager& Galois::Runtime::getCacheManager() {
-  static CacheManager obj;
-  return obj;
-}
 

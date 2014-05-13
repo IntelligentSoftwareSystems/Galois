@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2014, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -23,48 +23,75 @@
 #ifndef GALOIS_RUNTIME_CACHEMANAGER_H
 #define GALOIS_RUNTIME_CACHEMANAGER_H
 
-#include "Galois/Runtime/Lockable.h"
+#include "Galois/Runtime/ll/SimpleLock.h"
+#include "Galois/Runtime/FatPointer.h"
+//#include "Galois/Runtime/Serialize.h"
+
+#include <unordered_map>
+#include <deque>
 
 namespace Galois {
 namespace Runtime {
 
-class remoteObj {
-public:
-  virtual Lockable* getObj() = 0;
-  virtual size_t getTypeHash() const = 0;
-};
-
+class DeSerializeBuffer;
 template<typename T>
-class remoteObjImpl : public remoteObj {
-  T obj;
-public:
-  virtual size_t getTypeHash() const { return typeid(T).hash_code(); }
-  virtual Lockable* getObj() { return &obj; }
-  T* getObjTyped() { return &obj; }
-};
+T gDeserializeObj(DeSerializeBuffer&);
 
 class CacheManager {
 
+  class remoteObj {
+    bool RW;
+  public:
+    remoteObj(bool rw) :RW(rw) {}
+    virtual ~remoteObj();
+    virtual void* getObj() = 0;
+    bool isRO() const { return !RW; }
+    bool isRW() const { return  RW; }
+  };
+  
+  template<typename T>
+  class remoteObjImpl : public remoteObj {
+    T obj;
+  public:
+    remoteObjImpl(bool RW, DeSerializeBuffer& buf)
+      :remoteObj(RW), obj{std::move(gDeserializeObj<T>(buf))} {}
+    remoteObjImpl(bool RW, T&& buf)
+      :remoteObj(RW), obj(buf) {}
+    virtual ~remoteObjImpl() {}
+    virtual void* getObj() { return &obj; }
+  };
+
   std::unordered_map<fatPointer, remoteObj*> remoteObjects;
+  std::deque<remoteObj*> garbage;
   LL::SimpleLock Lock;
 
 public:
 
   template<typename T>
-  remoteObjImpl<T>* resolve(fatPointer ptr, bool write) {
-    assert(ptr.getHost() != NetworkInterface::ID);
+  void create(fatPointer ptr, bool write, DeSerializeBuffer& buf) {
     LL::SLguard lgr(Lock);
-    remoteObj*& retval = remoteObjects[ptr];
-    if (!retval) 
-      retval = new remoteObjImpl<T>();
-    return static_cast<remoteObjImpl<T>*>(retval);
+    remoteObj*& obj = remoteObjects[ptr];
+    if (obj) { // creating can replace RO with RW objects
+      assert(obj->isRO() && write);
+      garbage.push_back(obj);
+      obj = nullptr;
+    }
+    obj = new remoteObjImpl<T>(write, buf);
   }
 
-  remoteObj* weakResolve(fatPointer ptr) {
-    assert(ptr.getHost() != NetworkInterface::ID);
+  template<typename T>
+  void create(fatPointer ptr, bool write, T&& buf) {
     LL::SLguard lgr(Lock);
-    return remoteObjects[ptr];
+    remoteObj*& obj = remoteObjects[ptr];
+    if (obj) { // creating can replace RO with RW objects
+      assert(obj->isRO() && write);
+      garbage.push_back(obj);
+      obj = nullptr;
+    }
+    obj = new remoteObjImpl<T>(write, std::forward<T>(buf));
   }
+
+  void* resolve(fatPointer ptr, bool write);
 };
 
 CacheManager& getCacheManager();

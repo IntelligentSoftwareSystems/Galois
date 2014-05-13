@@ -41,10 +41,7 @@ class simpleFatPointer {
   uint32_t host;
   void* ptr;
 
-  void set(uint32_t h, void* p) {
-    host = h;
-    ptr = p;
-  }
+  void set(uint32_t h, void* p);
 
 protected:
 
@@ -56,9 +53,10 @@ protected:
 public:
 
   uint32_t getHost() const { return host; }
-  void setHost(uint32_t h) { host = h; }
   void* getObj() const { return ptr; }
-  void setObj(void* p) { ptr = p; }
+
+  void setHost(uint32_t h);
+  void setObj(void* p);
 };
 
 //Fat pointer taking advantage of unused bits in AMD64 addresses
@@ -76,17 +74,9 @@ protected:
   rawType rawCopy() const { return val; }
 
 public:
-  uint32_t getHost() const {
-    uintptr_t hval = val;
-    hval >>= 47;
-    hval &= 0x0000FFFF;
-    return hval;
-  }
-  void* getObj() const {
-    uintptr_t hval = val;
-    hval &= 0x80007FFFFFFFFFFF;
-    return (void*)hval;
-  }
+  uint32_t getHost() const;
+  void* getObj() const;
+
   void setHost(uint32_t h);
   void setObj(void* p);
 };
@@ -110,16 +100,16 @@ public:
     return ih(rawCopy());
   }
 
-  inline explicit operator bool() const { return fatPointerBase::getObj(); }
+  explicit operator bool() const { return fatPointerBase::getObj(); }
 
-  inline bool operator==(const fatPointerImpl& rhs) const { return rawCopy() == rhs.rawCopy(); }
-  inline bool operator!=(const fatPointerImpl& rhs) const { return rawCopy() != rhs.rawCopy(); }
-  inline bool operator<=(const fatPointerImpl& rhs) const { return rawCopy() <= rhs.rawCopy(); }
-  inline bool operator>=(const fatPointerImpl& rhs) const { return rawCopy() >= rhs.rawCopy(); }
-  inline bool operator< (const fatPointerImpl& rhs) const { return rawCopy() <  rhs.rawCopy(); }
-  inline bool operator> (const fatPointerImpl& rhs) const { return rawCopy() >  rhs.rawCopy(); }
+  bool operator==(const fatPointerImpl& rhs) const { return rawCopy() == rhs.rawCopy(); }
+  bool operator!=(const fatPointerImpl& rhs) const { return rawCopy() != rhs.rawCopy(); }
+  bool operator<=(const fatPointerImpl& rhs) const { return rawCopy() <= rhs.rawCopy(); }
+  bool operator>=(const fatPointerImpl& rhs) const { return rawCopy() >= rhs.rawCopy(); }
+  bool operator< (const fatPointerImpl& rhs) const { return rawCopy() <  rhs.rawCopy(); }
+  bool operator> (const fatPointerImpl& rhs) const { return rawCopy() >  rhs.rawCopy(); }
 
-  inline bool isLocal() const {
+  bool isLocal() const {
     return fatPointerBase::getHost() == NetworkInterface::ID;
   }
 };
@@ -129,10 +119,8 @@ size_t hash_value(const fatPointerImpl<T>& v) {
   return v.hash_value();
 }
 
-template<typename T>
-std::ostream& operator<<(std::ostream& os, const fatPointerImpl<T>& v) {
-  return os <<  "[" << v.getHost() << "," << v.getObj() << "]";
-}
+std::ostream& operator<<(std::ostream& os, const fatPointerImpl<detail::amd64FatPointer>& v);
+std::ostream& operator<<(std::ostream& os, const fatPointerImpl<detail::simpleFatPointer>& v);
 
 
 } // namespace detail

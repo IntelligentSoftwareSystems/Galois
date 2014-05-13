@@ -33,6 +33,7 @@
 #include "Galois/Runtime/ll/SimpleLock.h"
 #include "Galois/Runtime/ll/gio.h"
 #include "Galois/Runtime/FatPointer.h"
+#include "Galois/Runtime/Lockable.h"
 #include "Galois/Runtime/CacheManager.h"
 
 #include <boost/utility.hpp>
@@ -112,7 +113,6 @@ class LocalDirectory : public BaseDirectory {
     std::set<uint32_t> locRO;
     //Location which has the object in RW state
     uint32_t locRW;
-    //Lowest if for which a recall has been sent
     uint32_t recalledFor;
     //outstanding requests
     std::set<uint32_t> reqsRO;

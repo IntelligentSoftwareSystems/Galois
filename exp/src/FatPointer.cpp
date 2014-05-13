@@ -25,6 +25,21 @@
 
 using namespace Galois::Runtime;
 
+void detail::simpleFatPointer::set(uint32_t h, void* p) {
+  host = h;
+  ptr = p;
+}
+
+void detail::simpleFatPointer::setHost(uint32_t h) {
+  host = h;
+}
+
+void detail::simpleFatPointer::setObj(void* p) {
+  ptr = p;
+}
+
+
+
 uintptr_t detail::amd64FatPointer::compute(uint32_t h, void* p) const {
   return ((uintptr_t)h << 47) | ((uintptr_t)p & 0x80007FFFFFFFFFFF);
 }
@@ -40,5 +55,30 @@ void detail::amd64FatPointer::setHost(uint32_t h) {
 
 void detail::amd64FatPointer::setObj(void* p) {
   set(getHost(), p);
+}
+
+uint32_t detail::amd64FatPointer::getHost() const {
+  uintptr_t hval = val;
+  hval >>= 47;
+  hval &= 0x0000FFFF;
+  return hval;
+}
+
+void* detail::amd64FatPointer::getObj() const {
+  uintptr_t hval = val;
+  hval &= 0x80007FFFFFFFFFFF;
+  return (void*)hval;
+}
+
+
+
+std::ostream& detail::operator<<(std::ostream& os,
+                                 const detail::fatPointerImpl<detail::amd64FatPointer>& v) {
+  return os <<  "[" << v.getHost() << "," << v.getObj() << "]";
+}
+
+std::ostream& detail::operator<<(std::ostream& os, 
+                                 const detail::fatPointerImpl<detail::simpleFatPointer>& v) {
+  return os <<  "[" << v.getHost() << "," << v.getObj() << "]";
 }
 
