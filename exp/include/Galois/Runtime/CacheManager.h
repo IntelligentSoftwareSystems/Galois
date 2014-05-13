@@ -47,6 +47,8 @@ class CacheManager {
     virtual void* getObj() = 0;
     bool isRO() const { return !RW; }
     bool isRW() const { return  RW; }
+    void setRO() { RW = false; }
+    void setRW() { RW = true;  }
   };
   
   template<typename T>
@@ -69,6 +71,7 @@ public:
 
   template<typename T>
   void create(fatPointer ptr, bool write, DeSerializeBuffer& buf) {
+    assert(ptr.getHost() != NetworkInterface::ID);
     LL::SLguard lgr(Lock);
     remoteObj*& obj = remoteObjects[ptr];
     if (obj) { // creating can replace RO with RW objects
@@ -81,15 +84,27 @@ public:
 
   template<typename T>
   void create(fatPointer ptr, bool write, T&& buf) {
+    assert(ptr.getHost() != NetworkInterface::ID);
     LL::SLguard lgr(Lock);
     remoteObj*& obj = remoteObjects[ptr];
     if (obj) { // creating can replace RO with RW objects
+      //This is different than promoting an object as it may be a new value
       assert(obj->isRO() && write);
       garbage.push_back(obj);
       obj = nullptr;
     }
     obj = new remoteObjImpl<T>(write, std::forward<T>(buf));
   }
+
+  //! promote the existing value to RW.  Use create to replace a RO
+  //! value with a RW value
+  void makeRW(fatPointer ptr);
+
+  //! Does not write back.  That must be handled by the directory
+  void makeRO(fatPointer ptr);
+
+  //! Does not write back. That must be handled by the directory
+  void evict(fatPointer ptr);
 
   void* resolve(fatPointer ptr, bool write);
 };

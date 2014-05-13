@@ -23,8 +23,10 @@
 #ifndef GALOIS_RUNTIME_REMOTEPOINTER_H
 #define GALOIS_RUNTIME_REMOTEPOINTER_H
 
-#include "Galois/MethodFlags.h"
+//#include "Galois/MethodFlags.h"
 #include "Galois/Runtime/Directory.h"
+#include "Galois/Runtime/CacheManager.h"
+#include "Galois/Runtime/FatPointer.h"
 
 namespace Galois {
 namespace Runtime {
@@ -33,8 +35,7 @@ template<typename T>
 class gptr {
   fatPointer ptr;
 
-  //MethodFlag::NONE here means non-change, but obj must be present
-  T* inner_resolve(Galois::MethodFlag m) const;
+  T* inner_resolve(bool write) const;
 
   friend std::ostream& operator<<(std::ostream& os, const gptr<T>& v) {
     return os << v.ptr;
@@ -49,9 +50,12 @@ public:
   
   //operator fatPointer() const { return ptr; }
 
-  T& operator*()  const { return *inner_resolve(MethodFlag::NONE); }
-  T* operator->() const { return  inner_resolve(MethodFlag::NONE); }
-  T* resolve(MethodFlag m) const { return  inner_resolve(m); }
+  T& operator*()  { return *inner_resolve(true); }
+  T* operator->() { return  inner_resolve(true); }
+  const T& operator*()  const { return *inner_resolve(false); }
+  const T* operator->() const { return  inner_resolve(false); }
+
+  //  T* resolve(MethodFlag m) const { return  inner_resolve(m); }
 
   bool operator< (const gptr& rhs) const { return ptr < rhs.ptr;  }
   bool operator> (const gptr& rhs) const { return ptr > rhs.ptr;  }
@@ -76,30 +80,26 @@ public:
 
 };
 
-
 template<typename T>
-T* gptr<T>::inner_resolve(Galois::MethodFlag m) const {
+T* gptr<T>::inner_resolve(bool write) const {
   T* retval = nullptr;
+  if (isLocal())
+    retval = static_cast<T*>(ptr.getObj());
+  else
+    retval = static_cast<T*>(getCacheManager().resolve(ptr, write));
+  if (inGaloisForEach)
+    return retval;
+
+  if (isLocal()) {
+    while(!getLocalDirectory().fetch(static_cast<Lockable*>(ptr.getObj()))) {}
+    return retval;
+  }
+  
   do {
-    if (isLocal()) {
-      retval = static_cast<T*>(ptr.getObj());
-      // if (dir.isRemote(retval))
-      //   retval = nullptr;  
-    } else {
-      retval = getRemoteDirectory().resolve<T>(ptr, ResolveFlag::RW);
-    }
-    if (inGaloisForEach)
-      return retval;
-    
-    if (isLocal()) {
-      if (getLocalDirectory().fetch(static_cast<Lockable*>(ptr.getObj())))
-        return retval;
-    } else {
-      if (retval)
-        return retval;
-    }
-    doNetworkWork();
-  } while (true);
+    getRemoteDirectory().fetch<T>(ptr, write ? ResolveFlag::RW : ResolveFlag::RO);
+    retval = static_cast<T*>(getCacheManager().resolve(ptr, write));
+  } while (!retval);
+  return retval;
 }
 
 

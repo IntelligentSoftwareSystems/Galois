@@ -70,15 +70,3 @@ void* detail::amd64FatPointer::getObj() const {
   return (void*)hval;
 }
 
-
-
-std::ostream& detail::operator<<(std::ostream& os,
-                                 const detail::fatPointerImpl<detail::amd64FatPointer>& v) {
-  return os <<  "[" << v.getHost() << "," << v.getObj() << "]";
-}
-
-std::ostream& detail::operator<<(std::ostream& os, 
-                                 const detail::fatPointerImpl<detail::simpleFatPointer>& v) {
-  return os <<  "[" << v.getHost() << "," << v.getObj() << "]";
-}
-

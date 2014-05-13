@@ -112,16 +112,16 @@ public:
   bool isLocal() const {
     return fatPointerBase::getHost() == NetworkInterface::ID;
   }
+
+  friend std::ostream& operator<<(std::ostream& os, const fatPointerImpl& v) {
+    return os <<  "[" << v.getHost() << "," << v.getObj() << "]";
+  }
 };
 
 template<typename T>
 size_t hash_value(const fatPointerImpl<T>& v) {
   return v.hash_value();
 }
-
-std::ostream& operator<<(std::ostream& os, const fatPointerImpl<detail::amd64FatPointer>& v);
-std::ostream& operator<<(std::ostream& os, const fatPointerImpl<detail::simpleFatPointer>& v);
-
 
 } // namespace detail
 

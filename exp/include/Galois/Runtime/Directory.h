@@ -252,6 +252,9 @@ public:
   template<typename T>
   T* resolve(fatPointer ptr, ResolveFlag flag);
 
+  template<typename T>
+  void fetch(fatPointer ptr, ResolveFlag flag) {}
+
   void setContended(fatPointer ptr);
   void clearContended(fatPointer ptr);
   void dump(fatPointer ptr); //dump one object info

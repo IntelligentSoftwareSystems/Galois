@@ -40,6 +40,31 @@ void* CacheManager::resolve(fatPointer ptr, bool write) {
   return R->getObj();
 }
 
+void CacheManager::makeRW(fatPointer ptr) {
+  assert(ptr.getHost() != NetworkInterface::ID);
+  LL::SLguard lgr(Lock);
+  auto* R = remoteObjects[ptr];
+  assert(R && R->isRO());
+  R->setRW();
+}
+
+void CacheManager::makeRO(fatPointer ptr) {
+  assert(ptr.getHost() != NetworkInterface::ID);
+  LL::SLguard lgr(Lock);
+  auto* R = remoteObjects[ptr];
+  assert(R && R->isRW());
+  R->setRO();
+}
+
+void CacheManager::evict(fatPointer ptr) {
+  assert(ptr.getHost() != NetworkInterface::ID);
+  LL::SLguard lgr(Lock);
+  auto R = remoteObjects.find(ptr);
+  assert(R != remoteObjects.end() && R->second);
+  garbage.push_back(R->second);
+  remoteObjects.erase(R);
+}
+
 CacheManager& Galois::Runtime::getCacheManager() {
   static CacheManager CM;
   return CM;
