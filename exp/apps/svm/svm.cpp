@@ -32,6 +32,10 @@
 #include "Galois/Runtime/ll/PaddedLock.h"
 #include "Lonestar/BoilerPlate.h"
 
+#ifdef HAS_EIGEN
+#include <Eigen/Sparse>
+#endif
+
 #include <iostream>
 #include <cassert>
 #include <algorithm>
@@ -52,16 +56,25 @@ enum class UpdateType {
   Staleness
 };
 
+enum class AlgoType {
+  PrimalStochasticGradientDescent,
+  LeastSquares,
+  DualCoordinateDescent
+};
+
 namespace cll = llvm::cl;
 static cll::opt<std::string> inputGraphFilename(cll::Positional, cll::desc("<graph input file>"), cll::Required);
 static cll::opt<std::string> inputLabelFilename(cll::Positional, cll::desc("<label input file>"), cll::Required);
-static cll::opt<double> CREG("c", cll::desc("the regularization parameter C"), cll::init(1.0));
-static cll::opt<bool> SHUFFLE("s", cll::desc("shuffle samples between iterations"), cll::init(false));
-static cll::opt<double> TRAINING_FRACTION("tr", cll::desc("fraction of samples to use for training"), cll::init(0.8));
-static cll::opt<size_t> TRAINING_NUMBER("tn", cll::desc("number of samples to use for training"), cll::init(0));
-static cll::opt<double> ACCURACY_GOAL("ag", cll::desc("accuracy at which to stop running"), cll::init(0.95));
-static cll::opt<unsigned> ITER("i", cll::desc("how many iterations to run for, ignoring accuracy the goal"), cll::init(0));
-static cll::opt<UpdateType> UPDATE_TYPE("algo", cll::desc("Update type:"),
+static cll::opt<double> CREG("creg", cll::desc("the regularization parameter C"), cll::init(1.0));
+static cll::opt<bool> shuffleSamples("shuffle", cll::desc("shuffle samples between iterations"), cll::init(false));
+static cll::opt<unsigned> SEED("seed", cll::desc("random seed"), cll::init(~0U));
+static cll::opt<bool> printObjective("printObjective", cll::desc("print objective value"), cll::init(false));
+static cll::opt<bool> printAccuracy("printAccuracy", cll::desc("print accuracy value"), cll::init(true));
+static cll::opt<double> fractionTraining("fractionTraining", cll::desc("fraction of samples to use for training"), cll::init(0.8));
+static cll::opt<size_t> numberTraining("numberTraining", cll::desc("number of samples to use for training"), cll::init(0));
+static cll::opt<double> accuracyGoal("accuracyGoal", cll::desc("accuracy at which to stop running"), cll::init(0.95));
+static cll::opt<unsigned> maxIterations("iterations", cll::desc("how many iterations to run for, ignoring accuracy the goal"), cll::init(0));
+static cll::opt<UpdateType> updateType("update", cll::desc("Update type:"),
   cll::values(
     clEnumValN(UpdateType::Wild, "wild", "unsynchronized (default)"),
     clEnumValN(UpdateType::WildOrig, "wildorig", "unsynchronized"),
@@ -69,7 +82,13 @@ static cll::opt<UpdateType> UPDATE_TYPE("algo", cll::desc("Update type:"),
     clEnumValN(UpdateType::ReplicateByPackage, "replicateByPackage", "package replication"),
     clEnumValN(UpdateType::Staleness, "staleness", "stale reads"),
     clEnumValEnd), cll::init(UpdateType::Wild));
-
+static cll::opt<AlgoType> algoType("algo", cll::desc("Algorithm:"),
+    cll::values(
+      clEnumValN(AlgoType::PrimalStochasticGradientDescent, "psgd", "primal problem with stochastic gradient descent (default)"),
+#ifdef HAS_EIGEN
+      clEnumValN(AlgoType::LeastSquares, "ls", "minimize l2 norm of residual as least squares problem"),
+#endif
+      clEnumValEnd), cll::init(AlgoType::PrimalStochasticGradientDescent));
 
 /**          DATA TYPES        **/
 
@@ -224,18 +243,18 @@ struct linearSVM {
     Node& sample_data = g.getData(gnode);
     int label = sample_data.field;
 
-    bool update_type = label * dot < 1;
-    if (update_type)
+    bool bigUpdate = label * dot < 1;
+    if (bigUpdate)
       bigUpdates += size;
     for (cur = 0; cur < size; ++cur) {
       double delta;
       if (UT == UpdateType::WildOrig) {
-        if(update_type)
+        if (bigUpdate)
           delta = learningRate * (*wptrs[cur]/rfactors[cur] - label * dweights[cur]);
         else
           delta = *wptrs[cur]/rfactors[cur];
       } else {
-        if(update_type)
+        if (bigUpdate)
           delta = learningRate * (rfactors[cur] - label * dweights[cur]);
         else
           delta = rfactors[cur];
@@ -268,31 +287,32 @@ struct linearSVM {
   }
 };
 
-void printParameters()
-{
+void printParameters(const std::vector<GNode>& trainingSamples, const std::vector<GNode>& testingSamples) {
   std::cout << "Input graph file: " << inputGraphFilename << "\n";
   std::cout << "Input label file: " << inputLabelFilename << "\n";
   std::cout << "Threads: " << Galois::getActiveThreads() << "\n";
   std::cout << "Samples: " << NUM_SAMPLES << "\n";
   std::cout << "Variables: " << NUM_VARIABLES << "\n";
-  switch (UPDATE_TYPE) {
-    case UpdateType::Wild:
-      std::cout << "Update type: wild\n";
-      break;
-    case UpdateType::WildOrig:
-      std::cout << "Update type: wild orig\n";
-      break;
-    case UpdateType::ReplicateByThread:
-      std::cout << "Update type: replicate by thread\n";
-      break;
-    case UpdateType::ReplicateByPackage:
-      std::cout << "Update type: replicate by package\n";
-      break;
-    case UpdateType::Staleness:
-      std::cout << "Update type: stale reads\n";
-      break;
+  std::cout << "Training samples: " << trainingSamples.size() << "\n";
+  std::cout << "Testing samples: " << testingSamples.size() << "\n";
+  std::cout << "Algo type: ";
+  switch (algoType) {
+    case AlgoType::PrimalStochasticGradientDescent: std::cout << "PSGD"; break;
+    case AlgoType::LeastSquares: std::cout << "least squares"; break;
     default: abort();
   }
+  std::cout << "\n";
+
+  std::cout << "Update type: ";
+  switch (updateType) {
+    case UpdateType::Wild: std::cout << "wild"; break;
+    case UpdateType::WildOrig: std::cout << "wild orig"; break;
+    case UpdateType::ReplicateByThread: std::cout << "replicate by thread"; break;
+    case UpdateType::ReplicateByPackage: std::cout << "replicate by package"; break;
+    case UpdateType::Staleness: std::cout << "stale reads"; break;
+    default: abort();
+  }
+  std::cout << "\n";
 }
 
 void initializeVariableCounts(Graph& g) {
@@ -319,10 +339,8 @@ unsigned loadLabels(Graph& g, std::string filename) {
   return num_labels;
 }
 
-double getAccuracy(Graph& g, std::vector<GNode>& testing_samples) {
+size_t getNumCorrect(Graph& g, std::vector<GNode>& testing_samples) {
   Galois::GAccumulator<size_t> correct;
-  // 0.5 * norm(w)^2 + C * sum_i [max(0, 1 - y_i * w * x_i)]
-  Galois::GAccumulator<double> objective;
 
   Galois::do_all(testing_samples.begin(), testing_samples.end(), [&](GNode gnode) {
     double sum = 0.0;
@@ -340,7 +358,28 @@ double getAccuracy(Graph& g, std::vector<GNode>& testing_samples) {
     } else if (sum > 0.0 && label == 1) {
       correct += 1;
     }
-    objective += std::max(0.0, 1 - label * sum);
+  });
+  
+  return correct.reduce();
+}
+
+double getObjective(Graph& g, std::vector<GNode>& training_samples) {
+  // 0.5 * w^Tw + C * sum_i [max(0, 1 - y_i * w^T * x_i)]^2
+  Galois::GAccumulator<double> objective;
+
+  Galois::do_all(training_samples.begin(), training_samples.end(), [&](GNode gnode) {
+    double sum = 0.0;
+    Node& data = g.getData(gnode);
+    int label = data.field;
+    for (auto edge_it : g.out_edges(gnode)) {
+      GNode variable_node = g.getEdgeDst(edge_it);
+      Node& data = g.getData(variable_node);
+      double weight = g.getEdgeData(edge_it);
+      sum += data.w * weight;
+    }
+
+    double o = std::max(0.0, 1 - label * sum);
+    objective += o * o;
   });
   
   Galois::GAccumulator<double> norm;
@@ -348,60 +387,23 @@ double getAccuracy(Graph& g, std::vector<GNode>& testing_samples) {
     double v = g.getData(i + NUM_SAMPLES).w;
     norm += v * v;
   });
-  double obj = objective.reduce() * CREG + 0.5 * norm.reduce();
-  size_t c = correct.reduce();
-  double accuracy = c / (testing_samples.size() + 0.0);
-  std::cout 
-    << "Accuracy: " << accuracy << " "
-    << "(" << c <<  "/" << testing_samples.size() << ")" << " "
-    << "obj: " << obj << "\n";
-  return accuracy;
+  return objective.reduce() * CREG + 0.5 * norm.reduce();
 }
 
-int main(int argc, char** argv) {
-  LonestarStart(argc, argv, name, desc, url);
-  Galois::StatManager statManager;
-  
-  Graph g;
-  Galois::Graph::readGraph(g, inputGraphFilename);
-  NUM_SAMPLES = loadLabels(g, inputLabelFilename);
-  initializeVariableCounts(g);
-  
-  Galois::StatTimer timer;
+void runPrimalSgd(Graph& g, std::mt19937& gen, std::vector<GNode> trainingSamples, std::vector<GNode> testingSamples) {
   Galois::TimeAccumulator accumTimer;
   accumTimer.start();
-  timer.start();
 
-  NUM_VARIABLES = g.size() - NUM_SAMPLES;
-  assert(NUM_SAMPLES > 0 && NUM_VARIABLES > 0);
-  
-  printParameters();
-
-  //put samples in a list and shuffle them
-  std::vector<GNode> all_samples(g.begin(), g.begin() + NUM_SAMPLES);
-  std::random_shuffle(all_samples.begin(), all_samples.end());
-
-  //copy a fraction of the samples to the training samples list
-  unsigned num_training_samples = TRAINING_NUMBER;
-  if (num_training_samples == 0 || num_training_samples >= NUM_SAMPLES) 
-    num_training_samples = NUM_SAMPLES * TRAINING_FRACTION;
-  std::vector<GNode> training_samples(all_samples.begin(), all_samples.begin() + num_training_samples);
-  std::cout << "Training samples: " << training_samples.size() << "\n";
-  
-  //the remainder of samples go into the testing samples list
-  std::vector<GNode> testing_samples(all_samples.begin() + num_training_samples, all_samples.end());
-  std::cout << "Testing samples: " << testing_samples.size() << "\n";
-  
   //allocate storage for weights from previous iteration
   old_weights.create(NUM_VARIABLES);
-  if (UPDATE_TYPE == UpdateType::ReplicateByThread || UPDATE_TYPE == UpdateType::Staleness) {
+  if (updateType == UpdateType::ReplicateByThread || updateType == UpdateType::Staleness) {
     Galois::on_each([](unsigned tid, unsigned total) {
       double *p = new double[NUM_VARIABLES];
       *thread_weights.getLocal() = p;
       std::fill(p, p + NUM_VARIABLES, 0);
     });
   }
-  if (UPDATE_TYPE == UpdateType::ReplicateByPackage) {
+  if (updateType == UpdateType::ReplicateByPackage) {
     Galois::on_each([](unsigned tid, unsigned total) {
       if (Galois::Runtime::LL::isPackageLeader(tid)) {
         double *p = new double[NUM_VARIABLES];
@@ -411,25 +413,28 @@ int main(int argc, char** argv) {
     });
   }
 
-  //getAccuracy(g, testing_samples);
-  
+  double accuracy = -1.0; //holds most recent accuracy stat
+  if (printAccuracy) {
+    accuracy = getNumCorrect(g, testingSamples) / (double) testingSamples.size();
+    std::cout << "Initial Accuracy: " << accuracy << "\n";
+  }
+
   Galois::StatTimer sgdTime("SgdTime");
   
   //if no iteration count is specified, keep going until the accuracy goal is hit
   //  otherwise, run specified iterations
-  const bool use_accuracy_goal = ITER == 0;
-  double accuracy = -1.0; //holds most recent accuracy stat
-  for (unsigned iter = 1; iter <= ITER || use_accuracy_goal; iter++) {
+  const bool use_accuracy_goal = maxIterations == 0;
+  for (unsigned iter = 1; use_accuracy_goal || iter <= maxIterations; ++iter) {
     sgdTime.start();
     
     //include shuffling time in the time taken per iteration
     //also: not parallel
-    if(SHUFFLE)
-      std::random_shuffle(training_samples.begin(), training_samples.end());
+    if (shuffleSamples)
+      std::shuffle(trainingSamples.begin(), trainingSamples.end(), gen);
     
     double learning_rate = 30/(100.0 + iter);
-    auto ts_begin = training_samples.begin();
-    auto ts_end = training_samples.end();
+    auto ts_begin = trainingSamples.begin();
+    auto ts_end = trainingSamples.end();
     auto ln = Galois::loopname("LinearSVM");
     auto wl = Galois::wl<Galois::WorkList::dChunkedFIFO<32>>();
     Galois::GAccumulator<size_t> bigUpdates;
@@ -437,7 +442,7 @@ int main(int argc, char** argv) {
     Galois::Timer flopTimer;
     flopTimer.start();
 
-    UpdateType type = UPDATE_TYPE;
+    UpdateType type = updateType;
     switch (type) {
       case UpdateType::Wild:
         Galois::for_each(ts_begin, ts_end, linearSVM<UpdateType::Wild>(g, learning_rate, bigUpdates), ln, wl);
@@ -479,7 +484,7 @@ int main(int argc, char** argv) {
             (*package_weights.getRemoteByPkg(j))[i];
           localw[i] += o;
         }
-        localw[i] /= n;
+        localw[i] /=  n;
         GNode variable_node = (GNode) (i + NUM_SAMPLES);
         Node& var_data = g.getData(variable_node, Galois::NONE);
         var_data.w = localw[i];
@@ -504,17 +509,140 @@ int main(int argc, char** argv) {
     accumTimer.stop();
     std::cout 
       << iter << " GFLOP/s " << gflops << " "
-      << "(" << flopTimer.get() / 1000.0 << " s) "
-      << "AccumTime " << accumTimer.get() / 1000.0 << " ";
+      << "(" << flopTimer.get() / 1e3 << " s) "
+      << "AccumTime " << accumTimer.get() / 1e3;
     accumTimer.start();
-    accuracy = getAccuracy(g, testing_samples);
-    if (use_accuracy_goal && accuracy > ACCURACY_GOAL) {
-      std::cout << "Accuracy goal of " << ACCURACY_GOAL << " reached after " <<
-        iter << " iterations."<< std::endl;
+    if (use_accuracy_goal || printAccuracy) {
+      accuracy = getNumCorrect(g, testingSamples)/ (double) testingSamples.size();
+    } 
+    if (printAccuracy) {
+      std::cout << " Accuracy: " << accuracy;
+    }
+    if (printObjective) {
+      std::cout << " Obj: " << getObjective(g, trainingSamples);
+    }
+    std::cout << "\n";
+    if (use_accuracy_goal && accuracy > accuracyGoal) {
+      std::cout 
+        << "Accuracy goal of " << accuracyGoal 
+        << " reached after " << iter << " iterations.\n";
       break;
     }
   }
+}
+
+void runDualCoordinateDescent(Graph& g, std::mt19937& gen, std::vector<GNode> trainingSamples, std::vector<GNode> testingSamples) {
+
+}
+
+#ifdef HAS_EIGEN
+void runLeastSquares(Graph& g, std::mt19937& gen, std::vector<GNode> trainingSamples, std::vector<GNode> testingSamples) {
+  Eigen::SparseMatrix<double> A(NUM_SAMPLES, NUM_VARIABLES);
+  {
+    typedef Eigen::Triplet<double> Triplet;
+    std::vector<Triplet> triplets { g.sizeEdges() };
+    {
+      auto it = triplets.begin();
+      for (auto n : g) {
+        for (auto edge : g.out_edges(n)) {
+          *it++ = Triplet(n, g.getEdgeDst(edge) - NUM_SAMPLES, g.getEdgeData(edge));
+        }
+      }
+    }
+    A.setFromTriplets(triplets.begin(), triplets.end());
+  }
   
+  Eigen::VectorXd b(NUM_SAMPLES);
+  size_t cur = 0;
+  for (auto ii = g.begin(), ei = g.begin() + NUM_SAMPLES; ii != ei; ++ii) {
+    b(cur++) = g.getData(*ii).field;
+  }
+
+  // Least-squares problem: minimize |Ax - b|^2
+  // normal equation: A^T A x = A^T b
+  Eigen::VectorXd x;
+  // Cholesky is almost always faster but QR is more numerically stable
+  if (g.sizeEdges() > 10000) {
+    // Solve normal equation directly with Cholesky
+    Eigen::SparseMatrix<double> AT = A.transpose();
+    Eigen::SparseMatrix<double> ATA = AT * A;
+    Eigen::VectorXd ATb = AT * b;
+    Eigen::ConjugateGradient<Eigen::SparseMatrix<double>> solver;
+    solver.compute(ATA);
+    x = solver.solve(ATb);
+    std::cout << "cg iterations: " << solver.iterations() << "\n";
+    std::cout << "cg est error: " << solver.error() << "\n";
+  } else {
+    // Decompose normal equation
+    // A = QR
+    // A^T A x = A^T b
+    // R^T Q^T Q R x = R^T Q^T b => ... => R x = Q^T b
+    Eigen::SparseQR<Eigen::SparseMatrix<double>, Eigen::COLAMDOrdering<int> > solver;
+    solver.compute(A);
+    if (solver.info() != Eigen::Success) {
+      GALOIS_DIE("factorization failed");
+    }
+    Eigen::VectorXd QTb = solver.matrixQ().transpose() * b;
+    int r = solver.rank();
+    Eigen::VectorXd out;
+    out.resize(A.cols());
+    out.topRows(r) = solver.matrixR().topLeftCorner(r, r).triangularView<Eigen::Upper>().solve(QTb.topRows(r));
+    out.bottomRows(out.rows() - r).setZero();
+    x = solver.colsPermutation() * out;
+  }
+
+  // Verify
+  {
+    for (size_t i = 0; i < NUM_VARIABLES; ++i) {
+      g.getData(i + NUM_SAMPLES).w = x(i);
+    }
+    std::vector<GNode> allSamples(g.begin(), g.begin() + NUM_SAMPLES);
+    size_t n = getNumCorrect(g, allSamples);
+    std::cout << "All: " << n / (double) NUM_SAMPLES << " (" << n << "/" << NUM_SAMPLES << ")\n";
+    n = getNumCorrect(g, testingSamples);
+    std::cout << "Testing: " << n / (double) testingSamples.size() << " (" << n << "/" << testingSamples.size() << ")\n";
+  }
+}
+#endif
+
+int main(int argc, char** argv) {
+  LonestarStart(argc, argv, name, desc, url);
+  Galois::StatManager statManager;
+  
+  Graph g;
+  Galois::Graph::readGraph(g, inputGraphFilename);
+  NUM_SAMPLES = loadLabels(g, inputLabelFilename);
+  initializeVariableCounts(g);
+  NUM_VARIABLES = g.size() - NUM_SAMPLES;
+  assert(NUM_SAMPLES > 0 && NUM_VARIABLES > 0);
+
+  //put samples in a list and shuffle them
+  std::random_device rd;
+  std::mt19937 gen(SEED == ~0U ? rd() : SEED);
+
+  std::vector<GNode> allSamples(g.begin(), g.begin() + NUM_SAMPLES);
+  std::shuffle(allSamples.begin(), allSamples.end(), gen);
+
+  //copy a fraction of the samples to the training samples list
+  unsigned numTraining = numberTraining;
+  if (numTraining == 0 || numTraining >= NUM_SAMPLES) 
+    numTraining = std::min(static_cast<unsigned>(NUM_SAMPLES * fractionTraining), NUM_SAMPLES);
+  std::vector<GNode> trainingSamples(allSamples.begin(), allSamples.begin() + numTraining);
+  //the remainder of samples go into the testing samples list
+  std::vector<GNode> testingSamples(allSamples.begin() + numTraining, allSamples.end());
+  
+  printParameters(trainingSamples, testingSamples);
+
+  Galois::StatTimer timer;
+  timer.start();
+  switch (algoType) {
+    case AlgoType::PrimalStochasticGradientDescent: runPrimalSgd(g, gen, trainingSamples, testingSamples); break;
+    case AlgoType::DualCoordinateDescent: runDualCoordinateDescent(g, gen, trainingSamples, testingSamples); break;
+#ifdef HAS_EIGEN
+    case AlgoType::LeastSquares: runLeastSquares(g, gen, trainingSamples, testingSamples); break;
+#endif
+    default: abort();
+  }
   timer.stop();
 
   return 0;
