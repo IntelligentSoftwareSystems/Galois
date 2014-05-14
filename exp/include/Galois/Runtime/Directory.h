@@ -139,6 +139,10 @@ class LocalDirectory : public BaseDirectory {
   void recvRequestImpl(fatPointer ptr, ResolveFlag flag, uint32_t dest, typeHelper* th);
   void recvObjectImpl(fatPointer ptr);
 
+
+  static void ackObj(RecvBuffer&); //fatPointer, ResolveFlag, uint32_t);
+  friend class RemoteDirectory;
+
 public:
   bool fetch(Lockable* ptr) {
     metadata* md = getMD(ptr);
@@ -151,6 +155,8 @@ public:
     outstandingReqs = 1;
     return false;
   }
+
+  void fetch(fatPointer, ResolveFlag flag) { abort(); }
 
   //Recieve a request
   template<typename T>
@@ -205,12 +211,23 @@ class RemoteDirectory : public BaseDirectory {
     };
     LL::SimpleLock lock;
     StateFlag state;
-    Lockable* obj;
+    uint32_t pendingDest;
+    bool contended;
 
-    metadata() :state(INVALID), obj(nullptr) {}
+    metadata();
 
-    void dump(std::ostream& os) const;
+    ResolveFlag fetch(ResolveFlag flag);
+    void object(ResolveFlag flag);
+    bool request(ResolveFlag flag, uint32_t dest);
+
+    //! returns whether a fetch is needed
+    bool setContended();
+
+    //! returns whether the object should be sent away
+    bool clearContended();
   };
+  //sigh
+  friend std::ostream& operator<<(std::ostream& os, const metadata& md);
 
   std::unordered_map<fatPointer, metadata> md;
   LL::SimpleLock md_lock;
@@ -226,37 +243,42 @@ class RemoteDirectory : public BaseDirectory {
   //Recieve request to invalidate object
   void recvInvalidate(fatPointer ptr, uint32_t cause, typeHelper* th);
 
-  //Dispatch request
-  void recvRequestImpl(fatPointer ptr, ResolveFlag flag, uint32_t cause, typeHelper* th);
-
-  //handle object ariving
-  void recvObjectImpl(fatPointer ptr, ResolveFlag flag, Lockable* obj);
-
   //handle missing objects (or needing to upgrade)
   void resolveNotPresent(fatPointer ptr, ResolveFlag flag, metadata* md, typeHelper* th);
 
-public:
-  //Remote portion of API
 
+  //Dispatch request
+  template<typename T>
+  void recvRequestImpl(RecvBuffer& buf);
+
+  //handle object ariving
+  template<typename T>
+  void recvObjectImpl(RecvBuffer& buf);
+
+  //Remote portion of API
+protected:
   //Recieve a request
   template<typename T>
   static void recvRequest(RecvBuffer& buf);
+
   //Recieve an object
   template<typename T>
   static void recvObject(RecvBuffer& buf);
 
   //Local portion of API
-
+public:
+  //! process any queues
   void makeProgress();
 
+  //! initiate, if necessary, a fetch of a remote object
   template<typename T>
-  T* resolve(fatPointer ptr, ResolveFlag flag);
+  void fetch(fatPointer ptr, ResolveFlag flag);
 
-  template<typename T>
-  void fetch(fatPointer ptr, ResolveFlag flag) {}
-
+  //! engage priority protocol for ptr
   void setContended(fatPointer ptr);
+  //! unengage priority protocol for ptr
   void clearContended(fatPointer ptr);
+
   void dump(fatPointer ptr); //dump one object info
   void dump(); //dump direcotry status
 };
@@ -267,52 +289,68 @@ RemoteDirectory& getRemoteDirectory();
 // Implementation
 ////////////////////////////////////////////////////////////////////////////////
 
-template<typename T>
-T* RemoteDirectory::resolve(fatPointer ptr, ResolveFlag flag) {
-  //  trace("RemoteDirectory::resolve for % flag %\n", ptr, flag);
-  metadata* md = getMD(ptr);
-  std::lock_guard<LL::SimpleLock> lg(md->lock);
-  if ((flag == RO && (md->state == metadata::HERE_RO || md->state == metadata::UPGRADE)) ||
-      (flag == RW &&  md->state == metadata::HERE_RW)) {
-    assert(md->obj);
-    return static_cast<T*>(md->obj);
-  } else {
-    resolveNotPresent(ptr, flag, md, typeHelperImpl<T>::get());
-    return nullptr;
-  }
-}
-
 //Generic landing pad for requests
 template<typename T>
 void RemoteDirectory::recvRequest(RecvBuffer& buf) {
+  getRemoteDirectory().recvRequestImpl<T>(buf);
+}
+
+template<typename T>
+void RemoteDirectory::recvRequestImpl(RecvBuffer& buf) {
   fatPointer ptr;
   ResolveFlag flag;
-  uint32_t cause;
-  gDeserialize(buf, ptr, flag, cause);
-  getRemoteDirectory().recvRequestImpl(ptr, flag, cause, typeHelperImpl<T>::get());
+  uint32_t dest;
+  gDeserialize(buf, ptr, flag, dest);
+  metadata* md = getMD(ptr);
+  std::lock_guard<LL::SimpleLock> lg(md->lock);
+  md->request(flag, dest);
 }
 
 template<typename T>
 void RemoteDirectory::recvObject(RecvBuffer& buf) {
+  getRemoteDirectory().recvObjectImpl<T>(buf);
+}
+
+template<typename T>
+void RemoteDirectory::recvObjectImpl(RecvBuffer& buf) {
   fatPointer ptr;
   ResolveFlag flag;
   gDeserialize(buf, ptr, flag);
   assert(flag == RW || flag == RO);
-  //T* obj = new T(buf);
-  T* obj = new T();
-  gDeserialize(buf, *obj);
-  getRemoteDirectory().recvObjectImpl(ptr, flag, static_cast<Lockable*>(obj));
+  metadata* md = getMD(ptr);
+  std::lock_guard<LL::SimpleLock> lg(md->lock);
+  md->object(flag);
+  getCacheManager().create<T>(ptr, flag == RW, buf);
+  SendBuffer sbuf;
+  gSerialize(sbuf, ptr, flag, NetworkInterface::ID);
+  getSystemNetworkInterface().send(ptr.getHost(), &LocalDirectory::ackObj, sbuf);
+}
+
+template<typename T>
+void RemoteDirectory::fetch(fatPointer ptr, ResolveFlag flag) {
+  //trace("RemoteDirectory::fetch for % flag %\n", ptr, flag);
+  metadata* md = getMD(ptr);
+  std::lock_guard<LL::SimpleLock> lg(md->lock, std::adopt_lock);
+  ResolveFlag requestFlag = md->fetch(flag);
+  if (requestFlag != INV) {
+    SendBuffer sbuf;
+    gSerialize(sbuf, ptr, requestFlag, NetworkInterface::ID);
+    getSystemNetworkInterface().send(ptr.getHost(), &LocalDirectory::recvRequest<T>, sbuf);
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 
+// template<typename T>
+// BaseDirectory::typeHelperImpl<T>::typeHelperImpl()
+//   : typeHelper(&RemoteDirectory::recvRequest<T>,
+//                &RemoteDirectory::recvObject<T>,
+//                &LocalDirectory::recvRequest<T>,
+//                &LocalDirectory::recvObject<T>)
+// {}
+
 template<typename T>
-BaseDirectory::typeHelperImpl<T>::typeHelperImpl()
-  : typeHelper(&RemoteDirectory::recvRequest<T>,
-               &RemoteDirectory::recvObject<T>,
-               &LocalDirectory::recvRequest<T>,
-               &LocalDirectory::recvObject<T>)
-{}
+BaseDirectory::typeHelperImpl<T>::typeHelperImpl() :typeHelper(nullptr, nullptr, nullptr, nullptr) {}
 
 template<typename T>
 void BaseDirectory::typeHelperImpl<T>::vSerialize(SendBuffer& buf, Lockable* ptr) const {

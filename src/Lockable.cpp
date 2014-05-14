@@ -70,6 +70,11 @@ bool LockManagerBase::isAcquired(const Lockable* lockable) const {
   return lockable->owner.getValue() == this;
 }
 
+bool LockManagerBase::isAcquiredAny(const Lockable* lockable) {
+  assert(lockable);
+  return lockable->owner.getValue() != nullptr;
+}
+
 bool LockManagerBase::empty() const {
   return locks.empty();
 }

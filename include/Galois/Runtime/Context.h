@@ -131,14 +131,36 @@ inline void acquire(Lockable* lockable, Galois::MethodFlag m) {
 }
 
 template<typename T>
+class gptr;
+
+template<typename T>
 inline void acquire(gptr<T> ptr, Galois::MethodFlag m) {
-  T* obj = ptr.resolve(m);
+  T* obj = ptr.resolve();
   if (!obj) {
-    getRemoteDirectory().resolve<T>(static_cast<fatPointer>(ptr), ResolveFlag::RW);
+    //FIXME Better resolve flag
+    getRemoteDirectory().fetch<T>(static_cast<fatPointer>(ptr), ResolveFlag::RW);
     throw remote_ex{static_cast<fatPointer>(ptr)};
   }
-  acquire(obj, m);
+  acquire(static_cast<Lockable*>(obj), m);
 }
+
+//! ensures conherent serial access
+template<typename T>
+inline void serial_acquire(gptr<T> ptr) {
+  do {
+    T* obj = ptr.resolve();
+    if (!obj) {
+      //FIXME Better resolve flag
+      getRemoteDirectory().fetch<T>(static_cast<fatPointer>(ptr), ResolveFlag::RW);
+    } else if (LockManagerBase::isAcquiredAny(obj)) {
+      getLocalDirectory().fetch(static_cast<fatPointer>(ptr), ResolveFlag::RW);
+    } else {
+      return;
+    }
+    doNetworkWork();
+  } while(true);
+}
+
 // inline bool isAcquired(Lockable* C) {
 //   return C->owner.is_locked();
 // }

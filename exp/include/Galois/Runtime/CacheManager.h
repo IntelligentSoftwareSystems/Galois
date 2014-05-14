@@ -37,77 +37,85 @@ class DeSerializeBuffer;
 template<typename T>
 T gDeserializeObj(DeSerializeBuffer&);
 
+
+namespace details {
+
+class remoteObj {
+  std::atomic<unsigned> refs;
+public:
+  void incRef() { ++refs; }
+  void decRef() { --refs; }
+  virtual ~remoteObj();
+  virtual void* getObj() = 0;
+};
+
+template<typename T>
+class remoteObjImpl : public remoteObj {
+  T obj;
+public:
+  remoteObjImpl(DeSerializeBuffer& buf) :obj{std::move(gDeserializeObj<T>(buf))} {}
+  remoteObjImpl(T&& buf) :obj(buf) {}
+  virtual ~remoteObjImpl() {}
+  virtual void* getObj() { return &obj; }
+};
+
+}
+
+class ResolveCache {
+  std::unordered_map<fatPointer, void*> addrs;
+  std::deque<details::remoteObj*> objs;
+ 
+public:
+  void* resolve(fatPointer);
+  void reset();
+};
+
+
 class CacheManager {
 
-  class remoteObj {
-    bool RW;
-  public:
-    remoteObj(bool rw) :RW(rw) {}
-    virtual ~remoteObj();
-    virtual void* getObj() = 0;
-    bool isRO() const { return !RW; }
-    bool isRW() const { return  RW; }
-    void setRO() { RW = false; }
-    void setRW() { RW = true;  }
-  };
-  
-  template<typename T>
-  class remoteObjImpl : public remoteObj {
-    T obj;
-  public:
-    remoteObjImpl(bool RW, DeSerializeBuffer& buf)
-      :remoteObj(RW), obj{std::move(gDeserializeObj<T>(buf))} {}
-    remoteObjImpl(bool RW, T&& buf)
-      :remoteObj(RW), obj(buf) {}
-    virtual ~remoteObjImpl() {}
-    virtual void* getObj() { return &obj; }
-  };
-
-  std::unordered_map<fatPointer, remoteObj*> remoteObjects;
-  std::deque<remoteObj*> garbage;
+  std::unordered_map<fatPointer, details::remoteObj*> remoteObjects;
+  std::deque<details::remoteObj*> garbage;
   LL::SimpleLock Lock;
+
+  //! resolve a value to a reference count incremented metadata
+  //! used by ResolveCache
+  details::remoteObj* resolveIncRef(fatPointer);
+
+  friend class ResolveCache;
 
 public:
 
   template<typename T>
-  void create(fatPointer ptr, bool write, DeSerializeBuffer& buf) {
+  void create(fatPointer ptr, DeSerializeBuffer& buf) {
     assert(ptr.getHost() != NetworkInterface::ID);
     LL::SLguard lgr(Lock);
-    remoteObj*& obj = remoteObjects[ptr];
-    if (obj) { // creating can replace RO with RW objects
-      assert(obj->isRO() && write);
+    details::remoteObj*& obj = remoteObjects[ptr];
+    if (obj) { // creating can replace old objects
       garbage.push_back(obj);
-      obj = nullptr;
     }
-    obj = new remoteObjImpl<T>(write, buf);
+    obj = new details::remoteObjImpl<T>(buf);
   }
 
   template<typename T>
-  void create(fatPointer ptr, bool write, T&& buf) {
+  void create(fatPointer ptr, T&& buf) {
     assert(ptr.getHost() != NetworkInterface::ID);
     LL::SLguard lgr(Lock);
-    remoteObj*& obj = remoteObjects[ptr];
-    if (obj) { // creating can replace RO with RW objects
-      //This is different than promoting an object as it may be a new value
-      assert(obj->isRO() && write);
+    details::remoteObj*& obj = remoteObjects[ptr];
+    if (obj) { // creating can replace old objects
       garbage.push_back(obj);
-      obj = nullptr;
     }
-    obj = new remoteObjImpl<T>(write, std::forward<T>(buf));
+    obj = new details::remoteObjImpl<T>(std::forward<T>(buf));
   }
 
-  //! promote the existing value to RW.  Use create to replace a RO
-  //! value with a RW value
-  void makeRW(fatPointer ptr);
-
-  //! Does not write back.  That must be handled by the directory
-  void makeRO(fatPointer ptr);
-
   //! Does not write back. That must be handled by the directory
-  void evict(fatPointer ptr);
+  void evict(fatPointer);
 
-  void* resolve(fatPointer ptr, bool write);
+  //! resolve a value, mainly (always?) for serial code
+  void* resolve(fatPointer);
 };
+
+ResolveCache* getThreadResolve();
+void setThreadResolve(ResolveCache*);
 
 CacheManager& getCacheManager();
 

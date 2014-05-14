@@ -104,6 +104,136 @@ bool BaseDirectory::dirOwns(Lockable* ptr) {
 // Remote Directory
 ////////////////////////////////////////////////////////////////////////////////
 
+void RemoteDirectory::setContended(fatPointer ptr) {
+  trace("RemoteDirectory::setContended for %\n", ptr);
+  metadata* md = getMD(ptr);
+  std::lock_guard<LL::SimpleLock> lg(md->lock, std::adopt_lock);
+  md->setContended();
+}
+
+void RemoteDirectory::clearContended(fatPointer ptr) {
+  trace("RemoteDirectory::clearContended for %\n", ptr);
+  metadata* md = getMD(ptr);
+  std::lock_guard<LL::SimpleLock> lg(md->lock, std::adopt_lock);
+  md->clearContended();
+}
+
+RemoteDirectory::metadata* RemoteDirectory::getMD(fatPointer ptr) {
+  std::lock_guard<LL::SimpleLock> lg(md_lock);
+  assert(ptr.getHost() != NetworkInterface::ID);
+  auto* retval = &md[ptr];
+  retval->lock.lock();
+  return retval;
+}
+
+
+
+
+////////////////////////////////////////////////////////////////////////////////
+// Remote Directory Metadata
+////////////////////////////////////////////////////////////////////////////////
+
+RemoteDirectory::metadata::metadata() 
+  :state(INVALID), pendingDest(~0), contended(false)
+{}
+
+ResolveFlag RemoteDirectory::metadata::fetch(ResolveFlag flag) {
+  assert(flag != INV);
+  if (flag == RW) {
+    switch (state) {
+    case INVALID:
+    case PENDING_RO:
+      state = PENDING_RW;
+      return flag;
+    case HERE_RO:
+      state = UPGRADE;
+      return flag;
+    default:
+      return INV;
+    }
+  } else {
+    switch (state) {
+    case INVALID:
+      state = PENDING_RO;
+      return flag;
+    default:
+      return INV;
+    }
+  } 
+}
+
+bool RemoteDirectory::metadata::request(ResolveFlag flag, uint32_t dest) {
+  if (dest < pendingDest)
+    pendingDest = dest;
+  if (contended)
+    return pendingDest < NetworkInterface::ID;
+  return true;
+}
+
+void RemoteDirectory::metadata::object(ResolveFlag flag) {
+  assert(flag != INV);
+  assert(state != INVALID);
+  assert(pendingDest == ~0);
+  if (flag == RW) {
+    switch (state) {
+    case PENDING_RW:
+    case UPGRADE:
+      state = HERE_RW;
+      return;
+    default:
+      assert(0 && "Invalid state transition");
+      abort();
+    }
+  } else {
+    switch (state) {
+    case PENDING_RO:
+      state = HERE_RO;
+      return;
+    default:
+      assert(0 && "Invalid state transition");
+      abort();
+    }
+  }
+}
+
+bool RemoteDirectory::metadata::setContended() {
+  assert(state != INVALID);
+  contended = true;
+  return state == PENDING_RO || state == HERE_RO;
+}
+
+bool RemoteDirectory::metadata::clearContended() {
+  assert(state == HERE_RO || state == HERE_RW || state == UPGRADE);
+  contended = false;
+    //see if we should send the object on
+  return pendingDest != ~0;
+}
+
+std::ostream& Galois::Runtime::operator<<(std::ostream& os, const RemoteDirectory::metadata& md) {
+  static const char* StateFlagNames[] = {"I", "PR", "PW", "RO", "RW", "UW"};
+  return os << StateFlagNames[md.state] << "," << md.pendingDest << "," << md.contended;
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// Old stuff
+////////////////////////////////////////////////////////////////////////////////
+
+// template<typename T>
+// T* RemoteDirectory::resolve(fatPointer ptr, ResolveFlag flag) {
+//   //  trace("RemoteDirectory::resolve for % flag %\n", ptr, flag);
+//   metadata* md = getMD(ptr);
+//   std::lock_guard<LL::SimpleLock> lg(md->lock);
+//   if ((flag == RO && (md->state == metadata::HERE_RO || md->state == metadata::UPGRADE)) ||
+//       (flag == RW &&  md->state == metadata::HERE_RW)) {
+//     assert(md->obj);
+//     return static_cast<T*>(md->obj);
+//   } else {
+//     resolveNotPresent(ptr, flag, md, typeHelperImpl<T>::get());
+//     return nullptr;
+//   }
+// }
+
+
 void RemoteDirectory::makeProgress() {
   //FIXME: make safe
   decltype(writeback) q;
@@ -120,13 +250,10 @@ void RemoteDirectory::makeProgress() {
 }
 
 void RemoteDirectory::dump() {
-  //FIXME: write
   std::lock_guard<LL::SimpleLock> lg(md_lock);
   for(auto& pair : md) {
     std::lock_guard<LL::SimpleLock> mdlg(pair.second.lock);
-    std::cout << pair.first << ": ";
-    pair.second.dump(std::cout);
-    std::cout << "\n";
+    std::cout << pair.first << ": " << pair.second << "\n";
   }
 }
 
@@ -134,66 +261,51 @@ void RemoteDirectory::dump(fatPointer ptr) {
   //FIXME: write
 }
 
-void RemoteDirectory::setContended(fatPointer ptr) {
-  //FIXME: write
-  trace("RemoteDirectory::setContended for %\n", ptr);
-}
 
-void RemoteDirectory::clearContended(fatPointer ptr) {
-  //FIXME: write
-  trace("RemoteDirectory::clearContended for %\n", ptr);
-}
+// //Recieve OK to upgrade RO -> RW
+// void RemoteDirectory::recvUpgrade(fatPointer ptr, typeHelper* th) {
+//   trace("RemoteDirectory::recvUpgrade for %\n", ptr);
+//   metadata* md = getMD(ptr);
+//   std::lock_guard<LL::SimpleLock> lg(md->lock);
+//   assert(md->state == metadata::UPGRADE);
+//   md->state = metadata::HERE_RW;
+// }
 
-RemoteDirectory::metadata* RemoteDirectory::getMD(fatPointer ptr) {
-  std::lock_guard<LL::SimpleLock> lg(md_lock);
-  assert(ptr.getHost() != NetworkInterface::ID);
-  return &md[ptr];
-}
+// //Recieve request to invalidate object
+// //FIXME: deal with cause and local priority control
+// void RemoteDirectory::recvInvalidate(fatPointer ptr, uint32_t cause, typeHelper* th) {
+//   trace("RemoteDirectory::recvInvalidate for % cause %\n", ptr, cause);
+//   metadata* md = getMD(ptr);
+//   std::lock_guard<LL::SimpleLock> lg(md->lock); //FIXME: transfer lock
+//   assert(md->state == metadata::HERE_RO || md->state == metadata::HERE_RW);
+//   if (md->state == metadata::HERE_RW)
+//     writeback.emplace_back(ptr, md->obj, th);
+//   md->state = metadata::INVALID;
+//   md->obj = nullptr;
+// }
 
-//Recieve OK to upgrade RO -> RW
-void RemoteDirectory::recvUpgrade(fatPointer ptr, typeHelper* th) {
-  trace("RemoteDirectory::recvUpgrade for %\n", ptr);
-  metadata* md = getMD(ptr);
-  std::lock_guard<LL::SimpleLock> lg(md->lock);
-  assert(md->state == metadata::UPGRADE);
-  md->state = metadata::HERE_RW;
-}
+// void RemoteDirectory::recvRequestImpl(fatPointer ptr, ResolveFlag flag, uint32_t cause, typeHelper* th) {
+//   switch (flag) {
+//   case INV:
+//     recvInvalidate(ptr, cause, th);
+//     break;
+//   case RW:
+//     recvUpgrade(ptr, th);
+//   default:
+//     abort();
+//   }
+// }
 
-//Recieve request to invalidate object
-//FIXME: deal with cause and local priority control
-void RemoteDirectory::recvInvalidate(fatPointer ptr, uint32_t cause, typeHelper* th) {
-  trace("RemoteDirectory::recvInvalidate for % cause %\n", ptr, cause);
-  metadata* md = getMD(ptr);
-  std::lock_guard<LL::SimpleLock> lg(md->lock); //FIXME: transfer lock
-  assert(md->state == metadata::HERE_RO || md->state == metadata::HERE_RW);
-  if (md->state == metadata::HERE_RW)
-    writeback.emplace_back(ptr, md->obj, th);
-  md->state = metadata::INVALID;
-  md->obj = nullptr;
-}
-
-void RemoteDirectory::recvRequestImpl(fatPointer ptr, ResolveFlag flag, uint32_t cause, typeHelper* th) {
-  switch (flag) {
-  case INV:
-    recvInvalidate(ptr, cause, th);
-    break;
-  case RW:
-    recvUpgrade(ptr, th);
-  default:
-    abort();
-  }
-}
-
-void RemoteDirectory::recvObjectImpl(fatPointer ptr, ResolveFlag flag, Lockable* obj) {
-  trace("RemoteDirectory::recvObject for % flag % ptr %\n", ptr, flag, obj);
-  metadata* md = getMD(ptr);
-  std::lock_guard<LL::SimpleLock> lg(md->lock); //FIXME: transfer lock
-  assert(md->obj == nullptr);
-  assert((md->state == metadata::PENDING_RO && flag == RO)
-         || (md->state == metadata::PENDING_RW && flag == RW));
-  md->state = flag == RW ? metadata::HERE_RW : metadata::HERE_RO;
-  md->obj = obj;
-}
+// void RemoteDirectory::recvObjectImpl(fatPointer ptr, ResolveFlag flag, Lockable* obj) {
+//   trace("RemoteDirectory::recvObject for % flag % ptr %\n", ptr, flag, obj);
+//   metadata* md = getMD(ptr);
+//   std::lock_guard<LL::SimpleLock> lg(md->lock); //FIXME: transfer lock
+//   assert(md->obj == nullptr);
+//   assert((md->state == metadata::PENDING_RO && flag == RO)
+//          || (md->state == metadata::PENDING_RW && flag == RW));
+//   md->state = flag == RW ? metadata::HERE_RW : metadata::HERE_RO;
+//   md->obj = obj;
+// }
 
 //! precondition: md is locked
 void RemoteDirectory::resolveNotPresent(fatPointer ptr, ResolveFlag flag, metadata* md, typeHelper* th) {
@@ -227,10 +339,6 @@ void RemoteDirectory::resolveNotPresent(fatPointer ptr, ResolveFlag flag, metada
   th->requestObj(ptr, flag);
 }
 
-void RemoteDirectory::metadata::dump(std::ostream& os) const {
-  static const char* StateFlagNames[] = {"I", "PR", "PW", "RO", "RW", "UW"};
-  os << "{" << StateFlagNames[state] << " " << obj << "}";
-}
 
 
 

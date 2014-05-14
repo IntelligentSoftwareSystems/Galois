@@ -27,6 +27,7 @@
 #include "Galois/Runtime/Directory.h"
 #include "Galois/Runtime/CacheManager.h"
 #include "Galois/Runtime/FatPointer.h"
+#include "Galois/Runtime/Context.h"
 
 namespace Galois {
 namespace Runtime {
@@ -35,10 +36,18 @@ template<typename T>
 class gptr {
   fatPointer ptr;
 
-  T* inner_resolve(bool write) const;
-
   friend std::ostream& operator<<(std::ostream& os, const gptr<T>& v) {
     return os << v.ptr;
+  }
+
+  T* resolve_safe() {
+    if (inGaloisForEach) {
+      //parallel code ensures acquire happens before use
+    } else {
+      //Serial code nees hand holding
+      serial_acquire(*this);
+    }
+    return resolve();
   }
 
 public:
@@ -48,14 +57,8 @@ public:
   explicit constexpr  gptr(T* p) noexcept :gptr(NetworkInterface::ID, p) {}
   gptr(uint32_t o, T* p) noexcept :ptr(o, static_cast<void*>(p)) {}
   
-  //operator fatPointer() const { return ptr; }
-
-  T& operator*()  { return *inner_resolve(true); }
-  T* operator->() { return  inner_resolve(true); }
-  const T& operator*()  const { return *inner_resolve(false); }
-  const T* operator->() const { return  inner_resolve(false); }
-
-  //  T* resolve(MethodFlag m) const { return  inner_resolve(m); }
+  T& operator*()  { return *resolve_safe(); }
+  T* operator->() { return  resolve_safe(); }
 
   bool operator< (const gptr& rhs) const { return ptr < rhs.ptr;  }
   bool operator> (const gptr& rhs) const { return ptr > rhs.ptr;  }
@@ -69,6 +72,21 @@ public:
 
   bool isLocal() const { return ptr.isLocal(); }
 
+  T* resolve() {
+    void* obj = nullptr;
+    if (ptr.isLocal()) {
+      obj = ptr.getObj();
+    } else {
+      ResolveCache* tr = getThreadResolve();
+      if (tr) // equivalent to in a parallel loop
+        obj = tr->resolve(ptr);
+      else
+        obj = getCacheManager().resolve(ptr);
+    }
+    return obj ? static_cast<T*>(obj) : nullptr;
+  }
+
+
   // bool sameHost(const gptr& rhs) const {
   //   return ptr.getHost() == rhs.ptr.getHost();
   // }
@@ -80,27 +98,27 @@ public:
 
 };
 
-template<typename T>
-T* gptr<T>::inner_resolve(bool write) const {
-  T* retval = nullptr;
-  if (isLocal())
-    retval = static_cast<T*>(ptr.getObj());
-  else
-    retval = static_cast<T*>(getCacheManager().resolve(ptr, write));
-  if (inGaloisForEach)
-    return retval;
+// template<typename T>
+// T* gptr<T>::inner_resolve(bool write) const {
+//   T* retval = nullptr;
+//   if (isLocal())
+//     retval = static_cast<T*>(ptr.getObj());
+//   else
+//     retval = static_cast<T*>(getCacheManager().resolve(ptr, write));
+//   if (inGaloisForEach)
+//     return retval;
 
-  if (isLocal()) {
-    while(!getLocalDirectory().fetch(static_cast<Lockable*>(ptr.getObj()))) {}
-    return retval;
-  }
+//   if (isLocal()) {
+//     while(!getLocalDirectory().fetch(static_cast<Lockable*>(ptr.getObj()))) {}
+//     return retval;
+//   }
   
-  do {
-    getRemoteDirectory().fetch<T>(ptr, write ? ResolveFlag::RW : ResolveFlag::RO);
-    retval = static_cast<T*>(getCacheManager().resolve(ptr, write));
-  } while (!retval);
-  return retval;
-}
+//   do {
+//     getRemoteDirectory().fetch<T>(ptr, write ? ResolveFlag::RW : ResolveFlag::RO);
+//     retval = static_cast<T*>(getCacheManager().resolve(ptr, write));
+//   } while (!retval);
+//   return retval;
+// }
 
 
 } //namespace Runtime

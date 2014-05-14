@@ -30,7 +30,7 @@
 using namespace Galois::Runtime;
 
 //! Global thread context for each active thread
-static __thread SimpleRuntimeContext* thread_ctx = 0;
+static __thread SimpleRuntimeContext* thread_ctx = nullptr;
 
 void Galois::Runtime::doCheckWrite() {
   // if (getPending () == PENDING) {

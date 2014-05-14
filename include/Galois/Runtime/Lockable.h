@@ -67,6 +67,8 @@ public:
 
   bool isAcquired(const Lockable* lockable) const;
 
+  static bool isAcquiredAny(const Lockable* lockable);
+
   //Release one object.  This manager must use releaseChecked after this.
   void releaseOne(Lockable* lockable);
 

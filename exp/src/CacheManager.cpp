@@ -25,35 +25,36 @@
 
 using namespace Galois::Runtime;
 
+static __thread ResolveCache* thread_resolve = nullptr;
+
+////////////////////////////////////////////////////////////////////////////////
 
 //ancor vtable
-CacheManager::remoteObj::~remoteObj() {}
+details::remoteObj::~remoteObj() {}
 
-void* CacheManager::resolve(fatPointer ptr, bool write) {
+////////////////////////////////////////////////////////////////////////////////
+
+details::remoteObj* CacheManager::resolveIncRef(fatPointer ptr) {
   assert(ptr.getHost() != NetworkInterface::ID);
   LL::SLguard lgr(Lock);
-  auto* R = remoteObjects[ptr];
-  if (!R)
-    return nullptr;
-  if (write && R->isRO())
-    return nullptr;
-  return R->getObj();
+  auto ii = remoteObjects.find(ptr);
+  if (ii != remoteObjects.end()) {
+    assert(ii->second);
+    ii->second->incRef();
+    return ii->second;
+  }
+  return nullptr;
 }
 
-void CacheManager::makeRW(fatPointer ptr) {
+void* CacheManager::resolve(fatPointer ptr) {
   assert(ptr.getHost() != NetworkInterface::ID);
   LL::SLguard lgr(Lock);
-  auto* R = remoteObjects[ptr];
-  assert(R && R->isRO());
-  R->setRW();
-}
-
-void CacheManager::makeRO(fatPointer ptr) {
-  assert(ptr.getHost() != NetworkInterface::ID);
-  LL::SLguard lgr(Lock);
-  auto* R = remoteObjects[ptr];
-  assert(R && R->isRW());
-  R->setRO();
+  auto ii = remoteObjects.find(ptr);
+  if (ii != remoteObjects.end()) {
+    assert(ii->second);
+    return ii->second->getObj();
+  }
+  return nullptr;
 }
 
 void CacheManager::evict(fatPointer ptr) {
@@ -63,6 +64,39 @@ void CacheManager::evict(fatPointer ptr) {
   assert(R != remoteObjects.end() && R->second);
   garbage.push_back(R->second);
   remoteObjects.erase(R);
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+
+void* ResolveCache::resolve(fatPointer ptr) {
+  void* a = addrs[ptr];
+  if (!a) {
+    details::remoteObj* r = getCacheManager().resolveIncRef(ptr);
+    if (r) {
+      a = addrs[ptr] = r->getObj();
+      objs.push_back(r);
+    }
+  }
+  return a;
+}
+
+void ResolveCache::reset() {
+  for (auto* p : objs)
+    p->decRef();
+  addrs.clear();
+  objs.clear();
+}
+
+////////////////////////////////////////////////////////////////////////////////
+
+
+ResolveCache* Galois::Runtime::getThreadResolve() {
+  return thread_resolve;
+}
+
+void Galois::Runtime::setThreadResolve(ResolveCache* rc) {
+  thread_resolve = rc;
 }
 
 CacheManager& Galois::Runtime::getCacheManager() {

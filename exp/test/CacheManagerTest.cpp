@@ -26,70 +26,33 @@
 
 using namespace Galois::Runtime;
 
-struct foo {
+struct foo : public Lockable {
   int x;
   int y;
   friend std::ostream& operator<<(std::ostream& os, const foo& v) {
     return os << "{" << v.x << "," << v.y << "}";
   }
+  foo(int _x, int _y) :x(_x), y(_y) {}
 };
 
 void test_CM() {
   auto& cm = getCacheManager();
   fatPointer fp{1, reinterpret_cast<void*>(0x010)};
 
-  std::cout << fp << "\n";
-  std::cout << cm.resolve(fp, false) << " " 
-            << cm.resolve(fp, true) << " (0,0)\n";
-
-  cm.create(fp, false, foo{1,2});
-
-  std::cout << fp << "\n";
-  std::cout << cm.resolve(fp, false) << " " 
-            << cm.resolve(fp, true) << " (X,0)\n";
-
-  cm.create(fp, true, foo{2,3});
-
-  std::cout << fp << "\n";
-  std::cout << cm.resolve(fp, false) << " " 
-            << cm.resolve(fp, true) << " (X,X)\n";
-
+  std::cout << fp << " " << cm.resolve(fp) << "\n";
+  cm.create(fp, foo{1,2});
+  std::cout << fp << " " << cm.resolve(fp) << "\n";
   cm.evict(fp);
-
-  std::cout << fp << "\n";
-  std::cout << cm.resolve(fp, false) << " " 
-            << cm.resolve(fp, true) << " (0,0)\n";
-
-  cm.create(fp, false, foo{1,2});
-
-  std::cout << fp << "\n";
-  std::cout << cm.resolve(fp, false) << " " 
-            << cm.resolve(fp, true) << " (X,0)\n";
-
-  cm.makeRW(fp);
-
-  std::cout << fp << "\n";
-  std::cout << cm.resolve(fp, false) << " " 
-            << cm.resolve(fp, true) << " (X,X)\n";
-
-  cm.makeRO(fp);
-
-  std::cout << fp << "\n";
-  std::cout << cm.resolve(fp, false) << " " 
-            << cm.resolve(fp, true) << " (X,0)\n";
-
-  cm.evict(fp);
-
-  std::cout << fp << "\n";
-  std::cout << cm.resolve(fp, false) << " " 
-            << cm.resolve(fp, true) << " (0,0)\n";
+  std::cout << fp << " " << cm.resolve(fp) << "\n";
+  cm.create(fp, foo{1,2});
+  std::cout << fp << " " << cm.resolve(fp) << "\n";
 }
 
 void test_RP() {
   foo lfoo{1,2};
   gptr<foo> glfoo(&lfoo);
   gptr<foo> grfoo(1, reinterpret_cast<foo*>(0x10));
-  getCacheManager().create((fatPointer)grfoo, true, foo{3,4});
+  getCacheManager().create((fatPointer)grfoo, foo{3,4});
 
   std::cout << "L: " << glfoo << "\n";
   std::cout << "R: " << grfoo << "\n";
