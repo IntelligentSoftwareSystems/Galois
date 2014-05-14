@@ -39,6 +39,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <map>
+#include <list>
 #include <cstddef>
 
 #include <memory.h>
@@ -517,18 +518,18 @@ public:
   static SizedAlloc* getAllocatorForSize(const size_t);
 
 private:
+  typedef std::map<size_t, SizedAlloc*> AllocatorsMap;
   static SizedAllocatorFactory* getInstance();
   static LL::PtrLock<SizedAllocatorFactory, true> instance;
-  typedef std::map<size_t, SizedAlloc*> AllocatorsMap;
-  AllocatorsMap allocators;
-  LL::SimpleLock lock;
-
-  SizedAlloc* getAllocForSize(const size_t);
-
   static __thread AllocatorsMap* localAllocators;
+  AllocatorsMap allocators;
+  std::list<AllocatorsMap*> allLocalAllocators;
+  LL::SimpleLock lock;
 
   SizedAllocatorFactory();
   ~SizedAllocatorFactory();
+
+  SizedAlloc* getAllocForSize(const size_t);
 };
 
 class FixedSizeAllocator {
