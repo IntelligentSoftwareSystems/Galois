@@ -94,11 +94,11 @@ static cll::opt<std::string> inputFilename(cll::Positional,
 static cll::opt<std::string> outputFilename(cll::Positional,
     cll::desc("<output file>"), cll::Required);
 static cll::opt<std::string> transposeFilename("graphTranspose",
-    cll::desc("[transpose graph file]"), cll::init(""));
+    cll::desc("transpose graph file"), cll::init(""));
 static cll::opt<std::string> outputPermutationFilename("outputNodePermutation",
-    cll::desc("[output node permutation file]"), cll::init(""));
+    cll::desc("output node permutation file"), cll::init(""));
 static cll::opt<std::string> labelsFilename("labels",
-    cll::desc("[labels file]"), cll::init(""));
+    cll::desc("labels file for svmlight2gr"), cll::init(""));
 static cll::opt<EdgeType> edgeType("edgeType", cll::desc("Input/Output edge type:"),
     cll::values(
       clEnumValN(EdgeType::float32_, "float32", "32 bit floating point edge values"),
@@ -2102,6 +2102,7 @@ struct Svmlight2Gr: public HasNoVoidSpecialization {
       infile.clear();
       infile.seekg(0, std::ios::beg);
       size_t numNodes = 0;
+
       while (infile) {
         if (phase == 2) {
           float label;
@@ -2118,7 +2119,7 @@ struct Svmlight2Gr: public HasNoVoidSpecialization {
         const int maxLength = 1024;
         char buffer[maxLength];
         int idx = 0;
-
+        
         while (infile) {
           char c = infile.get();
           if (!infile)
@@ -2129,9 +2130,12 @@ struct Svmlight2Gr: public HasNoVoidSpecialization {
             if (idx) {
               char *delim = strchr(buffer, ':');
               if (!delim)
-                GALOIS_DIE("unknown feature format: '", buffer, "'");
+                GALOIS_DIE("unknown feature format: '", buffer, "' on line: ", numNodes + 1);
               *delim = '\0';
-              if (phase == 0) {
+              double value = strtod(delim + 1, NULL);
+              if (value == 0.0) {
+                ; // pass
+              } else if (phase == 0) {
                 long feature = strtol(buffer, NULL, 10);
                 maxFeature = std::max(maxFeature, feature);
                 numEdges += 1;
@@ -2139,7 +2143,6 @@ struct Svmlight2Gr: public HasNoVoidSpecialization {
                 p.incrementDegree(numNodes);
               } else {
                 long feature = strtol(buffer, NULL, 10);
-                double value = strtod(delim + 1, NULL);
                 edge_value_type data = value;
                 edgeData.set(p.addNeighbor(numNodes, feature + featureOffset), data); 
               }
