@@ -1,4 +1,5 @@
 /** Single source shortest paths -*- C++ -*-
+ * @example SSSP.cpp
  * @file
  * @section License
  *
@@ -202,7 +203,9 @@ template<typename Graph>
 void readInOutGraph(Graph& graph) {
   using namespace Galois::Graph;
   if (symmetricGraph) {
+    //! [Reading a graph]
     Galois::Graph::readGraph(graph, filename);
+    //! [Reading a graph]
   } else if (transposeGraphName.size()) {
     Galois::Graph::readGraph(graph, filename, transposeGraphName);
   } else {
