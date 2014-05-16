@@ -60,7 +60,7 @@ class DisseminationBarrier: public Galois::Runtime::Barrier {
       LocalData& lhs = *nodes.getRemote(i);
       lhs.parity = 0;
       lhs.sense = 1;
-      for (unsigned j = 0; j < sizeof(lhs.myflags)/sizeof(*lhs.myflags); ++i)
+      for (unsigned j = 0; j < sizeof(lhs.myflags)/sizeof(*lhs.myflags); ++j)
         lhs.myflags[j].flag[0] = lhs.myflags[j].flag[1] = 0;
 
       int d = 1;
