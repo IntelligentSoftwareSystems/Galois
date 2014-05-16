@@ -17,7 +17,7 @@ if(ARCH STREQUAL "mic")
 endif()
 
 # Don't do anything when already set
-if(ARCH_FLAGS)
+if(ARCH_CXX_FLAGS)
   set(ARCH_CXX_FLAGS_CANDIDATES)
   set(ARCH_FLAGS_FOUND_INTERNAL "YES")
 endif()

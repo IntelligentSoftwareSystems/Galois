@@ -11,7 +11,13 @@ int main(int c, char** argv) {
   return 0;
 }
 ")
-CHECK_C_SOURCE_COMPILES("${Mmap64_C_TEST_SOURCE}" HAVE_MMAP64)
+
 if(HAVE_MMAP64)
-  message(STATUS "mmap64 found")
+
+else()
+  CHECK_C_SOURCE_COMPILES("${Mmap64_C_TEST_SOURCE}" HAVE_MMAP64_INTERNAL)
+  if(HAVE_MMAP64_INTERNAL)
+    message(STATUS "mmap64 found")
+    set(HAVE_MMAP64 "${HAVE_MMAP64_INTERNAL}" CACHE BOOL "Have mmap64")
+  endif()
 endif()
