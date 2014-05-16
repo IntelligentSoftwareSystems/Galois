@@ -97,10 +97,12 @@ struct F2 {
 
 int main(int argc, char** argv) {
   unsigned M = Galois::Runtime::LL::getMaxThreads() / 2;
-  size_t mega = 200;
-  if (argc > 1) {
+  size_t mega = 1;
+  if (argc > 1)
     mega = atoi(argv[1]);
-  }
+  if (!mega)
+    mega = 200;
+
   size_t seed = time(NULL);
   printf("Working set: %zu MB\n\n", mega);
   printf("Effective random-access bandwidth (MB/s)\n");

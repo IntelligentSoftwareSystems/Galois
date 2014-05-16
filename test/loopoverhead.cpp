@@ -6,7 +6,7 @@
 #include <omp.h>
 
 int RandomNumber () { return (rand()%1000000); }
-const unsigned iter = 16*1024;
+unsigned iter = 1;
 
 struct emp {
   template<typename T>
@@ -98,20 +98,31 @@ void test(std::string header, unsigned maxThreads, unsigned minVec, unsigned max
   std::cout << "\n";
 }
 
-int main() {
+int main(int argc, char** argv) {
   using namespace std::placeholders;
 #pragma omp parallel for
   for (int x = 0; x< 100; ++x)
     {}
+
+  unsigned maxVector = 16;
+  if (argc > 1)
+    iter = atoi(argv[1]);
+  if (!iter)
+    iter = 16*1024;
+  if (argc > 2)
+    maxVector = atoi(argv[2]);
+  if (!maxVector)
+    maxVector = 1024*1024;
+
   unsigned M = Galois::Runtime::LL::getMaxThreads() / 2;
-  test("inline\t",    1, 16, 1024*1024, [] (std::vector<unsigned>& V, unsigned num, unsigned th) { return t_inline(V, num); });
-  test("stl\t",       1, 16, 1024*1024, [] (std::vector<unsigned>& V, unsigned num, unsigned th) { return t_stl(V, num); });
-  test("omp\t",       M, 16, 1024*1024, t_omp);
-  test("doall N W", M, 16, 1024*1024, std::bind(t_doall,false,false,_1,_2,_3));
-  test("doall N S", M, 16, 1024*1024, std::bind(t_doall,false,true,_1,_2,_3));
-  test("foreach N", M, 16, 1024*1024, std::bind(t_foreach,false,_1,_2,_3));
-  test("doall B W", M, 16, 1024*1024, std::bind(t_doall,true,false,_1,_2,_3));
-  test("doall B S", M, 16, 1024*1024, std::bind(t_doall,true,true,_1,_2,_3));
-  test("foreach B", M, 16, 1024*1024, std::bind(t_foreach,true,_1,_2,_3));
+  test("inline\t",  1, 16, maxVector, [] (std::vector<unsigned>& V, unsigned num, unsigned th) { return t_inline(V, num); });
+  test("stl\t",     1, 16, maxVector, [] (std::vector<unsigned>& V, unsigned num, unsigned th) { return t_stl(V, num); });
+  test("omp\t",     M, 16, maxVector, t_omp);
+  test("doall N W", M, 16, maxVector, std::bind(t_doall,false,false,_1,_2,_3));
+  test("doall N S", M, 16, maxVector, std::bind(t_doall,false,true,_1,_2,_3));
+  test("foreach N", M, 16, maxVector, std::bind(t_foreach,false,_1,_2,_3));
+  test("doall B W", M, 16, maxVector, std::bind(t_doall,true,false,_1,_2,_3));
+  test("doall B S", M, 16, maxVector, std::bind(t_doall,true,true,_1,_2,_3));
+  test("foreach B", M, 16, maxVector, std::bind(t_foreach,true,_1,_2,_3));
   return 0;
 }

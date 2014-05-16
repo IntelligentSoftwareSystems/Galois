@@ -6,7 +6,9 @@
 #include <cstdlib>
 #include <unistd.h>
 
-const unsigned iter = 16*1024;
+unsigned iter = 1;
+unsigned numThreads = 2;
+
 char bname[100];
 
 struct emp {
@@ -33,8 +35,7 @@ struct emp {
 };
 
 void test(Galois::Runtime::Barrier& b) {
-
-  unsigned M = Galois::Runtime::LL::getMaxThreads();
+  unsigned M = numThreads;
   if (M > 16) M /= 2;
   while (M) {   
     Galois::setActiveThreads(M); //Galois::Runtime::LL::getMaxThreads());
@@ -48,7 +49,14 @@ void test(Galois::Runtime::Barrier& b) {
   }
 }
 
-int main() {
+int main(int argc, char** argv) {
+  if (argc > 1)
+    iter = atoi(argv[1]);
+  if (!iter)
+    iter = 16*1024;
+  if (argc > 2)
+    numThreads = Galois::Runtime::LL::getMaxThreads();
+
   gethostname(bname, sizeof(bname));
   using namespace Galois::Runtime::benchmarking;
   test(getPthreadBarrier());

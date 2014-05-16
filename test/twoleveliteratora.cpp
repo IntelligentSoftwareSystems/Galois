@@ -7,8 +7,9 @@
 #include GALOIS_CXX11_STD_HEADER(vector)
 #include <list>
 #include <iostream>
+#include <cstdlib>
 
-const int N = 1024 * 4;
+int N = 1;
 
 template<class D, class I>
 struct GetBegin {
@@ -278,7 +279,12 @@ void check_strided_iteration() {
   check_strided<false, std::random_access_iterator_tag, std::list<std::list<int>>,std::list<int>>();
 }
 
-int main() {
+int main(int argc, char** argv) {
+  if (argc > 1)
+    N = atoi(argv[1]);
+  if (N <= 0)
+    N = 1024 * 4;
+
   typedef std::vector<std::vector<int>> NestedVector;
 
   // Static checks
