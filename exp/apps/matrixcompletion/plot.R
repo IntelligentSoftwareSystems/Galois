@@ -15,7 +15,7 @@ dd <- read.csv("data.csv", stringsAsFactors=F)
 dd <- dd[,!grepl("null", names(dd))]
 dd <- subset(dd, !is.na(RMSE1))
 dd$Kind <- ""
-dd$Kind[grepl("sgd-ddn", dd$CommandLine)] <- "galois"
+dd$Kind[grepl("mc-ddn", dd$CommandLine)] <- "galois"
 dd$Kind[grepl("nomad", dd$CommandLine)] <- "nomad"
 dd$Kind[grepl("collaborative", dd$CommandLine)] <- "graphlab"
 dd$Input <- ""

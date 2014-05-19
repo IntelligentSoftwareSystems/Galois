@@ -37,9 +37,9 @@
 
 #include "Lonestar/BoilerPlate.h"
 
-static const char* const name = "Stochastic Gradient Descent";
+static const char* const name = "Matrix Completion";
 static const char* const desc = "Computes Matrix Decomposition using Stochastic Gradient Descent";
-static const char* const url = "sgd";
+static const char* const url = 0;
 
 static const int LATENT_VECTOR_SIZE = 20; //Prad's default: 100, Intel: 20
 static const unsigned int MAX_MOVIE_UPDATES = 1; //Prad's default: 5

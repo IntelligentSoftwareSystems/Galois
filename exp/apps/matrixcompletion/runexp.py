@@ -37,7 +37,7 @@ CommandTable = [{
 
 def galoisCommand(c):
   # exp/apps/sgd/sgd-ddn /net/faraday/workspace/inputs/weighted/bipartite/bgg.gr -t 20 -algo blockedEdge -lambda 0.01 -learningRate 0.0005 -decayRate 0.001 -learningRateFunction Purdue -itemsPerBlock 200 -usersPerBlock 1024 -fixedRounds 400 -useExactError
-  cmd = os.path.join(RootDir, 'default/exp/apps/sgd/sgd-ddn')
+  cmd = os.path.join(RootDir, 'default/exp/apps/matrixcompletion/mc-ddn')
   input = os.path.join('/net/faraday/workspace/inputs/weighted/bipartite', c['name'] + '.gr')
   
   iterations = int(math.ceil(c['time'] / c['secondsPerIteration']['galois']))

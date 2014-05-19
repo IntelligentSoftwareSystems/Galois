@@ -19,7 +19,7 @@
  * Author: Prad Nelluru <pradn@cs.utexas.edu>
  * Author: Donald Nguyen <ddn@cs.utexas.edu>
  */
-#include "Sgd.h"
+#include "MC.h"
 #include "TcpServer.h"
 
 #include "Galois/config.h"
@@ -44,9 +44,9 @@
 #include <random>
 #include <type_traits>
 
-static const char* const name = "Stochastic Gradient Descent";
+static const char* const name = "Matrix Completion";
 static const char* const desc = "Computes Matrix Decomposition using Stochastic Gradient Descent";
-static const char* const url = "sgd";
+static const char* const url = 0;
 
 enum Algo {
   blockedEdge,

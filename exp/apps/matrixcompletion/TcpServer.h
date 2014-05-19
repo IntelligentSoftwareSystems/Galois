@@ -1,7 +1,7 @@
 #ifndef TCPSERVER_H
 #define TCPSERVER_H
 
-#include "Sgd.h"
+#include "MC.h"
 #include "Galois/Endian.h"
 #include "Galois/ParallelSTL/ParallelSTL.h"
 #include "Galois/Runtime/TiledExecutor.h"
