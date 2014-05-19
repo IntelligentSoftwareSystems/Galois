@@ -1,3 +1,6 @@
+/**
+@page Manual
+
 Manual
 ======
 
@@ -21,7 +24,6 @@ Linking to Things
 
 [oollink]: http://www.stack.nl/~dimitri/doxygen/manual/markdown.html "Markdown Document"
 
-Another Subsection
-------------------
+@section Test Test
 
-Hello
+*/

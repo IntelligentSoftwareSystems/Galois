@@ -54,7 +54,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
   if(ICC_VERSION VERSION_GREATER 13.0 OR ICC_VERSION VERSION_EQUAL 13.0)
     #message(STATUS "ICC Version >= 13.0")
   else()
-    message(FATAL_ERROR "ICC must be 13.0 or higher found: ${ICC_VERSION}")
+    message(FATAL_ERROR "ICC must be 13.0 or higher; found: ${ICC_VERSION} instead")
   endif()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -wd68 -wd981 -wd383 -wd869 -wd2196 -wd279 -wd2504 -wd2943 -wd32013")
 
@@ -294,6 +294,14 @@ endif()
 ###### Documentation ######
 set(DOXYFILE_SOURCE_DIR "src\" \"include\" \"docs")
 include(UseDoxygen OPTIONAL)
+if(DOXYGEN_FOUND)
+  execute_process(COMMAND ${DOXYGEN_EXECUTABLE} --version OUTPUT_VARIABLE DOXYGEN_VERSION)
+  if(DOXYGEN_VERSION VERSION_GREATER 1.8.0 OR DOXYGEN_VERSION VERSION_EQUAL 1.8.0)
+    #message(STATUS "doxygen version >= 1.8.0")
+  else()
+    message(FATAL_ERROR "doxygen must be version 1.8.0 or higher; found: ${DOXYGEN_VERSION} instead")
+  endif()
+endif()
 
 ###### Distribution ######
 include(InstallRequiredSystemLibraries)
