@@ -51,7 +51,7 @@ static inline void for_each_wl_impl (ExecutorTy& exec, const bool isParallel) {
 // When using ParaMeter say: for_each_wl <ParaMeter<WLTy> > (wl, ...)
 // and when usin galois say: for_each_wl (wl,...)
 template <typename ExecTy, typename WLTy, typename FunctionTy>
-static inline void for_each_wl (WLTy& wl, FunctionTy f, const char* loopname=0) {
+static inline void for_each_wl (WLTy& wl, const FunctionTy& f, const char* loopname=0) {
   typedef typename WLTy::value_type T;
   typedef Galois::Runtime::ForEachWork<WorkList::ExternRef<ExecTy>, T, FunctionTy> WorkTy;
 
@@ -61,7 +61,7 @@ static inline void for_each_wl (WLTy& wl, FunctionTy f, const char* loopname=0) 
 }
 
 template <typename WLTy, typename FunctionTy>
-static inline void for_each_wl (WLTy& wl, FunctionTy f, const char* loopname=0) {
+static inline void for_each_wl (WLTy& wl, const FunctionTy& f, const char* loopname=0) {
   typedef typename WLTy::value_type T;
   typedef typename Galois::WorkList::ExternRef<WLTy>::template retype<T>::type WLRef;
   typedef Galois::Runtime::ForEachWork<WLRef, T, FunctionTy> WorkTy;
