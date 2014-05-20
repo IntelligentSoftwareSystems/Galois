@@ -135,13 +135,17 @@ class gptr;
 
 template<typename T>
 inline void acquire(gptr<T> ptr, Galois::MethodFlag m) {
-  T* obj = ptr.resolve();
-  if (!obj) {
-    //FIXME Better resolve flag
-    getRemoteDirectory().fetch<T>(static_cast<fatPointer>(ptr), ResolveFlag::RW);
-    throw remote_ex{static_cast<fatPointer>(ptr)};
+  if (inGaloisForEach) {
+    T* obj = ptr.resolve();
+    if (!obj) {
+      //FIXME Better resolve flag
+      getRemoteDirectory().fetch<T>(static_cast<fatPointer>(ptr), ResolveFlag::RW);
+      throw remote_ex{static_cast<fatPointer>(ptr)};
+    }
+    acquire(static_cast<Lockable*>(obj), m);
+  } else {
+    serial_acquire(ptr);
   }
-  acquire(static_cast<Lockable*>(obj), m);
 }
 
 //! ensures conherent serial access
