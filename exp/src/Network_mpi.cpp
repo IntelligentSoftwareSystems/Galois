@@ -125,13 +125,14 @@ public:
   }
 
   virtual void send(uint32_t dest, recvFuncTy recv, SendBuffer& buf) {
-    trace("NetworkInterfaceAsyncMPI::send % %\n", dest, recv);
+    //trace("NetworkInterfaceAsyncMPI::send % to %\n", (void*)recv, dest);
     lock.lock();
     //wait for a send slot
     // while (pending_sends.size() >= 128)
     //   update_pending_sends();
     assert(recv);
     buf.serialize_header((void*)recv);
+    //trace("NetworkInterfaceAsyncMPI::send buf %\n", buf);
     assert(dest < Num);
     pending_sends.emplace_back(MPI_REQUEST_NULL, std::move(buf));
     auto & com = pending_sends.back();
@@ -150,9 +151,9 @@ public:
       recvFuncTy f;
       uintptr_t fp;
       gDeserialize(*data,fp);
-      trace("NetworkInterfaceAsyncMPI::handleRecieves %\n", fp);
       assert(fp);
       f = (recvFuncTy)fp;
+      //trace("NetworkInterfaceAsyncMPI::handleRecieves %\n", (void*)f);
       //Call deserialized function
       f(*data);
     }

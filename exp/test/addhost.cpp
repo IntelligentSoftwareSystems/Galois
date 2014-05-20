@@ -12,6 +12,7 @@ struct R : public Galois::Runtime::Lockable {
    int i;
 
   R() :i(0) {}
+  R(RecvBuffer& buf) { deserialize(buf); }
 
   void add(int v) {
     std::cout << "In Host " << NetworkInterface::ID << " and thread " << LL::getTID() << " processing number " << v << " old value " << i << std::endl; //endl for the flush

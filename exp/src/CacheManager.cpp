@@ -66,6 +66,10 @@ void CacheManager::evict(fatPointer ptr) {
   remoteObjects.erase(R);
 }
 
+bool CacheManager::isCurrent(fatPointer ptr, void* obj) {
+  return obj == resolve(ptr);
+}
+
 ////////////////////////////////////////////////////////////////////////////////
 
 

@@ -33,6 +33,7 @@ struct foo : public Lockable {
     return os << "{" << v.x << "," << v.y << "}";
   }
   foo(int _x, int _y) :x(_x), y(_y) {}
+  foo() = default;
 };
 
 void test_CM() {

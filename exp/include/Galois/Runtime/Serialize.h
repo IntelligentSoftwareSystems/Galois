@@ -76,8 +76,8 @@ public:
 
   SerializeBuffer() {
     //reserve a header
-    bufdata.resize(sizeof(void*) + sizeof(uintptr_t));
-    start = sizeof(void*) + sizeof(uintptr_t);
+    bufdata.resize(2*sizeof(void*));
+    start = 2*sizeof(void*);
   }
 
   inline void push(const char c) {
@@ -85,21 +85,11 @@ public:
   }
 
   void serialize_header(void* data) {
-    assert(bufdata.size() >= sizeof(uintptr_t));
+    assert(start != 0);
     unsigned char* pdata = (unsigned char*)&data;
+    start -= sizeof(void*);
     for (size_t i = 0; i < sizeof(void*); ++i)
-      bufdata[sizeof(uintptr_t) + i] = pdata[i];
-    start = sizeof(uintptr_t);
-  }
-  void serialize_header(uintptr_t data1, void* data2) {
-    assert(bufdata.size() >= sizeof(uintptr_t));
-    unsigned char* pdata = (unsigned char*)&data1;
-    for (size_t i = 0; i < sizeof(uintptr_t); ++i)
-      bufdata[i] = pdata[i];
-    pdata = (unsigned char*)&data2;
-    for (size_t i = sizeof(uintptr_t); i < sizeof(void*); ++i)
-      bufdata[i] = pdata[i];
-    start = 0;
+      bufdata[start + i] = pdata[i];
   }
 
   void* linearData() { return &bufdata[start]; }
@@ -108,11 +98,16 @@ public:
 
   //Utility
 
-  void print(std::ostream& o) {
-    o << "<{";
-    for (auto ii = bufdata.begin(), ee = bufdata.end(); ii != ee; ++ii)
+  void print(std::ostream& o) const {
+    o << "<{" << std::hex;
+    for (auto ii = bufdata.begin() + start, ee = bufdata.end(); ii != ee; ++ii)
       o << (unsigned int)*ii << " ";
-    o << "}>";
+    o << std::dec << "}>";
+  }
+
+  friend std::ostream& operator<<(std::ostream& os, const SerializeBuffer& b) {
+    b.print(os);
+    return os;
   }
 };
 
@@ -218,11 +213,16 @@ public:
 
   //Utility
 
-  void print(std::ostream& o) {
-    o << "<{(" << offset << ") ";
+  void print(std::ostream& o) const {
+    o << "<{(" << offset << ") " << std::hex;
     for (auto ii = bufdata.begin(), ee = bufdata.end(); ii != ee; ++ii)
       o << (unsigned int)*ii << " ";
-    o << "}>";
+    o << std::dec << "}>";
+  }
+
+  friend std::ostream& operator<<(std::ostream& os, const DeSerializeBuffer& buf) {
+    buf.print(os);
+    return os;
   }
 };
 

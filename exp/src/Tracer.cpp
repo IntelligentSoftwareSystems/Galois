@@ -21,52 +21,30 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#ifndef GALOIS_RUNTIME_TRACER_H
-#define GALOIS_RUNTIME_TRACER_H
+#include "Galois/Runtime/Tracer.h"
 
-#include <iostream>
-#include <sstream>
+#include <fstream>
+#include <cassert>
 
-namespace Galois {
-namespace Runtime {
-uint32_t getHostID();
+#include <sys/types.h>
+#include <unistd.h>
 
-namespace detail {
-
-static inline void traceImpl(std::ostringstream& os, const char* format) {
-  os << format;
-}
-
-template<typename T, typename... Args>
-static inline void traceImpl(std::ostringstream& os, const char* format, T value, Args... args) {
-  for (; *format != '\0'; format++) {
-    if (*format == '%') {
-      os << value;
-      traceImpl(os, format + 1, args...);
-      return;
-    }
-    os << *format;
+static std::ofstream& openIfNot() {
+  static std::ofstream output;
+  if (!output.is_open()) {
+    pid_t id = getpid();
+    char name[100] = "";
+    gethostname(name, sizeof(name));
+    char fname[120];
+    snprintf(fname, sizeof(fname), "%s.%d.log", name, id);
+    output.open(fname, std::ios_base::app);
   }
+  assert(output.is_open());
+  return output;
 }
 
-void printTrace(std::ostringstream&);
-
-} // namespace detail
-
-const bool doTrace = true;
-
-//FIXME use better forwarding
-template<typename... Args>
-static inline void trace(const char* format, Args... args) {
-  if (doTrace) {
-    std::ostringstream os;
-    os << "<" << getHostID() << "> ";
-    detail::traceImpl(os, format, args...);
-    detail::printTrace(os);
-  }
+void Galois::Runtime::detail::printTrace(std::ostringstream& os) {
+  auto& out = openIfNot();
+  out << os.str();
+  out.flush();
 }
-
-} // namespace Runtime
-} // namespace Galois
-
-#endif

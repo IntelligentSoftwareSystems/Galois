@@ -75,6 +75,7 @@ class NetworkInterfaceBuffer : public NetworkInterface {
   }
 
   void sendInternal(state_out& s, unsigned dest, recvFuncTy recv, SendBuffer& buf) {
+    assert(recv);
     std::lock_guard<LL::SimpleLock> lg(s.lock);
     header h = {(uint32_t)buf.size(), (uintptr_t)recv};
     writeBuffer(s, (char*)&h, sizeof(header));
@@ -133,6 +134,7 @@ class NetworkInterfaceBuffer : public NetworkInterface {
       readBuffer(s, sizeof(header), (char*)buf.linearData(), h.size);
       advBuffer(s, sizeof(header) + h.size);
       recvFuncTy func = (recvFuncTy)h.func;
+      assert(func);
       func(buf);
     }
   }

@@ -267,7 +267,7 @@ protected:
       //getRemoteDirectory().(ex.ptr);
       abortIteration(*p, tld);
     } catch (const conflict_ex& ex) {
-      getLocalDirectory().fetch(ex.ptr);
+      //FIXME:      getLocalDirectory().fetch(ex.ptr);
       abortIteration(*p, tld);
     }
     return workHappened;

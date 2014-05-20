@@ -279,7 +279,8 @@ public:
   template<typename... Args>
   GraphNode(Args&&... args) :GraphNodeData<NodeDataTy>(std::forward<Args...>(args...)) {}
 
-  GraphNode() {}
+  GraphNode() = default;
+  GraphNode(Galois::Runtime::DeSerializeBuffer& buf) { deserialize(buf); }
 
   //serialize
   typedef int tt_has_serialize;

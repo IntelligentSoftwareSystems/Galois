@@ -40,7 +40,7 @@ class gptr {
     return os << v.ptr;
   }
 
-  T* resolve_safe() {
+  T* resolve_safe() const {
     if (inGaloisForEach) {
       //parallel code ensures acquire happens before use
     } else {
@@ -59,6 +59,8 @@ public:
   
   T& operator*()  { return *resolve_safe(); }
   T* operator->() { return  resolve_safe(); }
+  T& operator*()  const { return *resolve_safe(); }
+  T* operator->() const { return  resolve_safe(); }
 
   bool operator< (const gptr& rhs) const { return ptr < rhs.ptr;  }
   bool operator> (const gptr& rhs) const { return ptr > rhs.ptr;  }
@@ -72,7 +74,7 @@ public:
 
   bool isLocal() const { return ptr.isLocal(); }
 
-  T* resolve() {
+  T* resolve() const {
     void* obj = nullptr;
     if (ptr.isLocal()) {
       obj = ptr.getObj();

@@ -29,7 +29,6 @@
 
 #include <type_traits>
 #include <cassert>
-#include <iostream>
 
 using namespace Galois::Runtime;
 
@@ -54,6 +53,8 @@ static void networkExit() {
 static void loop_pad(::RecvBuffer& b) {
   uintptr_t f;
   gDeserialize(b, f);
+  trace("Loop Recieved %\n", (void*)f);
+  trace("Loop RecvBuffer %\n", b);
   loopwork.push_back(std::make_pair((recvFuncTy)f, b));
 }
 
@@ -66,8 +67,8 @@ void NetworkInterface::start() {
     while (!ourexit) {
       doNetworkWork();
       if (!loopwork.empty()) {
-        std::cout << "Loop Recieved\n";
         auto p = loopwork.front();
+        trace("Loop Executing %\n", (void*)p.first);
         loopwork.pop_front();
         p.first(p.second);
       }
@@ -88,7 +89,9 @@ void NetworkInterface::terminate() {
 }
 
 void NetworkInterface::sendLoop(uint32_t dest, recvFuncTy recv, SendBuffer& buf) {
+  trace("Loop Sent % to % pad %\n", (void*)recv, dest, (void*)&loop_pad);
   buf.serialize_header((void*)recv);
+  trace("Loop SendBuffer %\n", buf);
   getSystemNetworkInterface().send(dest, &loop_pad, buf);
 }
 

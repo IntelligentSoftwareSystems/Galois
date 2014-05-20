@@ -33,6 +33,11 @@
 namespace Galois {
 namespace Runtime {
 
+namespace details {
+struct dser_t {};
+struct tser_t {};
+}
+
 class DeSerializeBuffer;
 template<typename T>
 T gDeserializeObj(DeSerializeBuffer&);
@@ -53,7 +58,14 @@ template<typename T>
 class remoteObjImpl : public remoteObj {
   T obj;
 public:
-  remoteObjImpl(DeSerializeBuffer& buf) :obj{std::move(gDeserializeObj<T>(buf))} {}
+  //  remoteObjImpl(DeSerializeBuffer& buf) :obj{std::move(gDeserializeObj<T>(buf))} {}
+  template<typename U = void>
+  remoteObjImpl(DeSerializeBuffer& buf, details::dser_t* p) :obj{buf} {}
+  template<typename U = void>
+  remoteObjImpl(DeSerializeBuffer& buf, details::tser_t* p) {
+    gDeserialize(buf, obj);
+  }
+
   remoteObjImpl(T&& buf) :obj(buf) {}
   virtual ~remoteObjImpl() {}
   virtual void* getObj() { return &obj; }
@@ -82,6 +94,7 @@ class CacheManager {
   details::remoteObj* resolveIncRef(fatPointer);
 
   friend class ResolveCache;
+  friend class RemoteDirectory;
 
 public:
 
@@ -93,7 +106,9 @@ public:
     if (obj) { // creating can replace old objects
       garbage.push_back(obj);
     }
-    obj = new details::remoteObjImpl<T>(buf);
+    //FIXME: need to do RO lock
+    typename std::conditional<has_serialize<T>::value, details::dser_t, details::tser_t>::type* P = 0;
+    obj = new details::remoteObjImpl<T>(buf, P);
   }
 
   template<typename T>
@@ -104,6 +119,7 @@ public:
     if (obj) { // creating can replace old objects
       garbage.push_back(obj);
     }
+    //FIXME: need to do RO lock
     obj = new details::remoteObjImpl<T>(std::forward<T>(buf));
   }
 
@@ -112,6 +128,8 @@ public:
 
   //! resolve a value, mainly (always?) for serial code
   void* resolve(fatPointer);
+
+  bool isCurrent(fatPointer, void*);
 };
 
 ResolveCache* getThreadResolve();

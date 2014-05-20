@@ -52,6 +52,7 @@ public:
   Bag() {}
   explicit Bag(pointer p) :basePtr(p) {}
   Bag(pointer p, Runtime::DeSerializeBuffer&) :basePtr(p) {}
+  Bag(Runtime::DeSerializeBuffer& buf) { deserialize(buf); }
 
   void getInitData(Runtime::SerializeBuffer&) {}
 
