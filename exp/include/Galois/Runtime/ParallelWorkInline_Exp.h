@@ -22,15 +22,21 @@
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#ifndef GALOIS_RUNTIME_PARALLELWORKINLINE_H
-#define GALOIS_RUNTIME_PARALLELWORKINLINE_H
+#ifndef GALOIS_RUNTIME_PARALLELWORKINLINE_EXP_H
+#define GALOIS_RUNTIME_PARALLELWORKINLINE_EXP_H
 
 #include "Galois/Runtime/ParallelWork.h"
 #include <cstdio>
 
+
+// #define GALOIS_DO_OUTER_PREFETCH 1
+#undef GALOIS_DO_OUTER_PREFETCH
+
+#include <xmmintrin.h>
+
 namespace Galois {
 namespace Runtime {
-namespace {
+namespace Exp {
 
 template<bool Enabled>
 class LoopStatistics {
@@ -75,6 +81,19 @@ struct FixedSizeRingAdaptor: public Galois::FixedSizeRing<T,ChunkSize> {
     if (isLIFO) this->pop_front();
     else this->pop_back();
   }
+
+#ifdef GALOIS_DO_OUTER_PREFETCH
+  typename FixedSizeRingAdaptor::const_reference  lookAhead (unsigned off) const {
+    assert (!this->empty ());
+    if (isLIFO) {
+      return this->getAt (off);
+    } else {
+      return this->getAt (this->size () - off);
+    }
+  }
+#endif
+
+
 };
 
 struct WID {
@@ -159,6 +178,12 @@ public:
     }
   }
 
+  // exp
+  inline void push (const value_type& val) {
+    WID id;
+    push (id, val);
+  }
+
   void push(const WID& id, const value_type& val)  {
     p& n = *data.getLocal(id.tid);
     if (n.next && !n.next->full()) {
@@ -191,6 +216,13 @@ public:
     p& n = *data.getLocal(id.tid);
     return n.next->cur();
   }
+
+#ifdef GALOIS_DO_OUTER_PREFETCH
+  const value_type& lookAhead (const WID& id, unsigned off) const {
+    p& n = *data.getLocal (id.tid);
+    return n.next->lookAhead (off);
+  }
+#endif // GALOIS_DO_OUTER_PREFETCH
 
   bool empty(const WID& id) {
     p& n = *data.getRemote(id.tid);
@@ -257,12 +289,14 @@ void dChunkedMaster<T,OuterTy,isLIFO,ChunkSize>::pushSP(const WID& id, p& n, con
 }
 
 template<typename T,int ChunkSize>
+// class Worklist: public dChunkedMaster<T, WorkList::ConExtLinkedStack, true, ChunkSize> { };
 class Worklist: public dChunkedMaster<T, WorkList::ConExtLinkedQueue, true, ChunkSize> { };
 
-template<class T, class FunctionTy>
+template<class T, class FunctionTy, typename PreFunc=FunctionTy>
 class BSInlineExecutor {
   typedef T value_type;
-  typedef Worklist<value_type,256> WLTy;
+  static const unsigned CHUNK_SIZE = FunctionTy::CHUNK_SIZE;
+  typedef Worklist<value_type,CHUNK_SIZE> WLTy;
 
   struct ThreadLocalData {
     Galois::Runtime::UserContextAccess<value_type> facing;
@@ -273,6 +307,7 @@ class BSInlineExecutor {
 
   WLTy wls[2];
   FunctionTy function;
+  PreFunc preFunc;
   const char* loopname;
   Galois::Runtime::Barrier& barrier;
   LL::CacheLineStorage<volatile long> done;
@@ -321,18 +356,55 @@ class BSInlineExecutor {
   void process(ThreadLocalData& tld, const WID& wid, WLTy* cur, WLTy* next) {
     int cs = std::max(cur->currentChunkSize(wid), 1U);
     for (int i = 0; i < cs; ++i) {
+
+
+// #ifdef GALOIS_DO_OUTER_PREFETCH
+      // const unsigned l1_pftch_dist = 1;
+      // if ((i + l1_pftch_dist) < cs) {
+        // const value_type& next = cur->lookAhead (wid, l1_pftch_dist);
+        // preFunc (next, _MM_HINT_T0);
+      // }
+// #endif
       value_type& val = cur->cur(wid);
+// #ifdef GALOIS_DO_OUTER_PREFETCH
+      // preFunc (val, _MM_HINT_T0);
+// #endif
+
       tld.stat.inc_iterations();
-      function(val, tld.facing.data());
-      if (ForEachTraits<FunctionTy>::NeedsPush) {
-        next->push(wid,
-            tld.facing.getPushBuffer().begin(),
-            tld.facing.getPushBuffer().end());
-        tld.facing.resetPushBuffer();
-      }
+      function(val, *next);
+
+      // function(val, tld.facing);
+// 
+      // if (ForEachTraits<FunctionTy>::NeedsPush) {
+        // next->push(wid,
+            // tld.facing.getPushBuffer().begin(),
+            // tld.facing.getPushBuffer().end());
+        // tld.facing.resetPushBuffer();
+      // }
+
+      cur->pop(wid);
+
+// #ifdef GALOIS_DO_OUTER_PREFETCH
+      // const unsigned l2_pftch_dist = 1;
+      // if ((i + l2_pftch_dist) < cs) {
+        // const value_type& next = cur->lookAhead (wid, l2_pftch_dist);
+        // preFunc (next, _MM_HINT_T1);
+      // }
+// #endif
+
+
+// #ifdef GALOIS_DO_OUTER_PREFETCH
+      // const unsigned l2_pftch_dist = 2;
+      // if ((i + l2_pftch_dist) < cs) {
+        // const value_type& next = cur->lookAhead (wid, l2_pftch_dist);
+        // preFunc (next, _MM_HINT_T1);
+      // }
+// #endif
+
       if (ForEachTraits<FunctionTy>::NeedsAborts)
         tld.ctx.commitIteration();
-      cur->pop(wid);
+
+
     }
   }
 
@@ -375,7 +447,21 @@ class BSInlineExecutor {
   }
 
 public:
-  BSInlineExecutor(const FunctionTy& f, const char* ln): function(f), loopname(ln), barrier(getSystemBarrier()) { 
+  BSInlineExecutor(const FunctionTy& f, const char* ln): function(f), preFunc (f), loopname(ln), barrier(getSystemBarrier()) {
+    if (ForEachTraits<FunctionTy>::NeedsBreak) {
+      assert(0 && "not supported by this executor");
+      abort();
+    }
+  }
+
+  BSInlineExecutor (const FunctionTy& f, const PreFunc& preFunc, const char* ln)
+    : 
+      function(f), 
+      preFunc (preFunc),
+      loopname(ln), 
+      barrier(getSystemBarrier ()),
+      done (false)
+  { 
     if (ForEachTraits<FunctionTy>::NeedsBreak) {
       assert(0 && "not supported by this executor");
       abort();
@@ -395,30 +481,53 @@ public:
 };
 
 
-} // end anonymouse
+} // end namespace Exp
+
+template <typename R, typename OpFunc, typename PreFunc>
+void for_each_bs (const R& range, const OpFunc& opFunc, const PreFunc& preFunc, const char* loopname=nullptr) {
+
+  if (inGaloisForEach)
+    GALOIS_DIE("Nested for_each not supported");
+  
+
+  inGaloisForEach = true;
+
+  typedef typename R::value_type T;
+
+  typedef Exp::BSInlineExecutor<T, OpFunc, PreFunc> Executor;
+
+  Executor e (opFunc, preFunc, loopname);
+  Barrier& barrier = getSystemBarrier ();
+
+  getSystemThreadPool ().run (activeThreads, 
+    std::bind (&Executor::template AddInitialWork<R>, std::ref (e), range),
+    std::ref (barrier),
+    std::ref (e));
+
+  inGaloisForEach = false;
+}
+
+
 } // end runtime
 
-namespace WorkList {
-  struct BulkSynchronousInline {
-    template<typename T>
-    struct retype {
-      typedef BulkSynchronousInline type;
-    };
-  };
-}
+// namespace WorkList {
+  // template<class T=int>
+  // class BulkSynchronousInline { };
+// }
+// 
+// namespace Runtime {
+// namespace {
+// 
+// template<class T,class FunctionTy>
+// struct ForEachWork<WorkList::BulkSynchronousInline<>,T,FunctionTy>:
+  // public BSInlineExecutor<T,FunctionTy> {
+  // typedef BSInlineExecutor<T,FunctionTy> SuperTy;
+  // ForEachWork(const FunctionTy& f, const char* ln): SuperTy(f, ln) { }
+// };
+// 
+// }
 
-namespace Runtime {
-namespace {
-
-template<class T,class FunctionTy>
-struct ForEachWork<WorkList::BulkSynchronousInline,T,FunctionTy>:
-  public BSInlineExecutor<T,FunctionTy> {
-  typedef BSInlineExecutor<T,FunctionTy> SuperTy;
-  ForEachWork(const FunctionTy& f, const char* ln): SuperTy(f, ln) { }
-};
-
-}
-} // runtime
+// } // runtime
 
 
 } //galois

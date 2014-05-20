@@ -1,4 +1,4 @@
-/** FIFO BFS -*- C++ -*-
+/** Wavefront BFS -*- C++ -*-
  * @file
  * @section License
  *
@@ -20,48 +20,15 @@
  *
  * @section Description
  *
- * FIFO BFS.
+ * Wavefront BFS.
  *
  * @author <ahassaan@ices.utexas.edu>
  */
 
-#ifndef FIFO_BFS_H_
-#define FIFO_BFS_H_
+#include "WavefrontBulkSyncEdge.h"
 
-#include <deque>
-
-#include "bfs.h"
-
-class BFSserialFIFO: public BFS<unsigned> {
-
-  typedef std::deque<GNode> WL_ty;
-  typedef BFS<unsigned> Super_ty;
-
-public:
-  virtual const std::string getVersion () const { return "Serial FIFO"; }
-
-  virtual size_t runBFS (Graph& graph, GNode& startNode) {
-
-
-    WL_ty worklist;
-    size_t niter = 0;
-
-    graph.getData (startNode, Galois::NONE) = 0;
-    worklist.push_back (startNode);
-
-    while (!worklist.empty ()) {
-
-      GNode src = worklist.front ();
-      worklist.pop_front ();
-
-      Super_ty::bfsOperator<false> (graph, src, worklist);
-
-      ++niter;
-    }
-
-    return niter;
-  }
-};
-
-#endif // FIFO_BFS_H_
-
+int main (int argc, char* argv[]) {
+  WavefrontBulkSyncEdge wf;
+  wf.run (argc, argv);
+  return 0;
+}
