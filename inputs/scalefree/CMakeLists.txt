@@ -4,7 +4,7 @@ function(rgraph base numnodes numedges)
       ${CMAKE_BINARY_DIR}/tools/bin/GTgraph-rmat -n ${numnodes} -m ${numedges} ${base}.rmat
     DEPENDS ${CMAKE_BINARY_DIR}/tools/bin/GTgraph-rmat)
   add_custom_command(OUTPUT ${base}.gr
-    COMMAND graph-convert-standalone -dimacs2gr ${base}.rmat ${base}.gr
+    COMMAND graph-convert-standalone -edgeType int32 -dimacs2gr ${base}.rmat ${base}.gr
     DEPENDS ${base}.dimacs graph-convert-standalone)
 endfunction(rgraph)
 
