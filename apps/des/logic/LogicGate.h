@@ -109,11 +109,6 @@ public:
    */
   virtual const SimTime& getDelay() const = 0;
 
-  /**
-   * @param delay value to set to
-   */
-  virtual void setDelay (const SimTime& delay) = 0;
-
   
   /**
    * Handles an erroneous situation, where the net name in
@@ -122,11 +117,19 @@ public:
    * @param le
    */
   virtual void netNameMismatch (const LogicUpdate& le) const = 0;
+
+  virtual size_t getStateSize () const = 0;
+
+  virtual void copyState (char* const buf, const size_t bufSize) const = 0;
+
+  virtual void restoreState (char* const buf, const size_t bufSize) = 0;
 };
 
 
 template <size_t Nout, size_t Nin> 
 class BaseLogicGate: public LogicGate {
+
+  friend class NetlistParser;
 
 protected:
 
@@ -155,17 +158,6 @@ public:
     return delay;
   }
 
-  /**
-   * Sets the delay.
-   *
-   * @param delay the new delay
-   */
-  virtual void setDelay(const SimTime& delay) {
-    this->delay = delay;
-    if (this->delay <= 0) {
-      this->delay = MIN_DELAY;
-    }
-  }
 
   /**
    * @return number of inputs
@@ -195,15 +187,6 @@ public:
 
 
   /**
-   * Sets the output name.
-   *
-   * @param outputName the new output name
-   */
-  void setOutputName(const std::string& outputName) {
-    this->outputName = outputName;
-  }
-
-  /**
    * Sets the output val.
    *
    * @param outputVal the new output val
@@ -217,6 +200,36 @@ public:
     std::cerr << "Received logic update : " << le.str () << " with mismatching net name, this = " << str () << std::endl;
     exit (-1);
   }
+
+private:
+  /**
+   * Sets the delay.
+   *
+   * @param delay the new delay
+   */
+  virtual void setDelay(const SimTime& delay) {
+    this->delay = delay;
+    if (this->delay <= 0) {
+      this->delay = MIN_DELAY;
+    }
+  }
+ 
+protected:
+
+  struct State {
+    LogicVal outputVal;
+    SimTime delay;
+
+    State (const BaseLogicGate& g)
+      : outputVal (g.outputVal), delay (g.delay) 
+    {}
+
+    virtual void restore (BaseLogicGate& g) {
+      g.outputVal = outputVal;
+      g.delay = delay;
+    }
+  };
+
 };
 
 

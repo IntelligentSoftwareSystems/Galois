@@ -1,4 +1,4 @@
-/** DES ordered version -*- C++ -*-
+/** DES two phase ordered version -*- C++ -*-
  * @file
  * @section License
  *
@@ -30,8 +30,7 @@
 #include "Galois/Atomic.h"
 #include "Galois/Galois.h"
 
-#include "Galois/Runtime/LCordered.h"
-#include "Galois/Runtime/PerThreadWorkList.h"
+#include "Galois/Runtime/KDGtwoPhase.h"
 #include "Galois/Runtime/ll/PaddedLock.h"
 #include "Galois/Runtime/ll/CompilerSpecific.h"
 
@@ -130,7 +129,7 @@ struct SimObjInfo: public TypeHelper {
 };
 
 
-class DESordered: 
+class DEStwoPhase: 
   public des::AbstractMain<TypeHelper::SimInit_ty>, public TypeHelper {
 
   struct NhoodVisitor {
@@ -144,28 +143,34 @@ class DESordered:
     {}
     
     template <typename C>
-    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (const Event_ty& event, C&) const {
+    void operator () (const Event_ty& event, C&) const {
       SimObjInfo& recvInfo = sobjInfoVec[event.getRecvObj ()->getID ()];
-      graph.getData (recvInfo.node, Galois::MethodFlag::CHECK_CONFLICT);
+      if (recvInfo.isReady (event)) {
+        graph.getData (recvInfo.node, Galois::MethodFlag::CHECK_CONFLICT);
+
+      } else {
+        Galois::Runtime::signalConflict (NULL);
+      }
     }
   };
 
-  struct ReadyTest {
-    VecSobjInfo& sobjInfoVec;
-
-    explicit ReadyTest (VecSobjInfo& sobjInfoVec): sobjInfoVec (sobjInfoVec) {}
-
-    GALOIS_ATTRIBUTE_PROF_NOINLINE bool operator () (const Event_ty& event) const {
-      SimObjInfo& sinfo = sobjInfoVec[event.getRecvObj ()->getID ()];
-      return sinfo.isReady (event);
-    }
-  };
+  // struct ReadyTest {
+    // VecSobjInfo& sobjInfoVec;
+// 
+    // explicit ReadyTest (VecSobjInfo& sobjInfoVec): sobjInfoVec (sobjInfoVec) {}
+// 
+    // bool operator () (const Event_ty& event) const {
+      // size_t id = event.getRecvObj ()->getID ();
+      // SimObjInfo& sinfo = sobjInfoVec[id];
+      // return sinfo.isReady (event);
+    // }
+  // };
 
 
   struct OpFunc {
 
-    static const size_t CHUNK_SIZE = 8;
-    static const size_t UNROLL_FACTOR = 1024;
+    static const unsigned CHUNK_SIZE = 64;
+
 
     Graph& graph;
     std::vector<SimObjInfo>& sobjInfoVec;
@@ -185,15 +190,17 @@ class DESordered:
     {}
 
     template <typename C>
-    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (const Event_ty& event, C& lwl) {
+    void operator () (const Event_ty& event, C& lwl) {
 
       // std::cout << ">>> Processing: " << event.detailedString () << std::endl;
 
       // TODO: needs a PQ with remove operation to work correctly
-      assert (ReadyTest (sobjInfoVec) (event));
+      // assert (ReadyTest (sobjInfoVec) (event));
 
       SimObj_ty* recvObj = static_cast<SimObj_ty*> (event.getRecvObj ());
       SimObjInfo& recvInfo = sobjInfoVec[recvObj->getID ()];
+
+      assert (recvInfo.isReady (event));
 
       nevents += 1;
       newEvents.get ().clear ();
@@ -244,12 +251,12 @@ protected:
     AddList_ty newEvents;
     Accumulator_ty nevents;
 
-    Galois::Runtime::for_each_ordered_lc (
+    Galois::Runtime::for_each_ordered_2p_win (
         simInit.getInitEvents ().begin (), simInit.getInitEvents ().end (),
         Cmp_ty (), 
         NhoodVisitor (graph, sobjInfoVec),
-        OpFunc (graph, sobjInfoVec, newEvents, nevents),
-        ReadyTest (sobjInfoVec), "des_main_loop");
+        OpFunc (graph, sobjInfoVec, newEvents, nevents));
+        // ReadyTest (sobjInfoVec));
 
     std::cout << "Number of events processed= " << 
       nevents.reduce () << std::endl;
