@@ -43,16 +43,13 @@
 #include "Galois/Accumulator.h"
 
 #include "Galois/Runtime/PerThreadWorkList.h"
-#include "Galois/Runtime/DoAll.h"
+#include "Galois/DoAllWrap.h"
 #include "Galois/Runtime/ll/CompilerSpecific.h"
 #include "Galois/Markable.h"
 
 
 #include "dependTest.h"
 #include "Billiards.h"
-
-
-typedef Galois::GAccumulator<size_t> Accumulator;
 
 
 class BilliardsPOsortedVec;
@@ -63,14 +60,14 @@ class BilliardsPOunsorted: public Billiards {
   typedef Galois::Runtime::PerThreadVector<MEvent> WLTy;
   typedef Galois::Runtime::PerThreadVector<Event> ILTy;
 
-  typedef Galois::Runtime::PerThreadStorage<std::vector<Event> > AddListTy;
+  typedef Galois::Runtime::PerThreadVector<Event> AddListTy;
 
   friend class BilliardsPOsortedVec;
 
 
 public:
 
-  static const unsigned CHUNK_SIZE = 1;
+  // static const unsigned CHUNK_SIZE = 1;
 
   virtual const std::string version () const { return "Parallel Partially Ordered with Unsorted workList"; }
 
@@ -78,7 +75,14 @@ public:
   virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const double endtime, bool enablePrints=false) {
 
     WLTy workList;
-    workList.fill_serial (initEvents.begin (), initEvents.end (), &WLTy::Cont_ty::push_back);
+    // workList.fill_serial (initEvents.begin (), initEvents.end (), &WLTy::Cont_ty::push_back);
+    Galois::do_all_choice (
+        initEvents.begin (), initEvents.end (),
+        [&workList] (const Event& e) {
+          workList.get ().push_back (MEvent (e));
+        },
+        "fill_init");
+
 
     return runSimInternal<FindIndepEvents, SimulateIndepEvents, AddNextEvents, RemoveSimulatedEvents> (
         table, workList, endtime, enablePrints);
@@ -89,11 +93,12 @@ private:
 
 template <typename _CleanupFunc>
 GALOIS_ATTRIBUTE_PROF_NOINLINE static void updateODG_clean (WLTy& workList, const unsigned currStep) {
-  Galois::Runtime::do_all_coupled (
-      boost::counting_iterator<unsigned> (0),
-      boost::counting_iterator<unsigned> (workList.numRows ()), 
-      _CleanupFunc (workList, currStep),
-      "remove_simulated_events", 1);
+  Galois::on_each (_CleanupFunc (workList, currStep), Galois::loopname ("remove_simulated_events"));
+  // Galois::Runtime::do_all_coupled (
+      // boost::counting_iterator<unsigned> (0),
+      // boost::counting_iterator<unsigned> (workList.numRows ()), 
+      // _CleanupFunc (workList, currStep),
+      // "remove_simulated_events", 1);
 }
 
 template <typename _FindIndepFunc, typename _SimulateFunc,
@@ -109,8 +114,6 @@ static size_t runSimInternal (Table& table, WLTy& workList, const double endtime
 
     ILTy indepList;
 
-
-
     AddListTy addList;
     unsigned currStep = 0;
 
@@ -118,25 +121,30 @@ static size_t runSimInternal (Table& table, WLTy& workList, const double endtime
     size_t iter = 0;
 
 
-    do {
+    while (!workList.empty_all ()) {
 
-      indepList.clear_all ();
+
+      // printf ("currStep = %d, workList.size () = %zd\n", currStep, workList.size_all ());
 
       findTimer.start ();
-      Galois::Runtime::do_all_coupled (workList, 
-          _FindIndepFunc (indepList, workList, currStep, findIter), "find_indep_events", CHUNK_SIZE);
+      // Galois::Runtime::do_all (workList, 
+      Galois::do_all_choice (workList, 
+          _FindIndepFunc (indepList, workList, currStep, findIter), "find_indep_events");
       findTimer.stop ();
 
       // printf ("currStep= %d, indepList.size ()= %zd, workList.size ()= %zd\n", 
           // currStep, indepList.size_all (), workList.size_all ());
+
+      assert (!indepList.empty_all () && "couldn't find any independent events");
 
       simTimer.start ();
       std::for_each (indepList.begin_all (), indepList.end_all (), _SimulateFunc ());
       simTimer.stop ();
 
       addTimer.start ();
-      Galois::Runtime::do_all_coupled (indepList, 
-          _AddNextFunc (workList, addList, table, endtime, enablePrints), "add_next_events", CHUNK_SIZE);
+      // Galois::Runtime::do_all_coupled (indepList, 
+      Galois::do_all_choice (indepList, 
+          _AddNextFunc (workList, addList, table, endtime, enablePrints), "add_next_events");
       addTimer.stop ();
 
 
@@ -147,9 +155,9 @@ static size_t runSimInternal (Table& table, WLTy& workList, const double endtime
 
       ++currStep;
       iter += indepList.size_all ();
+      indepList.clear_all ();
 
-
-    } while (!indepList.empty_all ()); 
+    } 
 
 
     if (true) {
@@ -247,7 +255,7 @@ private:
   struct SimulateIndepEvents {
 
     GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (Event& event) {
-      event.simulateCollision ();
+      event.simulate();
     }
   };
 
@@ -275,11 +283,11 @@ private:
 
 
     GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (Event& event) {
-      addList.getLocal ()->clear ();
+      addList.get().clear ();
 
-      event.addNextEvents (*addList.getLocal (), table, endtime);
+      table.addNextEvents (event, addList.get (), endtime);
 
-      for (std::vector<Event>::iterator a = addList.getLocal ()->begin (), ea = addList.getLocal ()->end ();
+      for (auto a = addList.get ().begin (), ea = addList.get ().end ();
           a != ea; ++a ) {
 
         workList.get ().push_back (MEvent (*a));
@@ -303,8 +311,7 @@ private:
         currStep (_currStep)
     {}
 
-    GALOIS_ATTRIBUTE_PROF_NOINLINE void updateODG_clean (unsigned r) {
-      assert (r < workList.numRows ());
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void updateODG_clean (const unsigned r) {
 
       for (WLTy::local_iterator i = workList[r].begin (), ei = workList[r].end (); i != ei;) {
 
@@ -324,8 +331,9 @@ private:
       }
     }
 
-    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (unsigned r) {
-      updateODG_clean (r);
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (const unsigned tid, const unsigned numT) {
+      assert (tid < workList.numRows ());
+      updateODG_clean (tid);
     }
   
   };
@@ -350,12 +358,26 @@ public:
   virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const double endtime, bool enablePrints=false) {
 
     WLTy workList;
-    workList.fill_serial (initEvents.begin (), initEvents.end (), &WLTy::Cont_ty::push_back);
+    // workList.fill_serial (initEvents.begin (), initEvents.end (), &WLTy::Cont_ty::push_back);
+    Galois::do_all_choice (
+        initEvents.begin (), initEvents.end (),
+        [&workList] (const Event& e) {
+          workList.get ().push_back (MEvent (e));
+        },
+        "fill_init");
 
     // sort events
-    for (unsigned r = 0; r < workList.numRows (); ++r) {
-      std::sort (workList[r].begin (), workList[r].end (), Event::Comparator ());
-    }
+    // for (unsigned r = 0; r < workList.numRows (); ++r) {
+      // std::sort (workList[r].begin (), workList[r].end (), Event::Comparator ());
+    // }
+    Galois::on_each (
+        [&workList] (const unsigned tid, const unsigned numT) {
+          unsigned r = tid;
+          assert (r < workList.numRows ());
+           std::sort (workList[r].begin (), workList[r].end (), Event::Comparator ());
+
+        },
+        Galois::loopname("initsort"));
 
 
 
@@ -437,7 +459,7 @@ private:
         SuperTy (_workList, _currStep)
     {}
 
-    GALOIS_ATTRIBUTE_PROF_NOINLINE void updateODG_clean (unsigned r) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void updateODG_clean (const unsigned r) {
       // first remove simulated events
       SuperTy::updateODG_clean (r);
 
@@ -445,8 +467,9 @@ private:
       std::sort (workList[r].begin (), workList[r].end (), Event::Comparator ());
     }
 
-    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (unsigned r) {
-      updateODG_clean (r);
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (const unsigned tid, const unsigned numT) {
+      assert (tid < workList.numRows ());
+      updateODG_clean (tid);
     }
 
   };
