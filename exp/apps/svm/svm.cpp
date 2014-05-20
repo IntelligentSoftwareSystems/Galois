@@ -729,7 +729,9 @@ void runLeastSquares(Graph& g, std::mt19937& gen, std::vector<GNode>& trainingSa
   if (g.sizeEdges() > 10000) {
     // Solve normal equation directly with Cholesky
     Eigen::SparseMatrix<double> AT = A.transpose();
-    Eigen::SparseMatrix<double> ATA = AT * A + lambda * Eigen::MatrixXd::Identity(AT.rows(), A.cols());
+    Eigen::SparseMatrix<double> ATA = AT * A;
+    for (int i = 0; i < ATA.rows(); ++i)
+      ATA.coeffRef(i, i) += creg;
     Eigen::VectorXd ATb = AT * b;
     Eigen::ConjugateGradient<Eigen::SparseMatrix<double>> solver;
     solver.compute(ATA);
