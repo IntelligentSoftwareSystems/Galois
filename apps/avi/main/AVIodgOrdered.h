@@ -121,7 +121,7 @@ protected:
     NhoodVisit(Graph& g, Locks& l): graph(g), locks(l) { }
 
     template <typename C>
-    void operator()(const Update& item, C&) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator()(const Update& item, C&) {
       typedef std::vector<GlobalNodalIndex> V;
 
       const V& conn = item.avi->getGeometry().getConnectivity();
@@ -139,7 +139,7 @@ protected:
 
   struct Process {
 
-    static const size_t CHUNK_SIZE = 32;
+    static const size_t CHUNK_SIZE = 4;
     static const size_t UNROLL_FACTOR = 256;
 
 
@@ -161,7 +161,7 @@ protected:
       createSyncFiles(createSyncFiles),
       niter(niter) { }
 
-    void operator()(const Update& item, Galois::UserContext<Update>& ctx) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator()(const Update& item, Galois::UserContext<Update>& ctx) {
       // for debugging, remove later
       niter += 1;
 
