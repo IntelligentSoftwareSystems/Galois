@@ -55,7 +55,7 @@ static inline void for_each_wl (WLTy& wl, FunctionTy f, const char* loopname=0) 
   typedef typename WLTy::value_type T;
   typedef Galois::Runtime::ForEachWork<WorkList::ExternRef<ExecTy>, T, FunctionTy> WorkTy;
 
-  WorkTy W (wl, f, loopname);
+  WorkTy W (Galois::WorkList::ExternRef<ExecTy> (wl), f, loopname);
 
   hidden::for_each_wl_impl (W, false);
 }
@@ -63,9 +63,10 @@ static inline void for_each_wl (WLTy& wl, FunctionTy f, const char* loopname=0) 
 template <typename WLTy, typename FunctionTy>
 static inline void for_each_wl (WLTy& wl, FunctionTy f, const char* loopname=0) {
   typedef typename WLTy::value_type T;
-  typedef Galois::Runtime::ForEachWork<WorkList::ExternRef<WLTy>, T, FunctionTy> WorkTy;
+  typedef typename Galois::WorkList::ExternRef<WLTy>::template retype<T>::type WLRef;
+  typedef Galois::Runtime::ForEachWork<WLRef, T, FunctionTy> WorkTy;
 
-  WorkTy W (wl, f, loopname);
+  WorkTy W (WLRef (wl), f, loopname);
 
   hidden::for_each_wl_impl (W, true);
 }

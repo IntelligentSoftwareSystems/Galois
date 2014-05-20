@@ -452,8 +452,8 @@ private:
     } else {
       I b = beg;
       I e = end;
-      using Tp = typename std::remove_reference<decltype (*b)>::type;
-      Tp pivot = *(b + std::distance (b, e) / 2);
+      using V = typename std::remove_reference<decltype (*b)>::type;
+      V pivot = *(b + std::distance (b, e) / 2);
 
       --e;
       while (b != e) {
