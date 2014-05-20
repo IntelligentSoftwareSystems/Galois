@@ -26,9 +26,11 @@
 
 #include "Galois/Galois.h"
 #include "Galois/Runtime/PerThreadStorage.h"
+#include "Galois/Runtime/ll/gio.h"
 #include "Galois/WorkList/WorkList.h"
-
+#include "Galois/Runtime/LCordered.h"
 #include "Galois/Runtime/KDGtwoPhase.h"
+
 
 #include <boost/iterator/transform_iterator.hpp>
 
@@ -119,7 +121,7 @@ protected:
     NhoodVisit(Graph& g, Locks& l): graph(g), locks(l) { }
 
     template <typename C>
-    void operator()(const Update& item, C&) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator()(const Update& item, C&) {
       typedef std::vector<GlobalNodalIndex> V;
 
       const V& conn = item.avi->getGeometry().getConnectivity();
@@ -137,7 +139,8 @@ protected:
 
   struct Process {
 
-    static const size_t CHUNK_SIZE = 32;
+    static const size_t CHUNK_SIZE = 4;
+    static const size_t UNROLL_FACTOR = 256;
 
 
     MeshInit& meshInit;
@@ -158,7 +161,7 @@ protected:
       createSyncFiles(createSyncFiles),
       niter(niter) { }
 
-    void operator()(const Update& item, Galois::UserContext<Update>& ctx) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator()(const Update& item, Galois::UserContext<Update>& ctx) {
       // for debugging, remove later
       niter += 1;
 
@@ -192,10 +195,10 @@ public:
 
     switch (execType) {
       case useAddRem:
-        Galois::for_each_ordered (
+        Galois::Runtime::for_each_ordered_lc (
             boost::make_transform_iterator(elems.begin(), MakeUpdate()),
             boost::make_transform_iterator(elems.end(), MakeUpdate()), 
-            Comparator(), nhVisitorAddRem, p);
+            Comparator(), nhVisitorAddRem, p, "avi_ordered_loop_lc");
         break;
       case useTwoPhase:
         // Galois::for_each_ordered (
@@ -205,7 +208,7 @@ public:
             Comparator(), nhVisitor, p);
         break;
       default:
-        GALOIS_ERROR(true, "Unknown executor type");
+        GALOIS_DIE("Unknown executor type");
         break;
     }
 

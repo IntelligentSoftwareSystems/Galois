@@ -275,7 +275,7 @@ public:
         [this] (Ctxt* ctx) {
           ctxtAlloc.destroy (ctx);
           ctxtAlloc.deallocate (ctx, 1);
-                                  }, "free_ctx", true);
+        }, "free_ctx", true);
   }
 
   void createEdge (Ctxt* a, Ctxt* b) {

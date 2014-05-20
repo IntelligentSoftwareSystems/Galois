@@ -30,6 +30,7 @@
 #include "Galois/Atomic.h"
 #include "Galois/Galois.h"
 
+#include "Galois/Runtime/LCordered.h"
 #include "Galois/Runtime/PerThreadWorkList.h"
 #include "Galois/Runtime/ll/PaddedLock.h"
 #include "Galois/Runtime/ll/CompilerSpecific.h"
@@ -143,7 +144,7 @@ class DESordered:
     {}
     
     template <typename C>
-    void operator () (const Event_ty& event, C&) const {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (const Event_ty& event, C&) const {
       SimObjInfo& recvInfo = sobjInfoVec[event.getRecvObj ()->getID ()];
       graph.getData (recvInfo.node, Galois::MethodFlag::CHECK_CONFLICT);
     }
@@ -152,9 +153,9 @@ class DESordered:
   struct ReadyTest {
     VecSobjInfo& sobjInfoVec;
 
-    ReadyTest (VecSobjInfo& sobjInfoVec): sobjInfoVec (sobjInfoVec) {}
+    explicit ReadyTest (VecSobjInfo& sobjInfoVec): sobjInfoVec (sobjInfoVec) {}
 
-    bool operator () (const Event_ty& event) const {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE bool operator () (const Event_ty& event) const {
       SimObjInfo& sinfo = sobjInfoVec[event.getRecvObj ()->getID ()];
       return sinfo.isReady (event);
     }
@@ -162,6 +163,10 @@ class DESordered:
 
 
   struct OpFunc {
+
+    static const size_t CHUNK_SIZE = 8;
+    static const size_t UNROLL_FACTOR = 1024;
+
     Graph& graph;
     std::vector<SimObjInfo>& sobjInfoVec;
     AddList_ty& newEvents;
@@ -180,7 +185,7 @@ class DESordered:
     {}
 
     template <typename C>
-    void operator () (const Event_ty& event, C& lwl) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (const Event_ty& event, C& lwl) {
 
       // std::cout << ">>> Processing: " << event.detailedString () << std::endl;
 
@@ -239,12 +244,12 @@ protected:
     AddList_ty newEvents;
     Accumulator_ty nevents;
 
-    Galois::for_each_ordered (
+    Galois::Runtime::for_each_ordered_lc (
         simInit.getInitEvents ().begin (), simInit.getInitEvents ().end (),
         Cmp_ty (), 
         NhoodVisitor (graph, sobjInfoVec),
         OpFunc (graph, sobjInfoVec, newEvents, nevents),
-        ReadyTest (sobjInfoVec));
+        ReadyTest (sobjInfoVec), "des_main_loop");
 
     std::cout << "Number of events processed= " << 
       nevents.reduce () << std::endl;

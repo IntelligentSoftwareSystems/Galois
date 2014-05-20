@@ -30,6 +30,7 @@
 
 #include "Kruskal.h"
 #include "KruskalParallel.h"
+#include "Galois/Runtime/KDGtwoPhase.h"
 
 namespace kruskal {
 
@@ -51,7 +52,8 @@ struct UnionFindUsingRuntime {
     EdgeCtxWL* nextWL = NULL; // not used actually
     Accumulator mstSum;
 
-    Galois::for_each_ordered (perThrdWL.begin_all (), perThrdWL.end_all (),
+    // Galois::for_each_ordered (perThrdWL.begin_all (), perThrdWL.end_all (),
+    Galois::Runtime::for_each_ordered_2p_win (perThrdWL.begin_all (), perThrdWL.end_all (),
         Edge::Comparator (),
         FindLoop (repVec, repOwnerCtxVec, findIter),
         LinkUpLoop<true> (repVec, repOwnerCtxVec, *nextWL, mstSum, linkUpIter));

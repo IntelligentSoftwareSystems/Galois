@@ -76,9 +76,9 @@ public:
 
 
 protected:
-  static const unsigned CHUNK_SIZE = 8;
+  static const unsigned DEFAULT_CHUNK_SIZE = 8;
 
-  static const unsigned DEFAULT_EPI = 32;
+  static const unsigned DEFAULT_EPI = 1024;
 
   /**
    * Gets the version.
@@ -120,6 +120,11 @@ public:
 
     initRemaining (simInit, graph);
 
+    Galois::preAlloc (256 * Galois::getActiveThreads ());
+        // + (simInit.getInitEvents().size() * graph.size()));
+
+    Galois::reportPageAlloc("MeminfoPre");
+
     Galois::StatTimer t;
 
     t.start ();
@@ -129,6 +134,8 @@ public:
 
     Galois::Runtime::endSampling ();
     t.stop ();
+
+    Galois::reportPageAlloc("MeminfoPost");
 
     if (!skipVerify) {
       simInit.verify ();

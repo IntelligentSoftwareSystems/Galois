@@ -1,0 +1,16 @@
+/**
+
+\page Manual Manual
+@section data_structure Parallel Data Structures
+
+Galois C++ includes two tested graph classes:
+
+ - {@link Galois::Graph::FirstGraph}
+
+   This graph allows concurrent mutation of the graph.
+ 
+ - {@link Galois::Graph::LC_CSR_Graph}
+
+   This is a local computation graph which does not allow graph mutation. A Local Computation graph directly mmaps a binary representation of the graph into memory for fast load times. The format of the graph is documented in the FileGraph class.
+
+*/

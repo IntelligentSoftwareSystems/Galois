@@ -255,9 +255,10 @@ getGlobalMin (std::vector<SimObjInfo>& sobjInfoVec) {
 class DESorderedHandSet: 
   public des::AbstractMain<TypeHelper::SimInit_ty>, public TypeHelper {
 
-  static const unsigned EPI = 32;
-
   struct OpFuncSet {
+
+    typedef int tt_does_not_need_aborts;
+    
     Graph& graph;
     std::vector<SimObjInfo>& sobjInfoVec;
     AddList_ty& newEvents;
@@ -281,7 +282,7 @@ class DESorderedHandSet:
       // std::cout << ">>> Processing: " << event.detailedString () << std::endl;
 
       unsigned epi = 0;
-      while (epi < EPI) {
+      while (epi < DEFAULT_EPI) {
         ++epi;
 
         SimObj_ty* recvObj = static_cast<SimObj_ty*> (event.getRecvObj ());
@@ -326,7 +327,7 @@ class DESorderedHandSet:
           event = srcInfo.getMin ();
           assert (srcInfo.isSrc (event));
 
-          if (epi == EPI) { lwl.push (event); }
+          if (epi == DEFAULT_EPI) { lwl.push (event); }
           // lwl.push (srcInfo.getMin ());
           // std::cout << "%%% Adding: " << static_cast<const Event_ty&> (srcInfo.getMin ()).detailedString () << std::endl;
         } else {
@@ -401,7 +402,7 @@ protected:
     while (true) {
       ++round;
 
-      typedef Galois::WorkList::dChunkedFIFO<CHUNK_SIZE> WL_ty;
+      typedef Galois::WorkList::dChunkedFIFO<DEFAULT_CHUNK_SIZE> WL_ty;
 
       Galois::for_each(initWL.begin (), initWL.end (), 
                        OpFuncSet (graph, sobjInfoVec, newEvents,  nevents),
