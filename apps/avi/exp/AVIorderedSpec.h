@@ -21,16 +21,13 @@
  * @author M. Amber Hassaan <ahassaan@ices.utexas.edu>
  */
 
-#ifndef AVI_ODG_ORDERED_H
-#define AVI_ODG_ORDERED_H
+#ifndef AVI_ORDERED_SPEC_H
+#define AVI_ORDERED_SPEC_H
 
 #include "Galois/Galois.h"
 #include "Galois/Runtime/PerThreadStorage.h"
-#include "Galois/Runtime/ll/gio.h"
 #include "Galois/WorkList/WorkList.h"
-#include "Galois/Runtime/LCordered.h"
-#include "Galois/Runtime/KDGtwoPhase.h"
-
+#include "Galois/Runtime/ROBexecutor.h"
 
 #include <boost/iterator/transform_iterator.hpp>
 
@@ -50,21 +47,7 @@
 
 #include "AVIabstractMain.h"
 
-
-enum ExecType {
-  useAddRem,
-  useTwoPhase,
-};
-
-static cll::opt<ExecType> execType (
-    cll::desc ("Ordered Executor Type:"),
-    cll::values (
-      clEnumVal(useAddRem, "Use Add-Remove executor"),
-      clEnumVal(useTwoPhase, "Use Two-Phase executor"),
-      clEnumValEnd),
-    cll::init (useAddRem));
-
-class AVIodgOrdered: public AVIabstractMain {
+class AVIorderedSpec: public AVIabstractMain {
 protected:
   typedef Galois::Graph::FirstGraph<void*,void,true> Graph;
   typedef Graph::GraphNode Lockable;
@@ -74,7 +57,7 @@ protected:
   Locks locks;
 
   virtual const std::string getVersion() const {
-    return "Parallel version, ODG automatically managed";
+    return "Parallel version, ROB executor ";
   }
   
   virtual void initRemaining(const MeshInit& meshInit, const GlobalVec& g) {
@@ -88,7 +71,7 @@ protected:
   struct Update {
     AVI* avi;
     double ts;
-    Update(AVI* a, double t): avi(a), ts(t) { }
+    explicit Update(AVI* a, double t): avi(a), ts(t) { }
 
     Update updatedCopy () const {
       return Update (avi, avi->getNextTimeStamp ());
@@ -98,6 +81,7 @@ protected:
       return (out << "(id:" << up.avi->getGlobalIndex() << ", ts:" << up.ts << ")");
     }
   };
+
   struct Comparator {
 
     bool operator() (const Update& a, const Update& b) const {
@@ -108,7 +92,6 @@ protected:
       return (c < 0);
     }
   };
-
 
   struct MakeUpdate: public std::unary_function<AVI*,Update> {
     Update operator()(AVI* avi) const { return Update(avi, avi->getNextTimeStamp ()); }
@@ -138,11 +121,6 @@ protected:
   };
 
   struct Process {
-
-    static const size_t CHUNK_SIZE = 32;
-    static const size_t UNROLL_FACTOR = 256;
-
-
     MeshInit& meshInit;
     GlobalVec& g;
     Galois::Runtime::PerThreadStorage<LocalVec>& perIterLocalVec;
@@ -161,16 +139,56 @@ protected:
       createSyncFiles(createSyncFiles),
       niter(niter) { }
 
-    void operator()(const Update& item, Galois::UserContext<Update>& ctx) {
+    void operator () (const Update& item, Galois::UserContext<Update>& ctx) {
       // for debugging, remove later
       niter += 1;
-
       LocalVec& l = *perIterLocalVec.getLocal();
 
-      AVIabstractMain::simulate(item.avi, meshInit, g, l, createSyncFiles);
+      AVI* avi = item.avi;
 
-      if (item.avi->getNextTimeStamp() < meshInit.getSimEndTime()) {
-        ctx.push(item.updatedCopy ());
+      if (createSyncFiles) {
+        meshInit.writeSync (*avi, g.vecQ, g.vecV_b, g.vecT);
+      }
+
+      const LocalToGlobalMap& l2gMap = meshInit.getLocalToGlobalMap();
+
+      avi->gather (l2gMap, g.vecQ, g.vecV, g.vecV_b, g.vecT,
+          l.q, l.v, l.vb, l.ti);
+
+      avi->computeLocalTvec (l.tnew);
+
+      if (avi->getTimeStamp () == 0.0) {
+        avi->vbInit (l.q, l.v, l.vb, l.ti, l.tnew,
+            l.qnew, l.vbinit,
+            l.forcefield, l.funcval, l.deltaV);
+        avi->update (l.q, l.v, l.vbinit, l.ti, l.tnew,
+            l.qnew, l.vnew, l.vbnew,
+            l.forcefield, l.funcval, l.deltaV);
+      }
+      else {
+        avi->update (l.q, l.v, l.vb, l.ti, l.tnew,
+            l.qnew, l.vnew, l.vbnew,
+            l.forcefield, l.funcval, l.deltaV);
+      }
+
+      double ts = avi->getTimeStamp ();
+
+      // FIXME: allocation problem here for vector members of LocalVec
+      auto f = [&l2gMap, avi, this, l, ts] (void) {
+        avi->assemble (l2gMap, l.q, l.v, l.vb, l.ti, g.vecQ, g.vecV, g.vecV_b, g.vecT, g.vecLUpdate);
+        avi->setTimeStamp (ts);
+      };
+
+      ctx.addUndoAction (f);
+
+      avi->incTimeStamp ();
+
+      avi->assemble (l2gMap, l.qnew, l.vnew, l.vbnew, l.tnew, g.vecQ, g.vecV, g.vecV_b, g.vecT, g.vecLUpdate);
+
+      // AVIabstractMain::simulate(item.avi, meshInit, g, l, createSyncFiles);
+
+      if (avi->getNextTimeStamp() < meshInit.getSimEndTime()) {
+        ctx.push (item.updatedCopy ());
       }
     }
   };
@@ -193,24 +211,11 @@ public:
 
     const std::vector<AVI*>& elems = meshInit.getAVIVec();
 
-    switch (execType) {
-      case useAddRem:
-        Galois::Runtime::for_each_ordered_lc (
-            boost::make_transform_iterator(elems.begin(), MakeUpdate()),
-            boost::make_transform_iterator(elems.end(), MakeUpdate()), 
-            Comparator(), nhVisitorAddRem, p, "avi_ordered_loop_lc");
-        break;
-      case useTwoPhase:
-        // Galois::for_each_ordered (
-        Galois::Runtime::for_each_ordered_2p_win (
-            boost::make_transform_iterator(elems.begin(), MakeUpdate()),
-            boost::make_transform_iterator(elems.end(), MakeUpdate()), 
-            Comparator(), nhVisitor, p);
-        break;
-      default:
-        GALOIS_DIE("Unknown executor type");
-        break;
-    }
+    // Galois::for_each_ordered (
+    Galois::Runtime::for_each_ordered_rob (
+        boost::make_transform_iterator(elems.begin(), MakeUpdate()),
+        boost::make_transform_iterator(elems.end(), MakeUpdate()), 
+        Comparator(), nhVisitor, p);
 
 
     printf("iterations = %lu\n", niter.reduce());

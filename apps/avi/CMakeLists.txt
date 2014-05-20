@@ -52,10 +52,6 @@ app(AVIorderedSerial main/AVIorderedSerial.cpp
   REQUIRES AVI_FOUND
   EXTLIBS AVI ${LAPACK_LIBRARIES})
 
-#app(AVIodgOrdered main/AVIodgOrdered.cpp 
-#  REQUIRES AVI_FOUND 
-#  EXTLIBS AVI ${LAPACK_LIBRARIES})
-
 app(AVIodgExplicit main/AVIodgExplicit.cpp
   REQUIRES AVI_FOUND
   EXTLIBS AVI ${LAPACK_LIBRARIES})
@@ -65,13 +61,17 @@ app(AVIodgExplicitNoLock main/AVIodgExplicitNoLock.cpp
   EXTLIBS AVI ${LAPACK_LIBRARIES})
 
 # the files may be removed from the release without causing error in cmake
-if(0)
-  app(AVIodgReadonly exp/AVIodgReadonly.cpp 
-    REQUIRES AVI_FOUND USE_EXP
+if(USE_EXP)
+  app(AVIodgOrdered main/AVIodgOrdered.cpp 
+    REQUIRES AVI_FOUND 
+    EXTLIBS AVI ${LAPACK_LIBRARIES})
+
+  app(AVIorderedSpec exp/AVIorderedSpec.cpp 
+    REQUIRES AVI_FOUND 
     EXTLIBS AVI ${LAPACK_LIBRARIES})
 
   app(AVIlevelExec exp/AVIlevelExec.cpp 
-    REQUIRES LAPACK_FOUND AVI_FOUND USE_EXP
+    REQUIRES AVI_FOUND 
     EXTLIBS AVI ${LAPACK_LIBRARIES})
 endif()
 

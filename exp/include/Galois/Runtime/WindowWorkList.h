@@ -57,7 +57,7 @@ public:
 
     GAccumulator<size_t> count;
 
-    Galois::do_all (b, e, 
+    Galois::Runtime::do_all_impl (Galois::Runtime::makeStandardRange (b, e), 
         [this, &count] (const T& x) {
           m_wl.get ().push_back (x);
           count += 1;
@@ -66,7 +66,7 @@ public:
 
     init_sz = count.reduce ();
 
-    Galois::on_each (
+    Galois::Runtime::on_each_impl (
         [this] (const unsigned tid, const unsigned numT) {
           std::sort (m_wl[tid].begin (), m_wl[tid].end (), cmp);
         }
@@ -156,7 +156,7 @@ public:
     }
 
     if (windowLim != nullptr) {
-      Galois::on_each (
+      Galois::Runtime::on_each_impl (
           [this, &workList, &ctxtMaker, numPerThrd, windowLim] (const unsigned tid, const unsigned numT) {
             Range& r = *(wlRange.getLocal (tid));
 
@@ -216,7 +216,7 @@ public:
   template <typename I>
   void initfill (I b, I e) {
 
-    Galois::do_all (b, e, 
+    Galois::Runtime::do_all_impl (Galois::Runtime::makeStandardRange (b, e),
         [this] (const T& x) {
           m_wl.get ().push (x);
         }
@@ -269,7 +269,7 @@ public:
     // windowLim is calculated by computing the max of max element pushed by each
     // thread. In this case, the max element is the one pushed in last 
 
-    Galois::on_each (
+    Galois::Runtime::on_each_impl (
         [this, &workList, &ctxtMaker, numPerThrd] (const unsigned tid, const unsigned numT) {
 
 
@@ -319,7 +319,7 @@ public:
 
       T limCopy (*windowLim);
 
-      Galois::on_each (
+      Galois::Runtime::on_each_impl (
           [this, &workList, &ctxtMaker, &limCopy] (const unsigned tid, const unsigned numT) {
             for (const T* t = &m_wl.get ().top (); 
               !m_wl.get ().empty () && cmp (*t, limCopy); t = &m_wl.get ().top ()) {
@@ -360,7 +360,7 @@ public:
 
   template <typename I>
   void initfill (I b, I e) {
-    Galois::on_each (
+    Galois::Runtime::on_each_impl (
         [this, b, e] (const unsigned tid, const unsigned numT) {
           std::pair<I,I> r = Galois::block_range (b, e, tid, numT);
           m_wl.getLocal ()->initfill (r.first, r.second);
@@ -370,7 +370,7 @@ public:
   template <typename WL>
   void poll (WL& workList, const size_t numElems) {
 
-    Galois::on_each (
+    Galois::Runtime::on_each_impl (
         [this, &workList, numElems] (const unsigned tid, const unsigned numT) {
           const size_t numPerThrd = numElems / numT;
           m_wl.getLocal ()->poll (workList, numPerThrd);
@@ -393,7 +393,7 @@ public:
     }
 
     if (windowLim != nullptr) {
-      Galois::on_each (
+      Galois::Runtime::on_each_impl (
           [this, &workList, windowLim] (const unsigned tid, const unsigned numT) {
             m_wl.getLocal ()->partition (workList, *windowLim);
           }, "poll_part_2");

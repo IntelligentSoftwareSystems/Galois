@@ -176,7 +176,7 @@ protected:
   TerminationDetection& term;
 
   WorkListTy wl;
-  FunctionTy& origFunction;
+  FunctionTy origFunction;
   const char* loopname;
   bool broke;
 
@@ -297,10 +297,18 @@ protected:
   }
 
 public:
-  ForEachWork(FunctionTy& f, const char* l): term(getSystemTermination()), origFunction(f), loopname(l), broke(false) { }
+  ForEachWork(const FunctionTy& f, const char* l): term(getSystemTermination()), origFunction(f), loopname(l), broke(false) { }
   
   template<typename W>
-  ForEachWork(W& w, FunctionTy& f, const char* l): term(getSystemTermination()), wl(w), origFunction(f), loopname(l), broke(false) { }
+  ForEachWork(const W& w, const FunctionTy& f, const char* l): term(getSystemTermination()), wl(w), origFunction(f), loopname(l), broke(false) { }
+
+#ifdef GALOIS_USE_EXP
+  template <typename W>
+  void reinit (const W& _wl) {
+    this->wl = WorkListTy (_wl);
+    broke = false;
+  }
+#endif
 
   template<typename RangeTy>
   void AddInitialWork(const RangeTy& range) {
