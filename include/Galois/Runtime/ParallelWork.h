@@ -334,7 +334,7 @@ public:
 };
 
 template<typename WLTy, typename RangeTy, typename FunctionTy>
-void for_each_impl(const RangeTy& range, FunctionTy f, const char* loopname) {
+void for_each_impl(const RangeTy& range, const FunctionTy& f, const char* loopname) {
   if (inGaloisForEach)
     GALOIS_DIE("Nested for_each not supported");
 
@@ -365,8 +365,8 @@ void for_each_impl(const RangeTy& range, FunctionTy f, const char* loopname) {
 
 template<typename FunctionTy>
 struct WOnEach {
-  FunctionTy& origFunction;
-  WOnEach(FunctionTy& f): origFunction(f) { }
+  const FunctionTy& origFunction;
+  explicit WOnEach(const FunctionTy& f): origFunction(f) { }
   void operator()(void) {
     FunctionTy fn(origFunction);
     fn(LL::getTID(), activeThreads);   
@@ -374,7 +374,7 @@ struct WOnEach {
 };
 
 template<typename FunctionTy>
-void on_each_impl(FunctionTy fn, const char* loopname = 0) {
+void on_each_impl(const FunctionTy& fn, const char* loopname = 0) {
   if (inGaloisForEach)
     GALOIS_DIE("Nested for_each not supported");
 
