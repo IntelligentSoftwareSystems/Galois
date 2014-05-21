@@ -8,4 +8,7 @@ app (BilliardsPOsortedSerial BilliardsPOsortedSerial.cpp ${Sources})
 
 app (BilliardsPOunsorted BilliardsPOunsorted.cpp ${Sources})
 app (BilliardsPOsortedVec BilliardsPOsortedVec.cpp ${Sources})
+app (BilliardsLevelExec BilliardsLevelExec.cpp ${Sources})
+app (BilliardsTwoPhase BilliardsTwoPhase.cpp ${Sources})
+app (BilliardsSpec BilliardsSpec.cpp ${Sources})
 add_subdirectory(viewer)

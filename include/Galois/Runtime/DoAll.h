@@ -46,8 +46,8 @@ namespace Runtime {
 template<class FunctionTy, class RangeTy>
 class DoAllWork {
   typedef typename RangeTy::local_iterator iterator;
-  FunctionTy& F;
-  RangeTy& range;
+  FunctionTy F;
+  RangeTy range;
 
   struct state {
     iterator stealBegin;
@@ -116,7 +116,7 @@ class DoAllWork {
 
 
 public:
-  DoAllWork(FunctionTy& _F, RangeTy& r)
+  DoAllWork(const FunctionTy& _F, const RangeTy& r)
     :F(_F), range(r)
   { }
 
@@ -137,7 +137,7 @@ public:
 };
 
 template<typename RangeTy, typename FunctionTy>
-void do_all_impl(RangeTy range, FunctionTy f, const char* loopname = 0, bool steal = false) {
+void do_all_impl(const RangeTy& range, const FunctionTy& f, const char* loopname = 0, bool steal = false) {
   if (Galois::Runtime::inGaloisForEach) {
     std::for_each(range.begin(), range.end(), f);
   } else {
@@ -146,11 +146,12 @@ void do_all_impl(RangeTy range, FunctionTy f, const char* loopname = 0, bool ste
       DoAllWork<FunctionTy, RangeTy> W(f, range);
       getSystemThreadPool().run(activeThreads, std::ref(W));
     } else {
-      getSystemThreadPool().run(activeThreads, [&f, &range] () {
+      FunctionTy f_cpy(f);
+      getSystemThreadPool().run(activeThreads, [&f_cpy, &range] () {
           auto begin = range.local_begin();
           auto end = range.local_end();
           while (begin != end)
-            f(*begin++);
+            f_cpy(*begin++);
         });
     }
     inGaloisForEach = false;

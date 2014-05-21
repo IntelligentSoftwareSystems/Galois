@@ -722,7 +722,7 @@ void runLeastSquares(Graph& g, std::mt19937& gen, std::vector<GNode>& trainingSa
     b(cur++) = g.getData(*ii).field;
   }
 
-  // Least-squares problem: minimize |Ax - b|^2
+  // Least-squares problem: minimize ||Ax - b||_2
   // normal equation: A^T A x = A^T b
   Eigen::VectorXd x;
   // Cholesky is almost always faster but QR is more numerically stable
@@ -730,6 +730,8 @@ void runLeastSquares(Graph& g, std::mt19937& gen, std::vector<GNode>& trainingSa
     // Solve normal equation directly with Cholesky
     Eigen::SparseMatrix<double> AT = A.transpose();
     Eigen::SparseMatrix<double> ATA = AT * A;
+    for (int i = 0; i < ATA.rows(); ++i)
+      ATA.coeffRef(i, i) += creg;
     Eigen::VectorXd ATb = AT * b;
     Eigen::ConjugateGradient<Eigen::SparseMatrix<double>> solver;
     solver.compute(ATA);
@@ -737,6 +739,7 @@ void runLeastSquares(Graph& g, std::mt19937& gen, std::vector<GNode>& trainingSa
     std::cout << "cg iterations: " << solver.iterations() << "\n";
     std::cout << "cg est error: " << solver.error() << "\n";
   } else {
+    // TODO add L2 regularizer
     // Decompose normal equation
     // A = QR
     // A^T A x = A^T b

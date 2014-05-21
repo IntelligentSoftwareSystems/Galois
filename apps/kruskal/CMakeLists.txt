@@ -1,3 +1,7 @@
 app (KruskalSerial KruskalSerial.cpp)
 app (KruskalHand KruskalHand.cpp)
-app (KruskalOrdered KruskalOrdered.cpp)
+if (USE_EXP) 
+  app (KruskalOrdered KruskalOrdered.cpp)
+  app (KruskalSpec KruskalSpec.cpp)
+  app (KruskalLevelExec KruskalLevelExec.cpp)
+endif()

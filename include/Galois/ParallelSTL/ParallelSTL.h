@@ -32,10 +32,10 @@
 namespace Galois {
 
 template<typename IterTy,typename FunctionTy, typename... Args>
-void do_all(const IterTy& b, const IterTy& e, FunctionTy fn, Args... args);
+void do_all(const IterTy& b, const IterTy& e, const FunctionTy& fn, Args... args);
 
 template<typename ConTy,typename FunctionTy, typename... Args>
-void do_all_local(ConTy& c, FunctionTy fn, Args... args);
+void do_all_local(ConTy& c, const FunctionTy& fn, Args... args);
 
 //! Parallel versions of STL library algorithms.
 namespace ParallelSTL {

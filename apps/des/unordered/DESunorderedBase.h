@@ -50,12 +50,13 @@ class DESunorderedBase:
   , public des_unord::TypeHelper {
 
 protected:
+  typedef des::AbstractMain<des_unord::TypeHelper::SimInit_ty> AbstractBase;
 
   virtual void initRemaining (const SimInit_ty& simInit, Graph& graph) {
 
     SimObj_ty::NEVENTS_PER_ITER = eventsPerIter;
     if (SimObj_ty::NEVENTS_PER_ITER == 0) { 
-      SimObj_ty::NEVENTS_PER_ITER = DEFAULT_EPI;
+      SimObj_ty::NEVENTS_PER_ITER = AbstractBase::DEFAULT_EPI;
     }
 
 

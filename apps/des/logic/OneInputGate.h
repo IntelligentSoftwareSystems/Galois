@@ -27,6 +27,8 @@
 #include <string>
 #include <sstream>
 
+#include <cassert>
+
 #include "comDefs.h"
 #include "logicDefs.h"
 #include "LogicFunctions.h"
@@ -132,15 +134,6 @@ public:
   }
 
   /**
-   * Sets the input name.
-   *
-   * @param inputName the new input name
-   */
-  void setInputName (const std::string& inputName) {
-    this->inputName = inputName;
-  }
-
-  /**
    * Gets the input val.
    *
    * @return the input val
@@ -156,6 +149,37 @@ public:
    */
   void setInputVal (const LogicVal& inputVal) {
     this->inputVal = inputVal;
+  }
+
+protected:
+
+  struct State: public BaseLogicGate::State {
+    LogicVal inputVal;
+
+    State (const OneInputGate& g)
+      : BaseLogicGate::State (g), inputVal (g.inputVal) 
+    {}
+
+    virtual void restore (OneInputGate& g) {
+      BaseLogicGate::State::restore (g);
+      g.inputVal = inputVal;
+    }
+
+  };
+
+public:
+  virtual size_t getStateSize () const { return sizeof (State); }
+
+  virtual void copyState (char* const buf, const size_t bufSize) const {
+    assert (bufSize >= getStateSize () && "insufficient buffer for state");
+    new (buf) State (*this);
+  }
+
+  virtual void restoreState (char* const buf, const size_t bufSize) {
+    assert (bufSize >= getStateSize () && "insufficient buffer for state");
+
+    State* s = reinterpret_cast<State*> (buf);
+    s->restore (*this);
   }
 
 };

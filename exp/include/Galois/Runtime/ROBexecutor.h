@@ -411,7 +411,7 @@ public:
     ++beg;
 
     if (beg != end) {
-      Galois::do_all (beg, end,
+      Galois::Runtime::do_all_impl (Galois::Runtime::makeStandardRange (beg, end),
           [this] (const T& x) {
           pending.get ().push (x);
           });
@@ -421,7 +421,7 @@ public:
 
     const T& dummy = *pending[0].begin ();
 
-    Galois::on_each (
+    Galois::Runtime::on_each_impl (
         [&dummy,this] (const unsigned tid, const unsigned numT) {
           for (unsigned j = 0; j < WINDOW_SIZE_PER_THREAD; ++j) {
             Ctxt* ctx = ctxtAlloc.allocate (1);

@@ -222,6 +222,10 @@ class DESorderedHand:
   };
 
   struct ProcessEvents {
+
+    typedef int tt_does_not_need_aborts;
+    typedef char tt_does_not_need_push;
+    
     Graph& graph;
     std::vector<SimObjInfo>& sobjInfoVec;
     AddList_ty& newEvents;
@@ -360,6 +364,9 @@ class DESorderedHandNB:
   public des::AbstractMain<TypeHelper::SimInit_ty>, public TypeHelper {
 
   struct OpFuncEagerAdd {
+
+    typedef int tt_does_not_need_aborts;
+
     Graph& graph;
     std::vector<SimObjInfo>& sobjInfoVec;
     AddList_ty& newEvents;
