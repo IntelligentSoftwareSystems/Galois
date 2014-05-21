@@ -21,25 +21,35 @@ This is for unordered Galois Iterators with machine topology support.
  
 This is for ordered Galois Iterators. 
 
-\subsection operator Operator
-
-An example to define an operator in {@link apps/tutorial/SSSPsimple.cpp} can be seen as follows:
-@snippet apps/tutorial/SSSPsimple.cpp Operator in SSSPsimple
-
 \subsubsection type_traits Type Traits
 
 The functor passed to for_each may be specialized by several different type-traits to optimize the runtime with respect to the features used by the functor. See the API documentation for more details. The following is list of available type-traits.
 
  - needs_parallel_break
+
     Indicates the operator may request the parallel loop to be suspended and a given function run in serial
+
  - does_not_need_parallel_push
+
     Indicates the operator does not generate new work and push it on the worklist
+
  - needs_per_iter_alloc
+
     Indicates the operator may request the access to a per-iteration allocator
+
  - does_not_need_context
+
     Indicates the operator doesn't need a per-iteration context
+
  - does_not_need_stats
+
     Indicates the operator doesn't need its execution stats recorded 
+
+
+\subsection operator Operator
+
+An example to define an operator in {@link apps/tutorial/SSSPsimple.cpp} can be seen as follows:
+@snippet apps/tutorial/SSSPsimple.cpp Operator in SSSPsimple
 
 \subsection scheduling Scheduling Policies
 

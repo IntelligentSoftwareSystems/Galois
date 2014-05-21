@@ -56,6 +56,7 @@ void relax_edge(unsigned src_data, Graph::edge_iterator ii,
   }
 }
 
+//! [Operator in SSSPsimple]
 struct SSSP {
   void operator()(UpdateRequest& req, Galois::UserContext<UpdateRequest>& ctx) const {
     unsigned& data = graph.getData(req.second);
@@ -66,6 +67,7 @@ struct SSSP {
       relax_edge(data, ii, ctx);
   }
 };
+//! [Operator in SSSPsimple]
 
 struct Init {
   void operator()(GNode& n, Galois::UserContext<GNode>& ctx) const {
@@ -73,11 +75,13 @@ struct Init {
   }
 };
 
+//! [UpdateRequestIndexer in SSSPsimple]
 struct UpdateRequestIndexer: public std::unary_function<UpdateRequest, unsigned int> {
   unsigned int operator() (const UpdateRequest& val) const {
     return val.first >> stepShift;
   }
 };
+//! [UpdateRequestIndexer in SSSPsimple]
 
 int main(int argc, char **argv) {
   Galois::StatManager statManager;
@@ -86,14 +90,18 @@ int main(int argc, char **argv) {
   Galois::Graph::readGraph(graph, filename);
   Galois::for_each(graph.begin(), graph.end(), Init());
 
+//! [OrderedByIntegerMetic in SSSPsimple]
   using namespace Galois::WorkList;
   typedef dChunkedLIFO<16> dChunk;
   typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
+//! [OrderedByIntegerMetic in SSSPsimple]
 
   Galois::StatTimer T;
   T.start();
   graph.getData(*graph.begin()) = 0;
+  //! [for_each in SSSPsimple]
   Galois::for_each(std::make_pair(0U, *graph.begin()), SSSP(), Galois::wl<OBIM>());
+  //! [for_each in SSSPsimple]
   T.stop();
   return 0;
 }
