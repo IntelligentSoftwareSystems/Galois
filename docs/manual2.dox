@@ -1,6 +1,0 @@
-/**
-@page Manual
-
-@section Section2 Section 2
-@snippet apps/sssp/SSSP.cpp Reading a graph
-*/
