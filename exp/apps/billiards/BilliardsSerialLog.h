@@ -47,7 +47,8 @@ public:
       const bool notStale = e.notStale ();
 
       addList.clear ();
-      e.simulate (addList, table, endtime);
+      e.simulate();
+      table.addNextEvents (e, addList, endtime);
 
       // may need to add new events for balls in stale events
       for (std::vector<Event>::iterator i = addList.begin (), ei = addList.end ();

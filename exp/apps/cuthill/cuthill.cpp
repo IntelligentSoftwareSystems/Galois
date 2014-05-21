@@ -322,11 +322,11 @@ public:
   }
 
   static void init() {
-    Galois::do_all_local(graph, initNode);
+    Galois::do_all_local(graph, &initNode);
   }
 
   static void reset() {
-    Galois::do_all_local(graph, resetNode);
+    Galois::do_all_local(graph, &resetNode);
   }
 
     // Compute maximum bandwidth for a given graph

@@ -95,7 +95,7 @@ struct tuple_index<T, S, -1> {
 };
 
 template<typename RangeTy, typename FunctionTy, typename Tuple>
-void for_each_gen(RangeTy r, const FunctionTy& fn, Tuple tpl) {
+void for_each_gen(const RangeTy& r, const FunctionTy& fn, Tuple tpl) {
   typedef Tuple tupleType;
   static_assert(-1 == tuple_index<tupleType, char*>::value, "old loopname");
   static_assert(-1 == tuple_index<tupleType, char const*>::value, "old loopname");
@@ -110,7 +110,7 @@ void for_each_gen(RangeTy r, const FunctionTy& fn, Tuple tpl) {
 }
 
 template<typename RangeTy, typename FunctionTy, typename Tuple>
-void do_all_gen(RangeTy r, const FunctionTy& fn, Tuple tpl) {
+void do_all_gen(const RangeTy& r, const FunctionTy& fn, Tuple tpl) {
   typedef Tuple tupleType;
   static_assert(-1 == tuple_index<tupleType, char*>::value, "old loopname");
   static_assert(-1 == tuple_index<tupleType, char const*>::value, "old loopname");

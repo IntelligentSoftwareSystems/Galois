@@ -53,7 +53,7 @@ int main(int argc, char** argv) {
   Galois::do_all(boost::make_counting_iterator<int>(0), boost::make_counting_iterator<int>(n), HelloWorld());
 
   std::cout << "Using a function pointer\n";
-  Galois::do_all(boost::make_counting_iterator<int>(0), boost::make_counting_iterator<int>(n), helloWorld);
+  Galois::do_all(boost::make_counting_iterator<int>(0), boost::make_counting_iterator<int>(n), &helloWorld);
 
   return 0;
 }

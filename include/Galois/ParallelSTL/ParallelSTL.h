@@ -267,11 +267,11 @@ void sort(RandomAccessIterator first, RandomAccessIterator last) {
 
 //FIXME: init is ignored
 template <class InputIterator, class T, typename BinaryOperation>
-T accumulate (InputIterator first, InputIterator last, T init, BinaryOperation binary_op) {
+T accumulate (InputIterator first, InputIterator last, T init, const BinaryOperation& binary_op) {
   struct updater {
     BinaryOperation op;
-    updater(BinaryOperation& f) :op(f) {}
-    void operator()(T& lhs, const T& rhs) { lhs = op(lhs, rhs); }
+    updater(const BinaryOperation& f) :op(f) {}
+    void operator()(T& lhs, const T& rhs) { lhs = this->op(lhs, rhs); }
   };
   GReducible<T, updater> R{updater(binary_op)};
   do_all(first, last, [&R] (const T& v) { R.update(v); });
