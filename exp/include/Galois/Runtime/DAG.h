@@ -126,7 +126,7 @@ protected:
   GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE ParCounter inDeg;
   const int origInDeg;
   NhoodMgr& nhmgr;
-  T active;
+  T elem;
 
   AdjSet adjSet;
   AdjList outNeighbors;
@@ -137,10 +137,10 @@ public:
     inDeg (0),
     origInDeg (0), 
     nhmgr (nhmgr),
-    active (t)
+    elem (t)
   {}
 
-  const T& getActive () const { return active; }
+  const T& getElem () const { return elem; }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE virtual void subAcquire (Lockable* l) {
     NItem& nitem = nhmgr.getNhoodItem (l);
@@ -224,7 +224,7 @@ protected:
       assert (src->isSrc ());
 
       UserCtx& uctx = *(userCtxts.getLocal ());
-      opFunc (src->getActive (), uctx);
+      opFunc (src->getElem (), uctx);
 
       for (auto i = src->neighbor_begin (), i_end = src->neighbor_end ();
           i != i_end; ++i) {
@@ -273,7 +273,7 @@ public:
     assert (b != nullptr);
 
     // a < b ? a : b
-    Ctxt* src = cmp (a->getActive () , b->getActive ()) ? a : b;
+    Ctxt* src = cmp (a->getElem () , b->getElem ()) ? a : b;
     Ctxt* dst = (src == a) ? b : a;
 
     // avoid adding same edge multiple times
@@ -306,7 +306,7 @@ public:
           Galois::Runtime::setThreadContext (ctx);
 
           UserCtx& uctx = *(userCtxts.getLocal ());
-          nhVisitor (ctx->getActive (), uctx);
+          nhVisitor (ctx->getElem (), uctx);
           Galois::Runtime::setThreadContext (NULL);
         }, "create_ctxt");
 
@@ -401,12 +401,12 @@ protected:
 
   protected:
     std::atomic<unsigned> numChild;
-    T active;
+    T elem;
     Task* parent;
 
   public:
-    Task (const T& a, const Task* p)
-      : numChild (0), active (a), parent (p)
+    Task (const T& a, Task* p)
+      : numChild (0), elem (a), parent (p)
     {}
 
     void setNumChildren (unsigned c) {
@@ -423,8 +423,8 @@ protected:
       return parent;
     }
 
-    const T& getActive () const { return active; }
-    T& getActive () { return active; }
+    const T& getElem () const { return elem; }
+    T& getElem () { return elem; }
 
   };
 
@@ -442,14 +442,13 @@ protected:
 
   };
 
-  template <typename A, typename... Args> 
-
 
   typedef Galois::Runtime::MM::FSBGaloisAllocator<Task> TaskAlloc;
   typedef Galois::Runtime::MM::FSBGaloisAllocator<BiModalTask> BiModalTaskAlloc;
   typedef Galois::Runtime::UserContextAccess<T> UserCtx;
   typedef Galois::Runtime::PerThreadStorage<UserCtx> PerThreadUserCtx;
 
+  /*
   struct ApplyOperatorSinglePhase {
     BiModalTaskAlloc& taskAlloc;
     PerThreadUserCtx& userCtxts;
@@ -474,7 +473,7 @@ protected:
       if (t->mode == BiModalTask::DIVIDE) {
         UserCtx& uctx = *userCtxts.getLocal ();
         uctx.reset ();
-        divFunc (t->getActive (), uctx);
+        divFunc (t->getElem (), uctx);
 
         bool hasChildren = uctx.getPushBuffer().begin () == uctx.getPushBuffer ().end ();
 
@@ -495,8 +494,8 @@ protected:
         }
       } // end outer if
 
-      if (task.mode == BiModalTask::CONQUER) {
-        conqFunc (t->active, uctx);
+      if (t.mode == BiModalTask::CONQUER) {
+        conqFunc (t->getElem(), uctx);
 
         Task* parent = t->getParent ();
         if (parent != nullptr && parent.removedLastChild()) {
@@ -510,17 +509,26 @@ protected:
 
     }
   };
+  */
 
+
+  template <typename CWL>
   struct ApplyDivide {
+
+    TaskAlloc& taskAlloc;
+    PerThreadUserCtx& userCtxts;
+    CWL& conqWL;
+    DivFunc& divFunc;
+    
 
     template <typename C>
     void operator () (Task* t, C& ctx) {
 
       UserCtx& uctx = *userCtxts.getLocal ();
       uctx.reset ();
-      divFunc (t->active, uctx);
+      divFunc (t->getElem(), uctx);
 
-      bool hasChildren = uctx.getPushBuffer().begin () == uctx.getPushBuffer ().end ();
+      bool hasChildren = uctx.getPushBuffer().begin () != uctx.getPushBuffer ().end ();
 
       if (hasChildren) {
         ptrdiff_t numChild = std::distance (uctx.getPushBuffer ().begin (), uctx.getPushBuffer ().end ());
@@ -532,6 +540,7 @@ protected:
             c != c_end; ++c, ++i) {
 
           Task* child = taskAlloc.allocAndConstruct (*c, t);
+          ctx.push (child);
         }
       } else { 
         conqWL.push (t);
@@ -542,14 +551,19 @@ protected:
   };
 
   struct ApplyConquer {
+
+    PerThreadUserCtx& userCtxts;
+    ConqFunc& conqFunc;
+
+
     template <typename C>
     void operator () (Task* t, C& ctx) {
       UserCtx& uctx = *userCtxts.getLocal ();
       uctx.reset ();
-      conqFunc (t->active, uctx);
+      conqFunc (t->getElem());
 
       Task* parent = t->getParent ();
-      if (parent != nullptr && parent.removedLastChild()) {
+      if (parent != nullptr && parent->removedLastChild()) {
         ctx.push (parent);
       }
     }
@@ -572,6 +586,7 @@ public:
       loopname (loopname)
   {}
 
+  /*
   void execute_1p (const R& range) {
 
     typedef Galois::Runtime::PerThreadVector<BiModalTask*> TaskWL;
@@ -596,31 +611,36 @@ public:
           taskAlloc.destroyAndFree (t);
         }, "initial_tasks_destroy");
   }
+  */
 
-  void execute_2p (const R& range) {
+  void execute_2p (const T& initItem) {
     typedef Galois::Runtime::PerThreadVector<Task*> TaskWL;
     typedef Galois::WorkList::dChunkedFIFO<CHUNK_SIZE, Task*> WL_ty;
 
     TaskAlloc taskAlloc;
     TaskWL initialTasks;
 
-    Galois::Runtime::do_all_impl (range, 
-        [&] (const T& a) {
-          Task* t = taskAlloc.allocAndConstruct (a, nullptr);
-          initialTasks.get ().push_back (t);
+    // Galois::Runtime::do_all_impl (range, 
+        // [&] (const T& a) {
+          // Task* t = taskAlloc.allocAndConstruct (a, nullptr);
+          // initialTasks.get ().push_back (t);
+// 
+        // },
+        // "initial_tasks_gen");
 
-        },
-        "initial_tasks_gen");
+    Task* initTask = taskAlloc.allocAndConstruct (initItem, nullptr);
+    initialTasks.get ().push_back (initTask);
 
+    WL_ty conqWL;
 
     std::string div_loop_name = loopname + ":divide_phase";
 
-    Galois::Runtime::for_each_impl<WL_ty> (range,
-        ApplyDivide (taskAlloc, userCtxts, conqWL, divFunc), div_loop_name.c_str ());
+    Galois::Runtime::for_each_impl<WL_ty> (makeLocalRange (initialTasks),
+        ApplyDivide<WL_ty> {taskAlloc, userCtxts, conqWL, divFunc}, div_loop_name.c_str ());
 
     std::string conq_loop_name = loopname + ":conquer_phase";
 
-    Galois::for_each_wl (conqWL, ApplyConquer (taskAlloc, userCtxts, conqFunc), conq_loop_name.c_str ());
+    Galois::for_each_wl (conqWL, ApplyConquer {userCtxts, conqFunc}, conq_loop_name.c_str ());
 
     Galois::Runtime::do_all_impl (makeLocalRange (initialTasks),
         [&] (Task* t) {
@@ -630,11 +650,17 @@ public:
 
 };
 
-template <typename R, typename DivFunc, ConqFunc>
-void for_each_ordered_tree_1p (const R& range, const DivFunc& divFunc, const ConqFunc& conqFunc, const char* loopname=nullptr) {
-}
+// template <typename T, typename DivFunc, ConqFunc>
+// void for_each_ordered_tree_1p (const T& initItem, const DivFunc& divFunc, const ConqFunc& conqFunc, const char* loopname=nullptr) {
+// }
 
-void for_each_ordered_tree_2p (const R& range, const DivFunc& divFunc, const ConqFunc& conqFunc, const char* loopname=nullptr) {
+template <typename T, typename DivFunc, typename ConqFunc>
+void for_each_ordered_tree_2p (const T& initItem, const DivFunc& divFunc, const ConqFunc& conqFunc, const char* loopname=nullptr) {
+
+  DivideAndConquerExecutor<T, DivFunc, ConqFunc> executor (divFunc, conqFunc, loopname);
+
+  executor.execute_2p (initItem);
+
 }
 
 } // end namespace Runtime
