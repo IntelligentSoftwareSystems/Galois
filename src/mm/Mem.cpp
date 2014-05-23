@@ -40,10 +40,10 @@ using namespace LL;
 SystemBaseAlloc::SystemBaseAlloc() {}
 SystemBaseAlloc::~SystemBaseAlloc() {}
 
+#ifndef GALOIS_FORCE_STANDALONE
 PtrLock<SizedAllocatorFactory, true> SizedAllocatorFactory::instance;
 __thread SizedAllocatorFactory::AllocatorsMap* SizedAllocatorFactory::localAllocators = 0;
 
-#ifndef USEMALLOC
 SizedAllocatorFactory::SizedAlloc* 
 SizedAllocatorFactory::getAllocatorForSize(const size_t size) {
   if (size == 0)

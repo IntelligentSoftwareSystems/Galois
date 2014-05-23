@@ -90,6 +90,17 @@ void largeFree(void* mem, size_t bytes);
 //! Print lines from /proc/pid/numa_maps that contain at least n (non-huge) pages
 void printInterleavedStats(int minPages = 16*1024);
 
+class MallocHeap {
+public:
+  enum { AllocSize = 0 };
+  void* allocate(size_t size) {
+    return malloc(size);
+  }
+  void deallocate(void* ptr) {
+    free(ptr);
+  }
+};
+
 //! Per-thread heaps using Galois thread aware construct
 template<class LocalHeap>
 class ThreadAwarePrivateHeap {
@@ -510,6 +521,19 @@ public:
   }
 };
 
+#ifdef GALOIS_FORCE_STANDALONE
+class SizedAllocatorFactory: private boost::noncopyable {
+public:
+  typedef MallocHeap SizedAlloc;
+
+  static SizedAlloc* getAllocatorForSize(const size_t) {
+    return &alloc;
+  }
+
+private:
+  static SizedAlloc alloc;
+};
+#else
 class SizedAllocatorFactory: private boost::noncopyable {
 public:
   typedef ThreadAwarePrivateHeap<
@@ -531,6 +555,7 @@ private:
 
   SizedAlloc* getAllocForSize(const size_t);
 };
+#endif
 
 class FixedSizeAllocator {
   SizedAllocatorFactory::SizedAlloc* alloc;
