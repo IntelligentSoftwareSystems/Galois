@@ -44,11 +44,17 @@
 #include <random>
 #include <type_traits>
 
+#ifdef HAS_EIGEN
+#include <Eigen/Sparse>
+#include <Eigen/Dense>
+#endif
+
 static const char* const name = "Matrix Completion";
 static const char* const desc = "Computes Matrix Decomposition using Stochastic Gradient Descent";
 static const char* const url = 0;
 
 enum Algo {
+  alternatingLeastSquares,
   blockedEdge,
   blockedEdgeServer,
   blockJump,
@@ -100,6 +106,7 @@ static cll::opt<int> fixedRounds("fixedRounds", cll::desc("run for a fixed numbe
 static cll::opt<bool> useExactError("useExactError", cll::desc("use exact error for testing convergence"), cll::init(false));
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
   cll::values(
+    clEnumValN(Algo::alternatingLeastSquares, "als", "Alternating least squares"),
     clEnumValN(Algo::blockedEdge, "blockedEdge", "Edge blocking (default)"),
     clEnumValN(Algo::blockedEdgeServer, "blockedEdgeServer", "Edge blocking with server support"),
     clEnumValN(Algo::blockJump, "blockJump", "Block jumping "),
@@ -1069,6 +1076,9 @@ int main(int argc, char** argv) {
   Galois::StatManager statManager;
 
   switch (algo) {
+#ifdef HAS_EIGEN
+    case Algo::alternatingLeastSquares: run<AlternatingLeastSquaresAlgo>(); break;
+#endif
     case Algo::blockedEdge: run<BlockedEdgeAlgo<false> >(); break;
     case Algo::blockedEdgeServer: run<BlockedEdgeAlgo<true> >(); break;
     case Algo::blockJump: run<BlockJumpAlgo>(); break;
