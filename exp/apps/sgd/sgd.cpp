@@ -45,13 +45,14 @@
 //Distributed Galois
 #include "Galois/Graphs/Graph3.h"
 #include "Galois/Runtime/DistSupport.h"
+#include "Galois/Reduction.h"
 
 
 #include <boost/iterator/transform_iterator.hpp>
 #define LATENT_VECTOR_SIZE 2
 typedef int EdgeData;
 unsigned int num_user_nodes = 0;
-uint64_t idCount = Galois::Runtime::networkHostID*(num_user_nodes)+1;
+uint64_t idCount = Galois::Runtime::NetworkInterface::ID*(num_user_nodes)+1;
 typedef struct Node
 {
   //double* latent_vector; //latent vector to be learned
@@ -154,7 +155,8 @@ std::unordered_map<FileGNode,DGNode> mapping;
 // DGNode ==> hostID mapping
 std::map<DGNode, uint64_t> HostIDMap;
 
-using accumulator = Galois::GAccumulator<int64_t>;
+//using accumulator = Galois::GAccumulator<int64_t>;
+using accumulator = Galois::DGReducible<int64_t>;
 
 //Processed movie nodes:
 uint64_t Processed_movie_nodes = 0;
@@ -164,7 +166,7 @@ volatile unsigned prog_barrier = 0;
 //unsigned int num_movie_nodes = 0;
 unsigned int num_movie_nodes = 0;
 using namespace Galois::Runtime;
-typedef Galois::Runtime::LL::SimpleLock<true> SLock;
+typedef Galois::Runtime::LL::SimpleLock SLock;
 SLock slock;
 SLock pblock;
 
@@ -215,38 +217,12 @@ inline void doGradientUpdate(Node& movie_data, Node& user_data, uint64_t edge_ra
 }
 
 
-static void progBarrier_landing_pad(RecvBuffer& buf) {
-   gDeserialize(buf,prog_barrier);
-    ++prog_barrier;
-}
-
-static void program_barrier() {
-  SendBuffer b;
-  gSerialize(b, prog_barrier);
-  getSystemNetworkInterface().broadcast(progBarrier_landing_pad, b);
-
-//unsigned old_val = prog_barrier;
- //unsigned new_val =  ++prog_barrier;
-    prog_barrier++;
-//prog_barrier.compare_exchange_strong(old_val,new_val);
-    printf("Entering barrier..%d\n", prog_barrier);
-  do {
-    //std::cout << "inside do loop\n";
-    getSystemDirectory().makeProgress();
-   // getSystemRemoteDirectory().makeProgress();
-    getSystemNetworkInterface().handleReceives();
-  } while (prog_barrier != networkHostNum);
-
-  prog_barrier = 0;
-  printf("Left barrier..\n");
-}
-
-Galois::GAccumulator<double> RMS;
-Galois::GAccumulator<unsigned> count_data;
+Galois::DGReducible<double> RMS;
+Galois::DGReducible<unsigned> count_data;
 /*void verify() {
 typedef Galois::GAccumulator<double> AccumDouble;
     AccumDouble rms;
-    cout<<"Host:"<<networkHostID<<" is verifying before SGD..\n";
+    cout<<"Host:"<<Galois::Runtime::NetworkInterface::ID<<" is verifying before SGD..\n";
     //Galois::do_all(graph.begin(), graph.begin()+num_movie_nodes, [&] (GNode n) {
     for(auto ni = graph.begin(), ei = graph.begin()+num_movie_nodes; ni != ei; ++ni) {
 	for(auto ii = graph.edge_begin(*ni); ii != graph.edge_end(*ni); ++ii){
@@ -266,9 +242,9 @@ typedef Galois::GAccumulator<double> AccumDouble;
     std::cout << "RMSE Total: " << total_rms << " Normalized: " << normalized_rms << std::endl;
 }*/
 void verify(Graphp g){
-    typedef Galois::GAccumulator<double> AccumDouble;
+    typedef Galois::DGReducible<double> AccumDouble;
     AccumDouble rms;
-    cout<<"Host:"<<networkHostID<<" is verifying after SGD..\n";
+    cout<<"Host:"<<Galois::Runtime::NetworkInterface::ID<<" is verifying after SGD..\n";
     //Galois::do_all_local(g, [&g,&rms] (DGNode n) {
 	auto ei = g->begin();
 	std::advance(ei,num_movie_nodes);
@@ -307,7 +283,7 @@ void printNode(const Node& t) {
     }
 }
 /* Operator */
-Galois::GAccumulator<size_t> numNodes; 
+Galois::DGReducible<size_t> numNodes; 
 unsigned count_done=0;
 struct sgd_algo {
    //unsigned int num_movie_nodes;
@@ -357,7 +333,7 @@ struct Process : public Galois::Runtime::Lockable {
     
     numNodes += 1;
     ++Processed_movie_nodes;
-    printf("Processed = %lu\t , hostID = %d\n", Processed_movie_nodes, networkHostID);
+    printf("Processed = %lu\t , hostID = %d\n", Processed_movie_nodes, Galois::Runtime::NetworkInterface::ID);
     if(movie_data.edge_offset == movie_data.number_of_edges)
 	++movie_data.updates;
     if(movie_data.updates < MAX_MOVIE_UPDATES)
@@ -367,7 +343,7 @@ struct Process : public Galois::Runtime::Lockable {
 
      //std::advance(edge_it,  movie_data.edge_offset);
      //std::advance(edge_it,  startRange);
-     //cout<<networkHostID<<" checking if multiple edges..\n"<<endl;
+     //cout<<Galois::Runtime::NetworkInterface::ID<<" checking if multiple edges..\n"<<endl;
      assert(edge_it != edge_end);
      unsigned int edge_rating;
      unsigned int dstID;
@@ -381,7 +357,7 @@ struct Process : public Galois::Runtime::Lockable {
 	dstID = edge_rating/10;
 	++edge_it;
     }
-    //cout<<networkHostID<<" reached range start...\n"<<endl;
+    //cout<<Galois::Runtime::NetworkInterface::ID<<" reached range start...\n"<<endl;
      //else if(dstID >= endRange)
     //	return;
      while((dstID < endRange) && (edge_it != edge_end)) {
@@ -400,7 +376,7 @@ struct Process : public Galois::Runtime::Lockable {
 	 //++movie_data.edge_offset;
 	 //assert(startRange<=dstID && dstID <= endRange);
      }
-   //cout<<networkHostID<<" reached range end...\n"<<endl;
+   //cout<<Galois::Runtime::NetworkInterface::ID<<" reached range end...\n"<<endl;
 	   // This is the last user
      if(edge_it == edge_end)// Galois::MethodFlag::NONE))
      {
@@ -409,9 +385,9 @@ struct Process : public Galois::Runtime::Lockable {
 	numNodes += 1;
 	++Processed_movie_nodes;
 	
-	//printf("Processed = %lu\t , hostID = %d\n", Processed_movie_nodes, networkHostID);
+	//printf("Processed = %lu\t , hostID = %d\n", Processed_movie_nodes, Galois::Runtime::NetworkInterface::ID);
 	movie_data.updates++;
-	//cout<<"Done with this movie.. count = "<<++count_done<<" host = "<<networkHostID<<endl;
+	//cout<<"Done with this movie.. count = "<<++count_done<<" host = "<<Galois::Runtime::NetworkInterface::ID<<endl;
 	if(movie_data.updates < MAX_MOVIE_UPDATES)
 	    ctx.push(movie);
      }            
@@ -450,19 +426,19 @@ void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
 	int movie_host1 = 0;
 
 	//Galois::for_each_local(g, Process(this,g), "Process");
-/*	unsigned int blockSize = num_user_nodes/networkHostNum;
-	for(int i=0;i<networkHostNum;i++) {
-	    int blockNum = (networkHostID+i)%networkHostNum;
+/*	unsigned int blockSize = num_user_nodes/Galois::Runtime::NetworkInterface::Num;
+	for(int i=0;i<Galois::Runtime::NetworkInterface::Num;i++) {
+	    int blockNum = (Galois::Runtime::NetworkInterface::ID+i)%Galois::Runtime::NetworkInterface::Num;
 	    unsigned int startRange = blockSize*blockNum;
 	    unsigned int endRange = blockSize*(blockNum+1);
-	    if(blockNum == networkHostNum-1)	endRange = num_user_nodes+1;
+	    if(blockNum == Galois::Runtime::NetworkInterface::Num-1)	endRange = num_user_nodes+1;
 	    startRange += num_movie_nodes+1;
 	    endRange += num_movie_nodes+1;
 	    cout<<"Iteration: "<<i<<endl;
 */
 	    uint32_t startRange = 0;
 	    uint32_t endRange = 0;
-	    uint32_t t = networkHostNum;
+	    uint32_t t = Galois::Runtime::NetworkInterface::Num;
 	    /* New for_each for blocking */
 	    Galois::for_each<>(g->begin(), ii, t, num_user_nodes, Process(this,g,startRange,endRange), "SGD Process");
 //	}
@@ -507,7 +483,7 @@ static void sendHostIDMap_landing_pad(RecvBuffer& buf) {
     gDeserialize(buf, hostID, n);
     sendBuffer b;
     slock.lock();
-    gserialize(b, networkHostID, n);
+    gserialize(b, Galois::Runtime::NetworkInterface::ID, n);
     slock.unlock();
     getSystemNetworkInterface().send(host, recvHostIDMap_landing_pad, b); 
 }
@@ -533,7 +509,7 @@ void giveDGraph(Graphp graph);
 uint64_t countEdgeData=0;
 static void create_remote_graph_edges(Graphp dgraph)
 {
-  printf ("creating all edges on HOST =>%u\n", networkHostID);
+  printf ("creating all edges on HOST =>%u\n", Galois::Runtime::NetworkInterface::ID);
    unsigned count = 0;
    unsigned scount = 0;
    unsigned rcount = 0;
@@ -598,27 +574,27 @@ static void create_dist_graph(Graphp dgraph, std::string inputFile) {
 
     auto  size = graph_end - graph_begin;;
     cout << "rest node size = "<<size<<endl;
-    block = size / networkHostNum;
-    f = networkHostID * block;
-    l = (networkHostID + 1) * block;
-    first = graph_begin + (networkHostID * block);
-    last  = graph_begin + ((networkHostID + 1) * block);
-    if (networkHostID == (networkHostNum-1)) last = graph_end;
+    block = size / Galois::Runtime::NetworkInterface::Num;
+    f = Galois::Runtime::NetworkInterface::ID * block;
+    l = (Galois::Runtime::NetworkInterface::ID + 1) * block;
+    first = graph_begin + (Galois::Runtime::NetworkInterface::ID * block);
+    last  = graph_begin + ((Galois::Runtime::NetworkInterface::ID + 1) * block);
+    if (Galois::Runtime::NetworkInterface::ID == (Galois::Runtime::NetworkInterface::Num-1)) last = graph_end;
 
     cout << "first - last" << (first - last)<< endl;
    // cout<<"Number of nodes = "<<std::distance(graph.begin(),graph.end())<<endl; 
-   // if(networkHostID == 0) {   
-//	std::cout << "number of node on host = " << networkHostID << " are: = " << last - first << "\n";
-	printf ("host: %u creating rest of the nodes\n", networkHostID);
+   // if(Galois::Runtime::NetworkInterface::ID == 0) {   
+//	std::cout << "number of node on host = " << Galois::Runtime::NetworkInterface::ID << " are: = " << last - first << "\n";
+	printf ("host: %u creating rest of the nodes\n", Galois::Runtime::NetworkInterface::ID);
 	Galois::for_each(first, last, create_nodes(dgraph,lk));
 }
 static void getDGraph_landing_pad(RecvBuffer& buf) {
     Graphp dgraph;
     gDeserialize(buf, dgraph);
-   // printf("%d has received DistGraph..\n",networkHostID);
+   // printf("%d has received DistGraph..\n",Galois::Runtime::NetworkInterface::ID);
 }
 void giveDGraph(Graphp dgraph) {
-    if(networkHostNum > 1) {
+    if(Galois::Runtime::NetworkInterface::Num > 1) {
     SendBuffer b;
     gSerialize(b, dgraph);
     getSystemNetworkInterface().broadcast(getDGraph_landing_pad, b);
@@ -637,8 +613,8 @@ static void readInputGraph_landing_pad(RecvBuffer& buf) {
 
 
 void readInputGraph(Graphp dgraph, std::string inputFile){
-  //  std::cout<<"NetworkHostNum="<<networkHostNum<<std::endl;
-     if(networkHostNum > 1) {
+  //  std::cout<<"NetworkHostNum="<<Galois::Runtime::NetworkInterface::Num<<std::endl;
+     if(Galois::Runtime::NetworkInterface::Num > 1) {
 	SendBuffer b;
 	gSerialize(b, inputFile, dgraph);
 	getSystemNetworkInterface().broadcast(readInputGraph_landing_pad, b);
@@ -648,7 +624,7 @@ void readInputGraph(Graphp dgraph, std::string inputFile){
     } 
     
     create_dist_graph(dgraph,inputFile);
-  //  printf("0..Done creating dist graph.. HOST --->%d\n", networkHostID);
+  //  printf("0..Done creating dist graph.. HOST --->%d\n", Galois::Runtime::NetworkInterface::ID);
 	
 }
 
@@ -662,7 +638,7 @@ void readGraph(Graphp dgraph, std::string inputFile) {
 void verify_(Graphp g) {
     auto ii = g->begin();
     std::advance(ii,num_movie_nodes);
-    if(networkHostID == 0)	
+    if(Galois::Runtime::NetworkInterface::ID == 0)	
 	Galois::for_each(g->begin(),ii,verify_before(g),"Verifying");
     else
 	Galois::for_each(g->begin(),ii,dummy_func2());
@@ -697,8 +673,8 @@ int main(int argc, char** argv)
 	readGraph(dgraph, inputFile);    
 	Tinitial.stop();
 
-//	if(networkHostID == 0) {	
-	    std::cout<< "create_remote_graph_edges host--->" << networkHostID<<"\n";
+//	if(Galois::Runtime::NetworkInterface::ID == 0) {	
+	    std::cout<< "create_remote_graph_edges host--->" << Galois::Runtime::NetworkInterface::ID<<"\n";
 	    create_remote_graph_edges(dgraph);
 	    std::cout<< "Done reading and building Graph\n";
 //	}
