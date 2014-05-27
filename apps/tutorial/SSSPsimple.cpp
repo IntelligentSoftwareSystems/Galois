@@ -31,7 +31,9 @@
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 
+//! [Define LC Graph]
 typedef Galois::Graph::LC_Linear_Graph<unsigned int, unsigned int> Graph;
+//! [Define LC Graph]
 typedef Graph::GraphNode GNode;
 typedef std::pair<unsigned, GNode> UpdateRequest;
 
@@ -47,8 +49,10 @@ static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>")
 void relax_edge(unsigned src_data, Graph::edge_iterator ii, 
 		Galois::UserContext<UpdateRequest>& ctx) {
   GNode dst = graph.getEdgeDst(ii);
+    //![get edge and node data] 
   unsigned int edge_data = graph.getEdgeData(ii);
   unsigned& dst_data = graph.getData(dst);
+    //![get edge and node data] 
   unsigned int newDist = dst_data + edge_data;
   if (newDist < dst_data) {
     dst_data = newDist;
@@ -59,12 +63,15 @@ void relax_edge(unsigned src_data, Graph::edge_iterator ii,
 //! [Operator in SSSPsimple]
 struct SSSP {
   void operator()(UpdateRequest& req, Galois::UserContext<UpdateRequest>& ctx) const {
-    unsigned& data = graph.getData(req.second);
+    GNode active_node = req.second;
+    unsigned& data = graph.getData(active_node);
     if (req.first >= data) return;
-    
-    for (Graph::edge_iterator ii = graph.edge_begin(req.second),
-           ee = graph.edge_end(req.second); ii != ee; ++ii)
+   
+    //![loop over neighbors] 
+    for (Graph::edge_iterator ii = graph.edge_begin(active_node),
+           ee = graph.edge_end(active_node); ii != ee; ++ii)
       relax_edge(data, ii, ctx);
+    //![loop over neighbors] 
   }
 };
 //! [Operator in SSSPsimple]

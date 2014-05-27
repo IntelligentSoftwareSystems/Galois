@@ -31,7 +31,9 @@
 #include <iostream>
 
 //! Graph has int node data, void edge data and is directed
+//! [define a graph]
 typedef Galois::Graph::FirstGraph<int,void,true> Graph;
+//! [define a graph]
 //! Opaque pointer to graph node
 typedef Graph::GraphNode GNode;
 
@@ -43,12 +45,16 @@ struct IncrementNeighbors {
   //! Operator. Context parameter is unused in this example.
   void operator()(GNode n, Galois::UserContext<GNode>& ctx) {
     // For each outgoing edge (n, dst)
+    //! [loop over neighbors]
     for (Graph::edge_iterator ii = g.edge_begin(n), ei = g.edge_end(n); ii != ei; ++ii) {
       GNode dst = g.getEdgeDst(ii);
+      //! [access node data]
       int& data = g.getData(dst);
       // Increment node data by 1
       data += 1;
+      //! [access node data]
     }
+    //! [loop over neighbors]
   }
 };
 
@@ -68,12 +74,15 @@ void constructTorus(Graph& g, int height, int width) {
   int numNodes = height * width;
   std::vector<GNode> nodes(numNodes);
   for (int i = 0; i < numNodes; ++i) {
+    //! [create and add node]
     GNode n = g.createNode(0);
     g.addNode(n);
     nodes[i] = n;
+    //! [create and add node]
   }
 
   // Add edges
+  //! [add edges]
   for (int x = 0; x < width; ++x) {
     for (int y = 0; y < height; ++y) {
       GNode c = nodes[x*height + y];
@@ -87,6 +96,7 @@ void constructTorus(Graph& g, int height, int width) {
       g.addEdge(c, w);
     }
   }
+  //! [add edges]
 }
 
 int main(int argc, char** argv) {

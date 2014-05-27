@@ -1,7 +1,14 @@
 /**
 
 \page Manual Manual
-@section graphio Graph IO
+@section graphio Graph Input and Output
 
+@subsection readwrite Reading or writing connectivities of graphs
+
+ {@link Galois::Graph::FileGraph} can be used to read/write the connectivities of graph from/to files. {@link Galois::Graph::FileGraph::structureFromFile} is used to mmap a binary format of graphs into a FileGraph object. Then {@link Galois::Graph::FirstGraph} or {@link Galois::Graph::LC_CSR_Graph} can be constructed from {@link Galois::Graph::FileGraph}. {@link Galois::Graph::LC_CSR_Graph} provides directly method {@link Galois::Graph::LC_CSR_Graph::constructFrom} to create {@link Galois::Graph::LC_CSR_Graph} from {@link Galois::Graph::FileGraph}. {@link Galois::Graph::FileGraph::structureToFile} is used to write the connectivities of FileGraph to binary file.     
+
+@subsection graphconvert Converting Graphs into different formats
+
+ graph-convert in the directoy of tools/graph-convert can be used to convert the graph files among different formats. The --help parameter will give the detailed parameters for converting and supported formats. In particular, it can convert a few ASCII-format graph files(e.g. edge list) into binary format which can be directly loaded in by {@link Galois::Graph::FileGraph::structureFromFile}.  
 
 */
