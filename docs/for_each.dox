@@ -162,7 +162,7 @@ And similarly, for_each_local, in the same file (iterating over a bag
 
 \subsection on_each on_each loop
 
-{@link Galois::on_each loop is for performing simple tasks on each thread in the
+{@link Galois::on_each} loop is for performing simple tasks on each thread in the
 execution. The task is encoded in a functor passed to on_each loop. The functor
 takes two arguments:
 
