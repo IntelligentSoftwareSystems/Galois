@@ -25,7 +25,7 @@
 
 #include "Galois/config.h"
 #include "Galois/FixedSizeRing.h"
-#include "Galois/Runtime/mm/Mem.h"
+#include "Galois/Mem.h"
 
 #include <boost/iterator/iterator_facade.hpp>
 
@@ -50,20 +50,23 @@ private:
   Block* last;
   unsigned num;
 
-  Galois::Runtime::MM::FixedSizeAllocator heap;
+  //! [Example Fixed Size Allocator]
+  Galois::GFixedAllocator<Block> heap;
   
   Block* alloc_block() {
-    return new (heap.allocate(sizeof(Block))) Block();
-  }
-
-  bool precondition() const {
-    return (num == 0 && first == NULL && last == NULL)
-      || (num > 0 && first != NULL && last != NULL);
+    Block* b = heap.allocate (1);
+    return new (b) Block();
   }
 
   void free_block(Block* b) {
     b->~Block();
-    heap.deallocate(b);
+    heap.deallocate(b, 1);
+  }
+  //! [Example Fixed Size Allocator]
+
+  bool precondition() const {
+    return (num == 0 && first == NULL && last == NULL)
+      || (num > 0 && first != NULL && last != NULL);
   }
 
   void extend_first() {

@@ -90,6 +90,7 @@ void largeFree(void* mem, size_t bytes);
 //! Print lines from /proc/pid/numa_maps that contain at least n (non-huge) pages
 void printInterleavedStats(int minPages = 16*1024);
 
+//! [Example Third Party Allocator]
 class MallocHeap {
 public:
   enum { AllocSize = 0 };
@@ -100,6 +101,8 @@ public:
     free(ptr);
   }
 };
+//! [Example Third Party Allocator]
+
 
 //! Per-thread heaps using Galois thread aware construct
 template<class LocalHeap>

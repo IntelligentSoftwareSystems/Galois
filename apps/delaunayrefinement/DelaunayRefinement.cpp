@@ -69,7 +69,10 @@ static cll::opt<DetAlgo> detAlgo(cll::desc("Deterministic algorithm:"),
 
 template<int Version=detBase>
 struct Process {
+  //! [Enabling Per Iteration Allocator in DMR]
   typedef int tt_needs_per_iter_alloc;
+  //! [Enabling Per Iteration Allocator in DMR]
+
 
   struct LocalState {
     Cavity cav;
@@ -100,7 +103,9 @@ struct Process {
       cavp->build();
       cavp->computePost();
     } else {
+      //! [Accessing Per Iteration Allocator in DMR]
       Cavity cav(graph, ctx.getPerIterAlloc());
+      //! [Accessing Per Iteration Allocator in DMR]
       cav.initialize(item);
       cav.build();
       cav.computePost();

@@ -3,7 +3,7 @@
 
 \section parallel_loop Parallel Loops
 
-\subsection for_each For_each
+\subsection for_each For-Each Loop
 There are several choices for for_each functions:
 
  - {@link Galois::for_each}
@@ -13,13 +13,15 @@ This is for unordered Galois Iterators without machine topology support.
 An example to use for_each in {@link apps/tutorial/SSSPsimple.cpp} can be seen as follows:
 @snippet apps/tutorial/SSSPsimple.cpp for_each in SSSPsimple
 
- - {@link Galois::for_each_local}
-
-This is for unordered Galois Iterators with machine topology support. 
-
  - {@link Galois::for_each_ordered}
  
 This is for ordered Galois Iterators. 
+
+
+\subsection operator Operator
+
+An example to define an operator in {@link apps/tutorial/SSSPsimple.cpp} can be seen as follows:
+@snippet apps/tutorial/SSSPsimple.cpp Operator in SSSPsimple
 
 \subsubsection type_traits Type Traits
 
@@ -45,11 +47,6 @@ The functor passed to for_each may be specialized by several different type-trai
 
     Indicates the operator doesn't need its execution stats recorded 
 
-
-\subsection operator Operator
-
-An example to define an operator in {@link apps/tutorial/SSSPsimple.cpp} can be seen as follows:
-@snippet apps/tutorial/SSSPsimple.cpp Operator in SSSPsimple
 
 \subsection scheduling Scheduling Policies
 
@@ -86,4 +83,12 @@ An example to define an OrderedByIntegerMetic scheduling in {@link apps/tutorial
 @snippet apps/tutorial/SSSPsimple.cpp OrderedByIntegerMetic in SSSPsimple
    The OBIM is an example to define a priority scheduling. Internally It uses a dChunkedLIFO to store the items with the same priority.
 
+\subsection do_all Do-All Loop
+
+\subsection for_each_local topology Aware for_each
+
+
+ - {@link Galois::for_each_local}
+
+This is for unordered Galois Iterators with machine topology support. 
 */
