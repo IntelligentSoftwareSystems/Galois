@@ -4,11 +4,18 @@
 \section parallel_loop Parallel Loops
 
 \subsection for_each For-Each Loop
-There are several choices for for_each functions:
 
- - {@link Galois::for_each}
+ {@link Galois::for_each} is the most commonly used loop construct to express
+ parallelism. It provides speculative unordered execution of a set of active
+ elements (or work items). A for_each can be invoked with the following parameters:
 
-This is for unordered Galois Iterators without machine topology support.  
+ - A pair of iterators [begin,end) that mark the set of initial active elements
+ - The *operator*, which is a C++ functor containing the loop body code. 
+ - The scheduling policy for work items, used by the internal worklist. It is
+   specified using the {@link Galois::wl} construct. 
+ - Optional argument for specifying the loop name, using the {@link
+   Galois::loopname} construct
+
 
 An example to use for_each in {@link apps/tutorial/SSSPsimple.cpp} can be seen as follows:
 @snippet apps/tutorial/SSSPsimple.cpp for_each in SSSPsimple
@@ -20,32 +27,50 @@ This is for ordered Galois Iterators.
 
 \subsection operator Operator
 
+The loop body of a {@link Galois::for_each} is specified as a C++ functor. We call
+this the *operator* of the loop. The functor takes two arguments:
+
+- The active element (or work item) to process in current iteration. This is picked
+  by the runtime using the scheduling policy
+- A reference to the runtime context of the loop {@link Galois::UserContext}. This
+  reference provides certain services needed by the loop body, e.g. the ability to add 
+  new items to the internal worklist (maintained by the runtime), allocate
+  iteration local objects, and suspend the parallel loop temporarily, etc.
+
 An example to define an operator in {@link apps/tutorial/SSSPsimple.cpp} can be seen as follows:
 @snippet apps/tutorial/SSSPsimple.cpp Operator in SSSPsimple
 
+The operator must be *cautious*. \b TODO: add ref to glossary here
+
 \subsubsection type_traits Type Traits
 
-The functor passed to for_each may be specialized by several different type-traits to optimize the runtime with respect to the features used by the functor. See the API documentation for more details. The following is list of available type-traits.
+We can specify several flags as typedefs in the operator to turn on and off certain
+features provided by the Galois runtime. Often turning off a feature saves the
+runtime cost of providing that feature and results in
+optimized execution:
 
- - needs_parallel_break
-
-    Indicates the operator may request the parallel loop to be suspended and a given function run in serial
-
- - does_not_need_parallel_push
+ - \b tt_does_not_need_push
 
     Indicates the operator does not generate new work and push it on the worklist
 
- - needs_per_iter_alloc
+ - \b tt_does_not_need_aborts
+
+    Indicates the operator doesn't need support for speculation. All iterations
+    will commit successfully
+
+ - \b tt_needs_per_iter_alloc
 
     Indicates the operator may request the access to a per-iteration allocator
+    \b TODO: add ref here
 
- - does_not_need_context
+ - \b tt_does_not_need_stats
 
-    Indicates the operator doesn't need a per-iteration context
+    Indicates the operator doesn't need to record its execution statistics.
 
- - does_not_need_stats
+ - \b tt_needs_parallel_break
 
-    Indicates the operator doesn't need its execution stats recorded 
+    Indicates the operator may request the parallel loop to be suspended
+    temporarily, at which point another function can be executed serially
 
 
 \subsection scheduling Scheduling Policies

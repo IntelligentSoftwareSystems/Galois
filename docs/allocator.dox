@@ -22,18 +22,22 @@ variable size allocations.
 We will use Delaunay Mesh Refinement (DMR), as an example to illustrate the use of the Per Iteration
 Allocator. The following steps are required to access the Per Iteration Allocator:
 
+\b TODO: add ref to functor flags
 - The loop operator (functor) needs specify the \t tt_needs_per_iter_alloc
   flag, as a \b typedef, to enable the allocator. E.g., in DMR 
   {@link apps/delaunayrefinement/DelaunayRefinement.cpp}: 
   @snippet apps/delaunayrefinement/DelaunayRefinement.cpp Enabling Per Iteration Allocator in DMR
 
 - A reference to the allocator can be accessed through 
-  {@link Galois::UserContext::getPerIterAlloc}. E.g., in DMR
+  {@link Galois::UserContext::getPerIterAlloc}, which can then be passed to dynamic
+  data structures such as std::vector. E.g., in DMR
   {@link apps/delaunayrefinement/DelaunayRefinement.cpp}:
   @snippet apps/delaunayrefinement/DelaunayRefinement.cpp  Accessing Per Iteration Allocator in DMR
 
-- \b TODO: Typedef using per-iter-alloc
-- \b TODO: Passing per-iter-alloc to STL vector
+The following snippet shows how to define an STL vector to use the Per Iteration
+Allocator (file {@link apps/delaunayrefinement/Cavity.h}):
+@snippet apps/delaunayrefinement/Cavity.h STL vector using PerIterAllocTy
+
   
 \subsection fixed-size-alloc Fixed Size Allocator
 
@@ -73,6 +77,5 @@ an allocator using this class, (see file {@link include/Galois/Runtime/mm/Mem.h}
 
 \subsection build-custom-alloc Types of Heaps and Building Custom Allocators
 
-- 
 
 */
