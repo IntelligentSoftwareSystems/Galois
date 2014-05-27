@@ -163,10 +163,12 @@ int main(int argc, char** argv) {
   Galois::StatTimer T;
   T.start();
 
+  //! [do_all_local example]
   Galois::InsertBag<GNode> initialBad;
 
   if (detAlgo == nondet)
     Galois::do_all_local(*graph, Preprocess(initialBad), Galois::loopname("findbad"));
+  //! [do_all_local example]
   else
     std::for_each(graph->begin(), graph->end(), Preprocess(initialBad));
 
@@ -181,8 +183,10 @@ int main(int argc, char** argv) {
   
   switch (detAlgo) {
     case nondet: 
+      //! [for_each_local example]
       Galois::for_each_local(initialBad, Process<>(), Galois::loopname("refine"), Galois::wl<Chunked>());
       break;
+      //! [for_each_local example]
     case detBase:
       Galois::for_each_det(initialBad.begin(), initialBad.end(), Process<>());
       break;

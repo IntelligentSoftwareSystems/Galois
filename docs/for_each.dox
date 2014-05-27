@@ -75,6 +75,9 @@ optimized execution:
 
 \subsection scheduling Scheduling Policies
 
+The scheduling policy for {@link Galois::for_each} can be specified by choosing
+one of the types in {@link Galois::WorkList} namespace and providing the type-name
+as an argument to {@link Galois::wl} parameter of the for_each. 
 The scheduling policies are listed as follows:
 
  - PriQueue
@@ -110,10 +113,62 @@ An example to define an OrderedByIntegerMetic scheduling in {@link apps/tutorial
 
 \subsection do_all Do-All Loop
 
-\subsection for_each_local topology Aware for_each
+{@link Galois::do_all} is a loop construct for trivially parallel loops that do not
+need any speculation, fancy scheduling policies, and do not generate new work items. The
+threads iterate in parallel over a range of iterators specified in the invocation
+of the do_all. The arguments are as follows:
+
+- A pair of iterators specifying the set of work-items.
+
+- A functor specifying the loop body of the do_all. It takes only one argument,
+  which is the current work item. 
+
+- {@link Galois::do_all_steal} can be supplied with argument \b true or \b false to
+  turn on work-stealing. This can be useful for loops where iterations have varying
+  execution time. 
+
+- Optionally {@link Galois::loopname} can be used to specify a name of loop, which
+  is useful for loop statistics
+
+The file {@link apps/tutorial/HelloWorld.cpp} contains some examples of do_all
+loops:
+@snippet apps/tutorial/HelloWorld.cpp do_all example
+
+\subsection for_each_local Locality Aware Loops: for_each_local and do_all_local
+
+Often a parallel loop iterates over (or consumes) data that was produced by a
+previous parallel loop. In such cases, locality can be improved if the threads in
+the consuming loop operate over the same elements they produced in the previous
+loop. This notion of *ownership* of data is supported in Galois, through 
+{@link Galois::for_each_local} and {@link Galois::do_all_local}. 
+
+The for_each_local and do_all_local are similar to their non-local counterparts, except
+for the first argument. Instead of passing in a pair of iterators, we pass in a
+"locality-aware data structure". A locality aware data structure must support 
+\b local_begin and \b local_end (in addition to \b begin and \b end), which point
+to the range of data items owned/produced by a thread. 
+
+Example of such data-structure is {@link Galois::Graph::FirstGraph}, used in 
+{@link apps/delaunayrefinement/DelaunayRefinement.cpp}:
+
+@snippet apps/delaunayrefinement/DelaunayRefinement.cpp do_all_local example
+
+And similarly, for_each_local, in the same file (iterating over a bag 
+{@link Galois::InsertBag} of items produced by the do_all_local above):
+
+@snippet apps/delaunayrefinement/DelaunayRefinement.cpp for_each_local example
 
 
- - {@link Galois::for_each_local}
 
-This is for unordered Galois Iterators with machine topology support. 
+\subsection on_each on_each loop
+
+{@link Galois::on_each loop is for performing simple tasks on each thread in the
+execution. The task is encoded in a functor passed to on_each loop. The functor
+takes two arguments:
+
+- \b tid: the thread-id assigned by runtime, which lies in the range
+  [0:num-threads). 
+- \b num-threads: the total number of threads used for execution
+
+\b TODO: example of on_each
 */
