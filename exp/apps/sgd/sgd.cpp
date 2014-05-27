@@ -87,7 +87,19 @@ typedef struct Node
     {
 	return (ID < other.ID);
     }
+
+typedef int tt_has_serialize;
+    void serialize(Galois::Runtime::SerializeBuffer& s) const {
+	gSerialize(s,latent_vector, updates, edge_offset, ID, number_of_edges);
+    }
+    void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
+	gDeserialize(s,latent_vector, updates, edge_offset, ID, number_of_edges);
+    } 
+
+
 } Node;
+
+
 
 using std::cout;
 using std::endl;
@@ -203,32 +215,6 @@ inline void doGradientUpdate(Node& movie_data, Node& user_data, uint64_t edge_ra
 }
 
 
-/*
-inline void doGradientUpdate(Node& movie_data, Node& user_data, unsigned int edge_rating)
-{
-        double step_size = LEARNING_RATE * 1.5 / (1.0 + DECAY_RATE * pow(movie_data.updates + 1, 1.5));
-        double* __restrict__ movie_latent = movie_data.latent_vector;
-        double* __restrict__ user_latent = user_data.latent_vector;
-	
-	//calculate error
-        double cur_error = - edge_rating;
-        for(unsigned int i = 0; i < LATENT_VECTOR_SIZE; i++)
-        {
-                cur_error += user_latent[i] * movie_latent[i];
-        }
-
-	//This is a gradient step
-        for(unsigned int i = 0; i < LATENT_VECTOR_SIZE; i++)
-        {
-                double prev_movie_val = movie_latent[i];
-
-                movie_latent[i] -= step_size * (cur_error * user_latent[i] + LAMBDA * prev_movie_val);
-                user_latent[i] -= step_size * (cur_error * prev_movie_val + LAMBDA * user_latent[i]);
-        }
-}
-
-*/
-
 static void progBarrier_landing_pad(RecvBuffer& buf) {
    gDeserialize(buf,prog_barrier);
     ++prog_barrier;
@@ -320,47 +306,6 @@ void printNode(const Node& t) {
         cout<<" "<<t.latent_vector[i]<<endl;
     }
 }
-/*
-struct printN {
-    Graphp g;
-    printN(Graphp g_) : g(g_) { }  
-
-    void operator()(const DGNode& data, Galois::UserContext<DGNode>& ctx) {
-	printNode(g->getData(data));
-    }  
-};
-*/
-/*
-struct verify_before : public Galois::Runtime::Lockable {
-    Graphp g;
-    verify_before() {}
-    verify_before(Graphp g_) : g(g_) { 
-    }
-
-    void operator()(const DGNode& movie, Galois::UserContext<DGNode>& ctx ) {
-	for(auto ii = g->edge_begin(movie); ii != g->edge_end(movie); ++ii){
-	    const DGNode& m = g->getEdgeDst(ii);
-	    if(g->edge_begin(m) != g->edge_end(m))
-		cout<<"Kuch gadbad hai..\n";
-	    double pred = calcPrediction(g->getData(movie), g->getData(m));
-	    double rating = ii->getValue();
-	    if(!std::isnormal(pred))
-		std::cout << "Denormal Warning\n";
-	    RMS += ((pred - rating)*(pred - rating));
-
-	}
-	count_data +=1;
-    } 
-    typedef int tt_has_serialize;
-    void serialize(Galois::Runtime::SerializeBuffer& s) const {
-	gSerialize(s,g);
-    }
-    void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
-	gDeserialize(s,g);
-    } 
-};
-*/
-
 /* Operator */
 Galois::GAccumulator<size_t> numNodes; 
 unsigned count_done=0;
@@ -501,30 +446,9 @@ void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
 
 	Node& dg_movie = g->getData(*ii);
 	//Node& g_movie = graph.getData(*jj);
-/*
-	std::cout << "dg_movie = " << dg_movie.ID << "\n";
-	std::cout << "g_movie = " << g_movie.ID << "\n";
-	std::cout << "num movie nodes  = " << num_movie_nodes << "\n";
-*/  
-/*	unsigned k=0;	
-	for(auto it = g->begin(),ee=g->end();k<1000; ++k,++it) {
-	  printNode(g->getData(*it));        
-	}
-*/
-//	std::cout<<"Value of k= "<<k<<std::endl; 
-        //Galois::for_each(g->begin(), ii, printN(g),"Printing nodes");
 	int movie_host0 = 0;
 	int movie_host1 = 0;
 
-/*	for(auto hh = g->begin(); hh != g->end(); ++hh){
-	    if(HostIDMap[*hh] == 0)
-		++movie_host0;
-	    if(HostIDMap[*hh] == 1)
-		++movie_host1;
-	} 
-*/
-
-//	std::cout<< "movie_host0 = " << movie_host0 << " moveie_host1 = " << movie_host1 <<std::endl;
 	//Galois::for_each_local(g, Process(this,g), "Process");
 /*	unsigned int blockSize = num_user_nodes/networkHostNum;
 	for(int i=0;i<networkHostNum;i++) {
@@ -539,6 +463,7 @@ void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
 	    uint32_t startRange = 0;
 	    uint32_t endRange = 0;
 	    uint32_t t = networkHostNum;
+	    /* New for_each for blocking */
 	    Galois::for_each<>(g->begin(), ii, t, num_user_nodes, Process(this,g,startRange,endRange), "SGD Process");
 //	}
 	//Galois::for_each(g->begin(), ii, verify_before(g), "Verifying");
@@ -546,9 +471,6 @@ void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
         // Verification routine
   //      std::cout << "Running Verification after completion\n";
         //verify(g);
-	
-
-  //program_barrier();
 	std::cout << "number of nodes = "<<numNodes.reduce() << "\n";
     }
 
@@ -599,108 +521,15 @@ struct create_nodes {
     create_nodes() = default;
     create_nodes(Graphp _g, SLock _l) : g(_g),l(_l){}
     
-    //void operator ()(FileGNode& item, Galois::UserContext<FileGNode>& ctx) {
     template<typename Context>
-    //void operator ()(const int& item, const Galois::UserContext<FileGNode>& ctx) {
     void operator ()(const FileGNode& item, const Context& ctx) {
-	//Node& node =  graph.getData(item);
-	//cout << "creating node\n";
 	Node node;
 	DGNode n = g->createNode(node);  
 	g->addNode(n);
-	//HostIDMap[n] = networkHostID;
-	//SendBuffer b;n
-	//gSerialize(b, networkHostID, n);
-	//getSystemNetworkInterface().broadcast(recvHostIDMap_landing_pad, b);
-	//getSystemNetworkInterface().handleReceives();
-//	std::cout << "inside create node on HOST ---> " << networkHostID << "\n";
-//	if(networkHostID == 1)
-//	    std::cout<<"host 1 >>>>>>" << HostIDMap[n]<<"\n";
-	/*Check that we have the right nodes*/
-	/*	l.lock();
-		mapping[item] = n;
-		llookup[lookup[item]] = n;
-		l.unlock();
-		*/
-//	num_ns++;
     }
-  /*  typedef int tt_has_serialize;
-    void serialize(Galois::Runtime::SerializeBuffer& s) const {
-	gSerialize(s,g,l);
-    }
-    void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
-	gDeserialize(s,g,l);
-    }
-*/
 };
 
-/*
-unsigned int initializeGraphData(Graph& g)
-{
-        unsigned int seed = 42;
-        std::default_random_engine eng(seed);
-        std::uniform_real_distribution<double> random_lv_value(0, 0.1);
-
-        unsigned int num_movie_nodes = 0;
-	unsigned int num_user_nodes = 0;
-	unsigned index = 0;
-	unsigned int numRatings = 0;
-     //  for all movie and user nodes in the graph
-	    for (Graph::iterator i = g.begin(), end = g.end(); i != end; ++i) {
-		Graph::GraphNode gnode = *i;
-		Node& data = g.getData(gnode);
-		
-		data.ID = index;
-		++index; 
-		data.updates = 0;
-		data.number_of_edges = 0; 
-		 //fill latent vectors with random values
-                 double* lv = new double[LATENT_VECTOR_SIZE];
-		 for(int i = 0; i < LATENT_VECTOR_SIZE; i++)
-                 {
-                     lv[i] = random_lv_value(eng);
-                 }
-		for(int i=0;i<LATENT_VECTOR_SIZE;i++) {
-		    data.latent_vector[i] = lv[i];
-		}
-              unsigned int num_edges = g.edge_end(gnode) - g.edge_begin(gnode);
-	    numRatings += num_edges;
-	    if(num_edges > 0)
-                 ++num_movie_nodes;
-	    else 
-		++num_user_nodes;
-	    
-	} 
-	
-	NUM_RATINGS = numRatings;
-        return num_movie_nodes;
-}
-*/
 void giveDGraph(Graphp graph);
-/*
-static void recvRemoteNode_landing_pad(RecvBuffer& buf) {
-  DGNode n;
-  Node node;
-  uint32_t host;
-  gDeserialize(buf,host,node,n);
-  slock.lock();
-  rlookup[node] = n;
-  slock.unlock();
-}
-
-static void getRemoteNode_landing_pad(RecvBuffer& buf) {
-  Node node;
-  uint32_t host;
-  gDeserialize(buf,host,node);
-  SendBuffer b;
-  slock.lock();
-  gSerialize(b, networkHostID, node, llookup[node]);
-  slock.unlock();
-  getSystemNetworkInterface().send(host,recvRemoteNode_landing_pad,b);
-}
-
-*/
-
 uint64_t countEdgeData=0;
 static void create_remote_graph_edges(Graphp dgraph)
 {
@@ -743,14 +572,6 @@ static void create_remote_graph_edges(Graphp dgraph)
 	    ++num_user_nodes;
 	NUM_RATINGS += n.number_of_edges;
   }
-  /*  auto uu = dgraph->begin();
-    std::advance(uu, num_movie_nodes+2);
-
-    for(auto g = dgraph->begin(); g != uu; ++g)
-    {
-	cout << "n edges = " <<dgraph->getData(*g).number_of_edges<<endl; 
-    }
-*/
 int movie_host0 = 0;
 	int movie_host1 = 0;
 	auto jj = dgraph->begin();
@@ -763,12 +584,6 @@ int movie_host0 = 0;
 	} 
 
 	std::cout<< "movie_host0 = " << movie_host0 << " moveie_host1 = " << movie_host1 <<std::endl;
-
-
- // std::cout <<"host="<<networkHostID<<" count = " << count <<"\n";
-    
- // printf ("host: %u nodes %u and edges %u remote edges %u\n", networkHostID, scount, count, rcount);
-//  printf ("host: %u done creating local edges\n", networkHostID);
 }
 
 
@@ -778,37 +593,10 @@ static void create_dist_graph(Graphp dgraph, std::string inputFile) {
     FGraph::iterator first, last;
     
     fgraph.structureFromFile(inputFile);
-    //fgraph.structureFromFileInterleaved<EdgeData>(inputFile);
-    //fgraph.structureFromFile<EdgeData>(inputFile);
-    //num_movie_nodes =  initializeGraphData(graph);
- //   std::cout << "num_movie_nodes = " << num_movie_nodes <<"\n";
-
-/*****************************************************************
-*Divide movie nodes equally first.
-*
-*****************************************************************/
-   // uint32_t size = num_movie_nodes;
-    //auto graph_begin = graph.begin();
-    //auto graph_end = graph.begin() + size;
-  /*  cout << "movie node size = "<<size<<endl;
-    block = size/networkHostNum;
-    f = networkHostID * block;
-    l = (networkHostID + 1) * block;
-    first = graph_begin + (networkHostID * block);
-    last = graph_begin + ((networkHostID + 1) * block);
-    if(networkHostID == (networkHostNum - 1)) last = graph_end; 
-    printf ("host: %u creating Movie nodes = %ld\n", networkHostID, (last-first));
-    Galois::for_each(first, last, create_nodes(dgraph,lk));
-*/	
-/*****************************************************************
-*Divide rest of the  nodes equally first.
-*
-*****************************************************************/
-
     auto graph_begin = fgraph.begin();
     auto graph_end = fgraph.end();
 
-  auto  size = graph_end - graph_begin;;
+    auto  size = graph_end - graph_begin;;
     cout << "rest node size = "<<size<<endl;
     block = size / networkHostNum;
     f = networkHostID * block;
@@ -822,18 +610,7 @@ static void create_dist_graph(Graphp dgraph, std::string inputFile) {
    // if(networkHostID == 0) {   
 //	std::cout << "number of node on host = " << networkHostID << " are: = " << last - first << "\n";
 	printf ("host: %u creating rest of the nodes\n", networkHostID);
-	//typedef Galois::WorkList::BulkSynchronous<Galois::WorkList::dChunkedLIFO<256> > WL;
-	//typedef Galois::WorkList::dChunkedFIFO<64> dChunk;
-	//typedef Galois::WorkList::LIFO<FileGNode, true> chunk;
-	//typedef Galois::Graph::FileGraph::iterator IterTy;
 	Galois::for_each(first, last, create_nodes(dgraph,lk));
-	//Galois::for_each<>(boost::counting_iterator<int>(0), boost::counting_iterator<int>(100), create_nodes(dgraph,lk));
-    
-  // }
-   /* else {
-	Galois::for_each(graph.begin(),graph.end(),dummy_func());
-    }*/
-
 }
 static void getDGraph_landing_pad(RecvBuffer& buf) {
     Graphp dgraph;
@@ -930,14 +707,21 @@ int main(int argc, char** argv)
 	verify(dgraph);
 	std::cout << "calling sgd \n";
 	Galois::StatTimer T("Sgd Time");
+
+        NetworkInterface& net = getSystemNetworkInterface();
+
+//	net.systemBarrier();
 	T.start();
 	sgd_algo()(dgraph);
 	 T.stop();   
-	Galois::StatTimer T2("Verify Time");
+  //      net.systemBarrier();
+
+/*	Galois::StatTimer T2("Verify Time");
 	T2.start();
 	cout<<"Verifying after SGD\n";
 	verify(dgraph);
 	T2.stop();
+*/
 	printf("NUMBER OF MOVIE NODES = %d\n", num_movie_nodes);
 	cout<<"Sum of edge data values = "<<countEdgeData<<endl;
 	Galois::Runtime::networkTerminate();

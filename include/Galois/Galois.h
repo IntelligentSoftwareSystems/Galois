@@ -37,6 +37,7 @@
 #include "Galois/Runtime/ParaMeter.h"
 #endif
 
+#include <iostream>
 
 /**
  * Main Galois namespace. All the core Galois functionality will be found in here.
@@ -67,14 +68,28 @@ void for_each(IterTy b, IterTy e, FunctionTy f, const char* loopname = "(NULL)",
       Runtime::is_serializable<FunctionTy>::value
       && Runtime::is_serializable<typename std::iterator_traits<IterTy>::value_type>::value
       >::type* = 0) {
+ // std::cout << " for_each_begins 1\n";
   Runtime::for_each_dist<WLTy>(b, e, f, loopname);
 }
+//Gill
+template<typename WLTy, typename IterTy, typename ValueTy, typename FunctionTy>
+void for_each(IterTy b, IterTy e, ValueTy i, ValueTy num_node, FunctionTy f, const char* loopname = "(NULL)",
+    typename std::enable_if<
+      Runtime::is_serializable<FunctionTy>::value
+      && Runtime::is_serializable<typename std::iterator_traits<IterTy>::value_type>::value
+      >::type* = 0) {
+  //std::cout << " for_each_begins 1 i =" << i <<std::endl;;
+  Runtime::for_each_dist<WLTy>(b, e, i, num_node, f, loopname);
+}
+
 template<typename WLTy, typename IterTy, typename FunctionTy>
 void for_each(IterTy b, IterTy e, FunctionTy f, const char* loopname = "(NULL)", 
     typename std::enable_if<
       !Runtime::is_serializable<FunctionTy>::value
       || !Runtime::is_serializable<typename std::iterator_traits<IterTy>::value_type>::value
       >::type* = 0) {
+    
+  std::cout << " for_each_begins 2\n";
   Runtime::for_each_impl<WLTy>(Runtime::makeStandardRange(b, e), f, loopname);
 }
 #else
@@ -94,10 +109,22 @@ void for_each(IterTy b, IterTy e, FunctionTy f, const char* loopname = "(NULL)")
  * @param fn operator
  * @param loopname string to identity loop in statistics output
  */
+
+
+
 template<typename IterTy, typename FunctionTy>
 void for_each(IterTy b, IterTy e, FunctionTy fn, const char* loopname = "(NULL)") {
   typedef WorkList::dChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> WLTy;
-  for_each<WLTy, IterTy, FunctionTy>(b, e, fn, loopname);
+  for_each<WLTy, IterTy, FunctionTy>(b, e,fn, loopname);
+}
+
+//Gill : new variant with iteration number.
+//XXX: Not generic, can not assume we know fn arguments to be changed.
+template<typename IterTy, typename FunctionTy, typename ValueTy>
+void for_each(IterTy b, IterTy e, ValueTy i, ValueTy num_node, FunctionTy fn, const char* loopname = "(NULL)") {
+  //std::cout << " for_each_begins 0 i = " << i << "startRange ="<<fn.startRange<<" Num_node = "<<num_node<< "\n";
+  typedef WorkList::dChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> WLTy;
+  for_each<WLTy, IterTy, ValueTy, FunctionTy>(b, e, i, num_node, fn, loopname);
 }
 
 /**

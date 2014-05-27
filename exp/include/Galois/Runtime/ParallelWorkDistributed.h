@@ -134,10 +134,10 @@ void for_each_landing_pad(RecvBuffer& buf) {
 	uint32_t blockNum = (networkHostID + i)%networkHostNum;
 	uint32_t startRange = blockSize*blockNum;
 	uint32_t endRange = blockSize*(blockNum + 1);
-	if(blockNum == (networkHostNum - 1)) endRange = (node_num + 1); 
+	if(blockNum == (networkHostNum - 1)) endRange = (node_num);//+ 1); 
 	
 	startRange += (total_nodes + 1);
-	endRange += (total_nodes + 1);
+	endRange += (total_nodes );
 	f.startRange = startRange;
 	f.endRange = endRange;
 	
@@ -151,7 +151,7 @@ void for_each_landing_pad(RecvBuffer& buf) {
   //Galois::Runtime::for_each_impl<WLTy>(Galois::Runtime::makeStandardRange(data.begin(), data.end()), f, loopname.c_str());
 
   // place a MPI barrier here for all the hosts to synchronize
-  //net.systemBarrier();
+  net.systemBarrier();
 }
 
 
@@ -272,7 +272,9 @@ void for_each_dist(IterTy b, IterTy e, ValueTy iterations, ValueTy node_num, Fun
     allData.insert(allData.end(), b,e);
     std::cout << "should not go here\n";
     f.startRange +=(total_nodes + 1);
-    f.endRange += (total_nodes + 1 + node_num + 1 );  
+    f.endRange += (total_nodes + node_num);// + 1 );  
+
+	std::cout << "i" << 0 <<"[" << f.startRange << "," << f.endRange<< "]"  << " on host = " << networkHostID <<"\n";
     for_each_impl<WLTy>(Galois::Runtime::makeStandardRange(allData.begin(), allData.end()),f,loopname);
     return;
   }
@@ -305,10 +307,10 @@ void for_each_dist(IterTy b, IterTy e, ValueTy iterations, ValueTy node_num, Fun
 	uint32_t blockNum = (networkHostID + i)%networkHostNum;
 	uint32_t startRange = blockSize*blockNum;
 	uint32_t endRange = blockSize*(blockNum + 1);
-	if(blockNum == (networkHostNum - 1)) endRange = (node_num + 1); 
+	if(blockNum == (networkHostNum - 1)) endRange = (node_num);// + 1); 
 	
 	startRange += (total_nodes + 1);
-	endRange += (total_nodes + 1);
+	endRange += (total_nodes );
 	f.startRange = startRange;
 	f.endRange = endRange;
 	
@@ -317,8 +319,9 @@ void for_each_dist(IterTy b, IterTy e, ValueTy iterations, ValueTy node_num, Fun
 	for_each_impl<WLTy>(Galois::Runtime::makeStandardRange(myblk.first, myblk.second),  f, loopname);
 	net.systemBarrier();
     }
+    std::cout<<"------------------------------------------\n";
   // place a MPI barrier here for all the hosts to synchronize
- // net.systemBarrier();
+  net.systemBarrier();
 }
 
 template<typename WLTy, typename T, typename FunctionTy>
@@ -411,7 +414,7 @@ void on_each_impl_dist(FunctionTy f, const char* loopname) {
 struct preAlloc_helper {
   size_t num;
 
-  preAlloc_helper() { }
+  preAlloc_helper() = default;
   preAlloc_helper(size_t n): num(n) { }
 
   void operator()(unsigned, unsigned n) {
