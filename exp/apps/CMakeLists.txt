@@ -21,5 +21,5 @@ add_subdirectory(sssp)
 add_subdirectory(triangles)
 #add_subdirectory(meshsingularities)
 add_subdirectory(visualize)
-#add_subdirectory(kruskalNew)
-add_subdirectory(sgd)
+
+
