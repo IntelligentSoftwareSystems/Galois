@@ -426,6 +426,12 @@ public:
     src->createEdge(src, dst);
   }
 
+  template <typename... Args>
+  void addEdge(NodeHandle src, NodeHandle dst, Args&&...args ) {
+    assert(src);
+    assert(dst);
+    src->createEdge(src, dst, std::forward<Args...>(args...));
+  }
   NodeHandle getEdgeDst(edge_iterator ii) {
     assert(ii->getDst()->getActive());
     return ii->getDst();
