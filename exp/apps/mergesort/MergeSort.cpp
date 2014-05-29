@@ -20,13 +20,14 @@
 
 namespace cll = llvm::cl;
 static cll::opt<unsigned> length("len", cll::desc("Length of the array"), cll::init(10000));
+static cll::opt<unsigned> LEAF_SIZE("leaf", cll::desc("recursion leaf size"), cll::init(64));
 
 const char* name = "merge sort";
 const char* desc = "merge sort";
 const char* url = "mergesort";
 
 enum Algo {
-  SERIAL, STL, GALOIS, CILK
+  SERIAL, STL, CILK, GALOIS_1P, GALOIS_2P
 };
 
 cll::opt<Algo> algorithm (
@@ -34,14 +35,15 @@ cll::opt<Algo> algorithm (
     cll::values (
       clEnumVal (SERIAL, "serial recursive"),
       clEnumVal (STL, "STL implementation"),
-      clEnumVal (GALOIS, "galois divide and conquer implementation"),
       clEnumVal (CILK, "CILK divide and conquer implementation"),
+      clEnumVal (GALOIS_1P, "galois single phase divide and conquer implementation"),
+      clEnumVal (GALOIS_2P, "galois two phase divide and conquer implementation"),
       clEnumValEnd),
 
     cll::init (SERIAL));
 
 
-static const size_t LEAF_SIZE = 8;
+// static const size_t LEAF_SIZE = 64;
 
 void initializeIntArray (int* array, const size_t L) {
   for (size_t i = 0; i < L; ++i) {
@@ -86,15 +88,13 @@ void splitRecursive (T* array, T* tmp_array, const size_t beg, const size_t end,
 
 
 template <typename T, typename C>
-void mergeSortSequential (T* array, const size_t L, const C& cmp) {
+void mergeSortSequential (T* array, T* tmp_array, const size_t L, const C& cmp) {
   assert (L > 0);
-  T* tmp_array = new T[L];
-  std::copy (array + 0, array + L, tmp_array);
   splitRecursive (array, tmp_array, 0, L, cmp);
 }
 
 template <typename T, typename C>
-void mergeSortCilk (T* array, const size_t L, const C& cmp) {
+void mergeSortCilk (T* array, T* tmp_array, const size_t L, const C& cmp) {
 #ifdef HAVE_CILK
   mergeSortSequential (array, L, cmp);
 #else
@@ -163,16 +163,30 @@ struct MergeGalois {
 };
 
 template <typename T, typename C>
-void mergeSortGalois (T* array, const size_t L, const C& cmp) {
+void mergeSortGalois (T* array, T* tmp_array, const size_t L, const C& cmp, Algo algo) {
 
-  T* tmp_array = new T[L];
-  std::copy (array + 0, array + L, tmp_array);
+  switch (algo) {
+    case GALOIS_1P: 
+      Galois::Runtime::for_each_ordered_tree_1p (
+          IndexRange (0, L),
+          SplitGalois<T,C> {array, tmp_array, cmp},
+          MergeGalois<T,C> {array, tmp_array, cmp},
+          "merge-sort-galois-1p");
+      break;
 
-  Galois::Runtime::for_each_ordered_tree_2p (
-      IndexRange (0, L),
-      SplitGalois<T,C> {array, tmp_array, cmp},
-      MergeGalois<T,C> {array, tmp_array, cmp},
-      "merge-sort-galois");
+    case GALOIS_2P:
+      Galois::Runtime::for_each_ordered_tree_2p (
+          IndexRange (0, L),
+          SplitGalois<T,C> {array, tmp_array, cmp},
+          MergeGalois<T,C> {array, tmp_array, cmp},
+          "merge-sort-galois-2p");
+      break;
+
+    default:
+      GALOIS_DIE("bad value for algorithm");
+      break;
+
+  }
 
 }
 
@@ -206,12 +220,18 @@ int main (int argc, char* argv[]) {
 
   initializeIntArray (array, length);
 
+  Galois::StatTimer t_copy ("copying time:");
+  t_copy.start ();
+  int* tmp_array = new int[length];
+  std::copy (array + 0, array + length, tmp_array);
+  t_copy.stop ();
+
   Galois::StatTimer t;
 
   t.start ();
   switch (algorithm) {
     case SERIAL:
-      mergeSortSequential (array, length, std::less<int> ());
+      mergeSortSequential (array, tmp_array, length, std::less<int> ());
       break;
 
     case STL:
@@ -219,15 +239,11 @@ int main (int argc, char* argv[]) {
       break;
 
     case CILK:
-      mergeSortCilk (array, length, std::less<int> ());
-      break;
-
-    case GALOIS:
-      mergeSortGalois (array, length, std::less<int> ());
+      mergeSortCilk (array, tmp_array, length, std::less<int> ());
       break;
 
     default:
-      std::abort ();
+      mergeSortGalois (array, tmp_array, length, std::less<int> (), algorithm);
 
   }
   t.stop ();

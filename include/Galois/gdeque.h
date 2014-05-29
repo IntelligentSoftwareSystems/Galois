@@ -146,7 +146,7 @@ public:
   typedef Iterator<T> iterator;
   typedef Iterator<const T> const_iterator;
 
-  gdeque(): first(), last(), num(), heap(sizeof(Block)) { }
+  gdeque(): first(), last(), num(), heap() { }
 
   ~gdeque() { clear(); }
 
