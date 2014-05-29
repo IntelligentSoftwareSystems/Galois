@@ -401,7 +401,8 @@ protected:
   class Task {
 
   protected:
-    std::atomic<unsigned> numChild;
+    // std::atomic<unsigned> numChild;
+    GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE std::atomic<unsigned> numChild;
     T elem;
     Task* parent;
 
