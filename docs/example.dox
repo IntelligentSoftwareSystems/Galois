@@ -1,6 +1,6 @@
 /**
  * @example apps/tutorial/SSSPsimple.cpp
  * @example apps/sssp/SSSP.cpp
- * @example apps/sssp/Torus.cpp
+ * @example apps/tutorial/Torus.cpp
  * @example apps/delaunaytriangulation/DelaunayTriangulation.cpp
  */

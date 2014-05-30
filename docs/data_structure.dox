@@ -5,74 +5,14 @@
 
 @subsection graphs Graphs
 
-There are two kinds of Galois parallel graph structures: morph graphs and local computation graphs. These graphs will be described in the following sections. In order to provide high performance, in general those graphs do not provide direct access to the incoming edges and neighbors given a node unless such functionality is specified. 
+\image html galois_parallel_graphs.png "Galois Parallel Graphs"
 
-@subsubsection morphgraph Morph Graph 
-
-Morph graph allows concurrent mutation of the graph.
-
-<hr>
-<H4> @link Galois::Graph::FirstGraph </H4>
-
-   - Defining a graph
-
-     The {@link Galois::Graph::FirstGraph} takes four template parameters to custormize the graph:
-
-     \li NodeTy: the type of data stored on each node
-     
-     \li EdgeTy: the type of data stored on each edge
-     
-     \li Directional: indicates if the graph is a directonal graph(true) or undirectional graph(false). By default, it is true. 
-     
-     \li HasNoLockable: indicates if abstract locks will be enabled in the graph or not. By default, it is false.  
-
-     Directional and HasNoLockable are optional.  
-
-     An example to define a {@link Galois::Graph::FirstGraph} can be seen as follows:
-
-     In {@link apps/tutorial/Torus.cpp}
-
-     @snippet apps/tutorial/Torus.cpp define a graph
-     
-     @snippet apps/delaunayrefinement/Subgraph.h FirstGraph Definition in DMR
-
-   - Mutating a graph
-    
-     A graph node can be created using {@link Galois::Graph::FirstGraph::createNode} which takes a node data object as the parameter. Then the created node can be added to the graph using {@link Galois::Graph::FirstGraph::addNode}. An existing node in the graph can be removed using {@link Galois::Graph::FirstGraph::removeNode}. 
-     
-     A graph edge can be created and added into graph using {@link Galois::Graph::FirstGraph::addEdge} which takes the two ending nodes of the edge as the parameters. {@link Galois::Graph::FirstGraph::addEdge} will first detect whether such edge exists so that the graph does not contain multi-edges. If the edge to be added exists, this function will return a reference to the corresponding edge data; otherwise, it will create an edge in the graph with a default edge data object and return a reference to the default edge data object. Through the returned reference, the edge data object can be updated. To add multi-edges into the graph, {@link Galois::Graph::FirstGraph::addMultiEdge} can be used. This function does not check if the edge to be added exists, so it is more efficient than {@link Galois::Graph::FirstGraph::addEdge}. An edge can be removed by using {@link Galois::Graph::FirstGraph::removeEdge}.
-
-    An example to mutate the graph can be seen as follows:
-    
-    In {@link apps/tutorial/Torus.cpp} 
- 
-    @snippet apps/tutorial/Torus.cpp create and add node
-   
-    @snippet apps/tutorial/Torus.cpp add edges
-   
-
-   - Accessing graph topology
-    
-    The number of nodes in the graph can be accessed by using {@link Galois::Graph::FirstGraph::size}. Note that this function is not threadsafe. {@link Galois::Graph::FirstGraph::sizeOfEdgeData} ??
-
-    The nodes in the graph can be accessed by the node iterator {@link Galois::Graph::FirstGraph::iterator} with {@link Galois::Graph::FirstGraph::begin} and {@link Galois::Graph::FirstGraph::end}. 
-
-    The outgoing edges of a node can be accessed by the edge iterator {@link Galois::Graph::FirstGraph::edge_iterator} with {@link Galois::Graph::FirstGraph::edge_begin} and {@link Galois::Graph::FirstGraph::edge_end}. Then the outgoing neighbors can be accessed by {@link Galois::Graph::FirstGraph::getEdgeDst} given a outgoing edge. This graph does not provide direct access to the incoming edges and neighbors of a node.  
-
-    An example to access the outgoing neighbors of a node can be seen as follows:
-
-    @snippet apps/delaunayrefinement/Cavity.h Accessing neighbors of a node in DMR
-    @snippet apps/tutorial/Torus.cpp loop over neighbors
-
-   - Accessing node data and edge data   
- 
-    Given a node or edge, the data on them can be accessed by {@link Galois::Graph::FirstGraph::getData} or {@link Galois::Graph::FirstGraph::getEdgeData} correspondingly. 
-
-    @snippet apps/tutorial/Torus.cpp access node data
+The current available galois parallel graphs can be seen in the above figure where shaded boxes represent conceptual graph class for classifying the graph data structures. Broadly, there are two kinds of Galois parallel graph structures: morph graphs and local computation graphs. Morph graphs allow graph mutations while local computation graphs do not allow any modification to the graph topology. These graphs are described in details in the following sections. In order to provide high performance, in general those graphs do not provide direct access to the incoming edges and neighbors given a node unless such functionality is specified. 
 
 @subsubsection localcompgraph Local Computation Graphs 
 
-   A local computation graph does not allow graph mutation. A Local Computation graph directly mmaps a binary representation of the graph into memory for fast load times. More details about how to read/write in a local computation graphs can be seen in \ref graphio.
+   A local computation graph does not allow graph mutation. Details about how to construct a local computation graphs can be seen in \ref graphio.
+
 <hr>
 <H4> @link Galois::Graph::LC_CSR_Graph </H4>
    
@@ -80,11 +20,11 @@ Internally, {@link Galois::Graph::LC_CSR_Graph} uses Compressed Sparse Row forma
  
    - Defining a graph
      
-     The {@link Galois::Graph::LC_CSR_Graph} takes five template parameters to custormize the graph:
+     The {@link Galois::Graph::LC_CSR_Graph} takes five template parameters to customize the graph:
 
-     \li NodeTy: the type of data stored on each node
+     \li NodeTy: the type of data stored on each node. Void can be used when no data is stored on each node.
      
-     \li EdgeTy: the type of data stored on each edge
+     \li EdgeTy: the type of data stored on each edge. Void can be used when no data is stored on each edge.
          
      \li HasNoLockable: indicates if abstract locks will be enabled in the graph or not. By default, it is true.  
 
@@ -126,17 +66,17 @@ Internally, {@link Galois::Graph::LC_CSR_Graph} uses Compressed Sparse Row forma
 
    - Other Functionalities
      
-    {@link Galois::Graph::LC_CSR_Graph::sortEdges} and  {@link Galois::Graph::LC_CSR_Graph::sortEdgesByEdgeData} can be used to make the outgoing edges of a node sorted.   
+    {@link Galois::Graph::LC_CSR_Graph::sortEdges} and {@link Galois::Graph::LC_CSR_Graph::sortEdgesByEdgeData} can be used to make the outgoing edges of a node sorted. The two functions differ by the comparison functions. In {@link Galois::Graph::LC_CSR_Graph::sortEdgesByEdgeData}, the comparison function is over edge data type EdgeTy. In {@link Galois::Graph::LC_CSR_Graph::sortEdges}, the comparison function is over {@link Galois::Graph::EdgeSortValue} which represents a pair of GraphNode and EdgeTy.   
  
 <hr>
 <H4> @link Galois::Graph::LC_Linear_Graph </H4>
 
-A variant of {@link Galois::Graph::LC_CSR_Graph} where the difference is the physical layouts of the data structures are slightly different but the functionalities of the two graphs are the same. Depending on the applications, the two graphs may have different performance.
+A variant of {@link Galois::Graph::LC_CSR_Graph} where the difference is the physical layouts of the data structures are slightly different but the functionalities of the two graphs are the same. Depending on the applications, the two graphs may achieve different performance from other variants.
 
 <hr>
 <H4> @link Galois::Graph::LC_InlineEdge_Graph </H4>
 
-A variant of {@link Galois::Graph::LC_CSR_Graph} where the difference is the physical layouts of the data structure are slightly different but the functionalities of those graphs are the same. Depending on the applications, the two graphs may have different performance.
+A variant of {@link Galois::Graph::LC_CSR_Graph} where the difference is the physical layouts of the data structure are slightly different but the functionalities of those graphs are the same. Depending on the applications, the graph may achieve different performance from other variants.
 
 <hr>
 
@@ -150,17 +90,97 @@ A variant of {@link Galois::Graph::LC_CSR_Graph} where the difference is the phy
 
 <hr> 
 
-<H4> @link Galois::Graph::LC_Morph_Graph </H4>
 
-This graph extends {@link Galois::Graph::LC_CSR_Graph} to give limited graph mutation ability. When creating a node, the users should specify the maximum allowed degree of the node. The edges connected this node with other nodes should not exceed this degree. {@link Galois::Graph::LC_Morph_Graph::createNode} is used to create node and it takes a parameter nedges to specify the maximum allowed degree of the node to be created. In addition, removing nodes in the graph is not supported. Edges can be removed using {@link Galois::Graph::LC_Morph_Graph::removeEdge}. Note removing edges will invalidate the edge_iterator if an edge_iterator is used.  
+@subsubsection morphgraph Morph Graphs 
+
+Morph graphs allow concurrent graph mutations.
+
+<hr>
+<H4> @link Galois::Graph::FirstGraph </H4>
+
+   - Defining a graph
+
+     The {@link Galois::Graph::FirstGraph} takes four template parameters to customize the graph:
+
+     \li NodeTy: the type of data stored on each node. Void can be used when no data is stored on each edge. 
+     
+     \li EdgeTy: the type of data stored on each edge. Void can be used when no data is stored on each edge.
+     
+     \li Directional: if true, the graph is a directional graph; otherwise, the graph is an un-directional graph. By default, it is true. 
+     
+     \li HasNoLockable: if true, abstract locks will be not enabled. By default, abstract lock is enabled.  
+
+     Directional and HasNoLockable are optional.  
+
+     An example to define a {@link Galois::Graph::FirstGraph} can be seen as follows:
+
+     In {@link apps/tutorial/Torus.cpp}
+
+     @snippet apps/tutorial/Torus.cpp define a graph
+     
+     @snippet apps/delaunayrefinement/Subgraph.h FirstGraph Definition in DMR
+
+   - Mutating a graph
+    
+     A graph node can be created using {@link Galois::Graph::FirstGraph::createNode}. If the node data type specified is not void, {@link Galois::Graph::FirstGraph::createNode} will create a node data object internally. The parameters of {@link Galois::Graph::FirstGraph::createNode} will passed to the constuctor of the node data type to create the node data instance. There are three cases: 
+     
+     \li if no parameter is passed into {@link Galois::Graph::FirstGraph::createNode}, then the default constructor of the node data type will be called to create the node data instance. 
+     \li if some parameters are passed into {@link Galois::Graph::FirstGraph::createNode}, the corresponding constructor of the node data type will be called to create the node data instance.
+     \li if a node data instance is passed into {@link Galois::Graph::FirstGraph::createNode}, then the copy constrcutor of the node data type will be called to create the node data instance.
+     
+     if the node data type specified is void, then {@link Galois::Graph::FirstGraph::createNode} should be called without paramters. {@link Galois::Graph::FirstGraph::createNode} will return an instance of {Galois::Graph::FistGraph::GraphNode} which stands for a reference to the created node. Through this instance, the created node can be added to the graph using {@link Galois::Graph::FirstGraph::addNode}. An existing node in the graph can be removed using {@link Galois::Graph::FirstGraph::removeNode}, the parameter of which is also an instace of {Galois::Graph::FistGraph::GraphNode}. 
+     
+     An example of creating nodes in the graph can be seen as follows:
+      
+     In {@link apps/tutorial/Torus.cpp}
+     
+     @snippet apps/tutorial/Torus.cpp create and add node
+
+     A graph edge can be created and added into a graph using {@link Galois::Graph::FirstGraph::addEdge}.In the directional case, the paramters src and dst of {@link Galois::Graph::FirstGraph::addEdge} represents the source node and the destination node of the edge to be added. When the graph is un-directional, any order of the two ending nodes of the edge to be added will be treated as the same edge and can be passed into this function with equal effects. {@link Galois::Graph::FirstGraph::addEdge} will first detect whether the edge to be added exists so that the graph does not contain multi-edges. If such edge does not exist, this function will create an edge in the graph with an edge data object initialized to the default value of the edge data type; otherwise, it will not add new edge into the graph. In either case, the function will return an edge_iterator pointing to the added edge. Passing this edge_iterator to {@link Galois::Graph::FirstGraph::getEdgeData} will return a reference to the edge data object associated with the added edge. Through the returned reference, the edge data object can be modified. To add multi-edges into the graph, {@link Galois::Graph::FirstGraph::addMultiEdge} can be used. This function does not check if the edge to be added exists, so it is more efficient than {@link Galois::Graph::FirstGraph::addEdge}. An edge can be removed by using {@link Galois::Graph::FirstGraph::removeEdge}.
+
+     An example of creating edges can be seen as follows:
+    
+     In {@link apps/tutorial/Torus.cpp} 
+   
+     @snippet apps/tutorial/Torus.cpp add edges
+  
+     {@link Galois::Graph::FirstGraph::resizeEdges} is used to pre-allocate space for edges of a graph node.
+
+   - Accessing graph topology
+    
+     The number of nodes in the graph can be accessed by using {@link Galois::Graph::FirstGraph::size}. Note that this function is not threadsafe. {@link Galois::Graph::FirstGraph::sizeOfEdgeData} can be used to return size of the edge data.
+
+     The nodes in the graph can be accessed by the node iterator {@link Galois::Graph::FirstGraph::iterator} with {@link Galois::Graph::FirstGraph::begin} and {@link Galois::Graph::FirstGraph::end}. 
+
+     The outgoing edges of a node can be accessed by the edge iterator {@link Galois::Graph::FirstGraph::edge_iterator} with {@link Galois::Graph::FirstGraph::edge_begin} and {@link Galois::Graph::FirstGraph::edge_end}. Then the outgoing neighbors can be accessed by {@link Galois::Graph::FirstGraph::getEdgeDst} given a outgoing edge. This graph does not provide direct access to the incoming edges and neighbors of a node.  
+
+    An example to access the outgoing neighbors of a node can be seen as follows:
+
+    @snippet apps/delaunayrefinement/Cavity.h Accessing neighbors of a node in DMR
+    @snippet apps/tutorial/Torus.cpp loop over neighbors
+
+   - Accessing node data and edge data   
+ 
+    Given a node or edge, the data on them can be accessed by {@link Galois::Graph::FirstGraph::getData} or {@link Galois::Graph::FirstGraph::getEdgeData} correspondingly. 
+
+    @snippet apps/tutorial/Torus.cpp access node data
 
 <hr> 
 
+<H4> @link Galois::Graph::LC_Morph_Graph </H4>
+
+This graph extends {@link Galois::Graph::LC_CSR_Graph} to give limited graph mutation ability. When creating a node, the users should specify the maximum allowed degree of the node. The outgoing edges of this node should not exceed this degree. {@link Galois::Graph::LC_Morph_Graph::createNode} is used to create node and its first parameter "nedges" is used to specify the maximum allowed degree. The remaining parameters of {@link Galois::Graph::LC_Morph_Graph::createNode} will be passed to the constructor of the node data type to create the node data instance, same as the parameters of {@link Galois::Graph::FirstGraph::createNode}. Importantly, removing nodes in the graph is not supported. Edges can be removed using {@link Galois::Graph::LC_Morph_Graph::removeEdge}. Note removing edges will invalidate the edge_iterator if an edge_iterator is used. Other functionalities of {@link Galois::Graph::LC_Morph_Graph} is same as {@link Galois::Graph::LC_CSR_Graph} which can be seen in \ref localcompgraph 
+
+<hr> 
+
+
 @subsubsection methodFlags Method flags for controlling conflict detection
      
-When using abstract locks, whenever a graph operation is called in parallel region, the runtime will check if the nodes or edges the graph operations will access has been locked by other threads. If yes, the runtime will roll back the computation. Otherwise, the runtime will log the information for un-do the computation when roll back happens. There are overheads associated with such confilict detection. The users can control such confilict detection by passing method flags into the graph operations to indicate the runtime not performing certain checks. One of {@link Galois::ALL}, {@link Galois::CHECK_CONFLICT}, {@link Galois::SAVE_UNDO}, or {@link Galois::NONE}, that dictates what support the runtime will provide for each call. By default, the runtime assumes Galois::ALL. Note: the current version of Galois, version 2.1, does not support saving undo information. Version 2.0 does support saving undo information. 
+When using abstract locks, whenever a graph operation is called in parallel region, the runtime will check if the nodes or edges the graph operations will access has been locked by other threads. If yes, the runtime will roll back the computation. Otherwise, the runtime will log the information for un-do the computation when roll back happens. There are overheads associated with such conflict detection. The users can control such conflict detection by passing method flags into the graph operations to indicate the runtime not performing certain checks. One of {@link Galois::ALL}, {@link Galois::CHECK_CONFLICT}, {@link Galois::SAVE_UNDO}, or {@link Galois::NONE}, that dictates what support the runtime will provide for each call. By default, the runtime assumes Galois::ALL. Note: the current version of Galois, version 2.1, does not support saving undo information. Version 2.0 does support saving undo information. 
 
 @subsection reducers Reducers
+
+\image html galois_parallel_reducers.png
 
 @subsubsection greducible General Reducer 
 
@@ -196,7 +216,36 @@ There are several built-in special reducers.
   
 {@link Galois::GVectorElementAccumulator} and {@link Galois::GMapElementAccumulator} provides element-wise accumulation over vector and map. {@link Galois::GVectorElementAccumulator} accumulates vectors where the accumulation operator is element-wise plus operator of the type of the elements inside the vector. Here assumes the accumulated vectors have equal size. {@link Galois::GMapElementAccumulator} accumulates maps each of which is a set of key-value pairs. The accumulation operator performs the plus operator on the values of the maps with the same keys. The plus operator is defined by the value type of the maps.   
 
- 
+<hr>
+
+@subsection collections Collections
+
+<H4> @link Galois::InsertBag </H4>
+
+{@link Galois::InsertBag} is an unordered collection allowing parallel insertions. One of its important characteristics is that it uses customized memory allocations to achieve scalable parallel insertions. 
+
+  - Defining an {@link Galois::InsertBag}
+
+    {@link Galois::InsertBag} has two template parameters:
+     
+     - T: Type of elements that the insertBag contains. 
+
+     - BlockSize: The maximum memory that the elements to be inserted can take per thread. In other words, BlockSize is equal to the product of the size of one element and the maximum number of elements one thread will insert into the bag. The default value is 0, which stands for one memory page.   
+
+  - Inserting elements
+    
+    {@link Galois::InsertBag::emplace} is used to insert copies of elements. Its paramters will be passed to the constuctor of the type of the elements to create the element in the bag. {@link Galois::InsertBag::push} is a shortcut of {@link Galois::InsertBag::emplace} to call the copy or move constuctor of the type of the elements. 
+
+  - Accessing elements 
+    
+    Accessing the elements is only allowed in serial. 
+
+    {@link Galois::InsertBag::begin} and {@link Galois::InsertBag::end} are used to access the elements.  
+
+    {@link Galois::InsertBag::empty} is used to check if the bag is empty. 
+    
+<hr>
+
 @subsection buildyourown Building Your Own Data Structures
 
 
