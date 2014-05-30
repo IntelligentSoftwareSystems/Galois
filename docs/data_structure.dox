@@ -180,6 +180,8 @@ When using abstract locks, whenever a graph operation is called in parallel regi
 
 @subsection reducers Reducers
 
+The relationships among the reducers available in Galois can be seen in the above figure. The shaded boxes are not real classes but for classifying the reducers. The general reducer is {@link Galois::GReducible}. Besides it, several common special reducers are available. Special reducers can be divided into two categories: SimpleReducible are trying to reduce values of primitive types or types with low copy cost; Accumulator is for accumulating values. The details can be seen the following sections.     
+
 \image html galois_parallel_reducers.png
 
 @subsubsection greducible General Reducer 
