@@ -180,9 +180,9 @@ When using abstract locks, whenever a graph operation is called in parallel regi
 
 @subsection reducers Reducers
 
-The relationships among the reducers available in Galois can be seen in the above figure. The shaded boxes are not real classes but for classifying the reducers. The general reducer is {@link Galois::GReducible}. Besides it, several common special reducers are available. Special reducers can be divided into two categories: SimpleReducible are trying to reduce values of primitive types or types with low copy cost; Accumulator is for accumulating values. The details can be seen the following sections.     
+The relationships among the reducers available in Galois can be seen in the above figure. The shaded boxes are not real classes but for classifying the reducers. The general reducer is {@link Galois::GReducible}. Besides it, several common special reducers are available. Special reducers can be divided into two categories: SimpleReducible are trying to reduce values of primitive types or types with low copy cost; Accumulator is for accumulating values. The details can be seen in the following sections.     
 
-\image html galois_parallel_reducers.png
+\image html galois_parallel_reducers.png "Galois Parallel Reducers"
 
 @subsubsection greducible General Reducer 
 
@@ -198,9 +198,23 @@ The relationships among the reducers available in Galois can be seen in the abov
 
     Here the lhs is updated in place to reflect the output of the reduction operator. 
 
+    An example of defining a BinFunc can be seen in the {@link apps/bfs/Diameter.cpp}:
+    
+    @snippet apps/bfs/Diameter.cpp Define BinFunc for GReducible 
+    
+    Given the BinFunc, defining a {@link Galois::GReducible} can be seen in the {@link apps/bfs/Diameter.cpp}:
+
+    @snippet apps/bfs/Diameter.cpp Define GReducible 
+
   - Reducing values
    
     {@link Galois::GReducible} starts with the default value of Type T. {@link Galois::GReducible::update} is used to provide new values to reduce in parallel. After parallel region, the final value can be retrieved using {@link Galois::GReducible::reduce}  
+
+    An example of using {@link Galois::GReducible} in parallel region can be seen in the {@link apps/bfs/Diameter.cpp}:
+
+    @snippet apps/bfs/Diameter.cpp Use GReducible in parallel 
+
+    @snippet apps/bfs/Diameter.cpp Reduce the final value
 
 @subsubsection specialreducers Special Reducers
 
@@ -232,11 +246,19 @@ There are several built-in special reducers.
      
      - T: Type of elements that the insertBag contains. 
 
-     - BlockSize: The maximum memory that the elements to be inserted can take per thread. In other words, BlockSize is equal to the product of the size of one element and the maximum number of elements one thread will insert into the bag. The default value is 0, which stands for one memory page.   
+     - BlockSize: The maximum memory that the elements to be inserted can take per thread. In other words, BlockSize is equal to the product of the size of one element and the maximum number of elements one thread will insert into the bag. This parameter is optional and the default value is 0, which stands for one memory page.   
+
+    An example of defining a InsertBag can be seen in the {@link apps/delaunaytriangulation/DelaunayTriangulationDet.cpp}:
+
+    @snippet apps/delaunaytriangulation/DelaunayTriangulationDet.cpp Define InsertBag 
 
   - Inserting elements
     
     {@link Galois::InsertBag::emplace} is used to insert copies of elements. Its paramters will be passed to the constuctor of the type of the elements to create the element in the bag. {@link Galois::InsertBag::push} is a shortcut of {@link Galois::InsertBag::emplace} to call the copy or move constuctor of the type of the elements. 
+
+    An example of inserting elements into a InsertBag can be seen in the {@link apps/delaunaytriangulation/DelaunayTriangulationDet.cpp}:
+
+    @snippet apps/delaunaytriangulation/DelaunayTriangulationDet.cpp Insert elements into InsertBag 
 
   - Accessing elements 
     
@@ -245,7 +267,11 @@ There are several built-in special reducers.
     {@link Galois::InsertBag::begin} and {@link Galois::InsertBag::end} are used to access the elements.  
 
     {@link Galois::InsertBag::empty} is used to check if the bag is empty. 
-    
+  
+    An example of accessing elements inside a InsertBag can be seen in the {@link apps/delaunaytriangulation/DelaunayTriangulationDet.cpp}:
+
+    @snippet apps/delaunaytriangulation/DelaunayTriangulationDet.cpp Access elements of InsertBag 
+  
 <hr>
 
 @subsection buildyourown Building Your Own Data Structures

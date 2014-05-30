@@ -3,4 +3,6 @@
  * @example apps/sssp/SSSP.cpp
  * @example apps/tutorial/Torus.cpp
  * @example apps/delaunaytriangulation/DelaunayTriangulation.cpp
+ * @example apps/delaunaytriangulation/DelaunayTriangulationDet.cpp
+ * @example apps/bfs/Diameter.cpp
  */

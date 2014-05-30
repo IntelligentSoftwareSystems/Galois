@@ -148,7 +148,7 @@ struct CountLevels {
       std::transform(b.begin(), b.end(), a.begin(), a.begin(), std::plus<size_t>());
     }
   };
-
+  //! [Define BinFunc for GReducible]
   struct updater {
     void operator()(std::deque<size_t>& lhs, size_t rhs) {
       if (lhs.size() <= rhs)
@@ -157,24 +157,30 @@ struct CountLevels {
     }
   };
 
+  //! [Define BinFunc for GReducible]
 
   Graph& graph;
+  //! [Define GReducible]
   Galois::GReducible<std::deque<size_t>, updater>* counts;
-  
+  //! [Define GReducible]
   CountLevels(Graph& g): graph(g) { }
-
+  
+  //! [Use GReducible in parallel]
   void operator()(typename Graph::GraphNode n) {
     Dist d = graph.getData(n).dist;
     if (d == DIST_INFINITY)
       return;
     counts->update(d);
   }
-
+  //! [Use GReducible in parallel]
+  
   std::deque<size_t> count() {
     Galois::GReducible<std::deque<size_t>, updater> C{updater()};
     counts = &C;
     Galois::do_all_local(graph, *this);
+   //![Reduce the final value] 
     return C.reduce(reducer());
+   //![Reduce the final value] 
   }
 };
 
