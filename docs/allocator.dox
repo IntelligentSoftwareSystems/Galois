@@ -58,9 +58,6 @@ include/Galois/gdeque.h} is shown below:
 @snippet include/Galois/gdeque.h Example Fixed Size Allocator
 
 
-\subsection var-size-alloc Variable Size Allocator
-\b TBD
-
 \subsection plugin-other-alloc Plugging in 3rd Party Allocators
 
 {@link Galois::Runtime::MM::ExternRefGaloisAllocator} is a wrapper class that can

@@ -80,28 +80,73 @@ one of the types in {@link Galois::WorkList} namespace and providing the type-na
 as an argument to {@link Galois::wl} parameter of the for_each. 
 The scheduling policies are listed as follows:
 
- - PriQueue
+ - \b OrderedList
 
-    implements a std::pri_queue compatible priority queue.
+    implements a std::pri_queue compatible priority queue. Elements of same
+    priority are processed in arbitrary order. 
 
- - FIFO and LIFO
+ - \b FIFO and \b LIFO
     
-    implement std::queue and std::stack like behaviors respectively. 
+    Implements std::queue and std::stack like behaviors respectively. 
 
- - OrderedByIntegerMetric
+ - \b OrderedByIntegerMetric
    
-    implements a priority queue based on a supplied function which maps a work item to an integer priority. Lower values are a higher priority. An inner queue may be passed to control how items within the same priority are stored. 
+    Implements a priority queue based on a supplied function which maps a work item to an integer priority. Lower values are a higher priority. An inner queue may be passed to control how items within the same priority are stored. 
 
- - ChunkedFIFO and ChunkedLIFO
+ - \b ChunkedFIFO and \b ChunkedLIFO
     
-    implement a chunked FIFO or LIFO strategy to reduce contention. Each thread has a chunk of work which it is filling when pushing and a chunk which is being emptied by popping. When a chunk is filled, it is placed on the central FIFO or LIFO. 
+    Implements a chunked FIFO or LIFO strategy to reduce contention. Each thread has a chunk of work which it is filling when pushing and a chunk which is being emptied by popping. When a chunk is filled, it is placed on the central FIFO or LIFO. 
 
- - dChunkedFIFO and dChunkedLIFO
-    
-    behave like their non-d counterparts, but maintain a FIFO or LIFO per CPU package (usually L3 cache). If a processor's package local FIFO or LIFO is empty, it attempts to steal a chunk from another CPU package.
+ - \b dChunkedFIFO and \b dChunkedLIFO
 
- - LocalQueues
-    create local non-shared worklists which are used for all work generated during concurrent operation and use a global worklist for all initial work. 
+    Behaves like their non-d counterparts, but maintain a FIFO or LIFO per CPU package (usually L3 cache). If a processor's package local FIFO or LIFO is empty, it attempts to steal a chunk from another CPU package.
+
+ - \b AltChunkedFIFO and \b AltChunkedLIFO
+
+    Is another alternative to using ChunkedLIFO/ChunkedFIFO or
+    dChunkedLIFO/dChunkedFIFO. This worklist implements are more scalable stealing
+    policy, and is suitable for loops with high load-imbalance and/or high thread
+    counts. In summary:
+
+      - \b ChunkedFIFO maintains a single global queue for chunks of work items
+
+      - \b dChunkedFIFO maintains a queue of chunks per each package (multi-core
+        processor) in the system
+
+      - \b AltChunkedFIFO maintains a queue of chunks per each thread. Normally
+        threads steal work within their package. Each package
+        has a leader, which steals from other packages when its own package is out
+        of work. 
+
+ - \b LocalQueues
+
+    Creates local non-shared worklists which are used for all work generated during concurrent operation and use a global worklist for all initial work. 
+
+ - \b BulkSynchronous
+
+    Executes the work items in parallel rounds, where all existing items in the
+    worklist are processed in current round, while any new items generated as a
+    result of this processing are postponed till next round. The rounds are
+    separated by barriers. 
+
+
+ - \b OwnerComputes
+
+    Is similar to LocalQueues, however, the user can provide a functor to map
+    work items to threads. So a thread may generate a work item and specify another
+    thread to process it. This functor is one of the template parameters, which
+    maps each work item to the range [0:numThreads). Another
+    difference from LocalQueues is that worklists are maintained per package. 
+    \b TODO: verify this
+
+
+ - \b StableIterator
+
+    Similar to {@link Galois::do_all}, where the loop iterates over a fixed range
+    of items, and the operator does not generate new work. The key difference from
+    {@link Galois::do_all} is that this scheduling policy supports speculation and
+    allows for iterations to abort. 
+
 
 An example to define an OrderedByIntegerMetic scheduling in {@link apps/tutorial/SSSPsimple.cpp} can be seen as follows:
 @snippet apps/tutorial/SSSPsimple.cpp UpdateRequestIndexer in SSSPsimple
