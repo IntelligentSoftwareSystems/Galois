@@ -98,23 +98,14 @@ public:
     NItemAlloc niAlloc;
 
     NItem* create (Lockable* l) {
-      NItem* ni = niAlloc.allocate (1);
+      NItem* ni = niAlloc.allocAndConstruct (ni, l);
       assert (ni != nullptr);
-      // XXX(ddn): Forwarding still wonky on XLC
-#if !defined(__IBMCPP__) || __IBMCPP__ > 1210
-      niAlloc.construct (ni, l);
-#else
-      niAlloc.construct (ni, NItem(l));
-#endif
-
       return ni;
     }
 
     void destroy (NItem* ni) {
       // delete ni; ni = NULL;
-      niAlloc.destroy (ni);
-      niAlloc.deallocate (ni, 1);
-      ni = NULL;
+      niAlloc.destroyAndFree (ni);
     }
   };
   
@@ -133,9 +124,10 @@ protected:
   typedef std::atomic<int> ParCounter;
 
   GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE ParCounter inDeg;
+  // ParCounter inDeg;
   const int origInDeg;
   NhoodMgr& nhmgr;
-  T active;
+  T elem;
 
   AdjSet adjSet;
   AdjList outNeighbors;
@@ -146,10 +138,10 @@ public:
     inDeg (0),
     origInDeg (0), 
     nhmgr (nhmgr),
-    active (t)
+    elem (t)
   {}
 
-  const T& getActive () const { return active; }
+  const T& getElem () const { return elem; }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE virtual void subAcquire (Lockable* l) {
     NItem& nitem = nhmgr.getNhoodItem (l);
@@ -233,7 +225,7 @@ protected:
       assert (src->isSrc ());
 
       UserCtx& uctx = *(userCtxts.getLocal ());
-      opFunc (src->getActive (), uctx);
+      opFunc (src->getElem (), uctx);
 
       for (auto i = src->neighbor_begin (), i_end = src->neighbor_end ();
           i != i_end; ++i) {
@@ -273,9 +265,8 @@ public:
   ~DAGexecutor (void) {
     Galois::Runtime::do_all_impl (makeLocalRange (allCtxts),
         [this] (Ctxt* ctx) {
-          ctxtAlloc.destroy (ctx);
-          ctxtAlloc.deallocate (ctx, 1);
-        }, "free_ctx", true);
+          ctxtAlloc.destroyAndFree (ctx);
+        }, "free_ctx");
   }
 
   void createEdge (Ctxt* a, Ctxt* b) {
@@ -283,7 +274,7 @@ public:
     assert (b != nullptr);
 
     // a < b ? a : b
-    Ctxt* src = cmp (a->getActive () , b->getActive ()) ? a : b;
+    Ctxt* src = cmp (a->getElem () , b->getElem ()) ? a : b;
     Ctxt* dst = (src == a) ? b : a;
 
     // avoid adding same edge multiple times
@@ -308,18 +299,15 @@ public:
     t_init.start ();
     Galois::Runtime::do_all_impl (range,
         [this] (const T& x) {
-          Ctxt* ctx = ctxtAlloc.allocate (1);
+          Ctxt* ctx = ctxtAlloc.allocAndConstruct (x, nhmgr);
           assert (ctx != NULL);
-          // new (ctx) Ctxt (x, nhmgr);
-          //ctxtAlloc.construct (ctx, Ctxt (x, nhmgr));
-          ctxtAlloc.construct (ctx, x, nhmgr);
 
           allCtxts.get ().push_back (ctx);
 
           Galois::Runtime::setThreadContext (ctx);
 
           UserCtx& uctx = *(userCtxts.getLocal ());
-          nhVisitor (ctx->getActive (), uctx);
+          nhVisitor (ctx->getElem (), uctx);
           Galois::Runtime::setThreadContext (NULL);
         }, "create_ctxt");
 
@@ -401,6 +389,264 @@ void for_each_ordered_dag (const R& range, const Cmp& cmp, const NhoodFunc& nhVi
   exec.initialize (range);
 
   exec.execute ();
+
+}
+
+template <typename T, typename DivFunc, typename ConqFunc>
+class DivideAndConquerExecutor {
+
+protected:
+
+
+  class Task {
+
+  protected:
+    std::atomic<unsigned> numChild;
+    T elem;
+    Task* parent;
+
+  public:
+    Task (const T& a, Task* p)
+      : numChild (0), elem (a), parent (p)
+    {}
+
+    void setNumChildren (unsigned c) {
+      assert (c > 0);
+      numChild = c;
+    }
+
+    bool removedLastChild (void) {
+      assert (numChild > 0);
+      return (--numChild == 0);
+    }
+
+    Task* getParent () { 
+      return parent;
+    }
+
+    const T& getElem () const { return elem; }
+    T& getElem () { return elem; }
+
+  };
+
+  struct BiModalTask: public Task {
+    enum Mode { DIVIDE, CONQUER };
+    Mode mode;
+
+    BiModalTask (const T& e, BiModalTask* p, const Mode& m)
+      : Task (e, p), mode (m)
+    {}
+
+    BiModalTask* getParent () {
+      return static_cast<BiModalTask*> (Task::getParent ());
+    }
+
+  };
+
+
+  typedef Galois::Runtime::MM::FSBGaloisAllocator<Task> TaskAlloc;
+  typedef Galois::Runtime::MM::FSBGaloisAllocator<BiModalTask> BiModalTaskAlloc;
+  typedef Galois::Runtime::UserContextAccess<T> UserCtx;
+  typedef Galois::Runtime::PerThreadStorage<UserCtx> PerThreadUserCtx;
+
+  struct ApplyOperatorSinglePhase {
+    typedef int tt_does_not_need_aborts;
+
+    BiModalTaskAlloc& taskAlloc;
+    PerThreadUserCtx& userCtxts;
+    DivFunc& divFunc;
+    ConqFunc& conqFunc;
+
+    template <typename C>
+    void operator () (BiModalTask* t, C& ctx) {
+
+      if (t->mode == BiModalTask::DIVIDE) {
+        UserCtx& uctx = *userCtxts.getLocal ();
+        uctx.reset ();
+        divFunc (t->getElem (), uctx);
+
+        bool hasChildren = uctx.getPushBuffer().begin () != uctx.getPushBuffer ().end ();
+
+        if (hasChildren) {
+          ptrdiff_t numChild = std::distance (uctx.getPushBuffer ().begin (), uctx.getPushBuffer ().end ());
+
+          t->setNumChildren (numChild);
+
+          unsigned i = 0;
+          for (auto c = uctx.getPushBuffer ().begin (), c_end = uctx.getPushBuffer ().end (); 
+              c != c_end; ++c, ++i) {
+
+            BiModalTask* child = taskAlloc.allocAndConstruct (*c, t, BiModalTask::DIVIDE);
+            ctx.push (child);
+          }
+        } else { 
+          // no children, so t is a leaf task
+          t->mode = BiModalTask::CONQUER;
+        }
+      } // end outer if
+
+      if (t->mode == BiModalTask::CONQUER) {
+        conqFunc (t->getElem());
+
+        BiModalTask* parent = t->getParent ();
+        if (parent != nullptr && parent->removedLastChild()) {
+          parent->mode = BiModalTask::CONQUER;
+          ctx.push (parent);
+        }
+
+        // task can be deallocated now
+        taskAlloc.destroyAndFree (t);
+      }
+
+    }
+  };
+
+
+  template <typename CWL>
+  struct ApplyDivide {
+    typedef int tt_does_not_need_aborts;
+
+    TaskAlloc& taskAlloc;
+    PerThreadUserCtx& userCtxts;
+    CWL& conqWL;
+    DivFunc& divFunc;
+    
+
+    template <typename C>
+    void operator () (Task* t, C& ctx) {
+
+      UserCtx& uctx = *userCtxts.getLocal ();
+      uctx.reset ();
+      divFunc (t->getElem(), uctx);
+
+      bool hasChildren = uctx.getPushBuffer().begin () != uctx.getPushBuffer ().end ();
+
+      if (hasChildren) {
+        ptrdiff_t numChild = std::distance (uctx.getPushBuffer ().begin (), uctx.getPushBuffer ().end ());
+
+        t->setNumChildren (numChild);
+
+        unsigned i = 0;
+        for (auto c = uctx.getPushBuffer ().begin (), c_end = uctx.getPushBuffer ().end (); 
+            c != c_end; ++c, ++i) {
+
+          Task* child = taskAlloc.allocAndConstruct (*c, t);
+          ctx.push (child);
+        }
+      } else { 
+        conqWL.push (t);
+      }
+    }
+
+
+  };
+
+  struct ApplyConquer {
+    typedef int tt_does_not_need_aborts;
+
+    PerThreadUserCtx& userCtxts;
+    ConqFunc& conqFunc;
+
+
+    template <typename C>
+    void operator () (Task* t, C& ctx) {
+      UserCtx& uctx = *userCtxts.getLocal ();
+      uctx.reset ();
+      conqFunc (t->getElem());
+
+      Task* parent = t->getParent ();
+      if (parent != nullptr && parent->removedLastChild()) {
+        ctx.push (parent);
+      }
+    }
+  };
+
+
+
+  DivFunc divFunc;
+  ConqFunc conqFunc;
+  std::string loopname;
+  PerThreadUserCtx userCtxts;
+
+  static const unsigned CHUNK_SIZE = 4;
+public:
+
+  DivideAndConquerExecutor (const DivFunc& divFunc, const ConqFunc& conqFunc, const char* loopname)
+    : 
+      divFunc (divFunc),
+      conqFunc (conqFunc),
+      loopname (loopname)
+  {}
+
+  void execute_1p (const T& initItem) {
+
+    typedef Galois::gdeque<BiModalTask*, 64> TaskWL;
+    typedef Galois::WorkList::dChunkedFIFO<CHUNK_SIZE, BiModalTask*> WL_ty;
+
+    BiModalTaskAlloc taskAlloc;
+    TaskWL initialTasks;
+
+    BiModalTask* t = taskAlloc.allocAndConstruct (initItem, nullptr, BiModalTask::DIVIDE);
+    initialTasks.push_back (t);
+
+    Galois::Runtime::for_each_impl<WL_ty> (
+        makeStandardRange (initialTasks.begin (), initialTasks.end ()), 
+        ApplyOperatorSinglePhase {taskAlloc, userCtxts, divFunc, conqFunc},
+        loopname.c_str ());
+
+    taskAlloc.destroyAndFree (t);
+  }
+
+  void execute_2p (const T& initItem) {
+    typedef Galois::Runtime::PerThreadVector<Task*> TaskWL;
+    typedef Galois::WorkList::dChunkedFIFO<CHUNK_SIZE, Task*> WL_ty;
+
+    TaskAlloc taskAlloc;
+    TaskWL initialTasks;
+
+    // Galois::Runtime::do_all_impl (range, 
+        // [&] (const T& a) {
+          // Task* t = taskAlloc.allocAndConstruct (a, nullptr);
+          // initialTasks.get ().push_back (t);
+// 
+        // },
+        // "initial_tasks_gen");
+
+    Task* initTask = taskAlloc.allocAndConstruct (initItem, nullptr);
+    initialTasks.get ().push_back (initTask);
+
+    WL_ty conqWL;
+
+    std::string div_loop_name = loopname + ":divide_phase";
+
+    Galois::Runtime::for_each_impl<WL_ty> (makeLocalRange (initialTasks),
+        ApplyDivide<WL_ty> {taskAlloc, userCtxts, conqWL, divFunc}, div_loop_name.c_str ());
+
+    std::string conq_loop_name = loopname + ":conquer_phase";
+
+    Galois::for_each_wl (conqWL, ApplyConquer {userCtxts, conqFunc}, conq_loop_name.c_str ());
+
+    Galois::Runtime::do_all_impl (makeLocalRange (initialTasks),
+        [&] (Task* t) {
+          taskAlloc.destroyAndFree (t);
+        }, "initial_tasks_destroy");
+  }
+
+};
+
+template <typename T, typename DivFunc, typename ConqFunc>
+void for_each_ordered_tree_1p (const T& initItem, const DivFunc& divFunc, const ConqFunc& conqFunc, const char* loopname=nullptr) {
+
+  DivideAndConquerExecutor<T, DivFunc, ConqFunc> executor (divFunc, conqFunc, loopname);
+  executor.execute_1p (initItem);
+}
+
+template <typename T, typename DivFunc, typename ConqFunc>
+void for_each_ordered_tree_2p (const T& initItem, const DivFunc& divFunc, const ConqFunc& conqFunc, const char* loopname=nullptr) {
+
+  DivideAndConquerExecutor<T, DivFunc, ConqFunc> executor (divFunc, conqFunc, loopname);
+
+  executor.execute_2p (initItem);
 
 }
 

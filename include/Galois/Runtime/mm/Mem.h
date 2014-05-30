@@ -645,10 +645,27 @@ public:
   inline void construct(U* p, Args&&... args ) const {
     ::new((void*)p) U(std::forward<Args>(args)...);
   }
+
   
   inline void destroy(pointer ptr) const {
     destruct(ptr);
   }
+
+  template <typename... Args>
+  inline pointer allocAndConstruct (Args&&... args) {
+    pointer p = allocate (1); 
+    assert (p != nullptr);
+    construct (p, std::forward<Args> (args)...);
+    return p;
+  }
+
+  void destroyAndFree (pointer& p) {
+    destroy (p);
+    deallocate (p, 1);
+    p = nullptr;
+  };
+
+
   
   size_type max_size() const throw() { return 1; }
 
