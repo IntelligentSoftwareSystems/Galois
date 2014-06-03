@@ -94,7 +94,10 @@ int main(int argc, char **argv) {
   Galois::StatManager statManager;
   LonestarStart(argc, argv, 0,0,0);
 
+//! [ReadGraph]
   Galois::Graph::readGraph(graph, filename);
+//! [ReadGraph]
+
   Galois::for_each(graph.begin(), graph.end(), Init());
 
 //! [OrderedByIntegerMetic in SSSPsimple]

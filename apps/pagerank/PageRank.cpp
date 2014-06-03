@@ -285,7 +285,11 @@ struct PullAlgo2 {
     ::with_numa_alloc<true>::type
     ::with_no_lockable<true>::type
     InnerGraph;
+  
+  //! [Define LC_InOut_Graph]
   typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  //! [Define LC_InOut_Graph]
+  
   typedef typename Graph::GraphNode GNode;
 
   std::string name() const { return "Pull2"; }
@@ -333,6 +337,7 @@ struct PullAlgo2 {
 
       LNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
 
+      //! [Access in-neighbors of LC_InOut_Graph]
       double sum = 0;
       for (auto jj = graph.in_edge_begin(src, Galois::MethodFlag::NONE), ej = graph.in_edge_end(src, Galois::MethodFlag::NONE);
           jj != ej; ++jj) {
@@ -340,6 +345,7 @@ struct PullAlgo2 {
         LNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
         sum += ddata.getPageRank(iteration) / ddata.nout;
       }
+      //! [Access in-neighbors of LC_InOut_Graph]
 
       float value = (1.0 - alpha) * sum + alpha;
       float diff = std::fabs(value - sdata.getPageRank(iteration));
@@ -386,6 +392,7 @@ struct PullAlgo2 {
 };
 
 //! Transpose in-edges to out-edges
+//![WriteGraph]
 static void precomputePullData() {
   typedef Galois::Graph::LC_CSR_Graph<size_t, void>
     ::with_no_lockable<true>::type InputGraph;
@@ -452,6 +459,7 @@ static void precomputePullData() {
   output.structureToFile(outputPullFilename);
   std::cout << "Wrote " << outputPullFilename << "\n";
 }
+//![WriteGraph]
 
 //! Make values unique
 template<typename GNode>

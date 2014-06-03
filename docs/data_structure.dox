@@ -36,9 +36,9 @@ Internally, {@link Galois::Graph::LC_CSR_Graph} uses Compressed Sparse Row forma
 
      An example to define a local computation graph can be seen as follows:
 
-     In {@link apps/tutorial/SSSPsimple.cpp}
+     In {@link apps/sssp/SSSP.cpp}
 
-     @snippet apps/tutorial/SSSPsimple.cpp Define LC Graph
+     @snippet apps/sssp/SSSP.cpp Define LC_CSR_Graph
 
    - Accessing graph topology
      
@@ -68,15 +68,35 @@ Internally, {@link Galois::Graph::LC_CSR_Graph} uses Compressed Sparse Row forma
      
     {@link Galois::Graph::LC_CSR_Graph::sortEdges} and {@link Galois::Graph::LC_CSR_Graph::sortEdgesByEdgeData} can be used to make the outgoing edges of a node sorted. The two functions differ by the comparison functions. In {@link Galois::Graph::LC_CSR_Graph::sortEdgesByEdgeData}, the comparison function is over edge data type EdgeTy. In {@link Galois::Graph::LC_CSR_Graph::sortEdges}, the comparison function is over {@link Galois::Graph::EdgeSortValue} which represents a pair of GraphNode and EdgeTy.   
  
+    An example of sort edges can be seen as follows:
+
+    In {@link apps/boruvka/Boruvka.cpp}
+  
+    @snippet apps/boruvka/Boruvka.cpp sortEdgeByEdgeData
+
+
 <hr>
+
 <H4> @link Galois::Graph::LC_Linear_Graph </H4>
 
 A variant of {@link Galois::Graph::LC_CSR_Graph} where the difference is the physical layouts of the data structures are slightly different but the functionalities of the two graphs are the same. Depending on the applications, the two graphs may achieve different performance from other variants.
+
+An example to define a {@link Galois::Graph::LC_Linear_Graph} can be seen as follows:
+
+In {@link apps/tutorial/SSSPsimple.cpp}
+
+@snippet apps/tutorial/SSSPsimple.cpp Define LC Graph
 
 <hr>
 <H4> @link Galois::Graph::LC_InlineEdge_Graph </H4>
 
 A variant of {@link Galois::Graph::LC_CSR_Graph} where the difference is the physical layouts of the data structure are slightly different but the functionalities of those graphs are the same. Depending on the applications, the graph may achieve different performance from other variants.
+
+An example to define a {@link Galois::Graph::LC_InlineEdge_Graph} can be seen as follows:
+
+In {@link apps/sssp/SSSP.cpp}
+
+@snippet apps/sssp/SSSP.cpp Define LC_InlineEdge_Graph
 
 <hr>
 
@@ -87,6 +107,16 @@ A variant of {@link Galois::Graph::LC_CSR_Graph} where the difference is the phy
    - Accessing incoming edges and neighbors of a node
 
      The incoming edges of a node can be accessed by {@link Galois::Graph::LC_InOut_Graph::in_edge_iterator} with {@link Galois::Graph::LC_InOut_Graph::in_edge_begin}. The data associated with the incoming edge can be accessed using {Galois::Graph::LC_CSR_Graph::getInEdgeData}. Given an incoming edge, the incoming neighbor node can be accessed using {@link Galois::Graph::LC_InOut_Graph::getInEdgeDst}.       
+
+    In {@link apps/pagerank/PageRank.cpp}
+
+    An example to define a {@link Galois::Graph::LC_InOut_Graph} can be seen as follows:
+
+    @snippet apps/pagerank/PageRank.cpp Define LC_InOut_Graph
+
+    An example to access the incoming edges and neighbors of a node can be seen as follows:
+
+    @snippet apps/pagerank/PageRank.cpp Access in-neighbors of LC_InOut_Graph
 
 <hr> 
 
@@ -163,7 +193,10 @@ Morph graphs allow concurrent graph mutations.
  
     Given a node or edge, the data on them can be accessed by {@link Galois::Graph::FirstGraph::getData} or {@link Galois::Graph::FirstGraph::getEdgeData} correspondingly. 
 
+    An example to access the data of a node can be seen as follows:
+
     @snippet apps/tutorial/Torus.cpp access node data
+
 
 <hr> 
 

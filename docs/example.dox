@@ -5,4 +5,6 @@
  * @example apps/delaunaytriangulation/DelaunayTriangulation.cpp
  * @example apps/delaunaytriangulation/DelaunayTriangulationDet.cpp
  * @example apps/bfs/Diameter.cpp
+ * @example apps/pagerank/PageRank.cpp
+ * @example apps/boruvka/Boruvka.cpp
  */

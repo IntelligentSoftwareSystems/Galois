@@ -311,7 +311,10 @@ public:
 };
 
 //! All Point* refer to elements in this bag
+
 Galois::InsertBag<Point> basePoints;
+//! [Define Insert Bag]
+
 Galois::InsertBag<Point*> ptrPoints;
 
 static void addBoundaryNodes(Point* p1, Point* p2, Point* p3) {
@@ -393,9 +396,11 @@ void divide(const Iter& b, const Iter& e) {
 void layoutPoints(PointList& points) {
   divide(points.begin(), points.end() - 3);
   Galois::do_all(points.begin(), points.end() - 3, insPt());
+//! [Insert elements into InsertBag]
   Point* p1 = &basePoints.push(*(points.end() - 1));
   Point* p2 = &basePoints.push(*(points.end() - 2));
   Point* p3 = &basePoints.push(*(points.end() - 3));
+//! [Insert elements into InsertBag]
   addBoundaryNodes(p1,p2,p3);
 }
 

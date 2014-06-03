@@ -214,8 +214,11 @@ void readInOutGraph(Graph& graph) {
 }
 
 struct SerialAlgo {
+  //! [Define LC_CSR_Graph]  
   typedef Galois::Graph::LC_CSR_Graph<SNode, uint32_t>
     ::with_no_lockable<true>::type Graph;
+  //! [Define LC_CSR_Graph]  
+
   typedef Graph::GraphNode GNode;
   typedef UpdateRequestCommon<GNode> UpdateRequest;
 
@@ -264,12 +267,15 @@ struct SerialAlgo {
 template<bool UseCas>
 struct AsyncAlgo {
   typedef SNode Node;
-
+  
+  // ! [Define LC_InlineEdge_Graph]
   typedef Galois::Graph::LC_InlineEdge_Graph<Node, uint32_t>
     ::template with_out_of_line_lockable<true>::type
     ::template with_compressed_node_ptr<true>::type
     ::template with_numa_alloc<true>::type
     Graph;
+  // ! [Define LC_InlineEdge_Graph]
+  
   typedef typename Graph::GraphNode GNode;
   typedef UpdateRequestCommon<GNode> UpdateRequest;
 
