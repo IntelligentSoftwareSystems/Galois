@@ -93,28 +93,27 @@ The scheduling policies are listed as follows:
    
     Implements a priority queue based on a supplied function which maps a work item to an integer priority. Lower values are a higher priority. An inner queue may be passed to control how items within the same priority are stored. 
 
- - \b ChunkedFIFO and \b ChunkedLIFO
-    
-    Implements a chunked FIFO or LIFO strategy to reduce contention. Each thread has a chunk of work which it is filling when pushing and a chunk which is being emptied by popping. When a chunk is filled, it is placed on the central FIFO or LIFO. 
+ - \b Chunked Worklists
 
- - \b dChunkedFIFO and \b dChunkedLIFO
+    Chunked worklists assign work items to threads one chunk at a time. Similarly,
+    each thread accumulates new work in a chunk before putting it on the worklist. 
+    Chunking offers better scalability because threads can amortize the cost of their access to
+    the shared worklist over the entire chunk. The user chooses the size of the
+    chunk: A large chunk size means less contention on the shared worklist, but may
+    lead to load-imbalance, while a small chunk size may increase the contention on
+    the shared worklist. The worklist of chunks itself can be organized in
+    different ways, and we have observed that mapping the communication patterns of
+    threads to the hardware-topology leads to more scalable implementations: 
 
-    Behaves like their non-d counterparts, but maintain a FIFO or LIFO per CPU package (usually L3 cache). If a processor's package local FIFO or LIFO is empty, it attempts to steal a chunk from another CPU package.
+      - \b ChunkedFIFO (or ChunkedLIFO) maintains a single global queue (or stack) for chunks of work items
 
- - \b AltChunkedFIFO and \b AltChunkedLIFO
+      - \b dChunkedFIFO (or dChunkedLIFO) maintains a queue (or stack) of chunks per each package (multi-core
+        processor) in the system. A thread tries to find a chunk in its local
+        package before stealing from other packages. 
 
-    Is another alternative to using ChunkedLIFO/ChunkedFIFO or
-    dChunkedLIFO/dChunkedFIFO. This worklist implements are more scalable stealing
-    policy, and is suitable for loops with high load-imbalance and/or high thread
-    counts. In summary:
-
-      - \b ChunkedFIFO maintains a single global queue for chunks of work items
-
-      - \b dChunkedFIFO maintains a queue of chunks per each package (multi-core
-        processor) in the system
-
-      - \b AltChunkedFIFO maintains a queue of chunks per each thread. Normally
-        threads steal work within their package. Each package
+      - \b AltChunkedFIFO (or AltChunkedLIFO) maintains a queue (or stack) of chunks per each thread. Normally
+        threads steal work within their package, but not every thread can steal
+        from outside its package. Each package
         has a leader, which steals from other packages when its own package is out
         of work. 
 
@@ -155,6 +154,25 @@ An example to define an OrderedByIntegerMetic scheduling in {@link apps/tutorial
 
 @snippet apps/tutorial/SSSPsimple.cpp OrderedByIntegerMetic in SSSPsimple
    The OBIM is an example to define a priority scheduling. Internally It uses a dChunkedLIFO to store the items with the same priority.
+
+\subsection Deterministic for_each
+
+{@link Galois::for_each_det} is a deterministic parallel implementation of the
+unordered for_each, described above. This implementation forces a deterministic
+parallel schedule on the work-items. 
+
+The operator must be *Cautious* (\b TODO link to glossary), just like the normal
+for_each. The implementation executes the operator twice: in the first execution,
+the operator is executed up till the *Fail-safe point*, which is first global write
+in the operator. We call this the *Prefix* of the operator, and executing this
+Prefix allows the runtime to compute the shared-data dependences. 
+In the second execution, the operator is executed completely. The
+user may specify the operator as two functors, where first contains the code for
+the Prefix, while the second contains the remaining code for the operator. 
+
+\b TODO: example of for_each_det
+
+
 
 \subsection do_all Do-All Loop
 
