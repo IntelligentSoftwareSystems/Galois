@@ -304,7 +304,8 @@ There are several built-in special reducers.
     An example of accessing elements inside a InsertBag can be seen in the {@link apps/delaunaytriangulation/DelaunayTriangulationDet.cpp}:
 
     @snippet apps/delaunaytriangulation/DelaunayTriangulationDet.cpp Access elements of InsertBag 
-  
+ 
+
 <hr>
 
 @subsection perthreadstorage PerThreadStorage
@@ -313,23 +314,23 @@ There are several built-in special reducers.
 
  - Defining {@link Galois::Runtime::PerThreadStorage}
 
- The template parameter of {@link Galois::Runtime::PerThreadStorage} is the type of data to be stored. The parameters of the constructor of {@link Galois::Runtime::PerThreadStorage} are the parameters to construct the data to be stored. 
+   The template parameter of {@link Galois::Runtime::PerThreadStorage} is the type of data to be stored. The parameters of the constructor of {@link Galois::Runtime::PerThreadStorage} are the parameters to construct the data to be stored. 
 
- An example to define a {@link Galois::Runtime::PerThreadStorage} can be seen as follows:
+   An example to define a {@link Galois::Runtime::PerThreadStorage} can be seen as follows:
 
- In {@link apps/boruvka/Boruvka.cpp}
+   In {@link apps/boruvka/Boruvka.cpp}
  
- @snippet apps/boruvka/BoruvkaMerge.cpp define per thread storage
+   @snippet apps/boruvka/BoruvkaMerge.cpp define per thread storage
 
  - Accessing {@link Galois::Runtime::PerThreadStorage}
 
- {@link Galois::Runtime::PerThreadStorage::getLocal} is used to access the data stored in the calling thread. There are two versions of this function. One is without any parameter and the other you can pass in a thread id. The latter one is a slightly optimized version when the user knows the thread id. {@link Galois::Runtime::PerThreadStorage::getRemote} is used to access the data stored in other threads by passing the thread id.
+   {@link Galois::Runtime::PerThreadStorage::getLocal} is used to access the data stored in the calling thread. There are two versions of this function. One is without any parameter and the other you can pass in a thread id. The latter one is a slightly optimized version when the user knows the thread id. {@link Galois::Runtime::PerThreadStorage::getRemote} is used to access the data stored in other threads by passing the thread id.
 
- An example to access a {@link Galois::Runtime::PerThreadStorage} can be seen as follows:
+   An example to access a {@link Galois::Runtime::PerThreadStorage} can be seen as follows:
 
- In {@link apps/boruvka/Boruvka.cpp}
+   In {@link apps/boruvka/Boruvka.cpp}
  
- @snippet apps/boruvka/BoruvkaMerge.cpp access perThreadStorage
+   @snippet apps/boruvka/BoruvkaMerge.cpp access perThreadStorage
 
 
 <hr>
