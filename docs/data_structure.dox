@@ -318,7 +318,7 @@ There are several built-in special reducers.
 
    An example to define a {@link Galois::Runtime::PerThreadStorage} can be seen as follows:
 
-   In {@link apps/boruvka/Boruvka.cpp}
+   In {@link apps/boruvka/BoruvkaMerge.cpp}
  
    @snippet apps/boruvka/BoruvkaMerge.cpp define per thread storage
 
@@ -328,7 +328,7 @@ There are several built-in special reducers.
 
    An example to access a {@link Galois::Runtime::PerThreadStorage} can be seen as follows:
 
-   In {@link apps/boruvka/Boruvka.cpp}
+   In {@link apps/boruvka/BoruvkaMerge.cpp}
  
    @snippet apps/boruvka/BoruvkaMerge.cpp access perThreadStorage
 
