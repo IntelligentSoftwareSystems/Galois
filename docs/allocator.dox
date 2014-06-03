@@ -74,5 +74,39 @@ an allocator using this class, (see file {@link include/Galois/Runtime/mm/Mem.h}
 
 \subsection build-custom-alloc Types of Heaps and Building Custom Allocators
 
+The allocators in Galois are implemented in a modular fashion. An allocator can
+take a heap implementation as its template argument. A heap implementation defines 
+two functions `void* allocate(size_t)` and `void deallocate(void*, size_t)`.
+Several heap implementations are just wrappers around another heap implementation
+to modify its interface in some way. In the following we list a few of them and
+show an example:
+
+- {@link Galois::Runtime::MM::SystemBaseAlloc} defines the basic heap
+  implementation used by Galois allocators, and is the source of all heap memory.
+  It is implemented as a list of pages stored by each thread. 
+
+- {@link Galois::Runtime::MM::FreeListHeap} maintains a linked list of blocks of
+  size *B*, where *B* is the size of the objects being allocated. This is a fixed
+  size heap, and is a wrapper around a source heap implementation that is passed
+  as a template argument.
+
+- {@link Galois::Runtime::MM::SimpleBumpPtr} allows allocating different size
+  objects within a block of memory by simply moving a pointer within the block. The
+  size of the block is determined by the source heap implementation provided as a
+  template argument. The memory within a block cannot be freed, however, blocks are 
+  freed only at the end of the program when the SimpleBumpPtr's destructor is
+  called.
+
+- {@link Galois::Runtime::MM::ThreadAwarePrivateHeap} creates a per-thread instance
+  of a source heap provided as a template argument. This is used for defining some
+  of the parallel allocators. 
+
+We show the Per Iteration Allocator, from {@link include/Galois/Mem.h}, to show how
+heap implementations can be combined together to form useful allocators:
+@snippet include/Galois/Mem.h PerIterAllocTy example
+
+Another example, from {@link include/Galois/Runtime/mm/Mem.h} shows how  the Fixed
+Size allocator is defined:
+@snippet include/Galois/Runtime/mm/Mem.h FixedSizeAllocator example
 
 */

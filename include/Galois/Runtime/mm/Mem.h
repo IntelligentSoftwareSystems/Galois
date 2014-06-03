@@ -539,8 +539,10 @@ private:
 #else
 class SizedAllocatorFactory: private boost::noncopyable {
 public:
+//! [FixedSizeAllocator example]
   typedef ThreadAwarePrivateHeap<
     FreeListHeap<SimpleBumpPtr<SystemBaseAlloc> > > SizedAlloc;
+//! [FixedSizeAllocator example]
 
   static SizedAlloc* getAllocatorForSize(const size_t);
 

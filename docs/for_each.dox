@@ -87,11 +87,9 @@ The scheduling policies are listed as follows:
 
  - \b FIFO and \b LIFO
     
-    Implements std::queue and std::stack like behaviors respectively. 
-
- - \b OrderedByIntegerMetric
-   
-    Implements a priority queue based on a supplied function which maps a work item to an integer priority. Lower values are a higher priority. An inner queue may be passed to control how items within the same priority are stored. 
+    Implements std::queue and std::stack like behaviors respectively. These
+    implementations do not scale with the number of threads, and are often not
+    suitable for parallel implementations. 
 
  - \b Chunked Worklists
 
@@ -116,6 +114,25 @@ The scheduling policies are listed as follows:
         from outside its package. Each package
         has a leader, which steals from other packages when its own package is out
         of work. 
+        We show an example of using chunked worklists from {@link apps/delaunayrefinement/DelaunayRefinement.cpp}
+        @snippet apps/delaunayrefinement/DelaunayRefinement.cpp for_each_local example
+
+
+ - \b OrderedByIntegerMetric
+   
+    Implements a priority queue based on a supplied function which maps a work
+    item to an integer priority. Lower values are a higher priority. An inner
+    queue may be passed to control how items within the same priority bin are stored. 
+    An example to define an OrderedByIntegerMetric scheduling in {@link apps/tutorial/SSSPsimple.cpp} can be seen as follows:
+    The OBIM in the following example shows how to define a priority scheduling. 
+    The UpdateRequestIndexer defines the priority binning function. Internally It uses a dChunkedLIFO to store the items with the same priority.
+
+    @snippet apps/tutorial/SSSPsimple.cpp OrderedByIntegerMetic in SSSPsimple
+
+    OBIM works well when the algorithms performance is sensitive to scheduling, and
+    the work-items can be grouped into a small number of bins, ordered by integer
+    priority (typically ~1000 bins). 
+
 
  - \b LocalQueues
 
@@ -147,13 +164,6 @@ The scheduling policies are listed as follows:
     allows for iterations to abort. 
 
 
-An example to define an OrderedByIntegerMetic scheduling in {@link apps/tutorial/SSSPsimple.cpp} can be seen as follows:
-@snippet apps/tutorial/SSSPsimple.cpp UpdateRequestIndexer in SSSPsimple
-
-   The UpdateRequestIndexer defines the priority. 
-
-@snippet apps/tutorial/SSSPsimple.cpp OrderedByIntegerMetic in SSSPsimple
-   The OBIM is an example to define a priority scheduling. Internally It uses a dChunkedLIFO to store the items with the same priority.
 
 \subsection Deterministic for_each
 

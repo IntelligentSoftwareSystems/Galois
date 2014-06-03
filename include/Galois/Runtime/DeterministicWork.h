@@ -1055,9 +1055,6 @@ static inline void for_each_det_impl(const RangeTy& range, WorkTy& W) {
 
 
 } // end namespace Runtime
-} // end namespace Galois
-
-namespace Galois {
 
 /**
  * Deterministic execution with prefix operator.
