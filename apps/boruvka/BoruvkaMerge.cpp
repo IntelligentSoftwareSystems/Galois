@@ -170,7 +170,9 @@ void printGraph() {
 }
 ///////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////
+//! [define per thread storage]
 Galois::Runtime::PerThreadStorage<long long> MSTWeight;
+//! [define per thread storage]
 struct process {
    template<typename ContextTy>
    void operator()(GNode& src, ContextTy& lwl) {
@@ -209,7 +211,9 @@ struct process {
       }
       assert(minEdgeWeight>=0);
       //update MST weight.
+      //! [access perThreadStorage] 
       *MSTWeight.getLocal() += minEdgeWeight;
+      //! [access perThreadStorage] 
       typedef std::pair<GNode, EdgeDataType> EdgeData;
       typedef std::set<EdgeData, std::less<EdgeData>, Galois::PerIterAllocTy::rebind<EdgeData>::other> edsetTy;
       edsetTy toAdd(std::less<EdgeData>(), Galois::PerIterAllocTy::rebind<EdgeData>::other(lwl.getPerIterAlloc()));

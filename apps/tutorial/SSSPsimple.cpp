@@ -82,22 +82,23 @@ struct Init {
   }
 };
 
-//! [UpdateRequestIndexer in SSSPsimple]
-struct UpdateRequestIndexer: public std::unary_function<UpdateRequest, unsigned int> {
-  unsigned int operator() (const UpdateRequest& val) const {
-    return val.first >> stepShift;
-  }
-};
-//! [UpdateRequestIndexer in SSSPsimple]
 
 int main(int argc, char **argv) {
   Galois::StatManager statManager;
   LonestarStart(argc, argv, 0,0,0);
 
+//! [ReadGraph]
   Galois::Graph::readGraph(graph, filename);
+//! [ReadGraph]
+
   Galois::for_each(graph.begin(), graph.end(), Init());
 
-//! [OrderedByIntegerMetic in SSSPsimple]
+  //! [OrderedByIntegerMetic in SSSPsimple]
+  struct UpdateRequestIndexer: public std::unary_function<UpdateRequest, unsigned int> {
+    unsigned int operator() (const UpdateRequest& val) const {
+      return val.first >> stepShift;
+    }
+  };
   using namespace Galois::WorkList;
   typedef dChunkedLIFO<16> dChunk;
   typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;

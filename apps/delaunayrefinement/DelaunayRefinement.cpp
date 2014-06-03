@@ -178,12 +178,12 @@ int main(int argc, char** argv) {
   Trefine.start();
   using namespace Galois::WorkList;
   
+      //! [for_each_local example]
   typedef LocalQueue<dChunkedLIFO<256>, ChunkedLIFO<256> > BQ;
   typedef AltChunkedLIFO<32> Chunked;
   
   switch (detAlgo) {
     case nondet: 
-      //! [for_each_local example]
       Galois::for_each_local(initialBad, Process<>(), Galois::loopname("refine"), Galois::wl<Chunked>());
       break;
       //! [for_each_local example]

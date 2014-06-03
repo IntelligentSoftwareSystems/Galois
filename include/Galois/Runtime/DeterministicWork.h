@@ -1055,9 +1055,6 @@ static inline void for_each_det_impl(const RangeTy& range, WorkTy& W) {
 
 
 } // end namespace Runtime
-} // end namespace Galois
-
-namespace Galois {
 
 /**
  * Deterministic execution with prefix operator.
@@ -1072,7 +1069,7 @@ namespace Galois {
  * @param loopname string to identify loop in statistics output
  */
 template<typename IterTy, typename Function1Ty, typename Function2Ty>
-static inline void for_each_det(IterTy b, IterTy e, Function1Ty prefix, Function2Ty fn, const char* loopname = 0) {
+static inline void for_each_det(IterTy b, IterTy e, const Function1Ty& prefix, const Function2Ty& fn, const char* loopname = 0) {
   typedef Runtime::StandardRange<IterTy> Range;
   typedef typename Range::value_type T;
   typedef Runtime::DeterministicImpl::Options<T,Function1Ty,Function2Ty> OptionsTy;
@@ -1095,7 +1092,7 @@ static inline void for_each_det(IterTy b, IterTy e, Function1Ty prefix, Function
  * @param loopname string to identify loop in statistics output
  */
 template<typename T, typename Function1Ty, typename Function2Ty>
-static inline void for_each_det(T i, Function1Ty prefix, Function2Ty fn, const char* loopname = 0) {
+static inline void for_each_det(T i, const Function1Ty& prefix, const Function2Ty& fn, const char* loopname = 0) {
   T wl[1] = { i };
   for_each_det(&wl[0], &wl[1], prefix, fn, loopname);
 }
@@ -1113,7 +1110,7 @@ static inline void for_each_det(T i, Function1Ty prefix, Function2Ty fn, const c
  * @param loopname string to identify loop in statistics output
  */
 template<typename IterTy, typename FunctionTy>
-static inline void for_each_det(IterTy b, IterTy e, FunctionTy fn, const char* loopname = 0) {
+static inline void for_each_det(IterTy b, IterTy e, const FunctionTy& fn, const char* loopname = 0) {
   for_each_det(b, e, fn, fn, loopname);
 }
 
@@ -1129,7 +1126,7 @@ static inline void for_each_det(IterTy b, IterTy e, FunctionTy fn, const char* l
  * @param loopname string to identify loop in statistics output
  */
 template<typename T, typename FunctionTy>
-static inline void for_each_det(T i, FunctionTy fn, const char* loopname = 0) {
+static inline void for_each_det(T i, const FunctionTy& fn, const char* loopname = 0) {
   T wl[1] = { i };
   for_each_det(&wl[0], &wl[1], fn, fn, loopname);
 }
