@@ -9,7 +9,8 @@ set(GALOIS_COPYRIGHT_YEAR "2014") # Also in COPYRIGHT
 
 if(NOT CMAKE_BUILD_TYPE)
   message(STATUS "No build type selected, default to release with debug info")
-  set(CMAKE_BUILD_TYPE "relwithdebinfo") 
+  set(CMAKE_BUILD_TYPE "relwithdebinfo")
+  add_definitions(-DNDEBUG)
 endif()
 
 ###### Options (alternatively pass as options to cmake -DName=Value) ######
