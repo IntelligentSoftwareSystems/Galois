@@ -107,8 +107,8 @@ static __thread int papiEventSet = PAPI_NULL;
 //static int papiEvents[2] = {PAPI_L3_TCA,PAPI_L3_TCM};
 //static const char* papiNames[2] = {"L3_ACCESSES","L3_MISSES"};
 
-static int papiEvents[2] = {PAPI_TOT_INS, PAPI_TOT_CYC};
-static const char* papiNames[2] = {"Instructions", "Cycles"};
+static int papiEvents[] = {PAPI_TOT_INS, PAPI_TOT_CYC};
+static const char* papiNames[] = {"Instructions", "Cycles" };
 
 //static int papiEvents[2] = {PAPI_L1_DCM, PAPI_TOT_CYC};
 //static const char* papiNames[2] = {"L1DCMCounter", "CyclesCounter"};

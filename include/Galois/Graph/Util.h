@@ -119,6 +119,23 @@ void readGraphDispatch(GraphTy& graph, read_lc_inout_graph_tag, const std::strin
 }
 
 template<typename GraphTy>
+void readGraphDispatch(GraphTy& graph, read_lc_inout_graph_tag, FileGraph& f1, FileGraph& f2) { 
+  graph.createAsymmetric();
+
+  typename GraphTy::out_graph_type::read_tag tag1;
+  readGraphDispatch(graph, tag1, f1);
+
+  typename GraphTy::in_graph_type::read_tag tag2;
+  readGraphDispatch(graph.inGraph, tag2, f2);
+}
+
+template<typename GraphTy>
+void readGraphDispatch(GraphTy& graph, read_lc_inout_graph_tag, FileGraph& f1) { 
+  typename GraphTy::out_graph_type::read_tag tag1;
+  readGraphDispatch(graph, tag1, f1);
+}
+
+template<typename GraphTy>
 void readGraphDispatch(GraphTy& graph, read_lc_inout_graph_tag, const std::string& f1) { 
   typename GraphTy::out_graph_type::read_tag tag1;
   readGraphDispatch(graph, tag1, f1);

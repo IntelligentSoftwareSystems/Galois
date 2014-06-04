@@ -48,16 +48,16 @@
 
 #define CHUNK_FACTOR 16
 
-#undef ENABLE_DO_ALL_TIMERS
+//#undef ENABLE_DO_ALL_TIMERS
 
 #define USE_NEW_DO_ALL_COUPLED
 
 
 namespace Galois {
+#ifdef ENABLE_DO_ALL_TIMERS
   class ThreadTimer {
     timespec m_start;
     timespec m_stop;
-
     int64_t  m_nsec;
 
   public:
@@ -73,11 +73,12 @@ namespace Galois {
       m_nsec += ((m_stop.tv_sec - m_start.tv_sec) << 30); // multiply by 1G
     }
 
-    int64_t get_nsec () const { return m_nsec; }
+    int64_t get_nsec() const { return m_nsec; }
 
-    int64_t get_sec () const { return (m_nsec >> 30); }
+    int64_t get_sec() const { return (m_nsec >> 30); }
       
   };
+#endif
 
   template <typename T>
   class AggStatistic {
@@ -755,12 +756,8 @@ void do_all_coupled_impl (PerThreadStorage<Range<Iter> >& ranges, FuncTp& func, 
   // assert (!inGaloisForEach);
   // inGaloisForEach = true;
 
-
   DoAllCoupledExec<Iter, FuncTp> exec (ranges, func, loopname, chunk_size);
-
-  RunCommand w[2] = { std::ref (exec), std::ref (getSystemBarrier ()) };
-
-  getSystemThreadPool ().run (&w[0], &w[2], activeThreads);
+  getSystemThreadPool().run(activeThreads, std::ref(exec));
   
   // inGaloisForEach = false;
 }

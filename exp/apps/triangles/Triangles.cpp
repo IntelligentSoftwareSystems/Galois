@@ -501,16 +501,33 @@ int main(int argc, char** argv) {
 
   // XXX Test if preallocation matters
   Galois::reportPageAlloc("MeminfoPre");
-  Galois::preAlloc(numThreads + 8 * Galois::Runtime::MM::numPageAllocTotal());
-  Galois::reportPageAlloc("MeminfoMid");
+  // Galois::preAlloc(numThreads + 8 * Galois::Runtime::MM::numPageAllocTotal());
+  // case by case preAlloc to avoid allocating unnecessarily
   switch (algo) {
-    case nodeiterator: run<NodeIteratorAlgo>(); break;
-    case edgeiterator: run<EdgeIteratorAlgo>(); break;
+
+    case nodeiterator: 
+      Galois::preAlloc (numThreads);
+      Galois::reportPageAlloc("MeminfoMid");
+      run<NodeIteratorAlgo>(); 
+      break;
+
+    case edgeiterator: 
+      Galois::preAlloc(numThreads + 16*(graph.size() + graph.sizeEdges()) / Galois::Runtime::MM::pageSize);
+      Galois::reportPageAlloc("MeminfoMid");
+      run<EdgeIteratorAlgo>(); 
+      break;
+
 #ifdef HAS_EIGEN
-    case hybrid: run<HybridAlgo>(); break;
-    case eigentriangle: run<EigenTriangleAlgo>(); break;
+      // TODO: add preAlloc calls
+    case hybrid: 
+      run<HybridAlgo>(); 
+      break;
+    case eigentriangle: 
+      run<EigenTriangleAlgo>(); 
+      break;
 #endif
-    default: std::cerr << "Unknown algo: " << algo << "\n";
+    default: 
+      std::cerr << "Unknown algo: " << algo << "\n";
   }
   Galois::reportPageAlloc("MeminfoPost");
 

@@ -364,7 +364,9 @@ struct SortEdges {
   Accum* accum;
 
   void operator()(const GNode& src) {
+    //! [sortEdgeByEdgeData]
     graph.sortEdgesByEdgeData(src, std::less<EdgeData>(), Galois::MethodFlag::NONE);
+    //! [sortEdgeByEdgeData]
 
     Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::NONE);
     Graph::edge_iterator ei = graph.edge_end(src, Galois::MethodFlag::NONE);

@@ -132,29 +132,6 @@ res <- summarizeBy(res,
                    Algo + Kind + Hostname + Threads + CommandLine ~ variable,
                    mean, ".Mean")
 
-ggplot(res,
-       aes(x=Threads, y=Time.Ref/Time.Mean, color=Kind)) +
-       geom_point() + 
-       geom_line() + 
-       scale_y_continuous("Speedup (rel. to best at t=1)") +
-       facet_grid(Hostname ~ Algo, scale="free")
-
-ggplot(res,
-       aes(x=Threads, y=Time.Mean/1000, color=Kind)) +
-       geom_point() + 
-       geom_line() + 
-       scale_y_continuous("Time (s)") +
-       facet_grid(Hostname ~ Algo, scale="free")
-
-#ggplot(res,
-#       aes(x=Threads, y=Iterations.Mean/Iterations.Ref, color=Kind)) +
-#       geom_point() + 
-#       geom_line() + 
-#       scale_y_continuous("Iterations relative to serial") +
-#       facet_grid(Hostname ~ Algo, scale="free")
-
-cat("Results in Rplots.pdf\n")
-
 ###
 # Might as well generate simplified json output
 ###
@@ -174,4 +151,29 @@ if (outputfile != "") {
   }))
   cat(json, file=outputfile)
   cat(sprintf("Results in %s\n", outputfile))
+} else {
+  ggplot(res,
+         aes(x=Threads, y=Time.Ref/Time.Mean, color=Kind)) +
+         geom_point() + 
+         geom_line() + 
+         scale_y_continuous("Speedup (rel. to best at t=1)") +
+         facet_grid(Hostname ~ Algo, scale="free")
+
+  ggplot(res,
+         aes(x=Threads, y=Time.Mean/1000, color=Kind)) +
+         geom_point() + 
+         geom_line() + 
+         scale_y_continuous("Time (s)") +
+         facet_grid(Hostname ~ Algo, scale="free")
+
+#ggplot(res,
+#       aes(x=Threads, y=Iterations.Mean/Iterations.Ref, color=Kind)) +
+#       geom_point() + 
+#       geom_line() + 
+#       scale_y_continuous("Iterations relative to serial") +
+#       facet_grid(Hostname ~ Algo, scale="free")
+
+  cat("Results in Rplots.pdf\n")
 }
+
+

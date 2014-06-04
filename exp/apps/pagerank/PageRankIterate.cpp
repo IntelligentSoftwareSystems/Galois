@@ -47,7 +47,7 @@ static const char* name = "Page Rank";
 static const char* desc = "Computes page ranks a la Page and Brin\n";
 static const char* url = NULL;
 
-enum class Algo {
+enum Algo {
   transpose,
   synchronous,
   serializable,
@@ -543,7 +543,7 @@ static void transposeGraph() {
     size_t sid = input.getData(src);
     assert(sid < input.size());
 
-    size_t num_neighbors = std::distance(input.edge_begin(src), input.edge_end(src));
+    //size_t num_neighbors = std::distance(input.edge_begin(src), input.edge_end(src));
 
     for (InputGraph::edge_iterator edge : input.out_edges(src)) {
       InputNode dst = input.getEdgeDst(edge);
@@ -649,10 +649,10 @@ static void printTop(int topn, unsigned int iteration) {
   }
 }
 
-template<typename Algo>
-static typename std::result_of<Algo()>::type run() {
-  Algo algo;
-  return algo();
+template<typename A>
+unsigned int run() {
+  A a;
+  return a();
 }
 
 unsigned int runAlgo() {

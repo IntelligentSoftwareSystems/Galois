@@ -24,10 +24,7 @@
 #include "Galois/Runtime/ParallelWork.h"
 
 void Galois::Runtime::preAlloc_impl(int num) {
-  int a = activeThreads;
-  a = (num + a - 1) / a;
-  RunCommand w[2] = {std::bind(Galois::Runtime::MM::pagePreAlloc, a),
-		     std::ref(getSystemBarrier())};
-  getSystemThreadPool().run(&w[0], &w[2], activeThreads);
+  int pagesPerThread = (num + activeThreads - 1) / activeThreads;
+  getSystemThreadPool().run(activeThreads, std::bind(Galois::Runtime::MM::pagePreAlloc, pagesPerThread));
 }
 

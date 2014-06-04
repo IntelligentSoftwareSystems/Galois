@@ -25,11 +25,13 @@
 #define GALOIS_RUNTIME_PERTHREADSTORAGE_H
 
 #include "Galois/config.h"
-#include "Galois/Runtime/ll/TID.h"
-#include "Galois/Runtime/ll/HWTopo.h"
-#include "Galois/Runtime/ThreadPool.h"
 #include "Galois/Runtime/ActiveThreads.h"
+#include "Galois/Runtime/ThreadPool.h"
+#include "Galois/Runtime/ll/HWTopo.h"
+#include "Galois/Runtime/ll/PaddedLock.h"
+#include "Galois/Runtime/ll/TID.h"
 
+#include <cstddef>
 #include <boost/utility.hpp>
 
 #include <cassert>
@@ -43,26 +45,41 @@ namespace Runtime {
 class PerBackend {
   static const unsigned MAX_SIZE = 30;
   static const unsigned MIN_SIZE = 3; // 8 bytes
+  typedef Galois::Runtime::LL::SimpleLock Lock;
 
   unsigned int nextLoc;
-  std::vector<char*> heads;
+  char** heads;
+  Lock freeOffsetsLock;
   std::vector<std::vector<unsigned> > freeOffsets;
+  /**
+   * Guards access to non-POD objects that can be accessed after PerBackend
+   * is destroyed. Access can occur through destroying PerThread/PerPackage
+   * objects with static storage duration, which have a reference to a
+   * PerBackend object, which may have be destroyed before the PerThread
+   * object itself.
+   */
+  bool invalid; 
 
   void initCommon();
-
   static unsigned nextLog2(unsigned size);
 
 public:
-  PerBackend(): nextLoc(0) {
+  PerBackend(): nextLoc(0), heads(0), invalid(false) {
     freeOffsets.resize(MAX_SIZE);
+  }
+
+  ~PerBackend() {
+    // Intentionally leak heads so that other PerThread operations are
+    // still valid after we are gone
+    invalid = true;
   }
 
   char* initPerThread();
   char* initPerPackage();
 
 #ifdef GALOIS_USE_EXP
-  char* initPerThread_cilk ();
-  char* initPerPackage_cilk ();
+  char* initPerThread_cilk();
+  char* initPerPackage_cilk();
 #endif // GALOIS_USE_EXP
 
   unsigned allocOffset(const unsigned size);
@@ -87,9 +104,8 @@ PerBackend& getPPSBackend();
 void initPTS();
 
 #ifdef GALOIS_USE_EXP
-void initPTS_cilk ();
+void initPTS_cilk();
 #endif // GALOIS_USE_EXP
-
 
 template<typename T>
 class PerThreadStorage: private boost::noncopyable {

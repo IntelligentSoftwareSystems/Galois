@@ -26,6 +26,7 @@
 #ifndef GALOIS_GRAPH_BAG_H
 #define GALOIS_GRAPH_BAG_H
 
+#include "Galois/Runtime/Serialize.h"
 #include "Galois/Runtime/PerHostStorage.h"
 #include "Galois/TwoLevelIterator.h"
 

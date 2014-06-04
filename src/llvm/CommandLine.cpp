@@ -55,6 +55,7 @@ TEMPLATE_INSTANTIATION(class opt<char>);
 TEMPLATE_INSTANTIATION(class opt<bool>);
 } } // end namespace llvm::cl
 
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
 void Option::anchor() {}
 void basic_parser_impl::anchor() {}
 void parser<bool>::anchor() {}
@@ -66,6 +67,7 @@ void parser<double>::anchor() {}
 void parser<float>::anchor() {}
 void parser<std::string>::anchor() {}
 void parser<char>::anchor() {}
+#endif
 
 //===----------------------------------------------------------------------===//
 
@@ -1096,6 +1098,7 @@ PRINT_OPT_DIFF(double)
 PRINT_OPT_DIFF(float)
 PRINT_OPT_DIFF(char)
 
+#ifndef DOXYGEN_SHOULD_SKIP_THIS
 void parser<std::string>::
 printOptionDiff(const Option &O, StringRef V, OptionValue<std::string> D,
                 size_t GlobalWidth) const {
@@ -1109,6 +1112,7 @@ printOptionDiff(const Option &O, StringRef V, OptionValue<std::string> D,
     std::cout << "*no default*";
   std::cout << ")\n";
 }
+#endif
 
 // Print a placeholder for options that don't yet support printOptionDiff().
 void basic_parser_impl::
@@ -1275,7 +1279,7 @@ class VersionPrinter {
 public:
   void print() {
     //ADL: GALOIS CHANGE
-    std::cout << "Galois Runtime 2.1";
+    //std::cout << "Galois Runtime 2.1\n";
   }
   void operator=(bool OptionWasSpecified) {
     if (!OptionWasSpecified) return;

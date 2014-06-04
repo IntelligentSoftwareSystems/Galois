@@ -185,8 +185,13 @@ int main(int argc, char** argv) {
   Tprealloc.start();
   std::cerr << "\nbeginning prealloc\n";
   Galois::reportPageAlloc("MeminfoPre1");
-  Galois::preAlloc(Galois::Runtime::MM::numPageAllocTotal() * 10);
-  //Galois::preAlloc(15 * numThreads + Galois::Runtime::MM::numPageAllocTotal() * 10);
+  // Galois::preAlloc(Galois::Runtime::MM::numPageAllocTotal() * 10);
+  // Tighter upper bound for pre-alloc, useful for machines with limited memory,
+  // e.g., Intel MIC. May not be enough for deterministic execution
+  const size_t NODE_SIZE = sizeof(**graph->begin());
+  Galois::preAlloc (5 * Galois::getActiveThreads () + NODE_SIZE * 8 * graph->size () / Galois::Runtime::MM::hugePageSize);
+  // Relaxed upper bound
+  // Galois::preAlloc(15 * numThreads + Galois::Runtime::MM::numPageAllocTotal() * 10);
   Galois::reportPageAlloc("MeminfoPre2");
   Tprealloc.stop();
 
@@ -208,6 +213,7 @@ int main(int argc, char** argv) {
   Trefine.start();
   using namespace Galois::WorkList;
   
+      //! [for_each_local example]
   typedef LocalQueue<dChunkedLIFO<256>, ChunkedLIFO<256> > BQ;
   typedef AltChunkedLIFO<32> Chunked;
 

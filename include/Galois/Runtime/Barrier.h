@@ -38,6 +38,9 @@ public:
 
   //wait at this barrier
   void operator()(void) { wait(); }
+
+  //barrier type.  Virtual to avoid per-instance space
+  virtual const char* name() const = 0;
 };
 
 /**
@@ -53,6 +56,18 @@ public:
  * happen, use {@link createSimpleBarrier()} instead. 
  */
 Barrier& getSystemBarrier();
+
+/**
+ * Create specific types of barriers.  For benchmarking only.  Use
+ * getSystemBarrier() for all production code
+ */
+namespace benchmarking {
+Barrier& getPthreadBarrier();
+Barrier& getMCSBarrier();
+Barrier& getTopoBarrier();
+Barrier& getCountingBarrier();
+Barrier& getDisseminationBarrier();
+}
 
 /**
  * Creates a new simple barrier. This barrier is not designed to be fast but

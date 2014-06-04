@@ -12,31 +12,35 @@ file(GLOB Sources
   libMeshInit/femap/*.cpp
   libMeshInit/dgmechanics/*.cpp
   libMeshInit/*.cpp
-  #dummy.f90
+  dummy.f90
 )
 
-enable_language(Fortran OPTIONAL)
+find_package(Fortran)
+if(Fortran_FOUND)
+  enable_language(Fortran OPTIONAL)
+endif()
+
 find_package(LAPACK)
 find_package(ZLIB)
 
-if(ZLIB_FOUND AND NOT GALOIS_ARCH_MIC)
+if(ZLIB_FOUND AND NOT ARCH STREQUAL "mic")
   add_definitions(-DGALOIS_HAS_ZLIB)
 endif()
-
 
 # TODO(ddn): CMake Boost module on BG/Q cannot be called multiple times. Skip
 # avi althogether for now.
 if(CMAKE_SYSTEM_NAME MATCHES "BlueGeneQ")
   set(Boost_FOUND off)
 else()
-  find_package(Boost 1.36.0 COMPONENTS system iostreams filesystem)
+  # Needs a slightly higher version than other Galois apps
+  find_package(Boost 1.50.0 COMPONENTS system iostreams filesystem)
 endif()
 
 if(CMAKE_Fortran_COMPILER_WORKS AND LAPACK_FOUND AND Boost_FOUND)
   include_directories(${ZLIB_INCLUDE_DIRS})
   add_library(AVI ${Sources})
 
-  if (ZLIB_FOUND AND NOT GALOIS_ARCH_MIC) 
+  if (ZLIB_FOUND AND NOT ARCH STREQUAL "mic") 
     target_link_libraries(AVI ${ZLIB_LIBRARIES})
     target_link_libraries(AVI ${Boost_LIBRARIES})
   endif()
@@ -48,10 +52,6 @@ app(AVIorderedSerial main/AVIorderedSerial.cpp
   REQUIRES AVI_FOUND
   EXTLIBS AVI ${LAPACK_LIBRARIES})
 
-app(AVIodgOrdered main/AVIodgOrdered.cpp 
-  REQUIRES AVI_FOUND 
-  EXTLIBS AVI ${LAPACK_LIBRARIES})
-
 app(AVIodgExplicit main/AVIodgExplicit.cpp
   REQUIRES AVI_FOUND
   EXTLIBS AVI ${LAPACK_LIBRARIES})
@@ -61,13 +61,17 @@ app(AVIodgExplicitNoLock main/AVIodgExplicitNoLock.cpp
   EXTLIBS AVI ${LAPACK_LIBRARIES})
 
 # the files may be removed from the release without causing error in cmake
-if(0)
-  app(AVIodgReadonly exp/AVIodgReadonly.cpp 
-    REQUIRES AVI_FOUND USE_EXP
+if(USE_EXP)
+  app(AVIodgOrdered main/AVIodgOrdered.cpp 
+    REQUIRES AVI_FOUND 
+    EXTLIBS AVI ${LAPACK_LIBRARIES})
+
+  app(AVIorderedSpec exp/AVIorderedSpec.cpp 
+    REQUIRES AVI_FOUND 
     EXTLIBS AVI ${LAPACK_LIBRARIES})
 
   app(AVIlevelExec exp/AVIlevelExec.cpp 
-    REQUIRES LAPACK_FOUND AVI_FOUND USE_EXP
+    REQUIRES AVI_FOUND 
     EXTLIBS AVI ${LAPACK_LIBRARIES})
 endif()
 

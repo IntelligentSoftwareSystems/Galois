@@ -2,11 +2,12 @@
 #include "Galois/Timer.h"
 #include "Galois/Galois.h"
 
+#include <cstdlib>
 #include <iostream>
 
 using namespace Galois::Runtime;
 
-const int num = 1024 * 1024 * 1024;
+int num = 1;
 
 template<typename T>
 struct testL {
@@ -49,7 +50,12 @@ void testf(const char* str) {
   std::cout << str << " L: " << tL.get() << " R: " << tR.get() << '\n';
 }
 
-int main() {
+int main(int argc, char** argv) {
+  if (argc > 1)
+    num = atoi(argv[1]);
+  if (num <= 0)
+    num = 1024 * 1024 * 1024;
+
   unsigned M = Galois::Runtime::LL::getMaxThreads();
 
   while (M) {

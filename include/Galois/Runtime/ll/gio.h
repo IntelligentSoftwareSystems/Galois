@@ -30,6 +30,7 @@
 
 #include <sstream>
 #include <cerrno>
+#include <string.h>
 
 //FIXME: move to Runtime
 
@@ -48,15 +49,11 @@ void gDebugStr(const std::string&);
 //! Prints an error string (for easy parsing)
 void gErrorStr(const std::string&);
 
-//! Converts a sequence of things to a string
-template<typename T>
-bool toString(std::ostringstream& os, const T& val) { os << val; return true; }
-
 //! Prints a sequence of things
 template<typename... Args>
 void gPrint(Args... args) {
   std::ostringstream os;
-  __attribute__((unused)) bool tmp[] = {toString(os, args)...};
+  __attribute__((unused)) int tmp[] = {(os << args, 0)...};
   gPrintStr(os.str());
 }
 
@@ -64,7 +61,7 @@ void gPrint(Args... args) {
 template<typename... Args>
 void gInfo(Args... args) {
   std::ostringstream os;
-  __attribute__((unused)) bool tmp[] = {toString(os, args)...};
+  __attribute__((unused)) int tmp[] = {(os << args, 0)...};
   gInfoStr(os.str());
 }
 
@@ -72,7 +69,7 @@ void gInfo(Args... args) {
 template<typename... Args>
 void gWarn(Args... args) {
   std::ostringstream os;
-  __attribute__((unused)) bool tmp[] = {toString(os, args)...};
+  __attribute__((unused)) int tmp[] = {(os << args, 0)...};
   gWarnStr(os.str());
 }
 
@@ -82,7 +79,7 @@ template<typename... Args>
 void gDebug(Args... args) {
 #ifndef NDEBUG
   std::ostringstream os;
-  __attribute__((unused)) bool tmp[] = {toString(os, args)...};
+  __attribute__((unused)) int tmp[] = {(os << args, 0)...};
   gDebugStr(os.str());
 #endif
 }
@@ -91,15 +88,13 @@ void gDebug(Args... args) {
 template<typename... Args>
 void gError(Args... args) {
   std::ostringstream os;
-  __attribute__((unused)) bool tmp[] = {toString(os, args)...};
+  __attribute__((unused)) int tmp[] = {(os << args, 0)...};
   gErrorStr(os.str());
 }
 
 void gFlush();
 
-#define GALOIS_SYS_ERROR(...) do { Galois::Runtime::LL::gError(__FILE__, ":", __LINE__, ": ", strerror(errno), ": ", ##__VA_ARGS__); } while (0)
-#define GALOIS_ERROR(...)     do { Galois::Runtime::LL::gError(__FILE__, ":", __LINE__, ": ", ##__VA_ARGS__); } while (0)
-#define GALOIS_SYS_DIE(...)   do { Galois::Runtime::LL::gError(__FILE__, ":", __LINE__, ": ", strerror(errno), ": ", ##__VA_ARGS__); abort(); } while (0)
+#define GALOIS_SYS_DIE(...)   do { Galois::Runtime::LL::gError(__FILE__, ":", __LINE__, ": ", strerror(errno), ": ",##__VA_ARGS__); abort(); } while (0)
 #define GALOIS_DIE(...)       do { Galois::Runtime::LL::gError(__FILE__, ":", __LINE__, ": ", ##__VA_ARGS__); abort(); } while (0)
 
 }

@@ -28,6 +28,8 @@
 #ifndef KRUSKAL_SERIAL_H_
 #define KRUSKAL_SERIAL_H_
 
+#include "Galois/Runtime/ll/CompilerSpecific.h"
+
 #include "Kruskal.h"
 
 namespace kruskal {
@@ -37,6 +39,26 @@ protected:
 
   virtual const std::string getVersion () const { return "Serial Ordered Kruskal"; }
 
+
+  GALOIS_ATTRIBUTE_PROF_NOINLINE static void mstFunc (const Edge& e, VecRep& repVec, size_t& mstSum) {
+      int rep1 = findPCiter_int (e.src, repVec);
+      int rep2 = findPCiter_int (e.dst, repVec);
+
+      if (rep1 != rep2) {
+        unionByRank_int (rep1, rep2, repVec);
+
+        mstSum += e.weight;
+      }
+  }
+
+  GALOIS_ATTRIBUTE_PROF_NOINLINE static void filterFunc (const Edge& e, VecRep& repVec, VecEdge& remaining) {
+      int rep1 = findPCiter_int (e.src, repVec);
+      int rep2 = findPCiter_int (e.dst, repVec);
+
+      if (rep1 != rep2) {
+        remaining.push_back (e);
+      }
+  }
 
   virtual void runMSTsplit (const size_t numNodes, const VecEdge& in_edges,
       size_t& mstWeight, size_t& totalIter) {
@@ -73,29 +95,14 @@ protected:
         i != ei; ++i) {
 
       ++iter;
-
-      int rep1 = findPCiter_int (i->src, repVec);
-      int rep2 = findPCiter_int (i->dst, repVec);
-
-      if (rep1 != rep2) {
-        unionByRank_int (rep1, rep2, repVec);
-
-        mstSum += i->weight;
-      }
-
+      mstFunc (*i, repVec, mstSum);
     }
 
     VecEdge remaining;
 
     for (VecEdge::const_iterator i = splitPoint, ei = edges.end ();
         i != ei; ++i) {
-
-      int rep1 = findPCiter_int (i->src, repVec);
-      int rep2 = findPCiter_int (i->dst, repVec);
-
-      if (rep1 != rep2) {
-        remaining.push_back (*i);
-      }
+      filterFunc (*i, repVec, remaining);
     }
     t_loop.stop ();
 
@@ -110,16 +117,7 @@ protected:
         i != ei; ++i) {
 
       ++iter;
-
-      int rep1 = findPCiter_int (i->src, repVec);
-      int rep2 = findPCiter_int (i->dst, repVec);
-
-      if (rep1 != rep2) {
-        unionByRank_int (rep1, rep2, repVec);
-
-        mstSum += i->weight;
-      }
-
+      mstFunc (*i, repVec, mstSum);
     }
     t_loop.stop ();
 
@@ -197,3 +195,4 @@ protected:
 
 } // end namespace kruskal
 #endif // KRUSKAL_SERIAL_H_
+

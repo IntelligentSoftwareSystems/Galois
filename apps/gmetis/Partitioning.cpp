@@ -274,12 +274,12 @@ struct KLMatch {
 void refine_kl(GGraph &graph,std::vector<GNode> &boundary,int oldPartNum, int newPartNum,std::vector<partInfo>& parts) {
   std::vector<GNode> swappedNodes;
   std::vector<PartMatch> foundNodes;
-  int iter = 0;
+  //int iter = 0;
   do {
     std::vector<PartMatch> matches;
-    for (int j = 0; j < boundary.size(); j++) {
+    for (unsigned int j = 0; j < boundary.size(); j++) {
       PerThreadPartInfo iterationInfo;
-      for (int i = 0; i < iterationInfo.size(); i++) {
+      for (unsigned int i = 0; i < iterationInfo.size(); i++) {
         iterationInfo.getRemote(i)->first = INT_MIN;
         iterationInfo.getRemote(i)->second.first = NULL; 
         iterationInfo.getRemote(i)->second.second = NULL; 
@@ -288,7 +288,7 @@ void refine_kl(GGraph &graph,std::vector<GNode> &boundary,int oldPartNum, int ne
       Galois::for_each(boundary.begin(),boundary.end(), matchIter,Galois::wl<Galois::WorkList::ChunkedLIFO<32> >());
       PartMatch bestMatch;
       bestMatch.first = INT_MIN;
-      for ( int i = 0; i < iterationInfo.size(); i++) {
+      for (unsigned int i = 0; i < iterationInfo.size(); i++) {
         PartMatch match = *iterationInfo.getRemote(i);
         if (match.first > bestMatch.first) {
           bestMatch = match;
@@ -309,7 +309,7 @@ void refine_kl(GGraph &graph,std::vector<GNode> &boundary,int oldPartNum, int ne
     int g_max = 0;
     int temp = 0;
     int index = -1;
-    for (int k = 0; k < matches.size(); k++) { 
+    for (unsigned int k = 0; k < matches.size(); k++) { 
       g_max+= matches[k].first;
       if ( g_max > temp) { 
         temp = g_max; 
@@ -336,7 +336,7 @@ void refine_kl(GGraph &graph,std::vector<GNode> &boundary,int oldPartNum, int ne
       swappedNodes.push_back(n1);
       swappedNodes.push_back(n2);
     }
-    for (int i = index+1; i<matches.size(); i++) { 
+    for (unsigned int i = index+1; i<matches.size(); i++) { 
       auto& m1 = graph.getData(matches[i].second.first);
       auto& m2 = graph.getData(matches[i].second.second);
       m1.setLocked(false);
@@ -372,7 +372,7 @@ struct serialBisect {
       continue;
      std::pair<unsigned, unsigned> ratio = item->splitRatio(nparts);
      std::vector<GNode> newNodes;
-     int iter = 0;
+     //int iter = 0;
      partInfo newPart;
      newPart.partWeight = 0;
      newPart = bisect(*graph, *item, ratio,&newNodes,newPart.partWeight);

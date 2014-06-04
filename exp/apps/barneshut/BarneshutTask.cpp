@@ -1599,7 +1599,7 @@ struct DoComputeForce<ComputeForceTy,WLTy,typename boost::enable_if<has_task<Com
     
     Galois::StatTimer computeTime("ParallelComputeForceTime");
     computeTime.start();
-    Galois::on_each(Wrapper<Outs>(W, outs), "MakeComputeForce");
+    Galois::on_each(Wrapper<Outs>(W, outs), Galois::loopname("MakeComputeForce"));
     computeTime.stop();
   }
 };
@@ -1779,7 +1779,7 @@ int main(int argc, char** argv) {
   Galois::StatManager M;
   LonestarStart(argc, argv, name, desc, url);
 
-  FixThreads fixThreads;
+  // FixThreads fixThreads;
   // tbb::task_scheduler_init iii(tbb::task_scheduler_init::default_num_threads()); XXX
 
   if (blockSizeX > MaxBlockSizeX) {

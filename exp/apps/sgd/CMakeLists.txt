@@ -1,1 +1,0 @@
-app(sgd sgd.cpp)

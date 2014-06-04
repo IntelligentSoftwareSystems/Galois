@@ -1622,7 +1622,6 @@ public:
   }
 };
 
-
 template<class T,class Compare=std::less<T>,bool Concurrent=true>
 class FCPairingHeap: private boost::noncopyable {
   struct Op {
@@ -1633,9 +1632,9 @@ class FCPairingHeap: private boost::noncopyable {
   };
 
   struct Slot {
-    Op* volatile req __attribute__((aligned(64)));
-    Slot* volatile next;
-    Slot* volatile prev;
+    std::atomic<Op*> req __attribute__((aligned(64)));
+    std::atomic<Slot*> next;
+    std::atomic<Slot*> prev;
     Slot(): req(NULL), next(NULL), prev(NULL) { }
   };
 
@@ -1648,9 +1647,9 @@ class FCPairingHeap: private boost::noncopyable {
 
   void flatCombine() {
     for (int tries = 0; tries < maxTries; ++tries) {
-      _GLIBCXX_READ_MEM_BARRIER;
+      //_GLIBCXX_READ_MEM_BARRIER;
       int changes = 0;
-      Slot* cur = slots;
+      Slot* cur = slots.load(std::memory_order_acquire);
       while (cur->next) {
         Op* op = cur->req;
         if (op && op->req) {
@@ -1676,10 +1675,10 @@ class FCPairingHeap: private boost::noncopyable {
     Slot* cur;
     do {
       cur = slots;
-      slot->next = cur;
+      slot->next.store(cur, std::memory_order_relaxed);
     //} while (!__sync_bool_compare_and_swap((uintptr_t*)&slots, reinterpret_cast<uintptr_t>(cur), reinterpret_cast<uintptr_t>(slot)));
     } while (!slots.compare_exchange_strong(cur, slot));
-    cur->prev = slot;
+    cur->prev.store(slot, std::memory_order_release);
   }
 
   Slot* getMySlot() {
@@ -1750,9 +1749,9 @@ public:
   void add(T value) {
     Slot* mySlot = getMySlot();
     //Slot* volatile& myNext = mySlot->next;
-    Op* volatile& myReq = mySlot->req;
+    std::atomic<Op*>& myReq = mySlot->req;
     Op* req = makeAddReq(value);
-    myReq = req;
+    myReq.store(req, std::memory_order_release);
 
     do {
       //if (!myNext) {
@@ -1767,11 +1766,11 @@ public:
         recycleOp(req);
         return;
       } else {
-        _GLIBCXX_WRITE_MEM_BARRIER;
-        while (myReq == req) {
+        //_GLIBCXX_WRITE_MEM_BARRIER;
+        while (myReq.load(std::memory_order_acquire) == req) {
 	  Galois::Runtime::LL::asmPause();
         }
-        _GLIBCXX_READ_MEM_BARRIER;
+        //_GLIBCXX_READ_MEM_BARRIER;
         recycleOp(req);
         return;
       }
@@ -1781,9 +1780,9 @@ public:
   Galois::optional<T> pollMin() {
     Slot* mySlot = getMySlot();
     //Slot* volatile& myNext = mySlot->next;
-    Op* volatile& myReq = mySlot->req;
+    std::atomic<Op*>& myReq = mySlot->req;
     Op* req = makePollReq();
-    myReq = req;
+    myReq.store(req, std::memory_order_release);
 
     do {
       //if (!myNext) {
@@ -1796,17 +1795,17 @@ public:
         flatCombine();
         lock.unlock();
 
-	Galois::optional<T> retval = myReq->retval;
+	Galois::optional<T> retval = myReq.load(std::memory_order_relaxed)->retval;
         recycleOp(req->response);
         recycleOp(req);
         return retval;
       } else {
-        _GLIBCXX_WRITE_MEM_BARRIER;
-        while (myReq == req) {
+        //_GLIBCXX_WRITE_MEM_BARRIER;
+        while (myReq.load(std::memory_order_acquire) == req) {
 	  Galois::Runtime::LL::asmPause();
         }
-        _GLIBCXX_READ_MEM_BARRIER;
-	Galois::optional<T> retval = myReq->retval;
+        //_GLIBCXX_READ_MEM_BARRIER;
+	Galois::optional<T> retval = myReq.load(std::memory_order_acquire)->retval;
         recycleOp(req->response);
         recycleOp(req);
         return retval;

@@ -49,7 +49,7 @@ namespace Galois {
  * {@link for_each()}. For example,
  *
  * \code
- * Galois::for_each<Galois::WorkList::dChunkedFIFO<32> >(begin, end, fn);
+ * Galois::for_each(begin, end, fn, Galois::wl<Galois::WorkList::dChunkedFIFO<32>>());
  * \endcode
  */
 namespace WorkList {

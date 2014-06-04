@@ -204,6 +204,8 @@ public:
     _reinit(val);
   }
 
+  virtual const char* name() const { return "TopoBarrier"; }
+
   virtual void wait() {
     unsigned id = Galois::Runtime::LL::getTID();
     treenode& n = *nodes.getLocal();
@@ -272,12 +274,14 @@ public:
   
   StupidDistBarrier() : count(0) {}
   
-  void reinit(unsigned val) {
+  virtual const char* name() const { return "DistBarrier"; }
+
+  virtual void reinit(unsigned val) {
     localBarrier.reinit(val);
     count = 0;
   }
   
-  void wait() {
+  virtual void wait() {
     if (Galois::Runtime::LL::getTID() == 0)
       count += Galois::Runtime::NetworkInterface::Num;
     

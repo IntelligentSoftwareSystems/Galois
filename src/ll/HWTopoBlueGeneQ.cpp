@@ -23,7 +23,7 @@
  * See HWTopoLinux.cpp.
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
-*/
+ */
 #include "Galois/Runtime/ll/HWTopo.h"
 #include "Galois/Runtime/ll/gio.h"
 
@@ -34,17 +34,17 @@ using namespace Galois::Runtime::LL;
 
 namespace {
 
-static bool linuxBindToProcessor(int proc) {
+static bool bindToProcessor(int proc) {
   cpu_set_t mask;
   /* CPU_ZERO initializes all the bits in the mask to zero. */
-  CPU_ZERO( &mask );
+  CPU_ZERO(&mask);
   
   /* CPU_SET sets only the bit corresponding to cpu. */
   // void to cancel unused result warning
-  (void)CPU_SET( proc, &mask );
+  (void)CPU_SET(proc, &mask);
   
   /* sched_setaffinity returns 0 in success */
-  if( sched_setaffinity( 0, sizeof(mask), &mask ) == -1 ) {
+  if (sched_setaffinity(0, sizeof(mask), &mask) == -1) {
     gWarn("Could not set CPU affinity for thread ", proc, "(", strerror(errno), ")");
     return false;
   }
@@ -58,25 +58,18 @@ struct Policy {
   unsigned numThreads, numCores, numPackages;
 
   Policy() {
-#if 1
     for (int i = 0; i < 16; ++i) {
       for (int j = 0; j < 4; ++j) {
         procmap.push_back(j*16 + i);
       }
     }
-#else
-    int cpuid_max = 63;
-    for (int i = 0; i <= cpuid_max; i++) {
-      procmap.push_back(i);
-    }
-#endif
     numThreads = procmap.size();
     numCores = procmap.size();
     numPackages = 1;
   }
 };
 
-Policy& getPolicy() {
+static Policy& getPolicy() {
   static Policy A;
   return A;
 }
@@ -84,7 +77,7 @@ Policy& getPolicy() {
 } //namespace
 
 bool Galois::Runtime::LL::bindThreadToProcessor(int id) {
-  return linuxBindToProcessor(getPolicy().procmap[id]);
+  return bindToProcessor(getPolicy().procmap[id]);
 }
 
 unsigned Galois::Runtime::LL::getProcessorForThread(int id) {

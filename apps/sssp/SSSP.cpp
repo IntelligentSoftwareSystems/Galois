@@ -1,4 +1,5 @@
 /** Single source shortest paths -*- C++ -*-
+ * @example SSSP.cpp
  * @file
  * @section License
  *
@@ -202,7 +203,9 @@ template<typename Graph>
 void readInOutGraph(Graph& graph) {
   using namespace Galois::Graph;
   if (symmetricGraph) {
+    //! [Reading a graph]
     Galois::Graph::readGraph(graph, filename);
+    //! [Reading a graph]
   } else if (transposeGraphName.size()) {
     Galois::Graph::readGraph(graph, filename, transposeGraphName);
   } else {
@@ -211,8 +214,11 @@ void readInOutGraph(Graph& graph) {
 }
 
 struct SerialAlgo {
+  //! [Define LC_CSR_Graph]  
   typedef Galois::Graph::LC_CSR_Graph<SNode, uint32_t>
     ::with_no_lockable<true>::type Graph;
+  //! [Define LC_CSR_Graph]  
+
   typedef Graph::GraphNode GNode;
   typedef UpdateRequestCommon<GNode> UpdateRequest;
 
@@ -261,12 +267,15 @@ struct SerialAlgo {
 template<bool UseCas>
 struct AsyncAlgo {
   typedef SNode Node;
-
+  
+  // ! [Define LC_InlineEdge_Graph]
   typedef Galois::Graph::LC_InlineEdge_Graph<Node, uint32_t>
     ::template with_out_of_line_lockable<true>::type
     ::template with_compressed_node_ptr<true>::type
     ::template with_numa_alloc<true>::type
     Graph;
+  // ! [Define LC_InlineEdge_Graph]
+  
   typedef typename Graph::GraphNode GNode;
   typedef UpdateRequestCommon<GNode> UpdateRequest;
 
@@ -497,7 +506,7 @@ void run(bool prealloc = true) {
   size_t approxNodeData = graph.size() * 64;
   //size_t approxEdgeData = graph.sizeEdges() * sizeof(typename Graph::edge_data_type) * 2;
   if (prealloc)
-    Galois::preAlloc(numThreads + approxNodeData / Galois::Runtime::MM::pageSize);
+    Galois::preAlloc(numThreads + approxNodeData / Galois::Runtime::MM::hugePageSize);
   Galois::reportPageAlloc("MeminfoPre");
 
   Galois::StatTimer T;
@@ -516,9 +525,7 @@ void run(bool prealloc = true) {
     if (verify(graph, source)) {
       std::cout << "Verification successful.\n";
     } else {
-      std::cerr << "Verification failed.\n";
-      assert(0 && "Verification failed");
-      abort();
+      GALOIS_DIE("Verification failed");
     }
   }
 }

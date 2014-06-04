@@ -1,14 +1,12 @@
 /** Maximal independent set application -*- C++ -*-
  * @file
  *
- * A simple spanning tree algorithm to demostrate the Galois system.
- *
  * @section License
  *
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2014, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -24,6 +22,7 @@
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 #include "Galois/Galois.h"
+#include "Galois/Accumulator.h"
 #include "Galois/Bag.h"
 #include "Galois/Statistic.h"
 #include "Galois/Graph/LCGraph.h"
@@ -68,22 +67,20 @@ static cll::opt<Algo> algo(cll::desc("Choose an algorithm:"),
       clEnumVal(orderedBase, "Base ordered execution"),
       clEnumValEnd), cll::init(nondet));
 
-enum MatchFlag {
+enum MatchFlag: char {
   UNMATCHED, OTHER_MATCHED, MATCHED
 };
 
 struct Node {
   MatchFlag flag; 
-  MatchFlag pendingFlag; 
-  Node() : flag(UNMATCHED), pendingFlag(UNMATCHED) { }
+  Node() : flag(UNMATCHED) { }
 };
 
 
 struct SerialAlgo {
-  typedef Galois::Graph::LC_InlineEdge_Graph<Node,void>
+  typedef Galois::Graph::LC_CSR_Graph<Node,void>
     ::with_numa_alloc<true>::type
-    ::with_no_lockable<true>::type
-    ::with_compressed_node_ptr<true>::type Graph;
+    ::with_no_lockable<true>::type Graph;
   typedef Graph::GraphNode GNode;
 
   void operator()(Graph& graph) {
@@ -128,11 +125,10 @@ struct Process {
   typedef int tt_does_not_need_push;
   typedef int tt_needs_per_iter_alloc; // For LocalState
 
-  typedef Galois::Graph::LC_InlineEdge_Graph<Node,void>
-    ::with_numa_alloc<true>::type
-    ::with_compressed_node_ptr<true>::type Graph;
+  typedef typename Galois::Graph::LC_CSR_Graph<Node,void>
+    ::template with_numa_alloc<true>::type Graph;
 
-  typedef Graph::GraphNode GNode;
+  typedef typename Graph::GraphNode GNode;
 
   struct LocalState {
     bool mod;
@@ -151,7 +147,7 @@ struct Process {
     if (me.flag != UNMATCHED)
       return false;
 
-    for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::NONE),
+    for (typename Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::NONE),
         ei = graph.edge_end(src, Galois::MethodFlag::NONE); ii != ei; ++ii) {
       GNode dst = graph.getEdgeDst(ii);
       Node& data = graph.getData(dst, Flag);
@@ -164,7 +160,7 @@ struct Process {
 
   void modify(GNode src) {
     Node& me = graph.getData(src, Galois::MethodFlag::NONE);
-    for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::NONE),
+    for (typename Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::NONE),
         ei = graph.edge_end(src, Galois::MethodFlag::NONE); ii != ei; ++ii) {
       GNode dst = graph.getEdgeDst(ii);
       Node& data = graph.getData(dst, Galois::MethodFlag::NONE);
@@ -206,7 +202,7 @@ struct OrderedProcess {
   typedef int tt_does_not_need_push;
 
   typedef typename Process<>::Graph Graph;
-  typedef Graph::GraphNode GNode;
+  typedef typename Graph::GraphNode GNode;
 
   Graph& graph;
   Process<> process;
@@ -247,7 +243,7 @@ struct DefaultAlgo {
 
   void operator()(Graph& graph) {
 #ifdef GALOIS_USE_EXP
-    typedef Galois::WorkList::BulkSynchronousInline<> WL;
+    typedef Galois::WorkList::BulkSynchronousInline WL;
 #else
     typedef Galois::WorkList::dChunkedFIFO<256> WL;
 #endif
@@ -287,23 +283,27 @@ struct PullAlgo {
     typedef Galois::InsertBag<GNode> Bag;
 
     Graph& graph;
-    Bag& tcur;
+    Bag& matched;
+    Bag& otherMatched;
     Bag& next;
+    Galois::GAccumulator<size_t>& numProcessed;
 
     void operator()(GNode src, Galois::UserContext<GNode>&) {
       (*this)(src);
     }
 
     void operator()(GNode src) {
-      Node& n = graph.getData(src, Galois::MethodFlag::NONE);
+      numProcessed += 1;
+      //Node& n = graph.getData(src, Galois::MethodFlag::NONE);
 
       MatchFlag f = MATCHED;
-      for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::NONE),
-          ei = graph.edge_end(src, Galois::MethodFlag::NONE); ii != ei; ++ii) {
-        GNode dst = graph.getEdgeDst(ii);
+      for (auto edge : graph.out_edges(src, Galois::MethodFlag::NONE)) {
+        GNode dst = graph.getEdgeDst(edge);
+        if (dst >= src) {
+          continue; 
+        } 
+        
         Node& other = graph.getData(dst, Galois::MethodFlag::NONE);
-        if (dst >= src)
-          continue;
         if (other.flag == MATCHED) {
           f = OTHER_MATCHED;
           break;
@@ -314,62 +314,74 @@ struct PullAlgo {
 
       if (f == UNMATCHED) {
         next.push_back(src);
-        return;
+      } else if (f == MATCHED) {
+        matched.push_back(src);
+      } else {
+        otherMatched.push_back(src);
       }
-
-      n.pendingFlag = f;
-      tcur.push_back(src);
     }
   };
 
+  template<MatchFlag F>
   struct Take {
     Graph& graph;
+    Galois::GAccumulator<size_t>& numTaken;
+
     void operator()(GNode src) {
       Node& n = graph.getData(src, Galois::MethodFlag::NONE);
-      n.flag = n.pendingFlag;
+      numTaken += 1;
+      n.flag = F;
     }
   };
 
   void operator()(Graph& graph) {
     Galois::Statistic rounds("Rounds");
+    Galois::GAccumulator<size_t> numProcessed;
+    Galois::GAccumulator<size_t> numTaken;
 
     typedef Galois::InsertBag<GNode> Bag;
-    Bag bags[3];
+    Bag bags[2];
     Bag *cur = &bags[0];
-    Bag *tcur = &bags[1];
-    Bag *next = &bags[2];
+    Bag *next = &bags[1];
+    Bag matched;
+    Bag otherMatched;
     uint64_t size = graph.size();
     uint64_t delta = graph.size() / 25;
 
     Graph::iterator ii = graph.begin();
     Graph::iterator ei = graph.begin();
-    uint64_t remaining = std::min(size, delta);
-    std::advance(ei, remaining);
-    size -= remaining;
 
-    while (ii != ei) {
-      Pull pull = { graph, *tcur, *next };
+    while (size > 0) {
+      Pull pull { graph, matched, otherMatched, *next, numProcessed };
+      Take<MATCHED> takeMatched { graph, numTaken };
+      Take<OTHER_MATCHED> takeOtherMatched { graph, numTaken };
 
-      Galois::do_all(ii, ei, pull);
-      Take take = { graph };
-      Galois::do_all_local(*tcur, take);
-      rounds += 1;
-      
-      while (!next->empty()) {
-        cur->clear();
-        tcur->clear();
-        std::swap(cur, next);
-        
-        Pull pull = { graph, *tcur, *next };
+      numProcessed.reset();
+
+      if (!cur->empty()) {
+        typedef Galois::WorkList::StableIterator<Bag::iterator> WL;
+        //Galois::for_each_local(*cur, pull, Galois::wl<WL>());
         Galois::do_all_local(*cur, pull);
-        Galois::do_all_local(*tcur, take);
-        rounds += 1;
       }
+
+      size_t numCur = numProcessed.reduce();
+      std::advance(ei, std::min(size, delta) - numCur);
+
+      if (ii != ei)
+        Galois::do_all(ii, ei, pull);
       ii = ei;
 
-      remaining = std::min(size, delta);
-      std::advance(ei, remaining);
-      size -= remaining;
+      numTaken.reset();
+
+      Galois::do_all_local(matched, takeMatched);
+      Galois::do_all_local(otherMatched, takeOtherMatched);
+
+      cur->clear();
+      matched.clear();
+      otherMatched.clear();
+      std::swap(cur, next);
+      rounds += 1;
+      size -= numTaken.reduce();
     }
   }
 };
@@ -377,6 +389,7 @@ struct PullAlgo {
 template<typename Graph>
 struct is_bad {
   typedef typename Graph::GraphNode GNode;
+  typedef typename Graph::node_data_type Node;
   Graph& graph;
 
   is_bad(Graph& g): graph(g) { }
@@ -438,13 +451,12 @@ void run() {
   Graph graph;
   Galois::Graph::readGraph(graph, filename);
 
-  // Galois::preAlloc(numThreads + (graph.size() * sizeof(Node) * numThreads / 8) / Galois::Runtime::MM::pageSize);
+  // Galois::preAlloc(numThreads + (graph.size() * sizeof(Node) * numThreads / 8) / Galois::Runtime::MM::hugePageSize);
   // Tighter upper bound
-  if(std::is_same<Algo, DefaultAlgo<nondet> >::value) {
-    Galois::preAlloc (numThreads + 8*graph.size()/Galois::Runtime::MM::pageSize);
-
+  if (std::is_same<Algo, DefaultAlgo<nondet> >::value) {
+    Galois::preAlloc(numThreads + 8*graph.size()/Galois::Runtime::MM::hugePageSize);
   } else {
-    Galois::preAlloc (numThreads + 32*graph.size()/Galois::Runtime::MM::pageSize);
+    Galois::preAlloc(numThreads + 32*graph.size()/Galois::Runtime::MM::hugePageSize);
   }
 
   Galois::reportPageAlloc("MeminfoPre");

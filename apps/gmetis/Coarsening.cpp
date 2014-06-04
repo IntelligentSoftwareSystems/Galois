@@ -171,7 +171,7 @@ struct parallelMatchAndCreateNodes {
       //Cautious point
       //no match
       if (selfMatch) {
-        pc.update(1);
+        pc.update(1U);
         N = coarseGGraph->createNode(numEdges, fineGGraph->getData(item).getWeight(), item);
         fineGGraph->getData(item).setMatched();
         fineGGraph->getData(item).setParent(N);
@@ -227,7 +227,7 @@ struct parallelPopulateEdges {
           sum += pp->second;
           ++pp;
         }
-        coarseGGraph->addEdgeWithoutCheck(node, dst, Galois::MethodFlag::NONE, sum);
+        coarseGGraph->addMultiEdge(node, dst, Galois::MethodFlag::NONE, sum);
       }
     }
     //    assert(e);

@@ -236,7 +236,8 @@ private:
       }
 
       addList.clear ();
-      i->simulate (addList, table, endtime);
+      i->simulate ();
+      table.addNextEvents (*i, addList, endtime);
 
       for (std::vector<Event>::iterator a = addList.begin (), ea = addList.end ();
           a != ea; ++a) {
@@ -495,7 +496,9 @@ protected:
       addList.clear ();
       const bool notStale = i->notStale ();
 
-      i->simulate (addList, table, endtime);
+
+      i->simulate ();
+      table.addNextEvents (*i, addList, endtime);
 
       for (std::vector<Event>::const_iterator a = addList.begin (), ea = addList.end ();
           a != ea; ++a) {

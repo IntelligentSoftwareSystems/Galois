@@ -28,9 +28,9 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 #include "Galois/Runtime/mm/Mem.h"
-//#include "Galois/Runtime/Support.h"
 
 #include <map>
+#include <mutex>
 
 using namespace Galois::Runtime;
 using namespace MM;
@@ -40,10 +40,10 @@ using namespace LL;
 SystemBaseAlloc::SystemBaseAlloc() {}
 SystemBaseAlloc::~SystemBaseAlloc() {}
 
+#ifndef GALOIS_FORCE_STANDALONE
 PtrLock<SizedAllocatorFactory, true> SizedAllocatorFactory::instance;
 __thread SizedAllocatorFactory::AllocatorsMap* SizedAllocatorFactory::localAllocators = 0;
 
-#ifndef USEMALLOC
 SizedAllocatorFactory::SizedAlloc* 
 SizedAllocatorFactory::getAllocatorForSize(const size_t size) {
   if (size == 0)
@@ -55,20 +55,24 @@ SizedAllocatorFactory::SizedAlloc*
 SizedAllocatorFactory::getAllocForSize(const size_t size) {
   typedef SizedAllocatorFactory::AllocatorsMap AllocMap;
 
-  if (!localAllocators)
+  if (!localAllocators) {
+    std::lock_guard<SimpleLock> ll(lock);
     localAllocators = new AllocMap;
+    allLocalAllocators.push_front(localAllocators);
+  }
 
   auto& lentry = (*localAllocators)[size];
   if (lentry)
     return lentry;
 
-  lock.lock();
-  auto& gentry = allocators[size];
-  if (!gentry)
-    gentry = new SizedAlloc();
-  lentry = gentry;
-  lock.unlock();
-  return  lentry;
+  {
+    std::lock_guard<SimpleLock> ll(lock);
+    auto& gentry = allocators[size];
+    if (!gentry)
+      gentry = new SizedAlloc();
+    lentry = gentry;
+    return lentry;
+  }
 }
 
 SizedAllocatorFactory* SizedAllocatorFactory::getInstance() {
@@ -90,9 +94,12 @@ SizedAllocatorFactory* SizedAllocatorFactory::getInstance() {
 SizedAllocatorFactory::SizedAllocatorFactory() :lock() {}
 
 SizedAllocatorFactory::~SizedAllocatorFactory() {
-  for (AllocatorsMap::iterator it = allocators.begin(), end = allocators.end();
-      it != end; ++it) {
-    delete it->second;
-  }
+  // TODO destructor ordering problem: there may be pointers to deleted
+  // SizedAlloc when this Factory is destroyed before dependent
+  // FixedSizeAllocators.
+  for (auto entry : allocators)
+    delete entry.second;
+  for (auto mptr : allLocalAllocators)
+    delete mptr;
 }
 #endif

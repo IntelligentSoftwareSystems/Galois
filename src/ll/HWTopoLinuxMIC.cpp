@@ -20,12 +20,7 @@
  *
  * @section Description
  *
- * This contains descriptions of machine topologies.  These describes levels in
- * the machine.  The lowest level is a package.
- *
- * This also matches OS cpu numbering to galois thread numbering and binds threads
- * to processors.  Threads are assigned densly in each package before the next 
- * package.  SMT hardware contexts are bound after all real cores (unsigned x86).
+ * See HWTopoLinux.cpp
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
 */
@@ -45,16 +40,11 @@
 
 #include <sched.h>
 
-#ifdef GALOIS_ARCH_MIC
 #define GALOIS_USE_MIC_TOPO
-#endif
-
-
 
 using namespace Galois::Runtime::LL;
 
 namespace {
-
   // TODO: store number of cores in each package?
   // and number of procs in each package?
 
@@ -71,23 +61,22 @@ struct cpuinfo {
   unsigned vcoreid;
   unsigned vtid;
   unsigned leader;
-  
 };
 
 static const char* sProcInfo = "/proc/cpuinfo";
 static const char* sCPUSet   = "/proc/self/cpuset";
 
-static bool linuxBindToProcessor(unsigned proc) {
+static bool bindToProcessor(unsigned proc) {
   cpu_set_t mask;
   /* CPU_ZERO initializes all the bits in the mask to zero. */
-  CPU_ZERO( &mask );
+  CPU_ZERO(&mask);
   
   /* CPU_SET sets only the bit corresponding to cpu. */
   // void to cancel unused result warning
-  (void)CPU_SET( proc, &mask );
+  (void)CPU_SET(proc, &mask);
   
   /* sched_setaffinity returns 0 in success */
-  if( sched_setaffinity( 0, sizeof(mask), &mask ) == -1 ) {
+  if (sched_setaffinity(0, sizeof(mask), &mask) == -1) {
     gWarn("Could not set CPU affinity for thread ", proc, "(", strerror(errno), ")");
     return false;
   }
@@ -96,7 +85,6 @@ static bool linuxBindToProcessor(unsigned proc) {
 
 //! Parse /proc/cpuinfo
 static void parseCPUInfo(std::vector<cpuinfo>& vals) {
-  
   vals.reserve(64);
 
   FILE* f = fopen(sProcInfo, "r");
@@ -108,7 +96,6 @@ static void parseCPUInfo(std::vector<cpuinfo>& vals) {
   const unsigned len = 1024;
   char* line = (char*)malloc(len);
   int cur = -1;
-
 
   while (fgets(line, len, f)) {
     int num;
@@ -136,7 +123,6 @@ static void parseCPUInfo(std::vector<cpuinfo>& vals) {
 
 //! Returns physical ids in current cpuset
 static void parseCPUSet(std::vector<unsigned>& vals) {
-  
   vals.reserve(64);
 
   //PARSE: /proc/self/cpuset
@@ -155,7 +141,7 @@ static void parseCPUSet(std::vector<unsigned>& vals) {
   }
   fclose(f);
 
-  if(char* t = index(path, '\n'))
+  if( char* t = index(path, '\n'))
     *t = '\0';
 
   if (strlen(path) == 1) {
@@ -209,8 +195,7 @@ static void parseCPUSet(std::vector<unsigned>& vals) {
   return;
 }
 
-struct AutoLinuxPolicyMIC {
-
+struct Policy {
   typedef std::vector<unsigned> VecNum;
   typedef std::set<unsigned> SetNum;
   typedef std::vector<VecNum> VecVecNum;
@@ -222,9 +207,8 @@ struct AutoLinuxPolicyMIC {
   typedef std::vector<VecPtr> VecVecPtr;
   typedef std::vector<VecVecPtr> VecVecVecPtr;
 
-
   struct OrderByPkg: public std::binary_function<unsigned,unsigned,bool> {
-    bool operator () (const cpuinfo* a, const cpuinfo* b) const {
+    bool operator() (const cpuinfo* a, const cpuinfo* b) const {
       assert (a != nullptr);
       assert (b != nullptr);
       return (a->physid < b->physid);
@@ -232,7 +216,7 @@ struct AutoLinuxPolicyMIC {
   };
 
   struct OrderByCore: public std::binary_function<unsigned,unsigned,bool> {
-    bool operator () (const cpuinfo* a, const cpuinfo* b) const {
+    bool operator() (const cpuinfo* a, const cpuinfo* b) const {
       assert (a != nullptr);
       assert (b != nullptr);
       return (a->coreid < b->coreid);
@@ -240,7 +224,7 @@ struct AutoLinuxPolicyMIC {
   };
   
   struct OrderByProc: public std::binary_function<unsigned,unsigned,bool> {
-    bool operator () (const cpuinfo* a, const cpuinfo* b) const {
+    bool operator() (const cpuinfo* a, const cpuinfo* b) const {
       assert (a != nullptr);
       assert (b != nullptr);
       return (a->proc < b->proc);
@@ -248,7 +232,7 @@ struct AutoLinuxPolicyMIC {
   };
   
   struct OrderByTID: public std::binary_function<unsigned,unsigned,bool> {
-    bool operator () (const cpuinfo* a, const cpuinfo* b) const {
+    bool operator() (const cpuinfo* a, const cpuinfo* b) const {
       assert (a != nullptr);
       assert (b != nullptr);
       return (a->vtid < b->vtid);
@@ -273,19 +257,16 @@ struct AutoLinuxPolicyMIC {
   std::vector<unsigned> leaderMapPackage;
 
 
-  AutoLinuxPolicyMIC () {
-
-
+  Policy() {
     std::vector<cpuinfo> rawInfoVec;
     parseCPUInfo (rawInfoVec);
 
     // for MIC only
 #ifdef GALOIS_USE_MIC_TOPO
-    for (auto i = rawInfoVec.begin (), endi = rawInfoVec.end (); i != endi; ++i) {
+    for (auto i = rawInfoVec.begin(), endi = rawInfoVec.end(); i != endi; ++i) {
       i->physid = i->coreid;
     }
 #endif
-
     std::vector<unsigned> enabledSet;
     parseCPUSet (enabledSet);
 
@@ -293,73 +274,62 @@ struct AutoLinuxPolicyMIC {
       printRawConfiguration(rawInfoVec, enabledSet);
     }
 
-    computeSizes (rawInfoVec, numPackagesRaw, numCoresRaw, numThreadsRaw);
+    computeSizes(rawInfoVec, numPackagesRaw, numCoresRaw, numThreadsRaw);
 
     std::vector<cpuinfo> activeSet;
-
     std::vector<cpuinfo>* infovec = nullptr;
 
-    if (enabledSet.empty ()) {
-
+    if (enabledSet.empty()) {
       infovec = &rawInfoVec;
-
       numPackages = numPackagesRaw;
       numCores = numCoresRaw;
       numThreads = numThreadsRaw;
-
     } else {
-
       infovec = &activeSet;
 
       // XXX: Following code assumes that the Proc IDs are contiguous in [0..numProcs)
       // but not necessarily in that order
-      std::vector<bool> enabledFlagVec (rawInfoVec.size (), false);
-      for (auto i = enabledSet.cbegin (), endi = enabledSet.cend (); i != endi; ++i) {
+      std::vector<bool> enabledFlagVec(rawInfoVec.size(), false);
+      for (auto i = enabledSet.cbegin(), endi = enabledSet.cend(); i != endi; ++i) {
         enabledFlagVec[*i] = true;
       }
 
-
-      for (auto i = rawInfoVec.cbegin (), endi = rawInfoVec.cend (); i != endi; ++i) {
+      for (auto i = rawInfoVec.cbegin(), endi = rawInfoVec.cend(); i != endi; ++i) {
         if (enabledFlagVec[i->proc]) {
           activeSet.push_back (*i);
         }
       }
 
       // compute the actual sizes based on activeSet 
-      computeSizes (activeSet, numPackages, numCores, numThreads);
+      computeSizes(activeSet, numPackages, numCores, numThreads);
     }
 
     assert (infovec != nullptr);
-    computeForwardMap (*infovec, numThreads);
+    computeForwardMap(*infovec, numThreads);
 
-    computeReverseMap (*infovec);
+    computeReverseMap(*infovec);
 
     if (EnvCheck("GALOIS_DEBUG_TOPO"))
       printFinalConfiguration(); 
   }
 
   static void computeSizes (const std::vector<cpuinfo>& infovec, unsigned& numP, unsigned& numC, unsigned& numT) {
-
-    numT = infovec.size ();
-
+    numT = infovec.size();
     MapNum_SetNum pkg_core_sets;
 
-    for (auto i = infovec.cbegin (), endi = infovec.cend (); i != endi; ++i) {
+    for (auto i = infovec.cbegin(), endi = infovec.cend(); i != endi; ++i) {
       if (pkg_core_sets.count (i->physid) == 0) {
-
-        pkg_core_sets.insert (std::make_pair (i->physid, SetNum ()));
+        pkg_core_sets.insert (std::make_pair (i->physid, SetNum()));
       }
-
       pkg_core_sets[i->physid].insert (i->coreid);
     }
 
-    numP = pkg_core_sets.size ();
-
+    numP = pkg_core_sets.size();
     numC = 0;
 
-    for (auto s = pkg_core_sets.cbegin (), ends = pkg_core_sets.cend (); s != ends; ++s) {
-      assert (s->second.size () > 0);
-      numC += s->second.size ();
+    for (auto s = pkg_core_sets.cbegin(), ends = pkg_core_sets.cend(); s != ends; ++s) {
+      assert (s->second.size() > 0);
+      numC += s->second.size();
     }
     
 
@@ -367,29 +337,26 @@ struct AutoLinuxPolicyMIC {
 
 
   static void computeForwardMap (std::vector<cpuinfo>& infovec, const unsigned numThreads) {
+    VecPtr infoptrs (infovec.size());
 
-    VecPtr infoptrs (infovec.size ());
-
-    for (unsigned i = 0; i < infovec.size (); ++i) {
+    for (unsigned i = 0; i < infovec.size(); ++i) {
       infoptrs[i] = &infovec[i];
     }
 
     // calls to sort here are not necessary, they just ensure that lower physical
     // id gets lower virtual id
-    std::sort (infoptrs.begin (), infoptrs.end (), OrderByPkg ());
+    std::sort (infoptrs.begin(), infoptrs.end(), OrderByPkg());
 
     MapNum_Num pkg_id_map;
-
     unsigned pkg_id_cntr = 0;
-    for (auto i = infoptrs.cbegin (), endi = infoptrs.cend (); i != endi; ++i) {
+    for (auto i = infoptrs.cbegin(), endi = infoptrs.cend(); i != endi; ++i) {
       if (pkg_id_map.count ((*i)->physid) == 0) {
         pkg_id_map.insert (std::make_pair ((*i)->physid, pkg_id_cntr++));
       }
     }
 
-    VecVecPtr pkg_grps (pkg_id_map.size ());
-
-    for (auto i = infoptrs.begin (), endi = infoptrs.end (); i != endi; ++i) {
+    VecVecPtr pkg_grps (pkg_id_map.size());
+    for (auto i = infoptrs.begin(), endi = infoptrs.end(); i != endi; ++i) {
       assert (pkg_id_map.count ((*i)->physid) > 0);
       (*i)->vpkgid = pkg_id_map[(*i)->physid];
       pkg_grps[(*i)->vpkgid].push_back (*i);
@@ -397,110 +364,92 @@ struct AutoLinuxPolicyMIC {
 
     // for MIC only
 #ifdef GALOIS_USE_MIC_TOPO
-    // for (auto p = pkg_grps.begin (), endp = pkg_grps.end (); p != endp; ++p) {
+    // for (auto p = pkg_grps.begin(), endp = pkg_grps.end(); p != endp; ++p) {
 // 
       // unsigned core_cntr = 0;
-      // for (auto i = p->begin (), endi = p->end (); i != endi; ++i) {
+      // for (auto i = p->begin(), endi = p->end(); i != endi; ++i) {
         // (*i)->coreid = core_cntr++;
       // }
     // }
 #endif
 
-
     VecVecVecPtr pkg_core_config;
-    pkg_core_config.resize (pkg_grps.size ());
+    pkg_core_config.resize (pkg_grps.size());
 
-    for (unsigned p = 0; p < pkg_grps.size (); ++p) {
-
-      std::sort (pkg_grps[p].begin (), pkg_grps[p].end (), OrderByCore ());
+    for (unsigned p = 0; p < pkg_grps.size(); ++p) {
+      std::sort (pkg_grps[p].begin(), pkg_grps[p].end(), OrderByCore());
 
       MapNum_Num core_id_map;
       unsigned core_id_cntr = 0;
 
-      for (auto i = pkg_grps[p].begin (), endi = pkg_grps[p].end (); i != endi; ++i) {
+      for (auto i = pkg_grps[p].begin(), endi = pkg_grps[p].end(); i != endi; ++i) {
         if (core_id_map.count ((*i)->coreid) == 0) {
           core_id_map.insert (std::make_pair ((*i)->coreid, core_id_cntr++));
         }
       }
 
-      pkg_core_config[p].resize (core_id_map.size ());
-
-      VecVecPtr core_grps (core_id_map.size ());
-
-      for (auto i = pkg_grps[p].begin (), endi = pkg_grps[p].end (); i != endi; ++i) {
-
+      pkg_core_config[p].resize (core_id_map.size());
+      VecVecPtr core_grps (core_id_map.size());
+      for (auto i = pkg_grps[p].begin(), endi = pkg_grps[p].end(); i != endi; ++i) {
         assert (core_id_map.count ((*i)->coreid) > 0);
         (*i)->vcoreid = core_id_map[(*i)->coreid];
         core_grps[(*i)->vcoreid].push_back (*i);
       }
 
-      for (unsigned c = 0; c < core_grps.size (); ++c) {
-
-        std::sort (core_grps[c].begin (), core_grps[c].end (), OrderByProc ());
-
+      for (unsigned c = 0; c < core_grps.size(); ++c) {
+        std::sort (core_grps[c].begin(), core_grps[c].end(), OrderByProc());
         // pushed in reverse order to make popping more efficient (needed afterwards)
-        for (auto i = core_grps[c].rbegin (), endi = core_grps[c].rend (); i != endi; ++i) {
+        for (auto i = core_grps[c].rbegin(), endi = core_grps[c].rend(); i != endi; ++i) {
           pkg_core_config[p][c].push_back (*i);
         }
       }
-
     }
 
     for (unsigned vtid_cntr = 0; vtid_cntr < numThreads; ) {
-
-      for (unsigned p = 0; p < pkg_core_config.size (); ++p) {
-        for (unsigned c = 0; c < pkg_core_config[p].size (); ++c) {
+      for (unsigned p = 0; p < pkg_core_config.size(); ++p) {
+        for (unsigned c = 0; c < pkg_core_config[p].size(); ++c) {
 // for MIC only
 #ifdef GALOIS_USE_MIC_TOPO
           const unsigned IDEAL_THREADS_PER_CORE = 2;
           for (unsigned _k = 0; _k < IDEAL_THREADS_PER_CORE; ++_k) {
-            if (!pkg_core_config[p][c].empty ()) {
+            if (!pkg_core_config[p][c].empty()) {
 
-              cpuinfo* i= pkg_core_config[p][c].back (); 
-              pkg_core_config[p][c].pop_back ();
+              cpuinfo* i= pkg_core_config[p][c].back(); 
+              pkg_core_config[p][c].pop_back();
               i->vtid = vtid_cntr++;
             }
           }
 #else 
-
-          if (!pkg_core_config[p][c].empty ()) {
-            cpuinfo* i = pkg_core_config[p][c].back (); 
-            pkg_core_config[p][c].pop_back ();
+          if (!pkg_core_config[p][c].empty()) {
+            cpuinfo* i = pkg_core_config[p][c].back(); 
+            pkg_core_config[p][c].pop_back();
             i->vtid = vtid_cntr++;
           }
 #endif
-          
         }
       }
     }
 
 
     // find and assign leader threads for packages
-    for (unsigned p = 0; p < pkg_grps.size (); ++p) {
-
+    for (unsigned p = 0; p < pkg_grps.size(); ++p) {
       // order by vtid;
-      std::sort (pkg_grps[p].begin (), pkg_grps[p].end (), OrderByTID ());
-
+      std::sort (pkg_grps[p].begin(), pkg_grps[p].end(), OrderByTID());
       unsigned leader = pkg_grps[p][0]->vtid;
-
-      for (auto i = pkg_grps[p].begin (), endi = pkg_grps[p].end (); i != endi; ++i) {
+      for (auto i = pkg_grps[p].begin(), endi = pkg_grps[p].end(); i != endi; ++i) {
         (*i)->leader = leader;
       }
     }
-
-
   }
 
 
   void computeReverseMap (const std::vector<cpuinfo>& infovec) {
     // now compute reverse mappings
-
-
-    processorMap.clear ();
-    coreMap.clear ();
-    packageMap.clear ();
-    leaderMapThread.clear ();
-    maxPackageMap.clear ();
+    processorMap.clear();
+    coreMap.clear();
+    packageMap.clear();
+    leaderMapThread.clear();
+    maxPackageMap.clear();
     
     processorMap.resize (numThreads);
     coreMap.resize (numThreads);
@@ -509,8 +458,7 @@ struct AutoLinuxPolicyMIC {
     maxPackageMap.resize (numThreads);
 
     leaderMapPackage.resize (numPackages);
-
-    for (auto i = infovec.cbegin (), endi = infovec.cend (); i != endi; ++i) {
+    for (auto i = infovec.cbegin(), endi = infovec.cend(); i != endi; ++i) {
       processorMap[i->vtid] = i->proc;
       coreMap[i->vtid] = i->vcoreid;
       packageMap[i->vtid] = i->vpkgid;
@@ -518,15 +466,14 @@ struct AutoLinuxPolicyMIC {
     }
 
     unsigned mp = 0;
-    for (unsigned i = 0; i < packageMap.size (); ++i) {
+    for (unsigned i = 0; i < packageMap.size(); ++i) {
       mp = std::max (packageMap[i], mp);
       maxPackageMap[i] = mp;
     }
 
-    for (unsigned i = 0; i < leaderMapThread.size (); ++i) {
+    for (unsigned i = 0; i < leaderMapThread.size(); ++i) {
       leaderMapPackage[packageMap[i]] =  leaderMapThread[i];
     }
-
   }
 
   static void printRawConfiguration(const std::vector<cpuinfo>& vals, const std::vector<unsigned>& enabledSet) {
@@ -563,8 +510,8 @@ struct AutoLinuxPolicyMIC {
 };
 
 
-AutoLinuxPolicyMIC& getPolicy() {
-  static AutoLinuxPolicyMIC A;
+static Policy& getPolicy() {
+  static Policy A;
   return A;
 }
 
@@ -613,6 +560,6 @@ unsigned Galois::Runtime::LL::getLeaderForThread(int id) {
 }
 
 unsigned Galois::Runtime::LL::getLeaderForPackage(int id) {
-  assert(id < (int)getPolicy ().numPackages);
+  assert(id < (int)getPolicy().numPackages);
   return getPolicy().leaderMapPackage[id];
 }

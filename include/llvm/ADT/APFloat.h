@@ -200,6 +200,7 @@ namespace llvm {
 
     /// getNaN - Factory for QNaN values.
     ///
+    /// \param Sem semantics
     /// \param Negative - True iff the NaN generated should be negative.
     /// \param type - The unspecified fill bits for creating the NaN, 0 by
     /// default.  The value is truncated as necessary.
@@ -231,6 +232,7 @@ namespace llvm {
     /// semantics.
     ///
     /// \param Negative - True iff the number should be negative
+    /// \param Sem semantics
     static APFloat getLargest(const fltSemantics &Sem, bool Negative = false);
 
     /// getSmallest - Returns the smallest (by magnitude) finite number
@@ -238,12 +240,14 @@ namespace llvm {
     /// relative loss of precision.
     ///
     /// \param Negative - True iff the number should be negative
+    /// \param Sem semantics
     static APFloat getSmallest(const fltSemantics &Sem, bool Negative = false);
 
     /// getSmallestNormalized - Returns the smallest (by magnitude)
     /// normalized finite number in the given semantics.
     ///
     /// \param Negative - True iff the number should be negative
+    /// \param Sem semantics
     static APFloat getSmallestNormalized(const fltSemantics &Sem,
                                          bool Negative = false);
 
@@ -333,6 +337,7 @@ namespace llvm {
 
     /// Converts this value into a decimal string.
     ///
+    //\ \param Str a string
     /// \param FormatPrecision The maximum number of digits of
     ///   precision to output.  If there are fewer digits available,
     ///   zero padding will not be used unless the value is
@@ -351,7 +356,7 @@ namespace llvm {
     /// 1.01E-2              5             2       0.0101
     /// 1.01E-2              4             2       0.0101
     /// 1.01E-2              4             1       1.01E-2
-    void toString(SmallVectorImpl<char> &Str,
+    void toString(SmallVectorImpl<char>& Str,
                   unsigned FormatPrecision = 0,
                   unsigned FormatMaxPadding = 3) const;
 

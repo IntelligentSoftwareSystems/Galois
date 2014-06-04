@@ -80,7 +80,7 @@ struct PriAuto {
 #undef WLFOO2
 
     {
-      GALOIS_ERROR(true, "unknown worklist: ", WorklistName.c_str(), "\n");
+      GALOIS_DIE("unknown worklist: ", WorklistName.c_str(), "\n");
     }
   }
   template<typename InitItemTy,typename FunctionTy>

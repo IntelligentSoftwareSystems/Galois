@@ -209,7 +209,7 @@ class ForEachWork<Galois::WorkList::ParaMeter<ContainerTy>,T,FunctionTy> {
       size_t numActivities = commitQueue.size();
 
       if (numActivities == 0) {
-        GALOIS_ERROR(true, "no progress made in step %d", currStep);
+        GALOIS_DIE("no progress made in step %d", currStep);
       }
 
       double avgLocks = 0;

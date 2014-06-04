@@ -101,7 +101,7 @@ struct tuple_index<T, S, -1> {
 };
 
 template<typename RangeTy, typename FunctionTy, typename Tuple>
-void for_each_gen(RangeTy r, FunctionTy fn, Tuple tpl) {
+void for_each_gen(const RangeTy& r, const FunctionTy& fn, Tuple tpl) {
   typedef Tuple tupleType;
   static_assert(-1 == tuple_index<tupleType, char*>::value, "old loopname");
   static_assert(-1 == tuple_index<tupleType, char const*>::value, "old loopname");
@@ -117,7 +117,7 @@ void for_each_gen(RangeTy r, FunctionTy fn, Tuple tpl) {
 }
 
 template<typename RangeTy, typename FunctionTy, typename Tuple>
-FunctionTy do_all_gen(RangeTy r, FunctionTy fn, Tuple tpl) {
+void do_all_gen(const RangeTy& r, const FunctionTy& fn, Tuple tpl) {
   typedef Tuple tupleType;
   static_assert(-1 == tuple_index<tupleType, char*>::value, "old loopname");
   static_assert(-1 == tuple_index<tupleType, char const*>::value, "old loopname");
@@ -150,7 +150,7 @@ FunctionTy do_all_gen(RangeTy r, FunctionTy fn, Tuple tpl) {
  * @param args optional arguments to loop, e.g., {@see loopname}, {@see wl}
  */
 template<typename IterTy, typename FunctionTy, typename... Args>
-void for_each(IterTy b, IterTy e, FunctionTy fn, Args... args) {
+void for_each(IterTy b, IterTy e, const FunctionTy& fn, Args... args) {
   HIDDEN::for_each_gen(Runtime::makeStandardRange(b,e), fn, std::make_tuple(loopname(), wl<HIDDEN::defaultWL>(), args...));
 }
 
@@ -165,7 +165,7 @@ void for_each(IterTy b, IterTy e, FunctionTy fn, Args... args) {
  * @param args optional arguments to loop
  */
 template<typename ItemTy, typename FunctionTy, typename... Args>
-void for_each(ItemTy i, FunctionTy fn, Args... args) {
+void for_each(ItemTy i, const FunctionTy& fn, Args... args) {
   ItemTy iwl[1] = {i};
   HIDDEN::for_each_gen(Runtime::makeStandardRange(&iwl[0], &iwl[1]), fn, std::make_tuple(loopname(), wl<HIDDEN::defaultWL>(), args...));
 }
@@ -181,7 +181,7 @@ void for_each(ItemTy i, FunctionTy fn, Args... args) {
  * @param args optional arguments to loop
  */
 template<typename ConTy, typename FunctionTy, typename... Args>
-void for_each_local(ConTy& c, FunctionTy fn, Args... args) {
+void for_each_local(ConTy& c, const FunctionTy& fn, Args... args) {
   HIDDEN::for_each_gen(Runtime::makeLocalRange(c), fn, std::make_tuple(loopname(), wl<HIDDEN::defaultWL>(), args...));
 }
 
@@ -196,13 +196,14 @@ void for_each_local(ConTy& c, FunctionTy fn, Args... args) {
  * @returns fn
  */
 template<typename IterTy,typename FunctionTy, typename... Args>
-FunctionTy do_all(const IterTy& b, const IterTy& e, FunctionTy fn, Args... args) {
-  return HIDDEN::do_all_gen(Runtime::makeStandardRange(b, e), fn, std::make_tuple(loopname(), do_all_steal(), args...));
+void do_all(const IterTy& b, const IterTy& e, const FunctionTy& fn, Args... args) {
+  HIDDEN::do_all_gen(Runtime::makeStandardRange(b, e), fn, std::make_tuple(loopname(), do_all_steal(), args...));
 }
 
 /**
- * Standard do-all loop with locality-aware container. All iterations should be independent.
- * Operator should conform to <code>fn(item)</code> where item is an element of c.
+ * Standard do-all loop with locality-aware container. All iterations should
+ * be independent.  Operator should conform to <code>fn(item)</code> where
+ * item is an element of c.
  *
  * @param c locality-aware container
  * @param fn operator
@@ -210,17 +211,18 @@ FunctionTy do_all(const IterTy& b, const IterTy& e, FunctionTy fn, Args... args)
  * @returns fn
  */
 template<typename ConTy,typename FunctionTy, typename... Args>
-FunctionTy do_all_local(ConTy& c, FunctionTy fn, Args... args) {
-  return HIDDEN::do_all_gen(Runtime::makeLocalRange(c), fn, std::make_tuple(loopname(), do_all_steal(), args...));
+void do_all_local(ConTy& c, const FunctionTy& fn, Args... args) {
+  HIDDEN::do_all_gen(Runtime::makeLocalRange(c), fn, std::make_tuple(loopname(), do_all_steal(), args...));
 }
 
 /**
- * Low-level parallel loop. Operator is applied for each running thread. Operator
- * should confirm to <code>fn(tid, numThreads)</code> where tid is the id of the current thread and
- * numThreads is the total number of running threads.
+ * Low-level parallel loop. Operator is applied for each running thread.
+ * Operator should confirm to <code>fn(tid, numThreads)</code> where tid is
+ * the id of the current thread and numThreads is the total number of running
+ * threads.
  *
  * @param fn operator
- * @param loopname string to identify loop in statistics output
+ * @param args optional arguments to loop (only loopname supported)
  */
 template<typename FunctionTy>
 static inline void on_each(FunctionTy fn, const char* loopname = 0) {
@@ -228,16 +230,16 @@ static inline void on_each(FunctionTy fn, const char* loopname = 0) {
 }
 
 /**
- * Preallocates pages on each thread.
+ * Preallocates hugepages on each thread.
  *
- * @param num number of pages to allocate of size {@link Galois::Runtime::MM::pageSize}
+ * @param num number of pages to allocate of size {@link Galois::Runtime::MM::hugePageSize}
  */
 static inline void preAlloc(int num) {
   Runtime::preAlloc_impl_dist(num);
 }
 
 /**
- * Reports number of pages allocated by the Galois system so far. The value is printing using
+ * Reports number of hugepages allocated by the Galois system so far. The value is printing using
  * the statistics infrastructure. 
  *
  * @param label Label to associated with report at this program point

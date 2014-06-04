@@ -69,7 +69,7 @@ struct Policy {
   }
 };
 
-Policy& getPolicy() {
+static Policy& getPolicy() {
   static Policy A;
   return A;
 }

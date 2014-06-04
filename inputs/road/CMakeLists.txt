@@ -8,7 +8,7 @@ function(dlinput base url)
     COMMAND ${GUNZIP} -c ${base}.gz > ${base}.dimacs
     DEPENDS ${base}.gz)
   add_custom_command(OUTPUT ${base}.gr
-    COMMAND graph-convert-standalone -dimacs2gr ${base}.dimacs ${base}.gr
+    COMMAND graph-convert-standalone -edgeType int32 -dimacs2gr ${base}.dimacs ${base}.gr
     DEPENDS ${base}.dimacs graph-convert-standalone)
 endfunction(dlinput)
 

@@ -1,12 +1,25 @@
+#ifndef POINT_H
+#define POINT_H
+
+#include "Galois/Runtime/Serialize.h"
 
 struct Point {
   double val[3];
+  
   Point() { val[0] = val[1] = val[2] = 0.0; }
-  //Point(double _x, double _y, double _z) : val{_x,_y,_z} {}
   Point(double _x, double _y, double _z) { val[0] = _x; val[1] = _y; val[2] = _z; }
-  //explicit Point(double v) : val{v,v,v} {} 
   explicit Point(double v) { val[0] = v; val[1] = v; val[2] = v; }
 
+  typedef int tt_has_serialize;
+  
+  void serialize(Galois::Runtime::SerializeBuffer& s) const {
+    Galois::Runtime::gSerialize(s, val[0], val[1], val[2]);
+  }
+
+  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
+    Galois::Runtime::gDeserialize(s, val[0], val[1], val[2]);
+  }
+  
   double operator[](const int index) const {
     return val[index];
   }
@@ -100,3 +113,4 @@ std::ostream& operator<<(std::ostream& os, const Point& p) {
   return os;
 }
 
+#endif
