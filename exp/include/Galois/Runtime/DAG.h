@@ -98,7 +98,7 @@ public:
     NItemAlloc niAlloc;
 
     NItem* create (Lockable* l) {
-      NItem* ni = niAlloc.allocAndConstruct (ni, l);
+      NItem* ni = niAlloc.allocAndConstruct (l);
       assert (ni != nullptr);
       return ni;
     }
