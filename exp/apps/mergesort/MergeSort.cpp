@@ -18,6 +18,11 @@
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 
+#ifdef HAVE_CILK
+#include <cilk/cilk.h>
+#include <cilk/cilk_api.h>
+#endif
+
 namespace cll = llvm::cl;
 static cll::opt<unsigned> length("len", cll::desc("Length of the array"), cll::init(10000));
 static cll::opt<unsigned> LEAF_SIZE("leaf", cll::desc("recursion leaf size"), cll::init(64));
@@ -60,23 +65,20 @@ void mergeHalves (T* array, T* tmp_array
 }
 
 template <typename T, typename C>
-#ifdef HAVE_CILK
-cilk
-#endif
 void splitRecursive (T* array, T* tmp_array, const size_t beg, const size_t end, const C& cmp) {
   if ((end - beg) > LEAF_SIZE) {
     const size_t mid = (beg + end) / 2;
 #ifdef HAVE_CILK 
-    spawn
+    cilk_spawn
 #endif
     splitRecursive (array, tmp_array, beg, mid, cmp);
 #ifdef HAVE_CILK
-    spawn
+    cilk_spawn
 #endif
     splitRecursive (array, tmp_array, mid, end, cmp);
 
 #ifdef HAVE_CILK
-    sync;
+    cilk_sync;
 #endif
 
     mergeHalves (array, tmp_array, beg, mid, end, cmp);
@@ -96,7 +98,7 @@ void mergeSortSequential (T* array, T* tmp_array, const size_t L, const C& cmp) 
 template <typename T, typename C>
 void mergeSortCilk (T* array, T* tmp_array, const size_t L, const C& cmp) {
 #ifdef HAVE_CILK
-  mergeSortSequential (array, L, cmp);
+  mergeSortSequential (array, tmp_array, L, cmp);
 #else
   std::perror ("CILK not found");
   std::abort ();
@@ -111,6 +113,18 @@ struct SplitGalois {
   T* array;
   T* tmp_array;
   const C& cmp;
+
+#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
+  SplitGalois (
+      T* array,
+      T* tmp_array,
+      const C& cmp)
+    :
+      array (array),
+      tmp_array (tmp_array),
+      cmp (cmp) 
+  {}
+#endif
 
   template <typename W>
   void operator () (const IndexRange& r, W& wl) {
@@ -137,6 +151,18 @@ struct MergeGalois {
   T* array;
   T* tmp_array;
   const C& cmp;
+
+#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
+  MergeGalois (
+      T* array,
+      T* tmp_array,
+      const C& cmp)
+    :
+      array (array),
+      tmp_array (tmp_array),
+      cmp (cmp) 
+  {}
+#endif
 
   void operator () (const IndexRange& r) {
     // std::printf ("running merge: (%d,%d)\n", r.first, r.second);
@@ -169,16 +195,26 @@ void mergeSortGalois (T* array, T* tmp_array, const size_t L, const C& cmp, Algo
     case GALOIS_1P: 
       Galois::Runtime::for_each_ordered_tree_1p (
           IndexRange (0, L),
+#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
+          SplitGalois<T,C> (array, tmp_array, cmp),
+          MergeGalois<T,C> (array, tmp_array, cmp),
+#else
           SplitGalois<T,C> {array, tmp_array, cmp},
           MergeGalois<T,C> {array, tmp_array, cmp},
+#endif
           "merge-sort-galois-1p");
       break;
 
     case GALOIS_2P:
       Galois::Runtime::for_each_ordered_tree_2p (
           IndexRange (0, L),
+#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
+          SplitGalois<T,C> (array, tmp_array, cmp),
+          MergeGalois<T,C> (array, tmp_array, cmp),
+#else
           SplitGalois<T,C> {array, tmp_array, cmp},
           MergeGalois<T,C> {array, tmp_array, cmp},
+#endif
           "merge-sort-galois-2p");
       break;
 

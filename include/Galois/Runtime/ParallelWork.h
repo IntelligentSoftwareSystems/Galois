@@ -353,8 +353,13 @@ void for_each_impl(const RangeTy& range, const FunctionTy& f, const char* loopna
 
   inGaloisForEach = true;
   getSystemThreadPool().run(activeThreads,
+#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
+                            std::bind(&WorkTy::initThread, std::ref(W)),
+                            std::bind (&WorkTy::template AddInitialWork<RangeTy>, std::ref(W), range),
+#else
                             [&W] () {W.initThread();},
-                            [&W, &range] {W.AddInitialWork(range);},
+                            [&W, &range] (void) {W.AddInitialWork(range);},
+#endif
                             std::ref(barrier),
                             std::ref(W));
   inGaloisForEach = false;
