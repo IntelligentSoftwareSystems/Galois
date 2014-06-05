@@ -74,31 +74,22 @@ public:
     std::ofstream file("tracking.csv", std::ofstream::app);
 
     //print header
-    file << "Epoch";
-    for (unsigned int t = 0; t < tracking.size(); ++t)
-      file << "," << t << "_count,"
-	   << t << "_mean,"
-	   << t << "_variance,"
-	   << t << "_stddev";
-    file << "\n";
-
+    file << "Epoch,thread,type,value\n";
     //for each epoch
     for (unsigned int x = 0; x <= clock.data; ++x) {
-      file << x;
       //for each thread
       for (unsigned int t = 0; t < tracking.size(); ++t) {
 	p& P = *tracking.getRemote(t);
 	if (P.values.find(x) != P.values.end()) {
 	  OnlineStat& S = P.values[x];
-	  file << "," << S.getCount()
-	       << "," << S.getMean()
-	       << "," << S.getVariance()
-	       << "," << S.getStdDeviation();
-	} else {
-	  file << ",,,,";
+          file << x << "," << t << ",count," << S.getCount() << "\n";
+          file << x << "," << t << ",mean," << S.getMean() << "\n";
+          file << x << "," << t << ",variance," << S.getVariance() << "\n";
+          file << x << "," << t << ",stddev," << S.getStdDeviation() << "\n";
+          file << x << "," << t << ",min," << S.getMin() << "\n";
+          file << x << "," << t << ",max," << S.getMax() << "\n";
 	}
       }
-      file << "\n";
     }
   }
     
