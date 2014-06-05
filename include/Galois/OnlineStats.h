@@ -23,17 +23,28 @@
 #ifndef GALOIS_ONLINESTATS_H
 #define GALOIS_ONLINESTATS_H
 
+#include <limits>
+
+namespace Galois {
+
 class OnlineStat {
   unsigned int n;
   double mean;
   double M2;
-  
+  double _min;
+  double _max;
+
 public:
-  OnlineStat() :n(0), mean(0.0), M2(0.0) {}
+  OnlineStat() :n(0), mean(0.0), M2(0.0), 
+                _min(std::numeric_limits<double>::max()),
+                _max(std::numeric_limits<double>::min())
+  {}
 
   void reset() {
     M2 = mean = 0.0;
     n = 0;
+    _min = std::numeric_limits<double>::max();
+    _max = std::numeric_limits<double>::min();
   }
   
   void insert(double x) {
@@ -41,24 +52,19 @@ public:
     double delta = x - mean;
     mean += delta / n;
     M2 += delta * (x - mean);
+    _min = std::min(x, _min);
+    _max = std::max(x, _max);
   }
 
-  double getVariance() const {
-    return M2/(n - 1);
-  }
-
-  double getStdDeviation() const {
-    return M2/n;
-  }
-
-  unsigned int getCount() const {
-    return n;
-  }
-
-  double getMean() const {
-    return mean;
-  }
+  double getVariance() const { return M2/(n - 1); }
+  double getStdDeviation() const { return M2/n; }
+  unsigned int getCount() const { return n; }
+  double getMean() const { return mean; }
+  double getMin() const { return _min; }
+  double getMax() const { return _max; }
 
 };
+
+} //namespace Galois
 
 #endif
