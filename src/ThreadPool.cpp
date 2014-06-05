@@ -46,22 +46,47 @@ ThreadPool::~ThreadPool() { }
 
 void ThreadPool::destroyCommon() {
   beKind(); // reset fastmode
+#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
+  struct ThrowShutdown {
+    void operator () (void) { throw shutdown_ty (); }
+  };
+  run(maxThreads, ThrowShutdown ());
+#else 
   run(maxThreads, []() { throw shutdown_ty(); });
+#endif
 }
+
+#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
+struct ThrowFastMode {
+  bool mode;
+  explicit ThrowFastMode (bool m) : mode (m) {}
+  void operator () (void) {
+    throw Galois::Runtime::ThreadPool::fastmode_ty {mode};
+  }
+};
+#endif
 
 void ThreadPool::burnPower(unsigned num) {
   //changing number of threads?  just do a reset
   if (masterFastmode && masterFastmode != num)
     beKind();
   if (!masterFastmode) {
+#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
+    run(num, ThrowFastMode (true));
+#else
     run(num, []() { throw fastmode_ty{true}; });
+#endif
     masterFastmode = num;
   }
 }
 
 void ThreadPool::beKind() {
   if (masterFastmode) {
+#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
+    run(masterFastmode, ThrowFastMode (false));
+#else
     run(masterFastmode, []() { throw fastmode_ty{false}; });
+#endif
     masterFastmode = 0;
   }
 }

@@ -74,6 +74,9 @@ protected:
   struct per_signal {
     std::atomic<int> done;
     std::atomic<int> fastRelease;
+#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
+    per_signal (void): done (), fastRelease () {}
+#endif
   };
   std::vector<LL::CacheLineStorage<per_signal>> signals; // signal loop
 

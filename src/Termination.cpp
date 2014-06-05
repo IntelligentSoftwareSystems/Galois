@@ -41,6 +41,9 @@ class LocalTerminationDetection : public TerminationDetection {
     std::atomic<long> hasToken;
     long processIsBlack;
     bool lastWasWhite; // only used by the master
+#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
+    TokenHolder (void) {}
+#endif
   };
 
   PerThreadStorage<TokenHolder> data;

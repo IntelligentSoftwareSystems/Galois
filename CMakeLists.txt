@@ -246,8 +246,6 @@ endif()
 
 ###### Global Functions ######
 
-include(ParseArguments)
-
 function(compileApp name)
   if(ARGN)
     set(Sources ${ARGN})
@@ -258,7 +256,10 @@ function(compileApp name)
 endfunction(compileApp)
 
 function(app name)
-  PARSE_ARGUMENTS(APP "REQUIRES;EXTLIBS" "" ${ARGN})
+  set(options)
+  set(oneValueArgs)
+  set(multiValueArgs REQUIRES EXTLIBS)
+  cmake_parse_arguments(APP "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
   foreach(required ${APP_REQUIRES})
     if(${${required}} MATCHES "TRUE")
@@ -268,7 +269,7 @@ function(app name)
     endif()
   endforeach()
 
-  compileApp(${name} ${APP_DEFAULT_ARGS})
+  compileApp(${name} ${APP_UNPARSED_ARGUMENTS})
   target_link_libraries(${name} ${APP_EXTLIBS})
   target_link_libraries(${name} galois)
   if(INSTALL_APPS)

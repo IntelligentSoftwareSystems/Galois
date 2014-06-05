@@ -65,8 +65,6 @@ endif()
 
 add_custom_target(more-suites)
 
-include(ParseArguments)
-
 set(Parallel ${CMAKE_CURRENT_SOURCE_DIR}/src/Parallel.cpp)
 if(GALOIS_USE_VTUNE)
   add_definitions(-DGALOIS_USE_VTUNE)
@@ -84,12 +82,15 @@ function(addsuitelibrary target)
 endfunction()
 
 function(addsuite target)
-  PARSE_ARGUMENTS(ADDSUITE "EXTLIBS" "" ${ARGN})
+  set(options)
+  set(oneValueArgs)
+  set(multiValueArgs EXTLIBS)
+  cmake_parse_arguments(ADDSUITE "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
   # Statically link everything to enable DMP compilation
   if(EXP_DOALL STREQUAL "DMP" OR EXP_DOALL STREQUAL "DMP_BS")
-    add_executable(${target} ${ADDSUITE_DEFAULT_ARGS} ${Parallel} ${DMPRUNTIME})
+    add_executable(${target} ${ADDSUITE_UNPARSED_ARGUMENTS} ${Parallel} ${DMPRUNTIME})
   else()
-    add_executable(${target} ${ADDSUITE_DEFAULT_ARGS} ${Parallel})
+    add_executable(${target} ${ADDSUITE_UNPARSED_ARGUMENTS} ${Parallel})
   endif()
   if(VTUNE_FOUND)
     target_link_libraries(${target} ${VTUNE_LIBRARIES})
