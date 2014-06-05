@@ -19,8 +19,8 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
+ * @author Joyce Whang <joyce@cs.utexas.edu>
  */
-// modified by Joyce Whang <joyce@cs.utexas.edu>
 
 #include "Galois/config.h"
 #include "Galois/Galois.h"
@@ -287,7 +287,12 @@ struct PullAlgo2 {
   Galois::GAccumulator<unsigned int> small_delta;
 
   void readGraph(Graph& graph) {
-    Galois::Graph::readGraph(graph, filename);
+    if (transposeGraphName.size()) {
+      Galois::Graph::readGraph(graph, filename, transposeGraphName); 
+    } else {
+      std::cerr << "Need to pass precomputed graph through -graphTranspose option\n";
+      abort();
+    }
   }
 
   struct Initialize {
@@ -497,21 +502,19 @@ struct Sync {
 
   void operator()(Graph& graph) {
     unsigned int iteration = 0;
-
+    auto numNodes = graph.size();
     while (true) {
-      Galois::for_each_local(graph, Process(this, graph, iteration));
+      Galois::do_all_local(graph, Process(this, graph, iteration));
       iteration += 1;
 
       float delta = max_delta.reduce();
       size_t sdelta = small_delta.reduce();
 
-      /*
       std::cout << "iteration: " << iteration
         << " max delta: " << delta
         << " small delta: " << sdelta
-        << " (" << sdelta / (float) graph.size() << ")"
+        << " (" << sdelta / numNodes << ")"
         << "\n";
-      */
 
       if (delta <= tolerance || iteration >= maxIterations) {
         break;
@@ -533,6 +536,10 @@ struct Sync {
 };
 
 //---------- parallel prioritized asynchronous algorithm (max. residual)
+int pri(double d) {
+  return d > 0.1 ? 0 : 1;//-1*(int)sqrt(-1*d*amp);
+}
+
 struct PrtRsd {
 
   struct LNode {
@@ -665,7 +672,7 @@ struct PrtRsd {
     void operator()(const UpdateRequest& srcRq, Galois::UserContext<UpdateRequest>& ctx) {
       GNode src = srcRq.second;
       LNode* node = &graph.getData(src, Galois::MethodFlag::NONE);
-      if (node->residual < tolerance || (int)(amp*node->residual/node->deg) != srcRq.first){ // degree biased residual
+      if (node->residual < tolerance || pri(node->residual/node->deg) != srcRq.first){ // degree biased residual
 	post +=1;
         return;
       }
@@ -676,23 +683,23 @@ struct PrtRsd {
 
       // update pagerank (consider each in-coming edge)
       double sum = 0;
-      for (auto jj = graph.in_edge_begin(src), ej = graph.in_edge_end(src); jj != ej; ++jj) {
+      for (auto jj = graph.in_edge_begin(src, Galois::MethodFlag::NONE), ej = graph.in_edge_end(src, Galois::MethodFlag::NONE); jj != ej; ++jj) {
         GNode dst = graph.getInEdgeDst(jj);
-        LNode& ddata = graph.getData(dst);
+        LNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
         sum += ddata.getPageRank() / ddata.nout;
       }
 
       unsigned nopush = 0;
      
       // update residual (consider each out-going edge)
-      for (auto jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj){
+      for (auto jj = graph.edge_begin(src, Galois::MethodFlag::NONE), ej = graph.edge_end(src, Galois::MethodFlag::NONE); jj != ej; ++jj){
         GNode dst = graph.getEdgeDst(jj); 
-        LNode& ddata = graph.getData(dst);
+        LNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
 	float oldR = ddata.residual; // degree biased residual
         ddata.residual += node->residual*alpha2/node->nout;
 	if (ddata.residual > tolerance && 
-            ((int)(amp*oldR/ddata.deg) != (int)(amp*ddata.residual/ddata.deg) || (oldR < tolerance))) {
-	  ctx.push(std::make_pair((int)(amp*ddata.residual/ddata.deg), dst)); // degree biased
+            (pri(oldR/ddata.deg) != pri(ddata.residual/ddata.deg) || (oldR < tolerance))) {
+	  ctx.push(std::make_pair(pri(ddata.residual/ddata.deg), dst)); // degree biased
 	} else {
           ++nopush;
         }
@@ -710,18 +717,18 @@ struct PrtRsd {
   void operator()(Graph& graph) {
  Galois::Statistic pre("PrePrune");
     Galois::Statistic post("PostPrune");
-    Galois::for_each_local(graph, Process1(this, graph), Galois::loopname("P1"));
-    Galois::for_each_local(graph, Process2(this, graph), Galois::loopname("P2")); 
+    Galois::do_all_local(graph, Process1(this, graph), Galois::loopname("P1"));
+    Galois::do_all_local(graph, Process2(this, graph), Galois::loopname("P2")); 
     std::cout<<"tolerance: "<<tolerance<<", amp: "<<amp<<"\n";
     using namespace Galois::WorkList;
     typedef dChunkedFIFO<16> dChunk;
-    typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
+    typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk>::with_block_period<4>::type OBIM;
     typedef WorkListTracker<UpdateRequestIndexer, OBIM> dOBIM;
     Galois::InsertBag<UpdateRequest> initialWL;
     Galois::do_all_local(graph, [&initialWL, &graph] (GNode src) {
 	LNode& data = graph.getData(src);
         if(data.residual>tolerance){
-	  initialWL.push_back(std::make_pair((int)(data.residual/data.deg*amp), src)); // degree biased
+	  initialWL.push_back(std::make_pair(pri(data.residual/data.deg), src)); // degree biased
         }
       });
     Galois::StatTimer T("InnerTime");
@@ -784,37 +791,37 @@ struct Async {
   };
   
   struct Process {
-    Async* self;
     Graph& graph;
      
-    Process(Async* s, Graph& g): self(s), graph(g) { }
+    Process(Graph& g): graph(g) { }
 
     void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) {
+      LNode& sdata = graph.getData(src);
+      // the node is processed
+      sdata.flag = false;
+
       double sum = 0;
-      for (auto jj = graph.in_edge_begin(src), ej = graph.in_edge_end(src); jj != ej; ++jj) {
+      for (auto jj = graph.in_edge_begin(src, Galois::MethodFlag::NONE), ej = graph.in_edge_end(src, Galois::MethodFlag::NONE); jj != ej; ++jj) {
         GNode dst = graph.getInEdgeDst(jj);
-        LNode& ddata = graph.getData(dst);
+        LNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
         sum += ddata.value / ddata.nout;
       }
       float value = (1.0 - alpha) * sum + alpha;
-      LNode& sdata = graph.getData(src);
       float diff = std::fabs(value - sdata.value);
       if (diff > tolerance) {
         sdata.value = value;
-        for (auto jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj) {
+        for (auto jj = graph.edge_begin(src, Galois::MethodFlag::NONE), ej = graph.edge_end(src, Galois::MethodFlag::NONE); jj != ej; ++jj) {
           GNode dst = graph.getEdgeDst(jj);
-	  LNode& ddata = graph.getData(dst);
+	  LNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
 	  // if the node is not in the worklist, then push
-	  if(!ddata.flag){
-            ctx.push(dst);
+	  if(!ddata.flag) {
 	    ddata.flag = true;
-	  }else{
+            ctx.push(dst);
+	  } else {
 	    //skip++;
 	  }
         }
       } 
-      // the node is processed
-      sdata.flag = false;
       
       //if(total%1000==0)
 	//std::cout<<"total: "<<total<<", skip: "<<skip<<", diff: "<<diff<<"\n";
@@ -825,7 +832,7 @@ struct Async {
   void operator()(Graph& graph) {
     //    skip = 0;
     typedef Galois::WorkList::dChunkedFIFO<16> WL;
-    Galois::for_each_local(graph, Process(this, graph), Galois::wl<WL>());
+    Galois::for_each_local(graph, Process(graph), Galois::wl<WL>());
   }
 };
 

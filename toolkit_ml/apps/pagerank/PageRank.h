@@ -8,8 +8,8 @@ static const float alpha = 1.0 - 0.85;
 static const float alpha2 = 0.85; // Joyce changed to this which is a usual way to define alpha.
 
 //! maximum relative change until we deem convergence
-//static const float tolerance = 0.01; 
-static const float tolerance = 0.00001; // Joyce
+static const float tolerance = 0.01; 
+//static const float tolerance = 0.00001; // Joyce
 
 //ICC v13.1 doesn't yet support std::atomic<float> completely, emmulate its
 //behavor with std::atomic<int>
