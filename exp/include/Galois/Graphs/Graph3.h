@@ -174,7 +174,7 @@ protected:
   }
   void dump(std::ostream& os) const {
     os << "numedges: " << edges.size();
-    for (auto ii = edges.begin(), ee =edges.end(); ii != ee; ++ii) {
+    for (auto ii = edges.begin(), ee = edges.end(); ii != ee; ++ii) {
       os << " ";
       ii->dump(os);
     }

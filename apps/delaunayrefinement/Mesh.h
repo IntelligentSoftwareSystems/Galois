@@ -405,10 +405,10 @@ private:
     // volatile int x = 1;
     // while (x) {}
 
+    std::cout << "MakeGraph\n";
     Galois::for_each(elements.begin(), elements.end(), create_nodes(mesh),
         Galois::loopname("create"), Galois::wl<Galois::WorkList::StableIterator<>>());
-
-    std::cout << "\nDone Create, now adding edges\n";
+    std::cout << "... now adding edges\n";
 
     std::map<Edge, GNode> edge_map;
     unsigned x = 0;
@@ -418,7 +418,7 @@ private:
       if (x % 1024 == 0)
         std::cerr << ".";
     }
-    std::cerr << "\n";
+    std::cout << "\n";
   }
 
 public:
@@ -426,13 +426,9 @@ public:
 
   void read(Graphp mesh, std::string basename) {
     std::deque<Tuple> tuples;
-    std::cout << "\nReadNodes\n";
     readNodes(basename, tuples);
-    std::cout << "\nReadElements\n";
     readElements(basename, tuples);
-    std::cout << "\nreadPoly\n";
     readPoly(basename, tuples);
-    std::cout << "\nMakeGraph\n";
     makeGraph(mesh);
   }
 };
