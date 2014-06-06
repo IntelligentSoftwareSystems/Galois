@@ -288,6 +288,29 @@ function(app name)
   endif()
 endfunction(app)
 
+function(makeTest name)
+  cmake_parse_arguments(APP "DISTSAFE" "" "REQUIRES" ${ARGN})
+
+  if(${APP_DISTSAFE})
+  else()
+    message("-- NOT compiling ${name} (not safe for distributed branch)")
+    return()
+  endif()
+  
+  foreach(required ${APP_REQUIRES})
+    if(${${required}} MATCHES "TRUE")
+    else()
+      message("-- NOT compiling ${name} (missing: ${required})")
+      return()
+    endif()
+  endforeach()
+
+  add_executable(test-${name} ${name}.cpp)
+  target_link_libraries(test-${name} galois)
+  add_test(${name} test-${name})
+endfunction()
+
+
 ###### Source finding ######
 include_directories(include)
 
