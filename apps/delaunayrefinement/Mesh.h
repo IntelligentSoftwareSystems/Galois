@@ -27,7 +27,7 @@
 
 #include "Subgraph.h"
 
-#include <vector>
+#include <deque>
 #include <string>
 #include <map>
 #include <iostream>
@@ -98,7 +98,7 @@ struct centerYCmpInv {
  *
  */
 class Mesh {
-  std::vector<Element> elements;
+  std::deque<Element> elements;
   size_t id;
 
 private:
@@ -109,7 +109,7 @@ private:
     }
   }
 
-  bool readNodesBin(std::string filename, std::vector<Tuple>& tuples) {
+  bool readNodesBin(std::string filename, std::deque<Tuple>& tuples) {
     FILE* pFile = fopen(filename.append(".node.bin").c_str(), "r");
     if (!pFile) {
       return false;
@@ -137,7 +137,7 @@ private:
     return true;
   }
 
-  void readNodes(std::string filename, std::vector<Tuple>& tuples) {
+  void readNodes(std::string filename, std::deque<Tuple>& tuples) {
     if (readNodesBin(filename, tuples))
       return;
     else
@@ -198,7 +198,7 @@ private:
     fclose(oFile);
   }
 
-  bool readElementsBin(std::string filename, std::vector<Tuple>& tuples) {
+  bool readElementsBin(std::string filename, std::deque<Tuple>& tuples) {
     FILE* pFile = fopen(filename.append(".ele.bin").c_str(), "r");
     if (!pFile) {
       return false;
@@ -225,7 +225,7 @@ private:
     return true;
   }
 
-  void readElements(std::string filename, std::vector<Tuple>& tuples) {
+  void readElements(std::string filename, std::deque<Tuple>& tuples) {
     if (readElementsBin(filename, tuples))
       return;
     else
@@ -282,7 +282,7 @@ private:
     fclose(oFile);
   }
 
-  bool readPolyBin(std::string filename, std::vector<Tuple>& tuples) {
+  bool readPolyBin(std::string filename, std::deque<Tuple>& tuples) {
     FILE* pFile = fopen(filename.append(".poly.bin").c_str(), "r");
     if (!pFile) {
       return false;
@@ -312,7 +312,7 @@ private:
     return true;
   }
 
-  void readPoly(std::string filename, std::vector<Tuple>& tuples) {
+  void readPoly(std::string filename, std::deque<Tuple>& tuples) {
     if (readPolyBin(filename, tuples))
       return;
     else
@@ -405,7 +405,8 @@ private:
     // volatile int x = 1;
     // while (x) {}
 
-    Galois::for_each<Galois::WorkList::StableIterator<std::deque<Element>::iterator > > (elements.begin(), elements.end(), create_nodes(mesh), "create");
+    Galois::for_each(elements.begin(), elements.end(), create_nodes(mesh),
+        Galois::loopname("create"), Galois::wl<Galois::WorkList::StableIterator<>>());
 
     std::cout << "\nDone Create, now adding edges\n";
 
@@ -424,7 +425,7 @@ public:
   Mesh(): id(0) { }
 
   void read(Graphp mesh, std::string basename) {
-    std::vector<Tuple> tuples;
+    std::deque<Tuple> tuples;
     std::cout << "\nReadNodes\n";
     readNodes(basename, tuples);
     std::cout << "\nReadElements\n";

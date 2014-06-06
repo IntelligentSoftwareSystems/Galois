@@ -158,7 +158,7 @@ int main(int argc, char** argv) {
 
   // check the host id and initialise the network
   Galois::Runtime::NetworkInterface::start();
-  Galois::Runtime::setTrace(false);
+  //Galois::Runtime::setTrace(false);
 
   Graphp graph = Graph::allocate();
   {
@@ -177,8 +177,9 @@ int main(int argc, char** argv) {
   Galois::StatTimer Tprefetch;
   Tprefetch.start();
   std::cerr << "\nbeginning prefetch\n";
-  Galois::for_each_local<Galois::WorkList::AltChunkedLIFO<32>>(graph, Prefetch(graph), "prefetch");
-  Galois::Runtime::setTrace(true);
+  Galois::for_each_local(graph, Prefetch(graph), 
+      Galois::loopname("prefetch"), Galois::wl<Galois::WorkList::AltChunkedLIFO<32>>());
+  //Galois::Runtime::setTrace(true);
   Tprefetch.stop();
 
   Galois::StatTimer Tprealloc;
@@ -204,7 +205,8 @@ int main(int argc, char** argv) {
   T.start();
   Tfindbad.start();
   std::cerr << "\nbeginning findbad\n";
-  Galois::for_each_local<Galois::WorkList::AltChunkedLIFO<32>>(graph, Preprocess(graph,gwl), "findbad");
+  Galois::for_each_local(graph, Preprocess(graph,gwl),
+      Galois::loopname("findbad"), Galois::wl<Galois::WorkList::AltChunkedLIFO<32>>());
   Tfindbad.stop();
 
   Galois::reportPageAlloc("MeminfoMid");
@@ -218,13 +220,13 @@ int main(int argc, char** argv) {
   typedef AltChunkedLIFO<32> Chunked;
 
   std::cerr << "\nbeginning refine\n";
-  Galois::for_each_local<Chunked>(gwl, Process(graph), "refine");
+  Galois::for_each_local(gwl, Process(graph), Galois::loopname("refine"), Galois::wl<Chunked>());
   Trefine.stop();
   T.stop();
   Tb.stop();
 
   std::cerr << "\nbeginning verify\n";
-  Galois::for_each_local<Chunked>(graph, Verification(graph), "verification");
+  Galois::for_each_local(graph, Verification(graph), Galois::loopname("verification"), Galois::wl<Chunked>());
 
   //  std::cout << "final configuration: " << NThirdGraphSize(graph) << " total triangles, ";
   //  std::cout << Galois::ParallelSTL::count_if_local(graph, is_bad(graph)) << " bad triangles\n";
