@@ -1,6 +1,15 @@
 #include "Galois/Runtime/RemotePointer.h"
 #include "Galois/Runtime/Serialize.h"
 
+struct S {
+  int x;
+  int *y;
+};
+
+struct Ssub: public S {
+  int z;
+};
+
 int main() {
   Galois::Runtime::fatPointer ptr;
   
@@ -11,10 +20,11 @@ int main() {
     assert(ptr.getObj() == oldobj);
   }
 
-//Misc error checking
+  static_assert(std::is_trivially_copyable<int>::value, "is_trivially_copyable not well supported");
+  static_assert(std::is_trivially_copyable<S>::value, "is_trivially_copyable not well supported");
+  static_assert(std::is_trivially_copyable<Ssub>::value, "is_trivially_copyable not well supported");
   static_assert(std::is_trivially_copyable<Galois::Runtime::fatPointer>::value, "fatPointer should be trivially serializable");
   static_assert(std::is_trivially_copyable<Galois::Runtime::gptr<int>>::value, "RemotePointer should be trivially serializable");
-
 
   return 0;
 }
