@@ -225,7 +225,7 @@ void do_all_local(ConTy& c, const FunctionTy& fn, Args... args) {
  * @param args optional arguments to loop (only loopname supported)
  */
 template<typename FunctionTy>
-static inline void on_each(FunctionTy fn, const char* loopname = 0) {
+static inline void on_each(const FunctionTy& fn, const char* loopname = 0) {
   Runtime::on_each_impl_dist(fn, loopname);
 }
 
