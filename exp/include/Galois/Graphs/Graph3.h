@@ -441,7 +441,7 @@ public:
     return N->getActive();
   }
 
-  size_t size() const { assert(0 && "Not implemented"); abort(); return 0; }
+  size_t size() const { GALOIS_DIE("Not implemented"); return 0; }
 
   typedef Runtime::PerThreadDist<ThirdGraph> pointer;
   static pointer allocate() {
