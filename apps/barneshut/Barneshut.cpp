@@ -721,7 +721,7 @@ double checkAllPairs(Bodies& bodies, int N) {
 
 void run(Bodies& bodies, BodyPtrs& pBodies, BodyPtrs& inNodes) {
   typedef Galois::WorkList::AltChunkedLIFO<32> WL;
-  typedef Galois::WorkList::StableIterator<decltype(pBodies.local_begin()), true> WLL;
+  typedef Galois::WorkList::StableIterator<true> WLL;
 
   Galois::preAlloc (Galois::getActiveThreads () + (3*sizeof (Octree) + 2*sizeof (Body))*nbodies/Galois::Runtime::MM::hugePageSize);
   Galois::reportPageAlloc("MeminfoPre");
