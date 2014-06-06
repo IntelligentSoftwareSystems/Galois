@@ -35,7 +35,6 @@
 
 #include <Galois/gdeque.h>
 
-
 //from libc++, clang specific
 namespace std {
 #ifdef __clang__
@@ -112,73 +111,72 @@ public:
 };
 
 template<typename T1, typename T2>
-bool gSerialize(SerializeBuffer& buf, const std::pair<T1, T2>& data) {
+void gSerialize(SerializeBuffer& buf, const std::pair<T1, T2>& data) {
   gSerialize(buf, data.first, data.second);
-  return true;
 }
 
-template<typename... Args>
-bool gSerialize(SerializeBuffer& buf, const Args&... args) {
-  //  std::cerr << "\n" << sizeof...(args) << "\n";
-  __attribute__((unused)) bool tmp[] = {gSerialize(buf, args)...};
-  return true;
+template<typename T1, typename T2, typename... Args>
+void gSerialize(SerializeBuffer& buf, T1&& t1, T2&& t2, Args&&... args) {
+  gSerialize(buf, std::forward<T1>(t1));
+  gSerialize(buf, std::forward<T2>(t2));
+  gSerialize(buf, std::forward<Args>(args)...);
 }
 
+inline void gSerialize(SerializeBuffer& buf) { }
 
-inline bool gSerialize(SerializeBuffer& buf, const std::string& data) {
+template<typename T, typename Alloc>
+void gSerialize(SerializeBuffer& buf, const std::vector<T, Alloc>& data) {
+  typename std::vector<T, Alloc>::size_type size;
+  size = data.size();
+  gSerialize(buf, size);
+  for (auto ii = data.begin(), ee = data.end(); ii != ee; ++ii)
+    gSerialize(buf, *ii);
+}
+
+template<typename T, typename Alloc>
+void gSerialize(SerializeBuffer& buf, const std::deque<T, Alloc>& data) {
+  typename std::deque<T, Alloc>::size_type size;
+  size = data.size();
+  gSerialize(buf, size);
+  for (auto ii = data.begin(), ee = data.end(); ii != ee; ++ii)
+    gSerialize(buf, *ii);
+}
+
+template<typename T, unsigned CS>
+void gSerialize(SerializeBuffer& buf, const Galois::gdeque<T,CS>& data) {
+  typename gdeque<T,CS>::size_type size;
+  size = data.size();
+  gSerialize(buf, size);
+  for (auto ii = data.begin(), ee = data.end(); ii != ee; ++ii)
+    gSerialize(buf, *ii);
+}
+
+template<typename T>
+auto gSerialize(SerializeBuffer& buf, const T& data) ->
+  decltype(
+      std::declval<typename std::enable_if<std::is_trivially_copyable<T>::value>::type>(),
+      std::declval<typename std::enable_if<!has_serialize<T>::value>::type>())
+{
+  //  std::cerr << networkHostID <<  " sesize " << sizeof(T) << " of " << typeid(T).name() << " " << "\n";
+  unsigned char* pdata = (unsigned char*)&data;
+  for (size_t i = 0; i < sizeof(T); ++i)
+    buf.push(pdata[i]);
+}
+
+template<typename T>
+auto gSerialize(SerializeBuffer& buf, const T& data) ->
+  decltype(std::declval<typename std::enable_if<has_serialize<T>::value>::type>()) 
+{
+  data.serialize(buf);
+}
+
+inline void gSerialize(SerializeBuffer& buf, const std::string& data) {
   typename std::string::size_type size;
   size = data.size();
   gSerialize(buf, size);
   for (decltype(size) x = 0 ; x < size; ++x)
     gSerialize(buf, data.at(x));
-  return true;
 }
-
-template<typename T, typename Alloc>
-bool gSerialize(SerializeBuffer& buf, const std::vector<T, Alloc>& data) {
-  typename std::vector<T, Alloc>::size_type size;
-  size = data.size();
-  gSerialize(buf, size);
-  for (auto ii = data.begin(), ee = data.end(); ii != ee; ++ii)
-    gSerialize(buf,*ii);
-  return true;
-}
-
-template<typename T, typename Alloc>
-bool gSerialize(SerializeBuffer& buf, const std::deque<T, Alloc>& data) {
-  typename std::deque<T, Alloc>::size_type size;
-  size = data.size();
-  gSerialize(buf,size);
-  for (auto ii = data.begin(), ee = data.end(); ii != ee; ++ii)
-    gSerialize(buf,*ii);
-  return true;
-}
-
-template<typename T, unsigned CS>
-bool gSerialize(SerializeBuffer& buf, const Galois::gdeque<T,CS>& data) {
-  typename gdeque<T,CS>::size_type size;
-  size = data.size();
-  gSerialize(buf,size);
-  for (auto ii = data.begin(), ee = data.end(); ii != ee; ++ii)
-    gSerialize(buf,*ii);
-  return true;
-}
-
-template<typename T>
-bool gSerialize(SerializeBuffer& buf, const T& data, typename std::enable_if<std::is_trivially_copyable<T>::value>::type* = 0, typename std::enable_if<!has_serialize<T>::value>::type* = 0) {
-  //  std::cerr << networkHostID <<  " sesize " << sizeof(T) << " of " << typeid(T).name() << " " << "\n";
-  unsigned char* pdata = (unsigned char*)&data;
-  for (size_t i = 0; i < sizeof(T); ++i)
-    buf.push(pdata[i]);
-  return true;
-}
-
-template<typename T>
-bool gSerialize(SerializeBuffer& buf, const T& data, typename std::enable_if<has_serialize<T>::value>::type* = 0) {
-  data.serialize(buf);
-  return true;
-}
-
 
 class DeSerializeBuffer {
   std::vector<unsigned char> bufdata;
@@ -230,69 +228,67 @@ public:
 //Deserialize support
 
 template<typename T>
-bool gDeserialize(DeSerializeBuffer& buf, T& data, typename std::enable_if<std::is_trivially_copyable<T>::value>::type* = 0, typename std::enable_if<!has_serialize<T>::value>::type* = 0) {
+auto gDeserialize(DeSerializeBuffer& buf, T& data) ->
+  decltype(
+      std::declval<typename std::enable_if<std::is_trivially_copyable<T>::value>::type>(),
+      std::declval<typename std::enable_if<!has_serialize<T>::value>::type>())
+{
   //  std::cerr << networkHostID <<  " desize " << sizeof(T) << " of " << typeid(T).name() << "\n";
   unsigned char* pdata = (unsigned char*)&data;
   for (size_t i = 0; i < sizeof(T); ++i)
     pdata[i] = buf.pop();
-  return true;
 }
 
 template<typename T>
-bool gDeserialize(DeSerializeBuffer& buf, T& data, typename std::enable_if<has_serialize<T>::value>::type* = 0) {
+auto gDeserialize(DeSerializeBuffer& buf, T& data) ->
+  decltype(std::declval<typename std::enable_if<has_serialize<T>::value>::type>()) {
   data.deserialize(buf);
-  return true;
 }
 
-inline bool gDeserialize(DeSerializeBuffer& buf, std::string& data) {
+inline void gDeserialize(DeSerializeBuffer& buf, std::string& data) {
   typedef typename std::string::size_type lsty;
   lsty size;
   gDeserialize(buf, size);
   data.resize(size);
   for (lsty x = 0; x < size; ++x)
     gDeserialize(buf, data.at(x));
-  return true;
 }
 
 template<typename T, typename Alloc>
-bool gDeserialize(DeSerializeBuffer& buf, std::deque<T, Alloc>& data) {
+void gDeserialize(DeSerializeBuffer& buf, std::deque<T, Alloc>& data) {
   typedef typename std::deque<T, Alloc>::size_type lsty;
   lsty size;
-  gDeserialize(buf,size);
+  gDeserialize(buf, size);
   data.resize(size);
   for (lsty x = 0; x < size; ++x)
-    gDeserialize(buf,data[x]);
-  return true;
+    gDeserialize(buf, data[x]);
 }
 
 template<typename T, typename Alloc>
-bool gDeserialize(DeSerializeBuffer& buf, std::vector<T, Alloc>& data) {
+void gDeserialize(DeSerializeBuffer& buf, std::vector<T, Alloc>& data) {
   typedef typename std::vector<T, Alloc>::size_type lsty;
   lsty size;
   gDeserialize(buf,size);
   data.resize(size);
   for (lsty x = 0; x < size; ++x)
-    gDeserialize(buf,data[x]);
-  return true;
+    gDeserialize(buf, data[x]);
 }
 
 template<typename T, unsigned CS>
-bool gDeserialize(DeSerializeBuffer& buf, Galois::gdeque<T,CS>& data) {
+void gDeserialize(DeSerializeBuffer& buf, Galois::gdeque<T,CS>& data) {
   typename gdeque<T,CS>::size_type size;
-  gDeserialize(buf,size);
+  gDeserialize(buf, size);
   data.clear();
   for (unsigned x = 0; x < size; ++x) {
     T t;
-    gDeserialize(buf,t);
+    gDeserialize(buf, t);
     data.push_back(std::move(t));
   }
-  return true;
 }
 
 template<typename T1, typename T2>
-bool gDeserialize(DeSerializeBuffer& buf, std::pair<T1, T2>& data) {
-  gDeserialize(buf,data.first,data.second);
-  return true;
+void gDeserialize(DeSerializeBuffer& buf, std::pair<T1, T2>& data) {
+  gDeserialize(buf, data.first, data.second);
 }
 
 namespace {
@@ -301,41 +297,33 @@ template<int N, int ...S> struct gens : gens<N-1, N-1, S...> {};
 template<int ...S> struct gens<0, S...>{ typedef seq<S...> type; };
 }
 template<typename... T, int... S>
-bool gDeserialize(DeSerializeBuffer& buf, std::tuple<T...>& data, seq<S...>) {
-  gDeserialize(buf, std::get<S>(data) ...);
-  return true;
+void gDeserializeTuple(DeSerializeBuffer& buf, std::tuple<T...>& data, seq<S...>) {
+  gDeserialize(buf, std::get<S>(data)...);
 }
 
 template<typename... T>
-bool gDeserialize(DeSerializeBuffer& buf, std::tuple<T...>& data) {
-  gDeserialize(buf, data, typename gens<sizeof...(T)>::type());
-  return true;
+void gDeserialize(DeSerializeBuffer& buf, std::tuple<T...>& data) {
+  gDeserializeTuple(buf, data, typename gens<sizeof...(T)>::type());
 }
 
-template<typename T1, typename T2, typename... U>
-bool gDeserialize1(DeSerializeBuffer& buf, T1& a1, T2& a2, U&... an) {
-  //  std::cerr << "\n";
-  gDeserialize(buf,a1);
-  gDeserialize(buf,a2);
-  gDeserialize(buf,an...);
-  return true;
+template<typename T1, typename T2, typename... Args>
+void gDeserialize(DeSerializeBuffer& buf, T1&& t1, T2&& t2, Args&&... args) {
+  gDeserialize(buf, std::forward<T1>(t1));
+  gDeserialize(buf, std::forward<T2>(t2));
+  gDeserialize(buf, std::forward<Args>(args)...);
 }
 
-template<typename... Args>
-bool gDeserialize(DeSerializeBuffer& buf, Args&... args) {
-  //  std::cerr << "\n" << sizeof...(args) << "\n";
-  __attribute__((unused)) bool tmp[] = {gDeserialize(buf, args)...};
-  return true;
-}
+inline void gDeserialize(DeSerializeBuffer& buf) { }
 
-inline bool gSerialize(SerializeBuffer& buf, const DeSerializeBuffer& rbuf) {
+inline void gSerialize(SerializeBuffer& buf, const DeSerializeBuffer& rbuf) {
   for (unsigned x = 0; x < rbuf.r_size(); ++x)
     buf.push(rbuf.r_linearData()[x]);
-  return true;
 }
 
-template<typename Iter, typename T>                                            
-Iter gDeserializeRaw(Iter iter, T& data, typename std::enable_if<std::is_trivially_copyable<T>::value>::type* = 0) {
+template<typename Iter, typename T>
+auto gDeserializeRaw(Iter iter, T& data) ->
+  decltype(std::declval<typename std::enable_if<std::is_trivially_copyable<T>::value>::type>(), Iter())
+{
   unsigned char* pdata = (unsigned char*)&data;
   for (size_t i = 0; i < sizeof(T); ++i)
     pdata[i] = *iter++;
