@@ -359,7 +359,7 @@ struct PullAlgo {
       numProcessed.reset();
 
       if (!cur->empty()) {
-        typedef Galois::WorkList::StableIterator<Bag::iterator> WL;
+        typedef Galois::WorkList::StableIterator<> WL;
         //Galois::for_each_local(*cur, pull, Galois::wl<WL>());
         Galois::do_all_local(*cur, pull);
       }

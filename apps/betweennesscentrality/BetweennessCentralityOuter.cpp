@@ -239,7 +239,7 @@ int main(int argc, char** argv) {
     << " Start Node: " << startNode 
     << " Iterations: " << iterations << "\n";
   
-  typedef Galois::WorkList::StableIterator<std::vector<GNode>::iterator, true> WL;
+  typedef Galois::WorkList::StableIterator<true> WL;
   Galois::StatTimer T;
   T.start();
   Galois::for_each(v.begin(), v.end(), Process(), Galois::wl<WL>());

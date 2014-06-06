@@ -333,13 +333,33 @@ public:
   }
 };
 
+template<typename WLTy>
+constexpr auto has_with_iterator(int) -> decltype(std::declval<typename WLTy::template with_iterator<int*>::type>(), bool()) {
+  return true;
+}
+
+template<typename>
+constexpr bool has_with_iterator(...) {
+  return false;
+}
+
+template<typename WLTy, typename IterTy, typename Enable = void>
+struct reiterator {
+  typedef WLTy type;
+};
+
+template<typename WLTy, typename IterTy>
+struct reiterator<WLTy, IterTy, typename std::enable_if<has_with_iterator<WLTy>(0)>::type> {
+  typedef typename WLTy::template with_iterator<IterTy>::type type;
+};
+
 template<typename WLTy, typename RangeTy, typename FunctionTy>
 void for_each_impl(const RangeTy& range, const FunctionTy& f, const char* loopname) {
   if (inGaloisForEach)
     GALOIS_DIE("Nested for_each not supported");
-
+  typedef typename reiterator<WLTy, typename RangeTy::iterator>::type WLNewTy;
   typedef typename RangeTy::value_type T;
-  typedef ForEachWork<typename WLTy::template retype<T>::type, T, FunctionTy> WorkTy;
+  typedef ForEachWork<typename WLNewTy::template retype<T>::type, T, FunctionTy> WorkTy;
 
   // NB: Initialize barrier before creating WorkTy to increase
   // PerThreadStorage reclaimation likelihood

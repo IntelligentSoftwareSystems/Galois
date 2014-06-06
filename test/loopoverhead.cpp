@@ -76,7 +76,7 @@ unsigned t_foreach(bool burn, std::vector<unsigned>& V, unsigned num, unsigned t
   Galois::Timer t;
   t.start();
   for (unsigned x = 0; x < iter; ++x)
-    Galois::for_each(V.begin(), V.begin() + num, emp(), Galois::wl<Galois::WorkList::StableIterator<std::vector<unsigned>::iterator>>());
+    Galois::for_each(V.begin(), V.begin() + num, emp(), Galois::wl<Galois::WorkList::StableIterator<>>());
   t.stop();
   return t.get();
 }
@@ -104,6 +104,7 @@ int main(int argc, char** argv) {
   for (int x = 0; x< 100; ++x)
     {}
 
+  
   unsigned maxVector = 16;
   if (argc > 1)
     iter = atoi(argv[1]);
