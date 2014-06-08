@@ -185,6 +185,72 @@ inline void updateCenter(Point& p, int index, double radius) {
   }
 }
 
+template <typename B> 
+struct BuildTreeTopDown {
+
+  struct WorkItem {
+    OctreeInternal<B>* node;
+    double radius;
+    PartList partList;
+
+  };
+  void partitionSinglePass (const WorkItem& w, WorkItem* child) {
+
+    for (unsigned i = 0; i < 8; ++i) {
+      PartList* list = partListAlloc.allocate (1);
+      new (list) PartList ();
+      child[i].partList = list;
+    }
+
+    for (I i = r.beg; i != r.end; ++i) {
+      unsigned index = getIndex (*i, w.node->pos);
+      child[index].partList->push_back (*i);
+    }
+
+    // clean up child array
+    for (unsigned i = 0; i < 8; ++i) {
+      if (child[i].partList.empty ()) {
+        partListAlloc.destroyAndFree (child[i].partList);
+      }
+    }
+
+    // delete the old list
+    partListAlloc.destroy (r.partList);
+    partListAlloc.deallocate (r.partList, 1);
+  }
+
+  template <typename C>
+  void operator () (WorkItem& w, C& ctx) {
+    assert (w.partList->begin() != w.partList->end ());
+
+    auto next = w.partList->begin (); ++next;
+    assert (next != w.partList->end ());
+
+    WorkItem child[8];
+    partitionSinglePass (w, child);
+
+    for (unsigned i = 0; i < 8; ++i) {
+      if (distOne (child[i].beg, child[i].end)) {
+
+        r.node->setChild (i, *(child[i].beg));
+
+      } else {
+        if (child[i].beg != child[i].end) {
+          Point new_pos = w.node->pos;
+          double radius = w.radius / 2;
+          updateCenter (new_pos, i, radius);
+          OctreeInternal<B>* internal = treeAlloc.allocAndConstruct (new_pos);
+          w.node->setChild (i, internal);
+
+          wl.push (child[i]);
+        }
+      }
+    }
+
+  }
+}
+
+
 #if 0 // disabling for now
 template <typename B>
 struct BuildOctreeTopDown {
