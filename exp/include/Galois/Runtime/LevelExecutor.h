@@ -24,7 +24,6 @@
 #ifndef GALOIS_RUNTIME_LEVEL_EXECUTOR_H
 #define GALOIS_RUNTIME_LEVEL_EXECUTOR_H
 
-#include <iostream>
 #include <map>
 #include <vector>
 
@@ -464,7 +463,7 @@ public:
     }
 
     if (isMasterThread ()) {
-      std::cout << "Level-by-Level, critical path length: " << steps << ", avg. parallelism: " << ((double) totalWork)/steps << std::endl;
+      LL::gPrint("Level-by-Level, critical path length: ", steps, ", avg. parallelism: ", totalWork/(double) steps, "\n");
     }
 
   }

@@ -39,6 +39,7 @@
 #include <utility>
 #include <vector>
 #include <algorithm>
+#include <iostream>
 #include <fstream>
 
 const char* name = "Triangles";

@@ -53,8 +53,6 @@
 
 #include <boost/iterator/transform_iterator.hpp>
 
-#include <iostream>
-
 static cll::opt<double> commitRatioArg("cratio", cll::desc("target commit ratio for two phase executor"), cll::init(0.80));
 
 namespace Galois {
@@ -414,11 +412,11 @@ protected:
   }
 
   void printStats (void) {
-    std::cout << "Two Phase Window executor, rounds: " << rounds << std::endl;
-    std::cout << "Two Phase Window executor, commits: " << numCommitted.reduce () << std::endl;
-    std::cout << "Two Phase Window executor, total: " << total.reduce () << std::endl;
-    std::cout << "Two Phase Window executor, efficiency: " << double (numCommitted.reduce ()) / total.reduce () << std::endl;
-    std::cout << "Two Phase Window executor, avg. parallelism: " << double (numCommitted.reduce ()) / rounds << std::endl;
+    LL::gPrint("Two Phase Window executor, rounds: ", rounds, "\n");
+    LL::gPrint("Two Phase Window executor, commits: ", numCommitted.reduce(), "\n");
+    LL::gPrint("Two Phase Window executor, total: ", total.reduce(), "\n");
+    LL::gPrint("Two Phase Window executor, efficiency: ", numCommitted.reduce() / (double) total.reduce(), "\n");
+    LL::gPrint("Two Phase Window executor, avg. parallelism: ", numCommitted.reduce() / (double) rounds, "\n");
   }
   
 };

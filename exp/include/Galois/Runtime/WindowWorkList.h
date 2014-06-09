@@ -27,7 +27,7 @@
 
 #include "Galois/Accumulator.h"
 #include "Galois/RangePQ.h"
-
+#include "Galois/Runtime/ll/gio.h"
 #include "Galois/Runtime/PerThreadWorkList.h"
 
 
@@ -49,7 +49,7 @@ class SortedRangeWindowWL {
 public:
 
   explicit SortedRangeWindowWL (const Cmp& cmp=Cmp ()): cmp (cmp) {
-    std::cout << "Using SortedRangeWindowWL" << std::endl;
+    LL::gPrint("Using SortedRangeWindowWL\n");
   }
 
   template <typename I>
@@ -209,7 +209,7 @@ public:
   explicit PQbasedWindowWL (const Cmp& cmp=Cmp ())
     : cmp (cmp), m_wl (cmp) 
   {
-    std::cout << "Using PQbasedWindowWL" << std::endl;
+    LL::gPrint("Using PQbasedWindowWL\n");
   }
 
 
