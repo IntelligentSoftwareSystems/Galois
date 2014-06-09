@@ -44,7 +44,6 @@
 
 #include "llvm/ADT/SmallVector.h"
 
-#include <iostream>
 #include GALOIS_CXX11_STD_HEADER(unordered_map)
 
 namespace Galois {
@@ -578,9 +577,7 @@ class LCorderedExec {
 
         // GALOIS_DEBUG ("Processing source: %s\n", src->str ().c_str ());
         if (debug && !sourceTest (src)) {
-          std::cout << "Not found to be a source: " << src->str ()
-            << std::endl;
-          // abort ();
+          LL::gDebug("not found to be a source: ", src->str());
         }
 
         niter += 1;
@@ -702,8 +699,7 @@ public:
     //       "find_initial_sources");
     t_find.stop ();
 
-    std::cout << "Number of initial sources found: " << nInitSrc.reduce () 
-      << std::endl;
+    LL::gPrint("Number of initial sources found: ", nInitSrc.reduce(), "\n");
 
     // AddWL addWL;
     PerThreadUserCtx perThUserCtx;
@@ -736,12 +732,11 @@ public:
 				 DelCtxt (ctxtAlloc)); //, "delete_all_ctxt");
     t_destroy.stop ();
 
-    std::cout << "Number of iterations: " << niter.reduce () << std::endl;
-
-    std::cout << "Time taken in creating intial contexts: " << t_create.get () << std::endl;
-    std::cout << "Time taken in finding intial sources: " << t_find.get () << std::endl;
-    std::cout << "Time taken in for_each loop: " << t_for.get () << std::endl;
-    std::cout << "Time taken in destroying all the contexts: " << t_destroy.get () << std::endl;
+    LL::gPrint("Number of iterations: ", niter.reduce(), "\n");
+    LL::gPrint("Time taken in creating intial contexts: ", t_create.get(), "\n");
+    LL::gPrint("Time taken in finding intial sources: ", t_find.get(), "\n");
+    LL::gPrint("Time taken in for_each loop: ", t_for.get(), "\n");
+    LL::gPrint("Time taken in destroying all the contexts: ", t_destroy.get(), "\n");
   }
 };
 
