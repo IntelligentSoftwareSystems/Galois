@@ -87,6 +87,8 @@ class fatPointerImpl : public fatPointerBase {
   using fatPointerBase::rawCopy;
 
 public:
+  using fatPointerBase::getHost;
+  using fatPointerBase::getObj;
 
   struct thisHost_t {};
   static thisHost_t thisHost;
@@ -110,11 +112,15 @@ public:
   bool operator> (const fatPointerImpl& rhs) const { return rawCopy() >  rhs.rawCopy(); }
 
   bool isLocal() const {
-    return fatPointerBase::getHost() == NetworkInterface::ID;
+    return getHost() == NetworkInterface::ID;
   }
 
   friend std::ostream& operator<<(std::ostream& os, const fatPointerImpl& v) {
     return os <<  "[" << v.getHost() << "," << v.getObj() << "]";
+  }
+
+  fatPointerImpl arith(int n) {
+    return fatPointerImpl(getHost(), (char*)getObj() + n);
   }
 };
 

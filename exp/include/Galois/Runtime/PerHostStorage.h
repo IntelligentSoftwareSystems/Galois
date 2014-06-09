@@ -93,10 +93,9 @@ class PerHost {
 
   explicit PerHost(uint64_t off) :offset(off), localHost(~0), localPtr(nullptr) {}
 
-  static void allocOnHost(DeSerializeBuffer& buf) {
-    uint64_t off;
-    gDeserialize(buf, off);
-    getPerHostBackend().createAt(off, new T(PerHost(off), buf));
+  template<typename... Args>
+  static void allocOnHost(uint64_t off, Args... args) {
+    getPerHostBackend().createAt(off, new T(args...));
   }
 
   static void deallocOnHost(uint64_t off) {
@@ -105,15 +104,12 @@ class PerHost {
 
 public:
   //create a pointer
-  static PerHost allocate() {
+  template<typename... Args>
+  static PerHost allocate(Args... args) {
     uint64_t off = getPerHostBackend().allocateOffset();
-    getPerHostBackend().createAt(off, new T(PerHost(off)));
-    PerHost ptr(off);
-    SerializeBuffer buf;
-    gSerialize(buf, off);
-    ptr->getInitData(buf);
-    getSystemNetworkInterface().broadcast(&allocOnHost, buf);
-    return ptr;
+    getPerHostBackend().createAt(off, new T(args...));
+    getSystemNetworkInterface().broadcastAlt(&allocOnHost<Args...>, off, args...);
+    return PerHost(off);
   }
   static void deallocate(PerHost ptr) {
     getSystemNetworkInterface().broadcastAlt(&deallocOnHost, ptr.offset);
@@ -298,14 +294,14 @@ public:
   iterator begin() { return iterator(0,0,*this); }
   iterator end() { return iterator(); }
 
-  // //serialize
-  // typedef int tt_has_serialize;
-  // void serialize(Galois::Runtime::SerializeBuffer& s) const {
-  //   gSerialize(s,offset);
-  // }
-  // void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
-  //   gDeserialize(s,offset);
-  //  }
+  //serialize
+  typedef int tt_has_serialize;
+  void serialize(Galois::Runtime::SerializeBuffer& s) const {
+    gSerialize(s,offset);
+  }
+  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
+    gDeserialize(s,offset);
+  }
 };
 
   

@@ -22,6 +22,7 @@
  */
 
 #include "Galois/Runtime/Tracer.h"
+#include "Galois/Runtime/ll/EnvCheck.h"
 
 #include <fstream>
 #include <cassert>
@@ -29,7 +30,9 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-static std::ofstream& openIfNot() {
+static std::ostream& openIfNot() {
+  if (Galois::Runtime::LL::EnvCheck("GALOIS_TRACE_LOCAL"))
+    return std::cerr;
   static std::ofstream output;
   if (!output.is_open()) {
     pid_t id = getpid();

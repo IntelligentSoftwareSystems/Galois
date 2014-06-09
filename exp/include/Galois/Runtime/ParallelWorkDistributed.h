@@ -314,7 +314,7 @@ void on_each_impl_dist(const FunctionTy& f, const char* loopname) {
 struct preAlloc_helper {
   size_t num;
 
-  preAlloc_helper() { }
+  preAlloc_helper() = default;
   preAlloc_helper(size_t n): num(n) { }
 
   void operator()(unsigned, unsigned n) {
