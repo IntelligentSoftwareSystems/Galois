@@ -1,7 +1,9 @@
-#include <vector>
 #include "Galois/Galois.h"
 #include "Lonestar/BoilerPlate.h"
 #include "Galois/Runtime/DistSupport.h"
+
+#include <iostream>
+#include <vector>
 
 using namespace std;
 using namespace Galois::Runtime;

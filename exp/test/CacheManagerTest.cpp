@@ -24,6 +24,8 @@
 #include "Galois/Runtime/CacheManager.h"
 #include "Galois/Runtime/RemotePointer.h"
 
+#include <iostream>
+
 using namespace Galois::Runtime;
 
 struct foo: public Lockable {
