@@ -50,6 +50,8 @@ class gptr {
     return resolve();
   }
 
+  explicit gptr(fatPointer p) :ptr(p) {}
+
 public:
   typedef T element_type;
   
@@ -73,6 +75,11 @@ public:
   explicit operator fatPointer()   const { return ptr; }
 
   bool isLocal() const { return ptr.isLocal(); }
+
+  //experimental
+  gptr operator+(int n) {
+    return gptr(ptr.arith(n*sizeof(T)));
+  }
 
   T* resolve() const {
     void* obj = nullptr;
