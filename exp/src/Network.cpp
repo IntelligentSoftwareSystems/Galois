@@ -67,7 +67,7 @@ void NetworkInterface::start() {
     while (!ourexit) {
       doNetworkWork();
       if (!loopwork.empty()) {
-        auto p = loopwork.front();
+        auto& p = loopwork.front();
         trace("Loop Executing %\n", (void*)p.first);
         loopwork.pop_front();
         p.first(p.second);
@@ -85,7 +85,6 @@ void NetworkInterface::terminate() {
   NetworkInterface& net = getSystemNetworkInterface();
   net.broadcastAlt(&networkExit);
   doNetworkWork();
-  return;
 }
 
 void NetworkInterface::sendLoop(uint32_t dest, recvFuncTy recv, SendBuffer& buf) {
