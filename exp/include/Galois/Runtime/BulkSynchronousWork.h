@@ -500,7 +500,7 @@ struct CopyIn {
 };
 
 template<typename ItemsTy, typename RangeTy, typename FnsTy, typename InitFnTy>
-static inline void do_all_bs_impl(RangeTy range, FnsTy fns, InitFnTy initFn, const char* loopname) {
+static inline void do_all_bs_impl(const RangeTy& range, const FnsTy& fns, InitFnTy initFn, const char* loopname) {
   using namespace boost;
 
   //! Keep only items for functions that need push
@@ -520,9 +520,7 @@ static inline void do_all_bs_impl(RangeTy range, FnsTy fns, InitFnTy initFn, con
   assert(!inGaloisForEach);
 
   inGaloisForEach = true;
-  RunCommand w[2] = {std::ref(W),
-		     std::ref(getSystemBarrier())};
-  getSystemThreadPool().run(&w[0], &w[2], activeThreads);
+  getSystemThreadPool().run(activeThreads, std::ref(W));
   inGaloisForEach = false;
 }
 
@@ -532,7 +530,7 @@ static inline void do_all_bs_impl(RangeTy range, FnsTy fns, InitFnTy initFn, con
 
 namespace Galois {
 template<typename ItemsTy, typename ConTy, typename FnsTy>
-static inline void do_all_bs_local(ConTy& c, FnsTy fns) {
+static inline void do_all_bs_local(ConTy& c, const FnsTy& fns) {
   typedef typename std::iterator_traits<typename ConTy::iterator>::value_type value_type;
   typedef typename Galois::Runtime::CopyIn<value_type> InitFn;
   Galois::Runtime::do_all_bs_impl<ItemsTy>(
@@ -540,13 +538,13 @@ static inline void do_all_bs_local(ConTy& c, FnsTy fns) {
 }
 
 template<typename ItemsTy, typename ConTy, typename FnsTy, typename InitFnTy>
-static inline void do_all_bs_local(ConTy& c, FnsTy fns, InitFnTy initFn) {
+static inline void do_all_bs_local(ConTy& c, const FnsTy& fns, InitFnTy initFn) {
   Galois::Runtime::do_all_bs_impl<ItemsTy>(
       Galois::Runtime::makeLocalRange(c), fns, initFn, 0);
 }
 
 template<typename ItemsTy, typename IterTy, typename FnsTy>
-static inline void do_all_bs(IterTy b, IterTy e, FnsTy fns) {
+static inline void do_all_bs(IterTy b, IterTy e, const FnsTy& fns) {
   typedef typename std::iterator_traits<IterTy>::value_type value_type;
   typedef typename Galois::Runtime::CopyIn<value_type> InitFn;
   Galois::Runtime::do_all_bs_impl<ItemsTy>(
@@ -554,7 +552,7 @@ static inline void do_all_bs(IterTy b, IterTy e, FnsTy fns) {
 }
 
 template<typename ItemsTy, typename IterTy, typename FnsTy, typename InitFnTy>
-static inline void do_all_bs(IterTy b, IterTy e, FnsTy fns, InitFnTy initFn) {
+static inline void do_all_bs(IterTy b, IterTy e, const FnsTy& fns, InitFnTy initFn) {
   Galois::Runtime::do_all_bs_impl<ItemsTy>(
       Galois::Runtime::makeStandardRange(b, e), fns, initFn, 0);
 }

@@ -29,7 +29,6 @@
 
 #include "Galois/Runtime/ActiveThreads.h"
 #include "Galois/Runtime/Termination.h"
-#include "Galois/Runtime/ll/CompilerSpecific.h"
 
 using namespace Galois::Runtime;
 
@@ -38,8 +37,8 @@ namespace {
 class LocalTerminationDetection : public TerminationDetection {
   struct TokenHolder {
     friend class TerminationDetection;
-    volatile long tokenIsBlack;
-    volatile long hasToken;
+    std::atomic<long> tokenIsBlack;
+    std::atomic<long> hasToken;
     long processIsBlack;
     bool lastWasWhite; // only used by the master
   };
@@ -51,7 +50,6 @@ class LocalTerminationDetection : public TerminationDetection {
     unsigned id = LL::getTID();
     TokenHolder& th = *data.getRemote((id + 1) % activeThreads);
     th.tokenIsBlack = isBlack;
-    LL::compilerBarrier();
     th.hasToken = true;
   }
 
@@ -68,14 +66,14 @@ public:
 
   virtual void initializeThread() {
     TokenHolder& th = *data.getLocal();
-    th.hasToken = false;
     th.tokenIsBlack = false;
     th.processIsBlack = true;
     th.lastWasWhite = true;
     globalTerm = false;
-    if (isSysMaster()) {
+    if (isSysMaster())
       th.hasToken = true;
-    }
+    else 
+      th.hasToken = false;
   }
 
   virtual void localTermination(bool workHappened) {

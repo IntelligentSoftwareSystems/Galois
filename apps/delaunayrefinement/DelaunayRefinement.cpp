@@ -126,8 +126,6 @@ struct Verification : public Galois::Runtime::Lockable {
   }
 };
 
-unsigned yy = 0;
-
 struct Prefetch : public Galois::Runtime::Lockable {
   Graphp   graph;
 
@@ -135,11 +133,7 @@ struct Prefetch : public Galois::Runtime::Lockable {
   Prefetch() {}
 
   void operator()(GNode item, Galois::UserContext<GNode>& ctx) const {
-    //std::cerr << Galois::Runtime::networkHostID;
     (void)graph->getData(item).isBad();
-    // unsigned x = __sync_fetch_and_add(&yy, 1);
-    // if (x % 1024 == 0)
-    //      std::cerr << ".";
   }
 
   // serialization functions
@@ -158,7 +152,7 @@ int main(int argc, char** argv) {
 
   // check the host id and initialise the network
   Galois::Runtime::NetworkInterface::start();
-  Galois::Runtime::setTrace(false);
+  //Galois::Runtime::setTrace(false);
 
   Graphp graph = Graph::allocate();
   {
@@ -176,17 +170,24 @@ int main(int argc, char** argv) {
   // call prefetch to get the nodes to the owner
   Galois::StatTimer Tprefetch;
   Tprefetch.start();
-  std::cerr << "\nbeginning prefetch\n";
-  Galois::for_each_local<Galois::WorkList::AltChunkedLIFO<32>>(graph, Prefetch(graph), "prefetch");
-  Galois::Runtime::setTrace(true);
+  std::cout << "beginning prefetch\n";
+  Galois::for_each_local(graph, Prefetch(graph), 
+      Galois::loopname("prefetch"), Galois::wl<Galois::WorkList::AltChunkedLIFO<32>>());
+  //Galois::Runtime::setTrace(true);
   Tprefetch.stop();
 
   Galois::StatTimer Tprealloc;
   Tprealloc.start();
-  std::cerr << "\nbeginning prealloc\n";
+  std::cout << "beginning prealloc\n";
   Galois::reportPageAlloc("MeminfoPre1");
-  Galois::preAlloc(Galois::Runtime::MM::numPageAllocTotal() * 10);
-  //Galois::preAlloc(15 * numThreads + Galois::Runtime::MM::numPageAllocTotal() * 10);
+  // Galois::preAlloc(Galois::Runtime::MM::numPageAllocTotal() * 10);
+  // Tighter upper bound for pre-alloc, useful for machines with limited memory,
+  // e.g., Intel MIC. May not be enough for deterministic execution
+  const size_t nodeSize = sizeof(**graph->begin());
+  auto graphSize = Galois::ParallelSTL::count_if_local(graph, [&](GNode) { return true; });
+  Galois::preAlloc(5 * Galois::getActiveThreads() + nodeSize * 8 * graphSize / Galois::Runtime::MM::hugePageSize);
+  // Relaxed upper bound
+  // Galois::preAlloc(15 * numThreads + Galois::Runtime::MM::numPageAllocTotal() * 10);
   Galois::reportPageAlloc("MeminfoPre2");
   Tprealloc.stop();
 
@@ -198,8 +199,9 @@ int main(int argc, char** argv) {
   Galois::StatTimer Tfindbad("findbad");
   T.start();
   Tfindbad.start();
-  std::cerr << "\nbeginning findbad\n";
-  Galois::for_each_local<Galois::WorkList::AltChunkedLIFO<32>>(graph, Preprocess(graph,gwl), "findbad");
+  std::cout << "beginning findbad\n";
+  Galois::for_each_local(graph, Preprocess(graph,gwl),
+      Galois::loopname("findbad"), Galois::wl<Galois::WorkList::AltChunkedLIFO<32>>());
   Tfindbad.stop();
 
   Galois::reportPageAlloc("MeminfoMid");
@@ -208,17 +210,18 @@ int main(int argc, char** argv) {
   Trefine.start();
   using namespace Galois::WorkList;
   
+      //! [for_each_local example]
   typedef LocalQueue<dChunkedLIFO<256>, ChunkedLIFO<256> > BQ;
   typedef AltChunkedLIFO<32> Chunked;
 
-  std::cerr << "\nbeginning refine\n";
-  Galois::for_each_local<Chunked>(gwl, Process(graph), "refine");
+  std::cout << "beginning refine\n";
+  Galois::for_each_local(gwl, Process(graph), Galois::loopname("refine"), Galois::wl<Chunked>());
   Trefine.stop();
   T.stop();
   Tb.stop();
 
-  std::cerr << "\nbeginning verify\n";
-  Galois::for_each_local<Chunked>(graph, Verification(graph), "verification");
+  std::cout << "beginning verify\n";
+  Galois::for_each_local(graph, Verification(graph), Galois::loopname("verification"), Galois::wl<Chunked>());
 
   //  std::cout << "final configuration: " << NThirdGraphSize(graph) << " total triangles, ";
   //  std::cout << Galois::ParallelSTL::count_if_local(graph, is_bad(graph)) << " bad triangles\n";

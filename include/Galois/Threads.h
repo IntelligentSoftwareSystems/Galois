@@ -29,12 +29,12 @@ namespace Galois {
  * value. System behavior is undefined if this function is called during
  * parallel execution or after the first parallel execution.
  */
-unsigned int setActiveThreads(unsigned int num);
+unsigned int setActiveThreads(unsigned int num) noexcept;
 
 /**
  * Returns the number of threads in use.
  */
-unsigned int getActiveThreads();
+unsigned int getActiveThreads()noexcept;
 
 }
 #endif

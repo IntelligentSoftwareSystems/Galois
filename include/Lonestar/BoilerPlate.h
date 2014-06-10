@@ -38,6 +38,10 @@
 static llvm::cl::opt<bool> skipVerify("noverify", llvm::cl::desc("Skip verification step"), llvm::cl::init(false));
 static llvm::cl::opt<int> numThreads("t", llvm::cl::desc("Number of threads"), llvm::cl::init(1));
 
+static void LonestarPrintVersion() {
+  Galois::Runtime::LL::gPrint("Galois Benchmark Suite v", GALOIS_VERSION_STRING, " (", GALOIS_REVISION, ")\n");
+}
+
 //! initialize lonestar benchmark
 static void LonestarStart(int argc, char** argv, const char* app, const char* desc = 0, const char* url = 0) {
   using namespace Galois::Runtime::LL;
@@ -48,13 +52,15 @@ static void LonestarStart(int argc, char** argv, const char* app, const char* de
 
   // display the name only if mater host
   if (NetworkInterface::ID == 0) {
-    gPrint("Galois Benchmark Suite v", GALOIS_VERSION_STRING, " (r", GALOIS_SVNVERSION, ")\n",
-	   "Copyright (C) ", GALOIS_COPYRIGHT_YEAR_STRING, " The University of Texas at Austin\n",
-	   "http://iss.ices.utexas.edu/galois/\n\n",
-	   "application: ", app ? app : "unspecified", "\n",
-	   desc ? desc : "");
+    LonestarPrintVersion();
+    gPrint("Copyright (C) ", GALOIS_COPYRIGHT_YEAR_STRING, " The University of Texas at Austin\n");
+    gPrint("http://iss.ices.utexas.edu/galois/\n\n");
+    gPrint("application: ", app ? app : "unspecified", "\n");
+    if (desc)
+      gPrint(desc, "\n");
     if (url)
       gPrint("http://iss.ices.utexas.edu/?p=projects/galois/benchmarks/", url, "\n");
+    gPrint("\n");
 
     std::ostringstream cmdout;
     for (int i = 0; i < argc; ++i) {
@@ -70,10 +76,12 @@ static void LonestarStart(int argc, char** argv, const char* app, const char* de
   gInfo("Hostname ", name);
   gFlush();
 
+  llvm::cl::SetVersionPrinter(LonestarPrintVersion);
   llvm::cl::ParseCommandLineOptions(argc, argv);
   numThreads = Galois::setActiveThreads(numThreads); 
 
   getSystemNetworkInterface().start();
+  Galois::Runtime::reportStat(0, "Threads", numThreads);
 }
 
 #endif

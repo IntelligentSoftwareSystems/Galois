@@ -152,7 +152,7 @@ private:
     if (BlockSize) {
       return newHeaderFromAllocator(heap.allocate(BlockSize), BlockSize);
     } else {
-      return newHeaderFromAllocator(Galois::Runtime::MM::pageAlloc(), Galois::Runtime::MM::pageSize);
+      return newHeaderFromAllocator(Galois::Runtime::MM::pageAlloc(), Galois::Runtime::MM::hugePageSize);
     }
   }
 

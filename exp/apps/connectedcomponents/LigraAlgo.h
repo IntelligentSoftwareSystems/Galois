@@ -84,7 +84,8 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi>  {
     }
   };
 
-  void readGraph(Graph& graph) {
+  template<typename G>
+  void readGraph(G& graph) {
     readInOutGraph(graph);
     this->checkIfInMemoryGraph(graph, memoryLimit);
   }

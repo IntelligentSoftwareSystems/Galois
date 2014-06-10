@@ -24,16 +24,27 @@
 #include "Galois/Runtime/CacheManager.h"
 #include "Galois/Runtime/RemotePointer.h"
 
+#include <iostream>
+
 using namespace Galois::Runtime;
 
-struct foo : public Lockable {
+struct foo: public Lockable {
   int x;
   int y;
   friend std::ostream& operator<<(std::ostream& os, const foo& v) {
     return os << "{" << v.x << "," << v.y << "}";
   }
   foo(int _x, int _y) :x(_x), y(_y) {}
+  foo(Galois::Runtime::DeSerializeBuffer& buf) { deserialize(buf); }
   foo() = default;
+
+  typedef int tt_has_serialize;
+  void serialize(Galois::Runtime::SerializeBuffer& s) const {
+    gSerialize(s, x, y);
+  }
+  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
+    gDeserialize(s, x, y);
+  }
 };
 
 void test_CM() {

@@ -60,7 +60,8 @@ public:
    * Updates the thread local value by applying the reduction operator to
    * current and newly provided value
    */
-  void update(const T& rhs) {
+  template<typename T2>
+  void update(const T2& rhs) {
     T& lhs = *m_data.getLocal();
     m_func(lhs, rhs);
   }
@@ -73,6 +74,20 @@ public:
     for (unsigned int i = 1; i < m_data.size(); ++i) {
       T& d = *m_data.getRemote(i);
       m_func(d0, d);
+      d = m_initial;
+    }
+    return d0;
+  }
+
+  /**
+   * Returns the final reduction value. Only valid outside the parallel region.
+   */
+  template<typename FnAlt>
+  T& reduce(FnAlt fn) {
+    T& d0 = *m_data.getLocal();
+    for (unsigned int i = 1; i < m_data.size(); ++i) {
+      T& d = *m_data.getRemote(i);
+      fn(d0, d);
       d = m_initial;
     }
     return d0;

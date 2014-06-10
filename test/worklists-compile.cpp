@@ -22,6 +22,10 @@
  */
 #include "Galois/Runtime/Range.h"
 
+#include <cstdlib>
+
+int run = 1;
+
 template<typename T2>
 struct checker {
   typedef typename T2::template retype<int>::type T;
@@ -31,7 +35,12 @@ struct checker {
 
   checker() {
     int a[4] = {1,2,3,0};
-    
+
+    // Don't actually run this code as some worklists don't support
+    // the full worklist API
+    if (run)
+      return;
+
     wl.push(0);
     wl.push_initial(Galois::Runtime::makeStandardRange(&a[0], &a[4]));
     wl.push(&a[0], &a[4]);
@@ -52,6 +61,9 @@ struct checker {
 #define GALOIS_WLCOMPILECHECK(name) checker<name<> > ck_##name;
 #include "Galois/WorkList/WorkList.h"
 
-int main() {
+int main(int argc, char** argv) {
+  if (argc > 1)
+    run = atoi(argv[1]);
+
   return 0;
 }

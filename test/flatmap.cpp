@@ -1,11 +1,12 @@
 #include "Galois/FlatMap.h"
 #include "Galois/Timer.h"
 
+#include <cstdlib>
 #include <iostream>
 #include <map>
 
-template<typename T, int X>
-void maptime(const char* c) {
+template<typename T>
+void maptime(const char* c, int X) {
   T m;
   Galois::Timer t1, t2;
   t1.start();
@@ -21,8 +22,7 @@ void maptime(const char* c) {
   std::cout << c << " " << t1.get() << " " << t2.get() << "\n";
 }
 
-int main() {
-
+int main(int argc, char** argv) {
   Galois::flat_map<int, double> m;
   Galois::flat_map<int, double> m2(m);
   //Galois::flat_map<int, double> m3 {{10,0},{20,0}};
@@ -74,13 +74,17 @@ int main() {
     std::cout << ii->first << " " << ii->second << " ";
   std::cout << "\n";
 
-  const int X = 1000000;
-  maptime<Galois::flat_map<int, double>,X>("fm");
-  maptime<Galois::flat_map<int, double>,X>("fm");
-  maptime<Galois::flat_map<int, double>,X>("fm");
-  maptime<std::map<int, double>,X>("std");
-  maptime<std::map<int, double>,X>("std");
-  maptime<std::map<int, double>,X>("std");
+  int X = 1;
+  if (argc > 1)
+    X = atoi(argv[1]);
+  if (X <= 0)
+    X = 1000000;
+  maptime<Galois::flat_map<int, double>>("fm", X);
+  maptime<Galois::flat_map<int, double>>("fm", X);
+  maptime<Galois::flat_map<int, double>>("fm", X);
+  maptime<std::map<int, double>>("std", X);
+  maptime<std::map<int, double>>("std", X);
+  maptime<std::map<int, double>>("std", X);
 
   return 0;
 }

@@ -41,6 +41,8 @@
 #include "Collision.h"
 #include "Event.h"
 
+#include "Galois/Runtime/ll/gio.h"
+
 class Table {
 
 public:
@@ -162,17 +164,23 @@ public:
   //! the collision physics is going to generate a new collision with the same object the
   //! ball just collided with, but we have already simulated a collision and ball should be moving
   //! in another direction and pick a different collision
-  void addNextEvents (std::vector<Event>& addList, Ball* b, Ball* prevBall, const double endtime) const {
 
-    addNextEventIntern (addList, b, prevBall, NULL, endtime);
-    
+  template <typename C>
+  void addNextEvents (const Event& e, C& addList, const double endtime) const {
+
+    switch (e.getKind ()) {
+      case Event::BALL_COLLISION:
+        addEventsForBallColl (e, addList, endtime);
+        break;
+
+      case Event::CUSHION_COLLISION:
+        addEventsForCushColl (e, addList, endtime);
+        break;
+
+      default:
+        GALOIS_DIE ("unkown event kind");
+    }
   }
-
-  void addNextEvents (std::vector<Event>& addList, Ball* b, Cushion* c, const double endtime) const {
-
-    addNextEventIntern (addList, b, NULL, c, endtime);
-  }
-
 
   double sumEnergy () const {
 
@@ -443,12 +451,49 @@ private:
   }
 
 
-  void addNextEventIntern (std::vector<Event>& addList, Ball* ball, Ball* prevBall, Cushion* prevCushion, const double endtime) const {
+  template <typename C>
+  void addEventsForBallColl (const Event& e, C& addList, const double endtime) const {
+
+    const Ball* b1 = &(e.getBall ());
+    const Ball* b2 = &(e.getOtherBall ());
+    
+    if (e.firstBallChanged () || e.otherBallChanged ()) {
+
+      if (!e.firstBallChanged ()) {
+        // b2 has collided with something else, while
+        // b1 has not collided with anything since this event was
+        // created
+
+        addNextEventIntern  (addList, b1, nullptr, nullptr, endtime);
+      }
+
+      if (!e.otherBallChanged ()) {
+        // b2 has not collided with anything yet
+        addNextEventIntern (addList, b2, nullptr, nullptr, endtime);
+
+      }
+    } else {
+      addNextEventIntern (addList, b1, b2, nullptr, endtime);
+      addNextEventIntern (addList, b2, b1, nullptr, endtime);
+    }
+  }
+
+  template <typename C>
+  void addEventsForCushColl (const Event& e, C& addList, const double endtime) const {
+
+    assert (e.getKind () == Event::CUSHION_COLLISION);
+    if (!e.firstBallChanged ()) {
+      addNextEventIntern (addList, &(e.getBall ()), nullptr, &(e.getCushion ()), endtime);
+    }
+  }
+
+  template <typename C>
+  void addNextEventIntern (C& addList, const Ball* ball, const Ball* prevBall, const Cushion* prevCushion, const double endtime) const {
 
     assert (ball != NULL);
 
-    std::pair<Ball*, double> ballColl = computeNextCollision (ball, this->balls, prevBall, endtime);
-    std::pair<Cushion*, double> cushColl = computeNextCollision (ball, this->cushions, prevCushion, endtime);
+    std::pair<const Ball*, double> ballColl = computeNextCollision (ball, this->balls, prevBall, endtime);
+    std::pair<const Cushion*, double> cushColl = computeNextCollision (ball, this->cushions, prevCushion, endtime);
 
     if (ballColl.first != NULL && cushColl.first != NULL) {
 
@@ -494,17 +539,17 @@ private:
   // compute earliest collision between a ball and some other object underTest
   // We don't want to create a collision with the object involved in previous collision
   template <typename T>
-  static std::pair<T*, double> computeNextCollision (const Ball* b, const std::vector<T*>& collObjs, const T* prevEventObj, const double endtime) {
+  static std::pair<const T*, double> computeNextCollision (const Ball* b, const std::vector<T*>& collObjs, const T* prevEventObj, const double endtime) {
 
     assert (static_cast<const CollidingObject*> (b) != static_cast<const CollidingObject*> (prevEventObj));
 
-    T* currMin = NULL;
+    const T* currMin = nullptr;
     double currMinTime = -1.0;
 
     for (typename std::vector<T*>::const_iterator i = collObjs.begin (), ei = collObjs.end ();
         i != ei; ++i) {
 
-      T* underTest = const_cast<T*> (*i);
+      const T* underTest = *i;
 
       // the object under test is not the same as the one involved in a previous collision event
       // if (static_cast<const CollidingObject*> (underTest) !=  static_cast<const CollidingObject*> (b)

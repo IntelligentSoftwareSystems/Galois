@@ -24,8 +24,9 @@
 #include "Galois/config.h"
 #include "Galois/Galois.h"
 #include "Galois/Statistic.h"
+#include "Galois/Bag.h"
 #include "Galois/Graphs/Bag.h"
-#include "llvm/Support/CommandLine.h"
+#include "Galois/Accumulator.h"
 #include "Lonestar/BoilerPlate.h"
 #include "Galois/WorkList/WorkListAlt.h"
 
@@ -35,8 +36,13 @@
 #include GALOIS_CXX11_STD_HEADER(array)
 #include <limits>
 #include <iostream>
-#include <strings.h>
+#include <fstream>
+#include <random>
 #include GALOIS_CXX11_STD_HEADER(deque)
+
+#include <strings.h>
+
+#include "Point.h"
 
 const char* name = "Barnshut N-Body Simulator";
 const char* desc =
@@ -48,74 +54,8 @@ static llvm::cl::opt<int> nbodies("n", llvm::cl::desc("Number of bodies"), llvm:
 static llvm::cl::opt<int> ntimesteps("steps", llvm::cl::desc("Number of steps"), llvm::cl::init(1));
 static llvm::cl::opt<int> seed("seed", llvm::cl::desc("Random seed"), llvm::cl::init(7));
 
-struct Point {
-  double x, y, z;
-  Point() : x(0.0), y(0.0), z(0.0) { }
-  Point(double _x, double _y, double _z) : x(_x), y(_y), z(_z) { }
-  explicit Point(double v) : x(v), y(v), z(v) { }
+using Galois::Runtime::gptr;
 
-  // serialization functions
-  typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
-    gSerialize(s,x,y,z);
-  }
-  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
-    gDeserialize(s,x,y,z);
-  }
-
-  double operator[](const int index) const {
-    switch (index) {
-      case 0: return x;
-      case 1: return y;
-      case 2: return z;
-    }
-    assert(false && "index out of bounds");
-    abort();
-  }
-
-  double& operator[](const int index) {
-    switch (index) {
-      case 0: return x;
-      case 1: return y;
-      case 2: return z;
-    }
-    assert(false && "index out of bounds");
-    abort();
-  }
-
-  bool operator==(const Point& other) {
-    if (x == other.x && y == other.y && z == other.z)
-      return true;
-    return false;
-  }
-
-  bool operator!=(const Point& other) {
-    return !operator==(other);
-  }
-
-  Point& operator+=(const Point& other) {
-    x += other.x;
-    y += other.y;
-    z += other.z;
-    return *this;
-  }
-
-  Point& operator*=(double value) {
-    x *= value;
-    y *= value;
-    z *= value;
-    return *this;
-  }
-
-  double dist2() {
-    return x * x + y * y + z * z;
-  }
-};
-
-std::ostream& operator<<(std::ostream& os, const Point& p) {
-  os << "(" << p[0] << "," << p[1] << "," << p[2] << ")";
-  return os;
-}
 
 /**
  * A node in an octree is either an internal node or a body (leaf).
@@ -150,18 +90,18 @@ struct Octree : public Galois::Runtime::Lockable {
   //  Octree(const Point& p, double m = 0.0) :pos(p), mass(m) {}
   // serialization functions
   typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
-    gSerialize(s,pos,mass,Leaf);
-    gSerialize(s,vel,acc);
+  void serialize(Galois::Runtime::SerializeBuffer& s) const {
+    Galois::Runtime::gSerialize(s,pos,mass,Leaf);
+    Galois::Runtime::gSerialize(s,vel,acc);
     for (int i = 0; i < 8; i++) {
-      gSerialize(s,child[i]);
+      Galois::Runtime::gSerialize(s,child[i]);
     }
   }
-  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
-    gDeserialize(s,pos,mass,Leaf);
-    gDeserialize(s,vel,acc);
+  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
+    Galois::Runtime::gDeserialize(s,pos,mass,Leaf);
+    Galois::Runtime::gDeserialize(s,vel,acc);
     for (int i = 0; i < 8; i++) {
-      gDeserialize(s,child[i]);
+      Galois::Runtime::gDeserialize(s,child[i]);
     }
   }
 };
@@ -184,10 +124,10 @@ struct BoundingBox : public Galois::Runtime::Lockable {
 
   // serialization functions
   typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
+  void serialize(Galois::Runtime::SerializeBuffer& s) const {
     gSerialize(s,min,max);
   }
-  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
     gDeserialize(s,min,max);
   }
 
@@ -210,7 +150,7 @@ struct BoundingBox : public Galois::Runtime::Lockable {
   }
 
   double diameter() const {
-    double diameter = max.x - min.x;
+    double diameter = max.x() - min.x();
     for (int i = 1; i < 3; i++) {
       double t = max[i] - min[i];
       if (diameter < t)
@@ -225,9 +165,9 @@ struct BoundingBox : public Galois::Runtime::Lockable {
 
   Point center() const {
     return Point(
-        (max.x + min.x) * 0.5,
-        (max.y + min.y) * 0.5,
-        (max.z + min.z) * 0.5);
+        (max.x() + min.x()) * 0.5,
+        (max.y() + min.y()) * 0.5,
+        (max.z() + min.z()) * 0.5);
   }
 };
 
@@ -244,7 +184,7 @@ struct Config {
   Config():
     dtime(0.5),
     eps(0.05),
-    tol(0.025),
+    tol(0.05), //0.025),
     dthf(dtime * 0.5),
     epssq(eps * eps),
     itolsq(1.0 / (tol * tol))  { }
@@ -262,12 +202,9 @@ Config config;
 
 inline int getIndex(const Point& a, const Point& b) {
   int index = 0;
-  if (a.x < b.x)
-    index += 1;
-  if (a.y < b.y)
-    index += 2;
-  if (a.z < b.z)
-    index += 4;
+  for (int i = 0; i < 3; ++i)
+    if (a[i] < b[i]) 
+      index += (1 << i);
   return index;
 }
 
@@ -289,15 +226,15 @@ struct PrintOctree : public Galois::Runtime::Lockable {
   template<typename Context>
   void operator()(gptr<Octree> b, Context& cnx) {
     std::stringstream ss;
-    b.dump(ss);
-    ss << " " << *b << " host: " << Galois::Runtime::Distributed::networkHostID << "\n";
+    //b.dump(ss);
+    ss << " " << *b << " host: " << Galois::Runtime::NetworkInterface::ID << "\n";
     std::cout << ss.str();
   }
 
   // serialization functions
   typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const { }
-  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) { }
+  void serialize(Galois::Runtime::SerializeBuffer& s) const { }
+  void deserialize(Galois::Runtime::DeSerializeBuffer& s) { }
 };
 
 struct GetBackLocalNodes : public Galois::Runtime::Lockable {
@@ -311,15 +248,15 @@ struct GetBackLocalNodes : public Galois::Runtime::Lockable {
       ss << "Leaf Node: ";
     else
       ss << "Internal Node: ";
-    b.dump(ss);
-    ss << " " << *b << " host: " << Galois::Runtime::Distributed::networkHostID << "\n";
+    //b.dump(ss);
+    ss << " " << *b << " host: " << Galois::Runtime::NetworkInterface::ID << "\n";
     // std::cout << ss.str();
   }
 
   // serialization functions
   typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const { }
-  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) { }
+  void serialize(Galois::Runtime::SerializeBuffer& s) const { }
+  void deserialize(Galois::Runtime::DeSerializeBuffer& s) { }
 };
 
 struct BuildOctree : public Galois::Runtime::Lockable {
@@ -336,18 +273,18 @@ struct BuildOctree : public Galois::Runtime::Lockable {
   //template<typename Context>
   //void operator()(gptr<Octree> b, Context& cnx) {
   void operator()(gptr<Octree> b) {
-    Octree* troot = transientAcquire(root);
-    Octree* tb = transientAcquire(b);
+    Octree* troot = Galois::Runtime::transientAcquire(root);
+    Octree* tb = Galois::Runtime::transientAcquire(b);
     insert(b, tb, root, troot, root_radius);
   }
 
   // serialization functions
   typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
-    gSerialize(s,root,inNodes,root_radius);
+  void serialize(Galois::Runtime::SerializeBuffer& s) const {
+    Galois::Runtime::gSerialize(s,root,inNodes,root_radius);
   }
-  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
-    gDeserialize(s,root,inNodes,root_radius);
+  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
+    Galois::Runtime::gDeserialize(s,root,inNodes,root_radius);
   }
 
   void insert(gptr<Octree>& b, Octree* tb, gptr<Octree> node, Octree* tnode, double radius) {
@@ -372,7 +309,11 @@ struct BuildOctree : public Galois::Runtime::Lockable {
       gptr<Octree> new_node(nnode);
       inNodes->push_back(new_node);
 
-      assert(tchild->pos != tb->pos);
+      if (tb->pos == tchild->pos) {
+	double jitter = config.tol / 2;
+	assert(jitter < radius);
+	tb->pos += (nnode->pos - tb->pos) * jitter;
+      }
       
       nnode = transientAcquire(new_node);
       insert(b, tb, new_node, nnode, radius);
@@ -488,10 +429,10 @@ struct ComputeForces : Galois::Runtime::Lockable {
 
   // serialization functions
   typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
-    gSerialize(s,top,diameter,root_dsq);
+  void serialize(Galois::Runtime::SerializeBuffer& s) const {
+    Galois::Runtime::gSerialize(s,top,diameter,root_dsq);
   }
-  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
+  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
     gDeserialize(s,top,diameter,root_dsq);
   }
 
@@ -595,8 +536,8 @@ struct AdvanceBodies {
   }
   // serialization functions
   typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const { }
-  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) { }
+  void serialize(Galois::Runtime::SerializeBuffer& s) const { }
+  void deserialize(Galois::Runtime::DeSerializeBuffer& s) { }
 };
 
 struct ReduceBoxes : public Galois::Runtime::Lockable {
@@ -614,17 +555,13 @@ struct ReduceBoxes : public Galois::Runtime::Lockable {
   }
   // serialization functions
   typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
-    gSerialize(s,initial);
+  void serialize(Galois::Runtime::SerializeBuffer& s) const {
+    Galois::Runtime::gSerialize(s,initial);
   }
-  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
-    gDeserialize(s,initial);
+  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
+    Galois::Runtime::gDeserialize(s,initial);
   }
 };
-
-double nextDouble() {
-  return rand() / (double) RAND_MAX;
-}
 
 struct InsertBody : public Galois::Runtime::Lockable {
   BodyPtrs pBodies;
@@ -638,13 +575,13 @@ struct InsertBody : public Galois::Runtime::Lockable {
   }
   // serialization functions
   typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::Distributed::SerializeBuffer& s) const {
-    gSerialize(s,pBodies);
-    gSerialize(s,bodies);
+  void serialize(Galois::Runtime::SerializeBuffer& s) const {
+    Galois::Runtime::gSerialize(s,pBodies);
+    Galois::Runtime::gSerialize(s,bodies);
   }
-  void deserialize(Galois::Runtime::Distributed::DeSerializeBuffer& s) {
-    gDeserialize(s,pBodies);
-    gDeserialize(s,bodies);
+  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
+    Galois::Runtime::gDeserialize(s,pBodies);
+    Galois::Runtime::gDeserialize(s,bodies);
   }
 };
 
@@ -670,19 +607,19 @@ struct centerYCmpInv {
 };
 
 
-template<typename Iter>
-void divide(const Iter& b, const Iter& e) {
+template<typename Iter, typename Gen>
+void divide(const Iter& b, const Iter& e, Gen& gen) {
   if (std::distance(b,e) > 32) {
     std::sort(b,e, centerXCmp());
     Iter m = Galois::split_range(b,e);
-    std::sort(b,m, centerYCmpInv());
-    std::sort(m,e, centerYCmp());
-    divide(b, Galois::split_range(b,m));
-    divide(Galois::split_range(b,m), m);
-    divide(m,Galois::split_range(m,e));
-    divide(Galois::split_range(m,e), e);
+    std::sort(b, m, centerYCmpInv());
+    std::sort(m, e, centerYCmp());
+    divide(b, Galois::split_range(b, m), gen);
+    divide(Galois::split_range(b, m), m, gen);
+    divide(m, Galois::split_range(m, e), gen);
+    divide(Galois::split_range(m, e), e, gen);
   } else {
-    std::random_shuffle(b,e);
+    std::shuffle(b, e, gen);
   }
 }
 
@@ -695,7 +632,12 @@ void generateInput(Bodies& bodies, BodyPtrs& pBodies, int nbodies, int seed) {
   Point p;
   double PI = boost::math::constants::pi<double>();
 
-  srand(seed);
+  std::mt19937 gen(seed);
+#if __cplusplus >= 201103L || defined(HAVE_CXX11_UNIFORM_INT_DISTRIBUTION)
+  std::uniform_real_distribution<double> dist(0, 1);
+#else
+  std::uniform_real<double> dist(0, 1);
+#endif
 
   double rsc = (3 * PI) / 16;
   double vsc = sqrt(1.0 / rsc);
@@ -703,11 +645,11 @@ void generateInput(Bodies& bodies, BodyPtrs& pBodies, int nbodies, int seed) {
   std::vector<Octree> tmp;
 
   for (int body = 0; body < nbodies; body++) {
-    double r = 1.0 / sqrt(pow(nextDouble() * 0.999, -2.0 / 3.0) - 1);
+    double r = 1.0 / sqrt(pow(dist(gen) * 0.999, -2.0 / 3.0) - 1);
     do {
       for (int i = 0; i < 3; i++)
-        p[i] = nextDouble() * 2.0 - 1.0;
-      sq = p.x * p.x + p.y * p.y + p.z * p.z;
+        p[i] = dist(gen) * 2.0 - 1.0;
+      sq = p.dist2();
     } while (sq > 1.0);
     scale = rsc * r / sqrt(sq);
 
@@ -717,14 +659,14 @@ void generateInput(Bodies& bodies, BodyPtrs& pBodies, int nbodies, int seed) {
       b.pos[i] = p[i] * scale;
 
     do {
-      p.x = nextDouble();
-      p.y = nextDouble() * 0.1;
-    } while (p.y > p.x * p.x * pow(1 - p.x * p.x, 3.5));
-    v = p.x * sqrt(2.0 / sqrt(1 + r * r));
+      p[0] = dist(gen);
+      p[1] = dist(gen) * 0.1;
+    } while (p[1] > p[0] * p[0] * pow(1 - p[0] * p[0], 3.5));
+    v = p[0] * sqrt(2.0 / sqrt(1 + r * r));
     do {
       for (int i = 0; i < 3; i++)
-        p[i] = nextDouble() * 2.0 - 1.0;
-      sq = p.x * p.x + p.y * p.y + p.z * p.z;
+        p[i] = dist(gen) * 2.0 - 1.0;
+      sq = p.dist2();
     } while (sq > 1.0);
     scale = vsc * v / sqrt(sq);
     for (int i = 0; i < 3; i++)
@@ -735,8 +677,8 @@ void generateInput(Bodies& bodies, BodyPtrs& pBodies, int nbodies, int seed) {
   }
 
   //sort and copy out
-  divide(tmp.begin(), tmp.end());
-  Galois::for_each<>(tmp.begin(), tmp.end(), InsertBody(pBodies, bodies));
+  divide(tmp.begin(), tmp.end(), gen);
+  Galois::do_all(tmp.begin(), tmp.end(), InsertBody(pBodies, bodies));
 }
 
 struct CheckAllPairs {
@@ -778,14 +720,16 @@ double checkAllPairs(Bodies& bodies, int N) {
 */
 
 void run(Bodies& bodies, BodyPtrs& pBodies, BodyPtrs& inNodes) {
-  typedef Galois::WorkList::dChunkedLIFO<256> WL_;
-  typedef Galois::WorkList::ChunkedAdaptor<false,32> WL;
+  typedef Galois::WorkList::AltChunkedLIFO<32> WL;
+  typedef Galois::WorkList::StableIterator<true> WLL;
+
+  Galois::preAlloc (Galois::getActiveThreads () + (3*sizeof (Octree) + 2*sizeof (Body))*nbodies/Galois::Runtime::MM::hugePageSize);
+  Galois::reportPageAlloc("MeminfoPre");
 
   for (int step = 0; step < ntimesteps; step++) {
     gptr<BoundingBox> box(new BoundingBox());
 
     // Do ReduceBoxes sequentially
-    //Galois::for_each_local<>(pBodies, ReduceBoxes(box));
     for(auto ii = pBodies->begin(), ee = pBodies->end(); ii != ee; ++ii)
       box->merge((*ii)->pos);
 

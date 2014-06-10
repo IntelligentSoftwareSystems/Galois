@@ -219,5 +219,16 @@ BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_has_known_trivial_constructor)
 template <typename T>
 struct has_known_trivial_constructor: public has_tt_has_known_trivial_constructor<T> { };
 
+//! Decay that handles std::ref
+template<typename T>
+struct special_decay {
+  using type = typename std::decay<T>::type;
+};
+
+template<typename T>
+struct special_decay<std::reference_wrapper<T>> {
+  using type = T&;
+};
+
 }
 #endif

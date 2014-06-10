@@ -39,6 +39,7 @@
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
 #include "Galois/Galois.h"
+#include "Galois/Accumulator.h"
 #include "Galois/Runtime/Sampling.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
@@ -60,6 +61,8 @@ static cll::opt<double>   endtime("end", cll::desc("simulation end time"), cll::
 class Billiards {
 
 public:
+  typedef Galois::GAccumulator<size_t> Accumulator;
+
   virtual const std::string version () const = 0;
   //! @return number of events processed
   virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const double endtime, bool enablePrints=false) = 0;
@@ -87,7 +90,9 @@ public:
     Galois::StatTimer timer ("Simulation time: ");
 
     timer.start ();
+    Galois::Runtime::beginSampling ();
     size_t numEvents = runSim (table, initEvents, endtime, enablePrints);
+    Galois::Runtime::endSampling ();
     timer.stop ();
 
     std::cout << "Billiards " << version () << ", number of events processed=" << numEvents << std::endl;
@@ -109,6 +114,12 @@ class BilliardsSerialPQ: public Billiards {
 public:
 
   virtual const std::string version () const { return "Serial Ordered with Priority Queue"; }
+
+  GALOIS_ATTRIBUTE_PROF_NOINLINE static void processEvent (Event& e, Table& table, std::vector<Event>& addList, const double endtime) {
+      addList.clear ();
+      e.simulate ();
+      table.addNextEvents (e, addList, endtime);
+  }
 
   virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const double endtime, bool enablePrints=false) {
 
@@ -132,8 +143,7 @@ public:
         std::cout << "Processing event=" << e.str () << std::endl;
       }
 
-      addList.clear ();
-      e.simulate (addList, table, endtime);
+      processEvent (e, table, addList, endtime);
 
       for (std::vector<Event>::iterator i = addList.begin (), ei = addList.end ();
           i != ei; ++i) {

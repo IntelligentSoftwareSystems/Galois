@@ -27,11 +27,13 @@
 
 namespace Galois {
 
+//! [PerIterAllocTy example]
 //! Base allocator for per-iteration allocator
 typedef Runtime::MM::SimpleBumpPtrWithMallocFallback<Runtime::MM::FreeListHeap<Runtime::MM::SystemBaseAlloc> > IterAllocBaseTy;
 
 //! Per-iteration allocator that conforms to STL allocator interface
-typedef Runtime::MM::ExternRefGaloisAllocator<char, IterAllocBaseTy> PerIterAllocTy;
+typedef Galois::Runtime::MM::ExternRefGaloisAllocator<char, IterAllocBaseTy> PerIterAllocTy;
+//! [PerIterAllocTy example]
 
 //! Scalable fixed-sized allocator for T that conforms to STL allocator interface but
 //! does not support variable sized allocations

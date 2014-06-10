@@ -20,10 +20,11 @@
  *
  * @section Description
  *
- * There are two main classes, ::FileGraph and ::LC_XXX_Graph. The former
- * represents the pure structure of a graph (i.e., whether an edge exists between
- * two nodes) and cannot be modified. The latter allows values to be stored on
- * nodes and edges, but the structure of the graph cannot be modified.
+ * There are two main classes, Galois::Graph::FileGraph and LC_XXX_Graph
+ * (e.g., Galois::Graph::LC_CSR_Graph). The former represents the pure
+ * structure of a graph (i.e., whether an edge exists between two nodes) and
+ * cannot be modified. The latter allows values to be stored on nodes and
+ * edges, but the structure of the graph cannot be modified.
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  * @author Donald Nguyen <ddn@cs.utexas.edu>
@@ -36,6 +37,7 @@
 #include "LC_Linear_Graph.h"
 #include "LC_Morph_Graph.h"
 #include "LC_InOut_Graph.h"
+#include "LC_Adaptor_Graph.h"
 #include "Util.h"
 
 #endif

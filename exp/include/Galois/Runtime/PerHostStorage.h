@@ -235,6 +235,7 @@ public:
     allocOnHost(dbuf);
     return ptr;
   }
+
   static void deallocate(PerThreadDist ptr) {
     getSystemNetworkInterface().broadcastAlt(&deallocOnHost, ptr.offset);
     deallocOnHost(ptr.offset);

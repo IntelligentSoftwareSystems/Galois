@@ -52,10 +52,15 @@ enum PseudoAlgo {
   fullPseudo
 };
 
-enum WriteType {
-  none,
+enum OutputType {
   permutedgraph,
   permutation
+};
+
+enum OutputEdgeType {
+  void_,
+  int32,
+  int64
 };
 
 typedef unsigned int DistType;
@@ -63,13 +68,18 @@ static const DistType DIST_INFINITY = std::numeric_limits<DistType>::max() - 1;
 
 namespace cll = llvm::cl;
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
-static cll::opt<std::string> outputFilename(cll::Positional, cll::desc("[output file]"), cll::init("permuted"));
-static cll::opt<WriteType> writeType("output", cll::desc("Output type:"),
+static cll::opt<std::string> outputFilename(cll::Positional, cll::desc("[output file]"), cll::init(""));
+static cll::opt<OutputType> writeType("output", cll::desc("Output type:"),
     cll::values(
-      clEnumValN(WriteType::none, "none", "None (default)"),
-      clEnumValN(WriteType::permutedgraph, "graph", "Permuted graph"),
-      clEnumValN(WriteType::permutation, "perm", "Permutation"),
-      clEnumValEnd), cll::init(WriteType::none));
+      clEnumValN(OutputType::permutedgraph, "graph", "Permuted graph"),
+      clEnumValN(OutputType::permutation, "perm", "Permutation (default)"),
+      clEnumValEnd), cll::init(OutputType::permutation));
+static cll::opt<OutputEdgeType> writeEdgeType("edgeType", cll::desc("Input/Output edge type:"),
+    cll::values(
+      clEnumValN(OutputEdgeType::void_, "void", "no edge values"),
+      clEnumValN(OutputEdgeType::int32, "int32", "32 bit edge values"),
+      clEnumValN(OutputEdgeType::int64, "int64", "64 bit edge values"),
+      clEnumValEnd), cll::init(OutputEdgeType::void_));
 static cll::opt<PseudoAlgo> pseudoAlgo(cll::desc("Psuedo-Peripheral algorithm:"),
     cll::values(
       clEnumVal(simplePseudo, "Simple"),
@@ -77,9 +87,7 @@ static cll::opt<PseudoAlgo> pseudoAlgo(cll::desc("Psuedo-Peripheral algorithm:")
       clEnumVal(fullPseudo, "Full algorithm"),
       clEnumValEnd), cll::init(fullPseudo));
 static cll::opt<bool> anyBFS("anyBFS", cll::desc("Use Any BFS ordering"), cll::init(false));
-static cll::opt<bool> useFloatEdgeWeights("useFloatEdgeWeights", 
-    cll::desc("Input and output graph edge weights are floats. By default, assume that they are doubles."), 
-    cll::init(false));
+static cll::opt<bool> printBandwidth("printBandwidth", cll::desc("Print bandwidth"), cll::init(false));
 static cll::opt<unsigned int> startNode("startnode",
     cll::desc("Node to start search from. Overrides pseudo-peripheral search."), cll::init(DIST_INFINITY));
 static cll::opt<unsigned int> pseudoStartNode("pseudoStartNode",
@@ -218,11 +226,12 @@ private:
   typedef Process<false, BagWorklist, AccumUpdate> OrderedProcess;
 
   //! Compute histogram of levels
+  template<typename GR>
   struct CountLevels {
-    std::deque<size_t> counts;
+    GR& counts;
     bool reset;
 
-    explicit CountLevels(bool r): reset(r) { }
+    explicit CountLevels(bool r, GR& c): counts(c), reset(r) { }
 
     void operator()(const GNode& n) {
       SNode& data = graph.getData(n, Galois::MethodFlag::NONE);
@@ -230,19 +239,16 @@ private:
       assert(data.dist != DIST_INFINITY);
       if (data.dist == DIST_INFINITY)
         return;
-
-      if (counts.size() <= data.dist)
-        counts.resize(data.dist + 1);
-      ++counts[data.dist];
+      counts.update(data.dist);
       if (reset)
         data.dist = DIST_INFINITY;
     }
 
-    static void reduce(CountLevels& dest, CountLevels& src) {
-      if (dest.counts.size() < src.counts.size())
-        dest.counts.resize(src.counts.size());
-      std::transform(src.counts.begin(), src.counts.end(),
-          dest.counts.begin(), dest.counts.begin(), std::plus<size_t>());
+    static void reduce(std::deque<size_t>& dest, std::deque<size_t>& src) {
+      if (dest.size() < src.size())
+        dest.resize(src.size());
+      std::transform(src.begin(), src.end(),
+          dest.begin(), dest.begin(), std::plus<size_t>());
     }
   };
 
@@ -258,8 +264,16 @@ private:
     graph.getData(source).dist = 0;
     Galois::for_each(source, UnorderedProcess(), Galois::wl<dChunk>());
 
-    res.counts = Galois::Runtime::do_all_impl(Galois::Runtime::makeLocalRange(graph),
-        CountLevels(reset), default_reduce()).counts;
+    struct updater {
+      void operator()(std::deque<size_t>& lhs, size_t rhs) {
+        if (lhs.size() <= rhs)
+          lhs.resize(rhs + 1);
+        ++lhs[rhs];
+      }
+    };
+    Galois::GReducible<std::deque<size_t>, updater> counts{updater()};
+    Galois::do_all_local(graph, CountLevels<decltype(counts)>(reset, counts));
+    res.counts = counts.reduce(CountLevels<decltype(counts)>::reduce);
     res.max_width = *std::max_element(res.counts.begin(), res.counts.end());
     res.complete = true;
     return res;
@@ -308,11 +322,11 @@ public:
   }
 
   static void init() {
-    Galois::do_all_local(graph, initNode);
+    Galois::do_all_local(graph, &initNode);
   }
 
   static void reset() {
-    Galois::do_all_local(graph, resetNode);
+    Galois::do_all_local(graph, &resetNode);
   }
 
     // Compute maximum bandwidth for a given graph
@@ -344,7 +358,7 @@ public:
       if (maxdiff > globalmax){
         while (!maxband.cas(globalmax, maxdiff)){
           globalmax = maxband;
-          if (!maxdiff > globalmax)
+          if (!(maxdiff > globalmax))
             break;
         }
       }
@@ -731,7 +745,7 @@ struct CuthillUnordered {
 
   template<typename C, typename RO, typename WO>
   static void place_nodes(C& c, RO& read_offset, WO& write_offset) {
-    Galois::on_each(PlaceFn<C,RO,WO>(c, read_offset, write_offset), "place");
+    Galois::on_each(PlaceFn<C,RO,WO>(c, read_offset, write_offset), Galois::loopname("place"));
   }
 
   template<typename C>
@@ -805,55 +819,30 @@ struct AnyBFSUnordered {
 
 template<typename EdgeTy>
 void writeGraph() {
-  typedef Galois::Graph::FileGraphWriter Writer;
-  typedef Galois::LargeArray<EdgeTy> EdgeData;
-  typedef typename EdgeData::value_type edge_value_type;
-  
   Galois::Graph::FileGraph origGraph;
-  EdgeData edgeData;
-  Writer p;
-
   origGraph.structureFromFileInterleaved<EdgeTy>(filename);
-  p.setNumNodes(graph.size());
-  p.setNumEdges(graph.sizeEdges());
-  p.setSizeofEdgeData(EdgeData::has_value ? sizeof(edge_value_type) : 0); 
-  edgeData.create(graph.sizeEdges());
+  std::vector<size_t> perm;
+  perm.resize(graph.size());
+  for (GNode n : graph)
+    perm[n] = graph.getData(n).id;
 
-  p.phase1();
-  for (GNode n : graph) {
-    p.incrementDegree(graph.getData(n).id, std::distance(graph.edge_begin(n), graph.edge_end(n)));
-  }
-  
-  p.phase2();
-  for (GNode n : graph) {
-    size_t sid = graph.getData(n).id;
-    for (Graph::edge_iterator ii : graph.out_edges(n)) {
-      GNode dst = graph.getEdgeDst(ii);
-      size_t did = graph.getData(dst).id;
-      edgeData.set(p.addNeighbor(sid, did), origGraph.getEdgeData<EdgeTy>(n, dst));
-    }
-  }
-
-  edge_value_type* rawEdgeData = p.finish<edge_value_type>();
-  if (EdgeData::has_value)
-    std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+  Galois::Graph::FileGraph out;
+  Galois::Graph::permute<EdgeTy>(origGraph, perm, out);
   std::cout 
     << "Writing permuted graph to " << outputFilename 
-    << " (nodes: " << p.size() << " edges: " << p.sizeEdges() << ")\n";
-  p.structureToFile(outputFilename);
+    << " (nodes: " << out.size() << " edges: " << out.sizeEdges() << ")\n";
+  out.structureToFile(outputFilename);
 }
 
 void writePermutation() {
   std::ofstream file(outputFilename.c_str());
   std::vector<unsigned int> transpose;
   transpose.resize(graph.size());
-  for (GNode n : graph) {
+  for (GNode n : graph)
     transpose[graph.getData(n).id] = n;
-  }
+  std::cout << "Writing permutation to " << outputFilename << "\n";
   for (unsigned int id : transpose)
     file << id << "\n";
-
-  std::cout << "Writing permutation to " << outputFilename << "\n";
   file.close();
 }
 
@@ -883,7 +872,8 @@ int main(int argc, char **argv) {
   std::cout << "Read " << std::distance(graph.begin(), graph.end()) << " nodes\n";
   perm.resize(std::distance(graph.begin(), graph.end()));
 
-  BFS::bandwidth("Initial");
+  if (printBandwidth)
+    BFS::bandwidth("Initial");
 
   Galois::StatTimer T;
   T.start();
@@ -915,13 +905,22 @@ int main(int argc, char **argv) {
   T.stop();
 
   BFS::permute(perm);
-  BFS::bandwidth("Permuted");
+  if (printBandwidth)
+    BFS::bandwidth("Permuted");
 
-  switch (writeType) {
-    case WriteType::none: break;
-    case WriteType::permutation: writePermutation(); break;
-    case WriteType::permutedgraph: if (useFloatEdgeWeights) writeGraph<float>(); else writeGraph<double>(); break;
-    default: abort();
+  if (outputFilename != "") {
+    switch (writeType) {
+      case OutputType::permutation: writePermutation(); break;
+      case OutputType::permutedgraph:
+        switch (writeEdgeType) {
+          case OutputEdgeType::void_: writeGraph<void>(); break;
+          case OutputEdgeType::int32: writeGraph<uint32_t>(); break;
+          case OutputEdgeType::int64: writeGraph<uint64_t>(); break;
+          default: abort();
+        }
+        break;
+      default: abort();
+    }
   }
 
   std::cout << "done!\n";

@@ -33,6 +33,8 @@
 #include "Galois/WorkList/WorkListExperimental.h"
 #endif
 
+#include <iostream>
+
 static const char* name = "Scheduler Micro Benchmark";
 static const char* desc = "Measures stuff";
 static const char* url = 0;

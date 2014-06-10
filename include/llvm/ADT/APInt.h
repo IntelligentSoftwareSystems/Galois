@@ -161,6 +161,8 @@ class APInt {
   /// result to hold the input.
   ///
   /// @param radix 2, 8, 10, 16, or 36
+  /// @param numBits number of bits
+  /// @param str string
   /// @brief Convert a char array into an APInt
   void fromString(unsigned numBits, StringRef str, uint8_t radix);
 

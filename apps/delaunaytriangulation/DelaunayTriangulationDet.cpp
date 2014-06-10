@@ -400,17 +400,21 @@ static void writePoints(const std::string& filename, const PointList& points) {
 }
 
 //! All Point* refer to elements in this bag
+//! [Define InsertBag]
 Galois::InsertBag<Point> basePoints;
+//! [Define InsertBag]
 size_t maxRounds;
 Galois::InsertBag<Point*>* rounds;
 const int roundShift = 4; //! round sizes are portional to (1 << roundsShift)
 
 static void copyPointsFromRounds(PointList& points) {
   for (int i = maxRounds - 1; i >= 0; --i) {
+//! [Access elements of InsertBag]
     Galois::InsertBag<Point*>& pptrs = rounds[i];
     for (Galois::InsertBag<Point*>::iterator ii = pptrs.begin(), ei = pptrs.end(); ii != ei; ++ii) {
       points.push_back(*(*ii));
     }
+//! [Access elements of InsertBag]
   }
 }
 
@@ -539,9 +543,11 @@ static void generateRounds(PointList& points, bool addBoundary) {
 
   // Now, handle boundary points
   size_t last = points.size();
+//! [Insert elements into InsertBag]
   Point* p1 = &basePoints.push(points[last-1]);
   Point* p2 = &basePoints.push(points[last-2]);
   Point* p3 = &basePoints.push(points[last-3]);
+//! [Insert elements into InsertBag]
 
   rounds[maxRounds].push(p1);
   rounds[maxRounds].push(p2);
@@ -561,13 +567,13 @@ static void readInput(const std::string& filename, bool addBoundary) {
 #if 1
   Galois::preAlloc(
       32 * points.size() * sizeof(Element) * 1.5 // mesh is about 2x number of points (for random points)
-      / (Galois::Runtime::MM::pageSize) // in pages
+      / (Galois::Runtime::MM::hugePageSize) // in pages
       );
 #else
   Galois::preAlloc(1 * numThreads // some per-thread state
       + 2 * points.size() * sizeof(Element) // mesh is about 2x number of points (for random points)
       * 32 // include graph node size
-      / (Galois::Runtime::MM::pageSize) // in pages
+      / (Galois::Runtime::MM::hugePageSize) // in pages
       );
 #endif
   Galois::reportPageAlloc("MeminfoPre");

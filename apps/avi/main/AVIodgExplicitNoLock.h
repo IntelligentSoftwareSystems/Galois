@@ -67,6 +67,8 @@ protected:
    */
   struct Process {
 
+    typedef int tt_does_not_need_aborts;
+
     Graph& graph;
     std::vector<AtomicInteger>& inDegVec;
     MeshInit& meshInit;

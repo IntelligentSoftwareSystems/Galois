@@ -971,10 +971,10 @@ struct BarrierNoDup {
 			//if(seglen > qlen) 
 			if(seglen > 1000) {
 #ifdef TOTAL_PREFIX
-				Galois::on_each(TotalPrefix(round, chunk, barrier), "totalprefix");
+				Galois::on_each(TotalPrefix(round, chunk, barrier), Galois::loopname("totalprefix"));
 #else
 
-				Galois::on_each(LocalPrefix(round, chunk), "localprefix");
+				Galois::on_each(LocalPrefix(round, chunk), Galois::loopname("localprefix"));
 
 				for(unsigned int i = 1; i < thr-1; ++i){
 					start = i * chunk;
@@ -982,7 +982,7 @@ struct BarrierNoDup {
 					graph.getData(initial[round][end], Galois::MethodFlag::NONE).numChildren += graph.getData(initial[round][start-1], Galois::MethodFlag::NONE).numChildren;
 				}
 
-				Galois::on_each(DistrPrefix(round, chunk), "distrprefix");
+				Galois::on_each(DistrPrefix(round, chunk), Galois::loopname("distrprefix"));
 #endif
 			}
 			else {

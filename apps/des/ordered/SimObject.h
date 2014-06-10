@@ -73,7 +73,12 @@ public:
     SendAddList<C> addListWrap (newEvents);
     this->execEventIntern (event, addListWrap, beg, end);
   }
+
+  virtual size_t getStateSize () const = 0;
   
+  virtual void copyState (char* const buf, const size_t bufSize) const = 0; 
+
+  virtual void restoreState (char* const buf, const size_t bufSize) = 0;
 };
 
 } // end namespace des_ord

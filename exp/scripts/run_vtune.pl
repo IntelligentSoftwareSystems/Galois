@@ -3,7 +3,7 @@
 use strict;
 use warnings;
 
-sub find_vtune () {
+sub find_vtune() {
   my $vtune = `which amplxe-cl 2> /dev/null`;
   chomp($vtune);
   if (not -e $vtune) {
@@ -19,16 +19,29 @@ sub find_vtune () {
   return $vtune;
 }
 
-sub find_kernel_sym () {
+sub find_kernel_sym() {
   # TODO: fix this path when kernel and library debug symbols get installed
   my $symbol = "/usr/lib/debug/boot/" . `uname -r`;
   chomp($symbol);
   return $symbol;
 }
 
-sub find_analysis_type () {
+sub arch_is_knc()  {
+  if ($ENV{'GALOIS_ARCH_MIC'}) {
+    return 1;
+  }
+  return 0;
+}
+
+sub find_analysis_type() {
   my $type = "nehalem-memory-access";
+  # my $type = "snb-general-exploration";
   # my $type = "nehalem-general-exploration";
+
+  if (arch_is_knc ()) {
+    $type = 'knc-general-exploration';
+    # $type = 'knc-bandwidth';
+  }
 
   my $sys = `hostname`;
   chomp($sys);
@@ -38,7 +51,7 @@ sub find_analysis_type () {
   return $type;
 }
 
-sub report_line ($$$$$$) {
+sub report_line($$$$$$) {
   my ($vtune, $report, $rdir, $threads, $outfile, $maxsec) = @_;
 
   system("echo \"THREADS\t$threads\" >>$outfile.line.log");
@@ -72,7 +85,7 @@ sub report_line ($$$$$$) {
   close $output;
 }
 
-sub report_function ($$$$$$) {
+sub report_function($$$$$$) {
   my ($vtune, $report, $rdir, $threads, $outfile, $maxsec) = @_;
 
   system("echo \"THREADS\t$threads\" >>$outfile.function.log");
@@ -82,8 +95,8 @@ sub report_function ($$$$$$) {
 my $vtune = find_vtune;
 my $symbol = find_kernel_sym;
 my $type = find_analysis_type;
-my $uname = `whoami`;
-chomp($uname);
+my $user = `whoami`;
+chomp($user);
 
 die("Run as: runvtune.pl [-t N] output app args*") unless ($#ARGV >= 1);
 
@@ -102,17 +115,29 @@ if ($found_threads) {
   $cmdline = $cmdline . " -t $threads";
 }
 
+if (arch_is_knc ()) {
+  $cmdline = "ssh -t mic0 $cmdline";
+}
+
 print "RUN: CommandLine $cmdline\n";
 
-# my $dire = "/tmp/$uname.vtune.r$threads";
-my $dire = "/workspace/$uname/tmp/vtune--r$threads";
+# my $dire = "/tmp/$user.vtune.r$threads";
+my $dire = "/workspace/$user/tmp/vtune--r$threads";
+if (system ("mkdir -p $dire") != 0) {
+  print "failed to use '$dire' for storing vtune data, trying /tmp\n";
+  $dire = "/tmp/$user/vtune--r$threads";
+
+  if (system ("mkdir -p $dire") != 0) {
+    die "failed to use '$dire' for storing vtune data, quitting\n";
+  }
+}
+
 my $rdir = "-result-dir=$dire";
 my $report = "-R hw-events -format csv -csv-delimiter tab";
-# my $type = "hotspots";
 
-my $collect;
+my $collect = "-analyze-system";
 if (1) {
-  $collect = "-analyze-system -collect $type -start-paused";
+  $collect .= " -collect $type";
 } else {
   # Manual counter configuration
   my @counters = qw(
@@ -122,7 +147,11 @@ if (1) {
     OFFCORE_RESPONSE_0.ANY_DATA.LOCAL_CACHE
     OFFCORE_RESPONSE_0.ANY_DATA.LOCAL_DRAM
     );
-  $collect = "-collect-with runsa -start-paused -knob event-config=" . join(',', @counters);
+  $collect .= " -collect-with runsa -start-paused -knob event-config=" . join(',', @counters);
+}
+
+unless (arch_is_knc()) {
+  $collect .= " -start-paused";
 }
 
 my $sdir = "-search-dir all=$symbol";
@@ -130,7 +159,10 @@ my $maxsec = 100000;
 
 system("rm -rf $dire");
 system("mkdir -p $dire");
+
+my $vtune_run_cmd = "$vtune $collect $rdir -- $cmdline";
+print "Running: '$vtune_run_cmd'\n";
 # system("set -x ; $vtune $collect $rdir $sdir -- $cmdline"); 
-system("$vtune $collect $rdir -- $cmdline");
+system("$vtune_run_cmd");
 report_function $vtune, $report, $rdir, $threads, $outfile, $maxsec;
 report_line $vtune, $report, $rdir, $threads, $outfile, $maxsec;

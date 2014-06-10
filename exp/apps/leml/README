@@ -1,0 +1,32 @@
+Galois Notes
+============
+
+Inputs are in /net/faraday/inputs/leml
+
+
+Compilation 
+===========
+
+0. A compiled binary is included in codes/
+1. If you want to compile your self, you need to change 
+   the ``BLASFLAG'' in codes/Makefile manually.
+2. type ``make'' to make the binary train-ml
+
+
+Data sets
+=========
+	bibtex: a smaller dataset
+	eurlex: a medium dataset
+	wiki: a large dataset
+
+Example Usage
+=============
+
+./codes/train-ml -k 50 smat-data/bibtex/
+
+
+The current routines for sparse_matrix times dense_matrix
+=================================================
+Please see the last two functions in codes/smat.cpp
+	void smat_x_dmat(const smat_t &X, const double* W, const size_t k, double *H);
+	void smat_x_dmat(const double a, const smat_t &X, const double* W, const size_t k, const double *H0, double *H);

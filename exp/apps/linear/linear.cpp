@@ -536,8 +536,8 @@ struct GenerateInput {
   //! Copy from GenGraph representation to user Graph
   void copy(GenGraph& g1, Graph& g) {
     typedef typename Graph::GraphNode GraphNode;
-    typedef typename Graph::node_type node_type;
-    typedef typename Graph::edge_type edge_type;
+    typedef typename Graph::node_data_type node_data_type;
+    typedef typename Graph::edge_data_type edge_data_type;
 
     // Create nodes
     std::vector<GraphNode> nodes;
@@ -547,7 +547,7 @@ struct GenerateInput {
       g1.getData(*ii).id = id++;
       double w = g1.getEdgeData(g1.findEdge(*ii, *ii));
       Node& node = g1.getData(*ii);
-      GraphNode n = g.createNode(node_type(node.b, node.x, w));
+      GraphNode n = g.createNode(node_data_type(node.b, node.x, w));
       g.addNode(n);
       nodes.push_back(n);
     }
@@ -564,7 +564,7 @@ struct GenerateInput {
         if (*src == dst)
           continue;
         GraphNode dnode = nodes[g1.getData(dst).id];
-        edge_type edge(g1.getEdgeData(ii));
+        edge_data_type edge(g1.getEdgeData(ii));
 
         g.getEdgeData(g.addEdge(snode, dnode)) = edge;
       }

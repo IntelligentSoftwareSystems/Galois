@@ -31,12 +31,12 @@
 namespace Galois {
 namespace WorkList {
 
-template<typename Indexer, typename realWL, typename T >
+template<typename Indexer, typename realWL, typename T = int>
 class WorkListTracker {
   struct p {
     OnlineStat stat;
     unsigned int epoch;
-    std::map<unsigned int, OnlineStat> values;
+    std::map<unsigned, OnlineStat> values;
   };
 
   //online collection of stats
@@ -50,9 +50,6 @@ class WorkListTracker {
   Indexer I;
 
 public:
-  template<bool newconcurrent>
-  struct rethread { typedef WorkListTracker<Indexer, typename realWL::template rethread<newconcurrent>::type, T> type; };
-
   template<typename Tnew>
   struct retype { typedef WorkListTracker<Indexer, typename realWL::template retype<Tnew>::type, Tnew> type; };
 
@@ -123,7 +120,7 @@ public:
   Galois::optional<value_type> pop() {
     Galois::optional<value_type> ret = wl.pop();
     if (!ret) return ret;
-    p& P = *tracking.getRemote();
+    p& P = *tracking.getLocal();
     unsigned int cclock = clock.data;
     if (P.epoch != cclock) {
       if (P.stat.getCount())
@@ -131,7 +128,7 @@ public:
       P.stat.reset();
       P.epoch = clock.data;
     }
-    unsigned int index = I(*ret);
+    auto index = I(*ret);
     P.stat.insert(index);
     if (Runtime::LL::getTID() == 0) {
       ++thread_clock.data;

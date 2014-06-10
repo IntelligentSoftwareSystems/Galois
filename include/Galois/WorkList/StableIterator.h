@@ -32,23 +32,23 @@
 namespace Galois {
 namespace WorkList {
 
-template<typename Iterator=int*, bool Steal = false>
+template<bool Steal = false, typename Iterator=int*>
 struct StableIterator {
   typedef typename std::iterator_traits<Iterator>::value_type value_type;
 
   //! change the concurrency flag
   template<bool _concurrent>
-  struct rethread { typedef StableIterator<Iterator, Steal> type; };
+  struct rethread { typedef StableIterator<Steal, Iterator> type; };
   
   //! change the type the worklist holds
   template<typename _T>
-  struct retype { typedef StableIterator<Iterator, Steal> type; };
+  struct retype { typedef StableIterator<Steal, Iterator> type; };
 
   template<typename _iterator>
-  struct with_iterator { typedef StableIterator<_iterator, Steal> type; };
+  struct with_iterator { typedef StableIterator<Steal, _iterator> type; };
 
   template<bool _steal>
-  struct with_steal { typedef StableIterator<Iterator, _steal> type; };
+  struct with_steal { typedef StableIterator<_steal, Iterator> type; };
 
 private:
   struct shared_state {
@@ -123,8 +123,9 @@ public:
   template<typename RangeTy>
   void push_initial(const RangeTy& r) {
     state& data = *TLDS.getLocal();
-    data.localBegin = r.local_begin();
-    data.localEnd = r.local_end();
+    auto lp = r.local_pair();
+    data.localBegin = lp.first;
+    data.localEnd = lp.second;
     data.nextVictim = Runtime::LL::getTID();
     data.populateSteal();
   }

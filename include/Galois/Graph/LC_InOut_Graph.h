@@ -40,6 +40,14 @@ namespace Graph {
  */
 template<typename GraphTy>
 class LC_InOut_Graph: public GraphTy::template with_id<true>::type {
+public:
+  template<typename _node_data>
+  struct with_node_data { typedef LC_InOut_Graph<typename GraphTy::template with_node_data<_node_data>::type> type; };
+
+  template<typename _edge_data>
+  struct with_edge_data { typedef LC_InOut_Graph<typename GraphTy::template with_edge_data<_edge_data>::type> type; };
+
+private:
   template<typename G>
   friend void readGraphDispatch(G&, read_lc_inout_graph_tag, const std::string&, const std::string&);
 

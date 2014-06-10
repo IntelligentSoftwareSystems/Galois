@@ -1,5 +1,4 @@
 find_package(SDL)
 if(SDL_FOUND)
-  app(drawgraph drawgraph.cpp)
-  target_link_libraries(drawgraph SDL)
+  app(drawgraph drawgraph.cpp EXTLIBS SDL)
 endif()

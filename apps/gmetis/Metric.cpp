@@ -109,6 +109,7 @@ unsigned computeCut(GGraph& g) {
 
 void printPartStats(std::vector<partInfo>& parts) {
   onlineStat e;
+  assert(!parts.empty());
   for (unsigned x = 0; x < parts.size(); ++x) {
     e.add(parts[x].partWeight);
   }

@@ -159,9 +159,10 @@ class Verifier : public Galois::Runtime::Lockable {
       }
     }
 
-    if (found.size() != graph->size()) {
+    auto size = Galois::ParallelSTL::count_if_local(graph, [&](GNode) { return true; });
+    if (found.size() != size) {
       std::cerr << "Error: Not all elements are reachable. ";
-      std::cerr << "Found: " << found.size() << " needed: " << graph->size() << ".\n";
+      std::cerr << "Found: " << found.size() << " needed: " << size << ".\n";
       return false;
     }
     return true;

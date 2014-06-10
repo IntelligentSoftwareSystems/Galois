@@ -10,6 +10,7 @@ using namespace Galois::Runtime;
 bool didbcast = false;
 
 struct sayHi : public Galois::Runtime::Lockable {
+  sayHi() = default;
   sayHi(Galois::Runtime::PerHost<sayHi> ptr, DeSerializeBuffer& b) { std::cout << "Hi_r " << this << "\n"; }
   sayHi(Galois::Runtime::PerHost<sayHi> ptr) { std::cout << "Hi_l " << this << "\n"; }
   ~sayHi() { std::cout << "Bye\n"; }

@@ -171,7 +171,7 @@ struct parallelMatchAndCreateNodes {
       //Cautious point
       //no match
       if (selfMatch) {
-        pc.update(1);
+        pc.update(1U);
         N = coarseGGraph->createNode(numEdges, fineGGraph->getData(item).getWeight(), item);
         fineGGraph->getData(item).setMatched();
         fineGGraph->getData(item).setParent(N);
@@ -227,7 +227,7 @@ struct parallelPopulateEdges {
           sum += pp->second;
           ++pp;
         }
-        coarseGGraph->addEdgeWithoutCheck(node, dst, Galois::MethodFlag::NONE, sum);
+        coarseGGraph->addMultiEdge(node, dst, Galois::MethodFlag::NONE, sum);
       }
     }
     //    assert(e);
@@ -332,8 +332,7 @@ unsigned findMatching(MetisGraph* coarseMetisGraph, bool useRM, bool use2Hop, bo
 
   bool useOBIM = true;
 
-  typedef decltype(fineMetisGraph->getGraph()->local_begin()) ITY;
-  typedef Galois::WorkList::StableIterator<ITY, true> WL;
+  typedef Galois::WorkList::StableIterator<true> WL;
   //typedef Galois::WorkList::Random<> WL;
   if(useRM) {
     parallelMatchAndCreateNodes<RMmatch> pRM(coarseMetisGraph, pc, bagOfLoners, !use2Hop);
@@ -376,7 +375,7 @@ unsigned findMatching(MetisGraph* coarseMetisGraph, bool useRM, bool use2Hop, bo
 void createCoarseEdges(MetisGraph *coarseMetisGraph) {
   MetisGraph* fineMetisGraph = coarseMetisGraph->getFinerGraph();
   GGraph* fineGGraph = fineMetisGraph->getGraph();
-  typedef Galois::WorkList::StableIterator<decltype(fineGGraph->local_begin()), true> WL;
+  typedef Galois::WorkList::StableIterator<true> WL;
   parallelPopulateEdges pPE(coarseMetisGraph);
   Galois::for_each_local(*coarseMetisGraph->getGraph(), pPE, Galois::loopname("popedge"), Galois::wl<WL>());
 }

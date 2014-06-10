@@ -14,7 +14,6 @@
 #include "llvm/Support/DataTypes.h"
 #include <cassert>
 #include <string>
-#include <iostream>
 
 namespace llvm {
   template <typename T>

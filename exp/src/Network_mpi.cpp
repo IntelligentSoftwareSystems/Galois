@@ -43,7 +43,7 @@ namespace {
 
 static void handleError(int rc) {
   if (rc != MPI_SUCCESS) {
-    GALOIS_ERROR(false, "MPI ERROR"); 
+    //GALOIS_ERROR(false, "MPI ERROR"); 
     MPI_Abort(MPI_COMM_WORLD, rc);
   }
 }

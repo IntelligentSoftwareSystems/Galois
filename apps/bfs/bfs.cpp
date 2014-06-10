@@ -626,7 +626,7 @@ struct DeterministicAlgo {
 
   void operator()(Graph& graph, const GNode& source) const {
 #ifdef GALOIS_USE_EXP
-    typedef Galois::WorkList::BulkSynchronousInline<> WL;
+    typedef Galois::WorkList::BulkSynchronousInline WL;
 #else
     typedef Galois::WorkList::BulkSynchronous<Galois::WorkList::dChunkedLIFO<256> > WL;
 #endif
@@ -652,7 +652,9 @@ void run() {
 
   initialize(algo, graph, source, report);
 
-  Galois::preAlloc(numThreads + (3*graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::MM::pageSize);
+  //Galois::preAlloc(numThreads + (3*graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::MM::hugePageSize);
+  Galois::preAlloc(8*(numThreads + (graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::MM::hugePageSize));
+
   Galois::reportPageAlloc("MeminfoPre");
 
   Galois::StatTimer T;
@@ -685,7 +687,7 @@ int main(int argc, char **argv) {
   typedef BulkSynchronous<dChunkedLIFO<256> > BSWL;
 
 #ifdef GALOIS_USE_EXP
-  typedef BulkSynchronousInline<> BSInline;
+  typedef BulkSynchronousInline BSInline;
 #else
   typedef BSWL BSInline;
 #endif

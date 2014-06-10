@@ -50,11 +50,11 @@ class SimpleLock {
   void slow_lock() const;
 
 public:
-  constexpr SimpleLock() : _lock(0) {  }
+  SimpleLock(): _lock(0) { }
   //relaxed order for copy
-  SimpleLock(const SimpleLock& p) :_lock(p._lock.load(std::memory_order_relaxed)) {}
+  SimpleLock(const SimpleLock& p): _lock(p._lock.load(std::memory_order_relaxed)) { }
 
-  SimpleLock& operator= (const SimpleLock& p) {
+  SimpleLock& operator=(const SimpleLock& p) {
     if (&p == this) return *this;
     //relaxed order for initialization
     _lock.store(p._lock.load(std::memory_order_relaxed), std::memory_order_relaxed);
@@ -82,7 +82,7 @@ public:
 
   inline bool try_lock() const {
     int oldval = 0;
-    if (_lock.load(std::memory_order_acquire))
+    if (_lock.load(std::memory_order_relaxed))
       return false;
     if (!_lock.compare_exchange_weak(oldval, 1, std::memory_order_acq_rel))
       return false;

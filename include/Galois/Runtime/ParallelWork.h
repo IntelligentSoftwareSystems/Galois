@@ -358,26 +358,44 @@ public:
   }
 };
 
+template<typename WLTy>
+constexpr auto has_with_iterator(int) -> decltype(std::declval<typename WLTy::template with_iterator<int*>::type>(), bool()) {
+  return true;
+}
+
+template<typename>
+constexpr bool has_with_iterator(...) {
+  return false;
+}
+
+template<typename WLTy, typename IterTy, typename Enable = void>
+struct reiterator {
+  typedef WLTy type;
+};
+
+template<typename WLTy, typename IterTy>
+struct reiterator<WLTy, IterTy, typename std::enable_if<has_with_iterator<WLTy>(0)>::type> {
+  typedef typename WLTy::template with_iterator<IterTy>::type type;
+};
+
 template<typename WLTy, typename RangeTy, typename FunctionTy>
 void for_each_impl(const RangeTy& range, FunctionTy f, const char* loopname) {
   typedef typename RangeTy::value_type T;
-  typedef ForEachWork<WLTy, T, FunctionTy> WorkTy;
+  typedef typename reiterator<WLTy, typename RangeTy::iterator>::type WLNewTy;
+  typedef ForEachWork<WLNewTy, T, FunctionTy> WorkTy;
 
   assert(!inGaloisForEach);
 
   inGaloisForEach = true;
 
   WorkTy W(f, loopname);
-  //RunCommand init(std::bind(&WorkTy::template AddInitialWork<RangeTy>, std::ref(W), range));
-  RunCommand w[5] = {
+  trace("Loop start %\n", loopname);
+  getSystemThreadPool().run(activeThreads, 
     std::bind(&WorkTy::initThread, std::ref(W)),
     std::bind(&WorkTy::template AddInitialWork<RangeTy>, std::ref(W), range), 
     std::ref(getSystemBarrier()),
-    std::ref(W),
-    std::ref(getSystemBarrier())
-  };
-  trace("Loop start %\n", loopname);
-  getSystemThreadPool().run(&w[0], &w[5], activeThreads);
+    std::ref(W)
+  );
   trace("Loop end %\n", loopname);
   inGaloisForEach = false;
 }
@@ -398,9 +416,7 @@ void on_each_impl(FunctionTy fn, const char* loopname = 0) {
     GALOIS_DIE("Nested for_each not supported");
 
   inGaloisForEach = true;
-  RunCommand w[2] = {WOnEach<FunctionTy>(fn),
-                     std::ref(getSystemBarrier())};
-  getSystemThreadPool().run(&w[0], &w[2], activeThreads);
+  getSystemThreadPool().run(activeThreads, WOnEach<FunctionTy>(fn));
   inGaloisForEach = false;
 }
 
@@ -413,9 +429,10 @@ void on_each_simple_impl(FunctionTy fn, const char* loopname = 0) {
   inGaloisForEach = true;
   Barrier* b = createSimpleBarrier();
   b->reinit(activeThreads);
-  RunCommand w[2] = {WOnEach<FunctionTy>(fn),
-                     std::ref(*b)};
-  getSystemThreadPool().run(&w[0], &w[2], activeThreads);
+  getSystemThreadPool().run(activeThreads, 
+    WOnEach<FunctionTy>(fn),
+    std::ref(*b)
+  );
   delete b;
   inGaloisForEach = false;
 }

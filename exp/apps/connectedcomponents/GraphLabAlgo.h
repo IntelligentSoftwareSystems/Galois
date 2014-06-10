@@ -91,7 +91,8 @@ struct GraphLabAlgo {
     }
   };
 
-  void readGraph(Graph& graph) {
+  template<typename G>
+  void readGraph(G& graph) {
     readInOutGraph(graph);
   }
 

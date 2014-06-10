@@ -6,6 +6,7 @@
 #include "Galois/Graph/LCGraph.h"
 #include "Galois/Graph/GraphNodeBag.h"
 
+#include <random>
 #include <boost/mpl/if.hpp>
 
 #include "BFS.h"

@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2014, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -26,10 +26,10 @@
 #define GALOIS_VERSION_H
 
 #include "Galois/config.h"
-#ifdef GALOIS_USE_SVNVERSION
-#include "Galois/svnversion.h"
+#ifdef GALOIS_USE_EMBEDDED_REVISION
+#include "Galois/revision.h"
 #else
-#define GALOIS_SVNVERSION 0
+#define GALOIS_REVISION 0
 #endif
 
 #endif

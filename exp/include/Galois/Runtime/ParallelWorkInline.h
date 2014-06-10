@@ -244,7 +244,7 @@ class BSInlineExecutor {
   };
 
   WLTy wls[2];
-  FunctionTy& function;
+  FunctionTy function;
   const char* loopname;
   Galois::Runtime::Barrier& barrier;
   LL::CacheLineStorage<volatile long> done;
@@ -330,7 +330,7 @@ class BSInlineExecutor {
   }
 
 public:
-  BSInlineExecutor(FunctionTy& f, const char* ln): function(f), loopname(ln), barrier(getSystemBarrier()) { 
+  BSInlineExecutor(const FunctionTy& f, const char* ln): function(f), loopname(ln), barrier(getSystemBarrier()) { 
     if (ForEachTraits<FunctionTy>::NeedsBreak) {
       assert(0 && "not supported by this executor");
       abort();
@@ -354,18 +354,22 @@ public:
 } // end runtime
 
 namespace WorkList {
-  template<class T=int>
-  class BulkSynchronousInline { };
+  struct BulkSynchronousInline {
+    template<typename T>
+    struct retype {
+      typedef BulkSynchronousInline type;
+    };
+  };
 }
 
 namespace Runtime {
 namespace {
 
 template<class T,class FunctionTy>
-struct ForEachWork<WorkList::BulkSynchronousInline<>,T,FunctionTy>:
+struct ForEachWork<WorkList::BulkSynchronousInline,T,FunctionTy>:
   public BSInlineExecutor<T,FunctionTy> {
   typedef BSInlineExecutor<T,FunctionTy> SuperTy;
-  ForEachWork(FunctionTy& f, const char* ln): SuperTy(f, ln) { }
+  ForEachWork(const FunctionTy& f, const char* ln): SuperTy(f, ln) { }
 };
 
 }

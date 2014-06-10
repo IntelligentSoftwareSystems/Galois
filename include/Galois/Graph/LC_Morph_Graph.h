@@ -56,6 +56,9 @@ public:
   template<typename _node_data>
   struct with_node_data { typedef  LC_Morph_Graph<_node_data,EdgeTy,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,HasId> type; };
 
+  template<typename _edge_data>
+  struct with_edge_data { typedef  LC_Morph_Graph<NodeTy,_edge_data,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,HasId> type; };
+
   template<bool _has_no_lockable>
   struct with_no_lockable { typedef LC_Morph_Graph<NodeTy,EdgeTy,_has_no_lockable,UseNumaAlloc,HasOutOfLineLockable,HasId> type; };
 
@@ -85,6 +88,9 @@ protected:
 
     EdgeInfo* edgeBegin;
     EdgeInfo* edgeEnd;
+#ifndef NDEBUG
+    EdgeInfo* trueEdgeEnd;
+#endif
 
   public:
     template<typename... Args>
@@ -203,6 +209,14 @@ public:
   edge_iterator edge_end(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
     return N->edgeEnd;
   }
+
+  /**
+   * An object with begin() and end() methods to iterate over the outgoing
+   * edges of N.
+   */
+  detail::EdgesIterator<LC_Morph_Graph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+    return detail::EdgesIterator<LC_Morph_Graph>(*this, N, mflag);
+  }
   
   template<typename... Args>
   GraphNode createNode(int nedges, Args&&... args) {
@@ -224,12 +238,15 @@ public:
 #endif
 
       local_edges->begin = (EdgeInfo*)estart;
-      char* eend = newblock + Runtime::MM::pageSize;
+      char* eend = newblock + Runtime::MM::hugePageSize;
       eend -= (uintptr_t)eend % sizeof(EdgeInfo);
       local_edges->end = (EdgeInfo*)eend;
     }
     N->edgeBegin = N->edgeEnd = local_edges->begin;
     local_edges->begin += nedges;
+#ifndef NDEBUG
+    N->trueEdgeEnd = local_edges->begin;
+#endif
     return GraphNode(N);
   }
 
@@ -242,19 +259,35 @@ public:
       it->dst = dst;
       it->construct(std::forward<Args>(args)...);
       src->edgeEnd++;
+      assert(src->edgeEnd <= src->trueEdgeEnd);
     }
     return it;
   }
 
   template<typename... Args>
-  edge_iterator addEdgeWithoutCheck(GraphNode src, GraphNode dst, Galois::MethodFlag mflag, Args&&... args) {
+  edge_iterator addMultiEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag, Args&&... args) {
     Galois::Runtime::checkWrite(mflag, true);
     acquireNode(src, mflag);
     auto it = src->edgeEnd;
     it->dst = dst;
     it->construct(std::forward<Args>(args)...);
     src->edgeEnd++;
+    assert(src->edgeEnd <= src->trueEdgeEnd);
     return it;
+  }
+
+  /**
+   * Remove an edge from the graph.
+   *
+   * Invalidates edge iterator.
+   */
+  void removeEdge(GraphNode src, edge_iterator dst, Galois::MethodFlag mflag = MethodFlag::ALL) {
+    Galois::Runtime::checkWrite(mflag, true);
+    acquireNode(src, mflag);
+    src->edgeEnd--;
+    assert(src->edgeBegin <= src->edgeEnd);
+    std::swap(*dst, *src->edgeEnd);
+    src->edgeEnd->destroy();
   }
   
   edge_iterator findEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = MethodFlag::ALL) {
@@ -288,6 +321,7 @@ public:
   }
   
   void constructEdgesFrom(FileGraph& graph, unsigned tid, unsigned total, const ReadGraphAuxData& aux) {
+    typedef typename EdgeInfo::value_type value_type;
     auto r = graph.divideBy(
         sizeof(NodeInfo) + LC_Morph_Graph::size_of_out_of_line::value,
         sizeof(EdgeInfo),
@@ -296,9 +330,9 @@ public:
     for (FileGraph::iterator ii = r.first, ei = r.second; ii != ei; ++ii) {
       for (FileGraph::edge_iterator nn = graph.edge_begin(*ii), en = graph.edge_end(*ii); nn != en; ++nn) {
         if (EdgeInfo::has_value) {
-          addEdgeWithoutCheck(aux[*ii], aux[graph.getEdgeDst(nn)], Galois::MethodFlag::NONE, graph.getEdgeData<uint32_t>(nn));
+          addMultiEdge(aux[*ii], aux[graph.getEdgeDst(nn)], Galois::MethodFlag::NONE, graph.getEdgeData<typename EdgeInfo::value_type>(nn));
         } else {
-          addEdgeWithoutCheck(aux[*ii], aux[graph.getEdgeDst(nn)], Galois::MethodFlag::NONE);
+          addMultiEdge(aux[*ii], aux[graph.getEdgeDst(nn)], Galois::MethodFlag::NONE);
         }
       }
     }

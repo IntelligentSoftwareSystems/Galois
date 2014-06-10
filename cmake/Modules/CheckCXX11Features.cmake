@@ -42,6 +42,15 @@ int main(){
 }
 ")
 
+set(CheckThreadYield
+"
+#include <thread>
+int main() {
+  std::this_thread::yield();
+  return 0;
+}
+")
+
 cmake_push_check_state()
 
 set(CMAKE_REQUIRED_FLAGS ${CXX11_FLAGS})
@@ -53,5 +62,7 @@ CHECK_CXX_SOURCE_COMPILES("${CheckChrono}"
   HAVE_CXX11_CHRONO)
 CHECK_CXX_SOURCE_COMPILES("${CheckAlignof}"
   HAVE_CXX11_ALIGNOF)
+CHECK_CXX_SOURCE_COMPILES("${CheckThreadYield}"
+  HAVE_CXX11_THREAD_YIELD)
 
 cmake_pop_check_state()

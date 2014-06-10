@@ -94,6 +94,7 @@ public:
   }
 
   local_iterator local_begin() const { return block_begin(); }
+
   local_iterator local_end() const { return block_end(); }
 
   block_iterator block_begin() const { return block_pair().first; }

@@ -30,27 +30,7 @@
 
 #define PRINT_DEBUG false
 
-void Event::simulate (std::vector<Event>& addList, const Table& table, const double endtime) {
-
-  switch (kind) {
-
-    case BALL_COLLISION:
-      simulateBallCollision (downCast<Ball> (otherObj));
-      addNextEvents (addList, downCast<Ball> (otherObj), table, endtime );
-      break;
-
-    case CUSHION_COLLISION:
-      simulateCushionCollision (downCast<Cushion> (otherObj));
-      addNextEvents (addList, downCast<Cushion> (otherObj), table, endtime);
-      break;
-
-    default:
-      abort ();
-
-  }
-}
-
-void Event::simulateCollision () {
+void Event::simulate () {
   switch (kind) {
 
     case BALL_COLLISION:
@@ -66,26 +46,6 @@ void Event::simulateCollision () {
 
   }
 }
-
-void Event::addNextEvents (std::vector<Event>& addList, const Table& table, const double endtime) {
-
-  switch (kind) {
-
-    case BALL_COLLISION:
-      addNextEvents (addList, downCast<Ball> (otherObj), table, endtime );
-      break;
-
-    case CUSHION_COLLISION:
-      addNextEvents (addList, downCast<Cushion> (otherObj), table, endtime);
-      break;
-
-    default:
-      abort ();
-
-  }
-}
-
-
 
 
 void Event::simulateBallCollision (Ball& b2) {
@@ -126,7 +86,9 @@ void Event::simulateCushionCollision (Cushion& c) {
 }
 
 
-void Event::addNextEvents (std::vector<Event>& addList, Ball& b2, const Table& table, const double endtime) {
+/*
+template <typename C>
+void Event::addNextEvents (C& addList, Ball& b2, const Table& table, const double endtime) {
 
   assert (kind == BALL_COLLISION);
   Ball& b1 = *ball;
@@ -174,7 +136,8 @@ void Event::addNextEvents (std::vector<Event>& addList, Ball& b2, const Table& t
 }
 
 
-void Event::addNextEvents (std::vector<Event>& addList, Cushion& c, const Table& table, const double endtime) {
+template <typename C>
+void Event::addNextEvents (C& addList, Cushion& c, const Table& table, const double endtime) {
 
   assert (kind == CUSHION_COLLISION);
 
@@ -188,3 +151,5 @@ void Event::addNextEvents (std::vector<Event>& addList, Cushion& c, const Table&
   }
 
 }
+
+*/

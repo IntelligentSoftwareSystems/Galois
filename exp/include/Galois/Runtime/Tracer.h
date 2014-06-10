@@ -24,11 +24,12 @@
 #ifndef GALOIS_RUNTIME_TRACER_H
 #define GALOIS_RUNTIME_TRACER_H
 
-#include <iostream>
+#include <ostream>
 #include <sstream>
 
 namespace Galois {
 namespace Runtime {
+
 uint32_t getHostID();
 
 namespace detail {

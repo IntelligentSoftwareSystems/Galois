@@ -108,6 +108,8 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
   //behavor with std::atomic<int>
   struct atomic_float : public std::atomic<int> {
     static_assert(sizeof(int) == sizeof(float), "int and float must be the same size");
+  public:
+    atomic_float() { }
 
     float atomicIncrement(float value) {
       while (true) {
@@ -273,7 +275,7 @@ void run() {
 
   initialize(algo, graph, source);
 
-  Galois::preAlloc(numThreads + (3*graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::MM::pageSize);
+  Galois::preAlloc(numThreads + (3*graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::MM::hugePageSize);
   Galois::reportPageAlloc("MeminfoPre");
 
   Galois::StatTimer T;

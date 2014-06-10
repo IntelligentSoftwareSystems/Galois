@@ -34,12 +34,12 @@
 #include "Galois/Runtime/ll/SimpleLock.h"
 #include "Galois/Runtime/ll/PtrLock.h"
 #include "Galois/Runtime/ll/CacheLineStorage.h"
-//#include "Galois/Runtime/ll/ThreadRWlock.h"
 
 #include <boost/utility.hpp>
 #include <cstdlib>
 #include <cstring>
 #include <map>
+#include <list>
 #include <cstddef>
 
 #include <memory.h>
@@ -49,24 +49,17 @@ namespace Runtime {
 //! Memory management functionality.
 namespace MM {
 
-const size_t smallPageSize = 4*1024;
-
-#ifdef GALOIS_ARCH_MIC
-const size_t pageSize = 2*1024*1024;
-
-// const size_t pageSize = 16*4*1024;
-#else 
-const size_t pageSize = 2*1024*1024;
-
-// const size_t pageSize = 16*4*1024;
-#endif
+extern size_t pageSize;
+const size_t hugePageSize = 2*1024*1024;
 
 void* pageAlloc();
-void  pageFree(void*);
+void pageFree(void*);
 //! Preallocate numpages large pages for each thread
 void pagePreAlloc(int numpages);
 //! Forces the given block to be paged into physical memory
-void pageIn(void *buf, size_t len);
+void pageIn(void *buf, size_t len, size_t stride);
+//! Forces the given readonly block to be paged into physical memory
+void pageInReadOnly(void *buf, size_t len, size_t stride);
 
 //! Returns total large pages allocated by Galois memory management subsystem
 int numPageAllocTotal();
@@ -87,15 +80,29 @@ int numNumaNodes();
  */
 void* largeInterleavedAlloc(size_t bytes, bool full = true);
 //! Frees memory allocated by {@link largeInterleavedAlloc()}
-void  largeInterleavedFree(void* mem, size_t bytes);
+void largeInterleavedFree(void* mem, size_t bytes);
 
 //! Allocates a large block of memory
 void* largeAlloc(size_t bytes, bool preFault = true);
 //! Frees memory allocated by {@link largeAlloc()}
-void  largeFree(void* mem, size_t bytes);
+void largeFree(void* mem, size_t bytes);
 
-//! Print lines from /proc/pid/numa_maps that contain at least n small pages
+//! Print lines from /proc/pid/numa_maps that contain at least n (non-huge) pages
 void printInterleavedStats(int minPages = 16*1024);
+
+//! [Example Third Party Allocator]
+class MallocHeap {
+public:
+  enum { AllocSize = 0 };
+  void* allocate(size_t size) {
+    return malloc(size);
+  }
+  void deallocate(void* ptr) {
+    free(ptr);
+  }
+};
+//! [Example Third Party Allocator]
+
 
 //! Per-thread heaps using Galois thread aware construct
 template<class LocalHeap>
@@ -243,7 +250,6 @@ public:
     NH->next = head;
     head = NH;
   }
-
 };
 
 //! Maintain a freelist using a lock which doesn't cover SourceHeap
@@ -373,7 +379,6 @@ public:
   }
 
   inline void deallocate(void* ptr) {}
-
 };
 
 //! This implements a bump pointer though chunks of memory
@@ -505,7 +510,7 @@ public:
 //! It maintains a freelist of hunks acquired from the system
 class SystemBaseAlloc {
 public:
-  enum { AllocSize = pageSize };
+  enum { AllocSize = hugePageSize };
 
   SystemBaseAlloc();
   ~SystemBaseAlloc();
@@ -519,27 +524,43 @@ public:
   }
 };
 
+#ifdef GALOIS_FORCE_STANDALONE
 class SizedAllocatorFactory: private boost::noncopyable {
 public:
+  typedef MallocHeap SizedAlloc;
+
+  static SizedAlloc* getAllocatorForSize(const size_t) {
+    return &alloc;
+  }
+
+private:
+  static SizedAlloc alloc;
+};
+#else
+class SizedAllocatorFactory: private boost::noncopyable {
+public:
+//! [FixedSizeAllocator example]
   typedef ThreadAwarePrivateHeap<
     FreeListHeap<SimpleBumpPtr<SystemBaseAlloc> > > SizedAlloc;
+//! [FixedSizeAllocator example]
 
   static SizedAlloc* getAllocatorForSize(const size_t);
 
 private:
+  typedef std::map<size_t, SizedAlloc*> AllocatorsMap;
   static SizedAllocatorFactory* getInstance();
   static LL::PtrLock<SizedAllocatorFactory, true> instance;
-  typedef std::map<size_t, SizedAlloc*> AllocatorsMap;
-  AllocatorsMap allocators;
-  LL::SimpleLock lock;
-
-  SizedAlloc* getAllocForSize(const size_t);
-
   static __thread AllocatorsMap* localAllocators;
+  AllocatorsMap allocators;
+  std::list<AllocatorsMap*> allLocalAllocators;
+  LL::SimpleLock lock;
 
   SizedAllocatorFactory();
   ~SizedAllocatorFactory();
+
+  SizedAlloc* getAllocForSize(const size_t);
 };
+#endif
 
 class FixedSizeAllocator {
   SizedAllocatorFactory::SizedAlloc* alloc;
@@ -558,6 +579,10 @@ public:
 
   inline bool operator!=(const FixedSizeAllocator& rhs) const {
     return alloc != rhs.alloc;
+  }
+  
+  inline bool operator==(const FixedSizeAllocator& rhs) const {
+    return alloc == rhs.alloc;
   }
 };
 
@@ -622,16 +647,38 @@ public:
   inline void construct(U* p, Args&&... args ) const {
     ::new((void*)p) U(std::forward<Args>(args)...);
   }
+
   
   inline void destroy(pointer ptr) const {
     destruct(ptr);
   }
+
+  template <typename... Args>
+  inline pointer allocAndConstruct (Args&&... args) {
+    pointer p = allocate (1); 
+    assert (p != nullptr);
+    construct (p, std::forward<Args> (args)...);
+    return p;
+  }
+
+  void destroyAndFree (pointer& p) {
+    destroy (p);
+    deallocate (p, 1);
+    p = nullptr;
+  };
+
+
   
   size_type max_size() const throw() { return 1; }
 
   template<typename T1>
   inline bool operator!=(const FSBGaloisAllocator<T1>& rhs) const {
     return Alloc != rhs.Alloc;
+  }
+
+  template<typename T1>
+  inline bool operator==(const FSBGaloisAllocator<T1>& rhs) const {
+    return Alloc == rhs.Alloc;
   }
 };
 

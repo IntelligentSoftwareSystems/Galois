@@ -107,7 +107,7 @@ def run(cmd, values, envs, options):
         now = datetime.datetime.now()
         diff = (now-start).seconds
         if diff > options.timeout:
-          os.kill(process.pid, signal.SIGKILL)
+          process.kill()
           #os.waitpid(-1, os.WNOHANG)
           os.waitpid(-1, 0)
           print("RUN: Variable Timeout = %d" % (diff*1000))

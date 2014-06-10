@@ -10,6 +10,7 @@
 #include "llvm/ADT/Twine.h"
 #include "llvm/ADT/SmallString.h"
 #include <sstream>
+#include <iostream>
 
 using namespace llvm;
 

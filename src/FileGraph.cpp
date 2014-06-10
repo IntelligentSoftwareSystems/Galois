@@ -29,6 +29,9 @@
 
 #include <cassert>
 
+#ifdef __linux__
+#include <linux/mman.h>
+#endif
 #include <sys/mman.h>
 #include <sys/stat.h>
 #include <sys/types.h>
@@ -36,6 +39,20 @@
 #include <unistd.h>
 
 using namespace Galois::Graph;
+
+#if defined(MAP_ANONYMOUS)
+static const int _MAP_ANON = MAP_ANONYMOUS;
+#elif defined(MAP_ANON)
+static const int _MAP_ANON = MAP_ANON;
+#else
+// fail
+#endif
+#ifdef MAP_POPULATE
+static const int _MAP_POP  = MAP_POPULATE;
+#else
+static const int _MAP_POP  = 0;
+#endif
+static const int _MAP_BASE = _MAP_ANON | _MAP_POP | MAP_PRIVATE;
 
 //File format V1:
 //version (1) {uint64_t LE}
@@ -61,15 +78,15 @@ FileGraph::~FileGraph() {
     close(masterFD);
 }
 
-//FIXME: perform le -> host on data here too
 void FileGraph::parse(void* m) {
   //parse file
   uint64_t* fptr = (uint64_t*)m;
-  __attribute__((unused)) uint64_t version = le64toh(*fptr); fptr++;
-  assert(version == 1);
-  sizeofEdge = le64toh(*fptr); fptr++;
-  numNodes = le64toh(*fptr); fptr++;
-  numEdges = le64toh(*fptr); fptr++;
+  uint64_t version = convert_le64toh(*fptr++);
+  if (version != 1)
+    GALOIS_DIE("unknown file version ", version);
+  sizeofEdge = convert_le64toh(*fptr++);
+  numNodes = convert_le64toh(*fptr++);
+  numEdges = convert_le64toh(*fptr++);
   outIdx = fptr;
   fptr += numNodes;
   uint32_t* fptr32 = (uint32_t*)fptr;
@@ -84,11 +101,6 @@ void FileGraph::structureFromMem(void* mem, size_t len, bool clone) {
   masterLength = len;
 
   if (clone) {
-    int _MAP_BASE = MAP_ANONYMOUS | MAP_PRIVATE;
-#ifdef MAP_POPULATE
-    _MAP_BASE |= MAP_POPULATE;
-#endif
-    
     void* m = mmap(0, masterLength, PROT_READ | PROT_WRITE, _MAP_BASE, -1, 0);
     if (m == MAP_FAILED) {
       GALOIS_SYS_DIE("failed copying graph");
@@ -106,18 +118,13 @@ void* FileGraph::structureFromGraph(FileGraph& g, size_t sizeof_edge_data) {
   // Allocate
   size_t common = g.masterLength - (g.sizeofEdge * g.numEdges);
   size_t len = common + (sizeof_edge_data * g.numEdges);
-  int _MAP_BASE = MAP_ANONYMOUS | MAP_PRIVATE;
-#ifdef MAP_POPULATE
-  _MAP_BASE |= MAP_POPULATE;
-#endif
   void* m = mmap(0, len, PROT_READ | PROT_WRITE, _MAP_BASE, -1, 0);
   if (m == MAP_FAILED) {
     GALOIS_SYS_DIE("failed copying graph");
   }
   memcpy(m, g.masterMapping, common);
   uint64_t* fptr = (uint64_t*)m;
-  fptr[1] = sizeof_edge_data; // Update sizeof(edgeData)
-  //parse(m);
+  fptr[1] = convert_le64toh(sizeof_edge_data);
   structureFromMem(m, len, false);
 
   return edgeData;
@@ -125,43 +132,32 @@ void* FileGraph::structureFromGraph(FileGraph& g, size_t sizeof_edge_data) {
 
 void* FileGraph::structureFromArrays(uint64_t* out_idx, uint64_t num_nodes,
       uint32_t* outs, uint64_t num_edges, size_t sizeof_edge_data) {
-  //version
-  uint64_t version = 1;
   uint64_t nBytes = sizeof(uint64_t) * 4; // version, sizeof_edge_data, numNodes, numEdges
 
   nBytes += sizeof(uint64_t) * num_nodes;
   nBytes += sizeof(uint32_t) * num_edges;
-  if (num_edges % 2) {
+  if (num_edges % 2)
     nBytes += sizeof(uint32_t); // padding
-  }
   nBytes += sizeof_edge_data * num_edges;
  
-  int _MAP_BASE = MAP_ANONYMOUS | MAP_PRIVATE;
-#ifdef MAP_POPULATE
-  _MAP_BASE |= MAP_POPULATE;
-#endif
-  
-  char* t = (char*) mmap(0, nBytes, PROT_READ | PROT_WRITE, _MAP_BASE, -1, 0);
-  if (t == MAP_FAILED) {
-    t = 0;
+  char* base = (char*) mmap(0, nBytes, PROT_READ | PROT_WRITE, _MAP_BASE, -1, 0);
+  if (base == MAP_FAILED) {
+    base = 0;
     GALOIS_SYS_DIE("failed allocating graph");
   }
-  char* base = t;
-  memcpy(t, &version, sizeof(version));
-  t += sizeof(version);
-  memcpy(t, &sizeof_edge_data, sizeof(sizeof_edge_data));
-  t += sizeof(sizeof_edge_data);
-  memcpy(t, &num_nodes, sizeof(num_nodes));
-  t += sizeof(num_nodes);
-  memcpy(t, &num_edges, sizeof(num_edges));
-  t += sizeof(num_edges);
-  memcpy(t, out_idx, sizeof(*out_idx) * num_nodes);
-  t += sizeof(*out_idx) * num_nodes;
-  memcpy(t, outs, sizeof(*outs) * num_edges);
-  if (num_edges % 2) {
-    t += sizeof(uint32_t); // padding
-  }
   
+  uint64_t* fptr = (uint64_t*) base;
+  *fptr++ = convert_le64toh(1);
+  *fptr++ = convert_le64toh(sizeof_edge_data);
+  *fptr++ = convert_le64toh(num_nodes);
+  *fptr++ = convert_le64toh(num_edges);
+
+  for (size_t i = 0; i < num_nodes; ++i)
+    *fptr++ = convert_le64toh(out_idx[i]);
+  uint32_t* fptr32 = (uint32_t*) fptr;
+  for (size_t i = 0; i < num_edges; ++i)
+    *fptr32++ = convert_le32toh(outs[i]);
+
   structureFromMem(base, nBytes, false);
   return edgeData;
 }
@@ -169,33 +165,27 @@ void* FileGraph::structureFromArrays(uint64_t* out_idx, uint64_t num_nodes,
 void FileGraph::structureFromFile(const std::string& filename, bool preFault) {
   masterFD = open(filename.c_str(), O_RDONLY);
   if (masterFD == -1) {
-    GALOIS_SYS_DIE("failed opening ", filename);
+    GALOIS_SYS_DIE("failed opening ", "'", filename, "'");
   }
 
   struct stat buf;
   int f = fstat(masterFD, &buf);
   if (f == -1) {
-    GALOIS_SYS_DIE("failed reading ", filename);
+    GALOIS_SYS_DIE("failed reading ", "'", filename, "'");
   }
   masterLength = buf.st_size;
 
-  int _MAP_BASE = MAP_PRIVATE;
-#ifdef MAP_POPULATE
-  if (preFault)
-    _MAP_BASE |= MAP_POPULATE;
-#endif
-  
-  void* m = mmap(0, masterLength, PROT_READ, _MAP_BASE, masterFD, 0);
+  void* m = mmap(0, masterLength, PROT_READ, preFault ? (MAP_PRIVATE | _MAP_POP) : MAP_PRIVATE, masterFD, 0);
   if (m == MAP_FAILED) {
     m = 0;
-    GALOIS_SYS_DIE("failed reading ", filename);
+    GALOIS_SYS_DIE("failed reading ", "'", filename, "'");
   }
   parse(m);
   masterMapping = m;
 
 #ifndef MAP_POPULATE
   if (preFault) {
-    Runtime::MM::pageIn(m, masterLength);
+    Runtime::MM::pageInReadOnly(m, masterLength, Galois::Runtime::MM::pageSize);
   }
 #endif
 }
@@ -224,14 +214,15 @@ FileGraph::divideBy(size_t nodeSize, size_t edgeSize, unsigned id, unsigned tota
     eb = numNodes;
   else
     eb = findIndex(nodeSize, edgeSize, block * (id + 1), bb, numNodes);
-  //Runtime::LL::gInfo("(", id, "/", total, ") ", bb, " ", eb, " ", numNodes);
+  if (false) {
+    Runtime::LL::gInfo("(", id, "/", total, ") ", bb, " ", eb, " ", eb - bb);
+  }
   return std::make_pair(iterator(bb), iterator(eb));
 }
 
 //FIXME: perform host -> le on data
 void FileGraph::structureToFile(const std::string& file) {
   ssize_t retval;
-  //ASSUME LE machine
   mode_t mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH;
   int fd = open(file.c_str(), O_WRONLY | O_CREAT | O_TRUNC, mode);
   size_t total = masterLength;
@@ -241,7 +232,7 @@ void FileGraph::structureToFile(const std::string& file) {
     if (retval == -1) {
       GALOIS_SYS_DIE("failed writing to ", file);
     } else if (retval == 0) {
-      GALOIS_DIE("ran out of space writing to ", file);
+      GALOIS_DIE("ran out of space writing to ", "'", file, "'");
     }
     total -= retval;
     ptr += retval;
@@ -268,29 +259,29 @@ void FileGraph::cloneFrom(FileGraph& other) {
 uint64_t FileGraph::getEdgeIdx(GraphNode src, GraphNode dst) const {
   for (uint32_t* ii = raw_neighbor_begin(src),
 	 *ee = raw_neighbor_end(src); ii != ee; ++ii)
-    if (le32toh(*ii) == dst)
+    if (convert_le32toh(*ii) == dst)
       return std::distance(outs, ii);
   return ~static_cast<uint64_t>(0);
 }
 
 uint32_t* FileGraph::raw_neighbor_begin(GraphNode N) const {
-  return (N == 0) ? &outs[0] : &outs[le64toh(outIdx[N-1])];
+  return (N == 0) ? &outs[0] : &outs[convert_le64toh(outIdx[N-1])];
 }
 
 uint32_t* FileGraph::raw_neighbor_end(GraphNode N) const {
-  return &outs[le64toh(outIdx[N])];
+  return &outs[convert_le64toh(outIdx[N])];
 }
 
 FileGraph::edge_iterator FileGraph::edge_begin(GraphNode N) const {
-  return edge_iterator(N == 0 ? 0 : le64toh(outIdx[N-1]));
+  return edge_iterator(N == 0 ? 0 : convert_le64toh(outIdx[N-1]));
 }
 
 FileGraph::edge_iterator FileGraph::edge_end(GraphNode N) const {
-  return edge_iterator(le64toh(outIdx[N]));
+  return edge_iterator(convert_le64toh(outIdx[N]));
 }
 
 FileGraph::GraphNode FileGraph::getEdgeDst(edge_iterator it) const {
-  return le32toh(outs[*it]);
+  return convert_le32toh(outs[*it]);
 }
 
 FileGraph::node_id_iterator FileGraph::node_id_begin() const {

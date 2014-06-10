@@ -50,7 +50,8 @@ static llvm::cl::opt<unsigned int> startNode("startNode", llvm::cl::desc("Node t
 static llvm::cl::opt<bool> forceVerify("forceVerify", llvm::cl::desc("Abort if not verified, only makes sense for torus graphs"));
 static llvm::cl::opt<bool> printAll("printAll", llvm::cl::desc("Print betweenness values for all nodes"));
 
-typedef Galois::Graph::LC_CSR_Graph<void, void>::with_no_lockable<true>::type
+typedef Galois::Graph::LC_CSR_Graph<void, void>
+  ::with_no_lockable<true>::type
   ::with_numa_alloc<true>::type Graph;
 typedef Graph::GraphNode GNode;
 
@@ -63,30 +64,19 @@ Galois::Runtime::PerThreadStorage<int*> perThreadD;
 Galois::Runtime::PerThreadStorage<double*> perThreadDelta;
 Galois::Runtime::PerThreadStorage<Galois::gdeque<GNode>*> perThreadSucc;
 
-template<typename T>
-struct PerIt {  
-  typedef typename Galois::PerIterAllocTy::rebind<T>::other Ty;
-};
-
-struct process {
+struct Process {
   typedef int tt_does_not_need_aborts;
-  //typedef int tt_needs_per_iter_alloc;
   typedef int tt_does_not_need_push;
 
-  void operator()(GNode& _req, Galois::UserContext<GNode>& lwl) {
+  void operator()(GNode& _req, Galois::UserContext<GNode>&) {
     Galois::gdeque<GNode> SQ;
+
     double* sigma = *perThreadSigma.getLocal();
     int* d = *perThreadD.getLocal();
     double* delta = *perThreadDelta.getLocal();
     Galois::gdeque<GNode>* succ = *perThreadSucc.getLocal();
 
-#if 0
-    std::deque<double, PerIt<double>::Ty> sigma(NumNodes, 0.0, lwl.getPerIterAlloc());
-    std::deque<int, PerIt<int>::Ty> d(NumNodes, 0, lwl.getPerIterAlloc());
-    std::deque<double, PerIt<double>::Ty> delta(NumNodes, 0.0, lwl.getPerIterAlloc());
-    std::deque<GNdeque, PerIt<GNdeque>::Ty> succ(NumNodes, GNdeque(lwl.getPerIterAlloc()), lwl.getPerIterAlloc());
-#endif    
-    unsigned int QAt = 0;
+    //unsigned int QAt = 0;
     
     int req = _req;
     
@@ -112,6 +102,7 @@ struct process {
 	}
       }
     }
+
     while (SQ.size() > 1) {
       int w = SQ.back();
       SQ.pop_back();
@@ -120,14 +111,13 @@ struct process {
       double delta_w = delta[w];
       auto& slist = succ[w];
       for (auto ii = slist.begin(), ee = slist.end(); ii != ee; ++ii) {
-	//std::cerr << "Processing node " << w << std::endl;
 	GNode v = *ii;
 	delta_w += (sigma_w/sigma[v])*(1.0 + delta[v]);
       }
       delta[w] = delta_w;
     }
     double* Vec = *CB.getLocal();
-    for (unsigned int i = 0; i < NumNodes; ++i) {
+    for (int i = 0; i < NumNodes; ++i) {
       Vec[i] += delta[i];
       delta[i] = 0;
       sigma[i] = 0;
@@ -142,23 +132,31 @@ struct process {
 void verify() {
   double sampleBC = 0.0;
   bool firstTime = true;
-  for (int i=0; i<NumNodes; ++i) {
+  for (int i = 0; i < NumNodes; ++i) {
     double bc = (*CB.getRemote(0))[i];
-    for (unsigned int j = 1; j < Galois::getActiveThreads(); ++j)
+    for (int j = 1; j < numThreads; ++j)
       bc += (*CB.getRemote(j))[i];
     if (firstTime) {
       sampleBC = bc;
-      std::cerr << "BC: " << sampleBC << std::endl;
+      std::cerr << "BC: " << sampleBC << "\n";
       firstTime = false;
     } else {
       if (!((bc - sampleBC) <= 0.0001)) {
         std::cerr << "If torus graph, verification failed " << (bc - sampleBC) << "\n";
         if (forceVerify)
           abort();
-        assert ((bc - sampleBC) <= 0.0001);
         return;
       }
     }
+  }
+}
+
+void printBCValues(int begin, int end, std::ostream& out, int precision = 6) {
+  for (; begin != end; ++begin) {
+    double bc = (*CB.getRemote(0))[begin];
+    for (int j = 1; j < numThreads; ++j)
+      bc += (*CB.getRemote(j))[begin];
+    out << begin << " " << std::setiosflags(std::ios::fixed) << std::setprecision(precision) << bc << "\n"; 
   }
 }
 
@@ -166,14 +164,10 @@ void printBCcertificate() {
   std::stringstream foutname;
   foutname << "outer_certificate_" << numThreads;
   std::ofstream outf(foutname.str().c_str());
-  std::cerr << "Writing certificate..." << std::endl;
+  std::cerr << "Writing certificate...\n";
 
-  for (int i=0; i<NumNodes; ++i) {
-    double bc = (*CB.getRemote(0))[i];
-    for (unsigned int j = 1; j < Galois::getActiveThreads(); ++j)
-      bc += (*CB.getRemote(j))[i];
-    outf << i << ": " << std::setiosflags(std::ios::fixed) << std::setprecision(9) << bc << std::endl;
-  }
+  printBCValues(0, NumNodes, outf, 9);
+
   outf.close();
 }
 
@@ -188,8 +182,7 @@ struct HasOut: public std::unary_function<GNode,bool> {
 struct InitializeLocal {
   template<typename T>
   void initArray(T** addr) {
-    T* a = new T[NumNodes];
-    *addr = a;
+    *addr = new T[NumNodes]();
   }
   void operator()(unsigned, unsigned) {
     initArray(CB.getLocal());
@@ -246,29 +239,21 @@ int main(int argc, char** argv) {
     << " Start Node: " << startNode 
     << " Iterations: " << iterations << "\n";
   
-  typedef Galois::WorkList::StableIterator< std::vector<GNode>::iterator, true> WLL;
+  typedef Galois::WorkList::StableIterator<true> WL;
   Galois::StatTimer T;
   T.start();
-  Galois::for_each(v.begin(), v.end(), process(), Galois::wl<WLL>());
+  Galois::for_each(v.begin(), v.end(), Process(), Galois::wl<WL>());
   T.stop();
 
-  if (!skipVerify) {
-    for (int i=0; i<10; ++i) {
-      double bc = (*CB.getRemote(0))[i];
-      for (unsigned int j = 1; j < Galois::getActiveThreads(); ++j)
-	bc += (*CB.getRemote(j))[i];
-      std::cout << i << ": " 
-        << std::setiosflags(std::ios::fixed) << std::setprecision(6) << bc << "\n";
-    }
-  }
+  printBCValues(0, std::min(10, NumNodes), std::cout, 6);
+
   if (printAll)
     printBCcertificate();
 
-  Galois::reportPageAlloc("MeminfoPost");
-
-  if (forceVerify || !skipVerify) {
+  if (forceVerify || !skipVerify)
     verify();
-  }
+
+  Galois::reportPageAlloc("MeminfoPost");
 
   // XXX(ddn): Could use unique_ptr but not supported on all our platforms :(
   Galois::on_each(DeleteLocal());

@@ -215,14 +215,14 @@ public:
   mapped_type& at(const key_type& __k) {
     iterator __i = lower_bound(__k);
     if (__i == end() || key_comp()(__k, (*__i).first))
-      throw std::out_of_range(__N("flat_map::at"));
+      throw std::out_of_range("flat_map::at");
     return (*__i).second;
   }
   
   const mapped_type& at(const key_type& __k) const {
     const_iterator __i = lower_bound(__k);
     if (__i == end() || key_comp()(__k, (*__i).first))
-      throw std::out_of_range(__N("flat_map::at"));
+      throw std::out_of_range("flat_map::at");
     return (*__i).second;
   }
   

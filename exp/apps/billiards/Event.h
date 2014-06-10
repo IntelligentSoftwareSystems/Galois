@@ -49,9 +49,8 @@
 // is to use virtual functions and hierarchy, but that
 // requires Event's being allocated on the heap.
 
-class Table;
-
 class Event {
+  friend class Table;
 
 public:
   enum EventKind {
@@ -96,28 +95,24 @@ private:
 
 public:
 
-  static Event makeBallCollision (Ball& ball, Ball& otherBall, const double time) {
+  static Event makeBallCollision (const Ball& ball, const Ball& otherBall, const double time) {
 
     assert (&ball != NULL);
     assert (&otherBall != NULL);
 
-    return Event (BALL_COLLISION, ball, otherBall, time);
+    return Event (BALL_COLLISION, const_cast<Ball&> (ball), const_cast<Ball&> (otherBall), time);
   }
 
-  static Event makeCushionCollision (Ball& ball, Cushion& c, const double time) {
+  static Event makeCushionCollision (const Ball& ball, const Cushion& c, const double time) {
 
     assert (&ball != NULL);
     assert (&c != NULL);
 
-    return Event (CUSHION_COLLISION, ball, c, time);
+    return Event (CUSHION_COLLISION, const_cast<Ball&> (ball), const_cast<Cushion&>(c), time);
 
   }
 
-  void simulate (std::vector<Event>& addList, const Table& table, const double endtime); 
-
-  void simulateCollision ();
-
-  void addNextEvents (std::vector<Event>& addList, const Table& table, const double endtime);
+  void simulate ();
 
   double getTime () const { return time; }
 
@@ -126,6 +121,31 @@ public:
   bool notStale () const { 
     return (ball->collCounter () == this->collCounterA && 
         otherObj->collCounter () == this->collCounterB);
+  }
+
+  bool firstBallChanged () const { 
+    return (ball->collCounter () != this->collCounterA);
+  }
+
+  bool otherBallChanged () const {
+    if (kind == BALL_COLLISION) {
+      return (otherObj->collCounter () != this->collCounterB);
+
+    } else { 
+      return false;
+    }
+  }
+
+  void updateFirstBall (const Ball& b) {
+    *(this->ball) = b;
+    this->collCounterA = b.collCounter ();
+  }
+
+  void updateOtherBall (const Ball& b) {
+    assert (kind == BALL_COLLISION);
+    Ball& ob = downCast<Ball> (otherObj);
+    ob = b;
+    this->collCounterB = b.collCounter ();
   }
 
   const Ball& getOtherBall () const { 
@@ -141,7 +161,6 @@ public:
   }
 
   EventKind getKind () const { return kind; }
-
 
 
   std::string str () const {
@@ -179,11 +198,12 @@ public:
 
   }
 
+  friend std::ostream& operator << (std::ostream& out, const Event& e) {
+    out << e.str ();
+    return out;
+  }
+
 private:
-
-  void addNextEvents (std::vector<Event>& addList, Ball& b2, const Table& table, const double endtime);
-
-  void addNextEvents (std::vector<Event>& addList, Cushion& c, const Table& table, const double endtime);
 
   void simulateBallCollision (Ball& b2);
 
@@ -264,8 +284,5 @@ public:
   }
 
 };
-
-
-
 
 #endif //  _EVENT_H_

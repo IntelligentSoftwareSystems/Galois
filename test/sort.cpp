@@ -13,6 +13,8 @@ struct IsOddS {
   bool operator() (int i) { return ((i%2)==1); }
 };
 
+int vectorSize = 1;
+
 int do_sort() {
 
   unsigned M = Galois::Runtime::LL::getMaxThreads();
@@ -23,7 +25,7 @@ int do_sort() {
     Galois::setActiveThreads(M); //Galois::Runtime::LL::getMaxThreads());
     std::cout << "Using " << M << " threads\n";
     
-    std::vector<unsigned> V(1024*1024*16);
+    std::vector<unsigned> V(vectorSize);
     std::generate (V.begin(), V.end(), RandomNumber);
     std::vector<unsigned> C = V;
 
@@ -74,7 +76,7 @@ int do_count_if() {
     Galois::setActiveThreads(M); //Galois::Runtime::LL::getMaxThreads());
     std::cout << "Using " << M << " threads\n";
     
-    std::vector<unsigned> V(1024*1024*16);
+    std::vector<unsigned> V(vectorSize);
     std::generate (V.begin(), V.end(), RandomNumber);
 
     unsigned x1,x2;
@@ -105,18 +107,16 @@ struct mymax : std:: binary_function<T,T,T> {
   }
 };
 
-
 int do_accumulate() {
 
   unsigned M = Galois::Runtime::LL::getMaxThreads();
   std::cout << "accumulate:\n";
 
   while (M) {
-    
     Galois::setActiveThreads(M); //Galois::Runtime::LL::getMaxThreads());
     std::cout << "Using " << M << " threads\n";
     
-    std::vector<unsigned> V(1024*1024*16);
+    std::vector<unsigned> V(vectorSize);
     std::generate (V.begin(), V.end(), RandomNumber);
 
     unsigned x1,x2;
@@ -142,7 +142,12 @@ int do_accumulate() {
   return 0;
 }
 
-int main() {
+int main(int argc, char** argv) {
+  if (argc > 1)
+    vectorSize = atoi(argv[1]);
+  if (vectorSize <= 0) 
+    vectorSize = 1024*1024*16;
+
   int ret = 0;
   //  ret |= do_sort();
   //  ret |= do_count_if();

@@ -30,26 +30,7 @@
 #include <cassert>
 
 __thread unsigned Galois::Runtime::LL::TID = 0;
-static unsigned nextID = 0;
 
-namespace {
-struct AtomicNextId {
-  unsigned next() {
-    return __sync_fetch_and_add(&nextID, 1);
-  }
-};
-typedef AtomicNextId NextId;
+void Galois::Runtime::LL::initTID(unsigned tid) {
+  TID = tid;
 }
-
-static NextId next;
-
-void Galois::Runtime::LL::initTID() {
-  TID = next.next();
-  assert(TID < getMaxThreads());
-}
-
-#ifdef GALOIS_USE_EXP
-void Galois::Runtime::LL::initTID_cilk () {
-  TID = next.next () % getMaxThreads ();
-}
-#endif // GALOIS_USE_EXP

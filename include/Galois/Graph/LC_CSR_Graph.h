@@ -45,44 +45,12 @@ namespace Graph {
  * most robust way to specify them is through the with_XXX nested templates.
  *
  * An example of use:
- * 
- * \code
- * typedef Galois::Graph::LC_CSR_Graph<int,int> Graph;
- * 
- * // Create graph
- * Graph g;
- * g.structureFromFile(inputfile);
  *
- * // Traverse graph
- * for (Graph::iterator ii = g.begin(), ei = g.end(); ii != ei; ++ii) {
- *   Graph::GraphNode src = *ii;
- *   for (Graph::edge_iterator jj = g.edge_begin(src), ej = g.edge_end(src); jj != ej; ++jj) {
- *     Graph::GraphNode dst = g.getEdgeDst(jj);
- *     int edgeData = g.getEdgeData(jj);
- *     int nodeData = g.getData(dst);
- *   }
- * }
- * \endcode
+ * \snippet test/graph.cpp Using a graph
  *
  * And in C++11:
  *
- * \code
- * typedef Galois::Graph::LC_CSR_Graph<int,int> Graph;
- * // or typedef Galois::Graph::LC_CSR_Graph<int,int>::with_no_lockable<true>::with_numa_alloc<true>
- *
- * // Create graph
- * Graph g;
- * g.structureFromFile(inputfile);
- *
- * // Traverse graph
- * for (Graph::GraphNode src : g) {
- *   for (Graph::edge_iterator edge : g.out_edges(src)) {
- *     Graph::GraphNode dst = g.getEdgeDst(edge);
- *     int edgeData = g.getEdgeData(edge);
- *     int nodeData = g.getData(dst);
- *   }
- * }
- * \endcode
+ * \snippet test/graph.cpp Using a graph cxx11
  *
  * @tparam NodeTy data on nodes
  * @tparam EdgeTy data on out edges
@@ -103,6 +71,9 @@ public:
 
   template<typename _node_data>
   struct with_node_data { typedef LC_CSR_Graph<_node_data,EdgeTy,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable> type; };
+
+  template<typename _edge_data>
+  struct with_edge_data { typedef LC_CSR_Graph<NodeTy,_edge_data,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable> type; };
 
   //! If true, do not use abstract locks in graph
   template<bool _has_no_lockable>
