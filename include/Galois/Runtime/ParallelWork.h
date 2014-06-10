@@ -264,10 +264,17 @@ protected:
 	p = lwl.pop();
       }
     } catch (const remote_ex& ex) {
+      std::cout << "R";
+      if (ex.ptr.isLocal()) {
+        getLocalDirectory().fetch(ex.ptr, RW);
+      } else {
+        (getRemoteDirectory().*(ex.rfetch))(ex.ptr, RW);
+      }
       //getRemoteDirectory().(ex.ptr);
       abortIteration(*p, tld);
     } catch (const conflict_ex& ex) {
-      //FIXME:      getLocalDirectory().fetch(ex.ptr);
+      std::cout << "L";
+      //getLocalDirectory().fetch(ex.ptr, RW);
       abortIteration(*p, tld);
     }
     return workHappened;

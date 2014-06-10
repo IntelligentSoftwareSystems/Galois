@@ -45,7 +45,7 @@ class simpleFatPointer {
 
 protected:
 
-  constexpr simpleFatPointer() noexcept :host(0), ptr(nullptr) {}
+  constexpr simpleFatPointer(uint32_t h, void* p) noexcept :host(h), ptr(p) {}
 
   typedef std::pair<uint32_t, void*> rawType;
   rawType rawCopy() const { return std::make_pair(host,ptr); }
@@ -131,7 +131,8 @@ size_t hash_value(const fatPointerImpl<T>& v) {
 
 } // namespace detail
 
-typedef detail::fatPointerImpl<detail::amd64FatPointer> fatPointer;
+//typedef detail::fatPointerImpl<detail::amd64FatPointer> fatPointer;
+typedef detail::fatPointerImpl<detail::simpleFatPointer> fatPointer;
 
 } // namespace Runtime
 } // namespace Galois

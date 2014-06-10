@@ -47,6 +47,7 @@ SimpleRuntimeContext* Galois::Runtime::getThreadContext() {
 }
 
 void Galois::Runtime::signalConflict(Lockable* lockable) {
+  abort();
   throw conflict_ex{lockable}; // Conflict
 }
 

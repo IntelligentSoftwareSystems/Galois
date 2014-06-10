@@ -95,7 +95,7 @@ class PerHost {
 
   template<typename... Args>
   static void allocOnHost(uint64_t off, Args... args) {
-    getPerHostBackend().createAt(off, new T(args...));
+    getPerHostBackend().createAt(off, new T(PerHost(off), args...));
   }
 
   static void deallocOnHost(uint64_t off) {
@@ -107,7 +107,7 @@ public:
   template<typename... Args>
   static PerHost allocate(Args... args) {
     uint64_t off = getPerHostBackend().allocateOffset();
-    getPerHostBackend().createAt(off, new T(args...));
+    getPerHostBackend().createAt(off, new T(PerHost(off), args...));
     getSystemNetworkInterface().broadcastAlt(&allocOnHost<Args...>, off, args...);
     return PerHost(off);
   }

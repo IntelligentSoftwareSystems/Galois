@@ -106,7 +106,7 @@ struct genericLandingPad {
   template<int ...S>
   static void callFunc(void (*fp)(Args...), std::tuple<Args...>& args, seq<S...>)
   {
-    return fp(std::get<S>(args) ...);
+    return fp(std::move(std::get<S>(args)) ...);
   }
 
   //do this the new fancy way

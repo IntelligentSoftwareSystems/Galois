@@ -25,6 +25,7 @@
 #define GALOIS_RUNTIME_DIRECTORY_H
 
 #include "Galois/gstl.h"
+#include "Galois/MethodFlags.h"
 #include "Galois/Runtime/ll/TID.h"
 //#include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/Network.h"
@@ -393,7 +394,11 @@ void BaseDirectory::typeHelperImpl<T>::cmCreate(fatPointer ptr, ResolveFlag flag
 
 ////////////////////////////////////////////////////////////////////////////////
 
-struct remote_ex { fatPointer ptr; };
+struct remote_ex {
+  fatPointer ptr;
+  Galois::MethodFlag flag;
+  void (RemoteDirectory::*rfetch) (fatPointer, ResolveFlag);
+};
 
 ////////////////////////////////////////////////////////////////////////////////
 

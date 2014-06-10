@@ -140,9 +140,15 @@ inline void acquire(gptr<T> ptr, Galois::MethodFlag m) {
     if (!obj) {
       //FIXME Better resolve flag
       getRemoteDirectory().fetch<T>(static_cast<fatPointer>(ptr), ResolveFlag::RW);
-      throw remote_ex{static_cast<fatPointer>(ptr)};
+      throw remote_ex{static_cast<fatPointer>(ptr), m, &RemoteDirectory::fetch<T>};
     }
-    acquire(static_cast<Lockable*>(obj), m);
+    if (shouldLock(m)) {
+      SimpleRuntimeContext* ctx = getThreadContext();
+      Lockable* lockable = static_cast<Lockable*>(obj);
+      if (ctx)
+        if (!ctx->acquire(lockable))
+          throw remote_ex{static_cast<fatPointer>(ptr), m, &RemoteDirectory::fetch<T>};
+    }
   } else {
     serial_acquire(ptr);
   }

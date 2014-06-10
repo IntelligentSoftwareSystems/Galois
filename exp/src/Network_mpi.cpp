@@ -125,7 +125,6 @@ public:
   }
 
   virtual void send(uint32_t dest, recvFuncTy recv, SendBuffer& buf) {
-    //trace("NetworkInterfaceAsyncMPI::send % to %\n", (void*)recv, dest);
     lock.lock();
     //wait for a send slot
     // while (pending_sends.size() >= 128)
