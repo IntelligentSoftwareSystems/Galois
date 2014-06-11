@@ -193,8 +193,6 @@ class LocalDirectory : public BaseDirectory {
   // void recvRequestImpl(fatPointer ptr, ResolveFlag flag, uint32_t dest, typeHelper* th);
   // void recvObjectImpl(fatPointer ptr);
 
-
-
   void ackInvalidateImpl(fatPointer, uint32_t);
 
   void recvObjectImpl(fatPointer, RecvBuffer&);
@@ -229,8 +227,11 @@ public:
   }
 
   //! engage priority protocol for ptr
+  void setContended(Lockable* ptr);
   void setContended(fatPointer ptr);
+
   //! unengage priority protocol for ptr
+  void clearContended(Lockable* ptr);
   void clearContended(fatPointer ptr);
 
   void makeProgress();

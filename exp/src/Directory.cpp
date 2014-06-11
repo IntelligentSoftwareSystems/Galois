@@ -469,6 +469,34 @@ void LocalDirectory::considerObject(metadata& md, Lockable* obj) {
 
 }
 
+
+void LocalDirectory::setContended(Lockable* ptr) {
+  metadata& md = getMD(ptr);
+  std::lock_guard<LL::SimpleLock> lg(md.lock, std::adopt_lock);
+  trace("LocalDirectory::setContended for %\n", ptr);
+  if (!md.contended)
+    md.contended = true;
+}
+
+void LocalDirectory::setContended(fatPointer ptr) {
+  assert(ptr.isLocal());
+  setContended(static_cast<Lockable*>(ptr.getObj()));
+}
+
+
+void LocalDirectory::clearContended(Lockable* ptr) {
+  metadata& md = getMD(ptr);
+  std::lock_guard<LL::SimpleLock> lg(md.lock, std::adopt_lock);
+  trace("LocalDirectory::clearContended for %\n", ptr);
+  md.contended = false;
+  considerObject(md, ptr);
+}
+
+void LocalDirectory::clearContended(fatPointer ptr) {
+  assert(ptr.isLocal());
+  clearContended(static_cast<Lockable*>(ptr.getObj()));
+}
+
 void LocalDirectory::makeProgress() {
   //  if (outstandingReqs) {
     outstandingReqs = 0; // clear flag before examining requests
