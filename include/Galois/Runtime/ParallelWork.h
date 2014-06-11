@@ -172,6 +172,62 @@ public:
   AbortedList* getQueue() { return queues.getLocal(); }
 };
 
+template<typename value_type>
+class RemoteAbortHandler {
+  std::multimap<value_type, fatPointer> waiting_on;
+
+  typedef WorkList::GFIFO<value_type> AbortedList;
+  AbortedList queue;
+
+  LL::SimpleLock lock;
+
+public:
+  void push(const value_type& val, fatPointer ptr, 
+            void (RemoteDirectory::*rfetch) (fatPointer, ResolveFlag)) {
+    std::lock_guard<LL::SimpleLock> lg(lock);
+    auto p = waiting_on.equal_range(val);
+    if (ptr.isLocal()) {
+      getLocalDirectory().setContended(ptr);
+    } else {
+      getRemoteDirectory().setContended(ptr);
+    }
+    bool newDep = std::find(p.first, p.second, std::pair<const value_type, decltype(ptr)>(val,ptr)) == p.second;
+    if (newDep) {
+      waiting_on.insert(std::make_pair(val, ptr));
+      if (ptr.isLocal()) {
+        getLocalDirectory().fetch(ptr, RW);
+      } else {
+        (getRemoteDirectory().*(rfetch))(ptr, RW);
+      }
+    }
+    queue.push(val);
+  }
+
+  void push(const value_type& val, Lockable* ptr) {
+    queue.push(val);
+  }
+
+  void commit(const value_type& val) {
+    std::lock_guard<LL::SimpleLock> lg(lock);
+    auto p = waiting_on.equal_range(val);
+    auto ii = p.first;
+    while (ii != p.second) {
+      if (ii->second.isLocal()) {
+        getLocalDirectory().clearContended(ii->second);
+      } else {
+        getRemoteDirectory().clearContended(ii->second);
+      }
+      ++ii;
+    }
+    waiting_on.erase(p.first, p.second);
+  }
+
+  decltype(queue.pop()) pop() {
+    return queue.pop();
+  }
+
+};
+
 template<class WorkListTy, class T, class FunctionTy>
 class ForEachWork {
 protected:
@@ -183,12 +239,46 @@ protected:
     SimpleRuntimeContext ctx;
     LoopStatistics<ForEachTraits<FunctionTy>::NeedsStats> stat;
     ThreadLocalData(const FunctionTy& fn, const char* ln): function(fn), stat(ln) {}
+
+    inline void commitIteration(WLTy& wl) {
+      if (ForEachTraits<FunctionTy>::NeedsPush) {
+        auto ii = facing.getPushBuffer().begin();
+        auto ee = facing.getPushBuffer().end();
+        if (ii != ee) {
+          wl.push(ii, ee);
+          facing.resetPushBuffer();
+        }
+      }
+      if (ForEachTraits<FunctionTy>::NeedsPIA)
+        facing.resetAlloc();
+      if (ForEachTraits<FunctionTy>::NeedsAborts)
+        ctx.commitIteration();
+    }
+
+    GALOIS_ATTRIBUTE_NOINLINE
+    void abortIteration() {
+      assert(ForEachTraits<FunctionTy>::NeedsAborts);
+      ctx.cancelIteration();
+      stat.inc_conflicts(); //Class specialization handles opt
+      //clear push buffer
+      if (ForEachTraits<FunctionTy>::NeedsPush)
+        facing.resetPushBuffer();
+      //reset allocator
+      if (ForEachTraits<FunctionTy>::NeedsPIA)
+        facing.resetAlloc();
+    }
+    
+    inline void startIteration() {
+      stat.inc_iterations();
+      if (ForEachTraits<FunctionTy>::NeedsAborts)
+        ctx.startIteration();
+    }
   };
 
   // NB: Place dynamically growing wl after fixed-size PerThreadStorage
   // members to give higher likelihood of reclaiming PerThreadStorage
 
-  AbortHandler<value_type> aborted; 
+  RemoteAbortHandler<value_type> aborted; 
   TerminationDetection& term;
 
   WLTy wl;
@@ -196,66 +286,21 @@ protected:
   const char* loopname;
   bool broke;
 
-  inline void commitIteration(ThreadLocalData& tld) {
-    if (ForEachTraits<FunctionTy>::NeedsPush) {
-      auto ii = tld.facing.getPushBuffer().begin();
-      auto ee = tld.facing.getPushBuffer().end();
-      if (ii != ee) {
-	wl.push(ii, ee);
-	tld.facing.resetPushBuffer();
-      }
-    }
-    if (ForEachTraits<FunctionTy>::NeedsPIA)
-      tld.facing.resetAlloc();
-    if (ForEachTraits<FunctionTy>::NeedsAborts)
-      tld.ctx.commitIteration();
-  }
 
-  template<typename Item>
-  GALOIS_ATTRIBUTE_NOINLINE
-  void abortIteration(const Item& item, ThreadLocalData& tld) {
-    assert(ForEachTraits<FunctionTy>::NeedsAborts);
-    tld.ctx.cancelIteration();
-    tld.stat.inc_conflicts(); //Class specialization handles opt
-    aborted.push(item);
-    //clear push buffer
-    if (ForEachTraits<FunctionTy>::NeedsPush)
-      tld.facing.resetPushBuffer();
-    //reset allocator
-    if (ForEachTraits<FunctionTy>::NeedsPIA)
-      tld.facing.resetAlloc();
-  }
-
-  inline void doProcess(value_type& val, ThreadLocalData& tld) {
-    tld.stat.inc_iterations();
-    if (ForEachTraits<FunctionTy>::NeedsAborts)
-      tld.ctx.startIteration();
-    tld.function(val, tld.facing.data());
-    commitIteration(tld);
-  }
-
-  bool runQueueSimple(ThreadLocalData& tld) {
-    bool workHappened = false;
-    Galois::optional<value_type> p = wl.pop();
-    if (p)
-      workHappened = true;
-    while (p) {
-      doProcess(*p, tld);
-      p = wl.pop();
-    }
-    return workHappened;
-  }
-
-  template<int limit, typename WL>
+  template<int limit, bool inAborted, typename WL>
   bool runQueue(ThreadLocalData& tld, WL& lwl) {
     bool workHappened = false;
-    Galois::optional<typename WL::value_type> p = lwl.pop();
+    Galois::optional<value_type> p = lwl.pop();
     unsigned num = 0;
     if (p)
       workHappened = true;
     try {
       while (p) {
-	doProcess(aborted.value(*p), tld);
+        tld.startIteration();
+        tld.function(*p, tld.facing.data());
+        tld.commitIteration(wl);
+        if (ForEachTraits<FunctionTy>::NeedsAborts && inAborted)
+          aborted.commit(*p);
 	if (limit) {
 	  ++num;
 	  if (num == limit)
@@ -265,24 +310,19 @@ protected:
       }
     } catch (const remote_ex& ex) {
       std::cout << "R";
-      if (ex.ptr.isLocal()) {
-        getLocalDirectory().fetch(ex.ptr, RW);
-      } else {
-        (getRemoteDirectory().*(ex.rfetch))(ex.ptr, RW);
-      }
-      //getRemoteDirectory().(ex.ptr);
-      abortIteration(*p, tld);
+      tld.abortIteration();
+      aborted.push(*p, ex.ptr, ex.rfetch);
     } catch (const conflict_ex& ex) {
       std::cout << "L";
-      //getLocalDirectory().fetch(ex.ptr, RW);
-      abortIteration(*p, tld);
+      tld.abortIteration();
+      aborted.push(*p, ex.ptr);
     }
     return workHappened;
   }
 
   GALOIS_ATTRIBUTE_NOINLINE
   bool handleAborts(ThreadLocalData& tld) {
-    return runQueue<0>(tld, *aborted.getQueue());
+    return runQueue<0, true>(tld, aborted);
   }
 
   void fastPushBack(typename UserContextAccess<value_type>::PushBufferTy& x) {
@@ -305,19 +345,15 @@ protected:
     do {
       didWork = false;
       //Run some iterations
-      if (couldAbort || ForEachTraits<FunctionTy>::NeedsBreak) {
-        if (isLeader)
-          didWork = runQueue<8>(tld, wl);
-        else
-          didWork = runQueue<ForEachTraits<FunctionTy>::NeedsBreak ? 32 : 0>(tld, wl);
-        // Check for abort
-        if (couldAbort)
-          didWork |= handleAborts(tld);
-        if (isLeader)
-          doNetworkWork();
-      } else { // No try/catch
-        didWork = runQueueSimple(tld);
-      }
+      if (isLeader)
+        didWork = runQueue<8, false>(tld, wl);
+      else
+        didWork = runQueue<ForEachTraits<FunctionTy>::NeedsBreak ? 32 : 0, false>(tld, wl);
+      // Check for abort
+      if (couldAbort)
+        didWork |= handleAborts(tld);
+      if (isLeader)
+        doNetworkWork();
       // Update node color and prop token
       term.localTermination(didWork);
       doNetworkWork();
