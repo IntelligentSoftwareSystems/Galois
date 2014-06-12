@@ -15,9 +15,6 @@ struct edge_counter {
   Graph::pointer g;
   
   void operator()(GNode node) {
-    if (Galois::Runtime::NetworkInterface::ID != 1)
-      return;
-    std::cout << node << " ";
     if (std::distance(g->edge_begin(node), g->edge_end(node)) != 2) {
       std::cerr << "FAILURE: Count is " << std::distance(g->edge_begin(node), g->edge_end(node)) << "\n";
     }
@@ -38,6 +35,7 @@ int main(int argc, char *argv[])
   Graph::pointer g = Graph::allocate(counts);
   std::cout << "Iter dist " << std::distance(g->begin(), g->end()) << "\n";
   std::cout << "Local Iter dist " << std::distance(g->local_begin(), g->local_end()) << "\n";
+
   for (int i = 0; i < g->size(); ++i) {
     std::cout << "a " << i << "\n";
     g->addEdge(*(g->begin() + i), *(g->begin() + ((i + 1) % g->size())), 0xDEADBEEF);
@@ -48,14 +46,15 @@ int main(int argc, char *argv[])
   }
 
   //Verify
+  std::cout << "\n*\n";
   for (auto ii = g->begin(), ee = g->end(); ii != ee; ++ii)
     edge_counter{g}(*ii);
-  std::cout << "\n";
+  std::cout << "\n*\n";
   Galois::for_each_local(g, edge_counter{g});
-  std::cout << "\n";
+  std::cout << "\n*\n";
   for (auto ii = g->begin(), ee = g->end(); ii != ee; ++ii)
     edge_counter{g}(*ii);
-  std::cout << "\n";
+  std::cout << "\n*\n";
 
   Galois::Runtime::getSystemNetworkInterface().terminate();
   return 0;
