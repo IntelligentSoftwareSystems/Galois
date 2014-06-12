@@ -309,11 +309,11 @@ protected:
 	p = lwl.pop();
       }
     } catch (const remote_ex& ex) {
-      std::cout << "R";
+      //      std::cout << "R";
       tld.abortIteration();
       aborted.push(*p, ex.ptr, ex.rfetch);
     } catch (const conflict_ex& ex) {
-      std::cout << "L";
+      //      std::cout << "L";
       tld.abortIteration();
       aborted.push(*p, ex.ptr);
     }
