@@ -1,7 +1,7 @@
 /* 
  * License:
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2014, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -14,566 +14,1101 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  *
- * Stochastic gradient descent for matrix factorization, implemented with Distributed Galois.
- * 
- * Authors: Gurbinder Gill <gill@cs.utexas.edu>
- *	    Bharat Naik    <bharatpn@cs.utexas.edu>
+ * Stochastic gradient descent for matrix factorization, implemented with Galois.
  *
-*/
+ * Author: Prad Nelluru <pradn@cs.utexas.edu>
+ * Author: Donald Nguyen <ddn@cs.utexas.edu>
+ * Author: Andrew Lenharth <andrew@lenharth.org>
+ */
+#include "MC.h"
+#include "TcpServer.h"
 
-#include <iostream>
-#include <random>
-#include <cmath>
-#include <algorithm>
-#include <utility>
-#include <unordered_map>
-#include <map>
-#include <atomic>
-#include <vector>
-#include <cstdint>
-
+#include "Galois/config.h"
+#include "Galois/Accumulator.h"
 #include "Galois/Galois.h"
+#include "Galois/Timer.h"
+#include "Galois/Statistic.h"
 #include "Galois/Graph/Graph.h"
 #include "Galois/Graph/LCGraph.h"
 #include "Galois/ParallelSTL/ParallelSTL.h"
-#include "llvm//Support/CommandLine.h"
+#include "Galois/Runtime/ll/PaddedLock.h"
+#include "Galois/Runtime/TiledExecutor.h"
 #include "Lonestar/BoilerPlate.h"
-#include "Galois/Runtime/Network.h"
-#include "Galois/Timer.h"
-#include "Galois/Statistic.h"
-#include "Galois/Graph/FileGraph.h"
-//Distributed Galois
-#include "Galois/Graphs/Graph3.h"
-#include "Galois/Runtime/DistSupport.h"
 
+#include <algorithm>
+#include <array>
+#include <cmath>
+#include <cstdlib>
+#include <fstream>
+#include <iostream>
+#include <ostream>
+#include <random>
+#include <type_traits>
 
-#include <boost/iterator/transform_iterator.hpp>
-#define LATENT_VECTOR_SIZE 2
-typedef int EdgeData;
-typedef struct Node
-{
-  //double* latent_vector; //latent vector to be learned
-  double latent_vector[LATENT_VECTOR_SIZE]; //latent vector to be learned
-  uint64_t updates; //number of updates made to this node (only used by movie nodes)
-  uint64_t edge_offset; //if a movie's update is interrupted, where to start when resuming
-  uint64_t ID;
-  uint32_t number_of_edges;
-  //iuint64_t hostID;  
-  Node() {
-      updates=0;
-      number_of_edges=0;
-      edge_offset=0;
-      unsigned int seed = 42;
-      std::default_random_engine eng(seed);
-      std::uniform_real_distribution<double> random_lv_value(0, 0.1);
-      double* lv = new double[LATENT_VECTOR_SIZE];
-      for(int i = 0; i < LATENT_VECTOR_SIZE; i++)
-      {
-	  lv[i] = random_lv_value(eng);
-      }
-      for(int i=0;i<LATENT_VECTOR_SIZE;i++) {
-	  latent_vector[i] = lv[i];
-      }
+static const char* const name = "Matrix Completion";
+static const char* const desc = "Computes Matrix Decomposition using Stochastic Gradient Descent";
+static const char* const url = 0;
 
-  } 
-    bool operator==(const Node& other) const
-    {
-	return (ID == other.ID);
-    }
-    bool operator<(const Node& other) const 
-    {
-	return (ID < other.ID);
-    }
-typedef int tt_has_serialize;
-    void serialize(Galois::Runtime::SerializeBuffer& s) const {
-	gSerialize(s,latent_vector, updates, edge_offset, ID, number_of_edges);
-    }
-    void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
-	gDeserialize(s,latent_vector, updates, edge_offset, ID, number_of_edges);
-    } 
-
-
-} Node;
-
-using std::cout;
-using std::endl;
-namespace std {
-    
-    template <>
-    struct hash<Node>
-    {
-	std::size_t operator()(const Node& other) const {
-	    using std::hash;
-	    using std::size_t;
-	    return (hash<unsigned int>()(other.ID));
-	}
-    };	
-}
-
-//Distributed Graph Nodes.
-typedef Galois::Graph::ThirdGraph<Node, uint32_t, Galois::Graph::EdgeDirection::Out> DGraph;
-typedef DGraph::NodeHandle DGNode;
-typedef typename DGraph::pointer Graphp;
-
-
-typedef Galois::Graph::FileGraph FGraph;
-typedef Galois::Graph::FileGraph::GraphNode FileGNode;
-FGraph fgraph;
-
-//Graph graph;
-std::unordered_map<FileGNode,DGNode> mapping;
-// DGNode ==> hostID mapping
-std::map<DGNode, uint64_t> HostIDMap;
-
-using accumulator = Galois::GAccumulator<int64_t>;
-
-//Processed movie nodes:
-uint64_t Processed_movie_nodes = 0;
-
-volatile unsigned prog_barrier = 0;
-//std::atomic<unsigned> prog_barrier;
-//unsigned int num_movie_nodes = 0;
-unsigned int num_movie_nodes = 0;
-
-using namespace Galois::Runtime;
-typedef Galois::Runtime::LL::SimpleLock<true> SLock;
-SLock slock;
-SLock pblock;
-
-//unsigned int LATENT_VECTOR_SIZE = 2;
-double LEARNING_RATE = 0.001;
-double DECAY_RATE = 0.9;
-double LAMBDA = 0.001;
-unsigned int MAX_MOVIE_UPDATES = 0;
-unsigned int NUM_RATINGS = 0;
-static const double MINVAL = -1e+100;
-static const double MAXVAL = 1e+100;
-
-
-double vector_dot(const Node& movie_data, const Node& user_data) {
-  const double* __restrict__ movie_latent = movie_data.latent_vector;
-  const double* __restrict__ user_latent = user_data.latent_vector;
-
-  double dp = 0.0;
-  for (int i = 0; i < LATENT_VECTOR_SIZE; ++i)
-    dp += user_latent[i] * movie_latent[i];
-    //dp += user_data.latent_vector[i] * movie_data.latent_vector[i];
-  assert(std::isnormal(dp));
-  return dp;
-}
-
-double calcPrediction (const Node& movie_data, const Node& user_data) {
-  double pred = vector_dot(movie_data, user_data);
-  pred = std::min (MAXVAL, pred);
-  pred = std::max (MINVAL, pred);
-  return pred;
-}
-
-inline void doGradientUpdate(Node& movie_data, Node& user_data, unsigned int edge_rating)
-{
-  double* __restrict__ movie_latent = movie_data.latent_vector;
-        double step_size = LEARNING_RATE * 1.5 / (1.0 + DECAY_RATE * pow(movie_data.updates + 1, 1.5));
-  double* __restrict__ user_latent = user_data.latent_vector;
-
-  double cur_error = edge_rating - vector_dot(movie_data, user_data);
-
-  for(unsigned int i = 0; i < LATENT_VECTOR_SIZE; i++)
-    {
-      double prev_movie_val = movie_latent[i];
-      double prev_user_val = user_latent[i];
-      movie_latent[i] += step_size * (cur_error * prev_user_val  - LAMBDA * prev_movie_val);
-      user_latent[i]  += step_size * (cur_error * prev_movie_val - LAMBDA * prev_user_val);
-    }
-}
-
-
-/*
-inline void doGradientUpdate(Node& movie_data, Node& user_data, unsigned int edge_rating)
-{
-        double step_size = LEARNING_RATE * 1.5 / (1.0 + DECAY_RATE * pow(movie_data.updates + 1, 1.5));
-        double* __restrict__ movie_latent = movie_data.latent_vector;
-        double* __restrict__ user_latent = user_data.latent_vector;
-	
-	//calculate error
-        double cur_error = - edge_rating;
-        for(unsigned int i = 0; i < LATENT_VECTOR_SIZE; i++)
-        {
-                cur_error += user_latent[i] * movie_latent[i];
-        }
-
-	//This is a gradient step
-        for(unsigned int i = 0; i < LATENT_VECTOR_SIZE; i++)
-        {
-                double prev_movie_val = movie_latent[i];
-
-                movie_latent[i] -= step_size * (cur_error * user_latent[i] + LAMBDA * prev_movie_val);
-                user_latent[i] -= step_size * (cur_error * prev_movie_val + LAMBDA * user_latent[i]);
-        }
-}
-
-*/
-
-static void progBarrier_landing_pad(RecvBuffer& buf) {
-   gDeserialize(buf,prog_barrier);
-    ++prog_barrier;
-}
-
-static void program_barrier() {
-  SendBuffer b;
-  gSerialize(b, prog_barrier);
-  getSystemNetworkInterface().broadcast(progBarrier_landing_pad, b);
-
-//unsigned old_val = prog_barrier;
- //unsigned new_val =  ++prog_barrier;
-    prog_barrier++;
-//prog_barrier.compare_exchange_strong(old_val,new_val);
-    printf("Entering barrier..%d\n", prog_barrier);
-  do {
-    //std::cout << "inside do loop\n";
-    getSystemDirectory().makeProgress();
-   // getSystemRemoteDirectory().makeProgress();
-    getSystemNetworkInterface().handleReceives();
-  } while (prog_barrier != networkHostNum);
-
-  prog_barrier = 0;
-  printf("Left barrier..\n");
-}
-
-Galois::GAccumulator<double> RMS;
-Galois::GAccumulator<unsigned> count_data;
-void verify(Graphp g){
-    typedef Galois::GAccumulator<double> AccumDouble;
-    AccumDouble rms;
-    cout<<"Host:"<<networkHostID<<" is verifying after SGD..\n";
-    //Galois::do_all_local(g, [&g,&rms] (DGNode n) {
-	auto ei = g->begin();
-	std::advance(ei,num_movie_nodes);
-	unsigned int count=0;
-	for(auto ni = g->begin(); ni != ei; ++ni) {
-			for(auto ii = g->edge_begin(*ni); ii != g->edge_end(*ni); ++ii){
-			
-			    DGNode m = g->getEdgeDst(ii);
-			    double pred = calcPrediction(g->getData(*ni), g->getData(m));
-			    double rating = ii->getValue();
-			    if(!std::isnormal(pred))
-				std::cout << "Denormal Warning\n";
-			    rms += ((pred - rating)*(pred - rating));
-				
-			}
-			count++;
-			    
-    }
-    cout<<"Reached end..\n"<<endl; 
-    double total_rms = rms.reduce();
-    double normalized_rms = sqrt(total_rms/NUM_RATINGS);
-    std::cout << "RMSE Total: " << total_rms << " Normalized: " << normalized_rms << std::endl;
- //   cout<<"Number of nodes seen = "<<count<<endl;
-
-}
-
-void printNode(const Node& t) {
-    cout<<"ID: "<<t.ID<<endl;
-    cout<<"Edge_offset: "<<t.edge_offset<<endl;
-    cout<<"Updates: "<<t.updates<<endl;
-    cout<<"Number of edges: "<<t.number_of_edges<<endl;
-    for(int i=0;i<LATENT_VECTOR_SIZE;i++) {
-        cout<<" "<<t.latent_vector[i]<<endl;
-    }
-}
-
-/* Operator */
-Galois::GAccumulator<size_t> numNodes; 
-unsigned count_done=0;
-struct sgd_algo {
-   //unsigned int num_movie_nodes;
-
-struct Process : public Galois::Runtime::Lockable {
-    Graphp g;
-    sgd_algo* self;
-    Process(){ }
-    // sgd(Graphp _g) : g(_g) {}
-    Process(sgd_algo* s, Graphp _g) : g(_g), self(s) { }
-    //void operator()(const DGNode& n, Galois::UserContext<DGNode>&) {(*this)(n);} 
-    void operator()(const DGNode& movie, Galois::UserContext<DGNode>& ctx)
-    {
-     Node& movie_data = g->getData(movie); 
-    //printNode(movie_data);
-
-     DGraph::edge_iterator edge_it = g->edge_begin(movie);
-     DGraph::edge_iterator edge_end = g->edge_end(movie);
-/**********************************************************
-* Process all the edges of a movie node in 
-* in one go.
-* ********************************************************/ 	
-    for(auto ii = edge_it; ii != edge_end; ++ii) {
-	DGNode user = g->getEdgeDst(edge_it);
-	Node& user_data = g->getData(user);
-	
-	unsigned int edge_rating = edge_it->getValue();
-    
-	doGradientUpdate(movie_data, user_data, edge_rating);
-	//++movie_data.edge_offset;
-    }
-    
-    numNodes += 1;
-    ++Processed_movie_nodes;
-
-}
-
-
-typedef int tt_has_serialize;
-void serialize(Galois::Runtime::SerializeBuffer& s) const {
-    gSerialize(s,g);
-}
-void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
-    gDeserialize(s,g);
-} 
-
-};
-    void operator()(Graphp g) {
-	DGraph::iterator ii = g->begin();
-	std::advance(ii,num_movie_nodes);
-	Node& dg_movie = g->getData(*ii);
-	//Galois::for_each_local(g, Process(this,g), "Process");
-	Galois::for_each(g->begin(), ii, Process(this,g), "SGD Process");
-	//Galois::for_each(g->begin(), ii, verify_before(g), "Verifying");
-   	std::cout << "number of nodes = "<<numNodes.reduce() << "\n";
-    }
-
+enum Algo {
+  blockedEdge,
+  blockedEdgeServer,
+  blockJump,
+  dotProductFixedTiling,
+  dotProductRecursiveTiling
 };
 
-static void recvHostIDMap_landing_pad(RecvBuffer& buf) {
-    
-    DGNode n;
-    uint32_t hostID;
-    gDeserialize(buf,hostID, n);
-    slock.lock();
-    HostIDMap[n] = hostID;
-    slock.unlock();
-}
-
-
-unsigned num_ns = 0;
-struct create_nodes {
-    Graphp g;
-    SLock l;
-    create_nodes() = default;
-    create_nodes(Graphp _g, SLock _l) : g(_g),l(_l){}
-    template<typename Context>
-    void operator ()(const FileGNode& item, const Context& ctx) {
-	Node node;
-	DGNode n = g->createNode(node);  
-	g->addNode(n);
-    }
+enum Step {
+  bold,
+  bottou,
+  intel,
+  inverse,
+  purdue
 };
 
-void giveDGraph(Graphp graph);
-/*
-static void recvRemoteNode_landing_pad(RecvBuffer& buf) {
-  DGNode n;
-  Node node;
-  uint32_t host;
-  gDeserialize(buf,host,node,n);
-  slock.lock();
-  rlookup[node] = n;
-  slock.unlock();
-}
+enum OutputType {
+  binary,
+  ascii
+};
 
-static void getRemoteNode_landing_pad(RecvBuffer& buf) {
-  Node node;
-  uint32_t host;
-  gDeserialize(buf,host,node);
-  SendBuffer b;
-  slock.lock();
-  gSerialize(b, networkHostID, node, llookup[node]);
-  slock.unlock();
-  getSystemNetworkInterface().send(host,recvRemoteNode_landing_pad,b);
-}
+namespace cll = llvm::cl;
+static cll::opt<std::string> inputFilename(cll::Positional, cll::desc("<input file>"), cll::Required);
+static cll::opt<std::string> outputFilename(cll::Positional, cll::desc("[output file]"), cll::init(""));
+static cll::opt<std::string> transposeGraphName("graphTranspose", cll::desc("Transpose of input graph"));
+static cll::opt<OutputType> outputType("output", cll::desc("Output type:"),
+    cll::values(
+      clEnumValN(OutputType::binary, "binary", "Binary"),
+      clEnumValN(OutputType::ascii, "ascii", "ASCII"),
+      clEnumValEnd), cll::init(OutputType::binary));
+// (Purdue, Netflix): 0.05, (Purdue, Yahoo Music): 1.0, (Purdue, HugeWiki): 0.01
+// Intel: 0.001 
+static cll::opt<float> lambda("lambda", cll::desc("regularization parameter [lambda]"), cll::init(0.05));
+// (Purdue, Neflix): 0.012, (Purdue, Yahoo Music): 0.00075, (Purdue, HugeWiki): 0.001
+// Intel: 0.001
+// Bottou: 0.1
+static cll::opt<float> learningRate("learningRate",
+    cll::desc("learning rate parameter [alpha] for Bold, Bottou, Intel and Purdue step size function"),
+    cll::init(0.012));
+// (Purdue, Netflix): 0.015, (Purdue, Yahoo Music): 0.01, (Purdue, HugeWiki): 0.0
+// Intel: 0.9
+static cll::opt<float> decayRate("decayRate", 
+    cll::desc("decay rate parameter [beta] for Intel and Purdue step size function"), 
+    cll::init(0.015));
+static cll::opt<float> tolerance("tolerance", cll::desc("convergence tolerance"), cll::init(0.01));
+static cll::opt<int> updatesPerEdge("updatesPerEdge", cll::desc("number of updates per edge"), cll::init(1));
+static cll::opt<int> usersPerBlock("usersPerBlock", cll::desc("users per block"), cll::init(2048));
+static cll::opt<int> itemsPerBlock("itemsPerBlock", cll::desc("items per block"), cll::init(350));
+static cll::opt<int> fixedRounds("fixedRounds", cll::desc("run for a fixed number of rounds"), cll::init(-1));
+static cll::opt<bool> useExactError("useExactError", cll::desc("use exact error for testing convergence"), cll::init(false));
+static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
+  cll::values(
+    clEnumValN(Algo::blockedEdge, "blockedEdge", "Edge blocking (default)"),
+    clEnumValN(Algo::blockedEdgeServer, "blockedEdgeServer", "Edge blocking with server support"),
+    clEnumValN(Algo::blockJump, "blockJump", "Block jumping "),
+    clEnumValN(Algo::dotProductFixedTiling, "dotProductFixedTiling", "Dot product fixed tiling test"),
+    clEnumValN(Algo::dotProductRecursiveTiling, "dotProductRecursiveTiling", "Dot product recursive tiling test"),
+  clEnumValEnd), 
+  cll::init(Algo::blockedEdge));
+static cll::opt<Step> learningRateFunction("learningRateFunction", cll::desc("Choose learning rate function:"),
+  cll::values(
+    clEnumValN(Step::intel, "intel", "Intel"),
+    clEnumValN(Step::purdue, "purdue", "Purdue"),
+    clEnumValN(Step::bottou, "bottou", "Bottou"),
+    clEnumValN(Step::bold, "bold", "Bold (default)"),
+    clEnumValN(Step::inverse, "inverse", "Inverse"),
+  clEnumValEnd), 
+  cll::init(Step::bold));
+static cll::opt<int> cutoff("cutoff");
 
-*/
+size_t NUM_ITEM_NODES = 0;
 
+struct PurdueStepFunction: public StepFunction {
+  virtual std::string name() const { return "Purdue"; }
+  virtual LatentValue stepSize(int round) const {
+    return learningRate * 1.5 / (1.0 + decayRate * pow(round + 1, 1.5));
+  }
+};
 
-static void create_remote_graph_edges(Graphp dgraph)
-{
-  printf ("creating all edges on HOST =>%u\n", networkHostID);
-   unsigned count = 0;
-   unsigned scount = 0;
-   unsigned rcount = 0;
+struct IntelStepFunction: public StepFunction {
+  virtual std::string name() const { return "Intel"; }
+  virtual LatentValue stepSize(int round) const {
+    return learningRate * pow(decayRate, round);
+  }
+};
 
-    unsigned cc = 0;
-	
-    auto dg_it = dgraph->begin();
-    cout<<"Started mapping.."<<endl;
-    for(auto ii = fgraph.begin(); ii != fgraph.end(); ++ii) {
-	mapping[*ii] = *dg_it;
-	++dg_it;	
+struct BottouStepFunction: public StepFunction {
+  virtual std::string name() const { return "Bottou"; }
+  virtual LatentValue stepSize(int round) const {
+    return learningRate / (1.0 + learningRate*lambda*round);
+  }
+};
+
+struct InverseStepFunction: public StepFunction {
+  virtual std::string name() const { return "Inverse"; }
+  virtual LatentValue stepSize(int round) const {
+    return 1.0 / (round + 1);
+  }
+};
+
+struct BoldStepFunction: public StepFunction {
+  virtual std::string name() const { return "Bold"; }
+  virtual bool isBold() const { return true; }
+  virtual LatentValue stepSize(int round) const { return 0.0; }
+};
+
+template<typename Graph>
+double sumSquaredError(Graph& g) {
+  typedef typename Graph::GraphNode GNode;
+  // computing Root Mean Square Error
+  // Assuming only item nodes have edges
+  Galois::GAccumulator<double> error;
+
+  // Save for performance testing
+#if 0
+  Galois::do_all(g.begin(), g.begin() + NUM_ITEM_NODES, [&](GNode n) {
+    for (auto ii = g.edge_begin(n), ei = g.edge_end(n); ii != ei; ++ii) {
+      GNode dst = g.getEdgeDst(ii);
+      LatentValue e = predictionError(g.getData(n).latentVector, g.getData(dst).latentVector, -static_cast<LatentValue>(g.getEdgeData(ii)));
+
+      error += (e * e);
     }
-    cout<<"Done with mapping"<<endl; 
-    for(auto ii = fgraph.begin(); ii != fgraph.end(); ++ii) {
-	FGraph::edge_iterator vv = fgraph.edge_begin(*ii);
-	FGraph::edge_iterator ev = fgraph.edge_end(*ii);
-	scount++;
-	Node& n = dgraph->getData(mapping[*ii]);
-//	cout << "n ID = "<< n.ID<<endl;
-	for (FGraph::edge_iterator jj = vv; jj != ev; ++jj) {
-	   // cout<<"Getting edges..\n";
-	    unsigned int edge_data = fgraph.getEdgeData<unsigned int>(jj);
-	    dgraph->addEdge(mapping[*ii],mapping[fgraph.getEdgeDst(jj)], edge_data);
-	    count++;
-	    n.number_of_edges+=1;
-	}
-	if(n.number_of_edges > 0)
-	    ++num_movie_nodes;
+  });
+#else
+  Galois::Runtime::Fixed2DGraphTiledExecutor<Graph> executor(g);
+  executor.execute(
+      g.begin(), g.begin() + NUM_ITEM_NODES,
+      g.begin() + NUM_ITEM_NODES, g.end(),
+      itemsPerBlock, usersPerBlock,
+      [&](GNode src, GNode dst, typename Graph::edge_iterator edge) {
+    LatentValue e = predictionError(g.getData(src).latentVector, g.getData(dst).latentVector, g.getEdgeData(edge));
+    error += (e * e);
+  }, false);
+#endif
+  return error.reduce();
+}
 
-	NUM_RATINGS += n.number_of_edges;
+template<typename Graph>
+size_t countEdges(Graph& g) {
+  typedef typename Graph::GraphNode GNode;
+  Galois::GAccumulator<size_t> edges;
+  Galois::Runtime::Fixed2DGraphTiledExecutor<Graph> executor(g);
+  executor.execute(
+      g.begin(), g.begin() + NUM_ITEM_NODES,
+      g.begin() + NUM_ITEM_NODES, g.end(),
+      itemsPerBlock, usersPerBlock,
+      [&](GNode src, GNode dst, typename Graph::edge_iterator edge) {
+    edges += 1;
+  }, false);
+  return edges.reduce();
+}
+
+template<typename Graph>
+void verify(Graph& g, const std::string& prefix) {
+  if (countEdges(g) != g.sizeEdges()) {
+    GALOIS_DIE("Error: edge list of input graph probably not sorted");
   }
 
-  /*  auto uu = dgraph->begin();
-    std::advance(uu, num_movie_nodes+2);
+  double error = sumSquaredError(g);
+  double rmse = std::sqrt(error/g.sizeEdges());
 
-    for(auto g = dgraph->begin(); g != uu; ++g)
-    {
-	cout << "n edges = " <<dgraph->getData(*g).number_of_edges<<endl; 
+  std::cout << prefix << "RMSE: " << rmse << "\n";
+}
+
+template<typename T, unsigned Size>
+struct ExplicitFiniteChecker { };
+
+template<typename T>
+struct ExplicitFiniteChecker<T,4U> {
+  static_assert(std::numeric_limits<T>::is_iec559, "Need IEEE floating point");
+  bool isFinite(T v) {
+    union { T value; uint32_t bits; } a = { v };
+    if (a.bits == 0x7F800000) {
+      return false; // +inf
+    } else if (a.bits == 0xFF800000) {
+      return false; // -inf
+    } else if (a.bits >= 0x7F800001 && a.bits <= 0x7FBFFFFF) {
+      return false; // signaling NaN
+    } else if (a.bits >= 0xFF800001 && a.bits <= 0xFFBFFFFF) {
+      return false; // signaling NaN
+    } else if (a.bits >= 0x7FC00000 && a.bits <= 0x7FFFFFFF) {
+      return false; // quiet NaN
+    } else if (a.bits >= 0xFFC00000 && a.bits <= 0xFFFFFFFF) {
+      return false; // quiet NaN
     }
-*/
-int movie_host0 = 0;
-	int movie_host1 = 0;
-	auto jj = dgraph->begin();
-	std::advance(jj , num_movie_nodes);
-	for(auto hh = dgraph->begin(); hh != jj; ++hh){
-	    if(HostIDMap[*hh] == 0)
-		++movie_host0;
-	    if(HostIDMap[*hh] == 1)
-		++movie_host1;
-	} 
+    return true;
+  }
+};
 
-	std::cout<< "movie_host0 = " << movie_host0 << " moveie_host1 = " << movie_host1 <<std::endl;
-
-
- // std::cout <<"host="<<networkHostID<<" count = " << count <<"\n";
-    
- // printf ("host: %u nodes %u and edges %u remote edges %u\n", networkHostID, scount, count, rcount);
-//  printf ("host: %u done creating local edges\n", networkHostID);
-}
-
-
-static void create_dist_graph(Graphp dgraph, std::string inputFile) {
-    SLock lk;
-    uint64_t block, f, l;
-    FGraph::iterator first, last;
-    
-    fgraph.structureFromFile(inputFile);
-    auto graph_begin = fgraph.begin();
-    auto graph_end = fgraph.end();
-
-  auto  size = graph_end - graph_begin;;
-    cout << "rest node size = "<<size<<endl;
-    block = size / networkHostNum;
-    f = networkHostID * block;
-    l = (networkHostID + 1) * block;
-    first = graph_begin + (networkHostID * block);
-    last  = graph_begin + ((networkHostID + 1) * block);
-    if (networkHostID == (networkHostNum-1)) last = graph_end;
-
-    cout << "first - last" << (first - last)<< endl;
-    printf ("host: %u creating rest of the nodes\n", networkHostID);
-    Galois::for_each(first, last, create_nodes(dgraph,lk));
-}
-static void getDGraph_landing_pad(RecvBuffer& buf) {
-    Graphp dgraph;
-    gDeserialize(buf, dgraph);
-   // printf("%d has received DistGraph..\n",networkHostID);
-}
-void giveDGraph(Graphp dgraph) {
-    if(networkHostNum > 1) {
-    SendBuffer b;
-    gSerialize(b, dgraph);
-    getSystemNetworkInterface().broadcast(getDGraph_landing_pad, b);
-//	printf("Handling receives...\n");
-    getSystemNetworkInterface().handleReceives();
-//	printf("Done Handling receives...\n");
+template<typename T>
+struct ExplicitFiniteChecker<T,8U> {
+  static_assert(std::numeric_limits<T>::is_iec559, "Need IEEE floating point");
+  bool isFinite(T v) {
+    union { T value; uint64_t bits; } a = { v };
+    if (a.bits == 0x7FF0000000000000) {
+      return false; // +inf
+    } else if (a.bits == 0xFFF0000000000000) {
+      return false; // -inf
+    } else if (a.bits >= 0x7FF0000000000001 && a.bits <= 0x7FF7FFFFFFFFFFFF) {
+      return false; // signaling NaN
+    } else if (a.bits >= 0xFFF0000000000001 && a.bits <= 0xFFF7FFFFFFFFFFFF) {
+      return false; // signaling NaN
+    } else if (a.bits >= 0x7FF8000000000000 && a.bits <= 0x7FFFFFFFFFFFFFFF) {
+      return false; // quiet NaN
+    } else if (a.bits >= 0xFFF8000000000000 && a.bits <= 0xFFFFFFFFFFFFFFFF) {
+      return false; // quiet NaN
     }
-}
-static void readInputGraph_landing_pad(RecvBuffer& buf) {
-    Graphp dgraph;
-    std::string inputFile;
-    gDeserialize(buf, inputFile, dgraph);
-    create_dist_graph(dgraph, inputFile);
- //   printf("1..Done creating dist graph..\n");
-}
+    return true;
+  }
+};
 
 
-void readInputGraph(Graphp dgraph, std::string inputFile){
-  //  std::cout<<"NetworkHostNum="<<networkHostNum<<std::endl;
-     if(networkHostNum > 1) {
-	SendBuffer b;
-	gSerialize(b, inputFile, dgraph);
-	getSystemNetworkInterface().broadcast(readInputGraph_landing_pad, b);
-//	printf("Handling receives...\n");
-	getSystemNetworkInterface().handleReceives();
-//	printf("Done Handling receives...\n");
-    } 
+template<typename T>
+bool isFinite(T v) {
+#ifdef __FAST_MATH__
+  return ExplicitFiniteChecker<T,sizeof(T)>().isFinite(v);
+#else
+  return std::isfinite(v);
+#endif
+}
+
+double countFlops(size_t nnz, int rounds, int k) {
+  double flop = 0;
+  if (useExactError) {
+    // dotProduct = 2K, square = 1, sum = 1
+    flop += nnz * (2.0 * k + 1 + 1);
+  } else {
+    // Computed during gradient update: square = 1, sum = 1
+    flop += nnz * (1 + 1);
+  }
+  // dotProduct = 2K, gradient = 10K, 
+  flop += rounds * (nnz * (12.0 * k));
+  return flop;
+}
+
+template<typename Graph, typename Fn>
+void executeUntilConverged(const StepFunction& sf, Graph& g, Fn fn) {
+  Galois::GAccumulator<double> errorAccum;
+  std::vector<LatentValue> steps(updatesPerEdge);
+  LatentValue last = -1.0;
+  int deltaRound = updatesPerEdge;
+  LatentValue rate = learningRate;
+  Galois::TimeAccumulator elapsed;
+
+  elapsed.start();
+  unsigned long lastTime = 0;
+
+  for (int round = 0; ; round += deltaRound) {
+    if (fixedRounds > 0 && round >= fixedRounds)
+      break;
+    if (fixedRounds > 0) 
+      deltaRound = std::min(deltaRound, fixedRounds - round);
     
-    create_dist_graph(dgraph,inputFile);
-  //  printf("0..Done creating dist graph.. HOST --->%d\n", networkHostID);
-	
+    for (int i = 0; i < updatesPerEdge; ++i) {
+      // Assume that loss decreases
+      if (sf.isBold())
+        steps[i] = i == 0 ? rate : steps[i-1] * 1.05;
+      else
+        steps[i] = sf.stepSize(round + i);
+    }
+
+    fn(&steps[0], round + deltaRound, useExactError ? NULL : &errorAccum);
+    double error = useExactError ? sumSquaredError(g) : errorAccum.reduce();
+
+    elapsed.stop();
+    unsigned long curElapsed = elapsed.get();
+    elapsed.start();
+    unsigned long millis = curElapsed - lastTime;
+    lastTime = curElapsed;
+
+    double gflops = countFlops(g.sizeEdges(), deltaRound, LATENT_VECTOR_SIZE) / millis / 1e6;
+
+    int curRound = round + deltaRound;
+    std::cout
+      << "R: " << curRound
+      << " elapsed (ms): " << curElapsed
+      << " GFLOP/s: " << gflops;
+    if (useExactError) {
+      std::cout << " RMSE (R " << curRound << "): " << std::sqrt(error/g.sizeEdges());
+    } else {
+      std::cout << " Approx. RMSE (R " << (curRound - 1) << ".5): " << std::sqrt(error/g.sizeEdges());
+    }
+    std::cout << "\n";
+    if (!isFinite(error))
+      break;
+    if (fixedRounds <= 0 && last >= 0.0 && std::abs((last - error) / last) < tolerance)
+      break;
+    if (sf.isBold()) {
+      // Assume that loss decreases first round
+      if (last >= 0.0 && last < error)
+        rate = steps[deltaRound - 1] * 0.5;
+      else
+        rate = steps[deltaRound - 1] * 1.05;
+    }
+    last = error;
+  }
 }
 
 
 
-void readGraph(Graphp dgraph, std::string inputFile) {
-    readInputGraph(dgraph, inputFile); 
+
+template<GraphPtrTy>
+void for_each_tiled_impl(GraphPtrTy g, FuncTy func) {
+  auto& barrier = getSystemBarrier();
+  //Perminate blocking of one dimension
+  unsigned x1,x2;
+  std::tie(x1,x2) = Galois::block_range(0, g.size_x(), Galois::Runtime::NetworkInterface::ID, Galois::Runtime::NetworkInterface::Num);
+
+  //for each block of other dimension
+  for(unsigned offset = 0; offset < Galois::Runtime::NetworkInterface::Num; ++offset) {
+    //compute current range
+    unsigned local_offset = (Galois::Runtime::NetworkInterface::ID + offset) % Galois::Runtime::NetworkInterface::Num;
+    std::tie(y1,y2) = Galois::block_range(0, g.size_y(), local_offset, Galois::Runtime::NetworkInterface::Num);
+    //for each item of first dimension
+    for (unsigned x = x1; x < x2; ++x) {
+      std::vector<unsigned> v = g->intersect_edges(x, y1, y2);
+      //for each item in the other dimension block
+      for (y : v) {
+        func(x, y);
+      }
+    }
+    barrier.wait();
+  }
 }
 
-int main(int argc, char** argv)
-{	
-	if(argc < 3)
-	{
-		std::cout << "Usage: <input binary gr file> <thread count>" << std::endl;
-		return -1;
-	}
-	
-	//std::cout<< "start reading and building Graph\n";
-	std::string inputFile = argv[1];
-	unsigned int threadCount = atoi(argv[2]);
+template<typename GraphPtrTy, typename FuncTy>
+void for_each_tiled(GraphPtrTy g, FuncTy func) {
+}
+                   
+      Galois::Runtime::Fixed2DGraphTiledExecutor<Graph> executor(g);
+      executor.execute(
+          g.begin(), g.begin() + NUM_ITEM_NODES,
+          g.begin() + NUM_ITEM_NODES, g.end(),
+          itemsPerBlock, usersPerBlock,
+          [&](GNode src, GNode dst, typename Graph::edge_iterator edge) {
 
-	//how many threads Galois should use
-	Galois::setActiveThreads(threadCount);
-  //      graph.structureFromFile(inputFile);
+// TODO refactor to use TiledExecutor
+// TODO To store previous error on edge, need LC graphs to support different edge data than serialized form 
+//! Simple edge-wise operator
+template<bool WithServer>
+class BlockedEdgeAlgo {
+  static const bool makeSerializable = false;
+  typedef Galois::Runtime::LL::PaddedLock<true> SpinLock;
 
-//	num_movie_nodes =  initializeGraphData(graph);
-//	std::cout << "num_movie_nodes = " << num_movie_nodes <<"\n";
-//	cout<<"Number of ratings = "<<NUM_RATINGS<<endl;	
-	Galois::StatManager statManager;
-	Galois::Runtime::networkStart();
-	
-	Graphp dgraph = DGraph::allocate();
+  struct BasicNode {
+    LatentValue latentVector[LATENT_VECTOR_SIZE];
+  };
 
-	Galois::StatTimer Tinitial("Initialization Time");
-	Tinitial.start();
-	readGraph(dgraph, inputFile);    
-	Tinitial.stop();
+  struct ServerNode: public BasicNode {
+    double sum;
+    size_t count;
+    bool deleted;
+    ServerNode(): sum(0), count(0), deleted(false) { }
+  };
 
-//	if(networkHostID == 0) {	
-	    std::cout<< "create_remote_graph_edges host--->" << networkHostID<<"\n";
-	    create_remote_graph_edges(dgraph);
-	    std::cout<< "Done reading and building Graph\n";
-//	}
-	//verify();
-	cout<<"Verifying before SGD\n";
-	verify(dgraph);
-	std::cout << "calling sgd \n";
-	Galois::StatTimer T("Sgd Time");
-	T.start();
-	sgd_algo()(dgraph);
-	 T.stop();   
-	Galois::StatTimer T2("Verify Time");
-	T2.start();
-	cout<<"Verifying after SGD\n";
-	verify(dgraph);
-	T2.stop();
-	printf("NUMBER OF MOVIE NODES = %d\n", num_movie_nodes);
-	Galois::Runtime::networkTerminate();
-	return 0;
+  typedef typename boost::mpl::if_c<WithServer, ServerNode, BasicNode>::type Node;
 
+  template<typename NodeData, bool Enabled=WithServer>
+  static bool deleted(NodeData& n, typename std::enable_if<Enabled>::type* = 0) {
+    return n.deleted;
+  }
+
+  template<typename NodeData, bool Enabled=WithServer>
+  static bool deleted(NodeData& n, typename std::enable_if<!Enabled>::type* = 0) {
+    return false;
+  }
+
+public:
+  typedef typename Galois::Graph::LC_CSR_Graph<Node, unsigned int>
+    //::template with_numa_alloc<true>::type
+    ::template with_out_of_line_lockable<true>::type
+    ::template with_no_lockable<!makeSerializable>::type Graph;
+
+  void readGraph(Graph& g) { Galois::Graph::readGraph(g, inputFilename); }
+
+  std::string name() const { return WithServer ? "blockedEdgeServer" : "blockedEdge"; }
+
+  size_t numItems() const { return NUM_ITEM_NODES; }
+
+private:
+  typedef typename Graph::GraphNode GNode;
+  typedef typename Graph::iterator iterator;
+  typedef typename Graph::edge_iterator edge_iterator;
+
+  /**
+   * Tasks are 2D ranges [start1, end1) x [start2, end2]
+   */
+  struct Task {
+    iterator start1;
+    GNode start2;
+    iterator end1;
+    GNode end2;
+    size_t id;
+    size_t x;
+    size_t y;
+    double error;
+    int updates;
+  };
+
+  struct GetDst: public std::unary_function<edge_iterator, GNode> {
+    Graph* g;
+    GetDst() { }
+    GetDst(Graph* _g): g(_g) { }
+    GNode operator()(typename Graph::edge_iterator ii) const {
+      return g->getEdgeDst(ii);
+    }
+  };
+
+  typedef Galois::NoDerefIterator<edge_iterator> no_deref_iterator;
+  typedef boost::transform_iterator<GetDst, no_deref_iterator> edge_dst_iterator;
+
+  struct Process {
+    Graph& g;
+    Galois::Statistic& edgesVisited;
+    Galois::Statistic& failures;
+    std::vector<SpinLock>& xLocks;
+    std::vector<SpinLock>& yLocks;
+    std::vector<Task>& tasks;
+    LatentValue* steps;
+    int maxUpdates;
+    Galois::GAccumulator<double>* errorAccum;
+
+#if 0
+    void updateBlock(Task& task) {
+      const int innerCount = std::numeric_limits<int>::max(); // XXX
+      const LatentValue stepSize = steps[updatesPerEdge - maxUpdates + task.updates];
+      GetDst fn { &g };
+      no_deref_iterator xxx;
+      std::array<no_deref_iterator,1024> starts;
+      double error = 0.0;
+
+      // TODO add round blocking -- Added by not very useful
+      // TODO modify edge data to support agnostic edge blocking
+      for (int phase = makeSerializable ? 0 : 1; phase < 2; ++phase) {
+        Galois::MethodFlag flag = phase == 0 ? Galois::ALL : Galois::NONE;
+        int numWorking;
+        int round = 0;
+        int limit = 0;
+        do {
+          numWorking = 0;
+          int index = 0;
+          for (auto ii = task.start1; ii != task.end1; ++ii, ++index) {
+            Node& nn = g.getData(*ii, round == 0 ? flag : Galois::NONE);
+            Graph::edge_iterator begin = g.edge_begin(*ii, Galois::NONE);
+            no_deref_iterator nbegin(round == 0 ? no_deref_iterator(begin) : starts[index]);
+            no_deref_iterator nend(no_deref_iterator(g.edge_end(*ii, Galois::NONE)));
+            edge_dst_iterator dbegin(nbegin, fn);
+            edge_dst_iterator dend(nend, fn);
+            edge_dst_iterator jj = round == 0 ? std::lower_bound(dbegin, dend, task.start2) : dbegin;
+            int i = 0;
+            bool done = false;
+            //for (i = 0; jj != dend && i < innerCount; ++jj, ++i) { // XXX
+            for (i = 0; jj != dend; ++jj, ++i) {
+              Graph::edge_iterator edge = *jj.base();
+
+              if (g.getEdgeDst(edge) > task.end2) {
+                done = true;
+                break;
+              }
+              if (g.getEdgeDst(edge) > task.start2 + limit)
+                break;
+
+              Node& mm = g.getData(g.getEdgeDst(edge), flag);
+              if (phase == 1) {
+                LatentValue e = doGradientUpdate(nn.latentVector, mm.latentVector, static_cast<LatentValue>(g.getEdgeData(edge)), stepSize);
+                error += e * e;
+                edgesVisited += 1;
+              }
+            }
+            if (done)
+              starts[index] = nend;
+            else
+              starts[index] = jj.base();
+
+            //if (!done && jj != dend && i == innerCount)
+            if (!done && jj != dend)
+              numWorking += 1;
+          }
+          round += 1;
+          limit += innerCount;
+        } while (numWorking > 0);
+      }
+      task.updates += 1;
+      errorAccum += (error - task.error);
+      task.error = error;
+    }
+#endif
+
+    void updateBlock(Task& task) {
+//      const int innerCount = std::numeric_limits<int>::max(); // XXX
+      const LatentValue stepSize = steps[updatesPerEdge - maxUpdates + task.updates];
+      GetDst fn { &g };
+      double error = 0.0;
+
+      // TODO modify edge data to support agnostic edge blocking
+      for (int phase = makeSerializable ? 0 : 1; phase < 2; ++phase) {
+        Galois::MethodFlag flag = phase == 0 ? Galois::ALL : Galois::NONE;
+        for (auto ii = task.start1; ii != task.end1; ++ii) {
+          Node& nn = g.getData(*ii, phase == 0 ? flag : Galois::NONE);
+          if (deleted(nn))
+            continue;
+          edge_iterator begin = g.edge_begin(*ii, Galois::NONE);
+          no_deref_iterator nbegin(begin);
+          no_deref_iterator nend(g.edge_end(*ii, Galois::NONE));
+          edge_dst_iterator dbegin(nbegin, fn);
+          edge_dst_iterator dend(nend, fn);
+          for (auto jj = std::lower_bound(dbegin, dend, task.start2); jj != dend; ++jj) {
+            edge_iterator edge = *jj.base();
+            if (g.getEdgeDst(edge) > task.end2)
+              break;
+            Node& mm = g.getData(g.getEdgeDst(edge), flag);
+            if (deleted(mm))
+              continue;
+            if (phase == 1) {
+              LatentValue e = doGradientUpdate(nn.latentVector, mm.latentVector, lambda, g.getEdgeData(edge), stepSize);
+              if (errorAccum)
+                error += e * e;
+              edgesVisited += 1;
+            }
+          }
+        }
+      }
+      task.updates += 1;
+      if (errorAccum) {
+        *errorAccum += (error - task.error);
+        task.error = error;
+      }
+    }
+
+    void operator()(Task& task) {
+      updateBlock(task);
+    }
+
+    void operator()(Task& task, Galois::UserContext<Task>& ctx) {
+#if 1
+      if (std::try_lock(xLocks[task.x], yLocks[task.y]) >= 0) {
+        //Galois::Runtime::forceAbort();
+        ctx.push(task);
+        return;
+      }
+#endif
+      updateBlock(task);
+      if (task.updates < maxUpdates)
+        ctx.push(task);
+
+#if 1
+      xLocks[task.x].unlock();
+      yLocks[task.y].unlock();
+#endif
+    }
+
+    size_t probeBlock(size_t start, size_t by, size_t n, size_t numBlocks) {
+      for (size_t i = 0; i < n; ++i, start += by) {
+        while (start >= numBlocks)
+          start -= numBlocks;
+        Task& b = tasks[start];
+
+        // TODO racy
+        if (b.updates < maxUpdates) {
+          if (std::try_lock(xLocks[b.x], yLocks[b.y]) < 0) {
+            // Return while holding locks
+            return start;
+          }
+        }
+      }
+      failures += 1;
+      return numBlocks;
+    }
+
+    // Nested Y then X
+    size_t nextBlock(size_t start, size_t numBlocks, bool inclusive) {
+      const size_t yDelta = xLocks.size();
+      const size_t xDelta = 1;
+      size_t b;
+
+      // TODO: Add x-then-y and all-x schedules back to show performance impact
+      for (int times = 0; times < 2; ++times) {
+        size_t yLimit = yLocks.size();
+        size_t xLimit = xLocks.size();
+        // First iteration is exclusive of start
+        if ((b = probeBlock(start + (inclusive ? 0 : yDelta), yDelta, yLimit - (inclusive ? 0 : 1), numBlocks)) != numBlocks)
+          return b;
+        if ((b = probeBlock(start + (inclusive ? 0 : xDelta), xDelta, xLimit - (inclusive ? 0 : 1), numBlocks)) != numBlocks)
+          return b;
+        start += yDelta + xDelta;
+        while (yLimit > 0 || xLimit > 0) {
+          while (start >= numBlocks)
+            start -= numBlocks;
+          // Subsequent iterations are inclusive of start
+          if (yLimit > 0 && (b = probeBlock(start, yDelta, yLimit - 1, numBlocks)) != numBlocks)
+            return b;
+          if (xLimit > 0 && (b = probeBlock(start, xDelta, xLimit - 1, numBlocks)) != numBlocks)
+            return b;
+          if (yLimit > 0) {
+            yLimit--;
+            start += yDelta;
+          }
+          if (xLimit > 0) {
+            xLimit--;
+            start += xDelta;
+          }
+        }
+      }
+
+      return numBlocks;
+    }
+
+    void operator()(unsigned tid, unsigned total) {
+      // TODO see if just randomly picking different starting points is enough
+      const size_t numYBlocks = yLocks.size();
+      const size_t numXBlocks = xLocks.size();
+      const size_t numBlocks = numXBlocks * numYBlocks;
+      const size_t xBlock = (numXBlocks + total - 1) / total;
+      size_t xStart = std::min(xBlock * tid, numXBlocks - 1);
+      const size_t yBlock = (numYBlocks + total - 1) / total;
+      size_t yStart = std::min(yBlock * tid, numYBlocks - 1);
+
+      //std::uniform_int_distribution<size_t> distY(0, numYBlocks - 1);
+      //std::uniform_int_distribution<size_t> distX(0, numXBlocks - 1);
+      //xStart = distX(gen);
+      //yStart = distY(gen);
+
+      size_t start = xStart + yStart * numXBlocks;
+
+      for (int i = 0; ; ++i) {
+        start = nextBlock(start, numBlocks, i == 0);
+        Task* t = &tasks[start];
+        if (t == &tasks[numBlocks])
+          break;
+        //Galois::Runtime::LL::gInfo("XXX ", tid, " ", t->x, " ", t->y);
+        updateBlock(*t);
+
+        xLocks[t->x].unlock();
+        yLocks[t->y].unlock();
+      }
+    }
+  };
+
+  struct Inspect {
+    Graph& g;
+    Galois::InsertBag<Task>& initial;
+    std::vector<SpinLock>& xLocks;
+    std::vector<SpinLock>& yLocks;
+    std::vector<Task>& tasks;
+
+    /**
+     * Divide edges into bundles (tasks) of approximately the same size M.
+     *
+     * Works best if graph has been reordered with RCM or similar such that
+     * XXX.
+     *
+     * 2D square tiling. If the graph were dense, we could simply divide the
+     * graph in M^1/2 by M^1/2 tiles
+     *
+     * Since it is sparse *and* we want to minimize number of graph
+     * traversals, we read a small square of M^1/4 items by M^1/4 users/out
+     * edges under the assumption that the graph is dense. Then, we figure out
+     * the actual number of edges in the region and extrapolate that out to
+     * figure out the dimensions of whole tile.
+     */
+    void operator()(unsigned tid, unsigned total) {
+      //adaptiveTiling(tid, total);
+      fixedTiling(tid, total);
+    }
+
+    void fixedTiling(unsigned tid, unsigned total) {
+      if (tid != 0)
+        return;
+      const size_t numUsers = g.size() - NUM_ITEM_NODES;
+      const size_t numBlocks0 = (NUM_ITEM_NODES + itemsPerBlock - 1) / itemsPerBlock;
+      const size_t numBlocks1 = (numUsers + usersPerBlock - 1) / usersPerBlock;
+      const size_t numBlocks = numBlocks0 * numBlocks1;
+
+      std::cout
+        << "itemsPerBlock: " << itemsPerBlock
+        << " usersPerBlock: " << usersPerBlock
+        << " numBlocks: " << numBlocks
+        << " numBlocks0: " << numBlocks0
+        << " numBlocks1: " << numBlocks1 << "\n";
+
+      xLocks.resize(numBlocks0);
+      yLocks.resize(numBlocks1);
+      tasks.resize(numBlocks);
+
+      GetDst fn { &g };
+      //int maxNnz = std::numeric_limits<int>::min();
+      //int minNnz = std::numeric_limits<int>::max();
+      //int maxFloats = std::numeric_limits<int>::min();
+      //int minFloats = std::numeric_limits<int>::max();
+
+      for (size_t i = 0; i < numBlocks; ++i) {
+        Task& task = tasks[i];
+        task.x = i % numBlocks0;
+        task.y = i / numBlocks0;
+        task.id = i;
+        task.updates = 0;
+        task.error = 0.0;
+        task.start1 = g.begin();
+        std::tie(task.start1, task.end1) = Galois::block_range(g.begin(), g.begin() + NUM_ITEM_NODES, task.x, numBlocks0);
+        task.start2 = task.y * usersPerBlock + NUM_ITEM_NODES;
+        task.end2 = (task.y + 1) * usersPerBlock + NUM_ITEM_NODES - 1;
+
+        initial.push(task);
+      }
+
+      if (false) {
+        for (size_t i = 0; i < numBlocks1; ++i) {
+          std::mt19937 gen;
+          std::cout << (i * numBlocks0) << " " << (i+1) * numBlocks0 << " " << numBlocks << "\n";
+          std::shuffle(&tasks[i * numBlocks0], &tasks[(i+1) * numBlocks0], gen);
+        }
+      }
+    }
+
+    void adaptiveTiling(unsigned tid, unsigned total) {
+      Galois::Statistic numTasks("Tasks");
+      Galois::Statistic underTasks("UnderTasks");
+      Galois::Statistic overTasks("OverTasks");
+
+      size_t totalSize = usersPerBlock * (size_t) itemsPerBlock;
+      size_t targetSize = static_cast<size_t>(std::max(std::sqrt(totalSize), 1.0));
+      size_t sampleSize = static_cast<size_t>(std::max(std::sqrt(targetSize), 1.0));
+      iterator cur, end;
+      std::tie(cur, end) = Galois::block_range(g.begin(), g.begin() + NUM_ITEM_NODES, tid, total);
+      //std::tie(cur, end) = Galois::block_range(g.begin(), g.end(), tid, total);
+      std::vector<edge_iterator> prevStarts;
+
+      while (cur != end) {
+        Task task;
+        task.start1 = cur;
+        task.updates = 0;
+
+        // Sample tile
+        size_t sampleNumEdges = 0;
+        // NB: both limits are inclusive
+        GNode sampleUpperLimit;
+        GNode sampleLowerLimit;
+        while (sampleNumEdges == 0 && cur != end) {
+          for (unsigned i = 0; cur != end && i < sampleSize; ++cur, ++i) {
+            if (sampleNumEdges == 0) {
+              unsigned j = 0;
+              for (auto jj = g.edge_begin(*cur), ej = g.edge_end(*cur); jj != ej && j < sampleSize; ++jj, ++j) {
+                GNode dst = g.getEdgeDst(jj);
+                if (sampleNumEdges == 0)
+                  sampleLowerLimit = dst;
+                sampleUpperLimit = dst;
+                sampleNumEdges += 1;
+              }
+            } else {
+              for (auto jj = g.edge_begin(*cur), ej = g.edge_end(*cur); jj != ej; ++jj) {
+                GNode dst = g.getEdgeDst(jj);
+                if (dst > sampleUpperLimit)
+                  break;
+                if (dst < sampleLowerLimit)
+                  sampleLowerLimit = dst;
+                sampleNumEdges += 1;
+              }
+            }
+          }
+        }
+
+        // TODO: use difference between sampleNumEdges to correct for skew
+        // TODO: add "FIFO" abort policy and retest Galois conflict versions
+
+        // Extrapolate tile
+        if (sampleNumEdges) {
+          // sampleSize : sqrt(sampleNumEdges) :: multiple : targetSize
+          double multiple = sampleSize / std::sqrt(sampleNumEdges) * targetSize;
+          size_t nodeBlockSize = std::max(std::distance(task.start1, cur) * multiple, 1.0);
+          // FIXME(ddn): Only works for graphs where GNodes are ids
+          size_t edgeBlockSize = std::max((sampleUpperLimit - sampleLowerLimit + 1) * multiple, 1.0);
+          // Testing code
+          //nodeBlockSize = itemsPerBlock;
+          //edgeBlockSize = usersPerBlock;
+
+          task.end1 = Galois::safe_advance(task.start1, end, nodeBlockSize);
+          // Adjust lower limit because new range (start1, end1) may include
+          // more nodes than sample range
+          if (std::distance(task.start1, cur) < std::distance(task.start1, task.end1)) {
+            for (auto ii = task.start1; ii != task.end1; ++ii) {
+              // Just sample first edge
+              for (auto jj = g.edge_begin(*ii), ej = g.edge_end(*ii); jj != ej; ++jj) {
+                GNode dst = g.getEdgeDst(jj);
+                if (dst < sampleLowerLimit)
+                  sampleLowerLimit = dst;
+                break;
+              }
+            }
+          }
+          task.start2 = sampleLowerLimit;
+          task.end2 = task.start2 + edgeBlockSize;
+
+#if 0
+          std::cout << "Sampled "
+            << (std::distance(task.start1, cur)) 
+            << " x "
+            << (sampleUpperLimit - sampleLowerLimit + 1)
+            << ": edges: " 
+            << sampleNumEdges 
+            << " multiple: " << multiple
+            << "\n";
+#endif
+          cur = task.end1;
+          prevStarts.resize(nodeBlockSize);
+
+          Task newTask = task;
+          for (int phase = 0; ; ++phase) {
+            size_t actualNumEdges = 0;
+            bool someMore = false;
+            unsigned i = 0;
+            for (auto ii = newTask.start1; ii != newTask.end1; ++ii, ++i) {
+              auto jj = phase == 0 ? g.edge_begin(*ii) : prevStarts[i];
+
+              for (auto ej = g.edge_end(*ii); jj != ej; ++jj) {
+                GNode dst = g.getEdgeDst(jj);
+                if (dst > newTask.end2) {
+                  someMore = true;
+                  break;
+                }
+                actualNumEdges += 1;
+              }
+              prevStarts[i] = jj;
+            }
+            if (actualNumEdges) {
+              numTasks += 1;
+              initial.push_back(newTask);
+#if 0
+              std::cout
+                << " tid: " << tid 
+                << " phase: " << phase 
+                << " actual edges: " << actualNumEdges 
+                << " ratio: " << (actualNumEdges / (double) totalSize)
+                << " start1: " << *newTask.start1 
+                << " end1: " << *newTask.end1
+                << " start2: " << newTask.start2
+                << " end2: " << newTask.end2
+                << "\n"; // XXX
+#endif
+              if (actualNumEdges < 0.25*totalSize) 
+                underTasks += 1;
+              else if (actualNumEdges > 4.0 * totalSize)
+                overTasks += 1;
+            } else if (!someMore) {
+              break;
+            }
+            newTask.start2 = newTask.end2 + 1;
+            newTask.end2 = newTask.start2 + edgeBlockSize;
+          }
+        }
+      }
+    }
+  };
+
+public:
+  void operator()(Graph& g, const StepFunction& sf) {
+    Galois::StatTimer inspect("InspectTime");
+    inspect.start();
+    Galois::InsertBag<Task> initial;
+    std::vector<SpinLock> xLocks;
+    std::vector<SpinLock> yLocks;
+    std::vector<Task> tasks;
+    Inspect fn1 { g, initial, xLocks, yLocks, tasks };
+    Galois::on_each(fn1);
+    inspect.stop();
+
+    Galois::Statistic edgesVisited("EdgesVisited");
+    Galois::Statistic failures("PopFailures");
+    Galois::StatTimer execute("ExecuteTime");
+    execute.start();
+
+#if 1
+    executeUntilConverged(sf, g, [&](LatentValue* steps, int maxUpdates, Galois::GAccumulator<double>* errorAccum) {
+      if (errorAccum)
+        GALOIS_DIE("not yet implemented");
+
+      Galois::Runtime::Fixed2DGraphTiledExecutor<Graph> executor(g);
+      executor.execute(
+          g.begin(), g.begin() + NUM_ITEM_NODES,
+          g.begin() + NUM_ITEM_NODES, g.end(),
+          itemsPerBlock, usersPerBlock,
+          [&](GNode src, GNode dst, typename Graph::edge_iterator edge) {
+        if (deleted(g.getData(src)))
+          return;
+        // const LatentValue stepSize = steps[updatesPerEdge - maxUpdates + task.updates]; XXX
+        //const LatentValue stepSize = steps[1 - maxUpdates + 0];
+        const LatentValue stepSize = steps[0];
+
+        LatentValue e = doGradientUpdate(g.getData(src).latentVector, g.getData(dst).latentVector, lambda, g.getEdgeData(edge), stepSize);
+        // XXX non exact error
+        //error += (e * e);
+        edgesVisited += 1;
+      }, true);
+    });
+#endif
+#if 0
+    executeUntilConverged(sf, g, [&](LatentValue* steps, int maxUpdates, Galois::GAccumulator<double>* errorAccum) {
+      Process fn2 { g, edgesVisited, failures, xLocks, yLocks, tasks, steps, maxUpdates, errorAccum };
+      // Testing sufficient optimizations by moving towards BlockJump
+      //Galois::for_each(initial.begin(), initial.end(), fn2, Galois::wl<Galois::WorkList::dChunkedFIFO<1>>());
+      //Galois::for_each_local(initial, fn2, Galois::wl<Galois::WorkList::dChunkedFIFO<1>>());
+      //Galois::do_all_local(initial, fn2, Galois::wl<Galois::WorkList::dChunkedLIFO<1>>());
+      Galois::on_each(fn2);
+      //TODO: delete when racy fix is in
+      if (!std::all_of(tasks.begin(), tasks.end(), [maxUpdates](Task& t) { return t.updates == maxUpdates; }))
+        std::cerr << "WARNING: Missing tasks\n";
+    });
+#endif
+    execute.stop();
+  }
+};
+
+//! Initializes latent vector with random values and returns basic graph parameters
+template<typename Graph>
+size_t initializeGraphData(Graph& g) {
+  double top = 1.0/std::sqrt(LATENT_VECTOR_SIZE);
+
+  Galois::Runtime::PerThreadStorage<std::mt19937> gen;
+
+#if __cplusplus >= 201103L || defined(HAVE_CXX11_UNIFORM_INT_DISTRIBUTION)
+  std::uniform_real_distribution<LatentValue> dist(0, top);
+#else
+  std::uniform_real<LatentValue> dist(0, top);
+#endif
+
+  Galois::do_all_local(g, [&](typename Graph::GraphNode n) {
+  //std::for_each(g.begin(), g.end(), [&](typename Graph::GraphNode n) {
+    auto& data = g.getData(n);
+
+    if (useSameLatentVector) {
+      std::mt19937 sameGen;
+      for (int i = 0; i < LATENT_VECTOR_SIZE; i++)
+        data.latentVector[i] = dist(sameGen);
+    } else {
+      for (int i = 0; i < LATENT_VECTOR_SIZE; i++)
+        data.latentVector[i] = dist(*gen.getLocal());
+    }
+  });
+
+  size_t numItemNodes = Galois::ParallelSTL::count_if(g.begin(), g.end(), [&](typename Graph::GraphNode n) -> bool {
+    return std::distance(g.edge_begin(n), g.edge_end(n)) != 0;
+  });
+
+  return numItemNodes;
+}
+
+
+StepFunction* newStepFunction() {
+  switch (learningRateFunction) {
+    case Step::intel: return new IntelStepFunction;
+    case Step::purdue: return new PurdueStepFunction;
+    case Step::bottou: return new BottouStepFunction;
+    case Step::inverse: return new InverseStepFunction;
+    case Step::bold: return new BoldStepFunction;
+  }
+  GALOIS_DIE("unknown step function");
+}
+
+template<typename Graph>
+void writeBinaryLatentVectors(Graph& g, const std::string& filename) {
+  std::ofstream file(filename);
+  for (auto ii = g.begin(), ei = g.end(); ii != ei; ++ii) {
+    auto& v = g.getData(*ii).latentVector;
+    for (int i = 0; i < LATENT_VECTOR_SIZE; ++i) {
+      file.write(reinterpret_cast<char*>(&v[i]), sizeof(v[i]));
+    }
+  }
+  file.close();
+}
+
+template<typename Graph>
+void writeAsciiLatentVectors(Graph& g, const std::string& filename) {
+  std::ofstream file(filename);
+  for (auto ii = g.begin(), ei = g.end(); ii != ei; ++ii) {
+    auto& v = g.getData(*ii).latentVector;
+    for (int i = 0; i < LATENT_VECTOR_SIZE; ++i) {
+      file << v[i] << " ";
+    }
+    file << "\n";
+  }
+  file.close();
+}
+
+
+template<typename Algo>
+void run() {
+  typename Algo::Graph g;
+  Algo algo;
+
+  Galois::Runtime::reportNumaAlloc("NumaAlloc0");
+
+  // Represent bipartite graph in general graph data structure:
+  //  * items are the first m nodes
+  //  * users are the next n nodes
+  //  * only items have outedges
+  algo.readGraph(g);
+
+  Galois::Runtime::reportNumaAlloc("NumaAlloc1");
+
+  NUM_ITEM_NODES = initializeGraphData(g);
+
+  Galois::Runtime::reportNumaAlloc("NumaAlloc2");
+
+  std::cout 
+    << "num users: " << g.size() - NUM_ITEM_NODES 
+    << " num items: " << NUM_ITEM_NODES 
+    << " num ratings: " << g.sizeEdges()
+    << "\n";
+
+  std::unique_ptr<StepFunction> sf { newStepFunction() };
+
+  std::cout
+    << "latent vector size: " << LATENT_VECTOR_SIZE
+    << " lambda: " << lambda
+    << " learning rate: " << learningRate
+    << " decay rate: " << decayRate
+    << " algo: " << algo.name()
+    << " step function: " << sf->name()
+    << "\n";
+      
+  if (!skipVerify) {
+    verify(g, "Initial");
+  }
+
+  Galois::StatTimer timer;
+  timer.start();
+  algo(g, *sf);
+  timer.stop();
+
+  if (!skipVerify) {
+    verify(g, "Final");
+  }
+
+  if (outputFilename != "") {
+    std::cout << "Writing latent vectors to " << outputFilename << "\n";
+    switch (outputType) {
+      case OutputType::binary: writeBinaryLatentVectors(g, outputFilename); break;
+      case OutputType::ascii: writeAsciiLatentVectors(g, outputFilename); break;
+      default: abort();
+    }
+  }
+
+  if (serverPort >= 0) {
+    startServer(algo, g, serverPort, std::cerr);
+  }
+
+  Galois::Runtime::reportNumaAlloc("NumaAlloc");
+}
+
+int main(int argc, char** argv) {
+  LonestarStart(argc, argv, name, desc, url);
+  Galois::StatManager statManager;
+
+  switch (algo) {
+    case Algo::blockedEdge: run<BlockedEdgeAlgo<false> >(); break;
+    case Algo::blockedEdgeServer: run<BlockedEdgeAlgo<true> >(); break;
+    case Algo::blockJump: run<BlockJumpAlgo>(); break;
+    case Algo::dotProductFixedTiling: run<DotProductFixedTilingAlgo>(); break;
+    case Algo::dotProductRecursiveTiling: run<DotProductRecursiveTilingAlgo>(); break;
+    default: GALOIS_DIE("unknown algorithm"); break;
+  }
+
+  return 0;
 }
