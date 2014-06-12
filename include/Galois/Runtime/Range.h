@@ -48,6 +48,7 @@ public:
   typedef typename std::iterator_traits<local_iterator>::value_type value_type;
   
   LocalRange(T c): container(c) { }
+  LocalRange() = default;
 
   iterator begin() const { return container->begin(); }
   iterator end() const { return container->end(); }
