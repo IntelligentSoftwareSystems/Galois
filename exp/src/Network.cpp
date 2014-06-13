@@ -69,8 +69,8 @@ void NetworkInterface::start() {
       if (!loopwork.empty()) {
         auto& p = loopwork.front();
         trace("Loop Executing %\n", (void*)p.first);
-        loopwork.pop_front();
         p.first(p.second);
+        loopwork.pop_front();
       }
     }
     exit(0);
