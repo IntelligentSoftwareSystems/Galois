@@ -131,8 +131,8 @@ size_t hash_value(const fatPointerImpl<T>& v) {
 
 } // namespace detail
 
-//typedef detail::fatPointerImpl<detail::amd64FatPointer> fatPointer;
-typedef detail::fatPointerImpl<detail::simpleFatPointer> fatPointer;
+typedef detail::fatPointerImpl<detail::amd64FatPointer> fatPointer;
+//typedef detail::fatPointerImpl<detail::simpleFatPointer> fatPointer;
 
 } // namespace Runtime
 } // namespace Galois
