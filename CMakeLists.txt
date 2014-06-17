@@ -280,7 +280,7 @@ function(app name)
     endif()
   endforeach()
 
-  compileApp(${name} ${APP_DEFAULT_ARGS})
+  compileApp(${name} ${APP_UNPARSED_ARGUMENTS})
   target_link_libraries(${name} ${APP_EXTLIBS})
   target_link_libraries(${name} galois)
   if(INSTALL_APPS)
