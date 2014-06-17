@@ -38,7 +38,8 @@ enum MethodFlag {
   SAVE_UNDO = 2,
   ALL = 3,
   WRITE = 5,
-  READ = 7
+  READ = 7,
+  SRC_ONLY = 8
 };
 
 //! Bitwise & for method flags
