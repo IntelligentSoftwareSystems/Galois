@@ -134,8 +134,13 @@ public:
     Galois::Runtime::getSystemThreadPool();
 
     offset = b.allocOffset(sizeof(T));
-    for (unsigned n = 0; n < LL::getMaxThreads(); ++n)
+    
+    for (unsigned n = 0; n < LL::getMaxThreads(); ++n) {
+      // std::cerr << (uintptr_t)b.getRemote(n, offset) << "\n";
+      // std::cerr << std::alignment_of<T>::value << "\n";
+      assert((uintptr_t)b.getRemote(n, offset) % std::alignment_of<T>::value == 0 && "Misalign");
       new (b.getRemote(n, offset)) T(std::forward<Args>(args)...);
+    }
   }
 
   ~PerThreadStorage() {
