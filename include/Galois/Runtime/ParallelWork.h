@@ -184,6 +184,15 @@ class RemoteAbortHandler {
 public:
   void push(const value_type& val, fatPointer ptr, 
             void (RemoteDirectory::*rfetch) (fatPointer, ResolveFlag)) {
+    //Not actually remote, so don't do anything
+    if (ptr.isLocal()) {
+      if (!getLocalDirectory().isRemote(ptr, RW))
+        return;
+    } else {
+      // if (!getRemoteDirectory().isRemote(ptr, RW))
+      //   return;
+    }
+    //Currently remote
     std::lock_guard<LL::SimpleLock> lg(lock);
     auto p = waiting_on.equal_range(val);
     if (ptr.isLocal()) {
