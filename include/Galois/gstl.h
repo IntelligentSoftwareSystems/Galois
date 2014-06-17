@@ -68,7 +68,8 @@ IterTy split_range(IterTy b, IterTy e) {
  * Returns a continuous block from the range based on the number of
  * divisions and the id of the block requested
  */
-template<typename IterTy>
+template<typename IterTy,
+         typename std::enable_if<!std::is_integral<IterTy>::value>::type* = nullptr>
 std::pair<IterTy, IterTy> block_range(IterTy b, IterTy e, unsigned id, unsigned num) {
   unsigned int dist = std::distance(b, e);
   unsigned int numper = std::max((dist + num - 1) / num, 1U); //round up
@@ -78,6 +79,21 @@ std::pair<IterTy, IterTy> block_range(IterTy b, IterTy e, unsigned id, unsigned 
   if (dist != B) {
     e = b;
     std::advance(e, B - A);
+  }
+  return std::make_pair(b,e);
+}
+
+template<typename IntTy,
+         typename std::enable_if<std::is_integral<IntTy>::value>::type* = nullptr>
+std::pair<IntTy, IntTy> block_range(IntTy b, IntTy e, unsigned id, unsigned num) {
+  unsigned int dist = e - b;
+  unsigned int numper = std::max((dist + num - 1) / num, 1U); //round up
+  unsigned int A = std::min(numper * id, dist);
+  unsigned int B = std::min(numper * (id + 1), dist);
+  b += A;
+  if (dist != B) {
+    e = b;
+    e += (B - A);
   }
   return std::make_pair(b,e);
 }
