@@ -261,12 +261,11 @@ class StupidDistBarrier;
 static StupidDistBarrier& getDistBarrier();
 
 class StupidDistBarrier : public Galois::Runtime::Barrier {
-
   TopoBarrier localBarrier;
 
   std::atomic<int> count;
 
-  static void barrierLandingPad(Galois::Runtime::RecvBuffer&) {
+  static void barrierLandingPad() {
     --getDistBarrier().count;
   }
 
@@ -291,8 +290,7 @@ public:
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     if (Galois::Runtime::LL::getTID() == 0) {
       //notify global and wait on global
-      Galois::Runtime::SendBuffer b;
-      net.broadcast(barrierLandingPad, b);
+      net.broadcastAlt(barrierLandingPad);
       --count;
     }
     
@@ -303,7 +301,6 @@ public:
     //wait at local barrier
     localBarrier.wait();
   }
-  
 };
 
 static StupidDistBarrier& getDistBarrier() {

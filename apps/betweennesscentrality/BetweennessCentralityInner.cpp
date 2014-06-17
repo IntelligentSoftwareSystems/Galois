@@ -218,7 +218,7 @@ struct AsyncAlgo {
     struct Indexer: public std::unary_function<GNode,int> {
       static Graph* g;
       int operator()(const GNode& val) const {
-        // //use in edges as that signifies how many people will wait on this node
+        //use in edges as that signifies how many people will wait on this node
         // auto ii = g->in_edge_begin(val, Galois::MethodFlag::NONE);
         // auto ee = g->in_edge_end(val, Galois::MethodFlag::NONE);
         // bool big = Galois::safe_advance(ii, ee, 10) != ee;
@@ -393,9 +393,11 @@ struct LeveledAlgo {
   };
 
   void operator()(Graph& graph, GNode source) {
-    Galois::StatTimer 
-      Tinit("InitTime"), Tlevel("LevelTime"), Tbfs("BFSTime"),
-      Tcount("CountTime"), Tdep("DepTime");
+    Galois::StatTimer Tinit("InitTime");
+    Galois::StatTimer Tlevel("LevelTime");
+    Galois::StatTimer Tbfs("BFSTime");
+    Galois::StatTimer Tcount("CountTime");
+    Galois::StatTimer Tdep("DepTime");
     Tinit.start();
     Galois::do_all_local(graph, Initialize(graph), Galois::loopname("INIT"));
     Tinit.stop();
@@ -464,10 +466,10 @@ void run() {
         << " " << graph.getData(*ii).dist
         << "\n";
     }
-    count = 0;
+    //count = 0;
     // for (typename Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii, ++count)
     //   std::cout << ((count % 128 == 0) ? "\n" : " ") << graph.getData(*ii).numPaths;
-    std::cout << "\n";
+    //std::cout << "\n";
   }
 }
 

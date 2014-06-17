@@ -67,10 +67,10 @@ void NetworkInterface::start() {
     while (!ourexit) {
       doNetworkWork();
       if (!loopwork.empty()) {
-        auto p = loopwork.front();
+        auto& p = loopwork.front();
         trace("Loop Executing %\n", (void*)p.first);
-        loopwork.pop_front();
         p.first(p.second);
+        loopwork.pop_front();
       }
     }
     exit(0);
@@ -82,10 +82,9 @@ void NetworkInterface::terminate() {
   if (NetworkInterface::Num == 1)
     return;
   assert(NetworkInterface::ID == 0);
-  NetworkInterface& net = getSystemNetworkInterface();
-  net.broadcastAlt(&networkExit);
+  wait();
+  getSystemNetworkInterface().broadcastAlt(&networkExit);
   doNetworkWork();
-  return;
 }
 
 void NetworkInterface::sendLoop(uint32_t dest, recvFuncTy recv, SendBuffer& buf) {
@@ -149,8 +148,16 @@ void NetworkInterface::broadcast(recvFuncTy recv, SendBuffer& buf, bool self) {
     recv(rbuf);
 }
 
-void NetworkInterface::flush() {
+static void waitLandingPad() {
+  getSystemThreadPool().run(activeThreads, []() { Galois::Runtime::getSystemBarrier().wait(); });
 }
+
+void NetworkInterface::wait() {
+  getSystemNetworkInterface().broadcastAlt(&waitLandingPad);
+  waitLandingPad();
+}
+
+void NetworkInterface::flush() { }
 
 NetworkBackend::SendBlock* NetworkBackend::allocSendBlock() {
   //FIXME: review for TBAA rules
