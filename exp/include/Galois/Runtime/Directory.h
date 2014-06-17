@@ -226,6 +226,10 @@ public:
     md.addReq(NetworkInterface::ID, flag);
   }
 
+  bool isRemote(fatPointer ptr, ResolveFlag flag) {
+    return dirOwns(static_cast<Lockable*>(ptr.getObj()));
+  }
+
   //! engage priority protocol for ptr
   void setContended(Lockable* ptr);
   void setContended(fatPointer ptr);
