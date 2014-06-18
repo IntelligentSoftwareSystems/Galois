@@ -83,7 +83,7 @@ public:
     bool e = true;
 
     for (unsigned i = 0; i < wlRange.size (); ++i) {
-      Range& r = *wlRange.getRemote (i);
+      const Range& r = *wlRange.getRemote (i);
       if (r.first != r.second) {
         e = false;
         break;
@@ -100,7 +100,7 @@ public:
     const T* minElem = nullptr;
 
     for (unsigned i = 0; i < numT; ++i) {
-      Range& r = *wlRange.getRemote (i);
+      const Range& r = *wlRange.getRemote (i);
 
       if (r.first != r.second) {
         if (minElem == nullptr || cmp (*minElem, *r.first)) {

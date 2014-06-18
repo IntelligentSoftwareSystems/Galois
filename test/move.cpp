@@ -58,11 +58,11 @@ int main() {
   test(Galois::LargeArray<MoveOnly>());
 
   testContainerA(Galois::gdeque<MoveOnly>(), MoveOnly());
-  //testContainerA(Galois::InsertBag<MoveOnly>(), MoveOnly());
+  testContainerA(Galois::InsertBag<MoveOnly>(), MoveOnly());
 #ifdef USE_EXP
   testContainerB(Galois::concurrent_flat_map<int, MoveOnly>(), std::make_pair(1, MoveOnly()));
 #endif
-  testContainerA(Galois::gdeque<MoveOnly>(), MoveOnly());
+  testContainerC(Galois::gdeque<MoveOnly>(), MoveOnly());
 
   return 0;
 }

@@ -182,6 +182,32 @@ public:
   size_type size() const /* noexcept */ { return _data.size(); }
   size_type max_size() const /* noexcept */ { return _data.max_size(); }
   
+  template<typename... Args>
+  std::pair<iterator, bool> emplace(Args&&... args) {
+    //assert(std::adjacent_find(_data.begin(), _data.end(), [&](const value_type& a, const value_type& b) {
+    //    return key_comp()(b.first, a.first);
+    //}) == _data.end());
+    _data.emplace_back(std::forward<Args>(args)...);
+    value_type& v = _data.back();
+    auto ee = _data.end();
+    --ee;
+    auto __i = std::lower_bound(_data.begin(), ee, v.first, value_key_comp());
+    // key < __i->first
+    bool retval = __i == ee || key_comp()(v.first, (*__i).first);
+    if (retval) {
+      if (__i != ee) {
+        value_type tmp = std::move(v);
+        __i = _data.emplace(__i, std::move(tmp));
+        _data.pop_back();
+      }
+    } else {
+      // key == __i->first 
+      _data.pop_back();
+    }
+
+    return std::make_pair(__i, retval);
+  }
+
   mapped_type& operator[](const key_type& __k) {
     iterator __i = lower_bound(__k);
     // __i->first is greater than or equivalent to __k.
