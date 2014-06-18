@@ -46,9 +46,8 @@
 
 static void printString(bool error, bool newline, uint32_t host, const std::string prefix, const std::string s) {
   static Galois::Runtime::LL::SimpleLock IOLock;
-  static bool local = Galois::Runtime::LL::EnvCheck("GALOIS_DEBUG_LOCAL");
 #ifndef GALOIS_FORCE_STANDALONE
-  if (Galois::Runtime::NetworkInterface::ID == 0 || local) {
+  if (Galois::Runtime::NetworkInterface::ID == 0) {
 #endif
     std::lock_guard<decltype(IOLock)> lock(IOLock);
     std::ostream& o = error ? std::cerr : std::cout;
