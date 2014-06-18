@@ -61,12 +61,16 @@ private:
   InnerEndFn m_inner_end_fn;
 
 #if __cplusplus >= 201103L
-  static_assert(std::is_convertible<InnerIter, 
-        typename std::result_of<InnerBeginFn(decltype(*std::declval<OuterIter>()))>::type>::value,
-        "InnerIter should be convertable to result of InnerBeginFn(*OuterIter)");
-  static_assert(std::is_convertible<InnerIter, 
-      typename std::result_of<InnerEndFn(decltype(*std::declval<OuterIter>()))>::type>::value,
-        "InnerIter should be convertable to result of InnerEndFn(*OuterIter)");
+  static_assert(std::is_convertible<
+      typename std::result_of<InnerBeginFn(decltype(*std::declval<OuterIter>()))>::type,
+      InnerIter
+      >::value,
+        "Result of InnerBeginFn(*OuterIter) should be convertable to InnerIter");
+  static_assert(std::is_convertible<
+      typename std::result_of<InnerEndFn(decltype(*std::declval<OuterIter>()))>::type,
+      InnerIter
+      >::value,
+        "Result of InnerEndFn(*OuterIter) should be convertable to InnerIter");
 #endif
 
   friend class boost::iterator_core_access;
