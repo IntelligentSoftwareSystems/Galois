@@ -1,7 +1,7 @@
 #include "Galois/Bag.h"
 #include "Galois/gdeque.h"
 #include "Galois/FlatMap.h"
-#ifdef USE_EXP
+#ifdef GALOIS_USE_EXP
 #include "Galois/ConcurrentFlatMap.h"
 #endif
 #include "Galois/LargeArray.h"
@@ -52,14 +52,14 @@ int main() {
   test(Galois::gdeque<MoveOnly>());
   test(Galois::Runtime::PerThreadStorage<MoveOnly>());
   test(Galois::Runtime::PerPackageStorage<MoveOnly>());
-#ifdef USE_EXP
+#ifdef GALOIS_USE_EXP
   test(Galois::concurrent_flat_map<int, MoveOnly>());
 #endif
   test(Galois::LargeArray<MoveOnly>());
 
   testContainerA(Galois::gdeque<MoveOnly>(), MoveOnly());
   testContainerA(Galois::InsertBag<MoveOnly>(), MoveOnly());
-#ifdef USE_EXP
+#ifdef GALOIS_USE_EXP
   testContainerB(Galois::concurrent_flat_map<int, MoveOnly>(), std::make_pair(1, MoveOnly()));
 #endif
   testContainerC(Galois::gdeque<MoveOnly>(), MoveOnly());
