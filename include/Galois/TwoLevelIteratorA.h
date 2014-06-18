@@ -316,11 +316,10 @@ private:
 
   template<class OtherOuterIter, class OtherInnerIter, class C, class BF, class EF>
   bool equal(const TwoLevelIteratorA<OtherOuterIter, OtherInnerIter, C, BF, EF>& x) const {
-    // All outer_end iterators are equal
     if (m_outer == m_outer_end && m_outer == x.m_outer)
       return true;
 
-    return this->base_reference() == x.base_reference() && m_outer == x.m_outer;
+    return m_outer == x.m_outer && this->base_reference() == x.base_reference();
   }
 
 public:
