@@ -99,8 +99,6 @@ private:
 
     for (; begin != it; ++begin)
       prev = begin;
-
-    return prev;
   }
 
   template<class Iter>
@@ -230,16 +228,16 @@ private:
     }
 
     while (n) {
-      difference_type k = std::distance(m_inner_begin_fn(*m_outer), this->base_reference());
-      if (k == 0) {
+      difference_type k = std::distance(m_inner_begin_fn(*m_outer), this->base_reference()) + 1;
+      if (k == 1) {
         decrement();
         --n;
-      } else if (k <= n) {
-        std::advance(this->base_reference(), -n);
-        n = 0;
-      } else {
+      } else if (k < n) {
         seek_backward();
         n -= k;
+      } else {
+        std::advance(this->base_reference(), -n);
+        n = 0;
       }
     }
   }
