@@ -245,9 +245,8 @@ public:
   void emplace_back(Args&&... args) {
     assert(precondition());
     ++num;
-    if (last && last->emplace_back(std::forward<Args>(args)...))
-      return;
-    extend_last();
+    if (!last || last->full())
+      extend_last();
     pointer p = last->emplace_back(std::forward<Args>(args)...);
     assert(p);
   }
@@ -264,9 +263,8 @@ public:
   void emplace_front(Args&&... args) {
     assert(precondition());
     ++num;
-    if (first && first->emplace_front(std::forward<Args>(args)...))
-      return;
-    extend_first();
+    if (!first || first->full())
+      extend_first();
     pointer p = first->emplace_front(std::forward<Args>(args)...);
     assert(p);
   }
