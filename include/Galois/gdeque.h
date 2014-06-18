@@ -162,6 +162,22 @@ public:
 
   gdeque(): first(), last(), num(), heap() { }
 
+  gdeque(gdeque&& o): first(), last(), num(), heap() {
+    std::swap(first, o.first);
+    std::swap(last, o.last);
+    std::swap(num, o.num);
+  }
+
+  gdeque& operator=(gdeque&& o) {
+    std::swap(first, o.first);
+    std::swap(last, o.last);
+    std::swap(num, o.num);
+    return *this;
+  }
+
+  gdeque(const gdeque&) = delete;
+  gdeque& operator=(const gdeque&) = delete;
+
   ~gdeque() { clear(); }
 
   iterator begin() { assert(precondition()); return iterator(first); }

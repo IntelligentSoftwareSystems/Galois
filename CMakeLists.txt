@@ -277,6 +277,25 @@ function(app name)
   endif()
 endfunction(app)
 
+function(makeTest name)
+  set(options)
+  set(oneValueArgs)
+  set(multiValueArgs REQUIRES)
+  cmake_parse_arguments(APP "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+
+  foreach(required ${APP_REQUIRES})
+    if(${${required}} MATCHES "TRUE")
+    else()
+      message("-- NOT compiling ${name} (missing: ${required})")
+      return()
+    endif()
+  endforeach()
+
+  add_executable(test-${name} ${name}.cpp)
+  target_link_libraries(test-${name} galois)
+  add_test(${name} test-${name})
+endfunction()
+
 ###### Source finding ######
 include_directories(include)
 

@@ -39,12 +39,11 @@
 namespace Galois {
 
 /**
- * Bag for only concurrent insertions. This data structure
- * supports scalable concurrent pushes but reading the bag
- * can only be done serially.
+ * Unordered collection of elements. This data structure supports scalable
+ * concurrent pushes but reading the bag can only be done serially.
  */
 template<typename T, unsigned int BlockSize = 0>
-class InsertBag: private boost::noncopyable {
+class InsertBag {
 
   struct header {
     header* next;
@@ -52,6 +51,8 @@ class InsertBag: private boost::noncopyable {
     T* dend; //end of valid data
     T* dlast; //end of storage
   };
+
+  typedef std::pair<header*, header*> PerThread;
 
 public:
   template<typename U>
@@ -178,6 +179,19 @@ public:
   //     "BlockSize should larger than sizeof(T) + O(1)");
 
   InsertBag(): heap(BlockSize) { }
+  InsertBag(InsertBag&& o): heap(BlockSize) {
+    std::swap(heap, o.heap);
+    std::swap(heads, o.heads);
+  }
+
+  InsertBag& operator=(InsertBag&& o) {
+    std::swap(heap, o.heap);
+    std::swap(heads, o.heads);
+    return *this;
+  }
+
+  InsertBag(const InsertBag&) = delete;
+  InsertBag& operator=(const InsertBag&) = delete;
 
   ~InsertBag() {
     destruct();

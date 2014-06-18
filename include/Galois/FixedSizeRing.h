@@ -28,15 +28,15 @@
 #include "Galois/LazyArray.h"
 
 #include <boost/iterator/iterator_facade.hpp>
-#include <boost/utility.hpp>
+#include <boost/iterator/reverse_iterator.hpp>
 
-#include GALOIS_CXX11_STD_HEADER(utility)
+#include <utility>
 
 namespace Galois {
 
 //! Unordered collection of bounded size
 template<typename T, unsigned chunksize = 64>
-class FixedSizeBag: private boost::noncopyable {
+class FixedSizeBag {
   LazyArray<T, chunksize> datac;
   unsigned count;
 
@@ -57,6 +57,28 @@ public:
   typedef const_pointer const_iterator;
 
   FixedSizeBag(): count(0) { }
+
+  template<typename InputIterator>
+  FixedSizeBag(InputIterator first, InputIterator last): count(0) {
+    while (first != last) {
+      assert(count < chunksize);
+      datac.emplace(count++, *first++);
+    }
+  }
+  
+  FixedSizeBag(FixedSizeBag&& o): count(0) {
+    std::swap(count, o.count);
+    std::swap(datac, o.datac);
+  }
+  
+  FixedSizeBag& operator=(FixedSizeBag&& o) {
+    std::swap(count, o.count);
+    std::swap(datac, o.datac);
+    return *this;
+  }
+
+  FixedSizeBag(const FixedSizeBag&) = delete;
+  FixedSizeBag& operator=(const FixedSizeBag&) = delete;
 
   ~FixedSizeBag() {
     clear();
@@ -151,7 +173,7 @@ public:
  
 //! Ordered collection of bounded size
 template<typename T, unsigned chunksize = 64>
-class FixedSizeRing: private boost::noncopyable {
+class FixedSizeRing {
   LazyArray<T, chunksize> datac;
   unsigned start;
   unsigned count;
@@ -210,6 +232,30 @@ public:
   typedef Iterator<const T, false> const_reverse_iterator;
 
   FixedSizeRing(): start(0), count(0) { }
+
+  template<typename InputIterator>
+  FixedSizeRing(InputIterator first, InputIterator last): start(0), count(0) {
+    while (first != last) {
+      assert(count < chunksize);
+      datac.emplace(count++, *first++);
+    }
+  }
+
+  FixedSizeRing(FixedSizeRing&& o): start(0), count(0) {
+    std::swap(start, o.start);
+    std::swap(count, o.count);
+    std::swap(datac, o.datac);
+  }
+
+  FixedSizeRing& operator=(FixedSizeRing&& o) {
+    std::swap(start, o.start);
+    std::swap(count, o.count);
+    std::swap(datac, o.datac);
+    return *this;
+  }
+
+  FixedSizeRing(const FixedSizeRing&) = delete;
+  FixedSizeRing& operator=(const FixedSizeRing&) = delete;
 
   ~FixedSizeRing() {
     clear();
