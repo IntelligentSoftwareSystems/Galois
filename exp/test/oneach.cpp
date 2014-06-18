@@ -1,6 +1,4 @@
 #include "Galois/Galois.h"
-#include <chrono>
-#include <thread>
 #include <iostream>
 
 struct Function {
