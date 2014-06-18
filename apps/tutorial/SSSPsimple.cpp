@@ -109,7 +109,7 @@ int main(int argc, char **argv) {
   graph.getData(*graph.begin()) = 0;
   //! [for_each in SSSPsimple]
   UpdateRequest init[] = { std::make_pair(0U, *graph.begin()) };
-  Galois::for_each(&init[0], &init[1], std::make_pair(0U, *graph.begin()), SSSP(), Galois::wl<OBIM>(), Galois::loopname("sssp_run_loop"));
+  Galois::for_each(&init[0], &init[1], SSSP(), Galois::wl<OBIM>(), Galois::loopname("sssp_run_loop"));
   //! [for_each in SSSPsimple]
   T.stop();
   return 0;

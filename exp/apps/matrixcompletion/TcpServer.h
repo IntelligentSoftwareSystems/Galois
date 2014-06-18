@@ -77,7 +77,7 @@ struct AuxData {
     double flop = (double) (graph.size() - numItems) * numItems * (2.0 * 100 + 2);
     flop += graph.size();
 
-    std::cout << "Margin GFLOP/S: " << flop / elapsed.get() / 1e6 << "\n"; // XXX
+    //std::cout << "Margin GFLOP/S: " << flop / elapsed.get() / 1e6 << "\n"; // XXX
     margins.resize(graph.size());
     auto mm = margins.begin();
     size_t id = 0;

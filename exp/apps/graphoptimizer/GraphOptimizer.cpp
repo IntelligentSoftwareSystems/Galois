@@ -31,6 +31,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 
+#include <iostream>
 #include <fstream>
 
 template<typename Iter>

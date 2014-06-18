@@ -28,15 +28,15 @@
 #include "Galois/LazyArray.h"
 
 #include <boost/iterator/iterator_facade.hpp>
-#include <boost/utility.hpp>
+#include <boost/iterator/reverse_iterator.hpp>
 
-#include GALOIS_CXX11_STD_HEADER(utility)
+#include <utility>
 
 namespace Galois {
 
 //! Unordered collection of bounded size
 template<typename T, unsigned chunksize = 64>
-class FixedSizeBag: private boost::noncopyable {
+class FixedSizeBag {
   LazyArray<T, chunksize> datac;
   unsigned count;
 
@@ -57,6 +57,28 @@ public:
   typedef const_pointer const_iterator;
 
   FixedSizeBag(): count(0) { }
+
+  template<typename InputIterator>
+  FixedSizeBag(InputIterator first, InputIterator last): count(0) {
+    while (first != last) {
+      assert(count < chunksize);
+      datac.emplace(count++, *first++);
+    }
+  }
+  
+  FixedSizeBag(FixedSizeBag&& o): count(0) {
+    std::swap(count, o.count);
+    std::swap(datac, o.datac);
+  }
+  
+  FixedSizeBag& operator=(FixedSizeBag&& o) {
+    std::swap(count, o.count);
+    std::swap(datac, o.datac);
+    return *this;
+  }
+
+  FixedSizeBag(const FixedSizeBag&) = delete;
+  FixedSizeBag& operator=(const FixedSizeBag&) = delete;
 
   ~FixedSizeBag() {
     clear();
@@ -138,8 +160,7 @@ public:
   void pop_back() {
     assert(precondition());
     assert(!empty());
-    unsigned end = (count - 1);
-    datac.destroy(end);
+    datac.destroy(count - 1);
     --count;
   }
 
@@ -151,7 +172,7 @@ public:
  
 //! Ordered collection of bounded size
 template<typename T, unsigned chunksize = 64>
-class FixedSizeRing: private boost::noncopyable {
+class FixedSizeRing {
   LazyArray<T, chunksize> datac;
   unsigned start;
   unsigned count;
@@ -163,40 +184,53 @@ class FixedSizeRing: private boost::noncopyable {
     return count <= chunksize && start <= chunksize;
   }
 
-  template<typename U, bool isForward>
-  class Iterator: public boost::iterator_facade<Iterator<U,isForward>, U, boost::forward_traversal_tag> {
+  template<typename U>
+  class Iterator: public boost::iterator_facade<Iterator<U>, U, boost::random_access_traversal_tag> {
     friend class boost::iterator_core_access;
     U* base;
     unsigned cur;
     unsigned count;
 
-    template<typename OtherTy, bool OtherIsForward>
-    bool equal(const Iterator<OtherTy, OtherIsForward>& o) const {
-      return base + cur == o.base + o.cur && count == o.count;
+    template<typename OtherTy>
+    bool equal(const Iterator<OtherTy>& o) const {
+      assert(base && o.base);
+      return &base[cur] == &o.base[o.cur] && count == o.count;
     }
 
-    U& dereference() const { return base[cur]; }
+    U& dereference() const {
+      return base[cur]; 
+    }
 
     void increment() {
-      if (--count == 0) {
-        base = 0; cur = 0;
-      } else {
-        cur = isForward ? (cur + 1) % chunksize : (cur + chunksize - 1) % chunksize;
-      }
+      assert(base && count != 0);
+      count -= 1;
+      cur = (cur + 1) % chunksize;
+    }
+
+    void decrement() {
+      assert(base && count < chunksize);
+      count += 1;
+      cur = (cur + chunksize - 1) % chunksize;
+    }
+
+    void advance(ptrdiff_t x) {
+      count -= x;
+      cur = (cur + chunksize + x) % chunksize;
+    }
+
+    ptrdiff_t distance_to(const Iterator& o) const {
+      ptrdiff_t c = count;
+      ptrdiff_t oc = o.count;
+      return c - oc;
     }
 
   public:
     Iterator(): base(0), cur(0), count(0) { }
     
-    template<typename OtherTy, bool OtherIsForward>
-    Iterator(const Iterator<OtherTy, OtherIsForward>& o): base(o.base), cur(o.cur), count(o.count) { }
+    template<typename OtherTy>
+    Iterator(const Iterator<OtherTy>& o): base(o.base), cur(o.cur), count(o.count) { }
     
-    Iterator(U* b, unsigned c, unsigned co): base(b), cur(c), count(co) { 
-      if (count == 0) {
-        base = 0;
-        cur = 0;
-      }
-    }
+    Iterator(U* b, unsigned c, unsigned co): base(b), cur(c), count(co) { }
   };
 
 public:
@@ -204,12 +238,36 @@ public:
   typedef T* pointer;
   typedef T& reference;
   typedef const T& const_reference;
-  typedef Iterator<T, true> iterator;
-  typedef Iterator<const T, true> const_iterator;
-  typedef Iterator<T, false> reverse_iterator;
-  typedef Iterator<const T, false> const_reverse_iterator;
+  typedef Iterator<T> iterator;
+  typedef Iterator<const T> const_iterator;
+  typedef boost::reverse_iterator<Iterator<T>> reverse_iterator;
+  typedef boost::reverse_iterator<Iterator<const T>> const_reverse_iterator;
 
   FixedSizeRing(): start(0), count(0) { }
+
+  template<typename InputIterator>
+  FixedSizeRing(InputIterator first, InputIterator last): start(0), count(0) {
+    while (first != last) {
+      assert(count < chunksize);
+      datac.emplace(count++, *first++);
+    }
+  }
+
+  FixedSizeRing(FixedSizeRing&& o): start(0), count(0) {
+    std::swap(start, o.start);
+    std::swap(count, o.count);
+    std::swap(datac, o.datac);
+  }
+
+  FixedSizeRing& operator=(FixedSizeRing&& o) {
+    std::swap(start, o.start);
+    std::swap(count, o.count);
+    std::swap(datac, o.datac);
+    return *this;
+  }
+
+  FixedSizeRing(const FixedSizeRing&) = delete;
+  FixedSizeRing& operator=(const FixedSizeRing&) = delete;
 
   ~FixedSizeRing() {
     clear();
@@ -250,12 +308,31 @@ public:
     start = 0;
   }
 
+  // NB(ddn): Keeping emplace_front/_back code paths separate to improve
+  // branch prediction etc
+  template<typename... Args>
+  pointer emplace(iterator pos, Args&&... args) {
+    if (full()) return 0;
+    unsigned i;
+    if (pos == begin()) {
+      i = start = (start + chunksize - 1) % chunksize;
+      ++count;
+    } else if (pos == end()) {
+      i = (start + count) % chunksize;
+      ++count;
+    } else {
+      auto d = std::distance(begin(), pos);
+      i = (start + d) % chunksize;
+      emplace_back();
+      std::move_backward(begin() + d, end() - 1, end());
+      datac.destroy(i);
+    }
+    return datac.emplace(i, std::forward<Args>(args)...);
+  }
+
   template<typename U>
   pointer push_front(U&& val) {
-    if (full()) return 0;
-    start = (start + chunksize - 1) % chunksize;
-    ++count;
-    return datac.construct(start, std::forward<U>(val));
+    return emplace_front(std::forward<U>(val));
   }
 
   template<typename... Args>
@@ -268,10 +345,7 @@ public:
 
   template<typename U>
   pointer push_back(U&& val) {
-    if (full()) return 0;
-    unsigned end = (start + count) % chunksize;
-    ++count;
-    return datac.construct(end, std::forward<U>(val));
+    return emplace_back(std::forward<U>(val));
   }
 
   template<typename... Args>
@@ -335,22 +409,20 @@ public:
   void pop_back() {
     assert(precondition());
     assert(!empty());
-    unsigned end = (start + count - 1) % chunksize;
-    datac.destroy(end);
+    datac.destroy((start + count - 1) % chunksize);
     --count;
   }
 
-  iterator begin() { return iterator(&datac[0], start, count); }
-  iterator end() { return iterator(); }
-  const_iterator begin() const { return const_iterator(&datac[0], start, count); }
-  const_iterator end() const { return const_iterator(); }
+  iterator begin() { return iterator(at(0), start, count); }
+  iterator end() { return iterator(at(0), (start + count) % chunksize, 0); }
+  const_iterator begin() const { return const_iterator(at(0), start, count); }
+  const_iterator end() const { return const_iterator(at(0), (start + count) % chunksize, 0); }
 
-  reverse_iterator rbegin() { return reverse_iterator(&datac[0], (start + count - 1) % chunksize, count); }
-  reverse_iterator rend() { return reverse_iterator(); }
-  const_iterator rbegin() const { const_reverse_iterator(&datac[0], (start + count - 1) % chunksize, count); }
-  const_iterator rend() const { const_reverse_iterator(); }
+  reverse_iterator rbegin() { return reverse_iterator(end()); }
+  reverse_iterator rend() { return reverse_iterator(begin()); }
+  const_iterator rbegin() const { const_reverse_iterator(end()); }
+  const_iterator rend() const { const_reverse_iterator(begin()); }
 };
  
 }
-
 #endif

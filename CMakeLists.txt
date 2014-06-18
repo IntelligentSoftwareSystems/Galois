@@ -251,8 +251,6 @@ endif()
 
 ###### Global Functions ######
 
-include(ParseArguments)
-
 function(compileApp name)
   if(ARGN)
     set(Sources ${ARGN})
@@ -263,8 +261,10 @@ function(compileApp name)
 endfunction(compileApp)
 
 function(app name)
-#PARSE_ARGUMENTS(APP "REQUIRES;EXTLIBS;DISTSAFE" "" ${ARGN})
-  cmake_parse_arguments(APP "DISTSAFE" "" "REQUIRES;EXTLIBS" ${ARGN})
+  set(options)
+  set(oneValueArgs)
+  set(multiValueArgs REQUIRES EXTLIBS)
+  cmake_parse_arguments(APP "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
   if(${APP_DISTSAFE})
   else()
@@ -289,7 +289,10 @@ function(app name)
 endfunction(app)
 
 function(makeTest name)
-  cmake_parse_arguments(APP "DISTSAFE" "" "REQUIRES" ${ARGN})
+  set(options DISTSAFE)
+  set(oneValueArgs)
+  set(multiValueArgs REQUIRES)
+  cmake_parse_arguments(APP "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
   if(${APP_DISTSAFE})
   else()
@@ -310,7 +313,6 @@ function(makeTest name)
   add_test(${name} test-${name})
 endfunction()
 
-
 ###### Source finding ######
 include_directories(include)
 
@@ -322,6 +324,7 @@ if(NOT SKIP_COMPILE_APPS)
   add_subdirectory(apps)
   add_subdirectory(inputs)
   add_subdirectory(test)
+  add_subdirectory(toolkit_ml)
 endif()
 if(USE_EXP)
   add_subdirectory(exp)

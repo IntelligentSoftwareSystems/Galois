@@ -432,7 +432,6 @@ void for_each_impl(const RangeTy& range, FunctionTy f, const char* loopname) {
   assert(!inGaloisForEach);
 
   inGaloisForEach = true;
-
   WorkTy W(f, loopname);
   trace("Loop start %\n", loopname);
   getSystemThreadPool().run(activeThreads, 
