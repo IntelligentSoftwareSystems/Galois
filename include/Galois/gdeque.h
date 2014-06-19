@@ -45,14 +45,8 @@ template<typename T, unsigned ChunkSize=64, typename ContainerTy=FixedSizeRing<T
 #if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
 class gdeque {
 public:
-  gdeque (const gdeque& that) {
-    GALOIS_DIE("copying gdeque not supported");
-  }
-
-  gdeque& operator = (const gdeque& that) {
-    GALOIS_DIE("assigning gdeque not supported");
-    return *this;
-  }
+  gdeque(const gdeque& that);
+  gdeque& operator=(const gdeque& that);
 #else
 class gdeque: private boost::noncopyable {
 #endif
@@ -433,7 +427,9 @@ public:
     inner_iterator ii = pos.get_inner_reference();
 #else
     Block* b = pos.b;
-    typename Block::iterator ii = b->begin() + pos.offset;
+    typename Block::iterator ii;
+    if (b)
+      ii = b->begin() + pos.offset;
 #endif
     auto p = emplace(b, ii, std::forward<Args>(args)...);
 #ifdef _NEW_ITERATOR
