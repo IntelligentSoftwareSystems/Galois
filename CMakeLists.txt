@@ -261,7 +261,7 @@ function(compileApp name)
 endfunction(compileApp)
 
 function(app name)
-  set(options)
+  set(options DISTSAFE)
   set(oneValueArgs)
   set(multiValueArgs REQUIRES EXTLIBS)
   cmake_parse_arguments(APP "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})

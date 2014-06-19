@@ -200,7 +200,8 @@ public:
     } else {
       getRemoteDirectory().setContended(ptr);
     }
-    bool newDep = std::find(p.first, p.second, std::pair<const value_type, decltype(ptr)>(val,ptr)) == p.second;
+    typedef typename std::remove_reference<decltype(*p.first)>::type pair_type;
+    bool newDep = std::find(p.first, p.second, pair_type(val, ptr)) == p.second;
     if (newDep) {
       waiting_on.insert(std::make_pair(val, ptr));
       if (ptr.isLocal()) {
