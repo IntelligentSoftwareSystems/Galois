@@ -291,7 +291,7 @@ endfunction(app)
 function(makeTest name)
   set(options DISTSAFE)
   set(oneValueArgs)
-  set(multiValueArgs REQUIRES)
+  set(multiValueArgs REQUIRES COMMAND_PREFIX COMMAND_SUFFIX)
   cmake_parse_arguments(APP "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
   if(${APP_DISTSAFE})
@@ -308,9 +308,18 @@ function(makeTest name)
     endif()
   endforeach()
 
+  set(commandline)
+  foreach(f ${APP_COMMAND_PREFIX})
+    list(APPEND commandline ${f})
+  endforeach()
+  list(APPEND commandline "$<TARGET_FILE:test-${name}>")
+  foreach(f ${APP_COMMAND_SUFFIX})
+    list(APPEND commandline ${f})
+  endforeach()
+
   add_executable(test-${name} ${name}.cpp)
   target_link_libraries(test-${name} galois)
-  add_test(${name} test-${name})
+  add_test(NAME ${name} COMMAND ${commandline})
 endfunction()
 
 ###### Source finding ######
