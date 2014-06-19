@@ -199,7 +199,7 @@ void gSerializeObj(SerializeBuffer& buf, const std::pair<T1, T2>& data) {
 }
 
 template<typename Seq>
-void gSerializeSeq(SerializeBuffer& buf, Seq& seq) {
+void gSerializeSeq(SerializeBuffer& buf, const Seq& seq) {
   typename Seq::size_type size = seq.size();
   gSerializeObj(buf, size);
   for (auto ii = seq.begin(), ee = seq.end(); ii != ee; ++ii)
@@ -221,7 +221,7 @@ void gSerializeObj(SerializeBuffer& buf, const Galois::gdeque<T,CS>& data) {
   gSerializeSeq(buf,data);
 }
 
-inline void gSerializeObj(SerializeBuffer& buf, std::string& data) {
+inline void gSerializeObj(SerializeBuffer& buf, const std::string& data) {
   gSerializeSeq(buf,data);
 }
 
