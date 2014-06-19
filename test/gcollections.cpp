@@ -109,7 +109,7 @@ int main(int argc, char** argv) {
   testSort("Galois::FixedSizeRing", Galois::FixedSizeRing<int, 32>(), 32);
   //testSort("Galois::gdeque", Galois::gdeque<int>(), 32 * 32);
 
-  int size = 1;
+  int size = 100;
   if (argc > 1)
     size = atoi(argv[1]);
   if (size <= 0)

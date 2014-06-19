@@ -87,7 +87,7 @@ public:
   typedef read_default_graph_tag read_tag;
 
 protected:
-  struct NodeInfo;
+  class NodeInfo;
   typedef detail::EdgeInfoBase<typename boost::mpl::if_c<HasCompressedNodePtr,uint32_t,NodeInfo*>::type,EdgeTy> EdgeInfo;
   typedef LargeArray<EdgeInfo> EdgeData;
 
