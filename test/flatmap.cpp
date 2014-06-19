@@ -153,7 +153,7 @@ int main(int argc, char** argv) {
 #endif
   Galois::setActiveThreads(8);
 
-  int size = 1;
+  int size = 100;
   if (argc > 1)
     size = atoi(argv[1]);
   if (size <= 0)
