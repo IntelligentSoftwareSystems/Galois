@@ -64,12 +64,11 @@ void check_forward() {
     GetEnd<D, I>
     >(data.begin(), data.end());
 #endif
-  if (!std::equal(r.first, r.second, boost::make_counting_iterator<int>(0))) {
-    GALOIS_DIE("failed case: forward ", (NonEmpty ? "non-empty" : "empty"),  " inner range");
-  } else if (std::distance(r.first, r.second) != N) {
-    GALOIS_DIE("failed case: forward ", (NonEmpty ? "non-empty" : "empty"),  " inner range: ",
+  GALOIS_ASSERT(std::equal(r.first, r.second, boost::make_counting_iterator<int>(0)),
+    "failed case: forward ", (NonEmpty ? "non-empty" : "empty"),  " inner range");
+  GALOIS_ASSERT(std::distance(r.first, r.second) == N,
+    "failed case: forward ", (NonEmpty ? "non-empty" : "empty"),  " inner range: ",
         std::distance(r.first, r.second), " != ", N);
-  }
 }
 
 template<bool NonEmpty, class Tag, class D>
@@ -113,19 +112,18 @@ void check_backward() {
     >(data.begin(), data.end());
 #endif
   auto c = boost::make_counting_iterator<int>(0);
-  if (std::distance(r.first, r.second) != N) {
-    GALOIS_DIE("failed case: backward ", (NonEmpty ? "non-empty" : "empty"), " inner range: ",
+  GALOIS_ASSERT(std::distance(r.first, r.second) == N,
+    "failed case: backward ", (NonEmpty ? "non-empty" : "empty"), " inner range: ",
         std::distance(r.first, r.second), " != ", N);
-  } else if (r.first == r.second) {
+  if (r.first == r.second) {
     return;
   }
 
   --r.second;
   while (true) {
-    if (*r.second != *c) {
-      GALOIS_DIE("failed case: backward ", (NonEmpty ? "non-empty" : "empty"), " inner range: ", 
+    GALOIS_ASSERT(*r.second == *c,
+      "failed case: backward ", (NonEmpty ? "non-empty" : "empty"), " inner range: ", 
           *r.second, " != ", *c);
-    }
     if (r.first == r.second)
       break;
     --r.second;
@@ -174,34 +172,31 @@ void check_strided() {
     >(data.begin(), data.end());
 #endif
   auto c = boost::make_counting_iterator<int>(0);
-  if (std::distance(r.first, r.second) != N) {
-    GALOIS_DIE("failed case: strided ", (NonEmpty ? "non-empty" : "empty"), " inner range: ",
+  GALOIS_ASSERT(std::distance(r.first, r.second) == N,
+    "failed case: strided ", (NonEmpty ? "non-empty" : "empty"), " inner range: ",
         std::distance(r.first, r.second), " != ", N);
-  } else if (r.first == r.second) {
+  if (r.first == r.second) {
     return;
   }
 
   while (r.first != r.second) {
-    if (*r.first != *c) {
-      GALOIS_DIE("failed case: strided ", (NonEmpty ? "non-empty" : "empty"), " inner range: ", 
+    GALOIS_ASSERT(*r.first == *c,
+      "failed case: strided ", (NonEmpty ? "non-empty" : "empty"), " inner range: ", 
           *r.first, " != ", *c);
-    }
     
     auto orig = r.first;
 
     int k = std::max((N - *c) / 2, 1);
     std::advance(r.first, k);
-    if (std::distance(orig, r.first) != k) {
-      GALOIS_DIE("failed case: strided ", (NonEmpty ? "non-empty" : "empty"), " inner range: ", 
+    GALOIS_ASSERT(std::distance(orig, r.first) == k,
+      "failed case: strided ", (NonEmpty ? "non-empty" : "empty"), " inner range: ", 
           std::distance(orig, r.first), " != ", k);
-    }
     for (int i = 0; i < k - 1; ++i)
       std::advance(r.first, -1);
 
-    if (std::distance(orig, r.first) != 1) {
-      GALOIS_DIE("failed case: strided ", (NonEmpty ? "non-empty" : "empty"), " inner range: ", 
+    GALOIS_ASSERT(std::distance(orig, r.first) == 1,
+      "failed case: strided ", (NonEmpty ? "non-empty" : "empty"), " inner range: ", 
           std::distance(orig, r.first), " != 1");
-    }
 
     ++c;
   }
@@ -254,10 +249,9 @@ void check_random() {
 
   int last = *r.first;
   for (auto ii = r.first + 1; ii != r.second; ++ii) {
-    if (last > *ii) {
-      GALOIS_DIE("failed case: random ", (NonEmpty ? "non-empty" : "empty"), " inner range: ",
+    GALOIS_ASSERT(last <= *ii,
+      "failed case: random ", (NonEmpty ? "non-empty" : "empty"), " inner range: ",
           last, " > ", *ii);
-    }
     last = *ii;
   }
 }

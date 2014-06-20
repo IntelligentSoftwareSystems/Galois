@@ -21,32 +21,25 @@ void testBasic(std::string prefix, C&& collection, int N) {
 
   int i = 0;
   for (auto it = c.begin(); it != c.end(); ++it, ++i) {
-    if (*it != i)
-      GALOIS_DIE(prefix);
+    GALOIS_ASSERT(*it == i, prefix);
   }
 
   i = N - 1;
   for (auto it = c.rbegin(); it != c.rend(); ++it, --i) {
-    if (*it != i)
-      GALOIS_DIE(prefix);
+    GALOIS_ASSERT(*it == i, prefix);
   }
   
-  if (c.size() != N)
-    GALOIS_DIE(prefix);
+  GALOIS_ASSERT(c.size() == N, prefix);
 
-  if (c.size() != std::distance(c.begin(), c.end()))
-    GALOIS_DIE(prefix);
+  GALOIS_ASSERT(c.size() == std::distance(c.begin(), c.end()), prefix);
 
   i = N - 1;
   for (; !c.empty(); --i, c.pop_back()) {
-    if (c.back() != i)
-      GALOIS_DIE(prefix);
+    GALOIS_ASSERT(c.back() == i, prefix);
   }
 
-  if (c.size() != 0)
-    GALOIS_DIE(prefix);
-  if (c.size() != std::distance(c.begin(), c.end()))
-    GALOIS_DIE(prefix);
+  GALOIS_ASSERT(c.size() == 0, prefix);
+  GALOIS_ASSERT(c.size() == std::distance(c.begin(), c.end()), prefix);
 }
 
 template<typename C>
@@ -62,16 +55,14 @@ void testSort(std::string prefix, C&& collection, int N) {
 
   int last = c.front();
   for (auto it = c.begin() + 1; it != c.end(); ++it) {
-    if (last > *it)
-      GALOIS_DIE(prefix);
+    GALOIS_ASSERT(last <= *it, prefix);
     last = *it;
   }
 
   last = c.back();
   c.pop_back();
   for (; !c.empty(); c.pop_back()) {
-    if (last < c.back())
-      GALOIS_DIE(prefix);
+    GALOIS_ASSERT(last >= c.back(), prefix);
     last = c.back();
   }
 }
