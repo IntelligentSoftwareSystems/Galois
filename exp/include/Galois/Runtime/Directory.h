@@ -222,6 +222,7 @@ public:
     assert(ptr.isLocal());
     metadata& md = getMD(static_cast<Lockable*>(ptr.getObj()));
     std::lock_guard<LL::SimpleLock> lg(md.lock, std::adopt_lock);
+    trace("LocalDirectory::fetch for % flag % md %\n", ptr, flag, md);
     assert(md.th);
     md.addReq(NetworkInterface::ID, flag);
   }
@@ -362,7 +363,7 @@ template<typename T>
 void RemoteDirectory::fetch(fatPointer ptr, ResolveFlag flag) {
   metadata& md = getMD(ptr);
   std::lock_guard<LL::SimpleLock> lg(md.lock, std::adopt_lock);
-  //trace("RemoteDirectory::fetch for % flag %\n", ptr, flag);
+  trace("RemoteDirectory::fetch for % flag % md %\n", ptr, flag, md);
   assert(md.th == typeHelperImpl<T>::get() || !md.th);
   if (!md.th)
     md.th = typeHelperImpl<T>::get();
