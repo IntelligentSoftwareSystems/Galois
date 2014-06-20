@@ -162,7 +162,7 @@ struct NhFunc {
   }
   void operator()(GNode& node) {
     // Touch all neighbors (this seems to be good enough)
-    Graph::edge_iterator ii = graph.edge_begin(node);
+    graph.edge_begin(node);
   }
 };
 
@@ -316,7 +316,7 @@ int main(int argc, char** argv) {
       depfile >> node;
       if ( !depfile ) break;
       assert(node < n);
-      if ( i < 0 || i >= n ) {
+      if ( /* i < 0  || */ i >= n ) {
         std::cout << "Error loading dependencies.\n";
         abort();
       }

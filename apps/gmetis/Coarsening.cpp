@@ -373,8 +373,8 @@ unsigned findMatching(MetisGraph* coarseMetisGraph, bool useRM, bool use2Hop, bo
 }
 
 void createCoarseEdges(MetisGraph *coarseMetisGraph) {
-  MetisGraph* fineMetisGraph = coarseMetisGraph->getFinerGraph();
-  GGraph* fineGGraph = fineMetisGraph->getGraph();
+  //MetisGraph* fineMetisGraph = coarseMetisGraph->getFinerGraph();
+  //GGraph* fineGGraph = fineMetisGraph->getGraph();
   typedef Galois::WorkList::StableIterator<true> WL;
   parallelPopulateEdges pPE(coarseMetisGraph);
   Galois::for_each_local(*coarseMetisGraph->getGraph(), pPE, Galois::loopname("popedge"), Galois::wl<WL>());

@@ -275,12 +275,11 @@ private:
     iterator end() { return edges.end();  }
     
     void erase(iterator ii) {
-      if ( SortNeighbors ) {
+      if (SortNeighbors) {
         // For sorted case remove the element, moving following
         // elements back to fill the space.
         edges.erase(ii);
-      }
-      else {
+      } else {
         // We don't need to preserve the order, so move the last edge
         // into this place and then remove last edge.
         *ii = edges.back();

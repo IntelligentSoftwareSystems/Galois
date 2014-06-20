@@ -28,9 +28,7 @@
 #include "Galois/Runtime/ParallelWork.h"
 #include <cstdio>
 
-
-// #define GALOIS_DO_OUTER_PREFETCH 1
-#undef GALOIS_DO_OUTER_PREFETCH
+// #define _DO_OUTER_PREFETCH 1
 
 #include <xmmintrin.h>
 
@@ -82,7 +80,7 @@ struct FixedSizeRingAdaptor: public Galois::FixedSizeRing<T,ChunkSize> {
     else this->pop_back();
   }
 
-#ifdef GALOIS_DO_OUTER_PREFETCH
+#ifdef _DO_OUTER_PREFETCH
   typename FixedSizeRingAdaptor::const_reference  lookAhead (unsigned off) const {
     assert (!this->empty ());
     if (isLIFO) {
@@ -217,12 +215,12 @@ public:
     return n.next->cur();
   }
 
-#ifdef GALOIS_DO_OUTER_PREFETCH
+#ifdef _DO_OUTER_PREFETCH
   const value_type& lookAhead (const WID& id, unsigned off) const {
     p& n = *data.getLocal (id.tid);
     return n.next->lookAhead (off);
   }
-#endif // GALOIS_DO_OUTER_PREFETCH
+#endif // _DO_OUTER_PREFETCH
 
   bool empty(const WID& id) {
     p& n = *data.getRemote(id.tid);
@@ -358,7 +356,7 @@ class BSInlineExecutor {
     for (int i = 0; i < cs; ++i) {
 
 
-// #ifdef GALOIS_DO_OUTER_PREFETCH
+// #ifdef _DO_OUTER_PREFETCH
       // const unsigned l1_pftch_dist = 1;
       // if ((i + l1_pftch_dist) < cs) {
         // const value_type& next = cur->lookAhead (wid, l1_pftch_dist);
@@ -366,7 +364,7 @@ class BSInlineExecutor {
       // }
 // #endif
       value_type& val = cur->cur(wid);
-// #ifdef GALOIS_DO_OUTER_PREFETCH
+// #ifdef _DO_OUTER_PREFETCH
       // preFunc (val, _MM_HINT_T0);
 // #endif
 
@@ -384,7 +382,7 @@ class BSInlineExecutor {
 
       cur->pop(wid);
 
-// #ifdef GALOIS_DO_OUTER_PREFETCH
+// #ifdef _DO_OUTER_PREFETCH
       // const unsigned l2_pftch_dist = 1;
       // if ((i + l2_pftch_dist) < cs) {
         // const value_type& next = cur->lookAhead (wid, l2_pftch_dist);
@@ -393,7 +391,7 @@ class BSInlineExecutor {
 // #endif
 
 
-// #ifdef GALOIS_DO_OUTER_PREFETCH
+// #ifdef _DO_OUTER_PREFETCH
       // const unsigned l2_pftch_dist = 2;
       // if ((i + l2_pftch_dist) < cs) {
         // const value_type& next = cur->lookAhead (wid, l2_pftch_dist);
@@ -531,5 +529,7 @@ void for_each_bs (const R& range, const OpFunc& opFunc, const PreFunc& preFunc, 
 
 
 } //galois
+
+#undef _DO_OUTER_PREFETCH
 
 #endif
