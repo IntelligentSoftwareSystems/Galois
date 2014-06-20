@@ -53,31 +53,10 @@ namespace Graph {
 
 //! Graph serialized to a file
 class FileGraph {
-  friend class FileGraphAllocator;
 public:
   typedef uint32_t GraphNode;
 
 private:
-  void move_assign(FileGraph&&);
-  
-  void* volatile masterMapping;
-  size_t masterLength;
-  uint64_t sizeofEdge;
-  int masterFD;
-
-  uint64_t* outIdx;
-  uint32_t* outs;
-
-  char* edgeData;
-
-  uint64_t numEdges;
-  uint64_t numNodes;
-
-private:
-  uint64_t getEdgeIdx(GraphNode src, GraphNode dst) const;
-  uint32_t* raw_neighbor_begin(GraphNode N) const;
-  uint32_t* raw_neighbor_end(GraphNode N) const;
-
   struct Convert32: public std::unary_function<uint32_t, uint32_t> {
     uint32_t operator()(uint32_t x) const {
       return convert_le32toh(x);
@@ -89,6 +68,23 @@ private:
       return convert_le64toh(x);
     }
   };
+
+  void* volatile masterMapping;
+  size_t masterLength;
+  uint64_t sizeofEdge;
+  uint64_t numNodes;
+  uint64_t numEdges;
+  int masterFD;
+
+  uint64_t* outIdx;
+  uint32_t* outs;
+
+  char* edgeData;
+
+  void move_assign(FileGraph&&);
+  uint64_t getEdgeIdx(GraphNode src, GraphNode dst) const;
+  uint32_t* raw_neighbor_begin(GraphNode N) const;
+  uint32_t* raw_neighbor_end(GraphNode N) const;
 
   //! Initializes a graph from block of memory
   void parse(void* m);
@@ -125,6 +121,8 @@ protected:
       uint32_t* outs, uint64_t numEdges) {
     return reinterpret_cast<T*>(structureFromArrays(outIdx, numNodes, outs, numEdges, sizeof(T)));
   }
+
+  void pageIn(unsigned id, unsigned total, size_t sizeofEdgeData);
 
 public:
   // Node Handling
