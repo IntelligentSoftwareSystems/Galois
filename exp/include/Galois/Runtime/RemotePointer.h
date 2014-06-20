@@ -95,6 +95,8 @@ public:
     return obj ? static_cast<T*>(obj) : nullptr;
   }
 
+  //Trivially_copyable
+  typedef int tt_is_copyable;
 
   // bool sameHost(const gptr& rhs) const {
   //   return ptr.getHost() == rhs.ptr.getHost();

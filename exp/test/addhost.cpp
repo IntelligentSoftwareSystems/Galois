@@ -42,6 +42,8 @@ struct f1 {
     r->add(data);
     return;
   }
+ //Trivially_copyable
+ typedef int tt_is_copyable;
 };
 
 static const char *name = "addhost distributed testcase";

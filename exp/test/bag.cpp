@@ -14,6 +14,9 @@ struct InsertBody {
     Galois::Runtime::LL::gPrint("host: ", Galois::Runtime::NetworkInterface::ID, " pushing: ", i, "\n");
     pBodies->push(i);
   }
+
+  //Trivially_copyable
+  typedef int tt_is_copyable;
 };
 
 struct PrintInt {

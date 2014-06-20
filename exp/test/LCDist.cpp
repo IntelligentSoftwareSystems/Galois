@@ -23,6 +23,19 @@ struct edge_counter {
   void operator()(GNode node, Galois::UserContext<GNode>& ctx) {
     operator()(node);
   }
+
+  //serialize
+  typedef int tt_has_serialize;
+  void serialize(Galois::Runtime::SerializeBuffer& s) const {
+    gSerialize(s, g);
+  }
+  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
+    gDeserialize(s, g);
+  }
+
+  //is_trivially_copyable
+  typedef int tt_is_copyable;
+
 };
 
 int main(int argc, char *argv[])

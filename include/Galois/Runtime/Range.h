@@ -66,6 +66,9 @@ public:
 
   block_iterator block_begin() const { return block_pair().first; }
   block_iterator block_end() const { return block_pair().second; }
+
+  //Trivially_copyable
+  typedef int tt_is_copyable;
 };
 
 template<typename T>

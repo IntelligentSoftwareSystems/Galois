@@ -60,6 +60,11 @@ BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_has_serialize)
 template<typename T>
 struct has_serialize : public has_tt_has_serialize<T> {};
 
+//GILL
+BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_is_copyable)
+template<typename T>
+struct is_copyable :  public has_tt_is_copyable<T> {};
+
 template<typename T>
 struct is_serializable {
   static const bool value = has_serialize<T>::value || std::is_trivially_copyable<T>::value;
@@ -165,12 +170,23 @@ namespace detail {
 template<typename T>
 void gSerializeObj(SerializeBuffer& buf, const T& data,
                    typename std::enable_if<std::is_trivially_copyable<T>::value>::type* = 0,
-                   typename std::enable_if<!has_serialize<T>::value>::type* = 0) {
+		   typename std::enable_if<!has_serialize<T>::value>::type* = 0) {
   unsigned char* pdata = (unsigned char*)&data;
   for (size_t i = 0; i < sizeof(T); ++i)
     buf.push(pdata[i]);
 }
 
+template<typename T>
+void gSerializeObj(SerializeBuffer& buf, const T& data,
+		   typename std::enable_if<is_copyable<T>::value>::type* = 0,
+		   typename std::enable_if<!has_serialize<T>::value>::type* = 0) {
+  unsigned char* pdata = (unsigned char*)&data;
+  for(size_t i = 0; i < sizeof(T); ++i)
+    buf.push(pdata[i]);
+
+}
+                   
+                   
 template<typename T>
 void gSerializeObj(SerializeBuffer& buf, const T& data,
                    typename std::enable_if<has_serialize<T>::value>::type* = 0) {
@@ -237,6 +253,15 @@ namespace detail {
 template<typename T>
 void gDeserializeObj(DeSerializeBuffer& buf, T& data,
                   typename std::enable_if<std::is_trivially_copyable<T>::value>::type* = 0,
+                  typename std::enable_if<!has_serialize<T>::value>::type* = 0) {
+  unsigned char* pdata = (unsigned char*)&data;
+  for (size_t i = 0; i < sizeof(T); ++i)
+    pdata[i] = buf.pop();
+}
+
+template<typename T>
+void gDeserializeObj(DeSerializeBuffer& buf, T& data,	
+		  typename std::enable_if<is_copyable<T>::value>::type* = 0,
                   typename std::enable_if<!has_serialize<T>::value>::type* = 0) {
   unsigned char* pdata = (unsigned char*)&data;
   for (size_t i = 0; i < sizeof(T); ++i)

@@ -122,7 +122,10 @@ public:
   fatPointerImpl arith(int n) {
     return fatPointerImpl(getHost(), (char*)getObj() + n);
   }
-};
+
+ //Trivially_copyable
+ typedef int tt_is_copyable;
+ };
 
 template<typename T>
 size_t hash_value(const fatPointerImpl<T>& v) {
