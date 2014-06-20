@@ -22,11 +22,14 @@
  */
 
 #include "Galois/Runtime/Tracer.h"
+#include "Galois/Runtime/Network.h"
+#include "Galois/Runtime/ll/SimpleLock.h"
 #include "Galois/Runtime/ll/EnvCheck.h"
 
 #include <fstream>
 #include <cassert>
 #include <iostream>
+#include <chrono>
 
 #include <sys/types.h>
 #include <unistd.h>
@@ -48,7 +51,13 @@ static std::ostream& openIfNot() {
 }
 
 void Galois::Runtime::detail::printTrace(std::ostringstream& os) {
+  using namespace std::chrono;
+  static LL::SimpleLock lock;
+  std::lock_guard<LL::SimpleLock> lg(lock);
   auto& out = openIfNot();
+  auto dtn = system_clock::now().time_since_epoch();
+  out << "<" << dtn.count() << "," << getHostID() << "> ";
   out << os.str();
   out.flush();
+  //  usleep(10);
 }

@@ -24,13 +24,10 @@
 #ifndef GALOIS_RUNTIME_TRACER_H
 #define GALOIS_RUNTIME_TRACER_H
 
-#include <ostream>
 #include <sstream>
 
 namespace Galois {
 namespace Runtime {
-
-uint32_t getHostID();
 
 namespace detail {
 
@@ -54,14 +51,13 @@ void printTrace(std::ostringstream&);
 
 } // namespace detail
 
-const bool doTrace = true;
+const bool doTrace = false;
 
 //FIXME use better forwarding
 template<typename... Args>
 static inline void trace(const char* format, Args... args) {
   if (doTrace) {
     std::ostringstream os;
-    os << "<" << getHostID() << "> ";
     detail::traceImpl(os, format, args...);
     detail::printTrace(os);
   }
