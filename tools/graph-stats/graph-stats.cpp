@@ -157,7 +157,7 @@ void do_sortedlogoffsethist() {
   Graph copy;
   {
     // Original FileGraph is immutable because it is backed by a file
-    copy.cloneFrom(graph);
+    copy = graph;
   }
 
   std::vector<std::map<int, size_t> > hists;

@@ -52,11 +52,14 @@ namespace Galois {
 namespace Graph {
 
 //! Graph serialized to a file
-class FileGraph: private boost::noncopyable {
+class FileGraph {
   friend class FileGraphAllocator;
 public:
   typedef uint32_t GraphNode;
 
+private:
+  void move_assign(FileGraph&&);
+  
 protected:
   void* volatile masterMapping;
   size_t masterLength;
@@ -110,6 +113,8 @@ protected:
    */
   size_t findIndex(size_t nodeSize, size_t edgeSize, size_t targetSize, size_t lb, size_t ub);
   
+  void structureFromFileInterleaved(const std::string& filename, size_t sizeofEdgeData);
+
 public:
   // Node Handling
 
@@ -172,6 +177,7 @@ public:
 
   template<typename EdgeTy> 
   EdgeTy& getEdgeData(edge_iterator it) const {
+    assert(edgeData);
     return reinterpret_cast<EdgeTy*>(edgeData)[*it];
   }
 
@@ -192,11 +198,13 @@ public:
 
   template<typename EdgeTy>
   EdgeTy* edge_data_begin() const {
+    assert(edgeData);
     return reinterpret_cast<EdgeTy*>(edgeData);
   }
 
   template<typename EdgeTy>
   EdgeTy* edge_data_end() const {
+    assert(edgeData);
     assert(sizeof(EdgeTy) == sizeofEdge);
     EdgeTy* r = reinterpret_cast<EdgeTy*>(edgeData);
     return &r[numEdges];
@@ -205,10 +213,10 @@ public:
   iterator begin() const;
   iterator end() const;
 
-  /**
-   * Divides nodes into balanced ranges.
-   */
+  //! Divides nodes into balanced ranges
   std::pair<iterator,iterator> divideBy(size_t nodeSize, size_t edgeSize, unsigned id, unsigned total);
+  //! Divides edges into balanced ranges
+  std::pair<uint64_t,uint64_t> divideEdgesBy(unsigned id, unsigned total);
 
   node_id_iterator node_id_begin() const;
   node_id_iterator node_id_end() const;
@@ -217,6 +225,7 @@ public:
 
   template<typename EdgeTy>
   EdgeTy& getEdgeData(neighbor_iterator it) {
+    assert(edgeData);
     return reinterpret_cast<EdgeTy*>(edgeData)[std::distance(outs, it.base())];
   }
 
@@ -232,17 +241,34 @@ public:
   size_t edgeSize() const { return sizeofEdge; }
 
   FileGraph();
+  FileGraph(const FileGraph&);
+  FileGraph& operator=(const FileGraph&);
+  FileGraph(FileGraph&&);
+  FileGraph& operator=(FileGraph&&);
   ~FileGraph();
 
   //! Reads graph connectivity information from file
   void structureFromFile(const std::string& filename, bool preFault = true);
 
+  /** 
+   * Read just header information from file (e.g., number of neighbors for
+   * each node but not actual adjacencies).
+   *
+   * Subsequent method calls that only need header information are valid,
+   * while methods that need adjacency information have undefined behavior.
+   */
+  void headerFromFile(const std::string& filename, bool preFault = true);
+
+  /**
+   * XXX
+   */
+  void partOfStructureFromFile(const std::string& filename, iterator begin, iterator end, bool preFault = true);
+  void partOfStructureFromFile(const std::string& filename, uint64_t begin, uint64_t end, bool preFault = true);
+
   /**
    * Reads graph connectivity information from file. Tries to balance memory
    * evenly across system.  Cannot be called during parallel execution.
    */
-  void structureFromFileInterleaved(const std::string& filename, size_t sizeofEdgeData);
-
   template<typename EdgeTy>
   void structureFromFileInterleaved(const std::string& filename, 
       typename std::enable_if<!std::is_void<EdgeTy>::value>::type* = 0) {
@@ -276,10 +302,6 @@ public:
 
   //! Writes graph connectivity information to file
   void structureToFile(const std::string& file);
-
-  void swap(FileGraph& other);
-
-  void cloneFrom(FileGraph& other);
 };
 
 /** 
@@ -424,7 +446,7 @@ void makeSymmetric(FileGraph& in, FileGraph& out) {
   if (EdgeData::has_value)
     std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
 
-  out.swap(g);
+  out = std::move(g);
 }
 
 /**
@@ -479,7 +501,7 @@ void permute(FileGraph& in, const PTy& p, FileGraph& out) {
   if (EdgeData::has_value)
     std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
 
-  out.swap(g);
+  out = std::move(g);
 }
 
 template<typename GraphTy,typename... Args>

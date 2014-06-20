@@ -414,7 +414,7 @@ void initializeGraph() {
   if (!symmetricGraph) 
     Galois::Graph::makeSymmetric<EdgeData>(origGraph, symGraph);
   else
-    symGraph.swap(origGraph);
+    std::swap(symGraph, origGraph);
 
   Galois::Graph::readGraph(graph, symGraph);
   

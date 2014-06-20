@@ -71,11 +71,48 @@ FileGraph::FileGraph()
 {
 }
 
+FileGraph::FileGraph(const FileGraph& other) {
+  structureFromMem(other.masterMapping, other.masterLength, true);
+}
+
+FileGraph& FileGraph::operator=(const FileGraph& other) {
+  if (this != &other) {
+    FileGraph tmp(*this);
+    *this = std::move(tmp);
+  }
+  return *this;
+}
+
+FileGraph::FileGraph(FileGraph&& other)
+  : masterMapping(0), masterLength(0), masterFD(0),
+    outIdx(0), outs(0), edgeData(0),
+    numEdges(0), numNodes(0)
+{
+  move_assign(std::move(other));
+}
+
+FileGraph& FileGraph::operator=(FileGraph&& other) {
+  move_assign(std::move(other));
+  return *this;
+}
+
 FileGraph::~FileGraph() {
   if (masterMapping)
     munmap(masterMapping, masterLength);
   if (masterFD)
     close(masterFD);
+}
+
+void FileGraph::move_assign(FileGraph&& o) {
+  std::swap(masterMapping, o.masterMapping);
+  std::swap(masterLength, o.masterLength);
+  std::swap(sizeofEdge, o.sizeofEdge);
+  std::swap(masterFD, o.masterFD);
+  std::swap(outIdx, o.outIdx);
+  std::swap(outs, o.outs);
+  std::swap(edgeData, o.edgeData);
+  std::swap(numEdges, o.numEdges);
+  std::swap(numNodes, o.numNodes);
 }
 
 void FileGraph::parse(void* m) {
@@ -238,22 +275,6 @@ void FileGraph::structureToFile(const std::string& file) {
     ptr += retval;
   }
   close(fd);
-}
-
-void FileGraph::swap(FileGraph& other) {
-  std::swap(masterMapping, other.masterMapping);
-  std::swap(masterLength, other.masterLength);
-  std::swap(sizeofEdge, other.sizeofEdge);
-  std::swap(masterFD, other.masterFD);
-  std::swap(outIdx, other.outIdx);
-  std::swap(outs, other.outs);
-  std::swap(edgeData, other.edgeData);
-  std::swap(numEdges, other.numEdges);
-  std::swap(numNodes, other.numNodes);
-}
-
-void FileGraph::cloneFrom(FileGraph& other) {
-  structureFromMem(other.masterMapping, other.masterLength, true);
 }
 
 uint64_t FileGraph::getEdgeIdx(GraphNode src, GraphNode dst) const {

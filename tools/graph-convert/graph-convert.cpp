@@ -1437,7 +1437,7 @@ struct Cleanup: public Conversion {
     {
       // Original FileGraph is immutable because it is backed by a file
       orig.structureFromFile(infilename);
-      graph.cloneFrom(orig);
+      graph = orig;
     }
 
     size_t numEdges = 0;
@@ -1535,7 +1535,7 @@ struct SortEdges: public boost::mpl::if_c<NeedsEdgeData, HasNoVoidSpecialization
     {
       // Original FileGraph is immutable because it is backed by a file
       orig.structureFromFile(infilename);
-      graph.cloneFrom(orig);
+      graph = orig;
     }
 
     for (typename Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
