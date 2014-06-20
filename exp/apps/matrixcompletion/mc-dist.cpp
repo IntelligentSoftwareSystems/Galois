@@ -302,7 +302,7 @@ struct sgd_edge_finder {
     auto ii = g->edge_begin(src, Galois::MethodFlag::SRC_ONLY);
     auto ee = g->edge_end(src, Galois::MethodFlag::SRC_ONLY);
     auto ii2 = std::lower_bound(ii, ee, dst1, [] (const decltype(*ii)& edg, GNode n) { return edg.dst < n; });
-    auto ee2 = std::lower_bound(ii, ee, dst2, [] (const decltype(*ii)& edg, GNode n) { return edg.dst < n; });
+    auto ee2 = std::upper_bound(ii, ee, dst2, [] (GNode n, const decltype(*ii)& edg) { return n < edg.dst; });
     while (ii2 != ee2) {
       bag.push_back(std::make_pair(src, std::distance(ii, ii2)));
       ++ii2;
@@ -339,27 +339,59 @@ static double genRand () {
 }
 
 // Initializes latent vector and id for each node
-std::tuple<unsigned int, unsigned int, unsigned int>
-initializeGraphData(Graph::pointer g)
-{
-  // unsigned int seed = 42;
-  // std::default_random_engine eng(seed);
-  // std::uniform_real_distribution<double> random_lv_value(0, 0.1);
-  const unsigned SEED = 4562727;
-  std::srand (SEED);
-  
-  unsigned int numMovieNodes = 0;
-  unsigned int numUserNodes = 0;
-  unsigned int numRatings = 0;
-  
-  //for all movie and user nodes in the graph
-  for (GNode gnode : *g) {
+struct initializeGraphData {
+  struct stats : public Galois::Runtime::Lockable {
+    unsigned int numMovieNodes;
+    unsigned int numUserNodes;
+    unsigned int numRatings;
+    stats() : numMovieNodes(0), numUserNodes(0), numRatings(0) {}
+    stats(Galois::Runtime::PerHost<stats>) : numMovieNodes(0), numUserNodes(0), numRatings(0) {}
+    stats(Galois::Runtime::DeSerializeBuffer& s) {
+      deserialize(s);
+    }
+    //serialize
+    typedef int tt_has_serialize;
+    void serialize(Galois::Runtime::SerializeBuffer& s) const {
+      gSerialize(s,numMovieNodes,numUserNodes,numRatings);
+    }
+    void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
+      gDeserialize(s,numMovieNodes,numUserNodes,numRatings);
+    }
+
+  };
+
+  Graph::pointer g;
+  Galois::Runtime::PerHost<stats> s;
+
+  std::tuple<unsigned int, unsigned int, unsigned int>
+  static go(Graph::pointer g)
+  {
+    const unsigned SEED = 4562727;
+    std::srand (SEED);
+
+    Galois::Runtime::PerHost<stats> s = Galois::Runtime::PerHost<stats>::allocate();
+    
+    Galois::for_each_local(g, initializeGraphData{g,s}, Galois::loopname("init"));
+
+    unsigned int numMovieNodes = 0;
+    unsigned int numUserNodes = 0;
+    unsigned int numRatings = 0;
+    for (unsigned x = 0; x < Galois::Runtime::NetworkInterface::Num; ++x) {
+      numMovieNodes += s.remote(x)->numMovieNodes;
+      numUserNodes += s.remote(x)->numUserNodes;
+      numRatings += s.remote(x)->numRatings;
+    }
+
+    return std::make_tuple(numMovieNodes, numUserNodes, numRatings);
+  }
+
+  void operator()(GNode gnode, Galois::UserContext<GNode>& ctx) {
     Node& data = g->at(gnode);
     
     //fill latent vectors with random values
     for(int i = 0; i < LATENT_VECTOR_SIZE; i++)
       data.latent_vector[i] = genRand();
-
+    
     g->sort_edges(gnode, [] (GNode e1_dst, const int& e1_data,
                              GNode e2_dst, const int& e2_data) {
                     return e1_dst < e2_dst;
@@ -368,18 +400,16 @@ initializeGraphData(Graph::pointer g)
     //count number of movies we've seen; only movies nodes have edges
     unsigned int num_edges = 
       std::distance(g->edge_begin(gnode, Galois::NONE), g->edge_end(gnode, Galois::NONE));
-    numRatings += num_edges;
+    s->numRatings += num_edges;
     if(num_edges > 0) {
-      numMovieNodes++;
+      s->numMovieNodes++;
       //std::cout << "M";
     } else {
-      numUserNodes++;
+      s->numUserNodes++;
       //std::cout <<"U";
     }
   }
-  
-  return std::make_tuple(numMovieNodes, numUserNodes, numRatings);
-}
+};
 
 int main(int argc, char** argv) {	
   LonestarStart (argc, argv, name, desc, url);
@@ -392,6 +422,8 @@ int main(int argc, char** argv) {
   //   assert(p < *ii);
   // }
 
+  Galois::Timer ltimer;
+  ltimer.start();
   //allocate local computation graph
   Graph::pointer g;
   {
@@ -412,10 +444,16 @@ int main(int argc, char** argv) {
       }
     }
   }
+  ltimer.stop();
+  std::cout << "Graph Loading: " << ltimer.get() << "ms\n";
 
   //fill each node's id & initialize the latent vectors
   unsigned int numMovieNodes, numUserNodes, numRatings;
-  std::tie(numMovieNodes, numUserNodes,numRatings) = initializeGraphData(g);
+  Galois::Timer itimer;
+  itimer.start();
+  std::tie(numMovieNodes, numUserNodes,numRatings) = initializeGraphData::go(g);
+  itimer.stop();
+  std::cout << "Graph Init: " << itimer.get() << "ms\n";
 
   std::cout << "Input initialized, num users = " << numUserNodes 
             << ", num movies = " << numMovieNodes
