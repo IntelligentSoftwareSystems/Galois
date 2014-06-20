@@ -330,9 +330,9 @@ struct Edgelist2Gr: public Conversion {
 
     edge_value_type* rawEdgeData = p.finish<edge_value_type>();
     if (EdgeData::has_value)
-      std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+      std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
 
-    p.structureToFile(outfilename);
+    p.toFile(outfilename);
     printStatus(numNodes, numEdges);
   }
 };
@@ -435,9 +435,9 @@ struct Mtx2Gr: public HasNoVoidSpecialization {
 
     edge_value_type* rawEdgeData = p.finish<edge_value_type>();
     if (EdgeData::has_value)
-      std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+      std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
 
-    p.structureToFile(outfilename);
+    p.toFile(outfilename);
     printStatus(p.size(), p.sizeEdges());
   }
 };
@@ -449,7 +449,7 @@ struct Gr2Mtx: public HasNoVoidSpecialization {
     typedef Graph::GraphNode GNode;
 
     Graph graph;
-    graph.structureFromFile(infilename);
+    graph.fromFile(infilename);
 
     std::ofstream file(outfilename.c_str());
     file << graph.size() << " " << graph.size() << " " << graph.sizeEdges() << "\n";
@@ -539,7 +539,7 @@ struct Nodelist2Gr: public HasOnlyVoidSpecialization {
 
     p.finish<void>();
 
-    p.structureToFile(outfilename);
+    p.toFile(outfilename);
     printStatus(numNodes, numEdges);
   }
 };
@@ -553,7 +553,7 @@ struct Gr2Edgelist: public Conversion {
     typedef typename EdgeData::value_type edge_value_type;
 
     Graph graph;
-    graph.structureFromFile(infilename);
+    graph.fromFile(infilename);
 
     std::ofstream file(outfilename.c_str());
     for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
@@ -611,7 +611,7 @@ struct Bipartitegr2Petsc: public HasNoVoidSpecialization {
     typedef typename EdgeData::value_type edge_value_type;
 
     Graph graph;
-    graph.structureFromFile(infilename);
+    graph.fromFile(infilename);
 
     size_t partition = 0;
     for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii, ++partition) {
@@ -676,7 +676,7 @@ struct RandomizeNodes: public Conversion {
     typedef typename std::iterator_traits<typename Permutation::iterator>::difference_type difference_type;
 
     Graph graph;
-    graph.structureFromFile(infilename);
+    graph.fromFile(infilename);
 
     Permutation perm;
     perm.create(graph.size());
@@ -693,7 +693,7 @@ struct RandomizeNodes: public Conversion {
     Galois::Graph::permute<EdgeTy>(graph, perm, out);
     outputPermutation(perm);
 
-    out.structureToFile(outfilename);
+    out.toFile(outfilename);
     printStatus(graph.size(), graph.sizeEdges());
   }
 };
@@ -734,8 +734,8 @@ struct RandomizeEdgeWeights: public HasNoVoidSpecialization {
     
     Graph graph, outgraph;
 
-    graph.structureFromFile(infilename);
-    OutEdgeTy* edgeData = outgraph.structureFromGraph<OutEdgeTy>(graph);
+    graph.fromFile(infilename);
+    OutEdgeTy* edgeData = outgraph.fromGraph<OutEdgeTy>(graph);
     OutEdgeTy* edgeDataEnd = edgeData + graph.sizeEdges();
 
     std::mt19937 gen;
@@ -744,7 +744,7 @@ struct RandomizeEdgeWeights: public HasNoVoidSpecialization {
       *edgeData = dist(gen);
     }
     
-    outgraph.structureToFile(outfilename);
+    outgraph.toFile(outfilename);
     printStatus(graph.size(), graph.sizeEdges(), outgraph.size(), outgraph.sizeEdges());
   }
 };
@@ -762,7 +762,7 @@ struct AddRing: public Conversion {
     typedef typename EdgeData::value_type edge_value_type;
     
     Graph graph;
-    graph.structureFromFile(infilename);
+    graph.fromFile(infilename);
 
     Writer p;
     EdgeData edgeData;
@@ -807,8 +807,8 @@ struct AddRing: public Conversion {
 
     edge_value_type* rawEdgeData = p.finish<edge_value_type>();
     if (EdgeData::has_value)
-      std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
-    p.structureToFile(outfilename);
+      std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
+    p.toFile(outfilename);
     printStatus(graph.size(), graph.sizeEdges(), p.size(), p.sizeEdges());
   }
 };
@@ -826,7 +826,7 @@ struct AddTree: public Conversion {
     typedef typename EdgeData::value_type edge_value_type;
     
     Graph graph;
-    graph.structureFromFile(infilename);
+    graph.fromFile(infilename);
 
     Writer p;
     EdgeData edgeData;
@@ -898,8 +898,8 @@ struct AddTree: public Conversion {
 
     edge_value_type* rawEdgeData = p.finish<edge_value_type>();
     if (EdgeData::has_value)
-      std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
-    p.structureToFile(outfilename);
+      std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
+    p.toFile(outfilename);
     printStatus(graph.size(), graph.sizeEdges(), p.size(), p.sizeEdges());
   }
 };
@@ -912,10 +912,10 @@ struct MakeSymmetric: public Conversion {
 
     Graph ingraph;
     Graph outgraph;
-    ingraph.structureFromFile(infilename);
+    ingraph.fromFile(infilename);
     Galois::Graph::makeSymmetric<EdgeTy>(ingraph, outgraph);
 
-    outgraph.structureToFile(outfilename);
+    outgraph.toFile(outfilename);
     printStatus(ingraph.size(), ingraph.sizeEdges(), outgraph.size(), outgraph.sizeEdges());
   }
 };
@@ -934,8 +934,8 @@ struct BipartiteSortByDegree: public Conversion {
     typedef Galois::LargeArray<GNode> Permutation;
 
     Graph ingraph, outgraph, transposegraph;
-    ingraph.structureFromFile(infilename);
-    transposegraph.structureFromFile(transposeFilename);
+    ingraph.fromFile(infilename);
+    transposegraph.fromFile(transposeFilename);
 
     Permutation perm;
     perm.create(ingraph.size());
@@ -966,7 +966,7 @@ struct BipartiteSortByDegree: public Conversion {
 
     Galois::Graph::permute<EdgeTy>(ingraph, inverse, outgraph);
     outputPermutation(inverse);
-    outgraph.structureToFile(outfilename);
+    outgraph.toFile(outfilename);
     printStatus(ingraph.size(), ingraph.sizeEdges());
   }
 };
@@ -980,7 +980,7 @@ struct SortByDegree: public Conversion {
     typedef Galois::LargeArray<GNode> Permutation;
 
     Graph ingraph, outgraph;
-    ingraph.structureFromFile(infilename);
+    ingraph.fromFile(infilename);
 
     Permutation perm;
     perm.create(ingraph.size());
@@ -1001,7 +1001,7 @@ struct SortByDegree: public Conversion {
 
     Galois::Graph::permute<EdgeTy>(ingraph, inverse, outgraph);
     outputPermutation(inverse);
-    outgraph.structureToFile(outfilename);
+    outgraph.toFile(outfilename);
     printStatus(ingraph.size(), ingraph.sizeEdges());
   }
 };
@@ -1014,13 +1014,13 @@ struct ToBigEndian: public HasNoVoidSpecialization {
     typedef Galois::LargeArray<GNode> Permutation;
 
     Graph ingraph, outgraph;
-    ingraph.structureFromFile(infilename);
-    EdgeTy* out = outgraph.structureFromGraph<EdgeTy>(ingraph);
+    ingraph.fromFile(infilename);
+    EdgeTy* out = outgraph.fromGraph<EdgeTy>(ingraph);
 
     for (auto ii = ingraph.edge_data_begin<EdgeTy>(), ei = ingraph.edge_data_end<EdgeTy>(); ii != ei; ++ii, ++out) {
       writeEndian<false>(out, *ii);
     }
-    outgraph.structureToFile(outfilename);
+    outgraph.toFile(outfilename);
     printStatus(ingraph.size(), ingraph.sizeEdges());
   }
 };
@@ -1033,7 +1033,7 @@ struct SortByHighDegreeParent: public Conversion {
     typedef Galois::LargeArray<GNode> Permutation;
 
     Graph graph;
-    graph.structureFromFile(infilename);
+    graph.fromFile(infilename);
 
     auto sz = graph.size();
 
@@ -1095,7 +1095,7 @@ struct SortByHighDegreeParent: public Conversion {
     //           << std::distance(out.edge_begin(perm2[first]), out.edge_end(perm2[first]))
     //           << "\n";
 
-    out.structureToFile(outfilename);
+    out.toFile(outfilename);
     printStatus(graph.size(), graph.sizeEdges());
   }
 };
@@ -1110,7 +1110,7 @@ struct RemoveHighDegree: public Conversion {
     typedef typename EdgeData::value_type edge_value_type;
     
     Graph graph;
-    graph.structureFromFile(infilename);
+    graph.fromFile(infilename);
 
     Writer p;
     EdgeData edgeData;
@@ -1136,7 +1136,7 @@ struct RemoveHighDegree: public Conversion {
     if (numEdges == graph.sizeEdges() && numNodes == graph.size()) {
       std::cout << "Graph already simplified; copy input to output\n";
       printStatus(graph.size(), graph.sizeEdges());
-      graph.structureToFile(outfilename);
+      graph.toFile(outfilename);
       return;
     }
 
@@ -1179,9 +1179,9 @@ struct RemoveHighDegree: public Conversion {
 
     edge_value_type* rawEdgeData = p.finish<edge_value_type>();
     if (EdgeData::has_value)
-      std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+      std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
     
-    p.structureToFile(outfilename);
+    p.toFile(outfilename);
     printStatus(graph.size(), graph.sizeEdges(), p.size(), p.sizeEdges());
   }
 };
@@ -1197,7 +1197,7 @@ struct PartitionBySource: public Conversion {
     typedef typename EdgeData::value_type edge_value_type;
     
     Graph graph;
-    graph.structureFromFile(infilename);
+    graph.fromFile(infilename);
 
     for (int i = 0; i < numParts; ++i) {
       Writer p;
@@ -1234,12 +1234,12 @@ struct PartitionBySource: public Conversion {
 
       edge_value_type* rawEdgeData = p.finish<edge_value_type>();
       if (EdgeData::has_value)
-        std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+        std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
 
       std::ostringstream partname;
       partname << outfilename << "." << i << ".of." << numParts;
 
-      p.structureToFile(partname.str());
+      p.toFile(partname.str());
       printStatus(graph.size(), graph.sizeEdges(), p.size(), p.sizeEdges());
     }
   }
@@ -1290,7 +1290,7 @@ struct PartitionByDestination: public Conversion {
     typedef typename EdgeData::value_type edge_value_type;
     
     Graph graph;
-    graph.structureFromFile(infilename);
+    graph.fromFile(infilename);
     InDegree inDegree;
     compute_indegree(graph, inDegree);
 
@@ -1345,12 +1345,12 @@ struct PartitionByDestination: public Conversion {
 
       edge_value_type* rawEdgeData = p.finish<edge_value_type>();
       if (EdgeData::has_value)
-        std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+        std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
 
       std::ostringstream partname;
       partname << outfilename << "." << i << ".of." << numParts;
 
-      p.structureToFile(partname.str());
+      p.toFile(partname.str());
       printStatus(graph.size(), graph.sizeEdges(), p.size(), p.sizeEdges());
     }
   }
@@ -1367,7 +1367,7 @@ struct Transpose: public Conversion {
     typedef typename EdgeData::value_type edge_value_type;
     
     Graph graph;
-    graph.structureFromFile(infilename);
+    graph.fromFile(infilename);
 
     Writer p;
     EdgeData edgeData;
@@ -1403,9 +1403,9 @@ struct Transpose: public Conversion {
 
     edge_value_type* rawEdgeData = p.finish<edge_value_type>();
     if (EdgeData::has_value)
-      std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+      std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
     
-    p.structureToFile(outfilename);
+    p.toFile(outfilename);
     printStatus(graph.size(), graph.sizeEdges(), p.size(), p.sizeEdges());
   }
 };
@@ -1436,8 +1436,8 @@ struct Cleanup: public Conversion {
     Graph orig, graph;
     {
       // Original FileGraph is immutable because it is backed by a file
-      orig.structureFromFile(infilename);
-      graph.cloneFrom(orig);
+      orig.fromFile(infilename);
+      graph = orig;
     }
 
     size_t numEdges = 0;
@@ -1462,7 +1462,7 @@ struct Cleanup: public Conversion {
     if (numEdges == graph.sizeEdges()) {
       std::cout << "Graph already simplified; copy input to output\n";
       printStatus(graph.size(), graph.sizeEdges());
-      graph.structureToFile(outfilename);
+      graph.toFile(outfilename);
       return;
     }
 
@@ -1514,9 +1514,9 @@ struct Cleanup: public Conversion {
 
     edge_value_type* rawEdgeData = p.finish<edge_value_type>();
     if (EdgeData::has_value)
-      std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+      std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
     
-    p.structureToFile(outfilename);
+    p.toFile(outfilename);
     printStatus(graph.size(), graph.sizeEdges(), p.size(), p.sizeEdges());
   }
 };
@@ -1534,8 +1534,8 @@ struct SortEdges: public boost::mpl::if_c<NeedsEdgeData, HasNoVoidSpecialization
     Graph orig, graph;
     {
       // Original FileGraph is immutable because it is backed by a file
-      orig.structureFromFile(infilename);
-      graph.cloneFrom(orig);
+      orig.fromFile(infilename);
+      graph = orig;
     }
 
     for (typename Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
@@ -1544,7 +1544,7 @@ struct SortEdges: public boost::mpl::if_c<NeedsEdgeData, HasNoVoidSpecialization
       graph.sortEdges<EdgeTy>(src, SortBy<GNode,EdgeTy>());
     }
 
-    graph.structureToFile(outfilename);
+    graph.toFile(outfilename);
     printStatus(graph.size(), graph.sizeEdges());
   }
 };
@@ -1559,7 +1559,7 @@ struct MakeUnsymmetric: public Conversion {
     typedef Graph::GraphNode GNode;
     
     Graph graph;
-    graph.structureFromFile(infilename);
+    graph.fromFile(infilename);
 
     size_t numEdges = 0;
 
@@ -1578,7 +1578,7 @@ struct MakeUnsymmetric: public Conversion {
     if (numEdges == graph.sizeEdges()) {
       std::cout << "Graph already simplified; copy input to output\n";
       printStatus(graph.size(), graph.sizeEdges());
-      graph.structureToFile(outfilename);
+      graph.toFile(outfilename);
       return;
     }
 
@@ -1624,9 +1624,9 @@ struct MakeUnsymmetric: public Conversion {
 
     edge_value_type* rawEdgeData = p.finish<edge_value_type>();
     if (EdgeData::has_value)
-      std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+      std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
     
-    p.structureToFile(outfilename);
+    p.toFile(outfilename);
     printStatus(graph.size(), graph.sizeEdges(), p.size(), p.sizeEdges());
   }
 };
@@ -1730,9 +1730,9 @@ struct Dimacs2Gr: public HasNoVoidSpecialization {
 
     edge_value_type* rawEdgeData = p.finish<edge_value_type>();
     if (EdgeData::has_value)
-      std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+      std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
 
-    p.structureToFile(outfilename);
+    p.toFile(outfilename);
     printStatus(p.size(), p.sizeEdges());
   }
 };
@@ -1801,7 +1801,7 @@ struct Pbbs2Gr: public HasOnlyVoidSpecialization {
 
     p.finish<void>();
 
-    p.structureToFile(outfilename);
+    p.toFile(outfilename);
     printStatus(p.size(), p.sizeEdges());
   }
 };
@@ -1814,7 +1814,7 @@ struct Gr2Pbbsedges: public HasNoVoidSpecialization {
     typedef Graph::GraphNode GNode;
 
     Graph graph;
-    graph.structureFromFile(infilename);
+    graph.fromFile(infilename);
 
     std::ofstream file(outfilename.c_str());
     file << "WeightedEdgeArray\n";
@@ -1859,7 +1859,7 @@ struct Gr2Pbbs: public Conversion {
     typedef typename EdgeData::value_type edge_value_type;
 
     Graph graph;
-    graph.structureFromFile(infilename);
+    graph.fromFile(infilename);
 
     std::ofstream file(outfilename.c_str());
     if (EdgeData::has_value)
@@ -1905,7 +1905,7 @@ struct Gr2BinaryPbbs: public HasOnlyVoidSpecialization {
     typedef Graph::GraphNode GNode;
 
     Graph graph;
-    graph.structureFromFile(infilename);
+    graph.fromFile(infilename);
 
     {
       std::string configName = outfilename + ".config";
@@ -1950,7 +1950,7 @@ struct Gr2Dimacs: public HasNoVoidSpecialization {
     typedef Graph::GraphNode GNode;
 
     Graph graph;
-    graph.structureFromFile(infilename);
+    graph.fromFile(infilename);
 
     std::ofstream file(outfilename.c_str());
     file << "p sp " << graph.size() << " " << graph.sizeEdges() << "\n";
@@ -1985,7 +1985,7 @@ struct Gr2Rmat: public HasNoVoidSpecialization {
     typedef Graph::GraphNode GNode;
 
     Graph graph;
-    graph.structureFromFile(infilename);
+    graph.fromFile(infilename);
 
     std::ofstream file(outfilename.c_str());
     file << "%%%\n";
@@ -2026,7 +2026,7 @@ struct Gr2Bsml: public Conversion {
     typedef typename Galois::LargeArray<EdgeTy> EdgeData;
 
     Graph graph;
-    graph.structureFromFile(infilename);
+    graph.fromFile(infilename);
 
     uint32_t nnodes = graph.size();
     uint32_t nedges = graph.sizeEdges(); 
@@ -2182,9 +2182,9 @@ struct Svmlight2Gr: public HasNoVoidSpecialization {
       } else {
         edge_value_type* rawEdgeData = p.finish<edge_value_type>();
         if (EdgeData::has_value)
-          std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+          std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
         numNodes += maxFeature + 1;
-        p.structureToFile(outfilename);
+        p.toFile(outfilename);
         printStatus(numNodes, numEdges);
       }
     }

@@ -241,7 +241,7 @@ public:
 
   void load(segment_type& s, edge_iterator begin, edge_iterator end, size_t sizeof_data);
 
-  void structureFromFile(const std::string& fname);
+  void fromFile(const std::string& fname);
 };
 
 struct read_oc_immutable_edge_graph_tag { };
@@ -510,7 +510,7 @@ public:
 
   //! Assumes that the graph is symmetric
   void createFrom(const std::string& fname) { 
-    outGraph.structureFromFile(fname);
+    outGraph.fromFile(fname);
     numNodes = outGraph.size();
     numEdges = outGraph.sizeEdges();
     nodeData.create(numNodes);
@@ -521,8 +521,8 @@ public:
   }
   
   void createFrom(const std::string& fname, const std::string& transpose) {
-    outGraph.structureFromFile(fname);
-    inGraphStorage.structureFromFile(transpose);
+    outGraph.fromFile(fname);
+    inGraphStorage.fromFile(transpose);
     numNodes = outGraph.size();
     if (numNodes != inGraphStorage.size())
       GALOIS_DIE("graph does not have the same number of nodes as its transpose");

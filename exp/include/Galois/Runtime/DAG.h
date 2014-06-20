@@ -98,14 +98,16 @@ public:
     NItemAlloc niAlloc;
 
     NItem* create (Lockable* l) {
-      NItem* ni = niAlloc.allocAndConstruct (l);
+      NItem* ni = niAlloc.allocate(1);
+      niAlloc.construct(l);
       assert (ni != nullptr);
       return ni;
     }
 
     void destroy (NItem* ni) {
       // delete ni; ni = NULL;
-      niAlloc.destroyAndFree (ni);
+      niAlloc.destroy(ni);
+      niAlloc.deallocate(ni, 1);
     }
   };
   
@@ -265,7 +267,8 @@ public:
   ~DAGexecutor (void) {
     Galois::Runtime::do_all_impl (makeLocalRange (allCtxts),
         [this] (Ctxt* ctx) {
-          ctxtAlloc.destroyAndFree (ctx);
+          ctxtAlloc.destroy(ctx);
+          ctxtAlloc.deallocate(ctx, 1);
         }, "free_ctx");
   }
 
@@ -299,7 +302,8 @@ public:
     t_init.start ();
     Galois::Runtime::do_all_impl (range,
         [this] (const T& x) {
-          Ctxt* ctx = ctxtAlloc.allocAndConstruct (x, nhmgr);
+          Ctxt* ctx = ctxtAlloc.allocate(1);
+          ctxtAlloc.construct(ctx, x, nhmgr);
           assert (ctx != NULL);
 
           allCtxts.get ().push_back (ctx);
@@ -491,7 +495,8 @@ protected:
           for (auto c = uctx.getPushBuffer ().begin (), c_end = uctx.getPushBuffer ().end (); 
               c != c_end; ++c, ++i) {
 
-            BiModalTask* child = taskAlloc.allocAndConstruct (*c, t, BiModalTask::DIVIDE);
+            BiModalTask* child = taskAlloc.allocate(1);
+            taskAlloc.construct(child, *c, t, BiModalTask::DIVIDE);
             ctx.push (child);
           }
         } else { 
@@ -510,7 +515,8 @@ protected:
         }
 
         // task can be deallocated now
-        taskAlloc.destroyAndFree (t);
+        taskAlloc.destroy(t);
+        taskAlloc.deallocate(t, 1);
       }
 
     }
@@ -559,7 +565,8 @@ protected:
         for (auto c = uctx.getPushBuffer ().begin (), c_end = uctx.getPushBuffer ().end (); 
             c != c_end; ++c, ++i) {
 
-          Task* child = taskAlloc.allocAndConstruct (*c, t);
+          Task* child = taskAlloc.allocate(1);
+          taskAlloc.construct (child, *c, t);
           ctx.push (child);
         }
       } else { 
@@ -624,7 +631,8 @@ public:
 
     BiModalTaskAlloc taskAlloc;
 
-    BiModalTask* t = taskAlloc.allocAndConstruct (initItem, nullptr, BiModalTask::DIVIDE);
+    BiModalTask* t = taskAlloc.allocate(1);
+    taskAlloc.construct(t, initItem, nullptr, BiModalTask::DIVIDE);
 
     BiModalTask* init[] = { t };
 
@@ -637,7 +645,8 @@ public:
 #endif
         loopname.c_str ());
 
-    taskAlloc.destroyAndFree (t);
+    taskAlloc.destroy(t);
+    taskAlloc.deallocate(t, 1);
   }
 
   void execute_2p (const T& initItem) {
@@ -653,7 +662,8 @@ public:
         // },
         // "initial_tasks_gen");
 
-    Task* initTask = taskAlloc.allocAndConstruct (initItem, nullptr);
+    Task* initTask = taskAlloc.allocate(1);
+    taskAlloc.construct(initTask, initItem, nullptr);
 
     WL_ty conqWL;
 
@@ -680,7 +690,8 @@ public:
 #endif
         conq_loop_name.c_str ());
 
-    taskAlloc.destroyAndFree (initTask);
+    taskAlloc.destroy(initTask);
+    taskAlloc.deallocate(initTask, 1);
 
   }
 

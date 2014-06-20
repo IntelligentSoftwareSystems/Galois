@@ -37,9 +37,7 @@ struct Fn2 {
   MapTy* m;
   void operator()(const int& x) {
     int v = (*m)[x].val;
-    if (v != x && v != 0) {
-      GALOIS_DIE("wrong value");
-    }
+    GALOIS_ASSERT(v == x || v == 0);
   }
 };
 
@@ -68,8 +66,7 @@ void timeMap(std::string c, const std::vector<int>& keys) {
   t2.start();
   for (auto& x : keys) {
     int v = m[x].val;
-    if (v != x)
-      GALOIS_DIE("wrong value");
+    GALOIS_ASSERT(v == x);
   }
   t2.stop();
   std::cout << c << " " << t1.get() << " " << t2.get() << "\n";

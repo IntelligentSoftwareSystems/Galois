@@ -132,7 +132,7 @@ static void readHeader(int fd, uint64_t& numNodes, uint64_t& numEdges) {
   }
 }
 
-void OCFileGraph::structureFromFile(const std::string& filename) {
+void OCFileGraph::fromFile(const std::string& filename) {
   masterFD = open(filename.c_str(), O_RDONLY);
   if (masterFD == -1) {
     GALOIS_SYS_DIE("failed opening ", filename);

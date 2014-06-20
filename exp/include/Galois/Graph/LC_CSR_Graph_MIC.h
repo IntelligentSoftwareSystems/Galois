@@ -36,14 +36,15 @@
 
 #include GALOIS_CXX11_STD_HEADER(type_traits)
 
-// #define GALOIS_DO_INNER_PREFETCH 1
+// #define _DO_INNER_PREFETCH 1
 
-#undef GALOIS_DO_INNER_PREFETCH
 
-// #define GALOIS_DO_OUTER_PREFETCH 1
+// #define _DO_OUTER_PREFETCH 1
 
-#undef GALOIS_DO_OUTER_PREFETCH
 
+#if defined(__INTEL_COMPILER)
+#define _DO_UNROLL
+#endif
 
 namespace Galois {
 namespace Graph {
@@ -62,7 +63,7 @@ namespace Graph {
  * 
  * // Create graph
  * Graph g;
- * g.structureFromFile(inputfile);
+ * Galois::Graph::readGraph(g, inputfile);
  *
  * // Traverse graph
  * for (Graph::iterator ii = g.begin(), ei = g.end(); ii != ei; ++ii) {
@@ -83,7 +84,7 @@ namespace Graph {
  *
  * // Create graph
  * Graph g;
- * g.structureFromFile(inputfile);
+ * Galois::Graph::readGraph(g, inputfile);
  *
  * // Traverse graph
  * for (Graph::GraphNode src : g) {
@@ -213,7 +214,7 @@ public:
   }
 
   void prefetchData (GraphNode N, const unsigned pftch_kind) const {
-#ifdef GALOIS_DO_OUTER_PREFETCH
+#ifdef _DO_OUTER_PREFETCH
     if (pftch_kind == _MM_HINT_T1) {
       _mm_prefetch ((const char*) &nodeData[N], _MM_HINT_T1);
     } else {
@@ -226,7 +227,7 @@ public:
   }
 
   void prefetchOutNeighbors (GraphNode N, const unsigned pftch_kind) const {
-#ifdef GALOIS_DO_OUTER_PREFETCH
+#ifdef _DO_OUTER_PREFETCH
     const EdgeIndex beg = raw_begin (N);
     const EdgeIndex end = raw_end (N);
 
@@ -234,14 +235,18 @@ public:
       const unsigned l1_pftch_count = 4;
       const unsigned prev_pftch_count = l1_pftch_count;
       const unsigned l2_pftch_count = 16;
+#ifdef _DO_UNROLL
 #pragma unroll (l2_pftch_count)
+#endif
       for (unsigned j = 0; j < l2_pftch_count; ++j) {
         if ((beg + prev_pftch_count + j) < end) {
           GraphNode next = edgeDst[beg + prev_pftch_count + j];
           _mm_prefetch ((const char*) &nodeData[next], _MM_HINT_T1);
         }
       }
+#ifdef _DO_UNROLL
 #pragma unroll (l1_pftch_count)
+#endif
       for (unsigned j = 0; j < l1_pftch_count; ++j) {
         if ((beg + j) < end) {
           GraphNode next = edgeDst[beg + j];
@@ -310,8 +315,10 @@ public:
 
     const unsigned pftch_count = 4;
 
-#ifdef GALOIS_DO_INNER_PREFETCH
+#ifdef _DO_INNER_PREFETCH
+#ifdef _DO_UNROLL
 #pragma unroll (pftch_count)
+#endif
     for (unsigned j = 0; j < pftch_count; ++j) {
       if ((beg + j) < end) {
         GraphNode next = edgeDst[beg + j];
@@ -332,8 +339,10 @@ public:
     for (EdgeIndex i = beg; i < end; i += pftch_count) {
 
 
-#ifdef GALOIS_DO_INNER_PREFETCH
+#ifdef _DO_INNER_PREFETCH
+#ifdef _DO_UNROLL
 #pragma unroll (pftch_count)
+#endif
       for (unsigned j = 0; j < pftch_count; ++j) {
         if ((i + j + pftch_count) < end) {
           GraphNode next = edgeDst[i + j + pftch_count];
@@ -350,7 +359,9 @@ public:
       // }
 #endif
 
+#ifdef _DO_UNROLL
 #pragma unroll (pftch_count)
+#endif
       for (unsigned j = 0; j < pftch_count; ++j) {
         if ((i + j) < end) {
           GraphNode dst = edgeDst[i + j];
@@ -364,7 +375,7 @@ public:
 
 #if 0
     for (EdgeIndex i = beg; i < end; ++i) {
-#ifdef GALOIS_DO_INNER_PREFETCH
+#ifdef _DO_INNER_PREFETCH
       const int pftch_dist = 3;
       if (i + pftch_dist < end) {
         GraphNode next = edgeDst[i + pftch_dist];
@@ -483,5 +494,9 @@ public:
 
 } // end namespace
 } // end namespace
+
+#undef _DO_INNER_PREFETCH
+#undef _DO_OUTER_PREFETCH
+#undef _DO_UNROLL
 
 #endif // GALOIS_GRAPH_LC_CSR_GRAPH_MIC_H

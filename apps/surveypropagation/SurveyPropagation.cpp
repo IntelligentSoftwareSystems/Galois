@@ -131,7 +131,7 @@ static Galois::GAccumulator<double> sumBias;
 
 //interesting parameters:
 static const double epsilon = 0.000001;
-static const int tmax = 100;
+//static const int tmax = 100;
 //static int tlimit = 0;
 
 void initialize_random_formula(int M, int N, int K) {
