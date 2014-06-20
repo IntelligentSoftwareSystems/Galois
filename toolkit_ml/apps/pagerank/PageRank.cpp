@@ -938,7 +938,7 @@ static void precomputePullData() {
   float* t = output.finish<float>();
   std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), t);
   
-  output.structureToFile(outputPullFilename);
+  output.toFile(outputPullFilename);
   std::cout << "Wrote " << outputPullFilename << "\n";
 }
 

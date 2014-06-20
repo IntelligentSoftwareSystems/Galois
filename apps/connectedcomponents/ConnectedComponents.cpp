@@ -676,7 +676,7 @@ void doWriteComponent(Graph& graph, typename Graph::node_data_type::component_ty
       << "Writing largest component to " << largestComponentFilename
       << " (nodes: " << numNodes << " edges: " << numEdges << ")\n";
 
-    p.structureToFile(largestComponentFilename);
+    p.toFile(largestComponentFilename);
   }
 
   if (permutationFilename != "") {

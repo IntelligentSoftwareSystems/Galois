@@ -19,8 +19,8 @@ void testBasic(Graph&& graph, const std::string& f, Fn fn) {
 
 int main(int argc, char** argv) {
   GALOIS_ASSERT(argc > 1);
-  testBasic(Galois::Graph::FileGraph(), argv[1], [](Graph& g, std::string f) { g.structureFromFile(f); });
-  testBasic(Galois::Graph::FileGraph(), argv[1], [](Graph& g, std::string f) { g.structureFromFileInterleaved<void>(f); });
+  testBasic(Galois::Graph::FileGraph(), argv[1], [](Graph& g, std::string f) { g.fromFile(f); });
+  testBasic(Galois::Graph::FileGraph(), argv[1], [](Graph& g, std::string f) { g.fromFileInterleaved<void>(f); });
 
   return 0;
 }

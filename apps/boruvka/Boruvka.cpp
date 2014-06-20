@@ -410,7 +410,7 @@ void initializeGraph() {
   Galois::Graph::FileGraph origGraph;
   Galois::Graph::FileGraph symGraph;
   
-  origGraph.structureFromFileInterleaved<EdgeData>(inputFilename);
+  origGraph.fromFileInterleaved<EdgeData>(inputFilename);
   if (!symmetricGraph) 
     Galois::Graph::makeSymmetric<EdgeData>(origGraph, symGraph);
   else

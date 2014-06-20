@@ -820,7 +820,7 @@ struct AnyBFSUnordered {
 template<typename EdgeTy>
 void writeGraph() {
   Galois::Graph::FileGraph origGraph;
-  origGraph.structureFromFileInterleaved<EdgeTy>(filename);
+  origGraph.fromFileInterleaved<EdgeTy>(filename);
   std::vector<size_t> perm;
   perm.resize(graph.size());
   for (GNode n : graph)
@@ -831,7 +831,7 @@ void writeGraph() {
   std::cout 
     << "Writing permuted graph to " << outputFilename 
     << " (nodes: " << out.size() << " edges: " << out.sizeEdges() << ")\n";
-  out.structureToFile(outputFilename);
+  out.toFile(outputFilename);
 }
 
 void writePermutation() {

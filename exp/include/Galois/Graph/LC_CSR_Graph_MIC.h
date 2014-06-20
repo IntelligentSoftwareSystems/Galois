@@ -63,7 +63,7 @@ namespace Graph {
  * 
  * // Create graph
  * Graph g;
- * g.structureFromFile(inputfile);
+ * Galois::Graph::readGraph(g, inputfile);
  *
  * // Traverse graph
  * for (Graph::iterator ii = g.begin(), ei = g.end(); ii != ei; ++ii) {
@@ -84,7 +84,7 @@ namespace Graph {
  *
  * // Create graph
  * Graph g;
- * g.structureFromFile(inputfile);
+ * Galois::Graph::readGraph(g, inputfile);
  *
  * // Traverse graph
  * for (Graph::GraphNode src : g) {

@@ -31,8 +31,8 @@
 namespace Galois {
 namespace Graph {
 
-void FileGraph::structureFromFileInterleaved(const std::string& filename, size_t sizeofEdgeData) {
-  structureFromFile(filename, false);
+void FileGraph::fromFileInterleaved(const std::string& filename, size_t sizeofEdgeData) {
+  fromFile(filename, false);
 
   std::mutex lock;
   std::condition_variable cond;

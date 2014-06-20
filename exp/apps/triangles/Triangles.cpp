@@ -445,7 +445,7 @@ void makeGraph(const std::string& triangleFilename) {
 
   G initial, permuted;
 
-  initial.structureFromFileInterleaved<void>(inputFilename);
+  initial.fromFileInterleaved<void>(inputFilename);
   
   // Getting around lack of resize for deque
   std::deque<N> nodes;
@@ -465,7 +465,7 @@ void makeGraph(const std::string& triangleFilename) {
   Galois::do_all(permuted.begin(), permuted.end(), [&](N x) { permuted.sortEdges<void>(x, IdLess<N,void>()); });
 
   std::cout << "Writing new input file: " << triangleFilename << "\n";
-  permuted.structureToFile(triangleFilename);
+  permuted.toFile(triangleFilename);
   Galois::Graph::readGraph(graph, permuted);
 }
 
