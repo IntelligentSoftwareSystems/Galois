@@ -660,7 +660,7 @@ public:
   }
 
   void constructNodesFrom(FileGraph& graph, unsigned tid, unsigned total, ReadGraphAuxData& aux) {
-    auto r = graph.divideBy(sizeof(gNode), sizeof(typename gNode::EdgeInfo), tid, total);
+    auto r = graph.divideByNode(sizeof(gNode), sizeof(typename gNode::EdgeInfo), tid, total);
     for (FileGraph::iterator ii = r.first, ei = r.second; ii != ei; ++ii) {
       aux[*ii] = createNode();
       addNode(aux[*ii], Galois::MethodFlag::NONE);
@@ -669,7 +669,7 @@ public:
 
   void constructEdgesFrom(FileGraph& graph, unsigned tid, unsigned total, const ReadGraphAuxData& aux) {
     typedef typename std::decay<typename gNode::EdgeInfo::reference>::type value_type;
-    auto r = graph.divideBy(sizeof(gNode), sizeof(typename gNode::EdgeInfo), tid, total);
+    auto r = graph.divideByNode(sizeof(gNode), sizeof(typename gNode::EdgeInfo), tid, total);
 
     for (FileGraph::iterator ii = r.first, ei = r.second; ii != ei; ++ii) {
       for (FileGraph::edge_iterator nn = graph.edge_begin(*ii), en = graph.edge_end(*ii); nn != en; ++nn) {

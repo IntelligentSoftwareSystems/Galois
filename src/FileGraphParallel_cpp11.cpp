@@ -44,7 +44,7 @@ void FileGraph::fromFileInterleaved(const std::string& filename, size_t sizeofEd
     unsigned tid = Galois::Runtime::LL::getTID();
     std::unique_lock<std::mutex> lk(lock);
     if (Galois::Runtime::LL::isPackageLeaderForSelf(tid)) {
-      pageIn(Galois::Runtime::LL::getPackageForThread(tid), maxPackages, sizeofEdgeData);
+      pageIn(Galois::Runtime::LL::getPackageForThread(tid), maxPackages, sizeofEdgeData, true);
       if (--count == 0)
         cond.notify_all();
     } else {

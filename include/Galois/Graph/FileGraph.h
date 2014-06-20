@@ -44,7 +44,7 @@
 
 #include <type_traits>
 #include <deque>
-
+#include <vector>
 #include <string.h>
 
 namespace Galois {
@@ -82,8 +82,12 @@ private:
 
   uint64_t* outIdx;
   uint32_t* outs;
-
   char* edgeData;
+
+  //! adjustments to node index when we load only part of a graph
+  uint32_t nodeOffset;
+  //! adjustments to edge index when we load only part of a graph
+  uint64_t edgeOffset;
 
   void move_assign(FileGraph&&);
   uint64_t getEdgeIdx(GraphNode src, GraphNode dst) const;
@@ -91,7 +95,7 @@ private:
   uint32_t* raw_neighbor_end(GraphNode N) const;
 
   //! Initializes a graph from block of memory
-  void fromMem(void* m);
+  void fromMem(void* m, uint32_t nodeOffset, uint64_t edgeOffset);
 
   void* fromGraph(FileGraph& g, size_t sizeofEdgeData);
 
@@ -109,7 +113,7 @@ private:
   
   void fromFileInterleaved(const std::string& filename, size_t sizeofEdgeData);
 
-  void pageIn(unsigned id, unsigned total, size_t sizeofEdgeData);
+  void pageIn(unsigned id, unsigned total, size_t sizeofEdgeData, bool byNode);
 
 protected:
   /**
@@ -122,7 +126,10 @@ protected:
    * @return pointer to begining of edgeData in graph
    */
   void* fromArrays(uint64_t* outIdx, uint64_t numNodes,
-      uint32_t* outs, uint64_t numEdges, char* edgeData, size_t sizeofEdgeData, bool converted);
+      uint32_t* outs, uint64_t numEdges,
+      char* edgeData, size_t sizeofEdgeData,
+      uint32_t nodeOffset, uint64_t edgeOffset,
+      bool converted);
 
 public:
   // Node Handling
@@ -185,7 +192,13 @@ public:
   }
 
   template<typename EdgeTy> 
-  EdgeTy& getEdgeData(edge_iterator it) const {
+  const EdgeTy& getEdgeData(edge_iterator it) const {
+    assert(edgeData);
+    return reinterpret_cast<const EdgeTy*>(edgeData)[*it];
+  }
+
+  template<typename EdgeTy>
+  EdgeTy& getEdgeData(edge_iterator it) {
     assert(edgeData);
     return reinterpret_cast<EdgeTy*>(edgeData)[*it];
   }
@@ -222,21 +235,15 @@ public:
   iterator begin() const;
   iterator end() const;
 
-  //! Divides nodes into balanced ranges
-  std::pair<iterator,iterator> divideBy(size_t nodeSize, size_t edgeSize, unsigned id, unsigned total);
+  //! Divides nodes into balanced ranges 
+  std::pair<iterator,iterator> divideByNode(size_t nodeSize, size_t edgeSize, unsigned id, unsigned total);
   //! Divides edges into balanced ranges
-  std::pair<uint64_t,uint64_t> divideEdgesBy(unsigned id, unsigned total);
+  std::pair<edge_iterator,edge_iterator> divideByEdge(size_t nodeSize, size_t edgeSize, unsigned id, unsigned total);
 
   node_id_iterator node_id_begin() const;
   node_id_iterator node_id_end() const;
   edge_id_iterator edge_id_begin() const;
   edge_id_iterator edge_id_end() const;
-
-  template<typename EdgeTy>
-  EdgeTy& getEdgeData(neighbor_iterator it) {
-    assert(edgeData);
-    return reinterpret_cast<EdgeTy*>(edgeData)[std::distance(outs, it.base())];
-  }
 
   bool hasNeighbor(GraphNode N1, GraphNode N2) const;
 
@@ -271,8 +278,7 @@ public:
   /**
    * XXX
    */
-  void partFromFile(const std::string& filename, iterator begin, iterator end, bool preFault = true);
-  void partFromFile(const std::string& filename, uint64_t begin, uint64_t end, bool preFault = true);
+  void partFromFile(const std::string& filename, unsigned id, unsigned total, bool byNode, bool preFault = true);
 
   /**
    * Reads graph connectivity information from file. Tries to balance memory
@@ -316,24 +322,15 @@ public:
  * </ol>
  */
 class FileGraphWriter: public FileGraph {
-  uint64_t *outIdx;
-  uint32_t *starts;
-  uint32_t *outs;
+  std::vector<uint64_t> outIdx;
+  std::vector<uint32_t> starts;
+  std::vector<uint32_t> outs;
   size_t sizeofEdgeData;
   size_t numNodes;
   size_t numEdges;
 
 public:
-  FileGraphWriter(): outIdx(0), starts(0), outs(0), sizeofEdgeData(0), numNodes(0), numEdges(0) { }
-
-  ~FileGraphWriter() { 
-    if (outIdx)
-      delete [] outIdx;
-    if (starts)
-      delete [] starts;
-    if (outs)
-      delete [] outs;
-  }
+  FileGraphWriter(): sizeofEdgeData(0), numNodes(0), numEdges(0) { }
 
   void setNumNodes(size_t n) { numNodes = n; }
   void setNumEdges(size_t n) { numEdges = n; }
@@ -342,9 +339,7 @@ public:
   //! Marks the transition to next phase of parsing, counting the degree of
   //! nodes
   void phase1() { 
-    assert(!outIdx);
-    outIdx = new uint64_t[numNodes];
-    memset(outIdx, 0, sizeof(*outIdx) * numNodes);
+    outIdx.resize(numNodes);
   }
 
   //! Increments degree of id by delta
@@ -359,16 +354,14 @@ public:
       return;
 
     // Turn counts into partial sums
-    uint64_t* prev = outIdx;
-    for (uint64_t *ii = outIdx + 1, *ei = outIdx + numNodes; ii != ei; ++ii, ++prev) {
+    auto prev = outIdx.begin();
+    for (auto ii = outIdx.begin() + 1, ei = outIdx.end(); ii != ei; ++ii, ++prev) {
       *ii += *prev;
     }
     assert(outIdx[numNodes-1] == numEdges);
 
-    starts = new uint32_t[numNodes];
-    memset(starts, 0, sizeof(*starts) * numNodes);
-
-    outs = new uint32_t[numEdges];
+    starts.resize(numNodes);
+    outs.resize(numEdges);
   }
 
   //! Adds a neighbor between src and dst
@@ -386,13 +379,10 @@ public:
    */
   template<typename T>
   T* finish() { 
-    void* ret = fromArrays(outIdx, numNodes, outs, numEdges, nullptr, sizeofEdgeData, false);
-    delete [] outIdx;
-    outIdx = 0;
-    delete [] starts;
-    starts = 0;
-    delete [] outs;
-    outs = 0;
+    void* ret = fromArrays(&outIdx[0], numNodes, &outs[0], numEdges, nullptr, sizeofEdgeData, 0, 0, false);
+    outIdx.clear();
+    starts.clear();
+    outs.clear();
     return reinterpret_cast<T*>(ret);
   }
 };

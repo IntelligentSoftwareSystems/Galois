@@ -251,7 +251,7 @@ public:
   void constructFrom(FileGraph& graph, unsigned tid, unsigned total) {
     typedef typename EdgeInfo::value_type EDV;
     // XXX
-    auto r = graph.divideBy(
+    auto r = graph.divideByNode(
         NodeData::size_of::value + LC_PartitionedInlineEdge_Graph::size_of_out_of_line::value,
         EdgeData::size_of::value,
         tid, total);

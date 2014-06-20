@@ -52,7 +52,7 @@ void FileGraph::fromFileInterleaved(const std::string& filename, size_t sizeofEd
       GALOIS_DIE("PTHREAD");
 
     if (Galois::Runtime::LL::isPackageLeaderForSelf(tid)) {
-      pageIn(Galois::Runtime::LL::getPackageForThread(tid), maxPackages, sizeofEdgeData);
+      pageIn(Galois::Runtime::LL::getPackageForThread(tid), maxPackages, sizeofEdgeData, true);
       if (--count == 0) {
         if (pthread_cond_broadcast(&cond))
           GALOIS_DIE("PTHREAD");
