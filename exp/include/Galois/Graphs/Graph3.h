@@ -138,6 +138,9 @@ public:
        << " val: " << val
        << "}>";
   }
+
+  //Trivially copyable
+  typedef int tt_is_copyable;
 };
 
 template<typename NHTy>
@@ -156,6 +159,9 @@ public:
     os << dst->getActive();
     os << "}>";
   }
+  //Gill
+  typedef int tt_is_copyable;
+
 };
 
 template<typename NHTy, typename EdgeDataTy>

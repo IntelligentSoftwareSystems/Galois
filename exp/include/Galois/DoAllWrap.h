@@ -150,7 +150,7 @@ struct DoAllImpl<CILK> {
 
 
   static void initOne (BusyBarrier& busybarrier, unsigned tid) {
-    Runtime::LL::initTID(tid % Runtime::getMaxThreads());
+    Runtime::LL::initTID(tid % Runtime::LL::getMaxThreads());
         Runtime::initPTS_cilk ();
 
         unsigned id = Runtime::LL::getTID ();

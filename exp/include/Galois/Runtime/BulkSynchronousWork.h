@@ -398,11 +398,11 @@ class Executor {
     }
   };
 
-  struct value_printer {
-    template<typename T> void operator()(T x) {
-      std::cout << "C: " << x << "\n";
-    }
-  };
+  //struct value_printer {
+  //  template<typename T> void operator()(T x) {
+  //    std::cout << "C: " << x << "\n";
+  //  }
+  //};
 
   void processFunctions(ThreadLocalData& tld, FirstWL* cur, FirstWL* next) {
     using namespace boost;

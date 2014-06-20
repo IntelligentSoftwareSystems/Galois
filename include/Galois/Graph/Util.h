@@ -45,7 +45,7 @@ void readGraph(GraphTy& graph, Args&&... args) {
 template<typename GraphTy>
 void readGraphDispatch(GraphTy& graph, read_default_graph_tag tag, const std::string& filename) {
   FileGraph f;
-  f.structureFromFileInterleaved<typename GraphTy::edge_data_type>(filename);
+  f.fromFileInterleaved<typename GraphTy::edge_data_type>(filename);
   readGraphDispatch(graph, tag, f);
 }
 
@@ -92,7 +92,7 @@ void readGraphDispatch(GraphTy& graph, read_default_graph_tag, FileGraph& f) {
 template<typename GraphTy>
 void readGraphDispatch(GraphTy& graph, read_with_aux_graph_tag tag, const std::string& filename) {
   FileGraph f;
-  f.structureFromFileInterleaved<typename GraphTy::edge_data_type>(filename);
+  f.fromFileInterleaved<typename GraphTy::edge_data_type>(filename);
   readGraphDispatch(graph, tag, f);
 }
 

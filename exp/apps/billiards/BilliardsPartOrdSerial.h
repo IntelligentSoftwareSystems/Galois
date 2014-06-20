@@ -454,7 +454,7 @@ protected:
       if (indep) {
 
         // from start upto i in priority order
-        for (WLTy::iterator j = workList.begin (), ej = workList.end (); 
+        for (WLTy::iterator j = workList.begin ()/*, ej = workList.end ()*/; 
             (j != i) && ((*j) < (*i)); ++j) {
 
           ++findIter;

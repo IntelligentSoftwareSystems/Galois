@@ -254,7 +254,7 @@ FunctionTy do_all_dist(const StandardRange<IterTy>& r, const FunctionTy& f, cons
 }
 
 template<typename T, typename FunctionTy>
-FunctionTy  do_all_dist(const LocalRange<T>& r, const FunctionTy& f, const char* loopname, bool steal) {
+FunctionTy do_all_dist(const LocalRange<T>& r, const FunctionTy& f, const char* loopname, bool steal) {
   // Get a handle to the network interface
   //  Don't move as NetworkInterface::Num and NetworkInterface::ID have to be initialized first
   NetworkInterface& net = getSystemNetworkInterface();
@@ -300,7 +300,7 @@ void on_each_impl_dist(const FunctionTy& f, const char* loopname) {
     // serialize function and data
     gSerialize(buf,f);
     //send data
-    net.sendLoop (i, &on_each_impl_landing_pad<FunctionTy>, buf);
+    net.sendLoop(i, &on_each_impl_landing_pad<FunctionTy>, buf);
   }
   net.flush();
   net.handleReceives();

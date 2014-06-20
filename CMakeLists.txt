@@ -251,8 +251,6 @@ endif()
 
 ###### Global Functions ######
 
-include(ParseArguments)
-
 function(compileApp name)
   if(ARGN)
     set(Sources ${ARGN})
@@ -263,8 +261,10 @@ function(compileApp name)
 endfunction(compileApp)
 
 function(app name)
-#PARSE_ARGUMENTS(APP "REQUIRES;EXTLIBS;DISTSAFE" "" ${ARGN})
-  cmake_parse_arguments(APP "DISTSAFE" "" "REQUIRES;EXTLIBS" ${ARGN})
+  set(options DISTSAFE)
+  set(oneValueArgs)
+  set(multiValueArgs REQUIRES EXTLIBS)
+  cmake_parse_arguments(APP "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
   if(${APP_DISTSAFE})
   else()
@@ -289,7 +289,10 @@ function(app name)
 endfunction(app)
 
 function(makeTest name)
-  cmake_parse_arguments(APP "DISTSAFE" "" "REQUIRES" ${ARGN})
+  set(options DISTSAFE)
+  set(oneValueArgs)
+  set(multiValueArgs REQUIRES COMMAND_PREFIX COMMAND_SUFFIX)
+  cmake_parse_arguments(APP "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
   if(${APP_DISTSAFE})
   else()
@@ -305,11 +308,19 @@ function(makeTest name)
     endif()
   endforeach()
 
+  set(commandline)
+  foreach(f ${APP_COMMAND_PREFIX})
+    list(APPEND commandline ${f})
+  endforeach()
+  list(APPEND commandline "$<TARGET_FILE:test-${name}>")
+  foreach(f ${APP_COMMAND_SUFFIX})
+    list(APPEND commandline ${f})
+  endforeach()
+
   add_executable(test-${name} ${name}.cpp)
   target_link_libraries(test-${name} galois)
-  add_test(${name} test-${name})
+  add_test(NAME ${name} COMMAND ${commandline})
 endfunction()
-
 
 ###### Source finding ######
 include_directories(include)
@@ -322,6 +333,7 @@ if(NOT SKIP_COMPILE_APPS)
   add_subdirectory(apps)
   add_subdirectory(inputs)
   add_subdirectory(test)
+  add_subdirectory(toolkit_ml)
 endif()
 if(USE_EXP)
   add_subdirectory(exp)

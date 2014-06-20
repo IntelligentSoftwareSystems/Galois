@@ -22,6 +22,9 @@ struct op {
     node->createEdge(node, node, -node->getData());
     std::cout << ".";
   }
+ //Gill
+  typedef int tt_is_copyable;
+
 };
 
 int main(int argc, char** argv) {

@@ -22,7 +22,7 @@ else
   SROME="${BASE}/inputs/structured/srome99.big.gr"
 fi
 
-run() {
+runSmallTest() {
   cmd="$@ -t 2"
   if [[ -x $1 ]]; then
     echo -en '\033[1;31m'
@@ -37,25 +37,25 @@ run() {
   fi
 }
 
-run apps/avi/AVIodgExplicitNoLock -n 0 -d 2 -f "${BASE}/inputs/avi/squareCoarse.NEU.gz"
-run apps/barneshut/barneshut -n 1000 -steps 1 -seed 0
-run apps/betweennesscentrality/betweennesscentrality-outer "${BASE}/inputs/structured/torus5.gr" -forceVerify
-run apps/bfs/bfs "${ROME}"
-run apps/boruvka/boruvka "${ROME}"
-run apps/clustering/clustering -numPoints 1000
-run apps/delaunayrefinement/delaunayrefinement "${BASE}/inputs/meshes/r10k.1"
-run apps/delaunaytriangulation/delaunaytriangulation "${BASE}/inputs/meshes/r10k.node"
-run apps/des/DESunordered "${BASE}/inputs/des/multTree6bit.net"
-run apps/gmetis/gmetis "${ROME}" 4
-run apps/kruskal/KruskalHand "${ROME}"
-run apps/independentset/independentset "${ROME}"
-run apps/matching/bipartite-mcm -inputType generated -n 100 -numEdges 1000 -numGroups 10 -seed 0
-run apps/preflowpush/preflowpush "${SROME}" 0 100
-run apps/sssp/sssp "${ROME}"
-run apps/surveypropagation/surveypropagation 9 100 300 3
-run apps/tutorial/hello-world 2 10
-run apps/tutorial/torus 2 100
-run apps/tutorial/torus-improved 2 100
+runSmallTest apps/avi/AVIodgExplicitNoLock -n 0 -d 2 -f "${BASE}/inputs/avi/squareCoarse.NEU.gz"
+runSmallTest apps/barneshut/barneshut -n 1000 -steps 1 -seed 0
+runSmallTest apps/betweennesscentrality/betweennesscentrality-outer "${BASE}/inputs/structured/torus5.gr" -forceVerify
+runSmallTest apps/bfs/bfs "${ROME}"
+runSmallTest apps/boruvka/boruvka "${ROME}"
+runSmallTest apps/clustering/clustering -numPoints 1000
+runSmallTest apps/delaunayrefinement/delaunayrefinement "${BASE}/inputs/meshes/r10k.1"
+runSmallTest apps/delaunaytriangulation/delaunaytriangulation "${BASE}/inputs/meshes/r10k.node"
+runSmallTest apps/des/DESunordered "${BASE}/inputs/des/multTree6bit.net"
+runSmallTest apps/gmetis/gmetis "${ROME}" 4
+runSmallTest apps/kruskal/KruskalHand "${ROME}"
+runSmallTest apps/independentset/independentset "${ROME}"
+runSmallTest apps/matching/bipartite-mcm -inputType generated -n 100 -numEdges 1000 -numGroups 10 -seed 0
+runSmallTest apps/preflowpush/preflowpush "${SROME}" 0 100
+runSmallTest apps/sssp/sssp "${ROME}"
+runSmallTest apps/surveypropagation/surveypropagation 9 100 300 3
+runSmallTest apps/tutorial/hello-world 2 10
+runSmallTest apps/tutorial/torus 2 100
+runSmallTest apps/tutorial/torus-improved 2 100
 
 if (($SKIPPED)); then
   echo -en '\033[1;32m'

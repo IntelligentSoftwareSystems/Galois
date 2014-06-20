@@ -31,6 +31,9 @@ struct op {
     }
     //printf("%d iteration in host %u and thread %u\n", nodeval, Distributed::networkHostID, LL::getTID());
   }
+
+  //Trivially_copyable
+  typedef int tt_is_copyable;
 };
 
 struct checking {
@@ -43,6 +46,9 @@ struct checking {
   void operator()(G::NodeHandle n, const Context& cnx) {
     printf("value: %d\n", graph->getData(n));
   }
+
+  //Trivially_copyable
+  typedef int tt_is_copyable;
 };
 
 int main(int argc, char** argv) {

@@ -157,7 +157,7 @@ struct EdgeFactory<void> {
  *   ... // Definition of node data
  * };
  *
- * typedef Galois::Graph::FastGraph<Node,int,true> Graph;
+ * typedef Galois::Graph::FirstGraph<Node,int,true> Graph;
  * 
  * // Create graph
  * Graph g;
@@ -196,9 +196,10 @@ struct EdgeFactory<void> {
  * @tparam NodeTy Type of node data
  * @tparam EdgeTy Type of edge data
  * @tparam Directional true if graph is directed
+ * @tparam SortNeighbors Keep neighbors sorted (for faster findEdge)
  */
 template<typename NodeTy, typename EdgeTy, bool Directional,
-  bool HasNoLockable=false
+         bool HasNoLockable=false, bool SortNeighbors=false
   >
 class FirstGraph : private boost::noncopyable {
 public:
@@ -232,6 +233,20 @@ private:
     template <typename T2>
     bool operator()(const T2& ii) const { return !ii.first() || !ii.first()->active; }
   };
+
+  template<typename T>
+  struct first_lt {
+    template <typename T2>
+    bool operator()(const T& N2, const T2& ii) const {
+      assert(ii.first() && "UNEXPECTED: invalid item in edgelist");
+      return N2 < ii.first();
+    }
+    template <typename T2>
+    bool operator()(const T2& ii, const T& N2) const {
+      assert(ii.first() && "UNEXPECTED: invalid item in edgelist");
+      return ii.first() < N2;
+    }
+  };
   
   class gNode;
   struct gNodeTypes: public detail::NodeInfoBaseTypes<NodeTy, !HasNoLockable> {
@@ -260,8 +275,16 @@ private:
     iterator end() { return edges.end();  }
     
     void erase(iterator ii) {
-      *ii = edges.back();
-      edges.pop_back();
+      if (SortNeighbors) {
+        // For sorted case remove the element, moving following
+        // elements back to fill the space.
+        edges.erase(ii);
+      } else {
+        // We don't need to preserve the order, so move the last edge
+        // into this place and then remove last edge.
+        *ii = edges.back();
+        edges.pop_back();
+      }
     }
 
     void erase(gNode* N) { 
@@ -271,7 +294,15 @@ private:
     }
 
     iterator find(gNode* N) {
-      return std::find_if(begin(), end(), first_eq_and_valid<gNode*>(N));
+      if ( SortNeighbors ) {
+        iterator ei = edges.end();
+        iterator ii = std::lower_bound(edges.begin(), ei, N,
+                                       first_lt<gNode*>());
+        first_eq_and_valid<gNode*> checker(N);
+        return (ii == ei || checker(*ii)) ? ii : ei;
+      }
+      else
+        return std::find_if(begin(), end(), first_eq_and_valid<gNode*>(N));
     }
 
     void resizeEdges(size_t size) {
@@ -280,18 +311,41 @@ private:
 
     template<typename... Args>
     iterator createEdge(gNode* N, EdgeTy* v, Args&&... args) {
-      return edges.insert(edges.end(), EdgeInfo(N, v, std::forward<Args>(args)...));
+      iterator ii;
+      if ( SortNeighbors ) {
+        // If neighbors are sorted, find appropriate insertion point.
+        // Insert before first neighbor that is too far.
+        ii = std::upper_bound(edges.begin(), edges.end(), N,
+                              first_lt<gNode*>());
+      }
+      else
+        ii = edges.end();
+      return edges.insert(ii, EdgeInfo(N, v, std::forward<Args>(args)...));
     }
 
     template<typename... Args>
     iterator createEdgeWithReuse(gNode* N, EdgeTy* v, Args&&... args) {
-      //First check for holes
-      iterator ii = std::find_if(begin(), end(), first_not_valid());
-      if (ii != end()) {
+      // First check for holes
+      iterator ii, ei;
+      if ( SortNeighbors ) {
+        // If neighbors are sorted, find acceptable range for insertion.
+        ii = std::lower_bound(edges.begin(), edges.end(), N,
+                              first_lt<gNode*>());
+        ei = std::upper_bound(ii, edges.end(), N,
+                              first_lt<gNode*>());
+      }
+      else {
+        // If not sorted, we can insert anywhere in the list.
+        ii = edges.begin();
+        ei = edges.end();
+      }
+      ii = std::find_if(ii, ei, first_not_valid());
+      if (ii != ei) {
+        // FIXME: We could move elements around (short distances).
 	*ii = EdgeInfo(N, v, std::forward<Args>(args)...);
 	return ii;
       }
-      return edges.insert(edges.end(), EdgeInfo(N, v, std::forward<Args>(args)...));
+      return edges.insert(ei, EdgeInfo(N, v, std::forward<Args>(args)...));
     }
 
     template<bool _A1 = HasNoLockable>
@@ -487,7 +541,18 @@ public:
     assert(src);
     assert(dst);
     src->acquire(mflag);
-    return boost::make_filter_iterator(is_edge(), src->find(dst), src->end());
+    typename gNodeTypes::iterator ii = src->find(dst), ei = src->end();
+    is_edge edge_predicate;
+    if ( ii != ei && edge_predicate(*ii) ) {
+      // After finding edge, lock dst and verify still active
+      dst->acquire(mflag);
+      if ( !edge_predicate(*ii) )
+        // I think we need this too, else we'll return some random iterator.
+        ii = ei;
+    }
+    else
+      ii = ei;
+    return boost::make_filter_iterator(edge_predicate, ii, ei);
   }
 
   /**

@@ -36,6 +36,9 @@ struct op {
       L.unlock();
     }
   }
+
+  //Trivially_copyable
+  typedef int tt_is_copyable;
 };
 
 struct cop {
@@ -53,6 +56,8 @@ struct cop {
     //std::cout << x << " " << Galois::Runtime::networkHostID << " " << Galois::Runtime::LL::getTID() << "\n";
     // L.unlock();
   }
+  //GILL
+  typedef int tt_is_copyable;
 };
 
 int main(int argc, char** argv) {

@@ -98,14 +98,16 @@ public:
     NItemAlloc niAlloc;
 
     NItem* create (Lockable* l) {
-      NItem* ni = niAlloc.allocAndConstruct (ni, l);
+      NItem* ni = niAlloc.allocate(1);
+      niAlloc.construct(l);
       assert (ni != nullptr);
       return ni;
     }
 
     void destroy (NItem* ni) {
       // delete ni; ni = NULL;
-      niAlloc.destroyAndFree (ni);
+      niAlloc.destroy(ni);
+      niAlloc.deallocate(ni, 1);
     }
   };
   
@@ -265,7 +267,8 @@ public:
   ~DAGexecutor (void) {
     Galois::Runtime::do_all_impl (makeLocalRange (allCtxts),
         [this] (Ctxt* ctx) {
-          ctxtAlloc.destroyAndFree (ctx);
+          ctxtAlloc.destroy(ctx);
+          ctxtAlloc.deallocate(ctx, 1);
         }, "free_ctx");
   }
 
@@ -299,7 +302,8 @@ public:
     t_init.start ();
     Galois::Runtime::do_all_impl (range,
         [this] (const T& x) {
-          Ctxt* ctx = ctxtAlloc.allocAndConstruct (x, nhmgr);
+          Ctxt* ctx = ctxtAlloc.allocate(1);
+          ctxtAlloc.construct(ctx, x, nhmgr);
           assert (ctx != NULL);
 
           allCtxts.get ().push_back (ctx);
@@ -401,7 +405,8 @@ protected:
   class Task {
 
   protected:
-    std::atomic<unsigned> numChild;
+    // std::atomic<unsigned> numChild;
+    GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE std::atomic<unsigned> numChild;
     T elem;
     Task* parent;
 
@@ -457,6 +462,20 @@ protected:
     DivFunc& divFunc;
     ConqFunc& conqFunc;
 
+#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
+    ApplyOperatorSinglePhase (
+        BiModalTaskAlloc& taskAlloc,
+        PerThreadUserCtx& userCtxts,
+        DivFunc& divFunc,
+        ConqFunc& conqFunc)
+      :
+        taskAlloc (taskAlloc),
+        userCtxts (userCtxts),
+        divFunc (divFunc),
+        conqFunc (conqFunc)
+    {}
+#endif
+
     template <typename C>
     void operator () (BiModalTask* t, C& ctx) {
 
@@ -476,7 +495,8 @@ protected:
           for (auto c = uctx.getPushBuffer ().begin (), c_end = uctx.getPushBuffer ().end (); 
               c != c_end; ++c, ++i) {
 
-            BiModalTask* child = taskAlloc.allocAndConstruct (*c, t, BiModalTask::DIVIDE);
+            BiModalTask* child = taskAlloc.allocate(1);
+            taskAlloc.construct(child, *c, t, BiModalTask::DIVIDE);
             ctx.push (child);
           }
         } else { 
@@ -495,7 +515,8 @@ protected:
         }
 
         // task can be deallocated now
-        taskAlloc.destroyAndFree (t);
+        taskAlloc.destroy(t);
+        taskAlloc.deallocate(t, 1);
       }
 
     }
@@ -511,6 +532,20 @@ protected:
     CWL& conqWL;
     DivFunc& divFunc;
     
+#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
+    ApplyDivide (
+        TaskAlloc& taskAlloc,
+        PerThreadUserCtx& userCtxts,
+        CWL& conqWL,
+        DivFunc& divFunc)
+      :
+        taskAlloc (taskAlloc),
+        userCtxts (userCtxts),
+        conqWL (conqWL),
+        divFunc (divFunc)
+    {}
+#endif
+
 
     template <typename C>
     void operator () (Task* t, C& ctx) {
@@ -530,7 +565,8 @@ protected:
         for (auto c = uctx.getPushBuffer ().begin (), c_end = uctx.getPushBuffer ().end (); 
             c != c_end; ++c, ++i) {
 
-          Task* child = taskAlloc.allocAndConstruct (*c, t);
+          Task* child = taskAlloc.allocate(1);
+          taskAlloc.construct (child, *c, t);
           ctx.push (child);
         }
       } else { 
@@ -546,6 +582,16 @@ protected:
 
     PerThreadUserCtx& userCtxts;
     ConqFunc& conqFunc;
+
+#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
+    ApplyConquer (
+        PerThreadUserCtx& userCtxts,
+        ConqFunc& conqFunc)
+      :
+        userCtxts (userCtxts),
+        conqFunc (conqFunc)
+    {}
+#endif
 
 
     template <typename C>
@@ -584,25 +630,29 @@ public:
     typedef Galois::WorkList::dChunkedFIFO<CHUNK_SIZE, BiModalTask*> WL_ty;
 
     BiModalTaskAlloc taskAlloc;
-    TaskWL initialTasks;
 
-    BiModalTask* t = taskAlloc.allocAndConstruct (initItem, nullptr, BiModalTask::DIVIDE);
-    initialTasks.push_back (t);
+    BiModalTask* t = taskAlloc.allocate(1);
+    taskAlloc.construct(t, initItem, nullptr, BiModalTask::DIVIDE);
+
+    BiModalTask* init[] = { t };
 
     Galois::Runtime::for_each_impl<WL_ty> (
-        makeStandardRange (initialTasks.begin (), initialTasks.end ()), 
+        makeStandardRange (init, init + 1), 
+#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
+        ApplyOperatorSinglePhase (taskAlloc, userCtxts, divFunc, conqFunc),
+#else
         ApplyOperatorSinglePhase {taskAlloc, userCtxts, divFunc, conqFunc},
+#endif
         loopname.c_str ());
 
-    taskAlloc.destroyAndFree (t);
+    taskAlloc.destroy(t);
+    taskAlloc.deallocate(t, 1);
   }
 
   void execute_2p (const T& initItem) {
-    typedef Galois::Runtime::PerThreadVector<Task*> TaskWL;
     typedef Galois::WorkList::dChunkedFIFO<CHUNK_SIZE, Task*> WL_ty;
 
     TaskAlloc taskAlloc;
-    TaskWL initialTasks;
 
     // Galois::Runtime::do_all_impl (range, 
         // [&] (const T& a) {
@@ -612,24 +662,37 @@ public:
         // },
         // "initial_tasks_gen");
 
-    Task* initTask = taskAlloc.allocAndConstruct (initItem, nullptr);
-    initialTasks.get ().push_back (initTask);
+    Task* initTask = taskAlloc.allocate(1);
+    taskAlloc.construct(initTask, initItem, nullptr);
 
     WL_ty conqWL;
 
     std::string div_loop_name = loopname + ":divide_phase";
 
-    Galois::Runtime::for_each_impl<WL_ty> (makeLocalRange (initialTasks),
-        ApplyDivide<WL_ty> {taskAlloc, userCtxts, conqWL, divFunc}, div_loop_name.c_str ());
+    Task* init[] = { initTask };
+
+    Galois::Runtime::for_each_impl<WL_ty> (makeStandardRange (init, init + 1),
+#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
+        ApplyDivide<WL_ty> (taskAlloc, userCtxts, conqWL, divFunc),
+#else
+        ApplyDivide<WL_ty> {taskAlloc, userCtxts, conqWL, divFunc}, 
+#endif
+
+        div_loop_name.c_str ());
 
     std::string conq_loop_name = loopname + ":conquer_phase";
 
-    Galois::for_each_wl (conqWL, ApplyConquer {userCtxts, conqFunc}, conq_loop_name.c_str ());
+    Galois::for_each_wl (conqWL, 
+#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
+        ApplyConquer (userCtxts, conqFunc), 
+#else
+        ApplyConquer {userCtxts, conqFunc}, 
+#endif
+        conq_loop_name.c_str ());
 
-    Galois::Runtime::do_all_impl (makeLocalRange (initialTasks),
-        [&] (Task* t) {
-          taskAlloc.destroyAndFree (t);
-        }, "initial_tasks_destroy");
+    taskAlloc.destroy(initTask);
+    taskAlloc.deallocate(initTask, 1);
+
   }
 
 };

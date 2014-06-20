@@ -46,6 +46,10 @@ class TopoBarrier : public Galois::Runtime::Barrier {
 
     //signal values
     std::atomic<unsigned> parentsense;
+
+#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
+    treenode (void) {}
+#endif
   };
 
   Galois::Runtime::PerPackageStorage<treenode> nodes;

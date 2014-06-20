@@ -41,10 +41,9 @@
 
 #include <boost/iterator/counting_iterator.hpp>
 #include <boost/iterator/transform_iterator.hpp>
-#include <boost/utility.hpp>
 
-#include GALOIS_CXX11_STD_HEADER(type_traits)
-//#include <fstream>
+#include <type_traits>
+#include <deque>
 
 #include <string.h>
 
@@ -52,29 +51,11 @@ namespace Galois {
 namespace Graph {
 
 //! Graph serialized to a file
-class FileGraph: private boost::noncopyable {
-  friend class FileGraphAllocator;
+class FileGraph {
 public:
   typedef uint32_t GraphNode;
 
-protected:
-  void* volatile masterMapping;
-  size_t masterLength;
-  uint64_t sizeofEdge;
-  int masterFD;
-
-  uint64_t* outIdx;
-  uint32_t* outs;
-
-  char* edgeData;
-
-  uint64_t numEdges;
-  uint64_t numNodes;
-
-  uint64_t getEdgeIdx(GraphNode src, GraphNode dst) const;
-  uint32_t* raw_neighbor_begin(GraphNode N) const;
-  uint32_t* raw_neighbor_end(GraphNode N) const;
-
+private:
   struct Convert32: public std::unary_function<uint32_t, uint32_t> {
     uint32_t operator()(uint32_t x) const {
       return convert_le32toh(x);
@@ -87,16 +68,32 @@ protected:
     }
   };
 
+  struct mapping {
+    void* ptr;
+    size_t len;
+  };
+
+  std::deque<mapping> mappings;
+  std::deque<int> fds;
+
+  uint64_t sizeofEdge;
+  uint64_t numNodes;
+  uint64_t numEdges;
+
+  uint64_t* outIdx;
+  uint32_t* outs;
+
+  char* edgeData;
+
+  void move_assign(FileGraph&&);
+  uint64_t getEdgeIdx(GraphNode src, GraphNode dst) const;
+  uint32_t* raw_neighbor_begin(GraphNode N) const;
+  uint32_t* raw_neighbor_end(GraphNode N) const;
+
   //! Initializes a graph from block of memory
-  void parse(void* m);
+  void fromMem(void* m);
 
-  //! Reads graph connectivity information from memory
-  void structureFromMem(void* mem, size_t len, bool clone);
-
-  void* structureFromArrays(uint64_t* outIdxs, uint64_t numNodes,
-      uint32_t* outs, uint64_t numEdges, size_t sizeofEdgeData);
-
-  void* structureFromGraph(FileGraph& g, size_t sizeofEdgeData);
+  void* fromGraph(FileGraph& g, size_t sizeofEdgeData);
 
   /**
    * Finds the first node N such that
@@ -110,6 +107,23 @@ protected:
    */
   size_t findIndex(size_t nodeSize, size_t edgeSize, size_t targetSize, size_t lb, size_t ub);
   
+  void fromFileInterleaved(const std::string& filename, size_t sizeofEdgeData);
+
+  void pageIn(unsigned id, unsigned total, size_t sizeofEdgeData);
+
+protected:
+  /**
+   * Copies graph connectivity information from arrays. Returns a pointer to
+   * array to populate with edge data.
+   *
+   * @param converted
+   *   whether values in arrays are in host byte ordering (false) or in
+   *   FileGraph byte ordering (true)
+   * @return pointer to begining of edgeData in graph
+   */
+  void* fromArrays(uint64_t* outIdx, uint64_t numNodes,
+      uint32_t* outs, uint64_t numEdges, char* edgeData, size_t sizeofEdgeData, bool converted);
+
 public:
   // Node Handling
 
@@ -172,6 +186,7 @@ public:
 
   template<typename EdgeTy> 
   EdgeTy& getEdgeData(edge_iterator it) const {
+    assert(edgeData);
     return reinterpret_cast<EdgeTy*>(edgeData)[*it];
   }
 
@@ -192,11 +207,13 @@ public:
 
   template<typename EdgeTy>
   EdgeTy* edge_data_begin() const {
+    assert(edgeData);
     return reinterpret_cast<EdgeTy*>(edgeData);
   }
 
   template<typename EdgeTy>
   EdgeTy* edge_data_end() const {
+    assert(edgeData);
     assert(sizeof(EdgeTy) == sizeofEdge);
     EdgeTy* r = reinterpret_cast<EdgeTy*>(edgeData);
     return &r[numEdges];
@@ -205,10 +222,10 @@ public:
   iterator begin() const;
   iterator end() const;
 
-  /**
-   * Divides nodes into balanced ranges.
-   */
+  //! Divides nodes into balanced ranges
   std::pair<iterator,iterator> divideBy(size_t nodeSize, size_t edgeSize, unsigned id, unsigned total);
+  //! Divides edges into balanced ranges
+  std::pair<uint64_t,uint64_t> divideEdgesBy(unsigned id, unsigned total);
 
   node_id_iterator node_id_begin() const;
   node_id_iterator node_id_end() const;
@@ -217,6 +234,7 @@ public:
 
   template<typename EdgeTy>
   EdgeTy& getEdgeData(neighbor_iterator it) {
+    assert(edgeData);
     return reinterpret_cast<EdgeTy*>(edgeData)[std::distance(outs, it.base())];
   }
 
@@ -226,43 +244,50 @@ public:
   unsigned int size() const { return numNodes; }
 
   //! Returns the number of edges in the graph
-  unsigned int sizeEdges() const { return numEdges; }
+  size_t sizeEdges() const { return numEdges; }
 
   //! Returns the size of an edge
   size_t edgeSize() const { return sizeofEdge; }
 
   FileGraph();
+  FileGraph(const FileGraph&);
+  FileGraph& operator=(const FileGraph&);
+  FileGraph(FileGraph&&);
+  FileGraph& operator=(FileGraph&&);
   ~FileGraph();
 
-  //! Reads graph connectivity information from file
-  void structureFromFile(const std::string& filename, bool preFault = true);
+  //! Reads graph from file
+  void fromFile(const std::string& filename, bool preFault = true);
+
+  /** 
+   * Read just header information from file (e.g., number of neighbors for
+   * each node but not actual adjacencies).
+   *
+   * Subsequent method calls that only need header information are valid,
+   * while methods that need adjacency information have undefined behavior.
+   */
+  void headerFromFile(const std::string& filename, bool preFault = true);
+
+  /**
+   * XXX
+   */
+  void partFromFile(const std::string& filename, iterator begin, iterator end, bool preFault = true);
+  void partFromFile(const std::string& filename, uint64_t begin, uint64_t end, bool preFault = true);
 
   /**
    * Reads graph connectivity information from file. Tries to balance memory
    * evenly across system.  Cannot be called during parallel execution.
    */
-  void structureFromFileInterleaved(const std::string& filename, size_t sizeofEdgeData);
-
   template<typename EdgeTy>
-  void structureFromFileInterleaved(const std::string& filename, 
+  void fromFileInterleaved(const std::string& filename, 
       typename std::enable_if<!std::is_void<EdgeTy>::value>::type* = 0) {
-    structureFromFileInterleaved(filename, sizeof(EdgeTy));
+    fromFileInterleaved(filename, sizeof(EdgeTy));
   }
 
   template<typename EdgeTy>
-  void structureFromFileInterleaved(const std::string& filename, 
+  void fromFileInterleaved(const std::string& filename, 
       typename std::enable_if<std::is_void<EdgeTy>::value>::type* = 0) {
-    structureFromFileInterleaved(filename, 0);
-  }
-
-  /**
-   * Reads graph connectivity information from arrays. Returns a pointer to
-   * array to populate with edge data.
-   */
-  template<typename T>
-  T* structureFromArrays(uint64_t* outIdxs, uint64_t numNodes,
-      uint32_t* outs, uint64_t numEdges) {
-    return reinterpret_cast<T*>(structureFromArrays(outIdx, numNodes, outs, numEdges, sizeof(T)));
+    fromFileInterleaved(filename, 0);
   }
 
   /** 
@@ -270,16 +295,12 @@ public:
    * array to populate with edge data.
    */
   template<typename T>
-  T* structureFromGraph(FileGraph& g) {
-    return reinterpret_cast<T*>(structureFromGraph(g, sizeof(T)));
+  T* fromGraph(FileGraph& g) {
+    return reinterpret_cast<T*>(fromGraph(g, sizeof(T)));
   }
 
   //! Writes graph connectivity information to file
-  void structureToFile(const std::string& file);
-
-  void swap(FileGraph& other);
-
-  void cloneFrom(FileGraph& other);
+  void toFile(const std::string& file);
 };
 
 /** 
@@ -295,13 +316,15 @@ public:
  * </ol>
  */
 class FileGraphWriter: public FileGraph {
-  uint64_t *outIdx; // outIdxs
+  uint64_t *outIdx;
   uint32_t *starts;
-  uint32_t *outs; // outs
+  uint32_t *outs;
   size_t sizeofEdgeData;
+  size_t numNodes;
+  size_t numEdges;
 
 public:
-  FileGraphWriter(): outIdx(0), starts(0), outs(0), sizeofEdgeData(0) { }
+  FileGraphWriter(): outIdx(0), starts(0), outs(0), sizeofEdgeData(0), numNodes(0), numEdges(0) { }
 
   ~FileGraphWriter() { 
     if (outIdx)
@@ -312,40 +335,40 @@ public:
       delete [] outs;
   }
 
-  void setNumNodes(uint64_t n) { this->numNodes = n; }
-  void setNumEdges(uint64_t n) { this->numEdges = n; }
+  void setNumNodes(uint64_t n) { numNodes = n; }
+  void setNumEdges(uint64_t n) { numEdges = n; }
   void setSizeofEdgeData(size_t n) { sizeofEdgeData = n; }
   
   //! Marks the transition to next phase of parsing, counting the degree of
   //! nodes
   void phase1() { 
     assert(!outIdx);
-    outIdx = new uint64_t[this->numNodes];
-    memset(outIdx, 0, sizeof(*outIdx) * this->numNodes);
+    outIdx = new uint64_t[numNodes];
+    memset(outIdx, 0, sizeof(*outIdx) * numNodes);
   }
 
   //! Increments degree of id by delta
   void incrementDegree(size_t id, int delta = 1) {
-    assert(id < this->numNodes);
+    assert(id < numNodes);
     outIdx[id] += delta;
   }
 
   //! Marks the transition to next phase of parsing, adding edges
   void phase2() {
-    if (this->numNodes == 0)
+    if (numNodes == 0)
       return;
 
     // Turn counts into partial sums
     uint64_t* prev = outIdx;
-    for (uint64_t *ii = outIdx + 1, *ei = outIdx + this->numNodes; ii != ei; ++ii, ++prev) {
+    for (uint64_t *ii = outIdx + 1, *ei = outIdx + numNodes; ii != ei; ++ii, ++prev) {
       *ii += *prev;
     }
-    assert(outIdx[this->numNodes-1] == this->numEdges);
+    assert(outIdx[numNodes-1] == numEdges);
 
-    starts = new uint32_t[this->numNodes];
-    memset(starts, 0, sizeof(*starts) * this->numNodes);
+    starts = new uint32_t[numNodes];
+    memset(starts, 0, sizeof(*starts) * numNodes);
 
-    outs = new uint32_t[this->numEdges];
+    outs = new uint32_t[numEdges];
   }
 
   //! Adds a neighbor between src and dst
@@ -363,7 +386,7 @@ public:
    */
   template<typename T>
   T* finish() { 
-    void* ret = structureFromArrays(outIdx, this->numNodes, outs, this->numEdges, sizeofEdgeData);
+    void* ret = fromArrays(outIdx, numNodes, outs, numEdges, nullptr, sizeofEdgeData, false);
     delete [] outIdx;
     outIdx = 0;
     delete [] starts;
@@ -422,9 +445,9 @@ void makeSymmetric(FileGraph& in, FileGraph& out) {
 
   edge_value_type* rawEdgeData = g.finish<edge_value_type>();
   if (EdgeData::has_value)
-    std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+    std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
 
-  out.swap(g);
+  out = std::move(g);
 }
 
 /**
@@ -477,17 +500,9 @@ void permute(FileGraph& in, const PTy& p, FileGraph& out) {
 
   edge_value_type* rawEdgeData = g.finish<edge_value_type>();
   if (EdgeData::has_value)
-    std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+    std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
 
-  out.swap(g);
-}
-
-template<typename GraphTy,typename... Args>
-GALOIS_ATTRIBUTE_DEPRECATED
-void structureFromFile(GraphTy& g, const std::string& fname, Args&&... args) {
-  FileGraph graph;
-  graph.structureFromFile(fname);
-  g.structureFromGraph(graph, std::forward<Args>(args)...);
+  out = std::move(g);
 }
 
 }

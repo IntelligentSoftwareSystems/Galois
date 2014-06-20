@@ -39,12 +39,11 @@
 namespace Galois {
 
 /**
- * Bag for only concurrent insertions. This data structure
- * supports scalable concurrent pushes but reading the bag
- * can only be done serially.
+ * Unordered collection of elements. This data structure supports scalable
+ * concurrent pushes but reading the bag can only be done serially.
  */
 template<typename T, unsigned int BlockSize = 0>
-class InsertBag: private boost::noncopyable {
+class InsertBag {
 
   struct header {
     header* next;
@@ -52,6 +51,8 @@ class InsertBag: private boost::noncopyable {
     T* dend; //end of valid data
     T* dlast; //end of storage
   };
+
+  typedef std::pair<header*, header*> PerThread;
 
 public:
   template<typename U>
@@ -120,18 +121,18 @@ public:
         advance_thread();
     }
   };
-  
+
 private:
   Galois::Runtime::MM::FixedSizeAllocator heap;
-  Galois::Runtime::PerThreadStorage<std::pair<header*,header*> > heads;
+  Galois::Runtime::PerThreadStorage<PerThread> heads;
 
   void insHeader(header* h) {
-    std::pair<header*,header*>& H = *heads.getLocal();
-    if (H.second) {
-      H.second->next = h;
-      H.second = h;
+    PerThread& hpair = *heads.getLocal();
+    if (hpair.second) {
+      hpair.second->next = h;
+      hpair.second = h;
     } else {
-      H.first = H.second = h;
+      hpair.first = hpair.second = h;
     }
   }
 
@@ -158,7 +159,7 @@ private:
 
   void destruct() {
     for (unsigned x = 0; x < heads.size(); ++x) {
-      std::pair<header*,header*>& hpair = *heads.getRemote(x);
+      PerThread& hpair = *heads.getRemote(x);
       header*& h = hpair.first;
       while (h) {
         uninitialized_destroy(h->dbegin, h->dend);
@@ -178,6 +179,19 @@ public:
   //     "BlockSize should larger than sizeof(T) + O(1)");
 
   InsertBag(): heap(BlockSize) { }
+  InsertBag(InsertBag&& o): heap(BlockSize) {
+    std::swap(heap, o.heap);
+    std::swap(heads, o.heads);
+  }
+
+  InsertBag& operator=(InsertBag&& o) {
+    std::swap(heap, o.heap);
+    std::swap(heads, o.heads);
+    return *this;
+  }
+
+  InsertBag(const InsertBag&) = delete;
+  InsertBag& operator=(const InsertBag&) = delete;
 
   ~InsertBag() {
     destruct();
@@ -187,9 +201,11 @@ public:
     destruct();
   }
 
-  typedef T        value_type;
+  typedef T value_type;
+  typedef T* pointer;
+  typedef const T* const_pointer;
   typedef const T& const_reference;
-  typedef T&       reference;
+  typedef T& reference;
   typedef Iterator<T> iterator;
   typedef Iterator<const T> const_iterator;
   typedef iterator local_iterator;
@@ -221,19 +237,35 @@ public:
       insHeader(H);
     }
     rv = new (H->dend) T(std::forward<Args>(args)...);
-    H->dend++;
+    ++H->dend;
     return *rv;
   }
 
-  //! Thread safe bag insertion
-  reference push(const T& val) { return emplace(val); }
-  //! Thread safe bag insertion
-  reference push(T&& val) { return emplace(std::move(val)); }
+  template<typename... Args>
+  reference emplace_back(Args&&... args) {
+    return emplace(std::forward<Args>(args)...);
+  }
+
+  /**
+   * Pop the last element pushed by this thread. The number of consecutive
+   * pops supported without intevening pushes is implementation dependent. 
+   */
+  void pop() {
+    header* H = heads.getLocal()->second;
+    if (H->dbegin == H->dend) {
+      throw std::out_of_range("InsertBag::pop");
+    }
+    uninitialized_destroy(H->dend - 1, H->dend);
+    --H->dend;
+  }
 
   //! Thread safe bag insertion
-  reference push_back(const T& val) { return emplace(val); }
+  template<typename ItemTy>
+  reference push(ItemTy&& val) { return emplace(std::forward<ItemTy>(val)); }
+
   //! Thread safe bag insertion
-  reference push_back(T&& val) { return emplace(std::move(val)); }
+  template<typename ItemTy>
+  reference push_back(ItemTy&& val) { return emplace(std::forward<ItemTy>(val)); }
 };
 
 }

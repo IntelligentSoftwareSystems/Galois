@@ -145,7 +145,7 @@ protected:
     assert (startId < graph.size ());
 
     unsigned id = 0;
-    GNode startNode;
+    GNode startNode = 0;
     for (typename Graph::iterator i = graph.begin (), ei = graph.end ();
         i != ei; ++i) {
 

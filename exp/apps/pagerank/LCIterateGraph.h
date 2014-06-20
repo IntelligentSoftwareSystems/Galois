@@ -173,9 +173,9 @@ public:
     return edge_iterator(raw_neighbor_end(N));
   }
 
-  void structureFromFile(const std::string& fname) {
+  void fromFile(const std::string& fname) {
     FileGraph graph;
-    graph.structureFromFile(fname);
+    graph.fromFile(fname);
     numNodes = graph.size();
     numEdges = graph.sizeEdges();
     NodeData = reinterpret_cast<NodeInfo*>(GaloisRuntime::MM::largeInterleavedAlloc(sizeof(NodeInfo) * numNodes));
@@ -326,9 +326,9 @@ public:
     return N->edgeend;
   }
 
-  void structureFromFile(const std::string& fname) {
+  void fromFile(const std::string& fname) {
     FileGraph graph;
-    graph.structureFromFile(fname);
+    graph.fromFile(fname);
     numNodes = graph.size();
     numEdges = graph.sizeEdges();
     NodeData = reinterpret_cast<NodeInfo*>(GaloisRuntime::MM::largeInterleavedAlloc(sizeof(*NodeData) * numNodes));
@@ -474,9 +474,9 @@ public:
     return N->edgeEnd();
   }
 
-  void structureFromFile(const std::string& fname) {
+  void fromFile(const std::string& fname) {
     FileGraph graph;
-    graph.structureFromFile(fname);
+    graph.fromFile(fname);
     numNodes = graph.size();
     numEdges = graph.sizeEdges();
     Data = GaloisRuntime::MM::largeInterleavedAlloc(sizeof(NodeInfo) * numNodes * 2 +
@@ -809,9 +809,9 @@ public:
     return N->edgeEnd();
   }
 
-  void structureFromFile(const std::string& fname) {
+  void fromFile(const std::string& fname) {
     FileGraph graph;
-    graph.structureFromFile(fname);
+    graph.fromFile(fname);
     numNodes = graph.size();
     numEdges = graph.sizeEdges();
 

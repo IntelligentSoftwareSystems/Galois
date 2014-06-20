@@ -139,6 +139,10 @@ public:
     return center.distance_squared(coords[0]);
   }
 
+  bool operator==(const Element& rhs) const {
+    return id == rhs.id;
+  }
+
   bool operator<(const Element& rhs) const {
     //apparently a triangle is less than a line
     if (dim() < rhs.dim()) return false;
@@ -248,7 +252,7 @@ public:
     Tuple d[2];
     for(int i = 0; i < dim(); ++i)
       for(int j = 0; j < e.dim(); ++j)
-	if (coords[i] == e.coords[j])
+        if (coords[i] == e.coords[j])
 	  d[at++] = coords[i];
     assert(at == 2);
     return Edge(d[0], d[1]);

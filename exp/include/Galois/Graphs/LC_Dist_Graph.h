@@ -25,6 +25,7 @@
 #define GALOIS_GRAPH_LCDIST_H
 
 #include <vector>
+#include <iostream>
 
 namespace Galois {
 namespace Graph {
@@ -222,6 +223,8 @@ public:
     iterator& operator+=(int n) { x += n; return *this; }
     iterator& operator-=(int n) { x -= n; return *this; }
     ptrdiff_t operator-(const iterator& rhs) { return x - rhs.x; }
+    //Trivially copyable
+    typedef int tt_is_copyable;
   };
 
   typedef iterator local_iterator;

@@ -31,7 +31,9 @@
 #include "Galois/Graph/TypeTraits.h"
 #include "Lonestar/BoilerPlate.h"
 
+#ifdef GALOIS_USE_EXP
 #include "Galois/WorkList/WorkListDebug.h"
+#endif
 
 #include GALOIS_CXX11_STD_HEADER(atomic)
 #include <string>
@@ -690,8 +692,11 @@ struct PrtRsd {
     using namespace Galois::WorkList;
     typedef dChunkedLIFO<4> dChunk;
     typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
+#ifdef GALOIS_USE_EXP
     typedef WorkListTracker<UpdateRequestIndexer, OBIM> dOBIM;
-
+#else
+    typedef OBIM dOBIM;
+#endif
     Galois::InsertBag<UpdateRequest> initialWL;
     Galois::do_all_local(graph, [&initialWL, &graph] (GNode src) {
 	LNode& data = graph.getData(src);
@@ -939,9 +944,9 @@ static void precomputePullData() {
   }
 
   float* t = output.finish<float>();
-  memcpy(t, &edgeData[0], sizeof(edgeData[0]) * edgeData.size());
+  std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), t);
   
-  output.structureToFile(outputPullFilename);
+  output.toFile(outputPullFilename);
   std::cout << "Wrote " << outputPullFilename << "\n";
 }
 //![WriteGraph]

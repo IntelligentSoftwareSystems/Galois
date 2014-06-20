@@ -209,7 +209,7 @@ class Fixed2DGraphTiledExecutor {
   // bulk synchronous diagonals: dynamic assignment within diagonals
   template<bool UseDense, typename Function>
   void executeLoopExp2(Function fn, unsigned tid, unsigned total) {
-    Point numBlocks { locks[0].size(), locks[1].size() };
+    Point numBlocks { { locks[0].size(), locks[1].size() } };
     Point block;
     Point start;
     for (int i = 0; i < numDims; ++i) {
@@ -223,7 +223,7 @@ class Fixed2DGraphTiledExecutor {
     size_t maxRounds = numBlocks[dim];
 
     for (size_t round = 0; round < maxRounds; ++round) {
-      Point base { start[0], start[1] };
+      Point base { { start[0], start[1] } };
       nextPoint(base, dim, round);
       for (size_t tries = 0; tries < numBlocks[odim]; ++tries) {
         size_t index = tries + base[odim];
@@ -251,7 +251,7 @@ class Fixed2DGraphTiledExecutor {
 
   template<bool UseDense, typename Function>
   void executeLoopOrig(Function fn, unsigned tid, unsigned total) {
-    Point numBlocks { locks[0].size(), locks[1].size() };
+    Point numBlocks { { locks[0].size(), locks[1].size() } };
     Point block;
     Point start;
     for (int i = 0; i < numDims; ++i) {
@@ -261,7 +261,7 @@ class Fixed2DGraphTiledExecutor {
 
     unsigned coresPerPackage = LL::getMaxCores() / LL::getMaxPackages();
     if (useLocks)
-      start = { start[0], std::min(block[1] * LL::getPackageForThread(tid) * coresPerPackage, numBlocks[1] - 1) };
+      start = { { start[0], std::min(block[1] * LL::getPackageForThread(tid) * coresPerPackage, numBlocks[1] - 1) } };
 
     Point p = start; 
 
@@ -342,7 +342,7 @@ class Fixed2DGraphTiledExecutor {
     Task* t;
 
     for (int times = 0; times < 2; ++times) {
-      Point limit { locks[0].size(), locks[1].size() };
+      Point limit { { locks[0].size(), locks[1].size() } };
       int inclusiveDelta = inclusive && times == 0 ? 0 : 1;
 
       // First iteration is exclusive of start
@@ -394,7 +394,7 @@ class Fixed2DGraphTiledExecutor {
 
     for (size_t i = 0; i < numBlocks; ++i) {
       Task& task = tasks[i];
-      task.coord = { i % numBlocks0, i / numBlocks0 };
+      task.coord = { { i % numBlocks0, i / numBlocks0 } };
       std::tie(task.start0, task.end0) = Galois::block_range(first0, last0, task.coord[0], numBlocks0);
       iterator s, e;
       std::tie(s, e) = Galois::block_range(first1, last1, task.coord[1], numBlocks1);
