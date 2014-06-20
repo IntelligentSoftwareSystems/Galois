@@ -651,7 +651,7 @@ void writePfpGraph(const std::string& inputFile, const std::string& outputFile) 
   }
 
   edge_value_type* rawEdgeData = p.finish<edge_value_type>();
-  std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+  std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
 
   p.structureToFile(outputFile);
 }

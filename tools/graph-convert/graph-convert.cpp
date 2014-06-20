@@ -330,7 +330,7 @@ struct Edgelist2Gr: public Conversion {
 
     edge_value_type* rawEdgeData = p.finish<edge_value_type>();
     if (EdgeData::has_value)
-      std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+      std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
 
     p.structureToFile(outfilename);
     printStatus(numNodes, numEdges);
@@ -435,7 +435,7 @@ struct Mtx2Gr: public HasNoVoidSpecialization {
 
     edge_value_type* rawEdgeData = p.finish<edge_value_type>();
     if (EdgeData::has_value)
-      std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+      std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
 
     p.structureToFile(outfilename);
     printStatus(p.size(), p.sizeEdges());
@@ -807,7 +807,7 @@ struct AddRing: public Conversion {
 
     edge_value_type* rawEdgeData = p.finish<edge_value_type>();
     if (EdgeData::has_value)
-      std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+      std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
     p.structureToFile(outfilename);
     printStatus(graph.size(), graph.sizeEdges(), p.size(), p.sizeEdges());
   }
@@ -898,7 +898,7 @@ struct AddTree: public Conversion {
 
     edge_value_type* rawEdgeData = p.finish<edge_value_type>();
     if (EdgeData::has_value)
-      std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+      std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
     p.structureToFile(outfilename);
     printStatus(graph.size(), graph.sizeEdges(), p.size(), p.sizeEdges());
   }
@@ -1179,7 +1179,7 @@ struct RemoveHighDegree: public Conversion {
 
     edge_value_type* rawEdgeData = p.finish<edge_value_type>();
     if (EdgeData::has_value)
-      std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+      std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
     
     p.structureToFile(outfilename);
     printStatus(graph.size(), graph.sizeEdges(), p.size(), p.sizeEdges());
@@ -1234,7 +1234,7 @@ struct PartitionBySource: public Conversion {
 
       edge_value_type* rawEdgeData = p.finish<edge_value_type>();
       if (EdgeData::has_value)
-        std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+        std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
 
       std::ostringstream partname;
       partname << outfilename << "." << i << ".of." << numParts;
@@ -1345,7 +1345,7 @@ struct PartitionByDestination: public Conversion {
 
       edge_value_type* rawEdgeData = p.finish<edge_value_type>();
       if (EdgeData::has_value)
-        std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+        std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
 
       std::ostringstream partname;
       partname << outfilename << "." << i << ".of." << numParts;
@@ -1403,7 +1403,7 @@ struct Transpose: public Conversion {
 
     edge_value_type* rawEdgeData = p.finish<edge_value_type>();
     if (EdgeData::has_value)
-      std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+      std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
     
     p.structureToFile(outfilename);
     printStatus(graph.size(), graph.sizeEdges(), p.size(), p.sizeEdges());
@@ -1514,7 +1514,7 @@ struct Cleanup: public Conversion {
 
     edge_value_type* rawEdgeData = p.finish<edge_value_type>();
     if (EdgeData::has_value)
-      std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+      std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
     
     p.structureToFile(outfilename);
     printStatus(graph.size(), graph.sizeEdges(), p.size(), p.sizeEdges());
@@ -1624,7 +1624,7 @@ struct MakeUnsymmetric: public Conversion {
 
     edge_value_type* rawEdgeData = p.finish<edge_value_type>();
     if (EdgeData::has_value)
-      std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+      std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
     
     p.structureToFile(outfilename);
     printStatus(graph.size(), graph.sizeEdges(), p.size(), p.sizeEdges());
@@ -1730,7 +1730,7 @@ struct Dimacs2Gr: public HasNoVoidSpecialization {
 
     edge_value_type* rawEdgeData = p.finish<edge_value_type>();
     if (EdgeData::has_value)
-      std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+      std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
 
     p.structureToFile(outfilename);
     printStatus(p.size(), p.sizeEdges());
@@ -2182,7 +2182,7 @@ struct Svmlight2Gr: public HasNoVoidSpecialization {
       } else {
         edge_value_type* rawEdgeData = p.finish<edge_value_type>();
         if (EdgeData::has_value)
-          std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+          std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
         numNodes += maxFeature + 1;
         p.structureToFile(outfilename);
         printStatus(numNodes, numEdges);

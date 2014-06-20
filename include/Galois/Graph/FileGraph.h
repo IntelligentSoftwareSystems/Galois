@@ -108,6 +108,8 @@ private:
   
   void structureFromFileInterleaved(const std::string& filename, size_t sizeofEdgeData);
 
+  void pageIn(unsigned id, unsigned total, size_t sizeofEdgeData);
+
 protected:
   void* structureFromArrays(uint64_t* outIdxs, uint64_t numNodes,
       uint32_t* outs, uint64_t numEdges, size_t sizeofEdgeData);
@@ -121,8 +123,6 @@ protected:
       uint32_t* outs, uint64_t numEdges) {
     return reinterpret_cast<T*>(structureFromArrays(outIdx, numNodes, outs, numEdges, sizeof(T)));
   }
-
-  void pageIn(unsigned id, unsigned total, size_t sizeofEdgeData);
 
 public:
   // Node Handling
@@ -445,7 +445,7 @@ void makeSymmetric(FileGraph& in, FileGraph& out) {
 
   edge_value_type* rawEdgeData = g.finish<edge_value_type>();
   if (EdgeData::has_value)
-    std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+    std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
 
   out = std::move(g);
 }
@@ -500,17 +500,9 @@ void permute(FileGraph& in, const PTy& p, FileGraph& out) {
 
   edge_value_type* rawEdgeData = g.finish<edge_value_type>();
   if (EdgeData::has_value)
-    std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+    std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
 
   out = std::move(g);
-}
-
-template<typename GraphTy,typename... Args>
-GALOIS_ATTRIBUTE_DEPRECATED
-void structureFromFile(GraphTy& g, const std::string& fname, Args&&... args) {
-  FileGraph graph;
-  graph.structureFromFile(fname);
-  g.structureFromGraph(graph, std::forward<Args>(args)...);
 }
 
 }

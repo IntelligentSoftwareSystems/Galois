@@ -576,7 +576,7 @@ static void transposeGraph() {
   }
 
   double* t = output.finish<double>();
-  memcpy(t, &edgeData[0], sizeof(edgeData[0]) * edgeData.size());
+  std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), t);
   
   output.structureToFile(otherFilename);
   std::cout << "Wrote " << otherFilename << "\n";
