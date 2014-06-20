@@ -184,6 +184,15 @@ class RemoteAbortHandler {
 public:
   void push(const value_type& val, fatPointer ptr, 
             void (RemoteDirectory::*rfetch) (fatPointer, ResolveFlag)) {
+    //Not actually remote, so don't do anything
+    if (ptr.isLocal()) {
+      if (!getLocalDirectory().isRemote(ptr, RW))
+        return;
+    } else {
+      // if (!getRemoteDirectory().isRemote(ptr, RW))
+      //   return;
+    }
+    //Currently remote
     std::lock_guard<LL::SimpleLock> lg(lock);
     auto p = waiting_on.equal_range(val);
     if (ptr.isLocal()) {
@@ -191,7 +200,8 @@ public:
     } else {
       getRemoteDirectory().setContended(ptr);
     }
-    bool newDep = std::find(p.first, p.second, std::pair<const value_type, decltype(ptr)>(val,ptr)) == p.second;
+    typedef typename std::remove_reference<decltype(*p.first)>::type pair_type;
+    bool newDep = std::find(p.first, p.second, pair_type(val, ptr)) == p.second;
     if (newDep) {
       waiting_on.insert(std::make_pair(val, ptr));
       if (ptr.isLocal()) {
@@ -423,7 +433,6 @@ void for_each_impl(const RangeTy& range, FunctionTy f, const char* loopname) {
   assert(!inGaloisForEach);
 
   inGaloisForEach = true;
-
   WorkTy W(f, loopname);
   trace("Loop start %\n", loopname);
   getSystemThreadPool().run(activeThreads, 

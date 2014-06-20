@@ -63,14 +63,15 @@ private:
   };
 
   struct state {
-    Runtime::LL::CacheLineStorage<shared_state> stealState;
+    //Runtime::LL::CacheLineStorage<shared_state> stealState;
+    shared_state stealState;
     Iterator localBegin;
     Iterator localEnd;
     unsigned int nextVictim;
     
     void populateSteal() {
       if (Steal && localBegin != localEnd) {
-	shared_state& s = stealState.data;
+	shared_state& s = stealState; //.data;
 	s.stealLock.lock();
 	s.stealEnd = localEnd;
 	s.stealBegin = localEnd = Galois::split_range(localBegin, localEnd);
@@ -83,7 +84,7 @@ private:
   Runtime::PerThreadStorage<state> TLDS;
 
   bool doSteal(state& dst, state& src, bool wait) {
-    shared_state& s = src.stealState.data;
+    shared_state& s = src.stealState; //.data;
     if (s.stealAvail) {
       if (wait) {
         s.stealLock.lock();

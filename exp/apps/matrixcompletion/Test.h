@@ -472,7 +472,7 @@ class Recursive2DExecutor {
     auto se = [](double x, double y) { return (x-y)*(x-y); };
     std::vector<std::array<double, 6>> error;
     for (int i = 0; i < 5; ++i)
-      error.emplace_back(std::array<double,6> {0.0, 0.0, 0.0, 0.0, 0.0, 0.0} );
+      error.emplace_back(std::array<double,6> { { 0.0, 0.0, 0.0, 0.0, 0.0, 0.0} } );
 
     std::vector<size_t> sumIn(g.size());
     std::vector<size_t> sumOut(g.size());

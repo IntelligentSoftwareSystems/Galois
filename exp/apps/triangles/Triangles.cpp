@@ -42,6 +42,7 @@
 #include <vector>
 #include <algorithm>
 #include <iostream>
+#include <fstream>
 
 const char* name = "Triangles";
 const char* desc = "Count triangles in a graph";

@@ -24,6 +24,8 @@
 #ifndef GALOIS_RUNTIME_TRACER_H
 #define GALOIS_RUNTIME_TRACER_H
 
+#include "Galois/Runtime/ll/EnvCheck.h"
+
 #include <ostream>
 #include <sstream>
 
@@ -59,6 +61,7 @@ const bool doTrace = true;
 //FIXME use better forwarding
 template<typename... Args>
 static inline void trace(const char* format, Args... args) {
+  static bool doTrace = LL::EnvCheck("GALOIS_DEBUG_TO_FILE");
   if (doTrace) {
     std::ostringstream os;
     os << "<" << getHostID() << "> ";

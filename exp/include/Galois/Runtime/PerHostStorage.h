@@ -21,8 +21,6 @@
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-
-
 #ifndef GALOIS_RUNTIME_PERHOSTSTORAGE
 #define GALOIS_RUNTIME_PERHOSTSTORAGE
 

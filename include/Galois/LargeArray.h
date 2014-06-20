@@ -30,8 +30,7 @@
 #include "Galois/Runtime/ll/gio.h"
 #include "Galois/Runtime/mm/Mem.h"
 
-#include <boost/utility.hpp>
-#include GALOIS_CXX11_STD_HEADER(utility)
+#include <utility>
 
 namespace Galois {
 
@@ -42,7 +41,7 @@ namespace Galois {
  * @tparam T value type of container
  */
 template<typename T>
-class LargeArray: private boost::noncopyable {
+class LargeArray {
   T* m_data;
   size_t m_size;
   int allocated;
@@ -83,7 +82,23 @@ public:
   LargeArray(void* d, size_t s): m_data(reinterpret_cast<T*>(d)), m_size(s), allocated(0) { }
 
   LargeArray(): m_data(0), m_size(0), allocated(0) { }
-  
+
+  LargeArray(LargeArray&& o): m_data(0), m_size(0), allocated(0) {
+    std::swap(this->m_data, o.m_data);
+    std::swap(this->m_size, o.m_size);
+    std::swap(this->allocated, o.allocated);
+  }
+
+  LargeArray& operator=(LargeArray&& o) {
+    std::swap(this->m_data, o.m_data);
+    std::swap(this->m_size, o.m_size);
+    std::swap(this->allocated, o.allocated);
+    return *this;
+  }
+
+  LargeArray(const LargeArray&) = delete;
+  LargeArray& operator=(const LargeArray&) = delete;
+
   ~LargeArray() {
     destroy();
     deallocate();
@@ -161,10 +176,12 @@ public:
 
 //! Void specialization
 template<>
-class LargeArray<void>: private boost::noncopyable {
+class LargeArray<void> {
 public:
   LargeArray(void* d, size_t s) { }
-  LargeArray() { }
+  LargeArray() = default;
+  LargeArray(const LargeArray&) = delete;
+  LargeArray& operator=(const LargeArray&) = delete;
 
   typedef void raw_value_type;
   typedef void* value_type;

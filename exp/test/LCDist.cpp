@@ -3,6 +3,7 @@
 #include "Galois/Graphs/LC_Dist_Graph.h"
 
 #include <vector>
+#include <iostream>
 
 static const char *name = "LC_Dist_Graph testcase";
 static const char *desc = "do stuff";

@@ -28,7 +28,7 @@
 
 #include "Galois/Runtime/Serialize.h"
 #include "Galois/Runtime/PerHostStorage.h"
-#include "Galois/TwoLevelIterator.h"
+#include "Galois/TwoLevelIteratorA.h"
 
 namespace Galois {
 namespace Graph {
@@ -94,9 +94,10 @@ public:
       return d->local_end();
     }
   };
-  typedef TwoLevelFwdIter<typename Runtime::PerThreadDist<Bag>::iterator, local_iterator, InnerBegFnL, InnerEndFnL> iterator;
-  iterator begin() { return iterator(basePtr.begin(), basePtr.end(), InnerBegFnL(), InnerEndFnL()); }
-  iterator end() { return iterator(basePtr.end(), basePtr.end(), InnerBegFnL(), InnerEndFnL()); }
+
+  typedef TwoLevelIteratorA<typename Runtime::PerThreadDist<Bag>::iterator, local_iterator, std::forward_iterator_tag, InnerBegFnL, InnerEndFnL> iterator;
+  iterator begin() { return iterator(basePtr.begin(), basePtr.end(), basePtr.begin(), InnerBegFnL(), InnerEndFnL()); }
+  iterator end() { return iterator(basePtr.end(), basePtr.end(), basePtr.end(), InnerBegFnL(), InnerEndFnL()); }
 
   // serialization functions
   typedef int tt_has_serialize;

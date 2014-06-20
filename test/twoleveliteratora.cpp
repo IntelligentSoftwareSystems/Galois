@@ -4,12 +4,13 @@
 
 #include <algorithm>
 #include <boost/iterator/counting_iterator.hpp>
-#include GALOIS_CXX11_STD_HEADER(vector)
+#include <vector>
 #include <list>
 #include <iostream>
 #include <cstdlib>
+#include <random>
 
-int N = 1;
+int N = 10;
 
 template<class D, class I>
 struct GetBegin {
@@ -23,8 +24,9 @@ struct GetEnd {
   typename I::const_iterator operator()(typename D::const_reference x) const { return x.end(); }
 };
 
-template<bool NonEmpty, class Tag, class D, class I>
+template<bool NonEmpty, class Tag, class D>
 void check_forward() {
+  typedef typename D::value_type I;
   D data;
 
   for (int i = 0; i < N; ++i) {
@@ -70,8 +72,9 @@ void check_forward() {
   }
 }
 
-template<bool NonEmpty, class Tag, class D, class I>
+template<bool NonEmpty, class Tag, class D>
 void check_backward() {
+  typedef typename D::value_type I;
   D data;
 
   for (int i = N-1; i >= 0; --i) {
@@ -130,8 +133,9 @@ void check_backward() {
   }
 }
 
-template<bool NonEmpty, class Tag, class D, class I>
+template<bool NonEmpty, class Tag, class D>
 void check_strided() {
+  typedef typename D::value_type I;
   D data;
 
   for (int i = 0; i < N; ++i) {
@@ -203,80 +207,147 @@ void check_strided() {
   }
 }
 
+template<bool NonEmpty, class Tag, class D>
+void check_random() {
+  typedef typename D::value_type I;
+  D data;
+  std::mt19937 gen;
+  std::uniform_int_distribution<int> dist(0, 100);
+
+  for (int i = 0; i < N; ++i) {
+#ifdef GALOIS_CXX11_VECTOR_HAS_NO_EMPLACE
+    if (NonEmpty) {
+      data.push_back(typename D::value_type());
+      data.back().push_back(dist(gen));
+    } else {
+      data.push_back(typename D::value_type());
+      data.push_back(typename D::value_type());
+      data.back().push_back(dist(gen));
+      data.push_back(typename D::value_type());
+    }
+#else
+    if (NonEmpty) {
+      data.emplace_back();
+      data.back().push_back(dist(gen));
+    } else {
+      data.emplace_back();
+      data.emplace_back();
+      data.back().push_back(dist(gen));
+      data.emplace_back();
+    }
+#endif
+  }
+
+#if __cplusplus >= 201103L
+  auto r = Galois::make_two_level_iterator<Tag>(data.begin(), data.end());
+#else
+  auto r = Galois::make_two_level_iterator<
+    Tag,
+    typename D::iterator,
+    typename I::iterator,
+    GetBegin<D, I>,
+    GetEnd<D, I>
+    >(data.begin(), data.end());
+#endif
+  
+  std::sort(r.first, r.second);
+
+  int last = *r.first;
+  for (auto ii = r.first + 1; ii != r.second; ++ii) {
+    if (last > *ii) {
+      GALOIS_DIE("failed case: random ", (NonEmpty ? "non-empty" : "empty"), " inner range: ",
+          last, " > ", *ii);
+    }
+    last = *ii;
+  }
+}
+
 void check_forward_iteration() {
-  check_forward<true, std::forward_iterator_tag, std::vector<std::vector<int>>, std::vector<int>>();
-  check_forward<true, std::forward_iterator_tag, std::vector<std::list<int>>, std::list<int>>();
-  check_forward<true, std::forward_iterator_tag, std::list<std::vector<int>>, std::vector<int>>();
-  check_forward<true, std::forward_iterator_tag, std::list<std::list<int>>, std::list<int>>();
+  check_forward<true, std::forward_iterator_tag, std::vector<std::vector<int>>>();
+  check_forward<true, std::forward_iterator_tag, std::vector<std::list<int>>>();
+  check_forward<true, std::forward_iterator_tag, std::list<std::vector<int>>>();
+  check_forward<true, std::forward_iterator_tag, std::list<std::list<int>>>();
 
-  check_forward<true, std::bidirectional_iterator_tag, std::vector<std::vector<int>>, std::vector<int>>();
-  check_forward<true, std::bidirectional_iterator_tag, std::vector<std::list<int>>, std::list<int>>();
-  check_forward<true, std::bidirectional_iterator_tag, std::list<std::vector<int>>, std::vector<int>>();
-  check_forward<true, std::bidirectional_iterator_tag, std::list<std::list<int>>, std::list<int>>();
+  check_forward<true, std::bidirectional_iterator_tag, std::vector<std::vector<int>>>();
+  check_forward<true, std::bidirectional_iterator_tag, std::vector<std::list<int>>>();
+  check_forward<true, std::bidirectional_iterator_tag, std::list<std::vector<int>>>();
+  check_forward<true, std::bidirectional_iterator_tag, std::list<std::list<int>>>();
 
-  check_forward<true, std::random_access_iterator_tag, std::vector<std::vector<int>>, std::vector<int>>();
-  check_forward<true, std::random_access_iterator_tag, std::vector<std::list<int>>, std::list<int>>();
-  check_forward<true, std::random_access_iterator_tag, std::list<std::vector<int>>, std::vector<int>>();
-  check_forward<true, std::random_access_iterator_tag, std::list<std::list<int>>, std::list<int>>();
+  check_forward<true, std::random_access_iterator_tag, std::vector<std::vector<int>>>();
+  check_forward<true, std::random_access_iterator_tag, std::vector<std::list<int>>>();
+  check_forward<true, std::random_access_iterator_tag, std::list<std::vector<int>>>();
+  check_forward<true, std::random_access_iterator_tag, std::list<std::list<int>>>();
 
-  check_forward<false, std::forward_iterator_tag, std::vector<std::vector<int>>, std::vector<int>>();
-  check_forward<false, std::forward_iterator_tag, std::vector<std::list<int>>, std::list<int>>();
-  check_forward<false, std::forward_iterator_tag, std::list<std::vector<int>>, std::vector<int>>();
-  check_forward<false, std::forward_iterator_tag, std::list<std::list<int>>, std::list<int>>();
+  check_forward<false, std::forward_iterator_tag, std::vector<std::vector<int>>>();
+  check_forward<false, std::forward_iterator_tag, std::vector<std::list<int>>>();
+  check_forward<false, std::forward_iterator_tag, std::list<std::vector<int>>>();
+  check_forward<false, std::forward_iterator_tag, std::list<std::list<int>>>();
 
-  check_forward<false, std::bidirectional_iterator_tag, std::vector<std::vector<int>>, std::vector<int>>();
-  check_forward<false, std::bidirectional_iterator_tag, std::vector<std::list<int>>, std::list<int>>();
-  check_forward<false, std::bidirectional_iterator_tag, std::list<std::vector<int>>, std::vector<int>>();
-  check_forward<false, std::bidirectional_iterator_tag, std::list<std::list<int>>, std::list<int>>();
+  check_forward<false, std::bidirectional_iterator_tag, std::vector<std::vector<int>>>();
+  check_forward<false, std::bidirectional_iterator_tag, std::vector<std::list<int>>>();
+  check_forward<false, std::bidirectional_iterator_tag, std::list<std::vector<int>>>();
+  check_forward<false, std::bidirectional_iterator_tag, std::list<std::list<int>>>();
 
-  check_forward<false, std::random_access_iterator_tag, std::vector<std::vector<int>>, std::vector<int>>();
-  check_forward<false, std::random_access_iterator_tag, std::vector<std::list<int>>, std::list<int>>();
-  check_forward<false, std::random_access_iterator_tag, std::list<std::vector<int>>, std::vector<int>>();
-  check_forward<false, std::random_access_iterator_tag, std::list<std::list<int>>, std::list<int>>();
+  check_forward<false, std::random_access_iterator_tag, std::vector<std::vector<int>>>();
+  check_forward<false, std::random_access_iterator_tag, std::vector<std::list<int>>>();
+  check_forward<false, std::random_access_iterator_tag, std::list<std::vector<int>>>();
+  check_forward<false, std::random_access_iterator_tag, std::list<std::list<int>>>();
 }
 
 void check_backward_iteration() {
-  check_backward<true, std::bidirectional_iterator_tag, std::vector<std::vector<int>>,std::vector<int>>();
-  check_backward<true, std::bidirectional_iterator_tag, std::vector<std::list<int>>,std::list<int>>();
-  check_backward<true, std::bidirectional_iterator_tag, std::list<std::vector<int>>,std::vector<int>>();
-  check_backward<true, std::bidirectional_iterator_tag, std::list<std::list<int>>,std::list<int>>();
+  check_backward<true, std::bidirectional_iterator_tag, std::vector<std::vector<int>>>();
+  check_backward<true, std::bidirectional_iterator_tag, std::vector<std::list<int>>>();
+  check_backward<true, std::bidirectional_iterator_tag, std::list<std::vector<int>>>();
+  check_backward<true, std::bidirectional_iterator_tag, std::list<std::list<int>>>();
 
-  check_backward<true, std::random_access_iterator_tag, std::vector<std::vector<int>>,std::vector<int>>();
-  check_backward<true, std::random_access_iterator_tag, std::vector<std::list<int>>,std::list<int>>();
-  check_backward<true, std::random_access_iterator_tag, std::list<std::vector<int>>,std::vector<int>>();
-  check_backward<true, std::random_access_iterator_tag, std::list<std::list<int>>,std::list<int>>();
+  check_backward<true, std::random_access_iterator_tag, std::vector<std::vector<int>>>();
+  check_backward<true, std::random_access_iterator_tag, std::vector<std::list<int>>>();
+  check_backward<true, std::random_access_iterator_tag, std::list<std::vector<int>>>();
+  check_backward<true, std::random_access_iterator_tag, std::list<std::list<int>>>();
 
-  check_backward<false, std::bidirectional_iterator_tag, std::vector<std::vector<int>>,std::vector<int>>();
-  check_backward<false, std::bidirectional_iterator_tag, std::vector<std::list<int>>,std::list<int>>();
-  check_backward<false, std::bidirectional_iterator_tag, std::list<std::vector<int>>,std::vector<int>>();
-  check_backward<false, std::bidirectional_iterator_tag, std::list<std::list<int>>,std::list<int>>();
+  check_backward<false, std::bidirectional_iterator_tag, std::vector<std::vector<int>>>();
+  check_backward<false, std::bidirectional_iterator_tag, std::vector<std::list<int>>>();
+  check_backward<false, std::bidirectional_iterator_tag, std::list<std::vector<int>>>();
+  check_backward<false, std::bidirectional_iterator_tag, std::list<std::list<int>>>();
 
-  check_backward<false, std::random_access_iterator_tag, std::vector<std::vector<int>>,std::vector<int>>();
-  check_backward<false, std::random_access_iterator_tag, std::vector<std::list<int>>,std::list<int>>();
-  check_backward<false, std::random_access_iterator_tag, std::list<std::vector<int>>,std::vector<int>>();
-  check_backward<false, std::random_access_iterator_tag, std::list<std::list<int>>,std::list<int>>();
+  check_backward<false, std::random_access_iterator_tag, std::vector<std::vector<int>>>();
+  check_backward<false, std::random_access_iterator_tag, std::vector<std::list<int>>>();
+  check_backward<false, std::random_access_iterator_tag, std::list<std::vector<int>>>();
+  check_backward<false, std::random_access_iterator_tag, std::list<std::list<int>>>();
 }
 
 void check_strided_iteration() {
-  check_strided<true, std::bidirectional_iterator_tag, std::vector<std::vector<int>>,std::vector<int>>();
-  check_strided<true, std::bidirectional_iterator_tag, std::vector<std::list<int>>,std::list<int>>();
-  check_strided<true, std::bidirectional_iterator_tag, std::list<std::vector<int>>,std::vector<int>>();
-  check_strided<true, std::bidirectional_iterator_tag, std::list<std::list<int>>,std::list<int>>();
+  check_strided<true, std::bidirectional_iterator_tag, std::vector<std::vector<int>>>();
+  check_strided<true, std::bidirectional_iterator_tag, std::vector<std::list<int>>>();
+  check_strided<true, std::bidirectional_iterator_tag, std::list<std::vector<int>>>();
+  check_strided<true, std::bidirectional_iterator_tag, std::list<std::list<int>>>();
 
-  check_strided<true, std::random_access_iterator_tag, std::vector<std::vector<int>>,std::vector<int>>();
-  check_strided<true, std::random_access_iterator_tag, std::vector<std::list<int>>,std::list<int>>();
-  check_strided<true, std::random_access_iterator_tag, std::list<std::vector<int>>,std::vector<int>>();
-  check_strided<true, std::random_access_iterator_tag, std::list<std::list<int>>,std::list<int>>();
+  check_strided<true, std::random_access_iterator_tag, std::vector<std::vector<int>>>();
+  check_strided<true, std::random_access_iterator_tag, std::vector<std::list<int>>>();
+  check_strided<true, std::random_access_iterator_tag, std::list<std::vector<int>>>();
+  check_strided<true, std::random_access_iterator_tag, std::list<std::list<int>>>();
 
-  check_strided<false, std::bidirectional_iterator_tag, std::vector<std::vector<int>>,std::vector<int>>();
-  check_strided<false, std::bidirectional_iterator_tag, std::vector<std::list<int>>,std::list<int>>();
-  check_strided<false, std::bidirectional_iterator_tag, std::list<std::vector<int>>,std::vector<int>>();
-  check_strided<false, std::bidirectional_iterator_tag, std::list<std::list<int>>,std::list<int>>();
+  check_strided<false, std::bidirectional_iterator_tag, std::vector<std::vector<int>>>();
+  check_strided<false, std::bidirectional_iterator_tag, std::vector<std::list<int>>>();
+  check_strided<false, std::bidirectional_iterator_tag, std::list<std::vector<int>>>();
+  check_strided<false, std::bidirectional_iterator_tag, std::list<std::list<int>>>();
 
-  check_strided<false, std::random_access_iterator_tag, std::vector<std::vector<int>>,std::vector<int>>();
-  check_strided<false, std::random_access_iterator_tag, std::vector<std::list<int>>,std::list<int>>();
-  check_strided<false, std::random_access_iterator_tag, std::list<std::vector<int>>,std::vector<int>>();
-  check_strided<false, std::random_access_iterator_tag, std::list<std::list<int>>,std::list<int>>();
+  check_strided<false, std::random_access_iterator_tag, std::vector<std::vector<int>>>();
+  check_strided<false, std::random_access_iterator_tag, std::vector<std::list<int>>>();
+  check_strided<false, std::random_access_iterator_tag, std::list<std::vector<int>>>();
+  check_strided<false, std::random_access_iterator_tag, std::list<std::list<int>>>();
+}
+
+void check_random_iteration() {
+  check_random<true, std::random_access_iterator_tag, std::vector<std::vector<int>>>();
+  check_random<true, std::random_access_iterator_tag, std::vector<std::list<int>>>();
+  check_random<true, std::random_access_iterator_tag, std::list<std::vector<int>>>();
+  check_random<true, std::random_access_iterator_tag, std::list<std::list<int>>>();
+
+  check_random<false, std::random_access_iterator_tag, std::vector<std::vector<int>>>();
+  check_random<false, std::random_access_iterator_tag, std::vector<std::list<int>>>();
+  check_random<false, std::random_access_iterator_tag, std::list<std::vector<int>>>();
+  check_random<false, std::random_access_iterator_tag, std::list<std::list<int>>>();
 }
 
 int main(int argc, char** argv) {
@@ -306,6 +377,7 @@ int main(int argc, char** argv) {
   check_forward_iteration();
   check_backward_iteration();
   check_strided_iteration();
+  check_random_iteration();
 
   return 0;
 }

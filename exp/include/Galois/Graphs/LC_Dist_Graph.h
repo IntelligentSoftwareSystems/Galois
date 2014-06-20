@@ -139,10 +139,10 @@ class LC_Dist {
     }
     std::partial_sum(Num.begin(), Num.end(), PrefixNum.begin());
 
-    std::copy(Num.begin(), Num.end(), std::ostream_iterator<unsigned>(std::cout, ","));
-    std::cout << "\n";
-    std::copy(PrefixNum.begin(), PrefixNum.end(), std::ostream_iterator<unsigned>(std::cout, ","));
-    std::cout << "\n";
+    // std::copy(Num.begin(), Num.end(), std::ostream_iterator<unsigned>(std::cout, ","));
+    // std::cout << "\n";
+    // std::copy(PrefixNum.begin(), PrefixNum.end(), std::ostream_iterator<unsigned>(std::cout, ","));
+    // std::cout << "\n";
 
     //Block nodes
     auto p = block_range(edges.begin(), edges.end(), 
@@ -242,25 +242,29 @@ public:
   //! Mutation
 
   template<typename... Args>
-  edge_iterator addEdge(GraphNode src, GraphNode dst, const EdgeTy& data, Galois::MethodFlag mflag = MethodFlag::ALL) {
+  edge_iterator addEdge(GraphNode src, GraphNode dst, const EdgeTy& data, MethodFlag mflag = MethodFlag::ALL) {
     acquire(src, mflag);
     return src->append(dst, data);
   }
 
-  edge_iterator addEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = MethodFlag::ALL) {
+  edge_iterator addEdge(GraphNode src, GraphNode dst, MethodFlag mflag = MethodFlag::ALL) {
     acquire(src, mflag);
     return src->append(dst);
   }
 
   //! Access
 
-  NodeTy& at(GraphNode N, MethodFlag mflag) {
+  NodeTy& at(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
     acquire(N, mflag);
     return N->data;
   }
 
-  EdgeTy& at(edge_iterator E, MethodFlag mflag) {
+  EdgeTy& at(edge_iterator E, MethodFlag mflag = MethodFlag::ALL) {
     return E->data;
+  }
+
+  GraphNode dst(edge_iterator E, MethodFlag mflag = MethodFlag::ALL) {
+    return E->dst;
   }
 
   //! Capacity
@@ -278,9 +282,10 @@ public:
 
   edge_iterator edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
     acquire(N, mflag);
-    for (edge_iterator ii = N->begin(), ee = N->end(); ii != ee; ++ii) {
-      acquireNode(ii->dst, mflag);
-    }
+    if (mflag != MethodFlag::SRC_ONLY)
+      for (edge_iterator ii = N->begin(), ee = N->end(); ii != ee; ++ii) {
+        acquireNode(ii->dst, mflag);
+      }
     return N->begin();
   }
   
@@ -289,6 +294,14 @@ public:
     return N->end();
   }
   
+  template<typename Compare>
+  void sort_edges(GraphNode N, Compare comp, MethodFlag mflag = MethodFlag::ALL) {
+    std::sort(edge_begin(N, mflag), edge_end(N, mflag),
+              [&comp] (const EdgeImplTy& e1, const EdgeImplTy& e2) {
+                return comp(e1.dst, e1.data, e2.dst, e2.data);
+              });
+  }
+
 };
 
 } //namespace Graph
