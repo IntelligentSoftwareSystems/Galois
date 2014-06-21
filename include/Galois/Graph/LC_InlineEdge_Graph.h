@@ -192,8 +192,8 @@ public:
     return getDst(ni);
   }
 
-  uint64_t size() const { return numNodes; }
-  uint64_t sizeEdges() const { return numEdges; }
+  size_t size() const { return numNodes; }
+  size_t sizeEdges() const { return numEdges; }
 
   const_iterator begin() const { return const_iterator(nodeData.begin()); }
   const_iterator end() const { return const_iterator(nodeData.end()); }

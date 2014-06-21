@@ -231,7 +231,7 @@ protected:
   template<int limit, typename WL>
   void runQueue(ThreadLocalData& tld, WL& lwl) {
     Galois::optional<typename WL::value_type> p;
-    unsigned num = 0;
+    int num = 0;
 #ifdef GALOIS_USE_LONGJMP
     if (setjmp(hackjmp) == 0) {
       while ((!limit || num++ < limit) && (p = lwl.pop())) {

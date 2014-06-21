@@ -76,9 +76,11 @@ class Synchronizer {
   Queues queues;
 
   ReducerData rdata[1024];
+#if _POSIX_BARRIERS > 0
   pthread_barrier_t b;
   pthread_barrier_t reducer1;
   pthread_barrier_t reducer2;
+#endif
   unsigned num_threads;
 
 public:
@@ -86,9 +88,13 @@ public:
   typedef Queue::iterator QueueIterator;
 
   Synchronizer(unsigned n): num_threads(n) { 
+#if _POSIX_BARRIERS > 0
     pthread_barrier_init(&b, NULL, num_threads);
     pthread_barrier_init(&reducer1, NULL, num_threads);
     pthread_barrier_init(&reducer2, NULL, num_threads);
+#else
+    GALOIS_DIE("pthread barrier not supported");
+#endif
     if (num_threads >= 1024) {
       assert(0 && "Too many theads");
       abort();
@@ -111,12 +117,14 @@ public:
   }
 
   void barrier() {
+#if _POSIX_BARRIERS > 0
     int rc = pthread_barrier_wait(&b);
     
     if (rc != 0 && rc != PTHREAD_BARRIER_SERIAL_THREAD) {
       assert(0 && "Problem");
       abort();
     }
+#endif
   }
 
   void sendRequest(unsigned id, GNode u, GNode v, unsigned x) {
@@ -129,6 +137,7 @@ public:
 
   template<typename T, typename Function>
   T reduce(unsigned id, T item, Function f) {
+#if _POSIX_BARRIERS > 0
     rdata[id].data = &item;
     int rc = pthread_barrier_wait(&reducer1);
     if (rc != 0 && rc != PTHREAD_BARRIER_SERIAL_THREAD) {
@@ -148,6 +157,9 @@ public:
     }
 
     return result;
+#else
+    return item;
+#endif
   }
 };
 

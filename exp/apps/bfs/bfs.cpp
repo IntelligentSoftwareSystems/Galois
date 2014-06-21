@@ -479,7 +479,7 @@ struct DetBarrierAlgo {
   typedef std::pair<GNode,int> ItemTy;
 
   struct LocalState {
-    typedef std::deque<GNode,Galois::PerIterAllocTy> Pending;
+    typedef std::deque<GNode,typename Galois::PerIterAllocTy::template rebind<GNode>::other> Pending;
     Pending pending;
     LocalState(DetBarrierAlgo<Version>& self, Galois::PerIterAllocTy& alloc): pending(alloc) { }
   };

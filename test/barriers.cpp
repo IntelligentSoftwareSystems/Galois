@@ -59,7 +59,9 @@ int main(int argc, char** argv) {
 
   gethostname(bname, sizeof(bname));
   using namespace Galois::Runtime::benchmarking;
+#if _POSIX_BARRIERS > 0
   test(getPthreadBarrier());
+#endif
   test(getCountingBarrier());
   test(getMCSBarrier());
   test(getTopoBarrier());

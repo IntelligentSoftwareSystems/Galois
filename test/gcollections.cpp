@@ -11,6 +11,7 @@
 #include <string>
 #include <deque>
 #include <vector>
+#include <random>
 
 template<typename C>
 void testBasic(std::string prefix, C&& collection, int N) {

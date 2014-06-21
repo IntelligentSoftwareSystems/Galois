@@ -538,7 +538,7 @@ class BCGraph {
     //for (int i=0; i<nnodes; ++i) {
 		int n = std::min(nnodes,10);
 		for (int i=0; i<n; ++i) {
-      std::cerr << i << ": " << setiosflags(std::ios::fixed) << std::setprecision(6) << nodes[i].data.bc << std::endl;
+      std::cerr << i << ": " << std::setiosflags(std::ios::fixed) << std::setprecision(6) << nodes[i].data.bc << std::endl;
     }
   }
 
@@ -549,7 +549,7 @@ class BCGraph {
 		std::string fname = outfname.str();
 		std::ofstream outfile(fname.c_str());
 		for (int i=0; i<nnodes; ++i) {
-			outfile << i << ": " << setiosflags(std::ios::fixed) << std::setprecision(6) << nodes[i].data.bc << std::endl;
+			outfile << i << ": " << std::setiosflags(std::ios::fixed) << std::setprecision(6) << nodes[i].data.bc << std::endl;
 		}
 		outfile.close();
 	}
