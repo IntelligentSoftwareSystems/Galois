@@ -428,7 +428,7 @@ int main(int argc, char** argv) {
   Graph::pointer g;
   {
     Galois::Graph::FileGraph fg;
-    fg.structureFromFile(inputFile);
+    fg.fromFile(inputFile);
     std::vector<unsigned> counts;
     for(auto& N : fg)
       counts.push_back(std::distance(fg.edge_begin(N), fg.edge_end(N)));
