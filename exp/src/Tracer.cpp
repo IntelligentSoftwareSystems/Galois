@@ -35,7 +35,8 @@
 #include <unistd.h>
 
 static std::ostream& openIfNot() {
-  if (Galois::Runtime::LL::EnvCheck("GALOIS_TRACE_LOCAL"))
+  static bool doCerr = Galois::Runtime::LL::EnvCheck("GALOIS_DEBUG_TRACE_STDERR");
+  if (doCerr)
     return std::cerr;
   static std::ofstream output;
   if (!output.is_open()) {
@@ -59,5 +60,8 @@ void Galois::Runtime::detail::printTrace(std::ostringstream& os) {
   out << "<" << dtn.count() << "," << getHostID() << "> ";
   out << os.str();
   out.flush();
-  //  usleep(10);
+  static int iSleep = 0;
+  static bool doSleep = Galois::Runtime::LL::EnvCheck("GALOIS_DEBUG_TRACE_PAUSE", iSleep);
+  if (doSleep)
+    usleep(iSleep ? iSleep : 10);
 }
