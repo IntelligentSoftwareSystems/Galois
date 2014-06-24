@@ -176,6 +176,7 @@ class LocalDirectory : public BaseDirectory {
   metadata& getMD(Lockable*);
 
   std::atomic<int> outstandingReqs;
+  std::atomic<uint64_t> sentRequests, sentInvalidates, sentObjects;
 
   //!Send object to dest
   void sendObj(metadata&, uint32_t dest, Lockable*, ResolveFlag);
@@ -239,6 +240,9 @@ public:
   void clearContended(Lockable* ptr);
   void clearContended(fatPointer ptr);
 
+  void resetStats();
+  void reportStats(const char* loopname);
+
   void makeProgress();
   void dump();
 };
@@ -291,10 +295,15 @@ class RemoteDirectory : public BaseDirectory {
   std::unordered_map<fatPointer, metadata> md;
   LL::SimpleLock md_lock;
 
+  std::atomic<uint64_t> sentRequests, sentInvalidateAcks, sentObjects;
+
   // std::deque<std::tuple<fatPointer, Lockable*, typeHelper*>> writeback;
 
   //get metadata for pointer
   metadata& getMD(fatPointer ptr);
+
+  //Wrapper for logging
+  void sendRequest(fatPointer ptr, ResolveFlag flag, recvFuncTy f);
 
   //do everything needed to evict ptr
   void doInvalidate(metadata& md, fatPointer ptr);
@@ -341,6 +350,9 @@ public:
   //! unengage priority protocol for ptr
   void clearContended(fatPointer ptr);
 
+  void resetStats();
+  void reportStats(const char* loopname);
+
   void dump(fatPointer ptr); //dump one object info
   void dump(); //dump direcotry status
 };
@@ -368,11 +380,8 @@ void RemoteDirectory::fetch(fatPointer ptr, ResolveFlag flag) {
   if (!md.th)
     md.th = typeHelperImpl<T>::get();
   ResolveFlag requestFlag = md.fetch(flag);
-  if (requestFlag != INV) {
-    SendBuffer sbuf;
-    gSerialize(sbuf, ptr, requestFlag, NetworkInterface::ID);
-    getSystemNetworkInterface().send(ptr.getHost(), &LocalDirectory::recvRequest<T>, sbuf);
-  }
+  if (requestFlag != INV)
+    sendRequest(ptr, requestFlag, &LocalDirectory::recvRequest<T>);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

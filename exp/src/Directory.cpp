@@ -70,9 +70,17 @@ RemoteDirectory::metadata& RemoteDirectory::getMD(fatPointer ptr) {
   return retval;
 }
 
+void RemoteDirectory::sendRequest(fatPointer ptr, ResolveFlag flag, recvFuncTy f) {
+  ++sentRequests;
+  SendBuffer sbuf;
+  gSerialize(sbuf, ptr, flag, NetworkInterface::ID);
+  getSystemNetworkInterface().send(ptr.getHost(), f, sbuf);
+}
+
 
 //FIXME: if contended, say we want it back.  What mode though?
 void RemoteDirectory::doInvalidate(metadata& md, fatPointer ptr) {
+  ++sentInvalidateAcks;
   trace("RemoteDirectory::doInvalidate % md %\n", ptr, md);
   md.invalidate();
   getCacheManager().evict(ptr);
@@ -97,6 +105,7 @@ void RemoteDirectory::tryWriteBack(metadata& md, fatPointer ptr) {
     md.th->serialize(b, obj);
     cm.evict(ptr); //IncRef keeps obj live for release
     dirRelease(obj);
+    ++sentObjects;
     getSystemNetworkInterface().send(ptr.getHost(), &LocalDirectory::recvObject, b);
   }
   vobj->decRef();
@@ -284,6 +293,18 @@ void RemoteDirectory::makeProgress() {
   // }
 }
 
+void RemoteDirectory::resetStats() {
+  sentRequests = 0;
+  sentInvalidateAcks = 0;
+  sentObjects = 0;
+}
+
+void RemoteDirectory::reportStats(const char* loopname) {
+  reportStat(loopname, "RD::sentRequests", sentRequests);
+  reportStat(loopname, "RD::sentInvalidateAcks", sentInvalidateAcks);
+  reportStat(loopname, "RD::sentObjects", sentObjects);
+}
+
 void RemoteDirectory::dump() {
   std::lock_guard<LL::SimpleLock> lg(md_lock);
   for(auto& pair : md) {
@@ -363,6 +384,7 @@ void LocalDirectory::recvObjectImpl(fatPointer ptr, RecvBuffer& buf) {
 }
 
 void LocalDirectory::sendObj(metadata& md, uint32_t dest, Lockable* obj, ResolveFlag flag) {
+  ++sentObjects;
   trace("LocalDirectory::sendObj % dest % flag % md %\n", obj, dest, flag, md);
   SendBuffer b;
   gSerialize(b, fatPointer(obj, fatPointer::thisHost), flag);
@@ -390,6 +412,7 @@ void LocalDirectory::invalidateReaders(metadata& md, Lockable* obj) {
   assert(md.locRW == ~0);
   auto& net = getSystemNetworkInterface();
   for (auto dest : md.locRO) {
+    ++sentInvalidates;
     SendBuffer b;
     gSerialize(b, fatPointer(obj, fatPointer::thisHost));
     net.send(dest, &RemoteDirectory::recvInvalidate, b);
@@ -421,6 +444,7 @@ void LocalDirectory::considerObject(metadata& md, Lockable* obj) {
   if (md.locRW != ~0) {
     //newer requester than last recall, so update recall
     md.recalled = nextDest;
+    ++sentRequests;
     trace("LocalDirectory::considerObject % recalling for % md(post) %\n", (void*)obj, nextDest, md);
     SendBuffer buf;
     gSerialize(buf, fatPointer(obj, fatPointer::thisHost), nextDest);
@@ -510,6 +534,18 @@ void LocalDirectory::makeProgress() {
       considerObject(ii->second, ii->first);
     }
     //  }
+}
+
+void LocalDirectory::resetStats() {
+  sentRequests = 0;
+  sentInvalidates = 0;
+  sentObjects = 0;
+}
+
+void LocalDirectory::reportStats(const char* loopname) {
+  reportStat(loopname, "LD::sentRequests", sentRequests);
+  reportStat(loopname, "LD::sentInvalidates", sentInvalidates);
+  reportStat(loopname, "LD::sentObjects", sentObjects);
 }
 
 void LocalDirectory::dump() {

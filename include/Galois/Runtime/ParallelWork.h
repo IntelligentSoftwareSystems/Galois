@@ -304,35 +304,35 @@ protected:
     unsigned num = 0;
     if (p)
       workHappened = true;
-    try {
-      while (p) {
+    while (p) {
+      try {
         tld.startIteration();
         tld.function(*p, tld.facing.data());
         tld.commitIteration(wl);
         if (ForEachTraits<FunctionTy>::NeedsAborts && inAborted)
           aborted.commit(*p);
-	if (limit) {
-	  ++num;
-	  if (num == limit)
-	    break;
-          }
-	p = lwl.pop();
+      } catch (const remote_ex& ex) {
+        //      std::cout << "R";
+        tld.abortIteration();
+        aborted.push(*p, ex.ptr, ex.rfetch);
+      } catch (const conflict_ex& ex) {
+        //      std::cout << "L";
+        tld.abortIteration();
+        aborted.push(*p, ex.ptr);
       }
-    } catch (const remote_ex& ex) {
-      //      std::cout << "R";
-      tld.abortIteration();
-      aborted.push(*p, ex.ptr, ex.rfetch);
-    } catch (const conflict_ex& ex) {
-      //      std::cout << "L";
-      tld.abortIteration();
-      aborted.push(*p, ex.ptr);
+      if (limit) {
+        ++num;
+        if (num == limit)
+          break;
+      }
+      p = lwl.pop();
     }
     return workHappened;
   }
 
   GALOIS_ATTRIBUTE_NOINLINE
   bool handleAborts(ThreadLocalData& tld) {
-    return runQueue<0, true>(tld, aborted);
+    return runQueue<8, true>(tld, aborted);
   }
 
   void fastPushBack(typename UserContextAccess<value_type>::PushBufferTy& x) {
@@ -356,7 +356,7 @@ protected:
       didWork = false;
       //Run some iterations
       if (isLeader)
-        didWork = runQueue<8, false>(tld, wl);
+        didWork = runQueue<32, false>(tld, wl);
       else
         didWork = runQueue<ForEachTraits<FunctionTy>::NeedsBreak ? 32 : 0, false>(tld, wl);
       // Check for abort
@@ -434,6 +434,8 @@ void for_each_impl(const RangeTy& range, FunctionTy f, const char* loopname) {
 
   inGaloisForEach = true;
   WorkTy W(f, loopname);
+  getLocalDirectory().resetStats();
+  getRemoteDirectory().resetStats();
   trace("Loop start %\n", loopname);
   getSystemThreadPool().run(activeThreads, 
     std::bind(&WorkTy::initThread, std::ref(W)),
@@ -442,6 +444,8 @@ void for_each_impl(const RangeTy& range, FunctionTy f, const char* loopname) {
     std::ref(W)
   );
   trace("Loop end %\n", loopname);
+  getLocalDirectory().reportStats(loopname);
+  getRemoteDirectory().reportStats(loopname);
   inGaloisForEach = false;
 }
 

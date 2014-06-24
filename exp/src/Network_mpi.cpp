@@ -169,7 +169,6 @@ public:
     handleError(rv);
     return;
   }
-
 };
 
 static const int numslots = 16;
