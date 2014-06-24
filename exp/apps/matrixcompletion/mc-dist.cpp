@@ -70,8 +70,6 @@ public:
 
 };
 
-uint64_t dg = 0, dt = 0;
-
 template<typename RngTy, typename FunctionTy>
 class BlockedExecuter {
   RngTy r;
@@ -97,13 +95,18 @@ public:
                 << " Users: " << y1Local << " - " << y2Local
                 << "\n";
       Galois::InsertBag<typename RngTy::value_type> items;
-      for (unsigned z = x1; z < x2; ++z)
-        r(z, std::make_pair(y1Local, y2Local), items);
+      RngTy& rL = r;
+      Galois::Timer T;
+      T.start();
+      Galois::Runtime::for_each_impl<Galois::WorkList::StableIterator<> >(Galois::Runtime::makeStandardRange(boost::make_counting_iterator(x1), boost::make_counting_iterator(x2)), [&items, &rL, y1Local, y2Local] (unsigned z, Galois::UserContext<unsigned>& ctx) { rL(z, std::make_pair(y1Local, y2Local), items); }, "BlockedExecutor::find");
+      T.stop();
+      std::cout << "find: " << T.get() << "\n";
+      T.start();
       Galois::Runtime::for_each_impl<Galois::WorkList::StableIterator<> >(
         Galois::Runtime::makeStandardRange(items.begin(), items.end()),
-        f, "BlockedExecutor");
-      std::cout << "Did " << dg << " Tried " << dt << "\n";
-      dg = dt = 0;
+        f, "BlockedExecutor::do");
+      T.stop();
+      std::cout << "do: " << T.get() << "\n";
       //barrier before execution in foreach should be sufficient
     }
   }
@@ -245,8 +248,6 @@ double doGradientUpdate(Node& movie_data, Node& user_data, int edge_rating, doub
   return cur_error;
 }
 
-unsigned src_max, src_min, dst_max, dst_min;
-
 //Edge doer
 struct sgd_edge_pair {
   Graph::pointer g;
@@ -256,14 +257,6 @@ struct sgd_edge_pair {
 
   template<typename Context>
   void operator()(std::pair<unsigned, unsigned> edge, Context& cnx) {
-    if (edge.second == 46641)
-      std::cout << "M: " << edge.first << ", U: " << edge.second << "\n";
-    ++dt;
-    dst_max = std::max(edge.second, dst_max);
-    dst_min = std::min(edge.second, dst_min);
-    src_max = std::max(edge.first, src_max);
-    src_min = std::min(edge.first, src_min);
-
     auto src = *(g->begin() + edge.first);
     auto dst = *(g->begin() + edge.second);
     auto ii = g->edge_begin(src, Galois::MethodFlag::SRC_ONLY);
@@ -271,7 +264,6 @@ struct sgd_edge_pair {
     ii = std::lower_bound(ii,ee, dst, [] (const decltype(*ii)& edg, GNode n) { return edg.dst < n; });
     if (ii != ee && g->dst(ii) == dst) {
       doGradientUpdate(g->at(src), g->at(dst), g->at(ii), step_size);
-      ++dg;
     }
   }
 
@@ -312,13 +304,7 @@ struct sgd_edge_finder {
 
 
 void go(Graph::pointer g, unsigned int numMovieNodes, unsigned int numUserNodes, const LearnFN* lf) {
-  std::deque<GNode> Movies;
-  for (auto ii = g->begin(), ee = g->end(); ii != ee; ++ii)
-    if (g->edge_begin(*ii) != g->edge_end(*ii))
-      Movies.push_back(*ii);
   for (int i = 0; i < 20; ++i) {
-    src_max = dst_max = 0;
-    src_min = dst_min = std::numeric_limits<unsigned>::max();
     double step_size = lf->step_size(i);
     std::cout << "Step Size: " << step_size << "\n";
     Galois::Timer timer;
@@ -328,8 +314,6 @@ void go(Graph::pointer g, unsigned int numMovieNodes, unsigned int numUserNodes,
                      sgd_edge_pair{g, step_size});
     timer.stop();
     std::cout << "Time: " << timer.get() << "ms\n";
-    std::cout << "src: " << src_min << " - " << src_max << "\n"
-              << "dst: " << dst_min << " - " << dst_max << "\n";
   }
 }
 
@@ -341,9 +325,9 @@ static double genRand () {
 // Initializes latent vector and id for each node
 struct initializeGraphData {
   struct stats : public Galois::Runtime::Lockable {
-    unsigned int numMovieNodes;
-    unsigned int numUserNodes;
-    unsigned int numRatings;
+    std::atomic<unsigned int> numMovieNodes;
+    std::atomic<unsigned int> numUserNodes;
+    std::atomic<unsigned int> numRatings;
     stats() : numMovieNodes(0), numUserNodes(0), numRatings(0) {}
     stats(Galois::Runtime::PerHost<stats>) : numMovieNodes(0), numUserNodes(0), numRatings(0) {}
     stats(Galois::Runtime::DeSerializeBuffer& s) {
@@ -352,10 +336,14 @@ struct initializeGraphData {
     //serialize
     typedef int tt_has_serialize;
     void serialize(Galois::Runtime::SerializeBuffer& s) const {
-      gSerialize(s,numMovieNodes,numUserNodes,numRatings);
+      gSerialize(s,(unsigned int)numMovieNodes,(unsigned int)numUserNodes,(unsigned int)numRatings);
     }
     void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
-      gDeserialize(s,numMovieNodes,numUserNodes,numRatings);
+      unsigned int mn,un,r;
+      gDeserialize(s,mn,un,r);
+      numMovieNodes = mn;
+      numUserNodes = un;
+      numRatings = r;
     }
 
   };
@@ -377,9 +365,10 @@ struct initializeGraphData {
     unsigned int numUserNodes = 0;
     unsigned int numRatings = 0;
     for (unsigned x = 0; x < Galois::Runtime::NetworkInterface::Num; ++x) {
-      numMovieNodes += s.remote(x)->numMovieNodes;
-      numUserNodes += s.remote(x)->numUserNodes;
-      numRatings += s.remote(x)->numRatings;
+      auto rv = s.remote(x);
+      numMovieNodes += rv->numMovieNodes;
+      numUserNodes += rv->numUserNodes;
+      numRatings += rv->numRatings;
     }
 
     return std::make_tuple(numMovieNodes, numUserNodes, numRatings);
@@ -395,7 +384,7 @@ struct initializeGraphData {
     g->sort_edges(gnode, [] (GNode e1_dst, const int& e1_data,
                              GNode e2_dst, const int& e2_data) {
                     return e1_dst < e2_dst;
-                  });
+                  }, Galois::MethodFlag::NONE);
     
     //count number of movies we've seen; only movies nodes have edges
     unsigned int num_edges = 
