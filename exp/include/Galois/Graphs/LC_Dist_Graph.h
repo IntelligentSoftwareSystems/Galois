@@ -277,12 +277,17 @@ public:
   iterator begin() { return iterator(this, 0); }
   iterator end  () { return iterator(this, PrefixNum[Runtime::NetworkInterface::Num - 1]); }
   
-  local_iterator local_begin() { return iterator(this, Runtime::NetworkInterface::ID == 0 ? 0 : PrefixNum[Runtime::NetworkInterface::ID - 1] ); }
+  local_iterator local_begin() {
+    if (Runtime::LL::getTID() == 0)
+      return iterator(this, Runtime::NetworkInterface::ID == 0 ? 0 : PrefixNum[Runtime::NetworkInterface::ID - 1] );
+    else
+      return local_end();
+  }
   local_iterator local_end  () { return iterator(this, PrefixNum[Runtime::NetworkInterface::ID]); }
 
   edge_iterator edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
     acquire(N, mflag);
-    if (mflag != MethodFlag::SRC_ONLY)
+    if (mflag != MethodFlag::SRC_ONLY && mflag != MethodFlag::NONE)
       for (edge_iterator ii = N->begin(), ee = N->end(); ii != ee; ++ii) {
         acquireNode(ii->dst, mflag);
       }
