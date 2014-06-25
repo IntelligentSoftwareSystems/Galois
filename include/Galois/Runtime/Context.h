@@ -171,6 +171,17 @@ inline void serial_acquire(gptr<T> ptr) {
   } while(true);
 }
 
+template<typename T>
+inline void prefetch(gptr<T> ptr, Galois::MethodFlag m = MethodFlag::ALL) {
+  T* obj = ptr.resolve();
+  if (!obj) {
+    //FIXME Better resolve flag
+    getRemoteDirectory().fetch<T>(static_cast<fatPointer>(ptr), ResolveFlag::RW);
+  } else if (LockManagerBase::isAcquiredAny(obj)) {
+    getLocalDirectory().fetch(static_cast<fatPointer>(ptr), ResolveFlag::RW);
+  }
+}
+
 // inline bool isAcquired(Lockable* C) {
 //   return C->owner.is_locked();
 // }
