@@ -116,7 +116,7 @@ class LC_Dist {
   std::vector<NodeImplTy> Nodes;
   std::vector<EdgeImplTy> Edges;
 
-  std::vector<GraphNode> Starts;
+  std::vector<std::pair<GraphNode, std::atomic<int> > > Starts;
   std::vector<unsigned> Num;
   std::vector<unsigned> PrefixNum;
 
@@ -125,13 +125,14 @@ class LC_Dist {
   friend class Runtime::PerHost<LC_Dist>;
 
   LC_Dist(Runtime::PerHost<LC_Dist> _self, std::vector<unsigned>& edges) 
-    :self(_self)
+    :Starts(Runtime::NetworkInterface::Num),
+     Num(Runtime::NetworkInterface::Num),
+     PrefixNum(Runtime::NetworkInterface::Num),
+     self(_self)
   {
+    //std::cerr << Runtime::NetworkInterface::ID << " Construct\n";
     Runtime::trace("LC_Dist with % nodes total\n", edges.size());
     //Fill up metadata vectors
-    Num.resize(Runtime::NetworkInterface::Num);
-    PrefixNum.resize(Num.size());
-    Starts.resize(Num.size());
     for (unsigned h = 0; h < Runtime::NetworkInterface::Num; ++h) {
       auto p = block_range(edges.begin(), edges.end(), h,
                            Runtime::NetworkInterface::Num);
@@ -158,22 +159,31 @@ class LC_Dist {
       Nodes.emplace_back(cur, *ii);
       cur += *ii;
     }
-    Starts[Runtime::NetworkInterface::ID] = GraphNode(&Nodes[0]);
+    Starts[Runtime::NetworkInterface::ID].first = GraphNode(&Nodes[0]);
+    Starts[Runtime::NetworkInterface::ID].second = 2;
   }
 
   static void getStart(Runtime::PerHost<LC_Dist> graph, uint32_t whom) {
-    Runtime::getSystemNetworkInterface().sendAlt(whom, putStart, graph, Runtime::NetworkInterface::ID, graph->Starts[Runtime::NetworkInterface::ID]);
+    //std::cerr << Runtime::NetworkInterface::ID << " getStart " << whom << "\n";
+    Runtime::getSystemNetworkInterface().sendAlt(whom, putStart, graph, Runtime::NetworkInterface::ID, graph->Starts[Runtime::NetworkInterface::ID].first);
   }
+
   static void putStart(Runtime::PerHost<LC_Dist> graph, uint32_t whom, GraphNode start) {
-    graph->Starts[whom] = start;
+    //std::cerr << Runtime::NetworkInterface::ID << " putStart " << whom << "\n";
+    graph->Starts[whom].first = start;
+    graph->Starts[whom].second = 2;
   }
 
   //blocking
   void fillStarts(uint32_t host) {
-    if (!Starts[host]) {
-      Runtime::getSystemNetworkInterface().sendAlt(host, getStart, self, Runtime::NetworkInterface::ID);
-      while (!Starts[host]) { Runtime::doNetworkWork(); }
+    if (Starts[host].second != 2) {
+      int ex = 0;
+      bool swap = Starts[host].second.compare_exchange_strong(ex,1);
+      if (swap)
+        Runtime::getSystemNetworkInterface().sendAlt(host, getStart, self, Runtime::NetworkInterface::ID);
+      while (Starts[host].second != 2) { Runtime::doNetworkWork(); }
     }
+    assert(Starts[host].first);
   }
 
   GraphNode generateNodePtr(unsigned x) {
@@ -182,7 +192,7 @@ class LC_Dist {
     unsigned host = std::distance(PrefixNum.begin(), ii);
     unsigned offset = x - (host == 0 ? 0 : *(ii - 1));
     fillStarts(host);
-    return Starts[host] + offset;
+    return Starts[host].first + offset;
   }
 
   void acquireNode(Runtime::gptr<NodeImplTy> node, Galois::MethodFlag mflag) {
