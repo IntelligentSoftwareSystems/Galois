@@ -106,7 +106,12 @@ public:
   static PerHost allocate(Args... args) {
     uint64_t off = getPerHostBackend().allocateOffset();
     getPerHostBackend().createAt(off, new T(PerHost(off), args...));
-    getSystemNetworkInterface().broadcastAlt(&allocOnHost<Args...>, off, args...);
+    //broadcast may be out of order with other messages
+    //getSystemNetworkInterface().broadcastAlt(&allocOnHost<Args...>, off, args...);
+    auto& net = getSystemNetworkInterface();
+    for (unsigned z = 0; z < NetworkInterface::Num; ++z)
+      if (z != NetworkInterface::ID)
+        net.sendAlt(z, &allocOnHost<Args...>, off, args...);
     return PerHost(off);
   }
   static void deallocate(PerHost ptr) {
