@@ -70,73 +70,89 @@ public:
 
 };
 
-template<typename RngTy, typename FunctionTy>
+template<typename PreFn, typename RngTy, typename FunctionTy>
 class BlockedExecuter {
+  PreFn p;
   RngTy r;
   FunctionTy f;
   unsigned x1, x2, y1, y2;
 
 public:
-  BlockedExecuter(const RngTy& _r, const FunctionTy& _f,
-                  unsigned _x1, unsigned _x2,
-                  unsigned _y1, unsigned _y2)
-    :r(_r), f(_f), x1(_x1), x2(_x2), y1(_y1), y2(_y2) {}
+  BlockedExecuter(const PreFn& _p, const RngTy& _r, const FunctionTy& _f,
+                  unsigned _x1, unsigned _x2, unsigned _y1, unsigned _y2)
+    :p(_p), r(_r), f(_f), x1(_x1), x2(_x2), y1(_y1), y2(_y2) {}
 
   void operator()() {
     unsigned num = Galois::Runtime::NetworkInterface::Num;
     unsigned id = Galois::Runtime::NetworkInterface::ID;
     unsigned x1Local, x2Local;
     std::tie(x1Local,x2Local) = Galois::block_range(x1, x2, id, num);
+    unsigned tPrefetch = 0, tFind = 0, tDo = 0;
     for (unsigned i = 0; i < num; ++i) {
       unsigned idLocal = (id + i) % num;
       unsigned y1Local, y2Local;
       std::tie(y1Local, y2Local) = Galois::block_range(y1,y2,idLocal,num);
-      std::cout << "Movies: " << x1Local << " - " << x2Local
+      std::cout << id
+                << " Movies: " << x1Local << " - " << x2Local
                 << " Users: " << y1Local << " - " << y2Local
                 << "\n";
       Galois::InsertBag<typename RngTy::value_type> items;
       RngTy& rL = r;
       Galois::Timer T;
+
       T.start();
-      Galois::Runtime::for_each_impl<Galois::WorkList::StableIterator<> >(Galois::Runtime::makeStandardRange(boost::make_counting_iterator(x1), boost::make_counting_iterator(x2)), [&items, &rL, y1Local, y2Local] (unsigned z, Galois::UserContext<unsigned>& ctx) { rL(z, std::make_pair(y1Local, y2Local), items); }, "BlockedExecutor::find");
+      // Galois::Runtime::do_all_impl(Galois::Runtime::makeStandardRange(boost::make_counting_iterator(y1Local), boost::make_counting_iterator(y2Local)), p, "BlockedExecutor::prefetch", true);
+      // Galois::Runtime::getSystemNetworkInterface().flush();
+      // Galois::Runtime::getSystemNetworkInterface().handleReceives();
       T.stop();
-      std::cout << "find: " << T.get() << "\n";
+      tPrefetch += T.get();
+      std::cout << Galois::Runtime::NetworkInterface::ID << " prefetch: " << T.get() << "\n";
+
+      T.start();
+      Galois::Runtime::for_each_impl<Galois::WorkList::StableIterator<> >(Galois::Runtime::makeStandardRange(boost::make_counting_iterator(x1Local), boost::make_counting_iterator(x2Local)), [&items, &rL, y1Local, y2Local] (unsigned z, Galois::UserContext<unsigned>& ctx) { rL(z, std::make_pair(y1Local, y2Local), items); }, "BlockedExecutor::find");
+      T.stop();
+      tFind += T.get();
+      std::cout << Galois::Runtime::NetworkInterface::ID << " find: " << T.get() << "\n";
+
       T.start();
       Galois::Runtime::for_each_impl<Galois::WorkList::StableIterator<> >(
         Galois::Runtime::makeStandardRange(items.begin(), items.end()),
         f, "BlockedExecutor::do");
       T.stop();
-      std::cout << "do: " << T.get() << "\n";
+      tDo += T.get();
+      std::cout << Galois::Runtime::NetworkInterface::ID << " do: " << T.get() << "\n";
       //barrier before execution in foreach should be sufficient
     }
+    std::cout << Galois::Runtime::NetworkInterface::ID << " ALL p: " << tPrefetch << " f: " << tFind << " d: " << tDo << "\n";
   }
 };
 
-template<typename RngTy, typename FnTy>
+template<typename PreFn, typename RngTy, typename FnTy>
 void for_each_blocked_pad(Galois::Runtime::RecvBuffer& buf) {
+  PreFn p;
   RngTy r;
   FnTy f;
   unsigned x1, x2, y1, y2;
-  Galois::Runtime::gDeserialize(buf, r, f, x1, x2, y1, y2);
-  BlockedExecuter<RngTy, FnTy> ex(r, f, x1,x2,y1,y2);
+  Galois::Runtime::gDeserialize(buf, p, r, f, x1, x2, y1, y2);
+  BlockedExecuter<PreFn, RngTy, FnTy> ex(p, r, f, x1,x2,y1,y2);
   ex();
 }
 
-template<typename RngTy, typename FnTy>
+template<typename PreFn, typename RngTy, typename FnTy>
 void for_each_blocked(unsigned x1, unsigned x2, unsigned y1, unsigned y2, 
-                      RngTy r, FnTy f) {
+                      PreFn p, RngTy r, FnTy f) {
   Galois::Runtime::NetworkInterface& net = Galois::Runtime::getSystemNetworkInterface();
   for (unsigned i = 1; i < Galois::Runtime::NetworkInterface::Num; i++) {
     Galois::Runtime::SendBuffer buf;
     // serialize function and data
-    Galois::Runtime::gSerialize(buf, r, f, x1,x2,y1,y2);
+    Galois::Runtime::gSerialize(buf, p, r, f, x1,x2,y1,y2);
     //send data
-    net.sendLoop (i, &for_each_blocked_pad<RngTy, FnTy>, buf);
+    net.sendLoop (i, &for_each_blocked_pad<PreFn, RngTy, FnTy>, buf);
   }
   net.flush();
   net.handleReceives();
   //Start locally
-  BlockedExecuter<RngTy,FnTy> ex(r, f, x1,x2,y1,y2);
+  BlockedExecuter<PreFn, RngTy,FnTy> ex(p, r, f, x1,x2,y1,y2);
   ex();
 }
 
@@ -302,6 +318,15 @@ struct sgd_edge_finder {
   }
 };
 
+struct node_prefetch {
+  Graph::pointer g;
+  node_prefetch(Graph::pointer g) : g(g) {}
+  node_prefetch() = default;
+
+  void operator()(unsigned user) {
+    Galois::Runtime::prefetch( *(g->begin() + user) );
+  }
+};
 
 void go(Graph::pointer g, unsigned int numMovieNodes, unsigned int numUserNodes, const LearnFN* lf) {
   for (int i = 0; i < 20; ++i) {
@@ -310,6 +335,7 @@ void go(Graph::pointer g, unsigned int numMovieNodes, unsigned int numUserNodes,
     Galois::Timer timer;
     timer.start();
     for_each_blocked(0, numMovieNodes, numMovieNodes, numMovieNodes + numUserNodes,
+                     node_prefetch{g},
                      sgd_edge_finder{g},
                      sgd_edge_pair{g, step_size});
     timer.stop();
