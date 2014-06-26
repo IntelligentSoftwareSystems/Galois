@@ -18,6 +18,45 @@
 
 namespace bh {
 
+
+template <typename B>
+void checkTreeBuildRecursive (unsigned& leafCount, const OctreeInternal<B>* node) {
+  assert (!node->isLeaf ());
+
+  for (unsigned i = 0; i < 8; ++i) {
+    if (node->getChild (i) != nullptr) {
+
+      if (i != getIndex (node->getChild (i)->pos, node->pos)) { 
+        GALOIS_DIE ("child pos out of bounding box");
+      }
+
+      if (!node->getChild (i)->isLeaf ()) { 
+        checkTreeBuildRecursive (
+            leafCount, 
+            static_cast<const OctreeInternal<B>*> (node->getChild (i)));
+
+      } else {
+        ++leafCount;
+      }
+    }
+  }
+}
+
+template <typename B>
+void checkTreeBuild (const OctreeInternal<B>* root, const BoundingBox& box, const unsigned numBodies) {
+
+
+  // 1. num leaves == numBodies
+  // 2. every node's position is within its bounding box
+
+  unsigned leafCount = 0;
+  checkTreeBuildRecursive (leafCount, root);
+
+  if (leafCount != numBodies) {
+    GALOIS_DIE ("mismatch in num-leaves and num-bodies");
+  }
+}
+
 template <typename B>
 struct TypeDefHelper {
   using Base_ty = B;
@@ -29,7 +68,7 @@ struct TypeDefHelper {
 };
 
 
-struct TreeSummarizeSerial: public TypeDefHelper<SerialNodeBase> {
+struct SummarizeTreeSerial: public TypeDefHelper<SerialNodeBase> {
 
   template <typename I>
   void operator () (InterNode* root, I bodbeg, I bodend) const {
@@ -142,42 +181,6 @@ struct TreeSummarizeCilk: public TypeDefHelper<SerialNodeBase> {
 
 #endif
 
-template<typename B>
-GALOIS_ATTRIBUTE_PROF_NOINLINE static void treeCompute (OctreeInternal<B>* node) {
-
-  assert ((node != NULL) && (!node->isLeaf ()));
-
-  double massSum = 0.0;
-  Point accum;
-
-  node->compactChildren ();
-
-  for (unsigned i = 0; i < 8; ++i) {
-    Octree<B>* child = node->getChild (i);
-
-    if (child == NULL) {
-      break;
-    }
-
-    massSum += child->mass;
-
-    for (unsigned j = 0; j < 3; ++j) {
-      accum [j] += child->mass * child->pos[j];
-    }
-
-  } // end for child
-
-  node->mass = massSum;
-
-  if (massSum > 0.0) {
-    double invSum = 1.0 / massSum;
-
-    for (unsigned j = 0; j < 3; ++j) {
-      node->pos [j] = accum [j] * invSum;
-    }
-  }
-
-}
 
 struct TreeSummarizeODG: public TypeDefHelper<SerialNodeBase> {
 
@@ -284,7 +287,7 @@ struct TreeSummarizeODG: public TypeDefHelper<SerialNodeBase> {
     void operator () (unsigned nid, ContextTy& lwl) {
       assert (odgNodes[nid].numChild == 0);
 
-      treeCompute (odgNodes[nid].node);
+      summarizeNode (odgNodes[nid].node);
 
       updateODG (nid, lwl);
     }
@@ -357,7 +360,7 @@ struct TreeSummarizeLevelByLevel: public TypeDefHelper<SerialNodeBase> {
   struct SummarizeOp {
 
     GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (InterNode* node) const {
-      treeCompute (node);
+      summarizeNode (node);
     }
 
   };
@@ -471,7 +474,7 @@ struct TreeSummarizeSpeculative: public TypeDefHelper<SpecNodeBase> {
         ctx.addUndoAction (restore);
       }
 
-      treeCompute (node);
+      summarizeNode (node);
 
     }
   };
@@ -569,7 +572,7 @@ struct TreeSummarizeLevelExec: public TypeDefHelper<LevelNodeBase> {
 
     template <typename C>
     void operator () (InterNode* node, C& ctx) const {
-      treeCompute (node);
+      summarizeNode (node);
     }
   };
 
@@ -615,7 +618,7 @@ struct TreeSummarizeKDGsemi: public TypeDefHelper<KDGNodeBase> {
 
       // std::cout << "Processing node: " << node << std::endl;
 
-      treeCompute (node);
+      summarizeNode (node);
 
       if (node != root) {
         InterNode* p = static_cast<InterNode*> (node->parent);
@@ -687,6 +690,300 @@ struct TreeSummarizeKDGsemi: public TypeDefHelper<KDGNodeBase> {
 
   }
 };
+
+
+
+
+template <typename B, typename PartList>
+struct WorkItemSinglePass {
+  typedef typename PartList::iterator Iter;
+  typedef OctreeInternal<B> Node_ty;
+
+  OctreeInternal<B>* node;
+  double radius;
+  PartList* partList;
+  Iter beg;
+  Iter end;
+};
+
+template <typename PartList>
+struct PartitionSinglePass {
+
+  typedef Galois::GFixedAllocator<PartList> PartListAlloc;
+
+  PartListAlloc partListAlloc;
+  
+  template <typename WorkItem>
+  void operator () (const WorkItem& w, WorkItem* child) {
+
+    for (unsigned i = 0; i < 8; ++i) {
+      PartList* list = partListAlloc.allocate (1);
+      new (list) PartList ();
+      child[i].partList = list;
+    }
+
+    assert (w.partList != nullptr);
+    for (auto i = w.partList->begin(), i_end = w.partList->end (); 
+        i != i_end; ++i) {
+      unsigned index = getIndex ((*i)->pos, w.node->pos);
+      child[index].partList->push_back (*i);
+    }
+
+    // clean up child array
+    for (unsigned i = 0; i < 8; ++i) {
+      child[i].beg = child[i].partList->begin ();
+      child[i].end = child[i].partList->end ();
+
+      if (child[i].partList->empty ()) {
+        partListAlloc.destroy (child[i].partList);
+        partListAlloc.deallocate (child[i].partList, 1);
+      } 
+    }
+
+    // delete the old list
+    if (w.partList != nullptr) {
+      partListAlloc.destroy (w.partList);
+      partListAlloc.deallocate (w.partList, 1);
+      const_cast<WorkItem&> (w).partList = nullptr;
+    }
+  }
+};
+
+// TODO: partitionMultiPassImpl
+
+
+
+template <typename WorkItem, typename TreeAlloc, typename Partitioner, typename ForkJoinHandler>
+void buildSummarizeRecursive (WorkItem& w, TreeAlloc& treeAlloc, Partitioner& partitioner,
+    ForkJoinHandler& fjh) {
+
+  assert (w.beg != w.end);
+
+  auto next = w.beg; ++next;
+  assert (next != w.end);
+
+  WorkItem child[8];
+  partitioner (w, child);
+
+  for (unsigned i = 0; i < 8; ++i) {
+    if( child[i].beg != child[i].end) {
+      auto next = child[i].beg; ++next;
+
+      if (next == child[i].end) { // size 1
+        w.node->setChild (i, *(child[i].beg));
+
+      } else {
+        Point new_pos = w.node->pos;
+        double radius = w.radius / 2;
+        updateCenter (new_pos, i, radius);
+        typename WorkItem::Node_ty* internal = treeAlloc.allocate (1);
+        treeAlloc.construct (internal, new_pos);
+        w.node->setChild (i, internal);
+
+        fjh.fork (child[i]);
+      }
+
+    }
+  }
+
+  fjh.join (w);
+
+}
+
+// template <typename WorkItem, typename TreeAlloc, typename Partitioner>
+// void buildSummarizeRecursive (WorkItem& w, TreeAlloc& treeAlloc, Partitioner& partitioner) {
+// 
+  // assert (w.beg != w.end);
+// 
+  // auto next = w.beg; ++next;
+  // assert (next != w.end);
+// 
+  // WorkItem child[8];
+  // partitioner (w, child);
+// 
+  // auto loopbody = [&] (unsigned i) {
+    // if( child[i].beg != child[i].end) {
+      // auto next = child[i].beg; ++next;
+// 
+      // if (next == child[i].end) { // size 1
+        // w.node->setChild (i, *(child[i].beg));
+// 
+      // } else {
+        // Point new_pos = w.node->pos;
+        // double radius = w.radius / 2;
+        // updateCenter (new_pos, i, radius);
+        // OctreeInternal<B>* internal = treeAlloc.allocate (1);
+        // treeAlloc.construct (internal, new_pos);
+        // w.node->setChild (i, internal);
+// 
+        // buildSummarizeRecursive (child[i], treeAlloc);
+      // }
+// 
+    // }
+  // };
+// 
+  // if (useCilk) {
+// #ifdef HAVE_CILK
+    // cilk_for (unsigned i = 0; i < 8; ++i) {
+      // loopbody (i);
+    // }
+// #else 
+    // GALOIS_DIE ("use a compiler that supports cilk");
+// #endif
+// 
+  // } else {
+    // for (unsigned i = 0; i < 8; ++i) {
+      // loopbody (i);
+    // }
+  // } // end for
+// 
+  // summarizeNode (w.node);
+// 
+// }
+
+
+template <typename B>
+struct BuildSummarizeSerial {
+
+  template <typename TreeAlloc, typename I>
+  OctreeInternal<B>* operator () (const BoundingBox& box, TreeAlloc& treeAlloc, I bodbeg, I bodend) const {
+
+    typedef Galois::gdeque<Body<B>*> PartList;
+    typedef WorkItemSinglePass<B, PartList> WorkItem;
+
+    OctreeInternal<B>* root = treeAlloc.allocate (1);
+    treeAlloc.construct (root, box.center ());
+
+    PartitionSinglePass<PartList> partitioner;
+
+    struct ForkJoinSerial {
+
+      TreeAlloc& treeAlloc;
+      PartitionSinglePass<PartList>& partitioner;
+
+      void fork (WorkItem& w) {
+        buildSummarizeRecursive (w, treeAlloc, partitioner, *this);
+      }
+
+      void join (WorkItem& w) {
+        summarizeNode (w.node);
+      }
+    };
+
+    WorkItem initial = {
+      root,
+      box.radius (),
+      nullptr,
+      bodbeg,
+      bodend
+    };
+
+
+    ForkJoinSerial f {treeAlloc, partitioner};
+    f.fork (initial);
+
+  }
+
+};
+
+template <typename B>
+struct BuildSummarizeGalois {
+
+  template <typename C, typename WorkItem>
+  struct GaloisForkHandler {
+
+    C& ctx;
+
+    template <typename... Args> 
+      void fork (WorkItem& w, Args&&... args) {
+        ctx.push (w);
+      }
+
+    void join (WorkItem&) {} // handled separately in Galois
+  };
+
+  template <typename TreeAlloc, typename I>
+  OctreeInternal<B>* operator () (const BoundingBox& box, TreeAlloc& treeAlloc, I bodbeg, I bodend) const {
+    typedef Galois::gdeque<Body<B>*> PartList;
+    typedef WorkItemSinglePass<B, PartList> WorkItem;
+
+    OctreeInternal<B>* root = treeAlloc.allocate (1);
+    treeAlloc.construct (root, box.center ());
+
+    PartitionSinglePass<PartList> partitioner;
+
+
+
+    struct SummarizeUsingDAG {
+
+      GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (WorkItem& w) {
+        summarizeNode (w.node);
+      }
+    };
+
+    struct BuildTreeTopDown {
+
+      TreeAlloc& treeAlloc;
+      PartitionSinglePass<PartList>& partitioner;
+
+      template <typename C>
+      void operator () (WorkItem& w, C& ctx) {
+        buildSummarizeRecursive (w, treeAlloc, partitioner, GaloisForkHandler<C, WorkItem> (ctx));
+
+      } // end method
+    };
+
+    WorkItem initial = {
+      root,
+      box.radius (),
+      nullptr,
+      bodbeg,
+      bodend
+    };
+
+    Galois::Runtime::for_each_ordered_tree_1p (
+        initial,
+        BuildTreeTopDown {treeAlloc, partitioner},
+        SummarizeUsingDAG (),
+        "octree-build-summarize-1p");
+
+
+    return root;
+
+      
+  }
+};
+
+
+
+
+template <typename BM, typename SM>
+struct BuildSummarizeSeparate {
+
+  BM builMethod;
+  SM summarizeMethod;
+  typedef typename SM::Base_ty Base_ty;
+  typedef OctreeInternal<Base_ty> Node_ty;
+
+
+  template <typename TreeAlloc, typename I>
+  Node_ty* operator () (const BoundingBox& box, TreeAlloc& treeAlloc, I bodbeg, I bodend) const {
+
+    Node_ty* root = builMethod (box, treeAlloc, bodbeg, bodend);
+
+    if (!skipVerify) {
+      printf ("Running Tree verification routine\n");
+      checkTreeBuild (root, box, std::distance (bodbeg, bodend));
+    }
+
+    summarizeMethod (root, bodbeg, bodend);
+    return root;
+  }
+
+};
+
+
+
 
 
 
