@@ -107,7 +107,6 @@ class NetworkInterfaceTCP : public NetworkInterface {
   //this host's listen socket is at it's offset
   //the remainder are client sockets
   std::vector<int> sockets;
-  std::vector<sockaddr_in> clients;
   std::vector<recvIP> recvState;
   std::vector<sendIP> sendState;
 
@@ -128,41 +127,97 @@ class NetworkInterfaceTCP : public NetworkInterface {
       std::cout << "Couldn't setsockopt(TCP_NODELAY)\n";
   }
 
-  void connectToMaster(std::string& strportno) {
-    sockets.resize(1);
+  int connectTo(std::string name, int port) {
+    std::ostringstream os;
+    os << port;
+    return connectTo(name, os.str());
+  }
 
-    std::string master;
-    if (!LL::EnvCheck("GALOIS_TCP_HOST", master))
-      abort();
-    
+  int connectTo(std::string name, std::string port) {
     struct addrinfo *result;
     struct addrinfo hint;
     bzero(&hint, sizeof(hint));
     hint.ai_family = AF_UNSPEC;
     hint.ai_socktype = SOCK_STREAM;
     hint.ai_flags = AI_NUMERICSERV;
-    if (getaddrinfo(master.c_str(), strportno.c_str(), &hint, &result) < 0)
+    if (getaddrinfo(name.c_str(), port.c_str(), &hint, &result) < 0)
       error("ERROR in getaddrinfo");
-
-    sockets[0] = -1;
+    
+    int sock = -1;
     for (addrinfo* rp = result; rp != NULL; rp = rp->ai_next) {
-      if ((sockets[0] = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol)) == -1)
+      if ((sock = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol)) == -1)
         continue;
-      if (connect(sockets[0],rp->ai_addr, rp->ai_addrlen) != -1)
+      if (connect(sock,rp->ai_addr, rp->ai_addrlen) != -1)
         break; // success
-      close(sockets[0]);
-      sockets[0] = -1;
+      close(sock);
+      sock = -1;
     }
 
     freeaddrinfo(result);
-
-    if (sockets[0] == -1)
+    
+    if (sock == -1)
       error("ERROR connecting");
 
-    setNoDelay(sockets[0]);
+    setNoDelay(sock);
+    return sock;
+   }
+
+  std::pair<int, std::vector<std::pair<std::string, int> > >
+  getPeers(int listenport) {
+    std::vector<std::pair<std::string, int> > peers;
+
+    std::string serverport;
+    if (!LL::EnvCheck("GALOIS_TCP_PORT", serverport))
+      error("Error, no server port");
+    std::string servername;
+    if (!LL::EnvCheck("GALOIS_TCP_NAME", servername))
+      error("Error, no server name");
+
+    int serversocket = connectTo(servername, serverport);
+
+    char buffer[2048];
+    bzero(buffer, sizeof(buffer));
+    
+    int r = snprintf(buffer, sizeof(buffer), "%d\n", listenport);
+    //std::cerr << buffer << "|" << r << "\n";
+    if (write(serversocket, buffer, r) < r)
+      error("ERROR in writing to starter");
+    
+    bzero(buffer, sizeof(buffer));
+    int off = 0;
+    while (!memchr(buffer, '\n', off)) {
+      r = read(serversocket, &buffer[off], sizeof(buffer) - off);
+      if (r < 0)
+        error("ERROR reading from server");
+      off += r;
+    }
+    buffer[--off] = '\0';
+
+    std::vector<char*> things;
+    things.push_back(buffer);
+    char* tmp = buffer;
+    while((tmp = (char*)memchr(tmp, ',', strlen(tmp)))) {
+      *tmp = '\0';
+      ++tmp;
+      things.push_back(tmp);
+    }
+    // for(auto p : things)
+    //   std::cerr << "|" << p << "|" << "\n";
+
+    int num = atoi(things[0]);
+    int me = atoi(things[1]);
+    for (int i = 0; i < num; ++i) {
+      std::string s(things.at(2+i*2));
+      int port = atoi(things.at(3+i*2));
+      peers.push_back(std::make_pair(s,port));
+    }
+
+    close(serversocket);
+
+    return std::make_pair(me, peers);
   }
 
-  int setupListenSocket(int portno, std::string& strportno) {
+  std::pair<int,int> setupListenSocket() {
     int listensocket = socket(AF_INET, SOCK_STREAM, 0);
     if (listensocket < 0)
       error("ERROR opening socket");
@@ -171,95 +226,52 @@ class NetworkInterfaceTCP : public NetworkInterface {
     bzero((char *) &serv_addr, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
     serv_addr.sin_addr.s_addr = INADDR_ANY;
-    serv_addr.sin_port = htons(portno);
+    serv_addr.sin_port = 0;
     if (bind(listensocket, (struct sockaddr *) &serv_addr, sizeof(serv_addr)) < 0)
       error("ERROR on binding");
-    if (listen(listensocket, numhosts) < 0)
+    if (listen(listensocket, 128) < 0) //MAX unaccepted things
       error("ERROR on listening");
-    std::cerr << "Listening on " << portno << "(as " << strportno << ")\n";
-    return listensocket;
+
+    struct sockaddr_in sin;
+    socklen_t len = sizeof(sin);
+    if (getsockname(listensocket, (struct sockaddr *)&sin, &len) == -1)
+      perror("getsockname");
+    else
+      std::cerr << "Listening on " << ntohs(sin.sin_port) << "\n";
+    return std::make_pair(listensocket, ntohs(sin.sin_port));
   }
 
-  void connectToChildren(int listensocket) {
-    id = 0;
+  void connectToPeers(int listensocket, std::vector<std::pair<std::string, int> > hosts) {
+    numhosts = hosts.size();
     sockets.resize(numhosts);
-    clients.resize(numhosts);
-
-    //connect all clients
-    int waiting = numhosts - 1;
-    while (waiting) {
-      socklen_t clilen = sizeof(sockaddr_in);
-      sockets[waiting] = accept(listensocket, (struct sockaddr *) &clients[waiting], &clilen);
-      if (sockets[waiting] < 0)
-        error("ERROR accepting");
-      //tell client their id
-      if (write(sockets[waiting], &waiting, sizeof(int)) < 0)
-        error("ERROR in writing id");
-      if (write(sockets[waiting], &numhosts, sizeof(int)) < 0)
-        error("ERROR in writing humhosts");
-      std::cerr << "heard from " << waiting << " of " << numhosts << "\n";
-      --waiting;
-    }
+    for (int i = 0; i < id; ++ i)
+      sockets[i] = accept(listensocket, nullptr, 0);
+    //connect
+    for (int x = id + 1; x < numhosts; ++x)
+      sockets[x] = connectTo(hosts[x].first, hosts[x].second);
   }
 
-  void connectToPeers(int listensocket, int portno) {
-    sockets.resize(numhosts);
-    for (int i = 1; i < numhosts; ++i) {
-      if (i == id) { //connect
-        for (int x = 1; x < numhosts; ++x) {
-          if (x != id) {
-            sockets[x] = socket(AF_INET, SOCK_STREAM, 0);
-            if (sockets[x] < 0)
-              error("ERROR opening socket");
-            clients[x].sin_port = htons(portno);
-            if (connect(sockets[x],(struct sockaddr *) &clients[x], sizeof(sockaddr_in)) < 0)
-              error("ERROR connecting");
-          }
-        }
-      } else { // listen
-        socklen_t clilen = sizeof(sockaddr_in);
-        sockets[i] = accept(listensocket, (struct sockaddr *) &clients[i], &clilen);
-      }
-    }
+  void trySends() {
+    fd_set wcheck = readfds;
+    timeval t = {0,0};
+    int retval = select(1 + maxsocket, NULL, &wcheck, NULL, &t);
+    if (retval == -1)
+      error("ERROR in select");
+    if (retval)
+      for (int x = 0; x < numhosts; ++x)
+        if (x != id)
+          if (FD_ISSET(sockets.at(x), &wcheck))
+            sendState[x].doSend();
   }
         
 public:
   NetworkInterfaceTCP() {
-    int listensocket;
-    int portno;
-    std::string strportno;
-
-    if (!LL::EnvCheck("GALOIS_TCP_PORT", portno))
-      portno = 95863;
-    if (!LL::EnvCheck("GALOIS_TCP_PORT", strportno))
-      strportno = "95863";
-
-    listensocket = setupListenSocket(portno, strportno);
-
-    if (LL::EnvCheck("GALOIS_TCP_MASTER", numhosts)) {
-      //get connection to all children
-      connectToChildren(listensocket);
-      //send address to everyone
-      for (int i = 1; i < numhosts; ++i)
-        if (write(sockets.at(i), &clients.at(0) , sizeof(sockaddr_in) * numhosts) < 0)
-          error("ERROR in writing clientlist");
-      //carry on
-    } else { //client
-      connectToMaster(strportno);
-      if (read(sockets[0], &id, sizeof(int)) < sizeof(int))
-        error("ERROR reading id");
-      if (read(sockets[0], &numhosts, sizeof(int)) < sizeof(int))
-        error("ERROR reading numhosts");
-      std::cerr << "Read " << id << " of " << numhosts << "\n";
-
-      //read address of everyone
-      clients.resize(numhosts);
-      if (read(sockets.at(0), &clients.at(0), sizeof(sockaddr_in) * numhosts) < 0)
-        error("ERROR in reading clientlist");
-      //connect to everyone
-      connectToPeers(listensocket, portno);
-    }
-
+    int listensocket, listenport;
+    std::tie(listensocket,listenport) = setupListenSocket();
+    auto mepeers = getPeers(listenport);
+    numhosts = mepeers.second.size();
+    id = mepeers.first;
+    connectToPeers(listensocket, mepeers.second);
     recvState.resize(numhosts);
     sendState.resize(numhosts);
     FD_ZERO(&readfds);
@@ -273,7 +285,7 @@ public:
     if (close(listensocket) < 0)
       error("ERROR closing setup socket");
 
-    ID = id;
+    ID = mepeers.first;
     Num = numhosts;
 
     std::cerr << "I am " << ID << " of " << Num << "\n";
@@ -281,27 +293,26 @@ public:
 
   virtual ~NetworkInterfaceTCP() {
     for (int i = 0; i < numhosts; ++i)
-      close(sockets.at(i));
+      if (i != ID)
+        close(sockets.at(i));
   }
 
   virtual void send(uint32_t dest, recvFuncTy recv, SendBuffer& buf) {
     sendState[dest].sendMessage(recv, buf);
+    sendState[dest].doSend();
   }
 
   virtual bool handleReceives() {
     if (debugRecv)
       assert(!inRecv);
     fd_set rcheck = readfds;
-    fd_set wcheck = readfds;
     timeval t = {0,0};
-    int retval = select(1 + maxsocket, &rcheck, &wcheck, NULL, &t);
+    int retval = select(1 + maxsocket, &rcheck, NULL /*&wcheck*/, NULL, &t);
     if (retval == -1)
       error("ERROR in select");
     if (retval) {
       for (int x = 0; x < numhosts; ++x) {
         if (x != id) {
-          if (FD_ISSET(sockets.at(x), &wcheck))
-            sendState[x].doSend();
           if (FD_ISSET(sockets.at(x), &rcheck)) {
             recvIP& state = recvState[x];
             state.doRead();
@@ -319,7 +330,12 @@ public:
         }
       }
     }
+    trySends();
     return retval;
+  }
+
+  virtual void flush() {
+    trySends();
   }
 
   virtual bool needsDedicatedThread() {
