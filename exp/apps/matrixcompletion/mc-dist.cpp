@@ -106,13 +106,13 @@ public:
       // Galois::Runtime::getSystemNetworkInterface().handleReceives();
       T.stop();
       tPrefetch += T.get();
-      std::cout << Galois::Runtime::NetworkInterface::ID << " prefetch: " << T.get() << "\n";
+      //      std::cout << Galois::Runtime::NetworkInterface::ID << " prefetch: " << T.get() << "\n";
 
       T.start();
       Galois::Runtime::for_each_impl<Galois::WorkList::StableIterator<> >(Galois::Runtime::makeStandardRange(boost::make_counting_iterator(x1Local), boost::make_counting_iterator(x2Local)), [&items, &rL, y1Local, y2Local] (unsigned z, Galois::UserContext<unsigned>& ctx) { rL(z, std::make_pair(y1Local, y2Local), items); }, "BlockedExecutor::find");
       T.stop();
       tFind += T.get();
-      std::cout << Galois::Runtime::NetworkInterface::ID << " find: " << T.get() << "\n";
+      //      std::cout << Galois::Runtime::NetworkInterface::ID << " find: " << T.get() << "\n";
 
       T.start();
       Galois::Runtime::for_each_impl<Galois::WorkList::StableIterator<> >(
@@ -120,7 +120,7 @@ public:
         f, "BlockedExecutor::do");
       T.stop();
       tDo += T.get();
-      std::cout << Galois::Runtime::NetworkInterface::ID << " do: " << T.get() << "\n";
+      //      std::cout << Galois::Runtime::NetworkInterface::ID << " do: " << T.get() << "\n";
       //barrier before execution in foreach should be sufficient
     }
     std::cout << Galois::Runtime::NetworkInterface::ID << " ALL p: " << tPrefetch << " f: " << tFind << " d: " << tDo << "\n";
