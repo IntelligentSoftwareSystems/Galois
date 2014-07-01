@@ -14,6 +14,8 @@
 
 #ifdef HAVE_CILK
 #include <cilk/reducer_opadd.h>
+#else
+#define cilk_for for
 #endif
 
 namespace bh {
@@ -26,7 +28,7 @@ void checkTreeBuildRecursive (unsigned& leafCount, const OctreeInternal<B>* node
   for (unsigned i = 0; i < 8; ++i) {
     if (node->getChild (i) != nullptr) {
 
-      if (i != getIndex (node->getChild (i)->pos, node->pos)) { 
+      if (i != getIndex (node->pos, node->getChild (i)->pos)) { 
         GALOIS_DIE ("child pos out of bounding box");
       }
 
@@ -722,10 +724,9 @@ struct PartitionSinglePass {
       child[i].partList = list;
     }
 
-    assert (w.partList != nullptr);
-    for (auto i = w.partList->begin(), i_end = w.partList->end (); 
+    for (auto i = w.beg, i_end = w.end; 
         i != i_end; ++i) {
-      unsigned index = getIndex ((*i)->pos, w.node->pos);
+      unsigned index = getIndex (w.node->pos, (*i)->pos);
       child[index].partList->push_back (*i);
     }
 
@@ -752,186 +753,173 @@ struct PartitionSinglePass {
 // TODO: partitionMultiPassImpl
 
 
+namespace recursive {
 
-template <typename WorkItem, typename TreeAlloc, typename Partitioner, typename ForkJoinHandler>
-void buildSummarizeRecursive (WorkItem& w, TreeAlloc& treeAlloc, Partitioner& partitioner,
-    ForkJoinHandler& fjh) {
+  template <bool USING_CILK, typename WorkItem, typename TreeAlloc, typename Partitioner, typename ForkJoinHandler>
+  void buildSummRecurImpl (WorkItem& w, TreeAlloc& treeAlloc, Partitioner& partitioner,
+      ForkJoinHandler& fjh) {
 
-  assert (w.beg != w.end);
+    assert (w.beg != w.end);
 
-  auto next = w.beg; ++next;
-  assert (next != w.end);
+    auto next = w.beg; ++next;
+    assert (next != w.end);
 
-  WorkItem child[8];
-  partitioner (w, child);
+    WorkItem child[8];
+    partitioner (w, child);
 
-  for (unsigned i = 0; i < 8; ++i) {
-    if( child[i].beg != child[i].end) {
-      auto next = child[i].beg; ++next;
+    auto loop_body = [&] (unsigned i) {
+      if( child[i].beg != child[i].end) {
+        auto next = child[i].beg; ++next;
 
-      if (next == child[i].end) { // size 1
-        w.node->setChild (i, *(child[i].beg));
+        if (next == child[i].end) { // size 1
+          w.node->setChild (i, *(child[i].beg));
 
-      } else {
-        Point new_pos = w.node->pos;
-        double radius = w.radius / 2;
-        updateCenter (new_pos, i, radius);
-        typename WorkItem::Node_ty* internal = treeAlloc.allocate (1);
-        treeAlloc.construct (internal, new_pos);
-        w.node->setChild (i, internal);
+        } else {
+          Point new_pos = w.node->pos;
+          double radius = w.radius / 2;
+          updateCenter (new_pos, i, radius);
+          typename WorkItem::Node_ty* internal = treeAlloc.allocate (1);
+          treeAlloc.construct (internal, new_pos);
+          w.node->setChild (i, internal);
 
-        fjh.fork (child[i]);
+          child[i].node = internal;
+          child[i].radius = radius;
+
+          fjh.fork (child[i]);
+        }
+
       }
+    };
 
+    if (USING_CILK) {
+      cilk_for (unsigned i = 0; i < 8; ++i) {
+        loop_body (i);
+      }
+    } else {
+      for (unsigned i = 0; i < 8; ++i) {
+        loop_body (i);
+      }
     }
-  }
 
-  fjh.join (w);
-
-}
-
-// template <typename WorkItem, typename TreeAlloc, typename Partitioner>
-// void buildSummarizeRecursive (WorkItem& w, TreeAlloc& treeAlloc, Partitioner& partitioner) {
-// 
-  // assert (w.beg != w.end);
-// 
-  // auto next = w.beg; ++next;
-  // assert (next != w.end);
-// 
-  // WorkItem child[8];
-  // partitioner (w, child);
-// 
-  // auto loopbody = [&] (unsigned i) {
-    // if( child[i].beg != child[i].end) {
-      // auto next = child[i].beg; ++next;
-// 
-      // if (next == child[i].end) { // size 1
-        // w.node->setChild (i, *(child[i].beg));
-// 
-      // } else {
-        // Point new_pos = w.node->pos;
-        // double radius = w.radius / 2;
-        // updateCenter (new_pos, i, radius);
-        // OctreeInternal<B>* internal = treeAlloc.allocate (1);
-        // treeAlloc.construct (internal, new_pos);
-        // w.node->setChild (i, internal);
-// 
-        // buildSummarizeRecursive (child[i], treeAlloc);
-      // }
-// 
-    // }
-  // };
-// 
-  // if (useCilk) {
-// #ifdef HAVE_CILK
-    // cilk_for (unsigned i = 0; i < 8; ++i) {
-      // loopbody (i);
-    // }
-// #else 
-    // GALOIS_DIE ("use a compiler that supports cilk");
-// #endif
-// 
-  // } else {
-    // for (unsigned i = 0; i < 8; ++i) {
-      // loopbody (i);
-    // }
-  // } // end for
-// 
-  // summarizeNode (w.node);
-// 
-// }
-
-
-template <typename B>
-struct BuildSummarizeSerial {
-
-  template <typename TreeAlloc, typename I>
-  OctreeInternal<B>* operator () (const BoundingBox& box, TreeAlloc& treeAlloc, I bodbeg, I bodend) const {
-
-    typedef Galois::gdeque<Body<B>*> PartList;
-    typedef WorkItemSinglePass<B, PartList> WorkItem;
-
-    OctreeInternal<B>* root = treeAlloc.allocate (1);
-    treeAlloc.construct (root, box.center ());
-
-    PartitionSinglePass<PartList> partitioner;
-
-    struct ForkJoinSerial {
-
-      TreeAlloc& treeAlloc;
-      PartitionSinglePass<PartList>& partitioner;
-
-      void fork (WorkItem& w) {
-        buildSummarizeRecursive (w, treeAlloc, partitioner, *this);
-      }
-
-      void join (WorkItem& w) {
-        summarizeNode (w.node);
-      }
-    };
-
-    WorkItem initial = {
-      root,
-      box.radius (),
-      nullptr,
-      bodbeg,
-      bodend
-    };
-
-
-    ForkJoinSerial f {treeAlloc, partitioner};
-    f.fork (initial);
+    fjh.join (w);
 
   }
 
-};
+  enum ExecType {
+    USE_SERIAL,
+    USE_CILK,
+    USE_GALOIS
+  };
 
-template <typename B>
-struct BuildSummarizeGalois {
+  template<bool USING_CILK, typename WorkItem, typename TreeAlloc, typename Partitioner> 
+  struct SerialForkJoin {
+
+    TreeAlloc& treeAlloc;
+    Partitioner& partitioner;
+
+    void fork (WorkItem& w) {
+      // printf ("calling fork\n");
+      buildSummRecurImpl<USING_CILK> (w, treeAlloc, partitioner, *this);
+    }
+
+    void join (WorkItem& w) {
+      // printf ("calling join");
+      summarizeNode (w.node);
+    }
+  };
 
   template <typename C, typename WorkItem>
   struct GaloisForkHandler {
 
     C& ctx;
 
-    template <typename... Args> 
-      void fork (WorkItem& w, Args&&... args) {
-        ctx.push (w);
-      }
+    void fork (WorkItem& w) {
+      ctx.push (w);
+    }
 
     void join (WorkItem&) {} // handled separately in Galois
   };
 
+  template <typename WorkItem, typename TreeAlloc, typename Partitioner>
+  struct GaloisBuild {
+
+    TreeAlloc& treeAlloc;
+    Partitioner& partitioner;
+
+    template <typename C>
+    void operator () (WorkItem& w, C& ctx) {
+      GaloisForkHandler<C,WorkItem> gfh {ctx};
+      buildSummRecurImpl<false> (w, this->treeAlloc, this->partitioner, gfh);
+
+    } // end method
+  };
+
+  template <typename WorkItem>
+  struct GaloisSummarize {
+
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (WorkItem& w) {
+      summarizeNode (w.node);
+    }
+  };
+
+  template <ExecType EXEC_TYPE>
+  struct ChooseExecutor {
+    template <typename WorkItem, typename TreeAlloc, typename Partitioner>
+    void operator () (WorkItem& initial, TreeAlloc& treeAlloc, Partitioner& partitioner) {
+      GALOIS_DIE ("not implemented");
+    }
+  };
+
+  template <> struct ChooseExecutor<USE_SERIAL> {
+    template <typename WorkItem, typename TreeAlloc, typename Partitioner>
+    void operator () (WorkItem& initial, TreeAlloc& treeAlloc, Partitioner& partitioner) {
+      SerialForkJoin<false, WorkItem, TreeAlloc, Partitioner> f {treeAlloc, partitioner};
+      f.fork (initial);
+    }
+  };
+
+  template <> struct ChooseExecutor<USE_CILK> {
+    template <typename WorkItem, typename TreeAlloc, typename Partitioner>
+    void operator () (WorkItem& initial, TreeAlloc& treeAlloc, Partitioner& partitioner) {
+      SerialForkJoin<true, WorkItem, TreeAlloc, Partitioner> f {treeAlloc, partitioner};
+      f.fork (initial);
+    }
+  };
+
+  template <> struct ChooseExecutor<USE_GALOIS> {
+    template <typename WorkItem, typename TreeAlloc, typename Partitioner>
+    void operator () (WorkItem& initial, TreeAlloc& treeAlloc, Partitioner& partitioner) {
+
+      Galois::Runtime::for_each_ordered_tree_1p (
+          initial,
+          GaloisBuild<WorkItem, TreeAlloc, Partitioner> {treeAlloc, partitioner},
+          GaloisSummarize<WorkItem> (),
+          "octree-build-summarize-1p");
+
+
+    }
+  };
+
+} // end namespace recursive 
+
+
+template <recursive::ExecType EXEC_TYPE>
+struct BuildSummarizeRecursive: public TypeDefHelper<SerialNodeBase> {
+
+  typedef Base_ty B;
+
+
   template <typename TreeAlloc, typename I>
   OctreeInternal<B>* operator () (const BoundingBox& box, TreeAlloc& treeAlloc, I bodbeg, I bodend) const {
+
     typedef Galois::gdeque<Body<B>*> PartList;
     typedef WorkItemSinglePass<B, PartList> WorkItem;
+
 
     OctreeInternal<B>* root = treeAlloc.allocate (1);
     treeAlloc.construct (root, box.center ());
 
     PartitionSinglePass<PartList> partitioner;
-
-
-
-    struct SummarizeUsingDAG {
-
-      GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (WorkItem& w) {
-        summarizeNode (w.node);
-      }
-    };
-
-    struct BuildTreeTopDown {
-
-      TreeAlloc& treeAlloc;
-      PartitionSinglePass<PartList>& partitioner;
-
-      template <typename C>
-      void operator () (WorkItem& w, C& ctx) {
-        buildSummarizeRecursive (w, treeAlloc, partitioner, GaloisForkHandler<C, WorkItem> (ctx));
-
-      } // end method
-    };
 
     WorkItem initial = {
       root,
@@ -941,20 +929,13 @@ struct BuildSummarizeGalois {
       bodend
     };
 
-    Galois::Runtime::for_each_ordered_tree_1p (
-        initial,
-        BuildTreeTopDown {treeAlloc, partitioner},
-        SummarizeUsingDAG (),
-        "octree-build-summarize-1p");
-
+    recursive::ChooseExecutor<EXEC_TYPE> f;
+    f (initial, treeAlloc, partitioner);
 
     return root;
-
-      
   }
+
 };
-
-
 
 
 template <typename BM, typename SM>

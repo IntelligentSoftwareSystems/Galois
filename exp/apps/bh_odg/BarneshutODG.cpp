@@ -67,13 +67,13 @@ enum TreeSummMethod {
   SERIAL, 
   SERIAL_TREE,
   GALOIS_TREE,
+  CILK_TREE,
   KDG_HAND, 
   KDG_SEMI, 
   LEVEL_HAND, 
   SPEC, 
   TWO_PHASE, 
   LEVEL_EXEC, 
-  CILK_EXEC
 };
 
 cll::opt<TreeSummMethod> treeSummOpt (
@@ -88,7 +88,7 @@ cll::opt<TreeSummMethod> treeSummOpt (
       clEnumVal (SPEC, "using speculative ordered executor"),
       clEnumVal (TWO_PHASE, "using two phase window ordered executor"),
       clEnumVal (LEVEL_EXEC, "using level-by-level executor"),
-      clEnumVal (CILK_EXEC, "using cilk executor"),
+      clEnumVal (CILK_TREE, "using cilk executor"),
       clEnumValEnd),
     cll::init (SERIAL));
 
@@ -208,7 +208,7 @@ Point run(int nbodies, int ntimesteps, int seed, const TB& treeBuilder) {
     t_tree_build.stop ();
 
     if (!skipVerify) {
-      BuildSummarizeSeparate<BuildSummarizeSerial<SerialNodeBase>, SummarizeTreeSerial> serialBuilder;
+      BuildSummarizeSeparate<BuildTreeSerial<SerialNodeBase>, SummarizeTreeSerial> serialBuilder;
       OctreeInternal<SerialNodeBase>* stop = serialBuilder (box, treeAlloc, bodies.begin (), bodies.end ());
 
       compareTrees (stop, top);
@@ -286,14 +286,17 @@ int main(int argc, char** argv) {
       pos = bh::run<true> (bh::nbodies, bh::ntimesteps, bh::seed, bh::BuildSummarizeSeparate<bh::BuildTreeSerial<bh::SerialNodeBase>, bh::SummarizeTreeSerial>  ());
       break;
       
-    // case bh::SERIAL_TREE:
-      // pos = bh::run<true> (bh::nbodies, bh::ntimesteps, bh::seed, bh::BuildSummarizeSerial ());
-      // break;
-      // 
-    // case bh::GALOIS_TREE:
-      // pos = bh::run<true> (bh::nbodies, bh::ntimesteps, bh::seed, bh::BuildSummarizeGalois ());
-      // break;
-// 
+    case bh::SERIAL_TREE:
+      pos = bh::run<true> (bh::nbodies, bh::ntimesteps, bh::seed, bh::BuildSummarizeRecursive<bh::recursive::USE_SERIAL> ());
+      break;
+      
+    case bh::GALOIS_TREE:
+      pos = bh::run<true> (bh::nbodies, bh::ntimesteps, bh::seed, bh::BuildSummarizeRecursive<bh::recursive::USE_GALOIS> ());
+      break;
+
+    case bh::CILK_TREE:
+      pos = bh::run<true> (bh::nbodies, bh::ntimesteps, bh::seed, bh::BuildSummarizeRecursive<bh::recursive::USE_CILK> ());
+      break;
 
     // case bh::KDG_HAND:
       // pos = bh::run<true> (bh::nbodies, bh::ntimesteps, bh::seed, bh::TreeSummarizeODG ());
@@ -319,9 +322,6 @@ int main(int argc, char** argv) {
       // // pos = bh::run<true> (bh::nbodies, bh::ntimesteps, bh::seed, bh::TreeSummarizeLevelExec ());
       // break;
 // 
-    // case bh::CILK_EXEC:
-      // pos = bh::run<true> (bh::nbodies, bh::ntimesteps, bh::seed, bh::TreeSummarizeCilk ());
-      // break;
 
     default:
       abort ();
