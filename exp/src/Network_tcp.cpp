@@ -31,6 +31,8 @@
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include <netdb.h>
+#include <fcntl.h>
+
 #include <iostream>
 
 using namespace Galois::Runtime;
@@ -42,11 +44,6 @@ namespace {
 
 class NetworkInterfaceTCP : public NetworkInterface {
 
-  struct header {
-    uint32_t size;
-    uintptr_t func;
-  };
-
   struct recvIP {
     int socket;
     LL::SimpleLock lock;
@@ -55,26 +52,25 @@ class NetworkInterfaceTCP : public NetworkInterface {
     void doRead() {
       std::lock_guard<LL::SimpleLock> lg(lock);
       unsigned char data[256];
-      int r = read(socket, data, sizeof(data));
-      if (r > 0)
+      int r = 0;
+      while ((r = read(socket, data, sizeof(data))) > 0)
         std::copy(&data[0], &data[r], std::back_inserter(buffer));
     }
 
-    bool recvMessage(recvFuncTy& recv, RecvBuffer& buf) {
-      std::lock_guard<LL::SimpleLock> lg(lock);
-      if (buffer.size() < sizeof(header))
-        return false;
-      header h;
+    //Assumes lock is held by caller (needed for message in-order delivery)
+    RecvBuffer recvMessage() {
+      //std::lock_guard<LL::SimpleLock> lg(lock);
+      if (buffer.size() < sizeof(uint32_t))
+        return RecvBuffer{};
+      uint32_t h;
       gDeserializeRaw(buffer.begin(), h);
-      if (h.size - sizeof(header) >= buffer.size()) {
-        recv = (recvFuncTy)h.func;
-        buf.reset(h.size);
-        std::copy(buffer.begin()+sizeof(header), buffer.begin() + h.size + sizeof(header),
-                  (unsigned char*)buf.linearData());
-        buffer.erase(buffer.begin(), buffer.begin() + h.size + sizeof(header));
-        return true;
+      if (h + sizeof(uint32_t) <= buffer.size()) {
+        RecvBuffer b(buffer.begin() + sizeof(uint32_t), 
+                     buffer.begin() + sizeof(uint32_t) + h);
+        buffer.erase(buffer.begin(), buffer.begin() + sizeof(uint32_t) + h);
+        return b;
       }
-      return false;
+      return RecvBuffer{};
     }
   };
 
@@ -83,7 +79,7 @@ class NetworkInterfaceTCP : public NetworkInterface {
     LL::SimpleLock lock;
     std::deque<unsigned char> buffer;
 
-    void doSend() {
+    void doWrite() {
       std::lock_guard<LL::SimpleLock> lg(lock);
       if (!buffer.empty()) {
         unsigned char data[256];
@@ -96,10 +92,17 @@ class NetworkInterfaceTCP : public NetworkInterface {
 
     void sendMessage(recvFuncTy recv, SendBuffer& buf) {
       std::lock_guard<LL::SimpleLock> lg(lock);
-      header h = {(uint32_t)buf.size(), (uintptr_t)recv};
+      uint32_t h = buf.size() + sizeof(recvFuncTy);
       unsigned char* ch = (unsigned char*)&h;
-      std::copy(ch, ch + sizeof(header), std::back_inserter(buffer));
+      std::copy(ch, ch + sizeof(uint32_t), std::back_inserter(buffer));
+      ch = (unsigned char*)&recv;
+      std::copy(ch, ch + sizeof(recvFuncTy), std::back_inserter(buffer));
       std::copy((unsigned char*)buf.linearData(), (unsigned char*)buf.linearData() + buf.size(), std::back_inserter(buffer));
+    }
+
+    bool pending() {
+      std::lock_guard<LL::SimpleLock> lg(lock);
+      return !buffer.empty();
     }
   };
 
@@ -125,6 +128,13 @@ class NetworkInterfaceTCP : public NetworkInterface {
     int ret = setsockopt( socket, IPPROTO_TCP, TCP_NODELAY, (char *)&flag, sizeof(flag) );
     if (ret == -1)
       std::cout << "Couldn't setsockopt(TCP_NODELAY)\n";
+  }
+
+  void setNonBlock(int socket) {
+    int flags;
+    flags = fcntl(socket,F_GETFL,0);
+    assert(flags != -1);
+    fcntl(socket, F_SETFL, flags | O_NONBLOCK);
   }
 
   int connectTo(std::string name, int port) {
@@ -245,25 +255,30 @@ class NetworkInterfaceTCP : public NetworkInterface {
     numhosts = hosts.size();
     sockets.resize(numhosts);
     for (int i = 0; i < id; ++ i)
-      sockets[i] = accept(listensocket, nullptr, 0);
+      sockets[i] = accept4(listensocket, nullptr, 0, SOCK_NONBLOCK);
     //connect
-    for (int x = id + 1; x < numhosts; ++x)
+    for (int x = id + 1; x < numhosts; ++x) {
       sockets[x] = connectTo(hosts[x].first, hosts[x].second);
+      setNonBlock(sockets[x]);
+    }
   }
 
-  void trySends() {
+  void tryIO() {
     fd_set wcheck = readfds;
+    fd_set rcheck = readfds;
     timeval t = {0,0};
-    int retval = select(1 + maxsocket, NULL, &wcheck, NULL, &t);
+    int retval = select(1 + maxsocket, &rcheck, &wcheck, NULL, &t);
     if (retval == -1)
       error("ERROR in select");
     if (retval)
-      for (int x = 0; x < numhosts; ++x)
-        if (x != id)
-          if (FD_ISSET(sockets.at(x), &wcheck))
-            sendState[x].doSend();
+      for (int x = 0; x < numhosts; ++x) {
+        if (FD_ISSET(sockets.at(x), &wcheck) && sendState[x].pending())
+          sendState[x].doWrite();
+        if (FD_ISSET(sockets.at(x), &rcheck))
+          recvState[x].doRead();
+      }
   }
-        
+
 public:
   NetworkInterfaceTCP() {
     int listensocket, listenport;
@@ -299,43 +314,35 @@ public:
 
   virtual void send(uint32_t dest, recvFuncTy recv, SendBuffer& buf) {
     sendState[dest].sendMessage(recv, buf);
-    sendState[dest].doSend();
+    tryIO();
   }
 
   virtual bool handleReceives() {
     if (debugRecv)
       assert(!inRecv);
-    fd_set rcheck = readfds;
-    timeval t = {0,0};
-    int retval = select(1 + maxsocket, &rcheck, NULL /*&wcheck*/, NULL, &t);
-    if (retval == -1)
-      error("ERROR in select");
-    if (retval) {
-      for (int x = 0; x < numhosts; ++x) {
-        if (x != id) {
-          if (FD_ISSET(sockets.at(x), &rcheck)) {
-            recvIP& state = recvState[x];
-            state.doRead();
-            //keep lock for recv, since it only blocks other threads from recieves from that host
-            recvFuncTy func;
-            RecvBuffer buf(0);
-            if (state.recvMessage(func, buf)) {
-              if (debugRecv)
-                inRecv = true;
-              func(buf);
-              if (debugRecv)
-                inRecv = false;
-            }
-          }
+    bool retval = false;
+    tryIO();
+    for (int x = 0; x < numhosts; ++x) {
+      if (x != id) {
+        std::lock_guard<LL::SimpleLock> lg(recvState[x].lock);
+        RecvBuffer buf = recvState[x].recvMessage();
+        if (buf.size()) {
+          retval = true;
+          recvFuncTy func;
+          gDeserialize(buf, func);
+          if (debugRecv)
+            inRecv = true;
+          func(buf);
+          if (debugRecv)
+            inRecv = false;
         }
       }
     }
-    trySends();
     return retval;
   }
 
   virtual void flush() {
-    trySends();
+    tryIO();
   }
 
   virtual bool needsDedicatedThread() {
