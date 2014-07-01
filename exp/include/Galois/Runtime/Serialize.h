@@ -126,10 +126,15 @@ class DeSerializeBuffer {
   int offset;
 public:
 
+  DeSerializeBuffer() :offset(0) {}
+
   explicit DeSerializeBuffer(int count) {
     offset = 0;
     bufdata.resize(count);
   }
+
+  template<typename Iter>
+  DeSerializeBuffer(Iter b, Iter e) : bufdata(b,e), offset{0} {}
 
   explicit DeSerializeBuffer(SerializeBuffer&& buf) {
     bufdata.swap(buf.bufdata);
