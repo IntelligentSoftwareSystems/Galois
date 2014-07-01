@@ -73,6 +73,7 @@ void NetworkInterface::start() {
         loopwork.pop_front();
       }
     }
+    getSystemThreadPool().run(activeThreads, []() { Galois::Runtime::getSystemBarrier().wait(); });
     exit(0);
   }
 }
@@ -82,9 +83,8 @@ void NetworkInterface::terminate() {
   if (NetworkInterface::Num == 1)
     return;
   assert(NetworkInterface::ID == 0);
-  wait();
   getSystemNetworkInterface().broadcastAlt(&networkExit);
-  doNetworkWork();
+  getSystemThreadPool().run(activeThreads, []() { Galois::Runtime::getSystemBarrier().wait(); });
 }
 
 void NetworkInterface::sendLoop(uint32_t dest, recvFuncTy recv, SendBuffer& buf) {
@@ -146,15 +146,6 @@ void NetworkInterface::broadcast(recvFuncTy recv, SendBuffer& buf, bool self) {
   bcastForward(*this, source, rbuf);
   if (self)
     recv(rbuf);
-}
-
-static void waitLandingPad() {
-  getSystemThreadPool().run(activeThreads, []() { Galois::Runtime::getSystemBarrier().wait(); });
-}
-
-void NetworkInterface::wait() {
-  getSystemNetworkInterface().broadcastAlt(&waitLandingPad);
-  waitLandingPad();
 }
 
 void NetworkInterface::flush() { }
