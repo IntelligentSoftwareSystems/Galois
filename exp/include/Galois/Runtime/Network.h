@@ -90,12 +90,6 @@ public:
   //! FIXME: Why does this exist?
   static void sendLoop(uint32_t dest, recvFuncTy recv, SendBuffer& buf);
 
-  /**
-   * Block until all remote hosts and threads have processed their messages so far.
-   * To be called by one thread on the main host. If running in parallel, use
-   * {@getSystemBarrier()} directly.
-   */
-  static void wait();
 };
 
 NetworkInterface& getSystemNetworkInterface();
