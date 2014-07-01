@@ -30,12 +30,13 @@ class ThreadedTCPRequestHandler(SocketServer.StreamRequestHandler):
             self.server.shutdown()
 
 class ThreadedTCPServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
-    pass
+    allow_reuse_address=True
 
 if __name__ == "__main__":
     # Port 0 means to select an arbitrary unused port
-    HOST, PORT = "", 0
+    HOST, PORT = "", 9999
 
+    
     server = ThreadedTCPServer((HOST, PORT), ThreadedTCPRequestHandler)
     ip, port = server.server_address
 
