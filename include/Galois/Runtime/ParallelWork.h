@@ -198,7 +198,7 @@ public:
     if (ptr.isLocal()) {
       getLocalDirectory().setContended(ptr);
     } else {
-      getRemoteDirectory().setContended(ptr);
+      //FIXME: types      getRemoteDirectory().setContended(ptr);
     }
     typedef typename std::remove_reference<decltype(*p.first)>::type pair_type;
     bool newDep = std::find(p.first, p.second, pair_type(val, ptr)) == p.second;
