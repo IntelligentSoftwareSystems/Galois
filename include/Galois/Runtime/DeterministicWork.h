@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2014, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -26,11 +26,13 @@
 #define GALOIS_RUNTIME_DETERMINISTICWORK_H
 
 #include "Galois/config.h"
+#include "Galois/Bag.h"
+#include "Galois/gslist.h"
 #include "Galois/Threads.h"
-
-#include "Galois/ParallelSTL/ParallelSTL.h"
 #include "Galois/TwoLevelIteratorA.h"
+#include "Galois/ParallelSTL/ParallelSTL.h"
 #include "Galois/Runtime/ll/gio.h"
+#include "Galois/Runtime/mm/Mem.h"
 
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/iterator/transform_iterator.hpp>
@@ -40,10 +42,15 @@
 #include <deque>
 #include <queue>
 
+// TODO deterministic hash
+// TODO fixed neighborhood
+
 namespace Galois {
 namespace Runtime {
 //! Implementation of deterministic execution
 namespace DeterministicImpl {
+
+extern __thread MM::SizedAllocatorFactory::SizedAlloc* listAllocator;
 
 template<bool Enabled>
 class LoopStatistics {
@@ -73,7 +80,6 @@ public:
   inline void inc_conflicts() const { }
 };
 
-
 template<typename T>
 struct DItem {
   T val;
@@ -83,26 +89,26 @@ struct DItem {
   DItem(const T& _val, unsigned long _id): val(_val), id(_id), localState(NULL) { }
 };
 
-template<typename T>
-struct DeterministicContext: public SimpleRuntimeContext {
+template<typename T, bool HasFixedNeighborhood>
+class DeterministicContext: public SimpleRuntimeContext {
+public:
   typedef DItem<T> Item;
-
   Item item;
-  bool not_ready;
 
-  DeterministicContext(const Item& _item): 
-      SimpleRuntimeContext(true), 
-      item(_item),
-      not_ready(false)
-  { }
+private:
+  bool notReady;
 
-  virtual void subAcquire(Lockable* lockable) {
+public:
+  DeterministicContext(const Item& _item): SimpleRuntimeContext(true), item(_item), notReady(false) { }
+
+  bool isReady() { return !notReady; }
+
+  virtual void subAcquire(Lockable* lockable) { 
     if (getPending() == COMMITTING)
       return;
 
-    if (this->tryLock(lockable)) {
+    if (this->tryLock(lockable))
       this->addToNhood(lockable);
-    }
 
     DeterministicContext* other;
     do {
@@ -113,7 +119,7 @@ struct DeterministicContext: public SimpleRuntimeContext {
         bool conflict = other->item.id < this->item.id;
         if (conflict) {
           // A lock that I want but can't get
-          not_ready = true;
+          notReady = true;
           return; 
         }
       }
@@ -121,10 +127,42 @@ struct DeterministicContext: public SimpleRuntimeContext {
 
     // Disable loser
     if (other) {
-      other->not_ready = true; // Only need atomic write
+      // Only need atomic write
+      other->notReady = true;
     }
+  }
+};
 
-    return;
+template<typename T>
+class DeterministicContext<T, true>: public SimpleRuntimeContext {
+public:
+  typedef DItem<T> Item;
+  Item item;
+
+private:
+  Galois::concurrent_gslist<DeterministicContext*> edges;
+
+  void addTask(DeterministicContext* ctx) {
+    edges.push_front(*listAllocator, ctx);
+  }
+
+public:
+  DeterministicContext(const Item& _item): SimpleRuntimeContext(true), item(_item) { }
+
+  bool isReady() { return false; }
+
+  virtual void subAcquire(Lockable* lockable) {
+    if (getPending() == COMMITTING)
+      return;
+
+    // First to lock becomes representative
+    if (this->tryLock(lockable)) {
+      this->addToNhood(lockable);
+      this->setOwner(lockable);
+    }
+    DeterministicContext* owner = static_cast<DeterministicContext*>(this->getOwner(lockable));
+    assert(owner);
+    owner->addTask(this);
   }
 };
 
@@ -232,6 +270,7 @@ struct Options {
   static const bool hasBreak = has_deterministic_parallel_break<function1_type>::value;
   static const bool hasId = has_deterministic_id<function1_type>::value;
   static const bool useLocalState = has_deterministic_local_state<function1_type>::value;
+  static const bool hasFixedNeighborhood = has_fixed_neighborhood<function1_type>::value && false; // XXX test
 
   function1_type fn1;
   function2_type fn2;
@@ -265,6 +304,8 @@ struct StateManagerBase {
   }
 };
 
+
+// XXX get rid of local pending
 template<typename OptionsTy>
 struct StateManagerBase<OptionsTy, true> {
   typedef typename OptionsTy::value_type value_type;
@@ -759,7 +800,7 @@ template<typename OptionsTy>
 class Executor: public BreakManager<OptionsTy>, StateManager<OptionsTy>, NewWorkManager<OptionsTy>, WindowManager {
   typedef typename OptionsTy::value_type value_type;
   typedef DItem<value_type> Item;
-  typedef DeterministicContext<value_type> Context;
+  typedef DeterministicContext<value_type, OptionsTy::hasFixedNeighborhood> Context;
 
   typedef WorkList::dChunkedFIFO<ChunkSize,Item> WL;
   typedef WorkList::dChunkedFIFO<ChunkSize,Context> PendingWork;
@@ -791,6 +832,18 @@ class Executor: public BreakManager<OptionsTy>, StateManager<OptionsTy>, NewWork
   bool pendingLoop(ThreadLocalData& tld);
   bool commitLoop(ThreadLocalData& tld);
   void go();
+  
+  template<bool Fixed = OptionsTy::hasFixedNeighborhood>
+  auto buildDAG(ThreadLocalData& tld) -> typename std::enable_if<Fixed>::type;
+
+  template<bool Fixed = OptionsTy::hasFixedNeighborhood>
+  auto buildDAG(ThreadLocalData& tld) -> typename std::enable_if<!Fixed>::type { }
+
+  template<bool Fixed = OptionsTy::hasFixedNeighborhood>
+  auto executeDAG(ThreadLocalData& tld) -> typename std::enable_if<Fixed>::type;
+
+  template<bool Fixed = OptionsTy::hasFixedNeighborhood>
+  auto executeDAG(ThreadLocalData& tld) -> typename std::enable_if<!Fixed>::type { }
 
 public:
   Executor(const OptionsTy& o, const char* ln):
@@ -815,10 +868,30 @@ public:
   }
 };
 
+// DAG executor
+// Multiphase:
+//  1: marking, first becomes representative
+//  2: edge swaping
+//  3:   preallocate
+//  4:   make concrete
+//  5: loop DAG scheduling
+
+template<typename OptionsTy> template<bool Fixed>
+auto Executor<OptionsTy>::buildDAG(ThreadLocalData& tld) -> typename std::enable_if<Fixed>::type
+{
+
+}
+
+template<typename OptionsTy> template<bool Fixed>
+auto Executor<OptionsTy>::executeDAG(ThreadLocalData& tld) -> typename std::enable_if<Fixed>::type
+{
+
+}
+
 template<typename OptionsTy>
 void Executor<OptionsTy>::go() {
   ThreadLocalData tld(options, loopname);
-  auto& local = this->getLocalWindowManager();
+  auto& local = this->getLocalWindowManager(); // XXX execute everything when using fixed neighborhoods
   tld.wlcur = &worklists[0];
   tld.wlnext = &worklists[1];
 
@@ -837,9 +910,25 @@ void Executor<OptionsTy>::go() {
 
       barrier.wait();
 
+      if (OptionsTy::hasFixedNeighborhood) {
+        nextPending = false;
+        buildDAG(tld);
+        // XXX build DAG
+      }
+      
+      bool nextCommit = false;
       setPending(COMMITTING);
-      bool nextCommit = commitLoop(tld);
       outerDone.get() = true;
+      if (OptionsTy::hasFixedNeighborhood) {
+        //XXX
+        executeDAG(tld);
+        if (OptionsTy::needsBreak)
+          barrier.wait();
+        break;
+      } else {
+        nextCommit = commitLoop(tld);
+      }
+      
       if (nextPending || nextCommit)
         innerDone.get() = false;
 
@@ -903,7 +992,6 @@ bool Executor<OptionsTy>::pendingLoop(ThreadLocalData& tld)
   while ((p = tld.wlcur->pop())) {
     // Use a new context for each item because there is a race when reusing
     // between aborted iterations.
-
     Context* ctx = this->emplaceContext(tld.localPending, pending, *p);
     assert(ctx != NULL);
 
@@ -938,7 +1026,7 @@ bool Executor<OptionsTy>::pendingLoop(ThreadLocalData& tld)
     if (ForEachTraits<typename OptionsTy::function1_type>::NeedsPIA && !OptionsTy::useLocalState)
       tld.facing.resetAlloc();
 
-    if (commit) { 
+    if (commit || OptionsTy::hasFixedNeighborhood) {
       this->saveLocalState(tld.facing, ctx->item.localState);
     } else {
       retval = true;
@@ -963,9 +1051,10 @@ bool Executor<OptionsTy>::commitLoop(ThreadLocalData& tld)
     bool commit = true;
     // Can skip this check in prefix by repeating computations but eagerly
     // aborting seems more efficient
-    if (ctx->not_ready)
-      commit = false;
 
+    // XXX: becomes counter
+    if (!ctx->isReady())
+      commit = false;
     setThreadContext(ctx);
     if (commit) {
       this->restoreLocalState(tld.facing, ctx->item.localState);
@@ -976,6 +1065,7 @@ bool Executor<OptionsTy>::commitLoop(ThreadLocalData& tld)
       try {
 #endif
         tld.options.fn2(ctx->item.val, tld.facing.data());
+        // XXX during execution, enqueue sucessors
 #ifdef GALOIS_USE_LONGJMP
       } else { clearConflictLock(); }
 #else
@@ -985,10 +1075,11 @@ bool Executor<OptionsTy>::commitLoop(ThreadLocalData& tld)
       switch (result) {
         case 0: break;
         case CONFLICT: commit = false; break;
-        default: assert(0 && "Unknown conflict flag"); abort(); break;
+        default: GALOIS_DIE("Unknown conflict flag"); break;
       }
     }
 
+    // XXX keep local state????
     this->deallocLocalState(tld.facing);
     
     if (commit) {
@@ -1001,8 +1092,7 @@ bool Executor<OptionsTy>::commitLoop(ThreadLocalData& tld)
         for (auto& item : tld.facing.getPushBuffer()) {
           this->pushNew(item, parent, ++count);
           if (count == 0) {
-            assert(0 && "Counter overflow");
-            abort();
+            GALOIS_DIE("Counter overflow");
           }
         }
         if (count)

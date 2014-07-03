@@ -101,7 +101,7 @@ protected:
   AcquireStatus tryAcquire(Lockable* lockable) { return FAIL; }
   bool stealByCAS(Lockable* lockable, LockManagerBase* other) { return false; }
   bool CASowner(Lockable* lockable, LockManagerBase* other) { return false; }
-  void ownByForce(Lockable* lockable) { }
+  void setOwner(Lockable* lockable) {}
   void release (Lockable* lockable) {}
   static bool tryLock(Lockable* lockable) { return false; }
   static LockManagerBase* getOwner(Lockable* lockable) { return 0; }
@@ -110,16 +110,16 @@ protected:
 
 class SimpleRuntimeContext: public LockManagerBase {
 protected:
-  void acquire(Lockable* lockable) { }
+  void acquire(Lockable* lockable) {}
   void release (Lockable* lockable) {}
   virtual void subAcquire(Lockable* lockable);
-  void addToNhood(Lockable* lockable) { }
+  void addToNhood(Lockable* lockable) {}
   static SimpleRuntimeContext* getOwner(Lockable* lockable) { return 0; }
 
 public:
   SimpleRuntimeContext(bool child = false): LockManagerBase () { }
-  virtual ~SimpleRuntimeContext() { }
-  void startIteration() { }
+  virtual ~SimpleRuntimeContext() {}
+  void startIteration() {}
   
   unsigned cancelIteration() { return 0; }
   unsigned commitIteration() { return 0; }
@@ -158,7 +158,7 @@ protected:
     return lockable->owner.CAS(other, this);
   }
 
-  inline void ownByForce(Lockable* lockable) {
+  inline void setOwner(Lockable* lockable) {
     assert(lockable != nullptr);
     assert(!lockable->owner.getValue());
     lockable->owner.setValue(this);

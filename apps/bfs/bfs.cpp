@@ -537,6 +537,8 @@ struct DeterministicAlgo {
   typedef std::pair<GNode,int> WorkItem;
 
   struct Process {
+    typedef int tt_has_fixed_neighborhood;
+    static_assert(Galois::has_fixed_neighborhood<Process>::value, "Oops");
     typedef int tt_needs_per_iter_alloc; // For LocalState
     static_assert(Galois::needs_per_iter_alloc<Process>::value, "Oops");
 
@@ -633,10 +635,10 @@ struct DeterministicAlgo {
     graph.getData(source).dist = 0;
 
     switch (Version) {
-    case DetAlgo::none: Galois::for_each(WorkItem(source, 1), Process(graph),Galois::wl<WL>()); break; 
+      case DetAlgo::none: Galois::for_each(WorkItem(source, 1), Process(graph),Galois::wl<WL>()); break; 
       case DetAlgo::base: Galois::for_each_det(WorkItem(source, 1), Process(graph)); break;
       case DetAlgo::disjoint: Galois::for_each_det(WorkItem(source, 1), Process(graph)); break;
-      default: std::cerr << "Unknown algorithm " << int(Version) << "\n"; abort();
+      default: GALOIS_DIE("Unknown algorithm ", int(Version));
     }
   }
 };
@@ -713,7 +715,7 @@ int main(int argc, char **argv) {
 #endif
     case Algo::deterministic: run<DeterministicAlgo<DetAlgo::base> >(); break;
     case Algo::deterministicDisjoint: run<DeterministicAlgo<DetAlgo::disjoint> >(); break;
-    default: std::cerr << "Unknown algorithm\n"; abort();
+    default: GALOIS_DIE("Unknown algorithm");
   }
   T.stop();
 
