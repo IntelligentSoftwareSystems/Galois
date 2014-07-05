@@ -35,6 +35,7 @@
 #include "Galois/Galois.h"
 #include "Galois/GaloisUnsafe.h"
 #include "Galois/Atomic.h"
+#include "Galois/CilkInit.h"
 #include "Galois/Statistic.h"
 #include "Galois/Runtime/DoAllCoupled.h"
 #include "Galois/Runtime/Sampling.h"
@@ -180,7 +181,7 @@ Point run(int nbodies, int ntimesteps, int seed, const TB& treeBuilder) {
     typedef Galois::WorkList::dChunkedLIFO<256> WL;
 
 
-    BoundingBox box;
+    ReducibleBox bbox;
     ToggleTime<TrackTime> t_bbox ("Time taken by Bounding Box computation: ");
 
     // TODO: use parallel reducer here
@@ -195,21 +196,22 @@ Point run(int nbodies, int ntimesteps, int seed, const TB& treeBuilder) {
     auto end = boost::make_transform_iterator (bodies.end (), GetPos ());
 
     t_bbox.start ();
-    Galois::for_each(beg, end,
-        ReduceBoxes<B>(box), Galois::wl<WL> ());
+    Galois::do_all(beg, end,
+        ReduceBoxes (bbox), Galois::do_all_steal(true));
     t_bbox.stop ();
 
+    BoundingBox box(bbox.reduce ());
 
     // OctreeInternal<B>* top = new OctreeInternal<B>(box);
     ToggleTime<TrackTime> t_tree_build ("Time taken by Octree building and summarization: ");
 
     t_tree_build.start ();
-    OctreeInternal<B>* top = treeBuilder (box, treeAlloc, bodies.begin (), bodies.end ());
+    OctreeInternal<B>* top = treeBuilder (box, bodies.begin (), bodies.end (), treeAlloc);
     t_tree_build.stop ();
 
     if (!skipVerify) {
       BuildSummarizeSeparate<BuildTreeSerial<SerialNodeBase>, SummarizeTreeSerial> serialBuilder;
-      OctreeInternal<SerialNodeBase>* stop = serialBuilder (box, treeAlloc, bodies.begin (), bodies.end ());
+      OctreeInternal<SerialNodeBase>* stop = serialBuilder (box, bodies.begin (), bodies.end (), treeAlloc);
 
       compareTrees (stop, top);
     }
@@ -251,6 +253,7 @@ Point run(int nbodies, int ntimesteps, int seed, const TB& treeBuilder) {
 
     // TODO: delete using TreeAlloc
     // delete top;
+    destroyTree (top, treeAlloc);
 
     for (auto i = bodies.begin (), endi = bodies.end ();
         i != endi; ++i) {
@@ -295,6 +298,7 @@ int main(int argc, char** argv) {
       break;
 
     case bh::CILK_TREE:
+      Galois::CilkInit ();
       pos = bh::run<true> (bh::nbodies, bh::ntimesteps, bh::seed, bh::BuildSummarizeRecursive<bh::recursive::USE_CILK> ());
       break;
 

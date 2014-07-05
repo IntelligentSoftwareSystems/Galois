@@ -5,6 +5,7 @@
 #include "Octree.h"
 
 #include "Galois/config.h"
+#include "Galois/Bag.h"
 #include "Galois/Runtime/ROBexecutor.h"
 // #include "Galois/Runtime/LevelExecutor.h"
 #include "Galois/Runtime/KDGtwoPhase.h"
@@ -20,6 +21,8 @@
 
 namespace bh {
 
+// TODO: use range type instead of iterator pairs
+//
 
 template <typename B>
 void checkTreeBuildRecursive (unsigned& leafCount, const OctreeInternal<B>* node) {
@@ -59,6 +62,237 @@ void checkTreeBuild (const OctreeInternal<B>* root, const BoundingBox& box, cons
   }
 }
 
+template <typename B, typename TreeAlloc>
+void destroyTree (OctreeInternal<B>* root, TreeAlloc& treeAlloc) {
+
+  struct TopDown {
+
+    template <typename C>
+    void operator () (OctreeInternal<B>* node, C& wl) {
+      assert (node != nullptr && !node->isLeaf ());
+
+      for (unsigned i = 0; i < 8; ++i) {
+        Octree<B>* child = node->getChild (i);
+        if (child != nullptr && !child->isLeaf ()) {
+          wl.push (static_cast<OctreeInternal<B>*> (child));
+        }
+      }
+    }
+  };
+
+  struct BottomUp {
+
+    TreeAlloc& treeAlloc;
+
+    void operator () (OctreeInternal<B>* node) {
+      this->treeAlloc.destroy (node);
+      this->treeAlloc.deallocate (node, 1);
+    }
+  };
+
+
+  Galois::StatTimer t_destroy ("time to destroy the tree recursively: ");
+
+  t_destroy.start ();
+  Galois::Runtime::for_each_ordered_tree_1p (
+      root,
+      TopDown (),
+      BottomUp {treeAlloc},
+      "octree-destroy");
+      
+
+  t_destroy.stop ();
+
+}
+
+
+template <typename B>
+struct BuildTreeSerial {
+
+  template <typename TreeAlloc, typename InternalNodes>
+  struct BuildOperator {
+    // NB: only correct when run sequentially
+    typedef int tt_does_not_need_stats;
+
+    TreeAlloc& treeAlloc;
+    InternalNodes& internalNodes;
+    OctreeInternal<B>* root;
+    double root_radius;
+
+    BuildOperator (
+        TreeAlloc& treeAlloc, 
+        InternalNodes& internalNodes, 
+        OctreeInternal<B>* _root, 
+        double radius) 
+      :
+
+        treeAlloc (treeAlloc),
+        internalNodes (internalNodes),
+        root(_root),
+        root_radius(radius)
+
+      {}
+
+
+    void operator () (Body<B>* b) {
+      insert(b, root, root_radius, treeAlloc, internalNodes);
+    }
+
+    template<typename Context>
+    void operator()(Body<B>* b, Context&) {
+      (*this) (b);
+    }
+
+    static void insert(Body<B>* b, OctreeInternal<B>* node, double radius, TreeAlloc& treeAlloc, InternalNodes& internalNodes) {
+
+      int index = getIndex(node->pos, b->pos);
+
+      assert(!node->isLeaf());
+
+      Octree<B>* child = node->getChild (index);
+
+      if (child == NULL) {
+        node->setChild (index, b);
+        return;
+      }
+
+      radius *= 0.5;
+      if (child->isLeaf()) {
+        // Expand leaf
+        Body<B>* n = static_cast<Body<B>*>(child);
+        Point new_pos(node->pos);
+        updateCenter(new_pos, index, radius);
+
+        OctreeInternal<B>* new_node = treeAlloc.allocate (1);
+        treeAlloc.construct (new_node, new_pos);
+        internalNodes.push_back (new_node);
+
+        assert(n->pos != b->pos);
+
+        node->setChild (index, new_node);
+        insert(b, new_node, radius, treeAlloc, internalNodes);
+        insert(n, new_node, radius, treeAlloc, internalNodes);
+      } else {
+        OctreeInternal<B>* n = static_cast<OctreeInternal<B>*>(child);
+        insert(b, n, radius, treeAlloc, internalNodes);
+      }
+    }
+
+
+  };
+
+  template <typename I, typename TreeAlloc, typename InternalNodes>
+  OctreeInternal<B>* operator () (const BoundingBox& box, I beg, I end
+      , TreeAlloc& treeAlloc, InternalNodes& internalNodes) const {
+
+    OctreeInternal<B>* root = treeAlloc.allocate (1);
+    treeAlloc.construct (root, box.center ());
+    internalNodes.push_back (root);
+      
+    std::for_each (beg, end, 
+        BuildOperator<TreeAlloc, InternalNodes> (treeAlloc, internalNodes, root, box.radius ()));
+
+    return root;
+  }
+
+};
+
+template <typename B>
+struct BuildTreeLockFree {
+
+  template <typename TreeAlloc, typename InternalNodes>
+  struct BuildOperator {
+
+    typedef int tt_does_not_need_aborts;
+    typedef int tt_does_not_need_push;
+    
+    TreeAlloc& treeAlloc;
+    InternalNodes& internalNodes;
+    OctreeInternal<B>* root;
+    double root_radius;
+
+    void operator () (Body<B>* b) {
+      insert(b, root, root_radius, treeAlloc, internalNodes);
+    }
+
+    template<typename Context>
+    void operator()(Body<B>* b, Context&) {
+      (*this) (b);
+    }
+
+    static void insert (Body<B>* b, OctreeInternal<B>* node, double radius
+        , TreeAlloc& treeAlloc, InternalNodes& internalNodes) {
+
+      unsigned index = getIndex (node->pos, b->pos);
+      assert (!node->isLeaf ());
+
+      if (node->getChild (index) == nullptr) { 
+        if (node->casChild (index, nullptr, b)) {
+          node->setChild (index, b);
+          return;
+        }
+      }
+
+      radius *= 0.5;
+      Octree<B>* child = node->getChild (index);
+      assert (child != nullptr);
+
+      if (child->isLeaf ()) {
+        
+        Point new_pos(node->pos);
+        updateCenter(new_pos, index, radius);
+        OctreeInternal<B>* new_node = treeAlloc.allocate (1);
+        treeAlloc.construct (new_node, new_pos);
+
+        assert (child->pos != b->pos);
+        
+        if (node->casChild (index, child, new_node)) {
+          node->setChild (index, new_node);
+          internalNodes.push_back (new_node);
+          // successful thread inserts the replaced leaf
+          insert (static_cast<Body<B>*> (child), new_node, radius, treeAlloc, internalNodes);
+
+        } else {
+          treeAlloc.destroy (new_node);
+          treeAlloc.deallocate (new_node);
+          new_node = nullptr;
+        }
+
+        child = node->getChild (index);
+        assert (child != nullptr && !child->isLeaf ());
+
+        insert (b, static_cast<OctreeInternal<B>*> (child), radius, treeAlloc, internalNodes);
+
+      } else {
+        OctreeInternal<B>* m = static_cast<OctreeInternal<B>*>(child);
+        insert(b, m, radius, treeAlloc, internalNodes);
+      }
+
+
+    }
+
+
+  };
+
+  template <typename I, typename TreeAlloc, typename InternalNodes>
+  OctreeInternal<B>* operator () (const BoundingBox& box, I beg, I end
+      , TreeAlloc& treeAlloc, InternalNodes& internalNodes) const {
+
+    OctreeInternal<B>* root = treeAlloc.allocate (1);
+    treeAlloc.construct (root, box.center ());
+    internalNodes.push_back (root);
+
+    typedef Galois::WorkList::dChunkedFIFO<64> WL_ty;
+      
+    Galois::do_all (beg, end, 
+        BuildOperator<TreeAlloc, InternalNodes> (treeAlloc, internalNodes, root, box.radius ()),
+        Galois::do_all_steal(true));
+
+    return root;
+  }
+};
+
+
 template <typename B>
 struct TypeDefHelper {
   using Base_ty = B;
@@ -72,8 +306,8 @@ struct TypeDefHelper {
 
 struct SummarizeTreeSerial: public TypeDefHelper<SerialNodeBase> {
 
-  template <typename I>
-  void operator () (InterNode* root, I bodbeg, I bodend) const {
+  template <typename I, typename InternalNodes>
+  void operator () (InterNode* root, I bodbeg, I bodend, InternalNodes& internalNodes) const {
     root->mass = recurse(root);
   }
 
@@ -909,8 +1143,8 @@ struct BuildSummarizeRecursive: public TypeDefHelper<SerialNodeBase> {
   typedef Base_ty B;
 
 
-  template <typename TreeAlloc, typename I>
-  OctreeInternal<B>* operator () (const BoundingBox& box, TreeAlloc& treeAlloc, I bodbeg, I bodend) const {
+  template <typename I, typename TreeAlloc>
+  OctreeInternal<B>* operator () (const BoundingBox& box, I bodbeg, I bodend, TreeAlloc& treeAlloc) const {
 
     typedef Galois::gdeque<Body<B>*> PartList;
     typedef WorkItemSinglePass<B, PartList> WorkItem;
@@ -945,19 +1179,22 @@ struct BuildSummarizeSeparate {
   SM summarizeMethod;
   typedef typename SM::Base_ty Base_ty;
   typedef OctreeInternal<Base_ty> Node_ty;
+  typedef Galois::InsertBag<Node_ty*> InternalNodes;
 
 
-  template <typename TreeAlloc, typename I>
-  Node_ty* operator () (const BoundingBox& box, TreeAlloc& treeAlloc, I bodbeg, I bodend) const {
+  template <typename I, typename TreeAlloc>
+  Node_ty* operator () (const BoundingBox& box, I bodbeg, I bodend, TreeAlloc& treeAlloc) const {
 
-    Node_ty* root = builMethod (box, treeAlloc, bodbeg, bodend);
+    InternalNodes internalNodes;
+
+    Node_ty* root = builMethod (box, bodbeg, bodend, treeAlloc, internalNodes);
 
     if (!skipVerify) {
       printf ("Running Tree verification routine\n");
       checkTreeBuild (root, box, std::distance (bodbeg, bodend));
     }
 
-    summarizeMethod (root, bodbeg, bodend);
+    summarizeMethod (root, bodbeg, bodend, internalNodes);
     return root;
   }
 

@@ -4,6 +4,8 @@
 #include "Point.h"
 #include "Octree.h"
 
+#include "Galois/Accumulator.h"
+
 namespace bh {
 
 struct BoundingBox {
@@ -63,17 +65,29 @@ std::ostream& operator<<(std::ostream& os, const BoundingBox& b) {
   return os;
 }
 
-template <typename B>
+struct BoxMergeFunc {
+  void operator () (BoundingBox& left, const BoundingBox& right) const {
+    left.merge (right);
+  }
+};
+
+struct ReducibleBox: public Galois::GReducible<BoundingBox, BoxMergeFunc> {
+};
+
 struct ReduceBoxes {
   // NB: only correct when run sequentially or tree-like reduction
   typedef int tt_does_not_need_stats;
-  BoundingBox& initial;
+  ReducibleBox& result;
 
-  ReduceBoxes(BoundingBox& _initial): initial(_initial) { }
+  ReduceBoxes(ReducibleBox& _result): result(_result) { }
+
+  void operator()(const Point& p) {
+    result.update (BoundingBox (p));
+  }
 
   template<typename Context>
   void operator()(const Point& p, Context&) {
-    initial.merge(p);
+    (*this) (p);
   }
 };
 

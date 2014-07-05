@@ -81,7 +81,7 @@ struct Octree: public B {
 
   explicit Octree (Point _pos): B (), pos (_pos), mass (0.0) {}
 
-  virtual ~Octree() { }
+  // virtual ~Octree() { }
   virtual bool isLeaf() const = 0;
 };
 
@@ -102,6 +102,11 @@ public:
     child[index] = c;
 
     B::setChild (index, c, prev);
+  }
+
+  bool casChild (unsigned index, Octree<B>* oldVal, Octree<B>* newVal) { 
+    assert (index < 8);
+    return __sync_bool_compare_and_swap (&child[index], oldVal, newVal);
   }
 
   Octree<B>* getChild (unsigned index) {
@@ -139,13 +144,13 @@ public:
     // }
   }
 
-  virtual ~OctreeInternal() {
-    for (int i = 0; i < 8; i++) {
-      if (child[i] != NULL && !child[i]->isLeaf()) {
-        delete child[i];
-      }
-    }
-  }
+  // virtual ~OctreeInternal() {
+    // for (int i = 0; i < 8; i++) {
+      // if (child[i] != NULL && !child[i]->isLeaf()) {
+        // delete child[i];
+      // }
+    // }
+  // }
   virtual bool isLeaf() const {
     return false;
   }
@@ -373,80 +378,6 @@ struct BuildOctreeTopDown {
 };
 
 #endif
-
-
-
-template <typename B>
-struct BuildTreeSerial {
-
-  template <typename TreeAlloc>
-  struct BuildOperator {
-    // NB: only correct when run sequentially
-    typedef int tt_does_not_need_stats;
-
-    TreeAlloc& treeAlloc;
-    OctreeInternal<B>* root;
-    double root_radius;
-
-    BuildOperator (TreeAlloc& treeAlloc, OctreeInternal<B>* _root, double radius) :
-      treeAlloc (treeAlloc),
-      root(_root),
-      root_radius(radius) { }
-
-    void operator () (Body<B>* b) {
-      insert(b, treeAlloc, root, root_radius);
-    }
-
-    template<typename Context>
-      void operator()(Body<B>* b, Context&) {
-        (*this) (b);
-      }
-
-    static void insert(Body<B>* b, TreeAlloc& treeAlloc, OctreeInternal<B>* node, double radius) {
-      int index = getIndex(node->pos, b->pos);
-
-      assert(!node->isLeaf());
-
-      Octree<B>* child = node->getChild (index);
-
-      if (child == NULL) {
-        node->setChild (index, b);
-        return;
-      }
-
-      radius *= 0.5;
-      if (child->isLeaf()) {
-        // Expand leaf
-        Body<B>* n = static_cast<Body<B>*>(child);
-        Point new_pos(node->pos);
-        updateCenter(new_pos, index, radius);
-        OctreeInternal<B>* new_node = treeAlloc.allocate (1);
-        treeAlloc.construct (new_node, new_pos);
-
-        assert(n->pos != b->pos);
-
-        node->setChild (index, new_node);
-        insert(b, treeAlloc, new_node, radius);
-        insert(n, treeAlloc, new_node, radius);
-      } else {
-        OctreeInternal<B>* n = static_cast<OctreeInternal<B>*>(child);
-        insert(b, treeAlloc, n, radius);
-      }
-    }
-
-
-  };
-
-  template <typename TreeAlloc, typename I>
-  OctreeInternal<B>* operator () (const BoundingBox& box, TreeAlloc& treeAlloc, I beg, I end) const {
-
-    OctreeInternal<B>* root = new OctreeInternal<B> (box.center ());
-    std::for_each (beg, end, BuildOperator<TreeAlloc> (treeAlloc, root, box.radius ()));
-
-    return root;
-  }
-
-};
 
 template <typename B>
 void copyToVecInterNodes (OctreeInternal<B>* root, std::vector<OctreeInternal<B>*>& vec) {
