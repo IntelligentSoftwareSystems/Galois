@@ -15,7 +15,3 @@ cll::opt<DoAllTypes> doAllKind (
 
 } // end namespace Galois
 
-
-#ifdef __INTEL_COMPILER
-bool Galois::DoAllImpl<Galois::CILK>::initialized = false;
-#endif

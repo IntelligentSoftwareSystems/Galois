@@ -174,6 +174,8 @@ void Galois::Runtime::initPTS() {
 }
 
 #ifdef GALOIS_USE_EXP
+// assumes that per thread storage has been initialized by Galois already
+// and just copies over the same pointers to cilk threads
 char* Galois::Runtime::PerBackend::initPerThread_cilk() {
   unsigned id = LL::getTID();
   assert(heads[id] != nullptr);
@@ -195,5 +197,7 @@ void Galois::Runtime::initPTS_cilk() {
   if (!ppsBase) {
     ppsBase = getPPSBackend().initPerPackage_cilk();
   }
+  assert (ptsBase != nullptr);
+  assert (ppsBase != nullptr);
 }
 #endif // GALOIS_USE_EXP
