@@ -70,11 +70,10 @@ enum TreeSummMethod {
   GALOIS_TREE,
   CILK_TREE,
   KDG_HAND, 
-  KDG_SEMI, 
-  LEVEL_HAND, 
+  LEVEL_EXEC, 
   SPEC, 
   TWO_PHASE, 
-  LEVEL_EXEC, 
+  DATA_DAG, 
 };
 
 cll::opt<TreeSummMethod> treeSummOpt (
@@ -83,13 +82,12 @@ cll::opt<TreeSummMethod> treeSummOpt (
       clEnumVal (SERIAL, "Serial recursive"),
       clEnumVal (SERIAL_TREE, "using data dependence DAG version of KDG"),
       clEnumVal (GALOIS_TREE, "using data dependence DAG version of KDG"),
+      clEnumVal (CILK_TREE, "using cilk executor"),
       clEnumVal (KDG_HAND, "KDG based hand-implemented"),
-      clEnumVal (KDG_SEMI, "KDG based semi-automated"),
-      clEnumVal (LEVEL_HAND, "level-by-level hand-implemented"),
+      clEnumVal (LEVEL_EXEC, "using level-by-level executor"),
       clEnumVal (SPEC, "using speculative ordered executor"),
       clEnumVal (TWO_PHASE, "using two phase window ordered executor"),
-      clEnumVal (LEVEL_EXEC, "using level-by-level executor"),
-      clEnumVal (CILK_TREE, "using cilk executor"),
+      clEnumVal (DATA_DAG, "Generate DAG using data dependences"),
       clEnumValEnd),
     cll::init (SERIAL));
 
@@ -210,8 +208,9 @@ Point run(int nbodies, int ntimesteps, int seed, const TB& treeBuilder) {
     t_tree_build.stop ();
 
     if (!skipVerify) {
-      BuildSummarizeSeparate<BuildTreeSerial<SerialNodeBase>, SummarizeTreeSerial> serialBuilder;
-      OctreeInternal<SerialNodeBase>* stop = serialBuilder (box, bodies.begin (), bodies.end (), treeAlloc);
+      std::cout << "Comparing against serially built & summarized tree..." << std::endl;
+      BuildSummarizeSeparate<BuildTreeSerial, SummarizeTreeSerial<B> > serialBuilder;
+      OctreeInternal<B>* stop = serialBuilder (box, bodies.begin (), bodies.end (), treeAlloc);
 
       compareTrees (stop, top);
     }
@@ -286,7 +285,7 @@ int main(int argc, char** argv) {
   switch (bh::treeSummOpt) {
     case bh::SERIAL:
       // TODO: fix template argument mistmatch between build and summarize
-      pos = bh::run<true> (bh::nbodies, bh::ntimesteps, bh::seed, bh::BuildSummarizeSeparate<bh::BuildTreeSerial<bh::SerialNodeBase>, bh::SummarizeTreeSerial>  ());
+      pos = bh::run<true> (bh::nbodies, bh::ntimesteps, bh::seed, bh::BuildSummarizeSeparate<bh::BuildTreeSerial, bh::SummarizeTreeSerial<> >  ());
       break;
       
     case bh::SERIAL_TREE:
@@ -302,30 +301,24 @@ int main(int argc, char** argv) {
       pos = bh::run<true> (bh::nbodies, bh::ntimesteps, bh::seed, bh::BuildSummarizeRecursive<bh::recursive::USE_CILK> ());
       break;
 
-    // case bh::KDG_HAND:
-      // pos = bh::run<true> (bh::nbodies, bh::ntimesteps, bh::seed, bh::TreeSummarizeODG ());
-      // break;
-// 
-    // case bh::KDG_SEMI:
-      // pos = bh::run<true> (bh::nbodies, bh::ntimesteps, bh::seed, bh::TreeSummarizeKDGsemi ());
-      // break;
-// 
-    // case bh::LEVEL_HAND:
-      // pos = bh::run<true> (bh::nbodies, bh::ntimesteps, bh::seed, bh::TreeSummarizeLevelByLevel ());
-      // break;
-// 
-    // case bh::SPEC:
-      // pos = bh::run<true> (bh::nbodies, bh::ntimesteps, bh::seed, bh::TreeSummarizeSpeculative ());
-      // break;
-// 
-    // case bh::TWO_PHASE:
-      // pos = bh::run<true> (bh::nbodies, bh::ntimesteps, bh::seed, bh::TreeSummarizeTwoPhase ());
-      // break;
-// 
-    // case bh::LEVEL_EXEC:
-      // // pos = bh::run<true> (bh::nbodies, bh::ntimesteps, bh::seed, bh::TreeSummarizeLevelExec ());
-      // break;
-// 
+    case bh::LEVEL_EXEC:
+      pos = bh::run<true> (bh::nbodies, bh::ntimesteps, bh::seed, bh::BuildSummarizeSeparate<bh::BuildTreeLockFree, bh::TreeSummarizeLevelExec> ());
+      break;
+ 
+    case bh::KDG_HAND:
+      pos = bh::run<true> (bh::nbodies, bh::ntimesteps, bh::seed, bh::BuildSummarizeSeparate<bh::BuildTreeLockFree, bh::TreeSummarizeKDGhand> ());
+      break;
+
+    case bh::SPEC:
+      pos = bh::run<true> (bh::nbodies, bh::ntimesteps, bh::seed, bh::BuildSummarizeSeparate<bh::BuildTreeLockFree, bh::TreeSummarizeSpeculative> ());
+      break;
+
+    case bh::TWO_PHASE:
+      pos = bh::run<true> (bh::nbodies, bh::ntimesteps, bh::seed, bh::BuildSummarizeSeparate<bh::BuildTreeLockFree, bh::TreeSummarizeTwoPhase> ());
+      break;
+
+    case bh::DATA_DAG:
+      pos = bh::run<true> (bh::nbodies, bh::ntimesteps, bh::seed, bh::BuildSummarizeSeparate<bh::BuildTreeLockFree, bh::TreeSummarizeDataDAG> ());
 
     default:
       abort ();

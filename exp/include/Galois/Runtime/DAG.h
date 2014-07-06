@@ -62,7 +62,7 @@ public:
   SharerSet sharers;
 
 public:
-  explicit DAGnhoodItem (Lockable* l): lockable (l) {}
+  explicit DAGnhoodItem (Lockable* l): lockable (l), sharers () {}
 
   void addSharer (Ctxt* ctx) {
     sharers.push (ctx);
@@ -98,8 +98,7 @@ public:
     NItemAlloc niAlloc;
 
     NItem* create (Lockable* l) {
-      NItem* ni = niAlloc.allocate(1);
-      niAlloc.construct(l);
+      NItem* ni = niAlloc.allocAndConstruct (ni, l);
       assert (ni != nullptr);
       return ni;
     }
@@ -495,8 +494,7 @@ protected:
           for (auto c = uctx.getPushBuffer ().begin (), c_end = uctx.getPushBuffer ().end (); 
               c != c_end; ++c, ++i) {
 
-            BiModalTask* child = taskAlloc.allocate(1);
-            taskAlloc.construct(child, *c, t, BiModalTask::DIVIDE);
+            BiModalTask* child = taskAlloc.allocAndConstruct(child, *c, t, BiModalTask::DIVIDE);
             ctx.push (child);
           }
         } else { 
@@ -515,8 +513,7 @@ protected:
         }
 
         // task can be deallocated now
-        taskAlloc.destroy(t);
-        taskAlloc.deallocate(t, 1);
+        taskAlloc.destroyAndFree(t);
       }
 
     }
@@ -565,8 +562,7 @@ protected:
         for (auto c = uctx.getPushBuffer ().begin (), c_end = uctx.getPushBuffer ().end (); 
             c != c_end; ++c, ++i) {
 
-          Task* child = taskAlloc.allocate(1);
-          taskAlloc.construct (child, *c, t);
+          Task* child = taskAlloc.allocAndConstruct(child, *c, t);
           ctx.push (child);
         }
       } else { 
@@ -604,6 +600,7 @@ protected:
       if (parent != nullptr && parent->removedLastChild()) {
         ctx.push (parent);
       }
+      taskAlloc.destroyAndFree (t);
     }
   };
 
@@ -631,7 +628,7 @@ public:
 
     BiModalTaskAlloc taskAlloc;
 
-    BiModalTask* t = taskAlloc.allocate(1);
+    BiModalTask* t = taskAlloc.allocAndConstruct(t, initItem, nullptr, BiModalTask::DIVIDE);
     taskAlloc.construct(t, initItem, nullptr, BiModalTask::DIVIDE);
 
     BiModalTask* init[] = { t };
@@ -645,8 +642,6 @@ public:
 #endif
         loopname.c_str ());
 
-    taskAlloc.destroy(t);
-    taskAlloc.deallocate(t, 1);
   }
 
   void execute_2p (const T& initItem) {
@@ -662,8 +657,7 @@ public:
         // },
         // "initial_tasks_gen");
 
-    Task* initTask = taskAlloc.allocate(1);
-    taskAlloc.construct(initTask, initItem, nullptr);
+    Task* initTask = taskAlloc.allocAndConstruct(initTask, initItem, nullptr);
 
     WL_ty conqWL;
 
@@ -690,8 +684,6 @@ public:
 #endif
         conq_loop_name.c_str ());
 
-    taskAlloc.destroy(initTask);
-    taskAlloc.deallocate(initTask, 1);
 
   }
 

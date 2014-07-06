@@ -7,7 +7,7 @@
 #include "Galois/config.h"
 #include "Galois/Bag.h"
 #include "Galois/Runtime/ROBexecutor.h"
-// #include "Galois/Runtime/LevelExecutor.h"
+#include "Galois/Runtime/LevelExecutor.h"
 #include "Galois/Runtime/KDGtwoPhase.h"
 #include "Galois/Runtime/DAG.h"
 
@@ -254,7 +254,7 @@ struct BuildTreeLockFree {
 
         } else {
           treeAlloc.destroy (new_node);
-          treeAlloc.deallocate (new_node);
+          treeAlloc.deallocate (new_node, 1);
           new_node = nullptr;
         }
 
@@ -285,7 +285,7 @@ struct BuildTreeLockFree {
     typedef Galois::WorkList::dChunkedFIFO<64> WL_ty;
       
     Galois::do_all (beg, end, 
-        BuildOperator<TreeAlloc, InternalNodes> (treeAlloc, internalNodes, root, box.radius ()),
+        BuildOperator<TreeAlloc, InternalNodes> {treeAlloc, internalNodes, root, box.radius ()},
         Galois::do_all_steal(true));
 
     return root;
@@ -299,12 +299,21 @@ struct TypeDefHelper {
   using TreeNode = Octree<B>;
   using InterNode = OctreeInternal<B>;
   using Leaf = Body<B>;
-  using VecTreeNode = std::vector<TreeNode*>;
-  using VecInterNode = std::vector<InterNode*>;
 };
 
 
-struct SummarizeTreeSerial: public TypeDefHelper<SerialNodeBase> {
+template <typename B=SerialNodeBase>
+// struct SummarizeTreeSerial: public TypeDefHelper<B> {
+struct SummarizeTreeSerial {
+
+  // typedef TypeDefHelper<B> Super;
+  // typedef typename Super::TreeNode TreeNode;
+  // typedef typename Super::InterNode InterNode;
+  // typedef typename Super::Leaf Leaf;
+  typedef B Base_ty;
+  typedef Octree<B> TreeNode;
+  typedef OctreeInternal<B> InterNode;
+  typedef Body<B> Leaf;
 
   template <typename I, typename InternalNodes>
   void operator () (InterNode* root, I bodbeg, I bodend, InternalNodes& internalNodes) const {
@@ -715,22 +724,14 @@ struct TreeSummarizeSpeculative: public TypeDefHelper<SpecNodeBase> {
     }
   };
 
-  template <typename I>
-  void operator () (InterNode* root, I bodbeg, I bodend) const {
-
-    Galois::StatTimer t_copy_to_vec ("time for copying nodes into a vector");
-
-    VecInterNode nodes;
-
-    t_copy_to_vec.start ();
-    copyToVecInterNodes (root, nodes);
-    t_copy_to_vec.stop ();
+  template <typename I, typename InternalNodes>
+  void operator () (InterNode* root, I bodbeg, I bodend, InternalNodes& internalNodes) const {
 
     Galois::StatTimer t_feach ("time for speculative for_each");
 
     t_feach.start ();
     Galois::Runtime::for_each_ordered_rob (
-        nodes.begin (), nodes.end (),
+        Galois::Runtime::makeLocalRange (internalNodes),
         LevelComparator<TreeNode> (), VisitNhood (), OpFunc<true> ());
     t_feach.stop ();
 
@@ -742,47 +743,31 @@ struct TreeSummarizeTwoPhase: public TreeSummarizeSpeculative {
 
   using Base = TreeSummarizeSpeculative;
 
-  template <typename I>
-  void operator () (InterNode* root, I bodbeg, I bodend) const {
-
-    Galois::StatTimer t_copy_to_vec ("time for copying nodes into a vector");
-
-    VecInterNode nodes;
-
-    t_copy_to_vec.start ();
-    copyToVecInterNodes (root, nodes);
-    t_copy_to_vec.stop ();
+  template <typename I, typename InternalNodes>
+  void operator () (InterNode* root, I bodbeg, I bodend, InternalNodes& internalNodes) const {
 
     Galois::StatTimer t_feach ("time for two-phase for_each");
 
     t_feach.start ();
     Galois::Runtime::for_each_ordered_2p_win (
-        nodes.begin (), nodes.end (),
+        Galois::Runtime::makeLocalRange (internalNodes),
         LevelComparator<TreeNode> (), Base::VisitNhood (), Base::OpFunc<false> ());
     t_feach.stop ();
 
   }
 };
 
-struct TreeSummarizeDAG: public TreeSummarizeTwoPhase {
+struct TreeSummarizeDataDAG: public TreeSummarizeTwoPhase {
   using Base = TreeSummarizeTwoPhase;
 
-  template <typename I>
-  void operator () (InterNode* root, I bodbeg, I bodend) const {
+  template <typename I, typename InternalNodes>
+  void operator () (InterNode* root, I bodbeg, I bodend, InternalNodes& internalNodes) const {
 
-    Galois::StatTimer t_copy_to_vec ("time for copying nodes into a vector");
-
-    VecInterNode nodes;
-
-    t_copy_to_vec.start ();
-    copyToVecInterNodes (root, nodes);
-    t_copy_to_vec.stop ();
-
-    Galois::StatTimer t_feach ("time for data dependend DAG based for_each");
+    Galois::StatTimer t_feach ("time summarization using data dep. DAG: ");
 
     t_feach.start ();
     Galois::Runtime::for_each_ordered_dag (
-        Galois::Runtime::makeStandardRange (nodes.begin (), nodes.end ()), 
+        Galois::Runtime::makeLocalRange (internalNodes), 
         LevelComparator<TreeNode> (), Base::VisitNhood (), Base::OpFunc<false> ());
     t_feach.stop ();
 
@@ -818,29 +803,21 @@ struct TreeSummarizeLevelExec: public TypeDefHelper<LevelNodeBase> {
     }
   };
 
-  template <typename I>
-  void operator () (InterNode* root, I bodbeg, I bodend) const {
-
-    Galois::StatTimer t_copy_to_vec ("time for copying nodes into a vector");
-
-    VecInterNode nodes;
-
-    t_copy_to_vec.start ();
-    copyToVecInterNodes (root, nodes);
-    t_copy_to_vec.stop ();
+  template <typename I, typename InternalNodes>
+  void operator () (InterNode* root, I bodbeg, I bodend, InternalNodes& internalNodes) const {
 
     Galois::StatTimer t_feach ("time for level-by-level for_each");
 
     t_feach.start ();
-    // Galois::Runtime::for_each_ordered_level (
-        // Galois::Runtime::makeStandardRange (nodes.begin (), nodes.end ()),
-        // GetLevel (), std::greater<unsigned> (), VisitNhood (), OpFunc ());
+    Galois::Runtime::for_each_ordered_level (
+        Galois::Runtime::makeLocalRange (internalNodes),
+        GetLevel (), std::greater<unsigned> (), VisitNhood (), OpFunc ());
     t_feach.stop ();
 
   }
 };
 
-struct TreeSummarizeKDGsemi: public TypeDefHelper<KDGNodeBase> {
+struct TreeSummarizeKDGhand: public TypeDefHelper<KDGNodeBase> {
 
   // TODO: add flags here for no-conflicts
   struct OpFunc {
@@ -893,13 +870,16 @@ struct TreeSummarizeKDGsemi: public TypeDefHelper<KDGNodeBase> {
     assert (counted == root->numChild);
   }
 
-  template <typename I>
-  void operator () (InterNode* root, I bodbeg, I bodend) const {
+  template <typename I, typename InternalNodes>
+  void operator () (InterNode* root, I bodbeg, I bodend, InternalNodes& internalNodes) const {
 
     static const unsigned CHUNK_SIZE = 64;
     typedef Galois::WorkList::dChunkedFIFO<CHUNK_SIZE, InterNode*> WL_ty;
 
-    checkTree (root);
+    if (!skipVerify) {
+      std::cerr << "KDG hand checking the tree. Timing may be off" << std::endl;
+      checkTree (root);
+    }
 
     Galois::StatTimer t_fill_wl ("Time to fill worklist for tree summarization: ");
 
@@ -1172,22 +1152,23 @@ struct BuildSummarizeRecursive: public TypeDefHelper<SerialNodeBase> {
 };
 
 
-template <typename BM, typename SM>
+template <template <typename> class BM, typename SM>
 struct BuildSummarizeSeparate {
 
-  BM builMethod;
-  SM summarizeMethod;
   typedef typename SM::Base_ty Base_ty;
+  typedef BM<Base_ty> BuildMethod;
   typedef OctreeInternal<Base_ty> Node_ty;
   typedef Galois::InsertBag<Node_ty*> InternalNodes;
 
+  BuildMethod buildMethod;
+  SM summarizeMethod;
 
   template <typename I, typename TreeAlloc>
   Node_ty* operator () (const BoundingBox& box, I bodbeg, I bodend, TreeAlloc& treeAlloc) const {
 
     InternalNodes internalNodes;
 
-    Node_ty* root = builMethod (box, bodbeg, bodend, treeAlloc, internalNodes);
+    Node_ty* root = buildMethod (box, bodbeg, bodend, treeAlloc, internalNodes);
 
     if (!skipVerify) {
       printf ("Running Tree verification routine\n");

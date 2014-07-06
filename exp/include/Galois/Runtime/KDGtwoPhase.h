@@ -53,14 +53,17 @@
 
 #include <boost/iterator/transform_iterator.hpp>
 
+#include <iostream>
+
 static cll::opt<double> commitRatioArg("cratio", cll::desc("target commit ratio for two phase executor"), cll::init(0.80));
 
 namespace Galois {
 namespace Runtime {
 
 // TODO: figure out when to call startIteration
+
 namespace {
-template <typename T, typename Cmp, typename NhFunc, typename OpFunc, typename WindowWL>
+template <typename T, typename Cmp, typename NhFunc, typename OpFunc, typename WindowWL> 
 class KDGtwoPhaseStableExecutor {
 
 public:
@@ -124,9 +127,9 @@ public:
     printStats ();
   }
 
-  template <typename I>
-  void fill_initial (I beg, I end) {
-    winWL.initfill (beg, end);
+  template <typename R>
+  void fill_initial (const R& range) {
+    winWL.initfill (range);
   }
 
   void execute () {
@@ -236,6 +239,9 @@ protected:
     // std::cout << "Calculated Window size: " << windowSize << ", Actual: " << wl->size_all () << std::endl;
 
   }
+
+
+
 
   // TODO: use setjmp here
   template <typename F>
@@ -410,27 +416,31 @@ protected:
   }
 
   void printStats (void) {
-    LL::gPrint("Two Phase Window executor, rounds: ", rounds, "\n");
-    LL::gPrint("Two Phase Window executor, commits: ", numCommitted.reduce(), "\n");
-    LL::gPrint("Two Phase Window executor, total: ", total.reduce(), "\n");
-    LL::gPrint("Two Phase Window executor, efficiency: ", numCommitted.reduce() / (double) total.reduce(), "\n");
-    LL::gPrint("Two Phase Window executor, avg. parallelism: ", numCommitted.reduce() / (double) rounds, "\n");
+    std::cout << "Two Phase Window executor, rounds: " << rounds << std::endl;
+    std::cout << "Two Phase Window executor, commits: " << numCommitted.reduce () << std::endl;
+    std::cout << "Two Phase Window executor, total: " << total.reduce () << std::endl;
+    std::cout << "Two Phase Window executor, efficiency: " << double (numCommitted.reduce ()) / total.reduce () << std::endl;
+    std::cout << "Two Phase Window executor, avg. parallelism: " << double (numCommitted.reduce ()) / rounds << std::endl;
   }
   
 };
 
 
-template <bool B, typename T1, typename T2> 
-struct ChooseIf {
-  using Ret_ty = T1;
-};
+namespace impl {
+  template <bool B, typename T1, typename T2> 
+  struct ChooseIf {
+    using Ret_ty = T1;
+  };
 
-template <typename T1, typename T2>
-struct ChooseIf<false, T1, T2> {
-  using Ret_ty = T2;
-};
+  template <typename T1, typename T2>
+  struct ChooseIf<false, T1, T2> {
+    using Ret_ty = T2;
+  };
+} // end impl
+
 
 template <typename T, typename Cmp, typename NhFunc, typename OpFunc, typename SL, typename WindowWL>
+
 class KDGtwoPhaseUnstableExecutor: public KDGtwoPhaseStableExecutor<T, Cmp, NhFunc, OpFunc, WindowWL>  {
 
   using Base = KDGtwoPhaseStableExecutor<T, Cmp, NhFunc, OpFunc, WindowWL>;
@@ -556,37 +566,38 @@ protected:
 
 };
 
-}
 
-template <typename Iter, typename Cmp, typename NhFunc, typename OpFunc>
-void for_each_ordered_2p_win (Iter beg, Iter end, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const char* loopname=0) {
+} // end anonymous namespace
 
-  using T = typename std::iterator_traits<Iter>::value_type;
+template <typename R, typename Cmp, typename NhFunc, typename OpFunc>
+void for_each_ordered_2p_win (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const char* loopname=0) {
+
+  using T = typename R::value_type;
   // using WindowWL = SortedRangeWindowWL<T, Cmp>;
   
   const bool ADDS = ForEachTraits<OpFunc>::NeedsPush;
 
-  using WindowWL = typename ChooseIf<ADDS, PQbasedWindowWL<T, Cmp>, SortedRangeWindowWL<T, Cmp> >::Ret_ty;
+  using WindowWL = typename impl::ChooseIf<ADDS, PQbasedWindowWL<T, Cmp>, SortedRangeWindowWL<T, Cmp> >::Ret_ty;
 
   using Exec = KDGtwoPhaseStableExecutor<T, Cmp, NhFunc, OpFunc, WindowWL>;
   
   Exec e (cmp, nhFunc, opFunc);
 
-  e.fill_initial (beg, end);
+  e.fill_initial (range);
   e.execute ();
 }
 
-template <typename Iter, typename Cmp, typename NhFunc, typename OpFunc, typename SL>
-void for_each_ordered_2p_win (Iter beg, Iter end, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const SL& serialLoop, const char* loopname=0) {
+template <typename R, typename Cmp, typename NhFunc, typename OpFunc, typename SL>
+void for_each_ordered_2p_win (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const SL& serialLoop, const char* loopname=0) {
 
-  using T = typename std::iterator_traits<Iter>::value_type;
+  using T = typename R::value_type;
   using WindowWL = PQbasedWindowWL<T, Cmp>;
 
   using Exec = KDGtwoPhaseUnstableExecutor<T, Cmp, NhFunc, OpFunc, SL, WindowWL>;
   
   Exec e (cmp, nhFunc, opFunc, serialLoop);
 
-  e.fill_initial (beg, end);
+  e.fill_initial (range);
   e.execute ();
 }
 

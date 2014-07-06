@@ -379,26 +379,26 @@ struct BuildOctreeTopDown {
 
 #endif
 
-template <typename B>
-void copyToVecInterNodes (OctreeInternal<B>* root, std::vector<OctreeInternal<B>*>& vec) {
-  vec.clear ();
-
-  vec.push_back (root);
-
-  for (size_t i = 0; i < vec.size (); ++i) {
-
-    if (!vec[i]->isLeaf ()) {
-      OctreeInternal<B>* node = static_cast<OctreeInternal<B>*> (vec[i]);
-
-      for (unsigned i = 0; i < 8; ++i) {
-        Octree<B>* c = node->getChild (i);
-        if (c != NULL && !c->isLeaf ()) {
-          vec.push_back (static_cast<OctreeInternal<B>*> (c));
-        }
-      }
-    }
-  }
-}
+// template <typename B>
+// void copyToVecInterNodes (OctreeInternal<B>* root, std::vector<OctreeInternal<B>*>& vec) {
+  // vec.clear ();
+// 
+  // vec.push_back (root);
+// 
+  // for (size_t i = 0; i < vec.size (); ++i) {
+// 
+    // if (!vec[i]->isLeaf ()) {
+      // OctreeInternal<B>* node = static_cast<OctreeInternal<B>*> (vec[i]);
+// 
+      // for (unsigned i = 0; i < 8; ++i) {
+        // Octree<B>* c = node->getChild (i);
+        // if (c != NULL && !c->isLeaf ()) {
+          // vec.push_back (static_cast<OctreeInternal<B>*> (c));
+        // }
+      // }
+    // }
+  // }
+// }
 
 } // end namespace bh
 
