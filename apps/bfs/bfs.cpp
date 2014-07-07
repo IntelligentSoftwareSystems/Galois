@@ -643,6 +643,16 @@ struct DeterministicAlgo {
   }
 };
 
+template<typename T>
+struct AllocationOverhead {
+  static const int value = 3;
+};
+
+template<DetAlgo T>
+struct AllocationOverhead<DeterministicAlgo<T>> {
+  static const int value = 40;
+};
+
 template<typename Algo>
 void run() {
   typedef typename Algo::Graph Graph;
@@ -655,7 +665,11 @@ void run() {
   initialize(algo, graph, source, report);
 
   //Galois::preAlloc(numThreads + (3*graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::MM::hugePageSize);
-  Galois::preAlloc(16*8*(numThreads + (graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::MM::hugePageSize));
+  //Galois::preAlloc(8*(numThreads + (graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::MM::hugePageSize));
+  size_t baseAlloc = graph.size() * sizeof(typename Graph::node_data_type) / Galois::Runtime::MM::hugePageSize;
+  baseAlloc += numThreads;
+  baseAlloc *= AllocationOverhead<Algo>::value;
+  Galois::preAlloc(baseAlloc);
 
   Galois::reportPageAlloc("MeminfoPre");
 
