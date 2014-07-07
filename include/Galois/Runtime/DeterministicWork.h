@@ -44,7 +44,9 @@
 
 // TODO deterministic hash
 // TODO fixed neighborhood
-
+// XXX cyclic scheduling
+// XXX reduce list contention
+// XXX profile, reuse graph
 namespace Galois {
 namespace Runtime {
 //! Implementation of deterministic execution
@@ -89,17 +91,19 @@ struct DItem {
   DItem(const T& _val, unsigned long _id): val(_val), id(_id), localState(NULL) { }
 };
 
-template<typename T, bool HasFixedNeighborhood>
-class DeterministicContext: public SimpleRuntimeContext {
+template<typename OptionsTy, bool HasFixedNeighborhood>
+class DeterministicContextBase: public SimpleRuntimeContext {
 public:
-  typedef DItem<T> Item;
+  typedef DItem<typename OptionsTy::value_type> Item;
   Item item;
 
 private:
   bool notReady;
 
 public:
-  DeterministicContext(const Item& _item): SimpleRuntimeContext(true), item(_item), notReady(false) { }
+  DeterministicContextBase(const Item& _item): SimpleRuntimeContext(true), item(_item), notReady(false) { }
+
+  void clear() { }
 
   bool isReady() { return !notReady; }
 
@@ -110,9 +114,9 @@ public:
     if (this->tryLock(lockable))
       this->addToNhood(lockable);
 
-    DeterministicContext* other;
+    DeterministicContextBase* other;
     do {
-      other = static_cast<DeterministicContext*>(this->getOwner(lockable));
+      other = static_cast<DeterministicContextBase*>(this->getOwner(lockable));
       if (other == this)
         return;
       if (other) {
@@ -133,21 +137,36 @@ public:
   }
 };
 
-template<typename T>
-class DeterministicContext<T, true>: public SimpleRuntimeContext {
+template<typename OptionsTy>
+class DeterministicContextBase<OptionsTy, true>: public SimpleRuntimeContext {
 public:
-  typedef DItem<T> Item;
+  typedef DItem<typename OptionsTy::value_type> Item;
+  typedef Galois::concurrent_gslist<DeterministicContextBase*,64> ContextList;
   Item item;
+  ContextList edges;
+  ContextList succs;
+  std::atomic<int> preds;
 
 private:
-  Galois::concurrent_gslist<DeterministicContext*> edges;
-
-  void addTask(DeterministicContext* ctx) {
+  void addTask(DeterministicContextBase* ctx) {
     edges.push_front(*listAllocator, ctx);
   }
 
 public:
-  DeterministicContext(const Item& _item): SimpleRuntimeContext(true), item(_item) { }
+  DeterministicContextBase(const Item& _item): SimpleRuntimeContext(true), item(_item), preds(0) { }
+
+  void clear() {
+    assert(preds == 0);
+    this->commitIteration();
+    // XXX replace with bulk heap
+    edges.clear(*listAllocator);
+    succs.clear(*listAllocator);
+  }
+
+  void addEdge(DeterministicContextBase* o) {
+    succs.push_front(*listAllocator, o);
+    o->preds += 1;
+  }
 
   bool isReady() { return false; }
 
@@ -156,15 +175,22 @@ public:
       return;
 
     // First to lock becomes representative
-    if (this->tryLock(lockable)) {
-      this->addToNhood(lockable);
-      this->setOwner(lockable);
-    }
-    DeterministicContext* owner = static_cast<DeterministicContext*>(this->getOwner(lockable));
-    assert(owner);
+    DeterministicContextBase* owner;
+    do {
+      if (this->tryLock(lockable)) {
+        this->setOwner(lockable);
+        this->addToNhood(lockable);
+      }
+      
+      owner = static_cast<DeterministicContextBase*>(this->getOwner(lockable));
+    } while (!owner);
+
     owner->addTask(this);
   }
 };
+
+template<typename OptionsTy>
+using DeterministicContext = DeterministicContextBase<OptionsTy, OptionsTy::hasFixedNeighborhood>;
 
 namespace {
 
@@ -270,13 +296,169 @@ struct Options {
   static const bool hasBreak = has_deterministic_parallel_break<function1_type>::value;
   static const bool hasId = has_deterministic_id<function1_type>::value;
   static const bool useLocalState = has_deterministic_local_state<function1_type>::value;
-  static const bool hasFixedNeighborhood = has_fixed_neighborhood<function1_type>::value && false; // XXX test
+  static const bool hasFixedNeighborhood = has_fixed_neighborhood<function1_type>::value; // XXX test
+
+  static const int ChunkSize = 32;
+  static const unsigned InitialNumRounds = 100;
+  static const size_t MinDelta = ChunkSize * 40;
 
   function1_type fn1;
   function2_type fn2;
 
   Options(const function1_type& fn1, const function2_type& fn2): fn1(fn1), fn2(fn2) { }
 };
+
+template<typename OptionsTy, bool Enable>
+class DAGManagerBase {
+  typedef DeterministicContext<OptionsTy> Context;
+public:
+  void initializeDAGManager() { }
+  void destroyDAGManager() { }
+  void pushDAGTask(Context* ctx) { }
+  bool buildDAG() { return false; }
+  template<typename Executor, typename ExecutorTLD>
+  bool executeDAG(Executor&, ExecutorTLD&) { return false; } 
+};
+
+
+// DAG executor
+// Multiphase:
+//  1: marking, first becomes representative
+//  2: edge swaping
+//  3:   preallocate
+//  4:   make concrete
+//  5: loop DAG scheduling
+template<typename OptionsTy>
+class DAGManagerBase<OptionsTy,true> {
+  typedef DeterministicContext<OptionsTy> Context;
+  typedef WorkList::dChunkedFIFO<OptionsTy::ChunkSize,Context*> WL;
+
+  struct ThreadLocalData: private boost::noncopyable {
+    typedef std::vector<Context*, typename PerIterAllocTy::rebind<Context*>::other> SortBuf;
+    IterAllocBaseTy heap;
+    PerIterAllocTy alloc;
+    SortBuf sortBuf;
+    ThreadLocalData(): alloc(&heap), sortBuf(alloc) { }
+  };
+
+  PerThreadStorage<ThreadLocalData> data;
+  WL worklists[2];
+  TerminationDetection& term;
+  Barrier& barrier;
+
+  struct ContextPtrLessThan {
+    bool operator()(const Context* a, const Context* b) const {
+      // XXX
+      if (a->item.id == b->item.id)
+        return a < b;
+      return a->item.id < b->item.id;
+    }
+  };
+
+public:
+  DAGManagerBase(): term(getSystemTermination()), barrier(getSystemBarrier()) { }
+
+  void initializeDAGManager() { 
+    if (!listAllocator)
+      listAllocator = MM::SizedAllocatorFactory::getAllocatorForSize(sizeof(typename Context::ContextList::block_type));
+  }
+  
+  void destroyDAGManager() {
+    // not needed since listAllocator is a global fixed size allocator
+    data.getLocal()->heap.clear();
+  }
+
+  void pushDAGTask(Context* ctx) {
+    worklists[0].push(ctx);
+  }
+
+  bool buildDAG() {
+    ThreadLocalData& tld = *data.getLocal();
+    Galois::optional<Context*> p;
+    size_t numTasks = 0;
+    while ((p = worklists[0].pop())) {
+      Context* ctx = *p;
+      tld.sortBuf.clear();
+      std::copy(ctx->edges.begin(), ctx->edges.end(), std::back_inserter(tld.sortBuf));
+      std::sort(tld.sortBuf.begin(), tld.sortBuf.end(), ContextPtrLessThan());
+
+      if (!tld.sortBuf.empty()) {
+        Context* last = tld.sortBuf.front();
+        for (auto ii = tld.sortBuf.begin() + 1, ei = tld.sortBuf.end(); ii != ei; ++ii) {
+          Context* cur = *ii;
+          if (last != cur && cur != ctx)
+            last->addEdge(cur);
+          last = cur;
+        }
+      }
+
+      worklists[1].push(ctx);
+      numTasks += 1;
+    }
+    return true;
+  }
+
+  template<typename Executor, typename ExecutorTLD>
+  bool executeDAG(Executor& e, ExecutorTLD& etld) {
+    auto& local = e.getLocalWindowManager();
+    Galois::optional<Context*> p;
+    Context* ctx;
+
+    // Go through all tasks to find intial sources and
+    while ((p = worklists[1].pop())) {
+      ctx = *p;
+      if (ctx->preds.load(std::memory_order_relaxed) == 0)
+        worklists[0].push(ctx);
+    }
+
+    term.initializeThread();
+
+    barrier.wait();
+
+    size_t oldCommitted = 0;
+    size_t committed = 0;
+    do {
+      Galois::optional<Context*> p;
+      while ((p = worklists[0].pop())) {
+        ctx = *p;
+        assert(ctx->preds == 0);
+        bool commit = e.executeTask(etld, ctx);
+        local.incrementCommitted();
+        assert(commit);
+        committed += 1;
+        e.deallocLocalState(etld.facing);
+        
+        if (ForEachTraits<typename OptionsTy::function2_type>::NeedsPIA && !OptionsTy::useLocalState)
+          etld.facing.resetAlloc();
+
+        etld.facing.resetPushBuffer();
+
+        // enqueue successors
+        for (auto& succ : ctx->succs) {
+          int v = --succ->preds;
+          assert(v >= 0);
+          if (v == 0)
+            worklists[0].push(succ);
+        }
+      }
+
+      term.localTermination(oldCommitted != committed);
+      oldCommitted = committed;
+      LL::asmPause();
+    } while (!term.globalTermination());
+
+    if (ForEachTraits<typename OptionsTy::function2_type>::NeedsPIA && OptionsTy::useLocalState)
+      etld.facing.resetAlloc();
+
+    setThreadContext(0);
+
+    return true;
+  }
+};
+
+template<typename OptionsTy>
+using DAGManager = DAGManagerBase<OptionsTy, OptionsTy::hasFixedNeighborhood>;
+
 
 template<typename OptionsTy, bool Enable>
 struct StateManagerBase {
@@ -305,7 +487,6 @@ struct StateManagerBase {
 };
 
 
-// XXX get rid of local pending
 template<typename OptionsTy>
 struct StateManagerBase<OptionsTy, true> {
   typedef typename OptionsTy::value_type value_type;
@@ -353,7 +534,7 @@ struct StateManagerBase<OptionsTy, true> {
 };
 
 template<typename OptionsTy>
-struct StateManager: public StateManagerBase<OptionsTy, OptionsTy::useLocalState> { };
+using StateManager = StateManagerBase<OptionsTy, OptionsTy::useLocalState>;
 
 template<typename OptionsTy, bool Enable>
 struct BreakManagerBase {
@@ -377,26 +558,23 @@ public:
 };
 
 template<typename OptionsTy>
-struct BreakManager: public BreakManagerBase<OptionsTy, OptionsTy::hasBreak> { };
+using BreakManager = BreakManagerBase<OptionsTy, OptionsTy::hasBreak>;
 
-constexpr int ChunkSize = 32;
-constexpr unsigned InitialNumRounds = 100;
-constexpr int MinDelta = ChunkSize * 40;
-
-class WindowManager {
+template<typename OptionsTy, bool Enable>
+class WindowManagerBase {
 public:
   class ThreadLocalData {
-    friend class WindowManager;
+    template <typename, bool> friend class WindowManagerBase;
     size_t window;
     size_t delta;
     size_t committed;
     size_t iterations;
-    size_t aborted;
 
   public:
-    size_t nextWindow() {
-      window += delta;
-      committed = iterations = aborted = 0;
+    size_t nextWindow(bool first = false) {
+      if (!first)
+        window += delta;
+      committed = iterations = 0;
       return window;
     }
 
@@ -409,7 +587,7 @@ private:
   unsigned numActive;
 
 public:
-  WindowManager() {
+  WindowManagerBase() {
     numActive = getActiveThreads(); 
   }
 
@@ -417,10 +595,16 @@ public:
     return *data.getLocal();
   }
 
+  size_t nextWindow(size_t dist, size_t atleast, size_t base = 0) {
+    ThreadLocalData& local = *data.getLocal();
+    return local.nextWindow(true);
+  }
+
   size_t initialWindow(size_t dist, size_t atleast, size_t base = 0) {
     ThreadLocalData& local = *data.getLocal();
-    size_t w = std::max(dist / InitialNumRounds, atleast) + base;
-    return (local.window = local.delta = w);
+    size_t w = std::max(dist / OptionsTy::InitialNumRounds, atleast) + base;
+    local.window = local.delta = w;
+    return w;
   }
 
   void calculateWindow(bool inner) {
@@ -446,14 +630,15 @@ public:
       local.delta = commitRatio / target * local.delta;
 
     if (!inner) {
-      local.delta = std::max(local.delta, (size_t) MinDelta);
-    } else if (local.delta < (size_t) MinDelta) {
+      if (local.delta < OptionsTy::MinDelta)
+        local.delta = OptionsTy::MinDelta;
+    } else if (local.delta < OptionsTy::MinDelta) {
       // Try to get some new work instead of increasing window
       local.delta = 0;
     }
 
     // Useful debugging info
-    if (false) {
+    if (true) {
       if (LL::getTID() == 0) {
         char buf[1024];
         snprintf(buf, 1024, "%d %.3f (%zu/%zu) window: %zu delta: %zu\n", 
@@ -465,6 +650,40 @@ public:
 };
 
 template<typename OptionsTy>
+class WindowManagerBase<OptionsTy,true> {
+public:
+  class ThreadLocalData {
+  public:
+    size_t nextWindow() {
+      return std::numeric_limits<size_t>::max();
+    }
+
+    void incrementIterations() { }
+    void incrementCommitted() { }
+  };
+
+private:
+  ThreadLocalData data;
+public:
+  ThreadLocalData& getLocalWindowManager() {
+    return data;
+  }
+
+  size_t nextWindow(size_t dist, size_t atleast, size_t base = 0) {
+    return data.nextWindow();
+  }
+
+  size_t initialWindow(size_t dist, size_t atleast, size_t base = 0) {
+    return std::numeric_limits<size_t>::max();
+  }
+
+  void calculateWindow(bool inner) { }
+};
+
+template<typename OptionsTy>
+using WindowManager = WindowManagerBase<OptionsTy, OptionsTy::hasFixedNeighborhood>;
+
+template<typename OptionsTy>
 class NewWorkManager {
   typedef typename OptionsTy::value_type value_type;
   typedef DItem<value_type> Item;
@@ -472,7 +691,7 @@ class NewWorkManager {
   typedef std::vector<NewItem, typename PerIterAllocTy::rebind<NewItem>::other> NewItemsTy;
   typedef typename NewItemsTy::iterator NewItemsIterator;
   typedef FIFO<1024,Item> ReserveTy;
-  typedef WorkList::dChunkedFIFO<ChunkSize,NewItem> NewWork;
+  typedef WorkList::dChunkedFIFO<OptionsTy::ChunkSize,NewItem> NewWork;
 
   struct GetNewItem: public std::unary_function<int,NewItemsTy&> {
     NewWorkManager* self;
@@ -632,7 +851,7 @@ class NewWorkManager {
   }
 
   template<typename WL>
-  void parallelSort(WindowManager& wm, WL* wl, unsigned tid) {
+  void parallelSort(WindowManager<OptionsTy>& wm, WL* wl, unsigned tid) {
     ThreadLocalData& local = *data.getLocal();
 
     local.newItems.clear();
@@ -661,7 +880,7 @@ class NewWorkManager {
     barrier.wait();
 
     if (OptionsTy::hasId) {
-      size_t window = wm.initialWindow(local.maxId - local.minId, MinDelta, local.minId);
+      size_t window = wm.nextWindow(local.maxId - local.minId, OptionsTy::MinDelta, local.minId);
       copyAllWithIds(ii, ei, wl, window);
     } else {
       // initial window
@@ -670,7 +889,7 @@ class NewWorkManager {
       MergeOuterIt eend(boost::make_counting_iterator((int) numActive), fn);
       auto ii = make_two_level_iterator<std::forward_iterator_tag, MergeOuterIt, typename NewItemsTy::iterator, GetBegin, GetEnd>(bbegin, eend);
 
-      size_t window = wm.initialWindow(local.size, MinDelta);
+      size_t window = wm.nextWindow(local.size, OptionsTy::MinDelta);
       copyMineAfterRedistribute(boost::make_transform_iterator(ii.first, typename NewItem::GetValue()),
           boost::make_transform_iterator(ii.second, typename NewItem::GetValue()),
           local.size, wl, window, tid);
@@ -761,17 +980,17 @@ public:
   }
 
   template<typename InputIteratorTy, typename WL>
-  void addInitialWork(WindowManager& wm, InputIteratorTy b, InputIteratorTy e, WL* wl) {
+  void addInitialWork(WindowManager<OptionsTy>& wm, InputIteratorTy b, InputIteratorTy e, WL* wl) {
     size_t dist = std::distance(b, e);
     if (OptionsTy::hasId) {
       ThreadLocalData& local = *data.getLocal();
-      size_t window = wm.initialWindow(dist, MinDelta, local.minId);
+      size_t window = wm.initialWindow(dist, OptionsTy::MinDelta, local.minId);
       copyMine(
           boost::make_transform_iterator(mergeBuf.begin(), typename NewItem::GetValue()),
           boost::make_transform_iterator(mergeBuf.end(), typename NewItem::GetValue()),
           mergeBuf.size(), wl, window, LL::getTID());
     } else {
-      size_t window = wm.initialWindow(dist, MinDelta);
+      size_t window = wm.initialWindow(dist, OptionsTy::MinDelta);
       copyMineAfterRedistribute(b, e, dist, wl, window, LL::getTID());
     }
   }
@@ -791,20 +1010,27 @@ public:
   }
 
   template<typename WL>
-  void distributeNewWork(WindowManager& wm, WL* wl) {
+  void distributeNewWork(WindowManager<OptionsTy>& wm, WL* wl) {
     parallelSort(wm, wl, LL::getTID());
   }
 };
 
 template<typename OptionsTy>
-class Executor: public BreakManager<OptionsTy>, StateManager<OptionsTy>, NewWorkManager<OptionsTy>, WindowManager {
+class Executor:
+  public BreakManager<OptionsTy>,
+  public StateManager<OptionsTy>,
+  public NewWorkManager<OptionsTy>,
+  public WindowManager<OptionsTy>,
+  public DAGManager<OptionsTy> 
+{
   typedef typename OptionsTy::value_type value_type;
   typedef DItem<value_type> Item;
-  typedef DeterministicContext<value_type, OptionsTy::hasFixedNeighborhood> Context;
+  typedef DeterministicContext<OptionsTy> Context;
 
-  typedef WorkList::dChunkedFIFO<ChunkSize,Item> WL;
-  typedef WorkList::dChunkedFIFO<ChunkSize,Context> PendingWork;
-  typedef WorkList::ChunkedFIFO<ChunkSize,Context,false> LocalPendingWork;
+  typedef WorkList::dChunkedFIFO<OptionsTy::ChunkSize,Item> WL;
+  typedef WorkList::dChunkedFIFO<OptionsTy::ChunkSize,Context> PendingWork;
+  typedef WorkList::ChunkedFIFO<OptionsTy::ChunkSize,Context,false> LocalPendingWork;
+  typedef WorkList::dChunkedFIFO<OptionsTy::ChunkSize,Context*> CWL;
 
   // Truly thread-local
   struct ThreadLocalData: private boost::noncopyable {
@@ -812,19 +1038,21 @@ class Executor: public BreakManager<OptionsTy>, StateManager<OptionsTy>, NewWork
     LocalPendingWork localPending;
     UserContextAccess<value_type> facing;
     LoopStatistics<OptionsTy::needsStats> stat;
+
     WL* wlcur;
     WL* wlnext;
     size_t rounds;
     size_t outerRounds;
     bool hasNewWork;
-    ThreadLocalData(const OptionsTy& o, const char* loopname): options(o), stat(loopname), rounds(0), outerRounds(0) { }
+    ThreadLocalData(const OptionsTy& o, const char* loopname):
+      options(o), stat(loopname), rounds(0), outerRounds(0) { }
   };
 
   const OptionsTy& options;
   Barrier& barrier;
-  const char* loopname;
   WL worklists[2];
   PendingWork pending;
+  const char* loopname;
   LL::CacheLineStorage<volatile long> innerDone;
   LL::CacheLineStorage<volatile long> outerDone;
   LL::CacheLineStorage<volatile long> hasNewWork;
@@ -832,18 +1060,14 @@ class Executor: public BreakManager<OptionsTy>, StateManager<OptionsTy>, NewWork
   bool pendingLoop(ThreadLocalData& tld);
   bool commitLoop(ThreadLocalData& tld);
   void go();
-  
-  template<bool Fixed = OptionsTy::hasFixedNeighborhood>
-  auto buildDAG(ThreadLocalData& tld) -> typename std::enable_if<Fixed>::type;
 
-  template<bool Fixed = OptionsTy::hasFixedNeighborhood>
-  auto buildDAG(ThreadLocalData& tld) -> typename std::enable_if<!Fixed>::type { }
-
-  template<bool Fixed = OptionsTy::hasFixedNeighborhood>
-  auto executeDAG(ThreadLocalData& tld) -> typename std::enable_if<Fixed>::type;
-
-  template<bool Fixed = OptionsTy::hasFixedNeighborhood>
-  auto executeDAG(ThreadLocalData& tld) -> typename std::enable_if<!Fixed>::type { }
+  void drainPending(ThreadLocalData& tld) {
+    Context* ctx;
+    while ((ctx = this->peekContext(tld.localPending, pending))) {
+      ctx->clear();
+      this->popContext(tld.localPending, pending);
+    }
+  }
 
 public:
   Executor(const OptionsTy& o, const char* ln):
@@ -853,8 +1077,11 @@ public:
         "need to use break function to break loop");
   }
 
+  bool executeTask(ThreadLocalData& tld, Context* ctx);
+
   template<typename RangeTy>
   void AddInitialWork(RangeTy range) {
+    this->initializeDAGManager();
     this->addInitialWork(*this, range.begin(), range.end(), &worklists[1]);
   }
 
@@ -868,30 +1095,10 @@ public:
   }
 };
 
-// DAG executor
-// Multiphase:
-//  1: marking, first becomes representative
-//  2: edge swaping
-//  3:   preallocate
-//  4:   make concrete
-//  5: loop DAG scheduling
-
-template<typename OptionsTy> template<bool Fixed>
-auto Executor<OptionsTy>::buildDAG(ThreadLocalData& tld) -> typename std::enable_if<Fixed>::type
-{
-
-}
-
-template<typename OptionsTy> template<bool Fixed>
-auto Executor<OptionsTy>::executeDAG(ThreadLocalData& tld) -> typename std::enable_if<Fixed>::type
-{
-
-}
-
 template<typename OptionsTy>
 void Executor<OptionsTy>::go() {
   ThreadLocalData tld(options, loopname);
-  auto& local = this->getLocalWindowManager(); // XXX execute everything when using fixed neighborhoods
+  auto& local = this->getLocalWindowManager();
   tld.wlcur = &worklists[0];
   tld.wlnext = &worklists[1];
 
@@ -910,24 +1117,21 @@ void Executor<OptionsTy>::go() {
 
       barrier.wait();
 
-      if (OptionsTy::hasFixedNeighborhood) {
-        nextPending = false;
-        buildDAG(tld);
-        // XXX build DAG
-      }
-      
+      if (this->buildDAG())
+        barrier.wait();
+
       bool nextCommit = false;
       setPending(COMMITTING);
       outerDone.get() = true;
-      if (OptionsTy::hasFixedNeighborhood) {
-        //XXX
-        executeDAG(tld);
+
+      if (this->executeDAG(*this, tld)) {
         if (OptionsTy::needsBreak)
           barrier.wait();
+        drainPending(tld);
         break;
-      } else {
-        nextCommit = commitLoop(tld);
       }
+      
+      nextCommit = commitLoop(tld);
       
       if (nextPending || nextCommit)
         innerDone.get() = false;
@@ -973,8 +1177,9 @@ void Executor<OptionsTy>::go() {
 
   setPending(NON_DET);
 
+  this->destroyDAGManager();
   this->clearNewWork();
-
+  
   if (OptionsTy::needsStats) {
     if (LL::getTID() == 0) {
       reportStat(loopname, "RoundsExecuted", tld.rounds);
@@ -993,8 +1198,7 @@ bool Executor<OptionsTy>::pendingLoop(ThreadLocalData& tld)
     // Use a new context for each item because there is a race when reusing
     // between aborted iterations.
     Context* ctx = this->emplaceContext(tld.localPending, pending, *p);
-    assert(ctx != NULL);
-
+    this->pushDAGTask(ctx);
     local.incrementIterations();
     bool commit = true;
 
@@ -1020,7 +1224,7 @@ bool Executor<OptionsTy>::pendingLoop(ThreadLocalData& tld)
       case 0: 
       case REACHED_FAILSAFE: break;
       case CONFLICT: commit = false; break;
-      default: assert(0 && "Unknown conflict flag"); abort(); break;
+      default: abort(); break;
     }
 
     if (ForEachTraits<typename OptionsTy::function1_type>::NeedsPIA && !OptionsTy::useLocalState)
@@ -1037,86 +1241,78 @@ bool Executor<OptionsTy>::pendingLoop(ThreadLocalData& tld)
 }
 
 template<typename OptionsTy>
+bool Executor<OptionsTy>::executeTask(ThreadLocalData& tld, Context* ctx) 
+{
+  setThreadContext(ctx);
+  this->restoreLocalState(tld.facing, ctx->item.localState);
+  int result = 0;
+#ifdef GALOIS_USE_LONGJMP
+  if ((result = setjmp(hackjmp)) == 0) {
+#else
+  try {
+#endif
+    tld.options.fn2(ctx->item.val, tld.facing.data());
+#ifdef GALOIS_USE_LONGJMP
+  } else { clearConflictLock(); }
+#else
+  } catch (const ConflictFlag& flag) { clearConflictLock(); result = flag; }
+#endif
+  clearReleasable();
+  switch (result) {
+    case 0: break;
+    case CONFLICT: return false; break;
+    default: GALOIS_DIE("Unknown conflict flag"); break;
+  }
+
+  if (OptionsTy::needsPush) {
+    unsigned long parent = ctx->item.id;
+    typedef typename UserContextAccess<value_type>::PushBufferTy::iterator iterator;
+    unsigned count = 0;
+    for (auto& item : tld.facing.getPushBuffer()) {
+      this->pushNew(item, parent, ++count);
+      if (count == 0) {
+        GALOIS_DIE("Counter overflow");
+      }
+    }
+    if (count)
+      tld.hasNewWork = true;
+  }
+  assert(OptionsTy::needsPush
+      || tld.facing.getPushBuffer().begin() == tld.facing.getPushBuffer().end());
+
+  return true;
+}
+
+template<typename OptionsTy>
 bool Executor<OptionsTy>::commitLoop(ThreadLocalData& tld) 
 {
   bool retval = false;
   auto& local = this->getLocalWindowManager();
 
-  size_t ncommits = 0;
-  size_t niter = 0;
-
   Context* ctx;
   while ((ctx = this->peekContext(tld.localPending, pending))) {
-    ++niter;
-    bool commit = true;
-    // Can skip this check in prefix by repeating computations but eagerly
-    // aborting seems more efficient
+    bool commit = false;
+    if (ctx->isReady())
+      commit = executeTask(tld, ctx);
 
-    // XXX: becomes counter
-    if (!ctx->isReady())
-      commit = false;
-    setThreadContext(ctx);
     if (commit) {
-      this->restoreLocalState(tld.facing, ctx->item.localState);
-      int result = 0;
-#ifdef GALOIS_USE_LONGJMP
-      if ((result = setjmp(hackjmp)) == 0) {
-#else
-      try {
-#endif
-        tld.options.fn2(ctx->item.val, tld.facing.data());
-        // XXX during execution, enqueue sucessors
-#ifdef GALOIS_USE_LONGJMP
-      } else { clearConflictLock(); }
-#else
-      } catch (const ConflictFlag& flag) { clearConflictLock(); result = flag; }
-#endif
-      clearReleasable();
-      switch (result) {
-        case 0: break;
-        case CONFLICT: commit = false; break;
-        default: GALOIS_DIE("Unknown conflict flag"); break;
-      }
-    }
-
-    // XXX keep local state????
-    this->deallocLocalState(tld.facing);
-    
-    if (commit) {
-      ++ncommits;
+      ctx->commitIteration();
       local.incrementCommitted();
-      if (OptionsTy::needsPush) {
-        unsigned long parent = ctx->item.id;
-        typedef typename UserContextAccess<value_type>::PushBufferTy::iterator iterator;
-        unsigned count = 0;
-        for (auto& item : tld.facing.getPushBuffer()) {
-          this->pushNew(item, parent, ++count);
-          if (count == 0) {
-            GALOIS_DIE("Counter overflow");
-          }
-        }
-        if (count)
-          tld.hasNewWork = true;
-      }
-      assert(OptionsTy::needsPush
-          || tld.facing.getPushBuffer().begin() == tld.facing.getPushBuffer().end());
     } else {
       this->reuseItem(ctx->item);
       tld.wlnext->push(ctx->item);
       tld.stat.inc_conflicts();
       retval = true;
-    }
-
-    if (commit) {
-      ctx->commitIteration();
-    } else {
       ctx->cancelIteration();
     }
 
+    this->deallocLocalState(tld.facing);
+    
     if (ForEachTraits<typename OptionsTy::function2_type>::NeedsPIA && !OptionsTy::useLocalState)
       tld.facing.resetAlloc();
 
     tld.facing.resetPushBuffer();
+    ctx->clear();
     this->popContext(tld.localPending, pending);
   }
 

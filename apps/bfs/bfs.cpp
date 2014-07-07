@@ -655,7 +655,7 @@ void run() {
   initialize(algo, graph, source, report);
 
   //Galois::preAlloc(numThreads + (3*graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::MM::hugePageSize);
-  Galois::preAlloc(8*(numThreads + (graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::MM::hugePageSize));
+  Galois::preAlloc(16*8*(numThreads + (graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::MM::hugePageSize));
 
   Galois::reportPageAlloc("MeminfoPre");
 
