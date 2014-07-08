@@ -163,7 +163,7 @@ inline void serial_acquire(gptr<T> ptr) {
       //FIXME Better resolve flag
       getRemoteDirectory().fetch<T>(static_cast<fatPointer>(ptr), ResolveFlag::RW);
     } else if (LockManagerBase::isAcquiredAny(obj)) {
-      getLocalDirectory().fetch(static_cast<fatPointer>(ptr), ResolveFlag::RW);
+      getLocalDirectory().fetch<T>(static_cast<fatPointer>(ptr), ResolveFlag::RW);
     } else {
       return;
     }
@@ -178,7 +178,7 @@ inline void prefetch(gptr<T> ptr, Galois::MethodFlag m = MethodFlag::ALL) {
     //FIXME Better resolve flag
     getRemoteDirectory().fetch<T>(static_cast<fatPointer>(ptr), ResolveFlag::RW);
   } else if (LockManagerBase::isAcquiredAny(obj)) {
-    getLocalDirectory().fetch(static_cast<fatPointer>(ptr), ResolveFlag::RW);
+    getLocalDirectory().fetch<T>(static_cast<fatPointer>(ptr), ResolveFlag::RW);
   }
 }
 

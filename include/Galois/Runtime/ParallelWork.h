@@ -183,7 +183,8 @@ class RemoteAbortHandler {
 
 public:
   void push(const value_type& val, fatPointer ptr, 
-            void (RemoteDirectory::*rfetch) (fatPointer, ResolveFlag)) {
+            void (RemoteDirectory::*rfetch) (fatPointer, ResolveFlag),
+            void (LocalDirectory::*lfetch) (fatPointer, ResolveFlag)) {
     //Not actually remote, so don't do anything
     if (ptr.isLocal()) {
       if (!getLocalDirectory().isRemote(ptr, RW))
@@ -196,7 +197,7 @@ public:
     std::lock_guard<LL::SimpleLock> lg(lock);
     auto p = waiting_on.equal_range(val);
     if (ptr.isLocal()) {
-      getLocalDirectory().setContended(ptr);
+      //FIXME: types getLocalDirectory().setContended(ptr);
     } else {
       //FIXME: types      getRemoteDirectory().setContended(ptr);
     }
@@ -205,7 +206,7 @@ public:
     if (newDep) {
       waiting_on.insert(std::make_pair(val, ptr));
       if (ptr.isLocal()) {
-        getLocalDirectory().fetch(ptr, RW);
+        (getLocalDirectory().*(lfetch))(ptr, RW);
       } else {
         (getRemoteDirectory().*(rfetch))(ptr, RW);
       }
@@ -314,7 +315,7 @@ protected:
       } catch (const remote_ex& ex) {
         //      std::cout << "R";
         tld.abortIteration();
-        aborted.push(*p, ex.ptr, ex.rfetch);
+        aborted.push(*p, ex.ptr, ex.rfetch, ex.lfetch);
       } catch (const conflict_ex& ex) {
         //      std::cout << "L";
         tld.abortIteration();

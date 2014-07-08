@@ -94,28 +94,21 @@ public:
   //These wrap type information for various dispatching purposes.  This
   //let's us keep vtables out of user objects
   class typeHelper {
-  protected:
-    typeHelper(recvFuncTy rWR);
-
   public:
-    virtual void serialize(SendBuffer&, Lockable*) const = 0;
     virtual void deserialize(RecvBuffer&, Lockable*) const = 0;
     virtual void cmCreate(fatPointer, ResolveFlag, RecvBuffer&) const = 0;
     virtual void send(uint32_t dest, fatPointer ptr, Lockable* obj, ResolveFlag flag) const = 0;
     virtual void request(uint32_t dest, fatPointer ptr, uint32_t whom, ResolveFlag flag) const = 0;
-    recvFuncTy writeremote;
   };
   
   template<typename T>
   class typeHelperImpl : public typeHelper {
-    typeHelperImpl();
   public:
     static typeHelperImpl* get() {
       static typeHelperImpl th;
       return &th;
     }
 
-    virtual void serialize(SendBuffer&, Lockable*) const;
     virtual void deserialize(RecvBuffer&, Lockable*) const;
     virtual void cmCreate(fatPointer, ResolveFlag, RecvBuffer&) const;
     virtual void send(uint32_t, fatPointer, Lockable*, ResolveFlag) const;
@@ -196,6 +189,16 @@ class LocalDirectory : public BaseDirectory {
       return retval;
     }
 
+    //Returns if object is present and there are no RO replicas
+    bool isHere() const {
+      return locRW == ~0 && locRO.empty();
+    }
+
+    //Returns if object has RO replicas and hasn't been recalled
+    bool isRO() const {
+      return recalled == ~0 && !locRO.empty();
+    }
+
     metadata() :locRW(~0), recalled(~0), th(nullptr) {}
 
     friend std::ostream& operator<< (std::ostream& os, const metadata& md) {
@@ -211,87 +214,69 @@ class LocalDirectory : public BaseDirectory {
     }
   };
 
-  std::unordered_map<Lockable*, metadata> dir;
+  std::unordered_map<fatPointer, metadata> dir;
   LL::SimpleLock dir_lock;
 
-  std::unordered_set<Lockable*> pending;
+  std::unordered_set<fatPointer> pending;
   LL::SimpleLock pending_lock;
   
-  void setPending(Lockable* obj) {
+  void setPending(fatPointer ptr) {
     std::lock_guard<LL::SimpleLock> lg(pending_lock);
-    pending.insert(obj);
+    pending.insert(ptr);
   }
 
-  metadata& getMD(Lockable*);
+  metadata& getMD(fatPointer ptr);
 
-  std::atomic<uint64_t> sentRequests, sentInvalidates, sentObjects;
-
-  //!Send object to dest
-  void sendObj(metadata&, uint32_t dest, Lockable*, ResolveFlag);
+  void eraseMD(fatPointer ptr, metadata& md);
 
   //!Send object to all outstanding readers
-  void sendToReaders(metadata&, Lockable*);
+  void sendToReaders(metadata&, fatPointer);
 
   //!Send invalidate to all outstanding readers
-  void invalidateReaders(metadata&, Lockable*, uint32_t);
+  void invalidateReaders(metadata&, fatPointer, uint32_t);
 
-  void considerObject(metadata& m, Lockable*);
+  void updatePendingRequests(metadata&, fatPointer);
 
-  // bool updateObjState(Lockable*, metadata&);
+  void considerObject(metadata& m, fatPointer ptr);
 
-  // void recvRequestImpl(fatPointer ptr, ResolveFlag flag, uint32_t dest, typeHelper* th);
-  // void recvObjectImpl(fatPointer ptr);
-
-  void ackInvalidateImpl(fatPointer, uint32_t);
-
-  void recvObjectImpl(fatPointer, RecvBuffer&);
-
-  void recvRequestImpl(fatPointer, ResolveFlag, uint32_t, typeHelper*);
+  void fetchImpl(fatPointer ptr, ResolveFlag flag, typeHelper* th, bool setContended);
 
 protected:
+
+  void recvObjectImpl(fatPointer, ResolveFlag, typeHelper* th, RecvBuffer&);
+
+  void recvRequestImpl(fatPointer, uint32_t, ResolveFlag, typeHelper*);
+
   //allow receiving objects
   template<typename T>
   friend void detail::recvObject(RecvBuffer& buf);
-
-  //Object arived at destination
-  //static void ackObject(RecvBuffer&); //fatPointer, ResolveFlag, uint32_t);
-
-  //Recieve a remote request for an object
+  //allow receiving requests
   template<typename T>
-  static void recvRequest(RecvBuffer&);
-
-  //Recieve an object (writeback)
-  static void recvObject(RecvBuffer&);
-
-  static void ackInvalidate(RecvBuffer&);
+  friend void detail::recvRequest(RecvBuffer& buf);
 
 public:
   //Local portion of API
-
-  void fetch(fatPointer ptr, ResolveFlag flag) {
-    assert(ptr.isLocal());
-    metadata& md = getMD(static_cast<Lockable*>(ptr.getObj()));
-    std::lock_guard<LL::SimpleLock> lg(md.lock, std::adopt_lock);
-    trace("LocalDirectory::fetch for % flag % md %\n", ptr, flag, md);
-    assert(md.th);
-    md.addReq(NetworkInterface::ID, flag);
-    setPending(static_cast<Lockable*>(ptr.getObj()));
-  }
 
   bool isRemote(fatPointer ptr, ResolveFlag flag) {
     return dirOwns(static_cast<Lockable*>(ptr.getObj()));
   }
 
-  //! engage priority protocol for ptr
-  void setContended(Lockable* ptr);
-  void setContended(fatPointer ptr);
+  //! initiate, if necessary, a fetch of a remote object
+  template<typename T>
+  void fetch(fatPointer ptr, ResolveFlag flag) {
+    fetchImpl(ptr, flag, typeHelperImpl<T>::get(), false);
+  }
 
-  //! unengage priority protocol for ptr
-  void clearContended(Lockable* ptr);
+  //! engage priority protocol for ptr.  May issue fetch
+  template<typename T>
+  void setContended(fatPointer ptr, ResolveFlag flag) {
+    fetchImpl(ptr, flag, typeHelperImpl<T>::get(), true);
+  }
+  //! unengage priority protocol for ptr.  May send object away
   void clearContended(fatPointer ptr);
 
-  void resetStats();
-  void reportStats(const char* loopname);
+  void resetStats() {}
+  void reportStats(const char* loopname) {}
 
   void makeProgress();
   void dump();
@@ -300,21 +285,6 @@ public:
 LocalDirectory& getLocalDirectory();
 
 ////////////////////////////////////////////////////////////////////////////////
-// Implementation
-////////////////////////////////////////////////////////////////////////////////
-
-//Generic landing pad for requests
-template<typename T>
-void LocalDirectory::recvRequest(RecvBuffer& buf) {
-  fatPointer ptr;
-  ResolveFlag flag;
-  uint32_t dest;
-  gDeserialize(buf, ptr, flag, dest);
-  getLocalDirectory().recvRequestImpl(ptr, flag, dest, typeHelperImpl<T>::get());
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
 
 class RemoteDirectory : public BaseDirectory {
 
@@ -415,16 +385,6 @@ RemoteDirectory& getRemoteDirectory();
 ////////////////////////////////////////////////////////////////////////////////
 
 template<typename T>
-BaseDirectory::typeHelperImpl<T>::typeHelperImpl()
-  : typeHelper(&detail::recvObject<T>)
-{}
-
-template<typename T>
-void BaseDirectory::typeHelperImpl<T>::serialize(SendBuffer& buf, Lockable* ptr) const {
-  gSerialize(buf, *static_cast<T*>(ptr));
-}
-
-template<typename T>
 void BaseDirectory::typeHelperImpl<T>::deserialize(RecvBuffer& buf, Lockable* ptr) const {
   gDeserialize(buf, *static_cast<T*>(ptr));
 }
@@ -455,6 +415,7 @@ struct remote_ex {
   fatPointer ptr;
   Galois::MethodFlag flag;
   void (RemoteDirectory::*rfetch) (fatPointer, ResolveFlag);
+  void (LocalDirectory::*lfetch) (fatPointer, ResolveFlag);
 };
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -483,7 +444,7 @@ void Galois::Runtime::detail::recvObject(RecvBuffer& buf) {
   ResolveFlag flag;
   gDeserialize(buf, ptr, flag);
   if (ptr.isLocal())
-    getLocalDirectory().recvObjectImpl(ptr, buf);
+    getLocalDirectory().recvObjectImpl(ptr, flag, BaseDirectory::typeHelperImpl<T>::get(), buf);
   else
     getRemoteDirectory().recvObjectImpl(ptr, flag, BaseDirectory::typeHelperImpl<T>::get(), buf);
 }
@@ -495,7 +456,7 @@ void Galois::Runtime::detail::recvRequest(RecvBuffer& buf) {
   ResolveFlag flag;
   gDeserialize(buf, ptr, dest, flag);
   if (ptr.isLocal())
-    0;//getLocalDirectory().recvRequestImpl(ptr, dest, flag, BaseDirectory::typeHelperImpl<T>::get());
+    getLocalDirectory().recvRequestImpl(ptr, dest, flag, BaseDirectory::typeHelperImpl<T>::get());
   else
     getRemoteDirectory().recvRequestImpl(ptr, dest, flag);
 }
