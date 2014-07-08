@@ -42,7 +42,7 @@
 
 namespace Galois {
 namespace Runtime {
-namespace impl {
+namespace {
 
 #define USE_DENSE_LEVELS 1
 // #undef USE_DENSE_LEVELS
@@ -295,9 +295,6 @@ struct InheritTraits<false> {
 };
 
 
-} // end namespace impl
-
-
 template <typename T, typename Key, typename KeyFn, typename KeyCmp, typename NhoodFunc, typename OpFunc>   
 class LevelExecutor {
 
@@ -306,7 +303,7 @@ class LevelExecutor {
   // hack to get ChunkedMaster base class
   using BaseWL = typename Galois::WorkList::dChunkedFIFO<CHUNK_SIZE>::template retype<T>::type;
   using WL_ty = Galois::WorkList::WLsizeWrapper<BaseWL>;
-  using LevelMap_ty = impl::LevelMap<Key, KeyCmp, WL_ty>;
+  using LevelMap_ty = LevelMap<Key, KeyCmp, WL_ty>;
 
   using UserCtx = UserContextAccess<T>;
   using PerThreadUserCtx = PerThreadStorage<UserCtx>;
@@ -316,7 +313,7 @@ class LevelExecutor {
 
 
 
-  struct BodyWrapper: public impl::InheritTraits<ForEachTraits<OpFunc>::NeedsAborts> {
+  struct BodyWrapper: public InheritTraits<ForEachTraits<OpFunc>::NeedsAborts> {
 
 
     KeyFn& keyFn;
@@ -474,6 +471,9 @@ public:
 
 
 };
+
+} // end namespace impl
+
 
 template <typename R, typename KeyFn, typename KeyCmp, typename NhoodFunc, typename OpFunc>
 void for_each_ordered_level (const R& range, const KeyFn& keyFn, const KeyCmp& kcmp, const NhoodFunc& nhVisit, const OpFunc& opFunc, const char* loopname=0) {
