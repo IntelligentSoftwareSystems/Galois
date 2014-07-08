@@ -96,53 +96,45 @@ public:
 
   // only push called in parallel by multiple threads
   void push (const Key& k, const value_type& x) {
-
 #ifdef USE_LEVEL_CACHING
     CachedLevel& cached = *(cachedLevels.getLocal ());
 
     if (cached && k == cached->first) { // fast path
       assert (cached->second != nullptr);
       cached->second->push (x);
-
-    } else  {
-#else
-    {
-#endif
-
-      // debug
-      // std::printf ("could not find cached worklist");
-
-      rwmutex.readLock ();
-      auto currLevel = levelMap.find (k);
-
-      if (currLevel == levelMap.end ()) {
-        rwmutex.readUnlock (); // give up read lock to acquire write lock
-
-        rwmutex.writeLock (); 
-        // check again after locking
-        if (levelMap.find (k) == levelMap.end ()) {
-          WL_ty* wl = wlAlloc.allocate (1); // new WL_ty ();
-          new (wl) WL_ty;
-          levelMap.insert (std::make_pair (k, wl));
-        }
-        rwmutex.writeUnlock ();
-
-        // read again now
-        rwmutex.readLock ();
-        currLevel = levelMap.find (k);
-      }
-      rwmutex.readUnlock ();
-
-      assert (currLevel != levelMap.end ());
-      currLevel->second->push (x);
-#ifdef USE_LEVEL_CACHING
-      cached = *currLevel;
-#endif
+      return;
     }
-    
+#endif
+    // debug
+    // std::printf ("could not find cached worklist");
 
+    rwmutex.readLock ();
+    auto currLevel = levelMap.find (k);
+
+    if (currLevel == levelMap.end ()) {
+      rwmutex.readUnlock (); // give up read lock to acquire write lock
+
+      rwmutex.writeLock (); 
+      // check again after locking
+      if (levelMap.find (k) == levelMap.end ()) {
+        WL_ty* wl = wlAlloc.allocate (1); // new WL_ty ();
+        new (wl) WL_ty;
+        levelMap.insert (std::make_pair (k, wl));
+      }
+      rwmutex.writeUnlock ();
+
+      // read again now
+      rwmutex.readLock ();
+      currLevel = levelMap.find (k);
+    }
+    rwmutex.readUnlock ();
+
+    assert (currLevel != levelMap.end ());
+    currLevel->second->push (x);
+#ifdef USE_LEVEL_CACHING
+    cached = *currLevel;
+#endif
   }
-
 
   void freeRemovedLevels () {
     while (!removedLevels.empty ()) {
@@ -209,7 +201,6 @@ public:
   }
 
   void push (const unsigned k, const value_type& x) {
-
 #ifdef USE_LEVEL_CACHING
     if (k < begLevel) {
       GALOIS_DIE ("Can't handle non-monotonic adds");

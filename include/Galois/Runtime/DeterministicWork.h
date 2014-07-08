@@ -43,10 +43,9 @@
 #include <queue>
 
 // TODO deterministic hash
-// TODO fixed neighborhood
-// XXX cyclic scheduling
-// XXX reduce list contention
-// XXX profile, reuse graph
+// TODO fixed neighborhood: cyclic scheduling 
+// TODO fixed neighborhood: reduce list contention
+// TODO fixed neighborhood: profile, reuse graph 
 namespace Galois {
 namespace Runtime {
 //! Implementation of deterministic execution
@@ -141,16 +140,21 @@ template<typename OptionsTy>
 class DeterministicContextBase<OptionsTy, true>: public SimpleRuntimeContext {
 public:
   typedef DItem<typename OptionsTy::value_type> Item;
-  typedef Galois::concurrent_gslist<DeterministicContextBase*,64> ContextList;
+  typedef Galois::concurrent_gslist<DeterministicContextBase*,8> ContextList;
+  //typedef Galois::gslist<DeterministicContextBase*,16> ContextList;
   Item item;
   ContextList edges;
   ContextList succs;
   std::atomic<int> preds;
 
-private:
-  void addTask(DeterministicContextBase* ctx) {
-    edges.push_front(*listAllocator, ctx);
-  }
+  struct ContextPtrLessThan {
+    bool operator()(const DeterministicContextBase* a, const DeterministicContextBase* b) const {
+      // XXX non-deterministic behavior when we have multiple items with the same id
+      if (a->item.id == b->item.id)
+        return a < b;
+      return a->item.id < b->item.id;
+    }
+  };
 
 public:
   DeterministicContextBase(const Item& _item): SimpleRuntimeContext(true), item(_item), preds(0) { }
@@ -158,7 +162,7 @@ public:
   void clear() {
     assert(preds == 0);
     this->commitIteration();
-    // XXX replace with bulk heap
+    // TODO replace with bulk heap
     edges.clear(*listAllocator);
     succs.clear(*listAllocator);
   }
@@ -175,17 +179,19 @@ public:
       return;
 
     // First to lock becomes representative
-    DeterministicContextBase* owner;
-    do {
+    DeterministicContextBase* owner = static_cast<DeterministicContextBase*>(this->getOwner(lockable));
+    while (!owner) {
       if (this->tryLock(lockable)) {
         this->setOwner(lockable);
         this->addToNhood(lockable);
       }
       
       owner = static_cast<DeterministicContextBase*>(this->getOwner(lockable));
-    } while (!owner);
+    }
 
-    owner->addTask(this);
+    if (std::find(edges.begin(), edges.end(), owner) != edges.end())
+      return;
+    edges.push_front(*listAllocator, owner);
   }
 };
 
@@ -296,7 +302,8 @@ struct Options {
   static const bool hasBreak = has_deterministic_parallel_break<function1_type>::value;
   static const bool hasId = has_deterministic_id<function1_type>::value;
   static const bool useLocalState = has_deterministic_local_state<function1_type>::value;
-  static const bool hasFixedNeighborhood = has_fixed_neighborhood<function1_type>::value; // XXX test
+  // TODO enable when working better, still ~2X slower than implicit version on bfs
+  static const bool hasFixedNeighborhood = has_fixed_neighborhood<function1_type>::value && false;
 
   static const int ChunkSize = 32;
   static const unsigned InitialNumRounds = 100;
@@ -320,18 +327,12 @@ public:
   bool executeDAG(Executor&, ExecutorTLD&) { return false; } 
 };
 
-
-// DAG executor
-// Multiphase:
-//  1: marking, first becomes representative
-//  2: edge swaping
-//  3:   preallocate
-//  4:   make concrete
-//  5: loop DAG scheduling
 template<typename OptionsTy>
 class DAGManagerBase<OptionsTy,true> {
   typedef DeterministicContext<OptionsTy> Context;
-  typedef WorkList::dChunkedFIFO<OptionsTy::ChunkSize,Context*> WL;
+  typedef WorkList::dChunkedFIFO<OptionsTy::ChunkSize * 2,Context*> WL1;
+  typedef WorkList::AltChunkedLIFO<OptionsTy::ChunkSize * 2,Context*> WL2;
+  typedef WorkList::dChunkedFIFO<32,Context*> WL3;
 
   struct ThreadLocalData: private boost::noncopyable {
     typedef std::vector<Context*, typename PerIterAllocTy::rebind<Context*>::other> SortBuf;
@@ -342,18 +343,11 @@ class DAGManagerBase<OptionsTy,true> {
   };
 
   PerThreadStorage<ThreadLocalData> data;
-  WL worklists[2];
+  WL1 taskList;
+  WL2 taskList2;
+  WL3 sourceList;
   TerminationDetection& term;
   Barrier& barrier;
-
-  struct ContextPtrLessThan {
-    bool operator()(const Context* a, const Context* b) const {
-      // XXX
-      if (a->item.id == b->item.id)
-        return a < b;
-      return a->item.id < b->item.id;
-    }
-  };
 
 public:
   DAGManagerBase(): term(getSystemTermination()), barrier(getSystemBarrier()) { }
@@ -369,18 +363,17 @@ public:
   }
 
   void pushDAGTask(Context* ctx) {
-    worklists[0].push(ctx);
+    taskList.push(ctx);
   }
 
   bool buildDAG() {
     ThreadLocalData& tld = *data.getLocal();
     Galois::optional<Context*> p;
-    size_t numTasks = 0;
-    while ((p = worklists[0].pop())) {
+    while ((p = taskList.pop())) {
       Context* ctx = *p;
       tld.sortBuf.clear();
       std::copy(ctx->edges.begin(), ctx->edges.end(), std::back_inserter(tld.sortBuf));
-      std::sort(tld.sortBuf.begin(), tld.sortBuf.end(), ContextPtrLessThan());
+      std::sort(tld.sortBuf.begin(), tld.sortBuf.end(), typename Context::ContextPtrLessThan());
 
       if (!tld.sortBuf.empty()) {
         Context* last = tld.sortBuf.front();
@@ -392,8 +385,7 @@ public:
         }
       }
 
-      worklists[1].push(ctx);
-      numTasks += 1;
+      taskList2.push(ctx);
     }
     return true;
   }
@@ -405,10 +397,10 @@ public:
     Context* ctx;
 
     // Go through all tasks to find intial sources and
-    while ((p = worklists[1].pop())) {
+    while ((p = taskList2.pop())) {
       ctx = *p;
       if (ctx->preds.load(std::memory_order_relaxed) == 0)
-        worklists[0].push(ctx);
+        sourceList.push(ctx);
     }
 
     term.initializeThread();
@@ -419,7 +411,7 @@ public:
     size_t committed = 0;
     do {
       Galois::optional<Context*> p;
-      while ((p = worklists[0].pop())) {
+      while ((p = sourceList.pop())) {
         ctx = *p;
         assert(ctx->preds == 0);
         bool commit = e.executeTask(etld, ctx);
@@ -438,7 +430,7 @@ public:
           int v = --succ->preds;
           assert(v >= 0);
           if (v == 0)
-            worklists[0].push(succ);
+            sourceList.push(succ);
         }
       }
 
@@ -572,7 +564,9 @@ public:
 
   public:
     size_t nextWindow(bool first = false) {
-      if (!first)
+      if (first)
+        window = delta;
+      else
         window += delta;
       committed = iterations = 0;
       return window;
@@ -596,8 +590,14 @@ public:
   }
 
   size_t nextWindow(size_t dist, size_t atleast, size_t base = 0) {
-    ThreadLocalData& local = *data.getLocal();
-    return local.nextWindow(true);
+    if (false) {
+      // This, which tries to continue delta with new work, seems to result in
+      // more conflicts (although less total rounds) and more time
+      ThreadLocalData& local = *data.getLocal();
+      return local.nextWindow(true);
+    } else {
+      return initialWindow(dist, atleast, base);
+    }
   }
 
   size_t initialWindow(size_t dist, size_t atleast, size_t base = 0) {
@@ -638,7 +638,7 @@ public:
     }
 
     // Useful debugging info
-    if (true) {
+    if (false) {
       if (LL::getTID() == 0) {
         char buf[1024];
         snprintf(buf, 1024, "%d %.3f (%zu/%zu) window: %zu delta: %zu\n", 
@@ -883,7 +883,6 @@ class NewWorkManager {
       size_t window = wm.nextWindow(local.maxId - local.minId, OptionsTy::MinDelta, local.minId);
       copyAllWithIds(ii, ei, wl, window);
     } else {
-      // initial window
       GetNewItem fn(this);
       MergeOuterIt bbegin(boost::make_counting_iterator(0), fn);
       MergeOuterIt eend(boost::make_counting_iterator((int) numActive), fn);
@@ -933,6 +932,27 @@ class NewWorkManager {
     }
   }
 
+  template<typename InputIteratorTy>
+  void sortInitialWorkDispatch(InputIteratorTy ii, InputIteratorTy ei, ...) { }
+
+  template<typename InputIteratorTy, bool HasId = OptionsTy::hasId, bool HasFixed = OptionsTy::hasFixedNeighborhood>
+  auto sortInitialWorkDispatch(InputIteratorTy ii, InputIteratorTy ei, int) 
+  -> typename std::enable_if<HasId && !HasFixed, void>::type
+  { 
+    ThreadLocalData& local = *data.getLocal();
+    size_t dist = std::distance(ii, ei);
+
+    mergeBuf.reserve(dist);
+    for (; ii != ei; ++ii)
+      mergeBuf.emplace_back(*ii, options.fn1.galoisDeterministicId(*ii), 1);
+
+    ParallelSTL::sort(mergeBuf.begin(), mergeBuf.end());
+
+    initialLimits(mergeBuf.begin(), mergeBuf.end());
+    broadcastLimits(local);
+  }
+
+
 public:
   NewWorkManager(const OptionsTy& o): 
     options(o), alloc(&heap), mergeBuf(alloc), distributeBuf(alloc), barrier(getSystemBarrier()) 
@@ -956,27 +976,9 @@ public:
 
   void clearNewWork() { data.getLocal()->heap.clear(); }
 
-  template<typename InputIteratorTy, bool HasId = OptionsTy::hasId>
-  auto sortInitialWork(InputIteratorTy ii, InputIteratorTy ei) 
-  -> typename std::enable_if<!HasId, void>::type 
-  { 
-  }
-
-  template<typename InputIteratorTy, bool HasId = OptionsTy::hasId>
-  auto sortInitialWork(InputIteratorTy ii, InputIteratorTy ei) 
-  -> typename std::enable_if<HasId, void>::type
-  { 
-    ThreadLocalData& local = *data.getLocal();
-    size_t dist = std::distance(ii, ei);
-
-    mergeBuf.reserve(dist);
-    for (; ii != ei; ++ii)
-      mergeBuf.emplace_back(*ii, options.fn1.galoisDeterministicId(*ii), 1);
-
-    ParallelSTL::sort(mergeBuf.begin(), mergeBuf.end());
-
-    initialLimits(mergeBuf.begin(), mergeBuf.end());
-    broadcastLimits(local);
+  template<typename InputIteratorTy>
+  void sortInitialWork(InputIteratorTy ii, InputIteratorTy ei) {
+    return sortInitialWorkDispatch(ii, ei, 0);
   }
 
   template<typename InputIteratorTy, typename WL>
@@ -985,10 +987,15 @@ public:
     if (OptionsTy::hasId) {
       ThreadLocalData& local = *data.getLocal();
       size_t window = wm.initialWindow(dist, OptionsTy::MinDelta, local.minId);
-      copyMine(
-          boost::make_transform_iterator(mergeBuf.begin(), typename NewItem::GetValue()),
-          boost::make_transform_iterator(mergeBuf.end(), typename NewItem::GetValue()),
-          mergeBuf.size(), wl, window, LL::getTID());
+      if (OptionsTy::hasFixedNeighborhood) {
+        copyMine(b, e, dist, wl, window, LL::getTID());
+      } else {
+        size_t dist = std::distance(b, e);
+        copyMine(
+            boost::make_transform_iterator(mergeBuf.begin(), typename NewItem::GetValue()),
+            boost::make_transform_iterator(mergeBuf.end(), typename NewItem::GetValue()),
+            mergeBuf.size(), wl, window, LL::getTID());
+      }
     } else {
       size_t window = wm.initialWindow(dist, OptionsTy::MinDelta);
       copyMineAfterRedistribute(b, e, dist, wl, window, LL::getTID());
@@ -1030,7 +1037,6 @@ class Executor:
   typedef WorkList::dChunkedFIFO<OptionsTy::ChunkSize,Item> WL;
   typedef WorkList::dChunkedFIFO<OptionsTy::ChunkSize,Context> PendingWork;
   typedef WorkList::ChunkedFIFO<OptionsTy::ChunkSize,Context,false> LocalPendingWork;
-  typedef WorkList::dChunkedFIFO<OptionsTy::ChunkSize,Context*> CWL;
 
   // Truly thread-local
   struct ThreadLocalData: private boost::noncopyable {
