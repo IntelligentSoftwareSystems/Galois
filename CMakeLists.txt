@@ -73,6 +73,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   else()
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -gcc-toolchain $ENV{GCC_BIN}/..")
   endif()
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fcolor-diagnostics")
 endif()
 
 # XL
