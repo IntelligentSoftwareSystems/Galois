@@ -164,7 +164,7 @@ private:
 
   // NB: Place dynamically growing masterLog after fixed-size PerThreadStorage
   // members to give higher likelihood of reclaiming PerThreadStorage
-  Runtime::PerThreadStorage<ThreadData> current;
+  Runtime::PerThreadStorage<ThreadData> data;
   Runtime::LL::PaddedLock<Concurrent> masterLock;
   MasterLog masterLog;
 
@@ -203,9 +203,9 @@ private:
       msS = p.scanStart;
       if (localLeader) {
         for (unsigned i = 0; i < Runtime::activeThreads; ++i)
-          msS = std::min(msS, current.getRemote(i)->scanStart);
+          msS = std::min(msS, data.getRemote(i)->scanStart);
       } else {
-        msS = std::min(msS, current.getRemote(Runtime::LL::getLeaderForThread(myID))->scanStart);
+        msS = std::min(msS, data.getRemote(Runtime::LL::getLeaderForThread(myID))->scanStart);
       }
     }
 
@@ -265,7 +265,7 @@ public:
 
   void push(const value_type& val) {
     Index index = indexer(val);
-    ThreadData& p = *current.getLocal();
+    ThreadData& p = *data.getLocal();
     // Fast path
     if (index == p.curIndex && p.current) {
       p.current->push(val);
@@ -298,7 +298,7 @@ public:
 
   Galois::optional<value_type> pop() {
     // Find a successful pop
-    ThreadData& p = *current.getLocal();
+    ThreadData& p = *data.getLocal();
     CTy* C = p.current;
 
     if (this->hasStored(p, p.curIndex))
@@ -321,18 +321,7 @@ public:
   template<bool Barrier=UseBarrier>
   auto empty() -> typename std::enable_if<Barrier, bool>::type {
     Galois::optional<value_type> item;
-    ThreadData& p = *current.getLocal();
-    do {
-      item = pop();
-      if (item) {
-        p.stored.push_back(std::make_pair(p.curIndex, *item));
-        this->term.localTermination(true);
-        return false;
-      }
-      this->term.localTermination(false);
-    } while (!this->term.globalTermination());
-
-    Index lastIndex = p.curIndex;
+    ThreadData& p = *data.getLocal();
 
     item = slowPop(p);
     if (item)
@@ -346,21 +335,20 @@ public:
     CTy* C = p.current;
 
     for (unsigned i = 0; i < Runtime::activeThreads; ++i) {
-      ThreadData& o = *current.getRemote(i);
+      ThreadData& o = *data.getRemote(i);
       if (curIndex > o.curIndex) {
         curIndex = o.curIndex;
         C = o.current;
       }
-      hasWork |= current.getRemote(i)->hasWork;
+      hasWork |= o.hasWork;
     }
-    if (p.hasWork) {
-      this->term.initializeThread();
-    }
+
     this->barrier.wait();
+    
     p.current = C;
     p.curIndex = curIndex;
 
-    return !(item && p.curIndex == lastIndex);
+    return !hasWork;
   }
 };
 GALOIS_WLCOMPILECHECK(OrderedByIntegerMetric)

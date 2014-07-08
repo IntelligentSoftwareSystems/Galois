@@ -63,7 +63,7 @@ static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>")
 
 static cll::opt<unsigned> numPages (
     "preAlloc",
-    cll::desc ("number of pages(per thread) to pre-allocate from OS for Galois allocators "),
+    cll::desc ("number of pages (per thread) to pre-allocate from OS for Galois allocators"),
     cll::init (32));
 
 namespace kruskal {
@@ -235,7 +235,7 @@ protected:
   //! in order to to specific initialization
   virtual void initRemaining (const size_t numNodes, const VecEdge& edges) { };
 
-  virtual void runMST (const size_t numNodes, const VecEdge& edges,
+  virtual void runMST (const size_t numNodes, VecEdge& edges,
       size_t& mstWeight, size_t& totalIter) = 0;
 
 
@@ -287,23 +287,18 @@ protected:
 				      src, ",", dst, ",", ingraph.getEdgeData (*e), ")");
         }
       }
-
     }
 
     std::cout << "Graph read with nodes=" << ingraph.size () << ", edges=" << numEdges << std::endl;
-
-
   }
   
 
 
   virtual void readPBBSfile (const std::string& filename, size_t& numNodes, SetInEdge& edgeSet) {
-
     typedef unsigned NodeData;
     typedef float EdgeData;
 
     static const unsigned WEIGHT_SCALE = 1000000;
-
 
     std::cout << "Reading input from: " << filename << std::endl;
 
@@ -317,7 +312,6 @@ protected:
     fscanf (inFile, "%s", header);
 
     // inFile.seekg (0, std::ios::beg);
-
 
     size_t numEdges = 0;
     numNodes = 0;
@@ -434,9 +428,7 @@ public:
     Galois::StatTimer t;
 
     t.start ();
-    // GaloisRuntime::beginSampling ();
     runMST (numNodes, edges, mstWeight, totalIter);
-    // GaloisRuntime::endSampling ();
     t.stop ();
     Galois::reportPageAlloc("MeminfoPost");
 
@@ -593,10 +585,6 @@ private:
     freeVecPtr (primNodes);
     return mstSum;
   }
-
-
-
-
 
   bool verify (const size_t numNodes, const SetInEdge& edgeSet, const size_t kruskalSum) const {
     Galois::StatTimer pt("PrimTime");

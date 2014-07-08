@@ -25,11 +25,12 @@
  * @author <ahassaan@ices.utexas.edu>
  */
 
-#ifndef KRUSKAL_LEVEL_EXEC_H
-#define KRUSKAL_LEVEL_EXEC_H
+#ifndef KRUSKALSTRICTOBIM_H
+#define KRUSKALSTRICTOBIM_H
 
 #include "Galois/Graph/Graph.h"
 #include "Galois/Runtime/LevelExecutor.h"
+#include "Galois/WorkList/WorkListExperimental.h"
 
 #include "Kruskal.h"
 #include "KruskalParallel.h"
@@ -38,18 +39,15 @@
 namespace kruskal {
 
 
-class KruskalLevelExec: public Kruskal {
+class KruskalStrictOBIM: public Kruskal {
   protected:
 
-  typedef Galois::Graph::FirstGraph<void*,void,true> Graph;
+  typedef Galois::Graph::FirstGraph<void,void,false> Graph;
   typedef Graph::GraphNode Lockable;
   typedef std::vector<Lockable> VecLocks;
 
-
-
-  virtual const std::string getVersion () const { return "Parallel Kruskal using Speculative Ordered Runtime"; }
-
-
+  virtual const std::string getVersion () const { return "Parallel Kruskal using Strict OBIM"; }
+  
   struct FindLoopSpec {
 
     Graph& graph;
@@ -138,16 +136,16 @@ class KruskalLevelExec: public Kruskal {
 
     Graph graph;
     VecLocks locks;
-    locks.reserve (numNodes);
-    for (size_t i = 0; i < numNodes; ++i) {
-      locks.push_back (graph.createNode (nullptr));
-    }
-
+    locks.resize(numNodes);
+    Galois::do_all(boost::counting_iterator<size_t>(0), boost::counting_iterator<size_t>(numNodes), [&](size_t i) {
+      locks[i] = graph.createNode();
+      graph.addNode(locks[i]);
+    });
+      
     VecRep repVec (numNodes, -1);
     Accumulator findIter;
     Accumulator linkUpIter;
     Accumulator mstSum;
-
 
     FindLoopSpec findLoop (graph, locks, repVec, findIter);
     LinkUpLoopSpec linkUpLoop (repVec, mstSum, linkUpIter);
@@ -155,9 +153,16 @@ class KruskalLevelExec: public Kruskal {
     Galois::TimeAccumulator runningTime;
 
     runningTime.start ();
-    Galois::Runtime::for_each_ordered_level (
-        Galois::Runtime::makeStandardRange (edges.begin (), edges.end ()),
-        GetWeight (), std::less<Weight_ty> (), findLoop, linkUpLoop);
+    typedef Galois::WorkList::OrderedByIntegerMetric<GetWeight, Galois::WorkList::ChunkedFIFO<128>>::with_barrier<true>::type WL;
+    Galois::for_each(edges.begin(), edges.end(),
+        [&](const Edge& e, Galois::UserContext<Edge>& ctx) {
+          findLoop(e, ctx);
+          linkUpLoop(e, ctx);
+    }, Galois::wl<WL>());
+    //}, Galois::wl<Galois::WorkList::StableIterator<>>());
+    //Galois::Runtime::for_each_ordered_level (
+    //    Galois::Runtime::makeStandardRange (edges.begin (), edges.end ()),
+    //    GetWeight (), std::less<Weight_ty> (), findLoop, linkUpLoop);
 
     runningTime.stop ();
 

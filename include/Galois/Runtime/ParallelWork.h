@@ -252,7 +252,7 @@ protected:
       abortIteration(*p, tld);
     }
 #endif
-}
+  }
 
   GALOIS_ATTRIBUTE_NOINLINE
   void handleAborts(ThreadLocalData& tld) {
@@ -264,11 +264,11 @@ protected:
     x.clear();
   }
 
-  bool checkEmpty(WorkListTy&, ...) { return true; }
+  bool checkEmpty(WorkListTy&, ThreadLocalData&, ...) { return true; }
 
   template<typename WL>
-  auto checkEmpty(WL& wl, bool didWork) -> decltype(wl.empty(), bool()) {
-    return didWork || wl.empty();
+  auto checkEmpty(WL& wl, ThreadLocalData& tld, int) -> decltype(wl.empty(), bool()) {
+    return wl.empty();
   }
 
   template<bool couldAbort, bool isLeader>
@@ -283,28 +283,34 @@ protected:
       tld.facing.setFastPushBack(
           std::bind(&ForEachWork::fastPushBack, this, std::placeholders::_1));
     unsigned long old_iterations = 0;
-    do {
-      // Run some iterations
-      if (couldAbort || ForEachTraits<FunctionTy>::NeedsBreak) {
-        constexpr int __NUM = (ForEachTraits<FunctionTy>::NeedsBreak || isLeader) ? 64 : 0;
-        runQueue<__NUM>(tld, wl);
-        // Check for abort
-        if (couldAbort)
-          handleAborts(tld);
-      } else { // No try/catch
-        runQueueSimple(tld);
-      }
+    while (true) {
+      do {
+        // Run some iterations
+        if (couldAbort || ForEachTraits<FunctionTy>::NeedsBreak) {
+          constexpr int __NUM = (ForEachTraits<FunctionTy>::NeedsBreak || isLeader) ? 64 : 0;
+          runQueue<__NUM>(tld, wl);
+          // Check for abort
+          if (couldAbort)
+            handleAborts(tld);
+        } else { // No try/catch
+          runQueueSimple(tld);
+        }
 
-      bool didWork = old_iterations != tld.stat_iterations;
-      old_iterations = tld.stat_iterations;
+        bool didWork = old_iterations != tld.stat_iterations;
+        old_iterations = tld.stat_iterations;
 
-      if (!checkEmpty(wl, didWork))
-        continue;
+        // Update node color and prop token
+        term.localTermination(didWork);
+        LL::asmPause(); // Let token propagate
+      } while (!term.globalTermination() && (!ForEachTraits<FunctionTy>::NeedsBreak || !broke));
 
-      // Update node color and prop token
-      term.localTermination(didWork);
-      LL::asmPause(); // Let token propagate
-    } while (!term.globalTermination() && (!ForEachTraits<FunctionTy>::NeedsBreak || !broke));
+      if (checkEmpty(wl, tld, 0))
+        break;
+      if (ForEachTraits<FunctionTy>::NeedsBreak && broke)
+        break;
+      initThread();
+      getSystemBarrier().wait();
+    }
 
     if (couldAbort)
       setThreadContext(0);
@@ -329,7 +335,7 @@ public:
     wl.push_initial(range);
   }
 
-  void initThread(void) {
+  void initThread() {
     term.initializeThread();
   }
 

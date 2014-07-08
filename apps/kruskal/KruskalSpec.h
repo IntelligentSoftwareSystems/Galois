@@ -134,7 +134,7 @@ class KruskalSpec: public Kruskal {
   };
 
 
-  virtual void runMST (const size_t numNodes, const VecEdge& edges,
+  virtual void runMST (const size_t numNodes, VecEdge& edges,
       size_t& mstWeight, size_t& totalIter) {
 
     Graph graph;
