@@ -106,7 +106,11 @@ public:
 
   bool casChild (unsigned index, Octree<B>* oldVal, Octree<B>* newVal) { 
     assert (index < 8);
-    return __sync_bool_compare_and_swap (&child[index], oldVal, newVal);
+    if( __sync_bool_compare_and_swap (&child[index], oldVal, newVal)) {
+      B::setChild (index, newVal, oldVal);
+      return true;
+    }
+    return false;
   }
 
   Octree<B>* getChild (unsigned index) {

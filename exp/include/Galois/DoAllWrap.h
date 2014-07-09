@@ -31,11 +31,7 @@
 #include "tbb/parallel_for_each.h"
 #endif
 
-#if HAVE_CILK
-#include <cilk/cilk.h>
-#include <cilk/cilk_api.h>
-#endif
-
+#include "CilkInit.h";
 #include <unistd.h>
 
 #include "llvm/Support/CommandLine.h"
@@ -104,7 +100,7 @@ struct DoAllImpl<COUPLED> {
 };
 
 
-#if HAVE_CILK
+#ifdef HAVE_CILK
 
 template <>
 struct DoAllImpl<CILK> {

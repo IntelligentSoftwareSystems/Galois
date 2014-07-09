@@ -22,6 +22,14 @@
  */
 #ifndef GALOIS_CILK_INIT_H
 #define GALOIS_CILK_INIT_H
+
+#include "Galois/config.h"
+
+#ifdef HAVE_CILK
+#include <cilk/cilk.h>
+#include <cilk/cilk_api.h>
+#endif
+
 namespace Galois {
 
   void CilkInit (void);

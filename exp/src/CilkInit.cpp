@@ -1,7 +1,13 @@
 #include "Galois/CilkInit.h"
+#include "Galois/Threads.h"
+#include "Galois/Runtime/PerThreadStorage.h"
+#include "Galois/Runtime/ThreadPool.h"
 #include "Galois/Runtime/ll/gio.h"
+#include "Galois/Runtime/ll/HWTopo.h"
+#include "Galois/Runtime/ll/TID.h"
+#include "Galois/Runtime/ll/EnvCheck.h"
 
-#if HAVE_CILK
+#ifdef HAVE_CILK
 #include <cilk/cilk.h>
 #include <cilk/cilk_api.h>
 #endif
@@ -34,7 +40,7 @@ struct BusyBarrier {
 };
 
 static void initOne (BusyBarrier& busybarrier, unsigned tid) {
-  Galois::Runtime::LL::initTID(tid % Runtime::getMaxThreads());
+  Galois::Runtime::LL::initTID(tid % Galois::Runtime::LL::getMaxThreads());
   Galois::Runtime::initPTS_cilk ();
 
   unsigned id = Galois::Runtime::LL::getTID ();
@@ -54,11 +60,11 @@ static void initOne (BusyBarrier& busybarrier, unsigned tid) {
 
 void Galois::CilkInit (void) {
 
-  if (initialized) { 
+  if (detail::initialized) { 
     return ;
   } else {
 
-    initialized = true;
+    detail::initialized = true;
 
     unsigned numT = getActiveThreads ();
 

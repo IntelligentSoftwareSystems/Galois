@@ -611,7 +611,7 @@ protected:
   std::string loopname;
   PerThreadUserCtx userCtxts;
 
-  static const unsigned CHUNK_SIZE = 4;
+  static const unsigned CHUNK_SIZE = 32;
 public:
 
   DivideAndConquerExecutor (const DivFunc& divFunc, const ConqFunc& conqFunc, const char* loopname)
