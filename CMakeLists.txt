@@ -8,9 +8,12 @@ set(GALOIS_VERSION ${GALOIS_VERSION_MAJOR}.${GALOIS_VERSION_MINOR}.${GALOIS_VERS
 set(GALOIS_COPYRIGHT_YEAR "2014") # Also in COPYRIGHT
 
 if(NOT CMAKE_BUILD_TYPE)
-  message(STATUS "No build type selected, default to release with debug info")
-  set(CMAKE_BUILD_TYPE "relwithdebinfo")
-  add_definitions(-DNDEBUG)
+  message(STATUS "No build type selected, default to release")
+  # cmake default flags with relwithdebinfo is -O2 -g
+  # cmake default flags with release is -O3 -DNDEBUG
+  set(CMAKE_BUILD_TYPE "Release")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g")
 endif()
 
 ###### Options (alternatively pass as options to cmake -DName=Value) ######
