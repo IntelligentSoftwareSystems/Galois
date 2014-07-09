@@ -44,7 +44,10 @@ namespace Runtime {
 
 class PerBackend {
   static const unsigned MAX_SIZE = 30;
-  static const unsigned MIN_SIZE = 3; // 8 bytes
+  // 16 byte alignment so vectorized initialization is easier
+  // NB(ddn): llvm seems to assume this under some cases because
+  // I've seen weird initialization crashes with MIN_SIZE = 3
+  static const unsigned MIN_SIZE = 4;
   typedef Galois::Runtime::LL::SimpleLock Lock;
 
   unsigned int nextLoc;

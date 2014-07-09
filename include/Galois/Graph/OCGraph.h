@@ -84,8 +84,8 @@ public:
     return graph.getEdgeDst(segment, ni);
   }
 
-  uint64_t size() const { return graph.size(); }
-  uint64_t sizeEdges() const { return graph.sizeEdges(); }
+  size_t size() const { return graph.size(); }
+  size_t sizeEdges() const { return graph.sizeEdges(); }
 
   iterator begin() const { return graph.begin(); }
   iterator end() const { return graph.end(); }
@@ -207,8 +207,8 @@ public:
 
   iterator begin() const { return iterator(0); }
   iterator end() const { return iterator(numNodes); }
-  uint64_t size() const { return numNodes; }
-  uint64_t sizeEdges() const { return numEdges; }
+  size_t size() const { return numNodes; }
+  size_t sizeEdges() const { return numEdges; }
   edge_iterator edge_begin(GraphNode n) const { return edge_iterator(n == 0 ? 0 : outIdx[n-1]); }
   edge_iterator edge_end(GraphNode n) const { return edge_iterator(outIdx[n]); }
   edge_offset_iterator edge_offset_begin() const { return outIdx; }
@@ -450,8 +450,8 @@ public:
     return outGraph.getEdgeDst(segment.out, ni);
   }
 
-  uint64_t size() const { return numNodes; }
-  uint64_t sizeEdges() const { return numEdges; }
+  size_t size() const { return numNodes; }
+  size_t sizeEdges() const { return numEdges; }
 
   iterator begin() const { return outGraph.begin(); }
   iterator end() const { return outGraph.end(); }

@@ -36,6 +36,7 @@
 #include <string>
 #include <cmath>
 #include <mutex>
+#include <numeric>
 
 using namespace Galois;
 using namespace Galois::Runtime;

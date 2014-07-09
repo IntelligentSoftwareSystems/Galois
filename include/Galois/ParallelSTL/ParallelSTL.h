@@ -119,7 +119,7 @@ InputIterator find_if(InputIterator first, InputIterator last, Predicate pred)
   HelperTy helper(accum, pred);
   Runtime::for_each_impl<WL>(Runtime::makeStandardRange(
         make_no_deref_iterator(first),
-        make_no_deref_iterator(last)), helper, 0);
+        make_no_deref_iterator(last)), helper, "ParallelSTL::find_if");
   for (unsigned i = 0; i < accum.size(); ++i) {
     if (*accum.getRemote(i))
       return **accum.getRemote(i);
@@ -286,7 +286,7 @@ void sort(RandomAccessIterator first, RandomAccessIterator last, Compare comp) {
   typedef std::pair<RandomAccessIterator,RandomAccessIterator> Pair;
   Pair initial[1] = { std::make_pair(first, last) };
   
-  Runtime::for_each_impl<WL>(Runtime::makeStandardRange(&initial[0], &initial[1]), sort_helper<Compare>(comp), 0);
+  Runtime::for_each_impl<WL>(Runtime::makeStandardRange(&initial[0], &initial[1]), sort_helper<Compare>(comp), "ParallelSTL::sort");
 }
 
 template<class RandomAccessIterator>

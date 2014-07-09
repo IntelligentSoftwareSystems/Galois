@@ -241,7 +241,7 @@ public:
   bool hasNeighbor(GraphNode N1, GraphNode N2) const;
 
   //! Returns the number of nodes in the graph
-  unsigned int size() const { return numNodes; }
+  size_t size() const { return numNodes; }
 
   //! Returns the number of edges in the graph
   size_t sizeEdges() const { return numEdges; }
@@ -335,8 +335,8 @@ public:
       delete [] outs;
   }
 
-  void setNumNodes(uint64_t n) { numNodes = n; }
-  void setNumEdges(uint64_t n) { numEdges = n; }
+  void setNumNodes(size_t n) { numNodes = n; }
+  void setNumEdges(size_t n) { numEdges = n; }
   void setSizeofEdgeData(size_t n) { sizeofEdgeData = n; }
   
   //! Marks the transition to next phase of parsing, counting the degree of

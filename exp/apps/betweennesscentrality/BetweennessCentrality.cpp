@@ -41,8 +41,23 @@
 #include <sstream>
 #include <vector>
 #include <cstdlib>
+#ifdef __linux__
 #include <linux/mman.h>
+#endif
 #include <sys/mman.h>
+
+#if defined(MAP_ANONYMOUS)
+static const int _MAP_ANON = MAP_ANONYMOUS;
+#elif defined(MAP_ANON)
+static const int _MAP_ANON = MAP_ANON;
+#else
+// fail
+#endif
+#ifdef MAP_POPULATE
+static const int _MAP_POP  = MAP_POPULATE;
+#else
+static const int _MAP_POP  = 0;
+#endif
 
 static const char* name = "Betweenness Centrality";
 static const char* desc = "Computes the betweenness centrality of all nodes in a graph";
@@ -77,15 +92,15 @@ struct TempState  {
 
   TempState() {
     size_t len = PAGE_ROUND_UP(sizeof(GNode) * NumNodes);
-    SQG = (GNode*)mmap(0, len, PROT_READ | PROT_WRITE, MAP_POPULATE | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    SQG = (GNode*)mmap(0, len, PROT_READ | PROT_WRITE, _MAP_POP | MAP_PRIVATE | _MAP_ANON, -1, 0);
     len = PAGE_ROUND_UP(sizeof(double) * NumNodes);
-    sigmaG = (double*)mmap(0, len, PROT_READ | PROT_WRITE, MAP_POPULATE | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    sigmaG = (double*)mmap(0, len, PROT_READ | PROT_WRITE, _MAP_POP | MAP_PRIVATE | _MAP_ANON, -1, 0);
     len = PAGE_ROUND_UP(sizeof(int) * NumNodes);
-    distG = (int*)mmap(0, len, PROT_READ | PROT_WRITE, MAP_POPULATE | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    distG = (int*)mmap(0, len, PROT_READ | PROT_WRITE, _MAP_POP | MAP_PRIVATE | _MAP_ANON, -1, 0);
     len = PAGE_ROUND_UP(sizeof(std::vector<GNode>) * NumNodes);
-    succsGlobal = (std::vector<GNode>*)mmap(0, len, PROT_READ | PROT_WRITE, MAP_POPULATE | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    succsGlobal = (std::vector<GNode>*)mmap(0, len, PROT_READ | PROT_WRITE, _MAP_POP | MAP_PRIVATE | _MAP_ANON, -1, 0);
     len = PAGE_ROUND_UP(sizeof(double) * NumNodes);
-    CB = (double*)mmap(0, len, PROT_READ | PROT_WRITE, MAP_POPULATE | MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    CB = (double*)mmap(0, len, PROT_READ | PROT_WRITE, _MAP_POP | MAP_PRIVATE | _MAP_ANON, -1, 0);
 
     //:SQG(NumNodes), sigmaG(NumNodes), distG(NumNodes), CB(NumNodes) {
     //succsGlobal.resize(NumNodes);
@@ -224,7 +239,7 @@ void printBCcertificate() {
 
   for (int i=0; i<NumNodes; ++i) {
     double bc = bcv[i];
-    outf << i << ": " << setiosflags(std::ios::fixed) << std::setprecision(9) << bc << std::endl;
+    outf << i << ": " << std::setiosflags(std::ios::fixed) << std::setprecision(9) << bc << std::endl;
   }
   outf.close();
 }
@@ -283,7 +298,7 @@ int main(int argc, char** argv) {
       if (*state.getRemote(i))
 	std::transform(bcv.begin(), bcv.end(), (*state.getRemote(i))->CB, bcv.begin(), std::plus<double>());
     for (int i=0; i<10; ++i)
-      std::cout << i << ": " << setiosflags(std::ios::fixed) << std::setprecision(6) << bcv[i] << "\n";
+      std::cout << i << ": " << std::setiosflags(std::ios::fixed) << std::setprecision(6) << bcv[i] << "\n";
 #if SHOULD_PRODUCE_CERTIFICATE
     printBCcertificate();
 #endif

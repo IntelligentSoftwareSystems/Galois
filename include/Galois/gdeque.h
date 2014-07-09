@@ -70,7 +70,6 @@ protected:
     Block* cur;
     Block* last;
 
-  private:
     void increment() { cur = cur->next; }
     void decrement() { if (cur) { cur = cur->prev; } else { cur = last; } }
 
@@ -88,16 +87,6 @@ protected:
 
   typedef typename Block::iterator inner_iterator;
   typedef typename Block::const_iterator const_inner_iterator;
-
-  template<typename U, typename V>
-  struct GetBegin {
-    V operator()(U& x) const { return x.begin(); }
-  };
-
-  template<typename U, typename V>
-  struct GetEnd {
-    V operator()(U& x) const { return x.end(); }
-  };
 #endif
 
   Block* first;
@@ -199,14 +188,14 @@ public:
     outer_iterator<Block>, 
     inner_iterator, 
     std::random_access_iterator_tag, 
-    GetBegin<Block, inner_iterator>,
-    GetEnd<Block, inner_iterator> > iterator;
+    GetBegin<Block>,
+    GetEnd<Block> > iterator;
   typedef Galois::TwoLevelIteratorA<
     outer_iterator<const Block>,
     const_inner_iterator,
     std::random_access_iterator_tag,
-    GetBegin<const Block, const_inner_iterator>,
-    GetEnd<const Block, const_inner_iterator> > const_iterator;
+    GetBegin<const Block>,
+    GetEnd<const Block> > const_iterator;
 #endif
 #ifndef _NEW_ITERATOR
   template<typename U>
@@ -291,8 +280,8 @@ public:
       outer_iterator<Block> { first, last },
       outer_iterator<Block> { nullptr, last },
       outer_iterator<Block> { first, last },
-      GetBegin<Block, inner_iterator> { },
-      GetEnd<Block, inner_iterator> { }
+      GetBegin<Block> { },
+      GetEnd<Block> { }
     };
 #else
     return iterator { first, last, 0 };
@@ -306,8 +295,8 @@ public:
       outer_iterator<Block> { first, last },
       outer_iterator<Block> { nullptr, last },
       outer_iterator<Block> { nullptr, last },
-      GetBegin<Block, inner_iterator> { },
-      GetEnd<Block, inner_iterator> { }
+      GetBegin<Block> { },
+      GetEnd<Block> { }
     };
 #else
     return iterator { nullptr, last, 0 };
@@ -322,7 +311,7 @@ public:
       outer_iterator<const Block> { first, last },
       outer_iterator<const Block> { nullptr, last },
       outer_iterator<const Block> { first, last },
-      GetBegin<const Block, const_inner_iterator> { },
+      GetBegin<const Block> { },
       GetEnd<const Block, const_inner_iterator> { }
     };
 #else
@@ -336,7 +325,7 @@ public:
       outer_iterator<const Block> { first, last },
       outer_iterator<const Block> { nullptr, last },
       outer_iterator<const Block> { nullptr, last },
-      GetBegin<const Block, const_inner_iterator> { },
+      GetBegin<const Block> { },
       GetEnd<const Block, const_inner_iterator> { }
     };
 #else
@@ -438,8 +427,8 @@ public:
       outer_iterator<Block> { nullptr, last },
       outer_iterator<Block> { p.first, last },
       p.second,
-      GetBegin<Block, inner_iterator> { },
-      GetEnd<Block, inner_iterator> { }
+      GetBegin<Block> { },
+      GetEnd<Block> { }
     };
 #else
     return iterator ( p.first, last, std::distance(p.first->begin(), p.second) );

@@ -51,7 +51,6 @@ void signalConflict(Lockable*);
 
 void forceAbort();
 
-
 class SimpleRuntimeContext { //: public LockManagerBase {
 public: //FIXME
   //! The locks we hold

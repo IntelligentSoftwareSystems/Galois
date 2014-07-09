@@ -36,6 +36,7 @@
 #include <Eigen/Sparse>
 #endif
 
+#include <random>
 #include <iostream>
 #include <cassert>
 #include <algorithm>

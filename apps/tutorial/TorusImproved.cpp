@@ -67,8 +67,8 @@ struct ValueEqual {
 class Point2D {
   int v[2];
 public:
-  Point2D() { }
-  Point2D(int x, int y) { v[0] = x; v[1] = y; }
+  Point2D(): v { 0, 0 } { }
+  Point2D(int x, int y): v { x, y } { }
 
   const int& at(int i) const { return v[i]; }
   const int& x() const { return v[0]; }
@@ -92,7 +92,7 @@ struct ZOrderCompare {
         x = y;
       }
     }
-    return p1.at(index) - p2.at(index) <= 0;
+    return p1.at(index) - p2.at(index) < 0;
   }
 
   bool lessMsb(int a, int b) const {
@@ -153,6 +153,8 @@ int main(int argc, char** argv) {
   }
   unsigned int numThreads = atoi(argv[1]);
   int n = atoi(argv[2]);
+
+  GALOIS_ASSERT(n > 2);
 
   numThreads = Galois::setActiveThreads(numThreads);
   std::cout << "Using " << numThreads << " threads and " << n << " x " << n << " torus\n";

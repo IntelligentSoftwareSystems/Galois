@@ -512,7 +512,7 @@ public:
   inline void* allocate(size_t size) {
     // Increase to alignment
     size_t alignedSize = (size + sizeof(double) - 1) & ~(sizeof(double) - 1);
-    if (alignedSize > SourceHeap::AllocSize) {
+    if (sizeof(Block) + alignedSize > SourceHeap::AllocSize) {
       void* p = malloc(alignedSize + sizeof(Block));
       refill(p, fallbackHead, NULL);
       return (char*)p + sizeof(Block);
@@ -520,8 +520,6 @@ public:
     // Check current block
     if (!head || offset + alignedSize > SourceHeap::AllocSize)
       refill(SourceHeap::allocate(SourceHeap::AllocSize), head, &offset);
-    if (offset + alignedSize > SourceHeap::AllocSize)
-      throw std::bad_alloc();
     char* retval = (char*)head;
     retval += offset;
     offset += alignedSize;
