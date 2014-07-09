@@ -50,11 +50,13 @@ class NetworkInterfaceTCP : public NetworkInterface {
     std::deque<unsigned char> buffer;
 
     void doRead() {
-      std::lock_guard<LL::SimpleLock> lg(lock);
-      unsigned char data[256];
-      int r = 0;
-      while ((r = read(socket, data, sizeof(data))) > 0)
-        std::copy(&data[0], &data[r], std::back_inserter(buffer));
+      if (lock.try_lock()) {
+        std::lock_guard<LL::SimpleLock> lg(lock, std::adopt_lock);
+        unsigned char data[256];
+        int r = 0;
+        while ((r = read(socket, data, sizeof(data))) > 0)
+          std::copy(&data[0], &data[r], std::back_inserter(buffer));
+      }
     }
 
     //Assumes lock is held by caller (needed for message in-order delivery)
@@ -80,13 +82,15 @@ class NetworkInterfaceTCP : public NetworkInterface {
     std::deque<unsigned char> buffer;
 
     void doWrite() {
-      std::lock_guard<LL::SimpleLock> lg(lock);
-      if (!buffer.empty()) {
-        unsigned char data[256];
-        int num = std::copy(buffer.begin(), Galois::safe_advance(buffer.begin(), buffer.end(), sizeof(data)), data) - data;
-        int r = write(socket, data, num);
-        if (r > 0)
-          buffer.erase(buffer.begin(), buffer.begin() + r);
+      if (lock.try_lock()) {
+        std::lock_guard<LL::SimpleLock> lg(lock, std::adopt_lock);
+        if (!buffer.empty()) {
+          unsigned char data[256];
+          int num = std::copy(buffer.begin(), Galois::safe_advance(buffer.begin(), buffer.end(), sizeof(data)), data) - data;
+          int r = write(socket, data, num);
+          if (r > 0)
+            buffer.erase(buffer.begin(), buffer.begin() + r);
+        }
       }
     }
 
