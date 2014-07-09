@@ -185,14 +185,14 @@ public:
   void push(const value_type& val, fatPointer ptr, 
             void (RemoteDirectory::*rfetch) (fatPointer, ResolveFlag),
             void (LocalDirectory::*lfetch) (fatPointer, ResolveFlag)) {
-    //Not actually remote, so don't do anything
     if (ptr.isLocal()) {
       if (!getLocalDirectory().isRemote(ptr, RW))
-        return;
+        return; //not actually remote
+      (getLocalDirectory().*(lfetch))(ptr, RW);
     } else {
-      // if (!getRemoteDirectory().isRemote(ptr, RW))
-      //   return;
+      (getRemoteDirectory().*(rfetch))(ptr, RW);
     }
+
     //Currently remote
     std::lock_guard<LL::SimpleLock> lg(lock);
     auto p = waiting_on.equal_range(val);
@@ -205,11 +205,6 @@ public:
     bool newDep = std::find(p.first, p.second, pair_type(val, ptr)) == p.second;
     if (newDep) {
       waiting_on.insert(std::make_pair(val, ptr));
-      if (ptr.isLocal()) {
-        (getLocalDirectory().*(lfetch))(ptr, RW);
-      } else {
-        (getRemoteDirectory().*(rfetch))(ptr, RW);
-      }
     }
     queue.push(val);
   }
