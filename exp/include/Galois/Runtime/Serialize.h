@@ -79,7 +79,8 @@ class DeSerializeBuffer;
 
 class SerializeBuffer {
   friend DeSerializeBuffer;
-  std::vector<unsigned char> bufdata;
+  typedef std::vector<unsigned char> vTy;
+  vTy bufdata;
   unsigned start;
 public:
 
@@ -103,7 +104,11 @@ public:
 
   void* linearData() { return &bufdata[start]; }
 
-  size_t size() const { return bufdata.size() - start; }
+  vTy::const_iterator begin() const { return bufdata.cbegin() + start; }
+  vTy::const_iterator end() const { return bufdata.cend(); }
+
+  typedef vTy::size_type size_type;
+  size_type size() const { return bufdata.size() - start; }
 
   //Utility
 
@@ -224,6 +229,11 @@ void gSerializeObj(SerializeBuffer& buf, const Galois::gdeque<T,CS>& data) {
 
 inline void gSerializeObj(SerializeBuffer& buf, const std::string& data) {
   gSerializeSeq(buf,data);
+}
+
+inline void gSerializeObj(SerializeBuffer& buf, const SerializeBuffer& data) {
+  for (unsigned char c : data)
+    buf.push(c);
 }
 
 inline void gSerializeObj(SerializeBuffer& buf, const DeSerializeBuffer& rbuf) {
