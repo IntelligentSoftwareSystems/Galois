@@ -109,7 +109,7 @@ void RemoteDirectory::recvRequestImpl(fatPointer ptr, uint32_t dest, ResolveFlag
   metadata& md = getMD(ptr);
   std::lock_guard<LL::SimpleLock> lg(md.lock, std::adopt_lock);
   trace("RemoteDirectory::recvRequest % dest % md %\n", ptr, dest, md);
-  if (md.contended && md.recalled > NetworkInterface::ID) {
+  if (md.contended && dest > NetworkInterface::ID) {
     addPendingReq(ptr, dest, flag);
   } else {
     bool wasContended = md.contended;
@@ -129,7 +129,6 @@ void RemoteDirectory::recvRequestImpl(fatPointer ptr, uint32_t dest, ResolveFlag
     }
     if (md.state == metadata::HERE_RW) {
       if (tryWriteBack(md, ptr)) {
-        eraseMD(ptr, md);
         if (wasContended)
           fetchImpl(ptr, RW, th, true);
       } else {
@@ -199,7 +198,7 @@ void RemoteDirectory::fetchImpl(fatPointer ptr, ResolveFlag flag, typeHelper* th
 ////////////////////////////////////////////////////////////////////////////////
 
 RemoteDirectory::metadata::metadata() 
-  :state(INVALID), recalled(~0), contended(false), th(nullptr)
+  :state(INVALID), contended(false), th(nullptr)
 {}
 
 ResolveFlag RemoteDirectory::metadata::fetch(ResolveFlag flag) {
@@ -234,7 +233,6 @@ ResolveFlag RemoteDirectory::metadata::fetch(ResolveFlag flag) {
 void RemoteDirectory::metadata::recvObj(ResolveFlag flag) {
   assert(flag != INV);
   assert(state != INVALID);
-  assert(recalled == ~0);
   if (flag == RW) {
     switch (state) {
     case PENDING_RW:
@@ -259,7 +257,7 @@ void RemoteDirectory::metadata::recvObj(ResolveFlag flag) {
 
 std::ostream& Galois::Runtime::operator<<(std::ostream& os, const RemoteDirectory::metadata& md) {
   static const char* StateFlagNames[] = {"I", "PR", "PW", "RO", "RW", "UW"};
-  return os << "state:" << StateFlagNames[md.state] << ",recalled:" << md.recalled << ",contended:" << md.contended << ",th:" << md.th;
+  return os << "state:" << StateFlagNames[md.state] << ",contended:" << md.contended << ",th:" << md.th;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -457,14 +455,16 @@ void LocalDirectory::considerObject(metadata& md, fatPointer ptr) {
   if (nextDest == NetworkInterface::ID) {
     if (md.contended) {
       //FIXME: notify
+    }
+    if (nextIsRW) {
+      md.reqsRW.erase(nextDest);
+      dirRelease(obj);
     } else {
-      if (nextIsRW)
-        md.reqsRW.erase(nextDest);
-      else
-        md.reqsRO.erase(nextDest);
+      md.reqsRO.erase(nextDest);
+      //FIXME: release lock
     }
   } else {
-    if (dirAcquire(obj)) {
+    if (dirOwns(obj) || dirAcquire(obj)) {
       if (nextIsRW) {
         assert(md.reqsRW.count(nextDest));
         md.reqsRW.erase(nextDest);
@@ -541,6 +541,7 @@ bool LocalDirectory::metadata::writeback() {
   assert(locRW != NetworkInterface::ID);
   assert(locRO.empty());
   locRW = ~0;
+  recalled =  ~0;
   return !reqsRW.empty() || !reqsRO.empty();
 }
 

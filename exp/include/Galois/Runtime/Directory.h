@@ -300,7 +300,6 @@ class RemoteDirectory : public BaseDirectory {
     };
     LL::SimpleLock lock;
     StateFlag state;
-    uint32_t recalled;
     bool contended;
     typeHelper* th;
 
