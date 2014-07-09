@@ -61,7 +61,7 @@ unsigned Galois::Runtime::PerBackend::nextLog2(unsigned size) {
     ++i;
   }
   if (i >= MAX_SIZE) { 
-    GALOIS_DIE("PTS size too big");
+    abort();
   }
   return i;
 }
