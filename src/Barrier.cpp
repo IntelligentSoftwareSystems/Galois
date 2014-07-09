@@ -277,10 +277,10 @@ public:
 
   virtual void reinit(unsigned val) {
     localBarrier.reinit(val);
-    count = 0;
   }
   
   virtual void wait() {
+    Galois::Runtime::trace("Entering Barrier\n");
     if (Galois::Runtime::LL::getTID() == 0)
       count += Galois::Runtime::NetworkInterface::Num;
     
@@ -300,6 +300,7 @@ public:
     
     //wait at local barrier
     localBarrier.wait();
+    Galois::Runtime::trace("Leaving Barrier\n");
   }
 };
 
