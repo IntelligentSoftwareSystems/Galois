@@ -97,55 +97,31 @@ void NetworkInterface::sendLoop(uint32_t dest, recvFuncTy recv, SendBuffer& buf)
 //anchor vtable
 NetworkInterface::~NetworkInterface() {}
 
-//RealID -> effective ID for the broadcast tree
-static unsigned getEID(unsigned realID, unsigned srcID) {
-  return (realID + NetworkInterface::Num - srcID) % NetworkInterface::Num;
-}
-
-//Effective id in the broadcast tree -> realID
-static unsigned getRID(unsigned eID, unsigned srcID) {
-  return (eID + srcID) % NetworkInterface::Num;
-}
-
 //forward decl
 static void bcastLandingPad(::RecvBuffer& buf);
-
-//forward message along tree
-static void bcastForward(NetworkInterface& net, unsigned source, ::RecvBuffer& buf) {
-  static const int width = 2;
-
-  unsigned eid = getEID(NetworkInterface::ID, source);
-  
-  for (int i = 0; i < width; ++i) {
-    unsigned ndst = eid * width + i + 1;
-    if (ndst < NetworkInterface::Num) {
-      SendBuffer sbuf;
-      gSerialize(sbuf, source, buf);
-      net.send(getRID(ndst, source), &bcastLandingPad, sbuf);
-    }
-  }
-}
 
 //recieve broadcast message over the network
 static void bcastLandingPad(RecvBuffer& buf) {
   unsigned source;
-  gDeserialize(buf, source);
-  trace("::bcastLandingPad %\n", source);
-  bcastForward(getSystemNetworkInterface(), source, buf);
-  //deliver locally
   recvFuncTy recv;
-  gDeserialize(buf, recv);
+  gDeserialize(buf, source, recv);
+  trace("NetworkInterface::bcastLandingPad % %\n", source, (void*)recv);
   recv(buf);
 }
 
 void NetworkInterface::broadcast(recvFuncTy recv, SendBuffer& buf, bool self) {
   unsigned source = NetworkInterface::ID;
-  trace("NetworkInterface::broadcast %\n", source);
-  buf.serialize_header((void*)recv);
-  RecvBuffer rbuf(std::move(buf));
-  bcastForward(*this, source, rbuf);
-  if (self)
-    recv(rbuf);
+  trace("NetworkInterface::broadcast % %\n", source, (void*)recv);
+  for (unsigned x = 0; x < Num; ++x) {
+    if (x != ID) {
+      SendBuffer b;
+      gSerialize(b, source, recv, buf);
+      send(x, &bcastLandingPad, b);
+    } else if (self) {
+      RecvBuffer rb(buf.begin(), buf.end());
+      recv(rb);
+    }
+  }
 }
 
 void NetworkInterface::flush() { }

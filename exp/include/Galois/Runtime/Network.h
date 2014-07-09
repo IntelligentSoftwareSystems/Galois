@@ -135,7 +135,7 @@ template<typename... Args>
 void NetworkInterface::broadcastAlt(void (*recv)(Args...), Args... param) {
   SendBuffer buf;
   gSerialize(buf, recv, param...);
-  broadcast(genericLandingPad<Args...>::func, buf);
+  broadcast(genericLandingPad<Args...>::func, buf, false);
 }
 
 } //Runtime
