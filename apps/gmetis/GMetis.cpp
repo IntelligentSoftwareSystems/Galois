@@ -124,10 +124,13 @@ void Partition(MetisGraph* metisGraph, unsigned nparts) {
 
   std::cout << "Initial dist\n";
   printPartStats(initParts);
+  std::cout << "\n";
+
   std::cout << "Refined dist\n";
   printPartStats(parts);
+  std::cout << "\n";
 
-  std::cout << "\nTime:  " << TM.get() << '\n';
+  std::cout << "Time:  " << TM.get() << '\n';
   return;
 }
 

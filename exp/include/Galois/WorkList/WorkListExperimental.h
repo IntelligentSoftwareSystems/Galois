@@ -1556,7 +1556,7 @@ class CTOrderedByIntegerMetric : private boost::noncopyable {
 };
 GALOIS_WLCOMPILECHECK(CTOrderedByIntegerMetric)
 
-
+#if _POSIX_BARRIERS > 0
 template<class Indexer, typename ContainerTy, bool concurrent = true, int binmax = 1024*1024 >
 class BarrierOBIM : private boost::noncopyable {
   typedef typename ContainerTy::template rethread<concurrent>::type CTy;
@@ -1648,6 +1648,7 @@ class BarrierOBIM : private boost::noncopyable {
     } while (true);
   }
 };
+#endif
 
 template<typename T = int, bool concurrent = true>
 class Random : private boost::noncopyable {

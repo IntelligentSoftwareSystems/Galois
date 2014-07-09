@@ -59,8 +59,9 @@ namespace Galois {
 namespace Runtime {
 
 // TODO: figure out when to call startIteration
-
-template <typename T, typename Cmp, typename NhFunc, typename OpFunc, typename WindowWL> class KDGtwoPhaseStableExecutor {
+namespace {
+template <typename T, typename Cmp, typename NhFunc, typename OpFunc, typename WindowWL>
+class KDGtwoPhaseStableExecutor {
 
 public:
   using Ctxt = TwoPhaseContext<T, Cmp>;
@@ -235,9 +236,6 @@ protected:
     // std::cout << "Calculated Window size: " << windowSize << ", Actual: " << wl->size_all () << std::endl;
 
   }
-
-
-
 
   // TODO: use setjmp here
   template <typename F>
@@ -422,39 +420,17 @@ protected:
 };
 
 
-namespace impl {
-  template <bool B, typename T1, typename T2> 
-  struct ChooseIf {
-    using Ret_ty = T1;
-  };
+template <bool B, typename T1, typename T2> 
+struct ChooseIf {
+  using Ret_ty = T1;
+};
 
-  template <typename T1, typename T2>
-  struct ChooseIf<false, T1, T2> {
-    using Ret_ty = T2;
-  };
-} // end impl
-
-template <typename Iter, typename Cmp, typename NhFunc, typename OpFunc>
-void for_each_ordered_2p_win (Iter beg, Iter end, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const char* loopname=0) {
-
-  using T = typename std::iterator_traits<Iter>::value_type;
-  // using WindowWL = SortedRangeWindowWL<T, Cmp>;
-  
-  const bool ADDS = ForEachTraits<OpFunc>::NeedsPush;
-
-  using WindowWL = typename impl::ChooseIf<ADDS, PQbasedWindowWL<T, Cmp>, SortedRangeWindowWL<T, Cmp> >::Ret_ty;
-
-  using Exec = KDGtwoPhaseStableExecutor<T, Cmp, NhFunc, OpFunc, WindowWL>;
-  
-  Exec e (cmp, nhFunc, opFunc);
-
-  e.fill_initial (beg, end);
-  e.execute ();
-}
-
+template <typename T1, typename T2>
+struct ChooseIf<false, T1, T2> {
+  using Ret_ty = T2;
+};
 
 template <typename T, typename Cmp, typename NhFunc, typename OpFunc, typename SL, typename WindowWL>
-
 class KDGtwoPhaseUnstableExecutor: public KDGtwoPhaseStableExecutor<T, Cmp, NhFunc, OpFunc, WindowWL>  {
 
   using Base = KDGtwoPhaseStableExecutor<T, Cmp, NhFunc, OpFunc, WindowWL>;
@@ -579,6 +555,26 @@ protected:
   }
 
 };
+
+}
+
+template <typename Iter, typename Cmp, typename NhFunc, typename OpFunc>
+void for_each_ordered_2p_win (Iter beg, Iter end, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const char* loopname=0) {
+
+  using T = typename std::iterator_traits<Iter>::value_type;
+  // using WindowWL = SortedRangeWindowWL<T, Cmp>;
+  
+  const bool ADDS = ForEachTraits<OpFunc>::NeedsPush;
+
+  using WindowWL = typename ChooseIf<ADDS, PQbasedWindowWL<T, Cmp>, SortedRangeWindowWL<T, Cmp> >::Ret_ty;
+
+  using Exec = KDGtwoPhaseStableExecutor<T, Cmp, NhFunc, OpFunc, WindowWL>;
+  
+  Exec e (cmp, nhFunc, opFunc);
+
+  e.fill_initial (beg, end);
+  e.execute ();
+}
 
 template <typename Iter, typename Cmp, typename NhFunc, typename OpFunc, typename SL>
 void for_each_ordered_2p_win (Iter beg, Iter end, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const SL& serialLoop, const char* loopname=0) {

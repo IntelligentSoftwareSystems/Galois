@@ -14,7 +14,7 @@ int main(int argc, char** argv) {
   int baseAllocSize = SystemBaseAlloc::AllocSize;
 
   FSBGaloisAllocator<element> falloc;
-  element* last;
+  element* last = nullptr;
   for (int i = 0; i < baseAllocSize; ++i) {
     element* ptr = falloc.allocate(1);
     falloc.construct(ptr, i);
@@ -29,7 +29,7 @@ int main(int argc, char** argv) {
     falloc.deallocate(last, 1);
     last = next;
   }
-  GALOIS_ASSERT(last);
+  GALOIS_ASSERT(!last);
 
   VariableSizeAllocator valloc;
   size_t allocated;

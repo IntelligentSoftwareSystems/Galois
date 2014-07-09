@@ -1,8 +1,9 @@
-#include "Galois/gdeque.h"
-#include "Galois/FixedSizeRing.h"
 #include "Galois/Bag.h"
-#include "Galois/Runtime/ll/gio.h"
+#include "Galois/gdeque.h"
+#include "Galois/gslist.h"
 #include "Galois/Timer.h"
+#include "Galois/Runtime/ll/gio.h"
+#include "Galois/Runtime/mm/Mem.h"
 
 #include <boost/iterator/counting_iterator.hpp>
 
@@ -11,13 +12,89 @@
 #include <string>
 #include <deque>
 #include <vector>
+#include <random>
+
+template<typename C>
+auto constexpr needs_heap(int)
+  -> decltype(typename C::promise_to_dealloc(), bool())
+{
+  return true;
+}
+
+template<typename C>
+bool constexpr needs_heap(...) {
+  return false;
+}
+
+template<typename C, typename HeapTy, typename V>
+auto addToCollection(C& c, HeapTy& heap, V&& v) 
+  -> typename std::enable_if<needs_heap<C>(0)>::type 
+{
+  c.push_front(heap.heap, std::forward<V>(v));
+}
+
+template<typename C, typename HeapTy, typename V>
+auto addToCollection(C& c, HeapTy& heap, V&& v) 
+  -> typename std::enable_if<!needs_heap<C>(0)>::type 
+{
+  c.push_back(std::forward<V>(v));
+}
+
+template<typename C>
+auto removeFromCollection(C& c) 
+  -> typename std::enable_if<needs_heap<C>(0)>::type 
+{
+  c.pop_front(typename C::promise_to_dealloc());
+}
+
+template<typename C>
+auto removeFromCollection(C& c)
+  -> typename std::enable_if<!needs_heap<C>(0)>::type 
+{
+  c.pop_back();
+}
+
+template<typename C, bool Enable>
+struct Heap { };
+
+template<typename C>
+struct Heap<C, true> {
+  Galois::Runtime::MM::FixedSizeAllocator heap;
+  Heap(): heap(sizeof(typename C::block_type)) { }
+};
 
 template<typename C>
 void testBasic(std::string prefix, C&& collection, int N) {
+  Heap<C, needs_heap<C>(0)> heap;
+
   assert(N > 0);
   C c = std::move(collection);
   for (int i = 0; i < N; ++i)
-    c.push_back(i);
+    addToCollection(c, heap, i);
+
+  int i = 0;
+  for (auto it = c.begin(); it != c.end(); ++it, ++i) {
+    ;
+  }
+
+  GALOIS_ASSERT(N == std::distance(c.begin(), c.end()), prefix);
+
+  i = N - 1;
+  for (; !c.empty(); --i, removeFromCollection(c)) {
+    ;
+  }
+
+  GALOIS_ASSERT(0 == std::distance(c.begin(), c.end()), prefix);
+}
+
+template<typename C>
+void testNormal(std::string prefix, C&& collection, int N) {
+  Heap<C, needs_heap<C>(0)> heap;
+
+  assert(N > 0);
+  C c = std::move(collection);
+  for (int i = 0; i < N; ++i)
+    addToCollection(c, heap, i);
 
   int i = 0;
   for (auto it = c.begin(); it != c.end(); ++it, ++i) {
@@ -34,7 +111,7 @@ void testBasic(std::string prefix, C&& collection, int N) {
   GALOIS_ASSERT(c.size() == std::distance(c.begin(), c.end()), prefix);
 
   i = N - 1;
-  for (; !c.empty(); --i, c.pop_back()) {
+  for (; !c.empty(); --i, removeFromCollection(c)) {
     GALOIS_ASSERT(c.back() == i, prefix);
   }
 
@@ -44,12 +121,14 @@ void testBasic(std::string prefix, C&& collection, int N) {
 
 template<typename C>
 void testSort(std::string prefix, C&& collection, int N) {
+  Heap<C, needs_heap<C>(0)> heap;
+
   assert(N > 0);
   C c = std::move(collection);
   std::mt19937 gen;
   std::uniform_int_distribution<int> dist(0, 100);
   for (int i = 0; i < N; ++i)
-    c.push_back(dist(gen));
+    addToCollection(c, heap, dist(gen));
 
   std::sort(c.begin(), c.end());
 
@@ -60,27 +139,29 @@ void testSort(std::string prefix, C&& collection, int N) {
   }
 
   last = c.back();
-  c.pop_back();
-  for (; !c.empty(); c.pop_back()) {
+  removeFromCollection(c);
+  for (; !c.empty(); removeFromCollection(c)) {
     GALOIS_ASSERT(last >= c.back(), prefix);
     last = c.back();
   }
 }
 
-template<typename T, typename Iterator>
-void timeAccess(std::string prefix, T&& x, Iterator first, Iterator last) {
+template<typename C, typename Iterator>
+void timeAccess(std::string prefix, C&& c, Iterator first, Iterator last) {
+  Heap<C, needs_heap<C>(0)> heap;
+
   Galois::Timer t1, t2;
   t1.start();
   while (first != last) {
-    x.emplace_back(*first++);
+    addToCollection(c, heap, *first++);
   }
   t1.stop();
   t2.start();
-  for (auto ii = x.begin(), ei = x.end(); ii != ei; ++ii) {
+  for (auto ii = c.begin(), ei = c.end(); ii != ei; ++ii) {
     (*ii).val;
   }
   t2.stop();
-  std::cout << prefix << " " << t1.get() << " " << t2.get() << "\n";
+  std::cout << prefix << " insert: " << t1.get() << " traverse: " << t2.get() << "\n";
 }
 
 template<typename T>
@@ -95,9 +176,8 @@ struct element {
 };
 
 int main(int argc, char** argv) {
-  testBasic("Galois::FixedSizeRing", Galois::FixedSizeRing<int, 32>(), 32);
-  testBasic("Galois::gdeque", Galois::gdeque<int>(), 32 * 32);
-  testSort("Galois::FixedSizeRing", Galois::FixedSizeRing<int, 32>(), 32);
+  testBasic("Galois::gslist", Galois::gslist<int>(), 32 * 32);
+  testNormal("Galois::gdeque", Galois::gdeque<int>(), 32 * 32);
   //testSort("Galois::gdeque", Galois::gdeque<int>(), 32 * 32);
 
   int size = 100;
@@ -108,6 +188,8 @@ int main(int argc, char** argv) {
   timeAccesses("std::deque", std::deque<element>(), size);
   timeAccesses("std::vector", std::vector<element>(), size);
   timeAccesses("Galois::gdeque", Galois::gdeque<element>(), size);
+  timeAccesses("Galois::gslist", Galois::gslist<element>(), size);
+  timeAccesses("Galois::concurrent_gslist", Galois::concurrent_gslist<element>(), size);
   timeAccesses("Galois::InsertBag", Galois::InsertBag<element>(), size);
 
   return 0;

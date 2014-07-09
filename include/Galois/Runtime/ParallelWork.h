@@ -292,7 +292,6 @@ protected:
   const char* loopname;
   bool broke;
 
-
   template<int limit, bool inAborted, typename WL>
   bool runQueue(ThreadLocalData& tld, WL& lwl) {
     bool workHappened = false;

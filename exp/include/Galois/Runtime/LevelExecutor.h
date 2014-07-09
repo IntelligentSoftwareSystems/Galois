@@ -42,7 +42,7 @@
 
 namespace Galois {
 namespace Runtime {
-namespace impl {
+namespace {
 
 #define USE_DENSE_LEVELS 1
 // #undef USE_DENSE_LEVELS
@@ -96,53 +96,45 @@ public:
 
   // only push called in parallel by multiple threads
   void push (const Key& k, const value_type& x) {
-
 #ifdef USE_LEVEL_CACHING
     CachedLevel& cached = *(cachedLevels.getLocal ());
 
     if (cached && k == cached->first) { // fast path
       assert (cached->second != nullptr);
       cached->second->push (x);
-
-    } else  {
-#else
-    {
-#endif
-
-      // debug
-      // std::printf ("could not find cached worklist");
-
-      rwmutex.readLock ();
-      auto currLevel = levelMap.find (k);
-
-      if (currLevel == levelMap.end ()) {
-        rwmutex.readUnlock (); // give up read lock to acquire write lock
-
-        rwmutex.writeLock (); 
-        // check again after locking
-        if (levelMap.find (k) == levelMap.end ()) {
-          WL_ty* wl = wlAlloc.allocate (1); // new WL_ty ();
-          new (wl) WL_ty;
-          levelMap.insert (std::make_pair (k, wl));
-        }
-        rwmutex.writeUnlock ();
-
-        // read again now
-        rwmutex.readLock ();
-        currLevel = levelMap.find (k);
-      }
-      rwmutex.readUnlock ();
-
-      assert (currLevel != levelMap.end ());
-      currLevel->second->push (x);
-#ifdef USE_LEVEL_CACHING
-      cached = *currLevel;
-#endif
+      return;
     }
-    
+#endif
+    // debug
+    // std::printf ("could not find cached worklist");
 
+    rwmutex.readLock ();
+    auto currLevel = levelMap.find (k);
+
+    if (currLevel == levelMap.end ()) {
+      rwmutex.readUnlock (); // give up read lock to acquire write lock
+
+      rwmutex.writeLock (); 
+      // check again after locking
+      if (levelMap.find (k) == levelMap.end ()) {
+        WL_ty* wl = wlAlloc.allocate (1); // new WL_ty ();
+        new (wl) WL_ty;
+        levelMap.insert (std::make_pair (k, wl));
+      }
+      rwmutex.writeUnlock ();
+
+      // read again now
+      rwmutex.readLock ();
+      currLevel = levelMap.find (k);
+    }
+    rwmutex.readUnlock ();
+
+    assert (currLevel != levelMap.end ());
+    currLevel->second->push (x);
+#ifdef USE_LEVEL_CACHING
+    cached = *currLevel;
+#endif
   }
-
 
   void freeRemovedLevels () {
     while (!removedLevels.empty ()) {
@@ -209,7 +201,6 @@ public:
   }
 
   void push (const unsigned k, const value_type& x) {
-
 #ifdef USE_LEVEL_CACHING
     if (k < begLevel) {
       GALOIS_DIE ("Can't handle non-monotonic adds");
@@ -295,9 +286,6 @@ struct InheritTraits<false> {
 };
 
 
-} // end namespace impl
-
-
 template <typename T, typename Key, typename KeyFn, typename KeyCmp, typename NhoodFunc, typename OpFunc>   
 class LevelExecutor {
 
@@ -306,7 +294,7 @@ class LevelExecutor {
   // hack to get ChunkedMaster base class
   using BaseWL = typename Galois::WorkList::dChunkedFIFO<CHUNK_SIZE>::template retype<T>::type;
   using WL_ty = Galois::WorkList::WLsizeWrapper<BaseWL>;
-  using LevelMap_ty = impl::LevelMap<Key, KeyCmp, WL_ty>;
+  using LevelMap_ty = LevelMap<Key, KeyCmp, WL_ty>;
 
   using UserCtx = UserContextAccess<T>;
   using PerThreadUserCtx = PerThreadStorage<UserCtx>;
@@ -316,7 +304,7 @@ class LevelExecutor {
 
 
 
-  struct BodyWrapper: public impl::InheritTraits<ForEachTraits<OpFunc>::NeedsAborts> {
+  struct BodyWrapper: public InheritTraits<ForEachTraits<OpFunc>::NeedsAborts> {
 
 
     KeyFn& keyFn;
@@ -474,6 +462,9 @@ public:
 
 
 };
+
+} // end namespace impl
+
 
 template <typename R, typename KeyFn, typename KeyCmp, typename NhoodFunc, typename OpFunc>
 void for_each_ordered_level (const R& range, const KeyFn& keyFn, const KeyCmp& kcmp, const NhoodFunc& nhVisit, const OpFunc& opFunc, const char* loopname=0) {

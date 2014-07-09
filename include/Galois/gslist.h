@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2014, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -20,33 +20,60 @@
  *
  * @section Description
  *
- * Container for when you want to minimize meta-data overhead but still
- * want a custom allocator.
+ * Container for when you want to minimize meta-data overhead but still want a
+ * custom allocator.
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 #ifndef GALOIS_GSLIST_H
 #define GALOIS_GSLIST_H
 
-#include "Galois/Runtime/mm/Mem.h"
-
 #include "Galois/FixedSizeRing.h"
+#include "Galois/TwoLevelIteratorA.h"
 
-#include <iterator>
+#include <boost/iterator/iterator_facade.hpp>
+#include <boost/mpl/if.hpp>
+
+#include <type_traits>
 
 namespace Galois {
 
-//! Singly linked list. To conserve space, allocator is maintained
-//! external to the list. 
-template<typename T, int ChunkSize=16> 
-class gslist {
+template<typename T, int ChunkSize, bool Concurrent> 
+class gslist_base {
+public:
+  //! Tag for methods that depend on user to deallocate memory, although gslist will destroy elements
+  struct promise_to_dealloc {};
 
-  struct Block: public FixedSizeRing<T,ChunkSize> {
+private:
+  typedef typename boost::mpl::if_c<Concurrent, ConcurrentFixedSizeBag<T, ChunkSize>, FixedSizeBag<T, ChunkSize>>::type Ring;
+
+  struct Block: public Ring {
     Block* next;
     Block(): next() {}
   };
 
-  Block* first;
+  template<typename U>
+  class outer_iterator: public boost::iterator_facade<outer_iterator<U>, U, boost::forward_traversal_tag> {
+    friend class boost::iterator_core_access;
+    Block* cur;
+
+    void increment() { cur = cur->next; }
+
+    template<typename OtherTy>
+    bool equal(const outer_iterator<OtherTy>& o) const { return cur == o.cur; }
+
+    U& dereference() const { return *cur; }
+
+  public:
+    outer_iterator(Block* c = 0): cur(c) {}
+
+    template<typename OtherTy>
+    outer_iterator(const outer_iterator<OtherTy>& o): cur(o.cur) {}
+  };
+
+  typedef typename boost::mpl::if_c<Concurrent, std::atomic<Block*>, Block*>::type First;
+
+  First first;
   
   template<typename HeapTy>
   Block* alloc_block(HeapTy& heap) {
@@ -59,111 +86,197 @@ class gslist {
     heap.deallocate(b);
   }
 
-  template<typename HeapTy>
-  void extend_first(HeapTy& heap) {
+  void free_block(promise_to_dealloc, Block* b) {
+    b->~Block();
+  }
+
+  template<typename HeapTy, bool C = Concurrent>
+  auto extend_first(HeapTy& heap) -> typename std::enable_if<C>::type {
+    Block* b = alloc_block(heap);
+    Block* f = first;
+    b->next = f;
+    if (!first.compare_exchange_strong(f, b))
+      heap.deallocate(b);
+  }
+
+  template<typename HeapTy, bool C = Concurrent>
+  auto extend_first(HeapTy& heap) ->typename std::enable_if<!C>::type {
     Block* b = alloc_block(heap);
     b->next = first;
     first = b;
   }
 
-  template<typename HeapTy>
-  void shrink_first(HeapTy& heap) {
+  Block* get_first() {
     Block* b = first;
-    first = b->next;
-    free_block(heap, b);
+    return b;
+  }
+
+  const Block* get_first() const {
+    Block* b = first;
+    return b;
+  }
+
+  template<typename U, bool C = Concurrent>
+  auto shrink_first(Block* old_first, U&& arg) -> typename std::enable_if<C>::type {
+    if (first.compare_exchange_strong(old_first, old_first->next)) {
+      free_block(std::forward<U>(arg), old_first);
+    }
+  }
+
+  template<typename U, bool C = Concurrent>
+  auto shrink_first(Block* old_first, U&& arg) -> typename std::enable_if<!C>::type {
+    if (first != old_first)
+      return;
+    first = old_first->next;
+    free_block(std::forward<U>(arg), old_first);
+  }
+
+  template<typename U>
+  void _clear(U&& arg) {
+    Block *b = get_first();
+    while (b) {
+      b->clear();
+      shrink_first(b, std::forward<U>(arg));
+      b = get_first();
+    }
+  }
+
+  template<typename U>
+  bool _pop_front(U&& arg) {
+    while (true) {
+      Block* b = get_first();
+      if (!b)
+        return false;
+      if (b->pop_front())
+        return true;
+
+      shrink_first(b, std::forward<U>(arg));
+    }
   }
 
 public:
   //! External allocator must be able to allocate this type
   typedef Block block_type;
   typedef T value_type;
+  typedef Galois::TwoLevelIteratorA<
+    outer_iterator<Block>,
+    typename Block::iterator,
+    std::forward_iterator_tag, 
+    GetBegin,
+    GetEnd > iterator;
+  typedef Galois::TwoLevelIteratorA<
+    outer_iterator<const Block>,
+    typename Block::const_iterator,
+    std::forward_iterator_tag, 
+    GetBegin,
+    GetEnd> const_iterator;
 
-  gslist(): first() { }
+  gslist_base(): first(0) { }
+  
+  gslist_base(const gslist_base&) = delete;
+  gslist_base& operator=(const gslist_base&) = delete;
 
-  ~gslist() {
-    assert(empty() && "Memory leak if gslist is not empty before destruction");
+  gslist_base(gslist_base&& other): first(0) {
+    *this = std::move(other);
   }
 
-  class iterator : public std::iterator<std::forward_iterator_tag, T> {
-    Block* b;
-    unsigned offset;
-
-    void advance() {
-      if (!b) return;
-      ++offset;
-      if (offset == b->size()) {
-	b = b->next;
-	offset = 0;
-      }
-    }
-
-  public:
-    iterator(Block* _b = 0, unsigned _off = 0): b(_b), offset(_off) {}
-
-    bool operator==(const iterator& rhs) const {
-      return b == rhs.b && offset == rhs.offset;
-    }
-
-    bool operator!=(const iterator& rhs) const {
-      return b != rhs.b || offset != rhs.offset;
-    }
-
-    T& operator*() const {
-      return b->getAt(offset);
-    }
-
-    iterator& operator++() {
-      advance();
-      return *this;
-    }
-
-    iterator operator++(int) {
-      iterator tmp(*this);
-      advance();
-      return tmp;
-    }
-  };
-
-  iterator begin() const {
-    return iterator(first);
+  gslist_base& operator=(gslist_base&& o) {
+    Block* m_first = first;
+    Block* o_first = o.first;
+    first = o_first;
+    o.first = m_first;
+    return *this;
   }
 
-  iterator end() const {
-    return iterator();
+  ~gslist_base() {
+    _clear(promise_to_dealloc());
+    //assert(empty() && "Memory leak if gslist is not empty before destruction");
+  }
+
+  iterator begin() {
+    return Galois::make_two_level_iterator(outer_iterator<Block>(get_first()), outer_iterator<Block>(nullptr)).first;
+  }
+
+  iterator end() {
+    return Galois::make_two_level_iterator(outer_iterator<Block>(get_first()), outer_iterator<Block>(nullptr)).second;
+  }
+
+  const_iterator begin() const {
+    return Galois::make_two_level_iterator(outer_iterator<const Block>(get_first()), outer_iterator<Block>(nullptr)).first;
+  }
+
+  const_iterator end() const {
+    return Galois::make_two_level_iterator(outer_iterator<const Block>(get_first()), outer_iterator<Block>(nullptr)).second;
   }
 
   bool empty() const {
-    return first == NULL;
+    return first == NULL || (get_first()->empty() && get_first()->next == NULL);
   }
 
   value_type& front() {
-    return first->front();
+    return get_first()->front();
   }
 
-  template<typename HeapTy>
-  void push_front(HeapTy& heap, const value_type& v) {
-    if (first && first->push_front(v))
-      return;
-    extend_first(heap);
-    first->push_front(v);
+  const value_type& front() const {
+    return get_first()->front();
   }
 
+  template<typename HeapTy, typename... Args, bool C = Concurrent>
+  auto emplace_front(HeapTy& heap, Args&&... args) -> typename std::enable_if<!C>::type {
+    if (!first || first->full())
+      extend_first(heap);
+    first->emplace_front(std::forward<Args>(args)...);
+  }
+
+  template<typename HeapTy, bool C = Concurrent>
+  auto push_front(HeapTy& heap, const value_type& v) -> typename std::enable_if<C>::type {
+    while (true) {
+      Block *b = get_first();
+      if (b && b->push_front(v))
+        return;
+      extend_first(heap);
+    }
+  }
+
+  template<typename HeapTy, typename ValueTy, bool C = Concurrent>
+  auto push_front(HeapTy& heap, ValueTy&& v) -> typename std::enable_if<!C>::type {
+    emplace_front(heap, std::forward<ValueTy>(v));
+  }
+
+  //! Returns true if something was popped
   template<typename HeapTy>
-  void pop_front(HeapTy& heap) {
-    first->pop_front();
-    if (first->empty())
-      shrink_first(heap);
+  bool pop_front(HeapTy& heap) {
+    return _pop_front(heap);
+  }
+
+  //! Returns true if something was popped
+  bool pop_front(promise_to_dealloc) {
+    return _pop_front(promise_to_dealloc());
   }
 
   template<typename HeapTy>
   void clear(HeapTy& heap) {
-    while (first) {
-      first->clear();
-      shrink_first(heap);
-    }
+    _clear(heap);
+  }
+
+  void clear(promise_to_dealloc) {
+    _clear(promise_to_dealloc());
   }
 };
 
-}
+/**
+ * Singly linked list. To conserve space, allocator is maintained external to
+ * the list. 
+ */
+template<typename T, unsigned chunksize = 16>
+using gslist = gslist_base<T, chunksize, false>;
 
+/**
+ * Concurrent linked list. To conserve space, allocator is maintained external
+ * to the list. Iteration order is unspecified.
+ */
+template<typename T, unsigned chunksize = 16>
+using concurrent_gslist = gslist_base<T, chunksize, true>;
+
+}
 #endif
