@@ -1,2 +1,2 @@
-makeTest(pairingheap)
+#makeTest(pairingheap)
 makeTest(skiplist)
