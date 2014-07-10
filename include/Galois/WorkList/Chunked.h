@@ -32,6 +32,7 @@
 namespace Galois {
 namespace WorkList {
 
+namespace {
 //This overly complex specialization avoids a pointer indirection for non-distributed WL when accessing PerLevel
 template<bool, template<typename> class PS, typename TQ>
 struct squeue {
@@ -251,6 +252,8 @@ public:
     }
   }
 };
+
+}
 
 /**
  * Chunked FIFO. A global FIFO of chunks of some fixed size.

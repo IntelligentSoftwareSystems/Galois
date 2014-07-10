@@ -264,6 +264,13 @@ protected:
     x.clear();
   }
 
+  bool checkEmpty(WorkListTy&, ...) { return true; }
+
+  template<typename WL>
+  auto checkEmpty(WL& wl, bool didWork) -> decltype(wl.empty(), bool()) {
+    return didWork || wl.empty();
+  }
+
   template<bool couldAbort, bool isLeader>
   void go() {
     // Thread-local data goes on the local stack to be NUMA friendly
@@ -290,6 +297,9 @@ protected:
 
       bool didWork = old_iterations != tld.stat_iterations;
       old_iterations = tld.stat_iterations;
+
+      if (!checkEmpty(wl, didWork))
+        continue;
 
       // Update node color and prop token
       term.localTermination(didWork);
