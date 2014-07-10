@@ -152,19 +152,19 @@ protected:
     UserContextAccess<value_type> facing;
     SimpleRuntimeContext ctx;
     unsigned long stat_conflicts;
-    unsigned long stat_commits;
+    unsigned long stat_iterations;
     unsigned long stat_pushes;
     const char* loopname;
     ThreadLocalData(const FunctionTy& fn, const char* ln)
-      : function(fn), stat_conflicts(0), stat_commits(0), stat_pushes(0), 
+      : function(fn), stat_conflicts(0), stat_iterations(0), stat_pushes(0), 
         loopname(ln)
     {}
     ~ThreadLocalData() {
       if (ForEachTraits<FunctionTy>::NeedsStats) {
         reportStat(loopname, "Conflicts", stat_conflicts);
-        reportStat(loopname, "Commits", stat_commits);
+        reportStat(loopname, "Commits", stat_iterations - stat_conflicts);
         reportStat(loopname, "Pushes", stat_pushes);
-        reportStat(loopname, "Iterations", stat_commits + stat_conflicts);
+        reportStat(loopname, "Iterations", stat_iterations);
       }
     }
   };
@@ -196,7 +196,7 @@ protected:
       tld.facing.resetAlloc();
     if (ForEachTraits<FunctionTy>::NeedsAborts)
       tld.ctx.commitIteration();
-    ++tld.stat_commits;
+    //++tld.stat_commits;
   }
 
   template<typename Item>
@@ -217,6 +217,7 @@ protected:
   inline void doProcess(value_type& val, ThreadLocalData& tld) {
     if (ForEachTraits<FunctionTy>::NeedsAborts)
       tld.ctx.startIteration();
+    ++tld.stat_iterations;
     tld.function(val, tld.facing.data());
     commitIteration(tld);
   }
@@ -274,11 +275,11 @@ protected:
     if (ForEachTraits<FunctionTy>::NeedsPush && !couldAbort)
       tld.facing.setFastPushBack(
           std::bind(&ForEachWork::fastPushBack, this, std::placeholders::_1));
-    unsigned old_commit = 0;
+    unsigned long old_iterations = 0;
     do {
       // Run some iterations
       if (couldAbort || ForEachTraits<FunctionTy>::NeedsBreak) {
-        constexpr int __NUM = (ForEachTraits<FunctionTy>::NeedsBreak || isLeader) ? 32 : 0;
+        constexpr int __NUM = (ForEachTraits<FunctionTy>::NeedsBreak || isLeader) ? 64 : 0;
         runQueue<__NUM>(tld, wl);
         // Check for abort
         if (couldAbort)
@@ -286,9 +287,12 @@ protected:
       } else { // No try/catch
         runQueueSimple(tld);
       }
+
+      bool didWork = old_iterations != tld.stat_iterations;
+      old_iterations = tld.stat_iterations;
+
       // Update node color and prop token
-      term.localTermination(old_commit != tld.stat_commits);
-      old_commit = tld.stat_commits;
+      term.localTermination(didWork);
       LL::asmPause(); // Let token propagate
     } while (!term.globalTermination() && (!ForEachTraits<FunctionTy>::NeedsBreak || !broke));
 
