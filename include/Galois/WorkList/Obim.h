@@ -42,7 +42,7 @@ template<typename T, typename Index, bool UseBarrier>
 class OrderedByIntegerMetricData { 
 protected:
   struct ThreadData { };
-  bool hasStored(Index) { return false; }
+  bool hasStored(ThreadData&, Index) { return false; }
   Galois::optional<T> popStored(ThreadData&, Index) { return {}; }
 };
 
