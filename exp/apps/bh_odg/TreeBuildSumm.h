@@ -66,7 +66,7 @@ struct DestroyTree {
   struct TopDown {
 
     template <typename C>
-    void operator () (OctreeInternal<B>* node, C& wl) {
+    void operator () (OctreeInternal<B>* node, C& wl) const {
       assert (node != nullptr && !node->isLeaf ());
 
       for (unsigned i = 0; i < 8; ++i) {
@@ -83,6 +83,7 @@ struct DestroyTree {
     TreeAlloc& treeAlloc;
 
     void operator () (OctreeInternal<B>* node) {
+      assert (node != nullptr && !node->isLeaf ());
       this->treeAlloc.destroy (node);
       this->treeAlloc.deallocate (node, 1);
     }
@@ -94,7 +95,7 @@ struct DestroyTree {
     Galois::StatTimer t_destroy ("time to destroy the tree recursively: ");
 
     t_destroy.start ();
-    Galois::Runtime::for_each_ordered_tree_1p (
+    Galois::Runtime::for_each_ordered_tree_2p (
         root,
         TopDown (),
         BottomUp {treeAlloc},
@@ -1007,6 +1008,32 @@ namespace recursive {
 
   }
 
+  template <bool USING_CILK, typename B, typename ForkJoinHandler>
+  void summarizeRecursive (OctreeInternal<B>* node, ForkJoinHandler& fjh) {
+    assert (node != nullptr && !node->isLeaf ());
+
+    auto loop_body = [node, &fjh] (unsigned i) {
+      Octree<B>* child = node->getChild (i);
+      if (child != nullptr && !child->isLeaf ()) {
+        fjh.fork (static_cast<OctreeInternal<B>*> (child));
+      }
+    };
+
+    if (USING_CILK) {
+      cilk_for (unsigned i = 0; i < 8; ++i) {
+        loop_body (i);
+      }
+    } else {
+      for (unsigned i = 0; i < 8; ++i) {
+        loop_body (i);
+      }
+    }
+
+    fjh.join (node);
+  }
+
+
+
   enum ExecType {
     USE_SERIAL,
     USE_CILK,
@@ -1030,16 +1057,27 @@ namespace recursive {
     }
   };
 
+  template <bool USING_CILK, typename B>
+  struct SummarizeForkJoin {
+    void fork (OctreeInternal<B>* node) {
+      summarizeRecursive<USING_CILK> (node, *this);
+    }
+
+    void join (OctreeInternal<B>* node) {
+      summarizeNode (node);
+    }
+  };
+
   template <typename C, typename WorkItem>
   struct GaloisForkHandler {
 
     C& ctx;
 
-    void fork (WorkItem& w) {
+    void fork (const WorkItem& w) {
       ctx.push (w);
     }
 
-    void join (WorkItem&) {} // handled separately in Galois
+    void join (const WorkItem&) {} // handled separately in Galois
   };
 
   template <typename WorkItem, typename TreeAlloc, typename Partitioner>
@@ -1049,9 +1087,20 @@ namespace recursive {
     Partitioner& partitioner;
 
     template <typename C>
-    void operator () (WorkItem& w, C& ctx) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (WorkItem& w, C& ctx) {
       GaloisForkHandler<C,WorkItem> gfh {ctx};
       buildSummRecurImpl<false> (w, this->treeAlloc, this->partitioner, gfh);
+
+    } // end method
+  };
+
+  template <typename B>
+  struct GaloisPassTopDown {
+
+    template <typename C>
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (OctreeInternal<B>* node, C& ctx) {
+      GaloisForkHandler<C,OctreeInternal<B>* > gfh {ctx};
+      summarizeRecursive<false> (node, gfh);
 
     } // end method
   };
@@ -1078,6 +1127,12 @@ namespace recursive {
       SerialForkJoin<false, WorkItem, TreeAlloc, Partitioner> f {treeAlloc, partitioner};
       f.fork (initial);
     }
+
+    template <typename B>
+    void operator () (OctreeInternal<B>* root) {
+      SummarizeForkJoin<true, B> f;
+      f.fork (root);
+    }
   };
 
   template <> struct ChooseExecutor<USE_CILK> {
@@ -1085,6 +1140,12 @@ namespace recursive {
     void operator () (WorkItem& initial, TreeAlloc& treeAlloc, Partitioner& partitioner) {
       SerialForkJoin<true, WorkItem, TreeAlloc, Partitioner> f {treeAlloc, partitioner};
       f.fork (initial);
+    }
+
+    template <typename B>
+    void operator () (OctreeInternal<B>* root) {
+      SummarizeForkJoin<true, B> f;
+      f.fork (root);
     }
   };
 
@@ -1098,6 +1159,16 @@ namespace recursive {
           GaloisSummarize<WorkItem> (),
           "octree-build-summarize-1p");
 
+
+    }
+
+    template <typename B>
+    void operator () (OctreeInternal<B>* root) {
+      Galois::Runtime::for_each_ordered_tree_1p (
+          root,
+          GaloisPassTopDown<B> (),
+          &summarizeNode<B>,
+          "octree-summarize-1p");
 
     }
   };
@@ -1139,6 +1210,39 @@ struct BuildSummarizeRecursive: public TypeDefHelper<SerialNodeBase> {
 
 };
 
+template <recursive::ExecType EXEC_TYPE> 
+struct BuildLockFreeSummarizeRecursive {
+
+  typedef SerialNodeBase B;
+  typedef B Base_ty;
+
+  template <typename I, typename TreeAlloc>
+  OctreeInternal<B>* operator () (const BoundingBox& box, I bodbeg, I bodend, TreeAlloc& treeAlloc) const {
+
+    struct DummyBag {
+      void push_back (OctreeInternal<B>* node) {}
+    };
+    
+    DummyBag _bag;
+
+    Galois::StatTimer t_build ("Time taken by tree build: ");
+    t_build.start ();
+    BuildTreeLockFree<B> builder;
+    OctreeInternal<B>* root = builder (box, bodbeg, bodend, treeAlloc, _bag);
+    t_build.stop ();
+
+    Galois::StatTimer t_summ ("Time taken by tree summarization: ");
+
+    t_summ.start ();
+    recursive::ChooseExecutor<EXEC_TYPE> f;
+    f (root);
+    t_summ.stop ();
+
+    return root;
+  }
+
+};
+
 
 template <template <typename> class BM, typename SM>
 struct BuildSummarizeSeparate {
@@ -1156,17 +1260,17 @@ struct BuildSummarizeSeparate {
 
     InternalNodes internalNodes;
 
-    Galois::StatTimer t_build ("Time taken in building: ");
+    Galois::StatTimer t_build ("Time taken by tree build: ");
     t_build.start ();
     Node_ty* root = buildMethod (box, bodbeg, bodend, treeAlloc, internalNodes);
     t_build.stop ();
 
     if (!skipVerify) {
-      printf ("Running Tree verification routine\n");
+      printf ("WARNING: Running Tree verification routine, Timing will be off\n");
       checkTreeBuild (root, box, std::distance (bodbeg, bodend));
     }
 
-    Galois::StatTimer t_summ ("Time taken in summarization: ");
+    Galois::StatTimer t_summ ("Time taken by tree summarization: ");
 
     t_summ.start ();
     summarizeMethod (root, bodbeg, bodend, internalNodes);
@@ -1176,6 +1280,8 @@ struct BuildSummarizeSeparate {
   }
 
 };
+
+
 
 
 

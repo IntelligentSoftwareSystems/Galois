@@ -68,23 +68,29 @@ void Galois::CilkInit (void) {
 
     unsigned numT = getActiveThreads ();
 
-    unsigned tot = __cilkrts_get_total_workers ();
-    std::printf ("CILK: total cilk workers = %d\n", tot);
+    // unsigned tot = __cilkrts_get_total_workers ();
+    // std::printf ("CILK: total cilk workers = %d\n", tot);
+
+    if (Galois::Runtime::LL::EnvCheck("GALOIS_DO_NOT_BIND_MAIN_THREAD")) {
+      GALOIS_DIE("Run program as: GALOIS_DO_NOT_BIND_MAIN_THREAD=1 prog args");
+    }
 
     char nw_str[128];
     std::sprintf (nw_str, "%d", numT);
+
+    std::printf ("Trying to set worker count to: %s\n", nw_str);
     if (0 != __cilkrts_set_param ("nworkers", nw_str)) {
       GALOIS_DIE("Failed to set Cilk worker count\n");
+    } else {
+      std::printf ("CILK: successfully set nworkers=%s\n", nw_str);
     }
 
-    unsigned nw = __cilkrts_get_nworkers ();
-
-    if (nw != numT) {
-      std::printf ("CILK: cilk nworkers=%d != galois threads=%d\n", nw, numT); 
-      unsigned tot = __cilkrts_get_total_workers ();
-      std::printf ("CILK: total cilk workers = %d\n", tot);
-      std::abort ();
-    }
+    // if (nw != numT) {
+      // std::printf ("CILK: cilk nworkers=%d != galois threads=%d\n", nw, numT); 
+      // unsigned tot = __cilkrts_get_total_workers ();
+      // std::printf ("CILK: total cilk workers = %d\n", tot);
+      // std::abort ();
+    // }
 
     detail::BusyBarrier busybarrier (numT);
 

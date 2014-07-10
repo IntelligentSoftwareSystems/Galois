@@ -74,6 +74,9 @@ enum TreeSummMethod {
   SPEC, 
   TWO_PHASE, 
   DATA_DAG, 
+  RSUMM_SERIAL,
+  RSUMM_CILK,
+  RSUMM_GALOIS,
 };
 
 cll::opt<TreeSummMethod> treeSummOpt (
@@ -88,6 +91,9 @@ cll::opt<TreeSummMethod> treeSummOpt (
       clEnumVal (SPEC, "using speculative ordered executor"),
       clEnumVal (TWO_PHASE, "using two phase window ordered executor"),
       clEnumVal (DATA_DAG, "Generate DAG using data dependences"),
+      clEnumVal (RSUMM_SERIAL, "Build Lock Free, Summarize Recursive Serial"),
+      clEnumVal (RSUMM_CILK, "Build Lock Free, Summarize Recursive Cilk"),
+      clEnumVal (RSUMM_GALOIS, "Build Lock Free, Summarize Recursive Galois"),
       clEnumValEnd),
     cll::init (SERIAL));
 
@@ -208,7 +214,7 @@ Point run(int nbodies, int ntimesteps, int seed, const TB& treeBuilder) {
     t_tree_build.stop ();
 
     if (!skipVerify) {
-      std::cout << "Comparing against serially built & summarized tree..." << std::endl;
+      std::cout << "WARNING: Comparing against serially built & summarized tree..., timing may be off" << std::endl;
       BuildSummarizeSeparate<BuildTreeSerial, SummarizeTreeSerial<B> > serialBuilder;
       OctreeInternal<B>* stop = serialBuilder (box, bodies.begin (), bodies.end (), treeAlloc);
 
@@ -319,6 +325,20 @@ int main(int argc, char** argv) {
 
     case bh::DATA_DAG:
       pos = bh::run<true> (bh::nbodies, bh::ntimesteps, bh::seed, bh::BuildSummarizeSeparate<bh::BuildTreeLockFree, bh::TreeSummarizeDataDAG> ());
+      break;
+
+    case bh::RSUMM_SERIAL:
+      pos = bh::run<true> (bh::nbodies, bh::ntimesteps, bh::seed, bh::BuildLockFreeSummarizeRecursive<bh::recursive::USE_SERIAL> ());
+      break;
+
+    case bh::RSUMM_CILK:
+      Galois::CilkInit ();
+      pos = bh::run<true> (bh::nbodies, bh::ntimesteps, bh::seed, bh::BuildLockFreeSummarizeRecursive<bh::recursive::USE_CILK> ());
+      break;
+
+    case bh::RSUMM_GALOIS:
+      pos = bh::run<true> (bh::nbodies, bh::ntimesteps, bh::seed, bh::BuildLockFreeSummarizeRecursive<bh::recursive::USE_GALOIS> ());
+      break;
 
     default:
       abort ();

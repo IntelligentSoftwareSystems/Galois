@@ -28,6 +28,11 @@
 #ifdef HAVE_CILK
 #include <cilk/cilk.h>
 #include <cilk/cilk_api.h>
+
+#else
+#define cilk_for for
+#define cilk_spawn 
+#define cilk_sync
 #endif
 
 namespace Galois {

@@ -31,7 +31,7 @@
 #include "tbb/parallel_for_each.h"
 #endif
 
-#include "CilkInit.h";
+#include "CilkInit.h"
 #include <unistd.h>
 
 #include "llvm/Support/CommandLine.h"
