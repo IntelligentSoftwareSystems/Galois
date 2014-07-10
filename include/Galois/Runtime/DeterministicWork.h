@@ -990,7 +990,6 @@ public:
       if (OptionsTy::hasFixedNeighborhood) {
         copyMine(b, e, dist, wl, window, LL::getTID());
       } else {
-        size_t dist = std::distance(b, e);
         copyMine(
             boost::make_transform_iterator(mergeBuf.begin(), typename NewItem::GetValue()),
             boost::make_transform_iterator(mergeBuf.end(), typename NewItem::GetValue()),
