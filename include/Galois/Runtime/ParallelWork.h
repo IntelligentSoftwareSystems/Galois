@@ -243,6 +243,7 @@ protected:
     FunctionTy function;
     UserContextAccess<value_type> facing;
     SimpleRuntimeContext ctx;
+    ResolveCache rc;
     LoopStatistics<ForEachTraits<FunctionTy>::NeedsStats> stat;
     ThreadLocalData(const FunctionTy& fn, const char* ln): function(fn), stat(ln) {}
 
@@ -278,6 +279,7 @@ protected:
       stat.inc_iterations();
       if (ForEachTraits<FunctionTy>::NeedsAborts)
         ctx.startIteration();
+      rc.reset();
     }
   };
 

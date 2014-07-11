@@ -337,14 +337,14 @@ class RemoteDirectory : public BaseDirectory {
   //erase the metadata for pointer
   //metadata is for the pointer and the caller must have the lock
   //invalidates the metadata
-  void eraseMD(fatPointer, metadata&);
+  void eraseMD(fatPointer, std::unique_lock<LL::SimpleLock>& mdl);
 
   //Add a pending request which couldn't be handle immediately
   void addPendingReq(fatPointer, uint32_t, ResolveFlag);
 
   //try to writeback ptr, may fail
   //if succeeds, invalidates md
-  bool tryWriteBack(metadata& md, fatPointer ptr);
+  bool tryWriteBack(metadata& md, fatPointer ptr, std::unique_lock<LL::SimpleLock>& lg);
 
 protected: // Remote portion of the api
   //! handle object ariving

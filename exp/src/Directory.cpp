@@ -66,12 +66,12 @@ RemoteDirectory::metadata& RemoteDirectory::getMD(fatPointer ptr) {
   return retval;
 }
 
-void RemoteDirectory::eraseMD(fatPointer ptr, metadata& m) {
+void RemoteDirectory::eraseMD(fatPointer ptr, std::unique_lock<LL::SimpleLock>& mdl) {
   std::lock_guard<LL::SimpleLock> lg(md_lock);
   assert(md.find(ptr) != md.end());
-  assert(&m == &md[ptr]);
-  assert(m.lock.is_locked());
-  //  md.erase(ptr);
+  assert(md[ptr].lock.is_locked());
+  mdl.unlock();
+  md.erase(ptr);
 }
 
 void RemoteDirectory::addPendingReq(fatPointer ptr, uint32_t dest, ResolveFlag flag) {
@@ -85,7 +85,7 @@ void RemoteDirectory::addPendingReq(fatPointer ptr, uint32_t dest, ResolveFlag f
   }
 }
 
-bool RemoteDirectory::tryWriteBack(metadata& md, fatPointer ptr) {
+bool RemoteDirectory::tryWriteBack(metadata& md, fatPointer ptr, std::unique_lock<LL::SimpleLock>& lg) {
   auto& cm = getCacheManager();
   auto* vobj = cm.resolveIncRef(ptr);
   assert(vobj);
@@ -98,7 +98,7 @@ bool RemoteDirectory::tryWriteBack(metadata& md, fatPointer ptr) {
     cm.evict(ptr); //IncRef keeps obj live for release
     md.th->send(ptr.getHost(), ptr, obj, RW);
     dirRelease(obj);
-    eraseMD(ptr, md);
+    eraseMD(ptr, lg);
     retval = true;
   }
   vobj->decRef();
@@ -107,7 +107,7 @@ bool RemoteDirectory::tryWriteBack(metadata& md, fatPointer ptr) {
 
 void RemoteDirectory::recvRequestImpl(fatPointer ptr, uint32_t dest, ResolveFlag flag) {
   metadata& md = getMD(ptr);
-  std::lock_guard<LL::SimpleLock> lg(md.lock, std::adopt_lock);
+  std::unique_lock<LL::SimpleLock> lg(md.lock, std::adopt_lock);
   trace("RemoteDirectory::recvRequest % dest % md %\n", ptr, dest, md);
   if (md.contended && dest > NetworkInterface::ID) {
     addPendingReq(ptr, dest, flag);
@@ -128,14 +128,14 @@ void RemoteDirectory::recvRequestImpl(fatPointer ptr, uint32_t dest, ResolveFlag
       abort();
     }
     if (md.state == metadata::HERE_RW) {
-      if (tryWriteBack(md, ptr)) {
+      if (tryWriteBack(md, ptr, lg)) {
         if (wasContended)
           fetchImpl(ptr, RW, th, true);
       } else {
         addPendingReq(ptr, dest, flag);
       }
     } else { // was RO, ack invalidate
-      eraseMD(ptr, md);
+      eraseMD(ptr, lg);
       getCacheManager().evict(ptr);
       th->request(ptr.getHost(), ptr, NetworkInterface::ID, INV);
       if (wasContended)
@@ -187,6 +187,7 @@ void RemoteDirectory::fetchImpl(fatPointer ptr, ResolveFlag flag, typeHelper* th
   assert(!ptr.isLocal());
   if (!md.th)
     md.th = th;
+  assert(md.state != metadata::HERE_RW);
   md.contended |= setContended;
   ResolveFlag requestFlag = md.fetch(flag);
   if (requestFlag != INV)

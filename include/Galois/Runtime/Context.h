@@ -47,8 +47,8 @@ struct conflict_ex { Lockable* ptr; };
 struct failsafe_ex {};
 //struct remote_ex { fatPointer ptr; };
 
-void signalConflict(Lockable*);
-
+void signalConflict(conflict_ex ex);
+void signalConflict(remote_ex ex);
 void forceAbort();
 
 class SimpleRuntimeContext { //: public LockManagerBase {
@@ -124,7 +124,7 @@ inline void acquire(Lockable* lockable, Galois::MethodFlag m) {
     SimpleRuntimeContext* ctx = getThreadContext();
     if (ctx)
       if (!ctx->acquire(lockable))
-        signalConflict(lockable);
+        signalConflict(conflict_ex{lockable});
     //doAcquire (lockable);
   }
 }
@@ -139,14 +139,16 @@ inline void acquire(gptr<T> ptr, Galois::MethodFlag m) {
     if (!obj) {
       //FIXME Better resolve flag
       getRemoteDirectory().fetch<T>(static_cast<fatPointer>(ptr), ResolveFlag::RW);
-      throw remote_ex{static_cast<fatPointer>(ptr), m, &RemoteDirectory::fetch<T>, &LocalDirectory::fetch<T>};
+      signalConflict(remote_ex{static_cast<fatPointer>(ptr), m, &RemoteDirectory::fetch<T>, &LocalDirectory::fetch<T>});
     }
     if (shouldLock(m)) {
       SimpleRuntimeContext* ctx = getThreadContext();
       Lockable* lockable = static_cast<Lockable*>(obj);
-      if (ctx)
-        if (!ctx->acquire(lockable))
-          throw remote_ex{static_cast<fatPointer>(ptr), m, &RemoteDirectory::fetch<T>, &LocalDirectory::fetch<T>};
+      if (ctx) {
+        bool b = ctx->acquire(lockable);
+        if (!b)
+          signalConflict(remote_ex{static_cast<fatPointer>(ptr), m, &RemoteDirectory::fetch<T>, &LocalDirectory::fetch<T>});
+      }
     }
   } else {
     serial_acquire(ptr);

@@ -47,12 +47,16 @@ SimpleRuntimeContext* Galois::Runtime::getThreadContext() {
   return thread_ctx;
 }
 
-void Galois::Runtime::signalConflict(Lockable* lockable) {
-  throw conflict_ex{lockable}; // Conflict
+void Galois::Runtime::signalConflict(conflict_ex ex) {
+  throw ex;
+}
+
+void Galois::Runtime::signalConflict(remote_ex ex) {
+  throw ex;
 }
 
 void Galois::Runtime::forceAbort() {
-  throw conflict_ex{nullptr}; // Conflict
+  signalConflict(conflict_ex{nullptr});
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -60,10 +64,12 @@ void Galois::Runtime::forceAbort() {
 ////////////////////////////////////////////////////////////////////////////////
 
 bool SimpleRuntimeContext::acquire(Lockable* lockable) {
-  if (customAcquire)
+  if (customAcquire) {
     return subAcquire(lockable);
-  else
-    return (locks.tryAcquire(lockable) != LockManagerBase::FAIL);
+  } else {
+    auto r = locks.tryAcquire(lockable);
+    return r != LockManagerBase::FAIL;
+  }
 }
 
 void SimpleRuntimeContext::release(Lockable* lockable) {

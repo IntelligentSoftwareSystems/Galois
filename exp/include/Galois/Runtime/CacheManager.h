@@ -78,6 +78,7 @@ class ResolveCache {
   std::deque<details::remoteObj*> objs;
  
 public:
+  ~ResolveCache() { reset(); }
   void* resolve(fatPointer);
   void reset();
 };
