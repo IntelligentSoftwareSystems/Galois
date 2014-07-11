@@ -44,11 +44,25 @@
 #include "Galois/Runtime/ll/ThreadRWlock.h"
 #include "Galois/Runtime/mm/Mem.h"
 
+#include "llvm/Support/CommandLine.h"
 
 #include <atomic>
 
 namespace Galois {
 namespace Runtime {
+
+enum TreeExecType {
+  TREE_1_PHASE,
+  TREE_2_PHASE
+};
+  
+cll::opt<TreeExecType> treeExecType (
+    cll::desc ("Divide and Conquer tree executor"),
+    cll::values (
+      clEnumVal (TREE_1_PHASE, "Single Phase Divide and Conquer"),
+      clEnumVal (TREE_2_PHASE, "Separate phases for Divide and Conquer"),
+      clEnumValEnd),
+    cll::init (TREE_1_PHASE));
 
 
 template <typename Ctxt>
@@ -401,8 +415,8 @@ protected:
   class Task {
 
   protected:
-    // std::atomic<unsigned> numChild;;
-    Galois::GAtomicPadded<unsigned> numChild;
+    GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE std::atomic<unsigned> numChild;;
+    // Galois::GAtomicPadded<unsigned> numChild;
     T elem;
     Task* parent;
 
@@ -637,19 +651,20 @@ public:
 };
 
 template <typename T, typename DivFunc, typename ConqFunc>
-void for_each_ordered_tree_1p (const T& initItem, const DivFunc& divFunc, const ConqFunc& conqFunc, const char* loopname=nullptr) {
-
-  DivideAndConquerExecutor<T, DivFunc, ConqFunc> executor (divFunc, conqFunc, loopname);
-  executor.execute_1p (initItem);
-}
-
-template <typename T, typename DivFunc, typename ConqFunc>
-void for_each_ordered_tree_2p (const T& initItem, const DivFunc& divFunc, const ConqFunc& conqFunc, const char* loopname=nullptr) {
+void for_each_ordered_tree (const T& initItem, const DivFunc& divFunc, const ConqFunc& conqFunc, const char* loopname=nullptr) {
 
   DivideAndConquerExecutor<T, DivFunc, ConqFunc> executor (divFunc, conqFunc, loopname);
 
-  executor.execute_2p (initItem);
-
+  switch (treeExecType) {
+    case TREE_1_PHASE:
+      executor.execute_1p (initItem);
+      break;
+    case TREE_2_PHASE:
+      executor.execute_2p (initItem);
+      break;
+    default:
+      std::abort ();
+  }
 }
 
 } // end namespace Runtime

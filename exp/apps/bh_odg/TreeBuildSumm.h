@@ -95,7 +95,7 @@ struct DestroyTree {
     Galois::StatTimer t_destroy ("time to destroy the tree recursively: ");
 
     t_destroy.start ();
-    Galois::Runtime::for_each_ordered_tree_2p (
+    Galois::Runtime::for_each_ordered_tree (
         root,
         TopDown (),
         BottomUp {treeAlloc},
@@ -1153,22 +1153,22 @@ namespace recursive {
     template <typename WorkItem, typename TreeAlloc, typename Partitioner>
     void operator () (WorkItem& initial, TreeAlloc& treeAlloc, Partitioner& partitioner) {
 
-      Galois::Runtime::for_each_ordered_tree_1p (
+      Galois::Runtime::for_each_ordered_tree (
           initial,
           GaloisBuild<WorkItem, TreeAlloc, Partitioner> {treeAlloc, partitioner},
           GaloisSummarize<WorkItem> (),
-          "octree-build-summarize-1p");
+          "octree-build-summarize-recursive");
 
 
     }
 
     template <typename B>
     void operator () (OctreeInternal<B>* root) {
-      Galois::Runtime::for_each_ordered_tree_1p (
+      Galois::Runtime::for_each_ordered_tree (
           root,
           GaloisPassTopDown<B> (),
           &summarizeNode<B>,
-          "octree-summarize-1p");
+          "octree-summarize-recursive");
 
     }
   };
