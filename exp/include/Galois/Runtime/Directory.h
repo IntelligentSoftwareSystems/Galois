@@ -227,7 +227,7 @@ class LocalDirectory : public BaseDirectory {
 
   metadata& getMD(fatPointer ptr);
 
-  void eraseMD(fatPointer ptr, metadata& md);
+  void eraseMD(fatPointer ptr, std::unique_lock<LL::SimpleLock>& mdl);
 
   //!Send object to all outstanding readers
   void sendToReaders(metadata&, fatPointer);
@@ -235,7 +235,7 @@ class LocalDirectory : public BaseDirectory {
   //!Send invalidate to all outstanding readers
   void invalidateReaders(metadata&, fatPointer, uint32_t);
 
-  void updatePendingRequests(metadata&, fatPointer);
+  void updatePendingRequests(metadata&, fatPointer, std::unique_lock<LL::SimpleLock>&);
 
   void considerObject(metadata& m, fatPointer ptr);
 
