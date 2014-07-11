@@ -55,7 +55,7 @@ class DoAllWork {
     LL::SimpleLock stealLock;
     std::atomic<bool> avail;
 
-    state() { stealLock.lock(); }
+    state(): avail(false) { stealLock.lock(); }
 
     void populateSteal(iterator& begin, iterator& end) {
       if (std::distance(begin, end) > 1) {
@@ -69,6 +69,9 @@ class DoAllWork {
     bool doSteal(iterator& begin, iterator& end, int minSteal) {
       if (avail) {
         std::lock_guard<LL::SimpleLock> lg(stealLock);
+        if (!avail)
+          return false;
+
         if (stealBegin != stealEnd) {
           begin = stealBegin;
           if (std::distance(stealBegin, stealEnd) < 2*minSteal)
@@ -100,7 +103,7 @@ class DoAllWork {
         if (TLDS.getRemote(x)->doSteal(begin, end, minSteal)) {
           if (std::distance(begin, end) > minSteal) {
             local.stealLock.lock();
-            local.populateSteal(begin,end);
+            local.populateSteal(begin, end);
           }
           return true;
         }
@@ -132,7 +135,7 @@ public:
     do {
       while (begin != end)
         F(*begin++);
-    } while (trySteal(tld,begin,end, minSteal));
+    } while (trySteal(tld, begin, end, minSteal));
   }
 };
 
