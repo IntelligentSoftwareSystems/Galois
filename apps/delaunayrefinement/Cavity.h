@@ -26,7 +26,9 @@
 #include <algorithm>
 
 class Cavity {
+  //! [STL vector using PerIterAllocTy]
   typedef std::vector<EdgeTuple,Galois::PerIterAllocTy::rebind<EdgeTuple>::other> ConnTy;
+  //! [STL vector using PerIterAllocTy]
 
   Tuple center;
   GNode centerNode;

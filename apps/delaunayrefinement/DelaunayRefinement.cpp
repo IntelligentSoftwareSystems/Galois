@@ -69,7 +69,10 @@ static cll::opt<DetAlgo> detAlgo(cll::desc("Deterministic algorithm:"),
 
 template<int Version=detBase>
 struct Process {
+  //! [Enabling Per Iteration Allocator in DMR]
   typedef int tt_needs_per_iter_alloc;
+  //! [Enabling Per Iteration Allocator in DMR]
+
 
   struct LocalState {
     Cavity cav;
@@ -100,7 +103,9 @@ struct Process {
       cavp->build();
       cavp->computePost();
     } else {
+      //! [Accessing Per Iteration Allocator in DMR]
       Cavity cav(graph, ctx.getPerIterAlloc());
+      //! [Accessing Per Iteration Allocator in DMR]
       cav.initialize(item);
       cav.build();
       cav.computePost();
@@ -150,7 +155,7 @@ int main(int argc, char** argv) {
   // Tighter upper bound for pre-alloc, useful for machines with limited memory,
   // e.g., Intel MIC. May not be enough for deterministic execution
   const size_t NODE_SIZE = sizeof(**graph->begin());
-  Galois::preAlloc (5 * Galois::getActiveThreads () + NODE_SIZE * 8 * graph->size () / Galois::Runtime::MM::pageSize);
+  Galois::preAlloc (5 * Galois::getActiveThreads () + NODE_SIZE * 8 * graph->size () / Galois::Runtime::MM::hugePageSize);
   // Relaxed upper bound
   // Galois::preAlloc(15 * numThreads + Galois::Runtime::MM::numPageAllocTotal() * 10);
   Galois::reportPageAlloc("MeminfoPre2");
@@ -158,10 +163,12 @@ int main(int argc, char** argv) {
   Galois::StatTimer T;
   T.start();
 
+  //! [do_all_local example]
   Galois::InsertBag<GNode> initialBad;
 
   if (detAlgo == nondet)
     Galois::do_all_local(*graph, Preprocess(initialBad), Galois::loopname("findbad"));
+  //! [do_all_local example]
   else
     std::for_each(graph->begin(), graph->end(), Preprocess(initialBad));
 
@@ -171,6 +178,7 @@ int main(int argc, char** argv) {
   Trefine.start();
   using namespace Galois::WorkList;
   
+      //! [for_each_local example]
   typedef LocalQueue<dChunkedLIFO<256>, ChunkedLIFO<256> > BQ;
   typedef AltChunkedLIFO<32> Chunked;
   
@@ -178,6 +186,7 @@ int main(int argc, char** argv) {
     case nondet: 
       Galois::for_each_local(initialBad, Process<>(), Galois::loopname("refine"), Galois::wl<Chunked>());
       break;
+      //! [for_each_local example]
     case detBase:
       Galois::for_each_det(initialBad.begin(), initialBad.end(), Process<>());
       break;

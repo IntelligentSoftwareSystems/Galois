@@ -27,6 +27,8 @@
 #include <string>
 #include <sstream>
 
+#include <cassert>
+
 #include "comDefs.h"
 #include "logicDefs.h"
 #include "LogicFunctions.h"
@@ -222,6 +224,43 @@ public:
     this->input2Val = input2Val;
   }
 
+protected:
+
+  struct State: public BaseLogicGate::State {
+    LogicVal input1Val;
+    LogicVal input2Val;
+
+    State (const TwoInputGate& g)
+      : 
+        BaseLogicGate::State (g), 
+        input1Val (g.input1Val), 
+        input2Val (g.input2Val)
+    {}
+
+    void restore (TwoInputGate& g) {
+      BaseLogicGate::State::restore (g);
+
+      g.input1Val = input1Val;
+      g.input2Val = input2Val;
+    }
+
+
+  };
+
+public:
+  virtual size_t getStateSize () const { return sizeof (State); }
+
+  virtual void copyState (char* const buf, const size_t bufSize) const {
+    assert (bufSize >= getStateSize () && "insufficient buffer for state");
+    new (buf) State (*this);
+  }
+
+  virtual void restoreState (char* const buf, const size_t bufSize) {
+    assert (bufSize >= getStateSize () && "insufficient buffer for state");
+
+    State* s = reinterpret_cast<State*> (buf);
+    s->restore (*this);
+  }
 };
 
 

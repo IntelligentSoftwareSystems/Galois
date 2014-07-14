@@ -71,8 +71,8 @@ enum Algo {
 
 enum OutputEdgeType {
   void_,
-  int32,
-  int64
+  int32_,
+  int64_
 };
 
 namespace cll = llvm::cl;
@@ -86,8 +86,8 @@ cll::opt<unsigned int> memoryLimit("memoryLimit",
 static cll::opt<OutputEdgeType> writeEdgeType("edgeType", cll::desc("Input/Output edge type:"),
     cll::values(
       clEnumValN(OutputEdgeType::void_, "void", "no edge values"),
-      clEnumValN(OutputEdgeType::int32, "int32", "32 bit edge values"),
-      clEnumValN(OutputEdgeType::int64, "int64", "64 bit edge values"),
+      clEnumValN(OutputEdgeType::int32_, "int32", "32 bit edge values"),
+      clEnumValN(OutputEdgeType::int64_, "int64", "64 bit edge values"),
       clEnumValEnd), cll::init(OutputEdgeType::void_));
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
     cll::values(
@@ -670,13 +670,13 @@ void doWriteComponent(Graph& graph, typename Graph::node_data_type::component_ty
 
     edge_value_type* rawEdgeData = p.finish<edge_value_type>();
     if (EdgeData::has_value)
-      std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+      std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
 
     std::cout
       << "Writing largest component to " << largestComponentFilename
       << " (nodes: " << numNodes << " edges: " << numEdges << ")\n";
 
-    p.structureToFile(largestComponentFilename);
+    p.toFile(largestComponentFilename);
   }
 
   if (permutationFilename != "") {
@@ -799,7 +799,7 @@ void run() {
     graph.getData(*ii).id = id;
   }
   
-  Galois::preAlloc(numThreads + (2 * graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::MM::pageSize);
+  Galois::preAlloc(numThreads + (2 * graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::MM::hugePageSize);
   Galois::reportPageAlloc("MeminfoPre");
 
   Galois::StatTimer T;
@@ -817,8 +817,8 @@ void run() {
     if (component && (largestComponentFilename != "" || permutationFilename != "")) {
       switch (writeEdgeType) {
         case OutputEdgeType::void_: writeComponent<void>(algo, graph, component); break;
-        case OutputEdgeType::int32: writeComponent<uint32_t>(algo, graph, component); break;
-        case OutputEdgeType::int64: writeComponent<uint64_t>(algo, graph, component); break;
+        case OutputEdgeType::int32_: writeComponent<uint32_t>(algo, graph, component); break;
+        case OutputEdgeType::int64_: writeComponent<uint64_t>(algo, graph, component); break;
         default: abort();
       }
     }

@@ -373,7 +373,7 @@ void globalRelabel(IncomingWL& incoming) {
   switch (detAlgo) {
     case nondet:
 #ifdef GALOIS_USE_EXP
-      Galois::for_each(app.sink, UpdateHeights<nondet>(), Galois::loopname("UpdateHeights"), Galois::wl<Galois::WorkList::BulkSynchronousInline<>>());
+      Galois::for_each(app.sink, UpdateHeights<nondet>(), Galois::loopname("UpdateHeights"), Galois::wl<Galois::WorkList::BulkSynchronousInline>());
 #else
       Galois::for_each(app.sink, UpdateHeights<nondet>(), Galois::loopname("UpdateHeights"));
 #endif
@@ -407,7 +407,7 @@ void acquire(const GNode& src) {
 
 void relabel(const GNode& src) {
   int minHeight = std::numeric_limits<int>::max();
-  int minEdge;
+  int minEdge = 0;
 
   int current = 0;
   for (Graph::edge_iterator 
@@ -591,7 +591,7 @@ void writePfpGraph(const std::string& inputFile, const std::string& outputFile) 
   typedef ReaderGraph::GraphNode ReaderGNode;
 
   ReaderGraph reader;
-  reader.structureFromFile(inputFile);
+  reader.fromFile(inputFile);
 
   typedef Galois::Graph::FileGraphWriter Writer;
   typedef Galois::LargeArray<EdgeTy> EdgeData;
@@ -651,9 +651,9 @@ void writePfpGraph(const std::string& inputFile, const std::string& outputFile) 
   }
 
   edge_value_type* rawEdgeData = p.finish<edge_value_type>();
-  std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+  std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
 
-  p.structureToFile(outputFile);
+  p.toFile(outputFile);
 }
 
 void initializeGraph(std::string inputFile, uint32_t sourceId, uint32_t sinkId, Config *newApp) {
@@ -675,7 +675,8 @@ void initializeGraph(std::string inputFile, uint32_t sourceId, uint32_t sinkId, 
     }
     Galois::Graph::readGraph(newApp->graph, inputFile);
 
-#ifdef HAVE_BIG_ENDIAN
+    // Assume that input edge data has already been converted instead
+#if 0//def HAVE_BIG_ENDIAN
     // Convert edge data to host ordering
     for (Graph::iterator ss = newApp->graph.begin(), es = newApp->graph.end(); ss != es; ++ss) {
       for (Graph::edge_iterator ii = newApp->graph.edge_begin(*ss), ei = newApp->graph.edge_end(*ss); ii != ei; ++ii) {

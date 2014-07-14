@@ -22,8 +22,8 @@ static void setPixelUnsafe(struct rgbData data[][WIDTH], int x, int y, struct rg
 
 static void drawchar(struct rgbData data[][WIDTH], int x0, int y0, char d, struct rgbData color) {
   int set;
-  int mask;
-  unsigned char* bitmap = font8x8_basic[d];
+  //int mask;
+  unsigned char* bitmap = font8x8_basic[(int)d];
   for (int x=0; x < 8; x++) {
     for (int y=0; y < 8; y++) {
       set = bitmap[x] & 1 << y;
@@ -33,7 +33,7 @@ static void drawchar(struct rgbData data[][WIDTH], int x0, int y0, char d, struc
   }
 }
 
-static void drawstring(struct rgbData data[][WIDTH], int x0, int y0, const char* d, struct rgbData color) {
+static inline void drawstring(struct rgbData data[][WIDTH], int x0, int y0, const char* d, struct rgbData color) {
   for (int i = 0; i < strlen(d); ++i)
     drawchar(data, x0 + i * 8, y0, d[i], color);
 }

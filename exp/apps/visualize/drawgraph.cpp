@@ -13,17 +13,17 @@
 
 const double PI = 3.141593;
 const double Tinit = 255;
-const double Tmax = 255.00;
-const double Tmin = 1;
+//const double Tmax = 255.00;
+//const double Tmin = 1;
 
 const double gravConst = .0625;//.0625;
-const int randRange = 1;
+//const int randRange = 1;
 const double idealDist = 4;
 const double lenLimit = 0.001;
 const double maxForceLimit = 50;
 const double totForceLimit = 500;
-const int RmaxMult = 16;
-const bool useScaling = false;
+//const int RmaxMult = 16;
+//const bool useScaling = false;
 
 bool doExit = false;
 double alpha = 1.0;
@@ -170,11 +170,11 @@ static bool renderGraph(struct rgbData data[][WIDTH], unsigned width, unsigned h
 
   rgbData black = {0,0,0};
   rgbData red = {255,0,0};
-  rgbData green = {0,255,0};
+  //rgbData green = {0,255,0};
   rgbData blue = {0,0,255};
-  rgbData green2 = {0,255,255};
-  rgbData green3 = {128,0,128};
-  rgbData green4 = {0,127,0};
+  //rgbData green2 = {0,255,255};
+  //rgbData green3 = {128,0,128};
+  //rgbData green4 = {0,127,0};
 
   rgbData color = {200,70,110};
   drawcircle(data, midX, midY, 10, color);
@@ -408,7 +408,7 @@ int main(int argc, char **argv) {
   //assign points in space to nodes
   initializeVertices(graph);
 
-  int Rmax = RmaxMult*nnodes;
+  //int Rmax = RmaxMult*nnodes;
 
   double Tglob = 0.0;
   computeGlobalTemp(graph, Tglob);
@@ -447,7 +447,7 @@ int main(int argc, char **argv) {
     Galois::Runtime::PerThreadStorage<double> maxForceSQ;
     Galois::Runtime::PerThreadStorage<Point<double>> totalForce;
     double step = natStepSize;
-    Vertex& v = graph.getData(*graph.begin());
+    //Vertex& v = graph.getData(*graph.begin());
     //v.dump();
     Galois::do_all(graph.begin(), graph.end(), computeImpulse(graph, numRounds % 2, step, maxForceSQ, totalForce));
     //v.dump();

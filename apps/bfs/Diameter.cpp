@@ -139,30 +139,48 @@ struct has_dist {
 
 template<typename Graph>
 struct CountLevels {
-  Graph& graph;
-  std::deque<size_t> counts;
-  
-  CountLevels(Graph& g): graph(g) { }
+  // Reduce function
+  struct reducer {
+    template<typename G>
+    void operator()(G& a, G& b) {
+      if (a.size() < b.size())
+        a.resize(b.size());
+      std::transform(b.begin(), b.end(), a.begin(), a.begin(), std::plus<size_t>());
+    }
+  };
+  //! [Define BinFunc for GReducible]
+  struct updater {
+    void operator()(std::deque<size_t>& lhs, size_t rhs) {
+      if (lhs.size() <= rhs)
+        lhs.resize(rhs + 1);
+      ++lhs[rhs];
+    }
+  };
 
+  //! [Define BinFunc for GReducible]
+
+  Graph& graph;
+  //! [Define GReducible]
+  Galois::GReducible<std::deque<size_t>, updater>* counts;
+  //! [Define GReducible]
+  CountLevels(Graph& g): graph(g) { }
+  
+  //! [Use GReducible in parallel]
   void operator()(typename Graph::GraphNode n) {
     Dist d = graph.getData(n).dist;
     if (d == DIST_INFINITY)
       return;
-    if (counts.size() <= d)
-      counts.resize(d + 1);
-    ++counts[d];
+    counts->update(d);
   }
-
-  // Reduce function
-  template<typename G>
-  void operator()(CountLevels<G>& a, CountLevels<G>& b) {
-    if (a.counts.size() < b.counts.size())
-      a.counts.resize(b.counts.size());
-    std::transform(b.counts.begin(), b.counts.end(), a.counts.begin(), a.counts.begin(), std::plus<size_t>());
-  }
-
+  //! [Use GReducible in parallel]
+  
   std::deque<size_t> count() {
-    return Galois::Runtime::do_all_impl(Galois::Runtime::makeLocalRange(graph), *this, *this).counts;
+    Galois::GReducible<std::deque<size_t>, updater> C{updater()};
+    counts = &C;
+    Galois::do_all_local(graph, *this);
+   //![Reduce the final value] 
+    return C.reduce(reducer());
+   //![Reduce the final value] 
   }
 };
 
@@ -428,7 +446,7 @@ void run() {
 
   initialize(algo, graph, source);
 
-  //Galois::preAlloc((numThreads + (graph.size() * sizeof(SNode) * 2) / Galois::Runtime::MM::pageSize)*8);
+  //Galois::preAlloc((numThreads + (graph.size() * sizeof(SNode) * 2) / Galois::Runtime::MM::hugePageSize)*8);
   Galois::reportPageAlloc("MeminfoPre");
 
   Galois::StatTimer T;

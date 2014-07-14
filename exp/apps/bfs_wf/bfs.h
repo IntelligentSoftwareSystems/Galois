@@ -35,10 +35,21 @@
 #include <iostream>
 #include <set>
 
+#define GALOIS_USE_MIC_CSR_IMPL
+// #undef GALOIS_USE_MIC_CSR_IMPL
+
+#ifdef GALOIS_USE_MIC_CSR_IMPL
+  #include "Galois/Graph/LC_CSR_Graph_MIC.h"
+#else
+  #include "Galois/Graph/LC_CSR_Graph.h"
+#endif
+
+#include "Galois/Accumulator.h"
+#include "Galois/DoAllWrap.h"
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
 #include "Galois/Galois.h"
-#include "Galois/Graph/LCGraph.h"
+#include "Galois/Graph/Util.h"
 #include "Galois/Graph/FileGraph.h"
 #include "llvm/Support/CommandLine.h"
 
@@ -57,17 +68,19 @@ static const char* const url = "bfs";
 static cll::opt<unsigned int> startId("startnode", cll::desc("Node to start search from"), cll::init(0));
 static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>"), cll::Required);
 
-static const unsigned LEVEL_INFINITY = 1 << 20;
+static const unsigned BFS_LEVEL_INFINITY = (1 << 20) - 1;
 
+static const unsigned CHUNK_SIZE = 1024; 
 
+#if 0
 struct NodeData {
   unsigned data;
 
   NodeData (): data (0) {}
-  explicit NodeData (unsigned _data): data (_data) {}
+  NodeData (unsigned _data): data (_data) {}
 
-  inline unsigned& level () { return data; }
-  inline const unsigned& level () const { return data; }
+  inline operator unsigned& () { return data; }
+  inline operator const unsigned& () const { return data; }
 
 };
 
@@ -75,19 +88,23 @@ struct NodeDataCacheLine: public Galois::Runtime::LL::CacheLineStorage<unsigned>
   typedef Galois::Runtime::LL::CacheLineStorage<unsigned> Super_ty;
 
   NodeDataCacheLine (): Super_ty (0) {}
-  explicit NodeDataCacheLine (unsigned _data): Super_ty (_data) {}
+  NodeDataCacheLine (unsigned _data): Super_ty (_data) {}
 
-  inline unsigned& level () { return Super_ty::data; }
-  inline const unsigned& level () const { return Super_ty::data; }
+  inline operator unsigned& () { return Super_ty::data; }
+  inline operator const unsigned& () const { return Super_ty::data; }
 
 };
+#endif
 
+typedef Galois::GAccumulator<unsigned> ParCounter;
 
 template <typename ND>
 class BFS {
 
 public:
-  typedef typename Galois::Graph::LC_CSR_Graph<ND, void> Graph;
+  typedef typename Galois::Graph::LC_CSR_Graph<ND, void>
+    ::template with_numa_alloc<true>::type
+    ::template with_no_lockable<true>::type Graph;
   typedef typename Graph::GraphNode GNode;
   typedef ND NodeData_ty;
 
@@ -99,26 +116,36 @@ protected:
   virtual void initGraph (const std::string& filename, Graph& graph) const {
     std::cout << "Reading graph from file: " << filename << std::endl;
 
+    Galois::StatTimer t_read ("Time for reading from file: ");
+
+    t_read.start ();
     Galois::Graph::readGraph(graph, filename);
+    t_read.stop ();
 
+
+    Galois::StatTimer t_init ("Time for initializing node data and counting edges: ");
+
+
+    t_init.start ();
     unsigned numNodes = graph.size ();
-    unsigned numEdges = 0;
+    ParCounter numEdges;
 
-    for (typename Graph::iterator i = graph.begin (), ei = graph.end ();
-        i != ei; ++i) {
+    Galois::do_all_choice (graph.begin (), graph.end (),
+        [&numEdges,&graph] (GNode n) {
+          graph.getData (n, Galois::NONE) = ND (BFS_LEVEL_INFINITY);
+          numEdges += graph.edge_end (n, Galois::NONE) - graph.edge_begin (n, Galois::NONE);
+          // std::cout << "Degree: " << graph.edge_end (n, Galois::NONE) - graph.edge_begin (n, Galois::NONE) << std::endl;
+        });
 
-      graph.getData (*i, Galois::NONE) = ND (LEVEL_INFINITY);
-      numEdges += graph.edge_end (*i, Galois::NONE) - graph.edge_begin (*i, Galois::NONE);
-    }
-
-    std::cout << "Graph read with nodes=" << numNodes << ", edges=" << numEdges << std::endl;
+    t_init.stop();
+    std::cout << "Graph read with nodes=" << numNodes << ", edges=" << numEdges.reduce () << std::endl;
   }
 
   virtual GNode getStartNode (const Graph& graph, unsigned startId) const {
     assert (startId < graph.size ());
 
     unsigned id = 0;
-    GNode startNode;
+    GNode startNode = 0;
     for (typename Graph::iterator i = graph.begin (), ei = graph.end ();
         i != ei; ++i) {
 
@@ -133,38 +160,60 @@ protected:
   }
 
   virtual bool verify (Graph& graph, GNode& startNode) const {
-    bool result = true;
 
-    for (typename Graph::iterator i = graph.begin (), ei = graph.end ();
-        i != ei; ++i) {
+    Galois::StatTimer t_verify ("Verification time: ");
 
-      const unsigned srcLevel = graph.getData (*i, Galois::NONE).level ();
-      if (srcLevel >= LEVEL_INFINITY) { 
-        std::cerr << "BAD Level value >= INFINITY at node " << (*i) << std::endl;
-        result = false;
-      }
-
-
-      for (typename Graph::edge_iterator ni = graph.edge_begin (*i, Galois::NONE), eni = graph.edge_end (*i, Galois::NONE);
-          ni != eni; ++ni) {
-        
-        GNode dst = graph.getEdgeDst (ni);
-        const unsigned dstLevel = graph.getData (dst, Galois::NONE).level ();
-        if (dstLevel > (srcLevel + 1)) {
-          result = false;
-          std::cerr << "BAD Level value=" << dstLevel << " at neighbor " << dst << " of node " 
-            << (*i) << std::endl; 
-        }
-      }
+    t_verify.start ();
+    Galois::Runtime::PerThreadStorage<bool> result;
+    for (unsigned i = 0; i < result.size (); ++i) {
+      *result.getRemote(i) = true;
     }
 
-    return result;
+    ParCounter numUnreachable;
+
+    Galois::do_all_choice (graph.begin (), graph.end (),
+        [&graph, &numUnreachable, &result, &startNode] (GNode n) {
+          const unsigned srcLevel = graph.getData (n, Galois::NONE);
+          if (srcLevel >= BFS_LEVEL_INFINITY) { 
+            numUnreachable += 1;
+            // std::cerr << "BAD Level value >= INFINITY at node " << (*i) << std::endl;
+            // result = false;
+          }
+
+
+          for (typename Graph::edge_iterator e = graph.edge_begin (n, Galois::NONE)
+            , ende = graph.edge_end (n, Galois::NONE); e != ende; ++e) {
+            
+            GNode dst = graph.getEdgeDst (e);
+            const unsigned dstLevel = graph.getData (dst, Galois::NONE);
+            if (dstLevel > (srcLevel + 1) || (dst != startNode && dstLevel == 0)) {
+              *result.getLocal () = false;
+              std::cerr << "BAD Level value=" << dstLevel << " at neighbor " << dst << " of node " 
+                << n << std::endl; 
+            }
+          }
+        });
+
+    if (numUnreachable.reduce () > 0) {
+      std::cerr << "WARNING: " << numUnreachable.reduce () << " nodes were unreachable. "
+        << "This is an error if the input is strongly connected" << std::endl;
+    }
+
+    bool conj = true;
+    for (unsigned i = 0; i < result.size (); ++i) {
+      conj = conj && *result.getRemote (i);
+    }
+
+    t_verify.stop ();
+
+    return conj;
   }
 
 public:
 
   virtual void run (int argc, char* argv[]) {
     LonestarStart (argc, argv, name, desc, url);
+    Galois::StatManager sm;
 
     Graph graph;
 
@@ -177,13 +226,21 @@ public:
     std::cout << "Running <" << getVersion () << "> BFS" << std::endl;
     std::cout << "start node = " << startNode << std::endl;
 
-    Galois::StatTimer timer ("BFS time: ");
+    Galois::StatTimer timer;
+
+
+    // for node based versions
+    // Galois::preAlloc (Galois::getActiveThreads () + 8*graph.size ()/Galois::Runtime::MM::pageSize);
+    // // for edge based versions
+    Galois::preAlloc (Galois::getActiveThreads () + 8*graph.sizeEdges ()/Galois::Runtime::MM::pageSize);
+    Galois::reportPageAlloc("MeminfoPre");
 
     timer.start ();
     Galois::Runtime::beginSampling ();
-    unsigned numIter = runBFS (graph, startNode);
+    size_t numIter = runBFS (graph, startNode);
     Galois::Runtime::endSampling ();
     timer.stop ();
+    Galois::reportPageAlloc("MeminfoPost");
 
     std::cout << "BFS " << getVersion () << " iterations=" << numIter << std::endl;
 
@@ -203,9 +260,8 @@ public:
   template <typename WL, typename T>
   GALOIS_ATTRIBUTE_PROF_NOINLINE static void addToWL (
       WL& workList, 
-      void (WL::*pushFn) (const typename WL::value_type&),
       const T& val) {
-    (workList.*pushFn) (val);
+    workList.push_back (val);
   }
 
 
@@ -213,12 +269,12 @@ public:
   template <bool doLock, typename WL>
   GALOIS_ATTRIBUTE_PROF_NOINLINE static unsigned bfsOperator (
       Graph& graph, GNode& src, 
-      WL& workList, void (WL::*pushFn) (const typename WL::value_type&)) {
+      WL& workList) {
 
 
     unsigned numAdds = 0;
 
-    const unsigned srcLevel = graph.getData (src, (doLock ? Galois::CHECK_CONFLICT : Galois::NONE)).level ();
+    const unsigned srcLevel = graph.getData (src, (doLock ? Galois::CHECK_CONFLICT : Galois::NONE));
 
     // putting a loop to acquire locks. For now, edge_begin does not acquire locks on neighbors,
     // which it should
@@ -238,11 +294,11 @@ public:
       GNode dst = graph.getEdgeDst (ni);
 
       ND& dstData = graph.getData (dst, Galois::NONE); // iterator should already have acquired locks on neighbors
-      if (dstData.level () == LEVEL_INFINITY) {
-        dstData.level () = srcLevel + 1;
+      if (dstData == BFS_LEVEL_INFINITY) {
+        dstData = srcLevel + 1;
 
-        // (workList.*pushFn) (dst);
-        addToWL (workList, pushFn, dst);
+        // workList.push_back (dst);
+        addToWL (workList, dst);
         ++numAdds;
       }
 

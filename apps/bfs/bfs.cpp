@@ -537,6 +537,8 @@ struct DeterministicAlgo {
   typedef std::pair<GNode,int> WorkItem;
 
   struct Process {
+    typedef int tt_has_fixed_neighborhood;
+    static_assert(Galois::has_fixed_neighborhood<Process>::value, "Oops");
     typedef int tt_needs_per_iter_alloc; // For LocalState
     static_assert(Galois::needs_per_iter_alloc<Process>::value, "Oops");
 
@@ -626,19 +628,29 @@ struct DeterministicAlgo {
 
   void operator()(Graph& graph, const GNode& source) const {
 #ifdef GALOIS_USE_EXP
-    typedef Galois::WorkList::BulkSynchronousInline<> WL;
+    typedef Galois::WorkList::BulkSynchronousInline WL;
 #else
     typedef Galois::WorkList::BulkSynchronous<Galois::WorkList::dChunkedLIFO<256> > WL;
 #endif
     graph.getData(source).dist = 0;
 
     switch (Version) {
-    case DetAlgo::none: Galois::for_each(WorkItem(source, 1), Process(graph),Galois::wl<WL>()); break; 
+      case DetAlgo::none: Galois::for_each(WorkItem(source, 1), Process(graph),Galois::wl<WL>()); break; 
       case DetAlgo::base: Galois::for_each_det(WorkItem(source, 1), Process(graph)); break;
       case DetAlgo::disjoint: Galois::for_each_det(WorkItem(source, 1), Process(graph)); break;
-      default: std::cerr << "Unknown algorithm " << int(Version) << "\n"; abort();
+      default: GALOIS_DIE("Unknown algorithm ", int(Version));
     }
   }
+};
+
+template<typename T>
+struct AllocationOverhead {
+  static const int value = 3;
+};
+
+template<DetAlgo T>
+struct AllocationOverhead<DeterministicAlgo<T>> {
+  static const int value = 40;
 };
 
 template<typename Algo>
@@ -652,8 +664,12 @@ void run() {
 
   initialize(algo, graph, source, report);
 
-  //Galois::preAlloc(numThreads + (3*graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::MM::pageSize);
-  Galois::preAlloc(8*(numThreads + (graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::MM::pageSize));
+  //Galois::preAlloc(numThreads + (3*graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::MM::hugePageSize);
+  //Galois::preAlloc(8*(numThreads + (graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::MM::hugePageSize));
+  size_t baseAlloc = graph.size() * sizeof(typename Graph::node_data_type) / Galois::Runtime::MM::hugePageSize;
+  baseAlloc += numThreads;
+  baseAlloc *= AllocationOverhead<Algo>::value;
+  Galois::preAlloc(baseAlloc);
 
   Galois::reportPageAlloc("MeminfoPre");
 
@@ -687,7 +703,7 @@ int main(int argc, char **argv) {
   typedef BulkSynchronous<dChunkedLIFO<256> > BSWL;
 
 #ifdef GALOIS_USE_EXP
-  typedef BulkSynchronousInline<> BSInline;
+  typedef BulkSynchronousInline BSInline;
 #else
   typedef BSWL BSInline;
 #endif
@@ -713,7 +729,7 @@ int main(int argc, char **argv) {
 #endif
     case Algo::deterministic: run<DeterministicAlgo<DetAlgo::base> >(); break;
     case Algo::deterministicDisjoint: run<DeterministicAlgo<DetAlgo::disjoint> >(); break;
-    default: std::cerr << "Unknown algorithm\n"; abort();
+    default: GALOIS_DIE("Unknown algorithm");
   }
   T.stop();
 

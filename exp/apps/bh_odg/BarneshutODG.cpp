@@ -64,7 +64,7 @@ static cll::opt<int> seed("seed", cll::desc("Random seed"), cll::init(7));
 
 
 enum TreeSummMethod {
-  SERIAL, KDG_HAND, KDG_SEMI, LEVEL_HAND, SPEC, TWO_PHASE, LEVEL_EXEC, CILK_EXEC
+  SERIAL, KDG_HAND, KDG_SEMI, LEVEL_HAND, SPEC, TWO_PHASE, DAG, LEVEL_EXEC, CILK_EXEC
 };
 
 cll::opt<TreeSummMethod> treeSummOpt (
@@ -76,6 +76,7 @@ cll::opt<TreeSummMethod> treeSummOpt (
       clEnumVal (LEVEL_HAND, "level-by-level hand-implemented"),
       clEnumVal (SPEC, "using speculative ordered executor"),
       clEnumVal (TWO_PHASE, "using two phase window ordered executor"),
+      clEnumVal (DAG, "using data dependence DAG version of KDG"),
       clEnumVal (LEVEL_EXEC, "using level-by-level executor"),
       clEnumVal (CILK_EXEC, "using cilk executor"),
       clEnumValEnd),
@@ -145,6 +146,15 @@ struct ToggleTime<false> {
   void stop() { }
 };
 
+template <typename B>
+struct GetPos {
+  typedef const Point& result_type;
+
+  result_type operator () (const Body<B>* b) const {
+    return b->pos;
+  }
+};
+
 
 template <bool TrackTime, typename SM>
 Point run(int nbodies, int ntimesteps, int seed, const SM& summMethod) {
@@ -170,19 +180,25 @@ Point run(int nbodies, int ntimesteps, int seed, const SM& summMethod) {
     BoundingBox box;
     ToggleTime<TrackTime> t_bbox ("Time taken by Bounding Box computation: ");
 
+    auto beg = boost::make_transform_iterator (bodies.begin (), GetPos<B> ());
+    auto end = boost::make_transform_iterator (bodies.end (), GetPos<B> ());
 
     t_bbox.start ();
-    Galois::for_each(bodies.begin(), bodies.end(),
+    Galois::for_each(beg, end,
         ReduceBoxes<B>(box), Galois::wl<WL> ());
     t_bbox.stop ();
 
 
-    OctreeInternal<B>* top = new OctreeInternal<B>(box.center());
+    // OctreeInternal<B>* top = new OctreeInternal<B>(box);
     ToggleTime<TrackTime> t_tree_build ("Time taken by Octree building: ");
 
     t_tree_build.start ();
-    Galois::for_each(bodies.begin(), bodies.end(),
-        BuildOctree<B>(top, box.radius()), Galois::wl<WL> ());
+    BuildOctreeSerial<B> build;
+
+    OctreeInternal<B>* top = build (box, bodies.begin (), bodies.end ());
+
+    // Galois::for_each(bodies.begin(), bodies.end(),
+        // BuildOctree<B>(top, box.radius()), Galois::wl<WL> ());
     t_tree_build.stop ();
 
     // reset the number of threads
@@ -266,8 +282,12 @@ int main(int argc, char** argv) {
       pos = bh::run<true> (bh::nbodies, bh::ntimesteps, bh::seed, bh::TreeSummarizeTwoPhase ());
       break;
 
+    case bh::DAG:
+      pos = bh::run<true> (bh::nbodies, bh::ntimesteps, bh::seed, bh::TreeSummarizeDAG ());
+      break;
+
     case bh::LEVEL_EXEC:
-      pos = bh::run<true> (bh::nbodies, bh::ntimesteps, bh::seed, bh::TreeSummarizeLevelExec ());
+      // pos = bh::run<true> (bh::nbodies, bh::ntimesteps, bh::seed, bh::TreeSummarizeLevelExec ());
       break;
 
     case bh::CILK_EXEC:

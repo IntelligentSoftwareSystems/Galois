@@ -38,6 +38,7 @@
 #include "Galois/Runtime/DoAll.h"
 #include "Galois/Runtime/ParallelWork.h"
 #include "Galois/Runtime/PerThreadWorkList.h"
+#include "Galois/Runtime/Range.h"
 #include "Galois/Runtime/ll/gio.h"
 #include "Galois/Runtime/ll/ThreadRWlock.h"
 #include "Galois/Runtime/mm/Mem.h"
@@ -65,8 +66,7 @@ protected:
   Lockable* lockable;
 
 public:
-  template <typename Cmp>
-  NhoodItem (Lockable* l, const Cmp& cmp):  sharers (CtxtCmp (cmp)), lockable (l) {}
+  NhoodItem (Lockable* l, const CtxtCmp& ctxcmp):  sharers (ctxcmp), lockable (l) {}
 
   void add (const Ctxt* ctx) {
 
@@ -98,10 +98,13 @@ public:
   }
   
   bool tryMappingTo (Lockable* l) {
-    return Base::stealByCAS (l, NULL);
+    return Base::CASowner (l, NULL);
   }
 
   void clearMapping () {
+    // release requires having owned the lock
+    bool r = Base::tryLock (lockable);
+    assert (r);
     Base::release (lockable);
   }
 
@@ -115,19 +118,187 @@ public:
     // assert (dynamic_cast<NhoodItem*> (o) != nullptr);
     return static_cast<NhoodItem*> (o);
   }
+
+
+  struct Factory {
+
+    typedef NhoodItem<Ctxt, CtxtCmp> NItem;
+    typedef Galois::Runtime::MM::FSBGaloisAllocator<NItem> NItemAlloc;
+
+    NItemAlloc niAlloc;
+    CtxtCmp ctxcmp;
+
+    explicit Factory (const CtxtCmp& ctxcmp): ctxcmp (ctxcmp) {}
+
+    NItem* create (Lockable* l) {
+      NItem* ni = niAlloc.allocate (1);
+      assert (ni != nullptr);
+      // XXX(ddn): Forwarding still wonky on XLC
+#if !defined(__IBMCPP__) || __IBMCPP__ > 1210
+      niAlloc.construct (ni, l, ctxcmp);
+#else
+      niAlloc.construct (ni, NItem(l, ctxcmp));
+#endif
+
+      return ni;
+    }
+
+    void destroy (NItem* ni) {
+      // delete ni; ni = NULL;
+      niAlloc.destroy (ni);
+      niAlloc.deallocate (ni, 1);
+      ni = NULL;
+    }
+  };
+
+
 };
 
+template<typename NItem>
+class PtrBasedNhoodMgr: boost::noncopyable {
+public:
+  typedef typename NItem::Factory NItemFactory;
 
-template <typename T, typename Cmp, typename NhoodMgr_tp>
+  typedef Galois::Runtime::MM::FSBGaloisAllocator<NItem> NItemAlloc;
+  typedef Galois::Runtime::PerThreadVector<NItem*> NItemWL;
+
+protected:
+  NItemFactory factory;
+  NItemWL allNItems;
+  
+public:
+  PtrBasedNhoodMgr(const NItemFactory& f): factory (f) {}
+
+  NItem& getNhoodItem (Lockable* l) {
+
+    if (NItem::getOwner (l) == NULL) {
+      // NItem* ni = new NItem (l, cmp);
+      NItem* ni = factory.create (l);
+
+      if (ni->tryMappingTo (l)) {
+        allNItems.get ().push_back (ni);
+
+      } else {
+        factory.destroy (ni);
+      }
+
+      assert (NItem::getOwner (l) != NULL);
+    }
+
+    NItem* ret = NItem::getOwner (l);
+    assert (ret != NULL);
+    return *ret;
+  }
+
+  LocalRange<NItemWL> getAllRange (void) {
+    return makeLocalRange (allNItems);
+  }
+
+  ~PtrBasedNhoodMgr() {
+    resetAllNItems();
+  }
+
+protected:
+  struct Reset {
+    PtrBasedNhoodMgr* self; 
+    void operator()(NItem* ni) {
+      ni->clearMapping();
+      self->factory.destroy(ni);
+    }
+  };
+
+  void resetAllNItems() {
+    Reset fn = { this };
+    do_all_impl(makeLocalRange(allNItems), fn);
+  }
+};
+
+template <typename NItem>
+class MapBasedNhoodMgr: public PtrBasedNhoodMgr<NItem> {
+public:
+  typedef MapBasedNhoodMgr MyType;
+
+  // typedef std::tr1::unordered_map<Lockable*, NItem> NhoodMap; 
+  //
+  typedef MM::SimpleBumpPtrWithMallocFallback<MM::FreeListHeap<MM::SystemBaseAlloc> > BasicHeap;
+  typedef MM::ThreadAwarePrivateHeap<BasicHeap> PerThreadHeap;
+  typedef MM::ExternRefGaloisAllocator<std::pair<Lockable*, NItem*>, PerThreadHeap> PerThreadAllocator;
+
+  typedef std::unordered_map<
+      Lockable*,
+      NItem*,
+      std::hash<Lockable*>,
+      std::equal_to<Lockable*>,
+      PerThreadAllocator
+    > NhoodMap;
+
+  typedef Galois::Runtime::LL::ThreadRWlock Lock_ty;
+  typedef PtrBasedNhoodMgr<NItem> Base;
+
+protected:
+  PerThreadHeap heap;
+  NhoodMap nhoodMap;
+  Lock_ty map_mutex;
+
+public:
+
+  MapBasedNhoodMgr (const typename Base::NItemFactory& f): 
+    Base (f),
+    heap (),
+    nhoodMap (8, std::hash<Lockable*> (), std::equal_to<Lockable*> (), PerThreadAllocator (&heap))
+
+  {}
+
+  NItem& getNhoodItem (Lockable* l) {
+
+    map_mutex.readLock ();
+      typename NhoodMap::iterator i = nhoodMap.find (l);
+
+      if (i == nhoodMap.end ()) {
+        // create the missing entry
+
+        map_mutex.readUnlock ();
+
+        map_mutex.writeLock ();
+          // check again to avoid over-writing existing entry
+          if (nhoodMap.find (l) == nhoodMap.end ()) {
+            NItem* ni = Base::factory.create (l);
+            Base::allNItems.get ().push_back (ni);
+            nhoodMap.insert (std::make_pair (l, ni));
+
+          }
+        map_mutex.writeUnlock ();
+
+        // read again now
+        map_mutex.readLock ();
+        i = nhoodMap.find (l);
+      }
+
+    map_mutex.readUnlock ();
+    assert (i != nhoodMap.end ());
+    assert (i->second != nullptr);
+
+    return *(i->second);
+    
+  }
+
+
+  ~MapBasedNhoodMgr () {
+    Base::resetAllNItems ();
+  }
+
+};
+
+template <typename T, typename Cmp>
 class LCorderedContext: public SimpleRuntimeContext {
 
 public:
   struct Comparator;
 
   typedef T value_type;
-  typedef NhoodMgr_tp NhoodMgr;
   typedef LCorderedContext MyType;
   typedef NhoodItem<MyType, typename MyType::Comparator> NItem;
+  typedef PtrBasedNhoodMgr<NItem> NhoodMgr;
   typedef Galois::GAtomic<bool> AtomicBool;
   typedef Galois::gdeque<NItem*, 4> NhoodList;
   // typedef llvm::SmallVector<NItem*, 4> NhoodList;
@@ -151,7 +322,7 @@ public:
       onWL (false) 
   {}
 
-  virtual void subAcquire (Lockable* l) {
+  GALOIS_ATTRIBUTE_PROF_NOINLINE virtual void subAcquire (Lockable* l) {
     NItem& nitem = nhmgr.getNhoodItem (l);
 
     assert (NItem::getOwner (l) == &nitem);
@@ -161,7 +332,7 @@ public:
     
   }
 
-  bool isSrc () const {
+  GALOIS_ATTRIBUTE_PROF_NOINLINE bool isSrc () const {
     assert (!nhood.empty ()); // TODO: remove later
 
     bool ret = true;
@@ -179,7 +350,7 @@ public:
     return ret;
   }
 
-  void removeFromNhood () {
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void removeFromNhood () {
     for (typename NhoodList::iterator n = nhood.begin ()
         , endn = nhood.end (); n != endn; ++n) {
 
@@ -197,7 +368,7 @@ public:
   }
 
   template <typename SourceTest, typename WL>
-  void findNewSources (const SourceTest& srcTest, WL& wl) {
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void findNewSources (const SourceTest& srcTest, WL& wl) {
 
     for (typename NhoodList::iterator n = nhood.begin ()
         , endn = nhood.end (); n != endn; ++n) {
@@ -216,7 +387,7 @@ public:
 
   // TODO: combine with above method and reuse the code
   template <typename SourceTest, typename WL>
-  void findSrcInNhood (const SourceTest& srcTest, WL& wl) {
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void findSrcInNhood (const SourceTest& srcTest, WL& wl) {
 
     for (typename NhoodList::iterator n = nhood.begin ()
         , endn = nhood.end (); n != endn; ++n) {
@@ -234,7 +405,7 @@ public:
   }
 
   struct Comparator {
-    Cmp cmp;
+    const Cmp& cmp;
 
     explicit Comparator (const Cmp& cmp): cmp (cmp) {}
 
@@ -248,193 +419,26 @@ public:
 };
 
 
-template<typename T, typename Cmp>
-class PtrBasedNhoodMgr {
-public:
-  typedef PtrBasedNhoodMgr MyType;
-  typedef LCorderedContext<T, Cmp, MyType> Ctxt;
-  typedef typename Ctxt::NItem NItem;
 
-  typedef Galois::Runtime::MM::FSBGaloisAllocator<NItem> NItemAlloc;
-  typedef Galois::Runtime::PerThreadVector<NItem*> NItemWL;
-
-protected:
-  Cmp cmp;
-  NItemAlloc niAlloc;
-  NItemWL allNItems;
-  
-public:
-  PtrBasedNhoodMgr(const Cmp& cmp): cmp (cmp) {}
-
-  NItem* create (Lockable* l) {
-    NItem* ni = niAlloc.allocate (1);
-    assert (ni != nullptr);
-    // XXX(ddn): Forwarding still wonky on XLC
-#if !defined(__IBMCPP__) || __IBMCPP__ > 1210
-    niAlloc.construct (ni, l, cmp);
-#else
-    niAlloc.construct (ni, NItem(l, cmp));
-#endif
-
-    return ni;
-  }
-
-  NItem& getNhoodItem (Lockable* l) {
-
-    if (NItem::getOwner (l) == NULL) {
-      // NItem* ni = new NItem (l, cmp);
-      NItem* ni = create (l);
-
-      if (ni->tryMappingTo (l)) {
-        allNItems.get ().push_back (ni);
-
-      } else {
-        // delete ni; ni = NULL;
-        niAlloc.destroy (ni);
-        niAlloc.deallocate (ni, 1);
-        ni = NULL;
-      }
-
-      assert (NItem::getOwner (l) != NULL);
-    }
-
-    NItem* ret = NItem::getOwner (l);
-    assert (ret != NULL);
-    return *ret;
-  }
-
-  ~PtrBasedNhoodMgr() {
-    resetAllNItems();
-  }
-
-protected:
-  struct Reset {
-    PtrBasedNhoodMgr* self; 
-    void operator()(NItem* ni) {
-      ni->clearMapping();
-      self->niAlloc.destroy(ni);
-      self->niAlloc.deallocate(ni, 1);
-    }
-  };
-
-  void resetAllNItems() {
-    Reset fn = { this };
-    do_all_impl(makeStandardRange(allNItems.begin_all(), allNItems.end_all()), fn);
-  }
-};
-
-template <typename T, typename Cmp>
-class MapBasedNhoodMgr: public PtrBasedNhoodMgr<T, Cmp> {
-public:
-  typedef MapBasedNhoodMgr MyType;
-  typedef LCorderedContext<T, Cmp, MyType> Ctxt;
-  typedef typename Ctxt::NItem NItem;
-
-  // typedef std::tr1::unordered_map<Lockable*, NItem> NhoodMap; 
-  //
-  typedef MM::SimpleBumpPtrWithMallocFallback<MM::FreeListHeap<MM::SystemBaseAlloc> > BasicHeap;
-  typedef MM::ThreadAwarePrivateHeap<BasicHeap> PerThreadHeap;
-  typedef MM::ExternRefGaloisAllocator<std::pair<Lockable*, NItem*>, PerThreadHeap> PerThreadAllocator;
-
-  typedef std::unordered_map<
-      Lockable*,
-      NItem*,
-      std::hash<Lockable*>,
-      std::equal_to<Lockable*>,
-      PerThreadAllocator
-    > NhoodMap;
-
-  typedef Galois::Runtime::LL::ThreadRWlock Lock_ty;
-  typedef Galois::Runtime::MM::FSBGaloisAllocator<NItem> NItemAlloc;
-  typedef Galois::Runtime::PerThreadVector<NItem*> NItemWL;
-  typedef PtrBasedNhoodMgr<T, Cmp> Base;
-
-protected:
-  PerThreadHeap heap;
-  NhoodMap nhoodMap;
-  Lock_ty map_mutex;
-
-public:
-
-  MapBasedNhoodMgr (const Cmp& cmp): 
-    Base (cmp),
-    heap (),
-    nhoodMap (8, std::hash<Lockable*> (), std::equal_to<Lockable*> (), PerThreadAllocator (&heap))
-
-  {}
-
-  NItem& getNhoodItem (Lockable* l) {
-
-    map_mutex.readLock ();
-      typename NhoodMap::iterator i = nhoodMap.find (l);
-
-      if (i == nhoodMap.end ()) {
-        // create the missing entry
-
-        map_mutex.readUnlock ();
-
-        map_mutex.writeLock ();
-          // check again to avoid over-writing existing entry
-          if (nhoodMap.find (l) == nhoodMap.end ()) {
-            NItem* ni = Base::create (l);
-            Base::allNItems.get ().push_back (ni);
-            nhoodMap.insert (std::make_pair (l, ni));
-
-          }
-        map_mutex.writeUnlock ();
-
-        // read again now
-        map_mutex.readLock ();
-        i = nhoodMap.find (l);
-      }
-
-    map_mutex.readUnlock ();
-    assert (i != nhoodMap.end ());
-    assert (i->second != nullptr);
-
-    return *(i->second);
-    
-  }
-
-  // NItem& getNhoodItem (Lockable* l) {
-// 
-    // map_mutex.lock ();
-      // typename NhoodMap::iterator i = nhoodMap.find (l);
-      // if (i == nhoodMap.end ()) {
-        // nhoodMap.insert (std::make_pair (l, NItem (cmp)));
-        // i = nhoodMap.find (l);
-        // assert (i != nhoodMap.end ());
-      // }
-// 
-    // map_mutex.unlock ();
-// 
-    // return i->second;
-// 
-  // }
-  //
-
-  ~MapBasedNhoodMgr () {
-    Base::resetAllNItems ();
-  }
-
-};
-
-template <typename Ctxt, typename StableTest>
-struct UnstableSourceTest {
+template <typename StableTest>
+struct SourceTest {
 
   StableTest stabilityTest;
 
-  explicit UnstableSourceTest (const StableTest& stabilityTest)
+  explicit SourceTest (const StableTest& stabilityTest)
     : stabilityTest (stabilityTest) {}
 
+  template <typename Ctxt>
   bool operator () (const Ctxt* ctx) const {
     assert (ctx != NULL);
     return ctx->isSrc () && stabilityTest (ctx->active);
   }
 };
 
-template <typename Ctxt>
-struct StableSourceTest {
+template <>
+struct SourceTest <void> {
+
+  template <typename Ctxt>
   bool operator () (const Ctxt* ctx) const {
     assert (ctx != NULL);
     return ctx->isSrc ();
@@ -448,8 +452,8 @@ class LCorderedExec {
   // important paramters
   // TODO: add capability to the interface to express these constants
   static const size_t DELETE_CONTEXT_SIZE = 1024;
-  static const size_t UNROLL_FACTOR = 32;
-  static const unsigned CHUNK_SIZE = 16;
+  static const size_t UNROLL_FACTOR = OperFunc::UNROLL_FACTOR;
+  static const unsigned CHUNK_SIZE = OperFunc::CHUNK_SIZE;
 
 
 
@@ -489,7 +493,7 @@ class LCorderedExec {
         ctxtWL (ctxtWL)
     {}
 
-    void operator () (const T& active) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (const T& active) {
       Ctxt* ctx = ctxtAlloc.allocate (1);
       assert (ctx != NULL);
       // new (ctx) Ctxt (active, nhmgr);
@@ -523,7 +527,7 @@ class LCorderedExec {
         nsrc (nsrc)
     {}
 
-    void operator () (Ctxt* ctx) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (Ctxt* ctx) {
       assert (ctx != NULL);
       // assume nhood of ctx is already expanded
 
@@ -542,6 +546,9 @@ class LCorderedExec {
 
 
   struct ApplyOperator {
+
+    typedef int tt_does_not_need_aborts;
+
     OperFunc& op;
     NhoodFunc& nhoodVisitor;
     NhoodMgr& nhmgr;
@@ -579,7 +586,7 @@ class LCorderedExec {
 
 
     template <typename WL>
-    void operator () (Ctxt* const in_src, WL& wl) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (Ctxt* const in_src, WL& wl) {
       assert (in_src != NULL);
 
       ctxtLocalQ.get ().clear ();
@@ -715,7 +722,7 @@ public:
     t_create.stop ();
 
     t_find.start ();
-    Galois::Runtime::do_all_impl(makeStandardRange(initCtxt.begin_all (), initCtxt.end_all ()),
+    Galois::Runtime::do_all_impl(makeLocalRange(initCtxt),
 				 FindInitSources (sourceTest, initSrc, nInitSrc));
     //       "find_initial_sources");
     t_find.stop ();
@@ -734,7 +741,7 @@ public:
 
     t_for.start ();
     Galois::Runtime::for_each_impl<SrcWL_ty> (
-        Galois::Runtime::makeStandardRange( initSrc.begin_all (), initSrc.end_all ()),
+        Galois::Runtime::makeLocalRange(initSrc),
         ApplyOperator (
           operFunc,
           nhoodVisitor,
@@ -750,7 +757,7 @@ public:
     t_for.stop ();
 
     t_destroy.start ();
-    Galois::Runtime::do_all_impl(makeStandardRange(ctxtDelQ.begin_all (), ctxtDelQ.end_all ()),
+    Galois::Runtime::do_all_impl(makeLocalRange(ctxtDelQ),
 				 DelCtxt (ctxtAlloc)); //, "delete_all_ctxt");
     t_destroy.stop ();
 
@@ -763,23 +770,23 @@ public:
   }
 };
 
-template <typename AI, typename Cmp, typename OperFunc, typename NhoodFunc>
-void for_each_ordered_lc (AI abeg, AI aend, const Cmp& cmp, const NhoodFunc& nhoodVisitor, const OperFunc& operFunc, const char* loopname) {
+template <typename AI, typename Cmp, typename OperFunc, typename NhoodFunc, typename ST>
+void for_each_ordered_lc_impl (AI abeg, AI aend, const Cmp& cmp, const NhoodFunc& nhoodVisitor, const OperFunc& operFunc, const ST& sourceTest, const char* loopname) {
 
   typedef typename std::iterator_traits<AI>::value_type T;
 
-  // typedef MapBasedNhoodMgr<T, Cmp> NhoodMgr;
-  typedef PtrBasedNhoodMgr<T, Cmp> NhoodMgr;
+  typedef LCorderedContext<T, Cmp> Ctxt;
+  typedef typename Ctxt::NhoodMgr NhoodMgr;
+  typedef typename Ctxt::NItem NItem;
+  typedef typename Ctxt::Comparator CtxtCmp;
 
-  typedef typename NhoodMgr::Ctxt Ctxt;
-  //typedef typename NhoodMgr::NItem NItem;
-  typedef StableSourceTest<Ctxt> SourceTest;
+  typedef LCorderedExec<OperFunc, NhoodFunc, Ctxt, ST> Exec;
 
-  typedef LCorderedExec<OperFunc, NhoodFunc, Ctxt, SourceTest> Exec;
+  CtxtCmp ctxcmp (cmp);
+  typename NItem::Factory factory(ctxcmp);
+  NhoodMgr nhmgr (factory);
 
-  NhoodMgr nhmgr (cmp);
-
-  Exec e (nhoodVisitor, operFunc, nhmgr, SourceTest ());
+  Exec e (nhoodVisitor, operFunc, nhmgr, sourceTest);
   // e.template execute<CHUNK_SIZE> (abeg, aend);
   e.execute (abeg, aend, loopname);
 }
@@ -787,25 +794,16 @@ void for_each_ordered_lc (AI abeg, AI aend, const Cmp& cmp, const NhoodFunc& nho
 template <typename AI, typename Cmp, typename OperFunc, typename NhoodFunc, typename StableTest>
 void for_each_ordered_lc (AI abeg, AI aend, const Cmp& cmp, const NhoodFunc& nhoodVisitor, const OperFunc& operFunc, const StableTest& stabilityTest, const char* loopname) {
 
-  typedef typename std::iterator_traits<AI>::value_type T;
-
-  // typedef MapBasedNhoodMgr<T, Cmp> NhoodMgr;
-  typedef PtrBasedNhoodMgr<T, Cmp> NhoodMgr;
-
-  typedef typename NhoodMgr::Ctxt Ctxt;
-  //typedef typename NhoodMgr::NItem NItem;
-  typedef UnstableSourceTest<Ctxt, StableTest> SourceTest;
-
-  typedef LCorderedExec<OperFunc, NhoodFunc, Ctxt, SourceTest> Exec;
-
-  NhoodMgr nhmgr (cmp);
-
-  Exec e (nhoodVisitor, operFunc, nhmgr, SourceTest (stabilityTest));
-  // e.template execute<CHUNK_SIZE> (abeg, aend);
-  e.execute (abeg, aend, loopname);
+  for_each_ordered_lc_impl (abeg, aend, cmp, nhoodVisitor, operFunc, SourceTest<StableTest> (stabilityTest), loopname);
 }
 
+template <typename AI, typename Cmp, typename OperFunc, typename NhoodFunc>
+void for_each_ordered_lc (AI abeg, AI aend, const Cmp& cmp, const NhoodFunc& nhoodVisitor, const OperFunc& operFunc, const char* loopname) {
+
+  for_each_ordered_lc_impl (abeg, aend, cmp, nhoodVisitor, operFunc, SourceTest<void> (), loopname);
 }
+
+} // end namespace Runtime
 } // end namespace Galois
 
 #endif //  GALOIS_RUNTIME_LC_ORDERED_H

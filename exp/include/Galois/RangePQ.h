@@ -27,8 +27,7 @@
 
 #include <utility>
 #include <type_traits>
-
-#include <bits/stl_tree.h>
+#include <map>
 
 #include "Galois/BoundedVector.h"
 
@@ -160,11 +159,8 @@ namespace hidden {
     using UnitBuf = RangeBuffer<T, Cmp, 1>;
     using RBufAlloc = Galois::Runtime::MM::FSBGaloisAllocator<RBuf>;
     using RBufPtrAlloc = Galois::Runtime::MM::FSBGaloisAllocator<RBuf*>;
-    using Tree = std::_Rb_tree<RBuf*, RBuf*, Identity<RBuf*>, typename RBuf::PtrComparator, RBufPtrAlloc>;
-
+    using Tree = std::map<RBuf*, RBuf*, typename RBuf::PtrComparator, RBufPtrAlloc>;
     using Set = std::set<RBuf*, typename RBuf::PtrComparator, RBufPtrAlloc>;
-
-
   };
 }
 
@@ -452,8 +448,8 @@ private:
     } else {
       I b = beg;
       I e = end;
-      using T = typename std::remove_reference<decltype (*b)>::type;
-      T pivot = *(b + std::distance (b, e) / 2);
+      using V = typename std::remove_reference<decltype (*b)>::type;
+      V pivot = *(b + std::distance (b, e) / 2);
 
       --e;
       while (b != e) {

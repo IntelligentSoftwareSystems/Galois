@@ -54,12 +54,12 @@ extern cll::opt<DoAllTypes> doAllKind;
 template <DoAllTypes TYPE> 
 struct DoAllImpl {
   template <typename I, typename F>
-  static inline void go (I beg, I end, F func, const char* loopname) {
+  static inline void go (I beg, I end, const F& func, const char* loopname) {
     std::abort ();
   }
 
   template <typename PW, typename F>
-  static inline void go (PW& perThrdWL, F func, const char* loopname) {
+  static inline void go (PW& perThrdWL, const F& func, const char* loopname) {
     std::abort ();
   }
 };
@@ -67,12 +67,12 @@ struct DoAllImpl {
 template <>
 struct DoAllImpl<GALOIS> {
   template <typename I, typename F>
-  static inline void go (I beg, I end, F func, const char* loopname) {
+  static inline void go (I beg, I end, const F& func, const char* loopname) {
     Galois::Runtime::do_all_impl (Runtime::makeStandardRange (beg, end), func, loopname, false);
   }
 
   template <typename PW, typename F>
-  static inline void go (PW& perThrdWL, F func, const char* loopname) {
+  static inline void go (PW& perThrdWL, const F& func, const char* loopname) {
     go (perThrdWL.begin_all (), perThrdWL.end_all (), func, loopname);
   }
 };
@@ -80,12 +80,12 @@ struct DoAllImpl<GALOIS> {
 template <>
 struct DoAllImpl<GALOIS_STEAL> {
   template <typename I, typename F>
-  static inline void go (I beg, I end, F func, const char* loopname) {
+  static inline void go (I beg, I end, const F& func, const char* loopname) {
     Galois::Runtime::do_all_impl (Runtime::makeStandardRange (beg, end), func, loopname, true);
   }
 
   template <typename PW, typename F>
-  static inline void go (PW& perThrdWL, F func, const char* loopname) {
+  static inline void go (PW& perThrdWL, const F& func, const char* loopname) {
     go (perThrdWL.begin_all (), perThrdWL.end_all (), func, loopname);
   }
 };
@@ -93,12 +93,12 @@ struct DoAllImpl<GALOIS_STEAL> {
 template <>
 struct DoAllImpl<COUPLED> {
   template <typename I, typename F>
-  static inline void go (I beg, I end, F func, const char* loopname) {
+  static inline void go (I beg, I end, const F& func, const char* loopname) {
     Galois::Runtime::do_all_coupled (beg, end, func, loopname);
   }
 
   template <typename PW, typename F>
-  static inline void go (PW& perThrdWL, F func, const char* loopname) {
+  static inline void go (PW& perThrdWL, const F& func, const char* loopname) {
     Galois::Runtime::do_all_coupled (perThrdWL, func, loopname);
   }
 };
@@ -110,7 +110,7 @@ template <>
 struct DoAllImpl<CILK> {
 
   template <typename I, typename F>
-  static inline void go (I beg, I end, F func, const char* loopname) {
+  static inline void go (I beg, I end, const F& func, const char* loopname) {
 
     init ();
 
@@ -120,7 +120,7 @@ struct DoAllImpl<CILK> {
   }
 
   template <typename PW, typename F>
-  static inline void go (PW& perThrdWL, F func, const char* loopname) {
+  static inline void go (PW& perThrdWL, const F& func, const char* loopname) {
     go (perThrdWL.begin_all (), perThrdWL.end_all (), func, loopname);
   }
 
@@ -150,7 +150,7 @@ struct DoAllImpl<CILK> {
 
 
   static void initOne (BusyBarrier& busybarrier, unsigned tid) {
-    Runtime::LL::initTID(tid % Runtime::getMaxThreads());
+    Runtime::LL::initTID(tid % Runtime::LL::getMaxThreads());
         Runtime::initPTS_cilk ();
 
         unsigned id = Runtime::LL::getTID ();
@@ -205,7 +205,7 @@ struct DoAllImpl<CILK> {
 #endif
 
 template <typename I, typename F> 
-void do_all_choice (I beg, I end, F func, const char* loopname=0) {
+void do_all_choice (I beg, I end, const F& func, const char* loopname=0) {
   switch (doAllKind) {
     case GALOIS_STEAL:
       DoAllImpl<GALOIS_STEAL>::go (beg, end, func, loopname);
@@ -229,7 +229,7 @@ void do_all_choice (I beg, I end, F func, const char* loopname=0) {
 }
 
 template <typename PW, typename F> 
-void do_all_choice (PW& perThrdWL, F func, const char* loopname=0) {
+void do_all_choice (PW& perThrdWL, const F& func, const char* loopname=0) {
   switch (doAllKind) {
     case GALOIS_STEAL:
       DoAllImpl<GALOIS_STEAL>::go (perThrdWL, func, loopname);

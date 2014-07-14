@@ -22,7 +22,7 @@ static cll::opt<int> seed(cll::Positional, cll::desc("<seed>"), cll::Required);
 static cll::opt<int> MaxIterations(cll::Positional, cll::desc("<max iterations>"), cll::Required);
 
 static const double DAMPING = 0.2;
-static const double TOL = 1e-10;
+//static const double TOL = 1e-10;
 
 template<typename NodeTy,typename EdgeTy>
 struct BipartiteGraph: public Galois::Graph::FirstGraph<NodeTy,EdgeTy,true> {

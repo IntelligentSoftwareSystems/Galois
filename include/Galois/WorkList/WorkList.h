@@ -60,8 +60,8 @@ namespace { // don't pollute the symbol table with the example
 // All classes (should) conform to:
 template<typename T, bool Concurrent>
 class AbstractWorkList {
-  AbstractWorkList(const AbstractWorkList&);
-  const AbstractWorkList& operator=(const AbstractWorkList&);
+  AbstractWorkList(const AbstractWorkList&) = delete;
+  const AbstractWorkList& operator=(const AbstractWorkList&) = delete;
 
 public:
   AbstractWorkList() { }
@@ -69,28 +69,37 @@ public:
   //! T is the value type of the WL
   typedef T value_type;
 
-  //! change the concurrency flag
+  //! Changes the concurrency flag
   template<bool _concurrent>
   struct rethread { typedef AbstractWorkList<T, _concurrent> type; };
 
-  //! change the type the worklist holds
+  //! Changes the type the worklist holds
   template<typename _T>
   struct retype { typedef AbstractWorkList<_T, Concurrent> type; };
 
-  //! push a value onto the queue
+  //! Pushes a value onto the queue
   void push(const value_type& val);
 
-  //! push a range onto the queue
+  //! Pushes a range onto the queue
   template<typename Iter>
   void push(Iter b, Iter e);
 
-  //! push initial range onto the queue
-  //! called with the same b and e on each thread
+  /**
+   * Pushes initial range onto the queue. Called with the same b and e on each
+   * thread
+   */
   template<typename RangeTy>
   void push_initial(const RangeTy&);
 
-  //! pop a value from the queue.
+  //! Pops a value from the queue.
   Galois::optional<value_type> pop();
+
+  /**
+   * (optional) Returns true if the worklist is empty. Called infrequently
+   * by scheduler after pop has failed. Good way to split retrieving work
+   * into pop (fast path) and empty (slow path).
+   */
+  bool empty();
 };
 
 } // end namespace anonymous

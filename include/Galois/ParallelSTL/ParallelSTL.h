@@ -23,39 +23,41 @@
 #ifndef GALOIS_PARALLELSTL_PARALLELSTL_H
 #define GALOIS_PARALLELSTL_PARALLELSTL_H
 
-#include "Galois/UserContext.h"
+#include "Galois/Accumulator.h"
 #include "Galois/NoDerefIterator.h"
 #include "Galois/WorkList/WorkList.h"
 #include "Galois/Runtime/ParallelWork.h"
 #include "Galois/Runtime/DoAll.h"
 
 namespace Galois {
+
+template<typename IterTy,typename FunctionTy, typename... Args>
+void do_all(const IterTy& b, const IterTy& e, const FunctionTy& fn, Args... args);
+
+template<typename ConTy,typename FunctionTy, typename... Args>
+void do_all_local(ConTy& c, const FunctionTy& fn, Args... args);
+
 //! Parallel versions of STL library algorithms.
 namespace ParallelSTL {
 
-template<typename Predicate>
+template<typename Predicate, typename TO>
 struct count_if_helper {
   Predicate f;
-  ptrdiff_t ret;
-  count_if_helper(Predicate p): f(p), ret(0) { }
+  GReducible<ptrdiff_t, TO>& ret;
+  count_if_helper(Predicate p, GReducible<ptrdiff_t,TO>& c): f(p), ret(c) { }
   template<typename T>
   void operator()(const T& v) {
-    if (f(v)) ++ret;
-  }
-};
-
-struct count_if_reducer {
-  template<typename CIH>
-  void operator()(CIH& dest, const CIH& src) {
-    dest.ret += src.ret;
+    if (f(v)) ret.update(1);
   }
 };
 
 template<class InputIterator, class Predicate>
 ptrdiff_t count_if(InputIterator first, InputIterator last, Predicate pred)
 {
-  return Runtime::do_all_impl(Runtime::makeStandardRange(first, last),
-			      count_if_helper<Predicate>(pred), count_if_reducer(), "count_if").ret;
+  auto R = [] (ptrdiff_t& lhs, ptrdiff_t rhs) { lhs += rhs; };
+  GReducible<ptrdiff_t,decltype(R)> count(R);
+  Galois::do_all(first, last, count_if_helper<Predicate, decltype(R)>(pred, count));
+  return count.reduce();
 }
 
 template<typename InputIterator, class Predicate>
@@ -88,7 +90,7 @@ InputIterator find_if(InputIterator first, InputIterator last, Predicate pred)
   HelperTy helper(accum, pred);
   Runtime::for_each_impl<WL>(Runtime::makeStandardRange(
         make_no_deref_iterator(first),
-        make_no_deref_iterator(last)), helper, 0);
+        make_no_deref_iterator(last)), helper, "ParallelSTL::find_if");
   for (unsigned i = 0; i < accum.size(); ++i) {
     if (*accum.getRemote(i))
       return **accum.getRemote(i);
@@ -255,7 +257,7 @@ void sort(RandomAccessIterator first, RandomAccessIterator last, Compare comp) {
   typedef std::pair<RandomAccessIterator,RandomAccessIterator> Pair;
   Pair initial[1] = { std::make_pair(first, last) };
   
-  Runtime::for_each_impl<WL>(Runtime::makeStandardRange(&initial[0], &initial[1]), sort_helper<Compare>(comp), 0);
+  Runtime::for_each_impl<WL>(Runtime::makeStandardRange(&initial[0], &initial[1]), sort_helper<Compare>(comp), "ParallelSTL::sort");
 }
 
 template<class RandomAccessIterator>
@@ -263,31 +265,17 @@ void sort(RandomAccessIterator first, RandomAccessIterator last) {
   Galois::ParallelSTL::sort(first, last, std::less<typename std::iterator_traits<RandomAccessIterator>::value_type>());
 }
 
-template<typename T, typename BinOp>
-struct accumulate_helper {
-  T init;
-  BinOp op;
-  accumulate_helper(T i, BinOp o) :init(i), op(o) {}
-  void operator()(const T& v) {
-    init = op(init,v);
-  }
-};
-
-template<typename BinOp>
-struct accumulate_helper_reduce {
-  BinOp op;
-  accumulate_helper_reduce(BinOp o) :op(o) {}
-  template<typename T>
-  void operator()(T& dest, const T& src) const {
-    dest.init = op(dest.init, src.init);
-  }
-};
-
+//FIXME: init is ignored
 template <class InputIterator, class T, typename BinaryOperation>
-T accumulate (InputIterator first, InputIterator last, T init, BinaryOperation binary_op) {
-  return Runtime::do_all_impl(Runtime::makeStandardRange(first, last),
-      accumulate_helper<T,BinaryOperation>(init, binary_op),
-      accumulate_helper_reduce<BinaryOperation>(binary_op), "accumulate").init;
+T accumulate (InputIterator first, InputIterator last, T init, const BinaryOperation& binary_op) {
+  struct updater {
+    BinaryOperation op;
+    updater(const BinaryOperation& f) :op(f) {}
+    void operator()(T& lhs, const T& rhs) { lhs = this->op(lhs, rhs); }
+  };
+  GReducible<T, updater> R{updater(binary_op)};
+  do_all(first, last, [&R] (const T& v) { R.update(v); });
+  return R.reduce(updater(binary_op));
 }
 
 template<class InputIterator, class T>
@@ -297,21 +285,26 @@ T accumulate(InputIterator first, InputIterator last, T init) {
 
 template<typename T, typename MapFn, typename ReduceFn>
 struct map_reduce_helper {
-  T init;
+  Galois::Runtime::PerThreadStorage<T>& init;
   MapFn fn;
   ReduceFn reduce;
-  map_reduce_helper(T i, MapFn fn, ReduceFn reduce) :init(i), fn(fn), reduce(reduce) {}
+  map_reduce_helper(Galois::Runtime::PerThreadStorage<T>& i, MapFn fn, ReduceFn reduce)
+    :init(i), fn(fn), reduce(reduce) {}
   template<typename U>
   void operator()(U&& v) {
-    init = reduce(fn(std::forward<U>(v)), init);
+    *init.getLocal() = reduce(fn(std::forward<U>(v)), *init.getLocal());
   }
 };
 
 template<class InputIterator, class MapFn, class T, class ReduceFn>
 T map_reduce(InputIterator first, InputIterator last, MapFn fn, T init, ReduceFn reduce) {
-  return Runtime::do_all_impl(Runtime::makeStandardRange(first, last),
-      map_reduce_helper<T,MapFn,ReduceFn>(init, fn, reduce),
-      accumulate_helper_reduce<ReduceFn>(reduce), "map_reduce").init;
+  Galois::Runtime::PerThreadStorage<T> reduced;
+  do_all(first, last,
+         map_reduce_helper<T,MapFn,ReduceFn>(reduced, fn, reduce));
+  //         Galois::loopname("map_reduce"));
+  for (unsigned i = 0; i < reduced.size(); ++i)
+    init = reduce(init, *reduced.getRemote(i));
+  return init;
 }
 
 }

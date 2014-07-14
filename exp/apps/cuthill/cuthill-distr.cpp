@@ -665,7 +665,7 @@ struct banddiff {
 		if(maxdiff > globalmax){
 			while(!maxband.cas(globalmax, maxdiff)){
 				globalmax = maxband;
-				if(!maxdiff > globalmax)
+				if(!(maxdiff > globalmax))
 					break;
 			}
 		}

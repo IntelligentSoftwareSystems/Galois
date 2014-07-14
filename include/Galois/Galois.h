@@ -95,7 +95,7 @@ struct tuple_index<T, S, -1> {
 };
 
 template<typename RangeTy, typename FunctionTy, typename Tuple>
-void for_each_gen(RangeTy r, FunctionTy fn, Tuple tpl) {
+void for_each_gen(const RangeTy& r, const FunctionTy& fn, Tuple tpl) {
   typedef Tuple tupleType;
   static_assert(-1 == tuple_index<tupleType, char*>::value, "old loopname");
   static_assert(-1 == tuple_index<tupleType, char const*>::value, "old loopname");
@@ -110,7 +110,7 @@ void for_each_gen(RangeTy r, FunctionTy fn, Tuple tpl) {
 }
 
 template<typename RangeTy, typename FunctionTy, typename Tuple>
-FunctionTy do_all_gen(RangeTy r, FunctionTy fn, Tuple tpl) {
+void do_all_gen(const RangeTy& r, const FunctionTy& fn, Tuple tpl) {
   typedef Tuple tupleType;
   static_assert(-1 == tuple_index<tupleType, char*>::value, "old loopname");
   static_assert(-1 == tuple_index<tupleType, char const*>::value, "old loopname");
@@ -121,11 +121,11 @@ FunctionTy do_all_gen(RangeTy r, FunctionTy fn, Tuple tpl) {
   constexpr unsigned isteal = tuple_index<tupleType, do_all_steal>::value;
   const char* ln = std::get<iloopname>(tpl).n;
   bool steal = std::get<isteal>(tpl).b;
-  return Runtime::do_all_impl(r, fn, ln, steal);
+  Runtime::do_all_impl(r, fn, ln, steal);
 }
 
 template<typename FunctionTy, typename Tuple>
-void on_each_gen(FunctionTy fn, Tuple tpl) {
+void on_each_gen(const FunctionTy& fn, Tuple tpl) {
   typedef Tuple tupleType;
   static_assert(-1 == tuple_index<tupleType, char*>::value, "old loopname");
   static_assert(-1 == tuple_index<tupleType, char const*>::value, "old loopname");
@@ -152,7 +152,7 @@ void on_each_gen(FunctionTy fn, Tuple tpl) {
  * @param args optional arguments to loop, e.g., {@see loopname}, {@see wl}
  */
 template<typename IterTy, typename FunctionTy, typename... Args>
-void for_each(IterTy b, IterTy e, FunctionTy fn, Args... args) {
+void for_each(IterTy b, IterTy e, const FunctionTy& fn, Args... args) {
   HIDDEN::for_each_gen(Runtime::makeStandardRange(b,e), fn, std::make_tuple(loopname(), wl<HIDDEN::defaultWL>(), args...));
 }
 
@@ -167,7 +167,7 @@ void for_each(IterTy b, IterTy e, FunctionTy fn, Args... args) {
  * @param args optional arguments to loop
  */
 template<typename ItemTy, typename FunctionTy, typename... Args>
-void for_each(ItemTy i, FunctionTy fn, Args... args) {
+void for_each(ItemTy i, const FunctionTy& fn, Args... args) {
   ItemTy iwl[1] = {i};
   HIDDEN::for_each_gen(Runtime::makeStandardRange(&iwl[0], &iwl[1]), fn, std::make_tuple(loopname(), wl<HIDDEN::defaultWL>(), args...));
 }
@@ -183,7 +183,7 @@ void for_each(ItemTy i, FunctionTy fn, Args... args) {
  * @param args optional arguments to loop
  */
 template<typename ConTy, typename FunctionTy, typename... Args>
-void for_each_local(ConTy& c, FunctionTy fn, Args... args) {
+void for_each_local(ConTy& c, const FunctionTy& fn, Args... args) {
   HIDDEN::for_each_gen(Runtime::makeLocalRange(c), fn, std::make_tuple(loopname(), wl<HIDDEN::defaultWL>(), args...));
 }
 
@@ -198,8 +198,8 @@ void for_each_local(ConTy& c, FunctionTy fn, Args... args) {
  * @returns fn
  */
 template<typename IterTy,typename FunctionTy, typename... Args>
-FunctionTy do_all(const IterTy& b, const IterTy& e, FunctionTy fn, Args... args) {
-  return HIDDEN::do_all_gen(Runtime::makeStandardRange(b, e), fn, std::make_tuple(loopname(), do_all_steal(), args...));
+void do_all(const IterTy& b, const IterTy& e, const FunctionTy& fn, Args... args) {
+  HIDDEN::do_all_gen(Runtime::makeStandardRange(b, e), fn, std::make_tuple(loopname(), do_all_steal(), args...));
 }
 
 /**
@@ -213,8 +213,8 @@ FunctionTy do_all(const IterTy& b, const IterTy& e, FunctionTy fn, Args... args)
  * @returns fn
  */
 template<typename ConTy,typename FunctionTy, typename... Args>
-FunctionTy do_all_local(ConTy& c, FunctionTy fn, Args... args) {
-  return HIDDEN::do_all_gen(Runtime::makeLocalRange(c), fn, std::make_tuple(loopname(), do_all_steal(), args...));
+void do_all_local(ConTy& c, const FunctionTy& fn, Args... args) {
+  HIDDEN::do_all_gen(Runtime::makeLocalRange(c), fn, std::make_tuple(loopname(), do_all_steal(), args...));
 }
 
 /**
@@ -227,7 +227,7 @@ FunctionTy do_all_local(ConTy& c, FunctionTy fn, Args... args) {
  * @param args optional arguments to loop (only loopname supported)
  */
 template<typename FunctionTy, typename... Args>
-void on_each(FunctionTy fn, Args... args) {
+void on_each(const FunctionTy& fn, Args... args) {
   HIDDEN::on_each_gen(fn, std::make_tuple(loopname(), args...));
 }
 

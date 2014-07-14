@@ -3,7 +3,7 @@ function(rgraph base numnodes)
     COMMAND python ${CMAKE_BINARY_DIR}/tools/generators/random-graph.py --density 4
       ${numnodes} 0 > ${base}.dimacs)
   add_custom_command(OUTPUT ${base}.gr
-    COMMAND graph-convert-standalone -dimacs2gr ${base}.dimacs ${base}.gr
+    COMMAND graph-convert-standalone -edgeType int32 -dimacs2gr ${base}.dimacs ${base}.gr
     DEPENDS ${base}.dimacs graph-convert-standalone)
 endfunction(rgraph)
 

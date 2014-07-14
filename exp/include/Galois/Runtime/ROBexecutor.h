@@ -49,8 +49,6 @@
 //#include "Galois/Runtime/ll/PthreadLock.h"
 #include "Galois/Runtime/mm/Mem.h"
 
-#include <iostream>
-
 namespace Galois {
 namespace Runtime {
 
@@ -411,7 +409,7 @@ public:
     ++beg;
 
     if (beg != end) {
-      Galois::do_all (beg, end,
+      Galois::Runtime::do_all_impl (Galois::Runtime::makeStandardRange (beg, end),
           [this] (const T& x) {
           pending.get ().push (x);
           });
@@ -421,7 +419,7 @@ public:
 
     const T& dummy = *pending[0].begin ();
 
-    Galois::on_each (
+    Galois::Runtime::on_each_impl (
         [&dummy,this] (const unsigned tid, const unsigned numT) {
           for (unsigned j = 0; j < WINDOW_SIZE_PER_THREAD; ++j) {
             Ctxt* ctx = ctxtAlloc.allocate (1);
@@ -549,20 +547,15 @@ public:
     assert (pending.empty_all ());
 
 
-    std::cout << "Total Iterations: " << numTotal.reduce () << std::endl;
-    std::cout << "Number Committed: " << numCommitted.reduce () << std::endl;
     double ar = double (numTotal.reduce () - numCommitted.reduce ()) / double (numTotal.reduce ());
-
-    std::cout << "Abort Ratio: " << ar << std::endl;
-
     double totalAborts = double (abortSelfByConflict.reduce () + abortSelfBySignal.reduce () + abortByOther.reduce ());
-
-    std::cout << "abortSelfByConflict: " << abortSelfByConflict.reduce () << ", " << double (100*abortSelfByConflict.reduce ())/totalAborts << "%" << std::endl;
-    std::cout << "abortSelfBySignal: " << abortSelfBySignal.reduce () << ", " << double (100*abortSelfBySignal.reduce ())/totalAborts << "%" << std::endl;
-    std::cout << "abortByOther: " << abortByOther.reduce () << ", " << double (100*abortByOther.reduce ())/totalAborts << "%" << std::endl;
-
-    std::cout << "Number of Global Cleanups: " << numGlobalCleanups.reduce () << std::endl;
-
+    LL::gPrint("Total Iterations: ", numTotal.reduce(), "\n");
+    LL::gPrint("Number Committed: ", numCommitted.reduce(), "\n");
+    LL::gPrint("Abort Ratio: ", ar, "\n");
+    LL::gPrint("abortSelfByConflict: ", abortSelfByConflict.reduce(), ", ", (100.0*abortSelfByConflict.reduce())/totalAborts, "%", "\n");
+    LL::gPrint("abortSelfBySignal: ", abortSelfBySignal.reduce(), ", ", (100.0*abortSelfBySignal.reduce())/totalAborts, "%", "\n");
+    LL::gPrint("abortByOther: ", abortByOther.reduce(), ", ", (100.0*abortByOther.reduce())/totalAborts, "%", "\n");
+    LL::gPrint("Number of Global Cleanups: ", numGlobalCleanups.reduce(), "\n");
   }
 
 private:
@@ -979,10 +972,10 @@ public:
 
       ++steps;
       std::swap (currPending, nextPending);
-      nextPending.clear ();
+      nextPending->clear ();
       execRcrd.push_back (0); // create record entry for current step;
 
-      while (!currPending.empty ()) {
+      while (!currPending->empty ()) {
         Ctxt* ctx = schedule ();
         assert (ctx != nullptr);
 

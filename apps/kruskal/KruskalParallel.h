@@ -103,7 +103,7 @@ struct EdgeCtx: public Edge {
 
 struct FindLoop {
 
-  // typedef char tt_does_not_need_push;
+  typedef char tt_does_not_need_push;
 
   VecRep_ty& repVec;
   VecAtomicCtxPtr& repOwnerCtxVec;
@@ -175,7 +175,8 @@ struct FindLoop {
 
 template <bool usingOrderedRuntime=false>
 struct LinkUpLoop {
-  // typedef char tt_does_not_need_push;
+  typedef char tt_does_not_need_push;
+  static const size_t CHUNK_SIZE = 64;
 
   VecRep_ty& repVec;
   VecAtomicCtxPtr& repOwnerCtxVec;
@@ -389,10 +390,10 @@ void refillWorkList (WL& wl, typename Range<I>::PTS& ranges, const size_t window
     }
   }
 
-  Galois::Runtime::LL::gDebug("size before refill: ", wl.size_all ());
+  // Galois::Runtime::LL::gDebug("size before refill: ", wl.size_all ());
 
   if (windowLimit != NULL) {
-    Galois::Runtime::LL::gDebug("new window limit: ", windowLimit->str ().c_str ());
+    // Galois::Runtime::LL::gDebug("new window limit: ", windowLimit->str ().c_str ());
 
     Galois::on_each (RefillWorkList<T, I, WL> (windowLimit, ranges, wl), Galois::loopname("refill"));
 
@@ -416,7 +417,7 @@ void refillWorkList (WL& wl, typename Range<I>::PTS& ranges, const size_t window
 
   }
 
-  Galois::Runtime::LL::gDebug("size after refill: ", wl.size_all ());
+  // Galois::Runtime::LL::gDebug("size after refill: ", wl.size_all ());
 }
 
 

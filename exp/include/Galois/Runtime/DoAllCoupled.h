@@ -30,7 +30,6 @@
 #include <algorithm>
 #include <vector>
 #include <limits>
-#include <iostream>
 
 #include <cstdio>
 #include <ctime>
@@ -118,7 +117,7 @@ namespace Galois {
 
     T average () const { return m_sum / m_values.size (); }
 
-    void print (std::ostream& out=std::cout) const { 
+    void print (std::ostream& out) const { 
       out << m_name << " [" << m_values.size () << "]"
         << ", max = " << m_max
         << ", min = " << m_min

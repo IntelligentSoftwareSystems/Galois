@@ -86,11 +86,8 @@ static int numNumaPagesFor(unsigned nodeid) {
 
   char format[2048];
   char search[2048];
-  int written;
-  written = snprintf(format, sizeof(format)/sizeof(*format), "N%u=%%d", nodeid);
-  assert((unsigned)written < sizeof(format)/sizeof(*format));
-  written = snprintf(search, sizeof(search)/sizeof(*search), "N%u=", nodeid);
-  assert((unsigned)written < sizeof(search)/sizeof(*search));
+  snprintf(format, sizeof(format), "N%u=%%d", nodeid);
+  snprintf(search, sizeof(search), "N%u=", nodeid);
 
   char line[2048];
   int totalPages = 0;
@@ -151,7 +148,8 @@ static inline int getNumaNode(unsigned tid) {
 #elif defined(GALOIS_USE_NUMA)
   return numa_node_of_cpu(proc);
 #else
-  return 0;
+  proc = 0; // get rid of unused warning
+  return proc;
 #endif
 }
 

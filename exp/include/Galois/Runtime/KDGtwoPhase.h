@@ -53,16 +53,15 @@
 
 #include <boost/iterator/transform_iterator.hpp>
 
-#include <iostream>
-
 static cll::opt<double> commitRatioArg("cratio", cll::desc("target commit ratio for two phase executor"), cll::init(0.80));
 
 namespace Galois {
 namespace Runtime {
 
 // TODO: figure out when to call startIteration
-
-template <typename T, typename Cmp, typename NhFunc, typename OpFunc, typename WindowWL> class KDGtwoPhaseStableExecutor {
+namespace {
+template <typename T, typename Cmp, typename NhFunc, typename OpFunc, typename WindowWL>
+class KDGtwoPhaseStableExecutor {
 
 public:
   using Ctxt = TwoPhaseContext<T, Cmp>;
@@ -136,7 +135,7 @@ public:
 
 protected:
 
-  void spillAll (CtxtWL& wl) {
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void spillAll (CtxtWL& wl) {
     Galois::on_each (
         [this, &wl] (const unsigned tid, const unsigned numT) {
           while (!wl[tid].empty ()) {
@@ -154,7 +153,7 @@ protected:
 
   }
 
-  void refill (CtxtWL* wl, size_t currCommits, size_t prevWindowSize) {
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void refill (CtxtWL* wl, size_t currCommits, size_t prevWindowSize) {
 
     const size_t INIT_MAX_ROUNDS = 500;
     const size_t THREAD_MULT_FACTOR = 16;
@@ -238,33 +237,47 @@ protected:
 
   }
 
-
-
-
+  // TODO: use setjmp here
   template <typename F>
   static void runCatching (F& func, Ctxt* c, UserCtxt& uhand) {
     Galois::Runtime::setThreadContext (c);
 
+    int result = 0;
+
+#ifdef GALOIS_USE_LONGJMP
+    if ((result = setjmp(hackjmp)) == 0) {
+#else
     try {
+#endif
       func (c->getElem (), uhand);
 
-    } catch (ConflictFlag f) {
-
-      switch (f) {
-        case CONFLICT: 
-          c->disableSrc ();
-          break;
-        default:
-          GALOIS_DIE ("can't handle conflict flag type");
-          break;
-      }
+#ifdef GALOIS_USE_LONGJMP
+    } else {
+      // TODO
     }
+#else 
+    } catch (ConflictFlag f) {
+      result = f;
+    }
+#endif
+
+    switch (result) {
+      case 0:
+        break;
+      case CONFLICT: 
+        c->disableSrc ();
+        break;
+      default:
+        GALOIS_DIE ("can't handle conflict flag type");
+        break;
+    }
+    
 
     Galois::Runtime::setThreadContext (NULL);
   }
 
   
-  void prepareRound (CtxtWL*& currWL, CtxtWL*& nextWL) {
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void prepareRound (CtxtWL*& currWL, CtxtWL*& nextWL) {
     ++rounds;
     std::swap (currWL, nextWL);
     size_t prevWindowSize = nextWL->size_all ();
@@ -276,7 +289,7 @@ protected:
     refill (currWL, currCommits, prevWindowSize);
   }
 
-  void expandNhood (CtxtWL* currWL) {
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhood (CtxtWL* currWL) {
 
     Galois::do_all_choice (currWL->begin_all (), currWL->end_all (),
         [this] (Ctxt* c) {
@@ -292,7 +305,7 @@ protected:
 
   }
 
-  void applyOperator (CtxtWL* currWL, CtxtWL* nextWL) {
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void applyOperator (CtxtWL* currWL, CtxtWL* nextWL) {
     const T* minElem = nullptr;
 
     if (ForEachTraits<OpFunc>::NeedsPush) {
@@ -397,49 +410,27 @@ protected:
   }
 
   void printStats (void) {
-    std::cout << "Two Phase Window executor, rounds: " << rounds << std::endl;
-    std::cout << "Two Phase Window executor, commits: " << numCommitted.reduce () << std::endl;
-    std::cout << "Two Phase Window executor, total: " << total.reduce () << std::endl;
-    std::cout << "Two Phase Window executor, efficiency: " << double (numCommitted.reduce ()) / total.reduce () << std::endl;
-    std::cout << "Two Phase Window executor, avg. parallelism: " << double (numCommitted.reduce ()) / rounds << std::endl;
+    LL::gPrint("Two Phase Window executor, rounds: ", rounds, "\n");
+    LL::gPrint("Two Phase Window executor, commits: ", numCommitted.reduce(), "\n");
+    LL::gPrint("Two Phase Window executor, total: ", total.reduce(), "\n");
+    LL::gPrint("Two Phase Window executor, efficiency: ", numCommitted.reduce() / (double) total.reduce(), "\n");
+    LL::gPrint("Two Phase Window executor, avg. parallelism: ", numCommitted.reduce() / (double) rounds, "\n");
   }
   
 };
 
 
-namespace impl {
-  template <bool B, typename T1, typename T2> 
-  struct ChooseIf {
-    using Ret_ty = T1;
-  };
+template <bool B, typename T1, typename T2> 
+struct ChooseIf {
+  using Ret_ty = T1;
+};
 
-  template <typename T1, typename T2>
-  struct ChooseIf<false, T1, T2> {
-    using Ret_ty = T2;
-  };
-} // end impl
-
-template <typename Iter, typename Cmp, typename NhFunc, typename OpFunc>
-void for_each_ordered_2p_win (Iter beg, Iter end, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const char* loopname=0) {
-
-  using T = typename std::iterator_traits<Iter>::value_type;
-  // using WindowWL = SortedRangeWindowWL<T, Cmp>;
-  
-  const bool ADDS = ForEachTraits<OpFunc>::NeedsPush;
-
-  using WindowWL = typename impl::ChooseIf<ADDS, PQbasedWindowWL<T, Cmp>, SortedRangeWindowWL<T, Cmp> >::Ret_ty;
-
-  using Exec = KDGtwoPhaseStableExecutor<T, Cmp, NhFunc, OpFunc, WindowWL>;
-  
-  Exec e (cmp, nhFunc, opFunc);
-
-  e.fill_initial (beg, end);
-  e.execute ();
-}
-
+template <typename T1, typename T2>
+struct ChooseIf<false, T1, T2> {
+  using Ret_ty = T2;
+};
 
 template <typename T, typename Cmp, typename NhFunc, typename OpFunc, typename SL, typename WindowWL>
-
 class KDGtwoPhaseUnstableExecutor: public KDGtwoPhaseStableExecutor<T, Cmp, NhFunc, OpFunc, WindowWL>  {
 
   using Base = KDGtwoPhaseStableExecutor<T, Cmp, NhFunc, OpFunc, WindowWL>;
@@ -474,7 +465,7 @@ protected:
     }
   };
 
-  void expandNhood (CtxtWL* currWL) {
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhood (CtxtWL* currWL) {
 
     auto m_beg = boost::make_transform_iterator (currWL->begin_all (), GetActive ());
     auto m_end = boost::make_transform_iterator (currWL->end_all (), GetActive ());
@@ -493,20 +484,35 @@ protected:
           // nhFunc (c, uhand);
           // runCatching (nhFunc, c, uhand);
           Galois::Runtime::setThreadContext (c);
+          int result = 0;
+#ifdef GALOIS_USE_LONGJMP
+          if ((result = setjmp(hackjmp)) == 0) {
+#else
           try {
+#endif 
             func (c->getElem (), uhand, m_beg, m_end);
 
-          } catch (ConflictFlag f) {
-
-            switch (f) {
-              case CONFLICT: 
-                c->disableSrc ();
-                break;
-              default:
-                GALOIS_DIE ("can't handle conflict flag type");
-                break;
-            }
+#ifdef GALOIS_USE_LONGJMP
+          } else {
+            // nothing to do here
           }
+#else
+          } catch (ConflictFlag f) {
+            result = f;
+          }
+#endif
+
+          switch (result) {
+            case 0:
+              break;
+            case CONFLICT: 
+              c->disableSrc ();
+              break;
+            default:
+              GALOIS_DIE ("can't handle conflict flag type");
+              break;
+          }
+          
 
           Galois::Runtime::setThreadContext (NULL);
 
@@ -549,6 +555,26 @@ protected:
   }
 
 };
+
+}
+
+template <typename Iter, typename Cmp, typename NhFunc, typename OpFunc>
+void for_each_ordered_2p_win (Iter beg, Iter end, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const char* loopname=0) {
+
+  using T = typename std::iterator_traits<Iter>::value_type;
+  // using WindowWL = SortedRangeWindowWL<T, Cmp>;
+  
+  const bool ADDS = ForEachTraits<OpFunc>::NeedsPush;
+
+  using WindowWL = typename ChooseIf<ADDS, PQbasedWindowWL<T, Cmp>, SortedRangeWindowWL<T, Cmp> >::Ret_ty;
+
+  using Exec = KDGtwoPhaseStableExecutor<T, Cmp, NhFunc, OpFunc, WindowWL>;
+  
+  Exec e (cmp, nhFunc, opFunc);
+
+  e.fill_initial (beg, end);
+  e.execute ();
+}
 
 template <typename Iter, typename Cmp, typename NhFunc, typename OpFunc, typename SL>
 void for_each_ordered_2p_win (Iter beg, Iter end, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const SL& serialLoop, const char* loopname=0) {

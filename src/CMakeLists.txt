@@ -1,10 +1,13 @@
-set(sources Barrier.cpp Context.cpp FileGraph.cpp FileGraphParallel.cpp
+set(sources Barrier.cpp Barrier_MCS.cpp Barrier_Topo.cpp Barrier_Pthread.cpp
+  Barrier_Counting.cpp Barrier_Dissemination.cpp
+  Context.cpp FileGraph.cpp 
+  DeterministicWork.cpp
   OCFileGraph.cpp PerThreadStorage.cpp PreAlloc.cpp Sampling.cpp Support.cpp
-  Termination.cpp Threads.cpp Timer.cpp)
+  Termination.cpp Threads.cpp Timer.cpp ThreadPool.cpp)
 if(HAVE_CXX11_THREAD_YIELD)
-  set(sources ${sources} ThreadPool_cpp11.cpp)
+  set(sources ${sources} ThreadPool_cpp11.cpp FileGraphParallel_cpp11.cpp)
 else()
-  set(sources ${sources} ThreadPool_pthread.cpp)
+  set(sources ${sources} ThreadPool_pthread.cpp FileGraphParallel_pthread.cpp)
 endif()
 
 set(include_dirs "${PROJECT_SOURCE_DIR}/include/")
@@ -15,19 +18,20 @@ if(USE_EXP)
 endif()
 set(include_dirs ${include_dirs} "${PROJECT_BINARY_DIR}/include/")
 
-include(ParseArguments)
-
 function(add_internal_library name)
   add_library(${name} OBJECT ${ARGN})
 endfunction()
 
 function(add_galois_library name)
-  PARSE_ARGUMENTS(X "LIBS" "" ${ARGN})
+  set(options)
+  set(oneValueArgs)
+  set(multiValueArgs LIBS)
+  cmake_parse_arguments(X "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
   set(objects)
   foreach(lib ${X_LIBS})
     list(APPEND objects "$<TARGET_OBJECTS:${lib}>")
   endforeach()
-  add_library(${name} ${X_DEFAULT_ARGS} ${objects})
+  add_library(${name} ${X_UNPARSED_ARGUMENTS} ${objects})
 endfunction()
 
 add_galois_library(galois ${sources} LIBS llvm mm ll)

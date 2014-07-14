@@ -29,13 +29,13 @@
 
 unsigned int Galois::Runtime::activeThreads = 1;
 
-unsigned int Galois::setActiveThreads(unsigned int num) {
+unsigned int Galois::setActiveThreads(unsigned int num) noexcept {
   num = std::min(num, Galois::Runtime::getSystemThreadPool().getMaxThreads());
   num = std::max(num, 1U);
   Galois::Runtime::activeThreads = num;
   return num;
 }
 
-unsigned int Galois::getActiveThreads() {
+unsigned int Galois::getActiveThreads() noexcept {
   return Galois::Runtime::activeThreads;
 }

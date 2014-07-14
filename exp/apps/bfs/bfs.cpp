@@ -479,7 +479,7 @@ struct DetBarrierAlgo {
   typedef std::pair<GNode,int> ItemTy;
 
   struct LocalState {
-    typedef std::deque<GNode,Galois::PerIterAllocTy> Pending;
+    typedef std::deque<GNode,typename Galois::PerIterAllocTy::template rebind<GNode>::other> Pending;
     Pending pending;
     LocalState(DetBarrierAlgo<Version>& self, Galois::PerIterAllocTy& alloc): pending(alloc) { }
   };
@@ -493,7 +493,7 @@ struct DetBarrierAlgo {
 
   void operator()(const GNode& source) const {
 #ifdef GALOIS_USE_EXP
-    typedef Galois::WorkList::BulkSynchronousInline<> WL;
+    typedef Galois::WorkList::BulkSynchronousInline WL;
 #else
   typedef Galois::WorkList::BulkSynchronous<Galois::WorkList::dChunkedLIFO<256> > WL;
 #endif
@@ -734,7 +734,7 @@ void run() {
   AlgoTy algo;
   GNode source, report;
   readGraph(source, report);
-  Galois::preAlloc((numThreads + (graph.size() * sizeof(SNode) * 2) / Galois::Runtime::MM::pageSize)*8);
+  Galois::preAlloc((numThreads + (graph.size() * sizeof(SNode) * 2) / Galois::Runtime::MM::hugePageSize)*8);
   Galois::reportPageAlloc("MeminfoPre");
 
   Galois::StatTimer T;
@@ -766,7 +766,7 @@ int main(int argc, char **argv) {
   typedef BulkSynchronous<dChunkedLIFO<256> > BSWL;
 
 #ifdef GALOIS_USE_EXP
-  typedef BulkSynchronousInline<> BSInline;
+  typedef BulkSynchronousInline BSInline;
 #else
   typedef BSWL BSInline;
 #endif

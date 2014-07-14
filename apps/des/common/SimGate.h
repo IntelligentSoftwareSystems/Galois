@@ -132,6 +132,20 @@ protected:
 
   }
 
+public:
+
+  virtual size_t getStateSize () const {
+    return impl.getStateSize ();
+  }
+
+  virtual void copyState (char* const buf, const size_t bufSize) const {
+    impl.copyState (buf, bufSize);
+  }
+
+  virtual void restoreState (char* const buf, const size_t bufSize) {
+    impl.restoreState (buf, bufSize);
+  }
+
 
 };
 

@@ -48,6 +48,7 @@ enum ConvertMode {
   bipartitegr2sorteddegreegr,
   dimacs2gr,
   edgelist2gr,
+  gr2biggr,
   gr2binarypbbs32,
   gr2binarypbbs64,
   gr2bsml,
@@ -74,16 +75,17 @@ enum ConvertMode {
   gr2trigr,
   mtx2gr,
   nodelist2gr,
-  pbbs2gr
+  pbbs2gr,
+  svmlight2gr
 };
 
 enum EdgeType {
-  float32,
-  float64,
-  int32,
-  int64,
-  uint32,
-  uint64,
+  float32_,
+  float64_,
+  int32_,
+  int64_,
+  uint32_,
+  uint64_,
   void_
 };
 
@@ -92,17 +94,19 @@ static cll::opt<std::string> inputFilename(cll::Positional,
 static cll::opt<std::string> outputFilename(cll::Positional,
     cll::desc("<output file>"), cll::Required);
 static cll::opt<std::string> transposeFilename("graphTranspose",
-    cll::desc("[transpose graph file]"), cll::init(""));
+    cll::desc("transpose graph file"), cll::init(""));
 static cll::opt<std::string> outputPermutationFilename("outputNodePermutation",
-    cll::desc("[output node permutation file]"), cll::init(""));
+    cll::desc("output node permutation file"), cll::init(""));
+static cll::opt<std::string> labelsFilename("labels",
+    cll::desc("labels file for svmlight2gr"), cll::init(""));
 static cll::opt<EdgeType> edgeType("edgeType", cll::desc("Input/Output edge type:"),
     cll::values(
-      clEnumValN(EdgeType::float32, "float32", "32 bit floating point edge values"),
-      clEnumValN(EdgeType::float64, "float64", "64 bit floating point edge values"),
-      clEnumValN(EdgeType::int32, "int32", "32 bit int edge values"),
-      clEnumValN(EdgeType::int64, "int64", "64 bit int edge values"),
-      clEnumValN(EdgeType::uint32, "uint32", "32 bit unsigned int edge values"),
-      clEnumValN(EdgeType::uint64, "uint64", "64 bit unsigned int edge values"),
+      clEnumValN(EdgeType::float32_, "float32", "32 bit floating point edge values"),
+      clEnumValN(EdgeType::float64_, "float64", "64 bit floating point edge values"),
+      clEnumValN(EdgeType::int32_, "int32", "32 bit int edge values"),
+      clEnumValN(EdgeType::int64_, "int64", "64 bit int edge values"),
+      clEnumValN(EdgeType::uint32_, "uint32", "32 bit unsigned int edge values"),
+      clEnumValN(EdgeType::uint64_, "uint64", "64 bit unsigned int edge values"),
       clEnumValN(EdgeType::void_, "void", "no edge values"),
       clEnumValEnd), cll::init(EdgeType::void_));
 static cll::opt<ConvertMode> convertMode(cll::desc("Conversion mode:"),
@@ -112,10 +116,10 @@ static cll::opt<ConvertMode> convertMode(cll::desc("Conversion mode:"),
       clEnumVal(bipartitegr2sorteddegreegr, "Sort nodes of bipartite binary gr by degree"),
       clEnumVal(dimacs2gr, "Convert dimacs to binary gr"),
       clEnumVal(edgelist2gr, "Convert edge list to binary gr"),
+      clEnumVal(gr2biggr, "Convert binary gr with little-endian edge data to big-endian edge data"),
       clEnumVal(gr2binarypbbs32, "Convert binary gr to unweighted binary pbbs graph"),
       clEnumVal(gr2binarypbbs64, "Convert binary gr to unweighted binary pbbs graph"),
       clEnumVal(gr2bsml, "Convert binary gr to binary sparse MATLAB matrix"),
-      clEnumVal(gr2bsml, "Convert binary void gr to binary sparse MATLAB matrix"),
       clEnumVal(gr2cgr, "Clean up binary gr: remove self edges and multi-edges"),
       clEnumVal(gr2dimacs, "Convert binary gr to dimacs"),
       clEnumVal(gr2edgelist, "Convert binary gr to edgelist"),
@@ -140,6 +144,7 @@ static cll::opt<ConvertMode> convertMode(cll::desc("Conversion mode:"),
       clEnumVal(mtx2gr, "Convert matrix market format to binary gr"),
       clEnumVal(nodelist2gr, "Convert node list to binary gr"),
       clEnumVal(pbbs2gr, "Convert pbbs graph to binary gr"),
+      clEnumVal(svmlight2gr, "Convert svmlight file to binary gr"),
       clEnumValEnd), cll::Required);
 static cll::opt<int> numParts("numParts", 
     cll::desc("number of parts to partition graph into"), cll::init(64));
@@ -181,12 +186,12 @@ void convert(C& c, HasNoVoidSpecialization, typename std::enable_if<std::is_same
 
 static std::string edgeTypeToName(EdgeType e) {
   switch (e) {
-    case EdgeType::float32: return "float32";
-    case EdgeType::float64: return "float64";
-    case EdgeType::int32: return "int32";
-    case EdgeType::int64: return "int64";
-    case EdgeType::uint32: return "uint32";
-    case EdgeType::uint64: return "uint64";
+    case EdgeType::float32_: return "float32";
+    case EdgeType::float64_: return "float64";
+    case EdgeType::int32_: return "int32";
+    case EdgeType::int64_: return "int64";
+    case EdgeType::uint32_: return "uint32";
+    case EdgeType::uint64_: return "uint64";
     case EdgeType::void_: return "void";
     default: abort();
   }
@@ -197,12 +202,12 @@ void convert() {
   C c;
   std::cout << "Graph type: " << edgeTypeToName(edgeType) << "\n";
   switch (edgeType) {
-    case EdgeType::float32: convert<float>(c, c); break;
-    case EdgeType::float64: convert<double>(c, c); break;
-    case EdgeType::int32: convert<int32_t>(c, c); break;
-    case EdgeType::int64: convert<int64_t>(c, c); break;
-    case EdgeType::uint32: convert<uint32_t>(c, c); break;
-    case EdgeType::uint64: convert<uint64_t>(c, c); break;
+    case EdgeType::float32_: convert<float>(c, c); break;
+    case EdgeType::float64_: convert<double>(c, c); break;
+    case EdgeType::int32_: convert<int32_t>(c, c); break;
+    case EdgeType::int64_: convert<int64_t>(c, c); break;
+    case EdgeType::uint32_: convert<uint32_t>(c, c); break;
+    case EdgeType::uint64_: convert<uint64_t>(c, c); break;
     case EdgeType::void_: convert<void>(c, c); break;
     default: abort();
   };
@@ -311,7 +316,7 @@ struct Edgelist2Gr: public Conversion {
     while (infile) {
       size_t src;
       size_t dst;
-      edge_value_type data;
+      edge_value_type data {};
 
       infile >> src >> dst;
 
@@ -325,9 +330,9 @@ struct Edgelist2Gr: public Conversion {
 
     edge_value_type* rawEdgeData = p.finish<edge_value_type>();
     if (EdgeData::has_value)
-      std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+      std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
 
-    p.structureToFile(outfilename);
+    p.toFile(outfilename);
     printStatus(numNodes, numEdges);
   }
 };
@@ -356,6 +361,9 @@ struct Mtx2Gr: public HasNoVoidSpecialization {
 
     for (int phase = 0; phase < 2; ++phase) {
       std::ifstream infile(infilename.c_str());
+      if ( infile.fail() ) {
+        GALOIS_DIE("Failed to open input file");
+      }
 
       // Skip comments
       while (infile) {
@@ -427,9 +435,9 @@ struct Mtx2Gr: public HasNoVoidSpecialization {
 
     edge_value_type* rawEdgeData = p.finish<edge_value_type>();
     if (EdgeData::has_value)
-      std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+      std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
 
-    p.structureToFile(outfilename);
+    p.toFile(outfilename);
     printStatus(p.size(), p.sizeEdges());
   }
 };
@@ -441,7 +449,7 @@ struct Gr2Mtx: public HasNoVoidSpecialization {
     typedef Graph::GraphNode GNode;
 
     Graph graph;
-    graph.structureFromFile(infilename);
+    graph.fromFile(infilename);
 
     std::ofstream file(outfilename.c_str());
     file << graph.size() << " " << graph.size() << " " << graph.sizeEdges() << "\n";
@@ -531,7 +539,7 @@ struct Nodelist2Gr: public HasOnlyVoidSpecialization {
 
     p.finish<void>();
 
-    p.structureToFile(outfilename);
+    p.toFile(outfilename);
     printStatus(numNodes, numEdges);
   }
 };
@@ -545,7 +553,7 @@ struct Gr2Edgelist: public Conversion {
     typedef typename EdgeData::value_type edge_value_type;
 
     Graph graph;
-    graph.structureFromFile(infilename);
+    graph.fromFile(infilename);
 
     std::ofstream file(outfilename.c_str());
     for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
@@ -566,7 +574,21 @@ struct Gr2Edgelist: public Conversion {
 };
 
 template<bool LittleEndian, typename T>
-void writePetsc(std::ofstream& out, T value) {
+void writeEndian(T* out, T value) {
+  static_assert(sizeof(T) == 4 || sizeof(T) == 8, "unknown data size");
+  switch ((sizeof(T) == 4 ? 0 : 2) + (LittleEndian ? 0 : 1)) {
+    case 3: value = Galois::convert_htobe64(value); break;
+    case 2: value = Galois::convert_htole64(value); break;
+    case 1: value = Galois::convert_htobe32(value); break;
+    case 0: value = Galois::convert_htole32(value); break;
+    default: abort();
+  }
+
+  *out = value;
+}
+
+template<bool LittleEndian, typename T>
+void writeEndian(std::ofstream& out, T value) {
   static_assert(sizeof(T) == 4 || sizeof(T) == 8, "unknown data size");
   switch ((sizeof(T) == 4 ? 0 : 2) + (LittleEndian ? 0 : 1)) {
     case 3: value = Galois::convert_htobe64(value); break;
@@ -589,7 +611,7 @@ struct Bipartitegr2Petsc: public HasNoVoidSpecialization {
     typedef typename EdgeData::value_type edge_value_type;
 
     Graph graph;
-    graph.structureFromFile(infilename);
+    graph.fromFile(infilename);
 
     size_t partition = 0;
     for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii, ++partition) {
@@ -600,15 +622,15 @@ struct Bipartitegr2Petsc: public HasNoVoidSpecialization {
     }
 
     std::ofstream file(outfilename.c_str());
-    writePetsc<LittleEndian, int32_t>(file, 1211216);
-    writePetsc<LittleEndian, int32_t>(file, partition); // rows
-    writePetsc<LittleEndian, int32_t>(file, graph.size() - partition); // columns
-    writePetsc<LittleEndian, int32_t>(file, graph.sizeEdges());
+    writeEndian<LittleEndian, int32_t>(file, 1211216);
+    writeEndian<LittleEndian, int32_t>(file, partition); // rows
+    writeEndian<LittleEndian, int32_t>(file, graph.size() - partition); // columns
+    writeEndian<LittleEndian, int32_t>(file, graph.sizeEdges());
 
     // number of nonzeros in each row
     for (Graph::iterator ii = graph.begin(), ei = ii + partition; ii != ei; ++ii) {
       GNode src = *ii;
-      writePetsc<LittleEndian, int32_t>(file, std::distance(graph.edge_begin(src), graph.edge_end(src)));
+      writeEndian<LittleEndian, int32_t>(file, std::distance(graph.edge_begin(src), graph.edge_end(src)));
     }
     
     // column indices 
@@ -616,7 +638,7 @@ struct Bipartitegr2Petsc: public HasNoVoidSpecialization {
       GNode src = *ii;
       for (Graph::edge_iterator jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj) {
         GNode dst = graph.getEdgeDst(jj);
-        writePetsc<LittleEndian, int32_t>(file, dst - partition);
+        writeEndian<LittleEndian, int32_t>(file, dst - partition);
       }
     }
 
@@ -624,7 +646,7 @@ struct Bipartitegr2Petsc: public HasNoVoidSpecialization {
     for (Graph::iterator ii = graph.begin(), ei = ii + partition; ii != ei; ++ii) {
       GNode src = *ii;
       for (Graph::edge_iterator jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj) {
-        writePetsc<LittleEndian, OutEdgeTy>(file, graph.getEdgeData<InEdgeTy>(jj));
+        writeEndian<LittleEndian, OutEdgeTy>(file, graph.getEdgeData<InEdgeTy>(jj));
       }
     }
     file.close();
@@ -654,7 +676,7 @@ struct RandomizeNodes: public Conversion {
     typedef typename std::iterator_traits<typename Permutation::iterator>::difference_type difference_type;
 
     Graph graph;
-    graph.structureFromFile(infilename);
+    graph.fromFile(infilename);
 
     Permutation perm;
     perm.create(graph.size());
@@ -671,7 +693,7 @@ struct RandomizeNodes: public Conversion {
     Galois::Graph::permute<EdgeTy>(graph, perm, out);
     outputPermutation(perm);
 
-    out.structureToFile(outfilename);
+    out.toFile(outfilename);
     printStatus(graph.size(), graph.sizeEdges());
   }
 };
@@ -712,8 +734,8 @@ struct RandomizeEdgeWeights: public HasNoVoidSpecialization {
     
     Graph graph, outgraph;
 
-    graph.structureFromFile(infilename);
-    OutEdgeTy* edgeData = outgraph.structureFromGraph<OutEdgeTy>(graph);
+    graph.fromFile(infilename);
+    OutEdgeTy* edgeData = outgraph.fromGraph<OutEdgeTy>(graph);
     OutEdgeTy* edgeDataEnd = edgeData + graph.sizeEdges();
 
     std::mt19937 gen;
@@ -722,7 +744,7 @@ struct RandomizeEdgeWeights: public HasNoVoidSpecialization {
       *edgeData = dist(gen);
     }
     
-    outgraph.structureToFile(outfilename);
+    outgraph.toFile(outfilename);
     printStatus(graph.size(), graph.sizeEdges(), outgraph.size(), outgraph.sizeEdges());
   }
 };
@@ -740,7 +762,7 @@ struct AddRing: public Conversion {
     typedef typename EdgeData::value_type edge_value_type;
     
     Graph graph;
-    graph.structureFromFile(infilename);
+    graph.fromFile(infilename);
 
     Writer p;
     EdgeData edgeData;
@@ -785,8 +807,8 @@ struct AddRing: public Conversion {
 
     edge_value_type* rawEdgeData = p.finish<edge_value_type>();
     if (EdgeData::has_value)
-      std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
-    p.structureToFile(outfilename);
+      std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
+    p.toFile(outfilename);
     printStatus(graph.size(), graph.sizeEdges(), p.size(), p.sizeEdges());
   }
 };
@@ -804,7 +826,7 @@ struct AddTree: public Conversion {
     typedef typename EdgeData::value_type edge_value_type;
     
     Graph graph;
-    graph.structureFromFile(infilename);
+    graph.fromFile(infilename);
 
     Writer p;
     EdgeData edgeData;
@@ -876,8 +898,8 @@ struct AddTree: public Conversion {
 
     edge_value_type* rawEdgeData = p.finish<edge_value_type>();
     if (EdgeData::has_value)
-      std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
-    p.structureToFile(outfilename);
+      std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
+    p.toFile(outfilename);
     printStatus(graph.size(), graph.sizeEdges(), p.size(), p.sizeEdges());
   }
 };
@@ -890,10 +912,10 @@ struct MakeSymmetric: public Conversion {
 
     Graph ingraph;
     Graph outgraph;
-    ingraph.structureFromFile(infilename);
+    ingraph.fromFile(infilename);
     Galois::Graph::makeSymmetric<EdgeTy>(ingraph, outgraph);
 
-    outgraph.structureToFile(outfilename);
+    outgraph.toFile(outfilename);
     printStatus(ingraph.size(), ingraph.sizeEdges(), outgraph.size(), outgraph.sizeEdges());
   }
 };
@@ -912,8 +934,8 @@ struct BipartiteSortByDegree: public Conversion {
     typedef Galois::LargeArray<GNode> Permutation;
 
     Graph ingraph, outgraph, transposegraph;
-    ingraph.structureFromFile(infilename);
-    transposegraph.structureFromFile(transposeFilename);
+    ingraph.fromFile(infilename);
+    transposegraph.fromFile(transposeFilename);
 
     Permutation perm;
     perm.create(ingraph.size());
@@ -944,7 +966,7 @@ struct BipartiteSortByDegree: public Conversion {
 
     Galois::Graph::permute<EdgeTy>(ingraph, inverse, outgraph);
     outputPermutation(inverse);
-    outgraph.structureToFile(outfilename);
+    outgraph.toFile(outfilename);
     printStatus(ingraph.size(), ingraph.sizeEdges());
   }
 };
@@ -958,7 +980,7 @@ struct SortByDegree: public Conversion {
     typedef Galois::LargeArray<GNode> Permutation;
 
     Graph ingraph, outgraph;
-    ingraph.structureFromFile(infilename);
+    ingraph.fromFile(infilename);
 
     Permutation perm;
     perm.create(ingraph.size());
@@ -979,7 +1001,26 @@ struct SortByDegree: public Conversion {
 
     Galois::Graph::permute<EdgeTy>(ingraph, inverse, outgraph);
     outputPermutation(inverse);
-    outgraph.structureToFile(outfilename);
+    outgraph.toFile(outfilename);
+    printStatus(ingraph.size(), ingraph.sizeEdges());
+  }
+};
+
+struct ToBigEndian: public HasNoVoidSpecialization {
+  template<typename EdgeTy>
+  void convert(const std::string& infilename, const std::string& outfilename) {
+    typedef Galois::Graph::FileGraph Graph;
+    typedef Graph::GraphNode GNode;
+    typedef Galois::LargeArray<GNode> Permutation;
+
+    Graph ingraph, outgraph;
+    ingraph.fromFile(infilename);
+    EdgeTy* out = outgraph.fromGraph<EdgeTy>(ingraph);
+
+    for (auto ii = ingraph.edge_data_begin<EdgeTy>(), ei = ingraph.edge_data_end<EdgeTy>(); ii != ei; ++ii, ++out) {
+      writeEndian<false>(out, *ii);
+    }
+    outgraph.toFile(outfilename);
     printStatus(ingraph.size(), ingraph.sizeEdges());
   }
 };
@@ -992,7 +1033,7 @@ struct SortByHighDegreeParent: public Conversion {
     typedef Galois::LargeArray<GNode> Permutation;
 
     Graph graph;
-    graph.structureFromFile(infilename);
+    graph.fromFile(infilename);
 
     auto sz = graph.size();
 
@@ -1054,7 +1095,7 @@ struct SortByHighDegreeParent: public Conversion {
     //           << std::distance(out.edge_begin(perm2[first]), out.edge_end(perm2[first]))
     //           << "\n";
 
-    out.structureToFile(outfilename);
+    out.toFile(outfilename);
     printStatus(graph.size(), graph.sizeEdges());
   }
 };
@@ -1069,7 +1110,7 @@ struct RemoveHighDegree: public Conversion {
     typedef typename EdgeData::value_type edge_value_type;
     
     Graph graph;
-    graph.structureFromFile(infilename);
+    graph.fromFile(infilename);
 
     Writer p;
     EdgeData edgeData;
@@ -1095,7 +1136,7 @@ struct RemoveHighDegree: public Conversion {
     if (numEdges == graph.sizeEdges() && numNodes == graph.size()) {
       std::cout << "Graph already simplified; copy input to output\n";
       printStatus(graph.size(), graph.sizeEdges());
-      graph.structureToFile(outfilename);
+      graph.toFile(outfilename);
       return;
     }
 
@@ -1138,9 +1179,9 @@ struct RemoveHighDegree: public Conversion {
 
     edge_value_type* rawEdgeData = p.finish<edge_value_type>();
     if (EdgeData::has_value)
-      std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+      std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
     
-    p.structureToFile(outfilename);
+    p.toFile(outfilename);
     printStatus(graph.size(), graph.sizeEdges(), p.size(), p.sizeEdges());
   }
 };
@@ -1156,7 +1197,7 @@ struct PartitionBySource: public Conversion {
     typedef typename EdgeData::value_type edge_value_type;
     
     Graph graph;
-    graph.structureFromFile(infilename);
+    graph.fromFile(infilename);
 
     for (int i = 0; i < numParts; ++i) {
       Writer p;
@@ -1193,12 +1234,12 @@ struct PartitionBySource: public Conversion {
 
       edge_value_type* rawEdgeData = p.finish<edge_value_type>();
       if (EdgeData::has_value)
-        std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+        std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
 
       std::ostringstream partname;
       partname << outfilename << "." << i << ".of." << numParts;
 
-      p.structureToFile(partname.str());
+      p.toFile(partname.str());
       printStatus(graph.size(), graph.sizeEdges(), p.size(), p.sizeEdges());
     }
   }
@@ -1249,7 +1290,7 @@ struct PartitionByDestination: public Conversion {
     typedef typename EdgeData::value_type edge_value_type;
     
     Graph graph;
-    graph.structureFromFile(infilename);
+    graph.fromFile(infilename);
     InDegree inDegree;
     compute_indegree(graph, inDegree);
 
@@ -1304,12 +1345,12 @@ struct PartitionByDestination: public Conversion {
 
       edge_value_type* rawEdgeData = p.finish<edge_value_type>();
       if (EdgeData::has_value)
-        std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+        std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
 
       std::ostringstream partname;
       partname << outfilename << "." << i << ".of." << numParts;
 
-      p.structureToFile(partname.str());
+      p.toFile(partname.str());
       printStatus(graph.size(), graph.sizeEdges(), p.size(), p.sizeEdges());
     }
   }
@@ -1326,7 +1367,7 @@ struct Transpose: public Conversion {
     typedef typename EdgeData::value_type edge_value_type;
     
     Graph graph;
-    graph.structureFromFile(infilename);
+    graph.fromFile(infilename);
 
     Writer p;
     EdgeData edgeData;
@@ -1362,9 +1403,9 @@ struct Transpose: public Conversion {
 
     edge_value_type* rawEdgeData = p.finish<edge_value_type>();
     if (EdgeData::has_value)
-      std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+      std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
     
-    p.structureToFile(outfilename);
+    p.toFile(outfilename);
     printStatus(graph.size(), graph.sizeEdges(), p.size(), p.sizeEdges());
   }
 };
@@ -1395,8 +1436,8 @@ struct Cleanup: public Conversion {
     Graph orig, graph;
     {
       // Original FileGraph is immutable because it is backed by a file
-      orig.structureFromFile(infilename);
-      graph.cloneFrom(orig);
+      orig.fromFile(infilename);
+      graph = orig;
     }
 
     size_t numEdges = 0;
@@ -1421,7 +1462,7 @@ struct Cleanup: public Conversion {
     if (numEdges == graph.sizeEdges()) {
       std::cout << "Graph already simplified; copy input to output\n";
       printStatus(graph.size(), graph.sizeEdges());
-      graph.structureToFile(outfilename);
+      graph.toFile(outfilename);
       return;
     }
 
@@ -1473,9 +1514,9 @@ struct Cleanup: public Conversion {
 
     edge_value_type* rawEdgeData = p.finish<edge_value_type>();
     if (EdgeData::has_value)
-      std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+      std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
     
-    p.structureToFile(outfilename);
+    p.toFile(outfilename);
     printStatus(graph.size(), graph.sizeEdges(), p.size(), p.sizeEdges());
   }
 };
@@ -1493,8 +1534,8 @@ struct SortEdges: public boost::mpl::if_c<NeedsEdgeData, HasNoVoidSpecialization
     Graph orig, graph;
     {
       // Original FileGraph is immutable because it is backed by a file
-      orig.structureFromFile(infilename);
-      graph.cloneFrom(orig);
+      orig.fromFile(infilename);
+      graph = orig;
     }
 
     for (typename Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
@@ -1503,7 +1544,7 @@ struct SortEdges: public boost::mpl::if_c<NeedsEdgeData, HasNoVoidSpecialization
       graph.sortEdges<EdgeTy>(src, SortBy<GNode,EdgeTy>());
     }
 
-    graph.structureToFile(outfilename);
+    graph.toFile(outfilename);
     printStatus(graph.size(), graph.sizeEdges());
   }
 };
@@ -1518,7 +1559,7 @@ struct MakeUnsymmetric: public Conversion {
     typedef Graph::GraphNode GNode;
     
     Graph graph;
-    graph.structureFromFile(infilename);
+    graph.fromFile(infilename);
 
     size_t numEdges = 0;
 
@@ -1537,7 +1578,7 @@ struct MakeUnsymmetric: public Conversion {
     if (numEdges == graph.sizeEdges()) {
       std::cout << "Graph already simplified; copy input to output\n";
       printStatus(graph.size(), graph.sizeEdges());
-      graph.structureToFile(outfilename);
+      graph.toFile(outfilename);
       return;
     }
 
@@ -1583,9 +1624,9 @@ struct MakeUnsymmetric: public Conversion {
 
     edge_value_type* rawEdgeData = p.finish<edge_value_type>();
     if (EdgeData::has_value)
-      std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+      std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
     
-    p.structureToFile(outfilename);
+    p.toFile(outfilename);
     printStatus(graph.size(), graph.sizeEdges(), p.size(), p.sizeEdges());
   }
 };
@@ -1689,9 +1730,9 @@ struct Dimacs2Gr: public HasNoVoidSpecialization {
 
     edge_value_type* rawEdgeData = p.finish<edge_value_type>();
     if (EdgeData::has_value)
-      std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+      std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
 
-    p.structureToFile(outfilename);
+    p.toFile(outfilename);
     printStatus(p.size(), p.sizeEdges());
   }
 };
@@ -1760,7 +1801,7 @@ struct Pbbs2Gr: public HasOnlyVoidSpecialization {
 
     p.finish<void>();
 
-    p.structureToFile(outfilename);
+    p.toFile(outfilename);
     printStatus(p.size(), p.sizeEdges());
   }
 };
@@ -1773,7 +1814,7 @@ struct Gr2Pbbsedges: public HasNoVoidSpecialization {
     typedef Graph::GraphNode GNode;
 
     Graph graph;
-    graph.structureFromFile(infilename);
+    graph.fromFile(infilename);
 
     std::ofstream file(outfilename.c_str());
     file << "WeightedEdgeArray\n";
@@ -1818,7 +1859,7 @@ struct Gr2Pbbs: public Conversion {
     typedef typename EdgeData::value_type edge_value_type;
 
     Graph graph;
-    graph.structureFromFile(infilename);
+    graph.fromFile(infilename);
 
     std::ofstream file(outfilename.c_str());
     if (EdgeData::has_value)
@@ -1864,7 +1905,7 @@ struct Gr2BinaryPbbs: public HasOnlyVoidSpecialization {
     typedef Graph::GraphNode GNode;
 
     Graph graph;
-    graph.structureFromFile(infilename);
+    graph.fromFile(infilename);
 
     {
       std::string configName = outfilename + ".config";
@@ -1909,7 +1950,7 @@ struct Gr2Dimacs: public HasNoVoidSpecialization {
     typedef Graph::GraphNode GNode;
 
     Graph graph;
-    graph.structureFromFile(infilename);
+    graph.fromFile(infilename);
 
     std::ofstream file(outfilename.c_str());
     file << "p sp " << graph.size() << " " << graph.sizeEdges() << "\n";
@@ -1944,7 +1985,7 @@ struct Gr2Rmat: public HasNoVoidSpecialization {
     typedef Graph::GraphNode GNode;
 
     Graph graph;
-    graph.structureFromFile(infilename);
+    graph.fromFile(infilename);
 
     std::ofstream file(outfilename.c_str());
     file << "%%%\n";
@@ -1985,7 +2026,7 @@ struct Gr2Bsml: public Conversion {
     typedef typename Galois::LargeArray<EdgeTy> EdgeData;
 
     Graph graph;
-    graph.structureFromFile(infilename);
+    graph.fromFile(infilename);
 
     uint32_t nnodes = graph.size();
     uint32_t nedges = graph.sizeEdges(); 
@@ -2030,6 +2071,126 @@ struct Gr2Bsml: public Conversion {
   }
 };
 
+/**
+ * SVMLight format.
+ *
+ * <line> .=. <target> <feature>:<value> <feature>:<value> ... <feature>:<value> # <info>
+ * <target> .=. +1 | -1 | 0 | <float> 
+ * <feature> .=. <integer> | "qid"
+ * <value> .=. <float>
+ * <info> .=. <string> 
+ *
+ */
+struct Svmlight2Gr: public HasNoVoidSpecialization {
+  template<typename EdgeTy>
+  void convert(const std::string& infilename, const std::string& outfilename) {
+    typedef Galois::Graph::FileGraphWriter Writer;
+    typedef Galois::LargeArray<EdgeTy> EdgeData;
+    typedef typename EdgeData::value_type edge_value_type;
+
+    Writer p;
+    EdgeData edgeData;
+    std::ifstream infile(infilename.c_str());
+    std::ofstream outlabels(labelsFilename.c_str());
+
+    if (!outlabels) {
+      GALOIS_DIE("unable to create labels file");
+    }
+
+    size_t featureOffset = 0;
+    size_t numEdges = 0;
+    long maxFeature = -1;
+
+    for (int phase = 0; phase < 3; ++phase) {
+      infile.clear();
+      infile.seekg(0, std::ios::beg);
+      size_t numNodes = 0;
+
+      while (infile) {
+        if (phase == 2) {
+          float label;
+          infile >> label;
+          if (!infile)
+            break;
+          outlabels << numNodes << " " << label << "\n";
+        } else {
+          infile.ignore(std::numeric_limits<std::streamsize>::max(), ' ');
+          if (!infile)
+            break;
+        }
+
+        const int maxLength = 1024;
+        char buffer[maxLength];
+        int idx = 0;
+        
+        while (infile) {
+          char c = infile.get();
+          if (!infile)
+            break;
+          if (c == ' ' || c == '\n' || c == '#') {
+            buffer[idx] = '\0';
+            // Parse "feature:value" pairs
+            if (idx) {
+              char *delim = strchr(buffer, ':');
+              if (!delim)
+                GALOIS_DIE("unknown feature format: '", buffer, "' on line: ", numNodes + 1);
+              *delim = '\0';
+              double value = strtod(delim + 1, NULL);
+              if (value == 0.0) {
+                ; // pass
+              } else if (phase == 0) {
+                long feature = strtol(buffer, NULL, 10);
+                maxFeature = std::max(maxFeature, feature);
+                numEdges += 1;
+              } else if (phase == 1) {
+                p.incrementDegree(numNodes);
+              } else {
+                long feature = strtol(buffer, NULL, 10);
+                edge_value_type data = value;
+                edgeData.set(p.addNeighbor(numNodes, feature + featureOffset), data); 
+              }
+            }
+
+            idx = 0;
+          } else {
+            buffer[idx++] = c;
+            if (idx == maxLength)
+              GALOIS_DIE("token too long");
+            continue;
+          }
+          if (c == '#') {
+            infile.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
+          }
+          if (c == '#' || c == '\n') {
+            break;
+          }
+        }
+
+        numNodes += 1;
+      }
+
+      if (phase == 0) {
+        featureOffset = numNodes;
+        numNodes += maxFeature + 1;
+        p.setNumNodes(numNodes);
+        p.setNumEdges(numEdges);
+        p.setSizeofEdgeData(EdgeData::size_of::value);
+        edgeData.create(numEdges);
+        p.phase1();
+      } else if (phase == 1) {
+        p.phase2();
+      } else {
+        edge_value_type* rawEdgeData = p.finish<edge_value_type>();
+        if (EdgeData::has_value)
+          std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
+        numNodes += maxFeature + 1;
+        p.toFile(outfilename);
+        printStatus(numNodes, numEdges);
+      }
+    }
+  }
+};
+
 // TODO: retest which conversions don't work with xlc
 #if !defined(__IBMCPP__) || __IBMCPP__ > 1210
 #endif
@@ -2043,6 +2204,7 @@ int main(int argc, char** argv) {
     case bipartitegr2sorteddegreegr: convert<BipartiteSortByDegree>(); break;
     case dimacs2gr: convert<Dimacs2Gr>(); break;
     case edgelist2gr: convert<Edgelist2Gr>(); break;
+    case gr2biggr: convert<ToBigEndian>(); break;
     case gr2binarypbbs32: convert<Gr2BinaryPbbs<uint32_t,uint32_t> >(); break;
     case gr2binarypbbs64: convert<Gr2BinaryPbbs<uint32_t,uint64_t> >(); break;
     case gr2bsml: convert<Gr2Bsml>(); break;
@@ -2070,6 +2232,7 @@ int main(int argc, char** argv) {
     case mtx2gr: convert<Mtx2Gr>(); break;
     case nodelist2gr: convert<Nodelist2Gr>(); break;
     case pbbs2gr: convert<Pbbs2Gr>(); break;
+    case svmlight2gr: convert<Svmlight2Gr>(); break;
     default: abort();
   }
   return 0;

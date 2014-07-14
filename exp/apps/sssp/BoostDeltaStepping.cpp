@@ -76,7 +76,7 @@ int main(int argc, char **argv) {
           boost::no_property,boost::property<boost::edge_weight_t,int> > BGraph;
 
   BGraph bg(g.size());
-  int numEdges = g.sizeEdges();
+  //int numEdges = g.sizeEdges();
 
   for (Graph::iterator ii = g.begin(),
       ei = g.end(); ii != ei; ++ii) {

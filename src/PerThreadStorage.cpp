@@ -22,8 +22,8 @@
  */
 
 #include "Galois/Runtime/PerThreadStorage.h"
-#include "Galois/Runtime/ll/gio.h"
 #include "Galois/Runtime/mm/Mem.h"
+#include "Galois/Runtime/ll/gio.h"
 #include <mutex>
 
 __thread char* Galois::Runtime::ptsBase;
@@ -42,7 +42,7 @@ Galois::Runtime::PerBackend& Galois::Runtime::getPPSBackend() {
 
 //#define MORE_MEM_HACK
 #ifdef MORE_MEM_HACK
-const size_t allocSize = Galois::Runtime::MM::hugePageSize * 10;
+const size_t allocSize = Galois::Runtime::MM::hugePageSize * 16;
 inline void* alloc() {
   return malloc(allocSize);
 }
@@ -61,24 +61,24 @@ unsigned Galois::Runtime::PerBackend::nextLog2(unsigned size) {
     ++i;
   }
   if (i >= MAX_SIZE) { 
-    GALOIS_DIE("PTS size too big");
+    abort();
   }
   return i;
 }
 
 unsigned Galois::Runtime::PerBackend::allocOffset(const unsigned sz) {
   unsigned retval = allocSize;
-
-  unsigned size = (1 << nextLog2(sz));
+  unsigned ll = nextLog2(sz);
+  unsigned size = (1 << ll);
 
   if ((nextLoc + size) <= allocSize) {
     // simple path, where we allocate bump ptr style
-    retval = __sync_fetch_and_add (&nextLoc, size);
-  } else {
+    retval = __sync_fetch_and_add(&nextLoc, size);
+  } else if (!invalid) {
     // find a free offset
     std::lock_guard<Lock> llock(freeOffsetsLock);
 
-    unsigned index = nextLog2(sz);
+    unsigned index = ll;
     if (!freeOffsets[index].empty()) {
       retval = freeOffsets[index].back();
       freeOffsets[index].pop_back();
@@ -113,13 +113,14 @@ unsigned Galois::Runtime::PerBackend::allocOffset(const unsigned sz) {
 }
 
 void Galois::Runtime::PerBackend::deallocOffset(const unsigned offset, const unsigned sz) {
-  unsigned size = (1 << nextLog2(sz));
+  unsigned ll = nextLog2(sz);
+  unsigned size = (1 << ll);
   if (__sync_bool_compare_and_swap(&nextLoc, offset + size, offset)) {
     ; // allocation was at the end, so recovered some memory
-  } else {
+  } else if (!invalid) {
     // allocation not at the end
     std::lock_guard<Lock> llock(freeOffsetsLock);
-    freeOffsets[nextLog2(sz)].push_back(offset);
+    freeOffsets[ll].push_back(offset);
   }
 }
 
@@ -130,8 +131,12 @@ void* Galois::Runtime::PerBackend::getRemote(unsigned thread, unsigned offset) {
 }
 
 void Galois::Runtime::PerBackend::initCommon() {
-  if (heads.empty())
-    heads.resize(LL::getMaxThreads());
+  if (!heads) {
+    assert(LL::getTID() == 0);
+    unsigned n = LL::getMaxThreads();
+    heads = new char*[n];
+    memset(heads, 0, sizeof(*heads)* n);
+  }
 }
 
 char* Galois::Runtime::PerBackend::initPerThread() {
@@ -158,19 +163,18 @@ char* Galois::Runtime::PerBackend::initPerPackage() {
 }
 
 void Galois::Runtime::initPTS() {
-  if (!Galois::Runtime::ptsBase) {
+  if (!ptsBase) {
     //unguarded initialization as initPTS will run in the master thread
     //before any other threads are generated
-    Galois::Runtime::ptsBase = getPTSBackend().initPerThread();
+    ptsBase = getPTSBackend().initPerThread();
   }
-  if (!Galois::Runtime::ppsBase) {
-    Galois::Runtime::ppsBase = getPPSBackend().initPerPackage();
+  if (!ppsBase) {
+    ppsBase = getPPSBackend().initPerPackage();
   }
 }
 
 #ifdef GALOIS_USE_EXP
 char* Galois::Runtime::PerBackend::initPerThread_cilk() {
-  assert (heads.size () == LL::getMaxThreads());
   unsigned id = LL::getTID();
   assert(heads[id] != nullptr);
 
@@ -178,7 +182,6 @@ char* Galois::Runtime::PerBackend::initPerThread_cilk() {
 }
 
 char* Galois::Runtime::PerBackend::initPerPackage_cilk() {
-  assert(heads.size() == LL::getMaxThreads());
   unsigned id = LL::getTID();
   assert(heads[id] != nullptr);
 
@@ -186,11 +189,11 @@ char* Galois::Runtime::PerBackend::initPerPackage_cilk() {
 }
 
 void Galois::Runtime::initPTS_cilk() {
-  if (!Galois::Runtime::ptsBase) {
-    Galois::Runtime::ptsBase = getPTSBackend().initPerThread_cilk ();
+  if (!ptsBase) {
+    ptsBase = getPTSBackend().initPerThread_cilk();
   }
-  if (!Galois::Runtime::ppsBase) {
-    Galois::Runtime::ppsBase = getPPSBackend().initPerPackage_cilk();
+  if (!ppsBase) {
+    ppsBase = getPPSBackend().initPerPackage_cilk();
   }
 }
 #endif // GALOIS_USE_EXP

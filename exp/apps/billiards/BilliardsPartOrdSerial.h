@@ -236,7 +236,8 @@ private:
       }
 
       addList.clear ();
-      i->simulate (addList, table, endtime);
+      i->simulate ();
+      table.addNextEvents (*i, addList, endtime);
 
       for (std::vector<Event>::iterator a = addList.begin (), ea = addList.end ();
           a != ea; ++a) {
@@ -453,7 +454,7 @@ protected:
       if (indep) {
 
         // from start upto i in priority order
-        for (WLTy::iterator j = workList.begin (), ej = workList.end (); 
+        for (WLTy::iterator j = workList.begin ()/*, ej = workList.end ()*/; 
             (j != i) && ((*j) < (*i)); ++j) {
 
           ++findIter;
@@ -495,7 +496,9 @@ protected:
       addList.clear ();
       const bool notStale = i->notStale ();
 
-      i->simulate (addList, table, endtime);
+
+      i->simulate ();
+      table.addNextEvents (*i, addList, endtime);
 
       for (std::vector<Event>::const_iterator a = addList.begin (), ea = addList.end ();
           a != ea; ++a) {

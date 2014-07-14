@@ -12,7 +12,12 @@ int main(int c, char** argv) {
   return ptr != MAP_FAILED;
 }
 ")
-CHECK_C_SOURCE_RUNS("${HugePages_C_TEST_SOURCE}" HAVE_HUGEPAGES)
 if(HAVE_HUGEPAGES)
-  message(STATUS "Huge pages found")
+
+else()
+  CHECK_C_SOURCE_RUNS("${HugePages_C_TEST_SOURCE}" HAVE_HUGEPAGES_INTERNAL)
+  if(HAVE_HUGEPAGES_INTERNAL)
+    message(STATUS "Huge pages found")
+    set(HAVE_HUGEPAGES "${HAVE_HUGEPAGES_INTERNAL}" CACHE BOOL "Have hugepages")
+  endif()
 endif()

@@ -201,8 +201,8 @@ template<typename T>
 struct does_not_need_aborts : public has_tt_does_not_need_aborts<T> {};
 
 /**
- * Indicates that the neighborhood set does not change through out i.e. is not
- * dependent on computed values. Examples of such fixed neighborhood is e.g. the 
+ * Indicates that the neighborhood set does not change, i.e., it is not
+ * dependent on computed values. Examples of fixed neighborhoods is the
  * neighborhood being all the neighbors of a node in the input graph, while the
  * counter example is the neighborhood being some of the neighbors based on
  * some predicate. 
@@ -218,6 +218,17 @@ struct has_fixed_neighborhood: public has_tt_has_fixed_neighborhood<T> {};
 BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_has_known_trivial_constructor)
 template <typename T>
 struct has_known_trivial_constructor: public has_tt_has_known_trivial_constructor<T> { };
+
+//! Decay that handles std::ref
+template<typename T>
+struct special_decay {
+  using type = typename std::decay<T>::type;
+};
+
+template<typename T>
+struct special_decay<std::reference_wrapper<T>> {
+  using type = T&;
+};
 
 }
 #endif

@@ -31,6 +31,7 @@
 #include "Galois/Runtime/ll/PaddedLock.h"
 #include "Galois/Runtime/ll/TID.h"
 
+#include <cstddef>
 #include <boost/utility.hpp>
 
 #include <cassert>
@@ -43,21 +44,40 @@ namespace Runtime {
 
 class PerBackend {
   static const unsigned MAX_SIZE = 30;
-  static const unsigned MIN_SIZE = 3; // 8 bytes
+  // 16 byte alignment so vectorized initialization is easier
+  // NB(ddn): llvm seems to assume this under some cases because
+  // I've seen weird initialization crashes with MIN_SIZE = 3
+  static const unsigned MIN_SIZE = 4;
   typedef Galois::Runtime::LL::SimpleLock Lock;
 
   unsigned int nextLoc;
-  std::vector<char*> heads;
+  char** heads;
   Lock freeOffsetsLock;
   std::vector<std::vector<unsigned> > freeOffsets;
+  /**
+   * Guards access to non-POD objects that can be accessed after PerBackend
+   * is destroyed. Access can occur through destroying PerThread/PerPackage
+   * objects with static storage duration, which have a reference to a
+   * PerBackend object, which may have be destroyed before the PerThread
+   * object itself.
+   */
+  bool invalid; 
 
   void initCommon();
-
   static unsigned nextLog2(unsigned size);
 
 public:
-  PerBackend(): nextLoc(0) {
+  PerBackend(): nextLoc(0), heads(0), invalid(false) {
     freeOffsets.resize(MAX_SIZE);
+  }
+
+  PerBackend(const PerBackend&) = delete;
+  PerBackend& operator=(const PerBackend&) = delete;
+
+  ~PerBackend() {
+    // Intentionally leak heads so that other PerThread operations are
+    // still valid after we are gone
+    invalid = true;
   }
 
   char* initPerThread();
@@ -93,12 +113,21 @@ void initPTS();
 void initPTS_cilk();
 #endif // GALOIS_USE_EXP
 
-
 template<typename T>
-class PerThreadStorage: private boost::noncopyable {
+class PerThreadStorage {
 protected:
   unsigned offset;
   PerBackend& b;
+
+  void destruct() {
+    if (offset == ~0)
+      return;
+
+    for (unsigned n = 0; n < LL::getMaxThreads(); ++n)
+      reinterpret_cast<T*>(b.getRemote(n, offset))->~T();
+    b.deallocOffset(offset, sizeof(T));
+    offset = ~0;
+  }
 
 public:
 #if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
@@ -125,24 +154,49 @@ public:
       new (b.getRemote(n, offset)) T(std::forward<Args>(args)...);
   }
 
-  ~PerThreadStorage() {
-    for (unsigned n = 0; n < LL::getMaxThreads(); ++n)
-      reinterpret_cast<T*>(b.getRemote(n, offset))->~T();
-    b.deallocOffset(offset, sizeof(T));
+  PerThreadStorage(PerThreadStorage&& o): offset(~0), b(getPTSBackend()) { 
+    std::swap(offset, o.offset);
   }
 
-  T* getLocal() const {
+  PerThreadStorage& operator=(PerThreadStorage&& o) {
+    std::swap(offset, o.offset);
+    return *this;
+  }
+
+  PerThreadStorage(const PerThreadStorage&) = delete;
+  PerThreadStorage& operator=(const PerThreadStorage&) = delete;
+
+  ~PerThreadStorage() {
+    destruct();
+  }
+
+  T* getLocal() {
+    void* ditem = b.getLocal(offset, ptsBase);
+    return reinterpret_cast<T*>(ditem);
+  }
+
+  const T* getLocal() const {
     void* ditem = b.getLocal(offset, ptsBase);
     return reinterpret_cast<T*>(ditem);
   }
 
   //! Like getLocal() but optimized for when you already know the thread id
-  T* getLocal(unsigned int thread) const {
+  T* getLocal(unsigned int thread) {
     void* ditem = b.getLocal(offset, thread);
     return reinterpret_cast<T*>(ditem);
   }
 
-  T* getRemote(unsigned int thread) const {
+  const T* getLocal(unsigned int thread) const {
+    void* ditem = b.getLocal(offset, thread);
+    return reinterpret_cast<T*>(ditem);
+  }
+
+  T* getRemote(unsigned int thread) {
+    void* ditem = b.getRemote(thread, offset);
+    return reinterpret_cast<T*>(ditem);
+  }
+
+  const T* getRemote(unsigned int thread) const {
     void* ditem = b.getRemote(thread, offset);
     return reinterpret_cast<T*>(ditem);
   }
@@ -153,10 +207,16 @@ public:
 };
 
 template<typename T>
-class PerPackageStorage: private boost::noncopyable {
+class PerPackageStorage {
 protected:
   unsigned offset;
   PerBackend& b;
+
+  void destruct() {
+    for (unsigned n = 0; n < LL::getMaxPackages(); ++n)
+      reinterpret_cast<T*>(b.getRemote(LL::getLeaderForPackage(n), offset))->~T();
+    b.deallocOffset(offset, sizeof(T));
+  }
 
 public:
 #if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
@@ -171,7 +231,7 @@ public:
       new (b.getRemote(LL::getLeaderForPackage(n), offset)) T();
   }
 #endif
-
+  
   template<typename... Args>
   PerPackageStorage(Args&&... args) :b(getPPSBackend()) {
     //in case we make one of these before initializing the thread pool
@@ -183,29 +243,57 @@ public:
       new (b.getRemote(LL::getLeaderForPackage(n), offset)) T(std::forward<Args>(args)...);
   }
 
-  ~PerPackageStorage() {
-    for (unsigned n = 0; n < LL::getMaxPackages(); ++n)
-      reinterpret_cast<T*>(b.getRemote(LL::getLeaderForPackage(n), offset))->~T();
-    b.deallocOffset(offset, sizeof(T));
+  PerPackageStorage(PerPackageStorage&& o): offset(std::move(o.offset)), b(getPPSBackend()) { }
+  PerPackageStorage& operator=(PerPackageStorage&& o) {
+    destruct();
+    offset = std::move(o.offset);
+    return *this;
   }
 
-  T* getLocal() const {
+  PerPackageStorage(const PerPackageStorage&) = delete;
+  PerPackageStorage& operator=(const PerPackageStorage&) = delete;
+
+  ~PerPackageStorage() {
+    destruct();
+  }
+
+  T* getLocal() {
+    void* ditem = b.getLocal(offset, ppsBase);
+    return reinterpret_cast<T*>(ditem);
+  }
+
+  const T* getLocal() const {
     void* ditem = b.getLocal(offset, ppsBase);
     return reinterpret_cast<T*>(ditem);
   }
 
   //! Like getLocal() but optimized for when you already know the thread id
-  T* getLocal(unsigned int thread) const {
+  T* getLocal(unsigned int thread) {
     void* ditem = b.getLocal(offset, thread);
     return reinterpret_cast<T*>(ditem);
   }
 
-  T* getRemote(unsigned int thread) const {
+  const T* getLocal(unsigned int thread) const {
+    void* ditem = b.getLocal(offset, thread);
+    return reinterpret_cast<T*>(ditem);
+  }
+
+  T* getRemote(unsigned int thread) {
     void* ditem = b.getRemote(thread, offset);
     return reinterpret_cast<T*>(ditem);
   }
 
-  T* getRemoteByPkg(unsigned int pkg) const {
+  const T* getRemote(unsigned int thread) const {
+    void* ditem = b.getRemote(thread, offset);
+    return reinterpret_cast<T*>(ditem);
+  }
+
+  T* getRemoteByPkg(unsigned int pkg) {
+    void* ditem = b.getRemote(LL::getLeaderForPackage(pkg), offset);
+    return reinterpret_cast<T*>(ditem);
+  }
+
+  const T* getRemoteByPkg(unsigned int pkg) const {
     void* ditem = b.getRemote(LL::getLeaderForPackage(pkg), offset);
     return reinterpret_cast<T*>(ditem);
   }
@@ -217,5 +305,4 @@ public:
 
 }
 } // end namespace Galois
-
 #endif

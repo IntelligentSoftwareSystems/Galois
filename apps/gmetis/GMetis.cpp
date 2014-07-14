@@ -124,10 +124,13 @@ void Partition(MetisGraph* metisGraph, unsigned nparts) {
 
   std::cout << "Initial dist\n";
   printPartStats(initParts);
+  std::cout << "\n";
+
   std::cout << "Refined dist\n";
   printPartStats(parts);
+  std::cout << "\n";
 
-  std::cout << "\nTime:  " << TM.get() << '\n';
+  std::cout << "Time:  " << TM.get() << '\n';
   return;
 }
 
@@ -180,7 +183,7 @@ struct OrderGraph {
     for (auto nb = graph.begin(), ne = graph.end(); nb != ne; nb++) { 
       GNode n = *nb; 
       auto &nd = graph.getData(n,flag); 
-      if (nd.getPart() == part) {
+      if (static_cast<int>(nd.getPart()) == part) {
         int edges = std::distance(graph.edge_begin(n,flag), graph.edge_end(n,flag));
         orderedNodes.push_back(std::make_pair(edges,n));
       }
@@ -194,7 +197,7 @@ struct OrderGraph {
       for (auto eb = graph.edge_begin(n,flag), ee = graph.edge_end(n,flag); eb != ee; eb++) {
         GNode neigh = graph.getEdgeDst(eb);
         auto &nd = graph.getData(neigh,flag);
-        if (nd.getPart() == part) { 
+        if (static_cast<int>(nd.getPart()) == part) { 
           threadMap[neigh] += index;
         }
       }
@@ -240,7 +243,7 @@ int main(int argc, char** argv) {
   
   if (orderedfile != "" || permutationfile != "") { 
     Galois::Graph::FileGraph g;
-    g.structureFromFile(filename);
+    g.fromFile(filename);
     typedef Galois::LargeArray<GNode> Permutation;
     Permutation perm; 
     perm.create(g.size());
@@ -281,7 +284,7 @@ int main(int argc, char** argv) {
     Galois::Graph::FileGraph out;
     Galois::Graph::permute<int>(g, perm2, out);
     if (orderedfile != "")
-      out.structureToFile(orderedfile);
+      out.toFile(orderedfile);
     if (permutationfile != "") {
       std::ofstream file(permutationfile.c_str());
       Galois::LargeArray<uint64_t> transpose;

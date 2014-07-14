@@ -39,6 +39,7 @@
 #include <cstdlib>
 #include <cstring>
 #include <map>
+#include <list>
 #include <cstddef>
 
 #include <memory.h>
@@ -89,6 +90,20 @@ void largeFree(void* mem, size_t bytes);
 //! Print lines from /proc/pid/numa_maps that contain at least n (non-huge) pages
 void printInterleavedStats(int minPages = 16*1024);
 
+//! [Example Third Party Allocator]
+class MallocHeap {
+public:
+  enum { AllocSize = 0 };
+  void* allocate(size_t size) {
+    return malloc(size);
+  }
+  void deallocate(void* ptr) {
+    free(ptr);
+  }
+};
+//! [Example Third Party Allocator]
+
+
 //! Per-thread heaps using Galois thread aware construct
 template<class LocalHeap>
 class ThreadAwarePrivateHeap {
@@ -102,8 +117,9 @@ public:
     clear();
   }
 
-  inline void* allocate(size_t size) {
-    return heaps.getLocal()->allocate(size);
+  template<typename... Args>
+  inline void* allocate(size_t size, Args&&... args) {
+    return heaps.getLocal()->allocate(size, std::forward<Args>(args)...);
   }
 
   inline void deallocate(void* ptr) {
@@ -348,7 +364,6 @@ public:
   }
 
   BlockAlloc() :SourceHeap(), head(0), headIndex(0) {
-    //    std::cerr << "BA " << TotalFit << " " << ElemSize << " " << sizeof(TyEq) << " " << sizeof(Block) << " " << SourceHeap::AllocSize << "\n";
     assert(sizeof(Block) <= SourceHeap::AllocSize);
   }
 
@@ -404,19 +419,43 @@ public:
   }
 
   inline void* allocate(size_t size) {
-    //increase to alignment
-    size = (size + sizeof(double) - 1) & ~(sizeof(double) - 1);
-    //Check current block
-    if (!head || offset + size > SourceHeap::AllocSize)
+    // Increase to alignment
+    size_t alignedSize = (size + sizeof(double) - 1) & ~(sizeof(double) - 1);
+    // Check current block
+    if (!head || offset + alignedSize > SourceHeap::AllocSize)
       refill();
-    //Make sure this will fit
-    if (offset + size > SourceHeap::AllocSize) {
-      assert(0 && "Too large");
-      return 0;
+    if (offset + alignedSize > SourceHeap::AllocSize)
+      throw std::bad_alloc();
+    char* retval = (char*)head;
+    retval += offset;
+    offset += alignedSize;
+    return retval;
+  }
+
+  /**
+   * Allocates size bytes but may fail. If so, size < allocated and
+   * allocated is the number of bytes allocated in the returned buffer.
+   */
+  inline void* allocate(size_t size, size_t& allocated) {
+    // Increase to alignment
+    size_t alignedSize = (size + sizeof(double) - 1) & ~(sizeof(double) - 1);
+    if (alignedSize > SourceHeap::AllocSize) {
+      alignedSize = SourceHeap::AllocSize;
+    }
+    // Check current block
+    if (!head || offset + alignedSize > SourceHeap::AllocSize) {
+      size_t remaining = SourceHeap::AllocSize - offset;
+      assert((remaining & (sizeof(double) - 1)) == 0); // should still be aligned
+      if (!remaining) {
+        refill();
+      } else {
+        alignedSize = remaining;
+      }
     }
     char* retval = (char*)head;
     retval += offset;
-    offset += size;
+    offset += alignedSize;
+    allocated = (alignedSize > size) ? size : alignedSize;
     return retval;
   }
 
@@ -471,20 +510,19 @@ public:
   }
 
   inline void* allocate(size_t size) {
-    //increase to alignment
-    size = (size + sizeof(double) - 1) & ~(sizeof(double) - 1);
-    //Check current block
-    if (!head || offset + size > SourceHeap::AllocSize)
-      refill(SourceHeap::allocate(SourceHeap::AllocSize), head, &offset);
-    //Make sure this will fit
-    if (offset + size > SourceHeap::AllocSize) {
-      void* p = malloc(size + sizeof(Block));
+    // Increase to alignment
+    size_t alignedSize = (size + sizeof(double) - 1) & ~(sizeof(double) - 1);
+    if (sizeof(Block) + alignedSize > SourceHeap::AllocSize) {
+      void* p = malloc(alignedSize + sizeof(Block));
       refill(p, fallbackHead, NULL);
       return (char*)p + sizeof(Block);
     }
+    // Check current block
+    if (!head || offset + alignedSize > SourceHeap::AllocSize)
+      refill(SourceHeap::allocate(SourceHeap::AllocSize), head, &offset);
     char* retval = (char*)head;
     retval += offset;
-    offset += size;
+    offset += alignedSize;
     return retval;
   }
 
@@ -509,28 +547,56 @@ public:
   }
 };
 
+#ifdef GALOIS_FORCE_STANDALONE
 class SizedAllocatorFactory: private boost::noncopyable {
 public:
+  typedef MallocHeap SizedAlloc;
+
+  static SizedAlloc* getAllocatorForSize(const size_t) {
+    return &alloc;
+  }
+
+private:
+  static SizedAlloc alloc;
+};
+#else
+class SizedAllocatorFactory: private boost::noncopyable {
+public:
+//! [FixedSizeAllocator example]
   typedef ThreadAwarePrivateHeap<
     FreeListHeap<SimpleBumpPtr<SystemBaseAlloc> > > SizedAlloc;
+//! [FixedSizeAllocator example]
 
   static SizedAlloc* getAllocatorForSize(const size_t);
 
 private:
+  typedef std::map<size_t, SizedAlloc*> AllocatorsMap;
   static SizedAllocatorFactory* getInstance();
   static LL::PtrLock<SizedAllocatorFactory, true> instance;
-  typedef std::map<size_t, SizedAlloc*> AllocatorsMap;
-  AllocatorsMap allocators;
-  LL::SimpleLock lock;
-
-  SizedAlloc* getAllocForSize(const size_t);
-
   static __thread AllocatorsMap* localAllocators;
+  AllocatorsMap allocators;
+  std::list<AllocatorsMap*> allLocalAllocators;
+  LL::SimpleLock lock;
 
   SizedAllocatorFactory();
   ~SizedAllocatorFactory();
+
+  SizedAlloc* getAllocForSize(const size_t);
+};
+#endif
+
+/**
+ * Scalable variable-size allocations.
+ *
+ * Slight misnomer as this doesn't support allocations greater than a page.
+ * Users should call {@link allocate(size_t, size_t&)} multiple times to split
+ * large allocations over multiple pages.
+ */
+class VariableSizeAllocator: public ThreadAwarePrivateHeap<SimpleBumpPtr<SystemBaseAlloc>> {
+
 };
 
+//! Main scalable allocator in Galois
 class FixedSizeAllocator {
   SizedAllocatorFactory::SizedAlloc* alloc;
 public:
@@ -548,6 +614,10 @@ public:
 
   inline bool operator!=(const FixedSizeAllocator& rhs) const {
     return alloc != rhs.alloc;
+  }
+  
+  inline bool operator==(const FixedSizeAllocator& rhs) const {
+    return alloc == rhs.alloc;
   }
 };
 
@@ -593,7 +663,7 @@ public:
   struct rebind { typedef FSBGaloisAllocator<Other> other; };
 
   FSBGaloisAllocator() throw(): Alloc(sizeof(Ty)) {}
-  template <class U> FSBGaloisAllocator (const FSBGaloisAllocator<U>&) throw(): Alloc(sizeof(Ty)) {}
+  template <class U> FSBGaloisAllocator(const FSBGaloisAllocator<U>&) throw(): Alloc(sizeof(Ty)) {}
 
   inline pointer address(reference val) const { return &val; }
   inline const_pointer address(const_reference val) const { return &val; }
@@ -616,12 +686,17 @@ public:
   inline void destroy(pointer ptr) const {
     destruct(ptr);
   }
-  
+
   size_type max_size() const throw() { return 1; }
 
   template<typename T1>
   inline bool operator!=(const FSBGaloisAllocator<T1>& rhs) const {
     return Alloc != rhs.Alloc;
+  }
+
+  template<typename T1>
+  inline bool operator==(const FSBGaloisAllocator<T1>& rhs) const {
+    return Alloc == rhs.Alloc;
   }
 };
 

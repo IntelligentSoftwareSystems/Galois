@@ -99,8 +99,8 @@ private:
 
 
 protected:
-  static const int CHUNK_SIZE = 32;
-  typedef Galois::WorkList::dChunkedFIFO<CHUNK_SIZE> AVIWorkList;
+  static const int DEFAULT_CHUNK_SIZE = 32;
+  typedef Galois::WorkList::dChunkedFIFO<DEFAULT_CHUNK_SIZE> AVIWorkList;
 
   typedef Galois::GAccumulator<size_t> IterCounter;
 
@@ -148,7 +148,7 @@ public:
    * @param l
    * @param createSyncFiles
    */
-  inline static void simulate (AVI* avi, MeshInit& meshInit,
+  GALOIS_ATTRIBUTE_PROF_NOINLINE static void simulate (AVI* avi, MeshInit& meshInit,
         GlobalVec& g, LocalVec& l, bool createSyncFiles);
 
   virtual ~AVIabstractMain() { }
@@ -234,15 +234,15 @@ void AVIabstractMain::run (int argc, char* argv[]) {
   initGlobalVec (*meshInit, g);
 
 
-  // derived classes may have some data to initialze before running the loop
+  // derived classes may have some data to initialize before running the loop
   initRemaining (*meshInit, g);
 
 
 
-  printf ("PAVI %s version\n", getVersion ().c_str ());
+  printf ("AVI %s version\n", getVersion ().c_str ());
   printf ("input mesh: %d elements, %d nodes\n", meshInit->getNumElements (), meshInit->getNumNodes ());
 
-  Galois::preAlloc (2*Galois::getActiveThreads ());
+  Galois::preAlloc (64*Galois::getActiveThreads ());
 
   Galois::reportPageAlloc("MeminfoPre");
 
@@ -309,7 +309,7 @@ void AVIabstractMain::verify (const InputConfig& input, const MeshInit& meshInit
 }
 
 
-void AVIabstractMain::simulate (AVI* avi, MeshInit& meshInit,
+GALOIS_ATTRIBUTE_PROF_NOINLINE void AVIabstractMain::simulate (AVI* avi, MeshInit& meshInit,
     GlobalVec& g, LocalVec& l, bool createSyncFiles) {
 
   if (createSyncFiles) {

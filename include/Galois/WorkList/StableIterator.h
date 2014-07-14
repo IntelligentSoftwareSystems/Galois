@@ -28,27 +28,39 @@
 #define GALOIS_WORKLIST_STABLEITERATOR_H
 
 #include "Galois/gstl.h"
+#include "Galois/WorkList/Chunked.h"
 
 namespace Galois {
 namespace WorkList {
 
-template<typename Iterator=int*, bool Steal = false>
+/**
+ * Low-overhead worklist when initial range is not invalidated by the
+ * operator.
+ *
+ * @tparam Steal     Try workstealing on initial ranges
+ * @tparam Container Worklist to manage work enqueued by the operator
+ * @tparam Iterator  (inferred by library)
+ */
+template<bool Steal = false, typename Container = dChunkedFIFO<>, typename Iterator=int*>
 struct StableIterator {
   typedef typename std::iterator_traits<Iterator>::value_type value_type;
 
   //! change the concurrency flag
   template<bool _concurrent>
-  struct rethread { typedef StableIterator<Iterator, Steal> type; };
+  struct rethread { typedef StableIterator<Steal, Container, Iterator> type; };
   
   //! change the type the worklist holds
   template<typename _T>
-  struct retype { typedef StableIterator<Iterator, Steal> type; };
+  struct retype { typedef StableIterator<Steal, typename Container::template retype<_T>::type, Iterator> type; };
 
   template<typename _iterator>
-  struct with_iterator { typedef StableIterator<_iterator, Steal> type; };
+  struct with_iterator { typedef StableIterator<Steal, typename Container::template retype<value_type>::type, _iterator> type; };
 
   template<bool _steal>
-  struct with_steal { typedef StableIterator<Iterator, _steal> type; };
+  struct with_steal { typedef StableIterator<_steal, Container, Iterator> type; };
+
+  template<typename _container>
+  struct with_container { typedef StableIterator<Steal, _container, Iterator> type; };
 
 private:
   struct shared_state {
@@ -56,10 +68,6 @@ private:
     Iterator stealEnd;
     Runtime::LL::SimpleLock stealLock;
     bool stealAvail;
-    void resetAvail() {
-      if (stealBegin != stealEnd)
-	stealAvail = true;
-    }
   };
 
   struct state {
@@ -67,6 +75,7 @@ private:
     Iterator localBegin;
     Iterator localEnd;
     unsigned int nextVictim;
+    unsigned int numStealFailures;
     
     void populateSteal() {
       if (Steal && localBegin != localEnd) {
@@ -74,13 +83,15 @@ private:
 	s.stealLock.lock();
 	s.stealEnd = localEnd;
 	s.stealBegin = localEnd = Galois::split_range(localBegin, localEnd);
-	s.resetAvail();
+	if (s.stealBegin != s.stealEnd)
+          s.stealAvail = true;
 	s.stealLock.unlock();
       }
     }
   };
 
   Runtime::PerThreadStorage<state> TLDS;
+  Container inner;
 
   bool doSteal(state& dst, state& src, bool wait) {
     shared_state& s = src.stealState.data;
@@ -93,7 +104,7 @@ private:
       if (s.stealBegin != s.stealEnd) {
 	dst.localBegin = s.stealBegin;
 	s.stealBegin = dst.localEnd = Galois::split_range(s.stealBegin, s.stealEnd);
-	s.resetAvail();
+        s.stealAvail = s.stealBegin != s.stealEnd;
       }
       s.stealLock.unlock();
     }
@@ -113,6 +124,7 @@ private:
       return *data.localBegin++;
     }
     ++data.nextVictim;
+    ++data.numStealFailures;
     data.nextVictim %= Runtime::activeThreads;
     return Galois::optional<value_type>();
   }
@@ -123,9 +135,11 @@ public:
   template<typename RangeTy>
   void push_initial(const RangeTy& r) {
     state& data = *TLDS.getLocal();
-    data.localBegin = r.local_begin();
-    data.localEnd = r.local_end();
+    auto lp = r.local_pair();
+    data.localBegin = lp.first;
+    data.localEnd = lp.second;
     data.nextVictim = Runtime::LL::getTID();
+    data.numStealFailures = 0;
     data.populateSteal();
   }
 
@@ -134,18 +148,22 @@ public:
     state& data = *TLDS.getLocal();
     if (data.localBegin != data.localEnd)
       return *data.localBegin++;
-    if (Steal)
-      return pop_steal(data);
-    return Galois::optional<value_type>();
+
+    Galois::optional<value_type> item;
+    if (Steal && 2 * data.numStealFailures > Runtime::activeThreads)
+      if ((item = pop_steal(data)))
+        return item;
+    return inner.pop();
   }
 
   void push(const value_type& val) {
-    abort();
+    inner.push(val);
   }
 
   template<typename Iter>
   void push(Iter b, Iter e) {
-    abort();
+    while (b != e)
+      push(*b++);
   }
 };
 GALOIS_WLCOMPILECHECK(StableIterator)

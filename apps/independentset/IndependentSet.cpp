@@ -243,7 +243,7 @@ struct DefaultAlgo {
 
   void operator()(Graph& graph) {
 #ifdef GALOIS_USE_EXP
-    typedef Galois::WorkList::BulkSynchronousInline<> WL;
+    typedef Galois::WorkList::BulkSynchronousInline WL;
 #else
     typedef Galois::WorkList::dChunkedFIFO<256> WL;
 #endif
@@ -359,7 +359,7 @@ struct PullAlgo {
       numProcessed.reset();
 
       if (!cur->empty()) {
-        typedef Galois::WorkList::StableIterator<Bag::iterator> WL;
+        typedef Galois::WorkList::StableIterator<> WL;
         //Galois::for_each_local(*cur, pull, Galois::wl<WL>());
         Galois::do_all_local(*cur, pull);
       }
@@ -451,12 +451,12 @@ void run() {
   Graph graph;
   Galois::Graph::readGraph(graph, filename);
 
-  // Galois::preAlloc(numThreads + (graph.size() * sizeof(Node) * numThreads / 8) / Galois::Runtime::MM::pageSize);
+  // Galois::preAlloc(numThreads + (graph.size() * sizeof(Node) * numThreads / 8) / Galois::Runtime::MM::hugePageSize);
   // Tighter upper bound
   if (std::is_same<Algo, DefaultAlgo<nondet> >::value) {
-    Galois::preAlloc(numThreads + 8*graph.size()/Galois::Runtime::MM::pageSize);
+    Galois::preAlloc(numThreads + 8*graph.size()/Galois::Runtime::MM::hugePageSize);
   } else {
-    Galois::preAlloc(numThreads + 32*graph.size()/Galois::Runtime::MM::pageSize);
+    Galois::preAlloc(numThreads + 32*graph.size()/Galois::Runtime::MM::hugePageSize);
   }
 
   Galois::reportPageAlloc("MeminfoPre");

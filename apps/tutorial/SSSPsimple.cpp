@@ -31,7 +31,9 @@
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 
+//! [Define LC Graph]
 typedef Galois::Graph::LC_Linear_Graph<unsigned int, unsigned int> Graph;
+//! [Define LC Graph]
 typedef Graph::GraphNode GNode;
 typedef std::pair<unsigned, GNode> UpdateRequest;
 
@@ -47,8 +49,10 @@ static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>")
 void relax_edge(unsigned src_data, Graph::edge_iterator ii, 
 		Galois::UserContext<UpdateRequest>& ctx) {
   GNode dst = graph.getEdgeDst(ii);
+    //![get edge and node data] 
   unsigned int edge_data = graph.getEdgeData(ii);
   unsigned& dst_data = graph.getData(dst);
+    //![get edge and node data] 
   unsigned int newDist = dst_data + edge_data;
   if (newDist < dst_data) {
     dst_data = newDist;
@@ -56,16 +60,21 @@ void relax_edge(unsigned src_data, Graph::edge_iterator ii,
   }
 }
 
+//! [Operator in SSSPsimple]
 struct SSSP {
   void operator()(UpdateRequest& req, Galois::UserContext<UpdateRequest>& ctx) const {
-    unsigned& data = graph.getData(req.second);
+    GNode active_node = req.second;
+    unsigned& data = graph.getData(active_node);
     if (req.first >= data) return;
-    
-    for (Graph::edge_iterator ii = graph.edge_begin(req.second),
-           ee = graph.edge_end(req.second); ii != ee; ++ii)
+   
+    //![loop over neighbors] 
+    for (Graph::edge_iterator ii = graph.edge_begin(active_node),
+           ee = graph.edge_end(active_node); ii != ee; ++ii)
       relax_edge(data, ii, ctx);
+    //![loop over neighbors] 
   }
 };
+//! [Operator in SSSPsimple]
 
 struct Init {
   void operator()(GNode& n, Galois::UserContext<GNode>& ctx) const {
@@ -73,27 +82,35 @@ struct Init {
   }
 };
 
-struct UpdateRequestIndexer: public std::unary_function<UpdateRequest, unsigned int> {
-  unsigned int operator() (const UpdateRequest& val) const {
-    return val.first >> stepShift;
-  }
-};
 
 int main(int argc, char **argv) {
   Galois::StatManager statManager;
   LonestarStart(argc, argv, 0,0,0);
 
+//! [ReadGraph]
   Galois::Graph::readGraph(graph, filename);
+//! [ReadGraph]
+
   Galois::for_each(graph.begin(), graph.end(), Init());
 
+  //! [OrderedByIntegerMetic in SSSPsimple]
+  struct UpdateRequestIndexer: public std::unary_function<UpdateRequest, unsigned int> {
+    unsigned int operator() (const UpdateRequest& val) const {
+      return val.first >> stepShift;
+    }
+  };
   using namespace Galois::WorkList;
   typedef dChunkedLIFO<16> dChunk;
   typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
+//! [OrderedByIntegerMetic in SSSPsimple]
 
   Galois::StatTimer T;
   T.start();
   graph.getData(*graph.begin()) = 0;
-  Galois::for_each(std::make_pair(0U, *graph.begin()), SSSP(), Galois::wl<OBIM>());
+  //! [for_each in SSSPsimple]
+  UpdateRequest init[] = { std::make_pair(0U, *graph.begin()) };
+  Galois::for_each(&init[0], &init[1], SSSP(), Galois::wl<OBIM>(), Galois::loopname("sssp_run_loop"));
+  //! [for_each in SSSPsimple]
   T.stop();
   return 0;
 }
