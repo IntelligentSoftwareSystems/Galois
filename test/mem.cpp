@@ -5,23 +5,23 @@ using namespace Galois::Runtime::MM;
 using namespace Galois::Runtime::LL;
 
 struct element {
-  int val;
+  unsigned val;
   element* next;
   element(int i): val(i), next(0) { }
 };
 
 int main(int argc, char** argv) {
-  int baseAllocSize = SystemBaseAlloc::AllocSize;
+  unsigned baseAllocSize = SystemBaseAlloc::AllocSize;
 
   FSBGaloisAllocator<element> falloc;
   element* last = nullptr;
-  for (int i = 0; i < baseAllocSize; ++i) {
+  for (unsigned i = 0; i < baseAllocSize; ++i) {
     element* ptr = falloc.allocate(1);
     falloc.construct(ptr, i);
     ptr->next = last;
     last = ptr;
   }
-  for (int i = baseAllocSize - 1; i >= 0; --i) {
+  for (unsigned i = baseAllocSize - 1; i >= 0; --i) {
     GALOIS_ASSERT(last);
     GALOIS_ASSERT(last->val == i);
     element* next = last->next;
