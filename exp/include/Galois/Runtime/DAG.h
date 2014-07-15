@@ -415,8 +415,8 @@ protected:
   class Task {
 
   protected:
-    GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE std::atomic<unsigned> numChild;;
-    // Galois::GAtomicPadded<unsigned> numChild;
+    std::atomic<unsigned> numChild;
+    // std::atomic<unsigned> numChild;
     T elem;
     Task* parent;
 
@@ -600,7 +600,8 @@ public:
   void execute_1p (const T& initItem) {
 
     typedef Galois::gdeque<BiModalTask*, 64> TaskWL;
-    typedef Galois::WorkList::dChunkedFIFO<CHUNK_SIZE, BiModalTask*> WL_ty;
+    // typedef Galois::WorkList::dChunkedFIFO<CHUNK_SIZE, BiModalTask*> WL_ty;
+    typedef Galois::WorkList::AltChunkedFIFO<CHUNK_SIZE, BiModalTask*> WL_ty;
 
     BiModalTaskAlloc taskAlloc;
     TaskWL initialTasks;

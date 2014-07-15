@@ -50,9 +50,9 @@ struct LevelComparator {
 
 struct KDGNodeBase {
 
-  typedef Galois::GAtomic<unsigned> UnsignedAtomic;
+  // typedef Galois::GAtomic<unsigned> UnsignedAtomic;
 
-  UnsignedAtomic numChild;
+  std::atomic<unsigned> numChild;
   KDGNodeBase* parent;
   
   KDGNodeBase (): numChild (0), parent (nullptr) {}

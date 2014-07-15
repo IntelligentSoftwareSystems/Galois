@@ -285,7 +285,7 @@ int main(int argc, char** argv) {
   std::cout << "Num. of threads: " << numThreads << std::endl;
 
   bh::Point pos;
-  Galois::StatTimer T;
+  Galois::StatTimer T("total time:");
 
   T.start();
   switch (bh::treeSummOpt) {

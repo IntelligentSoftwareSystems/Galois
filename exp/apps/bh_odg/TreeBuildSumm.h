@@ -10,6 +10,7 @@
 #include "Galois/Runtime/LevelExecutor.h"
 #include "Galois/Runtime/KDGtwoPhase.h"
 #include "Galois/Runtime/DAG.h"
+#include "Galois/Runtime/Sampling.h"
 
 #include <boost/iterator/transform_iterator.hpp>
 
@@ -563,12 +564,12 @@ struct TreeSummarizeODG: public TypeDefHelper<SerialNodeBase> {
 
     Galois::StatTimer t_feach ("Time taken by for_each in tree summarization");
 
-    t_feach.start ();
     Galois::Runtime::beginSampling ();
+    t_feach.start ();
     // Galois::for_each_wl<Galois::Runtime::WorkList::ParaMeter<WL_ty> > (wl, SummarizeOp (odgNodes), "tree_summ");
     Galois::for_each_wl (wl, SummarizeOp (odgNodes), "tree_summ");
-    Galois::Runtime::endSampling ();
     t_feach.stop ();
+    Galois::Runtime::endSampling ();
 
   }
 
@@ -646,8 +647,8 @@ struct TreeSummarizeLevelByLevel: public TypeDefHelper<SerialNodeBase> {
 
     Galois::StatTimer t_feach ("Time taken by for_each in tree summarization");
 
-    t_feach.start ();
     Galois::Runtime::beginSampling ();
+    t_feach.start ();
     for (unsigned i = levelWL.size (); i > 0;) {
       
       --i; // size - 1
@@ -668,8 +669,8 @@ struct TreeSummarizeLevelByLevel: public TypeDefHelper<SerialNodeBase> {
 
 
     }
-    Galois::Runtime::endSampling ();
     t_feach.stop ();
+    Galois::Runtime::endSampling ();
 
     std::cout << "TreeSummarizeLevelByLevel: iterations = " << iter << std::endl;
 
@@ -1233,10 +1234,12 @@ struct BuildLockFreeSummarizeRecursive {
 
     Galois::StatTimer t_summ ("Time taken by tree summarization: ");
 
+    Galois::Runtime::beginSampling();
     t_summ.start ();
     recursive::ChooseExecutor<EXEC_TYPE> f;
     f (root);
     t_summ.stop ();
+    Galois::Runtime::endSampling();
 
     return root;
   }
