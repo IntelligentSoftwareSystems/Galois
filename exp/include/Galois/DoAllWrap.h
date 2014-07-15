@@ -36,7 +36,6 @@
 
 #include "llvm/Support/CommandLine.h"
 
-namespace cll = llvm::cl;
 
 
 namespace Galois {
@@ -45,6 +44,7 @@ enum DoAllTypes {
   GALOIS, GALOIS_STEAL, COUPLED, CILK, OPENMP 
 };
 
+namespace cll = llvm::cl;
 extern cll::opt<DoAllTypes> doAllKind;
 
 template <DoAllTypes TYPE> 

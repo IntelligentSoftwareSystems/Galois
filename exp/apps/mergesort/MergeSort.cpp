@@ -7,6 +7,7 @@
 
 
 #include "Galois/Galois.h"
+#include "Galois/CilkInit.h"
 #include "Galois/GaloisUnsafe.h"
 #include "Galois/Atomic.h"
 #include "Galois/Statistic.h"
@@ -18,10 +19,6 @@
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 
-#ifdef HAVE_CILK
-#include <cilk/cilk.h>
-#include <cilk/cilk_api.h>
-#endif
 
 namespace cll = llvm::cl;
 static cll::opt<unsigned> length("len", cll::desc("Length of the array"), cll::init(10000));
@@ -32,7 +29,7 @@ const char* desc = "merge sort";
 const char* url = "mergesort";
 
 enum Algo {
-  SERIAL, STL, CILK, GALOIS_1P, GALOIS_2P
+  SERIAL, STL, CILK, GALOIS 
 };
 
 cll::opt<Algo> algorithm (
@@ -41,8 +38,7 @@ cll::opt<Algo> algorithm (
       clEnumVal (SERIAL, "serial recursive"),
       clEnumVal (STL, "STL implementation"),
       clEnumVal (CILK, "CILK divide and conquer implementation"),
-      clEnumVal (GALOIS_1P, "galois single phase divide and conquer implementation"),
-      clEnumVal (GALOIS_2P, "galois two phase divide and conquer implementation"),
+      clEnumVal (GALOIS, "galois divide and conquer implementation"),
       clEnumValEnd),
 
     cll::init (SERIAL));
@@ -189,40 +185,19 @@ struct MergeGalois {
 };
 
 template <typename T, typename C>
-void mergeSortGalois (T* array, T* tmp_array, const size_t L, const C& cmp, Algo algo) {
+void mergeSortGalois (T* array, T* tmp_array, const size_t L, const C& cmp) {
 
-  switch (algo) {
-    case GALOIS_1P: 
-      Galois::Runtime::for_each_ordered_tree_1p (
-          IndexRange (0, L),
+  Galois::Runtime::for_each_ordered_tree (
+      IndexRange (0, L),
 #if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
-          SplitGalois<T,C> (array, tmp_array, cmp),
-          MergeGalois<T,C> (array, tmp_array, cmp),
+      SplitGalois<T,C> (array, tmp_array, cmp),
+      MergeGalois<T,C> (array, tmp_array, cmp),
 #else
-          SplitGalois<T,C> {array, tmp_array, cmp},
-          MergeGalois<T,C> {array, tmp_array, cmp},
+      SplitGalois<T,C> {array, tmp_array, cmp},
+      MergeGalois<T,C> {array, tmp_array, cmp},
 #endif
-          "merge-sort-galois-1p");
-      break;
+      "merge-sort-galois");
 
-    case GALOIS_2P:
-      Galois::Runtime::for_each_ordered_tree_2p (
-          IndexRange (0, L),
-#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
-          SplitGalois<T,C> (array, tmp_array, cmp),
-          MergeGalois<T,C> (array, tmp_array, cmp),
-#else
-          SplitGalois<T,C> {array, tmp_array, cmp},
-          MergeGalois<T,C> {array, tmp_array, cmp},
-#endif
-          "merge-sort-galois-2p");
-      break;
-
-    default:
-      GALOIS_DIE("bad value for algorithm");
-      break;
-
-  }
 
 }
 
@@ -275,11 +250,16 @@ int main (int argc, char* argv[]) {
       break;
 
     case CILK:
+      Galois::CilkInit();
       mergeSortCilk (array, tmp_array, length, std::less<int> ());
       break;
 
+    case GALOIS:
+      mergeSortGalois (array, tmp_array, length, std::less<int> ());
+      break;
+
     default:
-      mergeSortGalois (array, tmp_array, length, std::less<int> (), algorithm);
+      std::abort ();
 
   }
   t.stop ();
