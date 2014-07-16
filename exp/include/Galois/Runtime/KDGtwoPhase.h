@@ -55,10 +55,13 @@
 
 #include <iostream>
 
-static cll::opt<double> commitRatioArg("cratio", cll::desc("target commit ratio for two phase executor"), cll::init(0.80));
 
 namespace Galois {
 namespace Runtime {
+
+namespace cll = llvm::cl;
+
+static cll::opt<double> commitRatioArg("cratio", cll::desc("target commit ratio for two phase executor"), cll::init(0.80));
 
 // TODO: figure out when to call startIteration
 
