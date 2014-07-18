@@ -114,6 +114,8 @@ void EquationSystem::eliminate(const int rows)
 			for (int k = i+1; k<n; ++k) {
 				matrix[j][k] -= x*matrix[i][k];
 			}
+			//xyz
+			matrix[j][i] = 0;
 			rhs[j] -= x*rhs[i];
 		}
 	}

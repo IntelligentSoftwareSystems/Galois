@@ -84,19 +84,19 @@ void EdgeProduction::generateGraph()
 	vmb->setLeft(mbc1Vertex);
 	vmb->setRight(mbc2Vertex);
 
-	mbGraphNode->data.setVertex(vmb);
-	bsMbGraphNode->data.setVertex(vmb);
+	mbGraphNode->getData().setVertex(vmb);
+	bsMbGraphNode->getData().setVertex(vmb);
 
 	Vertex *vmbRoot = new Vertex(NULL, NULL, NULL, NODE, vmb->left->system->n+4);
 	vmbRoot->setLeft(vmb);
 	vmbRoot->setRight(vmd);
 
-	mbRoot->data.setVertex(vmbRoot);
+	mbRoot->getData().setVertex(vmbRoot);
 
-	mbc1GraphNode->data.setVertex(mbc1Vertex);
-	bsMbc1GraphNode->data.setVertex(mbc1Vertex);
-	mbc2GraphNode->data.setVertex(mbc2Vertex);
-	bsMbc2GraphNode->data.setVertex(mbc2Vertex);
+	mbc1GraphNode->getData().setVertex(mbc1Vertex);
+	bsMbc1GraphNode->getData().setVertex(mbc1Vertex);
+	mbc2GraphNode->getData().setVertex(mbc2Vertex);
+	bsMbc2GraphNode->getData().setVertex(mbc2Vertex);
 	S = vmbRoot;
 }
 
@@ -253,17 +253,17 @@ Vertex *EdgeProduction::recursiveGraphGeneration(int low_range,
 		vmb->setLeft(mbc1Vertex);
 		vmb->setRight(mbc2Vertex);
 
-		mbGraphNode->data.setVertex(vmb);
-		bsMbGraphNode->data.setVertex(vmb);
+		mbGraphNode->getData().setVertex(vmb);
+		bsMbGraphNode->getData().setVertex(vmb);
 
 		Vertex *vmbc = new Vertex(NULL, NULL, NULL, NODE, vmb->left->system->n+4);
 		vmbc->setLeft(vmb);
 		vmbc->setRight(mc);
 
-		mbc1GraphNode->data.setVertex(mbc1Vertex);
-		bsMbc1GraphNode->data.setVertex(mbc1Vertex);
-		mbc2GraphNode->data.setVertex(mbc2Vertex);
-		bsMbc2GraphNode->data.setVertex(mbc2Vertex);
+		mbc1GraphNode->getData().setVertex(mbc1Vertex);
+		bsMbc1GraphNode->getData().setVertex(mbc1Vertex);
+		mbc2GraphNode->getData().setVertex(mbc2Vertex);
+		bsMbc2GraphNode->getData().setVertex(mbc2Vertex);
 
 		return vmbc;
 

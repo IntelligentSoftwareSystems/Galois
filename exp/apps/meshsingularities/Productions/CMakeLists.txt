@@ -1,24 +1,40 @@
-#app(Test2D Test2D.cpp EquationSystem.cpp Vertex.cpp Functions.cpp Point2D/DoubleArgFunction.cxx Point2D/Element.cxx Point2D/MatrixGenerator.cxx Point2D/Tier.cxx MatrixGeneration/GenericMatrixGenerator.cxx)
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
 
 add_subdirectory(Point2D)
 add_subdirectory(Point2DQuad)
 add_subdirectory(Point3D)
 add_subdirectory(Edge2D)
 
-SET(MUMPS "SEQ" CACHE STRING "Mumps type")
+SET(MUMPS_MODE "NO" CACHE STRING "Mumps type")
 SET(BLAS "NO" CACHE STRING "Use blas")
 
-SET(BLAS_INC /h1/kjopek/ATLAS/include/)
-SET(BLAS_LIB /h1/kjopek/atlas/)
+SET(VIRT_ENV "/home/nstud/konrad.jopek/virtenv")
+
+SET(BLAS_INC ${VIRT_ENV}/include/)
+SET(BLAS_LIB ${VIRT_ENV}/lib/)
+
+SET(MPI_INC ${VIRT_ENV}/include/)
+SET(MPI_LIB ${VIRT_ENV}/lib/)
+
+SET(METIS_LIB ${VIRT_ENV}/metis/)
+
+SET(MUMPS ${VIRT_ENV}/MUMPS/)
 
 include_directories(${BLAS_INC})
-link_directories(${BLAS_LIB})
+include_directories(${VIRT_ENV}/include)
+include_directories(${MPI_INC})
+include_directories(${MUMPS}/include)
 
-if( ${MUMPS} STREQUAL "SEQ" )
+link_directories(${BLAS_LIB})
+link_directories(${VIRT_ENV}/lib)
+link_directories(${MPI_LIB})
+link_directories(${METIS_LIB})
+link_directories(${MUMPS}/lib)
+
+if( ${MUMPS_MODE} STREQUAL "SEQ" )
 	message("Sequential mumps")
-	set(MUMPS /h1/dgoik/measurements/MUMPS_4.10.0_SEQ/)
-	include_directories(${MUMPS}include ${MUMPS}libseq)
-	link_directories(${MUMPS}lib /opt/apps/sysnet/intel/13.1/lib/intel64/ ${MUMPS}libseq/ /usr/lib64/)
+	include_directories(${MUMPS}libseq)
+	link_directories(${MUMPS}lib /opt/apps/sysnet/intel/13.1/lib/intel64/ ${MUMPS}libseq)
 	
 	#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pg")
 	
@@ -27,14 +43,16 @@ if( ${MUMPS} STREQUAL "SEQ" )
 		include_directories(${BLAS_INC})
 		link_directories(${BLAS_LIB})
 	endif()
-	
-	app(Solver EquationSystem.cpp PointProduction.cpp EdgeProduction.cpp Vertex.cpp Functions.cpp PointSingularitySolver.cpp GaloisWorker.cpp Node.cpp NumaEquationSystem.cpp MatrixGeneration/GenericMatrixGenerator.cxx Point3D/TripleArgFunction.cxx Point3D/Element.cxx Point3D/MatrixGenerator.cxx Point3D/Tier.cxx Point2D/DoubleArgFunction.cxx Point2D/Element.cxx Point2D/MatrixGenerator.cxx Point2D/Tier.cxx Edge2D/Tier.cxx Edge2D/MatrixGenerator.cxx Mumps.cxx FakeMatrixGenerator.cpp)	
-	target_link_libraries(Solver -lifcore -lsvml -ldl libdmumps.a libmumps_common.a libpord.a libmpiseq.a /h1/dgoik/measurements/gilbert_blas/libblas.so libmpiseq.a -lirc -liomp5 -lpthread -lsatlas -fopenmp)
-elseif (${MUMPS} STREQUAL "PAR")
+
+	#/usr/lib64/libblas.so.3.2	
+	#/h1/dgoik/measurements/gilbert_blas/libdblas.so
+	app(Solver EquationSystem.cpp PointProduction.cpp EdgeProduction.cpp Vertex.cpp Functions.cpp PointSingularitySolver.cpp GaloisWorker.cpp Node.cpp MatrixGeneration/GenericMatrixGenerator.cxx Point3D/TripleArgFunction.cxx Point3D/Element.cxx Point3D/MatrixGenerator.cxx Point3D/Tier.cxx Point2D/DoubleArgFunction.cxx Point2D/Element.cxx Point2D/MatrixGenerator.cxx Point2D/Tier.cxx Edge2D/Tier.cxx Edge2D/MatrixGenerator.cxx FakeMatrixGenerator.cpp)	
+	target_link_libraries(Solver  -ldl libpord.a ${BLAS_LIB}/libf77blas.a ${BLAS_LIB}/libcblas.a ${BLAS_LIB}/libatlas.a -lpthread -fopenmp)
+elseif (${MUMPS_MODE} STREQUAL "PAR")
 	message("parallel mumps")
 	set(MUMPS_PAR /h1/dgoik/measurements/MUMPS_4.10.0_PAR/)
 	set(LIBS_DIR /h1/dgoik/measurements/libs/)
-	set(LAM_2 /h1/dgoik/measurements/lam2/)
+	set(LAM_2 /h1/kjopek/lam2/)
 	include_directories(${LAM_2}include/ ${MUMPS_PAR}include)
 	set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pg")
 
@@ -46,7 +64,9 @@ elseif (${MUMPS} STREQUAL "PAR")
 	endif()
 	
 	link_directories(${MUMPS_PAR}lib ${LIBS_DIR} /opt/apps/sysnet/intel/13.1/lib/intel64/ /usr/lib64/ /usr/local/lib ${LAM_2}lib)
-	app(Solver ${LAM_2}include/mpi.h ${MUMPS_PAR}include/dmumps_c.h Mumps_Par.cxx EquationSystem.cpp PointProduction.cpp EdgeProduction.cpp Vertex.cpp Functions.cpp PointSingularitySolver.cpp GaloisWorker.cpp Node.cpp NumaEquationSystem.cpp MatrixGeneration/GenericMatrixGenerator.cxx Point3D/TripleArgFunction.cxx Point3D/Element.cxx Point3D/MatrixGenerator.cxx Point3D/Tier.cxx Point2D/DoubleArgFunction.cxx Point2D/Element.cxx Point2D/MatrixGenerator.cxx Point2D/Tier.cxx Edge2D/Tier.cxx Edge2D/MatrixGenerator.cxx)
-	target_link_libraries(Solver -lifcore -lsvml libdmumps.a libmumps_common.a libpord.a -lscalapack /h1/dgoik/measurements/libs/blacs1.a /h1/dgoik/measurements/libs/blacs2.a	-llammpio -llamf77mpi -lmpi -llam -lutil -ldl /h1/dgoik/measurements/gilbert_blas/libblas.so -lirc -liomp5 -lpthread ${BLAS_LIB}/libcblas.a ${BLAS_LIB}/liblapack.a ${BLAS_LIB}/libatlas.a)	
+	app(Solver ${LAM_2}include/mpi.h ${MUMPS_PAR}include/dmumps_c.h Mumps_Par.cxx EquationSystem.cpp PointProduction.cpp EdgeProduction.cpp Vertex.cpp Functions.cpp PointSingularitySolver.cpp GaloisWorker.cpp Node.cpp MatrixGeneration/GenericMatrixGenerator.cxx Point3D/TripleArgFunction.cxx Point3D/Element.cxx Point3D/MatrixGenerator.cxx Point3D/Tier.cxx Point2D/DoubleArgFunction.cxx Point2D/Element.cxx Point2D/MatrixGenerator.cxx Point2D/Tier.cxx Edge2D/Tier.cxx Edge2D/MatrixGenerator.cxx FakeMatrixGenerator.cpp)
+	target_link_libraries(Solver -lifcore -lsvml libdmumps.a libmumps_common.a libpord.a -lscalapack /usr/lib64/atlas/libf77blas.so.3 /usr/lib64/atlas/libcblas.so.3 -lmpi -llammpi++ -llammpio -llamf77mpi -llam -lutil -ld -lirc -liomp5 -lpthread ${BLAS_LIB}/libcblas.a ${BLAS_LIB}/liblapack.a)	
+else()
+	app(Solver EquationSystem.cpp PointProduction.cpp EdgeProduction.cpp Vertex.cpp Functions.cpp PointSingularitySolver.cpp GaloisWorker.cpp Node.cpp MatrixGeneration/GenericMatrixGenerator.cxx Point3D/TripleArgFunction.cxx Point3D/Element.cxx Point3D/MatrixGenerator.cxx Point3D/Tier.cxx Point2D/DoubleArgFunction.cxx Point2D/Element.cxx Point2D/MatrixGenerator.cxx Point2D/Tier.cxx Edge2D/Tier.cxx Edge2D/MatrixGenerator.cxx FakeMatrixGenerator.cpp)	
+	target_link_libraries(Solver -ldl -lpthread)
 endif()
-

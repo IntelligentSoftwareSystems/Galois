@@ -206,7 +206,6 @@ bool MatrixGenerator::GetMumpsArrays(int*& _in, int*& _jn, double*& _a, double*&
 			((Tier*)(*it_t))->FillNumberPairs(map,rhs);
 		}
 		long mumps_array_length = map->size();
-		//long mumps_array_length = 2*map->size() - matrix_size;
 
 		in = new int[mumps_array_length]();
 		jn = new int[mumps_array_length]();
@@ -220,27 +219,12 @@ bool MatrixGenerator::GetMumpsArrays(int*& _in, int*& _jn, double*& _a, double*&
 			jn[i] = it_m->first.second;
 			a[i++] = it_m->second;
 		}
-		
-/*
-		for(it_m = map->begin(); it_m != map->end(); ++it_m)
-		{
-			if(it_m->first.first != it_m->first.second)
-			{
-				in[i] = it_m->first.second;
-				jn[i] = it_m->first.first;
-				a[i++] = it_m->second;
-			}	
-		}
-*/		
+
 		delete map;
 
 		n = matrix_size;
 		//???? is that ok? what should be nz value if the input is triangle of diagonal matrix? non zeros in global matrix or just length of mumps arrays?
 		//nz = 2*mumps_array_length - n;
-		if(i == mumps_array_length)
-			printf("IS EQUAL\n"); 
-		else
-			printf("IS NOT EQUAL\n"); 
 		nz = mumps_array_length;
 		//nz = 18;
 	}

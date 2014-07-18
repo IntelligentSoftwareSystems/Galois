@@ -1,6 +1,8 @@
 #ifndef GALOISWORKER_H
 #define GALOISWORKER_H
 
+#include "Galois/Galois.h"
+#include "Galois/WorkList/WorkList.h"
 #include "Galois/Graph/LC_Morph_Graph.h"
 #include "Galois/Runtime/ParallelWork.h"
 

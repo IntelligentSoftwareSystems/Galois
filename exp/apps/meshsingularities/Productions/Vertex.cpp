@@ -15,7 +15,8 @@ Vertex::Vertex(Vertex *Left, Vertex *Right, Vertex *Parent, VertexType type, int
     this->right = Right;
     this->parent = Parent;
     this->type = type;
-    this->system = new NumaEquationSystem(systemSize, node);
+    // TODO: restore NUMA support
+//    this->system = new NumaEquationSystem(systemSize, node);
 }
 
 

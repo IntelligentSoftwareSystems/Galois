@@ -21,6 +21,14 @@ class FakeMatrixGenerator : public GenericMatrixGenerator
 public:
 	virtual std::vector<EquationSystem*>* CreateMatrixAndRhs(TaskDescription& task_description);
 	virtual void checkSolution(std::map<int,double> *solution_map, double (*f)(int dim, ...));
+	virtual std::vector<int>* GetProductionParameters(int polynomial_degree){
+                std::vector<int> *parameters = new std::vector<int>(4);
+                (*parameters)[0] = this->getiSize(polynomial_degree);
+                (*parameters)[1] = this->getLeafSize(polynomial_degree);
+                (*parameters)[2] = this->getA1Size(polynomial_degree);
+                (*parameters)[3] = this->getANSize(polynomial_degree);
+                return parameters;
+        }
 
 	virtual int getiSize(int p) {
 		return 24*(p-1)*(p-1) + 48*(p-1) + 26;
