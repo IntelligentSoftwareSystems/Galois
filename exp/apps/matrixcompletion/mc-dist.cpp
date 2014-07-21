@@ -496,5 +496,7 @@ int main(int argc, char** argv) {
   go(g, numMovieNodes, numUserNodes, lf.get());
   timer.stop();
 
+  Galois::Runtime::getSystemNetworkInterface().terminate();
+
   return 0;
 }
