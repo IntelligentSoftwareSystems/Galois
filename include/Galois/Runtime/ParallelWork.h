@@ -38,6 +38,7 @@
 #include "Galois/Runtime/Termination.h"
 #include "Galois/Runtime/ThreadPool.h"
 #include "Galois/Runtime/UserContextAccess.h"
+#include "Galois/Runtime/Sampling.h"
 #include "Galois/WorkList/GFifo.h"
 
 #include <algorithm>
@@ -434,12 +435,14 @@ void for_each_impl(const RangeTy& range, FunctionTy f, const char* loopname) {
   getLocalDirectory().resetStats();
   getRemoteDirectory().resetStats();
   trace("Loop start %\n", loopname);
+  beginLoopSampling(loopname);
   getSystemThreadPool().run(activeThreads, 
     std::bind(&WorkTy::initThread, std::ref(W)),
     std::bind(&WorkTy::template AddInitialWork<RangeTy>, std::ref(W), range), 
     std::ref(getSystemBarrier()),
     std::ref(W)
   );
+  endLoopSampling(loopname);
   trace("Loop end %\n", loopname);
   getLocalDirectory().reportStats(loopname);
   getRemoteDirectory().reportStats(loopname);

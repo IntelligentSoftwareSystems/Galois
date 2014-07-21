@@ -39,7 +39,8 @@ uint32_t Galois::Runtime::getHostID() { return NetworkInterface::ID; }
 
 //FIXME: move top level loop out of network interface
 
-static bool ourexit = false;
+static std::atomic<bool> ourexit;
+
 //FIXME: synchronize this
 static std::deque<std::pair<recvFuncTy, RecvBuffer>> loopwork;
 
@@ -59,6 +60,7 @@ static void loop_pad(::RecvBuffer& b) {
 }
 
 void NetworkInterface::start() {
+  ourexit = false;
   getSystemBarrier(); // initialize barrier before anyone might be at it
   auto& net = getSystemNetworkInterface();
   auto& ldir = getLocalDirectory();

@@ -31,8 +31,8 @@
 #include <tuple>
 #include <unordered_map>
 
-#define USE_TCP
-//#define USE_MPI
+//#define USE_TCP
+#define USE_MPI
 //#define USE_BUF
 
 namespace Galois {
