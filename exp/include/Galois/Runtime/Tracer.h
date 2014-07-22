@@ -51,13 +51,19 @@ static inline void traceImpl(std::ostringstream& os, const char* format, T value
 
 void printTrace(std::ostringstream&);
 
+extern bool doTrace;
+extern bool initTrace;
+
 } // namespace detail
 
 //FIXME use better forwarding
 template<typename... Args>
 static inline void trace(const char* format, Args... args) {
-  static bool doTrace = LL::EnvCheck("GALOIS_DEBUG_TRACE");
-  if (doTrace) {
+  if (!detail::initTrace) {
+    detail::doTrace = LL::EnvCheck("GALOIS_DEBUG_TRACE");
+    detail::initTrace = true;
+  }
+  if (detail::doTrace) {
     std::ostringstream os;
     detail::traceImpl(os, format, args...);
     detail::printTrace(os);

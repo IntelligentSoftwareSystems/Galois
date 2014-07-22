@@ -34,8 +34,14 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+static bool doCerr = false;
+static bool doCerrInit = false;
+
 static std::ostream& openIfNot() {
-  static bool doCerr = Galois::Runtime::LL::EnvCheck("GALOIS_DEBUG_TRACE_STDERR");
+  if (!doCerrInit) {
+    doCerr = Galois::Runtime::LL::EnvCheck("GALOIS_DEBUG_TRACE_STDERR");
+    doCerrInit = true;
+  }
   if (doCerr)
     return std::cerr;
   static std::ofstream output;
@@ -65,3 +71,6 @@ void Galois::Runtime::detail::printTrace(std::ostringstream& os) {
   if (doSleep)
     usleep(iSleep ? iSleep : 10);
 }
+
+bool Galois::Runtime::detail::doTrace = false;
+bool Galois::Runtime::detail::initTrace = false;
