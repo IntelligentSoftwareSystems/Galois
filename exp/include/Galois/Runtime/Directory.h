@@ -145,6 +145,9 @@ class LocalDirectory : public BaseDirectory {
     //whether object is participating in priority protocol
     bool contended;
 
+    //People to notify
+    std::deque<std::function<void(fatPointer)> > notifyList;
+
     //Type aware helper functions
     typeHelper* th;
 
@@ -275,6 +278,11 @@ public:
   //! unengage priority protocol for ptr.  May send object away
   void clearContended(fatPointer ptr);
 
+  //! setup notification on object reciept.  Returns true if
+  //! notification registered.  Returns false if object already in
+  //! requested state (no notification actualy registered)
+  bool notify(fatPointer ptr, ResolveFlag flag, std::function<void (fatPointer)> fnotify);
+
   void resetStats() {}
   void reportStats(const char* loopname) {}
 
@@ -301,6 +309,10 @@ class RemoteDirectory : public BaseDirectory {
     LL::SimpleLock lock;
     StateFlag state;
     bool contended;
+
+    //People to notify
+    std::deque<std::function<void(fatPointer)> > notifyList;
+
     typeHelper* th;
 
     metadata();
@@ -371,6 +383,11 @@ public: // Local portion of the api
   }
   //! unengage priority protocol for ptr.  May writeback object
   void clearContended(fatPointer ptr);
+
+  //! setup notification on object reciept.  Returns true if
+  //! notification registered.  Returns false if object already in
+  //! requested state (no notification actualy registered)
+  bool notify(fatPointer ptr, ResolveFlag flag, std::function<void (fatPointer)> fnotify);
 
   void resetStats();
   void reportStats(const char* loopname);

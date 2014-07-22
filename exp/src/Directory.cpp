@@ -147,14 +147,19 @@ void RemoteDirectory::recvRequestImpl(fatPointer ptr, uint32_t dest, ResolveFlag
 void RemoteDirectory::recvObjectImpl(fatPointer ptr, ResolveFlag flag, typeHelper* th, RecvBuffer& buf) {
   assert(flag == RW || flag == RO);
   metadata& md = getMD(ptr);
-  std::lock_guard<LL::SimpleLock> lg(md.lock, std::adopt_lock);
-  trace("RemoteDirectory::recvObject % flag % md %\n", ptr, flag, md);
-  md.recvObj(flag);
-  assert(md.th == th || !md.th);
-  if (!md.th)
-    md.th = th;
-  th->cmCreate(ptr, flag, buf);
-  //FIXME: handle RO locking
+  auto nl = std::move(md.notifyList);
+  {
+    std::lock_guard<LL::SimpleLock> lg(md.lock, std::adopt_lock);
+    trace("RemoteDirectory::recvObject % flag % md %\n", ptr, flag, md);
+    md.recvObj(flag);
+    assert(md.th == th || !md.th);
+    if (!md.th)
+      md.th = th;
+    th->cmCreate(ptr, flag, buf);
+    //FIXME: handle RO locking
+  } // release md lock
+  for (auto& fn : nl)
+    fn(ptr);
 }
 
 void RemoteDirectory::clearContended(fatPointer ptr) {
@@ -192,6 +197,20 @@ void RemoteDirectory::fetchImpl(fatPointer ptr, ResolveFlag flag, typeHelper* th
   ResolveFlag requestFlag = md.fetch(flag);
   if (requestFlag != INV)
     th->request(ptr.getHost(), ptr, NetworkInterface::ID, requestFlag);
+}
+
+bool RemoteDirectory::notify(fatPointer ptr, ResolveFlag flag, 
+                             std::function<void(fatPointer)> fnotify) {
+  metadata& md = getMD(ptr);
+  std::lock_guard<LL::SimpleLock> lg(md.lock, std::adopt_lock);
+  assert(flag == RW || flag == RO);
+  //check if unnecessary
+  if ( (flag == RW && md.state == metadata::HERE_RW)
+       || (flag == RO && md.state == metadata::HERE_RO)
+       || (flag == RO && md.state == metadata::HERE_RW))
+    return false;
+  md.notifyList.push_back(fnotify);
+  return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -349,8 +368,12 @@ void LocalDirectory::recvObjectImpl(fatPointer ptr, ResolveFlag flag,
 
   auto p = md.getNextDest();
   if (p.first == ~0) {
+    auto nl = std::move(md.notifyList);
     eraseMD(ptr, lg);
     dirRelease(obj); //Object is local now with no requesters, so release
+    //md lock is released by this point
+    for (auto& fn : nl)
+      fn(ptr);
   } else {
     considerObject(md, ptr);
   }
@@ -377,7 +400,6 @@ void LocalDirectory::fetchImpl(fatPointer ptr, ResolveFlag flag, typeHelper* th,
 
 void LocalDirectory::clearContended(fatPointer ptr) {
   assert(ptr.isLocal());
-  Lockable* obj = static_cast<Lockable*>(ptr.getObj());
   metadata& md = getMD(ptr);
   std::unique_lock<LL::SimpleLock> lg(md.lock, std::adopt_lock);
   trace("LocalDirectory::clearContended % md %\n", ptr, md);
@@ -393,7 +415,6 @@ void LocalDirectory::clearContended(fatPointer ptr) {
 
 void LocalDirectory::recvRequestImpl(fatPointer ptr, uint32_t dest, ResolveFlag flag, typeHelper* th) {
   assert(ptr.isLocal());
-  Lockable* obj = static_cast<Lockable*>(ptr.getObj());
   metadata& md = getMD(ptr);
   std::unique_lock<LL::SimpleLock> lg(md.lock, std::adopt_lock);
   trace("LocalDirectory::recvRequest % flag % dest % md %\n", ptr, flag, dest, md);
@@ -461,9 +482,7 @@ void LocalDirectory::considerObject(metadata& md, fatPointer ptr) {
   assert(md.locRO.empty() && md.locRW == ~0);
   //Next user is this host
   if (nextDest == NetworkInterface::ID) {
-    if (md.contended) {
-      //FIXME: notify
-    }
+    auto nl = std::move(md.notifyList);
     if (nextIsRW) {
       md.reqsRW.erase(nextDest);
       dirRelease(obj);
@@ -471,6 +490,8 @@ void LocalDirectory::considerObject(metadata& md, fatPointer ptr) {
       md.reqsRO.erase(nextDest);
       //FIXME: release lock
     }
+    for (auto& fn : nl)
+      fn(ptr); //FIXME: md lock is held in RO case
   } else {
     if (dirOwns(obj) || dirAcquire(obj)) {
       if (nextIsRW) {
@@ -508,6 +529,21 @@ void LocalDirectory::updatePendingRequests(metadata& md, fatPointer ptr, std::un
       eraseMD(ptr, lg);
   }
 }
+
+bool LocalDirectory::notify(fatPointer ptr, ResolveFlag flag, 
+                             std::function<void(fatPointer)> fnotify) {
+  metadata& md = getMD(ptr);
+  std::unique_lock<LL::SimpleLock> lg(md.lock, std::adopt_lock);
+  assert(flag == RW || flag == RO);
+  //check if unnecessary
+  if (md.isHere()) {
+    eraseMD(ptr, lg);
+    return false;
+  }
+  md.notifyList.push_back(fnotify);
+  return true;
+}
+
 
 void LocalDirectory::makeProgress() {
   std::unordered_set<fatPointer> todo;

@@ -175,62 +175,88 @@ public:
 
 template<typename value_type>
 class RemoteAbortHandler {
-  std::multimap<value_type, fatPointer> waiting_on;
+  std::multimap<fatPointer, value_type> waiting_on;
+  std::map<value_type, std::set<fatPointer> > contended_set;
 
   typedef WorkList::GFIFO<value_type> AbortedList;
-  AbortedList queue;
-
+  AbortedList ready;
+  
   LL::SimpleLock lock;
+  
+  void notify_impl(fatPointer ptr) {
+    std::lock_guard<LL::SimpleLock> lg(lock);
+    assert(waiting_on.count(ptr)); //push should only set up notify once per pointer
+    auto p = waiting_on.equal_range(ptr);
+    auto p2 = p;
+    while (p.first != p.second) {
+      ready.push(p.first->second);
+      ++p.first;
+    }
+    waiting_on.erase(p2.first, p2.second);
+  }
 
 public:
   void push(const value_type& val, fatPointer ptr, 
             void (RemoteDirectory::*rfetch) (fatPointer, ResolveFlag),
             void (LocalDirectory::*lfetch) (fatPointer, ResolveFlag)) {
-    if (ptr.isLocal()) {
-      if (!getLocalDirectory().isRemote(ptr, RW))
-        return; //not actually remote
+    std::lock_guard<LL::SimpleLock> lg(lock);
+
+    //Set contended and fetch
+    if (ptr.isLocal())
       (getLocalDirectory().*(lfetch))(ptr, RW);
-    } else {
+    else
       (getRemoteDirectory().*(rfetch))(ptr, RW);
+    contended_set[val].insert(ptr);
+
+    //already waiting on this pointer
+    if (waiting_on.count(ptr)) {
+      auto p = waiting_on.equal_range(ptr);
+      if (std::count(p.first, p.second, std::pair<const fatPointer, value_type>(ptr,val)))
+        return; //already waiting
+      waiting_on.insert(std::make_pair(ptr, val));
+      return;
     }
 
-    //Currently remote
-    std::lock_guard<LL::SimpleLock> lg(lock);
-    auto p = waiting_on.equal_range(val);
-    if (ptr.isLocal()) {
-      //FIXME: types getLocalDirectory().setContended(ptr);
-    } else {
-      //FIXME: types      getRemoteDirectory().setContended(ptr);
+    //Likely currently remote
+    bool mustWait;
+    auto fnotify = [this] (fatPointer p) { this->notify_impl(p); };
+    if (ptr.isLocal())
+      mustWait = getLocalDirectory().notify(ptr, RW, fnotify);
+    else
+      mustWait = getRemoteDirectory().notify(ptr, RW, fnotify);
+
+    //Certainly Remote
+    if (mustWait) {
+      waiting_on.insert(std::make_pair(ptr, val));
+    } else { //Present
+      ready.push(val);
     }
-    typedef typename std::remove_reference<decltype(*p.first)>::type pair_type;
-    bool newDep = std::find(p.first, p.second, pair_type(val, ptr)) == p.second;
-    if (newDep) {
-      waiting_on.insert(std::make_pair(val, ptr));
-    }
-    queue.push(val);
   }
 
   void push(const value_type& val, Lockable* ptr) {
-    queue.push(val);
+    ready.push(val);
   }
 
   void commit(const value_type& val) {
     std::lock_guard<LL::SimpleLock> lg(lock);
-    auto p = waiting_on.equal_range(val);
-    auto ii = p.first;
-    while (ii != p.second) {
-      if (ii->second.isLocal()) {
-        getLocalDirectory().clearContended(ii->second);
+    auto p = contended_set[val];
+    assert(!p.empty());
+    for (auto ptr : p)
+      if (ptr.isLocal()) {
+        getLocalDirectory().clearContended(ptr);
       } else {
-        getRemoteDirectory().clearContended(ii->second);
+        getRemoteDirectory().clearContended(ptr);
       }
-      ++ii;
-    }
-    waiting_on.erase(p.first, p.second);
+    contended_set.erase(val);
   }
 
-  decltype(queue.pop()) pop() {
-    return queue.pop();
+  decltype(ready.pop()) pop() {
+    return ready.pop();
+  }
+
+  bool noHiddenWork() {
+    std::lock_guard<LL::SimpleLock> lg(lock);
+    return waiting_on.empty();
   }
 
 };
@@ -330,7 +356,7 @@ protected:
 
   GALOIS_ATTRIBUTE_NOINLINE
   bool handleAborts(ThreadLocalData& tld) {
-    return runQueue<8, true>(tld, aborted);
+    return runQueue<8, true>(tld, aborted) || !aborted.noHiddenWork();
   }
 
   void fastPushBack(typename UserContextAccess<value_type>::PushBufferTy& x) {

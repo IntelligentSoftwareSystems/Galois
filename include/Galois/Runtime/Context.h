@@ -139,7 +139,7 @@ inline void acquire(gptr<T> ptr, Galois::MethodFlag m) {
     if (!obj) {
       //FIXME Better resolve flag
       getRemoteDirectory().fetch<T>(static_cast<fatPointer>(ptr), ResolveFlag::RW);
-      signalConflict(remote_ex{static_cast<fatPointer>(ptr), m, &RemoteDirectory::fetch<T>, &LocalDirectory::fetch<T>});
+      signalConflict(remote_ex{static_cast<fatPointer>(ptr), m, &RemoteDirectory::setContended<T>, &LocalDirectory::setContended<T>});
     }
     if (shouldLock(m)) {
       SimpleRuntimeContext* ctx = getThreadContext();
