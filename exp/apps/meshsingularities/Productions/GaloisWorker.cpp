@@ -263,6 +263,16 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
 	return result;
 }
 
+unsigned long ProductionProcess::getAllocatedSize(Vertex *root)
+{
+    unsigned long total = 0;
+    if (root != NULL) {
+        unsigned long total = (root->system->n+1)*root->system->n*sizeof(double);
+        total += getAllocatedSize(root->left)+getAllocatedSize(root->right);
+    }
+    return total;
+}
+
 inline int ProductionProcess::atomic_dec(int *value) {
 	// XXX: more portable solution?
 	return __atomic_sub_fetch(value, 1, __ATOMIC_ACQ_REL);
