@@ -31,16 +31,11 @@
 #include "tbb/parallel_for_each.h"
 #endif
 
-#if defined(__INTEL_COMPILER)
-#include <cilk/cilk.h>
-#include <cilk/cilk_api.h>
-#endif
-
+#include "CilkInit.h"
 #include <unistd.h>
 
 #include "llvm/Support/CommandLine.h"
 
-namespace cll = llvm::cl;
 
 
 namespace Galois {
@@ -49,6 +44,7 @@ enum DoAllTypes {
   GALOIS, GALOIS_STEAL, COUPLED, CILK, OPENMP 
 };
 
+namespace cll = llvm::cl;
 extern cll::opt<DoAllTypes> doAllKind;
 
 template <DoAllTypes TYPE> 
@@ -104,7 +100,7 @@ struct DoAllImpl<COUPLED> {
 };
 
 
-#if defined(__INTEL_COMPILER)
+#ifdef HAVE_CILK
 
 template <>
 struct DoAllImpl<CILK> {
@@ -112,7 +108,7 @@ struct DoAllImpl<CILK> {
   template <typename I, typename F>
   static inline void go (I beg, I end, const F& func, const char* loopname) {
 
-    init ();
+    CilkInit ();
 
     cilk_for(I it = beg; it != end; ++it) {
       func (*it);
@@ -124,84 +120,22 @@ struct DoAllImpl<CILK> {
     go (perThrdWL.begin_all (), perThrdWL.end_all (), func, loopname);
   }
 
-  struct BusyBarrier {
-    volatile int entered;
 
-    void check () const { assert (entered > 0); }
-
-    BusyBarrier (unsigned val) : entered (val) 
-    {
-      check ();
-    }
-
-    void wait () {
-      check ();
-      __sync_fetch_and_sub (&entered, 1);
-      while (entered > 0) {}
-    }
-
-    void reinit (unsigned val) {
-      entered = val;
-      check ();
-    }
-  };
-
-  static bool initialized;
-
-
-  static void initOne (BusyBarrier& busybarrier, unsigned tid) {
-    Runtime::LL::initTID(tid % Runtime::LL::getMaxThreads());
-        Runtime::initPTS_cilk ();
-
-        unsigned id = Runtime::LL::getTID ();
-        pthread_t self = pthread_self ();
-
-        std::printf ("CILK: Thread %ld assigned id=%d\n", self, id);
-
-        if (id != 0 || !Runtime::LL::EnvCheck("GALOIS_DO_NOT_BIND_MAIN_THREAD")) {
-          Runtime::LL::bindThreadToProcessor(id);
-        }
-
-
-        busybarrier.wait (); 
-  }
-
-  static void init () {
-
-    if (initialized) { 
-      return ;
-    } else {
-
-      initialized = true;
-
-      unsigned numT = getActiveThreads ();
-
-      unsigned tot = __cilkrts_get_total_workers ();
-      std::printf ("CILK: total cilk workers = %d\n", tot);
-
-      // char nw_str[128];
-      // std::sprintf (nw_str, "%d", numT);
-      // __cilkrts_set_param ("nworkers", nw_str);
-
-      unsigned nw = __cilkrts_get_nworkers ();
-
-      if (nw != numT) {
-        std::printf ("CILK: cilk nworkers=%d != galois threads=%d\n", nw, numT); 
-        unsigned tot = __cilkrts_get_total_workers ();
-        std::printf ("CILK: total cilk workers = %d\n", tot);
-        std::abort ();
-      }
-
-      BusyBarrier busybarrier (numT);
-
-      for (unsigned i = 0; i < numT; ++i) {
-        cilk_spawn initOne (busybarrier, i);
-      } // end for
-    }
-  }
 
 };
+#else 
 
+template <> struct DoAllImpl<CILK> {
+  template <typename I, typename F>
+  static inline void go (I beg, I end, const F& func, const char* loopname) {
+    GALOIS_DIE("Cilk not found\n");
+  }
+
+  template <typename PW, typename F>
+  static inline void go (PW& perThrdWL, const F& func, const char* loopname) {
+    GALOIS_DIE("Cilk not found\n");
+  }
+};
 #endif
 
 template <typename I, typename F> 

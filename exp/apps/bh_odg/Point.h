@@ -3,6 +3,11 @@
 
 namespace bh {
 
+bool checkRelativeError (const double ref, const double obs) {
+  const double THRESHOLD = 1.0e-10;
+  return fabs ((ref - obs) / ref) < THRESHOLD; 
+}
+
 struct Point {
   double x, y, z;
   Point() : x(0.0), y(0.0), z(0.0) { }
@@ -46,6 +51,13 @@ struct Point {
     return *this;
   }
 
+  Point& operator -= (const Point& other) {
+    x -= other.x;
+    y -= other.y;
+    z -= other.z;
+    return *this;
+  }
+
   Point& operator*=(double value) {
     x *= value;
     y *= value;
@@ -53,11 +65,27 @@ struct Point {
     return *this;
   }
 
+  double mag () const {
+    return sqrt (x*x + y*y + z*z);
+  }
+
   friend std::ostream& operator<<(std::ostream& os, const Point& p) {
     os << "(" << p[0] << "," << p[1] << "," << p[2] << ")";
     return os;
   }
+
+
+  friend bool checkRelativeError (const Point& ref, const Point& obs) {
+    // Point tmp (ref);
+    // tmp -= obs;
+    // return (tmp.mag () / ref.mag ()) < THRESHOLD;
+    return checkRelativeError (ref.x, obs.x) 
+        && checkRelativeError (ref.y, obs.y)
+        && checkRelativeError (ref.z, obs.z);
+  }
 };
+
+
 
 } // end namespace bh
 #endif // BH_POINT_H
