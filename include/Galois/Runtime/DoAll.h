@@ -123,6 +123,12 @@ public:
     :F(_F), range(r)
   { }
 
+#ifdef GALOIS_USE_EXP
+  void reinit (const RangeTy& r) {
+    range = r;
+  }
+#endif
+
   void operator()() {
     //Assume the copy constructor on the functor is readonly
     iterator begin = range.local_begin();

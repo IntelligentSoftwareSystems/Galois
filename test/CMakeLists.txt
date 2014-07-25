@@ -8,6 +8,7 @@ endif()
 set(BASE ${CMAKE_SOURCE_DIR})
 
 makeTest(acquire DISTSAFE)
+makeTest(awake-threadpool-overhead)
 makeTest(bandwidth)
 makeTest(barriers)
 makeTest(empty-member-lcgraph DISTSAFE)
