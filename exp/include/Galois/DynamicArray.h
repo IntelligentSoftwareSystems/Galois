@@ -1,4 +1,4 @@
-/** Bounded Vector-*- C++ -*-
+/** Lazy and non-lazy Dynamic Array-*- C++ -*-
  * @file
  * @section License
  *
@@ -20,23 +20,25 @@
  *
  * @author ahassaan@ices.utexas.edu
  */
-#ifndef GALOIS_BOUNDED_VECTOR_H
-#define GALOIS_BOUNDED_VECTOR_H
+#ifndef GALOIS_DYNAMIC_ARRAY_H
+#define GALOIS_DYNAMIC_ARRAY_H
 
-#include "Galois/LazyArray.h"
+#include <boost/noncopyable.hpp>
 
 namespace Galois {
 
-template <typename T, const size_t SZ>
-class BoundedVector {
+// TODO: dynamic Array using Fixed Size Allocator
 
-  typedef LazyArray<T, SZ> LArray;
+template <typename T, typename A=std::allocator<T> >
+class LazyDynamicArray: boost::noncopyable {
 
-  LArray m_array;
-  size_t m_size;
+protected:
+  A m_alloc;
 
-  void assertValidSize () const { assert (m_size <= SZ); }
+  T* m_array;
+  T* m_size;
 
+  
 public:
 
   using value_type = T;
@@ -51,66 +53,39 @@ public:
   using reverse_iterator = std::reverse_iterator<iterator>;
   using const_reverse_iterator = std::reverse_iterator<const_iterator>;
 
-  BoundedVector () : m_array (), m_size (0) {}
 
-  bool empty () const { return m_size == 0; }
+  explicit LazyDynamicArray (size_t length, const A& alloc=A()): 
+    m_alloc (alloc),
+    m_array (nullptr),
+    m_size (nullptr)
+  {
 
-  bool full () const { return m_size == SZ; }
+    m_array = m_alloc.allocate (length);
+    m_size = m_array + length;
 
-  size_type size () const { return m_size; }
+    assert (m_array != nullptr);
+  }
 
-  static size_type capacity () { return SZ; }
+
+  size_type size () const { 
+    assert (m_size >= m_array);
+    return m_size - m_array; 
+  }
+
+  template <typename... Args>
+  void initialize (const size_type i, Args&&... args) {
+    assert (i < size ());
+    m_alloc.construct (m_array + i, std::forward<Args> (args)...);
+  }
 
   reference operator [] (const size_type i) {
-    assert (i <= size ());
+    assert (i < size ());
     return m_array[i];
   }
 
   const_reference operator [] (const size_type i) const {
-    assert (i <= size ());
+    assert (i < size ());
     return m_array[i];
-  }
-
-  template <typename... Args>
-  void emplace_back(Args&&... args) {
-    assertValidSize ();
-    assert (!full ());
-
-    m_array.construct (m_size, std::forward<Args>(args)...);
-    ++m_size;
-  }
-
-  void push_back (const_reference v) {
-    assertValidSize ();
-    assert (!full ());
-
-    m_array.construct (m_size, v);
-    ++m_size;
-  }
-
-  const_reference front () const { 
-    return (*this)[0];
-  }
-
-  reference front () {
-    return (*this)[0];
-  }
-
-  const_reference back () const {
-    return (*this)[size () - 1];
-  }
-
-  reference back () {
-    return (*this)[size () - 1];
-  }
-
-  void pop_back () {
-    assertValidSize ();
-    assert (!empty ());
-
-    --m_size;
-    assertValidSize ();
-    m_array.destroy (m_size);
   }
 
   //iterators:
@@ -128,11 +103,9 @@ public:
   const_iterator cend() const { return end(); }
   const_reverse_iterator crbegin() const { return rbegin(); }
   const_reverse_iterator crend() const { return rend(); }
-
-
 };
 
-} // end namespace Galois
+}// end namespace Galois
 
-#endif // GALOIS_BOUNDED_VECTOR_H
 
+#endif // GALOIS_DYNAMIC_ARRAY_H
