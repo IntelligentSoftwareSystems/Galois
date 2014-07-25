@@ -11,7 +11,7 @@ cll::opt<DoAllTypes> doAllKind (
       clEnumVal (CILK, "CILK"),
       clEnumVal (OPENMP, "OPENMP"),
       clEnumValEnd),
-    cll::init (GALOIS));
+    cll::init (GALOIS_STEAL));
 
 } // end namespace Galois
 

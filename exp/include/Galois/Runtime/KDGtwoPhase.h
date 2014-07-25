@@ -141,7 +141,7 @@ public:
 
 protected:
   GALOIS_ATTRIBUTE_PROF_NOINLINE void spillAll (CtxtWL& wl) {
-    Galois::on_each (
+    on_each_impl (
         [this, &wl] (const unsigned tid, const unsigned numT) {
           while (!wl[tid].empty ()) {
             Ctxt* c = wl[tid].back ();
@@ -285,7 +285,7 @@ protected:
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhood (CtxtWL& currWL) {
-    Galois::do_all_choice (currWL.begin_all (), currWL.end_all (),
+    Galois::do_all_choice (makeLocalRange (*currWL),
         [this] (Ctxt* c) {
           UserCtxt& uhand = *userHandles.getLocal ();
           uhand.reset ();
@@ -308,7 +308,8 @@ protected:
       }
     }
 
-    Galois::do_all_choice (currWL.begin_all (), currWL.end_all (),
+
+    Galois::do_all_choice (makeLocalRange (*currWL),
         [this, &minElem, &nextWL] (Ctxt* c) {
           bool commit = false;
 
@@ -438,7 +439,7 @@ protected:
     typename Base::PerThreadUserCtxt& uh = Base::userHandles;
     GAccumulator<size_t>& total = Base::total;
 
-    Galois::do_all_choice (currWL.begin_all (), currWL.end_all (),
+    Galois::do_all_choice (makeLocalRange (*currWL),
         [m_beg, m_end, &func, &uh, &total] (Ctxt* c) {
           UserCtxt& uhand = *uh.getLocal ();
           uhand.reset ();
