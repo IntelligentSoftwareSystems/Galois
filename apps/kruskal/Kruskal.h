@@ -421,8 +421,10 @@ public:
 
     initRemaining (numNodes, edges);
 
+
     // pre allocate memory from OS for parallel runs
     Galois::preAlloc (numPages*Galois::getActiveThreads ());
+    Galois::reportPageAlloc("MeminfoPre");
     
     Galois::StatTimer t;
 
@@ -431,6 +433,7 @@ public:
     runMST (numNodes, edges, mstWeight, totalIter);
     // GaloisRuntime::endSampling ();
     t.stop ();
+    Galois::reportPageAlloc("MeminfoPost");
 
     printResults (mstWeight, totalIter);
 

@@ -32,6 +32,7 @@
 #include "Galois/Accumulator.h"
 #include "Galois/Runtime/PerThreadWorkList.h"
 #include "Galois/Runtime/ll/CompilerSpecific.h"
+#include "Galois/DynamicArray.h"
 
 #include "Kruskal.h"
 
@@ -39,7 +40,7 @@ namespace kruskal {
 
 struct EdgeCtx;
 
-typedef VecRep VecRep_ty;
+typedef Galois::LazyDynamicArray<int>  VecRep_ty;
 
 typedef Galois::Runtime::PerThreadVector<Edge> EdgeWL;
 typedef Galois::Runtime::PerThreadVector<EdgeCtx> EdgeCtxWL;
@@ -49,7 +50,7 @@ typedef Galois::GAccumulator<size_t> Accumulator;
 
 // typedef Galois::GAtomicPadded<EdgeCtx*> AtomicCtxPtr;
 typedef Galois::GAtomic<EdgeCtx*> AtomicCtxPtr;
-typedef std::vector<AtomicCtxPtr> VecAtomicCtxPtr;
+typedef Galois::LazyDynamicArray<AtomicCtxPtr> VecAtomicCtxPtr;
 
 static const int NULL_EDGE_ID = -1;
 
@@ -491,18 +492,20 @@ struct UnionFindWindow {
 
       // Galois::Runtime::beginSampling ();
       findTimer.start ();
-      Galois::do_all (currWL->begin_all (), currWL->end_all (),
+      Galois::do_all_local (*currWL,
           FindLoop (repVec, repOwnerCtxVec, findIter),
-                      Galois::loopname("find_loop"));
+          Galois::do_all_steal (true),
+          Galois::loopname("find_loop"));
       findTimer.stop ();
       // Galois::Runtime::endSampling ();
 
 
       // Galois::Runtime::beginSampling ();
       linkUpTimer.start ();
-      Galois::do_all (currWL->begin_all (), currWL->end_all (),
+      Galois::do_all_local (*currWL,
           LinkUpLoop<false> (repVec, repOwnerCtxVec, *nextWL, mstSum, linkUpIter),
-                      Galois::loopname("link_up_loop"));
+          Galois::do_all_steal (true),
+          Galois::loopname("link_up_loop"));
       linkUpTimer.stop ();
       // Galois::Runtime::endSampling ();
 
@@ -557,18 +560,37 @@ void runMSTsimple (const size_t numNodes, const VecEdge& edges,
   Accumulator linkUpIter;
 
 
-  VecRep_ty repVec (numNodes, -1);
-  VecAtomicCtxPtr repOwnerCtxVec (numNodes, AtomicCtxPtr (NULL));
+  // VecRep_ty repVec (numNodes, -1);
+  // VecAtomicCtxPtr repOwnerCtxVec (numNodes, AtomicCtxPtr (NULL));
+  VecRep_ty repVec (numNodes);
+  VecAtomicCtxPtr repOwnerCtxVec (numNodes);
 
+ 
+  Galois::Runtime::getSystemThreadPool ().burnPower (Galois::getActiveThreads ());
 
   fillUpTimer.start ();
+  Galois::do_all (
+      boost::counting_iterator<size_t>(0),
+      boost::counting_iterator<size_t>(numNodes),
+      [&repVec, &repOwnerCtxVec] (size_t i) {
+        repVec.initialize (i, -1);
+        repOwnerCtxVec.initialize (i, AtomicCtxPtr(nullptr));
+      },
+      Galois::do_all_steal (false),
+      Galois::loopname ("init-vectors"));
+
+
+
   EdgeCtxWL initWL;
   unsigned numT = Galois::getActiveThreads ();
   for (unsigned i = 0; i < numT; ++i) {
     initWL[i].reserve ((edges.size () + numT - 1) / numT);
   }
 
-  Galois::do_all (edges.begin (), edges.end (), FillUp (initWL), Galois::loopname("fill_init"));
+  Galois::do_all (edges.begin (), edges.end (), 
+      FillUp (initWL), 
+      Galois::do_all_steal (false),
+      Galois::loopname("fill_init"));
 
   fillUpTimer.stop ();
 
@@ -588,6 +610,7 @@ void runMSTsimple (const size_t numNodes, const VecEdge& edges,
   std::cout << "Time taken by LinkUpLoop: " << linkUpTimer.get () << std::endl;
   std::cout << "Time taken by FillUp: " << fillUpTimer.get () << std::endl;
 
+  Galois::Runtime::getSystemThreadPool ().beKind ();
 }
 
 
