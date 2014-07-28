@@ -285,7 +285,7 @@ protected:
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhood (CtxtWL& currWL) {
-    Galois::do_all_choice (makeLocalRange (*currWL),
+    Galois::do_all_choice (makeLocalRange (currWL),
         [this] (Ctxt* c) {
           UserCtxt& uhand = *userHandles.getLocal ();
           uhand.reset ();
@@ -309,7 +309,7 @@ protected:
     }
 
 
-    Galois::do_all_choice (makeLocalRange (*currWL),
+    Galois::do_all_choice (makeLocalRange (currWL),
         [this, &minElem, &nextWL] (Ctxt* c) {
           bool commit = false;
 
