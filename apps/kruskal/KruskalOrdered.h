@@ -53,7 +53,8 @@ struct UnionFindUsingRuntime {
     Accumulator mstSum;
 
     // Galois::for_each_ordered (perThrdWL.begin_all (), perThrdWL.end_all (),
-    Galois::Runtime::for_each_ordered_2p_win (perThrdWL.begin_all (), perThrdWL.end_all (),
+    Galois::Runtime::for_each_ordered_2p_win (
+        Galois::Runtime::makeStandardRange(perThrdWL.begin_all (), perThrdWL.end_all ()),
         Edge::Comparator (),
         FindLoop (repVec, repOwnerCtxVec, findIter),
         LinkUpLoop<true> (repVec, repOwnerCtxVec, *nextWL, mstSum, linkUpIter));

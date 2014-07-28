@@ -129,7 +129,7 @@ public:
     // createLocks (table, graph, nodes);
 
     Galois::Runtime::for_each_ordered_2p_win (
-        initEvents.begin (), initEvents.end (),
+        Galois::Runtime::makeStandardRange(initEvents.begin (), initEvents.end ()),
         Event::Comparator (),
         VisitNhood (),
         OpFunc (table, endtime, addList, iter),
