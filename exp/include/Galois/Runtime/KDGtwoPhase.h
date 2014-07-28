@@ -532,8 +532,10 @@ void for_each_ordered_2p_win (const R& range, const Cmp& cmp, const NhFunc& nhFu
   
   Exec e (cmp, nhFunc, opFunc);
 
+  getSystemThreadPool ().burnPower (Galois::getActiveThreads ());
   e.fill_initial (range);
   e.execute ();
+  getSystemThreadPool ().beKind ();
 }
 
 template <typename R, typename Cmp, typename NhFunc, typename OpFunc, typename SL>
@@ -546,8 +548,10 @@ void for_each_ordered_2p_win (const R& range, const Cmp& cmp, const NhFunc& nhFu
   
   Exec e (cmp, nhFunc, opFunc, serialLoop);
 
+  getSystemThreadPool ().burnPower (Galois::getActiveThreads ());
   e.fill_initial (range);
   e.execute ();
+  getSystemThreadPool ().beKind ();
 }
 
 
