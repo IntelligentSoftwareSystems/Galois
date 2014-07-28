@@ -357,7 +357,7 @@ void sparselu_par_call(float **BENCH)
           bots_arg_size,bots_arg_size,bots_arg_size_1,bots_arg_size_1);
 
   namespace ww = Galois::WorkList;
-  typedef Galois::WorkList::StableIterator<>::template with_container<ww::dChunkedLIFO<1>>::type WL;
+  typedef Galois::WorkList::StableIterator<>::with_container<ww::dChunkedLIFO<1>>::type WL;
 
   for (kk=0; kk<bots_arg_size; kk++) {
     lu0(BENCH[kk*bots_arg_size+kk]);
@@ -373,7 +373,6 @@ void sparselu_par_call(float **BENCH)
         Bmod { BENCH, kk }, Galois::wl<WL>());
   }
   bots_message(" completed!\n");
-  T.stop();
 }
 
 void sparselu_fini (float **BENCH, char *pass)
