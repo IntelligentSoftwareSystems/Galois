@@ -33,6 +33,7 @@
 #include "Galois/Runtime/mm/Mem.h"
 
 #include <boost/iterator/iterator_facade.hpp>
+#include <stdexcept>
 
 #include GALOIS_CXX11_STD_HEADER(algorithm)
 

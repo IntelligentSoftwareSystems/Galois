@@ -876,6 +876,34 @@ private:
     }
   };
 
+  struct Execute {
+    Graph& g;
+    Galois::Statistic& edgesVisited;
+
+    void operator()(LatentValue* steps, int maxUpdates, Galois::GAccumulator<double>* errorAccum) {
+      if (errorAccum)
+        GALOIS_DIE("not yet implemented");
+
+      Galois::Runtime::Fixed2DGraphTiledExecutor<Graph> executor(g);
+      executor.execute(
+          g.begin(), g.begin() + NUM_ITEM_NODES,
+          g.begin() + NUM_ITEM_NODES, g.end(),
+          itemsPerBlock, usersPerBlock,
+          [&](GNode src, GNode dst, typename Graph::edge_iterator edge) {
+        if (deleted(g.getData(src)))
+          return;
+        //const LatentValue stepSize = steps[updatesPerEdge - maxUpdates + task.updates]; XXX
+        //const LatentValue stepSize = steps[1 - maxUpdates + 0];
+        const LatentValue stepSize = steps[0];
+
+        LatentValue e = doGradientUpdate(g.getData(src).latentVector, g.getData(dst).latentVector, lambda, g.getEdgeData(edge), stepSize);
+        // XXX non exact error
+        //error += (e * e);
+        edgesVisited += 1;
+      }, true);
+    }
+  };
+
 public:
   void operator()(Graph& g, const StepFunction& sf) {
     Galois::StatTimer inspect("InspectTime");
@@ -894,28 +922,8 @@ public:
     execute.start();
 
 #if 1
-    executeUntilConverged(sf, g, [&](LatentValue* steps, int maxUpdates, Galois::GAccumulator<double>* errorAccum) {
-      if (errorAccum)
-        GALOIS_DIE("not yet implemented");
-
-      Galois::Runtime::Fixed2DGraphTiledExecutor<Graph> executor(g);
-      executor.execute(
-          g.begin(), g.begin() + NUM_ITEM_NODES,
-          g.begin() + NUM_ITEM_NODES, g.end(),
-          itemsPerBlock, usersPerBlock,
-          [&](GNode src, GNode dst, typename Graph::edge_iterator edge) {
-        if (deleted(g.getData(src)))
-          return;
-        // const LatentValue stepSize = steps[updatesPerEdge - maxUpdates + task.updates]; XXX
-        //const LatentValue stepSize = steps[1 - maxUpdates + 0];
-        const LatentValue stepSize = steps[0];
-
-        LatentValue e = doGradientUpdate(g.getData(src).latentVector, g.getData(dst).latentVector, lambda, g.getEdgeData(edge), stepSize);
-        // XXX non exact error
-        //error += (e * e);
-        edgesVisited += 1;
-      }, true);
-    });
+    Execute fn2 { g, edgesVisited };
+    executeUntilConverged(sf, g, fn2);
 #endif
 #if 0
     executeUntilConverged(sf, g, [&](LatentValue* steps, int maxUpdates, Galois::GAccumulator<double>* errorAccum) {
