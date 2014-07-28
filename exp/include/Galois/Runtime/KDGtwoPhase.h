@@ -52,8 +52,10 @@
 #include "Galois/Runtime/mm/Mem.h"
 
 #include <boost/iterator/transform_iterator.hpp>
+#include <boost/optional.hpp>
 
 #include <iostream>
+#include <memory>
 
 
 namespace Galois {
@@ -68,7 +70,6 @@ static cll::opt<double> commitRatioArg("cratio", cll::desc("target commit ratio 
 namespace {
 template <typename T, typename Cmp, typename NhFunc, typename OpFunc, typename WindowWL> 
 class KDGtwoPhaseStableExecutor {
-
 public:
   using Ctxt = TwoPhaseContext<T, Cmp>;
   using CtxtAlloc = Galois::Runtime::MM::FSBGaloisAllocator<Ctxt>;
@@ -103,17 +104,13 @@ protected:
   MakeContext ctxtMaker;
   PerThreadUserCtxt userHandles;
 
-
-  size_t windowSize = 0;
+  size_t windowSize;
+  size_t rounds;
+  size_t prevCommits;
   GAccumulator<size_t> numCommitted;
-
-  size_t rounds = 0;
-  size_t prevCommits = 0;
   GAccumulator<size_t> total;
 
-
 public:
-
   KDGtwoPhaseStableExecutor (
       const Cmp& cmp, 
       const NhFunc& nhFunc,
@@ -123,7 +120,10 @@ public:
       nhFunc (nhFunc),
       opFunc (opFunc),
       winWL (cmp),
-      ctxtMaker (cmp, ctxtAlloc)
+      ctxtMaker (cmp, ctxtAlloc),
+      windowSize(0),
+      rounds(0),
+      prevCommits(0)
   {}
 
   ~KDGtwoPhaseStableExecutor () {
@@ -140,7 +140,6 @@ public:
   }
 
 protected:
-
   GALOIS_ATTRIBUTE_PROF_NOINLINE void spillAll (CtxtWL& wl) {
     Galois::on_each (
         [this, &wl] (const unsigned tid, const unsigned numT) {
@@ -156,19 +155,14 @@ protected:
 
     assert (wl.empty_all ());
     assert (!winWL.empty ());
-
   }
 
-  GALOIS_ATTRIBUTE_PROF_NOINLINE void refill (CtxtWL* wl, size_t currCommits, size_t prevWindowSize) {
-
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void refill (CtxtWL& wl, size_t currCommits, size_t prevWindowSize) {
     const size_t INIT_MAX_ROUNDS = 500;
     const size_t THREAD_MULT_FACTOR = 16;
-
     const double TARGET_COMMIT_RATIO = commitRatioArg;
-
     const size_t MIN_WIN_SIZE = OpFunc::CHUNK_SIZE * getActiveThreads ();
     // const size_t MIN_WIN_SIZE = 2000000; // OpFunc::CHUNK_SIZE * getActiveThreads ();
-
     const size_t WIN_OVER_SIZE_FACTOR = 8;
 
     if (prevWindowSize == 0) {
@@ -185,8 +179,6 @@ protected:
             (winWL.initSize () / INIT_MAX_ROUNDS),
             (THREAD_MULT_FACTOR * MIN_WIN_SIZE));
       }
-
-
     } else {
 
       assert (windowSize > 0);
@@ -199,8 +191,7 @@ protected:
         // windowSize = windowSize + windowSize / 2;
 
       } else {
-
-          windowSize = int (windowSize * commitRatio/TARGET_COMMIT_RATIO); 
+        windowSize = int (windowSize * commitRatio/TARGET_COMMIT_RATIO); 
 
         // if (commitRatio / TARGET_COMMIT_RATIO < 0.90) {
           // windowSize = windowSize - (windowSize / 10);
@@ -209,7 +200,6 @@ protected:
           // windowSize = int (windowSize * commitRatio/TARGET_COMMIT_RATIO); 
         // }
       }
-
     }
 
     if (windowSize < MIN_WIN_SIZE) { 
@@ -220,27 +210,23 @@ protected:
 
 
     if (ForEachTraits<OpFunc>::NeedsPush) {
-
-      if (winWL.empty () && (wl->size_all () > windowSize)) {
+      if (winWL.empty () && (wl.size_all () > windowSize)) {
         // a case where winWL is empty and all the new elements were going into 
         // nextWL. When nextWL becomes bigger than windowSize, we must do something
         // to control efficiency. One solution is to spill all elements into winWL
         // and refill
         //
 
-        spillAll (*wl);
+        spillAll (wl);
 
-      } else if (wl->size_all () > (WIN_OVER_SIZE_FACTOR * windowSize)) {
+      } else if (wl.size_all () > (WIN_OVER_SIZE_FACTOR * windowSize)) {
         // too many adds. spill to control efficiency
-        spillAll (*wl);
+        spillAll (wl);
       }
     }
 
-
-    winWL.poll (*wl, windowSize, wl->size_all (), ctxtMaker);
-
+    winWL.poll (wl, windowSize, wl.size_all (), ctxtMaker);
     // std::cout << "Calculated Window size: " << windowSize << ", Actual: " << wl->size_all () << std::endl;
-
   }
 
 
@@ -285,8 +271,8 @@ protected:
     Galois::Runtime::setThreadContext (NULL);
   }
 
-  
-  GALOIS_ATTRIBUTE_PROF_NOINLINE void prepareRound (CtxtWL*& currWL, CtxtWL*& nextWL) {
+  template<typename Ptr>
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void prepareRound (Ptr& currWL, Ptr& nextWL) {
     ++rounds;
     std::swap (currWL, nextWL);
     size_t prevWindowSize = nextWL->size_all ();
@@ -295,12 +281,11 @@ protected:
     size_t currCommits = numCommitted.reduce () - prevCommits;
     prevCommits += currCommits;
 
-    refill (currWL, currCommits, prevWindowSize);
+    refill (*currWL, currCommits, prevWindowSize);
   }
 
-  GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhood (CtxtWL* currWL) {
-
-    Galois::do_all_choice (currWL->begin_all (), currWL->end_all (),
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhood (CtxtWL& currWL) {
+    Galois::do_all_choice (currWL.begin_all (), currWL.end_all (),
         [this] (Ctxt* c) {
           UserCtxt& uhand = *userHandles.getLocal ();
           uhand.reset ();
@@ -314,108 +299,76 @@ protected:
 
   }
 
-  GALOIS_ATTRIBUTE_PROF_NOINLINE void applyOperator (CtxtWL* currWL, CtxtWL* nextWL) {
-    const T* minElem = nullptr;
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void applyOperator (CtxtWL& currWL, CtxtWL& nextWL) {
+    boost::optional<T> minElem;
 
     if (ForEachTraits<OpFunc>::NeedsPush) {
       if (!winWL.empty ()) {
-        // make a copy
-        minElem = new T (*winWL.getMin ());
+        minElem = *winWL.getMin();
       }
     }
 
-
-    Galois::do_all_choice (currWL->begin_all (), currWL->end_all (),
-        [this, minElem, nextWL] (Ctxt* c) {
-
+    Galois::do_all_choice (currWL.begin_all (), currWL.end_all (),
+        [this, &minElem, &nextWL] (Ctxt* c) {
           bool commit = false;
 
           UserCtxt& uhand = *userHandles.getLocal ();
           uhand.reset ();
 
           if (c->isSrc ()) {
-          // opFunc (c->active, uhand);
-          runCatching (opFunc, c, uhand);
-
-          commit = c->isSrc (); // in case opFunc signalled abort
-
+            // opFunc (c->active, uhand);
+            runCatching (opFunc, c, uhand);
+            commit = c->isSrc (); // in case opFunc signalled abort
           } else {
-          commit = false;
+            commit = false;
           }
 
           if (commit) {
+            numCommitted += 1;
+            if (ForEachTraits<OpFunc>::NeedsPush) { 
+              for (auto i = uhand.getPushBuffer ().begin ()
+                  , endi = uhand.getPushBuffer ().end (); i != endi; ++i) {
 
-          numCommitted += 1;
-
-          if (ForEachTraits<OpFunc>::NeedsPush) { 
-
-
-            for (auto i = uhand.getPushBuffer ().begin ()
-                , endi = uhand.getPushBuffer ().end (); i != endi; ++i) {
-
-              if (minElem == nullptr || !cmp (*minElem, *i)) {
-                // if *i >= *minElem
-                nextWL->get ().push_back (ctxtMaker (*i));
-
-              } else {
-                assert (minElem != nullptr);
-
-                winWL.push (*i);
-
-              } 
+                if (!minElem || !cmp (*minElem, *i)) {
+                  // if *i >= *minElem
+                  nextWL.get().push_back (ctxtMaker (*i));
+                } else {
+                  winWL.push (*i);
+                } 
+              }
+            } else {
+              assert (uhand.getPushBuffer ().begin () == uhand.getPushBuffer ().end ());
             }
 
-          } else {
-            assert (uhand.getPushBuffer ().begin () == uhand.getPushBuffer ().end ());
-          }
-
-          c->commitIteration ();
-
-          c->~Ctxt ();
-          ctxtAlloc.deallocate (c, 1);
-
+            c->commitIteration ();
+            c->~Ctxt ();
+            ctxtAlloc.deallocate (c, 1);
           } else {
             c->cancelIteration ();
             c->reset ();
-            nextWL->get ().push_back (c);
-
+            nextWL.get ().push_back (c);
           }
-
         },
         "applyOperator");
-
-
-    if (ForEachTraits<OpFunc>::NeedsPush) {
-      if (minElem != nullptr) {
-        delete minElem;
-        minElem = nullptr;
-      }
-    }
   }
 
 
   void execute_stable () {
-
-    CtxtWL* currWL = new CtxtWL ();
-    CtxtWL* nextWL = new CtxtWL ();
+    std::unique_ptr<CtxtWL> currWL(new CtxtWL);
+    std::unique_ptr<CtxtWL> nextWL(new CtxtWL);
 
     while (true) {
-
       prepareRound (currWL, nextWL);
 
       if (currWL->empty_all ()) {
         break;
       }
 
-      expandNhood (currWL);
+      expandNhood (*currWL);
 
-      applyOperator (currWL, nextWL);
+      applyOperator (*currWL, *nextWL);
       
     }
-
-    delete currWL; currWL = nullptr;
-    delete nextWL; nextWL = nullptr;
-
   }
 
   void printStats (void) {
@@ -445,9 +398,7 @@ namespace impl {
 template <typename T, typename Cmp, typename NhFunc, typename OpFunc, typename SL, typename WindowWL>
 
 class KDGtwoPhaseUnstableExecutor: public KDGtwoPhaseStableExecutor<T, Cmp, NhFunc, OpFunc, WindowWL>  {
-
   using Base = KDGtwoPhaseStableExecutor<T, Cmp, NhFunc, OpFunc, WindowWL>;
-
   using Ctxt = typename Base::Ctxt;
   using CtxtWL = typename Base::CtxtWL;
 
@@ -470,7 +421,6 @@ public:
   }
 
 protected:
-
   struct GetActive: public std::unary_function<Ctxt*, const T&> {
     const T& operator () (const Ctxt* c) const {
       assert (c != nullptr);
@@ -478,10 +428,9 @@ protected:
     }
   };
 
-  GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhood (CtxtWL* currWL) {
-
-    auto m_beg = boost::make_transform_iterator (currWL->begin_all (), GetActive ());
-    auto m_end = boost::make_transform_iterator (currWL->end_all (), GetActive ());
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhood (CtxtWL& currWL) {
+    auto m_beg = boost::make_transform_iterator (currWL.begin_all (), GetActive ());
+    auto m_end = boost::make_transform_iterator (currWL.end_all (), GetActive ());
 
     using UserCtxt = typename Base::UserCtxt;
 
@@ -489,7 +438,7 @@ protected:
     typename Base::PerThreadUserCtxt& uh = Base::userHandles;
     GAccumulator<size_t>& total = Base::total;
 
-    Galois::do_all_choice (currWL->begin_all (), currWL->end_all (),
+    Galois::do_all_choice (currWL.begin_all (), currWL.end_all (),
         [m_beg, m_end, &func, &uh, &total] (Ctxt* c) {
           UserCtxt& uhand = *uh.getLocal ();
           uhand.reset ();
@@ -536,9 +485,8 @@ protected:
   }
 
   void execute_unstable (void) {
-
-    CtxtWL* currWL = new CtxtWL ();
-    CtxtWL* nextWL = new CtxtWL ();
+    std::unique_ptr<CtxtWL> currWL(new CtxtWL);
+    std::unique_ptr<CtxtWL> nextWL(new CtxtWL);
 
     while (true) {
 
@@ -548,7 +496,7 @@ protected:
         break;
       }
 
-      expandNhood (currWL);
+      expandNhood (*currWL);
 
       for (auto i = currWL->begin_all ()
           , endi = currWL->end_all (); i != endi; ++i) {
@@ -558,12 +506,9 @@ protected:
         }
       }
 
-      Base::applyOperator (currWL, nextWL);
+      Base::applyOperator (*currWL, *nextWL);
       
     }
-
-    delete currWL; currWL = nullptr;
-    delete nextWL; nextWL = nullptr;
 
   }
 
