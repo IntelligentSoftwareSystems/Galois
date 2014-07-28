@@ -189,8 +189,13 @@ int findPCiter_int (const int node, V& repVec) {
     rep = repVec[rep]; 
   }
 
-  // path compress
-  for (int n = node; n != rep;) {
+  // // path compress
+  // for (int n = node; n != rep;) {
+    // int next = repVec[n];
+    // repVec[n] = rep;
+    // n = next;
+  // }
+  for (int n = node; n != rep; ) {
     repVec[n] = rep;
     n = repVec[n];
   }

@@ -159,9 +159,31 @@ struct FindLoop {
     if (ctx.src != ctx.dst) {
       claimAsMin (ctx, ctx.src);
       claimAsMin (ctx, ctx.dst);
+    }
 
-    }     
+    // int s = kruskal::getRep_int (ctx.src, repVec);
+    // int d = kruskal::getRep_int (ctx.dst, repVec);
+    // 
+    // if (s != d) {
+      // ctx.src = kruskal::findPCiter_int (ctx.src, repVec);
+      // ctx.dst = kruskal::findPCiter_int (ctx.dst, repVec);
+      // 
+      // claimAsMin (ctx, ctx.src);
+      // claimAsMin (ctx, ctx.dst);
+// 
+    // } else {
+      // ctx.src = s;
+      // ctx.dst = d;
+    // }
 
+    // ctx.src = kruskal::getRep_int (ctx.src, repVec);
+    // ctx.dst = kruskal::getRep_int (ctx.dst, repVec);
+    // 
+    // if (ctx.src != ctx.dst) {
+      // claimAsMin (ctx, ctx.src);
+      // claimAsMin (ctx, ctx.dst);
+    // }
+    
   }
 
   template <typename C>
