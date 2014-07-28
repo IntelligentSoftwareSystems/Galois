@@ -36,7 +36,7 @@
 namespace Galois {
 namespace WorkList {
 
-namespace {
+namespace detail {
 
 template<typename T, typename Index, bool UseBarrier>
 class OrderedByIntegerMetricData { 
@@ -116,7 +116,7 @@ template<class Indexer = DummyIndexer<int>, typename Container = dChunkedFIFO<>,
   typename Index=int,
   bool UseBarrier=false,
   bool Concurrent=true>
-struct OrderedByIntegerMetric : private boost::noncopyable, public OrderedByIntegerMetricData<T, Index, UseBarrier> {
+struct OrderedByIntegerMetric : private boost::noncopyable, public detail::OrderedByIntegerMetricData<T, Index, UseBarrier> {
   template<bool _concurrent>
   struct rethread { typedef OrderedByIntegerMetric<Indexer, typename Container::template rethread<_concurrent>::type, BlockPeriod, BSP, T, Index, UseBarrier, _concurrent> type; };
 
@@ -146,7 +146,7 @@ private:
   typedef Galois::flat_map<Index, CTy*> LMapTy;
   //typedef std::map<Index, CTy*> LMapTy;
 
-  struct ThreadData: public OrderedByIntegerMetricData<T, Index, UseBarrier>::ThreadData {
+  struct ThreadData: public detail::OrderedByIntegerMetricData<T, Index, UseBarrier>::ThreadData {
     LMapTy local;
     Index curIndex;
     Index scanStart;
