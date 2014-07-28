@@ -153,7 +153,11 @@ public:
     if (Steal && 2 * data.numStealFailures > Runtime::activeThreads)
       if ((item = pop_steal(data)))
         return item;
-    return inner.pop();
+    if ((item = inner.pop()))
+      return item;
+    if (Steal)
+      return pop_steal(data);
+    return item;
   }
 
   void push(const value_type& val) {
