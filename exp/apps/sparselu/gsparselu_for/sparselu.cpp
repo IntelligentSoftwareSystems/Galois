@@ -283,7 +283,7 @@ static Galois::LargeArray<Galois::Runtime::Lockable> locks;
 void sparselu_init (float ***pBENCH, char *pass)
 {
    Galois::setActiveThreads(bots_arg_size_2);
-   Galois::Runtime::getSystemThreadPool().burnPower(bots_arg_size_2);
+   //Galois::Runtime::getSystemThreadPool().burnPower(bots_arg_size_2);
    Galois::preAlloc(5*bots_arg_size_2);
    Galois::reportPageAlloc("MeminfoPre");
    *pBENCH = (float **) malloc(bots_arg_size*bots_arg_size*sizeof(float *));
@@ -417,71 +417,123 @@ struct Bmod {
 };
 
 struct FwdBdivBmod {
-  struct Initializer: public std::unary_function<int, int> {
-    int operator()(int arg) const { return arg; }
+  enum { SEEK, LU0, FWD, BDIV, BMOD };
+
+  struct Task {
+    int type;
+    int kk;
   };
 
-  typedef std::less<int> Comparator;
+  struct Initializer: public std::unary_function<int, Task> {
+    Task operator()(int arg) const { return { SEEK, arg }; }
+  };
+
+  struct Comparator {
+    bool operator()(const Task& t1, const Task& t2) const {
+      // SEEKS first
+      if (t1.type == SEEK || t2.type == SEEK) {
+        if (t1.type == SEEK && t2.type == SEEK)
+          return t1.kk < t2.kk;
+        return t1.type == SEEK;
+      }
+
+      if (t1.kk == t2.kk)
+        return t1.type < t2.type;
+      return t1.kk < t2.kk;
+    }
+  };
 
   struct NeighborhoodVisitor {
     float** BENCH;
 
     typedef int tt_does_not_need_push;
 
-    void operator()(int kk, Galois::UserContext<int>&) {
-      int ii, jj;
-      Galois::Runtime::acquire(&locks[kk*bots_arg_size+kk], Galois::MethodFlag::CHECK_CONFLICT);
-      for (jj=kk+1; jj<bots_arg_size; jj++)
-         if (BENCH[kk*bots_arg_size+jj] != NULL)
-         {
-            Galois::Runtime::acquire(&locks[kk*bots_arg_size+jj], Galois::MethodFlag::CHECK_CONFLICT);
-         }
-      for (ii=kk+1; ii<bots_arg_size; ii++) 
-         if (BENCH[ii*bots_arg_size+kk] != NULL)
-         {
-           Galois::Runtime::acquire(&locks[ii*bots_arg_size+kk], Galois::MethodFlag::CHECK_CONFLICT);
-         }
-      for (ii=kk+1; ii<bots_arg_size; ii++)
-         if (BENCH[ii*bots_arg_size+kk] != NULL)
-            for (jj=kk+1; jj<bots_arg_size; jj++)
-               if (BENCH[kk*bots_arg_size+jj] != NULL)
-               {
-                 Galois::Runtime::acquire(&locks[ii*bots_arg_size+kk], Galois::MethodFlag::CHECK_CONFLICT);
-                 Galois::Runtime::acquire(&locks[kk*bots_arg_size+jj], Galois::MethodFlag::CHECK_CONFLICT);
-                 Galois::Runtime::acquire(&locks[ii*bots_arg_size+jj], Galois::MethodFlag::CHECK_CONFLICT);
-               }
+    void acquire(int ii, int jj) {
+      Galois::Runtime::acquire(&locks[ii*bots_arg_size+jj], Galois::MethodFlag::CHECK_CONFLICT);
+    }
+
+    void operator()(const Task& t, Galois::UserContext<Task>&) {
+      int ii, jj, kk;
+      kk = t.kk;
+      switch (t.type) {
+        case SEEK: return;
+        case LU0: return acquire(kk, kk);
+        case FWD:
+          acquire(kk, kk);
+          for (jj=kk+1; jj<bots_arg_size; jj++)
+             if (BENCH[kk*bots_arg_size+jj] != NULL)
+             {
+                acquire(kk, jj);
+             }
+          return;
+        case BDIV:
+          acquire(kk, kk);
+          for (ii=kk+1; ii<bots_arg_size; ii++) 
+             if (BENCH[ii*bots_arg_size+kk] != NULL)
+             {
+               acquire(ii, kk);
+             }
+          return;
+        case BMOD:
+          for (ii=kk+1; ii<bots_arg_size; ii++)
+             if (BENCH[ii*bots_arg_size+kk] != NULL)
+                for (jj=kk+1; jj<bots_arg_size; jj++)
+                   if (BENCH[kk*bots_arg_size+jj] != NULL)
+                   {
+                     acquire(ii, kk);
+                     acquire(kk, jj);
+                     acquire(ii, jj);
+                   }
+          return;
+      }
     }
   };
 
   struct Process {
     static const int CHUNK_SIZE = 1;
 
-    typedef int tt_does_not_need_push;
     typedef int tt_does_not_need_aborts;
 
     float** BENCH;
 
-    void operator()(int kk, Galois::UserContext<int>&) {
-      int ii, jj;
-      lu0(BENCH[kk*bots_arg_size+kk]);
-      for (jj=kk+1; jj<bots_arg_size; jj++)
-         if (BENCH[kk*bots_arg_size+jj] != NULL)
-         {
-            fwd(BENCH[kk*bots_arg_size+kk], BENCH[kk*bots_arg_size+jj]);
-         }
-      for (ii=kk+1; ii<bots_arg_size; ii++) 
-         if (BENCH[ii*bots_arg_size+kk] != NULL)
-         {
-            bdiv (BENCH[kk*bots_arg_size+kk], BENCH[ii*bots_arg_size+kk]);
-         }
-      for (ii=kk+1; ii<bots_arg_size; ii++)
-         if (BENCH[ii*bots_arg_size+kk] != NULL)
-            for (jj=kk+1; jj<bots_arg_size; jj++)
-               if (BENCH[kk*bots_arg_size+jj] != NULL)
-               {
-                     if (BENCH[ii*bots_arg_size+jj]==NULL) BENCH[ii*bots_arg_size+jj] = allocate_clean_block();
-                     bmod(BENCH[ii*bots_arg_size+kk], BENCH[kk*bots_arg_size+jj], BENCH[ii*bots_arg_size+jj]);
-               }
+    void operator()(const Task& t, Galois::UserContext<Task>& ctx) {
+      int ii, jj, kk;
+      kk = t.kk;
+
+      switch (t.type) {
+        case SEEK:
+          ctx.push(Task { LU0, kk });
+          ctx.push(Task { FWD, kk });
+          ctx.push(Task { BDIV, kk });
+          ctx.push(Task { BMOD, kk });
+          return;
+        case LU0:
+          return lu0(BENCH[kk*bots_arg_size+kk]);
+        case FWD:
+          for (jj=kk+1; jj<bots_arg_size; jj++)
+             if (BENCH[kk*bots_arg_size+jj] != NULL)
+             {
+                fwd(BENCH[kk*bots_arg_size+kk], BENCH[kk*bots_arg_size+jj]);
+             }
+          return;
+        case BDIV:
+          for (ii=kk+1; ii<bots_arg_size; ii++) 
+             if (BENCH[ii*bots_arg_size+kk] != NULL)
+             {
+                bdiv (BENCH[kk*bots_arg_size+kk], BENCH[ii*bots_arg_size+kk]);
+             }
+          return;
+        case BMOD:
+          for (ii=kk+1; ii<bots_arg_size; ii++)
+             if (BENCH[ii*bots_arg_size+kk] != NULL)
+                for (jj=kk+1; jj<bots_arg_size; jj++)
+                   if (BENCH[kk*bots_arg_size+jj] != NULL)
+                   {
+                         if (BENCH[ii*bots_arg_size+jj]==NULL) BENCH[ii*bots_arg_size+jj] = allocate_clean_block();
+                         bmod(BENCH[ii*bots_arg_size+kk], BENCH[kk*bots_arg_size+jj], BENCH[ii*bots_arg_size+jj]);
+                   }
+          return;
+      }
     }
   };
 };
@@ -532,13 +584,13 @@ void sparselu_par_call(float **BENCH)
   //bs_algo(BENCH);
   ikdg_algo(BENCH);
   bots_message(" completed!\n");
+  Galois::reportPageAlloc("MeminfoPost");
   T.stop();
 }
 
 void sparselu_fini (float **BENCH, char *pass)
 {
-   Galois::Runtime::getSystemThreadPool().beKind();
-   Galois::reportPageAlloc("MeminfoPost");
+   //Galois::Runtime::getSystemThreadPool().beKind();
    print_structure(pass, BENCH);
    locks.destroy();
    locks.deallocate();
