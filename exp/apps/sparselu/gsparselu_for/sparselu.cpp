@@ -29,6 +29,9 @@
 
 #include "Galois/Galois.h"
 #include "Galois/Statistic.h"
+#include "Galois/LargeArray.h"
+#include "Galois/Graph/FileGraph.h"
+#include "Galois/Runtime/KDGtwoPhase.h"
 #include <boost/iterator/transform_iterator.hpp>
 #include <boost/iterator/counting_iterator.hpp>
 
@@ -66,10 +69,11 @@ int checkmat (float *M, float *N)
    }
    return TRUE;
 }
+
 /***********************************************************************
  * genmat: 
  **********************************************************************/
-void genmat (float *M[])
+static void synthetic_genmat (float *M[])
 {
    int null_entry, init_val, i, j, ii, jj;
    float *p;
@@ -89,8 +93,8 @@ void genmat (float *M[])
 	 if (ii%2==1) null_entry = TRUE;
 	 if (jj%2==1) null_entry = TRUE;
 	 if (ii==jj) null_entry = FALSE;
-	 if (ii==jj-1) null_entry = FALSE; // XXX comment this out to get non-bulk sync structure
-         if (ii-1 == jj) null_entry = FALSE; // XXX ditto
+	 if (ii==jj-1) null_entry = FALSE;
+         if (ii-1 == jj) null_entry = FALSE;
          /* allocating matrix */
          if (null_entry == FALSE){
             a++;
@@ -121,6 +125,67 @@ void genmat (float *M[])
    }
    bots_debug("allo = %d, no = %d, total = %d, factor = %f\n",a,b,a+b,(float)((float)a/(float)(a+b)));
 }
+
+
+static void structure_from_file_genmat (float *M[])
+{
+   int null_entry, init_val, i, j, ii, jj;
+   float *p;
+   int a=0,b=0;
+   Galois::Graph::FileGraph g;
+   int num_blocks, max_id;
+
+   g.fromFile(bots_exec_message);
+   memset(M, 0, bots_arg_size*bots_arg_size*sizeof(*M));
+
+   num_blocks = (g.size() + bots_arg_size_1 - 1) / bots_arg_size_1;
+   max_id = bots_arg_size_1 * bots_arg_size;
+
+   init_val = 1325;
+
+   printf("full size: %d\n", num_blocks);
+
+   /* generating the structure */
+   for (auto ii : g)
+   {
+      if (ii >= max_id)
+         break;
+      int bii = ii / bots_arg_size_1;
+      for (auto edge : g.out_edges(ii))
+      {
+         /* computing null entries */
+         int jj = g.getEdgeDst(edge);
+         if (jj >= max_id)
+            continue;
+         int bjj = jj / bots_arg_size_1;
+         if (M[bii*bots_arg_size+bjj] == NULL)
+         {
+            a++;
+            M[bii*bots_arg_size+bjj] = (float *) malloc(bots_arg_size_1*bots_arg_size_1*sizeof(float));
+            memset(M[bii*bots_arg_size+bjj], 0, bots_arg_size_1*bots_arg_size_1*sizeof(float));
+         }
+         if (M[bii*bots_arg_size+bjj] == NULL)
+         {
+            bots_message("Error: Out of memory\n");
+            exit(101);
+         }
+         //init_val = (3125 * init_val) % 65536;
+         //float p = (float)((init_val - 32768.0) / 16384.0);
+         M[bii*bots_arg_size+bjj][(ii%bots_arg_size_1)*bots_arg_size_1+(jj%bots_arg_size_1)] = g.getEdgeData<float>(edge);
+      }
+   }
+   b = num_blocks * num_blocks - a;
+   bots_debug("allo = %d, no = %d, total = %d, factor = %f\n",a,b,a+b,(float)((float)a/(float)(a+b)));
+   printf("allo = %d, no = %d, total = %d, factor = %f\n",a,b,a+b,(float)((float)a/(float)(a+b)));
+}
+
+void genmat (float *M[])
+{
+  //synthetic_genmat(M);
+  structure_from_file_genmat(M);
+}
+
+
 /***********************************************************************
  * print_structure: 
  **********************************************************************/
@@ -213,6 +278,8 @@ void fwd(float *diag, float *col)
             col[i*bots_arg_size_1+j] = col[i*bots_arg_size_1+j] - diag[i*bots_arg_size_1+k]*col[k*bots_arg_size_1+j];
 }
 
+static Galois::LargeArray<Galois::Runtime::Lockable> locks;
+
 void sparselu_init (float ***pBENCH, char *pass)
 {
    Galois::setActiveThreads(bots_arg_size_2);
@@ -222,8 +289,10 @@ void sparselu_init (float ***pBENCH, char *pass)
    *pBENCH = (float **) malloc(bots_arg_size*bots_arg_size*sizeof(float *));
    genmat(*pBENCH);
    print_structure(pass, *pBENCH);
+   //locks.allocateInterleaved(bots_arg_size*bots_arg_size); XXX
+   locks.allocateLocal(bots_arg_size*bots_arg_size);
+   locks.construct();
 }
-
 
 void sparselu_seq_call(float **BENCH)
 {
@@ -347,17 +416,82 @@ struct Bmod {
   }
 };
 
-void sparselu_par_call(float **BENCH)
+struct FwdBdivBmod {
+  struct Initializer: public std::unary_function<int, int> {
+    int operator()(int arg) const { return arg; }
+  };
+
+  typedef std::less<int> Comparator;
+
+  struct NeighborhoodVisitor {
+    float** BENCH;
+
+    typedef int tt_does_not_need_push;
+
+    void operator()(int kk, Galois::UserContext<int>&) {
+      int ii, jj;
+      Galois::Runtime::acquire(&locks[kk*bots_arg_size+kk], Galois::MethodFlag::CHECK_CONFLICT);
+      for (jj=kk+1; jj<bots_arg_size; jj++)
+         if (BENCH[kk*bots_arg_size+jj] != NULL)
+         {
+            Galois::Runtime::acquire(&locks[kk*bots_arg_size+jj], Galois::MethodFlag::CHECK_CONFLICT);
+         }
+      for (ii=kk+1; ii<bots_arg_size; ii++) 
+         if (BENCH[ii*bots_arg_size+kk] != NULL)
+         {
+           Galois::Runtime::acquire(&locks[ii*bots_arg_size+kk], Galois::MethodFlag::CHECK_CONFLICT);
+         }
+      for (ii=kk+1; ii<bots_arg_size; ii++)
+         if (BENCH[ii*bots_arg_size+kk] != NULL)
+            for (jj=kk+1; jj<bots_arg_size; jj++)
+               if (BENCH[kk*bots_arg_size+jj] != NULL)
+               {
+                 Galois::Runtime::acquire(&locks[ii*bots_arg_size+kk], Galois::MethodFlag::CHECK_CONFLICT);
+                 Galois::Runtime::acquire(&locks[kk*bots_arg_size+jj], Galois::MethodFlag::CHECK_CONFLICT);
+                 Galois::Runtime::acquire(&locks[ii*bots_arg_size+jj], Galois::MethodFlag::CHECK_CONFLICT);
+               }
+    }
+  };
+
+  struct Process {
+    static const int CHUNK_SIZE = 1;
+
+    typedef int tt_does_not_need_push;
+    typedef int tt_does_not_need_aborts;
+
+    float** BENCH;
+
+    void operator()(int kk, Galois::UserContext<int>&) {
+      int ii, jj;
+      lu0(BENCH[kk*bots_arg_size+kk]);
+      for (jj=kk+1; jj<bots_arg_size; jj++)
+         if (BENCH[kk*bots_arg_size+jj] != NULL)
+         {
+            fwd(BENCH[kk*bots_arg_size+kk], BENCH[kk*bots_arg_size+jj]);
+         }
+      for (ii=kk+1; ii<bots_arg_size; ii++) 
+         if (BENCH[ii*bots_arg_size+kk] != NULL)
+         {
+            bdiv (BENCH[kk*bots_arg_size+kk], BENCH[ii*bots_arg_size+kk]);
+         }
+      for (ii=kk+1; ii<bots_arg_size; ii++)
+         if (BENCH[ii*bots_arg_size+kk] != NULL)
+            for (jj=kk+1; jj<bots_arg_size; jj++)
+               if (BENCH[kk*bots_arg_size+jj] != NULL)
+               {
+                     if (BENCH[ii*bots_arg_size+jj]==NULL) BENCH[ii*bots_arg_size+jj] = allocate_clean_block();
+                     bmod(BENCH[ii*bots_arg_size+kk], BENCH[kk*bots_arg_size+jj], BENCH[ii*bots_arg_size+jj]);
+               }
+    }
+  };
+};
+
+static void bs_algo(float **BENCH)
 {
   int ii, jj, kk;
 
-  Galois::StatManager manager;
-
-  bots_message("Computing SparseLU Factorization (%dx%d matrix with %dx%d blocks) ",
-          bots_arg_size,bots_arg_size,bots_arg_size_1,bots_arg_size_1);
-
   namespace ww = Galois::WorkList;
-  typedef Galois::WorkList::StableIterator<>::with_container<ww::dChunkedLIFO<1>>::type WL;
+  typedef ww::StableIterator<>::with_container<ww::dChunkedLIFO<1>>::type WL;
 
   for (kk=0; kk<bots_arg_size; kk++) {
     lu0(BENCH[kk*bots_arg_size+kk]);
@@ -372,7 +506,33 @@ void sparselu_par_call(float **BENCH)
         boost::transform_iterator<Bmod::Initializer, boost::counting_iterator<int>>(bots_arg_size),
         Bmod { BENCH, kk }, Galois::wl<WL>());
   }
+}
+
+static void ikdg_algo(float **BENCH)
+{
+  int kk;
+  typedef boost::transform_iterator<FwdBdivBmod::Initializer, boost::counting_iterator<int>> TI;
+
+  Galois::Runtime::for_each_ordered_2p_win(
+      Galois::Runtime::makeStandardRange(TI(0), TI(bots_arg_size)),
+      FwdBdivBmod::Comparator { },
+      FwdBdivBmod::NeighborhoodVisitor { BENCH },
+      FwdBdivBmod::Process { BENCH });
+}
+
+void sparselu_par_call(float **BENCH)
+{
+  Galois::StatManager manager;
+  Galois::StatTimer T;
+
+  T.start();
+  bots_message("Computing SparseLU Factorization (%dx%d matrix with %dx%d blocks) ",
+          bots_arg_size,bots_arg_size,bots_arg_size_1,bots_arg_size_1);
+
+  //bs_algo(BENCH);
+  ikdg_algo(BENCH);
   bots_message(" completed!\n");
+  T.stop();
 }
 
 void sparselu_fini (float **BENCH, char *pass)
@@ -380,6 +540,8 @@ void sparselu_fini (float **BENCH, char *pass)
    Galois::Runtime::getSystemThreadPool().beKind();
    Galois::reportPageAlloc("MeminfoPost");
    print_structure(pass, BENCH);
+   locks.destroy();
+   locks.deallocate();
 }
 
 int sparselu_check(float **SEQ, float **BENCH)
