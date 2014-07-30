@@ -35,6 +35,8 @@
 #include <boost/iterator/transform_iterator.hpp>
 #include <boost/iterator/counting_iterator.hpp>
 
+extern char bots_arg_file[256];
+
 /***********************************************************************
  * checkmat: 
  **********************************************************************/
@@ -135,7 +137,7 @@ static void structure_from_file_genmat (float *M[])
    Galois::Graph::FileGraph g;
    int num_blocks, max_id;
 
-   g.fromFile(bots_exec_message);
+   g.fromFile(bots_arg_file);
    memset(M, 0, bots_arg_size*bots_arg_size*sizeof(*M));
 
    num_blocks = (g.size() + bots_arg_size_1 - 1) / bots_arg_size_1;
@@ -176,13 +178,14 @@ static void structure_from_file_genmat (float *M[])
    }
    b = num_blocks * num_blocks - a;
    bots_debug("allo = %d, no = %d, total = %d, factor = %f\n",a,b,a+b,(float)((float)a/(float)(a+b)));
-   printf("allo = %d, no = %d, total = %d, factor = %f\n",a,b,a+b,(float)((float)a/(float)(a+b)));
 }
 
 void genmat (float *M[])
 {
-  //synthetic_genmat(M);
-  structure_from_file_genmat(M);
+  if (strlen(bots_arg_file) == 0)
+    synthetic_genmat(M);
+  else
+    structure_from_file_genmat(M);
 }
 
 
@@ -283,7 +286,7 @@ static Galois::LargeArray<Galois::Runtime::Lockable> locks;
 void sparselu_init (float ***pBENCH, char *pass)
 {
    Galois::setActiveThreads(bots_arg_size_2);
-   //Galois::Runtime::getSystemThreadPool().burnPower(bots_arg_size_2);
+   Galois::Runtime::getSystemThreadPool().burnPower(bots_arg_size_2);
    Galois::preAlloc(5*bots_arg_size_2);
    Galois::reportPageAlloc("MeminfoPre");
    *pBENCH = (float **) malloc(bots_arg_size*bots_arg_size*sizeof(float *));
@@ -417,29 +420,32 @@ struct Bmod {
 };
 
 struct FwdBdivBmod {
-  enum { SEEK, LU0, FWD, BDIV, BMOD };
+  enum { LU0, FWD, BDIV, BMOD };
 
   struct Task {
     int type;
     int kk;
+    int arg0;
+    int arg1;
   };
 
   struct Initializer: public std::unary_function<int, Task> {
-    Task operator()(int arg) const { return { SEEK, arg }; }
+    Task operator()(int kk) const { return { LU0, kk, 0, 0 }; }
   };
 
   struct Comparator {
     bool operator()(const Task& t1, const Task& t2) const {
-      // SEEKS first
-      if (t1.type == SEEK || t2.type == SEEK) {
-        if (t1.type == SEEK && t2.type == SEEK)
-          return t1.kk < t2.kk;
-        return t1.type == SEEK;
-      }
-
+      // Lexicographic (kk, type, arg0, arg1)
       if (t1.kk == t2.kk)
-        return t1.type < t2.type;
-      return t1.kk < t2.kk;
+        if (t1.type == t2.type)
+          if (t1.arg0 == t2.arg1)
+            return t1.arg1 < t2.arg1;
+          else
+            return t1.arg0 < t2.arg0;
+        else
+          return t1.type < t2.type;
+      else
+        return t1.kk < t2.kk;
     }
   };
 
@@ -453,37 +459,50 @@ struct FwdBdivBmod {
     }
 
     void operator()(const Task& t, Galois::UserContext<Task>&) {
-      int ii, jj, kk;
-      kk = t.kk;
+      int ii, jj, kk = t.kk;
       switch (t.type) {
-        case SEEK: return;
-        case LU0: return acquire(kk, kk);
-        case FWD:
+        case LU0:
           acquire(kk, kk);
-          for (jj=kk+1; jj<bots_arg_size; jj++)
-             if (BENCH[kk*bots_arg_size+jj] != NULL)
-             {
+          for (jj=kk+1; jj<bots_arg_size; jj++) {
+             if (BENCH[kk*bots_arg_size+jj] != NULL) {
                 acquire(kk, jj);
              }
-          return;
-        case BDIV:
-          acquire(kk, kk);
-          for (ii=kk+1; ii<bots_arg_size; ii++) 
-             if (BENCH[ii*bots_arg_size+kk] != NULL)
-             {
+          }
+          for (ii=kk+1; ii<bots_arg_size; ii++) {
+             if (BENCH[ii*bots_arg_size+kk] != NULL) {
                acquire(ii, kk);
              }
-          return;
-        case BMOD:
-          for (ii=kk+1; ii<bots_arg_size; ii++)
-             if (BENCH[ii*bots_arg_size+kk] != NULL)
-                for (jj=kk+1; jj<bots_arg_size; jj++)
-                   if (BENCH[kk*bots_arg_size+jj] != NULL)
-                   {
-                     acquire(ii, kk);
+          }
+          for (ii=kk+1; ii<bots_arg_size; ii++) {
+             if (BENCH[ii*bots_arg_size+kk] != NULL) {
+                acquire(ii, kk);
+                for (jj=kk+1; jj<bots_arg_size; jj++) {
+                   if (BENCH[kk*bots_arg_size+jj] != NULL) {
                      acquire(kk, jj);
                      acquire(ii, jj);
                    }
+                }
+             }
+          }
+          return;
+        case FWD:
+          acquire(kk, t.arg0);
+          for (ii=kk+1; ii<bots_arg_size; ii++) {
+             if (BENCH[ii*bots_arg_size+kk] != NULL) {
+                acquire(ii, t.arg0);
+             }
+          }
+          return;
+        case BDIV:
+          acquire(t.arg0, kk);
+          for (jj=kk+1; jj<bots_arg_size; jj++) {
+             if (BENCH[kk*bots_arg_size+jj] != NULL) {
+                acquire(t.arg0, jj);
+             }
+          }
+          return;
+        case BMOD:
+          acquire(t.arg0, t.arg1);
           return;
       }
     }
@@ -497,42 +516,39 @@ struct FwdBdivBmod {
     float** BENCH;
 
     void operator()(const Task& t, Galois::UserContext<Task>& ctx) {
-      int ii, jj, kk;
-      kk = t.kk;
+      int ii, jj, kk = t.kk;
 
       switch (t.type) {
-        case SEEK:
-          ctx.push(Task { LU0, kk });
-          ctx.push(Task { FWD, kk });
-          ctx.push(Task { BDIV, kk });
-          ctx.push(Task { BMOD, kk });
-          return;
         case LU0:
-          return lu0(BENCH[kk*bots_arg_size+kk]);
-        case FWD:
-          for (jj=kk+1; jj<bots_arg_size; jj++)
-             if (BENCH[kk*bots_arg_size+jj] != NULL)
-             {
-                fwd(BENCH[kk*bots_arg_size+kk], BENCH[kk*bots_arg_size+jj]);
+          lu0(BENCH[kk*bots_arg_size+kk]);
+          for (ii=kk+1; ii<bots_arg_size; ii++) {
+             if (BENCH[ii*bots_arg_size+kk] != NULL) {
+                ctx.push(Task { BDIV, kk, ii, 0 });
              }
-          return;
-        case BDIV:
-          for (ii=kk+1; ii<bots_arg_size; ii++) 
-             if (BENCH[ii*bots_arg_size+kk] != NULL)
-             {
-                bdiv (BENCH[kk*bots_arg_size+kk], BENCH[ii*bots_arg_size+kk]);
+          }
+          for (jj=kk+1; jj<bots_arg_size; jj++) {
+             if (BENCH[kk*bots_arg_size+jj] != NULL) {
+                ctx.push(Task { FWD, kk, jj, 0 });
              }
-          return;
-        case BMOD:
-          for (ii=kk+1; ii<bots_arg_size; ii++)
-             if (BENCH[ii*bots_arg_size+kk] != NULL)
-                for (jj=kk+1; jj<bots_arg_size; jj++)
-                   if (BENCH[kk*bots_arg_size+jj] != NULL)
-                   {
-                         if (BENCH[ii*bots_arg_size+jj]==NULL) BENCH[ii*bots_arg_size+jj] = allocate_clean_block();
-                         bmod(BENCH[ii*bots_arg_size+kk], BENCH[kk*bots_arg_size+jj], BENCH[ii*bots_arg_size+jj]);
+          }
+          for (ii=kk+1; ii<bots_arg_size; ii++) {
+             if (BENCH[ii*bots_arg_size+kk] != NULL) {
+                for (jj=kk+1; jj<bots_arg_size; jj++) {
+                   if (BENCH[kk*bots_arg_size+jj] != NULL) {
+                      if (BENCH[ii*bots_arg_size+jj]==NULL)
+                         BENCH[ii*bots_arg_size+jj] = allocate_clean_block();
+                      ctx.push(Task { BMOD, kk, ii, jj });
                    }
+                }
+             }
+          }
           return;
+        case FWD:
+          return fwd(BENCH[kk*bots_arg_size+kk], BENCH[kk*bots_arg_size+t.arg0]);
+        case BDIV:
+          return bdiv(BENCH[kk*bots_arg_size+kk], BENCH[t.arg0*bots_arg_size+kk]);
+        case BMOD:
+          return bmod(BENCH[t.arg0*bots_arg_size+kk], BENCH[kk*bots_arg_size+t.arg1], BENCH[t.arg0*bots_arg_size+t.arg1]);
       }
     }
   };
@@ -580,9 +596,10 @@ void sparselu_par_call(float **BENCH)
   T.start();
   bots_message("Computing SparseLU Factorization (%dx%d matrix with %dx%d blocks) ",
           bots_arg_size,bots_arg_size,bots_arg_size_1,bots_arg_size_1);
-
-  //bs_algo(BENCH);
-  ikdg_algo(BENCH);
+  if (bots_app_cutoff_value_1 == 0)
+    bs_algo(BENCH);
+  else
+    ikdg_algo(BENCH);
   bots_message(" completed!\n");
   Galois::reportPageAlloc("MeminfoPost");
   T.stop();
@@ -590,7 +607,7 @@ void sparselu_par_call(float **BENCH)
 
 void sparselu_fini (float **BENCH, char *pass)
 {
-   //Galois::Runtime::getSystemThreadPool().beKind();
+   Galois::Runtime::getSystemThreadPool().beKind();
    print_structure(pass, BENCH);
    locks.destroy();
    locks.deallocate();

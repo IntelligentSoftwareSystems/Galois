@@ -18,42 +18,34 @@
 /*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA            */
 /**********************************************************************************************/
 
-#include "omp-tasks-app.h"
+#define BOTS_PARAM_TYPE_NONE 0
+#define BOTS_PARAM_TYPE_INT 1
+#define BOTS_PARAM_TYPE_BOOL 2
+#define BOTS_PARAM_TYPE_STR 3
 
-#define BOTS_APP_NAME "SparseLU (For version)"
-#define BOTS_APP_PARAMETERS_DESC "S1=%dx%d, S2=%dx%d"
-#define BOTS_APP_PARAMETERS_LIST ,bots_arg_size,bots_arg_size,bots_arg_size_1,bots_arg_size_1
-
-#define BOTS_APP_USES_ARG_SIZE
-#define BOTS_APP_DEF_ARG_SIZE 50
-#define BOTS_APP_DESC_ARG_SIZE "Matrix Size"
-
-#define BOTS_APP_USES_ARG_SIZE_1
-#define BOTS_APP_DEF_ARG_SIZE_1 100
-#define BOTS_APP_DESC_ARG_SIZE_1 "Submatrix Size"
-
-#define BOTS_APP_INIT float **SEQ,**BENCH;
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-void sparselu_init(float ***pM, char *pass);
-void sparselu_fini(float **M, char *pass);
-void sparselu_seq_call(float **SEQ);
-void sparselu_par_call(float **BENCH);
-int sparselu_check(float **SEQ, float **BENCH);
-#ifdef __cplusplus
-}
+#ifdef _OPENMP
+# include <omp.h>
+#else
+# define omp_get_max_threads()  1
+# define omp_get_thread_num()   0
+# define omp_set_num_threads(x)
 #endif
 
-#define KERNEL_INIT sparselu_init(&BENCH,"benchmark");
-#define KERNEL_CALL sparselu_par_call(BENCH);
-#define KERNEL_FINI sparselu_fini(BENCH,"benchmark");
+void bots_print_usage(void);
+void bots_print_usage_option(char opt, int type, char* description, char *val, int subc, char **subv);
 
-#define KERNEL_SEQ_INIT sparselu_init(&SEQ,"serial");
-#define KERNEL_SEQ_CALL sparselu_seq_call(SEQ);
-#define KERNEL_SEQ_FINI sparselu_fini(SEQ,"serial");
+/***********************************************************************
+ * BENCHMARK HEADERS 
+ *********************************************************************/
+void bots_initialize();
+void bots_finalize();
+void bots_sequential_ini();
+long bots_sequential();
+void bots_sequential_fini();
+int bots_check_result();
+void bots_print_usage_specific();
+void bots_get_params_specific(int argc, char **argv);
+void bots_set_info();
 
-#define BOTS_APP_CHECK_USES_SEQ_RESULT
-#define KERNEL_CHECK sparselu_check(SEQ,BENCH);
-
+void bots_get_params_common(int argc, char **argv);
+void bots_get_params(int argc, char **argv);
