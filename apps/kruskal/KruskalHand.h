@@ -41,6 +41,11 @@ static cll::opt<unsigned> lowThresh (
     cll::desc ("low parallelism factor for workList refill in window executor"),
     cll::init (16));
 
+static cll::opt<bool> split (
+    "split",
+    cll::desc ("Split edges into light and heavy"),
+    cll::init (false));
+
 namespace kruskal {
 
 
@@ -52,8 +57,13 @@ class KruskalHand: public Kruskal {
   virtual void runMST (const size_t numNodes, const VecEdge& edges,
       size_t& mstWeight, size_t& totalIter) {
 
-    runMSTsimple (numNodes, edges, mstWeight, totalIter, UnionFindWindow (maxRounds, lowThresh));
+    if (split) {
+      runMSTfilter (numNodes, edges, mstWeight, totalIter, UnionFindWindow (maxRounds, lowThresh));
 
+    } else {
+
+      runMSTsimple (numNodes, edges, mstWeight, totalIter, UnionFindWindow (maxRounds, lowThresh));
+    }
   }
 };
 

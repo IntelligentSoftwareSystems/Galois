@@ -635,6 +635,218 @@ void runMSTsimple (const size_t numNodes, const VecEdge& edges,
   Galois::Runtime::getSystemThreadPool ().beKind ();
 }
 
+template <typename Iter>
+Edge pick_kth_internal (Iter b, Iter e, const typename std::iterator_traits<Iter>::difference_type k) {
+  typedef typename std::iterator_traits<Iter>::difference_type Dist_ty;
+  assert (std::distance (b, e) > k);
+
+  std::sort (b, e, Cmp ());
+
+  return *(b + k);
+}
+
+template <typename Iter>
+Edge pick_kth (Iter b, Iter e, const typename std::iterator_traits<Iter>::difference_type k) {
+  typedef typename std::iterator_traits<Iter>::difference_type Dist_ty;
+
+  static const size_t MAX_SAMPLE_SIZE = 1024;
+
+  Dist_ty total = std::distance (b, e);
+  assert (total > 0);
+
+  if (size_t (total) < MAX_SAMPLE_SIZE) {
+
+    std::vector<Edge> sampleSet (b, e);
+    return pick_kth_internal (sampleSet.begin (), sampleSet.end (), k);
+
+  } else {
+
+    size_t step = (total + MAX_SAMPLE_SIZE - 1)  / MAX_SAMPLE_SIZE; // round up;
+
+    std::vector<Edge> sampleSet;
+
+    size_t numSamples = total / step;
+
+    for (Iter i = b; i != e; std::advance (i, step)) {
+
+      if (sampleSet.size () == numSamples) {
+        break;
+      }
+
+      sampleSet.push_back (*i);
+    }
+
+    assert (numSamples == sampleSet.size ());
+    assert (numSamples <= MAX_SAMPLE_SIZE);
+
+    Dist_ty sample_k = k / step;
+
+    return pick_kth_internal (sampleSet.begin (), sampleSet.end (), sample_k);
+  }
+
+}
+
+
+struct Partition {
+  Edge pivot;
+  EdgeCtxWL& lighter;
+  EdgeWL& heavier;
+
+  Partition (
+      const Edge& pivot,
+      EdgeCtxWL& lighter,
+      EdgeWL& heavier)
+    :
+      pivot (pivot),
+      lighter (lighter),
+      heavier (heavier)
+  {}
+
+
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (const Edge& edge) const {
+
+    if (Cmp::compare (edge, pivot) <= 0) { // edge <= pivot
+      EdgeCtx ctx (edge);
+
+      lighter.get ().push_back (ctx);
+
+    } else {
+      heavier.get ().push_back (edge);
+    }
+  }
+};
+
+
+template <typename Iter> 
+void partition_edges (Iter b, Iter e, 
+    const typename std::iterator_traits<Iter>::difference_type k,
+    EdgeCtxWL& lighter, EdgeWL& heavier) {
+
+  assert (b != e);
+
+
+  size_t old_sz = lighter.size_all () + heavier.size_all ();
+
+  Edge pivot = pick_kth (b, e, k);
+
+  Galois::do_all (b, e, 
+      Partition (pivot, lighter, heavier), 
+      Galois::do_all_steal (false),
+      Galois::loopname ("partition_loop"));
+
+  assert ((lighter.size_all () + heavier.size_all ()) == old_sz + size_t (std::distance (b, e)));
+
+  // TODO: print here
+  std::printf ("total size = %ld, input index = %ld\n", std::distance (b, e), k);
+  std::printf ("lighter size = %zd, heavier size = %zd\n", 
+      lighter.size_all (), heavier.size_all ());
+
+}
+
+template <typename WL>
+struct FilterSelfEdges {
+  VecRep_ty& repVec;
+  WL& filterWL;
+
+  FilterSelfEdges (
+      VecRep_ty& repVec, 
+      WL& filterWL)
+    : 
+      repVec (repVec), 
+      filterWL (filterWL) 
+  {}
+
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (const Edge& edge) {
+
+    int rep1 = findPCiter_int (edge.src, repVec);
+    int rep2 = findPCiter_int (edge.dst, repVec);
+
+    if (rep1 != rep2) {
+      filterWL.get ().push_back (edge);
+    }
+  }
+};
+
+template <typename UF>
+void runMSTfilter (const size_t numNodes, const VecEdge& edges,
+    size_t& mstWeight, size_t& totalIter, UF ufLoop) {
+
+  totalIter = 0;
+  mstWeight = 0;
+
+  Galois::TimeAccumulator runningTime;
+  Galois::TimeAccumulator partitionTimer;
+  Galois::TimeAccumulator sortTimer;
+  Galois::TimeAccumulator findTimer;
+  Galois::TimeAccumulator linkUpTimer;
+  Galois::TimeAccumulator filterTimer;
+
+  Accumulator findIter;
+  Accumulator linkUpIter;
+
+
+
+  VecRep_ty repVec (numNodes);
+  VecAtomicCtxPtr repOwnerCtxVec (numNodes);
+  Galois::do_all (
+      boost::counting_iterator<size_t>(0),
+      boost::counting_iterator<size_t>(numNodes),
+      [&repVec, &repOwnerCtxVec] (size_t i) {
+        repVec.initialize (i, -1);
+        repOwnerCtxVec.initialize (i, AtomicCtxPtr(nullptr));
+      },
+      Galois::do_all_steal (false),
+      Galois::loopname ("init-vectors"));
+
+
+
+
+  runningTime.start ();
+
+  partitionTimer.start ();
+
+  EdgeCtxWL lighter;
+  EdgeWL heavier;
+
+  typedef std::iterator_traits<VecEdge::iterator>::difference_type Dist_ty;
+  Dist_ty splitPoint = numNodes;
+  lighter.reserve_all (numNodes / Galois::getActiveThreads ());
+  assert (edges.size () >= numNodes);
+  heavier.reserve_all (numNodes / Galois::getActiveThreads ());
+  partition_edges (edges.begin (), edges.end (), splitPoint, lighter, heavier);
+
+  partitionTimer.stop ();
+
+  ufLoop (lighter, repVec, repOwnerCtxVec, 
+      mstWeight, totalIter, sortTimer, findTimer, linkUpTimer, findIter, linkUpIter);
+
+
+  // reuse lighter for filterWL
+  lighter.clear_all ();
+
+  filterTimer.start ();
+  Galois::do_all_local (heavier,
+      FilterSelfEdges<EdgeCtxWL> (repVec, lighter),
+      Galois::do_all_steal (true),
+      Galois::loopname ("filter_loop"));
+  filterTimer.stop ();
+
+
+  ufLoop (lighter, repVec, repOwnerCtxVec, 
+      mstWeight, totalIter, sortTimer, findTimer, linkUpTimer, findIter, linkUpIter);
+  runningTime.stop ();
+
+  std::cout << "Number of FindLoop iterations = " << findIter.reduce () << std::endl;
+  std::cout << "Number of LinkUpLoop iterations = " << linkUpIter.reduce () << std::endl;
+
+  std::cout << "MST running time without initialization/destruction: " << runningTime.get () << std::endl;
+  std::cout << "Time taken by presort: " << sortTimer.get () << std::endl;
+  std::cout << "Time taken by FindLoop: " << findTimer.get () << std::endl;
+  std::cout << "Time taken by LinkUpLoop: " << linkUpTimer.get () << std::endl;
+  std::cout << "Time taken by partitioning Loop: " << partitionTimer.get () << std::endl;
+  std::cout << "Time taken by filter Loop: " << filterTimer.get () << std::endl;
+
+}
 
 
 
