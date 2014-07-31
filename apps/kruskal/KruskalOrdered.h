@@ -77,7 +77,7 @@ class KruskalOrdered: public Kruskal {
       size_t& mstWeight, size_t& totalIter) {
 
     if (split) {
-      runMSTfilter (numNodes, edges, mstWeight, totalIter, UnionFindWindow ());
+      runMSTfilter (numNodes, edges, mstWeight, totalIter, UnionFindUsingRuntime ());
     } else {
       runMSTsimple (numNodes, edges, mstWeight, totalIter, UnionFindUsingRuntime ());
     }

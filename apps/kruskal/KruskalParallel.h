@@ -398,7 +398,7 @@ void refillWorkList (WL& wl, typename Range<I>::PTS& ranges, const size_t prevWi
 
   typedef typename Range<I>::value_type T;
 
-  const size_t chunkSize = 32;
+  const size_t chunkSize = LinkUpLoop<false>::CHUNK_SIZE;
   const size_t numT = Galois::getActiveThreads ();
 
   const size_t minWinSize = numT * chunkSize;
