@@ -31,20 +31,6 @@
 #include "Kruskal.h"
 #include "KruskalParallel.h"
 
-static cll::opt<unsigned> maxRounds (
-    "maxRounds",
-    cll::desc ("number of rounds for window executor"),
-    cll::init (600));
-
-static cll::opt<unsigned> lowThresh (
-    "lowThresh",
-    cll::desc ("low parallelism factor for workList refill in window executor"),
-    cll::init (16));
-
-static cll::opt<bool> split (
-    "split",
-    cll::desc ("Split edges into light and heavy"),
-    cll::init (false));
 
 namespace kruskal {
 
@@ -58,11 +44,11 @@ class KruskalHand: public Kruskal {
       size_t& mstWeight, size_t& totalIter) {
 
     if (split) {
-      runMSTfilter (numNodes, edges, mstWeight, totalIter, UnionFindWindow (maxRounds, lowThresh));
+      runMSTfilter (numNodes, edges, mstWeight, totalIter, UnionFindWindow ());
 
     } else {
 
-      runMSTsimple (numNodes, edges, mstWeight, totalIter, UnionFindWindow (maxRounds, lowThresh));
+      runMSTsimple (numNodes, edges, mstWeight, totalIter, UnionFindWindow ());
     }
   }
 };

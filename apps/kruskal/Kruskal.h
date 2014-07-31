@@ -66,6 +66,11 @@ static cll::opt<unsigned> numPages (
     cll::desc ("number of pages(per thread) to pre-allocate from OS for Galois allocators "),
     cll::init (32));
 
+static cll::opt<bool> split (
+    "split",
+    cll::desc ("Split edges into light and heavy"),
+    cll::init (false));
+
 namespace kruskal {
 
 typedef unsigned Weight_ty;

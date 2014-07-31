@@ -33,6 +33,7 @@
 #include "Galois/Runtime/PerThreadWorkList.h"
 #include "Galois/Runtime/ll/CompilerSpecific.h"
 #include "Galois/DynamicArray.h"
+#include "Galois/Runtime/KDGtwoPhase.h"
 
 #include "Kruskal.h"
 
@@ -393,12 +394,44 @@ struct RefillWorkList {
 
 
 template <typename WL, typename I>
-void refillWorkList (WL& wl, typename Range<I>::PTS& ranges, const size_t windowSize, const size_t numT) {
-
+void refillWorkList (WL& wl, typename Range<I>::PTS& ranges, const size_t prevWindowSize, const size_t numCommits) {
 
   typedef typename Range<I>::value_type T;
 
-  size_t perThrdSize = windowSize / numT;
+  const size_t chunkSize = 32;
+  const size_t numT = Galois::getActiveThreads ();
+
+  const size_t minWinSize = numT * chunkSize;
+
+  double TARGET_COMMIT_RATIO = Galois::Runtime::commitRatioArg;
+
+  double commitRatio = double (numCommits) / double (prevWindowSize);
+
+  size_t windowSize = 0;
+
+  if (prevWindowSize == 0) {
+    windowSize = minWinSize;
+
+  } else {
+    if (commitRatio >= TARGET_COMMIT_RATIO) {
+      windowSize = 2 * prevWindowSize;
+
+    } else {
+      windowSize = size_t (commitRatio * prevWindowSize);
+    }
+  }
+
+  if (windowSize < minWinSize) {
+    windowSize = minWinSize;
+  }
+
+  if (wl.size_all () >= windowSize) {
+    return; 
+  }
+
+  size_t fillSize = windowSize - wl.size_all ();
+
+  size_t perThrdSize = fillSize / numT;
 
   const T* windowLimit = NULL;
 
@@ -446,15 +479,6 @@ void refillWorkList (WL& wl, typename Range<I>::PTS& ranges, const size_t window
 
 struct UnionFindWindow {
 
-  size_t maxRounds;
-  size_t lowThresh;
-
-  UnionFindWindow (): maxRounds (64), lowThresh (2) {}
-
-  UnionFindWindow (size_t maxRounds, size_t lowThresh)
-    : maxRounds (maxRounds), lowThresh (lowThresh) 
-  {}
-
   void operator () (
       EdgeCtxWL& perThrdWL, 
       VecRep_ty& repVec, 
@@ -482,31 +506,27 @@ struct UnionFindWindow {
     }
 
 
-    const size_t numT = Galois::getActiveThreads ();
-
-    const size_t totalDist = perThrdWL.size_all ();
-    const size_t windowSize = totalDist / maxRounds;
-
-    const size_t lowThreshSize = windowSize / lowThresh;
-
     unsigned round = 0;
     size_t numUnions = 0;
     Accumulator mstSum;
+    size_t prevWindowSize = 0;
+    size_t numCommits = 0;
 
     EdgeCtxWL* currWL = new EdgeCtxWL ();
     EdgeCtxWL* nextWL = new EdgeCtxWL ();
 
     while (true) {
       ++round;
+      prevWindowSize = currWL->size_all ();
+      numCommits = prevWindowSize - nextWL->size_all ();
       std::swap (nextWL, currWL);
       nextWL->clear_all ();
 
-      if (currWL->size_all () <= lowThreshSize) {
-        // size_t s = lowThreshSize - currWL->size_all () + 1;
-        sortTimer.start ();
-        refillWorkList<EdgeCtxWL, Iter> (*currWL, ranges, windowSize, numT);
-        sortTimer.stop ();
-      }
+
+      // size_t s = lowThreshSize - currWL->size_all () + 1;
+      sortTimer.start ();
+      refillWorkList<EdgeCtxWL, Iter> (*currWL, ranges, prevWindowSize, numCommits);
+      sortTimer.stop ();
 
       if (currWL->empty_all ()) {
         break;
@@ -784,6 +804,7 @@ void runMSTfilter (const size_t numNodes, const VecEdge& edges,
   Accumulator findIter;
   Accumulator linkUpIter;
 
+  Galois::Runtime::getSystemThreadPool ().burnPower (Galois::getActiveThreads ());
 
 
   VecRep_ty repVec (numNodes);
@@ -809,7 +830,7 @@ void runMSTfilter (const size_t numNodes, const VecEdge& edges,
   EdgeWL heavier;
 
   typedef std::iterator_traits<VecEdge::iterator>::difference_type Dist_ty;
-  Dist_ty splitPoint = numNodes;
+  Dist_ty splitPoint = (4 * numNodes) / 3;
   lighter.reserve_all (numNodes / Galois::getActiveThreads ());
   assert (edges.size () >= numNodes);
   heavier.reserve_all (numNodes / Galois::getActiveThreads ());
@@ -846,6 +867,7 @@ void runMSTfilter (const size_t numNodes, const VecEdge& edges,
   std::cout << "Time taken by partitioning Loop: " << partitionTimer.get () << std::endl;
   std::cout << "Time taken by filter Loop: " << filterTimer.get () << std::endl;
 
+  Galois::Runtime::getSystemThreadPool ().beKind ();
 }
 
 
