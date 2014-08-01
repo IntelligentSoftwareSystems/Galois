@@ -66,6 +66,12 @@ public:
     assert (m_array != nullptr);
   }
 
+  ~LazyDynamicArray () {
+    m_alloc.deallocate (m_array, m_size - m_array);
+    m_array = nullptr;
+    m_size = nullptr;
+  }
+
 
   size_type size () const { 
     assert (m_size >= m_array);
