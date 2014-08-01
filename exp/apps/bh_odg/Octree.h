@@ -52,10 +52,11 @@ struct KDGNodeBase {
 
   // typedef Galois::GAtomic<unsigned> UnsignedAtomic;
 
-  std::atomic<unsigned> numChild;
+  // GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE KDGNodeBase* parent;
   KDGNodeBase* parent;
+  std::atomic<unsigned> numChild;
   
-  KDGNodeBase (): numChild (0), parent (nullptr) {}
+  KDGNodeBase (): parent (nullptr), numChild (0) {}
 
 protected:
   void setChild (unsigned index, KDGNodeBase* c, KDGNodeBase* prev) {
