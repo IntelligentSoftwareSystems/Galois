@@ -76,7 +76,7 @@ class KruskalOrdered: public Kruskal {
   virtual void runMST (const size_t numNodes, const VecEdge& edges,
       size_t& mstWeight, size_t& totalIter) {
 
-    if (split) {
+    if (edges.size () >= 2 * numNodes) {
       runMSTfilter (numNodes, edges, mstWeight, totalIter, UnionFindUsingRuntime ());
     } else {
       runMSTsimple (numNodes, edges, mstWeight, totalIter, UnionFindUsingRuntime ());

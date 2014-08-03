@@ -188,7 +188,7 @@ protected:
   virtual void runMST (const size_t numNodes, const VecEdge& edges,
       size_t& mstWeight, size_t& totalIter) {
 
-    if (split) {
+    if (edges.size () >= 2 * numNodes) {
       runMSTsplit (numNodes, edges, mstWeight, totalIter);
 
     } else {
