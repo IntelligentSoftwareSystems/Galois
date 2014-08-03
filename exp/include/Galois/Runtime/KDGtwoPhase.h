@@ -79,6 +79,9 @@ public:
   using PerThreadUserCtxt = PerThreadStorage<UserCtxt>;
 
 protected:
+
+  static const bool DETAILED_STATS = false;
+
   struct MakeContext {
     const Cmp& cmp;
     CtxtAlloc& ctxtAlloc;
@@ -365,9 +368,21 @@ protected:
         break;
       }
 
+      Timer t;
+
+      if (DETAILED_STATS) {
+        std::printf ("trying to execute %zd elements\n", currWL->size_all ());
+        t.start ();
+      }
+
       expandNhood (*currWL);
 
       applyOperator (*currWL, *nextWL);
+
+      if (DETAILED_STATS) {
+        t.stop ();
+        std::printf ("Time taken: %ld\n", t.get ());
+      }
       
     }
   }

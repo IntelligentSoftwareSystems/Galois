@@ -581,6 +581,9 @@ static void ikdg_algo(float **BENCH)
   int kk;
   typedef boost::transform_iterator<FwdBdivBmod::Initializer, boost::counting_iterator<int>> TI;
 
+  Galois::setDoAllImpl (Galois::DOALL_GALOIS_FOREACH);
+  if (Galois::getDoAllImpl () != Galois::DOALL_GALOIS_FOREACH) { std::abort (); }
+
   Galois::Runtime::for_each_ordered_2p_win(
       Galois::Runtime::makeStandardRange(TI(0), TI(bots_arg_size)),
       FwdBdivBmod::Comparator { },

@@ -5,13 +5,22 @@ namespace Galois {
 cll::opt<DoAllTypes> doAllKind (
     cll::desc ("DoAll Implementation"),
     cll::values (
-      clEnumVal (GALOIS, "GALOIS"),
-      clEnumVal (GALOIS_STEAL, "GALOIS_STEAL"),
-      clEnumVal (COUPLED, "COUPLED"),
-      clEnumVal (CILK, "CILK"),
-      clEnumVal (OPENMP, "OPENMP"),
+      clEnumVal (DOALL_GALOIS, "DOALL_GALOIS"),
+      clEnumVal (DOALL_GALOIS_STEAL, "DOALL_GALOIS_STEAL"),
+      clEnumVal (DOALL_GALOIS_FOREACH, "DOALL_GALOIS_FOREACH"),
+      clEnumVal (DOALL_COUPLED, "DOALL_COUPLED"),
+      clEnumVal (DOALL_CILK, "DOALL_CILK"),
+      clEnumVal (DOALL_OPENMP, "DOALL_OPENMP"),
       clEnumValEnd),
-    cll::init (GALOIS_STEAL));
+    cll::init (DOALL_GALOIS_STEAL));
+
+void setDoAllImpl (const DoAllTypes& type) {
+  doAllKind = type;
+}
+
+DoAllTypes getDoAllImpl (void) {
+  return doAllKind;
+}
 
 } // end namespace Galois
 
