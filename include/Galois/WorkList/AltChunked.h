@@ -381,7 +381,7 @@ private:
   
   void delChunk(Chunk* C) {
     C->~Chunk();
-    heap.deallocate(C);
+    heap.deallocate(C, sizeof(Chunk));
   }
 
   void swapInPush(std::pair<Chunk*, Chunk*>& d) {

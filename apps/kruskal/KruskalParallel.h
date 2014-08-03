@@ -41,7 +41,8 @@ namespace kruskal {
 
 struct EdgeCtx;
 
-typedef Galois::LazyDynamicArray<int>  VecRep_ty;
+// typedef Galois::LazyDynamicArray<int>  VecRep_ty;
+typedef Galois::LazyDynamicArray<int, Galois::Runtime::MM::SerialNumaAllocator<int> >  VecRep_ty;
 
 typedef Galois::Runtime::PerThreadVector<Edge> EdgeWL;
 typedef Galois::Runtime::PerThreadVector<EdgeCtx> EdgeCtxWL;
@@ -51,7 +52,8 @@ typedef Galois::GAccumulator<size_t> Accumulator;
 
 // typedef Galois::GAtomicPadded<EdgeCtx*> AtomicCtxPtr;
 typedef Galois::GAtomic<EdgeCtx*> AtomicCtxPtr;
-typedef Galois::LazyDynamicArray<AtomicCtxPtr> VecAtomicCtxPtr;
+// typedef Galois::LazyDynamicArray<AtomicCtxPtr> VecAtomicCtxPtr;
+typedef Galois::LazyDynamicArray<AtomicCtxPtr, Galois::Runtime::MM::SerialNumaAllocator<AtomicCtxPtr> > VecAtomicCtxPtr;
 
 static const int NULL_EDGE_ID = -1;
 
