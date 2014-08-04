@@ -167,7 +167,7 @@ private:
         header* h2 = h;
         h = h->next;
         if (BlockSize)
-          heap.deallocate(h2);
+          heap.deallocate(h2, BlockSize);
         else
           Galois::Runtime::MM::pageFree(h2);
       }
