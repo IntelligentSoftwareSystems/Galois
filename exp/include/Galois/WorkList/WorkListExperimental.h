@@ -1259,7 +1259,7 @@ GALOIS_WLCOMPILECHECK(SkipListQueue)
 
 template<class Compare = std::less<int>, typename T = int, bool concurrent = true>
 class SetQueue : private boost::noncopyable, private Runtime::LL::PaddedLock<concurrent> {
-  std::set<T, Compare, Runtime::MM::FSBGaloisAllocator<T> > wl;
+  std::set<T, Compare, Runtime::MM::FixedSizeAllocator<T> > wl;
 
   using Runtime::LL::PaddedLock<concurrent>::lock;
   using Runtime::LL::PaddedLock<concurrent>::try_lock;
@@ -2125,7 +2125,7 @@ template<typename gWL = LIFO_SB, int chunksize = 64, typename T = int>
 class ChunkedAdaptor : private boost::noncopyable {
   typedef Chunk<T, chunksize> ChunkTy;
 
-  Runtime::MM::FixedSizeAllocator heap;
+  Runtime::MM::FixedSizeHeap heap;
 
   Runtime::PerThreadStorage<ChunkTy*> data;
 

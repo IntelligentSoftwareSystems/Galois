@@ -371,7 +371,7 @@ struct AltChunkedMaster : private boost::noncopyable {
 private:
   class Chunk : public ChunkHeader, public Galois::FixedSizeRing<T, ChunkSize> {};
 
-  Runtime::MM::FixedSizeAllocator heap;
+  Runtime::MM::FixedSizeHeap heap;
   Runtime::PerThreadStorage<std::pair<Chunk*, Chunk*> > data;
   Container worklist;
 

@@ -123,7 +123,7 @@ struct UEdgeInfoBase<NTy, void, false> {
 
 template<typename ETy>
 struct EdgeFactory {
-  Galois::Runtime::MM::FSBGaloisAllocator<ETy> mem;
+  Galois::Runtime::MM::FixedSizeAllocator<ETy> mem;
   template<typename... Args>
   ETy* mkEdge(Args&&... args) {
     ETy* e = mem.allocate(1);

@@ -530,14 +530,14 @@ public:
 
 
 namespace PerThreadFactory {
-  typedef MM::SimpleBumpPtrWithMallocFallback<MM::FreeListHeap<MM::SystemBaseAlloc> > BasicHeap;
-  typedef MM::ThreadAwarePrivateHeap<BasicHeap> Heap;
+  typedef MM::BumpWithMallocHeap<MM::FreeListHeap<MM::SystemHeap> > BasicHeap;
+  typedef MM::ThreadPrivateHeap<BasicHeap> Heap;
 
   template<typename T>
-  struct Alloc { typedef typename MM::ExternRefGaloisAllocator<T, Heap> type; };
+  struct Alloc { typedef typename MM::ExternalHeapAllocator<T, Heap> type; };
 
   template<typename T>
-  struct FSBAlloc { typedef typename MM::FSBGaloisAllocator<T> type; };
+  struct FSBAlloc { typedef typename MM::FixedSizeAllocator<T> type; };
 
   template<typename T>
   struct Vector { typedef typename std::vector<T, typename Alloc<T>::type > type; };

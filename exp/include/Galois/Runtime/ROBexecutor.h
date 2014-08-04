@@ -324,10 +324,10 @@ template <typename T, typename Cmp, typename NhFunc, typename OpFunc>
 class ROBexecutor: private boost::noncopyable {
 
   using Ctxt = ROBcontext<T, Cmp, ROBexecutor>;
-  using CtxtAlloc = Galois::Runtime::MM::FSBGaloisAllocator<Ctxt>;
+  using CtxtAlloc = MM::FixedSizeAllocator<Ctxt>;
   using CtxtCmp = typename Ctxt::PtrComparator;
-  using CtxtDeq = Galois::Runtime::PerThreadDeque<Ctxt*>;
-  using CtxtVec = Galois::Runtime::PerThreadVector<Ctxt*>;
+  using CtxtDeq = PerThreadDeque<Ctxt*>;
+  using CtxtVec = PerThreadVector<Ctxt*>;
 
   using PendingQ = Galois::MinHeap<T, Cmp>;
   using PerThrdPendingQ = PerThreadMinHeap<T, Cmp>;
@@ -908,7 +908,7 @@ template <typename T, typename Cmp, typename NhFunc, typename OpFunc>
 class ROBparaMeter: private boost::noncopyable {
 
   using Ctxt = ROBparamContext<T, Cmp, ROBparaMeter>;
-  using CtxtAlloc = Galois::Runtime::MM::FSBGaloisAllocator<Ctxt>;
+  using CtxtAlloc = MM::FixedSizeAllocator<Ctxt>;
   using CtxtCmp = typename Ctxt::PtrComparator;
   using CtxtDeq = Galois::Runtime::PerThreadDeque<Ctxt*>;
 

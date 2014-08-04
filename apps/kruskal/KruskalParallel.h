@@ -46,7 +46,7 @@ typedef Galois::LazyDynamicArray<int, Galois::Runtime::MM::SerialNumaAllocator<i
 
 typedef Galois::Runtime::PerThreadVector<Edge> EdgeWL;
 typedef Galois::Runtime::PerThreadVector<EdgeCtx> EdgeCtxWL;
-typedef Galois::Runtime::MM::FSBGaloisAllocator<EdgeCtx> EdgeCtxAlloc;
+typedef Galois::FixedSizeAllocator<EdgeCtx> EdgeCtxAlloc;
 typedef Edge::Comparator Cmp;
 typedef Galois::GAccumulator<size_t> Accumulator;
 

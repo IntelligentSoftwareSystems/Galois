@@ -317,8 +317,8 @@ typedef Galois::gdeque<Body> Bodies;
 typedef Galois::gdeque<Body*> BodyPtrs;
 
 struct BuildOctreeCilk {
-  typedef Galois::GFixedAllocator<BodyPtrs> BodyPtrsAlloc;
-  typedef Galois::GFixedAllocator<OctreeInternal> OctreeInternalAlloc;
+  typedef Galois::FixedSizeAllocator<BodyPtrs> BodyPtrsAlloc;
+  typedef Galois::FixedSizeAllocator<OctreeInternal> OctreeInternalAlloc;
 
   BodyPtrsAlloc& bodyPtrsAlloc;
   OctreeInternalAlloc& octreeInternalAlloc;
@@ -473,8 +473,8 @@ struct ComputeCenterOfMass {
 };
 
 struct BuildOctree {
-  typedef Galois::GFixedAllocator<BodyPtrs> BodyPtrsAlloc;
-  typedef Galois::GFixedAllocator<OctreeInternal> OctreeInternalAlloc;
+  typedef Galois::FixedSizeAllocator<BodyPtrs> BodyPtrsAlloc;
+  typedef Galois::FixedSizeAllocator<OctreeInternal> OctreeInternalAlloc;
 
   BodyPtrsAlloc& bodyPtrsAlloc;
   OctreeInternalAlloc& octreeInternalAlloc;

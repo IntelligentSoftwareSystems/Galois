@@ -77,7 +77,7 @@ public:
     WLTy workList;
     // workList.fill_serial (initEvents.begin (), initEvents.end (), &WLTy::Cont_ty::push_back);
     Galois::do_all_choice (
-        initEvents.begin (), initEvents.end (),
+        Galois::Runtime::makeStandardRange(initEvents.begin (), initEvents.end ()),
         [&workList] (const Event& e) {
           workList.get ().push_back (MEvent (e));
         },
@@ -128,7 +128,7 @@ static size_t runSimInternal (Table& table, WLTy& workList, const double endtime
 
       findTimer.start ();
       // Galois::Runtime::do_all (workList, 
-      Galois::do_all_choice (workList, 
+      Galois::do_all_choice (Galois::Runtime::makeLocalRange(workList), 
           _FindIndepFunc (indepList, workList, currStep, findIter), "find_indep_events");
       findTimer.stop ();
 
@@ -143,7 +143,7 @@ static size_t runSimInternal (Table& table, WLTy& workList, const double endtime
 
       addTimer.start ();
       // Galois::Runtime::do_all_coupled (indepList, 
-      Galois::do_all_choice (indepList, 
+      Galois::do_all_choice (Galois::Runtime::makeLocalRange(indepList), 
           _AddNextFunc (workList, addList, table, endtime, enablePrints), "add_next_events");
       addTimer.stop ();
 
@@ -360,7 +360,7 @@ public:
     WLTy workList;
     // workList.fill_serial (initEvents.begin (), initEvents.end (), &WLTy::Cont_ty::push_back);
     Galois::do_all_choice (
-        initEvents.begin (), initEvents.end (),
+        Galois::Runtime::makeStandardRange(initEvents.begin (), initEvents.end ()),
         [&workList] (const Event& e) {
           workList.get ().push_back (MEvent (e));
         },

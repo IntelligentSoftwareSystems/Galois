@@ -299,7 +299,8 @@ public:
     ParCounter numAdds;
     while (!currWL->empty_all ()) {
 
-      Galois::do_all_choice (*currWL, ParallelInnerLoop (graph, *nextWL, numAdds), "wavefront_inner_loop");
+      Galois::do_all_choice(Galois::Runtime::makeLocalRange(*currWL),
+          ParallelInnerLoop (graph, *nextWL, numAdds), "wavefront_inner_loop");
 
       std::swap (currWL, nextWL);
       nextWL->clear_all ();

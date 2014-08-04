@@ -72,8 +72,8 @@ template <typename T, typename Cmp, typename NhFunc, typename OpFunc, typename W
 class KDGtwoPhaseStableExecutor {
 public:
   using Ctxt = TwoPhaseContext<T, Cmp>;
-  using CtxtAlloc = Galois::Runtime::MM::FSBGaloisAllocator<Ctxt>;
-  using CtxtWL = Galois::Runtime::PerThreadVector<Ctxt*>;
+  using CtxtAlloc = MM::FixedSizeAllocator<Ctxt>;
+  using CtxtWL = PerThreadVector<Ctxt*>;
 
   using UserCtxt = UserContextAccess<T>;
   using PerThreadUserCtxt = PerThreadStorage<UserCtxt>;
@@ -454,7 +454,7 @@ protected:
     typename Base::PerThreadUserCtxt& uh = Base::userHandles;
     GAccumulator<size_t>& total = Base::total;
 
-    Galois::do_all_choice (makeLocalRange (*currWL),
+    Galois::do_all_choice (makeLocalRange (currWL),
         [m_beg, m_end, &func, &uh, &total] (Ctxt* c) {
           UserCtxt& uhand = *uh.getLocal ();
           uhand.reset ();

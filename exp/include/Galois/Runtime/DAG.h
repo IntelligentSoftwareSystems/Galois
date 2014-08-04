@@ -94,7 +94,7 @@ public:
   struct Factory {
 
     typedef DAGnhoodItem<Ctxt> NItem;
-    typedef Galois::Runtime::MM::FSBGaloisAllocator<NItem> NItemAlloc;
+    typedef MM::FixedSizeAllocator<NItem> NItemAlloc;
 
     NItemAlloc niAlloc;
 
@@ -206,10 +206,10 @@ protected:
   typedef typename Ctxt::NhoodMgr NhoodMgr;
   typedef typename Ctxt::NItem NItem;
 
-  typedef Galois::Runtime::MM::FSBGaloisAllocator<Ctxt> CtxtAlloc;
-  typedef Galois::Runtime::PerThreadVector<Ctxt*> CtxtWL;
-  typedef Galois::Runtime::UserContextAccess<T> UserCtx;
-  typedef Galois::Runtime::PerThreadStorage<UserCtx> PerThreadUserCtx;
+  typedef MM::FixedSizeAllocator<Ctxt> CtxtAlloc;
+  typedef PerThreadVector<Ctxt*> CtxtWL;
+  typedef UserContextAccess<T> UserCtx;
+  typedef PerThreadStorage<UserCtx> PerThreadUserCtx;
 
 
   struct ApplyOperator {
@@ -507,9 +507,9 @@ protected:
 
 
 
-  typedef Galois::Runtime::MM::FSBGaloisAllocator<Task> TaskAlloc;
-  typedef Galois::Runtime::UserContextAccess<T> UserCtx;
-  typedef Galois::Runtime::PerThreadStorage<UserCtx> PerThreadUserCtx;
+  typedef MM::FixedSizeAllocator<Task> TaskAlloc;
+  typedef UserContextAccess<T> UserCtx;
+  typedef PerThreadStorage<UserCtx> PerThreadUserCtx;
 
   struct ApplyOperatorSinglePhase {
     typedef int tt_does_not_need_aborts;

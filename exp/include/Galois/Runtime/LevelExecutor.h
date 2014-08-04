@@ -56,8 +56,8 @@ class LevelMap {
 
 public:
   using value_type = typename WL_ty::value_type;
-  using MapAlloc = MM::FSBGaloisAllocator<std::pair<const Key, WL_ty*> >;
-  using WLalloc = MM::FSBGaloisAllocator<WL_ty>;
+  using MapAlloc = MM::FixedSizeAllocator<std::pair<const Key, WL_ty*> >;
+  using WLalloc = MM::FixedSizeAllocator<WL_ty>;
   using InternalMap = std::map<Key, WL_ty*, KeyCmp, MapAlloc>;
   using GarbageVec = Galois::gdeque<WL_ty*>;
   using Level = std::pair<Key, WL_ty*>;
@@ -155,7 +155,7 @@ class LevelMap<unsigned, std::less<unsigned>, WL_ty> {
 
 public:
   using value_type = typename WL_ty::value_type;
-  using WLalloc = MM::FSBGaloisAllocator<WL_ty>;
+  using WLalloc = MM::FixedSizeAllocator<WL_ty>;
   using GarbageVec = Galois::gdeque<WL_ty*>;
   using Level = std::pair<unsigned, WL_ty*>;
   using InternalMap = std::deque<Level>;

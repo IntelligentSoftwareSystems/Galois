@@ -167,7 +167,7 @@ template <bool TrackTime, typename TB>
 Point run(int nbodies, int ntimesteps, int seed, const TB& treeBuilder) {
   typedef typename TB::Base_ty B;
   typedef Galois::gdeque<Body<B>*> Bodies;
-  typedef Galois::GFixedAllocator<OctreeInternal<B> > TreeAlloc;
+  typedef Galois::FixedSizeAllocator<OctreeInternal<B> > TreeAlloc;
   
 
   Config config;

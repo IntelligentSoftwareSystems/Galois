@@ -209,7 +209,7 @@ template<typename T, typename OwnerFn, template<typename, bool> class QT, bool d
 class OwnerComputeChunkedMaster : private boost::noncopyable {
   class Chunk : public Galois::FixedSizeRing<T, chunksize>, public QT<Chunk, concurrent>::ListNode {};
 
-  Runtime::MM::FixedSizeAllocator heap;
+  Runtime::MM::FixedSizeHeap heap;
   OwnerFn Fn;
 
   struct p {

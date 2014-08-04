@@ -915,7 +915,7 @@ struct WorkItemSinglePass {
 template <typename PartList>
 struct PartitionSinglePass {
 
-  typedef Galois::GFixedAllocator<PartList> PartListAlloc;
+  typedef Galois::FixedSizeAllocator<PartList> PartListAlloc;
 
   PartListAlloc partListAlloc;
   
