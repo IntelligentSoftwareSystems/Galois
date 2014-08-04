@@ -7,11 +7,19 @@
 namespace bh {
 
 
+
 struct SerialNodeBase {
 protected:
   void setChild (unsigned, SerialNodeBase*, SerialNodeBase*) {}
 };
 
+// Note: during tree construction, setChild should be called at most twice;
+// once when child is changed from null to some leaf node
+// second when child is changed from leaf node to internal node (in order to
+// expand) 
+// We want to record the 2nd change. Reason being that the active elements in
+// summarization are only the internal nodes and not the leaves. 
+// 
 
 struct SpecNodeBase: public Galois::Runtime::Lockable {
   unsigned level;
@@ -52,17 +60,16 @@ struct KDGNodeBase {
 
   // typedef Galois::GAtomic<unsigned> UnsignedAtomic;
 
-  // GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE KDGNodeBase* parent;
-  KDGNodeBase* parent;
+  // KDGNodeBase* parent;
+  // GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE std::atomic<unsigned> numChild;
   std::atomic<unsigned> numChild;
+  KDGNodeBase* parent;
   
-  KDGNodeBase (): parent (nullptr), numChild (0) {}
+  KDGNodeBase (): numChild (0), parent (nullptr) {}
 
 protected:
   void setChild (unsigned index, KDGNodeBase* c, KDGNodeBase* prev) {
-    if (prev == NULL) {
-      ++numChild;
-    }
+    ++numChild;
     c->parent = this;
   }
 
@@ -102,13 +109,17 @@ public:
     Octree<B>* prev = child[index];
     child[index] = c;
 
-    B::setChild (index, c, prev);
+    if (!c->isLeaf ()) {
+      B::setChild (index, c, prev);
+    }
   }
 
   bool casChild (unsigned index, Octree<B>* oldVal, Octree<B>* newVal) { 
     assert (index < 8);
     if( __sync_bool_compare_and_swap (&child[index], oldVal, newVal)) {
-      B::setChild (index, newVal, oldVal);
+      if (!newVal->isLeaf ()) {
+        B::setChild (index, newVal, oldVal);
+      }
       return true;
     }
     return false;

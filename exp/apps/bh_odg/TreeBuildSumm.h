@@ -238,7 +238,6 @@ struct BuildTreeLockFree {
 
       if (node->getChild (index) == nullptr) { 
         if (node->casChild (index, nullptr, b)) {
-          // node->setChild (index, b);
           return;
         }
       }
@@ -257,7 +256,6 @@ struct BuildTreeLockFree {
         assert (child->pos != b->pos);
         
         if (node->casChild (index, child, new_node)) {
-          // node->setChild (index, new_node);
           internalNodes.push_back (new_node);
           // successful thread inserts the replaced leaf
           insert (static_cast<Body<B>*> (child), new_node, radius, treeAlloc, internalNodes);
@@ -846,29 +844,27 @@ struct TreeSummarizeKDGhand: public TypeDefHelper<KDGNodeBase> {
     }
   };
 
-  static void checkTree (InterNode* root) {
+  static void checkTree (InterNode* node) {
     unsigned counted = 0;
     for (unsigned i = 0; i < 8; ++i) {
-      TreeNode* c = root->getChild (i);
+      TreeNode* c = node->getChild (i);
 
-      if (c != nullptr) {
-        assert (c->parent == root);
+      if (c != nullptr && !c->isLeaf ()) {
+        assert (c->parent == node);
         ++counted;
-
-        if (!c->isLeaf ()) {
-          checkTree (static_cast<InterNode*> (c));
-        }
+        checkTree (static_cast<InterNode*> (c));
       }
     }
 
-    assert (counted == root->numChild);
+    assert (counted == node->numChild);
   }
 
   template <typename I, typename InternalNodes>
   void operator () (InterNode* root, I bodbeg, I bodend, InternalNodes& internalNodes) const {
 
-    static const unsigned CHUNK_SIZE = 64;
-    typedef Galois::WorkList::dChunkedFIFO<CHUNK_SIZE, InterNode*> WL_ty;
+    static const unsigned CHUNK_SIZE = 16;
+    typedef Galois::WorkList::dChunkedLIFO<CHUNK_SIZE, InterNode*> WL_ty;
+    // typedef Galois::WorkList::AltChunkedLIFO<CHUNK_SIZE, InterNode*> WL_ty;
 
     if (!skipVerify) {
       std::cerr << "KDG hand checking the tree. Timing may be off" << std::endl;
@@ -879,14 +875,13 @@ struct TreeSummarizeKDGhand: public TypeDefHelper<KDGNodeBase> {
 
     t_fill_wl.start ();
     WL_ty wl;
-    Galois::do_all (bodbeg, bodend, 
-        [&wl] (Leaf* l) {
-          InterNode* p = static_cast<InterNode*> (l->parent);
-          unsigned c = --(p->numChild);
+    Galois::do_all_local (internalNodes,
+        [&wl] (InterNode* n) {
+          unsigned c = n->numChild;
 
           if (c == 0) {
             // std::cout << "Adding to wl: " << p << ", with numChild=" << p->numChild << std::endl;
-            wl.push (p);
+            wl.push (n);
           }
         },
         Galois::loopname("fill_init_wl"));
