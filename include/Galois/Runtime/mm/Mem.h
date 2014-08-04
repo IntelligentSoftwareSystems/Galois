@@ -93,14 +93,14 @@ void printInterleavedStats(int minPages = 16*1024);
 //! [Example Third Party Allocator]
 class MallocHeap {
 public:
-  //! Supported allocation size in bytes. If 0, allocator supports variable sized allocations
+  //! Supported allocation size in bytes. If 0, heap supports variable sized allocations
   enum { AllocSize = 0 };
 
   void* allocate(size_t size) {
     return malloc(size);
   }
   
-  void deallocate(void* ptr, size_t size) {
+  void deallocate(void* ptr) {
     free(ptr);
   }
 };
@@ -125,8 +125,8 @@ public:
     return heaps.getLocal()->allocate(size, std::forward<Args>(args)...);
   }
 
-  inline void deallocate(void* ptr, size_t size) {
-    heaps.getLocal()->deallocate(ptr, size);
+  inline void deallocate(void* ptr) {
+    heaps.getLocal()->deallocate(ptr);
   }
 
   void clear() {
@@ -150,9 +150,9 @@ public:
     return retval;
   }
   
-  inline void deallocate(void* ptr, size_t size) {
+  inline void deallocate(void* ptr) {
     lock.lock();
-    SourceHeap::deallocate(ptr, size);
+    SourceHeap::deallocate(ptr);
     lock.unlock();
   }
 };
@@ -168,8 +168,8 @@ public:
     return retval;
   }
 
-  inline void deallocate(void* ptr, size_t size) {
-    SourceHeap::deallocate(ptr, size);
+  inline void deallocate(void* ptr) {
+    SourceHeap::deallocate(ptr);
   }
 };
 
@@ -186,8 +186,8 @@ public:
     return (char*)ptr + offset;
   }
   
-  inline void deallocate(void* ptr, size_t size) {
-    SourceHeap::deallocate(getHeader(ptr), size + offset);
+  inline void deallocate(void* ptr) {
+    SourceHeap::deallocate(getHeader(ptr));
   }
 
   inline static Header* getHeader(void* ptr) {
@@ -207,9 +207,9 @@ public:
     return retval;
   }
 
-  inline void deallocate(void* ptr, size_t size) {
+  inline void deallocate(void* ptr) {
     assert(*(Src::getHeader(ptr)) == this);
-    Src::deallocate(ptr, size);
+    Src::deallocate(ptr);
   }
 
   inline static OwnerTaggedHeap* owner(void* ptr) {
@@ -232,7 +232,7 @@ public:
     while (head) {
       FreeNode* N = head;
       head = N->next;
-      SourceHeap::deallocate(N, SourceHeap::AllocSize);
+      SourceHeap::deallocate(N);
     }
   }
 
@@ -250,7 +250,7 @@ public:
     return SourceHeap::allocate(size);
   }
 
-  inline void deallocate(void* ptr, size_t size) {
+  inline void deallocate(void* ptr) {
     if (!ptr) return;
     assert((uintptr_t)ptr > 0x100);
     FreeNode* NH = (FreeNode*)ptr;
@@ -278,7 +278,7 @@ public:
     while (h) {
       FreeNode* N = h;
       h = N->next;
-      SourceHeap::deallocate(N, SourceHeap::AllocSize);
+      SourceHeap::deallocate(N);
     }
   }
 
@@ -306,7 +306,7 @@ public:
     return (void*)OH;
   }
 
-  inline void deallocate(void* ptr, size_t size) {
+  inline void deallocate(void* ptr) {
     if (!ptr) return;
     FreeNode* OH;
     FreeNode* NH;
@@ -365,7 +365,7 @@ public:
     while (head) {
       Block* B = head;
       head = B->next;
-      SourceHeap::deallocate(B, SourceHeap::AllocSize);
+      SourceHeap::deallocate(B);
     }
   }
 
@@ -384,7 +384,7 @@ public:
     return &head->data[headIndex++];
   }
 
-  inline void deallocate(void* ptr, size_t size) {}
+  inline void deallocate(void* ptr) {}
 };
 
 //! This implements a bump pointer though chunks of memory
@@ -421,7 +421,7 @@ public:
     while (head) {
       Block* B = head;
       head = B->next;
-      SourceHeap::deallocate(B, SourceHeap::AllocSize);
+      SourceHeap::deallocate(B);
     }
   }
 
@@ -466,7 +466,7 @@ public:
     return retval;
   }
 
-  inline void deallocate(void* ptr, size_t len) {}
+  inline void deallocate(void* ptr) {}
 };
 
 /**
@@ -508,7 +508,7 @@ public:
     while (head) {
       Block* B = head;
       head = B->next;
-      SourceHeap::deallocate(B, SourceHeap::AllocSize);
+      SourceHeap::deallocate(B);
     }
     while (fallbackHead) {
       Block* B = fallbackHead;
@@ -534,7 +534,7 @@ public:
     return retval;
   }
 
-  inline void deallocate(void* ptr, size_t size) {}
+  inline void deallocate(void* ptr) {}
 };
 
 //! This is the base source of memory for all allocators.
@@ -547,12 +547,10 @@ public:
   ~SystemHeap();
 
   inline void* allocate(size_t size) {
-    assert(size == AllocSize);
     return pageAlloc();
   }
 
-  inline void deallocate(void* ptr, size_t size) {
-    assert(size == AllocSize);
+  inline void deallocate(void* ptr) {
     pageFree(ptr);
   }
 };
@@ -602,8 +600,8 @@ private:
  * Users should call {@link allocate(size_t, size_t&)} multiple times to split
  * large allocations over multiple pages.
  */
-class VariableSizeHeap: public ThreadPrivateHeap<BumpHeap<SystemHeap>> {
-
+struct VariableSizeHeap: public ThreadPrivateHeap<BumpHeap<SystemHeap>> {
+  enum { AllocSize = 0 };
 };
 
 //! Main scalable allocator in Galois
@@ -619,8 +617,8 @@ public:
     return heap->allocate(size);
   }
 
-  inline void deallocate(void* ptr, size_t size) {
-    heap->deallocate(ptr, size);
+  inline void deallocate(void* ptr) {
+    heap->deallocate(ptr);
   }
 
   inline bool operator!=(const FixedSizeHeap& rhs) const {
@@ -632,13 +630,23 @@ public:
   }
 };
 
-struct SerialNumaHeap {
+class SerialNumaHeap {
+  enum { offset = (sizeof(size_t) + (sizeof(double) - 1)) & ~(sizeof(double) - 1) };
+
+public:
+  enum { AllocSize = 0 };
+
   void* allocate(size_t size) {
-    return largeInterleavedAlloc(size, true);
+    char* ptr = (char*) largeInterleavedAlloc(size + offset, true);
+    size_t* header = (size_t*) ptr;
+    *header = size;
+    return ptr + offset;
   }
 
-  void deallocate(void* ptr, size_t size) {
-    largeInterleavedFree(ptr, size);
+  void deallocate(void* ptr) {
+    char* realPtr = ((char*)ptr - offset);
+    size_t* header = (size_t*) realPtr;
+    largeInterleavedFree(header, *header);
   }
 };
 
@@ -697,7 +705,8 @@ public:
   }
   
   void deallocate(pointer ptr, size_type len) {
-    heap.deallocate(ptr, len);
+    assert(len == 1);
+    heap.deallocate(ptr);
   }
   
   template<class U, class... Args>
@@ -769,6 +778,7 @@ public:
   }
   
   inline pointer address(reference val) const { return &val; }
+
   inline const_pointer address(const_reference val) const { return &val; }
   
   pointer allocate(size_type size) {
@@ -778,7 +788,7 @@ public:
   }
   
   void deallocate(pointer ptr, size_type len) {
-    heap->deallocate(ptr, len);
+    heap->deallocate(ptr);
   }
   
   inline void construct(pointer ptr, const_reference val) const {
@@ -794,11 +804,16 @@ public:
     destruct(ptr);
   }
   
-  size_type max_size() const throw() { return size_t(-1)/sizeof(Ty); }
+  size_type max_size() const throw() { return (HeapTy::AllocSize == 0) ? size_t(-1)/sizeof(Ty) : HeapTy::AllocSize/sizeof(Ty); }
 
   template<typename T1,typename A1>
   bool operator!=(const ExternalHeapAllocator<T1,A1>& rhs) const {
     return heap != rhs.heap;
+  }
+
+  template<typename T1,typename A1>
+  bool operator==(const ExternalHeapAllocator<T1,A1>& rhs) const {
+    return heap == rhs.heap;
   }
 };
 
@@ -808,9 +823,13 @@ class SerialNumaAllocator: public ExternalHeapAllocator<T, SerialNumaHeap> {
   SerialNumaHeap heap;
 
 public:
+  template<class Other>
+  struct rebind {
+    typedef SerialNumaAllocator<Other> other;
+  };
+
   SerialNumaAllocator(): Super(&heap) {}
 };
-
 
 } // end namespace MM
 } // end namespace Runtime

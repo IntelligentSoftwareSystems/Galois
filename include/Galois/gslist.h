@@ -83,7 +83,7 @@ private:
   template<typename HeapTy>
   void free_block(HeapTy& heap, Block* b) {
     b->~Block();
-    heap.deallocate(b, sizeof(Block));
+    heap.deallocate(b);
   }
 
   void free_block(promise_to_dealloc, Block* b) {
@@ -96,7 +96,7 @@ private:
     Block* f = first;
     b->next = f;
     if (!first.compare_exchange_strong(f, b))
-      heap.deallocate(b, sizeof(Block));
+      heap.deallocate(b);
   }
 
   template<typename HeapTy, bool C = Concurrent>
