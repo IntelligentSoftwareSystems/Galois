@@ -129,7 +129,7 @@ static void synthetic_genmat (float *M[])
 
 static void structure_from_file_genmat (float *M[])
 {
-   int a, b;
+   int a, b, jj;
    int num_blocks, max_id;
 
    int fd = open(bots_arg_file, O_RDONLY);
@@ -188,8 +188,34 @@ static void structure_from_file_genmat (float *M[])
             bots_message("Error: Out of memory\n");
             exit(101);
          }
+         if (M[bjj*bots_arg_size+bii] == NULL)
+         {
+            a++;
+            M[bjj*bots_arg_size+bii] = (float *) malloc(bots_arg_size_1*bots_arg_size_1*sizeof(float));
+            memset(M[bjj*bots_arg_size+bii], 0, bots_arg_size_1*bots_arg_size_1*sizeof(float));
+         }
+         if (M[bjj*bots_arg_size+bii] == NULL)
+         {
+            bots_message("Error: Out of memory\n");
+            exit(101);
+         }
          M[bii*bots_arg_size+bjj][(ii%bots_arg_size_1)*bots_arg_size_1+(jj%bots_arg_size_1)] = edge_data[edge];
+         M[bjj*bots_arg_size+bii][(jj%bots_arg_size_1)*bots_arg_size_1+(ii%bots_arg_size_1)] = edge_data[edge];
       }
+   }
+   // Add identity diagonal as necessary
+   for (ii = 0; ii < bots_arg_size; ++ii) {
+     if (M[ii*bots_arg_size+ii] == NULL)
+     {
+        a++;
+        M[ii*bots_arg_size+ii] = (float *) malloc(bots_arg_size_1*bots_arg_size_1*sizeof(float));
+        memset(M[ii*bots_arg_size+ii], 0, bots_arg_size_1*bots_arg_size_1*sizeof(float));
+     }
+     for (jj = 0; jj < bots_arg_size_1; ++jj)
+     {
+       if (M[ii*bots_arg_size+ii][jj*bots_arg_size_1+jj] == 0.0)
+         M[ii*bots_arg_size+ii][jj*bots_arg_size_1+jj] = 1.0;
+     }
    }
    b = num_blocks * num_blocks - a;
    bots_debug("allo = %d, no = %d, total = %d, factor = %f\n",a,b,a+b,(float)((float)a/(float)(a+b)));
