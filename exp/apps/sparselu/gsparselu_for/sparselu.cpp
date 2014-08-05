@@ -129,21 +129,20 @@ static void synthetic_genmat (float *M[])
 }
 
 
+// From symmetric matrix
 static void structure_from_file_genmat (float *M[])
 {
-   int null_entry, init_val, i, j, ii, jj;
-   float *p;
-   int a=0,b=0;
+   int ii, jj;
+   int a=0, b;
    Galois::Graph::FileGraph g;
-   int num_blocks, max_id;
+   int num_blocks;
+   unsigned max_id;
 
    g.fromFile(bots_arg_file);
    memset(M, 0, bots_arg_size*bots_arg_size*sizeof(*M));
 
    num_blocks = (g.size() + bots_arg_size_1 - 1) / bots_arg_size_1;
    max_id = bots_arg_size_1 * bots_arg_size;
-
-   init_val = 1325;
 
    printf("full size: %d\n", num_blocks);
 
@@ -171,10 +170,34 @@ static void structure_from_file_genmat (float *M[])
             bots_message("Error: Out of memory\n");
             exit(101);
          }
-         //init_val = (3125 * init_val) % 65536;
-         //float p = (float)((init_val - 32768.0) / 16384.0);
+         if (M[bjj*bots_arg_size+bii] == NULL)
+         {
+            a++;
+            M[bjj*bots_arg_size+bii] = (float *) malloc(bots_arg_size_1*bots_arg_size_1*sizeof(float));
+            memset(M[bjj*bots_arg_size+bii], 0, bots_arg_size_1*bots_arg_size_1*sizeof(float));
+         }
+         if (M[bjj*bots_arg_size+bii] == NULL)
+         {
+            bots_message("Error: Out of memory\n");
+            exit(101);
+         }
          M[bii*bots_arg_size+bjj][(ii%bots_arg_size_1)*bots_arg_size_1+(jj%bots_arg_size_1)] = g.getEdgeData<float>(edge);
+         M[bjj*bots_arg_size+bii][(jj%bots_arg_size_1)*bots_arg_size_1+(ii%bots_arg_size_1)] = g.getEdgeData<float>(edge);
       }
+   }
+   // Add identity diagonal as necessary
+   for (ii = 0; ii < bots_arg_size; ++ii) {
+     if (M[ii*bots_arg_size+ii] == NULL)
+     {
+        a++;
+        M[ii*bots_arg_size+ii] = (float *) malloc(bots_arg_size_1*bots_arg_size_1*sizeof(float));
+        memset(M[ii*bots_arg_size+ii], 0, bots_arg_size_1*bots_arg_size_1*sizeof(float));
+     }
+     for (jj = 0; jj < bots_arg_size_1; ++jj)
+     {
+       if (M[ii*bots_arg_size+ii][jj*bots_arg_size_1+jj] == 0.0)
+         M[ii*bots_arg_size+ii][jj*bots_arg_size_1+jj] = 1.0;
+     }
    }
    b = num_blocks * num_blocks - a;
    bots_debug("allo = %d, no = %d, total = %d, factor = %f\n",a,b,a+b,(float)((float)a/(float)(a+b)));
