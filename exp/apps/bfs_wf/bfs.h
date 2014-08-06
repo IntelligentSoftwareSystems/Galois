@@ -70,7 +70,7 @@ static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>")
 
 static const unsigned BFS_LEVEL_INFINITY = (1 << 20) - 1;
 
-static const unsigned CHUNK_SIZE = 1024; 
+static const unsigned CHUNK_SIZE = 128; 
 
 #if 0
 struct NodeData {
@@ -135,7 +135,9 @@ protected:
           graph.getData (n, Galois::NONE) = ND (BFS_LEVEL_INFINITY);
           numEdges += graph.edge_end (n, Galois::NONE) - graph.edge_begin (n, Galois::NONE);
           // std::cout << "Degree: " << graph.edge_end (n, Galois::NONE) - graph.edge_begin (n, Galois::NONE) << std::endl;
-        });
+        },
+        "node-data-init",
+        Galois::doall_chunk_size<CHUNK_SIZE> ());
 
     t_init.stop();
     std::cout << "Graph read with nodes=" << numNodes << ", edges=" << numEdges.reduce () << std::endl;
@@ -192,7 +194,9 @@ protected:
                 << n << std::endl; 
             }
           }
-        });
+        },
+        "node-data-init",
+        Galois::doall_chunk_size<CHUNK_SIZE> ());
 
     if (numUnreachable.reduce () > 0) {
       std::cerr << "WARNING: " << numUnreachable.reduce () << " nodes were unreachable. "
