@@ -411,7 +411,18 @@ void makeSymmetric(FileGraph& in, FileGraph& out) {
   FileGraphWriter g;
   EdgeData edgeData;
 
-  size_t numEdges = in.sizeEdges() * 2;
+  size_t numEdges = 0;
+
+  for (FileGraph::iterator ii = in.begin(), ei = in.end(); ii != ei; ++ii) {
+    GNode src = *ii;
+    for (FileGraph::edge_iterator jj = in.edge_begin(src), ej = in.edge_end(src); jj != ej; ++jj) {
+      GNode dst = in.getEdgeDst(jj);
+      numEdges += 1;
+      if (src != dst)
+        numEdges += 1;
+    }
+  }
+
   g.setNumNodes(in.size());
   g.setNumEdges(numEdges);
   g.setSizeofEdgeData(EdgeData::has_value ? sizeof(edge_value_type) : 0);
@@ -422,7 +433,8 @@ void makeSymmetric(FileGraph& in, FileGraph& out) {
     for (FileGraph::edge_iterator jj = in.edge_begin(src), ej = in.edge_end(src); jj != ej; ++jj) {
       GNode dst = in.getEdgeDst(jj);
       g.incrementDegree(src);
-      g.incrementDegree(dst);
+      if (src != dst)
+        g.incrementDegree(dst);
     }
   }
 
@@ -435,10 +447,12 @@ void makeSymmetric(FileGraph& in, FileGraph& out) {
       if (EdgeData::has_value) {
         edge_value_type& data = in.getEdgeData<edge_value_type>(jj);
         edgeData.set(g.addNeighbor(src, dst), data);
-        edgeData.set(g.addNeighbor(dst, src), data);
+        if (src != dst)
+          edgeData.set(g.addNeighbor(dst, src), data);
       } else {
         g.addNeighbor(src, dst);
-        g.addNeighbor(dst, src);
+        if (src != dst)
+          g.addNeighbor(dst, src);
       }
     }
   }
