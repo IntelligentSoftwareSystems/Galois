@@ -408,26 +408,6 @@ void for_each_impl(const RangeTy& range, const FunctionTy& f, const char* loopna
   //   LoopTimer.stop();
 }
 
-template<typename FunctionTy>
-struct WOnEach {
-  const FunctionTy& origFunction;
-  explicit WOnEach(const FunctionTy& f): origFunction(f) { }
-  void operator()(void) {
-    FunctionTy fn(origFunction);
-    fn(LL::getTID(), activeThreads);   
-  }
-};
-
-template<typename FunctionTy>
-void on_each_impl(const FunctionTy& fn, const char* loopname = 0) {
-  if (inGaloisForEach)
-    GALOIS_DIE("Nested for_each not supported");
-
-  inGaloisForEach = true;
-  getSystemThreadPool().run(activeThreads, WOnEach<FunctionTy>(fn));
-  inGaloisForEach = false;
-}
-
 } // end namespace anonymous
 
 void preAlloc_impl(int num);

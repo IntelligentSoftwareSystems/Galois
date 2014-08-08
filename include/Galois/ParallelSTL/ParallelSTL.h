@@ -28,6 +28,7 @@
 #include "Galois/WorkList/WorkList.h"
 #include "Galois/Runtime/ParallelWork.h"
 #include "Galois/Runtime/DoAll.h"
+#include "Galois/Runtime/Executor_OnEach.h"
 
 namespace Galois {
 
