@@ -293,7 +293,7 @@ endif()
 
 ###### Documentation ######
 set(DOXYFILE_SOURCE_DIR "src\" \"include\" \"docs")
-include(UseDoxygen OPTIONAL)
+#include(UseDoxygen OPTIONAL)
 if(DOXYGEN_FOUND)
   execute_process(COMMAND ${DOXYGEN_EXECUTABLE} --version OUTPUT_VARIABLE DOXYGEN_VERSION)
   if(DOXYGEN_VERSION VERSION_GREATER 1.8.0 OR DOXYGEN_VERSION VERSION_EQUAL 1.8.0)

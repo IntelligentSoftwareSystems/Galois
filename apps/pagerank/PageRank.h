@@ -3,11 +3,7 @@
 
 #include "llvm/Support/CommandLine.h"
 
-//! d is the damping factor. Alpha is the prob that user will do a random jump, i.e., 1 - d
-static const float alpha = 1.0 - 0.85;
-
-//! maximum relative change until we deem convergence
-static const float tolerance = 0.01;
+static const float alpha = 0.85;
 
 //ICC v13.1 doesn't yet support std::atomic<float> completely, emmulate its
 //behavor with std::atomic<int>
@@ -32,14 +28,6 @@ struct atomic_float : public std::atomic<int> {
     union { float as_float; int as_int; } caster = { v };
     this->store(caster.as_int, std::memory_order_relaxed);
   }
-};
-
-struct PNode {
-  float value;
-  atomic_float accum;
-  PNode() { }
-
-  float getPageRank() { return value; }
 };
 
 extern llvm::cl::opt<unsigned int> memoryLimit;
