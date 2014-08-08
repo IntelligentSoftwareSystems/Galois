@@ -998,8 +998,8 @@ int main(int argc, char** argv) {
 	fringewl = &wl4;
 //  GaloisRuntime::WorkList::FIFO<int,  true> wl5;
 #else
-  Galois::WorkList::FIFO<ED*, false> wl2;
-  Galois::WorkList::FIFO<ND*, false> wl4;
+  Galois::WorkList::GFIFO<ED*, false> wl2;
+  Galois::WorkList::GFIFO<ND*, false> wl4;
 #endif
 
 //  for (int kk=0; kk<numThreads; ++kk) {

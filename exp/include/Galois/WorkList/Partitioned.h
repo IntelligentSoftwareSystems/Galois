@@ -23,7 +23,7 @@
 #ifndef GALOIS_WORKLIST_PARTITIONED_H
 #define GALOIS_WORKLIST_PARTITIONED_H
 
-#include "Galois/WorkList/Fifo.h"
+#include "Galois/WorkList/GFifo.h"
 #include "Galois/WorkList/WorkListHelpers.h"
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/ll/CacheLineStorage.h"
@@ -34,7 +34,7 @@
 namespace Galois {
 namespace WorkList {
 
-template<typename Indexer = DummyIndexer<int>, typename Container = FIFO<>,
+template<typename Indexer = DummyIndexer<int>, typename Container = GFIFO<>,
   int BlockPeriod=0,
   int MaxValue=64,
   typename T=int,
@@ -139,7 +139,7 @@ public:
 };
 GALOIS_WLCOMPILECHECK(Partitioned)
 
-template<typename Indexer = DummyIndexer<int>, typename Container = FIFO<>,
+template<typename Indexer = DummyIndexer<int>, typename Container = GFIFO<>,
   typename T=int,
   bool Concurrent=true>
 struct ThreadPartitioned : private boost::noncopyable {

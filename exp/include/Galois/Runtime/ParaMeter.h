@@ -37,7 +37,7 @@
 #include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/Termination.h"
 #include "Galois/Runtime/ThreadPool.h"
-#include "Galois/WorkList/Fifo.h"
+#include "Galois/WorkList/GFifo.h"
 #include "Galois/Runtime/ll/gio.h"
 
 #include "llvm/Support/CommandLine.h"
@@ -51,7 +51,7 @@
 
 namespace Galois {
 namespace WorkList {
-template<class ContainerTy = FIFO<>,class T=int>
+template<class ContainerTy = GFIFO<>,class T=int>
 class ParaMeter: private boost::noncopyable {
 };
 }

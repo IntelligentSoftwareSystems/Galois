@@ -23,6 +23,7 @@
 #ifndef GALOIS_RUNTIME_WORKLISTALT_H
 #define GALOIS_RUNTIME_WORKLISTALT_H
 
+#include "Galois/WorkList/GFifo.h"
 #include "Galois/Runtime/ll/CompilerSpecific.h"
 
 namespace Galois {
@@ -171,7 +172,7 @@ public:
 };
 //GALOIS_WLCOMPILECHECK(LocalQueues);
 
-template<typename WLTy = FIFO<>, typename T = int>
+template<typename WLTy = GFIFO<>, typename T = int>
 class LocalWorklist : private boost::noncopyable {
   typedef typename WLTy::template rethread<false>::type lWLTy;
   Runtime::PerThreadStorage<lWLTy> local;
