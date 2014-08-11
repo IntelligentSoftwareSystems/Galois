@@ -69,7 +69,7 @@ class BilliardsTwoPhase: public Billiards {
 
   struct OpFunc {
 
-    static const unsigned CHUNK_SIZE = 16;
+    static const unsigned CHUNK_SIZE = 1;
 
     Table& table;
     const double endtime;

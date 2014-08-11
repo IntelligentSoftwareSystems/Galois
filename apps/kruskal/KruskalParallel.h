@@ -109,6 +109,8 @@ struct FindLoop {
 
   typedef char tt_does_not_need_push;
 
+  static const unsigned CHUNK_SIZE = 32;
+
   VecRep_ty& repVec;
   VecAtomicCtxPtr& repOwnerCtxVec;
   Accumulator& findIter;
@@ -202,7 +204,7 @@ struct FindLoop {
 template <bool usingOrderedRuntime=false>
 struct LinkUpLoop {
   typedef char tt_does_not_need_push;
-  static const size_t CHUNK_SIZE = 64;
+  static const size_t CHUNK_SIZE = 32;
 
   VecRep_ty& repVec;
   VecAtomicCtxPtr& repOwnerCtxVec;
