@@ -249,10 +249,8 @@ void AVIabstractMain::run (int argc, char* argv[]) {
   Galois::StatTimer t;
   t.start ();
 
-  Galois::Runtime::beginSampling ();
   // don't write to files when measuring time
   runLoop (*meshInit, g, false);
-  Galois::Runtime::endSampling ();
 
   t.stop ();
 

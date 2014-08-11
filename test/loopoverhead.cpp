@@ -10,11 +10,11 @@ unsigned iter = 1;
 
 struct emp {
   template<typename T>
-  void operator()(const T& t) { 
+  void operator()(const T& t) const { 
     Galois::Runtime::LL::compilerBarrier(); 
   }
   template<typename T, typename C>
-  void operator()(const T& t, const C& c) { Galois::Runtime::LL::compilerBarrier(); }
+  void operator()(const T& t, const C& c) const { Galois::Runtime::LL::compilerBarrier(); }
   typedef int tt_does_not_need_push;
   typedef int tt_does_not_need_stats;
   typedef int tt_does_not_need_aborts;
