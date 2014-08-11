@@ -66,6 +66,7 @@ cll::opt<unsigned int> memoryLimit("memoryLimit",
     cll::desc("Memory limit for out-of-core algorithms (in MB)"), cll::init(~0U));
 static cll::opt<int> amp("amp", cll::desc("amp for priority"), cll::init(-100));
 static cll::opt<float> tolerance("tolerance", cll::desc("tolerance"), cll::init(0.01));
+static cll::opt<bool> dbg("dbg", cll::desc("dbg"), cll::init(false));
 static cll::opt<std::string> algo_str("algo_str", cll::desc("algo_str"), cll::init("NA"));
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
     cll::values(
@@ -371,7 +372,7 @@ struct AsyncRsd {
 	  LNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
 	  ddata.residual += sdata.residual*alpha/sdata.nout; // update residual
 	  // if the node is not in the worklist and the residual is greater than tolerance
-	  if(!ddata.flag && ddata.residual>tolerance) {
+	  if(!ddata.flag && ddata.residual>=tolerance) {
 	    ddata.flag = true;
             ctx.push(dst);
 	  } 
@@ -618,14 +619,14 @@ static void printTop(Graph& graph, int topn, const char *algo_name, int numThrea
 
   Top top;
   
-  /*
-  char filename[256];
-  int tamp = amp;
-  float ttol = tolerance;
-  sprintf(filename,"/scratch/01982/joyce/tmp/%s_t_%d_tol_%f_amp_%d", algo_name,numThreads,ttol,tamp);
   std::ofstream myfile;
-  myfile.open (filename);
-  */
+  if(dbg){
+    char filename[256];
+    int tamp = amp;
+    float ttol = tolerance;
+    sprintf(filename,"/scratch/01982/joyce/tmp/%s_t_%d_tol_%f_amp_%d", algo_name,numThreads,ttol,tamp);
+    myfile.open (filename);
+  }
 
   //std::cout<<"print PageRank\n";
   for (auto ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
@@ -634,7 +635,9 @@ static void printTop(Graph& graph, int topn, const char *algo_name, int numThrea
     float value = n.getPageRank()/sum; // normalized PR (divide PR by sum)
     //float value = n.getPageRank(); // raw PR 
     //std::cout<<value<<" "; 
-    //myfile << value <<" ";
+    if(dbg){
+      myfile << value <<" ";
+    }
     Pair key(value, src);
 
     if ((int) top.size() < topn) {
@@ -647,7 +650,9 @@ static void printTop(Graph& graph, int topn, const char *algo_name, int numThrea
       top.insert(std::make_pair(key, src));
     }
   }
-  //myfile.close();
+  if(dbg){
+    myfile.close();
+  }
   //std::cout<<"\nend of print\n";
 
   int rank = 1;
