@@ -43,6 +43,7 @@
 #include "Galois/Accumulator.h"
 
 #include "Galois/Runtime/PerThreadWorkList.h"
+#include "Galois/Runtime/Executor_OnEach.h"
 #include "Galois/DoAllWrap.h"
 #include "Galois/Runtime/ll/CompilerSpecific.h"
 #include "Galois/Markable.h"
@@ -101,7 +102,7 @@ private:
 
 template <typename _CleanupFunc>
 GALOIS_ATTRIBUTE_PROF_NOINLINE static void updateODG_clean (WLTy& workList, const unsigned currStep) {
-  Galois::on_each (_CleanupFunc (workList, currStep), Galois::loopname ("remove_simulated_events"));
+  Galois::Runtime::on_each_impl (_CleanupFunc (workList, currStep), "remove_simulated_events");
   // Galois::Runtime::do_all_coupled (
       // boost::counting_iterator<unsigned> (0),
       // boost::counting_iterator<unsigned> (workList.numRows ()), 
@@ -138,7 +139,7 @@ static size_t runSimInternal (Table& table, WLTy& workList, const double endtime
       Galois::do_all_choice (Galois::Runtime::makeLocalRange (workList),
           _FindIndepFunc (indepList, workList, currStep, findIter), 
           "find_indep_events", Galois::doall_chunk_size<1> ());
-      }
+
       findTimer.stop ();
 
       // printf ("currStep= %d, indepList.size ()= %zd, workList.size ()= %zd\n", 
@@ -377,7 +378,6 @@ public:
           workList.get ().push_back (MEvent (e));
         },
         "fill_init", Galois::doall_chunk_size<32> ());
-    }
 
     // sort events
     // for (unsigned r = 0; r < workList.numRows (); ++r) {
