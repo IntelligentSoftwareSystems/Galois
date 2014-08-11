@@ -57,7 +57,8 @@ enum Algo {
   sync_pr,  
   async,
   async_rsd,
-  async_prt
+  async_prt,
+  async_ppr_rsd
 };
 
 cll::opt<std::string> filename(cll::Positional, cll::desc("<input graph>"), cll::Required);
@@ -75,6 +76,7 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
       clEnumValN(Algo::async, "async", "Asynchronous without priority version..."),
       clEnumValN(Algo::async_rsd, "async_rsd", "Asynchronous with residual version..."),
       clEnumValN(Algo::async_prt, "async_prt", "Prioritized (degree biased residual) version..."),
+      clEnumValN(Algo::async_ppr_rsd, "async_ppr_rsd", "Asyncronous PPR"),
       clEnumValEnd), cll::init(Algo::async_prt));
 
 
@@ -353,6 +355,8 @@ struct AsyncRsd {
 
     void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) {
       LNode& sdata = graph.getData(src);
+      if (sdata.residual < tolerance)
+        return;
       // the node is processed
       sdata.flag = false;
       double sum = 0;
@@ -364,7 +368,7 @@ struct AsyncRsd {
       float value = alpha*sum + (1.0 - alpha);
       float diff = std::fabs(value - sdata.value);
 
-      if (diff > tolerance) {
+      if (diff >= tolerance) {
         sdata.value = value;
         // for each out-going neighbors
         for (auto jj = graph.edge_begin(src, Galois::MethodFlag::NONE), ej = graph.edge_end(src, Galois::MethodFlag::NONE); jj != ej; ++jj) {
@@ -663,18 +667,203 @@ static void printTop(Graph& graph, int topn, const char *algo_name, int numThrea
 }
 
 
-//! Find k seeds, in degree order which are at least on hop
 template<typename Graph>
-std::vector<typename Graph::GraphNode> findPPRSeeds(Graph& g, unsigned k) {
+std::vector<typename Graph::GraphNode> getDegSortedNodes(Graph& g) {
   std::vector<typename Graph::GraphNode> nodes;
   nodes.reserve(std::distance(g.begin(), g.end()));
   std::copy(g.begin(), g.end(), std::back_insert_iterator<decltype(nodes)>(nodes));
   Galois::ParallelSTL::sort(nodes.begin(), nodes.end(), 
-            [&g](const typename Graph::GraphNode& lhs, 
-                 const typename  Graph::GraphNode& rhs) {
-              return std::distance(g.edge_begin(lhs), g.edge_end(lhs))
-                > std::distance(g.edge_begin(rhs), g.edge_end(rhs));
-            });
+                            [&g](const typename Graph::GraphNode& lhs, 
+                                 const typename  Graph::GraphNode& rhs) {
+                              return std::distance(g.edge_begin(lhs), g.edge_end(lhs))
+                                > std::distance(g.edge_begin(rhs), g.edge_end(rhs));
+                            });
+  return nodes;
+}
+
+template<typename Graph>
+std::vector<typename Graph::GraphNode> getPRSortedNodes(Graph& g) {
+  std::vector<typename Graph::GraphNode> nodes;
+  nodes.reserve(std::distance(g.begin(), g.end()));
+  std::copy(g.begin(), g.end(), std::back_insert_iterator<decltype(nodes)>(nodes));
+  Galois::ParallelSTL::sort(nodes.begin(), nodes.end(), 
+                            [&g](const typename Graph::GraphNode& lhs, 
+                                 const typename  Graph::GraphNode& rhs) {
+                              return g.getData(lhs).getPageRank() > g.getData(rhs).getPageRank();
+                            });
+  return nodes;
+}
+
+
+//---------- asynchronous with residual (two level priority)
+struct PPRAsyncRsd {
+  static constexpr double alpha = 0.99;
+
+  struct LNode {
+    float value;
+    float residual; // tracking residual
+    bool flag; // tracking if it is in the worklist
+    bool seedset;
+    float getPageRank() const { return value; }
+  };
+
+  typedef Galois::Graph::LC_CSR_Graph<LNode,void>
+    ::with_numa_alloc<true>::type
+    Graph;
+  typedef Graph::GraphNode GNode;
+
+  std::string name() const { return "PPRAsyncRsd"; }
+
+  void readGraph(Graph& graph) {
+    Galois::Graph::readGraph(graph, filename); 
+  }
+
+  struct Initialize {
+    Graph& g;
+    Initialize(Graph& g): g(g) { }
+    void operator()(Graph::GraphNode n) {
+      LNode& data = g.getData(n);
+      data.value = 0.0;
+      data.flag = true;
+      data.seedset = false;
+      data.residual = 0.0;
+    }
+  };
+
+  struct Process2 {
+    Graph& graph;
+     
+    Process2(Graph& g): graph(g) { }
+
+    void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) {
+      LNode& sdata = graph.getData(src);
+      if (sdata.residual < tolerance)
+        return;
+
+      // the node is processed
+      sdata.flag = false;
+      double sum = 0;
+      for (auto jj = graph.edge_begin(src, Galois::MethodFlag::NONE), ej = graph.edge_end(src, Galois::MethodFlag::NONE); jj != ej; ++jj) {
+        GNode dst = graph.getEdgeDst(jj);
+        LNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+        sum += ddata.value / std::distance(graph.edge_begin(dst), graph.edge_end(dst));
+      }
+      float value = alpha * sum + (sdata.seedset ? (1.0 - alpha) : 0.0);
+      float diff = std::fabs(value - sdata.value);
+
+      if (diff >= tolerance) {
+        sdata.value = value;
+        //std::cout << src << " " << sdata.value << "\n";
+        // for each out-going neighbors
+        for (auto jj = graph.edge_begin(src, Galois::MethodFlag::NONE), ej = graph.edge_end(src, Galois::MethodFlag::NONE); jj != ej; ++jj) {
+          GNode dst = graph.getEdgeDst(jj);
+	  LNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+	  ddata.residual += sdata.residual*alpha/std::distance(graph.edge_begin(src), graph.edge_end(src)); // update residual
+	  // if the node is not in the worklist and the residual is greater than tolerance
+	  if(!ddata.flag && ddata.residual>=tolerance) {
+	    ddata.flag = true;
+            ctx.push(dst);
+	  } 
+        }
+        sdata.residual = 0.0; // update residual
+      } // enf of if
+      
+    } // end of operator
+  };
+
+  double computeResidual(Graph& graph,  GNode src) {
+    double retval = 0;
+    for (auto jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj){
+      GNode dst = graph.getEdgeDst(jj);
+      retval += 1.0/std::distance(graph.edge_begin(dst), graph.edge_end(dst));
+    }
+    return retval * alpha * (1.0 - alpha);
+  }
+
+  std::vector<GNode> cluster_from_sweep(Graph& g) {
+    // sparserow* G, sparsevec& p, 
+    // std::vector<mwIndex>& cluster, double *outcond, double* outvolume,
+    // double *outcut)
+    // now we have to do the sweep over p in sorted order by value
+    auto nodes = getPRSortedNodes(g);
+    struct ldata {
+      unsigned volume;
+      int cutsize;
+    };
+    
+    std::vector<unsigned> rank(nodes.size());
+    std::vector<ldata> data(nodes.size());
+
+    size_t i = 0;
+    for(auto n : nodes)
+      rank[n] = i++;
+    
+    unsigned total_degree = 0;
+
+    i = 0;
+    for (auto n : nodes) {
+      int deg = std::distance(g.edge_begin(n), g.edge_end(n));
+      total_degree += deg;
+      int change = deg;
+      for (auto ni = g.edge_begin(n), ne = g.edge_end(n); ni != ne; ++ni) {
+        if (rank[g.getEdgeDst(ni)] < rank[n])
+          change -= 2;
+      }
+      //assert(change > 0 || -change < curcutsize);
+      data[i].cutsize = change;
+      data[i].volume = deg;
+      ++i;
+    }
+    std::partial_sum(data.begin(), data.end(), data.begin(), [] (const ldata& lhs, const ldata& rhs) -> ldata { return {lhs.volume + rhs.volume, lhs.cutsize + rhs.cutsize}; });
+    std::vector<double> conductance(data.size());
+    std::transform(data.begin(), data.end(), conductance.begin(),
+                   [total_degree] (const ldata& d) -> double {
+                     if (d.volume == 0 || total_degree == d.volume)
+                       return  1.0;
+                     else 
+                       return double(d.cutsize)/double(std::min(d.volume, total_degree-d.volume));
+                   });
+
+    for (int i = 0; i < 10; ++i )
+      std::cout << conductance[i] << " ";
+    std::cout << "\n";
+
+    auto m = std::min_element(conductance.begin(), conductance.end());
+    assert(m != conductance.end());
+    double mincond = *m;
+    //printf("mincond=%f mincondind=%i\n", mincond, mincondind);
+    size_t num = std::distance(conductance.begin(), m);
+    std::vector<GNode> cluster;
+    for (i = 0; i <= num; ++i)
+      cluster.push_back(nodes[i]);
+    return cluster;
+  }
+
+
+
+  void operator()(Graph& graph, GNode seed) {
+    for (auto ii = graph.edge_begin(seed), ee = graph.edge_end(seed);
+         ii != ee; ++ii) {
+      auto n = graph.getEdgeDst(ii);
+      auto& d = graph.getData(n);
+      d.residual = computeResidual(graph,n);
+      d.seedset = true;
+      d.value = 1 - alpha;
+    }
+    graph.getData(seed).residual = computeResidual(graph, seed);
+    graph.getData(seed).seedset = true;
+    graph.getData(seed).value = 1 - alpha;
+
+    typedef Galois::WorkList::dChunkedFIFO<16> WL;
+    Galois::for_each_local(graph, Process2(graph), Galois::wl<WL>());
+  }
+};
+
+
+//! Find k seeds, in degree order which are at least on hop
+template<typename Graph>
+std::vector<typename Graph::GraphNode> findPPRSeeds(Graph& g, unsigned k) {
+  std::vector<typename Graph::GraphNode> nodes = getDegSortedNodes(g);
   std::set<typename Graph::GraphNode> marks;
   std::vector<typename Graph::GraphNode> retval;
   auto nodeI = nodes.begin();
@@ -704,12 +893,6 @@ void run() {
   Galois::preAlloc(numThreads + (graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::MM::hugePageSize);
   Galois::reportPageAlloc("MeminfoPre");
 
-  Galois::StatTimer Tt;
-  Tt.start();
-  auto seeds = findPPRSeeds(graph, 10000);
-  Tt.stop();
-  std::cout << "Find 10k seeds " << Tt.get() << "\n";
-
   Galois::StatTimer T;
   std::cout << "Running " << algo.name() << " version\n";
   std::cout << "tolerance: " << tolerance << "\n";
@@ -724,6 +907,70 @@ void run() {
     printTop(graph, 10, algo.name().c_str(), numThreads);
 }
 
+template<typename Algo>
+void runPPR() {
+  typedef typename Algo::Graph Graph;
+
+  Algo algo;
+  Graph graph;
+
+  algo.readGraph(graph);
+
+  std::cout << "Read " << std::distance(graph.begin(), graph.end()) << " Nodes\n";
+
+  Galois::preAlloc(numThreads + (graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::MM::hugePageSize);
+  Galois::reportPageAlloc("MeminfoPre");
+
+  unsigned numSeeds = 2;
+
+  Galois::StatTimer Tt;
+  Tt.start();
+  auto seeds = findPPRSeeds(graph, numSeeds);
+  Tt.stop();
+  std::cout << "Find " << numSeeds << " seeds (found " << seeds.size() << ") in " << Tt.get() << "ms\n";
+
+  std::map<typename Graph::GraphNode, std::deque<unsigned> > clusters;
+
+  unsigned counter = 0;
+  for (auto seed : seeds) {
+
+    Galois::StatTimer T1, T2, T3;
+    std::cout << "Running " << algo.name() << " version\n";
+    std::cout << "tolerance: " << tolerance << "\n";
+    T1.start();
+    Galois::do_all_local(graph, typename Algo::Initialize(graph));
+    T1.stop();
+    T2.start();
+    algo(graph, seed);
+    T2.stop();
+    T3.start();
+    auto c = algo.cluster_from_sweep(graph);
+    T3.stop();
+    std::cout << T1.get() << " " << T2.get() << " " << T3.get() << "\n";
+
+    std::cout << seed << " : " << c.size() << "\n";
+    // for (auto n : c)
+    //   std::cout << n << " ";
+    // std::cout << "\n";
+
+    for (auto n : c)
+      clusters[n].push_back(counter);
+    ++counter;
+
+    Galois::reportPageAlloc("MeminfoPost");
+  }
+
+  for (auto np : clusters) {
+    std::cout << np.first << ": ";
+    for (auto n : np.second)
+      std::cout << n << " ";
+    std::cout << "\n";
+  }
+
+  //if (!skipVerify)
+  //printTop(graph, 10, algo.name().c_str(), numThreads);
+}
+
 int main(int argc, char **argv) {
   LonestarStart(argc, argv, name, desc, url);
   Galois::StatManager statManager;
@@ -735,6 +982,7 @@ int main(int argc, char **argv) {
     case Algo::async: run<Async>(); break;
     case Algo::async_rsd: run<AsyncRsd>(); break;
     case Algo::async_prt: run<AsyncPrt>(); break;
+    case Algo::async_ppr_rsd: runPPR<PPRAsyncRsd>(); break;
     default: std::cerr << "Unknown algorithm\n"; abort();
   }
   T.stop();
