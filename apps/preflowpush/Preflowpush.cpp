@@ -337,7 +337,7 @@ struct UpdateHeights {
 };
 
 struct ResetHeights {
-  void operator()(const GNode& src) {
+  void operator()(const GNode& src) const {
     Node& node = app.graph.getData(src, Galois::MethodFlag::NONE);
     node.height = app.graph.size();
     node.current = 0;
@@ -351,7 +351,7 @@ struct FindWork {
   WLTy& wl;
   FindWork(WLTy& w) : wl(w) {}
 
-  void operator()(const GNode& src) {
+  void operator()(const GNode& src) const {
     Node& node = app.graph.getData(src, Galois::MethodFlag::NONE);
     if (src == app.sink || src == app.source || node.height >= (int) app.graph.size())
       return;

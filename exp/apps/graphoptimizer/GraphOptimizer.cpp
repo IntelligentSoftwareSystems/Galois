@@ -640,7 +640,7 @@ void dumphist(std::ostream& of, std::string name, std::vector<unsigned int>& hva
 
 struct ComputeRatio {
   template<typename GNode>
-  void operator()(const GNode& n) {
+  void operator()(const GNode& n) const {
     std::deque<unsigned int> IDs, IDs2, IDs3;
     std::vector<uint8_t> var;
     for (Graph::edge_iterator ii = graph.edge_begin(n),

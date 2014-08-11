@@ -24,7 +24,7 @@ class GraphNodeBag {
 
   struct InitializeSmall {
     GraphNodeBag* self;
-    void operator()(size_t n) {
+    void operator()(size_t n) const {
       self->bitmask[n] = 0;
     }
   };
@@ -40,7 +40,7 @@ class GraphNodeBag {
 
   struct Densify {
     GraphNodeBag* self;
-    void operator()(size_t n) {
+    void operator()(size_t n) const {
       self->bitmask[n] = true;
     }
   };

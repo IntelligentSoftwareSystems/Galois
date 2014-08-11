@@ -117,16 +117,17 @@ struct GraphLabDiameter {
 
   struct Initialize {
     Graph& graph;
-    Galois::optional<std::mt19937> gen;
+    //FIXME: don't use mutable
+    mutable Galois::optional<std::mt19937> gen;
 #if __cplusplus >= 201103L || defined(HAVE_CXX11_UNIFORM_REAL_DISTRIBUTION)
-    std::uniform_real_distribution<float> dist;
+    mutable std::uniform_real_distribution<float> dist;
 #else
-    std::uniform_real<float> dist;
+    mutable std::uniform_real<float> dist;
 #endif
 
     Initialize(Graph& g): graph(g) { }
 
-    size_t hash_value() {
+    size_t hash_value() const {
       if (!gen) {
         gen = std::mt19937();
         gen->seed(Galois::Runtime::LL::getTID());
@@ -138,7 +139,7 @@ struct GraphLabDiameter {
       return ret;
     }
 
-    void initHashed(LNode& data) {
+    void initHashed(LNode& data) const {
       for (size_t i = 0; i < 10; ++i) {
         size_t hash_val = hash_value();
 
@@ -151,7 +152,7 @@ struct GraphLabDiameter {
       }
     }
 
-    void initExact(LNode& data, size_t id) {
+    void initExact(LNode& data, size_t id) const {
       std::vector<bool> mask1(id + 2, 0);
       mask1[id] = 1;
       data.bitmask1.push_back(mask1);
@@ -160,7 +161,7 @@ struct GraphLabDiameter {
       data.bitmask2.push_back(mask2);
     }
 
-    void operator()(GNode n) {
+    void operator()(GNode n) const {
       LNode& data = graph.getData(n, Galois::MethodFlag::NONE);
       if (UseHashed)
         initHashed(data);
@@ -223,7 +224,7 @@ struct GraphLabDiameter {
   struct count_exact_visited {
     Graph& graph;
     count_exact_visited(Graph& g): graph(g) { }
-    size_t operator()(GNode n) {
+    size_t operator()(GNode n) const {
       LNode& data = graph.getData(n);
       size_t count = 0;
       for (size_t i = 0; i < data.bitmask1[0].size(); ++i)
@@ -237,7 +238,7 @@ struct GraphLabDiameter {
     Graph& graph;
     count_hashed_visited(Graph& g): graph(g) { }
 
-    size_t approximate_pair_number(const std::vector<std::vector<bool> >& bitmask) {
+    size_t approximate_pair_number(const std::vector<std::vector<bool> >& bitmask) const {
       float sum = 0.0;
       for (size_t a = 0; a < bitmask.size(); ++a) {
         for (size_t i = 0; i < bitmask[a].size(); ++i) {
@@ -250,7 +251,7 @@ struct GraphLabDiameter {
       return (size_t) (pow(2.0, sum / (float) (bitmask.size())) / 0.77351);
     }
 
-    size_t operator()(GNode n) {
+    size_t operator()(GNode n) const {
       LNode& data = graph.getData(n);
       return approximate_pair_number(data.bitmask1);
     }

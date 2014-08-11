@@ -10,7 +10,7 @@ int RandomNumber () { return (rand()%1000000); }
 bool IsOdd (int i) { return ((i%2)==1); }
 
 struct IsOddS {
-  bool operator() (int i) { return ((i%2)==1); }
+  bool operator() (int i) const { return ((i%2)==1); }
 };
 
 int vectorSize = 1;

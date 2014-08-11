@@ -191,7 +191,7 @@ template<typename Graph>
 struct Initialize {
   Graph& g;
   Initialize(Graph& g): g(g) { }
-  void operator()(typename Graph::GraphNode n) {
+  void operator()(typename Graph::GraphNode n) const {
     g.getData(n).dist = DIST_INFINITY;
   }
 };
@@ -418,11 +418,11 @@ struct HighCentralityAlgo {
     Dist newDist; 
     BackwardProcess(Graph& g, CountingBag* n, int d): graph(g), next(n), newDist(d) { }
 
-    void operator()(const GNode& n, Galois::UserContext<GNode>&) {
-      (*this)(n);
+    void operator()(const GNode& n, Galois::UserContext<GNode>&) const {
+      operator()(n);
     }
 
-    void operator()(const GNode& n) {
+    void operator()(const GNode& n) const {
       SNode& sdata = graph.getData(n, Galois::MethodFlag::NONE);
       if (sdata.dist <= newDist)
         return;

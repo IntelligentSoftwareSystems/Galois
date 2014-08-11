@@ -45,7 +45,7 @@ struct is_bad {
 struct create_nodes {
   Graph* g;
   create_nodes(Graph* _g): g(_g) {}
-  void operator()(Element& item) {
+  void operator()(Element& item) const {
     GNode n = g->createNode(item);
     g->addNode(n);
   }

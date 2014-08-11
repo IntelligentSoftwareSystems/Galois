@@ -275,7 +275,7 @@ class BFSwavefrontCoupled: public AbstractWavefrontBFS {
         numAdds (numAdds) 
     {} 
 
-    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (GNode src) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (GNode src) const {
       numAdds += Super_ty::bfsOperator<false> (graph, src, nextWL.get ());
     }
   };

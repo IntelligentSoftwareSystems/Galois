@@ -221,13 +221,13 @@ struct BuildTreeLockFree {
     OctreeInternal<B>* root;
     double root_radius;
 
-    void operator () (Body<B>* b) {
+    void operator () (Body<B>* b) const {
       insert(b, root, root_radius, treeAlloc, internalNodes);
     }
 
     template<typename Context>
-    void operator()(Body<B>* b, Context&) {
-      (*this) (b);
+    void operator()(Body<B>* b, Context&) const {
+      operator() (b);
     }
 
     static void insert (Body<B>* b, OctreeInternal<B>* node, double radius

@@ -206,7 +206,7 @@ private:
     {}
 
 
-    GALOIS_ATTRIBUTE_PROF_NOINLINE void updateODG_test (MEvent& e) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void updateODG_test (MEvent& e) const {
 
 
       if (!e.marked ()) {
@@ -246,7 +246,7 @@ private:
 
     }
 
-    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (MEvent& e) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (MEvent& e) const {
       updateODG_test (e);
     }
 
@@ -254,7 +254,7 @@ private:
 
   struct SimulateIndepEvents {
 
-    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (Event& event) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (Event& event) const {
       event.simulate();
     }
   };
@@ -282,7 +282,7 @@ private:
     {}
 
 
-    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (Event& event) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (Event& event) const {
       addList.get().clear ();
 
       table.addNextEvents (event, addList.get (), endtime);
@@ -407,7 +407,7 @@ private:
         findIter (_findIter)
     {} 
 
-    GALOIS_ATTRIBUTE_PROF_NOINLINE void updateODG_test (MEvent& e) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void updateODG_test (MEvent& e) const {
       if (!e.marked ()) {
 
         bool indep = true;
@@ -443,7 +443,7 @@ private:
       } // end outer if
     }
 
-    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (MEvent& e) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (MEvent& e) const {
       updateODG_test (e);
     }
   };

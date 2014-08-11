@@ -34,7 +34,7 @@ struct GraphLabAlgo {
   struct Initialize {
     Graph& g;
     Initialize(Graph& g): g(g) { }
-    void operator()(typename Graph::GraphNode n) {
+    void operator()(typename Graph::GraphNode n) const {
       LNode& data = g.getData(n, Galois::MethodFlag::NONE);
       data.data = 1.0;
     }

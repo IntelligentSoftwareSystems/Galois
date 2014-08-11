@@ -580,7 +580,7 @@ struct FillUp {
 
   explicit FillUp (EdgeCtxWL& wl): wl (wl) {}
 
-  GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (const Edge& edge) {
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (const Edge& edge) const {
     wl.get ().push_back (edge);
   }
 };
@@ -778,7 +778,7 @@ struct FilterSelfEdges {
       filterWL (filterWL) 
   {}
 
-  GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (const Edge& edge) {
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (const Edge& edge) const {
 
     int rep1 = findPCiter_int (edge.src, repVec);
     int rep2 = findPCiter_int (edge.dst, repVec);

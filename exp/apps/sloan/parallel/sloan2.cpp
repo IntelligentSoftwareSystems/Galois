@@ -243,7 +243,7 @@ private:
 
     explicit CountLevels(bool r, GR& c): counts(c), reset(r) { }
 
-    void operator()(const GNode& n) {
+    void operator()(const GNode& n) const {
       SNode& data = graph.getData(n, Galois::MethodFlag::NONE);
       
       assert(data.dist != DIST_INFINITY);
@@ -448,7 +448,7 @@ struct PseudoPeripheral {
     
     collect_nodes(Galois::InsertBag<GNode>& b, size_t d): bag(b), dist(d) { }
 
-    void operator()(const GNode& n) {
+    void operator()(const GNode& n) const {
       if (graph.getData(n).dist == dist)
         bag.push(n);
     }

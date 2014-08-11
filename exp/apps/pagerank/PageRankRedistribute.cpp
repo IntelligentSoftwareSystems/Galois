@@ -181,11 +181,11 @@ struct Process {
 
   Process(Accum& a, double t, unsigned int numNodes): accum(a), tol(t), addend(alpha/numNodes) { }
 
-  void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) {
-    (*this)(src);
+  void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) const {
+    operator()(src);
   }
 
-  void operator()(const GNode& src) {
+  void operator()(const GNode& src) const {
     double value = 0;
     for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::NONE), ei = graph.edge_end(src, Galois::MethodFlag::NONE); ii != ei; ++ii) {
       GNode dst = graph.getEdgeDst(ii);
@@ -221,7 +221,7 @@ struct RedistributeLost {
 
   RedistributeLost(double p): delta((1 - alpha) * p), next(iterations + 1) { }
 
-  void operator()(const GNode& src) {
+  void operator()(const GNode& src) const {
     Node& sdata = graph.getData(src, Galois::MethodFlag::NONE);
     double value = getPageRank(sdata, next);
     // assuming uniform prior probability, i.e., 1 / numNodes

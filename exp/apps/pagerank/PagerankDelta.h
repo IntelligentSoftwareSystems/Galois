@@ -47,7 +47,7 @@ struct PagerankDelta {
   struct Initialize {
     Graph& g;
     Initialize(Graph& g): g(g) { }
-    void operator()(Graph::GraphNode n) {
+    void operator()(Graph::GraphNode n) const {
       LNode& data = g.getData(n, Galois::MethodFlag::NONE);
       data.value = 1.0;
       int outs = std::distance(g.edge_begin(n, Galois::MethodFlag::NONE), g.edge_end(n, Galois::MethodFlag::NONE));

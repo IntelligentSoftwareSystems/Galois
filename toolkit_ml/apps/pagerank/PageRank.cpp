@@ -89,7 +89,7 @@ struct SerialAlgo {
   struct Initialize {
     Graph& g;
     Initialize(Graph& g): g(g) { }
-    void operator()(Graph::GraphNode n) {
+    void operator()(Graph::GraphNode n) const {
       g.getData(n).value = 1.0;
       g.getData(n).accum.write(0.0);
     }
@@ -182,7 +182,7 @@ struct PullAlgo {
   struct Initialize {
     Graph& g;
     Initialize(Graph& g): g(g) { }
-    void operator()(Graph::GraphNode n) {
+    void operator()(Graph::GraphNode n) const {
       LNode& data = g.getData(n, Galois::MethodFlag::NONE);
       data.value[0] = 1.0;
       data.value[1] = 1.0;
@@ -192,7 +192,7 @@ struct PullAlgo {
   struct Copy {
     Graph& g;
     Copy(Graph& g): g(g) { }
-    void operator()(Graph::GraphNode n) {
+    void operator()(Graph::GraphNode n) const {
       LNode& data = g.getData(n, Galois::MethodFlag::NONE);
       data.value[1] = data.value[0];
     }
@@ -205,11 +205,11 @@ struct PullAlgo {
 
     Process(PullAlgo* s, Graph& g, unsigned int i): self(s), graph(g), iteration(i) { }
 
-    void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) {
-      (*this)(src);
+    void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) const {
+      operator()(src);
     }
 
-    void operator()(const GNode& src) {
+    void operator()(const GNode& src) const {
       LNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
       double sum = 0;
 
@@ -301,7 +301,7 @@ struct PullAlgo2 {
   struct Initialize {
     Graph& g;
     Initialize(Graph& g): g(g) { }
-    void operator()(Graph::GraphNode n) {
+    void operator()(Graph::GraphNode n) const {
       LNode& data = g.getData(n, Galois::MethodFlag::NONE);
       data.value[0] = 1.0;
       data.value[1] = 1.0;
@@ -313,7 +313,7 @@ struct PullAlgo2 {
   struct Copy {
     Graph& g;
     Copy(Graph& g): g(g) { }
-    void operator()(Graph::GraphNode n) {
+    void operator()(Graph::GraphNode n) const {
       LNode& data = g.getData(n, Galois::MethodFlag::NONE);
       data.value[1] = data.value[0];
     }
@@ -326,11 +326,11 @@ struct PullAlgo2 {
 
     Process(PullAlgo2* s, Graph& g, unsigned int i): self(s), graph(g), iteration(i) { }
 
-    void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) {
-      (*this)(src);
+    void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) const {
+      operator()(src);
     }
 
-    void operator()(const GNode& src) {
+    void operator()(const GNode& src) const {
 
       LNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
 
@@ -397,6 +397,9 @@ struct PullAlgo2 {
 
 /* ------------------------- Joyce's codes start ------------------------- */
 //---------- parallel synchronous algorithm (original copy: PullAlgo2, readGraph is re-written.)
+
+int idcount = 0;
+
 struct Sync {
   struct LNode {
     float value[2];
@@ -447,8 +450,7 @@ struct Sync {
   struct Initialize {
     Graph& g;
     Initialize(Graph& g): g(g) { }
-    int idcount = 0;
-    void operator()(Graph::GraphNode n) {
+    void operator()(Graph::GraphNode n) const {
       LNode& data = g.getData(n);
       //data.value[0] = 1.0;
       //data.value[1] = 1.0;
@@ -463,7 +465,7 @@ struct Sync {
   struct Copy {
     Graph& g;
     Copy(Graph& g): g(g) { }
-    void operator()(Graph::GraphNode n) {
+    void operator()(Graph::GraphNode n) const {
       LNode& data = g.getData(n);
       data.value[1] = data.value[0];
     }
@@ -476,11 +478,11 @@ struct Sync {
 
     Process(Sync* s, Graph& g, unsigned int i): self(s), graph(g), iteration(i) { }
 
-    void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) {
-      (*this)(src);
+    void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) const {
+      operator()(src);
     }
 
-    void operator()(const GNode& src) {
+    void operator()(const GNode& src) const {
 
       LNode& sdata = graph.getData(src);
 
@@ -590,11 +592,11 @@ struct PrtRsd {
     Graph& g;
     Initialize(Graph& g): g(g) { }
     int id=0;
-    void operator()(Graph::GraphNode n) {
+    void operator()(Graph::GraphNode n) const {
       LNode& data = g.getData(n);
       data.pagerank = (1.0 - alpha2);
       data.residual = 0.0;
-      data.id = id++;
+      data.id = idcount++;
       int outs = std::distance(g.edge_begin(n), g.edge_end(n));
       data.nout = outs;
       int ins = std::distance(g.in_edge_begin(n), g.in_edge_end(n));
@@ -608,11 +610,11 @@ struct PrtRsd {
      
     Process1(PrtRsd* s, Graph& g): self(s), graph(g) { }
 
-    void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) {
-      (*this)(src);
+    void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) const {
+      operator()(src);
     }
 
-    void operator()(const GNode& src) {
+    void operator()(const GNode& src) const {
       LNode& data = graph.getData(src);
       // for each out-going neighbour, add residuals
       for (auto jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj){
@@ -629,11 +631,11 @@ struct PrtRsd {
      
     Process2(PrtRsd* s, Graph& g): self(s), graph(g) { }
 
-    void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) {
-      (*this)(src);
+    void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) const {
+      operator()(src);
     }
 
-    void operator()(const GNode& src) {
+    void operator()(const GNode& src) const {
       // scale the residual 
       LNode& data = graph.getData(src);
       data.residual = alpha2*(1-alpha2)*data.residual;
@@ -646,11 +648,11 @@ struct PrtRsd {
      
     Process4(PrtRsd* s, Graph& g): self(s), graph(g) { }
 
-    void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) {
-      (*this)(src);
+    void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) const {
+      operator()(src);
     }
 
-    void operator()(const GNode& src) {
+    void operator()(const GNode& src) const {
       // scale the residual 
       LNode& data = graph.getData(src);
       std::cout<<data.residual<<" ";
@@ -674,7 +676,7 @@ struct PrtRsd {
      
     Process3(PrtRsd* s, Graph& g, Galois::Statistic& _pre, Galois::Statistic& _post): self(s), graph(g), pre(_pre), post(_post) { }
 
-    void operator()(const UpdateRequest& srcRq, Galois::UserContext<UpdateRequest>& ctx) {
+    void operator()(const UpdateRequest& srcRq, Galois::UserContext<UpdateRequest>& ctx) const {
       GNode src = srcRq.second;
       
       LNode* node = &graph.getData(src); //, Galois::MethodFlag::NONE);
@@ -808,7 +810,7 @@ struct Async {
   struct Initialize {
     Graph& g;
     Initialize(Graph& g): g(g) { }
-    void operator()(Graph::GraphNode n) {
+    void operator()(Graph::GraphNode n) const {
       LNode& data = g.getData(n);
       data.value = (1.0 - alpha2);
       int outs = std::distance(g.edge_begin(n), g.edge_end(n));
@@ -822,7 +824,7 @@ struct Async {
      
     Process(Graph& g): graph(g) { }
 
-    void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) {
+    void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) const {
       LNode& sdata = graph.getData(src);
       // the node is processed
       sdata.flag = false;

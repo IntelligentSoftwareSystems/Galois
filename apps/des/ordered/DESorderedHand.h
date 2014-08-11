@@ -212,7 +212,7 @@ class DESorderedHand:
         findIter (findIter)
     {}
 
-    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (SimObjInfo& sinfo) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (SimObjInfo& sinfo) const {
       findIter += 1;
 
       if (sinfo.hasReady ()) {
@@ -245,7 +245,7 @@ class DESorderedHand:
     {}
 
 
-    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (const Event_ty& event) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (const Event_ty& event) const {
       nevents += 1;
 
 

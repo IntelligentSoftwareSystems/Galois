@@ -145,7 +145,7 @@ class PQuadTree {
     MinBox& least;
     MaxBox& most;
     ComputeBox(MinBox& l, MaxBox& m): least(l), most(m) { }
-    void operator()(const Point* p) {
+    void operator()(const Point* p) const {
       least.update(p->t());
       most.update(p->t());
     }

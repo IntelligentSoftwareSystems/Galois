@@ -457,7 +457,7 @@ struct GenerateRounds {
   
   GenerateRounds(const PointList& p, size_t l): points(p), log2(l) { }
 
-  void operator()(size_t index) {
+  void operator()(size_t index) const {
     const Point& p = points[index];
 
     Point* ptr = &basePoints.push(p);

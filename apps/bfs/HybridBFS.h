@@ -100,7 +100,7 @@ struct HybridBFS {
       (*this)(n);
     }
 
-    void operator()(const GNode& n) {
+    void operator()(const GNode& n) const {
       NodeData& sdata = graph.getData(n, Galois::MethodFlag::NONE);
       if (sdata.dist <= newDist)
         return;

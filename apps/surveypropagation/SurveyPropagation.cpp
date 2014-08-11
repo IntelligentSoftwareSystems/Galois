@@ -302,7 +302,7 @@ struct update_eta {
 
 //compute biases on each node
 struct update_biases {
-  void operator()(GNode i) {
+  void operator()(GNode i) const {
     SPNode& idata = graph.getData(i, Galois::MethodFlag::NONE);
     if (idata.solved) return;
 
@@ -396,7 +396,7 @@ void SP_algorithm() {
 struct fix_variables {
   double limit;
   fix_variables(double d) :limit(d) {}
-  void operator()(GNode i) {//, const Context& ctx) {
+  void operator()(GNode i) const {//, const Context& ctx) {
     SPNode& idata = graph.getData(i);
     if (idata.solved) return;
     if (idata.Bias > limit) {

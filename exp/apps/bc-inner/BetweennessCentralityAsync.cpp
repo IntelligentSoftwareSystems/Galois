@@ -775,7 +775,7 @@ struct fringeFindDOALL2 {
 };
 
 struct fringeFindDOALL2NoInline {
-	void inline operator()(int i,int) {
+  void operator()(int i,int) const {
     std::pair<int,int> p1 = nodeArrayRanges[i];
 		int start = p1.first;
 		int end = p1.second;
@@ -783,7 +783,7 @@ struct fringeFindDOALL2NoInline {
     operator()(j);
   }
 
-  void operator()(int j)
+  void operator()(int j) const
     {
 			ND * n = &(gnodes[j].data);
 			if (n->nsuccs == 0 && n->distance < DEF_DISTANCE) {
