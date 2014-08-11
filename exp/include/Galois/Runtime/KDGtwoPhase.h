@@ -299,7 +299,7 @@ protected:
           total += 1;
         },
         "expandNhood",
-        doall_chunk_size<NhFunc::CHUNK_SIZE> ());
+        doall_chunk_size<OpFunc::CHUNK_SIZE> ());
 
   }
 
