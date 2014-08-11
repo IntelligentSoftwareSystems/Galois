@@ -43,6 +43,7 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <set>
 
 #include "PageRank.h"
 
@@ -75,7 +76,6 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
       clEnumValN(Algo::async_rsd, "async_rsd", "Asynchronous with residual version..."),
       clEnumValN(Algo::async_prt, "async_prt", "Prioritized (degree biased residual) version..."),
       clEnumValEnd), cll::init(Algo::async_prt));
-
 
 
 //---------- parallel synchronous algorithm (reference: PullAlgo2)
@@ -662,6 +662,36 @@ static void printTop(Graph& graph, int topn, const char *algo_name, int numThrea
   }
 }
 
+
+//! Find k seeds, in degree order which are at least on hop
+template<typename Graph>
+std::vector<typename Graph::GraphNode> findPPRSeeds(Graph& g, unsigned k) {
+  std::vector<typename Graph::GraphNode> nodes;
+  nodes.reserve(std::distance(g.begin(), g.end()));
+  std::copy(g.begin(), g.end(), std::back_insert_iterator<decltype(nodes)>(nodes));
+  Galois::ParallelSTL::sort(nodes.begin(), nodes.end(), 
+            [&g](const typename Graph::GraphNode& lhs, 
+                 const typename  Graph::GraphNode& rhs) {
+              return std::distance(g.edge_begin(lhs), g.edge_end(lhs))
+                > std::distance(g.edge_begin(rhs), g.edge_end(rhs));
+            });
+  std::set<typename Graph::GraphNode> marks;
+  std::vector<typename Graph::GraphNode> retval;
+  auto nodeI = nodes.begin();
+  while (k) {
+    --k;
+    while (marks.count(*nodeI))
+      ++nodeI;
+    auto n = *nodeI++;
+    retval.push_back(n);
+    marks.insert(n);
+    for (auto ii = g.edge_begin(n), ee = g.edge_end(n); ii != ee; ++ii)
+      marks.insert(g.getEdgeDst(ii));
+  }
+  return retval;
+}
+
+
 template<typename Algo>
 void run() {
   typedef typename Algo::Graph Graph;
@@ -673,6 +703,12 @@ void run() {
 
   Galois::preAlloc(numThreads + (graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::MM::hugePageSize);
   Galois::reportPageAlloc("MeminfoPre");
+
+  Galois::StatTimer Tt;
+  Tt.start();
+  auto seeds = findPPRSeeds(graph, 10000);
+  Tt.stop();
+  std::cout << "Find 10k seeds " << Tt.get() << "\n";
 
   Galois::StatTimer T;
   std::cout << "Running " << algo.name() << " version\n";
