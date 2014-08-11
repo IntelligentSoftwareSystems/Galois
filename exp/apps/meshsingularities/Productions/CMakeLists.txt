@@ -1,4 +1,4 @@
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -g")
 
 add_subdirectory(Point2D)
 add_subdirectory(Point2DQuad)
@@ -7,8 +7,9 @@ add_subdirectory(Edge2D)
 
 SET(MUMPS_MODE "NO" CACHE STRING "Mumps type")
 SET(BLAS "NO" CACHE STRING "Use blas")
+SET(PAPI "NO" CACHE STRING "Use PAPI")
 
-SET(VIRT_ENV "/home/nstud/konrad.jopek/virtenv")
+SET(VIRT_ENV "/h1/kjopek/")
 
 SET(BLAS_INC ${VIRT_ENV}/include/)
 SET(BLAS_LIB ${VIRT_ENV}/lib/)
@@ -20,6 +21,9 @@ SET(METIS_LIB ${VIRT_ENV}/metis/)
 
 SET(MUMPS ${VIRT_ENV}/MUMPS/)
 
+SET(PAPI_INC ${VIRT_ENV}/papi/include)
+SET(PAPI_LIB ${VIRT_ENV}/papi/lib)
+
 include_directories(${BLAS_INC})
 include_directories(${VIRT_ENV}/include)
 include_directories(${MPI_INC})
@@ -30,6 +34,12 @@ link_directories(${VIRT_ENV}/lib)
 link_directories(${MPI_LIB})
 link_directories(${METIS_LIB})
 link_directories(${MUMPS}/lib)
+
+if (${PAPI} STREQUAL "YES")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DWITH_PAPI")
+    include_directories(${PAPI_INC})
+    link_directories(${PAPI_LIB})
+endif()
 
 if( ${MUMPS_MODE} STREQUAL "SEQ" )
 	message("Sequential mumps")
@@ -67,6 +77,9 @@ elseif (${MUMPS_MODE} STREQUAL "PAR")
 	app(Solver ${LAM_2}include/mpi.h ${MUMPS_PAR}include/dmumps_c.h Mumps_Par.cxx EquationSystem.cpp PointProduction.cpp EdgeProduction.cpp Vertex.cpp Functions.cpp PointSingularitySolver.cpp GaloisWorker.cpp Node.cpp MatrixGeneration/GenericMatrixGenerator.cxx Point3D/TripleArgFunction.cxx Point3D/Element.cxx Point3D/MatrixGenerator.cxx Point3D/Tier.cxx Point2D/DoubleArgFunction.cxx Point2D/Element.cxx Point2D/MatrixGenerator.cxx Point2D/Tier.cxx Edge2D/Tier.cxx Edge2D/MatrixGenerator.cxx FakeMatrixGenerator.cpp)
 	target_link_libraries(Solver -lifcore -lsvml libdmumps.a libmumps_common.a libpord.a -lscalapack /usr/lib64/atlas/libf77blas.so.3 /usr/lib64/atlas/libcblas.so.3 -lmpi -llammpi++ -llammpio -llamf77mpi -llam -lutil -ld -lirc -liomp5 -lpthread ${BLAS_LIB}/libcblas.a ${BLAS_LIB}/liblapack.a)	
 else()
-	app(Solver EquationSystem.cpp PointProduction.cpp EdgeProduction.cpp Vertex.cpp Functions.cpp PointSingularitySolver.cpp GaloisWorker.cpp Node.cpp MatrixGeneration/GenericMatrixGenerator.cxx Point3D/TripleArgFunction.cxx Point3D/Element.cxx Point3D/MatrixGenerator.cxx Point3D/Tier.cxx Point2D/DoubleArgFunction.cxx Point2D/Element.cxx Point2D/MatrixGenerator.cxx Point2D/Tier.cxx Edge2D/Tier.cxx Edge2D/MatrixGenerator.cxx FakeMatrixGenerator.cpp)	
-	target_link_libraries(Solver -ldl -lpthread)
+	app(Solver EquationSystem.cpp PointProduction.cpp EdgeProduction.cpp Vertex.cpp Functions.cpp PointSingularitySolver.cpp GaloisWorker.cpp Node.cpp MatrixGeneration/GenericMatrixGenerator.cxx Point3D/TripleArgFunction.cxx Point3D/Element.cxx Point3D/MatrixGenerator.cxx Point3D/Tier.cxx Point2D/DoubleArgFunction.cxx Point2D/Element.cxx Point2D/MatrixGenerator.cxx Point2D/Tier.cxx Edge2D/Tier.cxx Edge2D/MatrixGenerator.cxx FakeMatrixGenerator.cpp DynamicLib.cpp)	
+	target_link_libraries(Solver -ldl -lpthread -g)
+	if (${PAPI} STREQUAL "YES")
+	    target_link_libraries(Solver -ldl -lpthread -g -lpapi)
+    endif()
 endif()
