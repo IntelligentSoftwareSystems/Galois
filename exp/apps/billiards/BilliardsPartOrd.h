@@ -67,12 +67,15 @@ class BilliardsPOunsorted: public Billiards {
 
 public:
 
+
   // static const unsigned CHUNK_SIZE = 1;
 
   virtual const std::string version () const { return "Parallel Partially Ordered with Unsorted workList"; }
 
 
   virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const double endtime, bool enablePrints=false) {
+
+    Galois::Runtime::getSystemThreadPool ().burnPower (Galois::getActiveThreads ());
 
     WLTy workList;
     // workList.fill_serial (initEvents.begin (), initEvents.end (), &WLTy::Cont_ty::push_back);
@@ -81,11 +84,16 @@ public:
         [&workList] (const Event& e) {
           workList.get ().push_back (MEvent (e));
         },
-        "fill_init");
+        "fill_init",
+        Galois::doall_chunk_size<32> ());
 
 
-    return runSimInternal<FindIndepEvents, SimulateIndepEvents, AddNextEvents, RemoveSimulatedEvents> (
+    size_t i = runSimInternal<FindIndepEvents, SimulateIndepEvents, AddNextEvents, RemoveSimulatedEvents> (
         table, workList, endtime, enablePrints);
+
+    Galois::Runtime::getSystemThreadPool ().beKind ();
+
+    return i;
   }
 
 
@@ -127,9 +135,10 @@ static size_t runSimInternal (Table& table, WLTy& workList, const double endtime
       // printf ("currStep = %d, workList.size () = %zd\n", currStep, workList.size_all ());
 
       findTimer.start ();
-      // Galois::Runtime::do_all (workList, 
-      Galois::do_all_choice (Galois::Runtime::makeLocalRange(workList), 
-          _FindIndepFunc (indepList, workList, currStep, findIter), "find_indep_events");
+      Galois::do_all_choice (Galois::Runtime::makeLocalRange (workList),
+          _FindIndepFunc (indepList, workList, currStep, findIter), 
+          "find_indep_events", Galois::doall_chunk_size<1> ());
+      }
       findTimer.stop ();
 
       // printf ("currStep= %d, indepList.size ()= %zd, workList.size ()= %zd\n", 
@@ -143,8 +152,9 @@ static size_t runSimInternal (Table& table, WLTy& workList, const double endtime
 
       addTimer.start ();
       // Galois::Runtime::do_all_coupled (indepList, 
-      Galois::do_all_choice (Galois::Runtime::makeLocalRange(indepList), 
-          _AddNextFunc (workList, addList, table, endtime, enablePrints), "add_next_events");
+      Galois::do_all_choice (Galois::Runtime::makeLocalRange (indepList), 
+          _AddNextFunc (workList, addList, table, endtime, enablePrints), 
+          "add_next_events", Galois::doall_chunk_size<1> ());
       addTimer.stop ();
 
 
@@ -160,7 +170,7 @@ static size_t runSimInternal (Table& table, WLTy& workList, const double endtime
     } 
 
 
-    if (true) {
+    if (false) {
       updateODG_clean<_CleanupFunc> (workList, currStep);
 
       if (!workList.empty_all ()) {
@@ -357,6 +367,8 @@ public:
 
   virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const double endtime, bool enablePrints=false) {
 
+    Galois::Runtime::getSystemThreadPool ().burnPower (Galois::getActiveThreads ());
+
     WLTy workList;
     // workList.fill_serial (initEvents.begin (), initEvents.end (), &WLTy::Cont_ty::push_back);
     Galois::do_all_choice (
@@ -364,7 +376,8 @@ public:
         [&workList] (const Event& e) {
           workList.get ().push_back (MEvent (e));
         },
-        "fill_init");
+        "fill_init", Galois::doall_chunk_size<32> ());
+    }
 
     // sort events
     // for (unsigned r = 0; r < workList.numRows (); ++r) {
@@ -381,10 +394,14 @@ public:
 
 
 
-    return BilliardsPOunsorted::runSimInternal
+    size_t i =  BilliardsPOunsorted::runSimInternal
       <FindIndepEvents, BilliardsPOunsorted::SimulateIndepEvents, 
            BilliardsPOunsorted::AddNextEvents, RemoveAndSortEvents> 
              (table, workList, endtime, enablePrints);
+
+    Galois::Runtime::getSystemThreadPool ().beKind ();
+
+    return i;
   }
 
 private:

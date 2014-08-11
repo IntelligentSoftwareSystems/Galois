@@ -238,7 +238,6 @@ struct BuildTreeLockFree {
 
       if (node->getChild (index) == nullptr) { 
         if (node->casChild (index, nullptr, b)) {
-          // node->setChild (index, b);
           return;
         }
       }
@@ -257,7 +256,6 @@ struct BuildTreeLockFree {
         assert (child->pos != b->pos);
         
         if (node->casChild (index, child, new_node)) {
-          // node->setChild (index, new_node);
           internalNodes.push_back (new_node);
           // successful thread inserts the replaced leaf
           insert (static_cast<Body<B>*> (child), new_node, radius, treeAlloc, internalNodes);
@@ -654,8 +652,9 @@ struct TreeSummarizeLevelByLevel: public TypeDefHelper<SerialNodeBase> {
       --i; // size - 1
 
       if (!levelWL[i].empty ()) {
-        Galois::Runtime::do_all_coupled (levelWL[i].begin (), levelWL[i].end (),
-            SummarizeOp ());
+        Galois::Runtime::do_all_coupled (
+            Galois::Runtime::makeStandardRange (levelWL[i].begin (), levelWL[i].end ()),
+            SummarizeOp (), "level-hand", 32);
 
 
         if (USE_PARAMETER) {
@@ -687,6 +686,7 @@ struct TreeSummarizeLevelByLevel: public TypeDefHelper<SerialNodeBase> {
 struct TreeSummarizeSpeculative: public TypeDefHelper<SpecNodeBase> {
 
   struct VisitNhood {
+    static const unsigned CHUNK_SIZE = 32;
 
     void acquire (TreeNode* n) {
       Galois::Runtime::acquire (n, Galois::CHECK_CONFLICT);
@@ -711,7 +711,7 @@ struct TreeSummarizeSpeculative: public TypeDefHelper<SpecNodeBase> {
   template <bool useSpec>
   struct OpFunc {
     typedef char tt_does_not_need_push;
-    static const unsigned CHUNK_SIZE = 1024;
+    static const unsigned CHUNK_SIZE = 32;
 
 
     template <typename C>
@@ -787,7 +787,7 @@ struct TreeSummarizeLevelExec: public TypeDefHelper<LevelNodeBase> {
 
     typedef int tt_does_not_need_push;
     typedef char tt_does_not_need_aborts;
-    static const unsigned CHUNK_SIZE = 512;
+    static const unsigned CHUNK_SIZE = 32;
 
     template <typename C>
     void operator () (InterNode* node, C& ctx) const {
@@ -815,84 +815,87 @@ struct TreeSummarizeKDGhand: public TypeDefHelper<KDGNodeBase> {
 
   // TODO: add flags here for no-conflicts
   struct OpFunc {
-    InterNode* root;
-
-    explicit OpFunc (InterNode* root): root (root) {}
+    typedef int tt_does_not_need_aborts;
 
     template <typename C>
     void operator () (InterNode* node, C& ctx) {
-      assert (node->numChild == 0);
 
-      // std::cout << "Processing node: " << node << std::endl;
-
-      summarizeNode (node);
-
-      if (node != root) {
-        InterNode* p = static_cast<InterNode*> (node->parent);
-        assert (p != nullptr);
-
-        assert (p->numChild > 0);
-
-        unsigned x = --(p->numChild);
-        assert (x < 8);
-
-        if (x == 0) {
-          ctx.push (p);
+      if (node->numChild != 0) {
+        // continue visit top-down
+        for (unsigned i = 0; i < 8; ++i) {
+          TreeNode* c = node->getChild (i);
+          if (c != nullptr && !c->isLeaf ()) {
+            ctx.push (static_cast<InterNode*> (c));
+          }
         }
 
-      } else {
-        assert (node->parent == nullptr);
+      } else { 
+        // start going up
+        summarizeNode (node);
+
+        InterNode* p = static_cast<InterNode*> (node->parent);
+        if (p != nullptr) {
+          unsigned x = --(p->numChild);
+          if (x == 0) {
+            ctx.push (p);
+          }
+        }
       }
+      // std::cout << "Processing node: " << node << std::endl;
     }
   };
 
-  static void checkTree (InterNode* root) {
+  static void checkTree (InterNode* node) {
     unsigned counted = 0;
     for (unsigned i = 0; i < 8; ++i) {
-      TreeNode* c = root->getChild (i);
+      TreeNode* c = node->getChild (i);
 
-      if (c != nullptr) {
-        assert (c->parent == root);
+      if (c != nullptr && !c->isLeaf ()) {
+        assert (c->parent == node);
         ++counted;
-
-        if (!c->isLeaf ()) {
-          checkTree (static_cast<InterNode*> (c));
-        }
+        checkTree (static_cast<InterNode*> (c));
       }
     }
 
-    assert (counted == root->numChild);
+    assert (counted == node->numChild);
   }
 
   template <typename I, typename InternalNodes>
   void operator () (InterNode* root, I bodbeg, I bodend, InternalNodes& internalNodes) const {
 
-    static const unsigned CHUNK_SIZE = 64;
-    typedef Galois::WorkList::dChunkedFIFO<CHUNK_SIZE, InterNode*> WL_ty;
+    static const unsigned CHUNK_SIZE = 2;
+    // typedef Galois::WorkList::dChunkedLIFO<CHUNK_SIZE, InterNode*> WL_ty;
+    typedef Galois::WorkList::AltChunkedLIFO<CHUNK_SIZE, InterNode*> WL_ty;
 
     if (!skipVerify) {
       std::cerr << "KDG hand checking the tree. Timing may be off" << std::endl;
       checkTree (root);
     }
 
-    Galois::StatTimer t_fill_wl ("Time to fill worklist for tree summarization: ");
+    Galois::for_each (
+        root,
+        OpFunc (),
+        Galois::loopname ("kdg-hand"),
+        Galois::wl<WL_ty> ());
 
-    t_fill_wl.start ();
-    WL_ty wl;
-    Galois::do_all (bodbeg, bodend, 
-        [&wl] (Leaf* l) {
-          InterNode* p = static_cast<InterNode*> (l->parent);
-          unsigned c = --(p->numChild);
 
-          if (c == 0) {
-            // std::cout << "Adding to wl: " << p << ", with numChild=" << p->numChild << std::endl;
-            wl.push (p);
-          }
-        },
-        Galois::loopname("fill_init_wl"));
-    t_fill_wl.stop ();
+    // Galois::StatTimer t_fill_wl ("Time to fill worklist for tree summarization: ");
+// 
+    // t_fill_wl.start ();
+    // WL_ty wl;
+    // Galois::do_all_local (internalNodes,
+        // [&wl] (InterNode* n) {
+          // unsigned c = n->numChild;
+// 
+          // if (c == 0) {
+            // // std::cout << "Adding to wl: " << p << ", with numChild=" << p->numChild << std::endl;
+            // wl.push (n);
+          // }
+        // },
+        // Galois::loopname("fill_init_wl"));
+    // t_fill_wl.stop ();
 
-    Galois::for_each_wl (wl, OpFunc (root), "tree_summ");
+    // Galois::for_each_wl (wl, OpFunc (root), "tree_summ");
 
   }
 };

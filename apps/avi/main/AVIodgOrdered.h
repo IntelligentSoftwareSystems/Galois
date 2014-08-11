@@ -115,6 +115,7 @@ protected:
   };
 
   struct NhoodVisit {
+    static const size_t CHUNK_SIZE = 16;
     Graph& graph;
     Locks& locks;
 

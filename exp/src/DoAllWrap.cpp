@@ -12,7 +12,7 @@ cll::opt<DoAllTypes> doAllKind (
       clEnumVal (DOALL_CILK, "DOALL_CILK"),
       clEnumVal (DOALL_OPENMP, "DOALL_OPENMP"),
       clEnumValEnd),
-    cll::init (DOALL_GALOIS_STEAL));
+    cll::init (DOALL_COUPLED));
 
 void setDoAllImpl (const DoAllTypes& type) {
   doAllKind = type;

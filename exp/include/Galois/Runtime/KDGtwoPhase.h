@@ -298,7 +298,8 @@ protected:
 
           total += 1;
         },
-        "expandNhood");
+        "expandNhood",
+        doall_chunk_size<NhFunc::CHUNK_SIZE> ());
 
   }
 
@@ -353,7 +354,8 @@ protected:
             nextWL.get ().push_back (c);
           }
         },
-        "applyOperator");
+        "applyOperator",
+        doall_chunk_size<OpFunc::CHUNK_SIZE> ());
   }
 
 
@@ -496,7 +498,8 @@ protected:
 
           total += 1;
         },
-        "expandNhood");
+        "expandNhood",
+        doall_chunk_size<NhFunc::CHUNK_SIZE> ());
 
   }
 
