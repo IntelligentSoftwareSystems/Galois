@@ -4,7 +4,7 @@
 #include "Galois/Threads.h"
 #include "Galois/Statistic.h"
 
-#include "Galois/Runtime/DoAll.h"
+#include "Galois/Runtime/Executor_DoAll.h"
 #include "Galois/Runtime/Range.h"
 #include "Galois/Runtime/ThreadPool.h"
 
@@ -85,7 +85,7 @@ void runDoAllExplicit (const F& functor, const I& beg, const I& end) {
 
   auto range = Galois::Runtime::makeStandardRange (beg, end);
 
-  Galois::Runtime::DoAllWork<F, decltype(range)> exec (functor, range);
+  Galois::Runtime::detail::DoAllWork<F, decltype(range)> exec (functor, range, nullptr);
 
   volatile unsigned i = 0; 
   

@@ -43,7 +43,7 @@
 #include "Galois/Accumulator.h"
 
 #include "Galois/Runtime/PerThreadWorkList.h"
-#include "Galois/Runtime/DoAll.h"
+#include "Galois/Runtime/Executor_DoAll.h"
 #include "Galois/Runtime/ll/CompilerSpecific.h"
 #include "Galois/Markable.h"
 

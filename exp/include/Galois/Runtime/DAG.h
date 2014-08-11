@@ -36,7 +36,7 @@
 #include "Galois/Timer.h"
 
 #include "Galois/Runtime/Context.h"
-#include "Galois/Runtime/DoAll.h"
+#include "Galois/Runtime/Executor_DoAll.h"
 #include "Galois/Runtime/LCordered.h"
 #include "Galois/Runtime/ParallelWork.h"
 #include "Galois/Runtime/PerThreadWorkList.h"

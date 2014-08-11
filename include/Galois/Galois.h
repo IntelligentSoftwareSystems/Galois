@@ -29,7 +29,7 @@
 #include "Galois/Threads.h"
 #include "Galois/Runtime/ParallelWork.h"
 #include "Galois/Runtime/Executor_OnEach.h"
-#include "Galois/Runtime/DoAll.h"
+#include "Galois/Runtime/Executor_DoAll.h"
 #include "Galois/Runtime/DeterministicWork.h"
 #include "Galois/Runtime/OrderedWork.h"
 

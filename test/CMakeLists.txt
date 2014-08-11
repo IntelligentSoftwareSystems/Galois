@@ -31,6 +31,8 @@ makeTest(static DISTSAFE)
 makeTest(twoleveliteratora DISTSAFE)
 makeTest(worklists-compile DISTSAFE)
 
+makeTest(exec_oneach)
+
 function(runSmallTest prog)
   set(options DISTSAFE)
   set(oneValueArgs)

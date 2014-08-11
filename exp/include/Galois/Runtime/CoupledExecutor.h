@@ -3,7 +3,7 @@
 
 #include "Galois/GaloisUnsafe.h"
 
-#include "Galois/Runtime/DoAll.h"
+#include "Galois/Runtime/Executor_DoAll.h"
 #include "Galois/Runtime/PerThreadWorkList.h"
 #include "Galois/WorkList/WorkListWrapper.h"
 #include "Galois/WorkList/ExternRef.h"
@@ -46,7 +46,7 @@ void do_all_coupled_explicit (const R& initRange, const F& func, const char* loo
     };
 
   auto dummyRange = makeLocalRange (*curr);
-  DoAllWork<decltype(funcWrapper), decltype(dummyRange)> exec (funcWrapper, dummyRange);
+  detail::DoAllWork<decltype(funcWrapper), decltype(dummyRange)> exec (funcWrapper, dummyRange, nullptr);
 
   Galois::Runtime::Barrier& barrier = Galois::Runtime::getSystemBarrier ();
 
