@@ -14,7 +14,7 @@
 #include "Galois/Runtime/DoAllCoupled.h"
 #include "Galois/Runtime/Sampling.h"
 #include "Galois/Runtime/ll/CompilerSpecific.h"
-#include "Galois/Runtime/DAG.h"
+#include "Galois/Runtime/TreeExec.h"
 
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"

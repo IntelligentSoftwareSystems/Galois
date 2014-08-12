@@ -9,7 +9,8 @@
 #include "Galois/Runtime/ROBexecutor.h"
 #include "Galois/Runtime/LevelExecutor.h"
 #include "Galois/Runtime/KDGtwoPhase.h"
-#include "Galois/Runtime/DAG.h"
+#include "Galois/Runtime/DAGexec.h"
+#include "Galois/Runtime/TreeExec.h"
 #include "Galois/Runtime/Sampling.h"
 
 #include <boost/iterator/transform_iterator.hpp>

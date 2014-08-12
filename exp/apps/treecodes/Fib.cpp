@@ -14,7 +14,7 @@
 #include "Galois/Runtime/DoAllCoupled.h"
 #include "Galois/Runtime/Sampling.h"
 #include "Galois/Runtime/ll/CompilerSpecific.h"
-#include "Galois/Runtime/DAG.h"
+#include "Galois/Runtime/TreeExec.h"
 
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
@@ -23,7 +23,7 @@ namespace cll = llvm::cl;
 static cll::opt<unsigned> N("n", cll::desc("n-th fibonacci number"), cll::init(39));
 
 enum ExecType {
-  SERIAL, CILK, GALOIS, GALOIS_ALT 
+  SERIAL, CILK, GALOIS, GALOIS_ALT, GALOIS_STACK
 };
 
 static cll::opt<ExecType> execType (
@@ -33,6 +33,7 @@ static cll::opt<ExecType> execType (
       clEnumVal (CILK, "CILK divide and conquer implementation"),
       clEnumVal (GALOIS, "galois divide and conquer implementation"),
       clEnumVal (GALOIS_ALT, "galois alternate divide and conquer implementation"),
+      clEnumVal (GALOIS_STACK, "galois using thread stack"),
       clEnumValEnd),
 
     cll::init (SERIAL));
@@ -53,21 +54,11 @@ unsigned fib(unsigned n)
 }
 
 unsigned serialFib (unsigned n) {
-  unsigned prev = 1;
-  unsigned curr = 1;
-
-  if (n < 2) { 
+  if (n <= 2) { 
     return n;
   }
 
-  unsigned result = 0;
-  for (unsigned i = 2; i <= n; ++i) {
-    result = prev + curr;
-    prev = curr;
-    curr = result;
-  }
-
-  return result;
+  return serialFib (n-1) + serialFib (n-2);
 }
 
 
@@ -169,6 +160,38 @@ unsigned galoisFibAlt (unsigned n) {
 }
 
 
+struct GaloisFibStack {
+  unsigned n;
+  unsigned* result;
+
+  template <typename C>
+  void operator () (C& ctx) {
+    if (n <= 2) {
+      *result = n;
+      return;
+    }
+
+    unsigned left;
+    ctx.spawn (GaloisFibStack {n-1, &left});
+    unsigned right;
+    ctx.spawn (GaloisFibStack {n-2, &right});
+
+    ctx.sync ();
+
+    *result = left + right;
+  }
+};
+
+unsigned galoisFibStack (unsigned n) {
+  unsigned result = 0;
+  GaloisFibStack init {n, &result};
+
+  Galois::Runtime::for_each_ordered_tree (init, "fib");
+
+  return result;
+}
+
+
 int main (int argc, char* argv[]) {
 
   Galois::StatManager sm;
@@ -196,6 +219,10 @@ int main (int argc, char* argv[]) {
 
     case GALOIS_ALT:
       result = galoisFibAlt (N);
+      break;
+
+    case GALOIS_STACK:
+      result = galoisFibStack (N);
       break;
 
     default:
