@@ -361,7 +361,7 @@ struct Mtx2Gr: public HasNoVoidSpecialization {
 
     for (int phase = 0; phase < 2; ++phase) {
       std::ifstream infile(infilename.c_str());
-      if ( infile.fail() ) {
+      if (!infile) {
         GALOIS_DIE("Failed to open input file");
       }
 
