@@ -31,7 +31,7 @@ namespace Galois {
 namespace Graph {
 
 void FileGraph::fromFileInterleaved(const std::string& filename, size_t sizeofEdgeData) {
-  fromFile(filename, false);
+  fromFile(filename);
 
   pthread_mutex_t lock;
   pthread_cond_t cond;
@@ -52,7 +52,7 @@ void FileGraph::fromFileInterleaved(const std::string& filename, size_t sizeofEd
       GALOIS_DIE("PTHREAD");
 
     if (Galois::Runtime::LL::isPackageLeaderForSelf(tid)) {
-      pageIn(Galois::Runtime::LL::getPackageForThread(tid), maxPackages, sizeofEdgeData, true);
+      pageInByNode(Galois::Runtime::LL::getPackageForThread(tid), maxPackages, sizeofEdgeData);
       if (--count == 0) {
         if (pthread_cond_broadcast(&cond))
           GALOIS_DIE("PTHREAD");

@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2014, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -50,6 +50,7 @@
 namespace Galois {
 namespace Graph {
 
+//XXX(ddn): Refactor to eliminate OCFileGraph
 //! Graph serialized to a file
 class FileGraph {
 public:
@@ -97,6 +98,9 @@ private:
   //! Initializes a graph from block of memory
   void fromMem(void* m, uint32_t nodeOffset, uint64_t edgeOffset);
 
+  //! Initializes graph header from a block of memory
+  uint64_t* headerFromMem(void* m, uint32_t nodeOffset, uint64_t edgeOffset);
+
   void* fromGraph(FileGraph& g, size_t sizeofEdgeData);
 
   /**
@@ -113,7 +117,16 @@ private:
   
   void fromFileInterleaved(const std::string& filename, size_t sizeofEdgeData);
 
-  void pageIn(unsigned id, unsigned total, size_t sizeofEdgeData, bool byNode);
+  void pageInByNode(size_t id, size_t total, size_t sizeofEdgeData);
+
+  /** 
+   * Read just header information from file (e.g., number of neighbors for
+   * each node but not actual adjacencies).
+   *
+   * Subsequent method calls that only need header information are valid,
+   * while methods that need adjacency information have undefined behavior.
+   */
+  void headerFromFile(const std::string& filename);
 
 protected:
   /**
@@ -236,9 +249,9 @@ public:
   iterator end() const;
 
   //! Divides nodes into balanced ranges 
-  std::pair<iterator,iterator> divideByNode(size_t nodeSize, size_t edgeSize, unsigned id, unsigned total);
+  std::pair<iterator,iterator> divideByNode(size_t nodeSize, size_t edgeSize, size_t id, size_t total);
   //! Divides edges into balanced ranges
-  std::pair<edge_iterator,edge_iterator> divideByEdge(size_t nodeSize, size_t edgeSize, unsigned id, unsigned total);
+  std::pair<edge_iterator,edge_iterator> divideByEdge(size_t nodeSize, size_t edgeSize, size_t id, size_t total);
 
   node_id_iterator node_id_begin() const;
   node_id_iterator node_id_end() const;
@@ -264,21 +277,12 @@ public:
   ~FileGraph();
 
   //! Reads graph from file
-  void fromFile(const std::string& filename, bool preFault = true);
-
-  /** 
-   * Read just header information from file (e.g., number of neighbors for
-   * each node but not actual adjacencies).
-   *
-   * Subsequent method calls that only need header information are valid,
-   * while methods that need adjacency information have undefined behavior.
-   */
-  void headerFromFile(const std::string& filename, bool preFault = true);
+  void fromFile(const std::string& filename);
 
   /**
    * XXX
    */
-  void partFromFile(const std::string& filename, unsigned id, unsigned total, bool byNode, bool preFault = true);
+  void partFromFile(const std::string& filename, size_t id, size_t total, bool byNode);
 
   /**
    * Reads graph connectivity information from file. Tries to balance memory
@@ -305,7 +309,7 @@ public:
     return reinterpret_cast<T*>(fromGraph(g, sizeof(T)));
   }
 
-  //! Writes graph connectivity information to file
+  //! Writes graph to file
   void toFile(const std::string& file);
 };
 
