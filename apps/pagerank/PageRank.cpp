@@ -353,6 +353,11 @@ struct AsyncRsd {
 
     void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) {
       LNode& sdata = graph.getData(src);
+
+      if (sdata.residual < tolerance){
+        return;
+      }
+
       // the node is processed
       sdata.flag = false;
       double sum = 0;
@@ -364,7 +369,7 @@ struct AsyncRsd {
       float value = alpha*sum + (1.0 - alpha);
       float diff = std::fabs(value - sdata.value);
 
-      if (diff > tolerance) {
+      if (diff >= tolerance) {
         sdata.value = value;
         // for each out-going neighbors
         for (auto jj = graph.edge_begin(src, Galois::MethodFlag::NONE), ej = graph.edge_end(src, Galois::MethodFlag::NONE); jj != ej; ++jj) {
