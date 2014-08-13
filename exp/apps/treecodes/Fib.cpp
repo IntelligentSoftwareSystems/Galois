@@ -163,33 +163,33 @@ unsigned galoisFibAlt (unsigned n) {
 
 struct GaloisFibStack {
   unsigned n;
-  unsigned* result;
+  unsigned result;
 
   template <typename C>
   void operator () (C& ctx) {
     if (n <= 2) {
-      *result = n;
+      result = n;
       return;
     }
 
-    unsigned left;
-    ctx.spawn (GaloisFibStack {n-1, &left});
-    unsigned right;
-    ctx.spawn (GaloisFibStack {n-2, &right});
+    GaloisFibStack left {n-1, 0};
+    ctx.spawn (left);
+
+    GaloisFibStack right {n-2, 0};
+    ctx.spawn (right);
 
     ctx.sync ();
 
-    *result = left + right;
+    result = left.result + right.result;
   }
 };
 
 unsigned galoisFibStack (unsigned n) {
-  unsigned result = 0;
-  GaloisFibStack init {n, &result};
+  GaloisFibStack init {n, 0};
 
   Galois::Runtime::for_each_ordered_tree (init, "fib");
 
-  return result;
+  return init.result;
 }
 
 struct GaloisFibGeneric {

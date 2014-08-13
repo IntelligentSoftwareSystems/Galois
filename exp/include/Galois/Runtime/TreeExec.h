@@ -285,7 +285,7 @@ protected:
     {}
   };
 
-  typedef std::pair<Task*, F> WorkItem;
+  typedef std::pair<Task*, F*> WorkItem;
   static const unsigned CHUNK_SIZE = 2;
   typedef WorkList::AltChunkedLIFO<CHUNK_SIZE, WorkItem> WL_ty;
 
@@ -314,9 +314,9 @@ protected:
     Task* task;
     TreeExec& exec;
 
-    void spawn (const F& f) {
+    void spawn (F& f) {
       ++(task->numChild);
-      exec.push (WorkItem (task, f));
+      exec.push (WorkItem (task, &f));
     }
 
     void sync () {
@@ -351,7 +351,7 @@ protected:
 
       CtxWrapper ctx {&task, *this};
 
-      funcNparent->second (ctx);
+      (*funcNparent->second) (ctx);
 
       Task* parent = funcNparent->first;
 
@@ -377,8 +377,8 @@ public:
     term.initializeThread ();
   }
 
-  void initWork (const F& initTask) {
-    push (WorkItem (nullptr, initTask));
+  void initWork (F& initTask) {
+    push (WorkItem (nullptr, &initTask));
   }
 
   void operator () (void) {
@@ -396,7 +396,7 @@ public:
 };
 
 template <typename F> 
-void for_each_ordered_tree (const F& initTask, const char* loopname=nullptr) {
+void for_each_ordered_tree (F& initTask, const char* loopname=nullptr) {
 
   TreeExec<F> e (loopname);
 
