@@ -13,7 +13,7 @@ void setTreeExecutor (TreeExecGeneric* t) {
   treeExecPtr = t;
 }
 
-void spawn (std::function<void (void)> f) {
+void spawn (TreeTaskBase& f) {
   getTreeExecutor ().push (f);
 }
 
@@ -21,7 +21,7 @@ void sync (void) {
   getTreeExecutor ().syncLoop ();
 }
 
-void for_each_ordered_tree_generic (std::function<void (void)> initTask, const char* loopname) {
+void for_each_ordered_tree_generic (TreeTaskBase& initTask, const char* loopname) {
 
   TreeExecGeneric e (loopname);
 

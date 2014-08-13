@@ -192,32 +192,39 @@ unsigned galoisFibStack (unsigned n) {
   return init.result;
 }
 
-struct GaloisFibGeneric {
+struct GaloisFibGeneric: public Galois::Runtime::TreeTaskBase {
   unsigned n;
-  unsigned* result;
+  unsigned result;
 
-  void operator () (void) {
+  GaloisFibGeneric (unsigned _n, unsigned _result): 
+    Galois::Runtime::TreeTaskBase (),
+    n (_n),
+    result (_result)
+  {}
+
+  virtual void execute (void) {
     if (n <= 2) {
-      *result = n;
+      result = n;
       return;
     }
 
-    unsigned left;
-    Galois::Runtime::spawn (GaloisFibGeneric {n-1, &left});
+    GaloisFibGeneric left {n-1, 0};
+    Galois::Runtime::spawn (left);
 
-    unsigned right;
-    Galois::Runtime::spawn (GaloisFibGeneric {n-2, &right});
+    GaloisFibGeneric right {n-2, 0};
+    Galois::Runtime::spawn (right);
 
     Galois::Runtime::sync ();
 
-    *result = left + right;
+    result = left.result + right.result;
   }
 };
 
 unsigned galoisFibGeneric (unsigned n) {
-  unsigned result = 0;
-  Galois::Runtime::for_each_ordered_tree_generic (GaloisFibGeneric {n, &result}, "fib-gen");
-  return result;
+  GaloisFibGeneric init {n, 0};
+
+  Galois::Runtime::for_each_ordered_tree_generic (init, "fib-gen");
+  return init.result;
 }
 
 
@@ -225,7 +232,6 @@ int main (int argc, char* argv[]) {
 
   Galois::StatManager sm;
   LonestarStart (argc, argv, name, desc, url);
-
 
   unsigned result = -1;
 

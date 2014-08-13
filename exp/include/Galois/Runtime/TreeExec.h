@@ -407,10 +407,12 @@ void for_each_ordered_tree (F& initTask, const char* loopname=nullptr) {
       std::ref (e));
 }
 
+class TreeTaskBase {
+public:
+  virtual void execute (void) {}
+};
+
 class TreeExecGeneric {
-  typedef std::function<void (void)> F;
-
-
 
   struct Task {
     std::atomic<unsigned> numChild;
@@ -420,7 +422,7 @@ class TreeExecGeneric {
     {}
   };
 
-  typedef std::pair<Task*, F> WorkItem;
+  typedef std::pair<Task*, TreeTaskBase*> WorkItem;
   static const unsigned CHUNK_SIZE = 2;
   typedef WorkList::AltChunkedLIFO<CHUNK_SIZE, WorkItem> WL_ty;
 
@@ -459,13 +461,13 @@ public:
     term (getSystemTermination ()) 
   {}
 
-  void push (const F& f) {
+  void push (TreeTaskBase& f) {
     PerThreadData& ptd = *(perThreadData.getLocal ());
     Task* t = ptd.currTask;
     if (t != nullptr) {
       ++(t->numChild);
     }
-    workList.push (WorkItem (t, f));
+    workList.push (WorkItem (t, &f));
     ++(ptd.stat_pushes);
   }
 
@@ -493,7 +495,7 @@ public:
 
       ptd.currTask = &task;
 
-      funcNparent->second ();
+      funcNparent->second->execute ();
 
       Task* parent = funcNparent->first;
 
@@ -525,11 +527,11 @@ TreeExecGeneric& getTreeExecutor (void);
 
 void setTreeExecutor (TreeExecGeneric* t);
 
-void spawn (std::function<void (void)> f);
+void spawn (TreeTaskBase& f);
 
 void sync (void);
 
-void for_each_ordered_tree_generic (std::function<void (void)> initTask, const char* loopname=nullptr);
+void for_each_ordered_tree_generic (TreeTaskBase& initTask, const char* loopname=nullptr);
 
 
 
