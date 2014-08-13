@@ -1203,7 +1203,7 @@ struct PartitionBySource: public Conversion {
       Writer p;
       EdgeData edgeData;
 
-      auto r = graph.divideByNode(0, 1, i, numParts);
+      auto r = graph.divideByNode(0, 1, i, numParts).first;
 
       size_t numEdges = 0;
       if (r.first != r.second)

@@ -254,7 +254,7 @@ public:
     auto r = graph.divideByNode(
         NodeData::size_of::value + LC_PartitionedInlineEdge_Graph::size_of_out_of_line::value,
         EdgeData::size_of::value,
-        tid, total);
+        tid, total).first;
 
     EdgeInfo* curEdge = edgeData.data() + *graph.edge_begin(*r.first);
 

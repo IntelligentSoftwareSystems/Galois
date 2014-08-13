@@ -98,9 +98,6 @@ private:
   //! Initializes a graph from block of memory
   void fromMem(void* m, uint32_t nodeOffset, uint64_t edgeOffset);
 
-  //! Initializes graph header from a block of memory
-  uint64_t* headerFromMem(void* m, uint32_t nodeOffset, uint64_t edgeOffset);
-
   void* fromGraph(FileGraph& g, size_t sizeofEdgeData);
 
   /**
@@ -118,15 +115,6 @@ private:
   void fromFileInterleaved(const std::string& filename, size_t sizeofEdgeData);
 
   void pageInByNode(size_t id, size_t total, size_t sizeofEdgeData);
-
-  /** 
-   * Read just header information from file (e.g., number of neighbors for
-   * each node but not actual adjacencies).
-   *
-   * Subsequent method calls that only need header information are valid,
-   * while methods that need adjacency information have undefined behavior.
-   */
-  void headerFromFile(const std::string& filename);
 
 protected:
   /**
@@ -149,7 +137,7 @@ public:
 
   //! Checks if a node is in the graph (already added)
   bool containsNode(const GraphNode n) const {
-    return n < numNodes;
+    return n + nodeOffset < numNodes;
   }
 
   // Edge Handling
@@ -191,6 +179,10 @@ public:
    */
   template<typename EdgeTy, typename CompTy>
   void sortEdges(GraphNode N, const CompTy& comp) {
+#ifdef HAVE_BIG_ENDIAN
+    GALOIS_DIE("Automatic endian conversion for graph destinations not yet implemented");
+#endif
+
     typedef LargeArray<GraphNode> EdgeDst;
     typedef LargeArray<EdgeTy> EdgeData;
     typedef detail::EdgeSortIterator<GraphNode,uint64_t,EdgeDst,EdgeData> edge_sort_iterator;
@@ -248,10 +240,15 @@ public:
   iterator begin() const;
   iterator end() const;
 
+  typedef std::pair<iterator, iterator> NodeRange;
+  typedef std::pair<edge_iterator, edge_iterator> EdgeRange;
+  typedef std::pair<NodeRange, EdgeRange> GraphRange;
+
   //! Divides nodes into balanced ranges 
-  std::pair<iterator,iterator> divideByNode(size_t nodeSize, size_t edgeSize, size_t id, size_t total);
+  GraphRange divideByNode(size_t nodeSize, size_t edgeSize, size_t id, size_t total);
+
   //! Divides edges into balanced ranges
-  std::pair<edge_iterator,edge_iterator> divideByEdge(size_t nodeSize, size_t edgeSize, size_t id, size_t total);
+  GraphRange divideByEdge(size_t nodeSize, size_t edgeSize, size_t id, size_t total);
 
   node_id_iterator node_id_begin() const;
   node_id_iterator node_id_end() const;
@@ -280,9 +277,13 @@ public:
   void fromFile(const std::string& filename);
 
   /**
-   * XXX
+   * Reads a subgraph corresponding to given range of edges from file.
+   *
+   * An example of use:
+   *
+   * \snippet test/filegraph.cpp Reading part of graph
    */
-  void partFromFile(const std::string& filename, size_t id, size_t total, bool byNode);
+  void partFromFile(const std::string& filename, NodeRange nrange, EdgeRange erange);
 
   /**
    * Reads graph connectivity information from file. Tries to balance memory
