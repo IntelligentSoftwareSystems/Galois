@@ -20,11 +20,12 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
+#include "Galois/Runtime/Barrier.h"
 #include "Galois/Runtime/ThreadPool.h"
+#include "Galois/Runtime/Network.h"
 #include "Galois/Runtime/ll/EnvCheck.h"
 #include "Galois/Runtime/ll/HWTopo.h"
 #include "Galois/Runtime/ll/TID.h"
-
 #include <cstdlib>
 
 // Forward declare this to avoid including PerThreadStorage.
@@ -175,4 +176,8 @@ void ThreadPool::runInternal(unsigned num) {
   decascade(0);
   // Clean up
   work = nullptr;
+  // TODO(ddn): There might be some future use cases that don't want a barrier
+  // across hosts
+  if (NetworkInterface::Num != 1)
+    getHostBarrier().wait();
 }

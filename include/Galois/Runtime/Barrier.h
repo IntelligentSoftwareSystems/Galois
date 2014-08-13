@@ -48,14 +48,13 @@ public:
  * This is initialized to the current activeThreads. This barrier
  * is designed to be fast and should be used in the common
  * case. 
- *
- * However, there is a race if the number of active threads
- * is modified after using this barrier: some threads may still
- * be in the barrier while the main thread reinitializes this
- * barrier to the new number of active threads. If that may
- * happen, use {@link createSimpleBarrier()} instead. 
  */
 Barrier& getSystemBarrier();
+
+/**
+ * Barrier across hosts but not threads on a host.
+ */
+Barrier& getHostBarrier();
 
 /**
  * Create specific types of barriers.  For benchmarking only.  Use
@@ -69,14 +68,6 @@ Barrier& getCountingBarrier();
 Barrier& getDisseminationBarrier();
 }
 
-/**
- * Creates a new simple barrier. This barrier is not designed to be fast but
- * does gaurantee that all threads have left the barrier before returning
- * control. Useful when the number of active threads is modified to avoid a
- * race in {@link getSystemBarrier()}.  Client is reponsible for deallocating
- * returned barrier.
- */
-Barrier* createSimpleBarrier();
 }
 } // end namespace Galois
 

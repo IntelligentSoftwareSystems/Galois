@@ -119,6 +119,7 @@ public:
     work = std::ref(lwork);
     //work = std::function<void(void)>(exTuple(std::forward<Args>(args)...));
     runInternal(num);
+
   }
 
   void burnPower(unsigned num);

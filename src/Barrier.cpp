@@ -144,10 +144,6 @@ public:
   }
 };
 
-
-
-
-
 class TopoBarrier : public Galois::Runtime::Barrier {
   struct treenode {
     //vpid is Galois::Runtime::LL::getTID()
@@ -243,19 +239,6 @@ public:
 
 Galois::Runtime::Barrier::~Barrier() {}
 
-// void TopoBarrier::dump() {
-//   unsigned pkgs = LL::getMaxPackages();
-//   for (unsigned i = 0; i < pkgs; ++i) {
-//     treenode* n = nodes.getRemoteByPkg(i);
-//     std::cerr << n << " " << n->parentpointer << " " << n->childpointers[0] << " " << n->childpointers[1] << " " << n->havechild << " " << n->childnotready << " " << n->parentsense << "\n";
-//   }
-//   for (unsigned i = 0; i < sense.size(); ++i) {
-//     std::cerr << *sense.getRemote(i) << " ";
-//   }
-//   std::cerr << "\n";
-
-// }
-
 class StupidDistBarrier;
 static StupidDistBarrier& getDistBarrier();
 
@@ -279,9 +262,9 @@ public:
   }
   
   virtual void wait() {
-    Galois::Runtime::trace("Entering Barrier\n");
-    if (Galois::Runtime::LL::getTID() == 0)
+    if (Galois::Runtime::LL::getTID() == 0) {
       count += Galois::Runtime::NetworkInterface::Num;
+    }
     
     //wait at local barrier
     localBarrier.wait();
@@ -299,7 +282,6 @@ public:
     
     //wait at local barrier
     localBarrier.wait();
-    Galois::Runtime::trace("Leaving Barrier\n");
   }
 };
 
@@ -308,6 +290,42 @@ static StupidDistBarrier& getDistBarrier() {
   return b;
 }
 
+class HostBarrier : public Galois::Runtime::Barrier {
+  std::atomic<int> count;
+
+  static void barrierLandingPad() {
+    --static_cast<HostBarrier&>(Galois::Runtime::getHostBarrier()).count;
+  }
+
+public:
+  HostBarrier() : count(0) {}
+  
+  virtual const char* name() const { return "HostBarrier"; }
+
+  virtual void reinit(unsigned val) { }
+  
+  virtual void wait() {
+    if (Galois::Runtime::LL::getTID() == 0) {
+      count += Galois::Runtime::NetworkInterface::Num;
+    }
+    
+    auto& net = Galois::Runtime::getSystemNetworkInterface();
+    if (Galois::Runtime::LL::getTID() == 0) {
+      //notify global and wait on global
+      net.broadcastAlt(barrierLandingPad);
+      --count;
+    }
+    
+    while (count > 0) {
+      Galois::Runtime::doNetworkWork();
+    }
+  }
+};
+
+Galois::Runtime::Barrier& Galois::Runtime::getHostBarrier() {
+  static HostBarrier b;
+  return b;
+}
 
 Galois::Runtime::Barrier& Galois::Runtime::getSystemBarrier() {
   static unsigned num = ~0;
