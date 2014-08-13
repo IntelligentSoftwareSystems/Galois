@@ -31,7 +31,7 @@ struct GraphLabAlgo {
     Graph& graph;
 
     Initialize(Graph& g): graph(g) { }
-    void operator()(GNode n) {
+    void operator()(GNode n) const {
       LNode& data = graph.getData(n, Galois::MethodFlag::NONE);
       data.labelid = data.id;
     }

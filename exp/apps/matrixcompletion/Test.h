@@ -166,10 +166,10 @@ struct AlternatingLeastSquaresAlgo {
         XTX& WTW = *xtxs.getLocal();
         WTW.setConstant(0);
         for (Sp::InnerIterator it(A, col); it; ++it)
-          WTW += WT.col(it.row()) * WT.col(it.row()).transpose();
+          WTW.triangularView<Eigen::Upper>() += WT.col(it.row()) * WT.col(it.row()).transpose();
         for (int i = 0; i < LATENT_VECTOR_SIZE; ++i)
           WTW(i, i) += lambda;
-        HT.col(col) = WTW.llt().solve(WTA.col(col));
+        HT.col(col) = WTW.selfadjointView<Eigen::Upper>().llt().solve(WTA.col(col));
       });
       update1Time.stop();
 
@@ -186,10 +186,10 @@ struct AlternatingLeastSquaresAlgo {
         XTX& HTH = *xtxs.getLocal();
         HTH.setConstant(0);
         for (Sp::InnerIterator it(AT, col); it; ++it)
-          HTH += HT.col(it.row()) * HT.col(it.row()).transpose();
+          HTH.triangularView<Eigen::Upper>() += HT.col(it.row()) * HT.col(it.row()).transpose();
         for (int i = 0; i < LATENT_VECTOR_SIZE; ++i)
           HTH(i, i) += lambda;
-        WT.col(col) = HTH.llt().solve(HTAT.col(col));
+        WT.col(col) = HTH.selfadjointView<Eigen::Upper>().llt().solve(HTAT.col(col));
       });
       update2Time.stop();
 

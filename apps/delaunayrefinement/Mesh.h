@@ -57,7 +57,7 @@ struct create_nodes : public Galois::Runtime::Lockable {
   create_nodes(Graphp _g): g(_g) {}
 
   template<typename Context>
-  void operator()(Element& item, const Context& cnx) {
+  void operator()(Element& item, const Context& cnx) const {
     GNode n = g->createNode(item);
     g->addNode(n);
   }

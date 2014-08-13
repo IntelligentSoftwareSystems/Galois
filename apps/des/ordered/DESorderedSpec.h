@@ -162,7 +162,8 @@ protected:
 
     // Galois::for_each_ordered (
     Galois::Runtime::for_each_ordered_rob (
-        simInit.getInitEvents ().begin (), simInit.getInitEvents ().end (),
+        Galois::Runtime::makeStandardRange(
+          simInit.getInitEvents ().begin (), simInit.getInitEvents ().end ()),
         Cmp_ty (), 
         NhoodVisitor (graph, nodes),
         OpFunc (graph, nodes, nevents));

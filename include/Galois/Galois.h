@@ -28,7 +28,8 @@
 #include "Galois/UserContext.h"
 #include "Galois/Threads.h"
 #include "Galois/Runtime/ParallelWork.h"
-#include "Galois/Runtime/DoAll.h"
+#include "Galois/Runtime/Executor_OnEach.h"
+#include "Galois/Runtime/Executor_DoAll.h"
 
 #ifdef GALOIS_USE_EXP
 #include "Galois/Runtime/ParallelWorkDistributed.h"

@@ -5,12 +5,12 @@
 #include <map>
 
 int main(int argc, char** argv) {
-  typedef Galois::Runtime::MM::FixedSizeAllocator Heap;
+  typedef Galois::Runtime::MM::FixedSizeHeap Heap;
   typedef std::unique_ptr<Heap> HeapPtr;
   typedef Galois::Runtime::PerThreadStorage<HeapPtr> Heaps;
   typedef Galois::concurrent_gslist<int> Collection;
   int numThreads = 2;
-  int size = 100;
+  unsigned size = 100;
   if (argc > 1)
     numThreads = atoi(argv[1]);
   if (size <= 0)
@@ -28,7 +28,7 @@ int main(int argc, char** argv) {
   Galois::on_each([&](unsigned id, unsigned total) {
     HeapPtr& hp = *heaps.getLocal();
     hp = std::move(HeapPtr(new Heap(sizeof(Collection::block_type))));
-    for (int i = 0; i < size; ++i)
+    for (unsigned i = 0; i < size; ++i)
       c.push_front(*hp, i);
   });
 
@@ -36,7 +36,7 @@ int main(int argc, char** argv) {
   for (auto i : c) {
     counter[i] += 1;
   }
-  for (int i = 0; i < size; ++i) {
+  for (unsigned i = 0; i < size; ++i) {
     GALOIS_ASSERT(counter[i] == numThreads);
   }
   GALOIS_ASSERT(counter.size() == size);

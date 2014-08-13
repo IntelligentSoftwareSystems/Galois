@@ -1,6 +1,8 @@
 #ifndef GALOISWORKER_H
 #define GALOISWORKER_H
 
+#include "Galois/Galois.h"
+#include "Galois/WorkList/WorkList.h"
 #include "Galois/Graph/LC_Morph_Graph.h"
 #include "Galois/Runtime/ParallelWork.h"
 
@@ -25,6 +27,8 @@ public:
 
 private:
 	Graph *graph;
+	// returns effective size of memory allocated for matrices and RHS.
+	unsigned long getAllocatedSize(Vertex *root);
 	int atomic_dec(int *value);
 	//Galois::Runtime::PerPackageStorage<WL> pps;
 	int leftRange(int tasks, int cpus, int i);

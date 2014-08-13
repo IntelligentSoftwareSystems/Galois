@@ -159,7 +159,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
   struct Initialize {
     Graph& g;
     Initialize(Graph& g): g(g) { }
-    void operator()(typename Graph::GraphNode n) {
+    void operator()(typename Graph::GraphNode n) const {
       SNode& data = g.getData(n, Galois::MethodFlag::NONE);
       data.numPaths.write(0.0);
       data.dependencies.write(0.0);

@@ -157,8 +157,8 @@ namespace hidden {
   struct TypeHelper {
     using RBuf = RangeBuffer<T, Cmp>;
     using UnitBuf = RangeBuffer<T, Cmp, 1>;
-    using RBufAlloc = Galois::Runtime::MM::FSBGaloisAllocator<RBuf>;
-    using RBufPtrAlloc = Galois::Runtime::MM::FSBGaloisAllocator<RBuf*>;
+    using RBufAlloc = Galois::Runtime::MM::FixedSizeAllocator<RBuf>;
+    using RBufPtrAlloc = Galois::Runtime::MM::FixedSizeAllocator<RBuf*>;
     using Tree = std::map<RBuf*, RBuf*, typename RBuf::PtrComparator, RBufPtrAlloc>;
     using Set = std::set<RBuf*, typename RBuf::PtrComparator, RBufPtrAlloc>;
   };

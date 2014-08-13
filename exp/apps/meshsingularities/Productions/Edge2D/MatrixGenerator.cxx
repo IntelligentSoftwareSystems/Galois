@@ -1,4 +1,5 @@
 #include "MatrixGenerator.hxx"
+#include <sys/time.h>
 
 using namespace D2Edge;
 
@@ -183,6 +184,15 @@ std::vector<EquationSystem*>* MatrixGenerator::CreateMatrixAndRhs(TaskDescriptio
 
 		}
 
+		//zmiana
+		it_e = tier_vector->begin(); 
+		for(; it_e != tier_vector->end(); ++it_e)
+		{
+			//printf("--------------------------\n"); 
+			//(*it_e)->print(); 
+		}
+		//zmiana
+
 		return tier_vector;
 }
 
@@ -196,6 +206,7 @@ bool MatrixGenerator::GetMumpsArrays(int*& _in, int*& _jn, double*& _a, double*&
 			((Tier*)(*it_t))->FillNumberPairs(map,rhs);
 		}
 		long mumps_array_length = map->size();
+		//long mumps_array_length = 2*map->size() - matrix_size;
 
 		in = new int[mumps_array_length]();
 		jn = new int[mumps_array_length]();
@@ -209,15 +220,47 @@ bool MatrixGenerator::GetMumpsArrays(int*& _in, int*& _jn, double*& _a, double*&
 			jn[i] = it_m->first.second;
 			a[i++] = it_m->second;
 		}
-
+		
+/*
+		for(it_m = map->begin(); it_m != map->end(); ++it_m)
+		{
+			if(it_m->first.first != it_m->first.second)
+			{
+				in[i] = it_m->first.second;
+				jn[i] = it_m->first.first;
+				a[i++] = it_m->second;
+			}	
+		}
+*/		
 		delete map;
 
 		n = matrix_size;
 		//???? is that ok? what should be nz value if the input is triangle of diagonal matrix? non zeros in global matrix or just length of mumps arrays?
 		//nz = 2*mumps_array_length - n;
+		if(i == mumps_array_length)
+			printf("IS EQUAL\n"); 
+		else
+			printf("IS NOT EQUAL\n"); 
 		nz = mumps_array_length;
 		//nz = 18;
 	}
+
+	//zmiana
+	//for(int i = 0; i<nz; i++)
+		//printf("%d %d %lf\n",in[i],jn[i],a[i]);
+
+
+	timeval start_time;
+	timeval end_time;
+	gettimeofday(&start_time, NULL);
+	for(int i = 0; i<nz; i++)
+	{
+	}
+   	gettimeofday(&end_time, NULL);
+	printf("Tiers time %f [s] \n", ((end_time.tv_sec - start_time.tv_sec)*1000000 +(end_time.tv_usec - start_time.tv_usec))/1000000.0);
+	printf("%d\n",nz); 
+	//zmiana
+
 
 	mumps_arrays_created = true;
 	_in = in;

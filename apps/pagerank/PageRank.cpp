@@ -108,7 +108,7 @@ struct SerialAlgo {
   struct Initialize {
     Graph& g;
     Initialize(Graph& g): g(g) { }
-    void operator()(Graph::GraphNode n) {
+    void operator()(Graph::GraphNode n) const {
       g.getData(n).value = 1.0;
       g.getData(n).accum.write(0.0);
     }
@@ -201,7 +201,7 @@ struct PullAlgo {
   struct Initialize {
     Graph& g;
     Initialize(Graph& g): g(g) { }
-    void operator()(Graph::GraphNode n) {
+    void operator()(Graph::GraphNode n) const {
       LNode& data = g.getData(n, Galois::MethodFlag::NONE);
       data.value[0] = 1.0;
       data.value[1] = 1.0;
@@ -211,7 +211,7 @@ struct PullAlgo {
   struct Copy {
     Graph& g;
     Copy(Graph& g): g(g) { }
-    void operator()(Graph::GraphNode n) {
+    void operator()(Graph::GraphNode n) const {
       LNode& data = g.getData(n, Galois::MethodFlag::NONE);
       data.value[1] = data.value[0];
     }
@@ -319,7 +319,7 @@ struct PullAlgo2 {
   struct Initialize {
     Graph& g;
     Initialize(Graph& g): g(g) { }
-    void operator()(Graph::GraphNode n) {
+    void operator()(Graph::GraphNode n) const {
       LNode& data = g.getData(n, Galois::MethodFlag::NONE);
       data.value[0] = 1.0;
       data.value[1] = 1.0;
@@ -331,7 +331,7 @@ struct PullAlgo2 {
   struct Copy {
     Graph& g;
     Copy(Graph& g): g(g) { }
-    void operator()(Graph::GraphNode n) {
+    void operator()(Graph::GraphNode n) const {
       LNode& data = g.getData(n, Galois::MethodFlag::NONE);
       data.value[1] = data.value[0];
     }
@@ -417,6 +417,9 @@ struct PullAlgo2 {
 
 /* ------------------------- Joyce's codes start ------------------------- */
 //---------- parallel synchronous algorithm (original copy: PullAlgo2, readGraph is re-written.)
+
+int idcount = 0;
+
 struct Synch {
   struct LNode {
     float value[2];
@@ -451,8 +454,7 @@ struct Synch {
   struct Initialize {
     Graph& g;
     Initialize(Graph& g): g(g) { }
-    int idcount = 0;
-    void operator()(Graph::GraphNode n) {
+    void operator()(Graph::GraphNode n) const {
       LNode& data = g.getData(n, Galois::MethodFlag::NONE);
       data.value[0] = 1.0;
       data.value[1] = 1.0;
@@ -465,7 +467,7 @@ struct Synch {
   struct Copy {
     Graph& g;
     Copy(Graph& g): g(g) { }
-    void operator()(Graph::GraphNode n) {
+    void operator()(Graph::GraphNode n) const {
       LNode& data = g.getData(n, Galois::MethodFlag::NONE);
       data.value[1] = data.value[0];
     }
@@ -575,12 +577,11 @@ struct PrtRsd {
   struct Initialize {
     Graph& g;
     Initialize(Graph& g): g(g) { }
-    int id=0;
-    void operator()(Graph::GraphNode n) {
+    void operator()(Graph::GraphNode n) const {
       LNode& data = g.getData(n, Galois::MethodFlag::NONE);
       data.pagerank = (1.0 - alpha2);
       data.residual = 0.0;
-      data.id = id++;
+      data.id = idcount++;
       int outs = std::distance(g.edge_begin(n, Galois::MethodFlag::NONE), g.edge_end(n, Galois::MethodFlag::NONE));
       data.nout = outs;
     }
@@ -750,12 +751,11 @@ struct PrtDeg {
   struct Initialize {
     Graph& g;
     Initialize(Graph& g): g(g) { }
-    int id=0;
-    void operator()(Graph::GraphNode n) {
+    void operator()(Graph::GraphNode n) const {
       LNode& data = g.getData(n, Galois::MethodFlag::NONE);
       data.pagerank = (1.0 - alpha2);
       data.residual = 0.0;
-      data.id = id++;
+      data.id = idcount++;
       int outs = std::distance(g.edge_begin(n, Galois::MethodFlag::NONE), g.edge_end(n, Galois::MethodFlag::NONE));
       data.nout = outs;
       int ins = std::distance(g.in_edge_begin(n, Galois::MethodFlag::NONE), g.in_edge_end(n, Galois::MethodFlag::NONE));

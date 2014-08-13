@@ -288,11 +288,11 @@ struct PullAlgo {
     Bag& next;
     Galois::GAccumulator<size_t>& numProcessed;
 
-    void operator()(GNode src, Galois::UserContext<GNode>&) {
-      (*this)(src);
+    void operator()(GNode src, Galois::UserContext<GNode>&) const {
+      operator()(src);
     }
 
-    void operator()(GNode src) {
+    void operator()(GNode src) const {
       numProcessed += 1;
       //Node& n = graph.getData(src, Galois::MethodFlag::NONE);
 
@@ -327,7 +327,7 @@ struct PullAlgo {
     Graph& graph;
     Galois::GAccumulator<size_t>& numTaken;
 
-    void operator()(GNode src) {
+    void operator()(GNode src) const {
       Node& n = graph.getData(src, Galois::MethodFlag::NONE);
       numTaken += 1;
       n.flag = F;

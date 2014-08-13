@@ -104,7 +104,7 @@ public:
       auto& values = ii->second;
       size_t accum = 0;
       for (auto& x : values)
-        accum += std::accumulate(x.begin(), x.end(), 0);
+        accum += std::accumulate(x.begin(), x.end(), static_cast<unsigned long>(0));
 
       LL::gPrint("STAT,",
                  ii->first.first, ",",

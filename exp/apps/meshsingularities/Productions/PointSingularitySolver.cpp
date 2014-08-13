@@ -56,7 +56,7 @@ static cll::opt<bool> performTests("performTests", cll::desc("Run extended tests
 
 static cll::opt<bool> quad("quad", cll::desc("Special case for edge singularity"), cll::init(false));
 
-#define WITH_MUMPS_ENABLED 1
+//#define WITH_MUMPS_ENABLED 0
 
 #ifdef WITH_MUMPS_ENABLED
 static cll::opt<bool> mumps("mumps", cll::desc("Pass data to MUMPS"), cll::init(false));

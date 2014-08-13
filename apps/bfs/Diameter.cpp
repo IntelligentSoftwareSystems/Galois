@@ -118,7 +118,7 @@ struct collect_nodes_with_dist {
   Dist dist;
   collect_nodes_with_dist(Graph& g, Galois::InsertBag<GNode>& b, Dist d): graph(g), bag(b), dist(d) { }
 
-  void operator()(const GNode& n) {
+  void operator()(const GNode& n) const {
     if (graph.getData(n).dist == dist)
       bag.push(n);
   }
@@ -166,7 +166,7 @@ struct CountLevels {
   CountLevels(Graph& g): graph(g) { }
   
   //! [Use GReducible in parallel]
-  void operator()(typename Graph::GraphNode n) {
+  void operator()(typename Graph::GraphNode n) const {
     Dist d = graph.getData(n).dist;
     if (d == DIST_INFINITY)
       return;
@@ -226,7 +226,7 @@ struct SimpleAlgo {
   struct Initialize {
     Graph& graph;
     Initialize(Graph& g): graph(g) { }
-    void operator()(GNode n) {
+    void operator()(GNode n) const {
       graph.getData(n).dist = DIST_INFINITY;
     }
   };
@@ -291,7 +291,7 @@ struct PickKAlgo {
   struct Initialize {
     Graph& graph;
     Initialize(Graph& g): graph(g) { }
-    void operator()(GNode n) {
+    void operator()(GNode n) const {
       graph.getData(n).dist = DIST_INFINITY;
       graph.getData(n).done = false;
     }

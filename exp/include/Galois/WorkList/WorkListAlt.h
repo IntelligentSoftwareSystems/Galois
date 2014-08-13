@@ -23,6 +23,7 @@
 #ifndef GALOIS_RUNTIME_WORKLISTALT_H
 #define GALOIS_RUNTIME_WORKLISTALT_H
 
+#include "Galois/WorkList/GFifo.h"
 #include "Galois/Runtime/ll/CompilerSpecific.h"
 
 namespace Galois {
@@ -171,7 +172,7 @@ public:
 };
 //GALOIS_WLCOMPILECHECK(LocalQueues);
 
-template<typename WLTy = FIFO<>, typename T = int>
+template<typename WLTy = GFIFO<>, typename T = int>
 class LocalWorklist : private boost::noncopyable {
   typedef typename WLTy::template rethread<false>::type lWLTy;
   Runtime::PerThreadStorage<lWLTy> local;
@@ -209,7 +210,7 @@ template<typename T, typename OwnerFn, template<typename, bool> class QT, bool d
 class OwnerComputeChunkedMaster : private boost::noncopyable {
   class Chunk : public Galois::FixedSizeRing<T, chunksize>, public QT<Chunk, concurrent>::ListNode {};
 
-  Runtime::MM::FixedSizeAllocator heap;
+  Runtime::MM::FixedSizeHeap heap;
   OwnerFn Fn;
 
   struct p {
@@ -220,7 +221,7 @@ class OwnerComputeChunkedMaster : private boost::noncopyable {
   typedef QT<Chunk, concurrent> LevelItem;
 
   Runtime::PerThreadStorage<p> data;
-  squeue<distributed, Runtime::PerPackageStorage, LevelItem> Q;
+  detail::squeue<distributed, Runtime::PerPackageStorage, LevelItem> Q;
 
   Chunk* mkChunk() {
     return new (heap.allocate(sizeof(Chunk))) Chunk();

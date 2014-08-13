@@ -364,6 +364,14 @@ protected:
     x.clear();
   }
 
+  template<typename WL>
+  bool checkEmpty(WL&, ThreadLocalData&, ...) { return true; }
+
+  template<typename WL>
+  auto checkEmpty(WL& wl, ThreadLocalData& tld, int) -> decltype(wl.empty(), bool()) {
+    return wl.empty();
+  }
+
   template<bool couldAbort, bool isLeader>
   void go() {
     // Thread-local data goes on the local stack to be NUMA friendly
@@ -376,22 +384,31 @@ protected:
           std::bind(&ForEachWork::fastPushBack, std::ref(*this), std::placeholders::_1));
 
     bool didWork;
-    do {
-      didWork = false;
-      //Run some iterations
-      if (isLeader)
-        didWork = runQueue<32, false>(tld, wl);
-      else
-        didWork = runQueue<ForEachTraits<FunctionTy>::NeedsBreak ? 32 : 0, false>(tld, wl);
-      // Check for abort
-      if (couldAbort)
-        didWork |= handleAborts(tld);
-      if (isLeader)
+    while (true) {
+      do {
+        didWork = false;
+        //Run some iterations
+        if (isLeader)
+          didWork = runQueue<64, false>(tld, wl);
+        else
+          didWork = runQueue<ForEachTraits<FunctionTy>::NeedsBreak ? 64 : 0, false>(tld, wl);
+        // Check for abort
+        if (couldAbort)
+          didWork |= handleAborts(tld);
+        if (isLeader)
+          doNetworkWork();
+        // Update node color and prop token
+        term.localTermination(didWork);
         doNetworkWork();
-      // Update node color and prop token
-      term.localTermination(didWork);
-      doNetworkWork();
-    } while (!term.globalTermination() && (!ForEachTraits<FunctionTy>::NeedsBreak || !broke));
+      } while (!term.globalTermination() && (!ForEachTraits<FunctionTy>::NeedsBreak || !broke));
+
+      if (checkEmpty(wl, tld, 0))
+        break;
+      if (ForEachTraits<FunctionTy>::NeedsBreak && broke)
+        break;
+      initThread();
+      getSystemBarrier().wait();
+    }
 
     if (couldAbort)
       setThreadContext(0);
@@ -408,7 +425,7 @@ public:
     wl.push_initial(range);
   }
 
-  void initThread(void) {
+  void initThread() {
     term.initializeThread();
   }
 
@@ -472,43 +489,6 @@ void for_each_impl(const RangeTy& range, FunctionTy f, const char* loopname) {
   trace("Loop end %\n", loopname);
   getLocalDirectory().reportStats(loopname);
   getRemoteDirectory().reportStats(loopname);
-  inGaloisForEach = false;
-}
-
-template<typename FunctionTy>
-struct WOnEach {
-  FunctionTy& origFunction;
-  WOnEach(FunctionTy& f): origFunction(f) { }
-  void operator()(void) {
-    FunctionTy fn(origFunction);
-    fn(LL::getTID(), activeThreads);   
-  }
-};
-
-template<typename FunctionTy>
-void on_each_impl(FunctionTy fn, const char* loopname = 0) {
-  if (inGaloisForEach)
-    GALOIS_DIE("Nested for_each not supported");
-
-  inGaloisForEach = true;
-  getSystemThreadPool().run(activeThreads, WOnEach<FunctionTy>(fn));
-  inGaloisForEach = false;
-}
-
-//! on each executor with simple barrier.
-template<typename FunctionTy>
-void on_each_simple_impl(FunctionTy fn, const char* loopname = 0) {
-  if (inGaloisForEach)
-    GALOIS_DIE("Nested for_each not supported");
-
-  inGaloisForEach = true;
-  Barrier* b = createSimpleBarrier();
-  b->reinit(activeThreads);
-  getSystemThreadPool().run(activeThreads, 
-    WOnEach<FunctionTy>(fn),
-    std::ref(*b)
-  );
-  delete b;
   inGaloisForEach = false;
 }
 

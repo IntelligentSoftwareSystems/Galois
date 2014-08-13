@@ -371,17 +371,19 @@ struct AltChunkedMaster : private boost::noncopyable {
 private:
   class Chunk : public ChunkHeader, public Galois::FixedSizeRing<T, ChunkSize> {};
 
-  Runtime::MM::FixedSizeAllocator heap;
+  Runtime::MM::FixedSizeAllocator<Chunk> alloc;
   Runtime::PerThreadStorage<std::pair<Chunk*, Chunk*> > data;
   Container worklist;
 
   Chunk* mkChunk() {
-    return new (heap.allocate(sizeof(Chunk))) Chunk();
+    Chunk* ptr = alloc.allocate(1);
+    alloc.construct(ptr);
+    return ptr;
   }
   
-  void delChunk(Chunk* C) {
-    C->~Chunk();
-    heap.deallocate(C);
+  void delChunk(Chunk* ptr) {
+    alloc.destroy(ptr);
+    alloc.deallocate(ptr, 1);
   }
 
   void swapInPush(std::pair<Chunk*, Chunk*>& d) {
@@ -427,7 +429,7 @@ private:
 public:
   typedef T value_type;
 
-  AltChunkedMaster() : heap(sizeof(Chunk)) {}
+  AltChunkedMaster() {}
 
   void push(value_type val) {
     std::pair<Chunk*, Chunk*>& tld = *data.getLocal();

@@ -61,8 +61,8 @@ template <typename T, typename Cmp, typename NhFunc, typename OpFunc, typename S
 class KDGtwoPhaseParaMeter {
 
   using Ctxt = TwoPhaseContext<T, Cmp>;
-  using CtxtAlloc = Galois::Runtime::MM::FSBGaloisAllocator<Ctxt>;
-  using CtxtWL = Galois::Runtime::PerThreadVector<Ctxt*>;
+  using CtxtAlloc = MM::FixedSizeAllocator<Ctxt>;
+  using CtxtWL = PerThreadVector<Ctxt*>;
 
   using UserCtx = UserContextAccess<T>;
   using PerThreadUserCtx = PerThreadStorage<UserCtx>;

@@ -162,8 +162,8 @@ struct NodeIteratorAlgo {
     Process() { }
     Process(NodeIteratorAlgo* s,Graphp _g): g(_g), self(s) { }
 
-    void operator()(const DGNode& n, Galois::UserContext<DGNode>&) { (*this)(n); }
-    void operator()(const DGNode& n) {
+    void operator()(const DGNode& n, Galois::UserContext<DGNode>&) const { (*this)(n); }
+    void operator()(const DGNode& n) const {
       // Partition neighbors
       // [first, ea) [n] [bb, last)
       DGraph::edge_iterator first = g->edge_begin(n);

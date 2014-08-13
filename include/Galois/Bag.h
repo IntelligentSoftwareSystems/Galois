@@ -33,6 +33,7 @@
 #include "Galois/Runtime/mm/Mem.h"
 
 #include <boost/iterator/iterator_facade.hpp>
+#include <stdexcept>
 
 #include GALOIS_CXX11_STD_HEADER(algorithm)
 
@@ -123,7 +124,7 @@ public:
   };
 
 private:
-  Galois::Runtime::MM::FixedSizeAllocator heap;
+  Galois::Runtime::MM::FixedSizeHeap heap;
   Galois::Runtime::PerThreadStorage<PerThread> heads;
 
   void insHeader(header* h) {
@@ -136,7 +137,7 @@ private:
     }
   }
 
-  header* newHeaderFromAllocator(void *m, unsigned size) {
+  header* newHeaderFromHeap(void *m, unsigned size) {
     header* H = new (m) header();
     int offset = 1;
     if (sizeof(T) < sizeof(header))
@@ -151,9 +152,9 @@ private:
 
   header* newHeader() {
     if (BlockSize) {
-      return newHeaderFromAllocator(heap.allocate(BlockSize), BlockSize);
+      return newHeaderFromHeap(heap.allocate(BlockSize), BlockSize);
     } else {
-      return newHeaderFromAllocator(Galois::Runtime::MM::pageAlloc(), Galois::Runtime::MM::hugePageSize);
+      return newHeaderFromHeap(Galois::Runtime::MM::pageAlloc(), Galois::Runtime::MM::hugePageSize);
     }
   }
 

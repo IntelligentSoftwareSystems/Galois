@@ -20,20 +20,20 @@
  *
  * @section Description
  *
- * Implementation of the Galois foreach iterator. Includes various 
+ * Implementation of the do all loop. Includes various 
  * specializations to operators to reduce runtime overhead.
+ * Doesn't do Galoisish things
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#ifndef GALOIS_RUNTIME_DOALL_H
-#define GALOIS_RUNTIME_DOALL_H
+#ifndef GALOIS_RUNTIME_EXECUTOR_DOALL_H
+#define GALOIS_RUNTIME_EXECUTOR_DOALL_H
 
 #include "Galois/gstl.h"
 #include "Galois/Statistic.h"
 #include "Galois/Runtime/Barrier.h"
 #include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/Range.h"
-#include "Galois/Runtime/ForEachTraits.h"
 
 #include <algorithm>
 
@@ -159,6 +159,12 @@ public:
     : origF(F), outputF(F), RF(R), range(r), barrier(getSystemBarrier()), needsReduce(needsReduce), useStealing(steal)
   { }
 
+#ifdef GALOIS_USE_EXP
+  void reinit (const RangeTy& r) {
+    range = r;
+  }
+#endif
+
   void operator()() {
     //Assume the copy constructor on the functor is readonly
     PrivateState thisTLD(origF);
@@ -192,7 +198,6 @@ FunctionTy do_all_dispatch(RangeTy range, FunctionTy f, ReducerTy r, bool doRedu
   if (Galois::Runtime::inGaloisForEach) {
     return std::for_each(range.begin(), range.end(), f);
   } else {
-
     StatTimer LoopTimer("LoopTime", loopname);
     if (ForEachTraits<FunctionTy>::NeedsStats)
       LoopTimer.start();

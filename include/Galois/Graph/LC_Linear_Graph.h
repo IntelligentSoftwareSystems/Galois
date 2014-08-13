@@ -257,10 +257,10 @@ public:
   }
 
   void constructNodesFrom(FileGraph& graph, unsigned tid, unsigned total, const ReadGraphAuxData&) {
-    auto r = graph.divideBy(
+    auto r = graph.divideByNode(
         Nodes::size_of::value + 2 * sizeof(NodeInfo) + LC_Linear_Graph::size_of_out_of_line::value,
         sizeof(EdgeInfo),
-        tid, total);
+        tid, total).first;
 
     this->setLocalRange(*r.first, *r.second);
     NodeInfo* curNode = reinterpret_cast<NodeInfo*>(data.data());
@@ -282,10 +282,10 @@ public:
 
   void constructEdgesFrom(FileGraph& graph, unsigned tid, unsigned total, const ReadGraphAuxData&) {
     typedef typename EdgeInfo::value_type EDV;
-    auto r = graph.divideBy(
+    auto r = graph.divideByNode(
         Nodes::size_of::value + 2 * sizeof(NodeInfo) + LC_Linear_Graph::size_of_out_of_line::value,
         sizeof(EdgeInfo),
-        tid, total);
+        tid, total).first;
 
     for (FileGraph::iterator ii = r.first, ei = r.second; ii != ei; ++ii) {
       EdgeInfo* edge = nodes[*ii]->edgeBegin();

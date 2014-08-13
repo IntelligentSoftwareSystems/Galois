@@ -96,7 +96,7 @@ private:
   unsigned num;
 
   //! [Example Fixed Size Allocator]
-  Galois::GFixedAllocator<Block> heap;
+  Galois::FixedSizeAllocator<Block> heap;
   
   template<typename... Args>
   Block* alloc_block(Args&&... args) {

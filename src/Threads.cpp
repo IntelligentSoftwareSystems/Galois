@@ -22,12 +22,14 @@
  */
 
 #include "Galois/Runtime/ThreadPool.h"
-#include "Galois/Runtime/ActiveThreads.h"
 #include "Galois/Threads.h"
 
 #include <algorithm>
-
-unsigned int Galois::Runtime::activeThreads = 1;
+namespace Galois {
+namespace Runtime {
+unsigned int activeThreads = 1;
+}
+}
 
 unsigned int Galois::setActiveThreads(unsigned int num) noexcept {
   num = std::min(num, Galois::Runtime::getSystemThreadPool().getMaxThreads());

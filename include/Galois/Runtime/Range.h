@@ -27,13 +27,14 @@
 
 #include "Galois/gstl.h"
 
-#include "Galois/Runtime/ActiveThreads.h"
 #include "Galois/Runtime/ll/TID.h"
 
 #include <iterator>
 
 namespace Galois {
 namespace Runtime {
+
+extern unsigned int activeThreads;
 
 // TODO(ddn): update to have better forward iterator behavor for blocked/local iteration
 

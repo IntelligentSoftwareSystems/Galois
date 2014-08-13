@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2014, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -28,6 +28,7 @@
 #include "Galois/Runtime/mm/Mem.h"
 
 #include <cassert>
+#include <fstream>
 
 #ifdef __linux__
 #include <linux/mman.h>
@@ -45,12 +46,6 @@ static const int _MAP_ANON = MAP_ANON;
 #else
 // fail
 #endif
-#ifdef MAP_POPULATE
-static const int _MAP_POP  = MAP_POPULATE;
-#else
-static const int _MAP_POP  = 0;
-#endif
-static const int _MAP_BASE = _MAP_ANON | _MAP_POP | MAP_PRIVATE;
 
 #ifdef HAVE_MMAP64
 template<typename... Args>
@@ -81,12 +76,13 @@ namespace Graph {
 
 FileGraph::FileGraph()
   : sizeofEdge(0), numNodes(0), numEdges(0),
-    outIdx(0), outs(0), edgeData(0)
+    outIdx(0), outs(0), edgeData(0),
+    nodeOffset(0), edgeOffset(0)
 {
 }
 
 FileGraph::FileGraph(const FileGraph& o) {
-  fromArrays(o.outIdx, o.numNodes, o.outs, o.numEdges, o.edgeData, o.sizeofEdge, true);
+  fromArrays(o.outIdx, o.numNodes, o.outs, o.numEdges, o.edgeData, o.sizeofEdge, o.nodeOffset, o.edgeOffset, true);
 }
 
 FileGraph& FileGraph::operator=(const FileGraph& other) {
@@ -99,7 +95,8 @@ FileGraph& FileGraph::operator=(const FileGraph& other) {
 
 FileGraph::FileGraph(FileGraph&& other)
   : sizeofEdge(0), numNodes(0), numEdges(0),
-    outIdx(0), outs(0), edgeData(0)
+    outIdx(0), outs(0), edgeData(0),
+    nodeOffset(0), edgeOffset(0)
 {
   move_assign(std::move(other));
 }
@@ -125,10 +122,11 @@ void FileGraph::move_assign(FileGraph&& o) {
   std::swap(outIdx, o.outIdx);
   std::swap(outs, o.outs);
   std::swap(edgeData, o.edgeData);
+  std::swap(nodeOffset, o.nodeOffset);
+  std::swap(edgeOffset, o.edgeOffset);
 }
 
-void FileGraph::fromMem(void* m) {
-  //parse file
+void FileGraph::fromMem(void* m, uint32_t node_offset, uint64_t edge_offset) {
   uint64_t* fptr = (uint64_t*)m;
   uint64_t version = convert_le64toh(*fptr++);
   if (version != 1)
@@ -136,6 +134,8 @@ void FileGraph::fromMem(void* m) {
   sizeofEdge = convert_le64toh(*fptr++);
   numNodes = convert_le64toh(*fptr++);
   numEdges = convert_le64toh(*fptr++);
+  nodeOffset = node_offset;
+  edgeOffset = edge_offset;
   outIdx = fptr;
   fptr += numNodes;
   uint32_t* fptr32 = (uint32_t*)fptr;
@@ -146,7 +146,7 @@ void FileGraph::fromMem(void* m) {
   edgeData = (char*)fptr32;
 }
 
-static inline size_t rawBlockSize(size_t numNodes, size_t numEdges, size_t sizeofEdgeData) {
+static size_t rawBlockSize(size_t numNodes, size_t numEdges, size_t sizeofEdgeData) {
   size_t bytes = sizeof(uint64_t) * 4; // version, sizeof_edge_data, numNodes, numEdges
   bytes += sizeof(uint64_t) * numNodes;
   bytes += sizeof(uint32_t) * numEdges;
@@ -157,13 +157,18 @@ static inline size_t rawBlockSize(size_t numNodes, size_t numEdges, size_t sizeo
 }
 
 void* FileGraph::fromGraph(FileGraph& g, size_t sizeof_edge_data) {
-  return fromArrays(g.outIdx, g.numNodes, g.outs, g.numEdges, g.edgeData, sizeof_edge_data, true);
+  return fromArrays(g.outIdx, g.numNodes, g.outs, g.numEdges, g.edgeData, sizeof_edge_data, g.nodeOffset, g.edgeOffset, true);
 }
 
-void* FileGraph::fromArrays(uint64_t* out_idx, uint64_t num_nodes,
-      uint32_t* outs, uint64_t num_edges, char* edge_data, size_t sizeof_edge_data, bool converted) {
+void* FileGraph::fromArrays(
+    uint64_t* out_idx, uint64_t num_nodes,
+    uint32_t* outs, uint64_t num_edges,
+    char* edge_data, size_t sizeof_edge_data, 
+    uint32_t node_offset, uint64_t edge_offset,    
+    bool converted) 
+{
   size_t bytes = rawBlockSize(num_nodes, num_edges, sizeof_edge_data);
-  char* base = (char*) mmap_big(nullptr, bytes, PROT_READ | PROT_WRITE, _MAP_BASE, -1, 0);
+  char* base = (char*) mmap_big(nullptr, bytes, PROT_READ | PROT_WRITE, _MAP_ANON | MAP_PRIVATE, -1, 0);
   if (base == MAP_FAILED)
     GALOIS_SYS_DIE("failed allocating graph");
   mappings.push_back({base, bytes});
@@ -198,11 +203,11 @@ void* FileGraph::fromArrays(uint64_t* out_idx, uint64_t num_nodes,
   if (edge_data)
     memcpy(fptr0, edge_data, sizeof_edge_data * num_edges);
 
-  fromMem(base);
+  fromMem(base, node_offset, edge_offset);
   return edgeData;
 }
 
-void FileGraph::fromFile(const std::string& filename, bool preFault) {
+void FileGraph::fromFile(const std::string& filename) {
   int fd = open(filename.c_str(), O_RDONLY);
   if (fd == -1)
     GALOIS_SYS_DIE("failed opening ", "'", filename, "'");
@@ -212,25 +217,69 @@ void FileGraph::fromFile(const std::string& filename, bool preFault) {
   if (fstat(fd, &buf) == -1)
     GALOIS_SYS_DIE("failed reading ", "'", filename, "'");
 
-  void* base = mmap_big(nullptr, buf.st_size, PROT_READ, preFault ? (MAP_PRIVATE | _MAP_POP) : MAP_PRIVATE, fd, 0);
+  void* base = mmap_big(nullptr, buf.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
   if (base == MAP_FAILED)
     GALOIS_SYS_DIE("failed reading ", "'", filename, "'");
   mappings.push_back({base, static_cast<size_t>(buf.st_size)});
 
-  fromMem(base);
+  fromMem(base, 0, 0);
+}
 
-#ifndef MAP_POPULATE
-  if (preFault) {
-    Runtime::MM::pageInReadOnly(base, buf.st_size, Galois::Runtime::MM::pageSize);
+template<typename Mappings>
+static void* loadFromOffset(int fd, offset_t offset, size_t length, Mappings& mappings) {
+  // mmap needs page-aligned offsets
+  offset_t aligned = offset & ~static_cast<offset_t>(Galois::Runtime::MM::pageSize - 1);
+  offset_t alignment = offset - aligned;
+  length += alignment;
+  void *base = mmap_big(nullptr, length, PROT_READ, MAP_PRIVATE, fd, aligned);
+  if (base == MAP_FAILED)
+    GALOIS_SYS_DIE("failed allocating for fd ", fd);
+  mappings.push_back({base, length});
+  return static_cast<char*>(base) + alignment;
+}
+
+void FileGraph::partFromFile(const std::string& filename, NodeRange nrange, EdgeRange erange) {
+  int fd = open(filename.c_str(), O_RDONLY);
+  if (fd == -1)
+    GALOIS_SYS_DIE("failed opening ", "'", filename, "'");
+  fds.push_back(fd);
+
+  size_t headerSize = 4 * sizeof(uint64_t);
+  void* base = mmap(nullptr, headerSize, PROT_READ, MAP_PRIVATE, fd, 0);
+  if (base == MAP_FAILED)
+    GALOIS_SYS_DIE("failed reading ", "'", filename, "'");
+  mappings.push_back({base, headerSize});
+
+  // Read metadata of whole graph
+  fromMem(base, *nrange.first, *erange.first);
+
+  // Adjust metadata to correspond to part
+  uint64_t partNumNodes = std::distance(nrange.first, nrange.second);
+  uint64_t partNumEdges = std::distance(erange.first, erange.second);
+  size_t length = partNumNodes * sizeof(uint64_t);
+  offset_t offset = headerSize + nodeOffset * sizeof(uint64_t);
+  outIdx = static_cast<uint64_t*>(loadFromOffset(fd, offset, length, mappings));
+
+  length = partNumEdges * sizeof(uint32_t);
+  offset = headerSize + numNodes * sizeof(uint64_t) + edgeOffset * sizeof(uint32_t);
+  outs = static_cast<uint32_t*>(loadFromOffset(fd, offset, length, mappings));
+
+  edgeData = 0;
+  if (sizeofEdge) {
+    length = partNumEdges * sizeofEdge;
+    offset = rawBlockSize(numNodes, numEdges, 0) + sizeofEdge * edgeOffset;
+    edgeData = static_cast<char*>(loadFromOffset(fd, offset, length, mappings));
   }
-#endif
+
+  numNodes = partNumNodes;
+  numEdges = partNumEdges;
 }
 
 size_t FileGraph::findIndex(size_t nodeSize, size_t edgeSize, size_t targetSize, size_t lb, size_t ub) {
   while (lb < ub) {
     size_t mid = lb + (ub - lb) / 2;
-    size_t num_edges = *edge_end(mid);
-    size_t size = num_edges * edgeSize + (mid+1) * nodeSize;
+    size_t num_edges = *edge_begin(mid) - edgeOffset;
+    size_t size = num_edges * edgeSize + (mid-nodeOffset) * nodeSize;
     if (size < targetSize)
       lb = mid + 1;
     else
@@ -240,25 +289,45 @@ size_t FileGraph::findIndex(size_t nodeSize, size_t edgeSize, size_t targetSize,
 }
 
 auto 
-FileGraph::divideBy(size_t nodeSize, size_t edgeSize, unsigned id, unsigned total) -> std::pair<iterator,iterator>
+FileGraph::divideByNode(size_t nodeSize, size_t edgeSize, size_t id, size_t total)
+-> GraphRange
 {
   size_t size = numNodes * nodeSize + numEdges * edgeSize;
   size_t block = (size + total - 1) / total;
+  size_t aa = numEdges;
+  size_t ea = numEdges;
   size_t bb = findIndex(nodeSize, edgeSize, block * id, 0, numNodes);
-  size_t eb;
-  if (id + 1 == total)
-    eb = numNodes;
-  else
-    eb = findIndex(nodeSize, edgeSize, block * (id + 1), bb, numNodes);
+  size_t eb = findIndex(nodeSize, edgeSize, block * (id + 1), bb, numNodes);
+  if (bb != eb) {
+    aa = *edge_begin(bb);
+    ea = *edge_end(eb-1);
+  }
   if (false) {
     Runtime::LL::gInfo("(", id, "/", total, ") ", bb, " ", eb, " ", eb - bb);
   }
-  return std::make_pair(iterator(bb), iterator(eb));
+  return GraphRange(NodeRange(iterator(bb), iterator(eb)), EdgeRange(edge_iterator(aa), edge_iterator(ea)));
+}
+
+auto
+FileGraph::divideByEdge(size_t nodeSize, size_t edgeSize, size_t id, size_t total)
+-> std::pair<NodeRange, EdgeRange>
+{
+  size_t size = numEdges;
+  size_t block = (size + total - 1) / total;
+  size_t aa = block*id;
+  size_t ea = std::min(block * (id + 1), static_cast<size_t>(numEdges));
+  size_t bb = findIndex(0, 1, aa, 0, numNodes);
+  size_t eb = findIndex(0, 1, ea, bb, numNodes);
+
+  if (true) {
+    Runtime::LL::gInfo("(", id, "/", total, ") [", bb, " ", eb, " ", eb - bb, "], [", aa, " ", ea, " ", ea - aa, "]");
+  }
+  return GraphRange(NodeRange(iterator(bb), iterator(eb)), EdgeRange(edge_iterator(aa), edge_iterator(ea)));
 }
 
 //FIXME: perform host -> le on data
 void FileGraph::toFile(const std::string& file) {
-  // XXX handle files with multiple mappings
+  // FIXME handle files with multiple mappings
   GALOIS_ASSERT(mappings.size() == 1);
 
   ssize_t retval;
@@ -283,19 +352,18 @@ void FileGraph::toFile(const std::string& file) {
 }
 
 uint64_t FileGraph::getEdgeIdx(GraphNode src, GraphNode dst) const {
-  for (uint32_t* ii = raw_neighbor_begin(src),
-	 *ee = raw_neighbor_end(src); ii != ee; ++ii)
+  for (auto ii = raw_neighbor_begin(src), ei = raw_neighbor_end(src); ii != ei; ++ii) {
     if (convert_le32toh(*ii) == dst)
       return std::distance(outs, ii);
+  }
   return ~static_cast<uint64_t>(0);
 }
 
-void FileGraph::pageIn(unsigned id, unsigned total, size_t sizeofEdgeData) {
-  // XXX: by edge or by node ?
-  auto r = divideBy(
+void FileGraph::pageInByNode(size_t id, size_t total, size_t sizeofEdgeData) {
+  auto r = divideByNode(
     sizeof(uint64_t),
     sizeofEdgeData + sizeof(uint32_t),
-    id, total);
+    id, total).first;
   
   size_t ebegin = *edge_begin(*r.first);
   size_t eend = ebegin;
@@ -308,19 +376,25 @@ void FileGraph::pageIn(unsigned id, unsigned total, size_t sizeofEdgeData) {
 }
 
 uint32_t* FileGraph::raw_neighbor_begin(GraphNode N) const {
-  return (N == 0) ? &outs[0] : &outs[convert_le64toh(outIdx[N-1])];
+  return &outs[*edge_begin(N)];
 }
 
 uint32_t* FileGraph::raw_neighbor_end(GraphNode N) const {
-  return &outs[convert_le64toh(outIdx[N])];
+  return &outs[*edge_end(N)];
 }
 
 FileGraph::edge_iterator FileGraph::edge_begin(GraphNode N) const {
-  return edge_iterator(N == 0 ? 0 : convert_le64toh(outIdx[N-1]));
+  size_t idx = 0;
+  if (N > nodeOffset)
+    idx = std::min(convert_le64toh(outIdx[N-1-nodeOffset]), static_cast<uint64_t>(edgeOffset + numEdges)) - edgeOffset;
+  return edge_iterator(idx);
 }
 
 FileGraph::edge_iterator FileGraph::edge_end(GraphNode N) const {
-  return edge_iterator(convert_le64toh(outIdx[N]));
+  size_t idx = 0;
+  if (N >= nodeOffset)
+    idx = std::min(convert_le64toh(outIdx[N-nodeOffset]), static_cast<uint64_t>(edgeOffset + numEdges)) - edgeOffset;
+  return edge_iterator(idx);
 }
 
 FileGraph::GraphNode FileGraph::getEdgeDst(edge_iterator it) const {
@@ -348,11 +422,11 @@ bool FileGraph::hasNeighbor(GraphNode N1, GraphNode N2) const {
 }
 
 FileGraph::iterator FileGraph::begin() const {
-  return iterator(0);
+  return iterator(nodeOffset);
 }
 
 FileGraph::iterator FileGraph::end() const {
-  return iterator(numNodes);
+  return iterator(nodeOffset + numNodes);
 }
 
 } // end Graph

@@ -51,7 +51,7 @@ namespace Runtime {
 //! Implementation of deterministic execution
 namespace DeterministicImpl {
 
-extern __thread MM::SizedAllocatorFactory::SizedAlloc* listAllocator;
+extern __thread MM::SizedHeapFactory::SizedHeap* listHeap;
 
 template<bool Enabled>
 class LoopStatistics {
@@ -163,12 +163,12 @@ public:
     assert(preds == 0);
     this->commitIteration();
     // TODO replace with bulk heap
-    edges.clear(*listAllocator);
-    succs.clear(*listAllocator);
+    edges.clear(*listHeap);
+    succs.clear(*listHeap);
   }
 
   void addEdge(DeterministicContextBase* o) {
-    succs.push_front(*listAllocator, o);
+    succs.push_front(*listHeap, o);
     o->preds += 1;
   }
 
@@ -191,7 +191,7 @@ public:
 
     if (std::find(edges.begin(), edges.end(), owner) != edges.end())
       return;
-    edges.push_front(*listAllocator, owner);
+    edges.push_front(*listHeap, owner);
   }
 };
 
@@ -353,12 +353,12 @@ public:
   DAGManagerBase(): term(getSystemTermination()), barrier(getSystemBarrier()) { }
 
   void initializeDAGManager() { 
-    if (!listAllocator)
-      listAllocator = MM::SizedAllocatorFactory::getAllocatorForSize(sizeof(typename Context::ContextList::block_type));
+    if (!listHeap)
+      listHeap = MM::SizedHeapFactory::getHeapForSize(sizeof(typename Context::ContextList::block_type));
   }
   
   void destroyDAGManager() {
-    // not needed since listAllocator is a global fixed size allocator
+    // not needed since listHeap is a global fixed size allocator
     data.getLocal()->heap.clear();
   }
 
@@ -990,7 +990,6 @@ public:
       if (OptionsTy::hasFixedNeighborhood) {
         copyMine(b, e, dist, wl, window, LL::getTID());
       } else {
-        size_t dist = std::distance(b, e);
         copyMine(
             boost::make_transform_iterator(mergeBuf.begin(), typename NewItem::GetValue()),
             boost::make_transform_iterator(mergeBuf.end(), typename NewItem::GetValue()),

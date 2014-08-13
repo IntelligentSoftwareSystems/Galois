@@ -27,7 +27,8 @@
 #include "Galois/NoDerefIterator.h"
 #include "Galois/WorkList/WorkList.h"
 #include "Galois/Runtime/ParallelWork.h"
-#include "Galois/Runtime/DoAll.h"
+#include "Galois/Runtime/Executor_DoAll.h"
+#include "Galois/Runtime/Executor_OnEach.h"
 
 #ifdef GALOIS_USE_EXP
 #include "Galois/Runtime/ParallelWorkDistributed.h"
@@ -50,7 +51,7 @@ struct count_if_helper {
   GReducible<ptrdiff_t, TO>& ret;
   count_if_helper(Predicate p, GReducible<ptrdiff_t,TO>& c): f(p), ret(c) { }
   template<typename T>
-  void operator()(const T& v) {
+  void operator()(const T& v) const {
     if (f(v)) ret.update(1);
   }
 };
@@ -320,7 +321,7 @@ struct map_reduce_helper {
   map_reduce_helper(Galois::Runtime::PerThreadStorage<T>& i, MapFn fn, ReduceFn reduce)
     :init(i), fn(fn), reduce(reduce) {}
   template<typename U>
-  void operator()(U&& v) {
+  void operator()(U&& v) const {
     *init.getLocal() = reduce(fn(std::forward<U>(v)), *init.getLocal());
   }
 };

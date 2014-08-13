@@ -53,7 +53,7 @@
 namespace Galois {
 namespace WorkList {
 
-template<class T, class Indexer = DummyIndexer<T>, typename ContainerTy = FIFO<T>, bool concurrent=true >
+template<class T, class Indexer = DummyIndexer<T>, typename ContainerTy = GFIFO<T>, bool concurrent=true >
 class ApproxOrderByIntegerMetric : private boost::noncopyable {
   typename ContainerTy::template rethread<concurrent>::type data[2048];
   
@@ -114,7 +114,7 @@ public:
 };
 GALOIS_WLCOMPILECHECK(ApproxOrderByIntegerMetric)
 
-template<class T, class Indexer = DummyIndexer<T>, typename ContainerTy = FIFO<T>, bool concurrent=true >
+template<class T, class Indexer = DummyIndexer<T>, typename ContainerTy = GFIFO<T>, bool concurrent=true >
 class LogOrderByIntegerMetric : private boost::noncopyable {
   typename ContainerTy::template rethread<concurrent>::type data[sizeof(unsigned int)*8 + 1];
   
@@ -179,7 +179,7 @@ public:
 };
 GALOIS_WLCOMPILECHECK(LogOrderByIntegerMetric)
 
-template<typename T, typename Indexer = DummyIndexer<T>, typename LocalTy = FIFO<T>, typename GlobalTy = FIFO<T> >
+template<typename T, typename Indexer = DummyIndexer<T>, typename LocalTy = GFIFO<T>, typename GlobalTy = GFIFO<T> >
 class LocalFilter {
   GlobalTy globalQ;
 
@@ -391,7 +391,7 @@ class ReductionWL {
   typedef Runtime::LL::CacheLineStorage<LocalWL> paddedLocalWL;
 
   paddedLocalWL* WL;
-  FIFO<T> backup;
+  GFIFO<T> backup;
   int starving;
 
 public:
@@ -1259,7 +1259,7 @@ GALOIS_WLCOMPILECHECK(SkipListQueue)
 
 template<class Compare = std::less<int>, typename T = int, bool concurrent = true>
 class SetQueue : private boost::noncopyable, private Runtime::LL::PaddedLock<concurrent> {
-  std::set<T, Compare, Runtime::MM::FSBGaloisAllocator<T> > wl;
+  std::set<T, Compare, Runtime::MM::FixedSizeAllocator<T> > wl;
 
   using Runtime::LL::PaddedLock<concurrent>::lock;
   using Runtime::LL::PaddedLock<concurrent>::try_lock;
@@ -1345,7 +1345,7 @@ public:
 GALOIS_WLCOMPILECHECK(FCPairingHeapQueue)
 
 
-template<class Indexer, typename ContainerTy = Galois::WorkList::FIFO<>, typename T = int, bool concurrent = true >
+template<class Indexer, typename ContainerTy = Galois::WorkList::GFIFO<>, typename T = int, bool concurrent = true >
 class SimpleOrderedByIntegerMetric : private boost::noncopyable, private Galois::Runtime::LL::PaddedLock<concurrent> {
 
    using Galois::Runtime::LL::PaddedLock<concurrent>::lock;
@@ -2125,7 +2125,7 @@ template<typename gWL = LIFO_SB, int chunksize = 64, typename T = int>
 class ChunkedAdaptor : private boost::noncopyable {
   typedef Chunk<T, chunksize> ChunkTy;
 
-  Runtime::MM::FixedSizeAllocator heap;
+  Runtime::MM::FixedSizeHeap heap;
 
   Runtime::PerThreadStorage<ChunkTy*> data;
 

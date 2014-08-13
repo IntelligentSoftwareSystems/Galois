@@ -145,7 +145,7 @@ class PQuadTree {
     MinBox& least;
     MaxBox& most;
     ComputeBox(MinBox& l, MaxBox& m): least(l), most(m) { }
-    void operator()(const Point* p) {
+    void operator()(const Point* p) const {
       least.update(p->t());
       most.update(p->t());
     }
@@ -193,8 +193,8 @@ class PQuadTree {
   double m_radius;
   Node* m_root;
 
-  Galois::Runtime::MM::FSBGaloisAllocator<Node> nodeAlloc;
-  Galois::Runtime::MM::FSBGaloisAllocator<Node::PointsTy> pointsAlloc;
+  Galois::FixedSizeAllocator<Node> nodeAlloc;
+  Galois::FixedSizeAllocator<Node::PointsTy> pointsAlloc;
 
   template<typename IterTy>
   void init(IterTy begin, IterTy end) {

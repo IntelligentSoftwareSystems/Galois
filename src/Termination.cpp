@@ -27,8 +27,9 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "Galois/Runtime/ActiveThreads.h"
 #include "Galois/Runtime/Termination.h"
+
+extern unsigned Galois::Runtime::activeThreads;
 
 using namespace Galois::Runtime;
 

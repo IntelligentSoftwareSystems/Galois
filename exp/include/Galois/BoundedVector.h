@@ -71,6 +71,15 @@ public:
     return m_array[i];
   }
 
+  template <typename... Args>
+  void emplace_back(Args&&... args) {
+    assertValidSize ();
+    assert (!full ());
+
+    m_array.construct (m_size, std::forward<Args>(args)...);
+    ++m_size;
+  }
+
   void push_back (const_reference v) {
     assertValidSize ();
     assert (!full ());
@@ -83,7 +92,15 @@ public:
     return (*this)[0];
   }
 
+  reference front () {
+    return (*this)[0];
+  }
+
   const_reference back () const {
+    return (*this)[size () - 1];
+  }
+
+  reference back () {
     return (*this)[size () - 1];
   }
 

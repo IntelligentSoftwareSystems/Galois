@@ -242,7 +242,7 @@ struct GetBackLocalNodes : public Galois::Runtime::Lockable {
   GetBackLocalNodes() { }
 
   template<typename Context>
-  void operator()(gptr<Octree> b, Context& cnx) {
+  void operator()(gptr<Octree> b, Context& cnx) const {
     std::stringstream ss;
     if (b->Leaf)
       ss << "Leaf Node: ";
@@ -517,11 +517,11 @@ struct AdvanceBodies {
   AdvanceBodies() { }
 
   template<typename Context>
-  void operator()(gptr<Octree>& bb, Context&) {
+  void operator()(gptr<Octree>& bb, Context&) const {
     operator()(&(*bb));
   }
 
-  void operator()(Octree* bb) {
+  void operator()(Octree* bb) const {
     Octree& b = *bb;
     Point dvel(b.acc);
     dvel *= config.dthf;
@@ -569,7 +569,7 @@ struct InsertBody : public Galois::Runtime::Lockable {
   InsertBody() { }
   InsertBody(BodyPtrs& pb, Bodies& b): pBodies(pb), bodies(b) { }
   template<typename Context>
-  void operator()(Octree& b, const Context& cnx) {
+  void operator()(Octree& b, const Context& cnx) const {
     gptr<Octree> bodyptr(&*bodies->emplace(b));
     pBodies->push_back(bodyptr);
   }
@@ -686,7 +686,7 @@ struct CheckAllPairs {
   
   CheckAllPairs(Bodies& b): bodies(b) { }
 
-  double operator()(const Octree& body) {
+  double operator()(const Octree& body) const {
     const Octree* me = &body;
     Point acc;
     for (auto ii = bodies->local_begin(), ei = bodies->local_end(); ii != ei; ++ii) {

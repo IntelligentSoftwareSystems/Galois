@@ -385,11 +385,11 @@ struct SynchronousAlgo {
     Process(Accum& a, double t, unsigned int i):
       accum(a), tol(t), iteration(i) { }
 
-    void operator()(const TNode& src, Galois::UserContext<TNode>& ctx) {
-      (*this)(src);
+    void operator()(const TNode& src, Galois::UserContext<TNode>& ctx) const {
+      operator()(src);
     }
 
-    void operator()(const TNode& src) {
+    void operator()(const TNode& src) const {
       TData& sdata = tgraph.getData(src, Galois::MethodFlag::NONE);
       double sum = 0;
 

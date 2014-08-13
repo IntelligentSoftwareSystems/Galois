@@ -27,7 +27,6 @@
 
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/Barrier.h"
-#include "Galois/Runtime/ActiveThreads.h"
 #include "Galois/Runtime/ll/CompilerSpecific.h"
 
 namespace {

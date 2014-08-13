@@ -110,7 +110,7 @@ template<typename T,template<typename,bool> class OuterTy, bool isLIFO,int Chunk
 class dChunkedMaster : private boost::noncopyable {
   class Chunk : public FixedSizeRingAdaptor<T,isLIFO,ChunkSize>, public OuterTy<Chunk,true>::ListNode {};
 
-  MM::FixedSizeAllocator heap;
+  MM::FixedSizeAllocator<Chunk> alloc;
 
   struct p {
     Chunk* next;
@@ -122,12 +122,14 @@ class dChunkedMaster : private boost::noncopyable {
   PerPackageStorage<LevelItem> Q;
 
   Chunk* mkChunk() {
-    return new (heap.allocate(sizeof(Chunk))) Chunk();
+    Chunk* ptr = alloc.allocate(1);
+    alloc.construct(ptr);
+    return ptr;
   }
   
-  void delChunk(Chunk* C) {
-    C->~Chunk();
-    heap.deallocate(C);
+  void delChunk(Chunk* ptr) {
+    alloc.destroy(ptr);
+    alloc.deallocate(ptr, 1);
   }
 
   void pushChunk(const WID& id, Chunk* C)  {
@@ -169,7 +171,7 @@ class dChunkedMaster : private boost::noncopyable {
 public:
   typedef T value_type;
 
-  dChunkedMaster() : heap(sizeof(Chunk)) {
+  dChunkedMaster() {
     for (unsigned int i = 0; i < data.size(); ++i) {
       p& r = *data.getRemote(i);
       r.next = 0;

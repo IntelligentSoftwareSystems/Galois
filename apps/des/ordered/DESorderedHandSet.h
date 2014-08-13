@@ -93,7 +93,7 @@ struct SimObjInfo: public TypeHelper {
   typedef Galois::Runtime::LL::PaddedLock<true> Lock_ty;
   typedef des::AbstractMain<SimInit_ty>::GNode GNode;
   typedef std::set<MarkedEvent, Cmp_ty
-    , Galois::Runtime::MM::FSBGaloisAllocator<MarkedEvent> > PQ;
+    , Galois::FixedSizeAllocator<MarkedEvent> > PQ;
   // typedef std::priority_queue<MarkedEvent, std::vector<MarkedEvent>, Cmp_ty::RevCmp> PQ;
 
   Lock_ty mutex;

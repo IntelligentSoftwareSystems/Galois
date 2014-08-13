@@ -416,7 +416,7 @@ struct parallelBisect {
 struct initPart {
   GGraph& g;
   initPart(GGraph& _g): g(_g) {}
-  void operator()(GNode item) {
+  void operator()(GNode item) const {
     g.getData(item, Galois::MethodFlag::NONE).initRefine(0,true);
     g.getData(item, Galois::MethodFlag::NONE).initPartition();
   }

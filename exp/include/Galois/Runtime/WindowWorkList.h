@@ -52,12 +52,12 @@ public:
     LL::gPrint("Using SortedRangeWindowWL\n");
   }
 
-  template <typename I>
-  void initfill (I b, I e) {
+  template <typename R>
+  void initfill (const R& range) {
 
     GAccumulator<size_t> count;
 
-    Galois::Runtime::do_all_impl (Galois::Runtime::makeStandardRange (b, e), 
+    Galois::Runtime::do_all_impl (range,
         [this, &count] (const T& x) {
           m_wl.get ().push_back (x);
           count += 1;
@@ -213,10 +213,10 @@ public:
   }
 
 
-  template <typename I>
-  void initfill (I b, I e) {
+  template <typename R>
+  void initfill (const R& range) {
 
-    Galois::Runtime::do_all_impl (Galois::Runtime::makeStandardRange (b, e),
+    Galois::Runtime::do_all_impl (range,
         [this] (const T& x) {
           m_wl.get ().push (x);
         }
@@ -358,12 +358,11 @@ public:
 
   explicit PartialPQbasedWindowWL (const Cmp& cmp=Cmp ()): cmp (cmp) {}
 
-  template <typename I>
-  void initfill (I b, I e) {
+  template <typename R>
+  void initfill (const R& range) {
     Galois::Runtime::on_each_impl (
-        [this, b, e] (const unsigned tid, const unsigned numT) {
-          std::pair<I,I> r = Galois::block_range (b, e, tid, numT);
-          m_wl.getLocal ()->initfill (r.first, r.second);
+        [this, range] (const unsigned tid, const unsigned numT) {
+          m_wl.getLocal ()->initfill (range.local_begin (), range.local_end ());
         }, "initfill");
   }
 
