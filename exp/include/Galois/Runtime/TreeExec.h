@@ -409,7 +409,7 @@ void for_each_ordered_tree (F& initTask, const char* loopname=nullptr) {
 
 class TreeTaskBase {
 public:
-  virtual void execute (void) {}
+  virtual void operator () (void) {}
 };
 
 class TreeExecGeneric {
@@ -495,7 +495,7 @@ public:
 
       ptd.currTask = &task;
 
-      funcNparent->second->execute ();
+      funcNparent->second->operator () ();
 
       Task* parent = funcNparent->first;
 

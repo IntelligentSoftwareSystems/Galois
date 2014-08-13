@@ -202,7 +202,7 @@ struct GaloisFibGeneric: public Galois::Runtime::TreeTaskBase {
     result (_result)
   {}
 
-  virtual void execute (void) {
+  virtual void operator () (void) {
     if (n <= 2) {
       result = n;
       return;
