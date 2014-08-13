@@ -34,6 +34,7 @@
 #include "Galois/PriorityQueue.h"
 #include "Galois/Timer.h"
 
+#include "Galois/WorkList/WorkList.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/Executor_DoAll.h"
 #include "Galois/Runtime/ParallelWork.h"
@@ -42,6 +43,7 @@
 #include "Galois/Runtime/ll/gio.h"
 #include "Galois/Runtime/ll/ThreadRWlock.h"
 #include "Galois/Runtime/mm/Mem.h"
+
 
 #include "llvm/ADT/SmallVector.h"
 

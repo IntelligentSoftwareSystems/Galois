@@ -23,7 +23,7 @@ namespace cll = llvm::cl;
 static cll::opt<unsigned> N("n", cll::desc("n-th fibonacci number"), cll::init(39));
 
 enum ExecType {
-  SERIAL, CILK, GALOIS, GALOIS_ALT, GALOIS_STACK
+  SERIAL, CILK, GALOIS, GALOIS_ALT, GALOIS_STACK, GALOIS_GENERIC,
 };
 
 static cll::opt<ExecType> execType (
@@ -34,6 +34,7 @@ static cll::opt<ExecType> execType (
       clEnumVal (GALOIS, "galois divide and conquer implementation"),
       clEnumVal (GALOIS_ALT, "galois alternate divide and conquer implementation"),
       clEnumVal (GALOIS_STACK, "galois using thread stack"),
+      clEnumVal (GALOIS_GENERIC, "galois std::function version"),
       clEnumValEnd),
 
     cll::init (SERIAL));
@@ -191,6 +192,34 @@ unsigned galoisFibStack (unsigned n) {
   return result;
 }
 
+struct GaloisFibGeneric {
+  unsigned n;
+  unsigned* result;
+
+  void operator () (void) {
+    if (n <= 2) {
+      *result = n;
+      return;
+    }
+
+    unsigned left;
+    Galois::Runtime::spawn (GaloisFibGeneric {n-1, &left});
+
+    unsigned right;
+    Galois::Runtime::spawn (GaloisFibGeneric {n-2, &right});
+
+    Galois::Runtime::sync ();
+
+    *result = left + right;
+  }
+};
+
+unsigned galoisFibGeneric (unsigned n) {
+  unsigned result = 0;
+  Galois::Runtime::for_each_ordered_tree_generic (GaloisFibGeneric {n, &result}, "fib-gen");
+  return result;
+}
+
 
 int main (int argc, char* argv[]) {
 
@@ -224,6 +253,11 @@ int main (int argc, char* argv[]) {
     case GALOIS_STACK:
       result = galoisFibStack (N);
       break;
+
+    case GALOIS_GENERIC:
+      result = galoisFibGeneric (N);
+      break;
+
 
     default:
       std::abort ();
