@@ -163,7 +163,7 @@ public:
   void sortEdgesByEdgeData(GraphNode N, const CompTy& comp = std::less<EdgeTy>()) {
     typedef LargeArray<GraphNode> EdgeDst;
     typedef LargeArray<EdgeTy> EdgeData;
-    typedef detail::EdgeSortIterator<GraphNode,uint64_t,EdgeDst,EdgeData> edge_sort_iterator;
+    typedef detail::EdgeSortIterator<GraphNode,uint64_t,EdgeDst,EdgeData,Convert32> edge_sort_iterator;
 
     EdgeDst edgeDst(outs, numEdges);
     EdgeData ed(edgeData, numEdges);
@@ -179,13 +179,10 @@ public:
    */
   template<typename EdgeTy, typename CompTy>
   void sortEdges(GraphNode N, const CompTy& comp) {
-#ifdef HAVE_BIG_ENDIAN
-    GALOIS_DIE("Automatic endian conversion for graph destinations not yet implemented");
-#endif
 
     typedef LargeArray<GraphNode> EdgeDst;
     typedef LargeArray<EdgeTy> EdgeData;
-    typedef detail::EdgeSortIterator<GraphNode,uint64_t,EdgeDst,EdgeData> edge_sort_iterator;
+    typedef detail::EdgeSortIterator<GraphNode,uint64_t,EdgeDst,EdgeData,Convert32> edge_sort_iterator;
 
     EdgeDst edgeDst(outs, numEdges);
     EdgeData ed(edgeData, numEdges);
