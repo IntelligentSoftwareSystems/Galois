@@ -8,7 +8,7 @@ struct Function {
 };
 
 int main(int argc, char** argv) {
-  int threads = 1;
+  int threads = 2;
   if (argc > 1)
     threads = atoi(argv[1]);
 
