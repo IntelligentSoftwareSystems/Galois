@@ -309,6 +309,9 @@ function(makeTest name)
   add_executable(test-${name} ${name}.cpp)
   target_link_libraries(test-${name} galois)
   add_test(NAME ${name} COMMAND ${commandline})
+  # Allow parallel tests
+  set_tests_properties(${name} PROPERTIES ENVIRONMENT
+    GALOIS_DO_NOT_BIND_THREADS=1)
 endfunction()
 
 ###### Source finding ######
