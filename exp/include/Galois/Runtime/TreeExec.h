@@ -9,6 +9,7 @@
 #include "Galois/optional.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/DoAll.h"
+#include "Galois/Runtime/ForEachTraits.h"
 #include "Galois/Runtime/LCordered.h"
 #include "Galois/Runtime/ParallelWork.h"
 #include "Galois/Runtime/PerThreadWorkList.h"
@@ -304,7 +305,7 @@ protected:
 
     {}
 
-    ~PerThreadData (void) {
+    void reportStats (void) {
       reportStat(loopname, "Pushes", stat_pushes);
       reportStat(loopname, "Iterations", stat_iterations);
     }
@@ -382,8 +383,8 @@ public:
   }
 
   void operator () (void) {
+    PerThreadData& ptd = *(perThreadData.getLocal ());
     do {
-      PerThreadData& ptd = *(perThreadData.getLocal ());
       ptd.didWork = false;
 
       applyOperatorRecursive ();
@@ -391,6 +392,8 @@ public:
       term.localTermination (ptd.didWork);
       LL::asmPause (); // Take a breath, let the token propagate
     } while (!term.globalTermination ());
+
+    ptd.reportStats ();
   }
 
 };
@@ -443,7 +446,7 @@ class TreeExecGeneric {
 
     {}
 
-    ~PerThreadData (void) {
+    void reportStats (void) {
       reportStat(loopname, "Pushes", stat_pushes);
       reportStat(loopname, "Iterations", stat_iterations);
     }
@@ -511,8 +514,8 @@ public:
   }
 
   void operator () (void) {
+    PerThreadData& ptd = *(perThreadData.getLocal ());
     do {
-      PerThreadData& ptd = *(perThreadData.getLocal ());
       ptd.didWork = false;
 
       applyOperatorRecursive ();
@@ -520,6 +523,8 @@ public:
       term.localTermination (ptd.didWork);
       LL::asmPause (); // Take a breath, let the token propagate
     } while (!term.globalTermination ());
+
+    ptd.reportStats ();
   }
 };
 
