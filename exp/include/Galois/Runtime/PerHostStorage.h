@@ -151,8 +151,6 @@ public:
   }
 };
 
-
-
 class PerBackend_v3 {
   static const int dynSlots = 1024;
   static __thread void* space[dynSlots];
@@ -177,7 +175,7 @@ public:
   void deallocateOffset(uint64_t);
   
   template<typename T>
-  T*& resolve(uint64_t off ) { return *reinterpret_cast<T**>(&space[off]); }
+  T*& resolve(uint64_t off) { return *reinterpret_cast<T**>(&space[off]); }
 
   template<typename T>
   T*& resolveThread(uint64_t off, uint32_t tid) {
@@ -219,8 +217,11 @@ class PerThreadDist {
   }
 
   static void deallocOnHost(uint64_t off) {
-    for (unsigned x = 0; x < getSystemThreadPool().getMaxThreads(); ++x)
-      delete getPerThreadDistBackend().resolveThread<T>(off, x);
+    for (unsigned x = 0; x < getSystemThreadPool().getMaxThreads(); ++x) {
+      T*& p = getPerThreadDistBackend().resolveThread<T>(off, x);
+      delete p;
+      p = nullptr;
+    }
   }
 
 public:
@@ -306,10 +307,6 @@ public:
     gDeserialize(s,offset);
   }
 };
-
-  
-
-
 
 } // end namespace
 } // end namespace

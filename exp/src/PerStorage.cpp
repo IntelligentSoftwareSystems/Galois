@@ -22,6 +22,7 @@
  */
 
 #include "Galois/Runtime/PerHostStorage.h"
+#include "Galois/Runtime/ll/gio.h"
 
 #include <mutex>
 #include <algorithm>
@@ -123,8 +124,7 @@ uint64_t PerBackend_v3::allocateOffset() {
     return std::distance(freelist.begin(), ii);
   } else {
     //Send message and await magic
-    assert(0 && "not implemented");
-    abort();
+    GALOIS_DIE("not implemented");
   }
 }
 
@@ -135,8 +135,7 @@ void PerBackend_v3::deallocateOffset(uint64_t off) {
     freelist[off] = false;
   } else {
     //Send message and await magic
-    assert(0 && "not implemented");
-    abort();
+    GALOIS_DIE("not implemented");
   }
 }
 
