@@ -119,7 +119,7 @@ public:
 
   Edge() {}
 
-  NHTy getDst() { return dst; }
+  NHTy getDst() const { return dst; }
   EdgeDataTy& getValue() { return val; }
 
   typedef int tt_has_serialize;
@@ -148,7 +148,7 @@ public:
   Edge(const NHTy& d) :dst(d) {}
   Edge() {}
 
-  NHTy getDst() { return dst; }
+  NHTy getDst() const { return dst; }
 
   void dump(std::ostream& os) const {
     os << "<{Edge: dst: ";
@@ -183,6 +183,7 @@ protected:
       ii->dump(os);
     }
   }
+
  public:
   typedef typename EdgeListTy::iterator iterator;
 
@@ -234,6 +235,7 @@ protected:
       ii->dump(os);
     }
   }
+
  public:
   typedef typename EdgeListTy::iterator iterator;
 
@@ -436,6 +438,11 @@ public:
     return ii->getDst();
   }
 
+  template<typename EI>
+  auto getEdgeData(EI ii) -> decltype(ii->getValue()) {
+    return ii->getValue();
+  }
+
   NodeTy& getData(const NodeHandle& N) {
     assert(N);
     return N->getData();
@@ -452,8 +459,8 @@ public:
   static pointer allocate() {
     return Runtime::PerThreadDist<ThirdGraph>::allocate();
   }
-  static void deallocate(pointer ptr) {
-    Runtime::PerThreadDist<ThirdGraph>::deallocate(ptr);
+  static void deallocate(pointer p) {
+    Runtime::PerThreadDist<ThirdGraph>::deallocate(p);
   }
 
   explicit ThirdGraph(pointer p) :basePtr(p) {
@@ -468,6 +475,8 @@ public:
   }
 
   ~ThirdGraph() {
+    assert(localStateStore);
+    assert(localStatePtr);
     Bag<gNode>::deallocate(localStateStore);
     Bag<Runtime::gptr<gNode>>::deallocate(localStatePtr);
   }
