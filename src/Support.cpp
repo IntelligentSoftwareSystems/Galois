@@ -91,7 +91,7 @@ public:
     LL::gPrint("STATTYPE,LOOP,CATEGORY,n,sum");
     size_t total = 0;
     for (uint32_t host = 0; host < maxTids.size(); ++host) {
-      for (uint32_t tid = 0; tid < maxTids[host]; ++tid) {
+      for (uint32_t tid = 0; tid < maxTids[host] + 1; ++tid) {
         LL::gPrint(",H", host, "T", tid);
         total += 1;
       }
@@ -113,7 +113,7 @@ public:
                  accum
                  );
       for (uint32_t host = 0; host < maxTids.size(); ++host) {
-        for (uint32_t tid = 0; tid < maxTids[host]; ++tid) {
+        for (uint32_t tid = 0; tid < maxTids[host] + 1; ++tid) {
           size_t value = 0;
           if (host < v.size() && tid < v[host].size())
             value = v[host][tid];
