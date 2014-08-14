@@ -23,7 +23,7 @@ namespace cll = llvm::cl;
 static cll::opt<unsigned> N("n", cll::desc("n-th fibonacci number"), cll::init(39));
 
 enum ExecType {
-  SERIAL, CILK, GALOIS, GALOIS_ALT, GALOIS_STACK, GALOIS_GENERIC,
+  SERIAL, CILK, GALOIS, GALOIS_ALT, GALOIS_STACK, GALOIS_GENERIC, HAND
 };
 
 static cll::opt<ExecType> execType (
@@ -35,6 +35,7 @@ static cll::opt<ExecType> execType (
       clEnumVal (GALOIS_ALT, "galois alternate divide and conquer implementation"),
       clEnumVal (GALOIS_STACK, "galois using thread stack"),
       clEnumVal (GALOIS_GENERIC, "galois std::function version"),
+      clEnumVal (HAND, "Andrew's Handwritten version"),
       clEnumValEnd),
 
     cll::init (SERIAL));
@@ -228,6 +229,68 @@ unsigned galoisFibGeneric (unsigned n) {
 }
 
 
+struct FibHandFrame {
+  std::atomic<int> sum;
+  std::atomic<int> done;
+  FibHandFrame* parent;
+};
+
+Galois::InsertBag<FibHandFrame> B;
+
+struct FibHandOp {
+  typedef int tt_does_not_need_aborts;
+  typedef int tt_does_not_need_stats;
+
+  void notify_parent(FibHandFrame* r, int val) {
+    if (!r) return;
+    //fastpath
+    if (r->done == 1) {
+      notify_parent(r->parent, val + r->sum);
+      return;
+    }
+    r->sum += val;
+    if (++r->done == 2) {
+      notify_parent(r->parent, r->sum);
+      return;
+    } //else, someone else will clean up
+  }
+
+  template<typename ContextTy>
+  void operator() (std::pair<int, FibHandFrame*> wi, ContextTy& ctx) {
+    int n = wi.first;
+    FibHandFrame* r = wi.second;
+    if (n <= 2) {
+      notify_parent(r, n);
+      return;
+    }
+    FibHandFrame& foo = B.emplace();
+    foo.sum = 0;
+    foo.done = 0;
+    foo.parent = r;
+    ctx.push(std::make_pair(n-1, &foo));
+    ctx.push(std::make_pair(n-2, &foo));
+    return;
+  }
+};
+
+unsigned fibHand (int n) {
+
+  typedef Galois::WorkList::AltChunkedFIFO<64> Chunked;
+  // typedef Galois::WorkList::AltChunkedLIFO<4> Chunked;
+
+  FibHandFrame init;
+  init.sum = 0;
+  init.done = 0;
+  init.parent = 0;
+
+  Galois::for_each(std::make_pair(n, &init), 
+      FibHandOp(), 
+      Galois::loopname ("fib-hand"),
+      Galois::wl<Chunked>());
+
+  return init.sum;
+}
+
 int main (int argc, char* argv[]) {
 
   Galois::StatManager sm;
@@ -264,6 +327,9 @@ int main (int argc, char* argv[]) {
       result = galoisFibGeneric (N);
       break;
 
+    case HAND:
+      result = fibHand (N);
+      break;
 
     default:
       std::abort ();
