@@ -1,13 +1,8 @@
 #include "Galois/Galois.h"
-#include "Lonestar/BoilerPlate.h"
 #include "Galois/Graphs/LC_Dist_Graph.h"
 
 #include <vector>
 #include <iostream>
-
-static const char *name = "LC_Dist_Graph testcase";
-static const char *desc = "do stuff";
-static const char *url  = "LCDist";
 
 typedef Galois::Graph::LC_Dist<int, int> Graph;
 typedef Graph::GraphNode GNode;
@@ -16,12 +11,9 @@ struct edge_counter {
   Graph::pointer g;
   
   void operator()(GNode node) {
-    if (std::distance(g->edge_begin(node), g->edge_end(node)) != 2) {
-      std::cerr << "FAILURE: Count is " << std::distance(g->edge_begin(node), g->edge_end(node)) << "\n";
-    }
-    std::cout << Galois::Runtime::NetworkInterface::ID;
+    GALOIS_ASSERT(std::distance(g->edge_begin(node), g->edge_end(node)) == 2);
   }
-  void operator()(GNode node, Galois::UserContext<GNode>& ctx) {
+  void operator()(GNode node, Galois::UserContext<GNode>&) {
     operator()(node);
   }
 
@@ -36,13 +28,19 @@ struct edge_counter {
 
   //is_trivially_copyable
   typedef int tt_is_copyable;
-
 };
 
 int main(int argc, char *argv[])
 {
   Galois::StatManager M;
-  LonestarStart(argc, argv, name, desc, url);
+
+  int threads = 2;
+  if (argc > 1)
+    threads = atoi(argv[1]);
+
+  Galois::setActiveThreads(threads);
+  auto& net = Galois::Runtime::getSystemNetworkInterface();
+  net.start();
 
   std::vector<unsigned> counts(100, 2); // 100 nodes, 2 edges each
 
@@ -51,11 +49,11 @@ int main(int argc, char *argv[])
   std::cout << "Local Iter dist " << std::distance(g->local_begin(), g->local_end()) << "\n";
 
   for (int i = 0; i < g->size(); ++i) {
-    std::cout << "a " << i << "\n";
+    //std::cout << "a " << i << "\n";
     g->addEdge(*(g->begin() + i), *(g->begin() + ((i + 1) % g->size())), 0xDEADBEEF);
   }
   for (int i = 0; i < g->size(); ++i) {
-    std::cout << "b " << i << "\n";
+    //std::cout << "b " << i << "\n";
     g->addEdge(*(g->begin() + ((i + 1) % g->size())), *(g->begin() + i));
   }
 
@@ -70,6 +68,6 @@ int main(int argc, char *argv[])
     edge_counter{g}(*ii);
   std::cout << "\n*\n";
 
-  Galois::Runtime::getSystemNetworkInterface().terminate();
+  net.terminate();
   return 0;
 };
