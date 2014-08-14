@@ -77,13 +77,11 @@ public:
   }
 };
 
-
 template<typename NodeDataTy>
 class GraphNodeData {
   NodeDataTy data;
   
 protected:
-
   void serialize(Galois::Runtime::SerializeBuffer& s) const {
     gSerialize(s,data);
   }
@@ -159,9 +157,9 @@ public:
     os << dst->getActive();
     os << "}>";
   }
-  //Gill
-  typedef int tt_is_copyable;
 
+  //Trivially copyable
+  typedef int tt_is_copyable;
 };
 
 template<typename NHTy, typename EdgeDataTy>
@@ -264,23 +262,20 @@ class GraphNodeEdges<NHTy, EdgeDataTy, EdgeDirection::Un> {
 };
 
 
-#define SHORTHAND Galois::Runtime::gptr<GraphNode<NodeDataTy, EdgeDataTy, EDir> >
-
 template<typename NodeDataTy, typename EdgeDataTy, EdgeDirection EDir>
 class GraphNode
   : public Galois::Runtime::Lockable,
-    public GraphNodeBase<SHORTHAND >,
+    public GraphNodeBase<Galois::Runtime::gptr<GraphNode<NodeDataTy, EdgeDataTy, EDir> > >,
     public GraphNodeData<NodeDataTy>,
-    public GraphNodeEdges<SHORTHAND, EdgeDataTy, EDir>
+    public GraphNodeEdges<Galois::Runtime::gptr<GraphNode<NodeDataTy, EdgeDataTy, EDir> >, EdgeDataTy, EDir>
 {
   friend class ThirdGraph<NodeDataTy, EdgeDataTy, EDir>;
-
-  using GraphNodeBase<SHORTHAND >::getNextNode;
+  using GraphNodeBase<Galois::Runtime::gptr<GraphNode<NodeDataTy, EdgeDataTy, EDir> > >::getNextNode;
 
 public:
-  typedef SHORTHAND Handle;
-  typedef typename Galois::Graph::Edge<SHORTHAND,EdgeDataTy> EdgeType;
-  typedef typename GraphNodeEdges<SHORTHAND,EdgeDataTy,EDir>::iterator edge_iterator;
+  typedef Galois::Runtime::gptr<GraphNode<NodeDataTy, EdgeDataTy, EDir> > Handle;
+  typedef typename Galois::Graph::Edge<Handle,EdgeDataTy> EdgeType;
+  typedef typename GraphNodeEdges<Handle,EdgeDataTy,EDir>::iterator edge_iterator;
 
   template<typename... Args>
   GraphNode(Args&&... args) :GraphNodeData<NodeDataTy>(std::forward<Args...>(args...)) {}
@@ -291,23 +286,23 @@ public:
   //serialize
   typedef int tt_has_serialize;
   void serialize(Galois::Runtime::SerializeBuffer& s) const {
-    GraphNodeBase<SHORTHAND >::serialize(s);
+    GraphNodeBase<Handle>::serialize(s);
     GraphNodeData<NodeDataTy>::serialize(s);
-    GraphNodeEdges<SHORTHAND, EdgeDataTy, EDir>::serialize(s);
+    GraphNodeEdges<Handle, EdgeDataTy, EDir>::serialize(s);
   }
   void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
-    GraphNodeBase<SHORTHAND >::deserialize(s);
+    GraphNodeBase<Handle>::deserialize(s);
     GraphNodeData<NodeDataTy>::deserialize(s);
-    GraphNodeEdges<SHORTHAND, EdgeDataTy, EDir>::deserialize(s);
+    GraphNodeEdges<Handle, EdgeDataTy, EDir>::deserialize(s);
   }
   void dump(std::ostream& os) const {
     os << this << " ";
     os << "<{GN: ";
-    GraphNodeBase<SHORTHAND >::dump(os);
+    GraphNodeBase<Handle>::dump(os);
     os << " ";
     GraphNodeData<NodeDataTy>::dump(os);
     os << " ";
-    GraphNodeEdges<SHORTHAND, EdgeDataTy, EDir>::dump(os);
+    GraphNodeEdges<Handle, EdgeDataTy, EDir>::dump(os);
     os << "}>";
   }
 
@@ -316,8 +311,6 @@ public:
     return os;
   }
 };
-
-#undef SHORTHAND
 
 /**
  * A Graph
@@ -366,11 +359,11 @@ public:
     return N;
   }
   
-  void addNode(NodeHandle& N) {
+  void addNode(NodeHandle N) {
     N->setActive(true);
   }
   
-  void removeNode(NodeHandle& N) {
+  void removeNode(NodeHandle N) {
     if (N->getActive()) {
       N->setActive(false);
       // delete all the edges (in the deque)
@@ -399,7 +392,6 @@ public:
   iterator end() {
     return boost::make_filter_iterator<is_node>(localStatePtr->end(), localStatePtr->end());
   }
-
 
   //! Returns an iterator to the neighbors of a node 
   edge_iterator edge_begin(NodeHandle N) {
@@ -438,6 +430,7 @@ public:
     assert(dst);
     src->createEdge(src, dst, std::forward<Args...>(args...));
   }
+
   NodeHandle getEdgeDst(edge_iterator ii) {
     assert(ii->getDst()->getActive());
     return ii->getDst();
