@@ -55,13 +55,13 @@ static const char* url = 0;
 
 enum Algo {
   sync_pr,  
-  sync_pr_undir,
+//  sync_pr_undir,
   async,
-  async_undir,
+//  async_undir,
   async_rsd,
-  async_rsd_undir,
+//  async_rsd_undir,
   async_prt,
-  async_prt_undir,
+//  async_prt_undir,
   async_ppr_rsd
 };
 
@@ -78,13 +78,13 @@ static cll::opt<std::string> algo_str("algo_str", cll::desc("algo_str"), cll::in
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
     cll::values(
       clEnumValN(Algo::sync_pr, "sync_pr", "Synchronous version..."),
-      clEnumValN(Algo::sync_pr_undir, "sync_pr_undir", "(Undirected) Synchronous version..."),
+//      clEnumValN(Algo::sync_pr_undir, "sync_pr_undir", "(Undirected) Synchronous version..."),
       clEnumValN(Algo::async, "async", "Asynchronous without priority version..."),
-      clEnumValN(Algo::async_undir, "async_undir", "(Undirected) Asynchronous without priority version..."),
+//      clEnumValN(Algo::async_undir, "async_undir", "(Undirected) Asynchronous without priority version..."),
       clEnumValN(Algo::async_rsd, "async_rsd", "Residual-based asynchronous version..."),
-      clEnumValN(Algo::async_rsd_undir, "async_rsd_undir", "(Undirected) Residual-based asynchronous version..."),
+//      clEnumValN(Algo::async_rsd_undir, "async_rsd_undir", "(Undirected) Residual-based asynchronous version..."),
       clEnumValN(Algo::async_prt, "async_prt", "Prioritized (degree biased residual) version..."),
-      clEnumValN(Algo::async_prt_undir, "async_prt_undir", " (Undirected) Prioritized (degree biased residual) version..."),
+//      clEnumValN(Algo::async_prt_undir, "async_prt_undir", " (Undirected) Prioritized (degree biased residual) version..."),
       clEnumValN(Algo::async_ppr_rsd, "async_ppr_rsd", "Asyncronous PPR"),
       clEnumValEnd), cll::init(Algo::async_prt));
 
@@ -162,7 +162,8 @@ struct Sync {
 
       LNode& sdata = graph.getData(src);
 
-      double sum = computePageRankInOut(graph, src, iteration, Galois::MethodFlag::ALL);
+      Galois::MethodFlag lockflag = Galois::MethodFlag::NONE;
+      double sum = computePageRankInOut(graph, src, iteration, lockflag);
 
       float value = alpha*sum + (1.0 - alpha);
       float diff = std::fabs(value - sdata.getPageRank(iteration));
@@ -211,6 +212,7 @@ struct Sync {
 
 
 /*------------------------------ synchronous, global, Undirected ------------------------------*/
+/*
 struct SyncUndir {
   struct LNode {
     float value[2];
@@ -319,7 +321,7 @@ struct SyncUndir {
     }
   }
 };
-
+*/
 
 
 
@@ -361,7 +363,9 @@ struct Async {
       // the node is processed
       sdata.flag = false;
 
-      double sum = computePageRankInOut(graph, src, 0, Galois::MethodFlag::NONE);
+      Galois::MethodFlag lockflag = Galois::MethodFlag::NONE;
+
+      double sum = computePageRankInOut(graph, src, 0, lockflag);
       float value = alpha*sum + (1.0 - alpha);
       float diff = std::fabs(value - sdata.value);
       if (diff > tolerance) {
@@ -390,6 +394,7 @@ struct Async {
 
 
 /*------------------------------ asynchronous, global, Undirected ------------------------------*/
+/*
 struct AsyncUndir {
   struct LNode {
     float value;
@@ -462,7 +467,7 @@ struct AsyncUndir {
     Galois::for_each_local(graph, Process(graph), Galois::wl<WL>());
   }
 };
-
+*/
 
 
 
@@ -533,7 +538,7 @@ struct AsyncRsd {
 
       // the node is processed
       sdata.flag = false;
-      double sum = computePageRankInOut(graph, src, 0, Galois::MethodFlag::NONE);
+      double sum = computePageRankInOut(graph, src, 0, lockflag);
       float value = alpha*sum + (1.0 - alpha);
       float diff = std::fabs(value - sdata.value);
 
@@ -569,7 +574,6 @@ struct AsyncRsd {
           std::cout << N 
                     << " residual " << data.residual
                     << " pr " << data.value
-                    << " nout " << data.nout
                     << "\n";
         }
       }
@@ -582,6 +586,7 @@ struct AsyncRsd {
 
 
 /*------------------------------ residual-based asynchronous, global, Undirected ------------------------------*/
+/*
 struct AsyncRsdUndir {
   struct LNode {
     float value;
@@ -697,7 +702,7 @@ struct AsyncRsdUndir {
 
   }
 };
-
+*/
 
 
 
@@ -792,7 +797,7 @@ struct AsyncPrt {
       node = &graph.getData(src);
 
       // update pagerank (consider each in-coming edge)
-      double sum = computePageRankInOut(graph, src, 0, flag);
+      double sum = computePageRankInOut(graph, src, 0, lockflag);
 
       unsigned nopush = 0;
      
@@ -860,7 +865,6 @@ struct AsyncPrt {
           std::cout << N 
                     << " residual " << data.residual
                     << " pr " << data.pagerank
-                    << " nout " << data.nout
                     << "\n";
         }
       }
@@ -875,6 +879,7 @@ struct AsyncPrt {
 
 
 /*------------------------------ prioritized asynchronous, global, Undirected ------------------------------*/
+/*
 struct AsyncPrtUndir {
 
   struct LNode {
@@ -1038,7 +1043,7 @@ struct AsyncPrtUndir {
   } 
 
 };
-
+*/
 
 
 
@@ -1471,13 +1476,13 @@ int main(int argc, char **argv) {
   T.start();
   switch (algo) {
     case Algo::sync_pr: run<Sync>(); break;
-    case Algo::sync_pr_undir: run<SyncUndir>(); break;
+    //case Algo::sync_pr_undir: run<SyncUndir>(); break;
     case Algo::async: run<Async>(); break;
-    case Algo::async_undir: run<AsyncUndir>(); break;
+    //case Algo::async_undir: run<AsyncUndir>(); break;
     case Algo::async_rsd: run<AsyncRsd>(); break;
-    case Algo::async_rsd_undir: run<AsyncRsdUndir>(); break;
+    //case Algo::async_rsd_undir: run<AsyncRsdUndir>(); break;
     case Algo::async_prt: run<AsyncPrt>(); break;
-    case Algo::async_prt_undir: run<AsyncPrtUndir>(); break;
+    //case Algo::async_prt_undir: run<AsyncPrtUndir>(); break;
     case Algo::async_ppr_rsd: runPPR<PPRAsyncRsd>(); break;
     default: std::cerr << "Unknown algorithm\n"; abort();
   }
