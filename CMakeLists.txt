@@ -156,6 +156,11 @@ if(USE_EXP)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
   endif()
 
+  find_package(TBB)
+  if(TBB_FOUND)
+    include_directories(${TBB_INCLUDE_DIRS})
+  endif()
+
   if(USE_PROF)
     add_definitions(-DGALOIS_USE_PROF)
   endif()

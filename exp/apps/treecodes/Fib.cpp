@@ -5,6 +5,8 @@
 #include <cstring>
 #include <sstream>
 
+#include <tbb/tbb.h>
+
 
 #include "Galois/Galois.h"
 #include "Galois/CilkInit.h"
@@ -23,7 +25,7 @@ namespace cll = llvm::cl;
 static cll::opt<unsigned> N("n", cll::desc("n-th fibonacci number"), cll::init(39));
 
 enum ExecType {
-  SERIAL, CILK, GALOIS, GALOIS_ALT, GALOIS_STACK, GALOIS_GENERIC, HAND
+  SERIAL, CILK, GALOIS, GALOIS_ALT, GALOIS_STACK, GALOIS_GENERIC, HAND, OPENMP, TBB
 };
 
 static cll::opt<ExecType> execType (
@@ -36,6 +38,8 @@ static cll::opt<ExecType> execType (
       clEnumVal (GALOIS_STACK, "galois using thread stack"),
       clEnumVal (GALOIS_GENERIC, "galois std::function version"),
       clEnumVal (HAND, "Andrew's Handwritten version"),
+      clEnumVal (OPENMP, "OpenMP implementation"),
+      clEnumVal (TBB, "TBB implementation"),
       clEnumValEnd),
 
     cll::init (SERIAL));
@@ -273,7 +277,7 @@ struct FibHandOp {
   }
 };
 
-unsigned fibHand (int n) {
+unsigned fibHand (unsigned n) {
 
   typedef Galois::WorkList::AltChunkedFIFO<64> Chunked;
   // typedef Galois::WorkList::AltChunkedLIFO<4> Chunked;
@@ -290,6 +294,90 @@ unsigned fibHand (int n) {
 
   return init.sum;
 }
+
+unsigned fibOMP (unsigned n) {
+  if (n <= 2)
+    return n;
+  unsigned x, y;
+#pragma omp task shared(x) firstprivate(n) untied
+  x = fibOMP (n-1);
+#pragma omp task shared(y) firstprivate(n) untied
+  y = fibOMP (n-2);
+#pragma omp taskwait
+  return x + y;
+}
+
+unsigned fibOpenMP (unsigned n) {
+  unsigned result = 0;
+// #pragma omp parallel shared(result, n)
+#pragma omp parallel 
+  {
+#pragma omp single nowait 
+    result = fibOMP(n);
+  }
+
+  return result;
+}
+
+// struct FibTBBFrame {
+  // unsigned n;
+  // unsigned* result;
+// 
+  // void operator () (void) {
+    // if (n <= 2) { 
+      // *result = n;
+      // return;
+    // }
+// 
+    // unsigned x;
+    // FibTBBFrame left {n-1, &x};
+// 
+    // unsigned y;
+    // FibTBBFrame right {n-2, &y};
+// 
+    // tbb::parallel_invoke (left, right);
+// 
+    // *result = x + y;
+  // }
+// };
+
+class FibTBBTask: public tbb::task {
+public:
+  const unsigned n;
+  unsigned* const sum;
+
+  FibTBBTask( unsigned n_, unsigned* sum_ ) :
+    n(n_), sum(sum_)
+  {}
+  tbb::task* execute() {      // Overrides virtual function task::execute
+    if( n <= 2 ) {
+      *sum = n;
+    } else {
+      unsigned x, y;
+      FibTBBTask& a = *new( allocate_child() ) FibTBBTask(n-1,&x);
+      FibTBBTask& b = *new( allocate_child() ) FibTBBTask(n-2,&y);
+      set_ref_count(3);
+      // Start b running.
+      spawn( b );
+      // Start a running and wait for all children (a and b).
+      spawn_and_wait_for_all(a);
+      // Do the sum
+      *sum = x+y;
+    }
+    return NULL;
+  }
+};
+                    
+
+
+unsigned fibTBB (unsigned n) {
+  tbb::task_scheduler_init init;
+
+  unsigned result = 0;
+  FibTBBTask root {n, &result};
+  (&root)->execute ();
+  return result;
+};
 
 int main (int argc, char* argv[]) {
 
@@ -329,6 +417,14 @@ int main (int argc, char* argv[]) {
 
     case HAND:
       result = fibHand (N);
+      break;
+
+    case OPENMP:
+      result = fibOpenMP (N);
+      break;
+
+    case TBB:
+      result = fibTBB (N);
       break;
 
     default:
