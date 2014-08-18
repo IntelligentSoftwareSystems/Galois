@@ -279,7 +279,7 @@ class TreeExec {
 protected:
 
   struct Task {
-    std::atomic<unsigned> numChild;
+    GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE std::atomic<unsigned> numChild;
     Task* parent;
 
     Task (Task* parent): numChild (0), parent (parent)
@@ -289,6 +289,7 @@ protected:
   typedef std::pair<Task*, F*> WorkItem;
   static const unsigned CHUNK_SIZE = 2;
   typedef WorkList::AltChunkedLIFO<CHUNK_SIZE, WorkItem> WL_ty;
+  // typedef WorkList::AltChunkedFIFO<CHUNK_SIZE, WorkItem> WL_ty;
 
   struct PerThreadData {
     // most frequently accessed members first
@@ -418,7 +419,7 @@ public:
 class TreeExecGeneric {
 
   struct Task {
-    std::atomic<unsigned> numChild;
+    GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE std::atomic<unsigned> numChild;
     Task* parent;
 
     Task (Task* parent): numChild (0), parent (parent)
@@ -428,6 +429,7 @@ class TreeExecGeneric {
   typedef std::pair<Task*, TreeTaskBase*> WorkItem;
   static const unsigned CHUNK_SIZE = 2;
   typedef WorkList::AltChunkedLIFO<CHUNK_SIZE, WorkItem> WL_ty;
+  // typedef WorkList::AltChunkedFIFO<CHUNK_SIZE, WorkItem> WL_ty;
 
   struct PerThreadData {
     // most frequently accessed members first

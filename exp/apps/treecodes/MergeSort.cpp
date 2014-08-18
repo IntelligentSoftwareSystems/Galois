@@ -29,7 +29,7 @@ const char* desc = "merge sort";
 const char* url = "mergesort";
 
 enum Algo {
-  SERIAL, STL, CILK, GALOIS 
+  SERIAL, STL, CILK, GALOIS, GALOIS_STACK, GALOIS_GENERIC
 };
 
 cll::opt<Algo> algorithm (
@@ -39,6 +39,8 @@ cll::opt<Algo> algorithm (
       clEnumVal (STL, "STL implementation"),
       clEnumVal (CILK, "CILK divide and conquer implementation"),
       clEnumVal (GALOIS, "galois divide and conquer implementation"),
+      clEnumVal (GALOIS_STACK, "galois stack-based typeddivide and conquer implementation"),
+      clEnumVal (GALOIS_GENERIC, "galois stack-based generic divide and conquer implementation"),
       clEnumValEnd),
 
     cll::init (SERIAL));
@@ -202,6 +204,94 @@ void mergeSortGalois (T* array, T* tmp_array, const size_t L, const C& cmp) {
 }
 
 template <typename T, typename C>
+struct MergeSortGaloisStack {
+  T* array;
+  T* tmp_array;
+  const C& cmp;
+  size_t beg;
+  size_t end;
+
+  template <typename Ctx>
+  void operator () (Ctx& ctx) {
+    if ((end - beg) > LEAF_SIZE) {
+      size_t mid = (beg + end) / 2;
+
+      MergeSortGaloisStack left {array, tmp_array, cmp, beg, mid};
+      ctx.spawn (left);
+
+      MergeSortGaloisStack right {array, tmp_array, cmp, mid, end};
+      ctx.spawn (right);
+
+      ctx.sync ();
+
+      mergeHalves (array, tmp_array, beg, mid, end, cmp);
+
+    } else {
+      std::sort (array + beg, array + end, cmp);
+    }
+
+  }
+};
+
+
+template <typename T, typename C>
+void mergeSortGaloisStack (T* array, T* tmp_array, const size_t L, const C& cmp) {
+  MergeSortGaloisStack<T,C> init {array, tmp_array, cmp, 0, L};
+  Galois::Runtime::for_each_ordered_tree (init, "mergesort-stack");
+}
+
+template <typename T, typename C>
+struct MergeSortGaloisGeneric: public Galois::Runtime::TreeTaskBase {
+  T* array;
+  T* tmp_array;
+  const C& cmp;
+  size_t beg;
+  size_t end;
+
+  MergeSortGaloisGeneric (
+      T* array,
+      T* tmp_array,
+      const C& cmp,
+      size_t beg,
+      size_t end)
+    :
+      Galois::Runtime::TreeTaskBase (),
+      array (array),
+      tmp_array (tmp_array),
+      cmp (cmp),
+      beg (beg),
+      end (end)
+  {}
+
+
+  virtual void operator () (void) {
+    if ((end - beg) > LEAF_SIZE) {
+      size_t mid = (beg + end) / 2;
+
+      MergeSortGaloisGeneric left {array, tmp_array, cmp, beg, mid};
+      Galois::Runtime::spawn (left);
+
+      MergeSortGaloisGeneric right {array, tmp_array, cmp, mid, end};
+      Galois::Runtime::spawn (right);
+
+      Galois::Runtime::sync ();
+
+      mergeHalves (array, tmp_array, beg, mid, end, cmp);
+
+    } else {
+      std::sort (array + beg, array + end, cmp);
+    }
+  }
+};
+
+template <typename T, typename C>
+void mergeSortGaloisGeneric (T* array, T* tmp_array, const size_t L, const C& cmp) {
+  MergeSortGaloisGeneric<T,C> init {array, tmp_array, cmp, 0, L};
+  Galois::Runtime::for_each_ordered_tree_generic (init, "mergesort-stack");
+}
+
+
+template <typename T, typename C>
 void checkSorting (T* array, const size_t L, const C& cmp) {
 
   bool sorted = true;
@@ -256,6 +346,14 @@ int main (int argc, char* argv[]) {
 
     case GALOIS:
       mergeSortGalois (array, tmp_array, length, std::less<int> ());
+      break;
+
+    case GALOIS_STACK:
+      mergeSortGaloisStack (array, tmp_array, length, std::less<int> ());
+      break;
+
+    case GALOIS_GENERIC:
+      mergeSortGaloisGeneric (array, tmp_array, length, std::less<int> ());
       break;
 
     default:
