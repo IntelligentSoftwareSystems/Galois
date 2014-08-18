@@ -89,11 +89,30 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
       clEnumValEnd), cll::init(Algo::async_prt));
 
 
-/*------------------------------ synchronous, global, directed (reference: PullAlgo2) ------------------------------*/
+template<typename Graph>
+unsigned nout(Graph& g, typename Graph::GraphNode n) {
+  return std::distance(g.edge_begin(n), g.edge_end(n));
+}
+
+template<typename Graph>
+double computePageRankInOut(Graph& g, typename Graph::GraphNode src, int prArg, Galois::MethodFlag flag) {
+  double sum = 0;
+  for (auto jj = g.in_edge_begin(src, flag), ej = g.in_edge_end(src, flag);
+       jj != ej; ++jj) {
+    auto dst = g.getInEdgeDst(jj);
+    auto& ddata = g.getData(dst, flag);
+    sum += ddata.getPageRank(prArg) / nout(g, dst);
+  }
+  return sum;
+}
+
+
+
+//---------- parallel synchronous algorithm (reference: PullAlgo2)
 struct Sync {
   struct LNode {
     float value[2];
-    unsigned int nout;
+    void init() { value[0] = value[1] = 1.0 - alpha; }
     float getPageRank() { return value[1]; }
     float getPageRank(unsigned int it) { return value[it & 1]; }
     void setPageRank(unsigned it, float v) { value[(it+1) & 1] = v; }
@@ -119,17 +138,6 @@ struct Sync {
     }
   }
 
-  struct Initialize {
-    Graph& g;
-    Initialize(Graph& g): g(g) { }
-    void operator()(Graph::GraphNode n) {
-      LNode& data = g.getData(n);
-      data.value[0] = (1.0 - alpha);
-      data.value[1] = (1.0 - alpha); 
-      data.nout = std::distance(g.edge_begin(n), g.edge_end(n));
-    }
-  };
-
   struct Copy {
     Graph& g;
     Copy(Graph& g): g(g) { }
@@ -154,13 +162,7 @@ struct Sync {
 
       LNode& sdata = graph.getData(src);
 
-      double sum = 0;
-      for (auto jj = graph.in_edge_begin(src), ej = graph.in_edge_end(src);
-          jj != ej; ++jj) {
-        GNode dst = graph.getInEdgeDst(jj);
-        LNode& ddata = graph.getData(dst);
-        sum += ddata.getPageRank(iteration) / ddata.nout;
-      }
+      double sum = computePageRankInOut(graph, src, iteration, Galois::MethodFlag::ALL);
 
       float value = alpha*sum + (1.0 - alpha);
       float diff = std::fabs(value - sdata.getPageRank(iteration));
@@ -326,9 +328,10 @@ struct SyncUndir {
 struct Async {
   struct LNode {
     float value;
-    unsigned int nout;
     bool flag; // tracking if it is in the worklist
-    float getPageRank() { return value; }
+    LNode(): value(1.0) {}
+    void init() { value = 1.0 - alpha; flag = true; }
+    float getPageRank(int x = 0) { return value; }
   };
 
   typedef Galois::Graph::LC_CSR_Graph<LNode,void>
@@ -348,17 +351,6 @@ struct Async {
     }
   }
 
-  struct Initialize {
-    Graph& g;
-    Initialize(Graph& g): g(g) { }
-    void operator()(Graph::GraphNode n) {
-      LNode& data = g.getData(n);
-      data.value = (1.0 - alpha);
-      data.nout = std::distance(g.edge_begin(n), g.edge_end(n));
-      data.flag = true;
-    }
-  };
-  
   struct Process {
     Graph& graph;
      
@@ -369,14 +361,7 @@ struct Async {
       // the node is processed
       sdata.flag = false;
 
-      Galois::MethodFlag lockflag = Galois::MethodFlag::NONE;
-
-      double sum = 0;
-      for (auto jj = graph.in_edge_begin(src, lockflag), ej = graph.in_edge_end(src, lockflag); jj != ej; ++jj) {
-        GNode dst = graph.getInEdgeDst(jj);
-        LNode& ddata = graph.getData(dst, lockflag);
-        sum += ddata.value / ddata.nout;
-      }
+      double sum = computePageRankInOut(graph, src, 0, Galois::MethodFlag::NONE);
       float value = alpha*sum + (1.0 - alpha);
       float diff = std::fabs(value - sdata.value);
       if (diff > tolerance) {
@@ -486,9 +471,10 @@ struct AsyncUndir {
 struct AsyncRsd {
   struct LNode {
     float value;
-    unsigned int nout;
     bool flag; // tracking if it is in the worklist
-    float getPageRank() { return value; }
+    LNode(): value(1.0) {}
+    void init() { value = 1.0 - alpha; flag = true; residual = 0.0; }
+    float getPageRank(int x = 0) { return value; }
     float residual; // tracking residual
   };
 
@@ -509,18 +495,6 @@ struct AsyncRsd {
     }
   }
 
-  struct Initialize {
-    Graph& g;
-    Initialize(Graph& g): g(g) { }
-    void operator()(Graph::GraphNode n) {
-      LNode& data = g.getData(n);
-      data.value = (1.0 - alpha);
-      data.nout = std::distance(g.edge_begin(n), g.edge_end(n));
-      data.flag = true;
-      data.residual = 0.0;
-    }
-  };
-
   struct Process1 {
     AsyncRsd* self;
     Graph& graph;
@@ -537,7 +511,7 @@ struct AsyncRsd {
       for (auto jj = graph.in_edge_begin(src), ej = graph.in_edge_end(src); jj != ej; ++jj){
         GNode dst = graph.getInEdgeDst(jj);
 	LNode& ddata = graph.getData(dst);
-	data.residual = (float) data.residual + (float) 1/ddata.nout;  
+	data.residual = (float) data.residual + (float) 1/nout(graph,dst);  
       }
       data.residual = alpha*(1.0-alpha)*data.residual;
      }
@@ -559,30 +533,26 @@ struct AsyncRsd {
 
       // the node is processed
       sdata.flag = false;
-      double sum = 0;
-      for (auto jj = graph.in_edge_begin(src, lockflag), ej = graph.in_edge_end(src, lockflag); jj != ej; ++jj) {
-        GNode dst = graph.getInEdgeDst(jj);
-        LNode& ddata = graph.getData(dst, lockflag);
-        sum += ddata.value / ddata.nout;
-      }
+      double sum = computePageRankInOut(graph, src, 0, Galois::MethodFlag::NONE);
+      float value = alpha*sum + (1.0 - alpha);
+      float diff = std::fabs(value - sdata.value);
 
-      // for each out-going neighbors
-      for (auto jj = graph.edge_begin(src, lockflag), ej = graph.edge_end(src, lockflag); jj != ej; ++jj) {
-        GNode dst = graph.getEdgeDst(jj);
-	LNode& ddata = graph.getData(dst, lockflag);
-	ddata.residual += sdata.residual*alpha/sdata.nout; // update residual
-	// if the node is not in the worklist and the residual is greater than tolerance
-	if(!ddata.flag && ddata.residual>=tolerance) {
-	  ddata.flag = true;
-          ctx.push(dst);
-	} 
+      if (diff >= tolerance) {
+        sdata.value = value;
+        // for each out-going neighbors
+        for (auto jj = graph.edge_begin(src, Galois::MethodFlag::NONE), ej = graph.edge_end(src, Galois::MethodFlag::NONE); jj != ej; ++jj) {
+          GNode dst = graph.getEdgeDst(jj);
+	  LNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+	  ddata.residual += sdata.residual*alpha/nout(graph,src); // update residual
+	  // if the node is not in the worklist and the residual is greater than tolerance
+	  if(!ddata.flag && ddata.residual>=tolerance) {
+	    ddata.flag = true;
+            ctx.push(dst);
+	  } 
+        }
       }
-      sdata.value = alpha*sum + (1.0 - alpha); // update pagerank
-      sdata.residual = 0.0; // update residual
-      
-    } // end of operator
+    }
   };
-
   void operator()(Graph& graph) {
     Galois::do_all_local(graph, Process1(this, graph), Galois::loopname("P1"));
     typedef Galois::WorkList::dChunkedFIFO<16> WL;
@@ -606,7 +576,6 @@ struct AsyncRsd {
       std::cout<<"***** dbg2 allsafe: "<<allsafe<<"\n";
       Te.stop(); 
     }
-
   }
 };
 
@@ -746,9 +715,9 @@ struct AsyncPrt {
   struct LNode {
     float pagerank;
     float residual;
-    unsigned int nout;
-    unsigned int deg;
-    float getPageRank() { return pagerank; }
+    unsigned int deg; //FIXME: init this
+    void init() { pagerank = 1.0 - alpha; residual = 0.0; }
+    float getPageRank(int x = 0) { return pagerank; }
     float getResidual() { return residual; }
   };
  
@@ -769,18 +738,6 @@ struct AsyncPrt {
     }
   }
 
-  struct Initialize {
-    Graph& g;
-    Initialize(Graph& g): g(g) { }
-    void operator()(Graph::GraphNode n) {
-      LNode& data = g.getData(n);
-      data.pagerank = (1.0 - alpha);
-      data.residual = 0.0;
-      data.nout = std::distance(g.edge_begin(n), g.edge_end(n));
-      data.deg = data.nout + std::distance(g.in_edge_begin(n), g.in_edge_end(n));
-    }
-  };
-
   struct Process1 {
     AsyncPrt* self;
     Graph& graph;
@@ -797,7 +754,7 @@ struct AsyncPrt {
       for (auto jj = graph.in_edge_begin(src), ej = graph.in_edge_end(src); jj != ej; ++jj){
         GNode dst = graph.getInEdgeDst(jj);
 	LNode& ddata = graph.getData(dst);
-	data.residual = (float) data.residual + (float) 1/ddata.nout;  
+	data.residual = (float) data.residual + (float) 1/nout(graph,dst);  
       }
       data.residual = alpha*(1.0-alpha)*data.residual;
     }
@@ -835,12 +792,7 @@ struct AsyncPrt {
       node = &graph.getData(src);
 
       // update pagerank (consider each in-coming edge)
-      double sum = 0;
-      for (auto jj = graph.in_edge_begin(src, lockflag), ej = graph.in_edge_end(src, lockflag); jj != ej; ++jj) {
-        GNode dst = graph.getInEdgeDst(jj);
-        LNode& ddata = graph.getData(dst, lockflag);
-        sum += ddata.getPageRank() / ddata.nout;
-      }
+      double sum = computePageRankInOut(graph, src, 0, flag);
 
       unsigned nopush = 0;
      
@@ -850,7 +802,7 @@ struct AsyncPrt {
         LNode& ddata = graph.getData(dst, lockflag);
 	float oldR = ddata.residual; 
         int oldP = pri(ddata);
-        ddata.residual += node->residual*alpha/node->nout;
+        ddata.residual += node->residual*alpha/nout(graph,src);
 	if (ddata.residual >= tolerance && 
             (oldP != pri(ddata) || (oldR <= tolerance))) {
 	  ctx.push(std::make_pair(pri(ddata), dst)); 
@@ -869,6 +821,8 @@ struct AsyncPrt {
   }; //--- end of Process2
 
   void operator()(Graph& graph) {
+    Galois::do_all_local(graph, [&graph] (GNode n) { graph.getData(n).deg = nout(graph, n) + std::distance(graph.in_edge_begin(n), graph.in_edge_end(n)); });
+
     Galois::Statistic pre("PrePrune");
     Galois::Statistic post("PostPrune");
     std::cout<<"tolerance: "<<tolerance<<", amp: "<<amp<<"\n";
@@ -1238,7 +1192,8 @@ struct PPRAsyncRsd {
     float residual; // tracking residual
     bool flag; // tracking if it is in the worklist
     bool seedset;
-    float getPageRank() const { return value; }
+    void init() { value = 0.0; flag = true; seedset = false; residual = 0.0; }
+    float getPageRank(int x = 0) const { return value; }
   };
 
   typedef Galois::Graph::LC_CSR_Graph<LNode,void>
@@ -1251,18 +1206,6 @@ struct PPRAsyncRsd {
   void readGraph(Graph& graph) {
     Galois::Graph::readGraph(graph, filename); 
   }
-
-  struct Initialize {
-    Graph& g;
-    Initialize(Graph& g): g(g) { }
-    void operator()(Graph::GraphNode n) {
-      LNode& data = g.getData(n);
-      data.value = 0.0;
-      data.flag = true;
-      data.seedset = false;
-      data.residual = 0.0;
-    }
-  };
 
   struct Process2 {
     Graph& graph;
@@ -1360,9 +1303,9 @@ struct PPRAsyncRsd {
                        return double(d.cutsize)/double(std::min(d.volume, total_degree-d.volume));
                    });
 
-    for (int i = 0; i < 10; ++i )
-      std::cout << conductance[i] << " ";
-    std::cout << "\n";
+    // for (int i = 0; i < 10; ++i )
+    //   std::cout << conductance[i] << " ";
+    // std::cout << "\n";
 
     auto m = std::min_element(conductance.begin(), conductance.end());
     assert(m != conductance.end());
@@ -1433,7 +1376,7 @@ void run() {
   std::cout << "Running " << algo.name() << " version\n";
   std::cout << "tolerance: " << tolerance << "\n";
   T.start();
-  Galois::do_all_local(graph, typename Algo::Initialize(graph));
+  Galois::do_all_local(graph, [&graph] (typename Graph::GraphNode n) { graph.getData(n).init(); });
   algo(graph);
   T.stop();
   
@@ -1474,7 +1417,7 @@ void runPPR() {
     std::cout << "Running " << algo.name() << " version\n";
     std::cout << "tolerance: " << tolerance << "\n";
     T1.start();
-    Galois::do_all_local(graph, typename Algo::Initialize(graph));
+    Galois::do_all_local(graph, [&graph] (typename Graph::GraphNode n) { graph.getData(n).init(); });
     T1.stop();
     T2.start();
     algo(graph, seed);
