@@ -317,7 +317,8 @@ protected:
   }
 
 public:
-  ForEachWork(const FunctionTy& f, const char* l): term(getSystemTermination()), origFunction(f), loopname(l), broke(false) { }
+  template<typename... TArgs>
+  ForEachWork(const FunctionTy& f, const char* l, const TArgs&... targs): term(getSystemTermination()), wl(targs...), origFunction(f), loopname(l), broke(false) { }
   
   template<typename W>
   ForEachWork(const W& w, const FunctionTy& f, const char* l): term(getSystemTermination()), wl(w), origFunction(f), loopname(l), broke(false) { }
@@ -373,8 +374,8 @@ struct reiterator<WLTy, IterTy, typename std::enable_if<has_with_iterator<WLTy>(
   typedef typename WLTy::template with_iterator<IterTy>::type type;
 };
 
-template<typename WLTy, typename RangeTy, typename FunctionTy>
-void for_each_impl(const RangeTy& range, const FunctionTy& f, const char* loopname) {
+template<typename WLTy, typename RangeTy, typename FunctionTy, typename... TArgs>
+void for_each_impl(const RangeTy& range, const FunctionTy& f, const char* loopname, const TArgs&... targs) {
   if (inGaloisForEach)
     GALOIS_DIE("Nested for_each not supported");
   typedef typename reiterator<WLTy, typename RangeTy::iterator>::type WLNewTy;
@@ -385,7 +386,7 @@ void for_each_impl(const RangeTy& range, const FunctionTy& f, const char* loopna
   // PerThreadStorage reclaimation likelihood
   Barrier& barrier = getSystemBarrier();
 
-  WorkTy W(f, loopname);
+  WorkTy W(f, loopname, targs...);
 
   // StatTimer LoopTimer("LoopTime", loopname);
   // if (ForEachTraits<FunctionTy>::NeedsStats)
