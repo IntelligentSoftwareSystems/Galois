@@ -95,12 +95,12 @@ unsigned nout(Graph& g, typename Graph::GraphNode n) {
 }
 
 template<typename Graph>
-double computePageRankInOut(Graph& g, typename Graph::GraphNode src, int prArg, Galois::MethodFlag flag) {
+double computePageRankInOut(Graph& g, typename Graph::GraphNode src, int prArg, Galois::MethodFlag lockflag) {
   double sum = 0;
-  for (auto jj = g.in_edge_begin(src, flag), ej = g.in_edge_end(src, flag);
+  for (auto jj = g.in_edge_begin(src, lockflag), ej = g.in_edge_end(src, lockflag);
        jj != ej; ++jj) {
     auto dst = g.getInEdgeDst(jj);
-    auto& ddata = g.getData(dst, flag);
+    auto& ddata = g.getData(dst, lockflag);
     sum += ddata.getPageRank(prArg) / nout(g, dst);
   }
   return sum;
