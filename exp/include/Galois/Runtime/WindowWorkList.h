@@ -27,7 +27,7 @@
 
 #include "Galois/Accumulator.h"
 #include "Galois/RangePQ.h"
-
+#include "Galois/Runtime/ll/gio.h"
 #include "Galois/Runtime/PerThreadWorkList.h"
 
 
@@ -49,15 +49,15 @@ class SortedRangeWindowWL {
 public:
 
   explicit SortedRangeWindowWL (const Cmp& cmp=Cmp ()): cmp (cmp) {
-    std::cout << "Using SortedRangeWindowWL" << std::endl;
+    LL::gPrint("Using SortedRangeWindowWL\n");
   }
 
-  template <typename I>
-  void initfill (I b, I e) {
+  template <typename R>
+  void initfill (const R& range) {
 
     GAccumulator<size_t> count;
 
-    Galois::Runtime::do_all_impl (Galois::Runtime::makeStandardRange (b, e), 
+    Galois::Runtime::do_all_impl (range,
         [this, &count] (const T& x) {
           m_wl.get ().push_back (x);
           count += 1;
@@ -83,7 +83,7 @@ public:
     bool e = true;
 
     for (unsigned i = 0; i < wlRange.size (); ++i) {
-      Range& r = *wlRange.getRemote (i);
+      const Range& r = *wlRange.getRemote (i);
       if (r.first != r.second) {
         e = false;
         break;
@@ -100,7 +100,7 @@ public:
     const T* minElem = nullptr;
 
     for (unsigned i = 0; i < numT; ++i) {
-      Range& r = *wlRange.getRemote (i);
+      const Range& r = *wlRange.getRemote (i);
 
       if (r.first != r.second) {
         if (minElem == nullptr || cmp (*minElem, *r.first)) {
@@ -209,14 +209,14 @@ public:
   explicit PQbasedWindowWL (const Cmp& cmp=Cmp ())
     : cmp (cmp), m_wl (cmp) 
   {
-    std::cout << "Using PQbasedWindowWL" << std::endl;
+    LL::gPrint("Using PQbasedWindowWL\n");
   }
 
 
-  template <typename I>
-  void initfill (I b, I e) {
+  template <typename R>
+  void initfill (const R& range) {
 
-    Galois::Runtime::do_all_impl (Galois::Runtime::makeStandardRange (b, e),
+    Galois::Runtime::do_all_impl (range,
         [this] (const T& x) {
           m_wl.get ().push (x);
         }
@@ -358,12 +358,11 @@ public:
 
   explicit PartialPQbasedWindowWL (const Cmp& cmp=Cmp ()): cmp (cmp) {}
 
-  template <typename I>
-  void initfill (I b, I e) {
+  template <typename R>
+  void initfill (const R& range) {
     Galois::Runtime::on_each_impl (
-        [this, b, e] (const unsigned tid, const unsigned numT) {
-          std::pair<I,I> r = Galois::block_range (b, e, tid, numT);
-          m_wl.getLocal ()->initfill (r.first, r.second);
+        [this, range] (const unsigned tid, const unsigned numT) {
+          m_wl.getLocal ()->initfill (range.local_begin (), range.local_end ());
         }, "initfill");
   }
 

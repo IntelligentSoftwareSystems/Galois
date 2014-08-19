@@ -670,13 +670,13 @@ void doWriteComponent(Graph& graph, typename Graph::node_data_type::component_ty
 
     edge_value_type* rawEdgeData = p.finish<edge_value_type>();
     if (EdgeData::has_value)
-      std::copy(edgeData.begin(), edgeData.end(), rawEdgeData);
+      std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
 
     std::cout
       << "Writing largest component to " << largestComponentFilename
       << " (nodes: " << numNodes << " edges: " << numEdges << ")\n";
 
-    p.structureToFile(largestComponentFilename);
+    p.toFile(largestComponentFilename);
   }
 
   if (permutationFilename != "") {

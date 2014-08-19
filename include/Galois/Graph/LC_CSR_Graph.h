@@ -174,8 +174,8 @@ public:
     return edgeDst[*ni];
   }
 
-  uint64_t size() const { return numNodes; }
-  uint64_t sizeEdges() const { return numEdges; }
+  size_t size() const { return numNodes; }
+  size_t sizeEdges() const { return numEdges; }
 
   iterator begin() const { return iterator(0); }
   iterator end() const { return iterator(numNodes); }

@@ -124,7 +124,7 @@ Galois::Runtime::LockManagerBase::tryAcquire(Galois::Runtime::Lockable* lockable
 #if 0
   if (tryLock(lockable)) {
     assert(!getOwner(lockable));
-    ownByForce(lockable);
+    setOwner(lockable);
     return NEW_OWNER;
 #else
   if (lockable->owner.try_lock()) {

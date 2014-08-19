@@ -53,7 +53,7 @@ struct UnionFindUsingRuntime {
     Accumulator mstSum;
 
     // Galois::for_each_ordered (perThrdWL.begin_all (), perThrdWL.end_all (),
-    Galois::Runtime::for_each_ordered_2p_win (perThrdWL.begin_all (), perThrdWL.end_all (),
+    Galois::Runtime::for_each_ordered_2p_win (Galois::Runtime::makeLocalRange (perThrdWL),
         Edge::Comparator (),
         FindLoop (repVec, repOwnerCtxVec, findIter),
         LinkUpLoop<true> (repVec, repOwnerCtxVec, *nextWL, mstSum, linkUpIter));
@@ -73,10 +73,14 @@ class KruskalOrdered: public Kruskal {
 
   virtual const std::string getVersion () const { return "Parallel Kruskal using Ordered Runtime"; }
 
-  virtual void runMST (const size_t numNodes, const VecEdge& edges,
+  virtual void runMST (const size_t numNodes, VecEdge& edges,
       size_t& mstWeight, size_t& totalIter) {
 
-    runMSTsimple (numNodes, edges, mstWeight, totalIter, UnionFindUsingRuntime ());
+    if (edges.size () >= 2 * numNodes) {
+      runMSTfilter (numNodes, edges, mstWeight, totalIter, UnionFindUsingRuntime ());
+    } else {
+      runMSTsimple (numNodes, edges, mstWeight, totalIter, UnionFindUsingRuntime ());
+    }
 
   }
 };

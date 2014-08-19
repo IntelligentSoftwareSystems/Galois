@@ -1259,7 +1259,7 @@ GALOIS_WLCOMPILECHECK(SkipListQueue)
 
 template<class Compare = std::less<int>, typename T = int, bool concurrent = true>
 class SetQueue : private boost::noncopyable, private Runtime::LL::PaddedLock<concurrent> {
-  std::set<T, Compare, Runtime::MM::FSBGaloisAllocator<T> > wl;
+  std::set<T, Compare, Runtime::MM::FixedSizeAllocator<T> > wl;
 
   using Runtime::LL::PaddedLock<concurrent>::lock;
   using Runtime::LL::PaddedLock<concurrent>::try_lock;
@@ -1556,7 +1556,7 @@ class CTOrderedByIntegerMetric : private boost::noncopyable {
 };
 GALOIS_WLCOMPILECHECK(CTOrderedByIntegerMetric)
 
-
+#if _POSIX_BARRIERS > 0
 template<class Indexer, typename ContainerTy, bool concurrent = true, int binmax = 1024*1024 >
 class BarrierOBIM : private boost::noncopyable {
   typedef typename ContainerTy::template rethread<concurrent>::type CTy;
@@ -1648,6 +1648,7 @@ class BarrierOBIM : private boost::noncopyable {
     } while (true);
   }
 };
+#endif
 
 template<typename T = int, bool concurrent = true>
 class Random : private boost::noncopyable {
@@ -2124,7 +2125,7 @@ template<typename gWL = LIFO_SB, int chunksize = 64, typename T = int>
 class ChunkedAdaptor : private boost::noncopyable {
   typedef Chunk<T, chunksize> ChunkTy;
 
-  Runtime::MM::FixedSizeAllocator heap;
+  Runtime::MM::FixedSizeHeap heap;
 
   Runtime::PerThreadStorage<ChunkTy*> data;
 

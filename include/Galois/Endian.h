@@ -34,13 +34,7 @@
 
 namespace Galois {
 
-// NB: Wrap these standard functions with different names because
-// sometimes le64toh and such are implemented as macros and we don't
-// want any nasty surprises.
-static inline uint64_t convert_le64toh(uint64_t x) {
-#if !defined(HAVE_BIG_ENDIAN)
-  return x;
-#elif defined(USE_NAIVE_BYTE_SWAP) || !defined(HAVE_LE64TOH)
+static inline uint64_t convert_bswap64(uint64_t x) {
   return ((x<<56) & 0xFF00000000000000) | 
          ((x<<40) & 0x00FF000000000000) |
          ((x<<24) & 0x0000FF0000000000) |
@@ -49,6 +43,23 @@ static inline uint64_t convert_le64toh(uint64_t x) {
          ((x>>24) & 0x0000000000FF0000) |
          ((x>>40) & 0x000000000000FF00) |
          ((x>>56) & 0x00000000000000FF);
+}
+
+static inline uint32_t convert_bswap32(uint32_t x) {
+  return ((x<<24) & 0xFF000000) |
+         ((x<<8 ) & 0x00FF0000) |
+         ((x>>8 ) & 0x0000FF00) |
+         ((x>>24) & 0x000000FF);
+}
+
+// NB: Wrap these standard functions with different names because
+// sometimes le64toh and such are implemented as macros and we don't
+// want any nasty surprises.
+static inline uint64_t convert_le64toh(uint64_t x) {
+#if !defined(HAVE_BIG_ENDIAN)
+  return x;
+#elif defined(USE_NAIVE_BYTE_SWAP) || !defined(HAVE_LE64TOH)
+  return convert_bswap64(x);
 #else
   return le64toh(x);
 #endif
@@ -58,10 +69,7 @@ static inline uint32_t convert_le32toh(uint32_t x) {
 #if !defined(HAVE_BIG_ENDIAN)
   return x;
 #elif defined(USE_NAIVE_BYTE_SWAP) || !defined(HAVE_LE32TOH)
-  return ((x<<24) & 0xFF000000) |
-         ((x<<8 ) & 0x00FF0000) |
-         ((x>>8 ) & 0x0000FF00) |
-         ((x>>24) & 0x000000FF);
+  return convert_bswap32(x);
 #else
   return le32toh(x);
 #endif
@@ -71,14 +79,7 @@ static inline uint64_t convert_htobe64(uint64_t x) {
 #if defined(HAVE_BIG_ENDIAN)
   return x;
 #elif defined(USE_NAIVE_BYTE_SWAP) || !defined(HAVE_HTOBE64)
-  return ((x<<56) & 0xFF00000000000000) | 
-         ((x<<40) & 0x00FF000000000000) |
-         ((x<<24) & 0x0000FF0000000000) |
-         ((x<<8 ) & 0x000000FF00000000) |
-         ((x>>8 ) & 0x00000000FF000000) |
-         ((x>>24) & 0x0000000000FF0000) |
-         ((x>>40) & 0x000000000000FF00) |
-         ((x>>56) & 0x00000000000000FF);
+  return convert_bswap64(x);
 #else
   return htobe64(x);
 #endif
@@ -88,10 +89,7 @@ static inline uint32_t convert_htobe32(uint32_t x) {
 #if defined(HAVE_BIG_ENDIAN)
   return x;
 #elif defined(USE_NAIVE_BYTE_SWAP) || !defined(HAVE_HTOBE32)
-  return ((x<<24) & 0xFF000000) |
-         ((x<<8 ) & 0x00FF0000) |
-         ((x>>8 ) & 0x0000FF00) |
-         ((x>>24) & 0x000000FF);
+  return convert_bswap32(x);
 #else
   return htobe32(x);
 #endif
@@ -101,14 +99,7 @@ static inline uint64_t convert_htole64(uint64_t x) {
 #if !defined(HAVE_BIG_ENDIAN)
   return x;
 #elif defined(USE_NAIVE_BYTE_SWAP) || !defined(HAVE_HTOLE64)
-  return ((x<<56) & 0xFF00000000000000) | 
-         ((x<<40) & 0x00FF000000000000) |
-         ((x<<24) & 0x0000FF0000000000) |
-         ((x<<8 ) & 0x000000FF00000000) |
-         ((x>>8 ) & 0x00000000FF000000) |
-         ((x>>24) & 0x0000000000FF0000) |
-         ((x>>40) & 0x000000000000FF00) |
-         ((x>>56) & 0x00000000000000FF);
+  return convert_bswap64(x);
 #else
   return htole64(x);
 #endif
@@ -118,10 +109,7 @@ static inline uint32_t convert_htole32(uint32_t x) {
 #if !defined(HAVE_BIG_ENDIAN)
   return x;
 #elif defined(USE_NAIVE_BYTE_SWAP) || !defined(HAVE_HTOLE32)
-  return ((x<<24) & 0xFF000000) |
-         ((x<<8 ) & 0x00FF0000) |
-         ((x>>8 ) & 0x0000FF00) |
-         ((x>>24) & 0x000000FF);
+  return convert_bswap32(x);
 #else
   return htole32(x);
 #endif

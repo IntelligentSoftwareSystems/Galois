@@ -12,7 +12,7 @@ file(GLOB Sources
   libMeshInit/femap/*.cpp
   libMeshInit/dgmechanics/*.cpp
   libMeshInit/*.cpp
-  dummy.f90
+  dummy.f95
 )
 
 find_package(Fortran)

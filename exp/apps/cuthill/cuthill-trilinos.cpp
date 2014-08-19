@@ -25,7 +25,7 @@ int main(int argc, char** argv) {
   Ttotal.start();
 
   llvm::cl::ParseCommandLineOptions(argc, argv);
-  fileGraph.structureFromFileInterleaved<void>(filename);
+  fileGraph.fromFileInterleaved<void>(filename);
 
   // Load matrix from graph
   Epetra_Map rowMap(static_cast<int>(fileGraph.size()), 0, comm);

@@ -237,7 +237,7 @@ protected:
         input2Val (g.input2Val)
     {}
 
-    virtual void restore (TwoInputGate& g) {
+    void restore (TwoInputGate& g) {
       BaseLogicGate::State::restore (g);
 
       g.input1Val = input1Val;

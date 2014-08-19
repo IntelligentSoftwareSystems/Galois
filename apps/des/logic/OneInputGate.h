@@ -160,7 +160,7 @@ protected:
       : BaseLogicGate::State (g), inputVal (g.inputVal) 
     {}
 
-    virtual void restore (OneInputGate& g) {
+    void restore (OneInputGate& g) {
       BaseLogicGate::State::restore (g);
       g.inputVal = inputVal;
     }

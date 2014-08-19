@@ -193,8 +193,8 @@ public:
     return ni->dst;
   }
 
-  uint64_t size() const { return numNodes; }
-  uint64_t sizeEdges() const { return numEdges; }
+  size_t size() const { return numNodes; }
+  size_t sizeEdges() const { return numEdges; }
   iterator begin() { return &nodes[0]; }
   iterator end() { return &nodes[numNodes]; }
   const_iterator begin() const { return &nodes[0]; }

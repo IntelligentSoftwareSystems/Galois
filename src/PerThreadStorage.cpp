@@ -40,9 +40,9 @@ Galois::Runtime::PerBackend& Galois::Runtime::getPPSBackend() {
   return b;
 }
 
-//#define MORE_MEM_HACK
+#define MORE_MEM_HACK
 #ifdef MORE_MEM_HACK
-const size_t allocSize = Galois::Runtime::MM::hugePageSize * 10;
+const size_t allocSize = Galois::Runtime::MM::hugePageSize * 16;
 inline void* alloc() {
   return malloc(allocSize);
 }
@@ -61,7 +61,7 @@ unsigned Galois::Runtime::PerBackend::nextLog2(unsigned size) {
     ++i;
   }
   if (i >= MAX_SIZE) { 
-    GALOIS_DIE("PTS size too big");
+    abort();
   }
   return i;
 }
@@ -174,6 +174,8 @@ void Galois::Runtime::initPTS() {
 }
 
 #ifdef GALOIS_USE_EXP
+// assumes that per thread storage has been initialized by Galois already
+// and just copies over the same pointers to cilk threads
 char* Galois::Runtime::PerBackend::initPerThread_cilk() {
   unsigned id = LL::getTID();
   assert(heads[id] != nullptr);
@@ -195,5 +197,7 @@ void Galois::Runtime::initPTS_cilk() {
   if (!ppsBase) {
     ppsBase = getPPSBackend().initPerPackage_cilk();
   }
+  assert (ptsBase != nullptr);
+  assert (ppsBase != nullptr);
 }
 #endif // GALOIS_USE_EXP

@@ -8,8 +8,12 @@ set(GALOIS_VERSION ${GALOIS_VERSION_MAJOR}.${GALOIS_VERSION_MINOR}.${GALOIS_VERS
 set(GALOIS_COPYRIGHT_YEAR "2014") # Also in COPYRIGHT
 
 if(NOT CMAKE_BUILD_TYPE)
-  message(STATUS "No build type selected, default to release with debug info")
-  set(CMAKE_BUILD_TYPE "relwithdebinfo") 
+  message(STATUS "No build type selected, default to release")
+  # cmake default flags with relwithdebinfo is -O2 -g
+  # cmake default flags with release is -O3 -DNDEBUG
+  set(CMAKE_BUILD_TYPE "Release")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g")
 endif()
 
 ###### Options (alternatively pass as options to cmake -DName=Value) ######
@@ -97,10 +101,10 @@ endif()
 if(CMAKE_COMPILER_IS_GNUCC)
   execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion
                   OUTPUT_VARIABLE GCC_VERSION)
-  if(GCC_VERSION VERSION_GREATER 4.6 OR GCC_VERSION VERSION_EQUAL 4.6)
-    #message(STATUS "GCC Version >= 4.6")
+  if(GCC_VERSION VERSION_GREATER 4.7 OR GCC_VERSION VERSION_EQUAL 4.7)
+    #message(STATUS "GCC Version >= 4.7")
   else()
-    message(FATAL_ERROR "GCC must be 4.6 or higher")
+    message(FATAL_ERROR "GCC must be 4.7 or higher")
   endif()
 endif()
 
@@ -220,11 +224,8 @@ endif()
 find_package(Boost 1.38.0 REQUIRED)
 include_directories(${Boost_INCLUDE_DIR})
 
-# C++11 features
-find_package(CXX11)
-if ("${CXX11_FLAGS}" STREQUAL "")
-   message( FATAL_ERROR "Needs C++11")
-endif()
+find_package(CXX11 REQUIRED)
+
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CXX11_FLAGS}")
 
 include(CheckEndian)
@@ -245,8 +246,6 @@ endif()
 
 ###### Global Functions ######
 
-include(ParseArguments)
-
 function(compileApp name)
   if(ARGN)
     set(Sources ${ARGN})
@@ -257,7 +256,10 @@ function(compileApp name)
 endfunction(compileApp)
 
 function(app name)
-  PARSE_ARGUMENTS(APP "REQUIRES;EXTLIBS" "" ${ARGN})
+  set(options DISTSAFE)
+  set(oneValueArgs)
+  set(multiValueArgs REQUIRES EXTLIBS)
+  cmake_parse_arguments(APP "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
   foreach(required ${APP_REQUIRES})
     if(${${required}} MATCHES "TRUE")
@@ -267,13 +269,42 @@ function(app name)
     endif()
   endforeach()
 
-  compileApp(${name} ${APP_DEFAULT_ARGS})
+  compileApp(${name} ${APP_UNPARSED_ARGUMENTS})
   target_link_libraries(${name} ${APP_EXTLIBS})
   target_link_libraries(${name} galois)
+  target_link_libraries(${name} rt)
   if(INSTALL_APPS)
     install(TARGETS ${name} DESTINATION bin)
   endif()
 endfunction(app)
+
+function(makeTest name)
+  set(options DISTSAFE)
+  set(oneValueArgs)
+  set(multiValueArgs REQUIRES COMMAND_PREFIX COMMAND_SUFFIX)
+  cmake_parse_arguments(APP "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
+
+  foreach(required ${APP_REQUIRES})
+    if(${${required}} MATCHES "TRUE")
+    else()
+      message("-- NOT compiling ${name} (missing: ${required})")
+      return()
+    endif()
+  endforeach()
+
+  set(commandline)
+  foreach(f ${APP_COMMAND_PREFIX})
+    list(APPEND commandline ${f})
+  endforeach()
+  list(APPEND commandline "$<TARGET_FILE:test-${name}>")
+  foreach(f ${APP_COMMAND_SUFFIX})
+    list(APPEND commandline ${f})
+  endforeach()
+
+  add_executable(test-${name} ${name}.cpp)
+  target_link_libraries(test-${name} galois)
+  add_test(NAME ${name} COMMAND ${commandline})
+endfunction()
 
 ###### Source finding ######
 include_directories(include)
@@ -286,6 +317,7 @@ if(NOT SKIP_COMPILE_APPS)
   add_subdirectory(apps)
   add_subdirectory(inputs)
   add_subdirectory(test)
+  add_subdirectory(toolkit_ml)
 endif()
 if(USE_EXP)
   add_subdirectory(exp)
@@ -293,14 +325,9 @@ endif()
 
 ###### Documentation ######
 set(DOXYFILE_SOURCE_DIR "src\" \"include\" \"docs")
-#include(UseDoxygen OPTIONAL)
-if(DOXYGEN_FOUND)
-  execute_process(COMMAND ${DOXYGEN_EXECUTABLE} --version OUTPUT_VARIABLE DOXYGEN_VERSION)
-  if(DOXYGEN_VERSION VERSION_GREATER 1.8.0 OR DOXYGEN_VERSION VERSION_EQUAL 1.8.0)
-    #message(STATUS "doxygen version >= 1.8.0")
-  else()
-    message(FATAL_ERROR "doxygen must be version 1.8.0 or higher; found: ${DOXYGEN_VERSION} instead")
-  endif()
+find_package(UseDoxygen 1.8.0)
+if(NOT UseDoxygen_FOUND)
+  message(STATUS "Could NOT find required doxygen version: doxygen missing or < 1.8.0") 
 endif()
 
 ###### Distribution ######

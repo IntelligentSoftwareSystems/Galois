@@ -161,8 +161,8 @@ bool StressWork::getDValIntern (const MatDouble &argval, MatDouble& funcval, Fou
         for (size_t a = 0; a < nDof[f]; ++a) {
           for (size_t g = 0; g < Dim; ++g) {
             for (size_t b = 0; b < nDof[g]; ++b) {
-              for (register size_t J = 0; J < nDiv[f]; ++J) {
-                for (register size_t L = 0; L < nDiv[g]; ++L) {
+              for (size_t J = 0; J < nDiv[f]; ++J) {
+                for (size_t L = 0; L < nDiv[g]; ++L) {
                   dfuncval[f][a][g][b] += IntWeights[f][q] * A[f * NDM * MAT_SIZE + J * MAT_SIZE + g * NDM + L] * DShape[f][q * nDof[f] * nDiv[f] + a * nDiv[f] + J]
                       * DShape[g][q * nDof[g] * nDiv[g] + b * nDiv[g] + L];
                 }

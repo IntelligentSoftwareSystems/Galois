@@ -39,9 +39,9 @@ namespace Galois {
 
 /**
  * Thread-safe ordered set. Faster than STL heap operations (about 10%-15% faster on serially) and
- * can use scalable allocation, e.g., {@link GFixedAllocator}.
+ * can use scalable allocation, e.g., {@link FixedSizeAllocator}.
  */
-template <typename T, typename Cmp=std::less<T>, typename Alloc=Galois::GFixedAllocator<T> >
+template <typename T, typename Cmp=std::less<T>, typename Alloc=Galois::FixedSizeAllocator<T> >
 class ThreadSafeOrderedSet {
   typedef std::set<T, Cmp, Alloc> Set;
 

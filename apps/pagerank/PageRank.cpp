@@ -1,5 +1,5 @@
 /** Page rank application -*- C++ -*-
- * @file
+* @file
  * @section License
  *
  * Galois, a framework to exploit amorphous data-parallelism in irregular
@@ -52,6 +52,9 @@ namespace cll = llvm::cl;
 static const char* name = "Page Rank";
 static const char* desc = "Computes page ranks a la Page and Brin";
 static const char* url = 0;
+//static const float tolerance = 0.0001; // Joyce
+static const float amp = (1/tolerance)*(-1000); // Joyce
+static const float amp2 = (1/tolerance)*(-1); // Joyce
 
 enum Algo {
   sync_pr,  
@@ -271,12 +274,14 @@ struct SyncUndir {
 
       LNode& sdata = graph.getData(src);
 
+      //! [Access in-neighbors of LC_InOut_Graph]
       double sum = 0;
       for (auto jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj) {
         GNode dst = graph.getEdgeDst(jj);
         LNode& ddata = graph.getData(dst);
         sum += ddata.getPageRank(iteration) / ddata.nout;
       }
+      //! [Access in-neighbors of LC_InOut_Graph]
 
       float value = alpha*sum + (1.0 - alpha);
       float diff = std::fabs(value - sdata.getPageRank(iteration));
@@ -724,6 +729,7 @@ int pri(const NTy& n) {
   //double d = n.residual;
   return (int)(d * amp); //d > 0.1 ? 0 : 1;//-1*(int)sqrt(-1*d*amp);
 }
+//![WriteGraph]
 
 struct AsyncPrt {
 

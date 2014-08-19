@@ -123,7 +123,7 @@ public:
   struct Factory {
 
     typedef NhoodItem<Ctxt, CtxtCmp> NItem;
-    typedef Galois::Runtime::MM::FSBGaloisAllocator<NItem> NItemAlloc;
+    typedef MM::FixedSizeAllocator<NItem> NItemAlloc;
 
     NItemAlloc niAlloc;
     CtxtCmp ctxcmp;
@@ -159,7 +159,7 @@ class PtrBasedNhoodMgr: boost::noncopyable {
 public:
   typedef typename NItem::Factory NItemFactory;
 
-  typedef Galois::Runtime::MM::FSBGaloisAllocator<NItem> NItemAlloc;
+  typedef MM::FixedSizeAllocator<NItem> NItemAlloc;
   typedef Galois::Runtime::PerThreadVector<NItem*> NItemWL;
 
 protected:
@@ -220,9 +220,9 @@ public:
 
   // typedef std::tr1::unordered_map<Lockable*, NItem> NhoodMap; 
   //
-  typedef MM::SimpleBumpPtrWithMallocFallback<MM::FreeListHeap<MM::SystemBaseAlloc> > BasicHeap;
-  typedef MM::ThreadAwarePrivateHeap<BasicHeap> PerThreadHeap;
-  typedef MM::ExternRefGaloisAllocator<std::pair<Lockable*, NItem*>, PerThreadHeap> PerThreadAllocator;
+  typedef MM::BumpWithMallocHeap<MM::FreeListHeap<MM::SystemHeap> > BasicHeap;
+  typedef MM::ThreadPrivateHeap<BasicHeap> PerThreadHeap;
+  typedef MM::ExternalHeapAllocator<std::pair<Lockable*, NItem*>, PerThreadHeap> PerThreadAllocator;
 
   typedef std::unordered_map<
       Lockable*,
@@ -464,13 +464,13 @@ class LCorderedExec {
   typedef typename Ctxt::value_type T;
   typedef typename Ctxt::NhoodMgr NhoodMgr;
 
-  typedef Galois::Runtime::MM::FSBGaloisAllocator<Ctxt> CtxtAlloc;
-  typedef Galois::Runtime::PerThreadVector<Ctxt*> CtxtWL;
-  typedef Galois::Runtime::PerThreadDeque<Ctxt*> CtxtDelQ;
-  typedef Galois::Runtime::PerThreadDeque<Ctxt*> CtxtLocalQ;
+  typedef MM::FixedSizeAllocator<Ctxt> CtxtAlloc;
+  typedef PerThreadVector<Ctxt*> CtxtWL;
+  typedef PerThreadDeque<Ctxt*> CtxtDelQ;
+  typedef PerThreadDeque<Ctxt*> CtxtLocalQ;
   // typedef Galois::Runtime::PerThreadVector<T> AddWL;
-  typedef Galois::Runtime::UserContextAccess<T> UserCtx;
-  typedef Galois::Runtime::PerThreadStorage<UserCtx> PerThreadUserCtx;
+  typedef UserContextAccess<T> UserCtx;
+  typedef PerThreadStorage<UserCtx> PerThreadUserCtx;
 
 
   typedef Galois::GAccumulator<size_t> Accumulator;

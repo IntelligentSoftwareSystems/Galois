@@ -38,6 +38,7 @@ class BilliardsTwoPhase: public Billiards {
   using AddListTy = Galois::Runtime::PerThreadVector<Event>;
 
   struct VisitNhood {
+    static const unsigned CHUNK_SIZE = 1;
 
     template <typename C, typename I>
     GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (const Event& event, const C& c, const I beg, const I end) {
@@ -68,7 +69,7 @@ class BilliardsTwoPhase: public Billiards {
 
   struct OpFunc {
 
-    static const unsigned CHUNK_SIZE = 16;
+    static const unsigned CHUNK_SIZE = 1;
 
     Table& table;
     const double endtime;
@@ -119,7 +120,7 @@ class BilliardsTwoPhase: public Billiards {
 
 public:
 
-  virtual const std::string version () const { return "using Level-by-Level Executor"; }
+  virtual const std::string version () const { return "using IKDG"; }
 
   virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const double endtime, bool enablePrints=false) {
 
@@ -129,7 +130,7 @@ public:
     // createLocks (table, graph, nodes);
 
     Galois::Runtime::for_each_ordered_2p_win (
-        initEvents.begin (), initEvents.end (),
+        Galois::Runtime::makeStandardRange(initEvents.begin (), initEvents.end ()),
         Event::Comparator (),
         VisitNhood (),
         OpFunc (table, endtime, addList, iter),

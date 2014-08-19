@@ -32,7 +32,7 @@
 #include "Galois/Runtime/ll/gio.h"
 #include <pthread.h>
 
-#if defined(_POSIX_BARRIERS)
+#if _POSIX_BARRIERS > 0
 
 namespace {
 

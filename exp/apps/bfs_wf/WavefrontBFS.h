@@ -286,6 +286,7 @@ public:
 
   virtual size_t runBFS (Graph& graph, GNode& startNode) {
 
+
     WL_ty* currWL = new WL_ty ();
     WL_ty* nextWL = new WL_ty ();
 
@@ -297,14 +298,19 @@ public:
     unsigned level = 0;
 
     ParCounter numAdds;
+    Galois::Runtime::getSystemThreadPool ().burnPower (Galois::getActiveThreads ());
     while (!currWL->empty_all ()) {
 
-      Galois::do_all_choice (*currWL, ParallelInnerLoop (graph, *nextWL, numAdds), "wavefront_inner_loop");
+      Galois::do_all_choice (Galois::Runtime::makeLocalRange(*currWL), 
+          ParallelInnerLoop (graph, *nextWL, numAdds), 
+          "wavefront_inner_loop",
+          Galois::doall_chunk_size<CHUNK_SIZE> ());
 
       std::swap (currWL, nextWL);
       nextWL->clear_all ();
       ++level;
     }
+    Galois::Runtime::getSystemThreadPool ().beKind ();
 
     numIter += numAdds.reduce ();
 

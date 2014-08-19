@@ -44,11 +44,17 @@
 #include <random>
 #include <type_traits>
 
+#ifdef HAS_EIGEN
+#include <Eigen/Sparse>
+#include <Eigen/Dense>
+#endif
+
 static const char* const name = "Matrix Completion";
 static const char* const desc = "Computes Matrix Decomposition using Stochastic Gradient Descent";
 static const char* const url = 0;
 
 enum Algo {
+  alternatingLeastSquares,
   blockedEdge,
   blockedEdgeServer,
   blockJump,
@@ -100,6 +106,7 @@ static cll::opt<int> fixedRounds("fixedRounds", cll::desc("run for a fixed numbe
 static cll::opt<bool> useExactError("useExactError", cll::desc("use exact error for testing convergence"), cll::init(false));
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
   cll::values(
+    clEnumValN(Algo::alternatingLeastSquares, "als", "Alternating least squares"),
     clEnumValN(Algo::blockedEdge, "blockedEdge", "Edge blocking (default)"),
     clEnumValN(Algo::blockedEdgeServer, "blockedEdgeServer", "Edge blocking with server support"),
     clEnumValN(Algo::blockJump, "blockJump", "Block jumping "),
@@ -869,6 +876,34 @@ private:
     }
   };
 
+  struct Execute {
+    Graph& g;
+    Galois::Statistic& edgesVisited;
+
+    void operator()(LatentValue* steps, int maxUpdates, Galois::GAccumulator<double>* errorAccum) {
+      if (errorAccum)
+        GALOIS_DIE("not yet implemented");
+
+      Galois::Runtime::Fixed2DGraphTiledExecutor<Graph> executor(g);
+      executor.execute(
+          g.begin(), g.begin() + NUM_ITEM_NODES,
+          g.begin() + NUM_ITEM_NODES, g.end(),
+          itemsPerBlock, usersPerBlock,
+          [&](GNode src, GNode dst, typename Graph::edge_iterator edge) {
+        if (deleted(g.getData(src)))
+          return;
+        //const LatentValue stepSize = steps[updatesPerEdge - maxUpdates + task.updates]; XXX
+        //const LatentValue stepSize = steps[1 - maxUpdates + 0];
+        const LatentValue stepSize = steps[0];
+
+        LatentValue e = doGradientUpdate(g.getData(src).latentVector, g.getData(dst).latentVector, lambda, g.getEdgeData(edge), stepSize);
+        // XXX non exact error
+        //error += (e * e);
+        edgesVisited += 1;
+      }, true);
+    }
+  };
+
 public:
   void operator()(Graph& g, const StepFunction& sf) {
     Galois::StatTimer inspect("InspectTime");
@@ -887,28 +922,8 @@ public:
     execute.start();
 
 #if 1
-    executeUntilConverged(sf, g, [&](LatentValue* steps, int maxUpdates, Galois::GAccumulator<double>* errorAccum) {
-      if (errorAccum)
-        GALOIS_DIE("not yet implemented");
-
-      Galois::Runtime::Fixed2DGraphTiledExecutor<Graph> executor(g);
-      executor.execute(
-          g.begin(), g.begin() + NUM_ITEM_NODES,
-          g.begin() + NUM_ITEM_NODES, g.end(),
-          itemsPerBlock, usersPerBlock,
-          [&](GNode src, GNode dst, typename Graph::edge_iterator edge) {
-        if (deleted(g.getData(src)))
-          return;
-        // const LatentValue stepSize = steps[updatesPerEdge - maxUpdates + task.updates]; XXX
-        //const LatentValue stepSize = steps[1 - maxUpdates + 0];
-        const LatentValue stepSize = steps[0];
-
-        LatentValue e = doGradientUpdate(g.getData(src).latentVector, g.getData(dst).latentVector, lambda, g.getEdgeData(edge), stepSize);
-        // XXX non exact error
-        //error += (e * e);
-        edgesVisited += 1;
-      }, true);
-    });
+    Execute fn2 { g, edgesVisited };
+    executeUntilConverged(sf, g, fn2);
 #endif
 #if 0
     executeUntilConverged(sf, g, [&](LatentValue* steps, int maxUpdates, Galois::GAccumulator<double>* errorAccum) {
@@ -1069,6 +1084,9 @@ int main(int argc, char** argv) {
   Galois::StatManager statManager;
 
   switch (algo) {
+#ifdef HAS_EIGEN
+    case Algo::alternatingLeastSquares: run<AlternatingLeastSquaresAlgo>(); break;
+#endif
     case Algo::blockedEdge: run<BlockedEdgeAlgo<false> >(); break;
     case Algo::blockedEdgeServer: run<BlockedEdgeAlgo<true> >(); break;
     case Algo::blockJump: run<BlockJumpAlgo>(); break;

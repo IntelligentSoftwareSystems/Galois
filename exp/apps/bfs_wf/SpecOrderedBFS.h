@@ -138,7 +138,7 @@ public:
     wl.push_back (first);
 
     Galois::Runtime::for_each_ordered_rob (
-        wl.begin (), wl.end (),
+        Galois::Runtime::makeStandardRange(wl.begin (), wl.end ()),
         Comparator (), 
         VisitNhood (graph),
         OpFunc (graph, numIter));

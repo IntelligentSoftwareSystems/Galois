@@ -152,19 +152,19 @@ protected:
     UserContextAccess<value_type> facing;
     SimpleRuntimeContext ctx;
     unsigned long stat_conflicts;
-    unsigned long stat_commits;
+    unsigned long stat_iterations;
     unsigned long stat_pushes;
     const char* loopname;
     ThreadLocalData(const FunctionTy& fn, const char* ln)
-      : function(fn), stat_conflicts(0), stat_commits(0), stat_pushes(0), 
+      : function(fn), stat_conflicts(0), stat_iterations(0), stat_pushes(0), 
         loopname(ln)
     {}
     ~ThreadLocalData() {
       if (ForEachTraits<FunctionTy>::NeedsStats) {
         reportStat(loopname, "Conflicts", stat_conflicts);
-        reportStat(loopname, "Commits", stat_commits);
+        reportStat(loopname, "Commits", stat_iterations - stat_conflicts);
         reportStat(loopname, "Pushes", stat_pushes);
-        reportStat(loopname, "Iterations", stat_commits + stat_conflicts);
+        reportStat(loopname, "Iterations", stat_iterations);
       }
     }
   };
@@ -196,7 +196,7 @@ protected:
       tld.facing.resetAlloc();
     if (ForEachTraits<FunctionTy>::NeedsAborts)
       tld.ctx.commitIteration();
-    ++tld.stat_commits;
+    //++tld.stat_commits;
   }
 
   template<typename Item>
@@ -217,6 +217,7 @@ protected:
   inline void doProcess(value_type& val, ThreadLocalData& tld) {
     if (ForEachTraits<FunctionTy>::NeedsAborts)
       tld.ctx.startIteration();
+    ++tld.stat_iterations;
     tld.function(val, tld.facing.data());
     commitIteration(tld);
   }
@@ -231,7 +232,7 @@ protected:
   template<int limit, typename WL>
   void runQueue(ThreadLocalData& tld, WL& lwl) {
     Galois::optional<typename WL::value_type> p;
-    unsigned num = 0;
+    int num = 0;
 #ifdef GALOIS_USE_LONGJMP
     if (setjmp(hackjmp) == 0) {
       while ((!limit || num++ < limit) && (p = lwl.pop())) {
@@ -251,7 +252,7 @@ protected:
       abortIteration(*p, tld);
     }
 #endif
-}
+  }
 
   GALOIS_ATTRIBUTE_NOINLINE
   void handleAborts(ThreadLocalData& tld) {
@@ -261,6 +262,13 @@ protected:
   void fastPushBack(typename UserContextAccess<value_type>::PushBufferTy& x) {
     wl.push(x.begin(), x.end());
     x.clear();
+  }
+
+  bool checkEmpty(WorkListTy&, ThreadLocalData&, ...) { return true; }
+
+  template<typename WL>
+  auto checkEmpty(WL& wl, ThreadLocalData& tld, int) -> decltype(wl.empty(), bool()) {
+    return wl.empty();
   }
 
   template<bool couldAbort, bool isLeader>
@@ -274,23 +282,35 @@ protected:
     if (ForEachTraits<FunctionTy>::NeedsPush && !couldAbort)
       tld.facing.setFastPushBack(
           std::bind(&ForEachWork::fastPushBack, this, std::placeholders::_1));
-    unsigned old_commit = 0;
-    do {
-      // Run some iterations
-      if (couldAbort || ForEachTraits<FunctionTy>::NeedsBreak) {
-        constexpr int __NUM = (ForEachTraits<FunctionTy>::NeedsBreak || isLeader) ? 32 : 0;
-        runQueue<__NUM>(tld, wl);
-        // Check for abort
-        if (couldAbort)
-          handleAborts(tld);
-      } else { // No try/catch
-        runQueueSimple(tld);
-      }
-      // Update node color and prop token
-      term.localTermination(old_commit != tld.stat_commits);
-      old_commit = tld.stat_commits;
-      LL::asmPause(); // Let token propagate
-    } while (!term.globalTermination() && (!ForEachTraits<FunctionTy>::NeedsBreak || !broke));
+    unsigned long old_iterations = 0;
+    while (true) {
+      do {
+        // Run some iterations
+        if (couldAbort || ForEachTraits<FunctionTy>::NeedsBreak) {
+          constexpr int __NUM = (ForEachTraits<FunctionTy>::NeedsBreak || isLeader) ? 64 : 0;
+          runQueue<__NUM>(tld, wl);
+          // Check for abort
+          if (couldAbort)
+            handleAborts(tld);
+        } else { // No try/catch
+          runQueueSimple(tld);
+        }
+
+        bool didWork = old_iterations != tld.stat_iterations;
+        old_iterations = tld.stat_iterations;
+
+        // Update node color and prop token
+        term.localTermination(didWork);
+        LL::asmPause(); // Let token propagate
+      } while (!term.globalTermination() && (!ForEachTraits<FunctionTy>::NeedsBreak || !broke));
+
+      if (checkEmpty(wl, tld, 0))
+        break;
+      if (ForEachTraits<FunctionTy>::NeedsBreak && broke)
+        break;
+      initThread();
+      getSystemBarrier().wait();
+    }
 
     if (couldAbort)
       setThreadContext(0);
@@ -315,7 +335,7 @@ public:
     wl.push_initial(range);
   }
 
-  void initThread(void) {
+  void initThread() {
     term.initializeThread();
   }
 
@@ -333,13 +353,33 @@ public:
   }
 };
 
+template<typename WLTy>
+constexpr auto has_with_iterator(int) -> decltype(std::declval<typename WLTy::template with_iterator<int*>::type>(), bool()) {
+  return true;
+}
+
+template<typename>
+constexpr bool has_with_iterator(...) {
+  return false;
+}
+
+template<typename WLTy, typename IterTy, typename Enable = void>
+struct reiterator {
+  typedef WLTy type;
+};
+
+template<typename WLTy, typename IterTy>
+struct reiterator<WLTy, IterTy, typename std::enable_if<has_with_iterator<WLTy>(0)>::type> {
+  typedef typename WLTy::template with_iterator<IterTy>::type type;
+};
+
 template<typename WLTy, typename RangeTy, typename FunctionTy>
 void for_each_impl(const RangeTy& range, const FunctionTy& f, const char* loopname) {
   if (inGaloisForEach)
     GALOIS_DIE("Nested for_each not supported");
-
+  typedef typename reiterator<WLTy, typename RangeTy::iterator>::type WLNewTy;
   typedef typename RangeTy::value_type T;
-  typedef ForEachWork<typename WLTy::template retype<T>::type, T, FunctionTy> WorkTy;
+  typedef ForEachWork<typename WLNewTy::template retype<T>::type, T, FunctionTy> WorkTy;
 
   // NB: Initialize barrier before creating WorkTy to increase
   // PerThreadStorage reclaimation likelihood
@@ -353,8 +393,13 @@ void for_each_impl(const RangeTy& range, const FunctionTy& f, const char* loopna
 
   inGaloisForEach = true;
   getSystemThreadPool().run(activeThreads,
+#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
+                            std::bind(&WorkTy::initThread, std::ref(W)),
+                            std::bind (&WorkTy::template AddInitialWork<RangeTy>, std::ref(W), range),
+#else
                             [&W] () {W.initThread();},
-                            [&W, &range] {W.AddInitialWork(range);},
+                            [&W, &range] (void) {W.AddInitialWork(range);},
+#endif
                             std::ref(barrier),
                             std::ref(W));
   inGaloisForEach = false;

@@ -267,7 +267,7 @@ static inline void setNumaAlloc(void* data, size_t len, bool isNuma) {
 void* Galois::Runtime::MM::largeInterleavedAlloc(size_t len, bool full) {
   void* data;
 #ifdef GALOIS_FORCE_STANDALONE
-  unsigned total = 1;
+  unsigned __attribute__((unused)) total = 1;
   bool inForEach = false;
 #else
   unsigned total = full ? Galois::Runtime::LL::getMaxCores() : activeThreads;

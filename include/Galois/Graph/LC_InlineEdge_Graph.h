@@ -118,23 +118,23 @@ protected:
   uint64_t numNodes;
   uint64_t numEdges;
 
-  template<bool _C = HasCompressedNodePtr>
-  NodeInfo* getDst(edge_iterator ii, typename std::enable_if<_C>::type* x = 0) const {
+  template<bool C_b = HasCompressedNodePtr>
+  NodeInfo* getDst(edge_iterator ii, typename std::enable_if<C_b>::type* x = 0) const {
     return const_cast<NodeInfo*>(&nodeData[ii->dst]);
   }
 
-  template<bool _C = HasCompressedNodePtr>
-  NodeInfo* getDst(edge_iterator ii, typename std::enable_if<!_C>::type* x = 0) const {
+  template<bool C_b = HasCompressedNodePtr>
+  NodeInfo* getDst(edge_iterator ii, typename std::enable_if<!C_b>::type* x = 0) const {
     return ii->dst;
   }
 
-  template<typename Container,typename Index, bool _C = HasCompressedNodePtr>
-  void setEdgeDst(Container& c, edge_iterator edge, Index idx, typename std::enable_if<_C>::type* = 0) {
+  template<typename Container,typename Index, bool C_b = HasCompressedNodePtr>
+  void setEdgeDst(Container& c, edge_iterator edge, Index idx, typename std::enable_if<C_b>::type* = 0) {
     edge->dst = idx;
   }
 
-  template<typename Container,typename Index, bool _C = HasCompressedNodePtr>
-  void setEdgeDst(Container& c, edge_iterator edge, Index idx, typename std::enable_if<!_C>::type* = 0) {
+  template<typename Container,typename Index, bool C_b = HasCompressedNodePtr>
+  void setEdgeDst(Container& c, edge_iterator edge, Index idx, typename std::enable_if<!C_b>::type* = 0) {
     edge->dst = &c[idx];
   }
 
@@ -192,8 +192,8 @@ public:
     return getDst(ni);
   }
 
-  uint64_t size() const { return numNodes; }
-  uint64_t sizeEdges() const { return numEdges; }
+  size_t size() const { return numNodes; }
+  size_t sizeEdges() const { return numEdges; }
 
   const_iterator begin() const { return const_iterator(nodeData.begin()); }
   const_iterator end() const { return const_iterator(nodeData.end()); }

@@ -417,7 +417,7 @@ struct firstForEach {
 			Bpreds.clear();//resize(0);
 			Bpreds.push_back(A);
 			B->distance = ADist + 1;
-			int newBDist = ADist + 1;
+			//int newBDist = ADist + 1;
 #ifdef COUNT_ACTIONS
 			if (BDist > largestNodeDist.get())
 				largestNodeDist.get() = B->distance;

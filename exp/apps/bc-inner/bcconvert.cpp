@@ -122,7 +122,7 @@ void constructFromGraph(Graph& graph, Graph* transpose, GraphArrays& a) {
 }
 
 void readGraph(Graph& g, const std::string& name) {
-  g.structureFromFile(name);
+  g.fromFile(name);
   std::cout << "Read " << g.size() << " nodes and " << g.sizeEdges() << " edges\n";
 }
 

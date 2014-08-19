@@ -124,10 +124,13 @@ void Partition(MetisGraph* metisGraph, unsigned nparts) {
 
   std::cout << "Initial dist\n";
   printPartStats(initParts);
+  std::cout << "\n";
+
   std::cout << "Refined dist\n";
   printPartStats(parts);
+  std::cout << "\n";
 
-  std::cout << "\nTime:  " << TM.get() << '\n';
+  std::cout << "Time:  " << TM.get() << '\n';
   return;
 }
 
@@ -240,7 +243,7 @@ int main(int argc, char** argv) {
   
   if (orderedfile != "" || permutationfile != "") { 
     Galois::Graph::FileGraph g;
-    g.structureFromFile(filename);
+    g.fromFile(filename);
     typedef Galois::LargeArray<GNode> Permutation;
     Permutation perm; 
     perm.create(g.size());
@@ -281,7 +284,7 @@ int main(int argc, char** argv) {
     Galois::Graph::FileGraph out;
     Galois::Graph::permute<int>(g, perm2, out);
     if (orderedfile != "")
-      out.structureToFile(orderedfile);
+      out.toFile(orderedfile);
     if (permutationfile != "") {
       std::ofstream file(permutationfile.c_str());
       Galois::LargeArray<uint64_t> transpose;

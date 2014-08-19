@@ -36,6 +36,7 @@
 #include <Eigen/Sparse>
 #endif
 
+#include <random>
 #include <iostream>
 #include <cassert>
 #include <algorithm>
@@ -546,7 +547,7 @@ double getDualObjective(Graph& g, const std::vector<GNode>& trainingSamples, dou
   Galois::GAccumulator<double> objective;
 
   Galois::do_all(trainingSamples.begin(), trainingSamples.end(), [&](GNode n) {
-    Node& data = g.getData(n);
+    //Node& data = g.getData(n);
     int label = g.getData(n).field;
     objective += alpha[n] * (alpha[n] * diag[label + 1] - 2);
   });

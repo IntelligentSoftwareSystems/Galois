@@ -172,7 +172,7 @@ public:
     createLocks (table, graph, nodes);
 
     Galois::Runtime::for_each_ordered_rob (
-        initEvents.begin (), initEvents.end (),
+        Galois::Runtime::makeStandardRange(initEvents.begin (), initEvents.end ()),
         Event::Comparator (),
         VisitNhood (graph, nodes),
         OpFunc (table, endtime, iter));

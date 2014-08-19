@@ -224,7 +224,7 @@ protected:
       : outputVal (g.outputVal), delay (g.delay) 
     {}
 
-    virtual void restore (BaseLogicGate& g) {
+    void restore (BaseLogicGate& g) {
       g.outputVal = outputVal;
       g.delay = delay;
     }

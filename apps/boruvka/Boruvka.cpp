@@ -364,7 +364,9 @@ struct SortEdges {
   Accum* accum;
 
   void operator()(const GNode& src) {
+    //! [sortEdgeByEdgeData]
     graph.sortEdgesByEdgeData(src, std::less<EdgeData>(), Galois::MethodFlag::NONE);
+    //! [sortEdgeByEdgeData]
 
     Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::NONE);
     Graph::edge_iterator ei = graph.edge_end(src, Galois::MethodFlag::NONE);
@@ -408,11 +410,11 @@ void initializeGraph() {
   Galois::Graph::FileGraph origGraph;
   Galois::Graph::FileGraph symGraph;
   
-  origGraph.structureFromFileInterleaved<EdgeData>(inputFilename);
+  origGraph.fromFileInterleaved<EdgeData>(inputFilename);
   if (!symmetricGraph) 
     Galois::Graph::makeSymmetric<EdgeData>(origGraph, symGraph);
   else
-    symGraph.swap(origGraph);
+    std::swap(symGraph, origGraph);
 
   Galois::Graph::readGraph(graph, symGraph);
   

@@ -26,7 +26,8 @@
 #include "Galois/config.h"
 #include "Galois/FlatMap.h"
 #include "Galois/Runtime/PerThreadStorage.h"
-#include "Galois/WorkList/Fifo.h"
+#include "Galois/Runtime/Termination.h"
+#include "Galois/WorkList/Chunked.h"
 #include "Galois/WorkList/WorkListHelpers.h"
 
 #include GALOIS_CXX11_STD_HEADER(type_traits)
@@ -35,11 +36,60 @@
 namespace Galois {
 namespace WorkList {
 
+namespace detail {
+
+template<typename T, typename Index, bool UseBarrier>
+class OrderedByIntegerMetricData { 
+protected:
+  struct ThreadData { };
+  bool hasStored(ThreadData&, Index) { return false; }
+  Galois::optional<T> popStored(ThreadData&, Index) { return {}; }
+};
+
+template<typename T, typename Index>
+class OrderedByIntegerMetricData<T, Index, true> {
+protected:
+  struct ThreadData {
+    bool hasWork;
+    std::deque<std::pair<Index,T>> stored;
+  };
+
+  Runtime::TerminationDetection& term;
+  Runtime::Barrier& barrier;
+
+  OrderedByIntegerMetricData(): term(Runtime::getSystemTermination()), barrier(Runtime::getSystemBarrier()) { }
+
+  bool hasStored(ThreadData& p, Index idx) {
+    for (auto& e : p.stored) {
+      if (e.first == idx) {
+        std::swap(e, p.stored.front());
+        return true;
+      }
+    }
+    return false;
+  }
+
+  Galois::optional<T> popStored(ThreadData& p, Index idx) {
+    Galois::optional<T> item;
+    for (auto ii = p.stored.begin(), ei = p.stored.end(); ii != ei; ++ii) {
+      if (ii->first == idx) {
+        item = ii->second;
+        p.stored.erase(ii);
+        break;
+      }
+    }
+    return item;
+  }
+};
+
+}
+
 /**
  * Approximate priority scheduling. Indexer is a default-constructable class
- * whose instances conform to <code>R r = indexer(item)</code> where R is
- * some type with a total order defined by <code>operator&lt;</code> and <code>operator==</code>
- * and item is an element from the Galois set iterator.
+ * whose instances conform to <code>R r = indexer(item)</code> where R is some
+ * type with a total order defined by <code>operator&lt;</code> and
+ * <code>operator==</code> and item is an element from the Galois set
+ * iterator.
  *
  * An example:
  * \code
@@ -59,39 +109,44 @@ namespace WorkList {
  *                     iterations
  * @tparam BSP Use back-scan prevention
  */
-template<class Indexer = DummyIndexer<int>, typename Container = FIFO<>,
+template<class Indexer = DummyIndexer<int>, typename Container = dChunkedFIFO<>,
   unsigned BlockPeriod=0,
   bool BSP=true,
   typename T=int,
   typename Index=int,
+  bool UseBarrier=false,
   bool Concurrent=true>
-struct OrderedByIntegerMetric : private boost::noncopyable {
+struct OrderedByIntegerMetric : private boost::noncopyable, public detail::OrderedByIntegerMetricData<T, Index, UseBarrier> {
   template<bool _concurrent>
-  struct rethread { typedef OrderedByIntegerMetric<Indexer, typename Container::template rethread<_concurrent>::type, BlockPeriod, BSP, T, Index, _concurrent> type; };
+  struct rethread { typedef OrderedByIntegerMetric<Indexer, typename Container::template rethread<_concurrent>::type, BlockPeriod, BSP, T, Index, UseBarrier, _concurrent> type; };
 
   template<typename _T>
-  struct retype { typedef OrderedByIntegerMetric<Indexer, typename Container::template retype<_T>::type, BlockPeriod, BSP, _T, typename std::result_of<Indexer(_T)>::type, Concurrent> type; };
+  struct retype { typedef OrderedByIntegerMetric<Indexer, typename Container::template retype<_T>::type, BlockPeriod, BSP, _T, typename std::result_of<Indexer(_T)>::type, UseBarrier, Concurrent> type; };
 
   template<unsigned _period>
-  struct with_block_period { typedef OrderedByIntegerMetric<Indexer, Container, _period, BSP, T, Index, Concurrent> type; };
+  struct with_block_period { typedef OrderedByIntegerMetric<Indexer, Container, _period, BSP, T, Index, UseBarrier, Concurrent> type; };
 
   template<typename _container>
-  struct with_container { typedef OrderedByIntegerMetric<Indexer, _container, BlockPeriod, BSP, T, Index, Concurrent> type; };
+  struct with_container { typedef OrderedByIntegerMetric<Indexer, _container, BlockPeriod, BSP, T, Index, UseBarrier, Concurrent> type; };
 
   template<typename _indexer>
-  struct with_indexer { typedef OrderedByIntegerMetric<_indexer, Container, BlockPeriod, BSP, T, Index, Concurrent> type; };
+  struct with_indexer { typedef OrderedByIntegerMetric<_indexer, Container, BlockPeriod, BSP, T, Index, UseBarrier, Concurrent> type; };
 
   template<bool _bsp>
-  struct with_back_scan_prevention { typedef OrderedByIntegerMetric<Indexer, Container, BlockPeriod, _bsp, T, Index, Concurrent> type; };
+  struct with_back_scan_prevention { typedef OrderedByIntegerMetric<Indexer, Container, BlockPeriod, _bsp, T, Index, UseBarrier, Concurrent> type; };
+
+  template<bool _use_barrier>
+  struct with_barrier { typedef OrderedByIntegerMetric<Indexer, Container, BlockPeriod, BSP, T, Index, _use_barrier, Concurrent> type; };
 
   typedef T value_type;
+  typedef Index index_type;
 
 private:
   typedef typename Container::template rethread<Concurrent>::type CTy;
   typedef Galois::flat_map<Index, CTy*> LMapTy;
   //typedef std::map<Index, CTy*> LMapTy;
 
-  struct perItem {
+  struct ThreadData: public detail::OrderedByIntegerMetricData<T, Index, UseBarrier>::ThreadData {
     LMapTy local;
     Index curIndex;
     Index scanStart;
@@ -99,7 +154,7 @@ private:
     unsigned int lastMasterVersion;
     unsigned int numPops;
 
-    perItem() :
+    ThreadData() :
       curIndex(std::numeric_limits<Index>::min()), 
       scanStart(std::numeric_limits<Index>::min()),
       current(0), lastMasterVersion(0), numPops(0) { }
@@ -109,14 +164,14 @@ private:
 
   // NB: Place dynamically growing masterLog after fixed-size PerThreadStorage
   // members to give higher likelihood of reclaiming PerThreadStorage
-  Runtime::PerThreadStorage<perItem> current;
+  Runtime::PerThreadStorage<ThreadData> data;
   Runtime::LL::PaddedLock<Concurrent> masterLock;
   MasterLog masterLog;
 
   std::atomic<unsigned int> masterVersion;
   Indexer indexer;
 
-  bool updateLocal(perItem& p) {
+  bool updateLocal(ThreadData& p) {
     if (p.lastMasterVersion != masterVersion.load(std::memory_order_relaxed)) {
       //masterLock.lock();
       for (; p.lastMasterVersion < masterVersion.load(std::memory_order_relaxed); ++p.lastMasterVersion) {
@@ -137,7 +192,7 @@ private:
   }
 
   GALOIS_ATTRIBUTE_NOINLINE
-  Galois::optional<T> slowPop(perItem& p) {
+  Galois::optional<T> slowPop(ThreadData& p) {
     //Failed, find minimum bin
     updateLocal(p);
     unsigned myID = Runtime::LL::getTID();
@@ -148,51 +203,51 @@ private:
       msS = p.scanStart;
       if (localLeader) {
         for (unsigned i = 0; i < Runtime::activeThreads; ++i)
-          msS = std::min(msS, current.getRemote(i)->scanStart);
+          msS = std::min(msS, data.getRemote(i)->scanStart);
       } else {
-        msS = std::min(msS, current.getRemote(Runtime::LL::getLeaderForThread(myID))->scanStart);
+        msS = std::min(msS, data.getRemote(Runtime::LL::getLeaderForThread(myID))->scanStart);
       }
     }
 
     for (auto ii = p.local.lower_bound(msS), ee = p.local.end(); ii != ee; ++ii) {
-      Galois::optional<T> retval;
-      if ((retval = ii->second->pop())) {
+      Galois::optional<T> item;
+      if ((item = ii->second->pop())) {
         p.current = ii->second;
         p.curIndex = ii->first;
         p.scanStart = ii->first;
-        return retval;
+        return item;
       }
     }
     return Galois::optional<value_type>();
   }
 
   GALOIS_ATTRIBUTE_NOINLINE
-  CTy* slowUpdateLocalOrCreate(perItem& p, Index i) {
+  CTy* slowUpdateLocalOrCreate(ThreadData& p, Index i) {
     //update local until we find it or we get the write lock
     do {
-      CTy* lC;
+      CTy* C;
       updateLocal(p);
-      if ((lC = p.local[i]))
-        return lC;
+      if ((C = p.local[i]))
+        return C;
     } while (!masterLock.try_lock());
     //we have the write lock, update again then create
     updateLocal(p);
-    CTy*& lC2 = p.local[i];
-    if (!lC2) {
-      lC2 = new CTy();
+    CTy*& C2 = p.local[i];
+    if (!C2) {
+      C2 = new CTy();
       p.lastMasterVersion = masterVersion.load(std::memory_order_relaxed) + 1;
-      masterLog.push_back(std::make_pair(i, lC2));
+      masterLog.push_back(std::make_pair(i, C2));
       masterVersion.fetch_add(1);
     }
     masterLock.unlock();
-    return lC2;
+    return C2;
   }
 
-  inline CTy* updateLocalOrCreate(perItem& p, Index i) {
+  inline CTy* updateLocalOrCreate(ThreadData& p, Index i) {
     //Try local then try update then find again or else create and update the master log
-    CTy* lC;
-    if ((lC = p.local[i]))
-      return lC;
+    CTy* C;
+    if ((C = p.local[i]))
+      return C;
     //slowpath
     return slowUpdateLocalOrCreate(p, i);
   }
@@ -210,7 +265,7 @@ public:
 
   void push(const value_type& val) {
     Index index = indexer(val);
-    perItem& p = *current.getLocal();
+    ThreadData& p = *data.getLocal();
     // Fast path
     if (index == p.curIndex && p.current) {
       p.current->push(val);
@@ -218,15 +273,15 @@ public:
     }
 
     // Slow path
-    CTy* lC = updateLocalOrCreate(p, index);
+    CTy* C = updateLocalOrCreate(p, index);
     if (BSP && index < p.scanStart)
       p.scanStart = index;
     // Opportunistically move to higher priority work
-    if (index < p.curIndex) {
+    if (!UseBarrier && index < p.curIndex) {
       p.curIndex = index;
-      p.current = lC;
+      p.current = C;
     }
-    lC->push(val);
+    C->push(val);
   }
 
   template<typename Iter>
@@ -243,17 +298,57 @@ public:
 
   Galois::optional<value_type> pop() {
     // Find a successful pop
-    perItem& p = *current.getLocal();
+    ThreadData& p = *data.getLocal();
     CTy* C = p.current;
-    if (BlockPeriod && (p.numPops++ & ((1<<BlockPeriod)-1)) == 0)
+
+    if (this->hasStored(p, p.curIndex))
+      return this->popStored(p, p.curIndex);
+
+    if (!UseBarrier && BlockPeriod && (p.numPops++ & ((1<<BlockPeriod)-1)) == 0)
       return slowPop(p);
 
-    Galois::optional<value_type> retval;
-    if (C && (retval = C->pop()))
-      return retval;
+    Galois::optional<value_type> item;
+    if (C && (item = C->pop()))
+      return item;
 
+    if (UseBarrier)
+      return item;
+    
     // Slow path
     return slowPop(p);
+  }
+
+  template<bool Barrier=UseBarrier>
+  auto empty() -> typename std::enable_if<Barrier, bool>::type {
+    Galois::optional<value_type> item;
+    ThreadData& p = *data.getLocal();
+
+    item = slowPop(p);
+    if (item)
+      p.stored.push_back(std::make_pair(p.curIndex, *item));
+    p.hasWork = item;
+
+    this->barrier.wait();
+
+    bool hasWork = p.hasWork;
+    Index curIndex = p.curIndex;
+    CTy* C = p.current;
+
+    for (unsigned i = 0; i < Runtime::activeThreads; ++i) {
+      ThreadData& o = *data.getRemote(i);
+      if (curIndex > o.curIndex) {
+        curIndex = o.curIndex;
+        C = o.current;
+      }
+      hasWork |= o.hasWork;
+    }
+
+    this->barrier.wait();
+    
+    p.current = C;
+    p.curIndex = curIndex;
+
+    return !hasWork;
   }
 };
 GALOIS_WLCOMPILECHECK(OrderedByIntegerMetric)

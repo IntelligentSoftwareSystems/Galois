@@ -1,6 +1,7 @@
 set(sources Barrier.cpp Barrier_MCS.cpp Barrier_Topo.cpp Barrier_Pthread.cpp
   Barrier_Counting.cpp Barrier_Dissemination.cpp
   Context.cpp FileGraph.cpp 
+  DeterministicWork.cpp
   OCFileGraph.cpp PerThreadStorage.cpp PreAlloc.cpp Sampling.cpp Support.cpp
   Termination.cpp Threads.cpp Timer.cpp ThreadPool.cpp)
 if(HAVE_CXX11_THREAD_YIELD)
@@ -17,19 +18,20 @@ if(USE_EXP)
 endif()
 set(include_dirs ${include_dirs} "${PROJECT_BINARY_DIR}/include/")
 
-include(ParseArguments)
-
 function(add_internal_library name)
   add_library(${name} OBJECT ${ARGN})
 endfunction()
 
 function(add_galois_library name)
-  PARSE_ARGUMENTS(X "LIBS" "" ${ARGN})
+  set(options)
+  set(oneValueArgs)
+  set(multiValueArgs LIBS)
+  cmake_parse_arguments(X "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
   set(objects)
   foreach(lib ${X_LIBS})
     list(APPEND objects "$<TARGET_OBJECTS:${lib}>")
   endforeach()
-  add_library(${name} ${X_DEFAULT_ARGS} ${objects})
+  add_library(${name} ${X_UNPARSED_ARGUMENTS} ${objects})
 endfunction()
 
 add_galois_library(galois ${sources} LIBS llvm mm ll)
@@ -77,7 +79,7 @@ endif()
 if(USE_PAPI)
   # Sadly, none of our machines places papi in a well-known place or provides
   # a method for finding papi automatically. Hardcode some constants.
-  set(PAPI_ROOT "/h1/lenharth/papi;/usr/global/tools/papi/bgqos_0/papi-5.0.1-V1R1M2")
+  set(PAPI_ROOT "/h1/lenharth/papi;/usr/global/tools/papi/bgqos_0/papi-5.0.1-V1R1M2;/usr/lib64/papi-5.1.1/usr")
   find_package(PAPI)
   if (PAPI_FOUND)
     set(GALOIS_USE_PAPI on)

@@ -134,7 +134,7 @@ class KruskalSpec: public Kruskal {
   };
 
 
-  virtual void runMST (const size_t numNodes, const VecEdge& edges,
+  virtual void runMST (const size_t numNodes, VecEdge& edges,
       size_t& mstWeight, size_t& totalIter) {
 
     Graph graph;
@@ -156,7 +156,7 @@ class KruskalSpec: public Kruskal {
 
     runningTime.start ();
     Galois::Runtime::for_each_ordered_rob (
-        edges.begin (), edges.end (),
+        Galois::Runtime::makeStandardRange(edges.begin (), edges.end ()),
         Edge::Comparator (), findLoop, linkUpLoop);
 
     runningTime.stop ();

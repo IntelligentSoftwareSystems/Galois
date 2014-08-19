@@ -35,8 +35,10 @@
 #include <limits>
 #include <iostream>
 #include <fstream>
-#include <strings.h>
+#include <random>
 #include GALOIS_CXX11_STD_HEADER(deque)
+
+#include <strings.h>
 
 #include "Point.h"
 
@@ -187,12 +189,20 @@ struct BuildOctree {
     radius *= 0.5;
     if (child->Leaf) {
       // Expand leaf
+
       Octree* new_node = &T.emplace(updateCenter(node->pos, index, radius));
-      assert(node->pos != b->pos);
+      if (b->pos == child->pos) {
+	// Jitter point to gaurantee uniqueness.
+	double jitter = config.tol / 2;
+	assert(jitter < radius);
+	b->pos += (new_node->pos - b->pos) * jitter;
+      }
+
+      //assert(node->pos != b->pos);
       //node->child[index].unlock_and_set(new_node);
       insert(b, new_node, radius);
       insert(static_cast<Body*>(child), new_node, radius);
-      node->child[index].unlock_and_set(new_node);
+      node->child[index].unlock_and_set(new_node);	
     } else {
       node->child[index].unlock();
       insert(b, static_cast<Octree*>(child), radius);
@@ -366,18 +376,11 @@ struct AdvanceBodies {
   }
 };
 
-
-double nextDouble() {
-  return rand() / (double) RAND_MAX;
-}
-
 struct InsertBody {
   BodyPtrs& pBodies;
   Bodies& bodies;
   InsertBody(BodyPtrs& pb, Bodies& b): pBodies(pb), bodies(b) { }
   void operator()(const Body& b) {
-    //Body b2 = b;
-    //b2.owner = Galois::Runtime::LL::getTID();
     pBodies.push_back(&(bodies.push_back(b)));
   }
 };
@@ -404,19 +407,19 @@ struct centerYCmpInv {
 };
 
 
-template<typename Iter>
-void divide(const Iter& b, const Iter& e) {
+template<typename Iter, typename Gen>
+void divide(const Iter& b, const Iter& e, Gen& gen) {
   if (std::distance(b,e) > 32) {
     std::sort(b,e, centerXCmp());
     Iter m = Galois::split_range(b,e);
-    std::sort(b,m, centerYCmpInv());
-    std::sort(m,e, centerYCmp());
-    divide(b, Galois::split_range(b,m));
-    divide(Galois::split_range(b,m), m);
-    divide(m,Galois::split_range(m,e));
-    divide(Galois::split_range(m,e), e);
+    std::sort(b, m, centerYCmpInv());
+    std::sort(m, e, centerYCmp());
+    divide(b, Galois::split_range(b, m), gen);
+    divide(Galois::split_range(b, m), m, gen);
+    divide(m, Galois::split_range(m, e), gen);
+    divide(Galois::split_range(m, e), e, gen);
   } else {
-    std::random_shuffle(b,e);
+    std::shuffle(b, e, gen);
   }
 }
 
@@ -429,7 +432,12 @@ void generateInput(Bodies& bodies, BodyPtrs& pBodies, int nbodies, int seed) {
   Point p;
   double PI = boost::math::constants::pi<double>();
 
-  srand(seed);
+  std::mt19937 gen(seed);
+#if __cplusplus >= 201103L || defined(HAVE_CXX11_UNIFORM_INT_DISTRIBUTION)
+  std::uniform_real_distribution<double> dist(0, 1);
+#else
+  std::uniform_real<double> dist(0, 1);
+#endif
 
   double rsc = (3 * PI) / 16;
   double vsc = sqrt(1.0 / rsc);
@@ -437,10 +445,10 @@ void generateInput(Bodies& bodies, BodyPtrs& pBodies, int nbodies, int seed) {
   std::vector<Body> tmp;
 
   for (int body = 0; body < nbodies; body++) {
-    double r = 1.0 / sqrt(pow(nextDouble() * 0.999, -2.0 / 3.0) - 1);
+    double r = 1.0 / sqrt(pow(dist(gen) * 0.999, -2.0 / 3.0) - 1);
     do {
       for (int i = 0; i < 3; i++)
-        p[i] = nextDouble() * 2.0 - 1.0;
+        p[i] = dist(gen) * 2.0 - 1.0;
       sq = p.dist2();
     } while (sq > 1.0);
     scale = rsc * r / sqrt(sq);
@@ -449,13 +457,13 @@ void generateInput(Bodies& bodies, BodyPtrs& pBodies, int nbodies, int seed) {
     b.mass = 1.0 / nbodies;
     b.pos = p * scale;
     do {
-      p[0] = nextDouble();
-      p[1] = nextDouble() * 0.1;
+      p[0] = dist(gen);
+      p[1] = dist(gen) * 0.1;
     } while (p[1] > p[0] * p[0] * pow(1 - p[0] * p[0], 3.5));
     v = p[0] * sqrt(2.0 / sqrt(1 + r * r));
     do {
       for (int i = 0; i < 3; i++)
-        p[i] = nextDouble() * 2.0 - 1.0;
+        p[i] = dist(gen) * 2.0 - 1.0;
       sq = p.dist2();
     } while (sq > 1.0);
     scale = vsc * v / sqrt(sq);
@@ -466,7 +474,7 @@ void generateInput(Bodies& bodies, BodyPtrs& pBodies, int nbodies, int seed) {
   }
 
   //sort and copy out
-  divide(tmp.begin(), tmp.end());
+  divide(tmp.begin(), tmp.end(), gen);
   Galois::do_all(tmp.begin(), tmp.end(), InsertBody(pBodies, bodies));
 }
 
@@ -507,7 +515,7 @@ double checkAllPairs(Bodies& bodies, int N) {
 void run(Bodies& bodies, BodyPtrs& pBodies, size_t nbodies) {
   typedef Galois::WorkList::dChunkedLIFO<256> WL_;
   typedef Galois::WorkList::AltChunkedLIFO<32> WL;
-  typedef Galois::WorkList::StableIterator<decltype(pBodies.local_begin()), true> WLL;
+  typedef Galois::WorkList::StableIterator<true> WLL;
 
   Galois::preAlloc (Galois::getActiveThreads () + (3*sizeof (Octree) + 2*sizeof (Body))*nbodies/Galois::Runtime::MM::hugePageSize);
   Galois::reportPageAlloc("MeminfoPre");

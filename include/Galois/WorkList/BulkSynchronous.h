@@ -27,6 +27,8 @@
 #include "Chunked.h"
 #include "WLCompileCheck.h"
 
+#include <atomic>
+
 namespace Galois {
 namespace WorkList {
 
@@ -58,13 +60,13 @@ private:
   CTy wls[2];
   Runtime::PerThreadStorage<TLD> tlds;
   Runtime::Barrier& barrier;
-  Runtime::LL::CacheLineStorage<volatile long> some;
-  volatile bool empty;
+  Runtime::LL::CacheLineStorage<std::atomic<bool>> some;
+  std::atomic<bool> isEmpty;
 
  public:
   typedef T value_type;
 
-  BulkSynchronous(): barrier(Runtime::getSystemBarrier()), empty(false) { }
+  BulkSynchronous(): barrier(Runtime::getSystemBarrier()), isEmpty(false), some(false) { }
 
   void push(const value_type& val) {
     wls[(tlds.getLocal()->round + 1) & 1].push(val);
@@ -89,7 +91,7 @@ private:
     Galois::optional<value_type> r;
     
     while (true) {
-      if (empty)
+      if (isEmpty)
         return r; // empty
 
       r = wls[tld.round].pop();
@@ -99,7 +101,7 @@ private:
       barrier.wait();
       if (Runtime::LL::getTID() == 0) {
         if (!some.get())
-          empty = true;
+          isEmpty = true;
         some.get() = false; 
       }
       tld.round = (tld.round + 1) & 1;

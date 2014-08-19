@@ -225,7 +225,7 @@ protected:
   
   Galois::IterAllocBaseTy IterationAllocatorBase;
   Galois::PerIterAllocTy PerIterationAllocator;
-  Galois::Runtime::MM::FixedSizeAllocator heap;
+  Galois::Runtime::MM::FixedSizeHeap heap;
 
   UserTaskContext():
     PerIterationAllocator(&IterationAllocatorBase), 

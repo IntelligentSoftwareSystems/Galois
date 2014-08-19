@@ -35,6 +35,7 @@
 #include <string>
 #include <cmath>
 #include <mutex>
+#include <numeric>
 
 using namespace Galois;
 using namespace Galois::Runtime;
@@ -50,9 +51,11 @@ public:
   StatManager() {}
 
   void addToStat(const std::string& loop, const std::string& category, size_t value) {
-    auto lStat = Stats.getLocal();
+    auto* lStat = Stats.getLocal();
+    // lStat->first.lock();
     std::lock_guard<LL::SimpleLock> lg(lStat->first);
     lStat->second.emplace_back(loop, category, value);
+    // lStat->first.unlock();
   }
 
   void addToStat(Galois::Statistic* value) {

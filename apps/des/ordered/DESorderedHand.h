@@ -59,7 +59,7 @@ struct SimObjInfo: public TypeHelper {
   typedef Galois::Runtime::LL::SimpleLock Lock_ty;
   typedef des::AbstractMain<SimInit_ty>::GNode GNode;
   typedef std::set<Event_ty, Cmp_ty
-    , Galois::Runtime::MM::FSBGaloisAllocator<Event_ty> > PQ;
+    , Galois::FixedSizeAllocator<Event_ty> > PQ;
 
   Lock_ty mutex;
   PQ pendingEvents;

@@ -61,12 +61,16 @@ private:
   InnerEndFn m_inner_end_fn;
 
 #if __cplusplus >= 201103L
-  static_assert(std::is_convertible<InnerIter, 
-        typename std::result_of<InnerBeginFn(decltype(*std::declval<OuterIter>()))>::type>::value,
-        "InnerIter should be convertable to result of InnerBeginFn(*OuterIter)");
-  static_assert(std::is_convertible<InnerIter, 
-      typename std::result_of<InnerEndFn(decltype(*std::declval<OuterIter>()))>::type>::value,
-        "InnerIter should be convertable to result of InnerEndFn(*OuterIter)");
+  static_assert(std::is_convertible<
+      typename std::result_of<InnerBeginFn(decltype(*std::declval<OuterIter>()))>::type,
+      InnerIter
+      >::value,
+        "Result of InnerBeginFn(*OuterIter) should be convertable to InnerIter");
+  static_assert(std::is_convertible<
+      typename std::result_of<InnerEndFn(decltype(*std::declval<OuterIter>()))>::type,
+      InnerIter
+      >::value,
+        "Result of InnerEndFn(*OuterIter) should be convertable to InnerIter");
 #endif
 
   friend class boost::iterator_core_access;
@@ -95,8 +99,6 @@ private:
 
     for (; begin != it; ++begin)
       prev = begin;
-
-    return prev;
   }
 
   template<class Iter>
@@ -206,12 +208,13 @@ private:
 
   template<class DiffType = difference_type>
   void jump_forward(DiffType n) {
+    assert(n >= 0);
     while (n) {
       difference_type k = std::distance(this->base_reference(), m_inner_end_fn(*m_outer));
-      difference_type s = std::min(k, n);
-      n -= s;
-      std::advance(this->base_reference(), s);
-      if (s == k)
+      difference_type m = std::min(k, n);
+      n -= m;
+      std::advance(this->base_reference(), m);
+      if (m == k)
         seek_forward();
     }
   }
@@ -220,33 +223,37 @@ private:
   void jump_backward(DiffType n) {
     // Note: not the same as jump_forward due to difference between beginning
     // and end of ranges
+    assert(n >= 0);
     if (n && m_outer == m_outer_end) {
       decrement();
       --n;
     }
 
     while (n) {
-      difference_type k = std::distance(m_inner_begin_fn(*m_outer), this->base_reference());
-      if (k == 0) {
+      difference_type k = std::distance(m_inner_begin_fn(*m_outer), this->base_reference()) + 1;
+      if (k == 1) {
         decrement();
         --n;
-      } else if (k <= n) {
-        std::advance(this->base_reference(), -n);
-        n = 0;
-      } else {
+      } else if (k < n) {
         seek_backward();
         n -= k;
+      } else {
+        std::advance(this->base_reference(), -n);
+        n = 0;
       }
     }
   }
 
   template<class DiffType = difference_type>
   void advance_dispatch(DiffType n, std::random_access_iterator_tag) {
-    if (n < 0) {
+    if (n == 1)
+      increment();
+    else if (n == -1)
+      decrement();
+    else if (n < 0)
       jump_backward(-n);
-    } else if (n > 0) {
+    else if (n > 0)
       jump_forward(n);
-    }
   }
 
   void advance(difference_type n) {
@@ -316,11 +323,10 @@ private:
 
   template<class OtherOuterIter, class OtherInnerIter, class C, class BF, class EF>
   bool equal(const TwoLevelIteratorA<OtherOuterIter, OtherInnerIter, C, BF, EF>& x) const {
-    // All outer_end iterators are equal
     if (m_outer == m_outer_end && m_outer == x.m_outer)
       return true;
 
-    return this->base_reference() == x.base_reference() && m_outer == x.m_outer;
+    return m_outer == x.m_outer && this->base_reference() == x.base_reference();
   }
 
 public:
@@ -343,6 +349,26 @@ public:
       seek_forward();
     }
   }
+
+  TwoLevelIteratorA(
+      OuterIter outer_begin,
+      OuterIter outer_end,
+      OuterIter outer,
+      InnerIter inner,
+      InnerBeginFn inner_begin_fn,
+      InnerEndFn inner_end_fn):
+    m_outer_begin(outer_begin),
+    m_outer_end(outer_end),
+    m_outer(outer),
+    m_inner_begin_fn(inner_begin_fn),
+    m_inner_end_fn(inner_end_fn)
+  { 
+    this->base_reference() = inner;
+  }
+
+  const OuterIter& get_outer_reference() const { return m_outer; }
+
+  const InnerIter& get_inner_reference() const { return this->base_reference(); }
 };
 
 //! Helper functor, returns <code>t.end()</code>
