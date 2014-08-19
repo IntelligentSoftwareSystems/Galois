@@ -9,7 +9,7 @@
 #include "Galois/optional.h"
 #include "Galois/GaloisUnsafe.h"
 #include "Galois/Runtime/Context.h"
-#include "Galois/Runtime/DoAll.h"
+#include "Galois/Runtime/Executor_DoAll.h"
 #include "Galois/Runtime/ForEachTraits.h"
 #include "Galois/Runtime/LCordered.h"
 #include "Galois/Runtime/ParallelWork.h"
@@ -388,14 +388,14 @@ public:
 
 template <typename F>
 void for_each_ordered_tree_impl (F& initTask, const char* loopname=nullptr) {
-  assert (initTask != nullptr);
+  //  assert (initTask != nullptr);
 
   TreeExecStack<F> e (loopname);
 
   e.initWork (initTask);
 
   getSystemThreadPool ().run (Galois::getActiveThreads (),
-      [&e] (void) { e.initThread (); },
+      [&e] () { e.initThread (); },
       std::ref (e));
 }
 class TreeTaskBase;
