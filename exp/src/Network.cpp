@@ -75,12 +75,22 @@ void NetworkInterface::start() {
         loopwork.pop_front();
       }
     }
+    getSystemNetworkInterface().reportStats();
     getSystemThreadPool().run(activeThreads, []() { Galois::Runtime::getSystemBarrier().wait(); });
     exit(0);
   }
 }
 
+void NetworkInterface::reportStats() {
+  statRecvNum.report();
+  statRecvBytes.report();
+  statSendNum.report();
+  statSendBytes.report();
+}
+
 void NetworkInterface::terminate() {
+  getSystemNetworkInterface().reportStats();
+
   //return if just one host is running
   if (NetworkInterface::Num == 1)
     return;

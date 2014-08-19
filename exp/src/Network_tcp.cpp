@@ -317,6 +317,8 @@ public:
   }
 
   virtual void send(uint32_t dest, recvFuncTy recv, SendBuffer& buf) {
+    this->statSendNum += 1;
+    this->statSendBytes += buf.size();
     sendState[dest].sendMessage(recv, buf);
     tryIO();
   }
@@ -331,6 +333,8 @@ public:
         std::lock_guard<LL::SimpleLock> lg(recvState[x].lock);
         RecvBuffer buf = recvState[x].recvMessage();
         if (buf.size()) {
+          this->statRecvNum += 1;
+          this->statRecvBytes += buf.size();
           retval = true;
           recvFuncTy func;
           gDeserialize(buf, func);

@@ -25,6 +25,7 @@
 #ifndef GALOIS_RUNTIME_NETWORK_H
 #define GALOIS_RUNTIME_NETWORK_H
 
+#include "Galois/Statistic.h"
 #include "Galois/Runtime/Serialize.h"
 
 #include <cstdint>
@@ -44,11 +45,21 @@ typedef DeSerializeBuffer RecvBuffer;
 typedef void (*recvFuncTy)(RecvBuffer&);
 
 class NetworkInterface {
+protected:
+  Galois::Statistic statSendNum;
+  Galois::Statistic statRecvNum;
+  Galois::Statistic statSendBytes;
+  Galois::Statistic statRecvBytes;
+
+  void reportStats();
+  
 public:
 
   static uint32_t ID;
   static uint32_t Num;
 
+  NetworkInterface(): 
+    statSendNum("SendNum"), statRecvNum("RecvNum"), statSendBytes("SendBytes"), statRecvBytes("RecvBytes") { }
   virtual ~NetworkInterface();
 
   //!send a message to a given (dest) host.  A message is simply a
@@ -89,7 +100,6 @@ public:
   //! send a top level loop item (executed in the top level event loop)
   //! FIXME: Why does this exist?
   static void sendLoop(uint32_t dest, recvFuncTy recv, SendBuffer& buf);
-
 };
 
 NetworkInterface& getSystemNetworkInterface();

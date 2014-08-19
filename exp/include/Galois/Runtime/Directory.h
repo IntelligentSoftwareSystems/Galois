@@ -251,6 +251,8 @@ protected:
   template<typename T>
   friend void detail::recvRequest(RecvBuffer& buf);
 
+  void invalidateImpl(fatPointer, typeHelper*);
+
 public:
   //Local portion of API
 
@@ -273,6 +275,7 @@ public:
   void clearContended(fatPointer ptr);
 
   //!Send invalidate to all outstanding reader/writers
+  //TODO(ddn) remove this in favor of standard acquire, writeback mechanism
   void invalidate(fatPointer ptr);
 
   //! setup notification on object reciept.  Returns true if
