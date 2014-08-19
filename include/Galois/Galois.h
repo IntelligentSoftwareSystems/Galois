@@ -70,10 +70,17 @@ struct wl_tag {};
 /**
  * Specify worklist to use. Optional argument to {@link for_each()} loops.
  */
-template<typename WLTy>
-struct wl : public wl_tag {
+template<typename WLTy, typename... Args>
+struct sWL : public wl_tag {
   typedef WLTy WL;
+  std::tuple<Args...> args;
+  sWL(const Args&... _args) : args(_args...) {}
 };
+
+template<typename WLTy, typename... Args>
+sWL<WLTy, Args...> wl(const Args&... args) {
+  return sWL<WLTy, Args...>(args...);
+}
 
 
 namespace HIDDEN {
@@ -95,6 +102,20 @@ struct tuple_index<T, S, -1> {
   enum { value = -1 };
 };
 
+template<int ...> struct seq {};
+template<int N, int ...S> struct gens : gens<N-1, N-1, S...> {};
+template<int ...S> struct gens<0, S...>{ typedef seq<S...> type; };
+
+template<typename WLTy, typename RangeTy, typename FunctionTy, typename... TArgs, int... S>
+void for_each_bounce(const RangeTy& range, const FunctionTy& fn, const char* loopname, const std::tuple<TArgs...>& targs, seq<S...>) {
+  Runtime::for_each_impl<WLTy>(range, fn, loopname, std::move(std::get<S>(targs))...);
+}
+
+template<typename WLTy, typename RangeTy, typename FunctionTy, typename... TArgs>
+void for_each_bounce(const RangeTy& range, const FunctionTy& fn, const char* loopname, const std::tuple<TArgs...>& targs) {
+  for_each_bounce<WLTy>(range, fn, loopname, targs, typename gens<sizeof...(TArgs)>::type());
+}
+
 template<typename RangeTy, typename FunctionTy, typename Tuple>
 void for_each_gen(const RangeTy& r, const FunctionTy& fn, Tuple tpl) {
   typedef Tuple tupleType;
@@ -104,10 +125,11 @@ void for_each_gen(const RangeTy& r, const FunctionTy& fn, Tuple tpl) {
   // std::cout << tuple_index<tupleType, char*>::value << " "
   //           << tuple_index<tupleType, char const*>::value << "\n";
   constexpr unsigned iloopname = tuple_index<tupleType, loopname>::value;
-  constexpr unsigned iwl = tuple_index<tupleType, wl_tag>::value;
   const char* ln = std::get<iloopname>(tpl).n;
-  typedef typename std::tuple_element<iwl,tupleType>::type::WL WLTy;
-  Runtime::for_each_impl<WLTy>(r, fn, ln);
+  constexpr unsigned iwl = tuple_index<tupleType, wl_tag>::value;
+  typedef typename std::tuple_element<iwl, tupleType>::type TArgs;
+  typedef typename TArgs::WL WLTy;
+  for_each_bounce<WLTy>(r, fn, ln, std::get<iwl>(tpl).args);
 }
 
 template<typename RangeTy, typename FunctionTy, typename Tuple>
