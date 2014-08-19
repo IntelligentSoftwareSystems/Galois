@@ -342,6 +342,16 @@ struct Async {
   typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
 
+  void check() {
+    static_assert(std::is_same<std::iterator_traits<Graph::edge_iterator>::iterator_category,
+                  std::random_access_iterator_tag>::value, "Not random");
+    static_assert(std::is_same<std::iterator_traits<InnerGraph::edge_iterator>::iterator_category,
+                std::random_access_iterator_tag>::value, "Not random");
+    static_assert(std::is_same<std::iterator_traits<Graph::in_edge_iterator>::iterator_category,
+              std::random_access_iterator_tag>::value, "Not random");
+  }
+
+
   std::string name() const { return "Async"; }
 
   void readGraph(Graph& graph) {
