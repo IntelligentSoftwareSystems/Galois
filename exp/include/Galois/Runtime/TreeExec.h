@@ -287,7 +287,7 @@ protected:
   };
 
   typedef std::pair<Task*, F*> WorkItem;
-  static const unsigned CHUNK_SIZE = 2;
+  static const unsigned CHUNK_SIZE = 1;
   typedef WorkList::AltChunkedLIFO<CHUNK_SIZE, WorkItem> WL_ty;
   // typedef WorkList::AltChunkedFIFO<CHUNK_SIZE, WorkItem> WL_ty;
 

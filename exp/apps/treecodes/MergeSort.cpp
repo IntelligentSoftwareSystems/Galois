@@ -211,32 +211,52 @@ struct MergeSortGaloisStack {
   size_t beg;
   size_t end;
 
+  enum State { SPLIT, MERGE };
+  State state;
+
   template <typename Ctx>
   void operator () (Ctx& ctx) {
-    if ((end - beg) > LEAF_SIZE) {
-      size_t mid = (beg + end) / 2;
+    switch (state) {
+      case SPLIT: 
+        {
+          if ((end - beg) > LEAF_SIZE) {
+            size_t mid = (beg + end) / 2;
 
-      MergeSortGaloisStack left {array, tmp_array, cmp, beg, mid};
-      ctx.spawn (left);
+            MergeSortGaloisStack left {array, tmp_array, cmp, beg, mid, SPLIT};
+            ctx.spawn (left);
 
-      MergeSortGaloisStack right {array, tmp_array, cmp, mid, end};
-      ctx.spawn (right);
+            MergeSortGaloisStack right {array, tmp_array, cmp, mid, end, SPLIT};
+            ctx.spawn (right);
 
-      ctx.sync ();
+            ctx.sync ();
 
-      mergeHalves (array, tmp_array, beg, mid, end, cmp);
+            MergeSortGaloisStack combine { array, tmp_array, cmp, beg, end, MERGE};
+            ctx.spawn (combine);
 
-    } else {
-      std::sort (array + beg, array + end, cmp);
+            ctx.sync ();
+
+            // mergeHalves (array, tmp_array, beg, mid, end, cmp);
+          } else {
+            std::sort (array + beg, array + end, cmp);
+          }
+          return;
+        }
+      case MERGE:
+        {
+          size_t mid = (beg + end) / 2;
+          mergeHalves (array, tmp_array, beg, mid, end, cmp);
+          return;
+        }
+      default:
+        std::abort ();
     }
-
   }
 };
 
 
 template <typename T, typename C>
 void mergeSortGaloisStack (T* array, T* tmp_array, const size_t L, const C& cmp) {
-  MergeSortGaloisStack<T,C> init {array, tmp_array, cmp, 0, L};
+  MergeSortGaloisStack<T,C> init {array, tmp_array, cmp, 0, L, MergeSortGaloisStack<T,C>::SPLIT};
   Galois::Runtime::for_each_ordered_tree (init, "mergesort-stack");
 }
 
