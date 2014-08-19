@@ -127,19 +127,21 @@ void RemoteDirectory::recvRequestImpl(fatPointer ptr, uint32_t dest, ResolveFlag
       assert(0 && "Invalid Mode");
       abort();
     }
-    if (md.state == metadata::HERE_RW && flag != INV) {
+    if (flag == INV) {
+      // ACK invalidate
+      eraseMD(ptr, lg);
+      getCacheManager().evict(ptr);
+      th->request(ptr.getHost(), ptr, NetworkInterface::ID, INV);
+      if (wasContended)
+        fetchImpl(ptr, RO, th, true);
+    } else {
+      assert(md.state == metadata::HERE_RW);
       if (tryWriteBack(md, ptr, lg)) {
         if (wasContended)
           fetchImpl(ptr, RW, th, true);
       } else {
         addPendingReq(ptr, dest, flag);
       }
-    } else { // ack invalidate
-      eraseMD(ptr, lg);
-      getCacheManager().evict(ptr);
-      th->request(ptr.getHost(), ptr, NetworkInterface::ID, INV);
-      if (wasContended)
-        fetchImpl(ptr, RO, th, true);
     }
   }
 }
@@ -384,8 +386,10 @@ void LocalDirectory::fetchImpl(fatPointer ptr, ResolveFlag flag, typeHelper* th,
   assert(ptr.isLocal());
   metadata& md = getMD(ptr);
   std::unique_lock<LL::SimpleLock> lg(md.lock, std::adopt_lock);
+  assert(!md.th || md.th == th);
+  if (!md.th)
+    md.th = th;
   trace("LocalDirectory::fetch for % flag % md %\n", ptr, flag, md);
-  assert(md.th);
   if (md.isHere()) {
     if (setContended)
       md.contended = true;
@@ -422,7 +426,7 @@ void LocalDirectory::recvRequestImpl(fatPointer ptr, uint32_t dest, ResolveFlag 
   if (!md.th)
     md.th = th;
   if (flag == INV) {
-    //ack of invalidate
+    //ACK of invalidate
     assert(md.locRO.count(dest));
     md.locRO.erase(dest);
     if (md.locRO.empty()) {
@@ -464,18 +468,23 @@ void LocalDirectory::invalidateReaders(metadata& md, fatPointer ptr, uint32_t ne
 }
 
 void LocalDirectory::invalidate(fatPointer ptr) {
+  assert(ptr.isLocal());
   metadata& md = getMD(ptr);
   std::unique_lock<LL::SimpleLock> lg(md.lock, std::adopt_lock);
 
-  // Insert dummy RO record
+  // md.th may be null
+  assert(md.th || !md.th);
+
+  // TODO(ddn): issuing writebacks might also be possible but using INV seems
+  // to break less directory invariants 
   if (md.locRW != ~0)
     md.locRO.insert(md.locRW);
 
-  // TODO(ddn): check if 3rd argument is correct
   for (auto dest : md.locRO)
     md.th->request(dest, ptr, NetworkInterface::ID, INV);
 
-  trace("LocalDirectory::invalidate % md %\n", ptr, md);
+  if (!md.locRO.empty())
+    trace("LocalDirectory::invalidate % md %\n", ptr, md);
 }
 
 void LocalDirectory::considerObject(metadata& md, fatPointer ptr) {
@@ -486,7 +495,8 @@ void LocalDirectory::considerObject(metadata& md, fatPointer ptr) {
   //caller should have checked that there is a request
   assert(nextDest != ~0);
 
-  trace("LocalDirectory::considerObject % has dest % RW % remote % md %\n", ptr, nextDest, nextIsRW, (md.locRW != ~0 || !md.locRO.empty()) ? 'T' : 'F', md);
+  trace("LocalDirectory::considerObject % has dest % RW % remote % md %\n", 
+      ptr, nextDest, nextIsRW, (md.locRW != ~0 || !md.locRO.empty()) ? 'T' : 'F', md);
 
   Lockable* obj = static_cast<Lockable*>(ptr.getObj());
 
@@ -618,5 +628,3 @@ RemoteDirectory& Galois::Runtime::getRemoteDirectory() {
   static RemoteDirectory obj;
   return obj;
 }
-
-

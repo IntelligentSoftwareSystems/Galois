@@ -88,32 +88,13 @@ struct AddRemoveNode {
         "Node: ", graph->getData(node1), " not removed");
       GALOIS_ASSERT(std::distance(graph->edge_begin(node2), graph->edge_end(node2)) == 0);
     }
-    Galois::Runtime::LL::gInfo("ZZZ ", x, " ",
-        node1,  " ", graph->getData(node1), " ", graph->containsNode(node1), " ",
-        node2, " ", graph->getData(node2), " ", graph->containsNode(node2));
   }
 };
 
 void testAddRemove(int N) {
   UndirectedGraph::pointer g = UndirectedGraph::allocate();
 
-  Galois::Runtime::getLocalDirectory().dump();
-  Galois::Runtime::getRemoteDirectory().dump();
-
   Galois::for_each(boost::counting_iterator<int>(0), boost::counting_iterator<int>(N), AddRemoveNode(g));
-
-  Galois::Runtime::getLocalDirectory().dump();
-  Galois::Runtime::getRemoteDirectory().dump();
-
-  std::cout << "=======\n";
-  for (auto nn : *g) {
-    Galois::Runtime::acquire(nn, Galois::MethodFlag::ALL);
-    std::cout << "0 " << nn << " " << g->getData(nn) << " " << g->containsNode(nn) << "\n";
-  }
-  std::cout << "=======\n";
-
-  Galois::Runtime::getLocalDirectory().dump();
-  Galois::Runtime::getRemoteDirectory().dump();
 
   ptrdiff_t dist = std::distance(g->begin(), g->end());
   int expected = ((N + 1) / 2) * 2 + (N / 2);
@@ -129,6 +110,13 @@ void testAddRemove(int N) {
   UndirectedGraph::deallocate(g);
 }
 
+
+struct Wait {
+  void operator()(unsigned, unsigned) {
+    Galois::Runtime::getSystemBarrier().wait();
+  }
+};
+
 int main(int argc, char** argv) {
   Galois::StatManager statManager;
   int threads = 2;
@@ -142,7 +130,7 @@ int main(int argc, char** argv) {
   auto& net = Galois::Runtime::getSystemNetworkInterface();
   net.start();
   
-  //testSerialAdd(N);
+  testSerialAdd(N);
   testParallelAdd(N);
   testAddRemove(N);
 

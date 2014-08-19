@@ -273,7 +273,7 @@ public:
   void clearContended(fatPointer ptr);
 
   //!Send invalidate to all outstanding reader/writers
-  void invalidate(fatPointer);
+  void invalidate(fatPointer ptr);
 
   //! setup notification on object reciept.  Returns true if
   //! notification registered.  Returns false if object already in

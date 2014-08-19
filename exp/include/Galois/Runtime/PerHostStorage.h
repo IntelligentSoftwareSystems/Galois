@@ -218,6 +218,8 @@ class PerThreadDist {
   static void deallocOnHost(uint64_t off) {
     for (unsigned x = 0; x < getSystemThreadPool().getMaxThreads(); ++x) {
       T*& p = getPerThreadDistBackend().resolveThread<T>(off, x);
+      // Invalidate any gptrs we may have generated
+      getLocalDirectory().invalidate(static_cast<Runtime::fatPointer>(gptr<T>(p)));
       delete p;
       p = nullptr;
     }

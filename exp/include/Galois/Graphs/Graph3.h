@@ -494,8 +494,6 @@ public:
     assert(localStatePtr);
   }
 
-  ~ThirdGraph() { }
-
   void getInitData(Runtime::SerializeBuffer& buf) {
     gSerialize(buf, localStateStore, localStatePtr);
   }
