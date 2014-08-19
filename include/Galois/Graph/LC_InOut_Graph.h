@@ -82,7 +82,7 @@ public:
   typedef read_lc_inout_graph_tag read_tag;
 
   // Union of edge_iterator and InGraph::edge_iterator
-  class in_edge_iterator: public boost::iterator_facade<in_edge_iterator, void*, boost::random_access_traversal_tag, void*> {
+  class in_edge_iterator: public boost::iterator_facade<in_edge_iterator, void*, std::random_access_iterator_tag, void*> {
     friend class boost::iterator_core_access;
     friend class LC_InOut_Graph;
     typedef edge_iterator Iterator0;
@@ -115,6 +115,13 @@ public:
       } else {
         return boost::fusion::at_c<1>(its) == boost::fusion::at_c<1>(o.its);
       }
+    }
+
+    typename in_edge_iterator::difference_type distance_to(const in_edge_iterator& lhs) const {
+      if (type == 0)
+        return boost::fusion::at_c<0>(lhs.its) - boost::fusion::at_c<0>(its);
+      else
+        return boost::fusion::at_c<1>(lhs.its) - boost::fusion::at_c<1>(its);
     }
 
     void* dereference() const { return 0; }
