@@ -28,81 +28,20 @@ namespace Galois {
 namespace Runtime {
 
 template <typename T, typename DivFunc, typename ConqFunc, bool NEEDS_CHILDREN>
-class DivideAndConquerExecutor {
+class TreeExecutorTwoFunc {
 
 protected:
-  template <bool _NEEDS_CHILDREN, typename Task>
-  struct TreeExecPolicy {
-    typedef Galois::gdeque<Task*, 8> ChildList;
-
-    static void addChild (Task* t, Task* child) {
-      assert (child != nullptr);
-      t->children.push_back (child);
-    }
-
-    static void invokeConqFunc (ConqFunc& conqFunc, Task* t) {
-
-      struct GetElem: std::unary_function<Task*, const T&> {
-        const T& operator () (Task* t) const {
-          return t->getElem ();
-        }
-      };
-
-      auto beg = boost::make_transform_iterator (t->children.begin (), GetElem ());
-      auto end = boost::make_transform_iterator (t->children.end (), GetElem ());
-
-      conqFunc (t->getElem (), beg, end);
-    }
-
-    template <typename TaskAlloc>
-    static void freeTask (TaskAlloc& taskAlloc, Task* t) {
-      // remove the children upon completion, but not the task itself as it 
-      // will be accessed by its parent
-      for (auto i = t->children.begin (), i_end = t->children.end (); i != i_end; ++i) {
-        taskAlloc.destroy (*i);
-        taskAlloc.deallocate (*i, 1);
-        *i = nullptr;
-      }
-    };
-
-  };
-
-  template <typename Task>
-  struct TreeExecPolicy<false, Task> {
-
-    // dummy implementation
-    struct ChildList {
-    };
-
-    static void addChild (Task* t, Task* child) {}
-
-    static void invokeConqFunc (ConqFunc& conqFunc, Task* t) {
-      conqFunc (t->getElem ());
-    }
-
-    template <typename TaskAlloc>
-    static void freeTask (TaskAlloc& taskAlloc, Task* t) {
-      // if (t->getParent () != nullptr) { // non-root task
-        taskAlloc.destroy (t);
-        taskAlloc.deallocate (t, 1);
-      // }
-    }
-  };
-
 
   class Task {
   public:
     enum Mode { DIVIDE, CONQUER };
 
   protected:
-    friend struct TreeExecPolicy<NEEDS_CHILDREN, Task>;
 
     GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE Mode mode;
     T elem;
     Task* parent;
     std::atomic<unsigned> numChild;
-
-    typename TreeExecPolicy<NEEDS_CHILDREN, Task>::ChildList children;
 
 
     // std::atomic<unsigned> numChild;
@@ -118,7 +57,7 @@ protected:
       numChild = c;
     }
 
-    bool removedLastChild (void) {
+    bool processedLastChild (void) {
       assert (numChild > 0);
       return (--numChild == 0);
     }
@@ -140,6 +79,35 @@ protected:
   typedef UserContextAccess<T> UserCtx;
   typedef PerThreadStorage<UserCtx> PerThreadUserCtx;
 
+
+  template <typename C>
+  class CtxWrapper: boost::noncopyable {
+  public:
+    TaskAlloc& taskAlloc;
+    C& ctx;
+    Task* parent;
+    size_t numChild;
+
+    CtxWrapper (TaskAlloc& taskAlloc, C& ctx, Task* parent):
+      boost::noncopyable (),
+      taskAlloc (taskAlloc),
+      ctx (ctx),
+      parent (parent),
+      numChild (0)
+    {}
+
+    void spawn (const T& elem) {
+      Task* child = taskAlloc.allocate (1);
+      assert (child != nullptr);
+      taskAlloc.construct (child, elem, parent, Task::DIVIDE);
+      ctx.push (child);
+      ++numChild;
+    }
+
+    void sync (void) {}
+  };
+
+
   struct ApplyOperatorSinglePhase {
     typedef int tt_does_not_need_aborts;
 
@@ -152,47 +120,32 @@ protected:
     void operator () (Task* t, C& ctx) {
 
       if (t->hasMode (Task::DIVIDE)) {
-        UserCtx& uctx = *userCtxts.getLocal ();
-        uctx.reset ();
+        // UserCtx& uctx = *userCtxts.getLocal ();
+        // uctx.reset ();
+        CtxWrapper<C> uctx {taskAlloc, ctx, t};
         divFunc (t->getElem (), uctx);
 
-        bool hasChildren = uctx.getPushBuffer().begin () != uctx.getPushBuffer ().end ();
-
-        if (hasChildren) {
-          ptrdiff_t numChild = std::distance (uctx.getPushBuffer ().begin (), uctx.getPushBuffer ().end ());
-
-          t->setNumChildren (numChild);
-
-          unsigned i = 0;
-          for (auto c = uctx.getPushBuffer ().begin (), c_end = uctx.getPushBuffer ().end (); 
-              c != c_end; ++c, ++i) {
-
-            Task* child = taskAlloc.allocate (1); 
-            assert (child != nullptr);
-            taskAlloc.construct (child, *c, t, Task::DIVIDE);
-            TreeExecPolicy<NEEDS_CHILDREN, Task>::addChild (t, child);
-            ctx.push (child);
-          }
-        } else { 
-          // no children, so t is a leaf task
+        if (uctx.numChild == 0) {
           t->setMode (Task::CONQUER);
+
+        } else {
+          t->setNumChildren (uctx.numChild);
         }
+
       } // end outer if
 
       if (t->hasMode (Task::CONQUER)) {
-        TreeExecPolicy<NEEDS_CHILDREN, Task>::invokeConqFunc (conqFunc, t);
-        // conqFunc (t->getElem());
+        conqFunc (t->getElem());
 
         Task* parent = t->getParent ();
-        if (parent != nullptr && parent->removedLastChild()) {
+        if (parent != nullptr && parent->processedLastChild()) {
           parent->setMode (Task::CONQUER);
           ctx.push (parent);
         }
 
         // task can be deallocated now
-        // taskAlloc.destroy (t);
-        // taskAlloc.deallocate (t, 1);
-        TreeExecPolicy<NEEDS_CHILDREN, Task>::freeTask (taskAlloc, t);
+        taskAlloc.destroy (t);
+        taskAlloc.deallocate (t, 1);
       }
 
     }
@@ -210,31 +163,14 @@ protected:
 
 public:
 
-  DivideAndConquerExecutor (const DivFunc& divFunc, const ConqFunc& conqFunc, const char* loopname)
+  TreeExecutorTwoFunc (const DivFunc& divFunc, const ConqFunc& conqFunc, const char* loopname)
     : 
       divFunc (divFunc),
       conqFunc (conqFunc),
       loopname (loopname)
   {}
 
-  void execute_no_children (const T& initItem) {
-    TaskAlloc taskAlloc;
-
-    Task* initTask = taskAlloc.allocate (1); 
-    taskAlloc.construct (initTask, initItem, nullptr, Task::DIVIDE);
-
-    Task* a[] = {initTask};
-
-    Galois::Runtime::for_each_impl<WL_ty> (
-        makeStandardRange (&a[0], &a[1]), 
-        ApplyOperatorSinglePhase {taskAlloc, userCtxts, divFunc, conqFunc},
-        loopname.c_str ());
-  }
-
-  T execute_with_children (const T& initItem) {
-
-    // typedef Galois::WorkList::dChunkedLIFO<CHUNK_SIZE, Task*> WL_ty;
-
+  void execute (const T& initItem) {
     TaskAlloc taskAlloc;
 
     Task* initTask = taskAlloc.allocate (1); 
@@ -247,30 +183,16 @@ public:
         ApplyOperatorSinglePhase {taskAlloc, userCtxts, divFunc, conqFunc},
         loopname.c_str ());
 
-    T result = initTask->getElem ();
-
-    taskAlloc.destroy (initTask);
-    taskAlloc.deallocate (initTask, 1);
-
-    return result;
+    // initTask deleted in ApplyOperatorSinglePhase,
   }
+
 
 };
 template <typename T, typename DivFunc, typename ConqFunc>
 void for_each_ordered_tree (const T& initItem, const DivFunc& divFunc, const ConqFunc& conqFunc, const char* loopname=nullptr) {
 
-  DivideAndConquerExecutor<T, DivFunc, ConqFunc, false> executor (divFunc, conqFunc, loopname);
-  executor.execute_no_children (initItem);
-}
-
-struct TreeExecNeedsChildren {};
-
-template <typename T, typename DivFunc, typename ConqFunc>
-T for_each_ordered_tree (const T& initItem, const DivFunc& divFunc, const ConqFunc& conqFunc, TreeExecNeedsChildren, const char* loopname=nullptr) {
-
-  DivideAndConquerExecutor<T, DivFunc, ConqFunc, true> executor (divFunc, conqFunc, loopname);
-  return executor.execute_with_children (initItem);
-
+  TreeExecutorTwoFunc<T, DivFunc, ConqFunc, false> executor (divFunc, conqFunc, loopname);
+  executor.execute (initItem);
 }
 
 template <typename F>

@@ -33,8 +33,7 @@ static cll::opt<ExecType> execType (
     cll::values (
       clEnumVal (SERIAL, "serial recursive"),
       clEnumVal (CILK, "CILK divide and conquer implementation"),
-      clEnumVal (GALOIS, "galois divide and conquer implementation"),
-      clEnumVal (GALOIS_ALT, "galois alternate divide and conquer implementation"),
+      clEnumVal (GALOIS, "galois basic divide and conquer implementation"),
       clEnumVal (GALOIS_STACK, "galois using thread stack"),
       clEnumVal (GALOIS_GENERIC, "galois std::function version"),
       clEnumVal (HAND, "Andrew's Handwritten version"),
@@ -68,56 +67,6 @@ unsigned serialFib (unsigned n) {
 }
 
 
-struct FibEntry {
-  unsigned n;
-  unsigned result;
-};
-
-struct GaloisDivide {
-
-  template <typename C>
-  void operator () (FibEntry& x, C& wl) {
-    if (x.n <= 2) {
-      x.result = x.n;
-      return;
-    }
-
-    FibEntry y; y.n = x.n - 1;
-    FibEntry z; z.n = x.n - 2;
-
-    wl.push (y);
-    wl.push (z);
-  }
-};
-
-struct GaloisConquer {
-
-  template <typename I>
-  void operator () (FibEntry& x, I beg, I end) {
-    if (beg != end) {
-      unsigned sum = 0;
-      for (I i = beg; i != end; ++i) {
-        sum += i->result;
-      }
-
-      x.result = sum;
-    }
-  }
-};
-
-unsigned galoisFib (unsigned n) {
-  FibEntry initial {n, 0};
-
-  FibEntry final = Galois::Runtime::for_each_ordered_tree (
-      initial,
-      GaloisDivide (),
-      GaloisConquer (),
-      Galois::Runtime::TreeExecNeedsChildren (),
-      "fib-galois");
-
-  return final.result;
-}
-
 struct FibRecord {
   unsigned n;
   unsigned* result;
@@ -125,9 +74,9 @@ struct FibRecord {
   unsigned term_n_2;
 };
 
-struct GaloisDivideAlt {
+struct GaloisDivide {
   template <typename C>
-  void operator () (FibRecord& r, C& wl) {
+  void operator () (FibRecord& r, C& ctx) {
     if (r.n <= 2) {
       r.term_n_1 = r.n;
       r.term_n_2 = 0;
@@ -138,18 +87,18 @@ struct GaloisDivideAlt {
 
     FibRecord rigt {r.n-2, &(r.term_n_2), 0, 0 };
 
-    wl.push (left);
-    wl.push (rigt);
+    ctx.spawn (left);
+    ctx.spawn (rigt);
   }
 };
 
-struct GaloisConquerAlt {
+struct GaloisConquer {
   void operator () (FibRecord& r) {
     *(r.result) = r.term_n_1 + r.term_n_2;
   };
 };
 
-unsigned galoisFibAlt (unsigned n) {
+unsigned galoisFib (unsigned n) {
 
   unsigned result = 0;
 
@@ -157,9 +106,9 @@ unsigned galoisFibAlt (unsigned n) {
 
   Galois::Runtime::for_each_ordered_tree (
       init,
-      GaloisDivideAlt (),
-      GaloisConquerAlt (),
-      "fib-galois-alt");
+      GaloisDivide (),
+      GaloisConquer (),
+      "fib-galois");
 
   return result;
 
@@ -401,10 +350,6 @@ int main (int argc, char* argv[]) {
 
     case GALOIS:
       result = galoisFib (N);
-      break;
-
-    case GALOIS_ALT:
-      result = galoisFibAlt (N);
       break;
 
     case GALOIS_STACK:
