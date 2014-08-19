@@ -73,7 +73,6 @@ PerBackend_v2& getPerHostBackend();
 
 template<typename T>
 class PerHost {
-
   //global name
   uint64_t offset;
 
@@ -115,6 +114,7 @@ public:
     return PerHost(off);
   }
   static void deallocate(PerHost ptr) {
+    assert(NetworkInterface::ID == 0);
     getSystemNetworkInterface().broadcastAlt(&deallocOnHost, ptr.offset);
     deallocOnHost(ptr.offset);
     getPerHostBackend().deallocateOffset(ptr.offset);
@@ -212,7 +212,6 @@ class PerThreadDist {
 	auto buf2 = buf;
 	getPerThreadDistBackend().resolveThread<T>(off, x) = new T(PerThreadDist(off), buf2);
       }
-      //std::cout << off << " " << x << " " << getPerThreadDistBackend().resolveThread<T>(off, x) << "\n";
     }
   }
 
@@ -295,7 +294,7 @@ public:
     iterator() :hostID(NetworkInterface::Num), threadID(activeThreads), basePtr() {}
   };
 
-  iterator begin() { return iterator(0,0,*this); }
+  iterator begin() { return iterator(0, 0, *this); }
   iterator end() { return iterator(); }
 
   //serialize

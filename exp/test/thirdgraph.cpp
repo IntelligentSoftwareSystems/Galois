@@ -12,9 +12,29 @@ typedef ThirdGraph<int, void, EdgeDirection::Un> UndirectedGraph;
 struct AddSelfLoop {
   template<typename T, typename Context>
   void operator()(const T& node, const Context&) {
+    Galois::Runtime::acquire(node, Galois::MethodFlag::ALL);
+    GALOIS_ASSERT(&*node);
     node->createEdge(node, node, node->getData());
   }
 };
+
+void testSerialAdd(int N) {
+  Graph::pointer g = Graph::allocate();
+
+  for (int x = 0; x < N; ++x)
+    g->addNode(g->createNode(x));
+
+  Galois::for_each(g->begin(), g->end(), AddSelfLoop());
+
+  GALOIS_ASSERT(std::distance(g->begin(), g->end()) == N);
+  for (auto nn : *g) {
+    GALOIS_ASSERT(std::distance(nn->begin(), nn->end()) == 1);
+    for (auto jj = nn->begin(), ej = nn->end(); jj != ej; ++jj)
+      GALOIS_ASSERT(nn->getData() == jj->getValue());
+  }
+
+  Graph::deallocate(g);
+}
 
 struct AddNode {
   typedef int tt_is_copyable;
@@ -31,6 +51,21 @@ struct AddNode {
     graph->addNode(node);
   }
 };
+
+void testParallelAdd(int N) {
+  Graph::pointer g = Graph::allocate();
+
+  Galois::for_each(boost::counting_iterator<int>(0), boost::counting_iterator<int>(N), AddNode(g));
+
+  GALOIS_ASSERT(std::distance(g->begin(), g->end()) == N);
+  for (auto nn : *g) {
+    GALOIS_ASSERT(std::distance(g->edge_begin(nn), g->edge_end(nn)) == 1);
+    for (auto jj = g->edge_begin(nn), ej = g->edge_end(nn); jj != ej; ++jj)
+      GALOIS_ASSERT(g->getData(nn) == g->getEdgeData(jj));
+  }
+
+  Graph::deallocate(g);
+}
 
 struct AddRemoveNode {
   typedef int tt_is_copyable;
@@ -53,54 +88,37 @@ struct AddRemoveNode {
         "Node: ", graph->getData(node1), " not removed");
       GALOIS_ASSERT(std::distance(graph->edge_begin(node2), graph->edge_end(node2)) == 0);
     }
+    Galois::Runtime::LL::gInfo("ZZZ ", x, " ",
+        node1,  " ", graph->getData(node1), " ", graph->containsNode(node1), " ",
+        node2, " ", graph->getData(node2), " ", graph->containsNode(node2));
   }
 };
-
-void testSerialAdd(int N) {
-  Graph::pointer g = Graph::allocate();
-
-  for (int x = 0; x < N; ++x)
-    g->addNode(g->createNode(x));
-
-  Galois::for_each(g->begin(), g->end(), AddSelfLoop());
-
-  GALOIS_ASSERT(std::distance(g->begin(), g->end()) == N);
-  for (auto nn : *g) {
-    GALOIS_ASSERT(std::distance(nn->begin(), nn->end()) == 1);
-    for (auto jj = nn->begin(), ej = nn->end(); jj != ej; ++jj)
-      GALOIS_ASSERT(nn->getData() == jj->getValue());
-  }
-
-  Graph::deallocate(g);
-}
-
-void testParallelAdd(int N) {
-  Graph::pointer g = Graph::allocate();
-
-  Galois::for_each(boost::counting_iterator<int>(0), boost::counting_iterator<int>(N), AddNode(g));
-
-  GALOIS_ASSERT(std::distance(g->begin(), g->end()) == N);
-  for (auto nn : *g) {
-    GALOIS_ASSERT(std::distance(g->edge_begin(nn), g->edge_end(nn)) == 1);
-    for (auto jj = g->edge_begin(nn), ej = g->edge_end(nn); jj != ej; ++jj)
-      GALOIS_ASSERT(g->getData(nn) == g->getEdgeData(jj));
-  }
-
-  Graph::deallocate(g);
-}
 
 void testAddRemove(int N) {
   UndirectedGraph::pointer g = UndirectedGraph::allocate();
 
+  Galois::Runtime::getLocalDirectory().dump();
+  Galois::Runtime::getRemoteDirectory().dump();
+
   Galois::for_each(boost::counting_iterator<int>(0), boost::counting_iterator<int>(N), AddRemoveNode(g));
 
-  std::cout << std::distance(g->begin(), g->end()) << "\n";
-  for (auto nn : *g) {
-    ptrdiff_t dist = std::distance(g->edge_begin(nn), g->edge_end(nn));
-    std::cout << g->getData(nn) << " " << (g->getData(nn) / 2) << " " << dist << "\n";
-  }
+  Galois::Runtime::getLocalDirectory().dump();
+  Galois::Runtime::getRemoteDirectory().dump();
 
-  GALOIS_ASSERT(std::distance(g->begin(), g->end()) == (N / 2) * 2 + (N / 2));
+  std::cout << "=======\n";
+  for (auto nn : *g) {
+    Galois::Runtime::acquire(nn, Galois::MethodFlag::ALL);
+    std::cout << "0 " << nn << " " << g->getData(nn) << " " << g->containsNode(nn) << "\n";
+  }
+  std::cout << "=======\n";
+
+  Galois::Runtime::getLocalDirectory().dump();
+  Galois::Runtime::getRemoteDirectory().dump();
+
+  ptrdiff_t dist = std::distance(g->begin(), g->end());
+  int expected = ((N + 1) / 2) * 2 + (N / 2);
+  GALOIS_ASSERT(dist == expected, ": ", dist, " != ", expected);
+
   for (auto nn : *g) {
     ptrdiff_t dist = std::distance(g->edge_begin(nn), g->edge_end(nn));
     if ((g->getData(nn) / 2) & 1)
@@ -124,7 +142,7 @@ int main(int argc, char** argv) {
   auto& net = Galois::Runtime::getSystemNetworkInterface();
   net.start();
   
-  testSerialAdd(N);
+  //testSerialAdd(N);
   testParallelAdd(N);
   testAddRemove(N);
 

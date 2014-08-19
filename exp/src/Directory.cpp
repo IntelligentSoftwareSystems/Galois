@@ -115,7 +115,7 @@ void RemoteDirectory::recvRequestImpl(fatPointer ptr, uint32_t dest, ResolveFlag
     bool wasContended = md.contended;
     ResolveFlag oldMode = INV;
     typeHelper* th = md.th;
-    switch(md.state) {
+    switch (md.state) {
     case metadata::HERE_RW:
     case metadata::UPGRADE:
       oldMode = RW;
@@ -127,14 +127,14 @@ void RemoteDirectory::recvRequestImpl(fatPointer ptr, uint32_t dest, ResolveFlag
       assert(0 && "Invalid Mode");
       abort();
     }
-    if (md.state == metadata::HERE_RW) {
+    if (md.state == metadata::HERE_RW && flag != INV) {
       if (tryWriteBack(md, ptr, lg)) {
         if (wasContended)
           fetchImpl(ptr, RW, th, true);
       } else {
         addPendingReq(ptr, dest, flag);
       }
-    } else { // was RO, ack invalidate
+    } else { // ack invalidate
       eraseMD(ptr, lg);
       getCacheManager().evict(ptr);
       th->request(ptr.getHost(), ptr, NetworkInterface::ID, INV);
@@ -324,9 +324,9 @@ void RemoteDirectory::reportStats(const char* loopname) {
 
 void RemoteDirectory::dump() {
   std::lock_guard<LL::SimpleLock> lg(md_lock);
-  for(auto& pair : md) {
+  for (auto& pair : md) {
     std::lock_guard<LL::SimpleLock> mdlg(pair.second.lock);
-    std::cout << pair.first << ": " << pair.second << "\n";
+    std::cout << "R " << pair.first << ": " << pair.second << "\n";
   }
 }
 
@@ -463,6 +463,21 @@ void LocalDirectory::invalidateReaders(metadata& md, fatPointer ptr, uint32_t ne
   }
 }
 
+void LocalDirectory::invalidate(fatPointer ptr) {
+  metadata& md = getMD(ptr);
+  std::unique_lock<LL::SimpleLock> lg(md.lock, std::adopt_lock);
+
+  // Insert dummy RO record
+  if (md.locRW != ~0)
+    md.locRO.insert(md.locRW);
+
+  // TODO(ddn): check if 3rd argument is correct
+  for (auto dest : md.locRO)
+    md.th->request(dest, ptr, NetworkInterface::ID, INV);
+
+  trace("LocalDirectory::invalidate % md %\n", ptr, md);
+}
+
 void LocalDirectory::considerObject(metadata& md, fatPointer ptr) {
   //Find next destination
   uint32_t nextDest = ~0;
@@ -563,9 +578,11 @@ void LocalDirectory::makeProgress() {
 }
 
 void LocalDirectory::dump() {
-  //FIXME: write
-  //std::lock_guard<LL::SimpleLock> lg(dir_lock);
-  trace("LocalDirectory::dump\n");
+  std::lock_guard<LL::SimpleLock> lg(dir_lock);
+  for (auto& pair : dir) {
+    std::lock_guard<LL::SimpleLock> mdlg(pair.second.lock);
+    std::cout << "L " << pair.first << ": " << pair.second << "\n";
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -585,7 +602,7 @@ bool LocalDirectory::metadata::writeback() {
   assert(locRW != NetworkInterface::ID);
   assert(locRO.empty());
   locRW = ~0;
-  recalled =  ~0;
+  recalled = ~0;
   return !reqsRW.empty() || !reqsRO.empty();
 }
 

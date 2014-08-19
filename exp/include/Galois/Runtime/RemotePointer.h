@@ -44,7 +44,7 @@ class gptr {
     if (inGaloisForEach) {
       //parallel code ensures acquire happens before use
     } else {
-      //Serial code nees hand holding
+      //Serial code needs hand holding
       serial_acquire(*this);
     }
     return resolve();

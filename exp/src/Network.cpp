@@ -32,8 +32,8 @@
 
 using namespace Galois::Runtime;
 
-uint32_t NetworkInterface::ID = 0;
-uint32_t NetworkInterface::Num = 1;
+uint32_t Galois::Runtime::NetworkInterface::ID = 0;
+uint32_t Galois::Runtime::NetworkInterface::Num = 1;
 
 uint32_t Galois::Runtime::getHostID() { return NetworkInterface::ID; }
 

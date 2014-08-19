@@ -82,21 +82,21 @@ void* PerBackend_v2::resolveRemote_i(uint64_t off, uint32_t hostID) {
     return resolve_i(off);
   } else {
     //FIXME: remote message
-     lock.lock();
-     void* retval = remoteCache[std::make_pair(off, hostID)];
-     lock.unlock();
-     if (retval)
-       return retval;
-     getSystemNetworkInterface().sendAlt(hostID, pBe2Resolve, NetworkInterface::ID, off);
-     do {
-       if (LL::getTID() == 0)
-         doNetworkWork();
-       lock.lock();
-       void* retval = remoteCache[std::make_pair(off, hostID)];
-       lock.unlock();
-       if (retval)
-	 return retval;
-     } while (true);
+    lock.lock();
+    void* retval = remoteCache[std::make_pair(off, hostID)];
+    lock.unlock();
+    if (retval)
+      return retval;
+    getSystemNetworkInterface().sendAlt(hostID, pBe2Resolve, NetworkInterface::ID, off);
+    do {
+      if (LL::getTID() == 0)
+        doNetworkWork();
+      lock.lock();
+      void* retval = remoteCache[std::make_pair(off, hostID)];
+      lock.unlock();
+      if (retval)
+        return retval;
+    } while (true);
   }
 }
 
@@ -104,9 +104,6 @@ Galois::Runtime::PerBackend_v2& Galois::Runtime::getPerHostBackend() {
   static PerBackend_v2 be;
   return be;
 }
-
-
-
 
 ////////////////////////////////////////////////////////////////////////////////
 // PerThreadDist
@@ -158,21 +155,21 @@ void* PerBackend_v3::resolveRemote_i(uint64_t offset, uint32_t hostID, uint32_t 
     return resolveThread<void>(offset, threadID);
   } else {
     //FIXME: remote message
-     lock.lock();
-     void* retval = remoteCache[std::make_tuple(offset, hostID, threadID)];
-     lock.unlock();
-     if (retval)
-       return retval;
-     getSystemNetworkInterface().sendAlt(hostID, pBe2Resolve, NetworkInterface::ID, offset, threadID);
-     do {
-       if (LL::getTID() == 0)
-         doNetworkWork();
-       lock.lock();
-       void* retval = remoteCache[std::make_tuple(offset, hostID, threadID)];
-       lock.unlock();
-       if (retval)
-	 return retval;
-     } while (true);
+    lock.lock();
+    void* retval = remoteCache[std::make_tuple(offset, hostID, threadID)];
+    lock.unlock();
+    if (retval)
+      return retval;
+    getSystemNetworkInterface().sendAlt(hostID, pBe2Resolve, NetworkInterface::ID, offset, threadID);
+    do {
+      if (LL::getTID() == 0)
+        doNetworkWork();
+      lock.lock();
+      void* retval = remoteCache[std::make_tuple(offset, hostID, threadID)];
+      lock.unlock();
+      if (retval)
+        return retval;
+    } while (true);
   }
 }
 

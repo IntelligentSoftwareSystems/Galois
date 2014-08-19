@@ -85,11 +85,6 @@ class NetworkInterfaceAsyncMPI : public NetworkInterface {
   }
 
 public:
-
-  using NetworkInterface::ID;
-  using NetworkInterface::Num;
-
-
   NetworkInterfaceAsyncMPI() {
     int provided;
     int rc = MPI_Init_thread (NULL, NULL, MPI_THREAD_SERIALIZED, &provided);
@@ -102,7 +97,7 @@ public:
     ID = taskRank;
     Num = numTasks;
     
-    if (taskRank == 0) {
+    if (ID == 0) {
       //master
       //printing on lead host doesn't require this object to be fully initialized
       switch (provided) {
