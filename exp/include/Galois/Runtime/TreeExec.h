@@ -50,7 +50,7 @@ protected:
 
   public:
     Task (const T& a, Task* p, const Mode& m)
-      : mode (m), elem (a), parent (p), numChild (0)    
+      : mode (m), elem (a), parent (p), numChild (0)
     {}
 
     void setNumChildren (unsigned c) {
@@ -94,7 +94,7 @@ protected:
     // C& ctx;
     // Task* parent;
     // size_t numChild;
-// 
+//
   // public:
     // CtxWrapper (TreeExecutorTwoFunc* executor, C& ctx, Task* parent):
       // boost::noncopyable (),
@@ -103,16 +103,16 @@ protected:
       // parent (parent),
       // numChild (0)
     // {}
-// 
+//
     // void spawn (const T& elem) {
       // Task* child = executor->spawn (elem, parent);
       // ctx.push (child);
       // ++numChild;
     // }
-// 
+//
     // size_t getNumChild (void) const { return numChild; }
-// 
-// 
+//
+//
     // void sync (void) const {}
   // };
 
@@ -129,7 +129,7 @@ protected:
     void spawn (const T& elem) {
       executor->spawn (elem, parent);
     }
-    
+
   };
 
   struct ApplyOperatorSinglePhase {
@@ -151,7 +151,7 @@ protected:
 
         // if (uctx.getNumChild () == 0) {
           // t->setMode (Task::CONQUER);
-// 
+//
         // } else {
           // t->setNumChildren (uctx.getNumChild ());
         // }
@@ -207,7 +207,7 @@ protected:
 public:
 
   TreeExecutorTwoFunc (const DivFunc& divFunc, const ConqFunc& conqFunc, const char* loopname)
-    : 
+    :
       divFunc (divFunc),
       conqFunc (conqFunc),
       loopname (loopname)
@@ -215,7 +215,7 @@ public:
 
   void execute (const T& initItem) {
 
-    Task* initTask = taskAlloc.allocate (1); 
+    Task* initTask = taskAlloc.allocate (1);
     taskAlloc.construct (initTask, initItem, nullptr, Task::DIVIDE);
 
     workList.push (initTask);
@@ -224,14 +224,13 @@ public:
         ApplyOperatorSinglePhase {this, taskAlloc, divFunc, conqFunc},
         loopname.c_str ());
 
-    
     // Task* a[] = {initTask};
-// 
+//
     // Galois::Runtime::for_each_impl<WL_ty> (
-        // makeStandardRange (&a[0], &a[1]), 
+        // makeStandardRange (&a[0], &a[1]),
         // ApplyOperatorSinglePhase {this, taskAlloc, divFunc, conqFunc},
         // loopname.c_str ());
- 
+
     // initTask deleted in ApplyOperatorSinglePhase,
   }
 
@@ -282,7 +281,7 @@ public:
       executor->syncLoop (*this);
     }
 
-    unsigned getNumChild (void) const { 
+    unsigned getNumChild (void) const {
       return parent->numChild;
     }
   };
@@ -295,10 +294,10 @@ protected:
     bool didWork;
     const char* loopname;
 
-    PerThreadData (const char* loopname): 
-      stat_iterations (0), 
+    PerThreadData (const char* loopname):
+      stat_iterations (0),
       stat_pushes (0) ,
-      didWork (false), 
+      didWork (false),
       loopname (loopname)
 
     {}
@@ -351,16 +350,16 @@ protected:
     }
   }
 
-  const char* loopname;  
+  const char* loopname;
   PerThreadStorage<PerThreadData> perThreadData;
   TerminationDetection& term;
   WL_ty workList;
 
 public:
-  TreeExecStack (const char* loopname): 
-    loopname (loopname), 
-    perThreadData (loopname), 
-    term (getSystemTermination ()) 
+  TreeExecStack (const char* loopname):
+    loopname (loopname),
+    perThreadData (loopname),
+    term (getSystemTermination ())
   {}
 
   void initThread (void) {
@@ -387,7 +386,7 @@ public:
 
 };
 
-template <typename F> 
+template <typename F>
 void for_each_ordered_tree_impl (F& initTask, const char* loopname=nullptr) {
   assert (initTask != nullptr);
 
@@ -413,6 +412,6 @@ void for_each_ordered_tree (F& initTask, const char* loopname=nullptr) {
   for_each_ordered_tree_impl<F> (initTask, loopname);
 }
 
-void for_each_ordered_tree_generic (TreeTaskBase& initTask, const char* loopname=nullptr); 
+void for_each_ordered_tree_generic (TreeTaskBase& initTask, const char* loopname=nullptr);
 } // end namespace Runtime
 } // end namespace Galois
