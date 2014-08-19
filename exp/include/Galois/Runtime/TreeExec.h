@@ -7,7 +7,7 @@
 #include "Galois/Timer.h"
 
 #include "Galois/optional.h"
-#include "Galois/GaloisUnsafe.h"
+// #include "Galois/GaloisUnsafe.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/DoAll.h"
 #include "Galois/Runtime/ForEachTraits.h"
@@ -88,54 +88,52 @@ protected:
 
 
 
-  // template <typename C>
-  // class CtxWrapper: boost::noncopyable {
-    // TaskAlloc& taskAlloc;
-    // C& ctx;
-    // Task* parent;
-    // size_t numChild;
-// 
-  // public:
-    // CtxWrapper (TaskAlloc& taskAlloc, C& ctx, Task* parent):
-      // boost::noncopyable (),
-      // taskAlloc (taskAlloc),
-      // ctx (ctx),
-      // parent (parent),
-      // numChild (0)
-    // {}
-// 
-    // void spawn (const T& elem) {
-      // Task* child = taskAlloc.allocate (1);
-      // assert (child != nullptr);
-      // taskAlloc.construct (child, elem, parent, Task::DIVIDE);
-      // ctx.push (child);
-      // ++numChild;
-    // }
-// 
-    // size_t getNumChild (void) const { return numChild; }
-// 
-// 
-    // void sync (void) const {}
-  // };
-
+  template <typename C>
   class CtxWrapper: boost::noncopyable {
     TreeExecutorTwoFunc* executor;
+    C& ctx;
     Task* parent;
+    size_t numChild;
 
   public:
-    CtxWrapper (TreeExecutorTwoFunc* executor, Task* parent)
-      : boost::noncopyable (), executor (executor), parent (parent)
+    CtxWrapper (TreeExecutorTwoFunc* executor, C& ctx, Task* parent):
+      boost::noncopyable (),
+      executor (executor),
+      ctx (ctx),
+      parent (parent),
+      numChild (0)
     {}
 
     void spawn (const T& elem) {
-      executor->spawn (elem, parent);
+      Task* child = executor->spawn (elem, parent);
+      ctx.push (child);
+      ++numChild;
     }
-    
+
+    size_t getNumChild (void) const { return numChild; }
+
+
+    void sync (void) const {}
   };
+
+  // class CtxWrapper: boost::noncopyable {
+    // TreeExecutorTwoFunc* executor;
+    // Task* parent;
+// 
+  // public:
+    // CtxWrapper (TreeExecutorTwoFunc* executor, Task* parent)
+      // : boost::noncopyable (), executor (executor), parent (parent)
+    // {}
+// 
+    // void spawn (const T& elem) {
+      // executor->spawn (elem, parent);
+    // }
+    // 
+  // };
 
   struct ApplyOperatorSinglePhase {
     typedef int tt_does_not_need_aborts;
-    typedef double tt_does_not_need_push;
+    // typedef double tt_does_not_need_push;
 
     TreeExecutorTwoFunc* executor;
     TaskAlloc& taskAlloc;
@@ -146,19 +144,20 @@ protected:
     void operator () (Task* t, C& ctx) {
 
       if (t->hasMode (Task::DIVIDE)) {
-        // CtxWrapper<C> uctx {taskAlloc, ctx, t};
-        CtxWrapper uctx {executor, t};
+        CtxWrapper<C> uctx {executor, ctx, t};
+        // CtxWrapper uctx {executor, t};
         divFunc (t->getElem (), uctx);
 
-        // if (uctx.getNumChild () == 0) {
-          // t->setMode (Task::CONQUER);
-// 
-        // } else {
-          // t->setNumChildren (uctx.getNumChild ());
-        // }
-        if (t->getNumChild () == 0) {
+        if (uctx.getNumChild () == 0) {
           t->setMode (Task::CONQUER);
+
+        } else {
+          t->setNumChildren (uctx.getNumChild ());
         }
+
+        // if (t->getNumChild () == 0) {
+          // t->setMode (Task::CONQUER);
+        // }
       } // end outer if
 
       if (t->hasMode (Task::CONQUER)) {
@@ -167,8 +166,8 @@ protected:
         Task* parent = t->getParent ();
         if (parent != nullptr && parent->processedLastChild()) {
           parent->setMode (Task::CONQUER);
-          // ctx.push (parent);
-          executor->push (parent);
+          ctx.push (parent);
+          // executor->push (parent);
         }
 
         // task can be deallocated now
@@ -179,16 +178,17 @@ protected:
     }
   };
 
-  void push (Task* t) {
-    workList.push (t);
-  }
+  // void push (Task* t) {
+    // workList.push (t);
+  // }
 
-  void spawn (const T& elem, Task* parent) {
-    parent->incNumChild ();
+  Task* spawn (const T& elem, Task* parent) {
+    // parent->incNumChild ();
     Task* child = taskAlloc.allocate (1);
     assert (child != nullptr);
     taskAlloc.construct (child, elem, parent, Task::DIVIDE);
-    workList.push (child);
+    // workList.push (child);
+    return child;
   }
 
 
@@ -197,7 +197,7 @@ protected:
   ConqFunc conqFunc;
   std::string loopname;
   TaskAlloc taskAlloc;
-  WL_ty workList;
+  // WL_ty workList;
 
 
 public:
@@ -210,24 +210,23 @@ public:
   {}
 
   void execute (const T& initItem) {
-    // TaskAlloc taskAlloc;
 
     Task* initTask = taskAlloc.allocate (1); 
     taskAlloc.construct (initTask, initItem, nullptr, Task::DIVIDE);
 
-    workList.push (initTask);
+    // workList.push (initTask);
+// 
+    // Galois::for_each_wl (workList,
+        // ApplyOperatorSinglePhase {this, taskAlloc, divFunc, conqFunc},
+        // loopname.c_str ());
 
-    Galois::for_each_wl (workList,
+    Task* a[] = {initTask};
+
+    Galois::Runtime::for_each_impl<WL_ty> (
+        makeStandardRange (&a[0], &a[1]), 
         ApplyOperatorSinglePhase {this, taskAlloc, divFunc, conqFunc},
         loopname.c_str ());
 
-    // Task* a[] = {initTask};
-// 
-    // Galois::Runtime::for_each_impl<WL_ty> (
-        // makeStandardRange (&a[0], &a[1]), 
-        // ApplyOperatorSinglePhase {taskAlloc, divFunc, conqFunc},
-        // loopname.c_str ());
-// 
     // initTask deleted in ApplyOperatorSinglePhase,
   }
 
