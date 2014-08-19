@@ -73,7 +73,8 @@ public:
   typedef T value_type;
 
   //! Change the concurrency flag (optional)
-  using rethread = AbstractWorkList<_T>;
+  template<bool Concurrent>
+  using rethread = AbstractWorkList<T>;
 
   //! Changes the type the worklist holds
   template<typename _T>
