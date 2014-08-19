@@ -124,14 +124,14 @@ struct SplitGalois {
   {}
 #endif
 
-  template <typename W>
-  void operator () (const IndexRange& r, W& wl) {
+  template <typename Ctx>
+  void operator () (const IndexRange& r, Ctx& ctx) {
     // std::printf ("running split: (%d,%d)\n", r.first, r.second);
     if ((r.second - r.first) > LEAF_SIZE) {
 
       const size_t mid = (r.first + r.second) / 2;
-      wl.push (IndexRange (r.first, mid));
-      wl.push (IndexRange (mid, r.second));
+      ctx.spawn (IndexRange (r.first, mid));
+      ctx.spawn (IndexRange (mid, r.second));
 
       // std::printf ("spawning split: (%d,%d)\n", r.first, mid);
       // std::printf ("spawning split: (%d,%d)\n", mid, r.second);

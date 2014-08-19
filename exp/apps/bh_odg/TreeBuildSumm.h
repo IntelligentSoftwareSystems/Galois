@@ -74,7 +74,7 @@ struct DestroyTree {
       for (unsigned i = 0; i < 8; ++i) {
         Octree<B>* child = node->getChild (i);
         if (child != nullptr && !child->isLeaf ()) {
-          wl.push (static_cast<OctreeInternal<B>*> (child));
+          wl.spawn (static_cast<OctreeInternal<B>*> (child));
         }
       }
     }
@@ -1079,7 +1079,7 @@ namespace recursive {
     C& ctx;
 
     void fork (const WorkItem& w) {
-      ctx.push (w);
+      ctx.spawn (w);
     }
 
     void join (const WorkItem&) {} // handled separately in Galois
