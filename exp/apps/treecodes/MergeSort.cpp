@@ -1,19 +1,8 @@
-#include <limits>
 #include <iostream>
-#include <fstream>
-#include <vector>
-#include <cstring>
-#include <sstream>
-
 
 #include "Galois/Galois.h"
 #include "Galois/CilkInit.h"
-#include "Galois/GaloisUnsafe.h"
-#include "Galois/Atomic.h"
 #include "Galois/Statistic.h"
-#include "Galois/Runtime/DoAllCoupled.h"
-#include "Galois/Runtime/Sampling.h"
-#include "Galois/Runtime/ll/CompilerSpecific.h"
 #include "Galois/Runtime/TreeExec.h"
 
 #include "llvm/Support/CommandLine.h"
