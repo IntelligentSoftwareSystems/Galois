@@ -100,6 +100,13 @@ public:
         ++boost::fusion::at_c<1>(its);
     }
 
+    void advance(unsigned n) {
+      if (type == 0)
+        boost::fusion::at_c<0>(its) += n;
+      else
+        boost::fusion::at_c<1>(its) += n;
+    }
+
     bool equal(const in_edge_iterator& o) const { 
       if (type != o.type)
         return false;
