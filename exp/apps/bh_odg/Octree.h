@@ -91,6 +91,8 @@ struct Octree: public B {
 
   // virtual ~Octree() { }
   virtual bool isLeaf() const = 0;
+
+  virtual ~Octree (void) {}
 };
 
 template <typename B>

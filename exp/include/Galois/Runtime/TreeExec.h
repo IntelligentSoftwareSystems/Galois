@@ -1,27 +1,37 @@
+/** Galois scheduler for tree shaped DAGs e.g. tree traversals and divide-and-conquer * algorithms -*- C++ -*-
+ * @file
+ * @section License
+ *
+ * Galois, a framework to exploit amorphous data-parallelism in irregular
+ * programs.
+ *
+ * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
+ * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
+ * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
+ * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
+ * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
+ * shall University be liable for incidental, special, indirect, direct or
+ * consequential damages or loss of profits, interruption of business, or
+ * related expenses which may arise from use of Software or Documentation,
+ * including but not limited to those resulting from defects in Software and/or
+ * Documentation, or loss or inaccuracy of data of any kind.
+ *
+ * @author M. Amber Hassaan <ahassaan@ices.utexas.edu>
+ */
 
-#include "Galois/config.h"
-#include "Galois/Accumulator.h"
-#include "Galois/Atomic.h"
-#include "Galois/gdeque.h"
-#include "Galois/PriorityQueue.h"
-#include "Galois/Timer.h"
+#ifndef GALOIS_RUNTIME_TREEEXEC_H
+#define GALOIS_RUNTIME_TREEEXEC_H
 
 #include "Galois/optional.h"
 #include "Galois/GaloisUnsafe.h"
-#include "Galois/Runtime/Context.h"
-#include "Galois/Runtime/Executor_DoAll.h"
 #include "Galois/Runtime/ForEachTraits.h"
-#include "Galois/Runtime/LCordered.h"
 #include "Galois/Runtime/ParallelWork.h"
-#include "Galois/Runtime/PerThreadWorkList.h"
 #include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/Termination.h"
 #include "Galois/Runtime/ll/gio.h"
-#include "Galois/Runtime/ll/ThreadRWlock.h"
 #include "Galois/Runtime/mm/Mem.h"
-
-#include "llvm/Support/CommandLine.h"
-
 
 #include <atomic>
 
@@ -415,3 +425,6 @@ void for_each_ordered_tree (F& initTask, const char* loopname=nullptr) {
 void for_each_ordered_tree_generic (TreeTaskBase& initTask, const char* loopname=nullptr);
 } // end namespace Runtime
 } // end namespace Galois
+
+
+#endif  // GALOIS_RUNTIME_TREEEXEC_H
