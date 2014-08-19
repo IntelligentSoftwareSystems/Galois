@@ -56,26 +56,28 @@ namespace WorkList {
 namespace { // don't pollute the symbol table with the example
 
 // Worklists may not be copied.
-// Worklists should be default instantiatable
 // All classes (should) conform to:
-template<typename T, bool Concurrent>
+template<typename T>
 class AbstractWorkList {
   AbstractWorkList(const AbstractWorkList&) = delete;
   const AbstractWorkList& operator=(const AbstractWorkList&) = delete;
 
 public:
-  AbstractWorkList() { }
+  AbstractWorkList();
+
+  //! Optional paramaterized Constructor
+  //! parameters can be whatever
+  AbstractWorkList(int, double, char*);
 
   //! T is the value type of the WL
   typedef T value_type;
 
-  //! Changes the concurrency flag
-  template<bool _concurrent>
-  struct rethread { typedef AbstractWorkList<T, _concurrent> type; };
+  //! Change the concurrency flag (optional)
+  using rethread = AbstractWorkList<_T>;
 
   //! Changes the type the worklist holds
   template<typename _T>
-  struct retype { typedef AbstractWorkList<_T, Concurrent> type; };
+  using retype = AbstractWorkList<_T>;
 
   //! Pushes a value onto the queue
   void push(const value_type& val);
