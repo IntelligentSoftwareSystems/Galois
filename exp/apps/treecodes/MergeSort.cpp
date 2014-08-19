@@ -211,64 +211,74 @@ struct MergeSortGaloisStack {
   size_t beg;
   size_t end;
 
-  enum State { SPLIT, MERGE };
-  State state;
-
   template <typename Ctx>
   void operator () (Ctx& ctx) {
-    switch (state) {
-      case SPLIT: 
-        {
-          if ((end - beg) > LEAF_SIZE) {
-            size_t mid = (beg + end) / 2;
+    if ((end - beg) > LEAF_SIZE) {
+      size_t mid = (beg + end) / 2;
 
-            MergeSortGaloisStack left {array, tmp_array, cmp, beg, mid, SPLIT};
-            ctx.spawn (left);
+      MergeSortGaloisStack left {array, tmp_array, cmp, beg, mid};
+      ctx.spawn (left);
 
-            MergeSortGaloisStack right {array, tmp_array, cmp, mid, end, SPLIT};
-            ctx.spawn (right);
+      MergeSortGaloisStack right {array, tmp_array, cmp, mid, end};
+      ctx.spawn (right);
 
-            ctx.sync ();
+      ctx.sync ();
 
-            MergeSortGaloisStack combine { array, tmp_array, cmp, beg, end, MERGE};
-            ctx.spawn (combine);
-
-            ctx.sync ();
-
-            // mergeHalves (array, tmp_array, beg, mid, end, cmp);
-          } else {
-            std::sort (array + beg, array + end, cmp);
-          }
-          return;
-        }
-      case MERGE:
-        {
-          size_t mid = (beg + end) / 2;
-          mergeHalves (array, tmp_array, beg, mid, end, cmp);
-          return;
-        }
-      default:
-        std::abort ();
+      mergeHalves (array, tmp_array, beg, mid, end, cmp);
+    } else {
+      std::sort (array + beg, array + end, cmp);
     }
+    return;
   }
 };
 
 
 template <typename T, typename C>
 void mergeSortGaloisStack (T* array, T* tmp_array, const size_t L, const C& cmp) {
-  MergeSortGaloisStack<T,C> init {array, tmp_array, cmp, 0, L, MergeSortGaloisStack<T,C>::SPLIT};
+  MergeSortGaloisStack<T,C> init {array, tmp_array, cmp, 0, L};
   Galois::Runtime::for_each_ordered_tree (init, "mergesort-stack");
 }
 
 template <typename T, typename C>
-struct MergeSortGaloisGeneric: public Galois::Runtime::TreeTaskBase {
+struct MergeGaloisGeneric: public Galois::Runtime::TreeTaskBase {
+  T* array;
+  T* tmp_array;
+  const C& cmp;
+  size_t beg;
+  size_t mid;
+  size_t end;
+
+  MergeGaloisGeneric (
+      T* array,
+      T* tmp_array,
+      const C& cmp,
+      size_t beg,
+      size_t mid,
+      size_t end)
+    : 
+      Galois::Runtime::TreeTaskBase (),
+      array (array),
+      tmp_array (tmp_array),
+      cmp (cmp),
+      beg (beg),
+      mid (mid),
+      end (end)
+  {}
+
+  virtual void operator () (Galois::Runtime::TreeTaskContext& ctx) {
+    mergeHalves (array, tmp_array, beg, mid, end, cmp);
+  }
+};
+
+template <typename T, typename C>
+struct SplitGaloisGeneric: public Galois::Runtime::TreeTaskBase {
   T* array;
   T* tmp_array;
   const C& cmp;
   size_t beg;
   size_t end;
 
-  MergeSortGaloisGeneric (
+  SplitGaloisGeneric (
       T* array,
       T* tmp_array,
       const C& cmp,
@@ -284,19 +294,24 @@ struct MergeSortGaloisGeneric: public Galois::Runtime::TreeTaskBase {
   {}
 
 
-  virtual void operator () (void) {
+  virtual void operator () (Galois::Runtime::TreeTaskContext& ctx) {
     if ((end - beg) > LEAF_SIZE) {
       size_t mid = (beg + end) / 2;
 
-      MergeSortGaloisGeneric left {array, tmp_array, cmp, beg, mid};
-      Galois::Runtime::spawn (left);
+      SplitGaloisGeneric left {array, tmp_array, cmp, beg, mid};
+      ctx.spawn (left);
 
-      MergeSortGaloisGeneric right {array, tmp_array, cmp, mid, end};
-      Galois::Runtime::spawn (right);
+      SplitGaloisGeneric right {array, tmp_array, cmp, mid, end};
+      ctx.spawn (right);
 
-      Galois::Runtime::sync ();
+      ctx.sync ();
 
-      mergeHalves (array, tmp_array, beg, mid, end, cmp);
+      MergeGaloisGeneric<T,C> m {array, tmp_array, cmp, beg, mid, end};
+      ctx.spawn (m);
+
+      ctx.sync ();
+
+      // mergeHalves (array, tmp_array, beg, mid, end, cmp);
 
     } else {
       std::sort (array + beg, array + end, cmp);
@@ -306,7 +321,7 @@ struct MergeSortGaloisGeneric: public Galois::Runtime::TreeTaskBase {
 
 template <typename T, typename C>
 void mergeSortGaloisGeneric (T* array, T* tmp_array, const size_t L, const C& cmp) {
-  MergeSortGaloisGeneric<T,C> init {array, tmp_array, cmp, 0, L};
+  SplitGaloisGeneric<T,C> init {array, tmp_array, cmp, 0, L};
   Galois::Runtime::for_each_ordered_tree_generic (init, "mergesort-stack");
 }
 

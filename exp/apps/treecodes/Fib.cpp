@@ -156,19 +156,19 @@ struct GaloisFibGeneric: public Galois::Runtime::TreeTaskBase {
     result (_result)
   {}
 
-  virtual void operator () (void) {
+  virtual void operator () (Galois::Runtime::TreeTaskContext& ctx) {
     if (n <= 2) {
       result = n;
       return;
     }
 
     GaloisFibGeneric left {n-1, 0};
-    Galois::Runtime::spawn (left);
+    ctx.spawn (left);
 
     GaloisFibGeneric right {n-2, 0};
-    Galois::Runtime::spawn (right);
+    ctx.spawn (right);
 
-    Galois::Runtime::sync ();
+    ctx.sync ();
 
     result = left.result + right.result;
   }

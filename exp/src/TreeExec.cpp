@@ -3,38 +3,8 @@
 namespace Galois {
 namespace Runtime {
 
-TreeExecGeneric* treeExecPtr = nullptr;
-
-TreeExecGeneric& getTreeExecutor (void) {
-  return *treeExecPtr;
-}
-
-void setTreeExecutor (TreeExecGeneric* t) {
-  treeExecPtr = t;
-}
-
-void spawn (TreeTaskBase& f) {
-  getTreeExecutor ().push (f);
-}
-
-void sync (void) {
-  getTreeExecutor ().syncLoop ();
-}
-
 void for_each_ordered_tree_generic (TreeTaskBase& initTask, const char* loopname) {
-
-  TreeExecGeneric e (loopname);
-
-  e.push (initTask);
-
-  setTreeExecutor (&e);
-
-  getSystemThreadPool ().run (Galois::getActiveThreads (),
-      [&e] (void) { e.initThread (); },
-      std::ref (e));
-
-
-  setTreeExecutor (nullptr);
+  for_each_ordered_tree_impl<TreeTaskBase> (initTask, loopname);
 }
 
 } // end namespace Runtime

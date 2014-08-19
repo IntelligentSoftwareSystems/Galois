@@ -240,8 +240,17 @@ void for_each_ordered_tree (const T& initItem, const DivFunc& divFunc, const Con
   executor.execute (initItem);
 }
 
+
+
+// template <typename E>
+// struct CtxWrapper {
+  // TreeExecStack<
+  // Task* parent;
+// };
+
+
 template <typename F>
-class TreeExec {
+class TreeExecStack {
 
 protected:
 
@@ -249,15 +258,40 @@ protected:
     GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE std::atomic<unsigned> numChild;
     Task* parent;
 
-    Task (Task* parent): numChild (0), parent (parent)
+    explicit Task (Task* parent): numChild (0), parent (parent)
     {}
   };
 
   typedef std::pair<Task*, F*> WorkItem;
-  static const unsigned CHUNK_SIZE = 1;
+  static const unsigned CHUNK_SIZE = 2;
   typedef WorkList::AltChunkedLIFO<CHUNK_SIZE, WorkItem> WL_ty;
   // typedef WorkList::AltChunkedFIFO<CHUNK_SIZE, WorkItem> WL_ty;
 
+public:
+
+  class CtxWrapper : private boost::noncopyable {
+    TreeExecStack* executor;
+    Task* parent;
+
+  public:
+    CtxWrapper (TreeExecStack* executor, Task* parent)
+      : boost::noncopyable (), executor (executor), parent (parent)
+    {}
+
+    void spawn (F& f) {
+      executor->spawn (f, parent);
+    }
+
+    void sync () {
+      executor->syncLoop (*this);
+    }
+
+    unsigned getNumChild (void) const { 
+      return parent->numChild;
+    }
+  };
+
+protected:
   struct PerThreadData {
     // most frequently accessed members first
     size_t stat_iterations;
@@ -279,19 +313,10 @@ protected:
     }
   };
 
-  struct CtxWrapper {
-    Task* task;
-    TreeExec& exec;
-
-    void spawn (F& f) {
-      ++(task->numChild);
-      exec.push (WorkItem (task, &f));
-    }
-
-    void sync () {
-      exec.syncLoop (*this);
-    }
-  };
+  void spawn (F& f, Task* parent) {
+    ++(parent->numChild);
+    push (WorkItem (parent, &f));
+  }
 
   void push (const WorkItem& p) {
     workList.push (p);
@@ -300,7 +325,7 @@ protected:
   }
 
   void syncLoop (CtxWrapper& ctx) {
-    while (ctx.task->numChild != 0) {
+    while (ctx.getNumChild () != 0) {
       applyOperatorRecursive ();
     }
   }
@@ -318,9 +343,9 @@ protected:
 
       Task task {funcNparent->first};
 
-      CtxWrapper ctx {&task, *this};
+      CtxWrapper ctx {this, &task};
 
-      (*funcNparent->second) (ctx);
+      funcNparent->second->operator () (ctx);
 
       Task* parent = funcNparent->first;
 
@@ -336,7 +361,7 @@ protected:
   WL_ty workList;
 
 public:
-  TreeExec (const char* loopname): 
+  TreeExecStack (const char* loopname): 
     loopname (loopname), 
     perThreadData (loopname), 
     term (getSystemTermination ()) 
@@ -367,9 +392,10 @@ public:
 };
 
 template <typename F> 
-void for_each_ordered_tree (F& initTask, const char* loopname=nullptr) {
+void for_each_ordered_tree_impl (F& initTask, const char* loopname=nullptr) {
+  assert (initTask != nullptr);
 
-  TreeExec<F> e (loopname);
+  TreeExecStack<F> e (loopname);
 
   e.initWork (initTask);
 
@@ -377,137 +403,20 @@ void for_each_ordered_tree (F& initTask, const char* loopname=nullptr) {
       [&e] (void) { e.initThread (); },
       std::ref (e));
 }
+class TreeTaskBase;
+
+typedef TreeExecStack<TreeTaskBase>::CtxWrapper TreeTaskContext;
 
 class TreeTaskBase {
 public:
-  virtual void operator () (void) {}
+  virtual void operator () (TreeTaskContext& ctx) = 0;
 };
 
-class TreeExecGeneric {
+template <typename F>
+void for_each_ordered_tree (F& initTask, const char* loopname=nullptr) {
+  for_each_ordered_tree_impl<F> (initTask, loopname);
+}
 
-  struct Task {
-    GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE std::atomic<unsigned> numChild;
-    Task* parent;
-
-    Task (Task* parent): numChild (0), parent (parent)
-    {}
-  };
-
-  typedef std::pair<Task*, TreeTaskBase*> WorkItem;
-  static const unsigned CHUNK_SIZE = 2;
-  typedef WorkList::AltChunkedLIFO<CHUNK_SIZE, WorkItem> WL_ty;
-  // typedef WorkList::AltChunkedFIFO<CHUNK_SIZE, WorkItem> WL_ty;
-
-  struct PerThreadData {
-    // most frequently accessed members first
-    Task* currTask;
-    size_t stat_iterations;
-    size_t stat_pushes;
-    bool didWork;
-    const char* loopname;
-
-    PerThreadData (const char* loopname): 
-      currTask (nullptr),
-      stat_iterations (0), 
-      stat_pushes (0) ,
-      didWork (false), 
-      loopname (loopname)
-
-    {}
-
-    void reportStats (void) {
-      reportStat(loopname, "Pushes", stat_pushes);
-      reportStat(loopname, "Iterations", stat_iterations);
-    }
-  };
-
-  const char* loopname;  
-  PerThreadStorage<PerThreadData> perThreadData;
-  TerminationDetection& term;
-  WL_ty workList;
-
-public:
-  TreeExecGeneric (const char* loopname): 
-    loopname (loopname), 
-    perThreadData (loopname), 
-    term (getSystemTermination ()) 
-  {}
-
-  void push (TreeTaskBase& f) {
-    PerThreadData& ptd = *(perThreadData.getLocal ());
-    Task* t = ptd.currTask;
-    if (t != nullptr) {
-      ++(t->numChild);
-    }
-    workList.push (WorkItem (t, &f));
-    ++(ptd.stat_pushes);
-  }
-
-  void syncLoop (void) {
-    PerThreadData& ptd = *(perThreadData.getLocal ());
-    Task* t= ptd.currTask;
-
-    while (t->numChild != 0) {
-      applyOperatorRecursive ();
-    }
-  }
-
-  void applyOperatorRecursive () {
-    Galois::optional<WorkItem> funcNparent = workList.pop ();
-
-    if (funcNparent) {
-      PerThreadData& ptd = *(perThreadData.getLocal ());
-      ++(ptd.stat_iterations);
-
-      if (!ptd.didWork) {
-        ptd.didWork = true;
-      }
-
-      Task task {funcNparent->first};
-
-      ptd.currTask = &task;
-
-      funcNparent->second->operator () ();
-
-      Task* parent = funcNparent->first;
-
-      if (parent != nullptr) {
-        --(parent->numChild);
-      }
-
-      ptd.currTask = nullptr;
-    }
-  }
-  void initThread (void) {
-    term.initializeThread ();
-  }
-
-  void operator () (void) {
-    PerThreadData& ptd = *(perThreadData.getLocal ());
-    do {
-      ptd.didWork = false;
-
-      applyOperatorRecursive ();
-
-      term.localTermination (ptd.didWork);
-      LL::asmPause (); // Take a breath, let the token propagate
-    } while (!term.globalTermination ());
-
-    ptd.reportStats ();
-  }
-};
-
-TreeExecGeneric& getTreeExecutor (void);
-
-void setTreeExecutor (TreeExecGeneric* t);
-
-void spawn (TreeTaskBase& f);
-
-void sync (void);
-
-void for_each_ordered_tree_generic (TreeTaskBase& initTask, const char* loopname=nullptr);
-
-
-
+void for_each_ordered_tree_generic (TreeTaskBase& initTask, const char* loopname=nullptr); 
 } // end namespace Runtime
 } // end namespace Galois
