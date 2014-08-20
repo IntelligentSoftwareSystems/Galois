@@ -60,7 +60,7 @@ public:
   T* releaseAt(uint64_t off) { return reinterpret_cast<T*>(releaseAt_i(off)); }
 
   template<typename T>
-  T* resolve(uint64_t off ) { return reinterpret_cast<T*>(resolve_i(off)); }
+  T* resolve(uint64_t off) { return reinterpret_cast<T*>(resolve_i(off)); }
 
   //returns pointer in remote address space
   template<typename T>

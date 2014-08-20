@@ -28,9 +28,9 @@ void testSerialAdd(int N) {
 
   GALOIS_ASSERT(std::distance(g->begin(), g->end()) == N);
   for (auto nn : *g) {
-    GALOIS_ASSERT(std::distance(nn->begin(), nn->end()) == 1);
-    for (auto jj = nn->begin(), ej = nn->end(); jj != ej; ++jj)
-      GALOIS_ASSERT(nn->getData() == jj->getValue());
+    GALOIS_ASSERT(std::distance(g->edge_begin(nn), g->edge_end(nn)) == 1);
+    for (auto jj = g->edge_begin(nn), ej = g->edge_end(nn); jj != ej; ++jj)
+      GALOIS_ASSERT(g->getData(nn) == g->getEdgeData(jj));
   }
 
   Graph::deallocate(g);
@@ -109,13 +109,6 @@ void testAddRemove(int N) {
   }
   UndirectedGraph::deallocate(g);
 }
-
-
-struct Wait {
-  void operator()(unsigned, unsigned) {
-    Galois::Runtime::getSystemBarrier().wait();
-  }
-};
 
 int main(int argc, char** argv) {
   Galois::StatManager statManager;
