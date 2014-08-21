@@ -197,7 +197,7 @@ class LocalDirectory : public BaseDirectory {
       return recalled == ~0 && !locRO.empty();
     }
 
-    metadata() :locRW(~0), recalled(~0), th(nullptr) {}
+    metadata() :locRW(~0), recalled(~0), contended(0), th(nullptr) {}
 
     friend std::ostream& operator<< (std::ostream& os, const metadata& md) {
       std::ostream_iterator<uint32_t> out_it(os, ",");
