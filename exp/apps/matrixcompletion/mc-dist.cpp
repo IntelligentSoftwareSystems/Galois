@@ -106,13 +106,13 @@ public:
       // Galois::Runtime::getSystemNetworkInterface().handleReceives();
       T.stop();
       tPrefetch += T.get();
-      //      std::cout << Galois::Runtime::NetworkInterface::ID << " prefetch: " << T.get() << "\n";
+      std::cout << Galois::Runtime::NetworkInterface::ID << " prefetch: " << T.get() << "\n";
 
       T.start();
       Galois::Runtime::for_each_impl<Galois::WorkList::StableIterator<> >(Galois::Runtime::makeStandardRange(boost::make_counting_iterator(x1Local), boost::make_counting_iterator(x2Local)), [&items, &rL, y1Local, y2Local] (unsigned z, Galois::UserContext<unsigned>& ctx) { rL(z, std::make_pair(y1Local, y2Local), items); }, "BlockedExecutor::find");
       T.stop();
       tFind += T.get();
-      //      std::cout << Galois::Runtime::NetworkInterface::ID << " find: " << T.get() << "\n";
+      std::cout << Galois::Runtime::NetworkInterface::ID << " find: " << T.get() << "\n";
 
       T.start();
       Galois::Runtime::for_each_impl<Galois::WorkList::StableIterator<> >(
@@ -120,7 +120,7 @@ public:
         f, "BlockedExecutor::do");
       T.stop();
       tDo += T.get();
-      //      std::cout << Galois::Runtime::NetworkInterface::ID << " do: " << T.get() << "\n";
+      std::cout << Galois::Runtime::NetworkInterface::ID << " do: " << T.get() << "\n";
       //barrier before execution in foreach should be sufficient
     }
     std::cout << Galois::Runtime::NetworkInterface::ID << " ALL p: " << tPrefetch << " f: " << tFind << " d: " << tDo << "\n";
@@ -196,6 +196,9 @@ struct Node {
       os << ", " << latent_vector[i];
     os << "}";
   }
+  //is_trivially_copyable
+  typedef int tt_is_copyable;
+
 };
 
 struct LearnFN {
@@ -277,7 +280,8 @@ struct sgd_edge_pair {
     auto dst = *(g->begin() + edge.second);
     auto ii = g->edge_begin(src, Galois::MethodFlag::SRC_ONLY);
     auto ee = g->edge_end(src, Galois::MethodFlag::SRC_ONLY);
-    ii = std::lower_bound(ii,ee, dst, [] (const decltype(*ii)& edg, GNode n) { return edg.dst < n; });
+//G
+    ii = std::lower_bound(ii,ee, dst, [] ( decltype(*ii)& edg, GNode n) { return edg.dst < n; });
     if (ii != ee && g->dst(ii) == dst) {
       doGradientUpdate(g->at(src), g->at(dst), g->at(ii), step_size);
     }
@@ -291,6 +295,9 @@ struct sgd_edge_pair {
     auto dst = g->dst(ii);
     doGradientUpdate(g->at(src), g->at(dst), g->at(ii), step_size);
   }
+
+  //is_trivially_copyable
+  typedef int tt_is_copyable;
 
 };
 
@@ -309,13 +316,18 @@ struct sgd_edge_finder {
     auto dst2 = *(g->begin() + (edge_range.second - 1));
     auto ii = g->edge_begin(src, Galois::MethodFlag::SRC_ONLY);
     auto ee = g->edge_end(src, Galois::MethodFlag::SRC_ONLY);
-    auto ii2 = std::lower_bound(ii, ee, dst1, [] (const decltype(*ii)& edg, GNode n) { return edg.dst < n; });
-    auto ee2 = std::upper_bound(ii, ee, dst2, [] (GNode n, const decltype(*ii)& edg) { return n < edg.dst; });
+//G
+    auto ii2 = std::lower_bound(ii, ee, dst1, [] ( decltype(*ii)& edg, GNode n) { return edg.dst < n; });
+//G
+    auto ee2 = std::upper_bound(ii, ee, dst2, [] (GNode n, decltype(*ii)& edg) { return n < edg.dst; });
     while (ii2 != ee2) {
       bag.push_back(std::make_pair(src, std::distance(ii, ii2)));
       ++ii2;
     }
   }
+  //is_trivially_copyable
+  typedef int tt_is_copyable;
+
 };
 
 struct node_prefetch {
@@ -326,6 +338,8 @@ struct node_prefetch {
   void operator()(unsigned user) {
     Galois::Runtime::prefetch( *(g->begin() + user) );
   }
+  //is_trivially_copyable
+  typedef int tt_is_copyable;
 };
 
 void go(Graph::pointer g, unsigned int numMovieNodes, unsigned int numUserNodes, const LearnFN* lf) {
@@ -371,6 +385,8 @@ struct initializeGraphData {
       numUserNodes = un;
       numRatings = r;
     }
+  //is_trivially_copyable
+    //  typedef int tt_is_copyable;
 
   };
 
@@ -424,6 +440,9 @@ struct initializeGraphData {
       //std::cout <<"U";
     }
   }
+  //is_trivially_copyable
+  typedef int tt_is_copyable;
+
 };
 
 int main(int argc, char** argv) {	
