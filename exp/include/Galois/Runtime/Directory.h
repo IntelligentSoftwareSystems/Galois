@@ -363,6 +363,8 @@ protected: // Remote portion of the api
   void recvObjectImpl(fatPointer, ResolveFlag, typeHelper*, RecvBuffer&);
   //! handle requests ariving
   void recvRequestImpl(fatPointer, uint32_t, ResolveFlag);
+  void recvRequestImpl(fatPointer, uint32_t, ResolveFlag, metadata&, std::unique_lock<LL::SimpleLock>&);
+
   //! handle local requests
   void fetchImpl(fatPointer ptr, ResolveFlag flag, typeHelper* th, bool setContended);
 

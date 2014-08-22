@@ -108,6 +108,10 @@ bool RemoteDirectory::tryWriteBack(metadata& md, fatPointer ptr, std::unique_loc
 void RemoteDirectory::recvRequestImpl(fatPointer ptr, uint32_t dest, ResolveFlag flag) {
   metadata& md = getMD(ptr);
   std::unique_lock<LL::SimpleLock> lg(md.lock, std::adopt_lock);
+  recvRequestImpl(ptr, dest, flag, md, lg);
+}
+
+void RemoteDirectory::recvRequestImpl(fatPointer ptr, uint32_t dest, ResolveFlag flag, metadata& md, std::unique_lock<LL::SimpleLock>& lg) {
   trace("RemoteDirectory::recvRequest % dest % md %\n", ptr, dest, md);
   if (md.contended && dest > NetworkInterface::ID) {
     addPendingReq(ptr, dest, flag);
@@ -164,7 +168,7 @@ void RemoteDirectory::recvObjectImpl(fatPointer ptr, ResolveFlag flag, typeHelpe
 
 void RemoteDirectory::clearContended(fatPointer ptr) {
   metadata& md = getMD(ptr);
-  std::lock_guard<LL::SimpleLock> lg(md.lock, std::adopt_lock);
+  std::unique_lock<LL::SimpleLock> lg(md.lock, std::adopt_lock);
   trace("RemoteDirectory::clearContended % md %\n", ptr, md);
   md.contended = false;
   assert(md.state != metadata::INVALID);
@@ -181,7 +185,7 @@ void RemoteDirectory::clearContended(fatPointer ptr) {
     }
   }
   if (doRecv)
-    recvRequestImpl(ptr, r.dest, r.flag);
+    recvRequestImpl(ptr, r.dest, r.flag, md, lg);
 }
 
 void RemoteDirectory::fetchImpl(fatPointer ptr, ResolveFlag flag, typeHelper* th, bool setContended) {
