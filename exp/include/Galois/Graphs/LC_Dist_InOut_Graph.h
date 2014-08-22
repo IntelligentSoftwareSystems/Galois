@@ -1,11 +1,11 @@
-/** Distributed LC Graph -*- C++ -*-
+/** Distributed LC InOut Graph -*- C++ -*-
  * @file
  * @section License
  *
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2014, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -19,10 +19,11 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
+ * @author Gurbinder Gill <gill@cs.utexas.edu>
  */
 
-#ifndef GALOIS_GRAPH_LCDIST_H
-#define GALOIS_GRAPH_LCDIST_H
+#ifndef GALOIS_GRAPH_LC_DIST_INOUT_H
+#define GALOIS_GRAPH_LC_DIST_INOUT_H
 
 #include <vector>
 #include <iostream>
@@ -31,75 +32,138 @@ namespace Galois {
 namespace Graph {
 
 template<typename NodeTy, typename EdgeTy>
-class LC_Dist {
+class LC_Dist_InOut {
 
   struct EdgeImplTy;
 
   struct NodeImplTy :public Runtime::Lockable {
-    NodeTy data;
-    EdgeImplTy* b;
-    EdgeImplTy* e;
-    unsigned len;
-    bool remote;
-
-    NodeImplTy(EdgeImplTy* start, unsigned len) :b(start), e(start), len(len), remote(false) {}
+    NodeImplTy(EdgeImplTy* start, unsigned len, EdgeImplTy* In_start, unsigned len_inEdges) :b(start), e(start), len(len), remote(false), b_inEdges(In_start), e_inEdges(In_start), len_inEdges(len_inEdges)
+    {}
     ~NodeImplTy() {
-      if (remote)
+      if (remote) {
         delete[] b;
+	delete[] b_inEdges;
+      }
       b = e = nullptr;
+      b_inEdges = e_inEdges = nullptr;
     }
 
     //Serialization support
     typedef int tt_has_serialize;
     NodeImplTy(Runtime::DeSerializeBuffer& buf) :remote(true) {
       ptrdiff_t diff;
-      gDeserialize(buf, data, len, diff);
+      ptrdiff_t diff_inEdges;
+      gDeserialize(buf, data, len, diff, len_inEdges, diff_inEdges);
       b = e = len ? (new EdgeImplTy[len]) : nullptr;
+      b_inEdges = e_inEdges = len_inEdges ? (new EdgeImplTy[len_inEdges]) : nullptr;
       while (diff--) {
         Runtime::gptr<NodeImplTy> ptr;
         EdgeTy tmp;
         gDeserialize(buf, ptr, tmp);
         append(ptr, tmp);
       }
+    
+      while (diff_inEdges--) {
+	Runtime::gptr<NodeImplTy> ptr;
+	EdgeTy tmp;
+	gDeserialize(buf, ptr, tmp);
+	append_inEdges(ptr, tmp);
+		
+      }
     }
+
     void serialize(Runtime::SerializeBuffer& buf) const {
       EdgeImplTy* begin = b;
       EdgeImplTy* end = e;
+	
+      EdgeImplTy* begin_In = b_inEdges;
+      EdgeImplTy* end_In = e_inEdges;
+	
       ptrdiff_t diff = end - begin;
-      gSerialize(buf, data, len, diff);
+      ptrdiff_t diff_inEdges = end_In - begin_In;
+      gSerialize(buf, data, len, diff, len_inEdges, diff_inEdges);
       while (begin != end) {
         gSerialize(buf, begin->dst, begin->data);
         ++begin;
       }
+      while (begin_In != end_In) {
+	gSerialize(buf, begin_In->dst, begin_In->data);
+	++begin_In;
+      }
+    
     }
     void deserialize(Runtime::DeSerializeBuffer& buf) {
       assert(!remote);
       ptrdiff_t diff;
       unsigned _len;
+      ptrdiff_t diff_inEdges;
+      unsigned _len_inEdges;
+    
       EdgeImplTy* begin = b;
-      gDeserialize(buf, data, _len, diff);
+      EdgeImplTy* begin_In = b_inEdges;
+      gDeserialize(buf, data, _len, diff, _len_inEdges, diff_inEdges);
       assert(_len == len);
       assert(diff >= e - b);
+      // inEdges
+      assert(_len_inEdges == len_inEdges);
+      assert(diff_inEdges >= e_inEdges - b_inEdges);
       while (diff--) {
         gDeserialize(buf, begin->dst, begin->data);
         ++begin;
       }
       e = begin;
+      while (diff_inEdges--) {
+	gDeserialize(buf, begin_In->dst, begin_In->data);
+	++begin_In;
+      }
+      e_inEdges = begin_In;
     }
 
+    NodeTy data;
+    EdgeImplTy* b;
+    EdgeImplTy* e;
+    unsigned len;
+// InEdge list for each node
+    EdgeImplTy* b_inEdges;
+    EdgeImplTy* e_inEdges;
+    unsigned len_inEdges;
+//
+    bool remote;
+
     EdgeImplTy* append(Runtime::gptr<NodeImplTy> dst, const EdgeTy& data) {
+      assert(e-b < len);
       e->dst = dst;
       e->data = data;
       return e++;
     }
 
     EdgeImplTy* append(Runtime::gptr<NodeImplTy> dst) {
+      assert(e-b < len);
       e->dst = dst;
       return e++;
     }
 
+// Appending In_Edges
+    EdgeImplTy* append_inEdges(Runtime::gptr<NodeImplTy> dst, const EdgeTy& data) {
+      assert(e_inEdges-b_inEdges < len_inEdges);
+      e_inEdges->dst = dst;
+      e_inEdges->data = data;
+      return e_inEdges++;
+    }
+
+    EdgeImplTy* append_inEdges(Runtime::gptr<NodeImplTy> dst) {
+      assert(e_inEdges-b_inEdges < len_inEdges);
+      e_inEdges->dst = dst;
+      return e_inEdges++;
+    }
+
     EdgeImplTy* begin() { return b; }
     EdgeImplTy* end() { return e; }
+    
+// for In_edge list for each node 
+    EdgeImplTy* begin_inEdges() { return b_inEdges; }
+    EdgeImplTy* end_inEdges() { return e_inEdges; }
+    
   };
 
   struct EdgeImplTy {
@@ -108,28 +172,43 @@ class LC_Dist {
   };
 
  public:
+
   typedef Runtime::gptr<NodeImplTy> GraphNode;
-
+//G
+  template<bool _has_id>
+  struct with_id { typedef LC_Dist_InOut type; };     
+  
+  template<typename _node_data>
+  struct with_node_data { typedef LC_Dist_InOut<_node_data, EdgeTy> type; };
+    
+  template<typename _edge_data>
+  struct with_edge_data { typedef LC_Dist_InOut<NodeTy, _edge_data> type; };
+  
+    
  private:
-  std::vector<NodeImplTy> Nodes;
-  std::vector<EdgeImplTy> Edges;
 
+  typedef std::vector<NodeImplTy> NodeData;  
+  typedef std::vector<EdgeImplTy> EdgeData;   
+  NodeData Nodes;
+  EdgeData Edges;
+  EdgeData In_Edges;
+  
   std::vector<std::pair<GraphNode, std::atomic<int> > > Starts;
   std::vector<unsigned> Num;
   std::vector<unsigned> PrefixNum;
 
-  Runtime::PerHost<LC_Dist> self;
+  Runtime::PerHost<LC_Dist_InOut> self;
 
-  friend class Runtime::PerHost<LC_Dist>;
+  friend class Runtime::PerHost<LC_Dist_InOut>;
 
-  LC_Dist(Runtime::PerHost<LC_Dist> _self, std::vector<unsigned>& edges) 
+  LC_Dist_InOut(Runtime::PerHost<LC_Dist_InOut> _self, std::vector<unsigned>& edges, std::vector<unsigned>& In_edges) 
     :Starts(Runtime::NetworkInterface::Num),
      Num(Runtime::NetworkInterface::Num),
      PrefixNum(Runtime::NetworkInterface::Num),
      self(_self)
   {
     //std::cerr << Runtime::NetworkInterface::ID << " Construct\n";
-    Runtime::trace("LC_Dist with % nodes total\n", edges.size());
+    Runtime::trace("LC_Dist_InOut with % nodes total\n", edges.size());
     //Fill up metadata vectors
     for (unsigned h = 0; h < Runtime::NetworkInterface::Num; ++h) {
       auto p = block_range(edges.begin(), edges.end(), h,
@@ -147,26 +226,39 @@ class LC_Dist {
     auto p = block_range(edges.begin(), edges.end(), 
                          Runtime::NetworkInterface::ID,
                          Runtime::NetworkInterface::Num);
+    //Block in_edge vector
+    auto p_inEdges = block_range(In_edges.begin(), In_edges.end(),
+				 Runtime::NetworkInterface::ID,
+				 Runtime::NetworkInterface::Num);
+    
+    //NOTE: range of p and p_inEdges will be same since the size(edges) == size(In_edges)
     //Allocate Edges
-    unsigned sum = std::accumulate(p.first, p.second, 0);
+    unsigned sum = std::accumulate(p.first, p.second, 0); // Total number of egdes on this host (me)
     Edges.resize(sum);
     EdgeImplTy* cur = &Edges[0];
+
+    //Allocate In_Edges
+    unsigned sum_inEdges = std::accumulate(p_inEdges.first, p_inEdges.second, 0);
+    In_Edges.resize(sum_inEdges);
+    EdgeImplTy* cur_In = &In_Edges[0]; //cur edgelist for in_edges
+
     //allocate Nodes
     Nodes.reserve(std::distance(p.first, p.second));
-    for (auto ii = p.first; ii != p.second; ++ii) {
-      Nodes.emplace_back(cur, *ii);
+    for (auto ii = p.first, ii_in = p_inEdges.first; ii != p.second; ++ii,++ii_in) {
+      Nodes.emplace_back(cur, *ii, cur_In, *ii_in);
       cur += *ii;
+      cur_In += *ii_in;
     }
     Starts[Runtime::NetworkInterface::ID].first = GraphNode(&Nodes[0]);
     Starts[Runtime::NetworkInterface::ID].second = 2;
   }
 
-  static void getStart(Runtime::PerHost<LC_Dist> graph, uint32_t whom) {
+  static void getStart(Runtime::PerHost<LC_Dist_InOut> graph, uint32_t whom) {
     //std::cerr << Runtime::NetworkInterface::ID << " getStart " << whom << "\n";
     Runtime::getSystemNetworkInterface().sendAlt(whom, putStart, graph, Runtime::NetworkInterface::ID, graph->Starts[Runtime::NetworkInterface::ID].first);
   }
 
-  static void putStart(Runtime::PerHost<LC_Dist> graph, uint32_t whom, GraphNode start) {
+  static void putStart(Runtime::PerHost<LC_Dist_InOut> graph, uint32_t whom, GraphNode start) {
     //std::cerr << Runtime::NetworkInterface::ID << " putStart " << whom << "\n";
     graph->Starts[whom].first = start;
     graph->Starts[whom].second = 2;
@@ -198,14 +290,20 @@ class LC_Dist {
   }
 
 public:
+  typedef EdgeImplTy edge_data_type;
+  typedef NodeImplTy node_data_type;
+  typedef typename EdgeData::reference edge_data_reference;
+  typedef typename NodeData::reference node_data_reference;
+    
+ 
   //This is technically a const (non-mutable) iterator
   class iterator : public std::iterator<std::random_access_iterator_tag,
                                         GraphNode, ptrdiff_t, GraphNode, GraphNode> {
-    LC_Dist* g;
+    LC_Dist_InOut* g;
     unsigned x;
 
-    friend class LC_Dist;
-    iterator(LC_Dist* _g, unsigned _x) :g(_g), x(_x) {}
+    friend class LC_Dist_InOut;
+    iterator(LC_Dist_InOut* _g, unsigned _x) :g(_g), x(_x) {}
 
   public:
     iterator() :g(nullptr), x(0) {}
@@ -238,9 +336,9 @@ public:
   typedef EdgeImplTy* edge_iterator;
 
   //! Creation and destruction
-  typedef Runtime::PerHost<LC_Dist> pointer;
-  static pointer allocate(std::vector<unsigned>& edges) {
-    return pointer::allocate(edges);
+  typedef Runtime::PerHost<LC_Dist_InOut> pointer;
+  static pointer allocate(std::vector<unsigned>& edges, std::vector<unsigned>& In_edges) {
+    return pointer::allocate(edges, In_edges);
   }
   static void deallocate(pointer ptr) {
     pointer::deallocate(ptr);
@@ -259,6 +357,17 @@ public:
     return src->append(dst);
   }
 
+// Adding inEdges to the Graph.
+  template<typename... Args>
+  edge_iterator addInEdge(GraphNode src, GraphNode dst, const EdgeTy& data, MethodFlag mflag = MethodFlag::ALL) {
+    acquire(src, mflag);
+    return src->append_inEdges(dst, data);
+  }
+
+  edge_iterator addInEdge(GraphNode src, GraphNode dst, MethodFlag mflag = MethodFlag::ALL) {
+    acquire(src, mflag);
+    return src->append_inEdges(dst);
+  }
   //! Access
 
   NodeTy& at(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
@@ -290,7 +399,7 @@ public:
     else
       return local_end();
   }
-  local_iterator local_end() { return iterator(this, PrefixNum[Runtime::NetworkInterface::ID]); }
+  local_iterator local_end  () { return iterator(this, PrefixNum[Runtime::NetworkInterface::ID]); }
 
   edge_iterator edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
     acquire(N, mflag);
@@ -305,7 +414,28 @@ public:
     acquireNode(N, mflag);
     return N->end();
   }
-  
+ 
+
+/**
+ * In Edge iterators 
+ *
+ */
+
+  edge_iterator in_edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+    acquire(N, mflag);
+    if (mflag != MethodFlag::SRC_ONLY && mflag != MethodFlag::NONE)
+      for (edge_iterator ii = N->begin_inEdges(), ee = N->end_inEdges(); ii !=ee; ++ii) {
+	acquireNode(ii->dst, mflag);	
+      }
+      
+   return N->begin_inEdges(); 
+  }
+
+  edge_iterator in_edge_end(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+   acquireNode(N, mflag);
+   return N->end_inEdges();  
+  }
+
   template<typename Compare>
   void sort_edges(GraphNode N, Compare comp, MethodFlag mflag = MethodFlag::ALL) {
     std::sort(edge_begin(N, mflag), edge_end(N, mflag),

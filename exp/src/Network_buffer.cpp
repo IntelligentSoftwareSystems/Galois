@@ -135,6 +135,8 @@ class NetworkInterfaceBuffer : public NetworkInterface {
       advBuffer(s, sizeof(header) + h.size);
       recvFuncTy func = (recvFuncTy)h.func;
       assert(func);
+      this->statRecvNum += 1;
+      this->statRecvBytes += buf.size();
       func(buf);
     }
   }
@@ -149,6 +151,8 @@ public:
   }
 
   virtual void send(uint32_t dest, recvFuncTy recv, SendBuffer& buf) {
+    this->statSendNum += 1;
+    this->statSendBytes += buf.size();
     sendInternal(states[dest].out, dest, recv, buf);
   }
 

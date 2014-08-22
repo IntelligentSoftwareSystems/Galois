@@ -42,7 +42,6 @@ class DeSerializeBuffer;
 template<typename T>
 T gDeserializeObj(DeSerializeBuffer&);
 
-
 namespace details {
 
 class remoteObj {
@@ -85,7 +84,6 @@ public:
 
 
 class CacheManager {
-
   std::unordered_map<fatPointer, details::remoteObj*> remoteObjects;
   std::deque<details::remoteObj*> garbage;
   LL::SimpleLock Lock;

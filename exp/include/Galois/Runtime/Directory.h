@@ -26,30 +26,28 @@
 
 #include "Galois/gstl.h"
 #include "Galois/MethodFlags.h"
-#include "Galois/Runtime/ll/TID.h"
-//#include "Galois/Runtime/Context.h"
-#include "Galois/Runtime/Network.h"
-#include "Galois/Runtime/Tracer.h"
-#include "Galois/Runtime/Support.h"
-#include "Galois/Runtime/ll/SimpleLock.h"
-#include "Galois/Runtime/ll/gio.h"
+#include "Galois/Runtime/CacheManager.h"
 #include "Galois/Runtime/FatPointer.h"
 #include "Galois/Runtime/Lockable.h"
-#include "Galois/Runtime/CacheManager.h"
+#include "Galois/Runtime/Network.h"
+#include "Galois/Runtime/Support.h"
+#include "Galois/Runtime/Tracer.h"
+#include "Galois/Runtime/ll/gio.h"
+#include "Galois/Runtime/ll/SimpleLock.h"
+#include "Galois/Runtime/ll/TID.h"
 
-#include <boost/utility.hpp>
 #include <boost/intrusive_ptr.hpp>
+#include <boost/utility.hpp>
 
+#include <array>
+#include <functional>
 #include <mutex>
+#include <set>
 #include <unordered_map>
 #include <unordered_set>
-#include <set>
-#include <functional>
-#include <array>
 
 namespace Galois {
 namespace Runtime {
-
 
 enum ResolveFlag {INV=0, RO=1, RW=2};
 
@@ -63,9 +61,8 @@ void recvObject(RecvBuffer& buf);
 template<typename T>
 void recvRequest(RecvBuffer& buf);
 
-
 template<typename metadata>
-class MetaHolder{
+class MetaHolder {
   std::unordered_map<fatPointer, metadata> md;
   LL::SimpleLock md_lock;
 
@@ -88,9 +85,7 @@ public:
 
 //Base class for common directory operations
 class BaseDirectory {
-
 public:
-
   //These wrap type information for various dispatching purposes.  This
   //let's us keep vtables out of user objects
   class typeHelper {
@@ -123,11 +118,12 @@ protected:
   bool dirAcquire(Lockable*);
   void dirRelease(Lockable*);
   bool dirOwns(Lockable*);
-
 };
 
 
-//handle local objects
+/**
+ * Manages local objects sent to remote hosts
+ */
 class LocalDirectory : public BaseDirectory {
   struct metadata {
     //Lock protecting this structure
@@ -168,7 +164,6 @@ class LocalDirectory : public BaseDirectory {
       return std::make_pair(nextDest, nextIsRW);
     }
 
-
     //!returns whether object is still needs processing
     bool writeback();
 
@@ -202,13 +197,17 @@ class LocalDirectory : public BaseDirectory {
       return recalled == ~0 && !locRO.empty();
     }
 
-    metadata() :locRW(~0), recalled(~0), th(nullptr) {}
+    metadata() :locRW(~0), recalled(~0), contended(0), th(nullptr) {}
 
-    friend std::ostream& operator<< (std::ostream& os, const metadata& md) {
+    friend std::ostream& operator<<(std::ostream& os, const metadata& md) {
       std::ostream_iterator<uint32_t> out_it(os, ",");
       os << "locRO:<";
       std::copy(md.locRO.begin(), md.locRO.end(), out_it);
-      os << ">,locRW:" << md.locRW << ",recalled:" << md.recalled << ",reqsRO:<";
+      os << ">,locRW:";
+      if (md.locRW != ~0) os << md.locRW;
+      os << ",recalled:";
+      if (md.recalled != ~0) os << md.recalled;
+      os << ",reqsRO:<";
       std::copy(md.reqsRO.begin(), md.reqsRO.end(), out_it);
       os << ">,reqsRW:<";
       std::copy(md.reqsRW.begin(), md.reqsRW.end(), out_it);
@@ -223,7 +222,8 @@ class LocalDirectory : public BaseDirectory {
   std::unordered_set<fatPointer> pending;
   LL::SimpleLock pending_lock;
   
-  void setPending(fatPointer ptr) {
+  //!Add a request to process later
+  void addPendingReq(fatPointer ptr) {
     std::lock_guard<LL::SimpleLock> lg(pending_lock);
     pending.insert(ptr);
   }
@@ -234,18 +234,19 @@ class LocalDirectory : public BaseDirectory {
 
   //!Send object to all outstanding readers
   void sendToReaders(metadata&, fatPointer);
-
+  
   //!Send invalidate to all outstanding readers
   void invalidateReaders(metadata&, fatPointer, uint32_t);
 
-  void updatePendingRequests(metadata&, fatPointer, std::unique_lock<LL::SimpleLock>&);
+  //!Forward request to next writer (if available)
+  void forwardRequestToNextWriter(metadata&, fatPointer, std::unique_lock<LL::SimpleLock>&);
 
+  //!Consider object for local use or to send on
   void considerObject(metadata& m, fatPointer ptr);
 
   void fetchImpl(fatPointer ptr, ResolveFlag flag, typeHelper* th, bool setContended);
 
 protected:
-
   void recvObjectImpl(fatPointer, ResolveFlag, typeHelper* th, RecvBuffer&);
 
   void recvRequestImpl(fatPointer, uint32_t, ResolveFlag, typeHelper*);
@@ -256,6 +257,8 @@ protected:
   //allow receiving requests
   template<typename T>
   friend void detail::recvRequest(RecvBuffer& buf);
+
+  void invalidateImpl(fatPointer, typeHelper*);
 
 public:
   //Local portion of API
@@ -278,6 +281,10 @@ public:
   //! unengage priority protocol for ptr.  May send object away
   void clearContended(fatPointer ptr);
 
+  //!Send invalidate to all outstanding reader/writers
+  //TODO(ddn) remove this in favor of standard acquire, writeback mechanism
+  void invalidate(fatPointer ptr);
+
   //! setup notification on object reciept.  Returns true if
   //! notification registered.  Returns false if object already in
   //! requested state (no notification actualy registered)
@@ -294,8 +301,10 @@ LocalDirectory& getLocalDirectory();
 
 ////////////////////////////////////////////////////////////////////////////////
 
+/**
+ * Manages remote objects from remote hosts.
+ */
 class RemoteDirectory : public BaseDirectory {
-
   //metadata for an object.
   struct metadata {
     enum StateFlag {
@@ -351,7 +360,7 @@ class RemoteDirectory : public BaseDirectory {
   //invalidates the metadata
   void eraseMD(fatPointer, std::unique_lock<LL::SimpleLock>& mdl);
 
-  //Add a pending request which couldn't be handle immediately
+  //!Add a request to process later
   void addPendingReq(fatPointer, uint32_t, ResolveFlag);
 
   //try to writeback ptr, may fail
@@ -359,16 +368,19 @@ class RemoteDirectory : public BaseDirectory {
   bool tryWriteBack(metadata& md, fatPointer ptr, std::unique_lock<LL::SimpleLock>& lg);
 
 protected: // Remote portion of the api
-  //! handle object ariving
+  //! handle incoming object
   void recvObjectImpl(fatPointer, ResolveFlag, typeHelper*, RecvBuffer&);
-  //! handle requests ariving
+
+  //! handle incoming requests
+  void recvRequestImpl(metadata&, fatPointer, std::unique_lock<LL::SimpleLock>&, uint32_t, ResolveFlag);
   void recvRequestImpl(fatPointer, uint32_t, ResolveFlag);
-  void recvRequestImpl(fatPointer, uint32_t, ResolveFlag, metadata&, std::unique_lock<LL::SimpleLock>&);
 
   //! handle local requests
   void fetchImpl(fatPointer ptr, ResolveFlag flag, typeHelper* th, bool setContended);
 
-public: // Local portion of the api
+public:
+  // Local portion of the api
+
   //! process any queues
   void makeProgress();
 
@@ -388,14 +400,14 @@ public: // Local portion of the api
 
   //! setup notification on object reciept.  Returns true if
   //! notification registered.  Returns false if object already in
-  //! requested state (no notification actualy registered)
+  //! requested state (no notification actually registered)
   bool notify(fatPointer ptr, ResolveFlag flag, std::function<void (fatPointer)> fnotify);
 
   void resetStats();
   void reportStats(const char* loopname);
 
   void dump(fatPointer ptr); //dump one object info
-  void dump(); //dump direcotry status
+  void dump(); //dump directory status
 };
 
 RemoteDirectory& getRemoteDirectory();

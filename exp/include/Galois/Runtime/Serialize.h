@@ -280,7 +280,7 @@ void gDeserializeObj(DeSerializeBuffer& buf, T& data,
 
 template<typename T1, typename T2>
 void gDeserializeObj(DeSerializeBuffer& buf, std::pair<T1, T2>& data) {
-  gDeserializeObj(buf, data.first, data.second);
+  gDeserialize(buf, data.first, data.second);
 }
 
 namespace {

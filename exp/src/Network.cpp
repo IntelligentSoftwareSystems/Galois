@@ -32,8 +32,8 @@
 
 using namespace Galois::Runtime;
 
-uint32_t NetworkInterface::ID = 0;
-uint32_t NetworkInterface::Num = 1;
+uint32_t Galois::Runtime::NetworkInterface::ID = 0;
+uint32_t Galois::Runtime::NetworkInterface::Num = 1;
 
 uint32_t Galois::Runtime::getHostID() { return NetworkInterface::ID; }
 
@@ -75,12 +75,22 @@ void NetworkInterface::start() {
         loopwork.pop_front();
       }
     }
+    getSystemNetworkInterface().reportStats();
     getSystemThreadPool().run(activeThreads, []() { Galois::Runtime::getSystemBarrier().wait(); });
     exit(0);
   }
 }
 
+void NetworkInterface::reportStats() {
+  statRecvNum.report();
+  statRecvBytes.report();
+  statSendNum.report();
+  statSendBytes.report();
+}
+
 void NetworkInterface::terminate() {
+  getSystemNetworkInterface().reportStats();
+
   //return if just one host is running
   if (NetworkInterface::Num == 1)
     return;

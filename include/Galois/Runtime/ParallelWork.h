@@ -199,6 +199,7 @@ public:
   void push(const value_type& val, fatPointer ptr, 
             void (RemoteDirectory::*rfetch) (fatPointer, ResolveFlag),
             void (LocalDirectory::*lfetch) (fatPointer, ResolveFlag)) {
+    // TODO(ddn) what if there are multiple copies of the same active element?
     std::lock_guard<LL::SimpleLock> lg(lock);
 
     //Set contended and fetch
@@ -239,14 +240,20 @@ public:
 
   void commit(const value_type& val) {
     std::lock_guard<LL::SimpleLock> lg(lock);
-    auto p = contended_set[val];
-    assert(!p.empty());
-    for (auto ptr : p)
+    // TODO(ddn) what if multiple copies 
+    // TODO(ddn) what if commit before notify?
+    auto& p = contended_set[val];
+    // DDN: There may be multiple copies of the same active node so the
+    // following assertion is not always true
+    //assert(!p.empty());
+    for (auto ptr : p) {
+      assert(waiting_on.count(ptr) == 0);
       if (ptr.isLocal()) {
         getLocalDirectory().clearContended(ptr);
       } else {
         getRemoteDirectory().clearContended(ptr);
       }
+    }
     contended_set.erase(val);
   }
 
@@ -254,9 +261,9 @@ public:
     return ready.pop();
   }
 
-  bool noHiddenWork() {
+  bool hiddenWork() {
     std::lock_guard<LL::SimpleLock> lg(lock);
-    return waiting_on.empty();
+    return !waiting_on.empty();
   }
 
 };
@@ -336,11 +343,9 @@ protected:
         if (ForEachTraits<FunctionTy>::NeedsAborts && inAborted)
           aborted.commit(*p);
       } catch (const remote_ex& ex) {
-        //      std::cout << "R";
         tld.abortIteration();
         aborted.push(*p, ex.ptr, ex.rfetch, ex.lfetch);
       } catch (const conflict_ex& ex) {
-        //      std::cout << "L";
         tld.abortIteration();
         aborted.push(*p, ex.ptr);
       }
@@ -356,7 +361,7 @@ protected:
 
   GALOIS_ATTRIBUTE_NOINLINE
   bool handleAborts(ThreadLocalData& tld) {
-    return runQueue<8, true>(tld, aborted) || !aborted.noHiddenWork();
+    return runQueue<8, true>(tld, aborted) || aborted.hiddenWork();
   }
 
   void fastPushBack(typename UserContextAccess<value_type>::PushBufferTy& x) {

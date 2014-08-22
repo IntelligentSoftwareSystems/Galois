@@ -60,7 +60,7 @@ public:
   T* releaseAt(uint64_t off) { return reinterpret_cast<T*>(releaseAt_i(off)); }
 
   template<typename T>
-  T* resolve(uint64_t off ) { return reinterpret_cast<T*>(resolve_i(off)); }
+  T* resolve(uint64_t off) { return reinterpret_cast<T*>(resolve_i(off)); }
 
   //returns pointer in remote address space
   template<typename T>
@@ -73,7 +73,6 @@ PerBackend_v2& getPerHostBackend();
 
 template<typename T>
 class PerHost {
-
   //global name
   uint64_t offset;
 
@@ -115,6 +114,7 @@ public:
     return PerHost(off);
   }
   static void deallocate(PerHost ptr) {
+    assert(NetworkInterface::ID == 0);
     getSystemNetworkInterface().broadcastAlt(&deallocOnHost, ptr.offset);
     deallocOnHost(ptr.offset);
     getPerHostBackend().deallocateOffset(ptr.offset);
@@ -151,8 +151,6 @@ public:
   }
 };
 
-
-
 class PerBackend_v3 {
   static const int dynSlots = 1024;
   static __thread void* space[dynSlots];
@@ -177,7 +175,7 @@ public:
   void deallocateOffset(uint64_t);
   
   template<typename T>
-  T*& resolve(uint64_t off ) { return *reinterpret_cast<T**>(&space[off]); }
+  T*& resolve(uint64_t off) { return *reinterpret_cast<T**>(&space[off]); }
 
   template<typename T>
   T*& resolveThread(uint64_t off, uint32_t tid) {
@@ -214,13 +212,17 @@ class PerThreadDist {
 	auto buf2 = buf;
 	getPerThreadDistBackend().resolveThread<T>(off, x) = new T(PerThreadDist(off), buf2);
       }
-      //std::cout << off << " " << x << " " << getPerThreadDistBackend().resolveThread<T>(off, x) << "\n";
     }
   }
 
   static void deallocOnHost(uint64_t off) {
-    for (unsigned x = 0; x < getSystemThreadPool().getMaxThreads(); ++x)
-      delete getPerThreadDistBackend().resolveThread<T>(off, x);
+    for (unsigned x = 0; x < getSystemThreadPool().getMaxThreads(); ++x) {
+      T*& p = getPerThreadDistBackend().resolveThread<T>(off, x);
+      // Invalidate any gptrs we may have generated
+      getLocalDirectory().invalidate(static_cast<Runtime::fatPointer>(gptr<T>(p)));
+      delete p;
+      p = nullptr;
+    }
   }
 
 public:
@@ -294,7 +296,7 @@ public:
     iterator() :hostID(NetworkInterface::Num), threadID(activeThreads), basePtr() {}
   };
 
-  iterator begin() { return iterator(0,0,*this); }
+  iterator begin() { return iterator(0, 0, *this); }
   iterator end() { return iterator(); }
 
   //serialize
@@ -306,10 +308,6 @@ public:
     gDeserialize(s,offset);
   }
 };
-
-  
-
-
 
 } // end namespace
 } // end namespace

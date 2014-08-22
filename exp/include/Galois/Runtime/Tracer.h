@@ -42,7 +42,7 @@ static inline void traceImpl(std::ostringstream& os, const char* format, T value
   for (; *format != '\0'; format++) {
     if (*format == '%') {
       os << value;
-      traceImpl(os, format + 1, args...);
+      traceImpl(os, format + 1, std::forward<Args>(args)...);
       return;
     }
     os << *format;
@@ -65,7 +65,7 @@ static inline void trace(const char* format, Args... args) {
   }
   if (detail::doTrace) {
     std::ostringstream os;
-    detail::traceImpl(os, format, args...);
+    detail::traceImpl(os, format, std::forward<Args>(args)...);
     detail::printTrace(os);
   }
 }

@@ -33,6 +33,7 @@
 #include <mpi.h>
 
 #include <deque>
+#include <mutex>
 #include <utility>
 #include <thread>
 
@@ -70,6 +71,8 @@ class NetworkInterfaceAsyncMPI : public NetworkInterface {
       MPI_Get_count(&status, MPI_BYTE, &count);
       retval = RecvBuffer(count);
       MPI_Recv(retval->linearData(), count, MPI_BYTE, MPI_ANY_SOURCE, FuncTag, MPI_COMM_WORLD, &status);
+      this->statRecvNum += 1;
+      this->statRecvBytes += count;
     }
     return retval;
   }
@@ -86,11 +89,6 @@ class NetworkInterfaceAsyncMPI : public NetworkInterface {
   }
 
 public:
-
-  using NetworkInterface::ID;
-  using NetworkInterface::Num;
-
-
   NetworkInterfaceAsyncMPI() {
     int provided;
     int rc = MPI_Init_thread (NULL, NULL, MPI_THREAD_SERIALIZED, &provided);
@@ -103,21 +101,16 @@ public:
     ID = taskRank;
     Num = numTasks;
     
-    if (taskRank == 0) {
+    if (ID == 0) {
       //master
       //printing on lead host doesn't require this object to be fully initialized
       switch (provided) {
       case MPI_THREAD_SINGLE: 
-      case MPI_THREAD_FUNNELED: 
-        assert(0 && "Insufficient mpi support");
-        abort();
-        break;
+      case MPI_THREAD_FUNNELED: GALOIS_DIE("Insufficient mpi support"); break;
       case MPI_THREAD_SERIALIZED: Galois::Runtime::LL::gInfo("MPI Supports: Serialized"); break;
       case MPI_THREAD_MULTIPLE: Galois::Runtime::LL::gInfo("MPI Supports: Multiple"); break;
       default: break;
       }
-    } else {
-      //slave
     }
   }
 
@@ -126,12 +119,14 @@ public:
   }
 
   virtual void send(uint32_t dest, recvFuncTy recv, SendBuffer& buf) {
-    lock.lock();
+    std::lock_guard<decltype(lock)> lg(lock);
     //wait for a send slot
     // while (pending_sends.size() >= 128)
     //   update_pending_sends();
     assert(recv);
     buf.serialize_header((void*)recv);
+    this->statSendNum += 1;
+    this->statSendBytes += buf.size();
     //trace("NetworkInterfaceAsyncMPI::send buf %\n", buf);
     assert(dest < Num);
     pending_sends.emplace_back(MPI_REQUEST_NULL, std::move(buf));
@@ -139,7 +134,6 @@ public:
     int rv = MPI_Issend(com.second.linearData(), com.second.size(), MPI_BYTE, dest, FuncTag, MPI_COMM_WORLD, &com.first);
     handleError(rv);
     update_pending_sends();
-    lock.unlock();
   }
 
   virtual bool handleReceives() {
@@ -389,10 +383,7 @@ public:
       switch (provided) {
       case MPI_THREAD_SINGLE: 
       case MPI_THREAD_FUNNELED:
-      default:
-        assert(0 && "Insufficient mpi support");
-        abort();
-        break;
+      default: GALOIS_DIE("Insufficient mpi support"); break;
       case MPI_THREAD_SERIALIZED: Galois::Runtime::LL::gInfo("MPI Supports: Serialized"); break;
       case MPI_THREAD_MULTIPLE: Galois::Runtime::LL::gInfo("MPI Supports: Multiple"); break;
       }
@@ -436,10 +427,9 @@ public:
       std::lock_guard<decltype(lock)> lg(lock);
       update_pending_sends();
       cont = !waiting.empty();
-      //This order let's us release the lock for a moment
+      //This order lets us release the lock for a moment
     } while (block && cont);
   }
-
 };
 
 }
