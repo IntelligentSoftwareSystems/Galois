@@ -36,6 +36,12 @@ class LC_Dist {
   struct EdgeImplTy;
 
   struct NodeImplTy :public Runtime::Lockable {
+    NodeTy data;
+    EdgeImplTy* b;
+    EdgeImplTy* e;
+    unsigned len;
+    bool remote;
+
     NodeImplTy(EdgeImplTy* start, unsigned len) :b(start), e(start), len(len), remote(false) {}
     ~NodeImplTy() {
       if (remote)
@@ -81,12 +87,6 @@ class LC_Dist {
       e = begin;
     }
 
-    NodeTy data;
-    EdgeImplTy* b;
-    EdgeImplTy* e;
-    unsigned len;
-    bool remote;
-
     EdgeImplTy* append(Runtime::gptr<NodeImplTy> dst, const EdgeTy& data) {
       e->dst = dst;
       e->data = data;
@@ -108,11 +108,9 @@ class LC_Dist {
   };
 
  public:
-
   typedef Runtime::gptr<NodeImplTy> GraphNode;
 
  private:
-
   std::vector<NodeImplTy> Nodes;
   std::vector<EdgeImplTy> Edges;
 
@@ -200,7 +198,6 @@ class LC_Dist {
   }
 
 public:
-
   //This is technically a const (non-mutable) iterator
   class iterator : public std::iterator<std::random_access_iterator_tag,
                                         GraphNode, ptrdiff_t, GraphNode, GraphNode> {

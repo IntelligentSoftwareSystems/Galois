@@ -108,6 +108,14 @@ bool RemoteDirectory::tryWriteBack(metadata& md, fatPointer ptr, std::unique_loc
 void RemoteDirectory::recvRequestImpl(fatPointer ptr, uint32_t dest, ResolveFlag flag) {
   metadata& md = getMD(ptr);
   std::unique_lock<LL::SimpleLock> lg(md.lock, std::adopt_lock);
+
+  recvRequestImpl(md, ptr, lg, dest, flag);
+}
+
+void RemoteDirectory::recvRequestImpl(
+    metadata& md, fatPointer ptr, std::unique_lock<LL::SimpleLock>& lg,
+    uint32_t dest, ResolveFlag flag)
+{
   trace("RemoteDirectory::recvRequest % dest % md %\n", ptr, dest, md);
   if (md.contended && dest > NetworkInterface::ID) {
     addPendingReq(ptr, dest, flag);
@@ -166,7 +174,7 @@ void RemoteDirectory::recvObjectImpl(fatPointer ptr, ResolveFlag flag, typeHelpe
 
 void RemoteDirectory::clearContended(fatPointer ptr) {
   metadata& md = getMD(ptr);
-  std::lock_guard<LL::SimpleLock> lg(md.lock, std::adopt_lock);
+  std::unique_lock<LL::SimpleLock> lg(md.lock, std::adopt_lock);
   trace("RemoteDirectory::clearContended % md %\n", ptr, md);
   md.contended = false;
   assert(md.state != metadata::INVALID);
@@ -183,7 +191,7 @@ void RemoteDirectory::clearContended(fatPointer ptr) {
     }
   }
   if (doRecv)
-    recvRequestImpl(ptr, r.dest, r.flag);
+    recvRequestImpl(md, ptr, lg, r.dest, r.flag);
 }
 
 void RemoteDirectory::fetchImpl(fatPointer ptr, ResolveFlag flag, typeHelper* th, bool setContended) {
@@ -308,7 +316,7 @@ void RemoteDirectory::makeProgress() {
     std::lock_guard<LL::SimpleLock> lg(reqs_lock);
     todo.swap(reqs);
   }
-  for (auto p : todo)
+  for (auto& p : todo)
     recvRequestImpl(p.first, p.second.dest, p.second.flag);
 }
 
@@ -362,13 +370,13 @@ void LocalDirectory::recvObjectImpl(fatPointer ptr, ResolveFlag flag,
   Lockable* obj = static_cast<Lockable*>(ptr.getObj());
   metadata& md = getMD(ptr);
   std::unique_lock<LL::SimpleLock> lg(md.lock, std::adopt_lock);
-  trace("LocalDirectory::writebackObject % flag % md %\n", ptr, flag, md);
   //We can write back the object in place as we know we have the write lock
   assert(dirOwns(obj)); //Check that we have the write lock
   md.writeback();
   md.th->deserialize(buf, obj);
 
   auto p = md.getNextDest();
+  trace("LocalDirectory::writebackObject % flag % md %\n", ptr, flag, md);
   if (p.first == ~0) {
     auto nl = std::move(md.notifyList);
     eraseMD(ptr, lg);
@@ -389,7 +397,7 @@ void LocalDirectory::fetchImpl(fatPointer ptr, ResolveFlag flag, typeHelper* th,
   assert(!md.th || md.th == th);
   if (!md.th)
     md.th = th;
-  trace("LocalDirectory::fetch for % flag % md %\n", ptr, flag, md);
+  trace("LocalDirectory::fetch for % flag % % md %\n", ptr, flag, setContended, md);
   if (md.isHere()) {
     if (setContended)
       md.contended = true;
@@ -398,7 +406,7 @@ void LocalDirectory::fetchImpl(fatPointer ptr, ResolveFlag flag, typeHelper* th,
   } else {
     md.addReq(NetworkInterface::ID, flag);
     md.contended |= setContended;
-    updatePendingRequests(md, ptr, lg);
+    forwardRequestToNextWriter(md, ptr, lg);
   }
 }
 
@@ -443,10 +451,9 @@ void LocalDirectory::recvRequestImpl(fatPointer ptr, uint32_t dest, ResolveFlag 
     else if (md.isRO())
       sendToReaders(md, ptr);
     else
-      updatePendingRequests(md, ptr, lg);
+      forwardRequestToNextWriter(md, ptr, lg);
   }
 }
-
 
 void LocalDirectory::sendToReaders(metadata& md, fatPointer ptr) {
   assert(md.locRW == ~0);
@@ -470,7 +477,7 @@ void LocalDirectory::invalidateReaders(metadata& md, fatPointer ptr, uint32_t ne
 void LocalDirectory::invalidate(fatPointer ptr) {
   assert(ptr.isLocal());
   metadata& md = getMD(ptr);
-  std::unique_lock<LL::SimpleLock> lg(md.lock, std::adopt_lock);
+  std::lock_guard<LL::SimpleLock> lg(md.lock, std::adopt_lock);
 
   // md.th may be null
   assert(md.th || !md.th);
@@ -488,15 +495,10 @@ void LocalDirectory::invalidate(fatPointer ptr) {
 }
 
 void LocalDirectory::considerObject(metadata& md, fatPointer ptr) {
-  //Find next destination
-  uint32_t nextDest = ~0;
-  bool nextIsRW = false;
-  std::tie(nextDest, nextIsRW) = md.getNextDest();
-  //caller should have checked that there is a request
-  assert(nextDest != ~0);
-
+  auto p = md.getNextDest();
   trace("LocalDirectory::considerObject % has dest % RW % remote % md %\n", 
-      ptr, nextDest, nextIsRW, (md.locRW != ~0 || !md.locRO.empty()) ? 'T' : 'F', md);
+      ptr, p.first, p.second, (md.locRW != ~0 || !md.locRO.empty()) ? 'T' : 'F', md);
+  assert(p.first != ~0 && "caller should have checked that there is a request");
 
   Lockable* obj = static_cast<Lockable*>(ptr.getObj());
 
@@ -506,48 +508,47 @@ void LocalDirectory::considerObject(metadata& md, fatPointer ptr) {
   //Object is local (locRW and locRO are empty)
   assert(md.locRO.empty() && md.locRW == ~0);
   //Next user is this host
-  if (nextDest == NetworkInterface::ID) {
+  if (p.first == NetworkInterface::ID) {
     auto nl = std::move(md.notifyList);
-    if (nextIsRW) {
-      md.reqsRW.erase(nextDest);
+    if (p.second) {
+      md.reqsRW.erase(p.first);
       dirRelease(obj);
     } else {
-      md.reqsRO.erase(nextDest);
+      md.reqsRO.erase(p.first);
       //FIXME: release lock
     }
     for (auto& fn : nl)
       fn(ptr); //FIXME: md lock is held in RO case
   } else {
-    if (dirOwns(obj) || dirAcquire(obj)) {
-      if (nextIsRW) {
-        assert(md.reqsRW.count(nextDest));
-        md.reqsRW.erase(nextDest);
-        md.locRW = nextDest;
-        md.th->send(nextDest, ptr, static_cast<Lockable*>(ptr.getObj()), RW);
+    if (md.contended && p.first > NetworkInterface::ID) {
+      addPendingReq(ptr);
+    } else if (dirOwns(obj) || dirAcquire(obj)) {
+      if (p.second) {
+        assert(md.reqsRW.count(p.first));
+        md.reqsRW.erase(p.first);
+        md.locRW = p.first;
+        md.th->send(p.first, ptr, static_cast<Lockable*>(ptr.getObj()), RW);
       } else { //RO
         sendToReaders(md, ptr);
       }
     } else { //locked by local iteration, defer
-      setPending(ptr); 
+      addPendingReq(ptr); 
     }
   }
 }
 
-void LocalDirectory::updatePendingRequests(metadata& md, fatPointer ptr, std::unique_lock<LL::SimpleLock>& lg) {
+void LocalDirectory::forwardRequestToNextWriter(metadata& md, fatPointer ptr, std::unique_lock<LL::SimpleLock>& lg) {
   //Check that all needed messages have been sent
-  //Find next destination
-  uint32_t nextDest = ~0;
-  bool nextIsRW = false;
-  std::tie(nextDest, nextIsRW) = md.getNextDest();
-  if (nextDest != ~0) {
-    if (md.recalled != nextDest) {
+  auto p = md.getNextDest();
+  if (p.first != ~0) {
+    if (md.recalled != p.first) {
       if (md.locRW != ~0) {
-        md.th->request(md.locRW, ptr, nextDest, RW);
+        md.th->request(md.locRW, ptr, p.first, RW);
       } else {
         assert(!md.locRO.empty());
-        invalidateReaders(md, ptr, nextDest);
+        invalidateReaders(md, ptr, p.first);
       }
-      md.recalled = nextDest;
+      md.recalled = p.first;
     }
   } else {
     if (!md.contended)
@@ -580,10 +581,13 @@ void LocalDirectory::makeProgress() {
   for (fatPointer ptr : todo) {
     metadata& md = getMD(ptr);
     std::lock_guard<LL::SimpleLock> obj_lg(md.lock, std::adopt_lock);
-    if (md.isHere())
+    auto p = md.getNextDest();
+    if (p.first == ~0)
+      continue;
+    else if (md.isHere())
       considerObject(md, ptr);
     else
-      setPending(ptr);
+      addPendingReq(ptr);
   }
 }
 

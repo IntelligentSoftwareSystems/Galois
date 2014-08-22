@@ -122,10 +122,11 @@ inline bool shouldLock(const Galois::MethodFlag g) {
 inline void acquire(Lockable* lockable, Galois::MethodFlag m) {
   if (shouldLock(m)) {
     SimpleRuntimeContext* ctx = getThreadContext();
-    if (ctx)
-      if (!ctx->acquire(lockable))
+    if (ctx) {
+      if (!ctx->acquire(lockable)) {
         signalConflict(conflict_ex{lockable});
-    //doAcquire (lockable);
+      }
+    }
   }
 }
 
@@ -136,18 +137,20 @@ template<typename T>
 inline void acquire(gptr<T> ptr, Galois::MethodFlag m) {
   if (inGaloisForEach) {
     T* obj = ptr.resolve();
+    fatPointer fptr = static_cast<fatPointer>(ptr);
     if (!obj) {
       //FIXME Better resolve flag
-      getRemoteDirectory().fetch<T>(static_cast<fatPointer>(ptr), ResolveFlag::RW);
-      signalConflict(remote_ex{static_cast<fatPointer>(ptr), m, &RemoteDirectory::setContended<T>, &LocalDirectory::setContended<T>});
+      getRemoteDirectory().fetch<T>(fptr, ResolveFlag::RW);
+      signalConflict(remote_ex{fptr, m, &RemoteDirectory::setContended<T>, &LocalDirectory::setContended<T>});
     }
     if (shouldLock(m)) {
       SimpleRuntimeContext* ctx = getThreadContext();
       Lockable* lockable = static_cast<Lockable*>(obj);
       if (ctx) {
-        bool b = ctx->acquire(lockable);
-        if (!b)
-          signalConflict(remote_ex{static_cast<fatPointer>(ptr), m, &RemoteDirectory::fetch<T>, &LocalDirectory::fetch<T>});
+        if (!ctx->acquire(lockable)) {
+          signalConflict(remote_ex{fptr, m, &RemoteDirectory::setContended<T>, &LocalDirectory::setContended<T>});
+          //signalConflict(remote_ex{fptr, m, &RemoteDirectory::fetch<T>, &LocalDirectory::fetch<T>});
+        }
       }
     }
   } else {
@@ -155,33 +158,49 @@ inline void acquire(gptr<T> ptr, Galois::MethodFlag m) {
   }
 }
 
-//! ensures conherent serial access
+//! Prefetches a possibly remote object, returns true if object is now local
 template<typename T>
-inline void serial_acquire(gptr<T> ptr) {
-  do {
-    T* obj = ptr.resolve();
-    if (!obj) {
-      //FIXME Better resolve flag
-      getRemoteDirectory().fetch<T>(static_cast<fatPointer>(ptr), ResolveFlag::RW);
-    } else if (LockManagerBase::isAcquiredAny(obj)) {
-      getLocalDirectory().fetch<T>(static_cast<fatPointer>(ptr), ResolveFlag::RW);
-    } else {
-      return;
-    }
-    doNetworkWork();
-  } while(true);
-}
-
-template<typename T>
-inline void prefetch(gptr<T> ptr, Galois::MethodFlag m = MethodFlag::ALL) {
+inline bool prefetch(gptr<T> ptr, Galois::MethodFlag m = MethodFlag::ALL) {
   T* obj = ptr.resolve();
   if (!obj) {
     //FIXME Better resolve flag
     getRemoteDirectory().fetch<T>(static_cast<fatPointer>(ptr), ResolveFlag::RW);
   } else if (LockManagerBase::isAcquiredAny(obj)) {
     getLocalDirectory().fetch<T>(static_cast<fatPointer>(ptr), ResolveFlag::RW);
+  } else {
+    return true;
   }
+  return false;
 }
+
+//! Fetches a possibly remote object, blocks until object is local
+template<typename T>
+inline void serial_acquire(gptr<T> ptr) {
+  // TODO check if this reduces message traffic significantly
+#if 0
+  while (!prefetch(ptr))
+    doNetworkWork();
+#else
+  bool a = false, b = false;
+  while (true) {
+    T* obj = ptr.resolve();
+    if (!obj) {
+      //FIXME Better resolve flag
+      if (!a) 
+        getRemoteDirectory().fetch<T>(static_cast<fatPointer>(ptr), ResolveFlag::RW);
+      a = true;
+    } else if (LockManagerBase::isAcquiredAny(obj)) {
+      if (!b)
+        getLocalDirectory().fetch<T>(static_cast<fatPointer>(ptr), ResolveFlag::RW);
+      b = true;
+    } else {
+      return;
+    }
+    doNetworkWork();
+  }
+#endif
+}
+
 
 // inline bool isAcquired(Lockable* C) {
 //   return C->owner.is_locked();

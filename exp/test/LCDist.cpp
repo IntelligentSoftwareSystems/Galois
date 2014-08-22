@@ -123,7 +123,7 @@ struct Grid {
         continue;
 
       graph->at(dd).second = m;
-      //ctx.push(dd);
+      ctx.push(dd);
     }
   }
 };
@@ -154,6 +154,7 @@ void testGrid(int N) {
         std::cout << "(" << g->at(g->dst(jj)).first << " " << g->at(g->dst(jj)).second << " " << g->at(jj) << ") ";
       } else {
         GALOIS_ASSERT(g->at(nn).first == g->at(jj));
+        GALOIS_ASSERT(g->at(g->dst(jj)).second == 0);
       }
     }
     if (printGraph)

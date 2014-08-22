@@ -199,11 +199,15 @@ class LocalDirectory : public BaseDirectory {
 
     metadata() :locRW(~0), recalled(~0), contended(0), th(nullptr) {}
 
-    friend std::ostream& operator<< (std::ostream& os, const metadata& md) {
+    friend std::ostream& operator<<(std::ostream& os, const metadata& md) {
       std::ostream_iterator<uint32_t> out_it(os, ",");
       os << "locRO:<";
       std::copy(md.locRO.begin(), md.locRO.end(), out_it);
-      os << ">,locRW:" << md.locRW << ",recalled:" << md.recalled << ",reqsRO:<";
+      os << ">,locRW:";
+      if (md.locRW != ~0) os << md.locRW;
+      os << ",recalled:";
+      if (md.recalled != ~0) os << md.recalled;
+      os << ",reqsRO:<";
       std::copy(md.reqsRO.begin(), md.reqsRO.end(), out_it);
       os << ">,reqsRW:<";
       std::copy(md.reqsRW.begin(), md.reqsRW.end(), out_it);
@@ -218,7 +222,8 @@ class LocalDirectory : public BaseDirectory {
   std::unordered_set<fatPointer> pending;
   LL::SimpleLock pending_lock;
   
-  void setPending(fatPointer ptr) {
+  //!Add a request to process later
+  void addPendingReq(fatPointer ptr) {
     std::lock_guard<LL::SimpleLock> lg(pending_lock);
     pending.insert(ptr);
   }
@@ -233,8 +238,10 @@ class LocalDirectory : public BaseDirectory {
   //!Send invalidate to all outstanding readers
   void invalidateReaders(metadata&, fatPointer, uint32_t);
 
-  void updatePendingRequests(metadata&, fatPointer, std::unique_lock<LL::SimpleLock>&);
+  //!Forward request to next writer (if available)
+  void forwardRequestToNextWriter(metadata&, fatPointer, std::unique_lock<LL::SimpleLock>&);
 
+  //!Consider object for local use or to send on
   void considerObject(metadata& m, fatPointer ptr);
 
   void fetchImpl(fatPointer ptr, ResolveFlag flag, typeHelper* th, bool setContended);
@@ -353,7 +360,7 @@ class RemoteDirectory : public BaseDirectory {
   //invalidates the metadata
   void eraseMD(fatPointer, std::unique_lock<LL::SimpleLock>& mdl);
 
-  //Add a pending request which couldn't be handle immediately
+  //!Add a request to process later
   void addPendingReq(fatPointer, uint32_t, ResolveFlag);
 
   //try to writeback ptr, may fail
@@ -361,10 +368,13 @@ class RemoteDirectory : public BaseDirectory {
   bool tryWriteBack(metadata& md, fatPointer ptr, std::unique_lock<LL::SimpleLock>& lg);
 
 protected: // Remote portion of the api
-  //! handle object arriving
+  //! handle incoming object
   void recvObjectImpl(fatPointer, ResolveFlag, typeHelper*, RecvBuffer&);
-  //! handle requests ariving
+
+  //! handle incoming requests
+  void recvRequestImpl(metadata&, fatPointer, std::unique_lock<LL::SimpleLock>&, uint32_t, ResolveFlag);
   void recvRequestImpl(fatPointer, uint32_t, ResolveFlag);
+  
   //! handle local requests
   void fetchImpl(fatPointer ptr, ResolveFlag flag, typeHelper* th, bool setContended);
 
