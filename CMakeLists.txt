@@ -94,7 +94,7 @@ endif()
 
 if(CYGWIN)
   message(STATUS "On Cygwin")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -U__STRICT_ANSI__")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -U__STRICT_ANSI__ -Werror")
 endif()
 
 # check for incompatible GCC
