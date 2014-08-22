@@ -108,10 +108,10 @@ bool RemoteDirectory::tryWriteBack(metadata& md, fatPointer ptr, std::unique_loc
 void RemoteDirectory::recvRequestImpl(fatPointer ptr, uint32_t dest, ResolveFlag flag) {
   metadata& md = getMD(ptr);
   std::unique_lock<LL::SimpleLock> lg(md.lock, std::adopt_lock);
-  recvRequestImpl(ptr, dest, flag, md, lg);
+  recvRequestImpl(md, ptr, lg, dest, flag);
 }
 
-void RemoteDirectory::recvRequestImpl(fatPointer ptr, uint32_t dest, ResolveFlag flag, metadata& md, std::unique_lock<LL::SimpleLock>& lg) {
+void RemoteDirectory::recvRequestImpl(metadata& md, fatPointer ptr, std::unique_lock<LL::SimpleLock>& lg, uint32_t dest, ResolveFlag flag) {
   trace("RemoteDirectory::recvRequest % dest % md %\n", ptr, dest, md);
   if (md.contended && dest > NetworkInterface::ID) {
     addPendingReq(ptr, dest, flag);
