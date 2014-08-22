@@ -331,7 +331,7 @@ struct CheckAcyclic {
 
   Accum* accum;
 
-  void operator()(const GNode& n) {
+  void operator()(const GNode& n) const {
     Node& data = graph.getData(n);
     if (data.isRep())
       accum->roots += 1;
@@ -363,7 +363,7 @@ struct SortEdges {
 
   Accum* accum;
 
-  void operator()(const GNode& src) {
+  void operator()(const GNode& src) const {
     //! [sortEdgeByEdgeData]
     graph.sortEdgesByEdgeData(src, std::less<EdgeData>(), Galois::MethodFlag::NONE);
     //! [sortEdgeByEdgeData]

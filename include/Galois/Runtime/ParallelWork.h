@@ -252,7 +252,7 @@ protected:
       abortIteration(*p, tld);
     }
 #endif
-}
+  }
 
   GALOIS_ATTRIBUTE_NOINLINE
   void handleAborts(ThreadLocalData& tld) {
@@ -264,11 +264,11 @@ protected:
     x.clear();
   }
 
-  bool checkEmpty(WorkListTy&, ...) { return true; }
+  bool checkEmpty(WorkListTy&, ThreadLocalData&, ...) { return true; }
 
   template<typename WL>
-  auto checkEmpty(WL& wl, bool didWork) -> decltype(wl.empty(), bool()) {
-    return didWork || wl.empty();
+  auto checkEmpty(WL& wl, ThreadLocalData& tld, int) -> decltype(wl.empty(), bool()) {
+    return wl.empty();
   }
 
   template<bool couldAbort, bool isLeader>
@@ -283,35 +283,42 @@ protected:
       tld.facing.setFastPushBack(
           std::bind(&ForEachWork::fastPushBack, this, std::placeholders::_1));
     unsigned long old_iterations = 0;
-    do {
-      // Run some iterations
-      if (couldAbort || ForEachTraits<FunctionTy>::NeedsBreak) {
-        constexpr int __NUM = (ForEachTraits<FunctionTy>::NeedsBreak || isLeader) ? 64 : 0;
-        runQueue<__NUM>(tld, wl);
-        // Check for abort
-        if (couldAbort)
-          handleAborts(tld);
-      } else { // No try/catch
-        runQueueSimple(tld);
-      }
+    while (true) {
+      do {
+        // Run some iterations
+        if (couldAbort || ForEachTraits<FunctionTy>::NeedsBreak) {
+          constexpr int __NUM = (ForEachTraits<FunctionTy>::NeedsBreak || isLeader) ? 64 : 0;
+          runQueue<__NUM>(tld, wl);
+          // Check for abort
+          if (couldAbort)
+            handleAborts(tld);
+        } else { // No try/catch
+          runQueueSimple(tld);
+        }
 
-      bool didWork = old_iterations != tld.stat_iterations;
-      old_iterations = tld.stat_iterations;
+        bool didWork = old_iterations != tld.stat_iterations;
+        old_iterations = tld.stat_iterations;
 
-      if (!checkEmpty(wl, didWork))
-        continue;
+        // Update node color and prop token
+        term.localTermination(didWork);
+        LL::asmPause(); // Let token propagate
+      } while (!term.globalTermination() && (!ForEachTraits<FunctionTy>::NeedsBreak || !broke));
 
-      // Update node color and prop token
-      term.localTermination(didWork);
-      LL::asmPause(); // Let token propagate
-    } while (!term.globalTermination() && (!ForEachTraits<FunctionTy>::NeedsBreak || !broke));
+      if (checkEmpty(wl, tld, 0))
+        break;
+      if (ForEachTraits<FunctionTy>::NeedsBreak && broke)
+        break;
+      initThread();
+      getSystemBarrier().wait();
+    }
 
     if (couldAbort)
       setThreadContext(0);
   }
 
 public:
-  ForEachWork(const FunctionTy& f, const char* l): term(getSystemTermination()), origFunction(f), loopname(l), broke(false) { }
+  template<typename... TArgs>
+  ForEachWork(const FunctionTy& f, const char* l, const TArgs&... targs): term(getSystemTermination()), wl(targs...), origFunction(f), loopname(l), broke(false) { }
   
   template<typename W>
   ForEachWork(const W& w, const FunctionTy& f, const char* l): term(getSystemTermination()), wl(w), origFunction(f), loopname(l), broke(false) { }
@@ -329,7 +336,7 @@ public:
     wl.push_initial(range);
   }
 
-  void initThread(void) {
+  void initThread() {
     term.initializeThread();
   }
 
@@ -367,8 +374,8 @@ struct reiterator<WLTy, IterTy, typename std::enable_if<has_with_iterator<WLTy>(
   typedef typename WLTy::template with_iterator<IterTy>::type type;
 };
 
-template<typename WLTy, typename RangeTy, typename FunctionTy>
-void for_each_impl(const RangeTy& range, const FunctionTy& f, const char* loopname) {
+template<typename WLTy, typename RangeTy, typename FunctionTy, typename... TArgs>
+void for_each_impl(const RangeTy& range, const FunctionTy& f, const char* loopname, const TArgs&... targs) {
   if (inGaloisForEach)
     GALOIS_DIE("Nested for_each not supported");
   typedef typename reiterator<WLTy, typename RangeTy::iterator>::type WLNewTy;
@@ -379,7 +386,7 @@ void for_each_impl(const RangeTy& range, const FunctionTy& f, const char* loopna
   // PerThreadStorage reclaimation likelihood
   Barrier& barrier = getSystemBarrier();
 
-  WorkTy W(f, loopname);
+  WorkTy W(f, loopname, targs...);
 
   // StatTimer LoopTimer("LoopTime", loopname);
   // if (ForEachTraits<FunctionTy>::NeedsStats)
@@ -400,26 +407,6 @@ void for_each_impl(const RangeTy& range, const FunctionTy& f, const char* loopna
 
   // if (ForEachTraits<FunctionTy>::NeedsStats)  
   //   LoopTimer.stop();
-}
-
-template<typename FunctionTy>
-struct WOnEach {
-  const FunctionTy& origFunction;
-  explicit WOnEach(const FunctionTy& f): origFunction(f) { }
-  void operator()(void) {
-    FunctionTy fn(origFunction);
-    fn(LL::getTID(), activeThreads);   
-  }
-};
-
-template<typename FunctionTy>
-void on_each_impl(const FunctionTy& fn, const char* loopname = 0) {
-  if (inGaloisForEach)
-    GALOIS_DIE("Nested for_each not supported");
-
-  inGaloisForEach = true;
-  getSystemThreadPool().run(activeThreads, WOnEach<FunctionTy>(fn));
-  inGaloisForEach = false;
 }
 
 } // end namespace anonymous

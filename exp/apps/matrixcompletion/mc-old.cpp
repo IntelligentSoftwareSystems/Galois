@@ -240,7 +240,7 @@ struct sgd_block_users_movies
 	Graph& g;
 	sgd_block_users_movies(Graph& g) : g(g) {}
 	
-	void operator()(ThreadWorkItem& workItem)
+	void operator()(ThreadWorkItem& workItem) const
 	{
 		Galois::Timer timer;
 		timer.start();
@@ -328,7 +328,7 @@ struct advance_edge_iterators
 	Graph& g;
 	advance_edge_iterators(Graph& g) : g(g) {}
 	
-	void operator()(ThreadWorkItem& workItem)
+	void operator()(ThreadWorkItem& workItem) const
 	{
 		//set up movie iterators
 		Graph::iterator movie_it = g.begin();
@@ -554,7 +554,7 @@ struct sgd_march
         spinlock* locks; 
 	sgd_march(Graph& g, spinlock* locks) : g(g), locks(locks) {}
 	
-	void operator()(ThreadWorkItem& workItem)
+	void operator()(ThreadWorkItem& workItem) const
 	{
 		Galois::Timer timer;
 		timer.start();

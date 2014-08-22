@@ -59,7 +59,7 @@ struct SimObjInfo: public TypeHelper {
   typedef Galois::Runtime::LL::SimpleLock Lock_ty;
   typedef des::AbstractMain<SimInit_ty>::GNode GNode;
   typedef std::set<Event_ty, Cmp_ty
-    , Galois::Runtime::MM::FSBGaloisAllocator<Event_ty> > PQ;
+    , Galois::FixedSizeAllocator<Event_ty> > PQ;
 
   Lock_ty mutex;
   PQ pendingEvents;
@@ -212,7 +212,7 @@ class DESorderedHand:
         findIter (findIter)
     {}
 
-    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (SimObjInfo& sinfo) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (SimObjInfo& sinfo) const {
       findIter += 1;
 
       if (sinfo.hasReady ()) {
@@ -245,7 +245,7 @@ class DESorderedHand:
     {}
 
 
-    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (const Event_ty& event) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (const Event_ty& event) const {
       nevents += 1;
 
 

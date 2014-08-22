@@ -31,9 +31,10 @@ std::vector<EquationSystem*> *FakeMatrixGenerator::CreateMatrixAndRhs(TaskDescri
 
 		EquationSystem *system = new EquationSystem(n);
 		for (int j=0; j<n; ++j) {
-			system->matrix[j][j] = 1.0;
+			for (int k=0; k<n; ++k) {
+				system->matrix[j][k] = (INT_MAX-rand())/INT_MAX*1.0;
+			}
 			system->rhs[j] = 1.0;
-			system->matrix[j][0] = 2.0;
 		}
 
 		leafVector->push_back(system);

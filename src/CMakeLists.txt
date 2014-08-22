@@ -79,7 +79,7 @@ endif()
 if(USE_PAPI)
   # Sadly, none of our machines places papi in a well-known place or provides
   # a method for finding papi automatically. Hardcode some constants.
-  set(PAPI_ROOT "/h1/lenharth/papi;/usr/global/tools/papi/bgqos_0/papi-5.0.1-V1R1M2")
+  set(PAPI_ROOT "/h1/lenharth/papi;/usr/global/tools/papi/bgqos_0/papi-5.0.1-V1R1M2;/usr/lib64/papi-5.1.1/usr")
   find_package(PAPI)
   if (PAPI_FOUND)
     set(GALOIS_USE_PAPI on)

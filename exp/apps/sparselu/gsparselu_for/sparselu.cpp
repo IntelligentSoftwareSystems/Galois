@@ -29,8 +29,13 @@
 
 #include "Galois/Galois.h"
 #include "Galois/Statistic.h"
+#include "Galois/LargeArray.h"
+#include "Galois/Graph/FileGraph.h"
+#include "Galois/Runtime/KDGtwoPhase.h"
 #include <boost/iterator/transform_iterator.hpp>
 #include <boost/iterator/counting_iterator.hpp>
+
+extern char bots_arg_file[256];
 
 /***********************************************************************
  * checkmat: 
@@ -66,10 +71,11 @@ int checkmat (float *M, float *N)
    }
    return TRUE;
 }
+
 /***********************************************************************
  * genmat: 
  **********************************************************************/
-void genmat (float *M[])
+static void synthetic_genmat (float *M[])
 {
    int null_entry, init_val, i, j, ii, jj;
    float *p;
@@ -89,8 +95,8 @@ void genmat (float *M[])
 	 if (ii%2==1) null_entry = TRUE;
 	 if (jj%2==1) null_entry = TRUE;
 	 if (ii==jj) null_entry = FALSE;
-	 if (ii==jj-1) null_entry = FALSE; // XXX comment this out to get non-bulk sync structure
-         if (ii-1 == jj) null_entry = FALSE; // XXX ditto
+	 if (ii==jj-1) null_entry = FALSE;
+         if (ii-1 == jj) null_entry = FALSE;
          /* allocating matrix */
          if (null_entry == FALSE){
             a++;
@@ -121,6 +127,91 @@ void genmat (float *M[])
    }
    bots_debug("allo = %d, no = %d, total = %d, factor = %f\n",a,b,a+b,(float)((float)a/(float)(a+b)));
 }
+
+
+// From symmetric matrix
+static void structure_from_file_genmat (float *M[])
+{
+   int ii, jj;
+   int a=0, b;
+   Galois::Graph::FileGraph g;
+   int num_blocks;
+   unsigned max_id;
+
+   g.fromFile(bots_arg_file);
+   memset(M, 0, bots_arg_size*bots_arg_size*sizeof(*M));
+
+   num_blocks = (g.size() + bots_arg_size_1 - 1) / bots_arg_size_1;
+   max_id = bots_arg_size_1 * bots_arg_size;
+
+   printf("full size: %d\n", num_blocks);
+
+   /* generating the structure */
+   for (auto ii : g)
+   {
+      if (ii >= max_id)
+         break;
+      int bii = ii / bots_arg_size_1;
+      for (auto edge : g.out_edges(ii))
+      {
+         /* computing null entries */
+         int jj = g.getEdgeDst(edge);
+         if (jj >= max_id)
+            continue;
+         int bjj = jj / bots_arg_size_1;
+         if (M[bii*bots_arg_size+bjj] == NULL)
+         {
+            a++;
+            M[bii*bots_arg_size+bjj] = (float *) malloc(bots_arg_size_1*bots_arg_size_1*sizeof(float));
+            memset(M[bii*bots_arg_size+bjj], 0, bots_arg_size_1*bots_arg_size_1*sizeof(float));
+         }
+         if (M[bii*bots_arg_size+bjj] == NULL)
+         {
+            bots_message("Error: Out of memory\n");
+            exit(101);
+         }
+         if (M[bjj*bots_arg_size+bii] == NULL)
+         {
+            a++;
+            M[bjj*bots_arg_size+bii] = (float *) malloc(bots_arg_size_1*bots_arg_size_1*sizeof(float));
+            memset(M[bjj*bots_arg_size+bii], 0, bots_arg_size_1*bots_arg_size_1*sizeof(float));
+         }
+         if (M[bjj*bots_arg_size+bii] == NULL)
+         {
+            bots_message("Error: Out of memory\n");
+            exit(101);
+         }
+         M[bii*bots_arg_size+bjj][(ii%bots_arg_size_1)*bots_arg_size_1+(jj%bots_arg_size_1)] = g.getEdgeData<float>(edge);
+         M[bjj*bots_arg_size+bii][(jj%bots_arg_size_1)*bots_arg_size_1+(ii%bots_arg_size_1)] = g.getEdgeData<float>(edge);
+      }
+   }
+   // Add identity diagonal as necessary
+   for (ii = 0; ii < bots_arg_size; ++ii) {
+     if (M[ii*bots_arg_size+ii] == NULL)
+     {
+        a++;
+        M[ii*bots_arg_size+ii] = (float *) malloc(bots_arg_size_1*bots_arg_size_1*sizeof(float));
+        memset(M[ii*bots_arg_size+ii], 0, bots_arg_size_1*bots_arg_size_1*sizeof(float));
+     }
+     for (jj = 0; jj < bots_arg_size_1; ++jj)
+     {
+       if (M[ii*bots_arg_size+ii][jj*bots_arg_size_1+jj] == 0.0)
+         M[ii*bots_arg_size+ii][jj*bots_arg_size_1+jj] = 1.0;
+     }
+   }
+   b = num_blocks * num_blocks - a;
+   bots_debug("allo = %d, no = %d, total = %d, factor = %f\n",a,b,a+b,(float)((float)a/(float)(a+b)));
+}
+
+void genmat (float *M[])
+{
+  if (strlen(bots_arg_file) == 0)
+    synthetic_genmat(M);
+  else
+    structure_from_file_genmat(M);
+}
+
+
 /***********************************************************************
  * print_structure: 
  **********************************************************************/
@@ -213,6 +304,8 @@ void fwd(float *diag, float *col)
             col[i*bots_arg_size_1+j] = col[i*bots_arg_size_1+j] - diag[i*bots_arg_size_1+k]*col[k*bots_arg_size_1+j];
 }
 
+static Galois::LargeArray<Galois::Runtime::Lockable> locks;
+
 void sparselu_init (float ***pBENCH, char *pass)
 {
    Galois::setActiveThreads(bots_arg_size_2);
@@ -222,8 +315,10 @@ void sparselu_init (float ***pBENCH, char *pass)
    *pBENCH = (float **) malloc(bots_arg_size*bots_arg_size*sizeof(float *));
    genmat(*pBENCH);
    print_structure(pass, *pBENCH);
+   //locks.allocateInterleaved(bots_arg_size*bots_arg_size); XXX
+   locks.allocateLocal(bots_arg_size*bots_arg_size);
+   locks.construct();
 }
-
 
 void sparselu_seq_call(float **BENCH)
 {
@@ -347,17 +442,148 @@ struct Bmod {
   }
 };
 
-void sparselu_par_call(float **BENCH)
+struct FwdBdivBmod {
+  enum { LU0, FWD, BDIV, BMOD };
+
+  struct Task {
+    int type;
+    int kk;
+    int arg0;
+    int arg1;
+  };
+
+  struct Initializer: public std::unary_function<int, Task> {
+    Task operator()(int kk) const { return { LU0, kk, 0, 0 }; }
+  };
+
+  struct Comparator {
+    bool operator()(const Task& t1, const Task& t2) const {
+      // Lexicographic (kk, type, arg0, arg1)
+      if (t1.kk == t2.kk)
+        if (t1.type == t2.type)
+          if (t1.arg0 == t2.arg1)
+            return t1.arg1 < t2.arg1;
+          else
+            return t1.arg0 < t2.arg0;
+        else
+          return t1.type < t2.type;
+      else
+        return t1.kk < t2.kk;
+    }
+  };
+
+  struct NeighborhoodVisitor {
+    static const unsigned CHUNK_SIZE = 4;
+    float** BENCH;
+
+    typedef int tt_does_not_need_push;
+
+    void acquire(int ii, int jj) {
+      Galois::Runtime::acquire(&locks[ii*bots_arg_size+jj], Galois::MethodFlag::CHECK_CONFLICT);
+    }
+
+    void operator()(const Task& t, Galois::UserContext<Task>&) {
+      int ii, jj, kk = t.kk;
+      switch (t.type) {
+        case LU0:
+          acquire(kk, kk);
+          for (jj=kk+1; jj<bots_arg_size; jj++) {
+             if (BENCH[kk*bots_arg_size+jj] != NULL) {
+                acquire(kk, jj);
+             }
+          }
+          for (ii=kk+1; ii<bots_arg_size; ii++) {
+             if (BENCH[ii*bots_arg_size+kk] != NULL) {
+               acquire(ii, kk);
+             }
+          }
+          for (ii=kk+1; ii<bots_arg_size; ii++) {
+             if (BENCH[ii*bots_arg_size+kk] != NULL) {
+                acquire(ii, kk);
+                for (jj=kk+1; jj<bots_arg_size; jj++) {
+                   if (BENCH[kk*bots_arg_size+jj] != NULL) {
+                     acquire(kk, jj);
+                     acquire(ii, jj);
+                   }
+                }
+             }
+          }
+          return;
+        case FWD:
+          acquire(kk, t.arg0);
+          for (ii=kk+1; ii<bots_arg_size; ii++) {
+             if (BENCH[ii*bots_arg_size+kk] != NULL) {
+                acquire(ii, t.arg0);
+             }
+          }
+          return;
+        case BDIV:
+          acquire(t.arg0, kk);
+          for (jj=kk+1; jj<bots_arg_size; jj++) {
+             if (BENCH[kk*bots_arg_size+jj] != NULL) {
+                acquire(t.arg0, jj);
+             }
+          }
+          return;
+        case BMOD:
+          acquire(t.arg0, t.arg1);
+          return;
+      }
+    }
+  };
+
+  struct Process {
+    static const int CHUNK_SIZE = 1;
+
+    typedef int tt_does_not_need_aborts;
+
+    float** BENCH;
+
+    void operator()(const Task& t, Galois::UserContext<Task>& ctx) {
+      int ii, jj, kk = t.kk;
+
+      switch (t.type) {
+        case LU0:
+          lu0(BENCH[kk*bots_arg_size+kk]);
+          for (ii=kk+1; ii<bots_arg_size; ii++) {
+             if (BENCH[ii*bots_arg_size+kk] != NULL) {
+                ctx.push(Task { BDIV, kk, ii, 0 });
+             }
+          }
+          for (jj=kk+1; jj<bots_arg_size; jj++) {
+             if (BENCH[kk*bots_arg_size+jj] != NULL) {
+                ctx.push(Task { FWD, kk, jj, 0 });
+             }
+          }
+          for (ii=kk+1; ii<bots_arg_size; ii++) {
+             if (BENCH[ii*bots_arg_size+kk] != NULL) {
+                for (jj=kk+1; jj<bots_arg_size; jj++) {
+                   if (BENCH[kk*bots_arg_size+jj] != NULL) {
+                      if (BENCH[ii*bots_arg_size+jj]==NULL)
+                         BENCH[ii*bots_arg_size+jj] = allocate_clean_block();
+                      ctx.push(Task { BMOD, kk, ii, jj });
+                   }
+                }
+             }
+          }
+          return;
+        case FWD:
+          return fwd(BENCH[kk*bots_arg_size+kk], BENCH[kk*bots_arg_size+t.arg0]);
+        case BDIV:
+          return bdiv(BENCH[kk*bots_arg_size+kk], BENCH[t.arg0*bots_arg_size+kk]);
+        case BMOD:
+          return bmod(BENCH[t.arg0*bots_arg_size+kk], BENCH[kk*bots_arg_size+t.arg1], BENCH[t.arg0*bots_arg_size+t.arg1]);
+      }
+    }
+  };
+};
+
+static void bs_algo(float **BENCH)
 {
   int ii, jj, kk;
 
-  Galois::StatManager manager;
-
-  bots_message("Computing SparseLU Factorization (%dx%d matrix with %dx%d blocks) ",
-          bots_arg_size,bots_arg_size,bots_arg_size_1,bots_arg_size_1);
-
   namespace ww = Galois::WorkList;
-  typedef Galois::WorkList::StableIterator<>::template with_container<ww::dChunkedLIFO<1>>::type WL;
+  typedef ww::StableIterator<>::with_container<ww::dChunkedLIFO<1>>::type WL;
 
   for (kk=0; kk<bots_arg_size; kk++) {
     lu0(BENCH[kk*bots_arg_size+kk]);
@@ -372,15 +598,46 @@ void sparselu_par_call(float **BENCH)
         boost::transform_iterator<Bmod::Initializer, boost::counting_iterator<int>>(bots_arg_size),
         Bmod { BENCH, kk }, Galois::wl<WL>());
   }
+}
+
+static void ikdg_algo(float **BENCH)
+{
+  int kk;
+  typedef boost::transform_iterator<FwdBdivBmod::Initializer, boost::counting_iterator<int>> TI;
+
+  Galois::setDoAllImpl (Galois::DOALL_COUPLED);
+  if (Galois::getDoAllImpl () != Galois::DOALL_COUPLED) { std::abort (); }
+
+  Galois::Runtime::for_each_ordered_2p_win(
+      Galois::Runtime::makeStandardRange(TI(0), TI(bots_arg_size)),
+      FwdBdivBmod::Comparator { },
+      FwdBdivBmod::NeighborhoodVisitor { BENCH },
+      FwdBdivBmod::Process { BENCH });
+}
+
+void sparselu_par_call(float **BENCH)
+{
+  Galois::StatManager manager;
+  Galois::StatTimer T;
+
+  T.start();
+  bots_message("Computing SparseLU Factorization (%dx%d matrix with %dx%d blocks) ",
+          bots_arg_size,bots_arg_size,bots_arg_size_1,bots_arg_size_1);
+  if (bots_app_cutoff_value_1 == 0)
+    bs_algo(BENCH);
+  else
+    ikdg_algo(BENCH);
   bots_message(" completed!\n");
+  Galois::reportPageAlloc("MeminfoPost");
   T.stop();
 }
 
 void sparselu_fini (float **BENCH, char *pass)
 {
    Galois::Runtime::getSystemThreadPool().beKind();
-   Galois::reportPageAlloc("MeminfoPost");
    print_structure(pass, BENCH);
+   locks.destroy();
+   locks.deallocate();
 }
 
 int sparselu_check(float **SEQ, float **BENCH)

@@ -361,7 +361,7 @@ struct Mtx2Gr: public HasNoVoidSpecialization {
 
     for (int phase = 0; phase < 2; ++phase) {
       std::ifstream infile(infilename.c_str());
-      if ( infile.fail() ) {
+      if (!infile) {
         GALOIS_DIE("Failed to open input file");
       }
 
@@ -1203,7 +1203,7 @@ struct PartitionBySource: public Conversion {
       Writer p;
       EdgeData edgeData;
 
-      auto r = graph.divideBy(0, 1, i, numParts);
+      auto r = graph.divideByNode(0, 1, i, numParts).first;
 
       size_t numEdges = 0;
       if (r.first != r.second)

@@ -224,7 +224,7 @@ void bots_print_usage()
    fprintf(stderr, "  -m <size>  : "BOTS_APP_DESC_ARG_SIZE_1"\n");
 #endif
 #ifdef BOTS_APP_USES_ARG_SIZE_2
-   fprintf(stderr, "  -l <size>  : "BOTS_APP_DESC_ARG_SIZE_2"\n");
+   fprintf(stderr, "  -t <size>  : "BOTS_APP_DESC_ARG_SIZE_2"\n");
 #endif
 #ifdef BOTS_APP_USES_ARG_FILE
    fprintf(stderr, "  -f <file>  : "BOTS_APP_DESC_ARG_FILE"\n");
@@ -326,7 +326,7 @@ bots_get_params_common(int argc, char **argv)
                bots_print_usage();
                exit (100);
 #ifdef BOTS_APP_USES_ARG_SIZE_2
-            case 'l': /* read argument size 2 */
+            case 't': /* read argument size 2 */
                argv[i][1] = '*';
                i++;
                if (argc == i) { bots_print_usage(); exit(100); }

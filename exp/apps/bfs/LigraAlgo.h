@@ -95,7 +95,7 @@ struct LigraDiameter: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> 
   struct Initialize {
     Graph& graph;
     Initialize(Graph& g): graph(g) { }
-    void operator()(GNode n) {
+    void operator()(GNode n) const {
       LNode& data = graph.getData(n, Galois::MethodFlag::NONE);
       data.dist = DIST_INFINITY;
       data.visited[0] = data.visited[1] = 0;
@@ -142,7 +142,7 @@ struct LigraDiameter: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> 
     int next;
     Update(LigraDiameter* s, Graph& g, int c, int n): self(s), graph(g), cur(c), next(n) { 
     }
-    void operator()(size_t id) {
+    void operator()(size_t id) const {
       LNode& data = graph.getData(graph.nodeFromId(id), Galois::MethodFlag::NONE);
       data.visited[next] |= data.visited[cur];
     }

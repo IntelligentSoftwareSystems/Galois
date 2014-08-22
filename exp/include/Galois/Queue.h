@@ -319,9 +319,9 @@ class ConcurrentSkipListMap : private boost::noncopyable {
   Galois::Runtime::PerThreadStorage<int> randomSeed;
   Compare comp;
 
-  Galois::Runtime::MM::FixedSizeAllocator node_heap;
-  Galois::Runtime::MM::FixedSizeAllocator index_heap;
-  Galois::Runtime::MM::FixedSizeAllocator head_index_heap;
+  Galois::Runtime::MM::FixedSizeHeap node_heap;
+  Galois::Runtime::MM::FixedSizeHeap index_heap;
+  Galois::Runtime::MM::FixedSizeHeap head_index_heap;
 
   /**
    * Initialize or reset state. Needed by constructors, clone, clear,

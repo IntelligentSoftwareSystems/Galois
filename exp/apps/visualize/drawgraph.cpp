@@ -318,12 +318,12 @@ struct computeImpulse {
                  Galois::Runtime::PerThreadStorage<Point<double>>& tf)
                  :g(_g), which(w), stepSize(ss), maxForceSQ(mf), totalForce(tf) {}
 
-  void operator()(GNode& n) {
+  void operator()(GNode& n) const {
     Vertex& v = g.getData(n);
     doNode(n, v);
   }
 
-  void doNode(GNode& n, Vertex& v) {
+  void doNode(GNode& n, Vertex& v) const {
     Point<double> pos = v.position(which);
     Point<double> fGravity, fRepulse, fSpring;
     if (!opt_no_gravity)
@@ -347,7 +347,7 @@ struct recomputePos {
   double step;
   recomputePos(Graph& _g, int w, double s) :g(_g), which(w), step(s) {}
 
-  void operator()(GNode& n) {
+  void operator()(GNode& n) const {
     Vertex& v = g.getData(n);
     v.position((which + 1) % 2) = updatePosition(v.position(which), v, step, v.force);
     updateTemp(v);

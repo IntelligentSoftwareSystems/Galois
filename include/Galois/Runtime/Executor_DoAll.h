@@ -20,26 +20,28 @@
  *
  * @section Description
  *
- * Implementation of the Galois foreach iterator. Includes various 
+ * Implementation of the do all loop. Includes various 
  * specializations to operators to reduce runtime overhead.
+ * Doesn't do Galoisish things
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#ifndef GALOIS_RUNTIME_DOALL_H
-#define GALOIS_RUNTIME_DOALL_H
+#ifndef GALOIS_RUNTIME_EXECUTOR_DOALL_H
+#define GALOIS_RUNTIME_EXECUTOR_DOALL_H
 
 #include "Galois/gstl.h"
 #include "Galois/Statistic.h"
 #include "Galois/Runtime/Barrier.h"
 #include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/Range.h"
-#include "Galois/Runtime/ForEachTraits.h"
 
 #include <algorithm>
 #include <mutex>
 
 namespace Galois {
 namespace Runtime {
+
+namespace detail {
 
 // TODO(ddn): Tune stealing. DMR suffers when stealing is on
 // TODO: add loopname + stats
@@ -48,6 +50,7 @@ class DoAllWork {
   typedef typename RangeTy::local_iterator iterator;
   FunctionTy F;
   RangeTy range;
+  const char* loopname;
 
   struct state {
     iterator stealBegin;
@@ -119,9 +122,15 @@ class DoAllWork {
 
 
 public:
-  DoAllWork(const FunctionTy& _F, const RangeTy& r)
-    :F(_F), range(r)
+  DoAllWork(const FunctionTy& _F, const RangeTy& r, const char* ln)
+    :F(_F), range(r), loopname(ln)
   { }
+
+#ifdef GALOIS_USE_EXP
+  void reinit (const RangeTy& r) {
+    range = r;
+  }
+#endif
 
   void operator()() {
     //Assume the copy constructor on the functor is readonly
@@ -139,22 +148,23 @@ public:
   }
 };
 
+} // end namespace detail
+
 template<typename RangeTy, typename FunctionTy>
 void do_all_impl(const RangeTy& range, const FunctionTy& f, const char* loopname = 0, bool steal = false) {
-  if (Galois::Runtime::inGaloisForEach) {
+  if (inGaloisForEach) {
     std::for_each(range.begin(), range.end(), f);
   } else {
     inGaloisForEach = true;
     if (steal) {
-      DoAllWork<FunctionTy, RangeTy> W(f, range);
+      detail::DoAllWork<FunctionTy, RangeTy> W(f, range, loopname);
       getSystemThreadPool().run(activeThreads, std::ref(W));
     } else {
-      FunctionTy f_cpy(f);
-      getSystemThreadPool().run(activeThreads, [&f_cpy, &range] () {
+      getSystemThreadPool().run(activeThreads, [&f, &range] () {
           auto begin = range.local_begin();
           auto end = range.local_end();
           while (begin != end)
-            f_cpy(*begin++);
+            f(*begin++);
         });
     }
     inGaloisForEach = false;

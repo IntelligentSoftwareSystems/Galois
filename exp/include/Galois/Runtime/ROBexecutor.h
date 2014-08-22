@@ -1,6 +1,6 @@
 /** Speculative Ordered Executor -*- C++ -*-
  * @file
- * This is the only file to include for basic Galois functionality.
+ * FIXME
  *
  * @section License
  *
@@ -33,7 +33,7 @@
 
 #include "Galois/Runtime/Barrier.h"
 #include "Galois/Runtime/Context.h"
-#include "Galois/Runtime/DoAll.h"
+#include "Galois/Runtime/Executor_DoAll.h"
 #include "Galois/Runtime/ForEachTraits.h"
 #include "Galois/Runtime/ParallelWork.h"
 #include "Galois/Runtime/PerThreadWorkList.h"
@@ -324,10 +324,10 @@ template <typename T, typename Cmp, typename NhFunc, typename OpFunc>
 class ROBexecutor: private boost::noncopyable {
 
   using Ctxt = ROBcontext<T, Cmp, ROBexecutor>;
-  using CtxtAlloc = Galois::Runtime::MM::FSBGaloisAllocator<Ctxt>;
+  using CtxtAlloc = MM::FixedSizeAllocator<Ctxt>;
   using CtxtCmp = typename Ctxt::PtrComparator;
-  using CtxtDeq = Galois::Runtime::PerThreadDeque<Ctxt*>;
-  using CtxtVec = Galois::Runtime::PerThreadVector<Ctxt*>;
+  using CtxtDeq = PerThreadDeque<Ctxt*>;
+  using CtxtVec = PerThreadVector<Ctxt*>;
 
   using PendingQ = Galois::MinHeap<T, Cmp>;
   using PerThrdPendingQ = PerThreadMinHeap<T, Cmp>;
@@ -400,20 +400,15 @@ public:
     pendingMutex.getLocal ()->unlock ();
   }
 
-  template <typename Iter>
-  GALOIS_ATTRIBUTE_PROF_NOINLINE void push_initial (Iter beg, Iter end) {
+  template <typename R>
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void push_initial (const R& range) {
 
-    assert (beg != end);
+    assert (range.begin () != range.end ());
 
-    pending[0].push (*beg);
-    ++beg;
-
-    if (beg != end) {
-      Galois::Runtime::do_all_impl (Galois::Runtime::makeStandardRange (beg, end),
-          [this] (const T& x) {
-          pending.get ().push (x);
-          });
-    }
+    Galois::Runtime::do_all_impl (range,
+        [this] (const T& x) {
+        pending.get ().push (x);
+        });
 
     assert (!pending.empty_all ());
 
@@ -812,22 +807,25 @@ private:
 };
 
 
-template <typename Iter, typename Cmp, typename NhFunc, typename OpFunc>
-void for_each_ordered_rob (Iter beg, Iter end, Cmp cmp, NhFunc nhFunc, OpFunc opFunc, const char* loopname=0) {
+template <typename R, typename Cmp, typename NhFunc, typename OpFunc>
+void for_each_ordered_rob (const R& range, Cmp cmp, NhFunc nhFunc, OpFunc opFunc, const char* loopname=0) {
 
-  using T = typename std::iterator_traits<Iter>::value_type;
+  using T = typename R::value_type;
 
   Galois::Runtime::beginSampling ();
 
   ROBexecutor<T, Cmp, NhFunc, OpFunc>  exec (cmp, nhFunc, opFunc);
 
-  exec.push_initial (beg, end);
+  if (range.begin () != range.end ()) {
 
-  getSystemThreadPool ().run (activeThreads, std::ref(exec));
+    exec.push_initial (range);
 
-  Galois::Runtime::endSampling ();
+    getSystemThreadPool ().run (activeThreads, std::ref(exec));
 
-  exec.printStats ();
+    Galois::Runtime::endSampling ();
+
+    exec.printStats ();
+  }
 }
 
 template <typename Iter, typename Cmp, typename NhFunc, typename OpFunc, typename StableTest>
@@ -910,7 +908,7 @@ template <typename T, typename Cmp, typename NhFunc, typename OpFunc>
 class ROBparaMeter: private boost::noncopyable {
 
   using Ctxt = ROBparamContext<T, Cmp, ROBparaMeter>;
-  using CtxtAlloc = Galois::Runtime::MM::FSBGaloisAllocator<Ctxt>;
+  using CtxtAlloc = MM::FixedSizeAllocator<Ctxt>;
   using CtxtCmp = typename Ctxt::PtrComparator;
   using CtxtDeq = Galois::Runtime::PerThreadDeque<Ctxt*>;
 

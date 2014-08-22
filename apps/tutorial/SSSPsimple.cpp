@@ -53,7 +53,7 @@ void relax_edge(unsigned src_data, Graph::edge_iterator ii,
   unsigned int edge_data = graph.getEdgeData(ii);
   unsigned& dst_data = graph.getData(dst);
     //![get edge and node data] 
-  unsigned int newDist = dst_data + edge_data;
+  unsigned int newDist = src_data + edge_data;
   if (newDist < dst_data) {
     dst_data = newDist;
     ctx.push(std::make_pair(newDist, dst));
@@ -65,7 +65,7 @@ struct SSSP {
   void operator()(UpdateRequest& req, Galois::UserContext<UpdateRequest>& ctx) const {
     GNode active_node = req.second;
     unsigned& data = graph.getData(active_node);
-    if (req.first >= data) return;
+    if (req.first > data) return;
    
     //![loop over neighbors] 
     for (Graph::edge_iterator ii = graph.edge_begin(active_node),

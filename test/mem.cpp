@@ -11,9 +11,9 @@ struct element {
 };
 
 int main(int argc, char** argv) {
-  unsigned baseAllocSize = SystemBaseAlloc::AllocSize;
+  unsigned baseAllocSize = SystemHeap::AllocSize;
 
-  FSBGaloisAllocator<element> falloc;
+  FixedSizeAllocator<element> falloc;
   element* last = nullptr;
   for (unsigned i = 0; i < baseAllocSize; ++i) {
     element* ptr = falloc.allocate(1);
@@ -21,9 +21,9 @@ int main(int argc, char** argv) {
     ptr->next = last;
     last = ptr;
   }
-  for (unsigned i = baseAllocSize - 1; i >= 0; --i) {
+  for (unsigned i = 0; i < baseAllocSize; ++i) {
     GALOIS_ASSERT(last);
-    GALOIS_ASSERT(last->val == i);
+    GALOIS_ASSERT(last->val == baseAllocSize - 1 - i);
     element* next = last->next;
     falloc.destroy(last);
     falloc.deallocate(last, 1);
@@ -31,7 +31,7 @@ int main(int argc, char** argv) {
   }
   GALOIS_ASSERT(!last);
 
-  VariableSizeAllocator valloc;
+  VariableSizeHeap valloc;
   size_t allocated;
   GALOIS_ASSERT(1 < baseAllocSize);
   valloc.allocate(1, allocated);

@@ -113,7 +113,7 @@ public:
                  ii->first.first.c_str(), ",",
                  ii->first.second.c_str(), ",",
                  maxThreadID + 1, ",",
-                 std::accumulate(Values.begin(), Values.end(), 0)
+                 std::accumulate(Values.begin(), Values.end(), static_cast<unsigned long>(0))
                  );
       for (unsigned x = 0; x <= maxThreadID; ++x)
         LL::gPrint(",", x < Values.size() ? Values.at(x) : 0);

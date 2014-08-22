@@ -18,42 +18,39 @@
 /*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA            */
 /**********************************************************************************************/
 
-#include "omp-tasks-app.h"
+#ifndef _COMMON_H
+#define _COMMON_H
 
-#define BOTS_APP_NAME "SparseLU (For version)"
-#define BOTS_APP_PARAMETERS_DESC "S1=%dx%d, S2=%dx%d"
-#define BOTS_APP_PARAMETERS_LIST ,bots_arg_size,bots_arg_size,bots_arg_size_1,bots_arg_size_1
-
-#define BOTS_APP_USES_ARG_SIZE
-#define BOTS_APP_DEF_ARG_SIZE 50
-#define BOTS_APP_DESC_ARG_SIZE "Matrix Size"
-
-#define BOTS_APP_USES_ARG_SIZE_1
-#define BOTS_APP_DEF_ARG_SIZE_1 100
-#define BOTS_APP_DESC_ARG_SIZE_1 "Submatrix Size"
-
-#define BOTS_APP_INIT float **SEQ,**BENCH;
-
-#ifdef __cplusplus
-extern "C" {
+#ifndef CC
+#define CC ""
 #endif
-void sparselu_init(float ***pM, char *pass);
-void sparselu_fini(float **M, char *pass);
-void sparselu_seq_call(float **SEQ);
-void sparselu_par_call(float **BENCH);
-int sparselu_check(float **SEQ, float **BENCH);
-#ifdef __cplusplus
-}
+#ifndef CFLAGS
+#define CFLAGS ""
+#endif
+#ifndef LD
+#define LD ""
+#endif
+#ifndef LDFLAGS
+#define LDFLAGS ""
+#endif
+#ifndef CDATE
+#define CDATE ""
+#endif
+#ifndef CMESSAGE
+#define CMESSAGE ""
 #endif
 
-#define KERNEL_INIT sparselu_init(&BENCH,"benchmark");
-#define KERNEL_CALL sparselu_par_call(BENCH);
-#define KERNEL_FINI sparselu_fini(BENCH,"benchmark");
+#define BOTS_ERROR                         0
+#define BOTS_ERROR_NOT_ENOUGH_MEMORY       1
+#define BOTS_ERROR_UNRECOGNIZED_PARAMETER  2
 
-#define KERNEL_SEQ_INIT sparselu_init(&SEQ,"serial");
-#define KERNEL_SEQ_CALL sparselu_seq_call(SEQ);
-#define KERNEL_SEQ_FINI sparselu_fini(SEQ,"serial");
+#define BOTS_WARNING                       0
 
-#define BOTS_APP_CHECK_USES_SEQ_RESULT
-#define KERNEL_CHECK sparselu_check(SEQ,BENCH);
+void bots_get_date(char *str);
+void bots_get_architecture(char *str);
+void bots_get_load_average(char *str);
+void bots_print_results(void);
 
+#define BOTS_TMP_STR_SZ 256
+
+#endif

@@ -235,10 +235,10 @@ struct SegReduce {
 
 #ifndef SERIAL_SWAP
 struct Swap {
-	void operator()(const GNode& item, Galois::UserContext<GNode>& ctx) {
+	void operator()(const GNode& item, Galois::UserContext<GNode>& ctx) const {
 	  operator()(item);
 	}
-  void operator()(const GNode& item) {
+  void operator()(const GNode& item) const {
 		SNode& idata = graph.getData(item, Galois::MethodFlag::NONE);
 		idata.numChildren -= idata.sum; 
 #ifndef NO_SORT
@@ -256,10 +256,10 @@ struct SortChildren {
 	//SortChildren(unsigned int r, Galois::GReduceMax<unsigned int>& m) : round(r), maxlen(m) {}
 	SortChildren(unsigned int r, Galois::GReduceMax<unsigned int>& m) : round(r) {}
 
-	void operator()(GNode& parent, Galois::UserContext<GNode>& ctx) {
+	void operator()(GNode& parent, Galois::UserContext<GNode>& ctx) const {
 	  operator()(parent);
 	}
-  void operator()(GNode& parent) {
+  void operator()(GNode& parent) const {
 		SNode& pdata = graph.getData(parent, Galois::MethodFlag::NONE);
 
 		if(pdata.sum > 1){
@@ -1146,10 +1146,10 @@ struct BarrierNoDup {
 			return usec;
 		}
 	  
-		void operator()(GNode& n, Galois::UserContext<GNode>& ctx) {
+		void operator()(GNode& n, Galois::UserContext<GNode>& ctx) const {
 		  operator()(n);
 		}
-	  void operator()(GNode& n) {
+	  void operator()(GNode& n) const {
 			SNode& sdata = graph.getData(n, Galois::MethodFlag::NONE);
 			unsigned int newDist = sdata.dist + 1;
 
@@ -1252,10 +1252,10 @@ struct BarrierNoDup {
 
 		Place(unsigned int r) : round(r) {}
 
-		void operator()(GNode& child, Galois::UserContext<GNode>& ctx) {
+		void operator()(GNode& child, Galois::UserContext<GNode>& ctx) const {
 		  operator()(child);
 		}
-	  void operator()(GNode& child) {
+	  void operator()(GNode& child) const {
 			SNode& cdata = graph.getData(child, Galois::MethodFlag::NONE);
 			SNode& pdata = graph.getData(cdata.parent, Galois::MethodFlag::NONE);
 
@@ -1278,10 +1278,10 @@ struct BarrierNoDup {
 	};
 
 	struct Children {
-		void operator()(GNode& child, Galois::UserContext<GNode>& ctx) {
+		void operator()(GNode& child, Galois::UserContext<GNode>& ctx) const {
 		  operator()(child);
 		}
-	  void operator()(GNode& child) {
+	  void operator()(GNode& child) const {
 			SNode& cdata = graph.getData(child, Galois::MethodFlag::NONE);
 			//graph.getData(cdata.parent, Galois::MethodFlag::NONE).mutex.lock();
 			graph.getData(cdata.parent, Galois::MethodFlag::NONE).numChildren++;

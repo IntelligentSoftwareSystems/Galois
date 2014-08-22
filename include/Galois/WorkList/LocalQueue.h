@@ -25,6 +25,7 @@
 
 #include "Galois/config.h"
 #include <boost/mpl/if.hpp>
+#include "Galois/WorkList/GFifo.h"
 #include GALOIS_CXX11_STD_HEADER(type_traits)
 
 namespace Galois {
@@ -39,7 +40,7 @@ struct NoGlobalQueue {
   struct retype { typedef NoGlobalQueue<_T> type; };
 };
 
-template<typename Global = NoGlobalQueue<>, typename Local = FIFO<>, typename T = int>
+template<typename Global = NoGlobalQueue<>, typename Local = GFIFO<>, typename T = int>
 struct LocalQueue : private boost::noncopyable {
   template<bool _concurrent>
   struct rethread { typedef LocalQueue<Global, Local, T> type; };

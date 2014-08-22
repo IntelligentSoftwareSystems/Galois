@@ -7,11 +7,19 @@
 namespace bh {
 
 
+
 struct SerialNodeBase {
 protected:
   void setChild (unsigned, SerialNodeBase*, SerialNodeBase*) {}
 };
 
+// Note: during tree construction, setChild should be called at most twice;
+// once when child is changed from null to some leaf node
+// second when child is changed from leaf node to internal node (in order to
+// expand) 
+// We want to record the 2nd change. Reason being that the active elements in
+// summarization are only the internal nodes and not the leaves. 
+// 
 
 struct SpecNodeBase: public Galois::Runtime::Lockable {
   unsigned level;
@@ -50,18 +58,18 @@ struct LevelComparator {
 
 struct KDGNodeBase {
 
-  typedef Galois::GAtomic<unsigned> UnsignedAtomic;
+  // typedef Galois::GAtomic<unsigned> UnsignedAtomic;
 
-  UnsignedAtomic numChild;
+  // KDGNodeBase* parent;
+  // GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE std::atomic<unsigned> numChild;
+  std::atomic<unsigned> numChild;
   KDGNodeBase* parent;
   
   KDGNodeBase (): numChild (0), parent (nullptr) {}
 
 protected:
   void setChild (unsigned index, KDGNodeBase* c, KDGNodeBase* prev) {
-    if (prev == NULL) {
-      ++numChild;
-    }
+    ++numChild;
     c->parent = this;
   }
 
@@ -81,8 +89,10 @@ struct Octree: public B {
 
   explicit Octree (Point _pos): B (), pos (_pos), mass (0.0) {}
 
-  virtual ~Octree() { }
+  // virtual ~Octree() { }
   virtual bool isLeaf() const = 0;
+
+  virtual ~Octree (void) {}
 };
 
 template <typename B>
@@ -101,10 +111,28 @@ public:
     Octree<B>* prev = child[index];
     child[index] = c;
 
-    B::setChild (index, c, prev);
+    if (!c->isLeaf ()) {
+      B::setChild (index, c, prev);
+    }
+  }
+
+  bool casChild (unsigned index, Octree<B>* oldVal, Octree<B>* newVal) { 
+    assert (index < 8);
+    if( __sync_bool_compare_and_swap (&child[index], oldVal, newVal)) {
+      if (!newVal->isLeaf ()) {
+        B::setChild (index, newVal, oldVal);
+      }
+      return true;
+    }
+    return false;
   }
 
   Octree<B>* getChild (unsigned index) {
+    assert (index < 8);
+    return child[index];
+  }
+
+  const Octree<B>* getChild (unsigned index) const {
     assert (index < 8);
     return child[index];
   }
@@ -134,13 +162,13 @@ public:
     // }
   }
 
-  virtual ~OctreeInternal() {
-    for (int i = 0; i < 8; i++) {
-      if (child[i] != NULL && !child[i]->isLeaf()) {
-        delete child[i];
-      }
-    }
-  }
+  // virtual ~OctreeInternal() {
+    // for (int i = 0; i < 8; i++) {
+      // if (child[i] != NULL && !child[i]->isLeaf()) {
+        // delete child[i];
+      // }
+    // }
+  // }
   virtual bool isLeaf() const {
     return false;
   }
@@ -182,6 +210,76 @@ inline void updateCenter(Point& p, int index, double radius) {
   for (int i = 0; i < 3; i++) {
     double v = (index & (1 << i)) > 0 ? radius : -radius;
     p[i] += v;
+  }
+}
+
+template<typename B>
+GALOIS_ATTRIBUTE_PROF_NOINLINE static void summarizeNode (OctreeInternal<B>* node) {
+
+  assert ((node != NULL) && (!node->isLeaf ()));
+
+  double massSum = 0.0;
+  Point accum;
+
+  node->compactChildren ();
+
+  for (unsigned i = 0; i < 8; ++i) {
+    Octree<B>* child = node->getChild (i);
+
+    if (child == NULL) {
+      break;
+    }
+
+    massSum += child->mass;
+
+    for (unsigned j = 0; j < 3; ++j) {
+      accum [j] += child->mass * child->pos[j];
+    }
+
+  } // end for child
+
+  node->mass = massSum;
+
+  if (massSum > 0.0) {
+    double invSum = 1.0 / massSum;
+
+    for (unsigned j = 0; j < 3; ++j) {
+      node->pos [j] = accum [j] * invSum;
+    }
+  }
+
+}
+
+
+template <typename B1, typename B2>
+void compareTrees (const OctreeInternal<B1>* ref, const OctreeInternal<B2>* obs) {
+  assert (!ref->isLeaf ());
+  assert (!obs->isLeaf ());
+
+  if (!checkRelativeError (ref->pos, obs->pos)) {
+    GALOIS_DIE ("different value for position");
+  }
+
+  if (!checkRelativeError (ref->mass, obs->mass)) {
+    GALOIS_DIE ("different value for mass");
+  }
+
+  for (unsigned i = 0; i < 8; ++i) {
+    if (ref->getChild (i) != nullptr) {
+      if (obs->getChild (i) == nullptr) { 
+        GALOIS_DIE ("child mismatch");
+      }
+
+      if (!ref->getChild (i)->isLeaf ()) {
+        if (obs->getChild (i)->isLeaf ()) {
+          GALOIS_DIE ("child mismatch");
+        }
+
+        compareTrees (
+            static_cast<const OctreeInternal<B1>*> (ref->getChild(i)), 
+            static_cast<const OctreeInternal<B2>*> (obs->getChild(i)));
+      }
+    }
   }
 }
 
@@ -299,99 +397,26 @@ struct BuildOctreeTopDown {
 
 #endif
 
-
-template <typename B>
-struct BuildOctreeSerial {
-
-  struct BuildOperator {
-    // NB: only correct when run sequentially
-    typedef int tt_does_not_need_stats;
-
-    OctreeInternal<B>* root;
-    double root_radius;
-
-    BuildOperator(OctreeInternal<B>* _root, double radius) :
-      root(_root),
-      root_radius(radius) { }
-
-    void operator () (Body<B>* b) {
-      insert(b, root, root_radius);
-    }
-
-    template<typename Context>
-    void operator()(Body<B>* b, Context&) {
-      (*this) (b);
-    }
-
-    static void insert(Body<B>* b, OctreeInternal<B>* node, double radius) {
-      int index = getIndex(node->pos, b->pos);
-
-      assert(!node->isLeaf());
-
-      Octree<B>* child = node->getChild (index);
-      
-      if (child == NULL) {
-        node->setChild (index, b);
-        return;
-      }
-      
-      radius *= 0.5;
-      if (child->isLeaf()) {
-        // Expand leaf
-        Body<B>* n = static_cast<Body<B>*>(child);
-        Point new_pos(node->pos);
-        updateCenter(new_pos, index, radius);
-        OctreeInternal<B>* new_node = new OctreeInternal<B>(new_pos);
-
-        assert(n->pos != b->pos);
-        
-        node->setChild (index, new_node);
-        insert(b, new_node, radius);
-        insert(n, new_node, radius);
-      } else {
-        OctreeInternal<B>* n = static_cast<OctreeInternal<B>*>(child);
-        insert(b, n, radius);
-      }
-    }
-
-
-  };
-
-  // template <typename A, typename I>
-  // OctreeInternal<B>* operator () (A& treeAlloc, const BoundingBox& _box, I beg, I end) {
+// template <typename B>
+// void copyToVecInterNodes (OctreeInternal<B>* root, std::vector<OctreeInternal<B>*>& vec) {
+  // vec.clear ();
+// 
+  // vec.push_back (root);
+// 
+  // for (size_t i = 0; i < vec.size (); ++i) {
+// 
+    // if (!vec[i]->isLeaf ()) {
+      // OctreeInternal<B>* node = static_cast<OctreeInternal<B>*> (vec[i]);
+// 
+      // for (unsigned i = 0; i < 8; ++i) {
+        // Octree<B>* c = node->getChild (i);
+        // if (c != NULL && !c->isLeaf ()) {
+          // vec.push_back (static_cast<OctreeInternal<B>*> (c));
+        // }
+      // }
+    // }
   // }
-
-  template <typename I>
-  OctreeInternal<B>* operator () (const BoundingBox& _box, I beg, I end) {
-    OctreeInternal<B>* root = new OctreeInternal<B> (_box.center ());
-
-    std::for_each (beg, end, BuildOperator (root, _box.radius ()));
-
-    return root;
-  }
-
-};
-
-template <typename B>
-void copyToVecInterNodes (OctreeInternal<B>* root, std::vector<OctreeInternal<B>*>& vec) {
-  vec.clear ();
-
-  vec.push_back (root);
-
-  for (size_t i = 0; i < vec.size (); ++i) {
-
-    if (!vec[i]->isLeaf ()) {
-      OctreeInternal<B>* node = static_cast<OctreeInternal<B>*> (vec[i]);
-
-      for (unsigned i = 0; i < 8; ++i) {
-        Octree<B>* c = node->getChild (i);
-        if (c != NULL && !c->isLeaf ()) {
-          vec.push_back (static_cast<OctreeInternal<B>*> (c));
-        }
-      }
-    }
-  }
-}
+// }
 
 } // end namespace bh
 

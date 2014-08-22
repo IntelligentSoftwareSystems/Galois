@@ -360,7 +360,7 @@ struct sgd_block
   double step_size;
   sgd_block(Graph& g, double ss) : g(g), step_size(ss) {}
 
-	void operator()(ThreadWorkItem& workItem)
+	void operator()(ThreadWorkItem& workItem) const
 	{
 		Galois::Timer timer;
 		timer.start();
@@ -427,7 +427,7 @@ struct sgd_block_users
   double step_size;
   sgd_block_users(Graph& g, double ss) : g(g), step_size(ss) {}
 
-	void operator()(ThreadWorkItem& workItem)
+	void operator()(ThreadWorkItem& workItem) const
 	{
 		Galois::Timer timer;
 		timer.start();
@@ -506,7 +506,7 @@ struct sgd_block_users_movies
   double step_size;
   sgd_block_users_movies(Graph& g, double ss) : g(g), step_size(ss) {}
 
-	void operator()(ThreadWorkItem& workItem)
+	void operator()(ThreadWorkItem& workItem) const
 	{
 		Galois::Timer timer;
 		timer.start();
@@ -595,7 +595,7 @@ struct advance_edge_iterators
 	Graph& g;
 	advance_edge_iterators(Graph& g) : g(g) {}
 
-	void operator()(ThreadWorkItem& workItem)
+	void operator()(ThreadWorkItem& workItem) const
 	{
 		//set up movie iterators
 		Graph::iterator movie_it = g.begin();
@@ -793,7 +793,7 @@ struct sgd_march
   double step_size;
   sgd_march(Graph& g, SpinLock* locks, double ss) : g(g), locks(locks), step_size(ss) {}
 
-	void operator()(ThreadWorkItem& workItem)
+	void operator()(ThreadWorkItem& workItem) const
 	{
 		Galois::Timer timer;
 		timer.start();
@@ -990,7 +990,7 @@ struct calculate_user_offsets
 	calculate_user_offsets(Graph& _g, SliceInfo* _slices, unsigned _mps, unsigned _nxs, unsigned _nys) : 
 		g(_g), slices(_slices), moviesPerSlice(_mps), numXSlices(_nxs), numYSlices(_nys), numSlices(_nxs * _nys) {}
 
-	void operator()(GNode movie)
+	void operator()(GNode movie) const
 	{
 		unsigned sliceY = std::min(movie / moviesPerSlice, numYSlices - 1);
 		SliceInfo* s = &slices[sliceY * numXSlices];
@@ -1053,7 +1053,7 @@ struct sgd_slice_jump
 	
 	//Preconditions: row and column of slice are locked
 	//Postconditions: increments update count, does sgd update on each movie and user in the slice
-	inline unsigned runSlice(SliceInfo* sp)
+	inline unsigned runSlice(SliceInfo* sp) const
 	{
 		SliceInfo& si = *sp;
 		sp->updates++; //number of times slice has been updated
@@ -1105,7 +1105,7 @@ struct sgd_slice_jump
 	
 	//determines the next slice to work on
 	//returns: slice id to work on, x and y locks are held on the slice
-	inline int getNextSlice(SliceInfo* sp)
+	inline int getNextSlice(SliceInfo* sp) const
 	{
 		bool foundWork = false;
 		unsigned workSearchTries = 0;
@@ -1142,7 +1142,7 @@ struct sgd_slice_jump
 		return foundWork ? nextSliceId : -1;
 	}
 
-	void operator()(SliceInfo* startSlice)
+	void operator()(SliceInfo* startSlice) const
 	{
                 Galois::Statistic edgesVisited("EdgesVisited");
 

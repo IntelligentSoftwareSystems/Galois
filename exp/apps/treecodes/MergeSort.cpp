@@ -1,27 +1,13 @@
-#include <limits>
 #include <iostream>
-#include <fstream>
-#include <vector>
-#include <cstring>
-#include <sstream>
-
 
 #include "Galois/Galois.h"
-#include "Galois/GaloisUnsafe.h"
-#include "Galois/Atomic.h"
+#include "Galois/CilkInit.h"
 #include "Galois/Statistic.h"
-#include "Galois/Runtime/DoAllCoupled.h"
-#include "Galois/Runtime/Sampling.h"
-#include "Galois/Runtime/ll/CompilerSpecific.h"
-#include "Galois/Runtime/DAG.h"
+#include "Galois/Runtime/TreeExec.h"
 
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 
-#ifdef HAVE_CILK
-#include <cilk/cilk.h>
-#include <cilk/cilk_api.h>
-#endif
 
 namespace cll = llvm::cl;
 static cll::opt<unsigned> length("len", cll::desc("Length of the array"), cll::init(10000));
@@ -32,7 +18,7 @@ const char* desc = "merge sort";
 const char* url = "mergesort";
 
 enum Algo {
-  SERIAL, STL, CILK, GALOIS_1P, GALOIS_2P
+  SERIAL, STL, CILK, GALOIS, GALOIS_STACK, GALOIS_GENERIC
 };
 
 cll::opt<Algo> algorithm (
@@ -41,8 +27,9 @@ cll::opt<Algo> algorithm (
       clEnumVal (SERIAL, "serial recursive"),
       clEnumVal (STL, "STL implementation"),
       clEnumVal (CILK, "CILK divide and conquer implementation"),
-      clEnumVal (GALOIS_1P, "galois single phase divide and conquer implementation"),
-      clEnumVal (GALOIS_2P, "galois two phase divide and conquer implementation"),
+      clEnumVal (GALOIS, "galois divide and conquer implementation"),
+      clEnumVal (GALOIS_STACK, "galois stack-based typeddivide and conquer implementation"),
+      clEnumVal (GALOIS_GENERIC, "galois stack-based generic divide and conquer implementation"),
       clEnumValEnd),
 
     cll::init (SERIAL));
@@ -126,14 +113,14 @@ struct SplitGalois {
   {}
 #endif
 
-  template <typename W>
-  void operator () (const IndexRange& r, W& wl) {
+  template <typename Ctx>
+  void operator () (const IndexRange& r, Ctx& ctx) {
     // std::printf ("running split: (%d,%d)\n", r.first, r.second);
     if ((r.second - r.first) > LEAF_SIZE) {
 
       const size_t mid = (r.first + r.second) / 2;
-      wl.push (IndexRange (r.first, mid));
-      wl.push (IndexRange (mid, r.second));
+      ctx.spawn (IndexRange (r.first, mid));
+      ctx.spawn (IndexRange (mid, r.second));
 
       // std::printf ("spawning split: (%d,%d)\n", r.first, mid);
       // std::printf ("spawning split: (%d,%d)\n", mid, r.second);
@@ -189,42 +176,144 @@ struct MergeGalois {
 };
 
 template <typename T, typename C>
-void mergeSortGalois (T* array, T* tmp_array, const size_t L, const C& cmp, Algo algo) {
+void mergeSortGalois (T* array, T* tmp_array, const size_t L, const C& cmp) {
 
-  switch (algo) {
-    case GALOIS_1P: 
-      Galois::Runtime::for_each_ordered_tree_1p (
-          IndexRange (0, L),
+  Galois::Runtime::for_each_ordered_tree (
+      IndexRange (0, L),
 #if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
-          SplitGalois<T,C> (array, tmp_array, cmp),
-          MergeGalois<T,C> (array, tmp_array, cmp),
+      SplitGalois<T,C> (array, tmp_array, cmp),
+      MergeGalois<T,C> (array, tmp_array, cmp),
 #else
-          SplitGalois<T,C> {array, tmp_array, cmp},
-          MergeGalois<T,C> {array, tmp_array, cmp},
+      SplitGalois<T,C> {array, tmp_array, cmp},
+      MergeGalois<T,C> {array, tmp_array, cmp},
 #endif
-          "merge-sort-galois-1p");
-      break;
+      "merge-sort-galois");
 
-    case GALOIS_2P:
-      Galois::Runtime::for_each_ordered_tree_2p (
-          IndexRange (0, L),
-#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
-          SplitGalois<T,C> (array, tmp_array, cmp),
-          MergeGalois<T,C> (array, tmp_array, cmp),
-#else
-          SplitGalois<T,C> {array, tmp_array, cmp},
-          MergeGalois<T,C> {array, tmp_array, cmp},
-#endif
-          "merge-sort-galois-2p");
-      break;
-
-    default:
-      GALOIS_DIE("bad value for algorithm");
-      break;
-
-  }
 
 }
+
+template <typename T, typename C>
+struct MergeSortGaloisStack {
+  T* array;
+  T* tmp_array;
+  const C& cmp;
+  size_t beg;
+  size_t end;
+
+  template <typename Ctx>
+  void operator () (Ctx& ctx) {
+    if ((end - beg) > LEAF_SIZE) {
+      size_t mid = (beg + end) / 2;
+
+      MergeSortGaloisStack left {array, tmp_array, cmp, beg, mid};
+      ctx.spawn (left);
+
+      MergeSortGaloisStack right {array, tmp_array, cmp, mid, end};
+      ctx.spawn (right);
+
+      ctx.sync ();
+
+      mergeHalves (array, tmp_array, beg, mid, end, cmp);
+    } else {
+      std::sort (array + beg, array + end, cmp);
+    }
+    return;
+  }
+};
+
+
+template <typename T, typename C>
+void mergeSortGaloisStack (T* array, T* tmp_array, const size_t L, const C& cmp) {
+  MergeSortGaloisStack<T,C> init {array, tmp_array, cmp, 0, L};
+  Galois::Runtime::for_each_ordered_tree (init, "mergesort-stack");
+}
+
+template <typename T, typename C>
+struct MergeGaloisGeneric: public Galois::Runtime::TreeTaskBase {
+  T* array;
+  T* tmp_array;
+  const C& cmp;
+  size_t beg;
+  size_t mid;
+  size_t end;
+
+  MergeGaloisGeneric (
+      T* array,
+      T* tmp_array,
+      const C& cmp,
+      size_t beg,
+      size_t mid,
+      size_t end)
+    : 
+      Galois::Runtime::TreeTaskBase (),
+      array (array),
+      tmp_array (tmp_array),
+      cmp (cmp),
+      beg (beg),
+      mid (mid),
+      end (end)
+  {}
+
+  virtual void operator () (Galois::Runtime::TreeTaskContext& ctx) {
+    mergeHalves (array, tmp_array, beg, mid, end, cmp);
+  }
+};
+
+template <typename T, typename C>
+struct SplitGaloisGeneric: public Galois::Runtime::TreeTaskBase {
+  T* array;
+  T* tmp_array;
+  const C& cmp;
+  size_t beg;
+  size_t end;
+
+  SplitGaloisGeneric (
+      T* array,
+      T* tmp_array,
+      const C& cmp,
+      size_t beg,
+      size_t end)
+    :
+      Galois::Runtime::TreeTaskBase (),
+      array (array),
+      tmp_array (tmp_array),
+      cmp (cmp),
+      beg (beg),
+      end (end)
+  {}
+
+
+  virtual void operator () (Galois::Runtime::TreeTaskContext& ctx) {
+    if ((end - beg) > LEAF_SIZE) {
+      size_t mid = (beg + end) / 2;
+
+      SplitGaloisGeneric left {array, tmp_array, cmp, beg, mid};
+      ctx.spawn (left);
+
+      SplitGaloisGeneric right {array, tmp_array, cmp, mid, end};
+      ctx.spawn (right);
+
+      ctx.sync ();
+
+      MergeGaloisGeneric<T,C> m {array, tmp_array, cmp, beg, mid, end};
+      ctx.spawn (m);
+
+      ctx.sync ();
+
+      // mergeHalves (array, tmp_array, beg, mid, end, cmp);
+
+    } else {
+      std::sort (array + beg, array + end, cmp);
+    }
+  }
+};
+
+template <typename T, typename C>
+void mergeSortGaloisGeneric (T* array, T* tmp_array, const size_t L, const C& cmp) {
+  SplitGaloisGeneric<T,C> init {array, tmp_array, cmp, 0, L};
+  Galois::Runtime::for_each_ordered_tree_generic (init, "mergesort-stack");
+}
+
 
 template <typename T, typename C>
 void checkSorting (T* array, const size_t L, const C& cmp) {
@@ -275,11 +364,24 @@ int main (int argc, char* argv[]) {
       break;
 
     case CILK:
+      Galois::CilkInit();
       mergeSortCilk (array, tmp_array, length, std::less<int> ());
       break;
 
+    case GALOIS:
+      mergeSortGalois (array, tmp_array, length, std::less<int> ());
+      break;
+
+    case GALOIS_STACK:
+      mergeSortGaloisStack (array, tmp_array, length, std::less<int> ());
+      break;
+
+    case GALOIS_GENERIC:
+      mergeSortGaloisGeneric (array, tmp_array, length, std::less<int> ());
+      break;
+
     default:
-      mergeSortGalois (array, tmp_array, length, std::less<int> (), algorithm);
+      std::abort ();
 
   }
   t.stop ();

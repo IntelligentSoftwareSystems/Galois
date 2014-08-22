@@ -36,7 +36,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
   struct Initialize {
     Graph& graph;
     Initialize(Graph& g): graph(g) { }
-    void operator()(GNode n) {
+    void operator()(GNode n) const {
       LNode& data = graph.getData(n);
       data.dist = DIST_INFINITY;
       data.visited = false;
@@ -68,7 +68,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
   struct ResetVisited {
     Graph& graph;
     ResetVisited(Graph& g): graph(g) { }
-    void operator()(size_t n) {
+    void operator()(size_t n) const {
       graph.getData(graph.nodeFromId(n)).visited = false;
     }
   };

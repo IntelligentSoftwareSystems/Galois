@@ -8,6 +8,7 @@ endif()
 set(BASE ${CMAKE_SOURCE_DIR})
 
 makeTest(acquire DISTSAFE)
+makeTest(awake-threadpool-overhead)
 makeTest(bandwidth)
 makeTest(barriers)
 makeTest(empty-member-lcgraph DISTSAFE)
@@ -29,6 +30,8 @@ makeTest(sort)
 makeTest(static DISTSAFE)
 makeTest(twoleveliteratora DISTSAFE)
 makeTest(worklists-compile DISTSAFE)
+
+makeTest(exec_oneach)
 
 function(runSmallTest prog)
   set(options DISTSAFE)

@@ -31,196 +31,156 @@
 #include "tbb/parallel_for_each.h"
 #endif
 
-#if defined(__INTEL_COMPILER)
-#include <cilk/cilk.h>
-#include <cilk/cilk_api.h>
-#endif
-
+#include "CilkInit.h"
 #include <unistd.h>
 
 #include "llvm/Support/CommandLine.h"
 
-namespace cll = llvm::cl;
 
 
 namespace Galois {
 
 enum DoAllTypes { 
-  GALOIS, GALOIS_STEAL, COUPLED, CILK, OPENMP 
+  DOALL_GALOIS, DOALL_GALOIS_STEAL, DOALL_GALOIS_FOREACH, DOALL_COUPLED, DOALL_CILK, DOALL_OPENMP 
 };
 
+namespace cll = llvm::cl;
 extern cll::opt<DoAllTypes> doAllKind;
+
+void setDoAllImpl (const DoAllTypes& type);
+
+DoAllTypes getDoAllImpl (void);
+
+template <unsigned CZ>
+struct doall_chunk_size {
+  static const unsigned value = CZ;
+};
+
+template <> 
+struct doall_chunk_size<0> {};
 
 template <DoAllTypes TYPE> 
 struct DoAllImpl {
-  template <typename I, typename F>
-  static inline void go (I beg, I end, const F& func, const char* loopname) {
-    std::abort ();
-  }
-
-  template <typename PW, typename F>
-  static inline void go (PW& perThrdWL, const F& func, const char* loopname) {
+  template <typename R, typename F>
+  static inline void go (const R& range, const F& func, const char* loopname) {
     std::abort ();
   }
 };
 
 template <>
-struct DoAllImpl<GALOIS> {
-  template <typename I, typename F>
-  static inline void go (I beg, I end, const F& func, const char* loopname) {
-    Galois::Runtime::do_all_impl (Runtime::makeStandardRange (beg, end), func, loopname, false);
-  }
-
-  template <typename PW, typename F>
-  static inline void go (PW& perThrdWL, const F& func, const char* loopname) {
-    go (perThrdWL.begin_all (), perThrdWL.end_all (), func, loopname);
+struct DoAllImpl<DOALL_GALOIS> {
+  template <typename R, typename F>
+  static inline void go (const R& range, const F& func, const char* loopname) {
+    Galois::Runtime::do_all_impl (range, func, loopname, false);
   }
 };
 
 template <>
-struct DoAllImpl<GALOIS_STEAL> {
-  template <typename I, typename F>
-  static inline void go (I beg, I end, const F& func, const char* loopname) {
-    Galois::Runtime::do_all_impl (Runtime::makeStandardRange (beg, end), func, loopname, true);
-  }
-
-  template <typename PW, typename F>
-  static inline void go (PW& perThrdWL, const F& func, const char* loopname) {
-    go (perThrdWL.begin_all (), perThrdWL.end_all (), func, loopname);
+struct DoAllImpl<DOALL_GALOIS_STEAL> {
+  template <typename R, typename F>
+  static inline void go (const R& range, const F& func, const char* loopname) {
+    Galois::Runtime::do_all_impl (range, func, loopname, false);
   }
 };
 
 template <>
-struct DoAllImpl<COUPLED> {
-  template <typename I, typename F>
-  static inline void go (I beg, I end, const F& func, const char* loopname) {
-    Galois::Runtime::do_all_coupled (beg, end, func, loopname);
-  }
+struct DoAllImpl<DOALL_GALOIS_FOREACH> {
 
-  template <typename PW, typename F>
-  static inline void go (PW& perThrdWL, const F& func, const char* loopname) {
-    Galois::Runtime::do_all_coupled (perThrdWL, func, loopname);
+  template <typename T, typename _F>
+  struct FuncWrap {
+    typedef char tt_does_not_need_push;
+    typedef int tt_does_not_need_aborts;
+
+    _F func;
+
+    template <typename C>
+    void operator () (T& x, C&) {
+      func (x);
+    }
+
+  };
+
+  template <const unsigned CHUNK_SIZE, typename R, typename F>
+  static inline void go (const R& range, const F& func, const char* loopname) {
+    typedef typename R::value_type T;
+    // typedef Galois::WorkList::dChunkedFIFO<CHUNK_SIZE, T> WL_ty;
+    typedef Galois::WorkList::dChunkedLIFO<CHUNK_SIZE, T> WL_ty;
+    // typedef Galois::WorkList::AltChunkedLIFO<CHUNK_SIZE, T> WL_ty;
+
+    Galois::Runtime::for_each_impl<WL_ty> (range, FuncWrap<T, F> {func}, loopname);
+  }
+};
+
+template <>
+struct DoAllImpl<DOALL_COUPLED> {
+  template <const unsigned CHUNK_SIZE, typename R, typename F>
+  static inline void go (const R& range, const F& func, const char* loopname) {
+    Galois::Runtime::do_all_coupled (range, func, loopname, CHUNK_SIZE);
   }
 };
 
 
-#if defined(__INTEL_COMPILER)
+#ifdef HAVE_CILK
 
 template <>
-struct DoAllImpl<CILK> {
-
-  template <typename I, typename F>
-  static inline void go (I beg, I end, const F& func, const char* loopname) {
-
-    init ();
-
-    cilk_for(I it = beg; it != end; ++it) {
+struct DoAllImpl<DOALL_CILK> {
+  template <typename R, typename F>
+  static inline void go (const R& range, const F& func, const char* loopname) {
+    CilkInit ();
+    cilk_for(auto it = range.begin (), end = range.end (); it != end; ++it) {
       func (*it);
     }
   }
 
-  template <typename PW, typename F>
-  static inline void go (PW& perThrdWL, const F& func, const char* loopname) {
-    go (perThrdWL.begin_all (), perThrdWL.end_all (), func, loopname);
-  }
 
-  struct BusyBarrier {
-    volatile int entered;
-
-    void check () const { assert (entered > 0); }
-
-    BusyBarrier (unsigned val) : entered (val) 
-    {
-      check ();
-    }
-
-    void wait () {
-      check ();
-      __sync_fetch_and_sub (&entered, 1);
-      while (entered > 0) {}
-    }
-
-    void reinit (unsigned val) {
-      entered = val;
-      check ();
-    }
-  };
-
-  static bool initialized;
-
-
-  static void initOne (BusyBarrier& busybarrier, unsigned tid) {
-    Runtime::LL::initTID(tid % Runtime::LL::getMaxThreads());
-        Runtime::initPTS_cilk ();
-
-        unsigned id = Runtime::LL::getTID ();
-        pthread_t self = pthread_self ();
-
-        std::printf ("CILK: Thread %ld assigned id=%d\n", self, id);
-
-        if (id != 0 || !Runtime::LL::EnvCheck("GALOIS_DO_NOT_BIND_MAIN_THREAD")) {
-          Runtime::LL::bindThreadToProcessor(id);
-        }
-
-
-        busybarrier.wait (); 
-  }
-
-  static void init () {
-
-    if (initialized) { 
-      return ;
-    } else {
-
-      initialized = true;
-
-      unsigned numT = getActiveThreads ();
-
-      unsigned tot = __cilkrts_get_total_workers ();
-      std::printf ("CILK: total cilk workers = %d\n", tot);
-
-      // char nw_str[128];
-      // std::sprintf (nw_str, "%d", numT);
-      // __cilkrts_set_param ("nworkers", nw_str);
-
-      unsigned nw = __cilkrts_get_nworkers ();
-
-      if (nw != numT) {
-        std::printf ("CILK: cilk nworkers=%d != galois threads=%d\n", nw, numT); 
-        unsigned tot = __cilkrts_get_total_workers ();
-        std::printf ("CILK: total cilk workers = %d\n", tot);
-        std::abort ();
-      }
-
-      BusyBarrier busybarrier (numT);
-
-      for (unsigned i = 0; i < numT; ++i) {
-        cilk_spawn initOne (busybarrier, i);
-      } // end for
-    }
-  }
 
 };
+#else 
 
+template <> struct DoAllImpl<DOALL_CILK> {
+  template <typename R, typename F>
+  static inline void go (const R& range, const F& func, const char* loopname) {
+    GALOIS_DIE("Cilk not found\n");
+  }
+};
 #endif
 
-template <typename I, typename F> 
-void do_all_choice (I beg, I end, const F& func, const char* loopname=0) {
-  switch (doAllKind) {
-    case GALOIS_STEAL:
-      DoAllImpl<GALOIS_STEAL>::go (beg, end, func, loopname);
+template <>
+struct DoAllImpl<DOALL_OPENMP> {
+  template <typename R, typename F>
+  static inline void go (const R& range, const F& func, const char* loopname) {
+  const auto end = range.end ();
+#pragma omp parallel for schedule(guided)
+    for (auto it = range.begin (); it < end; ++it) {
+      func (*it);
+    }
+  }
+};
+
+template <typename R, typename F, typename CS> 
+void do_all_choice (const R& range, const F& func, const DoAllTypes& type, const char* loopname=0, const CS& x=CS ()) {
+
+  const unsigned CHUNK_SIZE = CS::value;
+
+  switch (type) {
+    case DOALL_GALOIS_STEAL:
+      DoAllImpl<DOALL_GALOIS_STEAL>::go (range, func, loopname);
       break;
-    case GALOIS:
-      DoAllImpl<GALOIS>::go (beg, end, func, loopname);
+    case DOALL_GALOIS_FOREACH:
+      DoAllImpl<DOALL_GALOIS_FOREACH>::go<CHUNK_SIZE> (range, func, loopname);
       break;
-    case COUPLED:
-      DoAllImpl<COUPLED>::go (beg, end, func, loopname);
+    case DOALL_GALOIS:
+      DoAllImpl<DOALL_GALOIS>::go (range, func, loopname);
       break;
-    case CILK:
-      DoAllImpl<CILK>::go (beg, end, func, loopname);
+    case DOALL_COUPLED:
+      DoAllImpl<DOALL_COUPLED>::go<CHUNK_SIZE> (range, func, loopname);
       break;
-    case OPENMP:
-      DoAllImpl<OPENMP>::go (beg, end, func, loopname);
+    case DOALL_CILK:
+      DoAllImpl<DOALL_CILK>::go (range, func, loopname);
+      break;
+    case DOALL_OPENMP:
+      // DoAllImpl<DOALL_OPENMP>::go (range, func, loopname);
+      std::abort ();
       break;
     default:
       abort ();
@@ -228,28 +188,9 @@ void do_all_choice (I beg, I end, const F& func, const char* loopname=0) {
   }
 }
 
-template <typename PW, typename F> 
-void do_all_choice (PW& perThrdWL, const F& func, const char* loopname=0) {
-  switch (doAllKind) {
-    case GALOIS_STEAL:
-      DoAllImpl<GALOIS_STEAL>::go (perThrdWL, func, loopname);
-      break;
-    case GALOIS:
-      DoAllImpl<GALOIS>::go (perThrdWL, func, loopname);
-      break;
-    case COUPLED:
-      DoAllImpl<COUPLED>::go (perThrdWL, func, loopname);
-      break;
-    case CILK:
-      DoAllImpl<CILK>::go (perThrdWL, func, loopname);
-      break;
-    case OPENMP:
-      DoAllImpl<OPENMP>::go (perThrdWL, func, loopname);
-      break;
-    default:
-      abort ();
-      break;
-  }
+template <typename R, typename F, typename CS>
+void do_all_choice (const R& range, const F& func, const char* loopname=0, const CS& x=CS ()) {
+  do_all_choice (range, func, doAllKind, loopname, x);
 }
 
 } // end namespace Galois

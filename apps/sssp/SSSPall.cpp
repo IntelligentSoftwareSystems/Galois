@@ -96,7 +96,7 @@ struct process {
 };
 
 struct reset {
-  void operator()(GNode n) {//, Galois::UserContext<GNode>& lwl) {
+  void operator()(GNode n) const {//, Galois::UserContext<GNode>& lwl) {
     SNode& S = graph.getData(n, Galois::MethodFlag::NONE);
     for (int i = 0; i < NUM; ++i)
       S.dist[i] = DIST_INFINITY;

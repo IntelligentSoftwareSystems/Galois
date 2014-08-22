@@ -37,46 +37,46 @@ using namespace MM;
 using namespace LL;
 
 //Anchor the class
-SystemBaseAlloc::SystemBaseAlloc() {}
-SystemBaseAlloc::~SystemBaseAlloc() {}
+SystemHeap::SystemHeap() {}
+SystemHeap::~SystemHeap() {}
 
 #ifndef GALOIS_FORCE_STANDALONE
-PtrLock<SizedAllocatorFactory, true> SizedAllocatorFactory::instance;
-__thread SizedAllocatorFactory::AllocatorsMap* SizedAllocatorFactory::localAllocators = 0;
+PtrLock<SizedHeapFactory, true> SizedHeapFactory::instance;
+__thread SizedHeapFactory::HeapMap* SizedHeapFactory::localHeaps = 0;
 
-SizedAllocatorFactory::SizedAlloc* 
-SizedAllocatorFactory::getAllocatorForSize(const size_t size) {
+SizedHeapFactory::SizedHeap* 
+SizedHeapFactory::getHeapForSize(const size_t size) {
   if (size == 0)
     return 0;
-  return getInstance()->getAllocForSize(size);
+  return getInstance()->getHeap(size);
 }
 
-SizedAllocatorFactory::SizedAlloc* 
-SizedAllocatorFactory::getAllocForSize(const size_t size) {
-  typedef SizedAllocatorFactory::AllocatorsMap AllocMap;
+SizedHeapFactory::SizedHeap* 
+SizedHeapFactory::getHeap(const size_t size) {
+  typedef SizedHeapFactory::HeapMap HeapMap;
 
-  if (!localAllocators) {
+  if (!localHeaps) {
     std::lock_guard<SimpleLock> ll(lock);
-    localAllocators = new AllocMap;
-    allLocalAllocators.push_front(localAllocators);
+    localHeaps = new HeapMap;
+    allLocalHeaps.push_front(localHeaps);
   }
 
-  auto& lentry = (*localAllocators)[size];
+  auto& lentry = (*localHeaps)[size];
   if (lentry)
     return lentry;
 
   {
     std::lock_guard<SimpleLock> ll(lock);
-    auto& gentry = allocators[size];
+    auto& gentry = heaps[size];
     if (!gentry)
-      gentry = new SizedAlloc();
+      gentry = new SizedHeap();
     lentry = gentry;
     return lentry;
   }
 }
 
-SizedAllocatorFactory* SizedAllocatorFactory::getInstance() {
-  SizedAllocatorFactory* f = instance.getValue();
+SizedHeapFactory* SizedHeapFactory::getInstance() {
+  SizedHeapFactory* f = instance.getValue();
   if (f)
     return f;
   
@@ -85,21 +85,21 @@ SizedAllocatorFactory* SizedAllocatorFactory::getInstance() {
   if (f) {
     instance.unlock();
   } else {
-    f = new SizedAllocatorFactory();
+    f = new SizedHeapFactory();
     instance.unlock_and_set(f);
   }
   return f;
 }
 
-SizedAllocatorFactory::SizedAllocatorFactory() :lock() {}
+SizedHeapFactory::SizedHeapFactory() :lock() {}
 
-SizedAllocatorFactory::~SizedAllocatorFactory() {
+SizedHeapFactory::~SizedHeapFactory() {
   // TODO destructor ordering problem: there may be pointers to deleted
-  // SizedAlloc when this Factory is destroyed before dependent
-  // FixedSizeAllocators.
-  for (auto entry : allocators)
+  // SizedHeap when this Factory is destroyed before dependent
+  // FixedSizeHeaps.
+  for (auto entry : heaps)
     delete entry.second;
-  for (auto mptr : allLocalAllocators)
+  for (auto mptr : allLocalHeaps)
     delete mptr;
 }
 #endif

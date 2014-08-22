@@ -36,6 +36,14 @@
 #define BOTS_APP_DEF_ARG_SIZE_2 1
 #define BOTS_APP_DESC_ARG_SIZE_2 "Number of Threads"
 
+#define BOTS_APP_USES_ARG_FILE
+#define BOTS_APP_DESC_ARG_FILE "Graph file (for synthetic generator use empty string)"
+
+#define BOTS_APP_USES_ARG_CUTOFF_1
+#define BOTS_APP_DEF_ARG_CUTOFF_1 0
+#define BOTS_APP_DESC_ARG_CUTOFF_1 "0: use bulk-synchronous >0: use ikdg "
+
+
 #define BOTS_APP_INIT float **SEQ,**BENCH;
 
 void sparselu_init(float ***pM, char *pass);

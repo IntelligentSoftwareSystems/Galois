@@ -106,8 +106,8 @@ void ThreadPool::threadLoop(unsigned tid) {
   bool fastmode = false;
   do {
     if (fastmode) {
-      while (!signals.at(tid).get().fastRelease) { LL::asmPause(); }
-      signals.at(tid).get().fastRelease = 0;
+      while (!signals[tid].get().fastRelease) { LL::asmPause(); }
+      signals[tid].get().fastRelease = 0;
     } else {
       threadWait(tid);
     }
@@ -128,17 +128,17 @@ void ThreadPool::threadLoop(unsigned tid) {
 
 
 void ThreadPool::decascade(int tid) {
-  assert(tid == 0 || signals.at(tid).get().done == 0);
+  assert(tid == 0 || signals[tid].get().done == 0);
   const unsigned multiple = 3;
   unsigned limit = starting;
   for (unsigned i = 1; i <= multiple; ++i) {
     unsigned n = tid * multiple + i;
     if (n < limit) {
-      auto& done_flag = signals.at(n).get().done;
+      auto& done_flag = signals[n].get().done;
       while (!done_flag) { LL::asmPause(); }
     }
   }
-  signals.at(tid).get().done = 1;
+  signals[tid].get().done = 1;
 }
 
 void ThreadPool::cascade(int tid, bool fastmode) {
@@ -147,9 +147,9 @@ void ThreadPool::cascade(int tid, bool fastmode) {
   for (unsigned i = 1; i <= multiple; ++i) {
     unsigned n = tid * multiple + i;
     if (n < limit) {
-      signals.at(n).get().done = 0;
+      signals[n].get().done = 0;
       if (fastmode)
-        signals.at(n).get().fastRelease = 1;
+        signals[n].get().fastRelease = 1;
       else
         threadWakeup(n);
     }

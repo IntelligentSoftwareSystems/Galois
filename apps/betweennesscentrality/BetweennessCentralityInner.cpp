@@ -119,7 +119,7 @@ struct AsyncAlgo {
   struct Initialize {
     Graph& g;
     Initialize(Graph& g): g(g) { }
-    void operator()(Graph::GraphNode n) {
+    void operator()(Graph::GraphNode n) const {
       SNode& data = g.getData(n, Galois::MethodFlag::NONE);
       data.numPaths = -std::numeric_limits<float>::max();
       data.dependencies = -std::numeric_limits<float>::max();
@@ -311,7 +311,7 @@ struct LeveledAlgo {
   struct Initialize {
     Graph& g;
     Initialize(Graph& g): g(g) { }
-    void operator()(Graph::GraphNode n) {
+    void operator()(Graph::GraphNode n) const {
       SNode& data = g.getData(n, Galois::MethodFlag::NONE);
       data.numPaths = 0;
       data.dependencies = 0.0; //std::numeric_limits<float>::lowest();

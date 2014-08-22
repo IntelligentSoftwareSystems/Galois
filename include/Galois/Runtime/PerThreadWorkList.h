@@ -390,13 +390,11 @@ public:
   }
 
   global_const_iterator begin_all() const { 
-    return Galois::stl_two_level_cbegin(
-        make_outer_begin(*this), make_outer_end(*this));
+    return cbegin_all ();
   }
 
   global_const_iterator end_all() const { 
-    return Galois::stl_two_level_cend(
-        make_outer_begin(*this), make_outer_end(*this));
+    return cend_all ();
   }
 
   // for compatibility with Range.h
@@ -407,6 +405,10 @@ public:
   global_const_iterator begin () const { return begin_all (); }
 
   global_const_iterator end () const { return end_all (); }
+
+  global_const_iterator cbegin () const { return cbegin_all (); }
+
+  global_const_iterator cend () const { return cend_all (); }
 
   global_const_iterator cbegin_all() const { 
     return Galois::stl_two_level_cbegin(
@@ -429,13 +431,11 @@ public:
   }
 
   global_const_reverse_iterator rbegin_all() const { 
-    return Galois::stl_two_level_crbegin(
-        make_outer_rbegin(*this), make_outer_rend(*this));
+    return crbegin_all ();
   }
 
   global_const_reverse_iterator rend_all() const { 
-    return Galois::stl_two_level_crend(
-        make_outer_rbegin(*this), make_outer_rend(*this));
+    return crend_all ();
   }
 
   global_const_reverse_iterator crbegin_all() const { 
@@ -530,14 +530,14 @@ public:
 
 
 namespace PerThreadFactory {
-  typedef MM::SimpleBumpPtrWithMallocFallback<MM::FreeListHeap<MM::SystemBaseAlloc> > BasicHeap;
-  typedef MM::ThreadAwarePrivateHeap<BasicHeap> Heap;
+  typedef MM::BumpWithMallocHeap<MM::FreeListHeap<MM::SystemHeap> > BasicHeap;
+  typedef MM::ThreadPrivateHeap<BasicHeap> Heap;
 
   template<typename T>
-  struct Alloc { typedef typename MM::ExternRefGaloisAllocator<T, Heap> type; };
+  struct Alloc { typedef typename MM::ExternalHeapAllocator<T, Heap> type; };
 
   template<typename T>
-  struct FSBAlloc { typedef typename MM::FSBGaloisAllocator<T> type; };
+  struct FSBAlloc { typedef typename MM::FixedSizeAllocator<T> type; };
 
   template<typename T>
   struct Vector { typedef typename std::vector<T, typename Alloc<T>::type > type; };

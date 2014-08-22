@@ -25,7 +25,6 @@
 #define GALOIS_RUNTIME_PERTHREADSTORAGE_H
 
 #include "Galois/config.h"
-#include "Galois/Runtime/ActiveThreads.h"
 #include "Galois/Runtime/ThreadPool.h"
 #include "Galois/Runtime/ll/HWTopo.h"
 #include "Galois/Runtime/ll/PaddedLock.h"
@@ -41,6 +40,8 @@
 
 namespace Galois {
 namespace Runtime {
+
+extern unsigned int activeThreads;
 
 class PerBackend {
   static const unsigned MAX_SIZE = 30;

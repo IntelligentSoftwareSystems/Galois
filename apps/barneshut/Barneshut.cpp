@@ -166,9 +166,9 @@ struct BuildOctree {
   BuildOctree(Octree* _root, Tree& _t, double radius) 
     : root(_root), T(_t), root_radius(radius) {  }
 
-  void operator()(Body* b) { insert(b, root, root_radius); }
+  void operator()(Body* b) const { insert(b, root, root_radius); }
 
-  void insert(Body* b, Octree* node, double radius) {
+  void insert(Body* b, Octree* node, double radius) const {
     int index = getIndex(node->pos, b->pos);
     Node* child = node->child[index].getValue();
 
@@ -362,11 +362,11 @@ struct AdvanceBodies {
   AdvanceBodies() { }
 
   template<typename Context>
-  void operator()(Body* b, Context&) {
+  void operator()(Body* b, Context&) const {
     operator()(b);
   }
 
-  void operator()(Body* b) {
+  void operator()(Body* b) const {
     Point dvel(b->acc);
     dvel *= config.dthf;
     Point velh(b->vel);
@@ -380,7 +380,7 @@ struct InsertBody {
   BodyPtrs& pBodies;
   Bodies& bodies;
   InsertBody(BodyPtrs& pb, Bodies& b): pBodies(pb), bodies(b) { }
-  void operator()(const Body& b) {
+  void operator()(const Body& b) const {
     pBodies.push_back(&(bodies.push_back(b)));
   }
 };
@@ -483,7 +483,7 @@ struct CheckAllPairs {
   
   CheckAllPairs(Bodies& b): bodies(b) { }
 
-  double operator()(const Body& body) {
+  double operator()(const Body& body) const {
     const Body* me = &body;
     Point acc;
     for (Bodies::iterator ii = bodies.begin(), ei = bodies.end(); ii != ei; ++ii) {

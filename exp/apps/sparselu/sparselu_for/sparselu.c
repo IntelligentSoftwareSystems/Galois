@@ -24,8 +24,18 @@
 #include <string.h>
 #include <math.h>
 #include <libgen.h>
+#ifdef __linux__
+#include <linux/mman.h>
+#endif
+#include <sys/mman.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <fcntl.h>
+#include <unistd.h>
 #include "bots.h"
 #include "sparselu.h"
+
+extern char bots_arg_file[256];
 
 /***********************************************************************
  * checkmat: 
@@ -64,7 +74,7 @@ int checkmat (float *M, float *N)
 /***********************************************************************
  * genmat: 
  **********************************************************************/
-void genmat (float *M[])
+static void synthetic_genmat (float *M[])
 {
    int null_entry, init_val, i, j, ii, jj;
    float *p;
@@ -116,6 +126,110 @@ void genmat (float *M[])
    }
    bots_debug("allo = %d, no = %d, total = %d, factor = %f\n",a,b,a+b,(float)((float)a/(float)(a+b)));
 }
+
+static void structure_from_file_genmat (float *M[])
+{
+   int a, b, jj;
+   int num_blocks, max_id;
+
+   int fd = open(bots_arg_file, O_RDONLY);
+   if (fd == -1) abort();
+   struct stat buf;
+   if (fstat(fd, &buf) == -1) abort();
+   void *base = mmap(NULL, buf.st_size, PROT_READ, MAP_PRIVATE, fd, 0);
+   uint64_t *fptr = (uint64_t*) base;
+   uint64_t version = *fptr++;
+   if (version != 1) abort();
+   uint64_t sizeof_edge = *fptr++;
+   if (sizeof_edge != 4) abort();
+   uint64_t num_nodes = *fptr++;
+   uint64_t num_edges = *fptr++;
+   uint64_t *out_idx = fptr;
+   fptr += num_nodes;
+   uint32_t* fptr32 = (uint32_t*)fptr;
+   uint32_t* outs = fptr32;
+   fptr32 += num_edges;
+   if (num_edges % 2)
+     fptr32 += 1;
+   float* edge_data = (float*)fptr32;
+   
+   memset(M, 0, bots_arg_size*bots_arg_size*sizeof(*M));
+
+   num_blocks = (num_nodes + bots_arg_size_1 - 1) / bots_arg_size_1;
+   max_id = bots_arg_size_1 * bots_arg_size;
+
+   printf("full size: %d\n", num_blocks);
+
+   /* generating the structure */
+   uint32_t ii;
+   for (ii = 0; ii < num_nodes; ++ii)
+   {
+      if (ii >= max_id)
+         break;
+      int bii = ii / bots_arg_size_1;
+      uint64_t begin = (ii == 0) ? out_idx[0] : out_idx[ii-1];
+      uint64_t end = out_idx[ii];
+      uint64_t edge;
+      for (edge = begin; edge < end; ++edge)
+      {
+         /* computing null entries */
+         int jj = outs[edge];
+         if (jj >= max_id)
+            continue;
+         int bjj = jj / bots_arg_size_1;
+         if (M[bii*bots_arg_size+bjj] == NULL)
+         {
+            a++;
+            M[bii*bots_arg_size+bjj] = (float *) malloc(bots_arg_size_1*bots_arg_size_1*sizeof(float));
+            memset(M[bii*bots_arg_size+bjj], 0, bots_arg_size_1*bots_arg_size_1*sizeof(float));
+         }
+         if (M[bii*bots_arg_size+bjj] == NULL)
+         {
+            bots_message("Error: Out of memory\n");
+            exit(101);
+         }
+         if (M[bjj*bots_arg_size+bii] == NULL)
+         {
+            a++;
+            M[bjj*bots_arg_size+bii] = (float *) malloc(bots_arg_size_1*bots_arg_size_1*sizeof(float));
+            memset(M[bjj*bots_arg_size+bii], 0, bots_arg_size_1*bots_arg_size_1*sizeof(float));
+         }
+         if (M[bjj*bots_arg_size+bii] == NULL)
+         {
+            bots_message("Error: Out of memory\n");
+            exit(101);
+         }
+         M[bii*bots_arg_size+bjj][(ii%bots_arg_size_1)*bots_arg_size_1+(jj%bots_arg_size_1)] = edge_data[edge];
+         M[bjj*bots_arg_size+bii][(jj%bots_arg_size_1)*bots_arg_size_1+(ii%bots_arg_size_1)] = edge_data[edge];
+      }
+   }
+   // Add identity diagonal as necessary
+   for (ii = 0; ii < bots_arg_size; ++ii) {
+     if (M[ii*bots_arg_size+ii] == NULL)
+     {
+        a++;
+        M[ii*bots_arg_size+ii] = (float *) malloc(bots_arg_size_1*bots_arg_size_1*sizeof(float));
+        memset(M[ii*bots_arg_size+ii], 0, bots_arg_size_1*bots_arg_size_1*sizeof(float));
+     }
+     for (jj = 0; jj < bots_arg_size_1; ++jj)
+     {
+       if (M[ii*bots_arg_size+ii][jj*bots_arg_size_1+jj] == 0.0)
+         M[ii*bots_arg_size+ii][jj*bots_arg_size_1+jj] = 1.0;
+     }
+   }
+   b = num_blocks * num_blocks - a;
+   bots_debug("allo = %d, no = %d, total = %d, factor = %f\n",a,b,a+b,(float)((float)a/(float)(a+b)));
+}
+
+void genmat (float *M[])
+{
+
+  if (strlen(bots_arg_file) == 0)
+    synthetic_genmat(M);
+  else
+    structure_from_file_genmat(M);
+}
+
 /***********************************************************************
  * print_structure: 
  **********************************************************************/

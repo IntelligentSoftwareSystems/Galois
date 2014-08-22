@@ -64,7 +64,7 @@ struct findBoundary {
   Galois::InsertBag<GNode>& b;
   GGraph& g;
   findBoundary(Galois::InsertBag<GNode>& _b, GGraph& _g) : b(_b), g(_g) {}
-  void operator()(GNode n) {
+  void operator()(GNode n) const {
     auto& cn = g.getData(n, Galois::MethodFlag::NONE);
     if (cn.getmaybeBoundary())
       cn.setmaybeBoundary(isBoundary(g,n));
@@ -79,7 +79,7 @@ struct findBoundaryAndProject {
   GGraph& cg;
   GGraph& fg;
   findBoundaryAndProject(Galois::InsertBag<GNode>& _b, GGraph& _cg, GGraph& _fg) :b(_b), cg(_cg), fg(_fg) {}
-  void operator()(GNode n) {
+  void operator()(GNode n) const {
     auto& cn = cg.getData(n, Galois::MethodFlag::NONE);
     if (cn.getmaybeBoundary())
       cn.setmaybeBoundary(isBoundary(cg,n));
@@ -195,7 +195,7 @@ struct projectPart {
 
   projectPart(MetisGraph* Graph, std::vector<partInfo>& p) :fineGraph(Graph->getFinerGraph()->getGraph()), coarseGraph(Graph->getGraph()), parts(p) {}
 
-  void operator()(GNode n) {
+  void operator()(GNode n) const {
     auto& cn = coarseGraph->getData(n);
     unsigned part = cn.getPart();
     for (unsigned x = 0; x < cn.numChildren(); ++x)

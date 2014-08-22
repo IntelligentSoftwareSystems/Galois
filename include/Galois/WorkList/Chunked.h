@@ -67,7 +67,7 @@ struct ChunkedMaster : private boost::noncopyable {
 private:
   class Chunk : public FixedSizeRing<T, ChunkSize>, public QT<Chunk, Concurrent>::ListNode {};
 
-  Runtime::MM::FixedSizeAllocator heap;
+  Runtime::MM::FixedSizeAllocator<Chunk> alloc;
 
   struct p {
     Chunk* cur;
@@ -81,12 +81,14 @@ private:
   squeue<Distributed, Runtime::PerPackageStorage, LevelItem> Q;
 
   Chunk* mkChunk() {
-    return new (heap.allocate(sizeof(Chunk))) Chunk();
+    Chunk* ptr = alloc.allocate(1);
+    alloc.construct(ptr);
+    return ptr;
   }
   
-  void delChunk(Chunk* C) {
-    C->~Chunk();
-    heap.deallocate(C);
+  void delChunk(Chunk* ptr) {
+    alloc.destroy(ptr);
+    alloc.deallocate(ptr, 1);
   }
 
   void pushChunk(Chunk* C)  {
@@ -136,7 +138,7 @@ private:
 public:
   typedef T value_type;
 
-  ChunkedMaster() : heap(sizeof(Chunk)) { }
+  ChunkedMaster() { }
 
   void flush() {
     p& n = data.get();

@@ -255,7 +255,7 @@ struct AsyncAlgo {
   struct Initialize {
     Graph& g;
     Initialize(Graph& g): g(g) { }
-    void operator()(typename Graph::GraphNode n) {
+    void operator()(typename Graph::GraphNode n) const {
       g.getData(n, Galois::MethodFlag::NONE).dist = DIST_INFINITY;
     }
   };
@@ -504,7 +504,7 @@ struct Algo2 {
   struct Initialize {
     Graph& g;
     Initialize(Graph& g): g(g) { }
-    void operator()(Graph::GraphNode n) {
+    void operator()(Graph::GraphNode n) const {
       g.getData(n, Galois::MethodFlag::NONE).dist = DIST_INFINITY;
     }
   };
@@ -623,7 +623,7 @@ struct Algo3 {
   struct Initialize {
     Graph& g;
     Initialize(Graph& g): g(g) { }
-    void operator()(Graph::GraphNode n) {
+    void operator()(Graph::GraphNode n) const {
       g.getData(n, Galois::MethodFlag::NONE).dist = DIST_INFINITY;
     }
   };
@@ -778,7 +778,7 @@ struct Algo4 {
   struct Initialize {
     Graph& g;
     Initialize(Graph& g): g(g) { }
-    void operator()(Graph::GraphNode n) {
+    void operator()(Graph::GraphNode n) const {
       g.getData(n, Galois::MethodFlag::NONE).dist = DIST_INFINITY;
     }
   };
@@ -915,7 +915,7 @@ struct Algo5 {
   struct Initialize {
     Graph& g;
     Initialize(Graph& g): g(g) { }
-    void operator()(Graph::GraphNode n) {
+    void operator()(Graph::GraphNode n) const {
       g.getData(n, Galois::MethodFlag::NONE).dist = DIST_INFINITY;
     }
   };
@@ -1092,7 +1092,7 @@ struct Algo6 {
   struct Initialize {
     Graph& g;
     Initialize(Graph& g): g(g) { }
-    void operator()(Graph::GraphNode n) {
+    void operator()(Graph::GraphNode n) const {
       g.getData(n, Galois::MethodFlag::NONE).dist = DIST_INFINITY;
     }
   };
@@ -1276,7 +1276,7 @@ struct Algo7 {
   struct Initialize {
     Graph& g;
     Initialize(Graph& g): g(g) { }
-    void operator()(Graph::GraphNode n) {
+    void operator()(Graph::GraphNode n) const {
       Node& node = g.getData(n, Galois::MethodFlag::NONE);
       node.dist = DIST_INFINITY;
       node.start = std::numeric_limits<int>::max();

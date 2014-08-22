@@ -252,7 +252,8 @@ protected:
     Accumulator_ty nevents;
 
     Galois::Runtime::for_each_ordered_2p_win (
-        simInit.getInitEvents ().begin (), simInit.getInitEvents ().end (),
+        Galois::Runtime::makeStandardRange(
+          simInit.getInitEvents ().begin (), simInit.getInitEvents ().end ()),
         Cmp_ty (), 
         NhoodVisitor (graph, sobjInfoVec),
         OpFunc (graph, sobjInfoVec, newEvents, nevents));

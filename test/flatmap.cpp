@@ -27,7 +27,7 @@ std::ostream& operator<<(std::ostream& out, const element& e) {
 template<typename MapTy>
 struct Fn1 {
   MapTy* m;
-  void operator()(const int& x) {
+  void operator()(const int& x) const {
     (*m)[x] = element(x);
   }
 };
@@ -35,7 +35,7 @@ struct Fn1 {
 template<typename MapTy>
 struct Fn2 {
   MapTy* m;
-  void operator()(const int& x) {
+  void operator()(const int& x) const {
     int v = (*m)[x].val;
     GALOIS_ASSERT(v == x || v == 0);
   }

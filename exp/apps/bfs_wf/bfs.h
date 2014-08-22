@@ -70,7 +70,7 @@ static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>")
 
 static const unsigned BFS_LEVEL_INFINITY = (1 << 20) - 1;
 
-static const unsigned CHUNK_SIZE = 1024; 
+static const unsigned CHUNK_SIZE = 128; 
 
 #if 0
 struct NodeData {
@@ -130,12 +130,14 @@ protected:
     unsigned numNodes = graph.size ();
     ParCounter numEdges;
 
-    Galois::do_all_choice (graph.begin (), graph.end (),
+    Galois::do_all_choice (Galois::Runtime::makeLocalRange(graph),
         [&numEdges,&graph] (GNode n) {
           graph.getData (n, Galois::NONE) = ND (BFS_LEVEL_INFINITY);
           numEdges += graph.edge_end (n, Galois::NONE) - graph.edge_begin (n, Galois::NONE);
           // std::cout << "Degree: " << graph.edge_end (n, Galois::NONE) - graph.edge_begin (n, Galois::NONE) << std::endl;
-        });
+        },
+        "node-data-init",
+        Galois::doall_chunk_size<CHUNK_SIZE> ());
 
     t_init.stop();
     std::cout << "Graph read with nodes=" << numNodes << ", edges=" << numEdges.reduce () << std::endl;
@@ -171,7 +173,7 @@ protected:
 
     ParCounter numUnreachable;
 
-    Galois::do_all_choice (graph.begin (), graph.end (),
+    Galois::do_all_choice (Galois::Runtime::makeLocalRange(graph),
         [&graph, &numUnreachable, &result, &startNode] (GNode n) {
           const unsigned srcLevel = graph.getData (n, Galois::NONE);
           if (srcLevel >= BFS_LEVEL_INFINITY) { 
@@ -192,7 +194,9 @@ protected:
                 << n << std::endl; 
             }
           }
-        });
+        },
+        "node-data-init",
+        Galois::doall_chunk_size<CHUNK_SIZE> ());
 
     if (numUnreachable.reduce () > 0) {
       std::cerr << "WARNING: " << numUnreachable.reduce () << " nodes were unreachable. "
@@ -230,9 +234,11 @@ public:
 
 
     // for node based versions
-    // Galois::preAlloc (Galois::getActiveThreads () + 8*graph.size ()/Galois::Runtime::MM::pageSize);
+    // Galois::preAlloc (Galois::getActiveThreads () + 8*graph.size ()/Galois::Runtime::MM::hugePageSize);
     // // for edge based versions
-    Galois::preAlloc (Galois::getActiveThreads () + 8*graph.sizeEdges ()/Galois::Runtime::MM::pageSize);
+    unsigned p = Galois::getActiveThreads () + 8*graph.sizeEdges () / Galois::Runtime::MM::hugePageSize;
+    std::printf ("going to pre-alloc %u pages, hugePageSize=%d,\n", p, (unsigned)Galois::Runtime::MM::hugePageSize);
+    Galois::preAlloc (Galois::getActiveThreads () + 8*graph.sizeEdges ()/Galois::Runtime::MM::hugePageSize);
     Galois::reportPageAlloc("MeminfoPre");
 
     timer.start ();

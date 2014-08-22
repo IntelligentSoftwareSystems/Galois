@@ -37,7 +37,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
   struct Initialize {
     Graph& g;
     Initialize(Graph& g): g(g) { }
-    void operator()(typename Graph::GraphNode n) {
+    void operator()(typename Graph::GraphNode n) const {
       PNode& data = g.getData(n, Galois::MethodFlag::NONE);
       data.value = 1.0;
       data.accum.write(0.0);
@@ -65,7 +65,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
     LigraAlgo* self;
     Graph& graph;
     UpdateNode(LigraAlgo* s, Graph& g): self(s), graph(g) { }
-    void operator()(GNode src) {
+    void operator()(GNode src) const {
       PNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
       float value = (1.0 - alpha) * sdata.accum.read() + alpha;
       float diff = std::fabs(value - sdata.value);

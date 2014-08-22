@@ -184,8 +184,8 @@ struct NodeIteratorAlgo {
     NodeIteratorAlgo* self;
     Process(NodeIteratorAlgo* s): self(s) { }
 
-    void operator()(const GNode& n, Galois::UserContext<GNode>&) { (*this)(n); }
-    void operator()(const GNode& n) {
+    void operator()(const GNode& n, Galois::UserContext<GNode>&) const { operator()(n); }
+    void operator()(const GNode& n) const {
       // Partition neighbors
       // [first, ea) [n] [bb, last)
       Graph::edge_iterator first = graph.edge_begin(n, Galois::MethodFlag::NONE);
@@ -289,7 +289,7 @@ struct HybridAlgo {
       limitIdx = graph.getData(self->limit, Galois::MethodFlag::NONE);
     }
 
-    void operator()(const GNode& n) {
+    void operator()(const GNode& n) const {
       size_t nidx = graph.getData(n, Galois::MethodFlag::NONE) - limitIdx;
       for (Graph::edge_iterator edge : graph.out_edges(n, Galois::MethodFlag::NONE)) {
         GNode dst = graph.getEdgeDst(edge);
@@ -387,7 +387,7 @@ struct EdgeIteratorAlgo {
     EdgeIteratorAlgo* self;
     Initialize(EdgeIteratorAlgo* s): self(s) { }
 
-    void operator()(GNode n) {
+    void operator()(GNode n) const {
       for (Graph::edge_iterator edge : graph.out_edges(n, Galois::MethodFlag::NONE)) {
         GNode dst = graph.getEdgeDst(edge);
         if (n < dst)

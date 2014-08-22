@@ -76,7 +76,7 @@ protected:
     t_run.start ();
 
     // size_t splitSize = EDGE_FRAC * numNodes;
-    size_t splitSize = numNodes;
+    size_t splitSize = (4 * numNodes) / 3;
 
     t_sort.start ();
     VecEdge::iterator splitPoint = edges.begin () + splitSize;
@@ -185,10 +185,17 @@ protected:
     t_run.stop ();
   }
 
-  virtual void runMST (const size_t numNodes, const VecEdge& edges,
+  virtual void runMST (const size_t numNodes, VecEdge& edges,
       size_t& mstWeight, size_t& totalIter) {
 
-    runMSTsplit (numNodes, edges, mstWeight, totalIter);
+    if (edges.size () >= 2 * numNodes) {
+      runMSTsplit (numNodes, edges, mstWeight, totalIter);
+
+    } else {
+      runMSTsimple (numNodes, edges, mstWeight, totalIter);
+    }
+
+
   }
 
 };

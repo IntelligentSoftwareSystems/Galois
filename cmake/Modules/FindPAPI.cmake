@@ -8,8 +8,9 @@ if(PAPI_INCLUDE_DIRS AND PAPI_LIBRARIES)
   set(PAPI_FIND_QUIETLY TRUE)
 endif()
 
-find_path(PAPI_INCLUDE_DIRS papi.h PATHS ${PAPI_ROOT} PATH_SUFFIXES include)
-find_library(PAPI_LIBRARY NAMES papi PATHS ${PAPI_ROOT} PATH_SUFFIXES lib lib64)
+# XXX(ddn): our system papi is broken so ignore for now
+find_path(PAPI_INCLUDE_DIRS papi.h NO_DEFAULT_PATH PATHS ${PAPI_ROOT} PATH_SUFFIXES include)
+find_library(PAPI_LIBRARY NAMES papi NO_DEFAULT_PATH PATHS ${PAPI_ROOT} PATH_SUFFIXES lib lib64)
 find_library(PAPI_LIBRARIES NAMES rt PATH_SUFFIXES lib lib64)
 
 include(FindPackageHandleStandardArgs)

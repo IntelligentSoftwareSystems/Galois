@@ -26,4 +26,4 @@
  */
 #include "Galois/Runtime/DeterministicWork.h"
 
-__thread Galois::Runtime::MM::SizedAllocatorFactory::SizedAlloc* Galois::Runtime::DeterministicImpl::listAllocator;
+__thread Galois::Runtime::MM::SizedHeapFactory::SizedHeap* Galois::Runtime::DeterministicImpl::listHeap;

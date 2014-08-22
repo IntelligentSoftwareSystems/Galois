@@ -31,15 +31,6 @@
 #include "Kruskal.h"
 #include "KruskalParallel.h"
 
-static cll::opt<unsigned> maxRounds (
-    "maxRounds",
-    cll::desc ("number of rounds for window executor"),
-    cll::init (600));
-
-static cll::opt<unsigned> lowThresh (
-    "lowThresh",
-    cll::desc ("low parallelism factor for workList refill in window executor"),
-    cll::init (16));
 
 namespace kruskal {
 
@@ -49,11 +40,16 @@ class KruskalHand: public Kruskal {
 
   virtual const std::string getVersion () const { return "Handwritten using window-based two-phase union-find"; }
 
-  virtual void runMST (const size_t numNodes, const VecEdge& edges,
+  virtual void runMST (const size_t numNodes, VecEdge& edges,
       size_t& mstWeight, size_t& totalIter) {
 
-    runMSTsimple (numNodes, edges, mstWeight, totalIter, UnionFindWindow (maxRounds, lowThresh));
+    if (edges.size () >= 2 * numNodes) {
+      runMSTfilter (numNodes, edges, mstWeight, totalIter, UnionFindWindow ());
 
+    } else {
+
+      runMSTsimple (numNodes, edges, mstWeight, totalIter, UnionFindWindow ());
+    }
   }
 };
 

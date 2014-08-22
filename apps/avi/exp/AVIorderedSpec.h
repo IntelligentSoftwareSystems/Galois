@@ -213,8 +213,9 @@ public:
 
     // Galois::for_each_ordered (
     Galois::Runtime::for_each_ordered_rob (
-        boost::make_transform_iterator(elems.begin(), MakeUpdate()),
-        boost::make_transform_iterator(elems.end(), MakeUpdate()), 
+        Galois::Runtime::makeStandardRange (
+          boost::make_transform_iterator(elems.begin(), MakeUpdate()),
+          boost::make_transform_iterator(elems.end(), MakeUpdate())), 
         Comparator(), nhVisitor, p);
 
 

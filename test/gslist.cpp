@@ -5,7 +5,7 @@
 #include <map>
 
 int main(int argc, char** argv) {
-  typedef Galois::Runtime::MM::FixedSizeAllocator Heap;
+  typedef Galois::Runtime::MM::FixedSizeHeap Heap;
   typedef std::unique_ptr<Heap> HeapPtr;
   typedef Galois::Runtime::PerThreadStorage<HeapPtr> Heaps;
   typedef Galois::concurrent_gslist<int> Collection;
