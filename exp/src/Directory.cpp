@@ -187,11 +187,7 @@ void RemoteDirectory::clearContended(fatPointer ptr) {
     }
   }
   if (doRecv)
-<<<<<<< HEAD
-    recvRequestImpl(ptr, r.dest, r.flag, md, lg);
-=======
     recvRequestImpl(md, ptr, lg, r.dest, r.flag);
->>>>>>> fe52ed190f03a700e4529a72d3a0bc735f4b22c7
 }
 
 void RemoteDirectory::fetchImpl(fatPointer ptr, ResolveFlag flag, typeHelper* th, bool setContended) {
