@@ -34,6 +34,7 @@
 
 #include <deque>
 #include <utility>
+#include <thread>
 
 using namespace Galois::Runtime;
 
@@ -158,18 +159,168 @@ public:
     }
     return retval;
   }
+};
 
-  virtual bool needsDedicatedThread() {
-    return true;
+////////////////////////////////////////////////////////////////////////////////
+
+class NetworkInterfaceSyncMPI : public NetworkInterface {
+
+  struct sendData {
+    uint32_t dest;
+    SendBuffer buf;
+    MPI_Request status;
+    sendData(uint32_t d, const SendBuffer& b) :dest(d), buf(std::move(b)), status(MPI_REQUEST_NULL) {}
+  };
+
+  Galois::Runtime::LL::SimpleLock sends_lock;
+  std::deque<sendData> sends_pending;
+  std::atomic<int> sends_count;
+  std::atomic<int> sends_outstanding;
+
+  Galois::Runtime::LL::SimpleLock recv_lock;
+  std::deque<RecvBuffer> recv_list;
+  std::atomic<int> recv_count;
+
+  std::atomic<int> quit;
+
+  std::thread worker;
+
+  void sendOne() {
+    if (sends_count) {
+      //get Item
+      sends_lock.lock();
+      sendData& item = sends_pending[sends_pending.size() - sends_count];
+      --sends_count;
+      ++sends_outstanding;
+      sends_lock.unlock();
+      //send Item
+      int rv = MPI_Issend(item.buf.linearData(), item.buf.size(), MPI_BYTE, item.dest, FuncTag, MPI_COMM_WORLD, &item.status);
+      handleError(rv);
+      //      std::cerr << "S";
+    }
   }
 
-  virtual void systemBarrier() {
-    int rv;
-    rv = MPI_Barrier(MPI_COMM_WORLD);
+  void sendComplete() {
+    int flag = true;
+    while (flag && sends_outstanding) {
+      std::lock_guard<decltype(sends_lock)> lg(sends_lock);
+      MPI_Status s;
+      int rv = MPI_Test(&sends_pending[0].status, &flag, &s);
+      handleError(rv);
+      if (flag) {
+        sends_pending.pop_front();
+        --sends_outstanding;
+      }
+    }
+  }
+
+  void recvOne() {
+    MPI_Status status;
+    int flag, rv;
+    //async probe
+    rv = MPI_Iprobe(MPI_ANY_SOURCE, FuncTag, MPI_COMM_WORLD, &flag, &status);
     handleError(rv);
-    return;
+    if (flag) {
+      int count;
+      MPI_Get_count(&status, MPI_BYTE, &count);
+      RecvBuffer buf(count);
+      MPI_Recv(buf.linearData(), count, MPI_BYTE, MPI_ANY_SOURCE, FuncTag, MPI_COMM_WORLD, &status);
+      std::lock_guard<decltype(recv_lock)> lg(recv_lock);
+      recv_list.emplace_back(std::move(buf));
+      ++recv_count;
+      //      std::cerr << "R";
+    }
+  }
+
+  void initMPI() {
+    int provided;
+    int rc = MPI_Init_thread (NULL, NULL, MPI_THREAD_FUNNELED, &provided);
+    handleError(rc);
+    
+    int numTasks, taskRank;
+    MPI_Comm_size(MPI_COMM_WORLD, &numTasks);
+    MPI_Comm_rank(MPI_COMM_WORLD, &taskRank);
+    
+    ID = taskRank;
+    Num = numTasks;
+    
+    if (taskRank == 0) {
+      //master
+      //printing on lead host doesn't require this object to be fully initialized
+      const char* str;
+      switch (provided) {
+      case MPI_THREAD_SINGLE: 
+        assert(0 && "Insufficient mpi support");
+        abort();
+        break;
+      case MPI_THREAD_FUNNELED:   str = "MPI Supports: Funneled";   break;
+      case MPI_THREAD_SERIALIZED: str = "MPI Supports: Serialized"; break;
+      case MPI_THREAD_MULTIPLE:   str = "MPI Supports: Multiple";   break;
+      default:                    str = "MPI Supports: UNKNOWN";    break;
+      }
+      Galois::Runtime::LL::gInfo(str);
+    } else {
+      //slave
+    }
+  }
+
+  void workerThread() {
+    initMPI();
+    quit = 0;
+    while (!quit) {
+      sendOne();
+      recvOne();
+      sendComplete();
+    }
+    MPI_Finalize();
+    quit = 2;
+  }
+
+public:
+  using NetworkInterface::ID;
+  using NetworkInterface::Num;
+
+  NetworkInterfaceSyncMPI() :quit(1), worker(&NetworkInterfaceSyncMPI::workerThread, this) {
+    while (quit) {}
+  }
+
+  virtual ~NetworkInterfaceSyncMPI() {
+    quit = 1;
+    while (quit <= 1) {}
+  }
+
+  virtual void send(uint32_t dest, recvFuncTy recv, SendBuffer& buf) {
+    assert(recv);
+    assert(dest < Num);
+    buf.serialize_header((void*)recv);
+    std::lock_guard<decltype(sends_lock)> lg(sends_lock);
+    sends_pending.emplace_back(dest, std::move(buf));
+    ++sends_count;
+    //    std::cerr << "s";
+  }
+
+  virtual bool handleReceives() {
+    if (recv_count && recv_lock.try_lock()) {
+      RecvBuffer& data = recv_list.front();
+      //Unlocked call so reciever can call handleRecv()
+      recvFuncTy f;
+      uintptr_t fp;
+      gDeserialize(data,fp);
+      assert(fp);
+      f = (recvFuncTy)fp;
+      //      std::cerr << "r";
+      //Call deserialized function
+      f(data);
+      --recv_count;
+      recv_list.pop_front();
+      recv_lock.unlock();
+    }
+    return recv_count;
   }
 };
+
+
+////////////////////////////////////////////////////////////////////////////////
 
 static const int numslots = 16;
 class NetworkBackendMPI : public NetworkBackend {
@@ -293,9 +444,16 @@ public:
 
 }
 
-#ifdef USE_MPI
+#ifdef USE_MPI_ASYNC
 NetworkInterface& Galois::Runtime::getSystemNetworkInterface() {
   static NetworkInterfaceAsyncMPI net;
+  return net;
+}
+#endif
+
+#ifdef USE_MPI_SYNC
+NetworkInterface& Galois::Runtime::getSystemNetworkInterface() {
+  static NetworkInterfaceSyncMPI net;
   return net;
 }
 #endif

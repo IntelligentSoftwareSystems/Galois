@@ -32,7 +32,8 @@
 #include <unordered_map>
 
 //#define USE_TCP
-#define USE_MPI
+#define USE_MPI_ASYNC
+//#define USE_MPI_SYNC
 //#define USE_BUF
 
 namespace Galois {
