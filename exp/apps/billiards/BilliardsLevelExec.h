@@ -27,7 +27,7 @@
 #define BILLIARDS_LEVEL_EXEC_H
 
 #include "Galois/Graph/Graph.h"
-#include "Galois/Runtime/PerThreadWorkList.h"
+#include "Galois/Runtime/PerThreadContainer.h"
 #include "Galois/Runtime/LevelExecutor.h"
 
 #include "Billiards.h"

@@ -30,7 +30,7 @@
 #include "Galois/Timer.h"
 #include "Galois/Atomic.h"
 
-#include "Galois/Runtime/PerThreadWorkList.h"
+#include "Galois/Runtime/PerThreadContainer.h"
 #include "Galois/Runtime/ll/PaddedLock.h"
 #include "Galois/Runtime/ll/CompilerSpecific.h"
 

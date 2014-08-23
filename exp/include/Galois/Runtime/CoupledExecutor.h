@@ -4,7 +4,7 @@
 #include "Galois/GaloisUnsafe.h"
 
 #include "Galois/Runtime/Executor_DoAll.h"
-#include "Galois/Runtime/PerThreadWorkList.h"
+#include "Galois/Runtime/PerThreadContainer.h"
 #include "Galois/WorkList/WorkListWrapper.h"
 #include "Galois/WorkList/ExternRef.h"
 

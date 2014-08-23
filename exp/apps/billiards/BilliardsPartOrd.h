@@ -42,7 +42,7 @@
 
 #include "Galois/Accumulator.h"
 
-#include "Galois/Runtime/PerThreadWorkList.h"
+#include "Galois/Runtime/PerThreadContainer.h"
 #include "Galois/Runtime/Executor_OnEach.h"
 #include "Galois/DoAllWrap.h"
 #include "Galois/Runtime/ll/CompilerSpecific.h"

@@ -30,7 +30,7 @@
 
 #include "Galois/Atomic.h"
 #include "Galois/Accumulator.h"
-#include "Galois/Runtime/PerThreadWorkList.h"
+#include "Galois/Runtime/PerThreadContainer.h"
 #include "Galois/Runtime/ll/CompilerSpecific.h"
 #include "Galois/DynamicArray.h"
 #include "Galois/Runtime/KDGtwoPhase.h"

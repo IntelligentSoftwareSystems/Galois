@@ -38,7 +38,7 @@
 #include "Galois/Accumulator.h"
 #include "Galois/Bag.h"
 
-#include "Galois/Runtime/PerThreadWorkList.h"
+#include "Galois/Runtime/PerThreadContainer.h"
 #include "Galois/DoAllWrap.h"
 
 #include "bfs.h"
@@ -307,7 +307,7 @@ public:
           Galois::doall_chunk_size<CHUNK_SIZE> ());
 
       std::swap (currWL, nextWL);
-      nextWL->clear_all ();
+      nextWL->clear_all_parallel ();
       ++level;
     }
     Galois::Runtime::getSystemThreadPool ().beKind ();

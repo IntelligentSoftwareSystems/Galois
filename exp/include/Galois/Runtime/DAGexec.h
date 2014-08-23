@@ -39,7 +39,7 @@
 #include "Galois/Runtime/Executor_DoAll.h"
 #include "Galois/Runtime/LCordered.h"
 #include "Galois/Runtime/ParallelWork.h"
-#include "Galois/Runtime/PerThreadWorkList.h"
+#include "Galois/Runtime/PerThreadContainer.h"
 #include "Galois/Runtime/ll/gio.h"
 #include "Galois/Runtime/ll/ThreadRWlock.h"
 #include "Galois/Runtime/mm/Mem.h"
