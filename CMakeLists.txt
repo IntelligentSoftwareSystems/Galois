@@ -51,6 +51,11 @@ enable_testing()
 
 ###### Configure compiler ######
 
+if(NOT "$ENV{GCC_BIN}" STREQUAL "")
+  # Preserve captured environment variable during reconfiguration
+  set(CXX_TOOLCHAIN "$ENV{GCC_BIN}" CACHE STRING "GCC Toolchain")
+endif()
+
 # ICC
 if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
   execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion
@@ -62,19 +67,19 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
   endif()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -wd68 -wd981 -wd383 -wd869 -wd2196 -wd279 -wd2504 -wd2943 -wd32013 -wd3373")
 
-  if("$ENV{GCC_BIN}" STREQUAL "")
-    message(STATUS "Using default GCC toolchain; set environment variable GCC_BIN to override")
+  if(CXX_TOOLCHAIN)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -gxx-name=${CXX_TOOLCHAIN}/g++")
   else()
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -gxx-name=$ENV{GCC_BIN}/g++")
+    message(STATUS "Using default GCC toolchain; set environment variable GCC_BIN to override")
   endif()
 endif()
 
 # Clang
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  if("$ENV{GCC_BIN}" STREQUAL "")
-    message(STATUS "Using default GCC toolchain; set environment variable GCC_BIN to override")
+  if(CXX_TOOLCHAIN)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -gcc-toolchain ${CXX_TOOLCHAIN}/..")
   else()
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -gcc-toolchain $ENV{GCC_BIN}/..")
+    message(STATUS "Using default GCC toolchain; set environment variable GCC_BIN to override")
   endif()
 endif()
 
@@ -87,7 +92,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "XL")
   if(XLC_VERSION VERSION_GREATER 12.0)
     #message(STATUS "XLC Version > 12.0")
   else()
-    message(FATAL_ERROR "XLC must be higher than 12.0")
+    message(FATAL_ERROR "XLC must be higher than 12.0; found ${XLC_VERSION} instead")
   endif()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -qsuppress=1540-0724 -qsuppress=1500-029 -qmaxmem=-1 -qalias=noansi -qsmp=omp")
 endif()
