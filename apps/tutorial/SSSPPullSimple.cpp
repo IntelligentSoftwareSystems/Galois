@@ -105,8 +105,11 @@ int main(int argc, char **argv) {
   T.start();
   graph.getData(*graph.begin()) = 0;
   //! [for_each in SSSPPullsimple]
-  UpdateRequest init[] = { std::make_pair(0U, *graph.begin()) };
-  Galois::for_each(&init[0], &init[1], SSSP(), Galois::wl<OBIM>(), Galois::loopname("sssp_run_loop"));
+  std::vector<UpdateRequest> init;
+  for (auto ii = graph.edge_begin(*graph.begin()), ee = graph.edge_end(*graph.begin()); ii != ee; ++ii) 
+    init.push_back(std::make_pair(0, graph.getEdgeDst(ii)));
+
+  Galois::for_each(init.begin(), init.end(), SSSP(), Galois::wl<OBIM>(), Galois::loopname("sssp_run_loop"));
   //! [for_each in SSSPPullsimple]
   T.stop();
   return 0;
