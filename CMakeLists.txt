@@ -60,7 +60,7 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
   else()
     message(FATAL_ERROR "ICC must be 13.0 or higher; found: ${ICC_VERSION} instead")
   endif()
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -wd68 -wd981 -wd383 -wd869 -wd2196 -wd279 -wd2504 -wd2943 -wd32013")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -wd68 -wd981 -wd383 -wd869 -wd2196 -wd279 -wd2504 -wd2943 -wd32013 -wd3373")
 
   if("$ENV{GCC_BIN}" STREQUAL "")
     message(STATUS "Using default GCC toolchain; set environment variable GCC_BIN to override")
