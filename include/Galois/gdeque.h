@@ -42,14 +42,7 @@ namespace Galois {
 
 //! Like std::deque but use Galois memory management functionality
 template<typename T, unsigned ChunkSize=64, typename ContainerTy=FixedSizeRing<T, ChunkSize> > 
-#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
 class gdeque {
-public:
-  gdeque(const gdeque& that);
-  gdeque& operator=(const gdeque& that);
-#else
-class gdeque: private boost::noncopyable {
-#endif
 
 protected:
   struct Block: ContainerTy {

@@ -40,6 +40,7 @@
 #include "Galois/Runtime/UserContextAccess.h"
 #include "Galois/WorkList/GFifo.h"
 
+#include <utility>
 #include <algorithm>
 #include <functional>
 #include <memory>
@@ -325,8 +326,8 @@ public:
 
 #ifdef GALOIS_USE_EXP
   template <typename W>
-  void reinit (const W& _wl) {
-    this->wl = WorkListTy (_wl);
+  void reinit(const W& _wl) {
+    this->wl = WorkListTy(_wl);
     broke = false;
   }
 #endif
@@ -370,7 +371,9 @@ struct reiterator {
 };
 
 template<typename WLTy, typename IterTy>
-struct reiterator<WLTy, IterTy, typename std::enable_if<has_with_iterator<WLTy>(0)>::type> {
+struct reiterator<WLTy, IterTy,
+  typename std::enable_if<has_with_iterator<WLTy>(0)>::type> 
+{
   typedef typename WLTy::template with_iterator<IterTy>::type type;
 };
 
@@ -378,9 +381,10 @@ template<typename WLTy, typename RangeTy, typename FunctionTy, typename... TArgs
 void for_each_impl(const RangeTy& range, const FunctionTy& f, const char* loopname, const TArgs&... targs) {
   if (inGaloisForEach)
     GALOIS_DIE("Nested for_each not supported");
-  typedef typename reiterator<WLTy, typename RangeTy::iterator>::type WLNewTy;
   typedef typename RangeTy::value_type T;
-  typedef ForEachWork<typename WLNewTy::template retype<T>::type, T, FunctionTy> WorkTy;
+  typedef typename reiterator<WLTy, typename RangeTy::iterator>::type::template retype<T>::type WL;
+  typedef ForEachWork<WL, T, FunctionTy> WorkTy;
+
 
   // NB: Initialize barrier before creating WorkTy to increase
   // PerThreadStorage reclaimation likelihood
@@ -388,25 +392,13 @@ void for_each_impl(const RangeTy& range, const FunctionTy& f, const char* loopna
 
   WorkTy W(f, loopname, targs...);
 
-  // StatTimer LoopTimer("LoopTime", loopname);
-  // if (ForEachTraits<FunctionTy>::NeedsStats)
-  //   LoopTimer.start();
-
   inGaloisForEach = true;
   getSystemThreadPool().run(activeThreads,
-#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
-                            std::bind(&WorkTy::initThread, std::ref(W)),
-                            std::bind (&WorkTy::template AddInitialWork<RangeTy>, std::ref(W), range),
-#else
-                            [&W] () {W.initThread();},
-                            [&W, &range] (void) {W.AddInitialWork(range);},
-#endif
+                            [&W]() { W.initThread(); },
+                            [&W, &range]() { W.AddInitialWork(range); },
                             std::ref(barrier),
                             std::ref(W));
   inGaloisForEach = false;
-
-  // if (ForEachTraits<FunctionTy>::NeedsStats)  
-  //   LoopTimer.stop();
 }
 
 } // end namespace anonymous

@@ -206,7 +206,7 @@ public:
       GALOIS_DIE ("Can't handle non-monotonic adds");
     }
 
-    CachedLevel& cached = *(cachedLevels.getLocal ());
+    CachedLevel cached = *(cachedLevels.getLocal ());
 
     if (cached && k == cached->first) {
       assert (cached->second != nullptr);
@@ -253,7 +253,7 @@ public:
 
       currLevel.second->push (x);
 #ifdef USE_LEVEL_CACHING
-      cached = currLevel;
+      *cachedLevels.getLocal() = currLevel;
 #endif
       
     }
@@ -399,7 +399,6 @@ public:
 
     auto rp = range.local_pair ();
     for (auto i = rp.first, i_end = rp.second; i != i_end; ++i) {
-
       level_map.push (keyFn (*i), *i);
     }
 
