@@ -38,10 +38,10 @@ public:
 			 input(input)
 
 	{
-	};
+    }
 
-	void setVertex(Vertex *v1) { this->v = v1; }
-	void execute();
+    void setVertex(Vertex *v1) { this->v = v1; }
+    void execute();
 };
 
 typedef int EdgeData;

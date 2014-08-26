@@ -10,6 +10,13 @@ enum Singularities
 	ANISOTROPIC
 };
 
+enum Schedulers
+{
+    OLD,
+    CILK,
+    GALOIS_DAG
+};
+
 struct TaskDescription {
 	int dimensions;
 	int polynomialDegree;
@@ -26,6 +33,7 @@ struct TaskDescription {
 
 	bool performTests;
 	Singularities singularity;
+    Schedulers scheduler;
 };
 
 #endif
