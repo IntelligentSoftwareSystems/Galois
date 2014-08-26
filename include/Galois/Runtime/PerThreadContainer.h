@@ -58,7 +58,7 @@ enum GlobalPos {
   GLOBAL_BEGIN, GLOBAL_END
 };
 
-// #define ADAPTOR_BASED_OUTER_ITER
+#define ADAPTOR_BASED_OUTER_ITER
 
 // XXX: use a combination of boost::transform_iterator and
 // boost::counting_iterator to implement the following OuterPerThreadWLIter
@@ -510,8 +510,10 @@ public:
   void fill_parallel (const Range& range, Ret (Cont_ty::*pushFn) (const value_type&) = &Cont_ty::push_back) {
     Galois::Runtime::do_all_impl (
         range,
-        [this] (const typename Range::value_type& v) {
-          (get ().*pushFn)(v);
+        [this, pushFn] (const typename Range::value_type& v) {
+          Cont_ty& my = get ();
+          (my.*pushFn) (v);
+          // (get ().*pushFn)(v);
         },
         "fill_parallel", 
         false);
