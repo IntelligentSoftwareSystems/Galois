@@ -26,6 +26,12 @@ class Node {
         int n_left = -1;
         int n_right = -1;
 
+        std::vector<uint64_t> leftPlaces;
+        std::vector<uint64_t> leftMergePlaces;
+
+        std::vector<uint64_t> rightPlaces;
+        std::vector<uint64_t> rightMergePlaces;
+
         Node(int num) : node(num) {}
         ~Node() {
             delete this->system;

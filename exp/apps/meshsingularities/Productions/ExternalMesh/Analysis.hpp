@@ -26,6 +26,7 @@ class Analysis {
         static std::tuple<edge, uint64_t> parentEdge(edge e,
                     std::map<uint64_t, std::map<vertex, uint64_t>> &levelVertices,
                     std::map<uint64_t, std::map<edge, uint64_t>> &levelEdges, uint64_t level);
+        static void mergeAnaliser(Node *node);
     public:
         static void enumerateDOF(Mesh *mesh);
         static void doAnalise(Mesh *mesh);

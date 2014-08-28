@@ -96,76 +96,43 @@ void Node::fillin()
 
 void Node::merge()
 {
-    std::set<uint64_t> leftNodes;
-    std::set<uint64_t> rightNodes;
-    std::set<uint64_t> mergeNodes;
+//    std::set<uint64_t> leftNodes;
+//    std::set<uint64_t> rightNodes;
+//    std::set<uint64_t> mergeNodes;
 
-    for (uint64_t i=left->getDofsToElim(); i<left->getDofs().size(); ++i) {
-        leftNodes.insert(left->dofs[i]);
-    }
+//    for (uint64_t i=left->getDofsToElim(); i<left->getDofs().size(); ++i) {
+//        leftNodes.insert(left->dofs[i]);
+//    }
 
-    for (uint64_t i=right->getDofsToElim(); i<right->getDofs().size(); ++i) {
-        rightNodes.insert(right->dofs[i]);
-    }
+//    for (uint64_t i=right->getDofsToElim(); i<right->getDofs().size(); ++i) {
+//        rightNodes.insert(right->dofs[i]);
+//    }
 
-    for (uint64_t i=0; i<this->getDofs().size(); ++i) {
-        mergeNodes.insert(this->dofs[i]);
-    }
+//    for (uint64_t i=0; i<this->getDofs().size(); ++i) {
+//        mergeNodes.insert(this->dofs[i]);
+//    }
 
-    std::vector<uint64_t> lCommonNodes(leftNodes.size());
-    std::vector<uint64_t>::iterator itLeft;
-    std::vector<uint64_t> rCommonNodes(rightNodes.size());
-    std::vector<uint64_t>::iterator itRight;
+//    std::vector<uint64_t> lCommonNodes(leftNodes.size());
+//    std::vector<uint64_t>::iterator itLeft;
+//    std::vector<uint64_t> rCommonNodes(rightNodes.size());
+//    std::vector<uint64_t>::iterator itRight;
 
-    itLeft = std::set_intersection(leftNodes.begin(), leftNodes.end(),
-                          mergeNodes.begin(), mergeNodes.end(),
-                          lCommonNodes.begin());
+//    itLeft = std::set_intersection(leftNodes.begin(), leftNodes.end(),
+//                                   mergeNodes.begin(), mergeNodes.end(),
+//                                   lCommonNodes.begin());
 
-    itRight = std::set_intersection(rightNodes.begin(), rightNodes.end(),
-                          mergeNodes.begin(), mergeNodes.end(),
-                          rCommonNodes.begin());
+//    itRight = std::set_intersection(rightNodes.begin(), rightNodes.end(),
+//                                    mergeNodes.begin(), mergeNodes.end(),
+//                                    rCommonNodes.begin());
 
-    lCommonNodes.resize(itLeft - lCommonNodes.begin());
-    rCommonNodes.resize(itRight - rCommonNodes.begin());
+//    lCommonNodes.resize(itLeft - lCommonNodes.begin());
+//    rCommonNodes.resize(itRight - rCommonNodes.begin());
 
-    std::vector<uint64_t> leftPlaces;
-    std::vector<uint64_t> leftMergePlaces;
+//    std::vector<uint64_t> leftPlaces;
+//    std::vector<uint64_t> leftMergePlaces;
 
-    std::vector<uint64_t> rightPlaces;
-    std::vector<uint64_t> rightMergePlaces;
-
-    for (uint64_t elem : lCommonNodes) {
-        for (int i=left->getDofsToElim(); i<left->getDofs().size(); ++i) {
-            if (left->dofs[i] == elem) {
-                leftPlaces.push_back(i);
-                break;
-            }
-        }
-
-        for (int i=0; i<this->getDofs().size(); ++i) {
-            if (this->dofs[i] == elem) {
-                leftMergePlaces.push_back(i);
-                break;
-            }
-        }
-    }
-
-
-    for (uint64_t elem : rCommonNodes) {
-        for (int i=right->getDofsToElim(); i<right->getDofs().size(); ++i) {
-            if (right->dofs[i] == elem) {
-                rightPlaces.push_back(i);
-                break;
-            }
-        }
-
-        for (int i=0; i<this->getDofs().size(); ++i) {
-            if (this->dofs[i] == elem) {
-                rightMergePlaces.push_back(i);
-                break;
-            }
-        }
-    }
+//    std::vector<uint64_t> rightPlaces;
+//    std::vector<uint64_t> rightMergePlaces;
 
     for (int i=0; i<leftPlaces.size(); ++i) {
         for (int j=0; j<leftPlaces.size(); ++j) {

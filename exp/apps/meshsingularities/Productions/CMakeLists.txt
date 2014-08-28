@@ -1,4 +1,4 @@
-SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3 -g")
+SET(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -O3")
 
 add_subdirectory(Point2D)
 add_subdirectory(Point2DQuad)

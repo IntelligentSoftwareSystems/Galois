@@ -115,6 +115,7 @@ void Analysis::nodeAnaliser(Node *node, set<uint64_t> *parent)
         }
     }
 
+
 //    printf("Node (%-2d): ", node->getId());
 //    for (int dof : node->getDofs()) {
 //        printf("%d ", dof);
@@ -129,7 +130,82 @@ void Analysis::doAnalise(Mesh *mesh)
     Node *root = mesh->getRootNode();
     std::set<uint64_t> *parent = new set<uint64_t>();
     Analysis::nodeAnaliser(root, parent);
+    Analysis::mergeAnaliser(root);
+
     delete parent;
+}
+
+void Analysis::mergeAnaliser(Node *node)
+{
+    if (node->getLeft() != NULL && node->getRight() != NULL) {
+        std::set<uint64_t> leftNodes;
+        std::set<uint64_t> rightNodes;
+        std::set<uint64_t> mergeNodes;
+
+        for (uint64_t i=node->getLeft()->getDofsToElim(); i<node->getLeft()->getDofs().size(); ++i) {
+            leftNodes.insert(node->getLeft()->getDofs()[i]);
+        }
+
+        for (uint64_t i=node->getRight()->getDofsToElim(); i<node->getRight()->getDofs().size(); ++i) {
+            rightNodes.insert(node->getRight()->getDofs()[i]);
+        }
+
+        for (uint64_t i=0; i<node->getDofs().size(); ++i) {
+            mergeNodes.insert(node->getDofs()[i]);
+        }
+
+        std::vector<uint64_t> lCommonNodes(leftNodes.size());
+        std::vector<uint64_t>::iterator itLeft;
+        std::vector<uint64_t> rCommonNodes(rightNodes.size());
+        std::vector<uint64_t>::iterator itRight;
+
+        itLeft = std::set_intersection(leftNodes.begin(), leftNodes.end(),
+                                       mergeNodes.begin(), mergeNodes.end(),
+                                       lCommonNodes.begin());
+
+        itRight = std::set_intersection(rightNodes.begin(), rightNodes.end(),
+                                        mergeNodes.begin(), mergeNodes.end(),
+                                        rCommonNodes.begin());
+
+        lCommonNodes.resize(itLeft - lCommonNodes.begin());
+        rCommonNodes.resize(itRight - rCommonNodes.begin());
+
+        for (uint64_t elem : lCommonNodes) {
+            for (int i=node->getLeft()->getDofsToElim(); i<node->getLeft()->getDofs().size(); ++i) {
+                if (node->getLeft()->getDofs()[i] == elem) {
+                    node->leftPlaces.push_back(i);
+                    break;
+                }
+            }
+
+            for (int i=0; i<node->getDofs().size(); ++i) {
+                if (node->getDofs()[i] == elem) {
+                    node->leftMergePlaces.push_back(i);
+                    break;
+                }
+            }
+        }
+
+
+        for (uint64_t elem : rCommonNodes) {
+            for (int i=node->getRight()->getDofsToElim(); i<node->getRight()->getDofs().size(); ++i) {
+                if (node->getRight()->getDofs()[i] == elem) {
+                    node->rightPlaces.push_back(i);
+                    break;
+                }
+            }
+
+            for (int i=0; i<node->getDofs().size(); ++i) {
+                if (node->getDofs()[i] == elem) {
+                    node->rightMergePlaces.push_back(i);
+                    break;
+                }
+            }
+        }
+        Analysis::mergeAnaliser(node->getLeft());
+        Analysis::mergeAnaliser(node->getRight());
+
+    }
 }
 
 tuple<edge, uint64_t> Analysis::parentEdge(edge e,
