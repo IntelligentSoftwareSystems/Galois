@@ -3,6 +3,69 @@ using namespace std;
 
 // todo: rotator
 
+//int Analysis::rotate(root, parent)
+//{
+//if left branch is present then l = rotate(left) else l=0
+//if left branch is present then r = rotate(prawe)else r=0
+//h=r-l
+
+//if (h==1 || h==-1 || h==0) then return h //no rotation
+
+//if (h>=2) then
+//{//we need to perform some rotations to the left
+//  child=dziecko root->right które jest sąsiadem parent
+//  (if there are two such sons, we pick up the one with smaller
+//   number of connected neighbors - with shorter neighbors)
+
+//  if (child==root->right->right) && r<=0) ||
+//         (child==root->right->left) && r>=0) then
+//  {//rotation to the left
+//    if parent!=NULL then make root->right son of parent
+//      else T=root->right
+//    t=root->left
+//    make root left son of root->right
+//    (this step may require exchange of left son
+//     with right son for root->right)
+//    make child right son of root
+//    if parent!=NULL merge_list(parent->left,parent->right)
+//      else merge_list(T->left,T->right)
+//  }//end of rotation to the left
+//  else //double rotation
+//  {// lower level rotation to the right
+//   (rotation at root->right)
+//    parent1=root
+//    root1=root->right
+//    if parent1!=NULL then make root1->left son of parent
+//    t1=root1->right
+//    child1=son of root1->left being neighbor of t
+//    (if there are two such sons, we pick up the one with
+//     smaller number of connected neighbors)
+//    make root1 right son of root1->left
+//    (this step may require exchange of left son
+//     with right son of root1->left)
+//    make child1 left son of root1
+
+//    //rotation on higher level in left
+//     if parent!=NULL then make root->right son of parent
+//       else T=root->right
+//     t=root->left
+//     child=son of root->right, being neighbor of t
+//     make root left son of root->right
+//     (this step may require exchange of left son
+//      with right son for root->right)
+//     make child right son of root
+//  }//end of double rotations
+//}// if (h>=2)
+//else if (h<=-2) then
+//{//we need to perform some rotations to the right
+//if (child==root->left->right) && r<=0) ||
+//         (child==root->left->left) && r>=0) then
+//{//rotation to the right
+//(Here we perform the same actions as for the rotations
+// to the left, but in the symmetric way)
+//}
+
+
 void Analysis::nodeAnaliser(Node *node, set<uint64_t> *parent)
 {
     auto getAllDOFs = [] (Node *n) {

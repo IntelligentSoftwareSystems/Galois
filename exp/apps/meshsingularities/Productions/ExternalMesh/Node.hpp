@@ -27,6 +27,10 @@ class Node {
         int n_right = -1;
 
         Node(int num) : node(num) {}
+        ~Node() {
+            delete this->system;
+        }
+
         void setLeft(Node *left);
         void setRight(Node *right);
         void setParent(Node *parent);
@@ -57,7 +61,8 @@ class Node {
 
         void (*preprocessProduction)(double **matrixIn, double *rhsIn,
                                      double **matrixOut, double *rhsOut);
-
+        void fillin();
+        void merge();
         void eliminate();
         void bs();
 };
