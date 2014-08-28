@@ -49,7 +49,7 @@
 namespace Galois {
 namespace Runtime {
 
-enum ResolveFlag {INV=0, RO=1, RW=2};
+enum ResolveFlag {INV=0, RO=1, RW=2, UP_RO=3, UP_RW=4};
 
 namespace detail {
 
