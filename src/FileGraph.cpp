@@ -87,7 +87,7 @@ FileGraph::FileGraph(const FileGraph& o) {
 
 FileGraph& FileGraph::operator=(const FileGraph& other) {
   if (this != &other) {
-    FileGraph tmp(*this);
+    FileGraph tmp(other);
     *this = std::move(tmp);
   }
   return *this;

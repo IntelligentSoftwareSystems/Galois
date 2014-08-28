@@ -14,6 +14,9 @@
 #include "Galois/Runtime/ParallelWork.h"
 #include "Node.h"
 
+#ifdef WITH_PAPI
+#include "papi.h"
+#endif
 
 typedef Galois::WorkList::dChunkedLIFO<1> WL;
 

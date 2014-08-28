@@ -87,7 +87,7 @@ int main(int argc, char** argv) {
     }
   });
   /// XXX
-  std::sort(edges.begin(), edges.end(), [](const Edge& a, const Edge& b) {
+  std::sort(edges.begin(), edges.end(), [](const Edge& a, const Edge& b) -> bool {
     if (a.weight == b.weight)
       return a.src == b.src ? a.dst < b.dst : a.src < b.src;
     return a.weight < b.weight; 

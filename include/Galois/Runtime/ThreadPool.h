@@ -74,14 +74,8 @@ protected:
   struct per_signal {
     std::atomic<int> done;
     std::atomic<int> fastRelease;
-#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
-    per_signal (void): done (), fastRelease () {}
-#endif
   };
   std::vector<LL::CacheLineStorage<per_signal>> signals; // signal loop
-
-  struct shutdown_ty {}; //! type for shutting down thread
-  struct fastmode_ty {bool mode;}; //! type for setting fastmode
 
   //! Initialize TID and PTS
   void initThread(unsigned tid);
@@ -99,6 +93,9 @@ protected:
   void runInternal(unsigned num);
 
 public:
+  struct shutdown_ty {}; //! type for shutting down thread
+  struct fastmode_ty {bool mode;}; //! type for setting fastmode
+
   virtual ~ThreadPool();
 
   //! execute work on all threads

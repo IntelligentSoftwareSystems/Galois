@@ -13,7 +13,7 @@ class DLOpenError : public std::exception
       {
           return reason;
       }
-      ~DLOpenError() {
+      virtual ~DLOpenError() throw() {
           delete reason;
       }
 };

@@ -129,7 +129,7 @@ class DESlevelExec:
 
 
   struct GetRecvTime {
-    const des::SimTime operator () (const Event_ty& e) const {
+    des::SimTime operator () (const Event_ty& e) const {
       return e.getRecvTime ();
     }
   };

@@ -125,7 +125,7 @@ class KruskalStrictOBIM: public Kruskal {
     }
   };
 
-  struct GetWeight {
+  struct GetWeight: public std::unary_function<Edge,Weight_ty> {
     Weight_ty operator () (const Edge& e) const {
       return e.weight;
     }

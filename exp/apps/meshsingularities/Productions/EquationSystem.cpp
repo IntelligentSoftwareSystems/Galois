@@ -1,8 +1,6 @@
 #include "EquationSystem.h"
+#include <string>
 #include <cmath>
-
-#include <Galois/Galois.h>
-#include <boost/iterator.hpp>
 
 EquationSystem::EquationSystem(unsigned long n)
 {
@@ -100,14 +98,6 @@ void EquationSystem::eliminate(const int rows)
 		}
 
 		rhs[i] /= x;
-		/*Galois::do_all(boost::counting_iterator<int>(i+1),
-				boost::counting_iterator<int>(n), [&] (int j) {
-				x = matrix[j][i];
-				for (int k = i+1; k<n; ++k) {
-					matrix[j][k] -= x*matrix[i][k];
-				}
-				rhs[j] -= x*rhs[i];
-			}); */
 		for (j=i+1; j<n; ++j) {
 			x = matrix[j][i];
 
