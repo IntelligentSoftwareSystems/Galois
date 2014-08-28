@@ -113,12 +113,13 @@ void RemoteDirectory::recvRequestImpl(fatPointer ptr, uint32_t dest, ResolveFlag
 
 void RemoteDirectory::recvRequestImpl(metadata& md, fatPointer ptr, std::unique_lock<LL::SimpleLock>& lg, uint32_t dest, ResolveFlag flag) {
   trace("RemoteDirectory::recvRequest % dest % md %\n", ptr, dest, md);
-  if (md.contended && dest > NetworkInterface::ID) {
+  if ((md.contended && dest > NetworkInterface::ID)) {
     addPendingReq(ptr, dest, flag);
   } else {
     bool wasContended = md.contended;
     ResolveFlag oldMode = INV;
     typeHelper* th = md.th;
+    bool has_obj = true;
     switch (md.state) {
     case metadata::HERE_RW:
     case metadata::UPGRADE:
@@ -128,10 +129,13 @@ void RemoteDirectory::recvRequestImpl(metadata& md, fatPointer ptr, std::unique_
       oldMode = RO;
       break;
     default:
-      assert(0 && "Invalid Mode");
-      abort();
+      has_obj = false;
+      break;
     }
-    if (flag == INV) {
+    if ( !has_obj && (flag == UP_RW || flag == UP_RO)) {
+	eraseMD(ptr, lg);
+    } 
+    else if (flag == INV) {
       // ACK invalidate
       eraseMD(ptr, lg);
       getCacheManager().evict(ptr);
@@ -139,8 +143,11 @@ void RemoteDirectory::recvRequestImpl(metadata& md, fatPointer ptr, std::unique_
       if (wasContended)
         fetchImpl(ptr, RO, th, true);
     } else {
+      assert(has_obj);
       assert(md.state == metadata::HERE_RW);
       if (tryWriteBack(md, ptr, lg)) {
+	//XXX delete any pending requests from reqs
+	reqs.erase(ptr);
         if (wasContended)
           fetchImpl(ptr, RW, th, true);
       } else {
@@ -539,7 +546,7 @@ void LocalDirectory::forwardRequestToNextWriter(metadata& md, fatPointer ptr, st
   if (p.first != ~0) {
     if (md.recalled != p.first) {
       if (md.locRW != ~0) {
-        md.th->request(md.locRW, ptr, p.first, RW);
+        md.th->request(md.locRW, ptr, p.first, (md.recalled != 0 ) ? UP_RW : RW );
       } else {
         assert(!md.locRO.empty());
         invalidateReaders(md, ptr, p.first);
