@@ -195,6 +195,14 @@ class RemoteAbortHandler {
     waiting_on.erase(p2.first, p2.second);
   }
 
+  void dump() {
+    std::lock_guard<LL::SimpleLock> lg(lock);
+    if (!waiting_on.empty()) {
+      for (auto& foo : waiting_on)
+        trace("RAH Waiting on %\n", foo.first);
+    }
+  }
+
 public:
   void push(const value_type& val, fatPointer ptr, 
             void (RemoteDirectory::*rfetch) (fatPointer, ResolveFlag),
@@ -258,7 +266,10 @@ public:
   }
 
   decltype(ready.pop()) pop() {
-    return ready.pop();
+    auto foo = ready.pop();
+    if (!foo)
+      dump();
+    return foo;
   }
 
   bool hiddenWork() {
