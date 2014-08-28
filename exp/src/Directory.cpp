@@ -524,6 +524,12 @@ void LocalDirectory::considerObject(metadata& md, fatPointer ptr) {
         md.reqsRW.erase(p.first);
         md.locRW = p.first;
         md.th->send(p.first, ptr, static_cast<Lockable*>(ptr.getObj()), RW);
+        //Immediately recall the object if there is another waiter
+        auto pn = md.getNextDest();
+        if (pn.first != ~0) {
+          md.th->request(md.locRW, ptr, pn.first, RW);
+          md.recalled = pn.first;
+        }
       } else { //RO
         sendToReaders(md, ptr);
       }
