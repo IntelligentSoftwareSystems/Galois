@@ -16,8 +16,6 @@
 
 #include "Lonestar/BoilerPlate.h"
 
-#include <cilk/cilk.h>
-
 #include "llvm/Support/CommandLine.h"
 
 #include <sys/time.h>
