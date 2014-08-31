@@ -567,7 +567,7 @@ namespace PerThreadFactory {
   struct Alloc { typedef typename MM::ExternalHeapAllocator<T, Heap> type; };
 
   template<typename T>
-  struct FSBAlloc { typedef typename MM::FixedSizeAllocator<T> type; };
+  struct FixedSizeAlloc { typedef typename MM::FixedSizeAllocator<T> type; };
 
   template<typename T>
   struct Vector { typedef typename std::vector<T, typename Alloc<T>::type > type; };
@@ -576,10 +576,10 @@ namespace PerThreadFactory {
   struct Deque { typedef typename std::deque<T, typename Alloc<T>::type > type; };
 
   template<typename T>
-  struct List { typedef typename std::list<T, typename FSBAlloc<T>::type > type; };
+  struct List { typedef typename std::list<T, typename FixedSizeAlloc<T>::type > type; };
 
   template<typename T, typename C>
-  struct Set { typedef typename std::set<T, C, typename FSBAlloc<T>::type > type; };
+  struct Set { typedef typename std::set<T, C, typename FixedSizeAlloc<T>::type > type; };
 
   template<typename T, typename C>
   struct PQ { typedef MinHeap<T, C, typename Vector<T>::type > type; };
@@ -662,7 +662,7 @@ class PerThreadSet:
   public PerThreadContainer<typename PerThreadFactory::template Set<T, C>::type> {
 
 public:
-  typedef typename PerThreadFactory::template FSBAlloc<T>::type Alloc_ty;
+  typedef typename PerThreadFactory::template FixedSizeAlloc<T>::type Alloc_ty;
 
 protected:
   typedef typename PerThreadFactory::template Set<T, C>::type Cont_ty;
