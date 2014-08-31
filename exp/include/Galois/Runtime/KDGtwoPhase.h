@@ -234,45 +234,45 @@ protected:
 
 
 
+  // XXX: moved to KDGtwoPhaseSupport.h
 
-  // TODO: use setjmp here
-  template <typename F>
-  static void runCatching (F& func, Ctxt* c, UserCtxt& uhand) {
-    Galois::Runtime::setThreadContext (c);
-
-    int result = 0;
-
-#ifdef GALOIS_USE_LONGJMP
-    if ((result = setjmp(hackjmp)) == 0) {
-#else
-    try {
-#endif
-      func (c->getElem (), uhand);
-
-#ifdef GALOIS_USE_LONGJMP
-    } else {
-      // TODO
-    }
-#else 
-    } catch (ConflictFlag f) {
-      result = f;
-    }
-#endif
-
-    switch (result) {
-      case 0:
-        break;
-      case CONFLICT: 
-        c->disableSrc ();
-        break;
-      default:
-        GALOIS_DIE ("can't handle conflict flag type");
-        break;
-    }
-    
-
-    Galois::Runtime::setThreadContext (NULL);
-  }
+  // template <typename F>
+  // static void runCatching (F& func, Ctxt* c, UserCtxt& uhand) {
+    // Galois::Runtime::setThreadContext (c);
+// 
+    // int result = 0;
+// 
+// #ifdef GALOIS_USE_LONGJMP
+    // if ((result = setjmp(hackjmp)) == 0) {
+// #else
+    // try {
+// #endif
+      // func (c->getElem (), uhand);
+// 
+// #ifdef GALOIS_USE_LONGJMP
+    // } else {
+      // // TODO
+    // }
+// #else 
+    // } catch (ConflictFlag f) {
+      // result = f;
+    // }
+// #endif
+// 
+    // switch (result) {
+      // case 0:
+        // break;
+      // case CONFLICT: 
+        // c->disableSrc ();
+        // break;
+      // default:
+        // GALOIS_DIE ("can't handle conflict flag type");
+        // break;
+    // }
+    // 
+// 
+    // Galois::Runtime::setThreadContext (NULL);
+  // }
 
   template<typename Ptr>
   GALOIS_ATTRIBUTE_PROF_NOINLINE void prepareRound (Ptr& currWL, Ptr& nextWL) {
