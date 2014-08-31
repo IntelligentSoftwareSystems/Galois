@@ -334,6 +334,8 @@ private:
 
           workList[r].erase (tmp);
 
+          if (i == tmp) { break; }
+
           ei = workList[r].end ();
 
         } else {

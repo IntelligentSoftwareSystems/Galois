@@ -80,7 +80,6 @@ class KDGtwoPhaseParaMeter {
   PerThreadUserCtx userHandles;
 
   CtxtWL* currWL = new CtxtWL ();
-  CtxtWL* nextWL = new CtxtWL ();
 
 public:
 
@@ -98,7 +97,6 @@ public:
 
   ~KDGtwoPhaseParaMeter () {
     delete currWL; currWL = nullptr;
-    delete nextWL; nextWL = nullptr;
   }
 
 
@@ -121,12 +119,9 @@ public:
     size_t totalIterations = 0;
     CtxtWL allSources;
 
-    while (!nextWL->empty_all ()) {
+    while (!currWL->empty_all ()) {
 
       ++rounds;
-      std::swap (nextWL, currWL);
-      // TODO: deallocate/destroy the allocated contexts
-      nextWL->clear_all_parallel ();
 
       totalIterations += currWL->size_all ();
 
@@ -156,8 +151,6 @@ public:
 
             } else {
               c->cancelIteration ();
-              c->reset (); // for future reuse
-              nextWL->get ().push_back (c);
             }
           },
           "collect_sources",
@@ -190,19 +183,57 @@ public:
                 
                 createContext (*i);
               }
+
+              // std::printf ("commit iteration %p\n", c);
               c->commitIteration ();
-              c->reset (); // needed?
 
             } else {
-
-              c->reset ();
-              nextWL->get ().push_back (c);
+              c->cancelIteration ();
             }
 
             uhand.reset ();
           },
           "apply_operator",
           Galois::doall_chunk_size<OpFunc::CHUNK_SIZE> ());
+
+      Galois::Runtime::on_each_impl (
+          [this] (const unsigned tid, const unsigned numT) {
+            typename CtxtWL::Cont_ty& cont  = currWL->get(tid); 
+
+            for (auto i = cont.begin (), i_end = cont.end (); i != i_end;) { 
+
+              if ((*i)->isSrc ()) {
+                assert (!cont.empty ());
+                // std::printf ("going to destroy and deallocate %p, list size=%zd, back=%p, i=%d\n", 
+                  // *i, cont.size (), cont.back (), std::distance (cont.begin (), i));
+// 
+                auto last = cont.end ();
+                --last;
+
+                std::swap (*i, *last);
+
+                Ctxt* src = *last;
+                assert (src->isSrc ());
+                cont.pop_back ();
+
+
+                ctxtAlloc.destroy (src);
+                ctxtAlloc.deallocate (src, 1);
+
+                if (i == last) {
+                  break;
+                }
+
+                i_end = cont.end ();
+
+              } else {
+                (*i)->reset ();
+                ++i;
+              }
+            }
+
+          },
+          "clean-up");
 
     } // end while
 
@@ -212,8 +243,6 @@ public:
     std::cout << "KDGParaMeter: parallelism as a fraction of total: " << double (numCommitted.reduceRO ())/double(totalIterations) << std::endl;
 
     allSources.clear_all_parallel ();
-    currWL->clear_all_parallel ();
-    nextWL->clear_all_parallel ();
   }
 
 private:
@@ -222,7 +251,7 @@ private:
     Ctxt* ctx = ctxtAlloc.allocate (1);
     assert (ctx != nullptr);
     ctxtAlloc.construct (ctx, x, cmp);
-    nextWL->get ().push_back (ctx);
+    currWL->get ().push_back (ctx);
   }
 
   // template <typename F>

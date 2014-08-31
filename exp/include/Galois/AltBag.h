@@ -42,6 +42,26 @@ protected:
   OuterList outerList;
   size_t m_size;
 
+  Chunk& getLastChunk (void) {
+    assert (!outerList.empty ());
+    
+    Chunk& chunk = outerList.back ();
+
+    assert (!chunk.empty ());
+
+    return chunk;
+  }
+  
+  Chunk& getFirstChunk (void) {
+    assert (!outerList.empty ());
+
+    Chunk& chunk = outerList.front ();
+
+    assert (!chunk.empty ());
+
+    return chunk;
+  }
+
 
 public:
 
@@ -71,9 +91,15 @@ public:
   size_t size () const { return m_size; }
 
   bool empty () const {
-    assert (outerList.size () >= 1);
-    // has only 1 chunk and that chunk is empty
-    return (outerList.size () == 1 && outerList.front ().empty ());
+    auto b = outerList.begin ();
+    auto e = outerList.end ();
+
+    assert (b != e); // outerList.size () >= 1;
+
+    ++b;
+
+    // outerList.front () empty () && outerList.size () == 1
+    return (outerList.front ().empty () && b == e);
   }
 
   template <typename... Args>
@@ -93,6 +119,40 @@ public:
 
   void push_back (const T& elem) {
     this->emplace_back (elem);
+  }
+
+  void pop_back (void) {
+    Chunk& chunk = getLastChunk ();
+
+    chunk.pop_back ();
+
+    if(chunk.empty ()) {
+      outerList.pop_back ();
+    }
+
+    if (outerList.empty ()) {
+      // restore the invariant of outerList containing at least one empty chunk
+      outerList.emplace_back ();
+    }
+    --m_size;
+  }
+
+  reference back (void) {
+    Chunk& chunk = getLastChunk ();
+    return chunk.back ();
+  }
+
+  const_reference back (void) const {
+    return const_cast<SerialBag*> (this)->back ();
+  }
+
+  reference front (void) {
+    Chunk& chunk = getFirstChunk ();
+    return chunk.front ();
+  }
+
+  const_reference front (void) const {
+    return const_cast<SerialBag*> (this)->front ();
   }
 
   void clear (void) {
