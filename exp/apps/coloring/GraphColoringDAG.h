@@ -7,6 +7,7 @@
 #include "Galois/Runtime/ll/CompilerSpecific.h"
 
 #include <atomic>
+#include <random>
 
 struct NodeDataDAG {
   unsigned color;
@@ -31,68 +32,22 @@ class GraphColoringDAG: public GraphColoringBase<Graph> {
 protected:
 
   struct NodeDataComparator {
-    bool operator () (const NodeDataDAG& left, const NodeDataDAG& right) const {
+    static bool compare (const NodeDataDAG& left, const NodeDataDAG& right) {
       if (left.priority != right.priority) {
         return left.priority < right.priority;
       } else {
         return left.id < right.id;
       }
     }
+
+    bool operator () (const NodeDataDAG& left, const NodeDataDAG& right) const {
+      return compare (left, right);
+    }
   };
 
-  template <typename F>
-  void assignPriorityHelper (const F& nodeFunc) {
-    Galois::do_all_choice (
-        Galois::Runtime::makeLocalRange (graph),
-        [&] (GNode node) {
-          nodeFunc (node);
-        },
-        "assign-priority",
-        Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
-  }
 
-  void assignPriority (void) {
-
-    auto byId = [&] (GNode node) {
-      auto& nd = graph.getData (node, Galois::NONE);
-      nd.priority = nd.id;
-    };
-
-    auto minDegree = [&] (GNode node) {
-      auto& nd = graph.getData (node, Galois::NONE);
-      nd.priority = std::distance (
-                      graph.edge_begin (node, Galois::NONE),
-                      graph.edge_end (node, Galois::NONE));
-    };
-
-    const size_t numNodes = graph.size ();
-    auto maxDegree = [&] (GNode node) {
-      auto& nd = graph.getData (node, Galois::NONE);
-      nd.priority = numNodes - std::distance (
-                                  graph.edge_begin (node, Galois::NONE),
-                                  graph.edge_end (node, Galois::NONE));
-    };
-    
-
-    switch (heuristic) {
-      case FIRST_FIT:
-        assignPriorityHelper (byId);
-        break;
-
-      case MIN_DEGREE:
-        assignPriorityHelper (minDegree);
-        break;
-
-      case MAX_DEGREE:
-        assignPriorityHelper (maxDegree);
-        break;
-
-      default:
-        std::abort ();
-    }
-  }
-
-  void initDAG (void) {
+  template <typename W>
+  void initDAG (W& initWork) {
     NodeDataComparator cmp;
 
     Galois::do_all_choice (
@@ -102,16 +57,25 @@ protected:
 
           // std::printf ("Processing node %d with priority %d\n", sd.id, sd.priority);
 
+          unsigned addAmt = 0;
           for (Graph::edge_iterator e = graph.edge_begin (src, Galois::NONE),
               e_end = graph.edge_end (src, Galois::NONE); e != e_end; ++e) {
             GNode dst = graph.getEdgeDst (e);
             auto& dd = graph.getData (dst, Galois::NONE);
 
             if (cmp (dd, sd)) { // dd < sd
-              ++(sd.indegree);
-            } // only modify the node being processed
-            // if we modify neighbors, each node will be 
-            // processed twice.
+              ++addAmt;
+            }
+          }
+
+          // only modify the node being processed
+          // if we modify neighbors, each node will be 
+          // processed twice.
+          sd.indegree += addAmt;
+
+          if (addAmt == 0) {
+            assert (sd.indegree == 0);
+            initWork.push (src);
           }
         },
         "init-dag",
@@ -151,16 +115,11 @@ protected:
 
     Galois::InsertBag<GNode> initWork;
 
-    Galois::do_all_choice (
-        Galois::Runtime::makeLocalRange (graph),
-        [&] (GNode src) {
-          auto& sd = graph.getData (src, Galois::NONE);
-          if (sd.indegree == 0) {
-            initWork.push (src);
-          }
-        },
-        "init-worklist",
-        Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
+    Galois::StatTimer t_dag_init;("dag initialization time: ");
+
+    t_dag_init.start ();
+    initDAG (initWork);
+    t_dag_init.stop ();
 
     typedef Galois::WorkList::AltChunkedFIFO<DEFAULT_CHUNK_SIZE> WL_ty;
 
@@ -202,19 +161,18 @@ protected:
 
     struct NodeComparator {
       Graph& graph;
-      const NodeDataComparator dataCmp;
 
       bool operator () (GNode ln, GNode rn) const {
         const auto& ldata = graph.getData (ln, Galois::NONE);
         const auto& rdata = graph.getData (rn, Galois::NONE);
-        return dataCmp (ldata, rdata);
+        return NodeDataComparator::compare (ldata, rdata);
       }
     };
 
 
     Galois::Runtime::for_each_ordered_2p_param (
         Galois::Runtime::makeLocalRange (graph),
-        NodeComparator {graph, NodeDataComparator {}},
+        NodeComparator {graph},
         VisitNhood {*this},
         ApplyOperator {*this},
         "coloring-ordered-param");
@@ -222,12 +180,10 @@ protected:
 
   virtual void colorGraph (void) {
     assignPriority ();
-    const bool paraMeter = true;
 
-    if (paraMeter) {
+    if (useParaMeter) {
       colorKDGparam ();
     } else {
-      initDAG ();
       colorDAG ();
     }
   }

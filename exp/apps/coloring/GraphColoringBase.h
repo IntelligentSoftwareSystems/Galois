@@ -20,6 +20,8 @@
 
 enum HeuristicType {
   FIRST_FIT,
+  BY_ID,
+  RANDOM,
   MIN_DEGREE,
   MAX_DEGREE,
 };
@@ -31,12 +33,16 @@ static cll::opt<std::string> filename (cll::Positional, cll::desc ("<input file>
 static cll::opt<HeuristicType> heuristic (
     cll::desc ("choose heuristic"),
     cll::values (
-      clEnumVal (FIRST_FIT, "first fit"),
+      clEnumVal (FIRST_FIT, "first fit, no priority"),
+      clEnumVal (BY_ID, "order by ID modulo some constant"),
+      clEnumVal (RANDOM, "uniform random within some small range"),
       clEnumVal (MIN_DEGREE, "order by min degree first"),
       clEnumVal (MAX_DEGREE, "order by max degree first"),
       clEnumValEnd),
     cll::init (FIRST_FIT));
 
+
+static cll::opt<bool> useParaMeter ("parameter", cll::desc ("use parameter executor"), cll::init (false));
 
 static const char* const name = "Graph Coloring";
 static const char* const desc = "Greedy coloring of graphs with minimal number of colors";
@@ -47,7 +53,7 @@ class GraphColoringBase: private boost::noncopyable {
 
 protected:
 
-  static const unsigned DEFAULT_CHUNK_SIZE = 16;
+  static const unsigned DEFAULT_CHUNK_SIZE = 8;
 
   typedef Galois::Runtime::PerThreadVector<unsigned> PerThrdColorVec;
   typedef typename G::GraphNode GN;
@@ -149,6 +155,96 @@ protected:
 
   };
 
+  template <typename F>
+  void assignPriorityHelper (const F& nodeFunc) {
+    Galois::do_all_choice (
+        Galois::Runtime::makeLocalRange (graph),
+        [&] (GN node) {
+          nodeFunc (node);
+        },
+        "assign-priority",
+        Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
+  }
+
+  void assignPriority (void) {
+
+    static const unsigned MAX_LEVELS = 100;
+    static const unsigned SEED = 10;
+
+    auto byId = [&] (GN node) {
+      auto& nd = graph.getData (node, Galois::NONE);
+      nd.priority = nd.id % MAX_LEVELS;
+    };
+
+
+    struct RNG {
+      std::uniform_int_distribution<unsigned> dist;
+      std::mt19937 eng;
+      
+      RNG (void): dist (0, MAX_LEVELS), eng () {
+        this->eng.seed (SEED);
+      }
+
+      unsigned operator () (void) {
+        return dist(eng);
+      }
+    };
+
+    Galois::Runtime::PerThreadStorage<RNG>  perThrdRNG;
+
+    auto randPri = [&] (GN node) {
+      auto& rng = *(perThrdRNG.getLocal ());
+      auto& nd = graph.getData (node, Galois::NONE);
+      nd.priority = rng ();
+    };
+
+
+    auto minDegree = [&] (GN node) {
+      auto& nd = graph.getData (node, Galois::NONE);
+      nd.priority = std::distance (
+                      graph.edge_begin (node, Galois::NONE),
+                      graph.edge_end (node, Galois::NONE));
+    };
+
+    const size_t numNodes = graph.size ();
+    auto maxDegree = [&] (GN node) {
+      auto& nd = graph.getData (node, Galois::NONE);
+      nd.priority = numNodes - std::distance (
+                                  graph.edge_begin (node, Galois::NONE),
+                                  graph.edge_end (node, Galois::NONE));
+    };
+    
+    Galois::StatTimer t_priority ("priority assignment time: ");
+
+    t_priority.start ();
+
+    switch (heuristic) {
+      case FIRST_FIT:
+        // do nothing
+        break;
+
+      case BY_ID:
+        assignPriorityHelper (byId);
+        break;
+
+      case RANDOM:
+        assignPriorityHelper (randPri);
+        break;
+
+      case MIN_DEGREE:
+        assignPriorityHelper (minDegree);
+        break;
+
+      case MAX_DEGREE:
+        assignPriorityHelper (maxDegree);
+        break;
+
+      default:
+        std::abort ();
+    }
+
+    t_priority.stop ();
+  }
 
   void verify (void) {
     if (skipVerify) { return; }
@@ -208,11 +304,16 @@ public:
 
     readGraph ();
 
+    Galois::preAlloc (Galois::getActiveThreads () + 2*sizeof(NodeData)*graph.size ()/Galois::Runtime::MM::hugePageSize);
+    Galois::reportPageAlloc("MeminfoPre");
+
     Galois::StatTimer t;
 
     t.start ();
     colorGraph ();
     t.stop ();
+
+    Galois::reportPageAlloc("MeminfoPost");
 
     verify ();
   }

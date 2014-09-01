@@ -3,6 +3,8 @@
 
 #include "GraphColoringBase.h"
 
+#include "Galois/GaloisUnsafe.h"
+
 struct NodeData {
   unsigned color;
   unsigned priority;
@@ -37,9 +39,9 @@ protected:
     }
   };
 
+  typedef Galois::WorkList::AltChunkedFIFO<DEFAULT_CHUNK_SIZE> WL_ty;
+  // typedef Galois::WorkList::dChunkedFIFO<DEFAULT_CHUNK_SIZE> WL_ty;
   void firstFit (void) {
-    typedef Galois::WorkList::AltChunkedFIFO<DEFAULT_CHUNK_SIZE> WL_ty;
-    // typedef Galois::WorkList::dChunkedFIFO<DEFAULT_CHUNK_SIZE> WL_ty;
 
     Galois::for_each_local (
         graph, ColorNodeLocking {*this},
@@ -48,15 +50,41 @@ protected:
 
   }
 
-  virtual void colorGraph (void) {
-    switch (heuristic) {
-      case FIRST_FIT:
-        firstFit ();
-        break;
+  void priorityScheduling (void) {
+    typedef std::unary_function<GNode, unsigned> Base_ty;
+    struct GetPriority: public Base_ty {
+      Graph& graph;
 
-      default:
-        std::abort ();
-        
+      GetPriority (Graph& g): Base_ty (), graph (g) {}
+
+      unsigned operator () (GNode n) {
+        auto& nd = graph.getData (n, Galois::NONE);
+        return nd.priority;
+      }
+    };
+
+    typedef Galois::WorkList::OrderedByIntegerMetric<GetPriority, WL_ty> OBIM;
+
+    OBIM wl {GetPriority {graph} };
+
+    Galois::on_each (
+        [&] (const unsigned tid, const unsigned numT) {
+          wl.push_initial (Galois::Runtime::makeLocalRange (graph));
+        }, 
+        Galois::loopname ("wl_init"));
+
+    Galois::for_each_wl ( wl, ColorNodeLocking {*this}, "color-obim");
+
+  }
+
+  virtual void colorGraph (void) {
+    if (heuristic == FIRST_FIT) {
+      firstFit ();
+
+    } else {
+      assignPriority ();
+      priorityScheduling ();
+
     }
   }
 
