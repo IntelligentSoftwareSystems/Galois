@@ -3,35 +3,71 @@ using namespace std;
 
 // todo: rotator
 
-//int Analysis::rotate(root, parent)
-//{
-//if left branch is present then l = rotate(left) else l=0
-//if left branch is present then r = rotate(prawe)else r=0
-//h=r-l
+int Analysis::rotate(Node * root, Node * parent){
+    
+    int l,r,h;
+    
+    if (root->getLeft() != NULL) {
+        l = Analysis::rotate(root->getLeft(), root);
+    } else {
+        l=0;
+    }
+    
+    if (root->getRight() != NULL) {
+        r = Analysis::rotate(root->getRight(), root);
+    } else {
+        r=0;
+    }
+    h=r-l;
 
-//if (h==1 || h==-1 || h==0) then return h //no rotation
+    if ( (h==1) || (h==-1) || (h==0) ) { //no rotation
+        return h;
+    }
 
-//if (h>=2) then
-//{//we need to perform some rotations to the left
-//  child=dziecko root->right które jest sąsiadem parent
-//  (if there are two such sons, we pick up the one with smaller
-//   number of connected neighbors - with shorter neighbors)
-
-//  if (child==root->right->right) && r<=0) ||
-//         (child==root->right->left) && r>=0) then
-//  {//rotation to the left
-//    if parent!=NULL then make root->right son of parent
-//      else T=root->right
-//    t=root->left
-//    make root left son of root->right
-//    (this step may require exchange of left son
-//     with right son for root->right)
-//    make child right son of root
-//    if parent!=NULL merge_list(parent->left,parent->right)
-//      else merge_list(T->left,T->right)
-//  }//end of rotation to the left
-//  else //double rotation
-//  {// lower level rotation to the right
+    if (h>=2) {  //we need to perform some rotations to the left
+        bool child1 = Node::isNeighbour(root->getRight()->getLeft(), parent);
+        bool child2 = Node::isNeighbour(root->getRight()->getRight(), parent);
+        Node * child;
+        Node * otherChild;
+        if (child1){
+            if (child2){
+                if (root->getRight()->getLeft()->getNumberOfNeighbours() < root->getRight()->getRight()->getNumberOfNeighbours()){
+                    child = root->getRight()->getLeft();
+                    otherChild = root->getRight()->getRight();
+                } else {
+                    child = root->getRight()->getRight();
+                    otherChild = root->getRight()->getLeft();
+                }
+            } else{
+                child = root->getRight()->getLeft();
+                otherChild = root->getRight()->getRight();
+            }
+        } else{
+            child = root->getRight()->getRight();
+            child = root->getRight()->getLeft();
+        }
+        if (((child == root->getRight()->getRight()) && (r<=0)) || ((child == root->getRight()->getLeft()) && (r>=0))) {//rotation to the left
+            if (parent != NULL){
+                if (parent->getLeft() == root){
+                    parent->setLeft(root->getRight());
+                } else {
+                    parent->setRight(root->getRight());
+                }
+            }
+            Node * T = root->getRight();
+            Node * t = root->getLeft();
+            root->setRight(t);
+            root->setLeft(child);
+            T->setRight(otherChild);
+            T->setLeft(root);
+            if (parent != NULL) {
+                //merge_list(parent->left,parent->right)
+            } else {
+                // merge_list(T->left,T->right)
+            }
+        }//end of rotation to the left
+        else //double rotation
+        {// lower level rotation to the right
 //   (rotation at root->right)
 //    parent1=root
 //    root1=root->right
@@ -54,16 +90,10 @@ using namespace std;
 //     (this step may require exchange of left son
 //      with right son for root->right)
 //     make child right son of root
-//  }//end of double rotations
-//}// if (h>=2)
-//else if (h<=-2) then
-//{//we need to perform some rotations to the right
-//if (child==root->left->right) && r<=0) ||
-//         (child==root->left->left) && r>=0) then
-//{//rotation to the right
-//(Here we perform the same actions as for the rotations
-// to the left, but in the symmetric way)
-//}
+}//end of double rotations
+} // end if (h>=2)
+    // the same, but other direction rotation
+}
 
 
 void Analysis::nodeAnaliser(Node *node, set<uint64_t> *parent)

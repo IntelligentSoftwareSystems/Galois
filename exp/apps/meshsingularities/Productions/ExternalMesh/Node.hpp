@@ -71,6 +71,9 @@ class Node {
         void merge();
         void eliminate();
         void bs();
+        
+        static bool isNeighbour (Node *node, Node *parent);
+        int getNumberOfNeighbours();
 };
 
 #endif // NODE_HPP

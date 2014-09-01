@@ -168,3 +168,45 @@ void Node::bs()
 {
     this->system->backwardSubstitute(this->getDofsToElim());
 }
+
+
+bool Node::isNeighbour (Node *node, Node *parent)
+{
+    if (parent == NULL){
+        return true;
+    }
+    std::set<uint64_t> nodeDofs(node->getDofs().cbegin(), node->getDofs().cend());
+    std::set<uint64_t> parentDofs(parent->getDofs().cbegin(), parent->getDofs().cend());
+
+    if (nodeDofs.empty() || parentDofs.empty()) {
+        return false;
+    }
+    
+    auto nodeIt = nodeDofs.begin();
+    auto nodeItEnd = nodeDofs.end();
+
+    auto parentIt = parentDofs.begin();
+    auto parentItEnd = parentDofs.end();
+
+    // sets are internally sorted, so if the beginning of the one is greater
+    // than end of other - we can finish
+    if ((*parentIt > *nodeDofs.rbegin()) || (*nodeIt > *parentDofs.rbegin())) {
+        return false;
+    }
+
+    while (nodeIt != nodeItEnd && parentIt != parentItEnd) {
+        if (*nodeIt == *parentIt) {
+            return true; // common element? yes, we are neighbours!
+        } else if (*nodeIt > *parentIt) {
+            ++parentIt;
+        } else {
+            ++nodeIt;
+        }
+    }
+    return false; // no common elements => no neighbourhood
+};
+
+
+int Node::getNumberOfNeighbours(){
+    return 0; //TODO implement
+}
