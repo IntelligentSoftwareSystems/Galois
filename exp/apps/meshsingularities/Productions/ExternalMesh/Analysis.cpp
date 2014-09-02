@@ -3,6 +3,123 @@ using namespace std;
 
 // todo: rotator
 
+void Analysis::findLeftRotationChild(Node ** _parent, Node ** _root, bool child1, bool child2, Node ** _child, Node ** _otherChild){
+    Node * parent = (*_parent);
+    Node * root = (*_root);
+    
+    Node * child;
+    Node * otherChild;
+    if (child1){
+        if (child2){
+            if (root->getRight()->getLeft()->getNumberOfNeighbours() < root->getRight()->getRight()->getNumberOfNeighbours()){
+                child = root->getRight()->getLeft();
+                otherChild = root->getRight()->getRight();
+            } else {
+                child = root->getRight()->getRight();
+                otherChild = root->getRight()->getLeft();
+            }
+        } else{
+            child = root->getRight()->getLeft();
+            otherChild = root->getRight()->getRight();
+        }
+    } else{
+        child = root->getRight()->getRight();
+        otherChild = root->getRight()->getLeft();
+    }
+    
+    (*_child) = child;
+    (*_otherChild) = otherChild;
+}
+
+
+void Analysis::findRightRotationChild(Node ** _parent, Node ** _root, bool child1, bool child2, Node ** _child, Node ** _otherChild){
+    Node * parent = (*_parent);
+    Node * root = (*_root);
+    
+    Node * child;
+    Node * otherChild;
+    if (child1){
+        if (child2){
+            if (root->getLeft()->getLeft()->getNumberOfNeighbours() < root->getLeft()->getRight()->getNumberOfNeighbours()){
+                child = root->getLeft()->getLeft();
+                otherChild = root->getLeft()->getRight();
+            } else {
+                child = root->getLeft()->getRight();
+                otherChild = root->getLeft()->getLeft();
+            }
+        } else{
+            child = root->getLeft()->getLeft();
+            otherChild = root->getLeft()->getRight();
+        }
+    } else{
+        child = root->getLeft()->getRight();
+        otherChild = root->getLeft()->getLeft();
+    }
+    
+    (*_child) = child;
+    (*_otherChild) = otherChild;
+}
+
+
+Node * Analysis::leftRotation(Node ** _parent, Node ** _root, bool child1, bool child2, Node ** _child, Node ** _otherChild){
+    
+    Node * parent = (*_parent);
+    Node * root = (*_root);
+    Node * child = (*_child);
+    Node * otherChild = (*_otherChild);
+    
+    if (parent != NULL){
+        if (parent->getLeft() == root){
+            parent->setLeft(root->getRight());
+        } else {
+            parent->setRight(root->getRight());
+        }
+    }
+    Node * T = root->getRight();
+    Node * t = root->getLeft();
+    root->setRight(t);
+    root->setLeft(child);
+    T->setRight(otherChild);
+    T->setLeft(root);
+    if (parent != NULL) {
+        //merge_list(parent->left,parent->right)
+    } else {
+        // merge_list(T->left,T->right)
+    }
+    
+    return T;
+}
+
+
+Node * Analysis::rightRotation(Node ** _parent, Node ** _root, bool child1, bool child2, Node ** _child, Node ** _otherChild){
+    
+    Node * parent = (*_parent);
+    Node * root = (*_root);
+    Node * child = (*_child);
+    Node * otherChild = (*_otherChild);
+    
+    if (parent != NULL){
+        if (parent->getLeft() == root){
+            parent->setLeft(root->getLeft());
+        } else {
+            parent->setRight(root->getLeft());
+        }
+    }
+    Node * T = root->getLeft();
+    Node * t = root->getRight();
+    root->setLeft(t);
+    root->setRight(child);
+    T->setLeft(otherChild);
+    T->setRight(root);
+    if (parent != NULL) {
+        //merge_list(parent->left,parent->right)
+    } else {
+        // merge_list(T->left,T->right)
+    }
+    
+    return T;
+}
+
 int Analysis::rotate(Node * root, Node * parent){
     
     int l,r,h;
@@ -29,70 +146,63 @@ int Analysis::rotate(Node * root, Node * parent){
         bool child2 = Node::isNeighbour(root->getRight()->getRight(), parent);
         Node * child;
         Node * otherChild;
-        if (child1){
-            if (child2){
-                if (root->getRight()->getLeft()->getNumberOfNeighbours() < root->getRight()->getRight()->getNumberOfNeighbours()){
-                    child = root->getRight()->getLeft();
-                    otherChild = root->getRight()->getRight();
-                } else {
-                    child = root->getRight()->getRight();
-                    otherChild = root->getRight()->getLeft();
-                }
-            } else{
-                child = root->getRight()->getLeft();
-                otherChild = root->getRight()->getRight();
-            }
-        } else{
-            child = root->getRight()->getRight();
-            child = root->getRight()->getLeft();
-        }
+        findLeftRotationChild(&parent, &root, child1, child2, &child, &otherChild);
+        
         if (((child == root->getRight()->getRight()) && (r<=0)) || ((child == root->getRight()->getLeft()) && (r>=0))) {//rotation to the left
-            if (parent != NULL){
-                if (parent->getLeft() == root){
-                    parent->setLeft(root->getRight());
-                } else {
-                    parent->setRight(root->getRight());
-                }
-            }
-            Node * T = root->getRight();
-            Node * t = root->getLeft();
-            root->setRight(t);
-            root->setLeft(child);
-            T->setRight(otherChild);
-            T->setLeft(root);
-            if (parent != NULL) {
-                //merge_list(parent->left,parent->right)
-            } else {
-                // merge_list(T->left,T->right)
-            }
+            Node * T = leftRotation(&parent, &root, child1, child2, &child, &otherChild);
         }//end of rotation to the left
+        
         else //double rotation
         {// lower level rotation to the right
-//   (rotation at root->right)
-//    parent1=root
-//    root1=root->right
-//    if parent1!=NULL then make root1->left son of parent
-//    t1=root1->right
-//    child1=son of root1->left being neighbor of t
-//    (if there are two such sons, we pick up the one with
-//     smaller number of connected neighbors)
-//    make root1 right son of root1->left
-//    (this step may require exchange of left son
-//     with right son of root1->left)
-//    make child1 left son of root1
-
-//    //rotation on higher level in left
-//     if parent!=NULL then make root->right son of parent
-//       else T=root->right
-//     t=root->left
-//     child=son of root->right, being neighbor of t
-//     make root left son of root->right
-//     (this step may require exchange of left son
-//      with right son for root->right)
-//     make child right son of root
-}//end of double rotations
-} // end if (h>=2)
+            //   (rotation at root->right)
+            Node * parent1 = root;
+            Node * root1 = root->getRight();
+            bool nchild1 = Node::isNeighbour(root1->getLeft()->getLeft(), parent);
+            bool nchild2 = Node::isNeighbour(root1->getLeft()->getRight(), parent);
+            Node * nchild;
+            Node * notherChild;
+            
+            findRightRotationChild(&parent1, &root1, nchild1, nchild2, &nchild, &notherChild);
+            rightRotation(&parent1, &root1, nchild1, nchild2, &nchild, &notherChild);
+            
+            //rotation on higher level in left
+            child1 = Node::isNeighbour(root->getRight()->getLeft(), parent);
+            child2 = Node::isNeighbour(root->getRight()->getRight(), parent);
+            findLeftRotationChild(&parent, &root, child1, child2, &child, &otherChild);
+            Node * T = leftRotation(&parent, &root, child1, child2, &child, &otherChild);
+        }//end of double rotations
+    } else {// end if (h>=2)
     // the same, but other direction rotation
+        bool child1 = Node::isNeighbour(root->getLeft()->getLeft(), parent);
+        bool child2 = Node::isNeighbour(root->getLeft()->getRight(), parent);
+        Node * child;
+        Node * otherChild;
+        findRightRotationChild(&parent, &root, child1, child2, &child, &otherChild);
+        
+        if (((child == root->getLeft()->getRight()) && (r<=0)) || ((child == root->getLeft()->getLeft()) && (r>=0))) {//rotation to the left
+            Node * T = rightRotation(&parent, &root, child1, child2, &child, &otherChild);
+        }//end of rotation to the left
+        
+        else //double rotation
+        {// lower level rotation to the left
+            //   (rotation at root->left)
+            Node * parent1 = root;
+            Node * root1 = root->getLeft();
+            bool nchild1 = Node::isNeighbour(root1->getRight()->getLeft(), parent);
+            bool nchild2 = Node::isNeighbour(root1->getRight()->getRight(), parent);
+            Node * nchild;
+            Node * notherChild;
+            
+            findLeftRotationChild(&parent1, &root1, nchild1, nchild2, &nchild, &notherChild);
+            leftRotation(&parent1, &root1, nchild1, nchild2, &nchild, &notherChild);
+            
+            //rotation on higher level in right
+            child1 = Node::isNeighbour(root->getLeft()->getLeft(), parent);
+            child2 = Node::isNeighbour(root->getLeft()->getRight(), parent);
+            findRightRotationChild(&parent, &root, child1, child2, &child, &otherChild);
+            Node * T = rightRotation(&parent, &root, child1, child2, &child, &otherChild);
+        }//end of double rotations
+    }
 }
 
 

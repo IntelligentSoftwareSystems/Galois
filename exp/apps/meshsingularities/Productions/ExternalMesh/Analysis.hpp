@@ -28,6 +28,12 @@ class Analysis {
                     std::map<uint64_t, std::map<edge, uint64_t>> &levelEdges, uint64_t level);
         static void mergeAnaliser(Node *node);
 	static int rotate(Node * root, Node * parent);
+        
+        static void findLeftRotationChild(Node ** _parent, Node ** _root, bool child1, bool child2, Node ** _child, Node ** _otherChild);
+        static void findRightRotationChild(Node ** _parent, Node ** _root, bool child1, bool child2, Node ** _child, Node ** _otherChild);
+        static Node * leftRotation(Node ** _parent, Node ** _root, bool child1, bool child2, Node ** _child, Node ** _otherChild);
+        static Node * rightRotation(Node ** _parent, Node ** _root, bool child1, bool child2, Node ** _child, Node ** _otherChild);
+        
     public:
         static void enumerateDOF(Mesh *mesh);
         static void doAnalise(Mesh *mesh);
