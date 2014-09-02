@@ -1,6 +1,7 @@
 #include "Node.hpp"
 #include <set>
 #include <algorithm>
+#include "Analysis.hpp"
 
 void Node::setLeft(Node *left)
 {
@@ -20,6 +21,10 @@ void Node::setParent(Node *parent)
 void Node::addElement(Element *e)
 {
     this->mergedElements.push_back(e);
+}
+
+void Node::clearElements(){
+    this->mergedElements.clear();
 }
 
 void Node::setProduction(std::string &prodname)
@@ -65,6 +70,10 @@ void Node::addDof(uint64_t dof)
 std::vector<uint64_t> &Node::getDofs()
 {
     return this->dofs;
+}
+
+void Node::clearDofs(){
+    this->dofs.clear();
 }
 
 void Node::setDofsToElim(uint64_t dofs)
@@ -207,6 +216,61 @@ bool Node::isNeighbour (Node *node, Node *parent)
 };
 
 
-int Node::getNumberOfNeighbours(){
-    return 0; //TODO implement
+bool Node::isNeighbour (Element *element1, Element *element2)
+{
+    std::set<uint64_t> element1Dofs(element1->dofs.cbegin(), element1->dofs.cend());
+    std::set<uint64_t> element2Dofs(element2->dofs.cbegin(), element2->dofs.cend());
+
+    if (element1Dofs.empty() || element2Dofs.empty()) {
+        return false;
+    }
+    
+    auto element1It = element1Dofs.begin();
+    auto element1ItEnd = element1Dofs.end();
+
+    auto element2It = element2Dofs.begin();
+    auto element2ItEnd = element2Dofs.end();
+
+    // sets are internally sorted, so if the beginning of the one is greater
+    // than end of other - we can finish
+    if ((*element2It > *element1Dofs.rbegin()) || (*element1It > *element2Dofs.rbegin())) {
+        return false;
+    }
+
+    while (element1It != element1ItEnd && element2It != element2ItEnd) {
+        if (*element1It == *element2It) {
+            return true; // common element? yes, we are neighbours!
+        } else if (*element1It > *element2It) {
+            ++element2It;
+        } else {
+            ++element1It;
+        }
+    }
+    return false; // no common elements => no neighbourhood
+};
+
+
+int Node::getNumberOfNeighbours(std::vector<Element *> * allElements){
+    int common = 0;
+    for (Element * e1 : (*allElements)) {
+        for (Element * e2 : this->mergedElements) {
+            if (Node::isNeighbour(e1, e2)){
+                common++;
+            }
+        }
+    }
+    common -= this->mergedElements.size();
+    return common;
+}
+
+void Node::rebuildElements(){
+    this->clearDofs();
+    this->clearElements();
+    
+    for (Element * e : this->getLeft()->getElements()){
+        this->addElement(e);
+    }
+    for (Element * e : this->getRight()->getElements()){
+        this->addElement(e);
+    }
 }

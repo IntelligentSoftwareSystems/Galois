@@ -27,10 +27,10 @@ class Analysis {
                     std::map<uint64_t, std::map<vertex, uint64_t>> &levelVertices,
                     std::map<uint64_t, std::map<edge, uint64_t>> &levelEdges, uint64_t level);
         static void mergeAnaliser(Node *node);
-	static int rotate(Node * root, Node * parent);
         
-        static void findLeftRotationChild(Node ** _parent, Node ** _root, bool child1, bool child2, Node ** _child, Node ** _otherChild);
-        static void findRightRotationChild(Node ** _parent, Node ** _root, bool child1, bool child2, Node ** _child, Node ** _otherChild);
+	static int rotate(Node * root, Node * parent, Mesh * mesh);
+        static void findLeftRotationChild(Node ** _parent, Node ** _root, bool child1, bool child2, Node ** _child, Node ** _otherChild, Mesh * mesh);
+        static void findRightRotationChild(Node ** _parent, Node ** _root, bool child1, bool child2, Node ** _child, Node ** _otherChild, Mesh * mesh);
         static Node * leftRotation(Node ** _parent, Node ** _root, bool child1, bool child2, Node ** _child, Node ** _otherChild);
         static Node * rightRotation(Node ** _parent, Node ** _root, bool child1, bool child2, Node ** _child, Node ** _otherChild);
         
