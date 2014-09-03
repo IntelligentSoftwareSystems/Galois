@@ -516,12 +516,7 @@ static inline void do_all_bs_impl(const RangeTy& range, const FnsTy& fns, InitFn
   typedef Executor<FilteredItemsVector, FnsTy, InitialWork> Work;
 
   Work W(fns, InitialWork(range, initFn), loopname);
-
-  assert(!inGaloisForEach);
-
-  inGaloisForEach = true;
   getSystemThreadPool().run(activeThreads, std::ref(W));
-  inGaloisForEach = false;
 }
 
 } // end Anonymous

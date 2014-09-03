@@ -27,39 +27,31 @@
 #ifndef GALOIS_RUNTIME_EXECUTOR_ONEACH_H
 #define GALOIS_RUNTIME_EXECUTOR_ONEACH_H
 
+#include "Galois/Threads.h"
 #include "Galois/Runtime/ll/TID.h"
 #include "Galois/Runtime/ll/gio.h"
-
 #include "Galois/Runtime/ThreadPool.h"
 
 namespace Galois {
 namespace Runtime {
 
-extern unsigned int activeThreads;
-extern bool inGaloisForEach;
-
-namespace detail {
+namespace {
 
 template<typename FunctionTy>
-struct WOnEach {
+struct OnEachExecutor {
   const FunctionTy& origFunction;
-  explicit WOnEach(const FunctionTy& f): origFunction(f) { }
+  explicit OnEachExecutor(const FunctionTy& f): origFunction(f) { }
   void operator()(void) {
     FunctionTy fn(origFunction);
     fn(LL::getTID(), activeThreads);   
   }
 };
 
-} // end namespace detail
+}
 
 template<typename FunctionTy>
 void on_each_impl(const FunctionTy& fn, const char* loopname = nullptr) {
-  if (inGaloisForEach)
-    GALOIS_DIE("Nested parallelism not supported");
-  
-  inGaloisForEach = true;
-  getSystemThreadPool().run(activeThreads, detail::WOnEach<FunctionTy>(fn));
-  inGaloisForEach = false;
+  getSystemThreadPool().run(activeThreads, OnEachExecutor<FunctionTy>(fn));
 }
 
 } // end namespace Runtime

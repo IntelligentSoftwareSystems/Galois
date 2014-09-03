@@ -1336,13 +1336,8 @@ bool Executor<OptionsTy>::commitLoop(ThreadLocalData& tld)
 template<typename RangeTy, typename WorkTy>
 static inline void for_each_det_impl(const RangeTy& range, WorkTy& W) {
   W.preprocess(range.begin(), range.end());
-
-  assert(!inGaloisForEach);
-
-  inGaloisForEach = true;
   auto init = std::bind(&WorkTy::template AddInitialWork<RangeTy>, std::ref(W), std::ref(range));
   getSystemThreadPool().run(activeThreads, std::ref(init), std::ref(getSystemBarrier()), std::ref(W));
-  inGaloisForEach = false;
 }
 
 

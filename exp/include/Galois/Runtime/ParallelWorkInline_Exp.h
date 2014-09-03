@@ -20,7 +20,7 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  *
- * @author Donald Nguyen <ddn@cs.utexas.edu>
+ * @author Amber Hassaan <ahassaan@ices.utexas.edu>
  */
 #ifndef GALOIS_RUNTIME_PARALLELWORKINLINE_EXP_H
 #define GALOIS_RUNTIME_PARALLELWORKINLINE_EXP_H
@@ -485,13 +485,6 @@ public:
 
 template <typename R, typename OpFunc, typename PreFunc>
 void for_each_bs (const R& range, const OpFunc& opFunc, const PreFunc& preFunc, const char* loopname=nullptr) {
-
-  if (inGaloisForEach)
-    GALOIS_DIE("Nested for_each not supported");
-  
-
-  inGaloisForEach = true;
-
   typedef typename R::value_type T;
 
   typedef Exp::BSInlineExecutor<T, OpFunc, PreFunc> Executor;
@@ -503,8 +496,6 @@ void for_each_bs (const R& range, const OpFunc& opFunc, const PreFunc& preFunc, 
     std::bind (&Executor::template AddInitialWork<R>, std::ref (e), range),
     std::ref (barrier),
     std::ref (e));
-
-  inGaloisForEach = false;
 }
 
 

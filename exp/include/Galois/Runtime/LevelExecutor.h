@@ -475,19 +475,10 @@ void for_each_ordered_level (const R& range, const KeyFn& keyFn, const KeyCmp& k
   Exec_ty exec (keyFn, kcmp, nhVisit, opFunc, loopname);
   Barrier& barrier = getSystemBarrier ();
 
-  if (inGaloisForEach) {
-    GALOIS_DIE ("Nested parallelism not supported yet");
-  }
-
-  inGaloisForEach = true;
-
   getSystemThreadPool ().run (Galois::getActiveThreads (),
     std::bind (&Exec_ty::template fill_initial<R>, std::ref (exec), range),
     std::ref (barrier),
     std::ref (exec));
-
-  inGaloisForEach = false;
-
 }
 
 } // end namespace Runtime

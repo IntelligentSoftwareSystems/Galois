@@ -41,7 +41,7 @@
 namespace Galois {
 namespace Runtime {
 
-namespace detail {
+namespace {
 
 // TODO(ddn): Tune stealing. DMR suffers when stealing is on
 // TODO: add loopname + stats
@@ -148,26 +148,20 @@ public:
   }
 };
 
-} // end namespace detail
+}
 
 template<typename RangeTy, typename FunctionTy>
 void do_all_impl(const RangeTy& range, const FunctionTy& f, const char* loopname = 0, bool steal = false) {
-  if (inGaloisForEach) {
-    std::for_each(range.begin(), range.end(), f);
+  if (steal) {
+    DoAllWork<FunctionTy, RangeTy> W(f, range, loopname);
+    getSystemThreadPool().run(activeThreads, std::ref(W));
   } else {
-    inGaloisForEach = true;
-    if (steal) {
-      detail::DoAllWork<FunctionTy, RangeTy> W(f, range, loopname);
-      getSystemThreadPool().run(activeThreads, std::ref(W));
-    } else {
-      getSystemThreadPool().run(activeThreads, [&f, &range] () {
-          auto begin = range.local_begin();
-          auto end = range.local_end();
-          while (begin != end)
-            f(*begin++);
-        });
-    }
-    inGaloisForEach = false;
+    getSystemThreadPool().run(activeThreads, [&f, &range] () {
+        auto begin = range.local_begin();
+        auto end = range.local_end();
+        while (begin != end)
+          f(*begin++);
+      });
   }
 }
 
