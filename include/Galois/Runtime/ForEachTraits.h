@@ -36,14 +36,14 @@ namespace {
 template<typename FunctionTy>
 class ForEachTraits {
   // special_decay of std::ref(t) is T& so apply twice
-  typedef typename special_decay<typename special_decay<FunctionTy>::type>::type Fn;
+  typedef typename DEPRECATED::special_decay<typename DEPRECATED::special_decay<FunctionTy>::type>::type Fn;
 public:
   enum {
-    NeedsStats = !Galois::does_not_need_stats<Fn>::value,
-    NeedsBreak = Galois::needs_parallel_break<Fn>::value,
-    NeedsPush = !Galois::does_not_need_push<Fn>::value,
-    NeedsPIA = Galois::needs_per_iter_alloc<Fn>::value,
-    NeedsAborts = !Galois::does_not_need_aborts<Fn>::value
+    NeedsStats = !Galois::DEPRECATED::does_not_need_stats<Fn>::value,
+    NeedsBreak = Galois::DEPRECATED::needs_parallel_break<Fn>::value,
+    NeedsPush = !Galois::DEPRECATED::does_not_need_push<Fn>::value,
+    NeedsPIA = Galois::DEPRECATED::needs_per_iter_alloc<Fn>::value,
+    NeedsAborts = !Galois::DEPRECATED::does_not_need_aborts<Fn>::value
   };
 };
 

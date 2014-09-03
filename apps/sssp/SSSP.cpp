@@ -485,12 +485,13 @@ struct AsyncAlgoPP {
   }
 };
 
-namespace Galois {
+namespace Galois { namespace DEPRECATED {
 template<>
 struct does_not_need_aborts<AsyncAlgo<true>::Process> : public boost::true_type {};
 }
+}
 
-static_assert(Galois::does_not_need_aborts<AsyncAlgo<true>::Process>::value, "Oops");
+static_assert(Galois::DEPRECATED::does_not_need_aborts<AsyncAlgo<true>::Process>::value, "Oops");
 
 template<typename Algo>
 void run(bool prealloc = true) {

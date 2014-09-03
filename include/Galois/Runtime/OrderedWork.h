@@ -33,8 +33,8 @@ namespace Runtime {
 
 template <typename NhFunc, typename OpFunc>
 struct OrderedTraits {
-  static const bool NeedsPush = !Galois::does_not_need_push<OpFunc>::value;
-  static const bool HasFixedNeighborhood = Galois::has_fixed_neighborhood<NhFunc>::value;
+  static const bool NeedsPush = !Galois::DEPRECATED::does_not_need_push<OpFunc>::value;
+  static const bool HasFixedNeighborhood = Galois::DEPRECATED::has_fixed_neighborhood<NhFunc>::value;
 };
 
 

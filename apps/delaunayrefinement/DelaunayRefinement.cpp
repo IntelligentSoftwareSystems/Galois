@@ -79,7 +79,7 @@ struct Process {
     LocalState(Process<Version>& self, Galois::PerIterAllocTy& alloc): cav(graph, alloc) { }
   };
   typedef LocalState GaloisDeterministicLocalState;
-  static_assert(Galois::has_deterministic_local_state<Process>::value, "Oops");
+  static_assert(Galois::DEPRECATED::has_deterministic_local_state<Process>::value, "Oops");
 
   void operator()(GNode item, Galois::UserContext<GNode>& ctx) {
     if (!graph->containsNode(item, Galois::MethodFlag::ALL))

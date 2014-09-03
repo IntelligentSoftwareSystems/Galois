@@ -212,7 +212,7 @@ struct Process {
     LocalState(Process<Version>& self, Galois::PerIterAllocTy& alloc): cav(*graph, alloc) { }
   };
   typedef LocalState GaloisDeterministicLocalState;
-  static_assert(Galois::has_deterministic_local_state<Process>::value, "Oops");
+  static_assert(Galois::DEPRECATED::has_deterministic_local_state<Process>::value, "Oops");
 
   //! Parallel operator
   void operator()(Point* p, Galois::UserContext<Point*>& ctx) {

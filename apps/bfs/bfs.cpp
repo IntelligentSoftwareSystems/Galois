@@ -540,7 +540,7 @@ struct DeterministicAlgo {
     typedef int tt_has_fixed_neighborhood;
     static_assert(Galois::has_fixed_neighborhood<Process>::value, "Oops");
     typedef int tt_needs_per_iter_alloc; // For LocalState
-    static_assert(Galois::needs_per_iter_alloc<Process>::value, "Oops");
+    static_assert(Galois::DEPRECATED::needs_per_iter_alloc<Process>::value, "Oops");
 
     Graph& graph;
 
@@ -553,12 +553,12 @@ struct DeterministicAlgo {
       LocalState(Process& self, Galois::PerIterAllocTy& alloc): pending(alloc) { }
     };
     typedef LocalState GaloisDeterministicLocalState;
-    static_assert(Galois::has_deterministic_local_state<Process>::value, "Oops");
+    static_assert(Galois::DEPRECATED::has_deterministic_local_state<Process>::value, "Oops");
 
     uintptr_t galoisDeterministicId(const WorkItem& item) const {
       return item.first;
     }
-    static_assert(Galois::has_deterministic_id<Process>::value, "Oops");
+    static_assert(Galois::DEPRECATED::has_deterministic_id<Process>::value, "Oops");
 
     void build(const WorkItem& item, typename LocalState::Pending* pending) const {
       GNode n = item.first;

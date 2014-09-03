@@ -32,6 +32,7 @@
 #include "Galois/TwoLevelIteratorA.h"
 #include "Galois/ParallelSTL/ParallelSTL.h"
 #include "Galois/Runtime/ll/gio.h"
+#include "Galois/Runtime/ForEachTraits.h"
 #include "Galois/Runtime/mm/Mem.h"
 
 #include <boost/iterator/iterator_facade.hpp>
@@ -299,11 +300,11 @@ struct Options {
   static const bool needsStats = ForEachTraits<function1_type>::NeedsStats || ForEachTraits<function2_type>::NeedsStats;
   static const bool needsPush = ForEachTraits<function1_type>::NeedsPush || ForEachTraits<function2_type>::NeedsPush;
   static const bool needsBreak = ForEachTraits<function1_type>::NeedsBreak || ForEachTraits<function2_type>::NeedsBreak;
-  static const bool hasBreak = has_deterministic_parallel_break<function1_type>::value;
-  static const bool hasId = has_deterministic_id<function1_type>::value;
-  static const bool useLocalState = has_deterministic_local_state<function1_type>::value;
+  static const bool hasBreak = DEPRECATED::has_deterministic_parallel_break<function1_type>::value;
+  static const bool hasId = DEPRECATED::has_deterministic_id<function1_type>::value;
+  static const bool useLocalState = DEPRECATED::has_deterministic_local_state<function1_type>::value;
   // TODO enable when working better, still ~2X slower than implicit version on bfs
-  static const bool hasFixedNeighborhood = has_fixed_neighborhood<function1_type>::value && false;
+  static const bool hasFixedNeighborhood = DEPRECATED::has_fixed_neighborhood<function1_type>::value && false;
 
   static const int ChunkSize = 32;
   static const unsigned InitialNumRounds = 100;
