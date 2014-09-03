@@ -25,13 +25,15 @@
 
 #include "Galois/config.h"
 #include "Galois/FlatMap.h"
+#include "Galois/Runtime/Barrier.h"
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/Termination.h"
 #include "Galois/WorkList/Chunked.h"
 #include "Galois/WorkList/WorkListHelpers.h"
 
-#include GALOIS_CXX11_STD_HEADER(type_traits)
+#include <deque>
 #include <limits>
+#include <type_traits>
 
 namespace Galois {
 namespace WorkList {
@@ -54,10 +56,9 @@ protected:
     std::deque<std::pair<Index,T>> stored;
   };
 
-  Runtime::TerminationDetection& term;
   Runtime::Barrier& barrier;
 
-  OrderedByIntegerMetricData(): term(Runtime::getSystemTermination()), barrier(Runtime::getSystemBarrier()) { }
+  OrderedByIntegerMetricData(): barrier(Runtime::getSystemBarrier()) { }
 
   bool hasStored(ThreadData& p, Index idx) {
     for (auto& e : p.stored) {
@@ -336,7 +337,7 @@ public:
 
     for (unsigned i = 0; i < Runtime::activeThreads; ++i) {
       ThreadData& o = *data.getRemote(i);
-      if (curIndex > o.curIndex) {
+      if (o.hasWork && o.curIndex < curIndex) {
         curIndex = o.curIndex;
         C = o.current;
       }
