@@ -52,7 +52,7 @@ class BilliardsLevelExec: public Billiards {
     VisitNhood (Graph& graph, VecNodes& nodes): graph (graph), nodes (nodes) {}
 
     template <typename C>
-    void operator () (const Event& e, C& ctx) {
+    void operator () (const Event& e, C& ctx) const {
 
       const Ball& b1 = e.getBall ();
       assert (b1.getID () < nodes.size ());
@@ -90,7 +90,7 @@ class BilliardsLevelExec: public Billiards {
 
 
     template <typename C>
-    void operator () (const Event& e, C& ctx) {
+    void operator () (const Event& e, C& ctx) const {
 
       addList.get ().clear ();
 

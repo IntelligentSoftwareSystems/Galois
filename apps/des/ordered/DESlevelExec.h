@@ -105,7 +105,7 @@ class DESlevelExec:
     {}
 
     template <typename C>
-    void operator () (const Event_ty& event, C& ctx) {
+    void operator () (const Event_ty& event, C& ctx) const {
 
       // std::cout << ">>> Processing: " << event.detailedString () << std::endl;
 
