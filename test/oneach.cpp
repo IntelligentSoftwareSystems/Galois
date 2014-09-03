@@ -21,11 +21,11 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  */
 
-#include "Galois/Runtime/Executor_OnEach.h"
+#include "Galois/Galois.h"
 
 #include <iostream>
 
 int main(int argc, char** argv) {
-  Galois::Runtime::on_each_impl([] (int t, int num) { std::cout << t << "," << num << "\n"; }, "simple loop");
+  Galois::on_each([] (int t, int num) { std::cout << t << "," << num << "\n"; }, Galois::loopname("simple loop"));
   return 0;
 }
