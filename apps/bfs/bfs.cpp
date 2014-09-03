@@ -33,9 +33,6 @@
 #include "Galois/Graph/LCGraph.h"
 #include "Galois/Graph/TypeTraits.h"
 #include "Galois/ParallelSTL/ParallelSTL.h"
-#ifdef GALOIS_USE_EXP
-#include "Galois/Runtime/ParallelWorkInline.h"
-#endif
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 
