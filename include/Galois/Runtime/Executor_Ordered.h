@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2014, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -22,24 +22,24 @@
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#ifndef GALOIS_RUNTIME_ORDERED_WORK_H
-#define GALOIS_RUNTIME_ORDERED_WORK_H
-
-#include "Galois/Runtime/DeterministicWork.h"
-//#include "Galois/Runtime/LCordered.h"
+#ifndef GALOIS_RUNTIME_EXECUTOR_ORDERED_H
+#define GALOIS_RUNTIME_EXECUTOR_ORDERED_H
 
 namespace Galois {
 namespace Runtime {
 
+// TODO(ddn): Pull in and integrate in executors from exp
+
+#if 0
 template <typename NhFunc, typename OpFunc>
 struct OrderedTraits {
   static const bool NeedsPush = !Galois::DEPRECATED::does_not_need_push<OpFunc>::value;
   static const bool HasFixedNeighborhood = Galois::DEPRECATED::has_fixed_neighborhood<NhFunc>::value;
 };
-
+#endif
 
 template <typename Iter, typename Cmp, typename NhFunc, typename OpFunc>
-void for_each_ordered_impl (Iter beg, Iter end, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const char* loopname) {
+void for_each_ordered_impl(Iter beg, Iter end, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const char* loopname) {
 #if 0
   if (!OrderedTraits<NhFunc, OpFunc>::NeedsPush && OrderedTraits<NhFunc, OpFunc>::HasFixedNeighborhood) {
     // TODO: Remove-only/DAG executor
@@ -56,7 +56,7 @@ void for_each_ordered_impl (Iter beg, Iter end, const Cmp& cmp, const NhFunc& nh
 
 
 template <typename Iter, typename Cmp, typename NhFunc, typename OpFunc, typename StableTest>
-void for_each_ordered_impl (Iter beg, Iter end, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const StableTest& stabilityTest, const char* loopname) {
+void for_each_ordered_impl(Iter beg, Iter end, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const StableTest& stabilityTest, const char* loopname) {
 #if 0
   if (!OrderedTraits<NhFunc, OpFunc>::NeedsPush && OrderedTraits<NhFunc, OpFunc>::HasFixedNeighborhood) {
     GALOIS_DIE("no-adds + fixed-neighborhood == stable-source");
@@ -75,4 +75,4 @@ void for_each_ordered_impl (Iter beg, Iter end, const Cmp& cmp, const NhFunc& nh
 } // end namespace Runtime
 } // end namespace Galois
 
-#endif // GALOIS_RUNTIME_ORDERED_WORK_H
+#endif

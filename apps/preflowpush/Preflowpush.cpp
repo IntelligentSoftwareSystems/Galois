@@ -262,14 +262,15 @@ void reduceCapacity(const Graph::edge_iterator& ii, const GNode& src, const GNod
 
 template<DetAlgo version,bool useCAS=true>
 struct UpdateHeights {
-  //typedef int tt_does_not_need_aborts;
-  typedef int tt_needs_per_iter_alloc; // For LocalState
 
   struct LocalState {
     LocalState(UpdateHeights<version,useCAS>& self, Galois::PerIterAllocTy& alloc) { }
   };
-  typedef LocalState GaloisDeterministicLocalState;
-  static_assert(Galois::DEPRECATED::has_deterministic_local_state<UpdateHeights>::value, "Oops");
+
+  typedef std::tuple<
+    Galois::needs_per_iter_alloc<>,
+    Galois::has_deterministic_local_state<LocalState>
+  > function_traits;
 
   //struct IdFn {
   //  unsigned long operator()(const GNode& item) const {
@@ -362,6 +363,8 @@ struct FindWork {
 
 template<typename IncomingWL>
 void globalRelabel(IncomingWL& incoming) {
+  typedef Galois::WorkList::Deterministic<> DWL;
+
   Galois::StatTimer T1("ResetHeightsTime");
   T1.start();
   Galois::do_all_local(app.graph, ResetHeights(), Galois::loopname("ResetHeights"));
@@ -373,16 +376,20 @@ void globalRelabel(IncomingWL& incoming) {
   switch (detAlgo) {
     case nondet:
 #ifdef GALOIS_USE_EXP
-      Galois::for_each(app.sink, UpdateHeights<nondet>(), Galois::loopname("UpdateHeights"), Galois::wl<Galois::WorkList::BulkSynchronousInline>());
+      Galois::for_each(app.sink, UpdateHeights<nondet>(), Galois::loopname("UpdateHeights"), Galois::wl<Galois::WorkList::BulkSynchronousInline<>>());
 #else
       Galois::for_each(app.sink, UpdateHeights<nondet>(), Galois::loopname("UpdateHeights"));
 #endif
       break;
     case detBase:
-      Galois::for_each_det(app.sink, UpdateHeights<detBase>(), "UpdateHeights");
+      Galois::for_each(app.sink, UpdateHeights<detBase>(), 
+          Galois::wl<DWL>(),
+          Galois::loopname("UpdateHeights"));
       break;
     case detDisjoint:
-      Galois::for_each_det(app.sink, UpdateHeights<detDisjoint>(), "UpdateHeights");
+      Galois::for_each(app.sink, UpdateHeights<detDisjoint>(),
+          Galois::wl<DWL>(),
+          Galois::loopname("UpdateHeights"));
       break;
     default: std::cerr << "Unknown algorithm" << detAlgo << "\n"; abort();
   }
@@ -506,30 +513,39 @@ struct Counter {
 
 template<DetAlgo version>
 struct Process {
-  typedef int tt_needs_parallel_break;
-  typedef int tt_needs_per_iter_alloc; // For LocalState
-
   struct LocalState {
     LocalState(Process<version>& self, Galois::PerIterAllocTy& alloc) { }
   };
-  typedef LocalState GaloisDeterministicLocalState;
-  static_assert(Galois::DEPRECATED::has_deterministic_local_state<Process>::value, "Oops");
 
-  uintptr_t galoisDeterministicId(const GNode& item) const {
-    return app.graph.getData(item, Galois::MethodFlag::NONE).id;
-  }
-  static_assert(Galois::DEPRECATED::has_deterministic_id<Process>::value, "Oops");
-
-  bool galoisDeterministicParallelBreak() {
-    if (app.global_relabel_interval > 0 && counter.accum.reduce() >= app.global_relabel_interval) {
-      app.should_global_relabel = true;
-      return true;
+  struct DeterministicId {
+    uintptr_t operator()(const GNode& item) const {
+      return app.graph.getData(item, Galois::MethodFlag::NONE).id;
     }
-    return false;
+  };
+
+  struct ParallelBreak {
+    Process<version>& self;
+    bool operator()() {
+      if (app.global_relabel_interval > 0 && self.counter.accum.reduce() >= app.global_relabel_interval) {
+        app.should_global_relabel = true;
+        return true;
+      }
+      return false;
+    }
+  };
+
+  ParallelBreak getParallelBreak() {
+    return ParallelBreak { *this };
   }
-  static_assert(Galois::DEPRECATED::has_deterministic_parallel_break<Process>::value, "Oops");
 
   Counter& counter;
+
+  typedef std::tuple<
+    Galois::needs_parallel_break<>,
+    Galois::needs_per_iter_alloc<>,
+    Galois::has_deterministic_local_state<LocalState>,
+    Galois::has_deterministic_id<DeterministicId>
+  > function_traits;
 
   Process(Counter& c): counter(c) { }
 
@@ -561,7 +577,9 @@ struct Process {
 
 template<>
 struct Process<nondet> {
-  typedef int tt_needs_parallel_break;
+  typedef std::tuple<
+    Galois::needs_parallel_break<>
+  > function_traits;
 
   Counter& counter;
   int limit;
@@ -722,6 +740,7 @@ void initializePreflow(C& initial) {
 }
 
 void run() {
+  typedef Galois::WorkList::Deterministic<> DWL;
   typedef Galois::WorkList::dChunkedFIFO<16> Chunk;
   typedef Galois::WorkList::OrderedByIntegerMetric<Indexer,Chunk> OBIM;
 
@@ -741,10 +760,24 @@ void run() {
         }
         break;
       case detBase:
-        Galois::for_each_det(initial.begin(), initial.end(), Process<detBase>(counter), "Discharge");
+        {
+          Process<detBase> fn(counter);
+          Galois::for_each_local(initial,
+              fn, 
+              Galois::loopname("Discharge"),
+              Galois::wl<DWL>(),
+              Galois::make_trait_with_args<Galois::has_deterministic_parallel_break>(fn.getParallelBreak()));
+        }
         break;
       case detDisjoint:
-        Galois::for_each_det(initial.begin(), initial.end(), Process<detDisjoint>(counter), "Discharge");
+        {
+          Process<detDisjoint> fn(counter);
+          Galois::for_each_local(initial,
+              fn, 
+              Galois::loopname("Discharge"),
+              Galois::wl<DWL>(),
+              Galois::make_trait_with_args<Galois::has_deterministic_parallel_break>(fn.getParallelBreak()));
+        }
         break;
       default: std::cerr << "Unknown algorithm" << detAlgo << "\n"; abort();
     }

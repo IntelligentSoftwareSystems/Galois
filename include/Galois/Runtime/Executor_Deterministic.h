@@ -22,8 +22,8 @@
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#ifndef GALOIS_RUNTIME_DETERMINISTICWORK_H
-#define GALOIS_RUNTIME_DETERMINISTICWORK_H
+#ifndef GALOIS_RUNTIME_EXECUTOR_DETERMINISTIC_H
+#define GALOIS_RUNTIME_EXECUTOR_DETERMINISTIC_H
 
 #include "Galois/config.h"
 #include "Galois/Bag.h"
@@ -31,19 +31,29 @@
 #include "Galois/Threads.h"
 #include "Galois/TwoLevelIteratorA.h"
 #include "Galois/ParallelSTL/ParallelSTL.h"
-#include "Galois/Runtime/ll/gio.h"
+#include "Galois/Runtime/Barrier.h"
+#include "Galois/Runtime/Executor_ForEach.h"
 #include "Galois/Runtime/ForEachTraits.h"
+#include "Galois/Runtime/LoopStatistics.h"
+#include "Galois/Runtime/Range.h"
+#include "Galois/Runtime/Support.h"
+#include "Galois/Runtime/Termination.h"
+#include "Galois/Runtime/UserContextAccess.h"
+#include "Galois/Runtime/ll/gio.h"
 #include "Galois/Runtime/mm/Mem.h"
+#include "Galois/WorkList/WorkList.h"
 
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/iterator/transform_iterator.hpp>
 #include <boost/iterator/counting_iterator.hpp>
 
-#include GALOIS_CXX11_STD_HEADER(type_traits)
+#include <type_traits>
 #include <deque>
 #include <queue>
 
 // TODO deterministic hash
+// TODO deterministic hash: only give ids to window
+// TODO detect and fail if using releasable objects
 // TODO fixed neighborhood: cyclic scheduling 
 // TODO fixed neighborhood: reduce list contention
 // TODO fixed neighborhood: profile, reuse graph 
@@ -53,34 +63,6 @@ namespace Runtime {
 namespace DeterministicImpl {
 
 extern __thread MM::SizedHeapFactory::SizedHeap* listHeap;
-
-template<bool Enabled>
-class LoopStatistics {
-  unsigned long conflicts;
-  unsigned long iterations;
-  const char* loopname;
-
-public:
-  explicit LoopStatistics(const char* ln) :conflicts(0), iterations(0), loopname(ln) { }
-  ~LoopStatistics() {
-    reportStat(loopname, "Conflicts", conflicts);
-    reportStat(loopname, "Iterations", iterations);
-  }
-  inline void inc_iterations() {
-    ++iterations;
-  }
-  inline void inc_conflicts() {
-    ++conflicts;
-  }
-};
-
-template <>
-class LoopStatistics<false> {
-public:
-  explicit LoopStatistics(const char* ln) {}
-  inline void inc_iterations() const { }
-  inline void inc_conflicts() const { }
-};
 
 template<typename T>
 struct DItem {
@@ -199,8 +181,6 @@ public:
 template<typename OptionsTy>
 using DeterministicContext = DeterministicContextBase<OptionsTy, OptionsTy::hasFixedNeighborhood>;
 
-namespace {
-
 template<typename T>
 struct DNewItem { 
   T val;
@@ -291,30 +271,60 @@ struct FIFO {
   }
 };
 
-template<typename T, typename Function1Ty, typename Function2Ty>
-struct Options {
+template<typename T, typename FunctionTy, typename ArgsTy>
+struct OptionsCommon {
   typedef T value_type;
-  typedef Function1Ty function1_type;
-  typedef Function2Ty function2_type;
+  typedef FunctionTy function2_type;
+  typedef ArgsTy args_type;
 
-  static const bool needsStats = ForEachTraits<function1_type>::NeedsStats || ForEachTraits<function2_type>::NeedsStats;
-  static const bool needsPush = ForEachTraits<function1_type>::NeedsPush || ForEachTraits<function2_type>::NeedsPush;
-  static const bool needsBreak = ForEachTraits<function1_type>::NeedsBreak || ForEachTraits<function2_type>::NeedsBreak;
-  static const bool hasBreak = DEPRECATED::has_deterministic_parallel_break<function1_type>::value;
-  static const bool hasId = DEPRECATED::has_deterministic_id<function1_type>::value;
-  static const bool useLocalState = DEPRECATED::has_deterministic_local_state<function1_type>::value;
+  static const bool needsStats = !exists_by_supertype<does_not_need_stats_tag, ArgsTy>::value;
+  static const bool needsPush = !exists_by_supertype<does_not_need_push_tag, ArgsTy>::value;
+  static const bool needsAborts = !exists_by_supertype<does_not_need_aborts_tag, ArgsTy>::value;
+  static const bool needsPia = exists_by_supertype<needs_per_iter_alloc_tag, ArgsTy>::value;
+  static const bool needsBreak = exists_by_supertype<needs_parallel_break_tag, ArgsTy>::value;
+
+  static const bool hasBreak = exists_by_supertype<has_deterministic_parallel_break_tag, ArgsTy>::value;
+  static const bool hasId = exists_by_supertype<has_deterministic_id_tag, ArgsTy>::value;
+
+  static const bool useLocalState = exists_by_supertype<has_deterministic_local_state_tag, ArgsTy>::value;
   // TODO enable when working better, still ~2X slower than implicit version on bfs
-  static const bool hasFixedNeighborhood = DEPRECATED::has_fixed_neighborhood<function1_type>::value && false;
+  static const bool hasFixedNeighborhood = exists_by_supertype<has_fixed_neighborhood_tag, ArgsTy>::value && false;
 
   static const int ChunkSize = 32;
   static const unsigned InitialNumRounds = 100;
   static const size_t MinDelta = ChunkSize * 40;
 
-  function1_type fn1;
   function2_type fn2;
+  args_type args;
 
-  Options(const function1_type& fn1, const function2_type& fn2): fn1(fn1), fn2(fn2) { }
+  OptionsCommon(const FunctionTy& f, ArgsTy a): fn2(f), args(a) { }
 };
+
+template<typename T, typename FunctionTy, typename ArgsTy, bool Enable>
+struct OptionsBase: public OptionsCommon<T, FunctionTy, ArgsTy> {
+  typedef OptionsCommon<T, FunctionTy, ArgsTy> SuperTy;
+  typedef FunctionTy function1_type;
+
+  function1_type fn1;
+
+  OptionsBase(const FunctionTy& f, ArgsTy a): SuperTy(f, a), fn1(f) { }
+};
+
+template<typename T, typename FunctionTy, typename ArgsTy>
+struct OptionsBase<T, FunctionTy, ArgsTy, true>: public OptionsCommon<T, FunctionTy, ArgsTy> {
+  typedef OptionsCommon<T, FunctionTy, ArgsTy> SuperTy;
+  typedef typename get_type_by_supertype<has_neighborhood_visitor_tag, ArgsTy>::type::type function1_type;
+
+  function1_type fn1;
+
+  OptionsBase(const FunctionTy& f, ArgsTy a):
+    SuperTy(f, a), 
+    fn1(get_by_supertype<has_neighborhood_visitor_tag>(a).value) { }
+};
+
+template<typename T, typename FunctionTy, typename ArgsTy>
+using Options = OptionsBase<T, FunctionTy, ArgsTy, exists_by_supertype<has_neighborhood_visitor_tag, ArgsTy>::value>;
+
 
 template<typename OptionsTy, bool Enable>
 class DAGManagerBase {
@@ -421,7 +431,7 @@ public:
         committed += 1;
         e.deallocLocalState(etld.facing);
         
-        if (ForEachTraits<typename OptionsTy::function2_type>::NeedsPIA && !OptionsTy::useLocalState)
+        if (OptionsTy::needsPia && !OptionsTy::useLocalState)
           etld.facing.resetAlloc();
 
         etld.facing.resetPushBuffer();
@@ -440,7 +450,7 @@ public:
       LL::asmPause();
     } while (!term.globalTermination());
 
-    if (ForEachTraits<typename OptionsTy::function2_type>::NeedsPIA && OptionsTy::useLocalState)
+    if (OptionsTy::needsPia && OptionsTy::useLocalState)
       etld.facing.resetAlloc();
 
     setThreadContext(0);
@@ -456,7 +466,7 @@ using DAGManager = DAGManagerBase<OptionsTy, OptionsTy::hasFixedNeighborhood>;
 template<typename OptionsTy, bool Enable>
 struct StateManagerBase {
   typedef typename OptionsTy::value_type value_type;
-  typedef typename OptionsTy::function1_type function_type;
+  typedef typename OptionsTy::function2_type function_type;
   void allocLocalState(UserContextAccess<value_type>&, function_type& self) { }
   void deallocLocalState(UserContextAccess<value_type>&) { }
   void saveLocalState(UserContextAccess<value_type>&, void*&) { }
@@ -483,8 +493,8 @@ struct StateManagerBase {
 template<typename OptionsTy>
 struct StateManagerBase<OptionsTy, true> {
   typedef typename OptionsTy::value_type value_type;
-  typedef typename OptionsTy::function1_type function_type;
-  typedef typename function_type::GaloisDeterministicLocalState LocalState;
+  typedef typename OptionsTy::function2_type function_type;
+  typedef typename get_type_by_supertype<has_deterministic_local_state_tag, typename OptionsTy::args_type>::type::type LocalState;
 
   void allocLocalState(UserContextAccess<value_type>& c, function_type& self) {
     void *p = c.data().getPerIterAlloc().allocate(sizeof(LocalState));
@@ -531,20 +541,25 @@ using StateManager = StateManagerBase<OptionsTy, OptionsTy::useLocalState>;
 
 template<typename OptionsTy, bool Enable>
 struct BreakManagerBase {
-  bool checkBreak(typename OptionsTy::function1_type&) { return false; }
+  bool checkBreak() { return false; }
+  BreakManagerBase(const OptionsTy&) { }
 };
 
 template<typename OptionsTy>
 class BreakManagerBase<OptionsTy, true> {
+  typedef typename get_type_by_supertype<has_deterministic_parallel_break_tag, typename OptionsTy::args_type>::type::type BreakFn;
+  BreakFn breakFn;
   Barrier& barrier;
   LL::CacheLineStorage<volatile long> done;
 
 public:
-  BreakManagerBase(): barrier(getSystemBarrier()) { }
+  BreakManagerBase(const OptionsTy& o): 
+    breakFn(get_by_supertype<has_deterministic_parallel_break_tag>(o.args).value),
+    barrier(getSystemBarrier()) { }
 
-  bool checkBreak(typename OptionsTy::function1_type& fn) {
+  bool checkBreak() {
     if (LL::getTID() == 0)
-      done.get() = fn.galoisDeterministicParallelBreak();
+      done.get() = breakFn();
     barrier.wait();
     return done.get();
   }
@@ -684,8 +699,30 @@ public:
 template<typename OptionsTy>
 using WindowManager = WindowManagerBase<OptionsTy, OptionsTy::hasFixedNeighborhood>;
 
+template<typename OptionsTy, bool Enable>
+struct IdManagerBase {
+  typedef typename OptionsTy::value_type value_type;
+  IdManagerBase(const OptionsTy&) { }
+  uintptr_t id(const value_type&) { return 0; }
+};
+
 template<typename OptionsTy>
-class NewWorkManager {
+class IdManagerBase<OptionsTy, true> {
+  typedef typename OptionsTy::value_type value_type;
+  typedef typename get_type_by_supertype<has_deterministic_id_tag, typename OptionsTy::args_type>::type::type IdFn;
+  IdFn idFn;
+
+public:
+  IdManagerBase(const OptionsTy& o):
+    idFn(get_by_supertype<has_deterministic_id_tag>(o.args).value) {}
+  uintptr_t id(const value_type& x) { return idFn(x); }
+};
+
+template<typename OptionsTy>
+using IdManager = IdManagerBase<OptionsTy, OptionsTy::hasId>;
+
+template<typename OptionsTy>
+class NewWorkManager: public IdManager<OptionsTy> {
   typedef typename OptionsTy::value_type value_type;
   typedef DItem<value_type> Item;
   typedef DNewItem<value_type> NewItem;
@@ -716,7 +753,6 @@ class NewWorkManager {
     ThreadLocalData(): alloc(&heap), newItems(alloc) { }
   };
 
-  const OptionsTy& options;
   IterAllocBaseTy heap;
   PerIterAllocTy alloc;
   PerThreadStorage<ThreadLocalData> data;
@@ -945,7 +981,7 @@ class NewWorkManager {
 
     mergeBuf.reserve(dist);
     for (; ii != ei; ++ii)
-      mergeBuf.emplace_back(*ii, options.fn1.galoisDeterministicId(*ii), 1);
+      mergeBuf.emplace_back(*ii, this->id(*ii), 1);
 
     ParallelSTL::sort(mergeBuf.begin(), mergeBuf.end());
 
@@ -953,10 +989,9 @@ class NewWorkManager {
     broadcastLimits(local);
   }
 
-
 public:
   NewWorkManager(const OptionsTy& o): 
-    options(o), alloc(&heap), mergeBuf(alloc), distributeBuf(alloc), barrier(getSystemBarrier()) 
+    IdManager<OptionsTy>(o), alloc(&heap), mergeBuf(alloc), distributeBuf(alloc), barrier(getSystemBarrier()) 
   {
     numActive = getActiveThreads();
   }
@@ -1006,7 +1041,7 @@ public:
   auto pushNew(const value_type& val, unsigned long parent, unsigned count) 
   -> typename std::enable_if<HasId, void>::type
   {
-    new_.push(NewItem(val, options.fn1.galoisDeterministicId(val), 1));
+    new_.push(NewItem(val, this->id(val), 1));
   }
 
   template<bool HasId = OptionsTy::hasId>
@@ -1040,7 +1075,8 @@ class Executor:
 
   // Truly thread-local
   struct ThreadLocalData: private boost::noncopyable {
-    OptionsTy options;
+    typename OptionsTy::function1_type fn1;
+    typename OptionsTy::function2_type fn2;
     LocalPendingWork localPending;
     UserContextAccess<value_type> facing;
     LoopStatistics<OptionsTy::needsStats> stat;
@@ -1051,10 +1087,10 @@ class Executor:
     size_t outerRounds;
     bool hasNewWork;
     ThreadLocalData(const OptionsTy& o, const char* loopname):
-      options(o), stat(loopname), rounds(0), outerRounds(0) { }
+      fn1(o.fn1), fn2(o.fn2), stat(loopname), rounds(0), outerRounds(0) { }
   };
 
-  const OptionsTy& options;
+  OptionsTy options;
   Barrier& barrier;
   WL worklists[2];
   PendingWork pending;
@@ -1076,8 +1112,12 @@ class Executor:
   }
 
 public:
-  Executor(const OptionsTy& o, const char* ln):
-    NewWorkManager<OptionsTy>(o), options(o), barrier(getSystemBarrier()), loopname(ln) 
+  Executor(const OptionsTy& o):
+    NewWorkManager<OptionsTy>(o), 
+    BreakManager<OptionsTy>(o),
+    options(o),
+    barrier(getSystemBarrier()),
+    loopname(get_by_supertype<loopname_tag>(o.args).value) 
   { 
     static_assert(!OptionsTy::needsBreak || OptionsTy::hasBreak,
         "need to use break function to break loop");
@@ -1086,14 +1126,14 @@ public:
   bool executeTask(ThreadLocalData& tld, Context* ctx);
 
   template<typename RangeTy>
-  void AddInitialWork(RangeTy range) {
+  void initThread(const RangeTy& range) {
     this->initializeDAGManager();
     this->addInitialWork(*this, range.begin(), range.end(), &worklists[1]);
   }
 
-  template<typename IterTy>
-  void preprocess(IterTy ii, IterTy ei) {
-    this->sortInitialWork(ii, ei);
+  template<typename RangeTy>
+  void init(const RangeTy& range) {
+    this->sortInitialWork(range.begin(), range.end());
   }
 
   void operator()() {
@@ -1160,7 +1200,7 @@ void Executor<OptionsTy>::go() {
     if (tld.hasNewWork)
       hasNewWork.get() = true;
 
-    if (this->checkBreak(tld.options.fn1))
+    if (this->checkBreak())
       break;
 
     this->calculateWindow(false);
@@ -1212,14 +1252,14 @@ bool Executor<OptionsTy>::pendingLoop(ThreadLocalData& tld)
     tld.stat.inc_iterations();
     setThreadContext(ctx);
 
-    this->allocLocalState(tld.facing, tld.options.fn1);
+    this->allocLocalState(tld.facing, tld.fn2);
     int result = 0;
 #ifdef GALOIS_USE_LONGJMP
     if ((result = setjmp(hackjmp)) == 0) {
 #else
     try {
 #endif
-      tld.options.fn1(ctx->item.val, tld.facing.data());
+      tld.fn1(ctx->item.val, tld.facing.data());
 #ifdef GALOIS_USE_LONGJMP
     } else { clearConflictLock(); }
 #else
@@ -1233,7 +1273,8 @@ bool Executor<OptionsTy>::pendingLoop(ThreadLocalData& tld)
       default: abort(); break;
     }
 
-    if (ForEachTraits<typename OptionsTy::function1_type>::NeedsPIA && !OptionsTy::useLocalState)
+    // TODO only needed if fn1 needs pia 
+    if (OptionsTy::needsPia && !OptionsTy::useLocalState)
       tld.facing.resetAlloc();
 
     if (commit || OptionsTy::hasFixedNeighborhood) {
@@ -1257,7 +1298,7 @@ bool Executor<OptionsTy>::executeTask(ThreadLocalData& tld, Context* ctx)
 #else
   try {
 #endif
-    tld.options.fn2(ctx->item.val, tld.facing.data());
+    tld.fn2(ctx->item.val, tld.facing.data());
 #ifdef GALOIS_USE_LONGJMP
   } else { clearConflictLock(); }
 #else
@@ -1314,7 +1355,7 @@ bool Executor<OptionsTy>::commitLoop(ThreadLocalData& tld)
 
     this->deallocLocalState(tld.facing);
     
-    if (ForEachTraits<typename OptionsTy::function2_type>::NeedsPIA && !OptionsTy::useLocalState)
+    if (OptionsTy::needsPia && !OptionsTy::useLocalState)
       tld.facing.resetAlloc();
 
     tld.facing.resetPushBuffer();
@@ -1322,7 +1363,7 @@ bool Executor<OptionsTy>::commitLoop(ThreadLocalData& tld)
     this->popContext(tld.localPending, pending);
   }
 
-  if (ForEachTraits<typename OptionsTy::function2_type>::NeedsPIA && OptionsTy::useLocalState)
+  if (OptionsTy::needsPia && OptionsTy::useLocalState)
     tld.facing.resetAlloc();
 
   setThreadContext(0);
@@ -1330,94 +1371,39 @@ bool Executor<OptionsTy>::commitLoop(ThreadLocalData& tld)
   return retval;
 }
 
-} // end namespace anonymous
-} // end namespace DeterministicImpl
-
-template<typename RangeTy, typename WorkTy>
-static inline void for_each_det_impl(const RangeTy& range, WorkTy& W) {
-  W.preprocess(range.begin(), range.end());
-  auto init = std::bind(&WorkTy::template AddInitialWork<RangeTy>, std::ref(W), std::ref(range));
-  getSystemThreadPool().run(activeThreads, std::ref(init), std::ref(getSystemBarrier()), std::ref(W));
+} 
 }
 
-
-} // end namespace Runtime
+namespace WorkList {
 
 /**
- * Deterministic execution with prefix operator.
- * The prefix of the operator should be exactly the same as the operator
- * but with execution returning at the failsafe point. The operator
- * should conform to a standard Galois unordered set operator {@link for_each()}.
- *
- * @param b begining of range of initial items
- * @param e end of range of initial items
- * @param prefix prefix of operator
- * @param fn operator
- * @param loopname string to identify loop in statistics output
+ * Deterministic execution. Operator should be cautious.
  */
-template<typename IterTy, typename Function1Ty, typename Function2Ty>
-static inline void for_each_det(IterTy b, IterTy e, const Function1Ty& prefix, const Function2Ty& fn, const char* loopname = 0) {
-  typedef Runtime::StandardRange<IterTy> Range;
-  typedef typename Range::value_type T;
-  typedef Runtime::DeterministicImpl::Options<T,Function1Ty,Function2Ty> OptionsTy;
-  typedef Runtime::DeterministicImpl::Executor<OptionsTy> WorkTy;
+template<typename T=int>
+struct Deterministic {
+  template<bool _concurrent>
+  struct rethread { typedef Deterministic<T> type; };
 
-  OptionsTy options(prefix, fn);
-  WorkTy W(options, loopname);
-  Runtime::for_each_det_impl(Runtime::makeStandardRange(b, e), W);
+  template<typename _T>
+  struct retype { typedef Deterministic<_T> type; };
+
+  typedef T value_type;
+};
+
 }
 
-/**
- * Deterministic execution with prefix operator.
- * The prefix of the operator should be exactly the same as the operator
- * but with execution returning at the failsafe point. The operator
- * should conform to a standard Galois unordered set operator {@link for_each()}.
- *
- * @param i initial item
- * @param prefix prefix of operator
- * @param fn operator
- * @param loopname string to identify loop in statistics output
- */
-template<typename T, typename Function1Ty, typename Function2Ty>
-static inline void for_each_det(T i, const Function1Ty& prefix, const Function2Ty& fn, const char* loopname = 0) {
-  T wl[1] = { i };
-  for_each_det(&wl[0], &wl[1], prefix, fn, loopname);
+namespace Runtime {
+
+template<class T, class FunctionTy, class ArgsTy>
+struct ForEachExecutor<WorkList::Deterministic<T>, FunctionTy, ArgsTy>:
+  public DeterministicImpl::Executor<DeterministicImpl::Options<T, FunctionTy, ArgsTy>>
+{
+  typedef DeterministicImpl::Options<T, FunctionTy, ArgsTy> OptionsTy;
+  typedef DeterministicImpl::Executor<OptionsTy> SuperTy;
+  ForEachExecutor(const FunctionTy& f, const ArgsTy& args): SuperTy(OptionsTy(f, args)) { }
+};
+
 }
 
-/**
- * Deterministic execution with single operator.
- * The operator fn is used both for the prefix computation and for the
- * continuation of computation, c.f., the prefix operator version which
- * uses two different functions. The operator can distinguish between
- * the two uses by querying {@link UserContext.getLocalState()}.
- *
- * @param b begining of range of initial items
- * @param e end of range of initial items
- * @param fn operator
- * @param loopname string to identify loop in statistics output
- */
-template<typename IterTy, typename FunctionTy>
-static inline void for_each_det(IterTy b, IterTy e, const FunctionTy& fn, const char* loopname = 0) {
-  for_each_det(b, e, fn, fn, loopname);
 }
-
-/**
- * Deterministic execution with single operator.
- * The operator fn is used both for the prefix computation and for the
- * continuation of computation, c.f., the prefix operator version which
- * uses two different functions. The operator can distinguish between
- * the two uses by querying {@link UserContext.getLocalState()}.
- *
- * @param i initial item
- * @param fn operator
- * @param loopname string to identify loop in statistics output
- */
-template<typename T, typename FunctionTy>
-static inline void for_each_det(T i, const FunctionTy& fn, const char* loopname = 0) {
-  T wl[1] = { i };
-  for_each_det(&wl[0], &wl[1], fn, fn, loopname);
-}
-
-} // end namespace Galois
-
 #endif

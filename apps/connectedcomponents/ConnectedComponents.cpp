@@ -526,7 +526,7 @@ struct BlockedAsyncAlgo {
   void operator()(Graph& graph) {
     Galois::InsertBag<WorkItem> items;
     Merge merge = { graph, items };
-    Galois::do_all_local(graph, merge, Galois::loopname("Initialize"), Galois::do_all_steal(false));
+    Galois::do_all_local(graph, merge, Galois::loopname("Initialize"));
     Galois::for_each_local(items, merge,
         Galois::loopname("Merge"), Galois::wl<Galois::WorkList::dChunkedFIFO<128> >());
   }

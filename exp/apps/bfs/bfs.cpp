@@ -471,9 +471,6 @@ struct BarrierExpAlgo {
 //! BFS using optimized flags and barrier scheduling 
 template<DetAlgo Version>
 struct DetBarrierAlgo {
-  typedef int tt_needs_per_iter_alloc; // For LocalState
-  static_assert(Galois::DEPRECATED::needs_per_iter_alloc<DetBarrierAlgo>::value, "Oops");
-
   std::string name() const { return "Parallel (Deterministic Barrier)"; }
   typedef std::pair<GNode,int> ItemTy;
 
@@ -482,17 +479,23 @@ struct DetBarrierAlgo {
     Pending pending;
     LocalState(DetBarrierAlgo<Version>& self, Galois::PerIterAllocTy& alloc): pending(alloc) { }
   };
-  typedef LocalState GaloisDeterministicLocalState;
-  static_assert(Galois::DEPRECATED::has_deterministic_local_state<DetBarrierAlgo>::value, "Oops");
 
-  uintptr_t galoisDeterministicId(const ItemTy& item) const {
-    return graph.getData(item.first, Galois::MethodFlag::NONE).id;
-  }
-  static_assert(Galois::DEPRECATED::has_deterministic_id<DetBarrierAlgo>::value, "Oops");
+  struct DeterministicId {
+    uintptr_t operator()(const ItemTy& item) const {
+      return graph.getData(item.first, Galois::MethodFlag::NONE).id;
+    }
+  };
+
+  typedef std::tuple<
+    Galois::needs_per_iter_alloc<>,
+    Galois::has_deterministic_local_state<LocalState>,
+    Galois::has_deterministic_id<DeterministicId>
+  > function_traits;
 
   void operator()(const GNode& source) const {
+    typedef Galois::WorkList::Deterministic<> DWL;
 #ifdef GALOIS_USE_EXP
-    typedef Galois::WorkList::BulkSynchronousInline WL;
+    typedef Galois::WorkList::BulkSynchronousInline<> WL;
 #else
   typedef Galois::WorkList::BulkSynchronous<Galois::WorkList::dChunkedLIFO<256> > WL;
 #endif
@@ -510,9 +513,9 @@ struct DetBarrierAlgo {
       case nondet: 
         Galois::for_each(initial.begin(), initial.end(), *this, Galois::wl<WL>()); break;
       case detBase:
-        Galois::for_each_det(initial.begin(), initial.end(), *this); break;
+        Galois::for_each(initial.begin(), initial.end(), *this, Galois::wl<DWL>()); break;
       case detDisjoint:
-        Galois::for_each_det(initial.begin(), initial.end(), *this); break;
+        Galois::for_each(initial.begin(), initial.end(), *this, Galois::wl<DWL>()); break;
       default: std::cerr << "Unknown algorithm " << Version << "\n"; abort();
     }
   }
@@ -765,7 +768,7 @@ int main(int argc, char **argv) {
   typedef BulkSynchronous<dChunkedLIFO<256> > BSWL;
 
 #ifdef GALOIS_USE_EXP
-  typedef BulkSynchronousInline BSInline;
+  typedef BulkSynchronousInline<> BSInline;
 #else
   typedef BSWL BSInline;
 #endif

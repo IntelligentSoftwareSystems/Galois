@@ -534,11 +534,6 @@ struct DeterministicAlgo {
   typedef std::pair<GNode,int> WorkItem;
 
   struct Process {
-    typedef int tt_has_fixed_neighborhood;
-    static_assert(Galois::has_fixed_neighborhood<Process>::value, "Oops");
-    typedef int tt_needs_per_iter_alloc; // For LocalState
-    static_assert(Galois::DEPRECATED::needs_per_iter_alloc<Process>::value, "Oops");
-
     Graph& graph;
 
     Process(Graph& g): graph(g) { }
@@ -549,13 +544,19 @@ struct DeterministicAlgo {
       Pending pending;
       LocalState(Process& self, Galois::PerIterAllocTy& alloc): pending(alloc) { }
     };
-    typedef LocalState GaloisDeterministicLocalState;
-    static_assert(Galois::DEPRECATED::has_deterministic_local_state<Process>::value, "Oops");
 
-    uintptr_t galoisDeterministicId(const WorkItem& item) const {
-      return item.first;
-    }
-    static_assert(Galois::DEPRECATED::has_deterministic_id<Process>::value, "Oops");
+    struct DeterministicId {
+      uintptr_t operator()(const WorkItem& item) const {
+        return item.first;
+      }
+    };
+
+    typedef std::tuple<
+      Galois::has_fixed_neighborhood<>,
+      Galois::has_deterministic_id<DeterministicId>,
+      Galois::has_deterministic_local_state<LocalState>,
+      Galois::needs_per_iter_alloc<>
+    > function_traits;
 
     void build(const WorkItem& item, typename LocalState::Pending* pending) const {
       GNode n = item.first;
@@ -625,16 +626,17 @@ struct DeterministicAlgo {
 
   void operator()(Graph& graph, const GNode& source) const {
 #ifdef GALOIS_USE_EXP
-    typedef Galois::WorkList::BulkSynchronousInline WL;
+    typedef Galois::WorkList::BulkSynchronousInline<> WL;
 #else
     typedef Galois::WorkList::BulkSynchronous<Galois::WorkList::dChunkedLIFO<256> > WL;
 #endif
+    typedef Galois::WorkList::Deterministic<> DWL;
     graph.getData(source).dist = 0;
 
     switch (Version) {
-      case DetAlgo::none: Galois::for_each(WorkItem(source, 1), Process(graph),Galois::wl<WL>()); break; 
-      case DetAlgo::base: Galois::for_each_det(WorkItem(source, 1), Process(graph)); break;
-      case DetAlgo::disjoint: Galois::for_each_det(WorkItem(source, 1), Process(graph)); break;
+      case DetAlgo::none: Galois::for_each(WorkItem(source, 1), Process(graph), Galois::wl<WL>()); break; 
+      case DetAlgo::base: Galois::for_each(WorkItem(source, 1), Process(graph), Galois::wl<DWL>()); break;
+      case DetAlgo::disjoint: Galois::for_each(WorkItem(source, 1), Process(graph), Galois::wl<DWL>()); break;
       default: GALOIS_DIE("Unknown algorithm ", int(Version));
     }
   }
@@ -700,7 +702,7 @@ int main(int argc, char **argv) {
   typedef BulkSynchronous<dChunkedLIFO<256> > BSWL;
 
 #ifdef GALOIS_USE_EXP
-  typedef BulkSynchronousInline BSInline;
+  typedef BulkSynchronousInline<> BSInline;
 #else
   typedef BSWL BSInline;
 #endif

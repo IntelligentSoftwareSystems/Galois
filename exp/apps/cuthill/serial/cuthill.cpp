@@ -1100,7 +1100,7 @@ int main(int argc, char **argv) {
   typedef BulkSynchronous<dChunkedLIFO<256> > BSWL;
 
 #ifdef GALOIS_USE_EXP
-  typedef BulkSynchronousInline BSInline;
+  typedef BulkSynchronousInline<> BSInline;
 #else
   typedef BSWL BSInline;
 #endif

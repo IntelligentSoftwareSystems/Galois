@@ -43,7 +43,6 @@
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
 #include "Galois/Galois.h"
-#include "Galois/GaloisUnsafe.h"
 #include "Galois/Graph/FileGraph.h"
 #include "Galois/Graph/LCGraph.h"
 #include "Galois/Runtime/WorkList.h"

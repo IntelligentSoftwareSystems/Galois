@@ -26,7 +26,6 @@
 #define GALOIS_RUNTIME_RANGE_H
 
 #include "Galois/gstl.h"
-
 #include "Galois/Runtime/ll/TID.h"
 
 #include <iterator>
@@ -43,6 +42,7 @@ class LocalRange {
   T* container;
 
 public:
+  typedef T container_type;
   typedef typename T::iterator iterator;
   typedef typename T::local_iterator local_iterator;
   typedef iterator block_iterator;
@@ -52,6 +52,9 @@ public:
 
   iterator begin() const { return container->begin(); }
   iterator end() const { return container->end(); }
+
+  // TODO fix constness of local containers
+  /* const */ T& get_container() const { return *container; }
 
   std::pair<block_iterator, block_iterator> block_pair() const {
     return Galois::block_range(begin(), end(), LL::getTID(), activeThreads);
@@ -74,6 +77,7 @@ inline LocalRange<T> makeLocalRange(T& obj) { return LocalRange<T>(obj); }
 template<typename IterTy>
 class StandardRange {
   IterTy ii, ei;
+
 public:
   typedef IterTy iterator;
   typedef iterator local_iterator;
@@ -98,7 +102,6 @@ public:
   local_iterator local_end() const { return block_end(); }
 
   block_iterator block_begin() const { return block_pair().first; }
-
   block_iterator block_end() const { return block_pair().second; }
 };
 
@@ -109,5 +112,4 @@ inline StandardRange<IterTy> makeStandardRange(IterTy begin, IterTy end) {
 
 }
 } // end namespace Galois
-
 #endif

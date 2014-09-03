@@ -25,8 +25,9 @@
 
 #include "Galois/config.h"
 
-#include <type_traits>
+#include <algorithm>
 #include <stdexcept>
+#include <type_traits>
 #include <vector>
 
 namespace Galois {

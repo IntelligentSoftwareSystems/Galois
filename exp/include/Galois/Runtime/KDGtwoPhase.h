@@ -22,9 +22,10 @@
  *
  * @author M. Amber Hassaan <ahassaan@ices.utexas.edu>
  */
-#ifndef GALOIS_RUNTIME_KDG_TWO_PHASE_H
-#define GALOIS_RUNTIME_KDG_TWO_PHASE_H
+#ifndef GALOIS_RUNTIME_KDGTWOPHASE_H
+#define GALOIS_RUNTIME_KDGTWOPHASE_H
 
+#include "Galois/GaloisForwardDecl.h"
 #include "Galois/Accumulator.h"
 #include "Galois/Atomic.h"
 #include "Galois/BoundedVector.h"
@@ -32,12 +33,10 @@
 #include "Galois/PriorityQueue.h"
 #include "Galois/Timer.h"
 #include "Galois/DoAllWrap.h"
-
 #include "Galois/Runtime/Barrier.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/Executor_DoAll.h"
 #include "Galois/Runtime/ForEachTraits.h"
-#include "Galois/Runtime/ParallelWork.h"
 #include "Galois/Runtime/PerThreadWorkList.h"
 #include "Galois/Runtime/Range.h"
 #include "Galois/Runtime/Support.h"
@@ -144,7 +143,7 @@ public:
 
 protected:
   GALOIS_ATTRIBUTE_PROF_NOINLINE void spillAll (CtxtWL& wl) {
-    on_each_impl (
+    on_each(
         [this, &wl] (const unsigned tid, const unsigned numT) {
           while (!wl[tid].empty ()) {
             Ctxt* c = wl[tid].back ();
@@ -172,7 +171,7 @@ protected:
       assert (currCommits == 0);
 
       // initial settings
-      if (ForEachTraits<OpFunc>::NeedsPush) {
+      if (DEPRECATED::ForEachTraits<OpFunc>::NeedsPush) {
         windowSize = std::max (
             (winWL.initSize ()),
             (THREAD_MULT_FACTOR * MIN_WIN_SIZE));
@@ -212,7 +211,7 @@ protected:
     assert (windowSize > 0);
 
 
-    if (ForEachTraits<OpFunc>::NeedsPush) {
+    if (DEPRECATED::ForEachTraits<OpFunc>::NeedsPush) {
       if (winWL.empty () && (wl.size_all () > windowSize)) {
         // a case where winWL is empty and all the new elements were going into 
         // nextWL. When nextWL becomes bigger than windowSize, we must do something
@@ -306,7 +305,7 @@ protected:
   GALOIS_ATTRIBUTE_PROF_NOINLINE void applyOperator (CtxtWL& currWL, CtxtWL& nextWL) {
     boost::optional<T> minElem;
 
-    if (ForEachTraits<OpFunc>::NeedsPush) {
+    if (DEPRECATED::ForEachTraits<OpFunc>::NeedsPush) {
       if (!winWL.empty ()) {
         minElem = *winWL.getMin();
       }
@@ -330,7 +329,7 @@ protected:
 
           if (commit) {
             numCommitted += 1;
-            if (ForEachTraits<OpFunc>::NeedsPush) { 
+            if (DEPRECATED::ForEachTraits<OpFunc>::NeedsPush) { 
               for (auto i = uhand.getPushBuffer ().begin ()
                   , endi = uhand.getPushBuffer ().end (); i != endi; ++i) {
 
@@ -542,7 +541,7 @@ void for_each_ordered_2p_win (const R& range, const Cmp& cmp, const NhFunc& nhFu
   using T = typename R::value_type;
   // using WindowWL = SortedRangeWindowWL<T, Cmp>;
   
-  const bool ADDS = ForEachTraits<OpFunc>::NeedsPush;
+  const bool ADDS = DEPRECATED::ForEachTraits<OpFunc>::NeedsPush;
 
   using WindowWL = typename impl::ChooseIf<ADDS, PQbasedWindowWL<T, Cmp>, SortedRangeWindowWL<T, Cmp> >::Ret_ty;
 

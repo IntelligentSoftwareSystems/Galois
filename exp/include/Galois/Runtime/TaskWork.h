@@ -27,10 +27,10 @@
 
 #include "Galois/gdeque.h"
 #include "Galois/gslist.h"
+#include "Galois/Runtime/LoopStatistics.h"
 
 // #include <array> if c++11
 #include <boost/array.hpp>
-
 #include <boost/mpl/has_xxx.hpp>
 
 namespace Galois {

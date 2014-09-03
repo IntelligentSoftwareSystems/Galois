@@ -144,7 +144,7 @@ struct AsyncAlgo {
   void operator()() {
     Galois::Statistic emptyMerges("EmptyMerges");
     Galois::do_all_local(graph, Merge(emptyMerges),
-        Galois::loopname("Merge"), Galois::do_all_steal(true));
+        Galois::loopname("Merge"), Galois::do_all_steal<true>());
     Galois::do_all_local(graph, Normalize(), Galois::loopname("Normalize"));
   }
 };
@@ -212,7 +212,7 @@ struct BlockedAsyncAlgo {
   void operator()() {
     Galois::InsertBag<WorkItem> items;
     Merge merge = { items };
-    Galois::do_all_local(graph, merge, Galois::loopname("Initialize"), Galois::do_all_steal(false));
+    Galois::do_all_local(graph, merge, Galois::loopname("Initialize"));
     Galois::for_each_local(items, merge,
         Galois::loopname("Merge"), Galois::wl<Galois::WorkList::dChunkedFIFO<128> >());
     Galois::do_all_local(graph, Normalize(), Galois::loopname("Normalize"));
