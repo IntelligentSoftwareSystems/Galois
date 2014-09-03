@@ -81,6 +81,12 @@ class Node {
         int getNumberOfNeighbours(std::vector<Element *> * allElements);
         
         void rebuildElements();
+        
+        /*DEBUG*/
+        
+        int treeSize();
+        
+        /*END OF DEBUG*/
 };
 
 #endif // NODE_HPP

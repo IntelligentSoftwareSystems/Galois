@@ -27,6 +27,12 @@ enum Schedulers
     GALOIS_DAG
 };
 
+enum Rotator
+{
+    TRUE,
+    FALSE
+};
+
 const char* const name = "DAGSolver";
 const char* const desc = "Solver for FEM with singularities on meshes";
 const char* const url = NULL;
@@ -43,6 +49,12 @@ static cll::opt<Schedulers> scheduler("scheduler", cll::desc("Scheduler"),
                                       cll::values(clEnumVal(CILK, "Cilk-based"),
                                                   clEnumVal(GALOIS_DAG, "Galois-DAG"),
                                                   clEnumValEnd), cll::init(CILK));
+
+static cll::opt<Rotator> rotation("rotation", cll::desc("Rotation"),
+                                      cll::values(clEnumVal(TRUE, "true"),
+                                                  clEnumVal(FALSE, "false"),
+                                                  clEnumValEnd), cll::init(FALSE));
+
 using namespace std;
 
 #ifdef HAVE_CILK
@@ -190,7 +202,7 @@ int main(int argc, char ** argv)
 {
     LonestarStart(argc, argv, name, desc, url);
     struct timeval t1, t2;
-
+    
     //DynamicLib *lib = new DynamicLib(prodlib);
     //lib->load();
 
@@ -209,6 +221,16 @@ int main(int argc, char ** argv)
     gettimeofday(&t2, NULL);
     print_time("\tDOF enumeration", &t1, &t2);
 
+    //tree rotation
+    if (rotation == TRUE){
+        printf("Tree size %d\n", m->getRootNode()->treeSize());   // DEBUG
+        gettimeofday(&t1, NULL);
+        Analysis::rotate(m->getRootNode(), NULL, m);
+        gettimeofday(&t2, NULL);
+        printf("Tree size %d\n", m->getRootNode()->treeSize());   // DEBUG
+        print_time("\tTree rotation", &t1, &t2);
+    }
+    
     gettimeofday(&t1, NULL);
     Analysis::doAnalise(m);
     gettimeofday(&t2, NULL);

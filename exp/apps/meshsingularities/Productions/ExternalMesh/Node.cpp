@@ -328,3 +328,21 @@ void Node::rebuildElements(){
         this->addElement(e);
     }
 }
+
+
+
+
+/* DEBUG*/
+
+int Node::treeSize(){
+    int ret = 1;
+    if (this->getLeft() != NULL){
+        ret += this->getLeft()->treeSize();
+    }
+    if (this->getRight() != NULL){
+        ret += this->getRight()->treeSize();
+    }
+    return ret;
+}
+
+/*END OF DEBUG*/

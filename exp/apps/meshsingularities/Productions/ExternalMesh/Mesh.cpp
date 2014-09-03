@@ -139,3 +139,19 @@ Mesh *Mesh::loadFromFile(const char *filename, MeshSource src)
     fclose(fp);
     return mesh;
 }
+
+
+void Mesh::setRootNode(Node* root){
+    Node * oldRoot = this->nodes[0];
+    int newRoot=0;
+    bool found=false;
+    while (!found){
+        if (this->nodes[newRoot] == root){
+            found = true;
+        } else{
+            newRoot++;
+        }
+    }
+    this->nodes[newRoot] = oldRoot;
+    this->nodes[0] = root;
+}
