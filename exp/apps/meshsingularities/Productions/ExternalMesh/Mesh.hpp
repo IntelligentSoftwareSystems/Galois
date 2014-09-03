@@ -16,6 +16,11 @@ typedef enum {
     GENERATOR
 } MeshSource;
 
+typedef enum {
+    EDGE,
+    VERTEX
+} MeshSingularity;
+
 class Mesh {
     private:
         std::vector<Node *> nodes;
@@ -31,6 +36,9 @@ class Mesh {
 
         void addElement(Element *e);
         void addNode(Node *n);
+
+        void addAdaptations(MeshSingularity sing = EDGE);
+
         static Mesh *loadFromFile(const char *filename, MeshSource src = GENERATOR);
         bool saveToFile(const char * filename);
         Node *getRootNode();

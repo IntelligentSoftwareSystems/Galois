@@ -38,6 +38,12 @@ class Analysis {
         static void doAnalise(Mesh *mesh);
         static void nodeAnaliser(Node *n, std::set<uint64_t> *parent);
 	static int rotate(Node * root, Node * parent, Mesh * mesh);
+
+        // for debug use
+        static void debugNode(Node *n);
+        static void printTree(Node *n);
+        static void printElement(Element *e);
+
 };
 
 #endif // ANALYSIS_HPP
