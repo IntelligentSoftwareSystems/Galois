@@ -219,6 +219,7 @@ int Analysis::rotate(Node * root, Node * parent, Mesh * mesh){
             Node * T = rightRotation(&parent, &root, child1, child2, &child, &otherChild);
         }//end of double rotations
     }
+    return 0;
 }
 
 
