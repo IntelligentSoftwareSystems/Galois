@@ -9,6 +9,8 @@
 #include "Element.hpp"
 #include "../EquationSystem.h"
 
+class Mesh;
+
 class Node {
     private:
         int node = -1;
@@ -46,9 +48,11 @@ class Node {
 
         void addElement (Element *e);
         std::vector<Element *> &getElements();
+        void clearElements();
 
         void addDof(uint64_t dof);
         std::vector<uint64_t> &getDofs();
+        void clearDofs();
 
         int getId() const;
 
@@ -70,6 +74,12 @@ class Node {
         void merge() const;
         void eliminate() const;
         void bs() const;
+        
+        static bool isNeighbour (Node *node, Node *parent);
+        static bool isNeighbour (Element *element1, Element *element2);
+        int getNumberOfNeighbours(std::vector<Element *> * allElements);
+        
+        void rebuildElements();
 };
 
 #endif // NODE_HPP
