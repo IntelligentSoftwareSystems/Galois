@@ -26,24 +26,23 @@ class Node {
         int n_left = -1;
         int n_right = -1;
 
-        std::vector<uint64_t> leftPlaces;
-        std::vector<uint64_t> leftMergePlaces;
-
-        std::vector<uint64_t> rightPlaces;
-        std::vector<uint64_t> rightMergePlaces;
+        uint64_t *leftPlaces;
+        uint64_t *rightPlaces;
 
         Node(int num) : node(num) {}
         ~Node() {
-            delete this->system;
+            delete system;
+            //delete leftPlaces;
+            //delete rightPlaces;
         }
 
         void setLeft(Node *left);
         void setRight(Node *right);
         void setParent(Node *parent);
 
-        Node *getLeft();
-        Node *getRight();
-        Node *getParent();
+        Node *getLeft() const;
+        Node *getRight() const;
+        Node *getParent() const;
 
         void addElement (Element *e);
         std::vector<Element *> &getElements();
@@ -51,10 +50,10 @@ class Node {
         void addDof(uint64_t dof);
         std::vector<uint64_t> &getDofs();
 
-        int getId();
+        int getId() const;
 
         void setDofsToElim(uint64_t dofs);
-        uint64_t getDofsToElim();
+        uint64_t getDofsToElim() const;
 
         void allocateSystem();
 
@@ -67,10 +66,10 @@ class Node {
 
         void (*preprocessProduction)(double **matrixIn, double *rhsIn,
                                      double **matrixOut, double *rhsOut);
-        void fillin();
-        void merge();
-        void eliminate();
-        void bs();
+        void fillin() const;
+        void merge() const;
+        void eliminate() const;
+        void bs() const;
 };
 
 #endif // NODE_HPP

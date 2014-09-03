@@ -1,28 +1,126 @@
 #include "Analysis.hpp"
+#include <algorithm>
+
 using namespace std;
 
 // todo: rotator
+/*
+int Analysis::treeHeight(Node *root)
+{
+    if (root == NULL) {
+        return 0;
+    }
+    else {
+        return std::max(Analysis::treeHeight(root->getLeft()), Analysis::treeHeight(root->getRight()))+1;
+    }
+}
+*/
+/*
+int Analysis::rotate(Node *root, Node *parent)
+{
+    // two nodes are neighbours if the intersection of sets of DOFs is not empty.
+    auto isNeighbour = [] (Node *node, Node *parent) {
+        std::set<uint64_t> nodeDofs(node->getDofs().cbegin(), node->getDofs().cend());
+        std::set<uint64_t> parentDofs(parent->getDofs().cbegin(), parent->getDofs().cend());
 
-//int Analysis::rotate(root, parent)
-//{
-//if left branch is present then l = rotate(left) else l=0
-//if left branch is present then r = rotate(prawe)else r=0
-//h=r-l
+        if (nodeDofs.empty() || parentDofs.empty()) {
+            return false;
+        }
 
-//if (h==1 || h==-1 || h==0) then return h //no rotation
+        auto nodeIt = nodeDofs.begin();
+        auto nodeItEnd = nodeDofs.end();
 
-//if (h>=2) then
-//{//we need to perform some rotations to the left
-//  child=dziecko root->right które jest sąsiadem parent
-//  (if there are two such sons, we pick up the one with smaller
+        auto parentIt = parentDofs.begin();
+        auto parentItEnd = parentDofs.end();
+
+        // sets are internally sorted, so if the beginning of the one is greater
+        // than end of other - we can finish
+        if ((*parentIt > *nodeDofs.rbegin()) || (*nodeIt > *parentDofs.rbegin())) {
+            return false;
+        }
+
+        while (nodeIt != nodeItEnd && parentIt != parentItEnd) {
+            if (*nodeIt == *parentIt) {
+                return true; // common element? yes, we are neighbours!
+            } else if (*nodeIt > *parentIt) {
+                ++parentIt;
+            } else {
+                ++nodeIt;
+            }
+        }
+
+        return false; // no common elements => no neighbourhood
+    };
+
+    int l=0;
+    int r=0;
+
+    if (root->getLeft() != NULL) {
+        l = Analysis::rotate(root->getLeft(), root);
+    }
+    if (root->getRight() != NULL) {
+        r = Analysis::rotate(root->getRight(), root);
+    }
+
+    int h=r-l;
+
+    if (h==1 || h==-1 || h==0) {
+        return h; //no rotation
+    }
+
+    if (h>=2)
+    {//we need to perform some rotations to the left
+     //  child=dziecko root->right które jest sąsiadem parent
+     //  (if there are two such sons, we pick up the one with smaller
 //   number of connected neighbors - with shorter neighbors)
 
-//  if (child==root->right->right) && r<=0) ||
-//         (child==root->right->left) && r>=0) then
-//  {//rotation to the left
-//    if parent!=NULL then make root->right son of parent
-//      else T=root->right
-//    t=root->left
+        //
+        Node *child;
+
+        bool childIsRight = isNeighbour(root->getRight()->getRight(), parent);
+        bool childIsLeft = isNeighbour(root->getRight()->getLeft(), parent);
+
+        if (childIsRight && childIsLeft) {
+            int l_length = Analysis::treeHeight(root->getRight()->getLeft());
+            int r_length = Analysis::treeHeight(root->getRight()->getRight());
+            if (l_length > r_length) {
+                child = root->getRight()->getRight();
+            } else {
+                child = root->getRight()->getLeft();
+            }
+        }
+
+        if ((childIsRight && r<=0) ||
+            (childIsLeft && r>=0))
+        {
+            Node *T, *t;
+            //    if parent!=NULL then make root->right son of parent
+            //else T=root->right
+            //t=root->left
+
+            if (parent != NULL) {
+                parent->setRight(root->getRight());
+            } else {
+                T = root->getRight();
+            }
+
+            t = root->getLeft();
+
+            root->getRight()->setLeft(root);
+            root->setRight(child);
+
+            // WTF!? - podmieniamy roota?
+            if (parent != NULL) {
+                //merge_list(parent->left,parent->right)
+                parent->set
+            } else {
+
+            }
+            //      else merge_list(T->left,T->right)
+
+            // end of left rotation
+        }
+
 //    make root left son of root->right
 //    (this step may require exchange of left son
 //     with right son for root->right)
@@ -65,7 +163,10 @@ using namespace std;
 // to the left, but in the symmetric way)
 //}
 
-
+    }
+    return h;
+}
+*/
 void Analysis::nodeAnaliser(Node *node, set<uint64_t> *parent)
 {
     auto getAllDOFs = [] (Node *n) {
@@ -115,13 +216,6 @@ void Analysis::nodeAnaliser(Node *node, set<uint64_t> *parent)
         }
     }
 
-
-//    printf("Node (%-2d): ", node->getId());
-//    for (int dof : node->getDofs()) {
-//        printf("%d ", dof);
-//    }
-//    printf("\n");
-
     delete common;
 }
 
@@ -138,73 +232,25 @@ void Analysis::doAnalise(Mesh *mesh)
 void Analysis::mergeAnaliser(Node *node)
 {
     if (node->getLeft() != NULL && node->getRight() != NULL) {
-        std::set<uint64_t> leftNodes;
-        std::set<uint64_t> rightNodes;
-        std::set<uint64_t> mergeNodes;
+//        node->leftPlaces = new uint64_t[node->getLeft()->getDofs().size() - node->getLeft()->getDofsToElim()];
+//        node->rightPlaces = new uint64_t[node->getRight()->getDofs().size() - node->getRight()->getDofsToElim()];
 
-        for (uint64_t i=node->getLeft()->getDofsToElim(); i<node->getLeft()->getDofs().size(); ++i) {
-            leftNodes.insert(node->getLeft()->getDofs()[i]);
+        map<uint64_t, uint64_t> reverseMap;
+/*
+        for (int i=0; i<node->getDofs().size(); ++i) {
+            reverseMap[node->getDofs()[i]] = i;
         }
 
-        for (uint64_t i=node->getRight()->getDofsToElim(); i<node->getRight()->getDofs().size(); ++i) {
-            rightNodes.insert(node->getRight()->getDofs()[i]);
+        for (int i=node->getLeft()->getDofsToElim(); i<node->getLeft()->getDofs().size(); ++i) {
+            node->leftPlaces[i-node->getLeft()->getDofsToElim()] = reverseMap[node->getLeft()->getDofs()[i]];
         }
 
-        for (uint64_t i=0; i<node->getDofs().size(); ++i) {
-            mergeNodes.insert(node->getDofs()[i]);
+        for (int i=node->getRight()->getDofsToElim(); i<node->getRight()->getDofs().size(); ++i) {
+            node->rightPlaces[i-node->getRight()->getDofsToElim()] = reverseMap[node->getRight()->getDofs()[i]];
         }
-
-        std::vector<uint64_t> lCommonNodes(leftNodes.size());
-        std::vector<uint64_t>::iterator itLeft;
-        std::vector<uint64_t> rCommonNodes(rightNodes.size());
-        std::vector<uint64_t>::iterator itRight;
-
-        itLeft = std::set_intersection(leftNodes.begin(), leftNodes.end(),
-                                       mergeNodes.begin(), mergeNodes.end(),
-                                       lCommonNodes.begin());
-
-        itRight = std::set_intersection(rightNodes.begin(), rightNodes.end(),
-                                        mergeNodes.begin(), mergeNodes.end(),
-                                        rCommonNodes.begin());
-
-        lCommonNodes.resize(itLeft - lCommonNodes.begin());
-        rCommonNodes.resize(itRight - rCommonNodes.begin());
-
-        for (uint64_t elem : lCommonNodes) {
-            for (int i=node->getLeft()->getDofsToElim(); i<node->getLeft()->getDofs().size(); ++i) {
-                if (node->getLeft()->getDofs()[i] == elem) {
-                    node->leftPlaces.push_back(i);
-                    break;
-                }
-            }
-
-            for (int i=0; i<node->getDofs().size(); ++i) {
-                if (node->getDofs()[i] == elem) {
-                    node->leftMergePlaces.push_back(i);
-                    break;
-                }
-            }
-        }
-
-
-        for (uint64_t elem : rCommonNodes) {
-            for (int i=node->getRight()->getDofsToElim(); i<node->getRight()->getDofs().size(); ++i) {
-                if (node->getRight()->getDofs()[i] == elem) {
-                    node->rightPlaces.push_back(i);
-                    break;
-                }
-            }
-
-            for (int i=0; i<node->getDofs().size(); ++i) {
-                if (node->getDofs()[i] == elem) {
-                    node->rightMergePlaces.push_back(i);
-                    break;
-                }
-            }
-        }
+*/
         Analysis::mergeAnaliser(node->getLeft());
         Analysis::mergeAnaliser(node->getRight());
-
     }
 }
 
@@ -225,20 +271,20 @@ tuple<edge, uint64_t> Analysis::parentEdge(edge e,
     // horizontal edge
     if (y1 == y2) {
         if (levelEdges[level-1].count(edge(v1,vertex(2*x2-x1, y1)))) {
-            return tuple<edge, bool>(edge(v1,vertex(2*x2-x1, y1)), 2);
+            return tuple<edge, uint64_t>(edge(v1,vertex(2*x2-x1, y1)), 2);
         }
         if (levelEdges[level-1].count(edge(vertex(2*x1-x2, y1), v2))) {
-            return tuple<edge, bool>(edge(vertex(2*x1-x2, y1), v2), 1);
+            return tuple<edge, uint64_t>(edge(vertex(2*x1-x2, y1), v2), 1);
         }
-        return tuple<edge, bool>(e, 0);
+        return tuple<edge, uint64_t>(e, 0);
     } else {
         if (levelEdges[level-1].count(edge(v1,vertex(x1, 2*y2-y1)))) {
-            return tuple<edge, bool>(edge(v1,vertex(x1, 2*y2-y1)), 2);
+            return tuple<edge, uint64_t>(edge(v1,vertex(x1, 2*y2-y1)), 2);
         }
         if (levelEdges[level-1].count(edge(vertex(x1, 2*y1-y2), v2))) {
-            return tuple<edge, bool>(edge(vertex(x1, 2*y1-y2), v2), 1);
+            return tuple<edge, uint64_t>(edge(vertex(x1, 2*y1-y2), v2), 1);
         }
-        return tuple<edge, bool>(e, 0);
+        return tuple<edge, uint64_t>(e, 0);
     }
 }
 
@@ -260,10 +306,10 @@ void Analysis::enumerateElem(Mesh *mesh, Element *elem,
     map<vertex, uint64_t> &parentVertices = levelVertices[level-1];
     map<edge, uint64_t> &parentEdges = levelEdges[level-1];
 
-    tuple<edge, bool> ve1 = Analysis::parentEdge(e1, levelVertices, levelEdges, level);
-    tuple<edge, bool> ve2 = Analysis::parentEdge(e2, levelVertices, levelEdges, level);
-    tuple<edge, bool> ve3 = Analysis::parentEdge(e3, levelVertices, levelEdges, level);
-    tuple<edge, bool> ve4 = Analysis::parentEdge(e4, levelVertices, levelEdges, level);
+    tuple<edge, uint64_t> ve1 = Analysis::parentEdge(e1, levelVertices, levelEdges, level);
+    tuple<edge, uint64_t> ve2 = Analysis::parentEdge(e2, levelVertices, levelEdges, level);
+    tuple<edge, uint64_t> ve3 = Analysis::parentEdge(e3, levelVertices, levelEdges, level);
+    tuple<edge, uint64_t> ve4 = Analysis::parentEdge(e4, levelVertices, levelEdges, level);
 
 
     vertex v1(std::min(std::get<0>(std::get<0>(std::get<0>(ve1))),
@@ -387,6 +433,23 @@ void Analysis::enumerateDOF(Mesh *mesh)
 
     uint64_t n = 1;
 
+    auto compare = [](Element *e1, Element *e2) {
+        if (e1->k > e2->k) {
+            return false;
+        } else if (e1->k < e2->k) {
+            return true;
+        }
+
+        if (e1->l < e2->l) {
+            return true;
+        } else if (e1->l > e2->l) {
+            return false;
+        }
+        return false;
+    };
+
+    std::sort(mesh->getElements().begin(), mesh->getElements().end(), compare);
+
     // now, we have level plan for mesh
     for (Element *e : mesh->getElements()) {
         levels.insert(e->k);
@@ -406,4 +469,40 @@ void Analysis::enumerateDOF(Mesh *mesh)
         }
     }
     mesh->setDofs(n-1);
+}
+
+void Analysis::debugNode(Node *n)
+{
+    printf("Node: %d\n", n->getId());
+    printf("  dofs: ");
+    for (uint64_t dof : n->getDofs()) {
+        printf("%lu ", dof);
+    }
+    printf("\n");
+}
+
+void Analysis::printTree(Node *n)
+{
+    printf("Node id: %d ", n->getId());
+    printf("[");
+    for (uint64_t dof : n->getDofs()) {
+        printf("%lu, ", dof);
+    }
+    printf("]");
+    printf(" elim: %d\n", n->getDofsToElim());
+
+    if(n->getLeft() != NULL && n->getRight() != NULL) {
+        printTree(n->getLeft());
+        printTree(n->getRight());
+    }
+
+}
+
+void Analysis::printElement(Element *e)
+{
+    printf("E[%d,%d] at %d x %d -> %d x %d = [", e->k, e->l, e->x1, e->y1, e->x2, e->y2);
+    for (uint64_t dof : e->dofs) {
+        printf("%d, ", dof);
+    }
+    printf("]\n");
 }

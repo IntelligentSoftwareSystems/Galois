@@ -1,4 +1,5 @@
 #include "Mesh.hpp"
+#include <set>
 
 void Mesh::addElement(Element *e)
 {
@@ -8,6 +9,80 @@ void Mesh::addElement(Element *e)
 void Mesh::addNode(Node *n)
 {
     this->nodes.push_back(n);
+}
+
+void Mesh::addAdaptations(MeshSingularity sing)
+{
+    int max_level = 0;
+    std::vector<Element*> edgeElements;
+
+    for (Element *e : this->getElements()) {
+        e->x1 = 2*e->x1;
+        e->x2 = 2*e->x2;
+        e->y1 = 2*e->y1;
+        e->y2 = 2*e->y2;
+        max_level = e->k > max_level ? e->k : max_level;
+
+        if (e->y1 == 0) {
+            edgeElements.push_back(e);
+        }
+    }
+
+    if (sing == EDGE) {
+        int l = 1;
+        for (Element *e : edgeElements) {
+            // here we need to break elements into smaller ones,
+            // let's create four elements:
+            Element *e1 = new Element();
+            Element *e2 = new Element();
+            Element *e3 = new Element();
+            Element *e4 = new Element();
+
+            e1->x1 = e->x1;
+            e1->x2 = (e->x1+e->x2)/2;
+            e1->y1 = e->y1;
+            e1->y1 = (e->y1+e->y2)/2;
+            e1->k = e->k+1;
+            e1->l = l++;
+
+            e2->x1 = (e->x1+e->x2)/2;
+            e2->x2 = e->x2;
+            e2->y1 = e->y1;
+            e2->y2 = (e->y1+e->y2)/2;
+            e2->k = e->k+1;
+            e2->l = l++;
+
+            e3->x1 = e->x1;
+            e3->x2 = (e->x1+e->x2)/2;
+            e3->y1 = (e->y1+e->y2)/2;
+            e3->y2 = e->y2;
+            e3->k = e->k+1;
+            e3->l = l++;
+
+            e4->x1 = (e->x1+e->x2)/2;
+            e4->x2 = e->x2;
+            e4->y1 = (e->y1+e->y2)/2;
+            e4->y2 = e->y2;
+            e4->k = e->k+1;
+            e4->l = l++;
+
+            std::vector<Element*>::iterator it = this->getElements().begin();
+            for (; it!=this->getElements().end(); ++it) {
+                if (*it == e) {
+                    this->getElements().erase(it);
+                    break;
+                }
+            }
+
+            this->addElement(e1);
+            this->addElement(e2);
+            this->addElement(e3);
+            this->addElement(e4);
+
+
+
+        }
+    }
 }
 
 Node *Mesh::getRootNode()
@@ -104,13 +179,14 @@ Mesh *Mesh::loadFromFile(const char *filename, MeshSource src)
     }
 
     fscanf(fp, "%lu", &nodes);
+    nodesVector.resize(nodes);
 
     for (uint64_t i=0; i<nodes; ++i) {
         uint64_t node_id;
         uint64_t nr_elems;
         fscanf(fp, "%lu %lu", &node_id, &nr_elems);
         Node *n = new Node(node_id);
-        nodesVector.push_back(n);
+        nodesVector[node_id-1] = n;
         for (uint64_t q=0; q<nr_elems; ++q) {
             uint64_t k, l;
             fscanf(fp, "%lu %lu", &k, &l);
@@ -129,9 +205,11 @@ Mesh *Mesh::loadFromFile(const char *filename, MeshSource src)
     for (uint64_t i=0; i<nodes; ++i) {
         if (nodesVector[i]->n_left != -1) {
             nodesVector[i]->setLeft(nodesVector[nodesVector[i]->n_left-1]);
+            nodesVector[nodesVector[i]->n_left-1]->setParent(nodesVector[i]);
         }
         if (nodesVector[i]->n_right != -1) {
             nodesVector[i]->setRight(nodesVector[nodesVector[i]->n_right-1]);
+            nodesVector[nodesVector[i]->n_right-1]->setParent(nodesVector[i]);
         }
         mesh->addNode(nodesVector[i]);
     }

@@ -61,6 +61,17 @@ double test_function(int dim, ...)
 	return result;
 }
 
+void printVertices(Vertex *v, std::string space)
+{
+    printf("%ssize: %d x %d\n", space.c_str(), v->system->n, v->system->n);
+    if (v->left != NULL) {
+        printVertices(v->left, space+" ");
+    }
+    if (v->right != NULL) {
+        printVertices(v->right, space+" ");
+    }
+}
+
 int ProductionProcess::leftRange(int tasks, int cpus, int i)
 {
 	if (i == 0) {
@@ -79,7 +90,7 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
 	AbstractProduction *production;
 	Vertex *S;
 	Galois::StatTimer TMain;
-	TMain.start();
+    //TMain.start();
 	
 #ifdef WITH_PAPI
 	long long fpops = 0;
@@ -89,7 +100,7 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
     if (PAPI_library_init(PAPI_VER_CURRENT) != PAPI_VER_CURRENT) {
         fprintf(stderr, "PAPI is unsupported.\n");
         papi_supported = false; 
-        }
+    }
 
     if (PAPI_num_counters() < 2) {
         fprintf(stderr, "PAPI is unsupported.\n");
@@ -176,7 +187,9 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
         production = new PointProduction(vec, inputMatrices);
 
 	S = production->getRootVertex();
+    printVertices(S, "");
 	printf("Allocated: %lu bytes \n", this->getAllocatedSize(S));
+    printf("Root size: %d\n", S->system->n);
 	timerSolution.start();
 	int xx = gettimeofday(&start_time, NULL);
 	graph = production->getGraph();
@@ -251,7 +264,7 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
 	delete S;
 	delete tiers;
 
-	TMain.stop();
+    //TMain.stop();
 
 	return result;
 }
