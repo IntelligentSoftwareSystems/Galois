@@ -27,6 +27,7 @@
 #include "Galois/AltBag.h"
 
 #include <functional>
+#include <boost/iterator/filter_iterator.hpp>
 
 namespace Galois {
 namespace Runtime {
