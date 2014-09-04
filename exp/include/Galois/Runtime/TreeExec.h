@@ -20,18 +20,19 @@
  *
  * @author M. Amber Hassaan <ahassaan@ices.utexas.edu>
  */
-
 #ifndef GALOIS_RUNTIME_TREEEXEC_H
 #define GALOIS_RUNTIME_TREEEXEC_H
 
+#include "Galois/GaloisForwardDecl.h"
 #include "Galois/optional.h"
-#include "Galois/GaloisUnsafe.h"
-#include "Galois/Runtime/ForEachTraits.h"
-#include "Galois/Runtime/ParallelWork.h"
+#include "Galois/Traits.h"
 #include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/Termination.h"
+#include "Galois/Runtime/UserContextAccess.h"
 #include "Galois/Runtime/ll/gio.h"
 #include "Galois/Runtime/mm/Mem.h"
+#include "Galois/WorkList/AltChunked.h"
+#include "Galois/WorkList/ExternalReference.h"
 
 #include <atomic>
 
@@ -42,21 +43,15 @@ template <typename T, typename DivFunc, typename ConqFunc, bool NEEDS_CHILDREN>
 class TreeExecutorTwoFunc {
 
 protected:
-
   class Task {
   public:
     enum Mode { DIVIDE, CONQUER };
 
   protected:
-
     GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE Mode mode;
     T elem;
     Task* parent;
     std::atomic<unsigned> numChild;
-
-
-    // std::atomic<unsigned> numChild;
-
 
   public:
     Task (const T& a, Task* p, const Mode& m)
@@ -85,18 +80,13 @@ protected:
     const Mode& getMode () const { return mode; }
     bool hasMode (const Mode& m) const { return mode == m; }
     void setMode (const Mode& m) { mode = m; }
-
   };
-
-
 
   static const unsigned CHUNK_SIZE = 2;
   typedef Galois::WorkList::AltChunkedLIFO<CHUNK_SIZE, Task*> WL_ty;
   typedef MM::FixedSizeAllocator<Task> TaskAlloc;
   typedef UserContextAccess<T> UserCtx;
   typedef PerThreadStorage<UserCtx> PerThreadUserCtx;
-
-
 
   // template <typename C>
   // class CtxWrapper: boost::noncopyable {
@@ -205,17 +195,13 @@ protected:
     return child;
   }
 
-
-
   DivFunc divFunc;
   ConqFunc conqFunc;
   std::string loopname;
   TaskAlloc taskAlloc;
   WL_ty workList;
 
-
 public:
-
   TreeExecutorTwoFunc (const DivFunc& divFunc, const ConqFunc& conqFunc, const char* loopname)
     :
       divFunc (divFunc),
@@ -224,15 +210,14 @@ public:
   {}
 
   void execute (const T& initItem) {
-
     Task* initTask = taskAlloc.allocate (1);
     taskAlloc.construct (initTask, initItem, nullptr, Task::DIVIDE);
+    typedef WorkList::ExternalReference<WL_ty> WL;
 
-    workList.push (initTask);
-
-    Galois::for_each_wl (workList,
+    Galois::for_each(initTask,
         ApplyOperatorSinglePhase {this, taskAlloc, divFunc, conqFunc},
-        loopname.c_str ());
+        Galois::loopname(loopname.c_str()),
+        Galois::wl<WL>(&workList));
 
     // Task* a[] = {initTask};
 //
@@ -243,12 +228,10 @@ public:
 
     // initTask deleted in ApplyOperatorSinglePhase,
   }
-
-
 };
+
 template <typename T, typename DivFunc, typename ConqFunc>
 void for_each_ordered_tree (const T& initItem, const DivFunc& divFunc, const ConqFunc& conqFunc, const char* loopname=nullptr) {
-
   TreeExecutorTwoFunc<T, DivFunc, ConqFunc, false> executor (divFunc, conqFunc, loopname);
   executor.execute (initItem);
 }

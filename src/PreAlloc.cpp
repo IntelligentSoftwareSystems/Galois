@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2014, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -20,11 +20,10 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-
-#include "Galois/Runtime/ParallelWork.h"
+#include "Galois/Runtime/Executor_OnEach.h"
+#include "Galois/Runtime/mm/Mem.h"
 
 void Galois::Runtime::preAlloc_impl(int num) {
   int pagesPerThread = (num + activeThreads - 1) / activeThreads;
   getSystemThreadPool().run(activeThreads, std::bind(Galois::Runtime::MM::pagePreAlloc, pagesPerThread));
 }
-

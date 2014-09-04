@@ -28,6 +28,7 @@
 #define GALOIS_RUNTIME_LC_ORDERED_H
 
 #include "Galois/config.h"
+#include "Galois/GaloisForwardDecl.h"
 #include "Galois/Accumulator.h"
 #include "Galois/Atomic.h"
 #include "Galois/gdeque.h"
@@ -37,7 +38,6 @@
 #include "Galois/WorkList/WorkList.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/Executor_DoAll.h"
-#include "Galois/Runtime/ParallelWork.h"
 #include "Galois/Runtime/PerThreadContainer.h"
 #include "Galois/Runtime/Range.h"
 #include "Galois/Runtime/ll/gio.h"
@@ -194,6 +194,10 @@ public:
 
   LocalRange<NItemWL> getAllRange (void) {
     return makeLocalRange (allNItems);
+  }
+
+  NItemWL& getContainer() {
+    return allNItems;
   }
 
   ~PtrBasedNhoodMgr() {
@@ -742,8 +746,7 @@ public:
     // TODO: code to find global min goes here
 
     t_for.start ();
-    Galois::Runtime::for_each_impl<SrcWL_ty> (
-        Galois::Runtime::makeLocalRange(initSrc),
+    Galois::for_each_local(initSrc,
         ApplyOperator (
           operFunc,
           nhoodVisitor,
@@ -755,7 +758,7 @@ public:
           ctxtDelQ,
           perThUserCtx,
           niter),
-        "apply_operator");
+        Galois::loopname("apply_operator"), Galois::wl<SrcWL_ty>());
     t_for.stop ();
 
     t_destroy.start ();

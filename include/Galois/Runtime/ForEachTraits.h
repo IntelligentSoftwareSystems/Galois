@@ -28,27 +28,56 @@
 #ifndef GALOIS_RUNTIME_FOREACHTRAITS_H
 #define GALOIS_RUNTIME_FOREACHTRAITS_H
 
+#include "Galois/gtuple.h"
+#include "Galois/Traits.h"
 #include "Galois/TypeTraits.h"
+
+#include <tuple>
 
 namespace Galois {
 namespace Runtime {
-namespace {
+namespace DEPRECATED {
+
 template<typename FunctionTy>
 class ForEachTraits {
   // special_decay of std::ref(t) is T& so apply twice
-  typedef typename special_decay<typename special_decay<FunctionTy>::type>::type Fn;
+  typedef typename Galois::DEPRECATED::special_decay<typename Galois::DEPRECATED::special_decay<FunctionTy>::type>::type Fn;
 public:
   enum {
-    NeedsStats = !Galois::does_not_need_stats<Fn>::value,
-    NeedsBreak = Galois::needs_parallel_break<Fn>::value,
-    NeedsPush = !Galois::does_not_need_push<Fn>::value,
-    NeedsPIA = Galois::needs_per_iter_alloc<Fn>::value,
-    NeedsAborts = !Galois::does_not_need_aborts<Fn>::value
+    NeedsStats = !Galois::DEPRECATED::does_not_need_stats<Fn>::value,
+    NeedsBreak = Galois::DEPRECATED::needs_parallel_break<Fn>::value,
+    NeedsPush = !Galois::DEPRECATED::does_not_need_push<Fn>::value,
+    NeedsPIA = Galois::DEPRECATED::needs_per_iter_alloc<Fn>::value,
+    NeedsAborts = !Galois::DEPRECATED::does_not_need_aborts<Fn>::value
   };
+};
+
+template<typename FunctionTy>
+struct ExtractForEachTraits {
+  typedef typename true_indices<
+      !ForEachTraits<FunctionTy>::NeedsAborts,
+      !ForEachTraits<FunctionTy>::NeedsStats,
+      !ForEachTraits<FunctionTy>::NeedsPush,
+      ForEachTraits<FunctionTy>::NeedsBreak,
+      ForEachTraits<FunctionTy>::NeedsPIA>::type NotDefault;
+  typedef std::tuple<
+      does_not_need_aborts_tag, 
+      does_not_need_stats_tag,
+      does_not_need_push_tag,
+      needs_parallel_break_tag,
+      needs_per_iter_alloc_tag> Tags;
+  typedef std::tuple<
+      does_not_need_aborts<>,
+      does_not_need_stats<>,
+      does_not_need_push<>,
+      needs_parallel_break<>,
+      needs_per_iter_alloc<>> Values;
+  typedef typename tuple_elements<Tags, NotDefault>::type tags_type;
+  typedef typename tuple_elements<Values, NotDefault>::type values_type;
 };
 
 }
 }
-} // end namespace Galois
+}
 
 #endif // GALOIS_RUNTIME_FOREACHTRAITS_H

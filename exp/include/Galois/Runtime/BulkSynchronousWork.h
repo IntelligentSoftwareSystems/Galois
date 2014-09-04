@@ -25,8 +25,6 @@
 #ifndef GALOIS_RUNTIME_BULKSYNCHRONOUSWORK_H
 #define GALOIS_RUNTIME_BULKSYNCHRONOUSWORK_H
 
-#include "Galois/Runtime/ParallelWork.h"
-
 #include <boost/version.hpp>
 
 #if BOOST_VERSION < 104300
@@ -263,7 +261,7 @@ template<typename ItemTy>
 struct typeof_usercontext { typedef Galois::Runtime::UserContextAccess<ItemTy> type; };
 
 template<typename FnTy>
-struct needs_push { typedef boost::mpl::bool_<ForEachTraits<FnTy>::NeedsPush> type; };
+struct needs_push { typedef boost::mpl::bool_<DEPRECATED::ForEachTraits<FnTy>::NeedsPush> type; };
 
 template<typename VecTy>
 struct project1: boost::fusion::result_of::value_at<VecTy, boost::mpl::int_<1> >  { };
@@ -516,12 +514,7 @@ static inline void do_all_bs_impl(const RangeTy& range, const FnsTy& fns, InitFn
   typedef Executor<FilteredItemsVector, FnsTy, InitialWork> Work;
 
   Work W(fns, InitialWork(range, initFn), loopname);
-
-  assert(!inGaloisForEach);
-
-  inGaloisForEach = true;
   getSystemThreadPool().run(activeThreads, std::ref(W));
-  inGaloisForEach = false;
 }
 
 } // end Anonymous

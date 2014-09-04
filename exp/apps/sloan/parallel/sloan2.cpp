@@ -5,9 +5,6 @@
 #include "Galois/Statistic.h"
 #include "Galois/Graph/LCGraph.h"
 #include "Galois/Graph/Graph.h"
-#ifdef GALOIS_USE_EXP
-#include "Galois/Runtime/ParallelWorkInline.h"
-#endif
 #include "llvm/Support/CommandLine.h"
 #include "llvm/ADT/SmallVector.h"
 #include "Lonestar/BoilerPlate.h"

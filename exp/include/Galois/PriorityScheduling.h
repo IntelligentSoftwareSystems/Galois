@@ -55,8 +55,8 @@ struct PriAuto {
   typedef SkipListQueue<Less> SLQ;
   typedef SetQueue<Less> SETQ;
 
-  template<typename IterTy,typename FunctionTy>
-  static void for_each(IterTy b, IterTy e, FunctionTy f, const char* loopname = 0) {
+  template<typename IterTy, typename FunctionTy, typename... Args>
+  static void for_each(IterTy b, IterTy e, FunctionTy f, Args... args) {
     static bool printed = false;
 #define WLFOO2(__x)							\
     if (WorklistName == #__x) {						\
@@ -64,7 +64,7 @@ struct PriAuto {
 	gInfo("WorkList ", #__x);					\
 	printed = true;							\
       }									\
-      Galois::for_each(b,e,f,Galois::loopname(loopname), Galois::wl<__x>()); \
+      Galois::for_each(b,e,f,std::forward<Args>(args)..., Galois::wl<__x>()); \
     } else
 #include "PrioritySchedulers.h"
 #undef WLFOO2
@@ -74,7 +74,7 @@ struct PriAuto {
 	gInfo("WorkList ", "NI_" #__x);					\
 	printed = true;							\
       }									\
-      Galois::for_each(b,e,f,Galois::loopname(loopname), Galois::wl<NoInlineFilter<__x>>()); \
+      Galois::for_each(b,e,f,std::forward<Args>(args)..., Galois::wl<NoInlineFilter<__x>>()); \
     } else
 #include "PrioritySchedulers.h"
 #undef WLFOO2
@@ -83,10 +83,10 @@ struct PriAuto {
       GALOIS_DIE("unknown worklist: ", WorklistName.c_str(), "\n");
     }
   }
-  template<typename InitItemTy,typename FunctionTy>
-  static void for_each(InitItemTy i, FunctionTy f, const char* loopname = 0) {
+  template<typename InitItemTy, typename FunctionTy, typename... Args>
+  static void for_each(InitItemTy i, FunctionTy f, Args... args) {
     InitItemTy wl[1] = {i};
-    for_each(&wl[0], &wl[1], f, Galois::loopname(loopname));
+    for_each(&wl[0], &wl[1], f, std::forward<Args>(args)...);
   }
 };
 

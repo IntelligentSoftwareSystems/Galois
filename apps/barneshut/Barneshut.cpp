@@ -527,7 +527,7 @@ void run(Bodies& bodies, BodyPtrs& pBodies, size_t nbodies) {
     // Do tree building sequentially
     Galois::GReducible<BoundingBox, decltype(MB)> boxes(MB);
     Galois::do_all_local(pBodies, [&boxes] (const Body* b) {boxes.update(b->pos);},
-                         Galois::loopname("reduceBoxes"), Galois::do_all_steal(true));
+                         Galois::loopname("reduceBoxes"), Galois::do_all_steal<true>());
     BoundingBox box = boxes.reduce([] (BoundingBox& lhs, BoundingBox& rhs) {lhs.merge(rhs);});
     //std::for_each(bodies.begin(), bodies.end(), ReduceBoxes(box));
 

@@ -99,7 +99,7 @@ protected:
     NhoodVisit(Graph& g, Locks& l): graph(g), locks(l) { }
 
     template <typename C>
-    void operator()(const Update& item, C&) {
+    void operator()(const Update& item, C&) const {
       typedef std::vector<GlobalNodalIndex> V;
 
       const V& conn = item.avi->getGeometry().getConnectivity();
@@ -139,7 +139,7 @@ protected:
         niter(niter) 
     {}
 
-    void operator () (const Update& item, Galois::UserContext<Update>& ctx) {
+    void operator () (const Update& item, Galois::UserContext<Update>& ctx) const {
       // for debugging, remove later
       niter += 1;
       LocalVec& l = *perIterLocalVec.getLocal();
@@ -181,7 +181,6 @@ public:
         boost::make_transform_iterator(elems.begin(), MakeUpdate()),
         boost::make_transform_iterator(elems.end(), MakeUpdate())), 
         GetNextTS (), std::less<double> (), nhVisitor, p, "level-by-level-avi");
-
 
     printf("iterations = %lu\n", niter.reduce());
   }

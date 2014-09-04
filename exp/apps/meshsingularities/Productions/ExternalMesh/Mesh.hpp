@@ -47,6 +47,8 @@ class Mesh {
         int getPolynomial();
         void setDofs(int dofs);
         int getDofs();
+        
+        void setRootNode(Node * root);
 
         ~Mesh() {
             for (Node *n : nodes) {

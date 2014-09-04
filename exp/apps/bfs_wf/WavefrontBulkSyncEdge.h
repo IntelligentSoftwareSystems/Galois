@@ -68,8 +68,8 @@ protected:
 
         graph.mapOutEdges (up.node,
             [dstLevel, &wl] (GNode dst) {
-              // wl.push (Update (dst, dstLevel));
-              wl.emplace_back (dst, dstLevel);
+              wl.push (dst, dstLevel);
+              //wl.emplace(dst, dstLevel);
             },
             Galois::NONE);
       }

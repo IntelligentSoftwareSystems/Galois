@@ -1,7 +1,7 @@
 set(sources Barrier.cpp Barrier_MCS.cpp Barrier_Topo.cpp Barrier_Pthread.cpp
   Barrier_Counting.cpp Barrier_Dissemination.cpp
   Context.cpp FileGraph.cpp 
-  DeterministicWork.cpp
+  Deterministic.cpp
   OCFileGraph.cpp PerThreadStorage.cpp PreAlloc.cpp Sampling.cpp Support.cpp
   Termination.cpp Threads.cpp Timer.cpp ThreadPool.cpp)
 if(HAVE_CXX11_THREAD_YIELD)

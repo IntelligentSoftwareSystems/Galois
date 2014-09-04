@@ -2,16 +2,13 @@
 #define GALOISWORKER_H
 
 #include "Galois/Galois.h"
-#include "Galois/WorkList/WorkList.h"
 #include "Galois/Graph/LC_Morph_Graph.h"
-#include "Galois/Runtime/ParallelWork.h"
 
 #include <functional>
 #include "TaskDescription.h"
 
 #include "Galois/Statistic.h"
 #include "Galois/Runtime/ll/SimpleLock.h"
-#include "Galois/Runtime/ParallelWork.h"
 #include "Node.h"
 
 #ifdef WITH_PAPI

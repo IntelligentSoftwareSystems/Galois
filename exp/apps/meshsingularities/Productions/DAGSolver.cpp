@@ -10,7 +10,6 @@
 #include "Galois/Accumulator.h"
 #include "Galois/Bag.h"
 #include "Galois/CilkInit.h"
-#include "Galois/GaloisUnsafe.h"
 #include "Galois/Statistic.h"
 #include "Galois/Runtime/TreeExec.h"
 
@@ -32,6 +31,12 @@ enum Schedulers
     SEQ
 };
 
+enum Rotator
+{
+    TRUE,
+    FALSE
+};
+
 const char* const name = "DAGSolver";
 const char* const desc = "Solver for FEM with singularities on meshes";
 const char* const url = NULL;
@@ -47,7 +52,6 @@ static cll::opt<std::string> treefile("treefile", cll::desc("File with tree defi
 static cll::opt<bool> debug("debug", cll::desc("Debug mode"), cll::init(false));
 
 static cll::opt<Schedulers> scheduler("scheduler", cll::desc("Scheduler"),
-
                                       cll::values(
 #ifdef HAVE_CILK
                                           clEnumVal(CILK, "Cilk-based"),
@@ -55,6 +59,11 @@ static cll::opt<Schedulers> scheduler("scheduler", cll::desc("Scheduler"),
                                           clEnumVal(GALOIS_DAG, "Galois-DAG"),
                                           clEnumVal(SEQ, "Sequential"),
                                           clEnumValEnd), cll::init(CILK));
+
+static cll::opt<Rotator> rotation("rotation", cll::desc("Rotation"),
+                                      cll::values(clEnumVal(TRUE, "true"),
+                                                  clEnumVal(FALSE, "false"),
+                                                  clEnumValEnd), cll::init(FALSE));
 
 #ifdef WITH_PAPI
 static cll::opt<bool> perfcounters("perfcounters", cll::desc("Enable performance counters"),
@@ -252,7 +261,6 @@ int main(int argc, char ** argv)
         papi_supported = false;
     }
 #endif
-
     //DynamicLib *lib = new DynamicLib(prodlib);
     //lib->load();
 
@@ -271,6 +279,16 @@ int main(int argc, char ** argv)
     gettimeofday(&t2, NULL);
     print_time("\tDOF enumeration", &t1, &t2);
 
+    //tree rotation
+    if (rotation == TRUE){
+        printf("Tree size %d\n", m->getRootNode()->treeSize());   // DEBUG
+        gettimeofday(&t1, NULL);
+        Analysis::rotate(m->getRootNode(), NULL, m);
+        gettimeofday(&t2, NULL);
+        printf("Tree size %d\n", m->getRootNode()->treeSize());   // DEBUG
+        print_time("\tTree rotation", &t1, &t2);
+    }
+    
     gettimeofday(&t1, NULL);
     Analysis::doAnalise(m);
     gettimeofday(&t2, NULL);

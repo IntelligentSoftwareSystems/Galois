@@ -1,13 +1,12 @@
 /** Parallel STL equivalents -*- C++ -*-
  * @file
- * This is the only file to include for basic Galois functionality.
  *
  * @section License
  *
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2014, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -24,20 +23,13 @@
 #define GALOIS_PARALLELSTL_PARALLELSTL_H
 
 #include "Galois/Accumulator.h"
+#include "Galois/GaloisForwardDecl.h"
 #include "Galois/NoDerefIterator.h"
-#include "Galois/WorkList/WorkList.h"
-#include "Galois/Runtime/ParallelWork.h"
-#include "Galois/Runtime/Executor_DoAll.h"
-#include "Galois/Runtime/Executor_OnEach.h"
+#include "Galois/Traits.h"
+#include "Galois/UserContext.h"
+#include "Galois/WorkList/Chunked.h"
 
 namespace Galois {
-
-template<typename IterTy,typename FunctionTy, typename... Args>
-void do_all(const IterTy& b, const IterTy& e, const FunctionTy& fn, Args... args);
-
-template<typename ConTy,typename FunctionTy, typename... Args>
-void do_all_local(ConTy& c, const FunctionTy& fn, Args... args);
-
 //! Parallel versions of STL library algorithms.
 namespace ParallelSTL {
 
@@ -57,7 +49,7 @@ ptrdiff_t count_if(InputIterator first, InputIterator last, Predicate pred)
 {
   auto R = [] (ptrdiff_t& lhs, ptrdiff_t rhs) { lhs += rhs; };
   GReducible<ptrdiff_t,decltype(R)> count(R);
-  Galois::do_all(first, last, count_if_helper<Predicate, decltype(R)>(pred, count));
+  do_all(first, last, count_if_helper<Predicate, decltype(R)>(pred, count));
   return count.reduce();
 }
 
@@ -89,9 +81,7 @@ InputIterator find_if(InputIterator first, InputIterator last, Predicate pred)
   typedef Galois::WorkList::dChunkedFIFO<256> WL;
   AccumulatorTy accum;
   HelperTy helper(accum, pred);
-  Runtime::for_each_impl<WL>(Runtime::makeStandardRange(
-        make_no_deref_iterator(first),
-        make_no_deref_iterator(last)), helper, "ParallelSTL::find_if");
+  for_each(make_no_deref_iterator(first), make_no_deref_iterator(last), helper, Galois::wl<WL>());
   for (unsigned i = 0; i < accum.size(); ++i) {
     if (*accum.getRemote(i))
       return **accum.getRemote(i);
@@ -233,7 +223,7 @@ RandomAccessIterator partition(RandomAccessIterator first,
     return std::partition(first, last, pred);
   typedef partition_helper<RandomAccessIterator, Predicate> P;
   typename P::partition_helper_state s(first, last, pred);
-  Runtime::on_each_impl(P(&s), 0);
+  on_each(P(&s));
   if (s.rfirst == first && s.rlast == last) { //perfect !
     //abort();
     return s.first;
@@ -258,7 +248,7 @@ void sort(RandomAccessIterator first, RandomAccessIterator last, Compare comp) {
   typedef std::pair<RandomAccessIterator,RandomAccessIterator> Pair;
   Pair initial[1] = { std::make_pair(first, last) };
   
-  Runtime::for_each_impl<WL>(Runtime::makeStandardRange(&initial[0], &initial[1]), sort_helper<Compare>(comp), "ParallelSTL::sort");
+  for_each(&initial[0], &initial[1], sort_helper<Compare>(comp), Galois::wl<WL>());
 }
 
 template<class RandomAccessIterator>

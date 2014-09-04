@@ -58,7 +58,7 @@ void wsabie_model_projection(double *W, double *H, long nr_feats, long nr_labels
 #endif
 		project_with_len(W+s*k, k, wsabieC);
 #ifdef EXP_DOALL_GALOIS
-        }, Galois::do_all_steal(false));
+        });
 #else
         }
 #endif
@@ -71,7 +71,7 @@ void wsabie_model_projection(double *W, double *H, long nr_feats, long nr_labels
 #endif
 		project_with_len(H+j*k, k, wsabieC);
 #ifdef EXP_DOALL_GALOIS
-        }, Galois::do_all_steal(false));
+        });
 #else
         }
 #endif
@@ -140,7 +140,7 @@ void wsabie_updates(multilabel_problem *prob, multilabel_parameter *param, doubl
 				}
 				project_with_len(Ws, k, wsabieC);
 #ifdef EXP_DOALL_GALOIS
-                        }, Galois::do_all_steal(false));
+                        });
 #else
 			}
 #endif
@@ -239,7 +239,7 @@ void wsabie_updates_new_old(multilabel_problem *prob, multilabel_parameter *para
 				}
 				project_with_len(Ws, k, wsabieC);
 #ifdef EXP_DOALL_GALOIS
-                        }, Galois::do_all_steal(false));
+                        });
 #else
 			}
 #endif
@@ -356,7 +356,7 @@ void wsabie_updates_new(multilabel_problem *prob, multilabel_parameter *param, d
 					}
 					project_with_len(Ws, k, wsabieC);
 #ifdef EXP_DOALL_GALOIS
-                                }, Galois::do_all_steal(false));
+                                });
 #else
 				}
 #endif
@@ -508,7 +508,7 @@ void wsabie_updates_new2(multilabel_problem *prob, multilabel_parameter *param, 
 				}
 				project_with_len(Ws, k, wsabieC);
 #ifdef EXP_DOALL_GALOIS
-                        }, Galois::do_all_steal(false));
+                        });
 #else
 			}
 #endif
@@ -651,7 +651,7 @@ void wsabie_updates_new4(multilabel_problem *prob, multilabel_parameter *param, 
 				}
 				project_with_len(Ws, k, wsabieC);
 #ifdef EXP_DOALL_GALOIS
-                        }, Galois::do_all_steal(false));
+                        });
 #else
 			}
 #endif
@@ -800,7 +800,7 @@ void wsabie_updates_new3(multilabel_problem *prob, multilabel_parameter *param, 
 				}
 				project_with_len(Ws, k, wsabieC);
 #ifdef EXP_DOALL_GALOIS
-                        }, Galois::do_all_steal(false));
+                        });
 #else
 			}
 #endif
@@ -955,7 +955,7 @@ void wsabie_updates_2(multilabel_problem *prob, multilabel_parameter *param, dou
 					Ws[t] -= X.val_t[idx]*hdiff[t];
 				}
 #ifdef EXP_DOALL_GALOIS
-                        }, Galois::do_all_steal(false));
+                        });
 #else
 			}
 #endif

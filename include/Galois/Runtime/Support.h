@@ -28,13 +28,13 @@
 #include <string>
 
 namespace Galois {
+
 class Statistic;
+
 }
 
 namespace Galois {
 namespace Runtime {
-
-extern bool inGaloisForEach;
 
 //! Reports stats for a given thread
 void reportStat(const char* loopname, const char* category, unsigned long value);
