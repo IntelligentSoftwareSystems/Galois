@@ -223,6 +223,7 @@ Mesh *Mesh::loadFromFile(const char *filename, MeshSource src)
 bool Mesh::loadFrontalMatrices(const char *filename)
 {
     std::map<std::tuple<int,int>, EquationSystem*> inputMatrices;
+    std::map<int,std::tuple<int,int>> levelMaps;
 
     for (Element *e : this->elements) {
         std::tuple<int, int> t(e->k, e->l);
@@ -231,10 +232,39 @@ bool Mesh::loadFrontalMatrices(const char *filename)
 
     FILE *fp = NULL;
 
-    if ( (fp=fopen(filename, "r")) == NULL) {
+    if ((fp=fopen(filename, "r")) == NULL) {
         perror("fopen");
         return false;
     }
+
+    for (int i=0; i<this->elements.size(); ++i) {
+        int k, l, level;
+        fscanf(fp, "%d %d %d", &k, &l, &level);
+
+        std::tuple<int, int> t(k,l);
+        levelMaps[level] = t;
+    }
+
+    for (int i=0; i<this->elements.size(); ++i) {
+        int level;
+        fscanf(fp, "%d", &level);
+        EquationSystem *e = inputMatrices[levelMaps[level]];
+
+        for (int j=0; j<e->n; ++j) {
+            double val;
+            fscanf(fp, "%g ", &val);
+            e->rhs[j];
+        }
+
+        for (int j=0; j<e->n; ++j) {
+            for (int k=0; k<=j; ++k) {
+                double val;
+                fscanf(fp, "%g ", &val);
+                e->matrix[j][k] = e->matrix[k][j] = val;
+            }
+        }
+    }
+
 
 
     fclose(fp);

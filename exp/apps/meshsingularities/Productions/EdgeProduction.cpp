@@ -284,81 +284,60 @@ Graph *EdgeProduction::getGraph()
 
 void EdgeProduction::Execute(EProduction productionToExecute, Vertex* v, EquationSystem* input)
 {
-    printf("Vertex size: %d x %d\n", v->system->n, v->system->n);
+    //printf("Vertex size: %d x %d\n", v->system->n, v->system->n);
 
 	switch (productionToExecute) {
 	case EProduction::B:
-        printf("B\n");
 		B(v, input);
 		break;
 	case EProduction::C:
-        printf("C\n");
 		C(v, input);
 		break;
 	case EProduction::D:
-        printf("D\n");
         D(v, input);
 		break;
 	case EProduction::MB:
-        printf("MB\n");
 		MB(v);
 		break;
 	case EProduction::MC:
-        printf("MC\n");
 		MC(v);
 		break;
 	case EProduction::MD:
-        printf("MD\n");
 		MD(v);
 		break;
 	case EProduction::MBLeaf:
-        printf("MBLeaf\n");
 		MBLeaf(v);
 		break;
 	case EProduction::MBC:
-        printf("MBC\n");
 		MBC(v, false);
 		break;
 	case EProduction::MBRoot:
-        printf("MBRoot\n");
 		MBC(v, true);
 		break;
 	case EProduction::BSMD:
-        printf("BSMD\n");
 		BSMD(v);
 		break;
 	case EProduction::BSMB:
-        printf("BSMB\n");
 		BSMB(v);
 		break;
 	case EProduction::BSMC:
-        printf("BSMC\n");
 		BSMC(v);
 		break;
 	case EProduction::BSMBC:
-        printf("BSMBC\n");
 		BSMBC(v);
 		break;
 	case EProduction::BSMBLeaf:
-        printf("BSMBLeaf\n");
 		BSMBLeaf(v);
 		break;
 	case EProduction::BSC:
-        printf("BSC\n");
-
         BSC(v,input);
 		break;
 	case EProduction::BSD:
-        printf("BSD\n");
-
 		BSD(v,input);
 		break;
 	case EProduction::BSB:
-        printf("BSB\n");
-
 		BSB(v,input);
 		break;
-
 	default:
 		printf("Invalid production!\n");
 		break;

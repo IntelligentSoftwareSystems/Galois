@@ -197,17 +197,12 @@ void EquationSystem::eliminate(const int rows)
         }
     }
 
-
-
-
-
 #else
 	double maxX;
 	register int maxRow;
 	double x;
-	int i, j;
 
-	for (i=0;i<rows;++i) {
+    for (int i=0;i<rows;++i) {
 		maxX = fabs(matrix[i][i]);
 		maxRow = i;
 
@@ -224,14 +219,14 @@ void EquationSystem::eliminate(const int rows)
 
 		x = matrix[i][i];
 		// on diagonal - only 1.0
-		matrix[i][i] = 1.0;
+        matrix[i][i] = 1.0;
 
-		for (j=i+1;j<n;++j) {
+        for (int j=i+1;j<n;++j) {
 			matrix[i][j] /= x;
 		}
 
 		rhs[i] /= x;
-		for (j=i+1; j<n; ++j) {
+        for (int j=i+1; j<n; ++j) {
 			x = matrix[j][i];
 
 			for (int k = i+1; k<n; ++k) {
