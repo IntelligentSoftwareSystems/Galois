@@ -47,7 +47,10 @@ static cll::opt<std::string> prodlib("prodlib", cll::desc("Shared library with p
                                      cll::init("./pointproductions.so"));
 
 static cll::opt<std::string> treefile("treefile", cll::desc("File with tree definition"),
-                                     cll::init("./tree.txt"));
+                                     cll::init(""));
+
+static cll::opt<std::string> matrixfile("matrixfile", cll::desc("File with frontal matrices"),
+                                        cll::init(""));
 
 static cll::opt<bool> debug("debug", cll::desc("Debug mode"), cll::init(false));
 
