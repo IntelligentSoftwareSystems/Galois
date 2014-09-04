@@ -1,5 +1,5 @@
-#include "Galois/Timer.h"
 #include "Galois/Galois.h"
+#include "Galois/Timer.h"
 
 #include <iostream>
 #include <cstdlib>
@@ -63,7 +63,7 @@ unsigned t_doall(bool burn, bool steal, std::vector<unsigned>& V, unsigned num, 
   Galois::Timer t;
   t.start();
   for (unsigned x = 0; x < iter; ++x)
-    Galois::do_all(V.begin(), V.begin()+num, emp(), Galois::do_all_steal(steal));
+    Galois::do_all(V.begin(), V.begin()+num, emp(), Galois::do_all_steal<>());
   t.stop();
   return t.get();
 }

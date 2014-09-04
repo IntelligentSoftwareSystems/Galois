@@ -540,7 +540,7 @@ struct UnionFindWindow {
       findTimer.start ();
       Galois::do_all_local (*currWL,
           FindLoop (repVec, repOwnerCtxVec, findIter),
-          Galois::do_all_steal (true),
+          Galois::do_all_steal<true>(),
           Galois::loopname("find_loop"));
       findTimer.stop ();
       // Galois::Runtime::endSampling ();
@@ -550,7 +550,7 @@ struct UnionFindWindow {
       linkUpTimer.start ();
       Galois::do_all_local (*currWL,
           LinkUpLoop<false> (repVec, repOwnerCtxVec, *nextWL, mstSum, linkUpIter),
-          Galois::do_all_steal (true),
+          Galois::do_all_steal<true>(),
           Galois::loopname("link_up_loop"));
       linkUpTimer.stop ();
       // Galois::Runtime::endSampling ();
@@ -622,7 +622,6 @@ void runMSTsimple (const size_t numNodes, const VecEdge& edges,
         repVec.initialize (i, -1);
         repOwnerCtxVec.initialize (i, AtomicCtxPtr(nullptr));
       },
-      Galois::do_all_steal (false),
       Galois::loopname ("init-vectors"));
 
 
@@ -635,7 +634,6 @@ void runMSTsimple (const size_t numNodes, const VecEdge& edges,
 
   Galois::do_all (edges.begin (), edges.end (), 
       FillUp (initWL), 
-      Galois::do_all_steal (false),
       Galois::loopname("fill_init"));
 
   fillUpTimer.stop ();
@@ -755,7 +753,6 @@ void partition_edges (Iter b, Iter e,
 
   Galois::do_all (b, e, 
       Partition (pivot, lighter, heavier), 
-      Galois::do_all_steal (false),
       Galois::loopname ("partition_loop"));
 
   assert ((lighter.size_all () + heavier.size_all ()) == old_sz + size_t (std::distance (b, e)));
@@ -820,7 +817,6 @@ void runMSTfilter (const size_t numNodes, const VecEdge& edges,
         repVec.initialize (i, -1);
         repOwnerCtxVec.initialize (i, AtomicCtxPtr(nullptr));
       },
-      Galois::do_all_steal (false),
       Galois::loopname ("init-vectors"));
 
 
@@ -852,7 +848,7 @@ void runMSTfilter (const size_t numNodes, const VecEdge& edges,
   filterTimer.start ();
   Galois::do_all_local (heavier,
       FilterSelfEdges<EdgeCtxWL> (repVec, lighter),
-      Galois::do_all_steal (true),
+      Galois::do_all_steal<true>(),
       Galois::loopname ("filter_loop"));
   filterTimer.stop ();
 

@@ -24,6 +24,7 @@
 #define GALOIS_ALT_BAG_H
 
 #include "Galois/BoundedVector.h"
+#include "Galois/Runtime/PerThreadContainer.h"
 #include "Galois/Runtime/mm/Mem.h"
 
 #include <list>

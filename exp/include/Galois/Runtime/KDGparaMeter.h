@@ -18,7 +18,6 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  *
- *
  * @author M. Amber Hassaan <ahassaan@ices.utexas.edu>
  */
 #ifndef GALOIS_RUNTIME_KDG_PARAMETER_H
@@ -36,8 +35,6 @@
 #include "Galois/Runtime/Barrier.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/Executor_DoAll.h"
-#include "Galois/Runtime/ForEachTraits.h"
-#include "Galois/Runtime/ParallelWork.h"
 #include "Galois/Runtime/PerThreadContainer.h"
 #include "Galois/Runtime/Range.h"
 #include "Galois/Runtime/Support.h"

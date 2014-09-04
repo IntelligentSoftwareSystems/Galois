@@ -24,6 +24,7 @@
 #define GALOIS_DOALL_WRAPPER_H
 
 #include "Galois/Galois.h"
+#include "Galois/GaloisForwardDecl.h"
 #include "Galois/Runtime/DoAllCoupled.h"
 #include "Galois/Runtime/ll/EnvCheck.h"
 
@@ -35,8 +36,6 @@
 #include <unistd.h>
 
 #include "llvm/Support/CommandLine.h"
-
-
 
 namespace Galois {
 
@@ -97,7 +96,6 @@ struct DoAllImpl<DOALL_GALOIS_FOREACH> {
     void operator () (T& x, C&) {
       func (x);
     }
-
   };
 
   template <const unsigned CHUNK_SIZE, typename R, typename F>
@@ -107,7 +105,8 @@ struct DoAllImpl<DOALL_GALOIS_FOREACH> {
     typedef Galois::WorkList::dChunkedLIFO<CHUNK_SIZE, T> WL_ty;
     // typedef Galois::WorkList::AltChunkedLIFO<CHUNK_SIZE, T> WL_ty;
 
-    Galois::Runtime::for_each_impl<WL_ty> (range, FuncWrap<T, F> {func}, loopname);
+    Galois::Runtime::for_each_gen(range, FuncWrap<T, F> {func},
+        std::make_tuple(Galois::loopname(loopname), Galois::wl<WL_ty>()));
   }
 };
 
@@ -121,7 +120,6 @@ struct DoAllImpl<DOALL_COUPLED> {
 
 
 #ifdef HAVE_CILK
-
 template <>
 struct DoAllImpl<DOALL_CILK> {
   template <typename R, typename F>
@@ -131,12 +129,8 @@ struct DoAllImpl<DOALL_CILK> {
       func (*it);
     }
   }
-
-
-
 };
 #else 
-
 template <> struct DoAllImpl<DOALL_CILK> {
   template <typename R, typename F>
   static inline void go (const R& range, const F& func, const char* loopname) {
@@ -196,4 +190,3 @@ void do_all_choice (const R& range, const F& func, const char* loopname=0, const
 } // end namespace Galois
 
 #endif //  GALOIS_DOALL_WRAPPER_H
-

@@ -25,13 +25,15 @@
 
 #include "Galois/config.h"
 #include "Galois/FlatMap.h"
+#include "Galois/Runtime/Barrier.h"
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/Termination.h"
 #include "Galois/WorkList/Chunked.h"
 #include "Galois/WorkList/WorkListHelpers.h"
 
-#include GALOIS_CXX11_STD_HEADER(type_traits)
+#include <deque>
 #include <limits>
+#include <type_traits>
 
 namespace Galois {
 namespace WorkList {
@@ -54,10 +56,9 @@ protected:
     std::deque<std::pair<Index,T>> stored;
   };
 
-  Runtime::TerminationDetection& term;
   Runtime::Barrier& barrier;
 
-  OrderedByIntegerMetricData(): term(Runtime::getSystemTermination()), barrier(Runtime::getSystemBarrier()) { }
+  OrderedByIntegerMetricData(): barrier(Runtime::getSystemBarrier()) { }
 
   bool hasStored(ThreadData& p, Index idx) {
     for (auto& e : p.stored) {
@@ -82,6 +83,30 @@ protected:
   }
 };
 
+template<typename Index, bool UseDescending>
+struct OrderedByIntegerMetricComparator {
+  std::less<Index> compare;
+  Index identity;
+
+  template<typename C>
+  struct with_local_map {
+    typedef Galois::flat_map<Index, C, std::less<Index> > type;
+  };
+  OrderedByIntegerMetricComparator(): identity(std::numeric_limits<Index>::min()) {}
+};
+
+template<typename Index>
+struct OrderedByIntegerMetricComparator<Index, true> {
+  std::greater<Index> compare;
+  Index identity;
+
+  template<typename C>
+  struct with_local_map {
+    typedef Galois::flat_map<Index, C, std::greater<Index> > type;
+  };
+  OrderedByIntegerMetricComparator(): identity(std::numeric_limits<Index>::max()) {}
+};
+
 }
 
 /**
@@ -103,48 +128,69 @@ protected:
  * Galois::for_each<WL>(items.begin(), items.end(), Fn);
  * \endcode
  *
- * @tparam Indexer Indexer class
- * @tparam Container Scheduler for each bucket
- * @tparam BlockPeriod Check for higher priority work every 2^BlockPeriod
- *                     iterations
- * @tparam BSP Use back-scan prevention
+ * @tparam Indexer        Indexer class
+ * @tparam Container      Scheduler for each bucket
+ * @tparam BlockPeriod    Check for higher priority work every 2^BlockPeriod
+ *                        iterations
+ * @tparam BSP            Use back-scan prevention
+ * @tparam UseBarrier     Eliminate priority inversions by placing a barrier between
+ *                        priority levels
+ * @tparam UseMonotonic   Assume that an activity at priority p will not schedule
+ *                        work at priority p or any priority p1 where p1 < p.
+ * @tparam UseDescending  Use descending order instead
  */
+// TODO could move to general comparator but there are issues with atomic reads and initial values
+// for arbitrary types
 template<class Indexer = DummyIndexer<int>, typename Container = dChunkedFIFO<>,
   unsigned BlockPeriod=0,
   bool BSP=true,
   typename T=int,
   typename Index=int,
   bool UseBarrier=false,
+  bool UseMonotonic=false,
+  bool UseDescending=false,
   bool Concurrent=true>
-struct OrderedByIntegerMetric : private boost::noncopyable, public detail::OrderedByIntegerMetricData<T, Index, UseBarrier> {
+struct OrderedByIntegerMetric :
+  private boost::noncopyable,
+  public detail::OrderedByIntegerMetricData<T, Index, UseBarrier>,
+  public detail::OrderedByIntegerMetricComparator<Index, UseDescending>
+{
+  //static_assert(std::is_integral<Index>::value, "only integral index types supported");
+
   template<bool _concurrent>
-  struct rethread { typedef OrderedByIntegerMetric<Indexer, typename Container::template rethread<_concurrent>::type, BlockPeriod, BSP, T, Index, UseBarrier, _concurrent> type; };
+  struct rethread { typedef OrderedByIntegerMetric<Indexer, typename Container::template rethread<_concurrent>::type, BlockPeriod, BSP, T, Index, UseBarrier, UseMonotonic, UseDescending, _concurrent> type; };
 
   template<typename _T>
-  struct retype { typedef OrderedByIntegerMetric<Indexer, typename Container::template retype<_T>::type, BlockPeriod, BSP, _T, typename std::result_of<Indexer(_T)>::type, UseBarrier, Concurrent> type; };
+  struct retype { typedef OrderedByIntegerMetric<Indexer, typename Container::template retype<_T>::type, BlockPeriod, BSP, _T, typename std::result_of<Indexer(_T)>::type, UseBarrier, UseMonotonic, UseDescending, Concurrent> type; };
 
   template<unsigned _period>
-  struct with_block_period { typedef OrderedByIntegerMetric<Indexer, Container, _period, BSP, T, Index, UseBarrier, Concurrent> type; };
+  struct with_block_period { typedef OrderedByIntegerMetric<Indexer, Container, _period, BSP, T, Index, UseBarrier, UseMonotonic, UseDescending, Concurrent> type; };
 
   template<typename _container>
-  struct with_container { typedef OrderedByIntegerMetric<Indexer, _container, BlockPeriod, BSP, T, Index, UseBarrier, Concurrent> type; };
+  struct with_container { typedef OrderedByIntegerMetric<Indexer, _container, BlockPeriod, BSP, T, Index, UseBarrier, UseMonotonic, UseDescending, Concurrent> type; };
 
   template<typename _indexer>
-  struct with_indexer { typedef OrderedByIntegerMetric<_indexer, Container, BlockPeriod, BSP, T, Index, UseBarrier, Concurrent> type; };
+  struct with_indexer { typedef OrderedByIntegerMetric<_indexer, Container, BlockPeriod, BSP, T, Index, UseBarrier, UseMonotonic, UseDescending, Concurrent> type; };
 
   template<bool _bsp>
-  struct with_back_scan_prevention { typedef OrderedByIntegerMetric<Indexer, Container, BlockPeriod, _bsp, T, Index, UseBarrier, Concurrent> type; };
+  struct with_back_scan_prevention { typedef OrderedByIntegerMetric<Indexer, Container, BlockPeriod, _bsp, T, Index, UseBarrier, UseMonotonic, UseDescending, Concurrent> type; };
 
   template<bool _use_barrier>
-  struct with_barrier { typedef OrderedByIntegerMetric<Indexer, Container, BlockPeriod, BSP, T, Index, _use_barrier, Concurrent> type; };
+  struct with_barrier { typedef OrderedByIntegerMetric<Indexer, Container, BlockPeriod, BSP, T, Index, _use_barrier, UseMonotonic, UseDescending, Concurrent> type; };
+
+  template<bool _use_monotonic>
+  struct with_monotonic { typedef OrderedByIntegerMetric<Indexer, Container, BlockPeriod, BSP, T, Index, UseBarrier, _use_monotonic, UseDescending, Concurrent> type; };
+
+  template<bool _use_descending>
+  struct with_descending { typedef OrderedByIntegerMetric<Indexer, Container, BlockPeriod, BSP, T, Index, UseBarrier, UseMonotonic, _use_descending, Concurrent> type; };
 
   typedef T value_type;
   typedef Index index_type;
 
 private:
   typedef typename Container::template rethread<Concurrent>::type CTy;
-  typedef Galois::flat_map<Index, CTy*> LMapTy;
-  //typedef std::map<Index, CTy*> LMapTy;
+  typedef detail::OrderedByIntegerMetricComparator<Index, UseDescending> Comparator;
+  typedef typename Comparator::template with_local_map<CTy*>::type LMapTy;
 
   struct ThreadData: public detail::OrderedByIntegerMetricData<T, Index, UseBarrier>::ThreadData {
     LMapTy local;
@@ -154,9 +200,9 @@ private:
     unsigned int lastMasterVersion;
     unsigned int numPops;
 
-    ThreadData() :
-      curIndex(std::numeric_limits<Index>::min()), 
-      scanStart(std::numeric_limits<Index>::min()),
+    ThreadData(Index initial) :
+      curIndex(initial), 
+      scanStart(initial),
       current(0), lastMasterVersion(0), numPops(0) { }
   };
 
@@ -173,7 +219,6 @@ private:
 
   bool updateLocal(ThreadData& p) {
     if (p.lastMasterVersion != masterVersion.load(std::memory_order_relaxed)) {
-      //masterLock.lock();
       for (; p.lastMasterVersion < masterVersion.load(std::memory_order_relaxed); ++p.lastMasterVersion) {
         // XXX(ddn): Somehow the second block is better than
         // the first for bipartite matching (GCC 4.7.2)
@@ -185,7 +230,6 @@ private:
         assert(logEntry.second);
 #endif
       }
-      //masterLock.unlock();
       return true;
     }
     return false;
@@ -193,23 +237,28 @@ private:
 
   GALOIS_ATTRIBUTE_NOINLINE
   Galois::optional<T> slowPop(ThreadData& p) {
-    //Failed, find minimum bin
-    updateLocal(p);
     unsigned myID = Runtime::LL::getTID();
     bool localLeader = Runtime::LL::isPackageLeaderForSelf(myID);
+    Index msS = this->identity;
+    
+    updateLocal(p);
 
-    Index msS = std::numeric_limits<Index>::min();
-    if (BSP) {
+    if (BSP && !UseMonotonic) {
       msS = p.scanStart;
       if (localLeader) {
-        for (unsigned i = 0; i < Runtime::activeThreads; ++i)
-          msS = std::min(msS, data.getRemote(i)->scanStart);
+        for (unsigned i = 0; i < Runtime::activeThreads; ++i) {
+          Index o = data.getRemote(i)->scanStart;
+          if (this->compare(o, msS))
+            msS = o;
+        }
       } else {
-        msS = std::min(msS, data.getRemote(Runtime::LL::getLeaderForThread(myID))->scanStart);
+        Index o = data.getRemote(Runtime::LL::getLeaderForThread(myID))->scanStart;
+        if (this->compare(o, msS))
+          msS = o;
       }
     }
 
-    for (auto ii = p.local.lower_bound(msS), ee = p.local.end(); ii != ee; ++ii) {
+    for (auto ii = p.local.lower_bound(msS), ei = p.local.end(); ii != ei; ++ii) {
       Galois::optional<T> item;
       if ((item = ii->second->pop())) {
         p.current = ii->second;
@@ -218,6 +267,7 @@ private:
         return item;
       }
     }
+
     return Galois::optional<value_type>();
   }
 
@@ -253,7 +303,9 @@ private:
   }
 
 public:
-  OrderedByIntegerMetric(const Indexer& x = Indexer()): masterVersion(0), indexer(x) { }
+  OrderedByIntegerMetric(const Indexer& x = Indexer()): 
+    data(this->identity),
+    masterVersion(0), indexer(x) { }
 
   ~OrderedByIntegerMetric() {
     // Deallocate in LIFO order to give opportunity for simple garbage
@@ -266,6 +318,9 @@ public:
   void push(const value_type& val) {
     Index index = indexer(val);
     ThreadData& p = *data.getLocal();
+
+    assert(!UseMonotonic || this->compare(p.curIndex, index));
+
     // Fast path
     if (index == p.curIndex && p.current) {
       p.current->push(val);
@@ -274,10 +329,10 @@ public:
 
     // Slow path
     CTy* C = updateLocalOrCreate(p, index);
-    if (BSP && index < p.scanStart)
+    if (BSP && this->compare(index, p.scanStart))
       p.scanStart = index;
     // Opportunistically move to higher priority work
-    if (!UseBarrier && index < p.curIndex) {
+    if (!UseBarrier && this->compare(index, p.curIndex)) {
       p.curIndex = index;
       p.current = C;
     }
@@ -336,7 +391,7 @@ public:
 
     for (unsigned i = 0; i < Runtime::activeThreads; ++i) {
       ThreadData& o = *data.getRemote(i);
-      if (curIndex > o.curIndex) {
+      if (o.hasWork && this->compare(o.curIndex, curIndex)) {
         curIndex = o.curIndex;
         C = o.current;
       }
@@ -347,6 +402,16 @@ public:
     
     p.current = C;
     p.curIndex = curIndex;
+
+    if (UseMonotonic) {
+      auto ii = p.local.begin();
+      for (auto ii = p.local.begin(); ii != p.local.end(); ) {
+        bool toBreak = ii->second == C;
+        ii = p.local.erase(ii);
+        if (toBreak)
+          break;
+      }
+    }
 
     return !hasWork;
   }

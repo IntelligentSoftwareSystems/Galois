@@ -5,7 +5,6 @@
 
 #include "Galois/Galois.h"
 #include "Galois/CilkInit.h"
-#include "Galois/GaloisUnsafe.h"
 #include "Galois/Statistic.h"
 #include "Galois/Runtime/TreeExec.h"
 

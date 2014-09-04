@@ -24,6 +24,7 @@
 #include "Galois/Runtime/ll/EnvCheck.h"
 #include "Galois/Runtime/ll/HWTopo.h"
 #include "Galois/Runtime/ll/TID.h"
+#include "Galois/Runtime/ll/gio.h"
 
 #include <cstdlib>
 
@@ -31,14 +32,16 @@
 // We avoid this to stress that the thread Pool MUST NOT depend on PTS.
 namespace Galois {
 namespace Runtime {
+
 extern void initPTS();
+
 }
 }
 
 
 using namespace Galois::Runtime;
 
-ThreadPool::ThreadPool(unsigned m): maxThreads(m), starting(m), masterFastmode(false), signals(m) {
+ThreadPool::ThreadPool(unsigned m): maxThreads(m), starting(m), masterFastmode(false), signals(m), running(false) {
   initThread(0);
 }
 
@@ -159,6 +162,8 @@ void ThreadPool::cascade(int tid, bool fastmode) {
 void ThreadPool::runInternal(unsigned num) {
   //sanitize num
   //seq write to starting should make work safe
+  GALOIS_ASSERT(!running, "recursive thread pool execution not supported");
+  running = true;
   num = std::min(std::max(1U,num), maxThreads);
   starting = num;
   assert(!masterFastmode || masterFastmode == num);
@@ -175,4 +180,5 @@ void ThreadPool::runInternal(unsigned num) {
   decascade(0);
   // Clean up
   work = nullptr;
+  running = false;
 }

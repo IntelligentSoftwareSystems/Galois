@@ -7,7 +7,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2014, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -24,140 +24,25 @@
 #define GALOIS_GALOIS_H
 
 #include "Galois/config.h"
-#include "Galois/WorkList/WorkList.h"
-#include "Galois/UserContext.h"
-#include "Galois/Threads.h"
-#include "Galois/Runtime/ParallelWork.h"
-#include "Galois/Runtime/Executor_OnEach.h"
+#include "Galois/Runtime/Executor_Deterministic.h"
 #include "Galois/Runtime/Executor_DoAll.h"
-#include "Galois/Runtime/DeterministicWork.h"
-#include "Galois/Runtime/OrderedWork.h"
+#include "Galois/Runtime/Executor_ForEach.h"
+#include "Galois/Runtime/Executor_OnEach.h"
+#include "Galois/Runtime/Executor_Ordered.h"
+#include "Galois/WorkList/WorkList.h"
 
 #ifdef GALOIS_USE_EXP
-#include "Galois/Runtime/ParallelWorkInline.h"
-#include "Galois/Runtime/ParaMeter.h"
+#include "Galois/Runtime/Executor_BulkSynchronous.h"
+#include "Galois/Runtime/Executor_ParaMeter.h"
 #endif
 
-#include GALOIS_CXX11_STD_HEADER(utility)
-#include GALOIS_CXX11_STD_HEADER(type_traits)
-#include GALOIS_CXX11_STD_HEADER(tuple)
+#include <utility>
+#include <tuple>
 
 /**
  * Main Galois namespace. All the core Galois functionality will be found in here.
  */
 namespace Galois {
-
-/**
- * Specify name to appear in statistics. Optional argument to {@link do_all()}
- * and {@link for_each()} loops.
- */
-struct loopname {
-  const char* n;
-  loopname(const char* n = 0) :n(n) {}
-};
-
-/**
- * Specify whether @{link do_all()} loops should perform work-stealing. Optional
- * argument to {@link do_all()} loops.
- */
-struct do_all_steal {
-  bool b;
-  do_all_steal(bool b = false) :b(b) {}
-};
-
-struct wl_tag {};
-
-/**
- * Specify worklist to use. Optional argument to {@link for_each()} loops.
- */
-template<typename WLTy, typename... Args>
-struct sWL : public wl_tag {
-  typedef WLTy WL;
-  std::tuple<Args...> args;
-  sWL(const Args&... _args) : args(_args...) {}
-};
-
-template<typename WLTy, typename... Args>
-sWL<WLTy, Args...> wl(const Args&... args) {
-  return sWL<WLTy, Args...>(args...);
-}
-
-
-namespace HIDDEN {
-
-static constexpr unsigned GALOIS_DEFAULT_CHUNK_SIZE = 32;
-typedef WorkList::dChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> defaultWL;
-
-template <typename T, typename S, int i = std::tuple_size<T>::value - 1>
-struct tuple_index {
-  enum {
-    value = std::is_base_of<S, typename std::tuple_element<i, T>::type>::value 
-    || std::is_same<S, typename std::tuple_element<i, T>::type>::value
-    ? i : tuple_index<T, S, i-1>::value
-  };
-};
-
-template <typename T, typename S>
-struct tuple_index<T, S, -1> {
-  enum { value = -1 };
-};
-
-template<int ...> struct seq {};
-template<int N, int ...S> struct gens : gens<N-1, N-1, S...> {};
-template<int ...S> struct gens<0, S...>{ typedef seq<S...> type; };
-
-template<typename WLTy, typename RangeTy, typename FunctionTy, typename... TArgs, int... S>
-void for_each_bounce(const RangeTy& range, const FunctionTy& fn, const char* loopname, const std::tuple<TArgs...>& targs, seq<S...>) {
-  Runtime::for_each_impl<WLTy>(range, fn, loopname, std::move(std::get<S>(targs))...);
-}
-
-template<typename WLTy, typename RangeTy, typename FunctionTy, typename... TArgs>
-void for_each_bounce(const RangeTy& range, const FunctionTy& fn, const char* loopname, const std::tuple<TArgs...>& targs) {
-  for_each_bounce<WLTy>(range, fn, loopname, targs, typename gens<sizeof...(TArgs)>::type());
-}
-
-template<typename RangeTy, typename FunctionTy, typename Tuple>
-void for_each_gen(const RangeTy& r, const FunctionTy& fn, Tuple tpl) {
-  typedef Tuple tupleType;
-  static_assert(-1 == tuple_index<tupleType, char*>::value, "old loopname");
-  static_assert(-1 == tuple_index<tupleType, char const*>::value, "old loopname");
-  static_assert(-1 == tuple_index<tupleType, bool>::value, "old steal");
-  // std::cout << tuple_index<tupleType, char*>::value << " "
-  //           << tuple_index<tupleType, char const*>::value << "\n";
-  constexpr unsigned iloopname = tuple_index<tupleType, loopname>::value;
-  const char* ln = std::get<iloopname>(tpl).n;
-  constexpr unsigned iwl = tuple_index<tupleType, wl_tag>::value;
-  typedef typename std::tuple_element<iwl, tupleType>::type TArgs;
-  typedef typename TArgs::WL WLTy;
-  for_each_bounce<WLTy>(r, fn, ln, std::get<iwl>(tpl).args);
-}
-
-template<typename RangeTy, typename FunctionTy, typename Tuple>
-void do_all_gen(const RangeTy& r, const FunctionTy& fn, Tuple tpl) {
-  typedef Tuple tupleType;
-  static_assert(-1 == tuple_index<tupleType, char*>::value, "old loopname");
-  static_assert(-1 == tuple_index<tupleType, char const*>::value, "old loopname");
-  static_assert(-1 == tuple_index<tupleType, bool>::value, "old steal");
-  // std::cout << tuple_index<tupleType, char*>::value << " "
-  //           << tuple_index<tupleType, char const*>::value << "\n";
-  constexpr unsigned iloopname = tuple_index<tupleType, loopname>::value;
-  constexpr unsigned isteal = tuple_index<tupleType, do_all_steal>::value;
-  const char* ln = std::get<iloopname>(tpl).n;
-  bool steal = std::get<isteal>(tpl).b;
-  Runtime::do_all_impl(r, fn, ln, steal);
-}
-
-template<typename FunctionTy, typename Tuple>
-void on_each_gen(const FunctionTy& fn, Tuple tpl) {
-  typedef Tuple tupleType;
-  static_assert(-1 == tuple_index<tupleType, char*>::value, "old loopname");
-  static_assert(-1 == tuple_index<tupleType, char const*>::value, "old loopname");
-  constexpr unsigned iloopname = tuple_index<tupleType, loopname>::value;
-  const char* ln = std::get<iloopname>(tpl).n;
-  Runtime::on_each_impl(fn, ln);
-}
-
-} // namespace HIDDEN
 
 ////////////////////////////////////////////////////////////////////////////////
 // Foreach
@@ -175,8 +60,8 @@ void on_each_gen(const FunctionTy& fn, Tuple tpl) {
  * @param args optional arguments to loop, e.g., {@see loopname}, {@see wl}
  */
 template<typename IterTy, typename FunctionTy, typename... Args>
-void for_each(IterTy b, IterTy e, const FunctionTy& fn, Args... args) {
-  HIDDEN::for_each_gen(Runtime::makeStandardRange(b,e), fn, std::make_tuple(loopname(), wl<HIDDEN::defaultWL>(), args...));
+void for_each(const IterTy& b, const IterTy& e, const FunctionTy& fn, const Args&... args) {
+  Runtime::for_each_gen(Runtime::makeStandardRange(b,e), fn, std::make_tuple(args...));
 }
 
 /**
@@ -190,9 +75,9 @@ void for_each(IterTy b, IterTy e, const FunctionTy& fn, Args... args) {
  * @param args optional arguments to loop
  */
 template<typename ItemTy, typename FunctionTy, typename... Args>
-void for_each(ItemTy i, const FunctionTy& fn, Args... args) {
+void for_each(const ItemTy& i, const FunctionTy& fn, const Args&... args) {
   ItemTy iwl[1] = {i};
-  HIDDEN::for_each_gen(Runtime::makeStandardRange(&iwl[0], &iwl[1]), fn, std::make_tuple(loopname(), wl<HIDDEN::defaultWL>(), args...));
+  Runtime::for_each_gen(Runtime::makeStandardRange(&iwl[0], &iwl[1]), fn, std::make_tuple(args...));
 }
 
 /**
@@ -206,8 +91,8 @@ void for_each(ItemTy i, const FunctionTy& fn, Args... args) {
  * @param args optional arguments to loop
  */
 template<typename ConTy, typename FunctionTy, typename... Args>
-void for_each_local(ConTy& c, const FunctionTy& fn, Args... args) {
-  HIDDEN::for_each_gen(Runtime::makeLocalRange(c), fn, std::make_tuple(loopname(), wl<HIDDEN::defaultWL>(), args...));
+void for_each_local(ConTy& c, const FunctionTy& fn, const Args&... args) {
+  Runtime::for_each_gen(Runtime::makeLocalRange(c), fn, std::make_tuple(args...));
 }
 
 /**
@@ -221,8 +106,8 @@ void for_each_local(ConTy& c, const FunctionTy& fn, Args... args) {
  * @returns fn
  */
 template<typename IterTy,typename FunctionTy, typename... Args>
-void do_all(const IterTy& b, const IterTy& e, const FunctionTy& fn, Args... args) {
-  HIDDEN::do_all_gen(Runtime::makeStandardRange(b, e), fn, std::make_tuple(loopname(), do_all_steal(), args...));
+void do_all(const IterTy& b, const IterTy& e, const FunctionTy& fn, const Args&... args) {
+  Runtime::do_all_gen(Runtime::makeStandardRange(b, e), fn, std::make_tuple(args...));
 }
 
 /**
@@ -236,8 +121,8 @@ void do_all(const IterTy& b, const IterTy& e, const FunctionTy& fn, Args... args
  * @returns fn
  */
 template<typename ConTy,typename FunctionTy, typename... Args>
-void do_all_local(ConTy& c, const FunctionTy& fn, Args... args) {
-  HIDDEN::do_all_gen(Runtime::makeLocalRange(c), fn, std::make_tuple(loopname(), do_all_steal(), args...));
+void do_all_local(ConTy& c, const FunctionTy& fn, const Args&... args) {
+  Runtime::do_all_gen(Runtime::makeLocalRange(c), fn, std::make_tuple(args...));
 }
 
 /**
@@ -250,8 +135,8 @@ void do_all_local(ConTy& c, const FunctionTy& fn, Args... args) {
  * @param args optional arguments to loop (only loopname supported)
  */
 template<typename FunctionTy, typename... Args>
-void on_each(const FunctionTy& fn, Args... args) {
-  HIDDEN::on_each_gen(fn, std::make_tuple(loopname(), args...));
+void on_each(const FunctionTy& fn, const Args&... args) {
+  Runtime::on_each_gen(fn, std::make_tuple(args...));
 }
 
 /**

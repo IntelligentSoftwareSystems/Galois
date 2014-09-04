@@ -339,7 +339,7 @@ void smat_x_dmat(const smat_t &X, const double* W, size_t k, double *H)
                           Hi[k-1] += Xij*Wj[k-1];
 		}
 #ifdef EXP_DOALL_GALOIS
-        }, Galois::do_all_steal(true));
+        }, Galois::do_all_steal<>());
 #else
         }
 #endif
@@ -378,7 +378,7 @@ void smat_x_dmat(const double a, const smat_t &X, const double* W, const size_t 
                           Hi[k-1] += Xij*Wj[k-1];
 		}
 #ifdef EXP_DOALL_GALOIS
-        }, Galois::do_all_steal(true));
+        }, Galois::do_all_steal<>());
 #else
         }
 #endif

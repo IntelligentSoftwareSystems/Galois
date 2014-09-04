@@ -27,10 +27,10 @@
 
 #include "Galois/gdeque.h"
 #include "Galois/gslist.h"
+#include "Galois/Runtime/LoopStatistics.h"
 
 // #include <array> if c++11
 #include <boost/array.hpp>
-
 #include <boost/mpl/has_xxx.hpp>
 
 namespace Galois {
@@ -583,12 +583,7 @@ static inline void for_each_task(IterTy b, IterTy e, const char* loopname = 0) {
   WorkTy W(b, e, loopname);
   
   using namespace Galois::Runtime;
-
-  assert(!inGaloisForEach);
-
-  inGaloisForEach = true;
   getSystemThreadPool().run(activeThreads, std::bind(&WorkTy::initThread, std::ref(W)), std::ref(W));
-  inGaloisForEach = false;
 }
 
 template<typename PipelineTy,typename TaskTy>

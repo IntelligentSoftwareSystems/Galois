@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2014, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -21,21 +21,21 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 #include "Galois/Statistic.h"
+#include "Galois/gdeque.h"
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/Support.h"
-#include "Galois/gdeque.h"
-#include "Galois/Runtime/ll/StaticInstance.h"
-#include "Galois/Runtime/ll/PaddedLock.h"
 #include "Galois/Runtime/ll/gio.h"
+#include "Galois/Runtime/ll/PaddedLock.h"
+#include "Galois/Runtime/ll/StaticInstance.h"
 #include "Galois/Runtime/mm/Mem.h"
 
-#include <set>
-#include <map>
-#include <vector>
-#include <string>
 #include <cmath>
+#include <map>
 #include <mutex>
 #include <numeric>
+#include <set>
+#include <string>
+#include <vector>
 
 using namespace Galois;
 using namespace Galois::Runtime;
@@ -125,8 +125,6 @@ public:
 static LL::StaticInstance<StatManager> SM;
 
 }
-
-bool Galois::Runtime::inGaloisForEach = false;
 
 void Galois::Runtime::reportStat(const char* loopname, const char* category, unsigned long value) {
   SM.get()->addToStat(std::string(loopname ? loopname : "(NULL)"), 

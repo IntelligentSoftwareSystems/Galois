@@ -1,13 +1,11 @@
 /** Level-by-Level executor -*- C++ -*-
  * @file
- * This is the only file to include for basic Galois functionality.
- *
  * @section License
  *
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2014, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -19,19 +17,17 @@
  * related expenses which may arise from use of Software or Documentation,
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
+ *
+ * @author M. Amber Hassaan <ahassaan@ices.utexas.edu>
  */
+#ifndef GALOIS_RUNTIME_LEVELEXECUTOR_H
+#define GALOIS_RUNTIME_LEVELEXECUTOR_H
 
-#ifndef GALOIS_RUNTIME_LEVEL_EXECUTOR_H
-#define GALOIS_RUNTIME_LEVEL_EXECUTOR_H
-
-#include <map>
-#include <vector>
-
-
+#if 0
 #include "Galois/Accumulator.h"
-#include "Galois/optional.h"
 #include "Galois/Galois.h"
 #include "Galois/GaloisUnsafe.h"
+#include "Galois/optional.h"
 #include "Galois/PriorityQueue.h"
 #include "Galois/Runtime/UserContextAccess.h"
 #include "Galois/WorkList/WorkList.h"
@@ -39,6 +35,8 @@
 #include "Galois/Runtime/ll/ThreadRWlock.h"
 #include "Galois/Runtime/mm/Mem.h"
 
+#include <map>
+#include <vector>
 
 namespace Galois {
 namespace Runtime {
@@ -53,7 +51,6 @@ namespace {
 
 template <typename Key, typename KeyCmp, typename WL_ty>
 class LevelMap {
-
 public:
   using value_type = typename WL_ty::value_type;
   using MapAlloc = MM::FixedSizeAllocator<std::pair<const Key, WL_ty*> >;
@@ -63,9 +60,7 @@ public:
   using Level = std::pair<Key, WL_ty*>;
   using CachedLevel = Galois::optional<Level>;
 
-
 private:
-  
   LL::ThreadRWlock rwmutex;
   InternalMap levelMap;
   WLalloc wlAlloc;
@@ -73,7 +68,6 @@ private:
   PerThreadStorage<CachedLevel> cachedLevels;
 
 public:
-
   LevelMap (const KeyCmp& kcmp): 
     rwmutex (), 
     levelMap (kcmp) 
@@ -142,7 +136,6 @@ public:
       removedLevels.pop_front ();
       wlAlloc.destroy (wl);
       wlAlloc.deallocate (wl, 1);
-
     }
   }
 };
@@ -152,7 +145,6 @@ public:
 
 template <typename WL_ty>
 class LevelMap<unsigned, std::less<unsigned>, WL_ty> {
-
 public:
   using value_type = typename WL_ty::value_type;
   using WLalloc = MM::FixedSizeAllocator<WL_ty>;
@@ -162,7 +154,6 @@ public:
   using CachedLevel = Galois::optional<Level>;
 
 private:
-
   LL::ThreadRWlock rwmutex;
   InternalMap levelMap;
   WLalloc wlAlloc;
@@ -172,7 +163,6 @@ private:
   unsigned begLevel = 0;
 
 public:
-
   LevelMap (const std::less<unsigned>&) {}
 
   bool empty (void) const {
@@ -216,7 +206,6 @@ public:
 #else
     {
 #endif
-
       const unsigned index = k - begLevel;
 
       rwmutex.readLock ();
@@ -237,13 +226,11 @@ public:
 
             levelMap.push_back (std::make_pair (i + begLevel, wl));
           }
-          
         }
         rwmutex.writeUnlock ();
 
         // read again now
         rwmutex.readLock ();
-
       }
 
       assert (levelMap.size () > index);
@@ -273,7 +260,6 @@ public:
 
 #endif // USE_DENSE_LEVELS
 
-
 template <bool CanAbort> 
 struct InheritTraits {
   typedef char tt_does_not_need_push;
@@ -302,11 +288,7 @@ class LevelExecutor {
   struct BodyWrapper;
   using ForEachExec_ty = Galois::Runtime::ForEachWork<WorkList::ExternPtr<WL_ty>, T, BodyWrapper>;
 
-
-
   struct BodyWrapper: public InheritTraits<ForEachTraits<OpFunc>::NeedsAborts> {
-
-
     KeyFn& keyFn;
     NhoodFunc& nhVisit;
     OpFunc& opFunc;
@@ -458,8 +440,6 @@ public:
   void operator () (void) {
     go ();
   }
-
-
 };
 
 } // end namespace impl
@@ -475,22 +455,74 @@ void for_each_ordered_level (const R& range, const KeyFn& keyFn, const KeyCmp& k
   Exec_ty exec (keyFn, kcmp, nhVisit, opFunc, loopname);
   Barrier& barrier = getSystemBarrier ();
 
-  if (inGaloisForEach) {
-    GALOIS_DIE ("Nested parallelism not supported yet");
-  }
-
-  inGaloisForEach = true;
-
   getSystemThreadPool ().run (Galois::getActiveThreads (),
     std::bind (&Exec_ty::template fill_initial<R>, std::ref (exec), range),
     std::ref (barrier),
     std::ref (exec));
-
-  inGaloisForEach = false;
-
 }
 
 } // end namespace Runtime
 } // end namespace Galois
+
+#else
+
+#include "Galois/GaloisForwardDecl.h"
+#include "Galois/gtuple.h"
+#include "Galois/Runtime/ForEachTraits.h"
+#include "Galois/WorkList/Obim.h"
+
+namespace Galois {
+namespace Runtime {
+
+template<int... Is, typename R, typename OpFn, typename TupleTy>
+constexpr auto for_each_ordered_level_(int_seq<Is...>, const R& range, const OpFn& opFn, const TupleTy& tpl, int)
+  -> decltype(std::declval<typename R::container_type>(), void()) 
+{
+  for_each_local(range.get_container(), opFn, std::get<Is>(tpl)...);
+}
+
+template<int... Is, typename R, typename OpFn, typename TupleTy>
+constexpr auto for_each_ordered_level_(int_seq<Is...>, const R& range, const OpFn& opFn, const TupleTy& tpl, ...) 
+  -> void
+{
+  for_each(range.begin(), range.end(), opFn, std::get<Is>(tpl)...);
+}
+
+template<typename R, typename KeyFn, typename KeyCmp, typename NhoodFn, typename OpFn>
+void for_each_ordered_level(const R& range, const KeyFn& keyFn, const KeyCmp& keyCmp, const NhoodFn& nhoodFn, const OpFn& opFn, const char* ln=0) {
+  typedef typename R::value_type value_type;
+  typedef typename std::result_of<KeyFn(value_type)>::type key_type;
+  constexpr bool is_less = std::is_same<KeyCmp, std::less<key_type>>::value;
+  constexpr bool is_greater = std::is_same<KeyCmp, std::greater<key_type>>::value;
+  static_assert(is_less || is_greater && !(is_less && is_greater), "Arbitrary key comparisons not yet supported");
+  constexpr unsigned chunk_size = OpFn::CHUNK_SIZE;
+
+  typedef typename WorkList::OrderedByIntegerMetric<>
+    ::template with_container<WorkList::dChunkedFIFO<chunk_size>>::type
+    ::template with_indexer<KeyFn>::type
+    ::template with_barrier<true>::type 
+    ::template with_descending<is_greater>::type
+    ::template with_monotonic<true>::type WL;
+  auto args = std::tuple_cat(
+      typename Galois::Runtime::DEPRECATED::ExtractForEachTraits<OpFn>::values_type {},
+      std::make_tuple(
+              Galois::loopname(ln),
+              Galois::wl<WL>(keyFn)));
+  for_each_ordered_level_(
+      make_int_seq<std::tuple_size<decltype(args)>::value>(),
+      range, 
+      [&](value_type& x, UserContext<value_type>& ctx) {
+        nhoodFn(x, ctx);
+        opFn(x, ctx);
+      }, 
+      args, 
+      0);
+}
+
+}
+}
+
+#endif
+
 
 #endif // GALOIS_RUNTIME_LEVEL_EXECUTOR_H

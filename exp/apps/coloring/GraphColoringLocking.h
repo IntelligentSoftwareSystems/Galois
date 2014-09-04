@@ -3,7 +3,7 @@
 
 #include "GraphColoringBase.h"
 
-#include "Galois/GaloisUnsafe.h"
+#include "Galois/WorkList/ExternalReference.h"
 
 struct NodeData {
   unsigned color;
@@ -65,16 +65,9 @@ protected:
 
     typedef Galois::WorkList::OrderedByIntegerMetric<GetPriority, WL_ty> OBIM;
 
-    OBIM wl {GetPriority {graph} };
-
-    Galois::on_each (
-        [&] (const unsigned tid, const unsigned numT) {
-          wl.push_initial (Galois::Runtime::makeLocalRange (graph));
-        }, 
-        Galois::loopname ("wl_init"));
-
-    Galois::for_each_wl ( wl, ColorNodeLocking {*this}, "color-obim");
-
+    Galois::for_each_local(graph, 
+        ColorNodeLocking {*this}, Galois::loopname("color-obim"), 
+        Galois::wl<OBIM>(GetPriority {graph}));
   }
 
   virtual void colorGraph (void) {

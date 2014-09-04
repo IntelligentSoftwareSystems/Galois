@@ -1,4 +1,4 @@
-#include "Galois/Runtime/ParaMeter.h"
+#include "Galois/Runtime/Executor_ParaMeter.h"
 
 static const unsigned FNAME_SIZE = 256;
 static char statsFileName[FNAME_SIZE];
@@ -9,10 +9,10 @@ static bool& firstRun() {
 }
 
 static void printHeader(FILE* out) {
-   fprintf(out, "LOOPNAME, STEP, PARALLELISM, WORKLIST_SIZE\n");
+  fprintf(out, "LOOPNAME, STEP, PARALLELISM, WORKLIST_SIZE\n");
 }
 
-void Galois::Runtime::ParaMeterInit::init() {
+void Galois::Runtime::ParaMeter::createStatsFile() {
   if (firstRun()) {
     firstRun() = false;
 
@@ -30,6 +30,6 @@ void Galois::Runtime::ParaMeterInit::init() {
   }
 }
 
-const char* Galois::Runtime::ParaMeterInit::getStatsFileName() {
+const char* Galois::Runtime::ParaMeter::getStatsFileName() {
   return statsFileName;
 }

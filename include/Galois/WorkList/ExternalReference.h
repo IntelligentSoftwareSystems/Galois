@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2014, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -23,68 +23,27 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#ifndef GALOIS_WORKLIST_EXTERNREF_H
-#define GALOIS_WORKLIST_EXTERNREF_H
+#ifndef GALOIS_WORKLIST_EXTERNALREFERENCE_H
+#define GALOIS_WORKLIST_EXTERNREFEFERENCE_H
 
 namespace Galois {
 namespace WorkList {
 
-template<typename Container, bool pushinit = true>
-struct ExternRef {
+template<typename Container, bool IgnorePushInitial = false>
+struct ExternalReference {
   //! change the concurrency flag
   template<bool _concurrent>
-  struct rethread { typedef ExternRef<typename Container::template rethread<_concurrent>::type> type; };
+  struct rethread { typedef ExternalReference<typename Container::template rethread<_concurrent>::type> type; };
   
   //! change the type the worklist holds
   template<typename _T>
-  struct retype { typedef ExternRef<typename Container::template retype<_T>::type> type; };
-
-private:
-  Container& wl;
-
-public:
-  ExternRef(Container& _wl) :wl(_wl) {}
-
-  //! T is the value type of the WL
-  typedef typename Container::value_type value_type;
-
-  //! push a value onto the queue
-  void push(const value_type& val) { wl.push(val); }
-
-  //! push a range onto the queue
-  template<typename Iter>
-  void push(Iter b, Iter e) { wl.push(b,e); }
-
-  //! push initial range onto the queue
-  //! called with the same b and e on each thread
-  template<typename RangeTy>
-  void push_initial(const RangeTy& r) { if (pushinit) wl.push_initial(r); }
-
-  //! pop a value from the queue.
-  Galois::optional<value_type> pop() { return wl.pop(); }
-};
-
-template<typename Container, bool pushinit = true>
-struct ExternPtr {
-  //! change the concurrency flag
-  template<bool _concurrent>
-  struct rethread { typedef ExternPtr<typename Container::template rethread<_concurrent>::type> type; };
-  
-  //! change the type the worklist holds
-  template<typename _T>
-  struct retype { typedef ExternPtr<typename Container::template retype<_T>::type> type; };
+  struct retype { typedef ExternalReference<typename Container::template retype<_T>::type> type; };
 
 private:
   Container* wl;
 
 public:
-  ExternPtr(Container* _wl) :wl(_wl) {
-    assert (wl != nullptr);
-  }
-
-  ExternPtr (const Container& _wl): wl (const_cast<Container*> (&_wl)) {
-    assert (wl != nullptr);
-  }
+  ExternalReference(Container* _wl) :wl(_wl) {}
 
   //! T is the value type of the WL
   typedef typename Container::value_type value_type;
@@ -99,7 +58,7 @@ public:
   //! push initial range onto the queue
   //! called with the same b and e on each thread
   template<typename RangeTy>
-  void push_initial(const RangeTy& r) { if (pushinit) { wl->push_initial(r); } }
+  void push_initial(const RangeTy& r) { if (!IgnorePushInitial) wl->push_initial(r); }
 
   //! pop a value from the queue.
   Galois::optional<value_type> pop() { return wl->pop(); }

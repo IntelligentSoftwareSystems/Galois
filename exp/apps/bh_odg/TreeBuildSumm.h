@@ -295,7 +295,7 @@ struct BuildTreeLockFree {
       
     Galois::do_all (beg, end, 
         BuildOperator<TreeAlloc, InternalNodes> {treeAlloc, internalNodes, root, box.radius ()},
-        Galois::do_all_steal(true));
+        Galois::do_all_steal<true>());
 
     return root;
   }
@@ -553,6 +553,9 @@ struct TreeSummarizeODG: public TypeDefHelper<SerialNodeBase> {
   template <typename I>
   void operator () (InterNode* root, I bodbeg, I bodend) const {
     WL_ty wl;
+    typedef Galois::WorkList::ExternalReference<WL_ty> WL;
+    typedef typename WL_ty::value_type value_type;
+    value_type* it = nullptr;
     std::vector<ODGnode> odgNodes;
 
     Galois::StatTimer t_fill_wl ("Time to fill worklist for tree summarization: ");
@@ -565,8 +568,9 @@ struct TreeSummarizeODG: public TypeDefHelper<SerialNodeBase> {
 
     Galois::Runtime::beginSampling ();
     t_feach.start ();
+
     // Galois::for_each_wl<Galois::Runtime::WorkList::ParaMeter<WL_ty> > (wl, SummarizeOp (odgNodes), "tree_summ");
-    Galois::for_each_wl (wl, SummarizeOp (odgNodes), "tree_summ");
+    Galois::for_each(it, it, SummarizeOp (odgNodes), Galois::loopname("tree_summ"), Galois::wl<WL>(&wl));
     t_feach.stop ();
     Galois::Runtime::endSampling ();
 
@@ -716,7 +720,7 @@ struct TreeSummarizeSpeculative: public TypeDefHelper<SpecNodeBase> {
 
 
     template <typename C>
-    void operator () (InterNode* node, C& ctx) {
+    void operator () (InterNode* node, C& ctx) const {
 
       if (useSpec) {
         double orig_mass = node->mass;
@@ -804,10 +808,12 @@ struct TreeSummarizeLevelExec: public TypeDefHelper<LevelNodeBase> {
 
   template <typename I, typename InternalNodes>
   void operator () (InterNode* root, I bodbeg, I bodend, InternalNodes& internalNodes) const {
-
+    Galois::StatTimer tt;
+    tt.start();
     Galois::Runtime::for_each_ordered_level (
         Galois::Runtime::makeLocalRange (internalNodes),
         GetLevel (), std::greater<unsigned> (), VisitNhood (), OpFunc ());
+    tt.stop();
 
   }
 };
@@ -869,7 +875,7 @@ struct TreeSummarizeKDGhand: public TypeDefHelper<KDGNodeBase> {
     typedef Galois::WorkList::AltChunkedLIFO<CHUNK_SIZE, InterNode*> WL_ty;
 
     if (!skipVerify) {
-      std::cerr << "KDG hand checking the tree. Timing may be off" << std::endl;
+      std::cout << "KDG hand checking the tree. Timing may be off" << std::endl;
       checkTree (root);
     }
 

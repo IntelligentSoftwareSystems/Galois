@@ -169,7 +169,7 @@ public:
 					barXv[idx] += XV[i*k+s]*H[j*k+s];
 			}
 #ifdef EXP_DOALL_GALOIS
-                }, Galois::do_all_steal(false));
+                });
 #else
                 }
 #endif
@@ -381,7 +381,7 @@ public:
 					barXv[idx] += XV[i*k+s]*H[j*k+s];
 			}
 #ifdef EXP_DOALL_GALOIS
-                }, Galois::do_all_steal(false));
+                });
 #else
 		}
 #endif
@@ -432,7 +432,7 @@ public:
 #endif
 			z[i] = C[i]*z[i];
 #ifdef EXP_DOALL_GALOIS
-                }, Galois::do_all_steal(false));
+                });
 #else
                 }
 #endif
@@ -450,7 +450,7 @@ public:
 #endif
                         D[i]*=C[i];
 #ifdef EXP_DOALL_GALOIS
-                }, Galois::do_all_steal(false));
+                });
 #else
                 }
 #endif
@@ -511,7 +511,7 @@ public:
 					barXv[idx] += XV[i*k+s]*H[j*k+s];
 			}
 #ifdef EXP_DOALL_GALOIS
-                }, Galois::do_all_steal(false));
+                });
 #else
 		}
 #endif
@@ -566,7 +566,7 @@ public:
 			D[i] = C[i]*z[i]*(1-z[i]);
 			z[i] = C[i]*(z[i]-1)*y[i];
 #ifdef EXP_DOALL_GALOIS
-                }, Galois::do_all_steal(false));
+                });
 #else
 		}
 #endif
@@ -586,7 +586,7 @@ public:
 #endif
                         wa[i]*=D[i];
 #ifdef EXP_DOALL_GALOIS
-                }, Galois::do_all_steal(false));
+                });
 #else
                 }
 #endif
@@ -648,7 +648,7 @@ public:
 					barXv[idx] += XV[i*k+s]*H[j*k+s];
 			}
 #ifdef EXP_DOALL_GALOIS
-                }, Galois::do_all_steal(false));
+                });
 #else
 		}
 #endif
@@ -681,7 +681,7 @@ public:
 				} else barXv[idx] = 0;
 			}
 #ifdef EXP_DOALL_GALOIS
-                }, Galois::do_all_steal(false));
+                });
 #else
 		}
 #endif
@@ -744,7 +744,7 @@ public:
 #endif
                           D[i]*=C[i];
 #ifdef EXP_DOALL_GALOIS
-                }, Galois::do_all_steal(false));
+                });
 #else
                 }
 #endif
@@ -764,7 +764,7 @@ static void construct_C_array(double *C, smat_t *Y, double Cp, double Cn){
 #endif
 		C[i] = y[i] > 0 ? Cp:Cn;
 #ifdef EXP_DOALL_GALOIS
-        }, Galois::do_all_steal(false));
+        });
 #else
         }
 #endif
@@ -993,7 +993,7 @@ void bilinear_predict_full(const bilinear_problem* prob, const double *H, biline
 			top_real_acc[p] += correct_cnt;
 		}
 #ifdef EXP_DOALL_GALOIS
-        }, Galois::do_all_steal(false));
+        });
 #else
 	}
 #endif
@@ -1101,7 +1101,7 @@ void bilinear_predict(const bilinear_problem* prob, const double *W, const doubl
 			top_real_acc[p] += correct_cnt;
 		}
 #ifdef EXP_DOALL_GALOIS
-        }, Galois::do_all_steal(false));
+        });
 #else
 	}
 #endif

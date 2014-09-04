@@ -67,7 +67,7 @@ class LevelExecBFS: public BFS<Level_ty> {
     explicit VisitNhood (Graph& graph): graph (graph) {}
 
     template <typename C>
-    void operator () (const Update& up, C& ctx) {
+    void operator () (const Update& up, C& ctx) const {
 
       // just like DES, we only lock the node being updated, but not its
       // outgoing neighbors
@@ -87,7 +87,7 @@ class LevelExecBFS: public BFS<Level_ty> {
     OpFunc (Graph& graph, ParCounter& numIter): graph (graph), numIter (numIter) {}
 
     template <typename C>
-    void operator () (const Update& up, C& ctx) {
+    void operator () (const Update& up, C& ctx) const {
 
       if (graph.getData (up.node, Galois::NONE) == BFS_LEVEL_INFINITY) {
 

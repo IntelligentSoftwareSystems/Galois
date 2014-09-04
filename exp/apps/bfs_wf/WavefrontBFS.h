@@ -28,22 +28,19 @@
 #ifndef WAVEFRONT_BFS_H_
 #define WAVEFRONT_BFS_H_
 
+#include "Galois/Accumulator.h"
+#include "Galois/AltBag.h"
+#include "Galois/DoAllWrap.h"
+#include "Galois/Runtime/PerThreadContainer.h"
+#include "Galois/WorkList/ExternalReference.h"
+
+#include "bfs.h"
+
 #include <string>
 #include <sstream>
 #include <limits>
 #include <iostream>
 #include <set>
-
-#include "Galois/GaloisUnsafe.h"
-#include "Galois/Accumulator.h"
-// #include "Galois/Bag.h"
-
-#include "Galois/Runtime/PerThreadContainer.h"
-#include "Galois/DoAllWrap.h"
-#include "Galois/AltBag.h"
-
-#include "bfs.h"
-
 
 class AbstractWavefrontBFS: public BFS<unsigned> {
 
@@ -213,19 +210,18 @@ protected:
   friend class BFSwavefrontNolock;
 
 private:
-
-
-
-
   template <bool doLock>
   struct ParallelInnerLoop {
     GALOIS_ATTRIBUTE_PROF_NOINLINE unsigned operator () (Graph& graph, GaloisWL& currWL, GaloisWL& nextWL) const {
+      typedef typename GaloisWL::value_type value_type;
+      typedef Galois::WorkList::ExternalReference<GaloisWL> WL;
+
+      value_type *it = nullptr;
 
       ParCounter numAdds;
 
       ForEachFunctor<doLock, GaloisWL, Super_ty::NodeData_ty> l (graph, nextWL, numAdds);
-      Galois::for_each_wl (currWL, l);
-      // Galois::for_each_wl <Galois::Runtime::WorkList::ParaMeter<GaloisWL> > (currWL, l);
+      Galois::for_each(it, it, l, Galois::wl<WL>(&currWL));
 
       return numAdds.reduce ();
     }

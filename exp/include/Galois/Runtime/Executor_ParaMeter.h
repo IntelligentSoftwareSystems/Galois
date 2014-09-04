@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2014, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -20,59 +20,51 @@
  *
  * @section Description
  *
- * Implementation of ParaMeter runtime
- * Ordered with speculation not supported yet
+ * Implementation of ParaMeter runtime.  Ordered with speculation not supported
+ * yet
  *
  * @author Amber Hassaan <ahassaan@ices.utexas.edu>
  */
-#ifndef GALOIS_RUNTIME_PARAMETER_H
-#define GALOIS_RUNTIME_PARAMETER_H
+#ifndef GALOIS_RUNTIME_EXECUTOR_PARAMETER_H
+#define GALOIS_RUNTIME_EXECUTOR_PARAMETER_H
 
-#include "Galois/TypeTraits.h"
+#include "Galois/gtuple.h"
+#include "Galois/Traits.h"
 #include "Galois/Mem.h"
-
 #include "Galois/Runtime/Context.h"
-#include "Galois/Runtime/ForEachTraits.h"
-#include "Galois/Runtime/ParallelWork.h"
+#include "Galois/Runtime/Executor_ForEach.h"
 #include "Galois/Runtime/Support.h"
-#include "Galois/Runtime/Termination.h"
-#include "Galois/Runtime/ThreadPool.h"
-#include "Galois/WorkList/GFifo.h"
 #include "Galois/Runtime/ll/gio.h"
+#include "Galois/WorkList/GFifo.h"
 
-#include "llvm/Support/CommandLine.h"
-
-#include <deque>
-#include <vector>
 #include <algorithm>
+#include <cstdio>
 #include <cstdlib>
 #include <ctime>
-#include <cstdio>
+#include <deque>
+#include <vector>
 
 namespace Galois {
-namespace WorkList {
-template<class ContainerTy = GFIFO<>,class T=int>
-class ParaMeter: private boost::noncopyable {
-};
-}
-
 namespace Runtime {
+namespace ParaMeter {
 
-namespace ParaMeterInit {
-  void init();
-  const char* getStatsFileName();
-}
-
-namespace {
+// TODO(ddn): Take stats file as a trait or from loopname
+void createStatsFile();
+const char* getStatsFileName();
 
 // Single ParaMeter stats file per run of an app
 // which includes all instances of for_each loops
 // run with ParaMeter Executor
-template<class ContainerTy,class T, class FunctionTy>
-class ForEachWork<Galois::WorkList::ParaMeter<ContainerTy>,T,FunctionTy> {
+template<class T, class FunctionTy, class ArgsTy>
+class ParaMeterExecutor {
   typedef T value_type;
-  typedef Galois::Runtime::UserContextAccess<value_type> UserContextTy;
-  typedef typename ContainerTy::template retype<value_type>::WL WorkListTy;
+  typedef typename WorkList::GFIFO<>::template retype<value_type>::type WorkListTy;
+
+  static const bool needsStats = !exists_by_supertype<does_not_need_stats_tag, ArgsTy>::value;
+  static const bool needsPush = !exists_by_supertype<does_not_need_push_tag, ArgsTy>::value;
+  static const bool needsAborts = !exists_by_supertype<does_not_need_aborts_tag, ArgsTy>::value;
+  static const bool needsPia = exists_by_supertype<needs_per_iter_alloc_tag, ArgsTy>::value;
+  static const bool needsBreak = exists_by_supertype<needs_parallel_break_tag, ArgsTy>::value;
 
   struct StepStats {
     size_t step;
@@ -87,22 +79,15 @@ class ForEachWork<Galois::WorkList::ParaMeter<ContainerTy>,T,FunctionTy> {
   };
 
   struct IterationContext {
-    UserContextTy facing;
+    Galois::Runtime::UserContextAccess<value_type> facing;
     SimpleRuntimeContext ctx;
 
     void resetUserCtx() {
-      if (ForEachTraits<FunctionTy>::NeedsPIA) {
+      if (needsPia)
         facing.resetAlloc();
-      }
 
-      if (ForEachTraits<FunctionTy>::NeedsPush) {
+      if (needsPush)
         facing.getPushBuffer().clear();
-      }
-
-      if (ForEachTraits<FunctionTy>::NeedsBreak) {
-        // TODO: no support for breaks yet
-        // facing.resetBreak();
-      }
     }
   };
 
@@ -150,7 +135,6 @@ class ForEachWork<Galois::WorkList::ParaMeter<ContainerTy>,T,FunctionTy> {
       next = new WorkListTy();
     }
   };
-
 
   void go() {
     beginLoop();
@@ -302,8 +286,8 @@ class ForEachWork<Galois::WorkList::ParaMeter<ContainerTy>,T,FunctionTy> {
   }
 
   unsigned commitIteration(IterationContext& it) {
-    if (ForEachTraits<FunctionTy>::NeedsPush) {
-      for (typename UserContextTy::pushBufferTy::iterator a = it.facing.getPushBuffer().begin(),
+    if (needsPush) {
+      for (auto a = it.facing.getPushBuffer().begin(),
           ea = it.facing.getPushBuffer().end(); a != ea; ++a) {
         workList.getNext().push(*a);
       }
@@ -313,27 +297,25 @@ class ForEachWork<Galois::WorkList::ParaMeter<ContainerTy>,T,FunctionTy> {
   }
 
 public:
-  ForEachWork(FunctionTy& f, const char* ln): function(f), loopname(ln) { }
+  static_assert(!needsBreak, "not supported by this executor");
 
-  ForEachWork (WorkListTy& wl, FunctionTy& f, const char* ln) 
-    : workList (wl), function (f), loopname (ln) 
-  {}
+  ParaMeterExecutor(FunctionTy& f, const ArgsTy& args): function(f), 
+    loopname(get_by_supertype<loopname_tag>(args).value) { }
 
-  template<typename IterTy>
-  bool AddInitialWork(IterTy b, IterTy e) {
-    workList.getCurr().push_initial(b, e);
-    return true;
-  }
-
-  void initThread() {}
-
-  void operator()() {
-    ParaMeterInit::init();
-    pstatsFile = fopen(ParaMeterInit::getStatsFileName(), "a"); // open in append mode
+  template<typename RangeTy>
+  void init(const RangeTy& range) {
+    workList.getCurr().push_initial(range.begin(), range.end());
+    createStatsFile();
+    pstatsFile = fopen(getStatsFileName(), "a"); // open in append mode
     go();
     fclose(pstatsFile);
     pstatsFile = NULL;
   }
+
+  template<typename RangeTy>
+  void initThread(const RangeTy& range) { }
+
+  void operator()() { }
 
 private:
   ParaMeterWorkList workList;
@@ -346,13 +328,36 @@ private:
   std::vector<StepStats> allSteps;
 };
 
-
-} // end namespace
 }
 }
 
-#else
-#warning Reincluding ParaMeter
-#endif // GALOIS_RUNTIME_PARAMETER_H
+namespace WorkList {
 
+template<class T=int>
+class ParaMeter {
+public:
+  template<bool _concurrent>
+  struct rethread { typedef ParaMeter<T> type; };
 
+  template<typename _T>
+  struct retype { typedef ParaMeter<_T> type; };
+
+  typedef T value_type;
+};
+
+}
+
+namespace Runtime {
+
+template<class T, class FunctionTy, class ArgsTy>
+class ForEachExecutor<Galois::WorkList::ParaMeter<T>, FunctionTy, ArgsTy>:
+  public ParaMeter::ParaMeterExecutor<T, FunctionTy, ArgsTy> 
+{
+  typedef ParaMeter::ParaMeterExecutor<T, FunctionTy, ArgsTy> SuperTy;
+  ForEachExecutor(const FunctionTy& f, const ArgsTy& args): SuperTy(f, args) { }
+};
+
+}
+
+}
+#endif

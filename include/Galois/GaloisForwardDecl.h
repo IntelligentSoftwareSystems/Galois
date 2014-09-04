@@ -1,11 +1,14 @@
-/** Galois user interface -*- C++ -*-
+/** Forward Declarations -*- C++ -*-
  * @file
+ *
+ * Forward declarations to avoid circular dependencies in runtime components.
+ *
  * @section License
  *
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2014, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -18,28 +21,17 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  */
-#ifndef GALOIS_THREADS_H
-#define GALOIS_THREADS_H
+#include "Galois/UserContext.h"
 
 namespace Galois {
-namespace Runtime {
 
-extern unsigned int activeThreads;
+template<typename IterTy,typename FunctionTy, typename... Args>
+void do_all(const IterTy& b, const IterTy& e, const FunctionTy& fn, const Args&... args);
 
-}
+template<typename ConTy,typename FunctionTy, typename... Args>
+void do_all_local(ConTy& c, const FunctionTy& fn, const Args&... args);
 
-/**
- * Sets the number of threads to use when running any Galois iterator. Returns
- * the actual value of threads used, which could be less than the requested
- * value. System behavior is undefined if this function is called during
- * parallel execution or after the first parallel execution.
- */
-unsigned int setActiveThreads(unsigned int num) noexcept;
-
-/**
- * Returns the number of threads in use.
- */
-unsigned int getActiveThreads() noexcept;
+template<typename IterTy,typename FunctionTy, typename... Args>
+void for_each(const IterTy& b, const IterTy& e, const FunctionTy& fn, const Args&... args);
 
 }
-#endif
