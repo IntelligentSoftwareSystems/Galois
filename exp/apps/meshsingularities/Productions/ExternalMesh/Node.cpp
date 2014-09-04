@@ -107,34 +107,19 @@ void Node::merge() const
 {
     for (int i=getLeft()->getDofsToElim(); i<getLeft()->getDofs().size(); ++i) {
         for (int j=getLeft()->getDofsToElim(); j<getLeft()->getDofs().size(); ++j) {
-            //system->matrix[leftPlaces[i-getLeft()->getDofsToElim()]][leftPlaces[j-getLeft()->getDofsToElim()]] =
-            //        left->system->matrix[i][j];
+            system->matrix[leftPlaces[i-getLeft()->getDofsToElim()]][leftPlaces[j-getLeft()->getDofsToElim()]] =
+                    left->system->matrix[i][j];
         }
-        //system->rhs[leftPlaces[i-getLeft()->getDofsToElim()]] = left->system->rhs[i];
+        system->rhs[leftPlaces[i-getLeft()->getDofsToElim()]] = left->system->rhs[i];
     }
 
     for (int i=getRight()->getDofsToElim(); i<getRight()->getDofs().size(); ++i) {
         for (int j=getRight()->getDofsToElim(); j<getRight()->getDofs().size(); ++j) {
-            //system->matrix[rightPlaces[i-getRight()->getDofsToElim()]][rightPlaces[j-getRight()->getDofsToElim()]] =
-                   // right->system->matrix[i][j];
+            system->matrix[rightPlaces[i-getRight()->getDofsToElim()]][rightPlaces[j-getRight()->getDofsToElim()]] +=
+                    right->system->matrix[i][j];
         }
-        //system->rhs[rightPlaces[i-getRight()->getDofsToElim()]] = right->system->rhs[i];
+        system->rhs[rightPlaces[i-getRight()->getDofsToElim()]] += right->system->rhs[i];
     }
-/*
-    for (int i=0; i<leftPlaces.size(); ++i) {
-        for (int j=0; j<leftPlaces.size(); ++j) {
-            system->matrix[leftMergePlaces[i]][leftMergePlaces[j]] = left->system->matrix[leftPlaces[i]][leftPlaces[j]];
-        }
-        system->rhs[leftMergePlaces[i]] = left->system->rhs[leftPlaces[i]];
-    }
-
-    for (int i=0; i<rightPlaces.size(); ++i) {
-        for (int j=0; j<rightPlaces.size(); ++j) {
-            system->matrix[rightMergePlaces[i]][rightMergePlaces[j]] += right->system->matrix[rightPlaces[i]][rightPlaces[j]];
-        }
-        system->rhs[rightMergePlaces[i]] += right->system->rhs[rightPlaces[i]];
-    }
-*/
 }
 
 void Node::eliminate() const

@@ -40,6 +40,7 @@ class Mesh {
         void addAdaptations(MeshSingularity sing = EDGE);
 
         static Mesh *loadFromFile(const char *filename, MeshSource src = GENERATOR);
+        bool loadFrontalMatrices(const char *filename);
         bool saveToFile(const char * filename);
         Node *getRootNode();
         std::vector<Element *> &getElements();
