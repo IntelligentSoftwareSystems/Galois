@@ -667,7 +667,7 @@ void printAccess(std::string msg){
       GNode dst = graph.getEdgeDst(ii);
       SNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
 
-      unsigned int diff = abs(sdata.id - ddata.id);
+      long int diff = abs(static_cast<long int>(sdata.id) - static_cast<long int>(ddata.id));
 
       std::cerr << ddata.id << " (" << diff << "), ";
     }
@@ -868,7 +868,7 @@ struct banddiff {
 			GNode dst = graph.getEdgeDst(ii);
 			SNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
 
-			long int diff = abs(sdata.id - ddata.id);
+			long int diff = abs(static_cast<long int>(sdata.id) - static_cast<long int>(ddata.id));
 			//long int diff = (long int) sdata.id - (long int) ddata.id;
 			maxdiff = diff > maxdiff ? diff : maxdiff;
 		}

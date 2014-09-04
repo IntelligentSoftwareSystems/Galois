@@ -115,7 +115,7 @@ protected:
 
     Galois::InsertBag<GNode> initWork;
 
-    Galois::StatTimer t_dag_init ("dag initialization time: ");
+    Galois::StatTimer t_dag_init("dag initialization time: ");
 
     t_dag_init.start ();
     initDAG (initWork);
