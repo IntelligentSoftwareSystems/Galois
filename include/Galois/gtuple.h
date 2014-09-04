@@ -26,6 +26,7 @@
 #define GALOIS_GTUPLE_H
 
 #include <tuple>
+#include <cstring>
 
 namespace Galois {
 
