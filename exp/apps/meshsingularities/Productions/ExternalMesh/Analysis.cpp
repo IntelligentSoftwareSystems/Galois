@@ -257,13 +257,17 @@ void Analysis::nodeAnaliser(Node *node, set<uint64_t> *parent)
     } else {
         common = getAllDOFs(node);
     }
+
+    int i = 0;
+
     for (uint64_t dof : *common) {
         if (!parent->count(dof)) {
             node->addDof(dof);
+            ++i;
         }
     }
 
-    node->setDofsToElim(node->getDofs().size());
+    node->setDofsToElim(i);
 
     for (uint64_t dof : *common) {
         if (parent->count(dof)) {
@@ -287,11 +291,11 @@ void Analysis::doAnalise(Mesh *mesh)
 void Analysis::mergeAnaliser(Node *node)
 {
     if (node->getLeft() != NULL && node->getRight() != NULL) {
-//        node->leftPlaces = new uint64_t[node->getLeft()->getDofs().size() - node->getLeft()->getDofsToElim()];
-//        node->rightPlaces = new uint64_t[node->getRight()->getDofs().size() - node->getRight()->getDofsToElim()];
+        node->leftPlaces = new uint64_t[node->getLeft()->getDofs().size() - node->getLeft()->getDofsToElim()];
+        node->rightPlaces = new uint64_t[node->getRight()->getDofs().size() - node->getRight()->getDofsToElim()];
 
         map<uint64_t, uint64_t> reverseMap;
-/*
+
         for (int i=0; i<node->getDofs().size(); ++i) {
             reverseMap[node->getDofs()[i]] = i;
         }
@@ -303,7 +307,7 @@ void Analysis::mergeAnaliser(Node *node)
         for (int i=node->getRight()->getDofsToElim(); i<node->getRight()->getDofs().size(); ++i) {
             node->rightPlaces[i-node->getRight()->getDofsToElim()] = reverseMap[node->getRight()->getDofs()[i]];
         }
-*/
+
         Analysis::mergeAnaliser(node->getLeft());
         Analysis::mergeAnaliser(node->getRight());
     }

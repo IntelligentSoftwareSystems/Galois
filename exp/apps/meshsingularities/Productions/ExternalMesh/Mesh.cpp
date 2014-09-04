@@ -1,5 +1,7 @@
 #include "Mesh.hpp"
 #include <set>
+#include <map>
+#include <tuple>
 
 void Mesh::addElement(Element *e)
 {
@@ -216,4 +218,25 @@ Mesh *Mesh::loadFromFile(const char *filename, MeshSource src)
 
     fclose(fp);
     return mesh;
+}
+
+bool Mesh::loadFrontalMatrices(const char *filename)
+{
+    std::map<std::tuple<int,int>, EquationSystem*> inputMatrices;
+
+    for (Element *e : this->elements) {
+        std::tuple<int, int> t(e->k, e->l);
+        inputMatrices[t] = new EquationSystem(e->dofs.size());
+    }
+
+    FILE *fp = NULL;
+
+    if ( (fp=fopen(filename, "r")) == NULL) {
+        perror("fopen");
+        return false;
+    }
+
+
+    fclose(fp);
+    return true;
 }

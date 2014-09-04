@@ -28,14 +28,16 @@ class Node {
         int n_left = -1;
         int n_right = -1;
 
-        uint64_t *leftPlaces;
-        uint64_t *rightPlaces;
+        uint64_t *leftPlaces = NULL;
+        uint64_t *rightPlaces = NULL;
 
         Node(int num) : node(num) {}
         ~Node() {
             delete system;
-            //delete leftPlaces;
-            //delete rightPlaces;
+            if (leftPlaces != NULL)
+                delete [] leftPlaces;
+            if (rightPlaces != NULL)
+                delete [] rightPlaces;
         }
 
         void setLeft(Node *left);
