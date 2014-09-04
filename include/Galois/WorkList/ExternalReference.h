@@ -24,7 +24,7 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 #ifndef GALOIS_WORKLIST_EXTERNALREFERENCE_H
-#define GALOIS_WORKLIST_EXTERNREFEFERENCE_H
+#define GALOIS_WORKLIST_EXTERNALREFERENCE_H
 
 namespace Galois {
 namespace WorkList {
