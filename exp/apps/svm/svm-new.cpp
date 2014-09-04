@@ -101,8 +101,8 @@ static cll::opt<AlgoType> algoType("algo", cll::desc("Algorithm:"),
       clEnumValN(AlgoType::DCDL1, "dcdl1", "Dual coordinate descent hinge loss"),
       clEnumValN(AlgoType::DCDL2, "dcdl2", "Dual coordinate descent square-hinge loss"),
       clEnumValN(AlgoType::DCDLR, "dcdlr", "Dual coordinate descent logistic regression"),
-	  clEnumValN(AlgoType::CDLasso, "cdlasso", "Coordinate descent Lasso"), 
-	  clEnumValN(AlgoType::GLMNETL1RLR, "l1rlr", "new GLMENT for L1-regularized Logistic Regression"), 
+			clEnumValN(AlgoType::CDLasso, "cdlasso", "Coordinate descent Lasso"), 
+			clEnumValN(AlgoType::GLMNETL1RLR, "l1rlr", "new GLMENT for L1-regularized Logistic Regression"), 
 #ifdef HAS_EIGEN
       clEnumValN(AlgoType::LeastSquares, "ls", "minimize l2 norm of residual as least squares problem"),
 #endif
@@ -172,6 +172,148 @@ Galois::LargeArray<double> old_weights;
 //undef to test specialization for dense feature space
 //#define DENSE
 //#define DENSE_NUM_FEATURES 500
+
+template<typename T, UpdateType UT>
+class DiffractedCollection {
+  Galois::Runtime::PerThreadStorage<T*> thread;
+  Galois::Runtime::PerPackageStorage<T*> package;
+  Galois::LargeArray<T> old;
+  size_t size;
+  unsigned num_threads;
+  unsigned num_packages;
+
+  template<typename GetFn>
+  void doMerge(const GetFn& getFn) {
+    bool byThread = UT == UpdateType::ReplicateByThread || UT == UpdateType::Staleness;
+    double *local = byThread ? *thread.getLocal() : *package.getLocal();
+    Galois::do_all(boost::counting_iterator<unsigned>(0), boost::counting_iterator<unsigned>(size), [&](unsigned i) {
+      unsigned n = byThread ? num_threads : num_packages;
+      for (unsigned j = 1; j < n; j++) {
+        double o = byThread ?
+          (*thread.getRemote(j))[i] :
+          (*package.getRemoteByPkg(j))[i];
+        local[i] += o;
+      }
+      local[i] /= n;
+      auto& v = getFn(i);
+      if (UT == UpdateType::Staleness)
+        v = (old[i] = local[i]);
+      else
+        v = local[i];
+    });
+    Galois::on_each([&](unsigned tid, unsigned total) {
+      switch (UT) {
+        case UpdateType::Staleness:
+        case UpdateType::ReplicateByThread:
+          if (tid)
+            std::copy(local, local + size, *thread.getLocal());
+          break;
+        case UpdateType::ReplicateByPackage:
+          if (tid && Galois::Runtime::LL::isPackageLeader(tid))
+            std::copy(local, local + size, *package.getLocal());
+          break;
+        default: abort();
+      }
+    });
+  }
+
+public:
+  DiffractedCollection(size_t n): size(n) {
+    num_threads = Galois::getActiveThreads();
+    num_packages = Galois::Runtime::LL::getMaxPackageForThread(num_threads-1) + 1;
+
+    if (UT == UpdateType::Staleness)
+      old.create(n);
+    switch (UT) {
+      case UpdateType::ReplicateByThread:
+      case UpdateType::Staleness:
+        Galois::on_each([n, this](unsigned tid, unsigned total) {
+          T *p = new T[n];
+          *thread.getLocal() = p;
+          std::fill(p, p + n, 0);
+        });
+      case UpdateType::ReplicateByPackage:
+        Galois::on_each([n, this](unsigned tid, unsigned total) {
+          if (Galois::Runtime::LL::isPackageLeader(tid)) {
+            T *p = new T[n];
+            *package.getLocal() = p;
+            std::fill(p, p + n, 0);
+          }
+        });
+      case UpdateType::Wild:
+      case UpdateType::WildOrig:
+        break;
+      default: abort();
+    }
+  }
+
+  struct Accessor {
+    T* rptr;
+    T* wptr;
+    T* bptr;
+
+    Accessor(T* p): rptr(p), wptr(p), bptr(nullptr) { }
+    Accessor(T* p1, T* p2): rptr(p1), wptr(p2), bptr(nullptr) { }
+    Accessor(T* p1, T* p2, T* p3): rptr(p1), wptr(p2), bptr(p3) { }
+
+    T& read(T& addr, ptrdiff_t x) {
+      switch (UT) {
+        case UpdateType::WildOrig:
+        case UpdateType::Wild: return addr;
+        default: return rptr[x];
+      }
+    }
+    T& write(T& addr, ptrdiff_t x) {
+      switch (UT) {
+        case UpdateType::WildOrig:
+        case UpdateType::Wild: return addr;
+        default: return wptr[x];
+      }
+    }
+    void writeBig(T& addr, const T& value) {
+      if (!bptr) return;
+      assert(rptr == wptr);
+      bptr[std::distance(wptr, &addr)] = value;
+    }
+  };
+
+  Accessor get() {
+    if (num_packages > 1 && UT == UpdateType::ReplicateByPackage) {
+      unsigned tid = Galois::Runtime::LL::getTID();
+      unsigned my_package = Galois::Runtime::LL::getPackageForSelf(tid);
+      unsigned next = (my_package + 1) % num_packages;
+      return Accessor { *package.getLocal(), *package.getLocal(), *package.getRemoteByPkg(next) };
+    }
+    
+    switch (UT) {
+      case UpdateType::Wild:
+      case UpdateType::WildOrig:
+      case UpdateType::Staleness:
+        return Accessor { &old[0], *thread.getLocal() };
+      case UpdateType::ReplicateByPackage:
+        return Accessor { *package.getLocal() };
+      case UpdateType::ReplicateByThread:
+        return Accessor { *thread.getLocal() };
+      default:
+        abort();
+    }
+  }
+
+  template<typename GetFn>
+  void merge(const GetFn& getFn) {
+    switch (UT) {
+      case UpdateType::Wild:
+      case UpdateType::WildOrig:
+        return;
+      case UpdateType::Staleness:
+      case UpdateType::ReplicateByPackage:
+      case UpdateType::ReplicateByThread:
+        return doMerge(getFn);
+      default:
+        abort();
+    }
+  }
+};
 
 
 
@@ -434,88 +576,72 @@ struct linearSVM_DCD {
 };
 
 // SGD for linearSVM and logistic regression -- only for wild update 
-template<UpdateType UT>
-struct linearSGD_Wild {  
-
+struct LinearSGDWild {  
   Graph& g;
   double learningRate;
   bool has_other;
 
-#ifdef DENSE
-  Node* baseNodeData;
-  ptrdiff_t edgeOffset;
-  double* baseEdgeData;
-#endif
-  linearSGD_Wild(Graph& _g, double _lr) : g(_g), learningRate(_lr) {
-    has_other = Galois::Runtime::LL::getMaxPackageForThread(Galois::getActiveThreads() - 1) > 1;
-#ifdef DENSE
-    baseNodeData = &g.getData(g.getEdgeDst(g.edge_begin(0)));
-    edgeOffset = std::distance(&g.getData(NUM_SAMPLES), baseNodeData);
-    baseEdgeData = &g.getEdgeData(g.edge_begin(0));
-#endif
-  }
+  LinearSGDWild(Graph& _g, double _lr) : g(_g), learningRate(_lr) { }
 
   void operator()(GNode n, Galois::UserContext<GNode>& ctx) {  
     Node& sample_data = g.getData(n);
    	double invcreg = 1.0/creg; 
-	// Gather
+		// Gather
     double dot = 0.0;
     for (auto edge_it : g.out_edges(n, Galois::NONE)) {
       GNode variable_node = g.getEdgeDst(edge_it);
       Node& var_data = g.getData(variable_node, Galois::NONE);
       double weight = var_data.w;
-	  dot += weight * g.getEdgeData(edge_it, Galois::NONE);
+			dot += weight * g.getEdgeData(edge_it, Galois::NONE);
     }
     
     int label = sample_data.field;
 
-	bool bigUpdate = true;
-	if ( (algoType == AlgoType::SGDL1) || (algoType == AlgoType::SGDL2))
-		bigUpdate = label * dot < 1;
+		bool bigUpdate = true;
+		if ( (algoType == AlgoType::SGDL1) || (algoType == AlgoType::SGDL2))
+			bigUpdate = label * dot < 1;
 
-	double d = 0.0;
-	if ( algoType == AlgoType::SGDL1 )
-		d = 1.0;
-	else if ( algoType == AlgoType::SGDL2 )
-		d = 2*(1-label*dot);
-	else if ( algoType == AlgoType::SGDLR )
-		d = 1/(1+exp(dot*label));
+		double d = 0.0;
+		if (algoType == AlgoType::SGDL1)
+			d = 1.0;
+		else if (algoType == AlgoType::SGDL2)
+			d = 2*(1-label*dot);
+		else if (algoType == AlgoType::SGDLR)
+			d = 1/(1+exp(dot*label));
 
     for (auto edge_it : g.out_edges(n, Galois::NONE)) {
       GNode variable_node = g.getEdgeDst(edge_it);
       Node& var_data = g.getData(variable_node, Galois::NONE);
-	  int varCount = var_data.field;
-	  double rfactor = var_data.QD;
-	  double delta = 0; 
-	  if ( bigUpdate == true)
-		  delta = learningRate * ( var_data.w*rfactor - d * label *  g.getEdgeData(edge_it, Galois::NONE));
-	  else
-		  delta = learningRate * ( var_data.w*rfactor);
+			int varCount = var_data.field;
+			double rfactor = var_data.QD;
+			double delta = 0; 
+			if ( bigUpdate == true)
+				delta = learningRate * (var_data.w*rfactor - d * label *  g.getEdgeData(edge_it, Galois::NONE));
+			else
+				delta = learningRate * (var_data.w*rfactor);
       var_data.w -= delta;
     }
   }
 };
 
-
-
 // SGD for linearSVM and logistic regression 
 template<UpdateType UT>
-struct linearSGD {  
+struct LinearSGD {  
   typedef int tt_needs_per_iter_alloc;
   typedef int tt_does_not_need_aborts;
 
   Graph& g;
+	DiffractedCollection<double, UT>& dstate;
   double learningRate;
-  Galois::GAccumulator<size_t>& bigUpdates;
-  bool has_other;
 
 #ifdef DENSE
   Node* baseNodeData;
   ptrdiff_t edgeOffset;
   double* baseEdgeData;
 #endif
-  linearSGD(Graph& _g, double _lr, Galois::GAccumulator<size_t>& b) : g(_g), learningRate(_lr), bigUpdates(b) {
-    has_other = Galois::Runtime::LL::getMaxPackageForThread(Galois::getActiveThreads() - 1) > 1;
+
+  LinearSGD(Graph& _g, DiffractedCollection<double, UT>& d, double _lr):
+		g(_g), dstate(d), learningRate(_lr) {
 #ifdef DENSE
     baseNodeData = &g.getData(g.getEdgeDst(g.edge_begin(0)));
     edgeOffset = std::distance(&g.getData(NUM_SAMPLES), baseNodeData);
@@ -524,19 +650,8 @@ struct linearSGD {
   }
 
   void operator()(GNode n, Galois::UserContext<GNode>& ctx) {  
-    double *packagew = *package_weights.getLocal();
-    double *threadw = *thread_weights.getLocal();
-    double *otherw = NULL;
     Galois::PerIterAllocTy& alloc = ctx.getPerIterAlloc();
 
-    if (has_other) {
-      unsigned tid = Galois::Runtime::LL::getTID();
-      unsigned my_package = Galois::Runtime::LL::getPackageForSelf(tid);
-      unsigned next = my_package + 1;
-      if (next >= 4)
-        next -= 4;
-      otherw = *package_weights.getRemoteByPkg(next);
-    }
     // Store edge data in iteration-local temporary to reduce cache misses
 #ifdef DENSE
     const ptrdiff_t size = DENSE_NUM_FEATURES;
@@ -555,6 +670,7 @@ struct linearSGD {
     // Gather
     size_t cur = 0;
     double dot = 0.0;
+    auto d = dstate.get();
 #ifdef DENSE
     double* myEdgeData = &baseEdgeData[size * n];
     for (cur = 0; cur < size; ) {
@@ -568,43 +684,10 @@ struct linearSGD {
 
       double weight;
 #ifdef DENSE
-      switch (UT) {
-        default:
-        case UpdateType::WildOrig:
-        case UpdateType::Wild:
-          weight = baseNodeData[cur].w;
-          break;
-        case UpdateType::ReplicateByThread:
-          weight = threadw[cur+edgeOffset];
-          break;
-        case UpdateType::ReplicateByPackage:
-          weight = packagew[cur+edgeOffset];
-          break;
-        case UpdateType::Staleness:
-          weight = old_weights[cur+edgeOffset]; 
-          break;
-      }
+      weight = d.read(baseNodeData[cur].w, cur+edgeOffset);
 #else
-      switch (UT) {
-        default:
-        case UpdateType::WildOrig:
-        case UpdateType::Wild:
-          wptrs[cur] = &var_data.w;
-          weight = *wptrs[cur];
-          break;
-        case UpdateType::ReplicateByThread:
-          wptrs[cur] = &threadw[variableNodeToId(variable_node)];
-          weight = *wptrs[cur];
-          break;
-        case UpdateType::ReplicateByPackage:
-          wptrs[cur] = &packagew[variableNodeToId(variable_node)];
-          weight = *wptrs[cur];
-          break;
-        case UpdateType::Staleness:
-          wptrs[cur] = &threadw[variableNodeToId(variable_node)];
-          weight = old_weights[variableNodeToId(variable_node)]; 
-          break;
-      }
+      wptrs[cur] = &d.write(var_data.w, variableNodeToId(variable_node));
+      weight = d.read(var_data.w, variableNodeToId(variable_node));
 #endif
       mweights[cur] = weight;
 #ifdef DENSE
@@ -624,64 +707,42 @@ struct linearSGD {
     Node& sample_data = g.getData(n);
     int label = sample_data.field;
 
-    bool bigUpdate = label * dot < 1;
-    if (bigUpdate || (algoType == AlgoType::SGDLR))
-      bigUpdates += size;
-
-	double d = 0.0;
-	if ( algoType == AlgoType::SGDL1 )
-		d = 1.0;
-	else if ( algoType == AlgoType::SGDL2 )
-		d = 2*(1-label*dot);
-	else if ( algoType == AlgoType::SGDLR )
-		d = 1/(1+exp(dot*label));
+    bool bigUpdate = algoType == AlgoType::SGDLR || label * dot < 1;
+		double dd = 0.0;
+		// TODO account for these ops
+		if (algoType == AlgoType::SGDL1)
+			dd = 1.0;
+		else if (algoType == AlgoType::SGDL2)
+			dd = 2*(1-label*dot);
+		else if (algoType == AlgoType::SGDLR)
+			dd = 1/(1+exp(dot*label));
 
     for (cur = 0; cur < size; ++cur) {
       double delta;
-	  if ( algoType == AlgoType::SGDLR )
-	  {
-      	if (UT == UpdateType::WildOrig) {
-      	    delta = learningRate * (*wptrs[cur]/rfactors[cur] - d * label * dweights[cur]);
-     	 } else {
-     	     delta = learningRate * (rfactors[cur] - d * label * dweights[cur]);
-     	 }
-	  }
-	  else
-	  {
-    	if (UT == UpdateType::WildOrig) {
-      	  if (bigUpdate)
-      	    delta = learningRate * (*wptrs[cur]/rfactors[cur] - d * label * dweights[cur]);
-     	   else
-        	  delta = *wptrs[cur]/rfactors[cur];
-     	 } else {
-     	   if (bigUpdate)
-     	     delta = learningRate * (rfactors[cur] - d * label * dweights[cur]);
-     	   else
-     	     delta = rfactors[cur];
-     	 }
-	  }
+			if (UT == UpdateType::WildOrig) {
+				if (bigUpdate)
+					delta = learningRate * (*wptrs[cur]/rfactors[cur] - dd * label * dweights[cur]);
+				else
+					delta = *wptrs[cur]/rfactors[cur];
+			 } else {
+				 if (bigUpdate)
+					 delta = learningRate * (rfactors[cur] - dd * label * dweights[cur]);
+				 else
+					 delta = rfactors[cur];
+			 }
 #ifdef DENSE
-      switch (UT) {
-        default:
-        case UpdateType::WildOrig:
-        case UpdateType::Wild:
-          baseNodeData[cur].w = mweights[cur] - delta;
-          break;
-        case UpdateType::ReplicateByThread:
-          threadw[cur+edgeOffset] = mweights[cur] - delta;
-          break;
-        case UpdateType::ReplicateByPackage:
-          packagew[cur+edgeOffset] = mweights[cur] - delta;
-          break;
-        case UpdateType::Staleness:
-          threadw[cur+edgeOffset] = mweights[cur] - delta;
-          break;
-      }
+      d.write(baseNodeData[cur].w, cur + edgeOffset) = mweights[cur] - delta;
 #else
       if (UT == UpdateType::WildOrig) {
-        *wptrs[cur] -= delta;
+        double v = *wptrs[cur] - delta;
+        *wptrs[cur] = v;
+        if (bigUpdate)
+          d.writeBig(*wptrs[cur], v);
       } else {
-        *wptrs[cur] = mweights[cur] - delta;
+        double v = mweights[cur] - delta;
+        *wptrs[cur] = v;
+        if (bigUpdate)
+          d.writeBig(*wptrs[cur], v);
       }
 #endif
     }
@@ -1346,31 +1407,12 @@ void runDCD(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<GNode>
 		std::cout << "Failed to converge\n";
 }
 
-
-
-
-void runPrimalSgd(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<GNode>& trainingSamples, std::vector<GNode>& testingSamples) {
+template<UpdateType UT>
+void runPrimalSgd_(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<GNode>& trainingSamples, std::vector<GNode>& testingSamples) {
   Galois::TimeAccumulator accumTimer;
   accumTimer.start();
 
-  //allocate storage for weights from previous iteration
-  old_weights.create(NUM_VARIABLES);
-  if (updateType == UpdateType::ReplicateByThread || updateType == UpdateType::Staleness) {
-    Galois::on_each([](unsigned tid, unsigned total) {
-      double *p = new double[NUM_VARIABLES];
-      *thread_weights.getLocal() = p;
-      std::fill(p, p + NUM_VARIABLES, 0);
-    });
-  }
-  if (updateType == UpdateType::ReplicateByPackage) {
-    Galois::on_each([](unsigned tid, unsigned total) {
-      if (Galois::Runtime::LL::isPackageLeader(tid)) {
-        double *p = new double[NUM_VARIABLES];
-        *package_weights.getLocal() = p;
-        std::fill(p, p + NUM_VARIABLES, 0);
-      }
-    });
-  }
+	DiffractedCollection<double, UT> dstate(NUM_VARIABLES);
 
   Galois::StatTimer sgdTime("SgdTime");
   
@@ -1392,91 +1434,27 @@ void runPrimalSgd(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<
     auto ts_end = trainingSamples.end();
     auto ln = Galois::loopname("LinearSVM");
     auto wl = Galois::wl<Galois::WorkList::dChunkedFIFO<32>>();
-    Galois::GAccumulator<size_t> bigUpdates;
 
-    Galois::Timer flopTimer;
-    flopTimer.start();
-
-    UpdateType type = updateType;
-
-    switch (type) {
-      case UpdateType::Wild:
-	        Galois::for_each(ts_begin, ts_end, linearSGD_Wild<UpdateType::Wild>(g_train, learning_rate), ln, wl);
-        break;
-      case UpdateType::WildOrig:
-        Galois::for_each(ts_begin, ts_end, linearSGD<UpdateType::WildOrig>(g_train, learning_rate, bigUpdates), ln, wl);
-        break;
-      case UpdateType::ReplicateByPackage:
-        Galois::for_each(ts_begin, ts_end, linearSGD<UpdateType::ReplicateByPackage>(g_train, learning_rate, bigUpdates), ln, wl);
-        break;
-      case UpdateType::ReplicateByThread:
-        Galois::for_each(ts_begin, ts_end, linearSGD<UpdateType::ReplicateByThread>(g_train, learning_rate, bigUpdates), ln, wl);
-        break;
-      case UpdateType::Staleness:
-        Galois::for_each(ts_begin, ts_end, linearSGD<UpdateType::Staleness>(g_train, learning_rate, bigUpdates), ln, wl);
-        break;
-      default: abort();
-    }
+		if (UT == UpdateType::Wild)
+			Galois::for_each(ts_begin, ts_end, LinearSGDWild(g_train, learning_rate), ln, wl);
+		else
+			Galois::for_each(ts_begin, ts_end, LinearSGD<UT>(g_train, dstate, learning_rate), ln, wl);
 	
-    flopTimer.stop();
     sgdTime.stop();
 
-    size_t numBigUpdates = bigUpdates.reduce();
-    double flop = 4*g_train.sizeEdges() + 2 + 3*numBigUpdates + g_train.sizeEdges();
-    if (type == UpdateType::ReplicateByPackage)
-      flop += numBigUpdates;
-    size_t millis = flopTimer.get();
-    double gflops = 0;
-    if (millis)
-      gflops = flop / millis / 1e6;
-
-    //swap weights from past iteration and this iteration
-    if (type != UpdateType::Wild && type != UpdateType::WildOrig) {
-      bool byThread = type == UpdateType::ReplicateByThread || type == UpdateType::Staleness;
-      double *localw = byThread ? *thread_weights.getLocal() : *package_weights.getLocal();
-      unsigned num_threads = Galois::getActiveThreads();
-      unsigned num_packages = Galois::Runtime::LL::getMaxPackageForThread(num_threads-1) + 1;
-      Galois::do_all(boost::counting_iterator<unsigned>(0), boost::counting_iterator<unsigned>(NUM_VARIABLES), [&](unsigned i) {
-        unsigned n = byThread ? num_threads : num_packages;
-        for (unsigned j = 1; j < n; j++) {
-          double o = byThread ?
-            (*thread_weights.getRemote(j))[i] :
-            (*package_weights.getRemoteByPkg(j))[i];
-          localw[i] += o;
-        }
-        localw[i] /=  n;
-        GNode variable_node = (GNode) (i + NUM_SAMPLES);
-        Node& var_data = g_train.getData(variable_node, Galois::NONE);
-        var_data.w = localw[i];
-        old_weights[i] = var_data.w;
-      });
-      Galois::on_each([&](unsigned tid, unsigned total) {
-        switch (type) {
-          case UpdateType::Staleness:
-          case UpdateType::ReplicateByThread:
-            if (tid)
-              std::copy(localw, localw + NUM_VARIABLES, *thread_weights.getLocal());
-          break;
-          case UpdateType::ReplicateByPackage:
-            if (tid && Galois::Runtime::LL::isPackageLeader(tid))
-              std::copy(localw, localw + NUM_VARIABLES, *package_weights.getLocal());
-          break;
-          default: abort();
-        }
-      });
-    }
+    dstate.merge([&g_train](ptrdiff_t x) -> double& { return g_train.getData(x + NUM_SAMPLES).w; });
 
     accumTimer.stop();
 
-	std::cout << "iter " <<  iter << " walltime " <<  sgdTime.get()/1e3;
+		std::cout << "iter " <<  iter << " walltime " <<  sgdTime.get()/1e3;
 
-	double obj = getPrimalObjective(g_train, trainingSamples) ;
-	if ( printObjective )
-		std::cout << " f " << obj;
-	if ( printAccuracy )
-		std::cout << " accuracy " << getNumCorrect(g_test, testingSamples, g_train)/ (double) testingSamples.size();
+		double obj = getPrimalObjective(g_train, trainingSamples);
+		if (printObjective)
+			std::cout << " f " << obj;
+		if (printAccuracy)
+			std::cout << " accuracy " << getNumCorrect(g_test, testingSamples, g_train)/ (double) testingSamples.size();
 
-	std::cout << "\n";
+		std::cout << "\n";
 
     if (!fixedIterations) {
       if (std::fabs((obj - minObj) / minObj) < tol) {
@@ -1489,6 +1467,17 @@ void runPrimalSgd(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<
 
   if (!fixedIterations)
     std::cout << "Failed to converge\n";
+}
+
+void runPrimalSgd(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<GNode>& trainingSamples, std::vector<GNode>& testingSamples) {
+	switch (updateType) {
+		case UpdateType::Wild: return runPrimalSgd_<UpdateType::Wild>(g_train, g_test, gen, trainingSamples, testingSamples);
+		case UpdateType::WildOrig: return runPrimalSgd_<UpdateType::WildOrig>(g_train, g_test, gen, trainingSamples, testingSamples);
+		case UpdateType::ReplicateByPackage: return runPrimalSgd_<UpdateType::ReplicateByPackage>(g_train, g_test, gen, trainingSamples, testingSamples);
+		case UpdateType::ReplicateByThread: return runPrimalSgd_<UpdateType::ReplicateByThread>(g_train, g_test, gen, trainingSamples, testingSamples);
+		case UpdateType::Staleness: return runPrimalSgd_<UpdateType::Staleness>(g_train, g_test, gen, trainingSamples, testingSamples);
+		default: abort();
+	}
 }
 
 
@@ -1637,20 +1626,21 @@ typedef struct {
 	Galois::GAccumulator<double> Gnorm1_new, QP_Gnorm1_new;
 } GLMNET_parameters;
 
-//#define CACHING
 // cd for the subproblem of glmenet for L1R-LR
+template<UpdateType UT>
 struct glmnet_cd { // {{{
-#ifdef CACHING
-	typedef int tt_needs_per_iter_alloc;
-#endif
 	typedef int tt_does_not_need_aborts;
 	typedef GLMNET_parameters param_t;
 	Graph& g_train;
+	DiffractedCollection<double, UT>& dstate;
 	GLMNET_parameters &params;
 	Bag& cd_bag;
 	size_t nr_samples;
 	double nu;
-	glmnet_cd(Graph &_g, param_t &_p, Bag &bag, size_t _nr_samples): g_train(_g), params(_p), cd_bag(bag), nr_samples(_nr_samples), nu(1e-12){}
+
+	glmnet_cd(Graph &_g, DiffractedCollection<double, UT>& d, param_t &_p, Bag &bag, size_t _nr_samples):
+		g_train(_g), dstate(d), params(_p), cd_bag(bag), nr_samples(_nr_samples), nu(1e-12) { }
+
 	void operator()(GNode feat_j, Galois::UserContext<GNode>& ctx){
 		auto &j_data = g_train.getData(feat_j, Galois::NONE);
 		auto &H = j_data.Hdiag;
@@ -1658,29 +1648,13 @@ struct glmnet_cd { // {{{
 		auto &wpd_j = j_data.wpd;
 		auto &w_j = j_data.w;
 		double G = Grad_j + (wpd_j-w_j)*nu;
-#ifdef CACHING
-		Galois::PerIterAllocTy& alloc = ctx.getPerIterAlloc();
-                
-                ptrdiff_t size = std::distance(g_train.edge_begin(feat_j, Galois::NONE), g_train.edge_end(feat_j, Galois::NONE));
-                double** xTdAddrs = (double**) alloc.allocate(sizeof(*xTdAddrs) * size);
-                double* xTds = (double*) alloc.allocate(sizeof(*xTds) * size);
-                double* xijs = (double*) alloc.allocate(sizeof(*xijs) * size);
-#endif
-                int ii = 0;
+    auto d = dstate.get();
+		
 		for(auto &edge : g_train.out_edges(feat_j, Galois::NONE)) {
-			auto &x_ij = g_train.getEdgeData(edge, Galois::NONE);
-#ifdef CACHING
-                        xijs[ii] = x_ij;
-#endif
-			auto &self = g_train.getData(g_train.getEdgeDst(edge), Galois::NONE);
-#ifdef CACHING
-                        xTdAddrs[ii] = &self.xTd;
-                        xTds[ii] = *xTdAddrs[ii];
-			G += xijs[ii]*self.D*xTds[ii];
-#else
-			G += x_ij*self.D*self.xTd;
-#endif
-                        ii += 1;
+			auto &x_ij = g_train.getEdgeData(edge);
+			auto dst = g_train.getEdgeDst(edge);
+			auto &ddata = g_train.getData(dst, Galois::NONE);
+			G += x_ij*ddata.D* d.read(ddata.xTd, dst);
 		}
 		double Gp = G+1;
 		double Gn = G-1;
@@ -1688,7 +1662,7 @@ struct glmnet_cd { // {{{
 		if(wpd_j == 0) {
 			if(Gp < 0) violation = -Gp;
 			else if(Gn > 0) violation = Gn;
-			else if(Gp>params.QP_Gmax_old/nr_samples && Gn < -params.QP_Gmax_old/nr_samples) {
+			else if(Gp>params.QP_Gmax_old/nr_samples && Gn<-params.QP_Gmax_old/nr_samples) {
 				return;
 			} 
 		} else if(wpd_j > 0) 
@@ -1706,20 +1680,15 @@ struct glmnet_cd { // {{{
 			return;
 		z = std::min(std::max(z,-10.0),10.0);
 		wpd_j += z;
-                ii = 0;
-                
 		for(auto &edge : g_train.out_edges(feat_j, Galois::NONE)) {
-#ifdef CACHING
-                        auto x_ij = xijs[ii];
-#else
-			auto x_ij = g_train.getEdgeData(edge, Galois::NONE);
-#endif
-#ifdef CACHING
-			*xTdAddrs[ii] = xTds[ii] + x_ij*z;
-#else
-			g_train.getData(g_train.getEdgeDst(edge), Galois::NONE).xTd += x_ij*z;
-#endif
-                        ii += 1;
+			auto &x_ij = g_train.getEdgeData(edge);
+			auto dst = g_train.getEdgeDst(edge);
+			auto &ddata = g_train.getData(dst, Galois::NONE);
+			double& l = d.read(ddata.xTd, dst);
+			double v = l + x_ij*z;
+			d.write(ddata.xTd, dst) = v;
+			//d.writeBig(l, v);
+			//d.write(ddata.xTd, dst) += x_ij*z;
 		}
 	}
 }; // }}}
@@ -1769,15 +1738,20 @@ struct glmnet_qp_construct { // {{{
 		params.Gnorm1_new.update(violation);
 	}
 }; // }}}
-void run_newGLMNET(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<GNode>& trainingSamples, std::vector<GNode>& testingSamples) { // {{{
+
+template<UpdateType UT>
+void runGLMNET_(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<GNode>& trainingSamples, std::vector<GNode>& testingSamples) { // {{{
 	Galois::TimeAccumulator accumTimer;
 	accumTimer.start();
-	Galois::StatTimer glmnetTime("GLMENT Time");
-	Galois::StatTimer cdTime("CD Time");
+	Galois::Runtime::getSystemThreadPool().burnPower(numThreads);
+
+  DiffractedCollection<double, UT> dstate(NUM_SAMPLES);
+
+	Galois::StatTimer glmnetTime("GLMNET_Time");
+	Galois::StatTimer cdTime("CD_Time");
 	Galois::StatTimer FirstTime("First_Time");
 	Galois::StatTimer SecondTime("Second_Time");
 	Galois::StatTimer ThirdTime("Third_Time");
-
 	Galois::StatTimer ActiveSetTime("Third_Time");
 
 	unsigned max_newton_iter = fixedIterations? fixedIterations: maxIterations;
@@ -1835,8 +1809,7 @@ void run_newGLMNET(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector
 	params.Gmax_old = std::numeric_limits<double>::max();
 	size_t nr_samples = trainingSamples.size();
 
-	while(newton_iter < max_newton_iter)
-	{
+	while(newton_iter < max_newton_iter) {
 		glmnetTime.start();
 
 		cur_bag.clear();
@@ -1854,48 +1827,6 @@ void run_newGLMNET(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector
 		auto ln = Galois::loopname("GLMENT-QPconstruction");
 		auto wl = Galois::wl<Galois::WorkList::dChunkedFIFO<32>>();
 		Galois::for_each(active_set.begin(), active_set.end(), glmnet_qp_construct(g_train, params, cur_bag, nr_samples), ln, wl);
-		/*
-		Galois::do_all(active_set.begin(), active_set.end(),
-		[&](GNode feat_j) { // {{{
-			auto &j_data = g_train.getData(feat_j, Galois::NONE);
-			auto &w_j = j_data.w;
-			auto &Hdiag_j = j_data.Hdiag;
-			auto &Grad_j = j_data.Grad;
-			auto &xjneg_sum_j = j_data.xjneg_sum;
-			Hdiag_j = nu; Grad_j = 0;
-			double tmp = 0;
-			for(auto &edge: g_train.out_edges(feat_j, Galois::NONE)) {
-				auto x_ij = g_train.getEdgeData(edge, Galois::NONE);
-				auto &self = g_train.getData(g_train.getEdgeDst(edge), Galois::NONE);
-				Hdiag_j += x_ij*x_ij*self.D;
-				tmp += x_ij*self.tau;
-			}
-			Grad_j = -tmp + xjneg_sum_j;
-
-			double Gp = Grad_j+1;
-			double Gn = Grad_j-1;
-			double violation = 0;
-			if(w_j == 0) {
-				if(Gp < 0) violation = -Gp;
-				else if(Gn > 0) violation = Gn;
-				//outer-level shrinking
-				else if(Gp > params.Gmax_old/nr_samples && Gn <-params.Gmax_old/nr_samples) {
-					return;
-				}
-
-			}
-			else if(w_j > 0)
-				violation = fabs(Gp);
-			else
-				violation = fabs(Gn);
-			cur_bag.push(feat_j);
-			params.Gmax_new.update(violation);
-			params.Gnorm1_new.update(violation);
-		}//}}}
-		);
-		*/
-
-
 
 		double tmp_Gnorm1_new = params.Gnorm1_new.reduce();
 		if(newton_iter == 0)
@@ -1915,51 +1846,104 @@ void run_newGLMNET(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector
 				active_set.push_back(feat_j);
 		};
 		init_original_active_set();
-		ActiveSetTime.stop();
 
+		ActiveSetTime.stop();
 
 		int original_active_size = active_set.size();
 		int cd_iter = 0;
-		Bag cd_bags[2];
-		std::copy(active_set.begin(), active_set.end(), std::back_inserter(cd_bags[0]));
+		Bag cd_bag;
 
 		double grad_norm = 0, H_norm = 0, xx = 0;
 		SecondTime.start();
 		while(cd_iter < max_cd_iter) { //{{{
 			params.QP_Gmax_new.reset();
 			params.QP_Gnorm1_new.reset();
-                        //XXX
-			//if(shuffleSamples)
-			//	std::shuffle(active_set.begin(), active_set.end(), gen);
-			auto ln = Galois::loopname("GLMENT-CDiteration");
-			auto wl = Galois::wl<Galois::WorkList::dChunkedFIFO<32>>();
-			//Galois::for_each(active_set.begin(), active_set.end(), glmnet_cd(g_train, params, cd_bag, nr_samples), ln, wl);
-			Galois::for_each_local(cd_bags[0], glmnet_cd(g_train, params, cd_bags[1], nr_samples), ln, wl);
 
+			if(shuffleSamples)
+				std::shuffle(active_set.begin(), active_set.end(), gen);
+			auto ln = Galois::loopname("GLMENT-CDiteration");
+#if 0
+			auto wl = Galois::wl<Galois::WorkList::dChunkedFIFO<32>>();
+			Galois::for_each(active_set.begin(), active_set.end(), glmnet_cd<UT>(g_train, dstate, params, cd_bag, nr_samples), ln, wl);
+			dstate.merge([&g_train](ptrdiff_t x) -> double& { return g_train.getData(x).xTd; });
+#else
+			{
+				auto wl = Galois::wl<Galois::WorkList::StableIterator<>>();
+				Galois::GAccumulator<double> Gaccum;
+				double nu = 1e-12;
+				for (auto feat_j : active_set) {
+					auto &j_data = g_train.getData(feat_j, Galois::NONE);
+					auto &H = j_data.Hdiag;
+					auto &Grad_j = j_data.Grad;
+					auto &wpd_j = j_data.wpd;
+					auto &w_j = j_data.w;
+					double G = Grad_j + (wpd_j-w_j)*nu;
+					Galois::for_each(
+							g_train.out_edges(feat_j, Galois::NONE).begin(),
+							g_train.out_edges(feat_j, Galois::NONE).end(),
+							[&](typename Graph::edge_iterator edge, Galois::UserContext<typename Graph::edge_iterator>&) {
+						auto &x_ij = g_train.getEdgeData(edge);
+						auto dst = g_train.getEdgeDst(edge);
+						auto &ddata = g_train.getData(dst, Galois::NONE);
+						Gaccum += x_ij * ddata.D * ddata.xTd;
+					}, ln, wl);
+					G += Gaccum.reduce();
+					Gaccum.reset();
+					double Gp = G+1;
+					double Gn = G-1;
+					double violation = 0;
+					if(wpd_j == 0) {
+						if(Gp < 0) violation = -Gp;
+						else if(Gn > 0) violation = Gn;
+						else if(Gp>params.QP_Gmax_old/nr_samples && Gn<-params.QP_Gmax_old/nr_samples) {
+							continue;
+						} 
+					} else if(wpd_j > 0) 
+						violation = fabs(Gp);
+					else 
+						violation = fabs(Gn);
+					cd_bag.push(feat_j);
+					params.QP_Gmax_new.update(violation);
+					params.QP_Gnorm1_new.update(violation);
+					double z = 0;
+					if(Gp < H*wpd_j) z = -Gp/H;
+					else if(Gn > H*wpd_j) z = -Gn/H;
+					else z = -wpd_j;
+					if(fabs(z) < 1.0e-12)
+						continue;
+					z = std::min(std::max(z,-10.0),10.0);
+					wpd_j += z;
+					Galois::for_each(
+							g_train.out_edges(feat_j, Galois::NONE).begin(),
+							g_train.out_edges(feat_j, Galois::NONE).end(),
+							[&](typename Graph::edge_iterator edge, Galois::UserContext<typename Graph::edge_iterator>&) {
+						auto &x_ij = g_train.getEdgeData(edge);
+						auto dst = g_train.getEdgeDst(edge);
+						auto &ddata = g_train.getData(dst, Galois::NONE);
+						ddata.xTd += x_ij * z;
+					}, ln, wl);
+				}
+			}
+#endif
 			cd_iter++;
 			double tmp_QP_Gmax_new = params.QP_Gmax_new.reduce();
 			double tmp_QP_Gnorm1_new = params.QP_Gnorm1_new.reduce();
-			//active_set.clear();
-			//for(auto &feat_j: cd_bag)
-			//	active_set.push_back(feat_j);
-			//cd_bag.clear();
+			active_set.clear();
+			for(auto &feat_j: cd_bag)
+				active_set.push_back(feat_j);
+			cd_bag.clear();
 			if(tmp_QP_Gmax_new <= inner_eps*params.Gnorm1_init){
-				if (std::distance(cd_bags[1].begin(), cd_bags[1].end()) == original_active_size)
-					break;
 				//inner stopping
 				if(active_set.size() == original_active_size)
 					break;
 				//active set reactivation
 				else { 
-					//init_original_active_set();
-					std::copy(active_set.begin(), active_set.end(), std::back_inserter(cd_bags[0]));
+					init_original_active_set();
 					params.QP_Gmax_old = std::numeric_limits<double>::max();
 				}
 			} else {
 				params.QP_Gmax_old = tmp_QP_Gmax_new;
 			}
-			cd_bags[0].clear();
-			std::swap(cd_bags[0], cd_bags[1]);
 		}//}}}
 		cdTime.stop();
 		SecondTime.stop();
@@ -2056,9 +2040,18 @@ void run_newGLMNET(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector
 		}
 		puts("");
 	}
-
+	Galois::Runtime::getSystemThreadPool().beKind();
 } // }}}
 
+void runGLMNET(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<GNode>& trainingSamples, std::vector<GNode>& testingSamples) {
+	switch (updateType) {
+		case UpdateType::Wild: return runGLMNET_<UpdateType::Wild>(g_train, g_test, gen, trainingSamples, testingSamples);
+		case UpdateType::ReplicateByPackage: return runGLMNET_<UpdateType::ReplicateByPackage>(g_train, g_test, gen, trainingSamples, testingSamples);
+		case UpdateType::ReplicateByThread: return runGLMNET_<UpdateType::ReplicateByThread>(g_train, g_test, gen, trainingSamples, testingSamples);
+		case UpdateType::Staleness: return runGLMNET_<UpdateType::Staleness>(g_train, g_test, gen, trainingSamples, testingSamples);
+		default: abort();
+	}
+}
 
 #ifdef HAS_EIGEN
 void runLeastSquares(Graph& g, std::mt19937& gen, std::vector<GNode>& trainingSamples, std::vector<GNode>& testingSamples) {
@@ -2178,26 +2171,25 @@ int main(int argc, char** argv) {
     std::cout << "\n";
   }
   
-  Galois::preAlloc(numThreads * 10);
-  Galois::reportPageAlloc("MeminfoPre");
   Galois::StatTimer timer;
   timer.start();
   switch (algoType) {
-    case AlgoType::SGDL1: runPrimalSgd(g_train, g_test, gen, trainingSamples, testingSamples); break;
-	case AlgoType::SGDL2: runPrimalSgd(g_train, g_test, gen, trainingSamples, testingSamples); break;
-	case AlgoType::SGDLR: runPrimalSgd(g_train, g_test, gen, trainingSamples, testingSamples); break;
-    case AlgoType::DCDL1: runDCD(g_train, g_test, gen, trainingSamples, testingSamples); break;
-	case AlgoType::DCDL2: runDCD(g_train, g_test, gen, trainingSamples, testingSamples); break;
-	case AlgoType::DCDLR: runDCD(g_train, g_test, gen, trainingSamples, testingSamples); break;
-	case AlgoType::CDLasso: runCD(g_train, g_test, gen, trainingSamples, testingSamples); break;
-	case AlgoType::GLMNETL1RLR: run_newGLMNET(g_train, g_test, gen, trainingSamples, testingSamples); break;
+    case AlgoType::SGDL1:
+		case AlgoType::SGDL2:
+		case AlgoType::SGDLR: runPrimalSgd(g_train, g_test, gen, trainingSamples, testingSamples); break;
+    case AlgoType::DCDL1:
+		case AlgoType::DCDL2:
+		case AlgoType::DCDLR:
+		case AlgoType::CDLasso: runCD(g_train, g_test, gen, trainingSamples, testingSamples); break;
+		case AlgoType::GLMNETL1RLR: runGLMNET(g_train, g_test, gen, trainingSamples, testingSamples); break;
 #ifdef HAS_EIGEN
 //    case AlgoType::LeastSquares: runLeastSquares(g, gen, trainingSamples, testingSamples); break;
 #endif
     default: abort();
   }
   timer.stop();
-  Galois::reportPageAlloc("MeminfoPost");
 
   return 0;
 }
+
+// vim: set noexpandtab:
