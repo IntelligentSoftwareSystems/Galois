@@ -100,6 +100,9 @@ void printHistogram(const std::string& name, HistsTy& hists) {
 
 void doSparsityPattern() {
   int columns = 80;
+  // COLUMNS is a special variable in bash (it executes tput cols) so users
+  // need to explicitly set the COLUMNS environment variable for this info
+  // to be passed here
   const char* colStr = std::getenv("COLUMNS");
   if (colStr)
     columns = std::atoi(colStr);
