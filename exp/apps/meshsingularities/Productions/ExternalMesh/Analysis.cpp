@@ -154,9 +154,29 @@ int Analysis::rotate(Node * root, Node * parent, Mesh * mesh){
     h=r-l;
 
     if ( (h==1) || (h==-1) || (h==0) ) { //no rotation
-        return h;
+        //return h;
+        if (l>r){
+            return l+1;
+        } else {
+            return r+1;
+        }
     }
+            
+            
+    /*if (h==0){
+        return 1;
+    }
+    if (h==-1){
+        printf ("dupa1\n");
+        return 2;
+    }
+    if (h==1){
+        printf ("dupa2\n");
+        return 2;
+    }*/
 
+    printf("rotating\n");
+    
     Node * T = NULL;
     
     if (h>=2) {  //we need to perform some rotations to the left
@@ -226,7 +246,34 @@ int Analysis::rotate(Node * root, Node * parent, Mesh * mesh){
         mesh->setRootNode(T);
     }
     
-    return 0;
+    
+    
+    
+    
+    
+    if (root->getLeft() != NULL) {
+        l = Analysis::rotate(root->getLeft(), root, mesh);
+    } else {
+        l=0;
+    }
+    
+    if (root->getRight() != NULL) {
+        r = Analysis::rotate(root->getRight(), root, mesh);
+    } else {
+        r=0;
+    }
+    h=r-l;
+
+    if ( (h==1) || (h==-1) || (h==0) ) { //no rotation
+        //return h;
+        if (l>r){
+            return l+1;
+        } else {
+            return r+1;
+        }
+    }
+    
+    //return 0;
 }
 
 void Analysis::nodeAnaliser(Node *node, set<uint64_t> *parent)
