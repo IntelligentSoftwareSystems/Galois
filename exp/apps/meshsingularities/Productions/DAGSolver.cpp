@@ -314,7 +314,7 @@ int main(int argc, char ** argv)
         print_time("\tsolution", &t1, &t2);
 #ifdef WITH_PAPI
         if (papi_supported) {
-            if ((papi_err = PAPI_read_counters(&fpops, 1)) != PAPI_OK) {
+            if ((papi_err = PAPI_stop_counters(&fpops, 1)) != PAPI_OK) {
                 fprintf(stderr, "Could not get values: %s\n", PAPI_strerror(papi_err));
             }
             printf("FLOPS: %ld\n", fpops);
@@ -364,7 +364,7 @@ int main(int argc, char ** argv)
         print_time("\tsolution", &t1, &t2);
 #ifdef WITH_PAPI
         if (papi_supported) {
-            if ((papi_err = PAPI_read_counters(&fpops, 1)) != PAPI_OK) {
+            if ((papi_err = PAPI_stop_counters(&fpops, 1)) != PAPI_OK) {
                 fprintf(stderr, "Could not get values: %s\n", PAPI_strerror(papi_err));
             }
             printf("FLOPS: %ld\n", fpops);
