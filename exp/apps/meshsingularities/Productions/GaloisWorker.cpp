@@ -187,7 +187,7 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
         production = new PointProduction(vec, inputMatrices);
 
 	S = production->getRootVertex();
-    printVertices(S, "");
+    //printVertices(S, "");
 	printf("Allocated: %lu bytes \n", this->getAllocatedSize(S));
     printf("Root size: %d\n", S->system->n);
 	timerSolution.start();
