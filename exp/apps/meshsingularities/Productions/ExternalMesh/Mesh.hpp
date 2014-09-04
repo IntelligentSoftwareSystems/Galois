@@ -28,6 +28,7 @@ class Mesh {
         int polynomial=0;
         int dimensions=2;
         int dofs = 0;
+        Node * root = NULL;
 
     public:
         Mesh(int poly, int dim) : polynomial(poly),

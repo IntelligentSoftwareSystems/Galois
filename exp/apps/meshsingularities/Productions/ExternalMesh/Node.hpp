@@ -79,7 +79,7 @@ class Node {
         
         static bool isNeighbour (Node *node, Node *parent);
         static bool isNeighbour (Element *element1, Element *element2);
-        int getNumberOfNeighbours(std::vector<Element *> * allElements);
+        int getNumberOfNeighbours(std::vector<Element *> & allElements);
         
         void rebuildElements();
         

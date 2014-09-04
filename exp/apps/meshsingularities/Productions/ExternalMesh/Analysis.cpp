@@ -11,9 +11,22 @@ void Analysis::findLeftRotationChild(Node ** _parent, Node ** _root, bool child1
     Node * otherChild;
     std::vector<Element *> allElements = mesh->getElements();
     
+    if (root->getRight()->getLeft() == NULL){
+        (*_child) = root->getRight()->getRight();
+        (*_otherChild) = root->getRight()->getLeft();
+        return;
+    }
+    
+    
+    if (root->getRight()->getLeft() == NULL){
+        (*_child) = root->getRight()->getLeft();
+        (*_otherChild) = root->getRight()->getRight();
+        return;
+    }
+    
     if (child1){
         if (child2){
-            if (root->getRight()->getLeft()->getNumberOfNeighbours(&allElements) < root->getRight()->getRight()->getNumberOfNeighbours(&allElements)){
+            if (root->getRight()->getLeft()->getNumberOfNeighbours(allElements) < root->getRight()->getRight()->getNumberOfNeighbours(allElements)){
                 child = root->getRight()->getLeft();
                 otherChild = root->getRight()->getRight();
             } else {
@@ -42,9 +55,22 @@ void Analysis::findRightRotationChild(Node ** _parent, Node ** _root, bool child
     Node * otherChild;
     std::vector<Element *> allElements = mesh->getElements();
     
+    if (root->getLeft()->getLeft() == NULL){
+        (*_child) = root->getLeft()->getRight();
+        (*_otherChild) = root->getLeft()->getLeft();
+        return;
+    }
+    
+    
+    if (root->getLeft()->getLeft() == NULL){
+        (*_child) = root->getLeft()->getLeft();
+        (*_otherChild) = root->getLeft()->getRight();
+        return;
+    }
+    
     if (child1){
         if (child2){
-            if (root->getLeft()->getLeft()->getNumberOfNeighbours(&allElements) < root->getLeft()->getRight()->getNumberOfNeighbours(&allElements)){
+            if (root->getLeft()->getLeft()->getNumberOfNeighbours(allElements) < root->getLeft()->getRight()->getNumberOfNeighbours(allElements)){
                 child = root->getLeft()->getLeft();
                 otherChild = root->getLeft()->getRight();
             } else {
@@ -175,7 +201,7 @@ int Analysis::rotate(Node * root, Node * parent, Mesh * mesh){
         return 2;
     }*/
 
-    printf("rotating\n");
+    //printf("rotating\n");
     
     Node * T = NULL;
     

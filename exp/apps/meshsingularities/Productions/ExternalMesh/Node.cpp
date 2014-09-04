@@ -152,43 +152,6 @@ bool Node::isNeighbour (Node *node, Node *parent)
     if (parent == NULL){
         return true;
     }
-    /*std::set<uint64_t> nodeDofs(node->getDofs().cbegin(), node->getDofs().cend());
-    std::set<uint64_t> parentDofs(parent->getDofs().cbegin(), parent->getDofs().cend());
-
-    if (nodeDofs.empty() || parentDofs.empty()) {
-        return false;
-    }
-    
-    auto nodeIt = nodeDofs.begin();
-    auto nodeItEnd = nodeDofs.end();
-
-    auto parentIt = parentDofs.begin();
-    auto parentItEnd = parentDofs.end();
-
-    // sets are internally sorted, so if the beginning of the one is greater
-    // than end of other - we can finish
-    if ((*parentIt > *nodeDofs.rbegin()) || (*nodeIt > *parentDofs.rbegin())) {
-        return false;
-    }
-
-    while (nodeIt != nodeItEnd && parentIt != parentItEnd) {
-        if (*nodeIt == *parentIt) {
-            return true; // common element? yes, we are neighbours!
-        } else if (*nodeIt > *parentIt) {
-            ++parentIt;
-        } else {
-            ++nodeIt;
-        }
-    }
-    return false; // no common elements => no neighbourhood*/
-    
-    /*for (Element * e1 : node->getElements()){
-        for (Element * e2 : parent->getElements()){
-            if (Node::isNeighbour(e1, e2)){
-                return true;
-            }
-        }
-    }*/
     
     auto getAllDOFs = [] (Node *n) {
         std::set<uint64_t> *dofs = new std::set<uint64_t> ();
@@ -199,13 +162,12 @@ bool Node::isNeighbour (Node *node, Node *parent)
         return dofs;
     };
     
-    std::set<uint64_t> * nodeDofs;
-    std::set<uint64_t> * parentDofs;
-    
-    nodeDofs = getAllDOFs(node);
-    parentDofs = getAllDOFs(parent);
+    std::set<uint64_t> * nodeDofs = getAllDOFs(node);
+    std::set<uint64_t> * parentDofs  = getAllDOFs(parent);
     
     if (nodeDofs->empty() || parentDofs->empty()) {
+        delete nodeDofs;
+        delete parentDofs;
         return false;
     }
     
@@ -218,11 +180,15 @@ bool Node::isNeighbour (Node *node, Node *parent)
     // sets are internally sorted, so if the beginning of the one is greater
     // than end of other - we can finish
     if ((*parentIt > *nodeDofs->rbegin()) || (*nodeIt > *parentDofs->rbegin())) {
+        delete nodeDofs;
+        delete parentDofs;
         return false;
     }
 
     while (nodeIt != nodeItEnd && parentIt != parentItEnd) {
         if (*nodeIt == *parentIt) {
+            delete nodeDofs;
+            delete parentDofs;
             return true; // common element? yes, we are neighbours!
         } else if (*nodeIt > *parentIt) {
             ++parentIt;
@@ -233,7 +199,6 @@ bool Node::isNeighbour (Node *node, Node *parent)
     
     delete nodeDofs;
     delete parentDofs;
-    
     return false;
 };
 
@@ -272,9 +237,9 @@ bool Node::isNeighbour (Element *element1, Element *element2)
 };
 
 
-int Node::getNumberOfNeighbours(std::vector<Element *> * allElements){
+int Node::getNumberOfNeighbours(std::vector<Element *> & allElements){
     int common = 0;
-    for (Element * e1 : (*allElements)) {
+    for (Element * e1 : allElements) {
         for (Element * e2 : this->mergedElements) {
             if (Node::isNeighbour(e1, e2)){
                 common++;
@@ -286,14 +251,17 @@ int Node::getNumberOfNeighbours(std::vector<Element *> * allElements){
 }
 
 void Node::rebuildElements(){
-    this->clearDofs();
     this->clearElements();
     
-    for (Element * e : this->getLeft()->getElements()){
-        this->addElement(e);
+    if (this->getLeft()!= NULL){
+        for (Element * e : this->getLeft()->getElements()){
+            this->addElement(e);
+        }
     }
-    for (Element * e : this->getRight()->getElements()){
-        this->addElement(e);
+    if (this->getRight() != NULL){
+        for (Element * e : this->getRight()->getElements()){
+            this->addElement(e);
+        }
     }
 }
 
