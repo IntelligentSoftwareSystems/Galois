@@ -250,16 +250,23 @@ int main(int argc, char ** argv)
     struct timeval t1, t2;
 
 #ifdef WITH_PAPI
-    long long fpops = 0;
     bool papi_supported = true;
-    int events[1] = {PAPI_FP_OPS};
+    int events[7] = {PAPI_FP_OPS,
+                    PAPI_TOT_INS,
+                    PAPI_BR_INS,
+                    PAPI_LD_INS,
+                    PAPI_SR_INS,
+                    PAPI_L1_DCM,
+                    PAPI_L2_TCM};
+    long long values[7] = {0,};
+
     int papi_err;
     if (PAPI_library_init(PAPI_VER_CURRENT) != PAPI_VER_CURRENT) {
         fprintf(stderr, "PAPI is unsupported.\n");
         papi_supported = false;
         }
 
-    if (PAPI_num_counters() < 2) {
+    if (PAPI_num_counters() < 7) {
         fprintf(stderr, "PAPI is unsupported.\n");
         papi_supported = false;
     }
@@ -319,7 +326,7 @@ int main(int argc, char ** argv)
 
 #ifdef WITH_PAPI
         if (papi_supported) {
-            if ((papi_err = PAPI_start_counters(events, 1)) != PAPI_OK) {
+            if ((papi_err = PAPI_start_counters(events, 7)) != PAPI_OK) {
                 fprintf(stderr, "Could not start counters: %s\n", PAPI_strerror(papi_err));
             }
         }
@@ -335,10 +342,24 @@ int main(int argc, char ** argv)
         print_time("\tsolution", &t1, &t2);
 #ifdef WITH_PAPI
         if (papi_supported) {
-            if ((papi_err = PAPI_stop_counters(&fpops, 1)) != PAPI_OK) {
+            if ((papi_err = PAPI_stop_counters(values, 7)) != PAPI_OK) {
                 fprintf(stderr, "Could not get values: %s\n", PAPI_strerror(papi_err));
             }
-            printf("FLOPS: %ld\n", fpops);
+            // PAPI_FP_OPS
+            // PAPI_TOT_INS
+            // PAPI_BR_INS
+            // PAPI_LD_INS
+            // PAPI_SR_INS
+            // PAPI_L1_DCM
+            // PAPI_L2_TCM
+            printf("Performance counters: \n");
+            printf("\tFP OPS: %ld\n", values[0]);
+            printf("\tTOT INS: %ld\n", values[1]);
+            printf("\tBR INS: %ld\n", values[2]);
+            printf("\tLD INS: %ld\n", values[3]);
+            printf("\tSR INS: %ld\n", values[4]);
+            printf("\tL1 DCM: %ld\n", values[5]);
+            printf("\tL2 TCM: %ld\n", values[6]);
         }
 #endif
     } else if (scheduler == CILK) {
@@ -369,7 +390,7 @@ int main(int argc, char ** argv)
 
 #ifdef WITH_PAPI
         if (papi_supported) {
-            if ((papi_err = PAPI_start_counters(events, 1)) != PAPI_OK) {
+            if ((papi_err = PAPI_start_counters(events, 7)) != PAPI_OK) {
                 fprintf(stderr, "Could not start counters: %s\n", PAPI_strerror(papi_err));
             }
         }
@@ -385,10 +406,25 @@ int main(int argc, char ** argv)
         print_time("\tsolution", &t1, &t2);
 #ifdef WITH_PAPI
         if (papi_supported) {
-            if ((papi_err = PAPI_stop_counters(&fpops, 1)) != PAPI_OK) {
+            if ((papi_err = PAPI_stop_counters(values, 7)) != PAPI_OK) {
                 fprintf(stderr, "Could not get values: %s\n", PAPI_strerror(papi_err));
             }
-            printf("FLOPS: %ld\n", fpops);
+            // PAPI_FP_OPS
+            // PAPI_TOT_INS
+            // PAPI_BR_INS
+            // PAPI_LD_INS
+            // PAPI_SR_INS
+            // PAPI_L1_DCM
+            // PAPI_L2_TCM
+            printf("Performance counters: \n");
+            printf("\tFP OPS: %ld\n", values[0]);
+            printf("\tTOT INS: %ld\n", values[1]);
+            printf("\tBR INS: %ld\n", values[2]);
+            printf("\tLD INS: %ld\n", values[3]);
+            printf("\tSR INS: %ld\n", values[4]);
+            printf("\tL1 DCM: %ld\n", values[5]);
+            printf("\tL2 TCM: %ld\n", values[6]);
+
         }
 #endif
     }
