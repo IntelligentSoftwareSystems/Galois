@@ -109,7 +109,7 @@ void ThreadPool::threadLoop(unsigned tid) {
   bool fastmode = false;
   do {
     if (fastmode) {
-      while (!signals[tid].get().fastRelease) { LL::asmPause(); }
+      while (!signals[tid].get().fastRelease.load(std::memory_order_relaxed)) { LL::asmPause(); }
       signals[tid].get().fastRelease = 0;
     } else {
       threadWait(tid);
