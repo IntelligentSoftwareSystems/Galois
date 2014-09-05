@@ -19,6 +19,7 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
+ * @author Gurbinder Gill  <gill@cs.utexas.edu>
  */
 
 #include "Galois/Runtime/DistSupport.h"
@@ -132,26 +133,28 @@ void RemoteDirectory::recvRequestImpl(metadata& md, fatPointer ptr, std::unique_
       has_obj = false;
       break;
     }
-    if ( !has_obj && (flag == UP_RW || flag == UP_RO)) {
+    if ((md.state == metadata::INVALID) && (flag == UP_RW || flag == UP_RO)) {
 	eraseMD(ptr, lg);
-    } 
-    else if (flag == INV) {
-      // ACK invalidate
-      eraseMD(ptr, lg);
-      getCacheManager().evict(ptr);
-      th->request(ptr.getHost(), ptr, NetworkInterface::ID, INV);
-      if (wasContended)
-        fetchImpl(ptr, RO, th, true);
-    } else {
-      assert(has_obj);
-      assert(md.state == metadata::HERE_RW);
-      if (tryWriteBack(md, ptr, lg)) {
-	//XXX delete any pending requests from reqs
-	reqs.erase(ptr);
+    }
+    else if(has_obj){
+      if (flag == INV) {
+        // ACK invalidate
+        eraseMD(ptr, lg);
+        getCacheManager().evict(ptr);
+        th->request(ptr.getHost(), ptr, NetworkInterface::ID, INV);
         if (wasContended)
-          fetchImpl(ptr, RW, th, true);
+          fetchImpl(ptr, RO, th, true);
       } else {
-        addPendingReq(ptr, dest, flag);
+        //assert(has_obj);
+        assert(md.state == metadata::HERE_RW);
+        if (tryWriteBack(md, ptr, lg)) {
+	  //delete any pending requests from reqs
+	  reqs.erase(ptr);
+          if (wasContended)
+            fetchImpl(ptr, RW, th, true);
+        } else {
+          addPendingReq(ptr, dest, flag);
+        }
       }
     }
   }
