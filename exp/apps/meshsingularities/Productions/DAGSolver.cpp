@@ -63,10 +63,7 @@ static cll::opt<Schedulers> scheduler("scheduler", cll::desc("Scheduler"),
                                           clEnumVal(SEQ, "Sequential"),
                                           clEnumValEnd), cll::init(CILK));
 
-static cll::opt<Rotator> rotation("rotation", cll::desc("Rotation"),
-                                      cll::values(clEnumVal(TRUE, "true"),
-                                                  clEnumVal(FALSE, "false"),
-                                                  clEnumValEnd), cll::init(FALSE));
+static cll::opt<bool> rotation("rotation", cll::desc("Rotation"), cll::init(false));
 
 #ifdef WITH_PAPI
 static cll::opt<bool> perfcounters("perfcounters", cll::desc("Enable performance counters"),
@@ -260,6 +257,8 @@ int main(int argc, char ** argv)
                     PAPI_L2_TCM};
     long long values[7] = {0,};
 
+    int eventSet = PAPI_NULL;
+
     int papi_err;
     if (PAPI_library_init(PAPI_VER_CURRENT) != PAPI_VER_CURRENT) {
         fprintf(stderr, "PAPI is unsupported.\n");
@@ -270,6 +269,19 @@ int main(int argc, char ** argv)
         fprintf(stderr, "PAPI is unsupported.\n");
         papi_supported = false;
     }
+
+    if ((papi_err = PAPI_create_eventset(&eventSet)) != PAPI_OK) {
+       fprintf(stderr, "Could not create event set: %s\n", PAPI_strerror(papi_err));
+    }
+
+    for (int i=0; i<7; ++i) {
+        if ((papi_err = PAPI_add_event(eventSet, events[i])) != PAPI_OK ) {
+            fprintf(stderr, "Could not add event: %s\n", PAPI_strerror(papi_err));
+        }
+    }
+
+
+
 #endif
     //DynamicLib *lib = new DynamicLib(prodlib);
     //lib->load();
@@ -290,7 +302,7 @@ int main(int argc, char ** argv)
     print_time("\tDOF enumeration", &t1, &t2);
 
     //tree rotation
-    if (rotation == TRUE){
+    if (rotation){
         printf("Tree size %d\n", m->getRootNode()->treeSize());   // DEBUG
         gettimeofday(&t1, NULL);
         Analysis::rotate(m->getRootNode(), NULL, m);
@@ -318,117 +330,90 @@ int main(int argc, char ** argv)
 
     printf("Root size: %d\n", m->getRootNode()->getDofs().size());
 
+
+// ALLOCATION
+    gettimeofday(&t1, NULL);
     if (scheduler == GALOIS_DAG) {
-        gettimeofday(&t1, NULL);
+
         galoisAllocation(m->getRootNode());
-        gettimeofday(&t2, NULL);
-        print_time("\tallocation", &t1, &t2);
+    }     else if (scheduler == CILK) {
+#ifdef HAVE_CILK
+        Galois::CilkInit();
+        cilk_alloc_tree(m->getRootNode());
+#else
+        printf("CILK is not supported.\n");
+        return 1;
+#endif
+    } else if (scheduler == SEQ) {
+        seqAllocation(m->getRootNode());
+    }
+    gettimeofday(&t2, NULL);
+    print_time("\tallocation", &t1, &t2);
+
+// FACTORIZATION
 
 #ifdef WITH_PAPI
         if (papi_supported) {
-            if ((papi_err = PAPI_start_counters(events, 7)) != PAPI_OK) {
+            if ((papi_err = PAPI_start(eventSet)) != PAPI_OK) {
                 fprintf(stderr, "Could not start counters: %s\n", PAPI_strerror(papi_err));
             }
         }
 #endif
-        gettimeofday(&t1, NULL);
+    gettimeofday(&t1, NULL);
+    if (scheduler == GALOIS_DAG) {
         galoisElimination(m->getRootNode());
-        gettimeofday(&t2, NULL);
-        print_time("\tfactorization", &t1, &t2);
-
-        gettimeofday(&t1, NULL);
-        galoisBackwardSubstitution(m->getRootNode());
-        gettimeofday(&t2, NULL);
-        print_time("\tsolution", &t1, &t2);
-#ifdef WITH_PAPI
-        if (papi_supported) {
-            if ((papi_err = PAPI_stop_counters(values, 7)) != PAPI_OK) {
-                fprintf(stderr, "Could not get values: %s\n", PAPI_strerror(papi_err));
-            }
-            // PAPI_FP_OPS
-            // PAPI_TOT_INS
-            // PAPI_BR_INS
-            // PAPI_LD_INS
-            // PAPI_SR_INS
-            // PAPI_L1_DCM
-            // PAPI_L2_TCM
-            printf("Performance counters: \n");
-            printf("\tFP OPS: %ld\n", values[0]);
-            printf("\tTOT INS: %ld\n", values[1]);
-            printf("\tBR INS: %ld\n", values[2]);
-            printf("\tLD INS: %ld\n", values[3]);
-            printf("\tSR INS: %ld\n", values[4]);
-            printf("\tL1 DCM: %ld\n", values[5]);
-            printf("\tL2 TCM: %ld\n", values[6]);
-        }
-#endif
     } else if (scheduler == CILK) {
 #ifdef HAVE_CILK
-        Galois::CilkInit();
-        gettimeofday(&t1, NULL);
-        cilk_alloc_tree(m->getRootNode());
-        gettimeofday(&t2, NULL);
-        print_time("\tallocation", &t1, &t2);
-
-        gettimeofday(&t1, NULL);
         cilk_do_elimination(m->getRootNode());
-        gettimeofday(&t2, NULL);
-        print_time("\tfactorization", &t1, &t2);
-
-        gettimeofday(&t1, NULL);
-        cilk_do_backward_substitution(m->getRootNode());
-        gettimeofday(&t2, NULL);
-        print_time("\tsolution", &t1, &t2);
 #else
         printf("CILK is not supported.\n");
 #endif
     } else if (scheduler == SEQ) {
-        gettimeofday(&t1, NULL);
-        seqAllocation(m->getRootNode());
-        gettimeofday(&t2, NULL);
-        print_time("\tallocation", &t1, &t2);
-
-#ifdef WITH_PAPI
-        if (papi_supported) {
-            if ((papi_err = PAPI_start_counters(events, 7)) != PAPI_OK) {
-                fprintf(stderr, "Could not start counters: %s\n", PAPI_strerror(papi_err));
-            }
-        }
-#endif
-        gettimeofday(&t1, NULL);
         seqElimination(m->getRootNode());
-        gettimeofday(&t2, NULL);
-        print_time("\tfactorization", &t1, &t2);
-
-        gettimeofday(&t1, NULL);
-        seqBackwardSubstitution(m->getRootNode());
-        gettimeofday(&t2, NULL);
-        print_time("\tsolution", &t1, &t2);
-#ifdef WITH_PAPI
-        if (papi_supported) {
-            if ((papi_err = PAPI_stop_counters(values, 7)) != PAPI_OK) {
-                fprintf(stderr, "Could not get values: %s\n", PAPI_strerror(papi_err));
-            }
-            // PAPI_FP_OPS
-            // PAPI_TOT_INS
-            // PAPI_BR_INS
-            // PAPI_LD_INS
-            // PAPI_SR_INS
-            // PAPI_L1_DCM
-            // PAPI_L2_TCM
-            printf("Performance counters: \n");
-            printf("\tFP OPS: %ld\n", values[0]);
-            printf("\tTOT INS: %ld\n", values[1]);
-            printf("\tBR INS: %ld\n", values[2]);
-            printf("\tLD INS: %ld\n", values[3]);
-            printf("\tSR INS: %ld\n", values[4]);
-            printf("\tL1 DCM: %ld\n", values[5]);
-            printf("\tL2 TCM: %ld\n", values[6]);
-
-        }
-#endif
     }
-    
+    gettimeofday(&t2, NULL);
+    print_time("\tfactorization", &t1, &t2);
+
+#ifdef WITH_PAPI
+    if (papi_supported) {
+        if ((papi_err = PAPI_stop(eventSet, values)) != PAPI_OK) {
+            fprintf(stderr, "Could not get values: %s\n", PAPI_strerror(papi_err));
+        }
+        // PAPI_FP_OPS
+        // PAPI_TOT_INS
+        // PAPI_BR_INS
+        // PAPI_LD_INS
+        // PAPI_SR_INS
+        // PAPI_L1_DCM
+        // PAPI_L2_TCM
+        printf("Performance counters for factorization stage: \n");
+        printf("\tFP OPS: %ld\n", values[0]);
+        printf("\tTOT INS: %ld\n", values[1]);
+        printf("\tBR INS: %ld\n", values[2]);
+        printf("\tLD INS: %ld\n", values[3]);
+        printf("\tSR INS: %ld\n", values[4]);
+        printf("\tL1 DCM: %ld\n", values[5]);
+        printf("\tL2 TCM: %ld\n", values[6]);
+    }
+#endif
+
+// SOLUTION
+
+    gettimeofday(&t1, NULL);
+    if (scheduler == GALOIS_DAG) {
+        galoisBackwardSubstitution(m->getRootNode());
+    } else if (scheduler == CILK) {
+#ifdef HAVE_CILK
+        cilk_do_backward_substitution(m->getRootNode());
+#else
+        printf("CILK is not supported.\n");
+#endif
+    } else if (scheduler == SEQ) {
+        seqBackwardSubstitution(m->getRootNode());
+    }
+    gettimeofday(&t2, NULL);
+    print_time("\tsolution", &t1, &t2);
+
     delete m;
     //delete lib;
 
