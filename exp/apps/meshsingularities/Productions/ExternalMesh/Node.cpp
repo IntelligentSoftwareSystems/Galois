@@ -152,6 +152,9 @@ bool Node::isNeighbour (Node *node, Node *parent)
     if (parent == NULL){
         return true;
     }
+    if (node == NULL){
+        return true;
+    }
     
     auto getAllDOFs = [] (Node *n) {
         std::set<uint64_t> *dofs = new std::set<uint64_t> ();
@@ -205,6 +208,13 @@ bool Node::isNeighbour (Node *node, Node *parent)
 
 bool Node::isNeighbour (Element *element1, Element *element2)
 {
+    if (element1 == NULL){
+        return true;
+    }
+    if (element2 == NULL){
+        return true;
+    }
+    
     std::set<uint64_t> element1Dofs(element1->dofs.cbegin(), element1->dofs.cend());
     std::set<uint64_t> element2Dofs(element2->dofs.cbegin(), element2->dofs.cend());
 

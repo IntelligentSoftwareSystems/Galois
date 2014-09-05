@@ -115,14 +115,6 @@ Node * Analysis::leftRotation(Node ** _parent, Node ** _root, bool child1, bool 
     T->rebuildElements();
     root->rebuildElements();
     
-    /*std::set<uint64_t> *parentDofs;
-    if (parent != NULL) {
-        parentDofs = new set<uint64_t>(parent->getDofs().cbegin(), parent->getDofs().cend());
-    } else {
-        parentDofs = new set<uint64_t>();
-    }
-    Analysis::nodeAnaliser(T, parentDofs);*/
-    
     return T;
 }
 
@@ -150,14 +142,6 @@ Node * Analysis::rightRotation(Node ** _parent, Node ** _root, bool child1, bool
     
     T->rebuildElements();
     root->rebuildElements();
-    
-    /*std::set<uint64_t> *parentDofs;
-    if (parent != NULL) {
-        parentDofs = new set<uint64_t>(parent->getDofs().cbegin(), parent->getDofs().cend());
-    } else {
-        parentDofs = new set<uint64_t>();
-    }
-    Analysis::nodeAnaliser(T, parentDofs);*/
     
     return T;
 }
@@ -206,8 +190,16 @@ int Analysis::rotate(Node * root, Node * parent, Mesh * mesh){
     Node * T = NULL;
     
     if (h>=2) {  //we need to perform some rotations to the left
-        bool child1 = Node::isNeighbour(root->getRight()->getLeft(), parent);
-        bool child2 = Node::isNeighbour(root->getRight()->getRight(), parent);
+        bool child1;
+        bool child2;
+        if (parent  == NULL){
+            child1 = true;
+            child2 = true;
+        } else {
+            if (root->getRight()==NULL) {printf ("l: %d  r:%d\n", l, r); printf("wielka dupa2\n");}
+            child1 = Node::isNeighbour(root->getRight()->getLeft(), parent->getLeft());
+            child2 = Node::isNeighbour(root->getRight()->getRight(), parent->getLeft());
+        }
         Node * child;
         Node * otherChild;
         findLeftRotationChild(&parent, &root, child1, child2, &child, &otherChild, mesh);
@@ -221,8 +213,15 @@ int Analysis::rotate(Node * root, Node * parent, Mesh * mesh){
             //   (rotation at root->right)
             Node * parent1 = root;
             Node * root1 = root->getRight();
-            bool nchild1 = Node::isNeighbour(root1->getLeft()->getLeft(), parent);
-            bool nchild2 = Node::isNeighbour(root1->getLeft()->getRight(), parent);
+            bool nchild1;
+            bool nchild2;
+            if (parent1  == NULL){
+                nchild1 = true;
+                nchild2 = true;
+            } else {
+                nchild1 = Node::isNeighbour(root1->getLeft()->getLeft(), parent1->getRight());
+                nchild2 = Node::isNeighbour(root1->getLeft()->getRight(), parent1->getRight());
+            }
             Node * nchild;
             Node * notherChild;
             
@@ -230,15 +229,28 @@ int Analysis::rotate(Node * root, Node * parent, Mesh * mesh){
             rightRotation(&parent1, &root1, nchild1, nchild2, &nchild, &notherChild);
             
             //rotation on higher level in left
-            child1 = Node::isNeighbour(root->getRight()->getLeft(), parent);
-            child2 = Node::isNeighbour(root->getRight()->getRight(), parent);
+
+            if (parent  == NULL){
+                child1 = true;
+                child2 = true;
+            } else {
+                child1 = Node::isNeighbour(root->getRight()->getLeft(), parent->getLeft());
+                child2 = Node::isNeighbour(root->getRight()->getRight(), parent->getLeft());
+            }
             findLeftRotationChild(&parent, &root, child1, child2, &child, &otherChild, mesh);
             T = leftRotation(&parent, &root, child1, child2, &child, &otherChild);
         }//end of double rotations
     } else {// end if (h>=2)
     // the same, but other direction rotation
-        bool child1 = Node::isNeighbour(root->getLeft()->getLeft(), parent);
-        bool child2 = Node::isNeighbour(root->getLeft()->getRight(), parent);
+        bool child1;
+        bool child2;
+        if (parent  == NULL){
+            child1 = true;
+            child2 = true;
+        } else {
+            child1 = Node::isNeighbour(root->getLeft()->getLeft(), parent->getRight());
+            child2 = Node::isNeighbour(root->getLeft()->getRight(), parent->getRight());
+        }
         Node * child;
         Node * otherChild;
         findRightRotationChild(&parent, &root, child1, child2, &child, &otherChild, mesh);
@@ -252,8 +264,15 @@ int Analysis::rotate(Node * root, Node * parent, Mesh * mesh){
             //   (rotation at root->left)
             Node * parent1 = root;
             Node * root1 = root->getLeft();
-            bool nchild1 = Node::isNeighbour(root1->getRight()->getLeft(), parent);
-            bool nchild2 = Node::isNeighbour(root1->getRight()->getRight(), parent);
+            bool nchild1;
+            bool nchild2;
+            if (parent1  == NULL){
+                nchild1 = true;
+                nchild2 = true;
+            } else {
+                nchild1 = Node::isNeighbour(root1->getRight()->getLeft(), parent1->getLeft());
+                nchild2 = Node::isNeighbour(root1->getRight()->getRight(), parent1->getLeft());
+            }
             Node * nchild;
             Node * notherChild;
             
@@ -261,8 +280,13 @@ int Analysis::rotate(Node * root, Node * parent, Mesh * mesh){
             leftRotation(&parent1, &root1, nchild1, nchild2, &nchild, &notherChild);
             
             //rotation on higher level in right
-            child1 = Node::isNeighbour(root->getLeft()->getLeft(), parent);
-            child2 = Node::isNeighbour(root->getLeft()->getRight(), parent);
+            if (parent  == NULL){
+                child1 = true;
+                child2 = true;
+            } else {
+                child1 = Node::isNeighbour(root->getLeft()->getLeft(), parent->getRight());
+                child2 = Node::isNeighbour(root->getLeft()->getRight(), parent->getRight());
+            }
             findRightRotationChild(&parent, &root, child1, child2, &child, &otherChild, mesh);
             T = rightRotation(&parent, &root, child1, child2, &child, &otherChild);
         }//end of double rotations
@@ -298,7 +322,7 @@ int Analysis::rotate(Node * root, Node * parent, Mesh * mesh){
             return r+1;
         }
     }
-    
+    //printf ("mega dupa\n");
     //return 0;
 }
 
