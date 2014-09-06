@@ -86,39 +86,38 @@ uint64_t Node::getDofsToElim() const
     return this->dofsToElim;
 }
 
-void Node::allocateSystem()
+void Node::allocateSystem(SolverMode mode)
 {
-    this->system = new EquationSystem(this->getDofs().size());
+    this->system = new EquationSystem(this->getDofs().size(), mode);
     //printf("Size: %d x %d\n", system->n, system->n);
 }
 
 void Node::fillin() const
 {
     int i;
-    for (i=0; i<this->system->n; ++i) {
-        for (int j=0; j<this->system->n; ++j) {
-            this->system->matrix[i][j] = i == j ? 1.0 : 0.0;
+    for (int j=0; j<this->system->n; ++j) {
+        for (i=0; i<this->system->n; ++i) {
+            this->system->matrix[j][i] = i == j ? 1.0 : 0.0;
         }
-        this->system->rhs[i] = 1.0;
+        this->system->rhs[j] = 1.0;
     }
 }
 
 void Node::merge() const
 {
-    for (int i=getLeft()->getDofsToElim(); i<getLeft()->getDofs().size(); ++i) {
-        for (int j=getLeft()->getDofsToElim(); j<getLeft()->getDofs().size(); ++j) {
-            system->matrix[leftPlaces[i-getLeft()->getDofsToElim()]][leftPlaces[j-getLeft()->getDofsToElim()]] =
-                    left->system->matrix[i][j];
+    for (int j=getLeft()->getDofsToElim(); j<getLeft()->getDofs().size(); ++j) {
+        for (int i=getLeft()->getDofsToElim(); i<getLeft()->getDofs().size(); ++i) {
+            system->matrix[leftPlaces[j-getLeft()->getDofsToElim()]][leftPlaces[i-getLeft()->getDofsToElim()]] =
+                    left->system->matrix[j][i];
         }
-        system->rhs[leftPlaces[i-getLeft()->getDofsToElim()]] = left->system->rhs[i];
+        system->rhs[leftPlaces[j-getLeft()->getDofsToElim()]] = left->system->rhs[j];
     }
-
-    for (int i=getRight()->getDofsToElim(); i<getRight()->getDofs().size(); ++i) {
-        for (int j=getRight()->getDofsToElim(); j<getRight()->getDofs().size(); ++j) {
-            system->matrix[rightPlaces[i-getRight()->getDofsToElim()]][rightPlaces[j-getRight()->getDofsToElim()]] +=
-                    right->system->matrix[i][j];
+    for (int j=getRight()->getDofsToElim(); j<getRight()->getDofs().size(); ++j) {
+        for (int i=getRight()->getDofsToElim(); i<getRight()->getDofs().size(); ++i) {
+            system->matrix[rightPlaces[j-getRight()->getDofsToElim()]][rightPlaces[i-getRight()->getDofsToElim()]] +=
+                    right->system->matrix[j][i];
         }
-        system->rhs[rightPlaces[i-getRight()->getDofsToElim()]] += right->system->rhs[i];
+        system->rhs[rightPlaces[j-getRight()->getDofsToElim()]] += right->system->rhs[j];
     }
 }
 

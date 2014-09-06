@@ -1,8 +1,8 @@
 #include "DynamicLib.h"
-#include "ExternalMesh/Analysis.hpp"
-#include "ExternalMesh/Node.hpp"
-#include "ExternalMesh/Element.hpp"
-#include "ExternalMesh/Mesh.hpp"
+#include "Analysis.hpp"
+#include "Node.hpp"
+#include "Element.hpp"
+#include "Mesh.hpp"
 
 #include "EquationSystem.h"
 
@@ -25,20 +25,13 @@
 
 enum Schedulers
 {
-    OLD,
     CILK,
     GALOIS_DAG,
     SEQ
 };
 
-enum Rotator
-{
-    TRUE,
-    FALSE
-};
-
 const char* const name = "DAGSolver";
-const char* const desc = "Solver for FEM with singularities on meshes";
+const char* const desc = "Mesh-based FEM solver";
 const char* const url = NULL;
 
 namespace cll = llvm::cl;
@@ -63,6 +56,12 @@ static cll::opt<Schedulers> scheduler("scheduler", cll::desc("Scheduler"),
                                           clEnumVal(SEQ, "Sequential"),
                                           clEnumValEnd), cll::init(CILK));
 
+static cll::opt<SolverMode> solverMode("solverMode", cll::desc("Elimination method"), cll::values(
+                                           clEnumVal(OLD, "Old, hand-made elimination"),
+                                           clEnumVal(LU, "LAPACK-based LU"),
+                                           clEnumVal(CHOLESKY, "LAPACK-based Cholesky"),
+                                           clEnumValEnd), cll::init(OLD));
+
 static cll::opt<bool> rotation("rotation", cll::desc("Rotation"), cll::init(false));
 
 #ifdef WITH_PAPI
@@ -75,7 +74,7 @@ using namespace std;
 #ifdef HAVE_CILK
 void cilk_alloc_tree(Node *n)
 {
-    n->allocateSystem();
+    n->allocateSystem(solverMode);
     if (n->getRight() != NULL && n->getLeft() != NULL) {
         cilk_spawn cilk_alloc_tree(n->getLeft());
         cilk_spawn cilk_alloc_tree(n->getRight());
@@ -172,7 +171,7 @@ struct GaloisAllocation: public Galois::Runtime::TreeTaskBase
     virtual void operator () (Galois::Runtime::TreeTaskContext &ctx)
     {
         //Analysis::debugNode(node);
-        node->allocateSystem();
+        node->allocateSystem(solverMode);
         if (node->getLeft() != NULL && node->getRight() != NULL) {
             GaloisAllocation left { node->getLeft() };
 
@@ -211,7 +210,7 @@ void galoisBackwardSubstitution(Node *node)
 
 void seqAllocation(Node *node)
 {
-    node->allocateSystem();
+    node->allocateSystem(solverMode);
     if (node->getLeft() != NULL && node->getRight() != NULL) {
         seqAllocation(node->getLeft());
         seqAllocation(node->getRight());

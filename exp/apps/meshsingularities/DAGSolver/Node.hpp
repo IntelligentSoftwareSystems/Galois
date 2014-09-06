@@ -7,7 +7,7 @@
 #include <cstdlib>
 
 #include "Element.hpp"
-#include "../EquationSystem.h"
+#include "EquationSystem.h"
 
 
 #include <set>
@@ -67,7 +67,7 @@ class Node {
         void setDofsToElim(uint64_t dofs);
         uint64_t getDofsToElim() const;
 
-        void allocateSystem();
+        void allocateSystem(SolverMode mode);
 
         void setProduction(std::string &prodname);
         std::string &getProduction();
