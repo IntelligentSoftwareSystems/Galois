@@ -9,6 +9,9 @@
 #include "Element.hpp"
 #include "../EquationSystem.h"
 
+
+#include <set>
+
 class Mesh;
 
 class Node {
@@ -27,6 +30,9 @@ class Node {
     public:
         int n_left = -1;
         int n_right = -1;
+        
+        int l=0;
+        int r=0;
 
         uint64_t *leftPlaces = NULL;
         uint64_t *rightPlaces = NULL;
@@ -86,6 +92,8 @@ class Node {
         /*DEBUG*/
         
         int treeSize();
+        int isBalanced(bool * bal);
+        bool isLooped(std::set<Node*> * n);
         
         /*END OF DEBUG*/
 };

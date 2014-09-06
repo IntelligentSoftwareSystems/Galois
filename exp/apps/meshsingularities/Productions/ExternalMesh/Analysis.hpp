@@ -30,14 +30,14 @@ class Analysis {
         
         static void findLeftRotationChild(Node ** _parent, Node ** _root, bool child1, bool child2, Node ** _child, Node ** _otherChild, Mesh * mesh);
         static void findRightRotationChild(Node ** _parent, Node ** _root, bool child1, bool child2, Node ** _child, Node ** _otherChild, Mesh * mesh);
-        static Node * leftRotation(Node ** _parent, Node ** _root, bool child1, bool child2, Node ** _child, Node ** _otherChild);
-        static Node * rightRotation(Node ** _parent, Node ** _root, bool child1, bool child2, Node ** _child, Node ** _otherChild);
+        static Node * leftRotation(Node ** _parent, Node ** _root, bool child1, bool child2, Node ** _child, Node ** _otherChild, bool * b);
+        static Node * rightRotation(Node ** _parent, Node ** _root, bool child1, bool child2, Node ** _child, Node ** _otherChild, bool * b);
         
     public:
         static void enumerateDOF(Mesh *mesh);
         static void doAnalise(Mesh *mesh);
         static void nodeAnaliser(Node *n, std::set<uint64_t> *parent);
-	static int rotate(Node * root, Node * parent, Mesh * mesh);
+	static int rotate(Node * root, Node * parent, Mesh * mesh, bool * b);
 
         // for debug use
         static void debugNode(Node *n);

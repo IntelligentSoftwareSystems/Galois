@@ -91,130 +91,129 @@ void Analysis::findRightRotationChild(Node ** _parent, Node ** _root, bool child
 }
 
 
-Node * Analysis::leftRotation(Node ** _parent, Node ** _root, bool child1, bool child2, Node ** _child, Node ** _otherChild){
+Node * Analysis::leftRotation(Node ** _parent, Node ** _root, bool child1, bool child2, Node ** _child, Node ** _otherChild, bool * b){
     
     Node * parent = (*_parent);
     Node * root = (*_root);
     Node * child = (*_child);
     Node * otherChild = (*_otherChild);
-    
-    if (parent != NULL){
-        if (parent->getLeft() == root){
-            parent->setLeft(root->getRight());
-        } else {
-            parent->setRight(root->getRight());
-        }
-    }
     Node * T = root->getRight();
     Node * t = root->getLeft();
+    
+    if (T==NULL){
+        return root;
+    }
+    
     root->setRight(t);
     root->setLeft(child);
     T->setRight(otherChild);
     T->setLeft(root);
     
+    if (parent != NULL){
+        if (parent->getLeft() == root){
+            parent->setLeft(T);
+        } else {
+            parent->setRight(T);
+        }
+    }
+    
     T->rebuildElements();
     root->rebuildElements();
+    (*b)=false;
     
     return T;
 }
 
 
-Node * Analysis::rightRotation(Node ** _parent, Node ** _root, bool child1, bool child2, Node ** _child, Node ** _otherChild){
+Node * Analysis::rightRotation(Node ** _parent, Node ** _root, bool child1, bool child2, Node ** _child, Node ** _otherChild, bool * b){
     
     Node * parent = (*_parent);
     Node * root = (*_root);
     Node * child = (*_child);
     Node * otherChild = (*_otherChild);
-    
-    if (parent != NULL){
-        if (parent->getLeft() == root){
-            parent->setLeft(root->getLeft());
-        } else {
-            parent->setRight(root->getLeft());
-        }
-    }
     Node * T = root->getLeft();
     Node * t = root->getRight();
+    
+    if (T==NULL){
+        return root;
+    }
+    
     root->setLeft(t);
     root->setRight(child);
     T->setLeft(otherChild);
     T->setRight(root);
     
+    if (parent != NULL){
+        if (parent->getLeft() == root){
+            parent->setLeft(T);
+        } else {
+            parent->setRight(T);
+        }
+    }
+    
     T->rebuildElements();
     root->rebuildElements();
+    (*b)=false;
     
     return T;
 }
 
-int Analysis::rotate(Node * root, Node * parent, Mesh * mesh){
+int Analysis::rotate(Node * root, Node * parent, Mesh * mesh, bool * b){
     
-    int l,r,h;
+    int h;
     
     if (root->getLeft() != NULL) {
-        l = Analysis::rotate(root->getLeft(), root, mesh);
+        root->l = Analysis::rotate(root->getLeft(), root, mesh, b);
     } else {
-        l=0;
+        root->l=0;
     }
     
     if (root->getRight() != NULL) {
-        r = Analysis::rotate(root->getRight(), root, mesh);
+        root->r = Analysis::rotate(root->getRight(), root, mesh, b);
     } else {
-        r=0;
+        root->r=0;
     }
-    h=r-l;
+    h=root->r-root->l;
 
     if ( (h==1) || (h==-1) || (h==0) ) { //no rotation
-        //return h;
-        if (l>r){
-            return l+1;
+        if (root->l>root->r){
+            return root->l+1;
         } else {
-            return r+1;
+            return root->r+1;
         }
     }
-            
-            
-    /*if (h==0){
-        return 1;
-    }
-    if (h==-1){
-        printf ("dupa1\n");
-        return 2;
-    }
-    if (h==1){
-        printf ("dupa2\n");
-        return 2;
-    }*/
-
-    //printf("rotating\n");
     
-    Node * T = NULL;
+    Node * T = root;
     
     if (h>=2) {  //we need to perform some rotations to the left
         bool child1;
         bool child2;
+        Node * child;
+        Node * otherChild;
+        
         if (parent  == NULL){
             child1 = true;
             child2 = true;
         } else {
-            if (root->getRight()==NULL) {printf ("l: %d  r:%d\n", l, r); printf("wielka dupa2\n");}
             child1 = Node::isNeighbour(root->getRight()->getLeft(), parent->getLeft());
             child2 = Node::isNeighbour(root->getRight()->getRight(), parent->getLeft());
         }
-        Node * child;
-        Node * otherChild;
         findLeftRotationChild(&parent, &root, child1, child2, &child, &otherChild, mesh);
         
-        if (((child == root->getRight()->getRight()) && (r<=0)) || ((child == root->getRight()->getLeft()) && (r>=0))) {//rotation to the left
-            T = leftRotation(&parent, &root, child1, child2, &child, &otherChild);
-        }//end of rotation to the left
-        
+        if (((child == root->getRight()->getRight()) && (root->getRight()->r<=root->getRight()->l))
+                || ((child == root->getRight()->getLeft()) && (root->getRight()->l<=root->getRight()->r))) {//rotation to the left
+            T = leftRotation(&parent, &root, child1, child2, &child, &otherChild, b);
+            //printf("rotation left\n");
+        } //end of rotation to the left
         else //double rotation
-        {// lower level rotation to the right
-            //   (rotation at root->right)
+        {// lower level rotation to the right (rotation at root->right)
             Node * parent1 = root;
             Node * root1 = root->getRight();
             bool nchild1;
             bool nchild2;
+            Node * nchild;
+            Node * notherChild;
+            
             if (parent1  == NULL){
                 nchild1 = true;
                 nchild2 = true;
@@ -222,14 +221,10 @@ int Analysis::rotate(Node * root, Node * parent, Mesh * mesh){
                 nchild1 = Node::isNeighbour(root1->getLeft()->getLeft(), parent1->getRight());
                 nchild2 = Node::isNeighbour(root1->getLeft()->getRight(), parent1->getRight());
             }
-            Node * nchild;
-            Node * notherChild;
-            
             findRightRotationChild(&parent1, &root1, nchild1, nchild2, &nchild, &notherChild, mesh);
-            rightRotation(&parent1, &root1, nchild1, nchild2, &nchild, &notherChild);
+            rightRotation(&parent1, &root1, nchild1, nchild2, &nchild, &notherChild, b);
             
             //rotation on higher level in left
-
             if (parent  == NULL){
                 child1 = true;
                 child2 = true;
@@ -238,12 +233,17 @@ int Analysis::rotate(Node * root, Node * parent, Mesh * mesh){
                 child2 = Node::isNeighbour(root->getRight()->getRight(), parent->getLeft());
             }
             findLeftRotationChild(&parent, &root, child1, child2, &child, &otherChild, mesh);
-            T = leftRotation(&parent, &root, child1, child2, &child, &otherChild);
+            
+            T = leftRotation(&parent, &root, child1, child2, &child, &otherChild, b);
+            //printf("double rotation left\n");
         }//end of double rotations
-    } else {// end if (h>=2)
-    // the same, but other direction rotation
+    }// end if (h>=2)
+    if (h<=-2) {  // the same, but other direction rotation
         bool child1;
         bool child2;
+        Node * child;
+        Node * otherChild;
+        
         if (parent  == NULL){
             child1 = true;
             child2 = true;
@@ -251,13 +251,13 @@ int Analysis::rotate(Node * root, Node * parent, Mesh * mesh){
             child1 = Node::isNeighbour(root->getLeft()->getLeft(), parent->getRight());
             child2 = Node::isNeighbour(root->getLeft()->getRight(), parent->getRight());
         }
-        Node * child;
-        Node * otherChild;
         findRightRotationChild(&parent, &root, child1, child2, &child, &otherChild, mesh);
         
-        if (((child == root->getLeft()->getRight()) && (r<=0)) || ((child == root->getLeft()->getLeft()) && (r>=0))) {//rotation to the left
-            T = rightRotation(&parent, &root, child1, child2, &child, &otherChild);
-        }//end of rotation to the left
+        if (((child == root->getLeft()->getRight()) && (root->getLeft()->r<=root->getLeft()->l))
+                || ((child == root->getLeft()->getLeft()) && (root->getLeft()->l<=root->getLeft()->r))) {//rotation to the left
+            T = rightRotation(&parent, &root, child1, child2, &child, &otherChild, b);
+            //printf("rotation right\n");
+        }//end of rotation to the right
         
         else //double rotation
         {// lower level rotation to the left
@@ -266,6 +266,9 @@ int Analysis::rotate(Node * root, Node * parent, Mesh * mesh){
             Node * root1 = root->getLeft();
             bool nchild1;
             bool nchild2;
+            Node * nchild;
+            Node * notherChild;
+            
             if (parent1  == NULL){
                 nchild1 = true;
                 nchild2 = true;
@@ -273,13 +276,9 @@ int Analysis::rotate(Node * root, Node * parent, Mesh * mesh){
                 nchild1 = Node::isNeighbour(root1->getRight()->getLeft(), parent1->getLeft());
                 nchild2 = Node::isNeighbour(root1->getRight()->getRight(), parent1->getLeft());
             }
-            Node * nchild;
-            Node * notherChild;
-            
             findLeftRotationChild(&parent1, &root1, nchild1, nchild2, &nchild, &notherChild, mesh);
-            leftRotation(&parent1, &root1, nchild1, nchild2, &nchild, &notherChild);
             
-            //rotation on higher level in right
+            leftRotation(&parent1, &root1, nchild1, nchild2, &nchild, &notherChild, b);
             if (parent  == NULL){
                 child1 = true;
                 child2 = true;
@@ -288,7 +287,9 @@ int Analysis::rotate(Node * root, Node * parent, Mesh * mesh){
                 child2 = Node::isNeighbour(root->getLeft()->getRight(), parent->getRight());
             }
             findRightRotationChild(&parent, &root, child1, child2, &child, &otherChild, mesh);
-            T = rightRotation(&parent, &root, child1, child2, &child, &otherChild);
+            
+            T = rightRotation(&parent, &root, child1, child2, &child, &otherChild, b);
+            //printf("double rotation right\n");
         }//end of double rotations
     }
     
@@ -296,34 +297,18 @@ int Analysis::rotate(Node * root, Node * parent, Mesh * mesh){
         mesh->setRootNode(T);
     }
     
-    
-    
-    
-    
-    
-    if (root->getLeft() != NULL) {
-        l = Analysis::rotate(root->getLeft(), root, mesh);
+    std::set<Node*>a;
+    if (T->isLooped(&a)){
+        printf("looped tree\n");
+        exit(-1);
+    }
+    bool bl=true;
+    T->isBalanced(&bl);
+    if (root->l>T->r){
+        return T->l+1;
     } else {
-        l=0;
+        return T->r+1;
     }
-    
-    if (root->getRight() != NULL) {
-        r = Analysis::rotate(root->getRight(), root, mesh);
-    } else {
-        r=0;
-    }
-    h=r-l;
-
-    if ( (h==1) || (h==-1) || (h==0) ) { //no rotation
-        //return h;
-        if (l>r){
-            return l+1;
-        } else {
-            return r+1;
-        }
-    }
-    //printf ("mega dupa\n");
-    //return 0;
 }
 
 void Analysis::nodeAnaliser(Node *node, set<uint64_t> *parent)

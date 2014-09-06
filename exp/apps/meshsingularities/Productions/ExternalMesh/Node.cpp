@@ -291,4 +291,47 @@ int Node::treeSize(){
     return ret;
 }
 
+
+int Node::isBalanced(bool * bal){
+    int h;
+    
+    if (this->getLeft()){
+        this->l = this->getLeft()->isBalanced(bal);
+    } else {
+        this->l=0;
+    }
+    
+    if (this->getRight()){
+        this->r = this->getRight()->isBalanced(bal);
+    } else{
+        this->r=0;
+    }
+    
+    h = this->r - this->l;
+    if ((h>=2) || (h<=-2)){
+        (*bal)=false;
+    }
+    
+    if (this->r>this->l){
+        return this->r+1;
+    } else{
+        return this->l+1;
+    }
+}
+
+
+bool Node::isLooped(std::set<Node*>* n){
+    if (n->count(this)){
+        return true;
+    }
+    n->insert(this);
+    if ((this->getLeft()) && (this->getLeft()->isLooped(n))){
+        return true;
+    }
+    if ((this->getRight()) && (this->getRight()->isLooped(n))){
+        return true;
+    }
+    return false;
+}
+
 /*END OF DEBUG*/
