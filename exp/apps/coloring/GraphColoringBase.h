@@ -153,7 +153,7 @@ protected:
 
     // std::printf ("Node %d assigned color %d\n", sd.id, sd.color);
 
-  };
+  }
 
   template <typename F>
   void assignPriorityHelper (const F& nodeFunc) {
@@ -298,7 +298,7 @@ protected:
 
 public:
 
-  virtual void run (int argc, char* argv[]) {
+  void run (int argc, char* argv[]) {
     LonestarStart (argc, argv, name, desc, url);
     Galois::StatManager sm;
 
