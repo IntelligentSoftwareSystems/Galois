@@ -115,7 +115,7 @@ protected:
 
     Galois::InsertBag<GNode> initWork;
 
-    Galois::StatTimer t_dag_init;("dag initialization time: ");
+    Galois::StatTimer t_dag_init ("dag initialization time: ");
 
     t_dag_init.start ();
     initDAG (initWork);
@@ -126,8 +126,12 @@ protected:
     std::printf ("Number of initial sources: %zd\n", 
         std::distance (initWork.begin (), initWork.end ()));
 
+    Galois::StatTimer t_dag_color ("dag coloring time: ");
+
+    t_dag_color.start ();
     Galois::for_each_local (initWork, ColorNodeDAG {*this}, 
         Galois::loopname ("color-DAG"), Galois::wl<WL_ty> ());
+    t_dag_color.stop ();
   }
 
   struct VisitNhood {
