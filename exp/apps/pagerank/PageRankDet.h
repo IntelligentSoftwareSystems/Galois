@@ -23,13 +23,13 @@
 
 namespace cll = llvm::cl;
 
-static cll::opt<std::string> filename (cll::Positional, cll::desc ("<input file>"), cll::Required);
+static cll::opt<std::string> inputfile (cll::Positional, cll::desc ("<input file>"), cll::Required);
 
 static const char* const name = "Page Rank";
 static const char* const desc = "Page Rank of a graph of web pages";
 static const char* const url = "pagerank";
 
-static const double PAGE_RANK_INIT = 1.0
+static const double PAGE_RANK_INIT = 1.0;
 
 template <typename IG>
 class PageRankBase {
@@ -38,11 +38,14 @@ protected:
 
   typedef typename Galois::Graph::LC_InOut_Graph<IG> Graph;
   typedef typename Graph::GraphNode GNode;
+  typedef typename Graph::node_data_type NodeData;
+
+  static const unsigned DEFAULT_CHUNK_SIZE = 16;
 
   Graph graph;
 
   void readGraph (void) {
-    Galois::Graph::readGraph (graph, filename);
+    Galois::Graph::readGraph (graph, inputfile);
 
     const size_t numNodes = graph.size ();
     Galois::GAccumulator<size_t> numEdges;
@@ -123,8 +126,8 @@ protected:
 
 public:
 
-  void run (int argc, char* argv[]) {
-    LonestarStart (argv, argc, name desc, url);
+  int run (int argc, char* argv[]) {
+    LonestarStart (argc, argv, name, desc, url);
     Galois::StatManager sm;
 
     readGraph ();
@@ -141,46 +144,8 @@ public:
     Galois::reportPageAlloc("MeminfoPost");
 
     verify ();
-  }
 
-
-};
-
-struct NodeData: public DAGdata {
-
-  double value;
-  unsigned outdegree;
-
-  NodeData (unsigned id, unsigned outdegree): 
-    DAGdata (id), value (PAGE_RANK_INIT), outdegree (outdegree) 
-  {}
-
-};
-
-typedef typename Galois::Graph::LC_CSR_Graph<NodeData, void>
-  ::with_numa_alloc<true>::type
-  ::with_no_lockable<true>::type 
-  InnerGraph;
-
-class PageRankColoredDAG: public PageRankBase<InnerGraph> {
-protected:
-
-  struct ApplyOperator {
-
-    PageRankColoredDAG& outer;
-
-    template <typename C>
-    void operator () (GNode src, C& ctx) {
-      outer.applyOperator (src, ctx);
-    }
-  };
-
-  virtual void runPageRank (void) {
-    Galois::Runtime::for_each_det_graph (
-        Galois::Runtime::makeLocalRange (graph),
-        graph,
-        ApplyOperator {*this},
-        "page-rank-chromatic");
+    return 0;
   }
 
 };

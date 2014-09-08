@@ -1,7 +1,16 @@
 #ifndef GALOIS_RUNTIME_DET_EDGE_FLIP_DAG_H
 #define GALOIS_RUNTIME_DET_EDGE_FLIP_DAG_H
 
+#include "Galois/Accumulator.h"
+#include "Galois/Galois.h"
+#include "Galois/GaloisUnsafe.h"
+
+#include "Galois/Graph/Graph.h"
+
+#include "Galois/WorkList/WorkListWrapper.h"
+
 #include <atomic>
+#include <vector>
 
 namespace Galois {
 namespace Runtime {
@@ -40,10 +49,10 @@ struct DAGdata {
   {}
 };
 
-template <typename GN>
+template <typename GNode>
 struct DAGdataDirected: public DAGdata {
 
-  typedef Galois::gdeque<GN, 64> AdjList;
+  typedef Galois::gdeque<GNode, 64> AdjList;
 
   AdjList preds;
 
@@ -80,7 +89,7 @@ protected:
   static const unsigned DEFAULT_CHUNK_SIZE = 16;
 
   typedef typename G::GraphNode GNode;
-  typedef typename G::NodeDataType ND;
+  typedef typename G::node_data_type ND;
 
   typedef Galois::Runtime::PerThreadVector<unsigned> PerThrdColorVec;
 
@@ -88,6 +97,7 @@ protected:
   P predApp;
   S succApp;
   PerThrdColorVec perThrdColorVec;
+  Galois::GReduceMax<unsigned> maxColors;
 
   DAGgeneratorBase (G& graph, const P& predApp, const S& succApp)
     : graph (graph), predApp (predApp), succApp (succApp) 
@@ -98,14 +108,14 @@ protected:
 
     Galois::do_all_choice (
         Galois::Runtime::makeLocalRange (graph),
-        [this] (GNode src) {
+        [this, &initWork] (GNode src) {
           
           auto& sd = graph.getData (src, Galois::NONE);
 
           assert (sd.indegree == 0);
           unsigned addAmt = 0;
 
-          auto closure = [&sd, &graph, &addAmt] (GNode dst) {
+          auto closure = [this, &sd, &addAmt] (GNode dst) {
             auto& dd = graph.getData (dst, Galois::NONE);
 
             if (DAGdataComparator<ND>::compare (dd, sd)) { // dd < sd
@@ -113,8 +123,8 @@ protected:
             }
           };
 
-          succApp (closure);
-          predApp (closure);
+          succApp (src, closure);
+          predApp (src, closure);
 
           sd.indegree += addAmt;
 
@@ -133,7 +143,7 @@ protected:
   void assignPriorityHelper (const F& nodeFunc) {
     Galois::do_all_choice (
         Galois::Runtime::makeLocalRange (graph),
-        [&] (GN node) {
+        [&] (GNode node) {
           nodeFunc (node);
         },
         "assign-priority",
@@ -145,7 +155,7 @@ protected:
     static const unsigned MAX_LEVELS = 100;
     static const unsigned SEED = 10;
 
-    auto byId = [&] (GN node) {
+    auto byId = [&] (GNode node) {
       auto& nd = graph.getData (node, Galois::NONE);
       nd.priority = nd.id % MAX_LEVELS;
     };
@@ -169,14 +179,14 @@ protected:
     // TODO: non-deterministic at the moment
     // can be fixed by making thread K call the generator
     // N times, where N is sum of calls of all threads < K
-    auto randPri = [&] (GN node) {
+    auto randPri = [&] (GNode node) {
       auto& rng = *(perThrdRNG.getLocal ());
       auto& nd = graph.getData (node, Galois::NONE);
       nd.priority = rng ();
     };
 
 
-    auto minDegree = [&] (GN node) {
+    auto minDegree = [&] (GNode node) {
       auto& nd = graph.getData (node, Galois::NONE);
       nd.priority = std::distance (
                       graph.edge_begin (node, Galois::NONE),
@@ -184,7 +194,7 @@ protected:
     };
 
     const size_t numNodes = graph.size ();
-    auto maxDegree = [&] (GN node) {
+    auto maxDegree = [&] (GNode node) {
       auto& nd = graph.getData (node, Galois::NONE);
       nd.priority = numNodes - std::distance (
                                   graph.edge_begin (node, Galois::NONE),
@@ -237,7 +247,7 @@ protected:
 
     unsigned addAmt = 0;
 
-    auto closure = [this, &ctx, &sd, &addAmt] (GNode dst) {
+    auto closure = [this, &forbiddenColors, &ctx, &sd, &addAmt] (GNode dst) {
       auto& dd = graph.getData (dst, Galois::NONE);
 
       if (forbiddenColors.size () <= dd.color) {
@@ -254,8 +264,8 @@ protected:
       }
     };
 
-    predApp (closure);
-    succApp (closure);
+    predApp (src, closure);
+    succApp (src, closure);
 
     for (size_t i = 1; i < forbiddenColors.size (); ++i) {
       if (forbiddenColors[i] != sd.id) { 
@@ -267,10 +277,13 @@ protected:
     if (sd.color == 0) {
       sd.color = forbiddenColors.size ();
     }
+    maxColors.update (sd.color);
 
     sd.indegree += addAmt;
 
+
     // std::printf ("Node %d assigned color %d\n", sd.id, sd.color);
+
 
   }
 
@@ -318,10 +331,14 @@ public:
     t_color.stop ();
   }
 
+  unsigned getMaxColors (void) const {
+    return maxColors.reduceRO ();
+  }
+
 };
 
 template <typename G>
-struct InOutFuncs {
+struct DAGgenInOut {
   typedef typename G::GraphNode GNode;
 
   struct PredClosureApplicator {
@@ -331,7 +348,7 @@ struct InOutFuncs {
     void operator () (GNode src, F func) {
       for (auto i = graph.in_edge_begin (src, Galois::NONE)
           , end_i = graph.in_edge_end (src, Galois::NONE); i != end_i; ++i) {
-        GNode dst = graph.getEdgeDst (i);
+        GNode dst = graph.getInEdgeDst (i);
         func (dst);
       }
     }
@@ -355,20 +372,15 @@ struct InOutFuncs {
 
   typedef DAGgeneratorBase<G, PredClosureApplicator, SuccClosureApplicator> Base_ty;
 
-  static Base_ty makeBase (G& graph) {
-    return Base_ty {graph, PredClosureApplicator {graph}, SuccClosureApplicator {graph}};
-  }
+  struct Generator: public Base_ty {
+
+    Generator (G& graph): Base_ty {graph, PredClosureApplicator {graph}, SuccClosureApplicator {graph}} 
+    {}
+
+  };
 
 };
 
-template <typename G>
-struct DAGgenInOut: public typename InOutFuncs<G>::Base_ty {
-
-  typedef typename InOutFuncs<G>::Base_ty Base_ty;
-
-  DAGgenInOut (G& graph): Base_ty {InOutFuncs<G>::makeBase (graph)} {}
-
-};
 
 // TODO: complete implementation
 /*
@@ -410,7 +422,7 @@ struct ChromaticExecutor {
 
   typedef typename G::GraphNode GNode;
 
-  const unsigned CHUNK_SIZE = F::CHUNK_SIZE;
+  static const unsigned CHUNK_SIZE = F::CHUNK_SIZE;
   typedef Galois::WorkList::AltChunkedFIFO<CHUNK_SIZE, GNode> Inner_WL_ty;
   typedef Galois::WorkList::WLsizeWrapper<Inner_WL_ty> WL_ty;
   typedef PerThreadStorage<UserContextAccess<GNode> > PerThreadUserCtx;
@@ -418,11 +430,13 @@ struct ChromaticExecutor {
   G& graph;
   F func;
   unsigned maxColors;
+  const char* loopname;
+
   std::vector<WL_ty*> colorWorkLists;
   PerThreadUserCtx userContexts;
 
-  ChromaticExecutor (G& graph, const F& func, unsigned maxColors)
-    : graph (graph), func (func), maxColors (maxColors) {
+  ChromaticExecutor (G& graph, const F& func, unsigned maxColors, const char* loopname)
+    : graph (graph), func (func), maxColors (maxColors), loopname (loopname) {
     
       assert (maxColors > 0);
       colorWorkLists.resize (maxColors, nullptr);
@@ -432,14 +446,22 @@ struct ChromaticExecutor {
       }
   }
 
+  ~ChromaticExecutor (void) {
+    for (unsigned i = 0; i < colorWorkLists.size (); ++i) {
+      delete colorWorkLists[i];
+      colorWorkLists[i] = nullptr;
+    }
+  }
+
   void push (GNode n) {
     auto& data = graph.getData (n);
 
     unsigned i = data.color;
     assert (i < maxColors);
 
-    if (data.onWL.cas (false, true)) {
-      colorWorkLists[i].push (n);
+    bool expected = false;
+    if (data.onWL.compare_exchange_strong (expected, true)) {
+      colorWorkLists[i]->push (n);
     }
   }
 
@@ -458,15 +480,16 @@ struct ChromaticExecutor {
       auto& nd = outer.graph.getData (n, Galois::NONE);
       nd.onWL = false;
 
-      for (auto i = userCtx.getPushBuffer ().begin (), end_i = userCtx.getPushBuffer ().end (); 
-          i != end_i; ++i) {
-          outer.push (*i);
-        }
+      for (auto i = userCtx.getPushBuffer ().begin (), 
+          end_i = userCtx.getPushBuffer ().end (); i != end_i; ++i) {
+
+        outer.push (*i);
       }
     }
   };
 
 
+  template <typename R>
   void execute (const R& range) {
 
     // fill initial
@@ -483,17 +506,17 @@ struct ChromaticExecutor {
       ++rounds;
 
       // find non-empty WL
-      WL* nextWL = nullptr;
+      WL_ty* nextWL = nullptr;
       unsigned nextIndex = 0;
 
       unsigned maxSize = 0;
       for (unsigned i = 0; i < colorWorkLists.size (); ++i) {
 
         unsigned j = (nextIndex + i) % colorWorkLists.size ();
-        size_t s = colorWorkLists[j].size ();
+        size_t s = colorWorkLists[j]->size ();
         if (s > 0 && s > maxSize) {
           maxSize = s;
-          nextWL = &(colorWorkLists[j]);
+          nextWL = colorWorkLists[j];
           nextIndex = (j + 1) % colorWorkLists.size ();
         }
       }
@@ -518,15 +541,14 @@ struct ChromaticExecutor {
 };
 
 // TODO: logic to choose correct DAG type based on graph type or some graph tag
-
-
+template <typename R, typename G, typename F>
 void for_each_det_graph (const R& range, G& graph, const F& func, const char* loopname) {
 
-  DAGgenInOut gen {graph};
+  typename DAGgenInOut<G>::Generator gen {graph};
 
   gen.colorDAG ();
 
-  ChromaticExecutor executor {graph, func, loopname};
+  ChromaticExecutor<G,F> executor {graph, func, gen.getMaxColors (), loopname};
 
   executor.execute (range);
 }
