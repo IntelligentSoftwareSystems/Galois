@@ -31,6 +31,7 @@
 #include "Galois/Graph/LCGraph.h"
 #include "Galois/ParallelSTL/ParallelSTL.h"
 #include "Galois/Runtime/ll/PaddedLock.h"
+#include "Galois/Runtime/ll/EnvCheck.h"
 #include "Galois/Runtime/TiledExecutor.h"
 #include "Lonestar/BoilerPlate.h"
 
@@ -49,12 +50,17 @@
 #include <Eigen/Dense>
 #endif
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 static const char* const name = "Matrix Completion";
 static const char* const desc = "Computes Matrix Decomposition using Stochastic Gradient Descent";
 static const char* const url = 0;
 
 enum Algo {
   alternatingLeastSquares,
+  asynchronousAlternatingLeastSquares,
   blockedEdge,
   blockedEdgeServer,
   blockJump,
@@ -107,6 +113,7 @@ static cll::opt<bool> useExactError("useExactError", cll::desc("use exact error 
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
   cll::values(
     clEnumValN(Algo::alternatingLeastSquares, "als", "Alternating least squares"),
+    clEnumValN(Algo::asynchronousAlternatingLeastSquares, "aals", "Asynchronous alternating least squares"),
     clEnumValN(Algo::blockedEdge, "blockedEdge", "Edge blocking (default)"),
     clEnumValN(Algo::blockedEdgeServer, "blockedEdgeServer", "Edge blocking with server support"),
     clEnumValN(Algo::blockJump, "blockJump", "Block jumping "),
@@ -1086,6 +1093,7 @@ int main(int argc, char** argv) {
   switch (algo) {
 #ifdef HAS_EIGEN
     case Algo::alternatingLeastSquares: run<AlternatingLeastSquaresAlgo>(); break;
+    case Algo::asynchronousAlternatingLeastSquares: run<AsynchronousAlternatingLeastSquaresAlgo>(); break;
 #endif
     case Algo::blockedEdge: run<BlockedEdgeAlgo<false> >(); break;
     case Algo::blockedEdgeServer: run<BlockedEdgeAlgo<true> >(); break;

@@ -68,6 +68,157 @@ struct DotProductFixedTilingAlgo {
 };
 
 #ifdef HAS_EIGEN
+struct AsynchronousAlternatingLeastSquaresAlgo {
+  std::string name() const { return "AsynchronousAlternatingLeastSquares"; }
+  struct Node { 
+    LatentValue latentVector[LATENT_VECTOR_SIZE];
+  };
+
+  typedef typename Galois::Graph::LC_CSR_Graph<Node, unsigned int>
+    ::with_out_of_line_lockable<true>::type Graph;
+  typedef Graph::GraphNode GNode;
+  // Column-major access 
+  typedef Eigen::SparseMatrix<LatentValue> Sp;
+  typedef Eigen::Matrix<LatentValue, LATENT_VECTOR_SIZE, Eigen::Dynamic> MT;
+  typedef Eigen::Matrix<LatentValue, LATENT_VECTOR_SIZE, 1> V;
+  typedef Eigen::Map<V> MapV;
+
+  Sp A;
+  Sp AT;
+
+  void readGraph(Graph& g) {
+    Galois::Graph::readGraph(g, inputFilename); 
+  }
+
+  void copyToGraph(Graph& g, MT& WT, MT& HT) {
+    // Copy out
+    for (GNode n : g) {
+      LatentValue* ptr = &g.getData(n).latentVector[0];
+      MapV mapV = { ptr };
+      if (n < NUM_ITEM_NODES) {
+        mapV = WT.col(n);
+      } else {
+        mapV = HT.col(n - NUM_ITEM_NODES);
+      }
+    }
+  }
+
+  void copyFromGraph(Graph& g, MT& WT, MT& HT) {
+    for (GNode n : g) {
+      LatentValue* ptr = &g.getData(n).latentVector[0];
+      MapV mapV = { ptr };
+      if (n < NUM_ITEM_NODES) {
+        WT.col(n) = mapV;
+      } else {
+        HT.col(n - NUM_ITEM_NODES) = mapV;
+      }
+    }
+  }
+
+  void initializeA(Graph& g) {
+    typedef Eigen::Triplet<int> Triplet;
+    std::vector<Triplet> triplets { g.sizeEdges() };
+    auto it = triplets.begin();
+    for (auto n : g) {
+      for (auto edge : g.out_edges(n)) {
+        *it++ = Triplet(n, g.getEdgeDst(edge) - NUM_ITEM_NODES, g.getEdgeData(edge));
+      }
+    }
+    A.resize(NUM_ITEM_NODES, g.size() - NUM_ITEM_NODES);
+    A.setFromTriplets(triplets.begin(), triplets.end());
+    AT = A.transpose();
+  }
+
+  void operator()(Graph& g, const StepFunction&) {
+    Galois::TimeAccumulator elapsed;
+    elapsed.start();
+
+    // Find W, H that minimize ||W H^T - A||_2^2 by solving alternating least
+    // squares problems:
+    //   (W^T W + lambda I) H^T = W^T A (solving for H^T)
+    //   (H^T H + lambda I) W^T = H^T A^T (solving for W^T)
+    MT WT { LATENT_VECTOR_SIZE, NUM_ITEM_NODES };
+    MT HT { LATENT_VECTOR_SIZE, g.size() - NUM_ITEM_NODES };
+    typedef Eigen::Matrix<LatentValue, LATENT_VECTOR_SIZE, LATENT_VECTOR_SIZE> XTX;
+    typedef Eigen::Matrix<LatentValue, LATENT_VECTOR_SIZE, Eigen::Dynamic> XTSp;
+
+    initializeA(g);
+    copyFromGraph(g, WT, HT);
+
+    double last = -1.0;
+    Galois::StatTimer updateTime("UpdateTime");
+    Galois::StatTimer copyTime("CopyTime");
+    Galois::Runtime::PerThreadStorage<XTX> xtxs;
+    Galois::Runtime::PerThreadStorage<V> Xs;
+
+    for (int round = 1; ; ++round) {
+      updateTime.start();
+      Galois::for_each(
+          boost::counting_iterator<size_t>(0),
+          boost::counting_iterator<size_t>(g.size()),
+          [&](size_t col, Galois::UserContext<size_t>&) {
+        // Compute WTW = W^T * W for sparse A
+        V& x = *Xs.getLocal();
+        if (col < NUM_ITEM_NODES) {
+          for (Sp::InnerIterator it(AT, col); it; ++it)
+            g.getData(it.row());
+          x.setConstant(0);
+          // HTAT = HT * AT; x = HTAT.col(col)
+          for (Sp::InnerIterator it(AT, col); it; ++it) {
+            //for (int i = 0; i < LATENT_VECTOR_SIZE; ++i)
+            //  x(i) += it.value() * HT.col(it.row())(i);
+            x += it.value() * HT.col(it.row());
+          }
+          XTX& HTH = *xtxs.getLocal();
+          HTH.setConstant(0);
+          for (Sp::InnerIterator it(AT, col); it; ++it)
+            HTH.triangularView<Eigen::Upper>() += HT.col(it.row()) * HT.col(it.row()).transpose();
+          for (int i = 0; i < LATENT_VECTOR_SIZE; ++i)
+            HTH(i, i) += lambda;
+          WT.col(col) = HTH.selfadjointView<Eigen::Upper>().llt().solve(x);
+        } else {
+          col = col - NUM_ITEM_NODES;
+          for (Sp::InnerIterator it(A, col); it; ++it)
+            g.getData(it.row());
+          x.setConstant(0);
+          // WTA = WT * A; x = WTA.col(col)
+          for (Sp::InnerIterator it(A, col); it; ++it) {
+            x += it.value() * WT.col(it.row());
+          }
+          XTX& WTW = *xtxs.getLocal();
+          WTW.setConstant(0);
+          for (Sp::InnerIterator it(A, col); it; ++it)
+            WTW.triangularView<Eigen::Upper>() += WT.col(it.row()) * WT.col(it.row()).transpose();
+          for (int i = 0; i < LATENT_VECTOR_SIZE; ++i)
+            WTW(i, i) += lambda;
+          HT.col(col) = WTW.selfadjointView<Eigen::Upper>().llt().solve(x);
+        }
+      });
+      updateTime.stop();
+
+      copyTime.start();
+      copyToGraph(g, WT, HT);
+      copyTime.stop();
+
+      double error = sumSquaredError(g);
+      elapsed.stop();
+      std::cout
+        << "R: " << round
+        << " elapsed (ms): " << elapsed.get()
+        << " RMSE (R " << round << "): " << std::sqrt(error/g.sizeEdges())
+        << "\n";
+      elapsed.start();
+
+      if (fixedRounds <= 0 && round > 1 && std::abs((last - error) / last) < tolerance)
+        break;
+      if (fixedRounds > 0 && round >= fixedRounds)
+        break;
+
+      last = error;
+    }
+  }
+};
+
 struct AlternatingLeastSquaresAlgo {
   std::string name() const { return "AlternatingLeastSquares"; }
   struct Node { 
@@ -154,6 +305,7 @@ struct AlternatingLeastSquaresAlgo {
 
     for (int round = 1; ; ++round) {
       mmTime.start();
+      // TODO parallelize this using tiled executor
       XTSp WTA = WT * A;
       mmTime.stop();
 
