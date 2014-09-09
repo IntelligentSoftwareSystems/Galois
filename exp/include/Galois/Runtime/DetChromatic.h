@@ -162,29 +162,31 @@ public:
         [this, &sources] (GNode src) {
           
           auto& sd = graph.getData (src, Galois::NONE);
-          assert (bool (sd.onWL));
+          // assert (bool (sd.onWL));
 
-          sd.indegree = 0; // reset
+          if (bool (sd.onWL)) {
+            sd.indegree = 0; // reset
 
-          unsigned addAmt = 0;
+            unsigned addAmt = 0;
 
-          auto closure = [this, &sd, &addAmt] (GNode dst) {
-            auto& dd = graph.getData (dst, Galois::NONE);
+            auto closure = [this, &sd, &addAmt] (GNode dst) {
+              auto& dd = graph.getData (dst, Galois::NONE);
 
-            if (bool (dd.onWL) && DAGdataComparator<ND>::compare (dd, sd)) { // dd < sd
+                if (bool (dd.onWL) && DAGdataComparator<ND>::compare (dd, sd)) { // dd < sd
               ++addAmt;
+              }
+            };
+
+
+            applyUndirected (src, closure);
+
+            sd.indegree += addAmt;
+
+            if (addAmt == 0) {
+              assert (sd.indegree == 0);
+              assert (bool(sd.onWL));
+              sources.push (src);
             }
-          };
-
-
-          applyUndirected (src, closure);
-
-          sd.indegree += addAmt;
-
-          if (addAmt == 0) {
-            assert (sd.indegree == 0);
-            assert (bool(sd.onWL));
-            sources.push (src);
           }
 
         },
@@ -572,20 +574,21 @@ struct ChromaticExecutor {
 
     template <typename C>
     void operator () (GNode n, C& ctx) {
-      auto& userCtx = *(outer.userContexts.getLocal ());
 
-
-      userCtx.reset ();
-      outer.func (n, userCtx);
+      // auto& userCtx = *(outer.userContexts.getLocal ());
+// 
+      // userCtx.reset ();
+      // outer.func (n, userCtx);
+      outer.func (n, outer);
 
       auto& nd = outer.graph.getData (n, Galois::NONE);
       nd.onWL = false;
 
-      for (auto i = userCtx.getPushBuffer ().begin (), 
-          end_i = userCtx.getPushBuffer ().end (); i != end_i; ++i) {
-
-        outer.push (*i);
-      }
+      // for (auto i = userCtx.getPushBuffer ().begin (), 
+          // end_i = userCtx.getPushBuffer ().end (); i != end_i; ++i) {
+// 
+        // outer.push (*i);
+      // }
     }
   };
 
@@ -681,10 +684,11 @@ public:
   void push (GNode node) {
     auto& nd = graph.getData (node, Galois::NONE);
 
-    bool expected = false;
-    if (nd.onWL.compare_exchange_strong (expected, true)) {
-      nextWork.push (node);
-    }
+    // bool expected = false;
+    // if (nd.onWL.compare_exchange_strong (expected, true)) {
+      // nextWork.push (node);
+    // }
+    nd.onWL = true;
   }
 
   struct ApplyOperator {
@@ -695,20 +699,21 @@ public:
     template <typename C>
     void operator () (GNode src, C& ctx) {
       
-      auto& userCtx = *(outer.userContexts.getLocal ());
-
-      userCtx.reset ();
-      outer.func (src, userCtx);
+      // auto& userCtx = *(outer.userContexts.getLocal ());
+// 
+      // userCtx.reset ();
+      // outer.func (src, userCtx);
+      outer.func (src, outer);
 
       G& graph = outer.graph;
 
       auto& sd = graph.getData (src, Galois::NONE);
       sd.onWL = false;
 
-      for (auto i = userCtx.getPushBuffer ().begin (), 
-          end_i = userCtx.getPushBuffer ().end (); i != end_i; ++i) {
-        outer.push (*i);
-      }
+      // for (auto i = userCtx.getPushBuffer ().begin (), 
+          // end_i = userCtx.getPushBuffer ().end (); i != end_i; ++i) {
+        // outer.push (*i);
+      // }
 
       auto closure = [&graph, &ctx] (GNode dst) {
 
@@ -758,7 +763,7 @@ public:
       assert (sources.size () == 0);
 
       t_dag_init.start ();
-      dagGen.initActiveDAG (Galois::Runtime::makeLocalRange (nextWork), sources);
+      dagGen.initActiveDAG (Galois::Runtime::makeLocalRange (graph), sources);
       t_dag_init.stop ();
 
       nextWork.clear_all_parallel ();
@@ -783,6 +788,43 @@ public:
     std::printf ("InputGraphDAGexecutor: time taken by dag execution: %d\n", t_dag_exec.get ());
 
   }
+
+
+  /*
+  struct ApplyOperatorAsync {
+
+    typedef int tt_does_not_need_aborts;
+
+    InputGraphDAGexecutor& outer;
+
+    template <typename C>
+    void operator () (GNode src, C& ctx) {
+
+      auto& sd = graph.getData (src, Galois::NONE);
+
+      if (bool (sd.onWL)) {
+        outer.func (src, dummyCtx); 
+      }
+
+      G& graph = outer.graph;
+
+      auto closure = [&graph, &ctx] (GNode dst) {
+
+        auto& dd = graph.getData (dst, Galois::NONE);
+
+        unsigned x = --dd.indegree;
+        if (x == 0) {
+          ctx.push (dst);
+        }
+      };
+
+      outer.dagGen.applyUndirected (src, closure);
+
+    }
+  };
+  */
+
+
 
 };
 
