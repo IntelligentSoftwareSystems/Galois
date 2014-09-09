@@ -61,6 +61,7 @@ static const char* const url = 0;
 enum Algo {
   alternatingLeastSquares,
   asynchronousAlternatingLeastSquares,
+  simpleAlternatingLeastSquares,
   blockedEdge,
   blockedEdgeServer,
   blockJump,
@@ -113,6 +114,7 @@ static cll::opt<bool> useExactError("useExactError", cll::desc("use exact error 
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
   cll::values(
     clEnumValN(Algo::alternatingLeastSquares, "als", "Alternating least squares"),
+    clEnumValN(Algo::simpleAlternatingLeastSquares, "sals", "Simple alternating least squares"),
     clEnumValN(Algo::asynchronousAlternatingLeastSquares, "aals", "Asynchronous alternating least squares"),
     clEnumValN(Algo::blockedEdge, "blockedEdge", "Edge blocking (default)"),
     clEnumValN(Algo::blockedEdgeServer, "blockedEdgeServer", "Edge blocking with server support"),
@@ -398,6 +400,7 @@ class BlockedEdgeAlgo {
   }
 
 public:
+  bool isSgd() const { return true; }
   typedef typename Galois::Graph::LC_CSR_Graph<Node, unsigned int>
     //::template with_numa_alloc<true>::type
     ::template with_out_of_line_lockable<true>::type
@@ -1050,12 +1053,16 @@ void run() {
 
   std::cout
     << "latent vector size: " << LATENT_VECTOR_SIZE
-    << " lambda: " << lambda
-    << " learning rate: " << learningRate
-    << " decay rate: " << decayRate
     << " algo: " << algo.name()
-    << " step function: " << sf->name()
-    << "\n";
+    << " lambda: " << lambda;
+  if (algo.isSgd()) {
+    std::cout
+      << " learning rate: " << learningRate
+      << " decay rate: " << decayRate
+      << " step function: " << sf->name();
+  }
+
+  std::cout << "\n";
       
   if (!skipVerify) {
     verify(g, "Initial");
@@ -1092,8 +1099,9 @@ int main(int argc, char** argv) {
 
   switch (algo) {
 #ifdef HAS_EIGEN
-    case Algo::alternatingLeastSquares: run<AlternatingLeastSquaresAlgo>(); break;
-    case Algo::asynchronousAlternatingLeastSquares: run<AsynchronousAlternatingLeastSquaresAlgo>(); break;
+    case Algo::alternatingLeastSquares: run<AsynchronousAlternatingLeastSquaresAlgo<true>>(); break;
+    case Algo::simpleAlternatingLeastSquares: run<AlternatingLeastSquaresAlgo>(); break;
+    case Algo::asynchronousAlternatingLeastSquares: run<AsynchronousAlternatingLeastSquaresAlgo<false>>(); break;
 #endif
     case Algo::blockedEdge: run<BlockedEdgeAlgo<false> >(); break;
     case Algo::blockedEdgeServer: run<BlockedEdgeAlgo<true> >(); break;
