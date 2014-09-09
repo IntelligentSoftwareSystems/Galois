@@ -438,14 +438,14 @@ struct ChromaticExecutor {
 
   G& graph;
   F func;
-  unsigned maxColors;
   const char* loopname;
+  unsigned nextIndex;
 
   std::vector<WL_ty*> colorWorkLists;
   PerThreadUserCtx userContexts;
 
   ChromaticExecutor (G& graph, const F& func, unsigned maxColors, const char* loopname)
-    : graph (graph), func (func), maxColors (maxColors), loopname (loopname) {
+    : graph (graph), func (func), loopname (loopname), nextIndex (0) {
     
       assert (maxColors > 0);
       colorWorkLists.resize (maxColors, nullptr);
@@ -472,6 +472,52 @@ struct ChromaticExecutor {
     if (data.onWL.compare_exchange_strong (expected, true)) {
       colorWorkLists[i]->push (n);
     }
+  }
+
+  WL_ty* chooseLargest (void) {
+    WL_ty* nextWL = nullptr;
+
+    unsigned maxSize = 0;
+    for (unsigned i = 0; i < colorWorkLists.size (); ++i) {
+
+      size_t s = colorWorkLists[i]->size ();
+      if (s > 0 && s > maxSize) {
+        maxSize = s;
+        nextWL = colorWorkLists[i];
+      }
+    }
+
+    return nextWL;
+  }
+
+  WL_ty* chooseFirst (void) {
+    WL_ty* nextWL = nullptr;
+
+    for (unsigned i = 0; i < colorWorkLists.size (); ++i) {
+      if (colorWorkLists[i]->size () > 0) {
+        nextWL = colorWorkLists[i];
+        break;
+      }
+    }
+
+    return nextWL;
+  }
+
+  WL_ty* chooseNext (void) {
+    WL_ty* nextWL = nullptr;
+
+    for (unsigned i = 0; i < colorWorkLists.size (); ++i) {
+
+      unsigned j = (nextIndex + i) % colorWorkLists.size ();
+      size_t s = colorWorkLists[j]->size ();
+      if (s > 0) {
+        nextWL = colorWorkLists[j];
+        nextIndex = (j + 1) % colorWorkLists.size ();
+        break;
+      }
+    }
+
+    return nextWL;
   }
 
   struct ApplyOperator {
@@ -515,20 +561,7 @@ struct ChromaticExecutor {
       ++rounds;
 
       // find non-empty WL
-      WL_ty* nextWL = nullptr;
-      unsigned nextIndex = 0;
-
-      unsigned maxSize = 0;
-      for (unsigned i = 0; i < colorWorkLists.size (); ++i) {
-
-        unsigned j = (nextIndex + i) % colorWorkLists.size ();
-        size_t s = colorWorkLists[j]->size ();
-        if (s > 0 && s > maxSize) {
-          maxSize = s;
-          nextWL = colorWorkLists[j];
-          nextIndex = (j + 1) % colorWorkLists.size ();
-        }
-      }
+      WL_ty* nextWL = chooseNext ();
 
       if (nextWL == nullptr) {
         break;
