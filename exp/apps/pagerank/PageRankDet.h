@@ -23,13 +23,32 @@
 
 namespace cll = llvm::cl;
 
-static cll::opt<std::string> inputfile (cll::Positional, cll::desc ("<input file>"), cll::Required);
+static cll::opt<std::string> inputFile (cll::Positional, cll::desc ("<input file>"), cll::Required);
+
+static cll::opt<std::string> transposeFile ("transpose", cll::desc ("<transpose file>"), cll::Required);
 
 static const char* const name = "Page Rank";
 static const char* const desc = "Page Rank of a graph of web pages";
 static const char* const url = "pagerank";
 
 static const double PAGE_RANK_INIT = 1.0;
+
+struct PData {
+  float value;
+  unsigned outdegree; 
+
+  PData (void)
+    : value (PAGE_RANK_INIT), outdegree (0) {}
+
+  PData (unsigned outdegree)
+    : value (PAGE_RANK_INIT), outdegree (outdegree) {}
+
+
+  double getPageRank () const {
+    return value;
+  }
+
+};
 
 template <typename IG>
 class PageRankBase {
@@ -45,7 +64,7 @@ protected:
   Graph graph;
 
   void readGraph (void) {
-    Galois::Graph::readGraph (graph, inputfile);
+    Galois::Graph::readGraph (graph, inputFile, transposeFile);
 
     const size_t numNodes = graph.size ();
     Galois::GAccumulator<size_t> numEdges;
@@ -118,7 +137,8 @@ protected:
       return;
     }
 
-    // TODO: 
+    printTop (graph, 10);
+
   }
 
 

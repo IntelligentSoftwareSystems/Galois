@@ -1,17 +1,16 @@
 #include "PageRankDet.h"
 
-struct NodeData: public Galois::Runtime::DAGdata {
 
-  double value;
-  unsigned outdegree;
+struct NodeData: public Galois::Runtime::DAGdata, PData {
 
   NodeData (void)
-    : Galois::Runtime::DAGdata (0), value (PAGE_RANK_INIT), outdegree (0) 
+    : Galois::Runtime::DAGdata (0), PData ()
   {}
 
   NodeData (unsigned id, unsigned outdegree)
-    : Galois::Runtime::DAGdata (id), value (PAGE_RANK_INIT), outdegree (outdegree) 
+    : Galois::Runtime::DAGdata (id), PData (outdegree)
   {}
+
 
 };
 

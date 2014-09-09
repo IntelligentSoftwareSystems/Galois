@@ -1,5 +1,5 @@
-#ifndef GALOIS_RUNTIME_DET_EDGE_FLIP_DAG_H
-#define GALOIS_RUNTIME_DET_EDGE_FLIP_DAG_H
+#ifndef GALOIS_RUNTIME_DET_CHROMATIC_H
+#define GALOIS_RUNTIME_DET_CHROMATIC_H
 
 #include "Galois/Accumulator.h"
 #include "Galois/Galois.h"
@@ -101,7 +101,14 @@ protected:
 
   DAGgeneratorBase (G& graph, const P& predApp, const S& succApp)
     : graph (graph), predApp (predApp), succApp (succApp) 
-  {}
+  {
+    // mark 0-th color as taken
+    for (unsigned i = 0; i < perThrdColorVec.numRows (); ++i) {
+      auto& forbiddenColors = perThrdColorVec.get(i);
+      forbiddenColors.resize (1, 0);
+      forbiddenColors[0] = 0;
+    }
+  }
 
   template <typename W>
   void initDAG (W& initWork) {
@@ -328,6 +335,8 @@ public:
         Galois::loopname ("color-DAG"), Galois::wl<WL_ty> ());
     t_dag_color.stop ();
 
+    std::printf ("DAG colored with %d colors\n", maxColors.reduceRO ());
+
     t_color.stop ();
   }
 
@@ -456,8 +465,8 @@ struct ChromaticExecutor {
   void push (GNode n) {
     auto& data = graph.getData (n);
 
-    unsigned i = data.color;
-    assert (i < maxColors);
+    unsigned i = data.color - 1;
+    assert (i < colorWorkLists.size ());
 
     bool expected = false;
     if (data.onWL.compare_exchange_strong (expected, true)) {
@@ -544,6 +553,8 @@ struct ChromaticExecutor {
 template <typename R, typename G, typename F>
 void for_each_det_graph (const R& range, G& graph, const F& func, const char* loopname) {
 
+  Galois::Runtime::getSystemThreadPool ().burnPower (Galois::getActiveThreads ());
+
   typename DAGgenInOut<G>::Generator gen {graph};
 
   gen.colorDAG ();
@@ -551,10 +562,12 @@ void for_each_det_graph (const R& range, G& graph, const F& func, const char* lo
   ChromaticExecutor<G,F> executor {graph, func, gen.getMaxColors (), loopname};
 
   executor.execute (range);
+
+  Galois::Runtime::getSystemThreadPool ().beKind ();
 }
 
 
 } // end namespace Runtime
 } // end namespace Galois
 
-#endif // GALOIS_RUNTIME_DET_EDGE_FLIP_DAG_H
+#endif // GALOIS_RUNTIME_DET_CHROMATIC_H
