@@ -23,7 +23,7 @@ OUT_PREFIX="vtune_out_${stamp}"
 for t in $threads; do
   # outfile="${OUT_PREFIX}${t}"
 
-  cmd="$scriptsDir/run_vtune.pl -t $t ${OUT_PREFIX} $@"
+  cmd="$scriptsDir/run_vtune.pl -t $t -- ${OUT_PREFIX} $@"
 
   date;
   echo "Running: $cmd"

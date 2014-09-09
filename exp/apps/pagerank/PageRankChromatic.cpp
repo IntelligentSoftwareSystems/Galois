@@ -1,5 +1,21 @@
 #include "PageRankDet.h"
 
+namespace cll = llvm::cl;
+
+enum ExecType {
+  CHROMATIC,
+  EDGE_FLIP
+};
+
+static cll::opt<ExecType> execType (
+    "executor",
+    cll::desc ("Deterministic Executor Type"),
+    cll::values (
+      clEnumValN (CHROMATIC, "CHROMATIC", "Chromatic Executor"),
+      clEnumValN (EDGE_FLIP, "EDGE_FLIP", "Edge Flipping DAG overlayed on input graph"),
+      clEnumValEnd),
+    cll::init (CHROMATIC));
+
 
 struct NodeData: public Galois::Runtime::DAGdata, PData {
 
@@ -35,11 +51,29 @@ protected:
   };
 
   virtual void runPageRank (void) {
-    Galois::Runtime::for_each_det_graph (
-        Galois::Runtime::makeLocalRange (graph),
-        graph,
-        ApplyOperator {*this},
-        "page-rank-chromatic");
+
+    switch (execType) {
+      
+      case CHROMATIC:
+        Galois::Runtime::for_each_det_chromatic (
+            Galois::Runtime::makeLocalRange (graph),
+            graph,
+            ApplyOperator {*this},
+            "page-rank-chromatic");
+        break;
+
+      case EDGE_FLIP:
+        Galois::Runtime::for_each_det_dag_active (
+            Galois::Runtime::makeLocalRange (graph),
+            graph,
+            ApplyOperator {*this},
+            "page-rank-chromatic");
+        break;
+
+      default:
+        std::abort ();
+
+    }
   }
 
 };

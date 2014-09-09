@@ -151,7 +151,7 @@ public:
 
     readGraph ();
 
-    Galois::preAlloc (Galois::getActiveThreads () + 2*sizeof(NodeData)*graph.size ()/Galois::Runtime::MM::hugePageSize);
+    Galois::preAlloc (Galois::getActiveThreads () + (2*sizeof(NodeData)*graph.size () + graph.sizeEdges ())/Galois::Runtime::MM::hugePageSize);
     Galois::reportPageAlloc("MeminfoPre");
 
     Galois::StatTimer t;
