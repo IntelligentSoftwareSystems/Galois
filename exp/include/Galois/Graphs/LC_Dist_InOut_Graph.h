@@ -259,7 +259,7 @@ class LC_Dist_InOut {
   }
 
   static void putStart(Runtime::PerHost<LC_Dist_InOut> graph, uint32_t whom, GraphNode start) {
-    //std::cerr << Runtime::NetworkInterface::ID << " putStart " << whom << "\n";
+    std::cerr << Runtime::NetworkInterface::ID << " putStart " << whom << "\n";
     graph->Starts[whom].first = start;
     graph->Starts[whom].second = 2;
   }
