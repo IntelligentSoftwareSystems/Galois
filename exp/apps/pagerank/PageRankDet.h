@@ -58,7 +58,7 @@ protected:
   typedef typename Graph::GraphNode GNode;
   typedef typename Graph::node_data_type NodeData;
 
-  static const unsigned DEFAULT_CHUNK_SIZE = 16;
+  static const unsigned DEFAULT_CHUNK_SIZE = 1;
 
   Graph graph;
 
@@ -151,7 +151,7 @@ public:
 
     readGraph ();
 
-    Galois::preAlloc (Galois::getActiveThreads () + (2*sizeof(NodeData)*graph.size () + graph.sizeEdges ())/Galois::Runtime::MM::hugePageSize);
+    Galois::preAlloc (Galois::getActiveThreads () + (4*sizeof(NodeData)*graph.size () + 2*graph.sizeEdges ())/Galois::Runtime::MM::hugePageSize);
     Galois::reportPageAlloc("MeminfoPre");
 
     Galois::StatTimer t;

@@ -88,7 +88,7 @@ struct DAGgeneratorBase {
 
 protected:
 
-  static const unsigned DEFAULT_CHUNK_SIZE = 16;
+  static const unsigned DEFAULT_CHUNK_SIZE = 4;
 
   typedef typename G::GraphNode GNode;
   typedef typename G::node_data_type ND;
