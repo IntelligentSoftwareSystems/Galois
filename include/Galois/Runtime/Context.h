@@ -110,9 +110,9 @@ protected:
 
 class SimpleRuntimeContext: public LockManagerBase {
 protected:
-  void acquire(Lockable* lockable) {}
-  void release (Lockable* lockable) {}
-  virtual void subAcquire(Lockable* lockable);
+  void acquire(Lockable* lockable, Galois::MethodFlag m) {}
+  void release(Lockable* lockable) {}
+  virtual void subAcquire(Lockable* lockable, Galois::MethodFlag m);
   void addToNhood(Lockable* lockable) {}
   static SimpleRuntimeContext* getOwner(Lockable* lockable) { return 0; }
 
@@ -187,14 +187,14 @@ class SimpleRuntimeContext: public LockManagerBase {
   bool customAcquire;
 
 protected:
-  friend void doAcquire(Lockable*);
+  friend void doAcquire(Lockable*, Galois::MethodFlag);
 
   static SimpleRuntimeContext* getOwner(Lockable* lockable) {
-    LockManagerBase* owner = LockManagerBase::getOwner (lockable);
+    LockManagerBase* owner = LockManagerBase::getOwner(lockable);
     return static_cast<SimpleRuntimeContext*>(owner);
   }
 
-  virtual void subAcquire(Lockable* lockable);
+  virtual void subAcquire(Lockable* lockable, Galois::MethodFlag m);
 
   void addToNhood(Lockable* lockable) {
     assert(!lockable->next);
@@ -202,7 +202,7 @@ protected:
     locks = lockable;
   }
 
-  void acquire(Lockable* lockable);
+  void acquire(Lockable* lockable, Galois::MethodFlag m);
   void release(Lockable* lockable);
 
 public:
@@ -248,22 +248,22 @@ inline bool shouldLock(const Galois::MethodFlag g) {
 }
 
 //! actual locking function.  Will always lock.
-inline void doAcquire(Lockable* lockable) {
+inline void doAcquire(Lockable* lockable, Galois::MethodFlag m) {
   SimpleRuntimeContext* ctx = getThreadContext();
   if (ctx)
-    ctx->acquire(lockable);
+    ctx->acquire(lockable, m);
 }
 
 //! Master function which handles conflict detection
 //! used to acquire a lockable thing
 inline void acquire(Lockable* lockable, Galois::MethodFlag m) {
   if (shouldLock(m))
-    doAcquire(lockable);
+    doAcquire(lockable, m);
 }
 
 struct AlwaysLockObj {
   void operator()(Lockable* lockable) const {
-    doAcquire(lockable);
+    doAcquire(lockable, Galois::MethodFlag::ALL);
   }
 };
 

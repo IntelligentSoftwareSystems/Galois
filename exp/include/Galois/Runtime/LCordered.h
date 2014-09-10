@@ -324,7 +324,8 @@ public:
       onWL (false) 
   {}
 
-  GALOIS_ATTRIBUTE_PROF_NOINLINE virtual void subAcquire (Lockable* l) {
+  GALOIS_ATTRIBUTE_PROF_NOINLINE
+  virtual void subAcquire (Lockable* l, Galois::MethodFlag) {
     NItem& nitem = nhmgr.getNhoodItem (l);
 
     assert (NItem::getOwner (l) == &nitem);

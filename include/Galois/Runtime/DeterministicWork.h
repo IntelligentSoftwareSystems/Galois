@@ -106,7 +106,7 @@ public:
 
   bool isReady() { return !notReady; }
 
-  virtual void subAcquire(Lockable* lockable) { 
+  virtual void subAcquire(Lockable* lockable, Galois::MethodFlag) { 
     if (getPending() == COMMITTING)
       return;
 
@@ -174,7 +174,7 @@ public:
 
   bool isReady() { return false; }
 
-  virtual void subAcquire(Lockable* lockable) {
+  virtual void subAcquire(Lockable* lockable, Galois::MethodFlag) {
     if (getPending() == COMMITTING)
       return;
 

@@ -71,7 +71,7 @@ public:
 
   T& getElem () { return active; }
 
-  virtual void subAcquire (Lockable* l) {
+  virtual void subAcquire (Lockable* l, Galois::MethodFlag) {
 
 
     if (Base::tryLock (l)) {

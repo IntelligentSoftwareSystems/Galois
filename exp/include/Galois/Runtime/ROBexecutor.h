@@ -154,7 +154,8 @@ public:
     return state.cas (s_old, s_new);
   }
 
-  GALOIS_ATTRIBUTE_PROF_NOINLINE virtual void subAcquire (Lockable* l) {
+  GALOIS_ATTRIBUTE_PROF_NOINLINE 
+  virtual void subAcquire (Lockable* l, Galois::MethodFlag) {
 
     for (bool succ = false; !succ; ) {
       Base::AcquireStatus acq = Base::tryAcquire (l);
@@ -845,7 +846,7 @@ public:
 
   ROBparamContext (const T& x, Exec& e, const size_t _step): Base (x, e), step (_step) {}
 
-  virtual void subAcquire (Lockable* l) {
+  virtual void subAcquire (Lockable* l, Galois::MethodFlag m) {
     for (bool succ = false; !succ; ) {
       typename Base::AcquireStatus acq = Base::tryAcquire (l);
 
