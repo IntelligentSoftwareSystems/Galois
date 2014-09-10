@@ -573,7 +573,6 @@ private:
     void operator()(Task& task, Galois::UserContext<Task>& ctx) {
 #if 1
       if (std::try_lock(xLocks[task.x], yLocks[task.y]) >= 0) {
-        //Galois::Runtime::forceAbort();
         ctx.push(task);
         return;
       }

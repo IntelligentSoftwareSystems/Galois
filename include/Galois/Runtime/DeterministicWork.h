@@ -309,6 +309,8 @@ struct Options {
   static const unsigned InitialNumRounds = 100;
   static const size_t MinDelta = ChunkSize * 40;
 
+  static_assert(!hasFixedNeighborhood || (hasFixedNeighborhood && hasId), "Please provide id function when operator has fixed neighborhood");
+
   function1_type fn1;
   function2_type fn2;
 

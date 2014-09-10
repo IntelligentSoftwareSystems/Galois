@@ -209,6 +209,11 @@ struct AsynchronousAlternatingLeastSquaresAlgo {
     typedef LocalState GaloisDeterministicLocalState;
     static_assert(Galois::has_deterministic_local_state<Process>::value, "Oops");
 
+    uintptr_t galoisDeterministicId(size_t x) const {
+      return x;
+    }
+    static_assert(Galois::has_deterministic_id<Process>::value, "Oops");
+
     AsynchronousAlternatingLeastSquaresAlgo& self;
     Graph& g;
     MT& WT;
@@ -226,7 +231,7 @@ struct AsynchronousAlternatingLeastSquaresAlgo {
       self(self), g(g), WT(WT), HT(HT), xtxs(xtxs), rhs(rhs) { }
     
     void operator()(size_t col, Galois::UserContext<size_t>& ctx) {
-      // TODO(ddn) IKDG version can be improved by better initial assignment of work
+      // TODO(ddn) IKDG version can be improved by read/write
       // TODO(ddn) AddRemove can be improevd by reusing DAG
       if (DetKind != 0) {
         bool used;
