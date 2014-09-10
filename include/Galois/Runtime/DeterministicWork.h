@@ -81,19 +81,38 @@ public:
   inline void inc_conflicts() const { }
 };
 
-template<typename T>
-struct DItem {
+template<typename T, bool HasLocalState>
+class DItemBase {
+public:
   T val;
   unsigned long id;
-  void *localState;
 
-  DItem(const T& _val, unsigned long _id): val(_val), id(_id), localState(NULL) { }
+  DItemBase(const T& _val, unsigned long _id): val(_val), id(_id) { }
+  void* getLocalState() const { return nullptr; }
+  void setLocalState(void*) { }
 };
+
+template<typename T>
+class DItemBase<T, true> {
+public:
+  T val;
+private:
+  void *localState;
+public:
+  unsigned long id;
+
+  DItemBase(const T& _val, unsigned long _id): val(_val), localState(nullptr), id(_id) { }
+  void* getLocalState() const { return localState; }
+  void setLocalState(void* ptr) { localState = ptr; }
+};
+
+template<typename OptionsTy>
+using DItem = DItemBase<typename OptionsTy::value_type, OptionsTy::hasLocalState>;
 
 template<typename OptionsTy, bool HasFixedNeighborhood>
 class DeterministicContextBase: public SimpleRuntimeContext {
 public:
-  typedef DItem<typename OptionsTy::value_type> Item;
+  typedef DItem<OptionsTy> Item;
   Item item;
 
 private:
@@ -139,7 +158,7 @@ public:
 template<typename OptionsTy>
 class DeterministicContextBase<OptionsTy, true>: public SimpleRuntimeContext {
 public:
-  typedef DItem<typename OptionsTy::value_type> Item;
+  typedef DItem<OptionsTy> Item;
   typedef Galois::concurrent_gslist<DeterministicContextBase*,8> ContextList;
   //typedef Galois::gslist<DeterministicContextBase*,16> ContextList;
   Item item;
@@ -301,7 +320,7 @@ struct Options {
   static const bool needsBreak = ForEachTraits<function1_type>::NeedsBreak || ForEachTraits<function2_type>::NeedsBreak;
   static const bool hasBreak = has_deterministic_parallel_break<function1_type>::value;
   static const bool hasId = has_deterministic_id<function1_type>::value;
-  static const bool useLocalState = has_deterministic_local_state<function1_type>::value;
+  static const bool hasLocalState = has_deterministic_local_state<function1_type>::value;
   // TODO enable when working better, still ~2X slower than implicit version on bfs
   static const bool hasFixedNeighborhood = has_fixed_neighborhood<function1_type>::value;
 
@@ -422,7 +441,7 @@ public:
         committed += 1;
         e.deallocLocalState(etld.facing);
         
-        if (ForEachTraits<typename OptionsTy::function2_type>::NeedsPIA && !OptionsTy::useLocalState)
+        if (ForEachTraits<typename OptionsTy::function2_type>::NeedsPIA && !OptionsTy::hasLocalState)
           etld.facing.resetAlloc();
 
         etld.facing.resetPushBuffer();
@@ -441,7 +460,7 @@ public:
       LL::asmPause();
     } while (!term.globalTermination());
 
-    if (ForEachTraits<typename OptionsTy::function2_type>::NeedsPIA && OptionsTy::useLocalState)
+    if (ForEachTraits<typename OptionsTy::function2_type>::NeedsPIA && OptionsTy::hasLocalState)
       etld.facing.resetAlloc();
 
     setThreadContext(0);
@@ -460,12 +479,12 @@ struct StateManagerBase {
   typedef typename OptionsTy::function1_type function_type;
   void allocLocalState(UserContextAccess<value_type>&, function_type& self) { }
   void deallocLocalState(UserContextAccess<value_type>&) { }
-  void saveLocalState(UserContextAccess<value_type>&, void*&) { }
-  void restoreLocalState(UserContextAccess<value_type>&, void*) { } 
-  void reuseItem(DItem<value_type>& item) { }
+  void saveLocalState(UserContextAccess<value_type>&, DItem<OptionsTy>&) { }
+  void restoreLocalState(UserContextAccess<value_type>&, const DItem<OptionsTy>&) { } 
+  void reuseItem(DItem<OptionsTy>& item) { }
 
   template<typename LWL, typename GWL>
-  typename GWL::value_type* emplaceContext(LWL& lwl, GWL& gwl, const DItem<value_type>& item) const {
+  typename GWL::value_type* emplaceContext(LWL& lwl, GWL& gwl, const DItem<OptionsTy>& item) const {
     return gwl.emplace(item);
   }
   
@@ -500,17 +519,17 @@ struct StateManagerBase<OptionsTy, true> {
       p->~LocalState();
   }
 
-  void saveLocalState(UserContextAccess<value_type>& c, void*& localState) { 
+  void saveLocalState(UserContextAccess<value_type>& c, DItem<OptionsTy>& item) { 
     bool dummy;
-    localState = c.data().getLocalState(dummy);
+    item.setLocalState(c.data().getLocalState(dummy));
   }
 
-  void restoreLocalState(UserContextAccess<value_type>& c, void* localState) { 
-    c.setLocalState(localState, true);
+  void restoreLocalState(UserContextAccess<value_type>& c, const DItem<OptionsTy>& item) { 
+    c.setLocalState(item.getLocalState(), true);
   }
 
   template<typename LWL, typename GWL>
-  typename LWL::value_type* emplaceContext(LWL& lwl, GWL& gwl, const DItem<value_type>& item) const {
+  typename LWL::value_type* emplaceContext(LWL& lwl, GWL& gwl, const DItem<OptionsTy>& item) const {
     return lwl.emplace(item);
   }
 
@@ -524,11 +543,11 @@ struct StateManagerBase<OptionsTy, true> {
     lwl.pop_peeked();
   }
 
-  void reuseItem(DItem<value_type>& item) { item.localState = NULL; }
+  void reuseItem(DItem<OptionsTy>& item) { item.setLocalState(nullptr); }
 };
 
 template<typename OptionsTy>
-using StateManager = StateManagerBase<OptionsTy, OptionsTy::useLocalState>;
+using StateManager = StateManagerBase<OptionsTy, OptionsTy::hasLocalState>;
 
 template<typename OptionsTy, bool Enable>
 struct BreakManagerBase {
@@ -688,7 +707,7 @@ using WindowManager = WindowManagerBase<OptionsTy, OptionsTy::hasFixedNeighborho
 template<typename OptionsTy>
 class NewWorkManager {
   typedef typename OptionsTy::value_type value_type;
-  typedef DItem<value_type> Item;
+  typedef DItem<OptionsTy> Item;
   typedef DNewItem<value_type> NewItem;
   typedef std::vector<NewItem, typename PerIterAllocTy::rebind<NewItem>::other> NewItemsTy;
   typedef typename NewItemsTy::iterator NewItemsIterator;
@@ -1032,7 +1051,7 @@ class Executor:
   public DAGManager<OptionsTy> 
 {
   typedef typename OptionsTy::value_type value_type;
-  typedef DItem<value_type> Item;
+  typedef DItem<OptionsTy> Item;
   typedef DeterministicContext<OptionsTy> Context;
 
   typedef WorkList::dChunkedFIFO<OptionsTy::ChunkSize,Item> WL;
@@ -1234,11 +1253,11 @@ bool Executor<OptionsTy>::pendingLoop(ThreadLocalData& tld)
       default: abort(); break;
     }
 
-    if (ForEachTraits<typename OptionsTy::function1_type>::NeedsPIA && !OptionsTy::useLocalState)
+    if (ForEachTraits<typename OptionsTy::function1_type>::NeedsPIA && !OptionsTy::hasLocalState)
       tld.facing.resetAlloc();
 
     if (commit || OptionsTy::hasFixedNeighborhood) {
-      this->saveLocalState(tld.facing, ctx->item.localState);
+      this->saveLocalState(tld.facing, ctx->item);
     } else {
       retval = true;
     }
@@ -1251,7 +1270,7 @@ template<typename OptionsTy>
 bool Executor<OptionsTy>::executeTask(ThreadLocalData& tld, Context* ctx) 
 {
   setThreadContext(ctx);
-  this->restoreLocalState(tld.facing, ctx->item.localState);
+  this->restoreLocalState(tld.facing, ctx->item);
   int result = 0;
 #ifdef GALOIS_USE_LONGJMP
   if ((result = setjmp(hackjmp)) == 0) {
@@ -1315,7 +1334,7 @@ bool Executor<OptionsTy>::commitLoop(ThreadLocalData& tld)
 
     this->deallocLocalState(tld.facing);
     
-    if (ForEachTraits<typename OptionsTy::function2_type>::NeedsPIA && !OptionsTy::useLocalState)
+    if (ForEachTraits<typename OptionsTy::function2_type>::NeedsPIA && !OptionsTy::hasLocalState)
       tld.facing.resetAlloc();
 
     tld.facing.resetPushBuffer();
@@ -1323,7 +1342,7 @@ bool Executor<OptionsTy>::commitLoop(ThreadLocalData& tld)
     this->popContext(tld.localPending, pending);
   }
 
-  if (ForEachTraits<typename OptionsTy::function2_type>::NeedsPIA && OptionsTy::useLocalState)
+  if (ForEachTraits<typename OptionsTy::function2_type>::NeedsPIA && OptionsTy::hasLocalState)
     tld.facing.resetAlloc();
 
   setThreadContext(0);
