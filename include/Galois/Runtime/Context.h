@@ -257,9 +257,8 @@ inline void doAcquire(Lockable* lockable) {
 //! Master function which handles conflict detection
 //! used to acquire a lockable thing
 inline void acquire(Lockable* lockable, Galois::MethodFlag m) {
-  if (shouldLock(m)) {
+  if (shouldLock(m))
     doAcquire(lockable);
-  }
 }
 
 struct AlwaysLockObj {
@@ -276,9 +275,7 @@ struct CheckedLockObj {
   }
 };
 
-void signalConflict(Lockable*);
-
-void forceAbort();
+void signalConflict(Lockable* = nullptr);
 
 }
 } // end namespace Galois
