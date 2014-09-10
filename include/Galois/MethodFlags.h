@@ -26,7 +26,8 @@
 
 namespace Galois {
 
-/** What should the runtime do when executing a method.
+/** 
+ * What should the runtime do when executing a method.
  *
  * Various methods take an optional parameter indicating what actions
  * the runtime should do on the user's behalf: (1) checking for conflicts,
@@ -37,7 +38,11 @@ enum MethodFlag {
   CHECK_CONFLICT = 1,
   SAVE_UNDO = 2,
   ALL = 3,
-  WRITE = 4
+  //! Method writes
+  WRITE = 4,
+  //! Method always reads, by default Galois assumes that read operations will
+  //! eventually write
+  INTENT_TO_READ = 8
 };
 
 //! Bitwise & for method flags

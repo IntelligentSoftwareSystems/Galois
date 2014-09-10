@@ -109,7 +109,7 @@ public:
 template<typename OptionsTy>
 using DItem = DItemBase<typename OptionsTy::value_type, OptionsTy::hasLocalState>;
 
-template<typename OptionsTy, bool HasFixedNeighborhood>
+template<typename OptionsTy, bool HasFixedNeighborhood, bool HasIntentToRead>
 class DeterministicContextBase: public SimpleRuntimeContext {
 public:
   typedef DItem<OptionsTy> Item;
@@ -155,8 +155,53 @@ public:
   }
 };
 
+class ReaderRuntimeContext: public SimpleRuntimeContext {
+public:
+  SimpleRuntimeContext* parent;
+  bool notReady;
+  ReaderRuntimeContext(SimpleRuntimeContext* c): parent(c), notReady(false) { }
+};
+
 template<typename OptionsTy>
-class DeterministicContextBase<OptionsTy, true>: public SimpleRuntimeContext {
+class DeterministicContextBase<OptionsTy, false, true>: public SimpleRuntimeContext {
+public:
+  typedef DItem<OptionsTy> Item;
+  Item item;
+
+private:
+  ReaderRuntimeContext readerCtx;
+  bool notReady;
+
+  void acquireRead(Lockable* lockable) {
+    // TODO
+  }
+
+  void acquireWrite(Lockable* lockable) {
+    // TODO
+  }
+
+public:
+  DeterministicContextBase(const Item& _item):
+    SimpleRuntimeContext(true), item(_item), readerCtx(this), notReady(false) { }
+
+  void clear() { }
+
+  bool isReady() const { return !notReady && !readerCtx.notReady; }
+
+  virtual void subAcquire(Lockable* lockable, Galois::MethodFlag m) { 
+    if (getPending() == COMMITTING)
+      return;
+    
+    if (m & MethodFlag::INTENT_TO_READ) {
+      acquireRead(lockable);
+    } else {
+      acquireWrite(lockable);
+    }
+  }
+};
+
+template<typename OptionsTy>
+class DeterministicContextBase<OptionsTy, true, false>: public SimpleRuntimeContext {
 public:
   typedef DItem<OptionsTy> Item;
   typedef Galois::concurrent_gslist<DeterministicContextBase*,8> ContextList;
@@ -215,7 +260,7 @@ public:
 };
 
 template<typename OptionsTy>
-using DeterministicContext = DeterministicContextBase<OptionsTy, OptionsTy::hasFixedNeighborhood>;
+using DeterministicContext = DeterministicContextBase<OptionsTy, OptionsTy::hasFixedNeighborhood, OptionsTy::hasIntentToRead>;
 
 namespace {
 
@@ -323,6 +368,7 @@ struct Options {
   static const bool hasLocalState = has_deterministic_local_state<function1_type>::value;
   // TODO enable when working better, still ~2X slower than implicit version on bfs
   static const bool hasFixedNeighborhood = has_fixed_neighborhood<function1_type>::value;
+  static const bool hasIntentToRead = false;
 
   static const int ChunkSize = 32;
   static const unsigned InitialNumRounds = 100;
