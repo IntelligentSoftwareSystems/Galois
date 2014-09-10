@@ -303,7 +303,7 @@ struct Options {
   static const bool hasId = has_deterministic_id<function1_type>::value;
   static const bool useLocalState = has_deterministic_local_state<function1_type>::value;
   // TODO enable when working better, still ~2X slower than implicit version on bfs
-  static const bool hasFixedNeighborhood = has_fixed_neighborhood<function1_type>::value && false;
+  static const bool hasFixedNeighborhood = has_fixed_neighborhood<function1_type>::value;
 
   static const int ChunkSize = 32;
   static const unsigned InitialNumRounds = 100;

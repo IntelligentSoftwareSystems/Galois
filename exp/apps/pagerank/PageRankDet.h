@@ -43,7 +43,6 @@ struct PData {
   PData (unsigned outdegree)
     : value (PAGE_RANK_INIT), outdegree (outdegree) {}
 
-
   double getPageRank () const {
     return value;
   }
