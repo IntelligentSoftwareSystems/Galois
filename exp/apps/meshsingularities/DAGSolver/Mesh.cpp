@@ -2,6 +2,7 @@
 #include <set>
 #include <map>
 #include <tuple>
+#include <algorithm>
 
 void Mesh::addElement(Element *e)
 {
@@ -119,6 +120,11 @@ bool Mesh::saveToFile(const char *filename)
     if (fp == NULL) {
         return false;
     }
+    
+    auto myCompFunction = [] (Node * n1, Node * n2){
+        return (n1->getId() < n2->getId());
+    };
+    std::sort(this->nodes.begin(), this->nodes.end(), myCompFunction);
 
     fprintf(fp, "%u\n", this->getPolynomial());
     fprintf(fp, "%lu\n", this->getElements().size());

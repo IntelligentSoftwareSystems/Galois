@@ -45,6 +45,9 @@ static cll::opt<std::string> treefile("treefile", cll::desc("File with tree defi
 static cll::opt<std::string> matrixfile("matrixfile", cll::desc("File with frontal matrices"),
                                         cll::init(""));
 
+static cll::opt<std::string> outtreefile("outtreefile", cll::desc("Output tree file"),
+                                        cll::init(""));
+
 static cll::opt<bool> debug("debug", cll::desc("Debug mode"), cll::init(false));
 
 static cll::opt<int> maxRotations("maxRotations", cll::desc("Max rotations"),
@@ -321,8 +324,13 @@ int main(int argc, char ** argv)
         gettimeofday(&t2, NULL);
         //printf("\nTree size %d\n", m->getRootNode()->treeSize());   // DEBUG
         print_time("\ttree rotation", &t1, &t2);
+	//m->saveToFile("/h1/mwozniak/dupa.txt");
     }
     
+    if (outtreefile.size()){
+        m->saveToFile(outtreefile.c_str());
+    }
+
     gettimeofday(&t1, NULL);
     Analysis::doAnalise(m);
     gettimeofday(&t2, NULL);
