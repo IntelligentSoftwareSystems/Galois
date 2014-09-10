@@ -137,6 +137,11 @@ struct Process {
   typedef LocalState GaloisDeterministicLocalState;
   static_assert(Galois::has_deterministic_local_state<Process>::value, "Oops");
 
+  uintptr_t galoisDeterministicId(const GNode& x) const {
+    return x;
+  }
+  static_assert(Galois::has_deterministic_id<Process>::value, "Oops");
+
   Graph& graph;
 
   Process(Graph& g): graph(g) { }
