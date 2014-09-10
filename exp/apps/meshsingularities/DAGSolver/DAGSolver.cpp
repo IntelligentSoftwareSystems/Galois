@@ -47,6 +47,9 @@ static cll::opt<std::string> matrixfile("matrixfile", cll::desc("File with front
 
 static cll::opt<bool> debug("debug", cll::desc("Debug mode"), cll::init(false));
 
+static cll::opt<int> maxRotations("maxRotations", cll::desc("Max rotations"),
+					cll::init(1000000));
+
 static cll::opt<Schedulers> scheduler("scheduler", cll::desc("Scheduler"),
                                       cll::values(
 #ifdef HAVE_CILK
@@ -302,10 +305,11 @@ int main(int argc, char ** argv)
 
     //tree rotation
     if (rotation){
-        printf("Tree size %d\n\n", m->getRootNode()->treeSize());   // DEBUG
+        //printf("Tree size %d\n\n", m->getRootNode()->treeSize());   // DEBUG
         gettimeofday(&t1, NULL);
         bool balanced=false;
-        while (!balanced){
+	int iter=0;
+        while ((!balanced) && (iter<maxRotations)){
             //printf("rotating\n");
             balanced=true;
             Analysis::rotate(m->getRootNode(), NULL, m, &balanced);
@@ -315,8 +319,8 @@ int main(int argc, char ** argv)
             }
         }
         gettimeofday(&t2, NULL);
-        printf("\nTree size %d\n", m->getRootNode()->treeSize());   // DEBUG
-        print_time("\tTree rotation", &t1, &t2);
+        //printf("\nTree size %d\n", m->getRootNode()->treeSize());   // DEBUG
+        print_time("\ttree rotation", &t1, &t2);
     }
     
     gettimeofday(&t1, NULL);
