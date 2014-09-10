@@ -61,6 +61,8 @@ static const char* const url = 0;
 enum Algo {
   alternatingLeastSquares,
   asynchronousAlternatingLeastSquares,
+  ikdgAsynchronousAlternatingLeastSquares,
+  addRemoveAsynchronousAlternatingLeastSquares,
   simpleAlternatingLeastSquares,
   blockedEdge,
   blockedEdgeServer,
@@ -116,6 +118,8 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
     clEnumValN(Algo::alternatingLeastSquares, "als", "Alternating least squares"),
     clEnumValN(Algo::simpleAlternatingLeastSquares, "sals", "Simple alternating least squares"),
     clEnumValN(Algo::asynchronousAlternatingLeastSquares, "aals", "Asynchronous alternating least squares"),
+    clEnumValN(Algo::ikdgAsynchronousAlternatingLeastSquares, "ikdg-aals", "Asynchronous alternating least squares"),
+    clEnumValN(Algo::addRemoveAsynchronousAlternatingLeastSquares, "add-remove-aals", "Asynchronous alternating least squares"),
     clEnumValN(Algo::blockedEdge, "blockedEdge", "Edge blocking (default)"),
     clEnumValN(Algo::blockedEdgeServer, "blockedEdgeServer", "Edge blocking with server support"),
     clEnumValN(Algo::blockJump, "blockJump", "Block jumping "),
@@ -1099,9 +1103,11 @@ int main(int argc, char** argv) {
 
   switch (algo) {
 #ifdef HAS_EIGEN
-    case Algo::alternatingLeastSquares: run<AsynchronousAlternatingLeastSquaresAlgo<true>>(); break;
+    case Algo::alternatingLeastSquares: run<AsynchronousAlternatingLeastSquaresAlgo<true, 0>>(); break;
     case Algo::simpleAlternatingLeastSquares: run<AlternatingLeastSquaresAlgo>(); break;
-    case Algo::asynchronousAlternatingLeastSquares: run<AsynchronousAlternatingLeastSquaresAlgo<false>>(); break;
+    case Algo::asynchronousAlternatingLeastSquares: run<AsynchronousAlternatingLeastSquaresAlgo<false, 0>>(); break;
+    case Algo::ikdgAsynchronousAlternatingLeastSquares: run<AsynchronousAlternatingLeastSquaresAlgo<false, 1>>(); break;
+    case Algo::addRemoveAsynchronousAlternatingLeastSquares: run<AsynchronousAlternatingLeastSquaresAlgo<false, 2>>(); break;
 #endif
     case Algo::blockedEdge: run<BlockedEdgeAlgo<false> >(); break;
     case Algo::blockedEdgeServer: run<BlockedEdgeAlgo<true> >(); break;

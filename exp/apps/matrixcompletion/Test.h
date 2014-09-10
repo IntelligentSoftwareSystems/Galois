@@ -69,7 +69,7 @@ struct DotProductFixedTilingAlgo {
 };
 
 #ifdef HAS_EIGEN
-template<bool BulkSynchronous>
+template<bool BulkSynchronous, int DetKind>
 struct AsynchronousAlternatingLeastSquaresAlgo {
   bool isSgd() const { return false; }
   std::string name() const { return "AsynchronousAlternatingLeastSquares"; }
@@ -77,6 +77,7 @@ struct AsynchronousAlternatingLeastSquaresAlgo {
     LatentValue latentVector[LATENT_VECTOR_SIZE];
   };
 
+  static_assert((BulkSynchronous && DetKind == 0) || (!BulkSynchronous), "BulkSynchronous is always deterministic");
 
   typedef typename Galois::Graph::LC_CSR_Graph<Node, unsigned int> BaseGraph;
   typedef typename std::conditional<BulkSynchronous,
@@ -137,17 +138,28 @@ struct AsynchronousAlternatingLeastSquaresAlgo {
     AT = A.transpose();
   }
 
+  void visit(Graph& g, size_t col) {
+    if (BulkSynchronous)
+      return;
+
+    if (col < NUM_ITEM_NODES) {
+      for (Sp::InnerIterator it(AT, col); it; ++it)
+        g.getData(it.row());
+    } else {
+      col = col - NUM_ITEM_NODES;
+      for (Sp::InnerIterator it(A, col); it; ++it)
+        g.getData(it.row());
+    }
+  }
+
   void update(Graph& g, size_t col, MT& WT, MT& HT,
     Galois::Runtime::PerThreadStorage<XTX>& xtxs,
     Galois::Runtime::PerThreadStorage<V>& rhs) 
   {
     // Compute WTW = W^T * W for sparse A
     V& r = *rhs.getLocal();
+    visit(g, col);
     if (col < NUM_ITEM_NODES) {
-      if (!BulkSynchronous) {
-        for (Sp::InnerIterator it(AT, col); it; ++it)
-          g.getData(it.row());
-      }
       r.setConstant(0);
       // HTAT = HT * AT; r = HTAT.col(col)
       for (Sp::InnerIterator it(AT, col); it; ++it)
@@ -161,10 +173,6 @@ struct AsynchronousAlternatingLeastSquaresAlgo {
       WT.col(col) = HTH.selfadjointView<Eigen::Upper>().llt().solve(r);
     } else {
       col = col - NUM_ITEM_NODES;
-      if (!BulkSynchronous) {
-        for (Sp::InnerIterator it(A, col); it; ++it)
-          g.getData(it.row());
-      }
       r.setConstant(0);
       // WTA = WT * A; x = WTA.col(col)
       for (Sp::InnerIterator it(A, col); it; ++it)
@@ -178,6 +186,59 @@ struct AsynchronousAlternatingLeastSquaresAlgo {
       HT.col(col) = WTW.selfadjointView<Eigen::Upper>().llt().solve(r);
     }
   }
+
+  struct NonDetTraits { };
+  struct IKDGTraits {
+    typedef int tt_needs_per_iter_alloc;
+  };
+  struct AddRemoveTraits {
+    typedef int tt_needs_per_iter_alloc;
+    typedef int tt_has_fixed_neighborhood;
+  };
+
+  struct Process: 
+    public std::conditional<DetKind == 0, 
+      NonDetTraits,
+      typename std::conditional<DetKind == 1,
+        IKDGTraits,
+        AddRemoveTraits>::type>::type
+  {
+    struct LocalState {
+      LocalState(Process&, Galois::PerIterAllocTy&) { }
+    };
+    typedef LocalState GaloisDeterministicLocalState;
+    static_assert(Galois::has_deterministic_local_state<Process>::value, "Oops");
+
+    AsynchronousAlternatingLeastSquaresAlgo& self;
+    Graph& g;
+    MT& WT;
+    MT& HT;
+    Galois::Runtime::PerThreadStorage<XTX>& xtxs;
+    Galois::Runtime::PerThreadStorage<V>& rhs;
+
+    Process(
+      AsynchronousAlternatingLeastSquaresAlgo& self,
+      Graph& g,
+      MT& WT,
+      MT& HT,
+      Galois::Runtime::PerThreadStorage<XTX>& xtxs,
+      Galois::Runtime::PerThreadStorage<V>& rhs):
+      self(self), g(g), WT(WT), HT(HT), xtxs(xtxs), rhs(rhs) { }
+    
+    void operator()(size_t col, Galois::UserContext<size_t>& ctx) {
+      // TODO(ddn) IKDG version can be improved by better initial assignment of work
+      // TODO(ddn) AddRemove can be improevd by reusing DAG
+      if (DetKind != 0) {
+        bool used;
+        LocalState* localState = (LocalState*) ctx.getLocalState(used);
+        if (!used) {
+          self.visit(g, col);
+          return;
+        }
+      }
+      self.update(g, col, WT, HT, xtxs, rhs);
+    }
+  };
 
   void operator()(Graph& g, const StepFunction&) {
     Galois::TimeAccumulator elapsed;
@@ -205,22 +266,23 @@ struct AsynchronousAlternatingLeastSquaresAlgo {
         Galois::for_each(
             boost::counting_iterator<size_t>(0),
             boost::counting_iterator<size_t>(NUM_ITEM_NODES),
-            [&](size_t col, Galois::UserContext<size_t>&) {
-          update(g, col, WT, HT, xtxs, rhs);
-        });
+            Process(*this, g, WT, HT, xtxs, rhs));
         Galois::for_each(
             boost::counting_iterator<size_t>(NUM_ITEM_NODES),
             boost::counting_iterator<size_t>(g.size()),
-            [&](size_t col, Galois::UserContext<size_t>&) {
-          update(g, col, WT, HT, xtxs, rhs);
-        });
+            Process(*this, g, WT, HT, xtxs, rhs));
       } else {
-        Galois::for_each(
-            boost::counting_iterator<size_t>(0),
-            boost::counting_iterator<size_t>(g.size()),
-            [&](size_t col, Galois::UserContext<size_t>&) {
-          update(g, col, WT, HT, xtxs, rhs);
-        });
+        if (DetKind == 0) {
+          Galois::for_each(
+              boost::counting_iterator<size_t>(0),
+              boost::counting_iterator<size_t>(g.size()),
+              Process(*this, g, WT, HT, xtxs, rhs));
+        } else {
+          Galois::for_each_det(
+              boost::counting_iterator<size_t>(0),
+              boost::counting_iterator<size_t>(g.size()),
+              Process(*this, g, WT, HT, xtxs, rhs));
+        }
       }
       updateTime.stop();
 
