@@ -1,0 +1,140 @@
+#include "PageRankDet.h"
+
+namespace cll = llvm::cl;
+
+enum ExecType {
+  KDG_R,
+  KDG_AR,
+  IKDG,
+};
+
+static cll::opt<ExecType> execType (
+    "executor",
+    cll::desc ("Deterministic Executor Type"),
+    cll::values (
+      clEnumValN (KDG_R, "KDG_R", "KDG_R"),
+      clEnumValN (KDG_AR, "KDG_AR", "KDG_AR"),
+      clEnumValN (IKDG, "IKDG", "IKDG"),
+      clEnumValEnd),
+    cll::init (KDG_R));
+
+
+struct NodeData: public Galois::Runtime::DAGdata, PData {
+
+  NodeData (void)
+    : Galois::Runtime::DAGdata (0), PData ()
+  {}
+
+  NodeData (unsigned id, unsigned outdegree)
+    : Galois::Runtime::DAGdata (id), PData (outdegree)
+  {}
+
+
+};
+
+typedef typename Galois::Graph::LC_CSR_Graph<NodeData, void>
+  ::with_numa_alloc<true>::type
+  InnerGraph;
+
+class PageRankChromatic: public PageRankBase<InnerGraph> {
+protected:
+
+  struct NodeComparator {
+    typedef Galois::Runtime::DAGdataComparator<NodeData> DataCmp;
+
+    Graph& graph;
+
+    bool operator () (GNode left, GNode right) const {
+      auto& ld = graph.getData (left, Galois::NONE);
+      auto& rd = graph.getData (right, Galois::NONE);
+
+      return DataCmp::compare (ld, rd);
+    }
+
+  };
+
+  struct NhoodVisitor {
+    static const unsigned CHUNK_SIZE = DEFAULT_CHUNK_SIZE;
+
+    Graph& graph;
+
+    template <typename C>
+    void operator () (GNode src, C&) {
+      graph.getData (src, Galois::CHECK_CONFLICT);
+
+      for (auto i = graph.in_edge_begin (src, Galois::CHECK_CONFLICT)
+          , end_i = graph.in_edge_end (src, Galois::CHECK_CONFLICT); i != end_i; ++i) {
+      }
+
+      // for (auto i = graph.edge_begin (src, Galois::CHECK_CONFLICT)
+          // , end_i = graph.edge_end (src, Galois::CHECK_CONFLICT); i != end_i; ++i) {
+      // }
+    }
+  };
+
+
+  template <bool useOnWL> 
+  struct ApplyOperator {
+
+    static const unsigned CHUNK_SIZE = DEFAULT_CHUNK_SIZE;
+    static const unsigned UNROLL_FACTOR = 32;
+
+    PageRankChromatic& outer;
+
+    template <typename C>
+    void operator () (GNode src, C& ctx) {
+      outer.applyOperator<useOnWL> (src, ctx);
+    }
+  };
+
+  virtual void runPageRank (void) {
+
+    switch (execType) {
+
+      case KDG_R:
+        // TODO: assign priorities to nodes
+        Galois::Runtime::for_each_det_kdg (
+            Galois::Runtime::makeLocalRange (graph),
+            NodeComparator {graph},
+            NhoodVisitor {graph},
+            ApplyOperator<true> {*this},
+            "page-rank-kdg-r",
+            Galois::Runtime::KDG_R);
+        break;
+
+      case KDG_AR:
+        // TODO: assign priorities to nodes
+        Galois::Runtime::for_each_det_kdg (
+            Galois::Runtime::makeLocalRange (graph),
+            NodeComparator {graph},
+            NhoodVisitor {graph},
+            ApplyOperator<true> {*this},
+            "page-rank-kdg-ar",
+            Galois::Runtime::KDG_AR);
+        break;
+
+      case IKDG:
+        // TODO: assign priorities to nodes
+        Galois::Runtime::for_each_det_kdg (
+            Galois::Runtime::makeLocalRange (graph),
+            NodeComparator {graph},
+            NhoodVisitor {graph},
+            ApplyOperator<true> {*this},
+            "page-rank-kdg-ikdg",
+            Galois::Runtime::IKDG);
+        break;
+
+      default:
+        std::abort ();
+
+    }
+  }
+
+};
+
+int main (int argc, char* argv[]) {
+
+  PageRankChromatic p;
+
+  return p.run (argc, argv);
+}

@@ -13,6 +13,7 @@
 #include "Galois/Runtime/Sampling.h"
 #include "Galois/Runtime/PerThreadContainer.h"
 #include "Galois/Runtime/DetChromatic.h"
+#include "Galois/Runtime/DetKDGexecutor.h"
 
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
@@ -107,7 +108,7 @@ protected:
     std::printf ("Graph read with %zd nodes and %zd edges\n", numNodes, numEdges.reduceRO ());
   }
 
-  template <typename C>
+  template <bool useOnWL, typename C>
   void applyOperator (GNode src, C& ctx) {
     double sum = 0;
 
@@ -120,14 +121,31 @@ protected:
     float value = (1.0 - alpha) * sum + alpha;
     auto& sdata = graph.getData(src, Galois::MethodFlag::NONE);
     float diff = std::fabs(value - sdata.value);
+
+    
     
     if (diff > tolerance) {
       sdata.value = value;
       for (auto jj = graph.edge_begin(src, Galois::MethodFlag::NONE), ej = graph.edge_end(src, Galois::MethodFlag::NONE); jj != ej; ++jj) {
         GNode dst = graph.getEdgeDst(jj);
-        ctx.push(dst);
+
+        if (useOnWL) {
+          auto& dd = graph.getData (dst, Galois::NONE);
+          bool expected = false;
+          if (dd.onWL.compare_exchange_strong (expected, true)) {
+            ctx.push (dst);
+          }
+
+        } else {
+          ctx.push(dst);
+        }
       }
     } 
+
+    if (useOnWL) {
+      sdata.onWL = false;
+    }
+
   }
 
   void verify (void) {

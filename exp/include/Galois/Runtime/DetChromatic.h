@@ -162,9 +162,9 @@ public:
         [this, &sources] (GNode src) {
           
           auto& sd = graph.getData (src, Galois::NONE);
-          // assert (bool (sd.onWL));
+          assert (bool (sd.onWL));
 
-          if (bool (sd.onWL)) {
+          // if (bool (sd.onWL)) {
             sd.indegree = 0; // reset
 
             unsigned addAmt = 0;
@@ -187,7 +187,7 @@ public:
               assert (bool(sd.onWL));
               sources.push (src);
             }
-          }
+          // } // end if
 
         },
         "init-Active-DAG",
@@ -684,11 +684,12 @@ public:
   void push (GNode node) {
     auto& nd = graph.getData (node, Galois::NONE);
 
-    // bool expected = false;
-    // if (nd.onWL.compare_exchange_strong (expected, true)) {
-      // nextWork.push (node);
-    // }
-    nd.onWL = true;
+    bool expected = false;
+    if (nd.onWL.compare_exchange_strong (expected, true)) {
+      nextWork.push (node);
+    }
+    //
+    // nd.onWL = true;
   }
 
   struct ApplyOperator {
@@ -763,7 +764,7 @@ public:
       assert (sources.size () == 0);
 
       t_dag_init.start ();
-      dagGen.initActiveDAG (Galois::Runtime::makeLocalRange (graph), sources);
+      dagGen.initActiveDAG (Galois::Runtime::makeLocalRange (nextWork), sources);
       t_dag_init.stop ();
 
       nextWork.clear_all_parallel ();
@@ -784,8 +785,8 @@ public:
     }
 
     std::printf ("InputGraphDAGexecutor: performed %d rounds\n", rounds);
-    std::printf ("InputGraphDAGexecutor: time taken by dag initialization: %d\n", t_dag_init.get ());
-    std::printf ("InputGraphDAGexecutor: time taken by dag execution: %d\n", t_dag_exec.get ());
+    std::printf ("InputGraphDAGexecutor: time taken by dag initialization: %lu\n", t_dag_init.get ());
+    std::printf ("InputGraphDAGexecutor: time taken by dag execution: %lu\n", t_dag_exec.get ());
 
   }
 

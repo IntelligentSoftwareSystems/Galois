@@ -4,7 +4,7 @@ namespace cll = llvm::cl;
 
 enum ExecType {
   CHROMATIC,
-  EDGE_FLIP
+  EDGE_FLIP,
 };
 
 static cll::opt<ExecType> execType (
@@ -38,15 +38,17 @@ typedef typename Galois::Graph::LC_CSR_Graph<NodeData, void>
 class PageRankChromatic: public PageRankBase<InnerGraph> {
 protected:
 
+  template <bool useOnWL> 
   struct ApplyOperator {
 
     static const unsigned CHUNK_SIZE = DEFAULT_CHUNK_SIZE;
+    static const unsigned UNROLL_FACTOR = 32;
 
     PageRankChromatic& outer;
 
     template <typename C>
     void operator () (GNode src, C& ctx) {
-      outer.applyOperator (src, ctx);
+      outer.applyOperator<useOnWL> (src, ctx);
     }
   };
 
@@ -58,7 +60,7 @@ protected:
         Galois::Runtime::for_each_det_chromatic (
             Galois::Runtime::makeLocalRange (graph),
             graph,
-            ApplyOperator {*this},
+            ApplyOperator<false> {*this},
             "page-rank-chromatic");
         break;
 
@@ -66,7 +68,7 @@ protected:
         Galois::Runtime::for_each_det_dag_active (
             Galois::Runtime::makeLocalRange (graph),
             graph,
-            ApplyOperator {*this},
+            ApplyOperator<false> {*this},
             "page-rank-chromatic");
         break;
 
