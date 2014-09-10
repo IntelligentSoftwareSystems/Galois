@@ -201,7 +201,7 @@ public:
   }
 
   void push_back (const T& x) {
-    Super_ty::get ().push_back ();
+    Super_ty::get ().push_back (x);
   }
 
   void push (const T& x) {

@@ -72,7 +72,7 @@ public:
 
   void add (const Ctxt* ctx) {
 
-    assert (!sharers.find (const_cast<Ctxt*> (ctx)));
+    // assert (!sharers.find (const_cast<Ctxt*> (ctx)));
     sharers.push (const_cast<Ctxt*> (ctx));
   }
 
@@ -615,31 +615,39 @@ class LCorderedExec {
 
         // addWL.get ().clear ();
         UserCtx& userCtx = *(perThUserCtx.getLocal ());
-        userCtx.resetPushBuffer ();
-        userCtx.resetAlloc ();
-        op (src->active, userCtx.data ()); 
 
-        addCtxtWL.get ().clear ();
-        CreateCtxtExpandNhood addCtxt (nhoodVisitor, nhmgr, ctxtAlloc, addCtxtWL);
-
-        // for (typename AddWL::local_iterator a = addWL.get ().begin ()
-            // , enda = addWL.get ().end (); a != enda; ++a) {
-        for (typename UserCtx::PushBufferTy::iterator a = userCtx.getPushBuffer ().begin ()
-            , enda = userCtx.getPushBuffer ().end (); a != enda; ++a) {
-          
-
-          addCtxt (*a);
+        if (true || ForEachTraits<OperFunc>::NeedsPush) {
+          userCtx.resetPushBuffer ();
+          userCtx.resetAlloc ();
         }
 
-        for (typename CtxtWL::local_iterator c = addCtxtWL.get ().begin ()
-            , endc = addCtxtWL.get ().end (); c != endc; ++c) {
+        op (src->active, userCtx.data ()); 
 
-          (*c)->findNewSources (sourceTest, wl);
-          // // if is source add to workList;
-          // if (sourceTest (*c) && (*c)->onWL.cas (false, true)) {
-          // // std::cout << "Adding new source: " << *c << std::endl;
-          // wl.push (*c);
-          // }
+
+        if (true || ForEachTraits<OperFunc>::NeedsPush) {
+
+          addCtxtWL.get ().clear ();
+          CreateCtxtExpandNhood addCtxt (nhoodVisitor, nhmgr, ctxtAlloc, addCtxtWL);
+
+          // for (typename AddWL::local_iterator a = addWL.get ().begin ()
+          // , enda = addWL.get ().end (); a != enda; ++a) {
+          for (typename UserCtx::PushBufferTy::iterator a = userCtx.getPushBuffer ().begin ()
+              , enda = userCtx.getPushBuffer ().end (); a != enda; ++a) {
+
+
+            addCtxt (*a);
+          }
+
+          for (typename CtxtWL::local_iterator c = addCtxtWL.get ().begin ()
+              , endc = addCtxtWL.get ().end (); c != endc; ++c) {
+
+            (*c)->findNewSources (sourceTest, wl);
+            // // if is source add to workList;
+            // if (sourceTest (*c) && (*c)->onWL.cas (false, true)) {
+            // // std::cout << "Adding new source: " << *c << std::endl;
+            // wl.push (*c);
+            // }
+          }
         }
 
         src->removeFromNhood ();
@@ -704,8 +712,8 @@ public:
       sourceTest (sourceTest)
   {}
 
-  template <typename AI>
-  void execute (AI abeg, AI aend, const char* loopname) {
+  template <typename R>
+  void execute (const R& range, const char* loopname) {
     CtxtAlloc ctxtAlloc;
     CtxtWL initCtxt;
     CtxtWL initSrc;
@@ -719,8 +727,9 @@ public:
     Galois::TimeAccumulator t_destroy;
 
     t_create.start ();
-    Galois::Runtime::do_all_impl(makeStandardRange(abeg, aend), 
-				 CreateCtxtExpandNhood (nhoodVisitor, nhmgr, ctxtAlloc, initCtxt));
+    Galois::Runtime::do_all_impl(
+        range, 
+				CreateCtxtExpandNhood (nhoodVisitor, nhmgr, ctxtAlloc, initCtxt));
     //        "create_initial_contexts");
     t_create.stop ();
 
@@ -773,10 +782,10 @@ public:
   }
 };
 
-template <typename AI, typename Cmp, typename OperFunc, typename NhoodFunc, typename ST>
-void for_each_ordered_lc_impl (AI abeg, AI aend, const Cmp& cmp, const NhoodFunc& nhoodVisitor, const OperFunc& operFunc, const ST& sourceTest, const char* loopname) {
+template <typename R, typename Cmp, typename OperFunc, typename NhoodFunc, typename ST>
+void for_each_ordered_lc_impl (const R& range, const Cmp& cmp, const NhoodFunc& nhoodVisitor, const OperFunc& operFunc, const ST& sourceTest, const char* loopname) {
 
-  typedef typename std::iterator_traits<AI>::value_type T;
+  typedef typename R::value_type T;
 
   typedef LCorderedContext<T, Cmp> Ctxt;
   typedef typename Ctxt::NhoodMgr NhoodMgr;
@@ -791,19 +800,19 @@ void for_each_ordered_lc_impl (AI abeg, AI aend, const Cmp& cmp, const NhoodFunc
 
   Exec e (nhoodVisitor, operFunc, nhmgr, sourceTest);
   // e.template execute<CHUNK_SIZE> (abeg, aend);
-  e.execute (abeg, aend, loopname);
+  e.execute (range, loopname);
 }
 
-template <typename AI, typename Cmp, typename OperFunc, typename NhoodFunc, typename StableTest>
-void for_each_ordered_lc (AI abeg, AI aend, const Cmp& cmp, const NhoodFunc& nhoodVisitor, const OperFunc& operFunc, const StableTest& stabilityTest, const char* loopname) {
+template <typename R, typename Cmp, typename OperFunc, typename NhoodFunc, typename StableTest>
+void for_each_ordered_lc (const R& range, const Cmp& cmp, const NhoodFunc& nhoodVisitor, const OperFunc& operFunc, const StableTest& stabilityTest, const char* loopname) {
 
-  for_each_ordered_lc_impl (abeg, aend, cmp, nhoodVisitor, operFunc, SourceTest<StableTest> (stabilityTest), loopname);
+  for_each_ordered_lc_impl (range, cmp, nhoodVisitor, operFunc, SourceTest<StableTest> (stabilityTest), loopname);
 }
 
-template <typename AI, typename Cmp, typename OperFunc, typename NhoodFunc>
-void for_each_ordered_lc (AI abeg, AI aend, const Cmp& cmp, const NhoodFunc& nhoodVisitor, const OperFunc& operFunc, const char* loopname) {
+template <typename R, typename Cmp, typename OperFunc, typename NhoodFunc>
+void for_each_ordered_lc (const R& range, const Cmp& cmp, const NhoodFunc& nhoodVisitor, const OperFunc& operFunc, const char* loopname) {
 
-  for_each_ordered_lc_impl (abeg, aend, cmp, nhoodVisitor, operFunc, SourceTest<void> (), loopname);
+  for_each_ordered_lc_impl (range, cmp, nhoodVisitor, operFunc, SourceTest<void> (), loopname);
 }
 
 } // end namespace Runtime

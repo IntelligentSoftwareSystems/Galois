@@ -13,8 +13,8 @@ static const float alpha2 = 0.85; // Joyce changed to this which is a usual way 
 //static const float tolerance = 0.01; 
 static const float tolerance = 0.0001; // Joyce
 
-//ICC v13.1 doesn't yet support std::atomic<float> completely, emmulate its
-//behavor with std::atomic<int>
+//ICC v13.1 doesn't yet support std::atomic<float> completely, emulate its
+//behavior with std::atomic<int>
 struct atomic_float : public std::atomic<int> {
   static_assert(sizeof(int) == sizeof(float), "int and float must be the same size");
 
