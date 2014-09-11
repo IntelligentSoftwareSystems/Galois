@@ -9,7 +9,6 @@
 #include "Element.hpp"
 #include "EquationSystem.h"
 
-
 #include <set>
 
 class Mesh;
@@ -83,6 +82,10 @@ class Node {
         void eliminate() const;
         void bs() const;
         
+        unsigned long getSizeInMemory();
+        unsigned long getFLOPs();
+        unsigned long getMemoryRearrangements();
+
         static bool isNeighbour (Node *node, Node *parent);
         static bool isNeighbour (Element *element1, Element *element2);
         int getNumberOfNeighbours(std::vector<Element *> & allElements);
