@@ -333,4 +333,43 @@ bool Node::isLooped(std::set<Node*>* n){
     return false;
 }
 
+unsigned long Node::getSizeInMemory()
+{
+    unsigned long total = this->dofs.size()*this->dofs.size()*sizeof(double) + this->dofs.size()*sizeof(double*);
+    if (left != NULL && right != NULL) {
+        total += left->getSizeInMemory() + right->getSizeInMemory();
+    }
+    return total;
+}
+
+unsigned long Node::getFLOPs()
+{
+    auto flops = [](unsigned int a, unsigned int b) {
+        return a*(6*b*b-6*a*b+6*b+2*a*a-3*a+1)/6;
+    };
+
+    unsigned long total = flops(this->getDofsToElim(), this->getDofs().size());
+    if (left != NULL && right != NULL) {
+        total += left->getFLOPs() + right->getFLOPs();
+    }
+
+    return total;
+}
+
+unsigned long Node::getMemoryRearrangements()
+{
+    unsigned long total = 0;
+
+    if (left != NULL && right != NULL) {
+        unsigned long memLeft = (left->getDofs().size() - left->getDofsToElim());
+        memLeft *= memLeft;
+        unsigned long memRight = (right->getDofs().size() - right->getDofsToElim());
+        memRight *= memRight;
+
+        total = memLeft+memRight+left->getMemoryRearrangements()+right->getMemoryRearrangements();
+    }
+
+    return total;
+}
+
 /*END OF DEBUG*/

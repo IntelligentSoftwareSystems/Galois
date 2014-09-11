@@ -103,14 +103,15 @@ int EquationSystem::eliminate(const int rows)
             printf("DPOTRF error: %d\n", error);
             return error;
         }
+
         clapack_dpotrs (CblasColMajor,
                         CblasUpper,
                         m,
                         k,
                         matrix[0],
-                n,
-                matrix[m],
-                n);
+                        n,
+                        matrix[m],
+                        n);
 
         cblas_dgemm(CblasColMajor,
                     CblasNoTrans,
