@@ -1,6 +1,8 @@
 #ifndef GALOIS_DAG_HPP
 #define GALOIS_DAG_HPP
+
 #include "Node.hpp"
+#include "EquationSystem.h"
 
 struct GaloisElimination: public Galois::Runtime::TreeTaskBase
 {
@@ -54,19 +56,19 @@ struct GaloisBackwardSubstitution: public Galois::Runtime::TreeTaskBase
 struct GaloisAllocation: public Galois::Runtime::TreeTaskBase
 {
     Node *node;
-
-    GaloisAllocation (Node *_node):
+    SolverMode mode;
+    GaloisAllocation (Node *_node, SolverMode _mode):
         Galois::Runtime::TreeTaskBase(),
-        node(_node)
+        node(_node), mode(mode)
     {}
 
     virtual void operator () (Galois::Runtime::TreeTaskContext &ctx)
     {
-        node->allocateSystem(solverMode);
+        node->allocateSystem(mode);
         if (node->getLeft() != NULL && node->getRight() != NULL) {
-            GaloisAllocation left { node->getLeft() };
+            GaloisAllocation left { node->getLeft(), mode };
 
-            GaloisAllocation right { node->getRight() };
+            GaloisAllocation right { node->getRight(), mode };
             ctx.spawn(left);
 
             ctx.spawn(right);
@@ -76,7 +78,7 @@ struct GaloisAllocation: public Galois::Runtime::TreeTaskBase
     }
 };
 
-void galoisAllocation(Node *node);
+void galoisAllocation(Node *node, SolverMode mode);
 void galoisElimination (Node *node);
 void galoisBackwardSubstitution(Node *node);
 

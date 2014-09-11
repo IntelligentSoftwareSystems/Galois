@@ -191,17 +191,17 @@ int main(int argc, char ** argv)
     gettimeofday(&t1, NULL);
     if (scheduler == GALOIS_DAG) {
 
-        galoisAllocation(m->getRootNode());
+        galoisAllocation(m->getRootNode(), solverMode);
     }     else if (scheduler == CILK) {
 #ifdef HAVE_CILK
         Galois::CilkInit();
-        cilk_alloc_tree(m->getRootNode());
+        cilk_alloc_tree(m->getRootNode(), solverMode);
 #else
         printf("CILK is not supported.\n");
         return 1;
 #endif
     } else if (scheduler == SEQ) {
-        seqAllocation(m->getRootNode());
+        seqAllocation(m->getRootNode(), solverMode);
     }
     gettimeofday(&t2, NULL);
     print_time("\tallocation", &t1, &t2);

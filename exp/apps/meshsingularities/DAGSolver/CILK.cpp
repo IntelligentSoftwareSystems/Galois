@@ -1,9 +1,8 @@
-#include "Node.hpp"
 #include "CILK.hpp"
 
-void cilk_alloc_tree(Node *n)
+void cilk_alloc_tree(Node *n, SolverMode mode)
 {
-    n->allocateSystem(solverMode);
+    n->allocateSystem(mode);
     if (n->getRight() != NULL && n->getLeft() != NULL) {
 #ifdef HAVE_CILK
         cilk_spawn

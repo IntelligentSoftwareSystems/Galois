@@ -1,8 +1,8 @@
 #include "GaloisDag.hpp"
 
-void galoisAllocation(Node *node)
+void galoisAllocation(Node *node, SolverMode mode)
 {
-    GaloisAllocation root {node};
+    GaloisAllocation root {node, mode};
     Galois::Runtime::for_each_ordered_tree_generic(root, "alloc-gen");
 }
 

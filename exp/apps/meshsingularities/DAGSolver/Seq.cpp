@@ -1,8 +1,8 @@
 #include "Seq.hpp"
 
-void seqAllocation(Node *node)
+void seqAllocation(Node *node, SolverMode mode)
 {
-    node->allocateSystem(solverMode);
+    node->allocateSystem(mode);
     if (node->getLeft() != NULL && node->getRight() != NULL) {
         seqAllocation(node->getLeft());
         seqAllocation(node->getRight());
