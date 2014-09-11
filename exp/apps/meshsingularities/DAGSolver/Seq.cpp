@@ -4,8 +4,8 @@ void seqAllocation(Node *node, SolverMode mode)
 {
     node->allocateSystem(mode);
     if (node->getLeft() != NULL && node->getRight() != NULL) {
-        seqAllocation(node->getLeft());
-        seqAllocation(node->getRight());
+        seqAllocation(node->getLeft(), mode);
+        seqAllocation(node->getRight(), mode);
     }
 }
 

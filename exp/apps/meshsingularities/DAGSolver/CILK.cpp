@@ -7,11 +7,11 @@ void cilk_alloc_tree(Node *n, SolverMode mode)
 #ifdef HAVE_CILK
         cilk_spawn
 #endif
-                cilk_alloc_tree(n->getLeft());
+                cilk_alloc_tree(n->getLeft(), mode);
 #ifdef HAVE_CILK
         cilk_spawn
 #endif
-                cilk_alloc_tree(n->getRight());
+                cilk_alloc_tree(n->getRight(), mode);
 #ifdef HAVE_CILK
         cilk_sync;
 #endif

@@ -1,6 +1,14 @@
 #ifndef GALOIS_DAG_HPP
 #define GALOIS_DAG_HPP
 
+#include "Galois/Galois.h"
+#include "Galois/Accumulator.h"
+#include "Galois/Bag.h"
+#include "Galois/CilkInit.h"
+#include "Galois/Statistic.h"
+#include "Galois/Runtime/TreeExec.h"
+
+
 #include "Node.hpp"
 #include "EquationSystem.h"
 
