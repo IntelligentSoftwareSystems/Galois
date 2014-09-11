@@ -21,6 +21,8 @@
 
 #include "CILK.hpp"
 #include "GaloisDag.hpp"
+#include "Seq.hpp"
+
 #ifdef WITH_PAPI
 #include "papi.h"
 #endif
