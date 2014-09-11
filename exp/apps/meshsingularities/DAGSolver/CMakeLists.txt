@@ -24,7 +24,7 @@ if (USE_BLAS)
     link_directories(${BLAS_LIB})
 endif()
 
-app(DAGSolver DAGSolver.cpp DynamicLib.cpp EquationSystem.cpp Analysis.cpp Node.cpp Mesh.cpp)
+app(DAGSolver DAGSolver.cpp DynamicLib.cpp EquationSystem.cpp Analysis.cpp Node.cpp Mesh.cpp CILK.cpp Seq.cpp GaloisDag.cpp)
 target_link_libraries(DAGSolver -ldl -lpthread)
 if (USE_PAPI_MESH)
     target_link_libraries(DAGSolver -lpapi)
