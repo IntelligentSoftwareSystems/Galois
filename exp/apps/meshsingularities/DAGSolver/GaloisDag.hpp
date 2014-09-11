@@ -1,0 +1,83 @@
+#ifndef GALOIS_DAG_HPP
+#define GALOIS_DAG_HPP
+#include "Node.hpp"
+
+struct GaloisElimination: public Galois::Runtime::TreeTaskBase
+{
+    Node *node;
+
+    GaloisElimination (Node *_node):
+        Galois::Runtime::TreeTaskBase (),
+        node (_node)
+    {}
+
+    virtual void operator () (Galois::Runtime::TreeTaskContext& ctx)
+    {
+        if (node->getLeft() != NULL && node->getRight() != NULL) {
+            GaloisElimination left {node->getLeft()};
+
+            GaloisElimination right {node->getRight()};
+            ctx.spawn (left);
+            ctx.spawn (right);
+
+            ctx.sync ();
+        }
+        node->eliminate();
+
+    }
+};
+
+struct GaloisBackwardSubstitution: public Galois::Runtime::TreeTaskBase
+{
+    Node *node;
+
+    GaloisBackwardSubstitution (Node *_node):
+        Galois::Runtime::TreeTaskBase(),
+        node(_node)
+    {}
+
+    virtual void operator () (Galois::Runtime::TreeTaskContext &ctx)
+    {
+        node->bs();
+        if (node->getLeft() != NULL && node->getRight() != NULL) {
+            // change to Galois::for_each (scales better)
+            GaloisBackwardSubstitution left { node->getLeft() };
+            GaloisBackwardSubstitution right { node->getRight() };
+
+            ctx.spawn(left);
+            ctx.spawn(right);
+            ctx.sync();
+        }
+    }
+};
+
+struct GaloisAllocation: public Galois::Runtime::TreeTaskBase
+{
+    Node *node;
+
+    GaloisAllocation (Node *_node):
+        Galois::Runtime::TreeTaskBase(),
+        node(_node)
+    {}
+
+    virtual void operator () (Galois::Runtime::TreeTaskContext &ctx)
+    {
+        node->allocateSystem(solverMode);
+        if (node->getLeft() != NULL && node->getRight() != NULL) {
+            GaloisAllocation left { node->getLeft() };
+
+            GaloisAllocation right { node->getRight() };
+            ctx.spawn(left);
+
+            ctx.spawn(right);
+
+            ctx.sync();
+        }
+    }
+};
+
+void galoisAllocation(Node *node);
+void galoisElimination (Node *node);
+void galoisBackwardSubstitution(Node *node);
+
+#endif

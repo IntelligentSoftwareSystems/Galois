@@ -25,6 +25,7 @@
 #ifndef GALOIS_GTUPLE_H
 #define GALOIS_GTUPLE_H
 
+#include <cstddef>
 #include <tuple>
 #include <cstring>
 

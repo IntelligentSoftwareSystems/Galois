@@ -475,14 +475,14 @@ namespace Galois {
 namespace Runtime {
 
 template<int... Is, typename R, typename OpFn, typename TupleTy>
-constexpr auto for_each_ordered_level_(int_seq<Is...>, const R& range, const OpFn& opFn, const TupleTy& tpl, int)
+auto for_each_ordered_level_(int_seq<Is...>, const R& range, const OpFn& opFn, const TupleTy& tpl, int)
   -> decltype(std::declval<typename R::container_type>(), void()) 
 {
   for_each_local(range.get_container(), opFn, std::get<Is>(tpl)...);
 }
 
 template<int... Is, typename R, typename OpFn, typename TupleTy>
-constexpr auto for_each_ordered_level_(int_seq<Is...>, const R& range, const OpFn& opFn, const TupleTy& tpl, ...) 
+auto for_each_ordered_level_(int_seq<Is...>, const R& range, const OpFn& opFn, const TupleTy& tpl, ...) 
   -> void
 {
   for_each(range.begin(), range.end(), opFn, std::get<Is>(tpl)...);
@@ -494,7 +494,7 @@ void for_each_ordered_level(const R& range, const KeyFn& keyFn, const KeyCmp& ke
   typedef typename std::result_of<KeyFn(value_type)>::type key_type;
   constexpr bool is_less = std::is_same<KeyCmp, std::less<key_type>>::value;
   constexpr bool is_greater = std::is_same<KeyCmp, std::greater<key_type>>::value;
-  static_assert(is_less || is_greater && !(is_less && is_greater), "Arbitrary key comparisons not yet supported");
+  static_assert((is_less || is_greater) && !(is_less && is_greater), "Arbitrary key comparisons not yet supported");
   constexpr unsigned chunk_size = OpFn::CHUNK_SIZE;
 
   typedef typename WorkList::OrderedByIntegerMetric<>

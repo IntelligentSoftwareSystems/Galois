@@ -19,6 +19,8 @@
 
 #include <sys/time.h>
 
+#include "CILK.hpp"
+#include "GaloisDag.hpp"
 #ifdef WITH_PAPI
 #include "papi.h"
 #endif
@@ -45,7 +47,13 @@ static cll::opt<std::string> treefile("treefile", cll::desc("File with tree defi
 static cll::opt<std::string> matrixfile("matrixfile", cll::desc("File with frontal matrices"),
                                         cll::init(""));
 
+static cll::opt<std::string> outtreefile("outtreefile", cll::desc("Output tree file"),
+                                        cll::init(""));
+
 static cll::opt<bool> debug("debug", cll::desc("Debug mode"), cll::init(false));
+
+static cll::opt<int> maxRotations("maxRotations", cll::desc("Max rotations"),
+					cll::init(1000000));
 
 static cll::opt<Schedulers> scheduler("scheduler", cll::desc("Scheduler"),
                                       cll::values(
@@ -65,175 +73,12 @@ static cll::opt<SolverMode> solverMode("solverMode", cll::desc("Elimination meth
 static cll::opt<bool> rotation("rotation", cll::desc("Rotation"), cll::init(false));
 
 #ifdef WITH_PAPI
-static cll::opt<bool> perfcounters("perfcounters", cll::desc("Enable performance counters"),
+static cll::opt<bool> papi_supported("perfcounters", cll::desc("Enable performance counters"),
                                    cll::init(false));
 #endif
 
 using namespace std;
 
-#ifdef HAVE_CILK
-void cilk_alloc_tree(Node *n)
-{
-    n->allocateSystem(solverMode);
-    if (n->getRight() != NULL && n->getLeft() != NULL) {
-        cilk_spawn cilk_alloc_tree(n->getLeft());
-        cilk_spawn cilk_alloc_tree(n->getRight());
-        cilk_sync;
-        //n->mergeProduction = (void(*)(double**, double*, double**, double*, double**, double*))
-        //        lib->resolvSymbol(n->getProduction());
-    } else {
-        //n->preprocessProduction = (void(*)(double**, double*, double**, double*))lib->resolvSymbol(n->getProduction());
-    }
-}
-
-void cilk_do_elimination(Node *n)
-{
-    if (n->getRight() != NULL && n->getLeft() != NULL) {
-        cilk_spawn cilk_do_elimination(n->getLeft());
-        cilk_spawn cilk_do_elimination(n->getRight());
-        cilk_sync;
-    }
-    n->eliminate();
-}
-
-void cilk_do_backward_substitution(Node *n)
-{
-    n->bs();
-    if (n->getRight() != NULL && n->getLeft() != NULL) {
-        cilk_spawn cilk_do_backward_substitution(n->getLeft());
-        cilk_spawn cilk_do_backward_substitution(n->getRight());
-        cilk_sync;
-    }
-}
-
-#endif // HAVE_CILK
-
-
-struct GaloisElimination: public Galois::Runtime::TreeTaskBase
-{
-    Node *node;
-
-    GaloisElimination (Node *_node):
-        Galois::Runtime::TreeTaskBase (),
-        node (_node)
-    {}
-
-    virtual void operator () (Galois::Runtime::TreeTaskContext& ctx)
-    {
-        if (node->getLeft() != NULL && node->getRight() != NULL) {
-            GaloisElimination left {node->getLeft()};
-
-            GaloisElimination right {node->getRight()};
-            ctx.spawn (left);
-            ctx.spawn (right);
-
-            ctx.sync ();
-        }
-        node->eliminate();
-
-    }
-};
-
-struct GaloisBackwardSubstitution: public Galois::Runtime::TreeTaskBase
-{
-    Node *node;
-
-    GaloisBackwardSubstitution (Node *_node):
-        Galois::Runtime::TreeTaskBase(),
-        node(_node)
-    {}
-
-    virtual void operator () (Galois::Runtime::TreeTaskContext &ctx)
-    {
-        node->bs();
-        if (node->getLeft() != NULL && node->getRight() != NULL) {
-            // change to Galois::for_each (scales better)
-            GaloisBackwardSubstitution left { node->getLeft() };
-            GaloisBackwardSubstitution right { node->getRight() };
-
-            ctx.spawn(left);
-
-            ctx.spawn(right);
-            ctx.sync();
-        }
-    }
-};
-
-struct GaloisAllocation: public Galois::Runtime::TreeTaskBase
-{
-    Node *node;
-
-    GaloisAllocation (Node *_node):
-        Galois::Runtime::TreeTaskBase(),
-        node(_node)
-    {}
-
-    virtual void operator () (Galois::Runtime::TreeTaskContext &ctx)
-    {
-        //Analysis::debugNode(node);
-        node->allocateSystem(solverMode);
-        if (node->getLeft() != NULL && node->getRight() != NULL) {
-            GaloisAllocation left { node->getLeft() };
-
-            GaloisAllocation right { node->getRight() };
-            ctx.spawn(left);
-
-            ctx.spawn(right);
-
-            ctx.sync();
-
-            //n->mergeProduction = (void(*)(double**, double*, double**, double*, double**, double*))
-            //        lib->resolvSymbol(n->getProduction());
-        //} else {
-            //n->preprocessProduction = (void(*)(double**, double*, double**, double*))lib->resolvSymbol(n->getProduction());
-        }
-    }
-};
-
-void galoisAllocation(Node *node)
-{
-    GaloisAllocation root {node};
-    Galois::Runtime::for_each_ordered_tree_generic(root, "alloc-gen");
-}
-
-void galoisElimination (Node *node)
-{
-    GaloisElimination root {node};
-    Galois::Runtime::for_each_ordered_tree_generic (root, "elim-gen");
-}
-
-void galoisBackwardSubstitution(Node *node)
-{
-    GaloisBackwardSubstitution root {node};
-    Galois::Runtime::for_each_ordered_tree_generic(root, "bs-gen");
-}
-
-void seqAllocation(Node *node)
-{
-    node->allocateSystem(solverMode);
-    if (node->getLeft() != NULL && node->getRight() != NULL) {
-        seqAllocation(node->getLeft());
-        seqAllocation(node->getRight());
-    }
-}
-
-void seqElimination(Node *node)
-{
-    if (node->getLeft() != NULL && node->getRight() != NULL) {
-        seqElimination(node->getLeft());
-        seqElimination(node->getRight());
-    }
-    node->eliminate();
-}
-
-void seqBackwardSubstitution(Node *node)
-{
-    node->bs();
-    if (node->getLeft() != NULL && node->getRight() != NULL) {
-        seqBackwardSubstitution(node->getLeft());
-        seqBackwardSubstitution(node->getRight());
-    }
-}
 
 void print_time(char *msg, timeval *t1, timeval *t2)
 {
@@ -246,15 +91,12 @@ int main(int argc, char ** argv)
     struct timeval t1, t2;
 
 #ifdef WITH_PAPI
-    bool papi_supported = true;
-    int events[7] = {PAPI_FP_OPS,
-                    PAPI_TOT_INS,
-                    PAPI_BR_INS,
+    int events[5] = {PAPI_FP_OPS,
                     PAPI_LD_INS,
                     PAPI_SR_INS,
                     PAPI_L1_DCM,
                     PAPI_L2_TCM};
-    long long values[7] = {0,};
+    long long values[5] = {0,};
 
     int eventSet = PAPI_NULL;
 
@@ -264,7 +106,7 @@ int main(int argc, char ** argv)
         papi_supported = false;
         }
 
-    if (PAPI_num_counters() < 7) {
+    if (PAPI_num_counters() < 5) {
         fprintf(stderr, "PAPI is unsupported.\n");
         papi_supported = false;
     }
@@ -273,7 +115,7 @@ int main(int argc, char ** argv)
        fprintf(stderr, "Could not create event set: %s\n", PAPI_strerror(papi_err));
     }
 
-    for (int i=0; i<7; ++i) {
+    for (int i=0; i<5; ++i) {
         if ((papi_err = PAPI_add_event(eventSet, events[i])) != PAPI_OK ) {
             fprintf(stderr, "Could not add event: %s\n", PAPI_strerror(papi_err));
         }
@@ -282,8 +124,6 @@ int main(int argc, char ** argv)
 
 
 #endif
-    //DynamicLib *lib = new DynamicLib(prodlib);
-    //lib->load();
 
     printf("Singularity solver - run info:\n");
     printf("\tmesh file: %s\n", treefile.c_str());
@@ -302,10 +142,11 @@ int main(int argc, char ** argv)
 
     //tree rotation
     if (rotation){
-        printf("Tree size %d\n\n", m->getRootNode()->treeSize());   // DEBUG
+        //printf("Tree size %d\n\n", m->getRootNode()->treeSize());   // DEBUG
         gettimeofday(&t1, NULL);
         bool balanced=false;
-        while (!balanced){
+        int iter=0;
+        while ((!balanced) && (iter<maxRotations)){
             //printf("rotating\n");
             balanced=true;
             Analysis::rotate(m->getRootNode(), NULL, m, &balanced);
@@ -315,10 +156,15 @@ int main(int argc, char ** argv)
             }
         }
         gettimeofday(&t2, NULL);
-        printf("\nTree size %d\n", m->getRootNode()->treeSize());   // DEBUG
-        print_time("\tTree rotation", &t1, &t2);
+        //printf("\nTree size %d\n", m->getRootNode()->treeSize());   // DEBUG
+        print_time("\ttree rotation", &t1, &t2);
+	//m->saveToFile("/h1/mwozniak/dupa.txt");
     }
     
+    if (outtreefile.size()){
+        m->saveToFile(outtreefile.c_str());
+    }
+
     gettimeofday(&t1, NULL);
     Analysis::doAnalise(m);
     gettimeofday(&t2, NULL);
@@ -375,6 +221,7 @@ int main(int argc, char ** argv)
         cilk_do_elimination(m->getRootNode());
 #else
         printf("CILK is not supported.\n");
+        return 1;
 #endif
     } else if (scheduler == SEQ) {
         seqElimination(m->getRootNode());
@@ -388,20 +235,16 @@ int main(int argc, char ** argv)
             fprintf(stderr, "Could not get values: %s\n", PAPI_strerror(papi_err));
         }
         // PAPI_FP_OPS
-        // PAPI_TOT_INS
-        // PAPI_BR_INS
         // PAPI_LD_INS
         // PAPI_SR_INS
         // PAPI_L1_DCM
         // PAPI_L2_TCM
         printf("Performance counters for factorization stage: \n");
         printf("\tFP OPS: %ld\n", values[0]);
-        printf("\tTOT INS: %ld\n", values[1]);
-        printf("\tBR INS: %ld\n", values[2]);
-        printf("\tLD INS: %ld\n", values[3]);
-        printf("\tSR INS: %ld\n", values[4]);
-        printf("\tL1 DCM: %ld\n", values[5]);
-        printf("\tL2 TCM: %ld\n", values[6]);
+        printf("\tLD INS: %ld\n", values[1]);
+        printf("\tSR INS: %ld\n", values[2]);
+        printf("\tL1 DCM: %ld\n", values[3]);
+        printf("\tL2 TCM: %ld\n", values[4]);
     }
 #endif
 
