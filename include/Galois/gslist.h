@@ -55,7 +55,7 @@ private:
   template<typename U>
   class outer_iterator: public boost::iterator_facade<outer_iterator<U>, U, boost::forward_traversal_tag> {
     friend class boost::iterator_core_access;
-    Block* cur;
+    U* cur;
 
     void increment() { cur = cur->next; }
 
@@ -65,7 +65,7 @@ private:
     U& dereference() const { return *cur; }
 
   public:
-    outer_iterator(Block* c = 0): cur(c) {}
+    outer_iterator(U* c = 0): cur(c) {}
 
     template<typename OtherTy>
     outer_iterator(const outer_iterator<OtherTy>& o): cur(o.cur) {}
@@ -202,11 +202,11 @@ public:
   }
 
   const_iterator begin() const {
-    return Galois::make_two_level_iterator(outer_iterator<const Block>(get_first()), outer_iterator<Block>(nullptr)).first;
+    return Galois::make_two_level_iterator(outer_iterator<const Block>(get_first()), outer_iterator<const Block>(nullptr)).first;
   }
 
   const_iterator end() const {
-    return Galois::make_two_level_iterator(outer_iterator<const Block>(get_first()), outer_iterator<Block>(nullptr)).second;
+    return Galois::make_two_level_iterator(outer_iterator<const Block>(get_first()), outer_iterator<const Block>(nullptr)).second;
   }
 
   bool empty() const {
