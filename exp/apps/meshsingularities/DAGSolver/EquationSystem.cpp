@@ -19,8 +19,8 @@ EquationSystem::EquationSystem(unsigned long n, SolverMode mode)
     //matrix = new double*[n];
     //matrix[0] = new double[n*(n+1)]();
 
-    posix_memalign(&matrix, sizeof(double*), n*sizeof(double*));
-    posix_memalign(&matrix[0], sizeof(double), n*(n+1)*sizeof(double));
+    posix_memalign((void**) &matrix, sizeof(double*), n*sizeof(double*));
+    posix_memalign((void**) &matrix[0], sizeof(double), n*(n+1)*sizeof(double));
 
     for (i = 0; i < n; ++i) {
         matrix[i] = matrix[0] + i * n;
@@ -40,8 +40,8 @@ EquationSystem::~EquationSystem()
     if (matrix != NULL) {
         //delete [] origPtr;
         //delete [] matrix;
-        free(origPtr);
-        free(matrix);
+        free((void*)origPtr);
+        free((void*)matrix);
     }
 
 }
