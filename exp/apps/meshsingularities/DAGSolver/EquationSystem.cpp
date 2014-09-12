@@ -1,6 +1,7 @@
 #include "EquationSystem.h"
 #include <string>
 #include <cmath>
+#include <cstdlib>
 
 extern "C" {
 #include <cblas.h>
@@ -15,8 +16,12 @@ EquationSystem::EquationSystem(unsigned long n, SolverMode mode)
 
     // we are working on continuous area of memory
 
-    matrix = new double*[n];
-    matrix[0] = new double[n*(n+1)]();
+    //matrix = new double*[n];
+    //matrix[0] = new double[n*(n+1)]();
+
+    posix_memalign(&matrix, sizeof(double*), n*sizeof(double*));
+    posix_memalign(&matrix[0], sizeof(double), n*(n+1)*sizeof(double));
+
     for (i = 0; i < n; ++i) {
         matrix[i] = matrix[0] + i * n;
     }
@@ -33,8 +38,10 @@ EquationSystem::EquationSystem(unsigned long n, SolverMode mode)
 EquationSystem::~EquationSystem()
 {
     if (matrix != NULL) {
-        delete [] origPtr;
-        delete [] matrix;
+        //delete [] origPtr;
+        //delete [] matrix;
+        free(origPtr);
+        free(matrix);
     }
 
 }
