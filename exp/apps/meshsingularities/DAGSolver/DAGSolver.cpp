@@ -190,7 +190,6 @@ int main(int argc, char ** argv)
 // ALLOCATION
     gettimeofday(&t1, NULL);
     if (scheduler == GALOIS_DAG) {
-
         galoisAllocation(m->getRootNode(), solverMode);
     }     else if (scheduler == CILK) {
 #ifdef HAVE_CILK
