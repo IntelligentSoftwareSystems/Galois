@@ -194,10 +194,15 @@ class DiffractedCollection {
     double *local = byThread ? *thread.getLocal() : *package.getLocal();
     unsigned n = byThread ? num_threads : num_packages;
     
-    if (UT == UpdateType::CycleByPackage || UT == UpdateType::ReplicateByPackage) {
+    if (true || UT == UpdateType::CycleByPackage || UT == UpdateType::ReplicateByPackage) {
       Galois::do_all(boost::counting_iterator<unsigned>(0), boost::counting_iterator<unsigned>(size), [&](unsigned i) {
-	int index = i % num_packages;
-	local[i] = (*package.getRemoteByPkg(index))[i];
+	if (byThread) {
+	  int index = i % num_threads;
+	  local[i] = (*thread.getRemote(index))[i];
+	} else {
+	  int index = i % num_packages;
+	  local[i] = (*package.getRemoteByPkg(index))[i];
+	}
 	auto& v = getFn(i);
 	if (UT == UpdateType::Staleness)
 	  v = (old[i] = local[i]);
@@ -1789,7 +1794,7 @@ void runGLMNET_(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<GN
 	Galois::StatTimer ActiveSetTime("ActiveSet_Time");
 
 	unsigned max_newton_iter = fixedIterations? fixedIterations: maxIterations;
-	unsigned max_cd_iter = 1000;
+	unsigned max_cd_iter = 50;
 	unsigned max_num_linesearch = 20;
 	double nu = 1e-12;
 	double inner_eps = 0.01;
@@ -1800,13 +1805,13 @@ void runGLMNET_(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<GN
 	std::vector<GNode> variables(g_train.begin()+NUM_SAMPLES, g_train.end());
 
 	// initialization {{{
-	for(auto &inst_node: trainingSamples) {
+	Galois::do_all(trainingSamples.begin(), trainingSamples.end(), [&](GNode inst_node) {
 		auto &self = g_train.getData(inst_node);
 		self.y = self.y > 0 ? 1: -1;
 		self.exp_wTx = 0.0;
-	}
+	});
 	double w_norm = 0;
-	for(auto &feat_j: variables) {
+	Galois::do_all(variables.begin(), variables.end(), [&](GNode feat_j) {
 		auto &j_data = g_train.getData(feat_j);
 		double &w_j = j_data.w;
 		double &wpd_j = j_data.wpd;
@@ -1821,20 +1826,21 @@ void runGLMNET_(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<GN
 			if(self.y == -1) 
 				xjneg_sum_j += creg*x_ij;
 		}
-	}
-	double xx = 0;
-	for(auto &feat_j: variables)
+	});
+	Galois::GAccumulator<double> xx;
+	Galois::do_all(variables.begin(), variables.end(), [&](GNode feat_j) {
 		xx += g_train.getData(feat_j).xjneg_sum;
+	});
 	double cc = creg;
-	printf("creg %lf init xx %lf\n", cc, xx);
+	printf("creg %lf init xx %lf\n", cc, xx.reduce());
 
-	for(auto &inst_node: trainingSamples) {
+	Galois::do_all(trainingSamples.begin(), trainingSamples.end(), [&](GNode inst_node) {
 		auto &self = g_train.getData(inst_node, Galois::NONE);
 		self.exp_wTx = exp(self.exp_wTx);
 		double tau_tmp = 1.0/(1.0+self.exp_wTx);
 		self.tau = creg*tau_tmp;
 		self.D = creg*self.exp_wTx*tau_tmp*tau_tmp;
-	} //}}}
+	}); //}}}
 
 	int newton_iter = 0;
 	Bag cur_bag; // used for outerlevel active set
@@ -2065,14 +2071,16 @@ void runGLMNET_(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<GN
 		glmnetTime.stop();
 		accumTimer.stop();
 
-		printf("iter %d walltime %.1f cdtime %.2f cd-iters %d firsttime %.2f secondtime %.2f thirdtime %.2f", newton_iter, glmnetTime.get()/1e3, cdTime.get()/1e3, cd_iter, FirstTime.get()/1e3, SecondTime.get()/1e3, ThirdTime.get()/1e3);
+		printf("iter %d walltime %.1f ittime %.1f cdtime %.2f cd-iters %d firsttime %.2f secondtime %.2f thirdtime %.2f", newton_iter, 
+		    accumTimer.get()/1e3, glmnetTime.get()/1e3, cdTime.get()/1e3, cd_iter, FirstTime.get()/1e3, SecondTime.get()/1e3, ThirdTime.get()/1e3);
 		if(printObjective) {
 			printf(" f %.6f", getPrimalObjective(g_train, trainingSamples));
 		}
 		if(printAccuracy) {
 			printf(" accuracy %.6f", getNumCorrect(g_test, testingSamples, g_train)/(double)testingSamples.size());
 		}
-		puts("");
+		printf("\n");
+		accumTimer.start();
 	}
 	//Galois::Runtime::getSystemThreadPool().beKind();
 } // }}}
