@@ -23,8 +23,11 @@ int main() {
   Galois::for_each_local(b, function_object());
   
   // Works without context as well
+#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1400
+#else
   Galois::for_each(v.begin(), v.end(), [](int x) { std::cout << x << "\n"; });
   Galois::for_each_local(b, [](int x) { std::cout << x << "\n"; });
+#endif
 
   return 0;
 }

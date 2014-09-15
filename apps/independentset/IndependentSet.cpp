@@ -257,7 +257,12 @@ struct DefaultAlgo {
       case detPrefix:
         Galois::for_each(graph.begin(), graph.end(), Process<>(graph),
             Galois::wl<DWL>(),
-            Galois::make_trait_with_args<Galois::has_neighborhood_visitor>(Process<detPrefix>(graph)));
+#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1400
+            Galois::has_neighborhood_visitor<Process<detPrefix>>(Process<detPrefix>(graph))
+#else
+            Galois::make_trait_with_args<Galois::has_neighborhood_visitor>(Process<detPrefix>(graph))
+#endif
+            );
         break;
       case detDisjoint:
         Galois::for_each(graph.begin(), graph.end(), Process<detDisjoint>(graph), Galois::wl<DWL>());

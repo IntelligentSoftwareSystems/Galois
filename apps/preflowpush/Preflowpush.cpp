@@ -766,7 +766,12 @@ void run() {
               fn, 
               Galois::loopname("Discharge"),
               Galois::wl<DWL>(),
-              Galois::make_trait_with_args<Galois::has_deterministic_parallel_break>(fn.getParallelBreak()));
+#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1400
+              Galois::has_deterministic_parallel_break<Process<detBase>::ParallelBreak>(fn.getParallelBreak())
+#else
+              Galois::make_trait_with_args<Galois::has_deterministic_parallel_break>(fn.getParallelBreak())
+#endif
+              );
         }
         break;
       case detDisjoint:
@@ -776,7 +781,12 @@ void run() {
               fn, 
               Galois::loopname("Discharge"),
               Galois::wl<DWL>(),
-              Galois::make_trait_with_args<Galois::has_deterministic_parallel_break>(fn.getParallelBreak()));
+#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1400
+              Galois::has_deterministic_parallel_break<Process<detDisjoint>::ParallelBreak>(fn.getParallelBreak())
+#else
+              Galois::make_trait_with_args<Galois::has_deterministic_parallel_break>(fn.getParallelBreak())
+#endif
+              );
         }
         break;
       default: std::cerr << "Unknown algorithm" << detAlgo << "\n"; abort();

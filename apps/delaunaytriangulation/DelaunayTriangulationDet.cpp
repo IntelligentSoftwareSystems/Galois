@@ -658,7 +658,12 @@ static void generateMesh() {
         Galois::for_each_local(pptrs, Process<>(&tree), Galois::wl<DWL>()); break;
       case detPrefix:
         Galois::for_each_local(pptrs, Process<>(&tree), Galois::wl<DWL>(),
-            Galois::make_trait_with_args<Galois::has_neighborhood_visitor>(Process<detPrefix>(&tree)));
+#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1400
+            Galois::has_neighborhood_visitor<Process<detPrefix>>(Process<detPrefix>(&tree))
+#else
+            Galois::make_trait_with_args<Galois::has_neighborhood_visitor>(Process<detPrefix>(&tree))
+#endif
+              );
         break;
       case detDisjoint:
         Galois::for_each_local(pptrs, Process<detDisjoint>(&tree), Galois::wl<DWL>());
