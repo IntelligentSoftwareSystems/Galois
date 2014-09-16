@@ -73,8 +73,8 @@ static cll::opt<std::string> transposeGraphName("graphTranspose", cll::desc("Tra
 cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations"), cll::init(10000000));
 cll::opt<unsigned int> memoryLimit("memoryLimit",
     cll::desc("Memory limit for out-of-core algorithms (in MB)"), cll::init(~0U));
-static cll::opt<int> amp("amp", cll::desc("amp for priority"), cll::init(-100));
-static cll::opt<float> tolerance("tolerance", cll::desc("tolerance"), cll::init(0.01));
+//static cll::opt<int> amp("amp", cll::desc("amp for priority"), cll::init(-100));
+//static cll::opt<float> tolerance("tolerance", cll::desc("tolerance"), cll::init(0.01));
 static cll::opt<bool> dbg("dbg", cll::desc("dbg"), cll::init(false));
 static cll::opt<bool> dbg2("dbg2", cll::desc("dbg2"), cll::init(false));
 static cll::opt<std::string> algo_str("algo_str", cll::desc("algo_str"), cll::init("NA"));
