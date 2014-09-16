@@ -1,62 +1,86 @@
 #!/usr/bin/perl
+#
+# Run vtune and collect report to file
 
 use strict;
 use warnings;
+use Getopt::Long;
+use Pod::Usage;
+use Cwd;
 
+## Search for vtune in common places
 sub find_vtune() {
   my $vtune = `which amplxe-cl 2> /dev/null`;
-  chomp($vtune);
+  chomp $vtune;
   if (not -e $vtune) {
-    my @vtune_vers = ("2013", "2011");
+    my @vtune_vers = ('2013', '2011');
     foreach my $ver (@vtune_vers) {
-      my $base = "/opt/intel/vtune_amplifier_xe_" . $ver;
-      if (-e $base and not $vtune) {
-        $vtune = $base . "/bin64/amplxe-cl";
-        last;
+      my $base = "/opt/intel/vtune_amplifier_xe_$ver/bin64/amplxe-cl";
+      if (-e $base) {
+        return $vtune;
       }
     }
   }
   return $vtune;
 }
 
-sub find_kernel_sym() {
-  # TODO: fix this path when kernel and library debug symbols get installed
-  my $symbol = "/usr/lib/debug/boot/" . `uname -r`;
-  chomp($symbol);
-  return $symbol;
+sub extra_symbols_option() {
+  my $uname = `uname -r`;
+  chomp $uname;
+  my @sdirs = ();
+  my @candidates = ("/usr/lib/debug/boot/$uname");
+  foreach my $c (@candidates) {
+    if (-e $c) {
+      push(@sdirs, "-search-dir all=$c");
+    }
+  }
+  return join('', @sdirs);
 }
 
-sub arch_is_knc()  {
-  if ($ENV{'GALOIS_ARCH_MIC'}) {
-    return 1;
+sub report_dir_option($) {
+  my ($threads) = @_;
+  my $user = `whoami`;
+  chomp $user;
+  my $cwd = getcwd();
+  my @candidates = ("/workspace/$user/tmp/vtune--r$threads", "/tmp/$user/vtune--r$threads", "$cwd/vtune--r$threads");
+  foreach my $c (@candidates) {
+    if (system("mkdir -p $c") == 0) {
+      return ($c, "-result-dir=$c");
+    }
   }
-  return 0;
+  return ('', '');
 }
 
-sub find_analysis_type() {
-  my $type = "nehalem-memory-access";
-  # my $type = "snb-general-exploration";
-  # my $type = "nehalem-general-exploration";
-
-  if (arch_is_knc ()) {
-    $type = 'knc-general-exploration';
-    # $type = 'knc-bandwidth';
-  }
-
-  my $sys = `hostname`;
-  chomp($sys);
-  if ($sys eq "volta") {
-    $type = "nehalem_general-exploration";
-  }
-  return $type;
+sub counter_option(@) {
+  return ['-collect-with runsa -knob event-config=' . join(',', @_), '-report hw-events'];
 }
 
-sub report_line($$$$$$) {
-  my ($vtune, $report, $rdir, $threads, $outfile, $maxsec) = @_;
+## returns analysis and report type option together
+sub analysis_option($) {
+  my ($vtune) = @_;
+  my @candidates = (
+    [qw/nehalem-memory-access hw-events/],
+    [qw/nehalem-general-exploration hw-events/],
+    [qw/nehalem_general-exploration hw-events/],
+    [qw/knc-general-exploration hw-events/],
+    [qw/snb-general-exploration hw-events/],
+    [qw/hotspots hotspots/]
+  );
+  foreach my $pair (@candidates) {
+    my $try = `$vtune -collect @$pair[0] 2>&1`;
+    unless ($try =~ /Cannot find analysis type/) {
+      return ("-collect @$pair[0]", "-report @$pair[1]");
+    }
+  }
+  return ('','');
+}
+
+sub report_line($$$$) {
+  my ($cmd, $threads, $outfile, $maxsec) = @_;
 
   system("echo \"THREADS\t$threads\" >>$outfile.line.log");
 
-  open(my $syspipe, "ulimit -t $maxsec ; $vtune $report $rdir -group-by source-line |") or die($!);
+  open(my $syspipe, "ulimit -t $maxsec ; $cmd -format csv -csv-delimiter tab -group-by source-line |") or die($!);
   open(my $output, ">> $outfile.line.log") or die($!);
   my @header = ();
   my @sums = ();
@@ -68,8 +92,8 @@ sub report_line($$$$$$) {
     if (not @header) {
       @header = @tokens;
       for my $tok (@tokens) {
-        if ($tok =~ /Hardware Event Count$/) { last; }
         $first_data_column++;
+        last if ($tok =~ /Module$/);
       }
     } else {
       for my $idx ($first_data_column .. @tokens - 1) {
@@ -78,91 +102,121 @@ sub report_line($$$$$$) {
     }
   }
   for my $idx ($first_data_column .. @header - 1) {
-    my $label = (split /:/, $header[$idx])[0];
+    my $label = (split /:/, $header[$idx])[1];
     print "RUN: Variable $label = $sums[$idx]\n";
   }
   close $syspipe;
   close $output;
 }
 
-sub report_function($$$$$$) {
-  my ($vtune, $report, $rdir, $threads, $outfile, $maxsec) = @_;
+sub report_function($$$$) {
+  my ($cmd, $threads, $outfile, $maxsec) = @_;
 
   system("echo \"THREADS\t$threads\" >>$outfile.function.log");
-  system("ulimit -t $maxsec ; $vtune $report $rdir -group-by function >> $outfile.function.log ");
+  system("ulimit -t $maxsec; $cmd -format csv -csv-delimiter tab -group-by function >> $outfile.function.log ");
 }
 
-my $vtune = find_vtune;
-my $symbol = find_kernel_sym;
-my $type = find_analysis_type;
-my $user = `whoami`;
-chomp($user);
-
-die("Run as: runvtune.pl [-t N] output app args*") unless ($#ARGV >= 1);
-
-my $threads = 1;
-my $found_threads = 0;
-if ($ARGV[0] eq "-t") {
-  shift @ARGV;
-  $threads = shift @ARGV;
-  $found_threads = 1;
-}
-
+my @counters = ();
+my $analyzeSystem = 1;
+my $startPaused = 1;
+my $help = 0;
+my $threads = 0;
+my $analysisType = '';
+my $reportType = '';
+my $reportTimeout = 100000;
+GetOptions(
+  't|threads=s'=>\$threads,
+  'analysisType=s'=>\$analysisType,
+  'reportType=s'=>\$reportType,
+  'counter=s'=>\@counters,
+  'startPaused!'=>\$startPaused,
+  'analyzeSystem!'=>\$analyzeSystem,
+  'reportTimeout=s'=>\$reportTimeout,
+  'help'=>\$help) or pod2usage(2);
+pod2usage(-exitstatus=>0, -verbose=>2, -noperldoc=>1) if $help;
 my $outfile = shift @ARGV;
 my $cmdline = join(" ", @ARGV);
 
-if ($found_threads) {
-  $cmdline = $cmdline . " -t $threads";
+if ($threads) {
+  $cmdline = "$cmdline -t $threads";
 }
 
-if (arch_is_knc ()) {
-  $cmdline = "ssh -t mic0 $cmdline";
+my $vtune = find_vtune;
+my $symbol = extra_symbols_option();
+my ($rdir, $rdiropt) = report_dir_option($threads);
+my ($copt, $ropt);
+if (@counters) {
+  ($copt, $ropt) = counter_option(@counters);
+} else {
+  ($copt, $ropt) = analysis_option($vtune);
 }
+
+die("cannot find way to run vtune") unless($rdir and $copt and $ropt);
+die("no command given") unless($cmdline);
 
 print "RUN: CommandLine $cmdline\n";
 
-# my $dire = "/tmp/$user.vtune.r$threads";
-my $dire = "/workspace/$user/tmp/vtune--r$threads";
-if (system ("mkdir -p $dire") != 0) {
-  print "failed to use '$dire' for storing vtune data, trying /tmp\n";
-  $dire = "/tmp/$user/vtune--r$threads";
+my @collect = ();
+push @collect, $vtune, $symbol, $rdiropt, $copt;
+push(@collect, '-analyze-system') if ($analyzeSystem);
+push(@collect, '-start-paused') if ($startPaused);
+push @collect, '--', $cmdline;
 
-  if (system ("mkdir -p $dire") != 0) {
-    die "failed to use '$dire' for storing vtune data, quitting\n";
-  }
-}
+my @report = ();
+push @report, $vtune, $rdiropt, $ropt;
 
-my $rdir = "-result-dir=$dire";
-my $report = "-R hw-events -format csv -csv-delimiter tab";
+system("rm -rf $rdir") == 0 or die($!);
+system("mkdir -p $rdir") == 0 or die($!);
 
-my $collect = "-analyze-system";
-if (1) {
-  $collect .= " -collect $type";
-} else {
-  # Manual counter configuration
-  my @counters = qw(
-    LONGEST_LAT_CACHE.MISS
-    OFFCORE_RESPONSE_0.ANY_DATA.REMOTE_DRAM
-    OFFCORE_RESPONSE_0.ANY_DATA.REMOTE_CACHE
-    OFFCORE_RESPONSE_0.ANY_DATA.LOCAL_CACHE
-    OFFCORE_RESPONSE_0.ANY_DATA.LOCAL_DRAM
-    );
-  $collect .= " -collect-with runsa -start-paused -knob event-config=" . join(',', @counters);
-}
+my $vtune_collect_cmd = join(' ', @collect);
+print "Running: '$vtune_collect_cmd'\n";
+system("$vtune_collect_cmd") == 0 or die("vtune collection failed");
+report_function join(' ', @report), $threads, $outfile, $reportTimeout;
+report_line join(' ', @report), $threads, $outfile, $reportTimeout;
 
-unless (arch_is_knc()) {
-  $collect .= " -start-paused";
-}
+__END__
 
-my $sdir = "-search-dir all=$symbol";
-my $maxsec = 100000;
+=head1 NAME
 
-system("rm -rf $dire");
-system("mkdir -p $dire");
+run_vtune - run vtune and parse results to file
 
-my $vtune_run_cmd = "$vtune $collect $rdir -- $cmdline";
-print "Running: '$vtune_run_cmd'\n";
-# system("set -x ; $vtune $collect $rdir $sdir -- $cmdline"); 
-system("$vtune_run_cmd");
-report_function $vtune, $report, $rdir, $threads, $outfile, $maxsec;
-report_line $vtune, $report, $rdir, $threads, $outfile, $maxsec;
+=head1 SYNOPSIS
+
+report_vtune [options] <outputbasename> <commandline>
+
+  Options:
+    -help                  brief help message
+    -analysisType=T        specify vtune analysis type manually
+    -reportType=T          specify vtune report type manually
+    -counter=C             specify hardware performance counters manually
+    -startPaused           start vtune paused (default)
+    -reportTimeout=SEC     timeout for generating report
+    -nostartPaused         start vtune running
+    -analyzeSystem         analyze entire system (default)
+    -noanalzeSystem        analyze just command and child processes
+
+=head1 OPTIONS
+
+=over 8
+
+=item B<-analysisType>=T
+
+Run "amplxe-cl -help collect" to see which collection methods are available.
+
+=item B<-reportType>=T
+
+Run "amplxe-cl -help report" to see which reports are available.
+
+=item B<-counter>=C
+
+Use multiple options for multiple counters. Examples of counter names are:
+LONGEST_LAT_CACHE.MISS or OFFCORE_RESPONSE_0.ANY_DATA.LOCAL_DRAM
+
+=back
+
+=head1 DESCRIPTION
+
+Run vtune and parse results to file
+
+=cut
+

@@ -13,27 +13,26 @@ module use /net/faraday/workspace/local/modules/modulefiles
 module load lapack
 module load vtune
 
-if [ "$1" == "intel" ]; then
-  module load intel
-  module load cmake
-else 
-  # Load system gcc first so that cmake can be found
-  module load gcc/4.8
-  module load cmake
-  module load gcc/4.8.1-scale
-fi
+#if [ "$1" == "intel" ]; then
+#    module load intel
+#    module load cmake
+#else 
+#    module load gcc/4.8.1-scale
+#    module load cmake
+#fi
 
+module load atc
+module load cmake
 module load tbb
 module load boost
 module load eigen
 module load neon
 module load subversion
+module load git
 
 if [ "$1" != "min" ]; then
-  module load clang/3.4-noconflict
   module load gdb
   module load mkl
   module load mpich2
-  module load git
   module load doxygen
 fi

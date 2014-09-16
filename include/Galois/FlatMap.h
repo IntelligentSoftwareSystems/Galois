@@ -25,7 +25,9 @@
 
 #include "Galois/config.h"
 
+#include <algorithm>
 #include <stdexcept>
+#include <type_traits>
 #include <vector>
 
 namespace Galois {
@@ -155,28 +157,28 @@ public:
   }
    */
 
-  allocator_type get_allocator() const noexcept { 
+  allocator_type get_allocator() const /* noexcept */ { 
     return allocator_type(_data.get_allocator()); 
   }
   
   // iterators
   
-  iterator  begin() noexcept { return _data.begin(); }
-  const_iterator begin() const noexcept { return _data.begin(); }
-  iterator  end() noexcept { return _data.end(); }
-  const_iterator end() const noexcept { return _data.end(); }
-  reverse_iterator rbegin() noexcept { return _data.rbegin(); }
-  const_reverse_iterator rbegin() const noexcept { return _data.rbegin(); }
-  reverse_iterator rend() noexcept { return _data.rend(); }
-  const_reverse_iterator  rend() const noexcept { return _data.rend(); }
-  const_iterator cbegin() const noexcept { return _data.begin(); }
-  const_iterator  cend() const noexcept { return _data.end(); }
-  const_reverse_iterator crbegin() const noexcept { return _data.rbegin(); }
-  const_reverse_iterator crend() const noexcept { return _data.rend(); }
+  iterator  begin() /* noexcept */ { return _data.begin(); }
+  const_iterator begin() const /* noexcept */ { return _data.begin(); }
+  iterator  end() /* noexcept */ { return _data.end(); }
+  const_iterator end() const /* noexcept */ { return _data.end(); }
+  reverse_iterator rbegin() /* noexcept */ { return _data.rbegin(); }
+  const_reverse_iterator rbegin() const /* noexcept */ { return _data.rbegin(); }
+  reverse_iterator rend() /* noexcept */ { return _data.rend(); }
+  const_reverse_iterator  rend() const /* noexcept */ { return _data.rend(); }
+  const_iterator cbegin() const /* noexcept */ { return _data.begin(); }
+  const_iterator  cend() const /* noexcept */ { return _data.end(); }
+  const_reverse_iterator crbegin() const /* noexcept */ { return _data.rbegin(); }
+  const_reverse_iterator crend() const /* noexcept */ { return _data.rend(); }
   
-  bool empty() const noexcept { return _data.empty(); }
-  size_type size() const noexcept { return _data.size(); }
-  size_type max_size() const noexcept { return _data.max_size(); }
+  bool empty() const /* noexcept */ { return _data.empty(); }
+  size_type size() const /* noexcept */ { return _data.size(); }
+  size_type max_size() const /* noexcept */ { return _data.max_size(); }
   
   template<typename... Args>
   std::pair<iterator, bool> emplace(Args&&... args) {
@@ -272,7 +274,7 @@ public:
 
   void swap(flat_map& __x) { _data.swap(__x._data); std::swap(_comp, __x._comp); }
 
-  void clear() noexcept { _data.clear(); }
+  void clear() /* noexcept */ { _data.clear(); }
 
   key_compare key_comp() const { return _comp; }
   value_compare value_comp() const { return value_compare(key_comp()); }

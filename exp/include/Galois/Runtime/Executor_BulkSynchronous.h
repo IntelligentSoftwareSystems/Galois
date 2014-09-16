@@ -1,13 +1,11 @@
-/** Simple Worklists that do not adhere to the general worklist contract -*- C++ -*-
+/** Simplified executor for just bulk synchronous execution -*- C++ -*-
  * @file
- * This is the only file to include for basic Galois functionality.
- *
  * @section License
  *
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2014, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -22,43 +20,15 @@
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#ifndef GALOIS_RUNTIME_PARALLELWORKINLINE_H
-#define GALOIS_RUNTIME_PARALLELWORKINLINE_H
+#ifndef GALOIS_RUNTIME_EXECUTOR_BULKSYNCHRONOUS_H
+#define GALOIS_RUNTIME_EXECUTOR_BULKSYNCHRONOUS_H
 
-#include "Galois/Runtime/ParallelWork.h"
-#include <cstdio>
+#include "Galois/Runtime/Executor_ForEach.h"
+#include "Galois/Runtime/LoopStatistics.h"
 
 namespace Galois {
 namespace Runtime {
-namespace {
-
-template<bool Enabled>
-class LoopStatistics {
-  unsigned long conflicts;
-  unsigned long iterations;
-  const char* loopname;
-
-public:
-  explicit LoopStatistics(const char* ln) :conflicts(0), iterations(0), loopname(ln) { }
-  ~LoopStatistics() {
-    reportStat(loopname, "Conflicts", conflicts);
-    reportStat(loopname, "Iterations", iterations);
-  }
-  inline void inc_iterations() {
-    ++iterations;
-  }
-  inline void inc_conflicts() {
-    ++conflicts;
-  }
-};
-
-template <>
-class LoopStatistics<false> {
-public:
-  explicit LoopStatistics(const char* ln) {}
-  inline void inc_iterations() const { }
-  inline void inc_conflicts() const { }
-};
+namespace BulkSynchronousImpl {
 
 template<typename T, bool isLIFO, unsigned ChunkSize>
 struct FixedSizeRingAdaptor: public Galois::FixedSizeRing<T,ChunkSize> {
@@ -258,18 +228,25 @@ void dChunkedMaster<T,OuterTy,isLIFO,ChunkSize>::pushSP(const WID& id, p& n, con
   n.next->push(val);
 }
 
+// TODO: Switch to thread-local worklists
 template<typename T,int ChunkSize>
 class Worklist: public dChunkedMaster<T, WorkList::ConExtLinkedQueue, true, ChunkSize> { };
 
-template<class T, class FunctionTy>
-class BSInlineExecutor {
+template<class T, class FunctionTy, class ArgsTy>
+class Executor {
   typedef T value_type;
   typedef Worklist<value_type,256> WLTy;
+
+  static const bool needsStats = !exists_by_supertype<does_not_need_stats_tag, ArgsTy>::value;
+  static const bool needsPush = !exists_by_supertype<does_not_need_push_tag, ArgsTy>::value;
+  static const bool needsAborts = !exists_by_supertype<does_not_need_aborts_tag, ArgsTy>::value;
+  static const bool needsPia = exists_by_supertype<needs_per_iter_alloc_tag, ArgsTy>::value;
+  static const bool needsBreak = exists_by_supertype<needs_parallel_break_tag, ArgsTy>::value;
 
   struct ThreadLocalData {
     Galois::Runtime::UserContextAccess<value_type> facing;
     SimpleRuntimeContext ctx;
-    LoopStatistics<ForEachTraits<FunctionTy>::NeedsStats> stat;
+    LoopStatistics<needsStats> stat;
     ThreadLocalData(const char* ln): stat(ln) { }
   };
 
@@ -287,7 +264,7 @@ class BSInlineExecutor {
   void abortIteration(ThreadLocalData& tld, const WID& wid, WLTy* cur, WLTy* next) {
     tld.ctx.cancelIteration();
     tld.stat.inc_conflicts();
-    if (ForEachTraits<FunctionTy>::NeedsPush) {
+    if (needsPush) {
       tld.facing.resetPushBuffer();
     }
     value_type& val = cur->cur(wid);
@@ -326,13 +303,13 @@ class BSInlineExecutor {
       value_type& val = cur->cur(wid);
       tld.stat.inc_iterations();
       function(val, tld.facing.data());
-      if (ForEachTraits<FunctionTy>::NeedsPush) {
+      if (needsPush) {
         next->push(wid,
             tld.facing.getPushBuffer().begin(),
             tld.facing.getPushBuffer().end());
         tld.facing.resetPushBuffer();
       }
-      if (ForEachTraits<FunctionTy>::NeedsAborts)
+      if (needsAborts)
         tld.ctx.commitIteration();
       cur->pop(wid);
     }
@@ -349,12 +326,12 @@ class BSInlineExecutor {
 
     while (true) {
       while (!cur->empty(wid)) {
-        if (ForEachTraits<FunctionTy>::NeedsAborts) {
+        if (needsAborts) {
           processWithAborts(tld, wid, cur, next);
         } else {
           process(tld, wid, cur, next);
         }
-        if (ForEachTraits<FunctionTy>::NeedsPIA)
+        if (needsPia)
           tld.facing.resetAlloc();
       }
 
@@ -377,52 +354,55 @@ class BSInlineExecutor {
   }
 
 public:
-  BSInlineExecutor(const FunctionTy& f, const char* ln): function(f), loopname(ln), barrier(getSystemBarrier()) { 
-    if (ForEachTraits<FunctionTy>::NeedsBreak) {
-      assert(0 && "not supported by this executor");
-      abort();
-    }
-  }
+  static_assert(!needsBreak, "not supported by this executor");
+  
+  Executor(const FunctionTy& f, const ArgsTy& args):
+    function(f), 
+    loopname(get_by_supertype<loopname_tag>(args).value),
+    barrier(getSystemBarrier()) { }
 
   template<typename RangeTy>
-  void AddInitialWork(RangeTy range) {
+  void init(const RangeTy& range) { }
+  
+  template<typename RangeTy>
+  void initThread(const RangeTy& range) {
     wls[0].push_initial(WID(), range.local_begin(), range.local_end());
   }
-
-  void initThread() {}
 
   void operator()() {
     go();
   }
 };
 
-
-} // end anonymouse
-} // end runtime
-
-namespace WorkList {
-  struct BulkSynchronousInline {
-    template<typename T>
-    struct retype {
-      typedef BulkSynchronousInline type;
-    };
-  };
+}
 }
 
-namespace Runtime {
-namespace {
+namespace WorkList {
 
-template<class T,class FunctionTy>
-struct ForEachWork<WorkList::BulkSynchronousInline,T,FunctionTy>:
-  public BSInlineExecutor<T,FunctionTy> {
-  typedef BSInlineExecutor<T,FunctionTy> SuperTy;
-  ForEachWork(const FunctionTy& f, const char* ln): SuperTy(f, ln) { }
+template<typename T=int>
+struct BulkSynchronousInline {
+  template<bool _concurrent>
+  struct rethread { typedef BulkSynchronousInline<T> type; };
+
+  template<typename _T>
+  struct retype { typedef BulkSynchronousInline<_T> type; };
+
+  typedef T value_type;
 };
 
 }
-} // runtime
 
+namespace Runtime {
 
-} //galois
+template<class T, class FunctionTy, class ArgsTy>
+struct ForEachExecutor<WorkList::BulkSynchronousInline<T>, FunctionTy, ArgsTy>:
+  public BulkSynchronousImpl::Executor<T, FunctionTy, ArgsTy> 
+{
+  typedef BulkSynchronousImpl::Executor<T, FunctionTy, ArgsTy> SuperTy;
+  ForEachExecutor(const FunctionTy& f, const ArgsTy& args): SuperTy(f, args) { }
+};
 
+}
+
+}
 #endif

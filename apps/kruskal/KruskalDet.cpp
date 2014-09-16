@@ -31,23 +31,22 @@ class Process {
   Galois::GAccumulator<size_t>& weight;
 
 public:
-
-  typedef int tt_has_fixed_neighborhood;
-  static_assert(Galois::has_fixed_neighborhood<Process>::value, "Oops");
-
-  uintptr_t galoisDeterministicId(const Edge& e) const {
-    return e.weight;
-  }
-  static_assert(Galois::has_deterministic_id<Process>::value, "Oops");
-
   struct LocalState {
     LocalState(Process& self, Galois::PerIterAllocTy& alloc) { }
   };
 
-  typedef int tt_needs_per_iter_alloc; // For LocalState
-  static_assert(Galois::needs_per_iter_alloc<Process>::value, "Oops");
-  typedef LocalState GaloisDeterministicLocalState;
-  static_assert(Galois::has_deterministic_local_state<Process>::value, "Oops");
+  struct DeterministicId {
+    uintptr_t operator()(const Edge& e) const {
+      return e.weight;
+    }
+  };
+
+  typedef std::tuple<
+    Galois::has_fixed_neighborhood<>,
+    Galois::has_deterministic_id<DeterministicId>,
+    Galois::has_deterministic_local_state<LocalState>,
+    Galois::needs_per_iter_alloc<>
+  > function_traits;
 
   Process(Graph& g, Galois::GAccumulator<size_t>& w): graph(g), weight(w) { }
 
@@ -87,7 +86,7 @@ int main(int argc, char** argv) {
     }
   });
   /// XXX
-  std::sort(edges.begin(), edges.end(), [](const Edge& a, const Edge& b) {
+  std::sort(edges.begin(), edges.end(), [](const Edge& a, const Edge& b) -> bool {
     if (a.weight == b.weight)
       return a.src == b.src ? a.dst < b.dst : a.src < b.src;
     return a.weight < b.weight; 
@@ -97,7 +96,7 @@ int main(int argc, char** argv) {
   Galois::StatTimer T;
   T.start();
   Galois::GAccumulator<size_t> weight;
-  Galois::for_each_det(edges.begin(), edges.end(), Process(graph, weight));
+  Galois::for_each(edges.begin(), edges.end(), Process(graph, weight), Galois::wl<Galois::WorkList::Deterministic<>>());
   T.stop();
   Galois::reportPageAlloc("MeminfoPost");
 

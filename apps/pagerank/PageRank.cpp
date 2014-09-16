@@ -80,16 +80,41 @@ static cll::opt<bool> dbg2("dbg2", cll::desc("dbg2"), cll::init(false));
 static cll::opt<std::string> algo_str("algo_str", cll::desc("algo_str"), cll::init("NA"));
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
     cll::values(
-      clEnumValN(Algo::sync_pr, "sync_pr", "Synchronous version..."),
-//      clEnumValN(Algo::sync_pr_undir, "sync_pr_undir", "(Undirected) Synchronous version..."),
-      clEnumValN(Algo::async, "async", "Asynchronous without priority version..."),
-//      clEnumValN(Algo::async_undir, "async_undir", "(Undirected) Asynchronous without priority version..."),
+      clEnumValN(Algo::pull, "pull", "Use precomputed data perform pull-based algorithm"),
+      clEnumValN(Algo::pull2, "pull2", "Use pull-based algorithm"),
+      clEnumValN(Algo::serial, "serial", "Compute PageRank in serial"),
+      clEnumValN(Algo::synch, "synch", "Synchronous version..."),
+      clEnumValN(Algo::prt_rsd, "prt_rsd", "Prioritized (max. residual) version..."),
+      clEnumValN(Algo::prt_deg, "prt_deg", "Prioritized (degree biased) version..."),
       clEnumValN(Algo::async_rsd, "async_rsd", "Residual-based asynchronous version..."),
-//      clEnumValN(Algo::async_rsd_undir, "async_rsd_undir", "(Undirected) Residual-based asynchronous version..."),
       clEnumValN(Algo::async_prt, "async_prt", "Prioritized (degree biased residual) version..."),
-//      clEnumValN(Algo::async_prt_undir, "async_prt_undir", " (Undirected) Prioritized (degree biased residual) version..."),
       clEnumValN(Algo::async_ppr_rsd, "async_ppr_rsd", "Asyncronous PPR"),
-      clEnumValEnd), cll::init(Algo::async_prt));
+#ifdef GALOIS_USE_EXP
+      clEnumValN(Algo::graphlab, "graphlab", "Use GraphLab programming model"),
+      clEnumValN(Algo::graphlabAsync, "graphlabAsync", "Use GraphLab-Asynchronous programming model"),
+      clEnumValN(Algo::ligra, "ligra", "Use Ligra programming model"),
+      clEnumValN(Algo::ligraChi, "ligraChi", "Use Ligra and GraphChi programming model"),
+      clEnumValN(Algo::pagerankWorklist, "pagerankWorklist", "Use worklist-based algorithm"),
+#endif
+      clEnumValEnd), cll::init(Algo::pull));
+
+struct SerialAlgo {
+  typedef Galois::Graph::LC_CSR_Graph<PNode,void>
+    ::with_no_lockable<true>::type Graph;
+  typedef Graph::GraphNode GNode;
+
+  std::string name() const { return "Serial"; }
+  
+  void readGraph(Graph& graph) { Galois::Graph::readGraph(graph, filename); }
+
+  struct Initialize {
+    Graph& g;
+    Initialize(Graph& g): g(g) { }
+    void operator()(Graph::GraphNode n) const {
+      g.getData(n).value = 1.0;
+      g.getData(n).accum.write(0.0);
+    }
+  };
 
 
 template<typename Graph>
@@ -141,11 +166,21 @@ struct Sync {
     }
   }
 
+  struct Initialize {
+    Graph& g;
+    Initialize(Graph& g): g(g) { }
+    void operator()(Graph::GraphNode n) const {
+      LNode& data = g.getData(n, Galois::MethodFlag::NONE);
+      data.value[0] = 1.0;
+      data.value[1] = 1.0;
+    }
+  };
+
   struct Copy {
     Graph& g;
     Copy(Graph& g): g(g) { }
-    void operator()(Graph::GraphNode n) {
-      LNode& data = g.getData(n);
+    void operator()(Graph::GraphNode n) const {
+      LNode& data = g.getData(n, Galois::MethodFlag::NONE);
       data.value[1] = data.value[0];
     }
   };

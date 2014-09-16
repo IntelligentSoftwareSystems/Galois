@@ -69,17 +69,17 @@ static cll::opt<DetAlgo> detAlgo(cll::desc("Deterministic algorithm:"),
 
 template<int Version=detBase>
 struct Process {
-  //! [Enabling Per Iteration Allocator in DMR]
-  typedef int tt_needs_per_iter_alloc;
-  //! [Enabling Per Iteration Allocator in DMR]
-
-
   struct LocalState {
     Cavity cav;
     LocalState(Process<Version>& self, Galois::PerIterAllocTy& alloc): cav(graph, alloc) { }
   };
-  typedef LocalState GaloisDeterministicLocalState;
-  static_assert(Galois::has_deterministic_local_state<Process>::value, "Oops");
+
+  //! [Enabling Per Iteration Allocator in DMR]
+  typedef std::tuple<
+    Galois::has_deterministic_local_state<LocalState>,
+    Galois::needs_per_iter_alloc<>
+  > function_traits;
+  //! [Enabling Per Iteration Allocator in DMR]
 
   void operator()(GNode item, Galois::UserContext<GNode>& ctx) {
     if (!graph->containsNode(item, Galois::MethodFlag::ALL))
@@ -178,7 +178,8 @@ int main(int argc, char** argv) {
   Trefine.start();
   using namespace Galois::WorkList;
   
-      //! [for_each_local example]
+  typedef Deterministic<> DWL;
+  //! [for_each_local example]
   typedef LocalQueue<dChunkedLIFO<256>, ChunkedLIFO<256> > BQ;
   typedef AltChunkedLIFO<32> Chunked;
   
@@ -188,13 +189,14 @@ int main(int argc, char** argv) {
       break;
       //! [for_each_local example]
     case detBase:
-      Galois::for_each_det(initialBad.begin(), initialBad.end(), Process<>());
+      Galois::for_each(initialBad.begin(), initialBad.end(), Process<>(), Galois::wl<DWL>());
       break;
     case detPrefix:
-      Galois::for_each_det(initialBad.begin(), initialBad.end(), Process<detPrefix>(), Process<>());
+      Galois::for_each(initialBad.begin(), initialBad.end(), Process<>(),
+          Galois::wl<DWL>(), Galois::has_neighborhood_visitor<Process<detPrefix>>());
       break;
     case detDisjoint:
-      Galois::for_each_det(initialBad.begin(), initialBad.end(), Process<detDisjoint>());
+      Galois::for_each(initialBad.begin(), initialBad.end(), Process<detDisjoint>(), Galois::wl<DWL>());
       break;
     default: std::cerr << "Unknown algorithm" << detAlgo << "\n"; abort();
   }

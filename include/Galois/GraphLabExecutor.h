@@ -103,7 +103,7 @@ class AsyncEngine {
 
     Initialize(AsyncEngine* s, Galois::InsertBag<WorkItem>& b): self(s), bag(b) { }
 
-    void operator()(GNode n) {
+    void operator()(GNode n) const {
       bag.push(WorkItem(n, message_type()));
     }
   };

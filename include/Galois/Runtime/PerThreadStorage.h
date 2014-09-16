@@ -25,7 +25,6 @@
 #define GALOIS_RUNTIME_PERTHREADSTORAGE_H
 
 #include "Galois/config.h"
-#include "Galois/Runtime/ActiveThreads.h"
 #include "Galois/Runtime/ThreadPool.h"
 #include "Galois/Runtime/ll/HWTopo.h"
 #include "Galois/Runtime/ll/PaddedLock.h"
@@ -41,6 +40,8 @@
 
 namespace Galois {
 namespace Runtime {
+
+extern unsigned int activeThreads;
 
 class PerBackend {
   static const unsigned MAX_SIZE = 30;
@@ -120,13 +121,13 @@ protected:
   PerBackend& b;
 
   void destruct() {
-    if (offset == ~0)
+    if (offset == ~0U)
       return;
 
     for (unsigned n = 0; n < LL::getMaxThreads(); ++n)
       reinterpret_cast<T*>(b.getRemote(n, offset))->~T();
     b.deallocOffset(offset, sizeof(T));
-    offset = ~0;
+    offset = ~0U;
   }
 
 public:
@@ -154,7 +155,7 @@ public:
       new (b.getRemote(n, offset)) T(std::forward<Args>(args)...);
   }
 
-  PerThreadStorage(PerThreadStorage&& o): offset(~0), b(getPTSBackend()) { 
+  PerThreadStorage(PerThreadStorage&& o): offset(~0U), b(getPTSBackend()) { 
     std::swap(offset, o.offset);
   }
 

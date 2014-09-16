@@ -33,7 +33,7 @@
 #include "Galois/Runtime/ll/PaddedLock.h"
 #include "Galois/Runtime/ll/CompilerSpecific.h"
 #include "Galois/Runtime/LevelExecutor.h"
-#include "Galois/Runtime/PerThreadWorkList.h"
+#include "Galois/Runtime/PerThreadContainer.h"
 #include "Galois/Runtime/Range.h"
 
 #include "abstractMain.h"
@@ -105,7 +105,7 @@ class DESlevelExec:
     {}
 
     template <typename C>
-    void operator () (const Event_ty& event, C& ctx) {
+    void operator () (const Event_ty& event, C& ctx) const {
 
       // std::cout << ">>> Processing: " << event.detailedString () << std::endl;
 
@@ -129,7 +129,7 @@ class DESlevelExec:
 
 
   struct GetRecvTime {
-    const des::SimTime operator () (const Event_ty& e) const {
+    des::SimTime operator () (const Event_ty& e) const {
       return e.getRecvTime ();
     }
   };

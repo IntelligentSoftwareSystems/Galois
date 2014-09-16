@@ -1,6 +1,6 @@
 /** Speculative Ordered Executor -*- C++ -*-
  * @file
- * This is the only file to include for basic Galois functionality.
+ * FIXME
  *
  * @section License
  *
@@ -33,10 +33,9 @@
 
 #include "Galois/Runtime/Barrier.h"
 #include "Galois/Runtime/Context.h"
-#include "Galois/Runtime/DoAll.h"
+#include "Galois/Runtime/Executor_DoAll.h"
 #include "Galois/Runtime/ForEachTraits.h"
-#include "Galois/Runtime/ParallelWork.h"
-#include "Galois/Runtime/PerThreadWorkList.h"
+#include "Galois/Runtime/PerThreadContainer.h"
 #include "Galois/Runtime/Range.h"
 #include "Galois/Runtime/Sampling.h"
 #include "Galois/Runtime/Support.h"

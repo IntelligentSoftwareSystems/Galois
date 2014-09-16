@@ -119,7 +119,7 @@ struct AsyncAlgo {
   struct Initialize {
     Graph& g;
     Initialize(Graph& g): g(g) { }
-    void operator()(Graph::GraphNode n) {
+    void operator()(Graph::GraphNode n) const {
       SNode& data = g.getData(n, Galois::MethodFlag::NONE);
       data.numPaths = -std::numeric_limits<float>::max();
       data.dependencies = -std::numeric_limits<float>::max();
@@ -311,7 +311,7 @@ struct LeveledAlgo {
   struct Initialize {
     Graph& g;
     Initialize(Graph& g): g(g) { }
-    void operator()(Graph::GraphNode n) {
+    void operator()(Graph::GraphNode n) const {
       SNode& data = g.getData(n, Galois::MethodFlag::NONE);
       data.numPaths = 0;
       data.dependencies = 0.0; //std::numeric_limits<float>::lowest();
@@ -412,7 +412,7 @@ struct LeveledAlgo {
     while (!levels.back()->empty()) {
       Bag* b = levels.back();
       levels.push_back(new Bag());
-      Galois::do_all_local(*b, BFS<>(graph, *levels.back()), Galois::loopname("BFS"), Galois::do_all_steal(true));
+      Galois::do_all_local(*b, BFS<>(graph, *levels.back()), Galois::loopname("BFS"), Galois::do_all_steal<true>());
       //Galois::do_all_local(*levels.back(), Counter(graph), "COUNTER", true);
     }
     delete levels.back();
@@ -422,7 +422,7 @@ struct LeveledAlgo {
 
     Tdep.start();
     for (int i = levels.size() - 1; i > 0; --i)
-      Galois::do_all_local(*levels[i-1], ComputeDep(graph), Galois::loopname("DEPS"), Galois::do_all_steal(true));
+      Galois::do_all_local(*levels[i-1], ComputeDep(graph), Galois::loopname("DEPS"), Galois::do_all_steal<true>());
     Tdep.stop();
     std::cout << "DEP DONE " << Tdep.get() << "\n";
     while (!levels.empty()) {

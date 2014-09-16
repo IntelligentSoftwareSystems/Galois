@@ -18,7 +18,6 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  *
- *
  * @author M. Amber Hassaan <ahassaan@ices.utexas.edu>
  */
 #ifndef GALOIS_RUNTIME_KDG_PARAMETER_H
@@ -30,13 +29,13 @@
 #include "Galois/gdeque.h"
 #include "Galois/PriorityQueue.h"
 #include "Galois/Timer.h"
+#include "Galois/AltBag.h"
+#include "Galois/DoAllWrap.h"
 
 #include "Galois/Runtime/Barrier.h"
 #include "Galois/Runtime/Context.h"
-#include "Galois/Runtime/DoAll.h"
-#include "Galois/Runtime/ForEachTraits.h"
-#include "Galois/Runtime/ParallelWork.h"
-#include "Galois/Runtime/PerThreadWorkList.h"
+#include "Galois/Runtime/Executor_DoAll.h"
+#include "Galois/Runtime/PerThreadContainer.h"
 #include "Galois/Runtime/Range.h"
 #include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/Termination.h"
@@ -62,21 +61,22 @@ class KDGtwoPhaseParaMeter {
 
   using Ctxt = TwoPhaseContext<T, Cmp>;
   using CtxtAlloc = MM::FixedSizeAllocator<Ctxt>;
-  using CtxtWL = PerThreadVector<Ctxt*>;
+  // using CtxtWL = PerThreadVector<Ctxt*>;
+  using CtxtWL = PerThreadBag<Ctxt*>;
 
   using UserCtx = UserContextAccess<T>;
   using PerThreadUserCtx = PerThreadStorage<UserCtx>;
 
+  static const unsigned DEFAULT_CHUNK_SIZE = 16;
 
   Cmp cmp;
   NhFunc nhFunc;
   OpFunc opFunc;
-  SafetyTestLoop<ST> stloop;
+  SafetyTestLoop<Ctxt, ST> stloop;
   CtxtAlloc ctxtAlloc;
   PerThreadUserCtx userHandles;
 
   CtxtWL* currWL = new CtxtWL ();
-  CtxtWL* nextWL = new CtxtWL ();
 
 public:
 
@@ -94,14 +94,13 @@ public:
 
   ~KDGtwoPhaseParaMeter () {
     delete currWL; currWL = nullptr;
-    delete nextWL; nextWL = nullptr;
   }
 
 
 
-  template <typename I>
-  void fill_initial (I beg, I end) {
-    Galois::do_all (beg, end,
+  template <typename R>
+  void fill_initial (const R& range) {
+    Galois::Runtime::do_all_impl (range,
         [this] (const T& x) {
           createContext (x);
         },
@@ -111,58 +110,65 @@ public:
 
   void execute () {
 
-    size_t rounds = 0;
-    GAccumulator<size_t> totalCommitted;
 
-    while (!nextWL->empty_all ()) {
+    size_t rounds = 0;
+    GAccumulator<size_t> numCommitted;
+    size_t totalIterations = 0;
+    CtxtWL allSources;
+
+    while (!currWL->empty_all ()) {
 
       ++rounds;
-      std::swap (nextWL, currWL);
-      // TODO: deallocate/destroy the allocated contexts
-      nextWL->clear_all ();
 
+      totalIterations += currWL->size_all ();
 
       // expand nhood
-      Galois::do_all (currWL->begin_all (), currWL->end_all (),
+      Galois::do_all_choice (
+          makeLocalRange (*currWL),
           [this] (Ctxt* c) {
-            UserCtxt& uhand = *userHandles.getLocal ();
+            UserCtx& uhand = *userHandles.getLocal ();
             uhand.reset ();
 
             // nhFunc (c, uhand);
             runCatching (nhFunc, c, uhand);
           },
-          "expand_nhood");
+          "expand_nhood",
+          Galois::doall_chunk_size<NhFunc::CHUNK_SIZE> ());
+
 
 
       // collect sources
       // release locks here to save a separate phase
-      allSources.clear_all ();
-      Galois::do_all (currWL->begin_all (), currWL->end_all (),
-          [this] (Ctxt* c) {
+      allSources.clear_all_parallel ();
+      Galois::do_all_choice (
+          makeLocalRange (*currWL),
+          [this, &allSources] (Ctxt* c) {
             if (c->isSrc ()) {
               allSources.get ().push_back (c);
-              c->commitIteration ();
 
             } else {
-              nextWL->get ().push_back (c);
               c->cancelIteration ();
             }
-            c->reset (); // for future reuse
           },
-          "collect_sources");
+          "collect_sources",
+          Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
 
+      // NOTE: safety test should be applied to all sources
+      // where each source is tested against all elements earlier in priority
       // apply stability test
-
-      auto iter_p = stloop.run (allSources.begin_all (), allSources.end_all ());
+      stloop.run (makeLocalRange (allSources));
 
       // apply operator 
-      Galois::do_all (iter_p.first, iter_p.second,
+      Galois::do_all_choice (
+          makeLocalRange (allSources),
           [this, &numCommitted] (Ctxt* c) {
-            assert (c->isSrc ());
+            // assert (c->isSrc ());
 
-            UserCtxt& uhand = *userHandles.getLocal ();
-            // opFunc (c->active, uhand);
-            runCatching (opFunc, c, uhand);
+            UserCtx& uhand = *userHandles.getLocal ();
+            if (c->isSrc ()) {
+              // opFunc (c->active, uhand);
+              runCatching (opFunc, c, uhand);
+            }
 
             // TODO: double check logic here
             if (c->isSrc ()) {
@@ -175,20 +181,65 @@ public:
                 createContext (*i);
               }
 
-            } else {
+              // std::printf ("commit iteration %p\n", c);
+              c->commitIteration ();
 
-              c->reset ();
-              nextWL->get ().push_back (c);
+            } else {
+              c->cancelIteration ();
             }
 
             uhand.reset ();
           },
-          "apply_operator");
+          "apply_operator",
+          Galois::doall_chunk_size<OpFunc::CHUNK_SIZE> ());
+
+      Galois::Runtime::on_each_impl (
+          [this] (const unsigned tid, const unsigned numT) {
+            typename CtxtWL::Cont_ty& cont  = currWL->get(tid); 
+
+            for (auto i = cont.begin (), i_end = cont.end (); i != i_end;) { 
+
+              if ((*i)->isSrc ()) {
+                assert (!cont.empty ());
+                // std::printf ("going to destroy and deallocate %p, list size=%zd, back=%p, i=%d\n", 
+                  // *i, cont.size (), cont.back (), std::distance (cont.begin (), i));
+// 
+                auto last = cont.end ();
+                --last;
+
+                std::swap (*i, *last);
+
+                Ctxt* src = *last;
+                assert (src->isSrc ());
+                cont.pop_back ();
+
+
+                ctxtAlloc.destroy (src);
+                ctxtAlloc.deallocate (src, 1);
+
+                if (i == last) {
+                  break;
+                }
+
+                i_end = cont.end ();
+
+              } else {
+                (*i)->reset ();
+                ++i;
+              }
+            }
+
+          },
+          "clean-up");
 
     } // end while
 
-    std::cout << "KDGtwoPhaseParaMeter: number of rounds: " << rounds << std::endl;
-    std::cout << "KDGtwoPhaseParaMeter: average parallelism: " << double (numCommitted.reduce ())/double(rounds) << std::endl;
+    std::cout << "KDGParaMeter: number of rounds: " << rounds << std::endl;
+    std::cout << "KDGParaMeter: total iterations: " << totalIterations << std::endl;
+    std::cout << "KDGParaMeter: average parallelism: " << double (numCommitted.reduceRO ())/double(rounds) << std::endl;
+    std::cout << "KDGParaMeter: parallelism as a fraction of total: " << double (numCommitted.reduceRO ())/double(totalIterations) << std::endl;
+
+    allSources.clear_all_parallel ();
   }
 
 private:
@@ -197,92 +248,50 @@ private:
     Ctxt* ctx = ctxtAlloc.allocate (1);
     assert (ctx != nullptr);
     ctxtAlloc.construct (ctx, x, cmp);
-    nextWL->get ().push_back (c);
+    currWL->get ().push_back (ctx);
   }
 
-  template <typename F>
-  void runCatching (F& func, Ctxt* c, UserCtxt& uhand) {
-    try {
-      func (c->getElem (), uhand);
+  // template <typename F>
+  // void runCatching (F& func, Ctxt* c, UserCtx& uhand) {
+// 
+    // Galois::Runtime::setThreadContext (c);
+// 
+    // try {
+      // func (c->getElem (), uhand);
+// 
+    // } catch (ConflictFlag f) {
+// 
+      // switch (f) {
+        // case CONFLICT: 
+          // c->disableSrc ();
+          // break;
+        // default:
+          // GALOIS_DIE ("can't handle conflict flag type");
+          // break;
+      // }
+    // }
+  // }
 
-    } catch (ConflictFlag f) {
-
-      switch (f) {
-        case CONFLICT: 
-          c->disableSrc ();
-          break;
-        default:
-          GALOIS_DIE ("can't handle conflict flag type");
-          break;
-      }
-    }
-  }
-
-
-  template <typename S>
-  class SafetyTestLoop {
-
-
-    struct GetActive {
-      const T& operator () (const Ctxt* c) const {
-        assert (c != nullptr);
-        return c->getElem ();
-      }
-    };
-
-    S safetyTest;
-    PerThreadVector<Ctxt*> safeSources;
-
-  public:
-
-    explicit UnstableSrcTestLoop (const S& safetyTest): safetyTest (safetyTest) {}
-
-    template <typename I>
-    std::pair <I, I> run (I beg, I end) {
-
-      safeSources.clear_all ();
-      Galois::do_all (beg, end,
-          [this] (const Ctxt* c) {
-            auto bt = boost::make_transform_iterator (beg, GetActive ());
-            auto et = boost::make_transform_iterator (end, GetActive ());
-            if (safetyTest (c->active, bt, et)) {
-              safeSources.get ().push_back (c);
-            }
-          },
-          "safety_test_loop");
-
-      return std::make_pair (safeSources.begin_all (), safeSources.end_all ());
-    }
-  };
-
-  template <>
-  struct SafetyTestLoop<int> {
-
-    template <typename I>
-    std::pair<I, I> run (I beg, I end) const { 
-      return std::make_pair (beg, end);
-    }
-  };
 
 
 
 };
 
-template <typename Iter, typename Cmp, typename NhFunc, typename OpFunc, typename ST>
-void for_each_ordered_2p_param (Iter beg, Iter end, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const ST& safetyTest, const char* loopname=0) {
+template <typename R, typename Cmp, typename NhFunc, typename OpFunc, typename ST>
+void for_each_ordered_2p_param (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const ST& safetyTest, const char* loopname) {
 
-  using T = typename std::iterator_traits<Iter>::value_type;
-  using Exec = TwoPhaseContext<T, Cmp, NhFunc, OpFunc, ST>;
+  using T = typename R::value_type;
+  using Exec = KDGtwoPhaseParaMeter <T, Cmp, NhFunc, OpFunc, ST>;
   
   Exec e (cmp, nhFunc, opFunc, safetyTest);
 
-  e.fill_initial (beg, end);
+  e.fill_initial (range);
   e.execute ();
 }
 
-template <typename Iter, typename Cmp, typename NhFunc, typename OpFunc>
-void for_each_ordered_2p_param (Iter beg, Iter end, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const char* loopname=0) {
-  for_each_ordered_2p_param (beg, end, cmp, nhFunc, opFunc, int (0), loopname);
+template <typename R, typename Cmp, typename NhFunc, typename OpFunc>
+void for_each_ordered_2p_param (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const char* loopname) {
+  for_each_ordered_2p_param (range, cmp, nhFunc, opFunc, int (0), loopname);
 }
 
 

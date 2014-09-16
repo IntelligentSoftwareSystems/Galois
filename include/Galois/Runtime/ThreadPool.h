@@ -24,7 +24,6 @@
 #define GALOIS_RUNTIME_THREADPOOL_H
 
 #include "Galois/config.h"
-
 #include "Galois/Runtime/ll/CacheLineStorage.h"
 
 #include <functional>
@@ -35,23 +34,38 @@
 namespace Galois {
 namespace Runtime {
 
-namespace detail {
+namespace HIDDEN {
+
 template<typename tpl, int s, int r>
-struct exTupleImpl {
+struct ExecuteTupleImpl {
   static inline void execute(tpl& cmds) {
     std::get<s>(cmds)();
-    exTupleImpl<tpl,s+1,r-1>::execute(cmds);
+    ExecuteTupleImpl<tpl,s+1,r-1>::execute(cmds);
   }
 };
+
 template<typename tpl, int s>
-struct exTupleImpl<tpl, s, 0> {
+struct ExecuteTupleImpl<tpl, s, 0> {
   static inline void execute(tpl& f) { }
 };
+
 }
 
 class ThreadPool {
 protected:
+  //! Per-thread mailboxes for notification
+  struct per_signal {
+    std::atomic<int> done;
+    std::atomic<int> fastRelease;
+  };
+
   unsigned maxThreads;
+  std::function<void(void)> work; 
+  std::atomic<unsigned> starting;
+  unsigned masterFastmode;
+  std::vector<LL::CacheLineStorage<per_signal>> signals;
+  bool running;
+
   ThreadPool(unsigned m);
 
   //!destroy all threads
@@ -62,26 +76,6 @@ protected:
 
   //! wake up thread
   virtual void threadWakeup(unsigned tid) = 0;
-
-  //Common implementation stuff
-
-  //Data passed to threads through run
-  std::function<void(void)> work; //active work command
-  std::atomic<unsigned> starting; // number of threads
-  unsigned masterFastmode; // use fastmode //only seen by thread 0
-
-  //Data used in run loop
-  struct per_signal {
-    std::atomic<int> done;
-    std::atomic<int> fastRelease;
-#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
-    per_signal (void): done (), fastRelease () {}
-#endif
-  };
-  std::vector<LL::CacheLineStorage<per_signal>> signals; // signal loop
-
-  struct shutdown_ty {}; //! type for shutting down thread
-  struct fastmode_ty {bool mode;}; //! type for setting fastmode
 
   //! Initialize TID and PTS
   void initThread(unsigned tid);
@@ -99,25 +93,29 @@ protected:
   void runInternal(unsigned num);
 
 public:
+  struct shutdown_ty {}; //! type for shutting down thread
+  struct fastmode_ty {bool mode;}; //! type for setting fastmode
+
   virtual ~ThreadPool();
 
   //! execute work on all threads
   //! a simple wrapper for run
   template<typename... Args>
   void run(unsigned num, Args&&... args) {
-    struct exTuple {
+    struct ExecuteTuple {
       using Ty = std::tuple<Args...>;
       Ty cmds;
 
-      void operator() () {
-        detail::exTupleImpl<Ty, 0, std::tuple_size<Ty>::value>::execute(this->cmds);
+      void operator()(){
+        HIDDEN::ExecuteTupleImpl<Ty, 0, std::tuple_size<Ty>::value>::execute(this->cmds);
       }
-      exTuple(Args&&... args) :cmds(std::forward<Args>(args)...) {}
+      ExecuteTuple(Args&&... args) :cmds(std::forward<Args>(args)...) {}
     };
-    //paying for an indirection in work allows small-object optimization in std::function to kick in and avoid a heap allocation
-    exTuple lwork(std::forward<Args>(args)...);
+    //paying for an indirection in work allows small-object optimization in std::function
+    //to kick in and avoid a heap allocation
+    ExecuteTuple lwork(std::forward<Args>(args)...);
     work = std::ref(lwork);
-    //work = std::function<void(void)>(exTuple(std::forward<Args>(args)...));
+    //work = std::function<void(void)>(ExecuteTuple(std::forward<Args>(args)...));
     runInternal(num);
   }
 
@@ -126,6 +124,8 @@ public:
 
   //!return the number of threads supported by the thread pool on the current machine
   unsigned getMaxThreads() const { return maxThreads; }
+
+  bool isRunning() const { return running; }
 };
 
 //!Returns or creates the appropriate thread pool for the system

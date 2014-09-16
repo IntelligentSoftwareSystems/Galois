@@ -42,7 +42,8 @@
 
 #include "Galois/Accumulator.h"
 
-#include "Galois/Runtime/PerThreadWorkList.h"
+#include "Galois/Runtime/PerThreadContainer.h"
+#include "Galois/Runtime/Executor_OnEach.h"
 #include "Galois/DoAllWrap.h"
 #include "Galois/Runtime/ll/CompilerSpecific.h"
 #include "Galois/Markable.h"
@@ -101,7 +102,7 @@ private:
 
 template <typename _CleanupFunc>
 GALOIS_ATTRIBUTE_PROF_NOINLINE static void updateODG_clean (WLTy& workList, const unsigned currStep) {
-  Galois::on_each (_CleanupFunc (workList, currStep), Galois::loopname ("remove_simulated_events"));
+  Galois::Runtime::on_each_impl (_CleanupFunc (workList, currStep), "remove_simulated_events");
   // Galois::Runtime::do_all_coupled (
       // boost::counting_iterator<unsigned> (0),
       // boost::counting_iterator<unsigned> (workList.numRows ()), 
@@ -138,7 +139,7 @@ static size_t runSimInternal (Table& table, WLTy& workList, const double endtime
       Galois::do_all_choice (Galois::Runtime::makeLocalRange (workList),
           _FindIndepFunc (indepList, workList, currStep, findIter), 
           "find_indep_events", Galois::doall_chunk_size<1> ());
-      }
+
       findTimer.stop ();
 
       // printf ("currStep= %d, indepList.size ()= %zd, workList.size ()= %zd\n", 
@@ -216,7 +217,7 @@ private:
     {}
 
 
-    GALOIS_ATTRIBUTE_PROF_NOINLINE void updateODG_test (MEvent& e) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void updateODG_test (MEvent& e) const {
 
 
       if (!e.marked ()) {
@@ -256,7 +257,7 @@ private:
 
     }
 
-    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (MEvent& e) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (MEvent& e) const {
       updateODG_test (e);
     }
 
@@ -264,7 +265,7 @@ private:
 
   struct SimulateIndepEvents {
 
-    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (Event& event) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (Event& event) const {
       event.simulate();
     }
   };
@@ -292,7 +293,7 @@ private:
     {}
 
 
-    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (Event& event) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (Event& event) const {
       addList.get().clear ();
 
       table.addNextEvents (event, addList.get (), endtime);
@@ -332,6 +333,8 @@ private:
           std::swap (*i, *tmp);
 
           workList[r].erase (tmp);
+
+          if (i == tmp) { break; }
 
           ei = workList[r].end ();
 
@@ -377,7 +380,6 @@ public:
           workList.get ().push_back (MEvent (e));
         },
         "fill_init", Galois::doall_chunk_size<32> ());
-    }
 
     // sort events
     // for (unsigned r = 0; r < workList.numRows (); ++r) {
@@ -424,7 +426,7 @@ private:
         findIter (_findIter)
     {} 
 
-    GALOIS_ATTRIBUTE_PROF_NOINLINE void updateODG_test (MEvent& e) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void updateODG_test (MEvent& e) const {
       if (!e.marked ()) {
 
         bool indep = true;
@@ -460,7 +462,7 @@ private:
       } // end outer if
     }
 
-    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (MEvent& e) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (MEvent& e) const {
       updateODG_test (e);
     }
   };

@@ -128,11 +128,9 @@ public:
     Galois::StatTimer t;
 
     t.start ();
-    Galois::Runtime::beginSampling ();
 
     runLoop(simInit, graph);
 
-    Galois::Runtime::endSampling ();
     t.stop ();
 
     Galois::reportPageAlloc("MeminfoPost");

@@ -28,7 +28,7 @@
 #include "Galois/Accumulator.h"
 #include "Galois/RangePQ.h"
 #include "Galois/Runtime/ll/gio.h"
-#include "Galois/Runtime/PerThreadWorkList.h"
+#include "Galois/Runtime/PerThreadContainer.h"
 
 
 namespace Galois {

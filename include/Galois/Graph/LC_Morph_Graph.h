@@ -309,10 +309,10 @@ public:
   }
 
   void constructNodesFrom(FileGraph& graph, unsigned tid, unsigned total, ReadGraphAuxData& aux) {
-    auto r = graph.divideBy(
+    auto r = graph.divideByNode(
         sizeof(NodeInfo) + LC_Morph_Graph::size_of_out_of_line::value,
         sizeof(EdgeInfo),
-        tid, total);
+        tid, total).first;
 
     size_t id = *r.first;
     for (FileGraph::iterator ii = r.first, ei = r.second; ii != ei; ++ii, ++id) {
@@ -322,10 +322,10 @@ public:
   
   void constructEdgesFrom(FileGraph& graph, unsigned tid, unsigned total, const ReadGraphAuxData& aux) {
     typedef typename EdgeInfo::value_type value_type;
-    auto r = graph.divideBy(
+    auto r = graph.divideByNode(
         sizeof(NodeInfo) + LC_Morph_Graph::size_of_out_of_line::value,
         sizeof(EdgeInfo),
-        tid, total);
+        tid, total).first;
 
     for (FileGraph::iterator ii = r.first, ei = r.second; ii != ei; ++ii) {
       for (FileGraph::edge_iterator nn = graph.edge_begin(*ii), en = graph.edge_end(*ii); nn != en; ++nn) {

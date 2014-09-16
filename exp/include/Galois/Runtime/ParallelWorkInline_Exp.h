@@ -20,14 +20,14 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  *
- * @author Donald Nguyen <ddn@cs.utexas.edu>
+ * @author Amber Hassaan <ahassaan@ices.utexas.edu>
  */
 #ifndef GALOIS_RUNTIME_PARALLELWORKINLINE_EXP_H
 #define GALOIS_RUNTIME_PARALLELWORKINLINE_EXP_H
 
-#include "Galois/Runtime/ParallelWork.h"
 #include <cstdio>
 
+#include "Galois/Runtime/ForEachTraits.h"
 // #define _DO_OUTER_PREFETCH 1
 
 #include <xmmintrin.h>
@@ -35,34 +35,6 @@
 namespace Galois {
 namespace Runtime {
 namespace Exp {
-
-template<bool Enabled>
-class LoopStatistics {
-  unsigned long conflicts;
-  unsigned long iterations;
-  const char* loopname;
-
-public:
-  explicit LoopStatistics(const char* ln) :conflicts(0), iterations(0), loopname(ln) { }
-  ~LoopStatistics() {
-    reportStat(loopname, "Conflicts", conflicts);
-    reportStat(loopname, "Iterations", iterations);
-  }
-  inline void inc_iterations() {
-    ++iterations;
-  }
-  inline void inc_conflicts() {
-    ++conflicts;
-  }
-};
-
-template <>
-class LoopStatistics<false> {
-public:
-  explicit LoopStatistics(const char* ln) {}
-  inline void inc_iterations() const { }
-  inline void inc_conflicts() const { }
-};
 
 template<typename T, bool isLIFO, unsigned ChunkSize>
 struct FixedSizeRingAdaptor: public Galois::FixedSizeRing<T,ChunkSize> {
@@ -301,7 +273,7 @@ class BSInlineExecutor {
   struct ThreadLocalData {
     Galois::Runtime::UserContextAccess<value_type> facing;
     SimpleRuntimeContext ctx;
-    LoopStatistics<ForEachTraits<FunctionTy>::NeedsStats> stat;
+    LoopStatistics<Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsStats> stat;
     ThreadLocalData(const char* ln): stat(ln) { }
   };
 
@@ -320,7 +292,7 @@ class BSInlineExecutor {
   void abortIteration(ThreadLocalData& tld, const WID& wid, WLTy* cur, WLTy* next) {
     tld.ctx.cancelIteration();
     tld.stat.inc_conflicts();
-    if (ForEachTraits<FunctionTy>::NeedsPush) {
+    if (Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPush) {
       tld.facing.resetPushBuffer();
     }
     value_type& val = cur->cur(wid);
@@ -401,7 +373,7 @@ class BSInlineExecutor {
       // }
 // #endif
 
-      if (ForEachTraits<FunctionTy>::NeedsAborts)
+      if (Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsAborts)
         tld.ctx.commitIteration();
 
 
@@ -419,12 +391,12 @@ class BSInlineExecutor {
 
     while (true) {
       while (!cur->empty(wid)) {
-        if (ForEachTraits<FunctionTy>::NeedsAborts) {
+        if (Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsAborts) {
           processWithAborts(tld, wid, cur, next);
         } else {
           process(tld, wid, cur, next);
         }
-        if (ForEachTraits<FunctionTy>::NeedsPIA)
+        if (Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPIA)
           tld.facing.resetAlloc();
       }
 
@@ -448,7 +420,7 @@ class BSInlineExecutor {
 
 public:
   BSInlineExecutor(const FunctionTy& f, const char* ln): function(f), preFunc (f), loopname(ln), barrier(getSystemBarrier()) {
-    if (ForEachTraits<FunctionTy>::NeedsBreak) {
+    if (Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsBreak) {
       assert(0 && "not supported by this executor");
       abort();
     }
@@ -462,7 +434,7 @@ public:
       barrier(getSystemBarrier ()),
       done (false)
   { 
-    if (ForEachTraits<FunctionTy>::NeedsBreak) {
+    if (Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsBreak) {
       assert(0 && "not supported by this executor");
       abort();
     }
@@ -485,13 +457,6 @@ public:
 
 template <typename R, typename OpFunc, typename PreFunc>
 void for_each_bs (const R& range, const OpFunc& opFunc, const PreFunc& preFunc, const char* loopname=nullptr) {
-
-  if (inGaloisForEach)
-    GALOIS_DIE("Nested for_each not supported");
-  
-
-  inGaloisForEach = true;
-
   typedef typename R::value_type T;
 
   typedef Exp::BSInlineExecutor<T, OpFunc, PreFunc> Executor;
@@ -503,32 +468,10 @@ void for_each_bs (const R& range, const OpFunc& opFunc, const PreFunc& preFunc, 
     std::bind (&Executor::template AddInitialWork<R>, std::ref (e), range),
     std::ref (barrier),
     std::ref (e));
-
-  inGaloisForEach = false;
 }
 
 
 } // end runtime
-
-// namespace WorkList {
-  // template<class T=int>
-  // class BulkSynchronousInline { };
-// }
-// 
-// namespace Runtime {
-// namespace {
-// 
-// template<class T,class FunctionTy>
-// struct ForEachWork<WorkList::BulkSynchronousInline<>,T,FunctionTy>:
-  // public BSInlineExecutor<T,FunctionTy> {
-  // typedef BSInlineExecutor<T,FunctionTy> SuperTy;
-  // ForEachWork(const FunctionTy& f, const char* ln): SuperTy(f, ln) { }
-// };
-// 
-// }
-
-// } // runtime
-
 
 } //galois
 

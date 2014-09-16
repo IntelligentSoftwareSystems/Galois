@@ -41,7 +41,7 @@ sub show {
   }
 }
 
-GetOptions('show=s'=>\$ShowType, 'in=s'=>\$InType, "help"=> \$Help) or pod2usage(2);
+GetOptions('show=s'=>\$ShowType, 'in=s'=>\$InType, 'help'=> \$Help) or pod2usage(2);
 pod2usage(-exitstatus=>0, -verbose=>2, -noperldoc=>1) if $Help;
 die("unknown show type") unless ($validShowTypes{$ShowType});
 die("unknown in type") unless ($validInTypes{$InType});

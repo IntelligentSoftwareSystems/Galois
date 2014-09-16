@@ -4,7 +4,7 @@
 #include "bfs.h"
 
 #include "Galois/Runtime/ParallelWorkInline_Exp.h"
-#include "Galois/Runtime/PerThreadWorkList.h"
+#include "Galois/Runtime/PerThreadContainer.h"
 #include "Galois/Runtime/CoupledExecutor.h"
 
 typedef uint32_t ND_ty;
@@ -68,8 +68,8 @@ protected:
 
         graph.mapOutEdges (up.node,
             [dstLevel, &wl] (GNode dst) {
-              // wl.push (Update (dst, dstLevel));
-              wl.emplace_back (dst, dstLevel);
+              wl.push (dst, dstLevel);
+              //wl.emplace(dst, dstLevel);
             },
             Galois::NONE);
       }

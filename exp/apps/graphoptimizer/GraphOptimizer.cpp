@@ -504,10 +504,10 @@ public:
   }
 
   void constructFrom(FileGraph& graph, unsigned tid, unsigned total) {
-    auto r = graph.divideBy(
+    auto r = graph.divideByNode(
         NodeData::size_of::value + EdgeIndData::size_of::value + LC_CCSR_Graph::size_of_out_of_line::value,
         EdgeDst::size_of::value + EdgeData::size_of::value,
-        tid, total);
+        tid, total).first;
     this->setLocalRange(*r.first, *r.second);
     if (tid == 0) {
       uint64_t offset = 0;
@@ -640,7 +640,7 @@ void dumphist(std::ostream& of, std::string name, std::vector<unsigned int>& hva
 
 struct ComputeRatio {
   template<typename GNode>
-  void operator()(const GNode& n) {
+  void operator()(const GNode& n) const {
     std::deque<unsigned int> IDs, IDs2, IDs3;
     std::vector<uint8_t> var;
     for (Graph::edge_iterator ii = graph.edge_begin(n),
@@ -924,7 +924,7 @@ int main(int argc, char **argv) {
   delta.resize(size);
   lenBW.resize(11);
 
-  Galois::do_all(graph.begin(), graph.end(), ComputeRatio(), Galois::do_all_steal(true));
+  Galois::do_all(graph.begin(), graph.end(), ComputeRatio(), Galois::do_all_steal<>());
 
   if (dostat) {
     std::cout << "Writing to " << outfilename.c_str() << "\n";

@@ -41,7 +41,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi>  {
     Bag& bag;
 
     Initialize(Graph& g, Bag& b): graph(g), bag(b) { }
-    void operator()(GNode n) {
+    void operator()(GNode n) const {
       LNode& data = graph.getData(n, Galois::MethodFlag::NONE);
       data.comp = data.id;
       bag.push(n, graph.sizeEdges() / graph.size());

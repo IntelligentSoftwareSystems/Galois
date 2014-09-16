@@ -1,11 +1,11 @@
-/** Number of Active Threads -*- C++ -*-
+/** Deterministic execution -*- C++ -*-
  * @file
  * @section License
  *
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2014, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -18,16 +18,10 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  *
- * @author Andrew Lenharth <andrewl@lenharth.org>
+ * @section Description
+ *
+ * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
+#include "Galois/Runtime/Executor_Deterministic.h"
 
-#ifndef GALOIS_RUNTIME_ACTIVETHREADS_H
-#define GALOIS_RUNTIME_ACTIVETHREADS_H
-
-namespace Galois {
-namespace Runtime {
-extern unsigned int activeThreads;
-}
-}
-
-#endif
+__thread Galois::Runtime::MM::SizedHeapFactory::SizedHeap* Galois::Runtime::DeterministicImpl::listHeap;

@@ -106,7 +106,7 @@ struct CreateNodes {
   int height;
   CreateNodes(Graph& g, std::vector<GNode>& n, int h): g(g), nodes(n), height(h) { }
 
-  void operator()(const Point2D& p) {
+  void operator()(const Point2D& p) const {
     GNode n = g.createNode(0);
     g.addNode(n);
     nodes[p.x() * height + p.y()] = n;

@@ -1511,7 +1511,7 @@ struct ComputeRefineDelta {
   typedef typename std::iterator_traits<IterTy>::value_type value_type;
   IterTy ei;
   ComputeRefineDelta(const IterTy& ei): ei(ei) { }
-  double operator()(IterTy cur) {
+  double operator()(IterTy cur) const {
     const value_type& v = *cur;
     std::advance(cur, 1);
     if (cur == ei)
@@ -1619,7 +1619,7 @@ struct CheckAllPairs {
   
   CheckAllPairs(Bodies& b): bodies(b) { }
 
-  double operator()(const Body& body) {
+  double operator()(const Body& body) const {
     const Body* me = &body;
     Point acc;
     for (Bodies::iterator ii = bodies.begin(), ei = bodies.end(); ii != ei; ++ii) {

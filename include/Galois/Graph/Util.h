@@ -26,6 +26,7 @@
 #define GALOIS_GRAPH_UTIL_H
 
 #include "Galois/Galois.h"
+#include "Galois/Graph/FileGraph.h"
 #include "Galois/Graph/Details.h"
 
 namespace Galois {

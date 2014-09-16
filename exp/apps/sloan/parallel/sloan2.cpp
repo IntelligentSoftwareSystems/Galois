@@ -5,9 +5,6 @@
 #include "Galois/Statistic.h"
 #include "Galois/Graph/LCGraph.h"
 #include "Galois/Graph/Graph.h"
-#ifdef GALOIS_USE_EXP
-#include "Galois/Runtime/ParallelWorkInline.h"
-#endif
 #include "llvm/Support/CommandLine.h"
 #include "llvm/ADT/SmallVector.h"
 #include "Lonestar/BoilerPlate.h"
@@ -243,7 +240,7 @@ private:
 
     explicit CountLevels(bool r, GR& c): counts(c), reset(r) { }
 
-    void operator()(const GNode& n) {
+    void operator()(const GNode& n) const {
       SNode& data = graph.getData(n, Galois::MethodFlag::NONE);
       
       assert(data.dist != DIST_INFINITY);
@@ -448,7 +445,7 @@ struct PseudoPeripheral {
     
     collect_nodes(Galois::InsertBag<GNode>& b, size_t d): bag(b), dist(d) { }
 
-    void operator()(const GNode& n) {
+    void operator()(const GNode& n) const {
       if (graph.getData(n).dist == dist)
         bag.push(n);
     }

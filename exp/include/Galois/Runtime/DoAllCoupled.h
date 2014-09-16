@@ -147,7 +147,7 @@ namespace Galois {
 namespace Galois {
 namespace Runtime {
 
-namespace {
+namespace details {
 
 static const unsigned DEFAULT_CHUNK_SIZE = 16;
 
@@ -683,26 +683,18 @@ public:
 
 };
 
-} // end namespace anonymous
+} // end namespace details
 
 
 template <typename R, typename F>
-void do_all_coupled (const R& range, const F& func, const char* loopname=0, const size_t chunk_size=DEFAULT_CHUNK_SIZE) {
-
-  assert (!inGaloisForEach);
-  inGaloisForEach = true;
-
-  DoAllCoupledExec<R, F> exec (range, func, loopname, chunk_size);
+void do_all_coupled (const R& range, const F& func, const char* loopname=0, const size_t chunk_size=details::DEFAULT_CHUNK_SIZE) {
+  details::DoAllCoupledExec<R, F> exec (range, func, loopname, chunk_size);
   Barrier& barrier = getSystemBarrier();
 
   getSystemThreadPool().run(activeThreads, 
       [&exec] (void) { exec.initThread (); },
       std::ref(barrier),
       std::ref(exec));
-  
-  inGaloisForEach = false;
-
-
 }
 
 } // end namespace Runtime

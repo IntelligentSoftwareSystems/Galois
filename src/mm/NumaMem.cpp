@@ -271,7 +271,7 @@ void* Galois::Runtime::MM::largeInterleavedAlloc(size_t len, bool full) {
   bool inForEach = false;
 #else
   unsigned total = full ? Galois::Runtime::LL::getMaxCores() : activeThreads;
-  bool inForEach = inGaloisForEach;
+  bool inForEach = getSystemThreadPool().isRunning();
 #endif
   bool numaAlloc = false;
 

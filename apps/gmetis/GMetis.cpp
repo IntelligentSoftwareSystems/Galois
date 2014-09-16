@@ -140,7 +140,7 @@ void Partition(MetisGraph* metisGraph, unsigned nparts) {
 struct parallelInitMorphGraph {
   GGraph &graph;
   parallelInitMorphGraph(GGraph &g):graph(g) {  }
-  void operator()(GNode node) {
+  void operator()(GNode node) const {
     for(GGraph::edge_iterator jj = graph.edge_begin(node),kk=graph.edge_end(node);jj!=kk;jj++) {
       graph.getEdgeData(jj)=1;
       // weight+=1;

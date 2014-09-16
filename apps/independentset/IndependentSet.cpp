@@ -27,9 +27,6 @@
 #include "Galois/Statistic.h"
 #include "Galois/Graph/LCGraph.h"
 #include "Galois/ParallelSTL/ParallelSTL.h"
-#ifdef GALOIS_USE_EXP
-#include "Galois/Runtime/ParallelWorkInline.h"
-#endif
 #include "llvm/Support/CommandLine.h"
 
 #include "Lonestar/BoilerPlate.h"
@@ -122,9 +119,6 @@ struct SerialAlgo {
 //! Basic operator for default and deterministic scheduling
 template<int Version=detBase>
 struct Process {
-  typedef int tt_does_not_need_push;
-  typedef int tt_needs_per_iter_alloc; // For LocalState
-
   typedef typename Galois::Graph::LC_CSR_Graph<Node,void>
     ::template with_numa_alloc<true>::type Graph;
 
@@ -134,8 +128,12 @@ struct Process {
     bool mod;
     LocalState(Process<Version>& self, Galois::PerIterAllocTy& alloc): mod(false) { }
   };
-  typedef LocalState GaloisDeterministicLocalState;
-  static_assert(Galois::has_deterministic_local_state<Process>::value, "Oops");
+
+  typedef std::tuple<
+    Galois::does_not_need_push<>,
+    Galois::needs_per_iter_alloc<>,
+    Galois::has_deterministic_local_state<LocalState>
+  > function_traits;
 
   Graph& graph;
 
@@ -242,8 +240,10 @@ struct DefaultAlgo {
   typedef typename Process<>::Graph Graph;
 
   void operator()(Graph& graph) {
+    typedef Galois::WorkList::Deterministic<> DWL;
+
 #ifdef GALOIS_USE_EXP
-    typedef Galois::WorkList::BulkSynchronousInline WL;
+    typedef Galois::WorkList::BulkSynchronousInline<> WL;
 #else
     typedef Galois::WorkList::dChunkedFIFO<256> WL;
 #endif
@@ -252,13 +252,20 @@ struct DefaultAlgo {
         Galois::for_each(graph.begin(), graph.end(), Process<>(graph), Galois::wl<WL>());
         break;
       case detBase:
-        Galois::for_each_det(graph.begin(), graph.end(), Process<>(graph));
+        Galois::for_each(graph.begin(), graph.end(), Process<>(graph), Galois::wl<DWL>());
         break;
       case detPrefix:
-        Galois::for_each_det(graph.begin(), graph.end(), Process<detPrefix>(graph), Process<>(graph));
+        Galois::for_each(graph.begin(), graph.end(), Process<>(graph),
+            Galois::wl<DWL>(),
+#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1400
+            Galois::has_neighborhood_visitor<Process<detPrefix>>(Process<detPrefix>(graph))
+#else
+            Galois::make_trait_with_args<Galois::has_neighborhood_visitor>(Process<detPrefix>(graph))
+#endif
+            );
         break;
       case detDisjoint:
-        Galois::for_each_det(graph.begin(), graph.end(), Process<detDisjoint>(graph));
+        Galois::for_each(graph.begin(), graph.end(), Process<detDisjoint>(graph), Galois::wl<DWL>());
         break;
       case orderedBase:
         Galois::for_each_ordered(graph.begin(), graph.end(), Compare<Graph>(graph),
@@ -288,11 +295,11 @@ struct PullAlgo {
     Bag& next;
     Galois::GAccumulator<size_t>& numProcessed;
 
-    void operator()(GNode src, Galois::UserContext<GNode>&) {
-      (*this)(src);
+    void operator()(GNode src, Galois::UserContext<GNode>&) const {
+      operator()(src);
     }
 
-    void operator()(GNode src) {
+    void operator()(GNode src) const {
       numProcessed += 1;
       //Node& n = graph.getData(src, Galois::MethodFlag::NONE);
 
@@ -327,7 +334,7 @@ struct PullAlgo {
     Graph& graph;
     Galois::GAccumulator<size_t>& numTaken;
 
-    void operator()(GNode src) {
+    void operator()(GNode src) const {
       Node& n = graph.getData(src, Galois::MethodFlag::NONE);
       numTaken += 1;
       n.flag = F;

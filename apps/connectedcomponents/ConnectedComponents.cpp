@@ -296,7 +296,7 @@ struct LabelPropAlgo {
     Graph& graph;
 
     Initialize(Graph& g): graph(g) { }
-    void operator()(GNode n) {
+    void operator()(GNode n) const {
       LNode& data = graph.getData(n, Galois::MethodFlag::NONE);
       data.comp = data.id;
     }
@@ -484,7 +484,7 @@ struct BlockedAsyncAlgo {
 
     //! Add the next edge between components to the worklist
     template<bool MakeContinuation, int Limit, typename Pusher>
-    void process(const GNode& src, const Graph::edge_iterator& start, Pusher& pusher) {
+    void process(const GNode& src, const Graph::edge_iterator& start, Pusher& pusher) const {
       Node& sdata = graph.getData(src, Galois::MethodFlag::NONE);
       int count = 1;
       for (Graph::edge_iterator ii = start, ei = graph.edge_end(src, Galois::MethodFlag::NONE);
@@ -509,7 +509,7 @@ struct BlockedAsyncAlgo {
       }
     }
 
-    void operator()(const GNode& src) {
+    void operator()(const GNode& src) const {
       Graph::edge_iterator start = graph.edge_begin(src, Galois::MethodFlag::NONE);
       if (Galois::Runtime::LL::getPackageForSelf(Galois::Runtime::LL::getTID()) == 0) {
         process<true, 0>(src, start, items);
@@ -518,7 +518,7 @@ struct BlockedAsyncAlgo {
       }
     }
 
-    void operator()(const WorkItem& item, Galois::UserContext<WorkItem>& ctx) {
+    void operator()(const WorkItem& item, Galois::UserContext<WorkItem>& ctx) const {
       process<true, 0>(item.src, item.start, ctx);
     }
   };
@@ -526,7 +526,7 @@ struct BlockedAsyncAlgo {
   void operator()(Graph& graph) {
     Galois::InsertBag<WorkItem> items;
     Merge merge = { graph, items };
-    Galois::do_all_local(graph, merge, Galois::loopname("Initialize"), Galois::do_all_steal(false));
+    Galois::do_all_local(graph, merge, Galois::loopname("Initialize"));
     Galois::for_each_local(items, merge,
         Galois::loopname("Merge"), Galois::wl<Galois::WorkList::dChunkedFIFO<128> >());
   }
@@ -712,7 +712,7 @@ struct CountLargest {
   
   CountLargest(Graph& g, Accums& accums): graph(g), accums(accums) { }
   
-  void operator()(const GNode& x) {
+  void operator()(const GNode& x) const {
     typename Graph::node_data_reference n = graph.getData(x, Galois::MethodFlag::NONE);
     if (n.isRep()) {
       accums.reps += 1;
@@ -752,7 +752,7 @@ struct ReduceMax {
 
   ReduceMax(Accum& accum): accum(accum) { }
 
-  void operator()(const std::pair<component_type,int>& x) {
+  void operator()(const std::pair<component_type,int>& x) const {
     accum.update(ComponentSizePair<Graph>(x.first, x.second));
   }
 };

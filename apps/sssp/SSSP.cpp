@@ -229,7 +229,7 @@ struct SerialAlgo {
     Graph& g;
     Initialize(Graph& g): g(g) { }
 
-    void operator()(Graph::GraphNode n) {
+    void operator()(Graph::GraphNode n) const {
       g.getData(n).dist = DIST_INFINITY;
     }
   };
@@ -288,7 +288,7 @@ struct AsyncAlgo {
   struct Initialize {
     Graph& g;
     Initialize(Graph& g): g(g) { }
-    void operator()(typename Graph::GraphNode n) {
+    void operator()(typename Graph::GraphNode n) const {
       g.getData(n, Galois::MethodFlag::NONE).dist = DIST_INFINITY;
     }
   };
@@ -351,15 +351,15 @@ struct AsyncAlgo {
     Bag& bag;
     Node& sdata;
     InitialProcess(AsyncAlgo* s, Graph& g, Bag& b, Node& d): self(s), graph(g), bag(b), sdata(d) { }
-    void operator()(typename Graph::edge_iterator ii) {
+    void operator()(typename Graph::edge_iterator ii) const {
       self->relaxEdge(graph, sdata, ii, bag);
     }
   };
 
   void operator()(Graph& graph, GNode source) {
     using namespace Galois::WorkList;
-    typedef dChunkedFIFO<64> Chunk;
-    typedef OrderedByIntegerMetric<UpdateRequestIndexer<UpdateRequest>, Chunk, 10> OBIM;
+    typedef ChunkedFIFO<64> Chunk;
+    typedef OrderedByIntegerMetric<UpdateRequestIndexer<UpdateRequest>, Chunk, 10, false> OBIM;
 
     std::cout << "INFO: Using delta-step of " << (1 << stepShift) << "\n";
     std::cout << "WARNING: Performance varies considerably due to delta parameter.\n";
@@ -395,7 +395,7 @@ struct AsyncAlgoPP {
   struct Initialize {
     Graph& g;
     Initialize(Graph& g): g(g) { }
-    void operator()(Graph::GraphNode n) {
+    void operator()(Graph::GraphNode n) const {
       g.getData(n, Galois::MethodFlag::NONE).dist = DIST_INFINITY;
     }
   };
@@ -460,7 +460,7 @@ struct AsyncAlgoPP {
     Graph& graph;
     Bag& bag;
     InitialProcess(AsyncAlgoPP* s, Graph& g, Bag& b): self(s), graph(g), bag(b) { }
-    void operator()(Graph::edge_iterator ii) {
+    void operator()(Graph::edge_iterator ii) const {
       Dist d = 0;
       self->relaxEdge(graph, d, ii, bag);
     }
@@ -468,8 +468,8 @@ struct AsyncAlgoPP {
 
   void operator()(Graph& graph, GNode source) {
     using namespace Galois::WorkList;
-    typedef dChunkedFIFO<64> Chunk;
-    typedef OrderedByIntegerMetric<UpdateRequestIndexer<UpdateRequest>, Chunk, 10> OBIM;
+    typedef ChunkedFIFO<64> Chunk;
+    typedef OrderedByIntegerMetric<UpdateRequestIndexer<UpdateRequest>, Chunk, 10, false> OBIM;
 
     std::cout << "INFO: Using delta-step of " << (1 << stepShift) << "\n";
     std::cout << "WARNING: Performance varies considerably due to delta parameter.\n";
@@ -485,12 +485,13 @@ struct AsyncAlgoPP {
   }
 };
 
-namespace Galois {
+namespace Galois { namespace DEPRECATED {
 template<>
 struct does_not_need_aborts<AsyncAlgo<true>::Process> : public boost::true_type {};
 }
+}
 
-static_assert(Galois::does_not_need_aborts<AsyncAlgo<true>::Process>::value, "Oops");
+static_assert(Galois::DEPRECATED::does_not_need_aborts<AsyncAlgo<true>::Process>::value, "Oops");
 
 template<typename Algo>
 void run(bool prealloc = true) {

@@ -30,7 +30,7 @@
 
 //! [do_all example]
 struct HelloWorld {
-  void operator()(int i) {
+  void operator()(int i) const {
     std::cout << "Hello " << i << "\n";
   }
 };

@@ -24,8 +24,8 @@
  *
  * @author <ahassaan@ices.utexas.edu>
  */
-#ifndef GALOIS_RUNTIME_PERTHREADWORKLIST_H
-#define GALOIS_RUNTIME_PERTHREADWORKLIST_H
+#ifndef GALOIS_RUNTIME_PERTHREADCONTAINER_H
+#define GALOIS_RUNTIME_PERTHREADCONTAINER_H
 
 #include <vector>
 #include <deque>
@@ -42,6 +42,8 @@
 #include "Galois/Threads.h"
 #include "Galois/PriorityQueue.h"
 #include "Galois/TwoLevelIterator.h"
+#include "Galois/Runtime/Executor_DoAll.h"
+#include "Galois/Runtime/Executor_OnEach.h"
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/ThreadPool.h"
 #include "Galois/Runtime/mm/Mem.h"
@@ -56,23 +58,23 @@ enum GlobalPos {
   GLOBAL_BEGIN, GLOBAL_END
 };
 
-// #define ADAPTOR_BASED_OUTER_ITER
+#define ADAPTOR_BASED_OUTER_ITER
 
 // XXX: use a combination of boost::transform_iterator and
 // boost::counting_iterator to implement the following OuterPerThreadWLIter
 #ifdef ADAPTOR_BASED_OUTER_ITER
 
-template<typename PerThrdWL>
+template<typename PerThrdCont>
 struct WLindexer: 
-  public std::unary_function<unsigned, typename PerThrdWL::Cont_ty&> 
+  public std::unary_function<unsigned, typename PerThrdCont::Cont_ty&> 
 {
-  typedef typename PerThrdWL::Cont_ty Ret_ty;
+  typedef typename PerThrdCont::Cont_ty Ret_ty;
 
-  PerThrdWL* wl;
+  PerThrdCont* wl;
 
   WLindexer(): wl(NULL) {}
 
-  WLindexer(PerThrdWL& _wl): wl(&_wl) {}
+  WLindexer(PerThrdCont& _wl): wl(&_wl) {}
 
   Ret_ty& operator()(unsigned i) const {
     assert(wl != NULL);
@@ -81,44 +83,44 @@ struct WLindexer:
   }
 };
 
-template<typename PerThrdWL>
+template<typename PerThrdCont>
 struct TypeFactory {
-  typedef typename boost::transform_iterator<WLindexer<PerThrdWL>, boost::counting_iterator<unsigned> > OuterIter;
+  typedef typename boost::transform_iterator<WLindexer<PerThrdCont>, boost::counting_iterator<unsigned> > OuterIter;
   typedef typename std::reverse_iterator<OuterIter> RvrsOuterIter;
 };
 
 
-template<typename PerThrdWL>
-typename TypeFactory<PerThrdWL>::OuterIter make_outer_begin(PerThrdWL& wl) {
+template<typename PerThrdCont>
+typename TypeFactory<PerThrdCont>::OuterIter make_outer_begin(PerThrdCont& wl) {
   return boost::make_transform_iterator(
-      boost::counting_iterator<unsigned>(0), WLindexer<PerThrdWL>(wl));
+      boost::counting_iterator<unsigned>(0), WLindexer<PerThrdCont>(wl));
 }
 
-template<typename PerThrdWL>
-typename TypeFactory<PerThrdWL>::OuterIter make_outer_end(PerThrdWL& wl) {
+template<typename PerThrdCont>
+typename TypeFactory<PerThrdCont>::OuterIter make_outer_end(PerThrdCont& wl) {
   return boost::make_transform_iterator(
-      boost::counting_iterator<unsigned>(wl.numRows()), WLindexer<PerThrdWL>(wl));
+      boost::counting_iterator<unsigned>(wl.numRows()), WLindexer<PerThrdCont>(wl));
 }
 
-template<typename PerThrdWL>
-typename TypeFactory<PerThrdWL>::RvrsOuterIter make_outer_rbegin(PerThrdWL& wl) {
-  return typename TypeFactory<PerThrdWL>::RvrsOuterIter(make_outer_end(wl));
+template<typename PerThrdCont>
+typename TypeFactory<PerThrdCont>::RvrsOuterIter make_outer_rbegin(PerThrdCont& wl) {
+  return typename TypeFactory<PerThrdCont>::RvrsOuterIter(make_outer_end(wl));
 }
 
-template<typename PerThrdWL>
-typename TypeFactory<PerThrdWL>::RvrsOuterIter make_outer_rend(PerThrdWL& wl) {
-  return typename TypeFactory<PerThrdWL>::RvrsOuterIter(make_outer_begin(wl));
+template<typename PerThrdCont>
+typename TypeFactory<PerThrdCont>::RvrsOuterIter make_outer_rend(PerThrdCont& wl) {
+  return typename TypeFactory<PerThrdCont>::RvrsOuterIter(make_outer_begin(wl));
 }
 
 #else
 
-template<typename PerThrdWL>
-class OuterPerThreadWLIter: public std::iterator<std::random_access_iterator_tag, typename PerThrdWL::Cont_ty> {
-  typedef typename PerThrdWL::Cont_ty Cont_ty;
+template<typename PerThrdCont>
+class OuterPerThreadWLIter: public std::iterator<std::random_access_iterator_tag, typename PerThrdCont::Cont_ty> {
+  typedef typename PerThrdCont::Cont_ty Cont_ty;
   typedef std::iterator<std::random_access_iterator_tag, Cont_ty> Super_ty;
   typedef typename Super_ty::difference_type Diff_ty;
 
-  PerThrdWL* workList;
+  PerThrdCont* workList;
   // using Diff_ty due to reverse iterator, whose 
   // end is -1, and,  begin is numRows - 1
   Diff_ty row;
@@ -141,7 +143,7 @@ class OuterPerThreadWLIter: public std::iterator<std::random_access_iterator_tag
 public:
   OuterPerThreadWLIter(): Super_ty(), workList(NULL), row(0) {}
 
-  OuterPerThreadWLIter(PerThrdWL& wl, const GlobalPos& pos)
+  OuterPerThreadWLIter(PerThrdCont& wl, const GlobalPos& pos)
     : Super_ty(), workList(&wl), row(0) {
 
     switch (pos) {
@@ -249,27 +251,27 @@ public:
 };
 
 
-template<typename PerThrdWL>
-OuterPerThreadWLIter<PerThrdWL> make_outer_begin(PerThrdWL& wl) {
-  return OuterPerThreadWLIter<PerThrdWL>(wl, GLOBAL_BEGIN);
+template<typename PerThrdCont>
+OuterPerThreadWLIter<PerThrdCont> make_outer_begin(PerThrdCont& wl) {
+  return OuterPerThreadWLIter<PerThrdCont>(wl, GLOBAL_BEGIN);
 }
 
-template<typename PerThrdWL>
-OuterPerThreadWLIter<PerThrdWL> make_outer_end(PerThrdWL& wl) {
-  return OuterPerThreadWLIter<PerThrdWL>(wl, GLOBAL_END);
+template<typename PerThrdCont>
+OuterPerThreadWLIter<PerThrdCont> make_outer_end(PerThrdCont& wl) {
+  return OuterPerThreadWLIter<PerThrdCont>(wl, GLOBAL_END);
 }
 
-template<typename PerThrdWL>
-std::reverse_iterator<OuterPerThreadWLIter<PerThrdWL> > 
-make_outer_rbegin(PerThrdWL& wl) {
-  typedef typename std::reverse_iterator<OuterPerThreadWLIter<PerThrdWL> > Ret_ty;
+template<typename PerThrdCont>
+std::reverse_iterator<OuterPerThreadWLIter<PerThrdCont> > 
+make_outer_rbegin(PerThrdCont& wl) {
+  typedef typename std::reverse_iterator<OuterPerThreadWLIter<PerThrdCont> > Ret_ty;
   return Ret_ty(make_outer_end(wl));
 }
 
-template<typename PerThrdWL>
-std::reverse_iterator<OuterPerThreadWLIter<PerThrdWL> > 
-make_outer_rend(PerThrdWL& wl) {
-  typedef typename std::reverse_iterator<OuterPerThreadWLIter<PerThrdWL> > Ret_ty;
+template<typename PerThrdCont>
+std::reverse_iterator<OuterPerThreadWLIter<PerThrdCont> > 
+make_outer_rend(PerThrdCont& wl) {
+  typedef typename std::reverse_iterator<OuterPerThreadWLIter<PerThrdCont> > Ret_ty;
   return Ret_ty(make_outer_begin(wl));
 }
 
@@ -279,7 +281,7 @@ make_outer_rend(PerThrdWL& wl) {
 
 
 template<typename Cont_tp> 
-class PerThreadWorkList {
+class PerThreadContainer {
 public:
   typedef Cont_tp Cont_ty;
   typedef typename Cont_ty::value_type value_type;
@@ -292,7 +294,7 @@ public:
   typedef typename Cont_ty::reverse_iterator local_reverse_iterator;
   typedef typename Cont_ty::const_reverse_iterator local_const_reverse_iterator;
 
-  typedef PerThreadWorkList This_ty;
+  typedef PerThreadContainer This_ty;
 
 #ifdef ADAPTOR_BASED_OUTER_ITER
   typedef typename TypeFactory<This_ty>::OuterIter OuterIter;
@@ -347,7 +349,7 @@ private:
   }
 
 protected:
-  PerThreadWorkList(): perThrdCont() {
+  PerThreadContainer(): perThrdCont() {
     for (unsigned i = 0; i < perThrdCont.size(); ++i) {
       *perThrdCont.getRemote(i) = NULL;
     }
@@ -359,7 +361,7 @@ protected:
     }
   }
 
-  ~PerThreadWorkList() { 
+  ~PerThreadContainer() { 
     destroy();
   }
 
@@ -480,6 +482,21 @@ public:
     }
   }
 
+  void clear_all_parallel (void) {
+    auto r = Galois::Runtime::makeStandardRange (
+        boost::counting_iterator<unsigned> (0),
+        boost::counting_iterator<unsigned> (perThrdCont.size ()));
+
+    Galois::Runtime:: do_all_impl (
+        r, 
+        [this] (unsigned i) {
+          get (i).clear ();
+        },
+        "clear_all", 
+        false);
+    
+  }
+
   bool empty_all() const {
     bool res = true;
     for (unsigned i = 0; i < perThrdCont.size(); ++i) {
@@ -489,43 +506,56 @@ public:
     return res;
   }
 
-  // TODO: fill parallel
-  template<typename Iter, typename R>
-  void fill_serial(Iter begin, Iter end,
-      R(Cont_ty::*pushFn)(const value_type&) = &Cont_ty::push_back) {
-
-    const unsigned P = Galois::getActiveThreads();
-
-    typedef typename std::iterator_traits<Iter>::difference_type Diff_ty;
-
-    // integer division, where we want to round up. So adding P-1
-    Diff_ty block_size = (std::distance(begin, end) + (P-1) ) / P;
-
-    assert(block_size >= 1);
-
-    Iter block_begin = begin;
-
-    for (unsigned i = 0; i < P; ++i) {
-
-      Iter block_end = block_begin;
-
-      if (std::distance(block_end, end) < block_size) {
-        block_end = end;
-
-      } else {
-        std::advance(block_end, block_size);
-      }
-
-      for (; block_begin != block_end; ++block_begin) {
-        // workList[i].push_back(Marked<Value_ty>(*block_begin));
-        ((*this)[i].*pushFn)(value_type(*block_begin));
-      }
-
-      if (block_end == end) {
-        break;
-      }
-    }
+  template <typename Range, typename Ret>
+  void fill_parallel (const Range& range, Ret (Cont_ty::*pushFn) (const value_type&) = &Cont_ty::push_back) {
+    Galois::Runtime::do_all_impl (
+        range,
+        [this, pushFn] (const typename Range::value_type& v) {
+          Cont_ty& my = get ();
+          (my.*pushFn) (v);
+          // (get ().*pushFn)(v);
+        },
+        "fill_parallel", 
+        false);
   }
+
+  // // TODO: fill parallel
+  // template<typename Iter, typename R>
+  // void fill_serial(Iter begin, Iter end,
+      // R(Cont_ty::*pushFn)(const value_type&) = &Cont_ty::push_back) {
+// 
+    // const unsigned P = Galois::getActiveThreads();
+// 
+    // typedef typename std::iterator_traits<Iter>::difference_type Diff_ty;
+// 
+    // // integer division, where we want to round up. So adding P-1
+    // Diff_ty block_size = (std::distance(begin, end) + (P-1) ) / P;
+// 
+    // assert(block_size >= 1);
+// 
+    // Iter block_begin = begin;
+// 
+    // for (unsigned i = 0; i < P; ++i) {
+// 
+      // Iter block_end = block_begin;
+// 
+      // if (std::distance(block_end, end) < block_size) {
+        // block_end = end;
+// 
+      // } else {
+        // std::advance(block_end, block_size);
+      // }
+// 
+      // for (; block_begin != block_end; ++block_begin) {
+        // // workList[i].push_back(Marked<Value_ty>(*block_begin));
+        // ((*this)[i].*pushFn)(value_type(*block_begin));
+      // }
+// 
+      // if (block_end == end) {
+        // break;
+      // }
+    // }
+  // }
 };
 
 
@@ -537,7 +567,7 @@ namespace PerThreadFactory {
   struct Alloc { typedef typename MM::ExternalHeapAllocator<T, Heap> type; };
 
   template<typename T>
-  struct FSBAlloc { typedef typename MM::FixedSizeAllocator<T> type; };
+  struct FixedSizeAlloc { typedef typename MM::FixedSizeAllocator<T> type; };
 
   template<typename T>
   struct Vector { typedef typename std::vector<T, typename Alloc<T>::type > type; };
@@ -546,10 +576,10 @@ namespace PerThreadFactory {
   struct Deque { typedef typename std::deque<T, typename Alloc<T>::type > type; };
 
   template<typename T>
-  struct List { typedef typename std::list<T, typename FSBAlloc<T>::type > type; };
+  struct List { typedef typename std::list<T, typename FixedSizeAlloc<T>::type > type; };
 
   template<typename T, typename C>
-  struct Set { typedef typename std::set<T, C, typename FSBAlloc<T>::type > type; };
+  struct Set { typedef typename std::set<T, C, typename FixedSizeAlloc<T>::type > type; };
 
   template<typename T, typename C>
   struct PQ { typedef MinHeap<T, C, typename Vector<T>::type > type; };
@@ -557,14 +587,14 @@ namespace PerThreadFactory {
 
 
 template<typename T>
-class PerThreadVector: public PerThreadWorkList<typename PerThreadFactory::template Vector<T>::type> {
+class PerThreadVector: public PerThreadContainer<typename PerThreadFactory::template Vector<T>::type> {
 public:
   typedef typename PerThreadFactory::Heap Heap_ty;
   typedef typename PerThreadFactory::template Alloc<T>::type Alloc_ty;
   typedef typename PerThreadFactory::template Vector<T>::type Cont_ty;
 
 protected:
-  typedef PerThreadWorkList<Cont_ty> Super_ty;
+  typedef PerThreadContainer<Cont_ty> Super_ty;
 
   Heap_ty heap;
   Alloc_ty alloc;
@@ -587,7 +617,7 @@ public:
 
 template<typename T>
 class PerThreadDeque: 
-  public PerThreadWorkList<typename PerThreadFactory::template Deque<T>::type> {
+  public PerThreadContainer<typename PerThreadFactory::template Deque<T>::type> {
 
 public:
   typedef typename PerThreadFactory::Heap Heap_ty;
@@ -595,7 +625,7 @@ public:
 
 protected:
   typedef typename PerThreadFactory::template Deque<T>::type Cont_ty;
-  typedef PerThreadWorkList<Cont_ty> Super_ty;
+  typedef PerThreadContainer<Cont_ty> Super_ty;
 
   Heap_ty heap;
   Alloc_ty alloc;
@@ -608,7 +638,7 @@ public:
 
 template<typename T>
 class PerThreadList:
-  public PerThreadWorkList<typename PerThreadFactory::template List<T>::type> {
+  public PerThreadContainer<typename PerThreadFactory::template List<T>::type> {
 
 public:
   typedef typename PerThreadFactory::Heap Heap_ty;
@@ -616,7 +646,7 @@ public:
 
 protected:
   typedef typename PerThreadFactory::template List<T>::type Cont_ty;
-  typedef PerThreadWorkList<Cont_ty> Super_ty;
+  typedef PerThreadContainer<Cont_ty> Super_ty;
 
   Heap_ty heap;
   Alloc_ty alloc;
@@ -629,14 +659,14 @@ public:
 
 template<typename T, typename C=std::less<T> >
 class PerThreadSet: 
-  public PerThreadWorkList<typename PerThreadFactory::template Set<T, C>::type> {
+  public PerThreadContainer<typename PerThreadFactory::template Set<T, C>::type> {
 
 public:
-  typedef typename PerThreadFactory::template FSBAlloc<T>::type Alloc_ty;
+  typedef typename PerThreadFactory::template FixedSizeAlloc<T>::type Alloc_ty;
 
 protected:
   typedef typename PerThreadFactory::template Set<T, C>::type Cont_ty;
-  typedef PerThreadWorkList<Cont_ty> Super_ty;
+  typedef PerThreadContainer<Cont_ty> Super_ty;
 
   Alloc_ty alloc;
 
@@ -660,7 +690,7 @@ public:
 
 template<typename T, typename C=std::less<T> >
 class PerThreadMinHeap:
-  public PerThreadWorkList<typename PerThreadFactory::template PQ<T, C>::type> {
+  public PerThreadContainer<typename PerThreadFactory::template PQ<T, C>::type> {
 
 public:
   typedef typename PerThreadFactory::Heap Heap_ty;
@@ -669,7 +699,7 @@ public:
 protected:
   typedef typename PerThreadFactory::template Vector<T>::type Vec_ty;
   typedef typename PerThreadFactory::template PQ<T, C>::type Cont_ty;
-  typedef PerThreadWorkList<Cont_ty> Super_ty;
+  typedef PerThreadContainer<Cont_ty> Super_ty;
 
   Heap_ty heap;
   Alloc_ty alloc;
@@ -692,6 +722,6 @@ public:
 };
 
 
-}
+} // end namespace Runtime
 } // end namespace Galois
-#endif
+#endif // GALOIS_RUNTIME_PERTHREADCONTAINER_H

@@ -22,6 +22,11 @@
 #define GALOIS_THREADS_H
 
 namespace Galois {
+namespace Runtime {
+
+extern unsigned int activeThreads;
+
+}
 
 /**
  * Sets the number of threads to use when running any Galois iterator. Returns
@@ -34,7 +39,7 @@ unsigned int setActiveThreads(unsigned int num) noexcept;
 /**
  * Returns the number of threads in use.
  */
-unsigned int getActiveThreads()noexcept;
+unsigned int getActiveThreads() noexcept;
 
 }
 #endif

@@ -53,6 +53,10 @@ public:
 
   BoundedVector () : m_array (), m_size (0) {}
 
+  ~BoundedVector (void) {
+    clear ();
+  }
+
   bool empty () const { return m_size == 0; }
 
   bool full () const { return m_size == SZ; }
@@ -111,6 +115,13 @@ public:
     --m_size;
     assertValidSize ();
     m_array.destroy (m_size);
+  }
+
+  void clear (void) {
+    for (size_t i = 0; i < size (); ++i) {
+      m_array.destroy (m_size);
+    }
+    m_size = 0;
   }
 
   //iterators:

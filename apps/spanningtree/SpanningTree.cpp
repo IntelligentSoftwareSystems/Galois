@@ -144,7 +144,7 @@ struct AsyncAlgo {
   void operator()() {
     Galois::Statistic emptyMerges("EmptyMerges");
     Galois::do_all_local(graph, Merge(emptyMerges),
-        Galois::loopname("Merge"), Galois::do_all_steal(true));
+        Galois::loopname("Merge"), Galois::do_all_steal<true>());
     Galois::do_all_local(graph, Normalize(), Galois::loopname("Normalize"));
   }
 };
@@ -165,7 +165,7 @@ struct BlockedAsyncAlgo {
 
     //! Add the next edge between components to the worklist
     template<bool MakeContinuation, int Limit, typename Pusher>
-    void process(const GNode& src, const Graph::edge_iterator& start, Pusher& pusher) {
+    void process(const GNode& src, const Graph::edge_iterator& start, Pusher& pusher) const {
       Node& sdata = graph.getData(src, Galois::MethodFlag::NONE);
       int count = 1;
       for (Graph::edge_iterator ii = start, ei = graph.edge_end(src, Galois::MethodFlag::NONE);
@@ -187,7 +187,7 @@ struct BlockedAsyncAlgo {
       }
     }
 
-    void operator()(const GNode& src) {
+    void operator()(const GNode& src) const {
       Graph::edge_iterator start = graph.edge_begin(src, Galois::MethodFlag::NONE);
       if (Galois::Runtime::LL::getPackageForSelf(Galois::Runtime::LL::getTID()) == 0) {
         process<true, 0>(src, start, items);
@@ -196,7 +196,7 @@ struct BlockedAsyncAlgo {
       }
     }
 
-    void operator()(const WorkItem& item, Galois::UserContext<WorkItem>& ctx) {
+    void operator()(const WorkItem& item, Galois::UserContext<WorkItem>& ctx) const {
       process<true, 0>(item.src, item.start, ctx);
     }
   };
@@ -212,7 +212,7 @@ struct BlockedAsyncAlgo {
   void operator()() {
     Galois::InsertBag<WorkItem> items;
     Merge merge = { items };
-    Galois::do_all_local(graph, merge, Galois::loopname("Initialize"), Galois::do_all_steal(false));
+    Galois::do_all_local(graph, merge, Galois::loopname("Initialize"));
     Galois::for_each_local(items, merge,
         Galois::loopname("Merge"), Galois::wl<Galois::WorkList::dChunkedFIFO<128> >());
     Galois::do_all_local(graph, Normalize(), Galois::loopname("Normalize"));
@@ -247,7 +247,7 @@ struct CheckAcyclic {
 
   Accum* accum;
 
-  void operator()(const GNode& n) {
+  void operator()(const GNode& n) const {
     Node& data = graph.getData(n);
     if (data.component() == &data)
       accum->roots += 1;

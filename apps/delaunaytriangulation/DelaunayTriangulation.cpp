@@ -350,7 +350,7 @@ static void addBoundaryNodes(Point* p1, Point* p2, Point* p3) {
 }
 
 struct insPt {
-  void operator()(Point& p) {
+  void operator()(Point& p) const {
     Point* pr = &basePoints.push(p);
     ptrPoints.push(pr);
   }

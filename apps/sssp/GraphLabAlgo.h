@@ -24,7 +24,7 @@ struct GraphLabAlgo {
   struct Initialize {
     Graph& g;
     Initialize(Graph& g): g(g) { }
-    void operator()(Graph::GraphNode n) {
+    void operator()(Graph::GraphNode n) const {
       g.getData(n).dist = DIST_INFINITY;
     }
   };

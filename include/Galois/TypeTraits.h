@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2014, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -20,21 +20,14 @@
  *
  * @section Description
  *
- * There are two ways to declare a typetrait. First, with a typedef or other
- * valid name declaration:
+ * There are two ways to declare a typetrait.
+ *
+ * First, with a typedef or other valid name declaration:
  * \code
  * struct MyClass {
  *   typedef int tt_needs_parallel_break;
  *   ....
  * };
- * \endcode
- *
- * The second way is by specializing a function:
- * \code
- * namespace Galois {
- *   template<>
- *   struct needs_parallel_break<MyClass> : public boost::true_type {};
- * }
  * \endcode
  *
  * Since the compiler doesn't check the names of these traits, a good
@@ -48,6 +41,14 @@
  * };
  * \endcode
  *
+ * The second way is by specializing a type:
+ * \code
+ * namespace Galois {
+ *   template<>
+ *   struct needs_parallel_break<MyClass> : public boost::true_type {};
+ * }
+ * \endcode
+ *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 #ifndef GALOIS_TYPETRAITS_H
@@ -57,7 +58,7 @@
 #include <boost/mpl/has_xxx.hpp>
 
 namespace Galois {
-
+namespace DEPRECATED {
 #define GALOIS_HAS_MEM_FUNC(func, name) \
   template<typename T, typename Sig> \
   struct has_##name { \
@@ -208,7 +209,7 @@ struct does_not_need_aborts : public has_tt_does_not_need_aborts<T> {};
  * some predicate. 
  */
 BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_has_fixed_neighborhood)
-template <typename T>
+template<typename T>
 struct has_fixed_neighborhood: public has_tt_has_fixed_neighborhood<T> {};
 
 /**
@@ -216,7 +217,7 @@ struct has_fixed_neighborhood: public has_tt_has_fixed_neighborhood<T> {};
  * std::is_trivially_constructible. 
  */
 BOOST_MPL_HAS_XXX_TRAIT_DEF(tt_has_known_trivial_constructor)
-template <typename T>
+template<typename T>
 struct has_known_trivial_constructor: public has_tt_has_known_trivial_constructor<T> { };
 
 //! Decay that handles std::ref
@@ -230,5 +231,6 @@ struct special_decay<std::reference_wrapper<T>> {
   using type = T&;
 };
 
+}
 }
 #endif

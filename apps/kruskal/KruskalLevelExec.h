@@ -73,7 +73,7 @@ class KruskalLevelExec: public Kruskal {
 
 
     template <typename C>
-    void operator () (const Edge& e, C& ctx) {
+    void operator () (const Edge& e, C& ctx) const {
       int repSrc = kruskal::findPCiter_int (e.src, repVec);
       int repDst = kruskal::findPCiter_int (e.dst, repVec);
       // int repSrc = kruskal::getRep_int (e.src, repVec);
@@ -111,7 +111,7 @@ class KruskalLevelExec: public Kruskal {
 
 
     template <typename C>
-    void operator () (const Edge& e, C& ctx) {
+    void operator () (const Edge& e, C& ctx) const {
       int repSrc = kruskal::findPCiter_int (e.src, repVec);
       int repDst = kruskal::findPCiter_int (e.dst, repVec);
 

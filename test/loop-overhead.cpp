@@ -1,5 +1,5 @@
-#include "Galois/Timer.h"
 #include "Galois/Galois.h"
+#include "Galois/Timer.h"
 
 #include <iostream>
 #include <cstdlib>
@@ -10,11 +10,11 @@ unsigned iter = 1;
 
 struct emp {
   template<typename T>
-  void operator()(const T& t) { 
+  void operator()(const T& t) const { 
     Galois::Runtime::LL::compilerBarrier(); 
   }
   template<typename T, typename C>
-  void operator()(const T& t, const C& c) { Galois::Runtime::LL::compilerBarrier(); }
+  void operator()(const T& t, const C& c) const { Galois::Runtime::LL::compilerBarrier(); }
   typedef int tt_does_not_need_push;
   typedef int tt_does_not_need_stats;
   typedef int tt_does_not_need_aborts;
@@ -63,7 +63,7 @@ unsigned t_doall(bool burn, bool steal, std::vector<unsigned>& V, unsigned num, 
   Galois::Timer t;
   t.start();
   for (unsigned x = 0; x < iter; ++x)
-    Galois::do_all(V.begin(), V.begin()+num, emp(), Galois::do_all_steal(steal));
+    Galois::do_all(V.begin(), V.begin()+num, emp(), Galois::do_all_steal<>());
   t.stop();
   return t.get();
 }

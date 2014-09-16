@@ -24,6 +24,11 @@
 #ifndef GALOIS_RUNTIME_KDG_TWO_PHASE_SUPPORT_H
 #define GALOIS_RUNTIME_KDG_TWO_PHASE_SUPPORT_H
 
+#include "Galois/AltBag.h"
+
+#include <functional>
+#include <boost/iterator/filter_iterator.hpp>
+
 namespace Galois {
 namespace Runtime {
 
@@ -38,6 +43,8 @@ class TwoPhaseContext: public SimpleRuntimeContext {
   bool source = true;
 
 public:
+
+  using value_type = T;
 
   explicit TwoPhaseContext (const T& x, const Cmp& cmp)
     : 
@@ -146,7 +153,110 @@ public:
 
 };
 
+template <typename Ctxt, typename S>
+class SafetyTestLoop {
 
+  using T = typename Ctxt::value_type;
+
+  struct GetActive: public std::unary_function<Ctxt, const T&> {
+    const T& operator () (const Ctxt* c) const {
+      assert (c != nullptr);
+      return c->getElem ();
+    }
+  };
+
+  struct GetLesserThan: public std::unary_function<const Ctxt*, bool> {
+
+    const Ctxt* curr;
+    typename Ctxt::PtrComparator cmp = typename Ctxt::PtrComparator ();
+
+    bool operator () (const Ctxt* that) const { 
+      return cmp (that, curr); 
+    }
+  };
+
+  S safetyTest;
+
+  static const unsigned DEFAULT_CHUNK_SIZE = 2;
+
+public:
+
+  explicit SafetyTestLoop (const S& safetyTest): safetyTest (safetyTest) {}
+
+  template <typename R>
+  void run (const R& range) const {
+
+    Galois::do_all_choice (range,
+        [this, &range] (const Ctxt* c) {
+
+          auto beg_lesser = boost::make_filter_iterator (
+            range.begin (), range.end (), GetLesserThan {c});
+
+          auto end_lesser = boost::make_filter_iterator (
+            range.end (), range.end (), GetLesserThan {c});
+
+
+          auto bt = boost::make_transform_iterator (beg_lesser, GetActive ());
+          auto et = boost::make_transform_iterator (end_lesser, GetActive ());
+
+
+          if (!safetyTest (c->getElem (), bt, et)) {
+            c->disableSrc ();
+          }
+        },
+        "safety_test_loop",
+        Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
+  }
+};
+
+template <typename Ctxt>
+struct SafetyTestLoop<Ctxt, int> {
+
+  SafetyTestLoop (int) {}
+
+  template <typename R>
+  void run (const R& range) const { 
+  }
+};
+
+
+template <typename F, typename Ctxt, typename UserCtxt>
+void runCatching (F& func, Ctxt* c, UserCtxt& uhand) {
+  Galois::Runtime::setThreadContext (c);
+
+  int result = 0;
+
+#ifdef GALOIS_USE_LONGJMP
+  if ((result = setjmp(hackjmp)) == 0) {
+#else
+    try {
+#endif
+      func (c->getElem (), uhand);
+
+#ifdef GALOIS_USE_LONGJMP
+    } else {
+      // TODO
+    }
+#else 
+  } catch (ConflictFlag f) {
+    result = f;
+  }
+#endif
+
+  switch (result) {
+    case 0:
+      break;
+    case CONFLICT: 
+      c->disableSrc ();
+      break;
+    default:
+      GALOIS_DIE ("can't handle conflict flag type");
+      break;
+  }
+
+
+  Galois::Runtime::setThreadContext (NULL);
+}
 
 
 } // end namespace Runtime

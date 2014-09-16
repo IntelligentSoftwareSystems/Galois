@@ -384,7 +384,8 @@ struct MatchingFF {
 
   //! Main entry point for Galois::for_each
   struct Process {
-    typedef int tt_needs_per_iter_alloc;
+    typedef std::tuple<Galois::needs_per_iter_alloc<>> function_traits;
+
     MatchingFF<G,Concurrent>& parent;
     G& g;
     SerialRevs& serialRevs;
@@ -540,8 +541,7 @@ struct MatchingABMP {
   }
 
   struct Process {
-    typedef int tt_needs_parallel_break;
-    typedef int tt_needs_per_iter_alloc;
+    typedef std::tuple<Galois::needs_per_iter_alloc<>,Galois::needs_parallel_break<>> function_traits;
     MatchingABMP<G,Concurrent>& parent;
     G& g;
     unsigned& maxLayer;
@@ -738,7 +738,7 @@ struct MatchingMF {
   }
 
   struct Process {
-    typedef int tt_needs_parallel_break;
+    typedef std::tuple<Galois::needs_parallel_break<>> function_traits;
 
     MatchingMF<G,Concurrent>& parent;
     G& g;
@@ -776,7 +776,6 @@ struct MatchingMF {
 
   template<bool useCAS>
   struct UpdateHeights {
-    typedef int tt_does_not_need_stats;
     G& g;
 
     UpdateHeights(G& _g): g(_g) { }
@@ -823,7 +822,7 @@ struct MatchingMF {
 
     Galois::StatTimer T("BfsTime");
     T.start();
-    Galois::for_each(sink, UpdateHeights<false>(g));
+    Galois::for_each(sink, UpdateHeights<false>(g), Galois::does_not_need_stats<>());
     T.stop();
 
     for (iterator ii = g.begin(), ei = g.end(); ii != ei; ++ii) {

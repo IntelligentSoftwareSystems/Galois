@@ -45,15 +45,27 @@ struct read_default_graph_tag { };
 struct read_with_aux_graph_tag { };
 struct read_lc_inout_graph_tag { };
 
+namespace detail {
+
+template<typename, typename, typename, typename,typename>
+struct EdgeSortReference;
+
+}
+
 //! Proxy object for {@link detail::EdgeSortIterator}
 template<typename GraphNode, typename EdgeTy>
-struct EdgeSortValue: public StrictObject<EdgeTy> {
+class EdgeSortValue: public StrictObject<EdgeTy> {
+  template<typename, typename, typename, typename,typename>
+  friend struct detail::EdgeSortReference;
+
+  GraphNode rawDst;
+
+public:
+  GraphNode dst;
   typedef StrictObject<EdgeTy> Super;
   typedef typename Super::value_type value_type;
 
-  GraphNode dst;
-  
-  EdgeSortValue(GraphNode d, const value_type& v): Super(v), dst(d) { }
+  EdgeSortValue(GraphNode d, GraphNode rd, const value_type& v): Super(v), rawDst(rd), dst(d) { }
 
   template<typename ER>
   EdgeSortValue(const ER& ref) {
@@ -103,7 +115,7 @@ struct LocalIteratorFeature<false> {
 };
 
 //! Proxy object for {@link EdgeSortIterator}
-template<typename GraphNode, typename EdgeIndex, typename EdgeDst, typename EdgeData>
+template<typename GraphNode, typename EdgeIndex, typename EdgeDst, typename EdgeData, typename GraphNodeConverter>
 struct EdgeSortReference {
   typedef typename EdgeData::raw_value_type EdgeTy;
   EdgeIndex at;
@@ -113,19 +125,19 @@ struct EdgeSortReference {
   EdgeSortReference(EdgeIndex x, EdgeDst* dsts, EdgeData* data): at(x), edgeDst(dsts), edgeData(data) { }
 
   EdgeSortReference operator=(const EdgeSortValue<GraphNode, EdgeTy>& x) {
-    edgeDst->set(at, x.dst);
+    edgeDst->set(at, x.rawDst);
     edgeData->set(at, x.get());
     return *this;
   }
 
-  EdgeSortReference operator=(const EdgeSortReference<GraphNode,EdgeIndex,EdgeDst,EdgeData>& x) {
+  EdgeSortReference operator=(const EdgeSortReference& x) {
     edgeDst->set(at, edgeDst->at(x.at));
     edgeData->set(at, edgeData->at(x.at));
     return *this;
   }
 
   EdgeSortValue<GraphNode, EdgeTy> operator*() const {
-    return EdgeSortValue<GraphNode, EdgeTy>(edgeDst->at(at), edgeData->at(at));
+    return EdgeSortValue<GraphNode, EdgeTy>(GraphNodeConverter()(edgeDst->at(at)), edgeDst->at(at), edgeData->at(at));
   }
 
   void initialize(EdgeSortValue<GraphNode, EdgeTy>& value) const {
@@ -146,6 +158,11 @@ struct EdgeSortCompWrapper {
   }
 };
 
+struct Identity {
+  template<typename T>
+  T operator()(const T& x) const { return x; }
+};
+
 /**
  * Iterator to facilitate sorting of CSR-like graphs. Converts random access operations
  * on iterator to appropriate computations on edge destinations and edge data.
@@ -154,16 +171,19 @@ struct EdgeSortCompWrapper {
  * @tparam EdgeIndex Integer-like value that is passed to EdgeDst and EdgeData
  * @tparam EdgeDst {@link LargeArray}-like container of edge destinations
  * @tparam EdgeData {@link LargeArray}-like container of edge data
+ * @tparam GraphNodeConverter A functor to apply when returning values of
+ *   EdgeDst when dereferencing this iterator; assignment uses untransformed
+ *   EdgeDst values
  */
-template<typename GraphNode, typename EdgeIndex, typename EdgeDst, typename EdgeData>
+template<typename GraphNode, typename EdgeIndex, typename EdgeDst, typename EdgeData, typename GraphNodeConverter=Identity>
 class EdgeSortIterator: public boost::iterator_facade<
-                        EdgeSortIterator<GraphNode, EdgeIndex, EdgeDst, EdgeData>,
+                        EdgeSortIterator<GraphNode, EdgeIndex, EdgeDst, EdgeData, GraphNodeConverter>,
                         EdgeSortValue<GraphNode, typename EdgeData::raw_value_type>,
                         boost::random_access_traversal_tag,
-                        EdgeSortReference<GraphNode, EdgeIndex, EdgeDst, EdgeData>
+                        EdgeSortReference<GraphNode, EdgeIndex, EdgeDst, EdgeData, GraphNodeConverter>
                         > {
-  typedef EdgeSortIterator<GraphNode,EdgeIndex,EdgeDst,EdgeData> Self;
-  typedef EdgeSortReference<GraphNode,EdgeIndex,EdgeDst,EdgeData> Reference;
+  typedef EdgeSortIterator<GraphNode,EdgeIndex,EdgeDst,EdgeData,GraphNodeConverter> Self;
+  typedef EdgeSortReference<GraphNode,EdgeIndex,EdgeDst,EdgeData, GraphNodeConverter> Reference;
 
   EdgeIndex at;
   EdgeDst* edgeDst;
@@ -325,8 +345,8 @@ public:
   iterator end() { return make_no_deref_iterator(g.edge_end(n)); }
 };
 
-template<typename GN, typename EI, typename EdgeData,typename Data>
-void swap(EdgeSortReference<GN,EI,EdgeData,Data> a, EdgeSortReference<GN,EI,EdgeData,Data> b) {
+template<typename A, typename B, typename C, typename D, typename E>
+void swap(EdgeSortReference<A,B,C,D,E> a, EdgeSortReference<A,B,C,D,E> b) {
   auto aa = *a;
   auto bb = *b;
   a = bb;

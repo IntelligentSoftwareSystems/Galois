@@ -81,13 +81,13 @@ struct ReduceBoxes {
 
   ReduceBoxes(ReducibleBox& _result): result(_result) { }
 
-  void operator()(const Point& p) {
+  void operator()(const Point& p) const {
     result.update (BoundingBox (p));
   }
 
   template<typename Context>
-  void operator()(const Point& p, Context&) {
-    (*this) (p);
+  void operator()(const Point& p, Context&) const {
+    operator() (p);
   }
 };
 

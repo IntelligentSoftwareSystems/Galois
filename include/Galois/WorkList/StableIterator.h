@@ -44,6 +44,7 @@ namespace WorkList {
 template<bool Steal = false, typename Container = dChunkedFIFO<>, typename Iterator=int*>
 struct StableIterator {
   typedef typename std::iterator_traits<Iterator>::value_type value_type;
+  typedef Iterator iterator;
 
   //! change the concurrency flag
   template<bool _concurrent>
@@ -54,7 +55,7 @@ struct StableIterator {
   struct retype { typedef StableIterator<Steal, typename Container::template retype<_T>::type, Iterator> type; };
 
   template<typename _iterator>
-  struct with_iterator { typedef StableIterator<Steal, typename Container::template retype<value_type>::type, _iterator> type; };
+  struct with_iterator { typedef StableIterator<Steal, Container, _iterator> type; };
 
   template<bool _steal>
   struct with_steal { typedef StableIterator<_steal, Container, Iterator> type; };

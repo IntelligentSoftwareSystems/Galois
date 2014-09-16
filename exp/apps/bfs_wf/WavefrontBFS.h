@@ -28,21 +28,19 @@
 #ifndef WAVEFRONT_BFS_H_
 #define WAVEFRONT_BFS_H_
 
+#include "Galois/Accumulator.h"
+#include "Galois/AltBag.h"
+#include "Galois/DoAllWrap.h"
+#include "Galois/Runtime/PerThreadContainer.h"
+#include "Galois/WorkList/ExternalReference.h"
+
+#include "bfs.h"
+
 #include <string>
 #include <sstream>
 #include <limits>
 #include <iostream>
 #include <set>
-
-#include "Galois/GaloisUnsafe.h"
-#include "Galois/Accumulator.h"
-#include "Galois/Bag.h"
-
-#include "Galois/Runtime/PerThreadWorkList.h"
-#include "Galois/DoAllWrap.h"
-
-#include "bfs.h"
-
 
 class AbstractWavefrontBFS: public BFS<unsigned> {
 
@@ -212,19 +210,18 @@ protected:
   friend class BFSwavefrontNolock;
 
 private:
-
-
-
-
   template <bool doLock>
   struct ParallelInnerLoop {
     GALOIS_ATTRIBUTE_PROF_NOINLINE unsigned operator () (Graph& graph, GaloisWL& currWL, GaloisWL& nextWL) const {
+      typedef typename GaloisWL::value_type value_type;
+      typedef Galois::WorkList::ExternalReference<GaloisWL> WL;
+
+      value_type *it = nullptr;
 
       ParCounter numAdds;
 
       ForEachFunctor<doLock, GaloisWL, Super_ty::NodeData_ty> l (graph, nextWL, numAdds);
-      Galois::for_each_wl (currWL, l);
-      // Galois::for_each_wl <Galois::Runtime::WorkList::ParaMeter<GaloisWL> > (currWL, l);
+      Galois::for_each(it, it, l, Galois::wl<WL>(&currWL));
 
       return numAdds.reduce ();
     }
@@ -258,7 +255,9 @@ class BFSwavefrontNolock: public AbstractWavefrontBFS {
 
 class BFSwavefrontCoupled: public AbstractWavefrontBFS {
 
-  typedef Galois::Runtime::PerThreadVector<GNode> WL_ty;
+  typedef Galois::PerThreadBag<GNode> WL_ty;
+  // typedef Galois::Runtime::PerThreadVector<GNode> WL_ty;
+  // typedef Galois::InsertBag<GNode> WL_ty;
 
   struct ParallelInnerLoop {
     Graph& graph;
@@ -275,8 +274,9 @@ class BFSwavefrontCoupled: public AbstractWavefrontBFS {
         numAdds (numAdds) 
     {} 
 
-    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (GNode src) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (GNode src) const {
       numAdds += Super_ty::bfsOperator<false> (graph, src, nextWL.get ());
+      // numAdds += Super_ty::bfsOperator<false> (graph, src, nextWL);
     }
   };
 
@@ -292,6 +292,7 @@ public:
 
     graph.getData (startNode, Galois::NONE) = 0;
     currWL->get ().push_back (startNode);
+    // currWL->push_back (startNode);
 
     size_t numIter = 1;
 
@@ -300,6 +301,7 @@ public:
     ParCounter numAdds;
     Galois::Runtime::getSystemThreadPool ().burnPower (Galois::getActiveThreads ());
     while (!currWL->empty_all ()) {
+    // while (!currWL->empty ()) {
 
       Galois::do_all_choice (Galois::Runtime::makeLocalRange(*currWL), 
           ParallelInnerLoop (graph, *nextWL, numAdds), 
@@ -307,7 +309,8 @@ public:
           Galois::doall_chunk_size<CHUNK_SIZE> ());
 
       std::swap (currWL, nextWL);
-      nextWL->clear_all ();
+      nextWL->clear_all_parallel ();
+      // nextWL->clear ();
       ++level;
     }
     Galois::Runtime::getSystemThreadPool ().beKind ();

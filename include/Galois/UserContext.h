@@ -40,7 +40,7 @@ namespace Galois {
 template<typename T>
 class UserContext: private boost::noncopyable {
 protected:
-// TODO: move to a separate class for dedicated for sepculative executors
+// TODO(ddn): move to a separate class for dedicated speculative executors
 #ifdef GALOIS_USE_EXP
   typedef std::function<void (void)> Closure;
   typedef Galois::gdeque<Closure, 8> UndoLog;

@@ -26,6 +26,7 @@
 
 #include "Galois/FixedSizeRing.h"
 #include "Galois/Runtime/ll/PaddedLock.h"
+#include "Galois/Runtime/mm/Mem.h"
 #include "Galois/WorkList/WorkListHelpers.h"
 #include "WLCompileCheck.h"
 

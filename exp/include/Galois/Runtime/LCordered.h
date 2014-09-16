@@ -28,20 +28,22 @@
 #define GALOIS_RUNTIME_LC_ORDERED_H
 
 #include "Galois/config.h"
+#include "Galois/GaloisForwardDecl.h"
 #include "Galois/Accumulator.h"
 #include "Galois/Atomic.h"
 #include "Galois/gdeque.h"
 #include "Galois/PriorityQueue.h"
 #include "Galois/Timer.h"
 
+#include "Galois/WorkList/WorkList.h"
 #include "Galois/Runtime/Context.h"
-#include "Galois/Runtime/DoAll.h"
-#include "Galois/Runtime/ParallelWork.h"
-#include "Galois/Runtime/PerThreadWorkList.h"
+#include "Galois/Runtime/Executor_DoAll.h"
+#include "Galois/Runtime/PerThreadContainer.h"
 #include "Galois/Runtime/Range.h"
 #include "Galois/Runtime/ll/gio.h"
 #include "Galois/Runtime/ll/ThreadRWlock.h"
 #include "Galois/Runtime/mm/Mem.h"
+
 
 #include "llvm/ADT/SmallVector.h"
 
@@ -194,6 +196,10 @@ public:
     return makeLocalRange (allNItems);
   }
 
+  NItemWL& getContainer() {
+    return allNItems;
+  }
+
   ~PtrBasedNhoodMgr() {
     resetAllNItems();
   }
@@ -201,7 +207,7 @@ public:
 protected:
   struct Reset {
     PtrBasedNhoodMgr* self; 
-    void operator()(NItem* ni) {
+    void operator()(NItem* ni) const {
       ni->clearMapping();
       self->factory.destroy(ni);
     }
@@ -493,7 +499,7 @@ class LCorderedExec {
         ctxtWL (ctxtWL)
     {}
 
-    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (const T& active) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (const T& active) const {
       Ctxt* ctx = ctxtAlloc.allocate (1);
       assert (ctx != NULL);
       // new (ctx) Ctxt (active, nhmgr);
@@ -527,7 +533,7 @@ class LCorderedExec {
         nsrc (nsrc)
     {}
 
-    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (Ctxt* ctx) {
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (Ctxt* ctx) const {
       assert (ctx != NULL);
       // assume nhood of ctx is already expanded
 
@@ -673,7 +679,7 @@ class LCorderedExec {
 
     explicit DelCtxt (CtxtAlloc& ctxtAlloc): ctxtAlloc (ctxtAlloc) {}
 
-    void operator () (Ctxt* ctx) {
+    void operator () (Ctxt* ctx) const {
       ctxtAlloc.destroy (ctx);
       ctxtAlloc.deallocate (ctx, 1);
     }
@@ -740,8 +746,7 @@ public:
     // TODO: code to find global min goes here
 
     t_for.start ();
-    Galois::Runtime::for_each_impl<SrcWL_ty> (
-        Galois::Runtime::makeLocalRange(initSrc),
+    Galois::for_each_local(initSrc,
         ApplyOperator (
           operFunc,
           nhoodVisitor,
@@ -753,7 +758,7 @@ public:
           ctxtDelQ,
           perThUserCtx,
           niter),
-        "apply_operator");
+        Galois::loopname("apply_operator"), Galois::wl<SrcWL_ty>());
     t_for.stop ();
 
     t_destroy.start ();

@@ -38,7 +38,7 @@
 #include "Galois/Statistic.h"
 #include "Galois/Accumulator.h"
 #include "Galois/util/Markable.h"
-#include "Galois/Runtime/PerThreadWorkList.h"
+#include "Galois/Runtime/PerThreadContainer.h"
 #include "Galois/Runtime/DoAllCoupled.h"
 #include "Galois/Runtime/ll/CompilerSpecific.h"
 

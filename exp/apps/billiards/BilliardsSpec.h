@@ -27,7 +27,7 @@
 #define BILLIARDS_SPEC_H
 
 #include "Galois/Graph/Graph.h"
-#include "Galois/Runtime/PerThreadWorkList.h"
+#include "Galois/Runtime/PerThreadContainer.h"
 #include "Galois/Runtime/ROBexecutor.h"
 
 #include "Billiards.h"

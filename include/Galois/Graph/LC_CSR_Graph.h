@@ -241,10 +241,10 @@ public:
   }
 
   void constructFrom(FileGraph& graph, unsigned tid, unsigned total) {
-    auto r = graph.divideBy(
+    auto r = graph.divideByNode(
         NodeData::size_of::value + EdgeIndData::size_of::value + LC_CSR_Graph::size_of_out_of_line::value,
         EdgeDst::size_of::value + EdgeData::size_of::value,
-        tid, total);
+        tid, total).first;
     this->setLocalRange(*r.first, *r.second);
     for (FileGraph::iterator ii = r.first, ei = r.second; ii != ei; ++ii) {
       nodeData.constructAt(*ii);

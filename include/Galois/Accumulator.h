@@ -39,22 +39,41 @@ namespace Galois {
  *
  *  void operator()(T& lhs, const T& rhs)
  *
- * Assumes that the initial value yields the identity element for binary functor.
+ * The identity value provided to the constructor is the identity element for the i
+ * binary functor.
+ * i.e. f(x, identity) == x
  */
 template<typename T, typename BinFunc>
 class GReducible {
 protected:
   BinFunc m_func;
   Galois::Runtime::PerThreadStorage<T> m_data;
-  const T m_initial;
+  const T m_identity;
 
-  explicit GReducible(const BinFunc& f, const T& initial): m_func(f), m_initial(initial) { }
+  void initialize (void) {
+    for (unsigned i = 0; i < m_data.size (); ++i) {
+      *(m_data.getRemote (i)) = m_identity;
+    }
+  }
 
 public:
+
   /**
    * @param f the binary functor acting as the reduction operator
+   * @param identity is the identity value for the functor f, 
+   * i.e., f(x,identity) == x
    */
-  explicit GReducible(const BinFunc& f = BinFunc()): m_func(f), m_initial(T()) { }
+  explicit GReducible(const BinFunc& f, const T& identity): m_func(f), m_identity(identity) { 
+    initialize ();
+  }
+
+  /**
+   * @param f the binary functor acting as the reduction operator
+   * default constructor T() assumed to yield identity value
+   */
+  explicit GReducible(const BinFunc& f = BinFunc()): m_func(f), m_identity(T()) {
+    initialize ();
+  }
 
   /**
    * Updates the thread local value by applying the reduction operator to
@@ -74,7 +93,7 @@ public:
     for (unsigned int i = 1; i < m_data.size(); ++i) {
       T& d = *m_data.getRemote(i);
       m_func(d0, d);
-      d = m_initial;
+      d = m_identity;
     }
     return d0;
   }
@@ -88,7 +107,7 @@ public:
     for (unsigned int i = 1; i < m_data.size(); ++i) {
       T& d = *m_data.getRemote(i);
       fn(d0, d);
-      d = m_initial;
+      d = m_identity;
     }
     return d0;
   }
@@ -98,7 +117,7 @@ public:
    */
   void reset() {
     for (unsigned int i = 0; i < m_data.size(); ++i) {
-      *m_data.getRemote(i) = m_initial;
+      *m_data.getRemote(i) = m_identity;
     }
   }
 };
@@ -198,15 +217,28 @@ template<typename T, typename BinFunc>
 class GSimpleReducible: public GReducible<T, ReduceAssignWrap<BinFunc> >  {
   typedef GReducible<T, ReduceAssignWrap<BinFunc> > base_type;
 public:
-  explicit GSimpleReducible(const BinFunc& func = BinFunc()): base_type(func) { }
+  explicit GSimpleReducible(const BinFunc& func = BinFunc(), const T& identity=T()): base_type(func, identity) { }
+
+  //! read-only reduction on values computed by each thread, 
+  //! valid outside parallel section
+  //! use inside parallel section at your own risk
+  T reduceRO () const {
+    T d0 = *this->m_data.getRemote(0);
+    for (unsigned int i = 1; i < this->m_data.size(); ++i) {
+      const T& d = *this->m_data.getRemote(i);
+      this->m_func(d0, d);
+    }
+    return d0;
+  }
 };
 
 //! Accumulator for T where accumulation is sum
 template<typename T>
-class GAccumulator: public GReducible<T, ReduceAssignWrap<std::plus<T> > > {
-  typedef GReducible<T, ReduceAssignWrap<std::plus<T> > > base_type;
+class GAccumulator: public GSimpleReducible<T, std::plus<T> > {
+  typedef GSimpleReducible<T, std::plus<T> > base_type;
 
 public:
+
   GAccumulator& operator+=(const T& rhs) {
     base_type::update(rhs);
     return *this;
@@ -217,14 +249,6 @@ public:
     return *this;
  }
 
-  T unsafeRead() const {
-    T d0 = *this->m_data.getRemote(0);
-    for (unsigned int i = 1; i < this->m_data.size(); ++i) {
-      const T& d = *this->m_data.getRemote(i);
-      this->m_func(d0, d);
-    }
-    return d0;
-  }
 };
 
 //! General accumulator for collections following STL interface where
@@ -304,18 +328,33 @@ public:
 
 //! Accumulator for T where accumulation is max
 template<typename T>
-class GReduceMax: public GReducible<T, ReduceAssignWrap<gmax<T> > > {
-  typedef GReducible<T, ReduceAssignWrap<gmax<T> > > base_type;
+class GReduceMax: public GSimpleReducible<T, gmax<T> > {
+  typedef GSimpleReducible<T, gmax<T> > base_type;
 public:
-  GReduceMax(): base_type(ReduceAssignWrap<gmax<T> >(), std::numeric_limits<T>::min()) { }
+  GReduceMax(): base_type(gmax<T> (), std::numeric_limits<T>::min()) { }
 };
 
 //! Accumulator for T where accumulation is min
 template<typename T>
-class GReduceMin: public GReducible<T, ReduceAssignWrap<gmin<T> > > {
-  typedef GReducible<T, ReduceAssignWrap<gmin<T> > > base_type;
+class GReduceMin: public GSimpleReducible<T, gmin<T > > {
+  typedef GSimpleReducible<T, gmin<T> > base_type;
 public:
-  GReduceMin(): base_type(ReduceAssignWrap<gmin<T> >(), std::numeric_limits<T>::max()) { }
+  GReduceMin(): base_type(gmin<T> (), std::numeric_limits<T>::max()) { }
+};
+
+
+//! logical AND reduction
+class GReduceLogicalAND: public GSimpleReducible<bool, std::logical_and<bool> > {
+  typedef GSimpleReducible<bool, std::logical_and<bool> > base_type;
+public:
+  GReduceLogicalAND (void): base_type (std::logical_and<bool> (), true) {}
+};
+
+class GReduceLogicalOR: public GSimpleReducible<bool, std::logical_or<bool> > {
+  typedef GSimpleReducible<bool, std::logical_or<bool> > base_type;
+public:
+  GReduceLogicalOR (void): base_type (std::logical_or<bool> (), false) {}
+
 };
 
 }

@@ -5,7 +5,7 @@
  * Galois, a framework to exploit amorphous data-parallelism in irregular
  * programs.
  *
- * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
+ * Copyright (C) 2014, The University of Texas at Austin. All rights reserved.
  * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
  * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
  * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
@@ -22,8 +22,10 @@
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#include "Galois/Runtime/ParallelWork.h"
 #include "Galois/Graph/FileGraph.h"
+#include "Galois/Runtime/ThreadPool.h"
+#include "Galois/Runtime/ll/HWTopo.h"
+#include "Galois/Runtime/ll/TID.h"
 
 #include <pthread.h>
 
@@ -31,7 +33,7 @@ namespace Galois {
 namespace Graph {
 
 void FileGraph::fromFileInterleaved(const std::string& filename, size_t sizeofEdgeData) {
-  fromFile(filename, false);
+  fromFile(filename);
 
   pthread_mutex_t lock;
   pthread_cond_t cond;
@@ -52,7 +54,7 @@ void FileGraph::fromFileInterleaved(const std::string& filename, size_t sizeofEd
       GALOIS_DIE("PTHREAD");
 
     if (Galois::Runtime::LL::isPackageLeaderForSelf(tid)) {
-      pageIn(Galois::Runtime::LL::getPackageForThread(tid), maxPackages, sizeofEdgeData);
+      pageInByNode(Galois::Runtime::LL::getPackageForThread(tid), maxPackages, sizeofEdgeData);
       if (--count == 0) {
         if (pthread_cond_broadcast(&cond))
           GALOIS_DIE("PTHREAD");

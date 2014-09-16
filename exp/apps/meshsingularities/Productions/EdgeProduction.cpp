@@ -284,6 +284,8 @@ Graph *EdgeProduction::getGraph()
 
 void EdgeProduction::Execute(EProduction productionToExecute, Vertex* v, EquationSystem* input)
 {
+    //printf("Vertex size: %d x %d\n", v->system->n, v->system->n);
+
 	switch (productionToExecute) {
 	case EProduction::B:
 		B(v, input);
@@ -292,7 +294,7 @@ void EdgeProduction::Execute(EProduction productionToExecute, Vertex* v, Equatio
 		C(v, input);
 		break;
 	case EProduction::D:
-		D(v, input);
+        D(v, input);
 		break;
 	case EProduction::MB:
 		MB(v);
@@ -328,7 +330,7 @@ void EdgeProduction::Execute(EProduction productionToExecute, Vertex* v, Equatio
 		BSMBLeaf(v);
 		break;
 	case EProduction::BSC:
-		BSC(v,input);
+        BSC(v,input);
 		break;
 	case EProduction::BSD:
 		BSD(v,input);
@@ -336,7 +338,6 @@ void EdgeProduction::Execute(EProduction productionToExecute, Vertex* v, Equatio
 	case EProduction::BSB:
 		BSB(v,input);
 		break;
-
 	default:
 		printf("Invalid production!\n");
 		break;

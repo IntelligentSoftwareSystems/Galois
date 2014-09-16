@@ -91,8 +91,6 @@ struct GetPointer: public std::unary_function<Point&,Point*> {
 //! Our main functor
 template<int Version=detBase>
 struct Process {
-  typedef int tt_needs_per_iter_alloc;
-  typedef int tt_does_not_need_push;
   typedef Galois::PerIterAllocTy Alloc;
 
   QuadTree* tree;
@@ -211,8 +209,12 @@ struct Process {
     Cavity<Alloc> cav;
     LocalState(Process<Version>& self, Galois::PerIterAllocTy& alloc): cav(*graph, alloc) { }
   };
-  typedef LocalState GaloisDeterministicLocalState;
-  static_assert(Galois::has_deterministic_local_state<Process>::value, "Oops");
+
+  typedef std::tuple<
+    Galois::has_deterministic_local_state<LocalState>,
+    Galois::needs_per_iter_alloc<>,
+    Galois::does_not_need_push<>
+    > function_traits;
 
   //! Parallel operator
   void operator()(Point* p, Galois::UserContext<Point*>& ctx) {
@@ -457,7 +459,7 @@ struct GenerateRounds {
   
   GenerateRounds(const PointList& p, size_t l): points(p), log2(l) { }
 
-  void operator()(size_t index) {
+  void operator()(size_t index) const {
     const Point& p = points[index];
 
     Point* ptr = &basePoints.push(p);
@@ -637,6 +639,7 @@ static void writeMesh(const std::string& filename) {
 
 static void generateMesh() {
   typedef Galois::WorkList::AltChunkedLIFO<32> Chunked;
+  typedef Galois::WorkList::Deterministic<> DWL;
 
   for (int i = maxRounds - 1; i >= 0; --i) {
     Galois::StatTimer BT("buildtree");
@@ -652,12 +655,19 @@ static void generateMesh() {
       case nondet:
         Galois::for_each_local(pptrs, Process<>(&tree), Galois::wl<Chunked>()); break;
       case detBase:
-        Galois::for_each_det(pptrs.begin(), pptrs.end(), Process<>(&tree)); break;
+        Galois::for_each_local(pptrs, Process<>(&tree), Galois::wl<DWL>()); break;
       case detPrefix:
-        Galois::for_each_det(pptrs.begin(), pptrs.end(), Process<detPrefix>(&tree), Process<>(&tree));
+        Galois::for_each_local(pptrs, Process<>(&tree), Galois::wl<DWL>(),
+#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1400
+            Galois::has_neighborhood_visitor<Process<detPrefix>>(Process<detPrefix>(&tree))
+#else
+            Galois::make_trait_with_args<Galois::has_neighborhood_visitor>(Process<detPrefix>(&tree))
+#endif
+              );
         break;
       case detDisjoint:
-        Galois::for_each_det(pptrs.begin(), pptrs.end(), Process<detDisjoint>(&tree)); break;
+        Galois::for_each_local(pptrs, Process<detDisjoint>(&tree), Galois::wl<DWL>());
+        break;
       default: GALOIS_DIE("Unknown algorithm: ", detAlgo);
     }
     PT.stop();
