@@ -93,10 +93,12 @@ private:
   template<typename HeapTy, bool C = Concurrent>
   auto extend_first(HeapTy& heap) -> typename std::enable_if<C>::type {
     Block* b = alloc_block(heap);
-    Block* f = first;
-    b->next = f;
-    if (!first.compare_exchange_strong(f, b))
-      heap.deallocate(b);
+    while (true) {
+      Block* f = first.load(std::memory_order_relaxed);
+      b->next = f;
+      if (first.compare_exchange_weak(f, b))
+        return;
+    }
   }
 
   template<typename HeapTy, bool C = Concurrent>
