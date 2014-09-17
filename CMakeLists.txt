@@ -165,6 +165,11 @@ if(USE_EXP)
   if(TBB_FOUND)
     include_directories(${TBB_INCLUDE_DIRS})
   endif()
+  
+  find_package(CBLAS)
+  if(CBLAS_FOUND)
+    include_directories(${BLAS_INCLUDE_DIRS})
+  endif()
 
   if(USE_PROF)
     add_definitions(-DGALOIS_USE_PROF)

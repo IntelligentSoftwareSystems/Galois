@@ -1,3 +1,5 @@
-add_subdirectory(DAGSolver)
-#add_subdirectory(Productions)
-add_subdirectory(tests)
+if(CBLAS_FOUND)
+  add_subdirectory(DAGSolver)
+  #add_subdirectory(Productions)
+  add_subdirectory(tests)
+endif()
