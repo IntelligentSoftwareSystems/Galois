@@ -102,7 +102,7 @@ private:
   }
 
   template<typename HeapTy, bool C = Concurrent>
-  auto extend_first(HeapTy& heap) ->typename std::enable_if<!C>::type {
+  auto extend_first(HeapTy& heap) -> typename std::enable_if<!C>::type {
     Block* b = alloc_block(heap);
     b->next = first;
     first = b;
@@ -121,6 +121,7 @@ private:
   template<typename U, bool C = Concurrent>
   auto shrink_first(Block* old_first, U&& arg) -> typename std::enable_if<C>::type {
     if (first.compare_exchange_strong(old_first, old_first->next)) {
+      //old_first->clear();
       free_block(std::forward<U>(arg), old_first);
     }
   }
@@ -130,6 +131,7 @@ private:
     if (first != old_first)
       return;
     first = old_first->next;
+    //old_first->clear();
     free_block(std::forward<U>(arg), old_first);
   }
 
@@ -137,7 +139,6 @@ private:
   void _clear(U&& arg) {
     Block *b = get_first();
     while (b) {
-      b->clear();
       shrink_first(b, std::forward<U>(arg));
       b = get_first();
     }
@@ -165,7 +166,7 @@ public:
     typename Block::iterator,
     std::forward_iterator_tag, 
     GetBegin,
-    GetEnd > iterator;
+    GetEnd> iterator;
   typedef Galois::TwoLevelIteratorA<
     outer_iterator<const Block>,
     typename Block::const_iterator,

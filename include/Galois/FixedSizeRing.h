@@ -115,7 +115,7 @@ public:
   auto push_front(const value_type& val) -> typename std::enable_if<C,pointer>::type {
     unsigned top;
     do {
-      top = count;
+      top = count.load(std::memory_order_relaxed);
       if (top >= ChunkSize)
         return nullptr;
     } while (!count.compare_exchange_weak(top, top + 1));
@@ -167,7 +167,7 @@ public:
   auto pop_front() -> typename std::enable_if<C, bool>::type {
     unsigned top;
     do {
-      top = count;
+      top = count.load(std::memory_order_relaxed);
       if (top == 0)
         return false;
     } while (!count.compare_exchange_weak(top, top - 1));
