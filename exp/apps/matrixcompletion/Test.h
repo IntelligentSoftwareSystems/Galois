@@ -143,12 +143,14 @@ struct AsynchronousAlternatingLeastSquaresAlgo {
       return;
 
     if (col < NUM_ITEM_NODES) {
+      g.getData(col);
       for (Sp::InnerIterator it(AT, col); it; ++it)
-        g.getData(it.row());
+        g.getData(it.row() + NUM_ITEM_NODES, Galois::MethodFlag::ALL | Galois::MethodFlag::INTENT_TO_READ);
     } else {
       col = col - NUM_ITEM_NODES;
+      g.getData(col + NUM_ITEM_NODES);
       for (Sp::InnerIterator it(A, col); it; ++it)
-        g.getData(it.row());
+        g.getData(it.row(), Galois::MethodFlag::ALL | Galois::MethodFlag::INTENT_TO_READ);
     }
   }
 
@@ -158,7 +160,6 @@ struct AsynchronousAlternatingLeastSquaresAlgo {
   {
     // Compute WTW = W^T * W for sparse A
     V& r = *rhs.getLocal();
-    visit(g, col);
     if (col < NUM_ITEM_NODES) {
       r.setConstant(0);
       // HTAT = HT * AT; r = HTAT.col(col)
@@ -190,6 +191,7 @@ struct AsynchronousAlternatingLeastSquaresAlgo {
   struct NonDetTraits { };
   struct IKDGTraits {
     typedef int tt_needs_per_iter_alloc;
+    typedef int tt_has_intent_to_read;
   };
   struct AddRemoveTraits {
     typedef int tt_needs_per_iter_alloc;
@@ -233,9 +235,11 @@ struct AsynchronousAlternatingLeastSquaresAlgo {
     void operator()(size_t col, Galois::UserContext<size_t>& ctx) {
       // TODO(ddn) IKDG version can be improved by read/write
       // TODO(ddn) AddRemove can be improevd by reusing DAG
-      if (DetKind != 0) {
+      if (DetKind == 0) {
+        self.visit(g, col);
+      } else {
         bool used;
-        LocalState* localState = (LocalState*) ctx.getLocalState(used);
+        ctx.getLocalState(used);
         if (!used) {
           self.visit(g, col);
           return;
