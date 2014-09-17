@@ -128,8 +128,8 @@ struct indices_of_non_matching_tags<Tuple, TagsTuple, int_seq<I, Is...> > {
 template<typename S, typename T, typename D,
   typename Seq = typename make_int_seq<std::tuple_size<T>::value>::type,
   typename ResSeq = typename HIDDEN::indices_of_non_matching_tags<S,T,Seq>::type>
-auto get_default_trait_values(S source, T tags, D defaults)
-  -> typename tuple_elements<D, ResSeq>::type
+typename tuple_elements<D, ResSeq>::type
+get_default_trait_values(S source, T tags, D defaults)
 {
   return get_by_indices(defaults, ResSeq {});
 }
