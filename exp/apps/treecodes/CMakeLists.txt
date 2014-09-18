@@ -1,2 +1,2 @@
-app (mergesort MergeSort.cpp EXTLIBS ${TBB_LIBRARIES})
-app (fib Fib.cpp EXTLIBS ${TBB_LIBRARIES})
+app (mergesort MergeSort.cpp)
+app (fib Fib.cpp REQUIRES TBB_FOUND EXTLIBS ${TBB_LIBRARIES})
