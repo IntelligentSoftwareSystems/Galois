@@ -190,7 +190,7 @@ double sumSquaredError(Graph& g) {
   Galois::do_all(g.begin(), g.begin() + NUM_ITEM_NODES, [&](GNode n) {
     for (auto ii = g.edge_begin(n), ei = g.edge_end(n); ii != ei; ++ii) {
       GNode dst = g.getEdgeDst(ii);
-      LatentValue e = predictionError(g.getData(n).latentVector, g.getData(dst).latentVector, -static_cast<LatentValue>(g.getEdgeData(ii)));
+      LatentValue e = predictionError(g.getData(n).latentVector, g.getData(dst).latentVector, g.getEdgeData(ii));
 
       error += (e * e);
     }
@@ -969,7 +969,6 @@ size_t initializeGraphData(Graph& g) {
 #endif
 
   Galois::do_all_local(g, [&](typename Graph::GraphNode n) {
-  //std::for_each(g.begin(), g.end(), [&](typename Graph::GraphNode n) {
     auto& data = g.getData(n);
 
     if (useSameLatentVector) {

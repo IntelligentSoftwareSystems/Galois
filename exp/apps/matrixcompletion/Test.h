@@ -250,6 +250,9 @@ struct AsynchronousAlternatingLeastSquaresAlgo {
   };
 
   void operator()(Graph& g, const StepFunction&) {
+    if (!useSameLatentVector && DetKind != 0) {
+      Galois::Runtime::LL::gWarn("Results are not deterministic with different numbers of threads unless -useSameLatentVector is true");
+    }
     Galois::TimeAccumulator elapsed;
     elapsed.start();
 

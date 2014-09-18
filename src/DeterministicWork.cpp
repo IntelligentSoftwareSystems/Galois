@@ -20,10 +20,8 @@
  *
  * @section Description
  *
- * Barriers
- *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 #include "Galois/Runtime/DeterministicWork.h"
 
-__thread Galois::Runtime::MM::SizedHeapFactory::SizedHeap* Galois::Runtime::DeterministicImpl::listHeap;
+__thread Galois::Runtime::MM::SizedHeapFactory::SizedHeap* Galois::Runtime::DeterministicImpl::dagListHeap;
