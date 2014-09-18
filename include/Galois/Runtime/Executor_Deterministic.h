@@ -1113,8 +1113,8 @@ class Executor:
 
 public:
   Executor(const OptionsTy& o):
-    NewWorkManager<OptionsTy>(o), 
     BreakManager<OptionsTy>(o),
+    NewWorkManager<OptionsTy>(o), 
     options(o),
     barrier(getSystemBarrier()),
     loopname(get_by_supertype<loopname_tag>(o.args).value) 

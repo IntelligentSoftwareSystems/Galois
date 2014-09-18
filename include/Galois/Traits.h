@@ -66,12 +66,14 @@ struct trait_has_value {
   type value;
   trait_has_value(const type& v): value(v) {}
   trait_has_value(type&& v): value(std::move(v)) {}
+  T getValue() const { return value; }
 };
 
 template<typename T, T V>
 struct trait_has_svalue {
   typedef T type;
   static const type value = V;
+  T getValue() const { return V; }
 };
 
 //! @section Utility
@@ -128,8 +130,8 @@ struct indices_of_non_matching_tags<Tuple, TagsTuple, int_seq<I, Is...> > {
 template<typename S, typename T, typename D,
   typename Seq = typename make_int_seq<std::tuple_size<T>::value>::type,
   typename ResSeq = typename HIDDEN::indices_of_non_matching_tags<S,T,Seq>::type>
-auto get_default_trait_values(S source, T tags, D defaults)
-  -> typename tuple_elements<D, ResSeq>::type
+typename tuple_elements<D, ResSeq>::type
+get_default_trait_values(S source, T tags, D defaults)
 {
   return get_by_indices(defaults, ResSeq {});
 }

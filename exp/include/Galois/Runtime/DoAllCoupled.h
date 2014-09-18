@@ -317,7 +317,7 @@ public:
           succ = true;
 
 
-          if (amount == HALF && m_size > chunk_size) {
+          if (amount == HALF && m_size > (decltype(m_size))chunk_size) {
             steal_size = m_size / 2;
           } else {
             steal_size = m_size;
