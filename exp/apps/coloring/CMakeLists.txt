@@ -1,2 +1,11 @@
-app (GraphColoringLocking GraphColoringLocking.cpp)
-app (GraphColoringDAG GraphColoringDAG.cpp)
+if (CMAKE_COMPILER_IS_GNUCC)
+  execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion
+                  OUTPUT_VARIABLE GCC_VERSION)
+  if(GCC_VERSION VERSION_GREATER 4.8 OR GCC_VERSION VERSION_EQUAL 4.8)
+    app (GraphColoringDAG GraphColoringDAG.cpp)
+    app (GraphColoringLocking GraphColoringLocking.cpp)
+  endif()
+else()
+  app (GraphColoringDAG GraphColoringDAG.cpp)
+  app (GraphColoringLocking GraphColoringLocking.cpp)
+endif()
