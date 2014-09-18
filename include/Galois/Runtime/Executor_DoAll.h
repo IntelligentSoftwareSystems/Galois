@@ -170,8 +170,8 @@ void do_all_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
 
   do_all_impl(
       r, fn,
-      get_by_supertype<loopname_tag>(dtpl).value,
-      get_by_supertype<do_all_steal_tag>(dtpl).value);
+      get_by_supertype<loopname_tag>(dtpl).getValue(),
+      get_by_supertype<do_all_steal_tag>(dtpl).getValue());
 }
 
 

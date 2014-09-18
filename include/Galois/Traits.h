@@ -66,12 +66,14 @@ struct trait_has_value {
   type value;
   trait_has_value(const type& v): value(v) {}
   trait_has_value(type&& v): value(std::move(v)) {}
+  T getValue() const { return value; }
 };
 
 template<typename T, T V>
 struct trait_has_svalue {
   typedef T type;
   static const type value = V;
+  T getValue() const { return V; }
 };
 
 //! @section Utility
