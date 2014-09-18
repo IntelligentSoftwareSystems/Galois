@@ -399,71 +399,71 @@ struct reiterator<WLTy, IterTy,
   typedef typename WLTy::template with_iterator<IterTy>::type type;
 };
 
-template<typename Fn, typename T>
-constexpr auto takes_context(int) 
-  -> decltype(std::declval<typename std::result_of<Fn(T&, UserContext<T>&)>::type>(), bool())
-{
-  return true;
-}
+// template<typename Fn, typename T>
+// constexpr auto takes_context(int) 
+//   -> decltype(std::declval<typename std::result_of<Fn(T&, UserContext<T>&)>::type>(), bool())
+// {
+//   return true;
+// }
 
-template<typename Fn, typename T>
-constexpr auto takes_context(...) -> bool
-{
-  return false;
-}
+// template<typename Fn, typename T>
+// constexpr auto takes_context(...) -> bool
+// {
+//   return false;
+// }
 
-template<typename Fn, typename T, typename Enable = void>
-struct MakeTakeContext
-{
-  Fn fn;
+// template<typename Fn, typename T, typename Enable = void>
+// struct MakeTakeContext
+// {
+//   Fn fn;
 
-  void operator()(T& item, UserContext<T>& ctx) const {
-    fn(item);
-  }
-};
+//   void operator()(T& item, UserContext<T>& ctx) const {
+//     fn(item);
+//   }
+// };
 
-template<typename Fn, typename T>
-struct MakeTakeContext<Fn, T, typename std::enable_if<takes_context<Fn, T>(0)>::type>
-{
-  Fn fn;
+// template<typename Fn, typename T>
+// struct MakeTakeContext<Fn, T, typename std::enable_if<takes_context<Fn, T>(0)>::type>
+// {
+//   Fn fn;
 
-  void operator()(T& item, UserContext<T>& ctx) const {
-    fn(item, ctx);
-  }
-};
+//   void operator()(T& item, UserContext<T>& ctx) const {
+//     fn(item, ctx);
+//   }
+// };
 
-template<typename WorkListTy, typename T, typename RangeTy, typename FunctionTy, typename ArgsTy>
-auto for_each_impl_(const RangeTy& range, const FunctionTy& fn, const ArgsTy& args) 
-  -> typename std::enable_if<takes_context<FunctionTy, T>(0)>::type
-{
-  typedef ForEachExecutor<WorkListTy, FunctionTy, ArgsTy> WorkTy;
-  Barrier& barrier = getSystemBarrier();
-  WorkTy W(fn, args);
-  W.init(range);
-  getSystemThreadPool().run(activeThreads,
-                            [&W, &range]() { W.initThread(range); },
-                            std::ref(barrier),
-                            std::ref(W));
-}
+// template<typename WorkListTy, typename T, typename RangeTy, typename FunctionTy, typename ArgsTy>
+// auto for_each_impl_(const RangeTy& range, const FunctionTy& fn, const ArgsTy& args) 
+//   -> typename std::enable_if<takes_context<FunctionTy, T>(0)>::type
+// {
+//   typedef ForEachExecutor<WorkListTy, FunctionTy, ArgsTy> WorkTy;
+//   Barrier& barrier = getSystemBarrier();
+//   WorkTy W(fn, args);
+//   W.init(range);
+//   getSystemThreadPool().run(activeThreads,
+//                             [&W, &range]() { W.initThread(range); },
+//                             std::ref(barrier),
+//                             std::ref(W));
+// }
 
-template<typename WorkListTy, typename T, typename RangeTy, typename FunctionTy, typename ArgsTy>
-auto for_each_impl_(const RangeTy& range, const FunctionTy& fn, const ArgsTy& args) 
-  -> typename std::enable_if<!takes_context<FunctionTy, T>(0)>::type
-{
-  typedef MakeTakeContext<FunctionTy, T> WrappedFunction;
-  auto newArgs = std::tuple_cat(args,
-      get_default_trait_values(args,
-        std::make_tuple(does_not_need_push_tag {}),
-        std::make_tuple(does_not_need_push<> {})));
-  typedef ForEachExecutor<WorkListTy, WrappedFunction, decltype(newArgs)> WorkTy;
-  Barrier& barrier = getSystemBarrier();
-  WorkTy W(WrappedFunction {fn}, newArgs);
-  W.init(range);
-  getSystemThreadPool().run(activeThreads,
-                            [&W, &range]() { W.initThread(range); },
-                            std::ref(barrier),
-                            std::ref(W));
-}
+// template<typename WorkListTy, typename T, typename RangeTy, typename FunctionTy, typename ArgsTy>
+// auto for_each_impl_(const RangeTy& range, const FunctionTy& fn, const ArgsTy& args) 
+//   -> typename std::enable_if<!takes_context<FunctionTy, T>(0)>::type
+// {
+//   typedef MakeTakeContext<FunctionTy, T> WrappedFunction;
+//   auto newArgs = std::tuple_cat(args,
+//       get_default_trait_values(args,
+//         std::make_tuple(does_not_need_push_tag {}),
+//         std::make_tuple(does_not_need_push<> {})));
+//   typedef ForEachExecutor<WorkListTy, WrappedFunction, decltype(newArgs)> WorkTy;
+//   Barrier& barrier = getSystemBarrier();
+//   WorkTy W(WrappedFunction {fn}, newArgs);
+//   W.init(range);
+//   getSystemThreadPool().run(activeThreads,
+//                             [&W, &range]() { W.initThread(range); },
+//                             std::ref(barrier),
+//                             std::ref(W));
+// }
 
 //TODO(ddn): Think about folding in range into args too
 template<typename RangeTy, typename FunctionTy, typename ArgsTy>
@@ -472,8 +472,16 @@ void for_each_impl(const RangeTy& range, const FunctionTy& fn, const ArgsTy& arg
   typedef typename get_type_by_supertype<wl_tag, ArgsTy>::type::type BaseWorkListTy;
   typedef typename reiterator<BaseWorkListTy, typename RangeTy::iterator>::type
     ::template retype<value_type>::type WorkListTy;
+  typedef ForEachExecutor<WorkListTy, FunctionTy, ArgsTy> WorkTy;
 
-  for_each_impl_<WorkListTy, value_type>(range, fn, args);
+  Barrier& barrier = getSystemBarrier();
+  WorkTy W(fn, args);
+  W.init(range);
+  getSystemThreadPool().run(activeThreads,
+                            [&W, &range]() { W.initThread(range); },
+                            std::ref(barrier),
+                            std::ref(W));
+  //  for_each_impl_<WorkListTy, value_type>(range, fn, args);
 }
 
 //! Normalize arguments to for_each

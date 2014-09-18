@@ -25,8 +25,9 @@ int main() {
   // Works without context as well
 #if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1400
 #else
-  Galois::for_each(v.begin(), v.end(), [](int x) { std::cout << x << "\n"; });
-  Galois::for_each_local(b, [](int x) { std::cout << x << "\n"; });
+  //Don't support Context-free versions yet (gcc 4.7 problem)
+  //  Galois::for_each(v.begin(), v.end(), [](int x) { std::cout << x << "\n"; });
+  //Galois::for_each_local(b, [](int x) { std::cout << x << "\n"; });
 #endif
 
   return 0;
