@@ -404,7 +404,6 @@ public:
     p.curIndex = curIndex;
 
     if (UseMonotonic) {
-      auto ii = p.local.begin();
       for (auto ii = p.local.begin(); ii != p.local.end(); ) {
         bool toBreak = ii->second == C;
         ii = p.local.erase(ii);
