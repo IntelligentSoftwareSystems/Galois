@@ -1,15 +1,18 @@
-app (BFSserialWavefront BFSserialWavefront.cpp)
 app (BFSserialFIFO BFSserialFIFO.cpp)
-app (BFSwavefrontLock BFSwavefrontLock.cpp)
-app (BFSwavefrontNolock BFSwavefrontNolock.cpp)
 
 if (CMAKE_COMPILER_IS_GNUCC)
   execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion
                   OUTPUT_VARIABLE GCC_VERSION)
   if(GCC_VERSION VERSION_GREATER 4.8 OR GCC_VERSION VERSION_EQUAL 4.8)
+    app (BFSserialWavefront BFSserialWavefront.cpp)
+    app (BFSwavefrontLock BFSwavefrontLock.cpp)
+    app (BFSwavefrontNolock BFSwavefrontNolock.cpp)
     app (BFSwavefrontCoupled BFSwavefrontCoupled.cpp)
   endif()
 else()
+  app (BFSserialWavefront BFSserialWavefront.cpp)
+  app (BFSwavefrontLock BFSwavefrontLock.cpp)
+  app (BFSwavefrontNolock BFSwavefrontNolock.cpp)
   app (BFSwavefrontCoupled BFSwavefrontCoupled.cpp)
 endif()
 
