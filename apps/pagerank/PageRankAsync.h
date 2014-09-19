@@ -78,7 +78,7 @@ struct AsyncSet {
     }
   };
 
-  void operator()(Graph& graph, PRTy tolerance) {
+  void operator()(Graph& graph, PRTy tolerance, PRTy amp) {
     typedef Galois::WorkList::dChunkedFIFO<16> WL;
     Galois::for_each_local(graph, Process(graph, tolerance), Galois::wl<WL>());
   }

@@ -48,6 +48,7 @@
 #include "PageRank.h"
 #include "PageRankAsync.h"
 #include "PageRankAsyncResidual.h"
+#include "PageRankAsyncPri.h"
 
 namespace cll = llvm::cl;
 
@@ -177,7 +178,7 @@ struct Sync {
     }
   };
 
-  void operator()(Graph& graph, PRTy) {
+  void operator()(Graph& graph, PRTy, PRTy) {
     unsigned int iteration = 0;
     auto numNodes = graph.size();
     while (true) {
@@ -332,81 +333,6 @@ struct SyncUndir {
 
 
 /*------------------------------ asynchronous, global, directed (reference: PagerankDelta) ------------------------------*/
-struct Async {
-  struct LNode {
-    float value;
-    bool flag; // tracking if it is in the worklist
-    LNode(): value(1.0) {}
-    void init() { value = 1.0 - alpha; flag = true; }
-    float getPageRank(int x = 0) { return value; }
-  };
-
-  typedef Galois::Graph::LC_CSR_Graph<LNode,void>
-    ::with_numa_alloc<true>::type
-    InnerGraph;
-  typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
-  typedef Graph::GraphNode GNode;
-
-  void check() {
-    static_assert(std::is_same<std::iterator_traits<Graph::edge_iterator>::iterator_category,
-                  std::random_access_iterator_tag>::value, "Not random");
-    static_assert(std::is_same<std::iterator_traits<InnerGraph::edge_iterator>::iterator_category,
-                std::random_access_iterator_tag>::value, "Not random");
-    static_assert(std::is_same<std::iterator_traits<Graph::in_edge_iterator>::iterator_category,
-              std::random_access_iterator_tag>::value, "Not random");
-  }
-
-
-  std::string name() const { return "Async"; }
-
-  void readGraph(Graph& graph, std::string filename, std::string transposeGraphName) {
-    if (transposeGraphName.size()) {
-      Galois::Graph::readGraph(graph, filename, transposeGraphName); 
-    } else {
-      std::cerr << "Need to pass precomputed graph through -graphTranspose option\n";
-      abort();
-    }
-  }
-
-  struct Process {
-    Graph& graph;
-     
-    Process(Graph& g): graph(g) { }
-
-    void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) {
-      LNode& sdata = graph.getData(src);
-      // the node is processed
-      sdata.flag = false;
-
-      Galois::MethodFlag lockflag = Galois::MethodFlag::NONE;
-
-      double sum = computePageRankInOut(graph, src, 0, lockflag);
-      float value = alpha*sum + (1.0 - alpha);
-      float diff = std::fabs(value - sdata.value);
-      if (diff > tolerance) {
-        sdata.value = value;
-        for (auto jj = graph.edge_begin(src, lockflag), ej = graph.edge_end(src, lockflag); jj != ej; ++jj) {
-          GNode dst = graph.getEdgeDst(jj);
-	  LNode& ddata = graph.getData(dst, lockflag);
-	  // if the node is not in the worklist, then push
-	  if(!ddata.flag) {
-	    ddata.flag = true;
-            ctx.push(dst);
-	  } 
-        }
-      } 
-      
-    }
-
-  };
-
-  void operator()(Graph& graph, PRTy) {
-    typedef Galois::WorkList::dChunkedFIFO<16> WL;
-    Galois::for_each_local(graph, Process(graph), Galois::wl<WL>());
-  }
-};
-
-
 
 /*------------------------------ asynchronous, global, Undirected ------------------------------*/
 /*
@@ -613,175 +539,6 @@ struct AsyncRsdUndir {
 
 
 /*------------------------------ prioritized asynchronous, global, directed ------------------------------*/
-template<typename NTy>
-int pri(const NTy& n) {
-  double d = n.residual / n.deg;
-  //double d = n.residual;
-  return (int)(d * amp); //d > 0.1 ? 0 : 1;//-1*(int)sqrt(-1*d*amp);
-}
-//![WriteGraph]
-
-struct AsyncPrt {
-
-  struct LNode {
-    float pagerank;
-    float residual;
-    unsigned int deg; //FIXME: init this
-    void init() { pagerank = 1.0 - alpha; residual = 0.0; }
-    float getPageRank(int x = 0) { return pagerank; }
-    float getResidual() { return residual; }
-  };
- 
-  typedef Galois::Graph::LC_CSR_Graph<LNode,void>
-    ::with_numa_alloc<true>::type
-    InnerGraph;
-  typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
-  typedef Graph::GraphNode GNode;
-
-  std::string name() const { return "AsyncPrt"; }
-
-  void readGraph(Graph& graph, std::string filename, std::string transposeGraphName) {
-    if (transposeGraphName.size()) {
-      Galois::Graph::readGraph(graph, filename, transposeGraphName); 
-    } else {
-      std::cerr << "Need to pass precomputed graph through -graphTranspose option\n";
-      abort();
-    }
-  }
-
-  struct Process1 {
-    AsyncPrt* self;
-    Graph& graph;
-     
-    Process1(AsyncPrt* s, Graph& g): self(s), graph(g) { }
-
-    void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) const {
-      (*this)(src);
-    }
-
-    void operator()(const GNode& src) const {
-      LNode& data = graph.getData(src);
-      // for each in-coming neighbour, add residual
-      for (auto jj = graph.in_edge_begin(src), ej = graph.in_edge_end(src); jj != ej; ++jj){
-        GNode dst = graph.getInEdgeDst(jj);
-	LNode& ddata = graph.getData(dst);
-	data.residual = (float) data.residual + (float) 1/nout(graph,dst,Galois::MethodFlag::NONE);  
-      }
-      data.residual = alpha*(1.0-alpha)*data.residual;
-    }
-  }; //--- end of Process1
-
-  // define priority
-  typedef std::pair<int, GNode> UpdateRequest;
-  struct UpdateRequestIndexer: public std::unary_function<UpdateRequest, int> {
-  int operator() (const UpdateRequest& val) const {
-    return val.first;
-    }
-  };
-
-  struct Process2 {
-    AsyncPrt* self;
-    Graph& graph;
-     
-    Galois::Statistic& pre;
-    Galois::Statistic& post;
-     
-    Process2(AsyncPrt* s, Graph& g, Galois::Statistic& _pre, Galois::Statistic& _post): self(s), graph(g), pre(_pre), post(_post) { }
-
-    void operator()(const UpdateRequest& srcRq, Galois::UserContext<UpdateRequest>& ctx) {
-      GNode src = srcRq.second;
-
-      Galois::MethodFlag lockflag = Galois::MethodFlag::NONE;
-      //Galois::MethodFlag lockflag = Galois::MethodFlag::ALL;      
-
-      LNode* node = &graph.getData(src, lockflag);
-      if (node->residual < tolerance || pri(*node) != srcRq.first){ 
-	post +=1;
-        return;
-      }
-      
-      node = &graph.getData(src);
-
-      // update pagerank (consider each in-coming edge)
-      double sum = computePageRankInOut(graph, src, 0, lockflag);
-
-      unsigned nopush = 0;
-     
-      // update residual (consider each out-going edge)
-      for (auto jj = graph.edge_begin(src, lockflag), ej = graph.edge_end(src, lockflag); jj != ej; ++jj){
-        GNode dst = graph.getEdgeDst(jj); 
-        LNode& ddata = graph.getData(dst, lockflag);
-	float oldR = ddata.residual; 
-        int oldP = pri(ddata);
-        ddata.residual += node->residual*alpha/nout(graph,src,Galois::MethodFlag::NONE);
-	if (ddata.residual >= tolerance && 
-            (oldP != pri(ddata) || (oldR <= tolerance))) {
-	  ctx.push(std::make_pair(pri(ddata), dst)); 
-	} else {
-          ++nopush;
-        }
-      }
-      if (nopush)
-        pre += nopush;
-
-      node->pagerank = alpha*sum + (1.0-alpha);
-      node->residual = 0.0;
-
-    }
-
-  }; //--- end of Process2
-
-  void operator()(Graph& graph, PRTy) {
-    Galois::do_all_local(graph, [&graph] (GNode n) { graph.getData(n).deg = nout(graph, n, Galois::MethodFlag::NONE) + std::distance(graph.in_edge_begin(n), graph.in_edge_end(n)); });
-
-    Galois::Statistic pre("PrePrune");
-    Galois::Statistic post("PostPrune");
-    std::cout<<"tolerance: "<<tolerance<<", amp: "<<amp<<"\n";
-
-    Galois::do_all_local(graph, Process1(this, graph), Galois::loopname("P1"));
-    
-    using namespace Galois::WorkList;
-    typedef dChunkedFIFO<16> dChunk;
-    typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk>::with_block_period<4>::type OBIM;
-    #ifdef GALOIS_USE_EXP
-    typedef WorkListTracker<UpdateRequestIndexer, OBIM> dOBIM;
-    #else
-    typedef OBIM dOBIM;
-    #endif
-    Galois::InsertBag<UpdateRequest> initialWL;
-    Galois::do_all_local(graph, [&initialWL, &graph] (GNode src) {
-	LNode& data = graph.getData(src);
-        if(data.residual>=tolerance){
-	  initialWL.push_back(std::make_pair(pri(data), src)); 
-        }
-      });
-    Galois::StatTimer T("InnerTime");
-    T.start();
-    Galois::for_each_local(initialWL, Process2(this, graph, pre, post), Galois::wl<OBIM>(), Galois::loopname("mainloop"));   
-    T.stop();
-
-    if(dbg2){
-      bool allsafe = true;
-      Galois::StatTimer Te("ExtraTime");
-      Te.start();
-      for(auto N : graph) {
-        auto& data = graph.getData(N);
-        if (data.residual > tolerance) {
-          allsafe = false;
-          std::cout << N 
-                    << " residual " << data.residual
-                    << " pr " << data.pagerank
-                    << "\n";
-        }
-      }
-      std::cout<<"***** dbg2 allsafe: "<<allsafe<<"\n";
-      Te.stop(); 
-    }
-
-  } 
-
-};
-
 
 
 /*------------------------------ prioritized asynchronous, global, Undirected ------------------------------*/
@@ -1288,7 +1045,7 @@ void run() {
   std::cout << "tolerance: " << tolerance << "\n";
   T.start();
   Galois::do_all_local(graph, [&graph] (typename Graph::GraphNode n) { graph.getData(n).init(); });
-  algo(graph, tolerance);
+  algo(graph, tolerance, amp);
   T.stop();
   
   Galois::reportPageAlloc("MeminfoPost");
@@ -1382,9 +1139,9 @@ int main(int argc, char **argv) {
   T.start();
   switch (algo) {
     case Algo::synch: run<Sync>(); break;
-    case Algo::async: run<Async>(); break;
+    case Algo::async: run<AsyncSet>(); break;
     case Algo::async_rsd: run<AsyncRsd>(); break;
-    case Algo::async_prt: run<AsyncPrt>(); break;
+    case Algo::async_prt: run<AsyncPri>(); break;
     case Algo::async_ppr_rsd: runPPR<PPRAsyncRsd>(); break;
     default: std::cerr << "Unknown algorithm\n"; abort();
   }

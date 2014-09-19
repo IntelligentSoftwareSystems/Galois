@@ -23,7 +23,7 @@
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 
-struct AsyncRsd {
+struct AsyncPri{
   struct LNode {
     PRTy value;
     std::atomic<PRTy> residual; // tracking residual
@@ -35,7 +35,7 @@ struct AsyncRsd {
   typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
 
-  std::string name() const { return "AsyncRsd"; }
+  std::string name() const { return "AsyncPri"; }
 
   void readGraph(Graph& graph, std::string filename, std::string transposeGraphName) {
     if (transposeGraphName.size()) {
@@ -63,12 +63,27 @@ struct AsyncRsd {
       data.residual = sum * alpha*(1.0-alpha);
     }
   }; 
+
+  struct PRPri {
+    Graph& graph;
+    PRTy amp;
+    PRPri(Graph& g, PRTy a) : graph(g), amp(a) {}
+    int operator()(const GNode& src, PRTy d) const {
+      d /= nout(graph, src, Galois::MethodFlag::NONE);
+      return std::max((int)floor(d*amp), 0);
+    }      
+    int operator()(const GNode& src) const {
+      PRTy d = graph.getData(src, Galois::MethodFlag::NONE).residual;
+      return operator()(src, d);
+    }
+  };
   
   struct Process {
     Graph& graph;
     PRTy tolerance;
+    PRPri pri;
 
-    Process(Graph& g, PRTy t): graph(g), tolerance(t) { }
+    Process(Graph& g, PRTy t, PRTy a): graph(g), tolerance(t), pri(g,a) { }
 
     void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) const {
       LNode& sdata = graph.getData(src);
@@ -98,7 +113,9 @@ struct AsyncRsd {
             old = ddata.residual;
           } while (!ddata.residual.compare_exchange_strong(old, old + delta));
 	  // if the node is not in the worklist and the residual is greater than tolerance
-	  if(old < tolerance && old + delta > tolerance)
+	  if((old < tolerance && old + delta > tolerance) ||
+             (pri(dst, old) != pri(dst,old+delta) && old + delta > tolerance)
+             )
             ctx.push(dst);
         }
       }
@@ -108,7 +125,8 @@ struct AsyncRsd {
   void operator()(Graph& graph, PRTy tolerance, PRTy amp) {
     Galois::do_all_local(graph, InitResidual(graph), Galois::loopname("InitResidual"));
     typedef Galois::WorkList::dChunkedFIFO<16> WL;
-    Galois::for_each_local(graph, Process(graph, tolerance), Galois::wl<WL>());
+    typedef Galois::WorkList::OrderedByIntegerMetric<PRPri,WL>::with_block_period<4>::type OBIM;
+    Galois::for_each_local(graph, Process(graph, tolerance, amp), Galois::wl<OBIM>(PRPri{graph, amp}));
   }
 
   void verify(Graph& graph, PRTy tolerance) {    
