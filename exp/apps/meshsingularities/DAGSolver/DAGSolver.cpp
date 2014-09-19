@@ -144,27 +144,23 @@ int main(int argc, char ** argv)
 
     //tree rotation
     if (rotation){
-        //printf("Tree size %d\n\n", m->getRootNode()->treeSize());   // DEBUG
         gettimeofday(&t1, NULL);
         bool balanced=false;
         int iter=0;
         while ((!balanced) && (iter<maxRotations)){
-            //printf("rotating\n");
             balanced=true;
             Analysis::rotate(m->getRootNode(), NULL, m, &balanced);
-            //printf("checking balancing\n");
             if (!balanced){
                 m->getRootNode()->isBalanced(&balanced);
             }
         }
         gettimeofday(&t2, NULL);
-        //printf("\nTree size %d\n", m->getRootNode()->treeSize());   // DEBUG
         print_time("\ttree rotation", &t1, &t2);
-	//m->saveToFile("/h1/mwozniak/dupa.txt");
     }
     
     if (outtreefile.size()){
         m->saveToFile(outtreefile.c_str());
+	exit(0);
     }
 
     gettimeofday(&t1, NULL);
