@@ -197,8 +197,9 @@ public:
     switch (execType) {
       case useAddRem:
         Galois::Runtime::for_each_ordered_lc (
+            Galois::Runtime::makeStandardRange(
             boost::make_transform_iterator(elems.begin(), MakeUpdate()),
-            boost::make_transform_iterator(elems.end(), MakeUpdate()), 
+            boost::make_transform_iterator(elems.end(), MakeUpdate())), 
             Comparator(), nhVisitorAddRem, p, "avi_ordered_loop_lc");
         break;
       case useTwoPhase:
