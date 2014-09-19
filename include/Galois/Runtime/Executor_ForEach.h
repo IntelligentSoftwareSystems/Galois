@@ -333,24 +333,31 @@ protected:
       setThreadContext(0);
   }
 
+  struct T1 {}; struct T2 {};
+
   template<typename... WArgsTy>
-  ForEachExecutor(const FunctionTy& f, const ArgsTy& args, int, const WArgsTy&... wargs):
+  ForEachExecutor(T2, const FunctionTy& f, const ArgsTy& args, const WArgsTy&... wargs):
     term(getSystemTermination()),
     wl(wargs...),
     origFunction(f),
     loopname(get_by_supertype<loopname_tag>(args).value),
     broke(false) { }
 
-  ForEachExecutor(const FunctionTy& f, const ArgsTy& args, int, int_seq<>):
-    ForEachExecutor(f, args, 0) {}
+  template<typename WArgsTy, int... Is>
+  ForEachExecutor(T1, const FunctionTy& f, 
+                  const ArgsTy& args, const WArgsTy& wlargs, int_seq<Is...>):
+    ForEachExecutor(T2{}, f, args, std::get<Is>(wlargs)...) {}
 
-  template<int... Is>
-  ForEachExecutor(const FunctionTy& f, const ArgsTy& args, int, int_seq<Is...>):
-    ForEachExecutor(f, args, 0, std::get<Is...>(get_by_supertype<wl_tag>(args).args)) {}
+  template<typename WArgsTy>
+  ForEachExecutor(T1, const FunctionTy& f, 
+                  const ArgsTy& args, const WArgsTy& wlargs, int_seq<>):
+    ForEachExecutor(T2{}, f, args) {}
 
 public:
   ForEachExecutor(const FunctionTy& f, const ArgsTy& args):
-    ForEachExecutor(f, args, 0, typename make_int_seq<std::tuple_size<decltype(get_by_supertype<wl_tag>(args).args)>::value>::type{}) {}
+    ForEachExecutor(T1{}, f, args, 
+                    get_by_supertype<wl_tag>(args).args, 
+                    typename make_int_seq<std::tuple_size<decltype(get_by_supertype<wl_tag>(args).args)>::value>::type{}) {}
   
   template<typename RangeTy>
   void init(const RangeTy&) { }
