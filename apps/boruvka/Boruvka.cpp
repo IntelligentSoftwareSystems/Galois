@@ -69,6 +69,7 @@ typedef int EdgeData;
 
 struct Node: public Galois::UnionFindNode<Node> {
   std::atomic<EdgeData*> lightest;
+  Node(): Galois::UnionFindNode<Node>(const_cast<Node*>(this)) { }
 };
 
 typedef Galois::Graph::LC_CSR_Graph<Node,EdgeData>
