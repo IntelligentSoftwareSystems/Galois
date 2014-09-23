@@ -250,9 +250,6 @@ struct AsyncALSalgo {
     void operator()(size_t col, Galois::UserContext<size_t>& ctx) {
       // TODO(ddn) IKDG version can be improved by read/write
       // TODO(ddn) AddRemove can be improevd by reusing DAG
-<<<<<<< HEAD
-      if (DetKind == 0) {
-      } else {
       if (algo == asyncALSkdg_i || algo == asyncALSkdg_ar) {
         self.visit(g, col);
         bool used;
