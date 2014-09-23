@@ -49,15 +49,13 @@
 #include "PageRankAsync.h"
 #include "PageRankAsyncResidual.h"
 #include "PageRankAsyncPri.h"
+#include "PageRankAsyncPriSet.h"
 
 namespace cll = llvm::cl;
 
 static const char* name = "Page Rank";
 static const char* desc = "Computes page ranks a la Page and Brin";
 static const char* url = 0;
-//static const float tolerance = 0.0001; // Joyce
-static const float amp = (1/tolerance)*(-1000); // Joyce
-static const float amp2 = (1/tolerance)*(-1); // Joyce
 
 enum Algo {
   graphlab,
@@ -71,6 +69,7 @@ enum Algo {
   async,
   async_rsd,
   async_prt,
+  async_prs,
   async_ppr_rsd
 };
 
@@ -79,8 +78,8 @@ static cll::opt<std::string> transposeGraphName("graphTranspose", cll::desc("Tra
 cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations"), cll::init(10000000));
 cll::opt<unsigned int> memoryLimit("memoryLimit",
     cll::desc("Memory limit for out-of-core algorithms (in MB)"), cll::init(~0U));
-//static cll::opt<int> amp("amp", cll::desc("amp for priority"), cll::init(-100));
-//static cll::opt<float> tolerance("tolerance", cll::desc("tolerance"), cll::init(0.01));
+static cll::opt<int> amp("amp", cll::desc("amp for priority"), cll::init(100));
+static cll::opt<float> tolerance("tolerance", cll::desc("tolerance"), cll::init(0.01));
 static cll::opt<bool> dbg("dbg", cll::desc("dbg"), cll::init(false));
 static cll::opt<bool> dbg2("dbg2", cll::desc("dbg2"), cll::init(false));
 static cll::opt<std::string> algo_str("algo_str", cll::desc("algo_str"), cll::init("NA"));
@@ -89,8 +88,10 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
       clEnumValN(Algo::pull, "pull", "Use precomputed data perform pull-based algorithm"),
       clEnumValN(Algo::pull2, "pull2", "Use pull-based algorithm"),
       clEnumValN(Algo::synch, "synch", "Synchronous version..."),
+      clEnumValN(Algo::async, "async", "Asynchronous versoin..."),
       clEnumValN(Algo::async_rsd, "async_rsd", "Residual-based asynchronous version..."),
       clEnumValN(Algo::async_prt, "async_prt", "Prioritized (degree biased residual) version..."),
+      clEnumValN(Algo::async_prs, "async_prs", "Prioritized Bulk Sync version..."),
       clEnumValN(Algo::async_ppr_rsd, "async_ppr_rsd", "Asyncronous PPR"),
 #ifdef GALOIS_USE_EXP
       clEnumValN(Algo::graphlab, "graphlab", "Use GraphLab programming model"),
@@ -1045,7 +1046,7 @@ void run() {
   std::cout << "tolerance: " << tolerance << "\n";
   T.start();
   Galois::do_all_local(graph, [&graph] (typename Graph::GraphNode n) { graph.getData(n).init(); });
-  algo(graph, tolerance, amp);
+  algo(graph, tolerance, -amp/tolerance);
   T.stop();
   
   Galois::reportPageAlloc("MeminfoPost");
@@ -1120,16 +1121,6 @@ void runPPR() {
 
 
 
-
-
-
-
-
-
-
-
-
-
 /*------------------------------ Main ------------------------------*/
 int main(int argc, char **argv) {
   LonestarStart(argc, argv, name, desc, url);
@@ -1142,6 +1133,7 @@ int main(int argc, char **argv) {
     case Algo::async: run<AsyncSet>(); break;
     case Algo::async_rsd: run<AsyncRsd>(); break;
     case Algo::async_prt: run<AsyncPri>(); break;
+    case Algo::async_prs: run<AsyncPriSet>(); break;
     case Algo::async_ppr_rsd: runPPR<PPRAsyncRsd>(); break;
     default: std::cerr << "Unknown algorithm\n"; abort();
   }

@@ -202,6 +202,11 @@ public:
     destruct();
   }
 
+  void swap(InsertBag& o) {
+    std::swap(heap, o.heap);
+    std::swap(heads, o.heads);
+  }
+
   typedef T value_type;
   typedef T* pointer;
   typedef const T* const_pointer;
