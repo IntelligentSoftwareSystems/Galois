@@ -55,7 +55,7 @@ private:
   template<typename U>
   class outer_iterator: public boost::iterator_facade<outer_iterator<U>, U, boost::forward_traversal_tag> {
     friend class boost::iterator_core_access;
-    Block* cur;
+    U* cur;
 
     void increment() { cur = cur->next; }
 
@@ -65,7 +65,7 @@ private:
     U& dereference() const { return *cur; }
 
   public:
-    outer_iterator(Block* c = 0): cur(c) {}
+    outer_iterator(U* c = 0): cur(c) {}
 
     template<typename OtherTy>
     outer_iterator(const outer_iterator<OtherTy>& o): cur(o.cur) {}
@@ -93,14 +93,16 @@ private:
   template<typename HeapTy, bool C = Concurrent>
   auto extend_first(HeapTy& heap) -> typename std::enable_if<C>::type {
     Block* b = alloc_block(heap);
-    Block* f = first;
-    b->next = f;
-    if (!first.compare_exchange_strong(f, b))
-      heap.deallocate(b);
+    while (true) {
+      Block* f = first.load(std::memory_order_relaxed);
+      b->next = f;
+      if (first.compare_exchange_weak(f, b))
+        return;
+    }
   }
 
   template<typename HeapTy, bool C = Concurrent>
-  auto extend_first(HeapTy& heap) ->typename std::enable_if<!C>::type {
+  auto extend_first(HeapTy& heap) -> typename std::enable_if<!C>::type {
     Block* b = alloc_block(heap);
     b->next = first;
     first = b;
@@ -119,6 +121,7 @@ private:
   template<typename U, bool C = Concurrent>
   auto shrink_first(Block* old_first, U&& arg) -> typename std::enable_if<C>::type {
     if (first.compare_exchange_strong(old_first, old_first->next)) {
+      //old_first->clear();
       free_block(std::forward<U>(arg), old_first);
     }
   }
@@ -128,6 +131,7 @@ private:
     if (first != old_first)
       return;
     first = old_first->next;
+    //old_first->clear();
     free_block(std::forward<U>(arg), old_first);
   }
 
@@ -135,7 +139,6 @@ private:
   void _clear(U&& arg) {
     Block *b = get_first();
     while (b) {
-      b->clear();
       shrink_first(b, std::forward<U>(arg));
       b = get_first();
     }
@@ -163,7 +166,7 @@ public:
     typename Block::iterator,
     std::forward_iterator_tag, 
     GetBegin,
-    GetEnd > iterator;
+    GetEnd> iterator;
   typedef Galois::TwoLevelIteratorA<
     outer_iterator<const Block>,
     typename Block::const_iterator,
@@ -202,11 +205,11 @@ public:
   }
 
   const_iterator begin() const {
-    return Galois::make_two_level_iterator(outer_iterator<const Block>(get_first()), outer_iterator<Block>(nullptr)).first;
+    return Galois::make_two_level_iterator(outer_iterator<const Block>(get_first()), outer_iterator<const Block>(nullptr)).first;
   }
 
   const_iterator end() const {
-    return Galois::make_two_level_iterator(outer_iterator<const Block>(get_first()), outer_iterator<Block>(nullptr)).second;
+    return Galois::make_two_level_iterator(outer_iterator<const Block>(get_first()), outer_iterator<const Block>(nullptr)).second;
   }
 
   bool empty() const {

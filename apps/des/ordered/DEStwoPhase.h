@@ -149,7 +149,7 @@ class DEStwoPhase:
         graph.getData (recvInfo.node, Galois::MethodFlag::CHECK_CONFLICT);
 
       } else {
-        Galois::Runtime::signalConflict (NULL);
+        Galois::Runtime::signalConflict ();
       }
     }
   };

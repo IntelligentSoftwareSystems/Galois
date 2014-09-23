@@ -109,6 +109,15 @@ struct Node: public Galois::UnionFindNode<Node> {
   typedef Node* component_type;
   unsigned int id;
 
+  Node(): Galois::UnionFindNode<Node>(const_cast<Node*>(this)) { }
+  Node(const Node& o): Galois::UnionFindNode<Node>(o.m_component), id(o.id) { }
+
+  Node& operator=(const Node& o) {
+    Node c(o);
+    std::swap(c, *this);
+    return *this;
+  }
+
   component_type component() { return this->findAndCompress(); }
 };
 

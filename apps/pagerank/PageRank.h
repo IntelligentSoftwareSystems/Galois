@@ -3,6 +3,8 @@
 
 #include "llvm/Support/CommandLine.h"
 
+#include <iostream>
+
 //! d is the damping factor. Alpha is the prob that user will do a random jump, i.e., 1 - d
 static const float alpha = 1.0 - 0.85;
 static const float alpha2 = 0.85; // Joyce changed to this which is a usual way to define alpha.
@@ -11,8 +13,8 @@ static const float alpha2 = 0.85; // Joyce changed to this which is a usual way 
 //static const float tolerance = 0.01; 
 static const float tolerance = 0.0001; // Joyce
 
-//ICC v13.1 doesn't yet support std::atomic<float> completely, emmulate its
-//behavor with std::atomic<int>
+//ICC v13.1 doesn't yet support std::atomic<float> completely, emulate its
+//behavior with std::atomic<int>
 struct atomic_float : public std::atomic<int> {
   static_assert(sizeof(int) == sizeof(float), "int and float must be the same size");
 
@@ -43,6 +45,53 @@ struct PNode {
 
   float getPageRank() { return value; }
 };
+
+//! Make values unique
+template<typename GNode>
+struct TopPair {
+  float value;
+  GNode id;
+
+  TopPair(double v, GNode i): value(v), id(i) { }
+
+  bool operator<(const TopPair& b) const {
+    if (value == b.value)
+      return id > b.id;
+    return value < b.value;
+  }
+};
+
+template<typename Graph>
+static void printTop(Graph& graph, int topn) {
+  typedef typename Graph::GraphNode GNode;
+  typedef TopPair<GNode> Pair;
+  typedef std::map<Pair,GNode> Top;
+
+  Top top;
+
+  for (auto ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+    GNode src = *ii;
+    auto& n = graph.getData(src);
+    auto value = n.getPageRank();
+    Pair key(value, src);
+
+    if ((int) top.size() < topn) {
+      top.insert(std::make_pair(key, src));
+      continue;
+    }
+
+    if (top.begin()->first < key) {
+      top.erase(top.begin());
+      top.insert(std::make_pair(key, src));
+    }
+  }
+
+  int rank = 1;
+  std::cout << "Rank PageRank Id\n";
+  for (typename Top::reverse_iterator ii = top.rbegin(), ei = top.rend(); ii != ei; ++ii, ++rank) {
+    std::cout << rank << ": " << ii->first.value << " " << ii->first.id << "\n";
+  }
+}
 
 extern llvm::cl::opt<unsigned int> memoryLimit;
 extern llvm::cl::opt<std::string> filename;

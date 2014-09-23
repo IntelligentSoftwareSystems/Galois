@@ -54,7 +54,7 @@ class BilliardsTwoPhase: public Billiards {
       }
 
       if (!indep) {
-        Galois::Runtime::signalConflict (NULL);
+        Galois::Runtime::signalConflict ();
       }
     }
   };

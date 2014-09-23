@@ -30,6 +30,7 @@
 #include "Galois/gslist.h"
 #include "Galois/Threads.h"
 #include "Galois/TwoLevelIteratorA.h"
+#include "Galois/UnionFind.h"
 #include "Galois/ParallelSTL/ParallelSTL.h"
 #include "Galois/Runtime/Barrier.h"
 #include "Galois/Runtime/Executor_ForEach.h"
@@ -57,26 +58,46 @@
 // TODO fixed neighborhood: cyclic scheduling 
 // TODO fixed neighborhood: reduce list contention
 // TODO fixed neighborhood: profile, reuse graph 
+// TODO fixed neighborhood: still ~2X slower than implicit version on bfs
 namespace Galois {
 namespace Runtime {
 //! Implementation of deterministic execution
 namespace DeterministicImpl {
 
-extern __thread MM::SizedHeapFactory::SizedHeap* listHeap;
+extern __thread MM::SizedHeapFactory::SizedHeap* dagListHeap;
 
-template<typename T>
-struct DItem {
+template<typename T, bool UseLocalState>
+class DItemBase {
+public:
   T val;
   unsigned long id;
-  void *localState;
 
-  DItem(const T& _val, unsigned long _id): val(_val), id(_id), localState(NULL) { }
+  DItemBase(const T& _val, unsigned long _id): val(_val), id(_id) { }
+  void* getLocalState() const { return nullptr; }
+  void setLocalState(void*) { }
 };
 
-template<typename OptionsTy, bool HasFixedNeighborhood>
+template<typename T>
+class DItemBase<T, true> {
+public:
+  T val;
+private:
+  void *localState;
+public:
+  unsigned long id;
+
+  DItemBase(const T& _val, unsigned long _id): val(_val), localState(nullptr), id(_id) { }
+  void* getLocalState() const { return localState; }
+  void setLocalState(void* ptr) { localState = ptr; }
+};
+
+template<typename OptionsTy>
+using DItem = DItemBase<typename OptionsTy::value_type, OptionsTy::useLocalState>;
+
+template<typename OptionsTy, bool HasFixedNeighborhood, bool HasIntentToRead>
 class DeterministicContextBase: public SimpleRuntimeContext {
 public:
-  typedef DItem<typename OptionsTy::value_type> Item;
+  typedef DItem<OptionsTy> Item;
   Item item;
 
 private:
@@ -89,7 +110,7 @@ public:
 
   bool isReady() { return !notReady; }
 
-  virtual void subAcquire(Lockable* lockable) { 
+  virtual void subAcquire(Lockable* lockable, Galois::MethodFlag) { 
     if (getPending() == COMMITTING)
       return;
 
@@ -117,14 +138,142 @@ public:
       other->notReady = true;
     }
   }
+
+  static void initialize() { }
+};
+
+class HasIntentToReadContext: public SimpleRuntimeContext {
+public:
+  unsigned long id;
+  bool notReady;
+  bool isWriter;
+
+  HasIntentToReadContext(unsigned long id, bool w):
+    SimpleRuntimeContext(true), id(id), notReady(false), isWriter(w) { }
+
+  bool isReady() { return !notReady; }
+};
+
+class ReaderContext: public Galois::UnionFindNode<ReaderContext>, public HasIntentToReadContext {
+  template<typename, bool, bool>
+    friend class DeterministicContextBase;
+
+public:
+  ReaderContext(unsigned long id): 
+    Galois::UnionFindNode<ReaderContext>(const_cast<ReaderContext*>(this)),
+    HasIntentToReadContext(id, false) { }
+
+  void build() {
+    if (this->isReady())
+      return;
+    ReaderContext* r = this->find();
+    if (r->isReady())
+      r->notReady = true;
+  }
+
+  bool propagate() {
+    return this->find()->isReady();
+  }
 };
 
 template<typename OptionsTy>
-class DeterministicContextBase<OptionsTy, true>: public SimpleRuntimeContext {
+class DeterministicContextBase<OptionsTy, false, true>: public HasIntentToReadContext {
 public:
-  typedef DItem<typename OptionsTy::value_type> Item;
+  typedef DItem<OptionsTy> Item;
+  Item item;
+
+private:
+  ReaderContext readerCtx;
+
+  void acquireRead(Lockable* lockable) {
+    HasIntentToReadContext* other;
+    do {
+      other = static_cast<HasIntentToReadContext*>(this->getOwner(lockable));
+      if (other == this || other == &readerCtx)
+        return;
+      if (other) {
+        bool conflict = other->id < this->id;
+        if (conflict) {
+          if (other->isWriter)
+            readerCtx.notReady = true;
+          else
+            readerCtx.merge(static_cast<ReaderContext*>(other));
+          return;
+        }
+      }
+    } while (!readerCtx.stealByCAS(lockable, other));
+
+    // Disable loser
+    if (other) {
+      if (other->isWriter) {
+        // Only need atomic write
+        other->notReady = true;
+      } else {
+        static_cast<ReaderContext*>(other)->merge(&readerCtx);
+      }
+    }
+  }
+
+  void acquireWrite(Lockable* lockable) {
+    HasIntentToReadContext* other;
+    do {
+      other = static_cast<HasIntentToReadContext*>(this->getOwner(lockable));
+      if (other == this || other == &readerCtx)
+        return;
+      if (other) {
+        bool conflict = other->id < this->id;
+        if (conflict) {
+          // A lock that I want but can't get
+          this->notReady = true;
+          return;
+        }
+      }
+    } while (!this->stealByCAS(lockable, other));
+
+    // Disable loser
+    if (other) {
+      // Only need atomic write
+      other->notReady = true;
+    }
+  }
+
+public:
+  DeterministicContextBase(const Item& i):
+    HasIntentToReadContext(i.id, true), item(i), readerCtx(i.id) { }
+
+  void clear() { }
+
+  void build() {
+    readerCtx.build();
+  }
+
+  void propagate() {
+    if (this->isReady() && !readerCtx.propagate())
+      this->notReady = true;
+  }
+
+  virtual void subAcquire(Lockable* lockable, Galois::MethodFlag m) { 
+    if (getPending() == COMMITTING)
+      return;
+    
+    if (this->tryLock(lockable))
+      this->addToNhood(lockable);
+
+    if (m & MethodFlag::INTENT_TO_READ) {
+      acquireRead(lockable);
+    } else {
+      acquireWrite(lockable);
+    }
+  }
+
+  static void initialize() { }
+};
+
+template<typename OptionsTy>
+class DeterministicContextBase<OptionsTy, true, false>: public SimpleRuntimeContext {
+public:
+  typedef DItem<OptionsTy> Item;
   typedef Galois::concurrent_gslist<DeterministicContextBase*,8> ContextList;
-  //typedef Galois::gslist<DeterministicContextBase*,16> ContextList;
   Item item;
   ContextList edges;
   ContextList succs;
@@ -146,18 +295,18 @@ public:
     assert(preds == 0);
     this->commitIteration();
     // TODO replace with bulk heap
-    edges.clear(*listHeap);
-    succs.clear(*listHeap);
+    edges.clear(*dagListHeap);
+    succs.clear(*dagListHeap);
   }
 
   void addEdge(DeterministicContextBase* o) {
-    succs.push_front(*listHeap, o);
+    succs.push_front(*dagListHeap, o);
     o->preds += 1;
   }
 
   bool isReady() { return false; }
 
-  virtual void subAcquire(Lockable* lockable) {
+  virtual void subAcquire(Lockable* lockable, Galois::MethodFlag) {
     if (getPending() == COMMITTING)
       return;
 
@@ -174,12 +323,22 @@ public:
 
     if (std::find(edges.begin(), edges.end(), owner) != edges.end())
       return;
-    edges.push_front(*listHeap, owner);
+    edges.push_front(*dagListHeap, owner);
+  }
+
+  static void initialize() {
+    if (!dagListHeap)
+      dagListHeap = MM::SizedHeapFactory::getHeapForSize(sizeof(typename ContextList::block_type));
   }
 };
 
 template<typename OptionsTy>
-using DeterministicContext = DeterministicContextBase<OptionsTy, OptionsTy::hasFixedNeighborhood>;
+class DeterministicContextBase<OptionsTy, true, true> {
+  // TODO implement me
+};
+
+template<typename OptionsTy>
+using DeterministicContext = DeterministicContextBase<OptionsTy, OptionsTy::hasFixedNeighborhood, OptionsTy::hasIntentToRead>;
 
 template<typename T>
 struct DNewItem { 
@@ -287,12 +446,15 @@ struct OptionsCommon {
   static const bool hasId = exists_by_supertype<has_deterministic_id_tag, ArgsTy>::value;
 
   static const bool useLocalState = exists_by_supertype<has_deterministic_local_state_tag, ArgsTy>::value;
-  // TODO enable when working better, still ~2X slower than implicit version on bfs
-  static const bool hasFixedNeighborhood = exists_by_supertype<has_fixed_neighborhood_tag, ArgsTy>::value && false;
+  static const bool hasFixedNeighborhood = exists_by_supertype<has_fixed_neighborhood_tag, ArgsTy>::value;
+  static const bool hasIntentToRead = exists_by_supertype<has_intent_to_read_tag, ArgsTy>::value;
 
   static const int ChunkSize = 32;
   static const unsigned InitialNumRounds = 100;
   static const size_t MinDelta = ChunkSize * 40;
+
+  static_assert(!hasFixedNeighborhood || (hasFixedNeighborhood && hasId), 
+      "Please provide id function when operator has fixed neighborhood");
 
   function2_type fn2;
   args_type args;
@@ -330,7 +492,6 @@ template<typename OptionsTy, bool Enable>
 class DAGManagerBase {
   typedef DeterministicContext<OptionsTy> Context;
 public:
-  void initializeDAGManager() { }
   void destroyDAGManager() { }
   void pushDAGTask(Context* ctx) { }
   bool buildDAG() { return false; }
@@ -363,13 +524,7 @@ class DAGManagerBase<OptionsTy,true> {
 public:
   DAGManagerBase(): term(getSystemTermination()), barrier(getSystemBarrier()) { }
 
-  void initializeDAGManager() { 
-    if (!listHeap)
-      listHeap = MM::SizedHeapFactory::getHeapForSize(sizeof(typename Context::ContextList::block_type));
-  }
-  
   void destroyDAGManager() {
-    // not needed since listHeap is a global fixed size allocator
     data.getLocal()->heap.clear();
   }
 
@@ -469,12 +624,12 @@ struct StateManagerBase {
   typedef typename OptionsTy::function2_type function_type;
   void allocLocalState(UserContextAccess<value_type>&, function_type& self) { }
   void deallocLocalState(UserContextAccess<value_type>&) { }
-  void saveLocalState(UserContextAccess<value_type>&, void*&) { }
-  void restoreLocalState(UserContextAccess<value_type>&, void*) { } 
-  void reuseItem(DItem<value_type>& item) { }
+  void saveLocalState(UserContextAccess<value_type>&, DItem<OptionsTy>&) { }
+  void restoreLocalState(UserContextAccess<value_type>&, const DItem<OptionsTy>&) { } 
+  void reuseItem(DItem<OptionsTy>& item) { }
 
   template<typename LWL, typename GWL>
-  typename GWL::value_type* emplaceContext(LWL& lwl, GWL& gwl, const DItem<value_type>& item) const {
+  typename GWL::value_type* emplaceContext(LWL& lwl, GWL& gwl, const DItem<OptionsTy>& item) const {
     return gwl.emplace(item);
   }
   
@@ -509,17 +664,17 @@ struct StateManagerBase<OptionsTy, true> {
       p->~LocalState();
   }
 
-  void saveLocalState(UserContextAccess<value_type>& c, void*& localState) { 
+  void saveLocalState(UserContextAccess<value_type>& c, DItem<OptionsTy>& item) { 
     bool dummy;
-    localState = c.data().getLocalState(dummy);
+    item.setLocalState(c.data().getLocalState(dummy));
   }
 
-  void restoreLocalState(UserContextAccess<value_type>& c, void* localState) { 
-    c.setLocalState(localState, true);
+  void restoreLocalState(UserContextAccess<value_type>& c, const DItem<OptionsTy>& item) { 
+    c.setLocalState(item.getLocalState(), true);
   }
 
   template<typename LWL, typename GWL>
-  typename LWL::value_type* emplaceContext(LWL& lwl, GWL& gwl, const DItem<value_type>& item) const {
+  typename LWL::value_type* emplaceContext(LWL& lwl, GWL& gwl, const DItem<OptionsTy>& item) const {
     return lwl.emplace(item);
   }
 
@@ -533,14 +688,15 @@ struct StateManagerBase<OptionsTy, true> {
     lwl.pop_peeked();
   }
 
-  void reuseItem(DItem<value_type>& item) { item.localState = NULL; }
+  void reuseItem(DItem<OptionsTy>& item) { item.setLocalState(nullptr); }
 };
 
 template<typename OptionsTy>
 using StateManager = StateManagerBase<OptionsTy, OptionsTy::useLocalState>;
 
 template<typename OptionsTy, bool Enable>
-struct BreakManagerBase {
+class BreakManagerBase {
+public:
   bool checkBreak() { return false; }
   BreakManagerBase(const OptionsTy&) { }
 };
@@ -567,6 +723,45 @@ public:
 
 template<typename OptionsTy>
 using BreakManager = BreakManagerBase<OptionsTy, OptionsTy::hasBreak>;
+
+
+template<typename OptionsTy, bool Enable>
+class IntentToReadManagerBase {
+  typedef DeterministicContext<OptionsTy> Context;
+public:
+  void pushIntentToReadTask(Context* ctx) { }
+  bool buildIntentToRead() { return false; }
+};
+
+template<typename OptionsTy>
+class IntentToReadManagerBase<OptionsTy, true> {
+  typedef DeterministicContext<OptionsTy> Context;
+  typedef Galois::gdeque<Context*> WL;
+  Galois::Runtime::PerThreadStorage<WL> pending;
+  Barrier& barrier;
+
+public:
+  IntentToReadManagerBase(): barrier(getSystemBarrier()) { }
+
+  void pushIntentToReadTask(Context* ctx) {
+    pending.getLocal()->push_back(ctx);
+  }
+
+  // NB(ddn): Need to gather information from dependees before commitLoop
+  // otherwise some contexts will be deallocated before we have time to check
+  bool buildIntentToRead() {
+    for (Context* ctx : *pending.getLocal())
+      ctx->build();
+    barrier.wait();
+    for (Context* ctx : *pending.getLocal())
+      ctx->propagate();
+    pending.getLocal()->clear();
+    return true;
+  }
+};
+
+template<typename OptionsTy>
+using IntentToReadManager = IntentToReadManagerBase<OptionsTy, OptionsTy::hasIntentToRead>;
 
 template<typename OptionsTy, bool Enable>
 class WindowManagerBase {
@@ -640,9 +835,10 @@ public:
 
     if (commitRatio >= target)
       local.delta += local.delta;
-    else if (allcommitted == 0) // special case when we don't execute anything
+    else if (allcommitted == 0) {
+      assert(0 && "someone should have committed");
       local.delta += local.delta;
-    else
+    } else
       local.delta = commitRatio / target * local.delta;
 
     if (!inner) {
@@ -724,7 +920,7 @@ using IdManager = IdManagerBase<OptionsTy, OptionsTy::hasId>;
 template<typename OptionsTy>
 class NewWorkManager: public IdManager<OptionsTy> {
   typedef typename OptionsTy::value_type value_type;
-  typedef DItem<value_type> Item;
+  typedef DItem<OptionsTy> Item;
   typedef DNewItem<value_type> NewItem;
   typedef std::vector<NewItem, typename PerIterAllocTy::rebind<NewItem>::other> NewItemsTy;
   typedef typename NewItemsTy::iterator NewItemsIterator;
@@ -1063,10 +1259,11 @@ class Executor:
   public StateManager<OptionsTy>,
   public NewWorkManager<OptionsTy>,
   public WindowManager<OptionsTy>,
-  public DAGManager<OptionsTy> 
+  public DAGManager<OptionsTy>,
+  public IntentToReadManager<OptionsTy>
 {
   typedef typename OptionsTy::value_type value_type;
-  typedef DItem<value_type> Item;
+  typedef DItem<OptionsTy> Item;
   typedef DeterministicContext<OptionsTy> Context;
 
   typedef WorkList::dChunkedFIFO<OptionsTy::ChunkSize,Item> WL;
@@ -1127,7 +1324,7 @@ public:
 
   template<typename RangeTy>
   void initThread(const RangeTy& range) {
-    this->initializeDAGManager();
+    Context::initialize();
     this->addInitialWork(*this, range.begin(), range.end(), &worklists[1]);
   }
 
@@ -1164,6 +1361,9 @@ void Executor<OptionsTy>::go() {
       barrier.wait();
 
       if (this->buildDAG())
+        barrier.wait();
+
+      if (this->buildIntentToRead())
         barrier.wait();
 
       bool nextCommit = false;
@@ -1278,7 +1478,7 @@ bool Executor<OptionsTy>::pendingLoop(ThreadLocalData& tld)
       tld.facing.resetAlloc();
 
     if (commit || OptionsTy::hasFixedNeighborhood) {
-      this->saveLocalState(tld.facing, ctx->item.localState);
+      this->saveLocalState(tld.facing, ctx->item);
     } else {
       retval = true;
     }
@@ -1291,7 +1491,7 @@ template<typename OptionsTy>
 bool Executor<OptionsTy>::executeTask(ThreadLocalData& tld, Context* ctx) 
 {
   setThreadContext(ctx);
-  this->restoreLocalState(tld.facing, ctx->item.localState);
+  this->restoreLocalState(tld.facing, ctx->item);
   int result = 0;
 #ifdef GALOIS_USE_LONGJMP
   if ((result = setjmp(hackjmp)) == 0) {

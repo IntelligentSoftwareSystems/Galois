@@ -137,7 +137,7 @@ public:
   }
 
   //! Force the abort of this iteration
-  void abort() { Galois::Runtime::forceAbort(); }
+  void abort() { Galois::Runtime::signalConflict(); }
 
   //! Store and retrieve local state for deterministic
   void* getLocalState(bool& used) { used = localStateUsed; return localState; }

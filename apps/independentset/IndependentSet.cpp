@@ -129,9 +129,16 @@ struct Process {
     LocalState(Process<Version>& self, Galois::PerIterAllocTy& alloc): mod(false) { }
   };
 
+  struct DeterministicId {
+    uintptr_t operator()(const GNode& x) const {
+      return x;
+    }
+  };
+
   typedef std::tuple<
     Galois::does_not_need_push<>,
     Galois::needs_per_iter_alloc<>,
+    Galois::has_deterministic_id<DeterministicId>,
     Galois::has_deterministic_local_state<LocalState>
   > function_traits;
 

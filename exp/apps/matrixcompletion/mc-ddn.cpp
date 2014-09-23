@@ -24,6 +24,7 @@
 
 #include "Galois/config.h"
 #include "Galois/Accumulator.h"
+#include "Galois/DetSchedules.h"
 #include "Galois/Galois.h"
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
@@ -31,6 +32,7 @@
 #include "Galois/Graph/LCGraph.h"
 #include "Galois/ParallelSTL/ParallelSTL.h"
 #include "Galois/Runtime/ll/PaddedLock.h"
+#include "Galois/Runtime/ll/EnvCheck.h"
 #include "Galois/Runtime/TiledExecutor.h"
 #include "Lonestar/BoilerPlate.h"
 
@@ -49,12 +51,20 @@
 #include <Eigen/Dense>
 #endif
 
+#ifdef _OPENMP
+#include <omp.h>
+#endif
+
 static const char* const name = "Matrix Completion";
 static const char* const desc = "Computes Matrix Decomposition using Stochastic Gradient Descent";
 static const char* const url = 0;
 
 enum Algo {
-  alternatingLeastSquares,
+  syncALS,
+  asyncALSkdg_i,
+  asyncALSkdg_ar,
+  asyncALSchromatic,
+  simpleALS,
   blockedEdge,
   blockedEdgeServer,
   blockJump,
@@ -106,7 +116,11 @@ static cll::opt<int> fixedRounds("fixedRounds", cll::desc("run for a fixed numbe
 static cll::opt<bool> useExactError("useExactError", cll::desc("use exact error for testing convergence"), cll::init(false));
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
   cll::values(
-    clEnumValN(Algo::alternatingLeastSquares, "als", "Alternating least squares"),
+    clEnumValN(Algo::syncALS, "syncALS", "Alternating least squares"),
+    clEnumValN(Algo::simpleALS, "simpleALS", "Simple alternating least squares"),
+    clEnumValN(Algo::asyncALSkdg_i, "asyncALSkdg_i", "Asynchronous alternating least squares"),
+    clEnumValN(Algo::asyncALSkdg_ar, "asyncALSkdg_ar", "Asynchronous alternating least squares"),
+    clEnumValN(Algo::asyncALSchromatic, "asyncALSchromatic", "Asynchronous alternating least squares"),
     clEnumValN(Algo::blockedEdge, "blockedEdge", "Edge blocking (default)"),
     clEnumValN(Algo::blockedEdgeServer, "blockedEdgeServer", "Edge blocking with server support"),
     clEnumValN(Algo::blockJump, "blockJump", "Block jumping "),
@@ -114,6 +128,7 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
     clEnumValN(Algo::dotProductRecursiveTiling, "dotProductRecursiveTiling", "Dot product recursive tiling test"),
   clEnumValEnd), 
   cll::init(Algo::blockedEdge));
+
 static cll::opt<Step> learningRateFunction("learningRateFunction", cll::desc("Choose learning rate function:"),
   cll::values(
     clEnumValN(Step::intel, "intel", "Intel"),
@@ -123,10 +138,13 @@ static cll::opt<Step> learningRateFunction("learningRateFunction", cll::desc("Ch
     clEnumValN(Step::inverse, "inverse", "Inverse"),
   clEnumValEnd), 
   cll::init(Step::bold));
+
 static cll::opt<int> serverPort("serverPort", cll::desc("enter server mode on specified port"), cll::init(-1));
+
 static cll::opt<bool> useSameLatentVector("useSameLatentVector",
     cll::desc("initialize all nodes to use same latent vector"),
     cll::init(false));
+
 static cll::opt<int> cutoff("cutoff");
 
 size_t NUM_ITEM_NODES = 0;
@@ -177,7 +195,7 @@ double sumSquaredError(Graph& g) {
   Galois::do_all(g.begin(), g.begin() + NUM_ITEM_NODES, [&](GNode n) {
     for (auto ii = g.edge_begin(n), ei = g.edge_end(n); ii != ei; ++ii) {
       GNode dst = g.getEdgeDst(ii);
-      LatentValue e = predictionError(g.getData(n).latentVector, g.getData(dst).latentVector, -static_cast<LatentValue>(g.getEdgeData(ii)));
+      LatentValue e = predictionError(g.getData(n).latentVector, g.getData(dst).latentVector, g.getEdgeData(ii));
 
       error += (e * e);
     }
@@ -391,6 +409,7 @@ class BlockedEdgeAlgo {
   }
 
 public:
+  bool isSgd() const { return true; }
   typedef typename Galois::Graph::LC_CSR_Graph<Node, unsigned int>
     //::template with_numa_alloc<true>::type
     ::template with_out_of_line_lockable<true>::type
@@ -559,7 +578,6 @@ private:
     void operator()(Task& task, Galois::UserContext<Task>& ctx) {
 #if 1
       if (std::try_lock(xLocks[task.x], yLocks[task.y]) >= 0) {
-        //Galois::Runtime::forceAbort();
         ctx.push(task);
         return;
       }
@@ -956,7 +974,6 @@ size_t initializeGraphData(Graph& g) {
 #endif
 
   Galois::do_all_local(g, [&](typename Graph::GraphNode n) {
-  //std::for_each(g.begin(), g.end(), [&](typename Graph::GraphNode n) {
     auto& data = g.getData(n);
 
     if (useSameLatentVector) {
@@ -1043,12 +1060,16 @@ void run() {
 
   std::cout
     << "latent vector size: " << LATENT_VECTOR_SIZE
-    << " lambda: " << lambda
-    << " learning rate: " << learningRate
-    << " decay rate: " << decayRate
     << " algo: " << algo.name()
-    << " step function: " << sf->name()
-    << "\n";
+    << " lambda: " << lambda;
+  if (algo.isSgd()) {
+    std::cout
+      << " learning rate: " << learningRate
+      << " decay rate: " << decayRate
+      << " step function: " << sf->name();
+  }
+
+  std::cout << "\n";
       
   if (!skipVerify) {
     verify(g, "Initial");
@@ -1085,7 +1106,11 @@ int main(int argc, char** argv) {
 
   switch (algo) {
 #ifdef HAS_EIGEN
-    case Algo::alternatingLeastSquares: run<AlternatingLeastSquaresAlgo>(); break;
+    case Algo::syncALS: run<AsyncALSalgo<syncALS>>(); break;
+    case Algo::simpleALS: run<SimpleALSalgo>(); break;
+    case Algo::asyncALSkdg_i: run<AsyncALSalgo<asyncALSkdg_i>>(); break;
+    case Algo::asyncALSkdg_ar: run<AsyncALSalgo<asyncALSkdg_ar>>(); break;
+    case Algo::asyncALSchromatic: run<AsyncALSalgo<asyncALSchromatic>>(); break;
 #endif
     case Algo::blockedEdge: run<BlockedEdgeAlgo<false> >(); break;
     case Algo::blockedEdgeServer: run<BlockedEdgeAlgo<true> >(); break;

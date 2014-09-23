@@ -86,6 +86,8 @@ struct TData: public Galois::UnionFindNode<TData> {
   double values[8];
   unsigned int id;
 
+  TData(): Galois::UnionFindNode<TData>(const_cast<TData*>(this)) { }
+
   double getPageRank(unsigned int it) {
     return values[it & (8-1)];
   }
@@ -95,7 +97,9 @@ struct TData: public Galois::UnionFindNode<TData> {
   }
 };
 
-struct GData: public Galois::UnionFindNode<GData> { };
+struct GData: public Galois::UnionFindNode<GData> { 
+  GData(): Galois::UnionFindNode<GData>(const_cast<GData*>(this)) { }
+};
 
 // A graph and its transpose. The main operation in pagerank is computing
 // values based on incoming edges, so we will mainly use the transpose of G,

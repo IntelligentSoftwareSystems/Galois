@@ -951,53 +951,6 @@ static void precomputePullData() {
 }
 //![WriteGraph]
 
-//! Make values unique
-template<typename GNode>
-struct TopPair {
-  float value;
-  GNode id;
-
-  TopPair(float v, GNode i): value(v), id(i) { }
-
-  bool operator<(const TopPair& b) const {
-    if (value == b.value)
-      return id > b.id;
-    return value < b.value;
-  }
-};
-
-template<typename Graph>
-static void printTop(Graph& graph, int topn) {
-  typedef typename Graph::GraphNode GNode;
-  typedef typename Graph::node_data_reference node_data_reference;
-  typedef TopPair<GNode> Pair;
-  typedef std::map<Pair,GNode> Top;
-
-  Top top;
-
-  for (auto ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
-    GNode src = *ii;
-    node_data_reference n = graph.getData(src);
-    float value = n.getPageRank();
-    Pair key(value, src);
-
-    if ((int) top.size() < topn) {
-      top.insert(std::make_pair(key, src));
-      continue;
-    }
-
-    if (top.begin()->first < key) {
-      top.erase(top.begin());
-      top.insert(std::make_pair(key, src));
-    }
-  }
-
-  int rank = 1;
-  std::cout << "Rank PageRank Id\n";
-  for (typename Top::reverse_iterator ii = top.rbegin(), ei = top.rend(); ii != ei; ++ii, ++rank) {
-    std::cout << rank << ": " << ii->first.value << " " << ii->first.id << "\n";
-  }
-}
 
 template<typename Algo>
 void run() {

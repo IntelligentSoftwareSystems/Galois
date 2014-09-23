@@ -536,7 +536,7 @@ protected:
 } // end anonymous namespace
 
 template <typename R, typename Cmp, typename NhFunc, typename OpFunc>
-void for_each_ordered_2p_win (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const char* loopname=0) {
+void for_each_ordered_2p_win (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const char* loopname=0, bool wakeupThreadPool=true) {
 
   using T = typename R::value_type;
   // using WindowWL = SortedRangeWindowWL<T, Cmp>;
@@ -549,14 +549,20 @@ void for_each_ordered_2p_win (const R& range, const Cmp& cmp, const NhFunc& nhFu
   
   Exec e (cmp, nhFunc, opFunc);
 
-  getSystemThreadPool ().burnPower (Galois::getActiveThreads ());
+  if (wakeupThreadPool) {
+    getSystemThreadPool ().burnPower (Galois::getActiveThreads ());
+  }
+
   e.fill_initial (range);
   e.execute ();
-  getSystemThreadPool ().beKind ();
+
+  if (wakeupThreadPool) {
+    getSystemThreadPool ().beKind ();
+  }
 }
 
 template <typename R, typename Cmp, typename NhFunc, typename OpFunc, typename SL>
-void for_each_ordered_2p_win (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const SL& serialLoop, const char* loopname=0) {
+void for_each_ordered_2p_win (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const SL& serialLoop, const char* loopname=0, bool wakeupThreadPool=true) {
 
   using T = typename R::value_type;
   using WindowWL = PQbasedWindowWL<T, Cmp>;
@@ -565,10 +571,16 @@ void for_each_ordered_2p_win (const R& range, const Cmp& cmp, const NhFunc& nhFu
   
   Exec e (cmp, nhFunc, opFunc, serialLoop);
 
-  getSystemThreadPool ().burnPower (Galois::getActiveThreads ());
+  if (wakeupThreadPool) {
+    getSystemThreadPool ().burnPower (Galois::getActiveThreads ());
+  }
+
   e.fill_initial (range);
   e.execute ();
-  getSystemThreadPool ().beKind ();
+
+  if (wakeupThreadPool) {
+    getSystemThreadPool ().beKind ();
+  }
 }
 
 

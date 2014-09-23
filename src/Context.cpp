@@ -106,10 +106,6 @@ void Galois::Runtime::signalConflict(Lockable* lockable) {
 #endif
 }
 
-void Galois::Runtime::forceAbort() {
-  signalConflict(NULL);
-}
-
 ////////////////////////////////////////////////////////////////////////////////
 // LockManagerBase & SimpleRuntimeContext
 ////////////////////////////////////////////////////////////////////////////////
@@ -137,10 +133,10 @@ Galois::Runtime::LockManagerBase::tryAcquire(Galois::Runtime::Lockable* lockable
   return FAIL;
 }
 
-void Galois::Runtime::SimpleRuntimeContext::acquire(Galois::Runtime::Lockable* lockable) {
+void Galois::Runtime::SimpleRuntimeContext::acquire(Galois::Runtime::Lockable* lockable, Galois::MethodFlag m) {
   AcquireStatus i;
   if (customAcquire) {
-    subAcquire(lockable);
+    subAcquire(lockable, m);
   } else if ((i = tryAcquire(lockable)) != AcquireStatus::FAIL) {
     if (i == AcquireStatus::NEW_OWNER) {
       addToNhood(lockable);
@@ -179,7 +175,7 @@ unsigned Galois::Runtime::SimpleRuntimeContext::cancelIteration() {
 }
 #endif
 
-void Galois::Runtime::SimpleRuntimeContext::subAcquire(Galois::Runtime::Lockable* lockable) {
+void Galois::Runtime::SimpleRuntimeContext::subAcquire(Galois::Runtime::Lockable* lockable, Galois::MethodFlag) {
   GALOIS_DIE("Shouldn't get here");
 }
 

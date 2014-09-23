@@ -59,7 +59,9 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
       clEnumValEnd), cll::init(blockedasync));
 
 struct Node: public Galois::UnionFindNode<Node> {
-  Node*& component() { return m_component; }
+  Node(): Galois::UnionFindNode<Node>(const_cast<Node*>(this)) { }
+  Node* component() { return find(); }
+  void setComponent(Node* n) { m_component = n; }
 };
 
 typedef Galois::Graph::LC_Linear_Graph<Node,void>
@@ -95,7 +97,7 @@ struct DemoAlgo {
       Node& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
       if (ddata.component() == root)
         continue;
-      ddata.component() = root;
+      ddata.setComponent(root);
       mst.push(std::make_pair(src, dst));
       ctx.push(dst);
     }
@@ -137,7 +139,7 @@ struct AsyncAlgo {
   struct Normalize {
     void operator()(const GNode& src) const {
       Node& sdata = graph.getData(src, Galois::MethodFlag::NONE);
-      sdata.component() = sdata.findAndCompress();
+      sdata.setComponent(sdata.findAndCompress());
     }
   };
 
@@ -205,7 +207,7 @@ struct BlockedAsyncAlgo {
   struct Normalize {
     void operator()(const GNode& src) const {
       Node& sdata = graph.getData(src, Galois::MethodFlag::NONE);
-      sdata.component() = sdata.findAndCompress();
+      sdata.setComponent(sdata.findAndCompress());
     }
   };
 

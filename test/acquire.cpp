@@ -18,7 +18,7 @@ int main(int argc, char** argv) {
   t.start();
  
   for (int x = 0; x < numAcquires; ++x)
-    Galois::Runtime::doAcquire(&L);
+    Galois::Runtime::acquire(&L, Galois::MethodFlag::ALL);
   
   t.stop();
   std::cout << "Locking time: " << t.get() << " ms after " << numAcquires << "\n";
