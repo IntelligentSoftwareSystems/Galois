@@ -66,46 +66,8 @@ protected:
   void readGraph (void) {
     Galois::Graph::readGraph (graph, inputFile, transposeFile);
 
-    const size_t numNodes = graph.size ();
-    Galois::GAccumulator<size_t> numEdges;
-
-    Galois::StatTimer t_init ("initialization time: ");
-    
-    t_init.start ();
-    Galois::on_each (
-        [&] (const unsigned tid, const unsigned numT) {
-
-          size_t num_per = (numNodes + numT - 1) / numT;
-          size_t beg = tid * num_per;
-          size_t end = std::min (numNodes, (tid + 1) * num_per);
-
-          auto it_beg = graph.begin ();
-          std::advance (it_beg, beg);
-
-          auto it_end = it_beg; 
-          std::advance (it_end, (end - beg));
-
-          for (; it_beg != it_end; ++it_beg) {
-
-            size_t deg = std::distance (
-              graph.edge_begin (*it_beg, Galois::NONE),
-              graph.edge_end (*it_beg, Galois::NONE));
-
-            // graph.getData (*it_beg, Galois::NONE) = NodeData (beg++);
-            auto* ndptr = &(graph.getData (*it_beg, Galois::NONE));
-            ndptr->~NodeData();
-            new (ndptr) NodeData (beg++, deg);
-            
-            numEdges.update (deg);
-          }
-
-
-        },
-        Galois::loopname ("initialize"));
-
-    t_init.stop ();
-
-    std::printf ("Graph read with %zd nodes and %zd edges\n", numNodes, numEdges.reduceRO ());
+    std::printf ("Graph read with %zd nodes and %zd edges\n", 
+        graph.size (), graph.sizeEdges ());
   }
 
   template <bool useOnWL, typename C>

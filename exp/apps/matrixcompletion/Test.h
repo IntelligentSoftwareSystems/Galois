@@ -69,20 +69,31 @@ struct DotProductFixedTilingAlgo {
 };
 
 #ifdef HAS_EIGEN
-template<bool BulkSynchronous, int DetKind>
-struct AsynchronousAlternatingLeastSquaresAlgo {
+
+template<Algo algo>
+struct AsyncALSalgo {
+
   bool isSgd() const { return false; }
+
   std::string name() const { return "AsynchronousAlternatingLeastSquares"; }
-  struct Node { 
+
+  
+  struct EmptyBase {};
+
+  typedef typename std::conditional<algo == asyncALSchromatic,
+          Galois::Runtime::DAGdata,
+          EmptyBase>::type NodeBase;
+
+  // TODO: fix compilation when inheriting from NodeBase
+  struct Node: public Galois::Runtime::DAGdata { 
     LatentValue latentVector[LATENT_VECTOR_SIZE];
   };
 
-  static_assert((BulkSynchronous && DetKind == 0) || (!BulkSynchronous), "BulkSynchronous is always deterministic");
-
+  static const bool NEEDS_LOCKS = algo == asyncALSkdg_i || asyncALSkdg_ar;
   typedef typename Galois::Graph::LC_CSR_Graph<Node, unsigned int> BaseGraph;
-  typedef typename std::conditional<BulkSynchronous,
-          typename BaseGraph::template with_no_lockable<true>::type,
-          typename BaseGraph::template with_out_of_line_lockable<true>::type>::type Graph;
+  typedef typename std::conditional<NEEDS_LOCKS,
+          typename BaseGraph::template with_out_of_line_lockable<true>::type,
+          typename BaseGraph::template with_no_lockable<true>::type>::type Graph;
   typedef typename Graph::GraphNode GNode;
   // Column-major access 
   typedef Eigen::SparseMatrix<LatentValue> Sp;
@@ -91,6 +102,9 @@ struct AsynchronousAlternatingLeastSquaresAlgo {
   typedef Eigen::Map<V> MapV;
   typedef Eigen::Matrix<LatentValue, LATENT_VECTOR_SIZE, LATENT_VECTOR_SIZE> XTX;
   typedef Eigen::Matrix<LatentValue, LATENT_VECTOR_SIZE, Eigen::Dynamic> XTSp;
+
+  typedef Galois::Runtime::PerThreadStorage<XTX> PerThrdXTX;
+  typedef Galois::Runtime::PerThreadStorage<V> PerThrdV;
 
   Sp A;
   Sp AT;
@@ -139,27 +153,28 @@ struct AsynchronousAlternatingLeastSquaresAlgo {
   }
 
   void visit(Graph& g, size_t col) {
-    if (BulkSynchronous)
+    if (algo == syncALS)
       return;
 
+    g.getData (GNode (col));
+
     if (col < NUM_ITEM_NODES) {
-      g.getData(col);
       for (Sp::InnerIterator it(AT, col); it; ++it)
         g.getData(it.row() + NUM_ITEM_NODES, Galois::MethodFlag::ALL | Galois::MethodFlag::INTENT_TO_READ);
     } else {
       col = col - NUM_ITEM_NODES;
-      g.getData(col + NUM_ITEM_NODES);
       for (Sp::InnerIterator it(A, col); it; ++it)
         g.getData(it.row(), Galois::MethodFlag::ALL | Galois::MethodFlag::INTENT_TO_READ);
     }
   }
 
   void update(Graph& g, size_t col, MT& WT, MT& HT,
-    Galois::Runtime::PerThreadStorage<XTX>& xtxs,
-    Galois::Runtime::PerThreadStorage<V>& rhs) 
+    PerThrdXTX& xtxs,
+    PerThrdV& rhs) 
   {
     // Compute WTW = W^T * W for sparse A
     V& r = *rhs.getLocal();
+    // visit(g, col); // TODO: confirm commenting out
     if (col < NUM_ITEM_NODES) {
       r.setConstant(0);
       // HTAT = HT * AT; r = HTAT.col(col)
@@ -199,11 +214,11 @@ struct AsynchronousAlternatingLeastSquaresAlgo {
   };
 
   struct Process: 
-    public std::conditional<DetKind == 0, 
+    public std::conditional<(algo != asyncALSkdg_i || algo != asyncALSkdg_ar), 
       NonDetTraits,
-      typename std::conditional<DetKind == 1,
-        IKDGTraits,
-        AddRemoveTraits>::type>::type
+      typename std::conditional<algo == asyncALSkdg_ar,
+        AddRemoveTraits,
+        IKDGTraits>::type>::type
   {
     struct LocalState {
       LocalState(Process&, Galois::PerIterAllocTy&) { }
@@ -216,28 +231,30 @@ struct AsynchronousAlternatingLeastSquaresAlgo {
     }
     static_assert(Galois::has_deterministic_id<Process>::value, "Oops");
 
-    AsynchronousAlternatingLeastSquaresAlgo& self;
+    AsyncALSalgo& self;
     Graph& g;
     MT& WT;
     MT& HT;
-    Galois::Runtime::PerThreadStorage<XTX>& xtxs;
-    Galois::Runtime::PerThreadStorage<V>& rhs;
+    PerThrdXTX& xtxs;
+    PerThrdV& rhs;
 
     Process(
-      AsynchronousAlternatingLeastSquaresAlgo& self,
+      AsyncALSalgo& self,
       Graph& g,
       MT& WT,
       MT& HT,
-      Galois::Runtime::PerThreadStorage<XTX>& xtxs,
-      Galois::Runtime::PerThreadStorage<V>& rhs):
+      PerThrdXTX& xtxs,
+      PerThrdV& rhs):
       self(self), g(g), WT(WT), HT(HT), xtxs(xtxs), rhs(rhs) { }
     
     void operator()(size_t col, Galois::UserContext<size_t>& ctx) {
       // TODO(ddn) IKDG version can be improved by read/write
       // TODO(ddn) AddRemove can be improevd by reusing DAG
+<<<<<<< HEAD
       if (DetKind == 0) {
-        self.visit(g, col);
       } else {
+      if (algo == asyncALSkdg_i || algo == asyncALSkdg_ar) {
+        self.visit(g, col);
         bool used;
         ctx.getLocalState(used);
         if (!used) {
@@ -249,8 +266,70 @@ struct AsynchronousAlternatingLeastSquaresAlgo {
     }
   };
 
+  // Code for invoking Chromatic and Edge Flipping schedulers
+  struct EigenGraphVisitor {
+
+    struct VisitSuccs {
+      Graph& g;
+      Sp& A;
+      Sp& AT;
+
+      template <typename F>
+      void operator () (GNode src, F& func) {
+        size_t col = src;
+        if (col < NUM_ITEM_NODES) {
+          for (Sp::InnerIterator it (AT, col); it; ++it) {
+            GNode dst = it.row ();
+            func (dst);
+          }
+
+        } else {
+          col = col - NUM_ITEM_NODES;
+          for (Sp::InnerIterator it (A, col); it; ++it) {
+            GNode dst = it.row ();
+            func (dst);
+          }
+        }
+      }
+
+    };
+
+    struct VisitPreds {
+
+
+      template <typename F>
+      void operator () (GNode src, F& func) const {} // logic implemented in succs
+    };
+
+    typedef Galois::Runtime::DAGmanager<Graph, VisitPreds, VisitSuccs> Base_ty;
+
+    struct Manager: public Base_ty {
+      Manager (Graph& g, Sp& A, Sp& AT): 
+        Base_ty {g, VisitPreds{}, VisitSuccs {g, A, AT} }
+        {}
+    };
+  };
+
+  struct ApplyUpdate {
+
+    static const unsigned CHUNK_SIZE = 32;
+
+    AsyncALSalgo& outer;
+    Graph& g;
+    MT& WT;
+    MT& HT;
+    PerThrdXTX& xtxs;
+    PerThrdV& rhs;
+
+    template <typename C>
+    void operator () (size_t col, C& ctx) {
+      outer.update (g, col, WT, HT, xtxs, rhs);
+    }
+  };
+
+
   void operator()(Graph& g, const StepFunction&) {
-    if (!useSameLatentVector && DetKind != 0) {
+    if (!useSameLatentVector && algo != syncALS) {
       Galois::Runtime::LL::gWarn("Results are not deterministic with different numbers of threads unless -useSameLatentVector is true");
     }
     Galois::TimeAccumulator elapsed;
@@ -269,33 +348,52 @@ struct AsynchronousAlternatingLeastSquaresAlgo {
     double last = -1.0;
     Galois::StatTimer updateTime("UpdateTime");
     Galois::StatTimer copyTime("CopyTime");
-    Galois::Runtime::PerThreadStorage<XTX> xtxs;
-    Galois::Runtime::PerThreadStorage<V> rhs;
+    PerThrdXTX xtxs;
+    PerThrdV rhs;
+
+    typename EigenGraphVisitor::Manager dagManager {g, A, AT}; 
 
     for (int round = 1; ; ++round) {
       updateTime.start();
-      if (BulkSynchronous) {
-        Galois::for_each(
-            boost::counting_iterator<size_t>(0),
-            boost::counting_iterator<size_t>(NUM_ITEM_NODES),
-            Process(*this, g, WT, HT, xtxs, rhs));
-        Galois::for_each(
-            boost::counting_iterator<size_t>(NUM_ITEM_NODES),
-            boost::counting_iterator<size_t>(g.size()),
-            Process(*this, g, WT, HT, xtxs, rhs));
-      } else {
-        if (DetKind == 0) {
+
+      switch (algo) {
+
+        case syncALS: 
+
           Galois::for_each(
               boost::counting_iterator<size_t>(0),
+              boost::counting_iterator<size_t>(NUM_ITEM_NODES),
+              Process(*this, g, WT, HT, xtxs, rhs));
+          Galois::for_each(
+              boost::counting_iterator<size_t>(NUM_ITEM_NODES),
               boost::counting_iterator<size_t>(g.size()),
               Process(*this, g, WT, HT, xtxs, rhs));
-        } else {
+          break;
+
+        case asyncALSkdg_ar:
+        case asyncALSkdg_i:
+
           Galois::for_each_det(
               boost::counting_iterator<size_t>(0),
               boost::counting_iterator<size_t>(g.size()),
               Process(*this, g, WT, HT, xtxs, rhs));
-        }
+          break;
+
+        case asyncALSchromatic:
+
+          Galois::for_each_det_choice (
+              Galois::Runtime::makeLocalRange (g),
+              ApplyUpdate {*this, g, WT, HT, xtxs, rhs},
+              g,
+              dagManager,
+              "als-async-chromatic");
+          break;
+
+        default:
+          GALOIS_DIE ("unknown algorithm type");
+          break;
       }
+
       updateTime.stop();
 
       copyTime.start();
@@ -321,7 +419,7 @@ struct AsynchronousAlternatingLeastSquaresAlgo {
   }
 };
 
-struct AlternatingLeastSquaresAlgo {
+struct SimpleALSalgo {
   bool isSgd() const { return false; }
   std::string name() const { return "AlternatingLeastSquares"; }
   struct Node { 
@@ -395,6 +493,7 @@ struct AlternatingLeastSquaresAlgo {
     MT HT { LATENT_VECTOR_SIZE, g.size() - NUM_ITEM_NODES };
     typedef Eigen::Matrix<LatentValue, LATENT_VECTOR_SIZE, LATENT_VECTOR_SIZE> XTX;
     typedef Eigen::Matrix<LatentValue, LATENT_VECTOR_SIZE, Eigen::Dynamic> XTSp;
+    typedef Galois::Runtime::PerThreadStorage<XTX> PerThrdXTX;
 
     initializeA(g);
     copyFromGraph(g, WT, HT);
@@ -404,7 +503,7 @@ struct AlternatingLeastSquaresAlgo {
     Galois::StatTimer update1Time("UpdateTime1");
     Galois::StatTimer update2Time("UpdateTime2");
     Galois::StatTimer copyTime("CopyTime");
-    Galois::Runtime::PerThreadStorage<XTX> xtxs;
+    PerThrdXTX xtxs;
 
     for (int round = 1; ; ++round) {
       mmTime.start();

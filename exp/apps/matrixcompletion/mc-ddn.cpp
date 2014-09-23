@@ -24,6 +24,7 @@
 
 #include "Galois/config.h"
 #include "Galois/Accumulator.h"
+#include "Galois/DetSchedules.h"
 #include "Galois/Galois.h"
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
@@ -59,11 +60,11 @@ static const char* const desc = "Computes Matrix Decomposition using Stochastic 
 static const char* const url = 0;
 
 enum Algo {
-  alternatingLeastSquares,
-  asynchronousAlternatingLeastSquares,
-  ikdgAsynchronousAlternatingLeastSquares,
-  addRemoveAsynchronousAlternatingLeastSquares,
-  simpleAlternatingLeastSquares,
+  syncALS,
+  asyncALSkdg_i,
+  asyncALSkdg_ar,
+  asyncALSchromatic,
+  simpleALS,
   blockedEdge,
   blockedEdgeServer,
   blockJump,
@@ -115,11 +116,11 @@ static cll::opt<int> fixedRounds("fixedRounds", cll::desc("run for a fixed numbe
 static cll::opt<bool> useExactError("useExactError", cll::desc("use exact error for testing convergence"), cll::init(false));
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
   cll::values(
-    clEnumValN(Algo::alternatingLeastSquares, "als", "Alternating least squares"),
-    clEnumValN(Algo::simpleAlternatingLeastSquares, "sals", "Simple alternating least squares"),
-    clEnumValN(Algo::asynchronousAlternatingLeastSquares, "aals", "Asynchronous alternating least squares"),
-    clEnumValN(Algo::ikdgAsynchronousAlternatingLeastSquares, "ikdg-aals", "Asynchronous alternating least squares"),
-    clEnumValN(Algo::addRemoveAsynchronousAlternatingLeastSquares, "add-remove-aals", "Asynchronous alternating least squares"),
+    clEnumValN(Algo::syncALS, "syncALS", "Alternating least squares"),
+    clEnumValN(Algo::simpleALS, "simpleALS", "Simple alternating least squares"),
+    clEnumValN(Algo::asyncALSkdg_i, "asyncALSkdg_i", "Asynchronous alternating least squares"),
+    clEnumValN(Algo::asyncALSkdg_ar, "asyncALSkdg_ar", "Asynchronous alternating least squares"),
+    clEnumValN(Algo::asyncALSchromatic, "asyncALSchromatic", "Asynchronous alternating least squares"),
     clEnumValN(Algo::blockedEdge, "blockedEdge", "Edge blocking (default)"),
     clEnumValN(Algo::blockedEdgeServer, "blockedEdgeServer", "Edge blocking with server support"),
     clEnumValN(Algo::blockJump, "blockJump", "Block jumping "),
@@ -127,6 +128,7 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
     clEnumValN(Algo::dotProductRecursiveTiling, "dotProductRecursiveTiling", "Dot product recursive tiling test"),
   clEnumValEnd), 
   cll::init(Algo::blockedEdge));
+
 static cll::opt<Step> learningRateFunction("learningRateFunction", cll::desc("Choose learning rate function:"),
   cll::values(
     clEnumValN(Step::intel, "intel", "Intel"),
@@ -136,10 +138,13 @@ static cll::opt<Step> learningRateFunction("learningRateFunction", cll::desc("Ch
     clEnumValN(Step::inverse, "inverse", "Inverse"),
   clEnumValEnd), 
   cll::init(Step::bold));
+
 static cll::opt<int> serverPort("serverPort", cll::desc("enter server mode on specified port"), cll::init(-1));
+
 static cll::opt<bool> useSameLatentVector("useSameLatentVector",
     cll::desc("initialize all nodes to use same latent vector"),
     cll::init(false));
+
 static cll::opt<int> cutoff("cutoff");
 
 size_t NUM_ITEM_NODES = 0;
@@ -1101,11 +1106,11 @@ int main(int argc, char** argv) {
 
   switch (algo) {
 #ifdef HAS_EIGEN
-    case Algo::alternatingLeastSquares: run<AsynchronousAlternatingLeastSquaresAlgo<true, 0>>(); break;
-    case Algo::simpleAlternatingLeastSquares: run<AlternatingLeastSquaresAlgo>(); break;
-    case Algo::asynchronousAlternatingLeastSquares: run<AsynchronousAlternatingLeastSquaresAlgo<false, 0>>(); break;
-    case Algo::ikdgAsynchronousAlternatingLeastSquares: run<AsynchronousAlternatingLeastSquaresAlgo<false, 1>>(); break;
-    case Algo::addRemoveAsynchronousAlternatingLeastSquares: run<AsynchronousAlternatingLeastSquaresAlgo<false, 2>>(); break;
+    case Algo::syncALS: run<AsyncALSalgo<syncALS>>(); break;
+    case Algo::simpleALS: run<SimpleALSalgo>(); break;
+    case Algo::asyncALSkdg_i: run<AsyncALSalgo<asyncALSkdg_i>>(); break;
+    case Algo::asyncALSkdg_ar: run<AsyncALSalgo<asyncALSkdg_ar>>(); break;
+    case Algo::asyncALSchromatic: run<AsyncALSalgo<asyncALSchromatic>>(); break;
 #endif
     case Algo::blockedEdge: run<BlockedEdgeAlgo<false> >(); break;
     case Algo::blockedEdgeServer: run<BlockedEdgeAlgo<true> >(); break;

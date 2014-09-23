@@ -3,6 +3,7 @@
 
 #include "Galois/Accumulator.h"
 #include "Galois/AltBag.h"
+#include "Galois/DoAllWrap.h"
 #include "Galois/Galois.h"
 #include "Galois/GaloisUnsafe.h"
 
@@ -46,7 +47,7 @@ struct DAGdata {
   std::atomic<unsigned> indegree;
 
 
-  DAGdata (unsigned _id)
+  explicit DAGdata (unsigned _id=0)
     : color (0), id (_id), priority (0), onWL (false), indegree (0) 
   {}
 };
@@ -84,7 +85,7 @@ struct DAGdataComparator {
 };
 
 template <typename G, typename P, typename S>
-struct DAGgeneratorBase {
+struct DAGmanager {
 
 protected:
 
@@ -96,13 +97,13 @@ protected:
   typedef Galois::Runtime::PerThreadVector<unsigned> PerThrdColorVec;
 
   G& graph;
-  P predApp;
-  S succApp;
+  P visitPreds;
+  S visitSuccs;
   PerThrdColorVec perThrdColorVec;
   Galois::GReduceMax<unsigned> maxColors;
 
-  DAGgeneratorBase (G& graph, const P& predApp, const S& succApp)
-    : graph (graph), predApp (predApp), succApp (succApp) 
+  DAGmanager (G& graph, const P& visitPreds, const S& visitSuccs)
+    : graph (graph), visitPreds (visitPreds), visitSuccs (visitSuccs) 
   {
     // mark 0-th color as taken
     for (unsigned i = 0; i < perThrdColorVec.numRows (); ++i) {
@@ -115,9 +116,9 @@ protected:
 public:
 
   template <typename F>
-  void applyUndirected (GNode src, F& f) {
-    succApp (src, f);
-    predApp (src, f);
+  void applyToAdj (GNode src, F& f) {
+    visitSuccs (src, f);
+    visitPreds (src, f);
   }
 
   template <typename W>
@@ -140,7 +141,7 @@ public:
             }
           };
 
-          applyUndirected (src, closure);
+          applyToAdj (src, closure);
 
           sd.indegree += addAmt;
 
@@ -178,7 +179,7 @@ public:
             };
 
 
-            applyUndirected (src, closure);
+            applyToAdj (src, closure);
 
             sd.indegree += addAmt;
 
@@ -195,6 +196,32 @@ public:
 
   }
 
+  void assignIDs (void) {
+
+    const size_t numNodes = graph.size ();
+
+    Galois::on_each (
+        [&] (const unsigned tid, const unsigned numT) {
+
+          size_t num_per = (numNodes + numT - 1) / numT;
+          size_t beg = tid * num_per;
+          size_t end = std::min (numNodes, (tid + 1) * num_per);
+
+          auto it_beg = graph.begin ();
+          std::advance (it_beg, beg);
+
+          auto it_end = it_beg; 
+          std::advance (it_end, (end - beg));
+
+          for (; it_beg != it_end; ++it_beg) {
+            auto& nd = graph.getData (*it_beg, Galois::NONE);
+            nd.id = beg++;
+          }
+        },
+        Galois::loopname ("assign-ids"));
+
+  }
+
 
   template <typename F>
   void assignPriorityHelper (const F& nodeFunc) {
@@ -208,6 +235,8 @@ public:
   }
 
   void assignPriority (void) {
+
+    assignIDs ();
 
     static const unsigned MAX_LEVELS = 100;
     static const unsigned SEED = 10;
@@ -321,7 +350,7 @@ public:
       }
     };
 
-    applyUndirected (src, closure);
+    applyToAdj (src, closure);
 
     for (size_t i = 1; i < forbiddenColors.size (); ++i) {
       if (forbiddenColors[i] != sd.id) { 
@@ -345,7 +374,7 @@ public:
 
   struct ColorNodeDAG {
     typedef int tt_does_not_need_aborts;
-    DAGgeneratorBase& outer;
+    DAGmanager& outer;
 
     template <typename C>
     void operator () (GNode src, C& ctx) {
@@ -395,10 +424,10 @@ public:
 };
 
 template <typename G>
-struct DAGgenInOut {
+struct DAGmanagerInOut {
   typedef typename G::GraphNode GNode;
 
-  struct PredClosureApplicator {
+  struct VisitPredecessors {
     G& graph;
 
     template <typename F>
@@ -413,7 +442,7 @@ struct DAGgenInOut {
   };
 
 
-  struct SuccClosureApplicator {
+  struct VisitSuccessors {
     G& graph;
 
     template <typename F>
@@ -426,51 +455,77 @@ struct DAGgenInOut {
     }
   };
 
+  typedef DAGmanager<G, VisitPredecessors, VisitSuccessors> Base_ty;
 
-  typedef DAGgeneratorBase<G, PredClosureApplicator, SuccClosureApplicator> Base_ty;
+  struct Manager: public Base_ty {
 
-  struct Generator: public Base_ty {
-
-    Generator (G& graph): Base_ty {graph, PredClosureApplicator {graph}, SuccClosureApplicator {graph}} 
+    Manager (G& graph): Base_ty {graph, VisitPredecessors {graph}, VisitSuccessors {graph}} 
     {}
+  };
 
+};
+
+template <typename G>
+struct DAGvisitorUndirected {
+
+  typedef typename G::GraphNode GNode;
+
+  struct VisitPredecessors {
+    G& graph;
+
+    template <typename F>
+    void operator () (GNode src, F& func) {};
+  };
+
+  struct VisitSuccessors {
+    G& graph;
+
+    template <typename F>
+    void operator () (GNode src, F& func) {
+
+      for (auto i = graph.edge_begin (src, Galois::NONE)
+           , end_i = graph.edge_end (src, Galois::NONE); i != end_i; ++i) {
+
+        GNode dst = graph.getEdgeDst (i);
+        func (dst);
+      }
+    }
   };
 
 };
 
 
 // TODO: complete implementation
-/*
-template <typename G>
-struct DAGgenDirected: public DAGgeneratorBase<G> {
-
-  void initDAGdirected (void) {
-
-    Galois::do_all_choice (
-        Galois::Runtime::makeLocalRange (graph),
-        [this] (GNode src) {
-        
-          auto& sd = graph.getData (src, Galois::NONE);
-          
-          unsigned addAmt = 0;
-          for (Graph::edge_iterator e = graph.edge_begin (src, Galois::NONE),
-              e_end = graph.edge_end (src, Galois::NONE); e != e_end; ++e) {
-            GNode dst = graph.getEdgeDst (e);
-            auto& dd = graph.getData (dst, Galois::NONE);
-
-            if (src != dst) {
-              dd.addPred (src);
-            }
-          }
-
-        },
-        "initDAG",
-        Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
-
-  }
-
-};
-*/
+//
+// template <typename G>
+// struct DAGvisitorDirected {
+// 
+  // void addPredecessors (void) {
+// 
+    // Galois::do_all_choice (
+        // Galois::Runtime::makeLocalRange (graph),
+        // [this] (GNode src) {
+        // 
+          // auto& sd = graph.getData (src, Galois::NONE);
+          // 
+          // unsigned addAmt = 0;
+          // for (Graph::edge_iterator e = graph.edge_begin (src, Galois::NONE),
+              // e_end = graph.edge_end (src, Galois::NONE); e != e_end; ++e) {
+            // GNode dst = graph.getEdgeDst (e);
+            // auto& dd = graph.getData (dst, Galois::NONE);
+// 
+            // if (src != dst) {
+              // dd.addPred (src);
+            // }
+          // }
+// 
+        // },
+        // "initDAG",
+        // Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
+// 
+  // }
+// 
+// };
 
 
 
@@ -631,24 +686,34 @@ struct ChromaticExecutor {
 
 };
 
-// TODO: logic to choose correct DAG type based on graph type or some graph tag
-template <typename R, typename G, typename F>
-void for_each_det_chromatic (const R& range, G& graph, const F& func, const char* loopname) {
+template <typename R, typename F, typename G, typename M>
+void for_each_det_chromatic (const R& range, const F& func, G& graph, M& dagManager, const char* loopname) {
 
   Galois::Runtime::getSystemThreadPool ().burnPower (Galois::getActiveThreads ());
 
-  typename DAGgenInOut<G>::Generator gen {graph};
+  dagManager.colorDAG ();
 
-  gen.colorDAG ();
-
-  ChromaticExecutor<G,F> executor {graph, func, gen.getMaxColors (), loopname};
+  ChromaticExecutor<G,F> executor {graph, func, dagManager.getMaxColors (), loopname};
 
   executor.execute (range);
 
   Galois::Runtime::getSystemThreadPool ().beKind ();
+
 }
 
-template <typename G, typename F, typename DAGgen>
+// TODO: logic to choose correct DAG type based on graph type or some graph tag
+template <typename R, typename G, typename F>
+void for_each_det_chromatic (const R& range, const F& func, G& graph, const char* loopname) {
+
+  typedef typename DAGmanagerInOut<G>::Manager  M;
+  M dagManager {graph};
+
+  for_each_det_chromatic (range, func, graph, 
+      dagManager, loopname);
+
+}
+
+template <typename G, typename F, typename M>
 struct InputGraphDAGexecutor {
 
   typedef typename G::GraphNode GNode;
@@ -663,8 +728,8 @@ struct InputGraphDAGexecutor {
 
   G& graph;
   F func;
+  M& dagManager;
   const char* loopname;
-  DAGgen dagGen;
 
 
   PerThreadUserCtx userContexts;
@@ -673,11 +738,11 @@ struct InputGraphDAGexecutor {
 
 public:
 
-  InputGraphDAGexecutor (G& graph, const F& func, const char* loopname)
+  InputGraphDAGexecutor (G& graph, const F& func, M& dagManager, const char* loopname)
     :
       graph (graph),
       func (func),
-      dagGen (graph),
+      dagManager (dagManager),
       loopname (loopname)
   {}
 
@@ -733,7 +798,7 @@ public:
       };
 
 
-      outer.dagGen.applyUndirected (src, closure);
+      outer.dagManager.applyToAdj (src, closure);
 
     }
 
@@ -744,7 +809,7 @@ public:
 
     WL_ty sources;
 
-    dagGen.assignPriority ();
+    dagManager.assignPriority ();
 
     Galois::do_all_choice (
         range,
@@ -764,7 +829,7 @@ public:
       assert (sources.size () == 0);
 
       t_dag_init.start ();
-      dagGen.initActiveDAG (Galois::Runtime::makeLocalRange (nextWork), sources);
+      dagManager.initActiveDAG (Galois::Runtime::makeLocalRange (nextWork), sources);
       t_dag_init.stop ();
 
       nextWork.clear_all_parallel ();
@@ -819,7 +884,7 @@ public:
         }
       };
 
-      outer.dagGen.applyUndirected (src, closure);
+      outer.dagManager.applyToAdj (src, closure);
 
     }
   };
@@ -829,19 +894,28 @@ public:
 
 };
 
-template <typename R, typename G, typename F>
-void for_each_det_dag_active (const R& range, G& graph, const F& func, const char* loopname) {
+
+
+template <typename R, typename F, typename G, typename M>
+void for_each_det_edge_flip_ar (const R& range, const F& func, G& graph, M& dagManager, const char* loopname) {
 
   Galois::Runtime::getSystemThreadPool ().burnPower (Galois::getActiveThreads ());
 
-  typedef typename DAGgenInOut<G>::Generator Generator;
-
-  InputGraphDAGexecutor<G,F, Generator> executor {graph, func, loopname};
+  InputGraphDAGexecutor<G,F, M> executor {graph, func, dagManager, loopname};
 
   executor.execute (range);
 
   Galois::Runtime::getSystemThreadPool ().beKind ();
 
+}
+
+template <typename R, typename F, typename G>
+void for_each_det_edge_flip_ar (const R& range, const F& func, G& graph, const char* loopname) {
+
+  typedef typename DAGmanagerInOut<G>::Manager M;
+  M dagManager {graph};
+
+  for_each_det_edge_flip_ar (range, func, graph, dagManager, loopname);
 }
 
 
