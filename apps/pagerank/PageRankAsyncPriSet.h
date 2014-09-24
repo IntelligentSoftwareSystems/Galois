@@ -94,16 +94,17 @@ struct AsyncPriSet{
       PRTy diff = std::fabs(value - sdata.value);
 
       if (diff >= tolerance) {
-        PRTy oldResidual = sdata.residual;
+        PRTy oldResidual = sdata.residual.exchange(0.0);
         sdata.value = value;
-        sdata.residual = 0.0;
+
+        int src_nout = nout(graph,src, lockflag);
 
         // for each out-going neighbors
         for (auto jj = graph.edge_begin(src, lockflag), ej = graph.edge_end(src, lockflag);
              jj != ej; ++jj) {
           GNode dst = graph.getEdgeDst(jj);
 	  LNode& ddata = graph.getData(dst, lockflag);
-          PRTy delta = oldResidual*alpha/nout(graph,src, lockflag);
+          PRTy delta = oldResidual*alpha/src_nout;
           PRTy old;
           do {
             old = ddata.residual;
@@ -152,26 +153,21 @@ struct AsyncPriSet{
       limit /= nonzero;
       if (count < 100)
         limit = 0.0;
+      std::cout << "Count is " << count << "\n";
       Galois::for_each_local(curWL, Process(graph, tolerance, nextWL, stats, limit), Galois::wl<WL>());
     }
   }
 
   void verify(Graph& graph, PRTy tolerance) {    
-    bool allsafe = true;
-    Galois::StatTimer Te("ExtraTime");
-    Te.start();
     for(auto N : graph) {
       auto& data = graph.getData(N);
       if (data.residual > tolerance) {
-        allsafe = false;
         std::cout << N 
                   << " residual " << data.residual
                   << " pr " << data.value
                   << "\n";
       }
     }
-    std::cout<<"***** dbg2 allsafe: "<<allsafe<<"\n";
-    Te.stop(); 
   }
 };
 

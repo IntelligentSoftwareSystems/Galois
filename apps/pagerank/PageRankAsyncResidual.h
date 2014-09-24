@@ -29,6 +29,10 @@ struct AsyncRsd {
     std::atomic<PRTy> residual; // tracking residual
     void init() { value = 1.0 - alpha; residual = 0.0; }
     PRTy getPageRank(int x = 0) { return value; }
+    friend std::ostream& operator<<(std::ostream& os, const LNode& n) {
+      os << "{PR " << n.value << ", residual " << n.residual << "}";
+      return os;
+    }
   };
 
   typedef Galois::Graph::LC_CSR_Graph<LNode,void>::with_numa_alloc<true>::type InnerGraph;
@@ -72,33 +76,26 @@ struct AsyncRsd {
 
     void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) const {
       LNode& sdata = graph.getData(src);
-      if (sdata.residual < tolerance) 
-        return;
       
       Galois::MethodFlag lockflag = Galois::MethodFlag::NONE;
 
       // the node is processed
+      sdata.residual = 0;
       PRTy sum = computePageRankInOut(graph, src, 0, lockflag);
       PRTy value = alpha*sum + (1.0 - alpha);
       PRTy diff = std::fabs(value - sdata.value);
-
-      if (diff >= tolerance) {
-        PRTy oldResidual = sdata.residual;
-        sdata.value = value;
-        sdata.residual = 0.0;
-
-        // for each out-going neighbors
-        for (auto jj = graph.edge_begin(src, lockflag), ej = graph.edge_end(src, lockflag);
-             jj != ej; ++jj) {
-          GNode dst = graph.getEdgeDst(jj);
-	  LNode& ddata = graph.getData(dst, lockflag);
-          PRTy delta = oldResidual*alpha/nout(graph,src, lockflag);
-          PRTy old;
-          do {
-            old = ddata.residual;
-          } while (!ddata.residual.compare_exchange_strong(old, old + delta));
-	  // if the node is not in the worklist and the residual is greater than tolerance
-	  if(old < tolerance && old + delta > tolerance)
+      sdata.value = value;
+      int src_nout = nout(graph,src, lockflag);
+      PRTy delta = diff*alpha/src_nout;
+      // for each out-going neighbors
+      for (auto jj = graph.edge_begin(src, lockflag), ej = graph.edge_end(src, lockflag);
+           jj != ej; ++jj) {
+        GNode dst = graph.getEdgeDst(jj);
+        LNode& ddata = graph.getData(dst, lockflag);
+        if (ddata.residual < tolerance) {
+          PRTy old = atomicAdd(ddata.residual, delta);
+          // if the node is not in the worklist and the residual is greater than tolerance
+          if(old + delta >= tolerance)
             ctx.push(dst);
         }
       }
@@ -111,22 +108,8 @@ struct AsyncRsd {
     Galois::for_each_local(graph, Process(graph, tolerance), Galois::wl<WL>());
   }
 
-  void verify(Graph& graph, PRTy tolerance) {    
-    bool allsafe = true;
-    Galois::StatTimer Te("ExtraTime");
-    Te.start();
-    for(auto N : graph) {
-      auto& data = graph.getData(N);
-      if (data.residual > tolerance) {
-        allsafe = false;
-        std::cout << N 
-                  << " residual " << data.residual
-                  << " pr " << data.value
-                  << "\n";
-      }
-    }
-    std::cout<<"***** dbg2 allsafe: "<<allsafe<<"\n";
-    Te.stop(); 
+  void verify(Graph& graph, PRTy tolerance) {
+    verifyInOut(graph, tolerance);
   }
 };
 

@@ -212,6 +212,8 @@ struct Sync {
       Galois::do_all_local(graph, Copy(graph));
     }
   }
+
+  void verify(Graph& graph, PRTy tolerance) {}
 };
 
 
@@ -1051,8 +1053,10 @@ void run() {
   
   Galois::reportPageAlloc("MeminfoPost");
 
-  if (!skipVerify)
+  if (!skipVerify) {
+    algo.verify(graph, tolerance);
     printTop(graph, 10, algo.name().c_str(), numThreads);
+  }
 }
 
 template<typename Algo>
@@ -1114,9 +1118,6 @@ void runPPR() {
       std::cout << n << " ";
     std::cout << "\n";
   }
-
-  //if (!skipVerify)
-  //printTop(graph, 10, algo.name().c_str(), numThreads);
 }
 
 

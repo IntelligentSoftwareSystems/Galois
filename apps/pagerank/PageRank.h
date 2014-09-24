@@ -30,8 +30,8 @@
 #include "llvm/Support/CommandLine.h"
 
 //! d is the damping factor. Alpha is the prob that user will do a random jump, i.e., 1 - d
-static const float alpha = 1.0 - 0.85;
-static const float alpha2 = 0.85; // Joyce changed to this which is a usual way to define alpha.
+//static const float alpha = 1.0 - 0.85;
+static const float alpha = 0.85; // Joyce changed to this which is a usual way to define alpha.
 
 typedef double PRTy;
 
@@ -50,6 +50,25 @@ double computePageRankInOut(Graph& g, typename Graph::GraphNode src, int prArg, 
     sum += ddata.getPageRank(prArg) / nout(g, dst, lockflag);
   }
   return sum;
+}
+
+PRTy atomicAdd(std::atomic<PRTy>& v, PRTy delta) {
+  PRTy old;
+  do {
+    old = v;
+  } while (!v.compare_exchange_strong(old, old + delta));
+  return old;
+}
+
+template<typename Graph>
+void verifyInOut(Graph& graph, PRTy tolerance) {
+  for(auto N : graph) {
+    auto& data = graph.getData(N);
+    auto residual = data.value - (alpha*computePageRankInOut(graph, N, 0, Galois::MethodFlag::NONE) + (1.0 - alpha));
+    if (residual > tolerance) {
+      std::cout << N << " residual " << residual << " pr " << data.getPageRank(0) << " data " << data << "\n";
+    }
+  }
 }
 
 

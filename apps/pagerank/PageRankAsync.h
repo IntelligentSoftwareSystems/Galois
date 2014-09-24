@@ -29,6 +29,10 @@ struct AsyncSet {
     std::atomic<int> flag;
     void init() { value = 1.0 - alpha; flag = 0; }
     PRTy getPageRank(int x = 0) { return value; }
+    friend std::ostream& operator<<(std::ostream& os, const LNode& n) {
+      os << "{PR " << n.value << ", flag " << n.flag << "}";
+      return os;
+    }
   };
 
   typedef Galois::Graph::LC_CSR_Graph<LNode,void>::with_numa_alloc<true>::type InnerGraph;
@@ -81,5 +85,9 @@ struct AsyncSet {
   void operator()(Graph& graph, PRTy tolerance, PRTy amp) {
     typedef Galois::WorkList::dChunkedFIFO<16> WL;
     Galois::for_each_local(graph, Process(graph, tolerance), Galois::wl<WL>());
+  }
+
+  void verify(Graph& graph, PRTy tolerance) {
+    verifyInOut(graph, tolerance);
   }
 };

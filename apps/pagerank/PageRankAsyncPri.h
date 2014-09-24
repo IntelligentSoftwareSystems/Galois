@@ -101,13 +101,13 @@ struct AsyncPri{
         PRTy oldResidual = sdata.residual;
         sdata.value = value;
         sdata.residual = 0.0;
-
+        int src_nout = nout(graph,src, lockflag);
         // for each out-going neighbors
         for (auto jj = graph.edge_begin(src, lockflag), ej = graph.edge_end(src, lockflag);
              jj != ej; ++jj) {
           GNode dst = graph.getEdgeDst(jj);
 	  LNode& ddata = graph.getData(dst, lockflag);
-          PRTy delta = oldResidual*alpha/nout(graph,src, lockflag);
+          PRTy delta = oldResidual*alpha/src_nout;
           PRTy old;
           do {
             old = ddata.residual;
