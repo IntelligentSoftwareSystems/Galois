@@ -92,10 +92,26 @@ protected:
     }
   };
 
+  struct AddToBag {
+    Galois::InsertBag<GNode>& bag;
+    void operator()(GNode x) const {
+      bag.push(x);
+    }
+  };
+
+  struct AddToNewBag {
+    Galois::InsertBag<GNode>& bag;
+    InnerGraph& graph;
+    void operator()(GNode x) const {
+      std::atomic<int>& m = graph.getData(x).mark;
+      int v = 0;
+      if (m.compare_exchange_strong(v, 1))
+        bag.push(x);
+    }
+  };
+
   virtual void runPageRank() {
-    Galois::do_all_local(graph, [this](GNode x) {
-      bags[0].push(x);
-    });
+    Galois::do_all_local(graph, AddToBag { bags[0] });
 
     while (!bags[0].empty()) {
       Galois::for_each(graph.begin(), graph.end(),
@@ -103,12 +119,7 @@ protected:
           Galois::loopname("page-rank-ikdg"),
           Galois::wl<Galois::WorkList::Deterministic<>>());
       bags[0].clear();
-      Galois::do_all_local(bags[1], [this](GNode x) {
-        std::atomic<int>& m = graph.getData(x).mark;
-        int v = 0;
-        if (m.compare_exchange_strong(v, 1))
-          bags[0].push(x);
-      });
+      Galois::do_all_local(bags[1], AddToNewBag { bags[0], graph });
     }
   }
 };

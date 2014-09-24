@@ -166,29 +166,29 @@ protected:
         Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
   }
 
-  void assignPriority (void) {
+  static const unsigned MAX_LEVELS = 100;
+  static const unsigned SEED = 10;
 
-    static const unsigned MAX_LEVELS = 100;
-    static const unsigned SEED = 10;
+  struct RNG {
+    std::uniform_int_distribution<unsigned> dist;
+    std::mt19937 eng;
+    
+    RNG (void): dist (0, MAX_LEVELS), eng () {
+      this->eng.seed (SEED);
+    }
+
+    unsigned operator () (void) {
+      return dist(eng);
+    }
+  };
+
+  void assignPriority (void) {
 
     auto byId = [&] (GN node) {
       auto& nd = graph.getData (node, Galois::NONE);
       nd.priority = nd.id % MAX_LEVELS;
     };
 
-
-    struct RNG {
-      std::uniform_int_distribution<unsigned> dist;
-      std::mt19937 eng;
-      
-      RNG (void): dist (0, MAX_LEVELS), eng () {
-        this->eng.seed (SEED);
-      }
-
-      unsigned operator () (void) {
-        return dist(eng);
-      }
-    };
 
     Galois::Runtime::PerThreadStorage<RNG>  perThrdRNG;
 

@@ -124,7 +124,6 @@ public:
 
   template <typename W>
   void initDAG (W& sources) {
-
     Galois::do_all_choice (
         Galois::Runtime::makeLocalRange (graph),
         [this, &sources] (GNode src) {
@@ -158,7 +157,6 @@ public:
 
   template <typename R, typename W>
   void initActiveDAG (const R& range, W& sources) {
-
     Galois::do_all_choice (
         range,
         [this, &sources] (GNode src) {
@@ -194,13 +192,11 @@ public:
         },
         "init-Active-DAG",
         Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
-
   }
 
   void assignIDs (void) {
 
     const size_t numNodes = graph.size ();
-
     Galois::on_each (
         [&] (const unsigned tid, const unsigned numT) {
 
@@ -220,7 +216,6 @@ public:
           }
         },
         Galois::loopname ("assign-ids"));
-
   }
 
 
@@ -253,7 +248,6 @@ public:
 
   void assignPriority (void) {
     assignIDs ();
-
     auto byId = [&] (GNode node) {
       auto& nd = graph.getData (node, Galois::NONE);
       nd.priority = nd.id % MAX_LEVELS;
@@ -321,7 +315,6 @@ public:
 
   template <typename C>
   void colorNode (GNode src, C& ctx) {
-
     auto& sd = graph.getData (src, Galois::NONE);
     assert (sd.indegree == 0);
     assert (sd.color == 0); // uncolored
@@ -367,7 +360,6 @@ public:
 
 
     // std::printf ("Node %d assigned color %d\n", sd.id, sd.color);
-
 
   }
 
@@ -767,7 +759,6 @@ public:
 
     template <typename C>
     void operator () (GNode src, C& ctx) {
-      
       // auto& userCtx = *(outer.userContexts.getLocal ());
 // 
       // userCtx.reset ();
@@ -802,14 +793,11 @@ public:
 
 
       outer.dagManager.applyToAdj (src, closure);
-
     }
-
   };
 
   template <typename R>
   void execute (const R& range) {
-
     WL_ty sources;
 
     dagManager.assignPriority ();
@@ -857,7 +845,6 @@ public:
     std::printf ("InputGraphDAGexecutor: performed %d rounds\n", rounds);
     std::printf ("InputGraphDAGexecutor: time taken by dag initialization: %lu\n", t_dag_init.get ());
     std::printf ("InputGraphDAGexecutor: time taken by dag execution: %lu\n", t_dag_exec.get ());
-
   }
 
 
