@@ -125,7 +125,7 @@ struct AsyncPri{
   void operator()(Graph& graph, PRTy tolerance, PRTy amp) {
     Galois::do_all_local(graph, InitResidual(graph), Galois::loopname("InitResidual"));
     typedef Galois::WorkList::dChunkedFIFO<16> WL;
-    typedef Galois::WorkList::OrderedByIntegerMetric<PRPri,WL>::with_block_period<4>::type OBIM;
+    typedef Galois::WorkList::OrderedByIntegerMetric<PRPri,WL>::with_block_period<8>::type OBIM;
     Galois::for_each_local(graph, Process(graph, tolerance, amp), Galois::wl<OBIM>(PRPri{graph, amp}));
   }
 
