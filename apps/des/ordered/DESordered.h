@@ -146,7 +146,7 @@ class DESordered:
     template <typename C>
     GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (const Event_ty& event, C&) const {
       SimObjInfo& recvInfo = sobjInfoVec[event.getRecvObj ()->getID ()];
-      graph.getData (recvInfo.node, Galois::MethodFlag::CHECK_CONFLICT);
+      graph.getData (recvInfo.node, Galois::MethodFlag::WRITE_INTENT);
     }
   };
 
@@ -226,7 +226,7 @@ protected:
     for (Graph::iterator n = graph.begin ()
         , endn = graph.end (); n != endn; ++n) {
 
-      SimObj_ty* so = static_cast<SimObj_ty*> (graph.getData (*n, Galois::MethodFlag::NONE));
+      SimObj_ty* so = static_cast<SimObj_ty*> (graph.getData (*n, Galois::MethodFlag::UNPROTECTED));
       sobjInfoVec[so->getID ()] = SimObjInfo (*n, so);
     }
   }

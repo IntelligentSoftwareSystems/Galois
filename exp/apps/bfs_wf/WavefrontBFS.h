@@ -57,7 +57,7 @@ protected:
     WL* currWL = new WL ();
     WL* nextWL = new WL ();
 
-    graph.getData (startNode, Galois::NONE) = 0;
+    graph.getData (startNode, Galois::MethodFlag::UNPROTECTED) = 0;
     currWL->push_back (startNode);
     size_t numIter = 1; //  counting the start node
 
@@ -290,7 +290,7 @@ public:
     WL_ty* currWL = new WL_ty ();
     WL_ty* nextWL = new WL_ty ();
 
-    graph.getData (startNode, Galois::NONE) = 0;
+    graph.getData (startNode, Galois::MethodFlag::UNPROTECTED) = 0;
     currWL->get ().push_back (startNode);
     // currWL->push_back (startNode);
 

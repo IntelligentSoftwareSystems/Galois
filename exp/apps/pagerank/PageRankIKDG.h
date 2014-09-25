@@ -34,9 +34,9 @@ protected:
     if (!used) {
       float v = graph.getData(src).value;
       double sum = 0;
-      for (auto jj : graph.in_edges(src, Galois::MethodFlag::ALL | Galois::MethodFlag::INTENT_TO_READ)) {
+      for (auto jj : graph.in_edges(src, Galois::MethodFlag::WRITE_INTENT | Galois::MethodFlag::INTENT_TO_READ)) {
         GNode dst = graph.getInEdgeDst(jj);
-        auto& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+        auto& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
         sum += ddata.value / ddata.outdegree;
       }
       float newV = (1.0 - alpha) * sum + alpha;
@@ -48,13 +48,13 @@ protected:
     if (!localState->mod) 
       return;
 
-    auto& sdata = graph.getData(src, Galois::MethodFlag::NONE);
+    auto& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
     float value = localState->value;
     
     sdata.value = value;
     if (sdata.mark.load(std::memory_order_relaxed))
       sdata.mark.store(0, std::memory_order_relaxed);
-    for (auto jj : graph.out_edges(src, Galois::MethodFlag::NONE)) {
+    for (auto jj : graph.out_edges(src, Galois::MethodFlag::UNPROTECTED)) {
       GNode dst = graph.getEdgeDst(jj);
       next.push(dst);
     }

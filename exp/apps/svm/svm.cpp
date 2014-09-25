@@ -492,7 +492,7 @@ void runPrimalSgd(Graph& g, std::mt19937& gen, std::vector<GNode>& trainingSampl
         }
         localw[i] /=  n;
         GNode variable_node = (GNode) (i + NUM_SAMPLES);
-        Node& var_data = g.getData(variable_node, Galois::NONE);
+        Node& var_data = g.getData(variable_node, Galois::MethodFlag::UNPROTECTED);
         var_data.w = localw[i];
         old_weights[i] = var_data.w;
       });

@@ -82,7 +82,7 @@ struct Process {
   //! [Enabling Per Iteration Allocator in DMR]
 
   void operator()(GNode item, Galois::UserContext<GNode>& ctx) {
-    if (!graph->containsNode(item, Galois::MethodFlag::ALL))
+    if (!graph->containsNode(item, Galois::MethodFlag::WRITE_INTENT))
       return;
     
     Cavity* cavp = NULL;
@@ -120,15 +120,15 @@ struct Preprocess {
   Galois::InsertBag<GNode>& wl;
   Preprocess(Galois::InsertBag<GNode>& w): wl(w) { }
   void operator()(GNode item) const {
-    if (graph->getData(item, Galois::MethodFlag::NONE).isBad())
+    if (graph->getData(item, Galois::MethodFlag::UNPROTECTED).isBad())
       wl.push(item);
   }
 };
 
 struct DetLessThan {
   bool operator()(const GNode& a, const GNode& b) const {
-    int idA = graph->getData(a, Galois::MethodFlag::NONE).getId();
-    int idB = graph->getData(b, Galois::MethodFlag::NONE).getId();
+    int idA = graph->getData(a, Galois::MethodFlag::UNPROTECTED).getId();
+    int idB = graph->getData(b, Galois::MethodFlag::UNPROTECTED).getId();
     if (idA == 0 || idB == 0) abort();
     return idA < idB;
   }

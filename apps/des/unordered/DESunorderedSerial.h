@@ -68,18 +68,18 @@ class DESunorderedSerial: public des_unord::DESunorderedBase {
       GNode activeNode = workList.front ();
       workList.pop_front ();
 
-      SimObj_ty* srcObj = static_cast<SimObj_ty*> (graph.getData (activeNode, Galois::MethodFlag::NONE));
+      SimObj_ty* srcObj = static_cast<SimObj_ty*> (graph.getData (activeNode, Galois::MethodFlag::UNPROTECTED));
 
       maxPending = std::max (maxPending, srcObj->numPendingEvents ());
 
       numEvents += srcObj->simulate(graph, activeNode);
 
 
-      for (Graph::edge_iterator i = graph.edge_begin (activeNode, Galois::MethodFlag::NONE)
-          , ei = graph.edge_end (activeNode, Galois::MethodFlag::NONE); i != ei; ++i) {
+      for (Graph::edge_iterator i = graph.edge_begin (activeNode, Galois::MethodFlag::UNPROTECTED)
+          , ei = graph.edge_end (activeNode, Galois::MethodFlag::UNPROTECTED); i != ei; ++i) {
 
         GNode dst = graph.getEdgeDst(i);
-        SimObj_ty* dstObj = static_cast<SimObj_ty*> (graph.getData (dst, Galois::MethodFlag::NONE));
+        SimObj_ty* dstObj = static_cast<SimObj_ty*> (graph.getData (dst, Galois::MethodFlag::UNPROTECTED));
 
         if (dstObj->isActive ()) {
           if (!onWLflags[dstObj->getID ()]) {

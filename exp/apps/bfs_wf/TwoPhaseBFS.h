@@ -82,7 +82,7 @@ class TwoPhaseBFS: public BFS<Level_ty> {
 
       // just like DES, we only lock the node being updated, but not its
       // outgoing neighbors
-      graph.getData (up.dst, Galois::CHECK_CONFLICT);
+      graph.getData (up.dst, Galois::MethodFlag::WRITE_INTENT);
     }
   };
 
@@ -98,18 +98,18 @@ class TwoPhaseBFS: public BFS<Level_ty> {
     template <typename C>
     void operator () (const Update& up, C& ctx) {
 
-      if (graph.getData (up.dst, Galois::NONE) == BFS_LEVEL_INFINITY) {
+      if (graph.getData (up.dst, Galois::MethodFlag::UNPROTECTED) == BFS_LEVEL_INFINITY) {
 
-        graph.getData (up.dst, Galois::NONE) = up.level;
+        graph.getData (up.dst, Galois::MethodFlag::UNPROTECTED) = up.level;
 
 
-        for (typename Graph::edge_iterator ni = graph.edge_begin (up.dst, Galois::MethodFlag::NONE)
-            , eni = graph.edge_end (up.dst, Galois::MethodFlag::NONE); ni != eni; ++ni) {
+        for (typename Graph::edge_iterator ni = graph.edge_begin (up.dst, Galois::MethodFlag::UNPROTECTED)
+            , eni = graph.edge_end (up.dst, Galois::MethodFlag::UNPROTECTED); ni != eni; ++ni) {
 
           GNode src = up.dst;
           GNode dst = graph.getEdgeDst (ni);
 
-          if (graph.getData (dst, Galois::MethodFlag::NONE) == BFS_LEVEL_INFINITY) {
+          if (graph.getData (dst, Galois::MethodFlag::UNPROTECTED) == BFS_LEVEL_INFINITY) {
             ctx.push (Update (src, dst, up.level + 1));
           }
         }

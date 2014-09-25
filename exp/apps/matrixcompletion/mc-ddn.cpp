@@ -476,7 +476,7 @@ private:
       // TODO add round blocking -- Added by not very useful
       // TODO modify edge data to support agnostic edge blocking
       for (int phase = makeSerializable ? 0 : 1; phase < 2; ++phase) {
-        Galois::MethodFlag flag = phase == 0 ? Galois::ALL : Galois::NONE;
+        Galois::MethodFlag flag = phase == 0 ? Galois::MethodFlag::ALL : Galois::MethodFlag::UNPROTECTED;
         int numWorking;
         int round = 0;
         int limit = 0;
@@ -484,10 +484,10 @@ private:
           numWorking = 0;
           int index = 0;
           for (auto ii = task.start1; ii != task.end1; ++ii, ++index) {
-            Node& nn = g.getData(*ii, round == 0 ? flag : Galois::NONE);
-            Graph::edge_iterator begin = g.edge_begin(*ii, Galois::NONE);
+            Node& nn = g.getData(*ii, round == 0 ? flag : Galois::MethodFlag::UNPROTECTED);
+            Graph::edge_iterator begin = g.edge_begin(*ii, Galois::MethodFlag::UNPROTECTED);
             no_deref_iterator nbegin(round == 0 ? no_deref_iterator(begin) : starts[index]);
-            no_deref_iterator nend(no_deref_iterator(g.edge_end(*ii, Galois::NONE)));
+            no_deref_iterator nend(no_deref_iterator(g.edge_end(*ii, Galois::MethodFlag::UNPROTECTED)));
             edge_dst_iterator dbegin(nbegin, fn);
             edge_dst_iterator dend(nend, fn);
             edge_dst_iterator jj = round == 0 ? std::lower_bound(dbegin, dend, task.start2) : dbegin;
@@ -538,14 +538,14 @@ private:
 
       // TODO modify edge data to support agnostic edge blocking
       for (int phase = makeSerializable ? 0 : 1; phase < 2; ++phase) {
-        Galois::MethodFlag flag = phase == 0 ? Galois::ALL : Galois::NONE;
+        Galois::MethodFlag flag = phase == 0 ? Galois::MethodFlag::ALL : Galois::MethodFlag::UNPROTECTED;
         for (auto ii = task.start1; ii != task.end1; ++ii) {
-          Node& nn = g.getData(*ii, phase == 0 ? flag : Galois::NONE);
+          Node& nn = g.getData(*ii, phase == 0 ? flag : Galois::MethodFlag::UNPROTECTED);
           if (deleted(nn))
             continue;
-          edge_iterator begin = g.edge_begin(*ii, Galois::NONE);
+          edge_iterator begin = g.edge_begin(*ii, Galois::MethodFlag::UNPROTECTED);
           no_deref_iterator nbegin(begin);
-          no_deref_iterator nend(g.edge_end(*ii, Galois::NONE));
+          no_deref_iterator nend(g.edge_end(*ii, Galois::MethodFlag::UNPROTECTED));
           edge_dst_iterator dbegin(nbegin, fn);
           edge_dst_iterator dend(nend, fn);
           for (auto jj = std::lower_bound(dbegin, dend, task.start2); jj != dend; ++jj) {

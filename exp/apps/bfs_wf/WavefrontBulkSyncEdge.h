@@ -58,8 +58,8 @@ protected:
     template <typename C>
     GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (const Update& up, C& wl) {
       bool updated = false;
-      if (graph.getData (up.node, Galois::NONE) == BFS_LEVEL_INFINITY) {
-        graph.getData (up.node, Galois::NONE) = up.level;
+      if (graph.getData (up.node, Galois::MethodFlag::UNPROTECTED) == BFS_LEVEL_INFINITY) {
+        graph.getData (up.node, Galois::MethodFlag::UNPROTECTED) = up.level;
         updated = true;
       }
 
@@ -71,7 +71,7 @@ protected:
               wl.push (dst, dstLevel);
               //wl.emplace(dst, dstLevel);
             },
-            Galois::NONE);
+            Galois::MethodFlag::UNPROTECTED);
       }
     }
   };

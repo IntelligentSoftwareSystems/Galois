@@ -78,7 +78,7 @@ class DESlevelExec:
     template <typename C>
     void operator () (const Event_ty& event, C& ctx) const {
       GNode n = nodes[event.getRecvObj ()->getID ()];
-      graph.getData (n, Galois::MethodFlag::CHECK_CONFLICT);
+      graph.getData (n, Galois::MethodFlag::WRITE_INTENT);
     }
   };
 
@@ -144,7 +144,7 @@ protected:
     for (Graph::iterator n = graph.begin ()
         , endn = graph.end (); n != endn; ++n) {
 
-      BaseSimObj_ty* so = graph.getData (*n, Galois::MethodFlag::NONE);
+      BaseSimObj_ty* so = graph.getData (*n, Galois::MethodFlag::UNPROTECTED);
       nodes[so->getID ()] = *n;
     }
   }

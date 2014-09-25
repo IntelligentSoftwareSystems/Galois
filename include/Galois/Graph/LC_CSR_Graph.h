@@ -158,14 +158,14 @@ protected:
   }
 
 public:
-  node_data_reference getData(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+  node_data_reference getData(GraphNode N, MethodFlag mflag = MethodFlag::WRITE_INTENT) {
     Galois::Runtime::checkWrite(mflag, false);
     NodeInfo& NI = nodeData[N];
     acquireNode(N, mflag);
     return NI.getData();
   }
 
-  edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::NONE) {
+  edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::UNPROTECTED) {
     Galois::Runtime::checkWrite(mflag, false);
     return edgeData[*ni];
   }
@@ -185,7 +185,7 @@ public:
   local_iterator local_begin() { return local_iterator(this->localBegin(numNodes)); }
   local_iterator local_end() { return local_iterator(this->localEnd(numNodes)); }
 
-  edge_iterator edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+  edge_iterator edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::WRITE_INTENT) {
     acquireNode(N, mflag);
     if (Galois::Runtime::shouldLock(mflag)) {
       for (edge_iterator ii = raw_begin(N), ee = raw_end(N); ii != ee; ++ii) {
@@ -195,12 +195,12 @@ public:
     return raw_begin(N);
   }
 
-  edge_iterator edge_end(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+  edge_iterator edge_end(GraphNode N, MethodFlag mflag = MethodFlag::WRITE_INTENT) {
     acquireNode(N, mflag);
     return raw_end(N);
   }
 
-  detail::EdgesIterator<LC_CSR_Graph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+  detail::EdgesIterator<LC_CSR_Graph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE_INTENT) {
     return detail::EdgesIterator<LC_CSR_Graph>(*this, N, mflag);
   }
 
@@ -208,7 +208,7 @@ public:
    * Sorts outgoing edges of a node. Comparison function is over EdgeTy.
    */
   template<typename CompTy>
-  void sortEdgesByEdgeData(GraphNode N, const CompTy& comp = std::less<EdgeTy>(), MethodFlag mflag = MethodFlag::ALL) {
+  void sortEdgesByEdgeData(GraphNode N, const CompTy& comp = std::less<EdgeTy>(), MethodFlag mflag = MethodFlag::WRITE_INTENT) {
     acquireNode(N, mflag);
     std::sort(edge_sort_begin(N), edge_sort_end(N), detail::EdgeSortCompWrapper<EdgeSortValue<GraphNode,EdgeTy>,CompTy>(comp));
   }
@@ -217,7 +217,7 @@ public:
    * Sorts outgoing edges of a node. Comparison function is over <code>EdgeSortValue<EdgeTy></code>.
    */
   template<typename CompTy>
-  void sortEdges(GraphNode N, const CompTy& comp, MethodFlag mflag = MethodFlag::ALL) {
+  void sortEdges(GraphNode N, const CompTy& comp, MethodFlag mflag = MethodFlag::WRITE_INTENT) {
     acquireNode(N, mflag);
     std::sort(edge_sort_begin(N), edge_sort_end(N), comp);
   }

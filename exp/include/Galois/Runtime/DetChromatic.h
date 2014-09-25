@@ -128,13 +128,13 @@ public:
         Galois::Runtime::makeLocalRange (graph),
         [this, &sources] (GNode src) {
           
-          auto& sd = graph.getData (src, Galois::NONE);
+          auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
 
           assert (sd.indegree == 0);
           unsigned addAmt = 0;
 
           auto closure = [this, &sd, &addAmt] (GNode dst) {
-            auto& dd = graph.getData (dst, Galois::NONE);
+            auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
 
             if (DAGdataComparator<ND>::compare (dd, sd)) { // dd < sd
               ++addAmt;
@@ -161,7 +161,7 @@ public:
         range,
         [this, &sources] (GNode src) {
           
-          auto& sd = graph.getData (src, Galois::NONE);
+          auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
           assert (bool (sd.onWL));
 
           // if (bool (sd.onWL)) {
@@ -170,7 +170,7 @@ public:
             unsigned addAmt = 0;
 
             auto closure = [this, &sd, &addAmt] (GNode dst) {
-              auto& dd = graph.getData (dst, Galois::NONE);
+              auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
 
                 if (bool (dd.onWL) && DAGdataComparator<ND>::compare (dd, sd)) { // dd < sd
               ++addAmt;
@@ -211,7 +211,7 @@ public:
           std::advance (it_end, (end - beg));
 
           for (; it_beg != it_end; ++it_beg) {
-            auto& nd = graph.getData (*it_beg, Galois::NONE);
+            auto& nd = graph.getData (*it_beg, Galois::MethodFlag::UNPROTECTED);
             nd.id = beg++;
           }
         },
@@ -249,7 +249,7 @@ public:
   void assignPriority (void) {
     assignIDs ();
     auto byId = [&] (GNode node) {
-      auto& nd = graph.getData (node, Galois::NONE);
+      auto& nd = graph.getData (node, Galois::MethodFlag::UNPROTECTED);
       nd.priority = nd.id % MAX_LEVELS;
     };
 
@@ -260,24 +260,24 @@ public:
     // N times, where N is sum of calls of all threads < K
     auto randPri = [&] (GNode node) {
       auto& rng = *(perThrdRNG.getLocal ());
-      auto& nd = graph.getData (node, Galois::NONE);
+      auto& nd = graph.getData (node, Galois::MethodFlag::UNPROTECTED);
       nd.priority = rng ();
     };
 
 
     auto minDegree = [&] (GNode node) {
-      auto& nd = graph.getData (node, Galois::NONE);
+      auto& nd = graph.getData (node, Galois::MethodFlag::UNPROTECTED);
       nd.priority = std::distance (
-                      graph.edge_begin (node, Galois::NONE),
-                      graph.edge_end (node, Galois::NONE));
+                      graph.edge_begin (node, Galois::MethodFlag::UNPROTECTED),
+                      graph.edge_end (node, Galois::MethodFlag::UNPROTECTED));
     };
 
     const size_t numNodes = graph.size ();
     auto maxDegree = [&] (GNode node) {
-      auto& nd = graph.getData (node, Galois::NONE);
+      auto& nd = graph.getData (node, Galois::MethodFlag::UNPROTECTED);
       nd.priority = numNodes - std::distance (
-                                  graph.edge_begin (node, Galois::NONE),
-                                  graph.edge_end (node, Galois::NONE));
+                                  graph.edge_begin (node, Galois::MethodFlag::UNPROTECTED),
+                                  graph.edge_end (node, Galois::MethodFlag::UNPROTECTED));
     };
     
     Galois::StatTimer t_priority ("priority assignment time: ");
@@ -315,7 +315,7 @@ public:
 
   template <typename C>
   void colorNode (GNode src, C& ctx) {
-    auto& sd = graph.getData (src, Galois::NONE);
+    auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
     assert (sd.indegree == 0);
     assert (sd.color == 0); // uncolored
 
@@ -326,7 +326,7 @@ public:
     unsigned addAmt = 0;
 
     auto closure = [this, &forbiddenColors, &ctx, &sd, &addAmt] (GNode dst) {
-      auto& dd = graph.getData (dst, Galois::NONE);
+      auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
 
       if (forbiddenColors.size () <= dd.color) {
         forbiddenColors.resize (dd.color + 1, unsigned (-1));
@@ -423,8 +423,8 @@ struct DAGmanagerInOut {
 
     template <typename F>
     void operator () (GNode src, F& func) {
-      for (auto i = graph.in_edge_begin (src, Galois::NONE)
-          , end_i = graph.in_edge_end (src, Galois::NONE); i != end_i; ++i) {
+      for (auto i = graph.in_edge_begin (src, Galois::MethodFlag::UNPROTECTED)
+          , end_i = graph.in_edge_end (src, Galois::MethodFlag::UNPROTECTED); i != end_i; ++i) {
         GNode dst = graph.getInEdgeDst (i);
         func (dst);
       }
@@ -438,8 +438,8 @@ struct DAGmanagerInOut {
 
     template <typename F>
     void operator () (GNode src, F& func) {
-      for (auto i = graph.edge_begin (src, Galois::NONE)
-          , end_i = graph.edge_end (src, Galois::NONE); i != end_i; ++i) {
+      for (auto i = graph.edge_begin (src, Galois::MethodFlag::UNPROTECTED)
+          , end_i = graph.edge_end (src, Galois::MethodFlag::UNPROTECTED); i != end_i; ++i) {
         GNode dst = graph.getEdgeDst (i);
         func (dst);
       }
@@ -474,8 +474,8 @@ struct DAGvisitorUndirected {
     template <typename F>
     void operator () (GNode src, F& func) {
 
-      for (auto i = graph.edge_begin (src, Galois::NONE)
-           , end_i = graph.edge_end (src, Galois::NONE); i != end_i; ++i) {
+      for (auto i = graph.edge_begin (src, Galois::MethodFlag::UNPROTECTED)
+           , end_i = graph.edge_end (src, Galois::MethodFlag::UNPROTECTED); i != end_i; ++i) {
 
         GNode dst = graph.getEdgeDst (i);
         func (dst);
@@ -497,13 +497,13 @@ struct DAGvisitorUndirected {
         // Galois::Runtime::makeLocalRange (graph),
         // [this] (GNode src) {
         // 
-          // auto& sd = graph.getData (src, Galois::NONE);
+          // auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
           // 
           // unsigned addAmt = 0;
-          // for (Graph::edge_iterator e = graph.edge_begin (src, Galois::NONE),
-              // e_end = graph.edge_end (src, Galois::NONE); e != e_end; ++e) {
+          // for (Graph::edge_iterator e = graph.edge_begin (src, Galois::MethodFlag::UNPROTECTED),
+              // e_end = graph.edge_end (src, Galois::MethodFlag::UNPROTECTED); e != e_end; ++e) {
             // GNode dst = graph.getEdgeDst (e);
-            // auto& dd = graph.getData (dst, Galois::NONE);
+            // auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
 // 
             // if (src != dst) {
               // dd.addPred (src);
@@ -627,7 +627,7 @@ struct ChromaticExecutor {
       // outer.func (n, userCtx);
       outer.func (n, outer);
 
-      auto& nd = outer.graph.getData (n, Galois::NONE);
+      auto& nd = outer.graph.getData (n, Galois::MethodFlag::UNPROTECTED);
       nd.onWL = false;
 
       // for (auto i = userCtx.getPushBuffer ().begin (), 
@@ -742,7 +742,7 @@ public:
   {}
 
   void push (GNode node) {
-    auto& nd = graph.getData (node, Galois::NONE);
+    auto& nd = graph.getData (node, Galois::MethodFlag::UNPROTECTED);
 
     bool expected = false;
     if (nd.onWL.compare_exchange_strong (expected, true)) {
@@ -767,7 +767,7 @@ public:
 
       G& graph = outer.graph;
 
-      auto& sd = graph.getData (src, Galois::NONE);
+      auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
       sd.onWL = false;
 
       // for (auto i = userCtx.getPushBuffer ().begin (), 
@@ -777,7 +777,7 @@ public:
 
       auto closure = [&graph, &ctx] (GNode dst) {
 
-        auto& dd = graph.getData (dst, Galois::NONE);
+        auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
 
         if (bool (dd.onWL)) {
           // assert (int (dd.indegree) > 0);
@@ -858,7 +858,7 @@ public:
     template <typename C>
     void operator () (GNode src, C& ctx) {
 
-      auto& sd = graph.getData (src, Galois::NONE);
+      auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
 
       if (bool (sd.onWL)) {
         outer.func (src, dummyCtx); 
@@ -868,7 +868,7 @@ public:
 
       auto closure = [&graph, &ctx] (GNode dst) {
 
-        auto& dd = graph.getData (dst, Galois::NONE);
+        auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
 
         unsigned x = --dd.indegree;
         if (x == 0) {

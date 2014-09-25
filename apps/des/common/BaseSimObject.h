@@ -128,7 +128,7 @@ protected:
     OutDegIterator (G& _graph, GI _edgeIter): BaseOutDegIter (), graph (_graph), edgeIter (_edgeIter) {}
 
     virtual typename Base::reference operator * () { 
-      return graph.getData (graph.getEdgeDst (edgeIter), Galois::MethodFlag::NONE);
+      return graph.getData (graph.getEdgeDst (edgeIter), Galois::MethodFlag::UNPROTECTED);
     }
 
     virtual typename Base::pointer operator-> () {
@@ -159,14 +159,14 @@ protected:
 
   template <typename G>
   OutDegIterator<G> make_begin (G& graph, typename G::GraphNode& node) const {
-    assert (graph.getData (node, Galois::MethodFlag::NONE) == this);
-    return OutDegIterator<G> (graph, graph.edge_begin (node, Galois::MethodFlag::NONE));
+    assert (graph.getData (node, Galois::MethodFlag::UNPROTECTED) == this);
+    return OutDegIterator<G> (graph, graph.edge_begin (node, Galois::MethodFlag::UNPROTECTED));
   }
 
   template <typename G>
   OutDegIterator<G> make_end (G& graph, typename G::GraphNode& node) const {
-    assert (graph.getData (node, Galois::MethodFlag::NONE) == this);
-    return OutDegIterator<G> (graph, graph.edge_end (node, Galois::MethodFlag::NONE));
+    assert (graph.getData (node, Galois::MethodFlag::UNPROTECTED) == this);
+    return OutDegIterator<G> (graph, graph.edge_end (node, Galois::MethodFlag::UNPROTECTED));
   }
 
   virtual void execEventIntern (const Event_ty& event, SendWrapper& sendWrap, BaseOutDegIter& b, BaseOutDegIter& e) = 0; 

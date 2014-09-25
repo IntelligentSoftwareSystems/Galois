@@ -28,9 +28,9 @@ protected:
     void operator () (GNode src, C&) {
 
       Graph& graph = outer.graph;
-      NodeData& sd = graph.getData (src, Galois::CHECK_CONFLICT);
-      for (Graph::edge_iterator e = graph.edge_begin (src, Galois::CHECK_CONFLICT),
-          e_end = graph.edge_end (src, Galois::CHECK_CONFLICT); e != e_end; ++e) {
+      NodeData& sd = graph.getData (src, Galois::MethodFlag::WRITE_INTENT);
+      for (Graph::edge_iterator e = graph.edge_begin (src, Galois::MethodFlag::WRITE_INTENT),
+          e_end = graph.edge_end (src, Galois::MethodFlag::WRITE_INTENT); e != e_end; ++e) {
         GNode dst = graph.getEdgeDst (e);
       }
 
@@ -58,7 +58,7 @@ protected:
       GetPriority (Graph& g): Base_ty (), graph (g) {}
 
       unsigned operator () (GNode n) {
-        auto& nd = graph.getData (n, Galois::NONE);
+        auto& nd = graph.getData (n, Galois::MethodFlag::UNPROTECTED);
         return nd.priority;
       }
     };

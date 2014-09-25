@@ -202,11 +202,11 @@ struct LogisticRegression {
 
     // Gather
     double dot = 0.0;
-    for (auto edge_it : g.out_edges(n, Galois::NONE)) {
+    for (auto edge_it : g.out_edges(n, Galois::MethodFlag::UNPROTECTED)) {
       GNode variable_node = g.getEdgeDst(edge_it);
-      Node& var_data = g.getData(variable_node, Galois::NONE);
+      Node& var_data = g.getData(variable_node, Galois::MethodFlag::UNPROTECTED);
       double weight = var_data.w;
-      dot += weight * g.getEdgeData(edge_it, Galois::NONE);
+      dot += weight * g.getEdgeData(edge_it, Galois::MethodFlag::UNPROTECTED);
     }
     
     int label = sample_data.field;
@@ -262,9 +262,9 @@ struct LogisticRegression {
 		if(d == 0) return;
 	}
 
-    for (auto edge_it : g.out_edges(n, Galois::NONE)) {
+    for (auto edge_it : g.out_edges(n, Galois::MethodFlag::UNPROTECTED)) {
       GNode variable_node = g.getEdgeDst(edge_it);
-      Node& var_data = g.getData(variable_node, Galois::NONE);
+      Node& var_data = g.getData(variable_node, Galois::MethodFlag::UNPROTECTED);
 
       double delta = -d*g.getEdgeData(edge_it);
       var_data.w -= delta;
@@ -312,11 +312,11 @@ struct linearSVM_DCD {
 
     // Gather
     double dot = 0.0;
-    for (auto edge_it : g.out_edges(n, Galois::NONE)) {
+    for (auto edge_it : g.out_edges(n, Galois::MethodFlag::UNPROTECTED)) {
       GNode variable_node = g.getEdgeDst(edge_it);
-      Node& var_data = g.getData(variable_node, Galois::NONE);
+      Node& var_data = g.getData(variable_node, Galois::MethodFlag::UNPROTECTED);
       double weight = var_data.w;
-      dot += weight * g.getEdgeData(edge_it, Galois::NONE);
+      dot += weight * g.getEdgeData(edge_it, Galois::MethodFlag::UNPROTECTED);
     }
     
     int label = sample_data.field;
@@ -354,9 +354,9 @@ struct linearSVM_DCD {
     if ( d == 0.0 )
       return;
 
-    for (auto edge_it : g.out_edges(n, Galois::NONE)) {
+    for (auto edge_it : g.out_edges(n, Galois::MethodFlag::UNPROTECTED)) {
       GNode variable_node = g.getEdgeDst(edge_it);
-      Node& var_data = g.getData(variable_node, Galois::NONE);
+      Node& var_data = g.getData(variable_node, Galois::MethodFlag::UNPROTECTED);
 
       double delta = -d*g.getEdgeData(edge_it);
       var_data.w -= delta;
@@ -391,11 +391,11 @@ struct linearSGD_Wild {
    	double invcreg = 1.0/creg; 
 	// Gather
     double dot = 0.0;
-    for (auto edge_it : g.out_edges(n, Galois::NONE)) {
+    for (auto edge_it : g.out_edges(n, Galois::MethodFlag::UNPROTECTED)) {
       GNode variable_node = g.getEdgeDst(edge_it);
-      Node& var_data = g.getData(variable_node, Galois::NONE);
+      Node& var_data = g.getData(variable_node, Galois::MethodFlag::UNPROTECTED);
       double weight = var_data.w;
-	  dot += weight * g.getEdgeData(edge_it, Galois::NONE);
+	  dot += weight * g.getEdgeData(edge_it, Galois::MethodFlag::UNPROTECTED);
     }
     
     int label = sample_data.field;
@@ -412,14 +412,14 @@ struct linearSGD_Wild {
 	else if ( algoType == AlgoType::SGDLR )
 		d = 1/(1+exp(dot*label));
 
-    for (auto edge_it : g.out_edges(n, Galois::NONE)) {
+    for (auto edge_it : g.out_edges(n, Galois::MethodFlag::UNPROTECTED)) {
       GNode variable_node = g.getEdgeDst(edge_it);
-      Node& var_data = g.getData(variable_node, Galois::NONE);
+      Node& var_data = g.getData(variable_node, Galois::MethodFlag::UNPROTECTED);
 	  int varCount = var_data.field;
 	  double rfactor = var_data.QD;
 	  double delta = 0; 
 	  if ( bigUpdate == true)
-		  delta = learningRate * ( var_data.w*rfactor - d * label *  g.getEdgeData(edge_it, Galois::NONE));
+		  delta = learningRate * ( var_data.w*rfactor - d * label *  g.getEdgeData(edge_it, Galois::MethodFlag::UNPROTECTED));
 	  else
 		  delta = learningRate * ( var_data.w*rfactor);
       var_data.w -= delta;
@@ -491,9 +491,9 @@ struct linearSGD {
     for (cur = 0; cur < size; ) {
       int varCount = baseNodeData[cur].field;
 #else
-    for (auto edge_it : g.out_edges(n, Galois::NONE)) {
+    for (auto edge_it : g.out_edges(n, Galois::MethodFlag::UNPROTECTED)) {
       GNode variable_node = g.getEdgeDst(edge_it);
-      Node& var_data = g.getData(variable_node, Galois::NONE);
+      Node& var_data = g.getData(variable_node, Galois::MethodFlag::UNPROTECTED);
       int varCount = var_data.field;
 #endif
 
@@ -650,12 +650,12 @@ struct Lasso_CD {
 //		return;
 	// Gather
     double dot = 0.0;
-    for (auto edge_it : g.out_edges(n, Galois::NONE)) {
+    for (auto edge_it : g.out_edges(n, Galois::MethodFlag::UNPROTECTED)) {
       GNode sample_node = g.getEdgeDst(edge_it);
-      Node& sample_data = g.getData(sample_node, Galois::NONE);
+      Node& sample_data = g.getData(sample_node, Galois::MethodFlag::UNPROTECTED);
 	  double r = sample_data.alpha;
-	  dot += r * g.getEdgeData(edge_it, Galois::NONE);
-//	  printf("%d-%d %lf   ", n-NUM_SAMPLES, sample_node, g.getEdgeData(edge_it, Galois::NONE));
+	  dot += r * g.getEdgeData(edge_it, Galois::MethodFlag::UNPROTECTED);
+//	  printf("%d-%d %lf   ", n-NUM_SAMPLES, sample_node, g.getEdgeData(edge_it, Galois::MethodFlag::UNPROTECTED));
     }
 
 	double violation = 0;
@@ -696,10 +696,10 @@ struct Lasso_CD {
 //	printf("%d: %lf %lf %lf\n", n-NUM_SAMPLES-2, wold, wnew, delta);
 	if ( std::fabs(delta) > 1e-12 )
 	{
-    	for (auto edge_it : g.out_edges(n, Galois::NONE)) {
+    	for (auto edge_it : g.out_edges(n, Galois::MethodFlag::UNPROTECTED)) {
 			GNode sample_node = g.getEdgeDst(edge_it);
-			Node& sample_data = g.getData(sample_node, Galois::NONE);
-			sample_data.alpha += delta*g.getEdgeData(edge_it, Galois::NONE);
+			Node& sample_data = g.getData(sample_node, Galois::MethodFlag::UNPROTECTED);
+			sample_data.alpha += delta*g.getEdgeData(edge_it, Galois::MethodFlag::UNPROTECTED);
 		}
 		w = wnew;
     }
@@ -1181,7 +1181,7 @@ void runPrimalSgd(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<
         }
         localw[i] /=  n;
         GNode variable_node = (GNode) (i + NUM_SAMPLES);
-        Node& var_data = g_train.getData(variable_node, Galois::NONE);
+        Node& var_data = g_train.getData(variable_node, Galois::MethodFlag::UNPROTECTED);
         var_data.w = localw[i];
         old_weights[i] = var_data.w;
       });
@@ -1364,7 +1364,7 @@ struct glmnet_cd { // {{{
 	double nu;
 	glmnet_cd(Graph &_g, param_t &_p, Bag &bag, size_t _nr_samples): g_train(_g), params(_p), cd_bag(bag), nr_samples(_nr_samples), nu(1e-12){}
 	void operator()(GNode feat_j, Galois::UserContext<GNode>& ctx){
-		auto &j_data = g_train.getData(feat_j, Galois::NONE);
+		auto &j_data = g_train.getData(feat_j, Galois::MethodFlag::UNPROTECTED);
 		auto &H = j_data.Hdiag;
 		auto &Grad_j = j_data.Grad;
 		auto &wpd_j = j_data.wpd;
@@ -1373,18 +1373,18 @@ struct glmnet_cd { // {{{
 #ifdef CACHING
 		Galois::PerIterAllocTy& alloc = ctx.getPerIterAlloc();
                 
-                ptrdiff_t size = std::distance(g_train.edge_begin(feat_j, Galois::NONE), g_train.edge_end(feat_j, Galois::NONE));
+                ptrdiff_t size = std::distance(g_train.edge_begin(feat_j, Galois::MethodFlag::UNPROTECTED), g_train.edge_end(feat_j, Galois::MethodFlag::UNPROTECTED));
                 double** xTdAddrs = (double**) alloc.allocate(sizeof(*xTdAddrs) * size);
                 double* xTds = (double*) alloc.allocate(sizeof(*xTds) * size);
                 double* xijs = (double*) alloc.allocate(sizeof(*xijs) * size);
 #endif
                 int ii = 0;
-		for(auto &edge : g_train.out_edges(feat_j, Galois::NONE)) {
-			auto &x_ij = g_train.getEdgeData(edge, Galois::NONE);
+		for(auto &edge : g_train.out_edges(feat_j, Galois::MethodFlag::UNPROTECTED)) {
+			auto &x_ij = g_train.getEdgeData(edge, Galois::MethodFlag::UNPROTECTED);
 #ifdef CACHING
                         xijs[ii] = x_ij;
 #endif
-			auto &self = g_train.getData(g_train.getEdgeDst(edge), Galois::NONE);
+			auto &self = g_train.getData(g_train.getEdgeDst(edge), Galois::MethodFlag::UNPROTECTED);
 #ifdef CACHING
                         xTdAddrs[ii] = &self.xTd;
                         xTds[ii] = *xTdAddrs[ii];
@@ -1419,16 +1419,16 @@ struct glmnet_cd { // {{{
 		z = std::min(std::max(z,-10.0),10.0);
 		wpd_j += z;
                 ii = 0;
-		for(auto &edge : g_train.out_edges(feat_j, Galois::NONE)) {
+		for(auto &edge : g_train.out_edges(feat_j, Galois::MethodFlag::UNPROTECTED)) {
 #ifdef CACHING
                         auto x_ij = xijs[ii];
 #else
-			auto x_ij = g_train.getEdgeData(edge, Galois::NONE);
+			auto x_ij = g_train.getEdgeData(edge, Galois::MethodFlag::UNPROTECTED);
 #endif
 #ifdef CACHING
 			*xTdAddrs[ii] = xTds[ii] + x_ij*z;
 #else
-			g_train.getData(g_train.getEdgeDst(edge), Galois::NONE).xTd += x_ij*z;
+			g_train.getData(g_train.getEdgeDst(edge), Galois::MethodFlag::UNPROTECTED).xTd += x_ij*z;
 #endif
                         ii += 1;
 		}
@@ -1444,16 +1444,16 @@ struct glmnet_qp_construct { // {{{
 	double nu;
 	glmnet_qp_construct(Graph &_g, param_t &_p, Bag& bag, size_t _nr_samples): g_train(_g), params(_p), cd_bag(bag), nr_samples(_nr_samples), nu(1e-12){}
 	void operator()(GNode feat_j, Galois::UserContext<GNode>& ctx){
-		auto &j_data = g_train.getData(feat_j, Galois::NONE);
+		auto &j_data = g_train.getData(feat_j, Galois::MethodFlag::UNPROTECTED);
 		auto &w_j = j_data.w;
 		auto &Hdiag_j = j_data.Hdiag;
 		auto &Grad_j = j_data.Grad;
 		auto &xjneg_sum_j = j_data.xjneg_sum;
 		Hdiag_j = nu; Grad_j = 0;
 		double tmp = 0;
-		for(auto &edge: g_train.out_edges(feat_j, Galois::NONE)) {
-			auto x_ij = g_train.getEdgeData(edge, Galois::NONE);
-			auto &self = g_train.getData(g_train.getEdgeDst(edge), Galois::NONE);
+		for(auto &edge: g_train.out_edges(feat_j, Galois::MethodFlag::UNPROTECTED)) {
+			auto x_ij = g_train.getEdgeData(edge, Galois::MethodFlag::UNPROTECTED);
+			auto &self = g_train.getData(g_train.getEdgeDst(edge), Galois::MethodFlag::UNPROTECTED);
 			Hdiag_j += x_ij*x_ij*self.D;
 			tmp += x_ij*self.tau;
 		}
@@ -1517,9 +1517,9 @@ void run_newGLMNET(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector
 		w_norm += fabs(w_j);
 		wpd_j = w_j;
 		xjneg_sum_j = 0;
-		for(auto edge: g_train.out_edges(feat_j, Galois::NONE)) {
-			auto x_ij = g_train.getEdgeData(edge, Galois::NONE);
-			auto &self = g_train.getData(g_train.getEdgeDst(edge), Galois::NONE);
+		for(auto edge: g_train.out_edges(feat_j, Galois::MethodFlag::UNPROTECTED)) {
+			auto x_ij = g_train.getEdgeData(edge, Galois::MethodFlag::UNPROTECTED);
+			auto &self = g_train.getData(g_train.getEdgeDst(edge), Galois::MethodFlag::UNPROTECTED);
 			self.exp_wTx += w_j*x_ij;
 			if(self.y == -1) 
 				xjneg_sum_j += creg*x_ij;
@@ -1532,7 +1532,7 @@ void run_newGLMNET(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector
 	printf("creg %lf init xx %lf\n", cc, xx);
 
 	for(auto &inst_node: trainingSamples) {
-		auto &self = g_train.getData(inst_node, Galois::NONE);
+		auto &self = g_train.getData(inst_node, Galois::MethodFlag::UNPROTECTED);
 		self.exp_wTx = exp(self.exp_wTx);
 		double tau_tmp = 1.0/(1.0+self.exp_wTx);
 		self.tau = creg*tau_tmp;
@@ -1568,16 +1568,16 @@ void run_newGLMNET(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector
 		/*
 		Galois::do_all(active_set.begin(), active_set.end(),
 		[&](GNode feat_j) { // {{{
-			auto &j_data = g_train.getData(feat_j, Galois::NONE);
+			auto &j_data = g_train.getData(feat_j, Galois::MethodFlag::UNPROTECTED);
 			auto &w_j = j_data.w;
 			auto &Hdiag_j = j_data.Hdiag;
 			auto &Grad_j = j_data.Grad;
 			auto &xjneg_sum_j = j_data.xjneg_sum;
 			Hdiag_j = nu; Grad_j = 0;
 			double tmp = 0;
-			for(auto &edge: g_train.out_edges(feat_j, Galois::NONE)) {
-				auto x_ij = g_train.getEdgeData(edge, Galois::NONE);
-				auto &self = g_train.getData(g_train.getEdgeDst(edge), Galois::NONE);
+			for(auto &edge: g_train.out_edges(feat_j, Galois::MethodFlag::UNPROTECTED)) {
+				auto x_ij = g_train.getEdgeData(edge, Galois::MethodFlag::UNPROTECTED);
+				auto &self = g_train.getData(g_train.getEdgeDst(edge), Galois::MethodFlag::UNPROTECTED);
 				Hdiag_j += x_ij*x_ij*self.D;
 				tmp += x_ij*self.tau;
 			}
@@ -1619,7 +1619,7 @@ void run_newGLMNET(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector
 		// Compute Newton direction -- Coordinate Descet for QP
 		cdTime.start();
 		params.QP_Gmax_old = std::numeric_limits<double>::max();
-		Galois::do_all(trainingSamples.begin(), trainingSamples.end(), [&](GNode &inst_node) {g_train.getData(inst_node, Galois::NONE).xTd = 0.0;});
+		Galois::do_all(trainingSamples.begin(), trainingSamples.end(), [&](GNode &inst_node) {g_train.getData(inst_node, Galois::MethodFlag::UNPROTECTED).xTd = 0.0;});
 		auto init_original_active_set = [&]{
 			active_set.clear();
 			for(auto &feat_j : cur_bag)
@@ -1681,7 +1681,7 @@ void run_newGLMNET(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector
 		Galois::GAccumulator<double> delta_acc, w_norm_acc;
 		Galois::do_all(variables.begin(), variables.end(), //{{{
 				[&](GNode &feat_j){
-				auto &self = g_train.getData(feat_j, Galois::NONE);
+				auto &self = g_train.getData(feat_j, Galois::MethodFlag::UNPROTECTED);
 				delta_acc.update(self.Grad*(self.wpd-self.w));
 				if(self.wpd != 0) w_norm_acc.update(fabs(self.wpd));
 				});//}}}
@@ -1690,7 +1690,7 @@ void run_newGLMNET(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector
 
 		Galois::GAccumulator<double> tmp_acc;
 		Galois::do_all(trainingSamples.begin(), trainingSamples.end(), [&](GNode &inst_node) {
-			auto &self = g_train.getData(inst_node, Galois::NONE);
+			auto &self = g_train.getData(inst_node, Galois::MethodFlag::UNPROTECTED);
 			if(self.y == -1) tmp_acc.update(creg*self.xTd);
 		});
 		double negsum_xTd = tmp_acc.reduce();
@@ -1700,7 +1700,7 @@ void run_newGLMNET(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector
 			double cond = w_norm_new - w_norm + negsum_xTd - sigma*delta;
 			tmp_acc.reset();
 			Galois::do_all(trainingSamples.begin(), trainingSamples.end(), [&](GNode &inst_node){
-				auto &self = g_train.getData(inst_node, Galois::NONE);
+				auto &self = g_train.getData(inst_node, Galois::MethodFlag::UNPROTECTED);
 				double exp_xTd = exp(self.xTd);
 				self.exp_wTx_new = self.exp_wTx*exp_xTd;
 				tmp_acc.update(creg*log((1+self.exp_wTx_new)/(exp_xTd+self.exp_wTx_new)));
@@ -1709,11 +1709,11 @@ void run_newGLMNET(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector
 			if(cond <= 0.0) {
 				w_norm = w_norm_new;
 				Galois::do_all(variables.begin(), variables.end(), [&](GNode &feat_j){
-						auto &self = g_train.getData(feat_j, Galois::NONE);
+						auto &self = g_train.getData(feat_j, Galois::MethodFlag::UNPROTECTED);
 						self.w = self.wpd;
 					});
 				Galois::do_all(trainingSamples.begin(), trainingSamples.end(), [&](GNode &inst_i){
-						auto &self = g_train.getData(inst_i, Galois::NONE);
+						auto &self = g_train.getData(inst_i, Galois::MethodFlag::UNPROTECTED);
 						self.exp_wTx = self.exp_wTx_new;
 						double tau_tmp = 1/(1+self.exp_wTx);
 						self.tau = creg*tau_tmp;
@@ -1724,29 +1724,29 @@ void run_newGLMNET(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector
 				w_norm_new = 0;
 				tmp_acc.reset();
 				Galois::do_all(variables.begin(), variables.end(), [&](GNode &feat_j){
-						auto &self = g_train.getData(feat_j, Galois::NONE);
+						auto &self = g_train.getData(feat_j, Galois::MethodFlag::UNPROTECTED);
 						self.wpd = (self.w+self.wpd)*0.5;
 						if(self.wpd != 0) tmp_acc.update(fabs(self.wpd));
 					});
 				w_norm_new = tmp_acc.reduce();
 				delta *= 0.5;
 				negsum_xTd *= 0.5;
-				Galois::do_all(trainingSamples.begin(), trainingSamples.end(), [&](GNode &inst_i){ g_train.getData(inst_i, Galois::NONE).xTd *=0.5;});
+				Galois::do_all(trainingSamples.begin(), trainingSamples.end(), [&](GNode &inst_i){ g_train.getData(inst_i, Galois::MethodFlag::UNPROTECTED).xTd *=0.5;});
 			}
 		}
 		if(num_linesearch >= max_num_linesearch) {
-			Galois::do_all(trainingSamples.begin(), trainingSamples.end(), [&](GNode &inst_i){ g_train.getData(inst_i, Galois::NONE).exp_wTx = 0;});
+			Galois::do_all(trainingSamples.begin(), trainingSamples.end(), [&](GNode &inst_i){ g_train.getData(inst_i, Galois::MethodFlag::UNPROTECTED).exp_wTx = 0;});
 
 			Galois::do_all(variables.begin(), variables.end(), [&](GNode &feat_j){
-					auto &self = g_train.getData(feat_j, Galois::NONE);
+					auto &self = g_train.getData(feat_j, Galois::MethodFlag::UNPROTECTED);
 					if(self.w != 0) {
 						for(auto &edge: g_train.out_edges(feat_j)) {
-						auto &x_ij = g_train.getEdgeData(edge, Galois::NONE);
-						g_train.getData(g_train.getEdgeDst(edge), Galois::NONE).exp_wTx += self.w*x_ij;
+						auto &x_ij = g_train.getEdgeData(edge, Galois::MethodFlag::UNPROTECTED);
+						g_train.getData(g_train.getEdgeDst(edge), Galois::MethodFlag::UNPROTECTED).exp_wTx += self.w*x_ij;
 						}
 					}
 				});
-			Galois::do_all(trainingSamples.begin(), trainingSamples.end(), [&](GNode &inst_i){ auto &exp_wTx = g_train.getData(inst_i, Galois::NONE).exp_wTx; exp_wTx = exp(exp_wTx);});
+			Galois::do_all(trainingSamples.begin(), trainingSamples.end(), [&](GNode &inst_i){ auto &exp_wTx = g_train.getData(inst_i, Galois::MethodFlag::UNPROTECTED).exp_wTx; exp_wTx = exp(exp_wTx);});
 		}
 		//}}} // end of line search
 

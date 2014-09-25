@@ -159,8 +159,8 @@ struct order_by_degree {
   bool operator()(const GNode& a, const GNode& b) {
     uint64_t wa = weights[a];
     uint64_t wb = weights[b];
-    int pa = graph.getData(a,Galois::MethodFlag::NONE).getPart();
-    int pb = graph.getData(b,Galois::MethodFlag::NONE).getPart();
+    int pa = graph.getData(a,Galois::MethodFlag::UNPROTECTED).getPart();
+    int pb = graph.getData(b,Galois::MethodFlag::UNPROTECTED).getPart();
     if (pa != pb) { 
       return pa < pb;
     }
@@ -176,7 +176,7 @@ struct OrderGraph {
   }
   template<typename Context>
   void operator()(int part, Context &lwl) {
-    auto flag = Galois::MethodFlag::NONE;
+    auto flag = Galois::MethodFlag::UNPROTECTED;
     typedef std::vector<std::pair<unsigned,GNode>, Galois::PerIterAllocTy::rebind<std::pair<unsigned,GNode> >::other> GD;
     //copy and translate all edges
     GD orderedNodes(GD::allocator_type(lwl.getPerIterAlloc()));

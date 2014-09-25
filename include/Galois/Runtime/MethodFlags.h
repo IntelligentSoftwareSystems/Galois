@@ -33,7 +33,7 @@ namespace Runtime {
 void doCheckWrite();
 
 inline bool isWriteMethod(Galois::MethodFlag m, bool write) {
-  return write || (m & MethodFlag::WRITE) != Galois::MethodFlag::NONE;
+  return write || (m & MethodFlag::WRITE) != Galois::MethodFlag::UNPROTECTED;
 }
 
 inline void checkWrite(Galois::MethodFlag m, bool write) {

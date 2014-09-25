@@ -131,7 +131,7 @@ public:
     return EdgeData.get(getEdgeIdx(src, dst));
   }
 
-  edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = NONE) {
+  edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::UNPROTECTED) {
     GaloisRuntime::checkWrite(mflag);
     return EdgeData.get(*ni);
   }
@@ -285,7 +285,7 @@ public:
     return EdgeData[getEdgeIdx(src,dst)].getData();
   }
 
-  edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = NONE) const {
+  edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::UNPROTECTED) const {
     GaloisRuntime::checkWrite(mflag);
     return ni->getData();
    }
@@ -433,7 +433,7 @@ public:
     return getEdgeIdx(src,dst)->getData();
   }
 
-  edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = NONE) const {
+  edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::UNPROTECTED) const {
     GaloisRuntime::checkWrite(mflag);
     return ni->getData();
   }
@@ -761,7 +761,7 @@ public:
     return getEdgeIdx(src,dst)->getData();
   }
 
-  edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = NONE) const {
+  edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::UNPROTECTED) const {
     GaloisRuntime::checkWrite(mflag);
     return ni->getData();
   }

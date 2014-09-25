@@ -163,7 +163,7 @@ struct UpdateRequestIndexer: public std::unary_function<UpdateRequest,unsigned i
 
 struct GNodeIndexer: public std::unary_function<GNode,unsigned int> {
   unsigned int operator()(const GNode& val) const {
-    return graph.getData(val, Galois::MethodFlag::NONE).dist;
+    return graph.getData(val, Galois::MethodFlag::UNPROTECTED).dist;
   }
 };
 
@@ -236,7 +236,7 @@ static void readGraph(GNode& source, GNode& report) {
   bool foundSource = false;
   for (Graph::iterator src = graph.begin(), ee =
       graph.end(); src != ee; ++src, ++id) {
-    SNode& node = graph.getData(*src, Galois::MethodFlag::NONE);
+    SNode& node = graph.getData(*src, Galois::MethodFlag::UNPROTECTED);
     node.dist = DIST_INFINITY;
     node.id = id;
     if (id == startNode) {
@@ -264,12 +264,12 @@ struct SerialAsyncAlgo {
 
   void operator()(const GNode source) const {
     std::deque<GNode> wl;
-    graph.getData(source, Galois::MethodFlag::NONE).dist = 0;
+    graph.getData(source, Galois::MethodFlag::UNPROTECTED).dist = 0;
 
-    for (Graph::edge_iterator ii = graph.edge_begin(source, Galois::MethodFlag::NONE), 
-           ei = graph.edge_end(source, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+    for (Graph::edge_iterator ii = graph.edge_begin(source, Galois::MethodFlag::UNPROTECTED), 
+           ei = graph.edge_end(source, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
       GNode dst = graph.getEdgeDst(ii);
-      SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+      SNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
       ddata.dist = 1;
       wl.push_back(dst);
     }
@@ -278,14 +278,14 @@ struct SerialAsyncAlgo {
       GNode n = wl.front();
       wl.pop_front();
 
-      SNode& data = graph.getData(n, Galois::MethodFlag::NONE);
+      SNode& data = graph.getData(n, Galois::MethodFlag::UNPROTECTED);
 
       unsigned int newDist = data.dist + 1;
 
-      for (Graph::edge_iterator ii = graph.edge_begin(n, Galois::MethodFlag::NONE),
-            ei = graph.edge_end(n, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+      for (Graph::edge_iterator ii = graph.edge_begin(n, Galois::MethodFlag::UNPROTECTED),
+            ei = graph.edge_end(n, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
         GNode dst = graph.getEdgeDst(ii);
-        SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+        SNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
 
         if (newDist < ddata.dist) {
           ddata.dist = newDist;
@@ -322,14 +322,14 @@ struct AsyncAlgo {
   }
 
   void operator()(GNode& n, Galois::UserContext<GNode>& ctx) const {
-    SNode& data = graph.getData(n, Galois::MethodFlag::NONE);
+    SNode& data = graph.getData(n, Galois::MethodFlag::UNPROTECTED);
 
     unsigned int newDist = data.dist + 1;
 
-    for (Graph::edge_iterator ii = graph.edge_begin(n, Galois::MethodFlag::NONE),
-          ei = graph.edge_end(n, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+    for (Graph::edge_iterator ii = graph.edge_begin(n, Galois::MethodFlag::UNPROTECTED),
+          ei = graph.edge_end(n, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
       GNode dst = graph.getEdgeDst(ii);
-      SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+      SNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
 
       unsigned int oldDist;
       while (true) {
@@ -381,10 +381,10 @@ struct BarrierAlgo {
 
     unsigned int newDist = item.second;
 
-    for (Graph::edge_iterator ii = graph.edge_begin(n, Galois::MethodFlag::NONE),
-          ei = graph.edge_end(n, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+    for (Graph::edge_iterator ii = graph.edge_begin(n, Galois::MethodFlag::UNPROTECTED),
+          ei = graph.edge_end(n, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
       GNode dst = graph.getEdgeDst(ii);
-      SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+      SNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
 
       unsigned int oldDist;
       while (true) {
@@ -429,10 +429,10 @@ struct BarrierExpAlgo {
 
       unsigned int newDist = item.second;
 
-      for (Graph::edge_iterator ii = graph.edge_begin(n, Galois::MethodFlag::NONE),
-            ei = graph.edge_end(n, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+      for (Graph::edge_iterator ii = graph.edge_begin(n, Galois::MethodFlag::UNPROTECTED),
+            ei = graph.edge_end(n, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
         GNode dst = graph.getEdgeDst(ii);
-        SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+        SNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
 
         unsigned int oldDist;
         while (true) {
@@ -482,7 +482,7 @@ struct DetBarrierAlgo {
 
   struct DeterministicId {
     uintptr_t operator()(const ItemTy& item) const {
-      return graph.getData(item.first, Galois::MethodFlag::NONE).id;
+      return graph.getData(item.first, Galois::MethodFlag::UNPROTECTED).id;
     }
   };
 
@@ -525,10 +525,10 @@ struct DetBarrierAlgo {
 
     unsigned int newDist = item.second;
     
-    for (Graph::edge_iterator ii = graph.edge_begin(n, Galois::MethodFlag::NONE),
-          ei = graph.edge_end(n, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+    for (Graph::edge_iterator ii = graph.edge_begin(n, Galois::MethodFlag::UNPROTECTED),
+          ei = graph.edge_end(n, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
       GNode dst = graph.getEdgeDst(ii);
-      SNode& ddata = graph.getData(dst, Galois::MethodFlag::ALL);
+      SNode& ddata = graph.getData(dst, Galois::MethodFlag::WRITE_INTENT);
 
       unsigned int oldDist;
       while (true) {
@@ -547,7 +547,7 @@ struct DetBarrierAlgo {
 
     for (typename LocalState::Pending::iterator ii = ppending->begin(), ei = ppending->end(); ii != ei; ++ii) {
       GNode dst = *ii;
-      SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+      SNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
 
       unsigned int oldDist;
       while (true) {
@@ -593,14 +593,14 @@ struct TBBAsyncAlgo {
 
   struct Fn {
     void operator()(const GNode& n, tbb::parallel_do_feeder<GNode>& feeder) const {
-      SNode& data = graph.getData(n, Galois::MethodFlag::NONE);
+      SNode& data = graph.getData(n, Galois::MethodFlag::UNPROTECTED);
 
       unsigned int newDist = data.dist + 1;
 
-      for (Graph::edge_iterator ii = graph.edge_begin(n, Galois::MethodFlag::NONE),
-            ei = graph.edge_end(n, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+      for (Graph::edge_iterator ii = graph.edge_begin(n, Galois::MethodFlag::UNPROTECTED),
+            ei = graph.edge_end(n, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
         GNode dst = graph.getEdgeDst(ii);
-        SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+        SNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
 
         unsigned int oldDist;
         while (true) {
@@ -645,10 +645,10 @@ struct TBBBarrierAlgo {
     Fn(ContainerTy& w, unsigned int d): wl(w), newDist(d) { }
 
     void operator()(const GNode& n) const {
-      for (Graph::edge_iterator ii = graph.edge_begin(n, Galois::MethodFlag::NONE),
-            ei = graph.edge_end(n, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+      for (Graph::edge_iterator ii = graph.edge_begin(n, Galois::MethodFlag::UNPROTECTED),
+            ei = graph.edge_end(n, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
         GNode dst = graph.getEdgeDst(ii);
-        SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+        SNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
 
         // Racy but okay
         if (ddata.dist <= newDist)

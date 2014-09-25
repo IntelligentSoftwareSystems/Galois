@@ -88,8 +88,8 @@ struct Process {
       GNode _v = *qq;
       int v = _v;
       for (Graph::edge_iterator
-          ii = G->edge_begin(_v, Galois::MethodFlag::NONE),
-          ee = G->edge_end(_v, Galois::MethodFlag::NONE); ii != ee; ++ii) {
+          ii = G->edge_begin(_v, Galois::MethodFlag::UNPROTECTED),
+          ee = G->edge_end(_v, Galois::MethodFlag::UNPROTECTED); ii != ee; ++ii) {
 	GNode _w = G->getEdgeDst(ii);
 	int w = _w;
 	if (!d[w]) {

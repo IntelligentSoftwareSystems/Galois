@@ -34,9 +34,9 @@ namespace Galois {
  * and/or (2) saving undo information. By default, both are performed (ALL).
  */
 enum MethodFlag {
-  NONE = 0,
-  CHECK_CONFLICT = 1,
-  SAVE_UNDO = 2,
+  UNPROTECTED = 0,
+  WRITE_INTENT = 1,
+  READ_INTENT = 2,
   ALL = 3,
   //! Method writes
   WRITE = 4,

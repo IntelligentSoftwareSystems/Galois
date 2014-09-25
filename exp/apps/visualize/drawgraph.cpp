@@ -261,7 +261,7 @@ Point<double> computeForceRepulsive(int which, Point<double> position, GNode n, 
   Point<double> fRepulse = {0.0,0.0};
   for (Graph::iterator jj = g.begin(), ej = g.end(); jj!=ej; jj++) {
     if (n != *jj) {
-      Vertex& u = g.getData(*jj, Galois::NONE);
+      Vertex& u = g.getData(*jj, Galois::MethodFlag::UNPROTECTED);
       auto change = position - u.position(which);
       double lenSQ = change.lengthSQ();
       if (lenSQ < lenLimit) { // not stable

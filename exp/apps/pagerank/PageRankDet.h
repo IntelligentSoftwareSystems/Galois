@@ -74,25 +74,25 @@ protected:
   void applyOperator (GNode src, C& ctx) {
     double sum = 0;
 
-    for (auto jj = graph.in_edge_begin(src, Galois::MethodFlag::NONE), ej = graph.in_edge_end(src, Galois::MethodFlag::NONE); jj != ej; ++jj) {
+    for (auto jj = graph.in_edge_begin(src, Galois::MethodFlag::UNPROTECTED), ej = graph.in_edge_end(src, Galois::MethodFlag::UNPROTECTED); jj != ej; ++jj) {
       GNode dst = graph.getInEdgeDst(jj);
-      auto& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+      auto& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
       sum += ddata.value / ddata.outdegree;
     }
 
     float value = (1.0 - alpha) * sum + alpha;
-    auto& sdata = graph.getData(src, Galois::MethodFlag::NONE);
+    auto& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
     float diff = std::fabs(value - sdata.value);
 
     
     
     if (diff > tolerance) {
       sdata.value = value;
-      for (auto jj = graph.edge_begin(src, Galois::MethodFlag::NONE), ej = graph.edge_end(src, Galois::MethodFlag::NONE); jj != ej; ++jj) {
+      for (auto jj = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED), ej = graph.edge_end(src, Galois::MethodFlag::UNPROTECTED); jj != ej; ++jj) {
         GNode dst = graph.getEdgeDst(jj);
 
         if (useOnWL) {
-          auto& dd = graph.getData (dst, Galois::NONE);
+          auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
           bool expected = false;
           if (dd.onWL.compare_exchange_strong (expected, true)) {
             ctx.push (dst);

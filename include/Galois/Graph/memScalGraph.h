@@ -186,13 +186,13 @@ public:
   /**
    * Adds a node to the graph.
    */
-  void addNode(const GraphNode& n, Galois::MethodFlag mflag = MethodFlag::ALL) {
+  void addNode(const GraphNode& n, Galois::MethodFlag mflag = MethodFlag::WRITE_INTENT) {
     Galois::Runtime::checkWrite(mflag, true);
     Galois::Runtime::acquire(n, mflag);
   }
 
   //! Gets the node data for a node.
-  NodeTy& getData(const GraphNode& n, Galois::MethodFlag mflag = MethodFlag::ALL) const {
+  NodeTy& getData(const GraphNode& n, Galois::MethodFlag mflag = MethodFlag::WRITE_INTENT) const {
     assert(n);
     Galois::Runtime::checkWrite(mflag, false);
     Galois::Runtime::acquire(n, mflag);
@@ -200,7 +200,7 @@ public:
   }
 
   //! Checks if a node is in the graph
-  bool containsNode(const GraphNode& n, Galois::MethodFlag mflag = MethodFlag::ALL) const {
+  bool containsNode(const GraphNode& n, Galois::MethodFlag mflag = MethodFlag::WRITE_INTENT) const {
     assert(n);
     Galois::Runtime::acquire(n, mflag);
   }
@@ -214,7 +214,7 @@ public:
    * value if desired.  This frees us from dealing with the void edge data
    * problem in this API
    */
-  edge_iterator addEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = MethodFlag::ALL) {
+  edge_iterator addEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = MethodFlag::WRITE_INTENT) {
     return createEdgeWithReuse(src, dst, mflag);
   }
 
@@ -226,7 +226,7 @@ public:
 
 
   //! Finds if an edge between src and dst exists
-  edge_iterator findEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = MethodFlag::ALL) {
+  edge_iterator findEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = MethodFlag::WRITE_INTENT) {
     assert(src);
     assert(dst);
     Galois::Runtime::acquire(src, mflag);
@@ -237,11 +237,11 @@ public:
   /**
    * Returns the edge data associated with the edge. It is an error to
    * get the edge data for a non-existent edge.  It is an error to get
-   * edge data for inactive edges. By default, the mflag is Galois::NONE
+   * edge data for inactive edges. By default, the mflag is Galois::MethodFlag::UNPROTECTED
    * because edge_begin() dominates this call and should perform the
    * appropriate locking.
    */
-  edge_data_reference getEdgeData(edge_iterator ii, Galois::MethodFlag mflag = MethodFlag::NONE) const {
+  edge_data_reference getEdgeData(edge_iterator ii, Galois::MethodFlag mflag = MethodFlag::UNPROTECTED) const {
 
     Galois::Runtime::checkWrite(mflag, false);
     Galois::Runtime::acquire(ii->first(), mflag);
@@ -257,7 +257,7 @@ public:
   //// General Things ////
 
   //! Returns an iterator to the neighbors of a node
-  edge_iterator edge_begin(GraphNode N, Galois::MethodFlag mflag = MethodFlag::ALL) {
+  edge_iterator edge_begin(GraphNode N, Galois::MethodFlag mflag = MethodFlag::WRITE_INTENT) {
     assert(N);
     Galois::Runtime::acquire(N, mflag);
 
@@ -271,7 +271,7 @@ public:
   }
 
   //! Returns the end of the neighbor iterator
-  edge_iterator edge_end(GraphNode N, Galois::MethodFlag mflag = MethodFlag::ALL) {
+  edge_iterator edge_end(GraphNode N, Galois::MethodFlag mflag = MethodFlag::WRITE_INTENT) {
     assert(N);
     // Not necessary; no valid use for an end pointer should ever require it
     //if (shouldLock(mflag))
@@ -283,7 +283,7 @@ public:
    * An object with begin() and end() methods to iterate over the outgoing
    * edges of N.
    */
-  detail::EdgesIterator<MemScalGraph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+  detail::EdgesIterator<MemScalGraph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE_INTENT) {
     return detail::EdgesIterator<MemScalGraph>(*this, N, mflag);
   }
 

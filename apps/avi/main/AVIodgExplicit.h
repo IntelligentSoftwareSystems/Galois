@@ -137,7 +137,7 @@ protected:
 
     for (std::vector<MNode>::const_iterator i = aviAdjNodes.begin (), ei = aviAdjNodes.end (); i != ei; ++i) {
       MNode aviAdjN = *i;
-      AVI* avi = mgraph.getData (aviAdjN, Galois::MethodFlag::NONE);
+      AVI* avi = mgraph.getData (aviAdjN, Galois::MethodFlag::UNPROTECTED);
       const std::vector<GlobalNodalIndex>& conn = avi->getGeometry ().getConnectivity ();
 
       for (std::vector<GlobalNodalIndex>::const_iterator j = conn.begin (), ej = conn.end (); j != ej; ++j) {
@@ -229,10 +229,10 @@ protected:
         // one-shot optimization: acquire abstract locks on active node and
         // neighbors (all its neighbors, in this case) before performing any modifications
 
-        AVI* srcAVI = graph.getData (src, Galois::MethodFlag::CHECK_CONFLICT);
+        AVI* srcAVI = graph.getData (src, Galois::MethodFlag::WRITE_INTENT);
 
-        for (Graph::edge_iterator e = graph.edge_begin (src, Galois::MethodFlag::CHECK_CONFLICT)
-             , ende = graph.edge_end (src, Galois::MethodFlag::CHECK_CONFLICT); e != ende; ++e) {
+        for (Graph::edge_iterator e = graph.edge_begin (src, Galois::MethodFlag::WRITE_INTENT)
+             , ende = graph.edge_end (src, Galois::MethodFlag::WRITE_INTENT); e != ende; ++e) {
         }
 
 
@@ -256,11 +256,11 @@ protected:
         // update the inEdges count and determine
         // which neighbor is at local minimum and needs to be added to the worklist
 
-        for (Graph::edge_iterator e = graph.edge_begin (src, Galois::MethodFlag::NONE)
-            , ende = graph.edge_end (src, Galois::MethodFlag::NONE); e != ende; ++e) {
+        for (Graph::edge_iterator e = graph.edge_begin (src, Galois::MethodFlag::UNPROTECTED)
+            , ende = graph.edge_end (src, Galois::MethodFlag::UNPROTECTED); e != ende; ++e) {
 
           const GNode& dst = graph.getEdgeDst (e);
-          AVI* dstAVI = graph.getData (dst, Galois::MethodFlag::NONE);
+          AVI* dstAVI = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
 
           if (AVIComparator::compare (srcAVI, dstAVI) > 0) {
             // if srcAVI has a higher time stamp that dstAVI
@@ -305,14 +305,14 @@ protected:
 
     for (Graph::iterator i = graph.begin (), e = graph.end (); i != e; ++i) {
       const GNode& src = *i;
-      AVI* srcAVI = graph.getData (src, Galois::MethodFlag::NONE);
+      AVI* srcAVI = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
 
       // calculate the in degree of src by comparing it against its neighbors
-      for (Graph::edge_iterator e = graph.edge_begin  (src, Galois::MethodFlag::NONE), 
-          ende = graph.edge_end (src, Galois::MethodFlag::NONE); e != ende; ++e) {
+      for (Graph::edge_iterator e = graph.edge_begin  (src, Galois::MethodFlag::UNPROTECTED), 
+          ende = graph.edge_end (src, Galois::MethodFlag::UNPROTECTED); e != ende; ++e) {
         
         GNode dst = graph.getEdgeDst (e);
-        AVI* dstAVI = graph.getData (dst, Galois::MethodFlag::NONE);
+        AVI* dstAVI = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
         if (AVIComparator::compare (srcAVI, dstAVI) > 0) {
           ++inDegVec[srcAVI->getGlobalIndex ()];
         }
@@ -344,7 +344,7 @@ public:
 //    // TODO: DEBUG
 //    std::cout << "Initial Worklist = " << std::endl;
 //    for (size_t i = 0; i < initWL.size (); ++i) {
-//      std::cout << graph.getData (initWL[i], Galois::MethodFlag::NONE)->toString () << ", ";
+//      std::cout << graph.getData (initWL[i], Galois::MethodFlag::UNPROTECTED)->toString () << ", ";
 //    }
 //    std::cout << std::endl;
 
@@ -397,16 +397,16 @@ public:
 
     for (Graph::iterator i = graph.begin (), e = graph.end (); i != e; ++i) {
       const GNode& src = *i;
-      AVI* srcAVI = graph.getData (src, Galois::MethodFlag::NONE);
+      AVI* srcAVI = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
 
       size_t inDeg = 0;
       // calculate the in degree of src by comparing it against its neighbors
-      for (Graph::edge_iterator e = graph.edge_begin (src, Galois::MethodFlag::NONE)
-          , ende = graph.edge_end (src, Galois::MethodFlag::NONE); e != ende; ++e) {
+      for (Graph::edge_iterator e = graph.edge_begin (src, Galois::MethodFlag::UNPROTECTED)
+          , ende = graph.edge_end (src, Galois::MethodFlag::UNPROTECTED); e != ende; ++e) {
 
 
         GNode dst = graph.getEdgeDst (e);
-        AVI* dstAVI = graph.getData (dst, Galois::MethodFlag::NONE);
+        AVI* dstAVI = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
         if (AVIComparator::compare (srcAVI, dstAVI) > 0) {
           ++inDeg;
 
@@ -415,8 +415,8 @@ public:
         }
       }
 
-      // size_t outDeg = graph.neighborsSize(src, Galois::MethodFlag::NONE) - inDeg;
-      size_t outDeg = std::distance (graph.edge_begin (src, Galois::MethodFlag::NONE), graph.edge_end (src, Galois::MethodFlag::NONE));
+      // size_t outDeg = graph.neighborsSize(src, Galois::MethodFlag::UNPROTECTED) - inDeg;
+      size_t outDeg = std::distance (graph.edge_begin (src, Galois::MethodFlag::UNPROTECTED), graph.edge_end (src, Galois::MethodFlag::UNPROTECTED));
 
       std::fill (center.begin (), center.end (), 0.0);
       srcAVI->getElement ().getGeometry ().computeCenter (center);
@@ -435,8 +435,8 @@ public:
     fprintf (edgesFile, "srcId, dstId\n");
     for (std::vector<std::pair<GNode, GNode> >::const_iterator i = outEdges.begin(), ei = outEdges.end();
         i != ei; ++i) {
-       size_t srcId = graph.getData (i->first, Galois::MethodFlag::NONE)->getGlobalIndex ();
-       size_t dstId = graph.getData (i->second, Galois::MethodFlag::NONE)->getGlobalIndex ();
+       size_t srcId = graph.getData (i->first, Galois::MethodFlag::UNPROTECTED)->getGlobalIndex ();
+       size_t dstId = graph.getData (i->second, Galois::MethodFlag::UNPROTECTED)->getGlobalIndex ();
 
        fprintf (edgesFile, "%zd, %zd\n", srcId, dstId);
 

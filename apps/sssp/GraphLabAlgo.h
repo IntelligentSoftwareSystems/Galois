@@ -52,7 +52,7 @@ struct GraphLabAlgo {
 
     void apply(Graph& graph, GNode node, const gather_type&) {
       changed = false;
-      SNode& data = graph.getData(node, Galois::MethodFlag::NONE);
+      SNode& data = graph.getData(node, Galois::MethodFlag::UNPROTECTED);
       if (data.dist > min_dist) {
         changed = true;
         data.dist = min_dist;
@@ -65,8 +65,8 @@ struct GraphLabAlgo {
     
     void scatter(Graph& graph, GNode node, GNode src, GNode dst,
         Galois::GraphLab::Context<Graph,Program>& ctx, Graph::edge_data_reference edgeValue) {
-      SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
-      SNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
+      SNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+      SNode& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
       Dist newDist = sdata.dist + edgeValue;
       if (ddata.dist > newDist) {
         ctx.push(dst, message_type(newDist));

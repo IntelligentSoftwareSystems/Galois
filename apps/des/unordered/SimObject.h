@@ -156,7 +156,7 @@ public:
         }
 
 
-        assert (graph.getData(myNode, Galois::MethodFlag::NONE) == this); // should already own a lock
+        assert (graph.getData(myNode, Galois::MethodFlag::UNPROTECTED) == this); // should already own a lock
         assert (event.getRecvObj () == this);
 
         typename Base::template OutDegIterator<G> beg = Base::make_begin (graph, myNode);

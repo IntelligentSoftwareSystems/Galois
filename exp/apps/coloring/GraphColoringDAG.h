@@ -53,15 +53,15 @@ protected:
     Galois::do_all_choice (
         Galois::Runtime::makeLocalRange (graph),
         [&] (GNode src) {
-          auto& sd = graph.getData (src, Galois::NONE);
+          auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
 
           // std::printf ("Processing node %d with priority %d\n", sd.id, sd.priority);
 
           unsigned addAmt = 0;
-          for (Graph::edge_iterator e = graph.edge_begin (src, Galois::NONE),
-              e_end = graph.edge_end (src, Galois::NONE); e != e_end; ++e) {
+          for (Graph::edge_iterator e = graph.edge_begin (src, Galois::MethodFlag::UNPROTECTED),
+              e_end = graph.edge_end (src, Galois::MethodFlag::UNPROTECTED); e != e_end; ++e) {
             GNode dst = graph.getEdgeDst (e);
-            auto& dd = graph.getData (dst, Galois::NONE);
+            auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
 
             if (cmp (dd, sd)) { // dd < sd
               ++addAmt;
@@ -92,16 +92,16 @@ protected:
 
       Graph& graph = outer.graph;
 
-      auto& sd = graph.getData (src, Galois::NONE);
+      auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
       assert (sd.indegree == 0);
 
       outer.colorNode (src);
 
-      for (Graph::edge_iterator e = graph.edge_begin (src, Galois::NONE),
-          e_end = graph.edge_end (src, Galois::NONE); e != e_end; ++e) {
+      for (Graph::edge_iterator e = graph.edge_begin (src, Galois::MethodFlag::UNPROTECTED),
+          e_end = graph.edge_end (src, Galois::MethodFlag::UNPROTECTED); e != e_end; ++e) {
 
         GNode dst = graph.getEdgeDst (e);
-        auto& dd = graph.getData (dst, Galois::NONE);
+        auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
         // std::printf ("Neighbor %d has indegree %d\n", dd.id, unsigned(dd.indegree));
         unsigned x = --(dd.indegree);
         if (x == 0) {
@@ -143,9 +143,9 @@ protected:
     template <typename C>
     void operator () (GNode src, C&) {
       Graph& graph = outer.graph;
-      NodeData& sd = graph.getData (src, Galois::CHECK_CONFLICT);
-      for (Graph::edge_iterator e = graph.edge_begin (src, Galois::CHECK_CONFLICT),
-          e_end = graph.edge_end (src, Galois::CHECK_CONFLICT); e != e_end; ++e) {
+      NodeData& sd = graph.getData (src, Galois::MethodFlag::WRITE_INTENT);
+      for (Graph::edge_iterator e = graph.edge_begin (src, Galois::MethodFlag::WRITE_INTENT),
+          e_end = graph.edge_end (src, Galois::MethodFlag::WRITE_INTENT); e != e_end; ++e) {
         GNode dst = graph.getEdgeDst (e);
       }
     }
@@ -167,8 +167,8 @@ protected:
       Graph& graph;
 
       bool operator () (GNode ln, GNode rn) const {
-        const auto& ldata = graph.getData (ln, Galois::NONE);
-        const auto& rdata = graph.getData (rn, Galois::NONE);
+        const auto& ldata = graph.getData (ln, Galois::MethodFlag::UNPROTECTED);
+        const auto& rdata = graph.getData (rn, Galois::MethodFlag::UNPROTECTED);
         return NodeDataComparator::compare (ldata, rdata);
       }
     };

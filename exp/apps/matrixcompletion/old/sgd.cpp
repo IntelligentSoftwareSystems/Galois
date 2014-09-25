@@ -80,12 +80,12 @@ struct sgd
 	{	
 		Node& movie_data = g.getData(movie);
 		
-        Graph::edge_iterator edge_it = g.edge_begin(movie, Galois::NONE) + movie_data.edge_offset;
+        Graph::edge_iterator edge_it = g.edge_begin(movie, Galois::MethodFlag::UNPROTECTED) + movie_data.edge_offset;
 		Graph::GraphNode user = g.getEdgeDst(edge_it);
-		//abort operation if conflict detected (Galois::ALL)
-		Node& user_data = g.getData(user, Galois::ALL);
-		//abort operation if conflict detected (Galois::ALL)
-		unsigned int edge_rating = g.getEdgeData(edge_it, Galois::ALL);	
+		//abort operation if conflict detected (Galois::MethodFlag::ALL)
+		Node& user_data = g.getData(user, Galois::MethodFlag::ALL);
+		//abort operation if conflict detected (Galois::MethodFlag::ALL)
+		unsigned int edge_rating = g.getEdgeData(edge_it, Galois::MethodFlag::ALL);	
 		
 		doGradientUpdate(movie_data, user_data, edge_rating);
 
@@ -93,7 +93,7 @@ struct sgd
 		++movie_data.edge_offset;
 
 		//we just looked at the last user
-		if(edge_it == g.edge_end(movie, Galois::NONE))
+		if(edge_it == g.edge_end(movie, Galois::MethodFlag::UNPROTECTED))
 		{
 			//start back at the first edge
             movie_data.edge_offset = 0;
@@ -137,7 +137,7 @@ unsigned int initializeGraphData(Graph& g)
 		
 		//count number of movies we've seen; only movies nodes have edges
 		unsigned int num_edges = 
-			g.edge_end(gnode, Galois::NONE) - g.edge_begin(gnode, Galois::NONE);
+			g.edge_end(gnode, Galois::MethodFlag::UNPROTECTED) - g.edge_begin(gnode, Galois::MethodFlag::UNPROTECTED);
 		if(num_edges > 0)
 			num_movie_nodes++;
 		
@@ -151,7 +151,7 @@ Graph* g_ptr;
 
 struct projCount : public std::unary_function<unsigned, Graph::GraphNode&> {
 	unsigned operator()(const Graph::GraphNode& node) const {
-		return g_ptr->getData(node, Galois::NONE).updates;
+		return g_ptr->getData(node, Galois::MethodFlag::UNPROTECTED).updates;
 	}
 };
 

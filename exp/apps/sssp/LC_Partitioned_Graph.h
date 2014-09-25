@@ -127,7 +127,7 @@ public:
   
   LC_InOut_Graph(): asymmetric(false) { }
 
-  edge_data_reference getInEdgeData(in_edge_iterator ni, MethodFlag mflag = MethodFlag::NONE) { 
+  edge_data_reference getInEdgeData(in_edge_iterator ni, MethodFlag mflag = MethodFlag::UNPROTECTED) { 
     Galois::Runtime::checkWrite(mflag, false);
     if (ni.type == 0) {
       return this->getEdgeData(boost::fusion::at_c<0>(ni.its));
@@ -144,7 +144,7 @@ public:
     }
   }
 
-  in_edge_iterator in_edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+  in_edge_iterator in_edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::WRITE_INTENT) {
     this->acquireNode(N, mflag);
     if (!asymmetric) {
       if (Galois::Runtime::shouldLock(mflag)) {
@@ -164,7 +164,7 @@ public:
     }
   }
 
-  in_edge_iterator in_edge_end(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+  in_edge_iterator in_edge_end(GraphNode N, MethodFlag mflag = MethodFlag::WRITE_INTENT) {
     this->acquireNode(N, mflag);
     if (!asymmetric) {
       return in_edge_iterator(this->raw_end(N));
@@ -173,7 +173,7 @@ public:
     }
   }
 
-  detail::InEdgesIterator<LC_InOut_Graph> in_edges(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+  detail::InEdgesIterator<LC_InOut_Graph> in_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE_INTENT) {
     return detail::InEdgesIterator<LC_InOut_Graph>(*this, N, mflag);
   }
 

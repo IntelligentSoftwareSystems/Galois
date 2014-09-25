@@ -45,8 +45,8 @@ protected:
     Graph& graph;
 
     bool operator () (GNode left, GNode right) const {
-      auto& ld = graph.getData (left, Galois::NONE);
-      auto& rd = graph.getData (right, Galois::NONE);
+      auto& ld = graph.getData (left, Galois::MethodFlag::UNPROTECTED);
+      auto& rd = graph.getData (right, Galois::MethodFlag::UNPROTECTED);
 
       return DataCmp::compare (ld, rd);
     }
@@ -60,14 +60,14 @@ protected:
 
     template <typename C>
     void operator () (GNode src, C&) {
-      graph.getData (src, Galois::CHECK_CONFLICT);
+      graph.getData (src, Galois::MethodFlag::WRITE_INTENT);
 
-      for (auto i = graph.in_edge_begin (src, Galois::CHECK_CONFLICT)
-          , end_i = graph.in_edge_end (src, Galois::CHECK_CONFLICT); i != end_i; ++i) {
+      for (auto i = graph.in_edge_begin (src, Galois::MethodFlag::WRITE_INTENT)
+          , end_i = graph.in_edge_end (src, Galois::MethodFlag::WRITE_INTENT); i != end_i; ++i) {
       }
 
-      // for (auto i = graph.edge_begin (src, Galois::CHECK_CONFLICT)
-          // , end_i = graph.edge_end (src, Galois::CHECK_CONFLICT); i != end_i; ++i) {
+      // for (auto i = graph.edge_begin (src, Galois::MethodFlag::WRITE_INTENT)
+          // , end_i = graph.edge_end (src, Galois::MethodFlag::WRITE_INTENT); i != end_i; ++i) {
       // }
     }
   };

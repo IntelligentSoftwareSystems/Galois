@@ -231,12 +231,13 @@ inline bool shouldLock(const Galois::MethodFlag g) {
 #else
   // Mask out additional "optional" flags
   switch (g & ALL) {
-  case NONE:
-  case SAVE_UNDO:
+  case MethodFlag::UNPROTECTED:
     return false;
-  case ALL:
-  case CHECK_CONFLICT:
+
+  case MethodFlag::READ_INTENT:
+  case WRITE_INTENT:
     return true;
+
   default:
     // XXX(ddn): Adding error checking code here either upsets the inlining
     // heuristics or icache behavior. Avoid complex code if possible.
@@ -263,7 +264,7 @@ inline void acquire(Lockable* lockable, Galois::MethodFlag m) {
 
 struct AlwaysLockObj {
   void operator()(Lockable* lockable) const {
-    doAcquire(lockable, Galois::MethodFlag::ALL);
+    doAcquire(lockable, Galois::MethodFlag::WRITE_INTENT);
   }
 };
 

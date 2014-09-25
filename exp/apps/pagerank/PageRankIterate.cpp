@@ -127,14 +127,14 @@ struct SerialAlgo {
       unsigned int small_delta = 0;
 
       for (TNode src : tgraph) {
-        TData& sdata = tgraph.getData(src, Galois::MethodFlag::NONE);
+        TData& sdata = tgraph.getData(src, Galois::MethodFlag::UNPROTECTED);
         float sum = 0;
 
-        for (TGraph::edge_iterator edge : tgraph.out_edges(src, Galois::MethodFlag::NONE)) {
+        for (TGraph::edge_iterator edge : tgraph.out_edges(src, Galois::MethodFlag::UNPROTECTED)) {
           TNode dst = tgraph.getEdgeDst(edge);
           float w = tgraph.getEdgeData(edge);
 
-          TData& ddata = tgraph.getData(dst, Galois::MethodFlag::NONE);
+          TData& ddata = tgraph.getData(dst, Galois::MethodFlag::UNPROTECTED);
           sum += ddata.getPageRank(iteration) * w;
         }
          
@@ -246,7 +246,7 @@ struct SpMVAlgo {
     if (false) {
       Galois::StatTimer TT("TuningTime");
       TT.start();
-      poski_TuneHint_Structure(Atunable, HINT_NO_BLOCKS, ARGS_NONE);
+      poski_TuneHint_Structure(Atunable, HINT_NO_BLOCKS, ARGS_MethodFlag::UNPROTECTED);
       poski_TuneHint_MatMult(Atunable, OP_NORMAL, 1, SYMBOLIC_VECTOR, 1, SYMBOLIC_VECTOR, ALWAYS_TUNE_AGGRESSIVELY);
       poski_TuneMat(Atunable);
       TT.stop();
@@ -319,14 +319,14 @@ struct DummyAlgo {
     }
 
     void process(const TNode& src, unsigned int iteration) {
-      TData& sdata = tgraph.getData(src, Galois::MethodFlag::NONE);
+      TData& sdata = tgraph.getData(src, Galois::MethodFlag::UNPROTECTED);
 
       double sum = 0;
-      for (TGraph::edge_iterator edge : tgraph.out_edges(src, Galois::MethodFlag::NONE)) {
+      for (TGraph::edge_iterator edge : tgraph.out_edges(src, Galois::MethodFlag::UNPROTECTED)) {
         TNode dst = tgraph.getEdgeDst(edge);
         double w = tgraph.getEdgeData(edge);
 
-        TData& ddata = tgraph.getData(dst, Galois::MethodFlag::NONE);
+        TData& ddata = tgraph.getData(dst, Galois::MethodFlag::UNPROTECTED);
         sum += ddata.getPageRank(iteration) * w;
       }
        
@@ -394,14 +394,14 @@ struct SynchronousAlgo {
     }
 
     void operator()(const TNode& src) const {
-      TData& sdata = tgraph.getData(src, Galois::MethodFlag::NONE);
+      TData& sdata = tgraph.getData(src, Galois::MethodFlag::UNPROTECTED);
       double sum = 0;
 
-      for (TGraph::edge_iterator edge : tgraph.out_edges(src, useND && useS ? Galois::MethodFlag::ALL : Galois::MethodFlag::NONE)) {
+      for (TGraph::edge_iterator edge : tgraph.out_edges(src, useND && useS ? Galois::MethodFlag::WRITE_INTENT : Galois::MethodFlag::UNPROTECTED)) {
         TNode dst = tgraph.getEdgeDst(edge);
         double w = tgraph.getEdgeData(edge);
 
-        TData& ddata = tgraph.getData(dst, useND && useS ? Galois::MethodFlag::ALL : Galois::MethodFlag::NONE);
+        TData& ddata = tgraph.getData(dst, useND && useS ? Galois::MethodFlag::WRITE_INTENT : Galois::MethodFlag::UNPROTECTED);
         sum += ddata.getPageRank(useND ? 0 : iteration) * w;
       }
 
@@ -484,14 +484,14 @@ struct AsynchronousAlgo {
       accum(a), tol(t), iteration(i) { }
 
     void operator()(const TNode& src, Galois::UserContext<TNode>& ctx) {
-      TData& sdata = tgraph.getData(src, Galois::MethodFlag::NONE);
+      TData& sdata = tgraph.getData(src, Galois::MethodFlag::UNPROTECTED);
       double sum = 0;
 
-      for (TGraph::edge_iterator edge : tgraph.out_edges(src, useND && useS ? Galois::MethodFlag::ALL : Galois::MethodFlag::NONE)) {
+      for (TGraph::edge_iterator edge : tgraph.out_edges(src, useND && useS ? Galois::MethodFlag::WRITE_INTENT : Galois::MethodFlag::UNPROTECTED)) {
         TNode dst = tgraph.getEdgeDst(edge);
         double w = tgraph.getEdgeData(edge);
 
-        TData& ddata = tgraph.getData(dst, useND && useS ? Galois::MethodFlag::ALL : Galois::MethodFlag::NONE);
+        TData& ddata = tgraph.getData(dst, useND && useS ? Galois::MethodFlag::WRITE_INTENT : Galois::MethodFlag::UNPROTECTED);
         sum += ddata.getPageRank(useND ? 0 : iteration) * w;
       }
 

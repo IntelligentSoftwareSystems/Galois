@@ -252,7 +252,7 @@ protected:
     unsigned idCntr = 0;
     for (InGraph::iterator n = ingraph.begin (), endn = ingraph.end ();
         n != endn; ++n) {
-      ingraph.getData (*n, Galois::MethodFlag::NONE) = idCntr++;
+      ingraph.getData (*n, Galois::MethodFlag::UNPROTECTED) = idCntr++;
     }
     numNodes = ingraph.size ();
 
@@ -263,13 +263,13 @@ protected:
     for (InGraph::iterator n = ingraph.begin (), endn = ingraph.end ();
         n != endn; ++n) {
 
-      unsigned src = ingraph.getData (*n, Galois::MethodFlag::NONE);
+      unsigned src = ingraph.getData (*n, Galois::MethodFlag::UNPROTECTED);
 
 
-      for (InGraph::edge_iterator e = ingraph.edge_begin (src, Galois::MethodFlag::NONE),
-          ende = ingraph.edge_end (src, Galois::MethodFlag::NONE); e != ende; ++e) {
+      for (InGraph::edge_iterator e = ingraph.edge_begin (src, Galois::MethodFlag::UNPROTECTED),
+          ende = ingraph.edge_end (src, Galois::MethodFlag::UNPROTECTED); e != ende; ++e) {
 
-        unsigned dst = ingraph.getData (ingraph.getEdgeDst (e), Galois::MethodFlag::NONE);
+        unsigned dst = ingraph.getData (ingraph.getEdgeDst (e), Galois::MethodFlag::UNPROTECTED);
 
         if (src != dst) {
           const Weight_ty& w = ingraph.getEdgeData (e);

@@ -1020,7 +1020,7 @@ struct ComputeForceUnroll {
 
   template<typename PipelineTy>
   void operator()(Galois::TaskContext<PipelineTy>& ctx) {
-    Galois::Runtime::acquire(body, Galois::MethodFlag::ALL);
+    Galois::Runtime::acquire(body, Galois::MethodFlag::WRITE_INTENT);
     recurse(ctx, node, dsq, 4);
   }
 };
@@ -1039,7 +1039,7 @@ struct ComputeForceBase {
   template<typename PipelineTy>
   void operator()(Galois::TaskContext<PipelineTy>& ctx) {
     Point delta;
-    Galois::Runtime::acquire(body, Galois::MethodFlag::ALL);
+    Galois::Runtime::acquire(body, Galois::MethodFlag::WRITE_INTENT);
     computeDelta(delta, body, node);
 
     double psq = delta.dist2();
@@ -1499,8 +1499,8 @@ struct Refine {
   void operator()(const IterTy& cur, Galois::UserContext<IterTy>&) {
     IterTy next = skip(cur, dist);
     if (improvement(cur, next)) {
-      Galois::Runtime::acquire((*cur).body, Galois::MethodFlag::ALL);
-      Galois::Runtime::acquire((*next).body, Galois::MethodFlag::ALL);
+      Galois::Runtime::acquire((*cur).body, Galois::MethodFlag::WRITE_INTENT);
+      Galois::Runtime::acquire((*next).body, Galois::MethodFlag::WRITE_INTENT);
       std::swap(*cur, *next);
     }
   }

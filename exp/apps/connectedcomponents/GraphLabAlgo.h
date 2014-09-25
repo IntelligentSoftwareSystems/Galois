@@ -32,7 +32,7 @@ struct GraphLabAlgo {
 
     Initialize(Graph& g): graph(g) { }
     void operator()(GNode n) const {
-      LNode& data = graph.getData(n, Galois::MethodFlag::NONE);
+      LNode& data = graph.getData(n, Galois::MethodFlag::UNPROTECTED);
       data.labelid = data.id;
     }
   };
@@ -67,9 +67,9 @@ struct GraphLabAlgo {
     void apply(Graph& graph, GNode node, const gather_type&) {
       if (received_labelid == std::numeric_limits<size_t>::max()) {
         perform_scatter = true;
-      } else if (graph.getData(node, Galois::MethodFlag::NONE).labelid > received_labelid) {
+      } else if (graph.getData(node, Galois::MethodFlag::UNPROTECTED).labelid > received_labelid) {
         perform_scatter = true;
-        graph.getData(node, Galois::MethodFlag::NONE).labelid = received_labelid;
+        graph.getData(node, Galois::MethodFlag::UNPROTECTED).labelid = received_labelid;
       }
     }
 
@@ -81,11 +81,11 @@ struct GraphLabAlgo {
 
     void scatter(Graph& graph, GNode node, GNode src, GNode dst,
         Galois::GraphLab::Context<Graph,Program>& ctx, typename Graph::edge_data_reference) {
-      LNode& data = graph.getData(node, Galois::MethodFlag::NONE);
+      LNode& data = graph.getData(node, Galois::MethodFlag::UNPROTECTED);
 
-      if (node == src && graph.getData(dst, Galois::MethodFlag::NONE).labelid > data.labelid) {
+      if (node == src && graph.getData(dst, Galois::MethodFlag::UNPROTECTED).labelid > data.labelid) {
         ctx.push(dst, message_type(data.labelid));
-      } else if (node == dst && graph.getData(src, Galois::MethodFlag::NONE).labelid > data.labelid) {
+      } else if (node == dst && graph.getData(src, Galois::MethodFlag::UNPROTECTED).labelid > data.labelid) {
         ctx.push(src, message_type(data.labelid));
       }
     }

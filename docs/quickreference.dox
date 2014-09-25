@@ -66,16 +66,15 @@ Specified as a template argument to {@link Galois::wl}
 
 {@link Galois::MethodFlag} passed optionally to graph functions
 
- - {@link Galois::NONE}: access to shared data is not protected. User
+ - {@link Galois::MethodFlag::UNPROTECTED}: access to shared data is not protected. User
    responsible/aware of concurrent accesses
 
- - {@link Galois::CHECK_CONFLICT}: Runtime monitors access to shared data, and
+ - {@link Galois::MethodFlag::WRITE_INTENT}: Runtime monitors access to shared data, and
    allows only one iteration to acquire ownership of the data element (e.g., node
-   or edge in the graph) being accessed
+   or edge in the graph) being accessed. 
 
- - {@link Galois::SAVE_UNDO}: Not implemented yet. Runtime monitors access to
-   shared data and also records state so that it can be restored if the iteration
-   aborts.
+ - {@link Galois::MethodFlag::READ_INTENT}: Runtime may allow multiple iterations to
+   read the shared data element. 
 
 \section data_structures Other Data Structures
 

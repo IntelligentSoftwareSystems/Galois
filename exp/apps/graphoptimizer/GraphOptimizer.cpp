@@ -439,14 +439,14 @@ protected:
   }
 
 public:
-  node_data_reference getData(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+  node_data_reference getData(GraphNode N, MethodFlag mflag = MethodFlag::WRITE_INTENT) {
     Galois::Runtime::checkWrite(mflag, false);
     NodeInfo& NI = nodeData[N];
     acquireNode(N, mflag);
     return NI.getData();
   }
 
-  edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::NONE) {
+  edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::UNPROTECTED) {
     Galois::Runtime::checkWrite(mflag, false);
     return edgeData[*ni];
   }
@@ -466,7 +466,7 @@ public:
   local_iterator local_begin() { return local_iterator(this->localBegin(numNodes)); }
   local_iterator local_end() { return local_iterator(this->localEnd(numNodes)); }
 
-  edge_iterator edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+  edge_iterator edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::WRITE_INTENT) {
     acquireNode(N, mflag);
     if (Galois::Runtime::shouldLock(mflag)) {
       for (edge_iterator ii = raw_begin(N), ee = raw_end(N); ii != ee; ++ii) {
@@ -476,12 +476,12 @@ public:
     return raw_begin(N);
   }
 
-  edge_iterator edge_end(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+  edge_iterator edge_end(GraphNode N, MethodFlag mflag = MethodFlag::WRITE_INTENT) {
     acquireNode(N, mflag);
     return raw_end(N);
   }
 
-  detail::EdgesIterator<LC_CCSR_Graph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+  detail::EdgesIterator<LC_CCSR_Graph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE_INTENT) {
     return detail::EdgesIterator<LC_CCSR_Graph>(*this, N, mflag);
   }
 
@@ -584,15 +584,15 @@ struct AsyncBFS {
       GNode n = item.first;
 
       unsigned newDist = item.second;
-      if (newDist > gr.getData(n, Galois::MethodFlag::NONE))
+      if (newDist > gr.getData(n, Galois::MethodFlag::UNPROTECTED))
         return;
 
       ++newDist;
 
-      for (typename Gr::edge_iterator ii = gr.edge_begin(n, Galois::MethodFlag::NONE),
-             ei = gr.edge_end(n, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+      for (typename Gr::edge_iterator ii = gr.edge_begin(n, Galois::MethodFlag::UNPROTECTED),
+             ei = gr.edge_end(n, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
         GNode dst = gr.getEdgeDst(ii);
-        volatile unsigned* ddata = &gr.getData(dst, Galois::MethodFlag::NONE);
+        volatile unsigned* ddata = &gr.getData(dst, Galois::MethodFlag::UNPROTECTED);
         
         unsigned  oldDist;
         while (true) {

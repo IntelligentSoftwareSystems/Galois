@@ -25,7 +25,7 @@ struct Matching {
         return;
     }
 
-    graph.getData(x, Galois::MethodFlag::ALL | Galois::MethodFlag::WRITE) = 1;
+    graph.getData(x, Galois::MethodFlag::WRITE_INTENT | Galois::MethodFlag::WRITE) = 1;
     for (auto edge : graph.out_edges(x)) {
       GNode dst = graph.getEdgeDst(edge);
       graph.getData(dst) = 1;

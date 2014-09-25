@@ -35,7 +35,7 @@ struct GraphLabAlgo {
     Graph& g;
     Initialize(Graph& g): g(g) { }
     void operator()(typename Graph::GraphNode n) const {
-      LNode& data = g.getData(n, Galois::MethodFlag::NONE);
+      LNode& data = g.getData(n, Galois::MethodFlag::UNPROTECTED);
       data.data = 1.0;
     }
   };
@@ -55,17 +55,17 @@ struct GraphLabAlgo {
     float last_change;
 
     void gather(Graph& graph, GNode node, GNode src, GNode dst, gather_type& sum, typename Graph::edge_data_reference) { 
-      int outs = std::distance(graph.edge_begin(src, Galois::MethodFlag::NONE),
-          graph.edge_end(src, Galois::MethodFlag::NONE));
-      sum.data += graph.getData(src, Galois::MethodFlag::NONE).data / outs;
+      int outs = std::distance(graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED),
+          graph.edge_end(src, Galois::MethodFlag::UNPROTECTED));
+      sum.data += graph.getData(src, Galois::MethodFlag::UNPROTECTED).data / outs;
     }
     
     void init(Graph& graph, GNode node, const message_type& msg) { }
 
     void apply(Graph& graph, GNode node, const gather_type& total) {
-      LNode& data = graph.getData(node, Galois::MethodFlag::NONE);
-      int outs = std::distance(graph.edge_begin(node, Galois::MethodFlag::NONE),
-          graph.edge_end(node, Galois::MethodFlag::NONE));
+      LNode& data = graph.getData(node, Galois::MethodFlag::UNPROTECTED);
+      int outs = std::distance(graph.edge_begin(node, Galois::MethodFlag::UNPROTECTED),
+          graph.edge_end(node, Galois::MethodFlag::UNPROTECTED));
       float newval = (1.0 - alpha) * total.data + alpha;
       last_change = (newval - data.data) / outs;
       data.data = newval;

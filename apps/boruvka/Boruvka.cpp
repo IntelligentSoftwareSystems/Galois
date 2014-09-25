@@ -123,15 +123,15 @@ struct ParallelAlgo {
   template<bool useLimit, typename Context, typename Pending>
   static void findLightest(ParallelAlgo* self,
       const GNode& src, int cur, Context& ctx, Pending& pending) {
-    Node& sdata = graph.getData(src, Galois::MethodFlag::NONE);
-    Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::NONE);
-    Graph::edge_iterator ei = graph.edge_end(src, Galois::MethodFlag::NONE);
+    Node& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
+    Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED);
+    Graph::edge_iterator ei = graph.edge_end(src, Galois::MethodFlag::UNPROTECTED);
 
     std::advance(ii, cur);
 
     for (; ii != ei; ++ii, ++cur) {
       GNode dst = graph.getEdgeDst(ii);
-      Node& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+      Node& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
       EdgeData& weight = graph.getEdgeData(ii);
       if (useLimit && weight > self->limit) {
         pending.push(WorkItem(src, dst, &weight, cur));
@@ -170,7 +170,7 @@ struct ParallelAlgo {
 
     template<typename Context,typename Pending>
     void operator()(const GNode& src, Context& ctx, Pending& pending) const {
-      Node& sdata = graph.getData(src, Galois::MethodFlag::NONE);
+      Node& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
       sdata.lightest = &inf;
       findLightest<false>(self, src, 0, ctx, pending);
     }
@@ -197,13 +197,13 @@ struct ParallelAlgo {
     template<typename Context, typename Pending>
     void operator()(const WorkItem& item, Context& ctx, Pending& pending) const {
       GNode src = item.edge.src;
-      Node& sdata = graph.getData(src, Galois::MethodFlag::NONE);
+      Node& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
       Node* rep = sdata.findAndCompress();
       int cur = item.cur;
 
       if (rep->lightest == item.edge.weight) {
         GNode dst = item.edge.dst;
-        Node& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+        Node& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
         if ((rep = sdata.merge(&ddata))) {
           rep->lightest = &inf;
           mst.push(Edge(src, dst, item.edge.weight));
@@ -366,11 +366,11 @@ struct SortEdges {
 
   void operator()(const GNode& src) const {
     //! [sortEdgeByEdgeData]
-    graph.sortEdgesByEdgeData(src, std::less<EdgeData>(), Galois::MethodFlag::NONE);
+    graph.sortEdgesByEdgeData(src, std::less<EdgeData>(), Galois::MethodFlag::UNPROTECTED);
     //! [sortEdgeByEdgeData]
 
-    Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::NONE);
-    Graph::edge_iterator ei = graph.edge_end(src, Galois::MethodFlag::NONE);
+    Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED);
+    Graph::edge_iterator ei = graph.edge_end(src, Galois::MethodFlag::UNPROTECTED);
     ptrdiff_t dist = std::distance(ii, ei);
     if (dist == 0)
       return;

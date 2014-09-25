@@ -101,7 +101,7 @@ protected:
     unsigned idCntr = 0;
     for (InGraph::iterator n = ingraph.begin (), endn = ingraph.end ();
         n != endn; ++n) {
-      ingraph.getData (*n, Galois::NONE) = idCntr;
+      ingraph.getData (*n, Galois::MethodFlag::UNPROTECTED) = idCntr;
       ++idCntr;
     }
 
@@ -114,14 +114,14 @@ protected:
     for (InGraph::iterator n = ingraph.begin (), endn = ingraph.end ();
         n != endn; ++n) {
 
-      InGNode src = ingraph.getData (*n, Galois::NONE);
+      InGNode src = ingraph.getData (*n, Galois::MethodFlag::UNPROTECTED);
 
       if (nodes[src] == NULL) {
         nodes[src] = new KNode_tp (src);
       }
 
-      for (InGraph::edge_iterator e = ingraph.edge_begin (src, Galois::NONE),
-          ende = ingraph.edge_end (src, Galois::NONE); e != ende; ++e) {
+      for (InGraph::edge_iterator e = ingraph.edge_begin (src, Galois::MethodFlag::UNPROTECTED),
+          ende = ingraph.edge_end (src, Galois::MethodFlag::UNPROTECTED); e != ende; ++e) {
 
         InGNode dst = ingraph.getEdgeDst (*e);
 

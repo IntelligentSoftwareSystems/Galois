@@ -36,7 +36,7 @@ struct gainIndexer : public std::unary_function<GNode, int> {
 
   int operator()(GNode n) {
     int retval = 0;
-    Galois::MethodFlag flag = Galois::NONE;
+    Galois::MethodFlag flag = Galois::MethodFlag::UNPROTECTED;
     unsigned int nPart = g->getData(n, flag).getPart();
     for (auto ii = g->edge_begin(n, flag), ee = g->edge_end(n); ii != ee; ++ii) {
       GNode neigh = g->getEdgeDst(ii);
@@ -65,7 +65,7 @@ struct findBoundary {
   GGraph& g;
   findBoundary(Galois::InsertBag<GNode>& _b, GGraph& _g) : b(_b), g(_g) {}
   void operator()(GNode n) const {
-    auto& cn = g.getData(n, Galois::MethodFlag::NONE);
+    auto& cn = g.getData(n, Galois::MethodFlag::UNPROTECTED);
     if (cn.getmaybeBoundary())
       cn.setmaybeBoundary(isBoundary(g,n));
     if (cn.getmaybeBoundary())
@@ -80,14 +80,14 @@ struct findBoundaryAndProject {
   GGraph& fg;
   findBoundaryAndProject(Galois::InsertBag<GNode>& _b, GGraph& _cg, GGraph& _fg) :b(_b), cg(_cg), fg(_fg) {}
   void operator()(GNode n) const {
-    auto& cn = cg.getData(n, Galois::MethodFlag::NONE);
+    auto& cn = cg.getData(n, Galois::MethodFlag::UNPROTECTED);
     if (cn.getmaybeBoundary())
       cn.setmaybeBoundary(isBoundary(cg,n));
 
     //project part and maybe boundary
     //unsigned part = cn.getPart();
     for (unsigned x = 0; x < cn.numChildren(); ++x) {
-      fg.getData(cn.getChild(x), Galois::MethodFlag::NONE).initRefine(cn.getPart(), cn.getmaybeBoundary());
+      fg.getData(cn.getChild(x), Galois::MethodFlag::UNPROTECTED).initRefine(cn.getPart(), cn.getmaybeBoundary());
     }
     if (cn.getmaybeBoundary())
       b.push(n);
@@ -158,14 +158,14 @@ struct refine_BKL2 {
           ned.setmaybeBoundary(true);
           if (fg)
             for (unsigned x = 0; x < ned.numChildren(); ++x)
-              fg->getData(ned.getChild(x), Galois::MethodFlag::NONE).setmaybeBoundary(true);
+              fg->getData(ned.getChild(x), Galois::MethodFlag::UNPROTECTED).setmaybeBoundary(true);
         }
         //if (ned.getPart() != newpart)
         //cnx.push(neigh);
       }
       if (fg)
         for (unsigned x = 0; x < nd.numChildren(); ++x)
-          fg->getData(nd.getChild(x), Galois::MethodFlag::NONE).setPart(newpart);
+          fg->getData(nd.getChild(x), Galois::MethodFlag::UNPROTECTED).setPart(newpart);
     }
   }
 
@@ -322,10 +322,10 @@ struct ChangePart {//move each node to its nearest cluster
     double dmin = std::numeric_limits<double>::min();
     int partition =-1;
     std::map <int, int> degreein;
-    degreein[g.getData(n, Galois::MethodFlag::NONE).getOldPart()] +=1;
-    for (GGraph::edge_iterator ii = g.edge_begin(n, Galois::MethodFlag::NONE), ei = g.edge_end(n, Galois::MethodFlag::NONE); ii != ei; ++ii){
-      int nclust = g.getData(g.getEdgeDst(ii), Galois::MethodFlag::NONE).getOldPart();
-      degreein[nclust] += (int) g.getEdgeData(ii, Galois::MethodFlag::NONE);
+    degreein[g.getData(n, Galois::MethodFlag::UNPROTECTED).getOldPart()] +=1;
+    for (GGraph::edge_iterator ii = g.edge_begin(n, Galois::MethodFlag::UNPROTECTED), ei = g.edge_end(n, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii){
+      int nclust = g.getData(g.getEdgeDst(ii), Galois::MethodFlag::UNPROTECTED).getOldPart();
+      degreein[nclust] += (int) g.getEdgeData(ii, Galois::MethodFlag::UNPROTECTED);
     }
 
     for(auto clust = degreein.begin(), ee = degreein.end(); clust != ee; clust++)
@@ -338,7 +338,7 @@ struct ChangePart {//move each node to its nearest cluster
         partition = clust->first;
       }
     }
-    g.getData(n, Galois::MethodFlag::NONE).setPart(partition);
+    g.getData(n, Galois::MethodFlag::UNPROTECTED).setPart(partition);
   }
 
 
@@ -361,14 +361,14 @@ struct ComputeClusterDist {
   }*/
 
   void operator()(GNode n, Galois::UserContext<GNode>& ctx) {
-    unsigned int clust = g.getData(n, Galois::MethodFlag::NONE).getPart();
+    unsigned int clust = g.getData(n, Galois::MethodFlag::UNPROTECTED).getPart();
     int degreet =0;
 
-    g.getData(n, Galois::MethodFlag::NONE).OldPartCpyNew();
-    for (GGraph::edge_iterator ii = g.edge_begin(n, Galois::MethodFlag::NONE), ei = g.edge_end(n, Galois::MethodFlag::NONE); ii != ei; ++ii)
-      if (g.getData(g.getEdgeDst(ii), Galois::MethodFlag::NONE).getPart() == clust)
-        degreet+=(int) g.getEdgeData(ii, Galois::MethodFlag::NONE);
-    card[clust]+=g.getData(n, Galois::MethodFlag::NONE).getWeight();
+    g.getData(n, Galois::MethodFlag::UNPROTECTED).OldPartCpyNew();
+    for (GGraph::edge_iterator ii = g.edge_begin(n, Galois::MethodFlag::UNPROTECTED), ei = g.edge_end(n, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii)
+      if (g.getData(g.getEdgeDst(ii), Galois::MethodFlag::UNPROTECTED).getPart() == clust)
+        degreet+=(int) g.getEdgeData(ii, Galois::MethodFlag::UNPROTECTED);
+    card[clust]+=g.getData(n, Galois::MethodFlag::UNPROTECTED).getWeight();
     degreeIn[clust] += degreet;
   }
 };

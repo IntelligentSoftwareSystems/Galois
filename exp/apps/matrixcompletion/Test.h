@@ -160,11 +160,11 @@ struct AsyncALSalgo {
 
     if (col < NUM_ITEM_NODES) {
       for (Sp::InnerIterator it(AT, col); it; ++it)
-        g.getData(it.row() + NUM_ITEM_NODES, Galois::MethodFlag::ALL | Galois::MethodFlag::INTENT_TO_READ);
+        g.getData(it.row() + NUM_ITEM_NODES, Galois::MethodFlag::WRITE_INTENT | Galois::MethodFlag::INTENT_TO_READ);
     } else {
       col = col - NUM_ITEM_NODES;
       for (Sp::InnerIterator it(A, col); it; ++it)
-        g.getData(it.row(), Galois::MethodFlag::ALL | Galois::MethodFlag::INTENT_TO_READ);
+        g.getData(it.row(), Galois::MethodFlag::WRITE_INTENT | Galois::MethodFlag::INTENT_TO_READ);
     }
   }
 
@@ -1165,8 +1165,8 @@ struct BlockJumpAlgo {
         Node& itemData = g.getData(item);
         size_t lastUser = si.userEnd + NUM_ITEM_NODES;
 
-        edge_dst_iterator start(no_deref_iterator(g.edge_begin(item, Galois::NONE)), fn);
-        edge_dst_iterator end(no_deref_iterator(g.edge_end(item, Galois::NONE)), fn);
+        edge_dst_iterator start(no_deref_iterator(g.edge_begin(item, Galois::MethodFlag::UNPROTECTED)), fn);
+        edge_dst_iterator end(no_deref_iterator(g.edge_end(item, Galois::MethodFlag::UNPROTECTED)), fn);
 
         // For each edge in the range
         for (auto ii = std::lower_bound(start, end, si.userStart + NUM_ITEM_NODES); ii != end; ++ii) {
