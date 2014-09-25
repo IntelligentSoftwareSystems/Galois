@@ -83,6 +83,7 @@ struct AsyncRsd {
       PRTy sum = computePageRankInOut(graph, src, 0, lockflag);
       PRTy value = alpha*sum + (1.0 - alpha);
       PRTy diff = std::fabs(value - sdata.value);
+
       if (diff > tolerance) {
         // the node is processed
         atomicAdd(sdata.residual, -oldResidual);

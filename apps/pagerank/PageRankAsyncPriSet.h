@@ -30,6 +30,10 @@ struct AsyncPriSet{
     std::atomic<bool> inWL; // tracking wl ocupancy
     void init() { value = 1.0 - alpha; residual = 0.0; inWL = true; }
     PRTy getPageRank(int x = 0) { return value; }
+    friend std::ostream& operator<<(std::ostream& os, const LNode& n) {
+      os << "{PR " << n.value << ", residual " << n.residual << ", inWL " << n.inWL << "}";
+      return os;
+    }
   };
 
   typedef Galois::Graph::LC_CSR_Graph<LNode,void>::with_numa_alloc<true>::type InnerGraph;
@@ -75,12 +79,19 @@ struct AsyncPriSet{
 
     Process(Graph& g, PRTy t, Galois::InsertBag<GNode>& wl, Galois::Runtime::PerThreadStorage<Galois::OnlineStat>& s, PRTy l): graph(g), tolerance(t), nextWL(wl), stats(s), limit(l) { }
 
-    void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) const {
+    //    void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) const {
+    void operator()(const GNode& src) const {
       LNode& sdata = graph.getData(src);
-      if ( sdata.residual / nout(graph, src, Galois::MethodFlag::NONE) < limit) {
+      auto src_nout = nout(graph, src, Galois::MethodFlag::NONE);
+      bool leaf = false;
+      if (src_nout == 0) {
+        leaf = true;
+        src_nout = 1;
+      }
+      if ( sdata.residual / src_nout < limit) {
         nextWL.push(src);
-        double R = graph.getData(src).residual;
-        R /= nout(graph, src, Galois::MethodFlag::NONE);
+        double R = sdata.residual;
+        R /= src_nout;
         stats.getLocal()->insert(std::max(0.0, R));
         return;
       }
@@ -89,42 +100,37 @@ struct AsyncPriSet{
 
       // the node is processed
       sdata.inWL = false;
+      PRTy oldResidual = sdata.residual;
       PRTy sum = computePageRankInOut(graph, src, 0, lockflag);
       PRTy value = alpha*sum + (1.0 - alpha);
       PRTy diff = std::fabs(value - sdata.value);
 
-      if (diff >= tolerance) {
-        PRTy oldResidual = sdata.residual.exchange(0.0);
+      if (diff > tolerance || leaf) {
+        atomicAdd(sdata.residual, -oldResidual);
         sdata.value = value;
-
-        int src_nout = nout(graph,src, lockflag);
 
         // for each out-going neighbors
         for (auto jj = graph.edge_begin(src, lockflag), ej = graph.edge_end(src, lockflag);
              jj != ej; ++jj) {
           GNode dst = graph.getEdgeDst(jj);
 	  LNode& ddata = graph.getData(dst, lockflag);
-          PRTy delta = oldResidual*alpha/src_nout;
-          PRTy old;
-          do {
-            old = ddata.residual;
-          } while (!ddata.residual.compare_exchange_strong(old, old + delta));
+          PRTy delta = diff*alpha/src_nout;
+          PRTy old = atomicAdd(ddata.residual, delta);
 	  // if the node is not in the worklist and the residual is greater than tolerance
-	  if (old < tolerance && old + delta > tolerance && !ddata.inWL) {
-            bool old = ddata.inWL.exchange(true);
-            if (!old)
+	  if (old + delta > tolerance && !ddata.inWL) {
+            bool already = ddata.inWL.exchange(true);
+            if (!already)
               nextWL.push(dst);
           }
         }
       }
-      double R = graph.getData(src).residual;
-      R /= nout(graph, src, Galois::MethodFlag::NONE);
+      double R = sdata.residual;
+      R /= src_nout;
       stats.getLocal()->insert(std::max(0.0, R)); // not strictly true
     }
   };
 
   void operator()(Graph& graph, PRTy tolerance, PRTy amp) {
-    typedef Galois::WorkList::dChunkedFIFO<16> WL;
 
     Galois::do_all_local(graph, InitResidual(graph), Galois::loopname("InitResidual"));
 
@@ -133,7 +139,7 @@ struct AsyncPriSet{
     Galois::Runtime::PerThreadStorage<Galois::OnlineStat> stats;
 
     //First do all the nodes once
-    Galois::for_each_local(graph, Process(graph, tolerance, nextWL, stats, 0.0) , Galois::wl<WL>());
+    Galois::do_all_local(graph, Process(graph, tolerance, nextWL, stats, 0.0), Galois::do_all_steal<true>());
 
     while (!nextWL.empty()) {
       curWL.swap(nextWL);
@@ -141,33 +147,24 @@ struct AsyncPriSet{
 
       double limit = 0.0;
       int count = 0;
-      int nonzero = 0;
       for (int i = 0; i < stats.size(); ++i) {
         if (stats.getRemote(i)->getCount()) {
+          //std::cout << *stats.getRemote(i) << "\n";
           count += stats.getRemote(i)->getCount();
-          limit += stats.getRemote(i)->getMean();
+          limit += stats.getRemote(i)->getMean() * stats.getRemote(i)->getCount();
           stats.getRemote(i)->reset();
-          ++nonzero;
         }
       }
-      limit /= nonzero;
-      if (count < 100)
+      limit /= count;
+      if (count < 1000)
         limit = 0.0;
-      std::cout << "Count is " << count << "\n";
-      Galois::for_each_local(curWL, Process(graph, tolerance, nextWL, stats, limit), Galois::wl<WL>());
+      std::cout << "Count is " << count << " next limit is " << limit << "\n";
+      Galois::do_all_local(curWL, Process(graph, tolerance, nextWL, stats, limit), Galois::do_all_steal<true>());
     }
   }
 
   void verify(Graph& graph, PRTy tolerance) {    
-    for(auto N : graph) {
-      auto& data = graph.getData(N);
-      if (data.residual > tolerance) {
-        std::cout << N 
-                  << " residual " << data.residual
-                  << " pr " << data.value
-                  << "\n";
-      }
-    }
+    verifyInOut(graph, tolerance);
   }
 };
 
