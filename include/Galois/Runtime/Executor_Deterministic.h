@@ -253,15 +253,18 @@ public:
   }
 
   virtual void subAcquire(Lockable* lockable, Galois::MethodFlag m) { 
+    assert (m == MethodFlag::READ_INTENT || m == MethodFlag::WRITE_INTENT);
+
     if (getPending() == COMMITTING)
       return;
     
     if (this->tryLock(lockable))
       this->addToNhood(lockable);
 
-    if (m & MethodFlag::READ_INTENT) {
+    if (m == MethodFlag::READ_INTENT) {
       acquireRead(lockable);
     } else {
+      assert (m == MethodFlag::WRITE_INTENT);
       acquireWrite(lockable);
     }
   }

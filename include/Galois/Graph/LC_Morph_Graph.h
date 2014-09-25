@@ -291,7 +291,7 @@ public:
   }
   
   edge_iterator findEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = MethodFlag::WRITE_INTENT) {
-    Galois::Runtime::checkWrite(mflag, true);
+    Galois::Runtime::checkWrite(mflag, true); // TODO: double check 'true' here
     acquireNode(src, mflag);
     return std::find_if(src->edgeBegin, src->edgeEnd, dst_equals(dst)); 
   }

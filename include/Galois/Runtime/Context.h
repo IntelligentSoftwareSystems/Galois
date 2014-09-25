@@ -230,12 +230,12 @@ inline bool shouldLock(const Galois::MethodFlag g) {
   return false;
 #else
   // Mask out additional "optional" flags
-  switch (g & ALL) {
+  switch (g) {
   case MethodFlag::UNPROTECTED:
     return false;
 
   case MethodFlag::READ_INTENT:
-  case WRITE_INTENT:
+  case MethodFlag::WRITE_INTENT:
     return true;
 
   default:

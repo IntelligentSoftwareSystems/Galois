@@ -50,9 +50,9 @@
 #endif
 
 #ifdef __GNUC__ // aka 'ATTRIBUTE_CONST' but following LLVM Conventions.
-#define LLVM_ATTRIBUTE_READMethodFlag::UNPROTECTED __attribute__((__const__))
+#define LLVM_ATTRIBUTE_READNONE __attribute__((__const__))
 #else
-#define LLVM_ATTRIBUTE_READMethodFlag::UNPROTECTED
+#define LLVM_ATTRIBUTE_READNONE
 #endif
 
 #ifdef __GNUC__  // aka 'ATTRIBUTE_PURE' but following LLVM Conventions.
