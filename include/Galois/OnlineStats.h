@@ -24,6 +24,7 @@
 #define GALOIS_ONLINESTATS_H
 
 #include <limits>
+#include <ostream>
 
 namespace Galois {
 
@@ -62,7 +63,17 @@ public:
   double getMean() const { return mean; }
   double getMin() const { return _min; }
   double getMax() const { return _max; }
-
+  
+  friend std::ostream& operator<<(std::ostream& os, const OnlineStat& s) {
+    os << "{count " << s.getCount()
+       << ", mean " << s.getMean()
+       << ", stddev " << s.getStdDeviation()
+       << ", var " << s.getVariance()
+       << ", min " << s.getMin()
+       << ", max " << s.getMax()
+       << "}";
+    return os;
+  }
 };
 
 } //namespace Galois
