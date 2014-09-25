@@ -190,29 +190,18 @@ if(USE_EXP)
       message(FATAL_ERROR "Hardware transactional memory not supported")
     endif()
   endif()
-
-  # Experimental Deterministic features
-  if(USE_DET_INORDER)
-    add_definitions(-DGALOIS_USE_DET_INORDER)
-  endif()
-  if(USE_DET_FIXED_WINDOW)
-    add_definitions(-DGALOIS_USE_DET_FIXED_WINDOW)
-  endif()
 endif()
 
 # PThreads
 find_package(Threads REQUIRED)
 
 # NUMA (linux)
-# currently not available on MIC (and not helpful either)
-#if(NOT ARCH STREQUAL "mic")
-  find_package(NUMA)
-  if(NUMA_FOUND)
-    set(GALOIS_USE_NUMA on)
-  elseif(USE_STRICT_CONFIG)
-    message(FATAL_ERROR "Need libnuma")
-  endif()
-#endif()
+find_package(NUMA)
+if(NUMA_FOUND)
+  set(GALOIS_USE_NUMA on)
+elseif(USE_STRICT_CONFIG)
+  message(FATAL_ERROR "Need libnuma")
+endif()
 
 #llvm ADT and command line parser
 #find_package(LLVM)
@@ -234,7 +223,6 @@ endif()
 # Boost
 set(Boost_ADDITIONAL_VERSIONS "1.40" "1.40.0" "1.47" "1.47.0" "1.49" "1.49.0" "1.51.0")
 set(Boost_USE_MULTITHREADED OFF)
-
 if(NOT "$ENV{BOOST_DIR}" STREQUAL "")
   set(BOOST_ROOT $ENV{BOOST_DIR})
 endif()
@@ -263,6 +251,10 @@ endif()
 
 ###### Global Functions ######
 
+function(add_internal_library name)
+  add_library(${name} OBJECT ${ARGN})
+endfunction()
+
 function(compileApp name)
   if(ARGN)
     set(Sources ${ARGN})
@@ -281,7 +273,7 @@ function(app name)
   foreach(required ${APP_REQUIRES})
     if(${${required}} MATCHES "TRUE")
     else()
-      message("-- NOT compiling ${name} (missing: ${required})")
+      message(STATUS "NOT compiling ${name} (missing: ${required})")
       return()
     endif()
   endforeach()
@@ -307,7 +299,7 @@ function(makeTest)
   foreach(required ${APP_REQUIRES})
     if(${${required}} MATCHES "TRUE")
     else()
-      message("-- NOT compiling ${name} (missing: ${required})")
+      message(STATUS "NOT compiling ${name} (missing: ${required})")
       return()
     endif()
   endforeach()
@@ -326,7 +318,7 @@ function(makeTest)
     if(TARGET ${base})
       list(APPEND commandline "$<TARGET_FILE:${base}>")
     else()
-      message("-- NOT adding test ${name} (missing target: ${base})")
+      message(STATUS "NOT adding test ${name} (missing target: ${base})")
       return()
     endif()
   else()
@@ -347,6 +339,9 @@ endfunction()
 ###### Source finding ######
 include_directories(include)
 
+if(USE_EXP)
+  add_subdirectory(exp)
+endif()
 add_subdirectory(lib)
 add_subdirectory(src)
 add_subdirectory(tools)
@@ -356,9 +351,6 @@ if(NOT SKIP_COMPILE_APPS)
   add_subdirectory(inputs)
   add_subdirectory(test)
   add_subdirectory(toolkit_ml)
-endif()
-if(USE_EXP)
-  add_subdirectory(exp)
 endif()
 
 ###### Documentation ######
@@ -379,7 +371,6 @@ set(CPACK_PACKAGE_VERSION_PATCH ${GALOIS_VERSION_PATCH})
 include(CPack)
 
 ###### Installation ######
-
 export(TARGETS galois APPEND FILE "${PROJECT_BINARY_DIR}/GaloisTargets.cmake")
 export(PACKAGE Galois)
 
@@ -390,16 +381,21 @@ if(USE_EXP)
   set(GALOIS_INCLUDE_DIR "${GALOIS_INCLUDE_DIR}" "${PROJECT_SOURCE_DIR}/exp/include")
 endif()
 
-# Galois include dependencies
-set(GALOIS_INCLUDE_DIRS)
+set(GALOIS_INCLUDE_DIRS) # Galois include dependencies
+set(GALOIS_INCLUDE_DIR)  # Galois include provides
 get_target_property(defs galois INCLUDE_DIRECTORIES)
 foreach(d ${defs})
   string(FIND ${d} ${PROJECT_BINARY_DIR} pos1)
   string(FIND ${d} ${PROJECT_SOURCE_DIR} pos2)
   if(NOT ${pos1} EQUAL 0 AND NOT ${pos2} EQUAL 0)
     set(GALOIS_INCLUDE_DIRS ${GALOIS_INCLUDE_DIRS} ${d})
+  else()
+    set(GALOIS_INCLUDE_DIR ${GALOIS_INCLUDE_DIR} ${d})
   endif()
 endforeach()
+install(DIRECTORY ${GALOIS_INCLUDE_DIR} DESTINATION "${INSTALL_INCLUDE_DIR}/.." COMPONENT dev
+  FILES_MATCHING PATTERN "*.h"
+  PATTERN ".svn" EXCLUDE)
 
 # Galois compiler definitions
 set(galois_defs)
