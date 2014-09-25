@@ -259,7 +259,7 @@ public:
     if (this->tryLock(lockable))
       this->addToNhood(lockable);
 
-    if (m & MethodFlag::INTENT_TO_READ) {
+    if (m & MethodFlag::READ_INTENT) {
       acquireRead(lockable);
     } else {
       acquireWrite(lockable);

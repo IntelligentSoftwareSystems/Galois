@@ -33,16 +33,10 @@ namespace Galois {
  * the runtime should do on the user's behalf: (1) checking for conflicts,
  * and/or (2) saving undo information. By default, both are performed (ALL).
  */
-enum MethodFlag {
+enum class MethodFlag {
   UNPROTECTED = 0,
   WRITE_INTENT = 1,
   READ_INTENT = 2,
-  ALL = 3,
-  //! Method writes
-  WRITE = 4,
-  //! Method always reads, by default Galois assumes that read operations will
-  //! eventually write
-  INTENT_TO_READ = 8
 };
 
 //! Bitwise & for method flags
