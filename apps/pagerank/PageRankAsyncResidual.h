@@ -25,7 +25,7 @@
 
 struct AsyncRsd {
   struct LNode {
-    PRTy value;
+    std::atomic<PRTy> value;
     std::atomic<PRTy> residual; // tracking residual
     void init() { value = 1.0 - alpha; residual = 0.0; }
     PRTy getPageRank(int x = 0) { return value; }
@@ -50,24 +50,6 @@ struct AsyncRsd {
     }
   }
 
-  struct InitResidual {
-    Graph& graph;
-     
-    InitResidual(Graph& g): graph(g) { }
-
-    void operator()(const GNode& src) const {
-      LNode& data = graph.getData(src);
-      // for each in-coming neighbour, add residual
-      PRTy sum = 0.0;
-      for (auto jj = graph.in_edge_begin(src), ej = graph.in_edge_end(src); jj != ej; ++jj){
-        GNode dst = graph.getInEdgeDst(jj);
-	LNode& ddata = graph.getData(dst);
-	sum += 1.0/nout(graph,dst, Galois::MethodFlag::NONE);  
-      }
-      data.residual = sum * alpha*(1.0-alpha);
-    }
-  }; 
-  
   struct Process {
     Graph& graph;
     PRTy tolerance;
@@ -79,35 +61,29 @@ struct AsyncRsd {
       
       Galois::MethodFlag lockflag = Galois::MethodFlag::NONE;
 
-      PRTy oldResidual = sdata.residual;
-      PRTy sum = computePageRankInOut(graph, src, 0, lockflag);
-      PRTy value = alpha*sum + (1.0 - alpha);
-      PRTy diff = std::fabs(value - sdata.value);
-
-      if (diff > tolerance) {
-        // the node is processed
-        atomicAdd(sdata.residual, -oldResidual);
-        sdata.value = value;
-        int src_nout = nout(graph,src, lockflag);
-        PRTy delta = diff*alpha/src_nout;
-        // for each out-going neighbors
-        for (auto jj = graph.edge_begin(src, lockflag), ej = graph.edge_end(src, lockflag);
-             jj != ej; ++jj) {
-          GNode dst = graph.getEdgeDst(jj);
-          LNode& ddata = graph.getData(dst, lockflag);
-          if (ddata.residual < tolerance) {
-            PRTy old = atomicAdd(ddata.residual, delta);
-            // if the node is not in the worklist and the residual is greater than tolerance
-            if(old + delta >= tolerance)
-              ctx.push(dst);
-          }
+      PRTy oldResidual = sdata.residual.exchange(0.0);
+      PRTy pr = computePageRankInOut(graph, src, 0, lockflag);
+      PRTy diff = std::fabs(pr - sdata.value);
+      sdata.value = pr;
+      int src_nout = nout(graph,src, lockflag);
+      PRTy delta = diff*alpha/src_nout;
+      // for each out-going neighbors
+      for (auto jj = graph.edge_begin(src, lockflag), ej = graph.edge_end(src, lockflag);
+           jj != ej; ++jj) {
+        GNode dst = graph.getEdgeDst(jj);
+        LNode& ddata = graph.getData(dst, lockflag);
+        if (ddata.residual <= tolerance) {
+          PRTy old = atomicAdd(ddata.residual, delta);
+          // if the node is not in the worklist and the residual is greater than tolerance
+          if(old <= tolerance && old + delta >= tolerance)
+            ctx.push(dst);
         }
       }
     }
   };
 
   void operator()(Graph& graph, PRTy tolerance, PRTy amp) {
-    Galois::do_all_local(graph, InitResidual(graph), Galois::loopname("InitResidual"));
+    initResidual(graph);
     typedef Galois::WorkList::dChunkedFIFO<16> WL;
     Galois::for_each_local(graph, Process(graph, tolerance), Galois::wl<WL>());
   }

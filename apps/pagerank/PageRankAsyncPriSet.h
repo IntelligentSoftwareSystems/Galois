@@ -27,8 +27,8 @@ struct AsyncPriSet{
   struct LNode {
     PRTy value;
     std::atomic<PRTy> residual; // tracking residual
-    std::atomic<bool> inWL; // tracking wl ocupancy
-    void init() { value = 1.0 - alpha; residual = 0.0; inWL = true; }
+    std::atomic<int> inWL; // tracking wl ocupancy
+    void init() { value = 1.0 - alpha; residual = 0.0; inWL = 1; }
     PRTy getPageRank(int x = 0) { return value; }
     friend std::ostream& operator<<(std::ostream& os, const LNode& n) {
       os << "{PR " << n.value << ", residual " << n.residual << ", inWL " << n.inWL << "}";
@@ -51,47 +51,24 @@ struct AsyncPriSet{
     }
   }
 
-  struct InitResidual {
-    Graph& graph;
-     
-    InitResidual(Graph& g): graph(g) { }
-
-    void operator()(const GNode& src) const {
-      LNode& data = graph.getData(src);
-      // for each in-coming neighbour, add residual
-      PRTy sum = 0.0;
-      for (auto jj = graph.in_edge_begin(src), ej = graph.in_edge_end(src); jj != ej; ++jj){
-        GNode dst = graph.getInEdgeDst(jj);
-	LNode& ddata = graph.getData(dst);
-	sum += 1.0/nout(graph,dst, Galois::MethodFlag::NONE);  
-      }
-      data.residual = sum * alpha*(1.0-alpha);
-    }
-  }; 
-
   struct Process {
     Graph& graph;
     PRTy tolerance;
     Galois::InsertBag<GNode>& nextWL;
     Galois::Runtime::PerThreadStorage<Galois::OnlineStat>& stats;
     PRTy limit;
-    
+    static const bool outOnly = true;
 
     Process(Graph& g, PRTy t, Galois::InsertBag<GNode>& wl, Galois::Runtime::PerThreadStorage<Galois::OnlineStat>& s, PRTy l): graph(g), tolerance(t), nextWL(wl), stats(s), limit(l) { }
 
     //    void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) const {
     void operator()(const GNode& src) const {
       LNode& sdata = graph.getData(src);
-      auto src_nout = nout(graph, src, Galois::MethodFlag::NONE);
-      bool leaf = false;
-      if (src_nout == 0) {
-        leaf = true;
-        src_nout = 1;
-      }
-      if ( sdata.residual / src_nout < limit) {
+      auto resScale = outOnly ? nout(graph, src, Galois::MethodFlag::NONE) + 1 : ninout(graph, src, Galois::MethodFlag::NONE);
+      if ( sdata.residual / resScale < limit) {
         nextWL.push(src);
         double R = sdata.residual;
-        R /= src_nout;
+        R /= resScale;
         stats.getLocal()->insert(std::max(0.0, R));
         return;
       }
@@ -99,16 +76,16 @@ struct AsyncPriSet{
       Galois::MethodFlag lockflag = Galois::MethodFlag::NONE;
 
       // the node is processed
-      sdata.inWL = false;
+      sdata.inWL = 0;
       PRTy oldResidual = sdata.residual;
-      PRTy sum = computePageRankInOut(graph, src, 0, lockflag);
-      PRTy value = alpha*sum + (1.0 - alpha);
-      PRTy diff = std::fabs(value - sdata.value);
+      PRTy pr = computePageRankInOut(graph, src, 0, lockflag);
+      PRTy diff = std::fabs(pr - sdata.value);
 
-      if (diff > tolerance || leaf) {
+      if (diff > tolerance) {
         atomicAdd(sdata.residual, -oldResidual);
-        sdata.value = value;
+        sdata.value = pr;
 
+        auto src_nout = nout(graph, src, Galois::MethodFlag::NONE);
         // for each out-going neighbors
         for (auto jj = graph.edge_begin(src, lockflag), ej = graph.edge_end(src, lockflag);
              jj != ej; ++jj) {
@@ -118,21 +95,19 @@ struct AsyncPriSet{
           PRTy old = atomicAdd(ddata.residual, delta);
 	  // if the node is not in the worklist and the residual is greater than tolerance
 	  if (old + delta > tolerance && !ddata.inWL) {
-            bool already = ddata.inWL.exchange(true);
-            if (!already)
+            if (0 ==ddata.inWL.exchange(1))
               nextWL.push(dst);
           }
         }
       }
       double R = sdata.residual;
-      R /= src_nout;
+      R /= resScale;
       stats.getLocal()->insert(std::max(0.0, R)); // not strictly true
     }
   };
 
   void operator()(Graph& graph, PRTy tolerance, PRTy amp) {
-
-    Galois::do_all_local(graph, InitResidual(graph), Galois::loopname("InitResidual"));
+    initResidual(graph);
 
     Galois::InsertBag<GNode> curWL;
     Galois::InsertBag<GNode> nextWL;
@@ -145,17 +120,22 @@ struct AsyncPriSet{
       curWL.swap(nextWL);
       nextWL.clear();
 
-      double limit = 0.0;
-      int count = 0;
+      double limit = 0.0, max = 0.0, sdev = 0.0;
+      int count = 0, nonzero = 0;
       for (int i = 0; i < stats.size(); ++i) {
-        if (stats.getRemote(i)->getCount()) {
-          //std::cout << *stats.getRemote(i) << "\n";
-          count += stats.getRemote(i)->getCount();
-          limit += stats.getRemote(i)->getMean() * stats.getRemote(i)->getCount();
+        auto* s = stats.getRemote(i);
+        if (s->getCount()) {
+          std::cout << *s << "\n";
+          count += s->getCount();
+          limit += s->getMean() * s->getCount();
+          max = std::max(max, s->getMax());
+          sdev += s->getStdDeviation();
           stats.getRemote(i)->reset();
+          ++nonzero;
         }
       }
       limit /= count;
+      //      limit += sdev / nonzero;
       if (count < 1000)
         limit = 0.0;
       std::cout << "Count is " << count << " next limit is " << limit << "\n";

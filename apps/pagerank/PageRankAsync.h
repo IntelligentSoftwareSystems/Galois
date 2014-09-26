@@ -64,11 +64,10 @@ struct AsyncSet {
       
       Galois::MethodFlag lockflag = Galois::MethodFlag::NONE;
 
-      PRTy sum = computePageRankInOut(graph, src, 0, lockflag);
-      PRTy value = alpha*sum + (1.0 - alpha);
-      PRTy diff = std::fabs(value - sdata.value);
-      if (diff > tolerance) {
-        sdata.value = value;
+      PRTy pr = computePageRankInOut(graph, src, 0, lockflag);
+      PRTy diff = std::fabs(pr - sdata.value);
+      if (diff >= tolerance) {
+        sdata.value = pr;
         for (auto jj = graph.edge_begin(src, lockflag), ej = graph.edge_end(src, lockflag);
              jj != ej; ++jj) {
           GNode dst = graph.getEdgeDst(jj);

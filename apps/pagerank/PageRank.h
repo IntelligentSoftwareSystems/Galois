@@ -41,6 +41,11 @@ unsigned nout(Graph& g, typename Graph::GraphNode n, Galois::MethodFlag flag) {
 }
 
 template<typename Graph>
+unsigned ninout(Graph& g, typename Graph::GraphNode n, Galois::MethodFlag flag) {
+  return std::distance(g.in_edge_begin(n, flag), g.in_edge_end(n, flag)) + nout(g, n, flag);
+}
+
+template<typename Graph>
 double computePageRankInOut(Graph& g, typename Graph::GraphNode src, int prArg, Galois::MethodFlag lockflag) {
   double sum = 0;
   for (auto jj = g.in_edge_begin(src, lockflag), ej = g.in_edge_end(src, lockflag);
@@ -49,8 +54,25 @@ double computePageRankInOut(Graph& g, typename Graph::GraphNode src, int prArg, 
     auto& ddata = g.getData(dst, lockflag);
     sum += ddata.getPageRank(prArg) / nout(g, dst, lockflag);
   }
-  return sum;
+  return alpha*sum + (1.0 - alpha);
 }
+
+template<typename Graph>
+void initResidual(Graph& graph) {
+  Galois::do_all_local(graph, [&graph] (const typename Graph::GraphNode& src) {
+      auto& data = graph.getData(src);
+      // for each in-coming neighbour, add residual
+      PRTy sum = 0.0;
+      for (auto jj = graph.in_edge_begin(src), ej = graph.in_edge_end(src); 
+           jj != ej; ++jj){
+        auto dst = graph.getInEdgeDst(jj);
+        auto& ddata = graph.getData(dst);
+        sum += 1.0/nout(graph,dst, Galois::MethodFlag::NONE);  
+      }
+      data.residual = sum * alpha * (1.0-alpha);
+    }, Galois::do_all_steal<true>());
+}
+
 
 PRTy atomicAdd(std::atomic<PRTy>& v, PRTy delta) {
   PRTy old;
@@ -64,7 +86,7 @@ template<typename Graph>
 void verifyInOut(Graph& graph, PRTy tolerance) {
   for(auto N : graph) {
     auto& data = graph.getData(N);
-    auto residual = data.value - (alpha*computePageRankInOut(graph, N, 0, Galois::MethodFlag::NONE) + (1.0 - alpha));
+    auto residual = std::fabs(data.value - computePageRankInOut(graph, N, 0, Galois::MethodFlag::NONE));
     if (residual > tolerance) {
       std::cout << N << " residual " << residual << " pr " << data.getPageRank(0) << " data " << data << "\n";
     }
