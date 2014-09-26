@@ -290,13 +290,13 @@ struct UpdateHeights {
 
       if (!used) {
         for (Graph::edge_iterator
-            ii = app.graph.edge_begin(src, Galois::MethodFlag::WRITE_INTENT),
-            ee = app.graph.edge_end(src, Galois::MethodFlag::WRITE_INTENT);
+            ii = app.graph.edge_begin(src, Galois::MethodFlag::WRITE),
+            ee = app.graph.edge_end(src, Galois::MethodFlag::WRITE);
             ii != ee; ++ii) {
           GNode dst = app.graph.getEdgeDst(ii);
           int rdata = app.graph.getEdgeData(findEdge(app.graph, dst, src));
           if (rdata > 0) {
-            app.graph.getData(dst, Galois::MethodFlag::WRITE_INTENT);
+            app.graph.getData(dst, Galois::MethodFlag::WRITE);
           }
         }
       }
@@ -305,14 +305,14 @@ struct UpdateHeights {
         if (!used)
           return;
       } else {
-        app.graph.getData(src, Galois::MethodFlag::WRITE_INTENT);
+        app.graph.getData(src, Galois::MethodFlag::WRITE);
         Galois::Runtime::signalFailSafe();
       }
     }
 
     for (Graph::edge_iterator
-        ii = app.graph.edge_begin(src, useCAS ? Galois::MethodFlag::UNPROTECTED : Galois::MethodFlag::WRITE_INTENT),
-        ee = app.graph.edge_end(src, useCAS ? Galois::MethodFlag::UNPROTECTED : Galois::MethodFlag::WRITE_INTENT);
+        ii = app.graph.edge_begin(src, useCAS ? Galois::MethodFlag::UNPROTECTED : Galois::MethodFlag::WRITE),
+        ee = app.graph.edge_end(src, useCAS ? Galois::MethodFlag::UNPROTECTED : Galois::MethodFlag::WRITE);
         ii != ee; ++ii) {
       GNode dst = app.graph.getEdgeDst(ii);
       int rdata = app.graph.getEdgeData(findEdge(app.graph, dst, src));
@@ -405,11 +405,11 @@ void globalRelabel(IncomingWL& incoming) {
 void acquire(const GNode& src) {
   // LC Graphs have a different idea of locking
   for (Graph::edge_iterator 
-      ii = app.graph.edge_begin(src, Galois::MethodFlag::WRITE_INTENT),
-      ee = app.graph.edge_end(src, Galois::MethodFlag::WRITE_INTENT);
+      ii = app.graph.edge_begin(src, Galois::MethodFlag::WRITE),
+      ee = app.graph.edge_end(src, Galois::MethodFlag::WRITE);
       ii != ee; ++ii) {
     GNode dst = app.graph.getEdgeDst(ii);
-    app.graph.getData(dst, Galois::MethodFlag::WRITE_INTENT);
+    app.graph.getData(dst, Galois::MethodFlag::WRITE);
   }
 }
 
@@ -446,7 +446,7 @@ void relabel(const GNode& src) {
 }
 
 bool discharge(const GNode& src, Galois::UserContext<GNode>& ctx) {
-  //Node& node = app.graph.getData(src, Galois::MethodFlag::WRITE_INTENT);
+  //Node& node = app.graph.getData(src, Galois::MethodFlag::WRITE);
   Node& node = app.graph.getData(src, Galois::MethodFlag::UNPROTECTED);
   //int prevHeight = node.height;
   bool relabeled = false;
@@ -456,7 +456,7 @@ bool discharge(const GNode& src, Galois::UserContext<GNode>& ctx) {
   }
 
   while (true) {
-    //Galois::MethodFlag flag = relabeled ? Galois::MethodFlag::UNPROTECTED : Galois::MethodFlag::WRITE_INTENT;
+    //Galois::MethodFlag flag = relabeled ? Galois::MethodFlag::UNPROTECTED : Galois::MethodFlag::WRITE;
     Galois::MethodFlag flag = Galois::MethodFlag::UNPROTECTED;
     bool finished = false;
     int current = node.current;
@@ -563,7 +563,7 @@ struct Process {
         if (!used)
           return;
       } else {
-        app.graph.getData(src, Galois::MethodFlag::WRITE_INTENT);
+        app.graph.getData(src, Galois::MethodFlag::WRITE);
         Galois::Runtime::signalFailSafe();
       }
     }

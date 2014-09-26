@@ -397,11 +397,11 @@ struct SynchronousAlgo {
       TData& sdata = tgraph.getData(src, Galois::MethodFlag::UNPROTECTED);
       double sum = 0;
 
-      for (TGraph::edge_iterator edge : tgraph.out_edges(src, useND && useS ? Galois::MethodFlag::WRITE_INTENT : Galois::MethodFlag::UNPROTECTED)) {
+      for (TGraph::edge_iterator edge : tgraph.out_edges(src, useND && useS ? Galois::MethodFlag::WRITE : Galois::MethodFlag::UNPROTECTED)) {
         TNode dst = tgraph.getEdgeDst(edge);
         double w = tgraph.getEdgeData(edge);
 
-        TData& ddata = tgraph.getData(dst, useND && useS ? Galois::MethodFlag::WRITE_INTENT : Galois::MethodFlag::UNPROTECTED);
+        TData& ddata = tgraph.getData(dst, useND && useS ? Galois::MethodFlag::WRITE : Galois::MethodFlag::UNPROTECTED);
         sum += ddata.getPageRank(useND ? 0 : iteration) * w;
       }
 
@@ -487,11 +487,11 @@ struct AsynchronousAlgo {
       TData& sdata = tgraph.getData(src, Galois::MethodFlag::UNPROTECTED);
       double sum = 0;
 
-      for (TGraph::edge_iterator edge : tgraph.out_edges(src, useND && useS ? Galois::MethodFlag::WRITE_INTENT : Galois::MethodFlag::UNPROTECTED)) {
+      for (TGraph::edge_iterator edge : tgraph.out_edges(src, useND && useS ? Galois::MethodFlag::WRITE : Galois::MethodFlag::UNPROTECTED)) {
         TNode dst = tgraph.getEdgeDst(edge);
         double w = tgraph.getEdgeData(edge);
 
-        TData& ddata = tgraph.getData(dst, useND && useS ? Galois::MethodFlag::WRITE_INTENT : Galois::MethodFlag::UNPROTECTED);
+        TData& ddata = tgraph.getData(dst, useND && useS ? Galois::MethodFlag::WRITE : Galois::MethodFlag::UNPROTECTED);
         sum += ddata.getPageRank(useND ? 0 : iteration) * w;
       }
 

@@ -48,14 +48,14 @@ class Cavity {
    */
   GNode getOpposite(GNode node) {
     assert(std::distance(graph->edge_begin(node), graph->edge_end(node)) == 3);
-    Element& element = graph->getData(node, Galois::MethodFlag::WRITE_INTENT);
+    Element& element = graph->getData(node, Galois::MethodFlag::WRITE);
     Tuple elementTuple = element.getObtuse();
     Edge ObtuseEdge = element.getOppositeObtuse();
-    for (Graph::edge_iterator ii = graph->edge_begin(node, Galois::MethodFlag::WRITE_INTENT),
-        ee = graph->edge_end(node, Galois::MethodFlag::WRITE_INTENT); ii != ee; ++ii) {
+    for (Graph::edge_iterator ii = graph->edge_begin(node, Galois::MethodFlag::WRITE),
+        ee = graph->edge_end(node, Galois::MethodFlag::WRITE); ii != ee; ++ii) {
       GNode neighbor = graph->getEdgeDst(ii);
       //Edge& edgeData = graph->getEdgeData(node, neighbor);
-      Edge edgeData = element.getRelatedEdge(graph->getData(neighbor, Galois::MethodFlag::WRITE_INTENT));
+      Edge edgeData = element.getRelatedEdge(graph->getData(neighbor, Galois::MethodFlag::WRITE));
       if (elementTuple != edgeData.getPoint(0) && elementTuple != edgeData.getPoint(1)) {
 	return neighbor;
       }
@@ -65,7 +65,7 @@ class Cavity {
   }
 
   void expand(GNode node, GNode next) {
-    Element& nextElement = graph->getData(next, Galois::MethodFlag::WRITE_INTENT);
+    Element& nextElement = graph->getData(next, Galois::MethodFlag::WRITE);
     if ((!(dim == 2 && nextElement.dim() == 2 && next != centerNode))
         && nextElement.inCircle(center)) {
       // isMember says next is part of the cavity, and we're not the second
@@ -83,7 +83,7 @@ class Cavity {
     } else {
       // not a member
       //Edge& edgeData = graph->getEdgeData(node, next);
-      Edge edgeData = nextElement.getRelatedEdge(graph->getData(node, Galois::MethodFlag::WRITE_INTENT));
+      Edge edgeData = nextElement.getRelatedEdge(graph->getData(node, Galois::MethodFlag::WRITE));
       EdgeTuple edge(node, next, edgeData);
       if (std::find(connections.begin(), connections.end(), edge) == connections.end()) {
 	connections.push_back(edge);
@@ -106,10 +106,10 @@ public:
     connections.clear();
     frontier.clear();
     centerNode = node;
-    centerElement = &graph->getData(centerNode, Galois::MethodFlag::WRITE_INTENT);
-    while (graph->containsNode(centerNode, Galois::MethodFlag::WRITE_INTENT) && centerElement->isObtuse()) {
+    centerElement = &graph->getData(centerNode, Galois::MethodFlag::WRITE);
+    while (graph->containsNode(centerNode, Galois::MethodFlag::WRITE) && centerElement->isObtuse()) {
       centerNode = getOpposite(centerNode);
-      centerElement = &graph->getData(centerNode, Galois::MethodFlag::WRITE_INTENT);
+      centerElement = &graph->getData(centerNode, Galois::MethodFlag::WRITE);
     }
     center = centerElement->getCenter();
     dim = centerElement->dim();
@@ -121,8 +121,8 @@ public:
     while (!frontier.empty()) {
       GNode curr = frontier.back();
       frontier.pop_back();
-      for (Graph::edge_iterator ii = graph->edge_begin(curr, Galois::MethodFlag::WRITE_INTENT), 
-	     ee = graph->edge_end(curr, Galois::MethodFlag::WRITE_INTENT); 
+      for (Graph::edge_iterator ii = graph->edge_begin(curr, Galois::MethodFlag::WRITE), 
+	     ee = graph->edge_end(curr, Galois::MethodFlag::WRITE); 
 	   ii != ee; ++ii) {
 	GNode neighbor = graph->getEdgeDst(ii);
 	expand(curr, neighbor);
@@ -146,7 +146,7 @@ public:
       EdgeTuple tuple = *ii;
       Element newElement(center, tuple.data.getPoint(0), tuple.data.getPoint(1));
       GNode other = pre.containsNode(tuple.dst) ?  tuple.src : tuple.dst;
-      Element& otherElement = graph->getData(other, Galois::MethodFlag::WRITE_INTENT);
+      Element& otherElement = graph->getData(other, Galois::MethodFlag::WRITE);
 
       GNode newNode = graph->createNode(newElement); // XXX
       const Edge& otherEdge = newElement.getRelatedEdge(otherElement);
@@ -154,7 +154,7 @@ public:
 
       for (PostGraph::iterator ii = post.begin(), ee = post.end(); ii != ee; ++ii) {
         GNode node = *ii;
-        Element& element = graph->getData(node, Galois::MethodFlag::WRITE_INTENT);
+        Element& element = graph->getData(node, Galois::MethodFlag::WRITE);
         if (element.isRelated(newElement)) {
           const Edge& edge = newElement.getRelatedEdge(element);
 	  post.addEdge(newNode, node, edge);

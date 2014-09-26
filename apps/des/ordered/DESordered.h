@@ -146,7 +146,7 @@ class DESordered:
     template <typename C>
     GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (const Event_ty& event, C&) const {
       SimObjInfo& recvInfo = sobjInfoVec[event.getRecvObj ()->getID ()];
-      graph.getData (recvInfo.node, Galois::MethodFlag::WRITE_INTENT);
+      graph.getData (recvInfo.node, Galois::MethodFlag::WRITE);
     }
   };
 

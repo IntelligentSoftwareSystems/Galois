@@ -157,7 +157,7 @@ public:
     }
   }
 
-  node_data_reference getData(const GraphNode& N, MethodFlag mflag = MethodFlag::WRITE_INTENT) {
+  node_data_reference getData(const GraphNode& N, MethodFlag mflag = MethodFlag::WRITE) {
     // Galois::Runtime::checkWrite(mflag, false);
     acquireNode(N, mflag);
     return N->getData();
@@ -195,7 +195,7 @@ public:
     return boost::make_transform_iterator(nodes.local_end(), makeGraphNode());
   }
 
-  edge_iterator edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::WRITE_INTENT) {
+  edge_iterator edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     acquireNode(N, mflag);
     if (Galois::Runtime::shouldLock(mflag)) {
       for (edge_iterator ii = N->edgeBegin, ee = N->edgeEnd; ii != ee; ++ii) {
@@ -205,7 +205,7 @@ public:
     return N->edgeBegin;
   }
 
-  edge_iterator edge_end(GraphNode N, MethodFlag mflag = MethodFlag::WRITE_INTENT) {
+  edge_iterator edge_end(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     return N->edgeEnd;
   }
 
@@ -213,15 +213,15 @@ public:
    * An object with begin() and end() methods to iterate over the outgoing
    * edges of N.
    */
-  detail::EdgesIterator<LC_Morph_Graph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE_INTENT) {
+  detail::EdgesIterator<LC_Morph_Graph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     return detail::EdgesIterator<LC_Morph_Graph>(*this, N, mflag);
   }
   
   template<typename... Args>
   GraphNode createNode(int nedges, Args&&... args) {
-    // Galois::Runtime::checkWrite(MethodFlag::WRITE_INTENT, true);
+    // Galois::Runtime::checkWrite(MethodFlag::WRITE, true);
     NodeInfo* N = &nodes.emplace(std::forward<Args>(args)...);
-    acquireNode(N, MethodFlag::WRITE_INTENT);
+    acquireNode(N, MethodFlag::WRITE);
     EdgeHolder*& local_edges = *edges.getLocal();
     if (!local_edges || std::distance(local_edges->begin, local_edges->end) < nedges) {
       EdgeHolder* old = local_edges;
@@ -280,7 +280,7 @@ public:
    *
    * Invalidates edge iterator.
    */
-  void removeEdge(GraphNode src, edge_iterator dst, Galois::MethodFlag mflag = MethodFlag::WRITE_INTENT) {
+  void removeEdge(GraphNode src, edge_iterator dst, Galois::MethodFlag mflag = MethodFlag::WRITE) {
     // Galois::Runtime::checkWrite(mflag, true);
     acquireNode(src, mflag);
     src->edgeEnd--;
@@ -289,7 +289,7 @@ public:
     src->edgeEnd->destroy();
   }
   
-  edge_iterator findEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = MethodFlag::WRITE_INTENT) {
+  edge_iterator findEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = MethodFlag::WRITE) {
     // Galois::Runtime::checkWrite(mflag, true); // TODO: double check 'true' here
     acquireNode(src, mflag);
     return std::find_if(src->edgeBegin, src->edgeEnd, dst_equals(dst)); 

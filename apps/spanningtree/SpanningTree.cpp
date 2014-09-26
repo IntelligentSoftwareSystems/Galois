@@ -91,8 +91,8 @@ struct DemoAlgo {
   Node* root;
 
   void operator()(GNode src, Galois::UserContext<GNode>& ctx) {
-    for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::WRITE_INTENT),
-	   ei = graph.edge_end(src, Galois::MethodFlag::WRITE_INTENT); ii != ei; ++ii) {
+    for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::WRITE),
+	   ei = graph.edge_end(src, Galois::MethodFlag::WRITE); ii != ei; ++ii) {
       GNode dst = graph.getEdgeDst(ii);
       Node& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
       if (ddata.component() == root)

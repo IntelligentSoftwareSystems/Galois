@@ -82,7 +82,7 @@ class TwoPhaseBFS: public BFS<Level_ty> {
 
       // just like DES, we only lock the node being updated, but not its
       // outgoing neighbors
-      graph.getData (up.dst, Galois::MethodFlag::WRITE_INTENT);
+      graph.getData (up.dst, Galois::MethodFlag::WRITE);
     }
   };
 

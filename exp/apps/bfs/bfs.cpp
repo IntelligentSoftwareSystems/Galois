@@ -528,7 +528,7 @@ struct DetBarrierAlgo {
     for (Graph::edge_iterator ii = graph.edge_begin(n, Galois::MethodFlag::UNPROTECTED),
           ei = graph.edge_end(n, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
       GNode dst = graph.getEdgeDst(ii);
-      SNode& ddata = graph.getData(dst, Galois::MethodFlag::WRITE_INTENT);
+      SNode& ddata = graph.getData(dst, Galois::MethodFlag::WRITE);
 
       unsigned int oldDist;
       while (true) {
@@ -580,7 +580,7 @@ struct DetBarrierAlgo {
     } else {
       typename LocalState::Pending pending(ctx.getPerIterAlloc());
       build(item, &pending);
-      graph.getData(item.first, Galois::MethodFlag::WRITE_INTENT);
+      graph.getData(item.first, Galois::MethodFlag::WRITE);
       Galois::Runtime::signalFailSafe(); // Failsafe point
       modify(item, ctx, &pending);
     }

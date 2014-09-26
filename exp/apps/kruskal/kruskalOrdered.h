@@ -59,7 +59,7 @@ struct KNodeLockable: public Galois::Runtime::Lockable, KNode {
 
   KNodeLockable (unsigned id): Galois::Runtime::Lockable (), KNode (id) {}
 
-  void acquire (Galois::MethodFlag mflag=Galois::MethodFlag::WRITE_INTENT) {
+  void acquire (Galois::MethodFlag mflag=Galois::MethodFlag::WRITE) {
     Galois::Runtime::acquire (this, mflag);
   }
 

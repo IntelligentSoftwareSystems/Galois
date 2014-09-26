@@ -149,8 +149,8 @@ unsigned int ordering_leastdegree(SymbolicGraph &graph, unsigned int i,
     // Measure degree of the node
     unsigned int degree = 0;
     for (SymbolicGraph::edge_iterator
-           iis = graph.edge_begin(node, Galois::MethodFlag::WRITE_INTENT),
-           eis = graph.edge_end(node, Galois::MethodFlag::WRITE_INTENT);
+           iis = graph.edge_begin(node, Galois::MethodFlag::WRITE),
+           eis = graph.edge_end(node, Galois::MethodFlag::WRITE);
 	 iis != eis; ++iis) {
       // Only include unseen (not yet eliminated) neighbors in the degree
       if ( graph.getData(graph.getEdgeDst(iis)).seen > seenbase ) continue;
@@ -232,8 +232,8 @@ struct SymbolicAlgo {
     // Make sure remaining neighbors form a clique
     // It should be safe to add edges between neighbors here.
     for (typename GraphType::edge_iterator
-           iis = graph.edge_begin(node, Galois::MethodFlag::WRITE_INTENT),
-           eis = graph.edge_end(node, Galois::MethodFlag::WRITE_INTENT);
+           iis = graph.edge_begin(node, Galois::MethodFlag::WRITE),
+           eis = graph.edge_end(node, Galois::MethodFlag::WRITE);
 	 iis != eis; ++iis) {
       SGNode src = graph.getEdgeDst(iis);
       Node &srcd = graph.getData(src);
@@ -241,8 +241,8 @@ struct SymbolicAlgo {
 
       // Enumerate all other neighbors
       for (typename GraphType::edge_iterator
-             iid = graph.edge_begin(node, Galois::MethodFlag::WRITE_INTENT),
-             eid = graph.edge_end(node, Galois::MethodFlag::WRITE_INTENT);
+             iid = graph.edge_begin(node, Galois::MethodFlag::WRITE),
+             eid = graph.edge_end(node, Galois::MethodFlag::WRITE);
 	   iid != eid; ++iid) {
         SGNode dst = graph.getEdgeDst(iid);
         Node &dstd = graph.getData(dst);
@@ -256,7 +256,7 @@ struct SymbolicAlgo {
 
         // The edge doesn't exist, so add an undirected edge between
 	// these two nodes
-        bridge = graph.addEdge(src, dst, Galois::MethodFlag::WRITE_INTENT);
+        bridge = graph.addEdge(src, dst, Galois::MethodFlag::WRITE);
         edgedata &ed = graph.getEdgeData(bridge, Galois::MethodFlag::UNPROTECTED);
         ed = 0;
       }
@@ -267,8 +267,8 @@ struct SymbolicAlgo {
     // Count number of edges to add to the output graph. These will be
     // preallocated and added later.
     for (typename GraphType::edge_iterator
-           iis = graph.edge_begin(node, Galois::MethodFlag::WRITE_INTENT),
-           eis = graph.edge_end(node, Galois::MethodFlag::WRITE_INTENT);
+           iis = graph.edge_begin(node, Galois::MethodFlag::WRITE),
+           eis = graph.edge_end(node, Galois::MethodFlag::WRITE);
 	 iis != eis; ++iis) {
       SGNode src = graph.getEdgeDst(iis);
       Node &srcd = graph.getData(src);
@@ -301,8 +301,8 @@ struct SymbolicAlgo {
 
     // Add edges to the output (elimination graph).
     for (typename GraphType::edge_iterator
-           iis = graph.edge_begin(node, Galois::MethodFlag::WRITE_INTENT),
-           eis = graph.edge_end(node, Galois::MethodFlag::WRITE_INTENT);
+           iis = graph.edge_begin(node, Galois::MethodFlag::WRITE),
+           eis = graph.edge_end(node, Galois::MethodFlag::WRITE);
 	 iis != eis; ++iis) {
       SGNode src = graph.getEdgeDst(iis);
       Node &srcd = graph.getData(src);
@@ -317,7 +317,7 @@ struct SymbolicAlgo {
       // Add a directed edge from src to node (copying weight)
       typename OutGraphType::edge_iterator
         edge = outgraph.addEdge(outnodes[srcd.id], outnode,
-                                Galois::MethodFlag::WRITE_INTENT);
+                                Galois::MethodFlag::WRITE);
       edgedata &ed = outgraph.getEdgeData(edge);
       ed = graph.getEdgeData(iis);
       // Bookkeeping
@@ -418,7 +418,7 @@ struct NhFunc {
   }
   void operator()(GNode& node) {
     // Touch all neighbors (this seems to be good enough)
-    Graph::edge_iterator ii = graph.edge_begin(node, Galois::MethodFlag::WRITE_INTENT);
+    Graph::edge_iterator ii = graph.edge_begin(node, Galois::MethodFlag::WRITE);
   }
 };
 
@@ -459,8 +459,8 @@ struct NumericAlgo {
 
     // Update all edges (except self-edge)
     for (Graph::edge_iterator
-           ii = graph.edge_begin(node, Galois::MethodFlag::WRITE_INTENT),
-           ei = graph.edge_end(node, Galois::MethodFlag::WRITE_INTENT);
+           ii = graph.edge_begin(node, Galois::MethodFlag::WRITE),
+           ei = graph.edge_end(node, Galois::MethodFlag::WRITE);
          ii != ei; ++ii) {
       GNode dst = graph.getEdgeDst(ii);
       Node &dstd = graph.getData(dst);
@@ -475,8 +475,8 @@ struct NumericAlgo {
     // Update all edges between neighbors (we're operating on the filled graph,
     // so we they form a (directed) clique)
     for (Graph::edge_iterator
-           iis = graph.edge_begin(node, Galois::MethodFlag::WRITE_INTENT),
-           eis = graph.edge_end(node, Galois::MethodFlag::WRITE_INTENT);
+           iis = graph.edge_begin(node, Galois::MethodFlag::WRITE),
+           eis = graph.edge_end(node, Galois::MethodFlag::WRITE);
          iis != eis; ++iis) {
       GNode src = graph.getEdgeDst(iis);
       Node &srcd = graph.getData(src);
@@ -485,8 +485,8 @@ struct NumericAlgo {
 
       // Enumerate all other neighbors
       for (Graph::edge_iterator
-             iid = graph.edge_begin(node, Galois::MethodFlag::WRITE_INTENT),
-             eid = graph.edge_end(node, Galois::MethodFlag::WRITE_INTENT);
+             iid = graph.edge_begin(node, Galois::MethodFlag::WRITE),
+             eid = graph.edge_end(node, Galois::MethodFlag::WRITE);
            iid != eid; ++iid) {
         GNode dst = graph.getEdgeDst(iid);
         Node &dstd = graph.getData(dst);
@@ -646,8 +646,8 @@ int main(int argc, char** argv) {
       assert(data.seen == 0);
       edgecount++;
       for (SymbolicGraph::edge_iterator
-             iid = graph.edge_begin(*ii, Galois::MethodFlag::WRITE_INTENT),
-             eid = graph.edge_end(*ii, Galois::MethodFlag::WRITE_INTENT);
+             iid = graph.edge_begin(*ii, Galois::MethodFlag::WRITE),
+             eid = graph.edge_end(*ii, Galois::MethodFlag::WRITE);
            iid != eid; ++iid)
         if ( data.id < graph.getData(graph.getEdgeDst(iid)).id ) edgecount++;
     }
@@ -675,8 +675,8 @@ int main(int argc, char** argv) {
     assert(data.seen == 2);
     data.seen = 0;
     for (Graph::edge_iterator
-           iid = outgraph.edge_begin(*ii, Galois::MethodFlag::WRITE_INTENT),
-           eid = outgraph.edge_end(*ii, Galois::MethodFlag::WRITE_INTENT);
+           iid = outgraph.edge_begin(*ii, Galois::MethodFlag::WRITE),
+           eid = outgraph.edge_end(*ii, Galois::MethodFlag::WRITE);
          iid != eid; ++iid)
       newedgecount++;
   }

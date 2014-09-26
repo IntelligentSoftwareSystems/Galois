@@ -69,11 +69,11 @@ Specified as a template argument to {@link Galois::wl}
  - {@link Galois::MethodFlag::UNPROTECTED}: access to shared data is not protected. User
    responsible/aware of concurrent accesses
 
- - {@link Galois::MethodFlag::WRITE_INTENT}: Runtime monitors access to shared data, and
+ - {@link Galois::MethodFlag::WRITE}: Runtime monitors access to shared data, and
    allows only one iteration to acquire ownership of the data element (e.g., node
    or edge in the graph) being accessed. 
 
- - {@link Galois::MethodFlag::READ_INTENT}: Runtime may allow multiple iterations to
+ - {@link Galois::MethodFlag::READ}: Runtime may allow multiple iterations to
    read the shared data element. 
 
 \section data_structures Other Data Structures

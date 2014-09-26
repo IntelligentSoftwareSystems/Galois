@@ -76,7 +76,7 @@ class SpecOrderedBFS: public BFS<Level_ty> {
 
       // just like DES, we only lock the node being updated, but not its
       // outgoing neighbors
-      graph.getData (up.node, Galois::MethodFlag::WRITE_INTENT);
+      graph.getData (up.node, Galois::MethodFlag::WRITE);
     }
   };
 

@@ -25,10 +25,10 @@ struct Matching {
         return;
     }
 
-    graph.getData(x, Galois::MethodFlag::WRITE_INTENT); 
+    graph.getData(x, Galois::MethodFlag::WRITE); 
     Galois::Runtime::signalFailSafe();
     
-    graph.getData(x, Galois::MethodFlag::WRITE_INTENT) = 1;
+    graph.getData(x, Galois::MethodFlag::WRITE) = 1;
     for (auto edge : graph.out_edges(x)) {
       GNode dst = graph.getEdgeDst(edge);
       graph.getData(dst) = 1;

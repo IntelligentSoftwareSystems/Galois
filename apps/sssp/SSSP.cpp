@@ -314,7 +314,7 @@ struct AsyncAlgo {
 
   template<typename Pusher>
   void relaxNode(Graph& graph, UpdateRequest& req, Pusher& pusher) {
-    const Galois::MethodFlag flag = UseCas ? Galois::MethodFlag::UNPROTECTED : Galois::MethodFlag::WRITE_INTENT;
+    const Galois::MethodFlag flag = UseCas ? Galois::MethodFlag::UNPROTECTED : Galois::MethodFlag::WRITE;
     Node& sdata = graph.getData(req.n, flag);
     volatile Dist* sdist = &sdata.dist;
 

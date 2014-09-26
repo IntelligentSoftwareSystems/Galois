@@ -160,11 +160,11 @@ struct AsyncALSalgo {
 
     if (col < NUM_ITEM_NODES) {
       for (Sp::InnerIterator it(AT, col); it; ++it)
-        g.getData(it.row() + NUM_ITEM_NODES, Galois::MethodFlag::READ_INTENT);
+        g.getData(it.row() + NUM_ITEM_NODES, Galois::MethodFlag::READ);
     } else {
       col = col - NUM_ITEM_NODES;
       for (Sp::InnerIterator it(A, col); it; ++it)
-        g.getData(it.row(), Galois::MethodFlag::READ_INTENT);
+        g.getData(it.row(), Galois::MethodFlag::READ);
     }
   }
 

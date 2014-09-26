@@ -463,7 +463,7 @@ void BP::runProcess(const Task& t, std::vector<std::vector<EdgeData> >& edgeData
       size_t i = t.i;
       size_t _I = t._I;
 
-      edgeData[i][_I].lock.get(Galois::MethodFlag::WRITE_INTENT);
+      edgeData[i][_I].lock.get(Galois::MethodFlag::WRITE);
       // Acquire neighborhood
       //diaforeach(const Neighbor &J, nbV(i)) {
       //  diaforeach(const Neighbor &j, nbF(J)) {

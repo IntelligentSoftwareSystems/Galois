@@ -694,7 +694,7 @@ struct TreeSummarizeSpeculative: public TypeDefHelper<SpecNodeBase> {
     static const unsigned CHUNK_SIZE = 32;
 
     void acquire (TreeNode* n) {
-      Galois::Runtime::acquire (n, Galois::MethodFlag::WRITE_INTENT);
+      Galois::Runtime::acquire (n, Galois::MethodFlag::WRITE);
     }
 
     template <typename C>

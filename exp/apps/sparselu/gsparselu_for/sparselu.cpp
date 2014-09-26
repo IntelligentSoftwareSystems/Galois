@@ -479,7 +479,7 @@ struct FwdBdivBmod {
     typedef int tt_does_not_need_push;
 
     void acquire(int ii, int jj) {
-      Galois::Runtime::acquire(&locks[ii*bots_arg_size+jj], Galois::MethodFlag::WRITE_INTENT);
+      Galois::Runtime::acquire(&locks[ii*bots_arg_size+jj], Galois::MethodFlag::WRITE);
     }
 
     void operator()(const Task& t, Galois::UserContext<Task>&) {

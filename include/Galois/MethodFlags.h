@@ -35,8 +35,10 @@ namespace Galois {
  */
 enum class MethodFlag: char {
   UNPROTECTED = 0,
-  WRITE_INTENT = 1,
-  READ_INTENT = 2,
+  WRITE = 1,
+  READ = 2,
+  INTERNAL_MASK = 3,
+  PREVIOUS = 4,
 };
 
 //! Bitwise & for method flags

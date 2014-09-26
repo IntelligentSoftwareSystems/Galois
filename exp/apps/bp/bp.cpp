@@ -31,7 +31,7 @@ struct BipartiteGraph: public Galois::Graph::FirstGraph<NodeTy,EdgeTy,true> {
   NodeList factors;
   NodeList variables;
 
-  void addNode(const typename Super::GraphNode& n, bool isFactor, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE_INTENT) {
+  void addNode(const typename Super::GraphNode& n, bool isFactor, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) {
     if (isFactor) {
       factors.push_back(n);
     } else {
@@ -40,12 +40,12 @@ struct BipartiteGraph: public Galois::Graph::FirstGraph<NodeTy,EdgeTy,true> {
     Super::addNode(n, mflag);
   }
 
-  void addNode(const typename Super::GraphNode& n, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE_INTENT) {
+  void addNode(const typename Super::GraphNode& n, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) {
     assert(0 && "Not supported in Bipartite Graph");
     abort();
   }
 
-  void removeNode(typename Super::GraphNode n, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE_INTENT) {
+  void removeNode(typename Super::GraphNode n, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) {
     assert(0 && "Not supported in Bipartite Graph");
     abort();
   }
@@ -305,8 +305,8 @@ struct GBP {
     assert(J_i != 0);
 
     // Incoming edges
-    for (Graph::neighbor_iterator dst = graph.neighbor_begin(src, Galois::MethodFlag::WRITE_INTENT),
-        edst = graph.neighbor_end(src, Galois::MethodFlag::WRITE_INTENT); dst != edst; ++dst) {
+    for (Graph::neighbor_iterator dst = graph.neighbor_begin(src, Galois::MethodFlag::WRITE),
+        edst = graph.neighbor_end(src, Galois::MethodFlag::WRITE); dst != edst; ++dst) {
       const Edge& edge = graph.getEdgeData(*dst, src, Galois::MethodFlag::UNPROTECTED);
       mu_i += edge.mean;
       J_i += edge.prec;
@@ -383,8 +383,8 @@ struct GBP {
     // Variance can not be zero (must be a diagonally dominant matrix)!
     //  assert(A(i,i) ~= 0);
     //  J(i) = A(i,i) + sum(MJ(:,i));
-    for (Graph::neighbor_iterator dst = graph.neighbor_begin(src, Galois::MethodFlag::WRITE_INTENT),
-        edst = graph.neighbor_end(src, Galois::MethodFlag::WRITE_INTENT); dst != edst; ++dst) {
+    for (Graph::neighbor_iterator dst = graph.neighbor_begin(src, Galois::MethodFlag::WRITE),
+        edst = graph.neighbor_end(src, Galois::MethodFlag::WRITE); dst != edst; ++dst) {
       const Edge& edge = graph.getEdgeData(*dst, src, Galois::MethodFlag::UNPROTECTED);
       node.mean += edge.mean;
       node.prec += edge.prec;

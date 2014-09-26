@@ -143,9 +143,9 @@ protected:
     template <typename C>
     void operator () (GNode src, C&) {
       Graph& graph = outer.graph;
-      NodeData& sd = graph.getData (src, Galois::MethodFlag::WRITE_INTENT);
-      for (Graph::edge_iterator e = graph.edge_begin (src, Galois::MethodFlag::WRITE_INTENT),
-          e_end = graph.edge_end (src, Galois::MethodFlag::WRITE_INTENT); e != e_end; ++e) {
+      NodeData& sd = graph.getData (src, Galois::MethodFlag::WRITE);
+      for (Graph::edge_iterator e = graph.edge_begin (src, Galois::MethodFlag::WRITE),
+          e_end = graph.edge_end (src, Galois::MethodFlag::WRITE); e != e_end; ++e) {
         GNode dst = graph.getEdgeDst (e);
       }
     }

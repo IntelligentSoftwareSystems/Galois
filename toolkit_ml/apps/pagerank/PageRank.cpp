@@ -690,7 +690,7 @@ struct PrtRsd {
       node = &graph.getData(src);
 
       //Galois::MethodFlag flag = Galois::MethodFlag::UNPROTECTED;
-      Galois::MethodFlag flag = Galois::MethodFlag::WRITE_INTENT;
+      Galois::MethodFlag flag = Galois::MethodFlag::WRITE;
 
       // update pagerank (consider each in-coming edge)
       double sum = 0;

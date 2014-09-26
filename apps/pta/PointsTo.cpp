@@ -334,7 +334,7 @@ void processAddressOfCopy(PointsToConstraints &constraints, WorkList &worklist) 
 		}
 	}
 }
-unsigned propagate(GNode &src, GNode &dst, Galois::MethodFlag flag = Galois::MethodFlag::WRITE_INTENT) {
+unsigned propagate(GNode &src, GNode &dst, Galois::MethodFlag flag = Galois::MethodFlag::WRITE) {
 	unsigned srcid = graph.getData(src, Galois::MethodFlag::UNPROTECTED).id;
 	unsigned dstid = graph.getData(dst, Galois::MethodFlag::UNPROTECTED).id;
 	unsigned newptsto = 0;
@@ -352,7 +352,7 @@ unsigned propagate(GNode &src, GNode &dst, Galois::MethodFlag flag = Galois::Met
 	return newptsto;
 }
 
-void processLoadStore(PointsToConstraints &constraints, WorkList &worklist, Galois::MethodFlag flag = Galois::MethodFlag::WRITE_INTENT) {
+void processLoadStore(PointsToConstraints &constraints, WorkList &worklist, Galois::MethodFlag flag = Galois::MethodFlag::WRITE) {
 	// add edges to the graph based on points-to information of the nodes
 	// and then add the source of each edge to the worklist.
 	for (PointsToConstraints::iterator ii = constraints.begin(); ii != constraints.end(); ++ii) {
@@ -371,7 +371,7 @@ void processLoadStore(PointsToConstraints &constraints, WorkList &worklist, Galo
 					GNode &nn = nodes[pointeerepr];
 					graph.addEdge(nn, nndstrepr, flag);
 					//std::cout << "debug: adding edge from " << *pointee << " to " << dst << std::endl;
-					worklist.push_back(UpdateRequest(nn, graph.getData(nn, Galois::MethodFlag::WRITE_INTENT).priority));
+					worklist.push_back(UpdateRequest(nn, graph.getData(nn, Galois::MethodFlag::WRITE).priority));
 				}
 			}
 		} else {	// store.
@@ -388,7 +388,7 @@ void processLoadStore(PointsToConstraints &constraints, WorkList &worklist, Galo
 				}
 			}
 			if (newedgeadded) {
-				worklist.push_back(UpdateRequest(nnsrcrepr, graph.getData(nnsrcrepr, Galois::MethodFlag::WRITE_INTENT).priority));
+				worklist.push_back(UpdateRequest(nnsrcrepr, graph.getData(nnsrcrepr, Galois::MethodFlag::WRITE).priority));
 			}
 		}
 	}
@@ -406,7 +406,7 @@ struct Process {
     for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED),
         ei = graph.edge_end(src, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
       GNode dst = graph.getEdgeDst(ii);
-	unsigned newptsto = propagate(src, dst, Galois::MethodFlag::WRITE_INTENT);
+	unsigned newptsto = propagate(src, dst, Galois::MethodFlag::WRITE);
 	if (newptsto) {
 		ctx.push(UpdateRequest(dst, newptsto));
 	}
@@ -414,7 +414,7 @@ struct Process {
   } else {
 	nfired = 0;
 	WorkList wl;
-	processLoadStore(loadstoreconstraints, wl, Galois::MethodFlag::WRITE_INTENT);
+	processLoadStore(loadstoreconstraints, wl, Galois::MethodFlag::WRITE);
 	/*if (wl.size() > THRESHOLD_OCD) {
 		ocd.process(wl);
 	}*/

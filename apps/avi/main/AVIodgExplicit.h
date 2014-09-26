@@ -229,10 +229,10 @@ protected:
         // one-shot optimization: acquire abstract locks on active node and
         // neighbors (all its neighbors, in this case) before performing any modifications
 
-        AVI* srcAVI = graph.getData (src, Galois::MethodFlag::WRITE_INTENT);
+        AVI* srcAVI = graph.getData (src, Galois::MethodFlag::WRITE);
 
-        for (Graph::edge_iterator e = graph.edge_begin (src, Galois::MethodFlag::WRITE_INTENT)
-             , ende = graph.edge_end (src, Galois::MethodFlag::WRITE_INTENT); e != ende; ++e) {
+        for (Graph::edge_iterator e = graph.edge_begin (src, Galois::MethodFlag::WRITE)
+             , ende = graph.edge_end (src, Galois::MethodFlag::WRITE); e != ende; ++e) {
         }
 
 

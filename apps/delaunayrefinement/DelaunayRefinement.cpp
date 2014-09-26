@@ -82,7 +82,7 @@ struct Process {
   //! [Enabling Per Iteration Allocator in DMR]
 
   void operator()(GNode item, Galois::UserContext<GNode>& ctx) {
-    if (!graph->containsNode(item, Galois::MethodFlag::WRITE_INTENT))
+    if (!graph->containsNode(item, Galois::MethodFlag::WRITE))
       return;
     
     Cavity* cavp = NULL;

@@ -189,13 +189,13 @@ struct Process {
     }
 
     if (Version == detDisjoint) {
-      *modp = build<Galois::MethodFlag::WRITE_INTENT>(src);
+      *modp = build<Galois::MethodFlag::WRITE>(src);
     } else {
-      bool mod = build<Galois::MethodFlag::WRITE_INTENT>(src);
+      bool mod = build<Galois::MethodFlag::WRITE>(src);
       if (Version == detPrefix) {
         return;
       } else {
-        graph.getData(src, Galois::MethodFlag::WRITE_INTENT);
+        graph.getData(src, Galois::MethodFlag::WRITE);
         Galois::Runtime::signalFailSafe(); // Failsafe point
       }
       if (mod)
@@ -223,7 +223,7 @@ struct OrderedProcess {
 
   void operator()(GNode src) {
     if (prefix) {
-      graph.edge_begin(src, Galois::MethodFlag::WRITE_INTENT);
+      graph.edge_begin(src, Galois::MethodFlag::WRITE);
     } else {
       if (process.build<Galois::MethodFlag::UNPROTECTED>(src))
         process.modify(src);

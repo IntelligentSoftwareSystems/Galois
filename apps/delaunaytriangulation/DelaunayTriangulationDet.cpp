@@ -148,8 +148,8 @@ struct Process {
   }
 
   GNode findCorrespondingNode(GNode start, const Point* p1, const Point* p2) {
-    for (Graph::edge_iterator ii = graph->edge_begin(start, Galois::MethodFlag::WRITE_INTENT),
-        ei = graph->edge_end(start, Galois::MethodFlag::WRITE_INTENT); ii != ei; ++ii) {
+    for (Graph::edge_iterator ii = graph->edge_begin(start, Galois::MethodFlag::WRITE),
+        ei = graph->edge_end(start, Galois::MethodFlag::WRITE); ii != ei; ++ii) {
       GNode dst = graph->getEdgeDst(ii);
       Element& e = graph->getData(dst, Galois::MethodFlag::UNPROTECTED);
       int count = 0;
@@ -168,12 +168,12 @@ struct Process {
     // Try simple hill climbing instead
     ContainsTuple contains(*graph, p->t());
     while (!contains(start)) {
-      Element& element = graph->getData(start, Galois::MethodFlag::WRITE_INTENT);
+      Element& element = graph->getData(start, Galois::MethodFlag::WRITE);
       if (element.boundary()) {
         // Should only happen when quad tree returns a boundary point which is rare
         // There's only one way to go from here
         assert(std::distance(graph->edge_begin(start), graph->edge_end(start)) == 1);
-        start = graph->getEdgeDst(graph->edge_begin(start, Galois::MethodFlag::WRITE_INTENT));
+        start = graph->getEdgeDst(graph->edge_begin(start, Galois::MethodFlag::WRITE));
       } else {
         // Find which neighbor will get us to point fastest by computing normal
         // vectors
@@ -193,7 +193,7 @@ struct Process {
       return false;
     }
 
-    result->get(Galois::MethodFlag::WRITE_INTENT);
+    result->get(Galois::MethodFlag::WRITE);
 
     GNode someNode = result->someElement();
 
@@ -231,7 +231,7 @@ struct Process {
       }
     }
 
-    p->get(Galois::MethodFlag::WRITE_INTENT);
+    p->get(Galois::MethodFlag::WRITE);
     assert(!p->inMesh());
 
     GNode node;
@@ -262,7 +262,7 @@ struct Process {
 
   //! Serial operator
   void operator()(Point* p) {
-    p->get(Galois::MethodFlag::WRITE_INTENT);
+    p->get(Galois::MethodFlag::WRITE);
     assert(!p->inMesh());
 
     GNode node;

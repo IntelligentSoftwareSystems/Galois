@@ -146,7 +146,7 @@ class DEStwoPhase:
     void operator () (const Event_ty& event, C&) const {
       SimObjInfo& recvInfo = sobjInfoVec[event.getRecvObj ()->getID ()];
       if (recvInfo.isReady (event)) {
-        graph.getData (recvInfo.node, Galois::MethodFlag::WRITE_INTENT);
+        graph.getData (recvInfo.node, Galois::MethodFlag::WRITE);
 
       } else {
         Galois::Runtime::signalConflict ();

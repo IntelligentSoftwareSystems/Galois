@@ -74,8 +74,8 @@ class Cavity: private boost::noncopyable {
         Point* p2 = e.getPoint(index);
         Point* p3 = e.getPoint((index + 1) % 3);
 
-        p2->get(Galois::MethodFlag::WRITE_INTENT);
-        p3->get(Galois::MethodFlag::WRITE_INTENT);
+        p2->get(Galois::MethodFlag::WRITE);
+        p3->get(Galois::MethodFlag::WRITE);
       }
     }
   }

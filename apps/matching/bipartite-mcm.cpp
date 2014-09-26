@@ -271,7 +271,7 @@ struct MatchingFF {
   typedef std::deque<GraphNode, typename Galois::PerIterAllocTy::rebind<GraphNode>::other> Queue;
   typedef std::vector<GraphNode, typename Galois::PerIterAllocTy::rebind<GraphNode>::other> Preds;
   
-  static const Galois::MethodFlag flag = Concurrent ? Galois::MethodFlag::WRITE_INTENT : Galois::MethodFlag::UNPROTECTED;
+  static const Galois::MethodFlag flag = Concurrent ? Galois::MethodFlag::WRITE : Galois::MethodFlag::UNPROTECTED;
 
   static const bool canRunIteratively = true;
 
@@ -441,7 +441,7 @@ struct MatchingABMP {
   typedef std::vector<Edge, typename Galois::PerIterAllocTy::rebind<Edge>::other> Revs;
   typedef std::pair<GraphNode,unsigned> WorkItem;
 
-  static const Galois::MethodFlag flag = Concurrent ? Galois::MethodFlag::WRITE_INTENT : Galois::MethodFlag::UNPROTECTED;
+  static const Galois::MethodFlag flag = Concurrent ? Galois::MethodFlag::WRITE : Galois::MethodFlag::UNPROTECTED;
 
   static const bool canRunIteratively = true;
 
@@ -632,7 +632,7 @@ struct MatchingMF {
   typedef typename G::iterator iterator;
   typedef typename G::node_data_type node_data_type;
   typedef typename G::edge_data_type edge_data_type;
-  static const Galois::MethodFlag flag = Concurrent ? Galois::MethodFlag::WRITE_INTENT : Galois::MethodFlag::UNPROTECTED;
+  static const Galois::MethodFlag flag = Concurrent ? Galois::MethodFlag::WRITE : Galois::MethodFlag::UNPROTECTED;
   static const bool canRunIteratively = false;
 
   /**
@@ -864,22 +864,22 @@ struct MatchingMF {
       for (edge_iterator ii = g.edge_begin(*src), ei = g.edge_end(*src);
           ii != ei; ++ii) {
         GraphNode dst = g.getEdgeDst(ii);
-        g.getEdgeData(g.addMultiEdge(dst, *src, Galois::MethodFlag::WRITE_INTENT)) = edge_data_type(0);
+        g.getEdgeData(g.addMultiEdge(dst, *src, Galois::MethodFlag::WRITE)) = edge_data_type(0);
         ++numEdges;
       }
     }
 
     // Add edge from source to each node in A
     for (typename NodeList::iterator src = g.A.begin(), esrc = g.A.end(); src != esrc; ++src) {
-      g.getEdgeData(g.addMultiEdge(source, *src, Galois::MethodFlag::WRITE_INTENT)) = edge_data_type();
-      g.getEdgeData(g.addMultiEdge(*src, source, Galois::MethodFlag::WRITE_INTENT)) = edge_data_type(0);
+      g.getEdgeData(g.addMultiEdge(source, *src, Galois::MethodFlag::WRITE)) = edge_data_type();
+      g.getEdgeData(g.addMultiEdge(*src, source, Galois::MethodFlag::WRITE)) = edge_data_type(0);
       ++numEdges;
     }
 
     // Add edge to sink from each node in B
     for (typename NodeList::iterator src = g.B.begin(), esrc = g.B.end(); src != esrc; ++src) {
-      g.getEdgeData(g.addMultiEdge(*src, sink, Galois::MethodFlag::WRITE_INTENT)) = edge_data_type();
-      g.getEdgeData(g.addMultiEdge(sink, *src, Galois::MethodFlag::WRITE_INTENT)) = edge_data_type(0);
+      g.getEdgeData(g.addMultiEdge(*src, sink, Galois::MethodFlag::WRITE)) = edge_data_type();
+      g.getEdgeData(g.addMultiEdge(sink, *src, Galois::MethodFlag::WRITE)) = edge_data_type(0);
       ++numEdges;
     }
 

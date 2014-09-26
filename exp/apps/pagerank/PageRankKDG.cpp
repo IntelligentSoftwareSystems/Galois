@@ -60,14 +60,14 @@ protected:
 
     template <typename C>
     void operator () (GNode src, C&) {
-      graph.getData (src, Galois::MethodFlag::WRITE_INTENT);
+      graph.getData (src, Galois::MethodFlag::WRITE);
 
-      for (auto i = graph.in_edge_begin (src, Galois::MethodFlag::WRITE_INTENT)
-          , end_i = graph.in_edge_end (src, Galois::MethodFlag::WRITE_INTENT); i != end_i; ++i) {
+      for (auto i = graph.in_edge_begin (src, Galois::MethodFlag::WRITE)
+          , end_i = graph.in_edge_end (src, Galois::MethodFlag::WRITE); i != end_i; ++i) {
       }
 
-      // for (auto i = graph.edge_begin (src, Galois::MethodFlag::WRITE_INTENT)
-          // , end_i = graph.edge_end (src, Galois::MethodFlag::WRITE_INTENT); i != end_i; ++i) {
+      // for (auto i = graph.edge_begin (src, Galois::MethodFlag::WRITE)
+          // , end_i = graph.edge_end (src, Galois::MethodFlag::WRITE); i != end_i; ++i) {
       // }
     }
   };

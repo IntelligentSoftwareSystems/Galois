@@ -78,7 +78,7 @@ class DESlevelExec:
     template <typename C>
     void operator () (const Event_ty& event, C& ctx) const {
       GNode n = nodes[event.getRecvObj ()->getID ()];
-      graph.getData (n, Galois::MethodFlag::WRITE_INTENT);
+      graph.getData (n, Galois::MethodFlag::WRITE);
     }
   };
 

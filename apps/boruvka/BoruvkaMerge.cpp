@@ -178,14 +178,14 @@ struct process {
    void operator()(GNode& src, ContextTy& lwl) {
       if (graph.containsNode(src) == false)
          return;
-      graph.getData(src, Galois::MethodFlag::WRITE_INTENT);
+      graph.getData(src, Galois::MethodFlag::WRITE);
       GNode * minNeighbor = 0;
 #if BORUVKA_DEBUG
       std::cout<<"Processing "<<graph.getData(src).toString()<<std::endl;
 #endif
       EdgeDataType minEdgeWeight = std::numeric_limits<EdgeDataType>::max();
       //Acquire locks on neighborhood.
-      for (Graph::edge_iterator dst = graph.edge_begin(src, Galois::MethodFlag::WRITE_INTENT), edst = graph.edge_end(src, Galois::MethodFlag::WRITE_INTENT); dst != edst; ++dst) {
+      for (Graph::edge_iterator dst = graph.edge_begin(src, Galois::MethodFlag::WRITE), edst = graph.edge_end(src, Galois::MethodFlag::WRITE); dst != edst; ++dst) {
          graph.getData(graph.getEdgeDst(dst));
       }
       //Find minimum neighbor
@@ -206,7 +206,7 @@ struct process {
             std::cout << " Min edge from "<<graph.getData(src) << " to "<<graph.getData(*minNeighbor)<<" " <<minEdgeWeight << " "<<std::endl;
 #endif
       //Acquire locks on neighborhood of min neighbor.
-      for (Graph::edge_iterator e_it = graph.edge_begin(*minNeighbor, Galois::MethodFlag::WRITE_INTENT), edst = graph.edge_end(*minNeighbor, Galois::MethodFlag::WRITE_INTENT); e_it != edst; ++e_it) {
+      for (Graph::edge_iterator e_it = graph.edge_begin(*minNeighbor, Galois::MethodFlag::WRITE), edst = graph.edge_end(*minNeighbor, Galois::MethodFlag::WRITE); e_it != edst; ++e_it) {
          graph.getData(graph.getEdgeDst(e_it));
       }
       assert(minEdgeWeight>=0);

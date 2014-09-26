@@ -177,7 +177,7 @@ public:
     }
   }
 
-  node_data_reference getData(GraphNode N, MethodFlag mflag = MethodFlag::WRITE_INTENT) {
+  node_data_reference getData(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     // Galois::Runtime::checkWrite(mflag, false);
     acquireNode(N, mflag);
     return N->getData();
@@ -205,7 +205,7 @@ public:
   const_local_iterator local_begin() const { return const_local_iterator(&nodeData[this->localBegin(numNodes)]); }
   const_local_iterator local_end() const { return const_local_iterator(&nodeData[this->localEnd(numNodes)]); }
 
-  edge_iterator edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::WRITE_INTENT) {
+  edge_iterator edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     acquireNode(N, mflag);
     if (Galois::Runtime::shouldLock(mflag)) {
       for (edge_iterator ii = N->edgeBegin(), ee = N->edgeEnd(); ii != ee; ++ii) {
@@ -215,12 +215,12 @@ public:
     return N->edgeBegin();
   }
 
-  edge_iterator edge_end(GraphNode N, MethodFlag mflag = MethodFlag::WRITE_INTENT) {
+  edge_iterator edge_end(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     acquireNode(N, mflag);
     return N->edgeEnd();
   }
 
-  detail::EdgesIterator<LC_PartitionedInlineEdge_Graph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE_INTENT) {
+  detail::EdgesIterator<LC_PartitionedInlineEdge_Graph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     return detail::EdgesIterator<LC_PartitionedInlineEdge_Graph>(*this, N, mflag);
   }
 

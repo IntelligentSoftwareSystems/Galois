@@ -129,7 +129,7 @@ public:
   //! Push new work 
   template<typename... Args>
   void push(Args&&... args) {
-    // Galois::Runtime::checkWrite(MethodFlag::WRITE_INTENT, true);
+    // Galois::Runtime::checkWrite(MethodFlag::WRITE, true);
     pushBuffer.emplace_back(std::forward<Args>(args)...);
     if (fastPushBack && pushBuffer.size() > fastPushBackLimit)
       fastPushBack(pushBuffer);

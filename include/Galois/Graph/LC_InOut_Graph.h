@@ -151,7 +151,7 @@ public:
     }
   }
 
-  in_edge_iterator in_edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::WRITE_INTENT) {
+  in_edge_iterator in_edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     this->acquireNode(N, mflag);
     if (!asymmetric) {
       if (Galois::Runtime::shouldLock(mflag)) {
@@ -171,7 +171,7 @@ public:
     }
   }
 
-  in_edge_iterator in_edge_end(GraphNode N, MethodFlag mflag = MethodFlag::WRITE_INTENT) {
+  in_edge_iterator in_edge_end(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     this->acquireNode(N, mflag);
     if (!asymmetric) {
       return in_edge_iterator(this->raw_end(N));
@@ -180,7 +180,7 @@ public:
     }
   }
 
-  detail::InEdgesIterator<LC_InOut_Graph> in_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE_INTENT) {
+  detail::InEdgesIterator<LC_InOut_Graph> in_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     return detail::InEdgesIterator<LC_InOut_Graph>(*this, N, mflag);
   }
 
@@ -190,7 +190,7 @@ public:
   template<typename CompTy>
   void sortInEdgesByEdgeData(GraphNode N,
       const CompTy& comp = std::less<typename GraphTy::edge_data_type>(),
-      MethodFlag mflag = MethodFlag::WRITE_INTENT) {
+      MethodFlag mflag = MethodFlag::WRITE) {
     this->acquireNode(N, mflag);
     if (!asymmetric) {
       std::sort(this->edge_sort_begin(N), this->edge_sort_end(N),
@@ -206,7 +206,7 @@ public:
    * Sorts incoming edges of a node. Comparison function is over <code>EdgeSortValue<GraphTy::edge_data_type></code>.
    */
   template<typename CompTy>
-  void sortInEdges(GraphNode N, const CompTy& comp, MethodFlag mflag = MethodFlag::WRITE_INTENT) {
+  void sortInEdges(GraphNode N, const CompTy& comp, MethodFlag mflag = MethodFlag::WRITE) {
     this->acquireNode(N, mflag);
     if (!asymmetric) {
       std::sort(this->edge_sort_begin(N), this->edge_sort_end(N), comp);

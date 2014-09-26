@@ -200,7 +200,7 @@ struct Boruvka {
   std::string name() { return std::string("Boruvka"); }
 
   void expandNeighborhood(Graph& g, const GraphNode& src) {
-    g.edge_begin(src, Galois::MethodFlag::WRITE_INTENT);
+    g.edge_begin(src, Galois::MethodFlag::WRITE);
   }
 
   std::pair<GraphNode, Weight> findMin(Graph& g, const GraphNode& src, Galois::MethodFlag flag) {
@@ -438,7 +438,7 @@ struct BoruvkaUnionFind {
   bool findMin(Graph& g, GraphNode node, const NodesTy& nodes, MinPairTy& minp) const {
     minp.second = std::numeric_limits<Weight>::max();
     
-    GraphNode rep = find(g, node, nodes, Galois::MethodFlag::WRITE_INTENT);
+    GraphNode rep = find(g, node, nodes, Galois::MethodFlag::WRITE);
     //GraphNode rep = compressPath(node, nodes);
     GraphNode cur = rep;
     GraphNode last = cur;
@@ -449,10 +449,10 @@ struct BoruvkaUnionFind {
       bool seen = false;
       Data& curData = g.getData(cur, Galois::MethodFlag::UNPROTECTED);
 
-      for (Graph::edge_iterator ii = g.edge_begin(cur, Galois::MethodFlag::WRITE_INTENT), 
-	     ei = g.edge_end(cur, Galois::MethodFlag::WRITE_INTENT); ii != ei; ++ii) {
+      for (Graph::edge_iterator ii = g.edge_begin(cur, Galois::MethodFlag::WRITE), 
+	     ei = g.edge_end(cur, Galois::MethodFlag::WRITE); ii != ei; ++ii) {
         GraphNode dst = g.getEdgeDst(ii);
-        if (rep == find(g, dst, nodes, Galois::MethodFlag::WRITE_INTENT))
+        if (rep == find(g, dst, nodes, Galois::MethodFlag::WRITE))
         //if (rep == compressPath(*dst, nodes))
           continue;
 
@@ -486,7 +486,7 @@ struct BoruvkaUnionFind {
       cur = nodes[next];
 
       // Check 2nd element in list as well
-      if (!first && minp.second < g.getData(cur, Galois::MethodFlag::WRITE_INTENT).minWeight) {
+      if (!first && minp.second < g.getData(cur, Galois::MethodFlag::WRITE).minWeight) {
         assert(g.getData(cur, Galois::MethodFlag::UNPROTECTED).minWeight != std::numeric_limits<Weight>::max());
         return true;
       }
@@ -602,8 +602,8 @@ void makeGraph(const std::string& in, Graph& g) {
           g.getEdgeData(g.findEdge(gdst, gsrc)) = w;
         }
       } else if (gsrc != gdst) {
-        g.addMultiEdge(gsrc, gdst, Galois::MethodFlag::WRITE_INTENT, w);
-        g.addMultiEdge(gdst, gsrc, Galois::MethodFlag::WRITE_INTENT, w);
+        g.addMultiEdge(gsrc, gdst, Galois::MethodFlag::WRITE, w);
+        g.addMultiEdge(gdst, gsrc, Galois::MethodFlag::WRITE, w);
         numEdges += 2;
       }
     }

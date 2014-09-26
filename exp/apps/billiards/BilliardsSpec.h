@@ -49,12 +49,12 @@ class BilliardsSpec: public Billiards {
 
       const Ball& b1 = e.getBall ();
       assert (b1.getID () < nodes.size ());
-      graph.getData (nodes[b1.getID ()], Galois::MethodFlag::WRITE_INTENT);
+      graph.getData (nodes[b1.getID ()], Galois::MethodFlag::WRITE);
 
       if (e.getKind () == Event::BALL_COLLISION) {
         const Ball& b2 = e.getOtherBall ();
         assert (b2.getID () < nodes.size ());
-        graph.getData (nodes[b2.getID ()], Galois::MethodFlag::WRITE_INTENT);
+        graph.getData (nodes[b2.getID ()], Galois::MethodFlag::WRITE);
       }
 
     }

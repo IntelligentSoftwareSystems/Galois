@@ -395,7 +395,7 @@ class DESorderedHandNB:
       SimObj_ty* recvObj = static_cast<SimObj_ty*> (event.getRecvObj ());
       SimObjInfo& recvInfo = sobjInfoVec[recvObj->getID ()];
 
-      graph.getData (recvInfo.node, Galois::MethodFlag::WRITE_INTENT); 
+      graph.getData (recvInfo.node, Galois::MethodFlag::WRITE); 
 
       if (recvInfo.isReady (event) 
           && recvInfo.isMin (event)) {

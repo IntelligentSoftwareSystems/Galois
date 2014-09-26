@@ -103,7 +103,7 @@ struct Searcher: private boost::noncopyable {
 
       wl.pop_front();
 
-      if (!graph.containsNode(cur, Galois::MethodFlag::WRITE_INTENT))
+      if (!graph.containsNode(cur, Galois::MethodFlag::WRITE))
         continue;
 
       if (marker.hasMark(cur))
@@ -130,8 +130,8 @@ struct Searcher: private boost::noncopyable {
       // Search neighbors (a) when matched and looking for all or (b) when no match and looking
       // for first
       if (matched == all) {
-        for (Graph::edge_iterator ii = graph.edge_begin(cur, Galois::MethodFlag::WRITE_INTENT),
-            ee = graph.edge_end(cur, Galois::MethodFlag::WRITE_INTENT);
+        for (Graph::edge_iterator ii = graph.edge_begin(cur, Galois::MethodFlag::WRITE),
+            ee = graph.edge_end(cur, Galois::MethodFlag::WRITE);
             ii != ee; ++ii) {
           GNode dst = graph.getEdgeDst(ii);
           wl.push_back(std::make_pair(dst, SomeGNode(cur)));

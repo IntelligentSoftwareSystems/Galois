@@ -230,12 +230,13 @@ inline bool shouldLock(const Galois::MethodFlag g) {
   return false;
 #else
   // Mask out additional "optional" flags
-  switch (g) {
+  switch (g & Galois::MethodFlag::INTERNAL_MASK) {
   case MethodFlag::UNPROTECTED:
+  case MethodFlag::PREVIOUS:
     return false;
 
-  case MethodFlag::READ_INTENT:
-  case MethodFlag::WRITE_INTENT:
+  case MethodFlag::READ:
+  case MethodFlag::WRITE:
     return true;
 
   default:
@@ -264,7 +265,7 @@ inline void acquire(Lockable* lockable, Galois::MethodFlag m) {
 
 struct AlwaysLockObj {
   void operator()(Lockable* lockable) const {
-    doAcquire(lockable, Galois::MethodFlag::WRITE_INTENT);
+    doAcquire(lockable, Galois::MethodFlag::WRITE);
   }
 };
 

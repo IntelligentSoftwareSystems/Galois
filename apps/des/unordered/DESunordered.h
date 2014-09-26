@@ -76,12 +76,12 @@ class DESunordered: public DESunorderedBase {
 
     void lockNeighborhood (GNode& activeNode) {
         // acquire locks on neighborhood: one shot
-        graph.getData (activeNode, Galois::MethodFlag::WRITE_INTENT);
+        graph.getData (activeNode, Galois::MethodFlag::WRITE);
 
-        // for (Graph::edge_iterator i = graph.edge_begin (activeNode, Galois::MethodFlag::WRITE_INTENT)
-            // , ei = graph.edge_end (activeNode, Galois::MethodFlag::WRITE_INTENT); i != ei; ++i) {
+        // for (Graph::edge_iterator i = graph.edge_begin (activeNode, Galois::MethodFlag::WRITE)
+            // , ei = graph.edge_end (activeNode, Galois::MethodFlag::WRITE); i != ei; ++i) {
           // GNode dst = graph.getEdgeDst (i);
-          // graph.getData (dst, Galois::MethodFlag::WRITE_INTENT);
+          // graph.getData (dst, Galois::MethodFlag::WRITE);
         // }
 
     }

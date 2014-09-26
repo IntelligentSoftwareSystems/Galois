@@ -144,7 +144,7 @@ public:
     }
   }
 
-  in_edge_iterator in_edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::WRITE_INTENT) {
+  in_edge_iterator in_edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     this->acquireNode(N, mflag);
     if (!asymmetric) {
       if (Galois::Runtime::shouldLock(mflag)) {
@@ -164,7 +164,7 @@ public:
     }
   }
 
-  in_edge_iterator in_edge_end(GraphNode N, MethodFlag mflag = MethodFlag::WRITE_INTENT) {
+  in_edge_iterator in_edge_end(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     this->acquireNode(N, mflag);
     if (!asymmetric) {
       return in_edge_iterator(this->raw_end(N));
@@ -173,7 +173,7 @@ public:
     }
   }
 
-  detail::InEdgesIterator<LC_InOut_Graph> in_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE_INTENT) {
+  detail::InEdgesIterator<LC_InOut_Graph> in_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     return detail::InEdgesIterator<LC_InOut_Graph>(*this, N, mflag);
   }
 

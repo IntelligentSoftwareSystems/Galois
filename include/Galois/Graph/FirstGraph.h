@@ -452,14 +452,14 @@ public:
   /**
    * Adds a node to the graph.
    */
-  void addNode(const GraphNode& n, Galois::MethodFlag mflag = MethodFlag::WRITE_INTENT) {
+  void addNode(const GraphNode& n, Galois::MethodFlag mflag = MethodFlag::WRITE) {
     // Galois::Runtime::checkWrite(mflag, true);
     n->acquire(mflag);
     n->active = true;
   }
 
   //! Gets the node data for a node.
-  node_data_reference getData(const GraphNode& n, Galois::MethodFlag mflag = MethodFlag::WRITE_INTENT) const {
+  node_data_reference getData(const GraphNode& n, Galois::MethodFlag mflag = MethodFlag::WRITE) const {
     assert(n);
     // Galois::Runtime::checkWrite(mflag, false);
     n->acquire(mflag);
@@ -467,7 +467,7 @@ public:
   }
 
   //! Checks if a node is in the graph
-  bool containsNode(const GraphNode& n, Galois::MethodFlag mflag = MethodFlag::WRITE_INTENT) const {
+  bool containsNode(const GraphNode& n, Galois::MethodFlag mflag = MethodFlag::WRITE) const {
     assert(n);
     n->acquire(mflag);
     return n->active;
@@ -478,7 +478,7 @@ public:
    * for undirected graphs or outgoing edges for directed graphs.
    */
   //FIXME: handle edge memory
-  void removeNode(GraphNode n, Galois::MethodFlag mflag = MethodFlag::WRITE_INTENT) {
+  void removeNode(GraphNode n, Galois::MethodFlag mflag = MethodFlag::WRITE) {
     assert(n);
     // Galois::Runtime::checkWrite(mflag, true);
     n->acquire(mflag);
@@ -495,7 +495,7 @@ public:
   /**
    * Resize the edges of the node. For best performance, should be done serially.
    */
-  void resizeEdges(GraphNode src, size_t size, Galois::MethodFlag mflag = MethodFlag::WRITE_INTENT) {
+  void resizeEdges(GraphNode src, size_t size, Galois::MethodFlag mflag = MethodFlag::WRITE) {
     assert(src);
     // Galois::Runtime::checkWrite(mflag, false);
     src->acquire(mflag);
@@ -509,7 +509,7 @@ public:
    * value if desired.  This frees us from dealing with the void edge data
    * problem in this API
    */
-  edge_iterator addEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = MethodFlag::WRITE_INTENT) {
+  edge_iterator addEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = MethodFlag::WRITE) {
     return createEdgeWithReuse(src, dst, mflag);
   }
 
@@ -520,7 +520,7 @@ public:
   }
 
   //! Removes an edge from the graph
-  void removeEdge(GraphNode src, edge_iterator dst, Galois::MethodFlag mflag = MethodFlag::WRITE_INTENT) {
+  void removeEdge(GraphNode src, edge_iterator dst, Galois::MethodFlag mflag = MethodFlag::WRITE) {
     assert(src);
     // Galois::Runtime::checkWrite(mflag, true);
     src->acquire(mflag);
@@ -536,7 +536,7 @@ public:
   }
 
   //! Finds if an edge between src and dst exists
-  edge_iterator findEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = MethodFlag::WRITE_INTENT) {
+  edge_iterator findEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = MethodFlag::WRITE) {
     assert(src);
     assert(dst);
     src->acquire(mflag);
@@ -577,7 +577,7 @@ public:
   //// General Things ////
 
   //! Returns an iterator to the neighbors of a node 
-  edge_iterator edge_begin(GraphNode N, Galois::MethodFlag mflag = MethodFlag::WRITE_INTENT) {
+  edge_iterator edge_begin(GraphNode N, Galois::MethodFlag mflag = MethodFlag::WRITE) {
     assert(N);
     N->acquire(mflag);
 
@@ -591,7 +591,7 @@ public:
   }
 
   //! Returns the end of the neighbor iterator 
-  edge_iterator edge_end(GraphNode N, Galois::MethodFlag mflag = MethodFlag::WRITE_INTENT) {
+  edge_iterator edge_end(GraphNode N, Galois::MethodFlag mflag = MethodFlag::WRITE) {
     assert(N);
     // Acquiring lock is not necessary: no valid use for an end pointer should
     // ever require it
@@ -603,7 +603,7 @@ public:
    * An object with begin() and end() methods to iterate over the outgoing
    * edges of N.
    */
-  detail::EdgesIterator<FirstGraph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE_INTENT) {
+  detail::EdgesIterator<FirstGraph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     return detail::EdgesIterator<FirstGraph>(*this, N, mflag);
   }
 

@@ -119,11 +119,11 @@ class AsyncEngine {
       message_type msg = item.second;
       
       if (needs_gather_in_edges<Operator>::value || needs_scatter_in_edges<Operator>::value) {
-        self->graph.in_edge_begin(node, Galois::MethodFlag::WRITE_INTENT);
+        self->graph.in_edge_begin(node, Galois::MethodFlag::WRITE);
       }
 
       if (needs_gather_out_edges<Operator>::value || needs_scatter_out_edges<Operator>::value) {
-        self->graph.edge_begin(node, Galois::MethodFlag::WRITE_INTENT);
+        self->graph.edge_begin(node, Galois::MethodFlag::WRITE);
       }
 
       op.init(self->graph, node, msg);

@@ -34,7 +34,7 @@ protected:
     if (!used) {
       float v = graph.getData(src).value;
       double sum = 0;
-      for (auto jj : graph.in_edges(src, Galois::MethodFlag::READ_INTENT)) {
+      for (auto jj : graph.in_edges(src, Galois::MethodFlag::READ)) {
         GNode dst = graph.getInEdgeDst(jj);
         auto& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
         sum += ddata.value / ddata.outdegree;

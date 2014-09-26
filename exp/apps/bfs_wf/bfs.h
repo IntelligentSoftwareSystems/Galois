@@ -280,16 +280,16 @@ public:
 
     unsigned numAdds = 0;
 
-    const unsigned srcLevel = graph.getData (src, (doLock ? Galois::MethodFlag::WRITE_INTENT : Galois::MethodFlag::UNPROTECTED));
+    const unsigned srcLevel = graph.getData (src, (doLock ? Galois::MethodFlag::WRITE : Galois::MethodFlag::UNPROTECTED));
 
     // putting a loop to acquire locks. For now, edge_begin does not acquire locks on neighbors,
     // which it should
     if (doLock) {
-      for (typename Graph::edge_iterator ni = graph.edge_begin (src, Galois::MethodFlag::WRITE_INTENT)
-          , eni = graph.edge_end (src, Galois::MethodFlag::WRITE_INTENT); ni != eni; ++ni) {
+      for (typename Graph::edge_iterator ni = graph.edge_begin (src, Galois::MethodFlag::WRITE)
+          , eni = graph.edge_end (src, Galois::MethodFlag::WRITE); ni != eni; ++ni) {
 
         GNode dst = graph.getEdgeDst (ni);
-        graph.getData (dst, Galois::MethodFlag::WRITE_INTENT);
+        graph.getData (dst, Galois::MethodFlag::WRITE);
       }
     }
 

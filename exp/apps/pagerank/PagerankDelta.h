@@ -65,11 +65,11 @@ struct PagerankDelta {
       double sum = 0;
       for (auto jj = graph.in_edge_begin(src, Galois::MethodFlag::UNPROTECTED), ej = graph.in_edge_end(src, Galois::MethodFlag::UNPROTECTED); jj != ej; ++jj) {
         GNode dst = graph.getInEdgeDst(jj);
-        LNode& ddata = graph.getData(dst, Galois::MethodFlag::WRITE_INTENT);
+        LNode& ddata = graph.getData(dst, Galois::MethodFlag::WRITE);
         sum += ddata.value / ddata.nout;
       }
       float value = (1.0 - alpha) * sum + alpha;
-      LNode& sdata = graph.getData(src, Galois::MethodFlag::WRITE_INTENT);
+      LNode& sdata = graph.getData(src, Galois::MethodFlag::WRITE);
       float diff = std::fabs(value - sdata.value);
       if (diff > tolerance) {
         sdata.value = value;
