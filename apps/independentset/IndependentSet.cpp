@@ -192,10 +192,12 @@ struct Process {
       *modp = build<Galois::MethodFlag::WRITE_INTENT>(src);
     } else {
       bool mod = build<Galois::MethodFlag::WRITE_INTENT>(src);
-      if (Version == detPrefix)
+      if (Version == detPrefix) {
         return;
-      else
-        graph.getData(src, Galois::MethodFlag::WRITE); // Failsafe point
+      } else {
+        graph.getData(src, Galois::MethodFlag::WRITE_INTENT);
+        Galois::Runtime::signalFailSafe(); // Failsafe point
+      }
       if (mod)
         modify(src);
     }

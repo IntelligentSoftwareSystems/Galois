@@ -28,7 +28,6 @@
 #include "Galois/Bag.h"
 #include "Galois/Graph/FileGraph.h"
 #include "Galois/Graph/Details.h"
-#include "Galois/Runtime/MethodFlags.h"
 
 #include "llvm/ADT/SmallVector.h"
 
@@ -402,7 +401,7 @@ private:
   edge_iterator createEdgeWithReuse(GraphNode src, GraphNode dst, Galois::MethodFlag mflag, Args&&... args) {
     assert(src);
     assert(dst);
-    Galois::Runtime::checkWrite(mflag, true);
+    // Galois::Runtime::checkWrite(mflag, true);
     src->acquire(mflag);
     typename gNode::iterator ii = src->find(dst);
     if (ii == src->end()) {
@@ -422,7 +421,7 @@ private:
   edge_iterator createEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag, Args&&... args) {
     assert(src);
     assert(dst);
-    Galois::Runtime::checkWrite(mflag, true);
+    // Galois::Runtime::checkWrite(mflag, true);
     src->acquire(mflag);
     typename gNode::iterator ii = src->end();
     if (ii == src->end()) {
@@ -454,7 +453,7 @@ public:
    * Adds a node to the graph.
    */
   void addNode(const GraphNode& n, Galois::MethodFlag mflag = MethodFlag::WRITE_INTENT) {
-    Galois::Runtime::checkWrite(mflag, true);
+    // Galois::Runtime::checkWrite(mflag, true);
     n->acquire(mflag);
     n->active = true;
   }
@@ -462,7 +461,7 @@ public:
   //! Gets the node data for a node.
   node_data_reference getData(const GraphNode& n, Galois::MethodFlag mflag = MethodFlag::WRITE_INTENT) const {
     assert(n);
-    Galois::Runtime::checkWrite(mflag, false);
+    // Galois::Runtime::checkWrite(mflag, false);
     n->acquire(mflag);
     return n->getData();
   }
@@ -481,7 +480,7 @@ public:
   //FIXME: handle edge memory
   void removeNode(GraphNode n, Galois::MethodFlag mflag = MethodFlag::WRITE_INTENT) {
     assert(n);
-    Galois::Runtime::checkWrite(mflag, true);
+    // Galois::Runtime::checkWrite(mflag, true);
     n->acquire(mflag);
     gNode* N = n;
     if (N->active) {
@@ -498,7 +497,7 @@ public:
    */
   void resizeEdges(GraphNode src, size_t size, Galois::MethodFlag mflag = MethodFlag::WRITE_INTENT) {
     assert(src);
-    Galois::Runtime::checkWrite(mflag, false);
+    // Galois::Runtime::checkWrite(mflag, false);
     src->acquire(mflag);
     src->resizeEdges(size);
    }
@@ -523,7 +522,7 @@ public:
   //! Removes an edge from the graph
   void removeEdge(GraphNode src, edge_iterator dst, Galois::MethodFlag mflag = MethodFlag::WRITE_INTENT) {
     assert(src);
-    Galois::Runtime::checkWrite(mflag, true);
+    // Galois::Runtime::checkWrite(mflag, true);
     src->acquire(mflag);
     if (Directional) {
       src->erase(dst.base());
@@ -564,7 +563,7 @@ public:
    */
   edge_data_reference getEdgeData(edge_iterator ii, Galois::MethodFlag mflag = MethodFlag::UNPROTECTED) const {
     assert(ii->first()->active);
-    Galois::Runtime::checkWrite(mflag, false);
+    // Galois::Runtime::checkWrite(mflag, false);
     ii->first()->acquire(mflag);
     return *ii->second();
   }

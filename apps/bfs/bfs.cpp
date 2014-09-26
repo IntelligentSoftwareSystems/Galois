@@ -618,7 +618,8 @@ struct DeterministicAlgo {
       } else {
         typename LocalState::Pending pending(ctx.getPerIterAlloc());
         build(item, &pending);
-        graph.getData(item.first, Galois::MethodFlag::WRITE); // Failsafe point
+        graph.getData(item.first, Galois::MethodFlag::WRITE_INTENT);
+        Galois::Runtime::signalFailSafe();
         modify(item, ctx, &pending);
       }
     }

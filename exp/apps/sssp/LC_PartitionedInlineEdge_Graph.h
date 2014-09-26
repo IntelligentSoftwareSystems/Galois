@@ -29,7 +29,6 @@
 #include "Galois/LargeArray.h"
 #include "Galois/Graph/FileGraph.h"
 #include "Galois/Graph/Details.h"
-#include "Galois/Runtime/MethodFlags.h"
 
 #include <boost/mpl/if.hpp>
 #include <type_traits>
@@ -179,13 +178,13 @@ public:
   }
 
   node_data_reference getData(GraphNode N, MethodFlag mflag = MethodFlag::WRITE_INTENT) {
-    Galois::Runtime::checkWrite(mflag, false);
+    // Galois::Runtime::checkWrite(mflag, false);
     acquireNode(N, mflag);
     return N->getData();
   }
 
   edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::UNPROTECTED) const {
-    Galois::Runtime::checkWrite(mflag, false);
+    // Galois::Runtime::checkWrite(mflag, false);
     return ni->get();
    }
 

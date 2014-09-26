@@ -11,7 +11,6 @@
 #include "Galois/Bag.h"
 #include "Galois/Graph/Details.h"
 #include "Galois/Runtime/Context.h"
-#include "Galois/Runtime/MethodFlags.h"
 
 #include "Galois/gdeque.h"
 
@@ -135,7 +134,7 @@ private:
   edge_iterator createEdgeWithReuse(GraphNode src, GraphNode dst, Galois::MethodFlag mflag, Args&&... args) {
     assert(src);
     assert(dst);
-    Galois::Runtime::checkWrite(mflag, true);
+    // Galois::Runtime::checkWrite(mflag, true);
     Galois::Runtime::acquire(src, mflag);
     typename gNode::iterator ii = src->find(dst);
     if (ii == src->end()) {
@@ -156,7 +155,7 @@ private:
   edge_iterator createEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag, Args&&... args) {
     assert(src);
     assert(dst);
-    Galois::Runtime::checkWrite(mflag, true);
+    // Galois::Runtime::checkWrite(mflag, true);
     Galois::Runtime::acquire(src, mflag);
     typename gNode::iterator ii = src->end();
     if (ii == src->end()) {
@@ -187,14 +186,14 @@ public:
    * Adds a node to the graph.
    */
   void addNode(const GraphNode& n, Galois::MethodFlag mflag = MethodFlag::WRITE_INTENT) {
-    Galois::Runtime::checkWrite(mflag, true);
+    // Galois::Runtime::checkWrite(mflag, true);
     Galois::Runtime::acquire(n, mflag);
   }
 
   //! Gets the node data for a node.
   NodeTy& getData(const GraphNode& n, Galois::MethodFlag mflag = MethodFlag::WRITE_INTENT) const {
     assert(n);
-    Galois::Runtime::checkWrite(mflag, false);
+    // Galois::Runtime::checkWrite(mflag, false);
     Galois::Runtime::acquire(n, mflag);
     return n->data;
   }
@@ -243,7 +242,7 @@ public:
    */
   edge_data_reference getEdgeData(edge_iterator ii, Galois::MethodFlag mflag = MethodFlag::UNPROTECTED) const {
 
-    Galois::Runtime::checkWrite(mflag, false);
+    // Galois::Runtime::checkWrite(mflag, false);
     Galois::Runtime::acquire(ii->first(), mflag);
     return *ii->second();
   }

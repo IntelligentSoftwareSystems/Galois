@@ -278,6 +278,8 @@ struct CheckedLockObj {
 
 void signalConflict(Lockable* = nullptr);
 
+void signalFailSafe(void);
+
 }
 } // end namespace Galois
 

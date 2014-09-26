@@ -28,7 +28,6 @@
 
 #include "Galois/Galois.h"
 #include "Galois/Graph/FileGraph.h"
-#include "Galois/Runtime/MethodFlags.h"
 #include "Galois/Runtime/mm/Mem.h"
 
 #include <iterator>
@@ -115,7 +114,7 @@ public:
   }
 
   NodeTy& getData(GraphNode N, MethodFlag mflag = ALL) {
-    GaloisRuntime::checkWrite(mflag);
+    // GaloisRuntime::checkWrite(mflag);
     NodeInfo& NI = NodeData[N];
     GaloisRuntime::acquire(&NI, mflag);
     return NI.data;
@@ -126,13 +125,13 @@ public:
   }
 
   edge_data_reference getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = ALL) {
-    GaloisRuntime::checkWrite(mflag);
+    // GaloisRuntime::checkWrite(mflag);
     GaloisRuntime::acquire(&NodeData[src], mflag);
     return EdgeData.get(getEdgeIdx(src, dst));
   }
 
   edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::UNPROTECTED) {
-    GaloisRuntime::checkWrite(mflag);
+    // GaloisRuntime::checkWrite(mflag);
     return EdgeData.get(*ni);
   }
 
@@ -274,19 +273,19 @@ public:
   }
 
   NodeTy& getData(GraphNode N, MethodFlag mflag = ALL) {
-    GaloisRuntime::checkWrite(mflag);
+    // GaloisRuntime::checkWrite(mflag);
     GaloisRuntime::acquire(N, mflag);
     return N->data;
   }
   
   edge_data_reference getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = ALL) {
-    GaloisRuntime::checkWrite(mflag);
+    // GaloisRuntime::checkWrite(mflag);
     GaloisRuntime::acquire(src, mflag);
     return EdgeData[getEdgeIdx(src,dst)].getData();
   }
 
   edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::UNPROTECTED) const {
-    GaloisRuntime::checkWrite(mflag);
+    // GaloisRuntime::checkWrite(mflag);
     return ni->getData();
    }
 
@@ -422,19 +421,19 @@ public:
   }
 
   NodeTy& getData(GraphNode N, MethodFlag mflag = ALL) {
-    GaloisRuntime::checkWrite(mflag);
+    // GaloisRuntime::checkWrite(mflag);
     GaloisRuntime::acquire(N, mflag);
     return N->data;
   }
   
   edge_data_reference getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = ALL) {
-    GaloisRuntime::checkWrite(mflag);
+    // GaloisRuntime::checkWrite(mflag);
     GaloisRuntime::acquire(src, mflag);
     return getEdgeIdx(src,dst)->getData();
   }
 
   edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::UNPROTECTED) const {
-    GaloisRuntime::checkWrite(mflag);
+    // GaloisRuntime::checkWrite(mflag);
     return ni->getData();
   }
 
@@ -750,19 +749,19 @@ public:
   }
 
   NodeTy& getData(GraphNode N, MethodFlag mflag = ALL) {
-    GaloisRuntime::checkWrite(mflag);
+    // GaloisRuntime::checkWrite(mflag);
     GaloisRuntime::acquire(N, mflag);
     return N->data;
   }
   
   edge_data_reference getEdgeData(GraphNode src, GraphNode dst, MethodFlag mflag = ALL) {
-    GaloisRuntime::checkWrite(mflag);
+    // GaloisRuntime::checkWrite(mflag);
     GaloisRuntime::acquire(src, mflag);
     return getEdgeIdx(src,dst)->getData();
   }
 
   edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::UNPROTECTED) const {
-    GaloisRuntime::checkWrite(mflag);
+    // GaloisRuntime::checkWrite(mflag);
     return ni->getData();
   }
 

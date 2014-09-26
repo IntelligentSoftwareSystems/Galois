@@ -30,7 +30,6 @@
 #include "Galois/LargeArray.h"
 #include "Galois/Graph/FileGraph.h"
 #include "Galois/Graph/Details.h"
-#include "Galois/Runtime/MethodFlags.h"
 
 #include GALOIS_CXX11_STD_HEADER(type_traits)
 
@@ -159,14 +158,14 @@ protected:
 
 public:
   node_data_reference getData(GraphNode N, MethodFlag mflag = MethodFlag::WRITE_INTENT) {
-    Galois::Runtime::checkWrite(mflag, false);
+    // Galois::Runtime::checkWrite(mflag, false);
     NodeInfo& NI = nodeData[N];
     acquireNode(N, mflag);
     return NI.getData();
   }
 
   edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::UNPROTECTED) {
-    Galois::Runtime::checkWrite(mflag, false);
+    // Galois::Runtime::checkWrite(mflag, false);
     return edgeData[*ni];
   }
 

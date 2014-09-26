@@ -30,7 +30,6 @@
 #include "Galois/LargeArray.h"
 #include "Galois/Graph/FileGraph.h"
 #include "Galois/Graph/Details.h"
-#include "Galois/Runtime/MethodFlags.h"
 
 #include <boost/mpl/if.hpp>
 #include GALOIS_CXX11_STD_HEADER(type_traits)
@@ -159,13 +158,13 @@ public:
   }
 
   node_data_reference getData(const GraphNode& N, MethodFlag mflag = MethodFlag::WRITE_INTENT) {
-    Galois::Runtime::checkWrite(mflag, false);
+    // Galois::Runtime::checkWrite(mflag, false);
     acquireNode(N, mflag);
     return N->getData();
   }
 
   edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::UNPROTECTED) {
-    Galois::Runtime::checkWrite(mflag, false);
+    // Galois::Runtime::checkWrite(mflag, false);
     acquireNode(ni->dst, mflag);
     return ni->get();
   }
@@ -220,7 +219,7 @@ public:
   
   template<typename... Args>
   GraphNode createNode(int nedges, Args&&... args) {
-    Galois::Runtime::checkWrite(MethodFlag::WRITE_INTENT, true);
+    // Galois::Runtime::checkWrite(MethodFlag::WRITE_INTENT, true);
     NodeInfo* N = &nodes.emplace(std::forward<Args>(args)...);
     acquireNode(N, MethodFlag::WRITE_INTENT);
     EdgeHolder*& local_edges = *edges.getLocal();
@@ -252,7 +251,7 @@ public:
 
   template<typename... Args>
   edge_iterator addEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag, Args&&... args) {
-    Galois::Runtime::checkWrite(mflag, true);
+    // Galois::Runtime::checkWrite(mflag, true);
     acquireNode(src, mflag);
     auto it = std::find_if(src->edgeBegin, src->edgeEnd, dst_equals(dst));
     if (it == src->edgeEnd) {
@@ -266,7 +265,7 @@ public:
 
   template<typename... Args>
   edge_iterator addMultiEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag, Args&&... args) {
-    Galois::Runtime::checkWrite(mflag, true);
+    // Galois::Runtime::checkWrite(mflag, true);
     acquireNode(src, mflag);
     auto it = src->edgeEnd;
     it->dst = dst;
@@ -282,7 +281,7 @@ public:
    * Invalidates edge iterator.
    */
   void removeEdge(GraphNode src, edge_iterator dst, Galois::MethodFlag mflag = MethodFlag::WRITE_INTENT) {
-    Galois::Runtime::checkWrite(mflag, true);
+    // Galois::Runtime::checkWrite(mflag, true);
     acquireNode(src, mflag);
     src->edgeEnd--;
     assert(src->edgeBegin <= src->edgeEnd);
@@ -291,7 +290,7 @@ public:
   }
   
   edge_iterator findEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = MethodFlag::WRITE_INTENT) {
-    Galois::Runtime::checkWrite(mflag, true); // TODO: double check 'true' here
+    // Galois::Runtime::checkWrite(mflag, true); // TODO: double check 'true' here
     acquireNode(src, mflag);
     return std::find_if(src->edgeBegin, src->edgeEnd, dst_equals(dst)); 
   }

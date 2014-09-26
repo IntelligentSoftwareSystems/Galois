@@ -30,7 +30,6 @@
 #include "Galois/LazyObject.h"
 #include "Galois/LargeArray.h"
 #include "Galois/Graph/Details.h"
-#include "Galois/Runtime/MethodFlags.h"
 
 #include <boost/iterator/counting_iterator.hpp>
 #include <boost/utility.hpp>
@@ -435,14 +434,14 @@ public:
   iterator end(const segment_type& cur) { return cur.nodeEnd; }
 
   node_data_reference getData(GraphNode N, MethodFlag mflag = MethodFlag::WRITE_INTENT) {
-    Galois::Runtime::checkWrite(mflag, false);
+    // Galois::Runtime::checkWrite(mflag, false);
     NodeInfo& NI = nodeData[N];
     acquireNode(N, mflag);
     return NI.getData();
   }
 
   edge_data_reference getEdgeData(const segment_type& segment, edge_iterator ni, MethodFlag mflag = MethodFlag::UNPROTECTED) {
-    Galois::Runtime::checkWrite(mflag, false);
+    // Galois::Runtime::checkWrite(mflag, false);
     return outGraph.getEdgeData<EdgeTy>(segment.out, ni);
   }
 
@@ -477,7 +476,7 @@ public:
   }
 
   edge_data_reference getInEdgeData(const segment_type& segment, edge_iterator ni, MethodFlag mflag = MethodFlag::UNPROTECTED) {
-    Galois::Runtime::checkWrite(mflag, false);
+    // Galois::Runtime::checkWrite(mflag, false);
     return inGraph->getEdgeData<EdgeTy>(segment.in, ni);
   }
 

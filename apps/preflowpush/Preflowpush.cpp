@@ -305,7 +305,8 @@ struct UpdateHeights {
         if (!used)
           return;
       } else {
-        app.graph.getData(src, Galois::MethodFlag::WRITE);
+        app.graph.getData(src, Galois::MethodFlag::WRITE_INTENT);
+        Galois::Runtime::signalFailSafe();
       }
     }
 
@@ -562,7 +563,8 @@ struct Process {
         if (!used)
           return;
       } else {
-        app.graph.getData(src, Galois::MethodFlag::WRITE);
+        app.graph.getData(src, Galois::MethodFlag::WRITE_INTENT);
+        Galois::Runtime::signalFailSafe();
       }
     }
 

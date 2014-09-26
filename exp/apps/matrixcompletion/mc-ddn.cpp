@@ -538,7 +538,7 @@ private:
 
       // TODO modify edge data to support agnostic edge blocking
       for (int phase = makeSerializable ? 0 : 1; phase < 2; ++phase) {
-        Galois::MethodFlag flag = phase == 0 ? Galois::MethodFlag::ALL : Galois::MethodFlag::UNPROTECTED;
+        Galois::MethodFlag flag = phase == 0 ? Galois::MethodFlag::WRITE_INTENT : Galois::MethodFlag::UNPROTECTED;
         for (auto ii = task.start1; ii != task.end1; ++ii) {
           Node& nn = g.getData(*ii, phase == 0 ? flag : Galois::MethodFlag::UNPROTECTED);
           if (deleted(nn))

@@ -18,7 +18,7 @@
 /*  Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA            */
 /**********************************************************************************************/
 
-#define BOTS_PARAM_TYPE_MethodFlag::UNPROTECTED 0
+#define BOTS_PARAM_TYPE_NONE 0
 #define BOTS_PARAM_TYPE_INT 1
 #define BOTS_PARAM_TYPE_BOOL 2
 #define BOTS_PARAM_TYPE_STR 3

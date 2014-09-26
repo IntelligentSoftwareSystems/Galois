@@ -24,7 +24,6 @@
  */
 #include "Galois/config.h"
 #include "Galois/Runtime/Context.h"
-#include "Galois/Runtime/MethodFlags.h"
 #include "Galois/Runtime/ll/SimpleLock.h"
 #include "Galois/Runtime/ll/CacheLineStorage.h"
 
@@ -78,7 +77,7 @@ Galois::Runtime::PendingFlag Galois::Runtime::getPending() {
   return pendingStatus.flag.get();
 }
 
-void Galois::Runtime::doCheckWrite() {
+void Galois::Runtime::signalFailSafe(void) {
   if (Galois::Runtime::getPending() == Galois::Runtime::PENDING) {
 #ifdef GALOIS_USE_LONGJMP
     if (releasableHead) releasableHead->releaseAll();
