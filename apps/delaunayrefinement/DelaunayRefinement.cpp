@@ -111,6 +111,7 @@ struct Process {
       cav.computePost();
       if (Version == detPrefix)
         return;
+      Galois::Runtime::signalFailSafe();
       cav.update(item, ctx);
     }
   }
