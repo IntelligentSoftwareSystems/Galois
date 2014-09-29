@@ -50,6 +50,7 @@
 #include "PageRankAsyncResidual.h"
 #include "PageRankAsyncPri.h"
 #include "PageRankAsyncPriSet.h"
+#include "PageRankEdge.h"
 
 namespace cll = llvm::cl;
 
@@ -70,6 +71,7 @@ enum Algo {
   async_rsd,
   async_prt,
   async_prs,
+  async_edge,
   async_ppr_rsd
 };
 
@@ -92,6 +94,7 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
       clEnumValN(Algo::async_rsd, "async_rsd", "Residual-based asynchronous version..."),
       clEnumValN(Algo::async_prt, "async_prt", "Prioritized (degree biased residual) version..."),
       clEnumValN(Algo::async_prs, "async_prs", "Prioritized Bulk Sync version..."),
+      clEnumValN(Algo::async_edge, "async_edge", "Edge based"),
       clEnumValN(Algo::async_ppr_rsd, "async_ppr_rsd", "Asyncronous PPR"),
 #ifdef GALOIS_USE_EXP
       clEnumValN(Algo::graphlab, "graphlab", "Use GraphLab programming model"),
@@ -1135,6 +1138,7 @@ int main(int argc, char **argv) {
     case Algo::async_rsd: run<AsyncRsd>(); break;
     case Algo::async_prt: run<AsyncPri>(); break;
     case Algo::async_prs: run<AsyncPriSet>(); break;
+    case Algo::async_edge: run<AsyncEdge>(); break;
     case Algo::async_ppr_rsd: runPPR<PPRAsyncRsd>(); break;
     default: std::cerr << "Unknown algorithm\n"; abort();
   }

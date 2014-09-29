@@ -68,8 +68,10 @@ struct AsyncPriSet{
       if ( sdata.residual / resScale < limit) {
         nextWL.push(src);
         double R = sdata.residual;
-        R /= resScale;
-        stats.getLocal()->insert(std::max(0.0, R));
+        //        if (R > tolerance) {
+          R /= resScale;
+          stats.getLocal()->insert(std::max(0.0, R));
+          //        }
         return;
       }
 
@@ -77,32 +79,29 @@ struct AsyncPriSet{
 
       // the node is processed
       sdata.inWL = 0;
-      PRTy oldResidual = sdata.residual;
+      PRTy oldResidual = sdata.residual.exchange(0.0);
       PRTy pr = computePageRankInOut(graph, src, 0, lockflag);
       PRTy diff = std::fabs(pr - sdata.value);
-
-      if (diff > tolerance) {
-        atomicAdd(sdata.residual, -oldResidual);
-        sdata.value = pr;
-
-        auto src_nout = nout(graph, src, Galois::MethodFlag::NONE);
-        // for each out-going neighbors
-        for (auto jj = graph.edge_begin(src, lockflag), ej = graph.edge_end(src, lockflag);
-             jj != ej; ++jj) {
-          GNode dst = graph.getEdgeDst(jj);
-	  LNode& ddata = graph.getData(dst, lockflag);
-          PRTy delta = diff*alpha/src_nout;
-          PRTy old = atomicAdd(ddata.residual, delta);
-	  // if the node is not in the worklist and the residual is greater than tolerance
-	  if (old + delta > tolerance && !ddata.inWL) {
-            if (0 ==ddata.inWL.exchange(1))
-              nextWL.push(dst);
-          }
+      sdata.value = pr;
+      auto src_nout = nout(graph, src, Galois::MethodFlag::NONE);
+      PRTy delta = diff*alpha/src_nout;
+      // for each out-going neighbors
+      for (auto jj = graph.edge_begin(src, lockflag), ej = graph.edge_end(src, lockflag);
+           jj != ej; ++jj) {
+        GNode dst = graph.getEdgeDst(jj);
+        LNode& ddata = graph.getData(dst, lockflag);
+        PRTy old = atomicAdd(ddata.residual, delta);
+        // if the node is not in the worklist and the residual is greater than tolerance
+        if (old + delta > tolerance && !ddata.inWL) {
+          if (0 ==ddata.inWL.exchange(1))
+            nextWL.push(dst);
         }
       }
       double R = sdata.residual;
-      R /= resScale;
-      stats.getLocal()->insert(std::max(0.0, R)); // not strictly true
+      //      if (R > tolerance) {
+        R /= resScale;
+        stats.getLocal()->insert(std::max(0.0, R)); // not strictly true
+        //      }
     }
   };
 
