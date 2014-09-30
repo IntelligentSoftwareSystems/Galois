@@ -48,6 +48,8 @@
 //#include "Galois/Runtime/ll/PthreadLock.h"
 #include "Galois/Runtime/mm/Mem.h"
 
+#include <atomic>
+
 namespace Galois {
 namespace Runtime {
 
@@ -96,7 +98,7 @@ class ROBcontext: public SimpleRuntimeContext {
 
 public:
 
-  enum State {
+  enum class State: int {
     UNSCHEDULED,
     SCHEDULED,
     READY_TO_COMMIT,
@@ -110,7 +112,8 @@ public:
 
   // TODO: privatize
 public:
-  GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE Galois::GAtomic<State> state;
+  // GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE Galois::GAtomic<State> state;
+  GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE std::atomic<State> state;
   T active;
   Exec& executor;
 
@@ -132,7 +135,7 @@ public:
   explicit ROBcontext (const T& x, Exec& e)
     : 
       Base (true), 
-      state (UNSCHEDULED), 
+      state (State::UNSCHEDULED), 
       active (x), 
       executor (e), 
       lostConflict (false),
@@ -150,7 +153,8 @@ public:
   }
 
   bool casState (State s_old, State s_new) { 
-    return state.cas (s_old, s_new);
+    // return state.cas (s_old, s_new);
+    return state.compare_exchange_strong (s_old, s_new);
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE 
@@ -198,7 +202,7 @@ public:
 
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void doCommit () {
-    assert (hasState (COMMITTING));
+    assert (hasState (State::COMMITTING));
     // release locks
     // add new elements to worklist
 
@@ -211,11 +215,11 @@ public:
 
     LL::compilerBarrier ();
 
-    setState (COMMIT_DONE);
+    setState (State::COMMIT_DONE);
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void doAbort () {
-    assert (hasState (ABORTING));
+    assert (hasState (State::ABORTING));
     // perform undo actions in reverse order
     // release locks
     // add active element to worklist
@@ -227,7 +231,7 @@ public:
 
     LL::compilerBarrier ();
 
-    setState (ABORT_DONE);
+    setState (State::ABORT_DONE);
 
   }
 
@@ -269,25 +273,25 @@ private:
     
     if (executor.getCtxtCmp () (this, that)) {
 
-      assert (!that->hasState (COMMIT_DONE) && !that->hasState (COMMITTING));
+      assert (!that->hasState (State::COMMIT_DONE) && !that->hasState (State::COMMITTING));
       // abort that
-      if (that->hasState (ABORT_DONE)) {
+      if (that->hasState (State::ABORT_DONE)) {
         // do nothing
 
-      } else if (that->casState (SCHEDULED, ABORT_SELF) || that->hasState (ABORT_SELF)) {
+      } else if (that->casState (State::SCHEDULED, State::ABORT_SELF) || that->hasState (State::ABORT_SELF)) {
         // signalled successfully
         // now wait for it to abort or abort yourself if 'that' missed the signal 
         // and completed execution
         dbg::debug ( this, " signalled ", that, " to ABORT_SELF on lock ", l);
         while (true) {
 
-          if (that->hasState (ABORT_DONE)) {
+          if (that->hasState (State::ABORT_DONE)) {
             break;
           }
 
           if (that->hasExecuted ()) {
-            if (that->casState (ABORT_SELF, ABORT_HELP)) {
-              that->setState (ABORTING);
+            if (that->casState (State::ABORT_SELF, State::ABORT_HELP)) {
+              that->setState (State::ABORTING);
               that->doAbort ();
               executor.abortByOther += 1;
               dbg::debug (this, " aborting ABORT_SELF->ABORT_HELP missed signal ", that, " on lock ", l);
@@ -298,8 +302,8 @@ private:
           LL::asmPause ();
         }
 
-      } else if (that->casState (READY_TO_COMMIT, ABORT_HELP)) {
-        that->setState (ABORTING);
+      } else if (that->casState (State::READY_TO_COMMIT, State::ABORT_HELP)) {
+        that->setState (State::ABORTING);
         that->doAbort ();
         executor.abortByOther += 1;
         dbg::debug (this, " aborting RTC->ABORT_HELP ", that, " on lock ", l);
@@ -307,7 +311,7 @@ private:
 
     } else { 
       // abort self
-      this->setState (ABORT_SELF);
+      this->setState (State::ABORT_SELF);
       dbg::debug (this, " losing conflict with ", that, " on lock ", l);
       ret = true;
     }
@@ -420,7 +424,7 @@ public:
             Ctxt* ctx = ctxtAlloc.allocate (1);
             assert (ctx != nullptr);
             ctxtAlloc.construct (ctx, dummy, *this);
-            ctx->setState (Ctxt::SCHEDULED);
+            ctx->setState (Ctxt::State::SCHEDULED);
 
             freeList[tid].push_back (ctx);
           }
@@ -431,7 +435,7 @@ public:
         // Ctxt* ctx = ctxtAlloc.allocate (1);
         // assert (ctx != nullptr);
         // ctxtAlloc.construct (ctx, dummy, *this);
-        // ctx->setState (Ctxt::SCHEDULED);
+        // ctx->setState (Ctxt::State::SCHEDULED);
 // 
         // freeList[i].push_back (ctx);
       // }
@@ -477,8 +481,8 @@ public:
 
           applyOperator (ctx);
 
-          if (!ctx->casState (Ctxt::SCHEDULED, Ctxt::READY_TO_COMMIT)) {
-            if (ctx->casState (Ctxt::ABORT_SELF, Ctxt::ABORTING)) {
+          if (!ctx->casState (Ctxt::State::SCHEDULED, Ctxt::State::READY_TO_COMMIT)) {
+            if (ctx->casState (Ctxt::State::ABORT_SELF, Ctxt::State::ABORTING)) {
 
               if (ctx->lostConflict) {
                 abortSelfByConflict += 1;
@@ -562,7 +566,7 @@ private:
     Galois::Runtime::setThreadContext (ctx);
     nhFunc (ctx->active, ctx->userHandle);
 
-    if (ctx->hasState (Ctxt::SCHEDULED)) {
+    if (ctx->hasState (Ctxt::State::SCHEDULED)) {
       opFunc (ctx->active, ctx->userHandle);
     }
     Galois::Runtime::setThreadContext (nullptr);
@@ -609,7 +613,7 @@ private:
               ctx->~Ctxt (); // destroy here only
               new (ctx) Ctxt (pending[minTID].pop (), *this);
 
-              ctx->setState (Ctxt::SCHEDULED);
+              ctx->setState (Ctxt::State::SCHEDULED);
               ctx->owner = LL::getTID ();
               rob.push (ctx);
               numTotal += 1;
@@ -653,7 +657,7 @@ private:
                 ctx->~Ctxt (); // destroy here only
                 new (ctx) Ctxt (pending[tid].pop (), *this);
 
-                ctx->setState (Ctxt::SCHEDULED);
+                ctx->setState (Ctxt::State::SCHEDULED);
                 ctx->owner = LL::getTID ();
                 rob.push (ctx);
                 numTotal += 1;
@@ -702,17 +706,17 @@ private:
 
         Ctxt* head = rob.top ();
 
-        if (head->hasState (Ctxt::ABORT_DONE)) {
+        if (head->hasState (Ctxt::State::ABORT_DONE)) {
           // ctxtDelQ.get ().push_back (rob.pop ());
           reclaim (rob.pop ());
           didWork = true;
           continue;
 
-        }  else if (head->hasState (Ctxt::READY_TO_COMMIT)) {
+        }  else if (head->hasState (Ctxt::State::READY_TO_COMMIT)) {
 
           if (isEarliest (head->active)) {
 
-            head->setState (Ctxt::COMMITTING);
+            head->setState (Ctxt::State::COMMITTING);
             head->doCommit ();
 
             Ctxt* t = rob.pop ();
@@ -765,7 +769,7 @@ private:
     while (!rob.empty ()) {
       Ctxt* ctx = rob.pop ();
 
-      if (ctx->hasState (Ctxt::ABORT_DONE)) {
+      if (ctx->hasState (Ctxt::State::ABORT_DONE)) {
         reclaim (ctx);
 
       } else {
@@ -886,12 +890,12 @@ private:
     // that can be in READY_TO_COMMIT only
     // return true if this aborts self
 
-    assert (this->hasState (Base::SCHEDULED) || this->hasState (Base::ABORT_SELF));
-    assert (that->hasState (Base::READY_TO_COMMIT));
+    assert (this->hasState (Base::State::SCHEDULED) || this->hasState (Base::State::ABORT_SELF));
+    assert (that->hasState (Base::State::READY_TO_COMMIT));
     
     bool ret = false;
     if (Base::executor.getCtxtCmp () (this, that)) {
-      assert (that->hasState (Base::READY_TO_COMMIT));
+      assert (that->hasState (Base::State::READY_TO_COMMIT));
       that->doAbort ();
       dbg::debug (this, " aborting ", that, " on lock ", l);
 
@@ -982,18 +986,18 @@ public:
         Galois::Runtime::setThreadContext (ctx);
         nhFunc (ctx->active, ctx->userHandle);
 
-        if (ctx->hasState (Ctxt::SCHEDULED)) {
+        if (ctx->hasState (Ctxt::State::SCHEDULED)) {
           opFunc (ctx->active, ctx->userHandle);
         }
         Galois::Runtime::setThreadContext (nullptr);
 
-        if (ctx->hasState (Ctxt::SCHEDULED)) {
-          ctx->setState (Ctxt::READY_TO_COMMIT);
+        if (ctx->hasState (Ctxt::State::SCHEDULED)) {
+          ctx->setState (Ctxt::State::READY_TO_COMMIT);
           rob.push (ctx);
 
         } else {
-          assert (ctx->hasState (Ctxt::ABORT_SELF));
-          ctx->setState (Ctxt::ABORTING);
+          assert (ctx->hasState (Ctxt::State::ABORT_SELF));
+          ctx->setState (Ctxt::State::ABORTING);
           ctx->doAbort ();
           nextPending->push (ctx->item);
         }
@@ -1017,7 +1021,7 @@ private:
     assert (steps > 0);
     ctxtAlloc.construct (ctx, currPending->pop (), *this, (steps-1));
 
-    ctx->setState (Ctxt::SCHEDULED);
+    ctx->setState (Ctxt::State::SCHEDULED);
 
     return ctx;
   }
@@ -1029,11 +1033,11 @@ private:
     while (!rob.empty ()) {
       Ctxt* head = rob.top ();
 
-      if (head->hasState (Ctxt::ABORT_DONE)) {
+      if (head->hasState (Ctxt::State::ABORT_DONE)) {
         rob.pop ();
         continue;
 
-      } else if (head->hasState (Ctxt::READY_TO_COMMIT)) {
+      } else if (head->hasState (Ctxt::State::READY_TO_COMMIT)) {
         assert (currPending->empty ());
 
         bool earliest = false;
@@ -1045,7 +1049,7 @@ private:
         }
 
         if (earliest) {
-          head->setState (COMMITTING);
+          head->setState (Ctxt::State::COMMITTING);
           head->doCommit ();
           Ctxt* t = rob.pop ();
           assert (t == head);
