@@ -18,7 +18,7 @@ struct Matching {
   Graph& graph;
   Galois::GAccumulator<int>& size;
 
-  void operator()(GNode x, Galois::UserContext<GNode>&) const {
+  void operator()(GNode x, Galois::UserContext<GNode>& ctx) const {
     for (auto edge : graph.out_edges(x)) {
       GNode dst = graph.getEdgeDst(edge);
       if (graph.getData(dst) != 0)
@@ -26,7 +26,7 @@ struct Matching {
     }
 
     graph.getData(x, Galois::MethodFlag::WRITE); 
-    Galois::Runtime::signalFailSafe();
+    ctx.cautiousPoint();
     
     graph.getData(x, Galois::MethodFlag::WRITE) = 1;
     for (auto edge : graph.out_edges(x)) {

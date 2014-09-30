@@ -47,8 +47,6 @@ public:
 
   void setFirstPass (void) { SuperTy::__setFirstPass(); }
   void resetFirstPass (void) { SuperTy::__resetFirstPass(); }
-  void doSignalFailSafe (void) { SuperTy::__doSignalFailSafe(); }
-  void dontSignalFailSafe (void) { SuperTy::__dontSignalFailSafe(); }
 
 // TODO: move to a separate class dedicated for speculative executors
 #ifdef GALOIS_USE_EXP

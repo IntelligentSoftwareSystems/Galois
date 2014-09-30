@@ -581,7 +581,7 @@ struct DetBarrierAlgo {
       typename LocalState::Pending pending(ctx.getPerIterAlloc());
       build(item, &pending);
       graph.getData(item.first, Galois::MethodFlag::WRITE);
-      Galois::Runtime::signalFailSafe(); // Failsafe point
+      ctx.cautiousPoint(); // Failsafe point
       modify(item, ctx, &pending);
     }
   }

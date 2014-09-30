@@ -256,7 +256,7 @@ struct Process {
       cav.build();
       if (Version == detPrefix)
         return;
-      Galois::Runtime::signalFailSafe();
+      ctx.cautiousPoint();
       cav.update();
     }
   }

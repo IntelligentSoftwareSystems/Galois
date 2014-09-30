@@ -94,8 +94,31 @@ public:
 template<typename OptionsTy>
 using DItem = DItemBase<typename OptionsTy::value_type, OptionsTy::useLocalState>;
 
+class FirstPassBase: public SimpleRuntimeContext {
+protected:
+  bool firstPassFlag;
+
+public:
+  explicit FirstPassBase (bool f = true): SimpleRuntimeContext (true), firstPassFlag (f) {}
+
+  bool isFirstPass (void) const { return firstPassFlag; }
+
+  void setFirstPass (void) { firstPassFlag = true; }
+
+  void resetFirstPass (void) { firstPassFlag = false; }
+
+  virtual void alwaysAcquire (Lockable*, Galois::MethodFlag) = 0;
+
+  virtual void subAcquire (Lockable* lockable, Galois::MethodFlag f) {
+    if (isFirstPass()) {
+      alwaysAcquire(lockable, f);
+    }
+  }
+
+};
+
 template<typename OptionsTy, bool HasFixedNeighborhood, bool HasIntentToRead>
-class DeterministicContextBase: public SimpleRuntimeContext {
+class DeterministicContextBase: public FirstPassBase {
 public:
   typedef DItem<OptionsTy> Item;
   Item item;
@@ -104,13 +127,13 @@ private:
   bool notReady;
 
 public:
-  DeterministicContextBase(const Item& _item): SimpleRuntimeContext(true), item(_item), notReady(false) { }
+  DeterministicContextBase(const Item& _item): FirstPassBase (true), item(_item), notReady(false) { }
 
   void clear() { }
 
   bool isReady() { return !notReady; }
 
-  virtual void subAcquire(Lockable* lockable, Galois::MethodFlag) { 
+  virtual void alwaysAcquire(Lockable* lockable, Galois::MethodFlag) { 
 
     if (this->tryLock(lockable))
       this->addToNhood(lockable);
@@ -140,14 +163,14 @@ public:
   static void initialize() { }
 };
 
-class HasIntentToReadContext: public SimpleRuntimeContext {
+class HasIntentToReadContext: public FirstPassBase {
 public:
   unsigned long id;
   bool notReady;
   bool isWriter;
 
   HasIntentToReadContext(unsigned long id, bool w):
-    SimpleRuntimeContext(true), id(id), notReady(false), isWriter(w) { }
+    FirstPassBase (true), id(id), notReady(false), isWriter(w) { }
 
   bool isReady() { return !notReady; }
 };
@@ -172,10 +195,14 @@ public:
   bool propagate() {
     return this->find()->isReady();
   }
+
+  virtual void alwaysAcquire (Lockable*, Galois::MethodFlag) {
+    GALOIS_DIE("shouldn't reach here");
+  }
 };
 
 template<typename OptionsTy>
-class DeterministicContextBase<OptionsTy, false, true>: public HasIntentToReadContext {
+class DeterministicContextBase<OptionsTy, false, true>: public HasIntentToReadContext, public FirstPassBase {
 public:
   typedef DItem<OptionsTy> Item;
   Item item;
@@ -237,7 +264,7 @@ private:
 
 public:
   DeterministicContextBase(const Item& i):
-    HasIntentToReadContext(i.id, true), item(i), readerCtx(i.id) { }
+    HasIntentToReadContext(i.id, true), FirstPassBase (true), item(i), readerCtx(i.id) { }
 
   void clear() { }
 
@@ -250,7 +277,7 @@ public:
       this->notReady = true;
   }
 
-  virtual void subAcquire(Lockable* lockable, Galois::MethodFlag m) { 
+  virtual void alwaysAcquire(Lockable* lockable, Galois::MethodFlag m) { 
     assert (m == MethodFlag::READ || m == MethodFlag::WRITE);
 
     if (this->tryLock(lockable))
@@ -268,7 +295,7 @@ public:
 };
 
 template<typename OptionsTy>
-class DeterministicContextBase<OptionsTy, true, false>: public SimpleRuntimeContext {
+class DeterministicContextBase<OptionsTy, true, false>: public FirstPassBase {
 public:
   typedef DItem<OptionsTy> Item;
   typedef Galois::concurrent_gslist<DeterministicContextBase*,8> ContextList;
@@ -287,7 +314,7 @@ public:
   };
 
 public:
-  DeterministicContextBase(const Item& _item): SimpleRuntimeContext(true), item(_item), preds(0) { }
+  DeterministicContextBase(const Item& _item): FirstPassBase(true), item(_item), preds(0) { }
 
   void clear() {
     assert(preds == 0);
@@ -304,7 +331,7 @@ public:
 
   bool isReady() { return false; }
 
-  virtual void subAcquire(Lockable* lockable, Galois::MethodFlag) {
+  virtual void alwaysAcquire (Lockable* lockable, Galois::MethodFlag) {
 
     // First to lock becomes representative
     DeterministicContextBase* owner = static_cast<DeterministicContextBase*>(this->getOwner(lockable));
@@ -1441,6 +1468,7 @@ bool Executor<OptionsTy>::pendingLoop(ThreadLocalData& tld)
     bool commit = true;
 
     ctx->startIteration();
+    ctx->setFirstPass();
     tld.stat.inc_iterations();
     tld.facing.setFirstPass();
     setThreadContext(ctx);
@@ -1460,6 +1488,7 @@ bool Executor<OptionsTy>::pendingLoop(ThreadLocalData& tld)
 #endif
     clearReleasable();
     tld.facing.resetFirstPass();
+    ctx->resetFirstPass();
     switch (result) {
       case 0: 
       case REACHED_FAILSAFE: break;
@@ -1487,6 +1516,7 @@ bool Executor<OptionsTy>::executeTask(ThreadLocalData& tld, Context* ctx)
   setThreadContext(ctx);
   this->restoreLocalState(tld.facing, ctx->item);
   tld.facing.resetFirstPass();
+  ctx->resetFirstPass();
   int result = 0;
 #ifdef GALOIS_USE_LONGJMP
   if ((result = setjmp(hackjmp)) == 0) {

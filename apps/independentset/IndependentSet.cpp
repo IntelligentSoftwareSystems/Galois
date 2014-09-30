@@ -196,7 +196,7 @@ struct Process {
         return;
       } else {
         graph.getData(src, Galois::MethodFlag::WRITE);
-        Galois::Runtime::signalFailSafe(); // Failsafe point
+        ctx.cautiousPoint(); // Failsafe point
       }
       if (mod)
         modify(src);

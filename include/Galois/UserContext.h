@@ -64,7 +64,6 @@ protected:
 
   //! some flags used by deterministic
   bool firstPassFlag = false;
-  bool signalFailSafeFlag = false;
   void* localState = nullptr;
   bool localStateUsed = false;
 
@@ -78,14 +77,6 @@ protected:
 
   void __resetFirstPass (void) {
     firstPassFlag = false;
-  }
-
-  void __doSignalFailSafe (void) {
-    signalFailSafeFlag = true;
-  }
-
-  void __dontSignalFailSafe (void) {
-    signalFailSafeFlag = false;
   }
 
 #ifdef GALOIS_USE_EXP
@@ -172,20 +163,20 @@ public:
   }
 #endif 
 
-  //! declare that the operator has crossed the cautious point.  This
-  //! implies all data has been touched thus no new locks will be
-  //! acquired.
-  void cautiousPoint() {
-    if (signalFailSafeFlag) {
-      Galois::Runtime::signalFailSafe();
-    }
-  }
-
   //! used by deterministic and ordered
   //! @returns true when the operator is invoked for the first time. The operator
   //! can use this information and choose to expand the neighborhood only in the first pass. 
   bool isFirstPass (void) const { 
     return firstPassFlag;
+  }
+
+  //! declare that the operator has crossed the cautious point.  This
+  //! implies all data has been touched thus no new locks will be
+  //! acquired.
+  void cautiousPoint() {
+    if (isFirstPass()) {
+      Galois::Runtime::signalFailSafe();
+    }
   }
 
 };
