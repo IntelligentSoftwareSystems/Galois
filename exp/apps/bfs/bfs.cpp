@@ -567,15 +567,14 @@ struct DetBarrierAlgo {
   void operator()(const ItemTy& item, Galois::UserContext<ItemTy>& ctx) const {
     typename LocalState::Pending* ppending;
     if (Version == detDisjoint) {
-      bool used;
-      LocalState* localState = (LocalState*) ctx.getLocalState(used);
+      LocalState* localState = (LocalState*) ctx.getLocalState();
       ppending = &localState->pending;
-      if (used) {
+      if (!ctx.isFirstPass()) {
         modify(item, ctx, ppending);
         return;
       }
     }
-    if (Version == detDisjoint) {
+    if (Version == detDisjoint && ctx.isFirstPass()) {
       build(item, ppending);
     } else {
       typename LocalState::Pending pending(ctx.getPerIterAlloc());

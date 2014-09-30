@@ -283,12 +283,8 @@ struct UpdateHeights {
    */
   void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) {
     if (version != nondet) {
-      bool used = false;
-      if (version == detDisjoint) {
-        ctx.getLocalState(used);
-      }
 
-      if (!used) {
+      if (ctx.isFirstPass()) {
         for (Graph::edge_iterator
             ii = app.graph.edge_begin(src, Galois::MethodFlag::WRITE),
             ee = app.graph.edge_end(src, Galois::MethodFlag::WRITE);
@@ -301,8 +297,7 @@ struct UpdateHeights {
         }
       }
 
-      if (version == detDisjoint) {
-        if (!used)
+      if (version == detDisjoint && ctx.isFirstPass()) {
           return;
       } else {
         app.graph.getData(src, Galois::MethodFlag::WRITE);
@@ -552,15 +547,10 @@ struct Process {
 
   void operator()(GNode& src, Galois::UserContext<GNode>& ctx) {
     if (version != nondet) {
-      bool used = false;
-      if (version == detDisjoint) {
-        ctx.getLocalState(used);
-      }
-      if (!used) {
+      if (ctx.isFirstPass()) {
         acquire(src);
       }
-      if (version == detDisjoint) {
-        if (!used)
+      if (version == detDisjoint && ctx.isFirstPass()) {
           return;
       } else {
         app.graph.getData(src, Galois::MethodFlag::WRITE);

@@ -65,7 +65,6 @@ protected:
   //! some flags used by deterministic
   bool firstPassFlag = false;
   void* localState = nullptr;
-  bool localStateUsed = false;
 
   void __resetAlloc() {
     IterationAllocatorBase.clear();
@@ -110,9 +109,8 @@ protected:
     pushBuffer.clear();
   }
 
-  void __setLocalState(void *p, bool used) {
+  void __setLocalState(void *p) {
     localState = p;
-    localStateUsed = used;
   }
 
   void __setFastPushBack(FastPushBack f) {
@@ -151,7 +149,7 @@ public:
   void abort() { Galois::Runtime::signalConflict(); }
 
   //! Store and retrieve local state for deterministic
-  void* getLocalState(bool& used) { used = localStateUsed; return localState; }
+  void* getLocalState(void) { return localState; }
  
 #ifdef GALOIS_USE_EXP
   void addUndoAction(const Closure& f) {

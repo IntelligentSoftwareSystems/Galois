@@ -605,15 +605,14 @@ struct DeterministicAlgo {
     void operator()(const WorkItem& item, Galois::UserContext<WorkItem>& ctx) const {
       typename LocalState::Pending* ppending;
       if (Version == DetAlgo::disjoint) {
-        bool used;
-        LocalState* localState = (LocalState*) ctx.getLocalState(used);
+        LocalState* localState = (LocalState*) ctx.getLocalState();
         ppending = &localState->pending;
-        if (used) {
+        if (!ctx.isFirstPass()) {
           modify(item, ctx, ppending);
           return;
         }
       }
-      if (Version == DetAlgo::disjoint) {
+      if (Version == DetAlgo::disjoint && ctx.isFirstPass()) {
         build(item, ppending);
       } else {
         typename LocalState::Pending pending(ctx.getPerIterAlloc());

@@ -41,7 +41,7 @@ public:
   PushBufferTy& getPushBuffer() { return SuperTy::__getPushBuffer(); }
   void resetPushBuffer() { SuperTy::__resetPushBuffer(); }
   SuperTy& data() { return *static_cast<SuperTy*>(this); }
-  void setLocalState(void *p, bool used) { SuperTy::__setLocalState(p, used); }
+  void setLocalState(void *p) { SuperTy::__setLocalState(p); }
   void setFastPushBack(FastPushBack f) { SuperTy::__setFastPushBack(f); }
   void setBreakFlag(bool *b) { SuperTy::didBreak = b; }
 

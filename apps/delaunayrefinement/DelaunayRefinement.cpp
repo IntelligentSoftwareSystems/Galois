@@ -85,23 +85,19 @@ struct Process {
     if (!graph->containsNode(item, Galois::MethodFlag::WRITE))
       return;
     
-    Cavity* cavp = NULL;
-
     if (Version == detDisjoint) {
-      bool used;
-      LocalState* localState = (LocalState*) ctx.getLocalState(used);
-      if (used) {
-        localState->cav.update(item, ctx);
-        return;
+
+      LocalState* localState = (LocalState*) ctx.getLocalState();
+
+      if (ctx.isFirstPass()) {
+        localState->cav.initialize(item);
+        localState->cav.build();
+        localState->cav.computePost();
       } else {
-        cavp = &localState->cav;
+        localState->cav.update(item,ctx);
       }
-    }
 
-    if (Version == detDisjoint) {
-      cavp->initialize(item);
-      cavp->build();
-      cavp->computePost();
+      return;
     } else {
       //! [Accessing Per Iteration Allocator in DMR]
       Cavity cav(graph, ctx.getPerIterAlloc());

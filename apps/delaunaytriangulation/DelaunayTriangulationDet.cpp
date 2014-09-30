@@ -221,9 +221,8 @@ struct Process {
     Cavity<Alloc>* cavp = NULL;
 
     if (Version == detDisjoint) {
-      bool used;
-      LocalState* localState = (LocalState*) ctx.getLocalState(used);
-      if (used) {
+      LocalState* localState = (LocalState*) ctx.getLocalState();
+      if (!ctx.isFirstPass()) {
         localState->cav.update();
         return;
       } else {
@@ -247,7 +246,7 @@ struct Process {
     assert(graph->getData(node).inTriangle(p->t()));
     assert(graph->containsNode(node));
 
-    if (Version == detDisjoint) {
+    if (Version == detDisjoint && ctx.isFirstPass()) {
       cavp->init(node, p);
       cavp->build();
     } else {

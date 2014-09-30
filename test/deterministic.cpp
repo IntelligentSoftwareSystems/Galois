@@ -48,9 +48,8 @@ struct MatchingWithLocalState {
   Galois::GAccumulator<int>& size;
 
   void operator()(GNode x, Galois::UserContext<GNode>& ctx) const { 
-    bool used;
-    LocalState* p = (LocalState*) ctx.getLocalState(used);
-    if (used) {
+    LocalState* p = (LocalState*) ctx.getLocalState();
+    if (!ctx.isFirstPass()) {
       // operator is being resumed; use p
       if (!p->toMark)
         return;

@@ -202,7 +202,7 @@ public:
 };
 
 template<typename OptionsTy>
-class DeterministicContextBase<OptionsTy, false, true>: public HasIntentToReadContext, public FirstPassBase {
+class DeterministicContextBase<OptionsTy, false, true>: public HasIntentToReadContext {
 public:
   typedef DItem<OptionsTy> Item;
   Item item;
@@ -264,7 +264,7 @@ private:
 
 public:
   DeterministicContextBase(const Item& i):
-    HasIntentToReadContext(i.id, true), FirstPassBase (true), item(i), readerCtx(i.id) { }
+    HasIntentToReadContext(i.id, true), item(i), readerCtx(i.id) { }
 
   void clear() { }
 
@@ -677,23 +677,21 @@ struct StateManagerBase<OptionsTy, true> {
   void allocLocalState(UserContextAccess<value_type>& c, function_type& self) {
     void *p = c.data().getPerIterAlloc().allocate(sizeof(LocalState));
     new (p) LocalState(self, c.data().getPerIterAlloc());
-    c.setLocalState(p, false);
+    c.setLocalState(p);
   }
 
   void deallocLocalState(UserContextAccess<value_type>& c) {
-    bool dummy;
-    LocalState *p = reinterpret_cast<LocalState*>(c.data().getLocalState(dummy));
+    LocalState *p = reinterpret_cast<LocalState*>(c.data().getLocalState());
     if (p)
       p->~LocalState();
   }
 
   void saveLocalState(UserContextAccess<value_type>& c, DItem<OptionsTy>& item) { 
-    bool dummy;
-    item.setLocalState(c.data().getLocalState(dummy));
+    item.setLocalState(c.data().getLocalState());
   }
 
   void restoreLocalState(UserContextAccess<value_type>& c, const DItem<OptionsTy>& item) { 
-    c.setLocalState(item.getLocalState(), true);
+    c.setLocalState(item.getLocalState());
   }
 
   template<typename LWL, typename GWL>

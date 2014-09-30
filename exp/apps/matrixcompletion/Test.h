@@ -260,9 +260,7 @@ struct AsyncALSalgo {
       // TODO(ddn) AddRemove can be improevd by reusing DAG
       if (algo == asyncALSkdg_i || algo == asyncALSkdg_ar) {
         self.visit(g, col);
-        bool used;
-        ctx.getLocalState(used);
-        if (!used) {
+        if (ctx.isFirstPass()) {
           self.visit(g, col);
           return;
         }

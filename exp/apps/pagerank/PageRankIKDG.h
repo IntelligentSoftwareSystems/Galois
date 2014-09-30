@@ -29,9 +29,8 @@ protected:
   };
 
   void applyOperator(GNode src, Galois::UserContext<GNode>& ctx, Galois::InsertBag<GNode>& next) {
-    bool used;
-    LocalState* localState = (LocalState*) ctx.getLocalState(used);
-    if (!used) {
+    LocalState* localState = (LocalState*) ctx.getLocalState();
+    if (ctx.isFirstPass()) {
       float v = graph.getData(src).value;
       double sum = 0;
       for (auto jj : graph.in_edges(src, Galois::MethodFlag::READ)) {

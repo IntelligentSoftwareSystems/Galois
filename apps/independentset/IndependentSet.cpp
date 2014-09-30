@@ -178,17 +178,16 @@ struct Process {
   void operator()(GNode src, Galois::UserContext<GNode>& ctx) {
     bool* modp;
     if (Version == detDisjoint) {
-      bool used;
-      LocalState* localState = (LocalState*) ctx.getLocalState(used);
+      LocalState* localState = (LocalState*) ctx.getLocalState();
       modp = &localState->mod;
-      if (used) {
+      if (!ctx.isFirstPass()) {
         if (*modp)
           modify(src);
         return;
       }
     }
 
-    if (Version == detDisjoint) {
+    if (Version == detDisjoint && ctx.isFirstPass ()) {
       *modp = build<Galois::MethodFlag::WRITE>(src);
     } else {
       bool mod = build<Galois::MethodFlag::WRITE>(src);
