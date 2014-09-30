@@ -49,15 +49,6 @@ enum ConflictFlag {
   BREAK = 2
 };
 
-enum PendingFlag {
-  NON_DET,
-  PENDING,
-  COMMITTING
-};
-
-//! Used by deterministic and ordered executor
-void setPending(PendingFlag value);
-PendingFlag getPending ();
 
 //! used to release lock over exception path
 static inline void clearConflictLock() { }

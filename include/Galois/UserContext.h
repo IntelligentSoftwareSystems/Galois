@@ -48,13 +48,44 @@ protected:
   UndoLog undoLog;
   CommitLog commitLog;
 #endif 
+  //! push stuff
+  typedef gdeque<T> PushBufferTy;
+  static const unsigned int fastPushBackLimit = 64;
+  typedef std::function<void(PushBufferTy&)> FastPushBack; 
 
+  PushBufferTy pushBuffer;
   //! Allocator stuff
   IterAllocBaseTy IterationAllocatorBase;
   PerIterAllocTy PerIterationAllocator;
 
+  //! used by all
+  bool* didBreak = nullptr;
+  FastPushBack fastPushBack;
+
+  //! some flags used by deterministic
+  bool firstPassFlag = false;
+  bool signalFailSafeFlag = false;
+  void* localState = nullptr;
+  bool localStateUsed = false;
+
   void __resetAlloc() {
     IterationAllocatorBase.clear();
+  }
+
+  void __setFirstPass (void) {
+    firstPassFlag = true;
+  }
+
+  void __resetFirstPass (void) {
+    firstPassFlag = false;
+  }
+
+  void __doSignalFailSafe (void) {
+    signalFailSafeFlag = true;
+  }
+
+  void __dontSignalFailSafe (void) {
+    signalFailSafeFlag = false;
   }
 
 #ifdef GALOIS_USE_EXP
@@ -79,9 +110,6 @@ protected:
   }
 #endif 
 
-  //! push stuff
-  typedef gdeque<T> PushBufferTy;
-  PushBufferTy pushBuffer;
 
   PushBufferTy& __getPushBuffer() {
     return pushBuffer;
@@ -91,22 +119,15 @@ protected:
     pushBuffer.clear();
   }
 
-  void* localState;
-  bool localStateUsed;
   void __setLocalState(void *p, bool used) {
     localState = p;
     localStateUsed = used;
   }
 
-  static const unsigned int fastPushBackLimit = 64;
-
-  typedef std::function<void(PushBufferTy&)> FastPushBack; 
-  FastPushBack fastPushBack;
   void __setFastPushBack(FastPushBack f) {
     fastPushBack = f;
   }
 
-  bool* didBreak;
 
 public:
   UserContext()
@@ -154,7 +175,18 @@ public:
   //! declare that the operator has crossed the cautious point.  This
   //! implies all data has been touched thus no new locks will be
   //! acquired.
-  void cautiousPoint();
+  void cautiousPoint() {
+    if (signalFailSafeFlag) {
+      Galois::Runtime::signalFailSafe();
+    }
+  }
+
+  //! used by deterministic and ordered
+  //! @returns true when the operator is invoked for the first time. The operator
+  //! can use this information and choose to expand the neighborhood only in the first pass. 
+  bool isFirstPass (void) const { 
+    return firstPassFlag;
+  }
 
 };
 

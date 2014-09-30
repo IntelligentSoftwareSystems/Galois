@@ -58,34 +58,15 @@ void Galois::Runtime::clearReleasable() {
 //! Global thread context for each active thread
 static __thread Galois::Runtime::SimpleRuntimeContext* thread_ctx = 0;
 
-namespace {
 
-struct PendingStatus {
-  Galois::Runtime::LL::CacheLineStorage<Galois::Runtime::PendingFlag> flag;
-  PendingStatus(): flag(Galois::Runtime::NON_DET) { }
-};
-
-PendingStatus pendingStatus;
-
-}
-
-void Galois::Runtime::setPending(Galois::Runtime::PendingFlag value) {
-  pendingStatus.flag = value;
-}
-
-Galois::Runtime::PendingFlag Galois::Runtime::getPending() {
-  return pendingStatus.flag.get();
-}
 
 void Galois::Runtime::signalFailSafe(void) {
-  if (Galois::Runtime::getPending() == Galois::Runtime::PENDING) {
 #ifdef GALOIS_USE_LONGJMP
-    if (releasableHead) releasableHead->releaseAll();
-    longjmp(hackjmp, Galois::Runtime::REACHED_FAILSAFE);
+  if (releasableHead) releasableHead->releaseAll();
+  longjmp(hackjmp, Galois::Runtime::REACHED_FAILSAFE);
 #else
-    throw Galois::Runtime::REACHED_FAILSAFE;
+  throw Galois::Runtime::REACHED_FAILSAFE;
 #endif
-  }
 }
 
 void Galois::Runtime::setThreadContext(Galois::Runtime::SimpleRuntimeContext* ctx) {

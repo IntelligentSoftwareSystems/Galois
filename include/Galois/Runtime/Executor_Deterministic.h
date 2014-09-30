@@ -111,8 +111,6 @@ public:
   bool isReady() { return !notReady; }
 
   virtual void subAcquire(Lockable* lockable, Galois::MethodFlag) { 
-    if (getPending() == COMMITTING)
-      return;
 
     if (this->tryLock(lockable))
       this->addToNhood(lockable);
@@ -255,9 +253,6 @@ public:
   virtual void subAcquire(Lockable* lockable, Galois::MethodFlag m) { 
     assert (m == MethodFlag::READ || m == MethodFlag::WRITE);
 
-    if (getPending() == COMMITTING)
-      return;
-    
     if (this->tryLock(lockable))
       this->addToNhood(lockable);
 
@@ -310,8 +305,6 @@ public:
   bool isReady() { return false; }
 
   virtual void subAcquire(Lockable* lockable, Galois::MethodFlag) {
-    if (getPending() == COMMITTING)
-      return;
 
     // First to lock becomes representative
     DeterministicContextBase* owner = static_cast<DeterministicContextBase*>(this->getOwner(lockable));
@@ -1357,7 +1350,6 @@ void Executor<OptionsTy>::go() {
       ++tld.rounds;
 
       std::swap(tld.wlcur, tld.wlnext);
-      setPending(PENDING);
       bool nextPending = pendingLoop(tld);
       innerDone.get() = true;
 
@@ -1370,7 +1362,6 @@ void Executor<OptionsTy>::go() {
         barrier.wait();
 
       bool nextCommit = false;
-      setPending(COMMITTING);
       outerDone.get() = true;
 
       if (this->executeDAG(*this, tld)) {
@@ -1424,8 +1415,6 @@ void Executor<OptionsTy>::go() {
     }
   }
 
-  setPending(NON_DET);
-
   this->destroyDAGManager();
   this->clearNewWork();
   
@@ -1453,6 +1442,7 @@ bool Executor<OptionsTy>::pendingLoop(ThreadLocalData& tld)
 
     ctx->startIteration();
     tld.stat.inc_iterations();
+    tld.facing.setFirstPass();
     setThreadContext(ctx);
 
     this->allocLocalState(tld.facing, tld.fn2);
@@ -1469,6 +1459,7 @@ bool Executor<OptionsTy>::pendingLoop(ThreadLocalData& tld)
     } catch (const ConflictFlag& flag) { clearConflictLock(); result = flag; }
 #endif
     clearReleasable();
+    tld.facing.resetFirstPass();
     switch (result) {
       case 0: 
       case REACHED_FAILSAFE: break;
@@ -1495,6 +1486,7 @@ bool Executor<OptionsTy>::executeTask(ThreadLocalData& tld, Context* ctx)
 {
   setThreadContext(ctx);
   this->restoreLocalState(tld.facing, ctx->item);
+  tld.facing.resetFirstPass();
   int result = 0;
 #ifdef GALOIS_USE_LONGJMP
   if ((result = setjmp(hackjmp)) == 0) {
