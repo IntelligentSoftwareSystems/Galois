@@ -1047,11 +1047,13 @@ void run() {
   Galois::reportPageAlloc("MeminfoPre");
 
   Galois::StatTimer T;
+  auto eamp = -amp;///tolerance;
   std::cout << "Running " << algo.name() << " version\n";
   std::cout << "tolerance: " << tolerance << "\n";
+  std::cout << "effective amp: " << eamp << "\n";
   T.start();
   Galois::do_all_local(graph, [&graph] (typename Graph::GraphNode n) { graph.getData(n).init(); });
-  algo(graph, tolerance, -amp/tolerance);
+  algo(graph, tolerance, eamp);
   T.stop();
   
   Galois::reportPageAlloc("MeminfoPost");

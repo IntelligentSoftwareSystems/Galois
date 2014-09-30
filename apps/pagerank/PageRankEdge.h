@@ -23,6 +23,7 @@
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 
+static llvm::cl::opt<bool> edgePri("edgePri", llvm::cl::desc("Use priority for edges-based"), llvm::cl::init(false));
 struct AsyncEdge {
   struct LNode {
     PRTy value;
@@ -39,7 +40,7 @@ struct AsyncEdge {
   typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
 
-  std::string name() const { return "EdgeAsync"; }
+  std::string name() const { return edgePri? "EdgePri" : "EdgeAsync"; }
 
   void readGraph(Graph& graph, std::string filename, std::string transposeGraphName) {
     check_types<Graph, InnerGraph>();
@@ -51,13 +52,48 @@ struct AsyncEdge {
     }
   }
 
+  struct sndPri {
+    int operator()(const std::pair<GNode, int>& n) const {
+      return n.second;
+    }
+  };
+
   struct Process {
     Graph& graph;
     PRTy tolerance;
+    PRTy amp;
 
-    Process(Graph& g, PRTy t): graph(g), tolerance(t) { }
+    Process(Graph& g, PRTy t, PRTy a): graph(g), tolerance(t), amp(a) { }
 
-    void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) const {
+    int pri(PRTy r, int n) const {
+      return (int)(r/n * amp);
+    }
+
+    void condSched(const GNode& node, LNode& lnode, PRTy delta, 
+                   Galois::UserContext<GNode>& ctx) const {
+      PRTy old = atomicAdd(lnode.residual, delta);
+      if (std::fabs(old) <= tolerance && std::fabs(old + delta) >= tolerance)
+        ctx.push(node);
+    }
+
+    void condSched(const GNode& node, LNode& lnode, PRTy delta, 
+                   Galois::UserContext<std::pair<GNode, int> >& ctx) const {
+      PRTy old = atomicAdd(lnode.residual, delta);
+      int out = nout(graph, node, Galois::MethodFlag::NONE) + 1;
+      if ((std::fabs(old) <= tolerance && std::fabs(old + delta) >= tolerance) ||
+          (pri(old, out) != pri(old+delta, out))) {
+        //std::cerr << " " << pri(old+delta) << " ";
+        ctx.push(std::make_pair(node, pri(old+delta, out)) );
+      }
+    }
+
+    template<typename Context>
+    void operator()(const std::pair<GNode, int>& data, Context& ctx) const {
+      operator()(data.first, ctx);
+    }
+
+    template<typename Context>
+    void operator()(const GNode& src, Context& ctx) const {
       LNode& sdata = graph.getData(src);
       
       Galois::MethodFlag lockflag = Galois::MethodFlag::NONE;
@@ -72,22 +108,28 @@ struct AsyncEdge {
              jj != ej; ++jj) {
           GNode dst = graph.getEdgeDst(jj);
           LNode& ddata = graph.getData(dst, lockflag);
-          PRTy old = atomicAdd(ddata.residual, delta);
-          if (old <= tolerance && old + delta >= tolerance)
-            ctx.push(dst);
+          condSched(dst, ddata, delta, ctx);
         }
       } else { // might need to reschedule self
-        PRTy old = atomicAdd(sdata.residual, oldResidual);
-        if (old <= tolerance && old + oldResidual >= tolerance)
-          ctx.push(src);
+        condSched(src, sdata, oldResidual, ctx);
       }
     }
   };
 
   void operator()(Graph& graph, PRTy tolerance, PRTy amp) {
-    initResidual(graph);
-    typedef Galois::WorkList::dChunkedFIFO<16> WL;
-    Galois::for_each_local(graph, Process(graph, tolerance), Galois::wl<WL>());
+    if (!edgePri) {
+      initResidual(graph);
+      typedef Galois::WorkList::dChunkedFIFO<16> WL;
+      Galois::for_each_local(graph, Process(graph, tolerance, amp), Galois::wl<WL>());
+    } else {
+      Galois::InsertBag<std::pair<GNode, int>> b;
+      initResidual(graph, b, [amp] (Graph& graph, const GNode& node) {
+          return (int)(graph.getData(node).residual * amp);
+        });
+      typedef Galois::WorkList::dChunkedFIFO<128> WL;
+      typedef Galois::WorkList::OrderedByIntegerMetric<sndPri,WL> OBIM;
+      Galois::for_each_local(b, Process(graph, tolerance, amp), Galois::wl<OBIM>());
+    }
   }
 
   void verify(Graph& graph, PRTy tolerance) {

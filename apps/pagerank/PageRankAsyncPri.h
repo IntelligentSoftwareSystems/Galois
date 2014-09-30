@@ -67,6 +67,12 @@ struct AsyncPri{
       return operator()(src, d);
     }
   };
+
+  struct sndPri {
+    int operator()(const std::pair<GNode, int>& n) const {
+      return n.second;
+    }
+  };
   
   struct Process {
     Graph& graph;
@@ -75,19 +81,24 @@ struct AsyncPri{
 
     Process(Graph& g, PRTy t, PRTy a): graph(g), tolerance(t), pri(g,a) { }
 
-    void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) const {
-      LNode& sdata = graph.getData(src);
+    void operator()(const std::pair<GNode,int>& srcn, Galois::UserContext<std::pair<GNode,int>>& ctx) const {
+      LNode& sdata = graph.getData(srcn.first);
+      
+      if(sdata.residual < tolerance || 
+         pri(srcn.first) != srcn.second)
+        return;
 
       Galois::MethodFlag lockflag = Galois::MethodFlag::NONE;
 
       PRTy oldResidual = sdata.residual.exchange(0.0);
-      PRTy pr = computePageRankInOut(graph, src, 0, lockflag);
+      PRTy pr = computePageRankInOut(graph, srcn.first, 0, lockflag);
       PRTy diff = std::fabs(pr - sdata.value);
       sdata.value = pr;
-      int src_nout = nout(graph,src, lockflag);
+      int src_nout = nout(graph,srcn.first, lockflag);
       PRTy delta = diff*alpha/src_nout;
       // for each out-going neighbors
-      for (auto jj = graph.edge_begin(src, lockflag), ej = graph.edge_end(src, lockflag);
+      for (auto jj = graph.edge_begin(srcn.first, lockflag), 
+             ej = graph.edge_end(srcn.first, lockflag);
            jj != ej; ++jj) {
         GNode dst = graph.getEdgeDst(jj);
         LNode& ddata = graph.getData(dst, lockflag);
@@ -95,7 +106,7 @@ struct AsyncPri{
         // if the node is not in the worklist and the residual is greater than tolerance
         if(old + delta >= tolerance &&
            (old <= tolerance || pri(dst, old) != pri(dst,old+delta)))
-          ctx.push(dst);
+          ctx.push(std::make_pair(dst, pri(dst, old+delta)));
       }
     }
   };
@@ -103,8 +114,13 @@ struct AsyncPri{
   void operator()(Graph& graph, PRTy tolerance, PRTy amp) {
     initResidual(graph);
     typedef Galois::WorkList::dChunkedFIFO<16> WL;
-    typedef Galois::WorkList::OrderedByIntegerMetric<PRPri,WL>::with_block_period<16>::type OBIM;
-    Galois::for_each_local(graph, Process(graph, tolerance, amp), Galois::wl<OBIM>(PRPri{graph, amp}));
+    typedef Galois::WorkList::OrderedByIntegerMetric<sndPri,WL>::with_block_period<16>::type OBIM;
+    Galois::InsertBag<std::pair<GNode, int> > bag;
+    PRPri pri(graph, amp);
+    Galois::do_all_local(graph, [&graph, &bag, &pri] (const GNode& node) {
+        bag.push(std::make_pair(node, pri(node)));
+      });
+    Galois::for_each_local(bag, Process(graph, tolerance, amp), Galois::wl<OBIM>());
   }
 
   void verify(Graph& graph, PRTy tolerance) {    

@@ -73,6 +73,23 @@ void initResidual(Graph& graph) {
     }, Galois::do_all_steal<true>());
 }
 
+template<typename Graph, typename PriFn>
+void initResidual(Graph& graph, Galois::InsertBag<std::pair<typename Graph::GraphNode, int> >& b, const PriFn& pri) {
+  Galois::do_all_local(graph, [&graph, &b, &pri] (const typename Graph::GraphNode& src) {
+      auto& data = graph.getData(src);
+      // for each in-coming neighbour, add residual
+      PRTy sum = 0.0;
+      for (auto jj = graph.in_edge_begin(src), ej = graph.in_edge_end(src); 
+           jj != ej; ++jj){
+        auto dst = graph.getInEdgeDst(jj);
+        auto& ddata = graph.getData(dst);
+        sum += 1.0/nout(graph,dst, Galois::MethodFlag::NONE);  
+      }
+      data.residual = sum * alpha * (1.0-alpha);
+      b.push(std::make_pair(src, pri(graph, src)));
+    }, Galois::do_all_steal<true>());
+}
+
 
 PRTy atomicAdd(std::atomic<PRTy>& v, PRTy delta) {
   PRTy old;
