@@ -460,6 +460,7 @@ bool verify(Graph& graph) {
 template<typename Algo>
 void run() {
   typedef typename Algo::Graph Graph;
+  typedef typename Graph::GraphNode GNode;
 
   Algo algo;
   Graph graph;
@@ -470,7 +471,7 @@ void run() {
   if (std::is_same<Algo, DefaultAlgo<nondet> >::value) {
     Galois::preAlloc(numThreads + 8*graph.size()/Galois::Runtime::MM::hugePageSize);
   } else {
-    Galois::preAlloc(numThreads + 32*graph.size()/Galois::Runtime::MM::hugePageSize);
+    Galois::preAlloc(numThreads + 64*(sizeof(GNode) + sizeof(Node))*graph.size()/Galois::Runtime::MM::hugePageSize);
   }
 
   Galois::reportPageAlloc("MeminfoPre");
