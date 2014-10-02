@@ -73,7 +73,7 @@ void bots_warning(int warning, char *message);
 #define BOTS_RESULT_NOT_REQUESTED 3
 
 
-typedef enum { BOTS_VERBOSE_MethodFlag::UNPROTECTED=0,
+typedef enum { BOTS_VERBOSE_NONE=0,
                BOTS_VERBOSE_DEFAULT,
                BOTS_VERBOSE_DEBUG } bots_verbose_mode_t;
 
