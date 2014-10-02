@@ -164,6 +164,7 @@ void RemoteDirectory::recvObjectImpl(fatPointer ptr, ResolveFlag flag, typeHelpe
   assert(flag == RW || flag == RO);
   metadata& md = getMD(ptr);
   auto nl = std::move(md.notifyList);
+  md.notifyList.clear();
   {
     std::lock_guard<LL::SimpleLock> lg(md.lock, std::adopt_lock);
     trace("RemoteDirectory::recvObject % flag % md %\n", ptr, flag, md);
@@ -385,6 +386,7 @@ void LocalDirectory::recvObjectImpl(fatPointer ptr, ResolveFlag flag,
   trace("LocalDirectory::writebackObject % flag % md %\n", ptr, flag, md);
   if (p.first == ~0) {
     auto nl = std::move(md.notifyList);
+    md.notifyList.clear();
     eraseMD(ptr, lg);
     dirRelease(obj); //Object is local now with no requesters, so release
     //md lock is released by this point
@@ -516,6 +518,7 @@ void LocalDirectory::considerObject(metadata& md, fatPointer ptr) {
   //Next user is this host
   if (p.first == NetworkInterface::ID) {
     auto nl = std::move(md.notifyList);
+    md.notifyList.clear();
     if (p.second) {
       md.reqsRW.erase(p.first);
       dirRelease(obj);
