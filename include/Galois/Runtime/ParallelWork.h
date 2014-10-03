@@ -196,7 +196,7 @@ class RemoteAbortHandler {
   }
 
   void dump() {
-    std::lock_guard<LL::SimpleLock> lg(lock);
+//    std::lock_guard<LL::SimpleLock> lg(lock);
     if (!waiting_on.empty()) {
       for (auto& foo : waiting_on)
         trace("RAH Waiting on %\n", foo.first);

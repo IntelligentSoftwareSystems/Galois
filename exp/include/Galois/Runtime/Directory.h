@@ -19,6 +19,7 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
+ * @author Gurbinder Gill  <gill@cs.utexas.edu>
  */
 
 #ifndef GALOIS_RUNTIME_DIRECTORY_H
@@ -72,6 +73,17 @@ public:
     auto& retval = md[ptr];
     retval.lock.lock();
     return retval;
+  }
+
+  metadata* getMD_ifext(fatPointer ptr) {
+    std::lock_guard<LL::SimpleLock> lg(md_lock);
+    if (md.find(ptr) != md.end()) {
+	static auto& retval = md[ptr];
+	retval.lock.lock();
+	return &retval;	
+    }
+    else 
+	return nullptr;
   }
 
   void eraseMD(fatPointer ptr, metadata& m) {
@@ -229,6 +241,7 @@ class LocalDirectory : public BaseDirectory {
   }
 
   metadata& getMD(fatPointer ptr);
+  metadata* getMD_ifext(fatPointer ptr);
 
   void eraseMD(fatPointer ptr, std::unique_lock<LL::SimpleLock>& mdl);
 
@@ -354,6 +367,7 @@ class RemoteDirectory : public BaseDirectory {
 
   //get metadata for pointer
   metadata& getMD(fatPointer ptr);
+  metadata* getMD_ifext(fatPointer ptr);
 
   //erase the metadata for pointer
   //metadata is for the pointer and the caller must have the lock

@@ -42,6 +42,9 @@ static const char* const url = 0;
 
 namespace cll = llvm::cl;
 static cll::opt<std::string> inputFile (cll::Positional, cll::desc("<input file>"), cll::Required);
+static cll::opt<unsigned int> maxIterations ("maxIterations", cll::desc("Maximum iterations"), cll::init(1));
+
+static int TOTAL_NODES;
 
 struct LNode {
     float value;
@@ -89,7 +92,13 @@ struct PageRank {
    
     void static go(Graph::pointer g)
     {
-	Galois::for_each_local(g, PageRank{g}, Galois::loopname("Page Rank"));
+	Galois::Timer round_time;
+	for(int iterations = 0; iterations < maxIterations; ++iterations){
+	    round_time.start();
+	    Galois::for_each_local(g, PageRank{g}, Galois::loopname("Page Rank"));
+	    round_time.stop();
+	    std::cout<<"Iteration : " << iterations << "  Time : " << round_time.get() << "ms\n";
+	}
     }    
  
     void operator() (GNode src, Galois::UserContext<GNode>& cnx) const {
@@ -106,18 +115,57 @@ struct PageRank {
 	float diff = std::fabs(value - sdata.value);
 	if (diff > TOLERANCE) {
 	    sdata.value = value;
-	    for (auto jj = g->edge_begin(src, Galois::MethodFlag::SRC_ONLY), ej = g->edge_end(src, Galois::MethodFlag::SRC_ONLY); jj != ej; ++jj) {
+	 /*   for (auto jj = g->edge_begin(src, Galois::MethodFlag::SRC_ONLY), ej = g->edge_end(src, Galois::MethodFlag::SRC_ONLY); jj != ej; ++jj) {
 		GNode dst = g->dst(jj, Galois::MethodFlag::SRC_ONLY);
 		cnx.push(dst);
 	    }
+	*/
 	}
+
     }
 
   typedef int tt_is_copyable;
 };
 
+/* 
+ * collect page rank of all the nodes 
+ * */
+
+/*struct compute_total_rank {
+    Graph::pointer g;
+    int total_rank = 0;
+    std::vector<int> a[TOTAL_NODES];
+    
+    void static go(Graph::pointer g) {
+	Galois::for_each_local(g, compute_total_rank(g), Galois::loopname("compute total rank")i);
+    }
+
+    void operator() (GNode n, Galois::UserContext<GNode>& cnx) const {
+	LNode& n = 
+    }
+
+    for(auto ii = g->begin(), ei = g->end(); ii != ei ; ++ii) {
+	//LNode& ddata = g->at(ii, Galois::MethodFlag::SRC_ONLY);
+	//total_rank += ddata.value;
+    }
+
+    
+    //return total_rank;
+};
+*/
+
+int compute_total_rank(Graph::pointer g) {
+    int total_rank = 0;
+
+    for(auto ii = g->begin(), ei=g->end(); ii != ei; ++ii) {
+	LNode& node = g->at(*ii); 
+	total_rank += node.value;
+    }
 
 
+    return total_rank;
+
+}
 
 int main(int argc, char** argv) {
     LonestarStart (argc, argv, name, desc, url);
@@ -155,6 +203,8 @@ int main(int argc, char** argv) {
 	if(counts.size() >  In_counts.size())
 	    In_counts.resize(counts.size());
 
+	TOTAL_NODES = counts.size();
+
 	std::cout << "size of transpose : " << In_counts.size() <<" : : "<<In_counts[0] <<"\n";
 	std::cout << "size of counts : " << counts.size() << "\n";
 	g = Graph::allocate(counts, In_counts);
@@ -162,16 +212,17 @@ int main(int argc, char** argv) {
         for (unsigned x = 0; x < counts.size(); ++x) {
 	    auto fgn = *(fg.begin() + x);
 	    auto gn = *(g->begin() + x);
-            //std::cout << "x = " << x << "   : \n";
+//            std::cout << "x = " << x << "   : \n";
 	    for (auto ii = fg.edge_begin(fgn), ee = fg.edge_end(fgn); ii != ee; ++ii) {
 		unsigned dst = fg.getEdgeDst(ii);
                 //std::cout <<"Incount["<<dst<<"]"<<In_counts[dst]<< " , " ;
 		int val = fg.getEdgeData<int>(ii);
-		g->addEdge(gn, *(g->begin() + dst), val);
-		g->addInEdge(*(g->begin() + dst),gn, val);
+		g->addEdge(gn, *(g->begin() + dst), val, Galois::MethodFlag::SRC_ONLY);
+		g->addInEdge(*(g->begin() + dst),gn, val, Galois::MethodFlag::SRC_ONLY);
 	    }
             //std::cout << "\n";
 	}
+
     }
     //Graph Construction ENDS here.
     timerLoad.stop();
@@ -196,6 +247,7 @@ int main(int argc, char** argv) {
 
     timerPR.stop();
     std::cout << "Page Rank: " << timerPR.get() << "ms\n";	
+    std::cout << "Total Page Rank: " << compute_total_rank(g) << "\n";	
 
     
  /*   
