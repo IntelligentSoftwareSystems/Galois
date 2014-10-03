@@ -175,9 +175,14 @@ public:
 
 template<typename value_type>
 class RemoteAbortHandler {
+  
+  std::map<value_type, fatPointer> contended_set; //contended flags to clear
+  //pending notifications
   std::multimap<fatPointer, value_type> waiting_on;
-  std::map<value_type, std::set<fatPointer> > contended_set;
+  //non-local items
+  std::map<value_type, unsigned > items;
 
+  //Read contains only items not in items (Above)
   typedef WorkList::GFIFO<value_type> AbortedList;
   AbortedList ready;
   
@@ -187,35 +192,36 @@ class RemoteAbortHandler {
     std::lock_guard<LL::SimpleLock> lg(lock);
     assert(waiting_on.count(ptr)); //push should only set up notify once per pointer
     auto p = waiting_on.equal_range(ptr);
-    auto p2 = p;
-    while (p.first != p.second) {
-      ready.push(p.first->second);
-      ++p.first;
+    while (auto ii = p.first; ii != p.second; ++ii) {
+      for (int i = 0; i < items[ii->second]; ++i)
+        ready.push(ii->second);
+      items.erase(ii->second);
     }
-    waiting_on.erase(p2.first, p2.second);
+    waiting_on.erase(p.first, p.second);
   }
 
   void dump() {
-//    std::lock_guard<LL::SimpleLock> lg(lock);
-    if (!waiting_on.empty()) {
-      for (auto& foo : waiting_on)
-        trace("RAH Waiting on %\n", foo.first);
-    }
+    std::lock_guard<LL::SimpleLock> lg(lock);
+    for (auto& foo : waiting_on)
+      trace("RAH Waiting on %\n", foo.first);
+    for (auto& foo : items)
+      trace("RAW Item % count %\n", foo.first, foo.second);
   }
 
 public:
   void push(const value_type& val, fatPointer ptr, 
             void (RemoteDirectory::*rfetch) (fatPointer, ResolveFlag),
             void (LocalDirectory::*lfetch) (fatPointer, ResolveFlag)) {
-    // TODO(ddn) what if there are multiple copies of the same active element?
     std::lock_guard<LL::SimpleLock> lg(lock);
+
+    items[va].count++;
 
     //Set contended and fetch
     if (ptr.isLocal())
       (getLocalDirectory().*(lfetch))(ptr, RW);
     else
       (getRemoteDirectory().*(rfetch))(ptr, RW);
-    contended_set[val].insert(ptr);
+    contended_set[va].insert(ptr);
 
     //already waiting on this pointer
     if (waiting_on.count(ptr)) {
@@ -248,12 +254,11 @@ public:
 
   void commit(const value_type& val) {
     std::lock_guard<LL::SimpleLock> lg(lock);
-    // TODO(ddn) what if multiple copies 
-    // TODO(ddn) what if commit before notify?
-    auto& p = contended_set[val];
-    // DDN: There may be multiple copies of the same active node so the
-    // following assertion is not always true
-    //assert(!p.empty());
+    //there may be multiple copies of val, but clear all contended flags with the first commit
+    auto ii = contended_set.find(val);
+    if (ii == contended_set.end())
+      return;
+    auto& p = *ii;
     for (auto ptr : p) {
       assert(waiting_on.count(ptr) == 0);
       if (ptr.isLocal()) {
@@ -262,7 +267,7 @@ public:
         getRemoteDirectory().clearContended(ptr);
       }
     }
-    contended_set.erase(val);
+    contended_set.erase(ii);
   }
 
   decltype(ready.pop()) pop() {
