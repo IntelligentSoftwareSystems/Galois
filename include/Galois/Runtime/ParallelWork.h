@@ -176,7 +176,7 @@ public:
 template<typename value_type>
 class RemoteAbortHandler {
   
-  std::map<value_type, fatPointer> contended_set; //contended flags to clear
+  std::multimap<value_type, fatPointer> contended_set; //contended flags to clear
   //pending notifications
   std::multimap<fatPointer, value_type> waiting_on;
   //non-local items
@@ -192,7 +192,7 @@ class RemoteAbortHandler {
     std::lock_guard<LL::SimpleLock> lg(lock);
     assert(waiting_on.count(ptr)); //push should only set up notify once per pointer
     auto p = waiting_on.equal_range(ptr);
-    while (auto ii = p.first; ii != p.second; ++ii) {
+    for (auto ii = p.first; ii != p.second; ++ii) {
       for (int i = 0; i < items[ii->second]; ++i)
         ready.push(ii->second);
       items.erase(ii->second);
@@ -214,19 +214,23 @@ public:
             void (LocalDirectory::*lfetch) (fatPointer, ResolveFlag)) {
     std::lock_guard<LL::SimpleLock> lg(lock);
 
-    items[va].count++;
+    //items[val] = items.count(val) + 1;
+    items[val]++;
 
     //Set contended and fetch
     if (ptr.isLocal())
       (getLocalDirectory().*(lfetch))(ptr, RW);
     else
       (getRemoteDirectory().*(rfetch))(ptr, RW);
-    contended_set[va].insert(ptr);
+
+    auto p = contended_set.equal_range(val);
+      if (!std::count(p.first, p.second, std::pair<const value_type, fatPointer>(val,ptr)))
+      contended_set.insert(std::pair<value_type, fatPointer>(val, ptr));
 
     //already waiting on this pointer
     if (waiting_on.count(ptr)) {
       auto p = waiting_on.equal_range(ptr);
-      if (std::count(p.first, p.second, std::pair<const fatPointer, value_type>(ptr,val)))
+      if (std::count(p.first, p.second, std::pair< const fatPointer, value_type>(ptr,val)))
         return; //already waiting
       waiting_on.insert(std::make_pair(ptr, val));
       return;
@@ -255,11 +259,12 @@ public:
   void commit(const value_type& val) {
     std::lock_guard<LL::SimpleLock> lg(lock);
     //there may be multiple copies of val, but clear all contended flags with the first commit
-    auto ii = contended_set.find(val);
-    if (ii == contended_set.end())
-      return;
-    auto& p = *ii;
-    for (auto ptr : p) {
+    auto ii = contended_set.equal_range(val);
+   // if (ii == contended_set.end())
+     // return;
+    //auto& p = *ii;
+    for (auto pr = ii.first; pr != ii.second; ++pr) {
+      auto ptr = pr->second;
       assert(waiting_on.count(ptr) == 0);
       if (ptr.isLocal()) {
         getLocalDirectory().clearContended(ptr);
@@ -267,7 +272,7 @@ public:
         getRemoteDirectory().clearContended(ptr);
       }
     }
-    contended_set.erase(ii);
+    contended_set.erase(ii.first, ii.second);
   }
 
   decltype(ready.pop()) pop() {
