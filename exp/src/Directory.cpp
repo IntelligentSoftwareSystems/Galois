@@ -67,6 +67,18 @@ RemoteDirectory::metadata& RemoteDirectory::getMD(fatPointer ptr) {
   return retval;
 }
 
+RemoteDirectory::metadata* RemoteDirectory::getMD_ifext(fatPointer ptr) {
+  std::lock_guard<LL::SimpleLock> lg(md_lock);
+  assert(ptr.getHost() != NetworkInterface::ID);
+  if (md.find(ptr) != md.end()) {
+    auto& retval = md[ptr];
+    retval.lock.lock();
+    return &retval;
+  }  
+  else 
+    return nullptr;
+} 
+
 void RemoteDirectory::eraseMD(fatPointer ptr, std::unique_lock<LL::SimpleLock>& mdl) {
   std::lock_guard<LL::SimpleLock> lg(md_lock);
   assert(md.find(ptr) != md.end());
@@ -294,7 +306,7 @@ void RemoteDirectory::metadata::recvObj(ResolveFlag flag) {
 
 std::ostream& Galois::Runtime::operator<<(std::ostream& os, const RemoteDirectory::metadata& md) {
   static const char* StateFlagNames[] = {"I", "PR", "PW", "RO", "RW", "UW"};
-  return os << "state:" << StateFlagNames[md.state] << ",contended:" << md.contended << ",th:" << md.th;
+  return os << "state:" << StateFlagNames[md.state] << ",contended:" << md.contended << ",th:" << md.th << " ,notifySize" << md.notifyList.size() ;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -363,6 +375,18 @@ LocalDirectory::metadata& LocalDirectory::getMD(fatPointer ptr) {
   return md;
 }
 
+LocalDirectory::metadata* LocalDirectory::getMD_ifext(fatPointer ptr) {
+  std::lock_guard<LL::SimpleLock> lg(dir_lock);
+  if (dir.find(ptr) != dir.end()) {  
+    auto& md = dir[ptr];
+    md.lock.lock();
+    return &md;
+  }
+  else 
+    return nullptr;
+
+}
+
 void LocalDirectory::eraseMD(fatPointer ptr, std::unique_lock<LL::SimpleLock>& mdl) {
   std::lock_guard<LL::SimpleLock> lg(dir_lock);
   assert(dir.find(ptr) != dir.end());
@@ -400,21 +424,22 @@ void LocalDirectory::recvObjectImpl(fatPointer ptr, ResolveFlag flag,
 void LocalDirectory::fetchImpl(fatPointer ptr, ResolveFlag flag, typeHelper* th, bool setContended) {
   //FIXME: deal with RO
   assert(ptr.isLocal());
-  metadata& md = getMD(ptr);
-  std::unique_lock<LL::SimpleLock> lg(md.lock, std::adopt_lock);
-  assert(!md.th || md.th == th);
-  if (!md.th)
-    md.th = th;
-  trace("LocalDirectory::fetch for % flag % % md %\n", ptr, flag, setContended, md);
-  if (md.isHere()) {
+  metadata* md = getMD_ifext(ptr);
+  assert(md != nullptr);
+  std::unique_lock<LL::SimpleLock> lg(md->lock, std::adopt_lock);
+  assert(!md->th || md->th == th);
+  if (!md->th)
+    md->th = th;
+  trace("LocalDirectory::fetch for % flag % setcont % md (%) %\n", ptr, flag, setContended, md, *md);
+  if (md->isHere()) {
     if (setContended)
-      md.contended = true;
+      md->contended = true;
     else
       eraseMD(ptr, lg);
   } else {
-    md.addReq(NetworkInterface::ID, flag);
-    md.contended |= setContended;
-    forwardRequestToNextWriter(md, ptr, lg);
+    md->addReq(NetworkInterface::ID, flag);
+    md->contended |= setContended;
+    forwardRequestToNextWriter(*md, ptr, lg);
   }
 }
 
@@ -537,6 +562,8 @@ void LocalDirectory::considerObject(metadata& md, fatPointer ptr) {
         md.reqsRW.erase(p.first);
         md.locRW = p.first;
         md.th->send(p.first, ptr, static_cast<Lockable*>(ptr.getObj()), RW);
+	if (md.contended)
+	    md.addReq(NetworkInterface::ID, RW);
         //Immediately recall the object if there is another waiter
         auto pn = md.getNextDest();
         if (pn.first != ~0) {
@@ -573,15 +600,27 @@ void LocalDirectory::forwardRequestToNextWriter(metadata& md, fatPointer ptr, st
 
 bool LocalDirectory::notify(fatPointer ptr, ResolveFlag flag, 
                              std::function<void(fatPointer)> fnotify) {
-  metadata& md = getMD(ptr);
-  std::unique_lock<LL::SimpleLock> lg(md.lock, std::adopt_lock);
+  metadata* md = getMD_ifext(ptr);
+  //metadata& md = getMD(ptr);
+  if (md == nullptr)
+    return false;
+
+  std::unique_lock<LL::SimpleLock> lg(md->lock, std::adopt_lock);
   assert(flag == RW || flag == RO);
   //check if unnecessary
-  if (md.isHere()) {
+  //if (md == nullptr || md.isHere()) {
+  if (md->isHere()) {
+    return false; 
+  }
+
+/*  if (md.isHere() && !(md.contended)) {
     eraseMD(ptr, lg);
     return false;
   }
-  md.notifyList.push_back(fnotify);
+*/
+  
+  assert(md->notifyList.empty());
+  md->notifyList.push_back(fnotify);
   return true;
 }
 
