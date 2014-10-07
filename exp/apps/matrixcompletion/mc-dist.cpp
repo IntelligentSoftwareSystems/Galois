@@ -20,6 +20,16 @@
  * Author: Andrew Lenharth <andrew@lenharth.org>
  */
 
+
+// hack 
+#include <iostream>
+#include <utility>
+template<typename T1, typename T2>
+std::ostream& operator<<(std::ostream& os, const std::pair<T1,T2>& p) {
+  return os << "(" << p.first << "," << p.second << ")";
+}
+// end hack
+
 #include "Galois/Galois.h"
 #include "Galois/gstl.h"
 #include "Galois/Graphs/LC_Dist_Graph.h"
@@ -69,6 +79,7 @@ public:
   // }
 
 };
+
 
 template<typename PreFn, typename RngTy, typename FunctionTy>
 class BlockedExecuter {
