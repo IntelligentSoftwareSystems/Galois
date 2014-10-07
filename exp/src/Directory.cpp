@@ -204,7 +204,7 @@ void RemoteDirectory::clearContended(fatPointer ptr) {
 void RemoteDirectory::fetchImpl(fatPointer ptr, ResolveFlag flag, typeHelper* th, bool setContended) {
   metadata& md = getMD(ptr);
   std::lock_guard<LL::SimpleLock> lg(md.lock, std::adopt_lock);
-  trace("RemoteDirectory::fetch for % flag % md %\n", ptr, flag, md);
+  trace("RemoteDirectory::fetch for % flag % setcont % md %\n", ptr, flag, md);
   assert(md.th == th || !md.th);
   assert(!ptr.isLocal());
   if (!md.th)
