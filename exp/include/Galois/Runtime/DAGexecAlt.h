@@ -25,8 +25,8 @@
  * @author <ahassaan@ices.utexas.edu>
  */
  
-#ifndef GALOIS_RUNTIME_DAGEXEC_H
-#define GALOIS_RUNTIME_DAGEXEC_H
+#ifndef GALOIS_RUNTIME_DAGEXEC_ALT_H
+#define GALOIS_RUNTIME_DAGEXEC_ALT_H
 
 #include "Galois/config.h"
 #include "Galois/GaloisForwardDecl.h"
@@ -51,22 +51,88 @@
 namespace Galois {
 namespace Runtime {
 
-
-template <typename Ctxt>
-struct DAGnhoodItem: public LockManagerBase {
+template <typename C>
+struct DAGnhoodItemSetBased: public LockManagerBase {
 
 public:
+  typedef C Ctxt;
   typedef LockManagerBase Base;
   typedef Galois::ThreadSafeOrderedSet<Ctxt*, std::less<Ctxt*> > SharerSet;
 
-  Lockable* lockable;
-  SharerSet sharers;
+  inline void addSharer (SharerSet& sharers, Ctxt* ctxt) {
+    assert (std::find (sharers.begin (), sharers.end (), ctxt) == sharers.end ());
+    sharers.push (ctxt);
+  }
 
+};
+
+template <typename C>
+struct DAGnhoodItemListBased: public LockManagerBase {
 public:
-  explicit DAGnhoodItem (Lockable* l): lockable (l), sharers () {}
+  typedef C Ctxt;
+  typedef LockManagerBase Base;
+  typedef Galois::concurrent_gslist<Ctxt*, 16> SharerSet;
 
-  void addSharer (Ctxt* ctx) {
-    sharers.push (ctx);
+  void addSharer (SharerSet& sharers, Ctxt* ctxt) {
+    assert (std::find (sharers.begin (), sharers.end (), ctxt) == sharers.end ());
+    sharers.push_back (ctxt);
+  }
+};
+
+template <typename Base>
+struct DAGnhoodItem: public Base {
+
+  typedef Base::Ctxt Ctxt;
+  typedef Base::SharerSet SharerSet;
+  typedef SharerSet::iterator HeadIter;
+
+  SharerSet sharers;
+  HeadIter head;
+  HeadIter end;
+  Lockable* lockable;
+
+  explicit DAGnhoodItem (Lockable* l): Base {}, lockable {l} {}
+
+  void addSharer (Ctxt* ctxt) {
+    Base::addSharer (sharers, ctxt);
+  }
+
+  void removeMin (Ctxt* ctxt) {
+    if (head != end) {
+      assert (*head == ctxt);
+      ++head;
+      assert (std::find (head, sharers.end (), ctxt) == sharers.end ());
+    }
+  }
+
+  template <typename CtxtCmp> 
+  sortSharerSet (const CtxtCmp& cmp) {
+    std::sort (sharers.begin (), sharers.end (), cmp);
+    head = sharers.begin ();
+    end = sharers.end ();
+  }
+
+  bool isMin (Ctxt* ctxt) const {
+    if (head != end) {
+      return ctxt == (*head);
+
+    } else {
+      return false;
+    }
+  }
+
+  Ctxt* getMin (void) const {
+    if (head == end) {
+      return nullptr;
+
+    } else {
+      return *head;
+    }
+  }
+
+  void reset (void) {
+    head = sharers.begin ();
+    assert (end == sharers.end ());
   }
 
   bool tryMappingTo (Lockable* l) {
@@ -111,13 +177,95 @@ public:
       niAlloc.deallocate (ni, 1);
     }
   };
-  
 };
 
 template <typename T>
 struct DAGcontext: public SimpleRuntimeContext {
 
-  typedef DAGnhoodItem<DAGcontext> NItem;
+  // typedef DAGnhoodItem<DAGcontext> NItem;
+  typedef DAGnhoodItem<DAGnhoodItemListBased<DAGcontext> > NItem;
+  typedef PtrBasedNhoodMgr<NItem> NhoodMgr;
+  typedef Galois::gdeque<DAGcontext*, 8> NhoodSet;
+  typedef Galois::GAtomic<bool> AtomicBool;
+
+
+  AtomicBool onWL;
+  T elem;
+  NhoodMgr& nhmgr;
+  NhoodSet nhood;
+
+
+  explicit DAGcontext (const T& t, NhoodMgr& nhmgr): 
+    SimpleRuntimeContext {true},
+    onWL {false},
+    elem {t}, 
+    nhmgr {nhmgr}
+  {}
+
+  GALOIS_ATTRIBUTE_PROF_NOINLINE
+  virtual void subAcquire (Lockable* l, Galois::MethodFlag) {
+    NItem& nitem = nhmgr.getNhoodItem (l);
+
+    assert (NItem::getOwner (l) == &nitem);
+
+    // enforcing set semantics
+    if (std::find (nhood.begin (), nhood.end (), nitem) == nhood.end ()) {
+      nitem.addSharer (this);
+    }
+  }
+
+  void remove (void) {
+    assert (isSrc());
+    for (auto i = nhood.begin (), end_i = nhood.end (); i != end_i; ++i) {
+      assert (i->getMin () == this);
+      i->removeMin ();
+    }
+  }
+
+  bool isSrc (void) const {
+    
+    if (nhood.empty ()) {
+      return true;
+    }
+
+    for (auto i = nhood.begin (), end_i = nhood.end (); i != end_i; ++i) {
+      if (i->getMin () != this) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+
+  template <typename WL>
+  void findNewSources (WL& workList) {
+    for (auto i = nhood.begin (), end_i = nhood.end (); i != end_i; ++i) {
+
+      DAGcontext* min = i->getMin ();
+
+      if (min != nullptr && 
+          !bool (min->onWL) &&
+          min->isSrc () &&
+          min->onWL.cas (false, true)) {
+
+        // GALOIS_DEBUG ("Adding found source: %s\n", highest->str ().c_str ());
+        wl.push (highest);
+      }
+    }
+  }
+
+  void reset (void) {}
+
+};
+
+/*
+
+template <typename T>
+struct DAGcontext: public SimpleRuntimeContext {
+
+  // typedef DAGnhoodItem<DAGcontext> NItem;
+  typedef DAGnhoodItem<DAGnhoodItemListBased<DAGcontext> > NItem;
   typedef PtrBasedNhoodMgr<NItem> NhoodMgr;
 
 protected:
@@ -197,6 +345,7 @@ public:
   }
 
 };
+*/
 
 
 template <typename T, typename Cmp, typename OpFunc, typename NhoodFunc>
@@ -208,7 +357,7 @@ protected:
   typedef typename Ctxt::NItem NItem;
 
   typedef MM::FixedSizeAllocator<Ctxt> CtxtAlloc;
-  typedef PerThreadVector<Ctxt*> CtxtWL;
+  typedef PerThreadBag<Ctxt*> CtxtWL;
   typedef UserContextAccess<T> UserCtx;
   typedef PerThreadStorage<UserCtx> PerThreadUserCtx;
 
@@ -231,13 +380,9 @@ protected:
       UserCtx& uctx = *(userCtxts.getLocal ());
       opFunc (src->getElem (), uctx);
 
-      for (auto i = src->neighbor_begin (), i_end = src->neighbor_end ();
-          i != i_end; ++i) {
+      src->removeFromNhood ();
 
-        if ((*i)->removeLastInNeigh (src)) {
-          wl.push (*i);
-        }
-      }
+      src->findNewSources (wl);
     }
   };
 
@@ -267,10 +412,11 @@ public:
   {}
 
   ~DAGexecutor (void) {
+
     Galois::do_all_local(allCtxts,
-        [this] (Ctxt* ctx) {
-          ctxtAlloc.destroy (ctx);
-          ctxtAlloc.deallocate (ctx, 1);
+        [this] (Ctxt* ctxt) {
+          ctxtAlloc.destroy (ctxt);
+          ctxtAlloc.deallocate (ctxt, 1);
         }, Galois::loopname("free_ctx"));
   }
 
@@ -300,42 +446,36 @@ public:
     Galois::StatTimer t_init ("Time to create the DAG: ");
 
     t_init.start ();
-    Galois::Runtime::do_all_choice (range,
+    Galois::do_all_choice (range,
         [this] (const T& x) {
-          Ctxt* ctx = ctxtAlloc.allocate (1);
-          assert (ctx != NULL);
-          ctxtAlloc.construct (ctx, x, nhmgr);
+          Ctxt* ctxt = ctxtAlloc.allocate (1);
+          assert (ctxt != NULL);
+          ctxtAlloc.construct (ctxt, x, nhmgr);
 
-          allCtxts.get ().push_back (ctx);
+          allCtxts.get ().push_back (ctxt);
 
-          Galois::Runtime::setThreadContext (ctx);
+          Galois::Runtime::setThreadContext (ctxt);
 
           UserCtx& uctx = *(userCtxts.getLocal ());
-          nhVisitor (ctx->getElem (), uctx);
+          nhVisitor (ctxt->getElem (), uctx);
           Galois::Runtime::setThreadContext (NULL);
         }, "create_ctxt");
 
 
-    Galois::do_all_choice (nhmgr.getContainer(),
+    Galois::do_all_choice (nhmgr.getAllRange(),
         [this] (NItem* nitem) {
-          for (auto i = nitem->sharers.begin ()
-            , i_end = nitem->sharers.end (); i != i_end; ++i) {
-
-            auto j = i;
-            ++j;
-            for (; j != i_end; ++j) {
-              createEdge (*i, *j);
-            }
-          }
-        }, Galois::loopname("create_ctxt_edges"), Galois::do_all_steal<true>());
+          nitem->sortSharerSet (cmp);
+        }, 
+        Galois::loopname("sort_sharers"), 
+        Galois::do_all_steal<true>());
 
     Galois::do_all_choice (allCtxts,
-        [this] (Ctxt* ctx) {
-          ctx->finalizeAdj ();
-          if (ctx->isSrc ()) {
-            initSources.get ().push_back (ctx);
+        [this] (Ctxt* ctxt) {
+          if (ctxt->isSrc ()) {
+            ctxt->onWL = true;
+            initSources.get ().push_back (ctxt);
           }
-        }, Galois::loopname("finalize"), Galois::do_all_steal<true>());
+        }, Galois::loopname("find-init-sources"), Galois::do_all_steal<true>());
 
     t_init.stop ();
   }
@@ -350,8 +490,8 @@ public:
 
     t_exec.start ();
 
-    Galois::for_each_choice (initSources,
-        ApplyOperator (opFunc, userCtxts), Galois::loopname("apply_operator"), Galois::wl<SrcWL_ty>());
+    Galois::for_each_local (initSources,
+        ApplyOperator {opFunc, userCtxts}, Galois::loopname("apply_operator"), Galois::wl<SrcWL_ty>());
 
     t_exec.stop ();
   }
@@ -360,11 +500,16 @@ public:
     Galois::StatTimer t_reset ("Time to reset the DAG: ");
 
     t_reset.start ();
-    Galois::do_all_choice (allCtxts,
-        [] (Ctxt* ctx) {
-          ctx->reset();
+    // Galois::do_all_choice (allCtxts,
+        // [] (Ctxt* ctxt) {
+          // ctxt->reset();
+        // },
+        // Galois::loopname("reset_dag"), Galois::do_all_steal<true>());
+    Galois::do_all_choice (nhmgr.getAllRange (),
+        [] (NItem* nitem) {
+          nitem->reset();
         },
-        Galois::loopname("reset_dag"), Galois::do_all_steal<true>());
+        
     t_reset.stop ();
   }
 
@@ -401,4 +546,4 @@ void for_each_ordered_dag (const R& range, const Cmp& cmp, const NhoodFunc& nhVi
 } // end namespace Galois
 
 
-#endif // GALOIS_RUNTIME_DAG_H
+#endif // GALOIS_RUNTIME_DAGEXEC_ALT_H

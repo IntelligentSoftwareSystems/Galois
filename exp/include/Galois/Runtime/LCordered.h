@@ -70,14 +70,14 @@ protected:
 public:
   NhoodItem (Lockable* l, const CtxtCmp& ctxcmp):  sharers (ctxcmp), lockable (l) {}
 
-  void add (const Ctxt* ctx) {
+  void add (const Ctxt* ctxt) {
 
-    // assert (!sharers.find (const_cast<Ctxt*> (ctx)));
-    sharers.push (const_cast<Ctxt*> (ctx));
+    // assert (!sharers.find (const_cast<Ctxt*> (ctxt)));
+    sharers.push (const_cast<Ctxt*> (ctxt));
   }
 
-  bool isHighestPriority (const Ctxt* ctx) const {
-    return !sharers.empty () && (sharers.top () == ctx);
+  bool isHighestPriority (const Ctxt* ctxt) const {
+    return !sharers.empty () && (sharers.top () == ctxt);
   }
 
   Ctxt* getHighestPriority () const {
@@ -89,10 +89,10 @@ public:
     }
   }
 
-  void remove (const Ctxt* ctx) {
-    sharers.remove (const_cast<Ctxt*> (ctx));
+  void remove (const Ctxt* ctxt) {
+    sharers.remove (const_cast<Ctxt*> (ctxt));
     // XXX: may fail in parallel execution
-    assert (!sharers.find (const_cast<Ctxt*> (ctx)));
+    assert (!sharers.find (const_cast<Ctxt*> (ctxt)));
   }
 
   void print () const { 
@@ -162,7 +162,7 @@ public:
   typedef typename NItem::Factory NItemFactory;
 
   typedef MM::FixedSizeAllocator<NItem> NItemAlloc;
-  typedef Galois::Runtime::PerThreadVector<NItem*> NItemWL;
+  typedef Galois::Runtime::PerThreadBag<NItem*> NItemWL;
 
 protected:
   NItemFactory factory;
@@ -313,6 +313,7 @@ public:
   // TODO: fix visibility below
 public:
   T active;
+  // FIXME: nhood should be a set instead of list
   NhoodList nhood;
   NhoodMgr& nhmgr;
   GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE AtomicBool onWL;
@@ -436,9 +437,9 @@ struct SourceTest {
     : stabilityTest (stabilityTest) {}
 
   template <typename Ctxt>
-  bool operator () (const Ctxt* ctx) const {
-    assert (ctx != NULL);
-    return ctx->isSrc () && stabilityTest (ctx->active);
+  bool operator () (const Ctxt* ctxt) const {
+    assert (ctxt != NULL);
+    return ctxt->isSrc () && stabilityTest (ctxt->active);
   }
 };
 
@@ -446,9 +447,9 @@ template <>
 struct SourceTest <void> {
 
   template <typename Ctxt>
-  bool operator () (const Ctxt* ctx) const {
-    assert (ctx != NULL);
-    return ctx->isSrc ();
+  bool operator () (const Ctxt* ctxt) const {
+    assert (ctxt != NULL);
+    return ctxt->isSrc ();
   }
 };
 
@@ -501,19 +502,19 @@ class LCorderedExec {
     {}
 
     GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (const T& active) const {
-      Ctxt* ctx = ctxtAlloc.allocate (1);
-      assert (ctx != NULL);
-      // new (ctx) Ctxt (active, nhmgr);
-      //ctxtAlloc.construct (ctx, Ctxt (active, nhmgr));
-      ctxtAlloc.construct (ctx, active, nhmgr);
+      Ctxt* ctxt = ctxtAlloc.allocate (1);
+      assert (ctxt != NULL);
+      // new (ctxt) Ctxt (active, nhmgr);
+      //ctxtAlloc.construct (ctxt, Ctxt (active, nhmgr));
+      ctxtAlloc.construct (ctxt, active, nhmgr);
 
-      ctxtWL.get ().push_back (ctx);
+      ctxtWL.get ().push_back (ctxt);
 
-      Galois::Runtime::setThreadContext (ctx);
+      Galois::Runtime::setThreadContext (ctxt);
       int tmp=0;
       // TODO: nhoodVisitor should take only one arg, 
       // 2nd arg being passed due to compatibility with Deterministic executor
-      nhoodVisitor (ctx->active, tmp); 
+      nhoodVisitor (ctxt->active, tmp); 
       Galois::Runtime::setThreadContext (NULL);
     }
 
@@ -534,18 +535,18 @@ class LCorderedExec {
         nsrc (nsrc)
     {}
 
-    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (Ctxt* ctx) const {
-      assert (ctx != NULL);
-      // assume nhood of ctx is already expanded
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (Ctxt* ctxt) const {
+      assert (ctxt != NULL);
+      // assume nhood of ctxt is already expanded
 
-      // if (ctx->isSrc ()) {
-        // std::cout << "Testing source: " << ctx->str () << std::endl;
+      // if (ctxt->isSrc ()) {
+        // std::cout << "Testing source: " << ctxt->str () << std::endl;
       // }
-      // if (sourceTest (ctx)) {
-        // std::cout << "Initial source: " << ctx->str () << std::endl;
+      // if (sourceTest (ctxt)) {
+        // std::cout << "Initial source: " << ctxt->str () << std::endl;
       // }
-      if (sourceTest (ctx) && ctx->onWL.cas (false, true)) {
-        initSrc.get ().push_back (ctx);
+      if (sourceTest (ctxt) && ctxt->onWL.cas (false, true)) {
+        initSrc.get ().push_back (ctxt);
         nsrc += 1;
       }
     }
@@ -688,9 +689,9 @@ class LCorderedExec {
 
     explicit DelCtxt (CtxtAlloc& ctxtAlloc): ctxtAlloc (ctxtAlloc) {}
 
-    void operator () (Ctxt* ctx) const {
-      ctxtAlloc.destroy (ctx);
-      ctxtAlloc.deallocate (ctx, 1);
+    void operator () (Ctxt* ctxt) const {
+      ctxtAlloc.destroy (ctxt);
+      ctxtAlloc.deallocate (ctxt, 1);
     }
   };
 
