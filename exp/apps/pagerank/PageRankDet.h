@@ -66,6 +66,15 @@ protected:
   void readGraph (void) {
     Galois::Graph::readGraph (graph, inputFile, transposeFile);
 
+    Galois::do_all_choice (Galois::Runtime::makeLocalRange (graph),
+        [&] (GNode n) {
+          auto& pdata = graph.getData (n, Galois::MethodFlag::UNPROTECTED);
+          pdata.outdegree = std::distance (
+            graph.edge_begin (n, Galois::MethodFlag::UNPROTECTED),
+            graph.edge_end (n, Galois::MethodFlag::UNPROTECTED));
+        },
+        "init-pdata", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
+
     std::printf ("Graph read with %zd nodes and %zd edges\n", 
         graph.size (), graph.sizeEdges ());
   }
