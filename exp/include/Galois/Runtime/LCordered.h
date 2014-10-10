@@ -34,6 +34,7 @@
 #include "Galois/gdeque.h"
 #include "Galois/PriorityQueue.h"
 #include "Galois/Timer.h"
+#include "Galois/AltBag.h"
 
 #include "Galois/WorkList/WorkList.h"
 #include "Galois/Runtime/Context.h"
@@ -162,7 +163,7 @@ public:
   typedef typename NItem::Factory NItemFactory;
 
   typedef MM::FixedSizeAllocator<NItem> NItemAlloc;
-  typedef Galois::Runtime::PerThreadBag<NItem*> NItemWL;
+  typedef Galois::PerThreadBag<NItem*> NItemWL;
 
 protected:
   NItemFactory factory;
@@ -335,8 +336,10 @@ public:
 
     assert (NItem::getOwner (l) == &nitem);
 
-    nhood.push_back (&nitem);
-    nitem.add (this);
+    if (std::find (nhood.begin (), nhood.end (), &nitem) == nhood.end ()) {
+      nhood.push_back (&nitem);
+      nitem.add (this);
+    }
     
   }
 
@@ -473,7 +476,7 @@ class LCorderedExec {
   typedef typename Ctxt::NhoodMgr NhoodMgr;
 
   typedef MM::FixedSizeAllocator<Ctxt> CtxtAlloc;
-  typedef PerThreadVector<Ctxt*> CtxtWL;
+  typedef PerThreadBag<Ctxt*> CtxtWL;
   typedef PerThreadDeque<Ctxt*> CtxtDelQ;
   typedef PerThreadDeque<Ctxt*> CtxtLocalQ;
   // typedef Galois::Runtime::PerThreadVector<T> AddWL;

@@ -51,6 +51,8 @@
 namespace Galois {
 namespace Runtime {
 
+namespace Exp {
+
 template <typename C>
 struct DAGnhoodItemSetBased: public LockManagerBase {
 
@@ -72,19 +74,24 @@ public:
   typedef C Ctxt;
   typedef LockManagerBase Base;
   typedef Galois::concurrent_gslist<Ctxt*, 16> SharerSet;
+  typedef Galois::Runtime::MM::FixedSizeHeap FSHeap;
+
+  FSHeap heap;
+
+  DAGnhoodItemListBased (void): LockManagerBase{}, heap (sizeof(Ctxt*)) {}
 
   void addSharer (SharerSet& sharers, Ctxt* ctxt) {
     assert (std::find (sharers.begin (), sharers.end (), ctxt) == sharers.end ());
-    sharers.push_back (ctxt);
+    sharers.push_front (heap, ctxt);
   }
 };
 
 template <typename Base>
 struct DAGnhoodItem: public Base {
 
-  typedef Base::Ctxt Ctxt;
-  typedef Base::SharerSet SharerSet;
-  typedef SharerSet::iterator HeadIter;
+  typedef typename Base::Ctxt Ctxt;
+  typedef typename Base::SharerSet SharerSet;
+  typedef typename SharerSet::iterator HeadIter;
 
   SharerSet sharers;
   HeadIter head;
@@ -106,7 +113,7 @@ struct DAGnhoodItem: public Base {
   }
 
   template <typename CtxtCmp> 
-  sortSharerSet (const CtxtCmp& cmp) {
+  void sortSharerSet (const CtxtCmp& cmp) {
     std::sort (sharers.begin (), sharers.end (), cmp);
     head = sharers.begin ();
     end = sharers.end ();
@@ -159,10 +166,11 @@ struct DAGnhoodItem: public Base {
 
   struct Factory {
 
-    typedef DAGnhoodItem<Ctxt> NItem;
+    typedef DAGnhoodItem<Base> NItem;
     typedef MM::FixedSizeAllocator<NItem> NItemAlloc;
 
     NItemAlloc niAlloc;
+
 
     NItem* create (Lockable* l) {
       NItem* ni = niAlloc.allocate (1);
@@ -185,7 +193,7 @@ struct DAGcontext: public SimpleRuntimeContext {
   // typedef DAGnhoodItem<DAGcontext> NItem;
   typedef DAGnhoodItem<DAGnhoodItemListBased<DAGcontext> > NItem;
   typedef PtrBasedNhoodMgr<NItem> NhoodMgr;
-  typedef Galois::gdeque<DAGcontext*, 8> NhoodSet;
+  typedef Galois::gdeque<NItem*, 8> NhoodSet;
   typedef Galois::GAtomic<bool> AtomicBool;
 
 
@@ -209,16 +217,17 @@ struct DAGcontext: public SimpleRuntimeContext {
     assert (NItem::getOwner (l) == &nitem);
 
     // enforcing set semantics
-    if (std::find (nhood.begin (), nhood.end (), nitem) == nhood.end ()) {
+    if (std::find (nhood.begin (), nhood.end (), &nitem) == nhood.end ()) {
+      nhood.push_back (&nitem);
       nitem.addSharer (this);
     }
   }
 
-  void remove (void) {
+  void removeFromNhood (void) {
     assert (isSrc());
     for (auto i = nhood.begin (), end_i = nhood.end (); i != end_i; ++i) {
-      assert (i->getMin () == this);
-      i->removeMin ();
+      assert ((*i)->getMin () == this);
+      (*i)->removeMin (this);
     }
   }
 
@@ -229,7 +238,7 @@ struct DAGcontext: public SimpleRuntimeContext {
     }
 
     for (auto i = nhood.begin (), end_i = nhood.end (); i != end_i; ++i) {
-      if (i->getMin () != this) {
+      if ((*i)->getMin () != this) {
         return false;
       }
     }
@@ -242,20 +251,29 @@ struct DAGcontext: public SimpleRuntimeContext {
   void findNewSources (WL& workList) {
     for (auto i = nhood.begin (), end_i = nhood.end (); i != end_i; ++i) {
 
-      DAGcontext* min = i->getMin ();
+      DAGcontext* min = (*i)->getMin ();
 
       if (min != nullptr && 
           !bool (min->onWL) &&
           min->isSrc () &&
           min->onWL.cas (false, true)) {
 
-        // GALOIS_DEBUG ("Adding found source: %s\n", highest->str ().c_str ());
-        wl.push (highest);
+        // GALOIS_DEBUG ("Adding found source: %s\n", min->str ().c_str ());
+        workList.push (min);
       }
     }
   }
 
   void reset (void) {}
+
+  template <typename Cmp>
+  struct Comparator {
+    Cmp cmp;
+
+    bool operator () (const DAGcontext* left, const DAGcontext* right) const {
+      return cmp (left->elem, right->elem);
+    }
+  };
 
 };
 
@@ -378,7 +396,7 @@ protected:
       assert (src->isSrc ());
 
       UserCtx& uctx = *(userCtxts.getLocal ());
-      opFunc (src->getElem (), uctx);
+      opFunc (src->elem, uctx);
 
       src->removeFromNhood ();
 
@@ -386,7 +404,7 @@ protected:
     }
   };
 
-
+  static const unsigned DEFAULT_CHUNK_SIZE = 16;
 
   Cmp cmp;
   NhoodFunc nhVisitor;
@@ -413,25 +431,12 @@ public:
 
   ~DAGexecutor (void) {
 
-    Galois::do_all_local(allCtxts,
+    Galois::do_all_choice (Galois::Runtime::makeLocalRange (allCtxts),
         [this] (Ctxt* ctxt) {
           ctxtAlloc.destroy (ctxt);
           ctxtAlloc.deallocate (ctxt, 1);
-        }, Galois::loopname("free_ctx"));
-  }
-
-  void createEdge (Ctxt* a, Ctxt* b) {
-    assert (a != nullptr);
-    assert (b != nullptr);
-
-    // a < b ? a : b
-    Ctxt* src = cmp (a->getElem () , b->getElem ()) ? a : b;
-    Ctxt* dst = (src == a) ? b : a;
-
-    // avoid adding same edge multiple times
-    if (src->addOutNeigh (dst)) {
-      dst->addInNeigh (src);
-    }
+        }, 
+        "free_ctx", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
   }
 
 
@@ -457,25 +462,25 @@ public:
           Galois::Runtime::setThreadContext (ctxt);
 
           UserCtx& uctx = *(userCtxts.getLocal ());
-          nhVisitor (ctxt->getElem (), uctx);
+          nhVisitor (ctxt->elem, uctx);
           Galois::Runtime::setThreadContext (NULL);
-        }, "create_ctxt");
+        }, "create_ctxt", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
 
 
     Galois::do_all_choice (nhmgr.getAllRange(),
         [this] (NItem* nitem) {
-          nitem->sortSharerSet (cmp);
+          nitem->sortSharerSet (typename Ctxt::template Comparator<Cmp> {cmp});
         }, 
-        Galois::loopname("sort_sharers"), 
-        Galois::do_all_steal<true>());
+        "sort_sharers", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE>());
 
-    Galois::do_all_choice (allCtxts,
+    Galois::do_all_choice (Galois::Runtime::makeLocalRange (allCtxts),
         [this] (Ctxt* ctxt) {
           if (ctxt->isSrc ()) {
             ctxt->onWL = true;
             initSources.get ().push_back (ctxt);
           }
-        }, Galois::loopname("find-init-sources"), Galois::do_all_steal<true>());
+        }, 
+        "find-init-sources", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE>());
 
     t_init.stop ();
   }
@@ -509,28 +514,31 @@ public:
         [] (NItem* nitem) {
           nitem->reset();
         },
+        "reset_dag", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
         
     t_reset.stop ();
   }
 
 };
 
-template <typename R, typename Cmp, typename OpFunc, typename NhoodFunc>
-DAGexecutor<typename R::value_type, Cmp, OpFunc, NhoodFunc> make_dag_executor (const R& range, const Cmp& cmp, const NhoodFunc& nhVisitor, const OpFunc& opFunc, const char* loopname=nullptr) {
+} // end namespace Exp
 
-  return new DAGexecutor<typename R::value_type, Cmp, OpFunc, NhoodFunc> (cmp, nhVisitor, opFunc);
+template <typename R, typename Cmp, typename OpFunc, typename NhoodFunc>
+Exp::DAGexecutor<typename R::value_type, Cmp, OpFunc, NhoodFunc> make_dag_executor (const R& range, const Cmp& cmp, const NhoodFunc& nhVisitor, const OpFunc& opFunc, const char* loopname=nullptr) {
+
+  return new Exp::DAGexecutor<typename R::value_type, Cmp, OpFunc, NhoodFunc> (cmp, nhVisitor, opFunc);
 }
 
 template <typename R, typename Cmp, typename OpFunc, typename NhoodFunc>
-void destroy_dag_executor (DAGexecutor<typename R::value_type, Cmp, OpFunc, NhoodFunc>*& exec_ptr) {
+void destroy_dag_executor (Exp::DAGexecutor<typename R::value_type, Cmp, OpFunc, NhoodFunc>*& exec_ptr) {
   delete exec_ptr; exec_ptr = nullptr;
 }
 
 template <typename R, typename Cmp, typename OpFunc, typename NhoodFunc>
-void for_each_ordered_dag (const R& range, const Cmp& cmp, const NhoodFunc& nhVisitor, const OpFunc& opFunc, const char* loopname=nullptr) {
+void for_each_ordered_dag_alt (const R& range, const Cmp& cmp, const NhoodFunc& nhVisitor, const OpFunc& opFunc, const char* loopname=nullptr) {
 
   typedef typename R::value_type T;
-  typedef DAGexecutor<T, Cmp, OpFunc, NhoodFunc> Exec_ty;
+  typedef Exp::DAGexecutor<T, Cmp, OpFunc, NhoodFunc> Exec_ty;
   
   Exec_ty exec (cmp, nhVisitor, opFunc);
 

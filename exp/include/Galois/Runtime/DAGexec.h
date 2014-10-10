@@ -51,6 +51,7 @@
 namespace Galois {
 namespace Runtime {
 
+namespace {
 
 template <typename Ctxt>
 struct DAGnhoodItem: public LockManagerBase {
@@ -123,7 +124,7 @@ struct DAGcontext: public SimpleRuntimeContext {
 protected:
   typedef Galois::ThreadSafeOrderedSet<DAGcontext*, std::less<DAGcontext*> > AdjSet;
   // TODO: change AdjList to array for quicker iteration
-  typedef Galois::gdeque<DAGcontext*, 8> AdjList;
+  typedef Galois::gdeque<DAGcontext*, 64> AdjList;
   typedef std::atomic<int> ParCounter;
 
   GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE ParCounter inDeg;
@@ -198,6 +199,8 @@ public:
 
 };
 
+} // end namespace anonymous
+
 
 template <typename T, typename Cmp, typename OpFunc, typename NhoodFunc>
 class DAGexecutor {
@@ -208,7 +211,7 @@ protected:
   typedef typename Ctxt::NItem NItem;
 
   typedef MM::FixedSizeAllocator<Ctxt> CtxtAlloc;
-  typedef PerThreadVector<Ctxt*> CtxtWL;
+  typedef PerThreadBag<Ctxt*> CtxtWL;
   typedef UserContextAccess<T> UserCtx;
   typedef PerThreadStorage<UserCtx> PerThreadUserCtx;
 
@@ -242,6 +245,7 @@ protected:
   };
 
 
+  static const unsigned DEFAULT_CHUNK_SIZE = 16;
 
   Cmp cmp;
   NhoodFunc nhVisitor;
@@ -267,11 +271,12 @@ public:
   {}
 
   ~DAGexecutor (void) {
-    Galois::do_all_local(allCtxts,
+    Galois::do_all_choice (Galois::Runtime::makeLocalRange (allCtxts),
         [this] (Ctxt* ctx) {
           ctxtAlloc.destroy (ctx);
           ctxtAlloc.deallocate (ctx, 1);
-        }, Galois::loopname("free_ctx"));
+        }, 
+       "free_ctx", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
   }
 
   void createEdge (Ctxt* a, Ctxt* b) {
@@ -300,7 +305,7 @@ public:
     Galois::StatTimer t_init ("Time to create the DAG: ");
 
     t_init.start ();
-    Galois::Runtime::do_all_choice (range,
+    Galois::do_all_choice (range,
         [this] (const T& x) {
           Ctxt* ctx = ctxtAlloc.allocate (1);
           assert (ctx != NULL);
@@ -313,10 +318,10 @@ public:
           UserCtx& uctx = *(userCtxts.getLocal ());
           nhVisitor (ctx->getElem (), uctx);
           Galois::Runtime::setThreadContext (NULL);
-        }, "create_ctxt");
+        }, "create_ctxt", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
 
 
-    Galois::do_all_choice (nhmgr.getContainer(),
+    Galois::do_all_choice (nhmgr.getAllRange(),
         [this] (NItem* nitem) {
           for (auto i = nitem->sharers.begin ()
             , i_end = nitem->sharers.end (); i != i_end; ++i) {
@@ -327,15 +332,15 @@ public:
               createEdge (*i, *j);
             }
           }
-        }, Galois::loopname("create_ctxt_edges"), Galois::do_all_steal<true>());
+        }, "create_ctxt_edges", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
 
-    Galois::do_all_choice (allCtxts,
+    Galois::do_all_choice (Galois::Runtime::makeLocalRange (allCtxts),
         [this] (Ctxt* ctx) {
           ctx->finalizeAdj ();
           if (ctx->isSrc ()) {
             initSources.get ().push_back (ctx);
           }
-        }, Galois::loopname("finalize"), Galois::do_all_steal<true>());
+        }, "finalize", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
 
     t_init.stop ();
   }
@@ -344,13 +349,11 @@ public:
 
     StatTimer t_exec ("Time to execute the DAG: ");
 
-    const unsigned CHUNK_SIZE = OpFunc::CHUNK_SIZE;
-    typedef Galois::WorkList::dChunkedFIFO<CHUNK_SIZE, Ctxt*> SrcWL_ty;
-
+    typedef Galois::WorkList::dChunkedFIFO<OpFunc::CHUNK_SIZE, Ctxt*> SrcWL_ty;
 
     t_exec.start ();
 
-    Galois::for_each_choice (initSources,
+    Galois::for_each_local (initSources,
         ApplyOperator (opFunc, userCtxts), Galois::loopname("apply_operator"), Galois::wl<SrcWL_ty>());
 
     t_exec.stop ();
@@ -360,11 +363,11 @@ public:
     Galois::StatTimer t_reset ("Time to reset the DAG: ");
 
     t_reset.start ();
-    Galois::do_all_choice (allCtxts,
+    Galois::do_all_choice (Galois::Runtime::makeLocalRange (allCtxts),
         [] (Ctxt* ctx) {
           ctx->reset();
         },
-        Galois::loopname("reset_dag"), Galois::do_all_steal<true>());
+        "reset_dag", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
     t_reset.stop ();
   }
 

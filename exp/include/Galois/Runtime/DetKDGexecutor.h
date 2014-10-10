@@ -4,11 +4,13 @@
 #include "Galois/Runtime/LCordered.h"
 #include "Galois/Runtime/KDGtwoPhase.h"
 #include "Galois/Runtime/DAGexec.h"
+#include "Galois/Runtime/DAGexecAlt.h"
 
 namespace Galois {
 namespace Runtime {
 
 enum KDGexecType {
+  KDG_R_ALT,
   KDG_R,
   KDG_AR,
   IKDG
@@ -88,6 +90,14 @@ struct DetKDGexecutor {
       nextWL->clear_all_parallel ();
 
       switch (kdgType) {
+        case KDG_R_ALT:
+          for_each_ordered_dag_alt (
+              Galois::Runtime::makeLocalRange (*currWL),
+              cmp,
+              nhoodVisitor,
+              ApplyOperator{*this},
+              "kdg_r");
+          break;
 
         case KDG_R:
           for_each_ordered_dag (

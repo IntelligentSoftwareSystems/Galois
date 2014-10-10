@@ -3,6 +3,7 @@
 namespace cll = llvm::cl;
 
 enum ExecType {
+  KDG_R_ALT,
   KDG_R,
   KDG_AR,
   IKDG,
@@ -12,6 +13,7 @@ static cll::opt<ExecType> execType (
     "executor",
     cll::desc ("Deterministic Executor Type"),
     cll::values (
+      clEnumValN (KDG_R_ALT, "KDG_R_ALT", "KDG_R_ALT"),
       clEnumValN (KDG_R, "KDG_R", "KDG_R"),
       clEnumValN (KDG_AR, "KDG_AR", "KDG_AR"),
       clEnumValN (IKDG, "IKDG", "IKDG"),
@@ -90,6 +92,16 @@ protected:
   virtual void runPageRank (void) {
 
     switch (execType) {
+      case KDG_R_ALT:
+        // TODO: assign priorities to nodes
+        Galois::Runtime::for_each_det_kdg (
+            Galois::Runtime::makeLocalRange (graph),
+            NodeComparator {graph},
+            NhoodVisitor {graph},
+            ApplyOperator<true> {*this},
+            "page-rank-kdg-r-alt",
+            Galois::Runtime::KDG_R_ALT);
+        break;
 
       case KDG_R:
         // TODO: assign priorities to nodes
