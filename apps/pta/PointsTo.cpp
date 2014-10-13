@@ -532,6 +532,7 @@ void printConstraints(PointsToConstraints &constraints) {
 }
 
 int main(int argc, char** argv) {
+  Galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
 
   numNodes = readConstraints(input.c_str(), addrcopyconstraints, loadstoreconstraints);
