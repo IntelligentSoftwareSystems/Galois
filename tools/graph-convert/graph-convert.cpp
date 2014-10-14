@@ -377,7 +377,7 @@ struct Mtx2Gr: public HasNoVoidSpecialization {
 
       // Read header
       char header[256];
-      infile.getline(header, 256, '\n');
+      infile.getline(header, 256);
       std::istringstream line(header, std::istringstream::in);
       std::vector<std::string> tokens;
       while (line) {
@@ -1664,7 +1664,7 @@ struct Dimacs2Gr: public HasNoVoidSpecialization {
 
       // Read header
       char header[256];
-      infile.getline(header, 256, '\n');
+      infile.getline(header, 256);
       std::istringstream line(header, std::istringstream::in);
       std::vector<std::string> tokens;
       while (line) {
