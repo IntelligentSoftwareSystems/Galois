@@ -65,6 +65,7 @@ enum ConvertMode {
   gr2randomweightgr,
   gr2ringgr,
   gr2rmat,
+  gr2metis,
   gr2sgr,
   gr2sorteddegreegr,
   gr2sorteddstgr,
@@ -133,6 +134,7 @@ static cll::opt<ConvertMode> convertMode(cll::desc("Conversion mode:"),
       clEnumVal(gr2randomweightgr, "Add or Randomize edge weights"),
       clEnumVal(gr2ringgr, "Convert binary gr to strongly connected graph by adding ring overlay"),
       clEnumVal(gr2rmat, "Convert binary gr to RMAT graph"),
+      clEnumVal(gr2metis, "Convert binary gr to METIS graph (unweighted)"),
       clEnumVal(gr2sgr, "Convert binary gr to symmetric graph by adding reverse edges"),
       clEnumVal(gr2sorteddegreegr, "Sort nodes by degree"),
       clEnumVal(gr2sorteddstgr, "Sort outgoing edges of binary gr by edge destination"),
@@ -2009,6 +2011,56 @@ struct Gr2Rmat: public HasNoVoidSpecialization {
 };
 
 /**
+ * METIS format (1-indexed). See METIS 4.10 manual, section 4.5.
+ *  % comment prefix
+ *  <num nodes> <num edges> [<data format> [<weights per vertex>]]
+ *  [<vertex data>] [<destination> [<edge data>]]*
+ *  ...
+ * vertex weights must be integers >= 0; edge weights must be > 0.
+ * Input graph must be symmetric. Does not write self-edges.
+ * FIXME: implement weights.
+ */
+struct Gr2Metis: public HasOnlyVoidSpecialization {
+  template<typename InEdgeTy>
+  void convert(const std::string& infilename, const std::string& outfilename) {
+    typedef Galois::Graph::FileGraph Graph;
+    typedef Graph::GraphNode GNode;
+
+    Graph graph;
+    graph.fromFile(infilename);
+
+    /* Skip self-edges */
+    unsigned int nedges = graph.sizeEdges();
+    for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+      GNode src = *ii;
+      for (Graph::edge_iterator jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj) {
+        GNode dst = graph.getEdgeDst(jj);
+        if ( dst == src )
+          nedges--;
+      }
+    }
+    assert((nedges % 2) == 0);
+    nedges /= 2;                // Do not double-count edges
+
+    std::ofstream file(outfilename.c_str());
+    file << graph.size() << " " << nedges << "\n";
+    for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
+      GNode src = *ii;
+      for (Graph::edge_iterator jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj) {
+        GNode dst = graph.getEdgeDst(jj);
+        //OutEdgeTy weight = graph.getEdgeData<InEdgeTy>(jj);
+        if ( dst != src )
+          file << dst + 1 << " ";
+      }
+      file << "\n";
+    }
+    file.close();
+
+    printStatus(graph.size(), nedges);
+  }
+};
+
+/**
  * GR to Binary Sparse MATLAB matrix.
  * [i, j, v] = find(A); 
  * fwrite(f, size(A,1), 'uint32');
@@ -2221,6 +2273,7 @@ int main(int argc, char** argv) {
     case gr2randomweightgr: convert<RandomizeEdgeWeights>(); break;
     case gr2ringgr: convert<AddRing>(); break;
     case gr2rmat: convert<Gr2Rmat<int32_t> >(); break;
+    case gr2metis: convert<Gr2Metis>(); break;
     case gr2sgr: convert<MakeSymmetric>(); break;
     case gr2sorteddegreegr: convert<SortByDegree>(); break;
     case gr2sorteddstgr: convert<SortEdges<IdLess, false> >(); break; 
