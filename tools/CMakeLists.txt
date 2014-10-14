@@ -91,7 +91,7 @@ function(cilkdl name url)
     dl(${name} ${url})
     set(more_tools ${more_tools} ${name} PARENT_SCOPE)
   else()
-    message(STATUS "Build of ${name} will be skipped because CILK is not available")
+    message(STATUS "NOT compiling ${name} (missing: CILK)")
   endif()
 endfunction(cilkdl)
 
