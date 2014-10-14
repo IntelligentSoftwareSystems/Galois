@@ -191,6 +191,7 @@ Graph::edge_iterator findEdge(Graph& g, GNode src, GNode dst) {
     if (g.getEdgeDst(ii) == dst)
       break;
   }
+  assert(ii != ei); // Never return the end iterator
   return ii;
 }
 
