@@ -66,8 +66,8 @@ public:
 public:
   explicit DAGnhoodItem (Lockable* l): lockable (l), sharers () {}
 
-  void addSharer (Ctxt* ctx) {
-    sharers.push (ctx);
+  void addSharer (Ctxt* ctxt) {
+    sharers.push (ctxt);
   }
 
   bool tryMappingTo (Lockable* l) {
@@ -121,7 +121,7 @@ struct DAGcontext: public SimpleRuntimeContext {
   typedef DAGnhoodItem<DAGcontext> NItem;
   typedef PtrBasedNhoodMgr<NItem> NhoodMgr;
 
-protected:
+public:
   typedef Galois::ThreadSafeOrderedSet<DAGcontext*, std::less<DAGcontext*> > AdjSet;
   // TODO: change AdjList to array for quicker iteration
   typedef Galois::gdeque<DAGcontext*, 64> AdjList;
@@ -220,25 +220,23 @@ protected:
 
     typedef int tt_does_not_need_aborts;
 
-    OpFunc& opFunc;
-    PerThreadUserCtx& userCtxts;
-
-    explicit ApplyOperator (OpFunc& opFunc, PerThreadUserCtx& userCtxts)
-      : opFunc (opFunc), userCtxts (userCtxts)
-    {}
+    DAGexecutor& outer;
 
     template <typename W>
     void operator () (Ctxt* src, W& wl) {
       assert (src->isSrc ());
 
-      UserCtx& uctx = *(userCtxts.getLocal ());
-      opFunc (src->getElem (), uctx);
+      printf ("processing source: %p, item: %d\n", src, src->elem);
+
+      UserCtx& uctx = *(outer.userCtxts.getLocal ());
+      outer.opFunc (src->getElem (), uctx);
 
       for (auto i = src->neighbor_begin (), i_end = src->neighbor_end ();
           i != i_end; ++i) {
 
         if ((*i)->removeLastInNeigh (src)) {
           wl.push (*i);
+          outer.numPush += 1;
         }
       }
     }
@@ -256,6 +254,7 @@ protected:
   CtxtWL allCtxts;
   CtxtWL initSources;
   PerThreadUserCtx userCtxts;
+  Galois::GAccumulator<size_t> numPush;
 
 public:
 
@@ -272,9 +271,9 @@ public:
 
   ~DAGexecutor (void) {
     Galois::do_all_choice (Galois::Runtime::makeLocalRange (allCtxts),
-        [this] (Ctxt* ctx) {
-          ctxtAlloc.destroy (ctx);
-          ctxtAlloc.deallocate (ctx, 1);
+        [this] (Ctxt* ctxt) {
+          ctxtAlloc.destroy (ctxt);
+          ctxtAlloc.deallocate (ctxt, 1);
         }, 
        "free_ctx", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
   }
@@ -304,25 +303,32 @@ public:
 
     Galois::StatTimer t_init ("Time to create the DAG: ");
 
+    std::printf ("total number of tasks: %ld\n", std::distance (range.begin (), range.end ()));
+
     t_init.start ();
     Galois::do_all_choice (range,
         [this] (const T& x) {
-          Ctxt* ctx = ctxtAlloc.allocate (1);
-          assert (ctx != NULL);
-          ctxtAlloc.construct (ctx, x, nhmgr);
+          Ctxt* ctxt = ctxtAlloc.allocate (1);
+          assert (ctxt != NULL);
+          ctxtAlloc.construct (ctxt, x, nhmgr);
 
-          allCtxts.get ().push_back (ctx);
+          allCtxts.get ().push_back (ctxt);
 
-          Galois::Runtime::setThreadContext (ctx);
+          Galois::Runtime::setThreadContext (ctxt);
 
           UserCtx& uctx = *(userCtxts.getLocal ());
-          nhVisitor (ctx->getElem (), uctx);
+          nhVisitor (ctxt->getElem (), uctx);
           Galois::Runtime::setThreadContext (NULL);
+
+          printf ("Created context:%p for item: %d\n", ctxt, x);
+
         }, "create_ctxt", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
 
 
     Galois::do_all_choice (nhmgr.getAllRange(),
         [this] (NItem* nitem) {
+          // std::printf ("Nitem: %p, num sharers: %ld\n", nitem, nitem->sharers.size ());
+
           for (auto i = nitem->sharers.begin ()
             , i_end = nitem->sharers.end (); i != i_end; ++i) {
 
@@ -335,12 +341,14 @@ public:
         }, "create_ctxt_edges", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
 
     Galois::do_all_choice (Galois::Runtime::makeLocalRange (allCtxts),
-        [this] (Ctxt* ctx) {
-          ctx->finalizeAdj ();
-          if (ctx->isSrc ()) {
-            initSources.get ().push_back (ctx);
+        [this] (Ctxt* ctxt) {
+          ctxt->finalizeAdj ();
+          if (ctxt->isSrc ()) {
+            initSources.get ().push_back (ctxt);
           }
         }, "finalize", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
+
+    std::printf ("Number of initial sources: %ld\n", std::distance (initSources.begin () , initSources.end ()));
 
     t_init.stop ();
   }
@@ -354,8 +362,10 @@ public:
     t_exec.start ();
 
     Galois::for_each_local (initSources,
-        ApplyOperator (opFunc, userCtxts), Galois::loopname("apply_operator"), Galois::wl<SrcWL_ty>());
+        ApplyOperator {*this}, Galois::loopname("apply_operator"), Galois::wl<SrcWL_ty>());
 
+    std::printf ("Number of pushes: %zd\n, (#pushes + #init) = %zd\n", 
+        numPush.reduceRO (), numPush.reduceRO () + initSources.size_all  ());
     t_exec.stop ();
   }
 
@@ -364,8 +374,8 @@ public:
 
     t_reset.start ();
     Galois::do_all_choice (Galois::Runtime::makeLocalRange (allCtxts),
-        [] (Ctxt* ctx) {
-          ctx->reset();
+        [] (Ctxt* ctxt) {
+          ctxt->reset();
         },
         "reset_dag", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
     t_reset.stop ();

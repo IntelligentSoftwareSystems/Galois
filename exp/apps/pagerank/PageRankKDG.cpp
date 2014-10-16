@@ -90,6 +90,11 @@ protected:
   };
 
   virtual void runPageRank (void) {
+    
+    typedef typename Galois::Runtime::DAGmanagerInOut<Graph>::Manager Manager;
+    Manager m {graph};
+    m.assignPriority ();
+
 
     switch (execType) {
       case KDG_R_ALT:

@@ -10,6 +10,7 @@
 #include "Galois/Runtime/LevelExecutor.h"
 #include "Galois/Runtime/KDGtwoPhase.h"
 #include "Galois/Runtime/DAGexec.h"
+#include "Galois/Runtime/DAGexecAlt.h"
 #include "Galois/Runtime/TreeExec.h"
 #include "Galois/Runtime/Sampling.h"
 
@@ -773,6 +774,9 @@ struct TreeSummarizeDataDAG: public TreeSummarizeTwoPhase {
     Galois::Runtime::for_each_ordered_dag (
         Galois::Runtime::makeLocalRange (internalNodes), 
         LevelComparator<TreeNode> (), Base::VisitNhood (), Base::OpFunc<false> ());
+    // Galois::Runtime::for_each_ordered_dag_alt (
+        // Galois::Runtime::makeLocalRange (internalNodes), 
+        // LevelComparator<TreeNode> (), Base::VisitNhood (), Base::OpFunc<false> ());
 
   }
 

@@ -69,6 +69,25 @@ public:
 };
 
 template <typename C>
+struct DAGnhoodItemVectorBased: public LockManagerBase {
+
+public:
+  typedef C Ctxt;
+  typedef LockManagerBase Base;
+  typedef std::vector<Ctxt*> SharerSet;
+
+  LL::SimpleLock mutex;
+
+  inline void addSharer (SharerSet& sharers, Ctxt* ctxt) {
+    mutex.lock ();
+      assert (std::find (sharers.begin (), sharers.end (), ctxt) == sharers.end ());
+      sharers.push_back (ctxt);
+    mutex.unlock();
+  }
+
+};
+
+template <typename C>
 struct DAGnhoodItemListBased: public LockManagerBase {
 public:
   typedef C Ctxt;
@@ -191,7 +210,7 @@ template <typename T>
 struct DAGcontext: public SimpleRuntimeContext {
 
   // typedef DAGnhoodItem<DAGcontext> NItem;
-  typedef DAGnhoodItem<DAGnhoodItemListBased<DAGcontext> > NItem;
+  typedef DAGnhoodItem<DAGnhoodItemVectorBased<DAGcontext> > NItem;
   typedef PtrBasedNhoodMgr<NItem> NhoodMgr;
   typedef Galois::gdeque<NItem*, 8> NhoodSet;
   typedef Galois::GAtomic<bool> AtomicBool;
@@ -234,6 +253,7 @@ struct DAGcontext: public SimpleRuntimeContext {
   bool isSrc (void) const {
     
     if (nhood.empty ()) {
+      // std::fprintf(stderr, "WARNING: isSrc() called with empty nhood\n");
       return true;
     }
 
@@ -248,7 +268,9 @@ struct DAGcontext: public SimpleRuntimeContext {
 
 
   template <typename WL>
-  void findNewSources (WL& workList) {
+  size_t findNewSources (WL& workList) {
+
+    size_t num = 0;
     for (auto i = nhood.begin (), end_i = nhood.end (); i != end_i; ++i) {
 
       DAGcontext* min = (*i)->getMin ();
@@ -260,8 +282,11 @@ struct DAGcontext: public SimpleRuntimeContext {
 
         // GALOIS_DEBUG ("Adding found source: %s\n", min->str ().c_str ());
         workList.push (min);
+        ++num;
       }
     }
+
+    return num;
   }
 
   void reset (void) {}
@@ -384,23 +409,19 @@ protected:
 
     typedef int tt_does_not_need_aborts;
 
-    OpFunc& opFunc;
-    PerThreadUserCtx& userCtxts;
-
-    explicit ApplyOperator (OpFunc& opFunc, PerThreadUserCtx& userCtxts)
-      : opFunc (opFunc), userCtxts (userCtxts)
-    {}
+    DAGexecutor& outer;
 
     template <typename W>
     void operator () (Ctxt* src, W& wl) {
       assert (src->isSrc ());
+      printf ("processing source: %p, item: %d\n", src, src->elem);
 
-      UserCtx& uctx = *(userCtxts.getLocal ());
-      opFunc (src->elem, uctx);
+      UserCtx& uctx = *(outer.userCtxts.getLocal ());
+      outer.opFunc (src->elem, uctx);
 
       src->removeFromNhood ();
 
-      src->findNewSources (wl);
+      outer.numPush += src->findNewSources (wl);
     }
   };
 
@@ -415,6 +436,7 @@ protected:
   CtxtWL allCtxts;
   CtxtWL initSources;
   PerThreadUserCtx userCtxts;
+  Galois::GAccumulator<size_t> numPush;
 
 public:
 
@@ -450,6 +472,8 @@ public:
 
     Galois::StatTimer t_init ("Time to create the DAG: ");
 
+    std::printf ("total number of tasks: %ld\n", std::distance (range.begin (), range.end ()));
+
     t_init.start ();
     Galois::do_all_choice (range,
         [this] (const T& x) {
@@ -464,12 +488,15 @@ public:
           UserCtx& uctx = *(userCtxts.getLocal ());
           nhVisitor (ctxt->elem, uctx);
           Galois::Runtime::setThreadContext (NULL);
+
+          printf ("Created context:%p for item: %d\n", ctxt, x);
         }, "create_ctxt", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
 
 
     Galois::do_all_choice (nhmgr.getAllRange(),
         [this] (NItem* nitem) {
           nitem->sortSharerSet (typename Ctxt::template Comparator<Cmp> {cmp});
+          // std::printf ("Nitem: %p, num sharers: %ld\n", nitem, nitem->sharers.size ());
         }, 
         "sort_sharers", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE>());
 
@@ -482,6 +509,8 @@ public:
         }, 
         "find-init-sources", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE>());
 
+    std::printf ("Number of initial sources: %ld\n", std::distance (initSources.begin () , initSources.end ()));
+
     t_init.stop ();
   }
 
@@ -493,11 +522,15 @@ public:
     typedef Galois::WorkList::dChunkedFIFO<CHUNK_SIZE, Ctxt*> SrcWL_ty;
 
 
+
     t_exec.start ();
 
     Galois::for_each_local (initSources,
-        ApplyOperator {opFunc, userCtxts}, Galois::loopname("apply_operator"), Galois::wl<SrcWL_ty>());
+        ApplyOperator {*this}, Galois::loopname {"apply_operator"}, Galois::wl<SrcWL_ty>());
 
+    std::printf ("Number of pushes: %zd\n, (#pushes + #init) = %zd\n", 
+        numPush.reduceRO (), numPush.reduceRO () + initSources.size_all  ());
+    
     t_exec.stop ();
   }
 

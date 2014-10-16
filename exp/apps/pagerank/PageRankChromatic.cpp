@@ -65,11 +65,11 @@ protected:
         break;
 
       case EDGE_FLIP:
-#if 0
-        Galois::Runtime::for_each_det_dag_active (
+#if 1
+        Galois::Runtime::for_each_det_edge_flip_ar (
             Galois::Runtime::makeLocalRange (graph),
-            graph,
             ApplyOperator<false> {*this},
+            graph,
             "page-rank-chromatic");
 #else
         abort();

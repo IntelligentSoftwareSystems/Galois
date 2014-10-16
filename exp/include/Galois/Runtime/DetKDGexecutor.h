@@ -19,8 +19,8 @@ enum KDGexecType {
 template <typename T, typename Cmp, typename NhoodFunc, typename OpFunc>
 struct DetKDGexecutor {
 
-  // typedef Galois::PerThreadBag<T> Bag_ty;
-  typedef Galois::Runtime::PerThreadVector<T> Bag_ty;
+  typedef Galois::PerThreadBag<T> Bag_ty;
+  // typedef Galois::Runtime::PerThreadVector<T> Bag_ty;
 
   static const unsigned DEFAULT_CHUNK_SIZE = 8;
 
@@ -130,6 +130,10 @@ struct DetKDGexecutor {
           std::abort ();
 
       } // end switch
+
+      if (rounds >= 2) { 
+        break; // TODO: remove
+      }
 
     } // end while
 
