@@ -26,7 +26,7 @@
 struct AsyncRsd {
   struct LNode {
     std::atomic<PRTy> value;
-    std::atomic<PRTy> residual; // tracking residual
+    std::atomic<PRTy> residual; 
     void init() { value = 1.0 - alpha; residual = 0.0; }
     PRTy getPageRank(int x = 0) { return value; }
     friend std::ostream& operator<<(std::ostream& os, const LNode& n) {
@@ -57,8 +57,7 @@ struct AsyncRsd {
     Process(Graph& g, PRTy t): graph(g), tolerance(t) { }
 
     void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) const {
-      LNode& sdata = graph.getData(src);
-      
+      LNode& sdata = graph.getData(src);      
       Galois::MethodFlag lockflag = Galois::MethodFlag::NONE;
 
       PRTy oldResidual = sdata.residual.exchange(0.0);
@@ -68,8 +67,7 @@ struct AsyncRsd {
       int src_nout = nout(graph,src, lockflag);
       PRTy delta = diff*alpha/src_nout;
       // for each out-going neighbors
-      for (auto jj = graph.edge_begin(src, lockflag), ej = graph.edge_end(src, lockflag);
-           jj != ej; ++jj) {
+      for (auto jj = graph.edge_begin(src, lockflag), ej = graph.edge_end(src, lockflag); jj != ej; ++jj) {
         GNode dst = graph.getEdgeDst(jj);
         LNode& ddata = graph.getData(dst, lockflag);
         if (ddata.residual <= tolerance) {

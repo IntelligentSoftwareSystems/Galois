@@ -29,9 +29,7 @@
 
 #include "llvm/Support/CommandLine.h"
 
-//! d is the damping factor. Alpha is the prob that user will do a random jump, i.e., 1 - d
-//static const float alpha = 1.0 - 0.85;
-static const float alpha = 0.85; // Joyce changed to this which is a usual way to define alpha.
+static const float alpha = 0.85; 
 
 typedef double PRTy;
 
@@ -48,8 +46,7 @@ unsigned ninout(Graph& g, typename Graph::GraphNode n, Galois::MethodFlag flag) 
 template<typename Graph>
 double computePageRankInOut(Graph& g, typename Graph::GraphNode src, int prArg, Galois::MethodFlag lockflag) {
   double sum = 0;
-  for (auto jj = g.in_edge_begin(src, lockflag), ej = g.in_edge_end(src, lockflag);
-       jj != ej; ++jj) {
+  for (auto jj = g.in_edge_begin(src, lockflag), ej = g.in_edge_end(src, lockflag); jj != ej; ++jj) {
     auto dst = g.getInEdgeDst(jj);
     auto& ddata = g.getData(dst, lockflag);
     sum += ddata.getPageRank(prArg) / nout(g, dst, lockflag);
@@ -63,8 +60,7 @@ void initResidual(Graph& graph) {
       auto& data = graph.getData(src);
       // for each in-coming neighbour, add residual
       PRTy sum = 0.0;
-      for (auto jj = graph.in_edge_begin(src), ej = graph.in_edge_end(src); 
-           jj != ej; ++jj){
+      for (auto jj = graph.in_edge_begin(src), ej = graph.in_edge_end(src); jj != ej; ++jj){
         auto dst = graph.getInEdgeDst(jj);
         auto& ddata = graph.getData(dst);
         sum += 1.0/nout(graph,dst, Galois::MethodFlag::NONE);  
@@ -79,8 +75,7 @@ void initResidual(Graph& graph, Galois::InsertBag<std::pair<typename Graph::Grap
       auto& data = graph.getData(src);
       // for each in-coming neighbour, add residual
       PRTy sum = 0.0;
-      for (auto jj = graph.in_edge_begin(src), ej = graph.in_edge_end(src); 
-           jj != ej; ++jj){
+      for (auto jj = graph.in_edge_begin(src), ej = graph.in_edge_end(src); jj != ej; ++jj){
         auto dst = graph.getInEdgeDst(jj);
         auto& ddata = graph.getData(dst);
         sum += 1.0/nout(graph,dst, Galois::MethodFlag::NONE);  
@@ -89,7 +84,6 @@ void initResidual(Graph& graph, Galois::InsertBag<std::pair<typename Graph::Grap
       b.push(std::make_pair(src, pri(graph, src)));
     }, Galois::do_all_steal<true>());
 }
-
 
 PRTy atomicAdd(std::atomic<PRTy>& v, PRTy delta) {
   PRTy old;
@@ -110,7 +104,6 @@ void verifyInOut(Graph& graph, PRTy tolerance) {
   }
 }
 
-
 template<typename Graph, typename InnerGraph>
 void check_types() {
   static_assert(std::is_same<typename std::iterator_traits<typename Graph::edge_iterator>::iterator_category,
@@ -120,6 +113,5 @@ void check_types() {
   static_assert(std::is_same<typename std::iterator_traits<typename Graph::in_edge_iterator>::iterator_category,
                 std::random_access_iterator_tag>::value, "Not random");
 }
-
 
 #endif

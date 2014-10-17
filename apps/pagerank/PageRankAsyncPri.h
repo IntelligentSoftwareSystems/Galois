@@ -26,7 +26,7 @@
 struct AsyncPri{
   struct LNode {
     PRTy value;
-    std::atomic<PRTy> residual; // tracking residual
+    std::atomic<PRTy> residual; 
     void init() { value = 1.0 - alpha; residual = 0.0; }
     PRTy getPageRank(int x = 0) { return value; }
     friend std::ostream& operator<<(std::ostream& os, const LNode& n) {
@@ -84,8 +84,7 @@ struct AsyncPri{
     void operator()(const std::pair<GNode,int>& srcn, Galois::UserContext<std::pair<GNode,int>>& ctx) const {
       LNode& sdata = graph.getData(srcn.first);
       
-      if(sdata.residual < tolerance || 
-         pri(srcn.first) != srcn.second)
+      if(sdata.residual < tolerance || pri(srcn.first) != srcn.second)
         return;
 
       Galois::MethodFlag lockflag = Galois::MethodFlag::NONE;
@@ -97,15 +96,12 @@ struct AsyncPri{
       int src_nout = nout(graph,srcn.first, lockflag);
       PRTy delta = diff*alpha/src_nout;
       // for each out-going neighbors
-      for (auto jj = graph.edge_begin(srcn.first, lockflag), 
-             ej = graph.edge_end(srcn.first, lockflag);
-           jj != ej; ++jj) {
+      for (auto jj = graph.edge_begin(srcn.first, lockflag), ej = graph.edge_end(srcn.first, lockflag); jj != ej; ++jj) {
         GNode dst = graph.getEdgeDst(jj);
         LNode& ddata = graph.getData(dst, lockflag);
         PRTy old = atomicAdd(ddata.residual, delta);
         // if the node is not in the worklist and the residual is greater than tolerance
-        if(old + delta >= tolerance &&
-           (old <= tolerance || pri(dst, old) != pri(dst,old+delta)))
+        if(old + delta >= tolerance && (old <= tolerance || pri(dst, old) != pri(dst,old+delta)))
           ctx.push(std::make_pair(dst, pri(dst, old+delta)));
       }
     }

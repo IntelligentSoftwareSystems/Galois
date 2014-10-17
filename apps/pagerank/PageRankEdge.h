@@ -27,7 +27,7 @@ static llvm::cl::opt<bool> edgePri("edgePri", llvm::cl::desc("Use priority for e
 struct AsyncEdge {
   struct LNode {
     PRTy value;
-    std::atomic<PRTy> residual; // tracking residual
+    std::atomic<PRTy> residual; 
     void init() { value = 1.0 - alpha; residual = 0.0; }
     PRTy getPageRank(int x = 0) { return value; }
     friend std::ostream& operator<<(std::ostream& os, const LNode& n) {
@@ -69,19 +69,16 @@ struct AsyncEdge {
       return (int)(r/n * amp);
     }
 
-    void condSched(const GNode& node, LNode& lnode, PRTy delta, 
-                   Galois::UserContext<GNode>& ctx) const {
+    void condSched(const GNode& node, LNode& lnode, PRTy delta, Galois::UserContext<GNode>& ctx) const {
       PRTy old = atomicAdd(lnode.residual, delta);
       if (std::fabs(old) <= tolerance && std::fabs(old + delta) >= tolerance)
         ctx.push(node);
     }
 
-    void condSched(const GNode& node, LNode& lnode, PRTy delta, 
-                   Galois::UserContext<std::pair<GNode, int> >& ctx) const {
+    void condSched(const GNode& node, LNode& lnode, PRTy delta, Galois::UserContext<std::pair<GNode, int> >& ctx) const {
       PRTy old = atomicAdd(lnode.residual, delta);
       int out = nout(graph, node, Galois::MethodFlag::NONE) + 1;
-      if ((std::fabs(old) <= tolerance && std::fabs(old + delta) >= tolerance) ||
-          (pri(old, out) != pri(old+delta, out))) {
+      if ((std::fabs(old) <= tolerance && std::fabs(old + delta) >= tolerance) || (pri(old, out) != pri(old+delta, out))) {
         //std::cerr << " " << pri(old+delta) << " ";
         ctx.push(std::make_pair(node, pri(old+delta, out)) );
       }
@@ -94,8 +91,7 @@ struct AsyncEdge {
 
     template<typename Context>
     void operator()(const GNode& src, Context& ctx) const {
-      LNode& sdata = graph.getData(src);
-      
+      LNode& sdata = graph.getData(src);      
       Galois::MethodFlag lockflag = Galois::MethodFlag::NONE;
 
       PRTy oldResidual = sdata.residual.exchange(0.0);
@@ -104,8 +100,7 @@ struct AsyncEdge {
         int src_nout = nout(graph,src, lockflag);
         PRTy delta = oldResidual*alpha/src_nout;
         // for each out-going neighbors
-        for (auto jj = graph.edge_begin(src, lockflag), ej = graph.edge_end(src, lockflag);
-             jj != ej; ++jj) {
+        for (auto jj = graph.edge_begin(src, lockflag), ej = graph.edge_end(src, lockflag); jj != ej; ++jj) {
           GNode dst = graph.getEdgeDst(jj);
           LNode& ddata = graph.getData(dst, lockflag);
           condSched(dst, ddata, delta, ctx);

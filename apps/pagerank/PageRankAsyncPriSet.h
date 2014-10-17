@@ -26,8 +26,8 @@
 struct AsyncPriSet{
   struct LNode {
     PRTy value;
-    std::atomic<PRTy> residual; // tracking residual
-    std::atomic<int> inWL; // tracking wl ocupancy
+    std::atomic<PRTy> residual; 
+    std::atomic<int> inWL; // tracking wl occupancy
     void init() { value = 1.0 - alpha; residual = 0.0; inWL = 1; }
     PRTy getPageRank(int x = 0) { return value; }
     friend std::ostream& operator<<(std::ostream& os, const LNode& n) {
@@ -40,7 +40,7 @@ struct AsyncPriSet{
   typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
   typedef Graph::GraphNode GNode;
 
-  std::string name() const { return "AsyncPri"; }
+  std::string name() const { return "AsyncPriSet"; }
 
   void readGraph(Graph& graph, std::string filename, std::string transposeGraphName) {
     if (transposeGraphName.size()) {

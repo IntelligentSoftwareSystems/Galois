@@ -59,17 +59,15 @@ struct AsyncSet {
 
     void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) const {
       LNode& sdata = graph.getData(src);
-      // the node is processed
-      sdata.flag = 0;
-      
+      sdata.flag = 0;   
       Galois::MethodFlag lockflag = Galois::MethodFlag::NONE;
 
       PRTy pr = computePageRankInOut(graph, src, 0, lockflag);
       PRTy diff = std::fabs(pr - sdata.value);
       if (diff >= tolerance) {
         sdata.value = pr;
-        for (auto jj = graph.edge_begin(src, lockflag), ej = graph.edge_end(src, lockflag);
-             jj != ej; ++jj) {
+	// for each out-going neighbors
+        for (auto jj = graph.edge_begin(src, lockflag), ej = graph.edge_end(src, lockflag); jj != ej; ++jj) {
           GNode dst = graph.getEdgeDst(jj);
 	  LNode& ddata = graph.getData(dst, lockflag);
 	  // if the node is not in the worklist, then push
