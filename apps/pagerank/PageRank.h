@@ -30,6 +30,7 @@
 #include "llvm/Support/CommandLine.h"
 
 static const float alpha = 0.85; 
+extern bool outOnly;
 
 typedef double PRTy;
 

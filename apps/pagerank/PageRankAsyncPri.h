@@ -53,11 +53,10 @@ struct AsyncPri{
   struct PRPri {
     Graph& graph;
     PRTy amp;
-    static const bool outOnly = true;
     PRPri(Graph& g, PRTy a) : graph(g), amp(a) {}
     int operator()(const GNode& src, PRTy d) const {
       if (outOnly)
-        d /= nout(graph, src, Galois::MethodFlag::NONE);
+        d /= (1 + nout(graph, src, Galois::MethodFlag::NONE));
       else
         d /= ninout(graph, src, Galois::MethodFlag::NONE);
       return d*amp; //std::max((int)floor(d*amp), 0);
@@ -82,27 +81,30 @@ struct AsyncPri{
     Process(Graph& g, PRTy t, PRTy a): graph(g), tolerance(t), pri(g,a) { }
 
     void operator()(const std::pair<GNode,int>& srcn, Galois::UserContext<std::pair<GNode,int>>& ctx) const {
-      LNode& sdata = graph.getData(srcn.first);
+      GNode src = srcn.first;
+      LNode& sdata = graph.getData(src);
       
-      if(sdata.residual < tolerance || pri(srcn.first) != srcn.second)
+      if(sdata.residual < tolerance || pri(src) != srcn.second)
         return;
 
       Galois::MethodFlag lockflag = Galois::MethodFlag::NONE;
 
       PRTy oldResidual = sdata.residual.exchange(0.0);
-      PRTy pr = computePageRankInOut(graph, srcn.first, 0, lockflag);
+      PRTy pr = computePageRankInOut(graph, src, 0, lockflag);
       PRTy diff = std::fabs(pr - sdata.value);
       sdata.value = pr;
-      int src_nout = nout(graph,srcn.first, lockflag);
+      int src_nout = nout(graph,src, lockflag);
       PRTy delta = diff*alpha/src_nout;
       // for each out-going neighbors
-      for (auto jj = graph.edge_begin(srcn.first, lockflag), ej = graph.edge_end(srcn.first, lockflag); jj != ej; ++jj) {
+      for (auto jj = graph.edge_begin(src, lockflag), ej = graph.edge_end(src, lockflag); jj != ej; ++jj) {
         GNode dst = graph.getEdgeDst(jj);
         LNode& ddata = graph.getData(dst, lockflag);
         PRTy old = atomicAdd(ddata.residual, delta);
         // if the node is not in the worklist and the residual is greater than tolerance
-        if(old + delta >= tolerance && (old <= tolerance || pri(dst, old) != pri(dst,old+delta)))
+        if(old + delta >= tolerance && (old <= tolerance || pri(dst, old) != pri(dst,old+delta))) {
+          //std::cerr << pri(dst, old+delta) << " ";
           ctx.push(std::make_pair(dst, pri(dst, old+delta)));
+        }
       }
     }
   };
@@ -113,10 +115,15 @@ struct AsyncPri{
     typedef Galois::WorkList::OrderedByIntegerMetric<sndPri,WL>::with_block_period<16>::type OBIM;
     Galois::InsertBag<std::pair<GNode, int> > bag;
     PRPri pri(graph, amp);
-    Galois::do_all_local(graph, [&graph, &bag, &pri] (const GNode& node) {
-        bag.push(std::make_pair(node, pri(node)));
-      });
-    Galois::for_each_local(bag, Process(graph, tolerance, amp), Galois::wl<OBIM>());
+    // Galois::do_all_local(graph, [&graph, &bag, &pri] (const GNode& node) {
+    //     bag.push(std::make_pair(node, pri(node)));
+    //   });
+    // Galois::for_each_local(bag, Process(graph, tolerance, amp), Galois::wl<OBIM>());
+
+    auto fn = [&pri] (const GNode& node) { return std::make_pair(node, pri(node)); };
+    Galois::for_each(boost::make_transform_iterator(graph.begin(), std::ref(fn)),
+                     boost::make_transform_iterator(graph.end(), std::ref(fn)),
+                     Process(graph, tolerance, amp), Galois::wl<OBIM>());
   }
 
   void verify(Graph& graph, PRTy tolerance) {    

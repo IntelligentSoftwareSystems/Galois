@@ -77,15 +77,20 @@ struct AsyncEdge {
 
     void condSched(const GNode& node, LNode& lnode, PRTy delta, Galois::UserContext<std::pair<GNode, int> >& ctx) const {
       PRTy old = atomicAdd(lnode.residual, delta);
-      int out = nout(graph, node, Galois::MethodFlag::NONE) + 1;
+      int out = outOnly ? nout(graph, node, Galois::MethodFlag::NONE) + 1 : ninout(graph, node, Galois::MethodFlag::NONE);
       if ((std::fabs(old) <= tolerance && std::fabs(old + delta) >= tolerance) || (pri(old, out) != pri(old+delta, out))) {
-        //std::cerr << " " << pri(old+delta) << " ";
         ctx.push(std::make_pair(node, pri(old+delta, out)) );
       }
     }
 
     template<typename Context>
     void operator()(const std::pair<GNode, int>& data, Context& ctx) const {
+      GNode node = data.first;
+      LNode& sdata = graph.getData(node, Galois::MethodFlag::NONE);
+      int out = outOnly ? nout(graph, node, Galois::MethodFlag::NONE) + 1 : ninout(graph, node, Galois::MethodFlag::NONE);
+      if (sdata.residual < tolerance ||
+          pri(sdata.residual, out) != data.second)
+        return;
       operator()(data.first, ctx);
     }
 
@@ -112,18 +117,20 @@ struct AsyncEdge {
   };
 
   void operator()(Graph& graph, PRTy tolerance, PRTy amp) {
+    initResidual(graph);
     if (!edgePri) {
-      initResidual(graph);
       typedef Galois::WorkList::dChunkedFIFO<16> WL;
       Galois::for_each_local(graph, Process(graph, tolerance, amp), Galois::wl<WL>());
     } else {
-      Galois::InsertBag<std::pair<GNode, int>> b;
-      initResidual(graph, b, [amp] (Graph& graph, const GNode& node) {
-          return (int)(graph.getData(node).residual * amp);
-        });
       typedef Galois::WorkList::dChunkedFIFO<128> WL;
       typedef Galois::WorkList::OrderedByIntegerMetric<sndPri,WL> OBIM;
-      Galois::for_each_local(b, Process(graph, tolerance, amp), Galois::wl<OBIM>());
+      auto fn = [&graph, amp] (const GNode& node) {
+        int out = outOnly ? nout(graph, node, Galois::MethodFlag::NONE) + 1 : ninout(graph, node, Galois::MethodFlag::NONE);
+        return std::make_pair(node, (int)(amp * graph.getData(node, Galois::MethodFlag::NONE).residual / out));
+      };
+      Galois::for_each(boost::make_transform_iterator(graph.begin(), std::ref(fn)),
+                       boost::make_transform_iterator(graph.end(), std::ref(fn)),
+                       Process(graph, tolerance, amp), Galois::wl<OBIM>());
     }
   }
 

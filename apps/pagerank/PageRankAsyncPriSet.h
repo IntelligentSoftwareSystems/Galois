@@ -57,7 +57,6 @@ struct AsyncPriSet{
     Galois::InsertBag<GNode>& nextWL;
     Galois::Runtime::PerThreadStorage<Galois::OnlineStat>& stats;
     PRTy limit;
-    static const bool outOnly = true;
 
     Process(Graph& g, PRTy t, Galois::InsertBag<GNode>& wl, Galois::Runtime::PerThreadStorage<Galois::OnlineStat>& s, PRTy l): graph(g), tolerance(t), nextWL(wl), stats(s), limit(l) { }
 

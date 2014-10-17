@@ -74,10 +74,11 @@ static cll::opt<std::string> transposeGraphName("graphTranspose", cll::desc("Tra
 cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations"), cll::init(10000000));
 cll::opt<unsigned int> memoryLimit("memoryLimit",
     cll::desc("Memory limit for out-of-core algorithms (in MB)"), cll::init(~0U));
-static cll::opt<int> amp("amp", cll::desc("amp for priority"), cll::init(100));
+static cll::opt<float> amp("amp", cll::desc("amp for priority"), cll::init(100));
 static cll::opt<float> tolerance("tolerance", cll::desc("tolerance"), cll::init(0.01));
 static cll::opt<bool> dbg("dbg", cll::desc("dbg"), cll::init(false));
 static cll::opt<std::string> algo_str("algo_str", cll::desc("algo_str"), cll::init("NA"));
+static cll::opt<bool> outOnlyP("outdeg", cll::desc("Out degree only for priority"), cll::init(false));
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
     cll::values(
       clEnumValN(Algo::synch, "synch", "Synchronous version..."),
@@ -89,7 +90,7 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
       clEnumValN(Algo::async_ppr_rsd, "async_ppr_rsd", "Asyncronous PPR"),
       clEnumValEnd), cll::init(Algo::async));
 
-
+bool outOnly;
 
 struct Sync {
   struct LNode {
@@ -382,6 +383,8 @@ void runPPR() {
 int main(int argc, char **argv) {
   LonestarStart(argc, argv, name, desc, url);
   Galois::StatManager statManager;
+
+  outOnly = outOnlyP;
 
   Galois::StatTimer T("TotalTime");
   T.start();
