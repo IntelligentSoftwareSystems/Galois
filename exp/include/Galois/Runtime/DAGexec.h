@@ -115,16 +115,84 @@ public:
   
 };
 
-template <typename T>
-struct DAGcontext: public SimpleRuntimeContext {
 
-  typedef DAGnhoodItem<DAGcontext> NItem;
+template <typename Ctxt>
+struct DAGnhoodItemRW: public LockManagerBase {
+
+public:
+  typedef LockManagerBase Base;
+  typedef Galois::ThreadSafeOrderedSet<Ctxt*, std::less<Ctxt*> > SharerSet;
+
+  Lockable* lockable;
+  SharerSet writers;
+  SharerSet readers;
+
+  explicit DAGnhoodItemRW (Lockable* l): lockable (l) {}
+
+  void addReader (Ctxt* ctxt) {
+    readers.push (ctxt);
+  }
+
+  void addWriter (Ctxt* ctxt) { 
+    writers.push (ctxt);
+  }
+
+  bool tryMappingTo (Lockable* l) {
+    return Base::CASowner (l, NULL);
+  }
+
+  void clearMapping () {
+    // release requires having owned the lock
+    bool r = Base::tryLock (lockable);
+    assert (r);
+    Base::release (lockable);
+  }
+
+  // just for debugging
+  const Lockable* getMapping () const {
+    return lockable;
+  }
+
+  static DAGnhoodItemRW* getOwner (Lockable* l) {
+    LockManagerBase* o = LockManagerBase::getOwner (l);
+    // assert (dynamic_cast<DAGnhoodItemRW*> (o) != nullptr);
+    return static_cast<DAGnhoodItemRW*> (o);
+  }
+
+  struct Factory {
+
+    typedef DAGnhoodItemRW<Ctxt> NItem;
+    typedef MM::FixedSizeAllocator<NItem> NItemAlloc;
+
+    NItemAlloc niAlloc;
+
+    NItem* create (Lockable* l) {
+      NItem* ni = niAlloc.allocate (1);
+      assert (ni != nullptr);
+      niAlloc.construct (ni, l);
+      return ni;
+    }
+
+    void destroy (NItem* ni) {
+      // delete ni; ni = NULL;
+      niAlloc.destroy (ni);
+      niAlloc.deallocate (ni, 1);
+    }
+  };
+
+};
+
+
+template <typename T, typename Derived, typename NItem_tp>
+struct DAGcontextBase: public SimpleRuntimeContext {
+
+  typedef NItem_tp NItem;
   typedef PtrBasedNhoodMgr<NItem> NhoodMgr;
 
 public:
-  typedef Galois::ThreadSafeOrderedSet<DAGcontext*, std::less<DAGcontext*> > AdjSet;
+  typedef Galois::ThreadSafeOrderedSet<Derived*, std::less<Derived*> > AdjSet;
   // TODO: change AdjList to array for quicker iteration
-  typedef Galois::gdeque<DAGcontext*, 64> AdjList;
+  typedef Galois::gdeque<Derived*, 64> AdjList;
   typedef std::atomic<int> ParCounter;
 
   GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE ParCounter inDeg;
@@ -137,7 +205,7 @@ public:
   AdjList outNeighbors;
 
 public:
-  explicit DAGcontext (const T& t, NhoodMgr& nhmgr): 
+  explicit DAGcontextBase (const T& t, NhoodMgr& nhmgr): 
     SimpleRuntimeContext (true), // true to call subAcquire
     inDeg (0),
     origInDeg (0), 
@@ -147,22 +215,12 @@ public:
 
   const T& getElem () const { return elem; }
 
-  GALOIS_ATTRIBUTE_PROF_NOINLINE
-  virtual void subAcquire (Lockable* l, Galois::MethodFlag) {
-    NItem& nitem = nhmgr.getNhoodItem (l);
-
-    assert (NItem::getOwner (l) == &nitem);
-
-    nitem.addSharer (this);
-    
-  }
-
   //! returns true on success
-  bool addOutNeigh (DAGcontext* that) {
+  bool addOutNeigh (Derived* that) {
     return adjSet.push (that);
   }
 
-  void addInNeigh (DAGcontext* that) {
+  void addInNeigh (Derived* that) {
     int* x = const_cast<int*> (&origInDeg);
     ++(*x);
     ++inDeg;
@@ -176,7 +234,7 @@ public:
     }
   }
 
-  bool removeLastInNeigh (DAGcontext* that) {
+  bool removeLastInNeigh (Derived* that) {
     assert (inDeg >= 0);
     return ((--inDeg) == 0);
   }
@@ -196,17 +254,73 @@ public:
   typename AdjList::iterator neighbor_end (void) {
     return outNeighbors.end ();
   }
+};
 
+template <typename T>
+struct DAGcontext: public DAGcontextBase<T, DAGcontext<T>, DAGnhoodItem<DAGcontext<T> > > {
+
+  typedef DAGcontextBase<T, DAGcontext, DAGnhoodItem<DAGcontext> > Base;
+  typedef typename Base::NItem NItem;
+  typedef typename Base::NhoodMgr NhoodMgr;
+
+  explicit DAGcontext (const T& t, typename Base::NhoodMgr& nhmgr)
+    : Base (t, nhmgr) 
+  {}
+
+  GALOIS_ATTRIBUTE_PROF_NOINLINE
+  virtual void subAcquire (Lockable* l, Galois::MethodFlag) {
+    NItem& nitem = Base::nhmgr.getNhoodItem (l);
+
+    assert (NItem::getOwner (l) == &nitem);
+
+    nitem.addSharer (this);
+    
+  }
+};
+
+
+template <typename T>
+struct DAGcontextRW: public DAGcontextBase<T, DAGcontextRW<T>, DAGnhoodItemRW<DAGcontextRW<T> > > {
+
+  typedef DAGcontextBase<T, DAGcontextRW, DAGnhoodItemRW<DAGcontextRW> > Base;
+  typedef typename Base::NItem NItem;
+  typedef typename Base::NhoodMgr NhoodMgr;
+
+  explicit DAGcontextRW (const T& t, NhoodMgr& nhmgr)
+    : Base (t, nhmgr) 
+  {}
+
+  GALOIS_ATTRIBUTE_PROF_NOINLINE
+  virtual void subAcquire (Lockable* l, Galois::MethodFlag f) {
+
+    NItem& nitem = Base::nhmgr.getNhoodItem (l);
+
+    assert (NItem::getOwner (l) == &nitem);
+
+    switch (f) {
+      case Galois::MethodFlag::READ:
+        nitem.addReader (this);
+        break;
+
+      case Galois::MethodFlag::WRITE:
+        nitem.addWriter (this);
+        break;
+
+      default:
+        GALOIS_DIE ("can't handle flag type\n");
+        break;
+    }
+  }
 };
 
 } // end namespace anonymous
 
 
-template <typename T, typename Cmp, typename OpFunc, typename NhoodFunc>
-class DAGexecutor {
+template <typename T, typename Cmp, typename OpFunc, typename NhoodFunc, typename Ctxt_tp>
+class DAGexecutorBase {
 
 protected:
-  typedef DAGcontext<T>  Ctxt;
+  typedef Ctxt_tp  Ctxt;
   typedef typename Ctxt::NhoodMgr NhoodMgr;
   typedef typename Ctxt::NItem NItem;
 
@@ -220,13 +334,13 @@ protected:
 
     typedef int tt_does_not_need_aborts;
 
-    DAGexecutor& outer;
+    DAGexecutorBase& outer;
 
     template <typename W>
     void operator () (Ctxt* src, W& wl) {
       assert (src->isSrc ());
 
-      printf ("processing source: %p, item: %d\n", src, src->elem);
+      // printf ("processing source: %p, item: %d\n", src, src->elem);
 
       UserCtx& uctx = *(outer.userCtxts.getLocal ());
       outer.opFunc (src->getElem (), uctx);
@@ -258,7 +372,7 @@ protected:
 
 public:
 
-  DAGexecutor (
+  DAGexecutorBase (
       const Cmp& cmp, 
       const NhoodFunc& nhVisitor, 
       const OpFunc& opFunc)
@@ -269,7 +383,7 @@ public:
       nhmgr (typename NItem::Factory ())
   {}
 
-  ~DAGexecutor (void) {
+  ~DAGexecutorBase (void) {
     Galois::do_all_choice (Galois::Runtime::makeLocalRange (allCtxts),
         [this] (Ctxt* ctxt) {
           ctxtAlloc.destroy (ctxt);
@@ -292,6 +406,7 @@ public:
     }
   }
 
+  virtual void createAllEdges (void) = 0;
 
   template <typename R>
   void initialize (const R& range) {
@@ -320,25 +435,13 @@ public:
           nhVisitor (ctxt->getElem (), uctx);
           Galois::Runtime::setThreadContext (NULL);
 
-          printf ("Created context:%p for item: %d\n", ctxt, x);
+          // printf ("Created context:%p for item: %d\n", ctxt, x);
 
         }, "create_ctxt", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
 
+    // virtual call implemented by derived classes
+    createAllEdges ();
 
-    Galois::do_all_choice (nhmgr.getAllRange(),
-        [this] (NItem* nitem) {
-          // std::printf ("Nitem: %p, num sharers: %ld\n", nitem, nitem->sharers.size ());
-
-          for (auto i = nitem->sharers.begin ()
-            , i_end = nitem->sharers.end (); i != i_end; ++i) {
-
-            auto j = i;
-            ++j;
-            for (; j != i_end; ++j) {
-              createEdge (*i, *j);
-            }
-          }
-        }, "create_ctxt_edges", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
 
     Galois::do_all_choice (Galois::Runtime::makeLocalRange (allCtxts),
         [this] (Ctxt* ctxt) {
@@ -383,6 +486,77 @@ public:
 
 };
 
+template <typename T, typename Cmp, typename OpFunc, typename NhoodFunc> 
+struct DAGexecutor: public DAGexecutorBase<T, Cmp, OpFunc, NhoodFunc, DAGcontext<T> > {
+
+  typedef DAGexecutorBase<T, Cmp, OpFunc, NhoodFunc, DAGcontext<T> > Base;
+  typedef typename Base::NItem NItem;
+
+  DAGexecutor(
+      const Cmp& cmp, 
+      const NhoodFunc& nhoodVisitor, 
+      const OpFunc& opFunc)
+    : 
+      Base (cmp, nhoodVisitor, opFunc) 
+  {}
+
+  virtual void createAllEdges (void) {
+    Galois::do_all_choice (Base::nhmgr.getAllRange(),
+        [this] (NItem* nitem) {
+          // std::printf ("Nitem: %p, num sharers: %ld\n", nitem, nitem->sharers.size ());
+
+          for (auto i = nitem->sharers.begin ()
+            , i_end = nitem->sharers.end (); i != i_end; ++i) {
+
+            auto j = i;
+            ++j;
+            for (; j != i_end; ++j) {
+              Base::createEdge (*i, *j);
+            }
+          }
+        }, "create_ctxt_edges", Galois::doall_chunk_size<Base::DEFAULT_CHUNK_SIZE> ());
+  }
+};
+
+template <typename T, typename Cmp, typename OpFunc, typename NhoodFunc> 
+struct DAGexecutorRW: public DAGexecutorBase<T, Cmp, OpFunc, NhoodFunc, DAGcontextRW<T> > {
+
+  typedef DAGexecutorBase<T, Cmp, OpFunc, NhoodFunc, DAGcontextRW<T> > Base;
+  typedef typename Base::NItem NItem;
+
+  DAGexecutorRW (
+      const Cmp& cmp, 
+      const NhoodFunc& nhoodVisitor, 
+      const OpFunc& opFunc)
+    : 
+      Base (cmp, nhoodVisitor, opFunc) 
+  {}
+
+  virtual void createAllEdges (void) {
+
+    Galois::do_all_choice (Base::nhmgr.getAllRange(),
+        [this] (NItem* nitem) {
+          // std::printf ("Nitem: %p, num sharers: %ld\n", nitem, nitem->sharers.size ());
+
+          for (auto w = nitem->writers.begin ()
+            , w_end = nitem->writers.end (); w != w_end; ++w) {
+
+            auto v = w;
+            ++v;
+            for (; v != w_end; ++v) {
+              Base::createEdge (*w, *v);
+            }
+
+            for (auto r = nitem->readers.begin ()
+              , r_end = nitem->readers.end (); r != r_end; ++r) {
+              Base::createEdge (*w, *r);
+            }
+          }
+        }, "create_ctxt_edges", Galois::doall_chunk_size<Base::DEFAULT_CHUNK_SIZE> ());
+  }
+
+};
+
 template <typename R, typename Cmp, typename OpFunc, typename NhoodFunc>
 DAGexecutor<typename R::value_type, Cmp, OpFunc, NhoodFunc> make_dag_executor (const R& range, const Cmp& cmp, const NhoodFunc& nhVisitor, const OpFunc& opFunc, const char* loopname=nullptr) {
 
@@ -398,7 +572,8 @@ template <typename R, typename Cmp, typename OpFunc, typename NhoodFunc>
 void for_each_ordered_dag (const R& range, const Cmp& cmp, const NhoodFunc& nhVisitor, const OpFunc& opFunc, const char* loopname=nullptr) {
 
   typedef typename R::value_type T;
-  typedef DAGexecutor<T, Cmp, OpFunc, NhoodFunc> Exec_ty;
+  typedef DAGexecutorRW<T, Cmp, OpFunc, NhoodFunc> Exec_ty;
+  // typedef DAGexecutor<T, Cmp, OpFunc, NhoodFunc> Exec_ty;
   
   Exec_ty exec (cmp, nhVisitor, opFunc);
 

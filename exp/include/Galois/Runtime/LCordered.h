@@ -457,14 +457,14 @@ struct SourceTest <void> {
 };
 
 // TODO: remove template parameters that can be passed to execute
-template <typename OperFunc, typename NhoodFunc, typename Ctxt, typename SourceTest>
+template <typename OpFunc, typename NhoodFunc, typename Ctxt, typename SourceTest>
 class LCorderedExec {
 
   // important paramters
   // TODO: add capability to the interface to express these constants
   static const size_t DELETE_CONTEXT_SIZE = 1024;
-  static const size_t UNROLL_FACTOR = OperFunc::UNROLL_FACTOR;
-  static const unsigned CHUNK_SIZE = OperFunc::CHUNK_SIZE;
+  static const size_t UNROLL_FACTOR = OpFunc::UNROLL_FACTOR;
+  static const unsigned CHUNK_SIZE = OpFunc::CHUNK_SIZE;
 
 
 
@@ -560,7 +560,7 @@ class LCorderedExec {
 
     typedef int tt_does_not_need_aborts;
 
-    OperFunc& op;
+    OpFunc& op;
     NhoodFunc& nhoodVisitor;
     NhoodMgr& nhmgr;
     const SourceTest& sourceTest;
@@ -572,7 +572,7 @@ class LCorderedExec {
     Accumulator& niter;
 
     ApplyOperator (
-        OperFunc& op,
+        OpFunc& op,
         NhoodFunc& nhoodVisitor,
         NhoodMgr& nhmgr,
         const SourceTest& sourceTest,
@@ -624,7 +624,7 @@ class LCorderedExec {
         // addWL.get ().clear ();
         UserCtx& userCtx = *(perThUserCtx.getLocal ());
 
-        if (true || DEPRECATED::ForEachTraits<OperFunc>::NeedsPush) {
+        if (true || DEPRECATED::ForEachTraits<OpFunc>::NeedsPush) {
           userCtx.resetPushBuffer ();
           userCtx.resetAlloc ();
         }
@@ -632,7 +632,7 @@ class LCorderedExec {
         op (src->active, userCtx.data ()); 
 
 
-        if (true || DEPRECATED::ForEachTraits<OperFunc>::NeedsPush) {
+        if (true || DEPRECATED::ForEachTraits<OpFunc>::NeedsPush) {
 
           addCtxtWL.get ().clear ();
           CreateCtxtExpandNhood addCtxt (nhoodVisitor, nhmgr, ctxtAlloc, addCtxtWL);
@@ -700,7 +700,7 @@ class LCorderedExec {
 
 private:
   NhoodFunc nhoodVisitor;
-  OperFunc operFunc;
+  OpFunc operFunc;
   // TODO: make cmp function of nhmgr thread local as well.
   NhoodMgr& nhmgr;
   SourceTest sourceTest;
@@ -710,7 +710,7 @@ public:
 
   LCorderedExec (
       const NhoodFunc& nhoodVisitor,
-      const OperFunc& operFunc,
+      const OpFunc& operFunc,
       NhoodMgr& nhmgr,
       const SourceTest& sourceTest)
     :
@@ -789,8 +789,8 @@ public:
   }
 };
 
-template <typename R, typename Cmp, typename OperFunc, typename NhoodFunc, typename ST>
-void for_each_ordered_lc_impl (const R& range, const Cmp& cmp, const NhoodFunc& nhoodVisitor, const OperFunc& operFunc, const ST& sourceTest, const char* loopname) {
+template <typename R, typename Cmp, typename OpFunc, typename NhoodFunc, typename ST>
+void for_each_ordered_lc_impl (const R& range, const Cmp& cmp, const NhoodFunc& nhoodVisitor, const OpFunc& operFunc, const ST& sourceTest, const char* loopname) {
 
   typedef typename R::value_type T;
 
@@ -799,7 +799,7 @@ void for_each_ordered_lc_impl (const R& range, const Cmp& cmp, const NhoodFunc& 
   typedef typename Ctxt::NItem NItem;
   typedef typename Ctxt::Comparator CtxtCmp;
 
-  typedef LCorderedExec<OperFunc, NhoodFunc, Ctxt, ST> Exec;
+  typedef LCorderedExec<OpFunc, NhoodFunc, Ctxt, ST> Exec;
 
   CtxtCmp ctxcmp (cmp);
   typename NItem::Factory factory(ctxcmp);
@@ -810,14 +810,14 @@ void for_each_ordered_lc_impl (const R& range, const Cmp& cmp, const NhoodFunc& 
   e.execute (range, loopname);
 }
 
-template <typename R, typename Cmp, typename OperFunc, typename NhoodFunc, typename StableTest>
-void for_each_ordered_lc (const R& range, const Cmp& cmp, const NhoodFunc& nhoodVisitor, const OperFunc& operFunc, const StableTest& stabilityTest, const char* loopname) {
+template <typename R, typename Cmp, typename OpFunc, typename NhoodFunc, typename StableTest>
+void for_each_ordered_lc (const R& range, const Cmp& cmp, const NhoodFunc& nhoodVisitor, const OpFunc& operFunc, const StableTest& stabilityTest, const char* loopname) {
 
   for_each_ordered_lc_impl (range, cmp, nhoodVisitor, operFunc, SourceTest<StableTest> (stabilityTest), loopname);
 }
 
-template <typename R, typename Cmp, typename OperFunc, typename NhoodFunc>
-void for_each_ordered_lc (const R& range, const Cmp& cmp, const NhoodFunc& nhoodVisitor, const OperFunc& operFunc, const char* loopname) {
+template <typename R, typename Cmp, typename OpFunc, typename NhoodFunc>
+void for_each_ordered_lc (const R& range, const Cmp& cmp, const NhoodFunc& nhoodVisitor, const OpFunc& operFunc, const char* loopname) {
 
   for_each_ordered_lc_impl (range, cmp, nhoodVisitor, operFunc, SourceTest<void> (), loopname);
 }

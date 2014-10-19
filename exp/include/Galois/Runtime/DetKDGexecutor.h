@@ -132,7 +132,7 @@ struct DetKDGexecutor {
       } // end switch
 
       if (rounds >= 2) { 
-        break; // TODO: remove
+        // break; // TODO: remove
       }
 
     } // end while
