@@ -253,6 +253,13 @@ class LC_Dist_InOut {
     Starts[Runtime::NetworkInterface::ID].second = 2;
   }
 
+  ~LC_Dist_InOut() {
+    auto ii = iterator(this, Runtime::NetworkInterface::ID == 0 ? 0 : PrefixNum[Runtime::NetworkInterface::ID - 1] );
+    auto ee = iterator(this, PrefixNum[Runtime::NetworkInterface::ID] );
+    for (; ii != ee; ++ii)
+      acquireNode(*ii, MethodFlag::ALL);
+  }
+
   static void getStart(Runtime::PerHost<LC_Dist_InOut> graph, uint32_t whom) {
     //std::cerr << Runtime::NetworkInterface::ID << " getStart " << whom << "\n";
     Runtime::getSystemNetworkInterface().sendAlt(whom, putStart, graph, Runtime::NetworkInterface::ID, graph->Starts[Runtime::NetworkInterface::ID].first);
