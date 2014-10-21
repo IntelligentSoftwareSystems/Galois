@@ -99,7 +99,7 @@ struct PageRank {
 	    round_time.stop();
 	    std::cout<<"Iteration : " << iterations << "  Time : " << round_time.get() << "ms\n";
 	}
-    }    
+    }
  
     void operator() (GNode src, Galois::UserContext<GNode>& cnx) const {
 	double sum = 0;
@@ -112,15 +112,15 @@ struct PageRank {
          }
         float value = (1.0 - alpha) * sum + alpha;
 	LNode&  sdata = g->at(src, Galois::MethodFlag::SRC_ONLY);
-	float diff = std::fabs(value - sdata.value);
-	if (diff > TOLERANCE) {
+        //	float diff = std::fabs(value - sdata.value);
+        //	if (diff > TOLERANCE) {
 	    sdata.value = value;
 	 /*   for (auto jj = g->edge_begin(src, Galois::MethodFlag::SRC_ONLY), ej = g->edge_end(src, Galois::MethodFlag::SRC_ONLY); jj != ej; ++jj) {
 		GNode dst = g->dst(jj, Galois::MethodFlag::SRC_ONLY);
 		cnx.push(dst);
 	    }
 	*/
-	}
+            //	}
 
     }
 
@@ -283,7 +283,8 @@ int main(int argc, char** argv) {
 */ 
 //    }
        // typedef Galois::WorkList::dChunkedFIFO<512> WL;
-       Galois::Runtime::getSystemNetworkInterface().terminate();
+    Graph::deallocate(g);
+    Galois::Runtime::getSystemNetworkInterface().terminate();
     return 0;
 }
     
