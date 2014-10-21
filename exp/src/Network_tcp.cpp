@@ -45,17 +45,28 @@ namespace {
 class NetworkInterfaceTCP : public NetworkInterface {
 
   struct recvIP {
+    //for array expansion
+    recvIP(const recvIP& other) :socket(other.socket) {}
+    recvIP() :socket(-1) {}
+
     int socket;
     LL::SimpleLock lock;
     std::deque<unsigned char> buffer;
+    std::atomic<bool> waiting;
 
     void doRead() {
       if (lock.try_lock()) {
         std::lock_guard<LL::SimpleLock> lg(lock, std::adopt_lock);
         unsigned char data[256];
         int r = 0;
-        while ((r = read(socket, data, sizeof(data))) > 0)
-          std::copy(&data[0], &data[r], std::back_inserter(buffer));
+        do {
+          r = read(socket, data, sizeof(data));
+          //std::cout << "R(" << r << ")";
+          if (r > 0)
+            std::copy(&data[0], &data[r], std::back_inserter(buffer));
+        } while (r == sizeof(data));
+        if (buffer.size())
+          waiting = true;
       }
     }
 
@@ -63,7 +74,8 @@ class NetworkInterfaceTCP : public NetworkInterface {
     RecvBuffer recvMessage() {
       //std::lock_guard<LL::SimpleLock> lg(lock);
       if (buffer.size() < sizeof(uint32_t))
-        return RecvBuffer{};
+        goto exit_recv;
+
       uint32_t h;
       gDeserializeRaw(buffer.begin(), h);
       if (h + sizeof(uint32_t) <= buffer.size()) {
@@ -72,41 +84,64 @@ class NetworkInterfaceTCP : public NetworkInterface {
         buffer.erase(buffer.begin(), buffer.begin() + sizeof(uint32_t) + h);
         return b;
       }
+    exit_recv:
+      waiting = false;
       return RecvBuffer{};
-    }
-  };
-
-  struct sendIP {
-    int socket;
-    LL::SimpleLock lock;
-    std::deque<unsigned char> buffer;
-
-    void doWrite() {
-      if (lock.try_lock()) {
-        std::lock_guard<LL::SimpleLock> lg(lock, std::adopt_lock);
-        if (!buffer.empty()) {
-          unsigned char data[256];
-          int num = std::copy(buffer.begin(), Galois::safe_advance(buffer.begin(), buffer.end(), sizeof(data)), data) - data;
-          int r = write(socket, data, num);
-          if (r > 0)
-            buffer.erase(buffer.begin(), buffer.begin() + r);
-        }
-      }
-    }
-
-    void sendMessage(recvFuncTy recv, SendBuffer& buf) {
-      std::lock_guard<LL::SimpleLock> lg(lock);
-      uint32_t h = buf.size() + sizeof(recvFuncTy);
-      unsigned char* ch = (unsigned char*)&h;
-      std::copy(ch, ch + sizeof(uint32_t), std::back_inserter(buffer));
-      ch = (unsigned char*)&recv;
-      std::copy(ch, ch + sizeof(recvFuncTy), std::back_inserter(buffer));
-      std::copy((unsigned char*)buf.linearData(), (unsigned char*)buf.linearData() + buf.size(), std::back_inserter(buffer));
     }
 
     bool pending() {
+      return waiting;
+    }
+      
+  };
+
+  struct sendIP {
+    //for array expansion
+    sendIP(const sendIP& other) :socket(other.socket) {}
+    sendIP() :socket(-1) {}
+
+    int socket;
+    LL::SimpleLock lock;
+    std::vector<unsigned char> buffer;
+    std::atomic<bool> waiting;
+
+    void doWriteImpl() {
+      //lock already held
+      if (buffer.size()) {
+        int r = write(socket, &buffer[0], buffer.size());
+        if (r > 0)
+          buffer.erase(buffer.begin(), buffer.begin() + r);
+      }
+      if (buffer.size() == 0)
+        waiting = false;
+    }
+    
+    void doWrite() {
+      if (lock.try_lock()) {
+        std::lock_guard<LL::SimpleLock> lg(lock, std::adopt_lock);
+        doWriteImpl();
+      }
+    }
+    
+    void sendMessage(recvFuncTy recv, SendBuffer& buf) {
       std::lock_guard<LL::SimpleLock> lg(lock);
-      return !buffer.empty();
+      auto insertPoint = std::back_inserter(buffer);
+      //frame
+      uint32_t h = buf.size() + sizeof(recvFuncTy);
+      unsigned char* ch = (unsigned char*)&h;
+      std::copy(ch, ch + sizeof(uint32_t), insertPoint);
+      //prefix
+      ch = (unsigned char*)&recv;
+      std::copy(ch, ch + sizeof(recvFuncTy), insertPoint);
+      //message
+      std::copy((unsigned char*)buf.linearData(), (unsigned char*)buf.linearData() + buf.size(), insertPoint);
+      if (!waiting)
+        waiting = true;
+      doWriteImpl();
+    }
+
+    bool pending() {
+      return waiting;
     }
   };
 
@@ -268,15 +303,21 @@ class NetworkInterfaceTCP : public NetworkInterface {
   }
 
   void tryIO() {
-    fd_set wcheck = readfds;
+    //only check sockets with data
+    fd_set wcheck;
+    FD_ZERO(&wcheck);
+    for (int x = 0; x < numhosts; ++x)
+      if (sendState[x].pending())
+        FD_SET(sockets.at(x), &wcheck);
+    //check all readers
     fd_set rcheck = readfds;
-    timeval t = {0,0};
+    timeval t = {0,0}; //non-blocking
     int retval = select(1 + maxsocket, &rcheck, &wcheck, NULL, &t);
     if (retval == -1)
       error("ERROR in select");
     if (retval)
       for (int x = 0; x < numhosts; ++x) {
-        if (FD_ISSET(sockets.at(x), &wcheck) && sendState[x].pending())
+        if (FD_ISSET(sockets.at(x), &wcheck))
           sendState[x].doWrite();
         if (FD_ISSET(sockets.at(x), &rcheck))
           recvState[x].doRead();
@@ -294,10 +335,13 @@ public:
     recvState.resize(numhosts);
     sendState.resize(numhosts);
     FD_ZERO(&readfds);
+    assert(numhosts <= FD_SETSIZE);
     for (int x = 0; x < numhosts; ++x) {
       recvState[x].socket = sendState[x].socket = sockets[x];
-      if (x != id)
+      if (x != id) {
+        assert(sockets.at(x) < FD_SETSIZE);
         FD_SET(sockets.at(x), &readfds);
+      }
     }
     maxsocket = *std::max_element(sockets.begin(), sockets.end());
 
@@ -320,7 +364,6 @@ public:
     this->statSendNum += 1;
     this->statSendBytes += buf.size();
     sendState[dest].sendMessage(recv, buf);
-    tryIO();
   }
 
   virtual bool handleReceives() {
@@ -329,7 +372,7 @@ public:
     bool retval = false;
     tryIO();
     for (int x = 0; x < numhosts; ++x) {
-      if (x != id) {
+      if (x != id && recvState[x].pending()) {
         std::lock_guard<LL::SimpleLock> lg(recvState[x].lock);
         RecvBuffer buf = recvState[x].recvMessage();
         if (buf.size()) {
