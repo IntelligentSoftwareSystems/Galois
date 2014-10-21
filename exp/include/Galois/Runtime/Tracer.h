@@ -38,7 +38,7 @@ static inline void traceImpl(std::ostringstream& os, const char* format) {
 }
 
 template<typename T, typename... Args>
-static inline void traceImpl(std::ostringstream& os, const char* format, T value, Args... args) {
+static inline void traceImpl(std::ostringstream& os, const char* format, T&& value, Args&&... args) {
   for (; *format != '\0'; format++) {
     if (*format == '%') {
       os << value;
@@ -56,9 +56,8 @@ extern bool initTrace;
 
 } // namespace detail
 
-//FIXME use better forwarding
 template<typename... Args>
-static inline void trace(const char* format, Args... args) {
+static inline void trace(const char* format, Args&&... args) {
   if (!detail::initTrace) {
     detail::doTrace = LL::EnvCheck("GALOIS_DEBUG_TRACE");
     detail::initTrace = true;
