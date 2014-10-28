@@ -457,9 +457,9 @@ public:
           }
         }, "finalize", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
 
-    std::printf ("Number of initial sources: %ld\n", std::distance (initSources.begin () , initSources.end ()));
+    std::printf ("Number of initial sources: %ld\n", initSources.size_all ());
 
-    printStats ();
+    // printStats ();
 
     t_init.stop ();
   }
@@ -495,6 +495,8 @@ public:
   void printStats (void) {
     Galois::GAccumulator<size_t> numEdges;
     Galois::GAccumulator<size_t> numNodes;
+
+    printf ("WARNING: timing affected by measuring DAG stats\n");
 
     Galois::do_all_choice (Galois::Runtime::makeLocalRange (allCtxts),
         [&numNodes,&numEdges] (Ctxt* ctxt) {
