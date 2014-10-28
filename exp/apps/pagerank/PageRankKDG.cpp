@@ -64,8 +64,8 @@ protected:
     void operator () (GNode src, C&) {
       graph.getData (src, Galois::MethodFlag::WRITE);
 
-      for (auto i = graph.in_edge_begin (src, Galois::MethodFlag::WRITE)
-          , end_i = graph.in_edge_end (src, Galois::MethodFlag::WRITE); i != end_i; ++i) {
+      for (auto i = graph.in_edge_begin (src, Galois::MethodFlag::READ)
+          , end_i = graph.in_edge_end (src, Galois::MethodFlag::READ); i != end_i; ++i) {
       }
 
       // for (auto i = graph.edge_begin (src, Galois::MethodFlag::WRITE)
@@ -98,45 +98,45 @@ protected:
 
     switch (execType) {
       case KDG_R_ALT:
-        // TODO: assign priorities to nodes
         Galois::Runtime::for_each_det_kdg (
             Galois::Runtime::makeLocalRange (graph),
             NodeComparator {graph},
             NhoodVisitor {graph},
-            ApplyOperator<true> {*this},
+            ApplyOperator<false> {*this},
+            graph, 
             "page-rank-kdg-r-alt",
             Galois::Runtime::KDG_R_ALT);
         break;
 
       case KDG_R:
-        // TODO: assign priorities to nodes
         Galois::Runtime::for_each_det_kdg (
             Galois::Runtime::makeLocalRange (graph),
             NodeComparator {graph},
             NhoodVisitor {graph},
-            ApplyOperator<true> {*this},
+            ApplyOperator<false> {*this},
+            graph, 
             "page-rank-kdg-r",
             Galois::Runtime::KDG_R);
         break;
 
       case KDG_AR:
-        // TODO: assign priorities to nodes
         Galois::Runtime::for_each_det_kdg (
             Galois::Runtime::makeLocalRange (graph),
             NodeComparator {graph},
             NhoodVisitor {graph},
-            ApplyOperator<true> {*this},
+            ApplyOperator<false> {*this},
+            graph, 
             "page-rank-kdg-ar",
             Galois::Runtime::KDG_AR);
         break;
 
       case IKDG:
-        // TODO: assign priorities to nodes
         Galois::Runtime::for_each_det_kdg (
             Galois::Runtime::makeLocalRange (graph),
             NodeComparator {graph},
             NhoodVisitor {graph},
-            ApplyOperator<true> {*this},
+            ApplyOperator<false> {*this},
+            graph, 
             "page-rank-kdg-ikdg",
             Galois::Runtime::IKDG);
         break;

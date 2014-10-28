@@ -16,7 +16,7 @@ enum KDGexecType {
   IKDG
 };
 
-template <typename T, typename Cmp, typename NhoodFunc, typename OpFunc>
+template <typename T, typename Cmp, typename NhoodFunc, typename OpFunc, typename G>
 struct DetKDGexecutor {
 
   typedef Galois::PerThreadBag<T> Bag_ty;
@@ -27,20 +27,26 @@ struct DetKDGexecutor {
   Cmp cmp;
   NhoodFunc nhoodVisitor;
   OpFunc opFunc;
+  G& graph; 
   const char* loopname;
+  unsigned rounds = 0; 
+  
 
   Bag_ty* currWL;
   Bag_ty* nextWL;
+  
 
   DetKDGexecutor (
       const Cmp& cmp,
       const NhoodFunc& nhoodVisitor, 
       const OpFunc& opFunc, 
+      G& graph, 
       const char* loopname)
     :
       cmp (cmp),
       nhoodVisitor (nhoodVisitor),
       opFunc (opFunc),
+      graph (graph),
       loopname (loopname)
   {
     currWL = new Bag_ty ();
@@ -54,7 +60,14 @@ struct DetKDGexecutor {
 
 
   void push (const T& elem) {
-    nextWL->get ().push_back (elem);
+
+    auto& elemData = graph.getData (elem, Galois::MethodFlag::UNPROTECTED);
+
+    unsigned expected = rounds;
+    const unsigned update = rounds + 1;
+    if (elemData.onWL.compare_exchange_strong (expected, update)) {
+      nextWL->get ().push_back (elem);
+    }
   }
 
   struct ApplyOperator {
@@ -83,7 +96,7 @@ struct DetKDGexecutor {
         "push_initial",
         Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
 
-    unsigned rounds = 0;
+    rounds = 0;
     while (!nextWL->empty_all ()) {
       ++rounds;
       std::swap (currWL, nextWL);
@@ -145,14 +158,15 @@ struct DetKDGexecutor {
 };
 
 
-template <typename R, typename Cmp, typename NhoodFunc, typename OpFunc>
-void for_each_det_kdg (const R& initRange, const Cmp& cmp, const NhoodFunc& nhoodVisitor, const OpFunc& opFunc, const char* loopname, const KDGexecType& kdgType) {
+template <typename R, typename Cmp, typename NhoodFunc, typename OpFunc, typename G>
+void for_each_det_kdg (const R& initRange, const Cmp& cmp, const NhoodFunc& nhoodVisitor, 
+    const OpFunc& opFunc, G& graph, const char* loopname, const KDGexecType& kdgType) {
 
   Galois::Runtime::getSystemThreadPool ().burnPower (Galois::getActiveThreads ());
 
   typedef typename R::value_type T;
 
-  DetKDGexecutor<T, Cmp, NhoodFunc, OpFunc> executor {cmp, nhoodVisitor, opFunc, loopname};
+  DetKDGexecutor<T, Cmp, NhoodFunc, OpFunc, G> executor {cmp, nhoodVisitor, opFunc, graph, loopname};
 
   executor.execute (initRange, kdgType);
 
