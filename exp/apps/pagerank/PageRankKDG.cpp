@@ -75,7 +75,6 @@ protected:
   };
 
 
-  template <bool useOnWL> 
   struct ApplyOperator {
 
     static const unsigned CHUNK_SIZE = DEFAULT_CHUNK_SIZE;
@@ -85,7 +84,7 @@ protected:
 
     template <typename C>
     void operator () (GNode src, C& ctx) {
-      outer.applyOperator<useOnWL> (src, ctx);
+      outer.applyOperator (src, ctx);
     }
   };
 
@@ -102,7 +101,7 @@ protected:
             Galois::Runtime::makeLocalRange (graph),
             NodeComparator {graph},
             NhoodVisitor {graph},
-            ApplyOperator<false> {*this},
+            ApplyOperator {*this},
             graph, 
             "page-rank-kdg-r-alt",
             Galois::Runtime::KDG_R_ALT);
@@ -113,7 +112,7 @@ protected:
             Galois::Runtime::makeLocalRange (graph),
             NodeComparator {graph},
             NhoodVisitor {graph},
-            ApplyOperator<false> {*this},
+            ApplyOperator {*this},
             graph, 
             "page-rank-kdg-r",
             Galois::Runtime::KDG_R);
@@ -124,7 +123,7 @@ protected:
             Galois::Runtime::makeLocalRange (graph),
             NodeComparator {graph},
             NhoodVisitor {graph},
-            ApplyOperator<false> {*this},
+            ApplyOperator {*this},
             graph, 
             "page-rank-kdg-ar",
             Galois::Runtime::KDG_AR);
@@ -135,7 +134,7 @@ protected:
             Galois::Runtime::makeLocalRange (graph),
             NodeComparator {graph},
             NhoodVisitor {graph},
-            ApplyOperator<false> {*this},
+            ApplyOperator {*this},
             graph, 
             "page-rank-kdg-ikdg",
             Galois::Runtime::IKDG);

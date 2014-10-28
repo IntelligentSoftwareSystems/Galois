@@ -38,7 +38,6 @@ typedef typename Galois::Graph::LC_CSR_Graph<NodeData, void>
 class PageRankChromatic: public PageRankBase<InnerGraph> {
 protected:
 
-  template <bool useOnWL> 
   struct ApplyOperator {
 
     static const unsigned CHUNK_SIZE = DEFAULT_CHUNK_SIZE;
@@ -48,7 +47,7 @@ protected:
 
     template <typename C>
     void operator () (GNode src, C& ctx) {
-      outer.applyOperator<useOnWL> (src, ctx);
+      outer.applyOperator (src, ctx);
     }
   };
 
@@ -59,7 +58,7 @@ protected:
       case CHROMATIC:
         Galois::Runtime::for_each_det_chromatic (
             Galois::Runtime::makeLocalRange (graph),
-            ApplyOperator<false> {*this},
+            ApplyOperator {*this},
             graph,
             "page-rank-chromatic");
         break;
@@ -68,7 +67,7 @@ protected:
 #if 1
         Galois::Runtime::for_each_det_edge_flip_ar (
             Galois::Runtime::makeLocalRange (graph),
-            ApplyOperator<false> {*this},
+            ApplyOperator {*this},
             graph,
             "page-rank-chromatic");
 #else

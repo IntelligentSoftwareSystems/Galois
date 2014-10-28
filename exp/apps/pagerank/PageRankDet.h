@@ -79,7 +79,7 @@ protected:
         graph.size (), graph.sizeEdges ());
   }
 
-  template <bool useOnWL, typename C>
+  template <typename C>
   void applyOperator (GNode src, C& ctx) {
     double sum = 0;
 
@@ -95,27 +95,14 @@ protected:
 
     
     
-    if (diff > tolerance) {
+    if (diff >= tolerance) {
       sdata.value = value;
+
       for (auto jj = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED), ej = graph.edge_end(src, Galois::MethodFlag::UNPROTECTED); jj != ej; ++jj) {
         GNode dst = graph.getEdgeDst(jj);
-
-        if (useOnWL) {
-          // auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
-          // bool expected = false;
-          // if (dd.onWL.compare_exchange_strong (expected, true)) {
-            // ctx.push (dst);
-          // }
-
-        } else {
-          ctx.push(dst);
-        }
+        ctx.push(dst);
       }
     } 
-
-    if (useOnWL) {
-      // sdata.onWL = false;
-    }
 
   }
 
