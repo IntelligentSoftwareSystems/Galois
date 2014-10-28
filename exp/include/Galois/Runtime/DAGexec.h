@@ -396,6 +396,11 @@ public:
     assert (a != nullptr);
     assert (b != nullptr);
 
+    if (a == b) { 
+      // no self edges
+      return; 
+    }
+
     // a < b ? a : b
     Ctxt* src = cmp (a->getElem () , b->getElem ()) ? a : b;
     Ctxt* dst = (src == a) ? b : a;
@@ -446,12 +451,15 @@ public:
     Galois::do_all_choice (Galois::Runtime::makeLocalRange (allCtxts),
         [this] (Ctxt* ctxt) {
           ctxt->finalizeAdj ();
+          // std::printf ("ctxt: %p, indegree=%d\n", ctxt, ctxt->origInDeg);
           if (ctxt->isSrc ()) {
             initSources.get ().push_back (ctxt);
           }
         }, "finalize", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
 
     std::printf ("Number of initial sources: %ld\n", std::distance (initSources.begin () , initSources.end ()));
+
+    printStats ();
 
     t_init.stop ();
   }
@@ -482,6 +490,21 @@ public:
         },
         "reset_dag", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
     t_reset.stop ();
+  }
+
+  void printStats (void) {
+    Galois::GAccumulator<size_t> numEdges;
+    Galois::GAccumulator<size_t> numNodes;
+
+    Galois::do_all_choice (Galois::Runtime::makeLocalRange (allCtxts),
+        [&numNodes,&numEdges] (Ctxt* ctxt) {
+          numNodes += 1;
+          numEdges += std::distance (ctxt->neighbor_begin (), ctxt->neighbor_end ());
+        },
+        "dag_stats", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
+
+    printf ("DAG created with %zd nodes, %zd edges\n", 
+        numNodes.reduceRO (), numEdges.reduceRO ());
   }
 
 };
