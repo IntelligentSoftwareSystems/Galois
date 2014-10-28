@@ -882,6 +882,83 @@ public:
   };
   */
 
+};
+
+template <typename G, typename F, typename M>
+struct InputGraphDAGtopologyDriven {
+
+  typedef typename G::GraphNode GNode;
+
+  typedef Galois::PerThreadBag<GNode> Bag_ty;
+
+  static const unsigned CHUNK_SIZE = F::CHUNK_SIZE;
+  typedef Galois::WorkList::AltChunkedFIFO<CHUNK_SIZE, GNode> Inner_WL_ty;
+  typedef Galois::WorkList::WLsizeWrapper<Inner_WL_ty> WL_ty;
+  typedef PerThreadStorage<UserContextAccess<GNode> > PerThreadUserCtx;
+
+
+  G& graph;
+  F func;
+  M& dagManager;
+  const char* loopname;
+  
+public:
+
+  InputGraphDAGtopologyDriven (G& graph, const F& func, M& dagManager, const char* loopname)
+    :
+      graph (graph),
+      func (func),
+      dagManager (dagManager),
+      loopname (loopname)
+  {}
+
+  // three strategies for termination
+  // 1. func keeps returns true when computation converges. Terminate when all
+  // nodes return true.
+  // 2. ctx.push just counts the number of pushes. Terminate when 0 pushes
+  // performed
+  // 3. ctx.push markes the node active. Apply the func to active nodes only.
+  // Terminate when no active nodes. 
+  //
+  // Other features: 
+  // 1. reinit the DAG on each round by a given priority function. 
+
+
+  void push (GNode node) {} // empty for now
+
+  struct ApplyOperator {
+    typedef int tt_does_not_need_aborts;
+
+    InputGraphDAGexecutor& outer;
+
+    template <typename C>
+    void operator () (GNode src, C& ctx) {
+
+      outer.func (src, outer);
+
+      G& graph = outer.graph;
+
+      auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
+      // sd.onWL = 0;
+
+      unsigned indegAmt = 0;
+
+      auto closure = [&graph, &ctx] (GNode dst) {
+
+        auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
+
+        unsigned x = --dd.indegree; 
+        if (x == 0) {
+          ctx.push (dst);
+        }
+
+        ++indegAmt;
+      };
+
+      sd.indegree += indegAmt;
+
+    } // end function
+  };
 
 
 };
