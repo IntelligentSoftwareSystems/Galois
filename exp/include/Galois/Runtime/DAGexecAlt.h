@@ -414,7 +414,7 @@ protected:
     template <typename W>
     void operator () (Ctxt* src, W& wl) {
       assert (src->isSrc ());
-      printf ("processing source: %p, item: %d\n", src, src->elem);
+      // printf ("processing source: %p, item: %d\n", src, src->elem);
 
       UserCtx& uctx = *(outer.userCtxts.getLocal ());
       outer.opFunc (src->elem, uctx);
@@ -489,7 +489,7 @@ public:
           nhVisitor (ctxt->elem, uctx);
           Galois::Runtime::setThreadContext (NULL);
 
-          printf ("Created context:%p for item: %d\n", ctxt, x);
+          // printf ("Created context:%p for item: %d\n", ctxt, x);
         }, "create_ctxt", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
 
 
