@@ -44,12 +44,12 @@ struct DAGdata {
   unsigned color;
   unsigned id;
   unsigned priority;
-  std::atomic<bool> onWL;
+  std::atomic<unsigned> onWL;
   std::atomic<unsigned> indegree;
 
 
   explicit DAGdata (unsigned _id=0)
-    : color (0), id (_id), priority (0), onWL (false), indegree (0) 
+    : color (0), id (_id), priority (0), onWL (0), indegree (0) 
   {}
 };
 
@@ -562,8 +562,8 @@ struct ChromaticExecutor {
     unsigned i = data.color - 1;
     assert (i < colorWorkLists.size ());
 
-    bool expected = false;
-    if (data.onWL.compare_exchange_strong (expected, true)) {
+    unsigned expected = 0;
+    if (data.onWL.compare_exchange_strong (expected, 1)) {
       colorWorkLists[i]->push (n);
     }
   }
@@ -628,7 +628,7 @@ struct ChromaticExecutor {
       outer.func (n, outer);
 
       auto& nd = outer.graph.getData (n, Galois::MethodFlag::UNPROTECTED);
-      nd.onWL = false;
+      nd.onWL = 0;
 
       // for (auto i = userCtx.getPushBuffer ().begin (), 
           // end_i = userCtx.getPushBuffer ().end (); i != end_i; ++i) {
@@ -744,8 +744,8 @@ public:
   void push (GNode node) {
     auto& nd = graph.getData (node, Galois::MethodFlag::UNPROTECTED);
 
-    bool expected = false;
-    if (nd.onWL.compare_exchange_strong (expected, true)) {
+    unsigned expected = 0;
+    if (nd.onWL.compare_exchange_strong (expected, 1)) {
       nextWork.push (node);
     }
     //
@@ -768,7 +768,7 @@ public:
       G& graph = outer.graph;
 
       auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
-      sd.onWL = false;
+      sd.onWL = 0;
 
       // for (auto i = userCtx.getPushBuffer ().begin (), 
           // end_i = userCtx.getPushBuffer ().end (); i != end_i; ++i) {
