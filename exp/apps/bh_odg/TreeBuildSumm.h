@@ -694,20 +694,20 @@ struct TreeSummarizeSpeculative: public TypeDefHelper<SpecNodeBase> {
   struct VisitNhood {
     static const unsigned CHUNK_SIZE = 32;
 
-    void acquire (TreeNode* n) {
-      Galois::Runtime::acquire (n, Galois::MethodFlag::WRITE);
+    void acquire (TreeNode* n, Galois::MethodFlag f) {
+      Galois::Runtime::acquire (n, f);
     }
 
     template <typename C>
     void operator () (InterNode* node, C& ctx) {
 
       assert (!node->isLeaf ());
-      acquire (node);
+      acquire (node, Galois::MethodFlag::WRITE);
 
       for (unsigned i = 0; i < 8; ++i) {
         TreeNode* c = node->getChild (i);
         if (c != NULL) {
-          acquire (c);
+          acquire (c, Galois::MethodFlag::READ);
         }
       }
     }
