@@ -101,11 +101,11 @@ protected:
         GNode dst = graph.getEdgeDst(jj);
 
         if (useOnWL) {
-          auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
-          bool expected = false;
-          if (dd.onWL.compare_exchange_strong (expected, true)) {
-            ctx.push (dst);
-          }
+          // auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
+          // bool expected = false;
+          // if (dd.onWL.compare_exchange_strong (expected, true)) {
+            // ctx.push (dst);
+          // }
 
         } else {
           ctx.push(dst);
@@ -114,15 +114,49 @@ protected:
     } 
 
     if (useOnWL) {
-      sdata.onWL = false;
+      // sdata.onWL = false;
     }
 
   }
+
+  bool checkConvergence (void) {
+    Galois::GReduceLogicalAND allConverged;
+
+    Galois::do_all_choice (Galois::Runtime::makeLocalRange (graph),
+        [&] (GNode src) {
+          double sum = 0;
+
+          for (auto jj = graph.in_edge_begin(src, Galois::MethodFlag::UNPROTECTED), ej = graph.in_edge_end(src, Galois::MethodFlag::UNPROTECTED); jj != ej; ++jj) {
+            GNode dst = graph.getInEdgeDst(jj);
+            auto& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+            sum += ddata.value / ddata.outdegree;
+          }
+
+          float value = (1.0 - alpha) * sum + alpha;
+          auto& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
+          float diff = std::fabs(value - sdata.value);
+
+          
+          
+          if (diff >= tolerance) {
+            allConverged.update (false);
+            // std::fprintf (stderr, "ERROR: convergence failed on node %d, error=%f, tolerance=%f\n", src, diff, tolerance);
+          }
+        }, 
+        "check-convergence", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
+
+    return allConverged.reduceRO ();
+  }
+
 
   void verify (void) {
     if (skipVerify) {
       std::printf ("Verification skipped\n");
       return;
+    }
+
+    if (!checkConvergence ()) {
+      std::fprintf (stderr, "ERROR: Convergence check failed\n");
     }
 
     printTop (graph, 10);
