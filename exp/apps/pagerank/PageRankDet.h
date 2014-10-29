@@ -80,7 +80,7 @@ protected:
   }
 
   template <typename C>
-  void applyOperator (GNode src, C& ctx) {
+  bool applyOperator (GNode src, C& ctx) {
     double sum = 0;
 
     for (auto jj = graph.in_edge_begin(src, Galois::MethodFlag::UNPROTECTED), ej = graph.in_edge_end(src, Galois::MethodFlag::UNPROTECTED); jj != ej; ++jj) {
@@ -103,6 +103,8 @@ protected:
         ctx.push(dst);
       }
     } 
+
+    return (diff >= tolerance);
 
   }
 

@@ -44,12 +44,13 @@ struct DAGdata {
   unsigned color;
   unsigned id;
   unsigned priority;
+  unsigned indeg_backup;
   std::atomic<unsigned> onWL;
   std::atomic<unsigned> indegree;
 
 
   explicit DAGdata (unsigned _id=0)
-    : color (0), id (_id), priority (0), onWL (0), indegree (0) 
+    : color (0), id (_id), priority (0), indeg_backup(0), onWL (0), indegree (0) 
   {}
 };
 
@@ -150,6 +151,8 @@ public:
             sources.push (src);
           }
 
+          sd.indeg_backup = sd.indegree;
+
         },
         "init-DAG",
         Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
@@ -187,11 +190,23 @@ public:
               assert (bool(sd.onWL));
               sources.push (src);
             }
+            sd.indeg_backup = sd.indegree; 
           // } // end if
 
         },
         "init-Active-DAG",
         Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
+  }
+
+  void reinitDAG (void) {
+    Galois::do_all_choice ( Galois::Runtime::makeLocalRange (graph), 
+        [this] (GNode src) {
+          auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
+          sd.indegree = sd.indeg_backup;
+        },
+        "reinitDAG",
+        Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
+
   }
 
   void assignIDs (void) {
@@ -884,86 +899,6 @@ public:
 
 };
 
-template <typename G, typename F, typename M>
-struct InputGraphDAGtopologyDriven {
-
-  typedef typename G::GraphNode GNode;
-
-  typedef Galois::PerThreadBag<GNode> Bag_ty;
-
-  static const unsigned CHUNK_SIZE = F::CHUNK_SIZE;
-  typedef Galois::WorkList::AltChunkedFIFO<CHUNK_SIZE, GNode> Inner_WL_ty;
-  typedef Galois::WorkList::WLsizeWrapper<Inner_WL_ty> WL_ty;
-  typedef PerThreadStorage<UserContextAccess<GNode> > PerThreadUserCtx;
-
-
-  G& graph;
-  F func;
-  M& dagManager;
-  const char* loopname;
-  
-public:
-
-  InputGraphDAGtopologyDriven (G& graph, const F& func, M& dagManager, const char* loopname)
-    :
-      graph (graph),
-      func (func),
-      dagManager (dagManager),
-      loopname (loopname)
-  {}
-
-  // three strategies for termination
-  // 1. func keeps returns true when computation converges. Terminate when all
-  // nodes return true.
-  // 2. ctx.push just counts the number of pushes. Terminate when 0 pushes
-  // performed
-  // 3. ctx.push markes the node active. Apply the func to active nodes only.
-  // Terminate when no active nodes. 
-  //
-  // Other features: 
-  // 1. reinit the DAG on each round by a given priority function. 
-
-
-  void push (GNode node) {} // empty for now
-
-  struct ApplyOperator {
-    typedef int tt_does_not_need_aborts;
-
-    InputGraphDAGexecutor& outer;
-
-    template <typename C>
-    void operator () (GNode src, C& ctx) {
-
-      outer.func (src, outer);
-
-      G& graph = outer.graph;
-
-      auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
-      // sd.onWL = 0;
-
-      unsigned indegAmt = 0;
-
-      auto closure = [&graph, &ctx] (GNode dst) {
-
-        auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
-
-        unsigned x = --dd.indegree; 
-        if (x == 0) {
-          ctx.push (dst);
-        }
-
-        ++indegAmt;
-      };
-
-      sd.indegree += indegAmt;
-
-    } // end function
-  };
-
-
-};
-
-
 
 template <typename R, typename F, typename G, typename M>
 void for_each_det_edge_flip_ar (const R& range, const F& func, G& graph, M& dagManager, const char* loopname) {
@@ -985,6 +920,246 @@ void for_each_det_edge_flip_ar (const R& range, const F& func, G& graph, const c
   M dagManager {graph};
 
   for_each_det_edge_flip_ar (range, func, graph, dagManager, loopname);
+}
+
+  // three strategies for termination
+  // 1. func keeps returns true when computation converges. Terminate when all
+  // nodes return true.
+  // 2. ctx.push just counts the number of pushes. Terminate when 0 pushes
+  // performed
+  // 3. ctx.push marks the node active. Apply the func to active nodes only.
+  // Terminate when no active nodes. "Activeness" can also be implemented as a
+  // counter, which is incremented every time a node is marked active and
+  // decremented upon processing
+  //
+  // Other features: 
+  // 1. reinit the DAG on each round by a given priority function. 
+
+  enum class TerminationPolicy {
+    CHECK_RETURN_VAL,
+    COUNT_PUSHES,
+    COUNT_ACTIVE
+  };
+
+template <typename G, typename F, typename M, TerminationPolicy TERM_POLICY=TerminationPolicy::COUNT_ACTIVE>
+struct InputGraphDAGtopologyDriven {
+
+
+  typedef typename G::GraphNode GNode;
+
+  typedef Galois::PerThreadBag<GNode> Bag_ty;
+
+  static const unsigned CHUNK_SIZE = F::CHUNK_SIZE;
+  typedef Galois::WorkList::AltChunkedFIFO<CHUNK_SIZE, GNode> Inner_WL_ty;
+  typedef Galois::WorkList::WLsizeWrapper<Inner_WL_ty> WL_ty;
+  typedef PerThreadStorage<UserContextAccess<GNode> > PerThreadUserCtx;
+
+
+  G& graph;
+  F func;
+  M& dagManager;
+  const char* loopname;
+
+  GReduceLogicalOR retVals; 
+  GAccumulator<size_t> numActiveFound; 
+  GAccumulator<size_t> numPushes; 
+  
+public:
+
+  InputGraphDAGtopologyDriven (G& graph, const F& func, M& dagManager, const char* loopname)
+    :
+      graph (graph),
+      func (func),
+      dagManager (dagManager),
+      loopname (loopname)
+  {}
+
+  struct ApplyOperator {
+    typedef int tt_does_not_need_aborts;
+
+    InputGraphDAGtopologyDriven& outer;
+
+    template <typename C>
+    void operator () (GNode src, C& ctx) {
+
+      G& graph = outer.graph;
+
+      auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
+      assert (sd.indegree == 0);
+
+      switch (TERM_POLICY) {
+
+        case TerminationPolicy::COUNT_PUSHES:
+          {
+            outer.func (src, outer);
+            break;
+          }
+
+        case TerminationPolicy::COUNT_ACTIVE:
+          {
+            if (sd.onWL > 0) { // is active
+              outer.func (src, outer);
+              outer.numActiveFound += 1;
+              sd.onWL = 0;
+            }
+            break;
+          }
+
+        case TerminationPolicy::CHECK_RETURN_VAL:
+          {
+            bool ret = outer.func (src, outer);
+            outer.retVals.update (ret);
+            break;
+          }
+
+        default:
+          {
+            std::abort ();
+          }
+      }
+
+      auto closure = [&graph, &ctx] (GNode dst) {
+
+        auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
+
+        unsigned x = --dd.indegree; 
+        if (x == 0) {
+          ctx.push (dst);
+        }
+      };
+
+      outer.dagManager.applyToAdj (src, closure);
+
+    } // end function
+  };
+
+  void push (GNode node) {
+
+    switch (TERM_POLICY) {
+
+      case TerminationPolicy::COUNT_PUSHES:
+        {
+          numPushes += 1;
+          break;
+        }
+
+      case TerminationPolicy::COUNT_ACTIVE:
+        {
+          auto& nd = graph.getData (node, Galois::MethodFlag::UNPROTECTED);
+          nd.onWL = 1;
+          break;
+        }
+
+      case TerminationPolicy::CHECK_RETURN_VAL:
+        {
+          break;
+        }
+
+      default:
+        {
+          std::abort ();
+        }
+    }
+  }
+
+  template <typename R>
+  void execute (const R& range) {
+    Bag_ty sources;
+
+    dagManager.assignPriority ();
+
+    Galois::do_all_choice (
+        range,
+        [this] (GNode node) {
+          push (node);
+        }, 
+        "push_initial",
+        Galois::doall_chunk_size<CHUNK_SIZE> ());
+
+    Galois::TimeAccumulator t_dag_init;
+    t_dag_init.start ();
+    dagManager.initDAG (sources);
+    t_dag_init.stop ();
+
+    Galois::TimeAccumulator t_dag_exec;
+
+    unsigned rounds = 0;
+    while (true) {
+
+      ++rounds;
+
+      assert (sources.size_all () != 0);
+
+      // reset
+      numActiveFound.reset ();
+      retVals.reset ();
+      numPushes.reset ();
+
+      t_dag_exec.start ();
+      Galois::for_each_local (sources,
+          ApplyOperator {*this},
+          Galois::loopname("ApplyOperator"),
+          Galois::wl<WL_ty>());
+      t_dag_exec.stop ();
+
+
+      bool term = false;
+
+      switch (TERM_POLICY) {
+        case TerminationPolicy::CHECK_RETURN_VAL:
+          term = !(retVals.reduceRO ());
+          break;
+
+        case TerminationPolicy::COUNT_PUSHES:
+          term = (numPushes.reduceRO () == 0);
+          break;
+
+        case TerminationPolicy::COUNT_ACTIVE:
+          term = (numActiveFound.reduceRO () == 0);
+          break;
+
+        default:
+          std::abort ();
+      }
+
+      if (term) { break; }
+
+      t_dag_init.start ();
+      dagManager.reinitDAG ();
+      t_dag_init.stop ();
+
+    }
+
+    std::printf ("InputGraphDAGtopologyDriven: performed %d rounds\n", rounds);
+    std::printf ("InputGraphDAGtopologyDriven: time taken by dag initialization: %lu\n", t_dag_init.get ());
+    std::printf ("InputGraphDAGtopologyDriven: time taken by dag execution: %lu\n", t_dag_exec.get ());
+  }
+
+
+};
+
+
+
+template <typename R, typename F, typename G, typename M>
+void for_each_det_edge_flip_topo (const R& range, const F& func, G& graph, M& dagManager, const char* loopname) {
+
+  Galois::Runtime::getSystemThreadPool ().burnPower (Galois::getActiveThreads ());
+
+  InputGraphDAGtopologyDriven<G,F, M, TerminationPolicy::CHECK_RETURN_VAL> executor {graph, func, dagManager, loopname};
+
+  executor.execute (range);
+
+  Galois::Runtime::getSystemThreadPool ().beKind ();
+
+}
+
+template <typename R, typename F, typename G>
+void for_each_det_edge_flip_topo (const R& range, const F& func, G& graph, const char* loopname) {
+
+  typedef typename DAGmanagerInOut<G>::Manager M;
+  M dagManager {graph};
+
+  for_each_det_edge_flip_topo (range, func, graph, dagManager, loopname);
 }
 
 

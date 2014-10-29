@@ -5,6 +5,7 @@ namespace cll = llvm::cl;
 enum ExecType {
   CHROMATIC,
   EDGE_FLIP,
+  TOPO,
 };
 
 static cll::opt<ExecType> execType (
@@ -13,6 +14,7 @@ static cll::opt<ExecType> execType (
     cll::values (
       clEnumValN (CHROMATIC, "CHROMATIC", "Chromatic Executor"),
       clEnumValN (EDGE_FLIP, "EDGE_FLIP", "Edge Flipping DAG overlayed on input graph"),
+      clEnumValN (TOPO, "TOPO", "Edge Flipping DAG overlayed on input graph"),
       clEnumValEnd),
     cll::init (CHROMATIC));
 
@@ -46,8 +48,8 @@ protected:
     PageRankChromatic& outer;
 
     template <typename C>
-    void operator () (GNode src, C& ctx) {
-      outer.applyOperator (src, ctx);
+    bool operator () (GNode src, C& ctx) {
+      return outer.applyOperator (src, ctx);
     }
   };
 
@@ -64,15 +66,19 @@ protected:
         break;
 
       case EDGE_FLIP:
-#if 1
         Galois::Runtime::for_each_det_edge_flip_ar (
             Galois::Runtime::makeLocalRange (graph),
             ApplyOperator {*this},
             graph,
             "page-rank-chromatic");
-#else
-        abort();
-#endif
+        break;
+
+      case TOPO:
+        Galois::Runtime::for_each_det_edge_flip_topo (
+            Galois::Runtime::makeLocalRange (graph),
+            ApplyOperator {*this},
+            graph,
+            "page-rank-chromatic");
         break;
 
       default:
