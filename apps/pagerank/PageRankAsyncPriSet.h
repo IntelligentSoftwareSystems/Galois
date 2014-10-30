@@ -63,21 +63,24 @@ struct AsyncPriSet{
     //    void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) const {
     void operator()(const GNode& src) const {
       LNode& sdata = graph.getData(src);
+      sdata.inWL = 0;
+
       auto resScale = outOnly ? nout(graph, src, Galois::MethodFlag::NONE) + 1 : ninout(graph, src, Galois::MethodFlag::NONE);
       if ( sdata.residual / resScale < limit) {
-        nextWL.push(src);
         double R = sdata.residual;
-        //        if (R > tolerance) {
-          R /= resScale;
-          stats.getLocal()->insert(std::max(0.0, R));
-          //        }
+        if (R >= tolerance) {
+          if (0 == sdata.inWL.exchange(1)) {
+            nextWL.push(src);
+            R /= resScale;
+            stats.getLocal()->insert(std::max(0.0, R));
+          }
+        }
         return;
       }
 
       Galois::MethodFlag lockflag = Galois::MethodFlag::NONE;
 
       // the node is processed
-      sdata.inWL = 0;
       PRTy oldResidual = sdata.residual.exchange(0.0);
       PRTy pr = computePageRankInOut(graph, src, 0, lockflag);
       PRTy diff = std::fabs(pr - sdata.value);
@@ -91,16 +94,14 @@ struct AsyncPriSet{
         LNode& ddata = graph.getData(dst, lockflag);
         PRTy old = atomicAdd(ddata.residual, delta);
         // if the node is not in the worklist and the residual is greater than tolerance
-        if (old + delta > tolerance && !ddata.inWL) {
-          if (0 ==ddata.inWL.exchange(1))
+        if (old + delta >= tolerance && !ddata.inWL) {
+          if (0 ==ddata.inWL.exchange(1)) {
             nextWL.push(dst);
+            auto rs = outOnly ? nout(graph, dst, Galois::MethodFlag::NONE) + 1 : ninout(graph, dst, Galois::MethodFlag::NONE);
+            stats.getLocal()->insert(old+delta / rs);
+          }
         }
       }
-      double R = sdata.residual;
-      //      if (R > tolerance) {
-        R /= resScale;
-        stats.getLocal()->insert(std::max(0.0, R)); // not strictly true
-        //      }
     }
   };
 
@@ -123,7 +124,7 @@ struct AsyncPriSet{
       for (int i = 0; i < stats.size(); ++i) {
         auto* s = stats.getRemote(i);
         if (s->getCount()) {
-          std::cout << *s << "\n";
+          //std::cout << *s << "\n";
           count += s->getCount();
           limit += s->getMean() * s->getCount();
           max = std::max(max, s->getMax());
@@ -133,10 +134,11 @@ struct AsyncPriSet{
         }
       }
       limit /= count;
+      limit /= 2;
       //      limit += sdev / nonzero;
-      if (count < 1000)
+      if (count < 5000)
         limit = 0.0;
-      std::cout << "Count is " << count << " next limit is " << limit << "\n";
+      //std::cout << "Count is " << count << " next limit is " << limit << " max is " << max << "\n";
       Galois::do_all_local(curWL, Process(graph, tolerance, nextWL, stats, limit), Galois::do_all_steal<true>());
     }
   }

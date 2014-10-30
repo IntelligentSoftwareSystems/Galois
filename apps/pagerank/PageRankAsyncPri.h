@@ -52,14 +52,17 @@ struct AsyncPri{
 
   struct PRPri {
     Graph& graph;
-    PRTy amp;
-    PRPri(Graph& g, PRTy a) : graph(g), amp(a) {}
+    PRTy tolerance;
+    PRPri(Graph& g, PRTy t) : graph(g), tolerance(t) {}
     int operator()(const GNode& src, PRTy d) const {
       if (outOnly)
         d /= (1 + nout(graph, src, Galois::MethodFlag::NONE));
       else
         d /= ninout(graph, src, Galois::MethodFlag::NONE);
-      return d*amp; //std::max((int)floor(d*amp), 0);
+      d /= tolerance;
+      if (d > 50)
+        return -50;
+      return -d; //d*amp; //std::max((int)floor(d*amp), 0);
     }      
     int operator()(const GNode& src) const {
       PRTy d = graph.getData(src, Galois::MethodFlag::NONE).residual;
@@ -78,7 +81,7 @@ struct AsyncPri{
     PRTy tolerance;
     PRPri pri;
 
-    Process(Graph& g, PRTy t, PRTy a): graph(g), tolerance(t), pri(g,a) { }
+    Process(Graph& g, PRTy t, PRTy a): graph(g), tolerance(t), pri(g,t) { }
 
     void operator()(const std::pair<GNode,int>& srcn, Galois::UserContext<std::pair<GNode,int>>& ctx) const {
       GNode src = srcn.first;
@@ -111,10 +114,10 @@ struct AsyncPri{
 
   void operator()(Graph& graph, PRTy tolerance, PRTy amp) {
     initResidual(graph);
-    typedef Galois::WorkList::dChunkedFIFO<16> WL;
-    typedef Galois::WorkList::OrderedByIntegerMetric<sndPri,WL>::with_block_period<16>::type OBIM;
+    typedef Galois::WorkList::dChunkedFIFO<32> WL;
+    typedef Galois::WorkList::OrderedByIntegerMetric<sndPri,WL>::with_block_period<8>::type OBIM;
     Galois::InsertBag<std::pair<GNode, int> > bag;
-    PRPri pri(graph, amp);
+    PRPri pri(graph, tolerance);
     // Galois::do_all_local(graph, [&graph, &bag, &pri] (const GNode& node) {
     //     bag.push(std::make_pair(node, pri(node)));
     //   });

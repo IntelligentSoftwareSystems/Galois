@@ -41,6 +41,8 @@ public:
                 _max(std::numeric_limits<double>::min())
   {}
 
+  OnlineStat(const OnlineStat&) = default;
+
   void reset() {
     M2 = mean = 0.0;
     n = 0;

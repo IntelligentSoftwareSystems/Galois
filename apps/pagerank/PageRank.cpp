@@ -60,12 +60,14 @@ static const char* desc = "Computes page ranks a la Page and Brin";
 static const char* url = 0;
 
 enum Algo {
-  synch,
+  sync_coord,
+  sync_aut,
   async,
   async_rsd,
   async_prt,
   async_prs,
   async_edge,
+  async_edge_prs,
   async_ppr_rsd
 };
 
@@ -81,33 +83,36 @@ static cll::opt<std::string> algo_str("algo_str", cll::desc("algo_str"), cll::in
 static cll::opt<bool> outOnlyP("outdeg", cll::desc("Out degree only for priority"), cll::init(false));
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
     cll::values(
-      clEnumValN(Algo::synch, "synch", "Synchronous version..."),
+      clEnumValN(Algo::sync_coord, "sync_coord", "Synchronous version, coordinated..."),
+      clEnumValN(Algo::sync_aut, "sync_aut", "Synchronous version, autonomous..."),
       clEnumValN(Algo::async, "async", "Asynchronous versoin..."),
       clEnumValN(Algo::async_rsd, "async_rsd", "Residual-based asynchronous version..."),
       clEnumValN(Algo::async_prt, "async_prt", "Prioritized (degree biased residual) version..."),
       clEnumValN(Algo::async_prs, "async_prs", "Prioritized Bulk Sync version..."),
       clEnumValN(Algo::async_edge, "async_edge", "Edge based"),
+      clEnumValN(Algo::async_edge_prs, "async_edge_prs", "Edge based"),
       clEnumValN(Algo::async_ppr_rsd, "async_ppr_rsd", "Asyncronous PPR"),
       clEnumValEnd), cll::init(Algo::async));
 
 bool outOnly;
 
+template<bool coord>
 struct Sync {
   struct LNode {
-    float value[2];
-    void init() { value[0] = value[1] = 1.0 - alpha; }
-    float getPageRank() { return value[1]; }
-    float getPageRank(unsigned int it) { return value[it & 1]; }
-    void setPageRank(unsigned it, float v) { value[(it+1) & 1] = v; }
+    float value[coord ? 2 : 1];
+    void init() { value[0] = value[coord ? 1 : 0] = 1.0 - alpha; }
+    float getPageRank() { return value[coord ? 1 : 0]; }
+    float getPageRank(unsigned int it) { return value[coord ? it & 1 : 0]; }
+    void setPageRank(unsigned it, float v) { value[coord ? (it+1) & 1 : 0] = v; }
   };
 
-  typedef Galois::Graph::LC_CSR_Graph<LNode,void>
-    ::with_numa_alloc<true>::type
+  typedef typename Galois::Graph::LC_CSR_Graph<LNode,void>
+    ::template with_numa_alloc<true>::type
     InnerGraph;
-  typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
-  typedef Graph::GraphNode GNode;
+  typedef typename Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  typedef typename Graph::GraphNode GNode;
 
-  std::string name() const { return "Sync"; }
+  std::string name() const { return coord ? "Sync_c" : "Sync_a"; }
 
   Galois::GReduceMax<float> max_delta;
   Galois::GAccumulator<unsigned int> small_delta;
@@ -124,19 +129,19 @@ struct Sync {
   struct Initialize {
     Graph& g;
     Initialize(Graph& g): g(g) { }
-    void operator()(Graph::GraphNode n) const {
+    void operator()(GNode n) const {
       LNode& data = g.getData(n, Galois::MethodFlag::NONE);
       data.value[0] = 1.0;
-      data.value[1] = 1.0;
+      data.value[coord ? 1 : 0] = 1.0;
     }
   };
 
   struct Copy {
     Graph& g;
     Copy(Graph& g): g(g) { }
-    void operator()(Graph::GraphNode n) const {
+    void operator()(GNode n) const {
       LNode& data = g.getData(n, Galois::MethodFlag::NONE);
-      data.value[1] = data.value[0];
+      data.value[coord ? 1 : 0] = data.value[0];
     }
   };
 
@@ -197,7 +202,8 @@ struct Sync {
     if (iteration & 1) {
       // Result already in right place
     } else {
-      Galois::do_all_local(graph, Copy(graph));
+      if (!coord)
+        Galois::do_all_local(graph, Copy(graph));
     }
   }
 
@@ -295,7 +301,7 @@ void run() {
 
   algo.readGraph(graph, filename, transposeGraphName);
 
-  Galois::preAlloc(numThreads + (graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::MM::hugePageSize);
+  Galois::preAlloc(numThreads + (2*graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::MM::hugePageSize);
   Galois::reportPageAlloc("MeminfoPre");
 
   Galois::StatTimer T;
@@ -389,12 +395,14 @@ int main(int argc, char **argv) {
   Galois::StatTimer T("TotalTime");
   T.start();
   switch (algo) {
-    case Algo::synch: run<Sync>(); break;
+  case Algo::sync_coord: run<Sync<true>>(); break;
+  case Algo::sync_aut: run<Sync<false>>(); break;
     case Algo::async: run<AsyncSet>(); break;
     case Algo::async_rsd: run<AsyncRsd>(); break;
     case Algo::async_prt: run<AsyncPri>(); break;
     case Algo::async_prs: run<AsyncPriSet>(); break;
     case Algo::async_edge: run<AsyncEdge>(); break;
+    case Algo::async_edge_prs:run<AsyncEdgePriSet>(); break;
     case Algo::async_ppr_rsd: runPPR<PPRAsyncRsd>(); break;
     default: std::cerr << "Unknown algorithm\n"; abort();
   }
