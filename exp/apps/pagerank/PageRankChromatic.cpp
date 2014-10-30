@@ -48,8 +48,8 @@ protected:
     PageRankChromatic& outer;
 
     template <typename C>
-    bool operator () (GNode src, C& ctx) {
-      return outer.applyOperator (src, ctx);
+    void operator () (GNode src, C& ctx) {
+      outer.applyOperator (src, ctx);
     }
   };
 

@@ -3,6 +3,7 @@
 namespace cll = llvm::cl;
 
 enum ExecType {
+  KDG_REUSE,
   KDG_R_ALT,
   KDG_R,
   KDG_AR,
@@ -13,6 +14,7 @@ static cll::opt<ExecType> execType (
     "executor",
     cll::desc ("Deterministic Executor Type"),
     cll::values (
+      clEnumValN (KDG_REUSE, "KDG_REUSE", "KDG_REUSE"),
       clEnumValN (KDG_R_ALT, "KDG_R_ALT", "KDG_R_ALT"),
       clEnumValN (KDG_R, "KDG_R", "KDG_R"),
       clEnumValN (KDG_AR, "KDG_AR", "KDG_AR"),
@@ -96,6 +98,16 @@ protected:
 
 
     switch (execType) {
+      case KDG_REUSE:
+        Galois::Runtime::for_each_det_kdg_topo (
+            Galois::Runtime::makeLocalRange (graph),
+            NodeComparator {graph},
+            NhoodVisitor {graph},
+            ApplyOperator {*this},
+            graph, 
+            "page-rank-kdg-reuse");
+        break;
+
       case KDG_R_ALT:
         Galois::Runtime::for_each_det_kdg (
             Galois::Runtime::makeLocalRange (graph),

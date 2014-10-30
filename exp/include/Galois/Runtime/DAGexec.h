@@ -195,8 +195,8 @@ public:
   typedef Galois::gdeque<Derived*, 64> AdjList;
   typedef std::atomic<int> ParCounter;
 
-  GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE ParCounter inDeg;
-  // ParCounter inDeg;
+  // GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE ParCounter inDeg;
+  ParCounter inDeg;
   const int origInDeg;
   NhoodMgr& nhmgr;
   T elem;
@@ -459,7 +459,7 @@ public:
 
     std::printf ("Number of initial sources: %ld\n", initSources.size_all ());
 
-    // printStats ();
+    printStats ();
 
     t_init.stop ();
   }
@@ -475,8 +475,8 @@ public:
     Galois::for_each_local (initSources,
         ApplyOperator {*this}, Galois::loopname("apply_operator"), Galois::wl<SrcWL_ty>());
 
-    std::printf ("Number of pushes: %zd\n, (#pushes + #init) = %zd\n", 
-        numPush.reduceRO (), numPush.reduceRO () + initSources.size_all  ());
+    // std::printf ("Number of pushes: %zd\n, (#pushes + #init) = %zd\n", 
+        // numPush.reduceRO (), numPush.reduceRO () + initSources.size_all  ());
     t_exec.stop ();
   }
 
@@ -488,7 +488,7 @@ public:
         [] (Ctxt* ctxt) {
           ctxt->reset();
         },
-        "reset_dag", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
+        "resetDAG", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
     t_reset.stop ();
   }
 
@@ -583,13 +583,13 @@ struct DAGexecutorRW: public DAGexecutorBase<T, Cmp, OpFunc, NhoodFunc, DAGconte
 };
 
 template <typename R, typename Cmp, typename OpFunc, typename NhoodFunc>
-DAGexecutor<typename R::value_type, Cmp, OpFunc, NhoodFunc> make_dag_executor (const R& range, const Cmp& cmp, const NhoodFunc& nhVisitor, const OpFunc& opFunc, const char* loopname=nullptr) {
+DAGexecutorRW<typename R::value_type, Cmp, OpFunc, NhoodFunc>* make_dag_executor (const R& range, const Cmp& cmp, const NhoodFunc& nhVisitor, const OpFunc& opFunc, const char* loopname=nullptr) {
 
-  return new DAGexecutor<typename R::value_type, Cmp, OpFunc, NhoodFunc> (cmp, nhVisitor, opFunc);
+  return new DAGexecutorRW<typename R::value_type, Cmp, OpFunc, NhoodFunc> (cmp, nhVisitor, opFunc);
 }
 
 template <typename R, typename Cmp, typename OpFunc, typename NhoodFunc>
-void destroy_dag_executor (DAGexecutor<typename R::value_type, Cmp, OpFunc, NhoodFunc>*& exec_ptr) {
+void destroy_dag_executor (DAGexecutorRW<typename R::value_type, Cmp, OpFunc, NhoodFunc>*& exec_ptr) {
   delete exec_ptr; exec_ptr = nullptr;
 }
 

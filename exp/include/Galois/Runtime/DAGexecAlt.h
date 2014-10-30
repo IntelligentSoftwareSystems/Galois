@@ -557,13 +557,13 @@ public:
 } // end namespace Exp
 
 template <typename R, typename Cmp, typename OpFunc, typename NhoodFunc>
-Exp::DAGexecutor<typename R::value_type, Cmp, OpFunc, NhoodFunc> make_dag_executor (const R& range, const Cmp& cmp, const NhoodFunc& nhVisitor, const OpFunc& opFunc, const char* loopname=nullptr) {
+Exp::DAGexecutor<typename R::value_type, Cmp, OpFunc, NhoodFunc> make_dag_executor_alt (const R& range, const Cmp& cmp, const NhoodFunc& nhVisitor, const OpFunc& opFunc, const char* loopname=nullptr) {
 
   return new Exp::DAGexecutor<typename R::value_type, Cmp, OpFunc, NhoodFunc> (cmp, nhVisitor, opFunc);
 }
 
 template <typename R, typename Cmp, typename OpFunc, typename NhoodFunc>
-void destroy_dag_executor (Exp::DAGexecutor<typename R::value_type, Cmp, OpFunc, NhoodFunc>*& exec_ptr) {
+void destroy_dag_executor_alt (Exp::DAGexecutor<typename R::value_type, Cmp, OpFunc, NhoodFunc>*& exec_ptr) {
   delete exec_ptr; exec_ptr = nullptr;
 }
 
