@@ -23,7 +23,7 @@
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 
-#include "Galois/WorkList/WorkListDebug.h"
+//#include "Galois/WorkList/WorkListDebug.h"
 
 static llvm::cl::opt<bool> edgePri("edgePri", llvm::cl::desc("Use priority for edges-based"), llvm::cl::init(false));
 
@@ -141,7 +141,7 @@ struct AsyncEdge {
       typedef Galois::WorkList::dChunkedFIFO<32> WL;
       //typedef Galois::WorkList::AltChunkedFIFO<32> WL;
       typedef Galois::WorkList::OrderedByIntegerMetric<sndPri,WL>::with_block_period<8>::type OBIM;
-      typedef Galois::WorkList::WorkListTracker<sndPri,OBIM> DOBIM;
+      //typedef Galois::WorkList::WorkListTracker<sndPri,OBIM> DOBIM;
       auto fn = [&graph, amp, tolerance] (const GNode& node) {
         int out = nout(graph, node, Galois::MethodFlag::NONE) + 1;
         return std::make_pair(node, pri(graph.getData(node, Galois::MethodFlag::NONE).residual, out,amp, tolerance));
