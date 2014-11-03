@@ -281,7 +281,7 @@ struct AsyncALSalgo {
         size_t col = src;
         if (col < NUM_ITEM_NODES) {
           for (Sp::InnerIterator it (AT, col); it; ++it) {
-            GNode dst = it.row ();
+            GNode dst = it.row () + NUM_ITEM_NODES;
             func (dst);
           }
 
