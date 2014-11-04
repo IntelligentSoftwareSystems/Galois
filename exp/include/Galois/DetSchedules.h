@@ -17,15 +17,17 @@ enum DetExecType {
   kdg_i,
   kdg_ar,
   chromatic,
+  topo,
   edge_flip
 };
 
 static cll::opt<DetExecType> detExecTypeArg("detexec", cll::desc("Choose schedule for asynchronous algorithm"),
   cll::values(
     clEnumValN(non_det, "non_det", "non deterministic using for_each"),
-    clEnumValN(det_i, "", "deterministic using implicit kdg"),
+    clEnumValN(det_i, "det_i", "deterministic using implicit kdg"),
     clEnumValN(det_ar, "det_ar", "deterministic add-remove"),
     clEnumValN(chromatic, "chromatic", "chromatic"),
+    clEnumValN(topo, "topo", "topo"),
     clEnumValN(edge_flip, "edge_flip", "edge_flip"),
   clEnumValEnd),
   cll::init(det_i));
@@ -91,6 +93,10 @@ void for_each_det_choice (const R& range, const F& func, G& graph, const char* l
       Galois::Runtime::for_each_det_edge_flip_ar (range, func, graph, loopname);
       break;
 
+    case topo:
+      Galois::Runtime::for_each_det_edge_flip_topo (range, func, graph, loopname);
+      break;
+
     default:
       GALOIS_DIE ("not implemented");
       break;
@@ -107,6 +113,10 @@ void for_each_det_choice (const R& range, const F& func, G& graph, M& dagManager
 
     case edge_flip:
       Galois::Runtime::for_each_det_edge_flip_ar (range, func, graph, dagManager, loopname);
+      break;
+
+    case topo:
+      Galois::Runtime::for_each_det_edge_flip_topo (range, func, graph, dagManager, loopname);
       break;
 
     default:

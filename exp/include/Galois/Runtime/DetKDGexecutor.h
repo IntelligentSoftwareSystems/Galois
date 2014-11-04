@@ -1,6 +1,9 @@
 #ifndef GALOIS_RUNTIME_DET_KDG_EXECUTOR_H
 #define GALOIS_RUNTIME_DET_KDG_EXECUTOR_H
 
+#include "Galois/Atomic.h"
+
+#include "Galois/Runtime/DetChromatic.h"
 #include "Galois/Runtime/LCordered.h"
 #include "Galois/Runtime/KDGtwoPhase.h"
 #include "Galois/Runtime/DAGexec.h"
@@ -65,7 +68,7 @@ struct DetKDGexecutor {
 
     unsigned expected = rounds;
     const unsigned update = rounds + 1;
-    if (elemData.onWL.compare_exchange_strong (expected, update)) {
+    if (elemData.onWL.cas (expected, update)) {
       nextWL->get ().push_back (elem);
     }
   }

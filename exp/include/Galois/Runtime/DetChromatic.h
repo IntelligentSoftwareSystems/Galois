@@ -5,6 +5,7 @@
 #include "Galois/AltBag.h"
 #include "Galois/DoAllWrap.h"
 #include "Galois/Galois.h"
+#include "Galois/Atomic.h"
 //#include "Galois/GaloisUnsafe.h"
 
 #include "Galois/Graph/Graph.h"
@@ -45,8 +46,10 @@ struct DAGdata {
   unsigned id;
   unsigned priority;
   unsigned indeg_backup;
-  std::atomic<unsigned> onWL;
-  std::atomic<unsigned> indegree;
+  // std::atomic<unsigned> onWL;
+  // std::atomic<unsigned> indegree;
+  GAtomic<unsigned> onWL;
+  GAtomic<unsigned> indegree;
 
 
   explicit DAGdata (unsigned _id=0)
@@ -578,7 +581,7 @@ struct ChromaticExecutor {
     assert (i < colorWorkLists.size ());
 
     unsigned expected = 0;
-    if (data.onWL.compare_exchange_strong (expected, 1)) {
+    if (data.onWL.cas (expected, 1)) {
       colorWorkLists[i]->push (n);
     }
   }
@@ -760,7 +763,7 @@ public:
     auto& nd = graph.getData (node, Galois::MethodFlag::UNPROTECTED);
 
     unsigned expected = 0;
-    if (nd.onWL.compare_exchange_strong (expected, 1)) {
+    if (nd.onWL.cas (expected, 1)) {
       nextWork.push (node);
     }
     //

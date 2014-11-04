@@ -35,6 +35,7 @@
 #include "Galois/gdeque.h"
 #include "Galois/PriorityQueue.h"
 #include "Galois/Timer.h"
+#include "Galois/DoAllWrap.h"
 
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/Executor_DoAll.h"
@@ -459,7 +460,7 @@ public:
 
     std::printf ("Number of initial sources: %ld\n", initSources.size_all ());
 
-    printStats ();
+    // printStats ();
 
     t_init.stop ();
   }
