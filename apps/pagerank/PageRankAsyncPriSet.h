@@ -23,6 +23,8 @@
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 
+#include "Galois/OnlineStats.h"
+
 struct AsyncPriSet{
   struct LNode {
     PRTy value;

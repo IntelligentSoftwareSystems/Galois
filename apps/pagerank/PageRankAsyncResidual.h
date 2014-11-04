@@ -60,7 +60,8 @@ struct AsyncRsd {
       LNode& sdata = graph.getData(src);      
       Galois::MethodFlag lockflag = Galois::MethodFlag::NONE;
 
-      PRTy oldResidual = sdata.residual.exchange(0.0);
+      //PRTy oldResidual = sdata.residual.exchange(0.0);
+      sdata.residual = 0;
       PRTy pr = computePageRankInOut(graph, src, 0, lockflag);
       PRTy diff = std::fabs(pr - sdata.value);
       sdata.value = pr;

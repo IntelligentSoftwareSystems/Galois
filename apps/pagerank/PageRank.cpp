@@ -131,8 +131,8 @@ struct Sync {
     Initialize(Graph& g): g(g) { }
     void operator()(GNode n) const {
       LNode& data = g.getData(n, Galois::MethodFlag::NONE);
-      data.value[0] = 1.0;
-      data.value[coord ? 1 : 0] = 1.0;
+      data.value[0] = 1.0 - alpha;
+      data.value[coord ? 1 : 0] = 1.0 - alpha;
     }
   };
 
@@ -166,7 +166,7 @@ struct Sync {
       float value = alpha*sum + (1.0 - alpha);
       float diff = std::fabs(value - sdata.getPageRank(iteration));
       sdata.setPageRank(iteration, value);
-      if (diff <= tolerance)
+      if (diff < tolerance)
         self->small_delta += 1;
       self->max_delta.update(diff);
     }
@@ -188,7 +188,7 @@ struct Sync {
         << " (" << sdelta / numNodes << ")"
         << "\n";
 
-      if (delta <= tolerance || iteration >= maxIterations) {
+      if (delta < tolerance || iteration >= maxIterations) {
         break;
       }
       max_delta.reset();
