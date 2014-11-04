@@ -1,16 +1,10 @@
 #!/bin/bash
 
-tmin=1;
-tinc=1;
-tmax=24;
+# README
+# run as:
+# threads="1 2 4 8 16" vtune.sh program ARGS
 
-# threads=$(seq $tmin $tinc $tmax)
-threads="1 4 8 12 16 20 24 28 32 36 40"
-# threads="1 2 4 6 8 10 12 14 16 18 20 22 24"
-# threads="1 2 4 8 16 32 40 60 80 100 120 122 140 160 180 200 220 240 244" 
-# threads="1 2 4 8"
-
-
+threads=${threads:="1 2 4 8 10 16 20 24 30 36 40"};
 
 scriptsDir=$(dirname $0)
 
