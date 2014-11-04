@@ -62,6 +62,7 @@ protected:
   static const unsigned DEFAULT_CHUNK_SIZE = 1;
 
   Graph graph;
+  Galois::GAccumulator<size_t> numIter;
 
   void readGraph (void) {
     Galois::Graph::readGraph (graph, inputFile, transposeFile);
@@ -79,14 +80,47 @@ protected:
         graph.size (), graph.sizeEdges ());
   }
 
-  template <typename C>
+  void visitNhood (GNode src) { 
+    graph.getData (src, Galois::MethodFlag::WRITE);
+
+    for (auto i = graph.in_edge_begin (src, Galois::MethodFlag::READ)
+        , end_i = graph.in_edge_end (src, Galois::MethodFlag::READ); i != end_i; ++i) {
+    }
+
+    // for (auto i = graph.edge_begin (src, Galois::MethodFlag::WRITE)
+    // , end_i = graph.edge_end (src, Galois::MethodFlag::WRITE); i != end_i; ++i) {
+    // }
+  }
+
+  template <typename C, bool use_onWL=false, bool doLock=false>
   void applyOperator (GNode src, C& ctx) {
+
+    if (doLock) {
+      graph.getData (src, Galois::MethodFlag::WRITE);
+    }
+
+    if (use_onWL) {
+      auto& sdata = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
+      sdata.onWL = 0;
+    }
+
+    numIter += 1;
     double sum = 0;
 
-    for (auto jj = graph.in_edge_begin(src, Galois::MethodFlag::UNPROTECTED), ej = graph.in_edge_end(src, Galois::MethodFlag::UNPROTECTED); jj != ej; ++jj) {
-      GNode dst = graph.getInEdgeDst(jj);
-      auto& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
-      sum += ddata.value / ddata.outdegree;
+    if (doLock) {
+      for (auto jj = graph.in_edge_begin(src, Galois::MethodFlag::READ), ej = graph.in_edge_end(src, Galois::MethodFlag::READ); jj != ej; ++jj) {
+        GNode dst = graph.getInEdgeDst(jj);
+        auto& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+        sum += ddata.value / ddata.outdegree;
+      }
+
+    } else {
+
+      for (auto jj = graph.in_edge_begin(src, Galois::MethodFlag::UNPROTECTED), ej = graph.in_edge_end(src, Galois::MethodFlag::UNPROTECTED); jj != ej; ++jj) {
+        GNode dst = graph.getInEdgeDst(jj);
+        auto& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+        sum += ddata.value / ddata.outdegree;
+      }
     }
 
     float value = (1.0 - alpha) * sum + alpha;
@@ -100,10 +134,20 @@ protected:
 
       for (auto jj = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED), ej = graph.edge_end(src, Galois::MethodFlag::UNPROTECTED); jj != ej; ++jj) {
         GNode dst = graph.getEdgeDst(jj);
-        ctx.push(dst);
+
+        if (use_onWL) {
+
+          auto& ddata = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
+          unsigned old = 0;
+          if (ddata.onWL.cas (old, 1)) {
+            ctx.push (dst);
+          }
+
+        } else {
+          ctx.push(dst);
+        } 
       }
     } 
-
   }
 
   bool checkConvergence (void) {
@@ -169,6 +213,8 @@ public:
     t.start ();
     runPageRank ();
     t.stop ();
+
+    std::printf ("Total number of updates/iterations performed by PageRank: %zd\n", numIter.reduceRO ());
 
     Galois::reportPageAlloc("MeminfoPost");
 

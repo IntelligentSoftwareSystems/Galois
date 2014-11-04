@@ -44,6 +44,8 @@ protected:
       return;
     }
 
+    Super::numIter += 1;
+
     if (!localState->mod) 
       return;
 
