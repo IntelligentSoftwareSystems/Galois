@@ -98,9 +98,9 @@ template<typename Graph>
 void verifyInOut(Graph& graph, PRTy tolerance) {
   for(auto N : graph) {
     auto& data = graph.getData(N);
-    auto residual = std::fabs(data.value - computePageRankInOut(graph, N, 0, Galois::MethodFlag::NONE));
+    auto residual = std::fabs(data.getPageRank() - computePageRankInOut(graph, N, 1, Galois::MethodFlag::NONE));
     if (residual > tolerance) {
-      std::cout << N << " residual " << residual << " pr " << data.getPageRank(0) << " data " << data << "\n";
+      std::cout << N << " residual " << residual << " pr " << data.getPageRank() << " data " << data << "\n";
     }
   }
 }

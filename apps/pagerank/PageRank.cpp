@@ -99,11 +99,31 @@ bool outOnly;
 template<bool coord>
 struct Sync {
   struct LNode {
-    float value[coord ? 2 : 1];
-    void init() { value[0] = value[coord ? 1 : 0] = 1.0 - alpha; }
-    float getPageRank() { return value[coord ? 1 : 0]; }
-    float getPageRank(unsigned int it) { return value[coord ? it & 1 : 0]; }
-    void setPageRank(unsigned it, float v) { value[coord ? (it+1) & 1 : 0] = v; }
+    std::array<float, coord ? 2 : 1> value;
+    void init() { 
+      std::fill(value.begin(), value.end(), 1.0 - alpha);
+    }
+    float getPageRank() { 
+      //      std::cout << 'b';
+      return value[coord ? 1 : 0];
+    }
+    float getPageRank(unsigned int it) { 
+      it = coord ? (it & 1) : 0;
+      //      std::cout << it;
+      return value[it];
+    }
+    void setPageRank(unsigned it, float v) { 
+      it = coord ? ((it + 1) & 1) : 0;
+      //      std::cout << 2+it;
+      value[it] = v;
+    }
+    friend std::ostream& operator<<(std::ostream& os, const LNode& n) {
+      os << "{PR " << n.value[0];
+      if (coord)
+        os << "," << n.value[1];
+      os << "}";
+      return os;
+    }
   };
 
   typedef typename Galois::Graph::LC_CSR_Graph<LNode,void>
@@ -131,8 +151,7 @@ struct Sync {
     Initialize(Graph& g): g(g) { }
     void operator()(GNode n) const {
       LNode& data = g.getData(n, Galois::MethodFlag::NONE);
-      data.value[0] = 1.0 - alpha;
-      data.value[coord ? 1 : 0] = 1.0 - alpha;
+      std::fill(data.value.begin(), data.value.end(), 1.0 - alpha);
     }
   };
 
@@ -141,7 +160,8 @@ struct Sync {
     Copy(Graph& g): g(g) { }
     void operator()(GNode n) const {
       LNode& data = g.getData(n, Galois::MethodFlag::NONE);
-      data.value[coord ? 1 : 0] = data.value[0];
+      assert(coord);
+      data.value[1] = data.value[0];
     }
   };
 
@@ -161,9 +181,9 @@ struct Sync {
       LNode& sdata = graph.getData(src);
 
       Galois::MethodFlag lockflag = Galois::MethodFlag::NONE;
-      double sum = computePageRankInOut(graph, src, iteration, lockflag);
+      double value = computePageRankInOut(graph, src, iteration, lockflag);
 
-      float value = alpha*sum + (1.0 - alpha);
+      //float value = alpha*sum + (1.0 - alpha);
       float diff = std::fabs(value - sdata.getPageRank(iteration));
       sdata.setPageRank(iteration, value);
       if (diff < tolerance)
@@ -186,7 +206,8 @@ struct Sync {
         << " max delta: " << delta
         << " small delta: " << sdelta
         << " (" << sdelta / numNodes << ")"
-        << "\n";
+                << "\n";
+        //<< graph.getData(*graph.begin()) << "\n";
 
       if (delta < tolerance || iteration >= maxIterations) {
         break;
@@ -202,12 +223,14 @@ struct Sync {
     if (iteration & 1) {
       // Result already in right place
     } else {
-      if (!coord)
+      if (coord)
         Galois::do_all_local(graph, Copy(graph));
     }
   }
 
-  void verify(Graph& graph, PRTy tolerance) {}
+  void verify(Graph& graph, PRTy tolerance) {
+    //verifyInOut(graph, tolerance);
+  }
 };
 
 
@@ -241,7 +264,7 @@ static void printTop(Graph& graph, int topn, const char *algo_name, int numThrea
   for (auto ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
     GNode src = *ii;
     node_data_reference n = graph.getData(src);
-    float value = n.getPageRank();
+    float value = n.getPageRank(0);
     sum += value;
   }
 
@@ -260,7 +283,7 @@ static void printTop(Graph& graph, int topn, const char *algo_name, int numThrea
   for (auto ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
     GNode src = *ii;
     node_data_reference n = graph.getData(src);
-    float value = n.getPageRank()/sum; // normalized PR (divide PR by sum)
+    float value = n.getPageRank(0)/sum; // normalized PR (divide PR by sum)
     //float value = n.getPageRank(); // raw PR 
     //std::cout<<value<<" "; 
     if(dbg){
