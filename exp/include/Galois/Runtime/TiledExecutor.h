@@ -94,15 +94,15 @@ class Fixed2DGraphTiledExecutor {
     GetDst getDst { &g };
 
     for (auto ii = task.start0; ii != task.end0; ++ii) {
-      edge_iterator begin = g.edge_begin(*ii, Galois::MethodFlag::NONE);
+      edge_iterator begin = g.edge_begin(*ii, Galois::MethodFlag::UNPROTECTED);
       no_deref_iterator nbegin(begin);
-      no_deref_iterator nend(g.edge_end(*ii, Galois::MethodFlag::NONE));
+      no_deref_iterator nend(g.edge_end(*ii, Galois::MethodFlag::UNPROTECTED));
       edge_dst_iterator dbegin(nbegin, getDst);
       edge_dst_iterator dend(nend, getDst);
 
-      if (UseExp && cutoff < 0 && std::distance(g.edge_begin(*ii, Galois::MethodFlag::NONE), g.edge_end(*ii, Galois::MethodFlag::NONE)) >= -cutoff)
+      if (UseExp && cutoff < 0 && std::distance(g.edge_begin(*ii, Galois::MethodFlag::UNPROTECTED), g.edge_end(*ii, Galois::MethodFlag::UNPROTECTED)) >= -cutoff)
         continue;
-      else if (UseExp && cutoff > 0 && std::distance(g.edge_begin(*ii, Galois::MethodFlag::NONE), g.edge_end(*ii, Galois::MethodFlag::NONE)) < cutoff)
+      else if (UseExp && cutoff > 0 && std::distance(g.edge_begin(*ii, Galois::MethodFlag::UNPROTECTED), g.edge_end(*ii, Galois::MethodFlag::UNPROTECTED)) < cutoff)
         continue;
 
       for (auto jj = std::lower_bound(dbegin, dend, task.start1); jj != dend; ) {

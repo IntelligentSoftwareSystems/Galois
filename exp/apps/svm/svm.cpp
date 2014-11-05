@@ -292,7 +292,7 @@ struct LinearSVM {
 #ifdef DENSE
     const ptrdiff_t size = DENSE_NUM_FEATURES;
 #else
-    ptrdiff_t size = std::distance(g.edge_begin(n, Galois::MethodFlag::NONE), g.edge_end(n, Galois::MethodFlag::NONE));
+    ptrdiff_t size = std::distance(g.edge_begin(n, Galois::MethodFlag::UNPROTECTED), g.edge_end(n, Galois::MethodFlag::UNPROTECTED));
 #endif
     // regularized factors
     double* rfactors = (double*) alloc.allocate(sizeof(double) * size);
