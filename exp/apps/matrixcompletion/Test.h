@@ -271,7 +271,8 @@ struct AsyncALSalgo {
 
   // Code for invoking Chromatic and Edge Flipping schedulers
   struct EigenGraphVisitor {
-    struct VisitSuccs {
+
+    struct VisitAdjacent {
       Graph& g;
       Sp& A;
       Sp& AT;
@@ -295,16 +296,11 @@ struct AsyncALSalgo {
       }
     };
 
-    struct VisitPreds {
-      template <typename F>
-      void operator () (GNode src, F& func) const {} // logic implemented in succs
-    };
-
-    typedef Galois::Runtime::DAGmanager<Graph, VisitPreds, VisitSuccs> Base_ty;
+    typedef Galois::Runtime::DAGmanager<Graph, VisitAdjacent> Base_ty;
 
     struct Manager: public Base_ty {
       Manager (Graph& g, Sp& A, Sp& AT): 
-        Base_ty {g, VisitPreds{}, VisitSuccs {g, A, AT} }
+        Base_ty {g, VisitAdjacent {g, A, AT} }
         {}
     };
   };

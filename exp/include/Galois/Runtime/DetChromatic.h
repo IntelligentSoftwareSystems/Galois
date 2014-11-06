@@ -46,6 +46,11 @@ struct DAGdata {
   unsigned id;
   unsigned priority;
   unsigned indeg_backup;
+
+  unsigned numDAGsucc;
+  unsigned* dagSucc;
+  
+
   // std::atomic<unsigned> onWL;
   // std::atomic<unsigned> indegree;
   GAtomic<unsigned> onWL;
@@ -53,28 +58,43 @@ struct DAGdata {
 
 
   explicit DAGdata (unsigned _id=0)
-    : color (0), id (_id), priority (0), indeg_backup(0), onWL (0), indegree (0) 
+    : 
+      color (0), 
+      id (_id), priority (0), 
+      indeg_backup(0), 
+      numDAGsucc (0), 
+      dagSucc (nullptr), 
+      onWL (0), 
+      indegree (0) 
   {}
 };
 
-template <typename GNode>
 struct DAGdataDirected: public DAGdata {
 
-  typedef Galois::gdeque<GNode, 64> AdjList;
+  typedef Galois::gdeque<unsigned, 64> AdjList;
 
-  AdjList preds;
+  AdjList incoming;
 
   DAGdataDirected (unsigned id): DAGdata (id) {}
 
-  void addPred (GNode n) {
-    assert (std::find (preds.begin (), preds.end (), n) == preds.end ());
-    preds.push_back (n);
+  void addIncoming (unsigned n) {
+    assert (std::find (incoming.begin (), incoming.end (), n) == incoming.end ());
+    incoming.push_back (n);
   }
   
 };
 
 template <typename ND>
 struct DAGdataComparator {
+
+  static int compare3val (const ND& left, const ND& right) {
+    int r = left.priority - right.priority;
+    if (r != 0) { 
+      return r;
+    } else {
+      return (r = left.id - right.id);
+    }
+  }
 
   static bool compare (const ND& left, const ND& right) {
     if (left.priority != right.priority) {
@@ -89,7 +109,7 @@ struct DAGdataComparator {
   }
 };
 
-template <typename G, typename P, typename S>
+template <typename G, typename A>
 struct DAGmanager {
 
 protected:
@@ -102,13 +122,13 @@ protected:
   typedef Galois::Runtime::PerThreadVector<unsigned> PerThrdColorVec;
 
   G& graph;
-  P visitPreds;
-  S visitSuccs;
+  A visitAdj;
   PerThrdColorVec perThrdColorVec;
   Galois::GReduceMax<unsigned> maxColors;
+  Galois::Runtime::MM::PowOf_2_BlockAllocator<unsigned, true> dagSuccAlloc;
 
-  DAGmanager (G& graph, const P& visitPreds, const S& visitSuccs)
-    : graph (graph), visitPreds (visitPreds), visitSuccs (visitSuccs) 
+  DAGmanager (G& graph, const A& visitAdj)
+    : graph (graph), visitAdj (visitAdj)
   {
     // mark 0-th color as taken
     for (unsigned i = 0; i < perThrdColorVec.numRows (); ++i) {
@@ -118,12 +138,26 @@ protected:
     }
   }
 
+  ~DAGmanager (void) {
+    freeDAGdata ();
+  }
+
 public:
 
   template <typename F>
   void applyToAdj (GNode src, F& f) {
-    visitSuccs (src, f);
-    visitPreds (src, f);
+    visitAdj (src, f);
+  }
+
+  template <typename F>
+  void applyToDAGsucc (GNode src, F& f) {
+
+    auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
+
+    for (unsigned i = 0; i < sd.numDAGsucc; ++i) {
+      GNode dst = sd.dagSucc[i];
+      f (dst);
+    }
   }
 
   template <typename W>
@@ -135,26 +169,54 @@ public:
           auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
 
           assert (sd.indegree == 0);
-          unsigned addAmt = 0;
+          unsigned indeg = 0;
+          unsigned outdeg = 0;
 
-          auto closure = [this, &sd, &addAmt] (GNode dst) {
+          auto countDegClosure = [this, &sd, &indeg, &outdeg] (GNode dst) {
             auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
 
-            if (DAGdataComparator<ND>::compare (dd, sd)) { // dd < sd
-              ++addAmt;
+            int c = DAGdataComparator<ND>::compare3val (dd, sd);
+            if (c < 0) { // dd < sd
+              ++indeg;
+            } else if (c > 0) { // sd < dd
+              ++outdeg;
+            } else {
+              // is a self edge (c == 0)
             }
           };
 
-          applyToAdj (src, closure);
+          applyToAdj (src, countDegClosure);
 
-          sd.indegree += addAmt;
+          sd.indegree += indeg;
 
-          if (addAmt == 0) {
+          if (indeg == 0) {
             assert (sd.indegree == 0);
             sources.push (src);
           }
 
           sd.indeg_backup = sd.indegree;
+
+          sd.numDAGsucc = outdeg;
+          try {
+            sd.dagSucc = dagSuccAlloc.allocate (sd.numDAGsucc);
+          } catch (std::bad_alloc& a) {
+            std::fprintf (stderr, "caught bad_alloc:, trying to allocate: %d\n", outdeg);
+            std::abort ();
+          }
+          assert (sd.dagSucc != nullptr);
+
+          unsigned i = 0;
+          auto fillDAGsucc = [this, &sd, &i] (GNode dst) {
+            auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
+
+            int c = DAGdataComparator<ND>::compare3val (dd, sd);
+            if (c > 0) { // dd > sd
+              sd.dagSucc[i++] = dst;
+            }
+          };
+
+          applyToAdj (src, fillDAGsucc);
+          assert (i == sd.numDAGsucc);
 
         },
         "init-DAG",
@@ -162,43 +224,84 @@ public:
   }
 
   template <typename R, typename W>
-  void initActiveDAG (const R& range, W& sources) {
+  void reinitActiveDAG (const R& range, W& sources) {
+
+    // XXX: may be superfluous
     Galois::do_all_choice (
         range,
-        [this, &sources] (GNode src) {
-          
+        [this] (GNode src) {
+          auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
+          assert (bool (sd.onWL));
+          sd.indegree = 0;
+        },
+        "reinitActiveDAG-0",
+        Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
+
+    Galois::do_all_choice (
+        range,
+        [this] (GNode src) {
+
           auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
           assert (bool (sd.onWL));
 
-          // if (bool (sd.onWL)) {
-            sd.indegree = 0; // reset
+          auto closure = [this] (GNode dst) {
+            auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
+            ++(dd.indegree);
+          };
 
-            unsigned addAmt = 0;
-
-            auto closure = [this, &sd, &addAmt] (GNode dst) {
-              auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
-
-                if (bool (dd.onWL) && DAGdataComparator<ND>::compare (dd, sd)) { // dd < sd
-              ++addAmt;
-              }
-            };
-
-
-            applyToAdj (src, closure);
-
-            sd.indegree += addAmt;
-
-            if (addAmt == 0) {
-              assert (sd.indegree == 0);
-              assert (bool(sd.onWL));
-              sources.push (src);
-            }
-            sd.indeg_backup = sd.indegree; 
-          // } // end if
-
+          applyToDAGsucc (src, closure);
         },
-        "init-Active-DAG",
+        "reinitActiveDAG-1",
         Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
+
+    Galois::do_all_choice (
+        range,
+        [this, &sources] (GNode src) {
+          auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
+          assert (bool (sd.onWL));
+          if (sd.indegree == 0) {
+            sources.push (src);
+          }
+        },
+        "reinitActiveDAG-2",
+        Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
+
+    // Galois::do_all_choice (
+        // range,
+        // [this, &sources] (GNode src) {
+          // 
+          // auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
+          // assert (bool (sd.onWL));
+// 
+          // // if (bool (sd.onWL)) {
+            // sd.indegree = 0; // reset
+// 
+            // unsigned addAmt = 0;
+// 
+            // auto closure = [this, &sd, &addAmt] (GNode dst) {
+              // auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
+// 
+              // if (bool (dd.onWL) && DAGdataComparator<ND>::compare (dd, sd)) { // dd < sd
+                // ++addAmt;
+              // }
+            // };
+// 
+// 
+            // applyToAdj (src, closure);
+// 
+            // sd.indegree += addAmt;
+// 
+            // if (addAmt == 0) {
+              // assert (sd.indegree == 0);
+              // assert (bool(sd.onWL));
+              // sources.push (src);
+            // }
+            // sd.indeg_backup = sd.indegree; 
+          // // } // end if
+// 
+        // },
+        // "reinit-Active-DAG",
+        // Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
   }
 
   void reinitDAG (void) {
@@ -208,6 +311,19 @@ public:
           sd.indegree = sd.indeg_backup;
         },
         "reinitDAG",
+        Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
+
+  }
+
+  void freeDAGdata (void) {
+    Galois::do_all_choice ( Galois::Runtime::makeLocalRange (graph), 
+        [this] (GNode src) {
+          auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
+          dagSuccAlloc.deallocate (sd.dagSucc, sd.numDAGsucc);
+          sd.numDAGsucc = 0;
+          sd.dagSucc = nullptr;
+        },
+        "freeDAGdata",
         Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
 
   }
@@ -436,26 +552,18 @@ template <typename G>
 struct DAGmanagerInOut {
   typedef typename G::GraphNode GNode;
 
-  struct VisitPredecessors {
+  struct VisitAdjacent {
     G& graph;
 
     template <typename F>
     void operator () (GNode src, F& func) {
+
       for (auto i = graph.in_edge_begin (src, Galois::MethodFlag::UNPROTECTED)
           , end_i = graph.in_edge_end (src, Galois::MethodFlag::UNPROTECTED); i != end_i; ++i) {
         GNode dst = graph.getInEdgeDst (i);
         func (dst);
       }
-    }
 
-  };
-
-
-  struct VisitSuccessors {
-    G& graph;
-
-    template <typename F>
-    void operator () (GNode src, F& func) {
       for (auto i = graph.edge_begin (src, Galois::MethodFlag::UNPROTECTED)
           , end_i = graph.edge_end (src, Galois::MethodFlag::UNPROTECTED); i != end_i; ++i) {
         GNode dst = graph.getEdgeDst (i);
@@ -464,11 +572,11 @@ struct DAGmanagerInOut {
     }
   };
 
-  typedef DAGmanager<G, VisitPredecessors, VisitSuccessors> Base_ty;
+  typedef DAGmanager<G, VisitAdjacent> Base_ty;
 
   struct Manager: public Base_ty {
 
-    Manager (G& graph): Base_ty {graph, VisitPredecessors {graph}, VisitSuccessors {graph}} 
+    Manager (G& graph): Base_ty {graph, VisitAdjacent {graph}}
     {}
   };
 
@@ -479,14 +587,7 @@ struct DAGvisitorUndirected {
 
   typedef typename G::GraphNode GNode;
 
-  struct VisitPredecessors {
-    G& graph;
-
-    template <typename F>
-    void operator () (GNode src, F& func) {};
-  };
-
-  struct VisitSuccessors {
+  struct VisitAdjacent {
     G& graph;
 
     template <typename F>
@@ -766,8 +867,6 @@ public:
     if (nd.onWL.cas (expected, 1)) {
       nextWork.push (node);
     }
-    //
-    // nd.onWL = true;
   }
 
   struct ApplyOperator {
@@ -798,19 +897,16 @@ public:
         auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
 
         if (bool (dd.onWL)) {
-          // assert (int (dd.indegree) > 0);
-
+          assert (int (dd.indegree) > 0);
           
           unsigned x = --dd.indegree; 
           if (x == 0) {
             ctx.push (dst);
           }
         }
-
       };
 
-
-      outer.dagManager.applyToAdj (src, closure);
+      outer.dagManager.applyToDAGsucc (src, closure);
     }
   };
 
@@ -838,7 +934,7 @@ public:
       assert (sources.size () == 0);
 
       t_dag_init.start ();
-      dagManager.initActiveDAG (Galois::Runtime::makeLocalRange (nextWork), sources);
+      dagManager.reinitActiveDAG (Galois::Runtime::makeLocalRange (nextWork), sources);
       t_dag_init.stop ();
 
       nextWork.clear_all_parallel ();
@@ -1000,7 +1096,7 @@ public:
         }
       };
 
-      outer.dagManager.applyToAdj (src, closure);
+      outer.dagManager.applyToDAGsucc (src, closure);
 
     } // end function
   };

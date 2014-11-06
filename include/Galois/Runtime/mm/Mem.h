@@ -318,6 +318,14 @@ public:
   }
 };
 
+template <typename SourceHeap>
+class FixedSizeFreeListHeap: public SourceHeap {
+
+  size_t blockSize;
+
+
+};
+
 template<unsigned ElemSize, typename SourceHeap>
 class BlockHeap : public SourceHeap {
   struct TyEq {
@@ -429,10 +437,13 @@ public:
     // Increase to alignment
     size_t alignedSize = (size + sizeof(double) - 1) & ~(sizeof(double) - 1);
     // Check current block
-    if (!head || offset + alignedSize > SourceHeap::AllocSize)
+    if (!head || offset + alignedSize > SourceHeap::AllocSize) {
       refill();
-    if (offset + alignedSize > SourceHeap::AllocSize)
+    }
+    if (offset + alignedSize > SourceHeap::AllocSize) {
+      std::abort(); // TODO: remove
       throw std::bad_alloc();
+    }
     char* retval = (char*)head;
     retval += offset;
     offset += alignedSize;
@@ -729,6 +740,143 @@ public:
   inline bool operator==(const FixedSizeAllocator<T1>& rhs) const {
     return heap == rhs.heap;
   }
+};
+
+template <typename Ty, bool useMallocAsBackup=false>
+class PowOf_2_BlockAllocator {
+
+  static const size_t LOG2_MIN_SIZE = 3; // 2^3 == 8 bytes
+  static const size_t LOG2_MAX_SIZE = 16; // 64k
+
+  typedef FixedSizeHeap Heap_ty;
+
+  std::vector<Heap_ty> heapTable;
+
+  static inline size_t pow2 (unsigned i) {
+    return (1U << i);
+  }
+
+  static unsigned nextLog2 (const size_t allocSize) {
+
+    unsigned i = LOG2_MIN_SIZE;
+
+    while (pow2 (i) < allocSize) {
+      ++i;
+    }
+
+    // if (pow2 (i) > pow2 (LOG2_MAX_SIZE)) {
+      // std::fprintf (stderr, "ERROR: block bigger than huge page size requested\n");
+      // throw std::bad_alloc();
+    // }
+
+    return i;
+  }
+
+  void* allocateBlock (const size_t allocSize) {
+
+    if (allocSize > pow2 (LOG2_MAX_SIZE)) {
+      if (useMallocAsBackup) {
+        return malloc (allocSize);
+      } else {
+        std::fprintf (stderr, "ERROR: block bigger than huge page size requested\n");
+        throw std::bad_alloc();
+      }
+    } else {
+
+      unsigned i = nextLog2 (allocSize);
+      assert (i < heapTable.size());
+      return heapTable[i].allocate (pow2 (i));
+    }
+  }
+
+  void deallocateBlock (void* ptr, const size_t allocSize) {
+    if (allocSize > pow2 (LOG2_MAX_SIZE)) {
+      if (useMallocAsBackup) {
+        free (ptr);
+      } else {
+        std::fprintf (stderr, "ERROR: block bigger than huge page size requested\n");
+        throw std::bad_alloc();
+      }
+    } else {
+      unsigned i = nextLog2 (allocSize);
+      assert (i < heapTable.size());
+      heapTable[i].deallocate (ptr);
+    }
+  }
+
+
+  void populateTable (void) {
+    assert (heapTable.empty ());
+
+    heapTable.clear ();
+    for (unsigned i = 0; i <= LOG2_MAX_SIZE; ++i) {
+      heapTable.push_back (Heap_ty (pow2 (i)));
+    }
+  }
+
+  template<typename T> 
+  static inline void destruct(T* t) { 
+    if (!std::is_scalar<T>::value) {
+      t->~T(); 
+    }
+  }
+
+
+public:
+  typedef size_t size_type;
+  typedef ptrdiff_t difference_type;
+  typedef Ty *pointer;
+  typedef const Ty *const_pointer;
+  typedef Ty& reference;
+  typedef const Ty& const_reference;
+  typedef Ty value_type;
+  
+  template<class Other>
+  struct rebind { typedef PowOf_2_BlockAllocator<Other> other; };
+
+  PowOf_2_BlockAllocator() throw() {
+    populateTable ();
+  }
+
+  template <typename U> 
+  PowOf_2_BlockAllocator(const PowOf_2_BlockAllocator<U>& that) throw()
+  : heapTable (that.heapTable) {}
+
+  inline pointer address(reference val) const { return &val; }
+
+  inline const_pointer address(const_reference val) const { return &val; }
+
+  pointer allocate(size_type size) {
+    return static_cast<pointer>(allocateBlock (size * sizeof (Ty)));
+  }
+  
+  void deallocate(pointer ptr, size_type len) {
+    deallocateBlock(ptr, len * sizeof(Ty));
+  }
+  
+  template<class U, class... Args>
+  inline void construct(U* p, Args&&... args ) const {
+    ::new((void*)p) U(std::forward<Args>(args)...);
+  }
+  
+  inline void destroy(pointer ptr) const {
+    destruct (ptr);
+  }
+
+  size_type max_size() const throw() { return pow2 (LOG2_MAX_SIZE) / sizeof (Ty); }
+};
+
+template <>
+class PowOf_2_BlockAllocator<void> {
+public:
+  typedef size_t size_type;
+  typedef ptrdiff_t difference_type;
+  typedef void* pointer;
+  typedef const void* const_pointer;
+  typedef void value_type;
+
+  template<typename Other>
+  struct rebind { typedef PowOf_2_BlockAllocator<Other> other; };
 };
 
 //! Keep a reference to an external allocator
