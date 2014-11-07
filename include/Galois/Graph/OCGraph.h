@@ -302,6 +302,7 @@ public:
 
   typedef typename OCFileGraph::GraphNode GraphNode;
   typedef EdgeTy edge_data_type;
+  typedef edge_data_type file_edge_data_type;
   typedef NodeTy node_data_type;
   typedef typename OCFileGraph::template EdgeReference<EdgeTy>::type edge_data_reference;
   typedef typename NodeInfo::reference node_data_reference;
