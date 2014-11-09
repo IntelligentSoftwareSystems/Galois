@@ -198,12 +198,13 @@ public:
 
   // GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE ParCounter inDeg;
   ParCounter inDeg;
-  const int origInDeg;
+  int origInDeg;
   NhoodMgr& nhmgr;
   T elem;
+  unsigned outDeg;
+  Derived** outNeighbors;
 
   AdjSet adjSet;
-  AdjList outNeighbors;
 
 public:
   explicit DAGcontextBase (const T& t, NhoodMgr& nhmgr): 
@@ -211,7 +212,9 @@ public:
     inDeg (0),
     origInDeg (0), 
     nhmgr (nhmgr),
-    elem (t)
+    elem (t),
+    outDeg (0),
+    outNeighbors (nullptr)
   {}
 
   const T& getElem () const { return elem; }
@@ -227,12 +230,35 @@ public:
     ++inDeg;
   }
 
-  void finalizeAdj (void) {
-    for (auto i = adjSet.begin (), i_end = adjSet.end (); 
-        i != i_end; ++i) {
+  template <typename A>
+  void finalizeAdj (A& allocator) {
+    assert (outDeg == 0);
+    assert (outNeighbors == nullptr);
 
-      outNeighbors.push_back (*i);
+    outDeg = adjSet.size ();
+
+    if (outDeg != 0) {
+      outNeighbors = allocator.allocate (outDeg);
+
+      unsigned j = 0;
+      for (auto i = adjSet.begin (), i_end = adjSet.end (); 
+          i != i_end; ++i) {
+
+        outNeighbors[j++] = *i;
+      }
+
+      assert (j == outDeg);
+      adjSet.clear ();
     }
+  }
+
+
+  Derived** neighbor_begin (void) {
+    return &outNeighbors[0];
+  }
+
+  Derived** neighbor_end (void) {
+    return &outNeighbors[outDeg];
   }
 
   bool removeLastInNeigh (Derived* that) {
@@ -248,12 +274,12 @@ public:
     inDeg = origInDeg;
   }
 
-  typename AdjList::iterator neighbor_begin (void) {
-    return outNeighbors.begin ();
-  }
-
-  typename AdjList::iterator neighbor_end (void) {
-    return outNeighbors.end ();
+  template <typename A>
+  void reclaimAlloc (A& allocator) {
+    if (outDeg != 0) {
+      allocator.deallocate (outNeighbors, outDeg);
+      outNeighbors = nullptr;
+    }
   }
 };
 
@@ -326,6 +352,7 @@ protected:
   typedef typename Ctxt::NItem NItem;
 
   typedef MM::FixedSizeAllocator<Ctxt> CtxtAlloc;
+  typedef MM::PowOf_2_BlockAllocator<Ctxt*> CtxtAdjAlloc;
   typedef PerThreadBag<Ctxt*> CtxtWL;
   typedef UserContextAccess<T> UserCtx;
   typedef PerThreadStorage<UserCtx> PerThreadUserCtx;
@@ -366,6 +393,7 @@ protected:
   NhoodMgr nhmgr;
 
   CtxtAlloc ctxtAlloc;
+  CtxtAdjAlloc ctxtAdjAlloc;
   CtxtWL allCtxts;
   CtxtWL initSources;
   PerThreadUserCtx userCtxts;
@@ -387,6 +415,7 @@ public:
   ~DAGexecutorBase (void) {
     Galois::do_all_choice (Galois::Runtime::makeLocalRange (allCtxts),
         [this] (Ctxt* ctxt) {
+          ctxt->reclaimAlloc (ctxtAdjAlloc);
           ctxtAlloc.destroy (ctxt);
           ctxtAlloc.deallocate (ctxt, 1);
         }, 
@@ -451,7 +480,7 @@ public:
 
     Galois::do_all_choice (Galois::Runtime::makeLocalRange (allCtxts),
         [this] (Ctxt* ctxt) {
-          ctxt->finalizeAdj ();
+          ctxt->finalizeAdj (ctxtAdjAlloc);
           // std::printf ("ctxt: %p, indegree=%d\n", ctxt, ctxt->origInDeg);
           if (ctxt->isSrc ()) {
             initSources.get ().push_back (ctxt);

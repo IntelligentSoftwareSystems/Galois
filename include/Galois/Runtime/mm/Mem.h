@@ -742,7 +742,7 @@ public:
   }
 };
 
-template <typename Ty, bool useMallocAsBackup=false>
+template <typename Ty, bool useMallocAsBackup=true>
 class PowOf_2_BlockAllocator {
 
   static const size_t LOG2_MIN_SIZE = 3; // 2^3 == 8 bytes
