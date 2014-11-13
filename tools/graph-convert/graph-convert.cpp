@@ -55,6 +55,7 @@ enum ConvertMode {
   gr2cgr,
   gr2dimacs,
   gr2edgelist,
+  gr2linegr,
   gr2lowdegreegr,
   gr2mtx,
   gr2partdstgr,
@@ -71,6 +72,7 @@ enum ConvertMode {
   gr2sorteddstgr,
   gr2sortedparentdegreegr,
   gr2sortedweightgr,
+  gr2streegr,
   gr2tgr,
   gr2treegr,
   gr2trigr,
@@ -124,6 +126,7 @@ static cll::opt<ConvertMode> convertMode(cll::desc("Conversion mode:"),
       clEnumVal(gr2cgr, "Clean up binary gr: remove self edges and multi-edges"),
       clEnumVal(gr2dimacs, "Convert binary gr to dimacs"),
       clEnumVal(gr2edgelist, "Convert binary gr to edgelist"),
+      clEnumVal(gr2linegr, "Overlay line graph"),
       clEnumVal(gr2lowdegreegr, "Remove high degree nodes from binary gr"),
       clEnumVal(gr2mtx, "Convert binary gr to matrix market format"),
       clEnumVal(gr2partdstgr, "Partition binary gr in N pieces by destination nodes"),
@@ -140,8 +143,9 @@ static cll::opt<ConvertMode> convertMode(cll::desc("Conversion mode:"),
       clEnumVal(gr2sorteddstgr, "Sort outgoing edges of binary gr by edge destination"),
       clEnumVal(gr2sortedparentdegreegr, "Sort nodes by degree of parent"),
       clEnumVal(gr2sortedweightgr, "Sort outgoing edges of binary gr by edge weight"),
+      clEnumVal(gr2streegr, "Convert binary gr to strongly connected graph by adding symmetric tree overlay"),
       clEnumVal(gr2tgr, "Transpose binary gr"),
-      clEnumVal(gr2treegr, "Convert binary gr to strongly connected graph by adding tree overlay"),
+      clEnumVal(gr2treegr, "Overlay tree"),
       clEnumVal(gr2trigr, "Convert symmetric binary gr to triangular form by removing reverse edges"),
       clEnumVal(mtx2gr, "Convert matrix market format to binary gr"),
       clEnumVal(nodelist2gr, "Convert node list to binary gr"),
@@ -151,7 +155,7 @@ static cll::opt<ConvertMode> convertMode(cll::desc("Conversion mode:"),
 static cll::opt<int> numParts("numParts", 
     cll::desc("number of parts to partition graph into"), cll::init(64));
 static cll::opt<int> maxValue("maxValue",
-    cll::desc("maximum weight to add for tree, ring and random weight conversions"), cll::init(100));
+    cll::desc("maximum weight to add for tree, line, ring and random weight conversions"), cll::init(100));
 static cll::opt<int> minValue("minValue",
     cll::desc("minimum weight to add for random weight conversions"), cll::init(1));
 static cll::opt<int> maxDegree("maxDegree",
@@ -754,12 +758,13 @@ struct RandomizeEdgeWeights: public HasNoVoidSpecialization {
 /**
  * Add edges (i, i-1) for all i \in V.
  */
+template<bool AddLine>
 struct AddRing: public Conversion {
   template<typename EdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) {
     typedef Galois::Graph::FileGraph Graph;
     typedef Galois::Graph::FileGraphWriter Writer;
-    typedef Graph::GraphNode GNode;
+    typedef typename Graph::GraphNode GNode;
     typedef Galois::LargeArray<EdgeTy> EdgeData;
     typedef typename EdgeData::value_type edge_value_type;
     
@@ -771,19 +776,22 @@ struct AddRing: public Conversion {
     EdgeData edgeValue;
 
     uint64_t size = graph.size();
-
+    uint64_t newEdges = AddLine ? size - 1 : size;
     p.setNumNodes(size);
-    p.setNumEdges(graph.sizeEdges() + size);
+    p.setNumEdges(graph.sizeEdges() + newEdges);
     p.setSizeofEdgeData(EdgeData::size_of::value);
-    edgeData.create(graph.sizeEdges() + size);
+    edgeData.create(graph.sizeEdges() + newEdges);
     edgeValue.create(1);
-    //edgeValue.set(0, maxValue + 1);
-    setEdgeValue<EdgeData,EdgeData::has_value>(edgeValue, maxValue + 1);
+    setEdgeValue<EdgeData,EdgeData::has_value>(edgeValue, maxValue);
 
     p.phase1();
     for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
       GNode src = *ii;
-      p.incrementDegree(src, std::distance(graph.edge_begin(src), graph.edge_end(src)) + 1);
+      auto d = std::distance(graph.edge_begin(src), graph.edge_end(src));
+      if (AddLine && src == 0)
+        p.incrementDegree(src, d);
+      else
+        p.incrementDegree(src, d + 1);
     }
 
     p.phase2();
@@ -798,6 +806,9 @@ struct AddRing: public Conversion {
           p.addNeighbor(src, dst);
         }
       }
+
+      if (AddLine && src == 0)
+        continue;
 
       GNode dst = src == 0 ? size - 1 : src - 1;
       if (EdgeData::has_value) {
@@ -818,6 +829,7 @@ struct AddRing: public Conversion {
 /**
  * Add edges (i, i*2+1), (i, i*2+2) and their complement. 
  */
+template<bool AddComplement>
 struct AddTree: public Conversion {
   template<typename EdgeTy>
   void convert(const std::string& infilename, const std::string& outfilename) {
@@ -842,7 +854,8 @@ struct AddTree: public Conversion {
       newEdges += (size - 2 + (2 - 1)) / 2; // (2) rounded up
     } else if (size >= 1)
       newEdges = 1;
-    newEdges *= 2; // reverse edges
+    if (AddComplement)
+      newEdges *= 2; // reverse edges
 
     p.setNumNodes(size);
     p.setNumEdges(graph.sizeEdges() + newEdges);
@@ -850,7 +863,7 @@ struct AddTree: public Conversion {
     edgeData.create(graph.sizeEdges() + newEdges);
     edgeValue.create(1);
     //edgeValue.set(0, maxValue + 1);
-    setEdgeValue<EdgeData,EdgeData::has_value>(edgeValue, maxValue + 1);
+    setEdgeValue<EdgeData,EdgeData::has_value>(edgeValue, maxValue);
 
     p.phase1();
     for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
@@ -858,11 +871,13 @@ struct AddTree: public Conversion {
       p.incrementDegree(src, std::distance(graph.edge_begin(src), graph.edge_end(src)));
       if (src * 2 + 1 < size) { // (1)
         p.incrementDegree(src);
-        p.incrementDegree(src * 2 + 1);
+        if (AddComplement)
+          p.incrementDegree(src * 2 + 1);
       }
       if (src * 2 + 2 < size) { // (2)
         p.incrementDegree(src);
-        p.incrementDegree(src * 2 + 2);
+        if (AddComplement)
+          p.incrementDegree(src * 2 + 2);
       }
     }
 
@@ -881,19 +896,23 @@ struct AddTree: public Conversion {
       if (src * 2 + 1 < size) {
         if (EdgeData::has_value) {
           edgeData.set(p.addNeighbor(src, src * 2 + 1), edgeValue.at(0));
-          edgeData.set(p.addNeighbor(src * 2 + 1, src), edgeValue.at(0));
+          if (AddComplement)
+            edgeData.set(p.addNeighbor(src * 2 + 1, src), edgeValue.at(0));
         } else {
           p.addNeighbor(src, src * 2 + 1);
-          p.addNeighbor(src * 2 + 1, src);
+          if (AddComplement)
+            p.addNeighbor(src * 2 + 1, src);
         }
       }
       if (src * 2 + 2 < size) {
         if (EdgeData::has_value) {
           edgeData.set(p.addNeighbor(src, src * 2 + 2), edgeValue.at(0));
-          edgeData.set(p.addNeighbor(src * 2 + 2, src), edgeValue.at(0));
+          if (AddComplement)
+            edgeData.set(p.addNeighbor(src * 2 + 2, src), edgeValue.at(0));
         } else {
           p.addNeighbor(src, src * 2 + 2);
-          p.addNeighbor(src * 2 + 2, src);
+          if (AddComplement)
+            p.addNeighbor(src * 2 + 2, src);
         }
       }
     }
@@ -2263,6 +2282,7 @@ int main(int argc, char** argv) {
     case gr2cgr: convert<Cleanup>(); break;
     case gr2dimacs: convert<Gr2Dimacs>(); break;
     case gr2edgelist: convert<Gr2Edgelist>(); break;
+    case gr2linegr: convert<AddRing<true>>(); break;
     case gr2lowdegreegr: convert<RemoveHighDegree>(); break;
     case gr2mtx: convert<Gr2Mtx>(); break;
     case gr2partdstgr: convert<PartitionByDestination>(); break;
@@ -2271,7 +2291,7 @@ int main(int argc, char** argv) {
     case gr2pbbsedges: convert<Gr2Pbbsedges>(); break;
     case gr2randgr: convert<RandomizeNodes>(); break;
     case gr2randomweightgr: convert<RandomizeEdgeWeights>(); break;
-    case gr2ringgr: convert<AddRing>(); break;
+    case gr2ringgr: convert<AddRing<false>>(); break;
     case gr2rmat: convert<Gr2Rmat<int32_t> >(); break;
     case gr2metis: convert<Gr2Metis>(); break;
     case gr2sgr: convert<MakeSymmetric>(); break;
@@ -2279,8 +2299,9 @@ int main(int argc, char** argv) {
     case gr2sorteddstgr: convert<SortEdges<IdLess, false> >(); break; 
     case gr2sortedparentdegreegr: convert<SortByHighDegreeParent>(); break;
     case gr2sortedweightgr: convert<SortEdges<WeightLess, true> >(); break;
+    case gr2streegr: convert<AddTree<true>>(); break; 
     case gr2tgr: convert<Transpose>(); break;
-    case gr2treegr: convert<AddTree>(); break; 
+    case gr2treegr: convert<AddTree<false>>(); break; 
     case gr2trigr: convert<MakeUnsymmetric>(); break;
     case mtx2gr: convert<Mtx2Gr>(); break;
     case nodelist2gr: convert<Nodelist2Gr>(); break;
