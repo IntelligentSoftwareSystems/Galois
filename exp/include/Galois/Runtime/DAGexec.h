@@ -390,6 +390,7 @@ protected:
   Cmp cmp;
   NhoodFunc nhVisitor;
   OpFunc opFunc;
+  std::string loopname;
   NhoodMgr nhmgr;
 
   CtxtAlloc ctxtAlloc;
@@ -404,11 +405,13 @@ public:
   DAGexecutorBase (
       const Cmp& cmp, 
       const NhoodFunc& nhVisitor, 
-      const OpFunc& opFunc)
+      const OpFunc& opFunc,
+      const char* loopname)
     :
       cmp (cmp),
       nhVisitor (nhVisitor),
       opFunc (opFunc),
+      loopname (loopname),
       nhmgr (typename NItem::Factory ())
   {}
 
@@ -510,7 +513,7 @@ public:
     t_exec.stop ();
   }
 
-  void resetDAG (void) {
+  void reinitDAG (void) {
     Galois::StatTimer t_reset ("Time to reset the DAG: ");
 
     t_reset.start ();
@@ -518,7 +521,7 @@ public:
         [] (Ctxt* ctxt) {
           ctxt->reset();
         },
-        "resetDAG", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
+        "reinitDAG", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
     t_reset.stop ();
   }
 
@@ -550,9 +553,10 @@ struct DAGexecutor: public DAGexecutorBase<T, Cmp, OpFunc, NhoodFunc, DAGcontext
   DAGexecutor(
       const Cmp& cmp, 
       const NhoodFunc& nhoodVisitor, 
-      const OpFunc& opFunc)
+      const OpFunc& opFunc, 
+      const char* loopname)
     : 
-      Base (cmp, nhoodVisitor, opFunc) 
+      Base (cmp, nhoodVisitor, opFunc, loopname) 
   {}
 
   virtual void createAllEdges (void) {
@@ -582,9 +586,10 @@ struct DAGexecutorRW: public DAGexecutorBase<T, Cmp, OpFunc, NhoodFunc, DAGconte
   DAGexecutorRW (
       const Cmp& cmp, 
       const NhoodFunc& nhoodVisitor, 
-      const OpFunc& opFunc)
+      const OpFunc& opFunc, 
+      const char* loopname)
     : 
-      Base (cmp, nhoodVisitor, opFunc) 
+      Base (cmp, nhoodVisitor, opFunc, loopname) 
   {}
 
   virtual void createAllEdges (void) {
@@ -615,7 +620,7 @@ struct DAGexecutorRW: public DAGexecutorBase<T, Cmp, OpFunc, NhoodFunc, DAGconte
 template <typename R, typename Cmp, typename OpFunc, typename NhoodFunc>
 DAGexecutorRW<typename R::value_type, Cmp, OpFunc, NhoodFunc>* make_dag_executor (const R& range, const Cmp& cmp, const NhoodFunc& nhVisitor, const OpFunc& opFunc, const char* loopname=nullptr) {
 
-  return new DAGexecutorRW<typename R::value_type, Cmp, OpFunc, NhoodFunc> (cmp, nhVisitor, opFunc);
+  return new DAGexecutorRW<typename R::value_type, Cmp, OpFunc, NhoodFunc> (cmp, nhVisitor, opFunc, loopname);
 }
 
 template <typename R, typename Cmp, typename OpFunc, typename NhoodFunc>

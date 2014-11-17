@@ -20,7 +20,7 @@ enum KDGexecType {
 };
 
 template <typename T, typename Cmp, typename NhoodFunc, typename OpFunc, typename G>
-struct DetKDGexecutor {
+struct DetKDGexecutorAddRem {
 
   typedef Galois::PerThreadBag<T> Bag_ty;
   // typedef Galois::Runtime::PerThreadVector<T> Bag_ty;
@@ -39,7 +39,7 @@ struct DetKDGexecutor {
   Bag_ty* nextWL;
   
 
-  DetKDGexecutor (
+  DetKDGexecutorAddRem (
       const Cmp& cmp,
       const NhoodFunc& nhoodVisitor, 
       const OpFunc& opFunc, 
@@ -56,7 +56,7 @@ struct DetKDGexecutor {
     nextWL = new Bag_ty ();
   }
 
-  ~DetKDGexecutor (void) {
+  ~DetKDGexecutorAddRem (void) {
     delete currWL; currWL = nullptr;
     delete nextWL; nextWL = nullptr;
   }
@@ -80,7 +80,7 @@ struct DetKDGexecutor {
 
     typedef int tt_does_not_need_push;
 
-    DetKDGexecutor& outer;
+    DetKDGexecutorAddRem& outer;
 
     template <typename C>
     void operator () (const T& elem, C& ctx) {
@@ -153,11 +153,11 @@ struct DetKDGexecutor {
       if (rounds >= 2) { 
         // break; // TODO: remove
       }
-      std::printf ("DetKDGreuseDAGexec: round %d time taken: %ld\n", rounds, t_exec.get ());
+      std::printf ("DetKDGexecutorAddRem round %d time taken: %ld\n", rounds, t_exec.get ());
 
     } // end while
 
-    std::printf ("DetKDGexecutor: performed %d rounds\n", rounds);
+    std::printf ("DetKDGexecutorAddRem: performed %d rounds\n", rounds);
 
   }
 
@@ -173,7 +173,7 @@ void for_each_det_kdg (const R& initRange, const Cmp& cmp, const NhoodFunc& nhoo
 
   typedef typename R::value_type T;
 
-  DetKDGexecutor<T, Cmp, NhoodFunc, OpFunc, G> executor {cmp, nhoodVisitor, opFunc, graph, loopname};
+  DetKDGexecutorAddRem<T, Cmp, NhoodFunc, OpFunc, G> executor {cmp, nhoodVisitor, opFunc, graph, loopname};
 
   executor.execute (initRange, kdgType);
 
@@ -181,7 +181,7 @@ void for_each_det_kdg (const R& initRange, const Cmp& cmp, const NhoodFunc& nhoo
 }
 
 template <typename T, typename Cmp, typename NhoodFunc, typename OpFunc, typename G>
-struct DetKDGreuseDAGexec {
+struct DetKDG_AddRem_reuseDAG {
 
   typedef Galois::PerThreadBag<T> Bag_ty;
   // typedef Galois::Runtime::PerThreadVector<T> Bag_ty;
@@ -197,7 +197,7 @@ struct DetKDGreuseDAGexec {
   Galois::GAccumulator<size_t> numPushes;
   
 
-  DetKDGreuseDAGexec (
+  DetKDG_AddRem_reuseDAG (
       const Cmp& cmp,
       const NhoodFunc& nhoodVisitor, 
       const OpFunc& opFunc, 
@@ -218,7 +218,7 @@ struct DetKDGreuseDAGexec {
 
     typedef int tt_does_not_need_push;
 
-    DetKDGreuseDAGexec& outer;
+    DetKDG_AddRem_reuseDAG& outer;
 
     template <typename C>
     void operator () (T elem, C& ctx) {
@@ -265,7 +265,7 @@ struct DetKDGreuseDAGexec {
       if (numPushes.reduceRO () == 0) { 
         break;
       }
-      std::printf ("DetKDGreuseDAGexec: round %d time taken: %ld\n", rounds, t_exec.get ());
+      std::printf ("DetKDG_AddRem_reuseDAG: round %d time taken: %ld\n", rounds, t_exec.get ());
 
       dagExec->resetDAG ();
       numPushes.reset ();
@@ -274,7 +274,7 @@ struct DetKDGreuseDAGexec {
     // destroy_dag_executor (dagExec);
     delete dagExec; dagExec = nullptr;
 
-    std::printf ("DetKDGreuseDAGexec: performed %d rounds\n", rounds);
+    std::printf ("DetKDG_AddRem_reuseDAG: performed %d rounds\n", rounds);
   }
 
 
@@ -282,14 +282,14 @@ struct DetKDGreuseDAGexec {
 
 
 template <typename R, typename Cmp, typename NhoodFunc, typename OpFunc, typename G>
-void for_each_det_kdg_topo (const R& initRange, const Cmp& cmp, const NhoodFunc& nhoodVisitor, 
+void for_each_det_kdg_ar_reuse (const R& initRange, const Cmp& cmp, const NhoodFunc& nhoodVisitor, 
     const OpFunc& opFunc, G& graph, const char* loopname) {
 
   Galois::Runtime::getSystemThreadPool ().burnPower (Galois::getActiveThreads ());
 
   typedef typename R::value_type T;
 
-  DetKDGreuseDAGexec<T, Cmp, NhoodFunc, OpFunc, G> executor {cmp, nhoodVisitor, opFunc, graph, loopname};
+  DetKDG_AddRem_reuseDAG<T, Cmp, NhoodFunc, OpFunc, G> executor {cmp, nhoodVisitor, opFunc, graph, loopname};
 
   executor.execute (initRange);
 
