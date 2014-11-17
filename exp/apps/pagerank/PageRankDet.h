@@ -187,7 +187,9 @@ protected:
     }
 
     if (!checkConvergence ()) {
-      std::fprintf (stderr, "ERROR: Convergence check failed\n");
+      std::fprintf (stderr, "ERROR: Convergence check FAILED\n");
+    } else {
+      std::printf ("OK: Convergence check PASSED\n");
     }
 
     printTop (graph, 10);

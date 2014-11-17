@@ -25,14 +25,14 @@ static cll::opt<ExecType> execType (
     cll::init (KDG_R));
 
 
-struct NodeData: public Galois::Runtime::DAGdata, PData {
+struct NodeData: public Galois::Runtime::TaskDAGdata, PData {
 
   NodeData (void)
-    : Galois::Runtime::DAGdata (0), PData ()
+    : Galois::Runtime::TaskDAGdata (0), PData ()
   {}
 
   NodeData (unsigned id, unsigned outdegree)
-    : Galois::Runtime::DAGdata (id), PData (outdegree)
+    : Galois::Runtime::TaskDAGdata (id), PData (outdegree)
   {}
 
 
