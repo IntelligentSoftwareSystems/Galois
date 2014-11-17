@@ -80,12 +80,12 @@ struct AsyncALSalgo {
   
   struct EmptyBase {};
 
-  typedef typename std::conditional<algo == asyncALSchromatic,
-          Galois::Runtime::DAGdata,
+  typedef typename std::conditional<algo == asyncALSreuse,
+          Galois::Runtime::InputDAGdata,
           EmptyBase>::type NodeBase;
 
   // TODO: fix compilation when inheriting from NodeBase
-  struct Node: public Galois::Runtime::DAGdata { 
+  struct Node: public Galois::Runtime::InputDAGdata { 
     LatentValue latentVector[LATENT_VECTOR_SIZE];
   };
 
@@ -259,7 +259,7 @@ struct AsyncALSalgo {
       // TODO(ddn) IKDG version can be improved by read/write
       // TODO(ddn) AddRemove can be improevd by reusing DAG
       if (algo == asyncALSkdg_i || algo == asyncALSkdg_ar) {
-        self.visit(g, col);
+        // self.visit(g, col);
         if (ctx.isFirstPass()) {
           self.visit(g, col);
           return;
@@ -305,9 +305,21 @@ struct AsyncALSalgo {
     };
   };
 
+  struct VisitNhood {
+    static const unsigned CHUNK_SIZE = ALS_CHUNK_SIZE;
+
+    AsyncALSalgo& outer;
+    Graph& g;
+
+    template <typename C>
+    void operator () (size_t col, C&) {
+      outer.visit (g, col);
+    }
+  };
+
   struct ApplyUpdate {
 
-    static const unsigned CHUNK_SIZE = 32;
+    static const unsigned CHUNK_SIZE = ALS_CHUNK_SIZE;
 
     AsyncALSalgo& outer;
     Graph& g;
@@ -318,6 +330,10 @@ struct AsyncALSalgo {
 
     template <typename C>
     void operator () (size_t col, C& ctx) {
+      (*this) (col);
+    }
+
+    void operator () (size_t col) {
       outer.update (g, col, WT, HT, xtxs, rhs);
     }
   };
@@ -348,19 +364,36 @@ struct AsyncALSalgo {
 
     typename EigenGraphVisitor::Manager dagManager {g, A, AT}; 
 
+    auto* reuseExec = Galois::Runtime::make_reusable_dag_exec (
+        Galois::Runtime::makeLocalRange (g),
+        g, dagManager, 
+        ApplyUpdate {*this, g, WT, HT, xtxs, rhs},
+        VisitNhood {*this, g}, std::less<GNode> (),
+        "als-async-reuse");
+
+    if (algo == asyncALSreuse) {
+      reuseExec->initialize (Galois::Runtime::makeLocalRange (g));
+    }
+
     for (int round = 1; ; ++round) {
+
       updateTime.start();
 
       switch (algo) {
         case syncALS: 
+          typedef Galois::WorkList::AltChunkedLIFO<ALS_CHUNK_SIZE> WL_ty;
           Galois::for_each(
               boost::counting_iterator<size_t>(0),
               boost::counting_iterator<size_t>(NUM_ITEM_NODES),
-              Process(*this, g, WT, HT, xtxs, rhs));
+              Process(*this, g, WT, HT, xtxs, rhs),
+              Galois::wl<WL_ty> (),
+              Galois::loopname ("syncALS-users"));
           Galois::for_each(
               boost::counting_iterator<size_t>(NUM_ITEM_NODES),
               boost::counting_iterator<size_t>(g.size()),
-              Process(*this, g, WT, HT, xtxs, rhs));
+              Process(*this, g, WT, HT, xtxs, rhs),
+              Galois::wl<WL_ty> (),
+              Galois::loopname ("syncALS-movies"));
           break;
 
         case asyncALSkdg_ar:
@@ -372,14 +405,10 @@ struct AsyncALSalgo {
               Galois::wl<Galois::WorkList::Deterministic<>>());
           break;
 
-        case asyncALSchromatic:
+        case asyncALSreuse:
+          reuseExec->execute ();
+          reuseExec->reinitDAG ();
 
-          Galois::for_each_det_choice (
-              Galois::Runtime::makeLocalRange (g),
-              ApplyUpdate {*this, g, WT, HT, xtxs, rhs},
-              g,
-              dagManager,
-              "als-async-chromatic");
           break;
 
         default:
@@ -408,7 +437,10 @@ struct AsyncALSalgo {
         break;
 
       last = error;
-    }
+    } // end for
+
+    delete reuseExec;
+    reuseExec = nullptr;
   }
 };
 
@@ -953,7 +985,7 @@ class Recursive2DExecutor {
         
       }
     }
-    for (int i = 0; i < error.size(); ++i) {
+    for (size_t i = 0; i < error.size(); ++i) {
       std::cout 
         << "RMSE Model " << i << ":" 
         << " 1: " << std::sqrt(error[i][0] / numBlocks) << " (" << error[i][3] / numBlocks << ")"
