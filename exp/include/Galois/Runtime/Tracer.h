@@ -27,6 +27,7 @@
 #include "Galois/Runtime/ll/EnvCheck.h"
 
 #include <sstream>
+#include <functional>
 
 namespace Galois {
 namespace Runtime {

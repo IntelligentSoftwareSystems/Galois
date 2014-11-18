@@ -200,12 +200,31 @@ class RemoteAbortHandler {
     waiting_on.erase(p.first, p.second);
   }
 
+
+  struct print_waiting_on {
+    decltype(waiting_on)& _waiting_on;
+    friend std::ostringstream& operator<< (std::ostringstream& os, print_waiting_on& val) {
+      for(auto& foo : val._waiting_on)
+        os << " " << foo.first;
+      return os;
+    }
+  };
+
+  struct print_items {
+    decltype(items)& _items;
+    friend std::ostringstream& operator<< (std::ostringstream& os, print_items& val) {
+      for(auto& foo : val._items)
+        os << " " << foo.first << "," << foo.second;
+      return os;
+    }
+  };
+
   void dump() {
     std::lock_guard<LL::SimpleLock> lg(lock);
-    for (auto& foo : waiting_on)
-      trace("RAH Waiting on %\n", foo.first);
-    for (auto& foo : items)
-      trace("RAW Item % count %\n", foo.first, foo.second);
+    if (!waiting_on.empty())
+      trace("RAH Waiting on %: %\n", waiting_on.size(), print_waiting_on{waiting_on});
+    if (!items.empty())
+      trace("RAH Item %: %\n", items.size(), print_items{items});
   }
 
 public:
@@ -415,9 +434,9 @@ protected:
         didWork = false;
         //Run some iterations
         if (isLeader)
-          didWork = runQueue<64, false>(tld, wl);
+          didWork = runQueue<8, false>(tld, wl);
         else
-          didWork = runQueue<ForEachTraits<FunctionTy>::NeedsBreak ? 64 : 0, false>(tld, wl);
+          didWork = runQueue<ForEachTraits<FunctionTy>::NeedsBreak ? 8 : 0, false>(tld, wl);
         // Check for abort
         if (couldAbort)
           didWork |= handleAborts(tld);

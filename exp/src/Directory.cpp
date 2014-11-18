@@ -32,6 +32,40 @@
 using namespace Galois::Runtime;
 
 ////////////////////////////////////////////////////////////////////////////////
+// MetaHolder
+////////////////////////////////////////////////////////////////////////////////
+
+template<typename metadata>
+metadata& detail::MetaHolder<metadata>::getMD(fatPointer ptr, typeHelper* th) {
+  std::lock_guard<LL::SimpleLock> lg(md_lock);
+  auto ii = md.find(ptr);
+  if (ii == md.end())
+    ii = md.emplace(ptr, th).first;
+  ii->second.lock.lock();
+  return ii->second;
+}
+
+template<typename metadata>
+metadata*  detail::MetaHolder<metadata>::getMD_ifext(fatPointer ptr) {
+  std::lock_guard<LL::SimpleLock> lg(md_lock);
+  auto ii = md.find(ptr);
+  if (ii != md.end()) {
+    ii->second.lock.lock();
+    return &ii->second;
+  }
+  return nullptr;
+}
+
+template<typename metadata>
+void  detail::MetaHolder<metadata>::eraseMD(fatPointer ptr, std::unique_lock<LL::SimpleLock>& mdl) {
+  //FIXME: will deadlock
+  std::lock_guard<LL::SimpleLock> lg(md_lock);
+  assert(md.find(ptr) != md.end());
+  mdl.release();
+  md.erase(ptr);
+}
+
+////////////////////////////////////////////////////////////////////////////////
 // Base Directory
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -59,43 +93,9 @@ bool BaseDirectory::dirOwns(Lockable* ptr) {
 // Remote Directory
 ////////////////////////////////////////////////////////////////////////////////
 
-RemoteDirectory::metadata& RemoteDirectory::getMD(fatPointer ptr) {
-  std::lock_guard<LL::SimpleLock> lg(md_lock);
-  assert(ptr.getHost() != NetworkInterface::ID);
-  auto& retval = md[ptr];
-  retval.lock.lock();
-  return retval;
-}
-
-RemoteDirectory::metadata* RemoteDirectory::getMD_ifext(fatPointer ptr) {
-  std::lock_guard<LL::SimpleLock> lg(md_lock);
-  assert(ptr.getHost() != NetworkInterface::ID);
-  if (md.find(ptr) != md.end()) {
-    auto& retval = md[ptr];
-    retval.lock.lock();
-    return &retval;
-  }  
-  else 
-    return nullptr;
-} 
-
-void RemoteDirectory::eraseMD(fatPointer ptr, std::unique_lock<LL::SimpleLock>& mdl) {
-  std::lock_guard<LL::SimpleLock> lg(md_lock);
-  assert(md.find(ptr) != md.end());
-  assert(md[ptr].lock.is_locked());
-  mdl.unlock();
-  md.erase(ptr);
-}
-
-void RemoteDirectory::addPendingReq(fatPointer ptr, uint32_t dest, ResolveFlag flag) {
+void RemoteDirectory::addPendingReq(fatPointer ptr) {
   std::lock_guard<LL::SimpleLock> rlg(reqs_lock);
-  auto ii = reqs.find(ptr);
-  if (ii == reqs.end()) {
-    reqs.emplace(std::make_pair(ptr, outstandingReq{dest, flag}));
-  } else {
-    ii->second.dest = std::min(ii->second.dest, dest);
-    ii->second.flag = flag; // FIXME
-  }
+  reqs.insert(ptr);
 }
 
 bool RemoteDirectory::tryWriteBack(metadata& md, fatPointer ptr, std::unique_lock<LL::SimpleLock>& lg) {
@@ -106,12 +106,11 @@ bool RemoteDirectory::tryWriteBack(metadata& md, fatPointer ptr, std::unique_loc
   Lockable* obj = static_cast<Lockable*>(vobj->getObj());
   bool retval = false;
   if (dirAcquire(obj)) {
-    trace("RemoteDirectory::tryWriteBack % md %\n", ptr, md);
     assert(cm.isCurrent(ptr, vobj->getObj()));
     cm.evict(ptr); //IncRef keeps obj live for release
+    trace("RD::sendObject % to % md %\n", ptr, ptr.getHost(), md);
     md.th->send(ptr.getHost(), ptr, obj, RW);
     dirRelease(obj);
-    eraseMD(ptr, lg);
     retval = true;
   }
   vobj->decRef();
@@ -119,126 +118,112 @@ bool RemoteDirectory::tryWriteBack(metadata& md, fatPointer ptr, std::unique_loc
 }
 
 void RemoteDirectory::recvRequestImpl(fatPointer ptr, uint32_t dest, ResolveFlag flag) {
-  metadata& md = getMD(ptr);
-  std::unique_lock<LL::SimpleLock> lg(md.lock, std::adopt_lock);
-  recvRequestImpl(md, ptr, lg, dest, flag);
+  metadata* md = dir.getMD_ifext(ptr);
+  assert(md || flag == UP_RW || flag == UP_RO);
+  //updates for already returned object
+  if ((!md || md->state == metadata::PENDING_RW || md->state == metadata::PENDING_RO)
+      && (flag == UP_RW || flag == UP_RO)) {
+    trace("RemoteDirectory::recvRequest % dest % DROPPING\n", ptr, dest);
+    return;
+  }
+  std::unique_lock<LL::SimpleLock> lg(md->lock, std::adopt_lock);
+  trace("RemoteDirectory::recvRequest % dest % flag % md %\n", ptr, dest, flag, *md);
+  md->recvRequest(dest, flag);
+  considerObject(*md, ptr, lg);
 }
 
-void RemoteDirectory::recvRequestImpl(metadata& md, fatPointer ptr, std::unique_lock<LL::SimpleLock>& lg, uint32_t dest, ResolveFlag flag) {
-  trace("RemoteDirectory::recvRequest % dest % md %\n", ptr, dest, md);
-  if ((md.contended && dest > NetworkInterface::ID)) {
-    addPendingReq(ptr, dest, flag);
+void RemoteDirectory::considerObject(metadata& md, fatPointer ptr, std::unique_lock<LL::SimpleLock>& lg) {
+  assert(md.recalled != ~0);
+  //contended objects are event driven, so drop request
+  if (md.contended && md.recalled > NetworkInterface::ID)
+    return;
+  
+  assert(md.state == metadata::HERE_RO || md.state == metadata::HERE_RW || md.state == metadata::UPGRADE);
+  if (md.state == metadata::HERE_RO || md.state == metadata::UPGRADE) {
+    //Recall is an invalidate
+    ResolveFlag act = md.doInvalidateRO();
+    //evict from cache
+    getCacheManager().evict(ptr);
+    //ack invalidate
+    md.th->request(ptr.getHost(), ptr, NetworkInterface::ID, INV);
+    if (act == INV) {
+      //erase metadata
+      dir.eraseMD(ptr, lg);
+    } else {
+      //refetch
+      fetchImpl(md, ptr, act, md.th, false, lg); // contended still set
+    }
   } else {
-    bool wasContended = md.contended;
-    ResolveFlag oldMode = INV;
-    typeHelper* th = md.th;
-    bool has_obj = true;
-    switch (md.state) {
-    case metadata::HERE_RW:
-    case metadata::UPGRADE:
-      oldMode = RW;
-      break;
-    case metadata::HERE_RO:
-      oldMode = RO;
-      break;
-    default:
-      has_obj = false;
-      break;
-    }
-    if ((md.state == metadata::INVALID) && (flag == UP_RW || flag == UP_RO)) {
-	eraseMD(ptr, lg);
-    }
-    else if(has_obj){
-      if (flag == INV) {
-        // ACK invalidate
-        eraseMD(ptr, lg);
-        getCacheManager().evict(ptr);
-        th->request(ptr.getHost(), ptr, NetworkInterface::ID, INV);
-        if (wasContended)
-          fetchImpl(ptr, RO, th, true);
-      } else {
-        //assert(has_obj);
-        assert(md.state == metadata::HERE_RW);
-        if (tryWriteBack(md, ptr, lg)) {
-	  //delete any pending requests from reqs
-	  reqs.erase(ptr);
-          if (wasContended)
-            fetchImpl(ptr, RW, th, true);
-        } else {
-          addPendingReq(ptr, dest, flag);
-        }
-      }
+    assert(md.state == metadata::HERE_RW);
+    if (tryWriteBack(md, ptr, lg)) {
+      if (md.doWriteBack())
+        fetchImpl(md, ptr, RW, md.th, false, lg); // contended still set
+      else
+        dir.eraseMD(ptr, lg);
+    } else {
+      //wasn't able to write back, locking problems, defer
+      addPendingReq(ptr);
     }
   }
 }
 
-void RemoteDirectory::recvObjectImpl(fatPointer ptr, ResolveFlag flag, typeHelper* th, RecvBuffer& buf) {
+void RemoteDirectory::recvObjectImpl(fatPointer ptr, ResolveFlag flag, detail::typeHelper* th, RecvBuffer& buf) {
   assert(flag == RW || flag == RO);
-  metadata& md = getMD(ptr);
-  auto nl = std::move(md.notifyList);
-  md.notifyList.clear();
-  {
+  decltype(metadata::notifyList) nl;
+
+  { //guard lock scope
+    metadata& md = dir.getMD(ptr, th);
     std::lock_guard<LL::SimpleLock> lg(md.lock, std::adopt_lock);
-    trace("RemoteDirectory::recvObject % flag % md %\n", ptr, flag, md);
+    trace("RD::recvObject % flag % md %\n", ptr, flag, md);
     md.recvObj(flag);
-    assert(md.th == th || !md.th);
-    if (!md.th)
-      md.th = th;
     th->cmCreate(ptr, flag, buf);
     //FIXME: handle RO locking
-  } // release md lock
+    std::swap(md.notifyList, nl);
+  }
+  //Do notifies
   for (auto& fn : nl)
     fn(ptr);
 }
 
 void RemoteDirectory::clearContended(fatPointer ptr) {
-  metadata& md = getMD(ptr);
-  std::unique_lock<LL::SimpleLock> lg(md.lock, std::adopt_lock);
-  trace("RemoteDirectory::clearContended % md %\n", ptr, md);
-  md.contended = false;
-  assert(md.state != metadata::INVALID);
-
-  bool doRecv = false;
-  outstandingReq r;
-  {
-    std::lock_guard<LL::SimpleLock> lg(reqs_lock);
-    auto ii = reqs.find(ptr);
-    if (ii != reqs.end()) {
-      doRecv = true;
-      r = ii->second;
-      reqs.erase(ii);
-    }
-  }
-  if (doRecv)
-    recvRequestImpl(md, ptr, lg, r.dest, r.flag);
+  metadata* md = dir.getMD_ifext(ptr);
+  if (!md)
+    return;
+  std::unique_lock<LL::SimpleLock> lg(md->lock, std::adopt_lock);
+  trace("RemoteDirectory::clearContended % md %\n", ptr, *md);
+  md->doClearContended(); //FIXME: simple transfer rather than check
+  if (md->recalled != ~0)
+    considerObject(*md, ptr, lg);
 }
 
-void RemoteDirectory::fetchImpl(fatPointer ptr, ResolveFlag flag, typeHelper* th, bool setContended) {
-  metadata& md = getMD(ptr);
-  std::lock_guard<LL::SimpleLock> lg(md.lock, std::adopt_lock);
-  trace("RemoteDirectory::fetch for % flag % setcont % md %\n", ptr, flag, md);
-  assert(md.th == th || !md.th);
+void RemoteDirectory::fetchImpl(metadata& md, fatPointer ptr, ResolveFlag flag, detail::typeHelper* th, bool setContended, std::unique_lock<LL::SimpleLock>& lg) {
   assert(!ptr.isLocal());
-  if (!md.th)
-    md.th = th;
-  assert(md.state != metadata::HERE_RW);
-  md.contended |= setContended;
-  ResolveFlag requestFlag = md.fetch(flag);
+  ResolveFlag requestFlag = md.fetch(flag, setContended);
   if (requestFlag != INV)
     th->request(ptr.getHost(), ptr, NetworkInterface::ID, requestFlag);
 }
 
+void RemoteDirectory::fetchImpl(fatPointer ptr, ResolveFlag flag, detail::typeHelper* th, bool setContended) {
+  assert(!ptr.isLocal());
+  metadata& md = dir.getMD(ptr, th);
+  std::unique_lock<LL::SimpleLock> lg(md.lock, std::adopt_lock);
+  trace("RemoteDirectory::fetch for % flag % setcont % md %\n", ptr, flag, setContended, md);
+  fetchImpl(md, ptr, flag, th, setContended, lg);
+}
+
 bool RemoteDirectory::notify(fatPointer ptr, ResolveFlag flag, 
                              std::function<void(fatPointer)> fnotify) {
-  metadata& md = getMD(ptr);
-  std::lock_guard<LL::SimpleLock> lg(md.lock, std::adopt_lock);
+  metadata* md = dir.getMD_ifext(ptr);
+  if (!md)
+    return false;
+  std::lock_guard<LL::SimpleLock> lg(md->lock, std::adopt_lock);
   assert(flag == RW || flag == RO);
   //check if unnecessary
-  if ( (flag == RW && md.state == metadata::HERE_RW)
-       || (flag == RO && md.state == metadata::HERE_RO)
-       || (flag == RO && md.state == metadata::HERE_RW))
+  if ( (flag == RW && md->state == metadata::HERE_RW)
+       || (flag == RO && md->state == metadata::HERE_RO)
+       || (flag == RO && md->state == metadata::HERE_RW))
     return false;
-  md.notifyList.push_back(fnotify);
+  md->notifyList.push_back(fnotify);
   return true;
 }
 
@@ -246,17 +231,28 @@ bool RemoteDirectory::notify(fatPointer ptr, ResolveFlag flag,
 // Remote Directory Metadata
 ////////////////////////////////////////////////////////////////////////////////
 
-RemoteDirectory::metadata::metadata() 
-  :state(INVALID), contended(false), th(nullptr)
+RemoteDirectory::metadata::metadata(detail::typeHelper* th) 
+  :state(INVALID), contended(false), recalled(~0), th(th)
 {}
 
-ResolveFlag RemoteDirectory::metadata::fetch(ResolveFlag flag) {
+RemoteDirectory::metadata::~metadata() {
+  assert(state == INVALID);
+  assert(contended == false);
+  assert(recalled == ~0);
+  assert(lock.is_locked());
+}
+
+//update state machine from local fetch and return message to send
+//returning INV means send no message
+ResolveFlag RemoteDirectory::metadata::fetch(ResolveFlag flag, bool setContended) {
   assert(flag != INV);
+  if (!contended && setContended)
+    contended = true;
   switch(flag) {
   case RW:
     switch (state) {
     case metadata::INVALID:
-    case metadata::PENDING_RO:
+    case metadata::PENDING_RO: //FIXME: after PRO -> PRW, what happens on recvObj(RO)?
       state = metadata::PENDING_RW;
       return RW;
     case metadata::HERE_RO:
@@ -279,10 +275,10 @@ ResolveFlag RemoteDirectory::metadata::fetch(ResolveFlag flag) {
   }
 }
 
+//update state machine from recieving a remote object
 void RemoteDirectory::metadata::recvObj(ResolveFlag flag) {
-  assert(flag != INV);
-  assert(state != INVALID);
-  if (flag == RW) {
+  switch(flag) {
+  case RW:
     switch (state) {
     case PENDING_RW:
     case UPGRADE:
@@ -292,7 +288,7 @@ void RemoteDirectory::metadata::recvObj(ResolveFlag flag) {
       assert(0 && "Invalid state transition");
       abort();
     }
-  } else {
+  case RO:
     switch (state) {
     case PENDING_RO:
       state = HERE_RO;
@@ -301,12 +297,47 @@ void RemoteDirectory::metadata::recvObj(ResolveFlag flag) {
       assert(0 && "Invalid state transition");
       abort();
     }
+  default:
+    assert(0 && "Invalid Flag");
+    abort();
   }
+}
+
+void RemoteDirectory::metadata::recvRequest(uint32_t dest, ResolveFlag flag) {
+  assert(state != INVALID);
+  assert((flag == INV && (state == HERE_RO || state == UPGRADE)) || flag != INV);
+  assert(dest <= recalled);
+  recalled = dest; //std::min(recalled, dest);
+}
+
+ResolveFlag RemoteDirectory::metadata::doInvalidateRO() {
+  assert(state == HERE_RO || state == UPGRADE);
+  ResolveFlag ReqMode = state == HERE_RO ? RO : RW;
+  state = INVALID;
+  recalled = ~0;
+  if (contended)
+    return ReqMode;
+  else
+    return INV;
+}
+
+bool RemoteDirectory::metadata::doWriteBack() {
+  assert(state == HERE_RW);
+  state = INVALID;
+  recalled = ~0;
+  return contended;
+}
+
+//Returns whether object should be sent back
+bool RemoteDirectory::metadata::doClearContended() {
+  assert(state != INVALID);
+  contended = false;
+  return recalled != ~0;
 }
 
 std::ostream& Galois::Runtime::operator<<(std::ostream& os, const RemoteDirectory::metadata& md) {
   static const char* StateFlagNames[] = {"I", "PR", "PW", "RO", "RW", "UW"};
-  return os << "state:" << StateFlagNames[md.state] << ",contended:" << md.contended << ",th:" << md.th << " ,notifySize" << md.notifyList.size() ;
+  return os << "state:" << StateFlagNames[md.state] << ",contended:" << md.contended << ",recalled:" << md.recalled << ",th:" << md.th << " ,notifySize " << md.notifyList.size() ;
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -316,7 +347,7 @@ std::ostream& Galois::Runtime::operator<<(std::ostream& os, const RemoteDirector
 // template<typename T>
 // T* RemoteDirectory::resolve(fatPointer ptr, ResolveFlag flag) {
 //   //  trace("RemoteDirectory::resolve for % flag %\n", ptr, flag);
-//   metadata* md = getMD(ptr);
+//   metadata* md = dir.getMD(ptr);
 //   std::lock_guard<LL::SimpleLock> lg(md->lock);
 //   if ((flag == RO && (md->state == metadata::HERE_RO || md->state == metadata::UPGRADE)) ||
 //       (flag == RW &&  md->state == metadata::HERE_RW)) {
@@ -335,8 +366,13 @@ void RemoteDirectory::makeProgress() {
     std::lock_guard<LL::SimpleLock> lg(reqs_lock);
     todo.swap(reqs);
   }
-  for (auto& p : todo)
-    recvRequestImpl(p.first, p.second.dest, p.second.flag);
+  for (auto& p : todo) {
+    metadata* md = dir.getMD_ifext(p);
+    if (md) {
+      std::unique_lock<LL::SimpleLock> lg(md->lock, std::adopt_lock);
+      considerObject(*md, p, lg);
+    }
+  }
 }
 
 void RemoteDirectory::resetStats() {
@@ -352,11 +388,11 @@ void RemoteDirectory::reportStats(const char* loopname) {
 }
 
 void RemoteDirectory::dump() {
-  std::lock_guard<LL::SimpleLock> lg(md_lock);
-  for (auto& pair : md) {
-    std::lock_guard<LL::SimpleLock> mdlg(pair.second.lock);
-    std::cout << "R " << pair.first << ": " << pair.second << "\n";
-  }
+  // std::lock_guard<LL::SimpleLock> lg(md_lock);
+  // for (auto& pair : md) {
+  //   std::lock_guard<LL::SimpleLock> mdlg(pair.second.lock);
+  //   std::cout << "R " << pair.first << ": " << pair.second << "\n";
+  // }
 }
 
 void RemoteDirectory::dump(fatPointer ptr) {
@@ -368,125 +404,55 @@ void RemoteDirectory::dump(fatPointer ptr) {
 // Local Directory
 ////////////////////////////////////////////////////////////////////////////////
 
-LocalDirectory::metadata& LocalDirectory::getMD(fatPointer ptr) {
-  std::lock_guard<LL::SimpleLock> lg(dir_lock);
-  metadata& md = dir[ptr];
-  md.lock.lock();
-  return md;
-}
-
-LocalDirectory::metadata* LocalDirectory::getMD_ifext(fatPointer ptr) {
-  std::lock_guard<LL::SimpleLock> lg(dir_lock);
-  if (dir.find(ptr) != dir.end()) {  
-    auto& md = dir[ptr];
-    md.lock.lock();
-    return &md;
-  }
-  else 
-    return nullptr;
-
-}
-
-void LocalDirectory::eraseMD(fatPointer ptr, std::unique_lock<LL::SimpleLock>& mdl) {
-  std::lock_guard<LL::SimpleLock> lg(dir_lock);
-  assert(dir.find(ptr) != dir.end());
-  assert(dir[ptr].lock.is_locked());
-  mdl.unlock();
-  dir.erase(ptr);
-}
-
 void LocalDirectory::recvObjectImpl(fatPointer ptr, ResolveFlag flag, 
-                                    typeHelper* th, RecvBuffer& buf) {
+                                    detail::typeHelper* th, RecvBuffer& buf) {
   assert(ptr.isLocal());
   Lockable* obj = static_cast<Lockable*>(ptr.getObj());
-  metadata& md = getMD(ptr);
+  metadata& md = dir.getMD(ptr, th);
   std::unique_lock<LL::SimpleLock> lg(md.lock, std::adopt_lock);
+  trace("LD::recvObject % flag % md %\n", ptr, flag, md);
+
   //We can write back the object in place as we know we have the write lock
   assert(dirOwns(obj)); //Check that we have the write lock
-  md.writeback();
   md.th->deserialize(buf, obj);
-
-  auto p = md.getNextDest();
-  trace("LocalDirectory::writebackObject % flag % md %\n", ptr, flag, md);
-  if (p.first == ~0) {
-    auto nl = std::move(md.notifyList);
-    md.notifyList.clear();
-    eraseMD(ptr, lg);
-    dirRelease(obj); //Object is local now with no requesters, so release
-    //md lock is released by this point
-    for (auto& fn : nl)
-      fn(ptr);
-  } else {
-    considerObject(md, ptr);
-  }
-}
-
-void LocalDirectory::fetchImpl(fatPointer ptr, ResolveFlag flag, typeHelper* th, bool setContended) {
-  //FIXME: deal with RO
-  assert(ptr.isLocal());
-  metadata* md = getMD_ifext(ptr);
-  assert(md != nullptr);
-  std::unique_lock<LL::SimpleLock> lg(md->lock, std::adopt_lock);
-  assert(!md->th || md->th == th);
-  if (!md->th)
-    md->th = th;
-  trace("LocalDirectory::fetch for % flag % setcont % md (%) %\n", ptr, flag, setContended, md, *md);
-  if (md->isHere()) {
-    if (setContended)
-      md->contended = true;
-    else
-      eraseMD(ptr, lg);
-  } else {
-    md->addReq(NetworkInterface::ID, flag);
-    md->contended |= setContended;
-    forwardRequestToNextWriter(*md, ptr, lg);
-  }
+  md.doWriteback();
+  considerObject(md, ptr, lg);
 }
 
 void LocalDirectory::clearContended(fatPointer ptr) {
   assert(ptr.isLocal());
-  metadata& md = getMD(ptr);
-  std::unique_lock<LL::SimpleLock> lg(md.lock, std::adopt_lock);
-  trace("LocalDirectory::clearContended % md %\n", ptr, md);
-  md.contended = false;
-  if (md.isHere()) {
-    auto p = md.getNextDest();
-    if (p.first == ~0) //no requester
-      eraseMD(ptr, lg);
-    else //send it somewhere
-      considerObject(md, ptr);
-  }
+  metadata* md = dir.getMD_ifext(ptr);
+  if (!md)
+    return;
+  std::unique_lock<LL::SimpleLock> lg(md->lock, std::adopt_lock);
+  trace("LocalDirectory::clearContended % md %\n", ptr, *md);
+  md->doClearContended();
+  considerObject(*md, ptr, lg);
 }
 
-void LocalDirectory::recvRequestImpl(fatPointer ptr, uint32_t dest, ResolveFlag flag, typeHelper* th) {
+void LocalDirectory::fetchImpl(fatPointer ptr, ResolveFlag flag, detail::typeHelper* th, bool setContended) {
+  //FIXME: deal with RO
   assert(ptr.isLocal());
-  metadata& md = getMD(ptr);
+  metadata* md = setContended ? &dir.getMD(ptr, th) : dir.getMD_ifext(ptr);
+  if (!md) {
+    trace("LocalDirectroy::fetch for % DROPPING\n", ptr);
+    return;
+  }
+  std::unique_lock<LL::SimpleLock> lg(md->lock, std::adopt_lock);
+  trace("LocalDirectory::fetch for % flag % setcont % md %\n", ptr, flag, setContended, *md);
+  md->fetch(flag, setContended);
+  considerObject(*md, ptr, lg);
+}
+
+void LocalDirectory::recvRequestImpl(fatPointer ptr, uint32_t dest, ResolveFlag flag, detail::typeHelper* th) {
+  assert(ptr.isLocal());
+  metadata& md = dir.getMD(ptr, th);
   std::unique_lock<LL::SimpleLock> lg(md.lock, std::adopt_lock);
   trace("LocalDirectory::recvRequest % flag % dest % md %\n", ptr, flag, dest, md);
-  assert(!md.th || md.th == th);
-  if (!md.th)
-    md.th = th;
-  if (flag == INV) {
-    //ACK of invalidate
-    assert(md.locRO.count(dest));
-    md.locRO.erase(dest);
-    if (md.locRO.empty()) {
-      auto p = md.getNextDest();
-      if (p.first == ~0) //no requester
-        eraseMD(ptr, lg);
-      else //send it somewhere
-        considerObject(md, ptr);
-    } //else still waiting for invalidates
-  } else {
-    md.addReq(dest, flag);
-    if (md.isHere())
-      considerObject(md, ptr);
-    else if (md.isRO())
-      sendToReaders(md, ptr);
-    else
-      forwardRequestToNextWriter(md, ptr, lg);
-  }
+  md.addReq(dest,flag);
+  considerObject(md, ptr, lg);
 }
+
 
 void LocalDirectory::sendToReaders(metadata& md, fatPointer ptr) {
   assert(md.locRW == ~0);
@@ -507,101 +473,133 @@ void LocalDirectory::invalidateReaders(metadata& md, fatPointer ptr, uint32_t ne
   }
 }
 
-void LocalDirectory::invalidate(fatPointer ptr) {
-  assert(ptr.isLocal());
-  metadata& md = getMD(ptr);
-  std::lock_guard<LL::SimpleLock> lg(md.lock, std::adopt_lock);
+// void LocalDirectory::invalidate(fatPointer ptr) {
+//   assert(ptr.isLocal());
+//   metadata& md = dir.getMD(ptr);
+//   std::lock_guard<LL::SimpleLock> lg(md.lock, std::adopt_lock);
 
-  // md.th may be null
-  assert(md.th || !md.th);
+//   // md.th may be null
+//   assert(md.th || !md.th);
 
-  // TODO(ddn): issuing writebacks might also be possible but using INV seems
-  // to break less directory invariants 
-  if (md.locRW != ~0)
-    md.locRO.insert(md.locRW);
+//   // TODO(ddn): issuing writebacks might also be possible but using INV seems
+//   // to break less directory invariants 
+//   if (md.locRW != ~0)
+//     md.locRO.insert(md.locRW);
 
-  for (auto dest : md.locRO)
-    md.th->request(dest, ptr, NetworkInterface::ID, INV);
+//   for (auto dest : md.locRO)
+//     md.th->request(dest, ptr, NetworkInterface::ID, INV);
 
-  if (!md.locRO.empty())
-    trace("LocalDirectory::invalidate % md %\n", ptr, md);
-}
+//   if (!md.locRO.empty())
+//     trace("LocalDirectory::invalidate % md %\n", ptr, md);
+// }
 
-void LocalDirectory::considerObject(metadata& md, fatPointer ptr) {
+void LocalDirectory::considerObject(metadata& md, fatPointer ptr, std::unique_lock<LL::SimpleLock>& lg) {
   auto p = md.getNextDest();
-  trace("LocalDirectory::considerObject % has dest % RW % remote % md %\n", 
-      ptr, p.first, p.second, (md.locRW != ~0 || !md.locRO.empty()) ? 'T' : 'F', md);
-  assert(p.first != ~0 && "caller should have checked that there is a request");
+  trace("LocalDirectory::considerObject % has dest % RW % md %\n", ptr, p.first, p.second, md);
 
-  Lockable* obj = static_cast<Lockable*>(ptr.getObj());
-
-  //Only consider objects which are already present (but may be locked locally)
-  assert(md.isHere());
-
-  //Object is local (locRW and locRO are empty)
-  assert(md.locRO.empty() && md.locRW == ~0);
-  //Next user is this host
-  if (p.first == NetworkInterface::ID) {
-    auto nl = std::move(md.notifyList);
-    md.notifyList.clear();
-    if (p.second) {
-      md.reqsRW.erase(p.first);
-      dirRelease(obj);
-    } else {
-      md.reqsRO.erase(p.first);
-      //FIXME: release lock
-    }
-    for (auto& fn : nl)
-      fn(ptr); //FIXME: md lock is held in RO case
-  } else {
-    if (md.contended && p.first > NetworkInterface::ID) {
-      addPendingReq(ptr);
-    } else if (dirOwns(obj) || dirAcquire(obj)) {
-      if (p.second) {
-        assert(md.reqsRW.count(p.first));
-        md.reqsRW.erase(p.first);
-        md.locRW = p.first;
-        md.th->send(p.first, ptr, static_cast<Lockable*>(ptr.getObj()), RW);
-	if (md.contended)
-	    md.addReq(NetworkInterface::ID, RW);
-        //Immediately recall the object if there is another waiter
-        auto pn = md.getNextDest();
-        if (pn.first != ~0) {
-          md.th->request(md.locRW, ptr, pn.first, RW);
-          md.recalled = pn.first;
-        }
-      } else { //RO
-        sendToReaders(md, ptr);
-      }
-    } else { //locked by local iteration, defer
-      addPendingReq(ptr); 
-    }
-  }
-}
-
-void LocalDirectory::forwardRequestToNextWriter(metadata& md, fatPointer ptr, std::unique_lock<LL::SimpleLock>& lg) {
-  //Check that all needed messages have been sent
-  auto p = md.getNextDest();
-  if (p.first != ~0) {
-    if (md.recalled != p.first) {
+  //First check if we need to update a remote host with a new request
+  if (md.locRW != ~0 || !md.locRO.empty()) {
+    if (md.recalled > p.first) {
       if (md.locRW != ~0) {
-        md.th->request(md.locRW, ptr, p.first, (md.recalled != 0 ) ? UP_RW : RW );
+        md.th->request(md.locRW, ptr, p.first, (md.recalled != ~0 ) ? UP_RW : RW );
       } else {
         assert(!md.locRO.empty());
         invalidateReaders(md, ptr, p.first);
       }
       md.recalled = p.first;
     }
-  } else {
-    if (!md.contended)
-      eraseMD(ptr, lg);
+    return;   
   }
+
+  //Object is here
+
+  //contended objects are event driven, so drop request
+  if (md.contended && p.first > NetworkInterface::ID)
+    return;
+
+  Lockable* obj = static_cast<Lockable*>(ptr.getObj());
+
+  //Next user is this host
+  if (p.first == NetworkInterface::ID) {
+    auto nl = std::move(md.notifyList);
+    md.notifyList.clear();
+    md.doSendTo(p.first, p.second);
+    if (p.second) {
+      assert(dirOwns(obj));
+      dirRelease(obj);
+    } else {
+      //FIXME: RO locking
+      abort();
+    }
+    for (auto& fn : nl)
+      fn(ptr); //FIXME: md lock held
+  } else if (p.first != ~0) {
+    auto foo = NetworkInterface::ID;
+    if (!dirOwns(obj)) {
+      //Try acquiring lock.
+      bool acq = dirAcquire(obj);
+      if (!acq) { //Failed?
+        addPendingReq(ptr);
+        return;
+      }
+      if (md.contended)
+        md.addReq(NetworkInterface::ID, RW);
+    }
+    md.doSendTo(p.first, p.second);
+    if (p.second) { //RW
+      trace("LD::sendObject % to % md %\n", ptr, p.first, md);
+      md.th->send(p.first, ptr, static_cast<Lockable*>(ptr.getObj()), RW);
+    } else { // RO
+      sendToReaders(md, ptr);
+      abort();
+    }
+  }
+
+  p = md.getNextDest();
+  if (p.first == ~0 && !md.contended && md.isHere())
+    dir.eraseMD(ptr, lg);
+  else if (p.first != ~0 && !md.isHere())
+    considerObject(md, ptr, lg);
+
+
+
+        
+  //       //Immediately recall the object if there is another waiter
+  //       auto pn = md.getNextDest();
+  //       if (pn.first != ~0) {
+  //         md.th->request(md.locRW, ptr, pn.first, RW);
+  //         md.recalled = pn.first;
+  //       }
+  //     } else { //RO
+  //       sendToReaders(md, ptr);
+  //     }
+  //   } else { //locked by local iteration, defer
+  //     addPendingReq(ptr); 
+  //   }
+  // }
 }
+
+// void LocalDirectory::forwardRequest(metadata& md, fatPointer ptr) {
+//   //Check that all needed messages have been sent
+//   auto p = md.getNextDest();
+//   assert(p.first != ~0);
+//   assert(md.locRW != ~0);
+//   if (md.recalled > p.first) {
+//     if (md.locRW != ~0) { //RW
+//       md.th->request(md.locRW, ptr, p.first, (md.recalled != 0 ) ? UP_RW : RW );
+//     } else { //RO
+//       assert(!md.locRO.empty());
+//       invalidateReaders(md, ptr, p.first);
+//       abort();
+//     }
+//     md.recalled = p.first;
+//   }
+// }
 
 bool LocalDirectory::notify(fatPointer ptr, ResolveFlag flag, 
                              std::function<void(fatPointer)> fnotify) {
-  metadata* md = getMD_ifext(ptr);
-  //metadata& md = getMD(ptr);
+  metadata* md = dir.getMD_ifext(ptr);
+  //metadata& md = dir.getMD(ptr);
   if (md == nullptr)
     return false;
 
@@ -614,7 +612,7 @@ bool LocalDirectory::notify(fatPointer ptr, ResolveFlag flag,
   }
 
 /*  if (md.isHere() && !(md.contended)) {
-    eraseMD(ptr, lg);
+    dir.eraseMD(ptr, lg);
     return false;
   }
 */
@@ -633,24 +631,26 @@ void LocalDirectory::makeProgress() {
   }
 
   for (fatPointer ptr : todo) {
-    metadata& md = getMD(ptr);
-    std::lock_guard<LL::SimpleLock> obj_lg(md.lock, std::adopt_lock);
-    auto p = md.getNextDest();
-    if (p.first == ~0)
-      continue;
-    else if (md.isHere())
-      considerObject(md, ptr);
-    else
-      addPendingReq(ptr);
+    metadata* md = dir.getMD_ifext(ptr);
+    if (md) {
+      std::unique_lock<LL::SimpleLock> obj_lg(md->lock, std::adopt_lock);
+      auto p = md->getNextDest();
+      if (p.first == ~0)
+        continue;
+      else if (md->isHere())
+        considerObject(*md, ptr, obj_lg);
+      else
+        addPendingReq(ptr);
+    }
   }
 }
 
 void LocalDirectory::dump() {
-  std::lock_guard<LL::SimpleLock> lg(dir_lock);
-  for (auto& pair : dir) {
-    std::lock_guard<LL::SimpleLock> mdlg(pair.second.lock);
-    std::cout << "L " << pair.first << ": " << pair.second << "\n";
-  }
+  // std::lock_guard<LL::SimpleLock> lg(dir_lock);
+  // for (auto& pair : dir) {
+  //   std::lock_guard<LL::SimpleLock> mdlg(pair.second.lock);
+  //   std::cout << "L " << pair.first << ": " << pair.second << "\n";
+  // }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -665,7 +665,28 @@ void LocalDirectory::metadata::addReq(uint32_t dest, ResolveFlag flag) {
   }
 }
 
-bool LocalDirectory::metadata::writeback() {
+bool LocalDirectory::metadata::fetch(ResolveFlag flag, bool setContended) {
+  if (!contended && setContended)
+    contended = true;
+  switch (flag) {
+  case RW: 
+    if (locRW != ~0) {
+      reqsRW.insert(NetworkInterface::ID);
+      return true;
+    }
+    break;
+  case RO:
+    if (!locRO.count(NetworkInterface::ID)) {
+      reqsRO.insert(NetworkInterface::ID);
+      return true;
+    }
+    break;
+  default: assert(0 && "Unexpected flag"); abort();
+  }
+  return false;
+}
+
+bool LocalDirectory::metadata::doWriteback() {
   assert(locRW != ~0);
   assert(locRW != NetworkInterface::ID);
   assert(locRO.empty());
@@ -674,6 +695,27 @@ bool LocalDirectory::metadata::writeback() {
   return !reqsRW.empty() || !reqsRO.empty();
 }
 
+void LocalDirectory::metadata::doSendTo(uint32_t dest, bool write) {
+  assert(locRO.empty() && locRW == ~0);
+  if (write) {
+    assert(reqsRW.count(dest));
+    reqsRW.erase(dest);
+    if (dest == NetworkInterface::ID) {
+      locRW = ~0;
+    } else {
+      locRW = dest;
+    }
+  } else {
+    assert(reqsRO.count(dest));
+    reqsRO.erase(dest);
+    locRO.insert(dest);
+  }
+}
+
+void LocalDirectory::metadata::doClearContended() {
+  //bool oldCont = contended;
+  contended = false;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 
