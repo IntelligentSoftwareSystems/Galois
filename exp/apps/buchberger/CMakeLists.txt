@@ -1,10 +1,7 @@
 find_package(GMP)
-
 include_directories(${GMP_INCLUDE_DIRS})
-#include_directories(/net/faraday/workspace/ddn/local/include)
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -msse2")
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -ftree-vectorizer-verbose=2")
 find_package(Boost 1.43)
-if(BOOST_FOUND)
-  app(buchberger REQUIRES GMP_FOUND EXTLIBS ${GMP_LIBRARIES} ${GMPXX_LIBRARIES}) # /net/faraday/workspace/ddn/local/lib/libgivaro.a)
+if(Boost_FOUND)
+  app(buchberger REQUIRES GMP_FOUND EXTLIBS ${GMP_LIBRARIES} ${GMPXX_LIBRARIES})
 endif()

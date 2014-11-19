@@ -70,6 +70,7 @@ public:
   typedef Super out_graph_type;
   typedef InGraph in_graph_type;
   typedef typename Super::GraphNode GraphNode;
+  typedef typename Super::file_edge_data_type file_edge_data_type;
   typedef typename Super::edge_data_type edge_data_type;
   typedef typename Super::node_data_type node_data_type;
   typedef typename Super::edge_data_reference edge_data_reference;

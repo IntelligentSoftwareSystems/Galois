@@ -1,6 +1,7 @@
 This directory is for the machine learning toolkit.
 
-All source and header files files should carry the following copyright notice:
+All source and header files files should carry the following copyright notice
+(or similar):
 
 /** Description of file -*- C++ -*-
  * @file
@@ -27,10 +28,6 @@ All source and header files files should carry the following copyright notice:
  * Multi-line description of file.
  *
  * @author Name <email>
-*/
+ */
 
 Subsequent major authors should add themselves to the author list, one author per line.
-
-src/ is for common source files (linked into the library)
-apps/ are for individual applications
-tests/ are for tests of components.  Tests of individual algorithms should be done by including an application in the apps directory for that algorithm.

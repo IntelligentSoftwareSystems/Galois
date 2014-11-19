@@ -23,8 +23,8 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#ifndef GALOIS_GRAPH_LC_CSR_GRAPH_MIC_H
-#define GALOIS_GRAPH_LC_CSR_GRAPH_MIC_H
+#ifndef GALOIS_GRAPH_LC_CSR_MIC_GRAPH_H
+#define GALOIS_GRAPH_LC_CSR_MIC_GRAPH_H
 
 #include "Galois/config.h"
 #include "Galois/LargeArray.h"
@@ -101,8 +101,9 @@ namespace Graph {
 template<typename NodeTy, typename EdgeTy,
   bool HasNoLockable=false,
   bool UseNumaAlloc=false,
-  bool HasOutOfLineLockable=false>
-class LC_CSR_Graph:
+  bool HasOutOfLineLockable=false,
+  typename FileEdgeTy=EdgeTy>
+class LC_CSR_MIC_Graph:
     private boost::noncopyable,
     private detail::LocalIteratorFeature<UseNumaAlloc>,
     private detail::OutOfLineLockableFeature<HasOutOfLineLockable && !HasNoLockable> {
@@ -110,25 +111,28 @@ class LC_CSR_Graph:
 
 public:
   template<bool _has_id>
-  struct with_id { typedef LC_CSR_Graph type; };
+  struct with_id { typedef LC_CSR_MIC_Graph type; };
 
   template<typename _node_data>
-  struct with_node_data { typedef LC_CSR_Graph<_node_data,EdgeTy,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable> type; };
+  struct with_node_data { typedef LC_CSR_MIC_Graph<_node_data,EdgeTy,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,FileEdgeTy> type; };
 
   template<typename _edge_data>
-  struct with_edge_data { typedef LC_CSR_Graph<NodeTy,_edge_data,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable> type; };
+  struct with_edge_data { typedef LC_CSR_MIC_Graph<NodeTy,_edge_data,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,FileEdgeTy> type; };
+
+  template<typename _file_edge_data>
+  struct with_file_edge_data { typedef LC_CSR_MIC_Graph<NodeTy,EdgeTy,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,_file_edge_data> type; };
 
   //! If true, do not use abstract locks in graph
   template<bool _has_no_lockable>
-  struct with_no_lockable { typedef LC_CSR_Graph<NodeTy,EdgeTy,_has_no_lockable,UseNumaAlloc,HasOutOfLineLockable> type; };
+  struct with_no_lockable { typedef LC_CSR_MIC_Graph<NodeTy,EdgeTy,_has_no_lockable,UseNumaAlloc,HasOutOfLineLockable,FileEdgeTy> type; };
 
   //! If true, use NUMA-aware graph allocation
   template<bool _use_numa_alloc>
-  struct with_numa_alloc { typedef LC_CSR_Graph<NodeTy,EdgeTy,HasNoLockable,_use_numa_alloc,HasOutOfLineLockable> type; };
+  struct with_numa_alloc { typedef LC_CSR_MIC_Graph<NodeTy,EdgeTy,HasNoLockable,_use_numa_alloc,HasOutOfLineLockable,FileEdgeTy> type; };
 
   //! If true, store abstract locks separate from nodes
   template<bool _has_out_of_line_lockable>
-  struct with_out_of_line_lockable { typedef LC_CSR_Graph<NodeTy,EdgeTy,HasNoLockable,UseNumaAlloc,_has_out_of_line_lockable> type; };
+  struct with_out_of_line_lockable { typedef LC_CSR_MIC_Graph<NodeTy,EdgeTy,HasNoLockable,UseNumaAlloc,_has_out_of_line_lockable,FileEdgeTy> type; };
 
   typedef read_default_graph_tag read_tag;
 
@@ -143,6 +147,7 @@ protected:
 public:
   typedef uint32_t GraphNode;
   typedef EdgeTy edge_data_type;
+  typedef FileEdgeTy file_edge_data_type;
   typedef NodeTy node_data_type;
   typedef typename EdgeData::reference edge_data_reference;
   typedef typename NodeInfoTypes::reference node_data_reference;
@@ -195,6 +200,20 @@ protected:
 
   template<bool _A1 = HasOutOfLineLockable, bool _A2 = HasNoLockable>
   void acquireNode(GraphNode N, MethodFlag mflag, typename std::enable_if<_A2>::type* = 0) { }
+
+  template<bool _A1 = EdgeData::has_value, bool _A2 = LargeArray<FileEdgeTy>::has_value>
+  void constructEdgeValue(FileGraph& graph, typename FileGraph::edge_iterator nn, 
+      typename std::enable_if<!_A1 || _A2>::type* = 0) {
+    typedef LargeArray<FileEdgeTy> FED;
+    if (EdgeData::has_value)
+      edgeData.set(*nn, graph.getEdgeData<typename FED::value_type>(nn));
+  }
+
+  template<bool _A1 = EdgeData::has_value, bool _A2 = LargeArray<FileEdgeTy>::has_value>
+  void constructEdgeValue(FileGraph& graph, typename FileGraph::edge_iterator nn,
+      typename std::enable_if<_A1 && !_A2>::type* = 0) {
+    edgeData.set(*nn, {});
+  }
 
   size_t getId(GraphNode N) {
     return N;
@@ -430,8 +449,8 @@ public:
     return raw_end(N);
   }
 
-  detail::EdgesIterator<LC_CSR_Graph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
-    return detail::EdgesIterator<LC_CSR_Graph>(*this, N, mflag);
+  detail::EdgesIterator<LC_CSR_MIC_Graph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
+    return detail::EdgesIterator<LC_CSR_MIC_Graph>(*this, N, mflag);
   }
 
   /**
@@ -472,7 +491,7 @@ public:
 
   void constructFrom(FileGraph& graph, unsigned tid, unsigned total) {
     auto r = graph.divideByNode(
-        NodeData::size_of::value + EdgeIndData::size_of::value + LC_CSR_Graph::size_of_out_of_line::value,
+        NodeData::size_of::value + EdgeIndData::size_of::value + LC_CSR_MIC_Graph::size_of_out_of_line::value,
         EdgeDst::size_of::value + EdgeData::size_of::value,
         tid, total).first;
     this->setLocalRange(*r.first, *r.second);
@@ -483,8 +502,7 @@ public:
       edgeIndData[(*ii) + 1] = *graph.edge_end(*ii);
       this->outOfLineConstructAt(*ii);
       for (FileGraph::edge_iterator nn = graph.edge_begin(*ii), en = graph.edge_end(*ii); nn != en; ++nn) {
-        if (EdgeData::has_value)
-          edgeData.set(*nn, graph.getEdgeData<typename EdgeData::value_type>(nn));
+        constructEdgeValue(graph, nn);
         edgeDst[*nn] = graph.getEdgeDst(nn);
       }
     }
@@ -498,4 +516,4 @@ public:
 #undef _DO_OUTER_PREFETCH
 #undef _DO_UNROLL
 
-#endif // GALOIS_GRAPH_LC_CSR_GRAPH_MIC_H
+#endif // GALOIS_GRAPH_LC_CSR_MIC_GRAPH_H

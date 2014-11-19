@@ -292,8 +292,8 @@ struct sgd_node_movie_pri {
          ii != ee; ++ii) {
       double e1 = doGradientUpdate(g.getData(node), g.getData(g.getEdgeDst(ii)), g.getEdgeData(ii), step_size);
       double e2 = g.getEdgeData(ii) - calcPrediction(g.getData(node), g.getData(g.getEdgeDst(ii)));
-      if (abs(e1 - e2) > 20) {
-        std::cerr << "A" << abs(e1 - e2);
+      if (std::abs(e1 - e2) > 20) {
+        std::cerr << "A" << std::abs(e1 - e2);
         cnx.push(g.getEdgeDst(ii));
       }
     }

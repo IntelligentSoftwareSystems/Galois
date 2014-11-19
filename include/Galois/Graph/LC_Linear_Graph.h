@@ -49,7 +49,8 @@ template<typename NodeTy, typename EdgeTy,
   bool HasNoLockable=false,
   bool UseNumaAlloc=false,
   bool HasOutOfLineLockable=false,
-  bool HasId=false>
+  bool HasId=false,
+  typename FileEdgeTy=EdgeTy>
 class LC_Linear_Graph:
     private boost::noncopyable,
     private detail::LocalIteratorFeature<UseNumaAlloc>,
@@ -58,22 +59,25 @@ class LC_Linear_Graph:
 
 public:
   template<bool _has_id>
-  struct with_id { typedef LC_Linear_Graph<NodeTy,EdgeTy,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,_has_id> type; };
+  struct with_id { typedef LC_Linear_Graph<NodeTy,EdgeTy,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,_has_id,FileEdgeTy> type; };
 
   template<typename _node_data>
-  struct with_node_data { typedef LC_Linear_Graph<_node_data,EdgeTy,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,HasId> type; };
+  struct with_node_data { typedef LC_Linear_Graph<_node_data,EdgeTy,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,HasId,FileEdgeTy> type; };
 
   template<typename _edge_data>
-  struct with_edge_data { typedef LC_Linear_Graph<NodeTy,_edge_data,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,HasId> type; };
+  struct with_edge_data { typedef LC_Linear_Graph<NodeTy,_edge_data,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,HasId,FileEdgeTy> type; };
+
+  template<typename _file_edge_data>
+  struct with_file_edge_data { typedef LC_Linear_Graph<NodeTy,EdgeTy,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,HasId,_file_edge_data> type; };
 
   template<bool _has_no_lockable>
-  struct with_no_lockable { typedef LC_Linear_Graph<NodeTy,EdgeTy,_has_no_lockable,UseNumaAlloc,HasOutOfLineLockable,HasId> type; };
+  struct with_no_lockable { typedef LC_Linear_Graph<NodeTy,EdgeTy,_has_no_lockable,UseNumaAlloc,HasOutOfLineLockable,HasId,FileEdgeTy> type; };
 
   template<bool _use_numa_alloc>
-  struct with_numa_alloc { typedef LC_Linear_Graph<NodeTy,EdgeTy,HasNoLockable,_use_numa_alloc,HasOutOfLineLockable,HasId> type; };
+  struct with_numa_alloc { typedef LC_Linear_Graph<NodeTy,EdgeTy,HasNoLockable,_use_numa_alloc,HasOutOfLineLockable,HasId,FileEdgeTy> type; };
 
   template<bool _has_out_of_line_lockable>
-  struct with_out_of_line_lockable { typedef LC_Linear_Graph<NodeTy,EdgeTy,HasNoLockable,UseNumaAlloc,_has_out_of_line_lockable,_has_out_of_line_lockable||HasId> type; };
+  struct with_out_of_line_lockable { typedef LC_Linear_Graph<NodeTy,EdgeTy,HasNoLockable,UseNumaAlloc,_has_out_of_line_lockable,_has_out_of_line_lockable||HasId,FileEdgeTy> type; };
 
   typedef read_with_aux_graph_tag read_tag;
 
@@ -113,6 +117,7 @@ protected:
 public:
   typedef NodeInfo* GraphNode;
   typedef EdgeTy edge_data_type;
+  typedef FileEdgeTy file_edge_data_type;
   typedef NodeTy node_data_type;
   typedef typename NodeInfoTypes::reference node_data_reference;
   typedef typename EdgeInfo::reference edge_data_reference;
@@ -148,6 +153,20 @@ protected:
 
   edge_iterator raw_end(GraphNode N) {
     return N->edgeEnd();
+  }
+
+  template<bool _A1 = EdgeInfo::has_value, bool _A2 = LargeArray<FileEdgeTy>::has_value>
+  void constructEdgeValue(FileGraph& graph, typename FileGraph::edge_iterator nn,
+      EdgeInfo* edge, typename std::enable_if<!_A1 || _A2>::type* = 0) {
+    typedef LargeArray<FileEdgeTy> FED;
+    if (EdgeInfo::has_value)
+      edge->construct(graph.getEdgeData<typename FED::value_type>(nn));
+  }
+
+  template<bool _A1 = EdgeInfo::has_value, bool _A2 = LargeArray<FileEdgeTy>::has_value>
+  void constructEdgeValue(FileGraph& graph, typename FileGraph::edge_iterator nn,
+      EdgeInfo* edge, typename std::enable_if<_A1 && !_A2>::type* = 0) {
+    edge->construct();
   }
 
   template<bool _Enable = HasId>
@@ -289,8 +308,7 @@ public:
     for (FileGraph::iterator ii = r.first, ei = r.second; ii != ei; ++ii) {
       EdgeInfo* edge = nodes[*ii]->edgeBegin();
       for (FileGraph::edge_iterator nn = graph.edge_begin(*ii), en = graph.edge_end(*ii); nn != en; ++nn) {
-        if (EdgeInfo::has_value)
-          edge->construct(graph.getEdgeData<EDV>(nn));
+        constructEdgeValue(graph, nn, edge);
         edge->dst = nodes[graph.getEdgeDst(nn)];
         ++edge;
       }

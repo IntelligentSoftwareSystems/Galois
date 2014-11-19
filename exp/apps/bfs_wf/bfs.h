@@ -39,7 +39,7 @@
 // #undef GALOIS_USE_MIC_CSR_IMPL
 
 #ifdef GALOIS_USE_MIC_CSR_IMPL
-  #include "Galois/Graph/LC_CSR_Graph_MIC.h"
+  #include "Galois/Graph/LC_CSR_MIC_Graph.h"
 #else
   #include "Galois/Graph/LC_CSR_Graph.h"
 #endif
@@ -102,7 +102,11 @@ template <typename ND>
 class BFS {
 
 public:
+#ifdef GALOIS_USE_MIC_CSR_IMPL
+  typedef typename Galois::Graph::LC_CSR_MIC_Graph<ND, void>
+#else
   typedef typename Galois::Graph::LC_CSR_Graph<ND, void>
+#endif
     ::template with_numa_alloc<true>::type
     ::template with_no_lockable<true>::type Graph;
   typedef typename Graph::GraphNode GNode;

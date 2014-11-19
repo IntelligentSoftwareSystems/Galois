@@ -22,8 +22,8 @@
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#ifndef GALOIS_GRAPH_LC_INOUT_GRAPH_H
-#define GALOIS_GRAPH_LC_INOUT_GRAPH_H
+#ifndef LC_PARTITIONED_GRAPH_H
+#define LC_PARTITIONED_GRAPH_H
 
 #include "Galois/Graph/Details.h"
 
@@ -78,6 +78,7 @@ class LC_Partitioned_Graph: public GraphTy::template with_id<true> {
 public:
   typedef uint32_t GraphNode;
   typedef typename MainGraph::edge_data_type edge_data_type;
+  typedef typename MainGraph::file_edge_data_type file_edge_data_type;
   typedef typename MainGraph::node_data_type node_data_type;
   typedef typename MainGraph::edge_data_reference edge_data_reference;
   typedef typename MainGraph::node_data_reference node_data_reference;

@@ -195,25 +195,33 @@ struct EdgeFactory<void> {
  * @tparam NodeTy Type of node data
  * @tparam EdgeTy Type of edge data
  * @tparam Directional true if graph is directed
- * @tparam SortNeighbors Keep neighbors sorted (for faster findEdge)
+ * @tparam SortedNeighbors Keep neighbors sorted (for faster findEdge)
  */
 template<typename NodeTy, typename EdgeTy, bool Directional,
-         bool HasNoLockable=false, bool SortNeighbors=false
+  bool HasNoLockable=false,
+  bool SortedNeighbors=false,
+  typename FileEdgeTy=EdgeTy
   >
 class FirstGraph : private boost::noncopyable {
 public:
   //! If true, do not use abstract locks in graph
   template<bool _has_no_lockable>
-  struct with_no_lockable { typedef FirstGraph<NodeTy,EdgeTy,Directional,_has_no_lockable> type; };
+  struct with_no_lockable { typedef FirstGraph<NodeTy,EdgeTy,Directional,_has_no_lockable,SortedNeighbors,FileEdgeTy> type; };
 
   template<typename _node_data>
-  struct with_node_data { typedef FirstGraph<_node_data,EdgeTy,Directional,HasNoLockable> type; };
+  struct with_node_data { typedef FirstGraph<_node_data,EdgeTy,Directional,HasNoLockable,SortedNeighbors,FileEdgeTy> type; };
 
   template<typename _edge_data>
-  struct with_edge_data { typedef FirstGraph<NodeTy,_edge_data,Directional,HasNoLockable> type; };
+  struct with_edge_data { typedef FirstGraph<NodeTy,_edge_data,Directional,HasNoLockable,SortedNeighbors,FileEdgeTy> type; };
+
+  template<typename _file_edge_data>
+  struct with_file_edge_data { typedef FirstGraph<NodeTy,EdgeTy,Directional,HasNoLockable,SortedNeighbors,_file_edge_data> type; };
 
   template<bool _directional>
-  struct with_directional { typedef FirstGraph<NodeTy,EdgeTy,_directional,HasNoLockable> type; };
+  struct with_directional { typedef FirstGraph<NodeTy,EdgeTy,_directional,HasNoLockable,SortedNeighbors,FileEdgeTy> type; };
+
+  template<bool _sorted_neighbors>
+  struct with_sorted_neighbors { typedef FirstGraph<NodeTy,EdgeTy,Directional,HasNoLockable,_sorted_neighbors,FileEdgeTy> type; };
 
   typedef read_with_aux_graph_tag read_tag;
 
@@ -274,7 +282,7 @@ private:
     iterator end() { return edges.end();  }
     
     void erase(iterator ii) {
-      if (SortNeighbors) {
+      if (SortedNeighbors) {
         // For sorted case remove the element, moving following
         // elements back to fill the space.
         edges.erase(ii);
@@ -293,7 +301,7 @@ private:
     }
 
     iterator find(gNode* N) {
-      if ( SortNeighbors ) {
+      if (SortedNeighbors) {
         iterator ei = edges.end();
         iterator ii = std::lower_bound(edges.begin(), ei, N,
                                        first_lt<gNode*>());
@@ -311,7 +319,7 @@ private:
     template<typename... Args>
     iterator createEdge(gNode* N, EdgeTy* v, Args&&... args) {
       iterator ii;
-      if ( SortNeighbors ) {
+      if (SortedNeighbors) {
         // If neighbors are sorted, find appropriate insertion point.
         // Insert before first neighbor that is too far.
         ii = std::upper_bound(edges.begin(), edges.end(), N,
@@ -326,7 +334,7 @@ private:
     iterator createEdgeWithReuse(gNode* N, EdgeTy* v, Args&&... args) {
       // First check for holes
       iterator ii, ei;
-      if ( SortNeighbors ) {
+      if (SortedNeighbors) {
         // If neighbors are sorted, find acceptable range for insertion.
         ii = std::lower_bound(edges.begin(), edges.end(), N,
                               first_lt<gNode*>());
@@ -382,6 +390,8 @@ public:
   typedef gNode* GraphNode;
   //! Edge data type
   typedef EdgeTy edge_data_type;
+  //! Edge data type of file we are loading this graph from
+  typedef FileEdgeTy file_edge_data_type;
   //! Node data type
   typedef NodeTy node_data_type;
   //! Edge iterator
@@ -435,6 +445,24 @@ private:
       }
     }
     return boost::make_filter_iterator(is_edge(), ii, src->end());
+  }
+
+  template<bool _A1 = LargeArray<EdgeTy>::has_value, bool _A2 = LargeArray<FileEdgeTy>::has_value>
+  void constructEdgeValue(FileGraph& graph, typename FileGraph::edge_iterator nn,
+      GraphNode src, GraphNode dst, typename std::enable_if<!_A1 || _A2>::type* = 0) {
+    typedef typename LargeArray<FileEdgeTy>::value_type FEDV;
+    typedef LargeArray<EdgeTy> ED;
+    if (ED::has_value) {
+      addMultiEdge(src, dst, Galois::MethodFlag::UNPROTECTED, graph.getEdgeData<FEDV>(nn));
+    } else {
+      addMultiEdge(src, dst, Galois::MethodFlag::UNPROTECTED);
+    }
+  }
+
+  template<bool _A1 = LargeArray<EdgeTy>::has_value, bool _A2 = LargeArray<FileEdgeTy>::has_value>
+  void constructEdgeValue(FileGraph& graph, typename FileGraph::edge_iterator nn,
+      GraphNode src, GraphNode dst, typename std::enable_if<_A1 && !_A2>::type* = 0) {
+    addMultiEdge(src, dst, Galois::MethodFlag::UNPROTECTED);
   }
 
 public:
@@ -672,11 +700,7 @@ public:
 
     for (FileGraph::iterator ii = r.first, ei = r.second; ii != ei; ++ii) {
       for (FileGraph::edge_iterator nn = graph.edge_begin(*ii), en = graph.edge_end(*ii); nn != en; ++nn) {
-        if (gNode::EdgeInfo::sizeOfSecond()) {
-          addMultiEdge(aux[*ii], aux[graph.getEdgeDst(nn)], Galois::MethodFlag::UNPROTECTED, graph.getEdgeData<value_type>(nn));
-        } else {
-          addMultiEdge(aux[*ii], aux[graph.getEdgeDst(nn)], Galois::MethodFlag::UNPROTECTED);
-        }
+        constructEdgeValue(graph, nn, aux[*ii], aux[graph.getEdgeDst(nn)]);
       }
     }
   }
