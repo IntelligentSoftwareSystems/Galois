@@ -313,7 +313,13 @@ struct PullAlgo2 {
   Galois::GAccumulator<unsigned int> small_delta;
 
   void readGraph(Graph& graph) {
-    Galois::Graph::readGraph(graph, filename);
+    if (symmetricGraph) {
+      Galois::Graph::readGraph(graph, filename);
+    } else if (transposeGraphName.size()) {
+      Galois::Graph::readGraph(graph, filename, transposeGraphName);
+    } else {
+      GALOIS_DIE("Graph type not supported");
+    }
   }
 
   struct Initialize {
