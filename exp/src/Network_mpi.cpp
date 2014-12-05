@@ -281,6 +281,7 @@ public:
   virtual ~NetworkInterfaceSyncMPI() {
     quit = 1;
     while (quit <= 1) {}
+    worker.join();
   }
 
   virtual void send(uint32_t dest, recvFuncTy recv, SendBuffer& buf) {

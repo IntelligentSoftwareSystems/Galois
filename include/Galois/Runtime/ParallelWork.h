@@ -434,9 +434,9 @@ protected:
         didWork = false;
         //Run some iterations
         if (isLeader)
-          didWork = runQueue<8, false>(tld, wl);
+          didWork = runQueue<1, false>(tld, wl);
         else
-          didWork = runQueue<ForEachTraits<FunctionTy>::NeedsBreak ? 8 : 0, false>(tld, wl);
+          didWork = runQueue<ForEachTraits<FunctionTy>::NeedsBreak ? 1 : 0, false>(tld, wl);
         // Check for abort
         if (couldAbort)
           didWork |= handleAborts(tld);

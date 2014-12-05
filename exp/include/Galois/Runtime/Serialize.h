@@ -90,6 +90,10 @@ public:
     start = 2*sizeof(void*);
   }
 
+  inline explicit SerializeBuffer(DeSerializeBuffer&& buf);
+
+  SerializeBuffer(const char* d, unsigned len) : bufdata(d, d+len), start(0) {}
+
   inline void push(const char c) {
     bufdata.push_back(c);
   }
@@ -127,6 +131,8 @@ public:
 
 
 class DeSerializeBuffer {
+  friend SerializeBuffer;
+
   std::vector<unsigned char> bufdata;
   int offset;
 public:
@@ -331,6 +337,12 @@ void gDeserializeObj(DeSerializeBuffer& buf, Galois::gdeque<T,CS>& data) {
 }
 
 } //namespace detail
+
+
+SerializeBuffer::SerializeBuffer(DeSerializeBuffer&& buf) {
+  bufdata.swap(buf.bufdata);
+  start = buf.offset;
+}
 
 
 template<typename T1, typename... Args>
