@@ -565,23 +565,6 @@ void LocalDirectory::considerObject(metadata& md, fatPointer ptr, std::unique_lo
     dir.eraseMD(ptr, lg);
   else if (p.first != ~0 && !md.isHere())
     considerObject(md, ptr, lg);
-
-
-
-        
-  //       //Immediately recall the object if there is another waiter
-  //       auto pn = md.getNextDest();
-  //       if (pn.first != ~0) {
-  //         md.th->request(md.locRW, ptr, pn.first, RW);
-  //         md.recalled = pn.first;
-  //       }
-  //     } else { //RO
-  //       sendToReaders(md, ptr);
-  //     }
-  //   } else { //locked by local iteration, defer
-  //     addPendingReq(ptr); 
-  //   }
-  // }
 }
 
 // void LocalDirectory::forwardRequest(metadata& md, fatPointer ptr) {
