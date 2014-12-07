@@ -129,6 +129,9 @@ public:
   void* resolve(fatPointer);
 
   bool isCurrent(fatPointer, void*);
+
+  //! Get the size of remoteObject map
+  size_t CM_size();
 };
 
 ResolveCache* getThreadResolve();

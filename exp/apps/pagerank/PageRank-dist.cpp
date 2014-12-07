@@ -65,22 +65,21 @@ static const double alpha = (1.0 - 0.85);
 //! maximum relative change until we deem convergence
 static const double TOLERANCE = 0.1;
 
-  
 
 struct InitializeGraph {
     Graph::pointer g;
 //    InitializeGraph(Graph::pointer _g) : g(_g) { }
-    
-    void static go(Graph::pointer g) 
+
+    void static go(Graph::pointer g)
     {
-	Galois::for_each_local(g, InitializeGraph{g}, Galois::loopname("init"));
+      Galois::for_each_local(g, InitializeGraph{g}, Galois::loopname("init"));
     }
-    
+
     void operator()(GNode n, Galois::UserContext<GNode>& cnx) const {
-	LNode& data = g->at(n);
-	data.value = 1.0;
-	//Adding Galois::NONE is imp. here since we don't need any blocking locks.
-	data.nout = std::distance(g->in_edge_begin(n, Galois::MethodFlag::SRC_ONLY),g->in_edge_end(n, Galois::MethodFlag::SRC_ONLY));	
+      LNode& data = g->at(n);
+      data.value = 1.0;
+      //Adding Galois::NONE is imp. here since we don't need any blocking locks.
+      data.nout = std::distance(g->in_edge_begin(n, Galois::MethodFlag::SRC_ONLY),g->in_edge_end(n, Galois::MethodFlag::SRC_ONLY));	
     }
 
   typedef int tt_is_copyable;
@@ -89,40 +88,39 @@ struct InitializeGraph {
 
 struct PageRank {
     Graph::pointer g;
-   
     void static go(Graph::pointer g)
     {
-	Galois::Timer round_time;
-	for(int iterations = 0; iterations < maxIterations; ++iterations){
-	    round_time.start();
-	    Galois::for_each_local(g, PageRank{g}, Galois::loopname("Page Rank"));
-	    round_time.stop();
-	    std::cout<<"Iteration : " << iterations << "  Time : " << round_time.get() << "ms\n";
-	}
+      Galois::Timer round_time;
+      for(int iterations = 0; iterations < maxIterations; ++iterations){
+          round_time.start();
+          Galois::for_each_local(g, PageRank{g}, Galois::loopname("Page Rank"));
+          round_time.stop();
+          std::cout<<"Iteration : " << iterations << "  Time : " << round_time.get() << "ms\n";
+      }
     }
- 
-    void operator() (GNode src, Galois::UserContext<GNode>& cnx) const {
-	double sum = 0;
-	LNode& n = g->at(src);
-	//std::cout << "n :" << n.nout <<"\n";
-	for (auto jj = g->in_edge_begin(src, Galois::MethodFlag::SRC_ONLY), ej = g->in_edge_end(src, Galois::MethodFlag::SRC_ONLY); jj != ej; ++jj) {
-	    GNode dst = g->dst(jj, Galois::MethodFlag::SRC_ONLY);
-	    LNode& ddata = g->at(dst, Galois::MethodFlag::SRC_ONLY);
-	    sum += ddata.value / ddata.nout;
-         }
-        float value = (1.0 - alpha) * sum + alpha;
-	LNode&  sdata = g->at(src, Galois::MethodFlag::SRC_ONLY);
-        //	float diff = std::fabs(value - sdata.value);
-        //	if (diff > TOLERANCE) {
-	    sdata.value = value;
-	 /*   for (auto jj = g->edge_begin(src, Galois::MethodFlag::SRC_ONLY), ej = g->edge_end(src, Galois::MethodFlag::SRC_ONLY); jj != ej; ++jj) {
-		GNode dst = g->dst(jj, Galois::MethodFlag::SRC_ONLY);
-		cnx.push(dst);
-	    }
-	*/
-            //	}
 
-    }
+    void operator() (GNode src, Galois::UserContext<GNode>& cnx) const {
+      double sum = 0;
+      LNode& n = g->at(src);
+      //std::cout << "n :" << n.nout <<"\n";
+      for (auto jj = g->in_edge_begin(src, Galois::MethodFlag::ALL), ej = g->in_edge_end(src, Galois::MethodFlag::SRC_ONLY); jj != ej; ++jj) {
+        GNode dst = g->dst(jj, Galois::MethodFlag::SRC_ONLY);
+        LNode& ddata = g->at(dst, Galois::MethodFlag::SRC_ONLY);
+        sum += ddata.value / ddata.nout;
+      }
+      float value = (1.0 - alpha) * sum + alpha;
+      LNode&  sdata = g->at(src, Galois::MethodFlag::SRC_ONLY);
+      float diff = std::fabs(value - sdata.value);
+      if (diff > TOLERANCE) {
+        sdata.value = value;
+        /*   for (auto jj = g->edge_begin(src, Galois::MethodFlag::SRC_ONLY), ej = g->edge_end(src, Galois::MethodFlag::SRC_ONLY); jj != ej; ++jj) {
+             GNode dst = g->dst(jj, Galois::MethodFlag::SRC_ONLY);
+             cnx.push(dst);
+             }
+             */
+      }
+
+  }
 
   typedef int tt_is_copyable;
 };
@@ -158,8 +156,8 @@ int compute_total_rank(Graph::pointer g) {
     int total_rank = 0;
 
     for(auto ii = g->begin(), ei=g->end(); ii != ei; ++ii) {
-	LNode& node = g->at(*ii); 
-	total_rank += node.value;
+      LNode& node = g->at(*ii); 
+      total_rank += node.value;
     }
 
 
@@ -178,79 +176,80 @@ int main(int argc, char** argv) {
     //NOTE: We are computing in edges on the fly and then using then in Graph construction.
     Graph::pointer g;
     {
-	Galois::Graph::FileGraph fg;
-	fg.fromFile(inputFile);
-	std::vector<unsigned> counts;
-	std::vector<unsigned> In_counts;
-	for(auto& N : fg)
-	{
-	    //std::cout << "N = " << N << "   : \n";
-	    counts.push_back(std::distance(fg.edge_begin(N), fg.edge_end(N)));
-	    for(auto ii = fg.edge_begin(N), ei = fg.edge_end(N); ii != ei; ++ii)
-	    {
-		unsigned dst = fg.getEdgeDst(ii);
-	        //std::cout << dst << " , " ;
-                if(dst >= In_counts.size())
-                {
-		    // +1 is imp because vec.resize makes sure new vec can hold dst entries so it 
-		    // will not have vec[dst] which is (dst+1)th entry!!
-		    In_counts.resize(dst+1); 
-		}
-		In_counts[dst]+=1;
-	    }
-	    //std::cout << "\n";
-	}
-	if(counts.size() >  In_counts.size())
-	    In_counts.resize(counts.size());
+      Galois::Graph::FileGraph fg;
+      fg.fromFile(inputFile);
+      std::vector<unsigned> counts;
+      std::vector<unsigned> In_counts;
+      for(auto& N : fg)
+      {
+          //std::cout << "N = " << N << "   : \n";
+          counts.push_back(std::distance(fg.edge_begin(N), fg.edge_end(N)));
+          for(auto ii = fg.edge_begin(N), ei = fg.edge_end(N); ii != ei; ++ii)
+          {
+              unsigned dst = fg.getEdgeDst(ii);
+              //std::cout << dst << " , " ;
+              if(dst >= In_counts.size()) {
+                // +1 is imp because vec.resize makes sure new vec can hold dst entries so it 
+                // will not have vec[dst] which is (dst+1)th entry!!
+                In_counts.resize(dst+1); 
+              }
+              In_counts[dst]+=1;
+          }
+          //std::cout << "\n";
+      }
+      if(counts.size() >  In_counts.size())
+          In_counts.resize(counts.size());
 
-	TOTAL_NODES = counts.size();
+      TOTAL_NODES = counts.size();
 
-	std::cout << "size of transpose : " << In_counts.size() <<" : : "<<In_counts[0] <<"\n";
-	std::cout << "size of counts : " << counts.size() << "\n";
-	g = Graph::allocate(counts, In_counts);
-     
-        for (unsigned x = 0; x < counts.size(); ++x) {
-	    auto fgn = *(fg.begin() + x);
-	    auto gn = *(g->begin() + x);
-//            std::cout << "x = " << x << "   : \n";
-	    for (auto ii = fg.edge_begin(fgn), ee = fg.edge_end(fgn); ii != ee; ++ii) {
-		unsigned dst = fg.getEdgeDst(ii);
-                //std::cout <<"Incount["<<dst<<"]"<<In_counts[dst]<< " , " ;
-		int val = fg.getEdgeData<int>(ii);
-		g->addEdge(gn, *(g->begin() + dst), val, Galois::MethodFlag::SRC_ONLY);
-		g->addInEdge(*(g->begin() + dst),gn, val, Galois::MethodFlag::SRC_ONLY);
-	    }
-            //std::cout << "\n";
-	}
+      std::cout << "size of transpose : " << In_counts.size() <<" : : "<<In_counts[0] <<"\n";
+      std::cout << "size of counts : " << counts.size() << "\n";
+      g = Graph::allocate(counts, In_counts);
 
+      for (unsigned x = 0; x < counts.size(); ++x) {
+        auto fgn = *(fg.begin() + x);
+        auto gn = *(g->begin() + x);
+        //std::cout << "x = " << x << "   : \n";
+        for (auto ii = fg.edge_begin(fgn), ee = fg.edge_end(fgn); ii != ee; ++ii) {
+          unsigned dst = fg.getEdgeDst(ii);
+          //std::cout <<"Incount["<<dst<<"]"<<In_counts[dst]<< " , " ;
+          int val = fg.getEdgeData<int>(ii);
+          g->addEdge(gn, *(g->begin() + dst), val, Galois::MethodFlag::SRC_ONLY);
+          g->addInEdge(*(g->begin() + dst),gn, val, Galois::MethodFlag::SRC_ONLY);
+        }
+              //std::cout << "\n";
     }
+
+  }
     //Graph Construction ENDS here.
     timerLoad.stop();
-    std::cout << "Graph Loading: " << timerLoad.get() << "ms\n";	
+    std::cout << "Graph Loading: " << timerLoad.get() << " ms\n";
 
     //Graph Initialization begins.
     Galois::Timer timerInit;
     timerInit.start();
     //Galois::for_each_local(g,InitializeGraph{}, Galois::loopname("init"));
+
     InitializeGraph::go(g);
+
     //auto N_n = *(g->begin() + 67);
     //LNode& n = g->at(N_n);
     //std::cout << "n.out : " << n.nout << "\n";
     timerInit.stop();
-    std::cout << "Graph Initialization: " << timerInit.get() << "ms\n";	
-	
+    std::cout << "Graph Initialization: " << timerInit.get() << " ms\n";
+
     Galois::Timer timerPR;
     timerPR.start();
     //typedef Galois::WorkList::dChunkedFIFO<512> WL;
     //Galois::for_each(g->begin(), g->end(), PageRank{g}, Galois::wl<WL>());
+
     PageRank::go(g);
 
     timerPR.stop();
-    std::cout << "Page Rank: " << timerPR.get() << "ms\n";	
-    std::cout << "Total Page Rank: " << compute_total_rank(g) << "\n";	
+    std::cout << "Page Rank: " << timerPR.get() << " ms\n";
+    std::cout << "Total Page Rank: " << compute_total_rank(g) << "\n";
 
-    
- /*   
+ /* 
    std::cout << "size = " << g->size() <<std::endl;
    std::cout << "Typeinfo " << typeid(Graph::GraphNode).name() <<std::endl;
 
@@ -283,12 +282,9 @@ int main(int argc, char** argv) {
 */ 
 //    }
        // typedef Galois::WorkList::dChunkedFIFO<512> WL;
-    Graph::deallocate(g);
-    Galois::Runtime::getSystemNetworkInterface().terminate();
+       Galois::Runtime::getSystemNetworkInterface().terminate();
     return 0;
 }
-    
-    
 
 
 

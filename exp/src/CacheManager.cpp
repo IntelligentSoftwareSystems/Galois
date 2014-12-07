@@ -70,6 +70,9 @@ bool CacheManager::isCurrent(fatPointer ptr, void* obj) {
   return obj == resolve(ptr);
 }
 
+size_t CacheManager::CM_size(){
+  return remoteObjects.size();
+}
 ////////////////////////////////////////////////////////////////////////////////
 
 

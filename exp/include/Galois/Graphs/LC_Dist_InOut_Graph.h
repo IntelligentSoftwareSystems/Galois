@@ -29,78 +29,78 @@
 #include <iostream>
 
 namespace Galois {
-namespace Graph {
+  namespace Graph {
 
-template<typename NodeTy, typename EdgeTy>
-class LC_Dist_InOut {
+    template<typename NodeTy, typename EdgeTy>
+      class LC_Dist_InOut {
 
-  struct EdgeImplTy;
+        struct EdgeImplTy;
 
-  struct NodeImplTy :public Runtime::Lockable {
-    NodeImplTy(EdgeImplTy* start, unsigned len, EdgeImplTy* In_start, unsigned len_inEdges) :b(start), e(start), len(len), remote(false), b_inEdges(In_start), e_inEdges(In_start), len_inEdges(len_inEdges)
-    {}
-    ~NodeImplTy() {
-      if (remote) {
-        delete[] b;
-	delete[] b_inEdges;
-      }
-      b = e = nullptr;
-      b_inEdges = e_inEdges = nullptr;
-    }
+        struct NodeImplTy :public Runtime::Lockable {
+          NodeImplTy(EdgeImplTy* start, unsigned len, EdgeImplTy* In_start, unsigned len_inEdges) :b(start), e(start), len(len), remote(false), b_inEdges(In_start), e_inEdges(In_start), len_inEdges(len_inEdges)
+          {}
+          ~NodeImplTy() {
+            if (remote) {
+              delete[] b;
+              delete[] b_inEdges;
+            }
+            b = e = nullptr;
+            b_inEdges = e_inEdges = nullptr;
+          }
 
-    //Serialization support
-    typedef int tt_has_serialize;
-    NodeImplTy(Runtime::DeSerializeBuffer& buf) :remote(true) {
-      ptrdiff_t diff;
-      ptrdiff_t diff_inEdges;
-      gDeserialize(buf, data, len, diff, len_inEdges, diff_inEdges);
-      b = e = len ? (new EdgeImplTy[len]) : nullptr;
-      b_inEdges = e_inEdges = len_inEdges ? (new EdgeImplTy[len_inEdges]) : nullptr;
-      while (diff--) {
-        Runtime::gptr<NodeImplTy> ptr;
-        EdgeTy tmp;
-        gDeserialize(buf, ptr, tmp);
-        append(ptr, tmp);
-      }
-    
-      while (diff_inEdges--) {
-	Runtime::gptr<NodeImplTy> ptr;
-	EdgeTy tmp;
-	gDeserialize(buf, ptr, tmp);
-	append_inEdges(ptr, tmp);
-		
-      }
-    }
+          //Serialization support
+          typedef int tt_has_serialize;
+          NodeImplTy(Runtime::DeSerializeBuffer& buf) :remote(true) {
+            ptrdiff_t diff;
+            ptrdiff_t diff_inEdges;
+            gDeserialize(buf, data, len, diff, len_inEdges, diff_inEdges);
+            b = e = len ? (new EdgeImplTy[len]) : nullptr;
+            b_inEdges = e_inEdges = len_inEdges ? (new EdgeImplTy[len_inEdges]) : nullptr;
+            while (diff--) {
+              Runtime::gptr<NodeImplTy> ptr;
+              EdgeTy tmp;
+              gDeserialize(buf, ptr, tmp);
+              append(ptr, tmp);
+            }
 
-    void serialize(Runtime::SerializeBuffer& buf) const {
-      EdgeImplTy* begin = b;
-      EdgeImplTy* end = e;
-	
-      EdgeImplTy* begin_In = b_inEdges;
-      EdgeImplTy* end_In = e_inEdges;
-	
-      ptrdiff_t diff = end - begin;
-      ptrdiff_t diff_inEdges = end_In - begin_In;
-      gSerialize(buf, data, len, diff, len_inEdges, diff_inEdges);
-      while (begin != end) {
-        gSerialize(buf, begin->dst, begin->data);
-        ++begin;
-      }
-      while (begin_In != end_In) {
-	gSerialize(buf, begin_In->dst, begin_In->data);
-	++begin_In;
-      }
-    
-    }
-    void deserialize(Runtime::DeSerializeBuffer& buf) {
-      assert(!remote);
-      ptrdiff_t diff;
-      unsigned _len;
-      ptrdiff_t diff_inEdges;
-      unsigned _len_inEdges;
-    
-      EdgeImplTy* begin = b;
-      EdgeImplTy* begin_In = b_inEdges;
+            while (diff_inEdges--) {
+              Runtime::gptr<NodeImplTy> ptr;
+              EdgeTy tmp;
+              gDeserialize(buf, ptr, tmp);
+              append_inEdges(ptr, tmp);
+
+            }
+          }
+
+          void serialize(Runtime::SerializeBuffer& buf) const {
+            EdgeImplTy* begin = b;
+            EdgeImplTy* end = e;
+
+            EdgeImplTy* begin_In = b_inEdges;
+            EdgeImplTy* end_In = e_inEdges;
+
+            ptrdiff_t diff = end - begin;
+            ptrdiff_t diff_inEdges = end_In - begin_In;
+            gSerialize(buf, data, len, diff, len_inEdges, diff_inEdges);
+            while (begin != end) {
+              gSerialize(buf, begin->dst, begin->data);
+              ++begin;
+            }
+            while (begin_In != end_In) {
+              gSerialize(buf, begin_In->dst, begin_In->data);
+              ++begin_In;
+            }
+
+          }
+          void deserialize(Runtime::DeSerializeBuffer& buf) {
+            assert(!remote);
+            ptrdiff_t diff;
+            unsigned _len;
+            ptrdiff_t diff_inEdges;
+            unsigned _len_inEdges;
+
+            EdgeImplTy* begin = b;
+            EdgeImplTy* begin_In = b_inEdges;
       gDeserialize(buf, data, _len, diff, _len_inEdges, diff_inEdges);
       assert(_len == len);
       assert(diff >= e - b);
