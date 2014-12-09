@@ -137,6 +137,12 @@ class LazyObject {
   const T* cast() const { return &data_.value(); }
 
 public:
+
+  //only valid if inialized
+  void move_in(LazyObject&& rhs) {
+    data_.value_ = std::move(rhs.data_.value_);
+  }
+
   typedef T value_type;
   typedef T& reference;
   typedef const T& const_reference;

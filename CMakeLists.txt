@@ -16,6 +16,9 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g")
 endif()
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g")
+
 ###### Options (alternatively pass as options to cmake -DName=Value) ######
 set(USE_GPROF OFF CACHE BOOL "Enable GCC profiling")
 set(USE_VTUNE OFF CACHE BOOL "Use VTune for profiling")
@@ -228,7 +231,7 @@ include_directories(${Boost_INCLUDE_DIR})
 #more warnings
 if(CMAKE_BUILD_TYPE MATCHES "Debug")
   if(NOT CMAKE_CXX_COMPILER_ID MATCHES "XL")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -fsanitize=address")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
   endif()
 endif()

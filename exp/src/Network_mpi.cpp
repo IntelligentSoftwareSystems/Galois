@@ -60,7 +60,6 @@ class NetworkInterfaceAsyncMPI : public NetworkInterface {
   Galois::optional<RecvBuffer> doOneRecv() {
     std::lock_guard<decltype(lock)> lg(lock);
     update_pending_sends();
-    Galois::optional<RecvBuffer> retval;
     MPI_Status status;
     //async probe
     int flag, rv;
@@ -69,12 +68,15 @@ class NetworkInterfaceAsyncMPI : public NetworkInterface {
     if (flag) {
       int count;
       MPI_Get_count(&status, MPI_BYTE, &count);
-      retval = RecvBuffer(count);
+      Galois::optional<RecvBuffer> retval(Galois::optional_default_t{});
+      retval->reset(count);
       MPI_Recv(retval->linearData(), count, MPI_BYTE, MPI_ANY_SOURCE, FuncTag, MPI_COMM_WORLD, &status);
       this->statRecvNum += 1;
       this->statRecvBytes += count;
+      return retval;
+    } else {
+      return Galois::optional<RecvBuffer>();
     }
-    return retval;
   }
 
   void update_pending_sends() {
@@ -137,9 +139,8 @@ public:
   }
 
   virtual bool handleReceives() {
-    Galois::optional<RecvBuffer> data;
     bool retval = false;
-    while ((data = doOneRecv())) {
+    while (Galois::optional<RecvBuffer> data = doOneRecv()) {
       retval = true;
       //Unlocked call so reciever can call handleRecv()
       recvFuncTy f;
@@ -163,7 +164,7 @@ class NetworkInterfaceSyncMPI : public NetworkInterface {
     uint32_t dest;
     SendBuffer buf;
     MPI_Request status;
-    sendData(uint32_t d, const SendBuffer& b) :dest(d), buf(std::move(b)), status(MPI_REQUEST_NULL) {}
+    sendData(uint32_t d, SendBuffer&& b) :dest(d), buf(std::move(b)), status(MPI_REQUEST_NULL) {}
   };
 
   Galois::Runtime::LL::SimpleLock sends_lock;

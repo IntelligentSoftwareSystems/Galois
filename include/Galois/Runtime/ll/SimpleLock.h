@@ -35,7 +35,7 @@
 #include "Galois/Runtime/ll/CompilerSpecific.h"
 
 #include <cassert>
-#include GALOIS_CXX11_STD_HEADER(atomic)
+#include <atomic>
 #include <mutex>
 
 namespace Galois {

@@ -209,7 +209,7 @@ class PerThreadDist {
     gDeserialize(buf, off);
     for (unsigned x = 0; x < getSystemThreadPool().getMaxThreads(); ++x) {
       if (!getPerThreadDistBackend().resolveThread<T>(off, x)) {
-	auto buf2 = buf;
+	DeSerializeBuffer buf2((char*)buf.linearData(), (char*)buf.linearData() + buf.size()); //explicit copy
 	getPerThreadDistBackend().resolveThread<T>(off, x) = new T(PerThreadDist(off), buf2);
       }
     }
@@ -231,10 +231,10 @@ public:
     uint64_t off = getPerThreadDistBackend().allocateOffset();
     getPerThreadDistBackend().resolve<T>(off) = new T(PerThreadDist(off));
     PerThreadDist ptr(off);
-    SerializeBuffer buf, buf2;
+    SerializeBuffer buf;
     gSerialize(buf, off);
     ptr->getInitData(buf);
-    buf2 = buf;
+    SerializeBuffer buf2((char*)buf.linearData(), buf.size()); //explicit copy
     getSystemNetworkInterface().broadcast(&allocOnHost, buf);
     DeSerializeBuffer dbuf(std::move(buf2));
     allocOnHost(dbuf);

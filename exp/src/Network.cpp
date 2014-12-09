@@ -56,7 +56,7 @@ static void loop_pad(::RecvBuffer& b) {
   gDeserialize(b, f);
   trace("Loop Recieved %\n", (void*)f);
   trace("Loop RecvBuffer %\n", b);
-  loopwork.push_back(std::make_pair((recvFuncTy)f, b));
+  loopwork.emplace_back((recvFuncTy)f, std::move(b));
 }
 
 void NetworkInterface::start() {

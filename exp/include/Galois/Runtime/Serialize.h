@@ -90,6 +90,8 @@ public:
     start = 2*sizeof(void*);
   }
 
+  SerializeBuffer(SerializeBuffer&& rhs) = default;  //disable copy constructor
+
   inline explicit SerializeBuffer(DeSerializeBuffer&& buf);
 
   SerializeBuffer(const char* d, unsigned len) : bufdata(d, d+len), start(0) {}
@@ -138,6 +140,7 @@ class DeSerializeBuffer {
 public:
 
   DeSerializeBuffer() :offset(0) {}
+  DeSerializeBuffer(DeSerializeBuffer&&) = default; //disable copy constructor
 
   explicit DeSerializeBuffer(int count) {
     offset = 0;
@@ -151,6 +154,8 @@ public:
     bufdata.swap(buf.bufdata);
     offset = buf.start;
   }
+
+  DeSerializeBuffer& operator=(DeSerializeBuffer&& buf) = default;
 
   void reset(int count) {
     offset = 0;
