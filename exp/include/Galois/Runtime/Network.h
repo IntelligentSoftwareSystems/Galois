@@ -103,6 +103,7 @@ public:
   //! send a top level loop item (executed in the top level event loop)
   //! FIXME: Why does this exist?
   static void sendLoop(uint32_t dest, recvFuncTy recv, SendBuffer& buf);
+  unsigned long reportSendBytes();
 };
 
 NetworkInterface& getSystemNetworkInterface();

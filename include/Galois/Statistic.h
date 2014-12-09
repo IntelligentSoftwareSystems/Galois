@@ -70,6 +70,10 @@ public:
     return statname;
   }
 
+  unsigned long getVal() {
+    return *val.getLocal();
+  }
+
   Statistic& operator+=(unsigned long v) {
     *val.getLocal() += v;
     return *this;

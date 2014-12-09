@@ -81,6 +81,7 @@ public:
   metadata& getMD(fatPointer ptr, typeHelper* th);
   metadata* getMD_ifext(fatPointer ptr);
   void eraseMD(fatPointer ptr, std::unique_lock<LL::SimpleLock>& mdl);
+  size_t mapSize();
 };
 
 } //namespace detail

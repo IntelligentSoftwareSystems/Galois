@@ -57,6 +57,11 @@ metadata*  detail::MetaHolder<metadata>::getMD_ifext(fatPointer ptr) {
 }
 
 template<typename metadata>
+size_t detail::MetaHolder<metadata>::mapSize(){
+  return md.size();
+}
+
+template<typename metadata>
 void  detail::MetaHolder<metadata>::eraseMD(fatPointer ptr, std::unique_lock<LL::SimpleLock>& mdl) {
   //FIXME: will deadlock
   std::lock_guard<LL::SimpleLock> lg(md_lock);
@@ -625,6 +630,8 @@ void LocalDirectory::makeProgress() {
       else
         addPendingReq(ptr);
     }
+
+  trace("LocalDirectory::makeProgress sendBytes: % , DirSize: % , CMsize: % \n", getSystemNetworkInterface().reportSendBytes(), dir.mapSize(), getCacheManager().CM_size());
   }
 }
 

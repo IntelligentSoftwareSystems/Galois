@@ -88,6 +88,10 @@ void NetworkInterface::reportStats() {
   statSendBytes.report();
 }
 
+unsigned long NetworkInterface::reportSendBytes() {
+  statSendBytes.getVal();
+}
+
 void NetworkInterface::terminate() {
   getSystemNetworkInterface().reportStats();
 
