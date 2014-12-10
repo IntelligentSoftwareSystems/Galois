@@ -266,6 +266,7 @@ int main(int argc, char** argv) {
        std::cout << "Typeinfo " << typeid(Graph::GraphNode).name() <<std::endl;
      */
 
+
     Galois::Runtime::getSystemNetworkInterface().terminate();
     return 0;
 }
