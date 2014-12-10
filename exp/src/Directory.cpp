@@ -630,9 +630,8 @@ void LocalDirectory::makeProgress() {
       else
         addPendingReq(ptr);
     }
-
-  trace("LocalDirectory::makeProgress sendBytes: % , DirSize: % , CMsize: % \n", getSystemNetworkInterface().reportSendBytes(), dir.mapSize(), getCacheManager().CM_size());
   }
+  trace("LocalDirectory::makeProgress sendBytes: % , DirSize: % , CMsize: % \n", getSystemNetworkInterface().reportSendBytes(), dir.mapSize(), getCacheManager().CM_size());
 }
 
 void LocalDirectory::dump() {

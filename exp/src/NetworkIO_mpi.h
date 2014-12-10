@@ -101,7 +101,7 @@ public:
       assert(nbytes != MPI_UNDEFINED);
       std::vector<char> d(nbytes);
       rv = MPI_Recv(d.data(), nbytes, MPI_BYTE, status.MPI_SOURCE, status.MPI_TAG, MPI_COMM_WORLD, &status);
-      printBuffer(true, _ID, status.MPI_SOURCE, d);
+      //printBuffer(true, _ID, status.MPI_SOURCE, d);
       handleError(rv);
       bool urg = status.MPI_TAG;
       inq.push_back(message{static_cast<uint32_t>(status.MPI_SOURCE), std::move(d), urg});
@@ -136,7 +136,7 @@ public:
     assert(!q.inflight);
     q.inflight = true;
     q.m = std::move(m);
-    printBuffer(false, _ID, m.dest, q.m.data);
+    //printBuffer(false, _ID, m.dest, q.m.data);
     int rv = MPI_Isend(q.m.data.data(), q.m.data.size(), MPI_BYTE, q.m.dest, q.m.urgent, MPI_COMM_WORLD, &q.cur);
     handleError(rv);
   }

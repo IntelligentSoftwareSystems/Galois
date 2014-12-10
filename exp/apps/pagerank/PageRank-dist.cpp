@@ -28,7 +28,7 @@
 #include "Galois/Graph/FileGraph.h"
 #include "Galois/Graphs/LC_Dist_InOut_Graph.h"
 #include "Galois/Bag.h"
-
+#include "Galois/Runtime/Context.h"
 
 #include "Lonestar/BoilerPlate.h"
 
@@ -51,7 +51,7 @@ struct LNode {
     unsigned int nout;
     LNode() : value(1.0), nout(0) {}
     float getPageRank() { return value; }
-    
+
    typedef int  tt_is_copyable;
 };
 
@@ -171,7 +171,7 @@ int main(int argc, char** argv) {
 
     Galois::Timer timerLoad;
     timerLoad.start();
-    
+
     //allocate local computation graph and Reading from the inputFile using FileGraph
     //NOTE: We are computing in edges on the fly and then using then in Graph construction.
     Graph::pointer g;
@@ -189,9 +189,9 @@ int main(int argc, char** argv) {
               unsigned dst = fg.getEdgeDst(ii);
               //std::cout << dst << " , " ;
               if(dst >= In_counts.size()) {
-                // +1 is imp because vec.resize makes sure new vec can hold dst entries so it 
+                // +1 is imp because vec.resize makes sure new vec can hold dst entries so it
                 // will not have vec[dst] which is (dst+1)th entry!!
-                In_counts.resize(dst+1); 
+                In_counts.resize(dst+1);
               }
               In_counts[dst]+=1;
           }
@@ -206,6 +206,14 @@ int main(int argc, char** argv) {
       std::cout << "size of counts : " << counts.size() << "\n";
       g = Graph::allocate(counts, In_counts);
 
+      //HACK: prefetch all the nodes. For Blocking serial code.
+      int nodes_check = 0;
+      for (auto N = g->begin(); N != g->end(); ++N) {
+        ++nodes_check;
+        Galois::Runtime::prefetch(*N);
+      }
+      std::cout<<"Nodes_check = " << nodes_check << "\n";
+
       for (unsigned x = 0; x < counts.size(); ++x) {
         auto fgn = *(fg.begin() + x);
         auto gn = *(g->begin() + x);
@@ -217,7 +225,6 @@ int main(int argc, char** argv) {
           g->addEdge(gn, *(g->begin() + dst), val, Galois::MethodFlag::SRC_ONLY);
           g->addInEdge(*(g->begin() + dst),gn, val, Galois::MethodFlag::SRC_ONLY);
         }
-              //std::cout << "\n";
     }
 
   }
@@ -232,9 +239,6 @@ int main(int argc, char** argv) {
 
     InitializeGraph::go(g);
 
-    //auto N_n = *(g->begin() + 67);
-    //LNode& n = g->at(N_n);
-    //std::cout << "n.out : " << n.nout << "\n";
     timerInit.stop();
     std::cout << "Graph Initialization: " << timerInit.get() << " ms\n";
 
@@ -246,43 +250,23 @@ int main(int argc, char** argv) {
     PageRank::go(g);
 
     timerPR.stop();
+
     std::cout << "Page Rank: " << timerPR.get() << " ms\n";
+    //HACK: prefetch all the nodes. For Blocking serial code.
+    int nodes_check = 0;
+    for (auto N = g->begin(); N != g->end(); ++N) {
+      ++nodes_check;
+      Galois::Runtime::prefetch(*N);
+    }
+    std::cout<<"Nodes_check = " << nodes_check << "\n";
     std::cout << "Total Page Rank: " << compute_total_rank(g) << "\n";
 
- /* 
-   std::cout << "size = " << g->size() <<std::endl;
-   std::cout << "Typeinfo " << typeid(Graph::GraphNode).name() <<std::endl;
+    /*
+       std::cout << "size = " << g->size() <<std::endl;
+       std::cout << "Typeinfo " << typeid(Graph::GraphNode).name() <<std::endl;
+     */
 
-/////Checking Graph /////
-   //for (auto ii = g->begin(), ee = g->end(); ii != ee; ++ii) {
-   	auto N = *(g->begin() + 0);
-	auto N_1 = *(g->begin() + 1);
-	auto N_9 = *(g->begin() + 9);
-	
-	LNode& data_1 = g->at(N_1);
-	data_1.value = 10;
-
-	LNode& data_9 = g->at(N_9);
-	data_9.value = 19;
-*/	
-/*	for (auto jj = g->in_edge_begin(N), ej = g->in_edge_end(N); jj != ej; ++jj) {
-	    std::cout << "Inside : ";
-	    GNode dst = g->dst(jj);
-	    LNode& data = g->at(dst);
-	    data.value = 9;
-	    //std::cout << data.value << "\n";
-	}
-*/
-/*	for (auto jj = g->in_edge_begin(N), ej = g->in_edge_end(N); jj != ej; ++jj) {
-	    std::cout << "Inside2 : ";
-	    GNode dst = g->dst(jj);
-	    LNode& data = g->at(dst);
-	    std::cout << data.value << "\n";
-	}
-*/ 
-//    }
-       // typedef Galois::WorkList::dChunkedFIFO<512> WL;
-       Galois::Runtime::getSystemNetworkInterface().terminate();
+    Galois::Runtime::getSystemNetworkInterface().terminate();
     return 0;
 }
 
