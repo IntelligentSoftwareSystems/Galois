@@ -136,7 +136,8 @@ class NetworkInterfaceRouted : public NetworkInterface {
 
   std::vector<dataBuffer> sendData;
   dataBuffer recvData;
-  std::atomic<int> quit;
+  std::atomic<bool> quit;
+  std::atomic<bool> ready;
   std::thread worker;
 
   bool isRouter() const {
@@ -194,6 +195,7 @@ class NetworkInterfaceRouted : public NetworkInterface {
       //hack
       sendData[Num].urgent |= m.urgent;
     }
+    assert(mesq.empty());
   }
 
   void workerThread() {
@@ -203,8 +205,9 @@ class NetworkInterfaceRouted : public NetworkInterface {
       ID = bio.ID();
       decltype(sendData) v(Num+1);
       sendData.swap(v);
-      quit = 0;
       uint32_t bias = 0;
+
+      ready = true;
       
       //loop
       while (!quit) {
@@ -216,20 +219,24 @@ class NetworkInterfaceRouted : public NetworkInterface {
         }
       }
     } //destroy bio before acking quit
-    quit = 2;
   }
+
 
 public:
   using NetworkInterface::ID;
   using NetworkInterface::Num;
 
-  NetworkInterfaceRouted() :quit(1), worker(&NetworkInterfaceRouted::workerThread, this) {
-    while (quit) {}
+  NetworkInterfaceRouted() :quit(false), ready(false) {}
+
+  void go() {
+    if (!ready) {
+      worker = std::thread(&NetworkInterfaceRouted::workerThread, this);
+      while (!ready) {};
+    }
   }
 
   virtual ~NetworkInterfaceRouted() {
     quit = 1;
-    while (quit <= 1) {}
     worker.join();
   }
 
@@ -251,12 +258,12 @@ public:
     recvData.lock.lock();
     if (!recvData.pending.empty()) {
       rmessage& m = recvData.pending.front();
-      retval = !recvData.pending.empty();
       assert(m.buf.size());
       recvFuncTy f;
       uintptr_t fp;
       DeSerializeBuffer buf(std::move(m.buf));
       recvData.pending.pop_front();
+      retval = !recvData.pending.empty();
       delete(&m);
       recvData.lock.unlock(); //FIXME: think about locking for message deliver order
       assert(buf.size());
@@ -278,6 +285,8 @@ public:
 #ifdef USE_ROUTED_MPI
 NetworkInterface& Galois::Runtime::getSystemNetworkInterface() {
   static NetworkInterfaceRouted<NetworkIOMPI> net;
+  net.go();
+  //FIXME: Hack, run the router
   while (net.ID == net.Num) {};
   return net;
 }
