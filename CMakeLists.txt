@@ -231,7 +231,7 @@ include_directories(${Boost_INCLUDE_DIR})
 #more warnings
 if(CMAKE_BUILD_TYPE MATCHES "Debug")
   if(NOT CMAKE_CXX_COMPILER_ID MATCHES "XL")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -fsanitize=address")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall") #xs -fsanitize=address")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
   endif()
 endif()
