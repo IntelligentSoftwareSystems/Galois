@@ -19,14 +19,14 @@ static cll::opt<ExecType> execType (
     cll::init (CHROMATIC));
 
 
-struct NodeData: public Galois::Runtime::InputDAGdata, PData {
+struct NodeData: public Galois::Runtime::InputDAGdataInOut, PData {
 
   NodeData (void)
-    : Galois::Runtime::InputDAGdata (0), PData ()
+    : Galois::Runtime::InputDAGdataInOut (0), PData ()
   {}
 
   NodeData (unsigned id, unsigned outdegree)
-    : Galois::Runtime::InputDAGdata (id), PData (outdegree)
+    : Galois::Runtime::InputDAGdataInOut (id), PData (outdegree)
   {}
 
 

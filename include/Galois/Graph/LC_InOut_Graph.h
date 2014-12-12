@@ -181,6 +181,16 @@ public:
     }
   }
 
+  template <typename F>
+  ptrdiff_t partition_in_neighbors (GraphNode N, const F& func) {
+
+    if (!asymmetric) {
+      return Super::partition_neighbors (N, func);
+    } else {
+      return inGraph.partition_neighbors (N, func);
+    }
+  }
+
   detail::InEdgesIterator<LC_InOut_Graph> in_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     return detail::InEdgesIterator<LC_InOut_Graph>(*this, N, mflag);
   }

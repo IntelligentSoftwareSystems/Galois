@@ -240,6 +240,16 @@ public:
     std::sort(edge_sort_begin(N), edge_sort_end(N), comp);
   }
 
+
+  template <typename F>
+  ptrdiff_t partition_neighbors (GraphNode N, const F& func) {
+
+    auto beg = &edgeDst[*raw_begin (N)];
+    auto end = &edgeDst[*raw_end (N)];
+    auto mid = std::partition (beg, end, func);
+    return (mid - beg);
+  }
+
   void allocateFrom(FileGraph& graph) {
     numNodes = graph.size();
     numEdges = graph.sizeEdges();
