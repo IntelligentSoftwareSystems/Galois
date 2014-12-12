@@ -36,6 +36,6 @@ int main(int argc, char** argv) {
   while (num < trials * (net.Num - 1)) { net.handleReceives(); }
   getSystemBarrier().wait();
   T.stop();
-  std::cerr << "\n*" << net.ID << " " << T.get() << "!\n";
+  std::cerr << "\n*" << net.ID << " " << T.get() << "!" << num << "\n";
   return 0;
 }

@@ -101,7 +101,7 @@ struct PageRank {
 
     void operator() (GNode src, Galois::UserContext<GNode>& cnx) const {
       double sum = 0;
-      LNode& n = g->at(src);
+      LNode& sdata = g->at(src);
       //std::cout << "n :" << n.nout <<"\n";
       for (auto jj = g->in_edge_begin(src, Galois::MethodFlag::ALL), ej = g->in_edge_end(src, Galois::MethodFlag::SRC_ONLY); jj != ej; ++jj) {
         GNode dst = g->dst(jj, Galois::MethodFlag::SRC_ONLY);
@@ -109,7 +109,6 @@ struct PageRank {
         sum += ddata.value / ddata.nout;
       }
       float value = (1.0 - alpha) * sum + alpha;
-      LNode&  sdata = g->at(src, Galois::MethodFlag::SRC_ONLY);
       float diff = std::fabs(value - sdata.value);
       if (diff > TOLERANCE) {
         sdata.value = value;

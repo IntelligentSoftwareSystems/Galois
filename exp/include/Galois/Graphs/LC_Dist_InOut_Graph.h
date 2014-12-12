@@ -39,7 +39,7 @@ namespace Galois {
         struct EdgeImplTy;
 
         struct NodeImplTy :public Runtime::Lockable {
-          NodeImplTy(EdgeImplTy* start, unsigned len, EdgeImplTy* In_start, unsigned len_inEdges) :b(start), e(start), len(len), remote(false), b_inEdges(In_start), e_inEdges(In_start), len_inEdges(len_inEdges)
+          NodeImplTy(EdgeImplTy* start, unsigned len, EdgeImplTy* In_start, unsigned len_inEdges) :b(start), e(start), len(len), b_inEdges(In_start), e_inEdges(In_start), len_inEdges(len_inEdges), remote(false)
           {}
           ~NodeImplTy() {
             if (remote) {
