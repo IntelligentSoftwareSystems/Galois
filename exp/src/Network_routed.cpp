@@ -51,9 +51,11 @@ class NetworkInterfaceRouted : public NetworkInterface {
       :time(std::chrono::high_resolution_clock::now()), dest(d), buf(data, len) {}
   };
 
+  typedef boost::intrusive::list<rmessage> msgListTy;
+
   struct dataBuffer {
     Galois::Runtime::LL::SimpleLock lock;
-    boost::intrusive::list<rmessage> pending;
+    msgListTy pending;
     unsigned bytes;
     std::atomic<int> urgent;
 
@@ -87,35 +89,8 @@ class NetworkInterfaceRouted : public NetworkInterface {
       return retval;
     }
 
-    static boost::intrusive::list<rmessage> emptyBuffer(const std::vector<char>& data) {
-      boost::intrusive::list<rmessage> retval;
-      unsigned sz = 0;
-      while (sz < data.size()) {
-        uint32_t dest, psize;
-        char* src = (char*)&dest;
-        std::copy_n(&data[sz], sizeof(dest), src);
-        src = (char*)&psize;
-        sz += sizeof(dest);
-        std::copy_n(&data[sz], sizeof(psize), src);
-        sz += sizeof(psize);
-        assert(psize);
-        rmessage* im = new rmessage{dest, &data[sz], psize};
-        retval.push_back(*im);
-        sz += psize;
-      }
-      assert(sz == data.size());
-      return retval;
-    }
-
     bool empty() {
       return pending.empty();
-    }
-
-    std::chrono::high_resolution_clock::time_point oldest() {
-      if (pending.empty())
-        return std::chrono::high_resolution_clock::now();
-      else
-        return pending.front().time;
     }
 
     bool ready() {
@@ -134,8 +109,31 @@ class NetworkInterfaceRouted : public NetworkInterface {
     }
   };
 
+
+  static msgListTy emptyBuffer(const std::vector<char>& data) {
+    msgListTy retval;
+    unsigned sz = 0;
+    while (sz < data.size()) {
+      uint32_t dest, psize;
+      char* src = (char*)&dest;
+      std::copy_n(&data[sz], sizeof(dest), src);
+      src = (char*)&psize;
+      sz += sizeof(dest);
+      std::copy_n(&data[sz], sizeof(psize), src);
+      sz += sizeof(psize);
+      assert(psize);
+      rmessage* im = new rmessage{dest, &data[sz], psize};
+      retval.push_back(*im);
+      sz += psize;
+    }
+    assert(sz == data.size());
+    return retval;
+  }
+
+
   std::vector<dataBuffer> sendData;
-  dataBuffer recvData;
+  LL::SimpleLock recvLock;
+  msgListTy recvData;
   std::atomic<bool> quit;
   std::atomic<bool> ready;
   std::thread worker;
@@ -149,7 +147,7 @@ class NetworkInterfaceRouted : public NetworkInterface {
     if (!isRouter())
       rdest = Num;
     auto& sd = sendData[rdest];
-    std::lock_guard<Galois::Runtime::LL::SimpleLock> lg(sd.lock);
+    std::lock_guard<LL::SimpleLock> lg(sd.lock);
     rmessage* m = new rmessage(dest, std::move(buf));
     sd.pending.push_back(*m);
     sd.bytes += sd.pending.back().size() + sizeof(uint32_t);
@@ -157,8 +155,8 @@ class NetworkInterfaceRouted : public NetworkInterface {
   
   void trySendPacket(BaseIO& bio, uint32_t dest, dataBuffer& sd)
   {
+    std::lock_guard<LL::SimpleLock> lg(sd.lock);
     if (sd.ready() && bio.readySend(dest)) {
-      std::lock_guard<LL::SimpleLock> lg(sd.lock);
       bool urg;
       auto d = sd.createBuffer(urg);
       assert(!d.empty());
@@ -179,7 +177,7 @@ class NetworkInterfaceRouted : public NetworkInterface {
   }
 
   void recvPacket(const typename BaseIO::message& m) {
-    auto mesq = dataBuffer::emptyBuffer(m.data);
+    msgListTy mesq = emptyBuffer(m.data);
     if (isRouter()) { //don't need locks, only one thread
       while (!mesq.empty()) {
         auto& im = mesq.front();
@@ -190,10 +188,13 @@ class NetworkInterfaceRouted : public NetworkInterface {
         sd.urgent |= m.urgent;
       }
     } else {
-      std::lock_guard<LL::SimpleLock>(recvData.lock);
-      recvData.pending.splice(recvData.pending.end(), mesq);
+      std::lock_guard<LL::SimpleLock> lg(recvLock);
+      //std::cerr << mesq.size() << " ";
+      recvData.splice(recvData.end(), mesq);
+      //std::cerr << mesq.size() << "\n";
       //hack
       sendData[Num].urgent |= m.urgent;
+      assert(mesq.empty());
     }
     assert(mesq.empty());
   }
@@ -255,17 +256,16 @@ public:
 
   virtual bool handleReceives() {
     bool retval = false;
-    recvData.lock.lock();
-    if (!recvData.pending.empty()) {
-      rmessage& m = recvData.pending.front();
+    std::lock_guard<LL::SimpleLock> lg(recvLock);
+    if (!recvData.empty()) {
+      rmessage& m = recvData.front();
+      recvData.pop_front();
       assert(m.buf.size());
       recvFuncTy f;
       uintptr_t fp;
       DeSerializeBuffer buf(std::move(m.buf));
-      recvData.pending.pop_front();
-      retval = !recvData.pending.empty();
+      retval = !recvData.empty();
       delete(&m);
-      recvData.lock.unlock(); //FIXME: think about locking for message deliver order
       assert(buf.size());
       gDeserialize(buf,fp);
       assert(fp);
@@ -273,8 +273,6 @@ public:
       //      std::cerr << "r";
       //Call deserialized function
       f(buf);
-    } else {
-      recvData.lock.unlock();
     }
     return retval;
   }
