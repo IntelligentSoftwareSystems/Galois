@@ -248,6 +248,7 @@ class StupidDistBarrier : public Galois::Runtime::Barrier {
   std::atomic<int> count;
 
   static void barrierLandingPad() {
+    //std::cout << "inside barrierLandingpad , count : " << getDistBarrier().count << "\n";
     --getDistBarrier().count;
   }
 
