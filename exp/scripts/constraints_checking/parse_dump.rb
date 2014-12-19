@@ -98,8 +98,9 @@ def open_files(filename)
   return array
 end #open_files
 
-# Main program to check all the constraints
-def constraint_checking
+# Functions to check all the constraints
+# CHECK 1 : If local dir has given some object, remote dir must know about that object.
+def local_to_remote_check
   #checking locals are consistent with remotes
   obj_ptr_re = /\[\d{1},(.*)\]/
   locRW_re = /\locRW\:(.?)\,/
@@ -107,24 +108,59 @@ def constraint_checking
   count = 0
   $arr_local_store.each do |local_file|
     local_file.each do |line|
-      obj_ptr = line.match(obj_ptr_re)
-      remote_host = line.match(locRW_re)
-      recalled_for = line.match(recalled_re)
+      unless line.chomp.empty?
+        obj_ptr = line.match(obj_ptr_re)
+        remote_host = line.match(locRW_re)
+        recalled_for = line.match(recalled_re)
 
-      #check if remote host knows about this obj_ptr
-      if !remote_host[1].eql?"" and recalled_for[1].eql?""
-        found = false
-        $arr_remote_store[remote_host[1].to_i].each do |r_line|
-          if r_line.include? obj_ptr[1]
-            found = true
+        #check if remote host knows about this obj_ptr
+        if !remote_host[1].eql?"" and recalled_for[1].eql?""
+          found = false
+          $arr_remote_store[remote_host[1].to_i].each do |r_line|
+            if r_line.include? obj_ptr[1]
+              found = true
+            end
+          end
+          if !found
+            p "OMG! #{count} gave its object #{obj_ptr[1]} to #{remote_host[1]}, but it doesn't seem to know about it"
           end
         end
-        if !found 
-          p "OMG! #{count} gave its object #{obj_ptr[1]} to #{remote_host[1]}, but it doesn't seem to know about it"
-        end
-
       end
     end
+    count = count + 1
+  end
+end
+
+#CHECK 2: If obj in local dir and has a reqsRW, then remote must have contented for that obj.
+def local_reqsRW_remote_contended
+  obj_ptr_re = /\[\d{1},(.*)\]/
+  reqsRW_re = /reqsRW:\<(.*)\>/
+  contended_re = /contended\:(.?)\,/
+  count = 0
+  $arr_local_store.each do |local_file|
+    local_file.each do |line|
+      unless line.chomp.empty?
+        obj_ptr = line.match(obj_ptr_re)
+        reqsRW = line.match(reqsRW_re)
+        reqs_arr = reqsRW[1].split(/,/)
+        reqs_arr.size.times do |i|
+          found = false
+          $arr_remote_store[reqs_arr[i].to_i].each do |r_line|
+            if r_line.include? obj_ptr[1]
+              found = true
+              contended = r_line.match(contended_re)
+              if contended[1].to_i == 0
+                p "OMG! #{count} has received a request, for object #{obj_ptr[1]} from #{reqs_arr[i].to_i}, but its not conteneded there"
+              end
+            end
+          end
+          if !found and !count.eql?reqs_arr[i].to_i
+              p "OMG! #{count} has received a request, for object #{obj_ptr[1]} from #{reqs_arr[i].to_i}, but remote dir at this host doesn't know"
+            end
+        end
+      end
+    end
+    count = count + 1
   end
 end
 
@@ -132,8 +168,10 @@ options = OptParserClass.parse(ARGV)
 check_opts(options)
 p options.t.class
 construct_fileNames(options)
-constraint_checking
-
+#
+######constraint_checking
+local_to_remote_check
+local_reqsRW_remote_contended
 #host_0_local =
 ##
 #
