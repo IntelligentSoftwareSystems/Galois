@@ -20,7 +20,7 @@
  *
  * @section Description
  *
- * Implementation of the Galois foreach iterator. Includes various 
+ * Implementation of the Galois foreach iterator. Includes various
  * specializations to operators to reduce runtime overhead.
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
@@ -48,6 +48,8 @@
 #include <memory>
 #include <chrono>
 #include <iostream>
+#include <ctime>
+#include <cstdlib>
 
 namespace Galois {
 //! Internal Galois functionality - Use at your own risk.
@@ -55,7 +57,7 @@ namespace Runtime {
 
 namespace {
 
-template<bool Enabled> 
+template<bool Enabled>
 class LoopStatistics {
   unsigned long conflicts;
   unsigned long iterations;
@@ -435,7 +437,8 @@ protected:
     //To dump when no progress is made by host 0 for 1 second
     using namespace std::chrono;
     auto t1 = high_resolution_clock::now();
-    double time_noProg = 1; //seconds
+    double time_noProg = 5; //seconds
+    int count_dump = 0;
 
     bool didWork;
     while (true) {
@@ -457,12 +460,13 @@ protected:
 
         // check if made no progress while !hiddenWork.empty()
         NetworkInterface& net = getSystemNetworkInterface();
-        if (net.ID == 0) {
+        //if (net.ID == 0) {
           auto t2 = high_resolution_clock::now();
           duration<double> time_span = duration_cast<duration<double>>(t2 - t1);
+          //std::cout << std::boolalpha << "didwork : " << didWork << "hiddenwork : " << aborted.hiddenWork() << "\n";
           if (!didWork && aborted.hiddenWork()) {
 
-            std::cout << "no progress being made!!!! for :" << time_span.count()<<" sec" << std::endl;
+            std::cout << "on Host : " << net.ID <<" no progress being made!!!! for :" << time_span.count()<<" sec" << std::endl;
 
             if (time_span.count() >= time_noProg) {
               for (int dest = 0; dest < net.Num; ++dest) {
@@ -478,10 +482,11 @@ protected:
               net.handleReceives();
             }
           }else{
-            std::cout <<" Host: " << net.ID <<"reseting t1" << std::endl;
+            std::cout << std::boolalpha <<" on Host : " << net.ID <<" didwork : " << didWork << " hiddenwork : " << aborted.hiddenWork() << "\n";
+            //std::cout <<" Host: " << net.ID <<"reseting t1" << std::endl;
             t1 = high_resolution_clock::now(); // reset t1
           }
-        }
+        //}
 
         if (dump_now) {
           // Let them all finish there work before they start dumping dir data to a file.
@@ -489,15 +494,17 @@ protected:
 
           getSystemBarrier().wait();
 
-          std::cout << "First barrier : on host: " << getSystemNetworkInterface().ID << " Total NUM : " << getSystemNetworkInterface().Num <<"\n";
+          //std::time_t timestamp = std::time(0);
+
+          //std::cout << "First barrier : on host: " << getSystemNetworkInterface().ID << " Total NUM : " << getSystemNetworkInterface().Num <<"\n";
           //////Dump Local Dir md data to a file///////
-          std::string localFileName = "dump_local_" + std::to_string(getSystemNetworkInterface().ID) + ".txt";
+          std::string localFileName = "dump_local_" + std::to_string(getSystemNetworkInterface().ID) + "_" + std::to_string(count_dump) + ".txt";
           std::ofstream outfile_local (localFileName);
           getLocalDirectory().dump(outfile_local);
           ///////Local Dump Ends//////////////////
 
           //////Dump Remote Dir md data to a file///////
-          std::string remoteFileName = "dump_remote_" + std::to_string(getSystemNetworkInterface().ID) + ".txt";
+          std::string remoteFileName = "dump_remote_" + std::to_string(getSystemNetworkInterface().ID) + "_" + std::to_string(count_dump) +".txt";
           std::ofstream outfile_remote (remoteFileName);
           getRemoteDirectory().dump(outfile_remote);
           ///////Remote Dump Ends//////////////////
@@ -507,6 +514,7 @@ protected:
           outfile_remote.close();
 
           dump_now = false;
+          ++count_dump;
           getSystemBarrier().wait();
           t1 = high_resolution_clock::now(); // reset t1
 
