@@ -546,7 +546,7 @@ void LocalDirectory::considerObject(metadata& md, fatPointer ptr, std::unique_lo
       }
       md.recalled = p.first;
     }
-    return;   
+    return;
   }
 
   //Object is here
@@ -571,6 +571,9 @@ void LocalDirectory::considerObject(metadata& md, fatPointer ptr, std::unique_lo
     }
     for (auto& fn : nl)
       fn(ptr); //FIXME: md lock held
+
+  trace("LocalDirectory::considerObject 2 After fn(ptr) % has dest % RW % md %\n", ptr, p.first, p.second, md);
+
   } else if (p.first != ~0) {
     auto foo = NetworkInterface::ID;
     if (!dirOwns(obj)) {
@@ -594,10 +597,13 @@ void LocalDirectory::considerObject(metadata& md, fatPointer ptr, std::unique_lo
   }
 
   p = md.getNextDest();
+  trace("LocalDirectory::considerObject 3 % has dest % RW % md.locRW % md.locRO % md.ishere % md %\n", ptr, p.first, p.second, md.locRW, md.locRW, md.isHere(), md);
   if (p.first == ~0 && !md.contended && md.isHere())
     dir.eraseMD(ptr, lg);
-  else if (p.first != ~0 && !md.isHere())
+  else if (p.first != ~0 && !md.isHere()) {
+    trace("LocalDirectory::considerObject 4 inside else if % has dest % RW % md %\n", ptr, p.first, p.second, md);
     considerObject(md, ptr, lg);
+  }
 }
 
 // void LocalDirectory::forwardRequest(metadata& md, fatPointer ptr) {
@@ -664,7 +670,7 @@ void LocalDirectory::makeProgress() {
         addPendingReq(ptr);
     }
   }
-  trace("LocalDirectory::makeProgress sendBytes: % , DirSize: % , CMsize: % \n", getSystemNetworkInterface().reportSendBytes(), dir.mapSize(), getCacheManager().CM_size());
+  //trace("LocalDirectory::makeProgress sendBytes: % , DirSize: % , CMsize: % \n", getSystemNetworkInterface().reportSendBytes(), dir.mapSize(), getCacheManager().CM_size());
 }
 
 void LocalDirectory::dump() {

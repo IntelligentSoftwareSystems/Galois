@@ -164,6 +164,33 @@ def local_reqsRW_remote_contended
   end
 end
 
+#CHECK 3: Obj is present locally, its not contented, and there is request for it, but its not given.
+def not_contended_with_reqs
+  obj_ptr_re = /\[\d{1},(.*)\]/
+  reqsRW_re = /reqsRW:\<(.*)\>/
+  locRW_re = /\locRW\:(.?)\,/
+  contended_re = /contended\:(.?)\,/
+  count = 0
+  $arr_local_store.each do |local_file|
+    local_file.each do |line|
+      unless line.chomp.empty?
+        obj_ptr = line.match(obj_ptr_re)
+        lockRW = line.match(locRW_re)
+        reqsRW = line.match(reqsRW_re)
+        reqs_arr = reqsRW[1].split(/,/)
+        contended = line.match(contended_re)
+        #if lockRW is empty, it should be contended locally
+        if lockRW[1].eql?"" and reqs_arr.size > 0
+          if contended[1].to_i == 0
+            p "OMG! #{count} has an object #{obj_ptr} , which is needed by remote hosts #{reqs_arr} and is not locally contended"
+          end
+        end
+      end
+    end
+    count = count + 1
+  end
+end
+
 options = OptParserClass.parse(ARGV)
 check_opts(options)
 p options.t.class
@@ -172,6 +199,7 @@ construct_fileNames(options)
 ######constraint_checking
 local_to_remote_check
 local_reqsRW_remote_contended
+not_contended_with_reqs
 #host_0_local =
 ##
 #
