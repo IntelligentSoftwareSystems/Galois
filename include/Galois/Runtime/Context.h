@@ -165,8 +165,10 @@ inline bool prefetch(gptr<T> ptr, Galois::MethodFlag m = MethodFlag::ALL) {
   if (!obj) {
     //FIXME Better resolve flag
     getRemoteDirectory().fetch<T>(static_cast<fatPointer>(ptr), ResolveFlag::RW);
+    //getRemoteDirectory().makeProgress();
   } else if (LockManagerBase::isAcquiredAny(obj)) {
     getLocalDirectory().fetch<T>(static_cast<fatPointer>(ptr), ResolveFlag::RW);
+    //getLocalDirectory().makeProgress();
   } else {
     return true;
   }

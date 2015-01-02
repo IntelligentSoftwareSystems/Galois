@@ -198,6 +198,11 @@ class LocalDirectory : public BaseDirectory {
       return locRW == ~0 && locRO.empty();
     }
 
+    //Returns if object is present and there are no RO replicas and is contended
+    bool isHere_contended() const {
+      return locRW == ~0 && locRO.empty() && contended;
+    }
+
     //Returns if object has RO replicas and hasn't been recalled
     bool isRO() const {
       return recalled == ~0 && !locRO.empty();
@@ -279,12 +284,14 @@ public:
   //! initiate, if necessary, a fetch of a remote object
   template<typename T>
   void fetch(fatPointer ptr, ResolveFlag flag) {
+    trace("LocalDir::fetch with setCont : false FFFFFFFFFFFF : %\n", ptr);
     fetchImpl(ptr, flag, typeHelperImpl<T>::get(), false);
   }
 
   //! engage priority protocol for ptr.  May issue fetch
   template<typename T>
   void setContended(fatPointer ptr, ResolveFlag flag) {
+    trace("LocalDir::setContended with setCont : true TTTTTTTTTT : %\n", ptr);
     fetchImpl(ptr, flag, typeHelperImpl<T>::get(), true);
   }
   //! unengage priority protocol for ptr.  May send object away

@@ -177,6 +177,7 @@ void RemoteDirectory::considerObject(metadata& md, fatPointer ptr, std::unique_l
     md.th->request(ptr.getHost(), ptr, NetworkInterface::ID, INV);
     if (act == INV) {
       //erase metadata
+      trace("RD::ConsiderObject % md %\n", ptr, md);
       dir.eraseMD(ptr, lg);
     } else {
       //refetch
@@ -187,8 +188,9 @@ void RemoteDirectory::considerObject(metadata& md, fatPointer ptr, std::unique_l
     if (tryWriteBack(md, ptr, lg)) {
       if (md.doWriteBack())
         fetchImpl(md, ptr, RW, md.th, false, lg); // contended still set
-      else
+      else {
         dir.eraseMD(ptr, lg);
+      }
     } else {
       //wasn't able to write back, locking problems, defer
       addPendingReq(ptr);
@@ -598,9 +600,12 @@ void LocalDirectory::considerObject(metadata& md, fatPointer ptr, std::unique_lo
 
   p = md.getNextDest();
   trace("LocalDirectory::considerObject 3 % has dest % RW % md.locRW % md.locRO % md.ishere % md %\n", ptr, p.first, p.second, md.locRW, md.locRW, md.isHere(), md);
-  if (p.first == ~0 && !md.contended && md.isHere())
+  if (p.first == ~0 && !md.contended && md.isHere()) {
+    trace("LocalDirectory::considerObject 3.5 EraseMD % has dest % RW % md.locRW % md.locRO % md.ishere % md %\n", ptr, p.first, p.second, md.locRW, md.locRW, md.isHere(), md);
     dir.eraseMD(ptr, lg);
+  }
   else if (p.first != ~0 && !md.isHere()) {
+  //else if (p.first != ~0 && !md.contended) {
     trace("LocalDirectory::considerObject 4 inside else if % has dest % RW % md %\n", ptr, p.first, p.second, md);
     considerObject(md, ptr, lg);
   }

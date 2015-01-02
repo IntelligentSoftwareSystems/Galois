@@ -51,6 +51,9 @@
 #include <ctime>
 #include <cstdlib>
 
+//for debugging
+//#define dump_no_prog 0
+
 namespace Galois {
 //! Internal Galois functionality - Use at your own risk.
 namespace Runtime {
@@ -292,6 +295,7 @@ public:
       auto ptr = pr->second;
       assert(waiting_on.count(ptr) == 0);
       if (ptr.isLocal()) {
+        trace("Local Commit: for %\n", ptr);
         getLocalDirectory().clearContended(ptr);
       } else {
         getRemoteDirectory().clearContended(ptr);
@@ -438,7 +442,7 @@ protected:
     using namespace std::chrono;
     auto t1 = high_resolution_clock::now();
     double time_noProg = 1; //seconds
-    double time_noProg_host1 = 700; //seconds
+    double time_noProg_host1 = 600; //seconds
     int count_dump = 0;
 
     bool didWork;
@@ -460,6 +464,7 @@ protected:
         doNetworkWork();
 
         // check if made no progress while !hiddenWork.empty()
+    #ifdef dump_no_prog
         NetworkInterface& net = getSystemNetworkInterface();
         if (net.ID == 0) {
           auto t2 = high_resolution_clock::now();
@@ -493,7 +498,7 @@ protected:
 
       //XXX do not know if this is the best way to do it. But after Host 0 is done we
       //need to track host 1
-      if (net.ID == 1) {
+      if (net.ID == 2) {
           auto t2 = high_resolution_clock::now();
           duration<double> time_span = duration_cast<duration<double>>(t2 - t1);
           //std::cout << std::boolalpha << "didwork : " << didWork << "hiddenwork : " << aborted.hiddenWork() << "\n";
@@ -516,8 +521,8 @@ protected:
               net.handleReceives();
             }
           }else{
-            //std::cout << std::boolalpha <<" on Host : " << net.ID <<" didwork : " << didWork << " hiddenwork : " << aborted.hiddenWork() << "\n";
-            //std::cout <<" Host: " << net.ID <<"reseting t1" << std::endl;
+            std::cout << std::boolalpha <<" on Host : " << net.ID <<" didwork : " << didWork << " hiddenwork : " << aborted.hiddenWork() << "\n";
+            std::cout <<" Host: " << net.ID <<"reseting t1" << std::endl;
             t1 = high_resolution_clock::now(); // reset t1
           }
         }
@@ -553,6 +558,7 @@ protected:
           t1 = high_resolution_clock::now(); // reset t1
 
         }
+      #endif
 
       } while (!term.globalTermination() && (!ForEachTraits<FunctionTy>::NeedsBreak || !broke));
 
