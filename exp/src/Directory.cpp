@@ -604,7 +604,7 @@ void LocalDirectory::considerObject(metadata& md, fatPointer ptr, std::unique_lo
     trace("LocalDirectory::considerObject 3.5 EraseMD % has dest % RW % md.locRW % md.locRO % md.ishere % md %\n", ptr, p.first, p.second, md.locRW, md.locRW, md.isHere(), md);
     dir.eraseMD(ptr, lg);
   }
-  else if (p.first != ~0 && !md.isHere()) {
+  else if (p.first != ~0 && !md.isHere_contended()) {
   //else if (p.first != ~0 && !md.contended) {
     trace("LocalDirectory::considerObject 4 inside else if % has dest % RW % md %\n", ptr, p.first, p.second, md);
     considerObject(md, ptr, lg);

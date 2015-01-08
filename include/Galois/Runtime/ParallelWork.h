@@ -498,7 +498,7 @@ protected:
 
       //XXX do not know if this is the best way to do it. But after Host 0 is done we
       //need to track host 1
-      if (net.ID == 2) {
+      if (net.ID == 1) {
           auto t2 = high_resolution_clock::now();
           duration<double> time_span = duration_cast<duration<double>>(t2 - t1);
           //std::cout << std::boolalpha << "didwork : " << didWork << "hiddenwork : " << aborted.hiddenWork() << "\n";
