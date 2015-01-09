@@ -42,17 +42,19 @@ static const char* const url = 0;
 
 namespace cll = llvm::cl;
 static cll::opt<std::string> inputFile (cll::Positional, cll::desc("<input file>"), cll::Required);
-static cll::opt<unsigned int> maxIterations ("maxIterations", cll::desc("Maximum iterations"), cll::init(1));
+static cll::opt<unsigned int> maxIterations ("maxIterations", cll::desc("Maximum iterations"), cll::init(2));
 
 static int TOTAL_NODES;
 
 struct LNode {
-    float value;
-    unsigned int nout;
-    LNode() : value(1.0), nout(0) {}
-    float getPageRank() { return value; }
-    
-   typedef int  tt_is_copyable;
+  float value;
+  std::atomic<float> residual;
+  unsigned int nout;
+  LNode() : value(1.0), nout(0) {}
+  LNode(const LNode& rhs) :value(rhs.value), residual(rhs.residual.load()), nout(rhs.nout) {}
+  float getPageRank() { return value; }
+  
+  typedef int  tt_is_copyable;
 };
 
 typedef Galois::Graph::LC_Dist_InOut<LNode, int> Graph;
@@ -64,6 +66,15 @@ static const double alpha = (1.0 - 0.85);
 
 //! maximum relative change until we deem convergence
 static const double TOLERANCE = 0.1;
+
+template<typename PRTy>
+PRTy atomicAdd(std::atomic<PRTy>& v, PRTy delta) {
+  PRTy old;
+  do {
+    old = v;
+  } while (!v.compare_exchange_strong(old, old + delta));
+  return old;
+}
 
 
 struct InitializeGraph {
@@ -77,7 +88,8 @@ struct InitializeGraph {
 
     void operator()(GNode n, Galois::UserContext<GNode>& cnx) const {
       LNode& data = g->at(n);
-      data.value = 1.0;
+      data.value = 1.0 - alpha;
+      data.residual = 0;
       //Adding Galois::NONE is imp. here since we don't need any blocking locks.
       data.nout = std::distance(g->in_edge_begin(n, Galois::MethodFlag::SRC_ONLY),g->in_edge_end(n, Galois::MethodFlag::SRC_ONLY));	
     }
@@ -121,6 +133,46 @@ struct PageRank {
 
   }
 
+  typedef int tt_is_copyable;
+};
+
+struct PageRankMsg {
+  Graph::pointer g;
+  void static go(Graph::pointer g) {
+    Galois::Timer round_time;
+    for(int iterations = 0; iterations < maxIterations; ++iterations){
+      round_time.start();
+      Galois::for_each_local(g, PageRank{g}, Galois::loopname("Page Rank"));
+      round_time.stop();
+      std::cout<<"Iteration : " << iterations << "  Time : " << round_time.get() << "ms\n";
+    }
+  }
+  
+  void static remoteUpdate(Graph::pointer pr, GNode src, float delta) {
+    auto& lnode = pr->at(src, Galois::MethodFlag::NONE);
+    atomicAdd(lnode.residual, delta);
+  }
+  
+  void operator() (GNode src, Galois::UserContext<GNode>& cnx) const {
+    LNode& sdata = g->at(src);      
+    Galois::MethodFlag lockflag = Galois::MethodFlag::NONE;
+    
+    float oldResidual = sdata.residual.exchange(0.0);
+    sdata.value = sdata.value + oldResidual;
+    float delta = oldResidual*alpha/sdata.nout;
+    // for each out-going neighbors
+    auto& net = Galois::Runtime::getSystemNetworkInterface();
+    for (auto jj = g->edge_begin(src, lockflag), ej = g->edge_end(src, lockflag); jj != ej; ++jj) {
+      GNode dst = g->dst(jj);
+      if (dst.isLocal()) {
+        LNode& ddata = g->at(dst, lockflag);
+        atomicAdd(ddata.residual, delta);
+      } else {
+        net.sendAlt(((Galois::Runtime::fatPointer)dst).getHost(), remoteUpdate, g, dst, delta);
+      }
+    }
+  }
+  
   typedef int tt_is_copyable;
 };
 
