@@ -307,8 +307,8 @@ public:
   typedef NhoodItem<MyType, typename MyType::Comparator> NItem;
   typedef PtrBasedNhoodMgr<NItem> NhoodMgr;
   typedef Galois::GAtomic<bool> AtomicBool;
-  typedef Galois::gdeque<NItem*, 4> NhoodList;
-  // typedef llvm::SmallVector<NItem*, 4> NhoodList;
+  // typedef Galois::gdeque<NItem*, 4> NhoodList;
+  typedef llvm::SmallVector<NItem*, 8> NhoodList;
   // typedef std::vector<NItem*> NhoodList;
 
   // TODO: fix visibility below
