@@ -34,6 +34,7 @@
 
 #include <iostream>
 #include <typeinfo>
+#include <algorithm>
 
 static const char* const name = "Page Rank - Distributed";
 static const char* const desc = "Computes PageRank on Distributed Galois";
@@ -124,32 +125,6 @@ struct PageRank {
   typedef int tt_is_copyable;
 };
 
-/* 
- * collect page rank of all the nodes 
- * */
-
-/*struct compute_total_rank {
-    Graph::pointer g;
-    int total_rank = 0;
-    std::vector<int> a[TOTAL_NODES];
-    
-    void static go(Graph::pointer g) {
-	Galois::for_each_local(g, compute_total_rank(g), Galois::loopname("compute total rank")i);
-    }
-
-    void operator() (GNode n, Galois::UserContext<GNode>& cnx) const {
-	LNode& n = 
-    }
-
-    for(auto ii = g->begin(), ei = g->end(); ii != ei ; ++ii) {
-	//LNode& ddata = g->at(ii, Galois::MethodFlag::SRC_ONLY);
-	//total_rank += ddata.value;
-    }
-
-    
-    //return total_rank;
-};
-*/
 
 int compute_total_rank(Graph::pointer g) {
     int total_rank = 0;
@@ -161,6 +136,85 @@ int compute_total_rank(Graph::pointer g) {
 
 
     return total_rank;
+
+}
+
+/* Compute Graph Distribution */
+using std::cout;
+using std::vector;
+using namespace Galois::Runtime;
+
+void compute_graph_distribution(Graph::pointer g) {
+  int n = Galois::Runtime::getSystemNetworkInterface().Num;
+  vector<vector<int>> dist_vec(n);
+  vector<int> local_count(n,0);
+
+  for(auto ii = g->begin(), ei = g->end(); ii != ei; ++ii) {
+    //iterate over all the edges of a node
+    fatPointer fptr = static_cast<fatPointer>(*ii);
+    auto hostID_src = fptr.getHost();
+    //cout << "src :" << hostID_src <<"\n";
+    for(auto jj = g->in_edge_begin(*ii, Galois::MethodFlag::SRC_ONLY), ej = g->in_edge_end(*ii, Galois::MethodFlag::SRC_ONLY); jj != ej; ++jj) {
+
+      GNode dst = g->dst(jj, Galois::MethodFlag::SRC_ONLY);
+      fatPointer fptr_dst = static_cast<fatPointer>(dst);
+      auto hostID_dst = fptr_dst.getHost();
+      if(hostID_dst == hostID_src) {
+        ++local_count[hostID_src];
+      } else {
+        //cout << "\thostID_dst : " << hostID_dst << "\n";
+        dist_vec[hostID_src].push_back(hostID_dst);
+      }
+
+    }
+  }
+
+  int total_edges = 0;
+  /* print out stats */
+  //local count
+  cout << "local Count\n";
+  int h = 0;
+  for (auto v : local_count) {
+    total_edges += v;
+    cout << "Host : " << h << "\n";
+    cout << "\t|E| "<< v <<"\n";
+  }
+
+  //remote
+  cout << "remote count\n";
+  for (int i = 0; i < n; ++i) {
+    total_edges += dist_vec[i].size(); 
+    cout <<"For : " << i <<" : " << dist_vec[i].size() << "\n";
+  }
+
+
+  cout << "Remote edge counts\n\n";
+  using std::count;
+  for (int i = 0; i < n; ++i) {
+    for(int j = 0; j < n; ++j) {
+      cout << "from : " << i << " to : " << j << " => " << count(dist_vec[i].begin(), dist_vec[i].end(), j) << "\n";
+    }
+
+    cout << "\n";
+  }
+
+  /* Percetage of local edges */
+  cout << "Local Edges %\n\n";
+  h = 0;
+  for (auto v : local_count) {
+    cout << "Host : " << h << "\n";
+    cout << "\t|E| : "<< v << " % : " << (double)v*((double)total_edges/100.0)  <<"\n";
+  }
+
+  /* Percetage of remote edges */
+  cout << "Remote Edges %\n\n";
+  for (int i = 0; i < n; ++i) {
+    cout << "Host : " << i << "\n";
+    cout <<"\t|E| : " << dist_vec[i].size() << " % : "<< (double)dist_vec[i].size()*((double)total_edges/100.0) <<"\n";
+  }
+
+
+  cout << "TOTOAL EDGES in Graph : " << total_edges << "\n";
 
 }
 
@@ -243,10 +297,8 @@ int main(int argc, char** argv) {
 
     Galois::Timer timerPR;
     timerPR.start();
-    //typedef Galois::WorkList::dChunkedFIFO<512> WL;
-    //Galois::for_each(g->begin(), g->end(), PageRank{g}, Galois::wl<WL>());
 
-    PageRank::go(g);
+    //PageRank::go(g);
 
     timerPR.stop();
 
@@ -260,6 +312,8 @@ int main(int argc, char** argv) {
     std::cout<<"Nodes_check = " << nodes_check << "\n";
     std::cout << "Total Page Rank: " << compute_total_rank(g) << "\n";
 
+    std::cout << "Computing graph Distribution\n";
+    compute_graph_distribution(g);
     /*
        std::cout << "size = " << g->size() <<std::endl;
        std::cout << "Typeinfo " << typeid(Graph::GraphNode).name() <<std::endl;
