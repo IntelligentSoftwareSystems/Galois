@@ -43,24 +43,28 @@ protected:
   OuterList outerList;
   size_t m_size;
 
-  Chunk& getLastChunk (void) {
-    assert (!outerList.empty ());
-    
-    Chunk& chunk = outerList.back ();
+  Chunk* getLastChunk (void) {
 
-    assert (!chunk.empty ());
+    if (outerList.empty ()) {
+      return nullptr;
 
-    return chunk;
+    } else {
+      Chunk& chunk = outerList.back ();
+      assert (!chunk.empty ());
+      return &chunk;
+    }
   }
   
-  Chunk& getFirstChunk (void) {
-    assert (!outerList.empty ());
+  Chunk* getFirstChunk (void) {
 
-    Chunk& chunk = outerList.front ();
+    if (outerList.empty ()) {
+      return nullptr;
 
-    assert (!chunk.empty ());
-
-    return chunk;
+    } else {
+      Chunk& chunk = outerList.front ();
+      assert (!chunk.empty ());
+      return &chunk;
+    }
   }
 
 
@@ -81,7 +85,6 @@ public:
   using const_reverse_iterator =  decltype(stl_two_level_crbegin (outerList.crbegin (), outerList.crend ()));
 
   SerialBag (): outerList (), m_size (0) {
-    outerList.emplace_back (); // put in 1 chunk to begin with
   }
 
   ~SerialBag (void) {
@@ -95,63 +98,111 @@ public:
     auto b = outerList.begin ();
     auto e = outerList.end ();
 
-    assert (b != e); // outerList.size () >= 1;
+    if (b == e) { 
+      return true; 
 
-    ++b;
+    } else {
+      // XXX: works if push_front and pop_front are
+      // not supported
+      return outerList.front.empty ();
 
-    // outerList.front () empty () && outerList.size () == 1
-    return (outerList.front ().empty () && b == e);
+    }
+
+
+    // ++b;
+    // // outerList.front () empty () && outerList.size () == 1
+    // return (outerList.front ().empty () && b == e);
   }
 
   template <typename... Args>
   void emplace_back (Args&&... args) {
-    assert (!outerList.empty ());
+    Chunk* chunk = getLastChunk ();
 
-    Chunk* chunk = &(outerList.back ());
-
-    if (chunk->full ()) {
+    if (chunk == nullptr || chunk->full ()) {
+      assert (outerList.empty () || chunk->full ());
       outerList.emplace_back ();
-      chunk = &(outerList.back ());
-    } 
+      chunk = getLastChunk ();
+    }
 
     chunk->emplace_back (std::forward<Args> (args)...);
     ++m_size;
+
+
+    // assert (!outerList.empty ());
+// 
+    // Chunk* chunk = &(outerList.back ());
+// 
+    // if (chunk->full ()) {
+      // outerList.emplace_back ();
+      // chunk = &(outerList.back ());
+    // } 
+// 
+    // chunk->emplace_back (std::forward<Args> (args)...);
+    // ++m_size;
   }
 
   void push_back (const T& elem) {
     this->emplace_back (elem);
   }
 
+  //! error to call when empty
+  //! Implementation does not check for empty container
+  //! to keep logic simpler
   void pop_back (void) {
-    Chunk& chunk = getLastChunk ();
 
-    chunk.pop_back ();
+    Chunk* chunk = getLastChunk ();
+    assert (chunk != nullptr);
 
-    if(chunk.empty ()) {
+    chunk->pop_back ();
+
+    if (chunk->empty ()) {
       outerList.pop_back ();
     }
-
-    if (outerList.empty ()) {
-      // restore the invariant of outerList containing at least one empty chunk
-      outerList.emplace_back ();
-    }
     --m_size;
+
+    // Chunk& chunk = getLastChunk ();
+// 
+    // chunk.pop_back ();
+// 
+    // if(chunk.empty ()) {
+      // outerList.pop_back ();
+    // }
+// 
+    // if (outerList.empty ()) {
+      // // restore the invariant of outerList containing at least one empty chunk
+      // outerList.emplace_back ();
+    // }
+    // --m_size;
   }
 
+  //! error to call when empty
+  //! Implementation does not check for empty container
+  //! to keep logic simpler
   reference back (void) {
-    Chunk& chunk = getLastChunk ();
+    Chunk* chunk = getLastChunk ();
+    assert (chunk != nullptr);
     return chunk.back ();
   }
 
+  //! error to call when empty
+  //! Implementation does not check for empty container
+  //! to keep logic simpler
   const_reference back (void) const {
     return const_cast<SerialBag*> (this)->back ();
   }
 
+  //! error to call when empty
+  //! Implementation does not check for empty container
+  //! to keep logic simpler
   reference front (void) {
-    Chunk& chunk = getFirstChunk ();
-    return chunk.front ();
+    Chunk* chunk = getFirstChunk ();
+    assert (chunk != nullptr);
+    return chunk->front ();
   }
 
+  //! error to call when empty
+  //! Implementation does not check for empty container
+  //! to keep logic simpler
   const_reference front (void) const {
     return const_cast<SerialBag*> (this)->front ();
   }
@@ -161,8 +212,6 @@ public:
       outerList.pop_back ();
     }
     m_size = 0;
-
-    outerList.emplace_back ();
   }
 
   iterator begin () {

@@ -43,6 +43,7 @@ SystemHeap::~SystemHeap() {}
 #ifndef GALOIS_FORCE_STANDALONE
 PtrLock<SizedHeapFactory, true> SizedHeapFactory::instance;
 __thread SizedHeapFactory::HeapMap* SizedHeapFactory::localHeaps = 0;
+PtrLock<Pow_2_BlockHeap, true>  Pow_2_BlockHeap::instance;
 
 SizedHeapFactory::SizedHeap* 
 SizedHeapFactory::getHeapForSize(const size_t size) {
@@ -86,6 +87,26 @@ SizedHeapFactory* SizedHeapFactory::getInstance() {
     instance.unlock();
   } else {
     f = new SizedHeapFactory();
+    instance.unlock_and_set(f);
+  }
+  return f;
+}
+
+Pow_2_BlockHeap::Pow_2_BlockHeap (void) throw (): heapTable () {
+  populateTable ();
+}
+
+Pow_2_BlockHeap* Pow_2_BlockHeap::getInstance() {
+  Pow_2_BlockHeap* f = instance.getValue();
+  if (f)
+    return f;
+  
+  instance.lock();
+  f = instance.getValue();
+  if (f) {
+    instance.unlock();
+  } else {
+    f = new Pow_2_BlockHeap();
     instance.unlock_and_set(f);
   }
   return f;

@@ -227,23 +227,20 @@ public:
 
   // typedef std::tr1::unordered_map<Lockable*, NItem> NhoodMap; 
   //
-  typedef MM::BumpWithMallocHeap<MM::FreeListHeap<MM::SystemHeap> > BasicHeap;
-  typedef MM::ThreadPrivateHeap<BasicHeap> PerThreadHeap;
-  typedef MM::ExternalHeapAllocator<std::pair<Lockable*, NItem*>, PerThreadHeap> PerThreadAllocator;
+  typedef MM::Pow_2_BlockAllocator<std::pair<Lockable*, NItem*> > MapAlloc;
 
   typedef std::unordered_map<
       Lockable*,
       NItem*,
       std::hash<Lockable*>,
       std::equal_to<Lockable*>,
-      PerThreadAllocator
+      MapAlloc
     > NhoodMap;
 
   typedef Galois::Runtime::LL::ThreadRWlock Lock_ty;
   typedef PtrBasedNhoodMgr<NItem> Base;
 
 protected:
-  PerThreadHeap heap;
   NhoodMap nhoodMap;
   Lock_ty map_mutex;
 
@@ -251,8 +248,7 @@ public:
 
   MapBasedNhoodMgr (const typename Base::NItemFactory& f): 
     Base (f),
-    heap (),
-    nhoodMap (8, std::hash<Lockable*> (), std::equal_to<Lockable*> (), PerThreadAllocator (&heap))
+    nhoodMap (8, std::hash<Lockable*> (), std::equal_to<Lockable*> (), MapAlloc ())
 
   {}
 
@@ -308,7 +304,8 @@ public:
   typedef PtrBasedNhoodMgr<NItem> NhoodMgr;
   typedef Galois::GAtomic<bool> AtomicBool;
   // typedef Galois::gdeque<NItem*, 4> NhoodList;
-  typedef llvm::SmallVector<NItem*, 8> NhoodList;
+  // typedef llvm::SmallVector<NItem*, 8> NhoodList;
+  typedef typename ContainersWithGAlloc::Vector<NItem*>::type NhoodList;
   // typedef std::vector<NItem*> NhoodList;
 
   // TODO: fix visibility below
@@ -476,7 +473,8 @@ class LCorderedExec {
   typedef typename Ctxt::NhoodMgr NhoodMgr;
 
   typedef MM::FixedSizeAllocator<Ctxt> CtxtAlloc;
-  typedef PerThreadBag<Ctxt*> CtxtWL;
+  // typedef PerThreadBag<Ctxt*, 16> CtxtWL;
+  typedef PerThreadVector<Ctxt*> CtxtWL;
   typedef PerThreadDeque<Ctxt*> CtxtDelQ;
   typedef PerThreadDeque<Ctxt*> CtxtLocalQ;
   // typedef Galois::Runtime::PerThreadVector<T> AddWL;
@@ -757,6 +755,7 @@ public:
     CtxtLocalQ ctxtLocalQ;
 
     typedef Galois::WorkList::dChunkedFIFO<CHUNK_SIZE, Ctxt*> SrcWL_ty;
+    // typedef Galois::WorkList::AltChunkedFIFO<CHUNK_SIZE, Ctxt*> SrcWL_ty;
     // TODO: code to find global min goes here
 
     t_for.start ();

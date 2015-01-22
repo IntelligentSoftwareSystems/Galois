@@ -164,7 +164,7 @@ class DESordered:
 
   struct OpFunc {
 
-    static const size_t CHUNK_SIZE = 8;
+    static const size_t CHUNK_SIZE = 4;
     static const size_t UNROLL_FACTOR = 1024;
 
     Graph& graph;
