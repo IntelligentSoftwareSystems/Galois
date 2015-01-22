@@ -30,12 +30,12 @@
 #include "Galois/gdeque.h"
 #include "Galois/PriorityQueue.h"
 #include "Galois/Timer.h"
+#include "Galois/PerThreadContainer.h"
 
 #include "Galois/Runtime/Barrier.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/Executor_DoAll.h"
 #include "Galois/Runtime/ForEachTraits.h"
-#include "Galois/Runtime/PerThreadContainer.h"
 #include "Galois/Runtime/Range.h"
 #include "Galois/Runtime/Sampling.h"
 #include "Galois/Runtime/Support.h"
@@ -914,7 +914,7 @@ class ROBparaMeter: private boost::noncopyable {
   using Ctxt = ROBparamContext<T, Cmp, ROBparaMeter>;
   using CtxtAlloc = MM::FixedSizeAllocator<Ctxt>;
   using CtxtCmp = typename Ctxt::PtrComparator;
-  using CtxtDeq = Galois::Runtime::PerThreadDeque<Ctxt*>;
+  using CtxtDeq = Galois::PerThreadDeque<Ctxt*>;
 
   using PendingQ = Galois::MinHeap<T, Cmp>;
   using ROB = Galois::MinHeap<Ctxt*, typename Ctxt::PtrComparator>;

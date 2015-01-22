@@ -24,8 +24,8 @@
  *
  * @author <ahassaan@ices.utexas.edu>
  */
-#ifndef GALOIS_RUNTIME_PERTHREADCONTAINER_H
-#define GALOIS_RUNTIME_PERTHREADCONTAINER_H
+#ifndef GALOIS_PERTHREADCONTAINER_H
+#define GALOIS_PERTHREADCONTAINER_H
 
 #include <vector>
 #include <deque>
@@ -50,7 +50,6 @@
 #include "Galois/Runtime/ll/gio.h"
 
 namespace Galois {
-namespace Runtime {
 
 namespace {
 
@@ -562,10 +561,10 @@ public:
 namespace ContainersWithGAlloc {
 
   template<typename T>
-  struct Pow2Alloc { typedef typename MM::Pow_2_BlockAllocator<T> type; };
+  struct Pow2Alloc { typedef typename Runtime::MM::Pow_2_BlockAllocator<T> type; };
 
   template<typename T>
-  struct FixedSizeAlloc { typedef typename MM::FixedSizeAllocator<T> type; };
+  struct FixedSizeAlloc { typedef typename Runtime::MM::FixedSizeAllocator<T> type; };
 
   template<typename T>
   struct Vector { typedef typename std::vector<T, typename Pow2Alloc<T>::type > type; };
@@ -712,6 +711,5 @@ public:
 };
 
 
-} // end namespace Runtime
 } // end namespace Galois
-#endif // GALOIS_RUNTIME_PERTHREADCONTAINER_H
+#endif // GALOIS_PERTHREADCONTAINER_H

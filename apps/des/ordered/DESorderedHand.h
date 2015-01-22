@@ -28,8 +28,8 @@
 
 #include "Galois/Accumulator.h"
 #include "Galois/Timer.h"
+#include "Galois/PerThreadContainer.h"
 
-#include "Galois/Runtime/PerThreadContainer.h"
 #include "Galois/Runtime/ll/PaddedLock.h"
 #include "Galois/Runtime/ll/CompilerSpecific.h"
 
@@ -52,7 +52,7 @@ typedef Galois::GAccumulator<size_t> Accumulator_ty;
 
 typedef des::EventRecvTimeLocalTieBrkCmp<TypeHelper::Event_ty> Cmp_ty;
 
-typedef Galois::Runtime::PerThreadVector<TypeHelper::Event_ty> AddList_ty;
+typedef Galois::PerThreadVector<TypeHelper::Event_ty> AddList_ty;
 
 struct SimObjInfo: public TypeHelper {
 
@@ -196,7 +196,7 @@ getGlobalMin (std::vector<SimObjInfo>& sobjInfoVec) {
 class DESorderedHand: 
   public des::AbstractMain<TypeHelper::SimInit_ty>, public TypeHelper {
 
-    typedef Galois::Runtime::PerThreadVector<Event_ty> WL_ty;
+    typedef Galois::PerThreadVector<Event_ty> WL_ty;
 
 
 

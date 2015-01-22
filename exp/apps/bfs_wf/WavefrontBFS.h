@@ -31,7 +31,8 @@
 #include "Galois/Accumulator.h"
 #include "Galois/AltBag.h"
 #include "Galois/DoAllWrap.h"
-#include "Galois/Runtime/PerThreadContainer.h"
+#include "Galois/PerThreadContainer.h"
+
 #include "Galois/WorkList/ExternalReference.h"
 
 #include "bfs.h"
@@ -256,7 +257,7 @@ class BFSwavefrontNolock: public AbstractWavefrontBFS {
 class BFSwavefrontCoupled: public AbstractWavefrontBFS {
 
   typedef Galois::PerThreadBag<GNode> WL_ty;
-  // typedef Galois::Runtime::PerThreadVector<GNode> WL_ty;
+  // typedef Galois::PerThreadVector<GNode> WL_ty;
   // typedef Galois::InsertBag<GNode> WL_ty;
 
   struct ParallelInnerLoop {

@@ -41,11 +41,11 @@
 
 
 #include "Galois/Accumulator.h"
+#include "Galois/Markable.h"
+#include "Galois/PerThreadContainer.h"
 
-#include "Galois/Runtime/PerThreadContainer.h"
 #include "Galois/Runtime/Executor_DoAll.h"
 #include "Galois/Runtime/ll/CompilerSpecific.h"
-#include "Galois/Markable.h"
 
 
 #include "dependTest.h"

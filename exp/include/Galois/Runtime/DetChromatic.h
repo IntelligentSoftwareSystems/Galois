@@ -175,7 +175,7 @@ protected:
   typedef typename G::GraphNode GNode;
   typedef typename G::node_data_type ND;
 
-  typedef Galois::Runtime::PerThreadVector<unsigned> PerThrdColorVec;
+  typedef Galois::PerThreadVector<unsigned> PerThrdColorVec;
 
   G& graph;
   A visitAdj;
@@ -729,7 +729,7 @@ struct DAGmanagerDefault: public DAGmanagerBase<G, A, InputDAGdata::VisitDAGsucc
   using GNode = typename G::GraphNode;
   using ND = typename G::node_data_type;
 
-  Galois::Runtime::MM::PowOf_2_BlockAllocator<unsigned, true> dagSuccAlloc;
+  Galois::Runtime::MM::Pow_2_BlockAllocator<unsigned> dagSuccAlloc;
 
   DAGmanagerDefault (G& graph, const A& visitAdj)
     : Base (graph, visitAdj, InputDAGdata::VisitDAGsuccessors ()) 

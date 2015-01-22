@@ -24,7 +24,8 @@
 #define GALOIS_ALT_BAG_H
 
 #include "Galois/BoundedVector.h"
-#include "Galois/Runtime/PerThreadContainer.h"
+#include "Galois/PerThreadContainer.h"
+
 #include "Galois/Runtime/mm/Mem.h"
 
 #include <list>
@@ -104,7 +105,7 @@ public:
     } else {
       // XXX: works if push_front and pop_front are
       // not supported
-      return outerList.front.empty ();
+      return outerList.front ().empty ();
 
     }
 
@@ -240,9 +241,9 @@ public:
 };
 
 template <typename T, const size_t SZ=16*1024>
-class PerThreadBag: public Runtime::PerThreadContainer<SerialBag<T, SZ> > {
+class PerThreadBag: public PerThreadContainer<SerialBag<T, SZ> > {
   using C = SerialBag<T, SZ>;
-  using Super_ty = Runtime::PerThreadContainer<C>;
+  using Super_ty = PerThreadContainer<C>;
 
 public:
 

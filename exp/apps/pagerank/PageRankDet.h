@@ -6,12 +6,13 @@
 #include "Galois/Statistic.h"
 #include "Galois/Galois.h"
 #include "Galois/DoAllWrap.h"
+#include "Galois/PerThreadContainer.h"
+
 #include "Galois/Graph/Util.h"
 #include "Galois/Graph/Graph.h"
 // #include "Galois/Graph/FileGraph.h"
 
 #include "Galois/Runtime/Sampling.h"
-#include "Galois/Runtime/PerThreadContainer.h"
 #include "Galois/Runtime/DetChromatic.h"
 #include "Galois/Runtime/DetKDGexecutor.h"
 

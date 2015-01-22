@@ -36,11 +36,11 @@
 #include "Galois/PriorityQueue.h"
 #include "Galois/Timer.h"
 #include "Galois/DoAllWrap.h"
+#include "Galois/PerThreadContainer.h"
 
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/Executor_DoAll.h"
 #include "Galois/Runtime/LCordered.h"
-#include "Galois/Runtime/PerThreadContainer.h"
 #include "Galois/Runtime/ll/gio.h"
 #include "Galois/Runtime/ll/ThreadRWlock.h"
 #include "Galois/Runtime/mm/Mem.h"
@@ -352,7 +352,7 @@ protected:
   typedef typename Ctxt::NItem NItem;
 
   typedef MM::FixedSizeAllocator<Ctxt> CtxtAlloc;
-  typedef MM::PowOf_2_BlockAllocator<Ctxt*> CtxtAdjAlloc;
+  typedef MM::Pow_2_BlockAllocator<Ctxt*> CtxtAdjAlloc;
   typedef PerThreadBag<Ctxt*> CtxtWL;
   typedef UserContextAccess<T> UserCtx;
   typedef PerThreadStorage<UserCtx> PerThreadUserCtx;
@@ -635,7 +635,7 @@ void for_each_ordered_dag (const R& range, const Cmp& cmp, const NhoodFunc& nhVi
   typedef DAGexecutorRW<T, Cmp, OpFunc, NhoodFunc> Exec_ty;
   // typedef DAGexecutor<T, Cmp, OpFunc, NhoodFunc> Exec_ty;
   
-  Exec_ty exec (cmp, nhVisitor, opFunc);
+  Exec_ty exec (cmp, nhVisitor, opFunc, loopname);
 
   exec.initialize (range);
 

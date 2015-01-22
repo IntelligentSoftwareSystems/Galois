@@ -35,11 +35,11 @@
 #include "Galois/PriorityQueue.h"
 #include "Galois/Timer.h"
 #include "Galois/AltBag.h"
+#include "Galois/PerThreadContainer.h"
 
 #include "Galois/WorkList/WorkList.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/Executor_DoAll.h"
-#include "Galois/Runtime/PerThreadContainer.h"
 #include "Galois/Runtime/Range.h"
 #include "Galois/Runtime/ll/gio.h"
 #include "Galois/Runtime/ll/ThreadRWlock.h"

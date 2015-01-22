@@ -30,8 +30,9 @@
 
 #include "bfs.h"
 
+#include "Galois/PerThreadContainer.h"
+
 #include "Galois/Runtime/ParallelWorkInline_Exp.h"
-#include "Galois/Runtime/PerThreadContainer.h"
 
 typedef uint32_t ND_ty;
 
