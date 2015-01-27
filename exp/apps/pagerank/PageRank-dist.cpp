@@ -298,7 +298,7 @@ int main(int argc, char** argv) {
     Galois::Timer timerPR;
     timerPR.start();
 
-    //PageRank::go(g);
+    PageRank::go(g);
 
     timerPR.stop();
 
@@ -312,8 +312,8 @@ int main(int argc, char** argv) {
     std::cout<<"Nodes_check = " << nodes_check << "\n";
     std::cout << "Total Page Rank: " << compute_total_rank(g) << "\n";
 
-    std::cout << "Computing graph Distribution\n";
-    compute_graph_distribution(g);
+    //std::cout << "Computing graph Distribution\n";
+    //compute_graph_distribution(g);
     /*
        std::cout << "size = " << g->size() <<std::endl;
        std::cout << "Typeinfo " << typeid(Graph::GraphNode).name() <<std::endl;
