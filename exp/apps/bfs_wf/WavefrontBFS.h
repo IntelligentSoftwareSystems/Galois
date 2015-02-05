@@ -261,7 +261,7 @@ class BFSwavefrontCoupled: public AbstractWavefrontBFS {
 #ifdef BFS_WF_USE_BAG
   typedef Galois::InsertBag<GNode> WL_ty;
 #else
-  typedef Galois::PerThreadBag<GNode, 1024> WL_ty;
+  typedef Galois::PerThreadBag<GNode, 64*1024> WL_ty;
   // typedef Galois::PerThreadVector<GNode> WL_ty;
 #endif // BFS_WF_USE_BAG
 
