@@ -354,9 +354,10 @@ protected:
     }
   }
 
-  void init(const Cont_ty& cont) {
+  template <typename... Args>
+  void init(Args&&... args) {
     for (unsigned i = 0; i < perThrdCont.size(); ++i) {
-      *perThrdCont.getRemote(i) = new Cont_ty(cont);
+      *perThrdCont.getRemote(i) = new Cont_ty(std::forward<Args> (args)...);
     }
   }
 
@@ -596,7 +597,7 @@ protected:
 
 public:
   PerThreadVector(): Super_ty(), alloc() {
-    Super_ty::init(Cont_ty(alloc));
+    Super_ty::init(alloc);
   }
 
   void reserve_all(size_t sz) {
@@ -625,7 +626,7 @@ protected:
 
 public:
   PerThreadDeque(): Super_ty(), alloc() {
-    Super_ty::init(Cont_ty(alloc));
+    Super_ty::init(alloc);
   }
 };
 
@@ -644,7 +645,7 @@ protected:
 
 public:
   PerThreadList(): Super_ty(), alloc() {
-    Super_ty::init(Cont_ty(alloc));
+    Super_ty::init(alloc);
   }
 };
 
@@ -663,7 +664,7 @@ protected:
 
 public:
   explicit PerThreadSet(const C& cmp = C()): Super_ty(), alloc() {
-    Super_ty::init(Cont_ty(cmp, alloc));
+    Super_ty::init(cmp, alloc);
   }
 
   typedef typename Super_ty::global_const_iterator global_const_iterator;
@@ -695,7 +696,7 @@ protected:
 
 public:
   explicit PerThreadMinHeap(const C& cmp = C()): Super_ty(), alloc() {
-    Super_ty::init(Cont_ty(cmp, Vec_ty(alloc)));
+    Super_ty::init(cmp, Vec_ty(alloc));
   }
 
   typedef typename Super_ty::global_const_iterator global_const_iterator;
