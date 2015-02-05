@@ -38,7 +38,8 @@ template <typename T, const size_t SZ=16*1024>
 class SerialBag {
 protected:
   using Chunk = BoundedVector<T, SZ>;
-  using OuterList = std::list<Chunk, Runtime::MM::FixedSizeAllocator<Chunk> >;
+  // using OuterList = std::list<Chunk, Runtime::MM::FixedSizeAllocator<Chunk> >;
+   using OuterList = typename ContainersWithGAlloc::Deque<Chunk>::type;
 
 
   OuterList outerList;
@@ -248,7 +249,7 @@ class PerThreadBag: public PerThreadContainer<SerialBag<T, SZ> > {
 public:
 
   PerThreadBag (): Super_ty () {
-    Super_ty::init (C());
+    Super_ty::init ();
   }
 
   void push_back (const T& x) {

@@ -39,6 +39,7 @@
 #include <boost/iterator/counting_iterator.hpp>
 #include <boost/iterator/transform_iterator.hpp>
 
+#include "Galois/gdeque.h"
 #include "Galois/Threads.h"
 #include "Galois/PriorityQueue.h"
 #include "Galois/TwoLevelIterator.h"
@@ -627,6 +628,18 @@ protected:
 public:
   PerThreadDeque(): Super_ty(), alloc() {
     Super_ty::init(alloc);
+  }
+};
+
+template <typename T, unsigned ChunkSize=64>
+class PerThreadGdeque: public PerThreadContainer<Galois::gdeque<T, ChunkSize> > {
+
+  using Super_ty = PerThreadContainer<Galois::gdeque<T, ChunkSize> >;
+  
+public:
+
+  PerThreadGdeque (): Super_ty () {
+    Super_ty::init ();
   }
 };
 
