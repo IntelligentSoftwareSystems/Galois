@@ -30,6 +30,8 @@
 #include <type_traits>
 #include <cassert>
 
+#include <iostream>
+
 using namespace Galois::Runtime;
 
 uint32_t Galois::Runtime::NetworkInterface::ID = 0;
@@ -44,11 +46,21 @@ static std::atomic<bool> ourexit;
 //FIXME: synchronize this
 static std::deque<std::pair<recvFuncTy, RecvBuffer>> loopwork;
 
+
+//landing pad for Router
+static void fake_landing() {
+  std::cout << "I am Router\n";
+}
+
 //!landing pad for worker hosts
 static void networkExit() {
   assert(NetworkInterface::Num > 1);
   assert(NetworkInterface::ID > 0);
   ourexit = true;
+
+  //if (NetworkInterface::ID == 2) {
+    //getSystemNetworkInterface().sendAlt(NetworkInterface::Num + 1, &fake_landing);
+  //}
 }
 
 static void loop_pad(::RecvBuffer& b) {

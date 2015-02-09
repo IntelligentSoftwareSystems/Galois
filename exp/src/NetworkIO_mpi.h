@@ -85,7 +85,9 @@ public:
     _Num = p.second;
     outq.resize(_Num);
   }
-  ~NetworkIOMPI() {}
+  ~NetworkIOMPI() {
+   // MPI_Finalize();
+  }
 
   void operator()() {
     int rv;

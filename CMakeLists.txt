@@ -8,10 +8,10 @@ set(GALOIS_VERSION ${GALOIS_VERSION_MAJOR}.${GALOIS_VERSION_MINOR}.${GALOIS_VERS
 set(GALOIS_COPYRIGHT_YEAR "2014") # Also in COPYRIGHT
 
 #adding additional compiler flags for mpip profiling
-set(LIBUNWIND_DIR "/net/ohm/export/cdgc/gill/modules/usr/local/lib")
-set(MPIP_DIR "/net/ohm/export/cdgc/gill/modules/mpip/lib")
-set(GCC_MPIP_LINK_FLAGS "-L${MPIP_DIR} -L${LIBUNWIND_DIR} -lmpiP -lbfd -liberty -lm -lunwind")
-link_directories(LIBUNWIND_DIR MPIP_DIR)
+#set(LIBUNWIND_DIR "/net/ohm/export/cdgc/gill/modules/usr/local/lib")
+#set(MPIP_DIR "/net/ohm/export/cdgc/gill/modules/mpip/lib")
+#set(GCC_MPIP_LINK_FLAGS "-L${MPIP_DIR} -L${LIBUNWIND_DIR} -lmpiP -lbfd -liberty -lm -lunwind")
+#link_directories(LIBUNWIND_DIR MPIP_DIR)
 
 
 if(NOT CMAKE_BUILD_TYPE)
@@ -26,7 +26,7 @@ endif()
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
 set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g")
 
-set(CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS} ${GCC_MPIP_LINK_FLAGS}" )
+#set(CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS} ${GCC_MPIP_LINK_FLAGS}" )
 
 ###### Options (alternatively pass as options to cmake -DName=Value) ######
 set(USE_GPROF OFF CACHE BOOL "Enable GCC profiling")

@@ -162,6 +162,9 @@ public:
     bufdata.resize(count);
   }
 
+  unsigned getOffset() const { return offset; }
+  unsigned setOffset(unsigned off) { assert(off <= size()); offset = off; }
+
   unsigned size() const { return bufdata.size(); }
 
   unsigned char pop() {

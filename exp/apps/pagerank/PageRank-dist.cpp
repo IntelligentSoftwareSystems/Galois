@@ -32,6 +32,7 @@
 
 #include "Lonestar/BoilerPlate.h"
 
+#include <mpi.h>
 #include <iostream>
 #include <typeinfo>
 #include <algorithm>
@@ -319,6 +320,7 @@ int main(int argc, char** argv) {
        std::cout << "Typeinfo " << typeid(Graph::GraphNode).name() <<std::endl;
      */
 
+    //MPI_Finalize();
     Galois::Runtime::getSystemNetworkInterface().terminate();
     return 0;
 }

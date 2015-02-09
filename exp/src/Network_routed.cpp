@@ -212,6 +212,8 @@ class NetworkInterfaceRouted : public NetworkInterface {
       
       //loop
       while (!quit) {
+        //if(isRouter())
+          //std::cout << "IsRouter : " << NetworkInterface::ID << "Num : " << NetworkInterface::Num << "\n";
         bio();
         if (bio.readyRecv()) //packets, woo!
           recvPacket(bio.recv());
@@ -219,6 +221,7 @@ class NetworkInterfaceRouted : public NetworkInterface {
           sendPacket(bio, bias);
         }
       }
+      //MPI_Finalize();
     } //destroy bio before acking quit
   }
 

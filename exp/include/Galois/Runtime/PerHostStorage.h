@@ -29,6 +29,9 @@
 #include "Galois/Runtime/ThreadPool.h"
 #include <boost/iterator/iterator_facade.hpp>
 
+#include <iostream>
+#include <typeinfo>
+
 namespace Galois {
 namespace Runtime {
 
@@ -197,6 +200,7 @@ class PerThreadDist {
   uint64_t offset;
 
   T* resolve() const {
+    assert((offset < (uint64_t)1024) && (offset > 0));
     T* r = getPerThreadDistBackend().resolve<T>(offset);
     assert(r);
     return r;
@@ -207,10 +211,13 @@ class PerThreadDist {
   static void allocOnHost(DeSerializeBuffer& buf) {
     uint64_t off;
     gDeserialize(buf, off);
+    assert(off < 1024ul);
     for (unsigned x = 0; x < getSystemThreadPool().getMaxThreads(); ++x) {
       if (!getPerThreadDistBackend().resolveThread<T>(off, x)) {
-	DeSerializeBuffer buf2((char*)buf.linearData(), (char*)buf.linearData() + buf.size()); //explicit copy
-	getPerThreadDistBackend().resolveThread<T>(off, x) = new T(PerThreadDist(off), buf2);
+        //DeSerializeBuffer buf2((char*)buf.linearData(), (char*)buf.linearData() + buf.size()); //explicit copy
+        auto o = buf.getOffset();
+        getPerThreadDistBackend().resolveThread<T>(off, x) = new T(PerThreadDist(off), buf);
+        buf.setOffset(o);
       }
     }
   }
@@ -234,8 +241,10 @@ public:
     SerializeBuffer buf;
     gSerialize(buf, off);
     ptr->getInitData(buf);
+    //std::cout << "Serialize buf :" << buf << "\n";
     SerializeBuffer buf2((char*)buf.linearData(), buf.size()); //explicit copy
-    getSystemNetworkInterface().broadcast(&allocOnHost, buf);
+    //std::cout <<"Serialize buf2 : " << buf2 << "\n";
+    getSystemNetworkInterface().broadcast(&allocOnHost, buf2);
     DeSerializeBuffer dbuf(std::move(buf2));
     allocOnHost(dbuf);
     return ptr;
@@ -306,6 +315,10 @@ public:
   }
   void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
     gDeserialize(s,offset);
+  }
+
+  int getOffset() {
+    return offset;
   }
 };
 

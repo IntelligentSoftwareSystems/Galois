@@ -53,7 +53,7 @@ struct is_bad : public Galois::Runtime::Lockable {
 
 
 //new create_nodes
-/*struct create_nodes { //  : public Galois::Runtime::Lockable {
+struct create_nodes { //  : public Galois::Runtime::Lockable {
   Graphp g;
   //create_nodes(Graphp _g): g(_g) {}
   void static go(Graphp g, std::deque<Element>& elements) {
@@ -78,10 +78,27 @@ struct is_bad : public Galois::Runtime::Lockable {
 
 };
 
+/*
+struct create_same {
+  Graphp g;
+
+  void static go(Graphp g, std::deque<Element>& elements) {
+    Galois::for_each(g, create_same{g}, Galois::loopname("Create same node"));
+  }
+
+  void operator() (Galois::UserContext<Element>& cnx) const {
+    Element item = new Element();
+    GNode n = g->createNode(item);
+    g->addNode(n);
+  }
+
+  typedef int tt_is_copyable;
+
+};
 */
 
 
-struct create_nodes : public Galois::Runtime::Lockable {
+/*struct create_nodes : public Galois::Runtime::Lockable {
   Graphp g;
   create_nodes() {}
   create_nodes(Graphp _g): g(_g) {}
@@ -101,7 +118,7 @@ struct create_nodes : public Galois::Runtime::Lockable {
     gDeserialize(s,g);
   }
 };
-
+*/
 
 struct centerXCmp {
   bool operator()(const Element& lhs, const Element& rhs) const {
@@ -437,8 +454,8 @@ private:
     // while (x) {}
 
     std::cout << "MakeGraph\n";
-    Galois::for_each(elements.begin(), elements.end(), create_nodes(mesh),Galois::loopname("create"), Galois::wl<Galois::WorkList::StableIterator<>>());
-    //create_nodes::go(mesh, elements);
+    //Galois::for_each(elements.begin(), elements.end(), create_nodes(mesh),Galois::loopname("create"), Galois::wl<Galois::WorkList::StableIterator<>>());
+    create_nodes::go(mesh, elements);
     std::cout << "... now adding edges\n";
 
     std::map<Edge, GNode> edge_map;
@@ -452,6 +469,11 @@ private:
     std::cout << "\n";
   }
 
+  void dummyFunc(Graphp g) {
+
+    //create_same::go(g,elements);
+  }
+
 public:
   Mesh(): id(0) { }
 
@@ -460,9 +482,12 @@ public:
     readNodes(basename, tuples);
     readElements(basename, tuples);
     readPoly(basename, tuples);
-    std::cout << "Calling makegraph\n";
-    makeGraph(mesh);
+
+    //std::cout << "XXXXXXXXXXXXXXXXXXXX calling dummy function\n";
+
     //dummyFunc(mesh);
+
+    makeGraph(mesh);
   }
 };
 

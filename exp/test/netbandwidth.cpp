@@ -3,6 +3,8 @@
 #include <cstring>
 #include <unistd.h>
 
+#include <mpi.h>
+
 #include "Galois/Runtime/Network.h"
 #include "Galois/Runtime/Barrier.h"
 #include "Galois/Timer.h"
@@ -37,5 +39,7 @@ int main(int argc, char** argv) {
   getSystemBarrier().wait();
   T.stop();
   std::cerr << "\n*" << net.ID << " " << T.get() << "!" << num << "\n";
+  std::cout << "Calling MPI_Finaliz\n";
+  MPI_Finalize();
   return 0;
 }
