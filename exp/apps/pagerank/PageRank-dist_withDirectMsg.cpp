@@ -222,7 +222,7 @@ int main(int argc, char** argv) {
 
     Galois::Timer timerLoad;
     timerLoad.start();
-    
+
     //allocate local computation graph and Reading from the inputFile using FileGraph
     //NOTE: We are computing in edges on the fly and then using then in Graph construction.
     Graph::pointer g;
@@ -268,7 +268,6 @@ int main(int argc, char** argv) {
           g->addEdge(gn, *(g->begin() + dst), val, Galois::MethodFlag::SRC_ONLY);
           g->addInEdge(*(g->begin() + dst),gn, val, Galois::MethodFlag::SRC_ONLY);
         }
-              //std::cout << "\n";
     }
 
   }
@@ -283,57 +282,19 @@ int main(int argc, char** argv) {
 
     InitializeGraph::go(g);
 
-    //auto N_n = *(g->begin() + 67);
-    //LNode& n = g->at(N_n);
-    //std::cout << "n.out : " << n.nout << "\n";
     timerInit.stop();
     std::cout << "Graph Initialization: " << timerInit.get() << " ms\n";
 
     Galois::Timer timerPR;
     timerPR.start();
-    //typedef Galois::WorkList::dChunkedFIFO<512> WL;
-    //Galois::for_each(g->begin(), g->end(), PageRank{g}, Galois::wl<WL>());
 
-    PageRank::go(g);
+    PageRankMsg::go(g);
 
     timerPR.stop();
     std::cout << "Page Rank: " << timerPR.get() << " ms\n";
     std::cout << "Total Page Rank: " << compute_total_rank(g) << "\n";
 
- /* 
-   std::cout << "size = " << g->size() <<std::endl;
-   std::cout << "Typeinfo " << typeid(Graph::GraphNode).name() <<std::endl;
-
-/////Checking Graph /////
-   //for (auto ii = g->begin(), ee = g->end(); ii != ee; ++ii) {
-   	auto N = *(g->begin() + 0);
-	auto N_1 = *(g->begin() + 1);
-	auto N_9 = *(g->begin() + 9);
-	
-	LNode& data_1 = g->at(N_1);
-	data_1.value = 10;
-
-	LNode& data_9 = g->at(N_9);
-	data_9.value = 19;
-*/	
-/*	for (auto jj = g->in_edge_begin(N), ej = g->in_edge_end(N); jj != ej; ++jj) {
-	    std::cout << "Inside : ";
-	    GNode dst = g->dst(jj);
-	    LNode& data = g->at(dst);
-	    data.value = 9;
-	    //std::cout << data.value << "\n";
-	}
-*/
-/*	for (auto jj = g->in_edge_begin(N), ej = g->in_edge_end(N); jj != ej; ++jj) {
-	    std::cout << "Inside2 : ";
-	    GNode dst = g->dst(jj);
-	    LNode& data = g->at(dst);
-	    std::cout << data.value << "\n";
-	}
-*/ 
-//    }
-       // typedef Galois::WorkList::dChunkedFIFO<512> WL;
-       Galois::Runtime::getSystemNetworkInterface().terminate();
+    Galois::Runtime::getSystemNetworkInterface().terminate();
     return 0;
 }
 
