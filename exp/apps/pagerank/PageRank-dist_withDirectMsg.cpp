@@ -53,7 +53,7 @@ struct LNode {
   LNode() : value(1.0), nout(0) {}
   LNode(const LNode& rhs) :value(rhs.value), residual(rhs.residual.load()), nout(rhs.nout) {}
   float getPageRank() { return value; }
-  
+
   typedef int  tt_is_copyable;
 };
 
@@ -147,16 +147,16 @@ struct PageRankMsg {
       std::cout<<"Iteration : " << iterations << "  Time : " << round_time.get() << "ms\n";
     }
   }
-  
+
   void static remoteUpdate(Graph::pointer pr, GNode src, float delta) {
     auto& lnode = pr->at(src, Galois::MethodFlag::NONE);
     atomicAdd(lnode.residual, delta);
   }
-  
+
   void operator() (GNode src, Galois::UserContext<GNode>& cnx) const {
-    LNode& sdata = g->at(src);      
+    LNode& sdata = g->at(src);
     Galois::MethodFlag lockflag = Galois::MethodFlag::NONE;
-    
+
     float oldResidual = sdata.residual.exchange(0.0);
     sdata.value = sdata.value + oldResidual;
     float delta = oldResidual*alpha/sdata.nout;
@@ -172,42 +172,20 @@ struct PageRankMsg {
       }
     }
   }
-  
+
   typedef int tt_is_copyable;
 };
 
-/* 
- * collect page rank of all the nodes 
- * */
-
-/*struct compute_total_rank {
-    Graph::pointer g;
-    int total_rank = 0;
-    std::vector<int> a[TOTAL_NODES];
-    
-    void static go(Graph::pointer g) {
-	Galois::for_each_local(g, compute_total_rank(g), Galois::loopname("compute total rank")i);
-    }
-
-    void operator() (GNode n, Galois::UserContext<GNode>& cnx) const {
-	LNode& n = 
-    }
-
-    for(auto ii = g->begin(), ei = g->end(); ii != ei ; ++ii) {
-	//LNode& ddata = g->at(ii, Galois::MethodFlag::SRC_ONLY);
-	//total_rank += ddata.value;
-    }
-
-    
-    //return total_rank;
-};
-*/
-
+/*
+ * collect page rank of all the nodes
+ *
+ *
+ */
 int compute_total_rank(Graph::pointer g) {
     int total_rank = 0;
 
     for(auto ii = g->begin(), ei=g->end(); ii != ei; ++ii) {
-      LNode& node = g->at(*ii); 
+      LNode& node = g->at(*ii);
       total_rank += node.value;
     }
 
@@ -223,8 +201,10 @@ int main(int argc, char** argv) {
     Galois::Timer timerLoad;
     timerLoad.start();
 
-    //allocate local computation graph and Reading from the inputFile using FileGraph
-    //NOTE: We are computing in edges on the fly and then using then in Graph construction.
+    /* Allocate local computation graph and Reading from the inputFile using FileGraph
+      *NOTE: We are computing in edges on the fly and then using then in Graph construction.
+      *
+      */
     Graph::pointer g;
     {
       Galois::Graph::FileGraph fg;
@@ -233,37 +213,44 @@ int main(int argc, char** argv) {
       std::vector<unsigned> In_counts;
       for(auto& N : fg)
       {
-          //std::cout << "N = " << N << "   : \n";
           counts.push_back(std::distance(fg.edge_begin(N), fg.edge_end(N)));
           for(auto ii = fg.edge_begin(N), ei = fg.edge_end(N); ii != ei; ++ii)
           {
               unsigned dst = fg.getEdgeDst(ii);
-              //std::cout << dst << " , " ;
               if(dst >= In_counts.size()) {
-                // +1 is imp because vec.resize makes sure new vec can hold dst entries so it 
-                // will not have vec[dst] which is (dst+1)th entry!!
-                In_counts.resize(dst+1); 
+                /* NOTE:+1 is imp because vec.resize makes sure new vec can hold dst entries so it
+                 * will not have vec[dst] which is (dst+1)th entry!!
+                 *
+                 */
+                In_counts.resize(dst+1);
               }
               In_counts[dst]+=1;
           }
-          //std::cout << "\n";
       }
       if(counts.size() >  In_counts.size())
           In_counts.resize(counts.size());
 
       TOTAL_NODES = counts.size();
 
+
       std::cout << "size of transpose : " << In_counts.size() <<" : : "<<In_counts[0] <<"\n";
       std::cout << "size of counts : " << counts.size() << "\n";
       g = Graph::allocate(counts, In_counts);
 
+
+      //HACK: Prefetch all the nodes. For Blocking serial code.
+      int nodes_check = 0;
+      for (auto N = g->begin(); N != g->end(); ++N) {
+        ++nodes_check;
+        Galois::Runtime::prefetch(*N);
+      }
+      std::cout<<"Nodes_check = " << nodes_check << "\n";
+
       for (unsigned x = 0; x < counts.size(); ++x) {
         auto fgn = *(fg.begin() + x);
         auto gn = *(g->begin() + x);
-        //std::cout << "x = " << x << "   : \n";
         for (auto ii = fg.edge_begin(fgn), ee = fg.edge_end(fgn); ii != ee; ++ii) {
           unsigned dst = fg.getEdgeDst(ii);
-          //std::cout <<"Incount["<<dst<<"]"<<In_counts[dst]<< " , " ;
           int val = fg.getEdgeData<int>(ii);
           g->addEdge(gn, *(g->begin() + dst), val, Galois::MethodFlag::SRC_ONLY);
           g->addInEdge(*(g->begin() + dst),gn, val, Galois::MethodFlag::SRC_ONLY);
@@ -278,20 +265,24 @@ int main(int argc, char** argv) {
     //Graph Initialization begins.
     Galois::Timer timerInit;
     timerInit.start();
-    //Galois::for_each_local(g,InitializeGraph{}, Galois::loopname("init"));
-
     InitializeGraph::go(g);
-
     timerInit.stop();
     std::cout << "Graph Initialization: " << timerInit.get() << " ms\n";
 
+    //PageRank begins.
     Galois::Timer timerPR;
     timerPR.start();
-
     PageRankMsg::go(g);
-
     timerPR.stop();
     std::cout << "Page Rank: " << timerPR.get() << " ms\n";
+
+    //HACK: prefetch all the nodes. For Blocking serial code.
+    int nodes_check = 0;
+    for (auto N = g->begin(); N != g->end(); ++N) {
+      ++nodes_check;
+      Galois::Runtime::prefetch(*N);
+    }
+    std::cout<<"Nodes_check = " << nodes_check << "\n";
     std::cout << "Total Page Rank: " << compute_total_rank(g) << "\n";
 
     Galois::Runtime::getSystemNetworkInterface().terminate();
