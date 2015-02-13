@@ -48,9 +48,29 @@ namespace Galois {
 namespace Runtime {
 namespace ParaMeter {
 
+struct StepStats {
+
+  size_t step;
+  size_t workListSize;
+  size_t parallelism = 0;
+
+  explicit StepStats (size_t _step, size_t _wlsz): step (_step), workListSize (_wlsz) {}
+
+  static void printHeader(FILE* out) {
+    fprintf(out, "LOOPNAME, STEP, PARALLELISM, WORKLIST_SIZE\n");
+  }
+
+  void dump(FILE* out, const char* loopname) const {
+    if (out) {
+      fprintf(out, "%s, %zu, %zu, %zu\n", loopname, step, parallelism, workListSize);
+    }
+  }
+};
+
+
 // TODO(ddn): Take stats file as a trait or from loopname
-void createStatsFile();
-const char* getStatsFileName();
+FILE* getStatsFile (void);
+void closeStatsFile (void);
 
 // Single ParaMeter stats file per run of an app
 // which includes all instances of for_each loops
@@ -65,18 +85,6 @@ class ParaMeterExecutor {
   static const bool needsAborts = !exists_by_supertype<does_not_need_aborts_tag, ArgsTy>::value;
   static const bool needsPia = exists_by_supertype<needs_per_iter_alloc_tag, ArgsTy>::value;
   static const bool needsBreak = exists_by_supertype<needs_parallel_break_tag, ArgsTy>::value;
-
-  struct StepStats {
-    size_t step;
-    size_t parallelism;
-    size_t workListSize;
-
-    void dump(FILE* out, const char* loopname) const {
-      if (out) {
-        fprintf(out, "%s, %zu, %zu, %zu\n", loopname, step, parallelism, workListSize);
-      }
-    }
-  };
 
   struct IterationContext {
     Galois::Runtime::UserContextAccess<value_type> facing;
@@ -245,7 +253,7 @@ class ParaMeterExecutor {
 
   void finishStep(const StepStats& stat) {
     allSteps.push_back(stat);
-    stat.dump(pstatsFile, loopname);
+    stat.dump(getStatsFile (), loopname);
     workList.switchWorkLists();
     setThreadContext(NULL);
   }
@@ -305,11 +313,10 @@ public:
   template<typename RangeTy>
   void init(const RangeTy& range) {
     workList.getCurr().push_initial(range.begin(), range.end());
-    createStatsFile();
-    pstatsFile = fopen(getStatsFileName(), "a"); // open in append mode
+
     go();
-    fclose(pstatsFile);
-    pstatsFile = NULL;
+
+    closeStatsFile ();
   }
 
   template<typename RangeTy>
