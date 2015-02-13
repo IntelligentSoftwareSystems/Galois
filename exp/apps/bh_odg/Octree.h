@@ -195,8 +195,8 @@ struct Body: public Octree<B>  {
 };
 
 
-inline int getIndex(const Point& a, const Point& b) {
-  int index = 0;
+inline unsigned  getIndex(const Point& a, const Point& b) {
+  unsigned  index = 0;
   if (a.x < b.x)
     index += 1;
   if (a.y < b.y)
