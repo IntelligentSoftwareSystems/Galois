@@ -10,7 +10,7 @@
 #include <string.h>
 
 //#define PAPI
-#include "simple/papi.h"
+#include "simple/simplepapi.h"
 
 #include "Galois/Galois.h"      // STRANGE ERRORS IF EXCLUDED
 #include "Galois/Runtime/TreeExec.h"

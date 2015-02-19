@@ -7,7 +7,7 @@
 #include "Lonestar/BoilerPlate.h"
 
 //#define PAPI
-#include "simple/papi.h"
+#include "simple/simplepapi.h"
 
 #include <float.h>              // For DBL_DIG, significant digits in double
 
