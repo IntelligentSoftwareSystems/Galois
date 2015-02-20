@@ -39,6 +39,8 @@
 
 #include "Galois/WorkList/WorkList.h"
 #include "Galois/Runtime/Context.h"
+#include "Galois/Runtime/ContextComparator.h"
+#include "Galois/Runtime/CustomLockable.h"
 #include "Galois/Runtime/Executor_DoAll.h"
 #include "Galois/Runtime/Range.h"
 #include "Galois/Runtime/ll/gio.h"
@@ -157,150 +159,15 @@ public:
 
 };
 
-template<typename NItem>
-class PtrBasedNhoodMgr: boost::noncopyable {
-public:
-  typedef typename NItem::Factory NItemFactory;
-
-  typedef MM::FixedSizeAllocator<NItem> NItemAlloc;
-  typedef Galois::PerThreadBag<NItem*> NItemWL;
-
-protected:
-  NItemFactory factory;
-  NItemWL allNItems;
-  
-public:
-  PtrBasedNhoodMgr(const NItemFactory& f): factory (f) {}
-
-  NItem& getNhoodItem (Lockable* l) {
-
-    if (NItem::getOwner (l) == NULL) {
-      // NItem* ni = new NItem (l, cmp);
-      NItem* ni = factory.create (l);
-
-      if (ni->tryMappingTo (l)) {
-        allNItems.get ().push_back (ni);
-
-      } else {
-        factory.destroy (ni);
-      }
-
-      assert (NItem::getOwner (l) != NULL);
-    }
-
-    NItem* ret = NItem::getOwner (l);
-    assert (ret != NULL);
-    return *ret;
-  }
-
-  LocalRange<NItemWL> getAllRange (void) {
-    return makeLocalRange (allNItems);
-  }
-
-  NItemWL& getContainer() {
-    return allNItems;
-  }
-
-  ~PtrBasedNhoodMgr() {
-    resetAllNItems();
-  }
-
-protected:
-  struct Reset {
-    PtrBasedNhoodMgr* self; 
-    void operator()(NItem* ni) const {
-      ni->clearMapping();
-      self->factory.destroy(ni);
-    }
-  };
-
-  void resetAllNItems() {
-    Reset fn = { this };
-    do_all_impl(makeLocalRange(allNItems), fn);
-  }
-};
-
-template <typename NItem>
-class MapBasedNhoodMgr: public PtrBasedNhoodMgr<NItem> {
-public:
-  typedef MapBasedNhoodMgr MyType;
-
-  // typedef std::tr1::unordered_map<Lockable*, NItem> NhoodMap; 
-  //
-  typedef MM::Pow_2_BlockAllocator<std::pair<Lockable*, NItem*> > MapAlloc;
-
-  typedef std::unordered_map<
-      Lockable*,
-      NItem*,
-      std::hash<Lockable*>,
-      std::equal_to<Lockable*>,
-      MapAlloc
-    > NhoodMap;
-
-  typedef Galois::Runtime::LL::ThreadRWlock Lock_ty;
-  typedef PtrBasedNhoodMgr<NItem> Base;
-
-protected:
-  NhoodMap nhoodMap;
-  Lock_ty map_mutex;
-
-public:
-
-  MapBasedNhoodMgr (const typename Base::NItemFactory& f): 
-    Base (f),
-    nhoodMap (8, std::hash<Lockable*> (), std::equal_to<Lockable*> (), MapAlloc ())
-
-  {}
-
-  NItem& getNhoodItem (Lockable* l) {
-
-    map_mutex.readLock ();
-      typename NhoodMap::iterator i = nhoodMap.find (l);
-
-      if (i == nhoodMap.end ()) {
-        // create the missing entry
-
-        map_mutex.readUnlock ();
-
-        map_mutex.writeLock ();
-          // check again to avoid over-writing existing entry
-          if (nhoodMap.find (l) == nhoodMap.end ()) {
-            NItem* ni = Base::factory.create (l);
-            Base::allNItems.get ().push_back (ni);
-            nhoodMap.insert (std::make_pair (l, ni));
-
-          }
-        map_mutex.writeUnlock ();
-
-        // read again now
-        map_mutex.readLock ();
-        i = nhoodMap.find (l);
-      }
-
-    map_mutex.readUnlock ();
-    assert (i != nhoodMap.end ());
-    assert (i->second != nullptr);
-
-    return *(i->second);
-    
-  }
-
-
-  ~MapBasedNhoodMgr () {
-    Base::resetAllNItems ();
-  }
-
-};
 
 template <typename T, typename Cmp>
 class LCorderedContext: public SimpleRuntimeContext {
 
 public:
-  struct Comparator;
-
   typedef T value_type;
   typedef LCorderedContext MyType;
-  typedef NhoodItem<MyType, typename MyType::Comparator> NItem;
+  typedef ContextComparator<MyType, Cmp> CtxtCmp; 
+  typedef NhoodItem<MyType, CtxtCmp> NItem;
   typedef PtrBasedNhoodMgr<NItem> NhoodMgr;
   typedef Galois::GAtomic<bool> AtomicBool;
   // typedef Galois::gdeque<NItem*, 4> NhoodList;
@@ -326,6 +193,8 @@ public:
       nhmgr (nhmgr), 
       onWL (false) 
   {}
+
+  const T& getActive () const { return active; }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE
   virtual void subAcquire (Lockable* l, Galois::MethodFlag) {
@@ -412,17 +281,6 @@ public:
     }
   }
 
-  struct Comparator {
-    const Cmp& cmp;
-
-    explicit Comparator (const Cmp& cmp): cmp (cmp) {}
-
-    inline bool operator () (const LCorderedContext* left, const LCorderedContext* right) const {
-      assert (left != NULL);
-      assert (right != NULL);
-      return cmp (left->active, right->active);
-    }
-  };
 
 };
 
@@ -796,7 +654,7 @@ void for_each_ordered_lc_impl (const R& range, const Cmp& cmp, const NhoodFunc& 
   typedef LCorderedContext<T, Cmp> Ctxt;
   typedef typename Ctxt::NhoodMgr NhoodMgr;
   typedef typename Ctxt::NItem NItem;
-  typedef typename Ctxt::Comparator CtxtCmp;
+  typedef typename Ctxt::CtxtCmp  CtxtCmp;
 
   typedef LCorderedExec<OpFunc, NhoodFunc, Ctxt, ST> Exec;
 
