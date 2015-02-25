@@ -966,6 +966,9 @@ public:
 
   void execute () {
 
+    size_t totalIter = 0;
+    size_t totalCommits = 0;
+
     while (!nextPending->empty () || !rob.empty ()) {
 
       ++steps;
@@ -979,6 +982,8 @@ public:
         assert (ctx != nullptr);
 
         dbg::debug (ctx, " scheduled with item ", ctx->active);
+
+        ++totalIter;
 
         Galois::Runtime::setThreadContext (ctx);
         nhFunc (ctx->active, ctx->userHandle);
@@ -1000,10 +1005,13 @@ public:
       }
 
       size_t numCommitted = clearROB ();
-
       assert (numCommitted > 0);
 
+      totalCommits += numCommitted;
+
     }
+
+    std::printf ("OptimParaMeterExecutor: steps=%zd, totalIter=%zd, totalCommits=%zd, avg=%f\n", steps, totalIter, totalCommits, float(totalCommits)/float(steps));
 
     finish ();
   }

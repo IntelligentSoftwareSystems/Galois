@@ -379,7 +379,7 @@ public:
 
     }
 
-    std::printf ("OptimParaMeterExecutor: steps=%zd, totalIter=%zd, totalCommits=%zd\n", steps, totalIter, totalCommits);
+    std::printf ("OptimParaMeterExecutor: steps=%zd, totalIter=%zd, totalCommits=%zd, avg=%f\n", steps, totalIter, totalCommits, float(totalCommits)/float(steps));
 
     finish ();
   }
