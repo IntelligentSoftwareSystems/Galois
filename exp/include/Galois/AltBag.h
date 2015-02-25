@@ -123,7 +123,7 @@ public:
     if (chunk == nullptr || chunk->full ()) {
       assert (outerList.empty () || chunk->full ());
       outerList.emplace_back ();
-      chunk = getLastChunk ();
+      chunk = &outerList.back ();
     }
 
     chunk->emplace_back (std::forward<Args> (args)...);
@@ -183,7 +183,7 @@ public:
   reference back (void) {
     Chunk* chunk = getLastChunk ();
     assert (chunk != nullptr);
-    return chunk.back ();
+    return chunk->back ();
   }
 
   //! error to call when empty
