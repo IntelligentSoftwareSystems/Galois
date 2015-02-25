@@ -1010,6 +1010,11 @@ public:
   
 private:
 
+  void freeCtxt (Ctxt* ctxt) {
+    ctxtAlloc.destroy (ctxt);
+    ctxtAlloc.deallocate (ctxt, 1);
+  }
+
   void finish (void) {
     for (const StepStats& s: execRcrds) {
       s.dump (getStatsFile (), loopname);
@@ -1040,7 +1045,7 @@ private:
       Ctxt* head = rob.top ();
 
       if (head->hasState (Ctxt::State::ABORT_DONE)) {
-        rob.pop ();
+        freeCtxt (rob.pop ());
         continue;
 
       } else if (head->hasState (Ctxt::State::READY_TO_COMMIT)) {
@@ -1064,6 +1069,7 @@ private:
           assert (s < execRcrds.size ());
           ++execRcrds[s].parallelism;
           numCommitted += 1;
+          freeCtxt (t);
 
 
         } else {

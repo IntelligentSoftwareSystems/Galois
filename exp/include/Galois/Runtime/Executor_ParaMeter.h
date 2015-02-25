@@ -237,10 +237,8 @@ class ParaMeterExecutor {
 
       // switch worklists
       // dump stats
-      StepStats stat;
-      stat.step = currStep;
+      StepStats stat {currStep, numIter};
       stat.parallelism = numActivities;
-      stat.workListSize = numIter;
 
       finishStep(stat);
       ++currStep;

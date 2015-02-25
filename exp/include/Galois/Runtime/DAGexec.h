@@ -40,7 +40,7 @@
 
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/Executor_DoAll.h"
-#include "Galois/Runtime/LCordered.h"
+#include "Galois/Runtime/OrderedLockable.h"
 #include "Galois/Runtime/ll/gio.h"
 #include "Galois/Runtime/ll/ThreadRWlock.h"
 #include "Galois/Runtime/mm/Mem.h"
@@ -55,80 +55,38 @@ namespace Runtime {
 namespace {
 
 template <typename Ctxt>
-struct DAGnhoodItem: public LockManagerBase {
+struct DAGnhoodItem: public OrdLocBase<DAGnhoodItem<Ctxt>, Ctxt, std::less<Ctxt*> > {
+
+  using CtxtCmp = std::less<Ctxt*>;
+  using Base = OrdLocBase<DAGnhoodItem, Ctxt, CtxtCmp >;
 
 public:
-  typedef LockManagerBase Base;
-  typedef Galois::ThreadSafeOrderedSet<Ctxt*, std::less<Ctxt*> > SharerSet;
+  typedef Galois::ThreadSafeOrderedSet<Ctxt*, CtxtCmp > SharerSet;
 
-  Lockable* lockable;
   SharerSet sharers;
 
 public:
-  explicit DAGnhoodItem (Lockable* l): lockable (l), sharers () {}
+  explicit DAGnhoodItem (Lockable* l, const CtxtCmp& c): Base (l), sharers (c) {}
 
   void addSharer (Ctxt* ctxt) {
     sharers.push (ctxt);
   }
-
-  bool tryMappingTo (Lockable* l) {
-    return Base::CASowner (l, NULL);
-  }
-
-  void clearMapping () {
-    // release requires having owned the lock
-    bool r = Base::tryLock (lockable);
-    assert (r);
-    Base::release (lockable);
-  }
-
-  // just for debugging
-  const Lockable* getMapping () const {
-    return lockable;
-  }
-
-  static DAGnhoodItem* getOwner (Lockable* l) {
-    LockManagerBase* o = LockManagerBase::getOwner (l);
-    // assert (dynamic_cast<DAGnhoodItem*> (o) != nullptr);
-    return static_cast<DAGnhoodItem*> (o);
-  }
-
-  struct Factory {
-
-    typedef DAGnhoodItem<Ctxt> NItem;
-    typedef MM::FixedSizeAllocator<NItem> NItemAlloc;
-
-    NItemAlloc niAlloc;
-
-    NItem* create (Lockable* l) {
-      NItem* ni = niAlloc.allocate (1);
-      assert (ni != nullptr);
-      niAlloc.construct (ni, l);
-      return ni;
-    }
-
-    void destroy (NItem* ni) {
-      // delete ni; ni = NULL;
-      niAlloc.destroy (ni);
-      niAlloc.deallocate (ni, 1);
-    }
-  };
-  
 };
 
 
 template <typename Ctxt>
-struct DAGnhoodItemRW: public LockManagerBase {
+struct DAGnhoodItemRW: public OrdLocBase<DAGnhoodItemRW<Ctxt>, Ctxt, std::less<Ctxt*> > {
+
+  using CtxtCmp = std::less<Ctxt*>;
+  using Base = OrdLocBase<DAGnhoodItemRW, Ctxt, CtxtCmp >;
 
 public:
-  typedef LockManagerBase Base;
-  typedef Galois::ThreadSafeOrderedSet<Ctxt*, std::less<Ctxt*> > SharerSet;
+  typedef Galois::ThreadSafeOrderedSet<Ctxt*, CtxtCmp > SharerSet;
 
-  Lockable* lockable;
   SharerSet writers;
   SharerSet readers;
 
-  explicit DAGnhoodItemRW (Lockable* l): lockable (l) {}
+  explicit DAGnhoodItemRW (Lockable* l, const CtxtCmp& c): Base (l) {}
 
   void addReader (Ctxt* ctxt) {
     readers.push (ctxt);
@@ -137,49 +95,6 @@ public:
   void addWriter (Ctxt* ctxt) { 
     writers.push (ctxt);
   }
-
-  bool tryMappingTo (Lockable* l) {
-    return Base::CASowner (l, NULL);
-  }
-
-  void clearMapping () {
-    // release requires having owned the lock
-    bool r = Base::tryLock (lockable);
-    assert (r);
-    Base::release (lockable);
-  }
-
-  // just for debugging
-  const Lockable* getMapping () const {
-    return lockable;
-  }
-
-  static DAGnhoodItemRW* getOwner (Lockable* l) {
-    LockManagerBase* o = LockManagerBase::getOwner (l);
-    // assert (dynamic_cast<DAGnhoodItemRW*> (o) != nullptr);
-    return static_cast<DAGnhoodItemRW*> (o);
-  }
-
-  struct Factory {
-
-    typedef DAGnhoodItemRW<Ctxt> NItem;
-    typedef MM::FixedSizeAllocator<NItem> NItemAlloc;
-
-    NItemAlloc niAlloc;
-
-    NItem* create (Lockable* l) {
-      NItem* ni = niAlloc.allocate (1);
-      assert (ni != nullptr);
-      niAlloc.construct (ni, l);
-      return ni;
-    }
-
-    void destroy (NItem* ni) {
-      // delete ni; ni = NULL;
-      niAlloc.destroy (ni);
-      niAlloc.deallocate (ni, 1);
-    }
-  };
 
 };
 
@@ -350,6 +265,8 @@ protected:
   typedef Ctxt_tp  Ctxt;
   typedef typename Ctxt::NhoodMgr NhoodMgr;
   typedef typename Ctxt::NItem NItem;
+  using CtxtCmp = typename NItem::CtxtCmp;
+  using NItemFactory = typename NItem::Factory;
 
   typedef MM::FixedSizeAllocator<Ctxt> CtxtAlloc;
   typedef MM::Pow_2_BlockAllocator<Ctxt*> CtxtAdjAlloc;
@@ -391,6 +308,7 @@ protected:
   NhoodFunc nhVisitor;
   OpFunc opFunc;
   std::string loopname;
+  NItemFactory nitemFactory;
   NhoodMgr nhmgr;
 
   CtxtAlloc ctxtAlloc;
@@ -412,7 +330,8 @@ public:
       nhVisitor (nhVisitor),
       opFunc (opFunc),
       loopname (loopname),
-      nhmgr (typename NItem::Factory ())
+      nitemFactory (CtxtCmp ()),
+      nhmgr (nitemFactory)
   {}
 
   ~DAGexecutorBase (void) {

@@ -39,8 +39,7 @@
 
 #include "Galois/WorkList/WorkList.h"
 #include "Galois/Runtime/Context.h"
-#include "Galois/Runtime/ContextComparator.h"
-#include "Galois/Runtime/CustomLockable.h"
+#include "Galois/Runtime/OrderedLockable.h"
 #include "Galois/Runtime/Executor_DoAll.h"
 #include "Galois/Runtime/Range.h"
 #include "Galois/Runtime/ll/gio.h"
@@ -59,19 +58,18 @@ namespace Runtime {
 static const bool debug = false;
 
 template <typename Ctxt, typename CtxtCmp>
-class NhoodItem: public LockManagerBase {
-  typedef LockManagerBase Base;
+class NhoodItem: public OrdLocBase<NhoodItem<Ctxt, CtxtCmp>, Ctxt, CtxtCmp> {
+  using Base = OrdLocBase<NhoodItem, Ctxt, CtxtCmp>;
 
 public:
-  // typedef Galois::ThreadSafeMinHeap<Ctxt*, CtxtCmp> PQ;
-  typedef Galois::ThreadSafeOrderedSet<Ctxt*, CtxtCmp> PQ;
+  using PQ =  Galois::ThreadSafeOrderedSet<Ctxt*, CtxtCmp>;
+  using Factory = OrdLocFactoryBase<NhoodItem, Ctxt, CtxtCmp>;
 
 protected:
   PQ sharers;
-  Lockable* lockable;
 
 public:
-  NhoodItem (Lockable* l, const CtxtCmp& ctxcmp):  sharers (ctxcmp), lockable (l) {}
+  NhoodItem (Lockable* l, const CtxtCmp& ctxtcmp):  Base (l), sharers (ctxtcmp) {}
 
   void add (const Ctxt* ctxt) {
 
@@ -101,62 +99,6 @@ public:
   void print () const { 
     // TODO
   }
-  
-  bool tryMappingTo (Lockable* l) {
-    return Base::CASowner (l, NULL);
-  }
-
-  void clearMapping () {
-    // release requires having owned the lock
-    bool r = Base::tryLock (lockable);
-    assert (r);
-    Base::release (lockable);
-  }
-
-  // just for debugging
-  const Lockable* getMapping () const {
-    return lockable;
-  }
-
-  static NhoodItem* getOwner (Lockable* l) {
-    LockManagerBase* o = LockManagerBase::getOwner (l);
-    // assert (dynamic_cast<NhoodItem*> (o) != nullptr);
-    return static_cast<NhoodItem*> (o);
-  }
-
-
-  struct Factory {
-
-    typedef NhoodItem<Ctxt, CtxtCmp> NItem;
-    typedef MM::FixedSizeAllocator<NItem> NItemAlloc;
-
-    NItemAlloc niAlloc;
-    CtxtCmp ctxcmp;
-
-    explicit Factory (const CtxtCmp& ctxcmp): ctxcmp (ctxcmp) {}
-
-    NItem* create (Lockable* l) {
-      NItem* ni = niAlloc.allocate (1);
-      assert (ni != nullptr);
-      // XXX(ddn): Forwarding still wonky on XLC
-#if !defined(__IBMCPP__) || __IBMCPP__ > 1210
-      niAlloc.construct (ni, l, ctxcmp);
-#else
-      niAlloc.construct (ni, NItem(l, ctxcmp));
-#endif
-
-      return ni;
-    }
-
-    void destroy (NItem* ni) {
-      // delete ni; ni = NULL;
-      niAlloc.destroy (ni);
-      niAlloc.deallocate (ni, 1);
-      ni = NULL;
-    }
-  };
-
-
 };
 
 
@@ -658,8 +600,8 @@ void for_each_ordered_lc_impl (const R& range, const Cmp& cmp, const NhoodFunc& 
 
   typedef LCorderedExec<OpFunc, NhoodFunc, Ctxt, ST> Exec;
 
-  CtxtCmp ctxcmp (cmp);
-  typename NItem::Factory factory(ctxcmp);
+  CtxtCmp ctxtcmp (cmp);
+  typename NItem::Factory factory(ctxtcmp);
   NhoodMgr nhmgr (factory);
 
   Exec e (nhoodVisitor, operFunc, nhmgr, sourceTest);

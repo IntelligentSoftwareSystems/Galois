@@ -1,22 +1,80 @@
-#ifndef GALOIS_RUNTIME_CUSTOM_LOCKABLE_H
-#define GALOIS_RUNTIME_CUSTOM_LOCKABLE_H
+#ifndef GALOIS_RUNTIME_ORDERED_LOCKABLE_H
+#define GALOIS_RUNTIME_ORDERED_LOCKABLE_H
 
+#include "Galois/AltBag.h"
+
+#include <unordered_map>
 
 namespace Galois {
 namespace Runtime {
 
+// TODO: change comparator to three valued int instead of bool
+template <typename Ctxt, typename Cmp>
+struct ContextComparator {
+  const Cmp& cmp;
+
+  explicit ContextComparator (const Cmp& cmp): cmp (cmp) {}
+
+  inline bool operator () (const Ctxt* left, const Ctxt* right) const {
+    assert (left != NULL);
+    assert (right != NULL);
+    return cmp (left->getActive (), right->getActive ());
+  }
+};
+
+
+template <typename NItem, typename Ctxt, typename CtxtCmp>
+struct OrdLocFactoryBase {
+
+  CtxtCmp ctxtcmp;
+
+  explicit OrdLocFactoryBase (const CtxtCmp& ctxtcmp): ctxtcmp (ctxtcmp) {}
+
+  void construct (NItem* ni, Lockable* l) const {
+    assert (ni != nullptr);
+    assert (l != nullptr);
+
+    new (ni) NItem (l, ctxtcmp);
+  }
+};
+
+template <typename NItem, typename Ctxt, typename CtxtCmp>
+struct OrdLocBase: public LockManagerBase {
+
+  using Base = LockManagerBase;
+
+  using Factory = OrdLocFactoryBase<NItem, Ctxt, CtxtCmp>;
+
+  Lockable* lockable;
+
+  explicit OrdLocBase (Lockable* l): 
+    Base (), lockable (l) {}
+
+  bool tryMappingTo (Lockable* l) {
+    return Base::CASowner (l, NULL);
+  }
+
+  void clearMapping () {
+    // release requires having owned the lock
+    bool r = Base::tryLock (lockable);
+    assert (r);
+    Base::release (lockable);
+  }
+
+  // just for debugging
+  const Lockable* getMapping () const {
+    return lockable;
+  }
+
+  static NItem* getOwner (Lockable* l) {
+    LockManagerBase* o = LockManagerBase::getOwner (l);
+    // assert (dynamic_cast<DAGnhoodItem*> (o) != nullptr);
+    return static_cast<NItem*> (o);
+  }
+};
+
 /**
- * NItem inherits from LockManagerBase
- *
- * NItem implements the interface:
- *
- * bool tryMappingTo (Lockable* l);
- *
- * void clearMapping (void);
- *
- * const Lockable* getMapping (void) const;
- *
- * static NItem* getOwner (Lockable* l);
+ * NItem inherits from OrdLocBase publicly
  *
  * NItem contains nested type Factory
  *
@@ -37,23 +95,39 @@ public:
   typedef Galois::PerThreadBag<NItem*> NItemWL;
 
 protected:
-  NItemFactory factory;
+  NItemAlloc niAlloc;
+  NItemFactory& factory;
   NItemWL allNItems;
+
+  NItem* create (Lockable* l) {
+    NItem* ni = niAlloc.allocate (1);
+    assert (ni != nullptr);
+    factory.construct (ni, l);
+    return ni;
+  }
+
+  void destroy (NItem* ni) {
+    // delete ni; ni = NULL;
+    niAlloc.destroy (ni);
+    niAlloc.deallocate (ni, 1);
+    ni = NULL;
+  }
+
   
 public:
-  PtrBasedNhoodMgr(const NItemFactory& f): factory (f) {}
+  PtrBasedNhoodMgr(NItemFactory& f): factory (f) {}
 
   NItem& getNhoodItem (Lockable* l) {
 
     if (NItem::getOwner (l) == NULL) {
       // NItem* ni = new NItem (l, cmp);
-      NItem* ni = factory.create (l);
+      NItem* ni = create (l);
 
       if (ni->tryMappingTo (l)) {
         allNItems.get ().push_back (ni);
 
       } else {
-        factory.destroy (ni);
+        destroy (ni);
       }
 
       assert (NItem::getOwner (l) != NULL);
@@ -81,12 +155,12 @@ protected:
     PtrBasedNhoodMgr* self; 
     void operator()(NItem* ni) const {
       ni->clearMapping();
-      self->factory.destroy(ni);
+      self->destroy(ni);
     }
   };
 
   void resetAllNItems() {
-    Reset fn = { this };
+    Reset fn {this};
     do_all_impl(makeLocalRange(allNItems), fn);
   }
 };
@@ -168,4 +242,4 @@ public:
 
 
 
-#endif // GALOIS_RUNTIME_CUSTOM_LOCKABLE_H
+#endif // GALOIS_RUNTIME_ORDERED_LOCKABLE_H
