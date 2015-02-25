@@ -186,7 +186,7 @@ protected:
   }
 
   inline bool innerAtEnd () const {
-    assert ( m_inner == innerEndFn (*m_outer));
+    assert ( m_end_inner == innerEndFn (*m_outer));
     return m_inner == m_end_inner;
   }
 
