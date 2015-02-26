@@ -277,7 +277,7 @@ void PageRank_Bulk(std::vector<Node>& graph_nodes, int chunk_size, int iteration
             int i = recv_buffer[dest_host][j] ;
             ++j; // to access delta corresponding to index at j.
             if(host_ID == 0)
-              cout << "RESIDULE : " << recv_buffer[dest_host][j] <<"\n";
+              //cout << "RESIDULE : " << recv_buffer[dest_host][j] <<"\n";
             graph_nodes[i].residual += recv_buffer[dest_host][j];
           }
         }
@@ -387,33 +387,49 @@ int main(int argc, char** argv){
   int host_ID;
   MPI_Comm_rank(MPI_COMM_WORLD, &host_ID);
 
+
+  double start_time, end_time;
+
+  /* Marks the beginning of MPI process */
+  MPI_Barrier(MPI_COMM_WORLD);
+  start_time = MPI_Wtime();
+
+
   char processor_name[MPI_MAX_PROCESSOR_NAME];
   int name_len;
   MPI_Get_processor_name(processor_name, &name_len);
 
-  //if(host_ID == 0) {
 
-    // Reading inputFile in host 0
-    if (argc < 2) {
-      cout << "Usage : provide inputFile name\n";
-      exit(0);
-    }
+  // Reading inputFile in host 0
+  if (argc < 2) {
+    cout << "Usage : provide inputFile name\n";
+    exit(0);
+  }
 
-    int iterations = 2;
-    std::string inputFile = argv[1];
-    //cout << "File : " << inputFile << "\n";
+  int iterations = 2;
+  std::string inputFile = argv[1];
+  //cout << "File : " << inputFile << "\n";
 
-    std::vector<Node> graph_nodes;
-    ReadFile(inputFile, graph_nodes);
-    //cout << " Host : " << host_ID << "\n";
-    //cout << " Graph Construction\n";
+  std::vector<Node> graph_nodes;
+  ReadFile(inputFile, graph_nodes);
+  //cout << " Host : " << host_ID << "\n";
+  //cout << " Graph Construction\n";
 
   cout << " Host : " << host_ID << " Graph nodes : " << graph_nodes.size() << "\n";
 
   cout << "CALLING PAGE RANK\n";
   PageRank_Bulk(graph_nodes, global_chunk_size, iterations);
 
+
+  MPI_Barrier(MPI_COMM_WORLD);
+  end_time = MPI_Wtime();
+
+
   MPI_Finalize();
+
+  if(host_ID == 0) {
+    cout << "Runtime : " << end_time - start_time << "Seconds \n";
+  }
   return 0;
 }
 
