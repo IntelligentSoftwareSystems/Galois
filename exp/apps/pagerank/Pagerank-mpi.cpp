@@ -58,7 +58,7 @@ struct Node {
   std::list<unsigned> out_edges;
 
 };
-void ReadFile(std::string inputFile, std::vector<Node>& graph_nodes) {
+size_t ReadFile(std::string inputFile, std::vector<Node>& graph_nodes) {
   Galois::Graph::FileGraph fg;
   fg.fromFile(inputFile);
 
@@ -135,7 +135,7 @@ void ReadFile(std::string inputFile, std::vector<Node>& graph_nodes) {
   //}
 
 
-
+ return total_nodes;
 }
 
 
@@ -209,7 +209,7 @@ void PageRank_Bulk(std::vector<Node>& graph_nodes, int chunk_size, int iteration
           int index;
           if(dest_host == host_ID) {
             index = nb - host_ID*chunk_size;
-            graph_nodes[index].rank += delta;
+            graph_nodes[index].residual += delta;
           }
           else
           {
@@ -293,8 +293,92 @@ void PageRank_Bulk(std::vector<Node>& graph_nodes, int chunk_size, int iteration
 }
 
 
+void PageRank_Bulk_AlltoAll(std::vector<Node>& graph_nodes, int chunk_size, int iterations, size_t total_nodes) {
 
-  void PageRank(std::vector<Node>& graph_nodes) {
+  int num_hosts;
+  MPI_Comm_size(MPI_COMM_WORLD, &num_hosts);
+
+  int host_ID;
+  MPI_Comm_rank(MPI_COMM_WORLD, &host_ID);
+
+  int send_count[num_hosts];
+  int recv_count[num_hosts];
+
+  vector<float> send_buffer(total_nodes, 0.0);
+  vector<float> receive_buffer(total_nodes, 0.0);
+
+  //if(host_ID == 0) {
+       //cout << " BEFORE\n";
+      //for(int j = 0; j < chunk_size; ++j) {
+        //cout << "SEND RESIDUAL : " << send_buffer[j] <<"\n";
+      //}
+    //}
+
+
+  for(int iter = 0; iter < iterations; ++iter) {
+    cout << "Iteration : " << iter << " On host : " << host_ID << "\n";
+    for(auto& GNode : graph_nodes) {
+
+      int neighbors = GNode.out_edges.size();
+      float old_residual = GNode.residual;
+      GNode.residual = 0.0; // TODO: does old residual goes to zero
+      GNode.rank += old_residual;
+      float delta = old_residual*alpha/neighbors;
+
+      if (delta > 0) {
+
+        // Bulk Syncronous for all the nodes
+        for (auto& nb : GNode.out_edges) {
+          int dest_host = get_host(nb);
+          int index;
+          if(dest_host == host_ID) {
+            index = nb - host_ID*chunk_size;
+            graph_nodes[index].residual += delta;
+          }
+          else
+          {
+            send_buffer[nb] += delta;
+          }
+        }
+      }
+    }
+
+    // TODO: DO ALL-TO-ALL to send sizes around. Transpose. Try an example first.
+
+    // MPI_Alltoall to get send around count from each process to each process.
+    // fill receive count. ith count is data to be send to ith process.
+
+    // Exchange send and receive buffers
+    int status;
+    status = MPI_Alltoall(&send_buffer.front(), chunk_size, MPI_FLOAT, &receive_buffer.front(), chunk_size, MPI_INT, MPI_COMM_WORLD);
+    if(status != MPI_SUCCESS) {
+      cout << "MPI_Alltoall failed\n";
+      exit(0);
+    }
+
+    // Apply received delta.
+    int index = 0;
+    for(int j = 0; j < total_nodes; ++j) {
+      //if(host_ID == 0){
+        //cout << "index : "<< index << "\n";
+        //cout << "RESIDULE : " << receive_buffer[j] <<"\n";
+      //}
+      graph_nodes[index].residual += receive_buffer[j];
+      index++;
+      if(index >= chunk_size)
+        index = 0;
+    }
+
+  }
+
+
+  cout << host_ID << " : RANK : " << graph_nodes[0].rank << "\n";
+
+
+}
+
+
+void PageRank(std::vector<Node>& graph_nodes) {
 
     int host_ID;
   MPI_Comm_rank(MPI_COMM_WORLD, &host_ID);
@@ -411,14 +495,14 @@ int main(int argc, char** argv){
   //cout << "File : " << inputFile << "\n";
 
   std::vector<Node> graph_nodes;
-  ReadFile(inputFile, graph_nodes);
+  size_t total_nodes = ReadFile(inputFile, graph_nodes);
   //cout << " Host : " << host_ID << "\n";
   //cout << " Graph Construction\n";
 
   cout << " Host : " << host_ID << " Graph nodes : " << graph_nodes.size() << "\n";
 
   cout << "CALLING PAGE RANK\n";
-  PageRank_Bulk(graph_nodes, global_chunk_size, iterations);
+  PageRank_Bulk_AlltoAll(graph_nodes, global_chunk_size, iterations, total_nodes);
 
 
   MPI_Barrier(MPI_COMM_WORLD);
