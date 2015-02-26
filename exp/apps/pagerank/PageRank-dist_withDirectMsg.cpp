@@ -42,7 +42,7 @@ static const char* const url = 0;
 
 namespace cll = llvm::cl;
 static cll::opt<std::string> inputFile (cll::Positional, cll::desc("<input file>"), cll::Required);
-static cll::opt<unsigned int> maxIterations ("maxIterations", cll::desc("Maximum iterations"), cll::init(2));
+static cll::opt<unsigned int> maxIterations ("maxIterations", cll::desc("Maximum iterations"), cll::init(1));
 
 static int TOTAL_NODES;
 
