@@ -490,9 +490,13 @@ int main(int argc, char** argv){
     exit(0);
   }
 
-  int iterations = 2;
   std::string inputFile = argv[1];
   //cout << "File : " << inputFile << "\n";
+
+  int iterations = 2;
+  if (argc == 3) {
+    iterations = atoi(argv[2]);
+  }
 
   std::vector<Node> graph_nodes;
   size_t total_nodes = ReadFile(inputFile, graph_nodes);
