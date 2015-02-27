@@ -474,11 +474,6 @@ int main(int argc, char** argv){
 
   double start_time, end_time;
 
-  /* Marks the beginning of MPI process */
-  MPI_Barrier(MPI_COMM_WORLD);
-  start_time = MPI_Wtime();
-
-
   char processor_name[MPI_MAX_PROCESSOR_NAME];
   int name_len;
   MPI_Get_processor_name(processor_name, &name_len);
@@ -506,8 +501,12 @@ int main(int argc, char** argv){
   cout << " Host : " << host_ID << " Graph nodes : " << graph_nodes.size() << "\n";
 
   cout << "CALLING PAGE RANK\n";
-  PageRank_Bulk_AlltoAll(graph_nodes, global_chunk_size, iterations, total_nodes);
 
+  /* Marks the beginning of MPI process */
+  MPI_Barrier(MPI_COMM_WORLD);
+  start_time = MPI_Wtime();
+
+  PageRank_Bulk_AlltoAll(graph_nodes, global_chunk_size, iterations, total_nodes);
 
   MPI_Barrier(MPI_COMM_WORLD);
   end_time = MPI_Wtime();
