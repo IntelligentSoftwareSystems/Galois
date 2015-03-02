@@ -142,7 +142,7 @@ struct PageRankMsg {
     Galois::Timer round_time;
     for(int iterations = 0; iterations < maxIterations; ++iterations){
       round_time.start();
-      Galois::for_each_local(g, PageRank{g}, Galois::loopname("Page Rank"));
+      Galois::for_each_local(g, PageRankMsg{g}, Galois::loopname("Page Rank"));
       round_time.stop();
       std::cout<<"Iteration : " << iterations << "  Time : " << round_time.get() << "ms\n";
     }
@@ -167,8 +167,10 @@ struct PageRankMsg {
       if (dst.isLocal()) {
         LNode& ddata = g->at(dst, lockflag);
         atomicAdd(ddata.residual, delta);
+        //        std::cout << 'l';
       } else {
         net.sendAlt(((Galois::Runtime::fatPointer)dst).getHost(), remoteUpdate, g, dst, delta);
+        //        std::cout << 'r';
       }
     }
   }
@@ -294,7 +296,8 @@ int main(int argc, char** argv) {
     //typedef Galois::WorkList::dChunkedFIFO<512> WL;
     //Galois::for_each(g->begin(), g->end(), PageRank{g}, Galois::wl<WL>());
 
-    PageRank::go(g);
+    //PageRank::go(g);
+    PageRankMsg::go(g);
 
     timerPR.stop();
     std::cout << "Page Rank: " << timerPR.get() << " ms\n";
