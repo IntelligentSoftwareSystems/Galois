@@ -7,6 +7,7 @@
 #include "Galois/config.h"
 #include "Galois/Bag.h"
 #include "Galois/Runtime/ROBexecutor.h"
+#include "Galois/Runtime/OrderedSpeculation.h"
 #include "Galois/Runtime/LevelExecutor.h"
 #include "Galois/Runtime/KDGtwoPhase.h"
 #include "Galois/Runtime/DAGexec.h"
