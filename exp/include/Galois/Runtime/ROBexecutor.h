@@ -895,7 +895,7 @@ class ROBparaMeter: private boost::noncopyable {
   using CtxtDeq = Galois::PerThreadDeque<Ctxt*>;
 
   using PendingQ = Galois::MinHeap<T, Cmp>;
-  using ROB = Galois::MinHeap<Ctxt*, typename Ctxt::PtrComparator>;
+  using ROB = std::vector<Ctxt*>;
   using ExecutionRecords = std::vector<StepStats>;
 
   Cmp itemCmp;
@@ -923,8 +923,7 @@ public:
       nhFunc (nhFunc), 
       opFunc (opFunc), 
       loopname (loopname),
-      ctxtCmp (itemCmp),
-      rob (ctxtCmp)
+      ctxtCmp (itemCmp)
   {
     currPending = new PendingQ;
     nextPending = new PendingQ;
@@ -995,13 +994,14 @@ public:
 
         if (ctx->hasState (Ctxt::State::SCHEDULED)) {
           ctx->setState (Ctxt::State::READY_TO_COMMIT);
-          rob.push (ctx);
 
         } else {
           assert (ctx->hasState (Ctxt::State::ABORT_SELF));
           ctx->setState (Ctxt::State::ABORTING);
           ctx->doAbort ();
         }
+
+        rob.push_back (ctx);
       }
 
       size_t numCommitted = clearROB ();
@@ -1045,6 +1045,76 @@ private:
     return ctx;
   }
 
+  size_t clearROB (void) {
+    // first remove all tasks that are not in READY_TO_COMMIT
+    auto new_end = std::partition (rob.begin (), rob.end (), 
+        [] (Ctxt* c) { 
+          assert (c != nullptr);
+          return c->hasState (Ctxt::State::READY_TO_COMMIT);
+        });
+
+
+    for (auto i = new_end, end_i = rob.end (); i != end_i; ++i) {
+      assert ((*i)->hasState (Ctxt::State::ABORT_DONE));
+      freeCtxt (*i);
+    }
+
+    rob.erase (new_end, rob.end ());
+
+    // now sort in reverse order
+    auto revCmp = [this] (Ctxt* a, Ctxt* b) { 
+      assert (a != nullptr);
+      assert (b != nullptr);
+      return !ctxtCmp (a, b);
+    };
+
+    std::sort (rob.begin (), rob.end (), revCmp);
+
+    // for debugging only, there should be no duplicates
+    auto uniq_end = std::unique (rob.begin (), rob.end ());
+    assert (uniq_end == rob.end ());
+
+    size_t numCommitted = 0;
+
+    while (!rob.empty ()) {
+      Ctxt* head = rob.back ();
+
+      assert (head->hasState (Ctxt::State::READY_TO_COMMIT));
+
+      dbg::debug ("head of rob ready to commit : ", head);
+      bool earliest = false;
+      if (!nextPending->empty ()) {
+        earliest = !itemCmp (nextPending->top (), head->active);
+
+      } else {
+        earliest = true;
+      }
+
+      if (earliest) {
+
+        head->setState (Ctxt::State::COMMITTING);
+        head->doCommit ();
+        rob.pop_back ();
+
+        const size_t s = head->step;
+        assert (s < execRcrds.size ());
+        ++execRcrds[s].parallelism;
+        numCommitted += 1;
+        freeCtxt (head);
+
+
+      } else {
+        dbg::debug ("head of rob could not commit : ", head);
+        break;
+      }
+
+    }
+
+    return numCommitted;
+
+  }
+
+  /*
   size_t clearROB (void) {
 
     size_t numCommitted = 0;
@@ -1091,6 +1161,7 @@ private:
 
     return numCommitted;
   }
+  */
 
 
 

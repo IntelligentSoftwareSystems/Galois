@@ -266,7 +266,7 @@ class OptimParaMeterExecutor: private boost::noncopyable {
   using CtxtCmp = typename Ctxt::CtxtCmp;
   using NItemFactory = typename Ctxt::NItem::Factory;
 
-  using CommitQ = Galois::MinHeap<Ctxt*, CtxtCmp>;
+  using CommitQ = std::vector<Ctxt*>;
   using PendingQ = Galois::MinHeap<Ctxt*, CtxtCmp>;
 
   using CtxtAlloc = Runtime::MM::FixedSizeAllocator<Ctxt>;
@@ -299,8 +299,7 @@ public:
       loopname (loopname),
       ctxtCmp (itemCmp),
       nitemFactory (ctxtCmp),
-      nhmgr (nitemFactory),
-      rob (ctxtCmp)
+      nhmgr (nitemFactory)
   {
     currPending = new PendingQ (ctxtCmp);
     nextPending = new PendingQ (ctxtCmp);
@@ -391,14 +390,8 @@ public:
           ctxt->publishChanges ();
 
           dbg::debug (ctxt, " adding self to rob");
-          rob.push (ctxt);
+          rob.push_back (ctxt);
           assert (std::find (rob.begin (), rob.end (), ctxt) != rob.end ());
-
-          // for debugging
-          // if (!rob.find (ctxt)) {
-            // Ctxt* found = *(std::find (rob.begin (), rob.end (), ctxt));
-            // dbg::debug (ctxt, " add to rob failed. found:  ", found, " with active: ", found->active);
-          // }
 
         } else {
           assert (ctxt->hasState (ContextState::ABORT_SELF));
@@ -411,7 +404,7 @@ public:
       totalCommits += numCommitted;
 
       if (numCommitted == 0) {
-        dbg::debug ("head of rob: ", rob.top (),  "  with item: ", rob.top ()->active);
+        dbg::debug ("head of rob: ", rob.back (),  "  with item: ", rob.back ()->active);
 
         dbg::debug ("head of nextPending: ", nextPending->top (),  "  with item: ", nextPending->top ()->active);
       }
@@ -468,56 +461,66 @@ private:
   }
 
   size_t clearROB (void) {
+    // first remove all tasks that are not in READY_TO_COMMIT
+    auto new_end = std::partition (rob.begin (), rob.end (), 
+        [] (Ctxt* c) { 
+          assert (c != nullptr);
+          return c->hasState (ContextState::READY_TO_COMMIT);
+        });
+
+
+    rob.erase (new_end, rob.end ());
+
+    // now sort in reverse order
+    auto revCmp = [this] (Ctxt* a, Ctxt* b) { 
+      assert (a != nullptr);
+      assert (b != nullptr);
+      return !ctxtCmp (a, b);
+    };
+
+    std::sort (rob.begin (), rob.end (), revCmp);
+
+    // for debugging only, there should be no duplicates
+    auto uniq_end = std::unique (rob.begin (), rob.end ());
+    assert (uniq_end == rob.end ());
 
     size_t numCommitted = 0;
 
     while (!rob.empty ()) {
-      Ctxt* head = rob.top ();
-      dbg::debug ("head of rob: ", head);
+      Ctxt* head = rob.back ();
 
-      if (head->hasState (ContextState::ABORTED_CHILD)
-          || head->hasState (ContextState::COMMIT_DONE)
-          || head->hasState (ContextState::UNSCHEDULED)) {
-        dbg::debug ("head of rob removed because aborted : ", head);
-        rob.pop ();
-        continue;
+      assert (head->hasState (ContextState::READY_TO_COMMIT));
 
-      } else if (head->hasState (ContextState::READY_TO_COMMIT)) {
-        assert (currPending->empty ());
-
-        dbg::debug ("head of rob ready to commit : ", head);
-        bool earliest = false;
-        if (!nextPending->empty ()) {
-          earliest = !ctxtCmp (nextPending->top (), head);
-
-        } else {
-          earliest = true;
-        }
-
-        if (earliest) {
-
-          head->doCommit ();
-          Ctxt* t = rob.pop ();
-          assert (t == head);
-
-          const size_t s = head->step;
-          assert (s < execRcrds.size ());
-          ++execRcrds[s].parallelism;
-          numCommitted += 1;
-          freeCtxt (t);
-
-
-        } else {
-          dbg::debug ("head of rob could not commit : ", head);
-          break;
-        }
+      dbg::debug ("head of rob ready to commit : ", head);
+      bool earliest = false;
+      if (!nextPending->empty ()) {
+        earliest = !ctxtCmp (nextPending->top (), head);
 
       } else {
-        GALOIS_DIE ("head in rob with invalid status");
+        earliest = true;
       }
+
+      if (earliest) {
+
+        head->doCommit ();
+        rob.pop_back ();
+
+        const size_t s = head->step;
+        assert (s < execRcrds.size ());
+        ++execRcrds[s].parallelism;
+        numCommitted += 1;
+        freeCtxt (head);
+
+
+      } else {
+        dbg::debug ("head of rob could not commit : ", head);
+        break;
+      }
+
     }
 
     return numCommitted;
+
   }
 
 };
