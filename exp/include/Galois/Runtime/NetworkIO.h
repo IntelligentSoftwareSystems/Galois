@@ -25,6 +25,8 @@
 #define GALOIS_RUNTIME_NETWORKTHREAD_H
 
 #include <cstdint>
+#include <vector>
+#include <tuple>
 
 namespace Galois {
 namespace Runtime {
