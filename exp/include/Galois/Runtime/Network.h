@@ -29,15 +29,6 @@
 #include "Galois/Runtime/Serialize.h"
 
 #include <cstdint>
-#include <tuple>
-#include <unordered_map>
-
-//#define USE_TCP
-//#define USE_MPI_ASYNC
-//#define USE_MPI_SYNC
-//#define USE_MPI_P2P
-#define USE_ROUTED_MPI
-//#define USE_BUF
 
 namespace Galois {
 namespace Runtime {
@@ -90,7 +81,7 @@ public:
   //!it is only valid for that thread to call this function
   virtual bool handleReceives() = 0;
 
-  virtual void flush();
+  virtual void flush() = 0;
 
   //! start a listen loop if not the lead process
   //! FIXME: should this be split out?
@@ -108,6 +99,9 @@ public:
 
 NetworkInterface& getSystemNetworkInterface();
 uint32_t getHostID();
+
+NetworkInterface& makeNetworkBuffered();
+NetworkInterface& makeNetworkRouted();
 
 ////////////////////////////////////////////////////////////////////////////////
 // Implementations
