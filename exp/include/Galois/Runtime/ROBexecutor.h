@@ -30,12 +30,13 @@
 #include "Galois/gdeque.h"
 #include "Galois/PriorityQueue.h"
 #include "Galois/Timer.h"
+#include "Galois/PerThreadContainer.h"
 
 #include "Galois/Runtime/Barrier.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/Executor_DoAll.h"
+#include "Galois/Runtime/Executor_ParaMeter.h"
 #include "Galois/Runtime/ForEachTraits.h"
-#include "Galois/Runtime/PerThreadContainer.h"
 #include "Galois/Runtime/Range.h"
 #include "Galois/Runtime/Sampling.h"
 #include "Galois/Runtime/Support.h"
@@ -811,33 +812,7 @@ private:
 };
 
 
-template <typename R, typename Cmp, typename NhFunc, typename OpFunc>
-void for_each_ordered_rob (const R& range, Cmp cmp, NhFunc nhFunc, OpFunc opFunc, const char* loopname=0) {
-
-  using T = typename R::value_type;
-
-  Galois::Runtime::beginSampling ();
-
-  ROBexecutor<T, Cmp, NhFunc, OpFunc>  exec (cmp, nhFunc, opFunc);
-
-  if (range.begin () != range.end ()) {
-
-    exec.push_initial (range);
-
-    getSystemThreadPool ().run (activeThreads, std::ref(exec));
-
-    Galois::Runtime::endSampling ();
-
-    exec.printStats ();
-  }
-}
-
-template <typename Iter, typename Cmp, typename NhFunc, typename OpFunc, typename StableTest>
-void for_each_ordered_rob (Iter beg, Iter end, Cmp cmp, NhFunc nhFunc, OpFunc opFunc, StableTest stabilityTest, const char* loopname=0) {
-
-  for_each_ordered_rob (beg, end, cmp, nhFunc, opFunc, loopname);
-}
-
+namespace ParaMeter {
 
 template <typename T, typename Cmp, typename Exec>
 class ROBparamContext: public ROBcontext<T, Cmp, Exec> {
@@ -896,10 +871,12 @@ private:
     bool ret = false;
     if (Base::executor.getCtxtCmp () (this, that)) {
       assert (that->hasState (Base::State::READY_TO_COMMIT));
+      that->setState (Base::State::ABORTING);
       that->doAbort ();
       dbg::debug (this, " aborting ", that, " on lock ", l);
 
     } else {
+      this->setState (Base::State::ABORT_SELF);
       ret = true;
     }
 
@@ -908,42 +885,51 @@ private:
 
 };
 
+
 template <typename T, typename Cmp, typename NhFunc, typename OpFunc>
 class ROBparaMeter: private boost::noncopyable {
 
   using Ctxt = ROBparamContext<T, Cmp, ROBparaMeter>;
   using CtxtAlloc = MM::FixedSizeAllocator<Ctxt>;
   using CtxtCmp = typename Ctxt::PtrComparator;
-  using CtxtDeq = Galois::Runtime::PerThreadDeque<Ctxt*>;
+  using CtxtDeq = Galois::PerThreadDeque<Ctxt*>;
 
   using PendingQ = Galois::MinHeap<T, Cmp>;
-  using ROB = Galois::MinHeap<Ctxt*, typename Ctxt::PtrComparator>;
-  using ExecutionRecord = std::vector<size_t>;
+  using ROB = std::vector<Ctxt*>;
+  using ExecutionRecords = std::vector<StepStats>;
 
   Cmp itemCmp;
   NhFunc nhFunc;
   OpFunc opFunc;
+  const char* loopname;
+
   CtxtCmp ctxtCmp;
+  ROB rob;
 
   PendingQ* currPending;
   PendingQ* nextPending;
-  ROB rob;
   CtxtAlloc ctxtAlloc;
-  ExecutionRecord execRcrd;
+  ExecutionRecords execRcrds;
   size_t steps;
 
+
 public:
-  ROBparaMeter (const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc)
+  // TODO: unused statistic added to avoid compile error. Fix ROBcontext
+  size_t abortByOther = 0;
+
+  ROBparaMeter (const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const char* loopname)
     : 
       itemCmp (cmp), 
       nhFunc (nhFunc), 
       opFunc (opFunc), 
-      ctxtCmp (itemCmp),
-      rob (ctxtCmp)
+      loopname (loopname),
+      ctxtCmp (itemCmp)
   {
     currPending = new PendingQ;
     nextPending = new PendingQ;
     steps = 0;
+
+    if (loopname == nullptr) { loopname = "NULL"; }
   }
 
   ~ROBparaMeter (void) {
@@ -957,6 +943,11 @@ public:
 
   const CtxtCmp& getCtxtCmp () const { return ctxtCmp; }
 
+  template <typename R>
+  void push_initial (const R& range) {
+    push (range.begin (), range.end ());
+  }
+
   template <typename Iter>
   void push (Iter beg, Iter end) {
     for (Iter i = beg; i != end; ++i) {
@@ -968,20 +959,30 @@ public:
     nextPending->push (x);
   }
 
+  void push_abort (const T& x, const unsigned owner) {
+    nextPending->push (x);
+  }
+
   void execute () {
+
+    size_t totalIter = 0;
+    size_t totalCommits = 0;
 
     while (!nextPending->empty () || !rob.empty ()) {
 
       ++steps;
       std::swap (currPending, nextPending);
       nextPending->clear ();
-      execRcrd.push_back (0); // create record entry for current step;
+      execRcrds.emplace_back (steps - 1, currPending->size ()); // create record entry for current step;
+      assert (execRcrds.size () == steps);
 
       while (!currPending->empty ()) {
         Ctxt* ctx = schedule ();
         assert (ctx != nullptr);
 
         dbg::debug (ctx, " scheduled with item ", ctx->active);
+
+        ++totalIter;
 
         Galois::Runtime::setThreadContext (ctx);
         nhFunc (ctx->active, ctx->userHandle);
@@ -993,24 +994,42 @@ public:
 
         if (ctx->hasState (Ctxt::State::SCHEDULED)) {
           ctx->setState (Ctxt::State::READY_TO_COMMIT);
-          rob.push (ctx);
 
         } else {
           assert (ctx->hasState (Ctxt::State::ABORT_SELF));
           ctx->setState (Ctxt::State::ABORTING);
           ctx->doAbort ();
-          nextPending->push (ctx->item);
         }
+
+        rob.push_back (ctx);
       }
 
       size_t numCommitted = clearROB ();
-
       assert (numCommitted > 0);
 
+      totalCommits += numCommitted;
+
     }
+
+    std::printf ("OptimParaMeterExecutor: steps=%zd, totalIter=%zd, totalCommits=%zd, avg=%f\n", steps, totalIter, totalCommits, float(totalCommits)/float(steps));
+
+    finish ();
   }
   
 private:
+
+  void freeCtxt (Ctxt* ctxt) {
+    ctxtAlloc.destroy (ctxt);
+    ctxtAlloc.deallocate (ctxt, 1);
+  }
+
+  void finish (void) {
+    for (const StepStats& s: execRcrds) {
+      s.dump (getStatsFile (), loopname);
+    }
+
+    closeStatsFile ();
+  }
 
   Ctxt* schedule () {
 
@@ -1027,6 +1046,76 @@ private:
   }
 
   size_t clearROB (void) {
+    // first remove all tasks that are not in READY_TO_COMMIT
+    auto new_end = std::partition (rob.begin (), rob.end (), 
+        [] (Ctxt* c) { 
+          assert (c != nullptr);
+          return c->hasState (Ctxt::State::READY_TO_COMMIT);
+        });
+
+
+    for (auto i = new_end, end_i = rob.end (); i != end_i; ++i) {
+      assert ((*i)->hasState (Ctxt::State::ABORT_DONE));
+      freeCtxt (*i);
+    }
+
+    rob.erase (new_end, rob.end ());
+
+    // now sort in reverse order
+    auto revCmp = [this] (Ctxt* a, Ctxt* b) { 
+      assert (a != nullptr);
+      assert (b != nullptr);
+      return !ctxtCmp (a, b);
+    };
+
+    std::sort (rob.begin (), rob.end (), revCmp);
+
+    // for debugging only, there should be no duplicates
+    auto uniq_end = std::unique (rob.begin (), rob.end ());
+    assert (uniq_end == rob.end ());
+
+    size_t numCommitted = 0;
+
+    while (!rob.empty ()) {
+      Ctxt* head = rob.back ();
+
+      assert (head->hasState (Ctxt::State::READY_TO_COMMIT));
+
+      dbg::debug ("head of rob ready to commit : ", head);
+      bool earliest = false;
+      if (!nextPending->empty ()) {
+        earliest = !itemCmp (nextPending->top (), head->active);
+
+      } else {
+        earliest = true;
+      }
+
+      if (earliest) {
+
+        head->setState (Ctxt::State::COMMITTING);
+        head->doCommit ();
+        rob.pop_back ();
+
+        const size_t s = head->step;
+        assert (s < execRcrds.size ());
+        ++execRcrds[s].parallelism;
+        numCommitted += 1;
+        freeCtxt (head);
+
+
+      } else {
+        dbg::debug ("head of rob could not commit : ", head);
+        break;
+      }
+
+    }
+
+    return numCommitted;
+
+  }
+
+  /*
+  size_t clearROB (void) {
 
     size_t numCommitted = 0;
 
@@ -1034,7 +1123,7 @@ private:
       Ctxt* head = rob.top ();
 
       if (head->hasState (Ctxt::State::ABORT_DONE)) {
-        rob.pop ();
+        freeCtxt (rob.pop ());
         continue;
 
       } else if (head->hasState (Ctxt::State::READY_TO_COMMIT)) {
@@ -1055,9 +1144,10 @@ private:
           assert (t == head);
 
           const size_t s = head->step;
-          assert (s < execRcrd.size ());
-          ++execRcrd[s];
+          assert (s < execRcrds.size ());
+          ++execRcrds[s].parallelism;
           numCommitted += 1;
+          freeCtxt (t);
 
 
         } else {
@@ -1071,12 +1161,41 @@ private:
 
     return numCommitted;
   }
+  */
 
 
 
 };
 
 
+
+} // end namespace ParaMeter
+
+template <typename R, typename Cmp, typename NhFunc, typename OpFunc>
+void for_each_ordered_rob (const R& range, Cmp cmp, NhFunc nhFunc, OpFunc opFunc, const char* loopname=0) {
+
+  using T = typename R::value_type;
+
+  ParaMeter::ROBparaMeter<T, Cmp, NhFunc, OpFunc> exec (cmp, nhFunc, opFunc, loopname);
+
+  exec.push_initial (range);
+  exec.execute ();
+
+  // Galois::Runtime::beginSampling ();
+// 
+  // ROBexecutor<T, Cmp, NhFunc, OpFunc>  exec (cmp, nhFunc, opFunc, loopname);
+// 
+  // if (range.begin () != range.end ()) {
+// 
+    // exec.push_initial (range);
+// 
+    // getSystemThreadPool ().run (activeThreads, std::ref(exec));
+// 
+    // Galois::Runtime::endSampling ();
+// 
+    // exec.printStats ();
+  // }
+}
 
 
 } // end namespace Runtime

@@ -5,6 +5,7 @@ namespace cll = llvm::cl;
 enum ExecType {
   CHROMATIC,
   EDGE_FLIP,
+  TOPO,
 };
 
 static cll::opt<ExecType> execType (
@@ -13,18 +14,19 @@ static cll::opt<ExecType> execType (
     cll::values (
       clEnumValN (CHROMATIC, "CHROMATIC", "Chromatic Executor"),
       clEnumValN (EDGE_FLIP, "EDGE_FLIP", "Edge Flipping DAG overlayed on input graph"),
+      clEnumValN (TOPO, "TOPO", "Edge Flipping DAG overlayed on input graph"),
       clEnumValEnd),
     cll::init (CHROMATIC));
 
 
-struct NodeData: public Galois::Runtime::DAGdata, PData {
+struct NodeData: public Galois::Runtime::InputDAGdataInOut, PData {
 
   NodeData (void)
-    : Galois::Runtime::DAGdata (0), PData ()
+    : Galois::Runtime::InputDAGdataInOut (0), PData ()
   {}
 
   NodeData (unsigned id, unsigned outdegree)
-    : Galois::Runtime::DAGdata (id), PData (outdegree)
+    : Galois::Runtime::InputDAGdataInOut (id), PData (outdegree)
   {}
 
 
@@ -38,7 +40,6 @@ typedef typename Galois::Graph::LC_CSR_Graph<NodeData, void>
 class PageRankChromatic: public PageRankBase<InnerGraph> {
 protected:
 
-  template <bool useOnWL> 
   struct ApplyOperator {
 
     static const unsigned CHUNK_SIZE = DEFAULT_CHUNK_SIZE;
@@ -48,7 +49,7 @@ protected:
 
     template <typename C>
     void operator () (GNode src, C& ctx) {
-      outer.applyOperator<useOnWL> (src, ctx);
+      outer.applyOperator (src, ctx);
     }
   };
 
@@ -59,21 +60,25 @@ protected:
       case CHROMATIC:
         Galois::Runtime::for_each_det_chromatic (
             Galois::Runtime::makeLocalRange (graph),
-            ApplyOperator<false> {*this},
+            ApplyOperator {*this},
             graph,
             "page-rank-chromatic");
         break;
 
       case EDGE_FLIP:
-#if 0
-        Galois::Runtime::for_each_det_dag_active (
+        Galois::Runtime::for_each_det_edge_flip_ar (
             Galois::Runtime::makeLocalRange (graph),
+            ApplyOperator {*this},
             graph,
-            ApplyOperator<false> {*this},
             "page-rank-chromatic");
-#else
-        abort();
-#endif
+        break;
+
+      case TOPO:
+        Galois::Runtime::for_each_det_edge_flip_topo (
+            Galois::Runtime::makeLocalRange (graph),
+            ApplyOperator {*this},
+            graph,
+            "page-rank-chromatic");
         break;
 
       default:

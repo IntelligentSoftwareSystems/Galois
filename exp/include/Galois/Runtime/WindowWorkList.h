@@ -27,8 +27,9 @@
 
 #include "Galois/Accumulator.h"
 #include "Galois/RangePQ.h"
+#include "Galois/PerThreadContainer.h"
+
 #include "Galois/Runtime/ll/gio.h"
-#include "Galois/Runtime/PerThreadContainer.h"
 
 
 namespace Galois {
@@ -36,7 +37,7 @@ namespace Runtime {
 
 template <typename T, typename Cmp>
 class SortedRangeWindowWL {
-  using PerThrdWL = Galois::Runtime::PerThreadVector<T>;
+  using PerThrdWL = Galois::PerThreadVector<T>;
   using Iter = typename PerThrdWL::local_iterator;
   using Range = std::pair<Iter, Iter>;
 
@@ -199,7 +200,7 @@ public:
 template <typename T, typename Cmp>
 class PQbasedWindowWL {
 
-  using PerThrdWL = Galois::Runtime::PerThreadMinHeap<T, Cmp>;
+  using PerThrdWL = Galois::PerThreadMinHeap<T, Cmp>;
 
   Cmp cmp;
   PerThrdWL m_wl;

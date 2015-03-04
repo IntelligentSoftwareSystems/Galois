@@ -148,11 +148,12 @@ void do_all_impl(const RangeTy& range, const FunctionTy& f, const char* loopname
     DoAllExecutor<FunctionTy, RangeTy> W(f, range, loopname);
     getSystemThreadPool().run(activeThreads, std::ref(W));
   } else {
-    getSystemThreadPool().run(activeThreads, [&f, &range] () {
+    FunctionTy f_cpy (f);
+    getSystemThreadPool().run(activeThreads, [&f_cpy, &range] () {
         auto begin = range.local_begin();
         auto end = range.local_end();
         while (begin != end)
-          f(*begin++);
+          f_cpy(*begin++);
       });
   }
 }

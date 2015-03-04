@@ -10,22 +10,28 @@
 
 namespace Galois {
 
+namespace Runtime {
+
 enum DetExecType {
   non_det,
   det_i,
   det_ar,
   kdg_i,
   kdg_ar,
+  kdg_r,
   chromatic,
+  topo,
   edge_flip
 };
 
 static cll::opt<DetExecType> detExecTypeArg("detexec", cll::desc("Choose schedule for asynchronous algorithm"),
   cll::values(
     clEnumValN(non_det, "non_det", "non deterministic using for_each"),
-    clEnumValN(det_i, "", "deterministic using implicit kdg"),
+    clEnumValN(det_i, "det_i", "deterministic using implicit kdg"),
     clEnumValN(det_ar, "det_ar", "deterministic add-remove"),
+    clEnumValN(kdg_r, "kdg_r", "kdg_r"),
     clEnumValN(chromatic, "chromatic", "chromatic"),
+    clEnumValN(topo, "topo", "topo"),
     clEnumValN(edge_flip, "edge_flip", "edge_flip"),
   clEnumValEnd),
   cll::init(det_i));
@@ -91,6 +97,10 @@ void for_each_det_choice (const R& range, const F& func, G& graph, const char* l
       Galois::Runtime::for_each_det_edge_flip_ar (range, func, graph, loopname);
       break;
 
+    case topo:
+      Galois::Runtime::for_each_det_edge_flip_topo (range, func, graph, loopname);
+      break;
+
     default:
       GALOIS_DIE ("not implemented");
       break;
@@ -109,6 +119,10 @@ void for_each_det_choice (const R& range, const F& func, G& graph, M& dagManager
       Galois::Runtime::for_each_det_edge_flip_ar (range, func, graph, dagManager, loopname);
       break;
 
+    case topo:
+      Galois::Runtime::for_each_det_edge_flip_topo (range, func, graph, dagManager, loopname);
+      break;
+
     default:
       GALOIS_DIE ("not implemented");
       break;
@@ -118,7 +132,125 @@ void for_each_det_choice (const R& range, const F& func, G& graph, M& dagManager
 }
 
 
+template <typename T, typename G, typename M, typename F, typename N, typename C> 
+struct ReuseableExecutorWrapper {
 
+  typedef Galois::Runtime::ChromaticReuseExecutor<G, M, F> Chrom;
+  typedef Galois::Runtime::InputGraphDAGreuseExecutor<G, M, F> InputDAG;
+  typedef Galois::Runtime::DAGexecutorRW<T, C, F, N> TaskDAG;
+
+
+  DetExecType detExec;
+
+  Chrom chromExec;
+  InputDAG inputDAGexec;
+  TaskDAG taskDAGexec;
+
+  ReuseableExecutorWrapper (
+      DetExecType detExec,
+      G& graph,
+      M& dagManager,
+      const F& func,
+      const N& nhVisitor,
+      const C& cmp, 
+      const char* loopname)
+    :
+      detExec {detExec},
+      chromExec {graph, dagManager, func, loopname},
+      inputDAGexec {graph, dagManager, func, loopname},
+      taskDAGexec {cmp, nhVisitor, func, loopname}
+  {}
+
+
+  template <typename R>
+  void initialize (const R& range) {
+
+    switch (detExec) {
+
+      case chromatic:
+        chromExec.initialize (range);
+        break;
+
+      case edge_flip:
+        inputDAGexec.initialize (range);
+        break;
+
+      case kdg_r:
+        taskDAGexec.initialize (range);
+        break;
+
+      default:
+        GALOIS_DIE ("det exec type not supported");
+        break;
+    }
+  }
+
+
+  void execute (void) {
+    switch (detExec) {
+
+      case chromatic:
+        chromExec.execute ();
+        break;
+
+      case edge_flip:
+        inputDAGexec.execute ();
+        break;
+
+      case kdg_r:
+        taskDAGexec.execute ();
+        break;
+
+      default:
+        GALOIS_DIE ("det exec type not supported");
+        break;
+    }
+    
+  }
+
+  void reinitDAG (void) {
+    switch (detExec) {
+
+      case chromatic:
+        chromExec.reinitDAG ();
+        break;
+
+      case edge_flip:
+        inputDAGexec.reinitDAG ();
+        break;
+
+      case kdg_r:
+        taskDAGexec.reinitDAG ();
+        break;
+
+      default:
+        GALOIS_DIE ("det exec type not supported");
+        break;
+    }
+  }
+
+};
+
+
+
+template <typename R, typename G, typename M, typename F, typename N, typename C>
+
+ReuseableExecutorWrapper<typename R::value_type, G, M, F, N, C>* make_reusable_dag_exec (const R& range, G& graph, M& dagManager, const F& func, const N& nhVisitor, const C& cmp, const char* loopname, DetExecType detExec=detExecTypeArg) {
+
+  return new ReuseableExecutorWrapper<typename R::value_type, G, M, F, N, C> {
+    detExec,
+    graph,
+    dagManager,
+    func,
+    nhVisitor,
+    cmp,
+    loopname
+  };
+}
+
+
+
+} // end namespace Runtime
 
 
 } // end namespace Galois

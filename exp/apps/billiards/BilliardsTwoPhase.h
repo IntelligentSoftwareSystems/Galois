@@ -26,8 +26,10 @@
 #ifndef BILLIARDS_TWO_PHASE_H
 #define BILLIARDS_TWO_PHASE_H
 
+#include "Galois/PerThreadContainer.h"
+
 #include "Galois/Graph/Graph.h"
-#include "Galois/Runtime/PerThreadContainer.h"
+
 #include "Galois/Runtime/KDGtwoPhase.h"
 
 #include "Billiards.h"
@@ -35,7 +37,7 @@
 
 class BilliardsTwoPhase: public Billiards {
 
-  using AddListTy = Galois::Runtime::PerThreadVector<Event>;
+  using AddListTy = Galois::PerThreadVector<Event>;
 
   struct VisitNhood {
     static const unsigned CHUNK_SIZE = 1;
