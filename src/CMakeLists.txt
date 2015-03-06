@@ -33,7 +33,7 @@ endif()
 
 set(include_dirs "${PROJECT_SOURCE_DIR}/include/")
 if(USE_EXP)
-  file(GLOB exp_sources ../exp/src/*.cpp)
+  file(GLOB exp_sources ../exp/src/*.cpp ../exp/src/net/*.cpp)
   set(include_dirs ${include_dirs} "${PROJECT_SOURCE_DIR}/exp/include/")
   set(sources ${sources} ${exp_sources})
 endif()

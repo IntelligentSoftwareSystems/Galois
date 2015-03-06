@@ -25,6 +25,7 @@
 #include "Galois/Runtime/Barrier.h"
 #include "Galois/Runtime/Directory.h"
 #include "Galois/Runtime/Network.h"
+#include "Galois/Runtime/NetworkIO.h"
 #include "Galois/Runtime/NetworkBackend.h"
 
 #include <type_traits>
@@ -38,6 +39,8 @@ uint32_t Galois::Runtime::NetworkInterface::ID = 0;
 uint32_t Galois::Runtime::NetworkInterface::Num = 1;
 
 uint32_t Galois::Runtime::getHostID() { return NetworkInterface::ID; }
+
+Galois::Runtime::NetworkIO::~NetworkIO() {}
 
 //FIXME: move top level loop out of network interface
 
@@ -101,7 +104,7 @@ void NetworkInterface::reportStats() {
 }
 
 unsigned long NetworkInterface::reportSendBytes() {
-  statSendBytes.getVal();
+  return statSendBytes.getVal();
 }
 
 void NetworkInterface::terminate() {
@@ -186,3 +189,6 @@ NetworkBackend::~NetworkBackend() {
 
 NetworkBackend::NetworkBackend(unsigned size) :sz(size) {}
 
+NetworkInterface& Galois::Runtime::getSystemNetworkInterface() {
+  return makeNetworkBuffered();
+}

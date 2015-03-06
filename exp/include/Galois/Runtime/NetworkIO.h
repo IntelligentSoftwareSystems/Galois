@@ -24,26 +24,30 @@
 #ifndef GALOIS_RUNTIME_NETWORKTHREAD_H
 #define GALOIS_RUNTIME_NETWORKTHREAD_H
 
-#include <vector>
 #include <cstdint>
+#include <vector>
+#include <tuple>
 
 namespace Galois {
 namespace Runtime {
 
 class NetworkIO {
  public:
-  struct message {
-    uint32_t dest;
-    std::vector<char> data;
-    bool urgent;
-  };
+  virtual ~NetworkIO();
   
+  //destructive of data buffer
+  virtual void enqueue(uint32_t dest, std::vector<uint8_t>& data) = 0;
+  //returns empty if no message
+  virtual std::vector<uint8_t> dequeue() = 0;
+
   //void operator() () -- make progress
   //bool readySend() -- can send
   //bool readyRecv() -- packet waiting
   //void send(const message&) -- send data
   //message recv() -- recieve data
 };
+
+std::tuple<NetworkIO*, uint32_t, uint32_t> makeNetworkIOMPI();
 
 } //namespace Runtime
 } //namespace Galois

@@ -86,8 +86,8 @@ public:
 
   SerializeBuffer() {
     //reserve a header
-    bufdata.resize(2*sizeof(void*));
-    start = 2*sizeof(void*);
+    bufdata.resize(3*sizeof(void*));
+    start = 3*sizeof(void*);
   }
 
   SerializeBuffer(SerializeBuffer&& rhs) = default;  //disable copy constructor
