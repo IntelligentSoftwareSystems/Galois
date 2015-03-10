@@ -11,7 +11,8 @@
 
 using namespace Galois::Runtime;
 
-static const int trials = 1000000;
+//tests small message bandwidth
+
 static int num = 0;
 
 void func(RecvBuffer&) {
@@ -19,8 +20,15 @@ void func(RecvBuffer&) {
 }
 
 int main(int argc, char** argv) {
+
+  int trials = 1000000;
+  if (argc > 1)
+    trials = atoi(argv[0]);
+
   NetworkInterface& net = getSystemNetworkInterface();
-  Galois::StatManager sm;
+  //  Galois::StatManager sm;
+
+  std::cout << "Sending " << trials << " between every host.  " << trials * (net.Num - 1) << " total messages per host.\n";
 
   getSystemBarrier().wait();
 
@@ -41,5 +49,8 @@ int main(int argc, char** argv) {
   std::cerr << "\n*" << net.ID << " " << T.get() << "!" << num << "\n";
   std::cout << "Calling MPI_Finaliz\n";
   MPI_Finalize();
+  std::stringstream os;
+  os << net.ID << ": " << T.get() << "ms " << num << " " << (double)num / T.get() << " msg/ms\n";
+  std::cout << os.str();
   return 0;
 }
