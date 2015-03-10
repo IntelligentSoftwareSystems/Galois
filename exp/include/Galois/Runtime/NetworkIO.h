@@ -33,6 +33,11 @@ namespace Runtime {
 
 class NetworkIO {
  public:
+ struct message {
+    uint32_t dest;
+    std::vector<char> data;
+    bool urgent;
+  };
   virtual ~NetworkIO();
   
   //destructive of data buffer
