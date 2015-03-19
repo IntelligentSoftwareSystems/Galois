@@ -8,10 +8,10 @@
 #include "Galois/DoAllWrap.h"
 #include "Galois/Graph/Util.h"
 #include "Galois/Graph/Graph.h"
+#include "Galois/PerThreadContainer.h"
 // #include "Galois/Graph/FileGraph.h"
 
 #include "Galois/Runtime/Sampling.h"
-#include "Galois/Runtime/PerThreadContainer.h"
 
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
@@ -55,7 +55,7 @@ protected:
 
   static const unsigned DEFAULT_CHUNK_SIZE = 8;
 
-  typedef Galois::Runtime::PerThreadVector<unsigned> PerThrdColorVec;
+  typedef Galois::PerThreadVector<unsigned> PerThrdColorVec;
   typedef typename G::GraphNode GN;
   typedef typename G::node_data_type NodeData;
 
@@ -85,16 +85,16 @@ protected:
           std::advance (it_end, (end - beg));
 
           for (; it_beg != it_end; ++it_beg) {
-            // graph.getData (*it_beg, Galois::NONE) = NodeData (beg++);
-            auto* ndptr = &(graph.getData (*it_beg, Galois::NONE));
+            // graph.getData (*it_beg, Galois::MethodFlag::UNPROTECTED) = NodeData (beg++);
+            auto* ndptr = &(graph.getData (*it_beg, Galois::MethodFlag::UNPROTECTED));
             ndptr->~NodeData();
             new (ndptr) NodeData (beg++);
             
             
 
             size_t deg = std::distance (
-              graph.edge_begin (*it_beg, Galois::NONE),
-              graph.edge_end (*it_beg, Galois::NONE));
+              graph.edge_begin (*it_beg, Galois::MethodFlag::UNPROTECTED),
+              graph.edge_end (*it_beg, Galois::MethodFlag::UNPROTECTED));
 
             numEdges.update (deg);
           }
@@ -118,16 +118,16 @@ protected:
 
   void colorNode (GN src) {
 
-    auto& sd = graph.getData (src, Galois::NONE);
+    auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
 
     auto& forbiddenColors = perThrdColorVec.get ();
     std::fill (forbiddenColors.begin (), forbiddenColors.end (), unsigned (-1));
 
-    for (typename G::edge_iterator e = graph.edge_begin (src, Galois::NONE),
-        e_end = graph.edge_end (src, Galois::NONE); e != e_end; ++e) {
+    for (typename G::edge_iterator e = graph.edge_begin (src, Galois::MethodFlag::UNPROTECTED),
+        e_end = graph.edge_end (src, Galois::MethodFlag::UNPROTECTED); e != e_end; ++e) {
 
       GN dst = graph.getEdgeDst (e);
-      auto& dd = graph.getData (dst, Galois::NONE);
+      auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
 
       if (forbiddenColors.size () <= dd.color) {
         forbiddenColors.resize (dd.color + 1, unsigned (-1));
@@ -153,7 +153,7 @@ protected:
 
     // std::printf ("Node %d assigned color %d\n", sd.id, sd.color);
 
-  };
+  }
 
   template <typename F>
   void assignPriorityHelper (const F& nodeFunc) {
@@ -166,52 +166,52 @@ protected:
         Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
   }
 
+  static const unsigned MAX_LEVELS = 100;
+  static const unsigned SEED = 10;
+
+  struct RNG {
+    std::uniform_int_distribution<unsigned> dist;
+    std::mt19937 eng;
+    
+    RNG (void): dist (0, MAX_LEVELS), eng () {
+      this->eng.seed (SEED);
+    }
+
+    unsigned operator () (void) {
+      return dist(eng);
+    }
+  };
+
   void assignPriority (void) {
 
-    static const unsigned MAX_LEVELS = 100;
-    static const unsigned SEED = 10;
-
     auto byId = [&] (GN node) {
-      auto& nd = graph.getData (node, Galois::NONE);
+      auto& nd = graph.getData (node, Galois::MethodFlag::UNPROTECTED);
       nd.priority = nd.id % MAX_LEVELS;
     };
 
-
-    struct RNG {
-      std::uniform_int_distribution<unsigned> dist;
-      std::mt19937 eng;
-      
-      RNG (void): dist (0, MAX_LEVELS), eng () {
-        this->eng.seed (SEED);
-      }
-
-      unsigned operator () (void) {
-        return dist(eng);
-      }
-    };
 
     Galois::Runtime::PerThreadStorage<RNG>  perThrdRNG;
 
     auto randPri = [&] (GN node) {
       auto& rng = *(perThrdRNG.getLocal ());
-      auto& nd = graph.getData (node, Galois::NONE);
+      auto& nd = graph.getData (node, Galois::MethodFlag::UNPROTECTED);
       nd.priority = rng ();
     };
 
 
     auto minDegree = [&] (GN node) {
-      auto& nd = graph.getData (node, Galois::NONE);
+      auto& nd = graph.getData (node, Galois::MethodFlag::UNPROTECTED);
       nd.priority = std::distance (
-                      graph.edge_begin (node, Galois::NONE),
-                      graph.edge_end (node, Galois::NONE));
+                      graph.edge_begin (node, Galois::MethodFlag::UNPROTECTED),
+                      graph.edge_end (node, Galois::MethodFlag::UNPROTECTED));
     };
 
     const size_t numNodes = graph.size ();
     auto maxDegree = [&] (GN node) {
-      auto& nd = graph.getData (node, Galois::NONE);
+      auto& nd = graph.getData (node, Galois::MethodFlag::UNPROTECTED);
       nd.priority = numNodes - std::distance (
-                                  graph.edge_begin (node, Galois::NONE),
-                                  graph.edge_end (node, Galois::NONE));
+                                  graph.edge_begin (node, Galois::MethodFlag::UNPROTECTED),
+                                  graph.edge_end (node, Galois::MethodFlag::UNPROTECTED));
     };
     
     Galois::StatTimer t_priority ("priority assignment time: ");
@@ -259,16 +259,16 @@ protected:
     Galois::do_all_choice (
         Galois::Runtime::makeLocalRange (graph),
         [&] (GN src) {
-          auto& sd = graph.getData (src, Galois::NONE);
+          auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
           if (sd.color == 0) {
             std::fprintf (stderr, "ERROR: src %d found uncolored\n", sd.id);
             foundError.update (true);
           }
-          for (typename G::edge_iterator e = graph.edge_begin (src, Galois::NONE),
-              e_end = graph.edge_end (src, Galois::NONE); e != e_end; ++e) {
+          for (typename G::edge_iterator e = graph.edge_begin (src, Galois::MethodFlag::UNPROTECTED),
+              e_end = graph.edge_end (src, Galois::MethodFlag::UNPROTECTED); e != e_end; ++e) {
 
             GN dst = graph.getEdgeDst (e);
-            auto& dd = graph.getData (dst, Galois::NONE);
+            auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
             if (sd.color == dd.color) {
               foundError.update (true);
               std::fprintf (stderr, "ERROR: nodes %d and %d have the same color\n",
@@ -298,7 +298,7 @@ protected:
 
 public:
 
-  virtual void run (int argc, char* argv[]) {
+  void run (int argc, char* argv[]) {
     LonestarStart (argc, argv, name, desc, url);
     Galois::StatManager sm;
 

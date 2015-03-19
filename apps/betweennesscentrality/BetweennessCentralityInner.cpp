@@ -120,7 +120,7 @@ struct AsyncAlgo {
     Graph& g;
     Initialize(Graph& g): g(g) { }
     void operator()(Graph::GraphNode n) const {
-      SNode& data = g.getData(n, Galois::MethodFlag::NONE);
+      SNode& data = g.getData(n, Galois::MethodFlag::UNPROTECTED);
       data.numPaths = -std::numeric_limits<float>::max();
       data.dependencies = -std::numeric_limits<float>::max();
       data.dist = std::numeric_limits<int>::max();
@@ -148,10 +148,10 @@ struct AsyncAlgo {
       if (newDist > g.getData(n).dist + 1)
         return;
       
-      for (Graph::edge_iterator ii = g.edge_begin(n, Galois::MethodFlag::NONE),
-            ei = g.edge_end(n, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+      for (Graph::edge_iterator ii = g.edge_begin(n, Galois::MethodFlag::UNPROTECTED),
+            ei = g.edge_end(n, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
         GNode dst = g.getEdgeDst(ii);
-        SNode& ddata = g.getData(dst, Galois::MethodFlag::NONE);
+        SNode& ddata = g.getData(dst, Galois::MethodFlag::UNPROTECTED);
 
         int oldDist;
         while (true) {
@@ -174,11 +174,11 @@ struct AsyncAlgo {
       static Graph* g;
       int operator()(const GNode& val) const {
         // //use out edges as that signifies how many people will wait on this node
-        // auto ii = g->edge_begin(val, Galois::MethodFlag::NONE);
-        // auto ee = g->edge_end(val, Galois::MethodFlag::NONE);
+        // auto ii = g->edge_begin(val, Galois::MethodFlag::UNPROTECTED);
+        // auto ee = g->edge_end(val, Galois::MethodFlag::UNPROTECTED);
         // bool big = Galois::safe_advance(ii, ee, 10) != ee;
-        // return 2 * g->getData(val, Galois::MethodFlag::NONE).dist + (big ? 0 : 1);
-        return g->getData(val, Galois::MethodFlag::NONE).dist;
+        // return 2 * g->getData(val, Galois::MethodFlag::UNPROTECTED).dist + (big ? 0 : 1);
+        return g->getData(val, Galois::MethodFlag::UNPROTECTED).dist;
       }
     };
 
@@ -188,14 +188,14 @@ struct AsyncAlgo {
     CountPaths(Graph& g) :g(g) { Indexer::g = &g; }
 
     void operator()(GNode& n, Galois::UserContext<GNode>& ctx) const {
-      SNode& sdata = g.getData(n, Galois::MethodFlag::NONE);
+      SNode& sdata = g.getData(n, Galois::MethodFlag::UNPROTECTED);
       while (sdata.numPaths == -std::numeric_limits<float>::max()) {
         unsigned long np = 0;
         bool allready = true;
-        for (Graph::in_edge_iterator ii = g.in_edge_begin(n, Galois::MethodFlag::NONE),
-               ee = g.in_edge_end(n, Galois::MethodFlag::NONE); ii != ee; ++ii) {
+        for (Graph::in_edge_iterator ii = g.in_edge_begin(n, Galois::MethodFlag::UNPROTECTED),
+               ee = g.in_edge_end(n, Galois::MethodFlag::UNPROTECTED); ii != ee; ++ii) {
           GNode dst = g.getInEdgeDst(ii);
-          SNode& ddata = g.getData(dst, Galois::MethodFlag::NONE);
+          SNode& ddata = g.getData(dst, Galois::MethodFlag::UNPROTECTED);
           if (ddata.dist + 1 == sdata.dist) {
             if (ddata.numPaths != -std::numeric_limits<float>::max()) {
               np += ddata.numPaths;
@@ -219,11 +219,11 @@ struct AsyncAlgo {
       static Graph* g;
       int operator()(const GNode& val) const {
         //use in edges as that signifies how many people will wait on this node
-        // auto ii = g->in_edge_begin(val, Galois::MethodFlag::NONE);
-        // auto ee = g->in_edge_end(val, Galois::MethodFlag::NONE);
+        // auto ii = g->in_edge_begin(val, Galois::MethodFlag::UNPROTECTED);
+        // auto ee = g->in_edge_end(val, Galois::MethodFlag::UNPROTECTED);
         // bool big = Galois::safe_advance(ii, ee, 10) != ee;
-        // return std::numeric_limits<int>::max() - 2 * g->getData(val, Galois::MethodFlag::NONE).dist + (big ? 0 : 1);
-        return std::numeric_limits<int>::max() - g->getData(val, Galois::MethodFlag::NONE).dist;
+        // return std::numeric_limits<int>::max() - 2 * g->getData(val, Galois::MethodFlag::UNPROTECTED).dist + (big ? 0 : 1);
+        return std::numeric_limits<int>::max() - g->getData(val, Galois::MethodFlag::UNPROTECTED).dist;
       }
     };
 
@@ -233,14 +233,14 @@ struct AsyncAlgo {
     ComputeDep(Graph& g) :g(g) { Indexer::g = &g; }
 
     void operator()(GNode& n, Galois::UserContext<GNode>& ctx) const {
-      SNode& sdata = g.getData(n, Galois::MethodFlag::NONE);
+      SNode& sdata = g.getData(n, Galois::MethodFlag::UNPROTECTED);
       while (sdata.dependencies == -std::numeric_limits<float>::max()) {
         float newDep = 0.0;
         bool allready = true;
-        for (Graph::edge_iterator ii = g.edge_begin(n, Galois::MethodFlag::NONE),
-               ei = g.edge_end(n, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+        for (Graph::edge_iterator ii = g.edge_begin(n, Galois::MethodFlag::UNPROTECTED),
+               ei = g.edge_end(n, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
           GNode dst = g.getEdgeDst(ii);
-          SNode& ddata = g.getData(dst, Galois::MethodFlag::NONE);
+          SNode& ddata = g.getData(dst, Galois::MethodFlag::UNPROTECTED);
           if (ddata.dist == sdata.dist + 1) {
             if (ddata.dependencies != -std::numeric_limits<float>::max()) {
               newDep += ((float)sdata.numPaths / (float)ddata.numPaths) * (1 + ddata.dependencies);
@@ -312,7 +312,7 @@ struct LeveledAlgo {
     Graph& g;
     Initialize(Graph& g): g(g) { }
     void operator()(Graph::GraphNode n) const {
-      SNode& data = g.getData(n, Galois::MethodFlag::NONE);
+      SNode& data = g.getData(n, Galois::MethodFlag::UNPROTECTED);
       data.numPaths = 0;
       data.dependencies = 0.0; //std::numeric_limits<float>::lowest();
       data.dist = std::numeric_limits<int>::max();
@@ -329,11 +329,11 @@ struct LeveledAlgo {
     BFS(Graph& g, Bag& b) :g(g), b(b) {}
 
     void operator()(GNode& n) const {
-      auto& sdata = g.getData(n, Galois::MethodFlag::NONE);
-      for (Graph::edge_iterator ii = g.edge_begin(n, Galois::MethodFlag::NONE),
-             ei = g.edge_end(n, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+      auto& sdata = g.getData(n, Galois::MethodFlag::UNPROTECTED);
+      for (Graph::edge_iterator ii = g.edge_begin(n, Galois::MethodFlag::UNPROTECTED),
+             ei = g.edge_end(n, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
         GNode dst = g.getEdgeDst(ii);
-        SNode& ddata = g.getData(dst, Galois::MethodFlag::NONE);
+        SNode& ddata = g.getData(dst, Galois::MethodFlag::UNPROTECTED);
         if (ddata.dist.load(std::memory_order_relaxed) == std::numeric_limits<int>::max()) {
           if (std::numeric_limits<int>::max() == ddata.dist.exchange(sdata.dist + 1))
             b.push_back(dst);
@@ -344,10 +344,10 @@ struct LeveledAlgo {
             ddata.numPaths = ddata.numPaths + sdata.numPaths;
         }
       }
-      // for (Graph::in_edge_iterator ii = g.in_edge_begin(n, Galois::MethodFlag::NONE),
-      //        ee = g.in_edge_end(n, Galois::MethodFlag::NONE); ii != ee; ++ii) {
+      // for (Graph::in_edge_iterator ii = g.in_edge_begin(n, Galois::MethodFlag::UNPROTECTED),
+      //        ee = g.in_edge_end(n, Galois::MethodFlag::UNPROTECTED); ii != ee; ++ii) {
       //   GNode dst = g.getInEdgeDst(ii);
-      //   SNode& ddata = g.getData(dst, Galois::MethodFlag::NONE);
+      //   SNode& ddata = g.getData(dst, Galois::MethodFlag::UNPROTECTED);
       //   if (ddata.dist + 1 == sdata.dist)
       //     sdata.numPaths += ddata.numPaths;
       // }
@@ -362,12 +362,12 @@ struct LeveledAlgo {
     Counter(Graph& g) :g(g) {}
 
     void operator()(GNode& n) const {
-      auto& sdata = g.getData(n, Galois::MethodFlag::NONE);
+      auto& sdata = g.getData(n, Galois::MethodFlag::UNPROTECTED);
       unsigned long np = 0;
-      for (Graph::in_edge_iterator ii = g.in_edge_begin(n, Galois::MethodFlag::NONE),
-             ee = g.in_edge_end(n, Galois::MethodFlag::NONE); ii != ee; ++ii) {
+      for (Graph::in_edge_iterator ii = g.in_edge_begin(n, Galois::MethodFlag::UNPROTECTED),
+             ee = g.in_edge_end(n, Galois::MethodFlag::UNPROTECTED); ii != ee; ++ii) {
         GNode dst = g.getInEdgeDst(ii);
-        SNode& ddata = g.getData(dst, Galois::MethodFlag::NONE);
+        SNode& ddata = g.getData(dst, Galois::MethodFlag::UNPROTECTED);
         if (ddata.dist + 1 == sdata.dist)
           np += ddata.numPaths;
       }
@@ -381,11 +381,11 @@ struct LeveledAlgo {
     ComputeDep(Graph& g) :g(g) {}
 
     void operator()(GNode& n) const {
-      SNode& sdata = g.getData(n, Galois::MethodFlag::NONE);
-      for (Graph::edge_iterator ii = g.edge_begin(n, Galois::MethodFlag::NONE),
-             ei = g.edge_end(n, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+      SNode& sdata = g.getData(n, Galois::MethodFlag::UNPROTECTED);
+      for (Graph::edge_iterator ii = g.edge_begin(n, Galois::MethodFlag::UNPROTECTED),
+             ei = g.edge_end(n, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
         GNode dst = g.getEdgeDst(ii);
-        SNode& ddata = g.getData(dst, Galois::MethodFlag::NONE);
+        SNode& ddata = g.getData(dst, Galois::MethodFlag::UNPROTECTED);
         if (ddata.dist == sdata.dist + 1)
           sdata.dependencies += ((float)sdata.numPaths / (float)ddata.numPaths) * (1 + ddata.dependencies);
       }

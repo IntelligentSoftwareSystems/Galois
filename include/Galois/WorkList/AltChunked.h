@@ -474,11 +474,11 @@ public:
 };
 
 template<int ChunkSize=64, typename T = int>
-class AltChunkedLIFO : public AltChunkedMaster<true, ChunkSize, StealingQueue<AltChunkedStack>, T> {};
+using AltChunkedLIFO = AltChunkedMaster<true, ChunkSize, StealingQueue<AltChunkedStack>, T>;
 GALOIS_WLCOMPILECHECK(AltChunkedLIFO)
 
 template<int ChunkSize=64, typename T = int>
-class AltChunkedFIFO : public AltChunkedMaster<false, ChunkSize, StealingQueue<AltChunkedQueue>, T> {};
+using AltChunkedFIFO = AltChunkedMaster<false, ChunkSize, StealingQueue<AltChunkedQueue>, T>;
 GALOIS_WLCOMPILECHECK(AltChunkedFIFO)
 
 } // end namespace

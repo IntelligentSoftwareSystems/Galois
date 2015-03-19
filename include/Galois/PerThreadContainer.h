@@ -24,8 +24,8 @@
  *
  * @author <ahassaan@ices.utexas.edu>
  */
-#ifndef GALOIS_RUNTIME_PERTHREADCONTAINER_H
-#define GALOIS_RUNTIME_PERTHREADCONTAINER_H
+#ifndef GALOIS_PERTHREADCONTAINER_H
+#define GALOIS_PERTHREADCONTAINER_H
 
 #include <vector>
 #include <deque>
@@ -39,6 +39,7 @@
 #include <boost/iterator/counting_iterator.hpp>
 #include <boost/iterator/transform_iterator.hpp>
 
+#include "Galois/gdeque.h"
 #include "Galois/Threads.h"
 #include "Galois/PriorityQueue.h"
 #include "Galois/TwoLevelIterator.h"
@@ -50,7 +51,6 @@
 #include "Galois/Runtime/ll/gio.h"
 
 namespace Galois {
-namespace Runtime {
 
 namespace {
 
@@ -355,9 +355,10 @@ protected:
     }
   }
 
-  void init(const Cont_ty& cont) {
+  template <typename... Args>
+  void init(Args&&... args) {
     for (unsigned i = 0; i < perThrdCont.size(); ++i) {
-      *perThrdCont.getRemote(i) = new Cont_ty(cont);
+      *perThrdCont.getRemote(i) = new Cont_ty(std::forward<Args> (args)...);
     }
   }
 
@@ -559,21 +560,19 @@ public:
 };
 
 
-namespace PerThreadFactory {
-  typedef MM::BumpWithMallocHeap<MM::FreeListHeap<MM::SystemHeap> > BasicHeap;
-  typedef MM::ThreadPrivateHeap<BasicHeap> Heap;
+namespace ContainersWithGAlloc {
 
   template<typename T>
-  struct Alloc { typedef typename MM::ExternalHeapAllocator<T, Heap> type; };
+  struct Pow2Alloc { typedef typename Runtime::MM::Pow_2_BlockAllocator<T> type; };
 
   template<typename T>
-  struct FixedSizeAlloc { typedef typename MM::FixedSizeAllocator<T> type; };
+  struct FixedSizeAlloc { typedef typename Runtime::MM::FixedSizeAllocator<T> type; };
 
   template<typename T>
-  struct Vector { typedef typename std::vector<T, typename Alloc<T>::type > type; };
+  struct Vector { typedef typename std::vector<T, typename Pow2Alloc<T>::type > type; };
 
   template<typename T>
-  struct Deque { typedef typename std::deque<T, typename Alloc<T>::type > type; };
+  struct Deque { typedef typename std::deque<T, typename Pow2Alloc<T>::type > type; };
 
   template<typename T>
   struct List { typedef typename std::list<T, typename FixedSizeAlloc<T>::type > type; };
@@ -587,21 +586,19 @@ namespace PerThreadFactory {
 
 
 template<typename T>
-class PerThreadVector: public PerThreadContainer<typename PerThreadFactory::template Vector<T>::type> {
+class PerThreadVector: public PerThreadContainer<typename ContainersWithGAlloc::template Vector<T>::type> {
 public:
-  typedef typename PerThreadFactory::Heap Heap_ty;
-  typedef typename PerThreadFactory::template Alloc<T>::type Alloc_ty;
-  typedef typename PerThreadFactory::template Vector<T>::type Cont_ty;
+  typedef typename ContainersWithGAlloc::template Pow2Alloc<T>::type Alloc_ty;
+  typedef typename ContainersWithGAlloc::template Vector<T>::type Cont_ty;
 
 protected:
   typedef PerThreadContainer<Cont_ty> Super_ty;
 
-  Heap_ty heap;
   Alloc_ty alloc;
 
 public:
-  PerThreadVector(): Super_ty(), heap(), alloc(&heap) {
-    Super_ty::init(Cont_ty(alloc));
+  PerThreadVector(): Super_ty(), alloc() {
+    Super_ty::init(alloc);
   }
 
   void reserve_all(size_t sz) {
@@ -617,62 +614,70 @@ public:
 
 template<typename T>
 class PerThreadDeque: 
-  public PerThreadContainer<typename PerThreadFactory::template Deque<T>::type> {
+  public PerThreadContainer<typename ContainersWithGAlloc::template Deque<T>::type> {
 
 public:
-  typedef typename PerThreadFactory::Heap Heap_ty;
-  typedef typename PerThreadFactory::template Alloc<T>::type Alloc_ty;
+  typedef typename ContainersWithGAlloc::template Pow2Alloc<T>::type Alloc_ty;
 
 protected:
-  typedef typename PerThreadFactory::template Deque<T>::type Cont_ty;
+  typedef typename ContainersWithGAlloc::template Deque<T>::type Cont_ty;
   typedef PerThreadContainer<Cont_ty> Super_ty;
 
-  Heap_ty heap;
   Alloc_ty alloc;
 
 public:
-  PerThreadDeque(): Super_ty(), heap(), alloc(&heap) {
-    Super_ty::init(Cont_ty(alloc));
+  PerThreadDeque(): Super_ty(), alloc() {
+    Super_ty::init(alloc);
+  }
+};
+
+template <typename T, unsigned ChunkSize=64>
+class PerThreadGdeque: public PerThreadContainer<Galois::gdeque<T, ChunkSize> > {
+
+  using Super_ty = PerThreadContainer<Galois::gdeque<T, ChunkSize> >;
+  
+public:
+
+  PerThreadGdeque (): Super_ty () {
+    Super_ty::init ();
   }
 };
 
 template<typename T>
 class PerThreadList:
-  public PerThreadContainer<typename PerThreadFactory::template List<T>::type> {
+  public PerThreadContainer<typename ContainersWithGAlloc::template List<T>::type> {
 
 public:
-  typedef typename PerThreadFactory::Heap Heap_ty;
-  typedef typename PerThreadFactory::template Alloc<T>::type Alloc_ty;
+  typedef typename ContainersWithGAlloc::template FixedSizeAlloc<T>::type Alloc_ty;
 
 protected:
-  typedef typename PerThreadFactory::template List<T>::type Cont_ty;
+  typedef typename ContainersWithGAlloc::template List<T>::type Cont_ty;
   typedef PerThreadContainer<Cont_ty> Super_ty;
 
-  Heap_ty heap;
   Alloc_ty alloc;
 
 public:
-  PerThreadList(): Super_ty(), heap(), alloc(&heap) {
-    Super_ty::init(Cont_ty(alloc));
+  PerThreadList(): Super_ty(), alloc() {
+    Super_ty::init(alloc);
   }
 };
 
 template<typename T, typename C=std::less<T> >
 class PerThreadSet: 
-  public PerThreadContainer<typename PerThreadFactory::template Set<T, C>::type> {
+  public PerThreadContainer<typename ContainersWithGAlloc::template Set<T, C>::type> {
 
 public:
-  typedef typename PerThreadFactory::template FixedSizeAlloc<T>::type Alloc_ty;
+  typedef typename ContainersWithGAlloc::template FixedSizeAlloc<T>::type Alloc_ty;
 
 protected:
-  typedef typename PerThreadFactory::template Set<T, C>::type Cont_ty;
+  typedef typename ContainersWithGAlloc::template Set<T, C>::type Cont_ty;
   typedef PerThreadContainer<Cont_ty> Super_ty;
 
   Alloc_ty alloc;
 
 public:
   explicit PerThreadSet(const C& cmp = C()): Super_ty(), alloc() {
-    Super_ty::init(Cont_ty(cmp, alloc));
+    Super_ty::init(cmp, alloc);
   }
 
   typedef typename Super_ty::global_const_iterator global_const_iterator;
@@ -690,23 +695,21 @@ public:
 
 template<typename T, typename C=std::less<T> >
 class PerThreadMinHeap:
-  public PerThreadContainer<typename PerThreadFactory::template PQ<T, C>::type> {
+  public PerThreadContainer<typename ContainersWithGAlloc::template PQ<T, C>::type> {
 
 public:
-  typedef typename PerThreadFactory::Heap Heap_ty;
-  typedef typename PerThreadFactory::template Alloc<T>::type Alloc_ty;
+  typedef typename ContainersWithGAlloc::template Pow2Alloc<T>::type Alloc_ty;
 
 protected:
-  typedef typename PerThreadFactory::template Vector<T>::type Vec_ty;
-  typedef typename PerThreadFactory::template PQ<T, C>::type Cont_ty;
+  typedef typename ContainersWithGAlloc::template Vector<T>::type Vec_ty;
+  typedef typename ContainersWithGAlloc::template PQ<T, C>::type Cont_ty;
   typedef PerThreadContainer<Cont_ty> Super_ty;
 
-  Heap_ty heap;
   Alloc_ty alloc;
 
 public:
-  explicit PerThreadMinHeap(const C& cmp = C()): Super_ty(), heap(), alloc(&heap) {
-    Super_ty::init(Cont_ty(cmp, Vec_ty(alloc)));
+  explicit PerThreadMinHeap(const C& cmp = C()): Super_ty(), alloc() {
+    Super_ty::init(cmp, Vec_ty(alloc));
   }
 
   typedef typename Super_ty::global_const_iterator global_const_iterator;
@@ -722,6 +725,5 @@ public:
 };
 
 
-} // end namespace Runtime
 } // end namespace Galois
-#endif // GALOIS_RUNTIME_PERTHREADCONTAINER_H
+#endif // GALOIS_PERTHREADCONTAINER_H

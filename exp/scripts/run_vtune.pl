@@ -122,8 +122,8 @@ my $analyzeSystem = 1;
 my $startPaused = 1;
 my $help = 0;
 my $threads = 0;
-my $analysisType = '';
-my $reportType = '';
+my $analysisType = 'nehalem-memory-access';
+my $reportType = 'hw-events';
 my $reportTimeout = 100000;
 GetOptions(
   't|threads=s'=>\$threads,

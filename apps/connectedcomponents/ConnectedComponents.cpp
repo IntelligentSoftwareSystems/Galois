@@ -109,6 +109,15 @@ struct Node: public Galois::UnionFindNode<Node> {
   typedef Node* component_type;
   unsigned int id;
 
+  Node(): Galois::UnionFindNode<Node>(const_cast<Node*>(this)) { }
+  Node(const Node& o): Galois::UnionFindNode<Node>(o.m_component), id(o.id) { }
+
+  Node& operator=(const Node& o) {
+    Node c(o);
+    std::swap(c, *this);
+    return *this;
+  }
+
   component_type component() { return this->findAndCompress(); }
 };
 
@@ -140,12 +149,12 @@ struct SerialAlgo {
     Merge(Graph& g): graph(g) { }
 
     void operator()(const GNode& src) const {
-      Node& sdata = graph.getData(src, Galois::MethodFlag::NONE);
+      Node& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
       
-      for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::NONE),
-          ei = graph.edge_end(src, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+      for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED),
+          ei = graph.edge_end(src, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
         GNode dst = graph.getEdgeDst(ii);
-        Node& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+        Node& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
         sdata.merge(&ddata);
       }
     }
@@ -192,12 +201,12 @@ struct SynchronousAlgo {
 
     //! Add the first edge between components to the worklist
     void operator()(const GNode& src) const {
-      for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::NONE),
-          ei = graph.edge_end(src, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+      for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED),
+          ei = graph.edge_end(src, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
         GNode dst = graph.getEdgeDst(ii);
         if (symmetricGraph && src >= dst)
           continue;
-        Node& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+        Node& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
         next.push(Edge(src, &ddata, 0));
         break;
       }
@@ -210,7 +219,7 @@ struct SynchronousAlgo {
     Merge(Graph& g, Galois::Statistic& e): graph(g), emptyMerges(e) { }
 
     void operator()(const Edge& edge) const {
-      Node& sdata = graph.getData(edge.src, Galois::MethodFlag::NONE);
+      Node& sdata = graph.getData(edge.src, Galois::MethodFlag::UNPROTECTED);
       if (!sdata.merge(edge.ddata))
         emptyMerges += 1;
     }
@@ -232,17 +241,17 @@ struct SynchronousAlgo {
 
     void operator()(const Edge& edge) const {
       GNode src = edge.src;
-      Node& sdata = graph.getData(src, Galois::MethodFlag::NONE);
+      Node& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
       Node* scomponent = sdata.findAndCompress();
-      Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::NONE);
-      Graph::edge_iterator ei = graph.edge_end(src, Galois::MethodFlag::NONE);
+      Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED);
+      Graph::edge_iterator ei = graph.edge_end(src, Galois::MethodFlag::UNPROTECTED);
       int count = edge.count + 1;
       std::advance(ii, count);
       for (; ii != ei; ++ii, ++count) {
         GNode dst = graph.getEdgeDst(ii);
         if (symmetricGraph && src >= dst)
           continue;
-        Node& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+        Node& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
         Node* dcomponent = ddata.findAndCompress();
         if (scomponent != dcomponent) {
           next.push(Edge(src, dcomponent, count));
@@ -297,7 +306,7 @@ struct LabelPropAlgo {
 
     Initialize(Graph& g): graph(g) { }
     void operator()(GNode n) const {
-      LNode& data = graph.getData(n, Galois::MethodFlag::NONE);
+      LNode& data = graph.getData(n, Galois::MethodFlag::UNPROTECTED);
       data.comp = data.id;
     }
   };
@@ -312,7 +321,7 @@ struct LabelPropAlgo {
     void update(LNode& sdata, Iterator ii, Iterator ei, GetNeighbor get, Galois::UserContext<GNode>& ctx) {
       for (; ii != ei; ++ii) {
         GNode dst = get(ii);
-        LNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+        LNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
 
         while (true) {
           component_type old = ddata.comp;
@@ -341,14 +350,14 @@ struct LabelPropAlgo {
 
     //! Add the next edge between components to the worklist
     void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) {
-      LNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
+      LNode& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
       
       if (Backward) {
-        update(sdata, graph.in_edge_begin(src, Galois::MethodFlag::NONE), graph.in_edge_end(src, Galois::MethodFlag::NONE),
+        update(sdata, graph.in_edge_begin(src, Galois::MethodFlag::UNPROTECTED), graph.in_edge_end(src, Galois::MethodFlag::UNPROTECTED),
             BackwardUpdate(graph), ctx);
       } 
       if (Forward) {
-        update(sdata, graph.edge_begin(src, Galois::MethodFlag::NONE), graph.edge_end(src, Galois::MethodFlag::NONE),
+        update(sdata, graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED), graph.edge_end(src, Galois::MethodFlag::UNPROTECTED),
             ForwardUpdate(graph), ctx);
       }
     }
@@ -385,12 +394,12 @@ struct AsyncOCAlgo {
     //! Add the next edge between components to the worklist
     template<typename GTy>
     void operator()(GTy& graph, const GNode& src) const {
-      Node& sdata = graph.getData(src, Galois::MethodFlag::NONE);
+      Node& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
 
-      for (typename GTy::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::NONE),
-          ei = graph.edge_end(src, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+      for (typename GTy::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED),
+          ei = graph.edge_end(src, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
         GNode dst = graph.getEdgeDst(ii);
-        Node& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+        Node& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
 
         if (symmetricGraph && src >= dst)
           continue;
@@ -436,12 +445,12 @@ struct AsyncAlgo {
     }
 
     void operator()(const GNode& src) const {
-      Node& sdata = graph.getData(src, Galois::MethodFlag::NONE);
+      Node& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
 
-      for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::NONE),
-          ei = graph.edge_end(src, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+      for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED),
+          ei = graph.edge_end(src, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
         GNode dst = graph.getEdgeDst(ii);
-        Node& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+        Node& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
 
         if (symmetricGraph && src >= dst)
           continue;
@@ -485,13 +494,13 @@ struct BlockedAsyncAlgo {
     //! Add the next edge between components to the worklist
     template<bool MakeContinuation, int Limit, typename Pusher>
     void process(const GNode& src, const Graph::edge_iterator& start, Pusher& pusher) const {
-      Node& sdata = graph.getData(src, Galois::MethodFlag::NONE);
+      Node& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
       int count = 1;
-      for (Graph::edge_iterator ii = start, ei = graph.edge_end(src, Galois::MethodFlag::NONE);
+      for (Graph::edge_iterator ii = start, ei = graph.edge_end(src, Galois::MethodFlag::UNPROTECTED);
           ii != ei; 
           ++ii, ++count) {
         GNode dst = graph.getEdgeDst(ii);
-        Node& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+        Node& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
 
         if (symmetricGraph && src >= dst)
           continue;
@@ -510,7 +519,7 @@ struct BlockedAsyncAlgo {
     }
 
     void operator()(const GNode& src) const {
-      Graph::edge_iterator start = graph.edge_begin(src, Galois::MethodFlag::NONE);
+      Graph::edge_iterator start = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED);
       if (Galois::Runtime::LL::getPackageForSelf(Galois::Runtime::LL::getTID()) == 0) {
         process<true, 0>(src, start, items);
       } else {
@@ -713,7 +722,7 @@ struct CountLargest {
   CountLargest(Graph& g, Accums& accums): graph(g), accums(accums) { }
   
   void operator()(const GNode& x) const {
-    typename Graph::node_data_reference n = graph.getData(x, Galois::MethodFlag::NONE);
+    typename Graph::node_data_reference n = graph.getData(x, Galois::MethodFlag::UNPROTECTED);
     if (n.isRep()) {
       accums.reps += 1;
       return;

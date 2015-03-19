@@ -82,26 +82,22 @@ struct Process {
   //! [Enabling Per Iteration Allocator in DMR]
 
   void operator()(GNode item, Galois::UserContext<GNode>& ctx) {
-    if (!graph->containsNode(item, Galois::MethodFlag::ALL))
+    if (!graph->containsNode(item, Galois::MethodFlag::WRITE))
       return;
     
-    Cavity* cavp = NULL;
-
     if (Version == detDisjoint) {
-      bool used;
-      LocalState* localState = (LocalState*) ctx.getLocalState(used);
-      if (used) {
-        localState->cav.update(item, ctx);
-        return;
+
+      LocalState* localState = (LocalState*) ctx.getLocalState();
+
+      if (ctx.isFirstPass()) {
+        localState->cav.initialize(item);
+        localState->cav.build();
+        localState->cav.computePost();
       } else {
-        cavp = &localState->cav;
+        localState->cav.update(item,ctx);
       }
-    }
 
-    if (Version == detDisjoint) {
-      cavp->initialize(item);
-      cavp->build();
-      cavp->computePost();
+      return;
     } else {
       //! [Accessing Per Iteration Allocator in DMR]
       Cavity cav(graph, ctx.getPerIterAlloc());
@@ -111,6 +107,7 @@ struct Process {
       cav.computePost();
       if (Version == detPrefix)
         return;
+      ctx.cautiousPoint();
       cav.update(item, ctx);
     }
   }
@@ -120,15 +117,15 @@ struct Preprocess {
   Galois::InsertBag<GNode>& wl;
   Preprocess(Galois::InsertBag<GNode>& w): wl(w) { }
   void operator()(GNode item) const {
-    if (graph->getData(item, Galois::MethodFlag::NONE).isBad())
+    if (graph->getData(item, Galois::MethodFlag::UNPROTECTED).isBad())
       wl.push(item);
   }
 };
 
 struct DetLessThan {
   bool operator()(const GNode& a, const GNode& b) const {
-    int idA = graph->getData(a, Galois::MethodFlag::NONE).getId();
-    int idB = graph->getData(b, Galois::MethodFlag::NONE).getId();
+    int idA = graph->getData(a, Galois::MethodFlag::UNPROTECTED).getId();
+    int idB = graph->getData(b, Galois::MethodFlag::UNPROTECTED).getId();
     if (idA == 0 || idB == 0) abort();
     return idA < idB;
   }
@@ -151,13 +148,15 @@ int main(int argc, char** argv) {
 	    << " total triangles, " << std::count_if(graph->begin(), graph->end(), is_bad(graph)) << " bad triangles\n";
 
   Galois::reportPageAlloc("MeminfoPre1");
-  // Galois::preAlloc(Galois::Runtime::MM::numPageAllocTotal() * 10);
   // Tighter upper bound for pre-alloc, useful for machines with limited memory,
   // e.g., Intel MIC. May not be enough for deterministic execution
   const size_t NODE_SIZE = sizeof(**graph->begin());
-  Galois::preAlloc (5 * Galois::getActiveThreads () + NODE_SIZE * 8 * graph->size () / Galois::Runtime::MM::hugePageSize);
-  // Relaxed upper bound
-  // Galois::preAlloc(15 * numThreads + Galois::Runtime::MM::numPageAllocTotal() * 10);
+  if (detAlgo == nondet) {
+    Galois::preAlloc (5 * Galois::getActiveThreads () + NODE_SIZE * 8 * graph->size () / Galois::Runtime::MM::hugePageSize);
+
+  } else {
+    Galois::preAlloc(Galois::getActiveThreads () + NODE_SIZE * 32 * graph->size () / Galois::Runtime::MM::hugePageSize);
+  }
   Galois::reportPageAlloc("MeminfoPre2");
 
   Galois::StatTimer T;

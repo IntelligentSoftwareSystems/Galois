@@ -24,4 +24,4 @@
  */
 #include "Galois/Runtime/Executor_Deterministic.h"
 
-__thread Galois::Runtime::MM::SizedHeapFactory::SizedHeap* Galois::Runtime::DeterministicImpl::listHeap;
+__thread Galois::Runtime::MM::SizedHeapFactory::SizedHeap* Galois::Runtime::DeterministicImpl::dagListHeap;

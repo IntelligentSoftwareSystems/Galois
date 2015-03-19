@@ -41,12 +41,12 @@
 
 
 #include "Galois/Accumulator.h"
-
-#include "Galois/Runtime/PerThreadContainer.h"
-#include "Galois/Runtime/Executor_OnEach.h"
-#include "Galois/DoAllWrap.h"
-#include "Galois/Runtime/ll/CompilerSpecific.h"
 #include "Galois/Markable.h"
+#include "Galois/DoAllWrap.h"
+#include "Galois/PerThreadContainer.h"
+
+#include "Galois/Runtime/Executor_OnEach.h"
+#include "Galois/Runtime/ll/CompilerSpecific.h"
 
 
 #include "dependTest.h"
@@ -58,10 +58,10 @@ class BilliardsPOsortedVec;
 class BilliardsPOunsorted: public Billiards {
 
   typedef Galois::Markable<Event> MEvent;
-  typedef Galois::Runtime::PerThreadVector<MEvent> WLTy;
-  typedef Galois::Runtime::PerThreadVector<Event> ILTy;
+  typedef Galois::PerThreadVector<MEvent> WLTy;
+  typedef Galois::PerThreadVector<Event> ILTy;
 
-  typedef Galois::Runtime::PerThreadVector<Event> AddListTy;
+  typedef Galois::PerThreadVector<Event> AddListTy;
 
   friend class BilliardsPOsortedVec;
 

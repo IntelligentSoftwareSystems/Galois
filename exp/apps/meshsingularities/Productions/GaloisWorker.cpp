@@ -24,7 +24,7 @@ void ProductionProcess::operator()(Graph::GraphNode src, Context& ctx)
 	// node-related work is here:
 	node.execute();
 
-	for(LCM_edge_iterator ii = graph->edge_begin(src, Galois::MethodFlag::NONE), ei = graph->edge_end(src, Galois::MethodFlag::NONE); ii != ei; ++ii)
+	for(LCM_edge_iterator ii = graph->edge_begin(src, Galois::MethodFlag::UNPROTECTED), ei = graph->edge_end(src, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii)
 	{
 		GraphNode graphNode = graph->getEdgeDst(ii);
 		int nr_of_incoming_edges = atomic_dec(&(graphNode->getData().incomingEdges));

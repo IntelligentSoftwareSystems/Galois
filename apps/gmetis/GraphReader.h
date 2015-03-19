@@ -39,7 +39,7 @@ typedef Galois::Graph::LC_CSR_Graph<int, unsigned int>::GraphNode InputGNode;
       if(n1==n2){
         continue;
       }
-      graph->addEdge(n1, n2, Galois::MethodFlag::ALL, 1);
+      graph->addEdge(n1, n2, Galois::MethodFlag::WRITE, 1);
       graph->getData(n1).setEdgeWeight(graph->getData(n1).getEdgeWeight() + 1);
       graph->getData(n1).setNumEdges(graph->getData(n1).getNumEdges() + 1);
       countEdges++;
@@ -85,7 +85,7 @@ struct parallelMakeEdges {
       if(weighted){
         weight = inputGraph->getEdgeData(jj);
       }
-      graph->addEdge(node, gnodes[neighId], Galois::MethodFlag::ALL, weight);
+      graph->addEdge(node, gnodes[neighId], Galois::MethodFlag::WRITE, weight);
       nodeData.setNumEdges(nodeData.getNumEdges() + 1);
       nodeData.setEdgeWeight(nodeData.getEdgeWeight() + weight);
       /*if(!directed){

@@ -53,15 +53,15 @@ protected:
     Galois::do_all_choice (
         Galois::Runtime::makeLocalRange (graph),
         [&] (GNode src) {
-          auto& sd = graph.getData (src, Galois::NONE);
+          auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
 
           // std::printf ("Processing node %d with priority %d\n", sd.id, sd.priority);
 
           unsigned addAmt = 0;
-          for (Graph::edge_iterator e = graph.edge_begin (src, Galois::NONE),
-              e_end = graph.edge_end (src, Galois::NONE); e != e_end; ++e) {
+          for (Graph::edge_iterator e = graph.edge_begin (src, Galois::MethodFlag::UNPROTECTED),
+              e_end = graph.edge_end (src, Galois::MethodFlag::UNPROTECTED); e != e_end; ++e) {
             GNode dst = graph.getEdgeDst (e);
-            auto& dd = graph.getData (dst, Galois::NONE);
+            auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
 
             if (cmp (dd, sd)) { // dd < sd
               ++addAmt;
@@ -92,16 +92,16 @@ protected:
 
       Graph& graph = outer.graph;
 
-      auto& sd = graph.getData (src, Galois::NONE);
+      auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
       assert (sd.indegree == 0);
 
       outer.colorNode (src);
 
-      for (Graph::edge_iterator e = graph.edge_begin (src, Galois::NONE),
-          e_end = graph.edge_end (src, Galois::NONE); e != e_end; ++e) {
+      for (Graph::edge_iterator e = graph.edge_begin (src, Galois::MethodFlag::UNPROTECTED),
+          e_end = graph.edge_end (src, Galois::MethodFlag::UNPROTECTED); e != e_end; ++e) {
 
         GNode dst = graph.getEdgeDst (e);
-        auto& dd = graph.getData (dst, Galois::NONE);
+        auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
         // std::printf ("Neighbor %d has indegree %d\n", dd.id, unsigned(dd.indegree));
         unsigned x = --(dd.indegree);
         if (x == 0) {
@@ -115,7 +115,7 @@ protected:
 
     Galois::InsertBag<GNode> initWork;
 
-    Galois::StatTimer t_dag_init;("dag initialization time: ");
+    Galois::StatTimer t_dag_init("dag initialization time: ");
 
     t_dag_init.start ();
     initDAG (initWork);
@@ -126,8 +126,12 @@ protected:
     std::printf ("Number of initial sources: %zd\n", 
         std::distance (initWork.begin (), initWork.end ()));
 
+    Galois::StatTimer t_dag_color ("dag coloring time: ");
+
+    t_dag_color.start ();
     Galois::for_each_local (initWork, ColorNodeDAG {*this}, 
         Galois::loopname ("color-DAG"), Galois::wl<WL_ty> ());
+    t_dag_color.stop ();
   }
 
   struct VisitNhood {
@@ -139,9 +143,9 @@ protected:
     template <typename C>
     void operator () (GNode src, C&) {
       Graph& graph = outer.graph;
-      NodeData& sd = graph.getData (src, Galois::CHECK_CONFLICT);
-      for (Graph::edge_iterator e = graph.edge_begin (src, Galois::CHECK_CONFLICT),
-          e_end = graph.edge_end (src, Galois::CHECK_CONFLICT); e != e_end; ++e) {
+      NodeData& sd = graph.getData (src, Galois::MethodFlag::WRITE);
+      for (Graph::edge_iterator e = graph.edge_begin (src, Galois::MethodFlag::WRITE),
+          e_end = graph.edge_end (src, Galois::MethodFlag::WRITE); e != e_end; ++e) {
         GNode dst = graph.getEdgeDst (e);
       }
     }
@@ -163,8 +167,8 @@ protected:
       Graph& graph;
 
       bool operator () (GNode ln, GNode rn) const {
-        const auto& ldata = graph.getData (ln, Galois::NONE);
-        const auto& rdata = graph.getData (rn, Galois::NONE);
+        const auto& ldata = graph.getData (ln, Galois::MethodFlag::UNPROTECTED);
+        const auto& rdata = graph.getData (rn, Galois::MethodFlag::UNPROTECTED);
         return NodeDataComparator::compare (ldata, rdata);
       }
     };

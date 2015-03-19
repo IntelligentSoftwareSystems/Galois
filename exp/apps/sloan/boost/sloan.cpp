@@ -190,19 +190,19 @@ struct UpdateRequestIndexer {
 
 struct GNodeIndexer {
   unsigned int operator()(const GNode& val) const {
-    return graph.getData(val, Galois::MethodFlag::NONE).dist;
+    return graph.getData(val, Galois::MethodFlag::UNPROTECTED).dist;
   }
 };
 
 struct GNodeLess {
   bool operator()(const GNode& a, const GNode& b) const {
-    return graph.getData(a, Galois::MethodFlag::NONE).dist < graph.getData(b, Galois::MethodFlag::NONE).dist;
+    return graph.getData(a, Galois::MethodFlag::UNPROTECTED).dist < graph.getData(b, Galois::MethodFlag::UNPROTECTED).dist;
   }
 };
 
 struct GNodeGreater {
   bool operator()(const GNode& a, const GNode& b) const {
-    return graph.getData(a, Galois::MethodFlag::NONE).dist > graph.getData(b, Galois::MethodFlag::NONE).dist;
+    return graph.getData(a, Galois::MethodFlag::UNPROTECTED).dist > graph.getData(b, Galois::MethodFlag::UNPROTECTED).dist;
   }
 };
 
@@ -271,10 +271,10 @@ static void printAccess(std::string msg){
 
 		std::cerr << sdata.id << " connected with (" << degree(*src) << "): ";
 
-		for (Graph::edge_iterator ii = graph.edge_begin(*src, Galois::MethodFlag::NONE), 
-				ei = graph.edge_end(*src, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+		for (Graph::edge_iterator ii = graph.edge_begin(*src, Galois::MethodFlag::UNPROTECTED), 
+				ei = graph.edge_end(*src, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
 			GNode dst = graph.getEdgeDst(ii);
-			SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+			SNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
 
 			unsigned int diff = abs(sdata.id - ddata.id);
 
@@ -478,7 +478,7 @@ static void printDegreeDistribution() {
 
 	for (Graph::iterator n = graph.begin(), ei = graph.end(); n != ei; ++n) {
 			distr[degree(*n)]++;
-			//std::cerr << graph.getData(*n, Galois::MethodFlag::NONE).id << "	" << graph.getData(*n, Galois::MethodFlag::NONE).dist << "\n";
+			//std::cerr << graph.getData(*n, Galois::MethodFlag::UNPROTECTED).id << "	" << graph.getData(*n, Galois::MethodFlag::UNPROTECTED).dist << "\n";
 	}
 
 	std::cerr << "Degree	Count\n";
@@ -500,17 +500,17 @@ static void readGraph(GNode& source, GNode& report) {
   bgraph = new BGraph(nnodes);
 
   for (Graph::iterator src = graph.begin(), ei = graph.end(); src != ei; ++src) {
-    SNode& node = graph.getData(*src, Galois::MethodFlag::NONE);
+    SNode& node = graph.getData(*src, Galois::MethodFlag::UNPROTECTED);
     node.id = id++;
   }
 
   std::cout << "Read binary graph\n";
 
 	for (Graph::iterator src = graph.begin(), ei = graph.end(); src != ei; ++src) {
-		SNode& dsrc = graph.getData(*src, Galois::MethodFlag::NONE);
-		for (Graph::edge_iterator ii = graph.edge_begin(*src, Galois::MethodFlag::NONE), ei = graph.edge_end(*src, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+		SNode& dsrc = graph.getData(*src, Galois::MethodFlag::UNPROTECTED);
+		for (Graph::edge_iterator ii = graph.edge_begin(*src, Galois::MethodFlag::UNPROTECTED), ei = graph.edge_end(*src, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
 			GNode dst = graph.getEdgeDst(ii);
-			SNode& ddst = graph.getData(dst, Galois::MethodFlag::NONE);
+			SNode& ddst = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
 			boost::add_edge(dsrc.id, ddst.id, *bgraph);
 		}
 	}

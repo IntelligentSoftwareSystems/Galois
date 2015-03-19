@@ -26,6 +26,7 @@
 #include "Galois/GaloisForwardDecl.h"
 #include "Galois/optional.h"
 #include "Galois/Traits.h"
+#include "Galois/Runtime/Executor_DoAll.h"
 #include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/Termination.h"
 #include "Galois/Runtime/UserContextAccess.h"
@@ -118,16 +119,16 @@ protected:
 
 
   class CtxWrapper: boost::noncopyable {
-    TreeExecutorTwoFunc* executor;
+    TreeExecutorTwoFunc& executor;
     Task* parent;
 
   public:
-    CtxWrapper (TreeExecutorTwoFunc* executor, Task* parent)
+    CtxWrapper (TreeExecutorTwoFunc& executor, Task* parent)
       : boost::noncopyable (), executor (executor), parent (parent)
     {}
 
     void spawn (const T& elem) {
-      executor->spawn (elem, parent);
+      executor.spawn (elem, parent);
     }
 
   };
@@ -136,10 +137,7 @@ protected:
     typedef int tt_does_not_need_aborts;
     typedef double tt_does_not_need_push;
 
-    TreeExecutorTwoFunc* executor;
-    TaskAlloc& taskAlloc;
-    DivFunc& divFunc;
-    ConqFunc& conqFunc;
+    TreeExecutorTwoFunc& executor;
 
     template <typename C>
     void operator () (Task* t, C& ctx) {
@@ -147,7 +145,7 @@ protected:
       if (t->hasMode (Task::DIVIDE)) {
         // CtxWrapper<C> uctx {executor, ctx, t};
         CtxWrapper uctx {executor, t};
-        divFunc (t->getElem (), uctx);
+        executor.divFunc (t->getElem (), uctx);
 
         // if (uctx.getNumChild () == 0) {
           // t->setMode (Task::CONQUER);
@@ -163,18 +161,18 @@ protected:
       } // end outer if
 
       if (t->hasMode (Task::CONQUER)) {
-        conqFunc (t->getElem());
+        executor.conqFunc (t->getElem());
 
         Task* parent = t->getParent ();
         if (parent != nullptr && parent->processedLastChild()) {
           parent->setMode (Task::CONQUER);
           // ctx.push (parent);
-          executor->push (parent);
+          executor.push (parent);
         }
 
         // task can be deallocated now
-        taskAlloc.destroy (t);
-        taskAlloc.deallocate (t, 1);
+        executor.taskAlloc.destroy (t);
+        executor.taskAlloc.deallocate (t, 1);
       }
 
     }
@@ -209,33 +207,45 @@ public:
       loopname (loopname)
   {}
 
-  void execute (const T& initItem) {
-    Task* initTask = taskAlloc.allocate (1);
-    taskAlloc.construct (initTask, initItem, nullptr, Task::DIVIDE);
-    typedef WorkList::ExternalReference<WL_ty> WL;
+  template <typename R>
+  void execute (const R& initRange) {
 
-    Galois::for_each(initTask,
-        ApplyOperatorSinglePhase {this, taskAlloc, divFunc, conqFunc},
+    Galois::Runtime::do_all_impl (initRange,
+        [this] (const T& item) {
+          Task* initTask = taskAlloc.allocate (1);
+          taskAlloc.construct (initTask, item, nullptr, Task::DIVIDE);
+          push (initTask);
+        },
+        "create_initial_tasks", true);
+
+    typedef WorkList::ExternalReference<WL_ty> WL;
+    typename WL::value_type* it = nullptr;
+
+    Galois::for_each (it, it,
+        ApplyOperatorSinglePhase {*this},
         Galois::loopname(loopname.c_str()),
         Galois::wl<WL>(&workList));
 
-    // Task* a[] = {initTask};
-//
-    // Galois::Runtime::for_each_impl<WL_ty> (
-        // makeStandardRange (&a[0], &a[1]),
-        // ApplyOperatorSinglePhase {this, taskAlloc, divFunc, conqFunc},
-        // loopname.c_str ());
-
-    // initTask deleted in ApplyOperatorSinglePhase,
+    // initialTasks deleted in ApplyOperatorSinglePhase,
   }
 };
 
-template <typename T, typename DivFunc, typename ConqFunc>
-void for_each_ordered_tree (const T& initItem, const DivFunc& divFunc, const ConqFunc& conqFunc, const char* loopname=nullptr) {
-  TreeExecutorTwoFunc<T, DivFunc, ConqFunc, false> executor (divFunc, conqFunc, loopname);
-  executor.execute (initItem);
+
+template <typename I, typename DivFunc, typename ConqFunc>
+void for_each_ordered_tree (I beg, I end, const DivFunc& divFunc, const ConqFunc& conqFunc, const char* loopname) {
+
+  typedef typename std::iterator_traits<I>::value_type T;
+
+  TreeExecutorTwoFunc<T, DivFunc, ConqFunc, false> executor {divFunc, conqFunc, loopname};
+  executor.execute (Galois::Runtime::makeStandardRange (beg, end));
 }
 
+template <typename T, typename DivFunc, typename ConqFunc>
+void for_each_ordered_tree (const T& rootItem, const DivFunc& divFunc, const ConqFunc& conqFunc, const char* loopname=nullptr) {
+
+  T tmp[] = { rootItem };
+  for_each_ordered_tree (&tmp[0], &tmp[1], divFunc, conqFunc, loopname);
+}
 
 template <typename F>
 class TreeExecStack {

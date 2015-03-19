@@ -30,7 +30,6 @@
 #include "Galois/LargeArray.h"
 #include "Galois/Graph/FileGraph.h"
 #include "Galois/Graph/Details.h"
-#include "Galois/Runtime/MethodFlags.h"
 
 #include <boost/mpl/if.hpp>
 #include GALOIS_CXX11_STD_HEADER(type_traits)
@@ -50,7 +49,8 @@ template<typename NodeTy, typename EdgeTy,
   bool HasNoLockable=false,
   bool UseNumaAlloc=false,
   bool HasOutOfLineLockable=false,
-  bool HasCompressedNodePtr=false>
+  bool HasCompressedNodePtr=false,
+  typename FileEdgeTy=EdgeTy>
 class LC_InlineEdge_Graph:
     private boost::noncopyable,
     private detail::LocalIteratorFeature<UseNumaAlloc>,
@@ -62,26 +62,29 @@ public:
   struct with_id { typedef LC_InlineEdge_Graph type; };
 
   template<typename _node_data>
-  struct with_node_data { typedef LC_InlineEdge_Graph<_node_data,EdgeTy,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,HasCompressedNodePtr> type; };
+  struct with_node_data { typedef LC_InlineEdge_Graph<_node_data,EdgeTy,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,HasCompressedNodePtr,FileEdgeTy> type; };
 
   template<typename _edge_data>
-  struct with_edge_data { typedef LC_InlineEdge_Graph<NodeTy,_edge_data,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,HasCompressedNodePtr> type; };
+  struct with_edge_data { typedef LC_InlineEdge_Graph<NodeTy,_edge_data,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,HasCompressedNodePtr,FileEdgeTy> type; };
+
+  template<typename _file_edge_data>
+  struct with_file_edge_data { typedef LC_InlineEdge_Graph<NodeTy,EdgeTy,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,HasCompressedNodePtr,_file_edge_data> type; };
 
   template<bool _has_no_lockable>
-  struct with_no_lockable { typedef LC_InlineEdge_Graph<NodeTy,EdgeTy,_has_no_lockable,UseNumaAlloc,HasOutOfLineLockable,HasCompressedNodePtr> type; };
+  struct with_no_lockable { typedef LC_InlineEdge_Graph<NodeTy,EdgeTy,_has_no_lockable,UseNumaAlloc,HasOutOfLineLockable,HasCompressedNodePtr,FileEdgeTy> type; };
 
   template<bool _use_numa_alloc>
-  struct with_numa_alloc { typedef LC_InlineEdge_Graph<NodeTy,EdgeTy,HasNoLockable,_use_numa_alloc,HasOutOfLineLockable,HasCompressedNodePtr> type; };
+  struct with_numa_alloc { typedef LC_InlineEdge_Graph<NodeTy,EdgeTy,HasNoLockable,_use_numa_alloc,HasOutOfLineLockable,HasCompressedNodePtr,FileEdgeTy> type; };
 
   template<bool _has_out_of_line_lockable>
-  struct with_out_of_line_lockable { typedef LC_InlineEdge_Graph<NodeTy,EdgeTy,HasNoLockable,UseNumaAlloc,_has_out_of_line_lockable,HasCompressedNodePtr> type; };
+  struct with_out_of_line_lockable { typedef LC_InlineEdge_Graph<NodeTy,EdgeTy,HasNoLockable,UseNumaAlloc,_has_out_of_line_lockable,HasCompressedNodePtr,FileEdgeTy> type; };
 
   /**
    * Compress representation of graph at the expense of one level of indirection on accessing
    * neighbors of a node
    */
   template<bool _has_compressed_node_ptr>
-  struct with_compressed_node_ptr { typedef  LC_InlineEdge_Graph<NodeTy,EdgeTy,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,_has_compressed_node_ptr> type; };
+  struct with_compressed_node_ptr { typedef  LC_InlineEdge_Graph<NodeTy,EdgeTy,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,_has_compressed_node_ptr,FileEdgeTy> type; };
 
   typedef read_default_graph_tag read_tag;
 
@@ -103,6 +106,7 @@ protected:
 public:
   typedef NodeInfo* GraphNode;
   typedef EdgeTy edge_data_type;
+  typedef FileEdgeTy file_edge_data_type;
   typedef NodeTy node_data_type;
   typedef typename EdgeInfo::reference edge_data_reference;
   typedef typename NodeInfoTypes::reference node_data_reference;
@@ -159,6 +163,20 @@ protected:
     return nodeData[getId(N)].edgeEnd();
   }
 
+  template<bool _A1 = EdgeInfo::has_value, bool _A2 = LargeArray<FileEdgeTy>::has_value>
+  void constructEdgeValue(FileGraph& graph, typename FileGraph::edge_iterator nn,
+      EdgeInfo* edge, typename std::enable_if<!_A1 || _A2>::type* = 0) {
+    typedef LargeArray<FileEdgeTy> FED;
+    if (EdgeInfo::has_value)
+      edge->construct(graph.getEdgeData<typename FED::value_type>(nn));
+  }
+
+  template<bool _A1 = EdgeInfo::has_value, bool _A2 = LargeArray<FileEdgeTy>::has_value>
+  void constructEdgeValue(FileGraph& graph, typename FileGraph::edge_iterator nn,
+      EdgeInfo* edge, typename std::enable_if<_A1 && !_A2>::type* = 0) {
+    edge->construct();
+  }
+
   size_t getId(GraphNode N) {
     return std::distance(this->nodeData.data(), N);
   }
@@ -177,14 +195,14 @@ public:
     }
   }
 
-  node_data_reference getData(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
-    Galois::Runtime::checkWrite(mflag, false);
+  node_data_reference getData(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
+    // Galois::Runtime::checkWrite(mflag, false);
     acquireNode(N, mflag);
     return N->getData();
   }
 
-  edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::NONE) const {
-    Galois::Runtime::checkWrite(mflag, false);
+  edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::UNPROTECTED) const {
+    // Galois::Runtime::checkWrite(mflag, false);
     return ni->get();
    }
 
@@ -205,7 +223,7 @@ public:
   const_local_iterator local_begin() const { return const_local_iterator(&nodeData[this->localBegin(numNodes)]); }
   const_local_iterator local_end() const { return const_local_iterator(&nodeData[this->localEnd(numNodes)]); }
 
-  edge_iterator edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+  edge_iterator edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     acquireNode(N, mflag);
     if (Galois::Runtime::shouldLock(mflag)) {
       for (edge_iterator ii = N->edgeBegin(), ee = N->edgeEnd(); ii != ee; ++ii) {
@@ -215,12 +233,12 @@ public:
     return N->edgeBegin();
   }
 
-  edge_iterator edge_end(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+  edge_iterator edge_end(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     acquireNode(N, mflag);
     return N->edgeEnd();
   }
 
-  detail::EdgesIterator<LC_InlineEdge_Graph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+  detail::EdgesIterator<LC_InlineEdge_Graph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     return detail::EdgesIterator<LC_InlineEdge_Graph>(*this, N, mflag);
   }
 
@@ -229,7 +247,7 @@ public:
    * Sorts outgoing edges of a node. Comparison function is over EdgeTy.
    */
   template<typename CompTy>
-  void sortEdgesByEdgeData(GraphNode N, const CompTy& comp = std::less<EdgeTy>(), MethodFlag mflag = MethodFlag::ALL) {
+  void sortEdgesByEdgeData(GraphNode N, const CompTy& comp = std::less<EdgeTy>(), MethodFlag mflag = MethodFlag::WRITE) {
     Galois::Runtime::acquire(N, mflag);
     std::sort(edge_sort_begin(N), edge_sort_end(N), EdgeSortCompWrapper<EdgeSortValue<GraphNode,EdgeTy>,CompTy>(comp));
   }
@@ -238,7 +256,7 @@ public:
    * Sorts outgoing edges of a node. Comparison function is over <code>EdgeSortValue<EdgeTy></code>.
    */
   template<typename CompTy>
-  void sortEdges(GraphNode N, const CompTy& comp, MethodFlag mflag = MethodFlag::ALL) {
+  void sortEdges(GraphNode N, const CompTy& comp, MethodFlag mflag = MethodFlag::WRITE) {
     Galois::Runtime::acquire(N, mflag);
     std::sort(edge_sort_begin(N), edge_sort_end(N), comp);
   }
@@ -275,8 +293,7 @@ public:
       this->outOfLineConstructAt(*ii);
       nodeData[*ii].edgeBegin() = curEdge;
       for (FileGraph::edge_iterator nn = graph.edge_begin(*ii), en = graph.edge_end(*ii); nn != en; ++nn) {
-        if (EdgeInfo::has_value)
-          curEdge->construct(graph.getEdgeData<EDV>(nn));
+        constructEdgeValue(graph, nn, curEdge);
         setEdgeDst(nodeData, curEdge, graph.getEdgeDst(nn));
         ++curEdge;
       }

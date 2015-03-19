@@ -42,7 +42,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi>  {
 
     Initialize(Graph& g, Bag& b): graph(g), bag(b) { }
     void operator()(GNode n) const {
-      LNode& data = graph.getData(n, Galois::MethodFlag::NONE);
+      LNode& data = graph.getData(n, Galois::MethodFlag::UNPROTECTED);
       data.comp = data.id;
       bag.push(n, graph.sizeEdges() / graph.size());
     }
@@ -57,7 +57,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi>  {
     }
     void operator()(size_t id) {
       GNode n = graph.nodeFromId(id);
-      LNode& data = graph.getData(n, Galois::MethodFlag::NONE);
+      LNode& data = graph.getData(n, Galois::MethodFlag::UNPROTECTED);
       data.oldComp = data.comp;
     }
   };
@@ -68,8 +68,8 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi>  {
     
     template<typename GTy>
     bool operator()(GTy& graph, typename GTy::GraphNode src, typename GTy::GraphNode dst, typename GTy::edge_data_reference) {
-      LNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
-      LNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+      LNode& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
+      LNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
 
       typename LNode::component_type orig = ddata.comp;
       while (true) {

@@ -30,7 +30,6 @@
 #include "Galois/LazyObject.h"
 #include "Galois/LargeArray.h"
 #include "Galois/Graph/Details.h"
-#include "Galois/Runtime/MethodFlags.h"
 
 #include <boost/iterator/counting_iterator.hpp>
 #include <boost/utility.hpp>
@@ -72,11 +71,11 @@ public:
   typedef typename Graph::local_iterator local_iterator;
   typedef typename Graph::const_local_iterator const_local_iterator;
 
-  node_data_reference getData(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+  node_data_reference getData(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     return graph.getData(N, mflag);
   }
 
-  edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::NONE) {
+  edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::UNPROTECTED) {
     return graph.getEdgeData(segment, ni, mflag);
   }
 
@@ -93,19 +92,19 @@ public:
   local_iterator local_begin() const { return graph.local_begin(); }
   local_iterator local_end() const { return graph.local_end(); }
 
-  edge_iterator edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+  edge_iterator edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     return graph.edge_begin(segment, N, mflag);
   }
 
-  edge_iterator edge_end(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+  edge_iterator edge_end(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     return graph.edge_end(segment, N, mflag);
   }
 
-  detail::EdgesIterator<BindSegmentGraph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+  detail::EdgesIterator<BindSegmentGraph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     return detail::EdgesIterator<BindSegmentGraph>(*this, N, mflag);
   }
 
-  edge_data_reference getInEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::NONE) {
+  edge_data_reference getInEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::UNPROTECTED) {
     return graph.getInEdgeData(segment, ni, mflag);
   }
 
@@ -113,15 +112,15 @@ public:
     return graph.getInEdgeDst(segment, ni);
   }
 
-  in_edge_iterator in_edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+  in_edge_iterator in_edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     return graph.in_edge_begin(segment, N, mflag);
   }
 
-  in_edge_iterator in_edge_end(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+  in_edge_iterator in_edge_end(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     return graph.in_edge_end(segment, N, mflag);
   }
 
-  detail::InEdgesIterator<BindSegmentGraph> in_edges(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+  detail::InEdgesIterator<BindSegmentGraph> in_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     return detail::InEdgesIterator<BindSegmentGraph>(*this, N, mflag);
   }
 
@@ -303,6 +302,7 @@ public:
 
   typedef typename OCFileGraph::GraphNode GraphNode;
   typedef EdgeTy edge_data_type;
+  typedef edge_data_type file_edge_data_type;
   typedef NodeTy node_data_type;
   typedef typename OCFileGraph::template EdgeReference<EdgeTy>::type edge_data_reference;
   typedef typename NodeInfo::reference node_data_reference;
@@ -434,15 +434,15 @@ public:
   iterator begin(const segment_type& cur) { return cur.nodeBegin; }
   iterator end(const segment_type& cur) { return cur.nodeEnd; }
 
-  node_data_reference getData(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
-    Galois::Runtime::checkWrite(mflag, false);
+  node_data_reference getData(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
+    // Galois::Runtime::checkWrite(mflag, false);
     NodeInfo& NI = nodeData[N];
     acquireNode(N, mflag);
     return NI.getData();
   }
 
-  edge_data_reference getEdgeData(const segment_type& segment, edge_iterator ni, MethodFlag mflag = MethodFlag::NONE) {
-    Galois::Runtime::checkWrite(mflag, false);
+  edge_data_reference getEdgeData(const segment_type& segment, edge_iterator ni, MethodFlag mflag = MethodFlag::UNPROTECTED) {
+    // Galois::Runtime::checkWrite(mflag, false);
     return outGraph.getEdgeData<EdgeTy>(segment.out, ni);
   }
 
@@ -461,7 +461,7 @@ public:
   local_iterator local_begin() { return local_iterator(this->localBegin(numNodes)); }
   local_iterator local_end() { return local_iterator(this->localEnd(numNodes)); }
 
-  edge_iterator edge_begin(const segment_type& segment, GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+  edge_iterator edge_begin(const segment_type& segment, GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     acquireNode(N, mflag);
     if (Galois::Runtime::shouldLock(mflag)) {
       for (edge_iterator ii = outGraph.edge_begin(N), ee = outGraph.edge_end(N); ii != ee; ++ii) {
@@ -471,13 +471,13 @@ public:
     return outGraph.edge_begin(N);
   }
 
-  edge_iterator edge_end(const segment_type& segment, GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+  edge_iterator edge_end(const segment_type& segment, GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     acquireNode(N, mflag);
     return outGraph.edge_end(N);
   }
 
-  edge_data_reference getInEdgeData(const segment_type& segment, edge_iterator ni, MethodFlag mflag = MethodFlag::NONE) {
-    Galois::Runtime::checkWrite(mflag, false);
+  edge_data_reference getInEdgeData(const segment_type& segment, edge_iterator ni, MethodFlag mflag = MethodFlag::UNPROTECTED) {
+    // Galois::Runtime::checkWrite(mflag, false);
     return inGraph->getEdgeData<EdgeTy>(segment.in, ni);
   }
 
@@ -485,7 +485,7 @@ public:
     return inGraph->getEdgeDst(segment.in, ni);
   }
 
-  in_edge_iterator in_edge_begin(const segment_type& segment, GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+  in_edge_iterator in_edge_begin(const segment_type& segment, GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     acquireNode(N, mflag);
     if (Galois::Runtime::shouldLock(mflag)) {
       for (in_edge_iterator ii = inGraph->edge_begin(N), ee = inGraph->edge_end(N); ii != ee; ++ii) {
@@ -495,7 +495,7 @@ public:
     return inGraph->edge_begin(N);
   }
 
-  in_edge_iterator in_edge_end(const segment_type& segment, GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+  in_edge_iterator in_edge_end(const segment_type& segment, GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     acquireNode(N, mflag);
     return inGraph->edge_end(N);
   }

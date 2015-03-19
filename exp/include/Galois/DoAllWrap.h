@@ -78,7 +78,7 @@ template <>
 struct DoAllImpl<DOALL_GALOIS_STEAL> {
   template <typename R, typename F>
   static inline void go (const R& range, const F& func, const char* loopname) {
-    Galois::Runtime::do_all_impl (range, func, loopname, false);
+    Galois::Runtime::do_all_impl (range, func, loopname, true);
   }
 };
 
@@ -102,8 +102,8 @@ struct DoAllImpl<DOALL_GALOIS_FOREACH> {
   static inline void go (const R& range, const F& func, const char* loopname) {
     typedef typename R::value_type T;
     // typedef Galois::WorkList::dChunkedFIFO<CHUNK_SIZE, T> WL_ty;
-    typedef Galois::WorkList::dChunkedLIFO<CHUNK_SIZE, T> WL_ty;
-    // typedef Galois::WorkList::AltChunkedLIFO<CHUNK_SIZE, T> WL_ty;
+    // typedef Galois::WorkList::dChunkedLIFO<CHUNK_SIZE, T> WL_ty;
+    typedef Galois::WorkList::AltChunkedLIFO<CHUNK_SIZE, T> WL_ty;
 
     Galois::Runtime::for_each_gen(range, FuncWrap<T, F> {func},
         std::make_tuple(Galois::loopname(loopname), Galois::wl<WL_ty>()));

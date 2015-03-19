@@ -40,12 +40,12 @@ public:
   template<typename... Args>
   GChecked(Args&&... args): val(std::forward<Args>(args)...) { }
 
-  T& get(Galois::MethodFlag m = MethodFlag::ALL) {
+  T& get(Galois::MethodFlag m = MethodFlag::WRITE) {
     Galois::Runtime::acquire(this, m);
     return val;
   }
 
-  const T& get(Galois::MethodFlag m = MethodFlag::ALL) const {
+  const T& get(Galois::MethodFlag m = MethodFlag::WRITE) const {
     Galois::Runtime::acquire(const_cast<GChecked*>(this), m);
     return val;
   }
@@ -54,7 +54,7 @@ public:
 template<>
 class GChecked<void>: public Galois::Runtime::Lockable {
 public:
-  void get(Galois::MethodFlag m = MethodFlag::ALL) const {
+  void get(Galois::MethodFlag m = MethodFlag::WRITE) const {
     Galois::Runtime::acquire(const_cast<GChecked*>(this), m);
   }
 };

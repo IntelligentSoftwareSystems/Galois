@@ -10,18 +10,6 @@ else()
   set(sources ${sources} ThreadPool_pthread.cpp FileGraphParallel_pthread.cpp)
 endif()
 
-set(include_dirs "${PROJECT_SOURCE_DIR}/include/")
-if(USE_EXP)
-  file(GLOB exp_sources ../exp/src/*.cpp)
-  set(include_dirs ${include_dirs} "${PROJECT_SOURCE_DIR}/exp/include/")
-  set(sources ${sources} ${exp_sources})
-endif()
-set(include_dirs ${include_dirs} "${PROJECT_BINARY_DIR}/include/")
-
-function(add_internal_library name)
-  add_library(${name} OBJECT ${ARGN})
-endfunction()
-
 function(add_galois_library name)
   set(options)
   set(oneValueArgs)
@@ -34,8 +22,13 @@ function(add_galois_library name)
   add_library(${name} ${X_UNPARSED_ARGUMENTS} ${objects})
 endfunction()
 
-add_galois_library(galois ${sources} LIBS llvm mm ll)
-add_galois_library(galois-nothreads FileGraph.cpp LIBS llvm mm-standalone ll)
+set(exp_libs)
+if(USE_EXP)
+  set(exp_libs exp)
+endif()
+
+add_galois_library(galois ${sources} LIBS llvm mm ll ${exp_libs})
+add_galois_library(galois-nothreads FileGraph.cpp LIBS llvm mm-standalone ll ${exp_libs})
 
 add_subdirectory(ll)
 add_subdirectory(llvm)
@@ -79,9 +72,12 @@ endif()
 if(USE_PAPI)
   # Sadly, none of our machines places papi in a well-known place or provides
   # a method for finding papi automatically. Hardcode some constants.
-  set(PAPI_ROOT "/h1/lenharth/papi;/usr/global/tools/papi/bgqos_0/papi-5.0.1-V1R1M2;/usr/lib64/papi-5.1.1/usr")
+  set(PAPI_ROOT 
+    "/h1/lenharth/papi"
+    "/usr/global/tools/papi/bgqos_0/papi-5.0.1-V1R1M2"
+    "/usr/lib64/papi-5.1.1/usr")
   find_package(PAPI)
-  if (PAPI_FOUND)
+  if(PAPI_FOUND)
     set(GALOIS_USE_PAPI on)
     include_directories(${PAPI_INCLUDE_DIRS})
     target_link_libraries(galois ${PAPI_LIBRARIES})
@@ -101,8 +97,4 @@ install(TARGETS galois
   EXPORT GaloisTargets
   RUNTIME DESTINATION "${INSTALL_BIN_DIR}" COMPONENT bin
   LIBRARY DESTINATION "${INSTALL_LIB_DIR}" COMPONENT shlib
-  ARCHIVE DESTINATION "${INSTALL_LIB_DIR}" COMPONENT dev
-  )
-install(DIRECTORY ${include_dirs} DESTINATION "${INSTALL_INCLUDE_DIR}" COMPONENT dev
-  FILES_MATCHING PATTERN "*.h"
-  PATTERN ".svn" EXCLUDE)
+  ARCHIVE DESTINATION "${INSTALL_LIB_DIR}" COMPONENT dev)

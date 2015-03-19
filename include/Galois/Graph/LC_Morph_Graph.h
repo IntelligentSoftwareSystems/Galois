@@ -30,7 +30,6 @@
 #include "Galois/LargeArray.h"
 #include "Galois/Graph/FileGraph.h"
 #include "Galois/Graph/Details.h"
-#include "Galois/Runtime/MethodFlags.h"
 
 #include <boost/mpl/if.hpp>
 #include GALOIS_CXX11_STD_HEADER(type_traits)
@@ -43,7 +42,8 @@ template<typename NodeTy, typename EdgeTy,
   bool HasNoLockable=false,
   bool UseNumaAlloc=false,
   bool HasOutOfLineLockable=false,
-  bool HasId=false>
+  bool HasId=false,
+  typename FileEdgeTy=EdgeTy>
 class LC_Morph_Graph:
     private boost::noncopyable,
     private detail::OutOfLineLockableFeature<HasOutOfLineLockable && !HasNoLockable> {
@@ -51,22 +51,25 @@ class LC_Morph_Graph:
 
 public:
   template<bool _has_id>
-  struct with_id { typedef LC_Morph_Graph<NodeTy,EdgeTy,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,_has_id> type; };
+  struct with_id { typedef LC_Morph_Graph<NodeTy,EdgeTy,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,_has_id,FileEdgeTy> type; };
 
   template<typename _node_data>
-  struct with_node_data { typedef  LC_Morph_Graph<_node_data,EdgeTy,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,HasId> type; };
+  struct with_node_data { typedef  LC_Morph_Graph<_node_data,EdgeTy,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,HasId,FileEdgeTy> type; };
 
   template<typename _edge_data>
-  struct with_edge_data { typedef  LC_Morph_Graph<NodeTy,_edge_data,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,HasId> type; };
+  struct with_edge_data { typedef  LC_Morph_Graph<NodeTy,_edge_data,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,HasId,FileEdgeTy> type; };
+
+  template<typename _file_edge_data>
+  struct with_file_edge_data { typedef  LC_Morph_Graph<NodeTy,EdgeTy,HasNoLockable,UseNumaAlloc,HasOutOfLineLockable,HasId,_file_edge_data> type; };
 
   template<bool _has_no_lockable>
-  struct with_no_lockable { typedef LC_Morph_Graph<NodeTy,EdgeTy,_has_no_lockable,UseNumaAlloc,HasOutOfLineLockable,HasId> type; };
+  struct with_no_lockable { typedef LC_Morph_Graph<NodeTy,EdgeTy,_has_no_lockable,UseNumaAlloc,HasOutOfLineLockable,HasId,FileEdgeTy> type; };
 
   template<bool _use_numa_alloc>
-  struct with_numa_alloc { typedef LC_Morph_Graph<NodeTy,EdgeTy,HasNoLockable,_use_numa_alloc,HasOutOfLineLockable,HasId> type; };
+  struct with_numa_alloc { typedef LC_Morph_Graph<NodeTy,EdgeTy,HasNoLockable,_use_numa_alloc,HasOutOfLineLockable,HasId,FileEdgeTy> type; };
 
   template<bool _has_out_of_line_lockable>
-  struct with_out_of_line_lockable { typedef LC_Morph_Graph<NodeTy,EdgeTy,HasNoLockable,UseNumaAlloc,_has_out_of_line_lockable,_has_out_of_line_lockable||HasId> type; };
+  struct with_out_of_line_lockable { typedef LC_Morph_Graph<NodeTy,EdgeTy,HasNoLockable,UseNumaAlloc,_has_out_of_line_lockable,_has_out_of_line_lockable||HasId,FileEdgeTy> type; };
 
   typedef read_with_aux_graph_tag read_tag;
 
@@ -109,6 +112,7 @@ protected:
 
 public:
   typedef NodeInfo* GraphNode;
+  typedef FileEdgeTy file_edge_data_type;
   typedef EdgeTy edge_data_type;
   typedef NodeTy node_data_type;
   typedef typename NodeInfoTypes::reference node_data_reference;
@@ -132,6 +136,23 @@ protected:
   template<bool _A1 = HasOutOfLineLockable, bool _A2 = HasNoLockable>
   void acquireNode(GraphNode N, MethodFlag mflag, typename std::enable_if<_A1 && !_A2>::type* = 0) {
     this->outOfLineAcquire(getId(N), mflag);
+  }
+
+  template<bool _A1 = EdgeInfo::has_value, bool _A2 = LargeArray<FileEdgeTy>::has_value>
+  void constructEdgeValue(FileGraph& graph, typename FileGraph::edge_iterator nn,
+      GraphNode src, GraphNode dst, typename std::enable_if<!_A1 || _A2>::type* = 0) {
+    typedef typename LargeArray<FileEdgeTy>::value_type FEDV;
+    if (EdgeInfo::has_value) {
+      addMultiEdge(src, dst, Galois::MethodFlag::UNPROTECTED, graph.getEdgeData<FEDV>(nn));
+    } else {
+      addMultiEdge(src, dst, Galois::MethodFlag::UNPROTECTED);
+    }
+  }
+
+  template<bool _A1 = EdgeInfo::has_value, bool _A2 = LargeArray<FileEdgeTy>::has_value>
+  void constructEdgeValue(FileGraph& graph, typename FileGraph::edge_iterator nn,
+      GraphNode src, GraphNode dst, typename std::enable_if<_A1 && !_A2>::type* = 0) {
+    addMultiEdge(src, dst, Galois::MethodFlag::UNPROTECTED);
   }
 
   template<bool _A1 = HasOutOfLineLockable, bool _A2 = HasNoLockable>
@@ -158,14 +179,14 @@ public:
     }
   }
 
-  node_data_reference getData(const GraphNode& N, MethodFlag mflag = MethodFlag::ALL) {
-    Galois::Runtime::checkWrite(mflag, false);
+  node_data_reference getData(const GraphNode& N, MethodFlag mflag = MethodFlag::WRITE) {
+    // Galois::Runtime::checkWrite(mflag, false);
     acquireNode(N, mflag);
     return N->getData();
   }
 
-  edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::NONE) {
-    Galois::Runtime::checkWrite(mflag, false);
+  edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::UNPROTECTED) {
+    // Galois::Runtime::checkWrite(mflag, false);
     acquireNode(ni->dst, mflag);
     return ni->get();
   }
@@ -196,7 +217,7 @@ public:
     return boost::make_transform_iterator(nodes.local_end(), makeGraphNode());
   }
 
-  edge_iterator edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+  edge_iterator edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     acquireNode(N, mflag);
     if (Galois::Runtime::shouldLock(mflag)) {
       for (edge_iterator ii = N->edgeBegin, ee = N->edgeEnd; ii != ee; ++ii) {
@@ -206,7 +227,7 @@ public:
     return N->edgeBegin;
   }
 
-  edge_iterator edge_end(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+  edge_iterator edge_end(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     return N->edgeEnd;
   }
 
@@ -214,15 +235,15 @@ public:
    * An object with begin() and end() methods to iterate over the outgoing
    * edges of N.
    */
-  detail::EdgesIterator<LC_Morph_Graph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+  detail::EdgesIterator<LC_Morph_Graph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     return detail::EdgesIterator<LC_Morph_Graph>(*this, N, mflag);
   }
   
   template<typename... Args>
   GraphNode createNode(int nedges, Args&&... args) {
-    Galois::Runtime::checkWrite(MethodFlag::ALL, true);
+    // Galois::Runtime::checkWrite(MethodFlag::WRITE, true);
     NodeInfo* N = &nodes.emplace(std::forward<Args>(args)...);
-    acquireNode(N, MethodFlag::ALL);
+    acquireNode(N, MethodFlag::WRITE);
     EdgeHolder*& local_edges = *edges.getLocal();
     if (!local_edges || std::distance(local_edges->begin, local_edges->end) < nedges) {
       EdgeHolder* old = local_edges;
@@ -252,7 +273,7 @@ public:
 
   template<typename... Args>
   edge_iterator addEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag, Args&&... args) {
-    Galois::Runtime::checkWrite(mflag, true);
+    // Galois::Runtime::checkWrite(mflag, true);
     acquireNode(src, mflag);
     auto it = std::find_if(src->edgeBegin, src->edgeEnd, dst_equals(dst));
     if (it == src->edgeEnd) {
@@ -266,7 +287,7 @@ public:
 
   template<typename... Args>
   edge_iterator addMultiEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag, Args&&... args) {
-    Galois::Runtime::checkWrite(mflag, true);
+    // Galois::Runtime::checkWrite(mflag, true);
     acquireNode(src, mflag);
     auto it = src->edgeEnd;
     it->dst = dst;
@@ -281,8 +302,8 @@ public:
    *
    * Invalidates edge iterator.
    */
-  void removeEdge(GraphNode src, edge_iterator dst, Galois::MethodFlag mflag = MethodFlag::ALL) {
-    Galois::Runtime::checkWrite(mflag, true);
+  void removeEdge(GraphNode src, edge_iterator dst, Galois::MethodFlag mflag = MethodFlag::WRITE) {
+    // Galois::Runtime::checkWrite(mflag, true);
     acquireNode(src, mflag);
     src->edgeEnd--;
     assert(src->edgeBegin <= src->edgeEnd);
@@ -290,8 +311,8 @@ public:
     src->edgeEnd->destroy();
   }
   
-  edge_iterator findEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = MethodFlag::ALL) {
-    Galois::Runtime::checkWrite(mflag, true);
+  edge_iterator findEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = MethodFlag::WRITE) {
+    // Galois::Runtime::checkWrite(mflag, true); // TODO: double check 'true' here
     acquireNode(src, mflag);
     return std::find_if(src->edgeBegin, src->edgeEnd, dst_equals(dst)); 
   }
@@ -322,6 +343,7 @@ public:
   
   void constructEdgesFrom(FileGraph& graph, unsigned tid, unsigned total, const ReadGraphAuxData& aux) {
     typedef typename EdgeInfo::value_type value_type;
+    typedef LargeArray<FileEdgeTy> FED;
     auto r = graph.divideByNode(
         sizeof(NodeInfo) + LC_Morph_Graph::size_of_out_of_line::value,
         sizeof(EdgeInfo),
@@ -329,11 +351,7 @@ public:
 
     for (FileGraph::iterator ii = r.first, ei = r.second; ii != ei; ++ii) {
       for (FileGraph::edge_iterator nn = graph.edge_begin(*ii), en = graph.edge_end(*ii); nn != en; ++nn) {
-        if (EdgeInfo::has_value) {
-          addMultiEdge(aux[*ii], aux[graph.getEdgeDst(nn)], Galois::MethodFlag::NONE, graph.getEdgeData<typename EdgeInfo::value_type>(nn));
-        } else {
-          addMultiEdge(aux[*ii], aux[graph.getEdgeDst(nn)], Galois::MethodFlag::NONE);
-        }
+        constructEdgeValue(graph, nn, aux[*ii], aux[graph.getEdgeDst(nn)]);
       }
     }
   }

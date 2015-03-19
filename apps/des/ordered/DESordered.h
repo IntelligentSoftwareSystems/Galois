@@ -29,9 +29,9 @@
 #include "Galois/Timer.h"
 #include "Galois/Atomic.h"
 #include "Galois/Galois.h"
+#include "Galois/PerThreadContainer.h"
 
 #include "Galois/Runtime/LCordered.h"
-#include "Galois/Runtime/PerThreadContainer.h"
 #include "Galois/Runtime/ll/PaddedLock.h"
 #include "Galois/Runtime/ll/CompilerSpecific.h"
 
@@ -52,7 +52,7 @@ typedef Galois::GAccumulator<size_t> Accumulator_ty;
 
 typedef des::EventRecvTimeLocalTieBrkCmp<TypeHelper::Event_ty> Cmp_ty;
 
-typedef Galois::Runtime::PerThreadVector<TypeHelper::Event_ty> AddList_ty;
+typedef Galois::PerThreadVector<TypeHelper::Event_ty> AddList_ty;
 
 struct SimObjInfo;
 typedef std::vector<SimObjInfo> VecSobjInfo;
@@ -146,7 +146,7 @@ class DESordered:
     template <typename C>
     GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (const Event_ty& event, C&) const {
       SimObjInfo& recvInfo = sobjInfoVec[event.getRecvObj ()->getID ()];
-      graph.getData (recvInfo.node, Galois::MethodFlag::CHECK_CONFLICT);
+      graph.getData (recvInfo.node, Galois::MethodFlag::WRITE);
     }
   };
 
@@ -164,7 +164,7 @@ class DESordered:
 
   struct OpFunc {
 
-    static const size_t CHUNK_SIZE = 8;
+    static const size_t CHUNK_SIZE = 4;
     static const size_t UNROLL_FACTOR = 1024;
 
     Graph& graph;
@@ -226,7 +226,7 @@ protected:
     for (Graph::iterator n = graph.begin ()
         , endn = graph.end (); n != endn; ++n) {
 
-      SimObj_ty* so = static_cast<SimObj_ty*> (graph.getData (*n, Galois::MethodFlag::NONE));
+      SimObj_ty* so = static_cast<SimObj_ty*> (graph.getData (*n, Galois::MethodFlag::UNPROTECTED));
       sobjInfoVec[so->getID ()] = SimObjInfo (*n, so);
     }
   }
@@ -245,7 +245,8 @@ protected:
     Accumulator_ty nevents;
 
     Galois::Runtime::for_each_ordered_lc (
-        simInit.getInitEvents ().begin (), simInit.getInitEvents ().end (),
+        Galois::Runtime::makeStandardRange(
+        simInit.getInitEvents ().begin (), simInit.getInitEvents ().end ()),
         Cmp_ty (), 
         NhoodVisitor (graph, sobjInfoVec),
         OpFunc (graph, sobjInfoVec, newEvents, nevents),

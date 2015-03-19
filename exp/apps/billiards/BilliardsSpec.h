@@ -26,8 +26,10 @@
 #ifndef BILLIARDS_SPEC_H
 #define BILLIARDS_SPEC_H
 
+#include "Galois/PerThreadContainer.h"
+
 #include "Galois/Graph/Graph.h"
-#include "Galois/Runtime/PerThreadContainer.h"
+
 #include "Galois/Runtime/ROBexecutor.h"
 
 #include "Billiards.h"
@@ -36,7 +38,7 @@ class BilliardsSpec: public Billiards {
   using Graph = Galois::Graph::FirstGraph<void*, void, true>;
   using GNode = Graph::GraphNode;
   using VecNodes = std::vector<GNode>;
-  using AddListTy = Galois::Runtime::PerThreadVector<Event>;
+  using AddListTy = Galois::PerThreadVector<Event>;
 
   struct VisitNhood {
     Graph& graph;
@@ -49,12 +51,12 @@ class BilliardsSpec: public Billiards {
 
       const Ball& b1 = e.getBall ();
       assert (b1.getID () < nodes.size ());
-      graph.getData (nodes[b1.getID ()], Galois::CHECK_CONFLICT);
+      graph.getData (nodes[b1.getID ()], Galois::MethodFlag::WRITE);
 
       if (e.getKind () == Event::BALL_COLLISION) {
         const Ball& b2 = e.getOtherBall ();
         assert (b2.getID () < nodes.size ());
-        graph.getData (nodes[b2.getID ()], Galois::CHECK_CONFLICT);
+        graph.getData (nodes[b2.getID ()], Galois::MethodFlag::WRITE);
       }
 
     }

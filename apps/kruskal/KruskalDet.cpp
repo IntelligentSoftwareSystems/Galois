@@ -51,9 +51,7 @@ public:
   Process(Graph& g, Galois::GAccumulator<size_t>& w): graph(g), weight(w) { }
 
   void operator()(const Edge& e, Galois::UserContext<Edge>& ctx) const {
-    bool used;
-    LocalState* localState = (LocalState*) ctx.getLocalState(used);
-    if (used)
+    if (!ctx.isFirstPass())
       return;
 
     Node& n1 = graph.getData(e.src);

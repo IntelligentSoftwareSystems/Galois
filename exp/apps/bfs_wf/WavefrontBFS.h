@@ -31,7 +31,8 @@
 #include "Galois/Accumulator.h"
 #include "Galois/AltBag.h"
 #include "Galois/DoAllWrap.h"
-#include "Galois/Runtime/PerThreadContainer.h"
+#include "Galois/PerThreadContainer.h"
+
 #include "Galois/WorkList/ExternalReference.h"
 
 #include "bfs.h"
@@ -57,7 +58,7 @@ protected:
     WL* currWL = new WL ();
     WL* nextWL = new WL ();
 
-    graph.getData (startNode, Galois::NONE) = 0;
+    graph.getData (startNode, Galois::MethodFlag::UNPROTECTED) = 0;
     currWL->push_back (startNode);
     size_t numIter = 1; //  counting the start node
 
@@ -255,9 +256,14 @@ class BFSwavefrontNolock: public AbstractWavefrontBFS {
 
 class BFSwavefrontCoupled: public AbstractWavefrontBFS {
 
-  typedef Galois::PerThreadBag<GNode> WL_ty;
-  // typedef Galois::Runtime::PerThreadVector<GNode> WL_ty;
-  // typedef Galois::InsertBag<GNode> WL_ty;
+// #define BFS_WF_USE_BAG 1
+
+#ifdef BFS_WF_USE_BAG
+  typedef Galois::InsertBag<GNode> WL_ty;
+#else
+  typedef Galois::PerThreadBag<GNode, 64*1024> WL_ty;
+  // typedef Galois::PerThreadVector<GNode> WL_ty;
+#endif // BFS_WF_USE_BAG
 
   struct ParallelInnerLoop {
     Graph& graph;
@@ -275,8 +281,11 @@ class BFSwavefrontCoupled: public AbstractWavefrontBFS {
     {} 
 
     GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (GNode src) const {
+#ifdef BFS_WF_USE_BAG
+      numAdds += Super_ty::bfsOperator<false> (graph, src, nextWL);
+#else
       numAdds += Super_ty::bfsOperator<false> (graph, src, nextWL.get ());
-      // numAdds += Super_ty::bfsOperator<false> (graph, src, nextWL);
+#endif
     }
   };
 
@@ -290,9 +299,12 @@ public:
     WL_ty* currWL = new WL_ty ();
     WL_ty* nextWL = new WL_ty ();
 
-    graph.getData (startNode, Galois::NONE) = 0;
+    graph.getData (startNode, Galois::MethodFlag::UNPROTECTED) = 0;
+#ifdef BFS_WF_USE_BAG
+    currWL->push_back (startNode);
+#else
     currWL->get ().push_back (startNode);
-    // currWL->push_back (startNode);
+#endif
 
     size_t numIter = 1;
 
@@ -300,8 +312,12 @@ public:
 
     ParCounter numAdds;
     Galois::Runtime::getSystemThreadPool ().burnPower (Galois::getActiveThreads ());
+
+#ifdef BFS_WF_USE_BAG
+    while (!currWL->empty ()) {
+#else
     while (!currWL->empty_all ()) {
-    // while (!currWL->empty ()) {
+#endif
 
       Galois::do_all_choice (Galois::Runtime::makeLocalRange(*currWL), 
           ParallelInnerLoop (graph, *nextWL, numAdds), 
@@ -309,8 +325,12 @@ public:
           Galois::doall_chunk_size<CHUNK_SIZE> ());
 
       std::swap (currWL, nextWL);
+
+#ifdef BFS_WF_USE_BAG
+      nextWL->clear ();
+#else
       nextWL->clear_all_parallel ();
-      // nextWL->clear ();
+#endif
       ++level;
     }
     Galois::Runtime::getSystemThreadPool ().beKind ();

@@ -32,7 +32,6 @@
 #include "Galois/NoDerefIterator.h"
 #include "Galois/Threads.h"
 #include "Galois/Runtime/Context.h"
-#include "Galois/Runtime/MethodFlags.h"
 #include "Galois/Runtime/PerThreadStorage.h"
 
 #include <boost/mpl/if.hpp>

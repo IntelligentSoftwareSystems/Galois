@@ -119,25 +119,25 @@ class AsyncEngine {
       message_type msg = item.second;
       
       if (needs_gather_in_edges<Operator>::value || needs_scatter_in_edges<Operator>::value) {
-        self->graph.in_edge_begin(node, Galois::MethodFlag::ALL);
+        self->graph.in_edge_begin(node, Galois::MethodFlag::WRITE);
       }
 
       if (needs_gather_out_edges<Operator>::value || needs_scatter_out_edges<Operator>::value) {
-        self->graph.edge_begin(node, Galois::MethodFlag::ALL);
+        self->graph.edge_begin(node, Galois::MethodFlag::WRITE);
       }
 
       op.init(self->graph, node, msg);
       
       gather_type sum;
       if (needs_gather_in_edges<Operator>::value) {
-        for (in_edge_iterator ii = self->graph.in_edge_begin(node, Galois::MethodFlag::NONE),
-            ei = self->graph.in_edge_end(node, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+        for (in_edge_iterator ii = self->graph.in_edge_begin(node, Galois::MethodFlag::UNPROTECTED),
+            ei = self->graph.in_edge_end(node, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
           op.gather(self->graph, node, self->graph.getInEdgeDst(ii), node, sum, self->graph.getInEdgeData(ii));
         }
       }
       if (needs_gather_out_edges<Operator>::value) {
-        for (edge_iterator ii = self->graph.edge_begin(node, Galois::MethodFlag::NONE), 
-            ei = self->graph.edge_end(node, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+        for (edge_iterator ii = self->graph.edge_begin(node, Galois::MethodFlag::UNPROTECTED), 
+            ei = self->graph.edge_end(node, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
           op.gather(self->graph, node, node, self->graph.getEdgeDst(ii), sum, self->graph.getEdgeData(ii));
         }
       }
@@ -150,14 +150,14 @@ class AsyncEngine {
       Context<Graph,Operator> context(&ctx);
 
       if (needs_scatter_in_edges<Operator>::value) {
-        for (in_edge_iterator ii = self->graph.in_edge_begin(node, Galois::MethodFlag::NONE),
-            ei = self->graph.in_edge_end(node, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+        for (in_edge_iterator ii = self->graph.in_edge_begin(node, Galois::MethodFlag::UNPROTECTED),
+            ei = self->graph.in_edge_end(node, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
           op.scatter(self->graph, node, self->graph.getInEdgeDst(ii), node, context, self->graph.getInEdgeData(ii));
         }
       }
       if (needs_scatter_out_edges<Operator>::value) {
-        for (edge_iterator ii = self->graph.edge_begin(node, Galois::MethodFlag::NONE), 
-            ei = self->graph.edge_end(node, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+        for (edge_iterator ii = self->graph.edge_begin(node, Galois::MethodFlag::UNPROTECTED), 
+            ei = self->graph.edge_end(node, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
           op.scatter(self->graph, node, node, self->graph.getEdgeDst(ii), context, self->graph.getEdgeData(ii));
         }
       }
@@ -213,15 +213,15 @@ class SyncEngine {
       gather_type sum;
 
       if (needs_gather_in_edges<Operator>::value) {
-        for (in_edge_iterator ii = self->graph.in_edge_begin(node, Galois::MethodFlag::NONE),
-            ei = self->graph.in_edge_end(node, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+        for (in_edge_iterator ii = self->graph.in_edge_begin(node, Galois::MethodFlag::UNPROTECTED),
+            ei = self->graph.in_edge_end(node, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
           op.gather(self->graph, node, self->graph.getInEdgeDst(ii), node, sum, self->graph.getInEdgeData(ii));
         }
       }
 
       if (needs_gather_out_edges<Operator>::value) {
-        for (edge_iterator ii = self->graph.edge_begin(node, Galois::MethodFlag::NONE), 
-            ei = self->graph.edge_end(node, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+        for (edge_iterator ii = self->graph.edge_begin(node, Galois::MethodFlag::UNPROTECTED), 
+            ei = self->graph.edge_end(node, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
           op.gather(self->graph, node, node, self->graph.getEdgeDst(ii), sum, self->graph.getEdgeData(ii));
         }
       }
@@ -252,14 +252,14 @@ class SyncEngine {
         return;
 
       if (needs_scatter_in_edges<Operator>::value) {
-        for (in_edge_iterator ii = self->graph.in_edge_begin(node, Galois::MethodFlag::NONE),
-            ei = self->graph.in_edge_end(node, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+        for (in_edge_iterator ii = self->graph.in_edge_begin(node, Galois::MethodFlag::UNPROTECTED),
+            ei = self->graph.in_edge_end(node, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
           op.scatter(self->graph, node, self->graph.getInEdgeDst(ii), node, context, self->graph.getInEdgeData(ii));
         }
       }
       if (needs_scatter_out_edges<Operator>::value) {
-        for (edge_iterator ii = self->graph.edge_begin(node, Galois::MethodFlag::NONE), 
-            ei = self->graph.edge_end(node, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+        for (edge_iterator ii = self->graph.edge_begin(node, Galois::MethodFlag::UNPROTECTED), 
+            ei = self->graph.edge_end(node, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
           op.scatter(self->graph, node, node, self->graph.getEdgeDst(ii), context, self->graph.getEdgeData(ii));
         }
       }

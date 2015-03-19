@@ -33,6 +33,7 @@
 #include "Galois/Runtime/ll/PaddedLock.h"
 #include "Galois/Runtime/ll/CompilerSpecific.h"
 #include "Galois/Runtime/ROBexecutor.h"
+#include "Galois/Runtime/OrderedSpeculation.h"
 
 #include "abstractMain.h"
 #include "SimInit.h"
@@ -51,7 +52,7 @@ typedef Galois::GAccumulator<size_t> Accumulator_ty;
 
 typedef des::EventRecvTimeLocalTieBrkCmp<TypeHelper::Event_ty> Cmp_ty;
 
-typedef Galois::Runtime::PerThreadVector<TypeHelper::Event_ty> AddList_ty;
+typedef Galois::PerThreadVector<TypeHelper::Event_ty> AddList_ty;
 
 
 
@@ -75,7 +76,7 @@ class DESorderedSpec:
     template <typename C>
     void operator () (const Event_ty& event, C& ctx) const {
       GNode n = nodes[event.getRecvObj ()->getID ()];
-      graph.getData (n, Galois::MethodFlag::CHECK_CONFLICT);
+      graph.getData (n, Galois::MethodFlag::WRITE);
     }
   };
 
@@ -151,7 +152,7 @@ protected:
     for (Graph::iterator n = graph.begin ()
         , endn = graph.end (); n != endn; ++n) {
 
-      BaseSimObj_ty* so = graph.getData (*n, Galois::MethodFlag::NONE);
+      BaseSimObj_ty* so = graph.getData (*n, Galois::MethodFlag::UNPROTECTED);
       nodes[so->getID ()] = *n;
     }
   }
@@ -161,7 +162,8 @@ protected:
     Accumulator_ty nevents;
 
     // Galois::for_each_ordered (
-    Galois::Runtime::for_each_ordered_rob (
+    // Galois::Runtime::for_each_ordered_rob (
+    Galois::Runtime::for_each_ordered_optim (
         Galois::Runtime::makeStandardRange(
           simInit.getInitEvents ().begin (), simInit.getInitEvents ().end ()),
         Cmp_ty (), 

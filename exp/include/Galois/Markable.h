@@ -34,7 +34,6 @@
 
 #include "Galois/Galois.h"
 
-#include "Galois/Runtime/PerThreadContainer.h"
 #include "Galois/Runtime/DoAllCoupled.h"
 
 namespace Galois {

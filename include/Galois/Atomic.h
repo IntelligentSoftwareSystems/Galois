@@ -34,7 +34,7 @@ namespace AtomicImpl {
 /**
  * Common implementation.
  */
-template<typename T, template <typename _> class W>
+template<typename T, template <typename _> class W, bool CONCURRENT>
 class GAtomicImpl {
   // Galois::Runtime::LL::CacheLineStorage<T> val;
   W<T> val;
@@ -95,10 +95,71 @@ public:
   }
 };
 
+// non-current version 
+template<typename T, template <typename _> class W>
+class GAtomicImpl<T, W, false> {
+  // Galois::Runtime::LL::CacheLineStorage<T> val;
+  W<T> val;
+
+public:
+  //! Initialize with a value
+  explicit GAtomicImpl(const T& i): val(i) {}
+  //! default constructor
+  GAtomicImpl() {}
+
+  //! atomic add and fetch
+  T operator+=(const T& rhs) {
+    return (val.data += rhs);
+  }
+  //! atomic sub and fetch
+  T operator-=(const T& rhs) {
+    return (val.data -= rhs);
+  }
+  //! atomic increment and fetch
+  T operator++() {
+    return ++(val.data);
+  }
+  //! atomic fetch and increment
+  T operator++(int) {
+    return (val.data)++;
+  }
+  //! atomic decrement and fetch
+  T operator--() { 
+    return --(val.data);
+  }
+  //! atomic fetch and decrement
+  T operator--(int) {
+    return (val.data)--;
+  }
+  //! conversion operator to base data type 
+  operator T() const {
+    return val.data;
+  }
+  //! assign from underlying type
+  T& operator=(const T& i) {
+    return val.data = i;
+  }
+  //! assignment operator
+  T& operator=(const GAtomicImpl& i) {
+    return val.data = i.val.data;
+  }
+  //! direct compare and swap
+  bool cas (const T& expected, const T& updated) {
+    if (val.data != expected) { 
+      return false;
+    } else {
+      val.data = updated;
+      return true;
+    }
+  }
+};
+
+
+
 //! Basic atomic
-template <typename T, template <typename _> class W>
-class GAtomicBase: public GAtomicImpl<T, W> {
-  typedef GAtomicImpl<T, W> Super_ty;
+template <typename T, template <typename _> class W, bool CONCURRENT>
+class GAtomicBase: public GAtomicImpl<T, W, CONCURRENT> {
+  typedef GAtomicImpl<T, W, CONCURRENT> Super_ty;
 
 public:
   //! Initialize with a value
@@ -117,9 +178,9 @@ public:
 };
 
 //! Specialization for pointers
-template <typename T, template <typename _> class W>
-class GAtomicBase<T*, W>: public GAtomicImpl<T*, W>  {
-  typedef GAtomicImpl<T*, W> Super_ty;
+template <typename T, template <typename _> class W, bool CONCURRENT>
+class GAtomicBase<T*, W, CONCURRENT>: public GAtomicImpl<T*, W, CONCURRENT>  {
+  typedef GAtomicImpl<T*, W, CONCURRENT> Super_ty;
 
 public:
   typedef typename std::iterator_traits<T*>::difference_type difference_type;
@@ -137,18 +198,26 @@ public:
   }
 
   T* operator+=(const difference_type& rhs) {
-    return __sync_add_and_fetch(&Super_ty::val.data, rhs); 
+    if (CONCURRENT) {
+      return __sync_add_and_fetch(&Super_ty::val.data, rhs); 
+    } else {
+      return (Super_ty::val.data += rhs);
+    }
   }
 
   T* operator-=(const difference_type& rhs) {
-    return __sync_sub_and_fetch(&Super_ty::val.data, rhs);
+    if (CONCURRENT) {
+      return __sync_sub_and_fetch(&Super_ty::val.data, rhs);
+    } else {
+      return (Super_ty::val.data -= rhs);
+    }
   }
 };
 
 //! Specialization for const pointers
-template <typename T, template <typename _> class W>
-class GAtomicBase<const T*, W>: public GAtomicImpl<const T*, W>  {
-  typedef GAtomicImpl<const T*, W> Super_ty;
+template <typename T, template <typename _> class W, bool CONCURRENT>
+class GAtomicBase<const T*, W, CONCURRENT>: public GAtomicImpl<const T*, W, CONCURRENT>  {
+  typedef GAtomicImpl<const T*, W, CONCURRENT> Super_ty;
 
 public:
   typedef typename std::iterator_traits<const T*>::difference_type difference_type;
@@ -166,18 +235,26 @@ public:
   }
 
   const T* operator+=(const difference_type& rhs) {
-    return __sync_add_and_fetch(&Super_ty::val.data, rhs); 
+    if (CONCURRENT) {
+      return __sync_add_and_fetch(&Super_ty::val.data, rhs); 
+    } else {
+      return (Super_ty::val.data += rhs);
+    }
   }
 
   const T* operator-=(const difference_type& rhs) {
-    return __sync_sub_and_fetch(&Super_ty::val.data, rhs);
+    if (CONCURRENT) {
+      return __sync_sub_and_fetch(&Super_ty::val.data, rhs);
+    } else {
+      return (Super_ty::val.data -= rhs);
+    }
   }
 };
 
 //! Specialization for bools
-template<template <typename _> class W>
-class GAtomicBase<bool, W>: private GAtomicImpl<bool, W> {
-  typedef GAtomicImpl<bool, W> Super_ty;
+template<template <typename _> class W, bool CONCURRENT>
+class GAtomicBase<bool, W, CONCURRENT>: private GAtomicImpl<bool, W, CONCURRENT> {
+  typedef GAtomicImpl<bool, W, CONCURRENT> Super_ty;
 
 public:
   //! Initialize with a value
@@ -191,7 +268,7 @@ public:
   }
 
   //! assignment operator
-  bool& operator=(const GAtomicBase<bool, W>& i) {
+  bool& operator=(const GAtomicBase& i) {
     return Super_ty::operator=(i);
   }
 
@@ -221,9 +298,9 @@ struct DummyWrapper {
  * primative data types.  Operators return the value of type T so as to
  * retain atomic RMW semantics.
  */
-template <typename T>
-class GAtomic: public AtomicImpl::GAtomicBase <T, AtomicImpl::DummyWrapper> {
-  typedef AtomicImpl::GAtomicBase<T, AtomicImpl::DummyWrapper> Super_ty;
+template <typename T, bool CONCURRENT=true>
+class GAtomic: public AtomicImpl::GAtomicBase <T, AtomicImpl::DummyWrapper, CONCURRENT> {
+  typedef AtomicImpl::GAtomicBase<T, AtomicImpl::DummyWrapper, CONCURRENT> Super_ty;
 
 public:
   GAtomic(): Super_ty() {}
@@ -241,11 +318,11 @@ public:
 /**
  * Cache-line padded version of {@link GAtomic}.
  */
-template <typename T>
+template <typename T, bool CONCURRENT=true>
 class GAtomicPadded: 
-  public AtomicImpl::GAtomicBase<T, Galois::Runtime::LL::CacheLineStorage> {
+  public AtomicImpl::GAtomicBase<T, Galois::Runtime::LL::CacheLineStorage, CONCURRENT> {
 
-  typedef AtomicImpl::GAtomicBase<T, Galois::Runtime::LL::CacheLineStorage> Super_ty;
+  typedef AtomicImpl::GAtomicBase<T, Galois::Runtime::LL::CacheLineStorage, CONCURRENT> Super_ty;
 
 public:
   GAtomicPadded(): Super_ty () {}

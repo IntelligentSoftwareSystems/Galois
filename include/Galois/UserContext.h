@@ -27,7 +27,6 @@
 #include "Galois/gdeque.h"
 
 #include "Galois/Runtime/Context.h"
-#include "Galois/Runtime/MethodFlags.h"
 
 #include <functional>
 
@@ -49,13 +48,34 @@ protected:
   UndoLog undoLog;
   CommitLog commitLog;
 #endif 
+  //! push stuff
+  typedef gdeque<T> PushBufferTy;
+  static const unsigned int fastPushBackLimit = 64;
+  typedef std::function<void(PushBufferTy&)> FastPushBack; 
 
+  PushBufferTy pushBuffer;
   //! Allocator stuff
   IterAllocBaseTy IterationAllocatorBase;
   PerIterAllocTy PerIterationAllocator;
 
+  //! used by all
+  bool* didBreak = nullptr;
+  FastPushBack fastPushBack;
+
+  //! some flags used by deterministic
+  bool firstPassFlag = false;
+  void* localState = nullptr;
+
   void __resetAlloc() {
     IterationAllocatorBase.clear();
+  }
+
+  void __setFirstPass (void) {
+    firstPassFlag = true;
+  }
+
+  void __resetFirstPass (void) {
+    firstPassFlag = false;
   }
 
 #ifdef GALOIS_USE_EXP
@@ -80,9 +100,6 @@ protected:
   }
 #endif 
 
-  //! push stuff
-  typedef gdeque<T> PushBufferTy;
-  PushBufferTy pushBuffer;
 
   PushBufferTy& __getPushBuffer() {
     return pushBuffer;
@@ -92,22 +109,14 @@ protected:
     pushBuffer.clear();
   }
 
-  void* localState;
-  bool localStateUsed;
-  void __setLocalState(void *p, bool used) {
+  void __setLocalState(void *p) {
     localState = p;
-    localStateUsed = used;
   }
 
-  static const unsigned int fastPushBackLimit = 64;
-
-  typedef std::function<void(PushBufferTy&)> FastPushBack; 
-  FastPushBack fastPushBack;
   void __setFastPushBack(FastPushBack f) {
     fastPushBack = f;
   }
 
-  bool* didBreak;
 
 public:
   UserContext()
@@ -130,17 +139,17 @@ public:
   //! Push new work 
   template<typename... Args>
   void push(Args&&... args) {
-    Galois::Runtime::checkWrite(MethodFlag::WRITE, true);
+    // Galois::Runtime::checkWrite(MethodFlag::WRITE, true);
     pushBuffer.emplace_back(std::forward<Args>(args)...);
     if (fastPushBack && pushBuffer.size() > fastPushBackLimit)
       fastPushBack(pushBuffer);
   }
 
   //! Force the abort of this iteration
-  void abort() { Galois::Runtime::forceAbort(); }
+  void abort() { Galois::Runtime::signalConflict(); }
 
   //! Store and retrieve local state for deterministic
-  void* getLocalState(bool& used) { used = localStateUsed; return localState; }
+  void* getLocalState(void) { return localState; }
  
 #ifdef GALOIS_USE_EXP
   void addUndoAction(const Closure& f) {
@@ -152,10 +161,21 @@ public:
   }
 #endif 
 
+  //! used by deterministic and ordered
+  //! @returns true when the operator is invoked for the first time. The operator
+  //! can use this information and choose to expand the neighborhood only in the first pass. 
+  bool isFirstPass (void) const { 
+    return firstPassFlag;
+  }
+
   //! declare that the operator has crossed the cautious point.  This
   //! implies all data has been touched thus no new locks will be
   //! acquired.
-  void cautiousPoint();
+  void cautiousPoint() {
+    if (isFirstPass()) {
+      Galois::Runtime::signalFailSafe();
+    }
+  }
 
 };
 

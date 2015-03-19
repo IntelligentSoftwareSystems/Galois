@@ -300,9 +300,9 @@ public:
             }
 
             // Relax each light edge. 
-            unsigned u_dist = g.getData(u, Galois::NONE).dist;
-            for (Graph::edge_iterator ii = g.edge_begin(u, Galois::NONE),
-                ei = g.edge_end(u, Galois::NONE); ii != ei; ++ii) {
+            unsigned u_dist = g.getData(u, Galois::MethodFlag::UNPROTECTED).dist;
+            for (Graph::edge_iterator ii = g.edge_begin(u, Galois::MethodFlag::UNPROTECTED),
+                ei = g.edge_end(u, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
               unsigned w = g.getEdgeData(ii);
               if (w <= delta) // light edge
                 relax(u, *ii, u_dist + w);
@@ -329,9 +329,9 @@ public:
            iter != deleted_vertices.end(); ++iter) {
         // Relax each heavy edge. 
         GNode u = *iter;
-        unsigned u_dist = g.getData(u, Galois::NONE).dist;
-        for (Graph::edge_iterator ii = g.edge_begin(u, Galois::NONE),
-            ei = g.edge_end(u, Galois::NONE); ii != ei; ++ii) {
+        unsigned u_dist = g.getData(u, Galois::MethodFlag::UNPROTECTED).dist;
+        for (Graph::edge_iterator ii = g.edge_begin(u, Galois::MethodFlag::UNPROTECTED),
+            ei = g.edge_end(u, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
           unsigned w = g.getEdgeData(ii);
           if (w > delta) // heavy edge
             relax(u, *ii, u_dist + w);
@@ -351,7 +351,7 @@ public:
             << v << ", "
             << x << ")" << std::endl;
 #endif
-    if (x < g.getData(v, Galois::NONE).dist) { 
+    if (x < g.getData(v, Galois::MethodFlag::UNPROTECTED).dist) { 
       // We're relaxing the edge to vertex v.
       if (sync.isLocal(id, v)) {
         // Compute the new bucket index for v
@@ -363,12 +363,12 @@ public:
         // Make sure that we have allocated the bucket itself.
         if (!buckets[new_index]) buckets[new_index] = new Bucket;
 
-        if (g.getData(v, Galois::NONE).dist != std::numeric_limits<unsigned>::max() - 1
+        if (g.getData(v, Galois::MethodFlag::UNPROTECTED).dist != std::numeric_limits<unsigned>::max() - 1
             && !vertex_was_deleted[v]) {
           // We're moving v from an old bucket into a new one. Compute
           // the old index, then splice it in.
           BucketIndex old_index 
-            = static_cast<BucketIndex>(g.getData(v, Galois::NONE).dist / delta);
+            = static_cast<BucketIndex>(g.getData(v, Galois::MethodFlag::UNPROTECTED).dist / delta);
           buckets[new_index]->splice(buckets[new_index]->end(),
                                      *buckets[old_index],
                                      position_in_bucket[v]);
@@ -383,7 +383,7 @@ public:
         --position_in_bucket[v];
 
         // Update predecessor and tentative distance information
-        g.getData(v, Galois::NONE).dist = x;
+        g.getData(v, Galois::MethodFlag::UNPROTECTED).dist = x;
       } else {
         sync.sendRequest(id, u, v, x);
       }

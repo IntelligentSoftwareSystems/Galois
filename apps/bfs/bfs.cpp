@@ -251,14 +251,14 @@ struct SerialAlgo {
       GNode n = wl.front();
       wl.pop_front();
 
-      SNode& data = graph.getData(n, Galois::MethodFlag::NONE);
+      SNode& data = graph.getData(n, Galois::MethodFlag::UNPROTECTED);
 
       Dist newDist = data.dist + 1;
 
-      for (Graph::edge_iterator ii = graph.edge_begin(n, Galois::MethodFlag::NONE),
-            ei = graph.edge_end(n, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+      for (Graph::edge_iterator ii = graph.edge_begin(n, Galois::MethodFlag::UNPROTECTED),
+            ei = graph.edge_end(n, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
         GNode dst = graph.getEdgeDst(ii);
-        SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+        SNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
 
         if (newDist < ddata.dist) {
           ddata.dist = newDist;
@@ -298,10 +298,10 @@ struct AsyncAlgo {
 
       Dist newDist = item.second;
 
-      for (Graph::edge_iterator ii = graph.edge_begin(n, Galois::MethodFlag::NONE),
-            ei = graph.edge_end(n, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+      for (Graph::edge_iterator ii = graph.edge_begin(n, Galois::MethodFlag::UNPROTECTED),
+            ei = graph.edge_end(n, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
         GNode dst = graph.getEdgeDst(ii);
-        SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+        SNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
 
         Dist oldDist;
         while (true) {
@@ -381,7 +381,7 @@ struct HighCentralityAlgo {
 
     void operator()(const Graph::edge_iterator& ii) {
       GNode dst = graph.getEdgeDst(ii);
-      SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+      SNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
 
       Dist oldDist;
       while (true) {
@@ -391,16 +391,16 @@ struct HighCentralityAlgo {
         if (__sync_bool_compare_and_swap(&ddata.dist, oldDist, newDist)) {
           next->wl.push(dst);
           next->count += 1
-            + std::distance(graph.edge_begin(dst, Galois::MethodFlag::NONE),
-              graph.edge_end(dst, Galois::MethodFlag::NONE));
+            + std::distance(graph.edge_begin(dst, Galois::MethodFlag::UNPROTECTED),
+              graph.edge_end(dst, Galois::MethodFlag::UNPROTECTED));
           break;
         }
       }
     }
 
     void operator()(const GNode& n) {
-      for (Graph::edge_iterator ii = graph.edge_begin(n, Galois::MethodFlag::NONE),
-            ei = graph.edge_end(n, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+      for (Graph::edge_iterator ii = graph.edge_begin(n, Galois::MethodFlag::UNPROTECTED),
+            ei = graph.edge_end(n, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
         (*this)(ii);
       }
     }
@@ -420,21 +420,21 @@ struct HighCentralityAlgo {
     }
 
     void operator()(const GNode& n) const {
-      SNode& sdata = graph.getData(n, Galois::MethodFlag::NONE);
+      SNode& sdata = graph.getData(n, Galois::MethodFlag::UNPROTECTED);
       if (sdata.dist <= newDist)
         return;
 
-      for (Graph::in_edge_iterator ii = graph.in_edge_begin(n, Galois::MethodFlag::NONE),
-            ei = graph.in_edge_end(n, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+      for (Graph::in_edge_iterator ii = graph.in_edge_begin(n, Galois::MethodFlag::UNPROTECTED),
+            ei = graph.in_edge_end(n, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
         GNode dst = graph.getInEdgeDst(ii);
-        SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+        SNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
 
         if (ddata.dist + 1 == newDist) {
           sdata.dist = newDist;
           next->wl.push(n);
           next->count += 1
-            + std::distance(graph.edge_begin(n, Galois::MethodFlag::NONE),
-              graph.edge_end(n, Galois::MethodFlag::NONE));
+            + std::distance(graph.edge_begin(n, Galois::MethodFlag::UNPROTECTED),
+              graph.edge_end(n, Galois::MethodFlag::UNPROTECTED));
           break;
         }
       }
@@ -447,8 +447,8 @@ struct HighCentralityAlgo {
     int next = 0;
     Dist newDist = 1;
     graph.getData(source).dist = 0;
-    Galois::for_each(graph.out_edges(source, Galois::MethodFlag::NONE).begin(), 
-        graph.out_edges(source, Galois::MethodFlag::NONE).end(),
+    Galois::for_each(graph.out_edges(source, Galois::MethodFlag::UNPROTECTED).begin(), 
+        graph.out_edges(source, Galois::MethodFlag::UNPROTECTED).end(),
         ForwardProcess(graph, &bags[next], newDist));
     while (!bags[next].empty()) {
       size_t nextSize = bags[next].size();
@@ -489,10 +489,10 @@ struct BarrierAlgo {
 
       Dist newDist = item.second;
 
-      for (Graph::edge_iterator ii = graph.edge_begin(n, Galois::MethodFlag::NONE),
-            ei = graph.edge_end(n, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+      for (Graph::edge_iterator ii = graph.edge_begin(n, Galois::MethodFlag::UNPROTECTED),
+            ei = graph.edge_end(n, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
         GNode dst = graph.getEdgeDst(ii);
-        SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+        SNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
 
         Dist oldDist;
         while (true) {
@@ -563,10 +563,10 @@ struct DeterministicAlgo {
 
       Dist newDist = item.second;
       
-      for (Graph::edge_iterator ii = graph.edge_begin(n, Galois::MethodFlag::NONE),
-            ei = graph.edge_end(n, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+      for (Graph::edge_iterator ii = graph.edge_begin(n, Galois::MethodFlag::UNPROTECTED),
+            ei = graph.edge_end(n, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
         GNode dst = graph.getEdgeDst(ii);
-        SNode& ddata = graph.getData(dst, Galois::MethodFlag::ALL);
+        SNode& ddata = graph.getData(dst, Galois::MethodFlag::WRITE);
 
         Dist oldDist;
         while (true) {
@@ -585,7 +585,7 @@ struct DeterministicAlgo {
 
       for (typename LocalState::Pending::iterator ii = ppending->begin(), ei = ppending->end(); ii != ei; ++ii) {
         GNode dst = *ii;
-        SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+        SNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
 
         Dist oldDist;
         while (true) {
@@ -605,20 +605,20 @@ struct DeterministicAlgo {
     void operator()(const WorkItem& item, Galois::UserContext<WorkItem>& ctx) const {
       typename LocalState::Pending* ppending;
       if (Version == DetAlgo::disjoint) {
-        bool used;
-        LocalState* localState = (LocalState*) ctx.getLocalState(used);
+        LocalState* localState = (LocalState*) ctx.getLocalState();
         ppending = &localState->pending;
-        if (used) {
+        if (!ctx.isFirstPass()) {
           modify(item, ctx, ppending);
           return;
         }
       }
-      if (Version == DetAlgo::disjoint) {
+      if (Version == DetAlgo::disjoint && ctx.isFirstPass()) {
         build(item, ppending);
       } else {
         typename LocalState::Pending pending(ctx.getPerIterAlloc());
         build(item, &pending);
-        graph.getData(item.first, Galois::MethodFlag::WRITE); // Failsafe point
+        graph.getData(item.first, Galois::MethodFlag::WRITE);
+        ctx.cautiousPoint();
         modify(item, ctx, &pending);
       }
     }

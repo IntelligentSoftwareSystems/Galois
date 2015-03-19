@@ -46,7 +46,7 @@ public:
     WL_ty worklist;
     size_t niter = 0;
 
-    graph.getData (startNode, Galois::NONE) = 0;
+    graph.getData (startNode, Galois::MethodFlag::UNPROTECTED) = 0;
     worklist.push_back (startNode);
 
     while (!worklist.empty ()) {

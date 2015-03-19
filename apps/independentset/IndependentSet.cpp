@@ -129,9 +129,16 @@ struct Process {
     LocalState(Process<Version>& self, Galois::PerIterAllocTy& alloc): mod(false) { }
   };
 
+  struct DeterministicId {
+    uintptr_t operator()(const GNode& x) const {
+      return x;
+    }
+  };
+
   typedef std::tuple<
     Galois::does_not_need_push<>,
     Galois::needs_per_iter_alloc<>,
+    Galois::has_deterministic_id<DeterministicId>,
     Galois::has_deterministic_local_state<LocalState>
   > function_traits;
 
@@ -145,8 +152,8 @@ struct Process {
     if (me.flag != UNMATCHED)
       return false;
 
-    for (typename Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::NONE),
-        ei = graph.edge_end(src, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+    for (typename Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED),
+        ei = graph.edge_end(src, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
       GNode dst = graph.getEdgeDst(ii);
       Node& data = graph.getData(dst, Flag);
       if (data.flag == MATCHED)
@@ -157,11 +164,11 @@ struct Process {
   }
 
   void modify(GNode src) {
-    Node& me = graph.getData(src, Galois::MethodFlag::NONE);
-    for (typename Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::NONE),
-        ei = graph.edge_end(src, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+    Node& me = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
+    for (typename Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED),
+        ei = graph.edge_end(src, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
       GNode dst = graph.getEdgeDst(ii);
-      Node& data = graph.getData(dst, Galois::MethodFlag::NONE);
+      Node& data = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
       data.flag = OTHER_MATCHED;
     }
 
@@ -171,24 +178,25 @@ struct Process {
   void operator()(GNode src, Galois::UserContext<GNode>& ctx) {
     bool* modp;
     if (Version == detDisjoint) {
-      bool used;
-      LocalState* localState = (LocalState*) ctx.getLocalState(used);
+      LocalState* localState = (LocalState*) ctx.getLocalState();
       modp = &localState->mod;
-      if (used) {
+      if (!ctx.isFirstPass()) {
         if (*modp)
           modify(src);
         return;
       }
     }
 
-    if (Version == detDisjoint) {
-      *modp = build<Galois::MethodFlag::ALL>(src);
+    if (Version == detDisjoint && ctx.isFirstPass ()) {
+      *modp = build<Galois::MethodFlag::WRITE>(src);
     } else {
-      bool mod = build<Galois::MethodFlag::ALL>(src);
-      if (Version == detPrefix)
+      bool mod = build<Galois::MethodFlag::WRITE>(src);
+      if (Version == detPrefix) {
         return;
-      else
-        graph.getData(src, Galois::MethodFlag::WRITE); // Failsafe point
+      } else {
+        graph.getData(src, Galois::MethodFlag::WRITE);
+        ctx.cautiousPoint(); // Failsafe point
+      }
       if (mod)
         modify(src);
     }
@@ -214,9 +222,9 @@ struct OrderedProcess {
 
   void operator()(GNode src) {
     if (prefix) {
-      graph.edge_begin(src, Galois::MethodFlag::ALL);
+      graph.edge_begin(src, Galois::MethodFlag::WRITE);
     } else {
-      if (process.build<Galois::MethodFlag::NONE>(src))
+      if (process.build<Galois::MethodFlag::UNPROTECTED>(src))
         process.modify(src);
     }
   }
@@ -230,7 +238,7 @@ struct Compare {
   Compare(Graph& g): graph(g) { }
   
   bool operator()(const GNode& a, const GNode& b) const {
-    return &graph.getData(a, Galois::MethodFlag::NONE)< &graph.getData(b, Galois::MethodFlag::NONE);
+    return &graph.getData(a, Galois::MethodFlag::UNPROTECTED)< &graph.getData(b, Galois::MethodFlag::UNPROTECTED);
   }
 };
 
@@ -301,16 +309,16 @@ struct PullAlgo {
 
     void operator()(GNode src) const {
       numProcessed += 1;
-      //Node& n = graph.getData(src, Galois::MethodFlag::NONE);
+      //Node& n = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
 
       MatchFlag f = MATCHED;
-      for (auto edge : graph.out_edges(src, Galois::MethodFlag::NONE)) {
+      for (auto edge : graph.out_edges(src, Galois::MethodFlag::UNPROTECTED)) {
         GNode dst = graph.getEdgeDst(edge);
         if (dst >= src) {
           continue; 
         } 
         
-        Node& other = graph.getData(dst, Galois::MethodFlag::NONE);
+        Node& other = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
         if (other.flag == MATCHED) {
           f = OTHER_MATCHED;
           break;
@@ -335,7 +343,7 @@ struct PullAlgo {
     Galois::GAccumulator<size_t>& numTaken;
 
     void operator()(GNode src) const {
-      Node& n = graph.getData(src, Galois::MethodFlag::NONE);
+      Node& n = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
       numTaken += 1;
       n.flag = F;
     }
@@ -453,6 +461,7 @@ bool verify(Graph& graph) {
 template<typename Algo>
 void run() {
   typedef typename Algo::Graph Graph;
+  typedef typename Graph::GraphNode GNode;
 
   Algo algo;
   Graph graph;
@@ -463,7 +472,7 @@ void run() {
   if (std::is_same<Algo, DefaultAlgo<nondet> >::value) {
     Galois::preAlloc(numThreads + 8*graph.size()/Galois::Runtime::MM::hugePageSize);
   } else {
-    Galois::preAlloc(numThreads + 32*graph.size()/Galois::Runtime::MM::hugePageSize);
+    Galois::preAlloc(numThreads + 64*(sizeof(GNode) + sizeof(Node))*graph.size()/Galois::Runtime::MM::hugePageSize);
   }
 
   Galois::reportPageAlloc("MeminfoPre");

@@ -30,10 +30,11 @@
 
 #include "Galois/Atomic.h"
 #include "Galois/Accumulator.h"
-#include "Galois/Runtime/PerThreadContainer.h"
-#include "Galois/Runtime/ll/CompilerSpecific.h"
+#include "Galois/PerThreadContainer.h"
 #include "Galois/DynamicArray.h"
+
 #include "Galois/Runtime/KDGtwoPhase.h"
+#include "Galois/Runtime/ll/CompilerSpecific.h"
 
 #include "Kruskal.h"
 
@@ -44,8 +45,8 @@ struct EdgeCtx;
 // typedef Galois::LazyDynamicArray<int>  VecRep_ty;
 typedef Galois::LazyDynamicArray<int, Galois::Runtime::MM::SerialNumaAllocator<int> >  VecRep_ty;
 
-typedef Galois::Runtime::PerThreadVector<Edge> EdgeWL;
-typedef Galois::Runtime::PerThreadVector<EdgeCtx> EdgeCtxWL;
+typedef Galois::PerThreadVector<Edge> EdgeWL;
+typedef Galois::PerThreadVector<EdgeCtx> EdgeCtxWL;
 typedef Galois::FixedSizeAllocator<EdgeCtx> EdgeCtxAlloc;
 typedef Edge::Comparator Cmp;
 typedef Galois::GAccumulator<size_t> Accumulator;
@@ -257,7 +258,7 @@ struct LinkUpLoop {
         ctx.resetStatus ();
 
         if (usingOrderedRuntime) {
-          Galois::Runtime::signalConflict (NULL);
+          Galois::Runtime::signalConflict ();
 
         } else {
           nextWL.get ().push_back (ctx);
