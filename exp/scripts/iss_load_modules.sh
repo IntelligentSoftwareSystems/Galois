@@ -35,4 +35,5 @@ if [ "$1" != "min" ]; then
   module load mkl
   module load mpich2
   module load doxygen
+  module load python
 fi
