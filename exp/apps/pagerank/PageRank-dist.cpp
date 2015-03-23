@@ -116,11 +116,12 @@ struct PageRank {
     void operator() (GNode src, Galois::UserContext<GNode>& cnx) const {
       double sum = 0;
       LNode& sdata = g->at(src);
-      //std::cout << "n :" << n.nout <<"\n";
+      //std::cout << "n :" << sdata.nout <<"\n";
       for (auto jj = g->in_edge_begin(src, Galois::MethodFlag::ALL), ej = g->in_edge_end(src, Galois::MethodFlag::SRC_ONLY); jj != ej; ++jj) {
         GNode dst = g->dst(jj, Galois::MethodFlag::SRC_ONLY);
         LNode& ddata = g->at(dst, Galois::MethodFlag::SRC_ONLY);
-        sum += ddata.value / ddata.nout;
+        if(ddata.nout > 0)
+          sum += ddata.value / ddata.nout;
       }
       float value = (1.0 - alpha) * sum + alpha;
       float diff = std::fabs(value - sdata.value);
@@ -293,12 +294,10 @@ int main(int argc, char** argv) {
       std::vector<unsigned> In_counts;
       for(auto& N : fg)
       {
-          //std::cout << "N = " << N << "   : \n";
           counts.push_back(std::distance(fg.edge_begin(N), fg.edge_end(N)));
           for(auto ii = fg.edge_begin(N), ei = fg.edge_end(N); ii != ei; ++ii)
           {
               unsigned dst = fg.getEdgeDst(ii);
-              //std::cout << dst << " , " ;
               if(dst >= In_counts.size()) {
                 // +1 is imp because vec.resize makes sure new vec can hold dst entries so it
                 // will not have vec[dst] which is (dst+1)th entry!!
@@ -306,7 +305,6 @@ int main(int argc, char** argv) {
               }
               In_counts[dst]+=1;
           }
-          //std::cout << "\n";
       }
       if(counts.size() >  In_counts.size())
           In_counts.resize(counts.size());
@@ -356,8 +354,8 @@ int main(int argc, char** argv) {
     Galois::Timer timerPR;
     timerPR.start();
 
-    //PageRank::go(g);
-    PageRankMsg::go(g);
+    PageRank::go(g);
+    //PageRankMsg::go(g);
 
     timerPR.stop();
 

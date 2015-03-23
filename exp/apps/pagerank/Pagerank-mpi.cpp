@@ -106,35 +106,13 @@ size_t ReadFile(std::string inputFile, std::vector<Node>& graph_nodes) {
   }
 
   // destroy filegraph don't need it anymore.
-  fg.~FileGraph();
+  //fg.~FileGraph();
 
   cout << " DeAllocating Filegraph : "<< host_ID << "\n";
  return total_nodes;
 }
 
 
-void receive() {
-
-  int count = 0;
-  MPI_Status status;
-
-  int host_ID;
-  MPI_Comm_rank(MPI_COMM_WORLD, &host_ID);
-
-  MPI_Probe(0,0, MPI_COMM_WORLD, &status);
-  MPI_Get_count(&status, MPI_INT, &count);
-
-  std::vector<Node> recv_buffer(count);
-
-  cout << "Host : " << host_ID << " : received chunk size : " << count << "\n";
-
-//  MPI_Recv(&recv_buffer.front(), count, Node, 0, 0, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
-
-  for(auto x : recv_buffer)
-    cout << x.rank << "\t";
-  cout << "\n";
-
-}
 
 int get_host(int node){
 
@@ -267,7 +245,8 @@ void PageRank_Bulk(std::vector<Node>& graph_nodes, int chunk_size, int iteration
 }
 
 
-void PageRank_Bulk_AlltoAll(std::vector<Node>& graph_nodes, int chunk_size, int iterations, size_t total_nodes) {
+void PageRank_Bulk_AlltoAll(std::vector<Node>& graph_nodes, int chunk_size, int iterations, size_t total_nodes, std::vector<vector<double>> &time_compute, std::vector<vector<double>> &time_mpi, std::vector<vector<double>> &time_apply) {
+//void PageRank_Bulk_AlltoAll(std::vector<Node>& graph_nodes, int chunk_size, int iterations, size_t total_nodes) {
 
   int num_hosts;
   MPI_Comm_size(MPI_COMM_WORLD, &num_hosts);
@@ -275,102 +254,78 @@ void PageRank_Bulk_AlltoAll(std::vector<Node>& graph_nodes, int chunk_size, int 
   int host_ID;
   MPI_Comm_rank(MPI_COMM_WORLD, &host_ID);
 
-  cout << "Inside function : "<< host_ID <<"\n";
-  int send_count[num_hosts];
-  int recv_count[num_hosts];
+  int local_chunk_size = graph_nodes.size();
+  vector<float>send_buffer(total_nodes, 0.0);
+  vector<float>receive_buffer(total_nodes, 0.0);
 
-  cout << "Allocating send_buffer : "<< host_ID <<" total nodes : " << total_nodes << "\n";
-  //vector<float>send_buffer(total_nodes, 0.0);
-  float send_buffer[total_nodes];
-  memset(send_buffer, 0.0, total_nodes);
+  double start_time_compute, end_time_compute, start_time_apply, end_time_apply, start_time_mpi, end_time_mpi;
 
-  cout << "Allocating receive_buffer : "<< host_ID <<"\n";
-  float receive_buffer[total_nodes];
-  memset(receive_buffer, 0.0, total_nodes);
+  for(int iter = 0; iter < iterations; ++iter) {
 
-  //vector<float>receive_buffer(total_nodes, 0.0);
-  //cout << " Total size(MB) : " << sizeof(int)*send_buffer.size()/(1024*1024) << "\n";
+    start_time_compute = MPI_Wtime();
+    for(auto& GNode : graph_nodes) {
+      int neighbors = GNode.out_edges.size();
+      float old_residual = GNode.residual;
+      GNode.residual = 0.0; // TODO: does old residual goes to zero
+      GNode.rank += old_residual;
+      float delta = old_residual*alpha/neighbors;
 
-  cout << "Vectors Allocated \n";
-  if(host_ID == 0) {
-       cout << " BEFORE\n";
-      for(int j = 0; j < chunk_size; ++j) {
-        cout << "SEND RESIDUAL : " << send_buffer[j] <<"\n";
+      if (delta > 0) {
+        // Bulk Syncronous for all the nodes
+        for (auto& nb : GNode.out_edges) {
+            send_buffer[nb] += delta;
+        }
       }
     }
 
+    end_time_compute = MPI_Wtime();
 
-  //for(int iter = 0; iter < iterations; ++iter) {
-    //cout << "Iteration : " << iter << " On host : " << host_ID << "\n";
-    //for(auto& GNode : graph_nodes) {
+    int status;
+    start_time_mpi = MPI_Wtime();
 
-      //int neighbors = GNode.out_edges.size();
-      //float old_residual = GNode.residual;
-      //GNode.residual = 0.0; // TODO: does old residual goes to zero
-      //GNode.rank += old_residual;
-      //float delta = old_residual*alpha/neighbors;
+    status = MPI_Alltoall(&send_buffer.front(), chunk_size, MPI_FLOAT, &receive_buffer.front(), chunk_size, MPI_INT, MPI_COMM_WORLD);
+    if(status != MPI_SUCCESS) {
+      cout << "MPI_Alltoall failed\n";
+      exit(0);
+    }
 
-      //if (delta > 0) {
+    end_time_mpi = MPI_Wtime();
 
-        //// Bulk Syncronous for all the nodes
-        //for (auto& nb : GNode.out_edges) {
-          ////int dest_host = get_host(nb);
-          ////int index;
-          ////if(dest_host == host_ID) {
-            ////index = nb - host_ID*chunk_size;
-            ////graph_nodes[index].residual += delta;
-          ////}
-          ////else
-          ////{
-            //send_buffer[nb] += delta;
-          ////}
-        //}
-      //}
-    //}
+    start_time_apply = MPI_Wtime();
 
-    //cout << "One node processed\n";
-    //// TODO: DO ALL-TO-ALL to send sizes around. Transpose. Try an example first.
+    // Apply received delta.
+    int index = 0;
+    for(int j = 0; j < total_nodes; ++j) {
+      graph_nodes[index].residual += receive_buffer[j];
+      index++;
+      if(index >= local_chunk_size)
+        index = 0;
+    }
+    end_time_apply = MPI_Wtime();
 
-    //// MPI_Alltoall to get send around count from each process to each process.
-    //// fill receive count. ith count is data to be send to ith process.
 
-    //// Exchange send and receive buffers
-    //// Allocate receive buffer.
+    time_compute[host_ID][iter] = (end_time_compute - start_time_compute);
+    time_mpi[host_ID][iter] = (end_time_mpi - start_time_mpi);
+    time_apply[host_ID][iter] = (end_time_apply - start_time_apply);
 
-    //float *receive_buffer;
-    //receive_buffer = (float*)malloc(total_nodes*sizeof(float));
-    //if(receive_buffer == NULL)
+
+
+    //if(host_ID == 0)
     //{
-      //cout << " Allocating receive buffer failed on host : " << host_ID << "\n";
-      //exit(1);
-    //}
-    //int status;
-    //status = MPI_Alltoall(&send_buffer.front(), chunk_size, MPI_FLOAT, receive_buffer, chunk_size, MPI_INT, MPI_COMM_WORLD);
-    //if(status != MPI_SUCCESS) {
-      //cout << "MPI_Alltoall failed\n";
-      //exit(0);
-    //}
+      //time_compute[iter] = (end_time_compute - start_time_compute);
+      //time_mpi[iter] = (end_time_mpi - start_time_mpi);
+      //time_apply[iter] = (end_time_apply - start_time_apply);
 
-    //cout << "MPI_All_to_all done\n";
-    //// Apply received delta.
-    //int index = 0;
-    //for(int j = 0; j < total_nodes; ++j) {
-      ////if(host_ID == 0){
-        ////cout << "index : "<< index << "\n";
-        ////cout << "RESIDULE : " << receive_buffer[j] <<"\n";
-      ////}
-      //graph_nodes[index].residual += receive_buffer[j];
-      //index++;
-      //if(index >= chunk_size)
-        //index = 0;
+      ////cout << "COMPUTE TIME : " << end_time_compute - start_time_compute << " Seconds \n";
+      ////cout << "MPI TIME : " << end_time_mpi - start_time_mpi << " Seconds \n";
+      ////cout << "Apply TIME : " << end_time_apply - start_time_apply << " Seconds \n";
     //}
 
-    //cout << "residual applied once\n";
 
-  //}
+  }
 
 
-  cout << host_ID << " : RANK : " << graph_nodes[0].rank << "\n";
+   //cout << host_ID << " : RANK : " << graph_nodes[0].rank << "\n";
 
 
 }
@@ -493,21 +448,26 @@ int main(int argc, char** argv){
     iterations = atoi(argv[2]);
   }
 
+  // Timing vectors
+  std::vector<vector<double>> time_compute(hosts, vector<double>(iterations, 0.0));
+  std::vector<vector<double>> time_mpi(hosts, vector<double>(iterations, 0.0));
+  std::vector<vector<double>> time_apply(hosts, vector<double>(iterations, 0.0));
+
   std::vector<Node> graph_nodes;
 
   cout << " Calling ReadFile : "<< host_ID << "\n";
   size_t total_nodes = ReadFile(inputFile, graph_nodes);
-  //cout << " Host : " << host_ID << "\n";
-  //cout << " Graph Construction\n";
 
   cout << " Host : " << host_ID << " Graph nodes : " << graph_nodes.size() << "\n";
+  cout << " Host : " << host_ID << " Total nodes : " << total_nodes << "\n";
 
-  cout << " Calling PageRank_Bulk_AlltoAll : "<< host_ID << "\n";
+  cout << "Calling Bulk_AlltoAll : "<< host_ID << "\n";
 
   /* Marks the beginning of MPI process */
   MPI_Barrier(MPI_COMM_WORLD);
   start_time = MPI_Wtime();
 
+  PageRank_Bulk_AlltoAll(graph_nodes, global_chunk_size, iterations, total_nodes, time_compute, time_mpi, time_apply);
   //PageRank_Bulk_AlltoAll(graph_nodes, global_chunk_size, iterations, total_nodes);
 
   MPI_Barrier(MPI_COMM_WORLD);
@@ -517,8 +477,18 @@ int main(int argc, char** argv){
   MPI_Finalize();
 
   if(host_ID == 0) {
-    cout << "Runtime : " << end_time - start_time << "Seconds \n";
+    cout << "\n Accumulative time for " << iterations << " iterations\n";
+    for(int i = 0 ; i < hosts; ++i)
+    {
+      cout << "Host : " << i << "\n";
+      cout << "\n\t " << std::accumulate(time_compute[i].begin(), time_compute[i].end(), 0.0) << "   " << std::accumulate(time_mpi[i].begin(), time_mpi[i].end(), 0.0) << "  "<< std::accumulate(time_apply[i].begin(), time_apply[i].end(), 0.0) << "\n";
+    }
+    //cout << "\n\n " << time_compute[0] << "   " << time_mpi[0] << "  "<< time_apply[0] << "\n";
+    //cout << "\n Accumulative time for " << iterations << " iterations\n";
+    //cout << "\n\n " << std::accumulate(time_compute.begin(), time_compute.end(), 0.0) << "   " << std::accumulate(time_mpi.begin(), time_mpi.end(), 0.0) << "  "<< std::accumulate(time_apply.begin(), time_apply.end(), 0.0) << "\n";
+    cout << "\n\n RUNTIME : " << end_time - start_time << " Seconds \n";
   }
+
   return 0;
 }
 
