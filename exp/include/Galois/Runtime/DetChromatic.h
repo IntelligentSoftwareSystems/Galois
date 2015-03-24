@@ -19,7 +19,28 @@
 namespace Galois {
 namespace Runtime {
 
-enum PriorityFunc {
+enum class InputDAG_ExecTy {
+  CHROMATIC,
+  EDGE_FLIP,
+  TOPO,
+  PART,
+};
+
+namespace cll = llvm::cl;
+
+static cll::opt<InputDAG_ExecTy> inputDAG_ExecTy (
+    "executor",
+    cll::desc ("Deterministic Executor Type"),
+    cll::values (
+      clEnumValN (InputDAG_ExecTy::CHROMATIC, "InputDAG_ExecTy::CHROMATIC", "Chromatic Executor"),
+      clEnumValN (InputDAG_ExecTy::EDGE_FLIP, "InputDAG_ExecTy::EDGE_FLIP", "Edge Flipping DAG overlayed on input graph"),
+      clEnumValN (InputDAG_ExecTy::TOPO, "InputDAG_ExecTy::TOPO", "Edge Flipping DAG overlayed on input graph"),
+      clEnumValN (InputDAG_ExecTy::PART, "InputDAG_ExecTy::PART", "Partitioned coarsened DAG overlayed on input graph"),
+      clEnumValEnd),
+    cll::init (InputDAG_ExecTy::CHROMATIC));
+
+
+enum class PriorityFunc {
   FIRST_FIT,
   BY_ID,
   RANDOM,
@@ -27,19 +48,18 @@ enum PriorityFunc {
   MAX_DEGREE,
 };
 
-namespace cll = llvm::cl;
 
 static cll::opt<PriorityFunc> priorityFunc (
     "priority",
     cll::desc ("choose ordering heuristic"),
     cll::values (
-      clEnumValN (FIRST_FIT, "FIRST_FIT", "first fit, no priority"),
-      clEnumValN (BY_ID, "BY_ID", "order by ID modulo some constant"),
-      clEnumValN (RANDOM, "RANDOM", "uniform random within some small range"),
-      clEnumValN (MIN_DEGREE, "MIN_DEGREE", "order by min degree first"),
-      clEnumValN (MAX_DEGREE, "MAX_DEGREE", "order by max degree first"),
+      clEnumValN (PriorityFunc::FIRST_FIT, "PriorityFunc::FIRST_FIT", "first fit, no priority"),
+      clEnumValN (PriorityFunc::BY_ID, "PriorityFunc::BY_ID", "order by ID modulo some constant"),
+      clEnumValN (PriorityFunc::RANDOM, "PriorityFunc::RANDOM", "uniform random within some small range"),
+      clEnumValN (PriorityFunc::MIN_DEGREE, "PriorityFunc::MIN_DEGREE", "order by min degree first"),
+      clEnumValN (PriorityFunc::MAX_DEGREE, "PriorityFunc::MAX_DEGREE", "order by max degree first"),
       clEnumValEnd),
-    cll::init (BY_ID));
+    cll::init (PriorityFunc::BY_ID));
 
 struct BaseDAGdata {
   unsigned id;
@@ -138,6 +158,7 @@ struct InputDAGdataInOut: public BaseDAGdata {
 
 struct InputDAGdataDirected: public InputDAGdata {
 
+  // TODO: change to vector with pow 2 alloc
   typedef Galois::gdeque<unsigned, 64> AdjList;
 
   AdjList incoming;
@@ -446,23 +467,23 @@ public:
     t_priority.start ();
 
     switch (priorityFunc) {
-      case FIRST_FIT:
+      case PriorityFunc::FIRST_FIT:
         // do nothing
         break;
 
-      case BY_ID:
+      case PriorityFunc::BY_ID:
         assignPriorityHelper (byId);
         break;
 
-      case RANDOM:
+      case PriorityFunc::RANDOM:
         assignPriorityHelper (randPri);
         break;
 
-      case MIN_DEGREE:
+      case PriorityFunc::MIN_DEGREE:
         assignPriorityHelper (minDegree);
         break;
 
-      case MAX_DEGREE:
+      case PriorityFunc::MAX_DEGREE:
         assignPriorityHelper (maxDegree);
         break;
 
@@ -1673,6 +1694,38 @@ void for_each_det_edge_flip_topo (const R& range, const F& func, G& graph, const
 
   for_each_det_edge_flip_topo (range, func, graph, dagManager, loopname);
 }
+
+template <InputDAG_ExecTy EXEC>
+struct ForEachDet_InputDAG {
+};
+
+
+template <> 
+struct ForEachDet_InputDAG<InputDAG_ExecTy::CHROMATIC> {
+
+  template <typename R, typename F, typename G>
+  static void run (const R& range, const F& func, G& graph, const char* loopname) {
+    for_each_det_chromatic (range, func, graph, loopname);
+  }
+};
+
+template <> 
+struct ForEachDet_InputDAG<InputDAG_ExecTy::EDGE_FLIP> {
+
+  template <typename R, typename F, typename G>
+  static void run (const R& range, const F& func, G& graph, const char* loopname) {
+    for_each_det_edge_flip_ar (range, func, graph, loopname);
+  }
+};
+
+template <> 
+struct ForEachDet_InputDAG<InputDAG_ExecTy::TOPO> {
+
+  template <typename R, typename F, typename G>
+  static void run (const R& range, const F& func, G& graph, const char* loopname) {
+    for_each_det_edge_flip_topo (range, func, graph, loopname);
+  }
+};
 
 
 } // end namespace Runtime

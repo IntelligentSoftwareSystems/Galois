@@ -2,6 +2,7 @@
 #define GALOIS_RUNTIME_ORDERED_LOCKABLE_H
 
 #include "Galois/AltBag.h"
+#include "Galois/Runtime/ll/ThreadRWlock.h"
 
 #include <unordered_map>
 

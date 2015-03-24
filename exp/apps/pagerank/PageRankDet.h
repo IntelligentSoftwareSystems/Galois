@@ -14,6 +14,7 @@
 
 #include "Galois/Runtime/Sampling.h"
 #include "Galois/Runtime/DetChromatic.h"
+#include "Galois/Runtime/DetPartInputDAG.h"
 #include "Galois/Runtime/DetKDGexecutor.h"
 
 #include "llvm/Support/CommandLine.h"
@@ -204,6 +205,11 @@ public:
 
   int run (int argc, char* argv[]) {
     LonestarStart (argc, argv, name, desc, url);
+    return run ();
+  }
+
+  int run (void) {
+
     Galois::StatManager sm;
 
     readGraph ();
