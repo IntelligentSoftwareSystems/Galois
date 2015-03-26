@@ -93,7 +93,23 @@ struct InitializeGraph {
       data.value = 1.0 - alpha;
       data.residual = 0;
       //Adding Galois::NONE is imp. here since we don't need any blocking locks.
-      data.nout = std::distance(g->in_edge_begin(n, Galois::MethodFlag::SRC_ONLY),g->in_edge_end(n, Galois::MethodFlag::SRC_ONLY));	
+      data.nout = std::distance(g->in_edge_begin(n, Galois::MethodFlag::SRC_ONLY),g->in_edge_end(n, Galois::MethodFlag::SRC_ONLY));
+    }
+
+  typedef int tt_is_copyable;
+};
+
+struct checkGraph {
+    Graph::pointer g;
+
+    void static go(Graph::pointer g)
+    {
+      Galois::for_each_local(g, checkGraph{g}, Galois::loopname("checkGraph"));
+    }
+
+    void operator()(GNode n, Galois::UserContext<GNode>& cnx) const {
+      LNode& data = g->at(n);
+      std::cout << data.value << "\n";
     }
 
   typedef int tt_is_copyable;
@@ -115,22 +131,29 @@ struct PageRank {
 
     void operator() (GNode src, Galois::UserContext<GNode>& cnx) const {
       double sum = 0;
-      LNode& sdata = g->at(src);
-      //std::cout << "n :" << n.nout <<"\n";
-      for (auto jj = g->in_edge_begin(src, Galois::MethodFlag::ALL), ej = g->in_edge_end(src, Galois::MethodFlag::SRC_ONLY); jj != ej; ++jj) {
+      Galois::MethodFlag flag_none = Galois::MethodFlag::NONE;
+
+      LNode& sdata = g->at(src, Galois::MethodFlag::SRC_ONLY);
+
+      /* check correctness of graph initialization
+      if(sdata.nout != std::distance(g->in_edge_begin(src, flag_none), g->in_edge_end(src, flag_none)))
+      {
+          std::cout << "ERROR : not matched\n";
+      }
+      */
+      for (auto jj = g->in_edge_begin(src, Galois::MethodFlag::NONE), ej = g->in_edge_end(src, Galois::MethodFlag::NONE); jj != ej; ++jj) {
         GNode dst = g->dst(jj, Galois::MethodFlag::SRC_ONLY);
         LNode& ddata = g->at(dst, Galois::MethodFlag::SRC_ONLY);
-        sum += ddata.value / ddata.nout;
+        //std::cout << ddata.value << ", " << ddata.nout <<"\n";
+        if(ddata.nout != 0)
+        {
+          sum += ddata.value / ddata.nout;
+        }
       }
       float value = (1.0 - alpha) * sum + alpha;
       float diff = std::fabs(value - sdata.value);
       if (diff > TOLERANCE) {
         sdata.value = value;
-        /*   for (auto jj = g->edge_begin(src, Galois::MethodFlag::SRC_ONLY), ej = g->edge_end(src, Galois::MethodFlag::SRC_ONLY); jj != ej; ++jj) {
-             GNode dst = g->dst(jj, Galois::MethodFlag::SRC_ONLY);
-             cnx.push(dst);
-             }
-             */
       }
 
   }
@@ -285,12 +308,12 @@ int main(int argc, char** argv) {
 
     //allocate local computation graph and Reading from the inputFile using FileGraph
     //NOTE: We are computing in edges on the fly and then using then in Graph construction.
+    std::vector<unsigned> counts;
+    std::vector<unsigned> In_counts;
     Graph::pointer g;
     {
       Galois::Graph::FileGraph fg;
       fg.fromFile(inputFile);
-      std::vector<unsigned> counts;
-      std::vector<unsigned> In_counts;
       for(auto& N : fg)
       {
           //std::cout << "N = " << N << "   : \n";
@@ -346,9 +369,22 @@ int main(int argc, char** argv) {
     //Graph Initialization begins.
     Galois::Timer timerInit;
     timerInit.start();
-    //Galois::for_each_local(g,InitializeGraph{}, Galois::loopname("init"));
 
-    InitializeGraph::go(g);
+    // Initializaion on host 0
+    int node_num = 0;
+    for(auto n = g->begin(); n != g->end(); ++n)
+    {
+      LNode& data = g->at(*n);
+      data.value = 1.0 - alpha;
+      data.residual = 0;
+      data.nout = In_counts[node_num] ;//std::distance(g->in_edge_begin(*n, Galois::MethodFlag::SRC_ONLY),g->in_edge_end(*n, Galois::MethodFlag::SRC_ONLY));
+      ++node_num;
+    }
+
+    if(node_num != g->size())
+      std::cout << "ERROR: Nodes initialized : " << node_num << "\n";
+
+    //InitializeGraph::go(g);
 
     timerInit.stop();
     std::cout << "Graph Initialization: " << timerInit.get() << " ms\n";
@@ -356,8 +392,7 @@ int main(int argc, char** argv) {
     Galois::Timer timerPR;
     timerPR.start();
 
-    //PageRank::go(g);
-    PageRankMsg::go(g);
+    PageRank::go(g);
 
     timerPR.stop();
 
@@ -373,12 +408,9 @@ int main(int argc, char** argv) {
 
     //std::cout << "Computing graph Distribution\n";
     //compute_graph_distribution(g);
-    /*
-       std::cout << "size = " << g->size() <<std::endl;
-       std::cout << "Typeinfo " << typeid(Graph::GraphNode).name() <<std::endl;
-     */
 
-    //MPI_Finalize();
+
+
     Galois::Runtime::getSystemNetworkInterface().terminate();
     return 0;
 }
