@@ -677,6 +677,8 @@ public:
 
     ctx.timer.stop ();
     assert (!ctx.hasWork ());
+
+    Galois::Runtime::reportStat (loopname, "Iterations", ctx.num_iter);
   }
 
 
