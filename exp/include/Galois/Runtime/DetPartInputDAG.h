@@ -42,7 +42,7 @@ struct InputGraphPartDAGexecutor {
     template <typename R, typename B>
     void pickSources (const R& range, const size_t rangeSize, B& sources) {
 
-      ptrdiff_t jump_size = std::max (rangeSize /(2*exec.numPart), size_t (1));
+      ptrdiff_t jump_size = std::max (rangeSize /(exec.numPart), size_t (1));
 
       auto iter = range.begin ();
       size_t dist = 0;
@@ -61,7 +61,8 @@ struct InputGraphPartDAGexecutor {
     template <typename I>
     void bfsTraversal (I beg, I end) {
 
-      using WL = Galois::WorkList::dChunkedFIFO<32>;
+      // using WL = Galois::WorkList::dChunkedFIFO<32>;
+      using WL = Galois::WorkList::AltChunkedFIFO<8>;
 
       Galois::for_each (beg, end,
           [this] (GNode src, Galois::UserContext<GNode>& ctxt) {
@@ -106,6 +107,9 @@ struct InputGraphPartDAGexecutor {
 
     void partition (void) {
 
+      Galois::StatTimer ptime ("partition time");
+      ptime.start ();
+
       Galois::PerThreadBag<GNode, 64>* currRemaining = new PerThreadBag<GNode, 64> ();
       Galois::PerThreadBag<GNode, 64>* nextRemaining = new PerThreadBag<GNode, 64> ();
 
@@ -146,9 +150,15 @@ struct InputGraphPartDAGexecutor {
       delete currRemaining; currRemaining = nullptr;
       delete nextRemaining; nextRemaining = nullptr;
 
+      ptime.stop ();
+
     }
 
     unsigned countComponents (void) {
+
+      Galois::StatTimer cctime ("countComponents time");
+      cctime.start ();
+
       std::vector<unsigned> componentIDs (exec.graph.size (), 0);
       
       auto nextSource = exec.graph.begin ();
@@ -190,43 +200,35 @@ struct InputGraphPartDAGexecutor {
         
       } // end while
 
+      cctime.stop ();
+
       return numComp;
 
     }
 
 
-    void revisitPartitions (void) {
+    void initCoarseAdj (void) {
       using ParCounter = Galois::GAccumulator<size_t>;
       using PartCounters = std::vector<ParCounter>;
 
+      Galois::StatTimer t("time initCoarseAdj");
+
+      t.start ();
+
       PartCounters partCounters (exec.numPart);
 
-      do_all_impl (makeLocalRange (exec.graph),
+      do_all_coupled (makeLocalRange (exec.graph),
           [this, &partCounters] (GNode src) {
 
             bool boundary = false;
 
             auto& sd = exec.graph.getData (src, Galois::MethodFlag::UNPROTECTED);
 
-            if (sd.partition == -1) {
-              unsigned deg = 0;
-              auto countDegClosure = [this, &deg, &src] (GNode dst) {
-                if (src != dst) {
-                  ++deg;
-                  std::printf ("src: %d has neighbor %d\n", src, dst);
-                }
-              };
-
-              exec.dagManager.applyToAdj (src, countDegClosure);
-
-              GALOIS_ASSERT (deg == 0);
-            }
-
             GALOIS_ASSERT (sd.partition != -1);
 
             partCounters[sd.partition] += 1;
 
-            auto checkPartClosure = [this, &sd, &boundary] (GNode dst) {
+            auto visitAdjClosure = [this, &sd, &boundary] (GNode dst) {
               auto& dd = exec.graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
 
               if (dd.partition != sd.partition) {
@@ -244,29 +246,30 @@ struct InputGraphPartDAGexecutor {
             };
 
 
-            exec.dagManager.applyToAdj (src, checkPartClosure);
+            exec.dagManager.applyToAdj (src, visitAdjClosure);
 
             GALOIS_ASSERT (sd.isBoundary == boundary);
            
           },
-          "check_partitions",
-          true);
+          "check_partitions");
 
       for (size_t i = 0; i < partCounters.size (); ++i) {
         std::printf ("partition %zd, size =%zd\n", i, partCounters[i].reduceRO ());
       }
       
+      t.stop ();
     }
   }; // end class BFSpartitioner
 
 
   struct PartMetaData: private boost::noncopyable {
 
-    using LocalWL = Galois::gdeque<GNode, 1024>;
+    using LocalWL = Galois::gdeque<GNode, 64>;
+    // using LocalWL = typename ContainersWithGAlloc::Deque<GNode>::type;
     using IncomingBoundaryWLmap = std::vector<LocalWL>;
 
     unsigned id;
-    std::atomic<unsigned> indegree;
+    std::atomic<int> indegree;
     IncomingBoundaryWLmap incomingWLs;
 
     std::vector<PartMetaData*> neighbors;
@@ -284,11 +287,18 @@ struct InputGraphPartDAGexecutor {
     void flipEdges (void) {
       GALOIS_ASSERT (indegree == 0);
 
+      // never increment self indegree and decrement others indegree in the same
+      // loop. Increment self indegree first and then others indegree so that if a
+      // neighbor becomes source and starts flipping edges, there is no error
+      indegree += int (neighbors.size ());
+
       for (PartMetaData* n: neighbors) {
-        --n->indegree;
+        int x = --(n->indegree);
         assert (n->indegree >= 0);
 
-        ++indegree;
+        if (x == 0) {
+          // std::printf ("partition %d is now a source\n", n->id);
+        }
       }
 
     }
@@ -329,11 +339,11 @@ struct InputGraphPartDAGexecutor {
 
 
   struct Ucontext {
-    InputGraphPartDAGexecutor& outer;
+    InputGraphPartDAGexecutor& exec;
     PartMetaData& pusher;
 
     void push (GNode n) {
-      outer.push (n, pusher);
+      exec.push (n, pusher);
     }
     
   };
@@ -341,7 +351,7 @@ struct InputGraphPartDAGexecutor {
 
 
 
-  static const unsigned PARTITION_MULT_FACTOR = 4;
+  static const unsigned PARTITION_MULT_FACTOR = 2;
 
   G& graph;
   F func;
@@ -404,6 +414,19 @@ struct InputGraphPartDAGexecutor {
         assert (p.id != q->id);
         if (p.id > q->id) {
           ++(p.indegree);
+        }
+      }
+    }
+
+    // for debug only
+    for (unsigned i = 0; i < numPart; ++i) {
+      PartMetaData& p = partitions[i];
+
+      if (p.indegree == 0) {
+        std::printf ("Partition %d is initially a source\n", i);
+
+        for (PartMetaData* q: p.neighbors) {
+          assert (q->indegree != 0);
         }
       }
     }
@@ -506,6 +529,7 @@ struct InputGraphPartDAGexecutor {
       workList.pop_front ();
 
       auto& nd = graph.getData (n, Galois::MethodFlag::UNPROTECTED);
+      assert (nd.partition == ctxt.pusher.id);
       nd.onWL = 0;
       func (n, ctxt);
     }
@@ -534,7 +558,7 @@ struct InputGraphPartDAGexecutor {
 
     std::printf ("Graph has %d components\n", partitioner.countComponents ());
 
-    partitioner.revisitPartitions ();
+    partitioner.initCoarseAdj ();
 
     initCoarseDAG ();
     
@@ -545,7 +569,7 @@ struct InputGraphPartDAGexecutor {
     Galois::Runtime::on_each_impl (
         [this, &workers] (const unsigned tid, const unsigned numT) {
           size_t beg = tid * PARTITION_MULT_FACTOR;
-          size_t end = std::max ((tid + 1) * PARTITION_MULT_FACTOR, numPart);
+          size_t end = std::min ((tid + 1) * PARTITION_MULT_FACTOR, numPart);
 
           ThreadWorker& w = *workers.getLocal (tid);
           for (; beg < end; ++beg) {
@@ -577,6 +601,8 @@ struct InputGraphPartDAGexecutor {
 
             if (p != nullptr) {
 
+            // LL::gDebug ("working on parition", p->id);
+
               Ucontext ctxt{*this, *p};
 
               applyOperator (ctxt, p->inner, workHappened, worker.innerIter);
@@ -592,6 +618,7 @@ struct InputGraphPartDAGexecutor {
                 p->flipEdges ();
 
               }
+
             }
 
 

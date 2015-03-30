@@ -181,7 +181,7 @@ class DoAllCoupledExec {
     ThreadContext () 
       :
         work_mutex (),
-        id (std::numeric_limits<unsigned>::max ()),
+        id (LL::getMaxThreads ()), // TODO: fix this initialization problem, see initThread
         shared_beg (),
         shared_end (),
         m_size (0),
@@ -372,6 +372,8 @@ private:
   GALOIS_ATTRIBUTE_NOINLINE bool transferWork (ThreadContext& rich, ThreadContext& poor, StealAmt amount) {
 
     assert (rich.id != poor.id);
+    assert (rich.id < Galois::getActiveThreads ());
+    assert (poor.id < Galois::getActiveThreads ());
 
     Iter steal_beg;
     Iter steal_end;
@@ -394,24 +396,28 @@ private:
     bool sawWork = false;
     bool stoleWork = false;
 
-    unsigned my_pack = LL::getPackageForSelf (poor.id);
-    unsigned per_pack = LL::getMaxThreads () / LL::getMaxPackages ();
+    const unsigned maxT = Galois::getActiveThreads ();
+    const unsigned my_pack = LL::getPackageForSelf (poor.id);
+    const unsigned per_pack = LL::getMaxThreads () / LL::getMaxPackages ();
 
-    unsigned pack_beg = my_pack * per_pack;
-    unsigned pack_end = (my_pack + 1) * per_pack;
+    const unsigned pack_beg = my_pack * per_pack;
+    const unsigned pack_end = (my_pack + 1) * per_pack;
 
-    for (unsigned i = pack_beg + 1; i < pack_end; ++i) {
+    for (unsigned i = 1; i < pack_end; ++i) {
+
       // go around the package in circle starting from the next thread
-      unsigned t = pack_beg + ((poor.id + i) % per_pack);
+      unsigned t = (poor.id + i) % per_pack + pack_beg; 
       assert ( (t >= pack_beg) && (t < pack_end));
 
-      if (workers.getRemote (t)->hasWorkWeak ()) {
-        sawWork = true;
+      if (t < maxT) { 
+        if (workers.getRemote (t)->hasWorkWeak ()) {
+          sawWork = true;
 
-        stoleWork = transferWork (*workers.getRemote (t), poor, HALF);
+          stoleWork = transferWork (*workers.getRemote (t), poor, HALF);
 
-        if (stoleWork) { 
-          break;
+          if (stoleWork) { 
+            break;
+          }
         }
       }
     }
@@ -424,7 +430,8 @@ private:
     bool stoleWork = false;
 
     unsigned myPkg = LL::getPackageForThread (poor.id);
-    unsigned maxT = LL::getMaxThreads ();
+    // unsigned maxT = LL::getMaxThreads ();
+    unsigned maxT = Galois::getActiveThreads ();
 
     for (unsigned i = 0; i < maxT; ++i) {
       ThreadContext& rich = *(workers.getRemote ((poor.id + i) % maxT));
