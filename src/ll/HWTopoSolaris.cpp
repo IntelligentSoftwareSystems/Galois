@@ -77,10 +77,12 @@ static Policy& getPolicy() {
 } //namespace
 
 bool Galois::Runtime::LL::bindThreadToProcessor(int id) {
+  assert(size_t(id) < procmap.size ());
   return sunBindToProcessor(getPolicy().procmap[id]);
 }
 
 unsigned Galois::Runtime::LL::getProcessorForThread(int id) {
+  assert(size_t(id) < procmap.size ());
   return getPolicy().procmap[id];
 }
 
