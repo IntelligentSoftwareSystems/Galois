@@ -113,7 +113,7 @@ struct InputDAGdata: public BaseDAGdata {
   // std::atomic<unsigned> indegree;
   GAtomic<int> indegree;
 
-  explicit InputDAGdata (unsigned _id=0): 
+  explicit InputDAGdata (unsigned id=0): 
     BaseDAGdata (id),
     numSucc (0), 
     dagSucc (nullptr), 
@@ -146,7 +146,7 @@ struct InputDAGdataInOut: public BaseDAGdata {
   // std::atomic<unsigned> indegree;
   GAtomic<int> indegree;
 
-  explicit InputDAGdataInOut (unsigned _id=0): 
+  explicit InputDAGdataInOut (unsigned id=0): 
     BaseDAGdata (id),
     dagSuccEndIn (0), 
     dagSuccEndOut (0), 
@@ -223,8 +223,8 @@ protected:
 public:
 
   template <typename F>
-  void applyToAdj (GNode src, F& f) {
-    visitAdj (src, f);
+  void applyToAdj (GNode src, F& f, const Galois::MethodFlag& flag=Galois::MethodFlag::UNPROTECTED) {
+    visitAdj (src, f, flag);
   }
 
   template <typename F>
@@ -614,16 +614,16 @@ struct DAGmanagerInOut {
     G& graph;
 
     template <typename F>
-    void operator () (GNode src, F& func) {
+    void operator () (GNode src, F& func, const Galois::MethodFlag& flag) {
 
-      for (auto i = graph.in_edge_begin (src, Galois::MethodFlag::UNPROTECTED)
-          , end_i = graph.in_edge_end (src, Galois::MethodFlag::UNPROTECTED); i != end_i; ++i) {
+      for (auto i = graph.in_edge_begin (src, flag)
+          , end_i = graph.in_edge_end (src, flag); i != end_i; ++i) {
         GNode dst = graph.getInEdgeDst (i);
         func (dst);
       }
 
-      for (auto i = graph.edge_begin (src, Galois::MethodFlag::UNPROTECTED)
-          , end_i = graph.edge_end (src, Galois::MethodFlag::UNPROTECTED); i != end_i; ++i) {
+      for (auto i = graph.edge_begin (src, flag)
+          , end_i = graph.edge_end (src, flag); i != end_i; ++i) {
         GNode dst = graph.getEdgeDst (i);
         func (dst);
       }
@@ -828,10 +828,10 @@ struct DAGvisitorUndirected {
     G& graph;
 
     template <typename F>
-    void operator () (GNode src, F& func) {
+    void operator () (GNode src, F& func, const Galois::MethodFlag& flag) {
 
-      for (auto i = graph.edge_begin (src, Galois::MethodFlag::UNPROTECTED)
-           , end_i = graph.edge_end (src, Galois::MethodFlag::UNPROTECTED); i != end_i; ++i) {
+      for (auto i = graph.edge_begin (src, flag)
+           , end_i = graph.edge_end (src, flag); i != end_i; ++i) {
 
         GNode dst = graph.getEdgeDst (i);
         func (dst);
