@@ -262,17 +262,17 @@ template <typename T, typename Cmp, typename OpFunc, typename NhoodFunc, typenam
 class DAGexecutorBase {
 
 protected:
-  typedef Ctxt_tp  Ctxt;
-  typedef typename Ctxt::NhoodMgr NhoodMgr;
-  typedef typename Ctxt::NItem NItem;
+  using Ctxt = Ctxt_tp;
+  using NhoodMgr = typename Ctxt::NhoodMgr;
+  using NItem = typename Ctxt::NItem;
   using CtxtCmp = typename NItem::CtxtCmp;
   using NItemFactory = typename NItem::Factory;
 
-  typedef MM::FixedSizeAllocator<Ctxt> CtxtAlloc;
-  typedef MM::Pow_2_BlockAllocator<Ctxt*> CtxtAdjAlloc;
-  typedef PerThreadBag<Ctxt*> CtxtWL;
-  typedef UserContextAccess<T> UserCtx;
-  typedef PerThreadStorage<UserCtx> PerThreadUserCtx;
+  using CtxtAlloc = MM::FixedSizeAllocator<Ctxt>;
+  using CtxtAdjAlloc = MM::Pow_2_BlockAllocator<Ctxt*>;
+  using CtxtWL = PerThreadBag<Ctxt*>;
+  using UserCtx = UserContextAccess<T>;
+  using PerThreadUserCtx = PerThreadStorage<UserCtx>;
 
 
   struct ApplyOperator {

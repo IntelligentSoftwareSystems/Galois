@@ -153,7 +153,7 @@ struct DetKDGexecutorAddRem {
       if (rounds >= 2) { 
         // break; // TODO: remove
       }
-      std::printf ("DetKDGexecutorAddRem round %d time taken: %ld\n", rounds, t_exec.get ());
+      // std::printf ("DetKDGexecutorAddRem round %d time taken: %ld\n", rounds, t_exec.get ());
 
     } // end while
 
@@ -265,9 +265,9 @@ struct DetKDG_AddRem_reuseDAG {
       if (numPushes.reduceRO () == 0) { 
         break;
       }
-      std::printf ("DetKDG_AddRem_reuseDAG: round %d time taken: %ld\n", rounds, t_exec.get ());
+      // std::printf ("DetKDG_AddRem_reuseDAG: round %d time taken: %ld\n", rounds, t_exec.get ());
 
-      dagExec->resetDAG ();
+      dagExec->reinitDAG ();
       numPushes.reset ();
     }
 

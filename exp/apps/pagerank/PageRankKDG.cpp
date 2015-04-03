@@ -12,7 +12,7 @@ enum ExecType {
 };
 
 static cll::opt<ExecType> execType (
-    "executor",
+    "execType",
     cll::desc ("Deterministic Executor Type"),
     cll::values (
       clEnumValN (KDG_REUSE, "KDG_REUSE", "KDG_REUSE"),
@@ -93,7 +93,7 @@ protected:
 
     switch (execType) {
       case KDG_REUSE:
-        Galois::Runtime::for_each_det_kdg_topo (
+        Galois::Runtime::for_each_det_kdg_ar_reuse (
             Galois::Runtime::makeLocalRange (graph),
             NodeComparator {graph},
             NhoodVisitor {*this},
