@@ -39,6 +39,6 @@ if [ "$1" != "min" ]; then
   module load texlive
   module load ghostscript
   module load python
-  module load screen
+  # module load screen #disabling for now because screen was compiled without proper color support
   module load valgrind
 fi
