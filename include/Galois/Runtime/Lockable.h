@@ -42,7 +42,7 @@ class LockManagerBase;
  * Lockable. 
  */
 class Lockable {
-  LL::PtrLock<LockManagerBase, true> owner;
+  LL::PtrLock<LockManagerBase> owner;
   friend class LockManagerBase;
 };
 

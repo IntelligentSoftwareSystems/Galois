@@ -41,7 +41,7 @@ struct ChunkHeader {
 
 #if 0
 class AtomicChunkedDeque {
-  Runtime::LL::PtrLock<ChunkHeader, true> head;
+  Runtime::LL::PtrLock<ChunkHeader> head;
   ChunkHeader* volatile tail;
 
 public:
@@ -115,7 +115,7 @@ public:
 #endif
 
 class AltChunkedQueue {
-  Runtime::LL::PtrLock<ChunkHeader, true> head;
+  Runtime::LL::PtrLock<ChunkHeader> head;
   ChunkHeader* tail;
 
   void prepend(ChunkHeader* C) {
@@ -220,7 +220,7 @@ public:
 };
 
 class AltChunkedStack {
-  Runtime::LL::PtrLock<ChunkHeader, true> head;
+  Runtime::LL::PtrLock<ChunkHeader> head;
 
   void prepend(ChunkHeader* C) {
     //Find tail of stolen stuff

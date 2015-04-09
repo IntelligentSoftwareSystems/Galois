@@ -64,7 +64,10 @@ public:
 
 template<typename T, bool concurrent>
 class ConExtLinkedStack {
-  Runtime::LL::PtrLock<T, concurrent> head;
+  typename std::conditional<concurrent, 
+                            Runtime::LL::PtrLock<T>,
+                            Runtime::LL::DummyPtrLock<T>
+                            >::type head;
   
 public:
   typedef ConExtListNode<T> ListNode;
@@ -112,7 +115,10 @@ public:
 
 template<typename T, bool concurrent>
 class ConExtLinkedQueue {
-  Runtime::LL::PtrLock<T,concurrent> head;
+  typename std::conditional<concurrent, 
+                            Runtime::LL::PtrLock<T>,
+                            Runtime::LL::DummyPtrLock<T>
+                            >::type head;
   T* tail;
   
 public:

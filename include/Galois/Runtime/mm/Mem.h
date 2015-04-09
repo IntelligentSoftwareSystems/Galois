@@ -580,7 +580,7 @@ public:
 private:
   typedef std::map<size_t, SizedHeap*> HeapMap;
   static SizedHeapFactory* getInstance();
-  static LL::PtrLock<SizedHeapFactory, true> instance;
+  static LL::PtrLock<SizedHeapFactory> instance;
   static __thread HeapMap* localHeaps;
   HeapMap heaps;
   std::list<HeapMap*> allLocalHeaps;

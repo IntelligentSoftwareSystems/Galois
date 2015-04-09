@@ -65,7 +65,7 @@ struct FreeNode {
   FreeNode* next;
 };
  
-typedef Galois::Runtime::LL::PtrLock<FreeNode, true> HeadPtr;
+typedef Galois::Runtime::LL::PtrLock<FreeNode> HeadPtr;
 typedef Galois::Runtime::LL::CacheLineStorage<HeadPtr> HeadPtrStorage;
 
 // Tracks pages allocated

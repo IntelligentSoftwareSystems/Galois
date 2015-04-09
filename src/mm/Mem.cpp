@@ -41,7 +41,7 @@ SystemHeap::SystemHeap() {}
 SystemHeap::~SystemHeap() {}
 
 #ifndef GALOIS_FORCE_STANDALONE
-PtrLock<SizedHeapFactory, true> SizedHeapFactory::instance;
+PtrLock<SizedHeapFactory> SizedHeapFactory::instance;
 __thread SizedHeapFactory::HeapMap* SizedHeapFactory::localHeaps = 0;
 
 SizedHeapFactory::SizedHeap* 
