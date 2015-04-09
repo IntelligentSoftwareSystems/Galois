@@ -13,10 +13,10 @@ using namespace Galois::Runtime::LL;
 
 int main() 
 { 
-  std::cout << "is_pod PtrLock<int, true> == " << std::boolalpha 
-	    << std::is_pod<PtrLock<int, true> >::value << std::endl; 
-  std::cout << "is_pod PtrLock<int, false> == " << std::boolalpha 
-	    << std::is_pod<PtrLock<int, false> >::value << std::endl; 
+  std::cout << "is_pod PtrLock<int> == " << std::boolalpha 
+	    << std::is_pod<PtrLock<int> >::value << std::endl; 
+  std::cout << "is_pod DummyPtrLock<int> == " << std::boolalpha 
+	    << std::is_pod<DummyPtrLock<int> >::value << std::endl; 
 
   std::cout << "is_pod SimpleLock == " << std::boolalpha 
 	    << std::is_pod<SimpleLock >::value << std::endl; 
