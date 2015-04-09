@@ -246,7 +246,7 @@ class MP_SC_Bag {
 
   Runtime::MM::FixedSizeAllocator heap;
 
-  Runtime::PerThreadStorage<PtrLock<Chunk*, true> > write_stack;
+  Runtime::PerThreadStorage<PtrLock<Chunk*> > write_stack;
 
   ConExtLinkedStack<Chunk, true> read_stack;
   Chunk* current;
@@ -262,7 +262,7 @@ public:
   MP_SC_Bag() :heap(sizeof(Chunk)), current(0) {}
 
   bool push(value_type val) {
-    PtrLock<Chunk*, true>& L = write_stack.get();
+    PtrLock<Chunk*>& L = write_stack.get();
     L.lock();
     Chunk* OldL = L.getValue();
     if (OldL && OldL->push_back(val)) {
@@ -1989,7 +1989,7 @@ public:
 };
 
 class LIFO_SB : private boost::noncopyable {
-  Runtime::LL::PtrLock<ChunkHeader, true> head;
+  Runtime::LL::PtrLock<ChunkHeader> head;
 
 public:
 
