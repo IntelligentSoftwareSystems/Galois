@@ -29,6 +29,11 @@
 #include <iostream>
 
 #include "Galois/Runtime/Context.h"
+#include "Galois/Graph/FileGraph.h"
+#include "Galois/Runtime/Serialize.h"
+#include "Galois/Runtime/PerHostStorage.h"
+#include "Galois/Runtime/DistSupport.h"
+
 
 namespace Galois {
   namespace Graph {
@@ -60,16 +65,14 @@ namespace Galois {
             b_inEdges = e_inEdges = len_inEdges ? (new EdgeImplTy[len_inEdges]) : nullptr;
             while (diff--) {
               Runtime::gptr<NodeImplTy> ptr;
-              EdgeTy tmp;
-              gDeserialize(buf, ptr, tmp);
-              append(ptr, tmp);
+              gDeserialize(buf, ptr);
+              append(ptr);
             }
 
             while (diff_inEdges--) {
               Runtime::gptr<NodeImplTy> ptr;
-              EdgeTy tmp;
-              gDeserialize(buf, ptr, tmp);
-              append_inEdges(ptr, tmp);
+              gDeserialize(buf, ptr);
+              append_inEdges(ptr);
 
             }
           }
@@ -85,11 +88,11 @@ namespace Galois {
             ptrdiff_t diff_inEdges = end_In - begin_In;
             gSerialize(buf, data, len, diff, len_inEdges, diff_inEdges);
             while (begin != end) {
-              gSerialize(buf, begin->dst, begin->data);
+              gSerialize(buf, begin->dst);
               ++begin;
             }
             while (begin_In != end_In) {
-              gSerialize(buf, begin_In->dst, begin_In->data);
+              gSerialize(buf, begin_In->dst);
               ++begin_In;
             }
 
@@ -110,12 +113,12 @@ namespace Galois {
             assert(_len_inEdges == len_inEdges);
             assert(diff_inEdges >= e_inEdges - b_inEdges);
             while (diff--) {
-              gDeserialize(buf, begin->dst, begin->data);
+              gDeserialize(buf, begin->dst);
               ++begin;
             }
             e = begin;
             while (diff_inEdges--) {
-              gDeserialize(buf, begin_In->dst, begin_In->data);
+              gDeserialize(buf, begin_In->dst);
               ++begin_In;
             }
             e_inEdges = begin_In;
@@ -132,13 +135,6 @@ namespace Galois {
           //
           bool remote;
 
-          EdgeImplTy* append(Runtime::gptr<NodeImplTy> dst, const EdgeTy& data) {
-            assert(e-b < len);
-            e->dst = dst;
-            e->data = data;
-            return e++;
-          }
-
           EdgeImplTy* append(Runtime::gptr<NodeImplTy> dst) {
             assert(e-b < len);
             e->dst = dst;
@@ -146,18 +142,21 @@ namespace Galois {
           }
 
           // Appending In_Edges
-          EdgeImplTy* append_inEdges(Runtime::gptr<NodeImplTy> dst, const EdgeTy& data) {
-            assert(e_inEdges-b_inEdges < len_inEdges);
-            e_inEdges->dst = dst;
-            e_inEdges->data = data;
-            return e_inEdges++;
-          }
-
           EdgeImplTy* append_inEdges(Runtime::gptr<NodeImplTy> dst) {
             assert(e_inEdges-b_inEdges < len_inEdges);
             e_inEdges->dst = dst;
             return e_inEdges++;
           }
+
+          unsigned get_num_outEdges()
+          {
+            return len;
+          }
+          unsigned get_num_inEdges()
+          {
+            return len_inEdges;
+          }
+
 
           EdgeImplTy* begin() { return b; }
           EdgeImplTy* end() { return e; }
@@ -170,7 +169,6 @@ namespace Galois {
 
         struct EdgeImplTy {
           Runtime::gptr<NodeImplTy> dst;
-          EdgeTy data;
         };
 
         public:
@@ -178,7 +176,7 @@ namespace Galois {
         typedef Runtime::gptr<NodeImplTy> GraphNode;
         //G
         template<bool _has_id>
-          struct with_id { typedef LC_Dist_InOut type; };     
+          struct with_id { typedef LC_Dist_InOut type; };
 
         template<typename _node_data>
           struct with_node_data { typedef LC_Dist_InOut<_node_data, EdgeTy> type; };
@@ -189,8 +187,8 @@ namespace Galois {
 
         private:
 
-        typedef std::vector<NodeImplTy> NodeData;  
-        typedef std::vector<EdgeImplTy> EdgeData;   
+        typedef std::vector<NodeImplTy> NodeData;
+        typedef std::vector<EdgeImplTy> EdgeData;
         NodeData Nodes;
         EdgeData Edges;
         EdgeData In_Edges;
@@ -246,6 +244,7 @@ namespace Galois {
 
           //allocate Nodes
           Nodes.reserve(std::distance(p.first, p.second));
+          //std::cout << " I am : " <<Runtime::NetworkInterface::ID << " with Nodes = " << std::distance(p.first, p.second)<<"\n";
           for (auto ii = p.first, ii_in = p_inEdges.first; ii != p.second; ++ii,++ii_in) {
             Nodes.emplace_back(cur, *ii, cur_In, *ii_in);
             cur += *ii;
@@ -268,7 +267,6 @@ namespace Galois {
         }
 
         static void putStart(Runtime::PerHost<LC_Dist_InOut> graph, uint32_t whom, GraphNode start) {
-          std::cerr << Runtime::NetworkInterface::ID << " putStart " << whom << "\n";
           graph->Starts[whom].first = start;
           graph->Starts[whom].second = 2;
         }
@@ -277,6 +275,7 @@ namespace Galois {
         void fillStarts(uint32_t host) {
           if (Starts[host].second != 2) {
             int ex = 0;
+            unsigned id = Runtime::NetworkInterface::ID;
             bool swap = Starts[host].second.compare_exchange_strong(ex,1);
             if (swap)
               Runtime::getSystemNetworkInterface().sendAlt(host, getStart, self, Runtime::NetworkInterface::ID);
@@ -356,25 +355,13 @@ namespace Galois {
         //! Mutation
 
         template<typename... Args>
-          edge_iterator addEdge(GraphNode src, GraphNode dst, const EdgeTy& data, MethodFlag mflag = MethodFlag::ALL) {
-            acquire(src, mflag);
-            src->append(dst, data);
-            //return src->append(dst, data);
-          }
-
           edge_iterator  addEdge(GraphNode src, GraphNode dst, MethodFlag mflag = MethodFlag::ALL) {
           acquire(src, mflag);
-          src->append(dst);
-          //return src->append(dst);
+          return src->append(dst);
         }
 
         // Adding inEdges to the Graph.
         template<typename... Args>
-          edge_iterator addInEdge(GraphNode src, GraphNode dst, const EdgeTy& data, MethodFlag mflag = MethodFlag::ALL) {
-            acquire(src, mflag);
-            return src->append_inEdges(dst, data);
-          }
-
         edge_iterator addInEdge(GraphNode src, GraphNode dst, MethodFlag mflag = MethodFlag::ALL) {
           acquire(src, mflag);
           return src->append_inEdges(dst);
@@ -386,9 +373,14 @@ namespace Galois {
           return N->data;
         }
 
-        EdgeTy& at(edge_iterator E, MethodFlag mflag = MethodFlag::ALL) {
-          return E->data;
+        unsigned get_num_outEdges(GraphNode N)
+        {
+          return N->get_num_outEdges();
         }
+
+        //EdgeTy& at(edge_iterator E, MethodFlag mflag = MethodFlag::ALL) {
+          //return E->data;
+        //}
 
         GraphNode dst(edge_iterator E, MethodFlag mflag = MethodFlag::ALL) {
           return E->dst;
@@ -470,13 +462,392 @@ namespace Galois {
         {
           for(auto ii = this->begin(); ii != this->end(); ++ii)
           {
-            prefetch(ii);
+            prefetch(*ii);
           }
+        }
+
+        void prefetch_these(unsigned start_index, unsigned end_index)
+        {
+          auto ii = this->begin() +  start_index;
+          auto ei = this->begin() + end_index;
+          for(; ii != ei; ++ii)
+          {
+            prefetch(*ii);
+          }
+        }
+
+
+        /*
+         * Per host graph constructions
+         * Each host constructs edges for their nodes.
+         */
+
+        typedef Runtime::SerializeBuffer SendBuffer;
+        typedef Runtime::DeSerializeBuffer RecvBuffer;
+
+        struct createOnEachHost_Edges {
+          pointer g;
+          std::string inputFile;
+          Galois::Graph::FileGraph fg;
+          std::vector<unsigned> counts;
+          std::vector<unsigned> In_counts;
+
+          createOnEachHost_Edges() {}
+          createOnEachHost_Edges(pointer _g, std::string _inputFile):g(_g), inputFile(_inputFile){}
+
+          void static go(pointer _g, std::string _inputFile, unsigned total_nodes)
+          {
+            std::cout << "inside function\n";
+            unsigned h = 0;
+            for(auto N = _g->begin(); N != _g->end(); ++N)
+            {
+              h++;
+            }
+            std::cout << "H -> " << h <<"\n";
+            Galois::for_each(boost::counting_iterator<unsigned>(0), boost::counting_iterator<unsigned>(total_nodes), createOnEachHost_Edges(_g, _inputFile), Galois::loopname("Construct outEdges"));
+          }
+
+          //void operator()(unsigned x, Galois::UserContext<unsigned>& cnx)
+          void operator()(unsigned tid, unsigned)
+          {
+            unsigned id = Runtime::NetworkInterface::ID;
+            unsigned num = Runtime::NetworkInterface::Num;
+
+            //std::cout << " I m on HOST : " << id << " file name : " << inputFile << "\n";
+
+            //XXX put lock on this
+            if(fg.size() == 0 )
+            {
+              fg.fromFile(inputFile);
+
+            for(auto& N : fg)
+            {
+              counts.push_back(std::distance(fg.edge_begin(N), fg.edge_end(N)));
+              for(auto ii = fg.edge_begin(N), ei = fg.edge_end(N); ii != ei; ++ii)
+              {
+                unsigned dst = fg.getEdgeDst(ii);
+                if(dst >= In_counts.size()) {
+                  In_counts.resize(dst+1);
+                }
+                In_counts[dst]+=1;
+              }
+            }
+            if(counts.size() >  In_counts.size())
+              In_counts.resize(counts.size());
+            }
+
+          unsigned total_nodes = counts.size();
+          unsigned zero = 0;
+          unsigned start_index, end_index;
+          std::tie(start_index, end_index) = Galois::block_range(zero, total_nodes, id, num);
+
+
+
+            for(unsigned x = start_index ; x < end_index; ++x)
+            {
+              auto fgn = *(fg.begin() + x);
+              auto gn = *(g->begin() + x);
+              for (auto ii = fg.edge_begin(fgn), ee = fg.edge_end(fgn); ii != ee; ++ii) {
+                unsigned dst = fg.getEdgeDst(ii);
+                //int val = fg.getEdgeData<int>(ii);
+                g->addEdge(gn, *(g->begin() + dst), Galois::MethodFlag::SRC_ONLY);
+              }
+            }
+        }
+
+          typedef int tt_has_serialize;
+          void serialize(SendBuffer& buf) const { gSerialize(buf, g, inputFile); }
+          void deserialize(RecvBuffer& buf) { gDeserialize(buf, g, inputFile); }
+        };
+
+
+
+
+
+        struct createOnEachHost_InEdges {
+          pointer g;
+          std::string inputFile_tr;
+          Galois::Graph::FileGraph fg;
+          std::vector<unsigned> counts;
+          std::vector<unsigned> In_counts;
+
+          createOnEachHost_InEdges() {}
+          createOnEachHost_InEdges(pointer _g, std::string _inputFile_tr):g(_g), inputFile_tr(_inputFile_tr){}
+
+          void static go(pointer _g, std::string _inputFile_tr, unsigned total_nodes)
+          {
+
+            Galois::for_each(boost::counting_iterator<unsigned>(0), boost::counting_iterator<unsigned>(total_nodes), createOnEachHost_InEdges(_g, _inputFile_tr), Galois::loopname("Construct InEdges"));
+          }
+
+          //void operator()(unsigned x, Galois::UserContext<unsigned>& cnx)
+          void operator()(unsigned tid, unsigned)
+          {
+            unsigned id = Runtime::NetworkInterface::ID;
+            unsigned num = Runtime::NetworkInterface::Num;
+
+
+            //XXX put lock on this
+            if(fg.size() == 0 )
+            {
+              fg.fromFile(inputFile_tr);
+
+            for(auto& N : fg)
+            {
+              counts.push_back(std::distance(fg.edge_begin(N), fg.edge_end(N)));
+              for(auto ii = fg.edge_begin(N), ei = fg.edge_end(N); ii != ei; ++ii)
+              {
+                unsigned dst = fg.getEdgeDst(ii);
+                if(dst >= In_counts.size()) {
+                  In_counts.resize(dst+1);
+                }
+                In_counts[dst]+=1;
+              }
+            }
+            if(counts.size() >  In_counts.size())
+              In_counts.resize(counts.size());
+            }
+
+          unsigned total_nodes = counts.size();
+          unsigned zero = 0;
+          unsigned start_index, end_index;
+          std::tie(start_index, end_index) = Galois::block_range(zero, total_nodes, id, num);
+
+
+
+          for(unsigned x = start_index ; x < end_index; ++x)
+          {
+            auto fgn = *(fg.begin() + x);
+            auto gn = *(g->begin() + x);
+            for (auto ii = fg.edge_begin(fgn), ee = fg.edge_end(fgn); ii != ee; ++ii) {
+              unsigned dst = fg.getEdgeDst(ii);
+              //int val = fg.getEdgeData<int>(ii);
+              g->addInEdge(gn, *(g->begin() + dst), Galois::MethodFlag::SRC_ONLY);
+            }
+          }
+
+        }
+
+          typedef int tt_has_serialize;
+          void serialize(SendBuffer& buf) const { gSerialize(buf, g, inputFile_tr); }
+          void deserialize(RecvBuffer& buf) { gDeserialize(buf, g, inputFile_tr); }
+        };
+
+        /*
+         * called on master host to initiate per host graph
+         * construction
+         *
+         */
+        template<typename... Args>
+        static void createPerHost(pointer& g, std::string inputFile, std::string inputFile_tr, Args... args)
+        {
+
+          unsigned num = Runtime::NetworkInterface::Num;
+          unsigned id = Runtime::NetworkInterface::ID;
+
+          Galois::Graph::FileGraph fg;
+          fg.fromFile(inputFile);
+
+
+          std::vector<unsigned> counts;
+          std::vector<unsigned> In_counts;
+          for(auto& N : fg)
+          {
+            counts.push_back(std::distance(fg.edge_begin(N), fg.edge_end(N)));
+            for(auto ii = fg.edge_begin(N), ei = fg.edge_end(N); ii != ei; ++ii)
+            {
+              unsigned dst = fg.getEdgeDst(ii);
+              if(dst >= In_counts.size()) {
+                // +1 is imp because vec.resize makes sure new vec can hold dst entries so it
+                // will not have vec[dst] which is (dst+1)th entry!!
+                In_counts.resize(dst+1);
+              }
+              In_counts[dst]+=1;
+            }
+          }
+          if(counts.size() >  In_counts.size())
+            In_counts.resize(counts.size());
+
+          unsigned TOTAL_NODES = counts.size();
+
+          g = allocate(counts, In_counts);
+          counts = std::vector<unsigned>();
+          In_counts = std::vector<unsigned>();
+          counts.shrink_to_fit();
+          In_counts.shrink_to_fit();
+          std::cout << "Allocation complete\n";
+          
+          //Runtime::on_each(createOnEachHost{g, inputFile});
+          Runtime::on_each_impl_dist(createOnEachHost_Edges(g, inputFile), "loop");
+          Runtime::on_each_impl_dist(createOnEachHost_InEdges(g, inputFile_tr), "loop");
+          //Galois::for_each(g->begin(), g->end(), createOnEachHost{g, inputFile}, Galois::loopname("For each"));
+          //createOnEachHost_Edges::go(g, inputFile, TOTAL_NODES);
+          //createOnEachHost_InEdges::go(g, inputFile_tr, TOTAL_NODES);
+
         }
 
       };
 
   } //namespace Graph
 } //namespace Galois
+
+
+
+
+
+
+
+
+        //template<typename... Args>
+        //static void createOnHost(pointer g, std::string inputFile, Args... args)
+        //{
+
+          //unsigned num = Runtime::NetworkInterface::Num;
+          //unsigned id = Runtime::NetworkInterface::ID;
+
+          //Galois::Graph::FileGraph fg;
+          //fg.fromFile(inputFile);
+          //std::vector<unsigned> counts;
+          //std::vector<unsigned> In_counts;
+          //for(auto& N : fg)
+          //{
+            //counts.push_back(std::distance(fg.edge_begin(N), fg.edge_end(N)));
+            //for(auto ii = fg.edge_begin(N), ei = fg.edge_end(N); ii != ei; ++ii)
+            //{
+              //unsigned dst = fg.getEdgeDst(ii);
+              //if(dst >= In_counts.size()) {
+                //// +1 is imp because vec.resize makes sure new vec can hold dst entries so it
+                //// will not have vec[dst] which is (dst+1)th entry!!
+                //In_counts.resize(dst+1);
+              //}
+              //In_counts[dst]+=1;
+            //}
+          //}
+          //if(counts.size() >  In_counts.size())
+            //In_counts.resize(counts.size());
+
+
+          //unsigned total_nodes = counts.size();
+          //unsigned zero = 0;
+          //unsigned start_index, end_index;
+          //std::tie(start_index, end_index) = Galois::block_range(zero, total_nodes, id, num);
+
+
+         //std::cout << " ON: "<< Runtime::NetworkInterface::ID << " Nodes From [ " << start_index << " , " << end_index  << "]\n";
+          ////std::cout << "Adding outEdges and Inedges on : " << Runtime::NetworkInterface::ID << "\n";
+          //for (unsigned x = start_index; x < end_index; ++x) {
+            //auto fgn = *(fg.begin() + x);
+            //auto gn = *(g->begin() + x);
+            ////std::cout << " x : " << x << " gn : " << gn << " \n";
+            //for (auto ii = fg.edge_begin(fgn), ee = fg.edge_end(fgn); ii != ee; ++ii) {
+              //unsigned dst = fg.getEdgeDst(ii);
+              //auto gn_dst = *(g->begin() + dst);
+              ////std::cout << gn_dst.isLocal() << "\n";
+              ////std::cout << " dst : " << dst << " gdst : " << (g->begin() + dst) << " \t";
+              ////int val = fg.getEdgeData<int>(ii);
+              ////g->addEdge(gn, *(g->begin() + dst), Galois::MethodFlag::SRC_ONLY);
+              ////if((dst >= start_index) && (dst < end_index) ) //XXX: check this: Is local
+                ////g->addInEdge(*(g->begin() + dst),gn, Galois::MethodFlag::SRC_ONLY);
+            //}
+            
+          //}
+          ////std::cout << " DONE: edges on host : " << Runtime::NetworkInterface::ID << "\n";
+
+
+        //}
+
+
+
+   //static void createPerHost(pointer& g, std::string inputFile, Args... args)
+        //{
+
+          //unsigned num = Runtime::NetworkInterface::Num;
+          //unsigned id = Runtime::NetworkInterface::ID;
+
+          //Galois::Graph::FileGraph fg;
+          //fg.fromFile(inputFile);
+          //std::vector<unsigned> counts;
+          //std::vector<unsigned> In_counts;
+          //for(auto& N : fg)
+          //{
+            //counts.push_back(std::distance(fg.edge_begin(N), fg.edge_end(N)));
+            //for(auto ii = fg.edge_begin(N), ei = fg.edge_end(N); ii != ei; ++ii)
+            //{
+              //unsigned dst = fg.getEdgeDst(ii);
+              //if(dst >= In_counts.size()) {
+                //// +1 is imp because vec.resize makes sure new vec can hold dst entries so it
+                //// will not have vec[dst] which is (dst+1)th entry!!
+                //In_counts.resize(dst+1);
+              //}
+              //In_counts[dst]+=1;
+            //}
+          //}
+          //if(counts.size() >  In_counts.size())
+            //In_counts.resize(counts.size());
+
+          //unsigned TOTAL_NODES = counts.size();
+
+          ////std::cout << "size of transpose : " << In_counts.size() <<" : : "<<In_counts[0] <<"\n";
+          ////std::cout << "size of counts : " << counts.size() << "\n";
+          //g = allocate(counts, In_counts);
+          //std::cout << "Allocation complete\n";
+         //[>
+          //* DEBUG
+          //int nodes_check = 0;
+          //for (auto N = g->begin(); N != g->end(); ++N) {
+            //++nodes_check;
+            //std::cout << " -> " << nodes_check << "\n";
+            ////Galois::Runtime::prefetch(*N,flag_none);
+          //}
+          //std::cout<<"Nodes_check = " << nodes_check << "\n";
+          //*/
+
+          //for (unsigned z = 0; z < num; ++z)
+          //{
+            //if(z != id)
+            //{
+              //std::cout <<" Z : " << z << "\n";
+              //Runtime::getSystemNetworkInterface().sendAlt(z, &createOnHost<Args...>, g, inputFile, args...);
+            //}
+          //}
+
+          //Runtime::getSystemBarrier();
+
+          //// Add egdes for nodes on host 0
+          //unsigned total_nodes = counts.size();
+          //unsigned zero = 0;
+          //unsigned start_index, end_index;
+          //std::tie(start_index, end_index) = Galois::block_range(zero, total_nodes, id, num);
+
+          ////g->prefetch_these(start_index, end_index);
+//[>
+          //auto p = block_range(counts.begin(), counts.end(), Runtime::NetworkInterface::ID, Runtime::NetworkInterface::Num);
+          //unsigned start_index = std::distance(counts.begin(), p.first);
+          //unsigned end_index = std::distance(p.first, p.second);
+//*/
+
+          
+          //std::cout << " ON: " << Runtime::NetworkInterface::ID << " Nodes From [ " << start_index << " , " << end_index  << "]\n";
+          //std::cout << "Adding outEdges and Inedges on : " << Runtime::NetworkInterface::ID << "\n";
+          //for (unsigned x = start_index; x < end_index; ++x) {
+            //auto fgn = *(fg.begin() + x);
+            //auto gn = *(g->begin() + x);
+
+            ////std::cout << gn.isLocal() << "\n";
+            ////std::cout << " x : " << x << " gn : " << gn << " \n";
+            //for (auto ii = fg.edge_begin(fgn), ee = fg.edge_end(fgn); ii != ee; ++ii) {
+              //unsigned dst = fg.getEdgeDst(ii);
+              //auto gn_dst = *(g->begin() + dst);
+              ////std::cout << gn_dst.isLocal() << "\n";
+              ////std::cout << " dst : " << dst << " gdst : " << (g->begin() + dst) << " \t";
+              ////int val = fg.getEdgeData<int>(ii);
+              ////g->addEdge(gn, *(g->begin() + dst), Galois::MethodFlag::SRC_ONLY);
+              ////if((dst >= start_index) && (dst < end_index) ) //XXX: check this: Is local
+                ////g->addInEdge(*(g->begin() + dst),gn, Galois::MethodFlag::SRC_ONLY);
+            //}
+          //}
+          
+        //}
+
 
 #endif

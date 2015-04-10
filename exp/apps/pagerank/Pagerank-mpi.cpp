@@ -48,6 +48,7 @@ static const double TOLERANCE = 0.1;
 enum {
   MASTER = 0,
   DELTA,
+  TIME,
   NUM_MSG_TYPE
 };
 
@@ -128,6 +129,7 @@ void PageRank_Bulk_AlltoAll(std::vector<Node>& graph_nodes, int chunk_size, int 
   vector<float>receive_buffer(total_nodes, 0.0);
 
   double start_time_compute, end_time_compute, start_time_apply, end_time_apply, start_time_mpi, end_time_mpi;
+  vector<double> send_times(3, 0.0);
 
   for(int iter = 0; iter < iterations; ++iter) {
 
@@ -152,7 +154,7 @@ void PageRank_Bulk_AlltoAll(std::vector<Node>& graph_nodes, int chunk_size, int 
     int status;
     start_time_mpi = MPI_Wtime();
 
-    status = MPI_Alltoall(&send_buffer.front(), chunk_size, MPI_FLOAT, &receive_buffer.front(), chunk_size, MPI_INT, MPI_COMM_WORLD);
+    status = MPI_Alltoall(&send_buffer.front(), chunk_size, MPI_FLOAT, &receive_buffer.front(), chunk_size, MPI_FLOAT, MPI_COMM_WORLD);
     if(status != MPI_SUCCESS) {
       cout << "MPI_Alltoall failed\n";
       exit(0);
@@ -173,34 +175,50 @@ void PageRank_Bulk_AlltoAll(std::vector<Node>& graph_nodes, int chunk_size, int 
     end_time_apply = MPI_Wtime();
 
 
-    //time_compute[host_ID] += (end_time_compute - start_time_compute);
-    //time_mpi[host_ID] += (end_time_mpi - start_time_mpi);
-    //time_apply[host_ID] += (end_time_apply - start_time_apply);
+    //DEBUG: For computing individual times.
 
-    time_compute[host_ID]  = host_ID ; //+= (end_time_compute - start_time_compute);
-    time_mpi[host_ID] = host_ID; //+= (end_time_mpi - start_time_mpi);
-    time_apply[host_ID] = host_ID; // += (end_time_apply - start_time_apply);
+    send_times[0] += (end_time_compute - start_time_compute);
+    send_times[1] += (end_time_mpi - start_time_mpi);
+    send_times[2] += (end_time_apply - start_time_apply);
+/*
+ *  double send_times[num_hosts*3];
+    send_times[3*host_ID + 0] = (end_time_compute - start_time_compute);
+    send_times[3*host_ID + 1] = (end_time_mpi - start_time_mpi);
+    send_times[3*host_ID + 2] = (end_time_apply - start_time_apply);
 
-    //if(host_ID == 0)
-    //{
-      //time_compute[iter] = (end_time_compute - start_time_compute);
-      //time_mpi[iter] = (end_time_mpi - start_time_mpi);
-      //time_apply[iter] = (end_time_apply - start_time_apply);
+    double recv_times[3*num_hosts];
+    status = MPI_Alltoall(send_times, 3, MPI_DOUBLE, recv_times, 3, MPI_DOUBLE, MPI_COMM_WORLD);
 
-      ////cout << "COMPUTE TIME : " << end_time_compute - start_time_compute << " Seconds \n";
-      ////cout << "MPI TIME : " << end_time_mpi - start_time_mpi << " Seconds \n";
-      ////cout << "Apply TIME : " << end_time_apply - start_time_apply << " Seconds \n";
-    //}
-
+    time_compute[host_ID]  += recv_times[3*host_ID + 0];
+    time_mpi[host_ID] += recv_times[3*num_hosts + 1];
+    time_apply[host_ID] += recv_times[3*num_hosts + 2];
+*/
 
   }
 
 
+  // DEBUG: Send times to zero
+  if(host_ID != 0)
+  {
+    MPI_Send(&send_times.front(), 3, MPI_DOUBLE, 0, TIME, MPI_COMM_WORLD);
+  }
+  if(host_ID == 0)
+  {
+    time_compute[host_ID]  = send_times[0];
+    time_mpi[host_ID]      = send_times[1];
+    time_apply[host_ID]    = send_times[2];
 
-  //cout <<"[ " << host_ID << " ]\n\t " << time_compute[host_ID] << "   " <<time_mpi[host_ID] << "  "<< time_apply[host_ID] << "\n";
+    vector<double> recv_times(3, 0.0);
+    MPI_Status recv_status;
+    for(int src = 1; src < num_hosts; src++)
+    {
+      MPI_Recv(&recv_times.front(), 3, MPI_DOUBLE, src, TIME, MPI_COMM_WORLD, &recv_status);
 
-   //cout << host_ID << " : RANK : " << graph_nodes[0].rank << "\n";
-
+      time_compute[src] = recv_times[0];
+      time_mpi[src]     = recv_times[1];
+      time_apply[src]   = recv_times[2];
+    }
+  }
 
 }
 
@@ -244,13 +262,9 @@ int main(int argc, char** argv){
   //std::vector<vector<double>> time_mpi(hosts, vector<double>(iterations, 0.0));
   //std::vector<vector<double>> time_apply(hosts, vector<double>(iterations, 0.0));
 
-  std::vector<double> time_compute(hosts,3.0);
-  std::vector<double> time_mpi(hosts,3.0);
-  std::vector<double> time_apply(hosts,3.0);
-
-  time_compute[0] = 0;
-  time_compute[1] = 1;
-  time_compute[2] = 2;
+  std::vector<double> time_compute(hosts,0.0);
+  std::vector<double> time_mpi(hosts,0.0);
+  std::vector<double> time_apply(hosts,0.0);
 
 
   if(host_ID == 0) {
