@@ -4,14 +4,211 @@
 namespace Galois {
 namespace Runtime {
 
-template <typename G, typename M, typename PartAdjMatrix>
-struct BFSpartitioner {
+template <typename G, typename M>
+struct GreedyPartitioner {
+
   using ParCounter = Galois::GAccumulator<size_t>;
   using PartCounters = std::vector<ParCounter>;
+  using GNode = typename G::GraphNode;
 
   G& graph;
   M& dagManager;
-  PartAdjMatrix& adjMatrix;
+  const unsigned numPart;
+
+  PartCounters  partSizes;
+  const size_t partSizeLim;
+  Galois::PerThreadVector<unsigned> perThreadPartCounters;
+
+  GreedyPartitioner (
+      G& graph,
+      M& dagManager,
+      const unsigned numPart)
+    :
+      graph (graph),
+      dagManager (dagManager),
+      numPart (numPart),
+      partSizes (numPart),
+      partSizeLim ((graph.size () + numPart)/numPart)
+  {
+    for (unsigned i = 0; i < perThreadPartCounters.numRows (); ++i) {
+      perThreadPartCounters.get (i).clear ();
+      perThreadPartCounters.get (i).resize (numPart, 0);
+    }
+  }
+
+  template <typename R>
+  void blockStart (const R& range) {
+    on_each_impl (
+        [this, &range] (const unsigned tid, const unsigned numT) {
+          unsigned partPerThread = (numPart + numT - 1) / numT;
+          unsigned pbeg = tid * partPerThread;
+
+          size_t size = 0;
+          unsigned currP = pbeg;
+          for (auto i = range.local_begin (), end_i = range.local_end ();
+            i != end_i; ++i) {
+
+            auto& nd = graph.getData (*i, Galois::MethodFlag::UNPROTECTED);
+            GALOIS_ASSERT (nd.partition == -1);
+
+            nd.partition = currP;
+            ++size;
+
+            if (size >= partSizeLim) {
+              ++currP;
+              if (currP >= numPart) {
+                currP = pbeg;
+              }
+              size = 0;
+            }
+          }
+        });
+
+  }
+
+  template <typename R>
+  void cyclicStart (const R& range) {
+    on_each_impl (
+        [this, &range] (const unsigned tid, const unsigned numT) {
+          int counter = 0;
+          for (auto i = range.local_begin (), end_i = range.local_end ();
+            i != end_i; ++i) {
+
+            auto& nd = graph.getData (*i, Galois::MethodFlag::UNPROTECTED);
+            GALOIS_ASSERT (nd.partition == -1);
+
+            nd.partition = counter % numPart;
+            ++counter;
+          }
+        });
+  }
+
+  void assignPartition (GNode src) {
+
+    auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
+
+    if (sd.partition != -1) {
+      return;
+    }
+
+    auto& partCounters = perThreadPartCounters.get ();
+    assert (partCounters.size () == numPart);
+    std::fill (partCounters.begin (), partCounters.end (), 0);
+
+    auto adjClosure = [this, &partCounters, &sd] (GNode dst) {
+      auto& dd = graph.getData (dst, MethodFlag::UNPROTECTED);
+
+      if (dd.partition != -1) {
+        assert (size_t (dd.partition) < partCounters.size ());
+        partCounters[dd.partition] += 1;
+      }
+    };
+
+    dagManager.applyToAdj (src, adjClosure);
+
+    auto maxIndex = std::max_element (partCounters.begin (), partCounters.end ());
+    assert (std::distance (partCounters.begin (), maxIndex) >= 0);
+    assert (maxIndex != partCounters.end ());
+    unsigned maxPart = maxIndex - partCounters.begin ();
+    sd.partition = maxPart;
+  }
+
+
+  void partition (void) {
+
+    Galois::StatTimer ptime ("partition time");
+    ptime.start ();
+
+
+    Galois::PerThreadBag<GNode, 64> sources;
+
+    dagManager.initDAG ();
+    dagManager.collectSources (sources);
+
+    cyclicStart (makeLocalRange (sources));
+
+
+    auto f = [this] (GNode src) { this->assignPartition (src); };
+    dagManager.runDAGcomputation (f, sources, "greedy-partition");
+  }
+
+
+  template <typename A>
+  void initCoarseAdj (A& adjMatrix) {
+
+    Galois::StatTimer t("time initCoarseAdj");
+
+    t.start ();
+
+    PartCounters partBoundarySizes (numPart);
+    for (ParCounter& c: partSizes) {
+      c.reset ();
+    }
+
+    do_all_coupled (makeLocalRange (graph),
+        [this, &partBoundarySizes, &adjMatrix] (GNode src) {
+
+          bool boundary = false;
+
+          auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
+
+          GALOIS_ASSERT (sd.partition != -1);
+
+          partSizes[sd.partition] += 1;
+
+          auto visitAdjClosure = [this, &sd, &boundary, &adjMatrix] (GNode dst) {
+            auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
+
+            GALOIS_ASSERT (dd.partition != -1);
+            if (dd.partition != sd.partition) {
+              boundary = true;
+
+              if (adjMatrix [sd.partition][dd.partition] != 1) {
+                adjMatrix [sd.partition][dd.partition] = 1;
+              }
+
+              if (adjMatrix [dd.partition][sd.partition] != 1) {
+                adjMatrix [dd.partition][sd.partition] = 1;
+              }
+            }
+          };
+
+
+          dagManager.applyToAdj (src, visitAdjClosure);
+          sd.isBoundary = boundary;
+
+          if (boundary) {
+            partBoundarySizes[sd.partition] += 1;
+          }
+
+          // GALOIS_ASSERT (sd.isBoundary == boundary);
+         
+        },
+        "check_partitions");
+
+    for (size_t i = 0; i < numPart; ++i) {
+      size_t total = partSizes[i].reduceRO ();
+      size_t boundary = partBoundarySizes[i].reduceRO ();
+      assert (total >= boundary);
+      size_t inner = total - boundary;
+      std::printf ("partition %zd, size =%zd, boundary=%zd, inner=%zd\n"
+          , i, total, boundary, inner);
+    }
+    
+    t.stop ();
+  }
+
+
+};
+
+template <typename G, typename M>
+struct BFSpartitioner {
+  using ParCounter = Galois::GAccumulator<size_t>;
+  using PartCounters = std::vector<ParCounter>;
+  using GNode = typename G::GraphNode;
+
+  G& graph;
+  M& dagManager;
   const unsigned numPart;
 
   PartCounters  partSizes;
@@ -20,12 +217,10 @@ struct BFSpartitioner {
   BFSpartitioner (
       G& graph,
       M& dagManager,
-      PartAdjMatrix& adjMatrix,
       const unsigned numPart)
     :
       graph (graph),
       dagManager (dagManager),
-      adjMatrix (adjMatrix),
       numPart (numPart),
       partSizes (numPart),
       partSizeLim ((graph.size () + numPart)/numPart)
@@ -205,140 +400,41 @@ struct BFSpartitioner {
 
   }
 
-
-  void initCoarseAdj (void) {
-
-    Galois::StatTimer t("time initCoarseAdj");
-
-    t.start ();
-
-    PartCounters partBoundarySizes (numPart);
-    for (ParCounter& c: partSizes) {
-      c.reset ();
-    }
-
-    do_all_coupled (makeLocalRange (graph),
-        [this, &partBoundarySizes] (GNode src) {
-
-          bool boundary = false;
-
-          auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
-
-          GALOIS_ASSERT (sd.partition != -1);
-
-          partSizes[sd.partition] += 1;
-
-          auto visitAdjClosure = [this, &sd, &boundary] (GNode dst) {
-            auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
-
-            GALOIS_ASSERT (dd.partition != -1);
-            if (dd.partition != sd.partition) {
-              boundary = true;
-
-              if (adjMatrix [sd.partition][dd.partition] != 1) {
-                adjMatrix [sd.partition][dd.partition] = 1;
-              }
-
-              if (adjMatrix [dd.partition][sd.partition] != 1) {
-                adjMatrix [dd.partition][sd.partition] = 1;
-              }
-            }
-          };
-
-
-          dagManager.applyToAdj (src, visitAdjClosure);
-          sd.isBoundary = boundary;
-
-          if (boundary) {
-            partBoundarySizes[sd.partition] += 1;
-          }
-
-          // GALOIS_ASSERT (sd.isBoundary == boundary);
-         
-        },
-        "check_partitions");
-
-    for (size_t i = 0; i < numPart; ++i) {
-      size_t total = partSizes[i].reduceRO ();
-      size_t boundary = partBoundarySizes[i].reduceRO ();
-      assert (total >= boundary);
-      size_t inner = total - boundary;
-      std::printf ("partition %zd, size =%zd, boundary=%zd, inner=%zd\n"
-          , i, total, boundary, inner);
-    }
-    
-    t.stop ();
-  }
 }; // end class BFSpartitioner
 
-struct BlockPartitioner: public BFSpartitioner {
-  using Base = BFSpartitioner;
+template <typename G, typename M>
+struct BlockPartitioner: public GreedyPartitioner<G, M> {
+  using Base = GreedyPartitioner<G, M>;;
   
   BlockPartitioner (
       G& graph,
       M& dagManager,
-      PartAdjMatrix& adjMatrix,
       const unsigned numPart)
     : 
-      Base (graph, dagManager, adjMatrix, numPart)
+      Base (graph, dagManager, numPart)
   {}
 
   void partition (void) {
-    on_each_impl (
-        [this] (const unsigned tid, const unsigned numT) {
-          unsigned partPerThread = (Base::numPart + numT - 1) / numT;
-          unsigned pbeg = tid * partPerThread;
 
-          size_t size = 0;
-          unsigned currP = pbeg;
-          for (auto i = Base::graph.local_begin (), end_i = Base::graph.local_end ();
-            i != end_i; ++i) {
-
-            auto& nd = Base::graph.getData (*i, Galois::MethodFlag::UNPROTECTED);
-            GALOIS_ASSERT (nd.partition == -1);
-
-            nd.partition = currP;
-            ++size;
-
-            if (size >= Base::partSizeLim) {
-              ++currP;
-              if (currP >= Base::numPart) {
-                currP = pbeg;
-              }
-              size = 0;
-            }
-          }
-        });
+    Base::blockStart (makeLocalRange (Base::graph));
   }
 };
 
-struct CyclicPartitioner: public BFSpartitioner {
+template <typename G, typename M>
+struct CyclicPartitioner: public GreedyPartitioner<G, M> {
 
-  using Base = BFSpartitioner;
+  using Base = GreedyPartitioner<G, M>;;
   
   CyclicPartitioner (
       G& graph,
       M& dagManager,
-      PartAdjMatrix& adjMatrix,
       const unsigned numPart)
     : 
-      Base (graph, dagManager, adjMatrix, numPart)
+      Base (graph, dagManager, numPart)
   {}
 
   void partition (void) {
-    on_each_impl (
-        [this] (const unsigned tid, const unsigned numT) {
-          int counter = 0;
-          for (auto i = Base::graph.local_begin (), end_i = Base::graph.local_end ();
-            i != end_i; ++i) {
-
-            auto& nd = Base::graph.getData (*i, Galois::MethodFlag::UNPROTECTED);
-            GALOIS_ASSERT (nd.partition == -1);
-
-            nd.partition = counter % Base::numPart;
-            ++counter;
-          }
-        });
+    Base::cyclicStart (makeLocalRange (Base::graph));
   }
 };
 

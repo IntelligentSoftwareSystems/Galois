@@ -62,17 +62,23 @@ static cll::opt<PriorityFunc> priorityFunc (
     cll::init (PriorityFunc::BY_ID));
 
 struct BaseDAGdata {
-  unsigned id;
-  unsigned priority;
-  unsigned color;
   // std::atomic<unsigned> onWL;
   GAtomic<int> onWL;
+  // std::atomic<unsigned> indegree;
+  GAtomic<int> indegree;
+  int indeg_backup;
 
-  explicit BaseDAGdata (unsigned _id) : 
-    id (_id), 
+  unsigned id;
+  unsigned priority;
+  int color;
+
+  explicit BaseDAGdata (unsigned id) : 
+    onWL (0),
+    indegree (0),
+    indeg_backup (0),
+    id (id), 
     priority (0), 
-    color (0), 
-    onWL (0)
+    color (-1)
   {}
 };
 
@@ -108,17 +114,12 @@ struct InputDAGdata: public BaseDAGdata {
   unsigned numSucc;
   unsigned* dagSucc;
   
-  int indeg_backup;
 
-  // std::atomic<unsigned> indegree;
-  GAtomic<int> indegree;
 
   explicit InputDAGdata (unsigned id=0): 
     BaseDAGdata (id),
     numSucc (0), 
-    dagSucc (nullptr), 
-    indeg_backup(0), 
-    indegree (0) 
+    dagSucc (nullptr)
   {}
 
   struct VisitDAGsuccessors {
@@ -142,16 +143,11 @@ struct InputDAGdataInOut: public BaseDAGdata {
   ptrdiff_t dagSuccEndIn;
   ptrdiff_t dagSuccEndOut;
   
-  int indeg_backup;
-  // std::atomic<unsigned> indegree;
-  GAtomic<int> indegree;
 
   explicit InputDAGdataInOut (unsigned id=0): 
     BaseDAGdata (id),
     dagSuccEndIn (0), 
-    dagSuccEndOut (0), 
-    indeg_backup(0), 
-    indegree (0) 
+    dagSuccEndOut (0)
   {}
 
 };
@@ -196,23 +192,23 @@ protected:
   typedef typename G::GraphNode GNode;
   typedef typename G::node_data_type ND;
 
-  typedef Galois::PerThreadVector<unsigned> PerThrdColorVec;
+  typedef Galois::PerThreadVector<bool> PerThrdColorVec;
 
   G& graph;
   A visitAdj;
   D visitDAGsucc;
   PerThrdColorVec perThrdColorVec;
-  Galois::GReduceMax<unsigned> maxColors;
+  Galois::GReduceMax<int> maxColors;
 
   DAGmanagerBase (G& graph, const A& visitAdj, const D& visitDAGsucc=D())
     : graph (graph), visitAdj (visitAdj), visitDAGsucc (visitDAGsucc)
   {
-    // mark 0-th color as taken
-    for (unsigned i = 0; i < perThrdColorVec.numRows (); ++i) {
-      auto& forbiddenColors = perThrdColorVec.get(i);
-      forbiddenColors.resize (1, 0);
-      forbiddenColors[0] = 0;
-    }
+    // // mark 0-th color as taken
+    // for (unsigned i = 0; i < perThrdColorVec.numRows (); ++i) {
+      // auto& forbiddenColors = perThrdColorVec.get(i);
+      // forbiddenColors.resize (1, 0);
+      // forbiddenColors[0] = 0;
+    // }
 
     if (DEBUG) {
       fprintf (stderr, "WARNING: DAGmanagerBase DEBUG mode on, timing may be off\n");
@@ -232,11 +228,14 @@ public:
     visitDAGsucc (src, srcData, f);
   }
 
-  template <typename P, typename W>
-  void initDAG (P postInit, W& sources) {
+  template <typename P>
+  void initDAG (P postInit) {
+
+    assignPriority ();
+
     Galois::do_all_choice (
         Galois::Runtime::makeLocalRange (graph),
-        [this, &postInit, &sources] (GNode src) {
+        [this, &postInit] (GNode src) {
           
           auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
 
@@ -257,10 +256,6 @@ public:
           sd.indegree = indeg;
           sd.indeg_backup = sd.indegree;
 
-          if (indeg == 0) {
-            assert (sd.indegree == 0);
-            sources.push (src);
-          }
 
           postInit (graph, src, sd);
 
@@ -268,6 +263,7 @@ public:
         "init-DAG",
         Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
   }
+
 
 
   template <typename R, typename W>
@@ -364,17 +360,104 @@ public:
         // Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
   }
 
-  void reinitDAG (void) {
+  
+  template <typename W>
+  void reinitDAG (W& sources) {
+
     Galois::do_all_choice ( Galois::Runtime::makeLocalRange (graph), 
-        [this] (GNode src) {
+        [this, &sources] (GNode src) {
           auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
           sd.indegree = sd.indeg_backup;
+
+          if (sd.indegree == 0) {
+            sources.push (src);
+          }
         },
         "reinitDAG",
         Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
 
   }
 
+  struct FakeBag {
+    void push (const GNode&) const {}
+  };
+
+  void reinitDAG (void) {
+    FakeBag b;
+    reinitDAG (b);
+  }
+
+  template <typename W>
+  void collectSources (W& sources) {
+    Galois::do_all_choice ( Galois::Runtime::makeLocalRange (graph), 
+        [this, &sources] (GNode src) {
+          auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
+          // assert (sd.indegree == sd.indeg_backup);
+          if (sd.indegree == 0) {
+            sources.push (src);
+          }
+        }, 
+        "collect-sources",
+        Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
+  }
+
+  template <typename F>
+  struct RunDAGcomp {
+    typedef int tt_does_not_need_aborts;
+    DAGmanagerBase& outer;
+    F& func;
+
+    template <typename C>
+    void operator () (GNode src, C& ctx) {
+
+      auto& sd = outer.graph.getData (src, Galois::MethodFlag::UNPROTECTED);
+      assert (sd.indegree == 0);
+
+      func (src);
+
+      auto dagClosure = [this, &ctx] (GNode dst) {
+        auto& dd = outer.graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
+
+        int x = --(dd.indegree);
+        // assert (x >= 0); // FIXME
+        if (x == 0) { 
+          // color == 0 is uncolored
+          // assert (dd.color == 0); // FIXME
+          ctx.push (dst);
+        }
+      };
+
+      outer.applyToDAGsucc (src, sd, dagClosure);
+
+    }
+  };
+
+  template <typename F, typename W>
+  void runDAGcomputation (F func, W& sources, const char* loopname) {
+
+    Galois::StatTimer t (loopname);
+
+    t.start ();
+
+    using WL_ty =  Galois::WorkList::AltChunkedFIFO<DEFAULT_CHUNK_SIZE>;
+
+    Galois::for_each_local(
+        sources,
+        RunDAGcomp<F> {*this, func},
+        Galois::loopname (loopname),
+        Galois::wl<WL_ty> ());
+
+
+    t.stop ();
+  }
+
+  template <typename F>
+  void runDAGcomputation (F func, const char* loopname) {
+    Galois::InsertBag<GNode> sources;
+
+    collectSources (sources);
+    runDAGcomputation (func, sources, loopname);
+  }
 
   void assignIDs (void) {
 
@@ -495,109 +578,52 @@ public:
   }
 
 
-  template <typename C>
-  void colorNode (GNode src, C& ctx) {
+  void colorNode (GNode src) {
     auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
     assert (sd.indegree == 0);
-    assert (sd.color == 0); // uncolored
+    assert (sd.color == -1); // uncolored
 
     auto& forbiddenColors = perThrdColorVec.get ();
-    assert (!forbiddenColors.empty ()); // must have at least 1 element
-    std::fill (forbiddenColors.begin (), forbiddenColors.end (), unsigned (-1));
+    std::fill (forbiddenColors.begin (), forbiddenColors.end (), false);
 
 
     auto colorClosure = [this, &forbiddenColors, &sd] (GNode dst) {
       auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
 
-      if (forbiddenColors.size () <= dd.color) {
-        forbiddenColors.resize (dd.color + 1, unsigned (-1));
+      if (int(forbiddenColors.size ()) <= dd.color) {
+        forbiddenColors.resize (dd.color + 1, false);
       }
       // std::printf ("Neighbor %d has color %d\n", dd.id, dd.color);
 
-      forbiddenColors[dd.color] = sd.id;
+      forbiddenColors[dd.color] = true;
 
     };
 
     applyToAdj (src, colorClosure);
 
-    for (size_t i = 1; i < forbiddenColors.size (); ++i) {
-      if (forbiddenColors[i] != sd.id) { 
+    for (size_t i = 0; i < forbiddenColors.size (); ++i) {
+      if (!forbiddenColors[i]) { 
         sd.color = i;
         break;
       }
     }
 
-    if (sd.color == 0) {
+    if (sd.color == -1) {
       sd.color = forbiddenColors.size ();
     }
     maxColors.update (sd.color);
-
-
-    auto dagClosure = [this, &ctx] (GNode dst) {
-      auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
-
-      int x = --(dd.indegree);
-      // assert (x >= 0); // FIXME
-      if (x == 0) { 
-        // color == 0 is uncolored
-        // assert (dd.color == 0); // FIXME
-        ctx.push (dst);
-      }
-    };
-
-    applyToAdj (src, dagClosure);
-
-    // sd.indegree = sd.indeg_backup; // reset the DAG // FIXME
 
 
     // std::printf ("Node %d assigned color %d\n", sd.id, sd.color);
 
   }
 
-  struct ColorNodeDAG {
-    typedef int tt_does_not_need_aborts;
-    DAGmanagerBase& outer;
-
-    template <typename C>
-    void operator () (GNode src, C& ctx) {
-
-      outer.colorNode (src, ctx);
-    }
-  };
-
 
   void colorDAG (void) {
 
-    Galois::StatTimer t_color ("coloring time (total): ");
-
-    t_color.start ();
-
-    assignPriority ();
-
-    Galois::InsertBag<GNode> sources;
-
-    Galois::StatTimer t_dag_init ("dag initialization time: ");
-
-    t_dag_init.start ();
-    auto postInit = [] (G& graph, GNode src, ND& srcData) {};
-    initDAG (postInit, sources);
-    t_dag_init.stop ();
-
-    typedef Galois::WorkList::AltChunkedFIFO<DEFAULT_CHUNK_SIZE> WL_ty;
-
-    std::printf ("Number of initial sources: %zd\n", 
-        std::distance (sources.begin (), sources.end ()));
-
-    Galois::StatTimer t_dag_color ("just the coloring time: ");
-
-    t_dag_color.start ();
-    Galois::for_each_local (sources, ColorNodeDAG {*this}, 
-        Galois::loopname ("color-DAG"), Galois::wl<WL_ty> ());
-    t_dag_color.stop ();
-
+    auto func = [this] (GNode src) { this->colorNode (src); };
+    runDAGcomputation (func, "color-DAG");
     std::printf ("DAG colored with %d colors\n", maxColors.reduceRO ());
-
-    t_color.stop ();
   }
 
   unsigned getMaxColors (void) const {
@@ -734,9 +760,8 @@ struct DAGmanagerInOut {
     Manager (G& graph): Base_ty {graph, VisitAdjacent {graph}, VisitDAGsuccessors {graph}}
     {}
 
-    template <typename W>
-    void initDAG (W& sources) {
-      Base_ty::initDAG (InitDAGoffsets (), sources);
+    void initDAG (void) {
+      Base_ty::initDAG (InitDAGoffsets ());
     }
 
   };
@@ -756,8 +781,7 @@ struct DAGmanagerDefault: public DAGmanagerBase<G, A, InputDAGdata::VisitDAGsucc
     : Base (graph, visitAdj, InputDAGdata::VisitDAGsuccessors ()) 
   {}
 
-  template <typename W>
-  void initDAG (W& sources) {
+  void initDAG (void) {
 
     auto postInit = [this] (G& graph, GNode src, ND& sd) {
 
@@ -792,7 +816,7 @@ struct DAGmanagerDefault: public DAGmanagerBase<G, A, InputDAGdata::VisitDAGsucc
       assert (i == sd.numSucc);
     };
 
-    Base::initDAG (postInit, sources);
+    Base::initDAG (postInit);
   }
 
   void freeDAGdata (void) {
@@ -915,7 +939,7 @@ struct ChromaticExecutor {
   void push (GNode n) {
     auto& data = graph.getData (n);
 
-    unsigned i = data.color - 1;
+    unsigned i = data.color;
     assert (i < colorWorkLists.size ());
 
     int expected = 0;
@@ -1028,7 +1052,7 @@ struct ChromaticExecutor {
 
       for_each(it, it,
           ApplyOperator {*this},
-          Galois::loopname("ApplyOperator"),
+          Galois::loopname(loopname),
           Galois::wl<WL>(nextWL));
 
       nextWL->reset_all ();
@@ -1096,7 +1120,7 @@ struct ChromaticReuseExecutor {
   void push_initial (GNode n) {
     auto& data = graph.getData (n, Galois::MethodFlag::UNPROTECTED);
 
-    unsigned i = data.color - 1;
+    unsigned i = data.color;
     assert (i < colorBags.size ());
 
     int expected = 0;
@@ -1164,7 +1188,7 @@ struct ChromaticReuseExecutor {
 
       Galois::do_all_choice (makeLocalRange (**i),
           ApplyOperator {*this},
-          "ApplyOperator",
+          loopname,
           Galois::doall_chunk_size<CHUNK_SIZE> ());
 
     }
@@ -1227,10 +1251,8 @@ struct InputGraphDAGreuseExecutor {
 
     push_initial (makeLocalRange (graph));
 
-    dagManager.assignPriority();
-
-    dagManager.initDAG (initialSources);
-
+    dagManager.initDAG ();
+    dagManager.collectSources (initialSources);
 
     t_init.stop ();
   }
@@ -1243,14 +1265,7 @@ struct InputGraphDAGreuseExecutor {
 
     push_initial (range);
 
-    dagManager.assignPriority();
-
-    struct DummyBag {
-      void push (const GNode&) {}
-    };
-
-    DummyBag tmp;
-    dagManager.initDAG (tmp);
+    dagManager.initDAG ();
 
     dagManager.reinitActiveDAG (range, initialSources);
 
@@ -1261,50 +1276,11 @@ struct InputGraphDAGreuseExecutor {
     GALOIS_DIE ("push not supported");
   }
 
-  struct ApplyOperator {
-
-    InputGraphDAGreuseExecutor& outer;
-
-    template <typename C>
-    void operator () (GNode src, C& ctx) {
-      G& graph = outer.graph;
-
-      auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
-      assert (sd.indegree == 0);
-
-      if (sd.onWL > 0) {
-        outer.func (src, outer);
-      }
-
-      auto closure = [&graph, &ctx] (GNode dst) {
-
-        auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
-
-        int x = --dd.indegree; 
-        assert (x >= 0);
-
-        if (x == 0) {
-          ctx.push (dst);
-        }
-      };
-
-      outer.dagManager.applyToDAGsucc (src, sd, closure);
-    }
-  };
 
   void execute (void) {
 
-    StatTimer t_exec ("InputGraphDAGreuseExecutor: execution time:");
-
-    t_exec.start ();
-
-    Galois::for_each_local (
-        initialSources,
-        ApplyOperator {*this},
-        Galois::loopname ("ApplyOperator"),
-        Galois::wl<WL_ty> ());
-
-    t_exec.stop ();
+    auto f = [this] (GNode src) { this->func (src, *this); };
+    dagManager.runDAGcomputation (f, initialSources, loopname);
   }
 
   void reinitDAG (void) {
@@ -1401,15 +1377,12 @@ public:
   template <typename R>
   void execute (const R& range) {
 
-    Bag_ty tmpSrc;
-
 
     Galois::TimeAccumulator t_dag_init;
     Galois::TimeAccumulator t_dag_exec;
 
     t_dag_init.start ();
-    dagManager.assignPriority ();
-    dagManager.initDAG (tmpSrc); 
+    dagManager.initDAG (); 
     t_dag_init.stop ();
 
     Galois::do_all_choice (
@@ -1444,7 +1417,7 @@ public:
       typename WL::value_type* it = 0;
       Galois::for_each(it, it,
           ApplyOperator {*this},
-          Galois::loopname("ApplyOperator"),
+          Galois::loopname(loopname),
           Galois::wl<WL>(&sources));
       t_dag_exec.stop ();
 
@@ -1564,44 +1537,6 @@ public:
       loopname (loopname)
   {}
 
-  struct ApplyOperator {
-    typedef int tt_does_not_need_aborts;
-
-    InputGraphDAGtopologyDriven& outer;
-
-    template <typename C>
-    void operator () (GNode src, C& ctx) {
-
-      G& graph = outer.graph;
-
-      auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
-      assert (sd.indegree == 0);
-
-      if (sd.onWL > 0) { // is active
-        sd.onWL = 0;
-        // --(sd.onWL);
-
-        outer.func (src, outer);
-        outer.numActiveFound += 1;
-      }
-
-      auto closure = [&graph, &ctx] (GNode dst) {
-
-        auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
-
-        int x = --dd.indegree; 
-        assert (x >= 0);
-
-        if (x == 0) {
-          ctx.push (dst);
-        }
-      };
-
-      outer.dagManager.applyToDAGsucc (src, sd, closure);
-
-    } // end function
-  };
-
   void push (GNode node) {
     numPushes += 1;
     auto& nd = graph.getData (node, Galois::MethodFlag::UNPROTECTED);
@@ -1617,8 +1552,8 @@ public:
 
     Galois::TimeAccumulator t_dag_init;
     t_dag_init.start ();
-    dagManager.assignPriority ();
-    dagManager.initDAG (sources);
+    dagManager.initDAG ();
+    dagManager.collectSources (sources);
     t_dag_init.stop ();
 
     Galois::do_all_choice (
@@ -1638,14 +1573,20 @@ public:
 
       assert (sources.size_all () != 0);
 
+      auto f = [this] (GNode src) {
+        auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
+        if (sd.onWL > 0) { // is active
+          sd.onWL = 0;
+          // --(sd.onWL);
+
+          this->func (src, *this);
+          this->numActiveFound += 1;
+        }
+      };
 
       t_dag_exec.start ();
-      Galois::for_each_local (sources,
-          ApplyOperator {*this},
-          Galois::loopname("ApplyOperator"),
-          Galois::wl<WL_ty>());
+      dagManager.runDAGcomputation (f, sources, loopname);
       t_dag_exec.stop ();
-
 
       bool term = (numPushes.reduceRO () == 0);
 

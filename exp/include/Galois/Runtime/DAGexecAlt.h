@@ -156,7 +156,7 @@ struct DAGnhoodItem: public OrdLocBase<DAGnhoodItem<Ctxt, SharerWrapper>, Ctxt, 
 
   void reset (void) {
     head = wrapper.sharers.begin ();
-    assert (end == sharers.sharers.end ());
+    assert (end == wrapper.sharers.end ());
   }
 
 };

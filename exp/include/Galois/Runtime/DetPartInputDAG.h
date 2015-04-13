@@ -379,14 +379,14 @@ struct InputGraphPartDAGexecutor {
     //
 
 
-    BFSpartitioner partitioner (graph, dagManager, adjMatrix, numPart);
+    GreedyPartitioner<G, M> partitioner (graph, dagManager, numPart);
     // BlockPartitioner partitioner (graph, dagManager, adjMatrix, numPart);
 
     partitioner.partition ();
 
-    std::printf ("Graph has %d components\n", partitioner.countComponents ());
+    // std::printf ("Graph has %d components\n", partitioner.countComponents ());
 
-    partitioner.initCoarseAdj ();
+    partitioner.initCoarseAdj (adjMatrix);
 
     initCoarseDAG ();
     
