@@ -513,7 +513,7 @@ public:
 
   void assignPriority (void) {
     assignIDs ();
-    auto byId = [&] (GNode node) {
+    auto byId = [this] (GNode node) {
       auto& nd = graph.getData (node, Galois::MethodFlag::UNPROTECTED);
       nd.priority = nd.id % MAX_LEVELS;
     };
@@ -523,26 +523,23 @@ public:
     // TODO: non-deterministic at the moment
     // can be fixed by making thread K call the generator
     // N times, where N is sum of calls of all threads < K
-    auto randPri = [&] (GNode node) {
+    auto randPri = [this, &perThrdRNG] (GNode node) {
       auto& rng = *(perThrdRNG.getLocal ());
       auto& nd = graph.getData (node, Galois::MethodFlag::UNPROTECTED);
       nd.priority = rng ();
     };
 
 
-    auto minDegree = [&] (GNode node) {
+    auto minDegree = [this] (GNode node) {
       auto& nd = graph.getData (node, Galois::MethodFlag::UNPROTECTED);
-      nd.priority = std::distance (
-                      graph.edge_begin (node, Galois::MethodFlag::UNPROTECTED),
-                      graph.edge_end (node, Galois::MethodFlag::UNPROTECTED));
+      nd.priority = visitAdj.count (node);
+      assert (nd.priority >= 0);
     };
 
     const size_t numNodes = graph.size ();
-    auto maxDegree = [&] (GNode node) {
+    auto maxDegree = [this, &numNodes] (GNode node) {
       auto& nd = graph.getData (node, Galois::MethodFlag::UNPROTECTED);
-      nd.priority = numNodes - std::distance (
-                                  graph.edge_begin (node, Galois::MethodFlag::UNPROTECTED),
-                                  graph.edge_end (node, Galois::MethodFlag::UNPROTECTED));
+      nd.priority = std::max (size_t (0), numNodes - visitAdj.count (node));
     };
     
     Galois::StatTimer t_priority ("priority assignment time: ");
@@ -618,12 +615,59 @@ public:
 
   }
 
+  void verifyColoring (void) {
+    Galois::StatTimer t_verify ("Coloring verification time: ");
+
+    t_verify.start ();
+    std::printf ("WARNING: verifying Coloring, timing will be off\n");
+
+    Galois::GReduceLogicalOR foundError;
+
+    Galois::do_all_choice (
+        Galois::Runtime::makeLocalRange (graph),
+        [&] (GNode src) {
+
+          auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
+          if (sd.color == -1) {
+            std::fprintf (stderr, "ERROR: src %d found uncolored\n", sd.id);
+            foundError.update (true);
+          }
+
+          for (auto e = graph.edge_begin (src, Galois::MethodFlag::UNPROTECTED),
+              e_end = graph.edge_end (src, Galois::MethodFlag::UNPROTECTED); e != e_end; ++e) {
+
+            GNode dst = graph.getEdgeDst (e);
+            auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
+            if (sd.color == dd.color) {
+              foundError.update (true);
+              std::fprintf (stderr, "ERROR: nodes %d and %d have the same color\n",
+                sd.id, dd.id);
+
+            }
+          }
+
+
+        }, 
+        "check-coloring",
+        Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
+
+    t_verify.stop ();
+
+    if (foundError.reduceRO ()) {
+      GALOIS_DIE ("ERROR! Coloring verification failed!\n");
+    } else {
+      printf ("OK! Coloring verification succeeded!\n");
+    }
+  }
 
   void colorDAG (void) {
 
     auto func = [this] (GNode src) { this->colorNode (src); };
     runDAGcomputation (func, "color-DAG");
     std::printf ("DAG colored with %d colors\n", maxColors.reduceRO ());
+    if (DEBUG) {
+      verifyColoring ();
+    }
   }
 
   unsigned getMaxColors (void) const {
@@ -654,6 +698,20 @@ struct DAGmanagerInOut {
         func (dst);
       }
     }
+
+    size_t count (GNode src) const {
+      ptrdiff_t in = std::distance (
+          graph.in_edge_begin (src, MethodFlag::UNPROTECTED),
+          graph.in_edge_end (src, MethodFlag::UNPROTECTED));
+      assert (in >= 0);
+
+      ptrdiff_t out = std::distance (
+          graph.edge_begin (src, MethodFlag::UNPROTECTED),
+          graph.edge_end (src, MethodFlag::UNPROTECTED));
+      assert (out >= 0);
+
+      return size_t (in + out);
+    }
   };
 
   struct VisitDAGsuccessors {
@@ -677,6 +735,12 @@ struct DAGmanagerInOut {
         GNode dst = graph.getEdgeDst (i);
         func (dst);
       }
+    }
+
+    size_t count (GNode src) const {
+
+      auto& sd = graph.getData (src, MethodFlag::UNPROTECTED);
+      return (sd.dagSuccEndIn + sd.dagSuccEndOut);
     }
 
   };
