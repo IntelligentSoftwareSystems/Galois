@@ -407,7 +407,7 @@ namespace Galois {
         edge_iterator edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
           acquire(N, mflag);
           if (mflag != MethodFlag::SRC_ONLY && mflag != MethodFlag::NONE)
-
+          {
             /** prefetch **/
             for (auto ii = N->begin(), ee = N->end(); ii != ee; ++ii) {
               prefetch(ii->dst);
@@ -415,6 +415,7 @@ namespace Galois {
             for (edge_iterator ii = N->begin(), ee = N->end(); ii != ee; ++ii) {
               acquireNode(ii->dst, mflag);
             }
+          }
           return N->begin();
         }
 
@@ -432,7 +433,7 @@ namespace Galois {
         edge_iterator in_edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
           acquire(N, mflag);
           if (mflag != MethodFlag::SRC_ONLY && mflag != MethodFlag::NONE)
-
+          {
             /** prefetch **/
             for (auto ii = N->begin_inEdges(), ee = N->end_inEdges(); ii != ee; ++ii) {
               prefetch(ii->dst);
@@ -440,7 +441,7 @@ namespace Galois {
             for (edge_iterator ii = N->begin_inEdges(), ee = N->end_inEdges(); ii !=ee; ++ii) {
               acquireNode(ii->dst, mflag);	
             }
-
+          }
           return N->begin_inEdges(); 
         }
 
@@ -670,6 +671,7 @@ namespace Galois {
 
           unsigned TOTAL_NODES = counts.size();
 
+          std::cout << "TOTAL NODEs : " << TOTAL_NODES << "\n";
           g = allocate(counts, In_counts);
           counts = std::vector<unsigned>();
           In_counts = std::vector<unsigned>();

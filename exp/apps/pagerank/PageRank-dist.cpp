@@ -86,21 +86,44 @@ PRTy atomicAdd(std::atomic<PRTy>& v, PRTy delta) {
 
 
 struct InitializeGraph {
-    Graph::pointer g;
-//    InitializeGraph(Graph::pointer _g) : g(_g) { }
+  Graph::pointer g;
 
-    void static go(Graph::pointer g)
+  void static go(Graph::pointer g)
+  {
+    Galois::for_each_local(g, InitializeGraph{g}, Galois::loopname("init"));
+  }
+
+  void static remoteUpdate(Graph::pointer pr, GNode src, float delta) {
+    auto& lnode = pr->at(src, Galois::MethodFlag::SRC_ONLY);
+    atomicAdd(lnode.residual, delta);
+  }
+
+
+  void operator()(GNode src, Galois::UserContext<GNode>& cnx) const {
+    LNode& sdata = g->at(src);
+    sdata.value = 1.0 - alpha;
+    sdata.nout = g->get_num_outEdges(src); //std::distance(g->edge_begin(n, Galois::MethodFlag::NONE),g->edge_end(n, Galois::MethodFlag::NONE));
+    sdata.residual = 0;
+
+
+    Galois::MethodFlag lockflag = Galois::MethodFlag::SRC_ONLY;
+    auto& net = Galois::Runtime::getSystemNetworkInterface();
+    if(sdata.nout > 0)
     {
-      Galois::for_each_local(g, InitializeGraph{g}, Galois::loopname("init"));
+      float delta = sdata.value*alpha/sdata.nout;
+      // for each out-going neighbors
+      for (auto jj = g->edge_begin(src, lockflag), ej = g->edge_end(src, lockflag); jj != ej; ++jj) {
+        GNode dst = g->dst(jj);
+        if (dst.isLocal()) {
+          LNode& ddata = g->at(dst, lockflag);
+          atomicAdd(ddata.residual, delta);
+        } else {
+          net.sendAlt(((Galois::Runtime::fatPointer)dst).getHost(), remoteUpdate, g, dst, delta);
+        }
+      }
     }
+  }
 
-    void operator()(GNode n, Galois::UserContext<GNode>& cnx) const {
-      LNode& data = g->at(n);
-      data.value = 1.0 - alpha;
-      data.residual = 0;
-      //Adding Galois::NONE is imp. here since we don't need any blocking locks.
-      data.nout = g->get_num_outEdges(n); //std::distance(g->edge_begin(n, Galois::MethodFlag::NONE),g->edge_end(n, Galois::MethodFlag::NONE));
-    }
 
   typedef int tt_is_copyable;
 };
@@ -128,6 +151,7 @@ struct PageRank {
     {
       Galois::Timer round_time;
       for(int iterations = 0; iterations < maxIterations; ++iterations){
+          std::cout<<"Iteration : " << iterations << "  start : " << "\n";
           round_time.start();
           Galois::for_each_local(g, PageRank{g}, Galois::loopname("Page Rank"));
           round_time.stop();
@@ -137,12 +161,12 @@ struct PageRank {
 
     void operator() (GNode src, Galois::UserContext<GNode>& cnx) const {
       double sum = 0;
-      Galois::MethodFlag flag_none = Galois::MethodFlag::NONE;
+      Galois::MethodFlag flag_src = Galois::MethodFlag::SRC_ONLY;
 
       LNode& sdata = g->at(src, Galois::MethodFlag::SRC_ONLY);
-      for (auto jj = g->in_edge_begin(src, Galois::MethodFlag::NONE), ej = g->in_edge_end(src, Galois::MethodFlag::NONE); jj != ej; ++jj) {
-        GNode dst = g->dst(jj, Galois::MethodFlag::SRC_ONLY);
-        LNode& ddata = g->at(dst, Galois::MethodFlag::SRC_ONLY);
+      for (auto jj = g->in_edge_begin(src, flag_src), ej = g->in_edge_end(src, flag_src); jj != ej; ++jj) {
+        GNode dst = g->dst(jj, flag_src);
+        LNode& ddata = g->at(dst, flag_src);
         //std::cout << ddata.value << ", " << ddata.nout <<"\n";
         if(ddata.nout != 0)
         {
@@ -161,53 +185,64 @@ struct PageRank {
 
 struct PageRankMsg {
   Graph::pointer g;
+  static int count;
   void static go(Graph::pointer g) {
     Galois::Timer round_time;
     for(int iterations = 0; iterations < maxIterations; ++iterations){
-      std::cout<<"Iteration : " << iterations << "  statrt : " << "\n";
+      std::cout<<"Iteration : " << iterations << "  start : " << "\n";
       round_time.start();
       Galois::for_each_local(g, PageRankMsg{g}, Galois::loopname("Page Rank"));
       round_time.stop();
       std::cout<<"Iteration : " << iterations << "  Time : " << round_time.get() << " ms\n";
     }
   }
-  
+
   void static remoteUpdate(Graph::pointer pr, GNode src, float delta) {
-    auto& lnode = pr->at(src, Galois::MethodFlag::NONE);
+    auto& lnode = pr->at(src, Galois::MethodFlag::SRC_ONLY);
     atomicAdd(lnode.residual, delta);
   }
-  
+
   void operator() (GNode src, Galois::UserContext<GNode>& cnx) const {
-    LNode& sdata = g->at(src);      
-    Galois::MethodFlag lockflag = Galois::MethodFlag::NONE;
-    
+    LNode& sdata = g->at(src);
+    Galois::MethodFlag lockflag = Galois::MethodFlag::SRC_ONLY;
+    auto& net = Galois::Runtime::getSystemNetworkInterface();
+    /*
+     * DEBUG
+     */
+ /* if(net.ID == 0)
+    {
+      count++;
+      std::cout << "count : " << count << "\n";
+    }
+    */
     float oldResidual = sdata.residual.exchange(0.0);
     sdata.value = sdata.value + oldResidual;
-    float delta = oldResidual*alpha/sdata.nout;
-    // for each out-going neighbors
-    auto& net = Galois::Runtime::getSystemNetworkInterface();
-    for (auto jj = g->edge_begin(src, lockflag), ej = g->edge_end(src, lockflag); jj != ej; ++jj) {
-      GNode dst = g->dst(jj);
-      if (dst.isLocal()) {
-        LNode& ddata = g->at(dst, lockflag);
-        atomicAdd(ddata.residual, delta);
-        //        std::cout << 'l';
-      } else {
-        net.sendAlt(((Galois::Runtime::fatPointer)dst).getHost(), remoteUpdate, g, dst, delta);
-        //        std::cout << 'r';
+    if(sdata.nout > 0)
+    {
+      float delta = oldResidual*alpha/sdata.nout;
+      // for each out-going neighbors
+      for (auto jj = g->edge_begin(src, lockflag), ej = g->edge_end(src, lockflag); jj != ej; ++jj) {
+        GNode dst = g->dst(jj);
+        if (dst.isLocal()) {
+          LNode& ddata = g->at(dst, lockflag);
+          atomicAdd(ddata.residual, delta);
+        } else {
+          net.sendAlt(((Galois::Runtime::fatPointer)dst).getHost(), remoteUpdate, g, dst, delta);
+        }
       }
     }
   }
-  
   typedef int tt_is_copyable;
 };
+
+int PageRankMsg::count = 0;
 
 /* 
  * collect page rank of all the nodes 
  * */
 
-int compute_total_rank(Graph::pointer g) {
-    int total_rank = 0;
+float compute_total_rank(Graph::pointer g) {
+    float total_rank = 0;
 
     for(auto ii = g->begin(), ei=g->end(); ii != ei; ++ii) {
       LNode& node = g->at(*ii); 
@@ -390,9 +425,9 @@ int main(int argc, char** argv) {
     timerInit.stop();
     std::cout << "Graph Initialization: " << timerInit.get() << " ms\n";
 
-    g->prefetch_all();
+    //g->prefetch_all();
 
-    std::cout << " All prefetched\n";
+    //std::cout << " All prefetched\n";
 
     Galois::Timer timerPR;
     timerPR.start();
