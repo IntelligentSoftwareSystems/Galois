@@ -30,6 +30,7 @@
 #include <cassert>
 #include <iostream>
 #include <chrono>
+#include <mutex>
 
 #include <sys/types.h>
 #include <unistd.h>

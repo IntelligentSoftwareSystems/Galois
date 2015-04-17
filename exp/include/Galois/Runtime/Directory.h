@@ -265,7 +265,7 @@ public:
   //Local portion of API
 
   bool isRemote(fatPointer ptr, ResolveFlag flag) {
-    return dirOwns(static_cast<Lockable*>(ptr.getObj()));
+    return dirOwns(ptr.getPtr<Lockable>());
   }
 
   //! initiate, if necessary, a fetch of a remote object

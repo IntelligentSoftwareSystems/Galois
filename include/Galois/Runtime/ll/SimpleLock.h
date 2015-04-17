@@ -36,7 +36,6 @@
 
 #include <cassert>
 #include <atomic>
-#include <mutex>
 
 namespace Galois {
 namespace Runtime {
@@ -104,8 +103,6 @@ public:
   //  inline bool try_lock() const { return true; }
   //inline bool is_locked() const { }
 };
-
-typedef std::lock_guard<LL::SimpleLock> SLguard;
 
 }
 }

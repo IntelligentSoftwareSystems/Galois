@@ -25,7 +25,7 @@
 #ifndef GALOIS_RUNTIME_LOCKABLE_H
 #define GALOIS_RUNTIME_LOCKABLE_H
 
-#include "Galois/Runtime/ll/PtrLock.h"
+#include "Galois/Runtime/ll/PtrRWLock.h"
 #include "Galois/gdeque.h"
 
 #include <boost/utility.hpp>
@@ -42,7 +42,7 @@ class LockManagerBase;
  * Lockable. 
  */
 class Lockable {
-  LL::PtrLock<LockManagerBase> owner;
+  LL::PtrRWLock<LockManagerBase> owner;
   friend class LockManagerBase;
 };
 
@@ -51,7 +51,8 @@ class Lockable {
  */
 
 class LockManagerBase: private boost::noncopyable {
-  gdeque<Lockable*> locks;
+  gdeque<Lockable*> rwlocks;
+  gdeque<Lockable*> rlocks;
 
 public:
   enum AcquireStatus {
@@ -59,30 +60,30 @@ public:
   };
 
   //Try to acquire an object
-  AcquireStatus tryAcquire(Lockable* lockable);
-
+  AcquireStatus tryAcquire(Lockable* lockable, bool readonly);
+  
   //Steals an object.  The old owner most only use a checked release
   //to release the object, a normal release will disrupt meta-data
-  LockManagerBase* forceAcquire(Lockable* lockable);
+  //  LockManagerBase* forceAcquire(Lockable* lockable);
 
   bool isAcquired(const Lockable* lockable) const;
 
   static bool isAcquiredAny(const Lockable* lockable);
 
-  //Release one object.  This manager must use releaseChecked after this.
+  //Release one object.
   void releaseOne(Lockable* lockable);
 
   //Release all objects.  Returns number of objects
-  unsigned  releaseAll();
+  std::pair<unsigned, unsigned>  releaseAll();
 
   //Release all objects which haven't been stolen.  Returns number of objects
-  unsigned releaseAllChecked();
+  //  unsigned releaseAllChecked();
 
   //Have objects ever been acquired? (release objects don't count as this being empty)
   bool empty() const;
 
   //Are objects actually present? (released objects are skipped)  More expensive.
-  bool emptyChecked();
+  //  bool emptyChecked();
 
   //dump objects and owners
   void dump(std::ostream& os);

@@ -39,52 +39,54 @@ namespace detail {
 //Really fat pointer
 class simpleFatPointer {
   uint32_t host;
-  void* ptr;
-
-  void set(uint32_t h, void* p);
+  uintptr_t ptr;
 
 protected:
-
-  constexpr simpleFatPointer(uint32_t h, void* p) noexcept :host(h), ptr(p) {}
-
-  typedef std::pair<uint32_t, void*> rawType;
-  rawType rawCopy() const { return std::make_pair(host,ptr); }
+  constexpr simpleFatPointer(uint32_t h, uintptr_t p) noexcept :host(h), ptr(p) {}
 
 public:
-
   uint32_t getHost() const { return host; }
-  void* getObj() const { return ptr; }
+  uintptr_t getObj() const { return ptr; }
 
-  void setHost(uint32_t h);
-  void setObj(void* p);
+  void setHost(uint32_t h) { host = h; }
+  void setObj(uintptr_t p) { ptr = p; }
+
+  void set(uint32_t h, uintptr_t p) { host = h; ptr = p; }
+  std::pair<uint32_t, uintptr_t> get() const { return std::make_pair(host, ptr); }
 };
 
 //Fat pointer taking advantage of unused bits in AMD64 addresses
 class amd64FatPointer {
   uintptr_t val;
+  static const uintptr_t ptrMask = 0x80007FFFFFFFFFFFULL;
 
-  uintptr_t compute(uint32_t h, void* p) const;
-  void set(uint32_t h, void* p);
+  constexpr uintptr_t compute(uint32_t h, uintptr_t p) const {
+    return ((uintptr_t)h << 47) | (p & ptrMask);
+  }
 
 protected:
 
-  amd64FatPointer(uint32_t h, void* p) noexcept :val(compute(h,p)) {}
-
-  typedef uintptr_t rawType;
-  rawType rawCopy() const { return val; }
+  constexpr amd64FatPointer(uint32_t h, uintptr_t p) noexcept :val(compute(h,p)) {}
 
 public:
-  uint32_t getHost() const;
-  void* getObj() const;
+  uint32_t getHost() const { return get().first; }
+  uintptr_t getObj() const { return get().second; }
 
-  void setHost(uint32_t h);
-  void setObj(void* p);
+  void setHost(uint32_t h) { set(h, get().second); }
+  void setObj(uintptr_t p) { set(get().first, p); }
+
+  void set(uint32_t h, uintptr_t p) { val = compute(h, p); }
+  std::pair<uint32_t, uintptr_t> get() const { 
+    uint32_t host = (val >> 47) & 0x0000FFFF;
+    uintptr_t ptr = val & ptrMask;
+    return std::make_pair(host, ptr);
+  }
 };
 
 
 template< typename fatPointerBase>
 class fatPointerImpl : public fatPointerBase {
-  using fatPointerBase::rawCopy;
+  using fatPointerBase::get;
 
 public:
   using fatPointerBase::getHost;
@@ -93,23 +95,29 @@ public:
   struct thisHost_t {};
   static thisHost_t thisHost;
 
-  constexpr fatPointerImpl() noexcept :fatPointerBase(0, nullptr) {}
-  constexpr fatPointerImpl(uint32_t h, void* p) noexcept :fatPointerBase(h,p) {}
-  fatPointerImpl(void* p, thisHost_t th) noexcept : fatPointerBase(NetworkInterface::ID,p) {}
+  constexpr fatPointerImpl() noexcept :fatPointerBase(0, 0) {}
+  constexpr fatPointerImpl(uint32_t h, uintptr_t p) noexcept :fatPointerBase(h,p) {}
+  fatPointerImpl(uintptr_t p, thisHost_t th) noexcept : fatPointerBase(NetworkInterface::ID,p) {}
 
   size_t hash_value() const {
-    boost::hash<typename fatPointerBase::rawType> ih;
-    return ih(rawCopy());
+    boost::hash<decltype(get())> ih;
+    return ih(get());
+  }
+
+  template<typename T>
+  T* getPtr() const { 
+    void* ptr = reinterpret_cast<void*>(getObj());
+    return static_cast<T*>(ptr);
   }
 
   explicit operator bool() const { return fatPointerBase::getObj(); }
 
-  bool operator==(const fatPointerImpl& rhs) const { return rawCopy() == rhs.rawCopy(); }
-  bool operator!=(const fatPointerImpl& rhs) const { return rawCopy() != rhs.rawCopy(); }
-  bool operator<=(const fatPointerImpl& rhs) const { return rawCopy() <= rhs.rawCopy(); }
-  bool operator>=(const fatPointerImpl& rhs) const { return rawCopy() >= rhs.rawCopy(); }
-  bool operator< (const fatPointerImpl& rhs) const { return rawCopy() <  rhs.rawCopy(); }
-  bool operator> (const fatPointerImpl& rhs) const { return rawCopy() >  rhs.rawCopy(); }
+  bool operator==(const fatPointerImpl& rhs) const { return get() == rhs.get(); }
+  bool operator!=(const fatPointerImpl& rhs) const { return get() != rhs.get(); }
+  bool operator<=(const fatPointerImpl& rhs) const { return get() <= rhs.get(); }
+  bool operator>=(const fatPointerImpl& rhs) const { return get() >= rhs.get(); }
+  bool operator< (const fatPointerImpl& rhs) const { return get() <  rhs.get(); }
+  bool operator> (const fatPointerImpl& rhs) const { return get() >  rhs.get(); }
 
   bool isLocal() const {
     return getHost() == NetworkInterface::ID;
@@ -120,7 +128,7 @@ public:
   }
 
   fatPointerImpl arith(int n) {
-    return fatPointerImpl(getHost(), (char*)getObj() + n);
+    return fatPointerImpl(getHost(), getObj() + n);
   }
 
  //Trivially_copyable

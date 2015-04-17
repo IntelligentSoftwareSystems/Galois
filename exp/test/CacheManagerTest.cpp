@@ -49,7 +49,7 @@ struct foo: public Lockable {
 
 void test_CM() {
   auto& cm = getCacheManager();
-  fatPointer fp{1, reinterpret_cast<void*>(0x010)};
+  fatPointer fp{1, 0x010};
 
   std::cout << fp << " " << cm.resolve(fp) << "\n";
   cm.create(fp, foo{1,2});

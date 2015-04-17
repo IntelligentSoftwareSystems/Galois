@@ -36,7 +36,7 @@ details::remoteObj::~remoteObj() {}
 
 details::remoteObj* CacheManager::resolveIncRef(fatPointer ptr) {
   assert(ptr.getHost() != NetworkInterface::ID);
-  LL::SLguard lgr(Lock);
+  std::lock_guard<LL::SimpleLock> lgr(Lock);
   auto ii = remoteObjects.find(ptr);
   if (ii != remoteObjects.end()) {
     assert(ii->second);
@@ -48,7 +48,7 @@ details::remoteObj* CacheManager::resolveIncRef(fatPointer ptr) {
 
 void* CacheManager::resolve(fatPointer ptr) {
   assert(ptr.getHost() != NetworkInterface::ID);
-  LL::SLguard lgr(Lock);
+  std::lock_guard<LL::SimpleLock> lgr(Lock);
   auto ii = remoteObjects.find(ptr);
   if (ii != remoteObjects.end()) {
     assert(ii->second);
@@ -59,7 +59,7 @@ void* CacheManager::resolve(fatPointer ptr) {
 
 void CacheManager::evict(fatPointer ptr) {
   assert(ptr.getHost() != NetworkInterface::ID);
-  LL::SLguard lgr(Lock);
+  std::lock_guard<LL::SimpleLock> lgr(Lock);
   auto R = remoteObjects.find(ptr);
   assert(R != remoteObjects.end() && R->second);
   garbage.push_back(R->second);

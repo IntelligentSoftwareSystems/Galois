@@ -65,13 +65,13 @@ public: //FIXME
   //   return static_cast<SimpleRuntimeContext*>(owner);
   // }
 
-  virtual bool subAcquire(Lockable* lockable);
-  virtual unsigned subCommit();
-  virtual unsigned subCancel();
+  virtual bool subAcquire(Lockable* lockable, bool readonly);
+  virtual std::pair<unsigned,unsigned> subCommit();
+  virtual std::pair<unsigned,unsigned> subCancel();
 
 public:
 
-  bool acquire(Lockable* lockable);
+  bool acquire(Lockable* lockable, bool readonly);
   void release(Lockable* lockable);
 
   SimpleRuntimeContext(bool child = false): customAcquire(child) { }
@@ -81,8 +81,8 @@ public:
     assert(locks.empty());
   }
   
-  unsigned cancelIteration();
-  unsigned commitIteration();
+  std::pair<unsigned,unsigned> cancelIteration();
+  std::pair<unsigned,unsigned> commitIteration();
 };
 
 //! get the current conflict detection class, may be null if not in parallel region
@@ -123,7 +123,7 @@ inline void acquire(Lockable* lockable, Galois::MethodFlag m) {
   if (shouldLock(m)) {
     SimpleRuntimeContext* ctx = getThreadContext();
     if (ctx) {
-      if (!ctx->acquire(lockable)) {
+      if (!ctx->acquire(lockable, m == Galois::MethodFlag::READ)) {
         signalConflict(conflict_ex{lockable});
       }
     }
@@ -147,7 +147,7 @@ inline void acquire(gptr<T> ptr, Galois::MethodFlag m) {
       SimpleRuntimeContext* ctx = getThreadContext();
       Lockable* lockable = static_cast<Lockable*>(obj);
       if (ctx) {
-        if (!ctx->acquire(lockable)) {
+        if (!ctx->acquire(lockable, m == Galois::MethodFlag::READ)) {
           signalConflict(remote_ex{fptr, m, &RemoteDirectory::setContended<T>, &LocalDirectory::setContended<T>});
           //signalConflict(remote_ex{fptr, m, &RemoteDirectory::fetch<T>, &LocalDirectory::fetch<T>});
         }
@@ -176,29 +176,15 @@ inline bool prefetch(gptr<T> ptr, Galois::MethodFlag m = MethodFlag::ALL) {
 //! Fetches a possibly remote object, blocks until object is local
 template<typename T>
 inline void serial_acquire(gptr<T> ptr) {
-  // TODO check if this reduces message traffic significantly
-#if 0
-  while (!prefetch(ptr))
+  T* obj = ptr.resolve();
+  if (!obj)
+    getRemoteDirectory().fetch<T>(static_cast<fatPointer>(ptr), ResolveFlag::RW);
+  else if (LockManagerBase::isAcquiredAny(obj))
+    getLocalDirectory().fetch<T>(static_cast<fatPointer>(ptr), ResolveFlag::RW);
+  do {
     doNetworkWork();
-#else
-  bool a = false, b = false;
-  while (true) {
-    T* obj = ptr.resolve();
-    if (!obj) {
-      //FIXME Better resolve flag
-      if (!a) 
-        getRemoteDirectory().fetch<T>(static_cast<fatPointer>(ptr), ResolveFlag::RW);
-      a = true;
-    } else if (LockManagerBase::isAcquiredAny(obj)) {
-      if (!b)
-        getLocalDirectory().fetch<T>(static_cast<fatPointer>(ptr), ResolveFlag::RW);
-      b = true;
-    } else {
-      return;
-    }
-    doNetworkWork();
-  }
-#endif
+    obj = ptr.resolve();
+  } while(!obj || LockManagerBase::isAcquiredAny(obj));
 }
 
 

@@ -29,6 +29,7 @@
 
 #include <unordered_map>
 #include <deque>
+#include <mutex>
 
 namespace Galois {
 namespace Runtime {
@@ -85,8 +86,8 @@ public:
 
 class CacheManager {
   std::unordered_map<fatPointer, details::remoteObj*> remoteObjects;
-  std::deque<details::remoteObj*> garbage;
   LL::SimpleLock Lock;
+  std::deque<details::remoteObj*> garbage;
 
   //! resolve a value to a reference count incremented metadata
   //! used by ResolveCache
@@ -100,7 +101,7 @@ public:
   template<typename T>
   void create(fatPointer ptr, DeSerializeBuffer& buf) {
     assert(ptr.getHost() != NetworkInterface::ID);
-    LL::SLguard lgr(Lock);
+    std::lock_guard<LL::SimpleLock> lgr(Lock);
     details::remoteObj*& obj = remoteObjects[ptr];
     if (obj) { // creating can replace old objects
       garbage.push_back(obj);
@@ -113,7 +114,7 @@ public:
   template<typename T>
   void create(fatPointer ptr, T&& buf) {
     assert(ptr.getHost() != NetworkInterface::ID);
-    LL::SLguard lgr(Lock);
+    std::lock_guard<LL::SimpleLock> lgr(Lock);
     details::remoteObj*& obj = remoteObjects[ptr];
     if (obj) { // creating can replace old objects
       garbage.push_back(obj);

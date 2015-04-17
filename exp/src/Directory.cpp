@@ -74,9 +74,9 @@ void  detail::MetaHolder<metadata>::eraseMD(fatPointer ptr, std::unique_lock<LL:
 // Base Directory
 ////////////////////////////////////////////////////////////////////////////////
 
-bool BaseDirectory::dirAcquire(Lockable* ptr) {
+bool BaseDirectory::dirAcquire(Lockable* ptr) { // FIXME: propper RO
   std::lock_guard<LL::SimpleLock> lg(dirContext_lock);
-  auto rv = dirContext.tryAcquire(ptr);
+  auto rv = dirContext.tryAcquire(ptr, false);
   switch (rv) {
   case LockManagerBase::FAIL:      return false;
   case LockManagerBase::NEW_OWNER: return true;
@@ -412,7 +412,7 @@ void RemoteDirectory::dump(fatPointer ptr) {
 void LocalDirectory::recvObjectImpl(fatPointer ptr, ResolveFlag flag, 
                                     detail::typeHelper* th, RecvBuffer& buf) {
   assert(ptr.isLocal());
-  Lockable* obj = static_cast<Lockable*>(ptr.getObj());
+  Lockable* obj = ptr.getPtr<Lockable>();
   metadata& md = dir.getMD(ptr, th);
   std::unique_lock<LL::SimpleLock> lg(md.lock, std::adopt_lock);
   trace("LD::recvObject % flag % md %\n", ptr, flag, md);
@@ -464,7 +464,7 @@ void LocalDirectory::sendToReaders(metadata& md, fatPointer ptr) {
   //assert(obj is RO locked);
   for (auto dest : md.reqsRO) {
     assert(md.locRO.count(dest) == 0);
-    md.th->send(dest, ptr, static_cast<Lockable*>(ptr.getObj()), RO);
+    md.th->send(dest, ptr, ptr.getPtr<Lockable>(), RO);
     md.locRO.insert(dest);
   }
   md.reqsRO.clear();
@@ -478,7 +478,7 @@ void LocalDirectory::invalidateReaders(metadata& md, fatPointer ptr, uint32_t ne
   }
 }
 
-// void LocalDirectory::invalidate(fatPointer ptr) {
+void LocalDirectory::invalidate(fatPointer ptr) {
 //   assert(ptr.isLocal());
 //   metadata& md = dir.getMD(ptr);
 //   std::lock_guard<LL::SimpleLock> lg(md.lock, std::adopt_lock);
@@ -496,7 +496,8 @@ void LocalDirectory::invalidateReaders(metadata& md, fatPointer ptr, uint32_t ne
 
 //   if (!md.locRO.empty())
 //     trace("LocalDirectory::invalidate % md %\n", ptr, md);
-// }
+  abort();
+}
 
 void LocalDirectory::considerObject(metadata& md, fatPointer ptr, std::unique_lock<LL::SimpleLock>& lg) {
   auto p = md.getNextDest();
@@ -522,7 +523,7 @@ void LocalDirectory::considerObject(metadata& md, fatPointer ptr, std::unique_lo
   if (md.contended && p.first > NetworkInterface::ID)
     return;
 
-  Lockable* obj = static_cast<Lockable*>(ptr.getObj());
+  Lockable* obj = ptr.getPtr<Lockable>();
 
   //Next user is this host
   if (p.first == NetworkInterface::ID) {
@@ -553,7 +554,7 @@ void LocalDirectory::considerObject(metadata& md, fatPointer ptr, std::unique_lo
     md.doSendTo(p.first, p.second);
     if (p.second) { //RW
       trace("LD::sendObject % to % md %\n", ptr, p.first, md);
-      md.th->send(p.first, ptr, static_cast<Lockable*>(ptr.getObj()), RW);
+      md.th->send(p.first, ptr, ptr.getPtr<Lockable>(), RW);
     } else { // RO
       sendToReaders(md, ptr);
       abort();

@@ -9,7 +9,7 @@ makeTest(networktest DISTSAFE COMMAND_PREFIX ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 
 makeTest(bag DISTSAFE)
 makeTest(pairingheap DISTSAFE)
 makeTest(skiplist DISTSAFE)
-makeTest(networkbe DISTSAFE)
+#makeTest(networkbe DISTSAFE)
 makeTest(networkfe DISTSAFE)
 makeTest(netbandwidth DISTSAFE COMMAND_PREFIX ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 2)
 makeTest(oneach DISTSAFE COMMAND_PREFIX ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 2)

@@ -55,9 +55,9 @@ class gptr {
 public:
   typedef T element_type;
   
-  constexpr gptr() noexcept :gptr(0, nullptr) {}
+  constexpr gptr() noexcept :ptr(0, 0) {}
   explicit constexpr  gptr(T* p) noexcept :gptr(NetworkInterface::ID, p) {}
-  gptr(uint32_t o, T* p) noexcept :ptr(o, static_cast<void*>(p)) {}
+  gptr(uint32_t o, T* p) noexcept :ptr(o, reinterpret_cast<uintptr_t>(p)) {}
   
   T& operator*()  { return *resolve_safe(); }
   T* operator->() { return  resolve_safe(); }
@@ -84,7 +84,7 @@ public:
   T* resolve() const {
     void* obj = nullptr;
     if (ptr.isLocal()) {
-      obj = ptr.getObj();
+      obj = ptr.getPtr<void>();
     } else {
       ResolveCache* tr = getThreadResolve();
       if (tr) // equivalent to in a parallel loop

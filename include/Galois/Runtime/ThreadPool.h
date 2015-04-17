@@ -106,11 +106,11 @@ public:
   template<typename... Args>
   void run(unsigned num, Args&&... args) {
     struct exTuple {
-      using Ty = std::tuple<Args...>;
-      Ty cmds;
+      using _Ty = std::tuple<Args...>;
+      _Ty cmds;
 
       void operator() () {
-        detail::exTupleImpl<Ty, 0, std::tuple_size<Ty>::value>::execute(this->cmds);
+        detail::exTupleImpl<_Ty, 0, std::tuple_size<_Ty>::value>::execute(this->cmds);
       }
       exTuple(Args&&... args) :cmds(std::forward<Args>(args)...) {}
     };
@@ -119,7 +119,6 @@ public:
     work = std::ref(lwork);
     //work = std::function<void(void)>(exTuple(std::forward<Args>(args)...));
     runInternal(num);
-
   }
 
   void burnPower(unsigned num);

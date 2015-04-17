@@ -25,6 +25,7 @@
 #include "Galois/Runtime/NetworkIO.h"
 
 #include <thread>
+#include <mutex>
 
 using namespace Galois::Runtime;
 

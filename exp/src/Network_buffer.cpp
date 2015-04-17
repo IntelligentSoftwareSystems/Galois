@@ -24,6 +24,8 @@
 #include "Galois/Runtime/Network.h"
 #include "Galois/Runtime/NetworkBackend.h"
 
+#include <mutex>
+
 using namespace Galois;
 using namespace Galois::Runtime;
 

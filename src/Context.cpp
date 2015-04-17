@@ -63,47 +63,48 @@ void Galois::Runtime::forceAbort() {
 // SimpleRuntimeContext
 ////////////////////////////////////////////////////////////////////////////////
 
-bool SimpleRuntimeContext::acquire(Lockable* lockable) {
+bool SimpleRuntimeContext::acquire(Lockable* lockable, bool ro) {
   if (customAcquire) {
-    return subAcquire(lockable);
+    return subAcquire(lockable, ro);
   } else {
-    auto r = locks.tryAcquire(lockable);
+    auto r = locks.tryAcquire(lockable, ro);
     return r != LockManagerBase::FAIL;
   }
 }
 
 void SimpleRuntimeContext::release(Lockable* lockable) {
-  assert(lockable);
+  abort();
+  //  assert(lockable);
   // The deterministic executor, for instance, steals locks from other
   // iterations
-  assert(customAcquire);// || getOwner(lockable) == this);
+  //  assert(customAcquire);// || getOwner(lockable) == this);
   //assert(!lockable->next);
-  locks.releaseOne(lockable);
+  //  locks.releaseOne(lockable);
 }
 
-unsigned SimpleRuntimeContext::commitIteration() {
+std::pair<unsigned,unsigned> SimpleRuntimeContext::commitIteration() {
   if (customAcquire)
     return subCommit();
   else
     return locks.releaseAll();
 }
 
-unsigned SimpleRuntimeContext::cancelIteration() { 
+std::pair<unsigned,unsigned> SimpleRuntimeContext::cancelIteration() { 
   if (customAcquire)
     return subCancel();
   else
     return commitIteration();
 }
 
-bool SimpleRuntimeContext::subAcquire(Lockable* lockable) {
+bool SimpleRuntimeContext::subAcquire(Lockable* lockable, bool readonly) {
   GALOIS_DIE("Shouldn't get here");
 }
 
-unsigned SimpleRuntimeContext::subCommit() {
+std::pair<unsigned,unsigned> SimpleRuntimeContext::subCommit() {
   GALOIS_DIE("Shouldn't get here");
 }
 
-unsigned SimpleRuntimeContext::subCancel() {
+std::pair<unsigned,unsigned> SimpleRuntimeContext::subCancel() {
   GALOIS_DIE("Shouldn't get here");
 }
 

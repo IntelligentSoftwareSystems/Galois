@@ -29,45 +29,40 @@
 using namespace Galois::Runtime;
 
 LockManagerBase::AcquireStatus
-LockManagerBase::tryAcquire(Galois::Runtime::Lockable* lockable) {
+LockManagerBase::tryAcquire(Galois::Runtime::Lockable* lockable, bool readonly) {
   assert(lockable);
   // XXX(ddn): Hand inlining this code makes a difference on 
   // delaunaytriangulation (GCC 4.7.2)
   if (lockable->owner.getValue() == this) {
     return ALREADY_OWNER;
-  } else if (lockable->owner.try_lock()) {
+  } else if (!readonly && lockable->owner.try_lock()) {
     lockable->owner.setValue(this);
-    locks.push_back(lockable);
+    rwlocks.push_back(lockable);
     return NEW_OWNER;
+  } else if (readonly) {
+    if (std::binary_search(rlocks.begin(), rlocks.end(), lockable)) {
+      return ALREADY_OWNER;
+    } else if (lockable->owner.try_lock_shared()) {
+      auto ii = std::upper_bound(rlocks.begin(), rlocks.end(), lockable);
+      rlocks.emplace(ii, lockable);
+      return NEW_OWNER;
+    }
   }
   return FAIL;
 }
 
-LockManagerBase* LockManagerBase::forceAcquire(Galois::Runtime::Lockable* lockable) {
-  assert(lockable);
-  do {
-    auto r = tryAcquire(lockable);
-    switch (r) {
-    case ALREADY_OWNER:
-      return this;
-    case NEW_OWNER:
-      locks.push_back(lockable);
-      return nullptr;
-    case FAIL: {
-      LockManagerBase* retval = lockable->owner.getValue();
-      if (lockable->owner.stealing_CAS(retval, this)) {
-        locks.push_back(lockable);
-        return retval;
-      }
-      break;
-    }
-    }
-  } while (true);
-}
+// LockManagerBase* LockManagerBase::forceAcquire(Lockable*) {
+//   abort();
+//   return nullptr;
+// }
 
 bool LockManagerBase::isAcquired(const Lockable* lockable) const {
   assert(lockable);
-  return lockable->owner.getValue() == this;
+  if (lockable->owner.is_locked() && lockable->owner.getValue() == this)
+    return true;
+  if (lockable->owner.is_locked_shared() && std::binary_search(rlocks.begin(), rlocks.end(), lockable))
+    return true;
+  return false;
 }
 
 bool LockManagerBase::isAcquiredAny(const Lockable* lockable) {
@@ -76,50 +71,66 @@ bool LockManagerBase::isAcquiredAny(const Lockable* lockable) {
 }
 
 bool LockManagerBase::empty() const {
-  return locks.empty();
+  return rlocks.empty() && rwlocks.empty();
 }
 
-bool LockManagerBase::emptyChecked() {
-  if (locks.empty()) return true;
-  for (auto ii = locks.begin(), ee = locks.end(); ii != ee; ++ii)
-    if ((*ii)->owner.getValue() == this)
-      return false;
-  return true;
-}
+// bool LockManagerBase::emptyChecked() {
+//   if (empty()) return true;
+//   for (auto ii = rwlocks.begin(), ee = rwlocks.end(); ii != ee; ++ii)
+//     if ((*ii)->owner.getValue() == this)
+//       return false;
+//   return true;
+// }
 
 void LockManagerBase::releaseOne(Lockable* lockable) {
   assert(lockable);
-  assert(lockable->owner.getValue() == this);
-  //FIXME: race condition with forceAcquire
-  lockable->owner.unlock_and_clear();
+  assert(isAcquired(lockable));
+  if (lockable->owner.is_locked()) {
+    lockable->owner.unlock_and_clear();
+    auto ii = std::find(rwlocks.begin(), rwlocks.end(), lockable);
+    assert(ii != rwlocks.end());
+    rwlocks.erase(ii);
+  } else {
+    auto ii = std::lower_bound(rlocks.begin(), rlocks.end(), lockable);
+    assert(ii != rlocks.end() && *ii == lockable);
+    rlocks.erase(ii);
+  }
 }
 
-unsigned LockManagerBase::releaseAll() {
-  unsigned retval = 0;
-  for (auto ii = locks.begin(), ee = locks.end(); ii != ee; ++ii) {
-    assert((*ii)->owner.getValue() == this);
-    (*ii)->owner.unlock_and_clear();
-    ++retval;
+std::pair<unsigned,unsigned> LockManagerBase::releaseAll() {
+  unsigned retr = 0, retw = 0;
+  for (auto p : rwlocks) {
+    assert(p->owner.getValue() == this);
+    p->owner.unlock_and_clear();
+    ++retw;
   }
-  locks.clear();
-  return retval;
+  rwlocks.clear();
+  for (auto p : rlocks) {
+    p->owner.unlock_shared();
+    ++retr;
+  }
+  rlocks.clear();
+  return std::make_pair(retr, retw);;
 }
 
-unsigned LockManagerBase::releaseAllChecked() {
-  unsigned retval = 0;
-  for (auto ii = locks.begin(), ee = locks.end(); ii != ee; ++ii) {
-    if ((*ii)->owner.getValue() == this) {
-      (*ii)->owner.unlock_and_clear();
-      ++retval;
-    }
-  }
-  locks.clear();
-  return retval;
-}
+// unsigned LockManagerBase::releaseAllChecked() {
+//   unsigned retval = 0;
+//   for (auto ii = locks.begin(), ee = locks.end(); ii != ee; ++ii) {
+//     if ((*ii)->owner.getValue() == this) {
+//       (*ii)->owner.unlock_and_clear();
+//       ++retval;
+//     }
+//   }
+//   locks.clear();
+//   return retval;
+// }
 
 void LockManagerBase::dump(std::ostream& os) {
-  os << "{" << this << ":";
-  for (auto ii = locks.begin(), ee = locks.end(); ii != ee; ++ii)
-    os << " " << *ii << "," << (*ii)->owner.getValue();
+  os << "{" << this << " R";
+  for (auto p : rlocks) 
+    os << " " << p;
+  os << " W";
+  for (auto p : rwlocks) 
+    os << " " << p << "," << p->owner.getValue();
   os << "}";
 }

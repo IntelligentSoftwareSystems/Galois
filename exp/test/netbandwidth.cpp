@@ -21,31 +21,37 @@ int main(int argc, char** argv) {
 
   int trials = 1000000;
   if (argc > 1)
-    trials = atoi(argv[0]);
+    trials = atoi(argv[1]);
 
   NetworkInterface& net = getSystemNetworkInterface();
-  //  Galois::StatManager sm;
+  Galois::StatManager sm;
 
-  std::cout << "Sending " << trials << " between every host.  " << trials * (net.Num - 1) << " total messages per host.\n";
+  for (int num = 3; num < net.Num; ++num) {
 
-  getSystemBarrier().wait();
+    std::cout << "Sending " << trials << " between every host.  " << trials * (num - 1) << " total messages per host.\n";
+    
+    getSystemBarrier().wait();
 
-  Galois::Timer T;
-  T.start();
-  for (int j = 0; j < net.Num; ++j) {
-    if (j != net.ID) {
-      for(int i = 0; i < trials; ++i) {
-        SendBuffer buf;
-        net.send(j, func, buf);
+    Galois::Timer T;
+    T.start();
+    if (net.ID < num) {
+      for (int j = 0; j < num; ++j) {
+        if (j != net.ID) {
+          for(int i = 0; i < trials; ++i) {
+            SendBuffer buf;
+            net.send(j, func, buf);
+          }
+        }
       }
     }
+    net.flush();
+    while (num < trials * (num - 1)) { net.handleReceives(); }
+    getSystemBarrier().wait();
+    T.stop();
+    std::stringstream os;
+    os << net.ID << "@" << num << ": " << T.get() << "ms " << num << " " << (double)num / T.get() << " msg/ms\n";
+    std::cout << os.str();
   }
-  net.flush();
-  while (num < trials * (net.Num - 1)) { net.handleReceives(); }
-  getSystemBarrier().wait();
-  T.stop();
-  std::stringstream os;
-  os << net.ID << ": " << T.get() << "ms " << num << " " << (double)num / T.get() << " msg/ms\n";
-  std::cout << os.str();
+
   return 0;
 }

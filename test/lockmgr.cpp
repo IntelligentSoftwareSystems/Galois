@@ -21,37 +21,42 @@ char translate(int i) {
   }
 }
 
+//FIXME: include ro tests
+
 int main(int argc, char** argv) {
   simple s1, s2;
   LockManagerBase b1, b2;
 
-  std::cout << translate(b1.tryAcquire(&s1)) << "\n";
+  std::cout << translate(b1.tryAcquire(&s1, false)) << "\n";
   b1.dump(std::cout); b2.dump(std::cout); std::cout << "\n";
-  std::cout << translate(b1.tryAcquire(&s1)) << "\n";
+  std::cout << translate(b1.tryAcquire(&s1, false)) << "\n";
   b1.dump(std::cout); b2.dump(std::cout); std::cout << "\n";
-  std::cout << translate(b1.tryAcquire(&s2)) << "\n";
+  std::cout << translate(b1.tryAcquire(&s2, false)) << "\n";
   b1.dump(std::cout); b2.dump(std::cout); std::cout << "\n";
-  std::cout << translate(b2.tryAcquire(&s1)) << "\n";
+  std::cout << translate(b2.tryAcquire(&s1, false)) << "\n";
   b1.dump(std::cout); b2.dump(std::cout); std::cout << "\n";
-  std::cout << translate(b2.tryAcquire(&s2)) << "\n";
+  std::cout << translate(b2.tryAcquire(&s2, false)) << "\n";
   b1.dump(std::cout); b2.dump(std::cout); std::cout << "\n";
-  std::cout << b1.releaseAll() << "\n";
+  auto rb1 = b1.releaseAll();
+  std::cout << rb1.first << " " << rb1.second << "\n";
   b1.dump(std::cout); b2.dump(std::cout); std::cout << "\n";
-  std::cout << translate(b2.tryAcquire(&s1)) << "\n";
+  std::cout << translate(b2.tryAcquire(&s1, false)) << "\n";
   b1.dump(std::cout); b2.dump(std::cout); std::cout << "\n";
-  std::cout << translate(b2.tryAcquire(&s2)) << "\n";
+  std::cout << translate(b2.tryAcquire(&s2, false)) << "\n";
   b1.dump(std::cout); b2.dump(std::cout); std::cout << "\n";
-  b1.forceAcquire(&s1);
+  // b1.forceAcquire(&s1);
+  // b1.dump(std::cout); b2.dump(std::cout); std::cout << "\n";
+  // b1.forceAcquire(&s2);
+  // b1.dump(std::cout); b2.dump(std::cout); std::cout << "\n";
+  std::cout << translate(b2.tryAcquire(&s1, false)) << "\n";
   b1.dump(std::cout); b2.dump(std::cout); std::cout << "\n";
-  b1.forceAcquire(&s2);
+  std::cout << translate(b2.tryAcquire(&s2, false)) << "\n";
   b1.dump(std::cout); b2.dump(std::cout); std::cout << "\n";
-  std::cout << translate(b2.tryAcquire(&s1)) << "\n";
+  auto rb2 = b2.releaseAll();
+  std::cout << rb2.first << " " << rb2.second << "\n";
   b1.dump(std::cout); b2.dump(std::cout); std::cout << "\n";
-  std::cout << translate(b2.tryAcquire(&s2)) << "\n";
-  b1.dump(std::cout); b2.dump(std::cout); std::cout << "\n";
-  std::cout << b2.releaseAllChecked() << "\n";
-  b1.dump(std::cout); b2.dump(std::cout); std::cout << "\n";
-  std::cout << b1.releaseAllChecked() << "\n";
+  rb1 = b1.releaseAll();
+  std::cout << rb1.first << " " << rb1.second << "\n";
   b1.dump(std::cout); b2.dump(std::cout); std::cout << "\n";
 
   return 0;
