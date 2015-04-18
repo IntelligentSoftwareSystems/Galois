@@ -11,13 +11,23 @@ struct GreedyPartitioner {
   using PartCounters = std::vector<ParCounter>;
   using GNode = typename G::GraphNode;
 
+  static constexpr size_t SIZE_LIM_MULT = 2;
+
   G& graph;
   M& dagManager;
   const unsigned numPart;
 
+
+  struct NborStat {
+    unsigned partition;
+    unsigned count;
+  };
+
   PartCounters  partSizes;
-  const size_t partSizeLim;
-  Galois::PerThreadVector<unsigned> perThreadPartCounters;
+  const size_t perThrdSizeLim;
+  Galois::PerThreadVector<NborStat> perThrdNborStats;
+  Galois::PerThreadVector<size_t> perThrdPartSizes;
+
 
   GreedyPartitioner (
       G& graph,
@@ -28,20 +38,25 @@ struct GreedyPartitioner {
       dagManager (dagManager),
       numPart (numPart),
       partSizes (numPart),
-      partSizeLim ((graph.size () + numPart)/numPart)
+      perThrdSizeLim ((graph.size () + numPart)/ (Galois::getActiveThreads () * numPart))
   {
-    for (unsigned i = 0; i < perThreadPartCounters.numRows (); ++i) {
-      perThreadPartCounters.get (i).clear ();
-      perThreadPartCounters.get (i).resize (numPart, 0);
+    for (unsigned i = 0; i < perThrdNborStats.numRows (); ++i) {
+      perThrdNborStats.get (i).clear ();
+      perThrdNborStats.get (i).resize (numPart, NborStat{0, 0});
+      perThrdPartSizes.get (i).resize (numPart, 0);
     }
   }
 
   template <typename R>
   void blockStart (const R& range) {
+
+          size_t lim = std::distance(range.begin (), range.end ()) / numPart;
+
     on_each_impl (
-        [this, &range] (const unsigned tid, const unsigned numT) {
+        [this, &range, &lim] (const unsigned tid, const unsigned numT) {
           unsigned partPerThread = (numPart + numT - 1) / numT;
           unsigned pbeg = tid * partPerThread;
+
 
           size_t size = 0;
           unsigned currP = pbeg;
@@ -54,7 +69,7 @@ struct GreedyPartitioner {
             nd.partition = currP;
             ++size;
 
-            if (size >= partSizeLim) {
+            if (size >= lim) {
               ++currP;
               if (currP >= numPart) {
                 currP = pbeg;
@@ -91,26 +106,59 @@ struct GreedyPartitioner {
       return;
     }
 
-    auto& partCounters = perThreadPartCounters.get ();
-    assert (partCounters.size () == numPart);
-    std::fill (partCounters.begin (), partCounters.end (), 0);
+    auto& nborStats = perThrdNborStats.get ();
+    assert (nborStats.size () == numPart);
 
-    auto adjClosure = [this, &partCounters, &sd] (GNode dst) {
+    for (unsigned i = 0; i < nborStats.size (); ++i) {
+      nborStats[i] = NborStat {i, 0};
+      assert (nborStats[i].partition == i);
+      assert (nborStats[i].count == 0);
+    }
+
+    // std::fill (nborStats.begin (), nborStats.end (), 0);
+
+    auto adjClosure = [this, &nborStats, &sd] (GNode dst) {
       auto& dd = graph.getData (dst, MethodFlag::UNPROTECTED);
 
       if (dd.partition != -1) {
-        assert (size_t (dd.partition) < partCounters.size ());
-        partCounters[dd.partition] += 1;
+        assert (size_t (dd.partition) < nborStats.size ());
+        nborStats[dd.partition].count += 1;
       }
     };
 
     dagManager.applyToAdj (src, adjClosure);
 
-    auto maxIndex = std::max_element (partCounters.begin (), partCounters.end ());
-    assert (std::distance (partCounters.begin (), maxIndex) >= 0);
-    assert (maxIndex != partCounters.end ());
-    unsigned maxPart = maxIndex - partCounters.begin ();
-    sd.partition = maxPart;
+    // auto maxIndex = std::max_element (nborStats.begin (), nborStats.end ());
+    // assert (std::distance (nborStats.begin (), maxIndex) >= 0);
+    // assert (maxIndex != nborStats.end ());
+    // unsigned maxPart = maxIndex - nborStats.begin ();
+    // sd.partition = maxPart;
+
+    auto sortFunc = [] (const NborStat& left, const NborStat& right) -> bool {
+      return left.count < right.count; // sort
+    };
+
+    std::sort (nborStats.begin (), nborStats.end (), sortFunc);
+    std::reverse (nborStats.begin (), nborStats.end ());
+
+    // check sort, for debug only
+    for (unsigned i = 1; i < nborStats.size (); ++i) {
+      assert (nborStats[i].count <= nborStats[i-1].count);
+    }
+
+    bool success = false;
+    for (const NborStat& ns: nborStats) {
+      if (false || perThrdPartSizes.get ()[ns.partition] < (SIZE_LIM_MULT * perThrdSizeLim)) {
+        sd.partition = ns.partition;
+        perThrdPartSizes.get ()[sd.partition] += 1;
+        success = true;
+        break;
+      }
+    }
+
+    GALOIS_ASSERT (success);
+
+
   }
 
 
@@ -126,6 +174,7 @@ struct GreedyPartitioner {
     dagManager.collectSources (sources);
 
     cyclicStart (makeLocalRange (sources));
+    // blockStart (makeLocalRange (sources));
 
 
     auto f = [this] (GNode src) { this->assignPartition (src); };
