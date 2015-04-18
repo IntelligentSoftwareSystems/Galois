@@ -97,7 +97,7 @@ struct DetKDGexecutorAddRem {
           push (elem);
         }, 
         "push_initial",
-        Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
+        Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
 
     rounds = 0;
     Galois::Timer t_exec;
@@ -246,7 +246,7 @@ struct DetKDG_AddRem_reuseDAG {
           push (node);
         }, 
         "push_initial",
-        Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
+        Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
 
     auto* dagExec = make_dag_executor (initRange, cmp, nhoodVisitor, ApplyOperator{*this}, loopname);
 

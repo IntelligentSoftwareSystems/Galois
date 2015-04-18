@@ -299,7 +299,7 @@ protected:
           total += 1;
         },
         "expandNhood",
-        doall_chunk_size<OpFunc::CHUNK_SIZE> ());
+        chunk_size<OpFunc::CHUNK_SIZE> ());
 
   }
 
@@ -355,7 +355,7 @@ protected:
           }
         },
         "applyOperator",
-        doall_chunk_size<OpFunc::CHUNK_SIZE> ());
+        chunk_size<OpFunc::CHUNK_SIZE> ());
   }
 
 
@@ -499,7 +499,7 @@ protected:
           total += 1;
         },
         "expandNhood",
-        doall_chunk_size<NhFunc::CHUNK_SIZE> ());
+        chunk_size<NhFunc::CHUNK_SIZE> ());
 
   }
 

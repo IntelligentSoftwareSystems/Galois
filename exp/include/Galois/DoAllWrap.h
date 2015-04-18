@@ -51,12 +51,12 @@ void setDoAllImpl (const DoAllTypes& type);
 DoAllTypes getDoAllImpl (void);
 
 template <unsigned CZ>
-struct doall_chunk_size {
+struct chunk_size {
   static const unsigned value = CZ;
 };
 
 template <> 
-struct doall_chunk_size<0> {};
+struct chunk_size<0> {};
 
 template <DoAllTypes TYPE> 
 struct DoAllImpl {

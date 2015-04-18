@@ -380,7 +380,7 @@ struct InputGraphPartDAGexecutor {
 
 
     GreedyPartitioner<G, M> partitioner (graph, dagManager, numPart);
-    // BlockPartitioner partitioner (graph, dagManager, adjMatrix, numPart);
+    // CyclicPartitioner<G, M> partitioner (graph, dagManager, numPart);
 
     partitioner.partition ();
 
@@ -398,13 +398,23 @@ struct InputGraphPartDAGexecutor {
 
     Galois::Runtime::on_each_impl (
         [this, &workers] (const unsigned tid, const unsigned numT) {
-          size_t beg = tid * PARTITION_MULT_FACTOR;
-          size_t end = std::min ((tid + 1) * PARTITION_MULT_FACTOR, numPart);
-
           ThreadWorker& w = *workers.getLocal (tid);
-          for (; beg < end; ++beg) {
-            w.myPartitions.push_back (&partitions[beg]);
+
+          // // block assignment
+          // size_t beg = tid * PARTITION_MULT_FACTOR;
+          // size_t end = std::min ((tid + 1) * PARTITION_MULT_FACTOR, numPart);
+// 
+          // for (; beg < end; ++beg) {
+            // w.myPartitions.push_back (&partitions[beg]);
+          // }
+
+          // cyclic assignment;
+          for (unsigned i = tid; i < numPart; i += numT) {
+            w.myPartitions.push_back (&partitions[i]);
           }
+
+
+
             
           term.initializeThread ();
         });

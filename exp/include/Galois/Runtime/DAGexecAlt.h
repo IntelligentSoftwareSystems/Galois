@@ -417,7 +417,7 @@ public:
           ctxtAlloc.destroy (ctxt);
           ctxtAlloc.deallocate (ctxt, 1);
         }, 
-        "free_ctx", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
+        "free_ctx", Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
   }
 
 
@@ -449,7 +449,7 @@ public:
           Galois::Runtime::setThreadContext (NULL);
 
           // printf ("Created context:%p for item: %d\n", ctxt, x);
-        }, "create_ctxt", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
+        }, "create_ctxt", Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
 
 
     Galois::do_all_choice (nhmgr.getAllRange(),
@@ -457,7 +457,7 @@ public:
           nitem->sortSharerSet (typename Ctxt::template Comparator<Cmp> {cmp});
           // std::printf ("Nitem: %p, num sharers: %ld\n", nitem, nitem->sharers.size ());
         }, 
-        "sort_sharers", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE>());
+        "sort_sharers", Galois::chunk_size<DEFAULT_CHUNK_SIZE>());
 
     Galois::do_all_choice (Galois::Runtime::makeLocalRange (allCtxts),
         [this] (Ctxt* ctxt) {
@@ -466,7 +466,7 @@ public:
             initSources.get ().push_back (ctxt);
           }
         }, 
-        "find-init-sources", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE>());
+        "find-init-sources", Galois::chunk_size<DEFAULT_CHUNK_SIZE>());
 
     std::printf ("Number of initial sources: %ld\n", std::distance (initSources.begin () , initSources.end ()));
 
@@ -506,7 +506,7 @@ public:
         [] (NItem* nitem) {
           nitem->reset();
         },
-        "reset_dag", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
+        "reset_dag", Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
         
     t_reset.stop ();
   }
