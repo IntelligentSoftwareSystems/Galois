@@ -322,7 +322,7 @@ public:
       Galois::do_all_choice (Galois::Runtime::makeLocalRange(*currWL), 
           ParallelInnerLoop (graph, *nextWL, numAdds), 
           "wavefront_inner_loop",
-          Galois::doall_chunk_size<CHUNK_SIZE> ());
+          Galois::chunk_size<CHUNK_SIZE> ());
 
       std::swap (currWL, nextWL);
 

@@ -76,7 +76,7 @@ protected:
             graph.edge_begin (n, Galois::MethodFlag::UNPROTECTED),
             graph.edge_end (n, Galois::MethodFlag::UNPROTECTED));
         },
-        "init-pdata", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
+        "init-pdata", Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
 
     std::printf ("Graph read with %zd nodes and %zd edges\n", 
         graph.size (), graph.sizeEdges ());
@@ -176,7 +176,7 @@ protected:
             // std::fprintf (stderr, "ERROR: convergence failed on node %d, error=%f, tolerance=%f\n", src, diff, tolerance);
           }
         }, 
-        "check-convergence", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
+        "check-convergence", Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
 
     return allConverged.reduceRO ();
   }

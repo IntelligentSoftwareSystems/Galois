@@ -96,6 +96,12 @@ int main (int argc, char* argv[]) {
         p.run ();
         break;
       }
+    case Galois::Runtime::InputDAG_ExecTy::HYBRID: 
+      {
+        PageRankInputDAG<Galois::Runtime::InputDAG_ExecTy::HYBRID> p;
+        p.run ();
+        break;
+      }
 
     default:
       std::abort ();
