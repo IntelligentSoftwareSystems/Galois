@@ -2067,7 +2067,7 @@ public:
 
     defineCutOffColor ();
 
-    colorStats (); return; 
+    // colorStats (); return; 
 
     currColorBags = new std::vector<Bag_ty> (cutOffColor);
     nextColorBags = new std::vector<Bag_ty> (cutOffColor);
@@ -2100,7 +2100,7 @@ public:
       nextHeavyWork->clear_all_parallel ();
 
 
-      if (true) {
+      if (DEBUG) {
         printRoundStats (rounds);
       }
 
