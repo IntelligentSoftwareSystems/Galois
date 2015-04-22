@@ -75,16 +75,13 @@ struct BaseDAGdata {
   unsigned priority;
   int color;
 
-  bool isActive;
-
   explicit BaseDAGdata (unsigned id) : 
     onWL (0),
     indegree (0),
     indeg_backup (0),
     id (id), 
     priority (0), 
-    color (-1),
-    isActive (false)
+    color (-1)
   {}
 };
 
@@ -289,6 +286,7 @@ public:
   }
 
 
+  static const int IS_ACTIVE = 2;
 
   template <typename R, typename W>
   void reinitActiveDAG (const R& range, W& sources) {
@@ -306,7 +304,7 @@ public:
           auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
           assert (sd.onWL > 0);
           sd.indegree = 0;
-          sd.isActive = true;
+          sd.onWL = IS_ACTIVE;
         },
         "reinitActiveDAG-0",
         Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
@@ -320,7 +318,7 @@ public:
 
           auto closure = [this] (GNode dst) {
             auto& dd = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
-            if (dd.isActive) {
+            if (int(dd.onWL) == IS_ACTIVE) {
               ++(dd.indegree);
             }
           };
@@ -335,7 +333,7 @@ public:
         [this, &sources] (GNode src) {
           auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
           assert (sd.onWL > 0);
-          if (sd.indegree == 0) {
+          if (int(sd.onWL) == IS_ACTIVE && sd.indegree == 0) {
             sources.push (src);
 
             // if (DEBUG) {
@@ -370,9 +368,8 @@ public:
     void operator () (GNode src, C& ctx) {
 
       auto& sd = dagManager.graph.getData (src, Galois::MethodFlag::UNPROTECTED);
-      assert (sd.onWL > 0); 
+      assert (sd.onWL == IS_ACTIVE); 
       sd.onWL = 0;
-      sd.isActive = false;
 
       func (src, userCtx);
 
@@ -380,8 +377,8 @@ public:
 
         auto& dd = dagManager.graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
 
-        if (dd.isActive) { // is a succ in active dag
-          assert (dd.onWL > 0);
+        if (int (dd.onWL) == IS_ACTIVE) { // is a succ in active dag
+          // assert (dd.onWL > 0);
 
           int x = --dd.indegree; 
           assert (x >= 0);
@@ -766,7 +763,7 @@ public:
     auto func = [this] (GNode src) { this->colorNode (src); };
     runDAGcomputation (func, "color-DAG");
     std::printf ("DAG colored with %d colors\n", getNumColors ());
-    if (true || DEBUG) {
+    if (false || DEBUG) {
       verifyColoring ();
     }
   }
@@ -2086,6 +2083,7 @@ public:
 
     unsigned rounds = 0;
 
+    Galois::StatTimer t_heavy("operator-heavy-serial");
     while (true) {
 
       ++rounds;
@@ -2100,7 +2098,7 @@ public:
       nextHeavyWork->clear_all_parallel ();
 
 
-      if (DEBUG) {
+      if (false) {
         printRoundStats (rounds);
       }
 
@@ -2126,16 +2124,29 @@ public:
       dagManager.runActiveDAGcomp (
           makeLocalRange (*currHeavyWork),
           func, *this, "operator-edge-flip-heavy", 
-          Galois::chunk_size<CHUNK_SIZE> ());
+          Galois::chunk_size<1> ());
 
-
-      if (numPushes.reduceRO () == 0) { 
-        break;
-      }
+      //serially
+      // t_heavy.start ();
+      // for (auto i = currHeavyWork->begin (), end_i = currHeavyWork->end ();
+          // i != end_i; ++i) {
+// 
+        // GNode src = *i;
+        // auto& sd = graph.getData (src, MethodFlag::UNPROTECTED);
+        // sd.onWL = 0;
+        // func (src, *this);
+      // }
+// 
+      // if (numPushes.reduceRO () == 0) { 
+        // break;
+      // }
+      // t_heavy.stop ();
 
 
 
     }
+
+    std::printf ("HybridInputDAGexecutor performed %d rounds\n", rounds);
 
     delete currColorBags; currColorBags = nullptr;
     delete nextColorBags; nextColorBags = nullptr;
