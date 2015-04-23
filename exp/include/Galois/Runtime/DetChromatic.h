@@ -362,6 +362,8 @@ public:
     F& func;
     U& userCtx;
     DAGmanagerBase& dagManager;
+    Galois::GAccumulator<size_t>& edgesVisited;
+    Galois::GAccumulator<size_t>& edgesFlipped;
 
 
     template <typename C>
@@ -376,9 +378,11 @@ public:
       auto closure = [this, &ctx] (GNode dst) {
 
         auto& dd = dagManager.graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
+        edgesVisited += 1;
 
         if (int (dd.onWL) == IS_ACTIVE) { // is a succ in active dag
           // assert (dd.onWL > 0);
+          edgesFlipped += 1;
 
           int x = --dd.indegree; 
           assert (x >= 0);
@@ -412,12 +416,21 @@ public:
     WL_ty sources; 
     reinitActiveDAG (range, sources);
 
+    Galois::GAccumulator<size_t> edgesVisited;
+    Galois::GAccumulator<size_t> edgesFlipped;
+
+
     typedef Galois::WorkList::ExternalReference<WL_ty> WL;
     typename WL::value_type* it = 0;
     Galois::for_each(it, it,
-        ActiveDAGoperator<F, U> {func, userCtx, *this},
+        ActiveDAGoperator<F, U> {func, userCtx, *this, edgesVisited, edgesFlipped},
         Galois::loopname(loopname),
         Galois::wl<WL>(&sources));
+
+    std::printf ("edgesVisited: %zd, edgesFlipped: %zd\n", edgesVisited.reduceRO (), edgesFlipped.reduceRO ());
+
+    reportStat (loopname, "heavy-edges-visited", edgesVisited.reduceRO ());
+    reportStat (loopname, "heavy-edges-flipped", edgesFlipped.reduceRO ());
 
     t.stop ();
 
@@ -2098,7 +2111,7 @@ public:
       nextHeavyWork->clear_all_parallel ();
 
 
-      if (false) {
+      if (true) {
         printRoundStats (rounds);
       }
 
@@ -2136,11 +2149,12 @@ public:
         // sd.onWL = 0;
         // func (src, *this);
       // }
-// 
-      // if (numPushes.reduceRO () == 0) { 
-        // break;
-      // }
-      // t_heavy.stop ();
+
+
+      if (numPushes.reduceRO () == 0) { 
+        break;
+      }
+      t_heavy.stop ();
 
 
 
