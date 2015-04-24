@@ -29,6 +29,8 @@ enum class InputDAG_ExecTy {
 
 namespace cll = llvm::cl;
 
+static cll::opt<int> cutOffColorOpt("cutoff", cll::desc("cut off color for hybrid executor"), cll::init(20));
+
 static cll::opt<InputDAG_ExecTy> inputDAG_ExecTy (
     "executor",
     cll::desc ("Deterministic Executor Type"),
@@ -2075,7 +2077,8 @@ public:
     dagManager.initDAG ();
     dagManager.colorDAG ();
 
-    defineCutOffColor ();
+    // defineCutOffColor ();
+    cutOffColor = cutOffColorOpt; GALOIS_ASSERT (cutOffColor > 0);
 
     // colorStats (); return; 
 
@@ -2129,7 +2132,7 @@ public:
               func (src, *this);
               }, 
               "operator-chromatic",
-              Galois::chunk_size<CHUNK_SIZE> ());
+              Galois::chunk_size<2> ());
         }
       }
 
@@ -2137,7 +2140,7 @@ public:
       dagManager.runActiveDAGcomp (
           makeLocalRange (*currHeavyWork),
           func, *this, "operator-edge-flip-heavy", 
-          Galois::chunk_size<1> ());
+          Galois::chunk_size<4> ());
 
       //serially
       // t_heavy.start ();
