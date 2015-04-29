@@ -38,8 +38,8 @@ template <typename T, const size_t SZ=16*1024>
 class SerialBag {
 protected:
   using Chunk = BoundedVector<T, SZ>;
-  // using OuterList = std::list<Chunk, Runtime::MM::FixedSizeAllocator<Chunk> >;
-   using OuterList = typename ContainersWithGAlloc::Deque<Chunk>::type;
+  using OuterList = std::list<Chunk, Runtime::MM::FixedSizeAllocator<Chunk> >;
+  // using OuterList = typename ContainersWithGAlloc::Deque<Chunk>::type;
 
 
   OuterList outerList;
@@ -216,6 +216,15 @@ public:
     m_size = 0;
   }
 
+  void splice (SerialBag& that) {
+
+    m_size += that.m_size;
+    outerList.splice (outerList.end (), that.outerList);
+    assert (that.outerList.empty ());
+    that.m_size = 0;
+
+  }
+
   iterator begin () {
     return stl_two_level_begin (outerList.begin (), outerList.end ());
   }
@@ -258,6 +267,12 @@ public:
 
   void push (const T& x) {
     push_back (x);
+  }
+
+  void splice_all (PerThreadBag& that) {
+    for (unsigned i = 0; i < Super_ty::numRows(); ++i) {
+      Super_ty::get(i).splice (that.Super_ty::get (i));
+    }
   }
 };
 

@@ -31,6 +31,8 @@ namespace cll = llvm::cl;
 
 static cll::opt<int> cutOffColorOpt("cutoff", cll::desc("cut off color for hybrid executor"), cll::init(20));
 
+static cll::opt<int> threadMultFactor("tmult", cll::desc("thread multiplication factor for low parallelism threshold"), cll::init(0));
+
 static cll::opt<InputDAG_ExecTy> inputDAG_ExecTy (
     "executor",
     cll::desc ("Deterministic Executor Type"),
@@ -288,7 +290,8 @@ public:
   }
 
 
-  static const int IS_ACTIVE = 2;
+  // made non-static to fix clang linking error
+  const int IS_ACTIVE = 2;
 
   template <typename R, typename W>
   void reinitActiveDAG (const R& range, W& sources) {
@@ -299,11 +302,15 @@ public:
 
     GALOIS_ASSERT (initialized);
 
-    // XXX: may be superfluous
     Galois::do_all_choice (
         range,
         [this] (GNode src) {
           auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
+
+          // if (sd.onWL == 0) {
+            // std::printf ("assertion going to fail sd.onWL==0, for id %d\n", sd.id);
+          // }
+
           assert (sd.onWL > 0);
           sd.indegree = 0;
           sd.onWL = IS_ACTIVE;
@@ -335,6 +342,7 @@ public:
         [this, &sources] (GNode src) {
           auto& sd = graph.getData (src, Galois::MethodFlag::UNPROTECTED);
           assert (sd.onWL > 0);
+          // std::printf ("active node %d, with indegree %d\n", sd.id, int(sd.indegree));
           if (int(sd.onWL) == IS_ACTIVE && sd.indegree == 0) {
             sources.push (src);
 
@@ -372,8 +380,10 @@ public:
     void operator () (GNode src, C& ctx) {
 
       auto& sd = dagManager.graph.getData (src, Galois::MethodFlag::UNPROTECTED);
-      assert (sd.onWL == IS_ACTIVE); 
+      assert (sd.onWL == dagManager.IS_ACTIVE); 
       sd.onWL = 0;
+
+      // std::printf ("edge-flip executing %d\n", sd.id);
 
       func (src, userCtx);
 
@@ -382,7 +392,7 @@ public:
         auto& dd = dagManager.graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
         edgesVisited += 1;
 
-        if (int (dd.onWL) == IS_ACTIVE) { // is a succ in active dag
+        if (int (dd.onWL) == dagManager.IS_ACTIVE) { // is a succ in active dag
           // assert (dd.onWL > 0);
           edgesFlipped += 1;
 
@@ -429,7 +439,7 @@ public:
         Galois::loopname(loopname),
         Galois::wl<WL>(&sources));
 
-    std::printf ("edgesVisited: %zd, edgesFlipped: %zd\n", edgesVisited.reduceRO (), edgesFlipped.reduceRO ());
+    // std::printf ("edgesVisited: %zd, edgesFlipped: %zd\n", edgesVisited.reduceRO (), edgesFlipped.reduceRO ());
 
     reportStat (loopname, "heavy-edges-visited", edgesVisited.reduceRO ());
     reportStat (loopname, "heavy-edges-flipped", edgesFlipped.reduceRO ());
@@ -2067,6 +2077,34 @@ public:
     printf ("Heavy Bucket has size %zd\n", currHeavyWork->size_all ());
   }
 
+  template <typename CS>
+  void runBag (Bag_ty& bag, bool runEdgeFlip, const char* loopname, const CS& cs) {
+
+    if (runEdgeFlip) {
+
+      dagManager.runActiveDAGcomp (
+          makeLocalRange (bag),
+          func, *this, loopname, 
+          cs);
+
+    } else {
+
+      Galois::do_all_choice(
+          makeLocalRange (bag),
+          [this] (GNode src) {
+            auto& sd = graph.getData (src, MethodFlag::UNPROTECTED);
+            assert (sd.onWL > 0);
+            sd.onWL = 0;
+            // printf ("Chromatic executing %d\n", sd.id);
+            func (src, *this);
+          }, 
+          loopname,
+          cs);
+
+    }
+
+  }
+
 
   template <typename R>
   void execute (const R& range) {
@@ -2096,7 +2134,6 @@ public:
         "push_initial",
         Galois::chunk_size<CHUNK_SIZE> ());
 
-
     unsigned rounds = 0;
 
     Galois::StatTimer t_heavy("operator-heavy-serial");
@@ -2114,33 +2151,75 @@ public:
       nextHeavyWork->clear_all_parallel ();
 
 
-      if (true) {
+      if (false) {
         printRoundStats (rounds);
       }
 
 
-      // run chromatic
+      static const unsigned HEAVY_CHUNK_SIZE = 1;
+
+      Bag_ty* eflipBag = nullptr;
+      bool runEdgeFlip = false;
 
       for (unsigned i = 0; i < currColorBags->size (); ++i) {
 
-        if (!(*currColorBags) [i].empty_all ()) {
-          Galois::do_all_choice(
-              makeLocalRange ((*currColorBags)[i]),
-              [this] (GNode src) {
-              auto& sd = graph.getData (src, MethodFlag::UNPROTECTED);
-              sd.onWL = 0;
-              func (src, *this);
-              }, 
-              "operator-chromatic",
-              Galois::chunk_size<2> ());
-        }
-      }
+        if (!(*currColorBags)[i].empty_all ()) {
 
+          size_t sz = (*currColorBags)[i].size_all ();
+
+          if (sz < (threadMultFactor * Galois::getActiveThreads ())) {
+
+            if (eflipBag == nullptr) {
+              eflipBag = &((*currColorBags)[i]);
+            } else {
+              eflipBag->splice_all ((*currColorBags)[i]);
+              runEdgeFlip = true;
+            }
+
+            continue;
+
+          } else {
+
+            // if (eflipBag != nullptr) {
+              // // eflipBag has some stuff, first run that
+              // runBag (*eflipBag, runEdgeFlip, 
+                  // (runEdgeFlip ? "operator-edge-flip" : "operator-chromatic"),
+                  // Galois::chunk_size<HEAVY_CHUNK_SIZE> ());
+// 
+              // eflipBag = nullptr;
+              // runEdgeFlip = false;
+            // }
+
+            // now run the current bucket using chromatic
+            runBag ((*currColorBags) [i], false, "operator-chromatic", 
+                Galois::chunk_size<HEAVY_CHUNK_SIZE> ());
+
+
+          } // end if sz
+        } // end if not empty 
+      } // end for
+
+
+      if (eflipBag != nullptr) {
+        // std::printf ("running edge-flip before cutoff, size=%zd, distance=%ld\n", eflipBag->size_all (),
+            // std::distance (eflipBag->begin (), eflipBag->end ()));
+
+        // eflipBag has some stuff, first run that
+        runBag (*eflipBag, runEdgeFlip, 
+            (runEdgeFlip ? "operator-edge-flip" : "operator-chromatic"),
+            Galois::chunk_size<HEAVY_CHUNK_SIZE> ());
+
+        eflipBag = nullptr;
+        runEdgeFlip = false;
+      }
+      
+
+
+      // std::printf ("running edge-flip after cutoff, for heavy bucket, size=%zd\n", currHeavyWork->size_all ());
       // run edge flip
-      dagManager.runActiveDAGcomp (
-          makeLocalRange (*currHeavyWork),
-          func, *this, "operator-edge-flip-heavy", 
-          Galois::chunk_size<4> ());
+      runBag (*currHeavyWork, true, "operator-edge-flip-remaining",
+          Galois::chunk_size<HEAVY_CHUNK_SIZE> ());
+
 
       //serially
       // t_heavy.start ();

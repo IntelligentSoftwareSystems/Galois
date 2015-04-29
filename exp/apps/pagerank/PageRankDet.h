@@ -61,7 +61,7 @@ protected:
   typedef typename Graph::GraphNode GNode;
   typedef typename Graph::node_data_type NodeData;
 
-  static const unsigned DEFAULT_CHUNK_SIZE = 4;
+  static const unsigned DEFAULT_CHUNK_SIZE = 1;
 
   Graph graph;
   Galois::GAccumulator<size_t> numIter;
