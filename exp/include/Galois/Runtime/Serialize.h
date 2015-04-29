@@ -100,6 +100,11 @@ public:
     bufdata.push_back(c);
   }
 
+  void insert(const unsigned char* c, size_t bytes) {
+    bufdata.insert(bufdata.end(), c, c+bytes);
+  }
+
+
   void serialize_header(void* data) {
     assert(start != 0);
     unsigned char* pdata = (unsigned char*)&data;
@@ -198,8 +203,7 @@ void gSerializeObj(SerializeBuffer& buf, const T& data,
                    typename std::enable_if<is_memory_copyable<T>::value>::type* = 0)
 {
   unsigned char* pdata = (unsigned char*)&data;
-  for (size_t i = 0; i < sizeof(T); ++i)
-    buf.push(pdata[i]);
+  buf.insert(pdata, sizeof(T));
 }
 
 template<typename T>
