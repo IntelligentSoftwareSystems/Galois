@@ -15,6 +15,7 @@
 
 #include <atomic>
 #include <vector>
+#include <type_traits>
 
 namespace Galois {
 namespace Runtime {
@@ -30,6 +31,7 @@ enum class InputDAG_ExecTy {
 namespace cll = llvm::cl;
 
 static cll::opt<int> cutOffColorOpt("cutoff", cll::desc("cut off color for hybrid executor"), cll::init(20));
+static cll::opt<bool> reinitAfterCutOff("reinit", cll::desc("In hybrid execuotr: reinit DAG successors of nodes after cutoff"), cll::init(false));
 
 static cll::opt<InputDAG_ExecTy> inputDAG_ExecTy (
     "executor",
@@ -288,7 +290,8 @@ public:
   }
 
 
-  static const int IS_ACTIVE = 2;
+  // made non-static to fix clang linking error
+  const int IS_ACTIVE = 2;
 
   template <typename R, typename W>
   void reinitActiveDAG (const R& range, W& sources) {
@@ -299,7 +302,6 @@ public:
 
     GALOIS_ASSERT (initialized);
 
-    // XXX: may be superfluous
     Galois::do_all_choice (
         range,
         [this] (GNode src) {
@@ -372,7 +374,7 @@ public:
     void operator () (GNode src, C& ctx) {
 
       auto& sd = dagManager.graph.getData (src, Galois::MethodFlag::UNPROTECTED);
-      assert (sd.onWL == IS_ACTIVE); 
+      assert (sd.onWL == dagManager.IS_ACTIVE); 
       sd.onWL = 0;
 
       func (src, userCtx);
@@ -382,7 +384,7 @@ public:
         auto& dd = dagManager.graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
         edgesVisited += 1;
 
-        if (int (dd.onWL) == IS_ACTIVE) { // is a succ in active dag
+        if (int (dd.onWL) == dagManager.IS_ACTIVE) { // is a succ in active dag
           // assert (dd.onWL > 0);
           edgesFlipped += 1;
 
@@ -429,7 +431,7 @@ public:
         Galois::loopname(loopname),
         Galois::wl<WL>(&sources));
 
-    std::printf ("edgesVisited: %zd, edgesFlipped: %zd\n", edgesVisited.reduceRO (), edgesFlipped.reduceRO ());
+    // std::printf ("edgesVisited: %zd, edgesFlipped: %zd\n", edgesVisited.reduceRO (), edgesFlipped.reduceRO ());
 
     reportStat (loopname, "heavy-edges-visited", edgesVisited.reduceRO ());
     reportStat (loopname, "heavy-edges-flipped", edgesFlipped.reduceRO ());
@@ -939,6 +941,44 @@ struct DAGmanagerInOut {
 
     void initDAG (void) {
       Base_ty::initDAG (InitDAGoffsets ());
+    }
+
+    template <typename R, typename P>
+    void filterDAGsucc (const R& range, const P& pred) {
+
+      G& graph = Base_ty::graph;
+
+      Galois::do_all_choice (
+          range, 
+          [&graph, &pred] (GNode src) {
+            auto& sd = graph.getData (src, MethodFlag::UNPROTECTED);
+
+            auto combinedPred = [&graph, &sd, &pred] (GNode dst) {
+
+              auto& dd = graph.getData (dst, MethodFlag::UNPROTECTED); 
+
+              using ND = typename std::remove_reference<decltype (dd)>::type;
+
+              return pred (dd) && (DAGdataComparator<ND>::compare3val (sd, dd) < 0); 
+            };
+
+
+            ptrdiff_t old_out = sd.dagSuccEndOut;
+            ptrdiff_t old_in = sd.dagSuccEndIn;
+
+            ptrdiff_t out_off = graph.partition_neighbors (src, combinedPred);
+            ptrdiff_t in_off = graph.partition_in_neighbors (src, combinedPred);
+
+            GALOIS_ASSERT (out_off <= old_out);
+            GALOIS_ASSERT (in_off <= old_in);
+
+            sd.dagSuccEndOut = out_off;
+            sd.dagSuccEndIn = in_off;
+
+          },
+          "reinitDAG-cutoff",
+          Galois::chunk_size<Base_ty::DEFAULT_CHUNK_SIZE> ());
+          
     }
 
   };
@@ -2078,7 +2118,48 @@ public:
     dagManager.colorDAG ();
 
     // defineCutOffColor ();
-    cutOffColor = cutOffColorOpt; GALOIS_ASSERT (cutOffColor > 0);
+    cutOffColor = cutOffColorOpt; 
+    GALOIS_ASSERT (cutOffColor > 0);
+
+    if (reinitAfterCutOff) {
+
+      Galois::StatTimer t_reinit ("reinit after cutoff");
+
+      t_reinit.start ();
+      using ND = typename G::node_data_type;
+      auto filterAfter = [this] (const ND& dd) {
+        return dd.color >= cutOffColor;
+      };
+
+      Bag_ty nodesAfterCutoff;
+      // Bag_ty nodesBeforeCutoff;
+
+      Galois::do_all_choice (
+          makeLocalRange (graph),
+          // [this, &filterAfter, &nodesAfterCutoff, &nodesBeforeCutoff] (GNode src) {
+          [this, &filterAfter, &nodesAfterCutoff] (GNode src) {
+            auto& sd = graph.getData (src, MethodFlag::UNPROTECTED);
+            if (filterAfter (sd)) {
+              nodesAfterCutoff.push (src);
+            } else {
+              // nodesBeforeCutoff.push (src);
+            }
+          },
+          "filter-after-cutoff",
+          Galois::chunk_size<CHUNK_SIZE> ());
+
+      dagManager.filterDAGsucc (makeLocalRange (nodesAfterCutoff), filterAfter);
+
+      // dagManager.filterDAGsucc (
+          // makeLocalRange (nodesBeforeCutoff), 
+          // [&filterAfter] (const ND& dd) { return !filterAfter (dd); }
+          // );
+      // nodesBeforeCutoff.clear_all_parallel ();
+
+      nodesAfterCutoff.clear_all_parallel ();
+
+      t_reinit.stop ();
+    }
 
     // colorStats (); return; 
 
@@ -2114,10 +2195,11 @@ public:
       nextHeavyWork->clear_all_parallel ();
 
 
-      if (true) {
+      if (false) {
         printRoundStats (rounds);
       }
 
+      static const unsigned HEAVY_CHUNK_SIZE = 1;
 
       // run chromatic
 
@@ -2132,7 +2214,7 @@ public:
               func (src, *this);
               }, 
               "operator-chromatic",
-              Galois::chunk_size<2> ());
+              Galois::chunk_size<HEAVY_CHUNK_SIZE> ());
         }
       }
 
@@ -2140,7 +2222,7 @@ public:
       dagManager.runActiveDAGcomp (
           makeLocalRange (*currHeavyWork),
           func, *this, "operator-edge-flip-heavy", 
-          Galois::chunk_size<4> ());
+          Galois::chunk_size<HEAVY_CHUNK_SIZE> ());
 
       //serially
       // t_heavy.start ();
