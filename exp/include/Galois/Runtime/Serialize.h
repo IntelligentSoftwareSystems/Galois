@@ -79,7 +79,7 @@ class DeSerializeBuffer;
 
 class SerializeBuffer {
   friend DeSerializeBuffer;
-  typedef std::vector<unsigned char> vTy;
+  typedef std::vector<char> vTy;
   vTy bufdata;
   unsigned start;
 public:
@@ -100,10 +100,13 @@ public:
     bufdata.push_back(c);
   }
 
-  void insert(const unsigned char* c, size_t bytes) {
+  void insert(const char* c, size_t bytes) {
     bufdata.insert(bufdata.end(), c, c+bytes);
   }
 
+  void reserve(size_t s) {
+    bufdata.reserve(bufdata.size() + s);
+  }
 
   void serialize_header(void* data) {
     assert(start != 0);
@@ -113,7 +116,7 @@ public:
       bufdata[start + i] = pdata[i];
   }
 
-  void* linearData() { return &bufdata[start]; }
+  const char* linearData() const { return &bufdata[start]; }
 
   vTy::const_iterator begin() const { return bufdata.cbegin() + start; }
   vTy::const_iterator end() const { return bufdata.cend(); }
@@ -140,7 +143,7 @@ public:
 class DeSerializeBuffer {
   friend SerializeBuffer;
 
-  std::vector<unsigned char> bufdata;
+  std::vector<char> bufdata;
   int offset;
 public:
 
@@ -173,9 +176,14 @@ public:
     return bufdata.at(offset++);
   }
 
+  void extract(char* dst, size_t num) {
+    for (size_t i = 0; i < num; ++i)
+      dst[i] = bufdata[offset++];
+  }
+
   void* linearData() { return &bufdata[0]; }
 
-  const unsigned char* r_linearData() const { return &bufdata[offset]; }
+  const char* r_linearData() const { return &bufdata[offset]; }
   size_t r_size() const { return bufdata.size() - offset; }
 
   //Utility
@@ -199,15 +207,15 @@ public:
 namespace detail {
 
 template<typename T>
-void gSerializeObj(SerializeBuffer& buf, const T& data,
+__attribute__((always_inline)) void gSerializeObj(SerializeBuffer& buf, const T& data,
                    typename std::enable_if<is_memory_copyable<T>::value>::type* = 0)
 {
-  unsigned char* pdata = (unsigned char*)&data;
+  char* pdata = (char*)&data;
   buf.insert(pdata, sizeof(T));
 }
 
 template<typename T>
-void gSerializeObj(SerializeBuffer& buf, const T& data,
+__attribute__((always_inline)) void gSerializeObj(SerializeBuffer& buf, const T& data,
                    typename std::enable_if<!is_memory_copyable<T>::value>::type* = 0,
                    typename std::enable_if<has_serialize<T>::value>::type* = 0)
 {
@@ -222,6 +230,12 @@ void gSerializeObj(SerializeBuffer& buf, const std::pair<T1, T2>& data) {
 template<typename Seq>
 void gSerializeSeq(SerializeBuffer& buf, const Seq& seq) {
   typename Seq::size_type size = seq.size();
+  typedef decltype(*seq.begin()) T;
+
+  size_t tsize = std::conditional<is_memory_copyable<T>::value, 
+    std::integral_constant<size_t, sizeof(T)>,
+    std::integral_constant<size_t, 1>>::type::value;
+  buf.reserve(size * tsize);
   gSerializeObj(buf, size);
   for (auto ii = seq.begin(), ee = seq.end(); ii != ee; ++ii)
     gSerializeObj(buf, *ii);
@@ -243,31 +257,31 @@ void gSerializeObj(SerializeBuffer& buf, const Galois::gdeque<T,CS>& data) {
 }
 
 inline void gSerializeObj(SerializeBuffer& buf, const std::string& data) {
-  gSerializeSeq(buf,data);
+  buf.insert(data.data(), data.length()+1);
 }
 
 inline void gSerializeObj(SerializeBuffer& buf, const SerializeBuffer& data) {
-  for (unsigned char c : data)
-    buf.push(c);
+  buf.insert(data.linearData(), data.size());
 }
 
 inline void gSerializeObj(SerializeBuffer& buf, const DeSerializeBuffer& rbuf) {
-  for (unsigned x = 0; x < rbuf.r_size(); ++x)
-    buf.push(rbuf.r_linearData()[x]);
+  buf.insert(rbuf.r_linearData(), rbuf.r_size());
 }
-
 
 } //detail
 
 template<typename T1, typename... Args>
-void gSerialize(SerializeBuffer& buf, T1&& t1, Args&&... args) {
+static inline void gSerialize(SerializeBuffer& buf, T1&& t1, Args&&... args) {
   detail::gSerializeObj(buf, std::forward<T1>(t1));
   gSerialize(buf, std::forward<Args>(args)...);
 }
 
-inline void gSerialize(SerializeBuffer& buf) { }
+static inline void gSerialize(SerializeBuffer&) {}
 
-
+//template<typename... Args>
+//void gSerialize(SerializeBuffer& buf, Args&&... args) {
+//  int dummy[sizeof...(Args)] = { (detail::gSerializeObj(buf, std::forward<Args>(args)), 0)...};
+//}
 
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -280,9 +294,8 @@ template<typename T>
 void gDeserializeObj(DeSerializeBuffer& buf, T& data,
                      typename std::enable_if<is_memory_copyable<T>::value>::type* = 0) 
 {
-  unsigned char* pdata = (unsigned char*)&data;
-  for (size_t i = 0; i < sizeof(T); ++i)
-    pdata[i] = buf.pop();
+  char* pdata = (char*)&data;
+  buf.extract(pdata, sizeof(T));
 }
 
 template<typename T>
@@ -327,7 +340,10 @@ void gDeserializeSeq(DeSerializeBuffer& buf, Seq& seq) {
 }
 
 inline void gDeserializeObj(DeSerializeBuffer& buf, std::string& data) {
-  gDeserializeSeq(buf, data);
+  char c = buf.pop();
+  while(c != '\0') {
+    data.push_back(c);
+  };
 }
 
 template<typename T, typename Alloc>
