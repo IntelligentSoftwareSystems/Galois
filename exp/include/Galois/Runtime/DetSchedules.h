@@ -208,19 +208,19 @@ struct ReuseableExecutorWrapper {
     
   }
 
-  void reinitDAG (void) {
+  void resetDAG (void) {
     switch (detExec) {
 
       case chromatic:
-        chromExec.reinitDAG ();
+        chromExec.resetDAG ();
         break;
 
       case edge_flip:
-        inputDAGexec.reinitDAG ();
+        inputDAGexec.resetDAG ();
         break;
 
       case kdg_r:
-        taskDAGexec.reinitDAG ();
+        taskDAGexec.resetDAG ();
         break;
 
       default:

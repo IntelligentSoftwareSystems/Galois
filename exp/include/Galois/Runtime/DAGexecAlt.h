@@ -39,7 +39,7 @@
 
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/Executor_DoAll.h"
-#include "Galois/Runtime/LCordered.h"
+#include "Galois/Runtime/OrderedLockable.h"
 #include "Galois/Runtime/ll/gio.h"
 #include "Galois/Runtime/ll/ThreadRWlock.h"
 #include "Galois/Runtime/mm/Mem.h"
@@ -53,32 +53,32 @@ namespace Runtime {
 
 namespace Exp {
 
-template <typename C>
-struct DAGnhoodItemSetBased: public LockManagerBase {
+template <typename Ctxt>
+struct SharerSet {
 
 public:
-  typedef C Ctxt;
-  typedef LockManagerBase Base;
-  typedef Galois::ThreadSafeOrderedSet<Ctxt*, std::less<Ctxt*> > SharerSet;
+  using CtxtCmp = std::less<Ctxt*>;
+  using Cont = Galois::ThreadSafeOrderedSet<Ctxt*, CtxtCmp>;
 
-  inline void addSharer (SharerSet& sharers, Ctxt* ctxt) {
+  Cont sharers;
+
+  inline void addSharer (Ctxt* ctxt) {
     assert (std::find (sharers.begin (), sharers.end (), ctxt) == sharers.end ());
     sharers.push (ctxt);
   }
 
 };
 
-template <typename C>
-struct DAGnhoodItemVectorBased: public LockManagerBase {
+template <typename Ctxt>
+struct SharerVec {
 
 public:
-  typedef C Ctxt;
-  typedef LockManagerBase Base;
-  typedef std::vector<Ctxt*> SharerSet;
+  using Cont = typename ContainersWithGAlloc::Vector<Ctxt*>::type;
 
   LL::SimpleLock mutex;
+  Cont sharers;
 
-  inline void addSharer (SharerSet& sharers, Ctxt* ctxt) {
+  inline void addSharer (Ctxt* ctxt) {
     mutex.lock ();
       assert (std::find (sharers.begin (), sharers.end (), ctxt) == sharers.end ());
       sharers.push_back (ctxt);
@@ -87,55 +87,53 @@ public:
 
 };
 
-template <typename C>
-struct DAGnhoodItemListBased: public LockManagerBase {
+template <typename Ctxt>
+struct SharerList {
 public:
-  typedef C Ctxt;
-  typedef LockManagerBase Base;
-  typedef Galois::concurrent_gslist<Ctxt*, 16> SharerSet;
-  typedef Galois::Runtime::MM::FixedSizeHeap FSHeap;
+  using Cont =  Galois::concurrent_gslist<Ctxt*, 16>;
+  using FSHeap =  Galois::Runtime::MM::FixedSizeHeap;
 
   FSHeap heap;
+  Cont sharers;
 
-  DAGnhoodItemListBased (void): LockManagerBase{}, heap (sizeof(Ctxt*)) {}
-
-  void addSharer (SharerSet& sharers, Ctxt* ctxt) {
+  void addSharer (Ctxt* ctxt) {
     assert (std::find (sharers.begin (), sharers.end (), ctxt) == sharers.end ());
     sharers.push_front (heap, ctxt);
   }
 };
 
-template <typename Base>
-struct DAGnhoodItem: public Base {
+template <typename Ctxt, typename SharerWrapper>
+struct DAGnhoodItem: public OrdLocBase<DAGnhoodItem<Ctxt, SharerWrapper>, Ctxt, std::less<Ctxt*> > {
 
-  typedef typename Base::Ctxt Ctxt;
-  typedef typename Base::SharerSet SharerSet;
-  typedef typename SharerSet::iterator HeadIter;
+  using CtxtCmp = std::less<Ctxt*>;
+  using Base = OrdLocBase<DAGnhoodItem, Ctxt, CtxtCmp >;
+  using HeadIter = typename SharerWrapper::Cont::iterator;
+  using SharerCont = typename SharerWrapper::Cont;
 
-  SharerSet sharers;
+  SharerWrapper wrapper;
   HeadIter head;
   HeadIter end;
   Lockable* lockable;
 
-  explicit DAGnhoodItem (Lockable* l): Base {}, lockable {l} {}
+  explicit DAGnhoodItem (Lockable* l, const CtxtCmp& ctxtCmp): Base (l) {}
 
   void addSharer (Ctxt* ctxt) {
-    Base::addSharer (sharers, ctxt);
+    wrapper.addSharer (ctxt);
   }
 
   void removeMin (Ctxt* ctxt) {
     if (head != end) {
       assert (*head == ctxt);
       ++head;
-      assert (std::find (head, sharers.end (), ctxt) == sharers.end ());
+      assert (std::find (head, wrapper.sharers.end (), ctxt) == wrapper.sharers.end ());
     }
   }
 
   template <typename CtxtCmp> 
   void sortSharerSet (const CtxtCmp& cmp) {
-    std::sort (sharers.begin (), sharers.end (), cmp);
-    head = sharers.begin ();
-    end = sharers.end ();
+    std::sort (wrapper.sharers.begin (), wrapper.sharers.end (), cmp);
+    head = wrapper.sharers.begin ();
+    end = wrapper.sharers.end ();
   }
 
   bool isMin (Ctxt* ctxt) const {
@@ -157,63 +155,20 @@ struct DAGnhoodItem: public Base {
   }
 
   void reset (void) {
-    head = sharers.begin ();
-    assert (end == sharers.end ());
+    head = wrapper.sharers.begin ();
+    assert (end == wrapper.sharers.end ());
   }
 
-  bool tryMappingTo (Lockable* l) {
-    return Base::CASowner (l, NULL);
-  }
-
-  void clearMapping () {
-    // release requires having owned the lock
-    bool r = Base::tryLock (lockable);
-    assert (r);
-    Base::release (lockable);
-  }
-
-  // just for debugging
-  const Lockable* getMapping () const {
-    return lockable;
-  }
-
-  static DAGnhoodItem* getOwner (Lockable* l) {
-    LockManagerBase* o = LockManagerBase::getOwner (l);
-    // assert (dynamic_cast<DAGnhoodItem*> (o) != nullptr);
-    return static_cast<DAGnhoodItem*> (o);
-  }
-
-  struct Factory {
-
-    typedef DAGnhoodItem<Base> NItem;
-    typedef MM::FixedSizeAllocator<NItem> NItemAlloc;
-
-    NItemAlloc niAlloc;
-
-
-    NItem* create (Lockable* l) {
-      NItem* ni = niAlloc.allocate (1);
-      assert (ni != nullptr);
-      niAlloc.construct (ni, l);
-      return ni;
-    }
-
-    void destroy (NItem* ni) {
-      // delete ni; ni = NULL;
-      niAlloc.destroy (ni);
-      niAlloc.deallocate (ni, 1);
-    }
-  };
 };
 
 template <typename T>
 struct DAGcontext: public SimpleRuntimeContext {
 
   // typedef DAGnhoodItem<DAGcontext> NItem;
-  typedef DAGnhoodItem<DAGnhoodItemVectorBased<DAGcontext> > NItem;
-  typedef PtrBasedNhoodMgr<NItem> NhoodMgr;
-  typedef Galois::gdeque<NItem*, 8> NhoodSet;
-  typedef Galois::GAtomic<bool> AtomicBool;
+  using NItem = DAGnhoodItem<DAGcontext, SharerVec<DAGcontext> >;
+  using NhoodMgr = PtrBasedNhoodMgr<NItem>;
+  using NhoodSet = Galois::gdeque<NItem*, 8>;
+  using AtomicBool = Galois::GAtomic<bool>;
 
 
   AtomicBool onWL;
@@ -308,7 +263,7 @@ template <typename T>
 struct DAGcontext: public SimpleRuntimeContext {
 
   // typedef DAGnhoodItem<DAGcontext> NItem;
-  typedef DAGnhoodItem<DAGnhoodItemListBased<DAGcontext> > NItem;
+  typedef DAGnhoodItem<SharerList<DAGcontext> > NItem;
   typedef PtrBasedNhoodMgr<NItem> NhoodMgr;
 
 protected:
@@ -395,9 +350,11 @@ template <typename T, typename Cmp, typename OpFunc, typename NhoodFunc>
 class DAGexecutor {
 
 protected:
-  typedef DAGcontext<T>  Ctxt;
-  typedef typename Ctxt::NhoodMgr NhoodMgr;
-  typedef typename Ctxt::NItem NItem;
+  using Ctxt = DAGcontext<T>;
+  using NhoodMgr = typename Ctxt::NhoodMgr;
+  using NItem = typename Ctxt::NItem;
+  using CtxtCmp = typename NItem::CtxtCmp;
+  using NItemFactory = typename NItem::Factory;
 
   typedef MM::FixedSizeAllocator<Ctxt> CtxtAlloc;
   typedef PerThreadBag<Ctxt*> CtxtWL;
@@ -430,6 +387,7 @@ protected:
   Cmp cmp;
   NhoodFunc nhVisitor;
   OpFunc opFunc;
+  NItemFactory nitemFactory;
   NhoodMgr nhmgr;
 
   CtxtAlloc ctxtAlloc;
@@ -448,7 +406,8 @@ public:
       cmp (cmp),
       nhVisitor (nhVisitor),
       opFunc (opFunc),
-      nhmgr (typename NItem::Factory ())
+      nitemFactory (CtxtCmp ()),
+      nhmgr (nitemFactory)
   {}
 
   ~DAGexecutor (void) {
@@ -458,7 +417,7 @@ public:
           ctxtAlloc.destroy (ctxt);
           ctxtAlloc.deallocate (ctxt, 1);
         }, 
-        "free_ctx", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
+        "free_ctx", Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
   }
 
 
@@ -490,7 +449,7 @@ public:
           Galois::Runtime::setThreadContext (NULL);
 
           // printf ("Created context:%p for item: %d\n", ctxt, x);
-        }, "create_ctxt", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
+        }, "create_ctxt", Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
 
 
     Galois::do_all_choice (nhmgr.getAllRange(),
@@ -498,7 +457,7 @@ public:
           nitem->sortSharerSet (typename Ctxt::template Comparator<Cmp> {cmp});
           // std::printf ("Nitem: %p, num sharers: %ld\n", nitem, nitem->sharers.size ());
         }, 
-        "sort_sharers", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE>());
+        "sort_sharers", Galois::chunk_size<DEFAULT_CHUNK_SIZE>());
 
     Galois::do_all_choice (Galois::Runtime::makeLocalRange (allCtxts),
         [this] (Ctxt* ctxt) {
@@ -507,7 +466,7 @@ public:
             initSources.get ().push_back (ctxt);
           }
         }, 
-        "find-init-sources", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE>());
+        "find-init-sources", Galois::chunk_size<DEFAULT_CHUNK_SIZE>());
 
     std::printf ("Number of initial sources: %ld\n", std::distance (initSources.begin () , initSources.end ()));
 
@@ -547,7 +506,7 @@ public:
         [] (NItem* nitem) {
           nitem->reset();
         },
-        "reset_dag", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
+        "reset_dag", Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
         
     t_reset.stop ();
   }

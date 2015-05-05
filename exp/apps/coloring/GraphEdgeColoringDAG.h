@@ -275,7 +275,7 @@ public:
 
          }
 
-      }, "check-edge-coloring", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE>());
+      }, "check-edge-coloring", Galois::chunk_size<DEFAULT_CHUNK_SIZE>());
 
       std::printf("Graph-edges colored with %d colors\n", maxColor.reduce());
 
@@ -348,7 +348,7 @@ protected:
                assert (sd.indegree == 0);
                initWork.push (src);
             }
-         }, "init-dag", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE>());
+         }, "init-dag", Galois::chunk_size<DEFAULT_CHUNK_SIZE>());
 
    }
    ////////////////////////////////////////////////////////////

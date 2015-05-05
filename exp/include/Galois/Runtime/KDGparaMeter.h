@@ -133,7 +133,7 @@ public:
             runCatching (nhFunc, c, uhand);
           },
           "expand_nhood",
-          Galois::doall_chunk_size<NhFunc::CHUNK_SIZE> ());
+          Galois::chunk_size<NhFunc::CHUNK_SIZE> ());
 
 
 
@@ -151,7 +151,7 @@ public:
             }
           },
           "collect_sources",
-          Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
+          Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
 
       // NOTE: safety test should be applied to all sources
       // where each source is tested against all elements earlier in priority
@@ -191,7 +191,7 @@ public:
             uhand.reset ();
           },
           "apply_operator",
-          Galois::doall_chunk_size<OpFunc::CHUNK_SIZE> ());
+          Galois::chunk_size<OpFunc::CHUNK_SIZE> ());
 
       Galois::Runtime::on_each_impl (
           [this] (const unsigned tid, const unsigned numT) {

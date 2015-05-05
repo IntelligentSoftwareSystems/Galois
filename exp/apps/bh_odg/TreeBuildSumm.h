@@ -744,7 +744,7 @@ struct TreeSummarizeSpeculative: public TypeDefHelper<SpecNodeBase> {
   template <typename I, typename InternalNodes>
   void operator () (InterNode* root, I bodbeg, I bodend, InternalNodes& internalNodes) const {
 
-    Galois::Runtime::for_each_ordered_rob (
+    Galois::Runtime::for_each_ordered_optim (
         Galois::Runtime::makeLocalRange (internalNodes),
         LevelComparator<TreeNode> (), VisitNhood (), OpFunc<true> ());
 

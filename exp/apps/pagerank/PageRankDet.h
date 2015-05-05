@@ -14,6 +14,7 @@
 
 #include "Galois/Runtime/Sampling.h"
 #include "Galois/Runtime/DetChromatic.h"
+#include "Galois/Runtime/DetPartInputDAG.h"
 #include "Galois/Runtime/DetKDGexecutor.h"
 
 #include "llvm/Support/CommandLine.h"
@@ -60,7 +61,7 @@ protected:
   typedef typename Graph::GraphNode GNode;
   typedef typename Graph::node_data_type NodeData;
 
-  static const unsigned DEFAULT_CHUNK_SIZE = 8;
+  static const unsigned DEFAULT_CHUNK_SIZE = 1;
 
   Graph graph;
   Galois::GAccumulator<size_t> numIter;
@@ -75,7 +76,7 @@ protected:
             graph.edge_begin (n, Galois::MethodFlag::UNPROTECTED),
             graph.edge_end (n, Galois::MethodFlag::UNPROTECTED));
         },
-        "init-pdata", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
+        "init-pdata", Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
 
     std::printf ("Graph read with %zd nodes and %zd edges\n", 
         graph.size (), graph.sizeEdges ());
@@ -175,7 +176,7 @@ protected:
             // std::fprintf (stderr, "ERROR: convergence failed on node %d, error=%f, tolerance=%f\n", src, diff, tolerance);
           }
         }, 
-        "check-convergence", Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
+        "check-convergence", Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
 
     return allConverged.reduceRO ();
   }
@@ -204,6 +205,11 @@ public:
 
   int run (int argc, char* argv[]) {
     LonestarStart (argc, argv, name, desc, url);
+    return run ();
+  }
+
+  int run (void) {
+
     Galois::StatManager sm;
 
     readGraph ();

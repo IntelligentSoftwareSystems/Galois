@@ -384,11 +384,12 @@ AutoLinuxPolicy& getPolicy() {
 } //namespace
 
 bool Galois::Runtime::LL::bindThreadToProcessor(int id) {
-  assert(id < (int)getPolicy().virtmap.size());
+  assert(size_t(id) < getPolicy().virtmap.size());
   return linuxBindToProcessor(getPolicy().virtmap[id]);
 }
 
 unsigned Galois::Runtime::LL::getProcessorForThread(int id) {
+  assert(size_t(id) < getPolicy().virtmap.size());
   return getPolicy().virtmap[id];
 }
 
@@ -405,26 +406,26 @@ unsigned Galois::Runtime::LL::getMaxPackages() {
 }
 
 unsigned Galois::Runtime::LL::getPackageForThread(int id) {
-  assert(id < (int)getPolicy().packages.size());
+  assert(size_t(id) < getPolicy().packages.size());
   return getPolicy().packages[id];
 }
 
 unsigned Galois::Runtime::LL::getMaxPackageForThread(int id) {
-  assert(id < (int)getPolicy().maxPackage.size());
+  assert(size_t(id) < getPolicy().maxPackage.size());
   return getPolicy().maxPackage[id];
 }
 
 bool Galois::Runtime::LL::isPackageLeader(int id) {
-  assert(id < (int)getPolicy().packages.size());
+  assert(size_t(id) < getPolicy().packages.size());
   return getPolicy().leaders[getPolicy().packages[id]] == id;
 }
 
 unsigned Galois::Runtime::LL::getLeaderForThread(int id) {
-  assert(id < (int)getPolicy().packages.size());
+  assert(size_t(id) < getPolicy().packages.size());
   return getPolicy().leaders[getPolicy().packages[id]];
 }
 
 unsigned Galois::Runtime::LL::getLeaderForPackage(int id) {
-  assert(id < (int)getPolicy().leaders.size());
+  assert(size_t(id) < getPolicy().leaders.size());
   return getPolicy().leaders[id];
 }

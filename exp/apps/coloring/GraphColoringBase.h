@@ -163,7 +163,7 @@ protected:
           nodeFunc (node);
         },
         "assign-priority",
-        Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
+        Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
   }
 
   static const unsigned MAX_LEVELS = 100;
@@ -281,7 +281,7 @@ protected:
 
         }, 
         "check-coloring",
-        Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
+        Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
 
     std::printf ("Graph colored with %d colors\n", maxColor.reduce ());
 
