@@ -119,7 +119,7 @@ namespace Galois {
 
     T range () const { return m_max - m_min; }
 
-    T average () const { return m_sum / m_values.size (); }
+    T average () const { return m_sum / T (m_values.size ()); }
 
     void print (void) const { 
       
@@ -425,7 +425,7 @@ private:
     return sawWork || stoleWork;
   }
 
-  GALOIS_ATTRIBUTE_NOINLINE bool stealOutsidePackage (ThreadContext& poor) {
+  GALOIS_ATTRIBUTE_NOINLINE bool stealOutsidePackage (ThreadContext& poor, const StealAmt& amt) {
     bool sawWork = false;
     bool stoleWork = false;
 
@@ -440,8 +440,8 @@ private:
         if (rich.hasWorkWeak ()) {
           sawWork = true;
 
-          // stoleWork = transferWork (rich, poor, FULL);
-          stoleWork = transferWork (rich, poor, HALF);
+          stoleWork = transferWork (rich, poor, amt);
+          // stoleWork = transferWork (rich, poor, HALF);
 
           if (stoleWork) {
             break;
@@ -509,13 +509,13 @@ private:
     LL::asmPause ();
 
     if (LL::isPackageLeader(poor.id)) {
-      ret = stealOutsidePackage (poor);
+      ret = stealOutsidePackage (poor, HALF);
 
       if (ret) { return true; }
       LL::asmPause ();
     }
 
-    ret = stealOutsidePackage (poor);
+    ret = stealOutsidePackage (poor, HALF);
     if (ret) { return true; } 
     LL::asmPause ();
 
@@ -698,12 +698,52 @@ public:
 template <typename R, typename F>
 void do_all_coupled (const R& range, const F& func, const char* loopname=0, const size_t chunk_size=details::DEFAULT_CHUNK_SIZE) {
   details::DoAllCoupledExec<R, F> exec (range, func, loopname, chunk_size);
+
   Barrier& barrier = getSystemBarrier();
 
   getSystemThreadPool().run(activeThreads, 
       [&exec] (void) { exec.initThread (); },
       std::ref(barrier),
       std::ref(exec));
+}
+
+template <typename R, typename F>
+void do_all_coupled_alt (const R& range, const F& func, const char* loopname=0, const size_t chunk_size=details::DEFAULT_CHUNK_SIZE) {
+
+  details::DoAllCoupledExec<R, F> exec (range, func, loopname, chunk_size);
+
+  Runtime::on_each_impl (
+      [&exec] (const unsigned tid, const unsigned numT) {
+        exec.initThread ();
+      });
+
+
+  std::vector<ThreadTimer<true> > perThrdTimer (Galois::getActiveThreads ());
+  
+
+  Runtime::on_each_impl(
+      [&exec, &perThrdTimer] (const unsigned tid, const unsigned numT) {
+
+        perThrdTimer[tid].start ();
+        exec ();
+        perThrdTimer[tid].stop ();
+        
+      });
+
+  int64_t maxTime = 0;
+  for (const auto& t: perThrdTimer) {
+    if (maxTime < t.get_nsec ()) {
+      maxTime = t.get_nsec ();
+    }
+  }
+
+  Runtime::on_each_impl( 
+      [&maxTime, &perThrdTimer, &loopname] (const unsigned tid, const unsigned numT) {
+        GALOIS_ASSERT ((maxTime - perThrdTimer[tid].get_nsec ()) >= 0);
+        Runtime::reportStat (loopname, "LoadImbalance", maxTime - perThrdTimer[tid].get_nsec ());
+      });
+
+
 }
 
 } // end namespace Runtime
