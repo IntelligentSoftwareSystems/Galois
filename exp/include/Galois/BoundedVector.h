@@ -143,6 +143,131 @@ public:
 
 };
 
+
+template <typename T>
+class DynamicBoundedVector {
+
+  T* const m_data;
+  T* const m_capacity;
+  T* m_size;
+
+public:
+
+  using value_type = T;
+  using reference = T&;
+  using size_type = size_t;
+  using difference_type = ptrdiff_t;
+  using const_reference = const  value_type&;
+  using pointer = value_type*;
+  using const_pointer = const  value_type*;
+  using iterator = pointer;
+  using const_iterator = const_pointer;
+  using reverse_iterator = std::reverse_iterator<iterator>;
+  using const_reverse_iterator = std::reverse_iterator<const_iterator>;
+
+  DynamicBoundedVector (T* beg, T* end)
+    :
+      m_data (beg),
+      m_capacity (end),
+      m_size (m_data)
+  {}
+
+  void clear (void) {
+    for (T* i = m_data; i < m_size; ++i) {
+      i->~T ();
+    }
+    m_size = m_data;
+  }
+
+  ~DynamicBoundedVector (void) {
+    clear ();
+    // m_data = nullptr;
+    // m_capacity = nullptr;
+    // m_size = nullptr;
+  }
+
+  bool empty (void) const {
+    return m_size == m_data;
+  }
+
+  bool full (void) const {
+    return m_size == m_capacity;
+  }
+
+  size_t size (void) const {
+    return m_size - m_data;
+  }
+
+  size_t capacity (void) const {
+    return m_capacity - m_data;
+  }
+
+  template <typename... Args>
+  void emplace_back(Args&&... args) {
+    assert (!full ());
+    assert (m_size < m_capacity);
+
+    ::new (m_size) T (std::forward<Args> (args)...);
+    ++m_size;
+  }
+
+  void push_back (const T& x) {
+    emplace_back (x);
+  }
+
+  void pop_back (void) {
+    assert (!empty ());
+    --m_size;
+    m_size->~T ();
+  }
+
+  reference front (void) {
+    assert (!empty ());
+    return *m_data;
+  }
+
+  const_reference front (void) const {
+    return const_cast<DynamicBoundedVector*> (this)->front ();
+  }
+
+  reference back (void) {
+    assert (!empty ());
+    return *(m_size - 1);
+  }
+
+  const_reference back (void) const {
+    return const_cast<DynamicBoundedVector*> (this)->back ();
+  }
+
+  reference operator [] (const size_type i) {
+    assert (i < size ());
+    return *(m_data + i);
+  }
+
+  const_reference operator [] (const size_type i) const {
+    return const_cast<DynamicBoundedVector&> (*this)[i];
+  }
+
+  iterator begin() { return m_data; }
+  const_iterator begin() const { return m_data; }
+  iterator end() { return m_size; }
+  const_iterator end() const { return m_size; }
+
+  reverse_iterator rbegin() { return reverse_iterator(end()); }
+  const_reverse_iterator rbegin() const { return const_reverse_iterator(end()); }
+  reverse_iterator rend() { return reverse_iterator(begin()); }
+  const_reverse_iterator rend() const { return const_reverse_iterator(begin()); }
+
+  const_iterator cbegin() const { return begin(); }
+  const_iterator cend() const { return end(); }
+  const_reverse_iterator crbegin() const { return rbegin(); }
+  const_reverse_iterator crend() const { return rend(); }
+
+
+};
+
+
+
 } // end namespace Galois
 
 #endif // GALOIS_BOUNDED_VECTOR_H
