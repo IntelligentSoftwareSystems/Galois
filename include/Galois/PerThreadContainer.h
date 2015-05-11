@@ -38,6 +38,7 @@
 
 #include <boost/iterator/counting_iterator.hpp>
 #include <boost/iterator/transform_iterator.hpp>
+#include <boost/iterator/iterator_facade.hpp>
 
 #include "Galois/gdeque.h"
 #include "Galois/Threads.h"
@@ -115,10 +116,18 @@ typename TypeFactory<PerThrdCont>::RvrsOuterIter make_outer_rend(PerThrdCont& wl
 #else
 
 template<typename PerThrdCont>
-class OuterPerThreadWLIter: public std::iterator<std::random_access_iterator_tag, typename PerThrdCont::Cont_ty> {
-  typedef typename PerThrdCont::Cont_ty Cont_ty;
-  typedef std::iterator<std::random_access_iterator_tag, Cont_ty> Super_ty;
-  typedef typename Super_ty::difference_type Diff_ty;
+class OuterPerThreadWLIter: public boost::iterator_facade<
+  OuterPerThreadWLIter<PerThrdCont>, 
+  typename PerThrdCont::Cont_ty, 
+  boost::random_access_traversal_tag> {
+
+
+
+
+  using Cont_ty = typename PerThrdCont::Cont_ty;
+  using Diff_ty = ptrdiff_t;
+
+  friend class boost::iterator_core_access;
 
   PerThrdCont* workList;
   // using Diff_ty due to reverse iterator, whose 
@@ -129,22 +138,22 @@ class OuterPerThreadWLIter: public std::iterator<std::random_access_iterator_tag
     assert((row >= 0) && (row < workList->numRows()));
   }
 
-  Cont_ty& getWL() {
+  // Cont_ty& getWL() {
+    // assertInRange();
+    // return (*workList)[row];
+  // }
+
+  Cont_ty& getWL() const {
     assertInRange();
     return (*workList)[row];
   }
-
-  const Cont_ty& getWL() const {
-    assertInRange();
-    return (*workList)[row];
-  }
-
 
 public:
-  OuterPerThreadWLIter(): Super_ty(), workList(NULL), row(0) {}
+
+  OuterPerThreadWLIter(): workList(NULL), row(0) {}
 
   OuterPerThreadWLIter(PerThrdCont& wl, const GlobalPos& pos)
-    : Super_ty(), workList(&wl), row(0) {
+    : workList(&wl), row(0) {
 
     switch (pos) {
       case GLOBAL_BEGIN:
@@ -158,98 +167,37 @@ public:
     }
   }
 
-  typename Super_ty::reference operator*() { return getWL(); }
+  Cont_ty& dereference (void) const { 
+    return getWL ();
+  }
 
-  typename Super_ty::reference operator*() const { return getWL(); }
+  // const Cont_ty& dereference (void) const {
+    // getWL ();
+  // }
 
-  typename Super_ty::pointer operator->() { return &(getWL()); }
 
-  typename Super_ty::value_type* operator->() const { return &(getWL()); }
-
-  OuterPerThreadWLIter& operator++() {
+  void increment (void) {
     ++row;
-    return *this;
   }
 
-  OuterPerThreadWLIter operator++(int) {
-    OuterPerThreadWLIter tmp(*this);
-    operator++();
-    return tmp;
-  }
-
-  OuterPerThreadWLIter& operator--() {
+  void decrement (void) {
     --row;
-    return *this;
   }
 
-  OuterPerThreadWLIter operator--(int) {
-    OuterPerThreadWLIter tmp(*this);
-    operator--();
-    return tmp;
+  bool equal (const OuterPerThreadWLIter& that) const {
+    assert (this->workList == that.workList);
+    return this->row == that.row;
   }
 
-  OuterPerThreadWLIter& operator+=(Diff_ty d) {
-    row = unsigned(Diff_ty(row) + d);
-    return *this;
+  void advance (ptrdiff_t n) {
+    row += n;
   }
 
-  OuterPerThreadWLIter& operator-=(Diff_ty d) {
-    row = unsigned (Diff_ty(row) - d);
-    return *this;
-  }
-
-  friend OuterPerThreadWLIter operator+(const OuterPerThreadWLIter& it, Diff_ty d) {
-    OuterPerThreadWLIter tmp(it);
-    tmp += d;
-    return tmp;
-  }
-
-  friend OuterPerThreadWLIter operator+(Diff_ty d, const OuterPerThreadWLIter& it) {
-    return it + d;
-  }
-
-  friend OuterPerThreadWLIter operator-(const OuterPerThreadWLIter& it, Diff_ty d) {
-    OuterPerThreadWLIter tmp(it);
-    tmp -= d;
-    return tmp;
-  }
-
-  friend Diff_ty operator-(const OuterPerThreadWLIter& left, const OuterPerThreadWLIter& right) {
-    return Diff_ty(left.row) - Diff_ty(right.row);
-  }
-
-  typename Super_ty::reference operator[](Diff_ty d) {
-    return *((*this) + d);
-  }
-
-  friend bool operator==(const OuterPerThreadWLIter& left, const OuterPerThreadWLIter& right) {
-    assert(left.workList == right.workList);
-    return(left.row == right.row);
-  }
-
-  friend bool operator!=(const OuterPerThreadWLIter& left, const OuterPerThreadWLIter& right) {
-    return !(left == right);
-  }
-
-  friend bool operator<(const OuterPerThreadWLIter& left, const OuterPerThreadWLIter& right) {
-    assert(left.workList == right.workList);
-
-    return (left.row < right.row);
-  }
-
-  friend bool operator<=(const OuterPerThreadWLIter& left, const OuterPerThreadWLIter& right) {
-    return (left == right) || (left < right);
-  }
-
-  friend bool operator>(const OuterPerThreadWLIter& left, const OuterPerThreadWLIter& right) {
-    return !(left <= right);
-  }
-
-  friend bool operator>=(const OuterPerThreadWLIter& left, const OuterPerThreadWLIter& right) {
-    return !(left < right);
+  Diff_ty distance_to (const OuterPerThreadWLIter& that) const {
+    assert (this->workList == that.workList);
+    return that.row - this->row;
   }
 };
-
 
 template<typename PerThrdCont>
 OuterPerThreadWLIter<PerThrdCont> make_outer_begin(PerThrdCont& wl) {
