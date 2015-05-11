@@ -27,6 +27,7 @@
 #include <boost/intrusive/list.hpp>
 
 #include <thread>
+#include <mutex>
 
 using namespace Galois::Runtime;
 
