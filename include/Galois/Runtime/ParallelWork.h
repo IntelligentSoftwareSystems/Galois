@@ -20,7 +20,7 @@
  *
  * @section Description
  *
- * Implementation of the Galois foreach iterator. Includes various 
+ * Implementation of the Galois foreach iterator. Includes various
  * specializations to operators to reduce runtime overhead.
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
@@ -41,9 +41,18 @@
 #include "Galois/Runtime/Sampling.h"
 #include "Galois/WorkList/GFifo.h"
 
+#include "Galois/Runtime/Directory.h"
+
 #include <algorithm>
 #include <functional>
 #include <memory>
+#include <chrono>
+#include <iostream>
+#include <ctime>
+#include <cstdlib>
+
+//for debugging
+//#define dump_no_prog 0
 
 namespace Galois {
 //! Internal Galois functionality - Use at your own risk.
@@ -51,7 +60,7 @@ namespace Runtime {
 
 namespace {
 
-template<bool Enabled> 
+template<bool Enabled>
 class LoopStatistics {
   unsigned long conflicts;
   unsigned long iterations;
@@ -286,6 +295,7 @@ public:
       auto ptr = pr->second;
       assert(waiting_on.count(ptr) == 0);
       if (ptr.isLocal()) {
+        trace("Local Commit: for %\n", ptr);
         getLocalDirectory().clearContended(ptr);
       } else {
         getRemoteDirectory().clearContended(ptr);
@@ -401,7 +411,7 @@ protected:
 
   GALOIS_ATTRIBUTE_NOINLINE
   bool handleAborts(ThreadLocalData& tld) {
-    return runQueue<8, true>(tld, aborted) || aborted.hiddenWork();
+    return runQueue<8, true>(tld, aborted) ;
   }
 
   void fastPushBack(typename UserContextAccess<value_type>::PushBufferTy& x) {
@@ -428,6 +438,13 @@ protected:
       tld.facing.setFastPushBack(
           std::bind(&ForEachWork::fastPushBack, std::ref(*this), std::placeholders::_1));
 
+    //To dump when no progress is made by host 0 for 1 second
+    using namespace std::chrono;
+    auto t1 = high_resolution_clock::now();
+    double time_noProg = 1; //seconds
+    double time_noProg_host1 = 600; //seconds
+    int count_dump = 0;
+
     bool didWork;
     while (true) {
       do {
@@ -443,8 +460,106 @@ protected:
         if (isLeader)
           doNetworkWork();
         // Update node color and prop token
-        term.localTermination(didWork);
+        term.localTermination(didWork || aborted.hiddenWork());
         doNetworkWork();
+
+        // check if made no progress while !hiddenWork.empty()
+    #ifdef dump_no_prog
+        NetworkInterface& net = getSystemNetworkInterface();
+        if (net.ID == 0) {
+          auto t2 = high_resolution_clock::now();
+          duration<double> time_span = duration_cast<duration<double>>(t2 - t1);
+          //std::cout << std::boolalpha << "didwork : " << didWork << "hiddenwork : " << aborted.hiddenWork() << "\n";
+          if (!didWork && aborted.hiddenWork()) {
+
+            std::cout << "on Host : " << net.ID <<" no progress being made!!!! for :" << time_span.count()<<" sec" << std::endl;
+
+            if (time_span.count() >= time_noProg) {
+              for (int dest = 0; dest < net.Num; ++dest) {
+                //if (dest != net.ID) {
+                  SendBuffer buf;
+                  std::cout << " sending msg to : "<< dest << "\n";
+                  net.send(dest, dump_dirs_to_file, buf);//send function here
+                //}
+                //SendBuffer buf;
+                //dump_dirs_to_file(buf);
+              }
+
+              t1 = high_resolution_clock::now(); // reset t1
+              net.flush();
+              net.handleReceives();
+            }
+          }else{
+            //std::cout << std::boolalpha <<" on Host : " << net.ID <<" didwork : " << didWork << " hiddenwork : " << aborted.hiddenWork() << "\n";
+            //std::cout <<" Host: " << net.ID <<"reseting t1" << std::endl;
+            t1 = high_resolution_clock::now(); // reset t1
+          }
+        }
+
+      //XXX do not know if this is the best way to do it. But after Host 0 is done we
+      //need to track host 1
+      if (net.ID == 1) {
+          auto t2 = high_resolution_clock::now();
+          duration<double> time_span = duration_cast<duration<double>>(t2 - t1);
+          //std::cout << std::boolalpha << "didwork : " << didWork << "hiddenwork : " << aborted.hiddenWork() << "\n";
+          if (!didWork && aborted.hiddenWork()) {
+
+            std::cout << "on Host : " << net.ID <<" no progress being made!!!! for :" << time_span.count()<<" sec" << std::endl;
+
+            if (time_span.count() >= time_noProg_host1) {
+              for (int dest = 0; dest < net.Num; ++dest) {
+                //if (dest != net.ID) {
+                  SendBuffer buf;
+                  std::cout << " sending msg to : "<< dest << "\n";
+                  net.send(dest, dump_dirs_to_file, buf);//send function here
+                //}
+                //SendBuffer buf;
+                //dump_dirs_to_file(buf);
+              }
+              t1 = high_resolution_clock::now(); // reset t1
+              net.flush();
+              net.handleReceives();
+            }
+          }else{
+            std::cout << std::boolalpha <<" on Host : " << net.ID <<" didwork : " << didWork << " hiddenwork : " << aborted.hiddenWork() << "\n";
+            std::cout <<" Host: " << net.ID <<"reseting t1" << std::endl;
+            t1 = high_resolution_clock::now(); // reset t1
+          }
+        }
+
+        if (dump_now) {
+          // Let them all finish there work before they start dumping dir data to a file.
+          std::cout << "inside dump_dirs_to_file  functioin on host: " << getSystemNetworkInterface().ID << "\n";
+
+          getSystemBarrier().wait();
+
+          //std::time_t timestamp = std::time(0);
+
+          //std::cout << "First barrier : on host: " << getSystemNetworkInterface().ID << " Total NUM : " << getSystemNetworkInterface().Num <<"\n";
+          //////Dump Local Dir md data to a file///////
+          std::string localFileName = "dump_local_" + std::to_string(getSystemNetworkInterface().ID) + "_" + std::to_string(count_dump) + ".txt";
+          std::ofstream outfile_local (localFileName);
+          getLocalDirectory().dump(outfile_local);
+          ///////Local Dump Ends//////////////////
+
+          //////Dump Remote Dir md data to a file///////
+          std::string remoteFileName = "dump_remote_" + std::to_string(getSystemNetworkInterface().ID) + "_" + std::to_string(count_dump) +".txt";
+          std::ofstream outfile_remote (remoteFileName);
+          getRemoteDirectory().dump(outfile_remote);
+          ///////Remote Dump Ends//////////////////
+
+
+          outfile_local.close();
+          outfile_remote.close();
+
+          dump_now = false;
+          ++count_dump;
+          getSystemBarrier().wait();
+          t1 = high_resolution_clock::now(); // reset t1
+
+        }
+      #endif
+
       } while (!term.globalTermination() && (!ForEachTraits<FunctionTy>::NeedsBreak || !broke));
 
       if (checkEmpty(wl, tld, 0))
@@ -461,7 +576,7 @@ protected:
 
 public:
   ForEachWork(FunctionTy& f, const char* l): term(getSystemTermination()), origFunction(f), loopname(l), broke(false) { }
-  
+
   template<typename W>
   ForEachWork(W& w, FunctionTy& f, const char* l): term(getSystemTermination()), wl(w), origFunction(f), loopname(l), broke(false) { }
 

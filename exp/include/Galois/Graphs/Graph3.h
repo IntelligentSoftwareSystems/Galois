@@ -37,6 +37,8 @@
 
 #include <boost/iterator/filter_iterator.hpp>
 
+#include <iostream>
+
 namespace Galois {
 namespace Graph {
 
@@ -488,14 +490,16 @@ public:
     localStatePtr = Bag<Runtime::gptr<gNode>>::allocate();
   }
 
-  ThirdGraph(pointer p, Runtime::DeSerializeBuffer& buf) :basePtr(p) {
+  explicit ThirdGraph(pointer p, Runtime::DeSerializeBuffer& buf) :basePtr(p) {
     gDeserialize(buf, localStateStore, localStatePtr);
+    //gDeserialize(buf, localStatePtr);
     assert(localStateStore);
     assert(localStatePtr);
   }
 
   void getInitData(Runtime::SerializeBuffer& buf) {
     gSerialize(buf, localStateStore, localStatePtr);
+    //gSerialize(buf, localStatePtr);
   }
 };
 

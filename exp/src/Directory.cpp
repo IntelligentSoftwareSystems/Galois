@@ -31,6 +31,7 @@
 
 using namespace Galois::Runtime;
 
+
 ////////////////////////////////////////////////////////////////////////////////
 // MetaHolder
 ////////////////////////////////////////////////////////////////////////////////
@@ -68,6 +69,24 @@ void  detail::MetaHolder<metadata>::eraseMD(fatPointer ptr, std::unique_lock<LL:
   assert(md.find(ptr) != md.end());
   mdl.release();
   md.erase(ptr);
+}
+
+template<typename metadata>
+void detail::MetaHolder<metadata>::dump() {
+  std::lock_guard<LL::SimpleLock> lg(md_lock);
+  for(auto &pair : md) {
+    std::lock_guard<LL::SimpleLock> mdlg(pair.second.lock);
+    std::cout << "R " << pair.first << ": " << pair.second << "\n";
+  }
+}
+template<typename metadata>
+void detail::MetaHolder<metadata>::dump(std::ofstream& dumpFileName) {
+  //std::lock_guard<LL::SimpleLock> lg(md_lock);
+  for(auto &pair : md) {
+   // std::lock_guard<LL::SimpleLock> mdlg(pair.second.lock);
+    dumpFileName << "< " << getSystemNetworkInterface().ID << " >" << " R " << pair.first << ": " << pair.second << "\n";
+  }
+
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -125,9 +144,14 @@ bool RemoteDirectory::tryWriteBack(metadata& md, fatPointer ptr, std::unique_loc
 void RemoteDirectory::recvRequestImpl(fatPointer ptr, uint32_t dest, ResolveFlag flag) {
   metadata* md = dir.getMD_ifext(ptr);
   assert(md || flag == UP_RW || flag == UP_RO);
+
   //updates for already returned object
   if ((!md || md->state == metadata::PENDING_RW || md->state == metadata::PENDING_RO)
       && (flag == UP_RW || flag == UP_RO)) {
+    // to make sure its lock is unlocked if md is not null
+    if (md)
+      std::unique_lock<LL::SimpleLock> lg(md->lock, std::adopt_lock);
+
     trace("RemoteDirectory::recvRequest % dest % DROPPING\n", ptr, dest);
     return;
   }
@@ -153,6 +177,7 @@ void RemoteDirectory::considerObject(metadata& md, fatPointer ptr, std::unique_l
     md.th->request(ptr.getHost(), ptr, NetworkInterface::ID, INV);
     if (act == INV) {
       //erase metadata
+      trace("RD::ConsiderObject % md %\n", ptr, md);
       dir.eraseMD(ptr, lg);
     } else {
       //refetch
@@ -163,8 +188,9 @@ void RemoteDirectory::considerObject(metadata& md, fatPointer ptr, std::unique_l
     if (tryWriteBack(md, ptr, lg)) {
       if (md.doWriteBack())
         fetchImpl(md, ptr, RW, md.th, false, lg); // contended still set
-      else
+      else {
         dir.eraseMD(ptr, lg);
+      }
     } else {
       //wasn't able to write back, locking problems, defer
       addPendingReq(ptr);
@@ -394,16 +420,24 @@ void RemoteDirectory::reportStats(const char* loopname) {
 
 void RemoteDirectory::dump() {
   // std::lock_guard<LL::SimpleLock> lg(md_lock);
-  // for (auto& pair : md) {
+  // for (auto& pair : dir.md) {
   //   std::lock_guard<LL::SimpleLock> mdlg(pair.second.lock);
   //   std::cout << "R " << pair.first << ": " << pair.second << "\n";
   // }
+  std::cout << "Remote Dir size : " << dir.mapSize() << "\n";
+  dir.dump();
 }
 
 void RemoteDirectory::dump(fatPointer ptr) {
   //FIXME: write
+  //auto pair = dir.md.find(ptr);
+  //std::lock_guard<LL::SimpleLock> mdlg(pair.second.lock);
+  //std::cout << "R " << pair.first << ": " << pair.second << "\n";
 }
 
+void RemoteDirectory::dump(std::ofstream& dumpFileName){
+  dir.dump(dumpFileName);
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // Local Directory
@@ -453,6 +487,7 @@ void LocalDirectory::recvRequestImpl(fatPointer ptr, uint32_t dest, ResolveFlag 
   assert(ptr.isLocal());
   metadata& md = dir.getMD(ptr, th);
   std::unique_lock<LL::SimpleLock> lg(md.lock, std::adopt_lock);
+  //std::lock_guard<LL::SimpleLock> lg(md.lock, std::adopt_lock);
   trace("LocalDirectory::recvRequest % flag % dest % md %\n", ptr, flag, dest, md);
   md.addReq(dest,flag);
   considerObject(md, ptr, lg);
@@ -514,7 +549,7 @@ void LocalDirectory::considerObject(metadata& md, fatPointer ptr, std::unique_lo
       }
       md.recalled = p.first;
     }
-    return;   
+    return;
   }
 
   //Object is here
@@ -539,6 +574,9 @@ void LocalDirectory::considerObject(metadata& md, fatPointer ptr, std::unique_lo
     }
     for (auto& fn : nl)
       fn(ptr); //FIXME: md lock held
+
+  trace("LocalDirectory::considerObject 2 After fn(ptr) % has dest % RW % md %\n", ptr, p.first, p.second, md);
+
   } else if (p.first != ~0) {
     auto foo = NetworkInterface::ID;
     if (!dirOwns(obj)) {
@@ -562,10 +600,16 @@ void LocalDirectory::considerObject(metadata& md, fatPointer ptr, std::unique_lo
   }
 
   p = md.getNextDest();
-  if (p.first == ~0 && !md.contended && md.isHere())
+  trace("LocalDirectory::considerObject 3 % has dest % RW % md.locRW % md.locRO % md.ishere % md %\n", ptr, p.first, p.second, md.locRW, md.locRW, md.isHere(), md);
+  if (p.first == ~0 && !md.contended && md.isHere()) {
+    trace("LocalDirectory::considerObject 3.5 EraseMD % has dest % RW % md.locRW % md.locRO % md.ishere % md %\n", ptr, p.first, p.second, md.locRW, md.locRW, md.isHere(), md);
     dir.eraseMD(ptr, lg);
-  else if (p.first != ~0 && !md.isHere())
+  }
+  else if (p.first != ~0 && !md.isHere_contended()) {
+  //else if (p.first != ~0 && !md.contended) {
+    trace("LocalDirectory::considerObject 4 inside else if % has dest % RW % md %\n", ptr, p.first, p.second, md);
     considerObject(md, ptr, lg);
+  }
 }
 
 // void LocalDirectory::forwardRequest(metadata& md, fatPointer ptr) {
@@ -631,9 +675,8 @@ void LocalDirectory::makeProgress() {
       else
         addPendingReq(ptr);
     }
-
-  trace("LocalDirectory::makeProgress sendBytes: % , DirSize: % , CMsize: % \n", getSystemNetworkInterface().reportSendBytes(), dir.mapSize(), getCacheManager().CM_size());
   }
+  //trace("LocalDirectory::makeProgress sendBytes: % , DirSize: % , CMsize: % \n", getSystemNetworkInterface().reportSendBytes(), dir.mapSize(), getCacheManager().CM_size());
 }
 
 void LocalDirectory::dump() {
@@ -642,8 +685,12 @@ void LocalDirectory::dump() {
   //   std::lock_guard<LL::SimpleLock> mdlg(pair.second.lock);
   //   std::cout << "L " << pair.first << ": " << pair.second << "\n";
   // }
+  dir.dump();
 }
 
+void LocalDirectory::dump(std::ofstream& dumpFileName){
+  dir.dump(dumpFileName);
+}
 ////////////////////////////////////////////////////////////////////////////////
 // Local Directory Metadata
 ////////////////////////////////////////////////////////////////////////////////
@@ -719,3 +766,7 @@ RemoteDirectory& Galois::Runtime::getRemoteDirectory() {
   static RemoteDirectory obj;
   return obj;
 }
+
+
+
+

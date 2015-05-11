@@ -37,6 +37,8 @@
 #include "Galois/Runtime/ll/SimpleLock.h"
 #include "Galois/Runtime/ll/TID.h"
 
+#include "Galois/Runtime/Barrier.h"
+
 #include <boost/intrusive_ptr.hpp>
 #include <boost/utility.hpp>
 
@@ -46,11 +48,15 @@
 #include <set>
 #include <unordered_map>
 #include <unordered_set>
+#include <string>
+#include <fstream>
 
 namespace Galois {
 namespace Runtime {
 
 enum ResolveFlag {INV=0, RO=1, RW=2, UP_RO=3, UP_RW=4};
+
+static bool dump_now = false;
 
 namespace detail {
 
@@ -71,7 +77,7 @@ public:
   virtual void send(uint32_t dest, fatPointer ptr, Lockable* obj, ResolveFlag flag) const = 0;
   virtual void request(uint32_t dest, fatPointer ptr, uint32_t whom, ResolveFlag flag) const = 0;
 };
-  
+
 template<typename metadata>
 class MetaHolder {
   std::unordered_map<fatPointer, metadata> md;
@@ -82,6 +88,8 @@ public:
   metadata* getMD_ifext(fatPointer ptr);
   void eraseMD(fatPointer ptr, std::unique_lock<LL::SimpleLock>& mdl);
   size_t mapSize();
+  void dump();
+  void dump(std::ofstream&);
 };
 
 } //namespace detail
@@ -163,7 +171,7 @@ class LocalDirectory : public BaseDirectory {
     void doClearContended();
     void doRequest(uint32_t dest, ResolveFlag flag);
     bool fetch(ResolveFlag flag, bool setContended);
-    
+
 
     uint32_t removeNextRW() {
       uint32_t retval = *reqsRW.begin();
@@ -188,6 +196,11 @@ class LocalDirectory : public BaseDirectory {
     //Returns if object is present and there are no RO replicas
     bool isHere() const {
       return locRW == ~0 && locRO.empty();
+    }
+
+    //Returns if object is present and there are no RO replicas and is contended
+    bool isHere_contended() const {
+      return locRW == ~0 && locRO.empty() && contended;
     }
 
     //Returns if object has RO replicas and hasn't been recalled
@@ -226,7 +239,7 @@ class LocalDirectory : public BaseDirectory {
 
   std::unordered_set<fatPointer> pending;
   LL::SimpleLock pending_lock;
-  
+
   //!Add a request to process later
   void addPendingReq(fatPointer ptr) {
     std::lock_guard<LL::SimpleLock> lg(pending_lock);
@@ -235,7 +248,7 @@ class LocalDirectory : public BaseDirectory {
 
   //!Send object to all outstanding readers
   void sendToReaders(metadata&, fatPointer);
-  
+
   //!Send invalidate to all outstanding readers
   void invalidateReaders(metadata&, fatPointer, uint32_t);
 
@@ -271,12 +284,14 @@ public:
   //! initiate, if necessary, a fetch of a remote object
   template<typename T>
   void fetch(fatPointer ptr, ResolveFlag flag) {
+    trace("LocalDir::fetch with setCont : false FFFFFFFFFFFF : %\n", ptr);
     fetchImpl(ptr, flag, typeHelperImpl<T>::get(), false);
   }
 
   //! engage priority protocol for ptr.  May issue fetch
   template<typename T>
   void setContended(fatPointer ptr, ResolveFlag flag) {
+    trace("LocalDir::setContended with setCont : true TTTTTTTTTT : %\n", ptr);
     fetchImpl(ptr, flag, typeHelperImpl<T>::get(), true);
   }
   //! unengage priority protocol for ptr.  May send object away
@@ -296,6 +311,7 @@ public:
 
   void makeProgress();
   void dump();
+  void dump(std::ofstream&);
 };
 
 LocalDirectory& getLocalDirectory();
@@ -335,7 +351,7 @@ class RemoteDirectory : public BaseDirectory {
     //! returns the message to send.  INV means don't send anything.
     //! Updates internal state assuming the message is sent
     ResolveFlag fetch(ResolveFlag flag, bool setContended);
-    
+
     void recvRequest(uint32_t dest, ResolveFlag flag);
     ResolveFlag doInvalidateRO();
     bool doWriteBack();
@@ -408,6 +424,7 @@ public:
 
   void dump(fatPointer ptr); //dump one object info
   void dump(); //dump directory status
+  void dump(std::ofstream&);
 };
 
 RemoteDirectory& getRemoteDirectory();
@@ -462,7 +479,12 @@ inline void doNetworkWork() {
     while (net.handleReceives()) { net.flush(); }
   }
 }
+inline void dump_dirs_to_file(RecvBuffer&) {
 
+  dump_now = true;
+  return;
+
+}
 
 } // namespace Runtime
 

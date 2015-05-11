@@ -32,7 +32,7 @@ def main(num_nodes, seed, options):
   num_edges = int(options.density) * num_nodes
   adj = collections.defaultdict(set)
 
-  print('p sp %d %d' % (num_nodes, num_edges))
+  #print('p sp %d %d' % (num_nodes, num_edges))
 
   def nextN():
     return random.randint(1, num_nodes)
@@ -41,7 +41,7 @@ def main(num_nodes, seed, options):
   def addEdge(src, dst, w):
     if dst in adj[src]:
       return False
-    print('a %d %d %d' % (src, dst, w))
+    #print('a %d %d %d' % (src, dst, w))
     adj[src].add(dst)
     return True
 

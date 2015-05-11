@@ -1,4 +1,4 @@
-/** Galois Dedicated Network Thread API -*- C++ -*-
+/** Delaunay refinement -*- C++ -*-
  * @file
  * @section License
  *
@@ -18,43 +18,52 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  *
- * @author Andrew Lenharth <andrewl@lenharth.org>
+ * @section Description
+ *
+ * @author Milind Kulkarni <milind@purdue.edu>
  */
+#ifndef EDGE_H
+#define EDGE_H
 
-#ifndef GALOIS_RUNTIME_NETWORKTHREAD_H
-#define GALOIS_RUNTIME_NETWORKTHREAD_H
+#include "Tuple.h"
 
-#include <cstdint>
-#include <vector>
-#include <tuple>
+class Element;
 
-namespace Galois {
-namespace Runtime {
-
-class NetworkIO {
- public:
- struct message {
-    uint32_t dest;
-    std::vector<char> data;
-    bool urgent;
-  };
-  virtual ~NetworkIO();
+class Edge {
+  Tuple p[2];
   
-  //destructive of data buffer
-  virtual void enqueue(uint32_t dest, std::vector<uint8_t>& data) = 0;
-  //returns empty if no message
-  virtual std::vector<uint8_t> dequeue() = 0;
+public:
+  Edge() {}
+  Edge(const Tuple& a, const Tuple& b) {
+    if (a < b) {
+      p[0] = a;
+      p[1] = b;
+    } else {
+      p[0] = b;
+      p[1] = a;
+    }
+  }
+  Edge(const Edge &rhs) {
+    p[0] = rhs.p[0];
+    p[1] = rhs.p[1];
+  }
+  
+  bool operator==(const Edge& rhs) const {
+    return p[0] == rhs.p[0] && p[1] == rhs.p[1];
+  }    
+  bool operator!=(const Edge& rhs) const {
+    return !(*this == rhs);
+  }    
+  bool operator<(const Edge& rhs) const {
+    return (p[0] < rhs.p[0]) || ((p[0] == rhs.p[0]) && (p[1] < rhs.p[1]));
+  }    
+  
+  bool operator>(const Edge& rhs) const {
+    return (p[0] > rhs.p[0]) || ((p[0] == rhs.p[0]) && (p[1] > rhs.p[1]));
+  }    
 
-  //void operator() () -- make progress
-  //bool readySend() -- can send
-  //bool readyRecv() -- packet waiting
-  //void send(const message&) -- send data
-  //message recv() -- recieve data
+  Tuple getPoint(int i) const {
+    return p[i];
+  }
 };
-
-std::tuple<NetworkIO*, uint32_t, uint32_t> makeNetworkIOMPI();
-
-} //namespace Runtime
-} //namespace Galois
-
 #endif
