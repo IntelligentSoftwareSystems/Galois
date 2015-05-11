@@ -30,6 +30,7 @@
 
 #include <type_traits>
 #include <cassert>
+#include <iostream>
 
 using namespace Galois::Runtime;
 
@@ -89,6 +90,13 @@ void NetworkInterface::reportStats() {
   statRecvBytes.report();
   statSendNum.report();
   statSendBytes.report();
+}
+
+void NetworkInterface::dumpStats() const {
+  std::cout <<  "RN " << statRecvNum.getVal()
+            << " RB " <<statRecvBytes.getVal()
+            << " SN " <<statSendNum.getVal()
+            << " SB " << statSendBytes.getVal() << "\n";
 }
 
 unsigned long NetworkInterface::reportSendBytes() {

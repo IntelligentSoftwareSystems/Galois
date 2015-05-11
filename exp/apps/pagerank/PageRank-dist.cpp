@@ -277,6 +277,7 @@ int main(int argc, char** argv) {
     //Graph Construction ENDS here.
     timerLoad.stop();
     std::cout << "Graph Loading: " << timerLoad.get() << " ms\n";
+    Galois::Runtime::getSystemNetworkInterface().dumpStats();
 
     //Graph Initialization begins.
     Galois::Timer timerInit;
@@ -290,6 +291,7 @@ int main(int argc, char** argv) {
     //std::cout << "n.out : " << n.nout << "\n";
     timerInit.stop();
     std::cout << "Graph Initialization: " << timerInit.get() << " ms\n";
+    Galois::Runtime::getSystemNetworkInterface().dumpStats();
 
     Galois::Timer timerPR;
     timerPR.start();
@@ -301,7 +303,9 @@ int main(int argc, char** argv) {
 
     timerPR.stop();
     std::cout << "Page Rank: " << timerPR.get() << " ms\n";
+    Galois::Runtime::getSystemNetworkInterface().dumpStats();
     std::cout << "Total Page Rank: " << compute_total_rank(g) << "\n";
+    Galois::Runtime::getSystemNetworkInterface().dumpStats();
 
  /* 
    std::cout << "size = " << g->size() <<std::endl;

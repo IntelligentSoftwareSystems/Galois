@@ -22,60 +22,24 @@
  */
 #include "Galois/Timer.h"
 
-#ifndef HAVE_CXX11_CHRONO
-// This is linux/bsd specific
-#include <sys/time.h>
-#endif
-
 using namespace Galois;
 
-#ifndef HAVE_CXX11_CHRONO
-Timer::Timer()
-  :_start_hi(0), _start_low(0), _stop_hi(0), _stop_low(0)
-{}
-
 void Timer::start() {
-  timeval start;
-  asm volatile("" ::: "memory");
-  gettimeofday(&start, 0);
-  asm volatile("" ::: "memory");
-  _start_hi = start.tv_sec;
-  _start_low = start.tv_usec;
+  startT = clockTy::now();
 }
 
 void Timer::stop() {
-  timeval stop;
-  asm volatile("" ::: "memory");
-  gettimeofday(&stop, 0);
-  asm volatile("" ::: "memory");
-  _stop_hi = stop.tv_sec;
-  _stop_low = stop.tv_usec;
+  stopT = clockTy::now();
 }
 
 unsigned long Timer::get() const {
-  unsigned long msec = _stop_hi - _start_hi;
-  msec *= 1000;
-  if (_stop_low > _start_low)
-    msec += (_stop_low - _start_low) / 1000;
-  else {
-    msec -= 1000; //borrow
-    msec += (_stop_low + 1000000 - _start_low) / 1000;
-  }
-  return msec;
+  return std::chrono::duration_cast<std::chrono::milliseconds>(stopT-startT).count();
 }
 
 unsigned long Timer::get_usec() const {
-  unsigned long usec = _stop_hi - _start_hi;
-  usec *= 1000000;
-  if (_stop_low > _start_low)
-    usec += (_stop_low - _start_low);
-  else {
-    usec -= 1000000; //borrow
-    usec += (_stop_low + 1000000 - _start_low);
-  }
-  return usec;
+  return std::chrono::duration_cast<std::chrono::microseconds>(stopT-startT).count();
 }
-#endif
+
 
 TimeAccumulator::TimeAccumulator()
   :ltimer(), acc(0)

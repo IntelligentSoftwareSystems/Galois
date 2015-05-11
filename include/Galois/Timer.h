@@ -23,46 +23,20 @@
 #ifndef GALOIS_TIMER_H
 #define GALOIS_TIMER_H
 
-#include "Galois/config.h"
-
-#ifdef HAVE_CXX11_CHRONO
 #include <chrono>
-#endif
 
 namespace Galois {
 
-#ifdef HAVE_CXX11_CHRONO
 class Timer {
   typedef std::chrono::steady_clock clockTy;
   //typedef std::chrono::high_resolution_clock clockTy;
   std::chrono::time_point<clockTy> startT, stopT;
 public:
-  void start() { startT = clockTy::now(); }
-  void stop() { stopT = clockTy::now(); }
-  unsigned long get() const {
-    return std::chrono::duration_cast<std::chrono::milliseconds>(stopT-startT).count();
-  }
-  unsigned long get_usec() const {
-    return std::chrono::duration_cast<std::chrono::microseconds>(stopT-startT).count();
-  }
-};
-#else
-//! A simple timer
-class Timer {
-  //This is so that implementations can vary without
-  //forcing includes of target specific headers
-  unsigned long _start_hi;
-  unsigned long _start_low;
-  unsigned long _stop_hi;
-  unsigned long _stop_low;
-public:
-  Timer();
   void start();
   void stop();
   unsigned long get() const;
   unsigned long get_usec() const;
 };
-#endif
 
 //! A multi-start time accumulator.
 //! Gives the final runtime for a series of intervals

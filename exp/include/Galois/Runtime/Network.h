@@ -56,6 +56,8 @@ public:
     statSendNum("SendNum"), statRecvNum("RecvNum"), statSendBytes("SendBytes"), statRecvBytes("RecvBytes") { }
   virtual ~NetworkInterface();
 
+  void dumpStats() const;
+
   //!send a message to a given (dest) host.  A message is simply a
   //!landing pad (recv) and some data (buf)
   //! buf is invalidated by this operation

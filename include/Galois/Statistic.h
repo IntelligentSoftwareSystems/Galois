@@ -58,7 +58,7 @@ public:
     valid = false;
   }
 
-  unsigned long getValue(unsigned tid) {
+  unsigned long getValue(unsigned tid) const {
     return *val.getRemote(tid);
   }
 
@@ -70,7 +70,7 @@ public:
     return statname;
   }
 
-  unsigned long getVal() {
+  unsigned long getVal() const {
     return *val.getLocal();
   }
 
