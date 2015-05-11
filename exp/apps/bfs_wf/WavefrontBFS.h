@@ -204,7 +204,7 @@ class BFSwavefrontNolock;
 
 class BFSwavefrontLock: public AbstractWavefrontBFS {
 protected:
-  typedef GaloisWLwrapper< Galois::WorkList::dChunkedFIFO<CHUNK_SIZE, GNode> > GaloisWL;
+  typedef GaloisWLwrapper< Galois::WorkList::dChunkedFIFO<DEFAULT_CHUNK_SIZE, GNode> > GaloisWL;
 
   typedef AbstractWavefrontBFS::Super_ty BaseBFS;
 
@@ -261,8 +261,8 @@ class BFSwavefrontCoupled: public AbstractWavefrontBFS {
 #ifdef BFS_WF_USE_BAG
   typedef Galois::InsertBag<GNode> WL_ty;
 #else
-  typedef Galois::PerThreadBag<GNode, 64*1024> WL_ty;
-  // typedef Galois::PerThreadVector<GNode> WL_ty;
+  typedef Galois::PerThreadBag<GNode> WL_ty;
+  // typedef Galois::PerThreadBag<GNode, 64> WL_ty;
 #endif // BFS_WF_USE_BAG
 
   struct ParallelInnerLoop {
@@ -322,7 +322,7 @@ public:
       Galois::do_all_choice (Galois::Runtime::makeLocalRange(*currWL), 
           ParallelInnerLoop (graph, *nextWL, numAdds), 
           "wavefront_inner_loop",
-          Galois::chunk_size<CHUNK_SIZE> ());
+          Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
 
       std::swap (currWL, nextWL);
 

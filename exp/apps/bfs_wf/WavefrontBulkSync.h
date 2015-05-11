@@ -38,6 +38,8 @@ typedef uint32_t ND_ty;
 
 class WavefrontBulkSync: public BFS<ND_ty> {
 
+  using Base = BFS<ND_ty>;
+
 protected:
   virtual const std::string getVersion () const { return "Wavefront using Bulk Synchronous Executor"; }
 
@@ -70,7 +72,7 @@ protected:
   struct OpFunc {
     typedef int tt_does_not_need_aborts;
     // typedef char tt_does_not_need_push;
-    static const unsigned CHUNK_SIZE = 128;
+    static const unsigned CHUNK_SIZE = DEFAULT_CHUNK_SIZE;
 
 
     Graph& graph;
