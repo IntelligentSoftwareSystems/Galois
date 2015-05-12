@@ -267,6 +267,11 @@ class SerialBag {
     std::printf ("\n");
   }
 
+  void init (void) {
+    tail = &sentinel;
+    sentinel.next = tail;
+    sentinel.prev = tail;
+  }
 
 
 public:
@@ -292,8 +297,7 @@ public:
       sentinel (),
       tail (&sentinel)
   {
-    sentinel.next = &sentinel;
-    sentinel.prev = &sentinel;
+    init ();
   }
 
   ~SerialBag (void) {
@@ -323,7 +327,7 @@ public:
       popFrontBlock ();
     }
 
-    tail = &sentinel;
+    init ();
   }
 
 
@@ -359,6 +363,22 @@ public:
     if (tail->chunk.empty ()) {
       popBackBlock ();
     }
+  }
+
+  void splice (SerialBag& that) {
+
+    if (!that.empty ()) {
+      this->tail->next = that.getHead ();
+      that.getHead ()->prev = this->tail;
+
+      this->tail = that.tail;
+      this->tail->next = &(this->sentinel);
+      this->sentinel.prev = this->tail;
+
+      that.init (); // make that look empty 
+    }
+
+    assert (that.empty ());
   }
 
   iterator begin () {
@@ -743,11 +763,11 @@ public:
     push_back (x);
   }
 
-  // void splice_all (PerThreadBag& that) {
-    // for (unsigned i = 0; i < Super_ty::numRows(); ++i) {
-      // Super_ty::get(i).splice (that.Super_ty::get (i));
-    // }
-  // }
+  void splice_all (PerThreadBag& that) {
+    for (unsigned i = 0; i < Super_ty::numRows(); ++i) {
+      Super_ty::get(i).splice (that.Super_ty::get (i));
+    }
+  }
 };
 
 } // end namespace Galois

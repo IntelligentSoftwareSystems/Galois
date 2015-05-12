@@ -1927,7 +1927,7 @@ struct HybridInputDAGexecutor {
   M& dagManager;
   const char* loopname;
 
-  int cutOffColor = 10000; // arbitrary value
+  unsigned cutOffColor = 10000; // arbitrary value
 
   std::vector<Bag_ty>* currColorBags;
   std::vector<Bag_ty>* nextColorBags;
@@ -2157,8 +2157,7 @@ public:
 
     // defineCutOffColor ();
     cutOffColor = cutOffColorOpt; 
-    cutOffColor = std::min (cutOffColor, dagManager.getNumColors ());
-    GALOIS_ASSERT (cutOffColor > 0);
+    cutOffColor = std::min (unsigned (cutOffColor), dagManager.getNumColors ());
 
     if (reinitAfterCutOff) {
 
