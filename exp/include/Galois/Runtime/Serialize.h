@@ -171,7 +171,7 @@ public:
   }
 
   unsigned getOffset() const { return offset; }
-  unsigned setOffset(unsigned off) { assert(off <= size()); offset = off; }
+  void setOffset(unsigned off) { assert(off <= size()); offset = off; }
 
   unsigned size() const { return bufdata.size(); }
 
@@ -346,6 +346,7 @@ inline void gDeserializeObj(DeSerializeBuffer& buf, std::string& data) {
   char c = buf.pop();
   while(c != '\0') {
     data.push_back(c);
+    c = buf.pop();
   };
 }
 

@@ -30,6 +30,7 @@
 
 #include <boost/utility.hpp>
 
+#include <deque>
 #include <ostream>
 
 namespace Galois {
@@ -51,8 +52,8 @@ class Lockable {
  */
 
 class LockManagerBase: private boost::noncopyable {
-  gdeque<Lockable*> rwlocks;
-  gdeque<Lockable*> rlocks;
+  std::deque<Lockable*> rwlocks;
+  std::deque<Lockable*> rlocks;
 
 public:
   enum AcquireStatus {

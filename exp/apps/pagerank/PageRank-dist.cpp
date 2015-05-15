@@ -63,7 +63,7 @@ struct LNode {
   typedef int  tt_is_copyable;
 };
 
-typedef Galois::Graph::LC_Dist_InOut<LNode, void> Graph;
+typedef Galois::Graph::LC_Dist_InOut<LNode> Graph;
 typedef typename Graph::GraphNode GNode;
 
 typedef Galois::Graph::ThirdGraph<LNode, void, Galois::Graph::EdgeDirection::Out > Graph_3;
@@ -102,11 +102,11 @@ struct InitializeGraph {
   void operator()(GNode src, Galois::UserContext<GNode>& cnx) const {
     LNode& sdata = g->at(src);
     sdata.value = 1.0 - alpha;
-    sdata.nout = g->get_num_outEdges(src); //std::distance(g->edge_begin(n, Galois::MethodFlag::NONE),g->edge_end(n, Galois::MethodFlag::NONE));
+    sdata.nout = std::distance(g->edge_begin(src, Galois::MethodFlag::SRC_ONLY),g->edge_end(src, Galois::MethodFlag::SRC_ONLY));
     sdata.residual = 0;
 
 
-    Galois::MethodFlag lockflag = Galois::MethodFlag::SRC_ONLY;
+    const Galois::MethodFlag lockflag = Galois::MethodFlag::SRC_ONLY;
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     if(sdata.nout > 0)
     {
@@ -114,11 +114,11 @@ struct InitializeGraph {
       // for each out-going neighbors
       for (auto jj = g->edge_begin(src, lockflag), ej = g->edge_end(src, lockflag); jj != ej; ++jj) {
         GNode dst = g->dst(jj);
-        if (dst.isLocal()) {
+        if (g->isLocal(dst)) {
           LNode& ddata = g->at(dst, lockflag);
           atomicAdd(ddata.residual, delta);
         } else {
-          net.sendAlt(((Galois::Runtime::fatPointer)dst).getHost(), remoteUpdate, g, dst, delta);
+          net.sendAlt(g->getHost(dst), remoteUpdate, g, dst, delta);
         }
       }
     }
@@ -194,6 +194,7 @@ struct PageRankMsg {
       Galois::for_each_local(g, PageRankMsg{g}, Galois::loopname("Page Rank"));
       round_time.stop();
       std::cout<<"Iteration : " << iterations << "  Time : " << round_time.get() << " ms\n";
+      Galois::Runtime::getSystemNetworkInterface().dumpStats();
     }
   }
 
@@ -223,11 +224,11 @@ struct PageRankMsg {
       // for each out-going neighbors
       for (auto jj = g->edge_begin(src, lockflag), ej = g->edge_end(src, lockflag); jj != ej; ++jj) {
         GNode dst = g->dst(jj);
-        if (dst.isLocal()) {
+        if (g->isLocal(dst)) {
           LNode& ddata = g->at(dst, lockflag);
           atomicAdd(ddata.residual, delta);
         } else {
-          net.sendAlt(((Galois::Runtime::fatPointer)dst).getHost(), remoteUpdate, g, dst, delta);
+          net.sendAlt(g->getHost(dst), remoteUpdate, g, dst, delta);
         }
       }
     }
@@ -254,6 +255,7 @@ float compute_total_rank(Graph::pointer g) {
 
 }
 
+#if 0
 /* Compute Graph Distribution */
 using std::cout;
 using std::vector;
@@ -332,41 +334,7 @@ void compute_graph_distribution(Graph::pointer g) {
   cout << "TOTOAL EDGES in Graph : " << total_edges << "\n";
 
 }
-
-int check_graph(Graph::pointer g, std::vector<unsigned>& counts, std::vector<unsigned>& In_counts)
-{
-
-  std::cout << " CHECKING GRAPHS\n\n";
-   unsigned x = 0;
-  for(auto nodeItr = g->begin(); nodeItr != g->end(); ++nodeItr, ++x)
-  {
-    int count_edges = 0;
-    for (auto jj = g->edge_begin(*nodeItr, Galois::MethodFlag::SRC_ONLY), ej = g->edge_end(*nodeItr, Galois::MethodFlag::SRC_ONLY); jj != ej; ++jj) {
-
-      count_edges++;
-
-    }
-    if(count_edges != counts[x])
-     return 1;
-  }
-
-  std::cout << " OutEdges are CORRECT\n\n";
-  x = 0;
-  for(auto nodeItr = g->begin(); nodeItr != g->end(); ++nodeItr, ++x)
-  {
-    int count_edges = 0;
-    for (auto jj = g->in_edge_begin(*nodeItr, Galois::MethodFlag::NONE), ej = g->in_edge_end(*nodeItr, Galois::MethodFlag::NONE); jj != ej; ++jj) {
-
-      count_edges++;
-
-    }
-    if(count_edges != In_counts[x])
-     return 2;
-  }
-
-  std::cout << " InEdges are CORRECT\n\n";
-  return 0;
-}
+#endif
 
 int main(int argc, char** argv) {
     LonestarStart (argc, argv, name, desc, url);
@@ -379,8 +347,7 @@ int main(int argc, char** argv) {
     //NOTE: We are computing in edges on the fly and then using then in Graph construction.
     //std::vector<unsigned> counts;
     //std::vector<unsigned> In_counts;
-    Graph::pointer g;
-    Graph::createPerHost(g, inputFile, inputFile_tr);
+    Graph::pointer g = Graph::allocate(inputFile, inputFile_tr);
 
 /*
 
@@ -434,8 +401,8 @@ int main(int argc, char** argv) {
     Galois::Timer timerPR;
     timerPR.start();
 
-    PageRank::go(g);
-    //PageRankMsg::go(g);
+    //PageRank::go(g);
+    PageRankMsg::go(g);
 
     timerPR.stop();
 
@@ -446,7 +413,7 @@ int main(int argc, char** argv) {
     int nodes_check = 0;
     for (auto N = g->begin(); N != g->end(); ++N) {
       ++nodes_check;
-      Galois::Runtime::prefetch(*N);
+      //Galois::Runtime::prefetch(*N);
     }
     std::cout<<"Nodes_check = " << nodes_check << "\n";
 

@@ -105,7 +105,8 @@ void NetworkInterface::reportStats() {
 }
 
 void NetworkInterface::dumpStats() const {
-  std::cout <<  "RN " << statRecvNum.getVal()
+  std::cout << ID
+            << ": RN " << statRecvNum.getVal()
             << " RB " <<statRecvBytes.getVal()
             << " SN " <<statSendNum.getVal()
             << " SB " << statSendBytes.getVal() << "\n";
