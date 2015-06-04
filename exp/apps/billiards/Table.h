@@ -35,7 +35,7 @@
 #include <ctime>
 
 #include "FPutils.h"
-#include "Vec2.h"
+#include "GeomUtils.h"
 #include "Cushion.h"
 #include "Ball.h"
 #include "Collision.h"

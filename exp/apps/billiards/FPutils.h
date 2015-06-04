@@ -42,7 +42,7 @@
 // cstdint requires c++0x
 #include <stdint.h>
 
-#include "Vec2.h"
+#include "GeomUtils.h"
 
 struct FPutils: private boost::noncopyable {
 

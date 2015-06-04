@@ -35,7 +35,7 @@
 
 #include <cassert>
 
-#include "Vec2.h"
+#include "GeomUtils.h"
 #include "FPutils.h"
 #include "CollidingObject.h"
 

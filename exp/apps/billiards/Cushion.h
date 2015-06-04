@@ -37,7 +37,7 @@
 #include <cstdio>
 #include <cmath>
 
-#include "Vec2.h"
+#include "GeomUtils.h"
 #include "CollidingObject.h"
 
 
@@ -55,16 +55,17 @@ private:
   //
   // The cushion is represented by the equation
   // r*end + (1-r)*start, where 0 <= r <= 1;
-  unsigned id;
-  Vec2 m_start;
-  Vec2 m_end;
+  unsigned m_id;
+  LineSegment m_line
 
 public:
   Cushion (const unsigned id, const Vec2& start, const Vec2& end) 
-    : CollidingObject (), id (id), m_start (start), m_end (end) {}
+    : CollidingObject (), m_id (id), m_line (start, end) {}
 
 
-  Vec2 lengthVec () const { return (m_end - m_start); }
+  const LineSegment& getLineSegment (void) const {
+    return m_line;
+  }
 
   virtual bool isStationary () const { return true; }
 
@@ -72,22 +73,16 @@ public:
   // remains fixed
   virtual unsigned collCounter () const { return 0; }
 
-  virtual unsigned getID () const { return id; }
+  virtual unsigned getID () const { return m_id; }
 
   virtual void incrCollCounter () {}
 
   virtual std::string str () const {
 
     char s [256];
-    sprintf (s, "[Cushion-%d,start=%s,end=%s]", id, m_start.str ().c_str (), m_end.str ().c_str ());
+    sprintf (s, "[Cushion-%d, %s]", id, m_line.str ());
     return s;
   }
-
-  const Vec2& start () const { return m_start; }
-
-  const Vec2& end () const { return m_end; }
-
-
 };
 
 

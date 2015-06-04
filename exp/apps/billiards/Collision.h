@@ -158,10 +158,14 @@ public:
   //!  and solve for 'r' and 't'
   //! 
 
+
   static std::pair<bool, double> computeCollisionTime (const Ball& ball, const Cushion& cush) {
+    return computeCollisionTime (ball, cush.getLineSegment ());
+  }
 
+  static std::pair<bool, double> computeCollisionTime (const Ball& ball, const LineSegment& lineSeg) {
 
-    Vec2 L = FPutils::truncate (cush.lengthVec ());
+    Vec2 L = FPutils::truncate (lineSeg.lengthVec ());
 
     Vec2    bpos =  FPutils::truncate (ball.pos ());
     Vec2    bvel =  FPutils::truncate (ball.vel ());
@@ -179,7 +183,7 @@ public:
     Vec2 R = FPutils::truncate (L.rightNormal ().unit ());
     R *= brad;
 
-    Vec2 common = D - cush.start () - R;
+    Vec2 common = D - lineSeg.getBegin () - R;
 
     double r = (bvel.getX () * common.getY ()) - (bvel.getY () * common.getX ());
     r /= denominator;
@@ -197,7 +201,7 @@ public:
     } else {
       assert (isInFuture (btime, t) && "Collision time in the past?");
 
-      bool app = isApproaching (ball, cush);
+      bool app = isApproaching (ball, lineSeg);
 
       return std::make_pair (app, t);
 
@@ -233,7 +237,7 @@ public:
   //!
   static void simulateCollision (Ball& ball, Cushion& cush, double time) {
 
-    Vec2 L = FPutils::truncate (cush.lengthVec ());
+    Vec2 L = FPutils::truncate (cush.getLineSegment ().lengthVec ());
 
     Vec2 bvel = FPutils::truncate (ball.vel ());
 
@@ -395,10 +399,10 @@ private:
   // is moving towards the cushion, else it's moving away from it.
   //
 
-  static bool isApproaching (const Ball& b, const Cushion& c) {
+  static bool isApproaching (const Ball& b, const LineSegment& l) {
     // assuming that t is a valid collision time
 
-    double d = b.vel ().dot (c.lengthVec ().rightNormal ());
+    double d = b.vel ().dot (l.lengthVec ().rightNormal ());
     return (d < 0.0);
   }
 

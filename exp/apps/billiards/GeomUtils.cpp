@@ -1,4 +1,4 @@
-/** 2D Point  -*- C++ -*-
+/** basic geometry facilities  -*- C++ -*-
  * @file
  * @section License
  *
@@ -20,13 +20,13 @@
  *
  * @section Description
  *
- * 2D Point .
+ * basic geometry facilities .
  *
  * @author <ahassaan@ices.utexas.edu>
  */
 
 
-#include "Vec2.h"
+#include "GeomUtils.h"
 
 Vec2 operator + (const Vec2& v1, const Vec2& v2) {
 

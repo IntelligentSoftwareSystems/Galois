@@ -38,7 +38,7 @@
 #include <cstdio>
 #include <ctime>
 
-#include "Vec2.h"
+#include "GeomUtils.h"
 #include "FPutils.h"
 #include "Cushion.h"
 #include "Ball.h"
