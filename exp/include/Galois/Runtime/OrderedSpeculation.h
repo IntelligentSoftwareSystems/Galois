@@ -131,8 +131,8 @@ struct OptimContext: public SimpleRuntimeContext {
   using CtxtCmp = ContextComparator<OptimContext, Cmp>;
   using NItem = OptimNhoodItem<OptimContext, CtxtCmp>;
   using NhoodMgr = PtrBasedNhoodMgr<NItem>;
-  using NhoodList = typename ContainersWithGAlloc::Vector<NItem*>::type;
-  using ChildList = typename ContainersWithGAlloc::Vector<OptimContext*>::type;
+  using NhoodList = typename gstl::Vector<NItem*>;
+  using ChildList = typename gstl::Vector<OptimContext*>;
 
   T active;
   ContextState state;

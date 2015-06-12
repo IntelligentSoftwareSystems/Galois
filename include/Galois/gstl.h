@@ -29,6 +29,8 @@
 
 namespace Galois {
 
+// TODO: move to namespace gstl?
+
 template<typename IterTy, class Distance>
 IterTy safe_advance_dispatch(IterTy b, IterTy e, Distance n, std::random_access_iterator_tag) {
   if (std::distance(b,e) >= n)

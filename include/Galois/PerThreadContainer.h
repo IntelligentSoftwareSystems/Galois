@@ -1,4 +1,4 @@
-/** Per Thread workLists-*- C++ -*-
+/** Per Thread Containers-*- C++ -*-
  * @file
  * @section License
  *
@@ -41,6 +41,7 @@
 #include <boost/iterator/iterator_facade.hpp>
 
 #include "Galois/gdeque.h"
+#include "Galois/STLcontainers.h"
 #include "Galois/Threads.h"
 #include "Galois/PriorityQueue.h"
 #include "Galois/TwoLevelIterator.h"
@@ -508,36 +509,11 @@ public:
 };
 
 
-namespace ContainersWithGAlloc {
-
-  template<typename T>
-  struct Pow2Alloc { typedef typename Runtime::MM::Pow_2_BlockAllocator<T> type; };
-
-  template<typename T>
-  struct FixedSizeAlloc { typedef typename Runtime::MM::FixedSizeAllocator<T> type; };
-
-  template<typename T>
-  struct Vector { typedef typename std::vector<T, typename Pow2Alloc<T>::type > type; };
-
-  template<typename T>
-  struct Deque { typedef typename std::deque<T, typename Pow2Alloc<T>::type > type; };
-
-  template<typename T>
-  struct List { typedef typename std::list<T, typename FixedSizeAlloc<T>::type > type; };
-
-  template<typename T, typename C>
-  struct Set { typedef typename std::set<T, C, typename FixedSizeAlloc<T>::type > type; };
-
-  template<typename T, typename C>
-  struct PQ { typedef MinHeap<T, C, typename Vector<T>::type > type; };
-};
-
-
 template<typename T>
-class PerThreadVector: public PerThreadContainer<typename ContainersWithGAlloc::template Vector<T>::type> {
+class PerThreadVector: public PerThreadContainer<typename gstl::template Vector<T> > {
 public:
-  typedef typename ContainersWithGAlloc::template Pow2Alloc<T>::type Alloc_ty;
-  typedef typename ContainersWithGAlloc::template Vector<T>::type Cont_ty;
+  typedef typename gstl::template Pow2Alloc<T>  Alloc_ty;
+  typedef typename gstl::template Vector<T>  Cont_ty;
 
 protected:
   typedef PerThreadContainer<Cont_ty> Super_ty;
@@ -562,13 +538,13 @@ public:
 
 template<typename T>
 class PerThreadDeque: 
-  public PerThreadContainer<typename ContainersWithGAlloc::template Deque<T>::type> {
+  public PerThreadContainer<typename gstl::template Deque<T> > {
 
 public:
-  typedef typename ContainersWithGAlloc::template Pow2Alloc<T>::type Alloc_ty;
+  typedef typename gstl::template Pow2Alloc<T>  Alloc_ty;
 
 protected:
-  typedef typename ContainersWithGAlloc::template Deque<T>::type Cont_ty;
+  typedef typename gstl::template Deque<T>  Cont_ty;
   typedef PerThreadContainer<Cont_ty> Super_ty;
 
   Alloc_ty alloc;
@@ -593,13 +569,13 @@ public:
 
 template<typename T>
 class PerThreadList:
-  public PerThreadContainer<typename ContainersWithGAlloc::template List<T>::type> {
+  public PerThreadContainer<typename gstl::template List<T> > {
 
 public:
-  typedef typename ContainersWithGAlloc::template FixedSizeAlloc<T>::type Alloc_ty;
+  typedef typename gstl::template FixedSizeAlloc<T>  Alloc_ty;
 
 protected:
-  typedef typename ContainersWithGAlloc::template List<T>::type Cont_ty;
+  typedef typename gstl::template List<T>  Cont_ty;
   typedef PerThreadContainer<Cont_ty> Super_ty;
 
   Alloc_ty alloc;
@@ -612,13 +588,13 @@ public:
 
 template<typename T, typename C=std::less<T> >
 class PerThreadSet: 
-  public PerThreadContainer<typename ContainersWithGAlloc::template Set<T, C>::type> {
+  public PerThreadContainer<typename gstl::template Set<T, C> > {
 
 public:
-  typedef typename ContainersWithGAlloc::template FixedSizeAlloc<T>::type Alloc_ty;
+  typedef typename gstl::template FixedSizeAlloc<T>  Alloc_ty;
 
 protected:
-  typedef typename ContainersWithGAlloc::template Set<T, C>::type Cont_ty;
+  typedef typename gstl::template Set<T, C>  Cont_ty;
   typedef PerThreadContainer<Cont_ty> Super_ty;
 
   Alloc_ty alloc;
@@ -643,14 +619,14 @@ public:
 
 template<typename T, typename C=std::less<T> >
 class PerThreadMinHeap:
-  public PerThreadContainer<typename ContainersWithGAlloc::template PQ<T, C>::type> {
+  public PerThreadContainer<typename gstl::template PQ<T, C> > {
 
 public:
-  typedef typename ContainersWithGAlloc::template Pow2Alloc<T>::type Alloc_ty;
+  typedef typename gstl::template Pow2Alloc<T>  Alloc_ty;
 
 protected:
-  typedef typename ContainersWithGAlloc::template Vector<T>::type Vec_ty;
-  typedef typename ContainersWithGAlloc::template PQ<T, C>::type Cont_ty;
+  typedef typename gstl::template Vector<T>  Vec_ty;
+  typedef typename gstl::template PQ<T, C>  Cont_ty;
   typedef PerThreadContainer<Cont_ty> Super_ty;
 
   Alloc_ty alloc;

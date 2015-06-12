@@ -114,7 +114,7 @@ public:
   typedef Galois::GAtomic<bool> AtomicBool;
   // typedef Galois::gdeque<NItem*, 4> NhoodList;
   // typedef llvm::SmallVector<NItem*, 8> NhoodList;
-  typedef typename ContainersWithGAlloc::Vector<NItem*>::type NhoodList;
+  typedef typename gstl::Vector<NItem*> NhoodList;
   // typedef std::vector<NItem*> NhoodList;
 
   // TODO: fix visibility below
