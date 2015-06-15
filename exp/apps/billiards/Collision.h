@@ -30,19 +30,21 @@
 #ifndef _COLLISION_H_
 #define _COLLISION_H_
 
+#include "FPutils.h"
+#include "Ball.h"
+#include "Cushion.h"
+
+
+
 #include <string>
 #include <iostream>
+#include <iterator>
 
 #include <boost/noncopyable.hpp>
 
 #include <cstdlib>
 #include <cstdio>
 #include <cmath>
-
-#include "FPutils.h"
-#include "Ball.h"
-#include "Cushion.h"
-
 
 class Collision: boost::noncopyable {
 
@@ -434,6 +436,81 @@ private:
 
   }
 
+  // common code to 
+  // compute earliest collision between a ball and some other object underTest
+  // We don't want to create a collision with the object involved in previous collision
+  template <typename I, typename T=typename std::iterator_traits<I>::value_type>
+  static std::pair<T, double> computeNextCollision (const Ball* b, const I collObjsBeg, const I collObjsEnd, const T* prevEventObj, const double endtime) {
+
+    assert (static_cast<const CollidingObject*> (b) != static_cast<const CollidingObject*> (prevEventObj));
+
+    const T* currMin = nullptr;
+    double currMinTime = -1.0;
+
+    for (I i = collObjsBeg; i != collObjsEnd; ++i) {
+
+      const T* underTest = *i;
+
+      // the object under test is not the same as the one involved in a previous collision event
+      // if (static_cast<const CollidingObject*> (underTest) !=  static_cast<const CollidingObject*> (b)
+          // && prevEventObj != underTest) { 
+
+      if (static_cast<const CollidingObject*> (underTest) !=  static_cast<const CollidingObject*> (b)) {
+
+        std::pair <bool, double> p = Collision::computeCollisionTime (*b, *underTest);
+
+
+        if (p.first) { // collision possible
+
+          assert (underTest != prevEventObj);
+
+          assert (p.second > 0.0);
+
+          // it may happen that a ball collides two balls or
+          // two cushions simulatneously. In such cases,
+          // we break the tie by choosing the object with smaller id
+          if (FPutils::almostEqual (p.second, currMinTime)) {
+            if (underTest->getID () < currMin->getID ()) {
+              currMin = underTest;
+              currMinTime = p.second;
+            }
+
+          } else  if ((currMin == NULL) || (p.second < currMinTime)) {
+            // colliding == NULL for the first time
+            currMin = underTest;
+            currMinTime = p.second;
+
+          } else {
+            assert (p.second > currMinTime);
+            // do nothing?
+          }
+
+          if (false) {
+            std::cout.precision (10);
+            std::cout << "At time: " << std::fixed << p.second << " Ball b=" << b->str () << 
+              " can collide with=" << underTest->str () << std::endl;
+          }
+
+        }
+
+
+
+      } // end outer if
+    } // end for
+
+
+    if (currMin != NULL) { assert (currMinTime > 0.0); }
+
+
+    if (currMinTime <= endtime) { 
+      return std::make_pair (currMin, currMinTime);
+
+    } else {
+      return std::make_pair (((T*) nullptr), -1.0);
+
+    }
+
+  }
 
 
 };

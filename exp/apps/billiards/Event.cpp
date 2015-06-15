@@ -30,60 +30,7 @@
 
 #define PRINT_DEBUG false
 
-void Event::simulate () {
-  switch (kind) {
 
-    case BALL_COLLISION:
-      simulateBallCollision (downCast<Ball> (otherObj));
-      break;
-
-    case CUSHION_COLLISION:
-      simulateCushionCollision (downCast<Cushion> (otherObj));
-      break;
-
-    default:
-      abort ();
-
-  }
-}
-
-
-void Event::simulateBallCollision (Ball& b2) {
-
-  assert (kind == BALL_COLLISION);
-
-  Ball& b1 = *ball;
-
-  if ((this->collCounterA == b1.collCounter ()) && 
-      (this->collCounterB == b2.collCounter ())) {
-
-    Collision::simulateCollision (b1, b2, time);
-
-    b1.incrCollCounter ();
-    b2.incrCollCounter ();
-
-    this->collCounterA = b1.collCounter ();
-    this->collCounterB = b2.collCounter ();
-  }
-}
-
-
-void Event::simulateCushionCollision (Cushion& c) { 
-
-  assert (kind == CUSHION_COLLISION);
-
-  Ball& b = *ball;
-
-  // cushion's collision counter should not change
-  assert (this->collCounterB == c.collCounter ()); 
-
-  if (this->collCounterA == b.collCounter ()) {
-    Collision::simulateCollision (b, c, time);
-
-    b.incrCollCounter ();
-    this->collCounterA = b.collCounter ();
-  }
-}
 
 
 /*

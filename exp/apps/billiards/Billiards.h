@@ -44,7 +44,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 
-#include "Table.h"
+#include "TableSectored.h"
 
 namespace cll = llvm::cl;
 
@@ -65,15 +65,15 @@ public:
 
   virtual const std::string version () const = 0;
   //! @return number of events processed
-  virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const double endtime, bool enablePrints=false) = 0;
+  virtual size_t runSim (TableSectored& table, std::vector<Event>& initEvents, const double endtime, bool enablePrints=false) = 0;
 
   virtual void run (int argc, char* argv[]) {
     
     Galois::StatManager sm;
     LonestarStart (argc, argv, name, desc, url);
 
-    Table table (length, width, numballs);
-    Table verCopy (table);
+    TableSectored table (length, width, numballs);
+    TableSectored verCopy (table);
 
     bool enablePrints = false;
 
@@ -105,7 +105,7 @@ public:
 
 private:
 
-  void verify (const Table& initial, Table& final, size_t numEvents, const double endtime);
+  void verify (const TableSectored& initial, TableSectored& final, size_t numEvents, const double endtime);
 };
 
 
@@ -121,7 +121,9 @@ public:
       table.addNextEvents (e, addList, endtime);
   }
 
-  virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const double endtime, bool enablePrints=false) {
+  virtual size_t runSim (TableSectored& tableSectored, std::vector<Event>& initEvents, const double endtime, bool enablePrints=false) {
+
+    Table& table = tableSectored; // remove sectoring functionality
 
     PriorityQueue pq;
 
@@ -168,7 +170,7 @@ public:
 };
 
 
-void Billiards::verify (const Table& initial, Table& final, size_t numEvents, const double endtime) {
+void Billiards::verify (const TableSectored& initial, TableSectored& final, size_t numEvents, const double endtime) {
 
   double initEnergy = initial.sumEnergy ();
   double finalEnergy = final.sumEnergy ();
@@ -177,7 +179,7 @@ void Billiards::verify (const Table& initial, Table& final, size_t numEvents, co
 
 
   BilliardsSerialPQ serial;
-  Table serialTable(initial);
+  TableSectored serialTable(initial);
 
   std::vector<Event> initEvents;
   serialTable.genInitialEvents (initEvents, endtime);

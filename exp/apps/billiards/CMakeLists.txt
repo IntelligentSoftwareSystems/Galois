@@ -1,5 +1,6 @@
 set (Sources dependTest.cpp Table.cpp Cushion.cpp FPutils.cpp Vec2.cpp Event.cpp)
 app (BilliardsSerialPQ BilliardsSerialPQ.cpp ${Sources})
+app (BilliardsSerialSectored BilliardsSerialSectored.cpp ${Sources})
 app (BilliardsSerialLog BilliardsSerialLog.cpp ${Sources})
 app (BilliardsFromLog BilliardsFromLog.cpp ${Sources})
 

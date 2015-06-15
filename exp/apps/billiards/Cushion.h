@@ -77,6 +77,22 @@ public:
 
   virtual void incrCollCounter () {}
 
+  virtual void simulate (const Event& e) {
+
+    assert (this == e.getCushion ());
+    assert (e.getKind () == Event::CUSHION_COLLISION);
+
+    Ball& b = e.getBall ();
+
+    if (e.notStale ()) {
+      Collision::simulateCollision (b, *this, e.getTime ());
+      b.incrCollCounter ();
+
+      // XXX: reason not clear for this
+      // this->collCounterA = b.collCounter ();
+    }
+  }
+
   virtual std::string str () const {
 
     char s [256];

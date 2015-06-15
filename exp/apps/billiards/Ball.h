@@ -39,6 +39,8 @@
 #include "FPutils.h"
 #include "CollidingObject.h"
 
+class Sector;
+
 class Ball: public CollidingObject {
 
   unsigned m_id;
@@ -51,6 +53,10 @@ class Ball: public CollidingObject {
   double m_timestamp;
 
   unsigned m_collCntr;
+
+  FlatSet<Sector*> sectors;
+
+  using SectorIterator = typename FlatSet<Sector*>::const_iterator;
 
 
 public:
@@ -110,6 +116,39 @@ public:
     return s;
   }
 
+  virtual void simulate (const Event& e) {
+
+    assert (e.getKind () == Event::BALL_COLLISION);
+    assert (this == e.getOtherBall ());
+
+    Ball& b1 = e.getBall ();
+
+    if (e.notStale ()) {
+      Collision::simulateCollision (*this, b1, e.getTime ());
+      this->incrCollCounter ();
+      b1->incrCollCounter ();
+
+      // XXX: reason for this not clear yet. 
+      // this->collCounterA = b1.collCounter ();
+      // this->collCounterB = b2.collCounter ();
+    }
+  }
+
+  void addSector (Sector* s) {
+    assert (s != nullptr);
+    sectors.insert (s);
+    assert (sectors.contains (s));
+  }
+
+  void removeSector (Sector* s) {
+    assert (sectors.contains (s));
+    sectors.erase (s);
+    assert (!sectors.contains (s));
+  }
+
+  std::pair<SectorIterator, SectorIterator> sectorRange (void) const {
+    return std::make_pair (sectors.begin (), sectors.end ());
+  }
 
   void update (const Vec2& newVel, const double time) {
 

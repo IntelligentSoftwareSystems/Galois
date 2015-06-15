@@ -54,7 +54,7 @@ public:
   };
 
 
-private:
+protected:
   double length;
   double width;
   
@@ -66,8 +66,8 @@ private:
   Table& operator = (const Table& that) { abort (); return *this; }
 
 public:
-  Table (double length, double width, unsigned numBalls) 
-    : length (length), width (width), numBalls (numBalls) {
+  Table (unsigned numBalls, double length, double width) 
+    : numBalls (numBalls), length (length), width (width) {
 
     srand (0); // TODO: use time (NULL) later 
     init ();
@@ -342,7 +342,7 @@ public:
     }
   }
 
-private:
+protected:
 
   void init () {
     createCushions ();
@@ -492,8 +492,8 @@ private:
 
     assert (ball != NULL);
 
-    std::pair<const Ball*, double> ballColl = computeNextCollision (ball, this->balls, prevBall, endtime);
-    std::pair<const Cushion*, double> cushColl = computeNextCollision (ball, this->cushions, prevCushion, endtime);
+    std::pair<Ball*, double> ballColl = Collision::computeNextCollision (ball, this->balls.begin (), this->balls.end (), prevBall, endtime);
+    std::pair<Cushion*, double> cushColl = Collision::computeNextCollision (ball, this->cushions.begin (), this->cushions.end (), prevCushion, endtime);
 
     if (ballColl.first != NULL && cushColl.first != NULL) {
 
@@ -533,83 +533,6 @@ private:
     }
 
   }
-
-
-  // common code to 
-  // compute earliest collision between a ball and some other object underTest
-  // We don't want to create a collision with the object involved in previous collision
-  template <typename T>
-  static std::pair<const T*, double> computeNextCollision (const Ball* b, const std::vector<T*>& collObjs, const T* prevEventObj, const double endtime) {
-
-    assert (static_cast<const CollidingObject*> (b) != static_cast<const CollidingObject*> (prevEventObj));
-
-    const T* currMin = nullptr;
-    double currMinTime = -1.0;
-
-    for (typename std::vector<T*>::const_iterator i = collObjs.begin (), ei = collObjs.end ();
-        i != ei; ++i) {
-
-      const T* underTest = *i;
-
-      // the object under test is not the same as the one involved in a previous collision event
-      // if (static_cast<const CollidingObject*> (underTest) !=  static_cast<const CollidingObject*> (b)
-          // && prevEventObj != underTest) { 
-
-      if (static_cast<const CollidingObject*> (underTest) !=  static_cast<const CollidingObject*> (b)) {
-
-        std::pair <bool, double> p = Collision::computeCollisionTime (*b, *underTest);
-
-
-        if (p.first) { // collision possible
-
-          assert (underTest != prevEventObj);
-
-          assert (p.second > 0.0);
-
-          // it may happen that a ball collides two balls or
-          // two cushions simulatneously. In such cases,
-          // we break the tie by choosing the object with smaller id
-          if (FPutils::almostEqual (p.second, currMinTime)) {
-            if (underTest->getID () < currMin->getID ()) {
-              currMin = underTest;
-              currMinTime = p.second;
-            }
-
-          } else  if ((currMin == NULL) || (p.second < currMinTime)) {
-            // colliding == NULL for the first time
-            currMin = underTest;
-            currMinTime = p.second;
-
-          } else {
-            assert (p.second > currMinTime);
-            // do nothing?
-          }
-
-          if (false) {
-            std::cout.precision (10);
-            std::cout << "At time: " << std::fixed << p.second << " Ball b=" << b->str () << 
-              " can collide with=" << underTest->str () << std::endl;
-          }
-
-        }
-
-
-
-      } // end outer if
-    } // end for
-
-
-    if (currMin != NULL) { assert (currMinTime > 0.0); }
-
-    if (currMinTime <= endtime) { 
-      return std::make_pair (currMin, currMinTime);
-
-    } else {
-      return std::make_pair (((T*) NULL), currMinTime);
-    }
-
-  }
-
 
 
   template <typename T>

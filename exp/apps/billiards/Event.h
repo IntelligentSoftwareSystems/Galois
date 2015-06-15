@@ -55,7 +55,9 @@ class Event {
 public:
   enum EventKind {
     BALL_COLLISION,
-    CUSHION_COLLISION
+    CUSHION_COLLISION,
+    SECTOR_ENTRY,
+    SECTOR_LEAVE
   };
 
 private:
@@ -95,24 +97,43 @@ private:
 
 public:
 
-  static Event makeBallCollision (const Ball& ball, const Ball& otherBall, const double time) {
+  static Event makeBallCollision (Ball& ball, Ball& otherBall, const double time) {
 
     assert (&ball != NULL);
     assert (&otherBall != NULL);
 
-    return Event (BALL_COLLISION, const_cast<Ball&> (ball), const_cast<Ball&> (otherBall), time);
+    return Event (BALL_COLLISION, ball, otherBall, time);
   }
 
-  static Event makeCushionCollision (const Ball& ball, const Cushion& c, const double time) {
+  static Event makeCushionCollision (Ball& ball, Cushion& c, const double time) {
 
     assert (&ball != NULL);
     assert (&c != NULL);
 
-    return Event (CUSHION_COLLISION, const_cast<Ball&> (ball), const_cast<Cushion&>(c), time);
+    return Event (CUSHION_COLLISION, ball, c, time);
 
   }
 
-  void simulate ();
+  static Event makeSectorEntry (Ball& ball, Sector& sector, const double time) {
+
+    assert (&ball != NULL);
+    assert (&sector != NULL);
+
+    return Event (SECTOR_ENTRY, ball, sector, time);
+  }
+
+  static Event makeSectorLeave (Ball& ball, Sector& sector, const double time) {
+
+    assert (&ball != NULL);
+    assert (&sector != NULL);
+
+    return Event (SECTOR_LEAVE, ball, sector, time);
+    
+  }
+
+  void simulate () {
+    otherObj->simulate (*this);
+  }
 
   double getTime () const { return time; }
 
@@ -148,16 +169,22 @@ public:
     this->collCounterB = b.collCounter ();
   }
 
-  const Ball& getOtherBall () const { 
+  Ball& getOtherBall () const { 
     assert (kind == BALL_COLLISION);
 
     return downCast<Ball> (otherObj);
   }
 
-  const Cushion& getCushion () const {
+  Cushion& getCushion () const {
     assert (kind == CUSHION_COLLISION);
 
     return downCast<Cushion> (otherObj);
+  }
+
+  Sector& getSector () const {
+    assert (kind == SECTOR_ENTRY || kind == SECTOR_LEAVE);
+    
+    return downCast<Sector> (otherObj);
   }
 
   EventKind getKind () const { return kind; }
@@ -204,10 +231,6 @@ public:
   }
 
 private:
-
-  void simulateBallCollision (Ball& b2);
-
-  void simulateCushionCollision (Cushion& c);
 
   template <typename T>
   static T& downCast (CollidingObject* obj) {
@@ -262,26 +285,6 @@ public:
       return (compare (e1, e2) > 0);
     }
   };
-
-  bool operator < (const Event& that) const {
-    return Comparator::compare (*this, that) < 0;
-  }
-
-  bool operator > (const Event& that) const {
-    return Comparator::compare (*this, that) > 0;
-  }
-
-  bool operator == (const Event& that) const { 
-    return Comparator::compare (*this, that) == 0;
-  }
-
-  bool operator >= (const Event& that) const { 
-    return Comparator::compare (*this, that) >= 0; 
-  }
-
-  bool operator <= (const Event& that) const {
-    return Comparator::compare (*this, that) <= 0;
-  }
 
 };
 
