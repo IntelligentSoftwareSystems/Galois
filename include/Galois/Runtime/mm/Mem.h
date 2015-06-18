@@ -878,6 +878,16 @@ public:
   }
 
   size_type max_size() const throw() { return size_type (-1); }
+
+  template<typename T1>
+  bool operator != (const Pow_2_BlockAllocator<T1>& rhs) const {
+    return heap != rhs.heap;
+  }
+
+  template<typename T1>
+  bool operator == (const Pow_2_BlockAllocator<T1>& rhs) const {
+    return heap == rhs.heap;
+  }
 };
 
 template <>
