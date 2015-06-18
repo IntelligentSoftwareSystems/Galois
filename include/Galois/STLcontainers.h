@@ -27,6 +27,13 @@
 #ifndef GALOIS_GSTL_CONTAINERS_H
 #define GALOIS_GSTL_CONTAINERS_H
 
+#include "PriorityQueue.h"
+
+#include <vector>
+#include <set>
+#include <deque>
+#include <list>
+
 namespace Galois {
 
 namespace gstl {
@@ -38,19 +45,19 @@ namespace gstl {
   using FixedSizeAlloc = typename Runtime::MM::FixedSizeAllocator<T>; 
 
   template<typename T>
-  using Vector = typename std::vector<T, typename Pow2Alloc<T> >; 
+  using Vector = std::vector<T, Pow2Alloc<T> >; 
 
   template<typename T>
-  using Deque = typename std::deque<T, typename Pow2Alloc<T> >; 
+  using Deque = std::deque<T, Pow2Alloc<T> >; 
 
   template<typename T>
-  using List = typename std::list<T, typename FixedSizeAlloc<T> >; 
+  using List = std::list<T, FixedSizeAlloc<T> >; 
 
   template<typename T, typename C>
-  using Set = typename std::set<T, C, typename FixedSizeAlloc<T> >; 
+  using Set = std::set<T, C, FixedSizeAlloc<T> >; 
 
   template<typename T, typename C>
-  using PQ = MinHeap<T, C, typename Vector<T> >; 
+  using PQ = MinHeap<T, C, Vector<T> >; 
 
   // template<typename T>
   // struct Pow2Alloc { typedef typename Runtime::MM::Pow_2_BlockAllocator<T> type; };
