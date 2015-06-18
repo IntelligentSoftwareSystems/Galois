@@ -56,7 +56,7 @@ private:
   // The cushion is represented by the equation
   // r*end + (1-r)*start, where 0 <= r <= 1;
   unsigned m_id;
-  LineSegment m_line
+  LineSegment m_line;
 
 public:
   Cushion (const unsigned id, const Vec2& start, const Vec2& end) 
@@ -77,26 +77,12 @@ public:
 
   virtual void incrCollCounter () {}
 
-  virtual void simulate (const Event& e) {
-
-    assert (this == e.getCushion ());
-    assert (e.getKind () == Event::CUSHION_COLLISION);
-
-    Ball& b = e.getBall ();
-
-    if (e.notStale ()) {
-      Collision::simulateCollision (b, *this, e.getTime ());
-      b.incrCollCounter ();
-
-      // XXX: reason not clear for this
-      // this->collCounterA = b.collCounter ();
-    }
-  }
+  virtual void simulate (const Event& e);
 
   virtual std::string str () const {
 
     char s [256];
-    sprintf (s, "[Cushion-%d, %s]", id, m_line.str ());
+    sprintf (s, "[Cushion-%d, %s]", m_id, m_line.str ().c_str ());
     return s;
   }
 };

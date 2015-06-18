@@ -37,6 +37,8 @@
 #include <cstdio>
 #include <cmath>
 
+class Event;
+
 class CollidingObject {
 
 public:

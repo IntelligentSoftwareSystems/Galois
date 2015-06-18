@@ -35,6 +35,8 @@
 
 class BilliardsLevelExec: public Billiards {
 
+public:
+
   using Graph = Galois::Graph::FirstGraph<void*, void, true>;
   using GNode = Graph::GraphNode;
   using VecNodes = std::vector<GNode>;
@@ -55,14 +57,14 @@ class BilliardsLevelExec: public Billiards {
     template <typename C>
     void operator () (const Event& e, C& ctx) const {
 
-      const Ball& b1 = e.getBall ();
-      assert (b1.getID () < nodes.size ());
-      graph.getData (nodes[b1.getID ()], Galois::MethodFlag::WRITE);
+      Ball* b1 = e.getBall ();
+      assert (b1->getID () < nodes.size ());
+      graph.getData (nodes[b1->getID ()], Galois::MethodFlag::WRITE);
 
       if (e.getKind () == Event::BALL_COLLISION) {
-        const Ball& b2 = e.getOtherBall ();
-        assert (b2.getID () < nodes.size ());
-        graph.getData (nodes[b2.getID ()], Galois::MethodFlag::WRITE);
+        Ball* b2 = e.getOtherBall ();
+        assert (b2->getID () < nodes.size ());
+        graph.getData (nodes[b2->getID ()], Galois::MethodFlag::WRITE);
       }
 
     }

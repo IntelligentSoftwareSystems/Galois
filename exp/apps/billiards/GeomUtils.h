@@ -168,6 +168,14 @@ public:
 
   {}
 
+  std::string str (void) const {
+    char s [256];
+
+    std::sprintf (s, "BB:<%s,%s>", m_min.str ().c_str (), m_max.str ().c_str ());
+
+    return s;
+  }
+
   void update (const Vec2& p) {
     if (m_min.getX () < p.getX ()) {
       m_min.getX () = p.getX ();
@@ -232,7 +240,8 @@ public:
   std::string str () const {
 
     char s[256];
-    sprintf (s, "[LineSegment: start: %s, end: %s]", pt1, pt2);
+    sprintf (s, "[LineSegment: start: %s, end: %s]"
+        , pt1.str ().c_str (), pt2.str ().c_str ());
 
     return s;
   }
@@ -283,32 +292,17 @@ public:
     }
   }
 
-
-
-    if (deltaX () == 0.0) {
-      return std::fabs (p.getX () - pt1.getX ());
-
-    } else if (deltaY () == 0.0) {
-      return std::fabs (p.getY () - pt1.getY ());
-
-    } else {
-
-      double a = 0.0;
-      double b = 0.0;
-      double c = 0.0;
-
-      getABC (a, b, c);
-
-      double denom = std::sqrt (a*a + b*b); 
-      assert (denom != 0.0);
-
-      return std::fabs (a * p.getX () + b * p.getY ()  + c) / denom;
-    }
-
-  }
-
 }; // end LineSegment
 
+
+
+enum class RectSide: int {
+  // clockwise numbering
+  LEFT = 0,
+  TOP = 1,
+  RIGHT = 2,
+  BOTTOM = 3
+};
 
 
 

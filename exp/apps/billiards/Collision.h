@@ -33,6 +33,11 @@
 #include "FPutils.h"
 #include "Ball.h"
 #include "Cushion.h"
+#include "Event.h"
+
+
+#include "Galois/optional.h"
+
 
 
 
@@ -436,13 +441,15 @@ private:
 
   }
 
+public:
   // common code to 
   // compute earliest collision between a ball and some other object underTest
   // We don't want to create a collision with the object involved in previous collision
-  template <typename I, typename T=typename std::iterator_traits<I>::value_type>
-  static std::pair<T, double> computeNextCollision (const Ball* b, const I collObjsBeg, const I collObjsEnd, const T* prevEventObj, const double endtime) {
+  template <typename I, typename T=typename std::remove_pointer<typename std::iterator_traits<I>::value_type>::type >
+  static Galois::optional<Event> computeNextEvent (const Event::EventKind& kind, const Ball* b, const I collObjsBeg, const I collObjsEnd, const double endtime) {
 
-    assert (static_cast<const CollidingObject*> (b) != static_cast<const CollidingObject*> (prevEventObj));
+
+    Galois::optional<Event> retVal;
 
     const T* currMin = nullptr;
     double currMinTime = -1.0;
@@ -461,8 +468,6 @@ private:
 
 
         if (p.first) { // collision possible
-
-          assert (underTest != prevEventObj);
 
           assert (p.second > 0.0);
 
@@ -502,14 +507,14 @@ private:
     if (currMin != NULL) { assert (currMinTime > 0.0); }
 
 
-    if (currMinTime <= endtime) { 
-      return std::make_pair (currMin, currMinTime);
+    if (currMinTime > 0.0 && currMinTime <= endtime) { 
+      assert (currMin != nullptr);
 
-    } else {
-      return std::make_pair (((T*) nullptr), -1.0);
+      retVal = Event::makeEvent (kind, b, currMin, currMinTime);
 
     }
 
+    return retVal;
   }
 
 

@@ -52,10 +52,11 @@ static const char* const name = "Billiards Simulation";
 static const char* const desc = "Simulates elastic collisions between billiard balls on a table";
 static const char* const url = "billiards";
 
-static cll::opt<double>   length("length", cll::desc("length of the billiards table"), cll::init(400.0));
-static cll::opt<double>   width("width", cll::desc("width of the billiards table"), cll::init(200.0));
-static cll::opt<unsigned> numballs("balls", cll::desc("number of balls on the table"), cll::init(100.0));
-static cll::opt<double>   endtime("end", cll::desc("simulation end time"), cll::init(200.0));
+static cll::opt<unsigned>   sectorSize("secsize", cll::desc("size of a (square) sector"), cll::init(100));
+static cll::opt<unsigned>   xSectors("xsec", cll::desc("number of sectors along length"), cll::init(1));
+static cll::opt<unsigned>   ySectors("ysec", cll::desc("number of sectors along height"), cll::init(1));
+static cll::opt<unsigned> numballs("balls", cll::desc("number of balls on the table"), cll::init(100));
+static cll::opt<double>   endtime("end", cll::desc("simulation end time"), cll::init(100.0));
 
 
 class Billiards {
@@ -72,7 +73,7 @@ public:
     Galois::StatManager sm;
     LonestarStart (argc, argv, name, desc, url);
 
-    TableSectored table (length, width, numballs);
+    TableSectored table (numballs, sectorSize, xSectors, ySectors);
     TableSectored verCopy (table);
 
     bool enablePrints = false;

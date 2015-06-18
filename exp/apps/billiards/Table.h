@@ -55,10 +55,10 @@ public:
 
 
 protected:
+  unsigned numBalls;
   double length;
   double width;
   
-  unsigned numBalls;
 
   std::vector<Cushion*> cushions;
   std::vector<Ball*> balls;
@@ -69,12 +69,12 @@ public:
   Table (unsigned numBalls, double length, double width) 
     : numBalls (numBalls), length (length), width (width) {
 
-    srand (0); // TODO: use time (NULL) later 
+    srand (0); // TODO: use time (nullptr) later 
     init ();
   }
 
   Table (const Table& that) 
-    : length (that.length), width (that.width), numBalls (that.numBalls) {
+    : numBalls (that.numBalls), length (that.length), width (that.width) {
 
       copyVecPtr (that.cushions, this->cushions);
       copyVecPtr (that.balls, this->balls);
@@ -91,11 +91,16 @@ public:
 
   double getWidth () const { return width; }
 
+  Cushion* getCushion (RectSide side) const { 
+    assert (int(side) < int (cushions.size ()));
+    return cushions [int (side)];
+  }
+
   const Ball& getBallByID (unsigned id) const {
     assert (id < balls.size ());
 
     // XXX: assumes ball ids and indices are same
-    assert (balls[id] != NULL);
+    assert (balls[id] != nullptr);
     return *balls[id]; 
   }
 
@@ -106,7 +111,7 @@ public:
     for (std::vector<Ball*>::iterator i = balls.begin (), ei = balls.end ();
         i != ei; ++i) {
 
-      addNextEventIntern (initEvents, *i, NULL, NULL, endtime); // prevObj set to null initially
+      addNextEventIntern (initEvents, *i, endtime); 
     }
   }
 
@@ -295,7 +300,7 @@ public:
   void writeConfig (const char* const confName="config.csv") const {
 
     FILE* confFile = fopen (confName, "w");
-    assert (confFile != NULL);
+    assert (confFile != nullptr);
 
     fprintf (confFile, "length, width, num_balls, ball.mass, ball.radius\n");
     fprintf (confFile, "%e, %e, %d, %e, %e\n",
@@ -308,7 +313,7 @@ public:
   void ballsToCSV (const char* ballsFile = "balls.csv") const {
     FILE* ballsFH = fopen (ballsFile, "w");
 
-    if( ballsFH == NULL) { abort (); }
+    if( ballsFH == nullptr) { abort (); }
 
     // fprintf (ballsFH, "ball_id, mass, radius, pos_x, pos_y, vel_x, vel_y\n");
     fprintf (ballsFH, "ball.id, ball.pos.x, ball.pos.y, ball.vel.x, ball.vel.y\n");
@@ -329,16 +334,17 @@ public:
 
     FILE* cushionsFH = fopen (cushionsFile, "w");
 
-    if (cushionsFH == NULL) { abort (); }
+    if (cushionsFH == nullptr) { abort (); }
 
     fprintf (cushionsFH, "cushion_id, start_x, start_y, end_x, end_y\n");
 
     for (std::vector<Cushion*>::const_iterator i = cushions.begin ()
         , ei = cushions.end (); i != ei; ++i) {
       const Cushion& c = *(*i);
+      const LineSegment& l = c.getLineSegment ();
 
       fprintf (cushionsFH, "%d, %g, %g, %g, %g"
-          , c.getID (), c.start ().getX (), c.start ().getY (), c.end ().getX (), c.end ().getY ());
+          , c.getID (), l.getBegin ().getX (), l.getBegin ().getY (), l.getEnd ().getX (), l.getEnd ().getY ());
     }
   }
 
@@ -359,6 +365,7 @@ protected:
     Vec2 topRight (length, width);
     Vec2 bottomRight (length, 0.0);
 
+    // adding clockwise so that we can index them with RectSide
     // left
     Cushion* left =  new Cushion (0, bottomLeft, topLeft);
     cushions.push_back (left);
@@ -454,27 +461,23 @@ protected:
   template <typename C>
   void addEventsForBallColl (const Event& e, C& addList, const double endtime) const {
 
-    const Ball* b1 = &(e.getBall ());
-    const Ball* b2 = &(e.getOtherBall ());
+    assert (e.getKind () == Event::BALL_COLLISION);
+
+    const Ball* b1 = e.getBall ();
+    const Ball* b2 = e.getOtherBall ();
     
-    if (e.firstBallChanged () || e.otherBallChanged ()) {
+    // firstBallChanged or otherBallChanged should return true 
+    // for an invalid event 'e'
 
-      if (!e.firstBallChanged ()) {
-        // b2 has collided with something else, while
-        // b1 has not collided with anything since this event was
-        // created
+    if (!e.firstBallChanged ()) {
 
-        addNextEventIntern  (addList, b1, nullptr, nullptr, endtime);
-      }
+      addNextEventIntern  (addList, b1, endtime, &e);
+    }
 
-      if (!e.otherBallChanged ()) {
-        // b2 has not collided with anything yet
-        addNextEventIntern (addList, b2, nullptr, nullptr, endtime);
+    if (!e.otherBallChanged ()) {
+      // b2 has not collided with anything yet
+      addNextEventIntern (addList, b2, endtime, &e);
 
-      }
-    } else {
-      addNextEventIntern (addList, b1, b2, nullptr, endtime);
-      addNextEventIntern (addList, b2, b1, nullptr, endtime);
     }
   }
 
@@ -483,61 +486,98 @@ protected:
 
     assert (e.getKind () == Event::CUSHION_COLLISION);
     if (!e.firstBallChanged ()) {
-      addNextEventIntern (addList, &(e.getBall ()), nullptr, &(e.getCushion ()), endtime);
+      addNextEventIntern (addList, e.getBall (), endtime, &e);
     }
   }
 
   template <typename C>
-  void addNextEventIntern (C& addList, const Ball* ball, const Ball* prevBall, const Cushion* prevCushion, const double endtime) const {
+  void addNextEventIntern (C& addList, const Ball* ball, const double endtime, const Event* prevEvent=nullptr) const {
 
-    assert (ball != NULL);
+    assert (ball != nullptr);
 
-    std::pair<Ball*, double> ballColl = Collision::computeNextCollision (ball, this->balls.begin (), this->balls.end (), prevBall, endtime);
-    std::pair<Cushion*, double> cushColl = Collision::computeNextCollision (ball, this->cushions.begin (), this->cushions.end (), prevCushion, endtime);
-
-    if (ballColl.first != NULL && cushColl.first != NULL) {
-
-      // giving preference to cushion collision when a ball is hitting another ball
-      // and a cushion at the same time
-
-      if (FPutils::almostEqual (ballColl.second, cushColl.second)) {
-
-        addList.push_back (Event::makeCushionCollision (*ball, *cushColl.first, cushColl.second));
-
-      } else {
-
-        const Event& e1 = Event::makeCushionCollision (*ball, *cushColl.first, cushColl.second);
-
-        const Event& e2 = Event::makeBallCollision (*ball, *ballColl.first, ballColl.second);
+    Galois::optional<Event> ballColl = Collision::computeNextEvent (Event::BALL_COLLISION, ball, this->balls.begin (), this->balls.end (), endtime);
+    Galois::optional<Event> cushColl = Collision::computeNextEvent (Event::CUSHION_COLLISION, ball, this->cushions.begin (), this->cushions.end (), endtime);
 
 
-        addList.push_back (std::min (e1, e2));
-      }
+
+    if (ballColl && prevEvent) {
+      assert (*ballColl != *prevEvent);
+    }
 
 
-    } else if (ballColl.first != NULL) {
+    if (cushColl && prevEvent) {
+      assert (*cushColl != *prevEvent);
+    }
 
-      addList.push_back (Event::makeBallCollision (*ball, *ballColl.first, ballColl.second));
 
-    } else if (cushColl.first != NULL) {
+    if (ballColl && cushColl) {
+      addList.push_back (std::min (*ballColl, *cushColl));
 
-      addList.push_back (Event::makeCushionCollision (*ball, *cushColl.first, cushColl.second));
+    } else if (ballColl) {
+      addList.push_back (*ballColl);
+
+    } else if (cushColl) {
+      addList.push_back (*cushColl);
 
     } else {
-
-      assert ((ballColl.second < 0.0 || ballColl.second > endtime) 
-          && "Valid collision time but no valid collision ball");
-
-      assert ((cushColl.second < 0.0 || cushColl.second > endtime) 
-          && "Valid collision time but no valid collision cushion");
+      assert (!ballColl && !cushColl);
     }
+
 
   }
 
 
+  // template <typename C>
+  // void addNextEventIntern (C& addList, const Ball* ball, const Ball* prevBall, const Cushion* prevCushion, const double endtime) const {
+// 
+    // assert (ball != nullptr);
+// 
+    // std::pair<const Ball*, double> ballColl = Collision::computeNextCollision (ball, this->balls.begin (), this->balls.end (), prevBall, endtime);
+    // std::pair<const Cushion*, double> cushColl = Collision::computeNextCollision (ball, this->cushions.begin (), this->cushions.end (), prevCushion, endtime);
+// 
+    // if (ballColl.first != nullptr && cushColl.first != nullptr) {
+// 
+      // // giving preference to cushion collision when a ball is hitting another ball
+      // // and a cushion at the same time
+// 
+      // if (FPutils::almostEqual (ballColl.second, cushColl.second)) {
+// 
+        // addList.push_back (Event::makeCushionCollision (ball, cushColl.first, cushColl.second));
+// 
+      // } else {
+// 
+        // const Event& e1 = Event::makeCushionCollision (ball, cushColl.first, cushColl.second);
+// 
+        // const Event& e2 = Event::makeBallCollision (ball, ballColl.first, ballColl.second);
+// 
+// 
+        // addList.push_back (std::min (e1, e2));
+      // }
+// 
+// 
+    // } else if (ballColl.first != nullptr) {
+// 
+      // addList.push_back (Event::makeBallCollision (ball, ballColl.first, ballColl.second));
+// 
+    // } else if (cushColl.first != nullptr) {
+// 
+      // addList.push_back (Event::makeCushionCollision (ball, cushColl.first, cushColl.second));
+// 
+    // } else {
+// 
+      // assert ((ballColl.second < 0.0 || ballColl.second > endtime) 
+          // && "Valid collision time but no valid collision ball");
+// 
+      // assert ((cushColl.second < 0.0 || cushColl.second > endtime) 
+          // && "Valid collision time but no valid collision cushion");
+    // }
+// 
+  // }
+
+
   template <typename T>
   static void copyVecPtr (const std::vector<T*>& src, std::vector<T*>& dst) {
-    dst.resize (src.size (), NULL);
+    dst.resize (src.size (), nullptr);
     for (size_t i = 0; i < src.size (); ++i) {
       dst[i] = new T(*(src[i]));
     }
@@ -549,7 +589,7 @@ protected:
         i != ei; ++i) {
 
       delete *i;
-      *i = NULL;
+      *i = nullptr;
     }
   }
 

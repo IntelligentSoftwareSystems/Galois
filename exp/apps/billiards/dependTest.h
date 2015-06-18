@@ -54,15 +54,15 @@ private:
   static bool dependsOnInternal (const Event& e2, const Event& e1) {
     assert (e1 < e2);
 
-    assert (e1.getBall ().vel ().mag () < V_MAX);
-    assert (e2.getBall ().vel ().mag () < V_MAX);
+    assert (e1.getBall ()->vel ().mag () < V_MAX);
+    assert (e2.getBall ()->vel ().mag () < V_MAX);
 
     if (e1.getKind () == Event::BALL_COLLISION) {
-      assert (e1.getOtherBall ().vel ().mag () < V_MAX);
+      assert (e1.getOtherBall ()->vel ().mag () < V_MAX);
     }
 
     if (e2.getKind () == Event::BALL_COLLISION) {
-      assert (e2.getOtherBall ().vel ().mag () < V_MAX);
+      assert (e2.getOtherBall ()->vel ().mag () < V_MAX);
     }
 
     bool haveSameBall = checkCommonBall (e1, e2);
@@ -114,8 +114,8 @@ private:
     return result;
   }
 
-  static bool isSame (const Ball& b1, const Ball& b2) {
-    return (b1.getID () == b2.getID ());
+  static bool isSame (const Ball* b1, const Ball* b2) {
+    return (b1->getID () == b2->getID ());
   }
 
   static double computeMinDist (const Event& e1, const Event& e2) {
@@ -157,20 +157,20 @@ private:
   //! We also subtract sum of radii of ball1 and ball2 
   //! to compute touching distance
   //
-  static double finalDist (const Event& e1, const Ball& ball1, const Event& e2, const Ball& ball2) {
+  static double finalDist (const Event& e1, const Ball* ball1, const Event& e2, const Ball* ball2) {
 
     Vec2 ball1Pos = finalPos (e1, ball1);
     Vec2 ball2Pos = finalPos (e2, ball2);
 
-    double sumRadii = (ball1.radius () + ball2.radius ());
+    double sumRadii = (ball1->radius () + ball2->radius ());
 
     return (ball1Pos.dist (ball2Pos) - sumRadii);
   }
 
-  static Vec2 finalPos (const Event& e, const Ball& ball) {
+  static Vec2 finalPos (const Event& e, const Ball* ball) {
     assert (isSame (e.getBall (), ball) || isSame (e.getOtherBall (), ball));
 
-    return (ball.pos () + ball.vel () * (e.getTime () - ball.time ()));
+    return (ball->pos () + ball->vel () * (e.getTime () - ball->time ()));
   }
 
 };
