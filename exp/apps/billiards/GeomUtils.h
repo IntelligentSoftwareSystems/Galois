@@ -163,8 +163,8 @@ public:
   using D = typename std::numeric_limits<double>;
 
   BoundingBox (void): 
-    m_min (D::min (), D::min ()), 
-    m_max (D::max (), D::max ())
+    m_min (D::max (), D::max ()), 
+    m_max (D::min (), D::min ())
 
   {}
 
@@ -177,19 +177,19 @@ public:
   }
 
   void update (const Vec2& p) {
-    if (m_min.getX () < p.getX ()) {
+    if (p.getX () < m_min.getX ()) {
       m_min.getX () = p.getX ();
     }
 
-    if (m_min.getY () < p.getY ()) {
+    if (p.getY () < m_min.getY ()) {
       m_min.getY () = p.getY ();
     }
 
-    if (m_max.getX () > p.getX ()) {
+    if (p.getX () > m_max.getX ()) {
       m_max.getX () = p.getX ();
     }
 
-    if (m_max.getY () > p.getY ()) {
+    if (p.getY () > m_max.getY ()) {
       m_max.getY () = p.getY ();
     }
   }

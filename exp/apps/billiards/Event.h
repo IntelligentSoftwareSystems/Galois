@@ -154,7 +154,7 @@ public:
   // }
 
   void simulate () {
-    assert (notStale ());
+    // assert (notStale ());
 
     if (notStale ()) {
       // update collision counters, such that event remains valid
@@ -239,6 +239,16 @@ public:
       case CUSHION_COLLISION:
         kindName = "CUSHION_COLLISION";
         objBstr = getCushion ()->str ();
+        break;
+
+      case SECTOR_ENTRY:
+        kindName = "SECTOR_ENTRY";
+        objBstr = getSector ()->str ();
+        break;
+
+      case SECTOR_LEAVE:
+        kindName = "SECTOR_LEAVE";
+        objBstr = getSector ()->str ();
         break;
 
       default:

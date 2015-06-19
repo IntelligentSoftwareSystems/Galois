@@ -133,13 +133,18 @@ public:
     assert (!sectors.contains (s));
   }
 
+  bool hasSector (const Sector* s) const {
+    assert (s);
+    return sectors.contains (const_cast<Sector*> (s));
+  }
+
   std::pair<SectorIterator, SectorIterator> sectorRange (void) const {
     return std::make_pair (sectors.begin (), sectors.end ());
   }
 
   void update (const Vec2& newVel, const double time) {
 
-    assert (time > m_timestamp && "Time update in the past?");
+    assert (time >= m_timestamp && "Time update in the past?");
 
     if (time < m_timestamp) {
       std::cerr << "Time update in the past" << std::endl;

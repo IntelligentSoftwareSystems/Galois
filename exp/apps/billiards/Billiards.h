@@ -73,10 +73,30 @@ public:
     Galois::StatManager sm;
     LonestarStart (argc, argv, name, desc, url);
 
+#define CUSTOM_TESTS
+
+#ifdef CUSTOM_TESTS
+
+    sectorSize = 1;
+    xSectors = 2;
+    ySectors = 1;
+    endtime = 10.0;
+
+    std::vector<Ball> balls;
+
+    balls.emplace_back (0, Vec2 (0.5, 0.5), Vec2 (1.0, 0.0), 1.0, 0.25);
+    balls.emplace_back (1, Vec2 (1.5, 0.5), Vec2 (-1.0, 0.0), 1.0, 0.25);
+
+    TableSectored table (balls.begin (), balls.end (), sectorSize, xSectors, ySectors);
+
+
+#else // CUSTOM_TESTS
     TableSectored table (numballs, sectorSize, xSectors, ySectors);
+#endif // CUSTOM_TESTS
+
     TableSectored verCopy (table);
 
-    bool enablePrints = false;
+    bool enablePrints = true;
 
 
     if (enablePrints) {
@@ -125,6 +145,10 @@ public:
   virtual size_t runSim (TableSectored& tableSectored, std::vector<Event>& initEvents, const double endtime, bool enablePrints=false) {
 
     Table& table = tableSectored; // remove sectoring functionality
+    initEvents.clear ();
+    table.genInitialEvents (initEvents, endtime);
+
+    std::printf ("BilliardsSerialPQ: number of initial events: %zd\n", initEvents.size ());
 
     PriorityQueue pq;
 
@@ -183,7 +207,9 @@ void Billiards::verify (const TableSectored& initial, TableSectored& final, size
   TableSectored serialTable(initial);
 
   std::vector<Event> initEvents;
-  serialTable.genInitialEvents (initEvents, endtime);
+  // serialTable.genInitialEvents (initEvents, endtime);
+  // Commented above because:
+  // call to BilliardsSerialPQ::runSim regenerates initial events from a flat table
 
   Galois::StatTimer timer ("Verfication time (Serial PQ simulation)= ");
   
@@ -203,6 +229,10 @@ void Billiards::verify (const TableSectored& initial, TableSectored& final, size
   FPutils::checkError (serEnergy, initEnergy);
   FPutils::checkError (serEnergy, finalEnergy);
 
+
+  //advance both tables to same endtime
+  final.advance (endtime);
+  serialTable.advance (endtime);
 
   // check the end state of both simulations
   // pass true to print differences 

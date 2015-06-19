@@ -70,7 +70,20 @@ public:
     : numBalls (numBalls), length (length), width (width) {
 
     srand (0); // TODO: use time (nullptr) later 
-    init ();
+    createCushions ();
+    createBalls ();
+  }
+
+  template <typename I>
+  Table (const I ballsBeg, const I ballsEnd, double length, double width)
+    : numBalls (std::distance (ballsBeg, ballsEnd)), length (length), width (width)
+  {
+    srand (0);
+    createCushions ();
+
+    for (I i = ballsBeg; i != ballsEnd; ++i) {
+      balls.push_back (new Ball (*i));
+    }
   }
 
   Table (const Table& that) 
@@ -115,7 +128,6 @@ public:
     }
   }
 
-  // TODO: debugging functions, remove later maybe
   void advance (double simTime) {
     for (Ball* b: balls) {
       if (simTime > b->time ()) {
@@ -260,13 +272,16 @@ public:
         }
       }
 
-      if (b1.collCounter () != b2.collCounter ()) {
-        equal = false;
-      
-        if (printDiff) {
-          printBallAttr ("collCounter", i, b1.collCounter (), b2.collCounter ());
-        }
-      }
+      // Commenting out comparison of collision counter so that
+      // sectored and flat simulations can be compared
+
+      // if (b1.collCounter () != b2.collCounter ()) {
+        // equal = false;
+      // 
+        // if (printDiff) {
+          // printBallAttr ("collCounter", i, b1.collCounter (), b2.collCounter ());
+        // }
+      // }
 
       if (!printDiff && !equal) {
         break;
@@ -349,11 +364,6 @@ public:
   }
 
 protected:
-
-  void init () {
-    createCushions ();
-    createBalls ();
-  }
 
   void createCushions () {
     // create all cushions by specifying endpoints clockwise
