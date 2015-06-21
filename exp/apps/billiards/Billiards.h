@@ -67,25 +67,87 @@ public:
   virtual const std::string version () const = 0;
   //! @return number of events processed
   virtual size_t runSim (TableSectored& table, std::vector<Event>& initEvents, const double endtime, bool enablePrints=false) = 0;
-
-  virtual void run (int argc, char* argv[]) {
-    
-    Galois::StatManager sm;
-    LonestarStart (argc, argv, name, desc, url);
-
 #define CUSTOM_TESTS
 
 #ifdef CUSTOM_TESTS
+
+  void testA (std::vector<Ball>& balls) {
 
     sectorSize = 1;
     xSectors = 2;
     ySectors = 1;
     endtime = 10.0;
 
+    balls.clear ();
+
+    balls.emplace_back (0, Vec2 (0.5, 0.5), Vec2 (1.0, 1.0), 1.0, 0.25);
+  }
+
+  void testB (std::vector<Ball>& balls) {
+
+    sectorSize = 1;
+    xSectors = 2;
+    ySectors = 1;
+    endtime = 10.0;
+
+    balls.clear ();
+
+    balls.emplace_back (0, Vec2 (0.5, 0.5), Vec2 (1.0, 1.0), 1.0, 0.25);
+    balls.emplace_back (1, Vec2 (1.5, 0.5), Vec2 (-1.0, 0.0), 1.0, 0.25);
+  }
+
+  void testC (std::vector<Ball>& balls) {
+
+    sectorSize = 1;
+    xSectors = 2;
+    ySectors = 2;
+    endtime = 10.0;
+
+    balls.clear ();
+
+    balls.emplace_back (0, Vec2 (0.5, 0.5), Vec2 (1.0, 1.0), 1.0, 0.25);
+    // balls.emplace_back (1, Vec2 (1.5, 0.5), Vec2 (-1.0, 0.0), 1.0, 0.25);
+  }
+
+  void testD (std::vector<Ball>& balls) {
+
+    sectorSize = 1;
+    xSectors = 2;
+    ySectors = 2;
+    endtime = 10.0;
+
+    balls.clear ();
+
+    balls.emplace_back (0, Vec2 (0.5, 0.5), Vec2 (1.0, -1.0), 1.0, 0.25);
+    // balls.emplace_back (1, Vec2 (1.5, 0.5), Vec2 (-1.0, 0.0), 1.0, 0.25);
+  }
+
+  void testE (std::vector<Ball>& balls) {
+
+    sectorSize = 1;
+    xSectors = 2;
+    ySectors = 2;
+    endtime = 10.0;
+
+    balls.clear ();
+
+    balls.emplace_back (0, Vec2 (0.5, 0.5), Vec2 (1.0, 1.0), 1.0, 0.25);
+    balls.emplace_back (1, Vec2 (1.5, 1.5), Vec2 (-1.0, -1.0), 1.0, 0.25);
+  }
+
+#endif // CUSTOM_TESTS
+
+  virtual void run (int argc, char* argv[]) {
+    
+    Galois::StatManager sm;
+    LonestarStart (argc, argv, name, desc, url);
+
+
+#ifdef CUSTOM_TESTS
+
     std::vector<Ball> balls;
 
-    balls.emplace_back (0, Vec2 (0.5, 0.5), Vec2 (1.0, 0.0), 1.0, 0.25);
-    balls.emplace_back (1, Vec2 (1.5, 0.5), Vec2 (-1.0, 0.0), 1.0, 0.25);
+    testE (balls);
 
     TableSectored table (balls.begin (), balls.end (), sectorSize, xSectors, ySectors);
 

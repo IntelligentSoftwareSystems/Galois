@@ -122,6 +122,56 @@ Galois::optional<Event> Sector::earliestSectorEntry (const Ball* ball, const dou
 
   } // end for
 
+  for (unsigned i = 0; i < sides.size (); ++i) {
+
+    if (!neighbors[i]) {
+      continue;
+    }
+
+    if (ball->hasSector (neighbors[i])) {
+      // ball already added to sector by earlier event
+      assert (neighbors[i]->hasBall (ball));
+      continue;
+
+    }
+
+    double brad = FPutils::truncate (ball->radius ());
+    // to handle entry at the corners, we compute an imaginary boundary outside the actual 
+    // one, that is brad away. 
+    // so that entry from corners can be handled. e.g., a ball entring at 45 degrees
+    // from the lower left corner of a sector. 
+    Vec2 R = brad * (sides[i].lengthVec ().leftNormal ().unit ());
+
+    Vec2 outerBeg = sides[i].getBegin () + R;
+    Vec2 outerEnd = sides[i].getEnd () + R;
+
+    std::pair<bool, double> p = Collision::computeCollisionTime (*ball, LineSegment (outerBeg, outerEnd));
+
+    if (p.first) {
+
+      assert (p.second >= 0.0);
+
+
+      if (FPutils::almostEqual (p.second, minTime)) {
+        assert (minSector != nullptr);
+
+        if (neighbors[i]->getID () < minSector->getID ()) {
+          minSector = neighbors[i];
+          minTime = p.second;
+        }
+
+      } else if (minSector == nullptr || p.second < minTime) {
+        minSector = neighbors[i];
+        minTime = p.second;
+
+      } else {
+        assert (p.second > minTime);
+      }
+
+    } // end p.first
+
+  } // end for
+
 
   Galois::optional<Event> e;
 
