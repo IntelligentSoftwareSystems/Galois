@@ -80,7 +80,7 @@ static void LonestarStart(int argc, char** argv, const char* app, const char* de
   llvm::cl::ParseCommandLineOptions(argc, argv);
   numThreads = Galois::setActiveThreads(numThreads); 
 
-  getSystemNetworkInterface().start();
+  //  getSystemNetworkInterface().start();
   Galois::Runtime::reportStat(0, "Threads", numThreads);
 }
 

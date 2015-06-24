@@ -60,7 +60,7 @@ template<typename NodeTy, typename EdgeTy,
   bool UseNumaAlloc=false,
   bool HasOutOfLineLockable=false>
 class LC_CSR_Graph:
-    private boost::noncopyable,
+    //    private boost::noncopyable,
     private detail::LocalIteratorFeature<UseNumaAlloc>,
     private detail::OutOfLineLockableFeature<HasOutOfLineLockable && !HasNoLockable> {
   template<typename Graph> friend class LC_InOut_Graph;
@@ -158,6 +158,10 @@ protected:
   }
 
 public:
+
+  LC_CSR_Graph(LC_CSR_Graph&&) = default;
+  LC_CSR_Graph() = default;
+
   node_data_reference getData(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
     Galois::Runtime::checkWrite(mflag, false);
     NodeInfo& NI = nodeData[N];
