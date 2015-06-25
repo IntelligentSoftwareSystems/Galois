@@ -211,9 +211,14 @@ int main(int argc, char** argv) {
     barrier.wait();
 
     for (int i = 0; i < maxIterations; ++i) {
+
+      std::cout << "Staring " << i << "\n";
+
       //communicate ghost cells
       sendGhostCells(net, g);
       barrier.wait();
+
+      std::cout << "Starting PR\n";
 
       //Do pagerank
       PageRank::go(rg, g.numOwned);
