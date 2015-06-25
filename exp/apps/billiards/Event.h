@@ -305,6 +305,19 @@ public:
           if (cmp == 0) {
             cmp = int (e1.getKind ()) - int (e2.getKind ());
           }
+
+          // if (cmp == 0) {
+            // cmp = e2.collCounterA - e1.collCounterA; // prefer later event over earlier
+// 
+            // if (cmp == 0) {
+              // cmp = e2.collCounterB - e1.collCounterB; // prefer later event over earlier
+// 
+              // if (cmp == 0) {
+                // cmp = int (e1.getKind ()) - int (e2.getKind ());
+              // }
+// 
+            // }
+          // }
         }
 
       } else if (e1.time < e2.time) {

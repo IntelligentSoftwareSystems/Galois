@@ -33,6 +33,7 @@ makeTest(ADD_TARGET static DISTSAFE)
 makeTest(ADD_TARGET twoleveliteratora DISTSAFE)
 makeTest(ADD_TARGET wakeup-overhead)
 makeTest(ADD_TARGET worklists-compile DISTSAFE)
+makeTest(ADD_TARGET floatingPointErrors)
 
 makeTest(TARGET apps/avi/AVIodgExplicitNoLock -n 0 -d 2 -f "${BASE}/inputs/avi/squareCoarse.NEU.gz")
 makeTest(TARGET apps/barneshut/barneshut -n 1000 -steps 1 -seed 0)

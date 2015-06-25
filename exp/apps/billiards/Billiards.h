@@ -66,9 +66,9 @@ public:
 
   virtual const std::string version () const = 0;
   //! @return number of events processed
-  virtual size_t runSim (TableSectored& table, std::vector<Event>& initEvents, const double endtime, bool enablePrints=false) = 0;
-#define CUSTOM_TESTS
+  virtual size_t runSim (TableSectored& table, std::vector<Event>& initEvents, const double endtime, bool enablePrints=false, bool logEvents=false) = 0;
 
+// #define CUSTOM_TESTS
 #ifdef CUSTOM_TESTS
 
   void testA (std::vector<Ball>& balls) {
@@ -135,6 +135,19 @@ public:
     balls.emplace_back (1, Vec2 (1.5, 1.5), Vec2 (-1.0, -1.0), 1.0, 0.25);
   }
 
+  void testF (std::vector<Ball>& balls) {
+
+    sectorSize = 10;
+    xSectors = 3;
+    ySectors = 3;
+    endtime = 100.0;
+
+    balls.clear ();
+
+    balls.emplace_back (0, Vec2 (0.5, 0.5), Vec2 (1.0, 1.0), 1.0, 0.25);
+    balls.emplace_back (1, Vec2 (1.5, 1.5), Vec2 (-1.0, -1.0), 1.0, 0.25);
+    balls.emplace_back (2, Vec2 (2.5, 2.5), Vec2 (-1.0, -1.0), 1.0, 0.25);
+  }
 #endif // CUSTOM_TESTS
 
   virtual void run (int argc, char* argv[]) {
@@ -147,7 +160,7 @@ public:
 
     std::vector<Ball> balls;
 
-    testE (balls);
+    testF (balls);
 
     TableSectored table (balls.begin (), balls.end (), sectorSize, xSectors, ySectors);
 
@@ -159,6 +172,7 @@ public:
     TableSectored verCopy (table);
 
     bool enablePrints = true;
+    bool logEvents = true;
 
 
     if (enablePrints) {
@@ -174,7 +188,7 @@ public:
 
     timer.start ();
     Galois::Runtime::beginSampling ();
-    size_t numEvents = runSim (table, initEvents, endtime, enablePrints);
+    size_t numEvents = runSim (table, initEvents, endtime, enablePrints, logEvents);
     Galois::Runtime::endSampling ();
     timer.stop ();
 
@@ -204,7 +218,7 @@ public:
       table.addNextEvents (e, addList, endtime);
   }
 
-  virtual size_t runSim (TableSectored& tableSectored, std::vector<Event>& initEvents, const double endtime, bool enablePrints=false) {
+  virtual size_t runSim (TableSectored& tableSectored, std::vector<Event>& initEvents, const double endtime, bool enablePrints=false, bool logEvents=false) {
 
     Table& table = tableSectored; // remove sectoring functionality
     initEvents.clear ();
@@ -233,6 +247,10 @@ public:
       }
 
       processEvent (e, table, addList, endtime);
+
+      if (logEvents) {
+        table.logCollisionEvent (e);
+      }
 
       for (std::vector<Event>::iterator i = addList.begin (), ei = addList.end ();
           i != ei; ++i) {
@@ -276,7 +294,7 @@ void Billiards::verify (const TableSectored& initial, TableSectored& final, size
   Galois::StatTimer timer ("Verfication time (Serial PQ simulation)= ");
   
   timer.start ();
-  size_t serEvents = serial.runSim(serialTable, initEvents, endtime, false);
+  size_t serEvents = serial.runSim(serialTable, initEvents, endtime, false, true);
   timer.stop ();
 
   std::cout << "Serial ordered numEvents=" << serEvents << std::endl;
@@ -302,6 +320,14 @@ void Billiards::verify (const TableSectored& initial, TableSectored& final, size
 
   if (!result) {
     std::cerr << "ERROR, Comparison against serial ordered simulation failed due to above differences" << std::endl;
+
+    std::cout << "<<<<<<<<<<< Event logs from Original Run >>>>>>>>>>>>>" << std::endl;
+    final.printEventLogs ();
+
+    std::cout << "<<<<<<<<<<< Event logs from Verification Run >>>>>>>>>>>>>" << std::endl;
+    serialTable.printEventLogs ();
+
+
     abort ();
 
   } else {

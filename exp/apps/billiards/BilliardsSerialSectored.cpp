@@ -12,7 +12,7 @@ public:
       table.addNextEvents (e, addList, endtime);
   }
 
-  virtual size_t runSim (TableSectored& table, std::vector<Event>& initEvents, const double endtime, bool enablePrints=false) {
+  virtual size_t runSim (TableSectored& table, std::vector<Event>& initEvents, const double endtime, bool enablePrints=false, bool logEvents=false) {
 
     PriorityQueue pq;
 
@@ -35,6 +35,10 @@ public:
       }
 
       processEvent (e, table, addList, endtime);
+
+      if (logEvents) {
+        table.logCollisionEvent (e);
+      }
 
       for (std::vector<Event>::iterator i = addList.begin (), ei = addList.end ();
           i != ei; ++i) {

@@ -212,22 +212,22 @@ private:
       for (size_t j = 0; j < ySectors; ++j) {
 
         if (i == 0) {
-          sectors[i][j]->addCushion (Table::getCushion (RectSide::BOTTOM));
+          sectors[i][j]->addCushion (Table::getCushion (RectSide::LEFT));
         }
 
         if (i == (xSectors - 1)) {
           assert (xSectors > 0);
 
-          sectors[i][j]->addCushion (Table::getCushion (RectSide::TOP));
+          sectors[i][j]->addCushion (Table::getCushion (RectSide::RIGHT));
         }
 
         if (j == 0) {
-          sectors[i][j]->addCushion (Table::getCushion (RectSide::LEFT));
+          sectors[i][j]->addCushion (Table::getCushion (RectSide::BOTTOM));
         }
 
         if (j == (ySectors - 1)) {
           assert (ySectors > 0);
-          sectors[i][j]->addCushion (Table::getCushion (RectSide::RIGHT));
+          sectors[i][j]->addCushion (Table::getCushion (RectSide::TOP));
         }
       }
     }
@@ -286,7 +286,9 @@ private:
       if (minE1) {
         addList.push_back (*minE1);
 
-        assert (*prevEvent != *minE1);
+        if (prevEvent->notStale ()) {
+          assert (*prevEvent != *minE1);
+        }
       }
     }
 
@@ -296,7 +298,9 @@ private:
       if (minE2) {
         addList.push_back (*minE2);
 
-        assert (*prevEvent != *minE2);
+        if (prevEvent->notStale ()) {
+          assert (*prevEvent != *minE2);
+        }
       }
     }
 
@@ -316,7 +320,7 @@ private:
     if (minE) {
       addList.push_back (*minE);
 
-      if (prevEvent) {
+      if (prevEvent && prevEvent->notStale ()) {
         assert (*prevEvent != *minE);
       }
     }

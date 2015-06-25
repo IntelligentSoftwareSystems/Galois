@@ -58,16 +58,18 @@ protected:
   unsigned numBalls;
   double length;
   double width;
+  std::vector<Galois::gstl::Vector<Event> > eventsPerBall;
   
 
   std::vector<Cushion*> cushions;
   std::vector<Ball*> balls;
 
+
   Table& operator = (const Table& that) { abort (); return *this; }
 
 public:
   Table (unsigned numBalls, double length, double width) 
-    : numBalls (numBalls), length (length), width (width) {
+    : numBalls (numBalls), length (length), width (width), eventsPerBall (numBalls) {
 
     srand (0); // TODO: use time (nullptr) later 
     createCushions ();
@@ -76,7 +78,7 @@ public:
 
   template <typename I>
   Table (const I ballsBeg, const I ballsEnd, double length, double width)
-    : numBalls (std::distance (ballsBeg, ballsEnd)), length (length), width (width)
+    : numBalls (std::distance (ballsBeg, ballsEnd)), length (length), width (width), eventsPerBall (numBalls)
   {
     srand (0);
     createCushions ();
@@ -87,7 +89,7 @@ public:
   }
 
   Table (const Table& that) 
-    : numBalls (that.numBalls), length (that.length), width (that.width) {
+    : numBalls (that.numBalls), length (that.length), width (that.width), eventsPerBall (that.eventsPerBall) {
 
       copyVecPtr (that.cushions, this->cushions);
       copyVecPtr (that.balls, this->balls);
@@ -115,6 +117,34 @@ public:
     // XXX: assumes ball ids and indices are same
     assert (balls[id] != nullptr);
     return *balls[id]; 
+  }
+
+  void logCollisionEvent (const Event& e) {
+
+   
+
+    if (e.notStale () && (e.getKind () == Event::BALL_COLLISION || e.getKind () == Event::CUSHION_COLLISION)) {
+      
+      assert (eventsPerBall.size () == getNumBalls ());
+
+      eventsPerBall [e.getBall ()->getID ()].push_back (e);
+
+      if (e.getKind () == Event::BALL_COLLISION) {
+        eventsPerBall [e.getOtherBall ()->getID ()].push_back (e);
+      }
+    }
+  }
+
+  void printEventLogs (void) {
+
+    for (size_t i = 0; i < eventsPerBall.size (); ++i) {
+
+      std::printf ("===== Events for Ball %zd =======\n", i);
+
+      for (const Event& e: eventsPerBall [i]) {
+        std::cout << e.str () << std::endl;
+      }
+    }
   }
 
   void genInitialEvents (std::vector<Event>& initEvents, const double endtime) {
@@ -510,12 +540,12 @@ protected:
 
 
 
-    if (ballColl && prevEvent) {
+    if (ballColl && prevEvent && prevEvent->notStale ()) {
       assert (*ballColl != *prevEvent);
     }
 
 
-    if (cushColl && prevEvent) {
+    if (cushColl && prevEvent && prevEvent->notStale ()) {
       assert (*cushColl != *prevEvent);
     }
 

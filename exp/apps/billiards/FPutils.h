@@ -66,7 +66,7 @@ struct FPutils: private boost::noncopyable {
   //
   // 32 bits give us a precision of 2^(-32) = 2.0e-10
 private:
-  static const unsigned HALF_FRACTION_BITS;
+  static const unsigned TRUCATE_FRACTION_BITS;
   static const uint64_t PRECISION_64;
 
 public:
@@ -74,6 +74,7 @@ public:
 
   static double truncate (const double d) {
     return (double (int64_t (d * TRUNCATE_PRECISION)) / TRUNCATE_PRECISION);
+    // return d;
   }
 
   static Vec2 truncate (const Vec2& v) {
@@ -93,7 +94,7 @@ public:
   // It can be shown for basic operations that after truncation, the 
   // relative error remains within a small constant factor of TRUNCATE_PRECISION
   static inline double FP_ERR_LIM () {
-    return 128.0 / (TRUNCATE_PRECISION);
+    return 1.0 / (TRUNCATE_PRECISION);
   } 
 
   //! checks relative error

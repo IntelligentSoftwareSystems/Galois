@@ -16,6 +16,9 @@ void Sector::simulate (const Event& e) {
   if (e.getKind () == Event::SECTOR_ENTRY) {
 
     b->update (b->vel (), e.getTime ());
+
+    assert (intersects (b));
+
     b->addSector (this);
     this->addBall (b);
 
@@ -23,6 +26,9 @@ void Sector::simulate (const Event& e) {
   } else if (e.getKind () == Event::SECTOR_LEAVE) {
 
     b->update (b->vel (), e.getTime ());
+
+    assert (!intersects (b));
+
     b->removeSector (this);
     this->removeBall (b);
 
