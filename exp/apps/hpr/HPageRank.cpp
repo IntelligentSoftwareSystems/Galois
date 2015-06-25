@@ -38,10 +38,20 @@ static const char* const name = "Page Rank - Distributed Heterogeneous";
 static const char* const desc = "Computes PageRank on Distributed Galois.  Uses pull algorithm, takes the pre-transposed graph.";
 static const char* const url = 0;
 
+enum Personality {
+  CPU,
+  GPU_CUDA,
+  GPU_OPENCL
+};
 
 namespace cll = llvm::cl;
+static cll::opt<Personality> personality ("personality", cll::desc("Personality"), 
+					  cll::values(clEnumValN(CPU, "cpu", "Galois CPU"), 
+						      clEnumValN(GPU_CUDA, "gpu/cuda", "GPU/CUDA"), 
+						      clEnumValN(GPU_OPENCL, "gpu/opencl", "GPU/OpenCL"),
+						      clEnumValEnd), 
+					  cll::init(CPU));
 static cll::opt<std::string> inputFile (cll::Positional, cll::desc("<input file (transpose)>"), cll::Required);
-
 static cll::opt<unsigned int> maxIterations ("maxIterations", cll::desc("Maximum iterations"), cll::init(2));
 
 struct LNode {
@@ -190,6 +200,9 @@ void sendGhostCells(Galois::Runtime::NetworkInterface& net, pGraph& g) {
 
 int main(int argc, char** argv) {
     LonestarStart (argc, argv, name, desc, url);
+
+    std::cout << "Personality is " << personality << std::endl;
+
     Galois::StatManager statManager;
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     auto& barrier = Galois::Runtime::getSystemBarrier();
