@@ -56,6 +56,8 @@
 #include "Galois/Runtime/ll/CompilerSpecific.h"
 #include <boost/mpl/has_xxx.hpp>
 
+#include <type_traits>
+
 namespace Galois {
 
 #define GALOIS_HAS_MEM_FUNC(func, name) \
