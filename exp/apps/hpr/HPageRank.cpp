@@ -30,6 +30,7 @@
 #include "Lonestar/BoilerPlate.h"
 
 #include "cuda/hpr_cuda.h"
+#include "cuda/cuda_mtypes.h"
 
 #include <iostream>
 #include <typeinfo>
@@ -201,7 +202,21 @@ void sendGhostCells(Galois::Runtime::NetworkInterface& net, pGraph& g) {
 
 void loadGraphNonCPU(pGraph &g) {
   assert(personality != CPU);
-  
+
+  MarshalGraph m;
+  m.nnodes = g.numNodes;
+
+  switch(personality) 
+    {
+    case GPU_CUDA:
+      load_graph_CUDA(m);
+      break;
+    case GPU_OPENCL:
+      break;
+    default:
+      assert(false);
+      break;
+    }   
 }
 
 int main(int argc, char** argv) {
