@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8.8)
+cmake_minimum_required(VERSION 2.8.10)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 project(Galois)
 set(GALOIS_VERSION_MAJOR "2")
@@ -56,6 +56,7 @@ set(USE_HTM OFF CACHE BOOL "Use HTM")
 set(EXP_DOALL "PTHREAD" CACHE STRING "Which type of implementation of parallel_doall")
 set(USE_PROF OFF CACHE BOOL "Use profiling specific features")
 set(USE_EMBEDDED_REVISION ON CACHE BOOL "Embed revision numbers")
+set(USE_HETERO ON CACHE BOOL "Use Heterogeneous features")
 
 ###### Configure (users don't need to go beyond here) ######
 
@@ -198,6 +199,17 @@ if(USE_EXP)
   endif()
   if(USE_DET_FIXED_WINDOW)
     add_definitions(-DGALOIS_USE_DET_FIXED_WINDOW)
+  endif()
+
+  if(USE_HETERO)
+    find_package(CUDA REQUIRED)
+    if(CUDA_FOUND)
+      set(CUDA_PROPAGATE_HOST_FLAGS off)
+      set(CUDA_SEPARABLE_COMPILATION on)
+      set(CUDA_HOST_COMPILER g++)
+    else()
+      message(FATAL_ERROR "Need CUDA for heterogenous code")
+    endif()
   endif()
 endif()
 
