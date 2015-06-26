@@ -27,8 +27,9 @@
 #include "Galois/Graph/FileGraph.h"
 #include "Galois/Graph/LC_CSR_Graph.h"
 #include "Galois/Graph/Util.h"
-
 #include "Lonestar/BoilerPlate.h"
+
+#include "cuda/hpr_cuda.h"
 
 #include <iostream>
 #include <typeinfo>
@@ -198,6 +199,11 @@ void sendGhostCells(Galois::Runtime::NetworkInterface& net, pGraph& g) {
   }
 }
 
+void loadGraphNonCPU(pGraph &g) {
+  assert(personality != CPU);
+  
+}
+
 int main(int argc, char** argv) {
     LonestarStart (argc, argv, name, desc, url);
 
@@ -210,8 +216,17 @@ int main(int argc, char** argv) {
     Graph rg;
     pGraph g = loadGraph(inputFile, Galois::Runtime::NetworkInterface::ID, Galois::Runtime::NetworkInterface::Num, rg);
 
+    loadGraphNonCPU(g);
+
     //local initialization
-    InitializeGraph::go(g.g);
+    if(personality == CPU) {
+      InitializeGraph::go(g.g); /* dispatch to appropriate device */
+    } else if(personality == GPU_CUDA) {
+      test_cuda();
+      return 1;
+    }
+
+
     barrier.wait();
 
     //send pGraph pointers
