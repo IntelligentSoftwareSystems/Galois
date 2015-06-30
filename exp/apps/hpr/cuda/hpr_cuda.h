@@ -3,9 +3,14 @@
 
 struct CUDA_Context;
 
+/* infrastructure */
 struct CUDA_Context *get_CUDA_context();
 void load_graph_CUDA(struct CUDA_Context *ctx, MarshalGraph &g);
-
 void test_cuda(struct CUDA_Context *ctx);
 
+/* application */
 void initialize_graph_cuda(struct CUDA_Context *ctx);
+
+/* application messages */
+void setNodeValue_CUDA(struct CUDA_Context *ctx, unsigned LID, float v);
+void setNodeAttr_CUDA(struct CUDA_Context *ctx, unsigned LID, unsigned nout);

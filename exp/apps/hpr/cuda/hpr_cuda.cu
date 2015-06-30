@@ -8,6 +8,7 @@
 
 struct CUDA_Context {
   size_t nowned;
+  size_t g_offset;
   CSRGraphTy hg;
   CSRGraphTy gg;
   Shared<float> pr[2];
@@ -37,6 +38,18 @@ __global__ void initialize_graph(CSRGraphTy g, index_type nowned,
 
 struct CUDA_Context *get_CUDA_context() {
   return (struct CUDA_Context *) calloc(1, sizeof(struct CUDA_Context));
+}
+
+void setNodeValue_CUDA(struct CUDA_Context *ctx, unsigned LID, float v) {
+  float *pr = ctx->pr[0].cpu_wr_ptr();
+  
+  pr[LID] = v;
+}
+
+void setNodeAttr_CUDA(struct CUDA_Context *ctx, unsigned LID, unsigned nout) {
+  int *pnout = ctx->nout.cpu_wr_ptr();
+  
+  pnout[LID] = nout;
 }
 
 void load_graph_CUDA(struct CUDA_Context *ctx, MarshalGraph &g) {

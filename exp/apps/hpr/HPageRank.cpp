@@ -72,14 +72,16 @@ struct pGraph {
   unsigned g_offset; // LID + g_offset = GID
   unsigned numOwned; // [0, numOwned) = global nodes owned, thus [numOwned, numNodes) are replicas
   unsigned numNodes; // number of nodes (may differ from g.size() to simplify loading)
-  unsigned numEdges; // for numNodes (for now)
 
   // [numNodes, g.size()) should be ignored
   std::vector<unsigned> L2G; // GID = L2G[LID - numOwned]
   unsigned id; // my hostid
   std::vector<unsigned> lastNodes; //[ [i - 1], [i]) -> Node owned by host i
   unsigned getHost(unsigned node) { // node is GID
-    return *std::upper_bound(lastNodes.begin(), lastNodes.end(), node);
+    return std::distance(lastNodes.begin(), 
+			 std::upper_bound(lastNodes.begin(), 
+					  lastNodes.end(), node)
+			 );
   }
   unsigned G2L(unsigned GID) {
     auto ii = std::find(L2G.begin(), L2G.end(), GID);
@@ -89,6 +91,24 @@ struct pGraph {
 
   pGraph(Graph& _g) :g(_g) {}
 };
+
+void loadLastNodes(pGraph &g, size_t size, unsigned numHosts) {
+  if(numHosts == 1)
+    return;
+
+  auto p = Galois::block_range(0UL, size, 0, numHosts);
+  unsigned pernum = p.second - p.first;
+  unsigned pos = pernum;
+
+  while(pos < size) {
+    g.lastNodes.push_back(pos);
+    pos += pernum;
+  }
+  
+  for(int i = 0; size < 10 && i < size; i++) {
+    printf("node %d owned by %d\n", i, g.getHost(i));
+  }
+}
 
 pGraph loadGraph(std::string file, unsigned hostID, unsigned numHosts, Graph& out) {
   pGraph retval{out};
@@ -126,6 +146,14 @@ pGraph loadGraph(std::string file, unsigned hostID, unsigned numHosts, Graph& ou
   Galois::Graph::FileGraph fg2;
   Galois::Graph::permute<void>(fg, perm, fg2);
   Galois::Graph::readGraph(retval.g, fg2);
+
+  for(unsigned i = 0; i < retval.numOwned; i++) {
+    retval.g.getData(i).nout = std::distance(retval.g.edge_begin(i), 
+					     retval.g.edge_end(i));
+  }
+
+  loadLastNodes(retval, fg.size(), numHosts);
+
   return retval;
 }
 
@@ -141,7 +169,7 @@ struct InitializeGraph {
   void operator()(GNode src) const {
     LNode& sdata = g->getData(src);
     sdata.value = 1.0 - alpha;
-    sdata.nout = 2; // FIXME
+    //sdata.nout = 2; // FIXME
   }
 };
 
@@ -186,7 +214,44 @@ void recvNodeStatic(unsigned GID, uint32_t hostID) {
 }
 
 void setNodeValue(pGraph* p, unsigned GID, float v) {
-  p->g.getData(p->G2L(GID)).value = v;
+  switch(personality) 
+    {
+    case CPU: 
+      p->g.getData(p->G2L(GID)).value = v;
+      break;
+    case GPU_CUDA:
+      setNodeValue_CUDA(cuda_ctx, p->G2L(GID), v);
+      break;
+    case GPU_OPENCL:
+      break;
+    default:
+      break;
+  }
+}
+
+// could be merged with setNodeValue, but this is one-time only ...
+void setNodeAttr(pGraph *p, unsigned GID, unsigned nout) {
+  switch(personality) 
+    {
+    case CPU: 
+      p->g.getData(p->G2L(GID)).nout = nout;
+      break;
+    case GPU_CUDA:
+      setNodeAttr_CUDA(cuda_ctx, p->G2L(GID), nout);
+      break;
+    case GPU_OPENCL:
+      break;
+    default:
+      break;
+  } 
+}
+
+void sendGhostCellAttrs(Galois::Runtime::NetworkInterface& net, pGraph& g) {
+  for (unsigned x = 0; x < remoteReplicas.size(); ++x) {
+    for (auto n : remoteReplicas[x]) {
+      net.sendAlt(x, setNodeAttr, magicPointer[x], n, g.g.getData(n - g.g_offset).nout);
+    }
+  }
 }
 
 void sendGhostCells(Galois::Runtime::NetworkInterface& net, pGraph& g) {
@@ -203,6 +268,7 @@ MarshalGraph pGraph2MGraph(pGraph &g) {
   m.nnodes = g.numNodes;
   m.nedges = g.g.sizeEdges(); // this needs to be updated
   m.nowned = g.numOwned;
+  m.g_offset = g.g_offset;
 
   m.row_start = (index_type *) calloc(m.nnodes + 1, sizeof(index_type));
   m.edge_dst = (index_type *) calloc(m.nedges, sizeof(index_type));
@@ -253,6 +319,8 @@ void loadGraphNonCPU(pGraph &g) {
       assert(false);
       break;
     }   
+
+  // TODO cleanup marshalgraph, leaks memory!
 }
 
 int main(int argc, char** argv) {
@@ -278,9 +346,7 @@ int main(int argc, char** argv) {
       InitializeGraph::go(g.g); /* dispatch to appropriate device */
     } else if(personality == GPU_CUDA) {
       initialize_graph_cuda(cuda_ctx);
-      return 1;
     }
-
 
     barrier.wait();
 
@@ -293,9 +359,15 @@ int main(int argc, char** argv) {
       net.sendAlt(g.getHost(GID), recvNodeStatic, GID, Galois::Runtime::NetworkInterface::ID);
     barrier.wait();
 
+    sendGhostCellAttrs(net, g);
+    barrier.wait();
+
+    if(personality == GPU_CUDA) 
+      return 1;
+
     for (int i = 0; i < maxIterations; ++i) {
 
-      std::cout << "Staring " << i << "\n";
+      std::cout << "Starting " << i << "\n";
 
       //communicate ghost cells
       sendGhostCells(net, g);
