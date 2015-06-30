@@ -394,7 +394,8 @@ int main(int argc, char** argv) {
       Galois::OpenCL::cl_env.init();
    }
 
-   loadGraphNonCPU(g);
+   if(personality != CPU)
+     loadGraphNonCPU(g);
 
    //local initialization
    if (personality == CPU) {
