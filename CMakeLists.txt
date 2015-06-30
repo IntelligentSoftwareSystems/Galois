@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8.10)
+cmake_minimum_required(VERSION 2.8.9)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 project(Galois)
 set(GALOIS_VERSION_MAJOR "2")
@@ -203,6 +203,7 @@ if(USE_EXP)
 
   if(USE_HETERO)
     find_package(CUDA REQUIRED)
+    find_package(OpenCL REQUIRED)
     if(CUDA_FOUND)
       set(CUDA_PROPAGATE_HOST_FLAGS off)
       set(CUDA_SEPARABLE_COMPILATION on)
