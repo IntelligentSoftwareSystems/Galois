@@ -47,8 +47,7 @@ enum Personality {
 
 namespace cll = llvm::cl;
 static cll::opt<Personality> personality("personality", cll::desc("Personality"),
-      cll::values(clEnumValN(CPU, "cpu", "Galois CPU"), clEnumValN(GPU_CUDA, "gpu/cuda", "GPU/CUDA"), clEnumValN(GPU_OPENCL, "gpu/opencl", "GPU/OpenCL"),
-      clEnumValEnd), cll::init(CPU));
+       cll::values(clEnumValN(CPU, "cpu", "Galois CPU"), clEnumValN(GPU_CUDA, "gpu/cuda", "GPU/CUDA"), clEnumValN(GPU_OPENCL, "gpu/opencl", "GPU/OpenCL"), clEnumValEnd), cll::init(CPU));
 static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file (transpose)>"), cll::Required);
 static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations"), cll::init(2));
 
@@ -83,7 +82,8 @@ struct pGraph {
       return std::distance(L2G.begin(), ii) + numOwned;
    }
 
-   pGraph(Graph& _g) :g(_g), g_offset(0), numOwned(0), numNodes(0), id(0) {
+   pGraph(Graph& _g) :
+         g(_g), g_offset(0), numOwned(0), numNodes(0), id(0) {
    }
 };
 /*********************************************************************************
@@ -181,13 +181,13 @@ struct InitializeGraph {
  *
  *************************************************************************************/
 typedef Galois::OpenCL::LC_LinearArray_Graph<Galois::OpenCL::Array, LNode, void> DeviceGraph;
-struct dPageRank{
+struct dPageRank {
    Galois::OpenCL::CL_Kernel kernel;
-   dPageRank(){
+   dPageRank() {
       kernel.init("/h2/rashid/workspace/GaloisDist/gdist/exp/apps/hpr/opencl/pagerank_kernel.cl", "pagerank");
    }
    template<typename GraphType>
-   void operator()(GraphType & graph, int num_items){
+   void operator()(GraphType & graph, int num_items) {
       fprintf(stderr, "Launching Kernel on device...%d\n", num_items);
       graph.copy_to_device();
       kernel.set_work_size(num_items);
@@ -390,7 +390,7 @@ int main(int argc, char** argv) {
 
    if (personality == GPU_CUDA) {
       cuda_ctx = get_CUDA_context();
-   }else if(personality == GPU_OPENCL){
+   } else if (personality == GPU_OPENCL) {
       Galois::OpenCL::cl_env.init();
    }
 

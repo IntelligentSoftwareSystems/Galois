@@ -1,5 +1,4 @@
 add_subdirectory(cuda)
-add_subdirectory(opencl)
-include_directories(${OPENCL_INCLUDE_DIRS} )
+include_directories(${CUDA_INCLUDE_DIRS} )
 app(hpagerank HPageRank.cpp DISTSAFE)
 target_link_libraries(hpagerank hpr_cuda cudadevrt OpenCL )
