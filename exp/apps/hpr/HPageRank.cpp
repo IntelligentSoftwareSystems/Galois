@@ -31,6 +31,7 @@
 
 #include "cuda/hpr_cuda.h"
 #include "cuda/cuda_mtypes.h"
+#include "hpr.h"
 
 #include <iostream>
 #include <typeinfo>
@@ -64,19 +65,15 @@ struct LNode {
 typedef Galois::Graph::LC_CSR_Graph<LNode, void> Graph;
 typedef typename Graph::GraphNode GNode;
 
-// Constants for page Rank Algo.
-//! d is the damping factor. Alpha is the prob that user will do a random jump, i.e., 1 - d
-static const double alpha = (1.0 - 0.85);
-
-//! maximum relative change until we deem convergence
-static const double TOLERANCE = 0.1;
-
+struct CUDA_Context *cuda_ctx;
 
 struct pGraph {
   Graph& g;
   unsigned g_offset; // LID + g_offset = GID
   unsigned numOwned; // [0, numOwned) = global nodes owned, thus [numOwned, numNodes) are replicas
   unsigned numNodes; // number of nodes (may differ from g.size() to simplify loading)
+  unsigned numEdges; // for numNodes (for now)
+
   // [numNodes, g.size()) should be ignored
   std::vector<unsigned> L2G; // GID = L2G[LID - numOwned]
   unsigned id; // my hostid
@@ -200,16 +197,55 @@ void sendGhostCells(Galois::Runtime::NetworkInterface& net, pGraph& g) {
   }
 }
 
-void loadGraphNonCPU(pGraph &g) {
-  assert(personality != CPU);
-
+MarshalGraph pGraph2MGraph(pGraph &g) {
   MarshalGraph m;
+  
   m.nnodes = g.numNodes;
+  m.nedges = g.g.sizeEdges(); // this needs to be updated
+  m.nowned = g.numOwned;
+
+  m.row_start = (index_type *) calloc(m.nnodes + 1, sizeof(index_type));
+  m.edge_dst = (index_type *) calloc(m.nedges, sizeof(index_type));
+
+  // TODO: initialize node_data and edge_data
+  m.node_data = NULL;
+  m.edge_data = NULL;
+
+  // pinched from Rashid's LC_LinearArray_Graph.h
+
+  size_t edge_counter = 0, node_counter = 0;
+  for(auto n = g.g.begin(); n != g.g.end() && *n != m.nnodes; n++, node_counter++) {
+    m.row_start[node_counter] = edge_counter;
+    for(auto e = g.g.edge_begin(*n); e != g.g.edge_end(*n); e++) {
+      m.edge_dst[edge_counter++] = g.g.getEdgeDst(e);
+    }
+  }  
+
+  m.row_start[node_counter] = edge_counter;
+   
+  // for(int i = 0; i < node_counter; i++) {
+  //   printf("%u ", m.row_start[i]);
+  // }
+
+  // for(int i = 0; i < edge_counter; i++) {
+  //   printf("%u ", m.edge_dst[i]);
+  // }
+  
+
+  // printf("nc: %zu ec: %zu\n", node_counter, edge_counter);
+  return m;
+}
+
+void loadGraphNonCPU(pGraph &g) {
+  MarshalGraph m;
+  
+  assert(personality != CPU);
 
   switch(personality) 
     {
     case GPU_CUDA:
-      load_graph_CUDA(m);
+      m = pGraph2MGraph(g);
+      load_graph_CUDA(cuda_ctx, m);
       break;
     case GPU_OPENCL:
       break;
@@ -231,13 +267,17 @@ int main(int argc, char** argv) {
     Graph rg;
     pGraph g = loadGraph(inputFile, Galois::Runtime::NetworkInterface::ID, Galois::Runtime::NetworkInterface::Num, rg);
 
+    if(personality == GPU_CUDA) {
+      cuda_ctx = get_CUDA_context();
+    }
+
     loadGraphNonCPU(g);
 
     //local initialization
     if(personality == CPU) {
       InitializeGraph::go(g.g); /* dispatch to appropriate device */
     } else if(personality == GPU_CUDA) {
-      test_cuda();
+      initialize_graph_cuda(cuda_ctx);
       return 1;
     }
 
@@ -270,8 +310,3 @@ int main(int argc, char** argv) {
 
     return 0;
 }
-
-
-
-
-
