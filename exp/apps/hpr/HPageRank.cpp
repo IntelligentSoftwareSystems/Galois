@@ -48,9 +48,10 @@ enum Personality {
 namespace cll = llvm::cl;
 static cll::opt<Personality> personality("personality", cll::desc("Personality"),
       cll::values(clEnumValN(CPU, "cpu", "Galois CPU"), clEnumValN(GPU_CUDA, "gpu/cuda", "GPU/CUDA"), clEnumValN(GPU_OPENCL, "gpu/opencl", "GPU/OpenCL"), clEnumValEnd),
-      cll::init(CPU));
+      cll::init(GPU_OPENCL));
 static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file (transpose)>"), cll::Required);
-static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations"), cll::init(2));
+static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations"), cll::init(4));
+static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.csv' file"), cll::init(false));
 
 struct LNode {
    float value;
@@ -187,8 +188,9 @@ typedef Galois::OpenCL::LC_LinearArray_Graph<Galois::OpenCL::Array, LNode, void>
 DeviceGraph dGraph;
 struct dPageRank {
    Galois::OpenCL::CL_Kernel kernel;
-   dPageRank() {}
-   void init(){
+   dPageRank() {
+   }
+   void init() {
       kernel.init("/h2/rashid/workspace/GaloisDist/gdist/exp/apps/hpr/opencl/pagerank_kernel.cl", "pagerank");
    }
    template<typename GraphType>
@@ -266,6 +268,7 @@ void setNodeValue(pGraph* p, unsigned GID, float v) {
       setNodeValue_CUDA(cuda_ctx, p->G2L(GID), v);
       break;
    case GPU_OPENCL:
+      dGraph.node_data()[GID].value = v;
       break;
    default:
       break;
@@ -285,6 +288,7 @@ void setNodeAttr(pGraph *p, unsigned GID, unsigned nout) {
       setNodeAttr_CUDA(cuda_ctx, p->G2L(GID), nout);
       break;
    case GPU_OPENCL:
+      dGraph.node_data()[GID].nout = nout;
       break;
    default:
       break;
@@ -306,11 +310,28 @@ void sendGhostCellAttrs(Galois::Runtime::NetworkInterface& net, pGraph& g) {
  **********************************************************************************/
 
 void sendGhostCells(Galois::Runtime::NetworkInterface& net, pGraph& g) {
-   for (unsigned x = 0; x < remoteReplicas.size(); ++x) {
-      for (auto n : remoteReplicas[x]) {
-         net.sendAlt(x, setNodeValue, magicPointer[x], n, g.g.getData(n - g.g_offset).value);
+   switch (personality) {
+   case CPU: {
+      for (unsigned x = 0; x < remoteReplicas.size(); ++x) {
+         for (auto n : remoteReplicas[x]) {
+            net.sendAlt(x, setNodeValue, magicPointer[x], n, g.g.getData(n - g.g_offset).value);
+         }
       }
+      break;
    }
+   case GPU_CUDA: {
+      break;
+   }
+   case GPU_OPENCL: {
+      for (unsigned x = 0; x < remoteReplicas.size(); ++x) {
+         for (auto n : remoteReplicas[x]) {
+            net.sendAlt(x, setNodeValue, magicPointer[x], n, dGraph.node_data()[(n - g.g_offset)].value);
+         }
+      }
+      break;
+   }
+   }
+
 }
 /*********************************************************************************
  *
@@ -409,7 +430,7 @@ int main(int argc, char** argv) {
       InitializeGraph::go(g.g); /* dispatch to appropriate device */
    } else if (personality == GPU_CUDA) {
       initialize_graph_cuda(cuda_ctx);
-   }else if(personality==GPU_OPENCL){
+   } else if (personality == GPU_OPENCL) {
       dOp.init();
    }
 
@@ -453,6 +474,32 @@ int main(int argc, char** argv) {
          break;
       }
       barrier.wait();
+   }
+   //Final synchronization to ensure that all the nodes are updated.
+   sendGhostCells(net, g);
+
+   if (verify) {
+      std::ofstream out_file("page_ranks.csv");
+      switch (personality) {
+      case CPU:{
+         int id=0;
+         for(auto n = g.g.begin(); n!=g.g.end(); ++n,++id){
+            out_file<<id << ", "<< g.g.getData(*n).value<<"\n";
+         }
+         break;
+      }
+      case GPU_OPENCL:{
+         int id=0;
+         for(int n = 0; n<dGraph.num_nodes(); ++n,++id){
+            out_file<<id << ", "<< dGraph.node_data()[n].value<<"\n";
+         }
+         break;
+      }
+
+      case GPU_CUDA:
+         break;
+      }
+      out_file.close();
    }
 
    return 0;

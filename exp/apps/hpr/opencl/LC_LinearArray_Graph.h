@@ -130,7 +130,7 @@ struct LC_LinearArray_Graph {
       const size_t gg_num_edges = ggraph.sizeEdges();
       init(gg_num_nodes, gg_num_edges);
       const int * ptr = (int *) this->gpu_graph->host_ptr();
-      fprintf(stderr, "Loading from GaloisGraph [%d,%d].\n", gg_num_nodes, gg_num_edges);
+      fprintf(stderr, "Loading from GaloisGraph [%d,%d].\n", (int)gg_num_nodes, (int)gg_num_edges);
       int edge_counter = 0;
       int node_counter = 0;
       for (auto n = ggraph.begin(); n != ggraph.end(); n++, node_counter++) {
