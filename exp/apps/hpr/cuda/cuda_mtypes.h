@@ -15,6 +15,7 @@ struct MarshalGraph {
   size_t nedges;
   size_t nowned;
   size_t g_offset;
+  int id;
   index_type *row_start;
   index_type *edge_dst;
   node_data_type *node_data;

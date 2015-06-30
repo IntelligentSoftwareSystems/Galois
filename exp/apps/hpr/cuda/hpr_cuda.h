@@ -10,6 +10,8 @@ void test_cuda(struct CUDA_Context *ctx);
 
 /* application */
 void initialize_graph_cuda(struct CUDA_Context *ctx);
+void test_graph_cuda(struct CUDA_Context *ctx);
+void pagerank_cuda(struct CUDA_Context *ctx);
 
 /* application messages */
 void setNodeValue_CUDA(struct CUDA_Context *ctx, unsigned LID, float v);

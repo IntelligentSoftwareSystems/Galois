@@ -7,6 +7,7 @@
 #include "../hpr.h"
 
 struct CUDA_Context {
+  int id;
   size_t nowned;
   size_t g_offset;
   CSRGraphTy hg;
@@ -36,6 +37,40 @@ __global__ void initialize_graph(CSRGraphTy g, index_type nowned,
   }
 }
 
+__global__ void pagerank(CSRGraphTy graph, index_type nowned, 
+			 float *pr, int *nout) {
+  int tid = TID_1D;
+  int num_threads = TOTAL_THREADS_1D;
+  float sum = 0;
+
+  for(int i = tid; i < nowned; i += num_threads) {
+
+    index_type edge_end = graph.getFirstEdge(i + 1);
+
+    for(index_type e = graph.getFirstEdge(i); e < edge_end; e++) {
+      index_type dst = graph.getAbsDestination(e);
+
+      if(nout != 0)  // can nout == 0?
+	sum += pr[dst] / nout[dst];      
+    }
+
+    float value = (1.0 * alpha) * sum + alpha;
+    float diff = fabs(value - pr[i]);
+    pr[i] = value;
+  }
+}
+
+__global__ void test_graph(CSRGraphTy g, index_type nowned, 
+			   float *pcur, float *pnext, int *nout, int id) {
+  int tid = TID_1D;
+  int num_threads = TOTAL_THREADS_1D;
+
+  for(int i = tid; i < g.nnodes; i += num_threads) {
+    printf("%d %d %d %d\n", id, tid, i, nout[i]); // i is LID!
+  }
+}
+
+
 struct CUDA_Context *get_CUDA_context() {
   return (struct CUDA_Context *) calloc(1, sizeof(struct CUDA_Context));
 }
@@ -56,7 +91,7 @@ void load_graph_CUDA(struct CUDA_Context *ctx, MarshalGraph &g) {
   CSRGraphTy &graph = ctx->hg;
 
   ctx->nowned = g.nowned;
-  
+  ctx->id = g.id;
   graph.nnodes = g.nnodes;
   graph.nedges = g.nedges;
 
@@ -86,6 +121,16 @@ void load_graph_CUDA(struct CUDA_Context *ctx, MarshalGraph &g) {
 
 void initialize_graph_cuda(struct CUDA_Context *ctx) {  
   initialize_graph<<<14, 256>>>(ctx->gg, ctx->nowned, ctx->pr[0].gpu_wr_ptr(), ctx->pr[1].gpu_wr_ptr(), ctx->nout.gpu_wr_ptr());
+  check_cuda(cudaDeviceSynchronize());
+}
+
+void pagerank_cuda(struct CUDA_Context *ctx) {  
+  pagerank<<<14, 256>>>(ctx->gg, ctx->nowned, ctx->pr[0].gpu_wr_ptr(), ctx->nout.gpu_wr_ptr());
+  check_cuda(cudaDeviceSynchronize());
+}
+
+void test_graph_cuda(struct CUDA_Context *ctx) {  
+  test_graph<<<14, 256>>>(ctx->gg, ctx->nowned, ctx->pr[0].gpu_wr_ptr(), ctx->pr[1].gpu_wr_ptr(), ctx->nout.gpu_wr_ptr(), ctx->id);
   check_cuda(cudaDeviceSynchronize());
 }
 

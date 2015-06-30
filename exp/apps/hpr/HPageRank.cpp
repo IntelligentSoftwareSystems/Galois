@@ -122,6 +122,7 @@ pGraph loadGraph(std::string file, unsigned hostID, unsigned numHosts, Graph& ou
    auto p = Galois::block_range(0UL, fg.size(), hostID, numHosts);
    retval.g_offset = p.first;
    retval.numOwned = p.second - p.first;
+   retval.id = hostID;
    std::vector<unsigned> perm(fg.size(), ~0); //[i (orig)] -> j (final)
    unsigned nextSlot = 0;
    std::cout << fg.size() << " " << p.first << " " << p.second << "\n";
@@ -141,6 +142,7 @@ pGraph loadGraph(std::string file, unsigned hostID, unsigned numHosts, Graph& ou
       }
    }
    retval.numNodes = nextSlot;
+
    //Fill remainder of graph since permute doesn't support truncating
    for (auto ii = fg.begin(); ii != fg.end(); ++ii)
       if (perm[*ii] == ~0)
@@ -318,7 +320,7 @@ MarshalGraph pGraph2MGraph(pGraph &g) {
    m.nedges = g.g.sizeEdges(); // this needs to be updated
    m.nowned = g.numOwned;
    m.g_offset = g.g_offset;
-
+   m.id = g.id;
    m.row_start = (index_type *) calloc(m.nnodes + 1, sizeof(index_type));
    m.edge_dst = (index_type *) calloc(m.nedges, sizeof(index_type));
 
@@ -415,11 +417,9 @@ int main(int argc, char** argv) {
       net.sendAlt(g.getHost(GID), recvNodeStatic, GID, Galois::Runtime::NetworkInterface::ID);
    barrier.wait();
 
+   // send nout values to remote replicas
    sendGhostCellAttrs(net, g);
    barrier.wait();
-
-   if (personality == GPU_CUDA)
-      return 1;
 
    for (int i = 0; i < maxIterations; ++i) {
 
@@ -432,7 +432,16 @@ int main(int argc, char** argv) {
       std::cout << "Starting PR\n";
 
       //Do pagerank
-      PageRank::go(rg, g.numOwned);
+      switch(personality) {
+      case CPU:
+	PageRank::go(rg, g.numOwned);
+	break;
+      case GPU_CUDA:
+	pagerank_cuda(cuda_ctx);
+	break;
+      default:
+	break;
+      }
       barrier.wait();
    }
 
