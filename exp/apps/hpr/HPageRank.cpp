@@ -47,7 +47,8 @@ enum Personality {
 
 namespace cll = llvm::cl;
 static cll::opt<Personality> personality("personality", cll::desc("Personality"),
-       cll::values(clEnumValN(CPU, "cpu", "Galois CPU"), clEnumValN(GPU_CUDA, "gpu/cuda", "GPU/CUDA"), clEnumValN(GPU_OPENCL, "gpu/opencl", "GPU/OpenCL"), clEnumValEnd), cll::init(CPU));
+      cll::values(clEnumValN(CPU, "cpu", "Galois CPU"), clEnumValN(GPU_CUDA, "gpu/cuda", "GPU/CUDA"), clEnumValN(GPU_OPENCL, "gpu/opencl", "GPU/OpenCL"), clEnumValEnd),
+      cll::init(CPU));
 static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file (transpose)>"), cll::Required);
 static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations"), cll::init(2));
 
@@ -183,9 +184,11 @@ struct InitializeGraph {
  *
  *************************************************************************************/
 typedef Galois::OpenCL::LC_LinearArray_Graph<Galois::OpenCL::Array, LNode, void> DeviceGraph;
+DeviceGraph dGraph;
 struct dPageRank {
    Galois::OpenCL::CL_Kernel kernel;
-   dPageRank() {
+   dPageRank() {}
+   void init(){
       kernel.init("/h2/rashid/workspace/GaloisDist/gdist/exp/apps/hpr/opencl/pagerank_kernel.cl", "pagerank");
    }
    template<typename GraphType>
@@ -366,6 +369,7 @@ void loadGraphNonCPU(pGraph &g) {
       load_graph_CUDA(cuda_ctx, m);
       break;
    case GPU_OPENCL:
+      dGraph.load_from_galois(g.g);
       break;
    default:
       assert(false);
@@ -396,14 +400,17 @@ int main(int argc, char** argv) {
       Galois::OpenCL::cl_env.init();
    }
 
-   if(personality != CPU)
-     loadGraphNonCPU(g);
+   if (personality != CPU)
+      loadGraphNonCPU(g);
+   dPageRank dOp;
 
    //local initialization
    if (personality == CPU) {
       InitializeGraph::go(g.g); /* dispatch to appropriate device */
    } else if (personality == GPU_CUDA) {
       initialize_graph_cuda(cuda_ctx);
+   }else if(personality==GPU_OPENCL){
+      dOp.init();
    }
 
    barrier.wait();
@@ -432,15 +439,18 @@ int main(int argc, char** argv) {
       std::cout << "Starting PR\n";
 
       //Do pagerank
-      switch(personality) {
+      switch (personality) {
       case CPU:
-	PageRank::go(rg, g.numOwned);
-	break;
+         PageRank::go(rg, g.numOwned);
+         break;
+      case GPU_OPENCL:
+         dOp(dGraph, g.numOwned);
+         break;
       case GPU_CUDA:
-	pagerank_cuda(cuda_ctx);
-	break;
+         pagerank_cuda(cuda_ctx);
+         break;
       default:
-	break;
+         break;
       }
       barrier.wait();
    }
