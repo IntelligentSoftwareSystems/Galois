@@ -234,7 +234,7 @@ void checkConservation(Config& orig) {
       int64_t ocap = orig.graph.getEdgeData(findEdge(orig.graph, map[srcId], map[dstId]));
       int64_t delta = 0;
       if (ocap > 0) 
-        delta -= ocap - app.graph.getEdgeData(jj);
+        delta -= (ocap - app.graph.getEdgeData(jj));
       else
         delta += app.graph.getEdgeData(jj);
       sum += delta;
@@ -254,7 +254,7 @@ void verify(Config& orig) {
   checkAugmentingPath();
 }
 
-void reduceCapacity(const Graph::edge_iterator& ii, const GNode& src, const GNode& dst, int amount) {
+void reduceCapacity(const Graph::edge_iterator& ii, const GNode& src, const GNode& dst, int64_t amount) {
   Graph::edge_data_type& cap1 = app.graph.getEdgeData(ii);
   Graph::edge_data_type& cap2 = app.graph.getEdgeData(findEdge(app.graph, dst, src));
   cap1 -= amount;
