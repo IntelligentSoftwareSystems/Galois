@@ -113,8 +113,8 @@ void for_each_gen(const RangeTy& r, const FunctionTy& fn, Tuple tpl) {
   constexpr unsigned iwl = tuple_index<tupleType, wl_tag>::value;
   const char* ln = std::get<iloopname>(tpl).n;
   typedef typename std::tuple_element<iwl,tupleType>::type::WL WLTy;
-//  Runtime::for_each_impl<WLTy>(r, fn, ln);
-  Runtime::for_each_dist<WLTy>(r, fn, ln);
+  Runtime::for_each_impl<WLTy>(r, fn, ln);
+  //  Runtime::for_each_dist<WLTy>(r, fn, ln);
 }
 
 template<typename RangeTy, typename FunctionTy, typename Tuple>
@@ -129,7 +129,7 @@ void do_all_gen(const RangeTy& r, const FunctionTy& fn, Tuple tpl) {
   constexpr unsigned isteal = tuple_index<tupleType, do_all_steal>::value;
   const char* ln = std::get<iloopname>(tpl).n;
   bool steal = std::get<isteal>(tpl).b;
-  Runtime::do_all_dist(r, fn, ln, steal);
+  Runtime::do_all_impl(r, fn, ln, steal);
   //return Runtime::do_all_impl(r, fn, ln, steal);
 }
 
