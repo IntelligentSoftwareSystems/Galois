@@ -156,10 +156,6 @@ pGraph loadGraph(std::string file, unsigned hostID, unsigned numHosts, Graph& ou
    Galois::Graph::permute<void>(fg, perm, fg2);
    Galois::Graph::readGraph(retval.g, fg2);
 
-   for (unsigned i = 0; i < retval.numOwned; i++) {
-      retval.g.getData(i).nout = std::distance(retval.g.edge_begin(i), retval.g.edge_end(i));
-   }
-
    loadLastNodes(retval, fg.size(), numHosts);
 
    return retval;
@@ -178,7 +174,7 @@ struct InitializeGraph {
    void operator()(GNode src) const {
       LNode& sdata = g->getData(src);
       sdata.value = 1.0 - alpha;
-      //sdata.nout = 2; // FIXME
+      sdata.nout = 2; // FIXME
    }
 };
 /************************************************************************************
@@ -301,8 +297,17 @@ void setNodeAttr(pGraph *p, unsigned GID, unsigned nout) {
 void sendGhostCellAttrs(Galois::Runtime::NetworkInterface& net, pGraph& g) {
    for (unsigned x = 0; x < remoteReplicas.size(); ++x) {
       for (auto n : remoteReplicas[x]) {
-	/* no per-personality needed */
-	net.sendAlt(x, setNodeAttr, magicPointer[x], n, g.g.getData(n - g.g_offset).nout);
+	/* no per-personality needed but until nout is 
+	   fixed for CPU and OpenCL ... */
+
+	switch(personality) {
+	case GPU_CUDA:
+	  net.sendAlt(x, setNodeAttr, magicPointer[x], n, getNodeAttr_CUDA(cuda_ctx, n - g.g_offset));
+	  break;
+	default:
+	  net.sendAlt(x, setNodeAttr, magicPointer[x], n, g.g.getData(n - g.g_offset).nout);
+	  break;
+	}
       }
    }
 }
@@ -436,6 +441,8 @@ int main(int argc, char** argv) {
 
    barrier.wait();
 
+   //goto v;
+   
    //send pGraph pointers
    for (uint32_t x = 0; x < Galois::Runtime::NetworkInterface::Num; ++x)
       net.sendAlt(x, setRemotePtr, Galois::Runtime::NetworkInterface::ID, &g);
@@ -480,6 +487,7 @@ int main(int argc, char** argv) {
    sendGhostCells(net, g);
    barrier.wait();
 
+ v:
    if (verify) {
       std::stringstream ss;
       ss << "page_ranks." << g.id << ".csv";
@@ -502,8 +510,9 @@ int main(int argc, char** argv) {
       }
       case GPU_CUDA:
 	for(int i = 0; i < g.numOwned; i++) {
-	  out_file << i + g.numOwned << ", " << getNodeValue_CUDA(cuda_ctx, i) << "\n"; 
+	  out_file << i + g.g_offset << ", " << getNodeValue_CUDA(cuda_ctx, i) << "\n"; 
 	}
+	
 	break;
       }
       out_file.close();

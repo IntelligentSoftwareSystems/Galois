@@ -33,9 +33,25 @@ __global__ void initialize_graph(CSRGraphTy g, index_type nowned,
   for(int i = tid; i < nowned; i += num_threads) {
     pcur[i] = 1.0 - alpha;
     pnext[i] = 0;
-    nout[i] = g.getOutDegree(i);
   }
 }
+
+
+__global__ void initialize_nout(CSRGraphTy graph, index_type nowned, int *nout) {
+  int tid = TID_1D;
+  int num_threads = TOTAL_THREADS_1D;
+
+  for(int i = tid; i < graph.nnodes; i += num_threads) {
+    index_type edge_end = graph.getFirstEdge(i + 1);
+
+    for(index_type e = graph.getFirstEdge(i); e < edge_end; e++) {
+      index_type dst = graph.getAbsDestination(e);
+      if(dst < nowned)
+	atomicAdd(nout + dst, 1);
+    }
+  }
+}
+
 
 __global__ void pagerank(CSRGraphTy graph, index_type nowned, 
 			 float *pr, int *nout) {
@@ -50,11 +66,13 @@ __global__ void pagerank(CSRGraphTy graph, index_type nowned,
     for(index_type e = graph.getFirstEdge(i); e < edge_end; e++) {
       index_type dst = graph.getAbsDestination(e);
 
-      if(nout != 0)  // can nout == 0?
+      if(nout[dst] != 0)  // can nout == 0?
 	sum += pr[dst] / nout[dst];      
+      else 
+	printf("WARNING: %d %d is zero\n", i, dst);
     }
 
-    float value = (1.0 * alpha) * sum + alpha;
+    float value = (1.0 - alpha) * sum + alpha;
     float diff = fabs(value - pr[i]);
     pr[i] = value;
   }
@@ -89,8 +107,19 @@ void setNodeValue_CUDA(struct CUDA_Context *ctx, unsigned LID, float v) {
 
 void setNodeAttr_CUDA(struct CUDA_Context *ctx, unsigned LID, unsigned nout) {
   int *pnout = ctx->nout.cpu_wr_ptr();
+
+  assert(LID >= ctx->nowned);
   
+  printf("setting %d %d %d\n", ctx->id, LID, nout);
   pnout[LID] = nout;
+}
+
+unsigned getNodeAttr_CUDA(struct CUDA_Context *ctx, unsigned LID) {
+  int *pnout = ctx->nout.cpu_rd_ptr();
+  
+  assert(LID < ctx->nowned);
+
+  return pnout[LID];
 }
 
 void load_graph_CUDA(struct CUDA_Context *ctx, MarshalGraph &g) {
@@ -126,7 +155,10 @@ void load_graph_CUDA(struct CUDA_Context *ctx, MarshalGraph &g) {
 }
 
 void initialize_graph_cuda(struct CUDA_Context *ctx) {  
+  ctx->nout.zero_gpu();
   initialize_graph<<<14, 256>>>(ctx->gg, ctx->nowned, ctx->pr[0].gpu_wr_ptr(), ctx->pr[1].gpu_wr_ptr(), ctx->nout.gpu_wr_ptr());
+
+  initialize_nout<<<14, 256>>>(ctx->gg, ctx->nowned, ctx->nout.gpu_wr_ptr());
   check_cuda(cudaDeviceSynchronize());
 }
 
