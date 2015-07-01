@@ -16,3 +16,5 @@ void pagerank_cuda(struct CUDA_Context *ctx);
 /* application messages */
 void setNodeValue_CUDA(struct CUDA_Context *ctx, unsigned LID, float v);
 void setNodeAttr_CUDA(struct CUDA_Context *ctx, unsigned LID, unsigned nout);
+float getNodeValue_CUDA(struct CUDA_Context *ctx, unsigned LID);
+

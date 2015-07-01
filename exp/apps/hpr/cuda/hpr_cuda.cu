@@ -75,6 +75,12 @@ struct CUDA_Context *get_CUDA_context() {
   return (struct CUDA_Context *) calloc(1, sizeof(struct CUDA_Context));
 }
 
+float getNodeValue_CUDA(struct CUDA_Context *ctx, unsigned LID) {
+  float *pr = ctx->pr[0].cpu_rd_ptr();
+
+  return pr[LID];
+}
+
 void setNodeValue_CUDA(struct CUDA_Context *ctx, unsigned LID, float v) {
   float *pr = ctx->pr[0].cpu_wr_ptr();
   

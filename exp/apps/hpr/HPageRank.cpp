@@ -48,10 +48,10 @@ enum Personality {
 namespace cll = llvm::cl;
 static cll::opt<Personality> personality("personality", cll::desc("Personality"),
       cll::values(clEnumValN(CPU, "cpu", "Galois CPU"), clEnumValN(GPU_CUDA, "gpu/cuda", "GPU/CUDA"), clEnumValN(GPU_OPENCL, "gpu/opencl", "GPU/OpenCL"), clEnumValEnd),
-      cll::init(GPU_OPENCL));
+      cll::init(CPU));
 static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file (transpose)>"), cll::Required);
 static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations"), cll::init(4));
-static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.csv' file"), cll::init(false));
+static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"), cll::init(false));
 
 struct LNode {
    float value;
@@ -301,7 +301,8 @@ void setNodeAttr(pGraph *p, unsigned GID, unsigned nout) {
 void sendGhostCellAttrs(Galois::Runtime::NetworkInterface& net, pGraph& g) {
    for (unsigned x = 0; x < remoteReplicas.size(); ++x) {
       for (auto n : remoteReplicas[x]) {
-         net.sendAlt(x, setNodeAttr, magicPointer[x], n, g.g.getData(n - g.g_offset).nout);
+	/* no per-personality needed */
+	net.sendAlt(x, setNodeAttr, magicPointer[x], n, g.g.getData(n - g.g_offset).nout);
       }
    }
 }
@@ -310,27 +311,25 @@ void sendGhostCellAttrs(Galois::Runtime::NetworkInterface& net, pGraph& g) {
  **********************************************************************************/
 
 void sendGhostCells(Galois::Runtime::NetworkInterface& net, pGraph& g) {
-   switch (personality) {
-   case CPU: {
-      for (unsigned x = 0; x < remoteReplicas.size(); ++x) {
-         for (auto n : remoteReplicas[x]) {
-            net.sendAlt(x, setNodeValue, magicPointer[x], n, g.g.getData(n - g.g_offset).value);
-         }
-      }
-      break;
-   }
-   case GPU_CUDA: {
-      break;
-   }
-   case GPU_OPENCL: {
-      for (unsigned x = 0; x < remoteReplicas.size(); ++x) {
-         for (auto n : remoteReplicas[x]) {
-            net.sendAlt(x, setNodeValue, magicPointer[x], n, dGraph.node_data()[(n - g.g_offset)].value);
-         }
-      }
-      break;
-   }
-   }
+  for (unsigned x = 0; x < remoteReplicas.size(); ++x) {
+    for (auto n : remoteReplicas[x]) {
+      switch (personality) 
+	{
+	case CPU: 
+	  net.sendAlt(x, setNodeValue, magicPointer[x], n, g.g.getData(n - g.g_offset).value);
+	  break;
+	case GPU_CUDA: 
+	  net.sendAlt(x, setNodeValue, magicPointer[x], n, getNodeValue_CUDA(cuda_ctx, n - g.g_offset));
+	  break;
+	case GPU_OPENCL: 
+	  net.sendAlt(x, setNodeValue, magicPointer[x], n, dGraph.node_data()[(n - g.g_offset)].value);
+	  break;
+	default:
+	  assert(false);
+	  break;
+	}
+    }
+  }
 
 }
 /*********************************************************************************
@@ -423,6 +422,7 @@ int main(int argc, char** argv) {
 
    if (personality != CPU)
       loadGraphNonCPU(g);
+
    dPageRank dOp;
 
    //local initialization
@@ -475,16 +475,21 @@ int main(int argc, char** argv) {
       }
       barrier.wait();
    }
+
    //Final synchronization to ensure that all the nodes are updated.
    sendGhostCells(net, g);
+   barrier.wait();
 
    if (verify) {
-      std::ofstream out_file("page_ranks.csv");
+      std::stringstream ss;
+      ss << "page_ranks." << g.id << ".csv";
+
+      std::ofstream out_file(ss.str());
       switch (personality) {
       case CPU:{
          int id=0;
-         for(auto n = g.g.begin(); n!=g.g.end(); ++n,++id){
-            out_file<<id << ", "<< g.g.getData(*n).value<<"\n";
+         for(auto n = g.g.begin(); n!=g.g.end() && id < g.numOwned; ++n,++id){
+            out_file<< id + g.g_offset << ", "<< g.g.getData(*n).value<<"\n";
          }
          break;
       }
@@ -495,9 +500,11 @@ int main(int argc, char** argv) {
          }
          break;
       }
-
       case GPU_CUDA:
-         break;
+	for(int i = 0; i < g.numOwned; i++) {
+	  out_file << i + g.numOwned << ", " << getNodeValue_CUDA(cuda_ctx, i) << "\n"; 
+	}
+	break;
       }
       out_file.close();
    }
