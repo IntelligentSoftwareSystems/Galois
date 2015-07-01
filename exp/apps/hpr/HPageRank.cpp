@@ -167,11 +167,12 @@ pGraph loadGraph(std::string file, unsigned hostID, unsigned numHosts, Graph& ou
 struct InitializeGraph {
    Graph* g;
 
-   void static go(Graph& _g) {
-      Galois::do_all(_g.begin(), _g.end(), InitializeGraph { &_g }, Galois::loopname("init"));
+  void static go(Graph& _g, unsigned num) {
+     Galois::do_all(_g.begin(), _g.begin() + num, InitializeGraph { &_g }, Galois::loopname("init"));
    }
 
    void operator()(GNode src) const {
+     printf("HERE %d\n", src);
       LNode& sdata = g->getData(src);
       sdata.value = 1.0 - alpha;
       sdata.nout = 2; // FIXME
@@ -403,6 +404,8 @@ void loadGraphNonCPU(pGraph &g) {
 
    // TODO cleanup marshalgraph, leaks memory!
 }
+
+
 /*********************************************************************************
  *
  **********************************************************************************/
@@ -410,11 +413,11 @@ void loadGraphNonCPU(pGraph &g) {
 int main(int argc, char** argv) {
    LonestarStart(argc, argv, name, desc, url);
 
-   std::cout << "Personality is " << personality << std::endl;
-
    Galois::StatManager statManager;
    auto& net = Galois::Runtime::getSystemNetworkInterface();
    auto& barrier = Galois::Runtime::getSystemBarrier();
+
+   std::cout << Galois::Runtime::NetworkInterface::ID << " personality is " << personality << std::endl;
 
    Graph rg;
    pGraph g = loadGraph(inputFile, Galois::Runtime::NetworkInterface::ID, Galois::Runtime::NetworkInterface::Num, rg);
@@ -428,17 +431,20 @@ int main(int argc, char** argv) {
    if (personality != CPU)
       loadGraphNonCPU(g);
 
+   std::cout << g.id << " graph loaded\n";
+
    dPageRank dOp;
 
    //local initialization
    if (personality == CPU) {
-      InitializeGraph::go(g.g); /* dispatch to appropriate device */
+     InitializeGraph::go(g.g, g.numOwned); 
+      std::cout << "returned\n";
    } else if (personality == GPU_CUDA) {
       initialize_graph_cuda(cuda_ctx);
    } else if (personality == GPU_OPENCL) {
       dOp.init();
    }
-
+   std::cout << g.id << " initialized\n";
    barrier.wait();
 
    //goto v;
@@ -450,9 +456,12 @@ int main(int argc, char** argv) {
    //Ask for cells
    for (auto GID : g.L2G)
       net.sendAlt(g.getHost(GID), recvNodeStatic, GID, Galois::Runtime::NetworkInterface::ID);
+
+   std::cout << "ask for remote replicas\n";
    barrier.wait();
 
    // send nout values to remote replicas
+   std::cout << "ask for ghost cell attrs\n";
    sendGhostCellAttrs(net, g);
    barrier.wait();
 
