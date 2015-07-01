@@ -37,6 +37,8 @@
 #include <typeinfo>
 #include <algorithm>
 
+//#define _HETERO_DEBUG_ 1
+
 static const char* const name = "Page Rank - Distributed Heterogeneous";
 static const char* const desc = "Computes PageRank on Distributed Galois.  Uses pull algorithm, takes the pre-transposed graph.";
 static const char* const url = 0;
@@ -104,10 +106,11 @@ void loadLastNodes(pGraph &g, size_t size, unsigned numHosts) {
       g.lastNodes.push_back(pos);
       pos += pernum;
    }
-
+#if _HETERO_DEBUG_
    for (int i = 0; size < 10 && i < size; i++) {
       printf("node %d owned by %d\n", i, g.getHost(i));
    }
+#endif
 }
 /*********************************************************************************
  * Load a partitioned graph from a file.
@@ -174,7 +177,7 @@ struct InitializeGraph {
    void operator()(GNode src) const {
       LNode& sdata = g->getData(src);
       sdata.value = 1.0 - alpha;
-      sdata.nout = 2; // FIXME
+      sdata.nout = 0; // FIXME
    }
 };
 /************************************************************************************
@@ -184,20 +187,66 @@ typedef Galois::OpenCL::LC_LinearArray_Graph<Galois::OpenCL::Array, LNode, void>
 DeviceGraph dGraph;
 struct dPageRank {
    Galois::OpenCL::CL_Kernel kernel;
-   dPageRank() {
+   Galois::OpenCL::CL_Kernel wb_kernel;
+   Galois::OpenCL::Array<float> *aux_array;
+   dPageRank() :
+         aux_array(nullptr) {
    }
-   void init() {
+   void init(int num_items) {
+      Galois::OpenCL::CL_Kernel init_kernel;
+
+      aux_array = new Galois::OpenCL::Array<float>(dGraph.num_nodes());
       kernel.init("/h2/rashid/workspace/GaloisDist/gdist/exp/apps/hpr/opencl/pagerank_kernel.cl", "pagerank");
+      wb_kernel.init("/h2/rashid/workspace/GaloisDist/gdist/exp/apps/hpr/opencl/pagerank_kernel.cl", "writeback");
+      init_kernel.init("/h2/rashid/workspace/GaloisDist/gdist/exp/apps/hpr/opencl/pagerank_kernel.cl", "initialize_nout");
+      dGraph.copy_to_device();
+
+      init_kernel.set_work_size(num_items);
+      wb_kernel.set_work_size(num_items);
+      kernel.set_work_size(num_items);
+
+      init_kernel.set_arg_list(&dGraph, aux_array);
+      kernel.set_arg_list(&dGraph, aux_array);
+      wb_kernel.set_arg_list(&dGraph, aux_array);
+
+      init_kernel.set_arg(2, sizeof(cl_int), &num_items);
+      wb_kernel.set_arg(2, sizeof(cl_int), &num_items);
+      kernel.set_arg(2, sizeof(cl_int), &num_items);
+
+//      fprintf(stderr, "Initializing nout - > %d\n", num_items);
+      init_kernel();
+      dGraph.copy_to_host();
+
+#if _HETERO_DEBUG_
+   {
+         unsigned my_id = Galois::Runtime::NetworkInterface::ID;
+         char filename[256];
+         sprintf(filename, "opencl_%d_graph_1.csv", my_id);
+         std::ofstream out_file(filename);
+         for (int i = 0; i < dGraph.num_nodes(); ++i) {
+            out_file << i << ", " << dGraph.node_data()[i].value << " " << dGraph.node_data()[i].nout << "[";
+            for (int idx = dGraph.outgoing_index()[i]; idx < dGraph.outgoing_index()[i + 1]; ++idx) {
+               out_file << dGraph.out_neighbors()[idx] << ",";
+            }
+            out_file << "]\n";
+         }
+         out_file.close();
+      }
+#endif
+
    }
    template<typename GraphType>
    void operator()(GraphType & graph, int num_items) {
+#if _HETERO_DEBUG_
       fprintf(stderr, "Launching Kernel on device...%d\n", num_items);
+#endif
       graph.copy_to_device();
-      kernel.set_work_size(num_items);
-      kernel.set_arg(0, sizeof(cl_mem), &graph.device_ptr());
       kernel();
+      wb_kernel();
       graph.copy_to_host();
+#if _HETERO_DEBUG_
       fprintf(stderr, "Done - Kernel on device...%d\n", num_items);
+#endif
    }
 
 };
@@ -264,7 +313,7 @@ void setNodeValue(pGraph* p, unsigned GID, float v) {
       setNodeValue_CUDA(cuda_ctx, p->G2L(GID), v);
       break;
    case GPU_OPENCL:
-      dGraph.node_data()[GID].value = v;
+      dGraph.node_data()[p->G2L(GID)].value = v;
       break;
    default:
       break;
@@ -284,7 +333,7 @@ void setNodeAttr(pGraph *p, unsigned GID, unsigned nout) {
       setNodeAttr_CUDA(cuda_ctx, p->G2L(GID), nout);
       break;
    case GPU_OPENCL:
-      dGraph.node_data()[GID].nout = nout;
+      dGraph.node_data()[p->G2L(GID)].nout = nout;
       break;
    default:
       break;
@@ -297,17 +346,20 @@ void setNodeAttr(pGraph *p, unsigned GID, unsigned nout) {
 void sendGhostCellAttrs(Galois::Runtime::NetworkInterface& net, pGraph& g) {
    for (unsigned x = 0; x < remoteReplicas.size(); ++x) {
       for (auto n : remoteReplicas[x]) {
-	/* no per-personality needed but until nout is 
-	   fixed for CPU and OpenCL ... */
+         /* no per-personality needed but until nout is
+          fixed for CPU and OpenCL ... */
 
-	switch(personality) {
-	case GPU_CUDA:
-	  net.sendAlt(x, setNodeAttr, magicPointer[x], n, getNodeAttr_CUDA(cuda_ctx, n - g.g_offset));
-	  break;
-	default:
-	  net.sendAlt(x, setNodeAttr, magicPointer[x], n, g.g.getData(n - g.g_offset).nout);
-	  break;
-	}
+         switch (personality) {
+         case GPU_CUDA:
+            net.sendAlt(x, setNodeAttr, magicPointer[x], n, getNodeAttr_CUDA(cuda_ctx, n - g.g_offset));
+            break;
+         case GPU_OPENCL:
+            net.sendAlt(x, setNodeAttr, magicPointer[x], n, dGraph.node_data()[n - g.g_offset].nout);
+            break;
+         default:
+            net.sendAlt(x, setNodeAttr, magicPointer[x], n, g.g.getData(n - g.g_offset).nout);
+            break;
+         }
       }
    }
 }
@@ -316,25 +368,24 @@ void sendGhostCellAttrs(Galois::Runtime::NetworkInterface& net, pGraph& g) {
  **********************************************************************************/
 
 void sendGhostCells(Galois::Runtime::NetworkInterface& net, pGraph& g) {
-  for (unsigned x = 0; x < remoteReplicas.size(); ++x) {
-    for (auto n : remoteReplicas[x]) {
-      switch (personality) 
-	{
-	case CPU: 
-	  net.sendAlt(x, setNodeValue, magicPointer[x], n, g.g.getData(n - g.g_offset).value);
-	  break;
-	case GPU_CUDA: 
-	  net.sendAlt(x, setNodeValue, magicPointer[x], n, getNodeValue_CUDA(cuda_ctx, n - g.g_offset));
-	  break;
-	case GPU_OPENCL: 
-	  net.sendAlt(x, setNodeValue, magicPointer[x], n, dGraph.node_data()[(n - g.g_offset)].value);
-	  break;
-	default:
-	  assert(false);
-	  break;
-	}
-    }
-  }
+   for (unsigned x = 0; x < remoteReplicas.size(); ++x) {
+      for (auto n : remoteReplicas[x]) {
+         switch (personality) {
+         case CPU:
+            net.sendAlt(x, setNodeValue, magicPointer[x], n, g.g.getData(n - g.g_offset).value);
+            break;
+         case GPU_CUDA:
+            net.sendAlt(x, setNodeValue, magicPointer[x], n, getNodeValue_CUDA(cuda_ctx, n - g.g_offset));
+            break;
+         case GPU_OPENCL:
+            net.sendAlt(x, setNodeValue, magicPointer[x], n, dGraph.node_data()[(n - g.g_offset)].value);
+            break;
+         default:
+            assert(false);
+            break;
+         }
+      }
+   }
 
 }
 /*********************************************************************************
@@ -385,9 +436,7 @@ MarshalGraph pGraph2MGraph(pGraph &g) {
 
 void loadGraphNonCPU(pGraph &g) {
    MarshalGraph m;
-
    assert(personality != CPU);
-
    switch (personality) {
    case GPU_CUDA:
       m = pGraph2MGraph(g);
@@ -415,7 +464,7 @@ int main(int argc, char** argv) {
    Galois::StatManager statManager;
    auto& net = Galois::Runtime::getSystemNetworkInterface();
    auto& barrier = Galois::Runtime::getSystemBarrier();
-
+   const unsigned my_host_id = Galois::Runtime::NetworkInterface::ID;
    Graph rg;
    pGraph g = loadGraph(inputFile, Galois::Runtime::NetworkInterface::ID, Galois::Runtime::NetworkInterface::Num, rg);
 
@@ -436,13 +485,13 @@ int main(int argc, char** argv) {
    } else if (personality == GPU_CUDA) {
       initialize_graph_cuda(cuda_ctx);
    } else if (personality == GPU_OPENCL) {
-      dOp.init();
+      dOp.init(g.numOwned);
    }
 
    barrier.wait();
 
    //goto v;
-   
+
    //send pGraph pointers
    for (uint32_t x = 0; x < Galois::Runtime::NetworkInterface::Num; ++x)
       net.sendAlt(x, setRemotePtr, Galois::Runtime::NetworkInterface::ID, &g);
@@ -487,36 +536,41 @@ int main(int argc, char** argv) {
    sendGhostCells(net, g);
    barrier.wait();
 
- v:
    if (verify) {
-      std::stringstream ss;
-      ss << "page_ranks." << g.id << ".csv";
 
-      std::ofstream out_file(ss.str());
       switch (personality) {
-      case CPU:{
-         int id=0;
-         for(auto n = g.g.begin(); n!=g.g.end() && id < g.numOwned; ++n,++id){
-            out_file<< id + g.g_offset << ", "<< g.g.getData(*n).value<<"\n";
+      case CPU: {
+         std::stringstream ss;
+         ss << "cpu_" << my_host_id << "_page_ranks.csv";
+         std::ofstream out_file(ss.str());
+         int id = 0;
+         for (auto n = g.g.begin(); n != g.g.end(); ++n, ++id) {
+            out_file << id << ", " << g.g.getData(*n).value << "\n";
          }
+         out_file.close();
          break;
       }
-      case GPU_OPENCL:{
-         int id=0;
-         for(int n = 0; n<dGraph.num_nodes(); ++n,++id){
-            out_file<<id << ", "<< dGraph.node_data()[n].value<<"\n";
+      case GPU_OPENCL: {
+
+         std::stringstream ss;
+         ss << "opencl_" << my_host_id << "_page_ranks.csv";
+         std::ofstream out_file(ss.str());
+         for (int n = 0; n < g.numOwned; ++n) {
+            out_file << my_host_id << ", " << n + g.g_offset << ", " << dGraph.node_data()[n + g.g_offset].value << ", " << dGraph.node_data()[(n + g.g_offset)].nout << "\n";
          }
+         out_file.close();
          break;
       }
       case GPU_CUDA:
-	for(int i = 0; i < g.numOwned; i++) {
-	  out_file << i + g.g_offset << ", " << getNodeValue_CUDA(cuda_ctx, i) << "\n"; 
-	}
-	
-	break;
+         std::stringstream ss;
+         ss << "cuda_" << my_host_id << "_page_ranks.csv";
+         std::ofstream out_file(ss.str());
+         for (int i = 0; i < g.numOwned; i++) {
+            out_file << i + g.g_offset << ", " << getNodeValue_CUDA(cuda_ctx, i) << ", " << getNodeAttr_CUDA(cuda_ctx, i) << "\n";
+         }
+         out_file.close();
+         break;
       }
-      out_file.close();
    }
-
    return 0;
 }

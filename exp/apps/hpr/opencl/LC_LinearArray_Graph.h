@@ -130,7 +130,7 @@ struct LC_LinearArray_Graph {
       const size_t gg_num_edges = ggraph.sizeEdges();
       init(gg_num_nodes, gg_num_edges);
       const int * ptr = (int *) this->gpu_graph->host_ptr();
-      fprintf(stderr, "Loading from GaloisGraph [%d,%d].\n", (int)gg_num_nodes, (int)gg_num_edges);
+//      fprintf(stderr, "Loading from GaloisGraph [%d,%d].\n", (int)gg_num_nodes, (int)gg_num_edges);
       int edge_counter = 0;
       int node_counter = 0;
       for (auto n = ggraph.begin(); n != ggraph.end(); n++, node_counter++) {
@@ -138,7 +138,7 @@ struct LC_LinearArray_Graph {
          node_data()[src_node] = ggraph.getData(*n);
          outgoing_index()[src_node] = edge_counter;
          for (auto nbr = ggraph.edge_begin(*n); nbr != ggraph.edge_end(*n); ++nbr) {
-            GNode dst = *nbr;
+            GNode dst = ggraph.getEdgeDst(*nbr);
             out_neighbors()[edge_counter] = dst;
             edge_counter++;
          }
@@ -146,7 +146,7 @@ struct LC_LinearArray_Graph {
       assert(node_counter==gg_num_nodes);
       outgoing_index()[gg_num_nodes] = edge_counter;
       assert(edge_counter == gg_num_edges && "Failed to add all edges.");
-      fprintf(stderr, "Loaded from GaloisGraph [%d,%d,%d,%d].\n", ptr[0], ptr[1], ptr[2], ptr[3]);
+//      fprintf(stderr, "Loaded from GaloisGraph [%d,%d,%d,%d].\n", ptr[0], ptr[1], ptr[2], ptr[3]);
    }
 #endif
    ~LC_LinearArray_Graph() {
