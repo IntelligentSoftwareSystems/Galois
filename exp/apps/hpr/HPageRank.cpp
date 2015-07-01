@@ -172,7 +172,6 @@ struct InitializeGraph {
    }
 
    void operator()(GNode src) const {
-     printf("HERE %d\n", src);
       LNode& sdata = g->getData(src);
       sdata.value = 1.0 - alpha;
       sdata.nout = 2; // FIXME
