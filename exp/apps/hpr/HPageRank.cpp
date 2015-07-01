@@ -563,7 +563,8 @@ int main(int argc, char** argv) {
          ss << "opencl_" << my_host_id << "_page_ranks.csv";
          std::ofstream out_file(ss.str());
          for (int n = 0; n < g.numOwned; ++n) {
-            out_file << my_host_id << ", " << n + g.g_offset << ", " << dGraph.node_data()[n + g.g_offset].value << ", " << dGraph.node_data()[(n + g.g_offset)].nout << "\n";
+//            out_file << n + g.g_offset << ", " << dGraph.node_data()[n + g.g_offset].value << ", " << dGraph.node_data()[(n + g.g_offset)].nout << "\n";
+            out_file << n + g.g_offset << ", " << dGraph.node_data()[n].value << ", " << dGraph.node_data()[(n)].nout << "\n";
          }
          out_file.close();
          break;

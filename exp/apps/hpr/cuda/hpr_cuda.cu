@@ -110,7 +110,7 @@ void setNodeAttr_CUDA(struct CUDA_Context *ctx, unsigned LID, unsigned nout) {
 
   assert(LID >= ctx->nowned);
   
-  printf("setting %d %d %d\n", ctx->id, LID, nout);
+//  printf("setting %d %d %d\n", ctx->id, LID, nout);
   pnout[LID] = nout;
 }
 
