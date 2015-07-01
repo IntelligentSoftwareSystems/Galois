@@ -178,6 +178,6 @@ void ThreadPool::runInternal(unsigned num) {
   work = nullptr;
   // TODO(ddn): There might be some future use cases that don't want a barrier
   // across hosts
-  if (NetworkInterface::Num != 1)
-    getHostBarrier().wait();
+  //  if (NetworkInterface::Num != 1)
+  //    getHostBarrier().wait();
 }
