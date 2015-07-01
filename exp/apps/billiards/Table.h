@@ -491,7 +491,8 @@ protected:
 
 
   double genRand (double lim_min, double lim_max) {
-    double r = double (rand ()) / double (RAND_MAX);
+    // double r = double (rand ()) / double (RAND_MAX);
+    double r = double (rand () % 1024) / 1024.0;
     double ret = lim_min + r*(lim_max - lim_min);
     
     return FPutils::truncate (ret);

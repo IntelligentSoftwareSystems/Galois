@@ -17,7 +17,7 @@ void Sector::simulate (const Event& e) {
 
     b->update (b->vel (), e.getTime ());
 
-    assert (intersects (b));
+    // assert (intersects (b));
 
     b->addSector (this);
     this->addBall (b);
@@ -27,7 +27,7 @@ void Sector::simulate (const Event& e) {
 
     b->update (b->vel (), e.getTime ());
 
-    assert (!intersects (b));
+    // assert (!intersects (b));
 
     b->removeSector (this);
     this->removeBall (b);

@@ -73,8 +73,8 @@ public:
   static const double TRUNCATE_PRECISION;
 
   static double truncate (const double d) {
-    return (double (int64_t (d * TRUNCATE_PRECISION)) / TRUNCATE_PRECISION);
-    // return d;
+    // return (double (int64_t (d * TRUNCATE_PRECISION)) / TRUNCATE_PRECISION);
+    return d;
   }
 
   static Vec2 truncate (const Vec2& v) {
