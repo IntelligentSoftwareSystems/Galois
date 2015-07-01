@@ -2,36 +2,44 @@
  * @file
  * @section License
  *
- * Galois, a framework to exploit amorphous data-parallelism in irregular
- * programs.
+ * This file is part of Galois.  Galoisis a gramework to exploit
+ * amorphous data-parallelism in irregular programs.
  *
- * Copyright (C) 2014, The University of Texas at Austin. All rights reserved.
- * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
- * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
- * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
- * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
- * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
- * shall University be liable for incidental, special, indirect, direct or
- * consequential damages or loss of profits, interruption of business, or
- * related expenses which may arise from use of Software or Documentation,
- * including but not limited to those resulting from defects in Software and/or
- * Documentation, or loss or inaccuracy of data of any kind.
+ * Galois is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * Galois is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with Galois.  If not, see
+ * <http://www.gnu.org/licenses/>.
+ *
+ * @section Copyright
+ *
+ * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * reserved.
  *
  * @section Description
  *
  * Topologoy Hybrid Shared-MCS Barriers
- *
+ *`
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
 
 #include "Galois/Runtime/PerThreadStorage.h"
-#include "Galois/Runtime/Barrier.h"
-#include "Galois/Runtime/ll/CompilerSpecific.h"
+#include "Galois/Substrate/Barrier.h"
+#include "Galois/Substrate/CompilerSpecific.h"
+
+#include <atomic>
 
 namespace {
 
-class TopoBarrier : public Galois::Runtime::Barrier {
+class TopoBarrier : public Galois::Substrate::Barrier {
   struct treenode {
     //vpid is Galois::Runtime::LL::getTID()
 
@@ -46,9 +54,6 @@ class TopoBarrier : public Galois::Runtime::Barrier {
     //signal values
     std::atomic<unsigned> parentsense;
 
-#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
-    treenode (void) {}
-#endif
   };
 
   Galois::Runtime::PerPackageStorage<treenode> nodes;
@@ -79,25 +84,9 @@ class TopoBarrier : public Galois::Runtime::Barrier {
     }
     for (unsigned i = 0; i < P; ++i)
       *sense.getRemote(i) = 1;
-#if 0
-    for (unsigned i = 0; i < pkgs; ++i) {
-      treenode& n = *nodes.getRemoteByPkg(i);
-      Galois::Runtime::LL::gPrint(i, 
-          " this ", &n,
-          " parent ", n.parentpointer, 
-          " child[0] ", n.childpointers[0],
-          " child[1] ", n.childpointers[1],
-          " havechild ", n.havechild,
-          "\n");
-    }
-#endif
   }
 
 public:
-  TopoBarrier(unsigned val = Galois::Runtime::activeThreads) {
-    _reinit(val);
-  }
-
   //not safe if any thread is in wait
   virtual void reinit(unsigned val) {
     _reinit(val);
@@ -110,7 +99,7 @@ public:
     bool leader = Galois::Runtime::LL::isPackageLeaderForSelf(id);
     //completion tree
     if (leader) {
-      while (n.childnotready) { Galois::Runtime::LL::asmPause(); }
+      while (n.childnotready) { Galois::Substrate::asmPause(); }
       n.childnotready = n.havechild;
       if (n.parentpointer) {
 	--n.parentpointer->childnotready;
@@ -122,7 +111,7 @@ public:
     //wait for signal
     if (id != 0) {
       while (n.parentsense != s) {
-	Galois::Runtime::LL::asmPause();
+	Galois::Substrate::asmPause();
       }
     }
     
@@ -144,11 +133,11 @@ public:
 
 }
 
-Galois::Runtime::Barrier& Galois::Runtime::benchmarking::getTopoBarrier() {
+Galois::Substrate::Barrier& Galois::Substrate::benchmarking::getTopoBarrier() {
   static TopoBarrier b;
   static unsigned num = ~0;
-  if (activeThreads != num) {
-    num = activeThreads;
+  if (Runtime::activeThreads != num) {
+    num = Runtime::activeThreads;
     b.reinit(num);
   }
   return b;

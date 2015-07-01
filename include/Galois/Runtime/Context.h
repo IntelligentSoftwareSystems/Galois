@@ -27,7 +27,7 @@
 
 #include "Galois/config.h"
 #include "Galois/MethodFlags.h"
-#include "Galois/Runtime/ll/PtrLock.h"
+#include "Galois/Substrate/PtrLock.h"
 #include "Galois/Runtime/ll/gio.h"
 
 #include <boost/utility.hpp>
@@ -121,7 +121,7 @@ public:
  * Lockable. 
  */
 class Lockable {
-  LL::PtrLock<LockManagerBase, true> owner;
+  Substrate::PtrLock<LockManagerBase> owner;
   //! Use an intrusive list to track neighborhood of a context without allocation overhead.
   //! Works for cases where a Lockable needs to be only in one context's neighborhood list
   Lockable* next;

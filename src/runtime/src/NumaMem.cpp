@@ -271,7 +271,7 @@ void* Galois::Runtime::MM::largeInterleavedAlloc(size_t len, bool full) {
   bool inForEach = false;
 #else
   unsigned total = full ? Galois::Runtime::LL::getMaxCores() : activeThreads;
-  bool inForEach = getSystemThreadPool().isRunning();
+  bool inForEach = Substrate::getSystemThreadPool().isRunning();
 #endif
   bool numaAlloc = false;
 
@@ -297,7 +297,7 @@ void* Galois::Runtime::MM::largeInterleavedAlloc(size_t len, bool full) {
     unsigned uniqueNodes;
     std::vector<int> mapping(total);
     createMapping(mapping, uniqueNodes);
-    getSystemThreadPool().run(total, std::bind(pageInInterleaved, data, len, std::ref(mapping), uniqueNodes));
+    Substrate::getSystemThreadPool().run(total, std::bind(pageInInterleaved, data, len, std::ref(mapping), uniqueNodes));
 #endif
   }
 

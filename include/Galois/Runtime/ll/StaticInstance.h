@@ -30,7 +30,7 @@
 #ifndef GALOIS_RUNTIME_LL_STATICINSTANCE_H
 #define GALOIS_RUNTIME_LL_STATICINSTANCE_H
 
-#include "CompilerSpecific.h"
+#include "Galois/Substrate/CompilerSpecific.h"
 
 namespace Galois {
 namespace Runtime {
@@ -47,14 +47,14 @@ struct StaticInstance {
     int oldval;
     do {
       while (_lock != 0) {
-	asmPause();
+        Substrate::asmPause();
       }
       oldval = __sync_fetch_and_or(&_lock, 1);
     } while (oldval & 1);
   }
 
   inline void unlock() {
-    compilerBarrier();
+    Substrate::compilerBarrier();
     _lock = 0;
   }
 

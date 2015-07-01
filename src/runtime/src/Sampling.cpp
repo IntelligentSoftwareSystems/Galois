@@ -23,21 +23,21 @@
 #include "Galois/config.h"
 #include "Galois/Runtime/Sampling.h"
 #include "Galois/Runtime/Support.h"
-#include "Galois/Runtime/ll/EnvCheck.h"
+#include "Galois/Substrate/EnvCheck.h"
 #include "Galois/Runtime/ll/TID.h"
 #include "Galois/Runtime/ll/gio.h"
 #include <cstdlib>
 
 static void endPeriod() {
   int val;
-  if (Galois::Runtime::LL::EnvCheck("GALOIS_EXIT_AFTER_SAMPLING", val)) {
+  if (Galois::Substrate::EnvCheck("GALOIS_EXIT_AFTER_SAMPLING", val)) {
     exit(val);
   }
 }
 
 static void beginPeriod() {
   int val;
-  if (Galois::Runtime::LL::EnvCheck("GALOIS_EXIT_BEFORE_SAMPLING", val)) {
+  if (Galois::Substrate::EnvCheck("GALOIS_EXIT_BEFORE_SAMPLING", val)) {
     exit(val);
   }
 }

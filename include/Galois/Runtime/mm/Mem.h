@@ -31,9 +31,9 @@
 #define GALOIS_RUNTIME_MEM_H
 
 #include "Galois/Runtime/PerThreadStorage.h"
-#include "Galois/Runtime/ll/SimpleLock.h"
-#include "Galois/Runtime/ll/PtrLock.h"
-#include "Galois/Runtime/ll/CacheLineStorage.h"
+#include "Galois/Substrate/SimpleLock.h"
+#include "Galois/Substrate/PtrLock.h"
+#include "Galois/Substrate/CacheLineStorage.h"
 
 #include <boost/utility.hpp>
 #include <cstdlib>
@@ -138,7 +138,7 @@ public:
 //! Apply a lock to a heap
 template<class SourceHeap>
 class LockedHeap : public SourceHeap {
-  LL::SimpleLock lock;
+  Substrate::SimpleLock lock;
 
 public:
   enum { AllocSize = SourceHeap::AllocSize };
@@ -288,7 +288,7 @@ public:
   }
 
   inline void* allocate(size_t size) {
-    static LL::SimpleLock lock;
+    static Substrate::SimpleLock lock;
 
     lock.lock();
     FreeNode* OH = 0;
@@ -584,11 +584,11 @@ public:
 private:
   typedef std::map<size_t, SizedHeap*> HeapMap;
   static SizedHeapFactory* getInstance();
-  static LL::PtrLock<SizedHeapFactory, true> instance;
+  static Substrate::PtrLock<SizedHeapFactory> instance;
   static __thread HeapMap* localHeaps;
   HeapMap heaps;
   std::list<HeapMap*> allLocalHeaps;
-  LL::SimpleLock lock;
+  Substrate::SimpleLock lock;
 
   SizedHeapFactory();
   ~SizedHeapFactory();
@@ -748,7 +748,7 @@ class Pow_2_BlockHeap: private boost::noncopyable {
 
   std::vector<Heap_ty> heapTable;
 
-  static LL::PtrLock<Pow_2_BlockHeap, true> instance;
+  static Substrate::PtrLock<Pow_2_BlockHeap> instance;
 
   static inline size_t pow2 (unsigned i) {
     return (1U << i);

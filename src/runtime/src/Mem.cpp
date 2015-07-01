@@ -41,9 +41,9 @@ SystemHeap::SystemHeap() {}
 SystemHeap::~SystemHeap() {}
 
 #ifndef GALOIS_FORCE_STANDALONE
-PtrLock<SizedHeapFactory, true> SizedHeapFactory::instance;
+Galois::Substrate::PtrLock<SizedHeapFactory> SizedHeapFactory::instance;
 __thread SizedHeapFactory::HeapMap* SizedHeapFactory::localHeaps = 0;
-PtrLock<Pow_2_BlockHeap, true>  Pow_2_BlockHeap::instance;
+Galois::Substrate::PtrLock<Pow_2_BlockHeap>  Pow_2_BlockHeap::instance;
 
 SizedHeapFactory::SizedHeap* 
 SizedHeapFactory::getHeapForSize(const size_t size) {
@@ -57,7 +57,7 @@ SizedHeapFactory::getHeap(const size_t size) {
   typedef SizedHeapFactory::HeapMap HeapMap;
 
   if (!localHeaps) {
-    std::lock_guard<SimpleLock> ll(lock);
+    std::lock_guard<Galois::Substrate::SimpleLock> ll(lock);
     localHeaps = new HeapMap;
     allLocalHeaps.push_front(localHeaps);
   }
@@ -67,7 +67,7 @@ SizedHeapFactory::getHeap(const size_t size) {
     return lentry;
 
   {
-    std::lock_guard<SimpleLock> ll(lock);
+    std::lock_guard<Galois::Substrate::SimpleLock> ll(lock);
     auto& gentry = heaps[size];
     if (!gentry)
       gentry = new SizedHeap();

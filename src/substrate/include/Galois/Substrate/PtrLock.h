@@ -2,70 +2,65 @@
  * @file
  * @section License
  *
- * Galois, a framework to exploit amorphous data-parallelism in
- * irregular programs.
+ * This file is part of Galois.  Galoisis a gramework to exploit
+ * amorphous data-parallelism in irregular programs.
  *
- * Copyright (C) 2013, The University of Texas at Austin. All rights
- * reserved.  UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES
- * CONCERNING THIS SOFTWARE AND DOCUMENTATION, INCLUDING ANY
- * WARRANTIES OF MERCHANTABILITY, FITNESS FOR ANY PARTICULAR PURPOSE,
- * NON-INFRINGEMENT AND WARRANTIES OF PERFORMANCE, AND ANY WARRANTY
- * THAT MIGHT OTHERWISE ARISE FROM COURSE OF DEALING OR USAGE OF
- * TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH RESPECT TO
- * THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
- * shall University be liable for incidental, special, indirect,
- * direct or consequential damages or loss of profits, interruption of
- * business, or related expenses which may arise from use of Software
- * or Documentation, including but not limited to those resulting from
- * defects in Software and/or Documentation, or loss or inaccuracy of
- * data of any kind.  
+ * Galois is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * Galois is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with Galois.  If not, see
+ * <http://www.gnu.org/licenses/>.
+ *
+ * @section Copyright
+ *
+ * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * reserved.
  *
  * @section Description
  *
  * This contains the pointer-based spinlock used in Galois.  We use a
  * test-and-test-and-set approach, with pause instructions on x86 and
  * compiler barriers on unlock.  A pointer-lock uses the low-order bit
- * in a pointer to store the lock, thus assumes a non-one-byte
- * alignment.
+ * in a pointer to store the lock.
  *
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
-#ifndef GALOIS_RUNTIME_LL_PTRLOCK_H
-#define GALOIS_RUNTIME_LL_PTRLOCK_H
+
+#ifndef GALOIS_SUBSTRATE_PTRLOCK_H
+#define GALOIS_SUBSTRATE_PTRLOCK_H
 
 #include "Galois/config.h"
-#include "Galois/Runtime/ll/CompilerSpecific.h"
+#include "Galois/Substrate/CompilerSpecific.h"
 
 #include <stdint.h>
 #include <cassert>
-#include GALOIS_CXX11_STD_HEADER(atomic)
+#include <atomic>
 
 namespace Galois {
-namespace Runtime {
-namespace LL {
+namespace Substrate {
 
-/// PtrLock is a spinlock and a pointer.  If the second template
-/// parameter is false, the lock is a noop.  This wraps a pointer and
-/// uses the low order bit for the lock flag
-/// Copying a lock is unsynchronized (relaxed ordering)
-template<typename T, bool isALock>
-class PtrLock;
+namespace detail {
+void ptr_slow_lock(std::atomic<uintptr_t>& l);
+}
+
+/// PtrLock is a spinlock and a pointer.  This wraps a pointer and
+/// uses the low order bit for the lock flag Copying a lock is
+/// unsynchronized (relaxed ordering)
 
 template<typename T>
-class PtrLock<T, true> {
+class PtrLock {
   std::atomic<uintptr_t> _lock;
 
-  GALOIS_ATTRIBUTE_NOINLINE
-  void slow_lock() {
-    uintptr_t oldval;
-    do {
-      while ((_lock.load(std::memory_order_acquire) & 1) != 0) {
-        asmPause();
-      }
-      oldval = _lock.fetch_or(1, std::memory_order_acq_rel);
-    } while (oldval & 1);
-    assert(_lock);
-  }
+  //  static_assert(alignof(T) > 1, "Bad data type alignment for PtrLock");
+
 
 public:
   constexpr PtrLock() : _lock(0) {}
@@ -89,7 +84,7 @@ public:
     return;
 
   slow_path:
-    slow_lock();
+    detail::ptr_slow_lock(_lock);
   }
 
   inline void unlock() {
@@ -148,10 +143,10 @@ public:
 };
 
 template<typename T>
-class PtrLock<T, false> {
+class DummyPtrLock {
   T* _lock;
 public:
-  PtrLock() : _lock() {}
+  DummyPtrLock() : _lock() {}
   
   inline void lock() {}
   inline void unlock() {}
@@ -173,8 +168,7 @@ public:
   }
 };
 
-}
-}
+} // end namespace Substrate
 } // end namespace Galois
 
 #endif

@@ -32,7 +32,7 @@
 #include "Galois/Threads.h"
 #include "Galois/Runtime/ll/TID.h"
 #include "Galois/Runtime/ll/gio.h"
-#include "Galois/Runtime/ThreadPool.h"
+#include "Galois/Substrate/ThreadPool.h"
 
 #include <tuple>
 
@@ -51,7 +51,7 @@ struct OnEachExecutor {
 
 template<typename FunctionTy>
 void on_each_impl(const FunctionTy& fn, const char* loopname = nullptr) {
-  getSystemThreadPool().run(activeThreads, OnEachExecutor<FunctionTy>(fn));
+  Substrate::getSystemThreadPool().run(activeThreads, OnEachExecutor<FunctionTy>(fn));
 }
 
 template<typename FunctionTy, typename TupleTy>

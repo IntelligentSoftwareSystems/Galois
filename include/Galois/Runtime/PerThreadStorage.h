@@ -25,9 +25,9 @@
 #define GALOIS_RUNTIME_PERTHREADSTORAGE_H
 
 #include "Galois/config.h"
-#include "Galois/Runtime/ThreadPool.h"
+#include "Galois/Substrate/ThreadPool.h"
 #include "Galois/Runtime/ll/HWTopo.h"
-#include "Galois/Runtime/ll/PaddedLock.h"
+#include "Galois/Substrate/PaddedLock.h"
 #include "Galois/Runtime/ll/TID.h"
 
 #include <cstddef>
@@ -49,7 +49,7 @@ class PerBackend {
   // NB(ddn): llvm seems to assume this under some cases because
   // I've seen weird initialization crashes with MIN_SIZE = 3
   static const unsigned MIN_SIZE = 4;
-  typedef Galois::Runtime::LL::SimpleLock Lock;
+  typedef Substrate::SimpleLock Lock;
 
   unsigned int nextLoc;
   char** heads;
@@ -148,7 +148,7 @@ public:
   PerThreadStorage(Args&&... args) :b(getPTSBackend()) {
     //in case we make one of these before initializing the thread pool
     //This will call initPTS for each thread if it hasn't already
-    Galois::Runtime::getSystemThreadPool();
+    Galois::Substrate::getSystemThreadPool();
 
     offset = b.allocOffset(sizeof(T));
     for (unsigned n = 0; n < LL::getMaxThreads(); ++n)
@@ -237,7 +237,7 @@ public:
   PerPackageStorage(Args&&... args) :b(getPPSBackend()) {
     //in case we make one of these before initializing the thread pool
     //This will call initPTS for each thread if it hasn't already
-    Galois::Runtime::getSystemThreadPool();
+    Galois::Substrate::getSystemThreadPool();
 
     offset = b.allocOffset(sizeof(T));
     for (unsigned n = 0; n < LL::getMaxPackages(); ++n)

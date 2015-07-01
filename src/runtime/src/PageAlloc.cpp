@@ -65,8 +65,8 @@ struct FreeNode {
   FreeNode* next;
 };
  
-typedef Galois::Runtime::LL::PtrLock<FreeNode, true> HeadPtr;
-typedef Galois::Runtime::LL::CacheLineStorage<HeadPtr> HeadPtrStorage;
+typedef Galois::Substrate::PtrLock<FreeNode> HeadPtr;
+typedef Galois::Substrate::CacheLineStorage<HeadPtr> HeadPtrStorage;
 
 // Tracks pages allocated
 struct PAState {
@@ -80,12 +80,12 @@ struct PAState {
 static Galois::Runtime::LL::StaticInstance<PAState> PA;
 
 #ifdef __linux__
-typedef Galois::Runtime::LL::SimpleLock AllocLock;
+typedef Galois::Substrate::SimpleLock AllocLock;
 #else
-typedef Galois::Runtime::LL::DummyLock AllocLock;
+typedef Galois::Substrate::DummyLock AllocLock;
 #endif
 static AllocLock allocLock;
-static Galois::Runtime::LL::SimpleLock dataLock;
+static Galois::Substrate::SimpleLock dataLock;
 static __thread HeadPtr* head = 0;
 
 void* allocFromOS() {
@@ -116,7 +116,7 @@ void* allocFromOS() {
   
   //protect the tracking structures
   {
-    std::lock_guard<Galois::Runtime::LL::SimpleLock> ll(dataLock);
+    std::lock_guard<Galois::Substrate::SimpleLock> ll(dataLock);
     HeadPtr*& h = head;
     if (!h) { //first allocation
       h = &((new HeadPtrStorage())->data);

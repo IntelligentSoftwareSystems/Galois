@@ -25,5 +25,5 @@
 
 void Galois::Runtime::preAlloc_impl(int num) {
   int pagesPerThread = (num + activeThreads - 1) / activeThreads;
-  getSystemThreadPool().run(activeThreads, std::bind(Galois::Runtime::MM::pagePreAlloc, pagesPerThread));
+  Substrate::getSystemThreadPool().run(activeThreads, std::bind(Galois::Runtime::MM::pagePreAlloc, pagesPerThread));
 }

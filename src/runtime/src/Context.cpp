@@ -24,8 +24,8 @@
  */
 #include "Galois/config.h"
 #include "Galois/Runtime/Context.h"
-#include "Galois/Runtime/ll/SimpleLock.h"
-#include "Galois/Runtime/ll/CacheLineStorage.h"
+#include "Galois/Substrate/SimpleLock.h"
+#include "Galois/Substrate/CacheLineStorage.h"
 
 #include <stdio.h>
 
@@ -142,7 +142,7 @@ unsigned Galois::Runtime::SimpleRuntimeContext::commitIteration() {
     Lockable* lockable = locks;
     locks = lockable->next;
     lockable->next = 0;
-    LL::compilerBarrier();
+    Substrate::compilerBarrier();
     release(lockable);
     ++numLocks;
   }

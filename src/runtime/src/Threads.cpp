@@ -21,7 +21,7 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "Galois/Runtime/ThreadPool.h"
+#include "Galois/Substrate/ThreadPool.h"
 #include "Galois/Threads.h"
 
 #include <algorithm>
@@ -32,7 +32,7 @@ unsigned int activeThreads = 1;
 }
 
 unsigned int Galois::setActiveThreads(unsigned int num) noexcept {
-  num = std::min(num, Galois::Runtime::getSystemThreadPool().getMaxThreads());
+  num = std::min(num, Galois::Substrate::getSystemThreadPool().getMaxThreads());
   num = std::max(num, 1U);
   Galois::Runtime::activeThreads = num;
   return num;

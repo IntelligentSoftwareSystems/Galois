@@ -54,7 +54,7 @@
 #ifndef GALOIS_TYPETRAITS_H
 #define GALOIS_TYPETRAITS_H
 
-#include "Galois/Runtime/ll/CompilerSpecific.h"
+#include "Galois/Substrate/CompilerSpecific.h"
 #include <boost/mpl/has_xxx.hpp>
 
 namespace Galois {

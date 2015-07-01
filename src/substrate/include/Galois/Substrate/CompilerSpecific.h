@@ -24,12 +24,11 @@
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#ifndef GALOIS_RUNTIME_LL_COMPILERSPECIFIC_H
-#define GALOIS_RUNTIME_LL_COMPILERSPECIFIC_H
+#ifndef GALOIS_SUBSTRATE_COMPILERSPECIFIC_H
+#define GALOIS_SUBSTRATE_COMPILERSPECIFIC_H
 
 namespace Galois {
-namespace Runtime {
-namespace LL {
+namespace Substrate {
 
 inline static void asmPause() {
 #if defined(__i386__) || defined(__amd64__)
@@ -83,8 +82,7 @@ inline static void flushInstructionPipeline() {
 #define GALOIS_ATTRIBUTE_PROF_NOINLINE inline
 #endif
 
-}
-}
+} // end namespace Substrate
 } // end namespace Galois
 
 #endif

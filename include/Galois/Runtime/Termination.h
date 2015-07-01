@@ -32,7 +32,7 @@
 
 #include "Galois/config.h"
 #include "Galois/Runtime/PerThreadStorage.h"
-#include "Galois/Runtime/ll/CacheLineStorage.h"
+#include "Galois/Substrate/CacheLineStorage.h"
 
 #include GALOIS_CXX11_STD_HEADER(atomic)
 
@@ -41,7 +41,7 @@ namespace Runtime {
 
 class TerminationDetection {
 protected:
-  LL::CacheLineStorage<std::atomic<int> > globalTerm;
+  Substrate::CacheLineStorage<std::atomic<int> > globalTerm;
 public:
   /**
    * Initializes the per-thread state.  All threads must call this

@@ -350,7 +350,7 @@ if(NOT SKIP_COMPILE_APPS)
   add_subdirectory(apps)
   add_subdirectory(inputs)
   add_subdirectory(test)
-  add_subdirectory(toolkit_ml)
+#  add_subdirectory(toolkit_ml)
 endif()
 
 ###### Documentation ######

@@ -2,26 +2,33 @@
  * @file
  * @section License
  *
- * Galois, a framework to exploit amorphous data-parallelism in irregular
- * programs.
+ * This file is part of Galois.  Galoisis a gramework to exploit
+ * amorphous data-parallelism in irregular programs.
  *
- * Copyright (C) 2014, The University of Texas at Austin. All rights reserved.
- * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
- * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
- * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
- * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
- * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
- * shall University be liable for incidental, special, indirect, direct or
- * consequential damages or loss of profits, interruption of business, or
- * related expenses which may arise from use of Software or Documentation,
- * including but not limited to those resulting from defects in Software and/or
- * Documentation, or loss or inaccuracy of data of any kind.
+ * Galois is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * Galois is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with Galois.  If not, see
+ * <http://www.gnu.org/licenses/>.
+ *
+ * @section Copyright
+ *
+ * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * reserved.
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#include "Galois/Runtime/ThreadPool.h"
-#include "Galois/Runtime/ll/EnvCheck.h"
+
+#include "Galois/Substrate/ThreadPool.h"
+#include "Galois/Substrate/EnvCheck.h"
 #include "Galois/Runtime/ll/HWTopo.h"
 #include "Galois/Runtime/ll/TID.h"
 #include "Galois/Runtime/ll/gio.h"
@@ -39,82 +46,92 @@ extern void initPTS();
 }
 
 
-using namespace Galois::Runtime;
+using namespace Galois::Substrate;
 
-ThreadPool::ThreadPool(unsigned m): maxThreads(m), starting(m), masterFastmode(false), signals(m), running(false) {
-  initThread(0);
+ThreadPool::ThreadPool(unsigned m): maxThreads(m), starting(m), masterFastmode(false), signals(nullptr), running(false) {
+  initThread();
+  assert(my_box.id == 0);
 }
 
 ThreadPool::~ThreadPool() { }
 
 void ThreadPool::destroyCommon() {
   beKind(); // reset fastmode
-#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
-  struct ThrowShutdown {
-    void operator () (void) { throw shutdown_ty (); }
-  };
-  run(maxThreads, ThrowShutdown ());
-#else 
   run(maxThreads, []() { throw shutdown_ty(); });
-#endif
 }
-
-#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
-struct ThrowFastMode {
-  bool mode;
-  explicit ThrowFastMode (bool m) : mode (m) {}
-  void operator () (void) {
-    throw Galois::Runtime::ThreadPool::fastmode_ty {mode};
-  }
-};
-#endif
 
 void ThreadPool::burnPower(unsigned num) {
   //changing number of threads?  just do a reset
   if (masterFastmode && masterFastmode != num)
     beKind();
   if (!masterFastmode) {
-#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
-    run(num, ThrowFastMode (true));
-#else
     run(num, []() { throw fastmode_ty{true}; });
-#endif
     masterFastmode = num;
   }
 }
 
 void ThreadPool::beKind() {
   if (masterFastmode) {
-#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
-    run(masterFastmode, ThrowFastMode (false));
-#else
     run(masterFastmode, []() { throw fastmode_ty{false}; });
-#endif
     masterFastmode = 0;
   }
 }
 
-void ThreadPool::initThread(unsigned tid) {
-  // Initialize TID
-  LL::initTID(tid);
-  initPTS();
-  if (!LL::EnvCheck("GALOIS_DO_NOT_BIND_THREADS"))
-    if (tid != 0 || !LL::EnvCheck("GALOIS_DO_NOT_BIND_MAIN_THREAD"))
-      LL::bindThreadToProcessor(tid);
+//inefficient append
+template<typename T>
+static void atomic_append(std::atomic<T*>& headptr, T* newnode) {
+  T* n = nullptr;
+  if (!headptr.compare_exchange_strong(n, newnode))
+    atomic_append(headptr.load()->next, newnode);
 }
 
-void ThreadPool::threadLoop(unsigned tid) {
-  initThread(tid);
-  decascade(tid);
+//find id
+template<typename T> 
+static unsigned findID(std::atomic<T*>& headptr, T* node, unsigned off) {
+  T* n = headptr.load();
+  assert(n);
+  if (n == node)
+    return off;
+  else
+    return findID(n->next, node, off+1);
+}
+
+template<typename T>
+static T* getNth(std::atomic<T*>& headptr, unsigned off) {
+  T* n = headptr.load();
+  if (!off)
+    return n;
+  else
+    return getNth(n->next, off - 1);
+}
+
+void ThreadPool::initThread() {
+  atomic_append(signals, &my_box);
+  my_box.id = findID(signals, &my_box, 0);
+
+  // Initialize TID
+  Runtime::LL::initTID(my_box.id);
+  Runtime::initPTS();
+
+  if (!EnvCheck("GALOIS_DO_NOT_BIND_THREADS"))
+    if (my_box.id != 0 || !EnvCheck("GALOIS_DO_NOT_BIND_MAIN_THREAD"))
+      Runtime::LL::bindThreadToProcessor(my_box.id);
+}
+
+void ThreadPool::threadLoop() {
+  initThread();
+  decascade();
   bool fastmode = false;
   do {
     if (fastmode) {
-      while (!signals[tid].get().fastRelease.load(std::memory_order_relaxed)) { LL::asmPause(); }
-      signals[tid].get().fastRelease = 0;
+      while (!signals[my_box.id].fastRelease.load(std::memory_order_relaxed)) {
+        asmPause();
+      }
+      signals[my_box.id].fastRelease = 0;
     } else {
-      threadWait(tid);
+      threadWait(my_box.id);
     }
-    cascade(tid, fastmode);
+    cascade(fastmode);
     
     try {
       work();
@@ -125,34 +142,35 @@ void ThreadPool::threadLoop(unsigned tid) {
     } catch (...) {
       abort();
     }
-    decascade(tid);
+    decascade();
   } while (true);
 }
 
 
-void ThreadPool::decascade(int tid) {
-  assert(tid == 0 || signals[tid].get().done == 0);
+void ThreadPool::decascade() {
+  assert(my_box.id == 0 || my_box.done == 0);
   const unsigned multiple = 3;
   unsigned limit = starting;
   for (unsigned i = 1; i <= multiple; ++i) {
-    unsigned n = tid * multiple + i;
+    unsigned n = my_box.id * multiple + i;
     if (n < limit) {
-      auto& done_flag = signals[n].get().done;
-      while (!done_flag) { LL::asmPause(); }
+      auto& done_flag = getNth(signals, n)->done;
+      while (!done_flag) { asmPause(); }
     }
   }
-  signals[tid].get().done = 1;
+  my_box.done = 1;
 }
 
-void ThreadPool::cascade(int tid, bool fastmode) {
+void ThreadPool::cascade(bool fastmode) {
   unsigned limit = starting;
   const unsigned multiple = 3;
   for (unsigned i = 1; i <= multiple; ++i) {
-    unsigned n = tid * multiple + i;
+    unsigned n = my_box.id * multiple + i;
     if (n < limit) {
-      signals[n].get().done = 0;
+      auto nid = getNth(signals, n);
+      nid->done = 0;
       if (fastmode)
-        signals[n].get().fastRelease = 1;
+        nid->fastRelease = 1;
       else
         threadWakeup(n);
     }
@@ -168,7 +186,7 @@ void ThreadPool::runInternal(unsigned num) {
   starting = num;
   assert(!masterFastmode || masterFastmode == num);
   //launch threads
-  cascade(0, masterFastmode);
+  cascade(masterFastmode);
   // Do master thread work
   try {
     work();
@@ -177,7 +195,7 @@ void ThreadPool::runInternal(unsigned num) {
   } catch (const fastmode_ty& fm) {
   }
   //wait for children
-  decascade(0);
+  decascade();
   // Clean up
   work = nullptr;
   running = false;

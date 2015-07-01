@@ -23,8 +23,8 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#ifndef GALOIS_GRAPH_LC_CSR_GRAPH_H
-#define GALOIS_GRAPH_LC_CSR_GRAPH_H
+#ifndef GALOIS_GRAPH__LC_CSR_GRAPH_H
+#define GALOIS_GRAPH__LC_CSR_GRAPH_H
 
 #include "Galois/config.h"
 #include "Galois/LargeArray.h"

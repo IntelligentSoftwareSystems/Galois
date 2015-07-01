@@ -1,14 +1,8 @@
-set(sources Barrier.cpp Barrier_MCS.cpp Barrier_Topo.cpp Barrier_Pthread.cpp
-  Barrier_Counting.cpp Barrier_Dissemination.cpp
-  Context.cpp FileGraph.cpp 
-  Deterministic.cpp
-  OCFileGraph.cpp PerThreadStorage.cpp PreAlloc.cpp Sampling.cpp Support.cpp
-  Termination.cpp Threads.cpp Timer.cpp ThreadPool.cpp)
-if(HAVE_CXX11_THREAD_YIELD)
-  set(sources ${sources} ThreadPool_cpp11.cpp FileGraphParallel_cpp11.cpp)
-else()
-  set(sources ${sources} ThreadPool_pthread.cpp FileGraphParallel_pthread.cpp)
-endif()
+#if(HAVE_CXX11_THREAD_YIELD)
+#  set(sources ${sources} FileGraphParallel_cpp11.cpp)
+#else()
+#  set(sources ${sources} FileGraphParallel_pthread.cpp)
+#endif()
 
 function(add_galois_library name)
   set(options)
@@ -27,13 +21,23 @@ if(USE_EXP)
   set(exp_libs exp)
 endif()
 
-add_galois_library(galois ${sources} LIBS llvm mm ll ${exp_libs})
-add_galois_library(galois-nothreads FileGraph.cpp LIBS llvm mm-standalone ll ${exp_libs})
+add_galois_library(galois ${sources} LIBS llvm ${exp_libs})
+add_galois_library(galois-nothreads  LIBS llvm ${exp_libs})
 
-add_subdirectory(ll)
+#add_subdirectory(ll)
 add_subdirectory(llvm)
-add_subdirectory(mm)
-add_subdirectory(mm-standalone)
+#add_subdirectory(mm)
+#add_subdirectory(mm-standalone)
+
+#Long term starts here
+add_subdirectory(substrate)
+add_subdirectory(runtime)
+add_subdirectory(graphs)
+#Long term ends here
+
+#include_directories(${gSubstrate_SOURCE_DIR})
+#include_directories(${gRuntime_SOURCE_DIR})
+
 
 target_link_libraries(galois ${CMAKE_THREAD_LIBS_INIT})
 

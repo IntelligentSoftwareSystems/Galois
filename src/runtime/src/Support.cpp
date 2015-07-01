@@ -25,7 +25,7 @@
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/ll/gio.h"
-#include "Galois/Runtime/ll/PaddedLock.h"
+#include "Galois/Substrate/PaddedLock.h"
 #include "Galois/Runtime/ll/StaticInstance.h"
 #include "Galois/Runtime/mm/Mem.h"
 
@@ -45,7 +45,7 @@ namespace {
 class StatManager {
   typedef std::tuple<std::string, std::string, unsigned long> RecordTy;
 
-  Galois::Runtime::PerThreadStorage<std::pair<LL::SimpleLock, gdeque<RecordTy> > > Stats;
+  Galois::Runtime::PerThreadStorage<std::pair<Substrate::SimpleLock, gdeque<RecordTy> > > Stats;
 
 public:
   StatManager() {}
@@ -53,7 +53,7 @@ public:
   void addToStat(const std::string& loop, const std::string& category, size_t value) {
     auto* lStat = Stats.getLocal();
     // lStat->first.lock();
-    std::lock_guard<LL::SimpleLock> lg(lStat->first);
+    std::lock_guard<Substrate::SimpleLock> lg(lStat->first);
     lStat->second.emplace_back(loop, category, value);
     // lStat->first.unlock();
   }
@@ -61,7 +61,7 @@ public:
   void addToStat(Galois::Statistic* value) {
     for (unsigned x = 0; x < Galois::Runtime::activeThreads; ++x) {
       auto rStat = Stats.getRemote(x);
-      std::lock_guard<LL::SimpleLock> lg(rStat->first);
+      std::lock_guard<Substrate::SimpleLock> lg(rStat->first);
       rStat->second.emplace_back(value->getLoopname(), value->getStatname(), value->getValue(x));
     }
   }
@@ -69,7 +69,7 @@ public:
   void addPageAllocToStat(const std::string& loop, const std::string& category) {
     for (unsigned x = 0; x < Galois::Runtime::activeThreads; ++x) {
       auto rStat = Stats.getRemote(x);
-      std::lock_guard<LL::SimpleLock> lg(rStat->first);
+      std::lock_guard<Substrate::SimpleLock> lg(rStat->first);
       rStat->second.emplace_back(loop, category, MM::numPageAllocForThread(x));
     }
   }
@@ -78,7 +78,7 @@ public:
     int nodes = Galois::Runtime::MM::numNumaNodes();
     for (int x = 0; x < nodes; ++x) {
       auto rStat = Stats.getRemote(x);
-      std::lock_guard<LL::SimpleLock> lg(rStat->first);
+      std::lock_guard<Substrate::SimpleLock> lg(rStat->first);
       rStat->second.emplace_back(loop, category, MM::numNumaAllocForNode(x));
     }
   }
@@ -91,7 +91,7 @@ public:
     //Find all loops and keys
     for (unsigned x = 0; x < Stats.size(); ++x) {
       auto rStat = Stats.getRemote(x);
-      std::lock_guard<LL::SimpleLock> lg(rStat->first);
+      std::lock_guard<Substrate::SimpleLock> lg(rStat->first);
       for (auto ii = rStat->second.begin(), ee = rStat->second.end();
 	   ii != ee; ++ii) {
         maxThreadID = x;
