@@ -67,6 +67,7 @@ static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file (
 static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations"), cll::init(4));
 static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"), cll::init(false));
 static cll::opt<int> gpudevice("gpu", cll::desc("Select GPU to run on, default is to choose automatically"), cll::init(-1));
+static cll::opt<std::string> personality_set("pset", cll::desc("String specifying personality for each host. 'c'=CPU,'g'=GPU/CUDA and 'o'=GPU/OpenCL"), cll::init(""));
 
 struct LNode {
    float value;
@@ -504,6 +505,21 @@ int main(int argc, char** argv) {
    auto& net = Galois::Runtime::getSystemNetworkInterface();
    auto& barrier = Galois::Runtime::getSystemBarrier();
    const unsigned my_host_id = Galois::Runtime::NetworkInterface::ID;
+   if(personality_set.length()==Galois::Runtime::NetworkInterface::Num){
+      switch (personality_set.c_str()[Galois::Runtime::NetworkInterface::ID]){
+      case 'g':
+         personality=GPU_CUDA;
+         break;
+      case 'o':
+         personality=GPU_OPENCL;
+         break;
+      case 'c':
+      default:
+         personality=CPU;
+         break;
+      }
+
+   }
    std::cout << "Host:"<<Galois::Runtime::NetworkInterface::ID << " personality is " << personality_str(personality) << std::endl;
    Graph rg;
    pGraph g = loadGraph(inputFile, Galois::Runtime::NetworkInterface::ID, Galois::Runtime::NetworkInterface::Num, rg);

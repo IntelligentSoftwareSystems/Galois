@@ -83,7 +83,7 @@ struct LC_LinearArray_Graph {
 /////////////////////////////////////////////////////////////////////////////////////////////
    LC_LinearArray_Graph() :
          SizeEdgeData(/*sizeof(EdgeDataType)*/0 / sizeof(unsigned int)), SizeNodeData(sizeof(NodeDataType) / sizeof(unsigned int)) {
-      fprintf(stderr, "Created LC_LinearArray_Graph with %d node %d edge data.", (int) SizeNodeData, (int) SizeEdgeData);
+//      fprintf(stderr, "Created LC_LinearArray_Graph with %d node %d edge data.", (int) SizeNodeData, (int) SizeEdgeData);
       _max_degree = _num_nodes = _num_edges = 0;
       gpu_graph = 0;
    }
