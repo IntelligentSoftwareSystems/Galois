@@ -216,9 +216,12 @@ struct dPageRank {
       Galois::OpenCL::CL_Kernel init_kernel;
 
       aux_array = new Galois::OpenCL::Array<float>(dGraph.num_nodes());
-      kernel.init("/h2/rashid/workspace/GaloisDist/gdist/exp/apps/hpr/opencl/pagerank_kernel.cl", "pagerank");
+      /*kernel.init("/h2/rashid/workspace/GaloisDist/gdist/exp/apps/hpr/opencl/pagerank_kernel.cl", "pagerank");
       wb_kernel.init("/h2/rashid/workspace/GaloisDist/gdist/exp/apps/hpr/opencl/pagerank_kernel.cl", "writeback");
-      init_kernel.init("/h2/rashid/workspace/GaloisDist/gdist/exp/apps/hpr/opencl/pagerank_kernel.cl", "initialize_nout");
+      init_kernel.init("/h2/rashid/workspace/GaloisDist/gdist/exp/apps/hpr/opencl/pagerank_kernel.cl", "initialize_nout");*/
+      kernel.init("pagerank_kernel.cl", "pagerank");
+      wb_kernel.init("pagerank_kernel.cl", "writeback");
+      init_kernel.init("pagerank_kernel.cl", "initialize_nout");
       dGraph.copy_to_device();
 
       init_kernel.set_work_size(num_items);
