@@ -47,8 +47,8 @@ __global__ void initialize_nout(CSRGraphTy graph, index_type nowned, int *nout) 
 
     for(index_type e = graph.getFirstEdge(i); e < edge_end; e++) {
       index_type dst = graph.getAbsDestination(e);
-      if(dst < nowned)
-	atomicAdd(nout + dst, 1);
+      assert(dst < graph.nnodes);
+      atomicAdd(nout + dst, 1);
     }
   }
 }
@@ -178,8 +178,8 @@ void load_graph_CUDA(struct CUDA_Context *ctx, MarshalGraph &g) {
   ctx->pr[1].alloc(graph.nnodes);
   ctx->nout.alloc(graph.nnodes);
 
-  printf("load_graph_GPU: %d owned nodes of total %d resident\n", 
-	 ctx->nowned, graph.nnodes);  
+  printf("load_graph_GPU: %d owned nodes of total %d resident, %d edges\n", 
+	 ctx->nowned, graph.nnodes, graph.nedges);  
 }
 
 void initialize_graph_cuda(struct CUDA_Context *ctx) {  

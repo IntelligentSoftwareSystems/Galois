@@ -86,6 +86,7 @@ struct pGraph {
    unsigned g_offset; // LID + g_offset = GID
    unsigned numOwned; // [0, numOwned) = global nodes owned, thus [numOwned, numNodes) are replicas
    unsigned numNodes; // number of nodes (may differ from g.size() to simplify loading)
+   unsigned numEdges;
 
    // [numNodes, g.size()) should be ignored
    std::vector<unsigned> L2G; // GID = L2G[LID - numOwned]
@@ -178,6 +179,16 @@ pGraph loadGraph(std::string file, unsigned hostID, unsigned numHosts, Graph& ou
    Galois::Graph::readGraph(retval.g, fg2);
 
    loadLastNodes(retval, fg.size(), numHosts);
+
+   /* TODO: This still counts edges from ghosts to remote nodes,
+      ideally we only want edges from ghosts to local nodes.
+   
+      See pGraphToMarshalGraph for one implementation.
+   */
+
+   retval.numEdges = std::distance(retval.g.edge_begin(*retval.g.begin()), 
+				   retval.g.edge_end(*(retval.g.begin() + 
+						       retval.numNodes - 1)));
 
    return retval;
 }
@@ -438,7 +449,7 @@ MarshalGraph pGraph2MGraph(pGraph &g) {
    MarshalGraph m;
 
    m.nnodes = g.numNodes;
-   m.nedges = g.g.sizeEdges(); // this needs to be updated
+   m.nedges = g.numEdges;
    m.nowned = g.numOwned;
    m.g_offset = g.g_offset;
    m.id = g.id;
@@ -455,12 +466,14 @@ MarshalGraph pGraph2MGraph(pGraph &g) {
    for (auto n = g.g.begin(); n != g.g.end() && *n != m.nnodes; n++, node_counter++) {
       m.row_start[node_counter] = edge_counter;
       for (auto e = g.g.edge_begin(*n); e != g.g.edge_end(*n); e++) {
-         m.edge_dst[edge_counter++] = g.g.getEdgeDst(e);
+	if(g.g.getEdgeDst(e) < g.numNodes)
+	  m.edge_dst[edge_counter++] = g.g.getEdgeDst(e);
       }
    }
 
    m.row_start[node_counter] = edge_counter;
-
+   m.nedges = edge_counter;
+   printf("dropped %d ghost->remote edges\n", g.numEdges - m.nedges);
    // for(int i = 0; i < node_counter; i++) {
    //   printf("%u ", m.row_start[i]);
    // }
