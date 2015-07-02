@@ -147,7 +147,7 @@ pGraph loadGraph(std::string file, unsigned hostID, unsigned numHosts, Graph& ou
    retval.id = hostID;
    std::vector<unsigned> perm(fg.size(), ~0); //[i (orig)] -> j (final)
    unsigned nextSlot = 0;
-   std::cout << fg.size() << " " << p.first << " " << p.second << "\n";
+//   std::cout << fg.size() << " " << p.first << " " << p.second << "\n";
    //Fill our partition
    for (unsigned i = p.first; i < p.second; ++i)
       perm[i] = nextSlot++;
@@ -169,7 +169,7 @@ pGraph loadGraph(std::string file, unsigned hostID, unsigned numHosts, Graph& ou
    for (auto ii = fg.begin(); ii != fg.end(); ++ii)
       if (perm[*ii] == ~0)
          perm[*ii] = nextSlot++;
-   std::cout << nextSlot << " " << fg.size() << "\n";
+//   std::cout << nextSlot << " " << fg.size() << "\n";
    assert(nextSlot == fg.size());
    //permute graph
    Galois::Graph::FileGraph fg2;
@@ -183,14 +183,11 @@ pGraph loadGraph(std::string file, unsigned hostID, unsigned numHosts, Graph& ou
 /*********************************************************************************
  *
  **********************************************************************************/
-
 struct InitializeGraph {
    Graph* g;
-
    void static go(Graph& _g, unsigned num) {
       Galois::do_all(_g.begin(), _g.begin() + num, InitializeGraph { &_g }, Galois::loopname("init"));
    }
-
    void operator()(GNode src) const {
       LNode& sdata = g->getData(src);
       sdata.value = 1.0 - alpha;
@@ -201,7 +198,11 @@ struct InitializeGraph {
    }
 };
 /************************************************************************************
- *
+ * OpenCL PageRank operator implementation.
+ * Uses two kernels for the updates and one kernel for initialization.
+ * In order to support BSP semantics, an aux_array is created which will
+ * be used to buffer the writes in 'kernel'. These updates will be
+ * written to the node-data in the 'writeback' kernel.
  *************************************************************************************/
 typedef Galois::OpenCL::LC_LinearArray_Graph<Galois::OpenCL::Array, LNode, void> DeviceGraph;
 DeviceGraph dGraph;
@@ -271,10 +272,9 @@ struct dPageRank {
       fprintf(stderr, "Done - Kernel on device...%d\n", num_items);
 #endif
    }
-
 };
 /*********************************************************************************
- *
+ * CPU PageRank operator implementation.
  **********************************************************************************/
 struct WriteBack {
    Graph * g;
@@ -300,6 +300,7 @@ struct PageRank {
       for (auto jj = g->edge_begin(src), ej = g->edge_end(src); jj != ej; ++jj) {
          GNode dst = g->getEdgeDst(jj);
          LNode& ddata = g->getData(dst);
+         if(ddata.nout!=0)
          sum += ddata.value / ddata.nout;
       }
       float value = (1.0 - alpha) * sum + alpha;
@@ -489,7 +490,6 @@ void loadGraphNonCPU(pGraph &g) {
       assert(false);
       break;
    }
-
    // TODO cleanup marshalgraph, leaks memory!
 }
 
@@ -499,12 +499,11 @@ void loadGraphNonCPU(pGraph &g) {
 
 int main(int argc, char** argv) {
    LonestarStart(argc, argv, name, desc, url);
-
    Galois::StatManager statManager;
    auto& net = Galois::Runtime::getSystemNetworkInterface();
    auto& barrier = Galois::Runtime::getSystemBarrier();
    const unsigned my_host_id = Galois::Runtime::NetworkInterface::ID;
-   std::cout << Galois::Runtime::NetworkInterface::ID << " personality is " << personality << std::endl;
+   std::cout << "Host:"<<Galois::Runtime::NetworkInterface::ID << " personality is " << personality_str(personality) << std::endl;
    Graph rg;
    pGraph g = loadGraph(inputFile, Galois::Runtime::NetworkInterface::ID, Galois::Runtime::NetworkInterface::Num, rg);
 
@@ -516,25 +515,24 @@ int main(int argc, char** argv) {
 
    if (personality != CPU)
       loadGraphNonCPU(g);
-
+#if _HETERO_DEBUG_
    std::cout << g.id << " graph loaded\n";
-
+#endif
    dPageRank dOp;
 
    //local initialization
    if (personality == CPU) {
-      InitializeGraph::go(g.g, g.numOwned);
-
-      std::cout << "returned\n";
+//      InitializeGraph::go(g.g, g.numOwned);
+      InitializeGraph::go(g.g, g.numNodes);
    } else if (personality == GPU_CUDA) {
       initialize_graph_cuda(cuda_ctx);
    } else if (personality == GPU_OPENCL) {
       dOp.init(g.numOwned);
    }
+#if _HETERO_DEBUG_
    std::cout << g.id << " initialized\n";
+#endif
    barrier.wait();
-
-   //goto v;
 
    //send pGraph pointers
    for (uint32_t x = 0; x < Galois::Runtime::NetworkInterface::Num; ++x)
@@ -543,25 +541,28 @@ int main(int argc, char** argv) {
    //Ask for cells
    for (auto GID : g.L2G)
       net.sendAlt(g.getHost(GID), recvNodeStatic, GID, Galois::Runtime::NetworkInterface::ID);
-
-   std::cout << "ask for remote replicas\n";
+#if _HETERO_DEBUG_
+   std::cout << "["<<my_host_id<< "]:ask for remote replicas\n";
+#endif
    barrier.wait();
 
    // send nout values to remote replicas
-   std::cout << "ask for ghost cell attrs\n";
+#if _HETERO_DEBUG_
+   std::cout << "["<<my_host_id<< "]:ask for ghost cell attrs\n";
+#endif
    sendGhostCellAttrs(net, g);
    barrier.wait();
 
    for (int i = 0; i < maxIterations; ++i) {
-
+#if _HETERO_DEBUG_
       std::cout << "Starting " << i << "\n";
-
+#endif
       //communicate ghost cells
       sendGhostCells(net, g);
       barrier.wait();
-
+#if _HETERO_DEBUG_
       std::cout << "Starting PR\n";
-
+#endif
       //Do pagerank
       switch (personality) {
       case CPU:
