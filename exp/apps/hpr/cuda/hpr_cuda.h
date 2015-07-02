@@ -19,4 +19,6 @@ void setNodeValue_CUDA(struct CUDA_Context *ctx, unsigned LID, float v);
 void setNodeAttr_CUDA(struct CUDA_Context *ctx, unsigned LID, unsigned nout);
 float getNodeValue_CUDA(struct CUDA_Context *ctx, unsigned LID);
 unsigned getNodeAttr_CUDA(struct CUDA_Context *ctx, unsigned LID);
+unsigned getNodeAttr2_CUDA(struct CUDA_Context *ctx, unsigned LID);
+void setNodeAttr2_CUDA(struct CUDA_Context *ctx, unsigned LID, unsigned nout);
 

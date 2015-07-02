@@ -47,7 +47,8 @@ __global__ void initialize_nout(CSRGraphTy graph, index_type nowned, int *nout) 
 
     for(index_type e = graph.getFirstEdge(i); e < edge_end; e++) {
       index_type dst = graph.getAbsDestination(e);
-      if(dst < nowned)
+      assert(dst < graph.nnodes);
+      if(!(i >= nowned && dst >= nowned))
 	atomicAdd(nout + dst, 1);
     }
   }
@@ -142,10 +143,28 @@ void setNodeAttr_CUDA(struct CUDA_Context *ctx, unsigned LID, unsigned nout) {
   pnout[LID] = nout;
 }
 
+void setNodeAttr2_CUDA(struct CUDA_Context *ctx, unsigned LID, unsigned nout) {
+  int *pnout = ctx->nout.cpu_wr_ptr();
+
+  //printf("setting %d %d %d\n", ctx->id, LID, nout);
+
+  assert(LID < ctx->nowned);
+  
+  pnout[LID] += nout;
+}
+
 unsigned getNodeAttr_CUDA(struct CUDA_Context *ctx, unsigned LID) {
   int *pnout = ctx->nout.cpu_rd_ptr();
   
   assert(LID < ctx->nowned);
+
+  return pnout[LID];
+}
+
+unsigned getNodeAttr2_CUDA(struct CUDA_Context *ctx, unsigned LID) {
+  int *pnout = ctx->nout.cpu_rd_ptr();
+  
+  assert(LID >= ctx->nowned);
 
   return pnout[LID];
 }
@@ -178,8 +197,8 @@ void load_graph_CUDA(struct CUDA_Context *ctx, MarshalGraph &g) {
   ctx->pr[1].alloc(graph.nnodes);
   ctx->nout.alloc(graph.nnodes);
 
-  printf("load_graph_GPU: %d owned nodes of total %d resident\n", 
-	 ctx->nowned, graph.nnodes);  
+  printf("load_graph_GPU: %d owned nodes of total %d resident, %d edges\n", 
+	 ctx->nowned, graph.nnodes, graph.nedges);  
 }
 
 void initialize_graph_cuda(struct CUDA_Context *ctx) {  
