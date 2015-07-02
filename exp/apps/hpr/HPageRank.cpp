@@ -37,7 +37,7 @@
 #include <typeinfo>
 #include <algorithm>
 
-//#define _HETERO_DEBUG_ 1
+#define _HETERO_DEBUG_ 0
 
 static const char* const name = "Page Rank - Distributed Heterogeneous";
 static const char* const desc = "Computes PageRank on Distributed Galois.  Uses pull algorithm, takes the pre-transposed graph.";
@@ -46,6 +46,18 @@ static const char* const url = 0;
 enum Personality {
    CPU, GPU_CUDA, GPU_OPENCL
 };
+std::string personality_str(Personality p) {
+   switch (p) {
+   case CPU:
+      return "CPU";
+   case GPU_CUDA:
+      return "GPU_CUDA";
+   case GPU_OPENCL:
+      return "GPU_OPENCL";
+   }
+   assert(false&& "Invalid personality");
+   return "";
+}
 
 namespace cll = llvm::cl;
 static cll::opt<Personality> personality("personality", cll::desc("Personality"),
@@ -62,6 +74,7 @@ struct LNode {
 
 typedef Galois::Graph::LC_CSR_Graph<LNode, void> Graph;
 typedef typename Graph::GraphNode GNode;
+std::map<GNode, float> buffered_updates;
 
 struct CUDA_Context *cuda_ctx;
 /*********************************************************************************
@@ -91,7 +104,11 @@ struct pGraph {
    }
 };
 /*********************************************************************************
- * Given a partitioned graph .
+ * Given a partitioned graph  .
+ * lastNodes maintains indices of nodes for each co-host. This is computed by
+ * determining the number of nodes for each partition in 'pernum', and going over
+ * all the nodes assigning the next 'pernum' nodes to the ith partition.
+ * The lastNodes is used to find the host by a binary search.
  **********************************************************************************/
 
 void loadLastNodes(pGraph &g, size_t size, unsigned numHosts) {
@@ -170,14 +187,17 @@ pGraph loadGraph(std::string file, unsigned hostID, unsigned numHosts, Graph& ou
 struct InitializeGraph {
    Graph* g;
 
-  void static go(Graph& _g, unsigned num) {
-     Galois::do_all(_g.begin(), _g.begin() + num, InitializeGraph { &_g }, Galois::loopname("init"));
+   void static go(Graph& _g, unsigned num) {
+      Galois::do_all(_g.begin(), _g.begin() + num, InitializeGraph { &_g }, Galois::loopname("init"));
    }
 
    void operator()(GNode src) const {
       LNode& sdata = g->getData(src);
       sdata.value = 1.0 - alpha;
-      sdata.nout = 2; // FIXME
+      buffered_updates[src] = 0;
+      for (auto nbr = g->edge_begin(src); nbr != g->edge_end(src); ++nbr) {
+         __sync_fetch_and_add(&g->getData(g->getEdgeDst(*nbr)).nout, 1);
+      }
    }
 };
 /************************************************************************************
@@ -218,7 +238,7 @@ struct dPageRank {
       dGraph.copy_to_host();
 
 #if _HETERO_DEBUG_
-   {
+      {
          unsigned my_id = Galois::Runtime::NetworkInterface::ID;
          char filename[256];
          sprintf(filename, "opencl_%d_graph_1.csv", my_id);
@@ -253,7 +273,17 @@ struct dPageRank {
 /*********************************************************************************
  *
  **********************************************************************************/
-
+struct WriteBack {
+   Graph * g;
+   void static go(Graph& _g, unsigned num) {
+      Galois::do_all(_g.begin(), _g.begin() + num, WriteBack { &_g }, Galois::loopname("Writeback"));
+   }
+   void operator()(GNode src) const {
+      LNode& sdata = g->getData(src);
+      sdata.value = buffered_updates[src];
+      buffered_updates[src] = 0;
+   }
+};
 struct PageRank {
    Graph* g;
 
@@ -271,7 +301,8 @@ struct PageRank {
       }
       float value = (1.0 - alpha) * sum + alpha;
       float diff = std::fabs(value - sdata.value);
-      sdata.value = value;
+//      sdata.value = value;
+      buffered_updates[src] = value;
    }
 };
 /*********************************************************************************
@@ -350,6 +381,9 @@ void sendGhostCellAttrs(Galois::Runtime::NetworkInterface& net, pGraph& g) {
           fixed for CPU and OpenCL ... */
 
          switch (personality) {
+         case CPU:
+            net.sendAlt(x, setNodeAttr, magicPointer[x], n, g.g.getData(n - g.g_offset).nout);
+            break;
          case GPU_CUDA:
             net.sendAlt(x, setNodeAttr, magicPointer[x], n, getNodeAttr_CUDA(cuda_ctx, n - g.g_offset));
             break;
@@ -357,14 +391,17 @@ void sendGhostCellAttrs(Galois::Runtime::NetworkInterface& net, pGraph& g) {
             net.sendAlt(x, setNodeAttr, magicPointer[x], n, dGraph.node_data()[n - g.g_offset].nout);
             break;
          default:
-            net.sendAlt(x, setNodeAttr, magicPointer[x], n, g.g.getData(n - g.g_offset).nout);
+            assert(false);
             break;
          }
       }
    }
 }
 /*********************************************************************************
- *
+ * Send ghost-cell updates to all hosts that require it. Go over all the remotereplica
+ * arrays, and for each array, go over all the elements and send it to the host 'x'.
+ * Note that we use the magicPointer array to obtain the reference of the graph object
+ * where the node data is to be set.
  **********************************************************************************/
 
 void sendGhostCells(Galois::Runtime::NetworkInterface& net, pGraph& g) {
@@ -453,7 +490,6 @@ void loadGraphNonCPU(pGraph &g) {
    // TODO cleanup marshalgraph, leaks memory!
 }
 
-
 /*********************************************************************************
  *
  **********************************************************************************/
@@ -484,7 +520,8 @@ int main(int argc, char** argv) {
 
    //local initialization
    if (personality == CPU) {
-     InitializeGraph::go(g.g, g.numOwned); 
+      InitializeGraph::go(g.g, g.numOwned);
+
       std::cout << "returned\n";
    } else if (personality == GPU_CUDA) {
       initialize_graph_cuda(cuda_ctx);
@@ -525,7 +562,8 @@ int main(int argc, char** argv) {
       //Do pagerank
       switch (personality) {
       case CPU:
-         PageRank::go(rg, g.numOwned);
+         PageRank::go(g.g, g.numOwned);
+         WriteBack::go(g.g, g.numOwned);
          break;
       case GPU_OPENCL:
          dOp(dGraph, g.numOwned);
@@ -544,41 +582,30 @@ int main(int argc, char** argv) {
    barrier.wait();
 
    if (verify) {
-
+      std::stringstream ss;
+      ss << personality_str(personality) << "_" << my_host_id << "_of_" << Galois::Runtime::NetworkInterface::Num << "_page_ranks.csv";
+      std::ofstream out_file(ss.str());
       switch (personality) {
       case CPU: {
-         std::stringstream ss;
-         ss << "cpu_" << my_host_id << "_page_ranks.csv";
-         std::ofstream out_file(ss.str());
-         int id = 0;
-         for (auto n = g.g.begin(); n != g.g.end(); ++n, ++id) {
-            out_file << id << ", " << g.g.getData(*n).value << "\n";
+         for (auto n = g.g.begin(); n != g.g.begin() + g.numOwned; ++n) {
+            out_file << *n + g.g_offset << ", " << g.g.getData(*n).value << ", " << g.g.getData(*n).nout << "\n";
          }
-         out_file.close();
          break;
       }
       case GPU_OPENCL: {
 
-         std::stringstream ss;
-         ss << "opencl_" << my_host_id << "_page_ranks.csv";
-         std::ofstream out_file(ss.str());
          for (int n = 0; n < g.numOwned; ++n) {
-//            out_file << n + g.g_offset << ", " << dGraph.node_data()[n + g.g_offset].value << ", " << dGraph.node_data()[(n + g.g_offset)].nout << "\n";
             out_file << n + g.g_offset << ", " << dGraph.node_data()[n].value << ", " << dGraph.node_data()[(n)].nout << "\n";
          }
-         out_file.close();
          break;
       }
       case GPU_CUDA:
-         std::stringstream ss;
-         ss << "cuda_" << my_host_id << "_page_ranks.csv";
-         std::ofstream out_file(ss.str());
          for (int i = 0; i < g.numOwned; i++) {
             out_file << i + g.g_offset << ", " << getNodeValue_CUDA(cuda_ctx, i) << ", " << getNodeAttr_CUDA(cuda_ctx, i) << "\n";
          }
-         out_file.close();
          break;
       }
+      out_file.close();
    }
    return 0;
 }

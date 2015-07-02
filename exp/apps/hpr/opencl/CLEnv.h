@@ -14,7 +14,7 @@ extern "C"{
 }
 #include "CLError.h"
 
-#define DEFAULT_CL_PLATFORM_ID 2
+#define DEFAULT_CL_PLATFORM_ID 1
 #define DEFAULT_CL_DEVICE_ID 0
 namespace Galois{
 namespace OpenCL{

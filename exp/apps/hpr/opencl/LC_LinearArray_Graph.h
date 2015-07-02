@@ -1,9 +1,9 @@
 /*
  * LC_LinearArray_Graph.h
  *
- *  Created on: Feb 27, 2013
+ *  Created on: Jul 1, 2014
  *  Single array representation, has incoming and outgoing edges.
- *      Author: rashid
+ *      Author: rashid@cs.utexas.edu
  */
 
 #include <iostream>

@@ -1,5 +1,12 @@
+/*
+ * pagerank_kernel.cl
+ * OpenCL kernels for PageRank on heterogeneous Galois.
+ *
+ *  Created on: Jun 30, 2015
+ *      Author: rashid
+ */
 
-const double alpha = (1.0 - 0.85);
+#define alpha (1.0 - 0.85)
 
 typedef struct dPageRank {
    float value;
