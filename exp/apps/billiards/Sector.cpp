@@ -39,7 +39,7 @@ void Sector::simulate (const Event& e) {
 
 }
 
-Galois::optional<Event> Sector::computeEarliestEvent (const Ball* ball, double endtime) const {
+Galois::optional<Event> Sector::computeEarliestEvent (const Ball* ball, const FP& endtime) const {
 
   // Minimum of:  
   // 1. earliest ball event
@@ -81,12 +81,12 @@ Galois::optional<Event> Sector::computeEarliestEvent (const Ball* ball, double e
   return minEvent;
 }
 
-Galois::optional<Event> Sector::earliestSectorEntry (const Ball* ball, const double endtime) const {
+Galois::optional<Event> Sector::earliestSectorEntry (const Ball* ball, const FP& endtime) const {
 
   assert (ball);
 
   Sector* minSector = nullptr;
-  double minTime = -1.0;
+  FP minTime = -1.0;
 
   for (unsigned i = 0; i < sides.size (); ++i) {
 
@@ -101,7 +101,7 @@ Galois::optional<Event> Sector::earliestSectorEntry (const Ball* ball, const dou
 
     }
 
-    std::pair<bool, double> p = Collision::computeCollisionTime (*ball, sides[i]);
+    std::pair<bool, FP> p = Collision::computeCollisionTime (*ball, sides[i]);
 
     if (p.first) {
 
@@ -141,7 +141,7 @@ Galois::optional<Event> Sector::earliestSectorEntry (const Ball* ball, const dou
 
     }
 
-    double brad = FPutils::truncate (ball->radius ());
+    FP brad = FPutils::truncate (ball->radius ());
     // to handle entry at the corners, we compute an imaginary boundary outside the actual 
     // one, that is brad away. 
     // so that entry from corners can be handled. e.g., a ball entring at 45 degrees
@@ -151,7 +151,7 @@ Galois::optional<Event> Sector::earliestSectorEntry (const Ball* ball, const dou
     Vec2 outerBeg = sides[i].getBegin () + R;
     Vec2 outerEnd = sides[i].getEnd () + R;
 
-    std::pair<bool, double> p = Collision::computeCollisionTime (*ball, LineSegment (outerBeg, outerEnd));
+    std::pair<bool, FP> p = Collision::computeCollisionTime (*ball, LineSegment (outerBeg, outerEnd));
 
     if (p.first) {
 
@@ -195,7 +195,7 @@ Galois::optional<Event> Sector::earliestSectorEntry (const Ball* ball, const dou
 
 }
 
-Galois::optional<Event> Sector::earliestSectorLeave (const Ball* ball, const double endtime) const {
+Galois::optional<Event> Sector::earliestSectorLeave (const Ball* ball, const FP& endtime) const {
 
   assert (ball);
 
@@ -209,13 +209,13 @@ Galois::optional<Event> Sector::earliestSectorLeave (const Ball* ball, const dou
     return retVal; // early Exit
   }
 
-  double brad = FPutils::truncate (ball->radius ());
+  FP brad = FPutils::truncate (ball->radius ());
 
   // for sector leaving, we compute an imaginary sector boundary outside
   // the actual boundary, such that the imaginary boundary is 1 ball diameter
   // away from the actual boundary. 
 
-  double minTime = -1.0;
+  FP minTime = -1.0;
   for (unsigned i = 0; i < sides.size (); ++i) {
 
     // assuming clockwise sides, we compute 2 vectors, each of mag 2*ball_radius
@@ -231,7 +231,7 @@ Galois::optional<Event> Sector::earliestSectorLeave (const Ball* ball, const dou
 
     LineSegment outer (outerBeg, outerEnd);
 
-    std::pair<bool, double> p = Collision::computeCollisionTime (*ball, outer);
+    std::pair<bool, FP> p = Collision::computeCollisionTime (*ball, outer);
 
     if (p.first) {
       assert (p.second >= 0.0);

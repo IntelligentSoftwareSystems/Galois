@@ -52,7 +52,7 @@ class Sector: public CollidingObject {
   Galois::FlatSet<Cushion*> cushions;
   Galois::FlatSet<Ball*> balls;
 
-  void init (const Vec2& bottomLeft, double sectorSize) {
+  void init (const Vec2& bottomLeft, const FP& sectorSize) {
 
     Vec2 delX (sectorSize, 0.0);
     Vec2 delY (0.0, sectorSize);
@@ -81,7 +81,7 @@ class Sector: public CollidingObject {
 
 public:
 
-  Sector (unsigned id, const Vec2& bottomLeft, double sectorSize)
+  Sector (unsigned id, const Vec2& bottomLeft, const FP& sectorSize)
     : CollidingObject (), id (id) 
   {
     init (bottomLeft, sectorSize);
@@ -171,13 +171,13 @@ public:
 
   virtual void simulate (const Event& e);
 
-  Galois::optional<Event> computeEarliestEvent (const Ball* ball, double endtime) const;
+  Galois::optional<Event> computeEarliestEvent (const Ball* ball, const FP& endtime) const;
 
 
-  Galois::optional<Event> earliestSectorEntry (const Ball* ball, const double endtime) const;
+  Galois::optional<Event> earliestSectorEntry (const Ball* ball, const FP& endtime) const;
 
 
-  Galois::optional<Event> earliestSectorLeave (const Ball* b, const double endtime) const;
+  Galois::optional<Event> earliestSectorLeave (const Ball* b, const FP& endtime) const;
 
 
 };

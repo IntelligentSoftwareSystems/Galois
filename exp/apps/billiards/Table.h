@@ -47,17 +47,17 @@ class Table {
 
 public:
   struct DefaultValues {
-    static const double BALL_MASS;
-    static const double BALL_RADIUS;
-    static const double MIN_SPEED;
-    static const double MAX_SPEED;
+    static const FP BALL_MASS;
+    static const FP BALL_RADIUS;
+    static const FP MIN_SPEED;
+    static const FP MAX_SPEED;
   };
 
 
 protected:
   unsigned numBalls;
-  double length;
-  double width;
+  FP length;
+  FP width;
   std::vector<Galois::gstl::Vector<Event> > eventsPerBall;
   
 
@@ -68,7 +68,7 @@ protected:
   Table& operator = (const Table& that) { abort (); return *this; }
 
 public:
-  Table (unsigned numBalls, double length, double width) 
+  Table (unsigned numBalls, const FP& length, const FP& width) 
     : numBalls (numBalls), length (length), width (width), eventsPerBall (numBalls) {
 
     srand (0); // TODO: use time (nullptr) later 
@@ -77,7 +77,7 @@ public:
   }
 
   template <typename I>
-  Table (const I ballsBeg, const I ballsEnd, double length, double width)
+  Table (const I ballsBeg, const I ballsEnd, const FP& length, const FP& width)
     : numBalls (std::distance (ballsBeg, ballsEnd)), length (length), width (width), eventsPerBall (numBalls)
   {
     srand (0);
@@ -102,9 +102,9 @@ public:
 
   unsigned getNumBalls () const { return numBalls; }
 
-  double getLength () const { return length; }
+  const FP& getLength () const { return length; }
 
-  double getWidth () const { return width; }
+  const FP& getWidth () const { return width; }
 
   Cushion* getCushion (RectSide side) const { 
     assert (int(side) < int (cushions.size ()));
@@ -147,7 +147,7 @@ public:
     }
   }
 
-  void genInitialEvents (std::vector<Event>& initEvents, const double endtime) {
+  void genInitialEvents (std::vector<Event>& initEvents, const FP& endtime) {
 
     initEvents.clear ();
 
@@ -158,7 +158,7 @@ public:
     }
   }
 
-  void advance (double simTime) {
+  void advance (const FP& simTime) {
     for (Ball* b: balls) {
       if (simTime > b->time ()) {
         b->update (b->vel (), simTime);
@@ -173,8 +173,8 @@ public:
 
     for (size_t i = 0; i < balls.size (); ++i) {
       const Ball* b0 = balls[i];
-      double px = b0->pos ().getX ();
-      double py = b0->pos ().getY ();
+      FP px = b0->pos ().getX ();
+      FP py = b0->pos ().getY ();
 
       // TODO: boundary tests don't include radius. 
       if (px < 0.0 || px > length) {
@@ -189,7 +189,7 @@ public:
       for (size_t j = i + 1; j < balls.size (); ++j) {
         const Ball* b1 = balls[j];
 
-        double d = b0->pos ().dist (b1->pos ());
+        FP d = b0->pos ().dist (b1->pos ());
 
         if (d < (b0->radius () + b1->radius ())) {
           std::cerr << "!!!  ERROR: Balls overlap, distance: " << d << ",   ";
@@ -213,7 +213,7 @@ public:
   //! in another direction and pick a different collision
 
   template <typename C>
-  void addNextEvents (const Event& e, C& addList, const double endtime) const {
+  void addNextEvents (const Event& e, C& addList, const FP& endtime) const {
 
     switch (e.getKind ()) {
       case Event::BALL_COLLISION:
@@ -229,9 +229,9 @@ public:
     }
   }
 
-  double sumEnergy () const {
+  FP sumEnergy () const {
 
-    double sumKE = 0.0;
+    FP sumKE = 0.0;
 
     for (std::vector<Ball*>::const_iterator i = balls.begin (), ei = balls.end ();
         i != ei; ++i) {
@@ -429,13 +429,13 @@ protected:
 
 
       // fixed radius for now
-      double radius = DefaultValues::BALL_RADIUS;
+      FP radius = DefaultValues::BALL_RADIUS;
 
       Vec2 pos = genBallPos(i, radius);
 
       // assign random initial velocity
-      double v_x = genRand ((0.0 - DefaultValues::MAX_SPEED), DefaultValues::MAX_SPEED);
-      double v_y = genRand ((0.0 - DefaultValues::MAX_SPEED), DefaultValues::MAX_SPEED);
+      FP v_x = genRand ((0.0 - DefaultValues::MAX_SPEED), DefaultValues::MAX_SPEED);
+      FP v_y = genRand ((0.0 - DefaultValues::MAX_SPEED), DefaultValues::MAX_SPEED);
 
       Vec2 vel (v_x, v_y);
 
@@ -448,7 +448,7 @@ protected:
   }
 
 
-  Vec2 genBallPos (size_t numGenerated, double radius) {
+  Vec2 genBallPos (size_t numGenerated, const FP& radius) {
 
     Vec2 pos (-1.0, -1.0);
 
@@ -468,8 +468,8 @@ protected:
       // We want to place the ball such that
       // its center is at least radius away from each cushion
        
-      double x_pos = genRand (radius, length - radius);
-      double y_pos = genRand (radius, width - radius);
+      FP x_pos = genRand (radius, length - radius);
+      FP y_pos = genRand (radius, width - radius);
 
       pos = Vec2(x_pos, y_pos);
 
@@ -490,17 +490,17 @@ protected:
   }
 
 
-  double genRand (double lim_min, double lim_max) {
-    // double r = double (rand ()) / double (RAND_MAX);
-    double r = double (rand () % 1024) / 1024.0;
-    double ret = lim_min + r*(lim_max - lim_min);
+  FP genRand (const FP& lim_min, const FP& lim_max) {
+    // FP r = FP (rand ()) / FP (RAND_MAX);
+    FP r = FP (rand () % 1024) / 1024.0;
+    FP ret = lim_min + r*(lim_max - lim_min);
     
     return FPutils::truncate (ret);
   }
 
 
   template <typename C>
-  void addEventsForBallColl (const Event& e, C& addList, const double endtime) const {
+  void addEventsForBallColl (const Event& e, C& addList, const FP& endtime) const {
 
     assert (e.getKind () == Event::BALL_COLLISION);
 
@@ -523,7 +523,7 @@ protected:
   }
 
   template <typename C>
-  void addEventsForCushColl (const Event& e, C& addList, const double endtime) const {
+  void addEventsForCushColl (const Event& e, C& addList, const FP& endtime) const {
 
     assert (e.getKind () == Event::CUSHION_COLLISION);
     if (!e.firstBallChanged ()) {
@@ -532,7 +532,7 @@ protected:
   }
 
   template <typename C>
-  void addNextEventIntern (C& addList, const Ball* ball, const double endtime, const Event* prevEvent=nullptr) const {
+  void addNextEventIntern (C& addList, const Ball* ball, const FP& endtime, const Event* prevEvent=nullptr) const {
 
     assert (ball != nullptr);
 
@@ -569,12 +569,12 @@ protected:
 
 
   // template <typename C>
-  // void addNextEventIntern (C& addList, const Ball* ball, const Ball* prevBall, const Cushion* prevCushion, const double endtime) const {
+  // void addNextEventIntern (C& addList, const Ball* ball, const Ball* prevBall, const Cushion* prevCushion, const FP& endtime) const {
 // 
     // assert (ball != nullptr);
 // 
-    // std::pair<const Ball*, double> ballColl = Collision::computeNextCollision (ball, this->balls.begin (), this->balls.end (), prevBall, endtime);
-    // std::pair<const Cushion*, double> cushColl = Collision::computeNextCollision (ball, this->cushions.begin (), this->cushions.end (), prevCushion, endtime);
+    // std::pair<const Ball*, FP> ballColl = Collision::computeNextCollision (ball, this->balls.begin (), this->balls.end (), prevBall, endtime);
+    // std::pair<const Cushion*, FP> cushColl = Collision::computeNextCollision (ball, this->cushions.begin (), this->cushions.end (), prevCushion, endtime);
 // 
     // if (ballColl.first != nullptr && cushColl.first != nullptr) {
 // 

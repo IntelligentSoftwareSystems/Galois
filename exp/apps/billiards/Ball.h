@@ -51,9 +51,9 @@ class Ball: public CollidingObject {
   Vec2 m_pos;
   Vec2 m_vel;
 
-  double m_mass;
-  double m_radius;
-  double m_timestamp;
+  FP m_mass;
+  FP m_radius;
+  FP m_timestamp;
 
   unsigned m_collCntr;
 
@@ -67,9 +67,9 @@ public:
       const unsigned id,
       const Vec2& pos,
       const Vec2& vel,
-      double mass, 
-      double radius,
-      double time=0.0):
+      const FP& mass, 
+      const FP& radius,
+      const FP& time=0.0):
 
     m_id (id),
     m_pos (pos),
@@ -84,7 +84,7 @@ public:
       assert (time >= 0.0);
       
       truncateAll ();
-    }
+    } 
 
 
 private:
@@ -142,7 +142,7 @@ public:
     return std::make_pair (sectors.begin (), sectors.end ());
   }
 
-  void update (const Vec2& newVel, const double time) {
+  void update (const Vec2& newVel, const FP& time) {
 
     assert (time >= m_timestamp && "Time update in the past?");
 
@@ -162,7 +162,7 @@ public:
 
   const Vec2& pos () const { return m_pos; }
 
-  Vec2 pos (const double t) const {
+  Vec2 pos (const FP& t) const {
 
     assert (t >= m_timestamp);
     return (m_pos + m_vel * (t - m_timestamp)); 
@@ -171,19 +171,19 @@ public:
 
   const Vec2& vel () const { return m_vel; }
 
-  double mass () const { return m_mass; }
+  const FP& mass () const { return m_mass; }
 
-  double time () const { return m_timestamp; }
+  const FP& time () const { return m_timestamp; }
 
-  double radius () const { return m_radius; }
+  const FP& radius () const { return m_radius; }
 
   Vec2 mom (const Vec2& _vel) const { return (mass () * (_vel )); }
 
   Vec2 mom () const { return mom (this->vel ()); }
 
-  double ke (const Vec2& _vel) const { return (_vel.magSqrd () * mass ())/2.0; }
+  FP ke (const Vec2& _vel) const { return (_vel.magSqrd () * mass ())/2.0; }
 
-  double ke () const { return ke (this->vel ()); }
+  FP ke () const { return ke (this->vel ()); }
   
 
 };

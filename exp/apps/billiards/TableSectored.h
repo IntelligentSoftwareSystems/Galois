@@ -104,7 +104,7 @@ public:
   }
 
 
-  void genInitialEvents (std::vector<Event>& initEvents, const double endtime) {
+  void genInitialEvents (std::vector<Event>& initEvents, const FP& endtime) {
 
     initEvents.clear ();
 
@@ -127,7 +127,7 @@ public:
   //! in another direction and pick a different collision
 
   template <typename C>
-  void addNextEvents (const Event& e, C& addList, const double endtime) const {
+  void addNextEvents (const Event& e, C& addList, const FP& endtime) const {
 
     switch (e.getKind ()) {
       case Event::BALL_COLLISION:
@@ -172,9 +172,9 @@ private:
       for (size_t j = 0; j < ySectors; ++j) {
 
         // bottom left corner of sector
-        Vec2 bl (double (i*sectorSize), double (j*sectorSize));
+        Vec2 bl (FP (i*sectorSize), FP (j*sectorSize));
 
-        sectors [i][j] = new Sector (idCntr, bl, double (sectorSize)); 
+        sectors [i][j] = new Sector (idCntr, bl, FP (sectorSize)); 
         idCntr++;
       }
     }
@@ -254,7 +254,7 @@ private:
   }
 
 
-  Galois::optional<Event> computeEarliestEvent (Ball* ball, const double endtime) const {
+  Galois::optional<Event> computeEarliestEvent (Ball* ball, const FP& endtime) const {
 
     auto range = ball->sectorRange ();
 
@@ -275,7 +275,7 @@ private:
   }
 
   template <typename C>
-  void addEventsForTwoBalls (C& addList, Ball* b1, Ball* b2, const double endtime, const Event* prevEvent) const {
+  void addEventsForTwoBalls (C& addList, Ball* b1, Ball* b2, const FP& endtime, const Event* prevEvent) const {
 
     assert (prevEvent != nullptr);
     assert (prevEvent->getKind () == Event::BALL_COLLISION);
@@ -307,7 +307,7 @@ private:
   }
 
   template <typename C>
-  void addEventsForOneBall (C& addList, Ball* b, const double endtime, const Event* prevEvent=nullptr) const {
+  void addEventsForOneBall (C& addList, Ball* b, const FP& endtime, const Event* prevEvent=nullptr) const {
 
     if (prevEvent && prevEvent->firstBallChanged ()) {
       assert (prevEvent->getKind () != Event::BALL_COLLISION);

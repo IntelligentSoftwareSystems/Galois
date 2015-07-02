@@ -74,13 +74,13 @@ class BilliardsTwoPhase: public Billiards {
     static const unsigned CHUNK_SIZE = 1;
 
     Table& table;
-    const double endtime;
+    const FP& endtime;
     AddListTy& addList;
     Accumulator& iter;
 
     OpFunc (
         Table& table,
-        double endtime,
+        const FP& endtime,
         AddListTy& addList,
         Accumulator& iter)
       :
@@ -124,7 +124,7 @@ public:
 
   virtual const std::string version () const { return "using IKDG"; }
 
-  virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const double endtime, bool enablePrints=false) {
+  virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const FP& endtime, bool enablePrints=false) {
 
     AddListTy addList;
     Accumulator iter;

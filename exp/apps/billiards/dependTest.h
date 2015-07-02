@@ -39,7 +39,7 @@
 
 class OrderDepTest {
 
-  static const double V_MAX;
+  static const FP V_MAX;
 
 public:
   static bool dependsOn(const Event& later, const Event& earlier) {
@@ -69,11 +69,11 @@ private:
 
     if (haveSameBall) { return true; }
 
-    double minDist = computeMinDist (e1, e2);
+    FP minDist = computeMinDist (e1, e2);
 
-    double vmaxTime = minDist / V_MAX;
+    FP vmaxTime = minDist / V_MAX;
 
-    double tdiff = e2.getTime () - e1.getTime ();
+    FP tdiff = e2.getTime () - e1.getTime ();
 
     assert (tdiff >= 0.0);
 
@@ -118,16 +118,16 @@ private:
     return (b1->getID () == b2->getID ());
   }
 
-  static double computeMinDist (const Event& e1, const Event& e2) {
+  static FP computeMinDist (const Event& e1, const Event& e2) {
 
-    double minDist = finalDist (e1, e1.getBall (), e2, e2.getBall ());
+    FP minDist = finalDist (e1, e1.getBall (), e2, e2.getBall ());
 
     if (e1.getKind () == Event::BALL_COLLISION && e2.getKind () == Event::BALL_COLLISION) {
 
 
-      double d12 = finalDist (e1, e1.getBall ()     , e2, e2.getOtherBall ());
-      double d21 = finalDist (e1, e1.getOtherBall (), e2, e2.getBall ());
-      double d22 = finalDist (e1, e1.getOtherBall (), e2, e2.getOtherBall ());
+      FP d12 = finalDist (e1, e1.getBall ()     , e2, e2.getOtherBall ());
+      FP d21 = finalDist (e1, e1.getOtherBall (), e2, e2.getBall ());
+      FP d22 = finalDist (e1, e1.getOtherBall (), e2, e2.getOtherBall ());
 
 
       minDist = std::min (
@@ -136,12 +136,12 @@ private:
 
     } else if (e1.getKind () == Event::BALL_COLLISION) {
 
-      double d21 = finalDist (e1, e1.getOtherBall (), e2, e2.getBall ());
+      FP d21 = finalDist (e1, e1.getOtherBall (), e2, e2.getBall ());
       minDist = std::min (minDist, d21);
 
     } else if (e2.getKind () == Event::BALL_COLLISION) {
 
-      double d12 = finalDist (e1, e1.getBall (), e2, e2.getOtherBall ());
+      FP d12 = finalDist (e1, e1.getBall (), e2, e2.getOtherBall ());
       minDist = std::min (minDist, d12);
 
     } else {
@@ -157,12 +157,12 @@ private:
   //! We also subtract sum of radii of ball1 and ball2 
   //! to compute touching distance
   //
-  static double finalDist (const Event& e1, const Ball* ball1, const Event& e2, const Ball* ball2) {
+  static FP finalDist (const Event& e1, const Ball* ball1, const Event& e2, const Ball* ball2) {
 
     Vec2 ball1Pos = finalPos (e1, ball1);
     Vec2 ball2Pos = finalPos (e2, ball2);
 
-    double sumRadii = (ball1->radius () + ball2->radius ());
+    FP sumRadii = (ball1->radius () + ball2->radius ());
 
     return (ball1Pos.dist (ball2Pos) - sumRadii);
   }

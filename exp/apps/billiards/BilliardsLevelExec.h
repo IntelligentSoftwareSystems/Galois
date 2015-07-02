@@ -43,7 +43,7 @@ public:
   using AddListTy = Galois::PerThreadVector<Event>;
 
   struct GetEventTime {
-    double operator () (const Event& e) const { 
+    const FP& operator () (const Event& e) const { 
       return e.getTime ();
     }
   };
@@ -75,13 +75,13 @@ public:
     static const unsigned CHUNK_SIZE = 1;
 
     Table& table;
-    const double endtime;
+    const FP& endtime;
     AddListTy& addList;
     Accumulator& iter;
 
     OpFunc (
         Table& table,
-        double endtime,
+        const FP& endtime,
         AddListTy& addList,
         Accumulator& iter)
       :
@@ -125,7 +125,7 @@ public:
 
   virtual const std::string version () const { return "using Level-by-Level Executor"; }
 
-  virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const double endtime, bool enablePrints=false) {
+  virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const FP& endtime, bool enablePrints=false) {
 
     Graph graph;
     VecNodes nodes;
@@ -137,7 +137,7 @@ public:
 
     Galois::Runtime::for_each_ordered_level (
         Galois::Runtime::makeStandardRange (initEvents.begin (), initEvents.end ()),
-        GetEventTime (), std::less<double> (),
+        GetEventTime (), std::less<FP> (),
         VisitNhood (graph, nodes),
         OpFunc (table, endtime, addList, iter));
 

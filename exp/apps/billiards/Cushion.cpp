@@ -3,7 +3,7 @@
 #include "Collision.h"
 
 
-const double Cushion::REFLECTION_COEFF = 1.0;
+const FP Cushion::REFLECTION_COEFF = 1.0;
 
 void Cushion::simulate (const Event& e) {
 

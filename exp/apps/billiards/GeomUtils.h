@@ -38,38 +38,39 @@
 #include <cmath>
 
 #include <limits>
+#include "FPutils.h"
 
 class Vec2 {
 
 protected:
 
-  double x;
-  double y;
+  FP x;
+  FP y;
 
 public:
 
-  Vec2 (double x, double y): x (x), y (y) {}
+  Vec2 (const FP& x, const FP& y): x (x), y (y) {}
 
-  // explicit Vec2 (double v): x (v), y (v) {}
+  // explicit Vec2 (FP v): x (v), y (v) {}
 
-  double& getX () { return x; }
+  FP& getX () { return x; }
 
-  const double& getX () const { return x; }
+  const FP& getX () const { return x; }
 
-  double& getY () { return y; }
+  FP& getY () { return y; }
 
-  const double& getY () const { return y; }
+  const FP& getY () const { return y; }
 
-  double dot (const Vec2& that) const {
+  FP dot (const Vec2& that) const {
     return ((x * that.x) + (y * that.y));
   }
 
-  double magSqrd () const {
+  FP magSqrd () const {
     return this->dot (*this);
   }
 
-  double  mag () const {
-    return sqrt (magSqrd ());
+  FP  mag () const {
+    return FPutils::sqrt (magSqrd ());
   }
 
 
@@ -91,7 +92,7 @@ public:
   //! negating y component of the result
   Vec2 rightNormal () const { return Vec2 (y, -x); }
 
-  Vec2& operator *= (double s) {
+  Vec2& operator *= (const FP& s) {
 
     x *= s;
     y *= s;
@@ -99,7 +100,7 @@ public:
     return *this;
   }
 
-  Vec2& operator /= (double s) {
+  Vec2& operator /= (const FP& s) {
 
     x /= s;
     y /= s;
@@ -124,7 +125,7 @@ public:
     return *this;
   }
 
-  double dist (const Vec2& that) const {
+  FP dist (const Vec2& that) const {
     Vec2 t (*this);
     t -= that;
     return t.mag ();
@@ -133,7 +134,7 @@ public:
   const std::string str () const {
 
     char s [256];
-    sprintf (s, "(%10.10f,%10.10f)", x, y);
+    sprintf (s, "(%10.10f,%10.10f)", double (x), double (y));
 
     return s;
   }
@@ -145,11 +146,11 @@ Vec2 operator + (const Vec2& v1, const Vec2& v2);
 
 Vec2 operator - (const Vec2& v1, const Vec2& v2);
 
-Vec2 operator / (const Vec2& v1, const double s);
+Vec2 operator / (const Vec2& v1, const FP& s);
 
-Vec2 operator * (const Vec2& v1, const double s);
+Vec2 operator * (const Vec2& v1, const FP& s);
 
-Vec2 operator * (const double s, const Vec2& v1);
+Vec2 operator * (const FP& s, const Vec2& v1);
 
 std::ostream& operator << (std::ostream& out, const Vec2& v);
 
@@ -160,7 +161,7 @@ class BoundingBox {
 
 
 public:
-  using D = typename std::numeric_limits<double>;
+  using D = typename std::numeric_limits<FP>;
 
   BoundingBox (void): 
     m_min (D::max (), D::max ()), 
@@ -223,11 +224,11 @@ class LineSegment {
   Vec2 pt1;
   Vec2 pt2;
 
-  double detlaY (void) const {
+  FP detlaY (void) const {
     return pt2.getY () - pt1.getY ();
   }
 
-  double deltaX (void) const {
+  FP deltaX (void) const {
     return pt2.getX () - pt1.getX ();
   }
 
@@ -259,7 +260,7 @@ public:
   }
 
 
-  double distanceFrom (const Vec2& p) const {
+  FP distanceFrom (const Vec2& p) const {
 
     // consider the vector from pt1 to p, call it V
     // and the lengthVec, which is from pt1 to pt2 , call it L
@@ -267,7 +268,7 @@ public:
     // the line-segment and we measure distance from the endpoints
     // else distance is V - V's projection on to L
     Vec2 L = lengthVec ();
-    const double Lsquared = L.magSqrd ();
+    const FP Lsquared = L.magSqrd ();
 
     if (Lsquared == 0.0) { 
       return (p - pt1).mag ();
@@ -276,7 +277,7 @@ public:
       Vec2 V = p - pt1;
 
       // V's projection on to L, normalized by |L|
-      const double r = (L.dot (V)) / Lsquared;
+      const FP r = (L.dot (V)) / Lsquared;
 
       if (r < 0.0) {  // p lies to the left of pt1
         return (p - pt1).mag ();

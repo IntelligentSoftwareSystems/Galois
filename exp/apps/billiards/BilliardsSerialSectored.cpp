@@ -6,13 +6,13 @@ public:
 
   virtual const std::string version () const { return "Serial Ordered with Priority Queue"; }
 
-  GALOIS_ATTRIBUTE_PROF_NOINLINE static void processEvent (Event& e, TableSectored& table, std::vector<Event>& addList, const double endtime) {
+  GALOIS_ATTRIBUTE_PROF_NOINLINE static void processEvent (Event& e, TableSectored& table, std::vector<Event>& addList, const FP& endtime) {
       addList.clear ();
       e.simulate ();
       table.addNextEvents (e, addList, endtime);
   }
 
-  virtual size_t runSim (TableSectored& table, std::vector<Event>& initEvents, const double endtime, bool enablePrints=false, bool logEvents=false) {
+  virtual size_t runSim (TableSectored& table, std::vector<Event>& initEvents, const FP& endtime, bool enablePrints=false, bool logEvents=false) {
 
     PriorityQueue pq;
 

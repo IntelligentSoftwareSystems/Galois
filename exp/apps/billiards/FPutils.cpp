@@ -1,6 +1,16 @@
 #include "FPutils.h"
+#include "GeomUtils.h"
 
-const double FPutils::EPSILON = 1.0e-15;
-const unsigned FPutils::TRUCATE_FRACTION_BITS = 20;
-const uint64_t FPutils::PRECISION_64 = (uint64_t(1) << FPutils::TRUCATE_FRACTION_BITS);
-const double FPutils::TRUNCATE_PRECISION = FPutils::PRECISION_64;
+const FP FPutils::EPSILON = double (1 / 1 << 30);
+const FP FPutils::ERROR_LIMIT = double (1 / 1 << 30);
+
+bool FPutils::almostEqual (const Vec2& v1, const Vec2& v2) {
+  return almostEqual (v1.getX (), v2.getX ()) && almostEqual (v1.getY (), v2.getY ());
+}
+
+bool FPutils::checkError (const Vec2& original, const Vec2& measured, bool useAssert=true) {
+
+  return checkError (original.getX (), measured.getX (), useAssert) 
+    && checkError (original.getY (), measured.getY (), useAssert);
+}
+

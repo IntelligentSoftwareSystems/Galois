@@ -45,12 +45,12 @@ class BilliardsSpec: public Billiards {
   struct OpFunc {
 
     Table& table;
-    const double endtime;
+    const FP& endtime;
     Accumulator& iter;
 
     OpFunc (
         Table& table,
-        double endtime,
+        const FP& endtime,
         Accumulator& iter)
       :
         table (table),
@@ -144,7 +144,7 @@ public:
 
   virtual const std::string version () const { return "using Speculative Executor"; }
 
-  virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const double endtime, bool enablePrints=false) {
+  virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const FP& endtime, bool enablePrints=false) {
 
     Graph graph;
     VecNodes nodes;

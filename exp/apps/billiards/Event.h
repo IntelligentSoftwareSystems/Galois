@@ -69,7 +69,7 @@ private:
   Ball* ball;
   CollidingObject* otherObj;
 
-  double time;
+  FP time;
 
   // collision counter is used to maintain
   // the versions of state of the object. If
@@ -84,7 +84,7 @@ private:
       const EventKind& kind, 
       Ball* ball, 
       CollidingObject* otherObj, 
-      const double time) 
+      const FP& time) 
     : 
     kind (kind),
     ball (ball),
@@ -119,7 +119,7 @@ private:
 public:
 
   template <typename T>
-  static Event makeEvent (const EventKind& kind, const Ball* ball, const T* collObj, const double time) {
+  static Event makeEvent (const EventKind& kind, const Ball* ball, const T* collObj, const FP& time) {
 
     assert (&ball != nullptr);
     assert (&collObj != nullptr);
@@ -127,7 +127,7 @@ public:
     return Event (kind, const_cast<Ball*> (ball), const_cast<T*> (collObj), time);
   }
 
-  // static Event makeCushionCollision (const Ball* ball, const Cushion* c, const double time) {
+  // static Event makeCushionCollision (const Ball* ball, const Cushion* c, const FP& time) {
 // 
     // assert (&ball != nullptr);
     // assert (&c != nullptr);
@@ -136,7 +136,7 @@ public:
 // 
   // }
 // 
-  // static Event makeSectorEntry (const Ball* ball, const Sector* sector, const double time) {
+  // static Event makeSectorEntry (const Ball* ball, const Sector* sector, const FP& time) {
 // 
     // assert (&ball != nullptr);
     // assert (&sector != nullptr);
@@ -144,7 +144,7 @@ public:
     // return Event (SECTOR_ENTRY, const_cast<Ball*> (ball), const_cast<Sector*> (sector), time);
   // }
 // 
-  // static Event makeSectorLeave (const Ball* ball, const Sector* sector, const double time) {
+  // static Event makeSectorLeave (const Ball* ball, const Sector* sector, const FP& time) {
 // 
     // assert (&ball != nullptr);
     // assert (&sector != nullptr);
@@ -168,7 +168,7 @@ public:
     }
   }
 
-  double getTime () const { return time; }
+  const FP& getTime () const { return time; }
 
   Ball* getBall () const { 
     assert (ball != nullptr);

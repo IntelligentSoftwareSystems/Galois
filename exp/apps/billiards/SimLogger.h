@@ -69,7 +69,7 @@ public:
 
 private:
 
-  void logToFile (double time, const Ball* b) {
+  void logToFile (const FP& time, const Ball* b) {
     assert (FPutils::almostEqual (b.time (), time) && "time stamp mismatch");
     fprintf (logFH, "%d, %e, %d, %e, %e, %e, %e\n", 
         step, time, b->getID (), b->pos ().getX (), b->pos ().getY (), b->vel ().getX (), b->vel ().getY ());

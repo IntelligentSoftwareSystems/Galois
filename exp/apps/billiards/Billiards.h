@@ -56,7 +56,7 @@ static cll::opt<unsigned>   sectorSize("secsize", cll::desc("size of a (square) 
 static cll::opt<unsigned>   xSectors("xsec", cll::desc("number of sectors along length"), cll::init(1));
 static cll::opt<unsigned>   ySectors("ysec", cll::desc("number of sectors along height"), cll::init(1));
 static cll::opt<unsigned> numballs("balls", cll::desc("number of balls on the table"), cll::init(100));
-static cll::opt<double>   endtime("end", cll::desc("simulation end time"), cll::init(100.0));
+static cll::opt<unsigned>   endtime("end", cll::desc("simulation end time"), cll::init(100));
 
 
 class Billiards {
@@ -66,7 +66,7 @@ public:
 
   virtual const std::string version () const = 0;
   //! @return number of events processed
-  virtual size_t runSim (TableSectored& table, std::vector<Event>& initEvents, const double endtime, bool enablePrints=false, bool logEvents=false) = 0;
+  virtual size_t runSim (TableSectored& table, std::vector<Event>& initEvents, const FP& endtime, bool enablePrints=false, bool logEvents=false) = 0;
 
 // #define CUSTOM_TESTS
 #ifdef CUSTOM_TESTS
@@ -202,7 +202,7 @@ public:
 
 private:
 
-  void verify (const TableSectored& initial, TableSectored& final, size_t numEvents, const double endtime);
+  void verify (const TableSectored& initial, TableSectored& final, size_t numEvents, const FP& endtime);
 };
 
 
@@ -212,13 +212,13 @@ public:
 
   virtual const std::string version () const { return "Serial Ordered with Priority Queue"; }
 
-  GALOIS_ATTRIBUTE_PROF_NOINLINE static void processEvent (Event& e, Table& table, std::vector<Event>& addList, const double endtime) {
+  GALOIS_ATTRIBUTE_PROF_NOINLINE static void processEvent (Event& e, Table& table, std::vector<Event>& addList, const FP& endtime) {
       addList.clear ();
       e.simulate ();
       table.addNextEvents (e, addList, endtime);
   }
 
-  virtual size_t runSim (TableSectored& tableSectored, std::vector<Event>& initEvents, const double endtime, bool enablePrints=false, bool logEvents=false) {
+  virtual size_t runSim (TableSectored& tableSectored, std::vector<Event>& initEvents, const FP& endtime, bool enablePrints=false, bool logEvents=false) {
 
     Table& table = tableSectored; // remove sectoring functionality
     initEvents.clear ();
@@ -275,10 +275,10 @@ public:
 };
 
 
-void Billiards::verify (const TableSectored& initial, TableSectored& final, size_t numEvents, const double endtime) {
+void Billiards::verify (const TableSectored& initial, TableSectored& final, size_t numEvents, const FP& endtime) {
 
-  double initEnergy = initial.sumEnergy ();
-  double finalEnergy = final.sumEnergy ();
+  FP initEnergy = initial.sumEnergy ();
+  FP finalEnergy = final.sumEnergy ();
 
   FPutils::checkError (initEnergy, finalEnergy);
 
@@ -304,7 +304,7 @@ void Billiards::verify (const TableSectored& initial, TableSectored& final, size
       << numEvents <<  " != verification=" << serEvents << std::endl;
   }
 
-  double serEnergy = serialTable.sumEnergy ();
+  FP serEnergy = serialTable.sumEnergy ();
 
   FPutils::checkError (serEnergy, initEnergy);
   FPutils::checkError (serEnergy, finalEnergy);

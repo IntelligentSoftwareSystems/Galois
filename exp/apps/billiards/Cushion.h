@@ -45,7 +45,7 @@ class Cushion: public CollidingObject {
 
 public:
   // return velocity is REFLECTION_COEFF * incident velocity
-  static const double REFLECTION_COEFF;
+  static const FP REFLECTION_COEFF;
 
 private:
   // A cushion is a straight line between

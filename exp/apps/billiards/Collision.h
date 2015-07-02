@@ -57,7 +57,7 @@ public:
 
   //! @param b1 Ball
   //! @param b2 Ball
-  //! @return a pair <bool, double>, 
+  //! @return a pair <bool, FP>, 
   //! first value is true if collision
   //! will happen, 2nd value is the time when the collision should
   //! happen
@@ -74,17 +74,17 @@ public:
   //!
   //! Solving the resulting quadratic equation gives us the result
 
-  static std::pair<bool, double> computeCollisionTime (const Ball& ball1, const Ball& ball2) {
+  static std::pair<bool, FP> computeCollisionTime (const Ball& ball1, const Ball& ball2) {
 
     Vec2    b1pos =  FPutils::truncate (ball1.pos ());
     Vec2    b1vel =  FPutils::truncate (ball1.vel ());
-    double  b1time = FPutils::truncate (ball1.time ());
-    double  b1rad =  FPutils::truncate (ball1.radius ());
+    FP  b1time = FPutils::truncate (ball1.time ());
+    FP  b1rad =  FPutils::truncate (ball1.radius ());
 
     Vec2    b2pos =  FPutils::truncate (ball2.pos ());
     Vec2    b2vel =  FPutils::truncate (ball2.vel ());
-    double  b2time = FPutils::truncate (ball2.time ());
-    double  b2rad =  FPutils::truncate (ball2.radius ());
+    FP  b2time = FPutils::truncate (ball2.time ());
+    FP  b2rad =  FPutils::truncate (ball2.radius ());
 
     Vec2 diffV = b1vel - b2vel;
 
@@ -92,25 +92,25 @@ public:
     // diffD = D1 - D2
     Vec2 diffD =  (b1pos - b1vel * b1time) - (b2pos - b2vel * b2time);
 
-    double sumRadius = (b1rad + b2rad);
-    double sumRadiusSqrd =  sumRadius * sumRadius;
+    FP sumRadius = (b1rad + b2rad);
+    FP sumRadiusSqrd =  sumRadius * sumRadius;
 
-    double diffVdiffD = diffV.dot (diffD);
+    FP diffVdiffD = diffV.dot (diffD);
 
     // Let discr be the term under the square root (discriminant) in quadratic
     // formula = 1/2a * (-b +- sqrt (b^2 - 4ac))
     // actually discr is the actual discriminant divided by 4
-    double discr = (diffVdiffD * diffVdiffD) - (diffV.magSqrd ()) * (diffD.magSqrd () - sumRadiusSqrd);
+    FP discr = (diffVdiffD * diffVdiffD) - (diffV.magSqrd ()) * (diffD.magSqrd () - sumRadiusSqrd);
 
     if (discr >= 0.0 ) {
       // solution is real
-      double t1 = (-diffVdiffD - sqrt (discr)) / diffV.magSqrd ();
-      double t2 = (-diffVdiffD + sqrt (discr)) / diffV.magSqrd ();
+      FP t1 = (-diffVdiffD - sqrt (discr)) / diffV.magSqrd ();
+      FP t2 = (-diffVdiffD + sqrt (discr)) / diffV.magSqrd ();
 
       t1 = FPutils::truncate (t1);
       t2 = FPutils::truncate (t2);
 
-      double t = -1.0;
+      FP t = -1.0;
       bool valid = false;
 
       // check if t1 is valid for both
@@ -166,20 +166,20 @@ public:
   //! 
 
 
-  static std::pair<bool, double> computeCollisionTime (const Ball& ball, const Cushion& cush) {
+  static std::pair<bool, FP> computeCollisionTime (const Ball& ball, const Cushion& cush) {
     return computeCollisionTime (ball, cush.getLineSegment ());
   }
 
-  static std::pair<bool, double> computeCollisionTime (const Ball& ball, const LineSegment& lineSeg) {
+  static std::pair<bool, FP> computeCollisionTime (const Ball& ball, const LineSegment& lineSeg) {
 
     Vec2 L = FPutils::truncate (lineSeg.lengthVec ());
 
     Vec2    bpos =  FPutils::truncate (ball.pos ());
     Vec2    bvel =  FPutils::truncate (ball.vel ());
-    double  btime = FPutils::truncate (ball.time ());
-    double  brad =  FPutils::truncate (ball.radius ());
+    FP  btime = FPutils::truncate (ball.time ());
+    FP  brad =  FPutils::truncate (ball.radius ());
 
-    double denominator = (bvel.getX () * L.getY ()) - (bvel.getY () * L.getX ());
+    FP denominator = (bvel.getX () * L.getY ()) - (bvel.getY () * L.getX ());
 
     if (fabs(denominator) < FPutils::EPSILON) {
       return std::make_pair (false, -1.0);
@@ -192,10 +192,10 @@ public:
 
     Vec2 common = D - lineSeg.getBegin () - R;
 
-    double r = (bvel.getX () * common.getY ()) - (bvel.getY () * common.getX ());
+    FP r = (bvel.getX () * common.getY ()) - (bvel.getY () * common.getX ());
     r /= denominator;
 
-    double t = (L.getX () * common.getY ()) - (L.getY () * common.getX ());
+    FP t = (L.getX () * common.getY ()) - (L.getY () * common.getX ());
     t /= denominator;
 
     r = FPutils::truncate (r);
@@ -242,27 +242,27 @@ public:
   //! multiplied by Cushions REFLECTION_COEFF, in order
   //! to model the slowing down of balls after hitting the cushion etc.
   //!
-  static void simulateCollision (Ball& ball, Cushion& cush, double time) {
+  static void simulateCollision (Ball& ball, Cushion& cush, const FP& time) {
 
     Vec2 L = FPutils::truncate (cush.getLineSegment ().lengthVec ());
 
     Vec2 bvel = FPutils::truncate (ball.vel ());
 
-    double t = FPutils::truncate (time);
+    FP t = FPutils::truncate (time);
 
     // component along the length
-    double tangent = L.dot (bvel);
+    FP tangent = L.dot (bvel);
 
     // component along the right normal
-    double normal = L.rightNormal ().dot (bvel);
+    FP normal = L.rightNormal ().dot (bvel);
 
-    double denom = L.magSqrd ();
+    FP denom = L.magSqrd ();
 
     // x component of vel after collision
-    double v_a_x = ((L.getX () * tangent) - (L.getY () * normal)) / denom;
+    FP v_a_x = ((L.getX () * tangent) - (L.getY () * normal)) / denom;
 
     // y component of vel after collision
-    double v_a_y = ((L.getY () * tangent) + (L.getX () * normal)) / denom;
+    FP v_a_y = ((L.getY () * tangent) + (L.getX () * normal)) / denom;
 
     Vec2 v_a (v_a_x, v_a_y);
 
@@ -297,19 +297,19 @@ public:
   //!
   //!
   //!
-  static void simulateCollision (Ball& ball1, Ball& ball2, double time) {
+  static void simulateCollision (Ball& ball1, Ball& ball2, const FP& time) {
 
     Vec2    b1pos =  FPutils::truncate (ball1.pos ());
     Vec2    b1vel =  FPutils::truncate (ball1.vel ());
-    double  b1time = FPutils::truncate (ball1.time ());
-    double  b1mass = FPutils::truncate (ball1.mass ());
+    FP  b1time = FPutils::truncate (ball1.time ());
+    FP  b1mass = FPutils::truncate (ball1.mass ());
 
     Vec2    b2pos =  FPutils::truncate (ball2.pos ());
     Vec2    b2vel =  FPutils::truncate (ball2.vel ());
-    double  b2time = FPutils::truncate (ball2.time ());
-    double  b2mass = FPutils::truncate (ball2.mass ());
+    FP  b2time = FPutils::truncate (ball2.time ());
+    FP  b2mass = FPutils::truncate (ball2.mass ());
 
-    double t = FPutils::truncate (time);
+    FP t = FPutils::truncate (time);
 
 
     assert (t >= b1time && t >= b2time);
@@ -322,15 +322,15 @@ public:
     Vec2 N = C.rightNormal (); // shouldn't matter, left or right normal is fine
 
 
-    double sumMass = b1mass + b2mass;
+    FP sumMass = b1mass + b2mass;
 
     // Magnitude of component vel along C 
-    double v1_tangent_before = b1vel.dot (C);
-    double v2_tangent_before = b2vel.dot (C);
+    FP v1_tangent_before = b1vel.dot (C);
+    FP v2_tangent_before = b2vel.dot (C);
 
-    double v1_tangent_after = ((b1mass - b2mass) * v1_tangent_before  +  (2.0*b2mass) * v2_tangent_before) / sumMass;
+    FP v1_tangent_after = ((b1mass - b2mass) * v1_tangent_before  +  (2.0*b2mass) * v2_tangent_before) / sumMass;
 
-    double v2_tangent_after = ((b2mass - b1mass) * v2_tangent_before  +  (2.0*b1mass) * v1_tangent_before) / sumMass;
+    FP v2_tangent_after = ((b2mass - b1mass) * v2_tangent_before  +  (2.0*b1mass) * v1_tangent_before) / sumMass;
 
 
     Vec2 V1_tangent_after = C * (v1_tangent_after / C.magSqrd ()); 
@@ -355,8 +355,8 @@ public:
 
     FPutils::checkError (momBefore, momAfter);
 
-    double keBefore = (ball1.ke (ball1.vel ()) + ball2.ke (ball2.vel ()));
-    double keAfter = (ball1.ke (V1_after) + ball2.ke (V2_after));
+    FP keBefore = (ball1.ke (ball1.vel ()) + ball2.ke (ball2.vel ()));
+    FP keAfter = (ball1.ke (V1_after) + ball2.ke (V2_after));
 
     FPutils::checkError (keBefore, keAfter);
 
@@ -390,7 +390,7 @@ private:
   //! thus if dist.vel < 0.0 then it must be the case that (collisionTime < b.time)
 
 
-  static bool isInFuture (const double ballTime, const double collisionTime) {
+  static bool isInFuture (const FP& ballTime, const FP& collisionTime) {
     assert (ballTime >= 0.0);
     // assert (ballTime != collisionTime);
     return (collisionTime >= ballTime || FPutils::almostEqual (collisionTime, ballTime));
@@ -409,7 +409,7 @@ private:
   static bool isApproaching (const Ball& b, const LineSegment& l) {
     // assuming that t is a valid collision time
 
-    double d = b.vel ().dot (l.lengthVec ().rightNormal ());
+    FP d = b.vel ().dot (l.lengthVec ().rightNormal ());
     return (d < 0.0);
   }
 
@@ -424,7 +424,7 @@ private:
   // Actually, if the difference of tangential components is positive
   // then the balls are approaching each other
 
-  static bool isApproaching (const Ball& b1, const Ball& b2, const double t) {
+  static bool isApproaching (const Ball& b1, const Ball& b2, const FP& t) {
     // assuming that t is a valid collision time
 
     Vec2 b1pos = b1.pos (t);
@@ -432,10 +432,10 @@ private:
 
     Vec2 C = b2pos - b1pos;
 
-    double b1tanComp = C.dot (b1.vel ());
-    double b2tanComp = C.dot (b2.vel ());
+    FP b1tanComp = C.dot (b1.vel ());
+    FP b2tanComp = C.dot (b2.vel ());
 
-    double diff = b1tanComp - b2tanComp;
+    FP diff = b1tanComp - b2tanComp;
 
     return (diff > 0.0);
 
@@ -446,13 +446,13 @@ public:
   // compute earliest collision between a ball and some other object underTest
   // We don't want to create a collision with the object involved in previous collision
   template <typename I, typename T=typename std::remove_pointer<typename std::iterator_traits<I>::value_type>::type >
-  static Galois::optional<Event> computeNextEvent (const Event::EventKind& kind, const Ball* b, const I collObjsBeg, const I collObjsEnd, const double endtime) {
+  static Galois::optional<Event> computeNextEvent (const Event::EventKind& kind, const Ball* b, const I collObjsBeg, const I collObjsEnd, const FP& endtime) {
 
 
     Galois::optional<Event> retVal;
 
     const T* currMin = nullptr;
-    double currMinTime = -1.0;
+    FP currMinTime = -1.0;
 
     for (I i = collObjsBeg; i != collObjsEnd; ++i) {
 
@@ -464,7 +464,7 @@ public:
 
       if (static_cast<const CollidingObject*> (underTest) !=  static_cast<const CollidingObject*> (b)) {
 
-        std::pair <bool, double> p = Collision::computeCollisionTime (*b, *underTest);
+        std::pair <bool, FP> p = Collision::computeCollisionTime (*b, *underTest);
 
 
         if (p.first) { // collision possible
