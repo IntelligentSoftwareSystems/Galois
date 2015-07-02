@@ -7,6 +7,7 @@
 #include "../hpr.h"
 
 struct CUDA_Context {
+  int device;
   int id;
   size_t nowned;
   size_t g_offset;
@@ -89,8 +90,35 @@ __global__ void test_graph(CSRGraphTy g, index_type nowned,
 }
 
 
-struct CUDA_Context *get_CUDA_context() {
-  return (struct CUDA_Context *) calloc(1, sizeof(struct CUDA_Context));
+struct CUDA_Context *get_CUDA_context(int id) {
+  struct CUDA_Context *p;
+  p = (struct CUDA_Context *) calloc(1, sizeof(struct CUDA_Context));
+  p->id = id;
+  return p;
+}
+
+bool init_CUDA_context(struct CUDA_Context *ctx, int device) {
+  struct cudaDeviceProp dev;
+
+  if(device == -1) {
+    check_cuda(cudaGetDevice(&device));
+  } else {
+    int count;
+    check_cuda(cudaGetDeviceCount(&count));
+  
+    if(device > count) {
+      fprintf(stderr, "Error: Out-of-range GPU %d specified (%d total GPUs)", device, count);
+      return false;
+    }
+    check_cuda(cudaSetDevice(device));
+  }
+  
+  ctx->device = device;
+
+  check_cuda(cudaGetDeviceProperties(&dev, device));
+
+  fprintf(stderr, "%d: Using GPU %d: %s\n", ctx->id, device, dev.name);
+  return true;
 }
 
 float getNodeValue_CUDA(struct CUDA_Context *ctx, unsigned LID) {
@@ -171,6 +199,7 @@ void test_graph_cuda(struct CUDA_Context *ctx) {
   test_graph<<<14, 256>>>(ctx->gg, ctx->nowned, ctx->pr[0].gpu_wr_ptr(), ctx->pr[1].gpu_wr_ptr(), ctx->nout.gpu_wr_ptr(), ctx->id);
   check_cuda(cudaDeviceSynchronize());
 }
+
 
 void test_cuda(struct CUDA_Context *ctx) {
   printf("hello from cuda!\n");

@@ -66,6 +66,7 @@ static cll::opt<Personality> personality("personality", cll::desc("Personality")
 static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file (transpose)>"), cll::Required);
 static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations"), cll::init(4));
 static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"), cll::init(false));
+static cll::opt<int> gpudevice("gpu", cll::desc("Select GPU to run on, default is to choose automatically"), cll::init(-1));
 
 struct LNode {
    float value;
@@ -508,7 +509,9 @@ int main(int argc, char** argv) {
    pGraph g = loadGraph(inputFile, Galois::Runtime::NetworkInterface::ID, Galois::Runtime::NetworkInterface::Num, rg);
 
    if (personality == GPU_CUDA) {
-      cuda_ctx = get_CUDA_context();
+      cuda_ctx = get_CUDA_context(Galois::Runtime::NetworkInterface::ID);
+      if(!init_CUDA_context(cuda_ctx, gpudevice))
+	return 1;
    } else if (personality == GPU_OPENCL) {
       Galois::OpenCL::cl_env.init();
    }
