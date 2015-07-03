@@ -88,9 +88,14 @@ public:
 
     Vec2 diffV = b1vel - b2vel;
 
+    if (FPutils::almostEqual(diffV.magSqrd (), 0.0)) {
+      return std::make_pair (false, -1.0);
+    }
+
     // D =  pos () - time ()*vel ()
     // diffD = D1 - D2
     Vec2 diffD =  (b1pos - b1vel * b1time) - (b2pos - b2vel * b2time);
+    assert (diffD.magSqrd () > (b1rad + b2rad));
 
     FP sumRadius = (b1rad + b2rad);
     FP sumRadiusSqrd =  sumRadius * sumRadius;
@@ -104,8 +109,8 @@ public:
 
     if (discr >= 0.0 ) {
       // solution is real
-      FP t1 = (-diffVdiffD - sqrt (discr)) / diffV.magSqrd ();
-      FP t2 = (-diffVdiffD + sqrt (discr)) / diffV.magSqrd ();
+      FP t1 = (-diffVdiffD - FPutils::sqrt (discr)) / diffV.magSqrd ();
+      FP t2 = (-diffVdiffD + FPutils::sqrt (discr)) / diffV.magSqrd ();
 
       t1 = FPutils::truncate (t1);
       t2 = FPutils::truncate (t2);
