@@ -103,7 +103,7 @@ struct pGraph {
    }
 
    pGraph(Graph& _g) :
-         g(_g), g_offset(0), numOwned(0), numNodes(0), id(0) {
+         g(_g), g_offset(0), numOwned(0), numNodes(0), id(0),numEdges(0) {
    }
 };
 /*********************************************************************************
@@ -229,32 +229,34 @@ struct dPageRank {
    dPageRank() :
          aux_array(nullptr) {
    }
-   void init(int num_items) {
-      Galois::OpenCL::CL_Kernel init_kernel;
-
+   void init(int num_items, int num_inits) {
+      Galois::OpenCL::CL_Kernel init_all, init_nout;
+//      fprintf(stderr, "NumNodes:: %d , %d, %d\n", dGraph.num_nodes(), num_items, num_inits);
       aux_array = new Galois::OpenCL::Array<float>(dGraph.num_nodes());
-      /*kernel.init("/h2/rashid/workspace/GaloisDist/gdist/exp/apps/hpr/opencl/pagerank_kernel.cl", "pagerank");
-      wb_kernel.init("/h2/rashid/workspace/GaloisDist/gdist/exp/apps/hpr/opencl/pagerank_kernel.cl", "writeback");
-      init_kernel.init("/h2/rashid/workspace/GaloisDist/gdist/exp/apps/hpr/opencl/pagerank_kernel.cl", "initialize_nout");*/
       kernel.init("pagerank_kernel.cl", "pagerank");
       wb_kernel.init("pagerank_kernel.cl", "writeback");
-      init_kernel.init("pagerank_kernel.cl", "initialize_nout");
+      init_nout.init("pagerank_kernel.cl", "initialize_nout");
+      init_all.init("pagerank_kernel.cl", "initialize_all");
       dGraph.copy_to_device();
 
-      init_kernel.set_work_size(num_items);
+      init_all.set_work_size(dGraph.num_nodes());
+      init_nout.set_work_size(dGraph.num_nodes());
       wb_kernel.set_work_size(num_items);
       kernel.set_work_size(num_items);
 
-      init_kernel.set_arg_list(&dGraph, aux_array);
+      init_nout.set_arg_list(&dGraph, aux_array);
+      init_all.set_arg_list(&dGraph, aux_array);
       kernel.set_arg_list(&dGraph, aux_array);
       wb_kernel.set_arg_list(&dGraph, aux_array);
+      int num_nodes = dGraph.num_nodes();
 
-      init_kernel.set_arg(2, sizeof(cl_int), &num_items);
+      init_nout.set_arg(2, sizeof(cl_int), &num_items);
       wb_kernel.set_arg(2, sizeof(cl_int), &num_items);
       kernel.set_arg(2, sizeof(cl_int), &num_items);
 
 //      fprintf(stderr, "Initializing nout - > %d\n", num_items);
-      init_kernel();
+      init_all();
+      init_nout();
       dGraph.copy_to_host();
 
 #if _HETERO_DEBUG_
@@ -373,7 +375,6 @@ void setNodeValue(pGraph* p, unsigned GID, float v) {
 /*********************************************************************************
  *
  **********************************************************************************/
-
 // could be merged with setNodeValue, but this is one-time only ...
 void setNodeAttr(pGraph *p, unsigned GID, unsigned nout) {
    switch (personality) {
@@ -390,13 +391,13 @@ void setNodeAttr(pGraph *p, unsigned GID, unsigned nout) {
       break;
    }
 }
-
+/*********************************************************************************
+ *
+ **********************************************************************************/
 // send values for nout calculated on my node
 void setNodeAttr2(pGraph *p, unsigned GID, unsigned nout) {
   auto LID = GID - p->g_offset;
-
   //printf("%d setNodeAttrs2 GID: %u nout: %u LID: %u\n", p->id, GID, nout, LID);  
-
    switch (personality) {
    case CPU:
       p->g.getData(LID).nout += nout;
@@ -411,7 +412,9 @@ void setNodeAttr2(pGraph *p, unsigned GID, unsigned nout) {
       break;
    }
 }
-
+/*********************************************************************************
+ *
+ **********************************************************************************/
 void sendGhostCellAttrs2(Galois::Runtime::NetworkInterface& net, pGraph& g) {
   for (auto n = g.g.begin() + g.numOwned; n != g.g.begin() + g.numNodes; ++n) {
     auto l2g_ndx = std::distance(g.g.begin(), n) - g.numOwned;
@@ -548,7 +551,7 @@ void loadGraphNonCPU(pGraph &g) {
       load_graph_CUDA(cuda_ctx, m);
       break;
    case GPU_OPENCL:
-      dGraph.load_from_galois(g.g);
+      dGraph.load_from_galois(g.g,g.numOwned,g.numEdges,g.numNodes-g.numOwned);
       break;
    default:
       assert(false);
@@ -604,11 +607,11 @@ int main(int argc, char** argv) {
    //local initialization
    if (personality == CPU) {
 //      InitializeGraph::go(g.g, g.numOwned);
-      InitializeGraph::go(g.g, g.numNodes);
+      InitializeGraph::go(g.g, g.numOwned);
    } else if (personality == GPU_CUDA) {
       initialize_graph_cuda(cuda_ctx);
    } else if (personality == GPU_OPENCL) {
-      dOp.init(g.numOwned);
+      dOp.init(g.numOwned, g.numNodes);
    }
 #if _HETERO_DEBUG_
    std::cout << g.id << " initialized\n";
@@ -682,7 +685,6 @@ int main(int argc, char** argv) {
          break;
       }
       case GPU_OPENCL: {
-
          for (int n = 0; n < g.numOwned; ++n) {
             out_file << n + g.g_offset << ", " << dGraph.node_data()[n].value << ", " << dGraph.node_data()[(n)].nout << "\n";
          }
@@ -696,5 +698,6 @@ int main(int argc, char** argv) {
       }
       out_file.close();
    }
+   std::cout.flush();
    return 0;
 }

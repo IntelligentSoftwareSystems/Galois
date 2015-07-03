@@ -84,9 +84,7 @@ __kernel void pagerank(__global int * graph_ptr,__global float* aux,  int num_it
       }//end for
       float value= (1.0 - alpha) * sum + alpha;
       float diff = fabs(value - sdata->value);
-//      sdata->value = value;
       aux[my_id] = value;
-//      sdata->nout = 2;
    }//end if
 }//end kernel
 
@@ -97,7 +95,17 @@ __kernel void writeback(__global int * graph_ptr,__global float * aux,  int num_
    if(my_id < num_items) {
       __global NodeData * sdata = node_data(&graph, my_id);
       sdata->value = aux[my_id];
-//      sdata->nout = 2;
+   }//end if
+}//end kernel
+
+__kernel void initialize_all(__global int * graph_ptr, __global float* aux_array) {
+   int my_id = get_global_id(0);
+   __local GraphType graph;
+   initialize(&graph, graph_ptr);
+   if(my_id < graph._num_nodes){
+      node_data(&graph, my_id)->value=1.0 - alpha;
+      aux_array[my_id] = 1.0 - alpha;
+      node_data(&graph, my_id)->nout=0;
    }//end if
 }//end kernel
 
@@ -105,14 +113,16 @@ __kernel void initialize_nout(__global int * graph_ptr, __global float* aux_arra
    int my_id = get_global_id(0);
    __local GraphType graph;
    initialize(&graph, graph_ptr);
-   if(my_id < graph._num_nodes) {
+   if(my_id < graph._num_nodes){
       node_data(&graph, my_id)->value=1.0 - alpha;
       aux_array[my_id] = 1.0 - alpha;
-      for(int i= out_neighbors_begin(&graph, my_id); i<out_neighbors_end(&graph, my_id); ++i) {
-         int dst_id = out_neighbors(&graph, my_id, i);
-         __global NodeData * dst_data = node_data(&graph, dst_id);
-         atomic_add(&dst_data->nout,1);
-//         printf("Init[%d->%d]", my_id,dst_id);
-      }//end for
+      if(my_id < num_items){
+         for(int i= out_neighbors_begin(&graph, my_id); i<out_neighbors_end(&graph, my_id); ++i) {
+            int dst_id = out_neighbors(&graph, my_id, i);
+            __global NodeData * dst_data = node_data(&graph, dst_id);
+            atomic_add(&dst_data->nout,1);
+   //         printf("Init[%d->%d]", my_id,dst_id);
+         }//end for
+      }
    }//end if
 }//end kernel
