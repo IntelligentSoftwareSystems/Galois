@@ -31,11 +31,11 @@
 #include "Galois/Timer.h"
 #include "Galois/AltBag.h"
 #include "Galois/DoAllWrap.h"
+#include "Galois/PerThreadContainer.h"
 
 #include "Galois/Runtime/Barrier.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/Executor_DoAll.h"
-#include "Galois/Runtime/PerThreadContainer.h"
 #include "Galois/Runtime/Range.h"
 #include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/Termination.h"
@@ -133,7 +133,7 @@ public:
             runCatching (nhFunc, c, uhand);
           },
           "expand_nhood",
-          Galois::doall_chunk_size<NhFunc::CHUNK_SIZE> ());
+          Galois::chunk_size<NhFunc::CHUNK_SIZE> ());
 
 
 
@@ -151,7 +151,7 @@ public:
             }
           },
           "collect_sources",
-          Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
+          Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
 
       // NOTE: safety test should be applied to all sources
       // where each source is tested against all elements earlier in priority
@@ -191,7 +191,7 @@ public:
             uhand.reset ();
           },
           "apply_operator",
-          Galois::doall_chunk_size<OpFunc::CHUNK_SIZE> ());
+          Galois::chunk_size<OpFunc::CHUNK_SIZE> ());
 
       Galois::Runtime::on_each_impl (
           [this] (const unsigned tid, const unsigned numT) {

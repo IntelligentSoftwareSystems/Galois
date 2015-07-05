@@ -33,11 +33,12 @@
 #include "Galois/PriorityQueue.h"
 #include "Galois/Timer.h"
 #include "Galois/DoAllWrap.h"
+#include "Galois/PerThreadContainer.h"
+
 #include "Galois/Runtime/Barrier.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/Executor_DoAll.h"
 #include "Galois/Runtime/ForEachTraits.h"
-#include "Galois/Runtime/PerThreadContainer.h"
 #include "Galois/Runtime/Range.h"
 #include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/Termination.h"
@@ -298,7 +299,7 @@ protected:
           total += 1;
         },
         "expandNhood",
-        doall_chunk_size<OpFunc::CHUNK_SIZE> ());
+        chunk_size<OpFunc::CHUNK_SIZE> ());
 
   }
 
@@ -354,7 +355,7 @@ protected:
           }
         },
         "applyOperator",
-        doall_chunk_size<OpFunc::CHUNK_SIZE> ());
+        chunk_size<OpFunc::CHUNK_SIZE> ());
   }
 
 
@@ -498,7 +499,7 @@ protected:
           total += 1;
         },
         "expandNhood",
-        doall_chunk_size<NhFunc::CHUNK_SIZE> ());
+        chunk_size<NhFunc::CHUNK_SIZE> ());
 
   }
 

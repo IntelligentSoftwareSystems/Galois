@@ -3,8 +3,9 @@
 
 #include "bfs.h"
 
+#include "Galois/PerThreadContainer.h"
+
 #include "Galois/Runtime/ParallelWorkInline_Exp.h"
-#include "Galois/Runtime/PerThreadContainer.h"
 #include "Galois/Runtime/CoupledExecutor.h"
 
 typedef uint32_t ND_ty;
@@ -21,7 +22,7 @@ protected:
     Update (GNode node, ND_ty level): node (node), level (level) {}
   };
 
-  typedef Galois::Runtime::PerThreadVector<Update> WL_ty;
+  typedef Galois::PerThreadVector<Update> WL_ty;
 
   struct PftchFunc {
     typedef int tt_does_not_need_aborts;

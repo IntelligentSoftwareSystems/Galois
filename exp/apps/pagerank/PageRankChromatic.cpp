@@ -1,92 +1,112 @@
 #include "PageRankDet.h"
 
-namespace cll = llvm::cl;
 
-enum ExecType {
-  CHROMATIC,
-  EDGE_FLIP,
-};
-
-static cll::opt<ExecType> execType (
-    "executor",
-    cll::desc ("Deterministic Executor Type"),
-    cll::values (
-      clEnumValN (CHROMATIC, "CHROMATIC", "Chromatic Executor"),
-      clEnumValN (EDGE_FLIP, "EDGE_FLIP", "Edge Flipping DAG overlayed on input graph"),
-      clEnumValEnd),
-    cll::init (CHROMATIC));
-
-
-struct NodeData: public Galois::Runtime::DAGdata, PData {
+template <typename B>
+struct NodeData: public B, PData {
 
   NodeData (void)
-    : Galois::Runtime::DAGdata (0), PData ()
+    : B (0), PData ()
   {}
 
   NodeData (unsigned id, unsigned outdegree)
-    : Galois::Runtime::DAGdata (id), PData (outdegree)
+    : B (id), PData (outdegree)
   {}
 
 
 };
 
-typedef typename Galois::Graph::LC_CSR_Graph<NodeData, void>
-  ::with_numa_alloc<true>::type
-  ::with_no_lockable<true>::type 
-  InnerGraph;
+template <Galois::Runtime::InputDAG_ExecTy EXEC>
+struct ChooseNodeDataType {
+  using type = Galois::Runtime::InputDAGdataInOut;
+};
 
-class PageRankChromatic: public PageRankBase<InnerGraph> {
+template <>
+struct ChooseNodeDataType<Galois::Runtime::InputDAG_ExecTy::PART> { 
+  using type = Galois::Runtime::InputDAGdataPartInOut;
+};
+
+
+
+
+template <Galois::Runtime::InputDAG_ExecTy EXEC>
+struct ChooseInnerGraph {
+  using ND = NodeData<typename ChooseNodeDataType<EXEC>::type>; 
+
+  using type = typename Galois::Graph::LC_CSR_Graph<ND, void>
+    ::template with_numa_alloc<true>::type
+    ::template with_no_lockable<true>::type;
+};
+
+template <Galois::Runtime::InputDAG_ExecTy EXEC>
+class PageRankInputDAG: public PageRankBase<typename ChooseInnerGraph<EXEC>::type> {
 protected:
 
-  template <bool useOnWL> 
+  using Base = PageRankBase<typename ChooseInnerGraph<EXEC>::type>;
+  using GNode = typename Base::GNode;
+
   struct ApplyOperator {
 
-    static const unsigned CHUNK_SIZE = DEFAULT_CHUNK_SIZE;
+    static const unsigned CHUNK_SIZE = Base::DEFAULT_CHUNK_SIZE;
     static const unsigned UNROLL_FACTOR = 32;
 
-    PageRankChromatic& outer;
+    PageRankInputDAG& outer;
 
     template <typename C>
     void operator () (GNode src, C& ctx) {
-      outer.applyOperator<useOnWL> (src, ctx);
+      outer.applyOperator (src, ctx);
     }
   };
 
   virtual void runPageRank (void) {
-
-    switch (execType) {
-      
-      case CHROMATIC:
-        Galois::Runtime::for_each_det_chromatic (
-            Galois::Runtime::makeLocalRange (graph),
-            ApplyOperator<false> {*this},
-            graph,
-            "page-rank-chromatic");
-        break;
-
-      case EDGE_FLIP:
-#if 0
-        Galois::Runtime::for_each_det_dag_active (
-            Galois::Runtime::makeLocalRange (graph),
-            graph,
-            ApplyOperator<false> {*this},
-            "page-rank-chromatic");
-#else
-        abort();
-#endif
-        break;
-
-      default:
-        std::abort ();
-
-    }
+    Galois::Runtime::ForEachDet_InputDAG<EXEC>::run (
+        Galois::Runtime::makeLocalRange(Base::graph),
+        ApplyOperator {*this},
+        Base::graph,
+        "page-rank-input-dag"
+        );
   }
 
 };
 
 int main (int argc, char* argv[]) {
+  LonestarStart (argc, argv, name, desc, url);
 
-  PageRankChromatic p;
+  switch (Galois::Runtime::inputDAG_ExecTy) {
+    case Galois::Runtime::InputDAG_ExecTy::CHROMATIC: 
+      {
+        PageRankInputDAG<Galois::Runtime::InputDAG_ExecTy::CHROMATIC> p;
+        p.run ();
+        break;
+      }
+    case Galois::Runtime::InputDAG_ExecTy::EDGE_FLIP: 
+      {
+        PageRankInputDAG<Galois::Runtime::InputDAG_ExecTy::EDGE_FLIP> p;
+        p.run ();
+        break;
+      }
+    case Galois::Runtime::InputDAG_ExecTy::TOPO: 
+      {
+        PageRankInputDAG<Galois::Runtime::InputDAG_ExecTy::TOPO> p;
+        p.run ();
+        break;
+      }
+    case Galois::Runtime::InputDAG_ExecTy::PART: 
+      {
+        PageRankInputDAG<Galois::Runtime::InputDAG_ExecTy::PART> p;
+        p.run ();
+        break;
+      }
+    case Galois::Runtime::InputDAG_ExecTy::HYBRID: 
+      {
+        PageRankInputDAG<Galois::Runtime::InputDAG_ExecTy::HYBRID> p;
+        p.run ();
+        break;
+      }
 
-  return p.run (argc, argv);
-}
+    default:
+      std::abort ();
+  }
+
+} // end main
+
+

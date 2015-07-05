@@ -70,7 +70,7 @@ static cll::opt<std::string> filename(cll::Positional, cll::desc("<input file>")
 
 static const unsigned BFS_LEVEL_INFINITY = (1 << 20) - 1;
 
-static const unsigned CHUNK_SIZE = 128; 
+static const unsigned DEFAULT_CHUNK_SIZE = 16; 
 
 #if 0
 struct NodeData {
@@ -141,7 +141,7 @@ protected:
           // std::cout << "Degree: " << graph.edge_end (n, Galois::MethodFlag::UNPROTECTED) - graph.edge_begin (n, Galois::MethodFlag::UNPROTECTED) << std::endl;
         },
         "node-data-init",
-        Galois::doall_chunk_size<CHUNK_SIZE> ());
+        Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
 
     t_init.stop();
     std::cout << "Graph read with nodes=" << numNodes << ", edges=" << numEdges.reduce () << std::endl;
@@ -177,7 +177,8 @@ protected:
 
     ParCounter numUnreachable;
 
-    Galois::do_all_choice (Galois::Runtime::makeLocalRange(graph),
+    Galois::do_all_choice (
+        Galois::Runtime::makeLocalRange(graph),
         [&graph, &numUnreachable, &result, &startNode] (GNode n) {
           const unsigned srcLevel = graph.getData (n, Galois::MethodFlag::UNPROTECTED);
           if (srcLevel >= BFS_LEVEL_INFINITY) { 
@@ -199,8 +200,8 @@ protected:
             }
           }
         },
-        "node-data-init",
-        Galois::doall_chunk_size<CHUNK_SIZE> ());
+        "bfs-verify",
+        Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
 
     if (numUnreachable.reduce () > 0) {
       std::cerr << "WARNING: " << numUnreachable.reduce () << " nodes were unreachable. "

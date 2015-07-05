@@ -28,6 +28,7 @@
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/WorkList/WorkList.h"
 #include "Galois/Runtime/ROBexecutor.h"
+#include "Galois/Runtime/OrderedSpeculation.h"
 
 #include <boost/iterator/transform_iterator.hpp>
 
@@ -213,6 +214,7 @@ public:
 
     // Galois::for_each_ordered (
     Galois::Runtime::for_each_ordered_rob (
+    // Galois::Runtime::for_each_ordered_optim (
         Galois::Runtime::makeStandardRange (
           boost::make_transform_iterator(elems.begin(), MakeUpdate()),
           boost::make_transform_iterator(elems.end(), MakeUpdate())), 

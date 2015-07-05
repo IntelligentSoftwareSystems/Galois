@@ -37,8 +37,9 @@
 
 #include "Galois/Statistic.h"
 #include "Galois/Accumulator.h"
+#include "Galois/PerThreadContainer.h"
 #include "Galois/util/Markable.h"
-#include "Galois/Runtime/PerThreadContainer.h"
+
 #include "Galois/Runtime/DoAllCoupled.h"
 #include "Galois/Runtime/ll/CompilerSpecific.h"
 
@@ -56,8 +57,8 @@ template <typename KNode_tp>
 struct WLfactory {
 
   typedef KEdge<KNode_tp> Edge_ty;
-  typedef typename Galois::Runtime::PerThreadVector<Edge_ty* > WL_ty;
-  typedef typename Galois::Runtime::PerThreadVector<Markable<Edge_ty* > > WLmarkable_ty;
+  typedef typename Galois::PerThreadVector<Edge_ty* > WL_ty;
+  typedef typename Galois::PerThreadVector<Markable<Edge_ty* > > WLmarkable_ty;
 
 };
 

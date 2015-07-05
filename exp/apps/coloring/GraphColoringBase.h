@@ -8,10 +8,10 @@
 #include "Galois/DoAllWrap.h"
 #include "Galois/Graph/Util.h"
 #include "Galois/Graph/Graph.h"
+#include "Galois/PerThreadContainer.h"
 // #include "Galois/Graph/FileGraph.h"
 
 #include "Galois/Runtime/Sampling.h"
-#include "Galois/Runtime/PerThreadContainer.h"
 
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
@@ -55,7 +55,7 @@ protected:
 
   static const unsigned DEFAULT_CHUNK_SIZE = 8;
 
-  typedef Galois::Runtime::PerThreadVector<unsigned> PerThrdColorVec;
+  typedef Galois::PerThreadVector<unsigned> PerThrdColorVec;
   typedef typename G::GraphNode GN;
   typedef typename G::node_data_type NodeData;
 
@@ -163,7 +163,7 @@ protected:
           nodeFunc (node);
         },
         "assign-priority",
-        Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
+        Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
   }
 
   static const unsigned MAX_LEVELS = 100;
@@ -281,7 +281,7 @@ protected:
 
         }, 
         "check-coloring",
-        Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
+        Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
 
     std::printf ("Graph colored with %d colors\n", maxColor.reduce ());
 

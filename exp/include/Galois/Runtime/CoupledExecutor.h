@@ -2,7 +2,7 @@
 #define GALOIS_RUNTIME_COUPLEDEXECUTOR_H
 
 #include "Galois/GaloisForwardDecl.h"
-#include "Galois/Runtime/PerThreadContainer.h"
+#include "Galois/PerThreadContainer.h"
 
 #include <tuple>
 

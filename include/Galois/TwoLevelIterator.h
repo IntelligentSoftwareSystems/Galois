@@ -138,6 +138,10 @@ protected:
   Outer m_beg_outer;
   Outer m_end_outer;
   Outer m_outer;
+
+
+  Inner m_beg_inner;
+  Inner m_end_inner;
   Inner m_inner;
 
   InnerBegFn innerBegFn;
@@ -156,32 +160,42 @@ protected:
     return m_beg_outer == m_end_outer;
   }
 
-  inline Inner innerBegin () { 
-    assert (!outerEmpty ());
-    assert (!outerAtEnd ());
-
-    return innerBegFn (*m_outer);
+  inline const Inner& getInnerBegin () const { 
+    return m_beg_inner;
   }
 
-  inline Inner innerEnd () {
-    assert (!outerEmpty ());
-    assert (!outerAtEnd ());
+  inline const Inner& getInnerEnd () const {
+    return m_end_inner;
+  }
 
-    return innerEndFn (*m_outer);
+  inline void setInnerAtBegin (void) {
+    assert (!outerAtEnd ());
+    m_inner = m_beg_inner = innerBegFn (*m_outer);
+    m_end_inner = innerEndFn (*m_outer);
+  }
+
+  inline void setInnerAtEnd (void) {
+    assert (!outerAtEnd ());
+    m_beg_inner = innerBegFn (*m_outer);
+    m_inner = m_end_inner = innerEndFn (*m_outer);
   }
 
   inline bool innerAtBegin () const {
-    return m_inner == const_cast<TwoLevelIterBase*> (this)->innerBegin ();
+    assert ( m_beg_inner == innerBegFn (*m_outer));
+    return m_inner == m_beg_inner;
   }
 
   inline bool innerAtEnd () const {
-    return m_inner == const_cast<TwoLevelIterBase*> (this)->innerEnd ();
+    assert ( m_end_inner == innerEndFn (*m_outer));
+    return m_inner == m_end_inner;
   }
 
   TwoLevelIterBase (): 
     m_beg_outer (), 
     m_end_outer (), 
     m_outer (), 
+    m_beg_inner (),
+    m_end_inner (),
     m_inner (),
     innerBegFn (),
     innerEndFn ()
@@ -197,6 +211,8 @@ protected:
       m_beg_outer (beg_outer), 
       m_end_outer (end_outer), 
       m_outer (outer_pos),
+      m_beg_inner (),
+      m_end_inner (),
       m_inner (),
       innerBegFn (innerBegFn),
       innerEndFn (innerEndFn)
@@ -222,7 +238,9 @@ protected:
     assert (!Base::outerEmpty ());
     ++Base::m_outer;
     if (!Base::outerAtEnd ()) {
-      Base::m_inner = Base::innerBegin ();
+
+      Base::setInnerAtBegin ();
+      // Base::m_inner = Base::innerBegin ();
     }
   }
 
@@ -269,7 +287,8 @@ public:
   {
 
     if (!Base::outerAtEnd ()) {
-      Base::m_inner = Base::innerBegin ();
+      // Base::m_inner = Base::innerBegin ();
+      Base::setInnerAtBegin ();
       seekValidBegin ();
     }
   }
@@ -318,13 +337,15 @@ protected:
 
     TwoLevelIteratorImpl::safe_decrement (FwdBase::m_outer, FwdBase::m_beg_outer, FwdBase::m_end_outer);
 
-    FwdBase::m_inner = FwdBase::innerEnd ();
+    // FwdBase::m_inner = FwdBase::innerEnd ();
+    FwdBase::setInnerAtEnd ();
   }
 
 
   void step_backward () {
     assert (!FwdBase::outerEmpty ());
-    assert (!FwdBase::outerAtBegin ());
+
+    // assert (!FwdBase::outerAtBegin ());
 
     // calling innerBegin when m_outer == m_end_outer is invalid
     // so call prevOuter first, and check for innerBegin afterwards
@@ -332,6 +353,7 @@ protected:
     if (FwdBase::outerAtEnd ()) {
       prevOuter ();
     }
+
 
     while (FwdBase::innerAtBegin ()) {
       assert (!FwdBase::outerAtBegin ());
@@ -392,7 +414,7 @@ protected:
       while (rem > 0) {
         assert (!BiDirBase::outerAtEnd ());
 
-        Diff_ty avail = std::distance (BiDirBase::m_inner, BiDirBase::innerEnd ());
+        Diff_ty avail = std::distance (BiDirBase::m_inner, BiDirBase::getInnerEnd ());
         assert (avail >= 0);
 
         if (rem > avail) {
@@ -427,7 +449,7 @@ protected:
       }
 
       while (rem > 0) {
-        Diff_ty avail = std::distance (BiDirBase::innerBegin (), BiDirBase::m_inner);
+        Diff_ty avail = std::distance (BiDirBase::getInnerBegin (), BiDirBase::m_inner);
         assert (avail >= 0);
 
         if (rem > avail) {
@@ -468,7 +490,7 @@ protected:
       Diff_ty d = tmp.m_inner - tmp.m_inner; // 0
 
       while (tmp.m_outer != that.m_outer) {
-        d += std::distance (tmp.m_inner, tmp.innerEnd ());
+        d += std::distance (tmp.m_inner, tmp.getInnerEnd ());
         tmp.nextOuter ();
       }
 

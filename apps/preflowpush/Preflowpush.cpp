@@ -82,7 +82,7 @@ const int BETA = 12;
 
 struct Node {
   uint32_t id;
-  size_t excess;
+  int64_t excess;
   int height;
   int current;
 
@@ -175,7 +175,7 @@ void checkHeights() {
     for (Graph::edge_iterator jj = app.graph.edge_begin(src),
         ej = app.graph.edge_end(src); jj != ej; ++jj) {
       GNode dst = app.graph.getEdgeDst(jj);
-      int cap = app.graph.getEdgeData(jj);
+      int64_t cap = app.graph.getEdgeData(jj);
       int dh = app.graph.getData(dst).height;
       if (cap > 0 && sh > dh + 1) {
         std::cerr << "height violated at " << app.graph.getData(src) << "\n";
@@ -226,13 +226,13 @@ void checkConservation(Config& orig) {
       abort();
     }
 
-    size_t sum = 0;
+    int64_t sum = 0;
     for (Graph::edge_iterator jj = app.graph.edge_begin(src),
         ej = app.graph.edge_end(src); jj != ej; ++jj) {
       GNode dst = app.graph.getEdgeDst(jj);
       uint32_t dstId = app.graph.getData(dst).id;
-      int ocap = orig.graph.getEdgeData(findEdge(orig.graph, map[srcId], map[dstId]));
-      int delta = 0;
+      int64_t ocap = orig.graph.getEdgeData(findEdge(orig.graph, map[srcId], map[dstId]));
+      int64_t delta = 0;
       if (ocap > 0) 
         delta -= ocap - app.graph.getEdgeData(jj);
       else
@@ -291,7 +291,7 @@ struct UpdateHeights {
             ee = app.graph.edge_end(src, Galois::MethodFlag::WRITE);
             ii != ee; ++ii) {
           GNode dst = app.graph.getEdgeDst(ii);
-          int rdata = app.graph.getEdgeData(findEdge(app.graph, dst, src));
+          int64_t rdata = app.graph.getEdgeData(findEdge(app.graph, dst, src));
           if (rdata > 0) {
             app.graph.getData(dst, Galois::MethodFlag::WRITE);
           }
@@ -311,7 +311,7 @@ struct UpdateHeights {
         ee = app.graph.edge_end(src, useCAS ? Galois::MethodFlag::UNPROTECTED : Galois::MethodFlag::WRITE);
         ii != ee; ++ii) {
       GNode dst = app.graph.getEdgeDst(ii);
-      int rdata = app.graph.getEdgeData(findEdge(app.graph, dst, src));
+      int64_t rdata = app.graph.getEdgeData(findEdge(app.graph, dst, src));
       if (rdata > 0) {
         Node& node = app.graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
         int newHeight = app.graph.getData(src, Galois::MethodFlag::UNPROTECTED).height + 1;
@@ -419,7 +419,7 @@ void relabel(const GNode& src) {
       ee = app.graph.edge_end(src, Galois::MethodFlag::UNPROTECTED);
       ii != ee; ++ii, ++current) {
     GNode dst = app.graph.getEdgeDst(ii);
-    int cap = app.graph.getEdgeData(ii);
+    int64_t cap = app.graph.getEdgeData(ii);
     if (cap > 0) {
       const Node& dnode = app.graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
       if (dnode.height < minHeight) {
@@ -462,7 +462,7 @@ bool discharge(const GNode& src, Galois::UserContext<GNode>& ctx) {
     std::advance(ii, node.current);
     for (; ii != ee; ++ii, ++current) {
       GNode dst = app.graph.getEdgeDst(ii);
-      int cap = app.graph.getEdgeData(ii);
+      int64_t cap = app.graph.getEdgeData(ii);
       if (cap == 0)// || current < node.current) 
         continue;
 
@@ -471,13 +471,14 @@ bool discharge(const GNode& src, Galois::UserContext<GNode>& ctx) {
         continue;
 
       // Push flow
-      int amount = std::min(static_cast<int>(node.excess), cap);
+      int64_t amount = std::min(node.excess, cap);
       reduceCapacity(ii, src, dst, amount);
 
       // Only add once
       if (dst != app.sink && dst != app.source && dnode.excess == 0) 
         ctx.push(dst);
       
+      assert (node.excess >= amount);
       node.excess -= amount;
       dnode.excess += amount;
       
@@ -723,7 +724,7 @@ void initializePreflow(C& initial) {
   for (Graph::edge_iterator ii = app.graph.edge_begin(app.source),
       ee = app.graph.edge_end(app.source); ii != ee; ++ii) {
     GNode dst = app.graph.getEdgeDst(ii);
-    int cap = app.graph.getEdgeData(ii);
+    int64_t cap = app.graph.getEdgeData(ii);
     reduceCapacity(ii, app.source, dst, cap);
     Node& node = app.graph.getData(dst);
     node.excess += cap;

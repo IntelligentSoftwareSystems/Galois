@@ -29,9 +29,9 @@
 #include "Galois/Timer.h"
 #include "Galois/Atomic.h"
 #include "Galois/Galois.h"
+#include "Galois/PerThreadContainer.h"
 
 #include "Galois/Runtime/LCordered.h"
-#include "Galois/Runtime/PerThreadContainer.h"
 #include "Galois/Runtime/ll/PaddedLock.h"
 #include "Galois/Runtime/ll/CompilerSpecific.h"
 
@@ -52,7 +52,7 @@ typedef Galois::GAccumulator<size_t> Accumulator_ty;
 
 typedef des::EventRecvTimeLocalTieBrkCmp<TypeHelper::Event_ty> Cmp_ty;
 
-typedef Galois::Runtime::PerThreadVector<TypeHelper::Event_ty> AddList_ty;
+typedef Galois::PerThreadVector<TypeHelper::Event_ty> AddList_ty;
 
 struct SimObjInfo;
 typedef std::vector<SimObjInfo> VecSobjInfo;
@@ -164,7 +164,7 @@ class DESordered:
 
   struct OpFunc {
 
-    static const size_t CHUNK_SIZE = 8;
+    static const size_t CHUNK_SIZE = 4;
     static const size_t UNROLL_FACTOR = 1024;
 
     Graph& graph;

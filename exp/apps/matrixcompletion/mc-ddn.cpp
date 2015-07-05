@@ -24,7 +24,6 @@
 
 #include "Galois/config.h"
 #include "Galois/Accumulator.h"
-#include "Galois/DetSchedules.h"
 #include "Galois/Galois.h"
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
@@ -34,6 +33,7 @@
 #include "Galois/Runtime/ll/PaddedLock.h"
 #include "Galois/Runtime/ll/EnvCheck.h"
 #include "Galois/Runtime/TiledExecutor.h"
+#include "Galois/Runtime/DetSchedules.h"
 #include "Lonestar/BoilerPlate.h"
 
 #include <algorithm>
@@ -63,7 +63,7 @@ enum Algo {
   syncALS,
   asyncALSkdg_i,
   asyncALSkdg_ar,
-  asyncALSchromatic,
+  asyncALSreuse,
   simpleALS,
   blockedEdge,
   blockedEdgeServer,
@@ -120,7 +120,7 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
     clEnumValN(Algo::simpleALS, "simpleALS", "Simple alternating least squares"),
     clEnumValN(Algo::asyncALSkdg_i, "asyncALSkdg_i", "Asynchronous alternating least squares"),
     clEnumValN(Algo::asyncALSkdg_ar, "asyncALSkdg_ar", "Asynchronous alternating least squares"),
-    clEnumValN(Algo::asyncALSchromatic, "asyncALSchromatic", "Asynchronous alternating least squares"),
+    clEnumValN(Algo::asyncALSreuse, "asyncALSreuse", "Asynchronous alternating least squares"),
     clEnumValN(Algo::blockedEdge, "blockedEdge", "Edge blocking (default)"),
     clEnumValN(Algo::blockedEdgeServer, "blockedEdgeServer", "Edge blocking with server support"),
     clEnumValN(Algo::blockJump, "blockJump", "Block jumping "),
@@ -146,6 +146,8 @@ static cll::opt<bool> useSameLatentVector("useSameLatentVector",
     cll::init(false));
 
 static cll::opt<int> cutoff("cutoff");
+
+static const unsigned ALS_CHUNK_SIZE = 4;
 
 size_t NUM_ITEM_NODES = 0;
 
@@ -912,9 +914,9 @@ private:
           return;
         //const LatentValue stepSize = steps[updatesPerEdge - maxUpdates + task.updates]; XXX
         //const LatentValue stepSize = steps[1 - maxUpdates + 0];
-        const LatentValue stepSize = steps[0];
+        // const LatentValue stepSize = steps[0];
 
-        LatentValue e = doGradientUpdate(g.getData(src).latentVector, g.getData(dst).latentVector, lambda, g.getEdgeData(edge), stepSize);
+        // LatentValue e = doGradientUpdate(g.getData(src).latentVector, g.getData(dst).latentVector, lambda, g.getEdgeData(edge), stepSize);
         // XXX non exact error
         //error += (e * e);
         edgesVisited += 1;
@@ -1110,7 +1112,7 @@ int main(int argc, char** argv) {
     case Algo::simpleALS: run<SimpleALSalgo>(); break;
     case Algo::asyncALSkdg_i: run<AsyncALSalgo<asyncALSkdg_i>>(); break;
     case Algo::asyncALSkdg_ar: run<AsyncALSalgo<asyncALSkdg_ar>>(); break;
-    case Algo::asyncALSchromatic: run<AsyncALSalgo<asyncALSchromatic>>(); break;
+    case Algo::asyncALSreuse: run<AsyncALSalgo<asyncALSreuse>>(); break;
 #endif
     case Algo::blockedEdge: run<BlockedEdgeAlgo<false> >(); break;
     case Algo::blockedEdgeServer: run<BlockedEdgeAlgo<true> >(); break;

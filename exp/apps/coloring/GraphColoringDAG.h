@@ -79,7 +79,7 @@ protected:
           }
         },
         "init-dag",
-        Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
+        Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
 
   }
 

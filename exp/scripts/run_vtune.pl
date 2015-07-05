@@ -56,12 +56,13 @@ sub counter_option(@) {
 }
 
 ## returns analysis and report type option together
-sub analysis_option($) {
-  my ($vtune) = @_;
+sub analysis_option(@) {
+  my ($vtune, $a) = @_;
   my @candidates = (
+    ["$a", "hw-events"],
     [qw/nehalem-memory-access hw-events/],
     [qw/nehalem-general-exploration hw-events/],
-    [qw/nehalem_general-exploration hw-events/],
+    [qw/general-exploration hw-events/],
     [qw/knc-general-exploration hw-events/],
     [qw/snb-general-exploration hw-events/],
     [qw/hotspots hotspots/]
@@ -148,7 +149,7 @@ my ($copt, $ropt);
 if (@counters) {
   ($copt, $ropt) = counter_option(@counters);
 } else {
-  ($copt, $ropt) = analysis_option($vtune);
+  ($copt, $ropt) = analysis_option($vtune, $analysisType);
 }
 
 die("cannot find way to run vtune") unless($rdir and $copt and $ropt);
