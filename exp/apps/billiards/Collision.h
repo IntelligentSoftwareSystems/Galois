@@ -107,7 +107,7 @@ public:
     // actually discr is the actual discriminant divided by 4
     FP discr = (diffVdiffD * diffVdiffD) - (diffV.magSqrd ()) * (diffD.magSqrd () - sumRadiusSqrd);
 
-    if (discr >= 0.0 ) {
+    if (discr >= FP (0.0)) {
       // solution is real
       FP t1 = (-diffVdiffD - FPutils::sqrt (discr)) / diffV.magSqrd ();
       FP t2 = (-diffVdiffD + FPutils::sqrt (discr)) / diffV.magSqrd ();
@@ -186,7 +186,7 @@ public:
 
     FP denominator = (bvel.getX () * L.getY ()) - (bvel.getY () * L.getX ());
 
-    if (fabs(denominator) < FPutils::EPSILON) {
+    if (FP::fabs(denominator) < FPutils::EPSILON) {
       return std::make_pair (false, -1.0);
     }
 
@@ -207,7 +207,7 @@ public:
     t = FPutils::truncate (t);
 
 
-    if ((r < 0.0) || (r > 1.0) || (!isInFuture(btime, t))) {
+    if ((r < FP (0.0)) || (r > FP (1.0)) || (!isInFuture(btime, t))) {
       return std::make_pair (false, -1.0);
 
     } else {
@@ -333,9 +333,9 @@ public:
     FP v1_tangent_before = b1vel.dot (C);
     FP v2_tangent_before = b2vel.dot (C);
 
-    FP v1_tangent_after = ((b1mass - b2mass) * v1_tangent_before  +  (2.0*b2mass) * v2_tangent_before) / sumMass;
+    FP v1_tangent_after = ((b1mass - b2mass) * v1_tangent_before  +  (FP (2.0) * b2mass) * v2_tangent_before) / sumMass;
 
-    FP v2_tangent_after = ((b2mass - b1mass) * v2_tangent_before  +  (2.0*b1mass) * v1_tangent_before) / sumMass;
+    FP v2_tangent_after = ((b2mass - b1mass) * v2_tangent_before  +  (FP (2.0) * b1mass) * v1_tangent_before) / sumMass;
 
 
     Vec2 V1_tangent_after = C * (v1_tangent_after / C.magSqrd ()); 
@@ -396,7 +396,7 @@ private:
 
 
   static bool isInFuture (const FP& ballTime, const FP& collisionTime) {
-    assert (ballTime >= 0.0);
+    assert (ballTime >= FP (0.0));
     // assert (ballTime != collisionTime);
     return (collisionTime >= ballTime || FPutils::almostEqual (collisionTime, ballTime));
   }
@@ -415,7 +415,7 @@ private:
     // assuming that t is a valid collision time
 
     FP d = b.vel ().dot (l.lengthVec ().rightNormal ());
-    return (d < 0.0);
+    return (d < FP (0.0));
   }
 
 
@@ -442,7 +442,7 @@ private:
 
     FP diff = b1tanComp - b2tanComp;
 
-    return (diff > 0.0);
+    return (diff > FP (0.0));
 
   }
 
@@ -474,7 +474,7 @@ public:
 
         if (p.first) { // collision possible
 
-          assert (p.second > 0.0);
+          assert (p.second > FP (0.0));
 
           // it may happen that a ball collides two balls or
           // two cushions simulatneously. In such cases,
@@ -509,10 +509,10 @@ public:
     } // end for
 
 
-    if (currMin != NULL) { assert (currMinTime > 0.0); }
+    if (currMin != NULL) { assert (currMinTime > FP (0.0)); }
 
 
-    if (currMinTime > 0.0 && currMinTime <= endtime) { 
+    if (currMinTime > FP (0.0) && currMinTime <= endtime) { 
       assert (currMin != nullptr);
 
       retVal = Event::makeEvent (kind, b, currMin, currMinTime);

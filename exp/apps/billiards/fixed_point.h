@@ -45,7 +45,10 @@
 #include <boost/static_assert.hpp>
 #include <boost/operators.hpp>
 #include <boost/concept_check.hpp>
+
 #include <limits>
+#include <type_traits>
+
 #ifndef _USE_MATH_DEFINES
 	#define _USE_MATH_DEFINES
 	#define __FPML_DEFINED_USE_MATH_DEFINES__
@@ -55,6 +58,17 @@
 
 namespace fpml {
 
+
+template <typename T> 
+struct NumDigits {
+  static_assert (std::is_integral<T>::value, "arg T must be integer type");
+  static const unsigned val = std::numeric_limits<T>::digits;
+};
+
+template <>
+struct NumDigits<__int128_t> {
+  static const unsigned val = 127;
+};
 
 /******************************************************************************/
 /*                                                                            */
@@ -70,9 +84,9 @@ template<
 	//! unsigned.
 	typename B,
 	/// The integer part bit count.
-	unsigned char I,
+	unsigned I,
 	/// The fractional part bit count.
-	unsigned char F = std::numeric_limits<B>::digits - I>
+	unsigned F = NumDigits<B>::val - I>
 /// A fixed point type.
 //!
 //! This type is designed to be a plug-in type to replace the floating point
@@ -134,16 +148,17 @@ class fixed_point
 	// Make sure that the bit counts are ok. If this line triggers an error, the
 	// sum of the bit counts for the fractional and integer parts do not match 
 	// the bit count provided by the base type. The sign bit does not count.
-	BOOST_STATIC_ASSERT(I + F == std::numeric_limits<B>::digits);
+	BOOST_STATIC_ASSERT(I + F == NumDigits<B>::val);
 
 	/// Grant the fixed_point template access to private members. Types with
 	/// different template parameters are different types and without this
 	/// declaration they do not have access to private members.
+  template <typename, unsigned, unsigned>
 	friend class fpml::fixed_point;
 
 	/// Grant the numeric_limits specialization for this fixed_point class 
 	/// access to private members.
-	friend class std::numeric_limits<fpml::fixed_point<B, I, F> >;
+	friend struct std::numeric_limits<fpml::fixed_point<B, I, F> >;
 
 	template<
 		/// The power.
@@ -203,10 +218,10 @@ public:
 	typedef B base_type;
 
 	/// The integer part bit count.
-	static const unsigned char integer_bit_count = I; 
+	static const unsigned integer_bit_count = I; 
 
 	/// The fractional part bit count.
-	static const unsigned char fractional_bit_count = F;
+	static const unsigned fractional_bit_count = F;
 
 	/// Default constructor.
 	//!
@@ -282,9 +297,9 @@ public:
 
 	template<
 		/// The other integer part bit count.
-		unsigned char I2,
+		unsigned I2,
 		/// The other fractional part bit count.
-		unsigned char F2>
+		unsigned F2>
 	/// Converting copy constructor.
 	fixed_point(
 		/// The right hand side.
@@ -309,9 +324,9 @@ public:
 
 	template<
 		/// The other integer part bit count.
-		unsigned char I2,
+		unsigned I2,
 		/// The other fractional part bit count.
-		unsigned char F2>
+		unsigned F2>
 	/// Converting copy assignment operator.
 	fpml::fixed_point<B, I, F> & operator =(
 		/// The right hand side.
@@ -517,19 +532,24 @@ public:
 			/// Make gcc happy.
 			typename U>
 		/// Promote signed int to signed long long.
-		struct promote_type<signed int, U> 
+		struct promote_type<int32_t, U> 
 		{
-			typedef signed long long type;
+			typedef int64_t type;
 		};
 
 		template<
 			/// Make gcc happy.
 			typename U>
 		/// Promote unsigned int to unsigned long long.
-		struct promote_type<unsigned int, U> 
+		struct promote_type<uint32_t, U> 
 		{
-			typedef unsigned long long type;
+			typedef uint64_t type;
 		};
+
+    template <typename U>
+    struct promote_type<int64_t, U> {
+      typedef __int128_t type;
+    };
 
 	public:
 
@@ -714,6 +734,9 @@ public:
 		return (long double)value_ / power2<F>::value;	
 	}
 
+  double dval (void) const {
+    return double (value_) / double (power2<F>::value);
+  }
 	/**************************************************************************/
 	/*                                                                        */
 	/* fabs                                                                   */
@@ -725,9 +748,9 @@ public:
 	//! The fabs function computes the absolute value of its argument.
 	//!
 	//! /return The absolute value of the argument.
-	friend fpml::fixed_point<B, I, F> fabs(
+	static fpml::fixed_point<B, I, F> fabs(
 		/// The argument to the function.
-		fpml::fixed_point<B, I, F> x)
+		const fpml::fixed_point<B, I, F>& x)
 	{
 		return x < fpml::fixed_point<B, I, F>(0) ? -x : x;
 	}
@@ -1008,10 +1031,10 @@ public:
 	//!
 	//! /return The square root of the argument. If the argument is negative, 
 	//! the function returns 0.
-	friend fpml::fixed_point<B, I, F> sqrt(
+	static fpml::fixed_point<B, I, F> sqrt(
 		/// The argument to the square root function, a nonnegative fixed-point
 		/// value.
-		fpml::fixed_point<B, I, F> x)
+		const fpml::fixed_point<B, I, F>& x)
 	{
 		if (x < fpml::fixed_point<B, I, F>(0))
 		{
@@ -1019,14 +1042,11 @@ public:
 			return 0;
 		}
 
-		typename fpml::fixed_point<B, I, F>::template promote_type<B>::type op = 
-			static_cast<typename fpml::fixed_point<B, I, F>::template promote_type<B>::type>(
-				x.value_) << (I - 1);
-		typename fpml::fixed_point<B, I, F>::template promote_type<B>::type res = 0;
-		typename fpml::fixed_point<B, I, F>::template promote_type<B>::type one = 
-			(typename fpml::fixed_point<B, I, F>::template promote_type<B>::type)1 << 
-				(std::numeric_limits<typename fpml::fixed_point<B, I, F>::template promote_type<B>
-					::type>::digits - 1); 
+    using P = typename fpml::fixed_point<B, I, F>::template promote_type<B>::type;
+
+		P op = static_cast<P>( x.value_) << (I - 1);
+		P res = 0;
+		P one = P (1) << (NumDigits<P>::val - 1); 
 
 		while (one > op)
 			one >>= 2;
@@ -1041,6 +1061,8 @@ public:
 			res >>= 1;
 			one >>= 2;
 		}
+
+    res <<= 1;
 
 		fpml::fixed_point<B, I, F> root;
 		root.value_ = static_cast<B>(res);
@@ -1059,9 +1081,9 @@ template<
 	/// The base type of the fixed_point type. 
 	typename B,
 	/// The integer part bit count of the fixed_point type.
-	unsigned char I,
+	unsigned I,
 	/// The fractional part bit count of the fixed_point type.
-	unsigned char F>
+	unsigned F>
 /// Stream input operator.
 //!
 //! A value is first input to type double and then the read value is converted
@@ -1088,9 +1110,9 @@ template<
 	/// The base type of the fixed_point type. 
 	typename B,
 	/// The integer part bit count of the fixed_point type.
-	unsigned char I,
+	unsigned I,
 	/// The fractional part bit count of the fixed_point type.
-	unsigned char F>
+	unsigned F>
 /// Stream output operator.
 //!
 //! The fixed_point value is first converted to type double and then the output
@@ -1125,9 +1147,9 @@ template<
 	/// The base type of the fixed_point type. 
 	typename B,
 	/// The integer part bit count of the fixed_point type.
-	unsigned char I,
+	unsigned I,
 	/// The fractional part bit count of the fixed_point type.
-	unsigned char F>
+	unsigned F>
 class numeric_limits<fpml::fixed_point<B, I, F> >
 {
 public:

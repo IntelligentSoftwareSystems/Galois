@@ -42,9 +42,10 @@
 #include <cstdint>
 
 #include "fixed_point.h"
-#include "GeomUtils.h"
 
-using FP = fpml::fixed_point<int64_t, 24, 40>;
+using FP = fpml::fixed_point<int64_t, 31, 32>;
+
+class Vec2;
 
 struct FPutils: private boost::noncopyable {
 
@@ -53,16 +54,17 @@ struct FPutils: private boost::noncopyable {
 
   static FP sqrt (const FP& t) {
     double d = std::sqrt (double (t));
-    assert (std::fabs ((double (t.sqrt ()) - d) / d) < 1e-5);
+    FP r = FP::sqrt (t);
+    
+    assert (std::fabs ((r.dval () - d) / d) < 1e-5);
 
-    return t.sqrt ();
+    return r;
   }
 
   static bool almostEqual (const FP& d1, const FP& d2) {
-    return (fabs (d1 - d2) < EPSILON);
+    return (FP::fabs (d1 - d2) < EPSILON);
   }
 
-  class Vec2;
 
   static bool almostEqual (const Vec2& v1, const Vec2& v2);
 
@@ -70,9 +72,9 @@ struct FPutils: private boost::noncopyable {
   //! checks relative error
   static bool checkError (const FP& original, const FP& measured, bool useAssert=true) {
 
-    FP err = (measured - original).fabs ();;
-    if (original != 0.0) {
-      err = ((measured - original) / original).fabs ();
+    FP err = FP::fabs (measured - original);
+    if (original != FP (0.0)) {
+      err = FP::fabs ((measured - original) / original);
     }
 
     bool withinLim = err < ERROR_LIMIT;
@@ -80,7 +82,7 @@ struct FPutils: private boost::noncopyable {
 
     if (!withinLim) {
       fprintf (stderr, "WARNING: FPutils::checkError, relative error=%10.20g above limit, ERROR_LIMIT=%10.20g\n"
-          , err, ERROR_LIMIT ());
+          , double (err), double (ERROR_LIMIT));
     }
 
     if (useAssert) {
@@ -96,7 +98,7 @@ struct FPutils: private boost::noncopyable {
 
   static const FP& truncate (const FP& val) { return val; }
 
-  static const Vec2& truncate (const Vec2& vec) { return vec; }
+  static const Vec2& truncate (const Vec2& vec); //  { return vec; }
 
 };
 

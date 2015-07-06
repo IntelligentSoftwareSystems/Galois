@@ -180,7 +180,7 @@ public:
     }
 
     std::vector<Event> initEvents;
-    table.genInitialEvents (initEvents, endtime);
+    table.genInitialEvents (initEvents, unsigned (endtime));
 
     std::cout << "Number of initial events = " << initEvents.size () << std::endl;
 
@@ -188,14 +188,14 @@ public:
 
     timer.start ();
     Galois::Runtime::beginSampling ();
-    size_t numEvents = runSim (table, initEvents, endtime, enablePrints, logEvents);
+    size_t numEvents = runSim (table, initEvents, unsigned (endtime), enablePrints, logEvents);
     Galois::Runtime::endSampling ();
     timer.stop ();
 
     std::cout << "Billiards " << version () << ", number of events processed=" << numEvents << std::endl;
 
     if (!skipVerify) {
-      verify (verCopy, table, numEvents, endtime);
+      verify (verCopy, table, numEvents, unsigned (endtime));
     }
 
   }

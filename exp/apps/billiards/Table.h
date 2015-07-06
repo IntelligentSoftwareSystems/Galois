@@ -177,11 +177,11 @@ public:
       FP py = b0->pos ().getY ();
 
       // TODO: boundary tests don't include radius. 
-      if (px < 0.0 || px > length) {
+      if (px < FP (0.0) || px > length) {
         std::cerr << "!!!  ERROR: Ball out of X lim: " << b0->str () << std::endl;
       }
 
-      if (py < 0.0 || py > width) {
+      if (py < FP (0.0) || py > width) {
         std::cerr << "!!!  ERROR: Ball out of Y lim: " << b0->str () << std::endl;
       }
 
@@ -349,7 +349,11 @@ public:
 
     fprintf (confFile, "length, width, num_balls, ball.mass, ball.radius\n");
     fprintf (confFile, "%e, %e, %d, %e, %e\n",
-        getLength (), getWidth (), getNumBalls (), DefaultValues::BALL_MASS, DefaultValues::BALL_RADIUS);
+        double (getLength ()), 
+        double (getWidth ()), 
+        getNumBalls (), 
+        double (DefaultValues::BALL_MASS), 
+        double (DefaultValues::BALL_RADIUS));
 
     fclose (confFile);
 
@@ -369,7 +373,12 @@ public:
       
 //       fprintf (ballsFH, "%d, %g, %g, %g, %g, %g, %g\n"
   //         , b.getID (), b.mass (), b.radius (), b.pos ().getX (), b.pos ().getY (), b.vel ().getX (), b.vel ().getY ());
-      fprintf (ballsFH, "%d, %e, %e, %e, %e\n", b.getID (), b.pos ().getX (), b.pos ().getY (), b.vel ().getX (), b.vel ().getY ());
+      fprintf (ballsFH, "%d, %e, %e, %e, %e\n", 
+          b.getID (), 
+          double (b.pos ().getX ()), 
+          double (b.pos ().getY ()), 
+          double (b.vel ().getX ()), 
+          double (b.vel ().getY ()));
     }
     
     fclose (ballsFH);
@@ -389,7 +398,11 @@ public:
       const LineSegment& l = c.getLineSegment ();
 
       fprintf (cushionsFH, "%d, %g, %g, %g, %g"
-          , c.getID (), l.getBegin ().getX (), l.getBegin ().getY (), l.getEnd ().getX (), l.getEnd ().getY ());
+          , c.getID (), 
+          double (l.getBegin ().getX ()), 
+          double (l.getBegin ().getY ()), 
+          double (l.getEnd ().getX ()), 
+          double (l.getEnd ().getY ()));
     }
   }
 
@@ -434,12 +447,12 @@ protected:
       Vec2 pos = genBallPos(i, radius);
 
       // assign random initial velocity
-      FP v_x = genRand ((0.0 - DefaultValues::MAX_SPEED), DefaultValues::MAX_SPEED);
-      FP v_y = genRand ((0.0 - DefaultValues::MAX_SPEED), DefaultValues::MAX_SPEED);
+      FP v_x = genRand ((FP (0.0) - DefaultValues::MAX_SPEED), DefaultValues::MAX_SPEED);
+      FP v_y = genRand ((FP (0.0) - DefaultValues::MAX_SPEED), DefaultValues::MAX_SPEED);
 
       Vec2 vel (v_x, v_y);
 
-      assert (vel.mag () < (2.0 * DefaultValues::MAX_SPEED));
+      assert (vel.mag () < (FP (2.0) * DefaultValues::MAX_SPEED));
 
       Ball* b = new Ball (i, pos, vel, DefaultValues::BALL_MASS, radius);
 
@@ -450,7 +463,7 @@ protected:
 
   Vec2 genBallPos (size_t numGenerated, const FP& radius) {
 
-    Vec2 pos (-1.0, -1.0);
+    Vec2 pos (FP (-1.0), FP (-1.0));
 
     unsigned numAttempts = 0;;
     const unsigned MAX_ATTEMPTS = 10;
@@ -492,7 +505,7 @@ protected:
 
   FP genRand (const FP& lim_min, const FP& lim_max) {
     // FP r = FP (rand ()) / FP (RAND_MAX);
-    FP r = FP (rand () % 1024) / 1024.0;
+    FP r = double (rand () % 1024) / 1024.0;
     FP ret = lim_min + r*(lim_max - lim_min);
     
     return FPutils::truncate (ret);

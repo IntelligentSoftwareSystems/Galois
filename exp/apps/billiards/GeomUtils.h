@@ -66,6 +66,9 @@ public:
   }
 
   FP magSqrd () const {
+    double d = double (this->dot (*this));
+    assert (d >= 0.0);
+
     return this->dot (*this);
   }
 
@@ -270,7 +273,7 @@ public:
     Vec2 L = lengthVec ();
     const FP Lsquared = L.magSqrd ();
 
-    if (Lsquared == 0.0) { 
+    if (Lsquared == FP (0.0)) { 
       return (p - pt1).mag ();
 
     } else {
@@ -279,10 +282,10 @@ public:
       // V's projection on to L, normalized by |L|
       const FP r = (L.dot (V)) / Lsquared;
 
-      if (r < 0.0) {  // p lies to the left of pt1
+      if (r < FP (0.0)) {  // p lies to the left of pt1
         return (p - pt1).mag ();
 
-      } else if (r > 1.0) { // p lies to the right of pt2
+      } else if (r > FP (1.0)) { // p lies to the right of pt2
         return (p - pt2).mag ();
 
       } else { // p lies between pt1 and pt2

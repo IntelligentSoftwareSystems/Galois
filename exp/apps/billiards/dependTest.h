@@ -75,7 +75,7 @@ private:
 
     FP tdiff = e2.getTime () - e1.getTime ();
 
-    assert (tdiff >= 0.0);
+    assert (tdiff >= FP (0.0));
 
     assert (!FPutils::almostEqual (vmaxTime, tdiff));
 

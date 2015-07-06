@@ -91,7 +91,7 @@ private:
     otherObj (otherObj),
     time (time) {
 
-      assert (time >= 0.0);
+      assert (time >= FP (0.0));
 
       collCounterA = this->ball->collCounter ();
       collCounterB = this->otherObj->collCounter ();

@@ -27,6 +27,7 @@
 
 
 #include "GeomUtils.h"
+#include "FPutils.h"
 
 Vec2 operator + (const Vec2& v1, const Vec2& v2) {
 
@@ -42,21 +43,21 @@ Vec2 operator - (const Vec2& v1, const Vec2& v2) {
   return diff;
 }
 
-Vec2 operator / (const Vec2& v1, const double s) {
+Vec2 operator / (const Vec2& v1, const FP& s) {
 
   Vec2 sv (v1);
   sv /= s;
   return sv;
 }
 
-Vec2 operator * (const Vec2& v1, const double s) {
+Vec2 operator * (const Vec2& v1, const FP& s) {
 
   Vec2 sv (v1);
   sv *= s;
   return sv;
 }
 
-Vec2 operator * (const double s, const Vec2& v1) {
+Vec2 operator * (const FP& s, const Vec2& v1) {
   return v1 * s;
 }
 

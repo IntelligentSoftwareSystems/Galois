@@ -79,9 +79,9 @@ public:
     m_timestamp (time),
     m_collCntr (0) {
 
-      assert (mass > 0.0);
-      assert (radius > 0.0);
-      assert (time >= 0.0);
+      assert (mass > FP (0.0));
+      assert (radius > FP (0.0));
+      assert (time >= FP (0.0));
       
       truncateAll ();
     } 
@@ -114,7 +114,7 @@ public:
   virtual std::string str () const {
     char s [1024];
     sprintf (s, "[Ball-%d,ts=%10.10f,pos=%s,vel=%s,cc=%d]"
-        , m_id, m_timestamp, m_pos.str ().c_str (), m_vel.str ().c_str (), m_collCntr);
+        , m_id, double (m_timestamp), m_pos.str ().c_str (), m_vel.str ().c_str (), m_collCntr);
 
     return s;
   }
@@ -144,11 +144,13 @@ public:
 
   void update (const Vec2& newVel, const FP& time) {
 
-    assert (time >= m_timestamp && "Time update in the past?");
 
     if (time < m_timestamp) {
-      std::cerr << "Time update in the past" << std::endl;
-      abort ();
+      if (!FPutils::almostEqual (time, m_timestamp)) {
+        assert (time >= m_timestamp && "Time update in the past?");
+        std::cerr << "Time update in the past" << std::endl;
+        abort ();
+      }
     }
 
     Vec2 newPos = this->pos (time); 
@@ -164,7 +166,13 @@ public:
 
   Vec2 pos (const FP& t) const {
 
-    assert (t >= m_timestamp);
+    if (t < m_timestamp) {
+      if (!FPutils::almostEqual (t, m_timestamp)) {
+        assert (t >= m_timestamp);
+        std::cerr << "Time in the past" << std::endl;
+        abort ();
+      }
+    }
     return (m_pos + m_vel * (t - m_timestamp)); 
   }
 
@@ -181,7 +189,7 @@ public:
 
   Vec2 mom () const { return mom (this->vel ()); }
 
-  FP ke (const Vec2& _vel) const { return (_vel.magSqrd () * mass ())/2.0; }
+  FP ke (const Vec2& _vel) const { return (_vel.magSqrd () * mass ())/FP (2.0); }
 
   FP ke () const { return ke (this->vel ()); }
   

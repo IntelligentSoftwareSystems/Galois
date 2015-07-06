@@ -105,7 +105,7 @@ Galois::optional<Event> Sector::earliestSectorEntry (const Ball* ball, const FP&
 
     if (p.first) {
 
-      assert (p.second >= 0.0);
+      assert (p.second >= FP (0.0));
 
 
       if (FPutils::almostEqual (p.second, minTime)) {
@@ -155,7 +155,7 @@ Galois::optional<Event> Sector::earliestSectorEntry (const Ball* ball, const FP&
 
     if (p.first) {
 
-      assert (p.second >= 0.0);
+      assert (p.second >= FP (0.0));
 
 
       if (FPutils::almostEqual (p.second, minTime)) {
@@ -182,7 +182,7 @@ Galois::optional<Event> Sector::earliestSectorEntry (const Ball* ball, const FP&
   Galois::optional<Event> e;
 
   if (minSector != nullptr) { 
-    assert (minTime >= 0.0);
+    assert (minTime >= FP (0.0));
     assert (!ball->hasSector (minSector));
     assert (!minSector->hasBall (ball));
 
@@ -222,8 +222,8 @@ Galois::optional<Event> Sector::earliestSectorLeave (const Ball* ball, const FP&
     // 1 vector is along the length while other is along the left normal. 
 
     Vec2 unitL = sides[i].lengthVec ().unit ();
-    Vec2 v1 = 2 * brad * unitL;
-    Vec2 v2 = 2 * brad * unitL.leftNormal ();
+    Vec2 v1 = FP (2) * brad * unitL;
+    Vec2 v2 = FP (2) * brad * unitL.leftNormal ();
 
 
     Vec2 outerBeg = sides[i].getBegin () + v2 - v1;
@@ -234,9 +234,9 @@ Galois::optional<Event> Sector::earliestSectorLeave (const Ball* ball, const FP&
     std::pair<bool, FP> p = Collision::computeCollisionTime (*ball, outer);
 
     if (p.first) {
-      assert (p.second >= 0.0);
+      assert (p.second >= FP (0.0));
 
-      if (minTime == -1.0 || p.second < minTime) {
+      if (minTime == FP (-1.0) || p.second < minTime) {
         minTime = p.second;
       }
     }
@@ -244,8 +244,8 @@ Galois::optional<Event> Sector::earliestSectorLeave (const Ball* ball, const FP&
 
 
 
-  if (minTime != -1.0 && minTime < endtime) {
-    assert (minTime > 0.0);
+  if (minTime != FP (-1.0) && minTime < endtime) {
+    assert (minTime > FP (0.0));
     assert (ball->hasSector (this));
     assert (this->hasBall (ball));
 
