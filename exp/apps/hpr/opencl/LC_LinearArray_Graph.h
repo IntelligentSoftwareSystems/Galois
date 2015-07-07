@@ -83,7 +83,7 @@ struct LC_LinearArray_Graph {
 /////////////////////////////////////////////////////////////////////////////////////////////
    LC_LinearArray_Graph() :
          SizeEdgeData(/*sizeof(EdgeDataType)*/0 / sizeof(unsigned int)), SizeNodeData(sizeof(NodeDataType) / sizeof(unsigned int)) {
-      fprintf(stderr, "Created LC_LinearArray_Graph with %d node %d edge data.", (int) SizeNodeData, (int) SizeEdgeData);
+//      fprintf(stderr, "Created LC_LinearArray_Graph with %d node %d edge data.", (int) SizeNodeData, (int) SizeEdgeData);
       _max_degree = _num_nodes = _num_edges = 0;
       gpu_graph = 0;
    }
@@ -130,7 +130,6 @@ struct LC_LinearArray_Graph {
       const size_t gg_num_edges = ggraph.sizeEdges();
       init(gg_num_nodes, gg_num_edges);
       const int * ptr = (int *) this->gpu_graph->host_ptr();
-//      fprintf(stderr, "Loading from GaloisGraph [%d,%d].\n", (int)gg_num_nodes, (int)gg_num_edges);
       int edge_counter = 0;
       int node_counter = 0;
       for (auto n = ggraph.begin(); n != ggraph.end(); n++, node_counter++) {
@@ -143,11 +142,39 @@ struct LC_LinearArray_Graph {
             edge_counter++;
          }
       }
-      assert(node_counter==gg_num_nodes);
+      if(node_counter!=gg_num_nodes)fprintf(stderr, "FAILED EDGE-COMPACTION :: %d, %d\n", node_counter, gg_num_nodes);
       outgoing_index()[gg_num_nodes] = edge_counter;
       assert(edge_counter == gg_num_edges && "Failed to add all edges.");
-//      fprintf(stderr, "Loaded from GaloisGraph [%d,%d,%d,%d].\n", ptr[0], ptr[1], ptr[2], ptr[3]);
    }
+
+   template<typename GaloisGraph>
+      void load_from_galois(GaloisGraph & ggraph, int gg_num_nodes, int gg_num_edges, int num_ghosts) {
+         typedef typename GaloisGraph::GraphNode GNode;
+   //      const size_t gg_num_nodes = ggraph.size();
+   //      const size_t gg_num_edges = ggraph.sizeEdges();
+         init(gg_num_nodes+num_ghosts, gg_num_edges);
+         const int * ptr = (int *) this->gpu_graph->host_ptr();
+         fprintf(stderr, "Loading from GaloisGraph [%d,%d,%d].\n", (int)gg_num_nodes, (int)gg_num_edges, num_ghosts);
+         int edge_counter = 0;
+         int node_counter = 0;
+         for (auto n = ggraph.begin(); n != ggraph.begin()+gg_num_nodes; n++, node_counter++) {
+            int src_node = *n;
+            node_data()[src_node] = ggraph.getData(*n);
+            outgoing_index()[src_node] = edge_counter;
+            for (auto nbr = ggraph.edge_begin(*n); nbr != ggraph.edge_end(*n); ++nbr) {
+               GNode dst = ggraph.getEdgeDst(*nbr);
+               out_neighbors()[edge_counter] = dst;
+               edge_counter++;
+            }
+         }
+         for(;node_counter<gg_num_nodes+num_ghosts;node_counter++){
+            outgoing_index()[node_counter] = edge_counter;
+         }
+         outgoing_index()[gg_num_nodes] = edge_counter;
+         if(node_counter!=gg_num_nodes)fprintf(stderr, "FAILED EDGE-COMPACTION :: %d, %d, %d\n", node_counter, gg_num_nodes, num_ghosts);
+         assert(edge_counter == gg_num_edges && "Failed to add all edges.");
+   //      fprintf(stderr, "Loaded from GaloisGraph [%d,%d,%d,%d].\n", ptr[0], ptr[1], ptr[2], ptr[3]);
+      }
 #endif
    ~LC_LinearArray_Graph() {
       deallocate();
