@@ -9,6 +9,7 @@
 struct CUDA_Context {
   int device;
   int id;
+  int pr_it;
   size_t nowned;
   size_t g_offset;
   CSRGraphTy hg;
@@ -56,12 +57,12 @@ __global__ void initialize_nout(CSRGraphTy graph, index_type nowned, int *nout) 
 
 
 __global__ void pagerank(CSRGraphTy graph, index_type nowned, 
-			 float *pr, int *nout) {
+			 float *pr, float *pr_next, int *nout) {
   int tid = TID_1D;
   int num_threads = TOTAL_THREADS_1D;
-  float sum = 0;
 
   for(int i = tid; i < nowned; i += num_threads) {
+    float sum = 0.0;
 
     index_type edge_end = graph.getFirstEdge(i + 1);
 
@@ -76,7 +77,7 @@ __global__ void pagerank(CSRGraphTy graph, index_type nowned,
 
     float value = (1.0 - alpha) * sum + alpha;
     float diff = fabs(value - pr[i]);
-    pr[i] = value;
+    pr_next[i] = value;
   }
 }
 
@@ -95,6 +96,7 @@ struct CUDA_Context *get_CUDA_context(int id) {
   struct CUDA_Context *p;
   p = (struct CUDA_Context *) calloc(1, sizeof(struct CUDA_Context));
   p->id = id;
+  p->pr_it = 0;
   return p;
 }
 
@@ -123,13 +125,13 @@ bool init_CUDA_context(struct CUDA_Context *ctx, int device) {
 }
 
 float getNodeValue_CUDA(struct CUDA_Context *ctx, unsigned LID) {
-  float *pr = ctx->pr[0].cpu_rd_ptr();
+  float *pr = ctx->pr[ctx->pr_it].cpu_rd_ptr();
 
   return pr[LID];
 }
 
 void setNodeValue_CUDA(struct CUDA_Context *ctx, unsigned LID, float v) {
-  float *pr = ctx->pr[0].cpu_wr_ptr();
+  float *pr = ctx->pr[ctx->pr_it].cpu_wr_ptr();
   
   pr[LID] = v;
 }
@@ -210,7 +212,11 @@ void initialize_graph_cuda(struct CUDA_Context *ctx) {
 }
 
 void pagerank_cuda(struct CUDA_Context *ctx) {  
-  pagerank<<<14, 256>>>(ctx->gg, ctx->nowned, ctx->pr[0].gpu_wr_ptr(), ctx->nout.gpu_wr_ptr());
+  pagerank<<<14, 256>>>(ctx->gg, ctx->nowned, 
+			ctx->pr[ctx->pr_it].gpu_wr_ptr(), 
+			ctx->pr[ctx->pr_it ^ 1].gpu_wr_ptr(), 
+			ctx->nout.gpu_wr_ptr());
+  ctx->pr_it ^= 1;  // not sure this is to be done here
   check_cuda(cudaDeviceSynchronize());
 }
 
