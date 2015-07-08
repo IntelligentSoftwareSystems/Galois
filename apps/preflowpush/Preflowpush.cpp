@@ -33,6 +33,8 @@
 
 #include "Lonestar/BoilerPlate.h"
 
+#include <boost/iterator/iterator_adaptor.hpp>
+
 #include <iostream>
 #include <fstream>
 
@@ -185,14 +187,101 @@ void checkHeights() {
   }
 }
 
-Graph::edge_iterator findEdge(Graph& g, GNode src, GNode dst) {
-  Graph::edge_iterator ii = g.edge_begin(src, Galois::MethodFlag::UNPROTECTED), ei = g.edge_end(src, Galois::MethodFlag::UNPROTECTED);
-  for (; ii != ei; ++ii) {
+
+Graph::edge_iterator findEdgeLog2 (Graph& g, GNode dst, Graph::edge_iterator i, Graph::edge_iterator end_i) {
+  
+  struct EdgeDstIter: 
+    public boost::iterator_facade<
+      EdgeDstIter,
+      GNode,
+      boost::random_access_traversal_tag,
+      GNode>
+  {
+    using Base = boost::iterator_facade<
+      EdgeDstIter, 
+      GNode,
+      boost::random_access_traversal_tag,
+      GNode>;
+
+    Graph* g;
+    Graph::edge_iterator ei;
+
+    EdgeDstIter (void): g (nullptr)
+    {}
+
+    EdgeDstIter (Graph* g, Graph::edge_iterator ei):
+      g (g), ei (ei)
+    {}
+
+  private:
+
+    friend boost::iterator_core_access;
+
+    GNode dereference (void) const {
+      return g->getEdgeDst (ei);
+    }
+
+    void increment (void) {
+      ++ei;
+    }
+
+    void decrement (void) {
+      --ei;
+    }
+
+    bool equal (const EdgeDstIter& that) const {
+      assert (this->g == that.g);
+      return this->ei == that.ei;
+    }
+
+    void advance (ptrdiff_t n) {
+      ei += n;
+    }
+
+    ptrdiff_t distance_to (const EdgeDstIter& that) const {
+      assert (this->g == that.g);
+
+      return that.ei - this->ei;
+    }
+
+  };
+                      
+  EdgeDstIter ai (&g, i);
+  EdgeDstIter end_ai (&g, end_i);
+
+  auto ret = std::lower_bound (ai, end_ai, dst);
+
+  assert (ret != end_ai);
+  assert (*ret == dst);
+
+  return ret.ei;
+
+}
+
+Graph::edge_iterator findEdgeLinear (Graph& g, GNode dst, Graph::edge_iterator beg_e, Graph::edge_iterator end_e) {
+
+  auto ii = beg_e;
+  for (; ii != end_e; ++ii) {
     if (g.getEdgeDst(ii) == dst)
       break;
   }
-  assert(ii != ei); // Never return the end iterator
+  assert(ii != end_e); // Never return the end iterator
   return ii;
+}
+
+Graph::edge_iterator findEdge(Graph& g, GNode src, GNode dst) {
+
+  auto i = g.edge_begin (src, Galois::MethodFlag::UNPROTECTED);
+  auto end_i = g.edge_end (src, Galois::MethodFlag::UNPROTECTED);
+
+  if ((end_i - i) < 32) { 
+    return findEdgeLinear (g, dst, i, end_i);
+
+  } else {
+    return findEdgeLog2 (g, dst, i, end_i);
+
+  }
+
 }
 
 void checkConservation(Config& orig) {
@@ -665,6 +754,18 @@ void writePfpGraph(const std::string& inputFile, const std::string& outputFile) 
   edge_value_type* rawEdgeData = p.finish<edge_value_type>();
   std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
 
+  using Wnode = Writer::GraphNode;
+
+  struct IdLess {
+    bool operator()(const Galois::Graph::EdgeSortValue<Wnode,edge_value_type>& e1, const Galois::Graph::EdgeSortValue<Wnode,edge_value_type>& e2) const {
+      return e1.dst < e2.dst;
+    }
+  };
+
+  for (Writer::iterator i = p.begin (), end_i = p.end (); i != end_i; ++i) {
+    p.sortEdges<edge_value_type> (*i, IdLess ());
+  }
+
   p.toFile(outputFile);
 }
 
@@ -732,6 +833,30 @@ void initializePreflow(C& initial) {
       initial.push_back(dst);
   }
 }
+
+void checkSorting (void) {
+
+  for (auto n = app.graph.begin (), end_n = app.graph.end (); n != end_n; ++n) {
+    Galois::optional<GNode> prevDst;
+
+    for (auto e = app.graph.edge_begin (*n, Galois::MethodFlag::UNPROTECTED)
+        , end_e = app.graph.edge_end (*n, Galois::MethodFlag::UNPROTECTED); e != end_e; ++e) {
+
+      GNode dst = app.graph.getEdgeDst (e);
+
+      if (prevDst) {
+        Node& prevNode = app.graph.getData (*prevDst, Galois::MethodFlag::UNPROTECTED);
+        Node& currNode = app.graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
+
+        GALOIS_ASSERT (prevNode.id < currNode.id, "Adjacency list unsorted");
+      }
+
+      prevDst = dst;
+    }
+
+  }
+}
+
 
 void run() {
   typedef Galois::WorkList::Deterministic<> DWL;
@@ -810,6 +935,10 @@ int main(int argc, char** argv) {
   LonestarStart(argc, argv, name, desc, url);
 
   initializeGraph(filename, sourceId, sinkId, &app);
+
+  // TODO: remove later
+  checkSorting ();
+
   if (relabelInt == 0) {
     app.global_relabel_interval = app.graph.size() * ALPHA + app.graph.sizeEdges() / 3;
   } else {
