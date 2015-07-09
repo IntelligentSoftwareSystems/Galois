@@ -2,32 +2,38 @@
  * @file
  * @section License
  *
- * Galois, a framework to exploit amorphous data-parallelism in irregular
- * programs.
+ * This file is part of Galois.  Galoisis a gramework to exploit
+ * amorphous data-parallelism in irregular programs.
  *
- * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
- * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
- * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
- * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
- * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
- * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
- * shall University be liable for incidental, special, indirect, direct or
- * consequential damages or loss of profits, interruption of business, or
- * related expenses which may arise from use of Software or Documentation,
- * including but not limited to those resulting from defects in Software and/or
- * Documentation, or loss or inaccuracy of data of any kind.
+ * Galois is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * Galois is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with Galois.  If not, see
+ * <http://www.gnu.org/licenses/>.
+ *
+ * @section Copyright
+ *
+ * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * reserved.
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#ifndef GALOIS_RUNTIME_ALTCHUNKED_H
-#define GALOIS_RUNTIME_ALTCHUNKED_H
+#ifndef GALOIS_WORKLIST_ALTCHUNKED_H
+#define GALOIS_WORKLIST_ALTCHUNKED_H
 
 #include "Galois/FixedSizeRing.h"
 #include "Galois/Threads.h"
 #include "Galois/Runtime/PerThreadStorage.h"
-#include "Galois/Runtime/ll/CompilerSpecific.h"
-#include "Galois/Runtime/ll/PtrLock.h"
+#include "Galois/Substrate/CompilerSpecific.h"
+#include "Galois/Substrate/PtrLock.h"
 #include "Galois/Runtime/mm/Mem.h"
 #include "WLCompileCheck.h"
 
@@ -39,83 +45,8 @@ struct ChunkHeader {
   ChunkHeader* prev;
 };
 
-#if 0
-class AtomicChunkedDeque {
-  Runtime::LL::PtrLock<ChunkHeader, true> head;
-  ChunkHeader* volatile tail;
-
-public:
-
-  void push_front(ChunkHeader* obj) {
-    head.lock();
-    obj->prev = 0;
-    obj->next = head.getValue();
-    if (obj->next)
-      obj->next->prev = obj;
-    if (!tail)
-      tail = obj;
-    head.unlock_and_set(obj);
-  }
-
-  void push_back(ChunkHeader* obj) {
-    head.lock();
-    obj->next = 0;
-    obj->prev = tail;
-    if (obj->prev)
-      obj->prev->next = obj;
-    tail = obj;
-    if (head.getValue())
-      head.unlock();
-    else
-      head.unlock_and_set(obj);
-  }
-
-  ChunkHeader* pop_back() {
-    //lockfree empty fast path
-    if (!tail) return 0;
-    head.lock();
-    ChunkHeader* retval = tail;
-    if (retval) {
-      if (retval->prev)
-	retval->prev->next = 0;
-      tail = retval->prev;
-      if (head.getValue() == retval)
-	head.unlock_and_clear();
-      else
-	head.unlock();
-      //clean up obj
-      retval->prev = retval->next = 0;
-      return retval;
-    } else {
-      head.unlock();
-      return 0;
-    }
-  }
-
-  ChunkHeader* pop_front() {
-    //lockfree empty fast path
-    if (!tail) return 0; //tail is just as useful as head
-    head.lock();
-    ChunkHeader* retval = head.getValue();
-    if (retval) {
-      if (retval->next)
-	retval->next->prev = 0;
-      if (tail == retval)
-	tail = 0;
-      head.unlock_and_set(retval->next);
-      //clean up obj
-      retval->prev = retval->next = 0;
-      return retval;
-    } else {
-      head.unlock();
-      return 0;
-    }
-  }
-};
-#endif
-
 class AltChunkedQueue {
-  Runtime::LL::PtrLock<ChunkHeader, true> head;
+  Substrate::PtrLock<ChunkHeader> head;
   ChunkHeader* tail;
 
   void prepend(ChunkHeader* C) {
@@ -220,7 +151,7 @@ public:
 };
 
 class AltChunkedStack {
-  Runtime::LL::PtrLock<ChunkHeader, true> head;
+  Substrate::PtrLock<ChunkHeader> head;
 
   void prepend(ChunkHeader* C) {
     //Find tail of stolen stuff
