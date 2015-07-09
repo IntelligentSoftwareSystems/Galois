@@ -105,7 +105,7 @@ struct LC_LinearArray_Graph {
       int edge_counter = 0;
       for (auto n = ggraph.begin(); n != ggraph.end(); ++n) {
          //fprintf(stderr, "[%6.6g, %d], ", pg.g.getData(*n).value, pg.g.getData(*n).nout);
-         node_data()[old_to_new[*n]] = ggraph.getData(*n);
+         getData()[old_to_new[*n]] = ggraph.getData(*n);
          outgoing_index()[old_to_new[*n]] = edge_counter;
          for (auto nbr = ggraph.edge_begin(*n); nbr != ggraph.edge_end(*n); ++nbr) {
             GNode dst = *nbr;
@@ -134,7 +134,7 @@ struct LC_LinearArray_Graph {
       int node_counter = 0;
       for (auto n = ggraph.begin(); n != ggraph.end(); n++, node_counter++) {
          int src_node = *n;
-         node_data()[src_node] = ggraph.getData(*n);
+         getData()[src_node] = ggraph.getData(*n);
          outgoing_index()[src_node] = edge_counter;
          for (auto nbr = ggraph.edge_begin(*n); nbr != ggraph.edge_end(*n); ++nbr) {
             GNode dst = ggraph.getEdgeDst(*nbr);
@@ -159,7 +159,7 @@ struct LC_LinearArray_Graph {
          int node_counter = 0;
          for (auto n = ggraph.begin(); n != ggraph.begin()+gg_num_nodes; n++, node_counter++) {
             int src_node = *n;
-            node_data()[src_node] = ggraph.getData(*n);
+            getData()[src_node] = ggraph.getData(*n);
             outgoing_index()[src_node] = edge_counter;
             for (auto nbr = ggraph.edge_begin(*n); nbr != ggraph.edge_end(*n); ++nbr) {
                GNode dst = ggraph.getEdgeDst(*nbr);
@@ -185,11 +185,11 @@ struct LC_LinearArray_Graph {
    size_t size() {
       return gpu_graph->size();
    }
-   NodeDataType * node_data() {
+   NodeDataType * getData() {
       return (NodeDataType*) (gpu_graph->host_data + 4);
    }
    unsigned int * outgoing_index() {
-      return (unsigned int*) (node_data()) + _num_nodes * SizeNodeData;
+      return (unsigned int*) (getData()) + _num_nodes * SizeNodeData;
    }
    unsigned int num_neighbors(NodeIDType node) {
       return outgoing_index()[node + 1] - outgoing_index()[node];
@@ -272,15 +272,15 @@ struct LC_LinearArray_Graph {
 /////////////////////////////////////////////////////////////////////////////////////////////
    void print_node(unsigned int idx, const char * post = "") {
       if (idx < _num_nodes) {
-         std::cout << "N-" << idx << "(" << (node_data())[idx] << ")" << " :: [";
+         std::cout << "N-" << idx << "(" << (getData())[idx] << ")" << " :: [";
          for (size_t i = (outgoing_index())[idx]; i < (outgoing_index())[idx + 1]; ++i) {
             //std::cout << " " << (neighbors())[i] << "(" << (edge_data())[i] << "), ";
-            std::cout << " " << (out_neighbors())[i] << "(" << (out_edge_data())[i] << "<" << node_data()[out_neighbors()[i]] << ">" << "), ";
+            std::cout << " " << (out_neighbors())[i] << "(" << (out_edge_data())[i] << "<" << getData()[out_neighbors()[i]] << ">" << "), ";
          }
          std::cout << "]##[";
          for (size_t i = (incoming_index())[idx]; i < (incoming_index())[idx + 1]; ++i) {
             //std::cout << " " << (in_neighbors())[i] << "(" << (in_edge_data())[i] << "), ";
-            std::cout << " " << (in_neighbors())[i] << "(" << (in_edge_data())[i] << "<" << node_data()[in_neighbors()[i]] << ">" << "), ";
+            std::cout << " " << (in_neighbors())[i] << "(" << (in_edge_data())[i] << "<" << getData()[in_neighbors()[i]] << ">" << "), ";
          }
          std::cout << "]" << post;
       }
@@ -288,15 +288,15 @@ struct LC_LinearArray_Graph {
    }
    void print_node_nobuff(unsigned int idx, const char * post = "") {
       if (idx < _num_nodes) {
-         fprintf(stderr, "N-%d(%d)::[", idx, (node_data())[idx]);
+         fprintf(stderr, "N-%d(%d)::[", idx, (getData())[idx]);
          for (size_t i = (outgoing_index())[idx]; i < (outgoing_index())[idx + 1]; ++i) {
             //std::cout << " " << (neighbors())[i] << "(" << (edge_data())[i] << "), ";
-            fprintf(stderr, "%d ( < %d(%d) > ),  ", (out_neighbors())[i], (out_edge_data())[i], node_data()[out_neighbors()[i]]);
+            fprintf(stderr, "%d ( < %d(%d) > ),  ", (out_neighbors())[i], (out_edge_data())[i], getData()[out_neighbors()[i]]);
          }
          fprintf(stderr, "]##[");
          for (size_t i = (incoming_index())[idx]; i < (incoming_index())[idx + 1]; ++i) {
             //std::cout << " " << (in_neighbors())[i] << "(" << (in_edge_data())[i] << "), ";
-            fprintf(stderr, "%d( %d <%d> ), ", (in_neighbors())[i], (in_edge_data())[i], node_data()[in_neighbors()[i]]);
+            fprintf(stderr, "%d( %d <%d> ), ", (in_neighbors())[i], (in_edge_data())[i], getData()[in_neighbors()[i]]);
          }
          fprintf(stderr, "]%s", post);
       }
@@ -396,7 +396,7 @@ struct LC_LinearArray_Graph {
    ////////////##############################################################///////////
    ////////////##############################################################///////////
    unsigned int verify() {
-      NodeDataTy * t_node_data = node_data();
+      NodeDataTy * t_node_data = getData();
       unsigned int * t_incoming_index = outgoing_index();
       unsigned int * t_neighbors = out_neighbors();
       EdgeDataType * t_in_edge_data = out_edge_data();
@@ -423,7 +423,7 @@ struct LC_LinearArray_Graph {
    ////////////##############################################################///////////
    ////////////##############################################################///////////
    unsigned int verify_in() {
-      unsigned int * t_node_data = node_data();
+      unsigned int * t_node_data = getData();
       unsigned int * t_incoming_index = incoming_index();
       unsigned int * t_neighbors = in_neighbors();
       unsigned int * t_in_edge_data = in_edge_data();
