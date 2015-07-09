@@ -497,7 +497,7 @@ public:
 
           if (false) {
             std::cout.precision (10);
-            std::cout << "At time: " << std::fixed << p.second << " Ball b=" << b->str () << 
+            std::cout << "At time: " << std::fixed << double (p.second) << " Ball b=" << b->str () << 
               " can collide with=" << underTest->str () << std::endl;
           }
 

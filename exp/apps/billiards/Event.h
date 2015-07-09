@@ -259,7 +259,7 @@ public:
     std::ostringstream s;
 
     s.precision (10);
-    s << "[time=" << std::fixed <<  time << ", kind=" << kindName;
+    s << "[time=" << std::fixed <<  double (time) << ", kind=" << kindName;
 
     s << std::setw (20) << std::setfill (' ') << "ball=" << ball->str ();
 
