@@ -46,8 +46,8 @@ template<typename T>
 struct CacheLineStorage {
   alignas(GALOIS_CACHE_LINE_SIZE) T data;
 
-  char buffer[GALOIS_CACHE_LINE_SIZE - sizeof(T)];
-  static_assert(sizeof(T) < GALOIS_CACHE_LINE_SIZE, "Too large a type");
+  char buffer[GALOIS_CACHE_LINE_SIZE - (sizeof(T) % GALOIS_CACHE_LINE_SIZE)];
+  //static_assert(sizeof(T) < GALOIS_CACHE_LINE_SIZE, "Too large a type");
 
   CacheLineStorage() :data() {}
   CacheLineStorage(const T& v) :data(v) {}

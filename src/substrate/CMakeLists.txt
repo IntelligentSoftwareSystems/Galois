@@ -20,4 +20,4 @@ endif()
 
 
 add_library(galois_substrate STATIC ${sources})
-target_include_directories(galois_substrate PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+#target_include_directories(galois_substrate PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)

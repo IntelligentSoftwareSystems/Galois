@@ -67,18 +67,18 @@ public:
  * barrier to the new number of active threads. If that may
  * happen, use {@link createSimpleBarrier()} instead. 
  */
-Barrier& getSystemBarrier();
+Barrier& getSystemBarrier(unsigned activeThreads);
 
 /**
  * Create specific types of barriers.  For benchmarking only.  Use
  * getSystemBarrier() for all production code
  */
 namespace benchmarking {
-Barrier& getPthreadBarrier();
-Barrier& getMCSBarrier();
-Barrier& getTopoBarrier();
-Barrier& getCountingBarrier();
-Barrier& getDisseminationBarrier();
+Barrier& getPthreadBarrier(unsigned);
+Barrier& getMCSBarrier(unsigned);
+Barrier& getTopoBarrier(unsigned);
+Barrier& getCountingBarrier(unsigned);
+Barrier& getDisseminationBarrier(unsigned);
 }
 
 /**
