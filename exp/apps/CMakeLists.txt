@@ -27,3 +27,5 @@ add_subdirectory(visualize)
 add_subdirectory(treecodes)
 add_subdirectory(delaunayrefinement_exp)
 add_subdirectory(hpr)
+add_subdirectory(hprgen)
+
