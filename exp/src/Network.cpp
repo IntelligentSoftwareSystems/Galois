@@ -196,7 +196,7 @@ NetworkBackend::~NetworkBackend() {
   }
 }
 
-NetworkBackend::NetworkBackend(unsigned size) :sz(size) {}
+NetworkBackend::NetworkBackend(unsigned size) :sz(size),_ID(0),_Num(0) {}
 
 NetworkInterface& Galois::Runtime::getSystemNetworkInterface() {
   //return makeNetworkRouted();

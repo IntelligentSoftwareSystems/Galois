@@ -75,12 +75,10 @@ __kernel void pagerank(__global int * graph_ptr,__global float* aux,  int num_it
    if(my_id < num_items) {
       double sum = 0;
       __global NodeData * sdata = node_data(&graph, my_id);
-//      printf("ND[%d->%d]", my_id,sdata->nout);
       for(int i= out_neighbors_begin(&graph, my_id); i<out_neighbors_end(&graph, my_id); ++i) {
          int dst_id = out_neighbors(&graph, my_id, i);
          __global NodeData * ddata = node_data(&graph, dst_id);
          sum+= ddata->value / ddata->nout;
-//         printf("PR[%d->%d]", my_id,dst_id);
       }//end for
       float value= (1.0 - alpha) * sum + alpha;
       float diff = fabs(value - sdata->value);
