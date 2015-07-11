@@ -107,7 +107,7 @@ public:
     // actually discr is the actual discriminant divided by 4
     FP discr = (diffVdiffD * diffVdiffD) - (diffV.magSqrd ()) * (diffD.magSqrd () - sumRadiusSqrd);
 
-    if (discr >= FP (0.0)) {
+    if (discr > FP (0.0)) {
       // solution is real
       FP t1 = (-diffVdiffD - FPutils::sqrt (discr)) / diffV.magSqrd ();
       FP t2 = (-diffVdiffD + FPutils::sqrt (discr)) / diffV.magSqrd ();

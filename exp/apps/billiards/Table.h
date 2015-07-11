@@ -147,6 +147,39 @@ public:
     }
   }
 
+  void diffEventLogs (const Table& that, const char* const thatName) {
+
+    for (size_t i = 0; i < numBalls; ++i) {
+      std::printf ("===== Events for Ball %zd =======\n", i);
+
+      if (this->eventsPerBall[i].size () != that.eventsPerBall[i].size ()) {
+        std::printf ("Number of events for Ball %zd differ with %s\n", i, thatName);
+      }
+
+      for (size_t j = 0; j < std::max (this->eventsPerBall[i].size (), that.eventsPerBall[i].size ()); ++j) {
+
+        const Event& e1 = this->eventsPerBall[i][j];
+        const Event& e2 = that.eventsPerBall[i][j];
+
+        if (j >= this->eventsPerBall[i].size ()) {
+          std::printf ("Only %s has event %s\n",  thatName, e2.str ().c_str ());
+          continue;
+        }
+
+        if (j >= that.eventsPerBall[i].size ()) {
+          std::printf ("%s does not have event %s\n",  thatName, e1.str ().c_str ());
+          continue;
+        }
+
+        if (e1 != e2) {
+          std::printf ("Differing events: this has %s\n %s has %s\n", e1.str ().c_str (), thatName, e2.str ().c_str ());
+        }
+        
+      }
+
+    }
+  }
+
   void genInitialEvents (std::vector<Event>& initEvents, const FP& endtime) {
 
     initEvents.clear ();

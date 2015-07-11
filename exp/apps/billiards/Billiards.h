@@ -321,12 +321,13 @@ void Billiards::verify (const TableSectored& initial, TableSectored& final, size
   if (!result) {
     std::cerr << "ERROR, Comparison against serial ordered simulation failed due to above differences" << std::endl;
 
-    std::cout << "<<<<<<<<<<< Event logs from Original Run >>>>>>>>>>>>>" << std::endl;
-    final.printEventLogs ();
+    // std::cout << "<<<<<<<<<<< Event logs from Original Run >>>>>>>>>>>>>" << std::endl;
+    // final.printEventLogs ();
+// 
+    // std::cout << "<<<<<<<<<<< Event logs from Verification Run >>>>>>>>>>>>>" << std::endl;
+    // serialTable.printEventLogs ();
 
-    std::cout << "<<<<<<<<<<< Event logs from Verification Run >>>>>>>>>>>>>" << std::endl;
-    serialTable.printEventLogs ();
-
+    final.diffEventLogs (serialTable, "Serial Flat Run");
 
     abort ();
 
