@@ -73,7 +73,7 @@ offset +=graph->_num_edges*graph->_edge_data_size;
 }
 
 //##########################################
-__kernel void sssp(__global int * graph_ptr,__global uint* aux,  int num_items) {
+__kernel void sssp(__global int * graph_ptr,__global uint* aux, __global int * meta,  int num_items) {
    int my_id = get_global_id(0);
    __local GraphType graph;
    initialize(&graph, graph_ptr);
@@ -84,7 +84,12 @@ __kernel void sssp(__global int * graph_ptr,__global uint* aux,  int num_items) 
          int dst_id = out_neighbors(&graph, my_id, i);
          NodeData ddata = *node_data(&graph, dst_id);
          EdgeData ewt = *out_edge_data(&graph, my_id, i);
-         min_dist = min(min_dist, ewt+ddata);
+         if(ewt + ddata < min_dist){
+            min_dist = ewt+ddata;
+            meta[0]=1;
+         }
+         //min_dist = min(min_dist, ewt+ddata);
+
       }//end for
       aux[my_id] = min_dist;
    }//end if

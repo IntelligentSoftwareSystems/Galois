@@ -73,6 +73,7 @@ typedef unsigned NodeDataType;
 typedef Galois::Graph::LC_CSR_Graph<NodeDataType, unsigned int> Graph;
 typedef typename Graph::GraphNode GNode;
 std::map<GNode, NodeDataType> buffered_updates;
+bool hasChanged(false);
 
 //////////////////////////////////////////////////////////////////////////////////////
 struct CUDA_Context *cuda_ctx;
@@ -110,7 +111,6 @@ struct pGraph {
  * all the nodes assigning the next 'pernum' nodes to the ith partition.
  * The lastNodes is used to find the host by a binary search.
  **********************************************************************************/
-
 void loadLastNodes(pGraph &g, size_t size, unsigned numHosts) {
    if (numHosts == 1)
       return;
@@ -217,13 +217,15 @@ struct dSSSP {
    Galois::OpenCL::CL_Kernel kernel;
    Galois::OpenCL::CL_Kernel wb_kernel;
    Galois::OpenCL::Array<NodeDataType> *aux_array;
+   Galois::OpenCL::Array<int> *meta_array;
    dSSSP() :
-         aux_array(nullptr) {
+         aux_array(nullptr),meta_array(nullptr) {
    }
    void init(int num_items, int num_inits) {
       Galois::OpenCL::CL_Kernel init_nodes;
       init_nodes.init("sssp_kernel.cl", "initialize_nodes");
       aux_array = new Galois::OpenCL::Array<NodeDataType>(dGraph.num_nodes());
+      meta_array = new Galois::OpenCL::Array<int>(16);
       kernel.init("sssp_kernel.cl", "sssp");
       wb_kernel.init("sssp_kernel.cl", "writeback");
       dGraph.copy_to_device();
@@ -232,25 +234,31 @@ struct dSSSP {
       kernel.set_work_size(num_items);
       init_nodes.set_work_size(num_items);
 
-      kernel.set_arg_list(&dGraph, aux_array);
+      kernel.set_arg_list(&dGraph, aux_array, meta_array);
       wb_kernel.set_arg_list(&dGraph, aux_array);
       init_nodes.set_arg_list(&dGraph, aux_array);
       int num_nodes = dGraph.num_nodes();
 
       wb_kernel.set_arg(2, sizeof(cl_int), &num_items);
-      kernel.set_arg(2, sizeof(cl_int), &num_items);
+      kernel.set_arg(3, sizeof(cl_int), &num_items);
       init_nodes.set_arg(2, sizeof(cl_int), &num_items);
       init_nodes();
 
       dGraph.copy_to_host();
-
+      meta_array->host_ptr()[0] = hasChanged;
+      meta_array->copy_to_host();
+      hasChanged = meta_array->host_ptr()[0];
    }
    template<typename GraphType>
    void operator()(GraphType & graph, int num_items) {
+      meta_array->host_ptr()[0]=hasChanged;
+      meta_array->copy_to_device();
       graph.copy_to_device();
       kernel();
       wb_kernel();
       graph.copy_to_host();
+      meta_array->copy_to_host();
+      hasChanged = meta_array->host_ptr()[0];
    }
 };
 /*********************************************************************************
@@ -281,6 +289,8 @@ struct SSSP {
          NodeDataType& ddata = g->getData(dst);
          unsigned int ewt = g->getEdgeData(jj);
          min_dist = std::min(min_dist, ewt + ddata);
+         if(min_dist < sdata)
+            hasChanged=true;
       }
       buffered_updates[src] = min_dist;
    }
@@ -288,7 +298,6 @@ struct SSSP {
 /*********************************************************************************
  *
  **********************************************************************************/
-
 // [hostid] -> vector of GID that host has replicas of
 std::vector<std::vector<unsigned> > remoteReplicas;
 // [hostid] -> remote pGraph Structure (locally invalid)
@@ -431,6 +440,13 @@ void loadGraphNonCPU(pGraph &g) {
    // TODO cleanup marshalgraph, leaks memory!
 }
 
+void recvChangeFlag(bool otherFlag){
+   hasChanged|=otherFlag;
+}
+void sendChangeFlag(Galois::Runtime::NetworkInterface & net){
+   for (uint32_t x = 0; x < Galois::Runtime::NetworkInterface::Num; ++x)
+        net.sendAlt(x, recvChangeFlag, hasChanged);
+}
 /*********************************************************************************
  *
  **********************************************************************************/
@@ -529,7 +545,15 @@ void inner_main() {
       default:
          break;
       }
+      sendChangeFlag(net);
+      barrier();
+      if(!hasChanged){
+         fprintf(stderr, "Terminating after %d steps\n", i);
+         break;
+      }
+      hasChanged=false;
    }
+//   fprintf(stderr, "Terminating after %d steps\n", maxIterations.Value);
    //Final synchronization to ensure that all the nodes are updated.
    sendGhostCells(net, g);
    barrier.wait();
