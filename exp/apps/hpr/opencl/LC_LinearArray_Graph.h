@@ -188,6 +188,9 @@ struct LC_LinearArray_Graph {
    NodeDataType * getData() {
       return (NodeDataType*) (gpu_graph->host_data + 4);
    }
+   NodeDataType & getData(NodeIDType nid) {
+         return ((NodeDataType*) (gpu_graph->host_data + 4))[nid];
+      }
    unsigned int * outgoing_index() {
       return (unsigned int*) (getData()) + _num_nodes * SizeNodeData;
    }

@@ -31,7 +31,8 @@
 #include "cuda/hpr_cuda.h"
 #include "cuda/cuda_mtypes.h"
 #include "hpr.h"
-#include "opencl/CLWrapper.h"
+
+#include "opencl/OpenCLPrBackend.h"
 
 #include <iostream>
 #include <typeinfo>
@@ -79,8 +80,10 @@ typedef typename Graph::GraphNode GNode;
 std::map<GNode, float> buffered_updates;
 
 //////////////////////////////////////////////////////////////////////////////////////
+typedef Galois::OpenCL::LC_LinearArray_Graph<Galois::OpenCL::Array, LNode, void> DeviceGraph;
 
 struct CUDA_Context *cuda_ctx;
+struct OPENCL_Context<DeviceGraph> cl_ctx;
 /*********************************************************************************
  * Partitioned graph structure.
  **********************************************************************************/
@@ -213,59 +216,7 @@ struct InitializeGraph {
       }
    }
 };
-/************************************************************************************
- * OpenCL PageRank operator implementation.
- * Uses two kernels for the updates and one kernel for initialization.
- * In order to support BSP semantics, an aux_array is created which will
- * be used to buffer the writes in 'kernel'. These updates will be
- * written to the node-data in the 'writeback' kernel.
- *************************************************************************************/
-typedef Galois::OpenCL::LC_LinearArray_Graph<Galois::OpenCL::Array, LNode, void> DeviceGraph;
-DeviceGraph dGraph;
-struct dPageRank {
-   Galois::OpenCL::CL_Kernel kernel;
-   Galois::OpenCL::CL_Kernel wb_kernel;
-   Galois::OpenCL::Array<float> *aux_array;
-   dPageRank() :
-         aux_array(nullptr) {
-   }
-   void init(int num_items, int num_inits) {
-      Galois::OpenCL::CL_Kernel init_all, init_nout;
-      aux_array = new Galois::OpenCL::Array<float>(dGraph.num_nodes());
-      kernel.init("pagerank_kernel.cl", "pagerank");
-      wb_kernel.init("pagerank_kernel.cl", "writeback");
-      init_nout.init("pagerank_kernel.cl", "initialize_nout");
-      init_all.init("pagerank_kernel.cl", "initialize_all");
-      dGraph.copy_to_device();
-
-      init_all.set_work_size(dGraph.num_nodes());
-      init_nout.set_work_size(dGraph.num_nodes());
-      wb_kernel.set_work_size(num_items);
-      kernel.set_work_size(num_items);
-
-      init_nout.set_arg_list(&dGraph, aux_array);
-      init_all.set_arg_list(&dGraph, aux_array);
-      kernel.set_arg_list(&dGraph, aux_array);
-      wb_kernel.set_arg_list(&dGraph, aux_array);
-      int num_nodes = dGraph.num_nodes();
-
-      init_nout.set_arg(2, sizeof(cl_int), &num_items);
-      wb_kernel.set_arg(2, sizeof(cl_int), &num_items);
-      kernel.set_arg(2, sizeof(cl_int), &num_items);
-
-      init_all();
-      init_nout();
-      dGraph.copy_to_host();
-   }
-   template<typename GraphType>
-   void operator()(GraphType & graph, int num_items) {
-      graph.copy_to_device();
-      kernel();
-      wb_kernel();
-      graph.copy_to_host();
-   }
-};
-/*********************************************************************************
+ /*********************************************************************************
  * CPU PageRank operator implementation.
  **********************************************************************************/
 struct WriteBack {
@@ -339,7 +290,7 @@ void setNodeValue(pGraph* p, unsigned GID, float v) {
       setNodeValue_CUDA(cuda_ctx, p->G2L(GID), v);
       break;
    case GPU_OPENCL:
-      dGraph.getData()[p->G2L(GID)].value = v;
+      cl_ctx.getData(p->G2L(GID)).value = v;
       break;
    default:
       break;
@@ -358,7 +309,7 @@ void setNodeAttr(pGraph *p, unsigned GID, unsigned nout) {
       setNodeAttr_CUDA(cuda_ctx, p->G2L(GID), nout);
       break;
    case GPU_OPENCL:
-      dGraph.getData()[p->G2L(GID)].nout = nout;
+      cl_ctx.getData(p->G2L(GID)).nout = nout;
       break;
    default:
       break;
@@ -379,7 +330,7 @@ void setNodeAttr2(pGraph *p, unsigned GID, unsigned nout) {
       setNodeAttr2_CUDA(cuda_ctx, LID, nout);
       break;
    case GPU_OPENCL:
-      dGraph.getData()[LID].nout += nout;
+      cl_ctx.getData(LID).nout += nout;
       break;
    default:
       break;
@@ -401,7 +352,7 @@ void sendGhostCellAttrs2(Galois::Runtime::NetworkInterface& net, pGraph& g) {
          net.sendAlt(x, setNodeAttr2, magicPointer[x], g.L2G[l2g_ndx], getNodeAttr2_CUDA(cuda_ctx, *n));
          break;
       case GPU_OPENCL:
-         net.sendAlt(x, setNodeAttr2, magicPointer[x], g.L2G[l2g_ndx], dGraph.getData()[*n].nout);
+         net.sendAlt(x, setNodeAttr2, magicPointer[x], g.L2G[l2g_ndx], cl_ctx.getData(*n).nout);
          break;
       default:
          assert(false);
@@ -428,7 +379,7 @@ void sendGhostCellAttrs(Galois::Runtime::NetworkInterface& net, pGraph& g) {
             net.sendAlt(x, setNodeAttr, magicPointer[x], n, getNodeAttr_CUDA(cuda_ctx, n - g.g_offset));
             break;
          case GPU_OPENCL:
-            net.sendAlt(x, setNodeAttr, magicPointer[x], n, dGraph.getData()[n - g.g_offset].nout);
+            net.sendAlt(x, setNodeAttr, magicPointer[x], n, cl_ctx.getData(n - g.g_offset).nout);
             break;
          default:
             assert(false);
@@ -454,7 +405,7 @@ void sendGhostCells(Galois::Runtime::NetworkInterface& net, pGraph& g) {
             net.sendAlt(x, setNodeValue, magicPointer[x], n, getNodeValue_CUDA(cuda_ctx, n - g.g_offset));
             break;
          case GPU_OPENCL:
-            net.sendAlt(x, setNodeValue, magicPointer[x], n, dGraph.getData()[(n - g.g_offset)].value);
+            net.sendAlt(x, setNodeValue, magicPointer[x], n, cl_ctx.getData((n - g.g_offset)).value);
             break;
          default:
             assert(false);
@@ -523,7 +474,7 @@ void loadGraphNonCPU(pGraph &g) {
       load_graph_CUDA(cuda_ctx, m);
       break;
    case GPU_OPENCL:
-      dGraph.load_from_galois(g.g, g.numOwned, g.numEdges, g.numNodes - g.numOwned);
+      cl_ctx.loadGraphNonCPU(g.g, g.numOwned, g.numEdges, g.numNodes - g.numOwned);
       break;
    default:
       assert(false);
@@ -574,7 +525,6 @@ void inner_main() {
 #if _HETERO_DEBUG_
    std::cout << g.id << " graph loaded\n";
 #endif
-   dPageRank dOp;
 
    //local initialization
    if (personality == CPU) {
@@ -582,7 +532,7 @@ void inner_main() {
    } else if (personality == GPU_CUDA) {
       initialize_graph_cuda(cuda_ctx);
    } else if (personality == GPU_OPENCL) {
-      dOp.init(g.numOwned, g.numNodes);
+      cl_ctx.init(g.numOwned, g.numNodes);
    }
 #if _HETERO_DEBUG_
    std::cout << g.id << " initialized\n";
@@ -629,7 +579,7 @@ void inner_main() {
          WriteBack::go(g.g, g.numOwned);
          break;
       case GPU_OPENCL:
-         dOp(dGraph, g.numOwned);
+         cl_ctx(g.numOwned);
          break;
       case GPU_CUDA:
          pagerank_cuda(cuda_ctx);
@@ -657,7 +607,7 @@ void inner_main() {
       }
       case GPU_OPENCL: {
          for (int n = 0; n < g.numOwned; ++n) {
-            out_file << n + g.g_offset << ", " << dGraph.getData()[n].value << ", " << dGraph.getData()[(n)].nout << "\n";
+            out_file << n + g.g_offset << ", " << cl_ctx.getData(n).value << ", " << cl_ctx.getData(n).nout << "\n";
          }
          break;
       }
