@@ -26,6 +26,8 @@
 #include "Galois/Graph/FileGraph.h"
 #include "Galois/Graph/LC_CSR_Graph.h"
 #include "Galois/Graph/Util.h"
+#include "Galois/Accumulator.h"
+
 #include "Lonestar/BoilerPlate.h"
 
 #include "cuda/hpr_cuda.h"
@@ -42,6 +44,9 @@
 static const char* const name = "Page Rank - Distributed Heterogeneous";
 static const char* const desc = "Computes PageRank on Distributed Galois.  Uses pull algorithm, takes the pre-transposed graph.";
 static const char* const url = 0;
+
+
+static const float tolerance = 0.0001;
 
 enum Personality {
    CPU, GPU_CUDA, GPU_OPENCL
@@ -77,7 +82,9 @@ struct LNode {
 typedef Galois::Graph::LC_CSR_Graph<LNode, void> Graph;
 typedef typename Graph::GraphNode GNode;
 std::map<GNode, float> buffered_updates;
+Galois::GReduceMax<float> max_delta;
 
+//std::atomic<float> max_delta(0.0);
 //////////////////////////////////////////////////////////////////////////////////////
 
 struct CUDA_Context *cuda_ctx;
@@ -226,13 +233,15 @@ struct dPageRank {
    Galois::OpenCL::CL_Kernel kernel;
    Galois::OpenCL::CL_Kernel wb_kernel;
    Galois::OpenCL::Array<float> *aux_array;
+   Galois::OpenCL::Array<float> *meta_array;
    dPageRank() :
-         aux_array(nullptr) {
+         aux_array(nullptr), meta_array(nullptr) {
    }
    void init(int num_items, int num_inits) {
       Galois::OpenCL::CL_Kernel init_all, init_nout;
       aux_array = new Galois::OpenCL::Array<float>(dGraph.num_nodes());
-      kernel.init("pagerank_kernel.cl", "pagerank");
+      meta_array = new Galois::OpenCL::Array<float>(16);
+      kernel.init("pagerank_kernel.cl", "pagerank_term");
       wb_kernel.init("pagerank_kernel.cl", "writeback");
       init_nout.init("pagerank_kernel.cl", "initialize_nout");
       init_all.init("pagerank_kernel.cl", "initialize_all");
@@ -245,13 +254,13 @@ struct dPageRank {
 
       init_nout.set_arg_list(&dGraph, aux_array);
       init_all.set_arg_list(&dGraph, aux_array);
-      kernel.set_arg_list(&dGraph, aux_array);
+      kernel.set_arg_list(&dGraph, aux_array, meta_array);
       wb_kernel.set_arg_list(&dGraph, aux_array);
       int num_nodes = dGraph.num_nodes();
 
       init_nout.set_arg(2, sizeof(cl_int), &num_items);
       wb_kernel.set_arg(2, sizeof(cl_int), &num_items);
-      kernel.set_arg(2, sizeof(cl_int), &num_items);
+      kernel.set_arg(3, sizeof(cl_int), &num_items);
 
       init_all();
       init_nout();
@@ -259,10 +268,14 @@ struct dPageRank {
    }
    template<typename GraphType>
    void operator()(GraphType & graph, int num_items) {
+      meta_array->host_ptr()[0]=max_delta.reduce();
       graph.copy_to_device();
+      meta_array->copy_to_device();
       kernel();
       wb_kernel();
       graph.copy_to_host();
+      meta_array->copy_to_host();
+      max_delta.update(meta_array->host_ptr()[0]);
    }
 };
 /*********************************************************************************
@@ -283,7 +296,9 @@ struct PageRank {
    Graph* g;
 
    void static go(Graph& _g, unsigned num) {
+      max_delta.reset();
       Galois::do_all(_g.begin(), _g.begin() + num, PageRank { &_g }, Galois::loopname("Page Rank"));
+      max_delta.reduce();
    }
 
    void operator()(GNode src) const {
@@ -296,6 +311,7 @@ struct PageRank {
       }
       float value = (1.0 - alpha) * sum + alpha;
       float diff = std::fabs(value - sdata.value);
+      max_delta.update( diff);
 //      sdata.value = value;
       buffered_updates[src] = value;
    }
@@ -464,6 +480,14 @@ void sendGhostCells(Galois::Runtime::NetworkInterface& net, pGraph& g) {
    }
 
 }
+void recvMaxDelta(float other_max_delta){
+   max_delta.update(other_max_delta);
+   max_delta.reduce();
+}
+void sendMaxDelta(Galois::Runtime::NetworkInterface& net) {
+   for (uint32_t x = 0; x < Galois::Runtime::NetworkInterface::Num; ++x)
+        net.sendAlt(x, recvMaxDelta, max_delta.reduce());
+}
 /*********************************************************************************
  *
  **********************************************************************************/
@@ -613,15 +637,9 @@ void inner_main() {
    barrier.wait();
 
    for (int i = 0; i < maxIterations; ++i) {
-#if _HETERO_DEBUG_
-      std::cout << "Starting " << i << "\n";
-#endif
       //communicate ghost cells
       sendGhostCells(net, g);
       barrier.wait();
-#if _HETERO_DEBUG_
-      std::cout << "Starting PR\n";
-#endif
       //Do pagerank
       switch (personality) {
       case CPU:
@@ -638,7 +656,16 @@ void inner_main() {
          break;
       }
       barrier.wait();
+      sendMaxDelta(net);
+      barrier.wait();
+      if(max_delta.reduce() <tolerance ){
+         fprintf(stderr, "Terminating after %d steps\n", i);
+         break;
+      }
+//      fprintf(stderr, "Continuing after %d steps, %6.6g \n", i, max_delta.reduce());
+      max_delta.reset();
    }
+
 
    //Final synchronization to ensure that all the nodes are updated.
    sendGhostCells(net, g);
