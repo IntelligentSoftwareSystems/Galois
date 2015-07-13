@@ -6,6 +6,23 @@
  *      Author: rashid
  */
 
+/*****************************************************************/
+ void atomic_max_float_global(volatile global float *source, const float operand) {
+    union {
+        unsigned int intVal;
+        float floatVal;
+    } newVal;
+    union {
+        unsigned int intVal;
+        float floatVal;
+    } prevVal;
+
+    do {
+        prevVal.floatVal = *source;
+        newVal.floatVal = max(prevVal.floatVal,operand);
+    } while (prevVal.floatVal < newVal.floatVal && atomic_cmpxchg((volatile global unsigned int *)source, prevVal.intVal, newVal.intVal) != prevVal.intVal);
+}
+ /******************************************************************/
 #define alpha (1.0 - 0.85)
 
 typedef struct dPageRank {
@@ -122,5 +139,24 @@ __kernel void initialize_nout(__global int * graph_ptr, __global float* aux_arra
    //         printf("Init[%d->%d]", my_id,dst_id);
          }//end for
       }
+   }//end if
+}//end kernel
+
+__kernel void pagerank_term(__global int * graph_ptr,__global float* aux,  __global float * meta, int num_items) {
+   int my_id = get_global_id(0);
+   __local GraphType graph;
+   initialize(&graph, graph_ptr);
+   if(my_id < num_items) {
+      double sum = 0;
+      __global NodeData * sdata = node_data(&graph, my_id);
+      for(int i= out_neighbors_begin(&graph, my_id); i<out_neighbors_end(&graph, my_id); ++i) {
+         int dst_id = out_neighbors(&graph, my_id, i);
+         __global NodeData * ddata = node_data(&graph, dst_id);
+         sum+= ddata->value / ddata->nout;
+      }//end for
+      float value= (1.0 - alpha) * sum + alpha;
+      float diff = fabs(value - sdata->value);
+      atomic_max_float_global(&meta[0],diff);
+      aux[my_id] = value;
    }//end if
 }//end kernel

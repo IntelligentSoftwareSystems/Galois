@@ -1,9 +1,9 @@
 /*
  * LC_LinearArray_Graph.h
  *
- *  Created on: Jul 1, 2014
+ *  Created on: Feb 27, 2013
  *  Single array representation, has incoming and outgoing edges.
- *      Author: rashid@cs.utexas.edu
+ *      Author: rashid
  */
 
 #include <iostream>
@@ -20,7 +20,6 @@
 
 namespace Galois {
 namespace OpenCL {
-
 static const char * _str_LC_LinearArray_Graph = "typedef struct _GraphType { \n"
       "uint _num_nodes;\n"
       "uint _num_edges;\n "
@@ -58,18 +57,18 @@ template<template<typename > class GPUWrapper, typename NodeDataTy, typename Edg
 
 struct LC_LinearArray_Graph {
    //Are you using gcc/4.7+ Error on line below for earlier versions.
-#ifdef _WIN32
-   typedef GPUWrapper<unsigned int> GPUType;
-   typedef typename GPUWrapper<unsigned int>::HostPtrType HostPtrType;
-   typedef typename GPUWrapper<unsigned int>::DevicePtrType DevicePtrType;
+   #ifdef _WIN32
+		typedef GPUWrapper<unsigned int> GPUType;
+        typedef typename GPUWrapper<unsigned int>::HostPtrType HostPtrType;
+        typedef typename GPUWrapper<unsigned int>::DevicePtrType DevicePtrType;
 #else
-   template<typename T> using ArrayType = GPUWrapper<T>;
-   //   typedef GPUWrapper<unsigned int> ArrayType;
-   typedef GPUWrapper<unsigned int> GPUType;
-   typedef typename GPUWrapper<unsigned int>::HostPtrType HostPtrType;
-   typedef typename GPUWrapper<unsigned int>::DevicePtrType DevicePtrType;
+		template<typename T> using ArrayType = GPUWrapper<T>;
+		        //   typedef GPUWrapper<unsigned int> ArrayType;
+        typedef GPUWrapper<unsigned int> GPUType;
+        typedef typename GPUWrapper<unsigned int>::HostPtrType HostPtrType;
+        typedef typename GPUWrapper<unsigned int>::DevicePtrType DevicePtrType;
 #endif
-   typedef NodeDataTy NodeDataType;
+	typedef NodeDataTy NodeDataType;
    typedef EdgeDataTy EdgeDataType;
    typedef unsigned int NodeIDType;
    typedef unsigned int EdgeIDType;
@@ -82,107 +81,19 @@ struct LC_LinearArray_Graph {
 /////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////
    LC_LinearArray_Graph() :
-         SizeEdgeData(/*sizeof(EdgeDataType)*/0 / sizeof(unsigned int)), SizeNodeData(sizeof(NodeDataType) / sizeof(unsigned int)) {
-//      fprintf(stderr, "Created LC_LinearArray_Graph with %d node %d edge data.", (int) SizeNodeData, (int) SizeEdgeData);
+         SizeEdgeData(sizeof(EdgeDataType) / sizeof(unsigned int)), SizeNodeData(sizeof(NodeDataType) / sizeof(unsigned int)){
+      fprintf(stderr, "Created LC_LinearArray_Graph with %d node %d edge data. ",(int)SizeNodeData,(int)SizeEdgeData);
+//      std::cout << "Created LC_LinearArray_Graph with " << SizeNodeData << " node " << SizeEdgeData << " edge data. ";
       _max_degree = _num_nodes = _num_edges = 0;
       gpu_graph = 0;
    }
-#if 0
-   template<typename GaloisGraph>
-   void load_from_galois(GaloisGraph & ggraph) {
-      typedef typename GaloisGraph::GraphNode GNode;
-      size_t num_nodes = ggraph.size()+1;
-      size_t num_edges = ggraph.sizeEdges();
-      init(num_nodes, num_edges);
-      std::map<GNode, int> old_to_new;
-      {
-         int node_counter = 0;
-         for (auto n = ggraph.begin(); n != ggraph.end(); ++n) {
-            old_to_new[*n]=node_counter++;
-         }
-         fprintf(stderr, "Initialized nodes :: %d \n", node_counter);
-      }
-      int edge_counter = 0;
-      for (auto n = ggraph.begin(); n != ggraph.end(); ++n) {
-         //fprintf(stderr, "[%6.6g, %d], ", pg.g.getData(*n).value, pg.g.getData(*n).nout);
-         getData()[old_to_new[*n]] = ggraph.getData(*n);
-         outgoing_index()[old_to_new[*n]] = edge_counter;
-         for (auto nbr = ggraph.edge_begin(*n); nbr != ggraph.edge_end(*n); ++nbr) {
-            GNode dst = *nbr;
-//            fprintf(stderr, "[%d, %d, %d, %d]", (int)*n, (int)*nbr, old_to_new[*n],edge_counter );
-            if(old_to_new.find(*dst)==old_to_new.end()) {
-               fprintf(stderr, "[*n=%d, *nbr=%d, *dst = %d map(*n)=%d, edgeCounter=%d]\n", (int)*n, (int)*nbr, (int) *dst, old_to_new[*n],edge_counter );
-            }
-            assert(old_to_new.find(*dst)!=old_to_new.end());
-            int dst_id = old_to_new[*dst]; //*nbr - node_begin;
-            out_neighbors()[edge_counter] = dst_id;
-            edge_counter++;
-         }
-      }
-      out_neighbors()[num_nodes] = edge_counter;
-      fprintf(stderr, "Loaded from GaloisGraph.\n");
-   }
-#else
-   template<typename GaloisGraph>
-   void load_from_galois(GaloisGraph & ggraph) {
-      typedef typename GaloisGraph::GraphNode GNode;
-      const size_t gg_num_nodes = ggraph.size();
-      const size_t gg_num_edges = ggraph.sizeEdges();
-      init(gg_num_nodes, gg_num_edges);
-      const int * ptr = (int *) this->gpu_graph->host_ptr();
-      int edge_counter = 0;
-      int node_counter = 0;
-      for (auto n = ggraph.begin(); n != ggraph.end(); n++, node_counter++) {
-         int src_node = *n;
-         getData()[src_node] = ggraph.getData(*n);
-         outgoing_index()[src_node] = edge_counter;
-         for (auto nbr = ggraph.edge_begin(*n); nbr != ggraph.edge_end(*n); ++nbr) {
-            GNode dst = ggraph.getEdgeDst(*nbr);
-            out_neighbors()[edge_counter] = dst;
-            edge_counter++;
-         }
-      }
-      if(node_counter!=gg_num_nodes)fprintf(stderr, "FAILED EDGE-COMPACTION :: %d, %d\n", node_counter, gg_num_nodes);
-      outgoing_index()[gg_num_nodes] = edge_counter;
-      assert(edge_counter == gg_num_edges && "Failed to add all edges.");
-   }
-
-   template<typename GaloisGraph>
-      void load_from_galois(GaloisGraph & ggraph, int gg_num_nodes, int gg_num_edges, int num_ghosts) {
-         typedef typename GaloisGraph::GraphNode GNode;
-   //      const size_t gg_num_nodes = ggraph.size();
-   //      const size_t gg_num_edges = ggraph.sizeEdges();
-         init(gg_num_nodes+num_ghosts, gg_num_edges);
-         const int * ptr = (int *) this->gpu_graph->host_ptr();
-         fprintf(stderr, "Loading from GaloisGraph [%d,%d,%d].\n", (int)gg_num_nodes, (int)gg_num_edges, num_ghosts);
-         int edge_counter = 0;
-         int node_counter = 0;
-         for (auto n = ggraph.begin(); n != ggraph.begin()+gg_num_nodes; n++, node_counter++) {
-            int src_node = *n;
-            getData()[src_node] = ggraph.getData(*n);
-            outgoing_index()[src_node] = edge_counter;
-            for (auto nbr = ggraph.edge_begin(*n); nbr != ggraph.edge_end(*n); ++nbr) {
-               GNode dst = ggraph.getEdgeDst(*nbr);
-               out_neighbors()[edge_counter] = dst;
-               edge_counter++;
-            }
-         }
-         for(;node_counter<gg_num_nodes+num_ghosts;node_counter++){
-            outgoing_index()[node_counter] = edge_counter;
-         }
-         outgoing_index()[gg_num_nodes] = edge_counter;
-         if(node_counter!=gg_num_nodes)fprintf(stderr, "FAILED EDGE-COMPACTION :: %d, %d, %d\n", node_counter, gg_num_nodes, num_ghosts);
-         assert(edge_counter == gg_num_edges && "Failed to add all edges.");
-   //      fprintf(stderr, "Loaded from GaloisGraph [%d,%d,%d,%d].\n", ptr[0], ptr[1], ptr[2], ptr[3]);
-      }
-#endif
-   ~LC_LinearArray_Graph() {
+   ~LC_LinearArray_Graph(){
       deallocate();
    }
    void read(const char * filename) {
       readFromGR(*this, filename);
    }
-   size_t size() {
+   size_t size(){
       return gpu_graph->size();
    }
    NodeDataType * getData() {
@@ -207,9 +118,9 @@ struct LC_LinearArray_Graph {
    EdgeDataType * out_edge_data() {
       return (EdgeDataType *) (unsigned int *) (out_neighbors()) + _num_edges;
    }
-//   EdgeDataType &out_edge_data(NodeIDType node_id, int nbr_id) {
-//      return out_edge_data()[outgoing_index()[node_id] + nbr_id];
-//   }
+   EdgeDataType &out_edge_data(NodeIDType node_id, int nbr_id) {
+      return out_edge_data()[outgoing_index()[node_id] + nbr_id];
+   }
    unsigned int * incoming_index() {
       return (unsigned int *) out_edge_data() + _num_edges * SizeEdgeData;
    }
@@ -237,7 +148,7 @@ struct LC_LinearArray_Graph {
    void init(size_t n_n, size_t n_e) {
       _num_nodes = n_n;
       _num_edges = n_e;
-      fprintf(stderr, "Allocating NN: :%d,  , NE %d :\n", (int) _num_nodes, (int) _num_edges);
+      fprintf(stderr, "Allocating NN: :%d,  , NE %d :\n", (int)_num_nodes ,(int)_num_edges );
 //      std::cout << "Allocating NN: " << _num_nodes << " , NE :" << _num_edges << ". ";
       //Num_nodes, num_edges, [node_data] , [outgoing_index], [out_neighbors], [edge_data], [incoming_index] , [incoming_neighbors]
       gpu_graph = new GPUType(4 + _num_nodes * SizeNodeData + _num_nodes + 1 + _num_edges + _num_edges * SizeEdgeData + _num_edges + 1 + _num_edges + _num_edges * SizeEdgeData);
@@ -247,6 +158,67 @@ struct LC_LinearArray_Graph {
       (*gpu_graph)[3] = (int) SizeEdgeData;
       //allocate_on_gpu();
    }
+   template<typename GaloisGraph>
+      void load_from_galois(GaloisGraph & ggraph) {
+         typedef typename GaloisGraph::GraphNode GNode;
+         const size_t gg_num_nodes = ggraph.size();
+         const size_t gg_num_edges = ggraph.sizeEdges();
+         init(gg_num_nodes, gg_num_edges);
+         const int * ptr = (int *) this->gpu_graph->host_ptr();
+         int edge_counter = 0;
+         int node_counter = 0;
+         for (auto n = ggraph.begin(); n != ggraph.end(); n++, node_counter++) {
+            int src_node = *n;
+            getData()[src_node] = ggraph.getData(*n);
+            outgoing_index()[src_node] = edge_counter;
+            for (auto nbr = ggraph.edge_begin(*n); nbr != ggraph.edge_end(*n); ++nbr) {
+               GNode dst = ggraph.getEdgeDst(*nbr);
+               EdgeDataType ewt = ggraph.getEdgeData(*nbr);
+               out_neighbors()[edge_counter] = dst;
+               out_edge_data()[edge_counter] = ewt;
+               edge_counter++;
+               fprintf(stderr, "Edge::[%d,%d,%d]", src_node, dst, ewt);
+            }
+         }
+//         if(node_counter!=gg_num_nodes)fprintf(stderr, "FAILED EDGE-COMPACTION :: %d, %d\n", node_counter, gg_num_nodes);
+         outgoing_index()[gg_num_nodes] = edge_counter;
+         assert(edge_counter == gg_num_edges && "Failed to add all edges.");
+      }
+
+      template<typename GaloisGraph>
+         void load_from_galois(GaloisGraph & ggraph, int gg_num_nodes, int gg_num_edges, int num_ghosts) {
+            typedef typename GaloisGraph::GraphNode GNode;
+      //      const size_t gg_num_nodes = ggraph.size();
+      //      const size_t gg_num_edges = ggraph.sizeEdges();
+            init(gg_num_nodes+num_ghosts, gg_num_edges);
+            const int * ptr = (int *) this->gpu_graph->host_ptr();
+            fprintf(stderr, "Loading from GaloisGraph [%d,%d,%d].\n", (int)gg_num_nodes, (int)gg_num_edges, num_ghosts);
+            int edge_counter = 0;
+            int node_counter = 0;
+            for (auto n = ggraph.begin(); n != ggraph.begin()+gg_num_nodes; n++, node_counter++) {
+               int src_node = *n;
+               getData()[src_node] = ggraph.getData(*n);
+               outgoing_index()[src_node] = edge_counter;
+               for (auto nbr = ggraph.edge_begin(*n); nbr != ggraph.edge_end(*n); ++nbr) {
+   //               GNode dst = ggraph.getEdgeDst(*nbr);
+   //               out_neighbors()[edge_counter] = dst;
+                  GNode dst = ggraph.getEdgeDst(*nbr);
+                  EdgeDataType ewt = ggraph.getEdgeData(*nbr);
+                  out_neighbors()[edge_counter] = dst;
+                  out_edge_data()[edge_counter] = ewt;
+                  if(dst==0)
+                  fprintf(stderr, "Edge::[%d,%d,%d]", src_node, dst, ewt);
+                  edge_counter++;
+               }
+            }
+            for(;node_counter<gg_num_nodes+num_ghosts;node_counter++){
+               outgoing_index()[node_counter] = edge_counter;
+            }
+            outgoing_index()[gg_num_nodes] = edge_counter;
+            if(node_counter!=gg_num_nodes)fprintf(stderr, "FAILED EDGE-COMPACTION :: %d, %d, %d\n", node_counter, gg_num_nodes, num_ghosts);
+            assert(edge_counter == gg_num_edges && "Failed to add all edges.");
+      //      fprintf(stderr, "Loaded from GaloisGraph [%d,%d,%d,%d].\n", ptr[0], ptr[1], ptr[2], ptr[3]);
+         }
    /////////////////////////////////////////////////////////////////////////////////////////////
    /////////////////////////////////////////////////////////////////////////////////////////////
    void copy_to_device(void) {
@@ -290,23 +262,23 @@ struct LC_LinearArray_Graph {
       return;
    }
    void print_node_nobuff(unsigned int idx, const char * post = "") {
-      if (idx < _num_nodes) {
-         fprintf(stderr, "N-%d(%d)::[", idx, (getData())[idx]);
-         for (size_t i = (outgoing_index())[idx]; i < (outgoing_index())[idx + 1]; ++i) {
-            //std::cout << " " << (neighbors())[i] << "(" << (edge_data())[i] << "), ";
-            fprintf(stderr, "%d ( < %d(%d) > ),  ", (out_neighbors())[i], (out_edge_data())[i], getData()[out_neighbors()[i]]);
+         if (idx < _num_nodes) {
+            fprintf(stderr, "N-%d(%d)::[",idx ,(getData())[idx] );
+            for (size_t i = (outgoing_index())[idx]; i < (outgoing_index())[idx + 1]; ++i) {
+               //std::cout << " " << (neighbors())[i] << "(" << (edge_data())[i] << "), ";
+               fprintf(stderr, "%d ( < %d(%d) > ),  " ,(out_neighbors())[i] , (out_edge_data())[i] , getData()[out_neighbors()[i]] );
+            }
+            fprintf(stderr, "]##[");
+            for (size_t i = (incoming_index())[idx]; i < (incoming_index())[idx + 1]; ++i) {
+               //std::cout << " " << (in_neighbors())[i] << "(" << (in_edge_data())[i] << "), ";
+               fprintf(stderr, "%d( %d <%d> ), ",(in_neighbors())[i] , (in_edge_data())[i] ,getData()[in_neighbors()[i]] );
+            }
+            fprintf(stderr, "]%s",post);
          }
-         fprintf(stderr, "]##[");
-         for (size_t i = (incoming_index())[idx]; i < (incoming_index())[idx + 1]; ++i) {
-            //std::cout << " " << (in_neighbors())[i] << "(" << (in_edge_data())[i] << "), ";
-            fprintf(stderr, "%d( %d <%d> ), ", (in_neighbors())[i], (in_edge_data())[i], getData()[in_neighbors()[i]]);
-         }
-         fprintf(stderr, "]%s", post);
+         return;
       }
-      return;
-   }
 
-   static const char * get_graph_decl(std::string &res) {
+   static const char * get_graph_decl(std::string  &res) {
       res.append(_str_LC_LinearArray_Graph);
       return _str_LC_LinearArray_Graph;
    }
@@ -329,12 +301,12 @@ struct LC_LinearArray_Graph {
 /////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////
    void print_graph_nobuff(void) {
-      fprintf(stderr, "\n====Printing graph (%d ,%d )=====\n", (int) _num_nodes, (int) _num_edges);
-      for (size_t i = 0; i < _num_nodes; ++i) {
-         print_node_nobuff(i, "\n");
+         fprintf(stderr, "\n====Printing graph (%d ,%d )=====\n", (int)_num_nodes,(int)_num_edges) ;
+         for (size_t i = 0; i < _num_nodes; ++i) {
+            print_node_nobuff(i, "\n");
+         }
+         return;
       }
-      return;
-   }
 
    /////////////////////////////////////////////////////////////////////////////////////////////
    /////////////////////////////////////////////////////////////////////////////////////////////
@@ -363,8 +335,7 @@ struct LC_LinearArray_Graph {
       }
       incoming_index()[_num_nodes] = count;
 //      std::cout << "MaxDegree[" << _max_degree << "]. , Max weight:: " << _max_weight << " ";
-      fprintf(stderr, "MaxDegree[%d]. , Max weight:: %d ", (int) _max_degree, (int) _max_weight);
-      ;
+      fprintf(stderr, "MaxDegree[%d]. , Max weight:: %d ",(int)_max_degree ,(int)_max_weight);;
    }
 /////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////
@@ -395,9 +366,8 @@ struct LC_LinearArray_Graph {
       }
       std::cout << "]";
    }
-
-   ////////////##############################################################///////////
-   ////////////##############################################################///////////
+/////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////
    unsigned int verify() {
       NodeDataTy * t_node_data = getData();
       unsigned int * t_incoming_index = outgoing_index();
