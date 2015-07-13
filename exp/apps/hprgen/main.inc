@@ -81,7 +81,7 @@
       // }
       case GPU_CUDA:
          for (int i = 0; i < g.numOwned; i++) {
-            out_file << i + g.g_offset << ", " << get_pr_CUDA(pr_cuda_ctx, i) << ", " << get_nout_CUDA(pr_cuda_ctx, i) << "\n";
+            out_file << i + g.g_offset << ", " << get_PRNode_pr_CUDA(pr_cuda_ctx, i) << ", " << get_PRNode_nout_CUDA(pr_cuda_ctx, i) << "\n";
          }
          break;
       }

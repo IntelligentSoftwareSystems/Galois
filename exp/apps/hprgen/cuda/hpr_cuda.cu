@@ -124,19 +124,19 @@ bool init_CUDA_context(struct pr_CUDA_Context *ctx, int device) {
   return true;
 }
 
-float get_pr_CUDA(struct pr_CUDA_Context *ctx, unsigned LID) {
+float get_PRNode_pr_CUDA(struct pr_CUDA_Context *ctx, unsigned LID) {
   float *pr = ctx->pr[ctx->pr_it].cpu_rd_ptr();
 
   return pr[LID];
 }
 
-void set_pr_CUDA(struct pr_CUDA_Context *ctx, unsigned LID, float v) {
+void set_PRNode_pr_CUDA(struct pr_CUDA_Context *ctx, unsigned LID, float v) {
   float *pr = ctx->pr[ctx->pr_it].cpu_wr_ptr();
   
   pr[LID] = v;
 }
 
-void set_nout_CUDA(struct pr_CUDA_Context *ctx, unsigned LID, unsigned nout) {
+void set_PRNode_nout_CUDA(struct pr_CUDA_Context *ctx, unsigned LID, unsigned nout) {
   int *pnout = ctx->nout.cpu_wr_ptr();
 
   assert(LID >= ctx->nowned);
@@ -145,7 +145,7 @@ void set_nout_CUDA(struct pr_CUDA_Context *ctx, unsigned LID, unsigned nout) {
   pnout[LID] = nout;
 }
 
-void set_nout_plus_CUDA(struct pr_CUDA_Context *ctx, unsigned LID, unsigned nout) {
+void set_PRNode_nout_plus_CUDA(struct pr_CUDA_Context *ctx, unsigned LID, unsigned nout) {
   int *pnout = ctx->nout.cpu_wr_ptr();
 
   //printf("setting %d %d %d\n", ctx->id, LID, nout);
@@ -163,7 +163,7 @@ unsigned getNodeAttr_CUDA(struct pr_CUDA_Context *ctx, unsigned LID) {
   return pnout[LID];
 }
 
-unsigned get_nout_CUDA(struct pr_CUDA_Context *ctx, unsigned LID) {
+unsigned get_PRNode_nout_CUDA(struct pr_CUDA_Context *ctx, unsigned LID) {
   int *pnout = ctx->nout.cpu_rd_ptr();
   
   //assert(LID >= ctx->nowned);

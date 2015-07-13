@@ -15,11 +15,10 @@ void test_graph_cuda(struct pr_CUDA_Context *ctx);
 void pagerank_cuda(struct pr_CUDA_Context *ctx);
 
 /* application messages */
-void set_pr_CUDA(struct pr_CUDA_Context *ctx, unsigned LID, float v);
-float get_pr_CUDA(struct pr_CUDA_Context *ctx, unsigned LID);
+void set_PRNode_pr_CUDA(struct pr_CUDA_Context *ctx, unsigned LID, float v);
+float get_PRNode_pr_CUDA(struct pr_CUDA_Context *ctx, unsigned LID);
 
-void set_nout_CUDA(struct pr_CUDA_Context *ctx, unsigned LID, unsigned nout);
-unsigned getNodeAttr_CUDA(struct pr_CUDA_Context *ctx, unsigned LID);
-unsigned get_nout_CUDA(struct pr_CUDA_Context *ctx, unsigned LID);
-void set_nout_plus_CUDA(struct pr_CUDA_Context *ctx, unsigned LID, unsigned nout);
+void set_PRNode_nout_CUDA(struct pr_CUDA_Context *ctx, unsigned LID, unsigned nout);
+unsigned get_PRNode_nout_CUDA(struct pr_CUDA_Context *ctx, unsigned LID);
+void set_PRNode_nout_plus_CUDA(struct pr_CUDA_Context *ctx, unsigned LID, unsigned nout);
 
