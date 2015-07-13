@@ -8,7 +8,7 @@
 //      InitializeGraph::go(g.g, g.numOwned);
       InitializeGraph::go(g.g, g.numOwned);
    } else if (personality == GPU_CUDA) {
-      initialize_graph_cuda(pr_cuda_ctx);
+      initialize_node_cuda(pr_cuda_ctx);
    }
    // } else if (personality == GPU_OPENCL) {
    //    dOp.init(g.numOwned, g.numNodes);
@@ -50,7 +50,7 @@
       //    dOp(dGraph, g.numOwned);
       //    break;
       case GPU_CUDA:
-         pagerank_cuda(pr_cuda_ctx);
+         pr_cuda(pr_cuda_ctx);
          break;
       default:
          break;

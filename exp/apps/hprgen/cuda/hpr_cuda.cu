@@ -203,7 +203,7 @@ void load_graph_CUDA(struct pr_CUDA_Context *ctx, MarshalGraph &g) {
 	 ctx->nowned, graph.nnodes, graph.nedges);  
 }
 
-void initialize_graph_cuda(struct pr_CUDA_Context *ctx) {  
+void initialize_node_cuda(struct pr_CUDA_Context *ctx) {  
   ctx->nout.zero_gpu();
   initialize_graph<<<14, 256>>>(ctx->gg, ctx->nowned, ctx->pr[0].gpu_wr_ptr(), ctx->pr[1].gpu_wr_ptr(), ctx->nout.gpu_wr_ptr());
 
@@ -211,7 +211,7 @@ void initialize_graph_cuda(struct pr_CUDA_Context *ctx) {
   check_cuda(cudaDeviceSynchronize());
 }
 
-void pagerank_cuda(struct pr_CUDA_Context *ctx) {  
+void pr_cuda(struct pr_CUDA_Context *ctx) {  
   pagerank<<<14, 256>>>(ctx->gg, ctx->nowned, 
 			ctx->pr[ctx->pr_it].gpu_wr_ptr(), 
 			ctx->pr[ctx->pr_it ^ 1].gpu_wr_ptr(), 
