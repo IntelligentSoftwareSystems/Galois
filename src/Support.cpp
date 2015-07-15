@@ -128,10 +128,10 @@ public:
 static LL::StaticInstance<StatManager> SM;
 
 static void reportStatInternal(std::string loop, std::string category, uint32_t host, uint32_t tid, size_t value) {
-  if (Galois::Runtime::NetworkInterface::ID == 0)
-    SM.get()->addToStat(loop, category, host, tid, value);
-  else
-    Galois::Runtime::getSystemNetworkInterface().sendAlt(0, reportStatInternal, loop, category, host, tid, value);
+//  if (Galois::Runtime::NetworkInterface::ID == 0)
+//    SM.get()->addToStat(loop, category, host, tid, value);
+//  else
+//    Galois::Runtime::getSystemNetworkInterface().sendAlt(0, reportStatInternal, loop, category, host, tid, value);
 }
 
 }

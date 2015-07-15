@@ -9,10 +9,9 @@
       InitializeGraph::go(g.g, g.numOwned);
    } else if (personality == GPU_CUDA) {
       initialize_node_cuda(pr_cuda_ctx);
-   }
-   // } else if (personality == GPU_OPENCL) {
-   //    dOp.init(g.numOwned, g.numNodes);
-   // }
+    } else if (personality == GPU_OPENCL) {
+       pr_cl_ctx.init(g.numOwned, g.numNodes);
+    }
 
 #if _HETERO_DEBUG_
    std::cout << g.id << " initialized\n";
@@ -46,9 +45,9 @@
          PageRank::go(g.g, g.numOwned);
          WriteBack::go(g.g, g.numOwned);
          break;
-      // case GPU_OPENCL:
-      //    dOp(dGraph, g.numOwned);
-      //    break;
+       case GPU_OPENCL:
+          pr_cl_ctx(g.numOwned);
+          break;
       case GPU_CUDA:
          pr_cuda(pr_cuda_ctx);
          break;
@@ -73,12 +72,12 @@
          }
          break;
       }
-      // case GPU_OPENCL: {
-      //    for (int n = 0; n < g.numOwned; ++n) {
-      //       out_file << n + g.g_offset << ", " << dGraph.node_data()[n].pr << ", " << dGraph.node_data()[(n)].nout << "\n";
-      //    }
-      //    break;
-      // }
+       case GPU_OPENCL: {
+          for (int n = 0; n < g.numOwned; ++n) {
+             out_file << n + g.g_offset << ", " << pr_cl_ctx.getData(n).pr << ", " << pr_cl_ctx.getData(n).nout << "\n";
+          }
+          break;
+       }
       case GPU_CUDA:
          for (int i = 0; i < g.numOwned; i++) {
             out_file << i + g.g_offset << ", " << get_PRNode_pr_CUDA(pr_cuda_ctx, i) << ", " << get_PRNode_nout_CUDA(pr_cuda_ctx, i) << "\n";
