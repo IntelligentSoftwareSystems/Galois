@@ -150,15 +150,23 @@ public:
   unsigned getMaxThreads() const { return mi.maxThreads; }
   unsigned getMaxCores() const { return mi.maxCores; }
   unsigned getMaxPackages() const { return mi.maxPackages; }
-  unsigned getMaxPackage(unsigned tid) const;
-  unsigned getLeaderForPackage(unsigned tid) const;
+
+  unsigned getLeaderForPackage(unsigned pid) const {
+    for (unsigned i = 0; i < getMaxThreads(); ++i)
+      if (getPackage(i) == pid && isLeader(i))
+        return i;
+    abort();
+  }
+  
   bool isLeader(unsigned tid) const;
   unsigned getPackage(unsigned tid) const;
   unsigned getLeader(unsigned tid) const;
+  unsigned getCumulativeMaxPackage(unsigned tid) const;
 
   static unsigned getTID() { return topo.tid; }
   static bool isLeader() { return topo.tid == topo.packageLeader; }
   static unsigned getLeader() { return topo.packageLeader; }
+  static unsigned getCumulativeMaxPackage() { return topo.cumulativeMaxPackage; }
 
 };
 

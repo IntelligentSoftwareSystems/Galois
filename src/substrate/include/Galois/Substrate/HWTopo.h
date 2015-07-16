@@ -46,6 +46,7 @@ public:
     unsigned packageLeader; // first thread id in tid's package
     unsigned package; // package of tid
     unsigned hwContext; // OS HW context numbering for bound thread
+    unsigned cumulativeMaxPackage; // max package id up to this point
   };
 
   struct machineInfo {
@@ -60,18 +61,6 @@ public:
   virtual bool bindThreadToProcessor(unsigned galois_thread_id) const = 0;
   //! get metadata for machine
   virtual const machineInfo& getMachineInfo() const = 0;
-
-  //! Map thread to package
-  //  virtual unsigned getPackageForThread(int galois_thread_id) const = 0;
-  //! Find the maximum package number for all threads up to and including id
-  //virtual unsigned getMaxPackageForThread(int galois_thread_id) const = 0;
-  //! is this the first thread in a package
-  //virtual bool isPackageLeader(int galois_thread_id) const = 0;
-
-  //virtual unsigned getLeaderForThread(int galois_thread_id) const = 0;
-  //virtual unsigned getLeaderForPackage(int galois_pkg_id) const = 0;
-
-  unsigned getMaxPackageForThread(unsigned tid) const;
 
 };
 

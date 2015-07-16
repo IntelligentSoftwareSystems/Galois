@@ -275,11 +275,14 @@ public:
     mi.maxPackages = countPackages(info);
 
     tInfo.resize(mi.maxThreads);
+    unsigned mid = 0;
     for (unsigned i = 0; i < mi.maxThreads; ++i) {
       tInfo[i].tid = i;
       tInfo[i].hwContext = info[i].proc;
       tInfo[i].package = info[i].physid;
       unsigned pid = info[i].physid;
+      mid = std::max(mid, pid);
+      tInfo[i].cumulativeMaxPackage = mid;
       tInfo[i].packageLeader = std::find_if(info.begin(), info.end(), [pid] (const cpuinfo& c) { return c.physid == pid; })->physid;
     }
   }
