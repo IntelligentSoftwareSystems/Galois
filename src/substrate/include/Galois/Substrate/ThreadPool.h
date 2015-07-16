@@ -74,19 +74,20 @@ protected:
     std::atomic<int> done;
     std::atomic<int> fastRelease;
     std::atomic<per_signal*> next;
-    HWTopo::threadInfo topo;
   };
 
   thread_local static per_signal my_box;
+  thread_local static HWTopo::threadInfo topo;
 
-  unsigned maxThreads;
+  HWTopo::machineInfo mi;
+
   std::function<void(void)> work; 
   std::atomic<unsigned> starting;
   unsigned masterFastmode;
   std::atomic<per_signal*> signals;
   bool running;
 
-  ThreadPool(unsigned m);
+  ThreadPool();
 
   //!destroy all threads
   void destroyCommon();
@@ -142,14 +143,23 @@ public:
   //experimental: leave busy wait
   void beKind();
 
-  //!return the number of threads supported by the thread pool on the current machine
-  unsigned getMaxThreads() const { return maxThreads; }
-
   bool isRunning() const { return running; }
 
-  static unsigned getTID() {
-    return my_box.topo.tid;
-  }
+
+  //!return the number of threads supported by the thread pool on the current machine
+  unsigned getMaxThreads() const { return mi.maxThreads; }
+  unsigned getMaxCores() const { return mi.maxCores; }
+  unsigned getMaxPackages() const { return mi.maxPackages; }
+  unsigned getMaxPackage(unsigned tid) const;
+  unsigned getLeaderForPackage(unsigned tid) const;
+  bool isLeader(unsigned tid) const;
+  unsigned getPackage(unsigned tid) const;
+  unsigned getLeader(unsigned tid) const;
+
+  static unsigned getTID() { return topo.tid; }
+  static bool isLeader() { return topo.tid == topo.packageLeader; }
+  static unsigned getLeader() { return topo.packageLeader; }
+
 };
 
 //!Returns or creates the appropriate thread pool for the system

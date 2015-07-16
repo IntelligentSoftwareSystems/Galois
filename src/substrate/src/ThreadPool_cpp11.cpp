@@ -28,12 +28,9 @@
  */
 #include "Galois/Substrate/ThreadPool.h"
 #include "Galois/Substrate/CompilerSpecific.h"
-#include "Galois/Runtime/ll/HWTopo.h"
 
 #include <thread>
 #include <condition_variable>
-
-using namespace Galois::Runtime;
 
 namespace {
 
@@ -73,10 +70,10 @@ class ThreadPool_cpp11 : public Galois::Substrate::ThreadPool {
 
 public:
   ThreadPool_cpp11():
-    ThreadPool(Galois::Runtime::LL::getMaxThreads()),
-    starts(maxThreads)
+    ThreadPool(),
+    starts(getMaxThreads())
   {   
-    for (unsigned i = 1; i < maxThreads; ++i) {
+    for (unsigned i = 1; i < getMaxThreads(); ++i) {
       std::thread t(&ThreadPool_cpp11::threadLoop, this);
       threads.emplace_back(std::move(t));
     }

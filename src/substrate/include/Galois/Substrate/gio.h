@@ -102,9 +102,9 @@ void gError(Args... args) {
 void gFlush();
 
 #define GALOIS_SYS_DIE(...)   do { Galois::Substrate::gError(__FILE__, ":", __LINE__, ": ", strerror(errno), ": ",##__VA_ARGS__); abort(); } while (0)
-#define GALOIS_DIE(...)       do { Galois::Runtime::LL::gError(__FILE__, ":", __LINE__, ": ", ##__VA_ARGS__); abort(); } while (0)
+#define GALOIS_DIE(...)       do { Galois::Substrate::gError(__FILE__, ":", __LINE__, ": ", ##__VA_ARGS__); abort(); } while (0)
 //! Like assert but unconditionally executed
-#define GALOIS_ASSERT(cond, ...) do { bool b = (cond); if (!b) { Galois::Runtime::LL::gError(__FILE__, ":", __LINE__, ": assertion failed: ", #cond, " ", ##__VA_ARGS__); abort(); } } while (0) 
+#define GALOIS_ASSERT(cond, ...) do { bool b = (cond); if (!b) { Galois::Substrate::gError(__FILE__, ":", __LINE__, ": assertion failed: ", #cond, " ", ##__VA_ARGS__); abort(); } } while (0) 
 
 } // end namespace Substrate
 } // end namespace Galois

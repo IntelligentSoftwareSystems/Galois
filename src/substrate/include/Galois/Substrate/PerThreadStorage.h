@@ -50,33 +50,6 @@
 namespace Galois {
 namespace Substrate {
 
-
-template<int Num>
-class rangeAllocator {
-  std::vector<bool> locs;
-
-public:
-  //n is number of consecutive items to allocate
-  size_t alloc(size_t n) {
-    for (size_t x = 0; x < Num-n; ++x) {
-      size_t y = x;
-      for (; y < n && !locs.test(y); ++y) {}
-      if (y == x + n) {
-        for (y = x; y < n; ++y)
-          locs.set(y);
-        return x;
-      }
-    }
-    throw "Failed alloc";
-  }
-
-  void dealloc(size_t start, size_t n) {
-    while (n--)
-      locs.set(starts++, false);
-  }
-};
-
-
 extern unsigned int activeThreads;
 
 class PerBackend {
@@ -151,7 +124,7 @@ protected:
     if (offset == ~0U)
       return;
     
-    for (unsigned n = 0; n < LL::getMaxThreads(); ++n)
+    for (unsigned n = 0; n < getSystemThreadPool().getMaxThreads(); ++n)
       reinterpret_cast<T*>(b.getRemote(n, offset))->~T();
     b.deallocOffset(offset, sizeof(T));
     offset = ~0U;
@@ -208,7 +181,7 @@ public:
   }
 
   unsigned size() const {
-    return LL::getMaxThreads();
+    return getSystemThreadPool().getMaxThreads();
   }
 };
 
@@ -222,24 +195,13 @@ protected:
   PerBackend& b;
 
   void destruct() {
-    for (unsigned n = 0; n < LL::getMaxPackages(); ++n)
-      reinterpret_cast<T*>(b.getRemote(LL::getLeaderForPackage(n), offset))->~T();
+    auto& tp = getSystemThreadPool();
+    for (unsigned n = 0; n < tp.getMaxPackages(); ++n)
+      reinterpret_cast<T*>(b.getRemote(tp.getLeaderForPackage(n), offset))->~T();
     b.deallocOffset(offset, sizeof(T));
   }
 
 public:
-#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
-  // ICC 13.1 doesn't detect the other constructor as the default constructor
-  PerPackageStorage(): b(getPPSBackend()) {
-    //in case we make one of these before initializing the thread pool
-    //This will call initPTS for each thread if it hasn't already
-    Galois::Runtime::getSystemThreadPool();
-
-    offset = b.allocOffset(sizeof(T));
-    for (unsigned n = 0; n < LL::getMaxPackages(); ++n)
-      new (b.getRemote(LL::getLeaderForPackage(n), offset)) T();
-  }
-#endif
   
   template<typename... Args>
   PerPackageStorage(Args&&... args) :b(getPPSBackend()) {
@@ -248,8 +210,9 @@ public:
     Galois::Substrate::getSystemThreadPool();
 
     offset = b.allocOffset(sizeof(T));
-    for (unsigned n = 0; n < LL::getMaxPackages(); ++n)
-      new (b.getRemote(LL::getLeaderForPackage(n), offset)) T(std::forward<Args>(args)...);
+    auto& tp = getSystemThreadPool();
+    for (unsigned n = 0; n < tp.getMaxPackages(); ++n)
+      new (b.getRemote(tp.getLeaderForPackage(n), offset)) T(std::forward<Args>(args)...);
   }
 
   PerPackageStorage(PerPackageStorage&& o): offset(std::move(o.offset)), b(getPPSBackend()) { }
@@ -298,17 +261,17 @@ public:
   }
 
   T* getRemoteByPkg(unsigned int pkg) {
-    void* ditem = b.getRemote(LL::getLeaderForPackage(pkg), offset);
+    void* ditem = b.getRemote(getSystemThreadPool().getLeaderForPackage(pkg), offset);
     return reinterpret_cast<T*>(ditem);
   }
 
   const T* getRemoteByPkg(unsigned int pkg) const {
-    void* ditem = b.getRemote(LL::getLeaderForPackage(pkg), offset);
+    void* ditem = b.getRemote(getSystemThreadPool().getLeaderForPackage(pkg), offset);
     return reinterpret_cast<T*>(ditem);
   }
 
   unsigned size() const {
-    return LL::getMaxThreads();
+    return getSystemThreadPool().getMaxThreads();
   }
 };
 

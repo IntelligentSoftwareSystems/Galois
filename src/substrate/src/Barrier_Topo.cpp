@@ -57,10 +57,11 @@ class TopoBarrier : public Galois::Substrate::Barrier {
   };
 
   Galois::Substrate::PerPackageStorage<treenode> nodes;
-  Galois::Substreate::PerThreadStorage<unsigned> sense;
+  Galois::Substrate::PerThreadStorage<unsigned> sense;
 
   void _reinit(unsigned P) {
-    unsigned pkgs = getHWTopo()->getMaxPackageForThread(P-1) + 1;
+    auto& tp = Galois::Substrate::getSystemThreadPool();
+    unsigned pkgs = tp.getMaxPackage(P-1) + 1;
     for (unsigned i = 0; i < pkgs; ++i) {
       treenode& n = *nodes.getRemoteByPkg(i);
       n.childnotready = 0;
@@ -72,7 +73,7 @@ class TopoBarrier : public Galois::Substrate::Barrier {
 	}
       }
       for (unsigned j = 0; j < P; ++j) {
-	if (Galois::Runtime::LL::getPackageForThread(j) == i && !Galois::Runtime::LL::isPackageLeader(j)) {
+	if (tp.getPackage(j) == i && !tp.isLeader(j)) {
           ++n.childnotready;
           ++n.havechild;
         }
@@ -93,10 +94,10 @@ public:
   }
 
   virtual void wait() {
-    unsigned id = Galois::Runtime::LL::getTID();
+    unsigned id = Galois::Substrate::ThreadPool::getTID();
     treenode& n = *nodes.getLocal();
     unsigned& s = *sense.getLocal();
-    bool leader = Galois::Runtime::LL::isPackageLeaderForSelf(id);
+    bool leader = Galois::Substrate::ThreadPool::isLeader();
     //completion tree
     if (leader) {
       while (n.childnotready) { Galois::Substrate::asmPause(); }
@@ -133,11 +134,11 @@ public:
 
 }
 
-Galois::Substrate::Barrier& Galois::Substrate::benchmarking::getTopoBarrier() {
+Galois::Substrate::Barrier& Galois::Substrate::benchmarking::getTopoBarrier(unsigned activeThreads) {
   static TopoBarrier b;
   static unsigned num = ~0;
-  if (Runtime::activeThreads != num) {
-    num = Runtime::activeThreads;
+  if (activeThreads != num) {
+    num = activeThreads;
     b.reinit(num);
   }
   return b;

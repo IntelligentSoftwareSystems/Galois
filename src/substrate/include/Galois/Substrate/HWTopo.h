@@ -43,24 +43,23 @@ public:
 
   struct threadInfo {
     unsigned tid;//tid == this thread
-    bool isPackageLeader; // packageLeader == tid
     unsigned packageLeader; // first thread id in tid's package
     unsigned package; // package of tid
     unsigned hwContext; // OS HW context numbering for bound thread
+  };
+
+  struct machineInfo {
+    unsigned maxThreads;
+    unsigned maxCores;
+    unsigned maxPackages;
   };
 
   //! Get metadata for thread
   virtual const threadInfo& getThreadInfo(unsigned galois_thread_id) const = 0;
   //! Bind thread specified by id to the correct OS thread
   virtual bool bindThreadToProcessor(unsigned galois_thread_id) const = 0;
-
-  //! Get number of threads supported
-  virtual unsigned getMaxThreads() const = 0;
-  //! Get number of cores supported
-  virtual unsigned getMaxCores() const = 0;
-  //! Get number of packages supported
-  virtual unsigned getMaxPackages() const = 0;
-
+  //! get metadata for machine
+  virtual const machineInfo& getMachineInfo() const = 0;
 
   //! Map thread to package
   //  virtual unsigned getPackageForThread(int galois_thread_id) const = 0;

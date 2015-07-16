@@ -29,9 +29,8 @@
 
 #include "Galois/Substrate/ThreadPool.h"
 #include "Galois/Substrate/EnvCheck.h"
-#include "Galois/Runtime/ll/HWTopo.h"
-#include "Galois/Runtime/ll/TID.h"
-#include "Galois/Runtime/ll/gio.h"
+#include "Galois/Substrate/HWTopo.h"
+#include "Galois/Substrate/gio.h"
 
 #include <cstdlib>
 
@@ -48,16 +47,15 @@ extern void initPTS();
 
 using namespace Galois::Substrate;
 
-ThreadPool::ThreadPool(unsigned m): maxThreads(m), starting(m), masterFastmode(false), signals(nullptr), running(false) {
+ThreadPool::ThreadPool(): mi(getHWTopo()->getMachineInfo()), starting(mi.maxThreads), masterFastmode(false), signals(nullptr), running(false) {
   initThread();
-  assert(my_box.id == 0);
 }
 
 ThreadPool::~ThreadPool() { }
 
 void ThreadPool::destroyCommon() {
   beKind(); // reset fastmode
-  run(maxThreads, []() { throw shutdown_ty(); });
+  run(mi.maxThreads, []() { throw shutdown_ty(); });
 }
 
 void ThreadPool::burnPower(unsigned num) {
@@ -107,15 +105,15 @@ static T* getNth(std::atomic<T*>& headptr, unsigned off) {
 
 void ThreadPool::initThread() {
   atomic_append(signals, &my_box);
-  my_box.id = findID(signals, &my_box, 0);
+  //my_box.id = findID(signals, &my_box, 0);
 
   // Initialize TID
-  Runtime::LL::initTID(my_box.id);
-  Runtime::initPTS();
+  //  Runtime::LL::initTID(my_box.id);
+  //Runtime::initPTS();
 
   if (!EnvCheck("GALOIS_DO_NOT_BIND_THREADS"))
-    if (my_box.id != 0 || !EnvCheck("GALOIS_DO_NOT_BIND_MAIN_THREAD"))
-      Runtime::LL::bindThreadToProcessor(my_box.id);
+    if (topo.tid != 0 || !EnvCheck("GALOIS_DO_NOT_BIND_MAIN_THREAD"))
+      getHWTopo()->bindThreadToProcessor(topo.tid);
 }
 
 void ThreadPool::threadLoop() {
@@ -124,12 +122,12 @@ void ThreadPool::threadLoop() {
   bool fastmode = false;
   do {
     if (fastmode) {
-      while (!signals[my_box.id].fastRelease.load(std::memory_order_relaxed)) {
+      while (!signals[topo.tid].fastRelease.load(std::memory_order_relaxed)) {
         asmPause();
       }
-      signals[my_box.id].fastRelease = 0;
+      signals[topo.tid].fastRelease = 0;
     } else {
-      threadWait(my_box.id);
+      threadWait(topo.tid);
     }
     cascade(fastmode);
     
@@ -148,11 +146,11 @@ void ThreadPool::threadLoop() {
 
 
 void ThreadPool::decascade() {
-  assert(my_box.id == 0 || my_box.done == 0);
+  assert(topo.tid == 0 || my_box.done == 0);
   const unsigned multiple = 3;
   unsigned limit = starting;
   for (unsigned i = 1; i <= multiple; ++i) {
-    unsigned n = my_box.id * multiple + i;
+    unsigned n = topo.tid * multiple + i;
     if (n < limit) {
       auto& done_flag = getNth(signals, n)->done;
       while (!done_flag) { asmPause(); }
@@ -165,7 +163,7 @@ void ThreadPool::cascade(bool fastmode) {
   unsigned limit = starting;
   const unsigned multiple = 3;
   for (unsigned i = 1; i <= multiple; ++i) {
-    unsigned n = my_box.id * multiple + i;
+    unsigned n = topo.tid * multiple + i;
     if (n < limit) {
       auto nid = getNth(signals, n);
       nid->done = 0;
@@ -182,7 +180,7 @@ void ThreadPool::runInternal(unsigned num) {
   //seq write to starting should make work safe
   GALOIS_ASSERT(!running, "recursive thread pool execution not supported");
   running = true;
-  num = std::min(std::max(1U,num), maxThreads);
+  num = std::min(std::max(1U,num), mi.maxThreads);
   starting = num;
   assert(!masterFastmode || masterFastmode == num);
   //launch threads

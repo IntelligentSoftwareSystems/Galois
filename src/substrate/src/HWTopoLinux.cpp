@@ -194,17 +194,8 @@ static std::vector<int> parseCPUSet() {
 }
 
 class HWTopoLinux : public HWTopo {
-
-  //number of hw supported threads
-  unsigned numThreads;
-  
-  //number of "real" processors
-  unsigned numCores;
-
-  //number of packages
-  unsigned numPackages;
-
   std::vector<threadInfo> tInfo;
+  machineInfo mi;
 
   //  std::vector<int> packages;
   //  std::vector<int> maxPackage;
@@ -279,40 +270,31 @@ public:
     markSMT(info);
     renumber(info);
 
-    numThreads = info.size();
-    numCores = countCores(info);
-    numPackages = countPackages(info);
+    mi.maxThreads = info.size();
+    mi.maxCores = countCores(info);
+    mi.maxPackages = countPackages(info);
 
-    tInfo.resize(numThreads);
-    for (unsigned i = 0; i < numThreads; ++i) {
+    tInfo.resize(mi.maxThreads);
+    for (unsigned i = 0; i < mi.maxThreads; ++i) {
+      tInfo[i].tid = i;
       tInfo[i].hwContext = info[i].proc;
       tInfo[i].package = info[i].physid;
-      tInfo[i].isPackageLeader = false;
+      unsigned pid = info[i].physid;
+      tInfo[i].packageLeader = std::find_if(info.begin(), info.end(), [pid] (const cpuinfo& c) { return c.physid == pid; })->physid;
     }
-    //.isPackageLeader
-    //.packageLeader
   }
 
   virtual const threadInfo& getThreadInfo(unsigned tid) const {    
     return tInfo[tid];
   }
 
+  virtual const machineInfo& getMachineInfo() const {
+    return mi;
+  }
+
   virtual bool bindThreadToProcessor(unsigned galois_thread_id) const {
     return bindToProcessor(getThreadInfo(galois_thread_id).hwContext);
   }
-
-  virtual unsigned getMaxThreads() const {
-    return numThreads;
-  }
-
-  virtual unsigned getMaxCores() const {
-    return numCores;
-  }
-
-  virtual unsigned getMaxPackages() const {
-    return numPackages;
-  }
-
 };
 
 } //namespace

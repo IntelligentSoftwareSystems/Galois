@@ -29,27 +29,27 @@
 
 #include "Galois/Substrate/PerThreadStorage.h"
 
-#include "Galois/Runtime/mm/Mem.h"
-#include "Galois/Runtime/ll/gio.h"
+//#include "Galois/Runtime/Mem.h"
+#include "Galois/Substrate/gio.h"
 #include <mutex>
 
-__thread char* Galois::Runtime::ptsBase;
+__thread char* Galois::Substrate::ptsBase;
 
-Galois::Runtime::PerBackend& Galois::Runtime::getPTSBackend() {
-  static Galois::Runtime::PerBackend b;
+Galois::Substrate::PerBackend& Galois::Substrate::getPTSBackend() {
+  static Galois::Substrate::PerBackend b;
   return b;
 }
 
-__thread char* Galois::Runtime::ppsBase;
+__thread char* Galois::Substrate::ppsBase;
 
-Galois::Runtime::PerBackend& Galois::Runtime::getPPSBackend() {
-  static Galois::Runtime::PerBackend b;
+Galois::Substrate::PerBackend& Galois::Substrate::getPPSBackend() {
+  static Galois::Substrate::PerBackend b;
   return b;
 }
 
 #define MORE_MEM_HACK
 #ifdef MORE_MEM_HACK
-const size_t allocSize = Galois::Runtime::MM::hugePageSize * 16;
+const size_t allocSize = 16*(2<<20); //Galois::Runtime::MM::hugePageSize * 16;
 inline void* alloc() {
   return malloc(allocSize);
 }
@@ -57,12 +57,12 @@ inline void* alloc() {
 #else
 const size_t allocSize = Galois::Runtime::MM::hugePageSize;
 inline void* alloc() {
-  return Galois::Runtime::MM::pageAlloc();
+  return Galois::Substrate::MM::pageAlloc();
 }
 #endif
 #undef MORE_MEM_HACK
 
-unsigned Galois::Runtime::PerBackend::nextLog2(unsigned size) {
+unsigned Galois::Substrate::PerBackend::nextLog2(unsigned size) {
   unsigned i = MIN_SIZE;
   while ((1U<<i) < size) {
     ++i;
@@ -73,7 +73,7 @@ unsigned Galois::Runtime::PerBackend::nextLog2(unsigned size) {
   return i;
 }
 
-unsigned Galois::Runtime::PerBackend::allocOffset(const unsigned sz) {
+unsigned Galois::Substrate::PerBackend::allocOffset(const unsigned sz) {
   unsigned retval = allocSize;
   unsigned ll = nextLog2(sz);
   unsigned size = (1 << ll);
@@ -119,7 +119,7 @@ unsigned Galois::Runtime::PerBackend::allocOffset(const unsigned sz) {
   return retval;
 }
 
-void Galois::Runtime::PerBackend::deallocOffset(const unsigned offset, const unsigned sz) {
+void Galois::Substrate::PerBackend::deallocOffset(const unsigned offset, const unsigned sz) {
   unsigned ll = nextLog2(sz);
   unsigned size = (1 << ll);
   if (__sync_bool_compare_and_swap(&nextLoc, offset + size, offset)) {
@@ -131,32 +131,32 @@ void Galois::Runtime::PerBackend::deallocOffset(const unsigned offset, const uns
   }
 }
 
-void* Galois::Runtime::PerBackend::getRemote(unsigned thread, unsigned offset) {
+void* Galois::Substrate::PerBackend::getRemote(unsigned thread, unsigned offset) {
   char* rbase = heads[thread];
   assert(rbase);
   return &rbase[offset];
 }
 
-void Galois::Runtime::PerBackend::initCommon() {
+void Galois::Substrate::PerBackend::initCommon() {
   if (!heads) {
-    assert(LL::getTID() == 0);
-    unsigned n = LL::getMaxThreads();
+    assert(ThreadPool::getTID() == 0);
+    unsigned n = getSystemThreadPool().getMaxThreads();
     heads = new char*[n];
     memset(heads, 0, sizeof(*heads)* n);
   }
 }
 
-char* Galois::Runtime::PerBackend::initPerThread() {
+char* Galois::Substrate::PerBackend::initPerThread() {
   initCommon();
-  char* b = heads[LL::getTID()] = (char*) alloc();
+  char* b = heads[ThreadPool::getTID()] = (char*) alloc();
   memset(b, 0, allocSize);
   return b;
 }
 
-char* Galois::Runtime::PerBackend::initPerPackage() {
+char* Galois::Substrate::PerBackend::initPerPackage() {
   initCommon();
-  unsigned id = LL::getTID();
-  unsigned leader = LL::getLeaderForThread(id);
+  unsigned id = ThreadPool::getTID();
+  unsigned leader = ThreadPool::getLeader();
   if (id == leader) {
     char* b = heads[id] = (char*) alloc();
     memset(b, 0, allocSize);
@@ -169,7 +169,7 @@ char* Galois::Runtime::PerBackend::initPerPackage() {
   }
 }
 
-void Galois::Runtime::initPTS() {
+void Galois::Substrate::initPTS() {
   if (!ptsBase) {
     //unguarded initialization as initPTS will run in the master thread
     //before any other threads are generated
@@ -180,31 +180,3 @@ void Galois::Runtime::initPTS() {
   }
 }
 
-#ifdef GALOIS_USE_EXP
-// assumes that per thread storage has been initialized by Galois already
-// and just copies over the same pointers to cilk threads
-char* Galois::Runtime::PerBackend::initPerThread_cilk() {
-  unsigned id = LL::getTID();
-  assert(heads[id] != nullptr);
-
-  return heads[id];
-}
-
-char* Galois::Runtime::PerBackend::initPerPackage_cilk() {
-  unsigned id = LL::getTID();
-  assert(heads[id] != nullptr);
-
-  return heads[id];
-}
-
-void Galois::Runtime::initPTS_cilk() {
-  if (!ptsBase) {
-    ptsBase = getPTSBackend().initPerThread_cilk();
-  }
-  if (!ppsBase) {
-    ppsBase = getPPSBackend().initPerPackage_cilk();
-  }
-  assert (ptsBase != nullptr);
-  assert (ppsBase != nullptr);
-}
-#endif // GALOIS_USE_EXP
