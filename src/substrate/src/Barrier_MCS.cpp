@@ -31,9 +31,9 @@
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
 
-
-#include "Galois/Runtime/PerThreadStorage.h"
+#include "Galois/Substrate/ThreadPool.h"
 #include "Galois/Substrate/Barrier.h"
+#include "Galois/Substrate/CompilerSpecific.h"
 
 #include <atomic>
 
@@ -50,23 +50,35 @@ class MCSBarrier: public Galois::Substrate::Barrier {
     std::atomic<bool> parentsense;
     bool sense;
     treenode() {}
+    treenode(const treenode& rhs) : parentpointer(rhs.parentpointer),
+                                    sense(rhs.sense)
+    {
+      childpointers[0] = rhs.childpointers[0];
+      childpointers[1] = rhs.childpointers[1];
+      for (int i = 0; i < 4; ++i) {
+        havechild[i] = rhs.havechild[i];
+        childnotready[i] = rhs.childnotready[i].load();
+      }
+      parentsense = rhs.parentsense.load();
+    }
   };
 
-  Galois::Runtime::PerThreadStorage<treenode> nodes;
+  std::vector<Galois::Substrate::CacheLineStorage<treenode> > nodes;
   
   void _reinit(unsigned P) {
-    for (unsigned i = 0; i < nodes.size(); ++i) {
-      treenode& n = *nodes.getRemote(i);
+    nodes.resize(P);
+    for (unsigned i = 0; i < P; ++i) {
+      treenode& n = nodes.at(i).get();
       n.sense = true;
       n.parentsense = false;
       for (int j = 0; j < 4; ++j)
 	n.childnotready[j] = n.havechild[j] = ((4*i+j+1) < P);
       n.parentpointer = (i == 0) ? 0 :
-	&nodes.getRemote((i-1)/4)->childnotready[(i-1)%4];
+	&nodes.at((i-1)/4).get().childnotready[(i-1)%4];
       n.childpointers[0] = ((2*i + 1) >= P) ? 0 :
-	&nodes.getRemote(2*i+1)->parentsense;
+	&nodes.at(2*i+1).get().parentsense;
       n.childpointers[1] = ((2*i + 2) >= P) ? 0 :
-	&nodes.getRemote(2*i+2)->parentsense;
+	&nodes.at(2*i+2).get().parentsense;
     }
   }
 
@@ -76,7 +88,7 @@ public:
   }
 
   virtual void wait() {
-    treenode& n = *nodes.getLocal();
+    treenode& n = nodes.at(Galois::Substrate::ThreadPool::getTID()).get();
     while (n.childnotready[0] || n.childnotready[1] || 
 	   n.childnotready[2] || n.childnotready[3]) {
       Galois::Substrate::asmPause();
@@ -103,11 +115,11 @@ public:
 
 }
 
-Galois::Substrate::Barrier& Galois::Substrate::benchmarking::getMCSBarrier() {
+Galois::Substrate::Barrier& Galois::Substrate::benchmarking::getMCSBarrier(unsigned activeThreads) {
   static MCSBarrier b;
   static unsigned num = ~0;
-  if (Runtime::activeThreads != num) {
-    num = Runtime::activeThreads;
+  if (activeThreads != num) {
+    num = activeThreads;
     b.reinit(num);
   }
   return b;

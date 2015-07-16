@@ -2,21 +2,28 @@
  * @file
  * @section License
  *
- * Galois, a framework to exploit amorphous data-parallelism in irregular
- * programs.
+
+ * This file is part of Galois.  Galoisis a gramework to exploit
+ * amorphous data-parallelism in irregular programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
- * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
- * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
- * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
- * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
- * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
- * shall University be liable for incidental, special, indirect, direct or
- * consequential damages or loss of profits, interruption of business, or
- * related expenses which may arise from use of Software or Documentation,
- * including but not limited to those resulting from defects in Software and/or
- * Documentation, or loss or inaccuracy of data of any kind.
+ * Galois is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * Galois is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with Galois.  If not, see
+ * <http://www.gnu.org/licenses/>.
+ *
+ * @section Copyright
+ *
+ * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * reserved.
  *
  * @section Description
  *
@@ -25,8 +32,8 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#ifndef GALOIS_RUNTIME_LL_GIO_H
-#define GALOIS_RUNTIME_LL_GIO_H
+#ifndef GALOIS_SUBSTRATE_GIO_H
+#define GALOIS_SUBSTRATE_GIO_H
 
 #include <sstream>
 #include <cerrno>
@@ -36,8 +43,7 @@
 //FIXME: move to Runtime
 
 namespace Galois {
-namespace Runtime {
-namespace LL {
+namespace Substrate {
 
 //! Prints a string
 void gPrintStr(const std::string&);
@@ -71,7 +77,7 @@ template<typename... Args>
 void gWarn(Args... args) {
   std::ostringstream os;
   __attribute__((unused)) int tmp[] = {(os << args, 0)...};
-  gWarnStr(os.str());
+  //  gWarnStr(os.str());
 }
 
 //! Prints a debug string from a sequence of things; prints nothing if NDEBUG
@@ -90,17 +96,17 @@ template<typename... Args>
 void gError(Args... args) {
   std::ostringstream os;
   __attribute__((unused)) int tmp[] = {(os << args, 0)...};
-  gErrorStr(os.str());
+  //  gErrorStr(os.str());
 }
 
 void gFlush();
 
-#define GALOIS_SYS_DIE(...)   do { Galois::Runtime::LL::gError(__FILE__, ":", __LINE__, ": ", strerror(errno), ": ",##__VA_ARGS__); abort(); } while (0)
+#define GALOIS_SYS_DIE(...)   do { Galois::Substrate::gError(__FILE__, ":", __LINE__, ": ", strerror(errno), ": ",##__VA_ARGS__); abort(); } while (0)
 #define GALOIS_DIE(...)       do { Galois::Runtime::LL::gError(__FILE__, ":", __LINE__, ": ", ##__VA_ARGS__); abort(); } while (0)
 //! Like assert but unconditionally executed
 #define GALOIS_ASSERT(cond, ...) do { bool b = (cond); if (!b) { Galois::Runtime::LL::gError(__FILE__, ":", __LINE__, ": assertion failed: ", #cond, " ", ##__VA_ARGS__); abort(); } } while (0) 
-}
-}
+
+} // end namespace Substrate
 } // end namespace Galois
 
 #endif //_GIO_H

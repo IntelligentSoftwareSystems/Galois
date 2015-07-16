@@ -2,33 +2,42 @@
  * @file
  * @section License
  *
- * Galois, a framework to exploit amorphous data-parallelism in irregular
- * programs.
+ * This file is part of Galois.  Galoisis a gramework to exploit
+ * amorphous data-parallelism in irregular programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
- * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
- * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
- * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
- * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
- * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
- * shall University be liable for incidental, special, indirect, direct or
- * consequential damages or loss of profits, interruption of business, or
- * related expenses which may arise from use of Software or Documentation,
- * including but not limited to those resulting from defects in Software and/or
- * Documentation, or loss or inaccuracy of data of any kind.
+ * Galois is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * Galois is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with Galois.  If not, see
+ * <http://www.gnu.org/licenses/>.
+ *
+ * @section Copyright
+ *
+ * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * reserved.
+ *
+ * @section Description
+ *
+ * Dynamic per-thread storage (dPTS).
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#ifndef GALOIS_RUNTIME_PERTHREADSTORAGE_H
-#define GALOIS_RUNTIME_PERTHREADSTORAGE_H
+#ifndef GALOIS_SUBSTRATE_PERTHREADSTORAGE_H
+#define GALOIS_SUBSTRATE_PERTHREADSTORAGE_H
 
 #include "Galois/config.h"
 #include "Galois/Substrate/ThreadPool.h"
-#include "Galois/Runtime/ll/HWTopo.h"
+#include "Galois/Substrate/HWTopo.h"
 #include "Galois/Substrate/PaddedLock.h"
-#include "Galois/Runtime/ll/TID.h"
 
 #include <cstddef>
 #include <boost/utility.hpp>
@@ -39,7 +48,34 @@
 #include GALOIS_CXX11_STD_HEADER(utility)
 
 namespace Galois {
-namespace Runtime {
+namespace Substrate {
+
+
+template<int Num>
+class rangeAllocator {
+  std::vector<bool> locs;
+
+public:
+  //n is number of consecutive items to allocate
+  size_t alloc(size_t n) {
+    for (size_t x = 0; x < Num-n; ++x) {
+      size_t y = x;
+      for (; y < n && !locs.test(y); ++y) {}
+      if (y == x + n) {
+        for (y = x; y < n; ++y)
+          locs.set(y);
+        return x;
+      }
+    }
+    throw "Failed alloc";
+  }
+
+  void dealloc(size_t start, size_t n) {
+    while (n--)
+      locs.set(starts++, false);
+  }
+};
+
 
 extern unsigned int activeThreads;
 
@@ -84,11 +120,6 @@ public:
   char* initPerThread();
   char* initPerPackage();
 
-#ifdef GALOIS_USE_EXP
-  char* initPerThread_cilk();
-  char* initPerPackage_cilk();
-#endif // GALOIS_USE_EXP
-
   unsigned allocOffset(const unsigned size);
   void deallocOffset(const unsigned offset, const unsigned size);
   void* getRemote(unsigned thread, unsigned offset);
@@ -110,10 +141,6 @@ PerBackend& getPPSBackend();
 
 void initPTS();
 
-#ifdef GALOIS_USE_EXP
-void initPTS_cilk();
-#endif // GALOIS_USE_EXP
-
 template<typename T>
 class PerThreadStorage {
 protected:
@@ -123,49 +150,26 @@ protected:
   void destruct() {
     if (offset == ~0U)
       return;
-
+    
     for (unsigned n = 0; n < LL::getMaxThreads(); ++n)
       reinterpret_cast<T*>(b.getRemote(n, offset))->~T();
     b.deallocOffset(offset, sizeof(T));
     offset = ~0U;
   }
 
+
 public:
-#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
-  // ICC 13.1 doesn't detect the other constructor as the default constructor
-  PerThreadStorage(): b(getPTSBackend()) {
-    //in case we make one of these before initializing the thread pool
-    //This will call initPTS for each thread if it hasn't already
-    Galois::Runtime::getSystemThreadPool();
-
-    offset = b.allocOffset(sizeof(T));
-    for (unsigned n = 0; n < LL::getMaxThreads(); ++n)
-      new (b.getRemote(n, offset)) T();
-  }
-#endif
-
+  //construct on each thread
   template<typename... Args>
   PerThreadStorage(Args&&... args) :b(getPTSBackend()) {
     //in case we make one of these before initializing the thread pool
     //This will call initPTS for each thread if it hasn't already
-    Galois::Substrate::getSystemThreadPool();
+    auto& tp = getSystemThreadPool();
 
     offset = b.allocOffset(sizeof(T));
-    for (unsigned n = 0; n < LL::getMaxThreads(); ++n)
+    for (unsigned n = 0; n < tp.getMaxThreads(); ++n)
       new (b.getRemote(n, offset)) T(std::forward<Args>(args)...);
   }
-
-  PerThreadStorage(PerThreadStorage&& o): offset(~0U), b(getPTSBackend()) { 
-    std::swap(offset, o.offset);
-  }
-
-  PerThreadStorage& operator=(PerThreadStorage&& o) {
-    std::swap(offset, o.offset);
-    return *this;
-  }
-
-  PerThreadStorage(const PerThreadStorage&) = delete;
-  PerThreadStorage& operator=(const PerThreadStorage&) = delete;
 
   ~PerThreadStorage() {
     destruct();
@@ -187,6 +191,7 @@ public:
     return reinterpret_cast<T*>(ditem);
   }
 
+
   const T* getLocal(unsigned int thread) const {
     void* ditem = b.getLocal(offset, thread);
     return reinterpret_cast<T*>(ditem);
@@ -206,6 +211,9 @@ public:
     return LL::getMaxThreads();
   }
 };
+
+
+
 
 template<typename T>
 class PerPackageStorage {

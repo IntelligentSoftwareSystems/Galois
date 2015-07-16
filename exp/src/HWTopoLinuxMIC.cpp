@@ -24,9 +24,9 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
 */
-#include "Galois/Runtime/ll/HWTopo.h"
-#include "Galois/Runtime/ll/EnvCheck.h"
-#include "Galois/Runtime/ll/gio.h"
+#include "Galois/Substrate/HWTopo.h"
+#include "Galois/Substrate/EnvCheck.h"
+#include "Galois/Substrate/gio.h"
 
 #include <vector>
 #include <set>
@@ -42,9 +42,13 @@
 
 #define GALOIS_USE_MIC_TOPO
 
-using namespace Galois::Runtime::LL;
+using namespace Galois::Substrate;
 
 namespace {
+
+static const char* sProcInfo = "/proc/cpuinfo";
+static const char* sCPUSet   = "/proc/self/cpuset";
+
   // TODO: store number of cores in each package?
   // and number of procs in each package?
 
@@ -63,9 +67,8 @@ struct cpuinfo {
   unsigned leader;
 };
 
-static const char* sProcInfo = "/proc/cpuinfo";
-static const char* sCPUSet   = "/proc/self/cpuset";
 
+//! binds current thread to OS HW context "proc"
 static bool bindToProcessor(unsigned proc) {
   cpu_set_t mask;
   /* CPU_ZERO initializes all the bits in the mask to zero. */
@@ -84,93 +87,81 @@ static bool bindToProcessor(unsigned proc) {
 }
 
 //! Parse /proc/cpuinfo
-static void parseCPUInfo(std::vector<cpuinfo>& vals) {
-  vals.reserve(64);
+static std::vector<cpuinfo> parseCPUInfo() {
+  std::vector<cpuinfo> vals;
 
-  FILE* f = fopen(sProcInfo, "r");
-  if (!f) {
+  const int len = 1024;
+  std::array<char, len> line;
+  
+  std::ifstream procInfo(sProcInfo);
+  if (!procInfo)
     GALOIS_SYS_DIE("failed opening ", sProcInfo);
-    return; //Shouldn't get here
-  }
 
-  const unsigned len = 1024;
-  char* line = (char*)malloc(len);
   int cur = -1;
 
-  while (fgets(line, len, f)) {
+  while (true) {
+    procInfo.getline(line.data(), len);
+    if (!procInfo)
+      break;
+    
     int num;
-    if (sscanf(line, "processor : %d", &num) == 1) {
+    if (sscanf(line.data(), "processor : %d", &num) == 1) {
       assert(cur < num);
       cur = num;
       vals.resize(cur + 1);
       vals.at(cur).proc = num;
-    } else if (sscanf(line, "physical id : %d", &num) == 1) {
+    } else if (sscanf(line.data(), "physical id : %d", &num) == 1) {
       vals.at(cur).physid = num;
-    } else if (sscanf(line, "siblings : %d", &num) == 1) {
+    } else if (sscanf(line.data(), "siblings : %d", &num) == 1) {
       vals.at(cur).sib = num;
-    } else if (sscanf(line, "core id : %d", &num) == 1) {
+    } else if (sscanf(line.data(), "core id : %d", &num) == 1) {
       vals.at(cur).coreid = num;
-    } else if (sscanf(line, "cpu cores : %d", &num) == 1) {
+    } else if (sscanf(line.data(), "cpu cores : %d", &num) == 1) {
       vals.at(cur).cpucores = num;
     }
   }
 
-  free(line);
-  fclose(f);
-
-  return;
+  return vals;
 }
 
 //! Returns physical ids in current cpuset
-static void parseCPUSet(std::vector<unsigned>& vals) {
-  vals.reserve(64);
+static std::vector<int> parseCPUSet() {
+  std::vector<int> vals;
 
-  //PARSE: /proc/self/cpuset
-  FILE* f = fopen(sCPUSet, "r");
-  if (!f) {
-    return;
+  //Parse: /proc/self/cpuset
+  std::string name;
+  {
+    std::ifstream cpuSetName(sCPUSet);
+    if (!cpuSetName)
+      return vals;
+    
+    //TODO: this will fail to read correctly if name contains newlines
+    cpuSetName.getline(cpuSetName, name);
+    if (!cpuSetName)
+      return vals;
   }
 
-  const unsigned len = 1024;
-  char* path = (char*)malloc(len);
-  path[0] = '/';
-  path[1] = '\0';
-  if (!fgets(path, len, f)) {
-    fclose(f);
-    return;
-  }
-  fclose(f);
+  if (name.size() <= 1)
+    return vals;
 
-  if( char* t = index(path, '\n'))
-    *t = '\0';
+  //Parse: /dev/cpuset/<name>/cpus
+  std::string path("/dev/cpuset");
+  path += name;
+  path += "/cpus";
+  std::ifstream cpuSet(path);
 
-  if (strlen(path) == 1) {
-    free(path);
-    return;
-  }
+  if (!cpuSet)
+    return vals;
 
-  char* path2 = (char*)malloc(len);
-  strcpy(path2, "/dev/cpuset");
-  strcat(path2, path);
-  strcat(path2, "/cpus");
+  std::string buffer;
+  getline(cpuSet,buffer);
+  if (!cpuSet)
+    return vals;
 
-  f = fopen(path2, "r");
-  if (!f) {
-    free(path2);
-    free(path);
-    GALOIS_SYS_DIE("failed opening ", path2);
-    return; //Shouldn't get here
-  }
-
-  //reuse path
-  char* np = path;
-  if (!fgets(np, len, f)) {
-    fclose(f);
-    return;
-  }
+  char* np = buffer.data();
   while (np && strlen(np)) {
     char* c = index(np, ',');  
-    if (c) { //slice string at comma (np is old string, c is next string
+    if (c) { //slice string at comma (np is old string, c is next string)
       *c = '\0';
       ++c;
     }
@@ -187,15 +178,13 @@ static void parseCPUSet(std::vector<unsigned>& vals) {
       vals.push_back(atoi(np));
     }
     np = c;
-  };
+  }
   
-  fclose(f);
-  free(path2);
-  free(path);
-  return;
+  return vals;
 }
 
-struct Policy {
+class HWTopoLinux : public HWTopo {
+
   typedef std::vector<unsigned> VecNum;
   typedef std::set<unsigned> SetNum;
   typedef std::vector<VecNum> VecVecNum;
@@ -258,8 +247,7 @@ struct Policy {
 
 
   Policy() {
-    std::vector<cpuinfo> rawInfoVec;
-    parseCPUInfo (rawInfoVec);
+    std::vector<cpuinfo> rawInfo = parseCPUInfo();
 
     // for MIC only
 #ifdef GALOIS_USE_MIC_TOPO
@@ -270,9 +258,8 @@ struct Policy {
     std::vector<unsigned> enabledSet;
     parseCPUSet (enabledSet);
 
-    if (EnvCheck("GALOIS_DEBUG_TOPO")) {
-      printRawConfiguration(rawInfoVec, enabledSet);
-    }
+    if (EnvCheck("GALOIS_DEBUG_TOPO"))
+      printRawConfiguration(rawInfo, enabledSet);
 
     computeSizes(rawInfoVec, numPackagesRaw, numCoresRaw, numThreadsRaw);
 

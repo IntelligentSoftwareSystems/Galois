@@ -32,8 +32,9 @@
  */
 
 
-#include "Galois/Runtime/PerThreadStorage.h"
+#include "Galois/Substrate/ThreadPool.h"
 #include "Galois/Substrate/Barrier.h"
+#include "Galois/Substrate/CompilerSpecific.h"
 
 #include <atomic>
 
@@ -49,6 +50,10 @@ class DisseminationBarrier: public Galois::Substrate::Barrier {
     std::atomic<int> flag[2];
     node* partner;
     node() :partner(nullptr) {}
+    node(const node& rhs) :partner(rhs.partner) {
+      flag[0] = rhs.flag[0].load();
+      flag[1] = rhs.flag[1].load();
+    }
   };
 
   struct LocalData {
@@ -58,13 +63,15 @@ class DisseminationBarrier: public Galois::Substrate::Barrier {
     //std::array<node, 32> myflags;
   };
 
-  Galois::Runtime::PerThreadStorage<LocalData> nodes;
+  std::vector<Galois::Substrate::CacheLineStorage<LocalData> > nodes;
   unsigned LogP;
+
 
   void _reinit(unsigned P) {
     LogP = FAST_LOG2_UP(P);
+    nodes.resize(P);
     for (unsigned i = 0; i < P; ++i) {
-      LocalData& lhs = *nodes.getRemote(i);
+      LocalData& lhs = nodes.at(i).get();
       lhs.parity = 0;
       lhs.sense = 1;
       for (unsigned j = 0; j < sizeof(lhs.myflags)/sizeof(*lhs.myflags); ++j)
@@ -72,7 +79,7 @@ class DisseminationBarrier: public Galois::Substrate::Barrier {
 
       int d = 1;
       for (unsigned j = 0; j < LogP; ++j) {
-        LocalData& rhs = *nodes.getRemote((i+d) % P);
+        LocalData& rhs = nodes.at((i+d) % P).get();
         lhs.myflags[j].partner = &rhs.myflags[j];
         d *= 2;
       }
@@ -86,7 +93,7 @@ public:
   }
 
   virtual void wait() {
-    auto& ld = *nodes.getLocal();
+    auto& ld = nodes.at(Galois::Substrate::ThreadPool::getTID()).get();
     auto& sense = ld.sense;
     auto& parity = ld.parity;
     for (unsigned r = 0; r < LogP; ++r) {
@@ -103,11 +110,11 @@ public:
 
 }
 
-Galois::Substrate::Barrier& Galois::Substrate::benchmarking::getDisseminationBarrier() {
+Galois::Substrate::Barrier& Galois::Substrate::benchmarking::getDisseminationBarrier(unsigned activeThreads) {
   static DisseminationBarrier b;
   static unsigned num = ~0;
-  if (Runtime::activeThreads != num) {
-    num = Runtime::activeThreads;
+  if (activeThreads != num) {
+    num = activeThreads;
     b.reinit(num);
   }
   return b;

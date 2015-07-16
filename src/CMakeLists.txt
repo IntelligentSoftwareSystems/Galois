@@ -18,7 +18,7 @@ endfunction()
 
 set(exp_libs)
 if(USE_EXP)
-  set(exp_libs exp)
+#  set(exp_libs exp)
 endif()
 
 add_galois_library(galois ${sources} LIBS llvm ${exp_libs})

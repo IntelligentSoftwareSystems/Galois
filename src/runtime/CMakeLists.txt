@@ -5,7 +5,6 @@ set(sources
         src/PreAlloc.cpp
         src/Support.cpp
         src/Threads.cpp
-        src/PerThreadStorage.cpp
         src/Sampling.cpp
         src/Termination.cpp
         src/Timer.cpp

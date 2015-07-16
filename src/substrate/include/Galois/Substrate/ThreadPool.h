@@ -36,6 +36,7 @@
 
 #include "Galois/config.h"
 #include "CacheLineStorage.h"
+#include "HWTopo.h"
 
 #include <functional>
 #include <atomic>
@@ -72,8 +73,8 @@ protected:
   struct per_signal {
     std::atomic<int> done;
     std::atomic<int> fastRelease;
-    unsigned id;
     std::atomic<per_signal*> next;
+    HWTopo::threadInfo topo;
   };
 
   thread_local static per_signal my_box;
@@ -147,7 +148,7 @@ public:
   bool isRunning() const { return running; }
 
   static unsigned getTID() {
-    return my_box.id;
+    return my_box.topo.tid;
   }
 };
 

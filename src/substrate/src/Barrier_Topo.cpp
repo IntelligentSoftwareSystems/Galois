@@ -31,7 +31,7 @@
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
 
-#include "Galois/Runtime/PerThreadStorage.h"
+#include "Galois/Substrate/PerThreadStorage.h"
 #include "Galois/Substrate/Barrier.h"
 #include "Galois/Substrate/CompilerSpecific.h"
 
@@ -56,11 +56,11 @@ class TopoBarrier : public Galois::Substrate::Barrier {
 
   };
 
-  Galois::Runtime::PerPackageStorage<treenode> nodes;
-  Galois::Runtime::PerThreadStorage<unsigned> sense;
+  Galois::Substrate::PerPackageStorage<treenode> nodes;
+  Galois::Substreate::PerThreadStorage<unsigned> sense;
 
   void _reinit(unsigned P) {
-    unsigned pkgs = Galois::Runtime::LL::getMaxPackageForThread(P-1) + 1;
+    unsigned pkgs = getHWTopo()->getMaxPackageForThread(P-1) + 1;
     for (unsigned i = 0; i < pkgs; ++i) {
       treenode& n = *nodes.getRemoteByPkg(i);
       n.childnotready = 0;

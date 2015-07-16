@@ -31,7 +31,7 @@
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
 
-#include "Galois/Runtime/PerThreadStorage.h"
+#include "Galois/Substrate/ThreadPool.h"
 #include "Galois/Substrate/Barrier.h"
 #include "Galois/Substrate/CompilerSpecific.h"
 
@@ -40,14 +40,15 @@ namespace {
 class CountingBarrier: public Galois::Substrate::Barrier {
   std::atomic<unsigned> count;
   std::atomic<bool> sense;
-  Galois::Runtime::PerThreadStorage<bool> local_sense;
   unsigned num;
+  std::vector<Galois::Substrate::CacheLineStorage<bool> > local_sense;
 
   void _reinit(unsigned val) {
     count = num = val;
     sense = false;
-    for (unsigned i = 0; i < local_sense.size(); ++i)
-      *local_sense.getRemote(i) = false;
+    local_sense.resize(val);
+    for (unsigned i = 0; i < val; ++i)
+      local_sense.at(i).get() = false;
   }
 
 public:
@@ -56,7 +57,7 @@ public:
   virtual void reinit(unsigned val) { _reinit(val); }
 
   virtual void wait() {
-    bool& lsense = *local_sense.getLocal();
+    bool& lsense = local_sense.at(Galois::Substrate::ThreadPool::getTID()).get();
     lsense = !lsense;
     if (--count == 0) {
       count = num;
@@ -71,11 +72,11 @@ public:
 
 }
 
-Galois::Substrate::Barrier& Galois::Substrate::benchmarking::getCountingBarrier() {
+Galois::Substrate::Barrier& Galois::Substrate::benchmarking::getCountingBarrier(unsigned activeThreads) {
   static CountingBarrier b;
   static unsigned num = ~0;
-  if (Runtime::activeThreads != num) {
-    num = Runtime::activeThreads;
+  if (activeThreads != num) {
+    num = activeThreads;
     b.reinit(num);
   }
   return b;
