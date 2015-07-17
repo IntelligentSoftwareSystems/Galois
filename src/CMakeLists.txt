@@ -21,8 +21,8 @@ if(USE_EXP)
 #  set(exp_libs exp)
 endif()
 
-add_galois_library(galois ${sources} LIBS llvm ${exp_libs})
-add_galois_library(galois-nothreads  LIBS llvm ${exp_libs})
+add_galois_library(galois ${sources} LIBS gllvm ${exp_libs})
+add_galois_library(galois-nothreads  LIBS gllvm ${exp_libs})
 
 #add_subdirectory(ll)
 add_subdirectory(llvm)

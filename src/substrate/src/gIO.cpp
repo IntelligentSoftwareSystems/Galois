@@ -32,7 +32,6 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "Galois/config.h"
 #include "Galois/Substrate/gio.h"
 #include "Galois/Substrate/SimpleLock.h"
 #include "Galois/Substrate/EnvCheck.h"

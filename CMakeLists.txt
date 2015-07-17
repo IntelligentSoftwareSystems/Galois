@@ -235,7 +235,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CXX11_FLAGS}")
 
 include(CheckEndian)
 
-include(llvm-extras)
+#include(llvm-extras)
 #always import c99 stdint functions into c++
 #include(UseStdMacro) # HandleLLVMOptions.cmake (via llvm-extras) already does this for us
 #include_directories("${PROJECT_BINARY_DIR}/include") # llvm-extra already does this for us

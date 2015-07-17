@@ -33,7 +33,6 @@
 #ifndef GALOIS_SUBSTRATE_CACHELINESTORAGE_H
 #define GALOIS_SUBSTRATE_CACHELINESTORAGE_H
 
-#include "Galois/config.h"
 #include "CompilerSpecific.h"
 
 #include <utility>

@@ -34,7 +34,6 @@
 #ifndef GALOIS_SUBSTRATE_THREADPOOL_H
 #define GALOIS_SUBSTRATE_THREADPOOL_H
 
-#include "Galois/config.h"
 #include "CacheLineStorage.h"
 #include "HWTopo.h"
 

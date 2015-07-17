@@ -107,9 +107,8 @@ void ThreadPool::initThread() {
   atomic_append(signals, &my_box);
   //my_box.id = findID(signals, &my_box, 0);
 
-  // Initialize TID
-  //  Runtime::LL::initTID(my_box.id);
-  //Runtime::initPTS();
+  // Initialize 
+  Runtime::initPTS();
 
   if (!EnvCheck("GALOIS_DO_NOT_BIND_THREADS"))
     if (topo.tid != 0 || !EnvCheck("GALOIS_DO_NOT_BIND_MAIN_THREAD"))

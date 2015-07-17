@@ -34,7 +34,6 @@
 #ifndef GALOIS_SUBSTRATE_PERTHREADSTORAGE_H
 #define GALOIS_SUBSTRATE_PERTHREADSTORAGE_H
 
-#include "Galois/config.h"
 #include "Galois/Substrate/ThreadPool.h"
 #include "Galois/Substrate/HWTopo.h"
 #include "Galois/Substrate/PaddedLock.h"
@@ -44,8 +43,7 @@
 
 #include <cassert>
 #include <vector>
-
-#include GALOIS_CXX11_STD_HEADER(utility)
+#include <utility>
 
 namespace Galois {
 namespace Substrate {
