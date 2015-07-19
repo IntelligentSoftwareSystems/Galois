@@ -43,7 +43,7 @@
 #include <cstdint>
 
 #include "fixed_point.h"
-#include "RationalWrapper.h"
+#include "FPwrapper.h"
 
 template <typename T>
 struct FPutilsGeneric: private boost::noncopyable {
@@ -118,8 +118,8 @@ const T FPutilsGeneric<T>::ERROR_LIMIT = double (1.0 / (1 << 18));
 
 
 
-using FP = fpml::fixed_point<int64_t, 31, 32>;
-// using FP = RationalWrapper;
+// using FP = fpml::fixed_point<int64_t, 31, 32>;
+using FP = DoubleWrapper;
 using FPutils = FPutilsGeneric<FP>;
 
 

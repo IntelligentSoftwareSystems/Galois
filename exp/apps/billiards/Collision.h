@@ -105,7 +105,27 @@ public:
     // Let discr be the term under the square root (discriminant) in quadratic
     // formula = 1/2a * (-b +- sqrt (b^2 - 4ac))
     // actually discr is the actual discriminant divided by 4
-    FP discr = (diffVdiffD * diffVdiffD) - (diffV.magSqrd ()) * (diffD.magSqrd () - sumRadiusSqrd);
+
+    // Let diffV = (x1,y1)
+    // and diffD = (x2,y2)
+    //
+    // discr = b^2 - 4ac
+    //    = (diffV.diffD)^2 - 4 (diffV) (diffD - sumRadiusSqrd)
+    //
+    //    simplifying the vector expression using (x1,y1) & (x2,y2) instead 
+    //    of diffV and diffD, we get:
+    // discr = (x1y2 - x2y1)^2 - sumRadiusSqrd (x1^2 + y1^2);
+
+    // FP discr = (diffVdiffD * diffVdiffD) - (diffV.magSqrd ()) * (diffD.magSqrd () - sumRadiusSqrd);
+    FP x1 = diffV.getX ();
+    FP y1 = diffV.getY ();
+
+    FP x2 = diffD.getX ();
+    FP y2 = diffD.getY ();
+
+    FP discr = sumRadiusSqrd * (diffV.magSqrd ()) - (x1*y2 - x2*y1) * (x1*y2 - x2*y1);
+
+    // std::printf ("discr = %10.10lf,  d2=%10.10lf\n", double (discr), double (d2));
 
     if (discr > FP (0.0)) {
       // solution is real

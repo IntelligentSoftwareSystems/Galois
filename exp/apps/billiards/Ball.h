@@ -173,7 +173,7 @@ public:
         abort ();
       }
     }
-    return (m_pos + m_vel * (t - m_timestamp)); 
+    return (m_pos + m_vel * t - m_vel * m_timestamp); 
   }
 
 
