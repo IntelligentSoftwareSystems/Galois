@@ -133,11 +133,13 @@ if(CMAKE_SYSTEM MATCHES "SunOS.*")
 endif()
 
 # Enable architecture-specific optimizations
-find_package(ArchFlags)
-if(ARCH_FLAGS_FOUND)
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${ARCH_CXX_FLAGS}")
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${ARCH_C_FLAGS}")
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${ARCH_EXE_FLAGS}")
+if(NOT USE_HETERO)
+  find_package(ArchFlags)
+  if(ARCH_FLAGS_FOUND)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${ARCH_CXX_FLAGS}")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${ARCH_C_FLAGS}")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${ARCH_EXE_FLAGS}")
+  endif()
 endif()
 
 #Boost
