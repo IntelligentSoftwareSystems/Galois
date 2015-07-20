@@ -1,4 +1,4 @@
-/** Reporting and utility code -*- C++ -*-
+/** Simple Safe Static Global Instance -*- C++ -*-
  * @file
  * @section License
  *
@@ -26,36 +26,55 @@
  *
  * @section Description
  *
- * @author Andrew Lenharth <andrewl@lenharth.org>
+ * This contains a wrapper to declare non-pod globals in a safe way.
+ *
+ * @author Andrew Lenharth <andrew@lenharth.org>
  */
 
-#ifndef GALOIS_RUNTIME_SUPPORT_H
-#define GALOIS_RUNTIME_SUPPORT_H
+#ifndef GALOIS_SUBSTRATE_STATICINSTANCE_H
+#define GALOIS_SUBSTRATE_STATICINSTANCE_H
 
-#include <string>
+#include "Galois/Substrate/CompilerSpecific.h"
 
 namespace Galois {
+namespace Substrate {
 
-class Statistic;
+//This should be much simpler in c++03 mode, but be general for now
+//This exists because ptrlock is not a pod, but this is.
+template<typename T>
+struct StaticInstance {
+  volatile T* V;
+  volatile int _lock;
 
-namespace Runtime {
+  inline void lock() {
+    int oldval;
+    do {
+      while (_lock != 0) {
+        Substrate::asmPause();
+      }
+      oldval = __sync_fetch_and_or(&_lock, 1);
+    } while (oldval & 1);
+  }
 
-//! Reports stats for a given thread
-void reportStat(const char* loopname, const char* category, unsigned long value);
-//! Reports stats for a given thread
-void reportStat(const std::string& loopname, const std::string& category, unsigned long value);
-//! Reports stats for all threads
-void reportStat(Galois::Statistic* value);
-//! Reports Galois system memory stats for all threads
-void reportPageAlloc(const char* category);
-//! Reports NUMA memory stats for all NUMA nodes
-void reportNumaAlloc(const char* category);
+  inline void unlock() {
+    compilerBarrier();
+    _lock = 0;
+  }
 
-//! Prints all stats
-void printStats();
+  T* get() {
+    volatile T* val = V;
+    if (val)
+      return (T*)val;
+    lock();
+    val = V;
+    if (!val)
+      V = val = new T();
+    unlock();
+    return (T*)val;
+  }
+};
 
-}
+} // end namespace Substrate
 } // end namespace Galois
 
 #endif
-

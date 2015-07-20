@@ -2,67 +2,49 @@
  * @file
  * @section License
  *
- * Galois, a framework to exploit amorphous data-parallelism in irregular
- * programs.
+ * This file is part of Galois.  Galoisis a gramework to exploit
+ * amorphous data-parallelism in irregular programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
- * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
- * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
- * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
- * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
- * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
- * shall University be liable for incidental, special, indirect, direct or
- * consequential damages or loss of profits, interruption of business, or
- * related expenses which may arise from use of Software or Documentation,
- * including but not limited to those resulting from defects in Software and/or
- * Documentation, or loss or inaccuracy of data of any kind.
+ * Galois is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * Galois is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with Galois.  If not, see
+ * <http://www.gnu.org/licenses/>.
+ *
+ * @section Copyright
+ *
+ * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * reserved.
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
+
 #ifndef GALOIS_TIMER_H
 #define GALOIS_TIMER_H
 
-#include "Galois/config.h"
-
-#ifdef HAVE_CXX11_CHRONO
 #include <chrono>
-#endif
 
 namespace Galois {
 
-#ifdef HAVE_CXX11_CHRONO
+//! A simple timer
 class Timer {
   typedef std::chrono::steady_clock clockTy;
   //typedef std::chrono::high_resolution_clock clockTy;
   std::chrono::time_point<clockTy> startT, stopT;
 public:
-  void start() { startT = clockTy::now(); }
-  void stop() { stopT = clockTy::now(); }
-  unsigned long get() const {
-    return std::chrono::duration_cast<std::chrono::milliseconds>(stopT-startT).count();
-  }
-  unsigned long get_usec() const {
-    return std::chrono::duration_cast<std::chrono::microseconds>(stopT-startT).count();
-  }
-};
-#else
-//! A simple timer
-class Timer {
-  //This is so that implementations can vary without
-  //forcing includes of target specific headers
-  unsigned long _start_hi;
-  unsigned long _start_low;
-  unsigned long _stop_hi;
-  unsigned long _stop_low;
-public:
-  Timer();
   void start();
   void stop();
   unsigned long get() const;
   unsigned long get_usec() const;
 };
-#endif
 
 //! A multi-start time accumulator.
 //! Gives the final runtime for a series of intervals

@@ -2,7 +2,6 @@
  * @file
  * @section License
  *
-
  * This file is part of Galois.  Galoisis a gramework to exploit
  * amorphous data-parallelism in irregular programs.
  *

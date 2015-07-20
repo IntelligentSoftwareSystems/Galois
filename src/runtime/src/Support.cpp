@@ -2,32 +2,38 @@
  * @file
  * @section License
  *
- * Galois, a framework to exploit amorphous data-parallelism in irregular
- * programs.
+ * This file is part of Galois.  Galoisis a gramework to exploit
+ * amorphous data-parallelism in irregular programs.
  *
- * Copyright (C) 2014, The University of Texas at Austin. All rights reserved.
- * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
- * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
- * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
- * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
- * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
- * shall University be liable for incidental, special, indirect, direct or
- * consequential damages or loss of profits, interruption of business, or
- * related expenses which may arise from use of Software or Documentation,
- * including but not limited to those resulting from defects in Software and/or
- * Documentation, or loss or inaccuracy of data of any kind.
+ * Galois is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * Galois is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with Galois.  If not, see
+ * <http://www.gnu.org/licenses/>.
+ *
+ * @section Copyright
+ *
+ * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * reserved.
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 #include "Galois/Statistic.h"
 #include "Galois/gdeque.h"
-#include "Galois/Runtime/PerThreadStorage.h"
+#include "Galois/Substrate/PerThreadStorage.h"
 #include "Galois/Runtime/Support.h"
-#include "Galois/Runtime/ll/gio.h"
+#include "Galois/Substrate/gio.h"
 #include "Galois/Substrate/PaddedLock.h"
-#include "Galois/Runtime/ll/StaticInstance.h"
-#include "Galois/Runtime/mm/Mem.h"
+#include "Galois/Substrate/StaticInstance.h"
+#include "Galois/Runtime/Mem.h"
 
 #include <cmath>
 #include <map>
@@ -37,6 +43,11 @@
 #include <string>
 #include <vector>
 
+namespace Galois {
+namespace Runtime {
+extern unsigned activeThreads;
+} } //end namespaces
+
 using namespace Galois;
 using namespace Galois::Runtime;
 
@@ -45,7 +56,7 @@ namespace {
 class StatManager {
   typedef std::tuple<std::string, std::string, unsigned long> RecordTy;
 
-  Galois::Runtime::PerThreadStorage<std::pair<Substrate::SimpleLock, gdeque<RecordTy> > > Stats;
+  Galois::Substrate::PerThreadStorage<std::pair<Substrate::SimpleLock, gdeque<RecordTy> > > Stats;
 
 public:
   StatManager() {}
@@ -70,16 +81,16 @@ public:
     for (unsigned x = 0; x < Galois::Runtime::activeThreads; ++x) {
       auto rStat = Stats.getRemote(x);
       std::lock_guard<Substrate::SimpleLock> lg(rStat->first);
-      rStat->second.emplace_back(loop, category, MM::numPageAllocForThread(x));
+      rStat->second.emplace_back(loop, category, numPageAllocForThread(x));
     }
   }
 
   void addNumaAllocToStat(const std::string& loop, const std::string& category) {
-    int nodes = Galois::Runtime::MM::numNumaNodes();
+    int nodes = Galois::Runtime::numNumaNodes();
     for (int x = 0; x < nodes; ++x) {
       auto rStat = Stats.getRemote(x);
       std::lock_guard<Substrate::SimpleLock> lg(rStat->first);
-      rStat->second.emplace_back(loop, category, MM::numNumaAllocForNode(x));
+      rStat->second.emplace_back(loop, category, numNumaAllocForNode(x));
     }
   }
 
@@ -102,27 +113,27 @@ public:
       }
     }
     //print header
-    LL::gPrint("STATTYPE,LOOP,CATEGORY,n,sum");
+    Substrate::gPrint("STATTYPE,LOOP,CATEGORY,n,sum");
     for (unsigned x = 0; x <= maxThreadID; ++x)
-      LL::gPrint(",T", x);
-    LL::gPrint("\n");
+      Substrate::gPrint(",T", x);
+    Substrate::gPrint("\n");
     //print all values
     for (auto ii = LKs.begin(), ee = LKs.end(); ii != ee; ++ii) {
       std::vector<unsigned long>& Values = ii->second;
-      LL::gPrint("STAT,",
+      Substrate::gPrint("STAT,",
                  ii->first.first.c_str(), ",",
                  ii->first.second.c_str(), ",",
                  maxThreadID + 1, ",",
                  std::accumulate(Values.begin(), Values.end(), static_cast<unsigned long>(0))
                  );
       for (unsigned x = 0; x <= maxThreadID; ++x)
-        LL::gPrint(",", x < Values.size() ? Values.at(x) : 0);
-      LL::gPrint("\n");
+        Substrate::gPrint(",", x < Values.size() ? Values.at(x) : 0);
+      Substrate::gPrint("\n");
     }
   }
 };
 
-static LL::StaticInstance<StatManager> SM;
+static Substrate::StaticInstance<StatManager> SM;
 
 }
 

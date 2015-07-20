@@ -48,8 +48,6 @@
 namespace Galois {
 namespace Substrate {
 
-extern unsigned int activeThreads;
-
 class PerBackend {
   static const unsigned MAX_SIZE = 30;
   // 16 byte alignment so vectorized initialization is easier

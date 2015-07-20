@@ -2,23 +2,27 @@
  * @file
  * @section License
  *
- * Galois, a framework to exploit amorphous data-parallelism in
- * irregular programs.
+ * This file is part of Galois.  Galoisis a gramework to exploit
+ * amorphous data-parallelism in irregular programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights
- * reserved.  UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES
- * CONCERNING THIS SOFTWARE AND DOCUMENTATION, INCLUDING ANY
- * WARRANTIES OF MERCHANTABILITY, FITNESS FOR ANY PARTICULAR PURPOSE,
- * NON-INFRINGEMENT AND WARRANTIES OF PERFORMANCE, AND ANY WARRANTY
- * THAT MIGHT OTHERWISE ARISE FROM COURSE OF DEALING OR USAGE OF
- * TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH RESPECT TO
- * THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
- * shall University be liable for incidental, special, indirect,
- * direct or consequential damages or loss of profits, interruption of
- * business, or related expenses which may arise from use of Software
- * or Documentation, including but not limited to those resulting from
- * defects in Software and/or Documentation, or loss or inaccuracy of
- * data of any kind.
+ * Galois is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * Galois is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with Galois.  If not, see
+ * <http://www.gnu.org/licenses/>.
+ *
+ * @section Copyright
+ *
+ * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * reserved.
  *
  * @section Description
  *
@@ -42,16 +46,13 @@ class LocalTerminationDetection : public TerminationDetection {
     std::atomic<long> hasToken;
     long processIsBlack;
     bool lastWasWhite; // only used by the master
-#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1310
-    TokenHolder (void) {}
-#endif
   };
 
-  PerThreadStorage<TokenHolder> data;
+  Galois::Substrate::PerThreadStorage<TokenHolder> data;
   
   //send token onwards
   void propToken(bool isBlack) {
-    unsigned id = LL::getTID();
+    unsigned id = Substrate::ThreadPool::getTID();
     TokenHolder& th = *data.getRemote((id + 1) % activeThreads);
     th.tokenIsBlack = isBlack;
     th.hasToken = true;
@@ -62,7 +63,7 @@ class LocalTerminationDetection : public TerminationDetection {
   }
 
   bool isSysMaster() const {
-    return LL::getTID() == 0;
+    return Substrate::ThreadPool::getTID() == 0;
   }
 
 public:
@@ -130,7 +131,7 @@ class TreeTerminationDetection : public TerminationDetection {
     TokenHolder* child[num];
   };
 
-  PerThreadStorage<TokenHolder> data;
+  Galois::Substrate::PerThreadStorage<TokenHolder> data;
 
   void processToken() {
     TokenHolder& th = *data.getLocal();
@@ -180,7 +181,7 @@ class TreeTerminationDetection : public TerminationDetection {
   }
 
   bool isSysMaster() const {
-    return LL::getTID() == 0;
+    return Substrate::ThreadPool::getTID() == 0;
   }
 
 public:
@@ -195,11 +196,12 @@ public:
     th.hasToken = false;
     th.lastWasWhite = false;
     globalTerm = false;
-    th.parent = (LL::getTID() - 1) / num;
-    th.parent_offset = (LL::getTID() - 1) % num;
-    for (int i = 0; i < num; ++i) {
-      int cn = LL::getTID() * num + i + 1;
-      if (cn < (int) activeThreads)
+    auto tid = Substrate::ThreadPool::getTID();
+    th.parent = (tid - 1) / num;
+    th.parent_offset = (tid - 1) % num;
+    for (unsigned i = 0; i < num; ++i) {
+      unsigned cn = tid * num + i + 1;
+      if (cn < activeThreads)
 	th.child[i] = data.getRemote(cn);
       else
 	th.child[i] = 0;

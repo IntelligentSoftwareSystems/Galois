@@ -15,9 +15,6 @@ set(sources
 )
 
 add_library(galois_runtime STATIC ${sources})
+target_include_directories(galois_runtime PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+
 target_link_libraries(galois_runtime galois_substrate)
-
-#target_include_directories(galois_runtime PUBLIC ${gSubstrate_SOURCE_DIR}/include)
-
-configure_file("${PROJECT_SOURCE_DIR}/include/Galois/config.h.in" "${PROJECT_BINARY_DIR}/include/Galois/config.h")
-
