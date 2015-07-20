@@ -62,14 +62,14 @@ class BilliardsTwoPhase: public Billiards {
   };
 
 
-  struct SerialPart {
+  struct ExecSources {
 
     GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (const Event& e) const {
       const_cast<Event&> (e).simulate ();
     }
   };
 
-  struct OpFunc {
+  struct AddEvents {
 
     static const unsigned CHUNK_SIZE = 1;
 
@@ -78,7 +78,7 @@ class BilliardsTwoPhase: public Billiards {
     AddListTy& addList;
     Accumulator& iter;
 
-    OpFunc (
+    AddEvents (
         Table& table,
         const FP& endtime,
         AddListTy& addList,
@@ -124,7 +124,7 @@ public:
 
   virtual const std::string version () const { return "using IKDG"; }
 
-  virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const FP& endtime, bool enablePrints=false) {
+  virtual size_t runSim (TableSectored& table, std::vector<Event>& initEvents, const FP& endtime, bool enablePrints=false, bool logEvents=false) {
 
     AddListTy addList;
     Accumulator iter;
@@ -135,8 +135,8 @@ public:
         Galois::Runtime::makeStandardRange(initEvents.begin (), initEvents.end ()),
         Event::Comparator (),
         VisitNhood (),
-        OpFunc (table, endtime, addList, iter),
-        SerialPart ());
+        ExecSources (),
+        AddEvents (table, endtime, addList, iter));
 
     return iter.reduce ();
 

@@ -34,6 +34,7 @@
 #include "Galois/Timer.h"
 #include "Galois/DoAllWrap.h"
 #include "Galois/PerThreadContainer.h"
+#include "Galois/optional.h"
 
 #include "Galois/Runtime/Barrier.h"
 #include "Galois/Runtime/Context.h"
@@ -52,7 +53,6 @@
 #include "Galois/Runtime/mm/Mem.h"
 
 #include <boost/iterator/transform_iterator.hpp>
-#include <boost/optional.hpp>
 
 #include <iostream>
 #include <memory>
@@ -63,7 +63,7 @@ namespace Runtime {
 
 namespace cll = llvm::cl;
 
-static cll::opt<double> commitRatioArg("cratio", cll::desc("target commit ratio for two phase executor"), cll::init(0.80));
+static cll::opt<double> commitRatioArg("cratio", cll::desc("target commit ratio for two phase executor, 0.0 to disable windowing"), cll::init(0.80));
 
 // TODO: figure out when to call startIteration
 
@@ -73,7 +73,7 @@ class KDGtwoPhaseStableExecutor {
 public:
   using Ctxt = TwoPhaseContext<T, Cmp>;
   using CtxtAlloc = MM::FixedSizeAllocator<Ctxt>;
-  using CtxtWL = PerThreadVector<Ctxt*>;
+  using CtxtWL = PerThreadBag<Ctxt*>;
 
   using UserCtxt = UserContextAccess<T>;
   using PerThreadUserCtxt = PerThreadStorage<UserCtxt>;
@@ -105,11 +105,16 @@ protected:
   WindowWL winWL;
   CtxtAlloc ctxtAlloc;
   MakeContext ctxtMaker;
-  PerThreadUserCtxt userHandles;
+  std::unique_ptr<CtxtWL> currWL;
+  std::unique_ptr<CtxtWL> nextWL;
+
 
   size_t windowSize;
   size_t rounds;
   size_t prevCommits;
+  double targetCommitRatio;
+
+  PerThreadUserCtxt userHandles;
   GAccumulator<size_t> numCommitted;
   GAccumulator<size_t> total;
 
@@ -124,18 +129,43 @@ public:
       opFunc (opFunc),
       winWL (cmp),
       ctxtMaker (cmp, ctxtAlloc),
+      currWL (new CtxtWL),
+      nextWL (new CtxtWL),
       windowSize(0),
       rounds(0),
-      prevCommits(0)
-  {}
+      prevCommits(0),
+      targetCommitRatio (commitRatioArg)
+  {
+    if (targetCommitRatio < 0.0) {
+      targetCommitRatio = 0.0;
+    }
+    if (targetCommitRatio > 1.0) {
+      targetCommitRatio = 1.0;
+    }
+  }
 
   ~KDGtwoPhaseStableExecutor () {
     printStats ();
+    assert (currWL->empty_all ());
+    assert (nextWL->empty_all ());
   }
 
   template <typename R>
   void fill_initial (const R& range) {
-    winWL.initfill (range);
+    if (targetCommitRatio == 0.0) {
+
+      Galois::do_all_choice (range,
+          [this] (const T& x) {
+            nextWL->push_back (ctxtMaker (x));
+          }, 
+          "init-fill",
+          chunk_size<NhFunc::CHUNK_SIZE> ());
+
+
+    } else {
+      winWL.initfill (range);
+          
+    }
   }
 
   void execute () {
@@ -144,6 +174,7 @@ public:
 
 protected:
   GALOIS_ATTRIBUTE_PROF_NOINLINE void spillAll (CtxtWL& wl) {
+    assert (targetCommitRatio != 0.0);
     on_each(
         [this, &wl] (const unsigned tid, const unsigned numT) {
           while (!wl[tid].empty ()) {
@@ -161,9 +192,12 @@ protected:
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void refill (CtxtWL& wl, size_t currCommits, size_t prevWindowSize) {
+
+    assert (targetCommitRatio != 0.0);
+
     const size_t INIT_MAX_ROUNDS = 500;
     const size_t THREAD_MULT_FACTOR = 16;
-    const double TARGET_COMMIT_RATIO = commitRatioArg;
+    const double TARGET_COMMIT_RATIO = targetCommitRatio;
     const size_t MIN_WIN_SIZE = OpFunc::CHUNK_SIZE * getActiveThreads ();
     // const size_t MIN_WIN_SIZE = 2000000; // OpFunc::CHUNK_SIZE * getActiveThreads ();
     const size_t WIN_OVER_SIZE_FACTOR = 8;
@@ -233,62 +267,22 @@ protected:
   }
 
 
-
-  // XXX: moved to KDGtwoPhaseSupport.h
-
-  // template <typename F>
-  // static void runCatching (F& func, Ctxt* c, UserCtxt& uhand) {
-    // Galois::Runtime::setThreadContext (c);
-// 
-    // int result = 0;
-// 
-// #ifdef GALOIS_USE_LONGJMP
-    // if ((result = setjmp(hackjmp)) == 0) {
-// #else
-    // try {
-// #endif
-      // func (c->getElem (), uhand);
-// 
-// #ifdef GALOIS_USE_LONGJMP
-    // } else {
-      // // TODO
-    // }
-// #else 
-    // } catch (ConflictFlag f) {
-      // result = f;
-    // }
-// #endif
-// 
-    // switch (result) {
-      // case 0:
-        // break;
-      // case CONFLICT: 
-        // c->disableSrc ();
-        // break;
-      // default:
-        // GALOIS_DIE ("can't handle conflict flag type");
-        // break;
-    // }
-    // 
-// 
-    // Galois::Runtime::setThreadContext (NULL);
-  // }
-
-  template<typename Ptr>
-  GALOIS_ATTRIBUTE_PROF_NOINLINE void prepareRound (Ptr& currWL, Ptr& nextWL) {
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void prepareRound () {
     ++rounds;
     std::swap (currWL, nextWL);
-    size_t prevWindowSize = nextWL->size_all ();
     nextWL->clear_all ();
 
-    size_t currCommits = numCommitted.reduce () - prevCommits;
-    prevCommits += currCommits;
+    if (targetCommitRatio != 0.0) {
+      size_t currCommits = numCommitted.reduce () - prevCommits;
+      prevCommits += currCommits;
 
-    refill (*currWL, currCommits, prevWindowSize);
+      size_t prevWindowSize = nextWL->size_all ();
+      refill (*currWL, currCommits, prevWindowSize);
+    }
   }
 
-  GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhood (CtxtWL& currWL) {
-    Galois::do_all_choice (makeLocalRange (currWL),
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhood () {
+    Galois::do_all_choice (makeLocalRange (*currWL),
         [this] (Ctxt* c) {
           UserCtxt& uhand = *userHandles.getLocal ();
           uhand.reset ();
@@ -303,18 +297,18 @@ protected:
 
   }
 
-  GALOIS_ATTRIBUTE_PROF_NOINLINE void applyOperator (CtxtWL& currWL, CtxtWL& nextWL) {
-    boost::optional<T> minElem;
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void applyOperator () {
+    Galois::optional<T> minElem;
 
     if (DEPRECATED::ForEachTraits<OpFunc>::NeedsPush) {
-      if (!winWL.empty ()) {
+      if (targetCommitRatio != 0.0 && !winWL.empty ()) {
         minElem = *winWL.getMin();
       }
     }
 
 
-    Galois::do_all_choice (makeLocalRange (currWL),
-        [this, &minElem, &nextWL] (Ctxt* c) {
+    Galois::do_all_choice (makeLocalRange (*currWL),
+        [this, &minElem] (Ctxt* c) {
           bool commit = false;
 
           UserCtxt& uhand = *userHandles.getLocal ();
@@ -336,7 +330,7 @@ protected:
 
                 if (!minElem || !cmp (*minElem, *i)) {
                   // if *i >= *minElem
-                  nextWL.get().push_back (ctxtMaker (*i));
+                  nextWL->push_back (ctxtMaker (*i));
                 } else {
                   winWL.push (*i);
                 } 
@@ -351,7 +345,7 @@ protected:
           } else {
             c->cancelIteration ();
             c->reset ();
-            nextWL.get ().push_back (c);
+            nextWL->push_back (c);
           }
         },
         "applyOperator",
@@ -360,11 +354,9 @@ protected:
 
 
   void execute_stable () {
-    std::unique_ptr<CtxtWL> currWL(new CtxtWL);
-    std::unique_ptr<CtxtWL> nextWL(new CtxtWL);
 
     while (true) {
-      prepareRound (currWL, nextWL);
+      prepareRound ();
 
       if (currWL->empty_all ()) {
         break;
@@ -377,9 +369,9 @@ protected:
         t.start ();
       }
 
-      expandNhood (*currWL);
+      expandNhood ();
 
-      applyOperator (*currWL, *nextWL);
+      applyOperator ();
 
       if (DETAILED_STATS) {
         t.stop ();
@@ -413,24 +405,24 @@ namespace impl {
 } // end impl
 
 
-template <typename T, typename Cmp, typename NhFunc, typename OpFunc, typename SL, typename WindowWL>
+template <typename T, typename Cmp, typename NhFunc, typename OpFunc, typename ExFunc, typename WindowWL>
 
 class KDGtwoPhaseUnstableExecutor: public KDGtwoPhaseStableExecutor<T, Cmp, NhFunc, OpFunc, WindowWL>  {
   using Base = KDGtwoPhaseStableExecutor<T, Cmp, NhFunc, OpFunc, WindowWL>;
   using Ctxt = typename Base::Ctxt;
   using CtxtWL = typename Base::CtxtWL;
 
-  SL serialLoop;
+  ExFunc execFunc;
 
 public:
   KDGtwoPhaseUnstableExecutor (
       const Cmp& cmp, 
       const NhFunc& nhFunc,
       const OpFunc& opFunc,
-      const SL& serialLoop)
+      const ExFunc& execFunc)
     :
       Base (cmp, nhFunc, opFunc),
-      serialLoop (serialLoop)
+      execFunc (execFunc)
   {}
 
 
@@ -446,7 +438,7 @@ protected:
     }
   };
 
-  GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhood (CtxtWL& currWL) {
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhoodUnstable (CtxtWL& currWL) {
     auto m_beg = boost::make_transform_iterator (currWL.begin_all (), GetActive ());
     auto m_end = boost::make_transform_iterator (currWL.end_all (), GetActive ());
 
@@ -504,28 +496,28 @@ protected:
   }
 
   void execute_unstable (void) {
-    std::unique_ptr<CtxtWL> currWL(new CtxtWL);
-    std::unique_ptr<CtxtWL> nextWL(new CtxtWL);
 
     while (true) {
 
-      Base::prepareRound (currWL, nextWL);
+      Base::prepareRound ();
 
-      if (currWL->empty_all ()) {
+      if (Base::currWL->empty_all ()) {
         break;
       }
 
-      expandNhood (*currWL);
+      expandNhoodUnstable (*Base::currWL);
 
-      for (auto i = currWL->begin_all ()
-          , endi = currWL->end_all (); i != endi; ++i) {
 
-        if ((*i)->isSrc ()) {
-          serialLoop ((*i)->getElem ());
-        }
-      }
+      Galois::do_all_choice (makeLocalRange (*Base::currWL),
+          [this] (Ctxt* ctx) {
+            if (ctx->isSrc ()) {
+              execFunc (ctx->getElem ());
+            }
+          }, 
+          "execute-safe-sources",
+          chunk_size<NhFunc::CHUNK_SIZE> ());
 
-      Base::applyOperator (*currWL, *nextWL);
+      Base::applyOperator ();
       
     }
 
@@ -562,15 +554,15 @@ void for_each_ordered_2p_win (const R& range, const Cmp& cmp, const NhFunc& nhFu
   }
 }
 
-template <typename R, typename Cmp, typename NhFunc, typename OpFunc, typename SL>
-void for_each_ordered_2p_win (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const SL& serialLoop, const char* loopname=0, bool wakeupThreadPool=true) {
+template <typename R, typename Cmp, typename NhFunc, typename AddFunc, typename ExFunc>
+void for_each_ordered_2p_win (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const ExFunc& execFunc, const AddFunc& addFunc, const char* loopname=0, bool wakeupThreadPool=true) {
 
   using T = typename R::value_type;
   using WindowWL = PQbasedWindowWL<T, Cmp>;
 
-  using Exec = KDGtwoPhaseUnstableExecutor<T, Cmp, NhFunc, OpFunc, SL, WindowWL>;
+  using Exec = KDGtwoPhaseUnstableExecutor<T, Cmp, NhFunc, AddFunc, ExFunc, WindowWL>;
   
-  Exec e (cmp, nhFunc, opFunc, serialLoop);
+  Exec e (cmp, nhFunc, addFunc, execFunc);
 
   if (wakeupThreadPool) {
     getSystemThreadPool ().burnPower (Galois::getActiveThreads ());
