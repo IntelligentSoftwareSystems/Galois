@@ -8,7 +8,7 @@
 
 #include <boost/mpl/if.hpp>
 
-#include "PageRank.h"
+#include "PageRankOld.h"
 
 template<bool UseDelta, bool UseAsync>
 struct GraphLabAlgo {
