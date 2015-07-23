@@ -67,7 +67,7 @@ struct AsyncPriSet{
       LNode& sdata = graph.getData(src);
       sdata.inWL = 0;
 
-      auto resScale = outOnly ? nout(graph, src, Galois::MethodFlag::NONE) + 1 : ninout(graph, src, Galois::MethodFlag::NONE);
+      auto resScale = outOnly ? nout(graph, src, Galois::MethodFlag::UNPROTECTED) + 1 : ninout(graph, src, Galois::MethodFlag::UNPROTECTED);
       if ( sdata.residual / resScale < limit) {
         double R = sdata.residual;
         if (R >= tolerance) {
@@ -80,14 +80,14 @@ struct AsyncPriSet{
         return;
       }
 
-      Galois::MethodFlag lockflag = Galois::MethodFlag::NONE;
+      Galois::MethodFlag lockflag = Galois::MethodFlag::UNPROTECTED;
 
       // the node is processed
       PRTy oldResidual = sdata.residual.exchange(0.0);
       PRTy pr = computePageRankInOut(graph, src, 0, lockflag);
       PRTy diff = std::fabs(pr - sdata.value);
       sdata.value = pr;
-      auto src_nout = nout(graph, src, Galois::MethodFlag::NONE);
+      auto src_nout = nout(graph, src, Galois::MethodFlag::UNPROTECTED);
       PRTy delta = diff*alpha/src_nout;
       // for each out-going neighbors
       for (auto jj = graph.edge_begin(src, lockflag), ej = graph.edge_end(src, lockflag);
@@ -99,7 +99,7 @@ struct AsyncPriSet{
         if (old + delta >= tolerance && !ddata.inWL) {
           if (0 ==ddata.inWL.exchange(1)) {
             nextWL.push(dst);
-            auto rs = outOnly ? nout(graph, dst, Galois::MethodFlag::NONE) + 1 : ninout(graph, dst, Galois::MethodFlag::NONE);
+            auto rs = outOnly ? nout(graph, dst, Galois::MethodFlag::UNPROTECTED) + 1 : ninout(graph, dst, Galois::MethodFlag::UNPROTECTED);
             stats.getLocal()->insert(old+delta / rs);
           }
         }

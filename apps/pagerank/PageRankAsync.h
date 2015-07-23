@@ -60,7 +60,7 @@ struct AsyncSet {
     void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) const {
       LNode& sdata = graph.getData(src);
       sdata.flag = 0;   
-      Galois::MethodFlag lockflag = Galois::MethodFlag::NONE;
+      Galois::MethodFlag lockflag = Galois::MethodFlag::UNPROTECTED;
 
       PRTy pr = computePageRankInOut(graph, src, 0, lockflag);
       PRTy diff = std::fabs(pr - sdata.value);

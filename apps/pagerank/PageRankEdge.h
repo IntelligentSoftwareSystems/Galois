@@ -86,7 +86,7 @@ struct AsyncEdge {
 
     void condSched(const GNode& node, LNode& lnode, PRTy delta, Galois::UserContext<std::pair<GNode, int> >& ctx) const {
       PRTy old = atomicAdd(lnode.residual, delta);
-      int out = nout(graph, node, Galois::MethodFlag::NONE) + 1;
+      int out = nout(graph, node, Galois::MethodFlag::UNPROTECTED) + 1;
       auto oldp = pri(old, out, amp, tolerance);
       auto newp = pri(old+delta, out, amp, tolerance);
       if ((std::fabs(old) <= tolerance && std::fabs(old + delta) >= tolerance) || (oldp != newp)) {
@@ -97,13 +97,13 @@ struct AsyncEdge {
     template<typename Context>
     void operator()(const std::pair<GNode, int>& data, Context& ctx) const {
       GNode node = data.first;
-      LNode& sdata = graph.getData(node, Galois::MethodFlag::NONE);
-      int out = nout(graph, node, Galois::MethodFlag::NONE) + 1;
+      LNode& sdata = graph.getData(node, Galois::MethodFlag::UNPROTECTED);
+      int out = nout(graph, node, Galois::MethodFlag::UNPROTECTED) + 1;
       if (sdata.residual < tolerance ||
           pri(sdata.residual, out, amp, tolerance) < data.second)
         return;
       // if (data.second < -500) 
-      //   std::cout << data.first << "," << data.second << "," << nout(graph, node, Galois::MethodFlag::NONE) << "," << ninout(graph, node, Galois::MethodFlag::NONE) << "," << sdata.value << "," << sdata.residual << "\n";
+      //   std::cout << data.first << "," << data.second << "," << nout(graph, node, Galois::MethodFlag::UNPROTECTED) << "," << ninout(graph, node, Galois::MethodFlag::UNPROTECTED) << "," << sdata.value << "," << sdata.residual << "\n";
 
       operator()(data.first, ctx);
     }
@@ -111,7 +111,7 @@ struct AsyncEdge {
     template<typename Context>
     void operator()(const GNode& src, Context& ctx) const {
       LNode& sdata = graph.getData(src);      
-      Galois::MethodFlag lockflag = Galois::MethodFlag::NONE;
+      Galois::MethodFlag lockflag = Galois::MethodFlag::UNPROTECTED;
 
       PRTy oldResidual = sdata.residual.exchange(0.0);
       if (std::fabs(oldResidual) > tolerance) {
@@ -143,8 +143,8 @@ struct AsyncEdge {
       typedef Galois::WorkList::OrderedByIntegerMetric<sndPri,WL>::with_block_period<8>::type OBIM;
       //typedef Galois::WorkList::WorkListTracker<sndPri,OBIM> DOBIM;
       auto fn = [&graph, amp, tolerance] (const GNode& node) {
-        int out = nout(graph, node, Galois::MethodFlag::NONE) + 1;
-        return std::make_pair(node, pri(graph.getData(node, Galois::MethodFlag::NONE).residual, out,amp, tolerance));
+        int out = nout(graph, node, Galois::MethodFlag::UNPROTECTED) + 1;
+        return std::make_pair(node, pri(graph.getData(node, Galois::MethodFlag::UNPROTECTED).residual, out,amp, tolerance));
       };
       Galois::for_each(boost::make_transform_iterator(graph.begin(), std::ref(fn)),
                        boost::make_transform_iterator(graph.end(), std::ref(fn)),
@@ -201,7 +201,7 @@ struct AsyncEdgePriSet {
       LNode& sdata = graph.getData(src);
       sdata.inWL = 0;
 
-      auto resScale = nout(graph, src, Galois::MethodFlag::NONE) + 1;
+      auto resScale = nout(graph, src, Galois::MethodFlag::UNPROTECTED) + 1;
       if ( sdata.residual / resScale < limit) {
         double R = sdata.residual;
         if (R >= tolerance) {
@@ -216,7 +216,7 @@ struct AsyncEdgePriSet {
 
       //++*Pstats.getLocal();
 
-      Galois::MethodFlag lockflag = Galois::MethodFlag::NONE;
+      Galois::MethodFlag lockflag = Galois::MethodFlag::UNPROTECTED;
 
       PRTy oldResidual = sdata.residual.exchange(0.0);
       sdata.value = sdata.value + oldResidual;
@@ -231,7 +231,7 @@ struct AsyncEdgePriSet {
         if (old + delta >= tolerance && !ddata.inWL) {
           if (0 ==ddata.inWL.exchange(1)) {
             nextWL.push(dst);
-            auto rs = nout(graph, dst, Galois::MethodFlag::NONE) + 1;
+            auto rs = nout(graph, dst, Galois::MethodFlag::UNPROTECTED) + 1;
             stats.getLocal()->insert(old+delta / rs);
           }
         }
@@ -247,7 +247,7 @@ struct AsyncEdgePriSet {
     template<typename Context>
     void operator()(const GNode& src, Context& ctx) const {
       LNode& sdata = graph.getData(src);      
-      Galois::MethodFlag lockflag = Galois::MethodFlag::NONE;
+      Galois::MethodFlag lockflag = Galois::MethodFlag::UNPROTECTED;
       
       PRTy oldResidual = sdata.residual.exchange(0.0);
       if (std::fabs(oldResidual) > tolerance) {

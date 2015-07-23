@@ -42,7 +42,7 @@
 #include <iostream>
 #include <fstream>
 
-#include "PageRank.h"
+#include "PageRankOld.h"
 #ifdef GALOIS_USE_EXP
 #include "GraphLabAlgo.h"
 #include "LigraAlgo.h"

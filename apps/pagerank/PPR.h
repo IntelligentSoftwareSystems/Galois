@@ -65,9 +65,9 @@ struct PPRAsyncRsd {
       // the node is processed
       sdata.flag = false;
       double sum = 0;
-      for (auto jj = graph.edge_begin(src, Galois::MethodFlag::NONE), ej = graph.edge_end(src, Galois::MethodFlag::NONE); jj != ej; ++jj) {
+      for (auto jj = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED), ej = graph.edge_end(src, Galois::MethodFlag::UNPROTECTED); jj != ej; ++jj) {
         GNode dst = graph.getEdgeDst(jj);
-        LNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+        LNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
         sum += ddata.value / std::distance(graph.edge_begin(dst), graph.edge_end(dst));
       }
       float value = alpha * sum + (sdata.seedset ? (1.0 - alpha) : 0.0);
@@ -77,9 +77,9 @@ struct PPRAsyncRsd {
         sdata.value = value;
         //std::cout << src << " " << sdata.value << "\n";
         // for each out-going neighbors
-        for (auto jj = graph.edge_begin(src, Galois::MethodFlag::NONE), ej = graph.edge_end(src, Galois::MethodFlag::NONE); jj != ej; ++jj) {
+        for (auto jj = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED), ej = graph.edge_end(src, Galois::MethodFlag::UNPROTECTED); jj != ej; ++jj) {
           GNode dst = graph.getEdgeDst(jj);
-	  LNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+	  LNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
 	  ddata.residual += sdata.residual*alpha/std::distance(graph.edge_begin(src), graph.edge_end(src)); // update residual
 	  // if the node is not in the worklist and the residual is greater than tolerance
 	  if(!ddata.flag && ddata.residual>=tolerance) {

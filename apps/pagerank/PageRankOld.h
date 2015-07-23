@@ -22,8 +22,8 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#ifndef APPS_PAGERANK_PAGERANK_H
-#define APPS_PAGERANK_PAGERANK_H
+#ifndef APPS_PAGERANK_PAGERANK_OLD_H
+#define APPS_PAGERANK_PAGERANK_OLD_H
 
 #include "llvm/Support/CommandLine.h"
 

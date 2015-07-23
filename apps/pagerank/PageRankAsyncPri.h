@@ -56,16 +56,16 @@ struct AsyncPri{
     PRPri(Graph& g, PRTy t) : graph(g), tolerance(t) {}
     int operator()(const GNode& src, PRTy d) const {
       if (outOnly)
-        d /= (1 + nout(graph, src, Galois::MethodFlag::NONE));
+        d /= (1 + nout(graph, src, Galois::MethodFlag::UNPROTECTED));
       else
-        d /= ninout(graph, src, Galois::MethodFlag::NONE);
+        d /= ninout(graph, src, Galois::MethodFlag::UNPROTECTED);
       d /= tolerance;
       if (d > 50)
         return -50;
       return -d; //d*amp; //std::max((int)floor(d*amp), 0);
     }      
     int operator()(const GNode& src) const {
-      PRTy d = graph.getData(src, Galois::MethodFlag::NONE).residual;
+      PRTy d = graph.getData(src, Galois::MethodFlag::UNPROTECTED).residual;
       return operator()(src, d);
     }
   };
@@ -90,7 +90,7 @@ struct AsyncPri{
       if(sdata.residual < tolerance || pri(src) != srcn.second)
         return;
 
-      Galois::MethodFlag lockflag = Galois::MethodFlag::NONE;
+      Galois::MethodFlag lockflag = Galois::MethodFlag::UNPROTECTED;
 
       PRTy oldResidual = sdata.residual.exchange(0.0);
       PRTy pr = computePageRankInOut(graph, src, 0, lockflag);

@@ -58,7 +58,7 @@ struct AsyncRsd {
 
     void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) const {
       LNode& sdata = graph.getData(src);      
-      Galois::MethodFlag lockflag = Galois::MethodFlag::NONE;
+      Galois::MethodFlag lockflag = Galois::MethodFlag::UNPROTECTED;
 
       //PRTy oldResidual = sdata.residual.exchange(0.0);
       sdata.residual = 0;
