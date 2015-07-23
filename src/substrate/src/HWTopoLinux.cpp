@@ -167,29 +167,27 @@ static std::vector<int> parseCPUSet() {
   getline(cpuSet,buffer);
   if (!cpuSet)
     return vals;
-  
-  const char* np = buffer.data();
-  while (np && strlen(np)) {
-    char* c = index(np, ',');  
-    if (c) { //slice string at comma (np is old string, c is next string)
-      *c = '\0';
-      ++c;
-    }
-    
-    char* d = index(np, '-');
-    if (d) { //range
-      *d = '\0';
-      ++d;
-      unsigned b = atoi(np);
-      unsigned e = atoi(d);
-      while (b <= e)
-        vals.push_back(b++);
-    } else { //singleton
-      vals.push_back(atoi(np));
-    }
-    np = c;
-  }
-  
+
+  size_t current;
+  size_t next = -1;
+  do {
+    current = next + 1;
+    next = buffer.find_first_of(',', current );
+    auto buf = buffer.substr(current, next - current);
+    if (buf.size()) {
+      size_t dash = buf.find_first_of('-', 0);
+      if (dash != std::string::npos) { //range
+        auto first = buf.substr(0, dash);
+        auto second = buf.substr(dash+1,std::string::npos);
+        unsigned b = atoi(first.data());
+        unsigned e = atoi(second.data());
+        while (b <= e)
+          vals.push_back(b++);
+      } else { // singleton
+        vals.push_back(atoi(buf.data()));
+      }
+    }      
+  } while (next != std::string::npos);  
   return vals;
 }
 
