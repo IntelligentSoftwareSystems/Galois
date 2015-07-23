@@ -6,8 +6,10 @@
 #include "Galois/Graph/Util.h"
 #include "Lonestar/BoilerPlate.h"
 
+#define BACKEND_GPU_OPENCL 1
+#define BACKEND_CPU 1
+
 #include "pr_opencl.h"
-#include "pr_cuda.h"
 
 #define _HETERO_DEBUG_ 0
 
@@ -16,35 +18,31 @@ static const char* const desc = "Sample DH Application";
 static const char* const url = 0;
 
 enum Personality {
-GPU_OPENCL,GPU_CUDA,CPU
+GPU_OPENCL,CPU
 };
 
 namespace cll = llvm::cl;
 
-static cll::opt<Personality> personality("personality", cll::desc("Personality"), cll::values(clEnumValN(GPU_OPENCL, "gpu/opencl", "GPU/OPENCL"),clEnumValN(GPU_CUDA, "gpu/cuda", "GPU/CUDA"),clEnumValN(CPU, "cpu/galois", "CPU"), clEnumValEnd), cll::init(GPU_OPENCL));
-static cll::opt<std::string> personality_set("pset", cll::desc("String specifying personality for each host: 'o'=GPU/OPENCL, 'g'=GPU/CUDA, 'c'=CPU"), cll::init(""));
+static cll::opt<Personality> personality("personality", cll::desc("Personality"), cll::values(clEnumValN(GPU_OPENCL, "gpu/opencl", "GPU/OPENCL"),clEnumValN(CPU, "cpu/galois", "CPU"), clEnumValEnd), cll::init(GPU_OPENCL));
+static cll::opt<std::string> personality_set("pset", cll::desc("String specifying personality for each host: 'o'=GPU/OPENCL, 'c'=CPU"), cll::init(""));
 static cll::opt<float> cldevice("cldevice", cll::desc("Select OpenCL device (platformid.deviceid) to run on , default is to choose automatically (OpenCL backend)"), cll::init(-1));
-static cll::opt<int> gpudevice("gpu", cll::desc("Select GPU to run on, default is to choose automatically"), cll::init(-1));
 static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file (transpose)>"), cll::Required);
 static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations"), cll::init(4));
 static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"), cll::init(false));
 
 struct PRNode { float pr; unsigned int nout; };
 typedef struct PRNode LNode;
-typedef Galois::OpenCL::LC_LinearArray_Graph<Galois::OpenCL::Array, LNode, void> DeviceGraph;
-struct OPENCL_Context<DeviceGraph> pr_cl_ctx;
-struct pr_CUDA_Context *pr_cuda_ctx;
 typedef Galois::Graph::LC_CSR_Graph<LNode, void> Graph;
 typedef typename Graph::GraphNode GNode;
+
+typedef typename Galois::OpenCL::LC_LinearArray_Graph<Galois::OpenCL::Array,LNode,void> DeviceGraph;
+struct OPENCL_Context<DeviceGraph> pr_cl_ctx;
 std::map<GNode, float> buffered_updates;
 
 std::string personality_str (Personality p) {
   switch (p) {
     case GPU_OPENCL:
       return "GPU_OPENCL";
-      break;
-    case GPU_CUDA:
-      return "GPU_CUDA";
       break;
     case CPU:
       return "CPU";
@@ -206,6 +204,7 @@ void recvNodeStatic(unsigned GID, uint32_t hostID) {
  *
  **********************************************************************************/
 
+#ifdef BACKEND_GPU_CUDA
 MarshalGraph pGraph2MGraph(pGraph &g) {
    MarshalGraph m;
 
@@ -236,7 +235,7 @@ MarshalGraph pGraph2MGraph(pGraph &g) {
 
    m.row_start[node_counter] = edge_counter;
    m.nedges = edge_counter;
-//   printf("dropped %u edges (g->r, g->l, g->g)\n", g.numEdges - m.nedges);
+   printf("dropped %u edges (g->r, g->l, g->g)\n", g.numEdges - m.nedges);
    // for(int i = 0; i < node_counter; i++) {
    //   printf("%u ", m.row_start[i]);
    // }
@@ -248,6 +247,7 @@ MarshalGraph pGraph2MGraph(pGraph &g) {
    // printf("nc: %zu ec: %zu\n", node_counter, edge_counter);
    return m;
 }
+#endif
 /*********************************************************************************
  *
  **********************************************************************************/
@@ -276,9 +276,6 @@ void recv_PRNode_nout(pGraph *p, unsigned GID, unsigned int nout) {
     case GPU_OPENCL:
       pr_cl_ctx.getData(LID).nout = nout;
       break;
-    case GPU_CUDA:
-      set_PRNode_nout_CUDA(pr_cuda_ctx, LID, nout);
-      break;
     case CPU:
       p->g.getData(LID).nout = nout;
       break;
@@ -294,9 +291,6 @@ void send_nout(Galois::Runtime::NetworkInterface& net, pGraph& p) {
       switch (personality) {
         case GPU_OPENCL:
           net.sendAlt(x, recv_PRNode_nout, magicPointer[x], n, pr_cl_ctx.getData(n - p.g_offset).nout);
-          break;
-        case GPU_CUDA:
-          net.sendAlt(x, recv_PRNode_nout, magicPointer[x], n, get_PRNode_nout_CUDA(pr_cuda_ctx, n - p.g_offset));
           break;
         case CPU:
           net.sendAlt(x, recv_PRNode_nout, magicPointer[x], n, p.g.getData(n - p.g_offset).nout);
@@ -315,9 +309,6 @@ void recv_PRNode_nout_plus(pGraph *p, unsigned GID, unsigned int nout) {
     case GPU_OPENCL:
       pr_cl_ctx.getData(LID).nout += nout;
       break;
-    case GPU_CUDA:
-      set_PRNode_nout_plus_CUDA(pr_cuda_ctx, LID, nout);
-      break;
     case CPU:
       p->g.getData(LID).nout += nout;
       break;
@@ -335,9 +326,6 @@ void send_nout_shared(Galois::Runtime::NetworkInterface& net, pGraph& p) {
       case GPU_OPENCL:
         net.sendAlt(x, recv_PRNode_nout_plus, magicPointer[x], p.L2G[l2g_ndx], pr_cl_ctx.getData(*n).nout);
         break;
-      case GPU_CUDA:
-        net.sendAlt(x, recv_PRNode_nout_plus, magicPointer[x], p.L2G[l2g_ndx], get_PRNode_nout_CUDA(pr_cuda_ctx, *n));
-        break;
       case CPU:
         net.sendAlt(x, recv_PRNode_nout_plus, magicPointer[x], p.L2G[l2g_ndx], p.g.getData(*n).nout);
         break;
@@ -353,9 +341,6 @@ void recv_PRNode_pr(pGraph *p, unsigned GID, float pr) {
   switch (personality) {
     case GPU_OPENCL:
       pr_cl_ctx.getData(LID).pr = pr;
-      break;
-    case GPU_CUDA:
-      set_PRNode_pr_CUDA(pr_cuda_ctx, LID, pr);
       break;
     case CPU:
       p->g.getData(LID).pr = pr;
@@ -373,9 +358,6 @@ void send_pr(Galois::Runtime::NetworkInterface& net, pGraph& p) {
         case GPU_OPENCL:
           net.sendAlt(x, recv_PRNode_pr, magicPointer[x], n, pr_cl_ctx.getData(n - p.g_offset).pr);
           break;
-        case GPU_CUDA:
-          net.sendAlt(x, recv_PRNode_pr, magicPointer[x], n, get_PRNode_pr_CUDA(pr_cuda_ctx, n - p.g_offset));
-          break;
         case CPU:
           net.sendAlt(x, recv_PRNode_pr, magicPointer[x], n, p.g.getData(n - p.g_offset).pr);
           break;
@@ -387,15 +369,13 @@ void send_pr(Galois::Runtime::NetworkInterface& net, pGraph& p) {
   }
 }
 void loadGraphNonCPU(pGraph &g) {
-  MarshalGraph m;
+  #ifdef BACKEND_GPU_CUDA 
+MarshalGraph m;
+#endif
   assert(personality != CPU);
   switch(personality) {
     case GPU_OPENCL:
       pr_cl_ctx.loadGraphNonCPU(g);
-      break;
-    case GPU_CUDA:
-      m = pGraph2MGraph(g);
-      load_graph_CUDA(pr_cuda_ctx, m);
       break;
     default:
       assert(false);
@@ -407,9 +387,6 @@ void parse_pset() {
     switch (personality_set.c_str()[Galois::Runtime::NetworkInterface::ID]) {
       case 'o':
         personality = GPU_OPENCL;
-        break;
-      case 'g':
-        personality = GPU_CUDA;
         break;
       case 'c':
         personality = CPU;
@@ -424,10 +401,6 @@ void dev_init() {
   switch(personality) {
     case GPU_OPENCL:
       Galois::OpenCL::cl_env.init(cldevice);
-      break;
-    case GPU_CUDA:
-      pr_cuda_ctx = get_CUDA_context(Galois::Runtime::NetworkInterface::ID);
-      if(!init_CUDA_context(pr_cuda_ctx, gpudevice)) exit(1);
       break;
     case CPU:
       break;
