@@ -165,6 +165,7 @@ public:
   static unsigned getTID() { return topo.tid; }
   static bool isLeader() { return topo.tid == topo.packageLeader; }
   static unsigned getLeader() { return topo.packageLeader; }
+  static unsigned getPackage() { return topo.package; }
   static unsigned getCumulativeMaxPackage() { return topo.cumulativeMaxPackage; }
 
 };

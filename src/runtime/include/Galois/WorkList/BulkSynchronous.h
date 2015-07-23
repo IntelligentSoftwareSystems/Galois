@@ -23,7 +23,7 @@
 #ifndef GALOIS_WORKLIST_BULKSYNCHRONOUS_H
 #define GALOIS_WORKLIST_BULKSYNCHRONOUS_H
 
-#include "Galois/Runtime/Barrier.h"
+#include "Galois/Substrate/Barrier.h"
 #include "Chunked.h"
 #include "WLCompileCheck.h"
 
@@ -58,15 +58,15 @@ private:
   };
 
   CTy wls[2];
-  Runtime::PerThreadStorage<TLD> tlds;
-  Runtime::Barrier& barrier;
-  Runtime::LL::CacheLineStorage<std::atomic<bool>> some;
+  Substrate::PerThreadStorage<TLD> tlds;
+  Substrate::Barrier& barrier;
+  Substrate::CacheLineStorage<std::atomic<bool>> some;
   std::atomic<bool> isEmpty;
 
  public:
   typedef T value_type;
 
-  BulkSynchronous(): barrier(Runtime::getSystemBarrier()), some(false), isEmpty(false) { }
+  BulkSynchronous(): barrier(Substrate::getSystemBarrier(Runtime::activeThreads)), some(false), isEmpty(false) { }
 
   void push(const value_type& val) {
     wls[(tlds.getLocal()->round + 1) & 1].push(val);
@@ -99,7 +99,7 @@ private:
         return r;
 
       barrier.wait();
-      if (Runtime::LL::getTID() == 0) {
+      if (Substrate::ThreadPool::getTID() == 0) {
         if (!some.get())
           isEmpty = true;
         some.get() = false; 

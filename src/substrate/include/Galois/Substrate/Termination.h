@@ -31,8 +31,8 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#ifndef GALOIS_RUNTIME_TERMINATION_H
-#define GALOIS_RUNTIME_TERMINATION_H
+#ifndef GALOIS_SUBSTRATE_TERMINATION_H
+#define GALOIS_SUBSTRATE_TERMINATION_H
 
 #include "Galois/Substrate/PerThreadStorage.h"
 #include "Galois/Substrate/CacheLineStorage.h"
@@ -40,11 +40,11 @@
 #include <atomic>
 
 namespace Galois {
-namespace Runtime {
+namespace Substrate {
 
 class TerminationDetection {
 protected:
-  Substrate::CacheLineStorage<std::atomic<int> > globalTerm;
+  CacheLineStorage<std::atomic<int> > globalTerm;
 public:
   /**
    * Initializes the per-thread state.  All threads must call this
@@ -70,8 +70,8 @@ public:
   }
 };
 
-//returns an object.  The object will be reused.
-TerminationDetection& getSystemTermination();
+//returns an object.  The object will be reused, but reinitialized to activeThreads
+TerminationDetection& getSystemTermination(unsigned activeThreads);
 
 } // end namespace Runtime
 } // end namespace Galois

@@ -26,7 +26,7 @@
 #define GALOIS_RUNTIME_RANGE_H
 
 #include "Galois/gstl.h"
-#include "Galois/Runtime/ll/TID.h"
+#include "Galois/Substrate/ThreadPool.h"
 
 #include <iterator>
 
@@ -57,7 +57,7 @@ public:
   /* const */ T& get_container() const { return *container; }
 
   std::pair<block_iterator, block_iterator> block_pair() const {
-    return Galois::block_range(begin(), end(), LL::getTID(), activeThreads);
+    return Galois::block_range(begin(), end(), Substrate::ThreadPool::getTID(), activeThreads);
   }
 
   std::pair<local_iterator, local_iterator> local_pair() const {
@@ -91,7 +91,7 @@ public:
   iterator end() const { return ei; }
 
   std::pair<block_iterator, block_iterator> block_pair() const {
-    return Galois::block_range(ii, ei, LL::getTID(), activeThreads);
+    return Galois::block_range(ii, ei, Substrate::ThreadPool::getTID(), activeThreads);
   }
 
   std::pair<local_iterator, local_iterator> local_pair() const {

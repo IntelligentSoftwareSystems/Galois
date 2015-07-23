@@ -2,21 +2,27 @@
  * @file
  * @section License
  *
- * Galois, a framework to exploit amorphous data-parallelism in irregular
- * programs.
+ * This file is part of Galois.  Galoisis a gramework to exploit
+ * amorphous data-parallelism in irregular programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
- * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
- * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
- * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
- * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
- * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
- * shall University be liable for incidental, special, indirect, direct or
- * consequential damages or loss of profits, interruption of business, or
- * related expenses which may arise from use of Software or Documentation,
- * including but not limited to those resulting from defects in Software and/or
- * Documentation, or loss or inaccuracy of data of any kind.
+ * Galois is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * Galois is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with Galois.  If not, see
+ * <http://www.gnu.org/licenses/>.
+ *
+ * @section Copyright
+ *
+ * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * reserved.
  *
  * @section Description
  *
@@ -26,6 +32,7 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
+
 #ifndef GALOIS_RUNTIME_EXECUTOR_FOREACH_H
 #define GALOIS_RUNTIME_EXECUTOR_FOREACH_H
 
@@ -34,16 +41,16 @@
 #include "Galois/Statistic.h"
 #include "Galois/Threads.h"
 #include "Galois/Traits.h"
-#include "Galois/Runtime/Barrier.h"
+#include "Galois/Substrate/Barrier.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/ForEachTraits.h"
 #include "Galois/Runtime/Range.h"
 #include "Galois/Runtime/Support.h"
-#include "Galois/Runtime/Termination.h"
-#include "Galois/Runtime/ThreadPool.h"
+#include "Galois/Substrate/Termination.h"
+#include "Galois/Substrate/ThreadPool.h"
 #include "Galois/Runtime/UserContextAccess.h"
 #include "Galois/WorkList/Chunked.h"
-#include "Galois/WorkList/GFifo.h"
+#include "Galois/WorkList/Simple.h"
 
 #include <algorithm>
 #include <functional>
@@ -59,19 +66,19 @@ typedef WorkList::dChunkedFIFO<GALOIS_DEFAULT_CHUNK_SIZE> defaultWL;
 
 template<typename value_type>
 class AbortHandler {
-  struct Item { value_type val; int retries; };
+  struct Item { value_type val;  int retries; };
 
   typedef WorkList::GFIFO<Item> AbortedList;
-  PerThreadStorage<AbortedList> queues;
+  Substrate::PerThreadStorage<AbortedList> queues;
   bool useBasicPolicy;
   
   /**
    * Policy: serialize via tree over packages.
    */
   void basicPolicy(const Item& item) {
-    unsigned tid = LL::getTID();
-    unsigned package = LL::getPackageForSelf(tid);
-    queues.getRemote(LL::getLeaderForPackage(package / 2))->push(item);
+    auto& tp = Substrate::getSystemThreadPool();
+    unsigned package = tp.getPackage();
+    queues.getRemote(tp.getLeaderForPackage(package / 2))->push(item);
   }
 
   /**
@@ -85,14 +92,15 @@ class AbortHandler {
       return;
     } 
     
-    unsigned tid = LL::getTID();
-    unsigned package = LL::getPackageForSelf(tid);
-    unsigned leader = LL::getLeaderForPackage(package);
+    unsigned tid = Substrate::ThreadPool::getTID();
+    auto& tp = Substrate::getSystemThreadPool();
+    unsigned package = Substrate::ThreadPool::getPackage();
+    unsigned leader = Substrate::ThreadPool::getLeader();
     if (tid != leader) {
       unsigned next = leader + (tid - leader) / 2;
       queues.getRemote(next)->push(item);
     } else {
-      queues.getRemote(LL::getLeaderForPackage(package / 2))->push(item);
+      queues.getRemote(tp.getLeaderForPackage(package / 2))->push(item);
     }
   }
 
@@ -107,14 +115,15 @@ class AbortHandler {
       return;
     } 
     
-    unsigned tid = LL::getTID();
-    unsigned package = LL::getPackageForSelf(tid);
-    unsigned leader = LL::getLeaderForPackage(package);
+    unsigned tid = Substrate::ThreadPool::getTID();
+    auto& tp = Substrate::getSystemThreadPool();
+    unsigned package = Substrate::ThreadPool::getPackage();
+    unsigned leader = tp.getLeaderForPackage(package);
     if (retries < 5 && tid != leader) {
       unsigned next = leader + (tid - leader) / 2;
       queues.getRemote(next)->push(item);
     } else {
-      queues.getRemote(LL::getLeaderForPackage(package / 2))->push(item);
+      queues.getRemote(tp.getLeaderForPackage(package / 2))->push(item);
     }
   }
 
@@ -128,7 +137,7 @@ class AbortHandler {
 public:
   AbortHandler() {
     // XXX(ddn): Implement smarter adaptive policy
-    useBasicPolicy = LL::getMaxPackages() > 2;
+    useBasicPolicy = Substrate::getSystemThreadPool().getMaxPackages() > 2;
   }
 
   value_type& value(Item& item) const { return item.val; }
@@ -190,7 +199,7 @@ protected:
   // members to give higher likelihood of reclaiming PerThreadStorage
 
   AbortHandler<value_type> aborted; 
-  TerminationDetection& term;
+  Substrate::TerminationDetection& term;
 
   WorkListTy wl;
   FunctionTy origFunction;
@@ -318,7 +327,7 @@ protected:
 
         // Update node color and prop token
         term.localTermination(didWork);
-        LL::asmPause(); // Let token propagate
+        Substrate::asmPause(); // Let token propagate
       } while (!term.globalTermination() && (!needsBreak || !broke));
 
       if (checkEmpty(wl, tld, 0))
@@ -326,7 +335,7 @@ protected:
       if (needsBreak && broke)
         break;
       term.initializeThread();
-      getSystemBarrier().wait();
+      Substrate::getSystemBarrier().wait();
     }
 
     if (couldAbort)
@@ -335,7 +344,7 @@ protected:
 
   template<typename... WArgsTy>
   ForEachExecutor(const FunctionTy& f, const ArgsTy& args, int, const WArgsTy&... wargs):
-    term(getSystemTermination()),
+    term(Substrate::getSystemTermination(activeThreads)),
     wl(wargs...),
     origFunction(f),
     loopname(get_by_supertype<loopname_tag>(args).value),
@@ -362,7 +371,7 @@ public:
   }
 
   void operator()() {
-    bool isLeader = LL::isPackageLeaderForSelf(LL::getTID());
+    bool isLeader = Substrate::ThreadPool::isLeader();
     bool couldAbort = needsAborts && activeThreads > 1;
     if (couldAbort && isLeader)
       go<true, true>();
@@ -474,13 +483,13 @@ void for_each_impl(const RangeTy& range, const FunctionTy& fn, const ArgsTy& arg
     ::template retype<value_type>::type WorkListTy;
   typedef ForEachExecutor<WorkListTy, FunctionTy, ArgsTy> WorkTy;
 
-  Barrier& barrier = getSystemBarrier();
+  auto& barrier = Substrate::getSystemBarrier(activeThreads);
   WorkTy W(fn, args);
   W.init(range);
-  getSystemThreadPool().run(activeThreads,
-                            [&W, &range]() { W.initThread(range); },
-                            std::ref(barrier),
-                            std::ref(W));
+  Substrate::getSystemThreadPool().run(activeThreads,
+             [&W, &range]() { W.initThread(range); },
+             std::ref(barrier),
+             std::ref(W));
   //  for_each_impl_<WorkListTy, value_type>(range, fn, args);
 }
 

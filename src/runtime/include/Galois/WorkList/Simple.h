@@ -30,7 +30,6 @@
 #ifndef GALOIS_WORKLIST_FIFO_H
 #define GALOIS_WORKLIST_FIFO_H
 
-#include "Galois/config.h"
 #include "Galois/Substrate/PaddedLock.h"
 #include "WLCompileCheck.h"
 
@@ -41,9 +40,9 @@ namespace Galois {
 namespace WorkList {
 
 //! Simple Container Wrapper worklist (not scalable).
-template<typename T, typename container = std::deque<T>, bool popBack >
+template<typename T, typename container = std::deque<T>, bool popBack = true>
 class Wrapper : private boost::noncopyable {
-  Substrate::PaddedLock lock;
+  Substrate::PaddedLock<true> lock;
   container wl;
 
 public:
@@ -51,27 +50,27 @@ public:
   using retype = Wrapper<_T>;
 
   typedef T value_type;
-
+  
   void push(const value_type& val) {
-    std::lock_guard<Substrate::PaddedLock> lg(lock)
+    std::lock_guard<Substrate::PaddedLock<true> > lg(lock);
     wl.push_back(val);
   }
-
+  
   template<typename Iter>
   void push(Iter b, Iter e) {
-    std::lock_guard<Substrate::PaddedLock> lg(lock)
+    std::lock_guard<Substrate::PaddedLock<true> > lg(lock);
     wl.insert(wl.end(),b,e);
   }
 
   template<typename RangeTy>
   void push_initial(const RangeTy& range) {
-    if (Runtime::LL::getTID() == 0)
+    if (Substrate::ThreadPool::getTID() == 0)
       push(range.begin(), range.end());
   }
 
   Galois::optional<value_type> pop() {
     Galois::optional<value_type> retval;
-    std::lock_guard<Substrate::PaddedLock> lg(lock);
+    std::lock_guard<Substrate::PaddedLock<true> > lg(lock);
     if (!wl.empty()) {
       if (popBack) {
         retval = wl.back();
@@ -86,16 +85,16 @@ public:
 };
 
 template<typename T>
-FIFO = Wrapper<T, std::deque<T>, false >;
+using FIFO = Wrapper<T, std::deque<T>, false >;
 
 template<typename T>
-GFIFO = Wrapper<T, Galois::gdeque<T>, false >;
+using GFIFO = Wrapper<T, Galois::gdeque<T>, false >;
 
 template<typename T>
-LIFO = Wrapper<T, std::deque<T>, true >;
+using LIFO = Wrapper<T, std::deque<T>, true >;
 
 template<typename T>
-GLIFO = Wrapper<T, Galois::gdeque<T>, true >;
+using GLIFO = Wrapper<T, Galois::gdeque<T>, true >;
 
 
 GALOIS_WLCOMPILECHECK(FIFO)

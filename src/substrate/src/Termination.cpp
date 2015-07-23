@@ -31,11 +31,9 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "Galois/Runtime/Termination.h"
+#include "Galois/Substrate/Termination.h"
 
-extern unsigned Galois::Runtime::activeThreads;
-
-using namespace Galois::Runtime;
+using namespace Galois::Substrate;
 
 namespace {
 //Dijkstra style 2-pass ring termination detection
@@ -50,9 +48,11 @@ class LocalTerminationDetection : public TerminationDetection {
 
   Galois::Substrate::PerThreadStorage<TokenHolder> data;
   
+  unsigned activeThreads;
+
   //send token onwards
   void propToken(bool isBlack) {
-    unsigned id = Substrate::ThreadPool::getTID();
+    unsigned id = ThreadPool::getTID();
     TokenHolder& th = *data.getRemote((id + 1) % activeThreads);
     th.tokenIsBlack = isBlack;
     th.hasToken = true;
@@ -63,11 +63,15 @@ class LocalTerminationDetection : public TerminationDetection {
   }
 
   bool isSysMaster() const {
-    return Substrate::ThreadPool::getTID() == 0;
+    return ThreadPool::getTID() == 0;
   }
 
 public:
   LocalTerminationDetection() {}
+
+  void init(unsigned aThreads) {
+    activeThreads = aThreads;
+  }
 
   virtual void initializeThread() {
     TokenHolder& th = *data.getLocal();
@@ -106,8 +110,9 @@ public:
   }
 };
 
-static LocalTerminationDetection& getLocalTermination() {
+static LocalTerminationDetection& getLocalTermination(unsigned activeThreads) {
   static LocalTerminationDetection term;
+  term.init(activeThreads);
   return term;
 }
 
@@ -131,7 +136,9 @@ class TreeTerminationDetection : public TerminationDetection {
     TokenHolder* child[num];
   };
 
-  Galois::Substrate::PerThreadStorage<TokenHolder> data;
+  PerThreadStorage<TokenHolder> data;
+
+  unsigned activeThreads;
 
   void processToken() {
     TokenHolder& th = *data.getLocal();
@@ -181,11 +188,15 @@ class TreeTerminationDetection : public TerminationDetection {
   }
 
   bool isSysMaster() const {
-    return Substrate::ThreadPool::getTID() == 0;
+    return ThreadPool::getTID() == 0;
   }
 
 public:
   TreeTerminationDetection() {}
+
+  void init(unsigned aThreads) {
+    activeThreads = aThreads;
+  }
 
   virtual void initializeThread() {
     TokenHolder& th = *data.getLocal();
@@ -196,7 +207,7 @@ public:
     th.hasToken = false;
     th.lastWasWhite = false;
     globalTerm = false;
-    auto tid = Substrate::ThreadPool::getTID();
+    auto tid = ThreadPool::getTID();
     th.parent = (tid - 1) / num;
     th.parent_offset = (tid - 1) % num;
     for (unsigned i = 0; i < num; ++i) {
@@ -220,15 +231,16 @@ public:
 };
 
 __attribute__((unused))
-static TreeTerminationDetection& getTreeTermination() {
+static TreeTerminationDetection& getTreeTermination(unsigned activeThreads) {
   static TreeTerminationDetection term;
+  term.init(activeThreads);
   return term;
 }
 
 } // namespace
 
-Galois::Runtime::TerminationDetection& Galois::Runtime::getSystemTermination() {
-  return getLocalTermination();
+Galois::Substrate::TerminationDetection& Galois::Substrate::getSystemTermination(unsigned activeThreads) {
+  return getLocalTermination(activeThreads);
   //return getTreeTermination();
 }
 

@@ -70,12 +70,12 @@ private:
   struct shared_state {
     Iterator stealBegin;
     Iterator stealEnd;
-    Runtime::LL::SimpleLock stealLock;
+    Substrate::SimpleLock stealLock;
     bool stealAvail;
   };
 
   struct state {
-    Runtime::LL::CacheLineStorage<shared_state> stealState;
+    Substrate::CacheLineStorage<shared_state> stealState;
     Iterator localBegin;
     Iterator localEnd;
     unsigned int nextVictim;
@@ -94,7 +94,7 @@ private:
     }
   };
 
-  Runtime::PerThreadStorage<state> TLDS;
+  Substrate::PerThreadStorage<state> TLDS;
   Container inner;
 
   bool doSteal(state& dst, state& src, bool wait) {
@@ -123,7 +123,7 @@ private:
     //only try stealing one other
     if (doSteal(data, *TLDS.getRemote(data.nextVictim), false)) {
       //share the wealth
-      if (data.nextVictim != Runtime::LL::getTID())
+      if (data.nextVictim != Substrate::ThreadPool::getTID())
 	data.populateSteal();
       return *data.localBegin++;
     }
@@ -142,7 +142,7 @@ public:
     auto lp = r.local_pair();
     data.localBegin = lp.first;
     data.localEnd = lp.second;
-    data.nextVictim = Runtime::LL::getTID();
+    data.nextVictim = Substrate::ThreadPool::getTID();
     data.numStealFailures = 0;
     data.populateSteal();
   }

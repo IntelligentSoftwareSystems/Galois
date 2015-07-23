@@ -2,40 +2,47 @@
  * @file
  * @section License
  *
- * Galois, a framework to exploit amorphous data-parallelism in irregular
- * programs.
+ * This file is part of Galois.  Galoisis a gramework to exploit
+ * amorphous data-parallelism in irregular programs.
  *
- * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
- * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
- * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
- * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
- * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
- * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
- * shall University be liable for incidental, special, indirect, direct or
- * consequential damages or loss of profits, interruption of business, or
- * related expenses which may arise from use of Software or Documentation,
- * including but not limited to those resulting from defects in Software and/or
- * Documentation, or loss or inaccuracy of data of any kind.
+ * Galois is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * Galois is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with Galois.  If not, see
+ * <http://www.gnu.org/licenses/>.
+ *
+ * @section Copyright
+ *
+ * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * reserved.
+ *
+ * @section Description
  *
  * Large unordered collections of things.
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
+
 #ifndef GALOIS_BAG_H
 #define GALOIS_BAG_H
 
-#include "Galois/config.h"
 #include "Galois/gstl.h"
-#include "Galois/Runtime/PerThreadStorage.h"
-#include "Galois/Runtime/ll/gio.h"
-#include "Galois/Runtime/mm/Mem.h"
+#include "Galois/Substrate/PerThreadStorage.h"
+#include "Galois/Substrate/gio.h"
+#include "Galois/Runtime/Mem.h"
 
 #include <boost/iterator/iterator_facade.hpp>
 #include <stdexcept>
-
-#include GALOIS_CXX11_STD_HEADER(algorithm)
+#include <algorithm>
 
 namespace Galois {
 
@@ -60,7 +67,7 @@ public:
   class Iterator: public boost::iterator_facade<Iterator<U>, U, boost::forward_traversal_tag> {
     friend class boost::iterator_core_access;
 
-    Galois::Runtime::PerThreadStorage<std::pair<header*,header*> >* hd;
+    Galois::Substrate::PerThreadStorage<std::pair<header*,header*> >* hd;
     unsigned int thr;
     header* p;
     U* v;
@@ -114,7 +121,7 @@ public:
     template<typename OtherTy>
     Iterator(const Iterator<OtherTy>& o): hd(o.hd), thr(o.thr), p(o.p), v(o.v) { }
 
-    Iterator(Galois::Runtime::PerThreadStorage<std::pair<header*,header*> >* h, unsigned t):
+    Iterator(Galois::Substrate::PerThreadStorage<std::pair<header*,header*> >* h, unsigned t):
       hd(h), thr(t), p(0), v(0)
     {
       // find first valid item
@@ -124,8 +131,8 @@ public:
   };
 
 private:
-  Galois::Runtime::MM::FixedSizeHeap heap;
-  Galois::Runtime::PerThreadStorage<PerThread> heads;
+  Galois::Runtime::FixedSizeHeap heap;
+  Galois::Substrate::PerThreadStorage<PerThread> heads;
 
   void insHeader(header* h) {
     PerThread& hpair = *heads.getLocal();
@@ -154,7 +161,7 @@ private:
     if (BlockSize) {
       return newHeaderFromHeap(heap.allocate(BlockSize), BlockSize);
     } else {
-      return newHeaderFromHeap(Galois::Runtime::MM::pageAlloc(), Galois::Runtime::MM::hugePageSize);
+      return newHeaderFromHeap(Galois::Runtime::pageAlloc(), Galois::Runtime::hugePageSize);
     }
   }
 
@@ -169,7 +176,7 @@ private:
         if (BlockSize)
           heap.deallocate(h2);
         else
-          Galois::Runtime::MM::pageFree(h2);
+          Galois::Runtime::pageFree(h2);
       }
       hpair.second = 0;
     }
@@ -216,8 +223,8 @@ public:
   const_iterator begin() const { return const_iterator(&heads, 0); }
   const_iterator end() const { return const_iterator(&heads, heads.size()); }
   
-  local_iterator local_begin() { return local_iterator(&heads, Galois::Runtime::LL::getTID()); }
-  local_iterator local_end() { return local_iterator(&heads, Galois::Runtime::LL::getTID() + 1); }
+  local_iterator local_begin() { return local_iterator(&heads, Galois::Substrate::ThreadPool::getTID()); }
+  local_iterator local_end() { return local_iterator(&heads, Galois::Substrate::ThreadPool::getTID() + 1); }
 
   bool empty() const {
     for (unsigned x = 0; x < heads.size(); ++x) {

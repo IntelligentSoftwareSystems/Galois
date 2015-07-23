@@ -32,11 +32,14 @@
 
 #include "Galois/FixedSizeRing.h"
 #include "Galois/Substrate/PaddedLock.h"
-#include "Galois/Runtime/mm/Mem.h"
+#include "Galois/Runtime/Mem.h"
 #include "Galois/WorkList/WorkListHelpers.h"
 #include "WLCompileCheck.h"
 
 namespace Galois {
+namespace Runtime {
+extern unsigned activeThreads;
+}
 namespace WorkList {
 
 namespace detail {
@@ -46,7 +49,7 @@ struct squeue {
   PS<TQ> queues;
   TQ& get(int i) { return *queues.getRemote(i); }
   TQ& get() { return *queues.getLocal(); }
-  int myEffectiveID() { return Runtime::LL::getTID(); }
+  int myEffectiveID() { return Substrate::ThreadPool::getTID(); }
   int size() { return Runtime::activeThreads; }
 };
 
@@ -71,7 +74,7 @@ struct ChunkedMaster : private boost::noncopyable {
 private:
   class Chunk : public FixedSizeRing<T, ChunkSize>, public QT<Chunk, Concurrent>::ListNode {};
 
-  Runtime::MM::FixedSizeAllocator<Chunk> alloc;
+  Runtime::FixedSizeAllocator<Chunk> alloc;
 
   struct p {
     Chunk* cur;
@@ -81,8 +84,8 @@ private:
 
   typedef QT<Chunk, Concurrent> LevelItem;
 
-  squeue<Concurrent, Runtime::PerThreadStorage, p> data;
-  squeue<Distributed, Runtime::PerPackageStorage, LevelItem> Q;
+  squeue<Concurrent, Substrate::PerThreadStorage, p> data;
+  squeue<Distributed, Substrate::PerPackageStorage, LevelItem> Q;
 
   Chunk* mkChunk() {
     Chunk* ptr = alloc.allocate(1);

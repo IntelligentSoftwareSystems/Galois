@@ -2,7 +2,6 @@
  * @file
  * @section License
  *
-
  * This file is part of Galois.  Galoisis a gramework to exploit
  * amorphous data-parallelism in irregular programs.
  *
@@ -30,7 +29,6 @@
 #ifndef GALOIS_WORKLIST_LOCALQUEUE_H
 #define GALOIS_WORKLIST_LOCALQUEUE_H
 
-#include "Galois/config.h"
 #include <boost/mpl/if.hpp>
 #include "Galois/WorkList/Simple.h"
 
@@ -48,7 +46,7 @@ struct NoGlobalQueue {
   struct retype { typedef NoGlobalQueue<_T> type; };
 };
 
-template<typename Global = NoGlobalQueue<>, typename Local = GFIFO<>, typename T = int>
+template<typename Global = NoGlobalQueue<>, typename Local = GFIFO<int>, typename T = int>
 struct LocalQueue : private boost::noncopyable {
   template<bool _concurrent>
   struct rethread { typedef LocalQueue<Global, Local, T> type; };
@@ -64,7 +62,7 @@ struct LocalQueue : private boost::noncopyable {
 
 private:
   typedef typename Local::template rethread<false>::type lWLTy;
-  Runtime::PerThreadStorage<lWLTy> local;
+  Substrate::PerThreadStorage<lWLTy> local;
   Global global;
 
   template<typename RangeTy, bool Enable = std::is_same<Global,NoGlobalQueue<T> >::value>

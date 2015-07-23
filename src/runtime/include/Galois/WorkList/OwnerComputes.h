@@ -52,18 +52,19 @@ private:
   typedef lWLTy pWL;
 
   OwnerFn Fn;
-  Runtime::PerPackageStorage<cWL> items;
-  Runtime::PerPackageStorage<pWL> pushBuffer;
+  Substrate::PerPackageStorage<cWL> items;
+  Substrate::PerPackageStorage<pWL> pushBuffer;
 
 public:
   typedef T value_type;
 
   void push(const value_type& val)  {
     unsigned int index = Fn(val);
-    unsigned int tid = Runtime::LL::getTID();
-    unsigned int mindex = Runtime::LL::getPackageForThread(index);
+    auto& tp = Substrate::getSystemThreadPool();
+    unsigned int tid = Sybstrate::ThreadPool::getTID();
+    unsigned int mindex = tp.getPackage(index);
     //std::cerr << "[" << index << "," << index % active << "]\n";
-    if (mindex == Runtime::LL::getPackageForSelf(tid))
+    if (mindex == Substrate::ThreadPool::getPackage())
       items.getLocal()->push(val);
     else
       pushBuffer.getRemote(mindex)->push(val);

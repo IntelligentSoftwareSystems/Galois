@@ -30,10 +30,9 @@
 #ifndef GALOIS_WORKLIST_OBIM_H
 #define GALOIS_WORKLIST_OBIM_H
 
-#include "Galois/config.h"
 #include "Galois/FlatMap.h"
 #include "Galois/Substrate/Barrier.h"
-#include "Galois/Runtime/PerThreadStorage.h"
+#include "Galois/Substrate/PerThreadStorage.h"
 #include "Galois/Substrate/Termination.h"
 #include "Galois/WorkList/Chunked.h"
 #include "Galois/WorkList/WorkListHelpers.h"
@@ -63,7 +62,7 @@ protected:
     std::deque<std::pair<Index,T>> stored;
   };
 
-  Runtime::Barrier& barrier;
+  Substrate::Barrier& barrier;
 
   OrderedByIntegerMetricData(): barrier(Runtime::getSystemBarrier()) { }
 

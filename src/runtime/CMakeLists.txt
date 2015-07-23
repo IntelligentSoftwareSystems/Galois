@@ -6,7 +6,6 @@ set(sources
         src/Support.cpp
         src/Threads.cpp
         src/Sampling.cpp
-        src/Termination.cpp
         src/Timer.cpp
         src/Mem.cpp
         src/NumaMem.cpp

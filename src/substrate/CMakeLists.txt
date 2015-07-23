@@ -14,6 +14,7 @@ set(sources
             src/EnvCheck.cpp
             src/PerThreadStorage.cpp
             src/HWTopoLinux.cpp
+            src/Termination.cpp
 )
 
 if (HAVE_PTHREAD)

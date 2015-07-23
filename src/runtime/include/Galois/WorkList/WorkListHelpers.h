@@ -71,7 +71,8 @@ public:
 
 template<typename T, bool concurrent>
 class ConExtLinkedStack {
-  Runtime::LL::PtrLock<T, concurrent> head;
+  //fixme: deal with concurrent
+  Substrate::PtrLock<T> head;
   
 public:
   typedef ConExtListNode<T> ListNode;
@@ -119,7 +120,8 @@ public:
 
 template<typename T, bool concurrent>
 class ConExtLinkedQueue {
-  Runtime::LL::PtrLock<T,concurrent> head;
+  //Fixme: deal with concurrent
+  Substrate::PtrLock<T> head;
   T* tail;
   
 public:

@@ -31,10 +31,10 @@
 
 #include "Galois/FixedSizeRing.h"
 #include "Galois/Threads.h"
-#include "Galois/Runtime/PerThreadStorage.h"
+#include "Galois/Substrate/PerThreadStorage.h"
 #include "Galois/Substrate/CompilerSpecific.h"
 #include "Galois/Substrate/PtrLock.h"
-#include "Galois/Runtime/mm/Mem.h"
+#include "Galois/Runtime/Mem.h"
 #include "WLCompileCheck.h"
 
 namespace Galois {
@@ -238,25 +238,26 @@ public:
 
 template<typename InnerWL>
 class StealingQueue : private boost::noncopyable {
-  Runtime::PerThreadStorage<std::pair<InnerWL, unsigned> > local;
+  Substrate::PerThreadStorage<std::pair<InnerWL, unsigned> > local;
 
   GALOIS_ATTRIBUTE_NOINLINE
   ChunkHeader* doSteal() {
     std::pair<InnerWL, unsigned>& me = *local.getLocal();
-    unsigned id = Runtime::LL::getTID();
-    unsigned pkg = Runtime::LL::getPackageForSelf(id);
+    auto& tp = Substrate::getSystemThreadPool();
+    unsigned id = tp.getTID();
+    unsigned pkg = Substrate::ThreadPool::getPackage();
     unsigned num = Galois::getActiveThreads();
 
     //First steal from this package
     for (unsigned eid = id + 1; eid < num; ++eid) {
-      if (Runtime::LL::getPackageForThread(eid) == pkg) {
+      if (tp.getPackage(eid) == pkg) {
 	ChunkHeader* c = me.first.stealHalfAndPop(local.getRemote(eid)->first);
 	if (c)
 	  return c;
       }
     }
     for (unsigned eid = 0; eid < id; ++eid) {
-      if (Runtime::LL::getPackageForThread(eid) == pkg) {
+      if (tp.getPackage(eid) == pkg) {
 	ChunkHeader* c = me.first.stealHalfAndPop(local.getRemote(eid)->first);
 	if (c)
 	  return c;
@@ -264,10 +265,10 @@ class StealingQueue : private boost::noncopyable {
     }
 
     //Leaders can cross package
-    if (Runtime::LL::isPackageLeaderForSelf(id)) {
+    if (Substrate::ThreadPool::isLeader()) {
       unsigned eid = (id + me.second) % num;
       ++me.second;
-      if (id != eid && Runtime::LL::isPackageLeader(eid)) {
+      if (id != eid && tp.isLeader(eid)) {
 	ChunkHeader* c = me.first.stealAllAndPop(local.getRemote(eid)->first);
 	if (c)
 	  return c;
@@ -302,8 +303,8 @@ struct AltChunkedMaster : private boost::noncopyable {
 private:
   class Chunk : public ChunkHeader, public Galois::FixedSizeRing<T, ChunkSize> {};
 
-  Runtime::MM::FixedSizeAllocator<Chunk> alloc;
-  Runtime::PerThreadStorage<std::pair<Chunk*, Chunk*> > data;
+  Runtime::FixedSizeAllocator<Chunk> alloc;
+  Substrate::PerThreadStorage<std::pair<Chunk*, Chunk*> > data;
   Container worklist;
 
   Chunk* mkChunk() {
