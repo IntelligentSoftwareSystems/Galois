@@ -1,5 +1,3 @@
-if(USE_EXP)
-  include_directories(../../exp/apps/pagerank .)
-endif()
+include_directories(.)
 app(pagerank PageRank.cpp)
 app(pagerank-old PageRankOld.cpp)

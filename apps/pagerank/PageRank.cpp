@@ -32,9 +32,6 @@
 #include "Galois/Graph/TypeTraits.h"
 #include "Lonestar/BoilerPlate.h"
 
-#ifdef GALOIS_USE_EXP
-#include "Galois/WorkList/WorkListDebug.h"
-#endif
 
 #include GALOIS_CXX11_STD_HEADER(atomic)
 #include <string>

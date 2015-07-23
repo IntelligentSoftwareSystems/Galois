@@ -43,11 +43,9 @@
 #include <fstream>
 
 #include "PageRankOld.h"
-#ifdef GALOIS_USE_EXP
 #include "GraphLabAlgo.h"
 #include "LigraAlgo.h"
 #include "PagerankDelta.h"
-#endif
 
 namespace cll = llvm::cl;
 
@@ -87,13 +85,11 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
       clEnumValN(Algo::synch, "synch", "Synchronous version..."),
       clEnumValN(Algo::prt_rsd, "prt_rsd", "Prioritized (max. residual) version..."),
       clEnumValN(Algo::prt_deg, "prt_deg", "Prioritized (degree biased) version..."),
-#ifdef GALOIS_USE_EXP
       clEnumValN(Algo::graphlab, "graphlab", "Use GraphLab programming model"),
       clEnumValN(Algo::graphlabAsync, "graphlabAsync", "Use GraphLab-Asynchronous programming model"),
       clEnumValN(Algo::ligra, "ligra", "Use Ligra programming model"),
       clEnumValN(Algo::ligraChi, "ligraChi", "Use Ligra and GraphChi programming model"),
       clEnumValN(Algo::pagerankWorklist, "pagerankWorklist", "Use worklist-based algorithm"),
-#endif
       clEnumValEnd), cll::init(Algo::pull));
 
 struct SerialAlgo {
@@ -1001,13 +997,11 @@ int main(int argc, char **argv) {
     case Algo::synch: run<Synch>(); break;
     case Algo::prt_rsd: run<PrtRsd>(); break;
     case Algo::prt_deg: run<PrtDeg>(); break;
-#ifdef GALOIS_USE_EXP
     case Algo::ligra: run<LigraAlgo<false> >(); break;
     case Algo::ligraChi: run<LigraAlgo<true> >(); break;
     case Algo::graphlab: run<GraphLabAlgo<false,false> >(); break;
     case Algo::graphlabAsync: run<GraphLabAlgo<true,true> >(); break;
     case Algo::pagerankWorklist: run<PagerankDelta>(); break;
-#endif
     case Algo::serial: run<SerialAlgo>(); break;
     default: std::cerr << "Unknown algorithm\n"; abort();
   }
