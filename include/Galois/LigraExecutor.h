@@ -20,11 +20,11 @@ struct Transposer {
   }
 
   in_edge_iterator in_edge_begin(Graph& g, GNode n) {
-    return g.in_edge_begin(n, Galois::MethodFlag::NONE);
+    return g.in_edge_begin(n, Galois::MethodFlag::UNPROTECTED);
   }
 
   in_edge_iterator in_edge_end(Graph& g, GNode n) {
-    return g.in_edge_end(n, Galois::MethodFlag::NONE);
+    return g.in_edge_end(n, Galois::MethodFlag::UNPROTECTED);
   }
 
   edge_data_reference getInEdgeData(Graph& g, in_edge_iterator ii) {
@@ -36,11 +36,11 @@ struct Transposer {
   }
 
   edge_iterator edge_begin(Graph& g, GNode n) {
-    return g.edge_begin(n, Galois::MethodFlag::NONE);
+    return g.edge_begin(n, Galois::MethodFlag::UNPROTECTED);
   }
 
   edge_iterator edge_end(Graph& g, GNode n) {
-    return g.edge_end(n, Galois::MethodFlag::NONE);
+    return g.edge_end(n, Galois::MethodFlag::UNPROTECTED);
   }
 
   edge_data_reference getEdgeData(Graph& g, edge_iterator ii) {
@@ -60,11 +60,11 @@ struct Transposer<Graph,false> {
   }
 
   in_edge_iterator in_edge_begin(Graph& g, GNode n) {
-    return g.edge_begin(n, Galois::MethodFlag::NONE);
+    return g.edge_begin(n, Galois::MethodFlag::UNPROTECTED);
   }
 
   in_edge_iterator in_edge_end(Graph& g, GNode n) {
-    return g.edge_end(n, Galois::MethodFlag::NONE);
+    return g.edge_end(n, Galois::MethodFlag::UNPROTECTED);
   }
 
   edge_data_reference getInEdgeData(Graph& g, in_edge_iterator ii) {
@@ -76,11 +76,11 @@ struct Transposer<Graph,false> {
   }
 
   edge_iterator edge_begin(Graph& g, GNode n) {
-    return g.in_edge_begin(n, Galois::MethodFlag::NONE);
+    return g.in_edge_begin(n, Galois::MethodFlag::UNPROTECTED);
   }
 
   edge_iterator edge_end(Graph& g, GNode n) {
-    return g.in_edge_end(n, Galois::MethodFlag::NONE);
+    return g.in_edge_end(n, Galois::MethodFlag::UNPROTECTED);
   }
 
   edge_data_reference getEdgeData(Graph& g, edge_iterator ii) {
@@ -219,12 +219,12 @@ void edgeMap(Graph& graph, EdgeOperator op, Bag& output) {
 template<bool Forward,typename Graph,typename EdgeOperator,typename Bag>
 void edgeMap(Graph& graph, EdgeOperator op, typename Graph::GraphNode single, Bag& output) {
   if (Forward) {
-    Galois::for_each(graph.out_edges(single, Galois::MethodFlag::NONE).begin(),
-        graph.out_edges(single, Galois::MethodFlag::NONE).end(),
+    Galois::for_each(graph.out_edges(single, Galois::MethodFlag::UNPROTECTED).begin(),
+        graph.out_edges(single, Galois::MethodFlag::UNPROTECTED).end(),
         hidden::SparseOperator<Graph,Bag,EdgeOperator,true>(graph, output, op, single));
   } else {
-    Galois::for_each(graph.in_edges(single, Galois::MethodFlag::NONE).begin(),
-        graph.in_edges(single, Galois::MethodFlag::NONE).end(),
+    Galois::for_each(graph.in_edges(single, Galois::MethodFlag::UNPROTECTED).begin(),
+        graph.in_edges(single, Galois::MethodFlag::UNPROTECTED).end(),
         hidden::SparseOperator<Graph,Bag,EdgeOperator,false>(graph, output, op, single));
   }
 }

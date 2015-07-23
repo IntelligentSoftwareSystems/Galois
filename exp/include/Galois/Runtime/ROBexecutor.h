@@ -30,12 +30,13 @@
 #include "Galois/gdeque.h"
 #include "Galois/PriorityQueue.h"
 #include "Galois/Timer.h"
+#include "Galois/PerThreadContainer.h"
 
 #include "Galois/Runtime/Barrier.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/Executor_DoAll.h"
+#include "Galois/Runtime/Executor_ParaMeter.h"
 #include "Galois/Runtime/ForEachTraits.h"
-#include "Galois/Runtime/PerThreadContainer.h"
 #include "Galois/Runtime/Range.h"
 #include "Galois/Runtime/Sampling.h"
 #include "Galois/Runtime/Support.h"
@@ -47,6 +48,8 @@
 #include "Galois/Runtime/ll/CompilerSpecific.h"
 //#include "Galois/Runtime/ll/PthreadLock.h"
 #include "Galois/Runtime/mm/Mem.h"
+
+#include <atomic>
 
 namespace Galois {
 namespace Runtime {
@@ -96,7 +99,7 @@ class ROBcontext: public SimpleRuntimeContext {
 
 public:
 
-  enum State {
+  enum class State: int {
     UNSCHEDULED,
     SCHEDULED,
     READY_TO_COMMIT,
@@ -110,7 +113,8 @@ public:
 
   // TODO: privatize
 public:
-  GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE Galois::GAtomic<State> state;
+  // GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE Galois::GAtomic<State> state;
+  GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE std::atomic<State> state;
   T active;
   Exec& executor;
 
@@ -132,7 +136,7 @@ public:
   explicit ROBcontext (const T& x, Exec& e)
     : 
       Base (true), 
-      state (UNSCHEDULED), 
+      state (State::UNSCHEDULED), 
       active (x), 
       executor (e), 
       lostConflict (false),
@@ -150,10 +154,12 @@ public:
   }
 
   bool casState (State s_old, State s_new) { 
-    return state.cas (s_old, s_new);
+    // return state.cas (s_old, s_new);
+    return state.compare_exchange_strong (s_old, s_new);
   }
 
-  GALOIS_ATTRIBUTE_PROF_NOINLINE virtual void subAcquire (Lockable* l) {
+  GALOIS_ATTRIBUTE_PROF_NOINLINE 
+  virtual void subAcquire (Lockable* l, Galois::MethodFlag) {
 
     for (bool succ = false; !succ; ) {
       Base::AcquireStatus acq = Base::tryAcquire (l);
@@ -197,7 +203,7 @@ public:
 
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void doCommit () {
-    assert (hasState (COMMITTING));
+    assert (hasState (State::COMMITTING));
     // release locks
     // add new elements to worklist
 
@@ -210,11 +216,11 @@ public:
 
     LL::compilerBarrier ();
 
-    setState (COMMIT_DONE);
+    setState (State::COMMIT_DONE);
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void doAbort () {
-    assert (hasState (ABORTING));
+    assert (hasState (State::ABORTING));
     // perform undo actions in reverse order
     // release locks
     // add active element to worklist
@@ -226,7 +232,7 @@ public:
 
     LL::compilerBarrier ();
 
-    setState (ABORT_DONE);
+    setState (State::ABORT_DONE);
 
   }
 
@@ -268,25 +274,25 @@ private:
     
     if (executor.getCtxtCmp () (this, that)) {
 
-      assert (!that->hasState (COMMIT_DONE) && !that->hasState (COMMITTING));
+      assert (!that->hasState (State::COMMIT_DONE) && !that->hasState (State::COMMITTING));
       // abort that
-      if (that->hasState (ABORT_DONE)) {
+      if (that->hasState (State::ABORT_DONE)) {
         // do nothing
 
-      } else if (that->casState (SCHEDULED, ABORT_SELF) || that->hasState (ABORT_SELF)) {
+      } else if (that->casState (State::SCHEDULED, State::ABORT_SELF) || that->hasState (State::ABORT_SELF)) {
         // signalled successfully
         // now wait for it to abort or abort yourself if 'that' missed the signal 
         // and completed execution
         dbg::debug ( this, " signalled ", that, " to ABORT_SELF on lock ", l);
         while (true) {
 
-          if (that->hasState (ABORT_DONE)) {
+          if (that->hasState (State::ABORT_DONE)) {
             break;
           }
 
           if (that->hasExecuted ()) {
-            if (that->casState (ABORT_SELF, ABORT_HELP)) {
-              that->setState (ABORTING);
+            if (that->casState (State::ABORT_SELF, State::ABORT_HELP)) {
+              that->setState (State::ABORTING);
               that->doAbort ();
               executor.abortByOther += 1;
               dbg::debug (this, " aborting ABORT_SELF->ABORT_HELP missed signal ", that, " on lock ", l);
@@ -297,8 +303,8 @@ private:
           LL::asmPause ();
         }
 
-      } else if (that->casState (READY_TO_COMMIT, ABORT_HELP)) {
-        that->setState (ABORTING);
+      } else if (that->casState (State::READY_TO_COMMIT, State::ABORT_HELP)) {
+        that->setState (State::ABORTING);
         that->doAbort ();
         executor.abortByOther += 1;
         dbg::debug (this, " aborting RTC->ABORT_HELP ", that, " on lock ", l);
@@ -306,7 +312,7 @@ private:
 
     } else { 
       // abort self
-      this->setState (ABORT_SELF);
+      this->setState (State::ABORT_SELF);
       dbg::debug (this, " losing conflict with ", that, " on lock ", l);
       ret = true;
     }
@@ -419,7 +425,7 @@ public:
             Ctxt* ctx = ctxtAlloc.allocate (1);
             assert (ctx != nullptr);
             ctxtAlloc.construct (ctx, dummy, *this);
-            ctx->setState (Ctxt::SCHEDULED);
+            ctx->setState (Ctxt::State::SCHEDULED);
 
             freeList[tid].push_back (ctx);
           }
@@ -430,7 +436,7 @@ public:
         // Ctxt* ctx = ctxtAlloc.allocate (1);
         // assert (ctx != nullptr);
         // ctxtAlloc.construct (ctx, dummy, *this);
-        // ctx->setState (Ctxt::SCHEDULED);
+        // ctx->setState (Ctxt::State::SCHEDULED);
 // 
         // freeList[i].push_back (ctx);
       // }
@@ -476,8 +482,8 @@ public:
 
           applyOperator (ctx);
 
-          if (!ctx->casState (Ctxt::SCHEDULED, Ctxt::READY_TO_COMMIT)) {
-            if (ctx->casState (Ctxt::ABORT_SELF, Ctxt::ABORTING)) {
+          if (!ctx->casState (Ctxt::State::SCHEDULED, Ctxt::State::READY_TO_COMMIT)) {
+            if (ctx->casState (Ctxt::State::ABORT_SELF, Ctxt::State::ABORTING)) {
 
               if (ctx->lostConflict) {
                 abortSelfByConflict += 1;
@@ -561,7 +567,7 @@ private:
     Galois::Runtime::setThreadContext (ctx);
     nhFunc (ctx->active, ctx->userHandle);
 
-    if (ctx->hasState (Ctxt::SCHEDULED)) {
+    if (ctx->hasState (Ctxt::State::SCHEDULED)) {
       opFunc (ctx->active, ctx->userHandle);
     }
     Galois::Runtime::setThreadContext (nullptr);
@@ -608,7 +614,7 @@ private:
               ctx->~Ctxt (); // destroy here only
               new (ctx) Ctxt (pending[minTID].pop (), *this);
 
-              ctx->setState (Ctxt::SCHEDULED);
+              ctx->setState (Ctxt::State::SCHEDULED);
               ctx->owner = LL::getTID ();
               rob.push (ctx);
               numTotal += 1;
@@ -652,7 +658,7 @@ private:
                 ctx->~Ctxt (); // destroy here only
                 new (ctx) Ctxt (pending[tid].pop (), *this);
 
-                ctx->setState (Ctxt::SCHEDULED);
+                ctx->setState (Ctxt::State::SCHEDULED);
                 ctx->owner = LL::getTID ();
                 rob.push (ctx);
                 numTotal += 1;
@@ -701,17 +707,17 @@ private:
 
         Ctxt* head = rob.top ();
 
-        if (head->hasState (Ctxt::ABORT_DONE)) {
+        if (head->hasState (Ctxt::State::ABORT_DONE)) {
           // ctxtDelQ.get ().push_back (rob.pop ());
           reclaim (rob.pop ());
           didWork = true;
           continue;
 
-        }  else if (head->hasState (Ctxt::READY_TO_COMMIT)) {
+        }  else if (head->hasState (Ctxt::State::READY_TO_COMMIT)) {
 
           if (isEarliest (head->active)) {
 
-            head->setState (Ctxt::COMMITTING);
+            head->setState (Ctxt::State::COMMITTING);
             head->doCommit ();
 
             Ctxt* t = rob.pop ();
@@ -764,7 +770,7 @@ private:
     while (!rob.empty ()) {
       Ctxt* ctx = rob.pop ();
 
-      if (ctx->hasState (Ctxt::ABORT_DONE)) {
+      if (ctx->hasState (Ctxt::State::ABORT_DONE)) {
         reclaim (ctx);
 
       } else {
@@ -806,33 +812,7 @@ private:
 };
 
 
-template <typename R, typename Cmp, typename NhFunc, typename OpFunc>
-void for_each_ordered_rob (const R& range, Cmp cmp, NhFunc nhFunc, OpFunc opFunc, const char* loopname=0) {
-
-  using T = typename R::value_type;
-
-  Galois::Runtime::beginSampling ();
-
-  ROBexecutor<T, Cmp, NhFunc, OpFunc>  exec (cmp, nhFunc, opFunc);
-
-  if (range.begin () != range.end ()) {
-
-    exec.push_initial (range);
-
-    getSystemThreadPool ().run (activeThreads, std::ref(exec));
-
-    Galois::Runtime::endSampling ();
-
-    exec.printStats ();
-  }
-}
-
-template <typename Iter, typename Cmp, typename NhFunc, typename OpFunc, typename StableTest>
-void for_each_ordered_rob (Iter beg, Iter end, Cmp cmp, NhFunc nhFunc, OpFunc opFunc, StableTest stabilityTest, const char* loopname=0) {
-
-  for_each_ordered_rob (beg, end, cmp, nhFunc, opFunc, loopname);
-}
-
+namespace ParaMeter {
 
 template <typename T, typename Cmp, typename Exec>
 class ROBparamContext: public ROBcontext<T, Cmp, Exec> {
@@ -844,7 +824,7 @@ public:
 
   ROBparamContext (const T& x, Exec& e, const size_t _step): Base (x, e), step (_step) {}
 
-  virtual void subAcquire (Lockable* l) {
+  virtual void subAcquire (Lockable* l, Galois::MethodFlag m) {
     for (bool succ = false; !succ; ) {
       typename Base::AcquireStatus acq = Base::tryAcquire (l);
 
@@ -885,16 +865,18 @@ private:
     // that can be in READY_TO_COMMIT only
     // return true if this aborts self
 
-    assert (this->hasState (Base::SCHEDULED) || this->hasState (Base::ABORT_SELF));
-    assert (that->hasState (Base::READY_TO_COMMIT));
+    assert (this->hasState (Base::State::SCHEDULED) || this->hasState (Base::State::ABORT_SELF));
+    assert (that->hasState (Base::State::READY_TO_COMMIT));
     
     bool ret = false;
     if (Base::executor.getCtxtCmp () (this, that)) {
-      assert (that->hasState (Base::READY_TO_COMMIT));
+      assert (that->hasState (Base::State::READY_TO_COMMIT));
+      that->setState (Base::State::ABORTING);
       that->doAbort ();
       dbg::debug (this, " aborting ", that, " on lock ", l);
 
     } else {
+      this->setState (Base::State::ABORT_SELF);
       ret = true;
     }
 
@@ -903,42 +885,51 @@ private:
 
 };
 
+
 template <typename T, typename Cmp, typename NhFunc, typename OpFunc>
 class ROBparaMeter: private boost::noncopyable {
 
   using Ctxt = ROBparamContext<T, Cmp, ROBparaMeter>;
   using CtxtAlloc = MM::FixedSizeAllocator<Ctxt>;
   using CtxtCmp = typename Ctxt::PtrComparator;
-  using CtxtDeq = Galois::Runtime::PerThreadDeque<Ctxt*>;
+  using CtxtDeq = Galois::PerThreadDeque<Ctxt*>;
 
   using PendingQ = Galois::MinHeap<T, Cmp>;
-  using ROB = Galois::MinHeap<Ctxt*, typename Ctxt::PtrComparator>;
-  using ExecutionRecord = std::vector<size_t>;
+  using ROB = std::vector<Ctxt*>;
+  using ExecutionRecords = std::vector<StepStats>;
 
   Cmp itemCmp;
   NhFunc nhFunc;
   OpFunc opFunc;
+  const char* loopname;
+
   CtxtCmp ctxtCmp;
+  ROB rob;
 
   PendingQ* currPending;
   PendingQ* nextPending;
-  ROB rob;
   CtxtAlloc ctxtAlloc;
-  ExecutionRecord execRcrd;
+  ExecutionRecords execRcrds;
   size_t steps;
 
+
 public:
-  ROBparaMeter (const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc)
+  // TODO: unused statistic added to avoid compile error. Fix ROBcontext
+  size_t abortByOther = 0;
+
+  ROBparaMeter (const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const char* loopname)
     : 
       itemCmp (cmp), 
       nhFunc (nhFunc), 
       opFunc (opFunc), 
-      ctxtCmp (itemCmp),
-      rob (ctxtCmp)
+      loopname (loopname),
+      ctxtCmp (itemCmp)
   {
     currPending = new PendingQ;
     nextPending = new PendingQ;
     steps = 0;
+
+    if (loopname == nullptr) { loopname = "NULL"; }
   }
 
   ~ROBparaMeter (void) {
@@ -952,6 +943,11 @@ public:
 
   const CtxtCmp& getCtxtCmp () const { return ctxtCmp; }
 
+  template <typename R>
+  void push_initial (const R& range) {
+    push (range.begin (), range.end ());
+  }
+
   template <typename Iter>
   void push (Iter beg, Iter end) {
     for (Iter i = beg; i != end; ++i) {
@@ -963,14 +959,22 @@ public:
     nextPending->push (x);
   }
 
+  void push_abort (const T& x, const unsigned owner) {
+    nextPending->push (x);
+  }
+
   void execute () {
+
+    size_t totalIter = 0;
+    size_t totalCommits = 0;
 
     while (!nextPending->empty () || !rob.empty ()) {
 
       ++steps;
       std::swap (currPending, nextPending);
       nextPending->clear ();
-      execRcrd.push_back (0); // create record entry for current step;
+      execRcrds.emplace_back (steps - 1, currPending->size ()); // create record entry for current step;
+      assert (execRcrds.size () == steps);
 
       while (!currPending->empty ()) {
         Ctxt* ctx = schedule ();
@@ -978,34 +982,54 @@ public:
 
         dbg::debug (ctx, " scheduled with item ", ctx->active);
 
+        ++totalIter;
+
         Galois::Runtime::setThreadContext (ctx);
         nhFunc (ctx->active, ctx->userHandle);
 
-        if (ctx->hasState (Ctxt::SCHEDULED)) {
+        if (ctx->hasState (Ctxt::State::SCHEDULED)) {
           opFunc (ctx->active, ctx->userHandle);
         }
         Galois::Runtime::setThreadContext (nullptr);
 
-        if (ctx->hasState (Ctxt::SCHEDULED)) {
-          ctx->setState (Ctxt::READY_TO_COMMIT);
-          rob.push (ctx);
+        if (ctx->hasState (Ctxt::State::SCHEDULED)) {
+          ctx->setState (Ctxt::State::READY_TO_COMMIT);
 
         } else {
-          assert (ctx->hasState (Ctxt::ABORT_SELF));
-          ctx->setState (Ctxt::ABORTING);
+          assert (ctx->hasState (Ctxt::State::ABORT_SELF));
+          ctx->setState (Ctxt::State::ABORTING);
           ctx->doAbort ();
-          nextPending->push (ctx->item);
         }
+
+        rob.push_back (ctx);
       }
 
       size_t numCommitted = clearROB ();
-
       assert (numCommitted > 0);
 
+      totalCommits += numCommitted;
+
     }
+
+    std::printf ("OptimParaMeterExecutor: steps=%zd, totalIter=%zd, totalCommits=%zd, avg=%f\n", steps, totalIter, totalCommits, float(totalCommits)/float(steps));
+
+    finish ();
   }
   
 private:
+
+  void freeCtxt (Ctxt* ctxt) {
+    ctxtAlloc.destroy (ctxt);
+    ctxtAlloc.deallocate (ctxt, 1);
+  }
+
+  void finish (void) {
+    for (const StepStats& s: execRcrds) {
+      s.dump (getStatsFile (), loopname);
+    }
+
+    closeStatsFile ();
+  }
 
   Ctxt* schedule () {
 
@@ -1016,11 +1040,81 @@ private:
     assert (steps > 0);
     ctxtAlloc.construct (ctx, currPending->pop (), *this, (steps-1));
 
-    ctx->setState (Ctxt::SCHEDULED);
+    ctx->setState (Ctxt::State::SCHEDULED);
 
     return ctx;
   }
 
+  size_t clearROB (void) {
+    // first remove all tasks that are not in READY_TO_COMMIT
+    auto new_end = std::partition (rob.begin (), rob.end (), 
+        [] (Ctxt* c) { 
+          assert (c != nullptr);
+          return c->hasState (Ctxt::State::READY_TO_COMMIT);
+        });
+
+
+    for (auto i = new_end, end_i = rob.end (); i != end_i; ++i) {
+      assert ((*i)->hasState (Ctxt::State::ABORT_DONE));
+      freeCtxt (*i);
+    }
+
+    rob.erase (new_end, rob.end ());
+
+    // now sort in reverse order
+    auto revCmp = [this] (Ctxt* a, Ctxt* b) { 
+      assert (a != nullptr);
+      assert (b != nullptr);
+      return !ctxtCmp (a, b);
+    };
+
+    std::sort (rob.begin (), rob.end (), revCmp);
+
+    // for debugging only, there should be no duplicates
+    auto uniq_end = std::unique (rob.begin (), rob.end ());
+    assert (uniq_end == rob.end ());
+
+    size_t numCommitted = 0;
+
+    while (!rob.empty ()) {
+      Ctxt* head = rob.back ();
+
+      assert (head->hasState (Ctxt::State::READY_TO_COMMIT));
+
+      dbg::debug ("head of rob ready to commit : ", head);
+      bool earliest = false;
+      if (!nextPending->empty ()) {
+        earliest = !itemCmp (nextPending->top (), head->active);
+
+      } else {
+        earliest = true;
+      }
+
+      if (earliest) {
+
+        head->setState (Ctxt::State::COMMITTING);
+        head->doCommit ();
+        rob.pop_back ();
+
+        const size_t s = head->step;
+        assert (s < execRcrds.size ());
+        ++execRcrds[s].parallelism;
+        numCommitted += 1;
+        freeCtxt (head);
+
+
+      } else {
+        dbg::debug ("head of rob could not commit : ", head);
+        break;
+      }
+
+    }
+
+    return numCommitted;
+
+  }
+
+  /*
   size_t clearROB (void) {
 
     size_t numCommitted = 0;
@@ -1028,11 +1122,11 @@ private:
     while (!rob.empty ()) {
       Ctxt* head = rob.top ();
 
-      if (head->hasState (Ctxt::ABORT_DONE)) {
-        rob.pop ();
+      if (head->hasState (Ctxt::State::ABORT_DONE)) {
+        freeCtxt (rob.pop ());
         continue;
 
-      } else if (head->hasState (Ctxt::READY_TO_COMMIT)) {
+      } else if (head->hasState (Ctxt::State::READY_TO_COMMIT)) {
         assert (currPending->empty ());
 
         bool earliest = false;
@@ -1044,15 +1138,16 @@ private:
         }
 
         if (earliest) {
-          head->setState (COMMITTING);
+          head->setState (Ctxt::State::COMMITTING);
           head->doCommit ();
           Ctxt* t = rob.pop ();
           assert (t == head);
 
           const size_t s = head->step;
-          assert (s < execRcrd.size ());
-          ++execRcrd[s];
+          assert (s < execRcrds.size ());
+          ++execRcrds[s].parallelism;
           numCommitted += 1;
+          freeCtxt (t);
 
 
         } else {
@@ -1066,12 +1161,41 @@ private:
 
     return numCommitted;
   }
+  */
 
 
 
 };
 
 
+
+} // end namespace ParaMeter
+
+template <typename R, typename Cmp, typename NhFunc, typename OpFunc>
+void for_each_ordered_rob (const R& range, Cmp cmp, NhFunc nhFunc, OpFunc opFunc, const char* loopname=0) {
+
+  using T = typename R::value_type;
+
+  ParaMeter::ROBparaMeter<T, Cmp, NhFunc, OpFunc> exec (cmp, nhFunc, opFunc, loopname);
+
+  exec.push_initial (range);
+  exec.execute ();
+
+  // Galois::Runtime::beginSampling ();
+// 
+  // ROBexecutor<T, Cmp, NhFunc, OpFunc>  exec (cmp, nhFunc, opFunc, loopname);
+// 
+  // if (range.begin () != range.end ()) {
+// 
+    // exec.push_initial (range);
+// 
+    // getSystemThreadPool ().run (activeThreads, std::ref(exec));
+// 
+    // Galois::Runtime::endSampling ();
+// 
+    // exec.printStats ();
+  // }
+}
 
 
 } // end namespace Runtime

@@ -69,14 +69,14 @@ protected:
   }
   
 public:
-  node_data_reference getData(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
-    Galois::Runtime::checkWrite(mflag, false);
+  node_data_reference getData(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
+    // Galois::Runtime::checkWrite(mflag, false);
     acquireNode(N, mflag);
     return derived().get_data(N);
   }
 
-  edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::NONE) {
-    Galois::Runtime::checkWrite(mflag, false);
+  edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::UNPROTECTED) {
+    // Galois::Runtime::checkWrite(mflag, false);
     return derived().get_edge_data(ni);
   }
 
@@ -92,7 +92,7 @@ public:
   local_iterator local_begin() { return local_iterator(this->localBegin(size())); }
   local_iterator local_end() { return local_iterator(this->localEnd(size())); }
 
-  edge_iterator edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+  edge_iterator edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     acquireNode(N, mflag);
     if (Galois::Runtime::shouldLock(mflag)) {
       for (edge_iterator ii = derived().get_edge_begin(N), ee = derived().get_edge_end(N); ii != ee; ++ii) {
@@ -102,12 +102,12 @@ public:
     return derived().get_edge_begin(N);
   }
 
-  edge_iterator edge_end(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+  edge_iterator edge_end(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     acquireNode(N, mflag);
     return derived().get_edge_end(N);
   }
 
-  detail::EdgesIterator<LC_Adaptor_Graph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+  detail::EdgesIterator<LC_Adaptor_Graph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     return detail::EdgesIterator<LC_Adaptor_Graph>(*this, N, mflag);
   }
 };

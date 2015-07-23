@@ -71,7 +71,7 @@ class LevelExecBFS: public BFS<Level_ty> {
 
       // just like DES, we only lock the node being updated, but not its
       // outgoing neighbors
-      // graph.getData (up.node, Galois::CHECK_CONFLICT);
+      // graph.getData (up.node, Galois::MethodFlag::WRITE);
     }
   };
 
@@ -89,17 +89,17 @@ class LevelExecBFS: public BFS<Level_ty> {
     template <typename C>
     void operator () (const Update& up, C& ctx) const {
 
-      if (graph.getData (up.node, Galois::NONE) == BFS_LEVEL_INFINITY) {
+      if (graph.getData (up.node, Galois::MethodFlag::UNPROTECTED) == BFS_LEVEL_INFINITY) {
 
-        graph.getData (up.node, Galois::NONE) = up.level;
+        graph.getData (up.node, Galois::MethodFlag::UNPROTECTED) = up.level;
 
 
-        for (auto ni = graph.edge_begin (up.node, Galois::MethodFlag::NONE)
-            , eni = graph.edge_end (up.node, Galois::MethodFlag::NONE); ni != eni; ++ni) {
+        for (auto ni = graph.edge_begin (up.node, Galois::MethodFlag::UNPROTECTED)
+            , eni = graph.edge_end (up.node, Galois::MethodFlag::UNPROTECTED); ni != eni; ++ni) {
 
           GNode dst = graph.getEdgeDst (ni);
 
-          if (graph.getData (dst, Galois::MethodFlag::NONE) == BFS_LEVEL_INFINITY) {
+          if (graph.getData (dst, Galois::MethodFlag::UNPROTECTED) == BFS_LEVEL_INFINITY) {
             ctx.push (Update (dst, up.level + 1));
           }
         }

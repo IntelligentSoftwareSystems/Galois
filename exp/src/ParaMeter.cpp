@@ -1,35 +1,72 @@
 #include "Galois/Runtime/Executor_ParaMeter.h"
+#include "Galois/Runtime/ll/gio.h"
 
-static const unsigned FNAME_SIZE = 256;
-static char statsFileName[FNAME_SIZE];
 
-static bool& firstRun() {
-  static bool isFirst = true;
-  return isFirst;
-}
+struct StatsFileManager {
+  static const unsigned FNAME_SIZE = 256;
 
-static void printHeader(FILE* out) {
-  fprintf(out, "LOOPNAME, STEP, PARALLELISM, WORKLIST_SIZE\n");
-}
+  bool init = false;
+  bool isOpen = false;
+  FILE* statsFH = nullptr;
+  char statsFileName[FNAME_SIZE];
 
-void Galois::Runtime::ParaMeter::createStatsFile() {
-  if (firstRun()) {
-    firstRun() = false;
 
-    time_t rawtime;
-    struct tm* timeinfo;
-
-    time(&rawtime);
-    timeinfo = localtime(&rawtime);
-
-    strftime(statsFileName, FNAME_SIZE, "ParaMeter_Stats_%Y-%m-%d_%H:%M:%S.csv", timeinfo);
-
-    FILE* statsFH = fopen(statsFileName, "w");
-    printHeader(statsFH);
-    fclose(statsFH);
+  ~StatsFileManager (void) {
+    close ();
   }
+
+  FILE* get (void) {
+    if (!init) {
+      init = true;
+
+      time_t rawtime;
+      struct tm* timeinfo;
+
+      time(&rawtime);
+      timeinfo = localtime(&rawtime);
+
+      strftime(statsFileName, FNAME_SIZE, "ParaMeter_Stats_%Y-%m-%d_%H:%M:%S.csv", timeinfo);
+
+      statsFH = fopen(statsFileName, "w");
+      GALOIS_ASSERT (statsFH != nullptr, "ParaMeter stats file error");
+
+      Galois::Runtime::ParaMeter::StepStats::printHeader(statsFH);
+
+      fclose(statsFH);
+
+    }
+
+    if (!isOpen) {
+      statsFH = fopen (statsFileName, "a"); // open in append mode
+      GALOIS_ASSERT (statsFH != nullptr, "ParaMeter stats file error");
+
+      isOpen = true;
+    }
+
+    return statsFH;
+
+  }
+
+  void close (void) {
+    if (isOpen) {
+      fclose (statsFH);
+      isOpen = false;
+      statsFH = nullptr;
+    }
+  }
+
+};
+
+static StatsFileManager& getStatsFileManager (void) {
+  static StatsFileManager s;
+  return s;
 }
 
-const char* Galois::Runtime::ParaMeter::getStatsFileName() {
-  return statsFileName;
+FILE* Galois::Runtime::ParaMeter::getStatsFile (void) {
+  return getStatsFileManager ().get ();
 }
+
+void Galois::Runtime::ParaMeter::closeStatsFile (void) {
+  getStatsFileManager ().close ();
+}
+

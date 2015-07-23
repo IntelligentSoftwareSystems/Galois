@@ -18,14 +18,17 @@ struct Matching {
   Graph& graph;
   Galois::GAccumulator<int>& size;
 
-  void operator()(GNode x, Galois::UserContext<GNode>&) const {
+  void operator()(GNode x, Galois::UserContext<GNode>& ctx) const {
     for (auto edge : graph.out_edges(x)) {
       GNode dst = graph.getEdgeDst(edge);
       if (graph.getData(dst) != 0)
         return;
     }
 
-    graph.getData(x, Galois::MethodFlag::ALL | Galois::MethodFlag::WRITE) = 1;
+    graph.getData(x, Galois::MethodFlag::WRITE); 
+    ctx.cautiousPoint();
+    
+    graph.getData(x, Galois::MethodFlag::WRITE) = 1;
     for (auto edge : graph.out_edges(x)) {
       GNode dst = graph.getEdgeDst(edge);
       graph.getData(dst) = 1;
@@ -45,9 +48,8 @@ struct MatchingWithLocalState {
   Galois::GAccumulator<int>& size;
 
   void operator()(GNode x, Galois::UserContext<GNode>& ctx) const { 
-    bool used;
-    LocalState* p = (LocalState*) ctx.getLocalState(used);
-    if (used) {
+    LocalState* p = (LocalState*) ctx.getLocalState();
+    if (!ctx.isFirstPass()) {
       // operator is being resumed; use p
       if (!p->toMark)
         return;

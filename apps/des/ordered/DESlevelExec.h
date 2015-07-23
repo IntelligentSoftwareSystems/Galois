@@ -29,11 +29,11 @@
 #include "Galois/Timer.h"
 #include "Galois/Atomic.h"
 #include "Galois/Galois.h"
+#include "Galois/PerThreadContainer.h"
 
 #include "Galois/Runtime/ll/PaddedLock.h"
 #include "Galois/Runtime/ll/CompilerSpecific.h"
 #include "Galois/Runtime/LevelExecutor.h"
-#include "Galois/Runtime/PerThreadContainer.h"
 #include "Galois/Runtime/Range.h"
 
 #include "abstractMain.h"
@@ -53,7 +53,7 @@ typedef Galois::GAccumulator<size_t> Accumulator_ty;
 
 typedef des::EventRecvTimeLocalTieBrkCmp<TypeHelper::Event_ty> Cmp_ty;
 
-typedef Galois::Runtime::PerThreadVector<TypeHelper::Event_ty> AddList_ty;
+typedef Galois::PerThreadVector<TypeHelper::Event_ty> AddList_ty;
 
 
 
@@ -61,7 +61,7 @@ class DESlevelExec:
   public des::AbstractMain<TypeHelper::SimInit_ty>, public TypeHelper {
 
   using VecGNode = std::vector<GNode>;
-  using AddList_ty =  Galois::Runtime::PerThreadVector<TypeHelper::Event_ty>;
+  using AddList_ty =  Galois::PerThreadVector<TypeHelper::Event_ty>;
 
   VecGNode nodes;
 
@@ -78,7 +78,7 @@ class DESlevelExec:
     template <typename C>
     void operator () (const Event_ty& event, C& ctx) const {
       GNode n = nodes[event.getRecvObj ()->getID ()];
-      graph.getData (n, Galois::MethodFlag::CHECK_CONFLICT);
+      graph.getData (n, Galois::MethodFlag::WRITE);
     }
   };
 
@@ -144,7 +144,7 @@ protected:
     for (Graph::iterator n = graph.begin ()
         , endn = graph.end (); n != endn; ++n) {
 
-      BaseSimObj_ty* so = graph.getData (*n, Galois::MethodFlag::NONE);
+      BaseSimObj_ty* so = graph.getData (*n, Galois::MethodFlag::UNPROTECTED);
       nodes[so->getID ()] = *n;
     }
   }

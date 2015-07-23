@@ -29,8 +29,8 @@
 #include "Galois/Accumulator.h"
 #include "Galois/Timer.h"
 #include "Galois/Atomic.h"
+#include "Galois/PerThreadContainer.h"
 
-#include "Galois/Runtime/PerThreadContainer.h"
 #include "Galois/Runtime/ll/PaddedLock.h"
 #include "Galois/Runtime/ll/CompilerSpecific.h"
 
@@ -51,7 +51,7 @@ typedef Galois::GAccumulator<size_t> Accumulator_ty;
 
 typedef des::EventRecvTimeLocalTieBrkCmp<TypeHelper::Event_ty> Cmp_ty;
 
-typedef Galois::Runtime::PerThreadVector<TypeHelper::Event_ty> AddList_ty;
+typedef Galois::PerThreadVector<TypeHelper::Event_ty> AddList_ty;
 
 typedef Galois::GAtomicPadded<bool> AtomicBool_ty;
 
@@ -359,7 +359,7 @@ protected:
     for (Graph::iterator n = graph.begin ()
         , endn = graph.end (); n != endn; ++n) {
 
-      SimObj_ty* so = static_cast<SimObj_ty*> (graph.getData (*n, Galois::MethodFlag::NONE));
+      SimObj_ty* so = static_cast<SimObj_ty*> (graph.getData (*n, Galois::MethodFlag::UNPROTECTED));
       sobjInfoVec[so->getID ()] = SimObjInfo (*n, so);
     }
   }

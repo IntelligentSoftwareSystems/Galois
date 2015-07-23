@@ -49,15 +49,6 @@ enum ConflictFlag {
   BREAK = 2
 };
 
-enum PendingFlag {
-  NON_DET,
-  PENDING,
-  COMMITTING
-};
-
-//! Used by deterministic and ordered executor
-void setPending(PendingFlag value);
-PendingFlag getPending ();
 
 //! used to release lock over exception path
 static inline void clearConflictLock() { }
@@ -110,9 +101,9 @@ protected:
 
 class SimpleRuntimeContext: public LockManagerBase {
 protected:
-  void acquire(Lockable* lockable) {}
-  void release (Lockable* lockable) {}
-  virtual void subAcquire(Lockable* lockable);
+  void acquire(Lockable* lockable, Galois::MethodFlag m) {}
+  void release(Lockable* lockable) {}
+  virtual void subAcquire(Lockable* lockable, Galois::MethodFlag m);
   void addToNhood(Lockable* lockable) {}
   static SimpleRuntimeContext* getOwner(Lockable* lockable) { return 0; }
 
@@ -187,14 +178,14 @@ class SimpleRuntimeContext: public LockManagerBase {
   bool customAcquire;
 
 protected:
-  friend void doAcquire(Lockable*);
+  friend void doAcquire(Lockable*, Galois::MethodFlag);
 
   static SimpleRuntimeContext* getOwner(Lockable* lockable) {
-    LockManagerBase* owner = LockManagerBase::getOwner (lockable);
+    LockManagerBase* owner = LockManagerBase::getOwner(lockable);
     return static_cast<SimpleRuntimeContext*>(owner);
   }
 
-  virtual void subAcquire(Lockable* lockable);
+  virtual void subAcquire(Lockable* lockable, Galois::MethodFlag m);
 
   void addToNhood(Lockable* lockable) {
     assert(!lockable->next);
@@ -202,7 +193,7 @@ protected:
     locks = lockable;
   }
 
-  void acquire(Lockable* lockable);
+  void acquire(Lockable* lockable, Galois::MethodFlag m);
   void release(Lockable* lockable);
 
 public:
@@ -230,13 +221,15 @@ inline bool shouldLock(const Galois::MethodFlag g) {
   return false;
 #else
   // Mask out additional "optional" flags
-  switch (g & ALL) {
-  case NONE:
-  case SAVE_UNDO:
+  switch (g & Galois::MethodFlag::INTERNAL_MASK) {
+  case MethodFlag::UNPROTECTED:
+  case MethodFlag::PREVIOUS:
     return false;
-  case ALL:
-  case CHECK_CONFLICT:
+
+  case MethodFlag::READ:
+  case MethodFlag::WRITE:
     return true;
+
   default:
     // XXX(ddn): Adding error checking code here either upsets the inlining
     // heuristics or icache behavior. Avoid complex code if possible.
@@ -248,23 +241,22 @@ inline bool shouldLock(const Galois::MethodFlag g) {
 }
 
 //! actual locking function.  Will always lock.
-inline void doAcquire(Lockable* lockable) {
+inline void doAcquire(Lockable* lockable, Galois::MethodFlag m) {
   SimpleRuntimeContext* ctx = getThreadContext();
   if (ctx)
-    ctx->acquire(lockable);
+    ctx->acquire(lockable, m);
 }
 
 //! Master function which handles conflict detection
 //! used to acquire a lockable thing
 inline void acquire(Lockable* lockable, Galois::MethodFlag m) {
-  if (shouldLock(m)) {
-    doAcquire(lockable);
-  }
+  if (shouldLock(m))
+    doAcquire(lockable, m);
 }
 
 struct AlwaysLockObj {
   void operator()(Lockable* lockable) const {
-    doAcquire(lockable);
+    doAcquire(lockable, Galois::MethodFlag::WRITE);
   }
 };
 
@@ -276,9 +268,9 @@ struct CheckedLockObj {
   }
 };
 
-void signalConflict(Lockable*);
+void signalConflict(Lockable* = nullptr);
 
-void forceAbort();
+void signalFailSafe(void);
 
 }
 } // end namespace Galois

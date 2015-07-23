@@ -49,12 +49,12 @@ struct HEMmatch {
     GNode retval = node; // match self if nothing else
     int maxwgt = std::numeric_limits<int>::min();
     //    nume += std::distance(graph->edge_begin(node), graph->edge_end(node));
-    for (auto jj = graph->edge_begin(node, Galois::MethodFlag::NONE), eejj = graph->edge_end(node);
+    for (auto jj = graph->edge_begin(node, Galois::MethodFlag::UNPROTECTED), eejj = graph->edge_end(node);
          jj != eejj; ++jj) {
       //      ++checked;
       GNode neighbor = graph->getEdgeDst(jj);
-      MetisNode& neighMNode = graph->getData(neighbor, Galois::MethodFlag::NONE);
-      int edgeData = graph->getEdgeData(jj, Galois::MethodFlag::NONE);
+      MetisNode& neighMNode = graph->getData(neighbor, Galois::MethodFlag::UNPROTECTED);
+      int edgeData = graph->getEdgeData(jj, Galois::MethodFlag::UNPROTECTED);
       if (!neighMNode.isMatched() && neighbor != node && maxwgt < edgeData) {
         maxwgt = edgeData;
         retval = neighbor;
@@ -70,10 +70,10 @@ struct HEMmatch {
 
 struct RMmatch {
   GNode operator()(GNode node, GGraph* graph) {
-    for (auto jj = graph->edge_begin(node, Galois::MethodFlag::NONE), eejj = graph->edge_end(node);
+    for (auto jj = graph->edge_begin(node, Galois::MethodFlag::UNPROTECTED), eejj = graph->edge_end(node);
          jj != eejj; ++jj) {
       GNode neighbor = graph->getEdgeDst(jj);
-      if (!graph->getData(neighbor, Galois::MethodFlag::NONE).isMatched() && neighbor != node)
+      if (!graph->getData(neighbor, Galois::MethodFlag::UNPROTECTED).isMatched() && neighbor != node)
         return neighbor;
     }
     return node;
@@ -89,7 +89,7 @@ struct TwoHopMatcher {
   MatchingPolicy matcher;
   GNode operator()(GNode node, GGraph* graph) {
     std::pair<GNode, int> retval(node, std::numeric_limits<int>::min());
-    for (auto jj = graph->edge_begin(node, Galois::MethodFlag::NONE), eejj = graph->edge_end(node);
+    for (auto jj = graph->edge_begin(node, Galois::MethodFlag::UNPROTECTED), eejj = graph->edge_end(node);
          jj != eejj; ++jj) {
       GNode neighbor = graph->getEdgeDst(jj);
       std::pair<GNode, int> tval = matcher(neighbor, graph, true);
@@ -135,7 +135,7 @@ struct parallelMatchAndCreateNodes {
   void operator()(GNode item, Galois::UserContext<GNode> &lwl) {
     if (fineGGraph->getData(item).isMatched())
       return;
-    if(fineGGraph->edge_begin(item, Galois::MethodFlag::NONE) == fineGGraph->edge_end(item, Galois::MethodFlag::NONE)){
+    if(fineGGraph->edge_begin(item, Galois::MethodFlag::UNPROTECTED) == fineGGraph->edge_end(item, Galois::MethodFlag::UNPROTECTED)){
       noEdgeBag.push(item);
       return;
     }
@@ -150,13 +150,13 @@ struct parallelMatchAndCreateNodes {
     //the node and check the matched status of the locked node.  the
     //lock before (final) read ensures that we will see any write to matched
 
-    unsigned numEdges = std::distance(fineGGraph->edge_begin(item, Galois::MethodFlag::NONE), fineGGraph->edge_end(item, Galois::MethodFlag::NONE));
+    unsigned numEdges = std::distance(fineGGraph->edge_begin(item, Galois::MethodFlag::UNPROTECTED), fineGGraph->edge_end(item, Galois::MethodFlag::UNPROTECTED));
     //assert(numEdges == std::distance(fineGGraph->edge_begin(item), fineGGraph->edge_end(item)));
 
     GNode N;
     if (ret != item) {
       //match found
-      numEdges += std::distance(fineGGraph->edge_begin(ret, Galois::MethodFlag::NONE), fineGGraph->edge_end(ret, Galois::MethodFlag::NONE));
+      numEdges += std::distance(fineGGraph->edge_begin(ret, Galois::MethodFlag::UNPROTECTED), fineGGraph->edge_end(ret, Galois::MethodFlag::UNPROTECTED));
       //Cautious point
       N = coarseGGraph->createNode(numEdges, 
                                    fineGGraph->getData(item).getWeight() +
@@ -201,17 +201,17 @@ struct parallelPopulateEdges {
   void goSort(GNode node, Context& lwl) {
     //    std::cout << 'p';
     //fineGGraph is read only in this loop, so skip locks
-    MetisNode &nodeData = coarseGGraph->getData(node, Galois::MethodFlag::NONE);
+    MetisNode &nodeData = coarseGGraph->getData(node, Galois::MethodFlag::UNPROTECTED);
 
     typedef std::deque<std::pair<GNode, unsigned>, Galois::PerIterAllocTy::rebind<std::pair<GNode,unsigned> >::other> GD;
     //copy and translate all edges
     GD edges(GD::allocator_type(lwl.getPerIterAlloc()));
 
     for (unsigned x = 0; x < nodeData.numChildren(); ++x)
-      for (auto ii = fineGGraph->edge_begin(nodeData.getChild(x), Galois::MethodFlag::NONE), ee = fineGGraph->edge_end(nodeData.getChild(x)); ii != ee; ++ii) {
+      for (auto ii = fineGGraph->edge_begin(nodeData.getChild(x), Galois::MethodFlag::UNPROTECTED), ee = fineGGraph->edge_end(nodeData.getChild(x)); ii != ee; ++ii) {
         GNode dst = fineGGraph->getEdgeDst(ii);
-        GNode p = fineGGraph->getData(dst, Galois::MethodFlag::NONE).getParent();
-        edges.emplace_back(p, fineGGraph->getEdgeData(ii, Galois::MethodFlag::NONE));
+        GNode p = fineGGraph->getData(dst, Galois::MethodFlag::UNPROTECTED).getParent();
+        edges.emplace_back(p, fineGGraph->getEdgeData(ii, Galois::MethodFlag::UNPROTECTED));
       }
     
     //slightly faster not ordering by edge weight
@@ -227,7 +227,7 @@ struct parallelPopulateEdges {
           sum += pp->second;
           ++pp;
         }
-        coarseGGraph->addMultiEdge(node, dst, Galois::MethodFlag::NONE, sum);
+        coarseGGraph->addMultiEdge(node, dst, Galois::MethodFlag::UNPROTECTED, sum);
       }
     }
     //    assert(e);
@@ -236,9 +236,9 @@ struct parallelPopulateEdges {
 
   template<typename Context>
   void operator()(GNode node, Context& lwl) {
-    // MetisNode &nodeData = coarseGGraph->getData(node, Galois::MethodFlag::NONE);
-    // if (std::distance(fineGGraph->edge_begin(nodeData.getChild(0), Galois::MethodFlag::NONE),
-    //                   fineGGraph->edge_begin(nodeData.getChild(0), Galois::MethodFlag::NONE))
+    // MetisNode &nodeData = coarseGGraph->getData(node, Galois::MethodFlag::UNPROTECTED);
+    // if (std::distance(fineGGraph->edge_begin(nodeData.getChild(0), Galois::MethodFlag::UNPROTECTED),
+    //                   fineGGraph->edge_begin(nodeData.getChild(0), Galois::MethodFlag::UNPROTECTED))
     //     < 256)
     //   goSort(node,lwl);
     // else
@@ -251,11 +251,11 @@ struct parallelPopulateEdges {
 struct HighDegreeIndexer: public std::unary_function<GNode, unsigned int> {
   static GGraph* indexgraph;
   unsigned int operator()(const GNode& val) const {
-    return indexgraph->getData(val, Galois::MethodFlag::NONE).isFailedMatch() ?
+    return indexgraph->getData(val, Galois::MethodFlag::UNPROTECTED).isFailedMatch() ?
       std::numeric_limits<unsigned int>::max() :
       (std::numeric_limits<unsigned int>::max() - 
-       ((std::distance(indexgraph->edge_begin(val, Galois::MethodFlag::NONE), 
-                       indexgraph->edge_end(val, Galois::MethodFlag::NONE))) >> 2));
+       ((std::distance(indexgraph->edge_begin(val, Galois::MethodFlag::UNPROTECTED), 
+                       indexgraph->edge_end(val, Galois::MethodFlag::UNPROTECTED))) >> 2));
   }
 };
 
@@ -263,8 +263,8 @@ GGraph* HighDegreeIndexer::indexgraph = 0;
 
 struct LowDegreeIndexer: public std::unary_function<GNode, unsigned int> {
   unsigned int operator()(const GNode& val) const {
-    unsigned x =std::distance(HighDegreeIndexer::indexgraph->edge_begin(val, Galois::MethodFlag::NONE), 
-                              HighDegreeIndexer::indexgraph->edge_end(val, Galois::MethodFlag::NONE));
+    unsigned x =std::distance(HighDegreeIndexer::indexgraph->edge_begin(val, Galois::MethodFlag::UNPROTECTED), 
+                              HighDegreeIndexer::indexgraph->edge_end(val, Galois::MethodFlag::UNPROTECTED));
     return x; // >> 2;
     // int targetlevel = 0;
     // while (x >>= 1) ++targetlevel;
@@ -275,7 +275,7 @@ struct LowDegreeIndexer: public std::unary_function<GNode, unsigned int> {
 
 struct WeightIndexer: public std::unary_function<GNode, int> {
   int operator()(const GNode& val) const {
-    return HighDegreeIndexer::indexgraph->getData(val, Galois::MethodFlag::NONE).getWeight();
+    return HighDegreeIndexer::indexgraph->getData(val, Galois::MethodFlag::UNPROTECTED).getWeight();
   }
 };
 

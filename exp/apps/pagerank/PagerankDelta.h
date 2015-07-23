@@ -48,9 +48,9 @@ struct PagerankDelta {
     Graph& g;
     Initialize(Graph& g): g(g) { }
     void operator()(Graph::GraphNode n) const {
-      LNode& data = g.getData(n, Galois::MethodFlag::NONE);
+      LNode& data = g.getData(n, Galois::MethodFlag::UNPROTECTED);
       data.value = 1.0;
-      int outs = std::distance(g.edge_begin(n, Galois::MethodFlag::NONE), g.edge_end(n, Galois::MethodFlag::NONE));
+      int outs = std::distance(g.edge_begin(n, Galois::MethodFlag::UNPROTECTED), g.edge_end(n, Galois::MethodFlag::UNPROTECTED));
       data.nout = outs;
     }
   };
@@ -63,17 +63,17 @@ struct PagerankDelta {
 
     void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) {
       double sum = 0;
-      for (auto jj = graph.in_edge_begin(src, Galois::MethodFlag::NONE), ej = graph.in_edge_end(src, Galois::MethodFlag::NONE); jj != ej; ++jj) {
+      for (auto jj = graph.in_edge_begin(src, Galois::MethodFlag::UNPROTECTED), ej = graph.in_edge_end(src, Galois::MethodFlag::UNPROTECTED); jj != ej; ++jj) {
         GNode dst = graph.getInEdgeDst(jj);
-        LNode& ddata = graph.getData(dst, Galois::MethodFlag::ALL);
+        LNode& ddata = graph.getData(dst, Galois::MethodFlag::WRITE);
         sum += ddata.value / ddata.nout;
       }
       float value = (1.0 - alpha) * sum + alpha;
-      LNode& sdata = graph.getData(src, Galois::MethodFlag::ALL);
+      LNode& sdata = graph.getData(src, Galois::MethodFlag::WRITE);
       float diff = std::fabs(value - sdata.value);
       if (diff > tolerance) {
         sdata.value = value;
-        for (auto jj = graph.edge_begin(src, Galois::MethodFlag::NONE), ej = graph.edge_end(src, Galois::MethodFlag::NONE); jj != ej; ++jj) {
+        for (auto jj = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED), ej = graph.edge_end(src, Galois::MethodFlag::UNPROTECTED); jj != ej; ++jj) {
           GNode dst = graph.getEdgeDst(jj);
           ctx.push(dst);
         }

@@ -100,8 +100,8 @@ struct Process {
     Tuple tuple;
     ContainsTuple(const Graph& g, const Tuple& t): graph(g), tuple(t) { }
     bool operator()(const GNode& n) const {
-      assert(!graph.getData(n, Galois::MethodFlag::NONE).boundary());
-      return graph.getData(n, Galois::MethodFlag::NONE).inTriangle(tuple);
+      assert(!graph.getData(n, Galois::MethodFlag::UNPROTECTED).boundary());
+      return graph.getData(n, Galois::MethodFlag::UNPROTECTED).inTriangle(tuple);
     }
   };
 
@@ -148,10 +148,10 @@ struct Process {
   }
 
   GNode findCorrespondingNode(GNode start, const Point* p1, const Point* p2) {
-    for (Graph::edge_iterator ii = graph->edge_begin(start, Galois::MethodFlag::CHECK_CONFLICT),
-        ei = graph->edge_end(start, Galois::MethodFlag::CHECK_CONFLICT); ii != ei; ++ii) {
+    for (Graph::edge_iterator ii = graph->edge_begin(start, Galois::MethodFlag::WRITE),
+        ei = graph->edge_end(start, Galois::MethodFlag::WRITE); ii != ei; ++ii) {
       GNode dst = graph->getEdgeDst(ii);
-      Element& e = graph->getData(dst, Galois::MethodFlag::NONE);
+      Element& e = graph->getData(dst, Galois::MethodFlag::UNPROTECTED);
       int count = 0;
       for (int i = 0; i < e.dim(); ++i) {
         if (e.getPoint(i) == p1 || e.getPoint(i) == p2) {
@@ -168,12 +168,12 @@ struct Process {
     // Try simple hill climbing instead
     ContainsTuple contains(*graph, p->t());
     while (!contains(start)) {
-      Element& element = graph->getData(start, Galois::MethodFlag::CHECK_CONFLICT);
+      Element& element = graph->getData(start, Galois::MethodFlag::WRITE);
       if (element.boundary()) {
         // Should only happen when quad tree returns a boundary point which is rare
         // There's only one way to go from here
         assert(std::distance(graph->edge_begin(start), graph->edge_end(start)) == 1);
-        start = graph->getEdgeDst(graph->edge_begin(start, Galois::MethodFlag::CHECK_CONFLICT));
+        start = graph->getEdgeDst(graph->edge_begin(start, Galois::MethodFlag::WRITE));
       } else {
         // Find which neighbor will get us to point fastest by computing normal
         // vectors
@@ -193,7 +193,7 @@ struct Process {
       return false;
     }
 
-    result->get(Galois::MethodFlag::CHECK_CONFLICT);
+    result->get(Galois::MethodFlag::WRITE);
 
     GNode someNode = result->someElement();
 
@@ -221,9 +221,8 @@ struct Process {
     Cavity<Alloc>* cavp = NULL;
 
     if (Version == detDisjoint) {
-      bool used;
-      LocalState* localState = (LocalState*) ctx.getLocalState(used);
-      if (used) {
+      LocalState* localState = (LocalState*) ctx.getLocalState();
+      if (!ctx.isFirstPass()) {
         localState->cav.update();
         return;
       } else {
@@ -231,7 +230,7 @@ struct Process {
       }
     }
 
-    p->get(Galois::MethodFlag::CHECK_CONFLICT);
+    p->get(Galois::MethodFlag::WRITE);
     assert(!p->inMesh());
 
     GNode node;
@@ -247,7 +246,7 @@ struct Process {
     assert(graph->getData(node).inTriangle(p->t()));
     assert(graph->containsNode(node));
 
-    if (Version == detDisjoint) {
+    if (Version == detDisjoint && ctx.isFirstPass()) {
       cavp->init(node, p);
       cavp->build();
     } else {
@@ -256,13 +255,14 @@ struct Process {
       cav.build();
       if (Version == detPrefix)
         return;
+      ctx.cautiousPoint();
       cav.update();
     }
   }
 
   //! Serial operator
   void operator()(Point* p) {
-    p->get(Galois::MethodFlag::CHECK_CONFLICT);
+    p->get(Galois::MethodFlag::WRITE);
     assert(!p->inMesh());
 
     GNode node;

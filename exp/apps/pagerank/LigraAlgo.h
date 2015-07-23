@@ -8,7 +8,7 @@
 
 #include <boost/mpl/if.hpp>
 
-#include "PageRank.h"
+#include "PageRankOld.h"
 
 template<bool UseGraphChi>
 struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
@@ -38,7 +38,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
     Graph& g;
     Initialize(Graph& g): g(g) { }
     void operator()(typename Graph::GraphNode n) const {
-      PNode& data = g.getData(n, Galois::MethodFlag::NONE);
+      PNode& data = g.getData(n, Galois::MethodFlag::UNPROTECTED);
       data.value = 1.0;
       data.accum.write(0.0);
     }
@@ -50,10 +50,10 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
 
     template<typename GTy>
     bool operator()(GTy& graph, typename GTy::GraphNode src, typename GTy::GraphNode dst, typename GTy::edge_data_reference) {
-      PNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
-      int neighbors = std::distance(graph.edge_begin(src, Galois::MethodFlag::NONE),
-          graph.edge_end(src, Galois::MethodFlag::NONE));
-      PNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+      PNode& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
+      int neighbors = std::distance(graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED),
+          graph.edge_end(src, Galois::MethodFlag::UNPROTECTED));
+      PNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
       float delta = sdata.value / neighbors;
       
       ddata.accum.atomicIncrement(delta);
@@ -66,7 +66,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
     Graph& graph;
     UpdateNode(LigraAlgo* s, Graph& g): self(s), graph(g) { }
     void operator()(GNode src) const {
-      PNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
+      PNode& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
       float value = (1.0 - alpha) * sdata.accum.read() + alpha;
       float diff = std::fabs(value - sdata.value);
       if (diff <= tolerance)

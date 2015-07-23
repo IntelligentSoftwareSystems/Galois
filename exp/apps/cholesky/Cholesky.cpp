@@ -36,9 +36,11 @@
 #include "Galois/ParallelSTL/ParallelSTL.h"
 #include "Galois/Graph/Graph.h" // FirstGraph
 #include "llvm/Support/CommandLine.h"
+#include <float.h>              // For DBL_DIG, significant digits in double
 
 #include "Lonestar/BoilerPlate.h"
 
+#include <list>
 #include <utility>
 #include <algorithm>
 #include <iostream>
@@ -54,23 +56,34 @@ const char* url = NULL;
 enum Ordering {
   sequential,
   leastdegree,
-  pointless
+  pointless,
+  fileorder
 };
 
-static cll::opt<std::string> inputFilename(cll::Positional, cll::desc("<graph file>"), cll::Required);
-static cll::opt<Ordering> ordering("ordering",
-                                   cll::desc("Graph traversal order:"),
-    cll::values(
-      clEnumVal(sequential, "Sequential ordering"),
-      clEnumVal(leastdegree, "Least-degree ordering"),
-      clEnumVal(pointless, "1,6,4,5,0,3,7,2;9,... ordering"),
-      clEnumValEnd), cll::init(leastdegree));
+static cll::opt<std::string>
+inputFilename(cll::Positional, cll::desc("<graph file>"), cll::Required);
+static cll::opt<Ordering>
+ordering("ordering", cll::desc("Graph traversal order:"),
+         cll::values(clEnumVal(sequential, "Sequential ordering"),
+                     clEnumVal(leastdegree, "Least-degree ordering"),
+                     clEnumVal(pointless, "1,6,4,5,0,3,7,2;9,... ordering"),
+                     clEnumVal(fileorder, "Read from orderingFile"),
+                     clEnumValEnd), cll::init(leastdegree));
+static cll::opt<std::string>
+orderingFile("orderingFile",
+             cll::desc("read/write ordering from/to this file"));
+static cll::opt<bool>
+skipNumeric("skipNumeric",
+            cll::desc("do not perform numeric factorization"));
+
 
 struct Node {
-  unsigned id;
+  unsigned int id;
+  unsigned int order;
   unsigned int seen;
-  unsigned int nedges;
-  Node(): seen(0), nedges(0) { };
+  unsigned int noutedges;
+  unsigned int degree;
+  Node(): order(0), seen(0), noutedges(0), degree(0) { };
 };
 
 // WARNING: Will silently behave oddly when given a .gr file with the
@@ -81,15 +94,12 @@ typedef double edgedata;
 // LC_Linear_Graph cannot have structure modified; not suitable for
 // symbolic factorization.
 //typedef Galois::Graph::LC_Linear_Graph<Node,edgedata>::with_numa_alloc<true>::type Graph;
-typedef Galois::Graph::FirstGraph<Node,edgedata,true> Graph;
-typedef Galois::Graph::FirstGraph<Node,edgedata,false> SymbolicGraph;
+typedef Galois::Graph::FirstGraph<Node,edgedata,true, false,false> Graph;
+typedef Galois::Graph::FirstGraph<Node,edgedata,false, false,true> SymbolicGraph;
 
 typedef Graph::GraphNode GNode;
 typedef SymbolicGraph::GraphNode SGNode;
 
-// The dependency list is stored as a total ordering
-typedef unsigned int DepItem;
-DepItem *depgraph;
 unsigned int nodecount = 0;
 
 std::ostream& operator<<(std::ostream& os, const Node& n) {
@@ -102,10 +112,32 @@ std::ostream& operator<<(std::ostream& os, const Node& n) {
 template<typename GraphType, typename NodeType>
 typename GraphType::edge_iterator
 findEdge(GraphType& g, NodeType src, NodeType dst, bool *hasEdge) {
+  typename GraphType::edge_iterator ii = g.findEdge(src, dst);
+  *hasEdge = ii != g.edge_end(src, Galois::MethodFlag::UNPROTECTED);
+  return ii;
+#if 0
   typename GraphType::edge_iterator
-    ii = g.edge_begin(src, Galois::MethodFlag::NONE),
-    ei = g.edge_end(src, Galois::MethodFlag::NONE);
+    ii = g.edge_begin(src, Galois::MethodFlag::UNPROTECTED),
+    ei = g.edge_end(src, Galois::MethodFlag::UNPROTECTED),
+    origei = ei;
+  unsigned targetid = g.getData(dst).id;
+  // Binary search
+  while ( ii < ei ) {
+    typename GraphType::edge_iterator i = ii + (ei - ii)/2;
+    NodeType midnode = g.getEdgeDst(i);
+    unsigned id = g.getData(dst).id;
+    if ( id == targetid ) {
+      *hasEdge = true;
+      return ii;
+    }
+    else if ( id < targetid )
+      ii = i+1;
+    else if ( id > targetid )
+      ei = i;
+  }
   *hasEdge = false;
+  return origei;
+  /*
   for (; ii != ei; ++ii) {
     if (g.getEdgeDst(ii) == dst) {
       *hasEdge = true;
@@ -113,13 +145,20 @@ findEdge(GraphType& g, NodeType src, NodeType dst, bool *hasEdge) {
     }
   }
   return ii;
+  */
+#endif
 }
 
 // include/Galois/Graphs/Serialize.h
 // Output a graph to a file as an edgelist
 template<typename GraphType>
 bool outputTextEdgeData(const char* ofile, GraphType& G) {
-  std::ofstream file(ofile);
+  //std::ofstream file(ofile);
+  FILE *file = fopen(ofile, "w");
+  if ( !file ) {
+    perror("fopen outfile");
+    return false;
+  }
   for (typename GraphType::iterator ii = G.begin(),
          ee = G.end(); ii != ee; ++ii) {
     unsigned src = G.getData(*ii).id;
@@ -127,87 +166,229 @@ bool outputTextEdgeData(const char* ofile, GraphType& G) {
     for (typename GraphType::edge_iterator jj = G.edge_begin(*ii),
            ej = G.edge_end(*ii); jj != ej; ++jj) {
       unsigned dst = G.getData(G.getEdgeDst(jj)).id;
-      file << src << ' ' << dst << ' ' << G.getEdgeData(jj) << '\n';
+      fprintf(file, "%d %d %.*e\n", src, dst, DBL_DIG+3, G.getEdgeData(jj));
     }
   }
+  fclose(file);
   return true;
 }
 
-// Find the unseen node in the graph of least degree
-unsigned int ordering_leastdegree(SymbolicGraph &graph, unsigned int i,
-                                  unsigned int seenbase = 0) {
-  unsigned int nseen = 0, bestid = 0, bestdegree = nodecount+1;
-  // Iterate over nodes
-  for ( SymbolicGraph::iterator ii = graph.begin(), ei = graph.end();
-        ii != ei; ++ii ) {
-    SGNode node = *ii;
-    Node &noded = graph.getData(node);
-    if ( noded.seen > seenbase ) {
-      nseen++;
-      continue;
-    }
-    // Measure degree of the node
-    unsigned int degree = 0;
-    for (SymbolicGraph::edge_iterator
-           iis = graph.edge_begin(node, Galois::MethodFlag::ALL),
-           eis = graph.edge_end(node, Galois::MethodFlag::ALL);
-	 iis != eis; ++iis) {
-      // Only include unseen (not yet eliminated) neighbors in the degree
-      if ( graph.getData(graph.getEdgeDst(iis)).seen > seenbase ) continue;
-      degree++;
-      // Maybe this isn't going to work out; abort if degree is too high
-      if ( degree >= bestdegree ) break;
-    }
-    // Keep track of the current least-degree node
-    if ( degree < bestdegree ) {
-      bestid = noded.id;
-      bestdegree = degree;
-      // We can't do better than 0
-      if ( degree == 0 ) break;
-    }
-  }
-  assert(nseen == i || bestdegree == 0);
-  //std::cout << "Least degree: Found node " << bestid << " with degree " << bestdegree << "\n";
-  return bestid;
-}
+struct OrderingManager {
+  SymbolicGraph &graph;
+  std::vector<SGNode> &innodes;
+  OrderingManager(SymbolicGraph &graph, std::vector<SGNode> &innodes):
+    graph(graph), innodes(innodes) { }
 
-// For the given ordering, return the ID of the next node that should
-// be eliminated.
-unsigned int ordering_next_node(SymbolicGraph &graph, unsigned int i,
-                                unsigned int seenbase = 0) {
-  static const unsigned int pointless_len = 8,
-    pointless_data[] = {1, 6, 4, 5, 0, 3, 7, 2}; // For "pointless" ordering
-  assert(i < nodecount);
-  unsigned int result = 0;
-  bool overflow = true;
+  std::ifstream orderfile;
 
-  switch (ordering) {
-  case sequential:
-    result = i;
-    break;
-  case leastdegree:
-    result = ordering_leastdegree(graph, i, seenbase);
-    break;
-  case pointless:
-    for ( unsigned int offset = i % pointless_len, base = i-offset, j = 0;
-          j < pointless_len; j++ ) {
-      unsigned int pointless_result = base + pointless_data[j];
-      if ( pointless_result >= nodecount ) continue;
-      if ( offset == 0 ) {
-        result = pointless_result;
-        overflow = false;
-        break;
+  // Initialize data required to implement the given ordering
+  void init() {
+    switch (ordering) {
+    case leastdegree:
+      // Least-degree ordering: count each node's degree
+      // FIXME: parallelize?
+      for ( SymbolicGraph::iterator ii = graph.begin(), ei = graph.end();
+            ii != ei; ++ii ) {
+        SGNode node = *ii;
+        unsigned int degree = 0;
+        // Measure degree of the node
+        for (SymbolicGraph::edge_iterator
+               iis = graph.edge_begin(node, Galois::MethodFlag::WRITE),
+               eis = graph.edge_end(node, Galois::MethodFlag::WRITE);
+             iis != eis; ++iis)
+          degree++;
+        assert(degree > 0);
+        Node &noded = graph.getData(node);
+        assert(noded.degree == 0);
+        noded.degree = degree;
+        leastdegree_list.push_back(noded.id);
+        //leastdegree_update_old(noded.id, true);
       }
-      offset--;
+      leastdegree_sort(); // One-time cost; shouldn't matter for large matrices
+      break;
+    case fileorder:
+      if ( !orderingFile.c_str()[0] ) {
+        std::cerr << "fileorder: No ordering file specified.\n";
+        assert(false && "No ordering file specified.");
+        abort();
+      }
+      orderfile.open(orderingFile.c_str());
+      if ( !orderfile.good() ) {
+        std::cerr << "fileorder: Error opening ordering file for read.\n";
+        assert(false && "Error opening ordering file for read.\n");
+        abort();
+      }
+      break;
+    default:
+      break;
     }
-    assert(!overflow && "Pointless overflow");
-    break;
-  default:
-    std::cerr << "Unknown ordering: " << ordering << "\n";
-    assert(false && "Unknown ordering");
   }
-  return result;
-}
+
+  typedef std::list<unsigned int> ldlist;
+  ldlist leastdegree_list;
+
+  bool leastdegree_list_compare(unsigned int id1, unsigned int id2) {
+    assert(id1 < nodecount && id2 < nodecount);
+    unsigned int d1 = graph.getData(innodes[id1]).degree,
+      d2 = graph.getData(innodes[id2]).degree; // FIXME: Does this work?
+    return d1 == d2 ? id1 < id2 : d1 < d2;
+  }
+
+  // Find the unseen node in the graph of least degree
+  unsigned int leastdegree_impl(unsigned int i, unsigned int seenbase = 0) {
+    unsigned int nseen = 0, bestid = 0, bestdegree = nodecount+1;
+    // Iterate over nodes
+    for ( SymbolicGraph::iterator ii = graph.begin(), ei = graph.end();
+          ii != ei; ++ii ) {
+      SGNode node = *ii;
+      Node &noded = graph.getData(node);
+      if ( noded.seen > seenbase ) {
+        nseen++;
+        continue;
+      }
+      if ( noded.degree < bestdegree ) {
+        bestid = noded.id;
+        bestdegree = noded.degree;
+        // We can't do better than 0
+        if ( bestdegree == 0 ) break;
+      }
+    }
+    assert(nseen == i || bestdegree == 0);
+    return bestid;
+  }
+
+#if 0
+  void leastdegree_verify_sorted() {
+    unsigned int last = 0;
+    bool first = true;
+    for ( ldlist::iterator ii = leastdegree_list.begin(),
+            ei = leastdegree_list.end(); ii != ei; ii++ ) {
+      if ( !first )
+        assert(leastdegree_list_compare(last, *ii));
+      last = *ii;
+      first = false;
+    }
+  }
+#endif
+
+  void leastdegree_update_old(unsigned int id, bool commit) {
+    assert(ordering == leastdegree);
+    leastdegree_list.remove(id);
+    // We might make multiple changes to the degree. We need to keep
+    // the list sorted, so we remove this node from the list right
+    // away. We only re-add the node after the last change.
+    if ( !commit ) return;
+    ldlist newlist(1, id);
+    // Evil hack: http://stackoverflow.com/a/15841503
+    //leastdegree_verify_sorted();
+    leastdegree_list.merge(newlist, [=](unsigned int id1, unsigned int id2)
+                           {return this->leastdegree_list_compare(id1, id2);});
+    //leastdegree_verify_sorted();
+    // FIXME: This is not very efficient. We shouldn't have to move the node
+    // very far in this (potentially long) list.
+  }
+
+  void leastdegree_update(unsigned int id, bool commit) {
+    //leastdegree_update_old(id, commit);
+    //return;
+    Galois::StatTimer TX("TimeSymbolicLeastDegreeUpdate");
+    TX.start();
+    assert(ordering == leastdegree);
+    ldlist::iterator ii = leastdegree_list.begin(),
+      bi = ii, ei = leastdegree_list.end();
+    // Locate the item we need to move
+    for ( ; ; ii++ ) {
+      if ( ii == ei ) {
+        assert(false && "leastdegree_update overflow");
+        abort();
+      }
+      if ( *ii == id ) break;
+    }
+    // Save item position and determine next node and previous node.
+    ldlist::iterator item = ii;
+    ii++;
+    ldlist::iterator item_next = ii;
+    while ( ii != ei && leastdegree_list_compare(*ii, *item) )
+      ii++;
+    if ( ii == item_next ) {
+      // We don't want to move it further, it's in the correct
+      // position relative to the next item. Maybe we need to move it
+      // back.
+      ii = item;
+      ldlist::iterator item_actual = ii;
+      item_actual++;
+      while ( !leastdegree_list_compare(*ii, *item) ) {
+        item_actual--;
+        if ( ii == bi ) break;
+        else ii--;
+      }
+      ii = item_actual;
+    }
+    TX.stop();
+    // If we still haven't moved, we don't need to move the node
+    if ( ii == item_next ) return;
+    // Move the item to be before ii.
+    leastdegree_list.splice(ii, leastdegree_list, item);
+  }
+
+  void leastdegree_sort() {
+    // Evil hack: http://stackoverflow.com/a/15841503
+    leastdegree_list.sort([=](unsigned int id1, unsigned int id2)
+                          {return this->leastdegree_list_compare(id1, id2);});
+  }
+
+  // For the given ordering, return the ID of the next node that should
+  // be eliminated.
+  unsigned int next_node(unsigned int i, unsigned int seenbase = 0) {
+    static const unsigned int pointless_len = 8,
+      pointless_data[] = {1, 6, 4, 5, 0, 3, 7, 2}; // For "pointless" ordering
+    assert(i < nodecount);
+    unsigned int result = 0;
+    bool overflow = true;
+
+    switch (ordering) {
+    case sequential:
+      result = i;
+      break;
+    case leastdegree:
+      //leastdegree_update3();
+      //result = leastdegree_impl(i, seenbase);
+      result = leastdegree_list.front();
+      leastdegree_list.pop_front();
+      break;
+    case pointless:
+      for ( unsigned int offset = i % pointless_len, base = i-offset, j = 0;
+            j < pointless_len; j++ ) {
+        unsigned int pointless_result = base + pointless_data[j];
+        if ( pointless_result >= nodecount ) continue;
+        if ( offset == 0 ) {
+          result = pointless_result;
+          overflow = false;
+          break;
+        }
+        offset--;
+      }
+      assert(!overflow && "Pointless overflow");
+      break;
+    case fileorder:
+      orderfile >> result;
+      if ( !orderfile.good() ) {
+        std::cerr << "Ordering file read error\n";
+        abort();
+      }
+      if ( i == nodecount ) {
+        std::cout << "Closing ordering file\n";
+        orderfile.close();
+      }
+      break;
+    default:
+      std::cerr << "Unknown ordering: " << ordering << "\n";
+      abort();
+    }
+    //printf("%d %d\n", result, graph.getData(innodes[result]).degree-1);
+    return result;
+  }
+};
 
 /**
  * Perform the symbolic factorization. Modifies the graph structure.
@@ -218,8 +399,13 @@ template<typename GraphType, typename OutGraphType>
 struct SymbolicAlgo {
   GraphType &graph;
   OutGraphType &outgraph;
+
+  std::vector<GNode> outnodes;
+  std::vector<SGNode> innodes;
+  OrderingManager ordermgr;
+
   SymbolicAlgo(GraphType &graph, OutGraphType &outgraph):
-    graph(graph), outgraph(outgraph) { };
+    graph(graph), outgraph(outgraph), ordermgr(graph, innodes) { };
 
   template<typename C>
   void operator()(SGNode node, C& ctx) {
@@ -232,8 +418,8 @@ struct SymbolicAlgo {
     // Make sure remaining neighbors form a clique
     // It should be safe to add edges between neighbors here.
     for (typename GraphType::edge_iterator
-           iis = graph.edge_begin(node, Galois::MethodFlag::ALL),
-           eis = graph.edge_end(node, Galois::MethodFlag::ALL);
+           iis = graph.edge_begin(node, Galois::MethodFlag::WRITE),
+           eis = graph.edge_end(node, Galois::MethodFlag::WRITE);
 	 iis != eis; ++iis) {
       SGNode src = graph.getEdgeDst(iis);
       Node &srcd = graph.getData(src);
@@ -241,8 +427,8 @@ struct SymbolicAlgo {
 
       // Enumerate all other neighbors
       for (typename GraphType::edge_iterator
-             iid = graph.edge_begin(node, Galois::MethodFlag::ALL),
-             eid = graph.edge_end(node, Galois::MethodFlag::ALL);
+             iid = graph.edge_begin(node, Galois::MethodFlag::WRITE),
+             eid = graph.edge_end(node, Galois::MethodFlag::WRITE);
 	   iid != eid; ++iid) {
         SGNode dst = graph.getEdgeDst(iid);
         Node &dstd = graph.getData(dst);
@@ -256,30 +442,51 @@ struct SymbolicAlgo {
 
         // The edge doesn't exist, so add an undirected edge between
 	// these two nodes
-        bridge = graph.addEdge(src, dst, Galois::MethodFlag::ALL);
-        edgedata &ed = graph.getEdgeData(bridge, Galois::MethodFlag::NONE);
+        bridge = graph.addEdge(src, dst, Galois::MethodFlag::WRITE);
+        edgedata &ed = graph.getEdgeData(bridge, Galois::MethodFlag::UNPROTECTED);
         ed = 0;
+        if ( ordering == leastdegree ) {
+          srcd.degree++;
+          dstd.degree++;
+          ordermgr.leastdegree_update(srcd.id, false);
+          ordermgr.leastdegree_update(dstd.id, false);
+        }
       }
     }
 
     //std::cout << "Counting edges for node " << noded.id << ": ";
 
+    // Update degree for this node (zero because it's eliminated)
+    noded.degree = 0;
+
     // Count number of edges to add to the output graph. These will be
     // preallocated and added later.
     for (typename GraphType::edge_iterator
-           iis = graph.edge_begin(node, Galois::MethodFlag::ALL),
-           eis = graph.edge_end(node, Galois::MethodFlag::ALL);
+           iis = graph.edge_begin(node, Galois::MethodFlag::WRITE),
+           eis = graph.edge_end(node, Galois::MethodFlag::WRITE);
 	 iis != eis; ++iis) {
       SGNode src = graph.getEdgeDst(iis);
       Node &srcd = graph.getData(src);
-      if ( srcd.seen == 0 ) continue;
-      srcd.nedges++;
-      //std::cout << "(" << srcd.id << ")";
+      if ( srcd.seen == 0 ) {
+        // We're eliminating ourself, so update the degree of this
+        // unseen neighbor
+        if ( ordering == leastdegree ) {
+          srcd.degree--;
+          ordermgr.leastdegree_update(srcd.id, true);
+        }
+      }
+      else {
+        srcd.noutedges++;
+        assert(srcd.degree == 0);
+        //std::cout << "(" << srcd.id << ")";
+      }
     }
     //std::cout << "\n";
   }
 
-  void add_outedges(SGNode node) {
+  int nzerodeg = 0;
+
+  void add_outedges(SGNode node) { // FIXME: &
     Node &noded = graph.getData(node);
     assert(noded.seen == 1);
     noded.seen = 2;
@@ -288,21 +495,22 @@ struct SymbolicAlgo {
     //std::cout << "Adding edges targeting node " << noded.id << " ";
 
     // Undirected graph double-counts self-edge
-    assert(noded.nedges > 1);
-    noded.nedges--;
-    //std::cout << "[a source of " << noded.nedges << " edges]: ";
+    assert(noded.noutedges > 1);
+    noded.noutedges--;
+    //std::cout << "[a source of " << noded.noutedges << " edges]: ";
     // Create our node and allocate our edges
     GNode outnode = outgraph.createNode(noded);
     outgraph.addNode(outnode);
-    outgraph.resizeEdges(outnode, noded.nedges);
+    outgraph.resizeEdges(outnode, noded.noutedges);
     outnodes[noded.id] = outnode;
     assert(outgraph.getData(outnode).id == noded.id);
     assert(outgraph.getData(outnode).seen == 2);
 
     // Add edges to the output (elimination graph).
+    int indegree = 0;
     for (typename GraphType::edge_iterator
-           iis = graph.edge_begin(node, Galois::MethodFlag::ALL),
-           eis = graph.edge_end(node, Galois::MethodFlag::ALL);
+           iis = graph.edge_begin(node, Galois::MethodFlag::WRITE),
+           eis = graph.edge_end(node, Galois::MethodFlag::WRITE);
 	 iis != eis; ++iis) {
       SGNode src = graph.getEdgeDst(iis);
       Node &srcd = graph.getData(src);
@@ -312,26 +520,27 @@ struct SymbolicAlgo {
         if ( doneself ) continue;
         doneself = true;
       }
-      assert(srcd.nedges > 0);
+      else indegree++;
+      assert(srcd.noutedges > 0);
       //std::cout << "Y ";
       // Add a directed edge from src to node (copying weight)
       typename OutGraphType::edge_iterator
         edge = outgraph.addEdge(outnodes[srcd.id], outnode,
-                                Galois::MethodFlag::ALL);
+                                Galois::MethodFlag::WRITE);
       edgedata &ed = outgraph.getEdgeData(edge);
       ed = graph.getEdgeData(iis);
       // Bookkeeping
-      srcd.nedges--;
+      srcd.noutedges--;
     }
+    if ( indegree == 0 ) nzerodeg++;
     //std::cout << "\n";
   }
 
-  std::vector<GNode> outnodes;
-  std::vector<SGNode> innodes;
-
   void operator()() {
     // Initialize the output (directed) graph: create nodes
+    unsigned int nodeorder[nodecount];
     unsigned int nodeID = 0;
+
     outnodes.resize(nodecount);
     innodes.resize(nodecount);
     for ( typename GraphType::iterator ii = graph.begin(), ei = graph.end();
@@ -340,16 +549,43 @@ struct SymbolicAlgo {
       nodeID++;
     }
     assert(nodeID == nodecount);
+    Galois::StatTimer TI("TimeSymbolicInit");
+    TI.start();
+    ordermgr.init();
+    TI.stop();
 
     // Eliminate each node in given traversal order.
     // FIXME: parallelize? See paper.
+    Galois::StatTimer TX("TimeSymbolicX");
     for ( unsigned int i = 0; i < nodecount; i++ ) {
       // Append next node to execution order
-      depgraph[i] = ordering_next_node(graph, i);
+      nodeorder[i] = ordermgr.next_node(i);
       //std::cout << "Eliminating " << i << "\n";
-      SGNode node = innodes[depgraph[i]];
+      SGNode node = innodes[nodeorder[i]];
+      graph.getData(node).order = i;
       void *emptyctx = NULL;
+      TX.start();
       (*this)(node, emptyctx);
+      TX.stop();
+    }
+
+    // Consider writing the ordering file
+    if ( ordering != fileorder && orderingFile.c_str()[0] ) {
+      std::ofstream orderfile;
+      std::cout << "Saving ordering to " << orderingFile.c_str() << "\n";
+      orderfile.open(orderingFile.c_str());
+      if ( !orderfile.good() ) {
+        std::cerr << "fileorder: Error opening ordering file for write.\n";
+        assert(false && "Error opening ordering file for write.\n");
+        abort();
+      }
+      for ( unsigned int i = 0; i < nodecount; i++ )
+        orderfile << nodeorder[i] << "\n";
+      if ( !orderfile.good() ) {
+        std::cerr << "Ordering file write error\n";
+        abort();
+      }
+      orderfile.close();
     }
 
     // Verify that all nodes have been eliminated before building outgraph
@@ -357,10 +593,11 @@ struct SymbolicAlgo {
       assert(graph.getData(innodes[i]).seen == 1);
     // Preallocate edges and add them to the output graph
     for ( unsigned int i = 0; i < nodecount; i++ )
-      add_outedges(innodes[depgraph[i]]);
+      add_outedges(innodes[nodeorder[i]]);
+    printf("%d nodes with zero in-degree.\n", nzerodeg);
     // Verify that the correct number of edges were added
     for ( unsigned int i = 0; i < nodecount; i++ )
-      assert(graph.getData(innodes[i]).nedges == 0);
+      assert(graph.getData(innodes[i]).noutedges == 0);
   }
 };
 
@@ -376,18 +613,9 @@ struct Cmp {
   Cmp(GraphType &graph): graph(graph) { };
 
   bool operator()(const GNode& node1, const GNode& node2) const {
-    Node &node1d = graph.getData(node1, Galois::MethodFlag::NONE);
-    Node &node2d = graph.getData(node2, Galois::MethodFlag::NONE);
-    int pos1 = -1, pos2 = -1;
-
-    // Check the total ordering to determine if item1 <= item2
-    for ( unsigned int i = 0; i < nodecount; i++ ) {
-      if ( depgraph[i] == node1d.id ) pos1 = i;
-      if ( depgraph[i] == node2d.id ) pos2 = i; // FIXME: make else if
-      if ( pos1 >= 0 && pos2 >= 0 ) break;      // FIXME: eliminate
-    }
-    assert(pos1 >= 0 && pos2 >= 0);
-    bool result = pos1 <= pos2;
+    Node &node1d = graph.getData(node1, Galois::MethodFlag::UNPROTECTED);
+    Node &node2d = graph.getData(node2, Galois::MethodFlag::UNPROTECTED);
+    bool result = node1d.order <= node2d.order;
     /*
     std::cout << "Cmp: " << node1d.id << " <= " << node2d.id << ": " <<
       (result ? "true" : "false") << "\n";
@@ -418,7 +646,7 @@ struct NhFunc {
   }
   void operator()(GNode& node) {
     // Touch all neighbors (this seems to be good enough)
-    Graph::edge_iterator ii = graph.edge_begin(node, Galois::MethodFlag::ALL);
+    Graph::edge_iterator ii = graph.edge_begin(node, Galois::MethodFlag::WRITE);
   }
 };
 
@@ -439,6 +667,7 @@ struct NumericAlgo {
 
   void operator()(GNode node, Galois::UserContext<GNode>& ctx) {
     // Update seen flag on node
+#define locktype Galois::MethodFlag::UNPROTECTED
     Node &noded = graph.getData(node);
     assert(noded.seen == 0);
     noded.seen = 1;
@@ -448,7 +677,7 @@ struct NumericAlgo {
     // Find self-edge for this node, update it
     bool hasEdge = false;
     edgedata& factor = graph.getEdgeData(findEdge(graph, node, node, &hasEdge),
-                                         Galois::MethodFlag::NONE);
+                                         locktype);
     assert(hasEdge);
     assert(factor > 0);
     factor = sqrt(factor);
@@ -459,13 +688,13 @@ struct NumericAlgo {
 
     // Update all edges (except self-edge)
     for (Graph::edge_iterator
-           ii = graph.edge_begin(node, Galois::MethodFlag::ALL),
-           ei = graph.edge_end(node, Galois::MethodFlag::ALL);
+           ii = graph.edge_begin(node, locktype),
+           ei = graph.edge_end(node, locktype);
          ii != ei; ++ii) {
       GNode dst = graph.getEdgeDst(ii);
       Node &dstd = graph.getData(dst);
       if ( dstd.seen == 0 ) {
-        edgedata &ed = graph.getEdgeData(ii, Galois::MethodFlag::NONE);
+        edgedata &ed = graph.getEdgeData(ii, locktype);
         ed /= factor;
         //printf("N-EDGE %4d %4d %10.5f\n", noded.id, graph.getData(dst).id, ed);
         //std::cout << noded.id << " " << dstd.id << " " << ed << "\n";
@@ -475,18 +704,18 @@ struct NumericAlgo {
     // Update all edges between neighbors (we're operating on the filled graph,
     // so we they form a (directed) clique)
     for (Graph::edge_iterator
-           iis = graph.edge_begin(node, Galois::MethodFlag::ALL),
-           eis = graph.edge_end(node, Galois::MethodFlag::ALL);
+           iis = graph.edge_begin(node, locktype),
+           eis = graph.edge_end(node, locktype);
          iis != eis; ++iis) {
       GNode src = graph.getEdgeDst(iis);
       Node &srcd = graph.getData(src);
       if ( srcd.seen > 0 ) continue;
-      edgedata& eds = graph.getEdgeData(iis, Galois::MethodFlag::NONE);
+      edgedata& eds = graph.getEdgeData(iis, locktype);
 
       // Enumerate all other neighbors
       for (Graph::edge_iterator
-             iid = graph.edge_begin(node, Galois::MethodFlag::ALL),
-             eid = graph.edge_end(node, Galois::MethodFlag::ALL);
+             iid = graph.edge_begin(node, locktype),
+             eid = graph.edge_end(node, locktype);
            iid != eid; ++iid) {
         GNode dst = graph.getEdgeDst(iid);
         Node &dstd = graph.getData(dst);
@@ -498,8 +727,8 @@ struct NumericAlgo {
         if ( !hasEdge ) continue;
 
         // Update the weight of the bridge edge
-        edgedata &edd = graph.getEdgeData(iid, Galois::MethodFlag::NONE),
-          &edb = graph.getEdgeData(bridge, Galois::MethodFlag::NONE);
+        edgedata &edd = graph.getEdgeData(iid, locktype),
+          &edb = graph.getEdgeData(bridge, locktype);
         edb -= eds*edd;
 
         //printf("I-EDGE %4d %4d %10.5f\n", srcd.id, dstd.id, edb);
@@ -512,11 +741,13 @@ struct NumericAlgo {
 
   void operator()() {
     Graph::iterator ii = graph.begin(), ei = graph.end();
-    if (ii != ei) { // Ensure there is at least one node in the graph.
-      Galois::for_each_ordered(ii, ei, Cmp<GraphType>(graph),
-                               NhFunc<GraphType>(graph), *this);
-      // Galois::for_each(ii, ei, *this);
+    if (ii == ei) {
+      assert(false && "Empty matrix?");
+      abort();
     }
+    Galois::for_each_ordered(ii, ei, Cmp<GraphType>(graph),
+                             NhFunc<GraphType>(graph), *this);
+    //Galois::for_each(ii, ei, *this);
   }
 };
 
@@ -545,8 +776,8 @@ static void makeGraph(GraphType &graph, const char* input) {
    for (InGraph::iterator src = in_graph.begin(), esrc = in_graph.end();
         src != esrc; ++src) {
       for (InGraph::edge_iterator
-             dst = in_graph.edge_begin(*src, Galois::MethodFlag::NONE),
-             edst = in_graph.edge_end(*src, Galois::MethodFlag::NONE);
+             dst = in_graph.edge_begin(*src, Galois::MethodFlag::UNPROTECTED),
+             edst = in_graph.edge_end(*src, Galois::MethodFlag::UNPROTECTED);
            dst != edst; ++dst) {
          edgedata w = in_graph.getEdgeData(dst);
          Element e(*src, w);
@@ -576,12 +807,12 @@ static void makeGraph(GraphType &graph, const char* input) {
       SGNode src = nodes[id];
       for (Elements::iterator j = i->begin(), ej = i->end(); j != ej; ++j) {
          typename GraphType::edge_iterator
-           it = graph.findEdge(src, nodes[j->first], Galois::MethodFlag::NONE);
-         if ( it != graph.edge_end(src, Galois::MethodFlag::NONE) ) {
+           it = graph.findEdge(src, nodes[j->first], Galois::MethodFlag::UNPROTECTED);
+         if ( it != graph.edge_end(src, Galois::MethodFlag::UNPROTECTED) ) {
            assert(graph.getEdgeData(it) == j->second);
            continue;
          }
-         it = graph.addEdge(src, nodes[j->first], Galois::MethodFlag::NONE);
+         it = graph.addEdge(src, nodes[j->first], Galois::MethodFlag::UNPROTECTED);
          graph.getEdgeData(it) = j->second;
          numEdges++;
       }
@@ -612,7 +843,7 @@ bool verify(GraphType &graph) {
 }
 
 template<typename Algo>
-void run(Algo algo, const char *algoname) {
+void run(Algo &algo, const char *algoname) {
   Galois::StatTimer T, U(algoname);
   T.start(); U.start();
   algo();
@@ -646,17 +877,13 @@ int main(int argc, char** argv) {
       assert(data.seen == 0);
       edgecount++;
       for (SymbolicGraph::edge_iterator
-             iid = graph.edge_begin(*ii, Galois::MethodFlag::ALL),
-             eid = graph.edge_end(*ii, Galois::MethodFlag::ALL);
+             iid = graph.edge_begin(*ii, Galois::MethodFlag::WRITE),
+             eid = graph.edge_end(*ii, Galois::MethodFlag::WRITE);
            iid != eid; ++iid)
         if ( data.id < graph.getData(graph.getEdgeDst(iid)).id ) edgecount++;
     }
     assert(i == nodecount);
   }
-
-  // Initialize dependency ordering
-  depgraph = new DepItem[nodecount];
-  assert(depgraph);
 
   Tinitial.stop();
 
@@ -665,7 +892,10 @@ int main(int argc, char** argv) {
 
   // First run the symbolic factorization
   std::cout << "Symbolic factorization\n";
-  run(SymbolicAlgo<SymbolicGraph,Graph>(graph, outgraph), "TimeSymbolic");
+  {
+    SymbolicAlgo<SymbolicGraph,Graph> algo(graph, outgraph);
+    run(algo, "TimeSymbolic");
+  }
 
   // Clear the seen flags for the numeric factorization.
   unsigned int newedgecount = 0;
@@ -675,20 +905,26 @@ int main(int argc, char** argv) {
     assert(data.seen == 2);
     data.seen = 0;
     for (Graph::edge_iterator
-           iid = outgraph.edge_begin(*ii, Galois::MethodFlag::ALL),
-           eid = outgraph.edge_end(*ii, Galois::MethodFlag::ALL);
+           iid = outgraph.edge_begin(*ii, Galois::MethodFlag::WRITE),
+           eid = outgraph.edge_end(*ii, Galois::MethodFlag::WRITE);
          iid != eid; ++iid)
       newedgecount++;
   }
   assert(newedgecount >= edgecount);
   std::cout << "Added " << (newedgecount-edgecount) << " edges\n";
 
+  if ( !skipVerify ) outputTextEdgeData("fillededges.txt", outgraph);
+  if ( skipNumeric ) return 0;
+
   // We should now have built a directed graph (outgraph) and total
   // ordering. Now run the numeric factorization.
   //
   // FIXME: Convert back to a LC_Graph?
   std::cout << "Numeric factorization\n";
-  run(NumericAlgo<Graph>(outgraph), "TimeNumeric");
+  {
+    NumericAlgo<Graph> algo(outgraph);
+    run(algo, "TimeNumeric");
+  }
 
   Galois::reportPageAlloc("MeminfoPost");
 

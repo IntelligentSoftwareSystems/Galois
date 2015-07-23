@@ -299,8 +299,8 @@ public:
   }
 
   /** 
-   * Reads graph connectivity information from arrays. Returns a pointer to
-   * array to populate with edge data.
+   * Reads graph connectivity information from graph but not edge data. Returns
+   * a pointer to array to populate with edge data.
    */
   template<typename T>
   T* fromGraph(FileGraph& g) {

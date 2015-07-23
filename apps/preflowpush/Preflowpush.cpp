@@ -33,6 +33,8 @@
 
 #include "Lonestar/BoilerPlate.h"
 
+#include <boost/iterator/iterator_adaptor.hpp>
+
 #include <iostream>
 #include <fstream>
 
@@ -82,7 +84,7 @@ const int BETA = 12;
 
 struct Node {
   uint32_t id;
-  size_t excess;
+  int64_t excess;
   int height;
   int current;
 
@@ -115,21 +117,21 @@ Config app;
 
 struct Indexer :std::unary_function<GNode, int> {
   int operator()(const GNode& n) const {
-    return -app.graph.getData(n, Galois::MethodFlag::NONE).height;
+    return -app.graph.getData(n, Galois::MethodFlag::UNPROTECTED).height;
   }
 };
 
 struct GLess :std::binary_function<GNode, GNode, bool> {
   bool operator()(const GNode& lhs, const GNode& rhs) const {
-    int lv = -app.graph.getData(lhs, Galois::MethodFlag::NONE).height;
-    int rv = -app.graph.getData(rhs, Galois::MethodFlag::NONE).height;
+    int lv = -app.graph.getData(lhs, Galois::MethodFlag::UNPROTECTED).height;
+    int rv = -app.graph.getData(rhs, Galois::MethodFlag::UNPROTECTED).height;
     return lv < rv;
   }
 };
 struct GGreater :std::binary_function<GNode, GNode, bool> {
   bool operator()(const GNode& lhs, const GNode& rhs) const {
-    int lv = -app.graph.getData(lhs, Galois::MethodFlag::NONE).height;
-    int rv = -app.graph.getData(rhs, Galois::MethodFlag::NONE).height;
+    int lv = -app.graph.getData(lhs, Galois::MethodFlag::UNPROTECTED).height;
+    int rv = -app.graph.getData(rhs, Galois::MethodFlag::UNPROTECTED).height;
     return lv > rv;
   }
 };
@@ -175,7 +177,7 @@ void checkHeights() {
     for (Graph::edge_iterator jj = app.graph.edge_begin(src),
         ej = app.graph.edge_end(src); jj != ej; ++jj) {
       GNode dst = app.graph.getEdgeDst(jj);
-      int cap = app.graph.getEdgeData(jj);
+      int64_t cap = app.graph.getEdgeData(jj);
       int dh = app.graph.getData(dst).height;
       if (cap > 0 && sh > dh + 1) {
         std::cerr << "height violated at " << app.graph.getData(src) << "\n";
@@ -185,13 +187,101 @@ void checkHeights() {
   }
 }
 
-Graph::edge_iterator findEdge(Graph& g, GNode src, GNode dst) {
-  Graph::edge_iterator ii = g.edge_begin(src, Galois::MethodFlag::NONE), ei = g.edge_end(src, Galois::MethodFlag::NONE);
-  for (; ii != ei; ++ii) {
+
+Graph::edge_iterator findEdgeLog2 (Graph& g, GNode dst, Graph::edge_iterator i, Graph::edge_iterator end_i) {
+  
+  struct EdgeDstIter: 
+    public boost::iterator_facade<
+      EdgeDstIter,
+      GNode,
+      boost::random_access_traversal_tag,
+      GNode>
+  {
+    using Base = boost::iterator_facade<
+      EdgeDstIter, 
+      GNode,
+      boost::random_access_traversal_tag,
+      GNode>;
+
+    Graph* g;
+    Graph::edge_iterator ei;
+
+    EdgeDstIter (void): g (nullptr)
+    {}
+
+    EdgeDstIter (Graph* g, Graph::edge_iterator ei):
+      g (g), ei (ei)
+    {}
+
+  private:
+
+    friend boost::iterator_core_access;
+
+    GNode dereference (void) const {
+      return g->getEdgeDst (ei);
+    }
+
+    void increment (void) {
+      ++ei;
+    }
+
+    void decrement (void) {
+      --ei;
+    }
+
+    bool equal (const EdgeDstIter& that) const {
+      assert (this->g == that.g);
+      return this->ei == that.ei;
+    }
+
+    void advance (ptrdiff_t n) {
+      ei += n;
+    }
+
+    ptrdiff_t distance_to (const EdgeDstIter& that) const {
+      assert (this->g == that.g);
+
+      return that.ei - this->ei;
+    }
+
+  };
+                      
+  EdgeDstIter ai (&g, i);
+  EdgeDstIter end_ai (&g, end_i);
+
+  auto ret = std::lower_bound (ai, end_ai, dst);
+
+  assert (ret != end_ai);
+  assert (*ret == dst);
+
+  return ret.ei;
+
+}
+
+Graph::edge_iterator findEdgeLinear (Graph& g, GNode dst, Graph::edge_iterator beg_e, Graph::edge_iterator end_e) {
+
+  auto ii = beg_e;
+  for (; ii != end_e; ++ii) {
     if (g.getEdgeDst(ii) == dst)
       break;
   }
+  assert(ii != end_e); // Never return the end iterator
   return ii;
+}
+
+Graph::edge_iterator findEdge(Graph& g, GNode src, GNode dst) {
+
+  auto i = g.edge_begin (src, Galois::MethodFlag::UNPROTECTED);
+  auto end_i = g.edge_end (src, Galois::MethodFlag::UNPROTECTED);
+
+  if ((end_i - i) < 32) { 
+    return findEdgeLinear (g, dst, i, end_i);
+
+  } else {
+    return findEdgeLog2 (g, dst, i, end_i);
+
+  }
+
 }
 
 void checkConservation(Config& orig) {
@@ -225,15 +315,15 @@ void checkConservation(Config& orig) {
       abort();
     }
 
-    size_t sum = 0;
+    int64_t sum = 0;
     for (Graph::edge_iterator jj = app.graph.edge_begin(src),
         ej = app.graph.edge_end(src); jj != ej; ++jj) {
       GNode dst = app.graph.getEdgeDst(jj);
       uint32_t dstId = app.graph.getData(dst).id;
-      int ocap = orig.graph.getEdgeData(findEdge(orig.graph, map[srcId], map[dstId]));
-      int delta = 0;
+      int64_t ocap = orig.graph.getEdgeData(findEdge(orig.graph, map[srcId], map[dstId]));
+      int64_t delta = 0;
       if (ocap > 0) 
-        delta -= ocap - app.graph.getEdgeData(jj);
+        delta -= (ocap - app.graph.getEdgeData(jj));
       else
         delta += app.graph.getEdgeData(jj);
       sum += delta;
@@ -253,7 +343,7 @@ void verify(Config& orig) {
   checkAugmentingPath();
 }
 
-void reduceCapacity(const Graph::edge_iterator& ii, const GNode& src, const GNode& dst, int amount) {
+void reduceCapacity(const Graph::edge_iterator& ii, const GNode& src, const GNode& dst, int64_t amount) {
   Graph::edge_data_type& cap1 = app.graph.getEdgeData(ii);
   Graph::edge_data_type& cap2 = app.graph.getEdgeData(findEdge(app.graph, dst, src));
   cap1 -= amount;
@@ -274,7 +364,7 @@ struct UpdateHeights {
 
   //struct IdFn {
   //  unsigned long operator()(const GNode& item) const {
-  //    return app.graph.getData(item, Galois::MethodFlag::NONE).id;
+  //    return app.graph.getData(item, Galois::MethodFlag::UNPROTECTED).id;
   //  }
   //};
 
@@ -283,41 +373,37 @@ struct UpdateHeights {
    */
   void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) {
     if (version != nondet) {
-      bool used = false;
-      if (version == detDisjoint) {
-        ctx.getLocalState(used);
-      }
 
-      if (!used) {
+      if (ctx.isFirstPass()) {
         for (Graph::edge_iterator
-            ii = app.graph.edge_begin(src, Galois::MethodFlag::CHECK_CONFLICT),
-            ee = app.graph.edge_end(src, Galois::MethodFlag::CHECK_CONFLICT);
+            ii = app.graph.edge_begin(src, Galois::MethodFlag::WRITE),
+            ee = app.graph.edge_end(src, Galois::MethodFlag::WRITE);
             ii != ee; ++ii) {
           GNode dst = app.graph.getEdgeDst(ii);
-          int rdata = app.graph.getEdgeData(findEdge(app.graph, dst, src));
+          int64_t rdata = app.graph.getEdgeData(findEdge(app.graph, dst, src));
           if (rdata > 0) {
-            app.graph.getData(dst, Galois::MethodFlag::CHECK_CONFLICT);
+            app.graph.getData(dst, Galois::MethodFlag::WRITE);
           }
         }
       }
 
-      if (version == detDisjoint) {
-        if (!used)
+      if (version == detDisjoint && ctx.isFirstPass()) {
           return;
       } else {
         app.graph.getData(src, Galois::MethodFlag::WRITE);
+        ctx.cautiousPoint();
       }
     }
 
     for (Graph::edge_iterator
-        ii = app.graph.edge_begin(src, useCAS ? Galois::MethodFlag::NONE : Galois::MethodFlag::CHECK_CONFLICT),
-        ee = app.graph.edge_end(src, useCAS ? Galois::MethodFlag::NONE : Galois::MethodFlag::CHECK_CONFLICT);
+        ii = app.graph.edge_begin(src, useCAS ? Galois::MethodFlag::UNPROTECTED : Galois::MethodFlag::WRITE),
+        ee = app.graph.edge_end(src, useCAS ? Galois::MethodFlag::UNPROTECTED : Galois::MethodFlag::WRITE);
         ii != ee; ++ii) {
       GNode dst = app.graph.getEdgeDst(ii);
-      int rdata = app.graph.getEdgeData(findEdge(app.graph, dst, src));
+      int64_t rdata = app.graph.getEdgeData(findEdge(app.graph, dst, src));
       if (rdata > 0) {
-        Node& node = app.graph.getData(dst, Galois::MethodFlag::NONE);
-        int newHeight = app.graph.getData(src, Galois::MethodFlag::NONE).height + 1;
+        Node& node = app.graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+        int newHeight = app.graph.getData(src, Galois::MethodFlag::UNPROTECTED).height + 1;
         if (useCAS) {
           int oldHeight;
           while (newHeight < (oldHeight = node.height)) {
@@ -339,7 +425,7 @@ struct UpdateHeights {
 
 struct ResetHeights {
   void operator()(const GNode& src) const {
-    Node& node = app.graph.getData(src, Galois::MethodFlag::NONE);
+    Node& node = app.graph.getData(src, Galois::MethodFlag::UNPROTECTED);
     node.height = app.graph.size();
     node.current = 0;
     if (src == app.sink)
@@ -353,7 +439,7 @@ struct FindWork {
   FindWork(WLTy& w) : wl(w) {}
 
   void operator()(const GNode& src) const {
-    Node& node = app.graph.getData(src, Galois::MethodFlag::NONE);
+    Node& node = app.graph.getData(src, Galois::MethodFlag::UNPROTECTED);
     if (src == app.sink || src == app.source || node.height >= (int) app.graph.size())
       return;
     if (node.excess > 0) 
@@ -404,11 +490,11 @@ void globalRelabel(IncomingWL& incoming) {
 void acquire(const GNode& src) {
   // LC Graphs have a different idea of locking
   for (Graph::edge_iterator 
-      ii = app.graph.edge_begin(src, Galois::MethodFlag::CHECK_CONFLICT),
-      ee = app.graph.edge_end(src, Galois::MethodFlag::CHECK_CONFLICT);
+      ii = app.graph.edge_begin(src, Galois::MethodFlag::WRITE),
+      ee = app.graph.edge_end(src, Galois::MethodFlag::WRITE);
       ii != ee; ++ii) {
     GNode dst = app.graph.getEdgeDst(ii);
-    app.graph.getData(dst, Galois::MethodFlag::CHECK_CONFLICT);
+    app.graph.getData(dst, Galois::MethodFlag::WRITE);
   }
 }
 
@@ -418,13 +504,13 @@ void relabel(const GNode& src) {
 
   int current = 0;
   for (Graph::edge_iterator 
-      ii = app.graph.edge_begin(src, Galois::MethodFlag::NONE),
-      ee = app.graph.edge_end(src, Galois::MethodFlag::NONE);
+      ii = app.graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED),
+      ee = app.graph.edge_end(src, Galois::MethodFlag::UNPROTECTED);
       ii != ee; ++ii, ++current) {
     GNode dst = app.graph.getEdgeDst(ii);
-    int cap = app.graph.getEdgeData(ii);
+    int64_t cap = app.graph.getEdgeData(ii);
     if (cap > 0) {
-      const Node& dnode = app.graph.getData(dst, Galois::MethodFlag::NONE);
+      const Node& dnode = app.graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
       if (dnode.height < minHeight) {
         minHeight = dnode.height;
         minEdge = current;
@@ -435,7 +521,7 @@ void relabel(const GNode& src) {
   assert(minHeight != std::numeric_limits<int>::max());
   ++minHeight;
 
-  Node& node = app.graph.getData(src, Galois::MethodFlag::NONE);
+  Node& node = app.graph.getData(src, Galois::MethodFlag::UNPROTECTED);
   if (minHeight < (int) app.graph.size()) {
     node.height = minHeight;
     node.current = minEdge;
@@ -445,8 +531,8 @@ void relabel(const GNode& src) {
 }
 
 bool discharge(const GNode& src, Galois::UserContext<GNode>& ctx) {
-  //Node& node = app.graph.getData(src, Galois::MethodFlag::CHECK_CONFLICT);
-  Node& node = app.graph.getData(src, Galois::MethodFlag::NONE);
+  //Node& node = app.graph.getData(src, Galois::MethodFlag::WRITE);
+  Node& node = app.graph.getData(src, Galois::MethodFlag::UNPROTECTED);
   //int prevHeight = node.height;
   bool relabeled = false;
 
@@ -455,8 +541,8 @@ bool discharge(const GNode& src, Galois::UserContext<GNode>& ctx) {
   }
 
   while (true) {
-    //Galois::MethodFlag flag = relabeled ? Galois::MethodFlag::NONE : Galois::MethodFlag::CHECK_CONFLICT;
-    Galois::MethodFlag flag = Galois::MethodFlag::NONE;
+    //Galois::MethodFlag flag = relabeled ? Galois::MethodFlag::UNPROTECTED : Galois::MethodFlag::WRITE;
+    Galois::MethodFlag flag = Galois::MethodFlag::UNPROTECTED;
     bool finished = false;
     int current = node.current;
     Graph::edge_iterator
@@ -465,22 +551,23 @@ bool discharge(const GNode& src, Galois::UserContext<GNode>& ctx) {
     std::advance(ii, node.current);
     for (; ii != ee; ++ii, ++current) {
       GNode dst = app.graph.getEdgeDst(ii);
-      int cap = app.graph.getEdgeData(ii);
+      int64_t cap = app.graph.getEdgeData(ii);
       if (cap == 0)// || current < node.current) 
         continue;
 
-      Node& dnode = app.graph.getData(dst, Galois::MethodFlag::NONE);
+      Node& dnode = app.graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
       if (node.height - 1 != dnode.height) 
         continue;
 
       // Push flow
-      int amount = std::min(static_cast<int>(node.excess), cap);
+      int64_t amount = std::min(node.excess, cap);
       reduceCapacity(ii, src, dst, amount);
 
       // Only add once
       if (dst != app.sink && dst != app.source && dnode.excess == 0) 
         ctx.push(dst);
       
+      assert (node.excess >= amount);
       node.excess -= amount;
       dnode.excess += amount;
       
@@ -519,7 +606,7 @@ struct Process {
 
   struct DeterministicId {
     uintptr_t operator()(const GNode& item) const {
-      return app.graph.getData(item, Galois::MethodFlag::NONE).id;
+      return app.graph.getData(item, Galois::MethodFlag::UNPROTECTED).id;
     }
   };
 
@@ -551,18 +638,14 @@ struct Process {
 
   void operator()(GNode& src, Galois::UserContext<GNode>& ctx) {
     if (version != nondet) {
-      bool used = false;
-      if (version == detDisjoint) {
-        ctx.getLocalState(used);
-      }
-      if (!used) {
+      if (ctx.isFirstPass()) {
         acquire(src);
       }
-      if (version == detDisjoint) {
-        if (!used)
+      if (version == detDisjoint && ctx.isFirstPass()) {
           return;
       } else {
         app.graph.getData(src, Galois::MethodFlag::WRITE);
+        ctx.cautiousPoint();
       }
     }
 
@@ -671,6 +754,18 @@ void writePfpGraph(const std::string& inputFile, const std::string& outputFile) 
   edge_value_type* rawEdgeData = p.finish<edge_value_type>();
   std::uninitialized_copy(std::make_move_iterator(edgeData.begin()), std::make_move_iterator(edgeData.end()), rawEdgeData);
 
+  using Wnode = Writer::GraphNode;
+
+  struct IdLess {
+    bool operator()(const Galois::Graph::EdgeSortValue<Wnode,edge_value_type>& e1, const Galois::Graph::EdgeSortValue<Wnode,edge_value_type>& e2) const {
+      return e1.dst < e2.dst;
+    }
+  };
+
+  for (Writer::iterator i = p.begin (), end_i = p.end (); i != end_i; ++i) {
+    p.sortEdges<edge_value_type> (*i, IdLess ());
+  }
+
   p.toFile(outputFile);
 }
 
@@ -730,7 +825,7 @@ void initializePreflow(C& initial) {
   for (Graph::edge_iterator ii = app.graph.edge_begin(app.source),
       ee = app.graph.edge_end(app.source); ii != ee; ++ii) {
     GNode dst = app.graph.getEdgeDst(ii);
-    int cap = app.graph.getEdgeData(ii);
+    int64_t cap = app.graph.getEdgeData(ii);
     reduceCapacity(ii, app.source, dst, cap);
     Node& node = app.graph.getData(dst);
     node.excess += cap;
@@ -738,6 +833,30 @@ void initializePreflow(C& initial) {
       initial.push_back(dst);
   }
 }
+
+void checkSorting (void) {
+
+  for (auto n = app.graph.begin (), end_n = app.graph.end (); n != end_n; ++n) {
+    Galois::optional<GNode> prevDst;
+
+    for (auto e = app.graph.edge_begin (*n, Galois::MethodFlag::UNPROTECTED)
+        , end_e = app.graph.edge_end (*n, Galois::MethodFlag::UNPROTECTED); e != end_e; ++e) {
+
+      GNode dst = app.graph.getEdgeDst (e);
+
+      if (prevDst) {
+        Node& prevNode = app.graph.getData (*prevDst, Galois::MethodFlag::UNPROTECTED);
+        Node& currNode = app.graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
+
+        GALOIS_ASSERT (prevNode.id < currNode.id, "Adjacency list unsorted");
+      }
+
+      prevDst = dst;
+    }
+
+  }
+}
+
 
 void run() {
   typedef Galois::WorkList::Deterministic<> DWL;
@@ -816,6 +935,10 @@ int main(int argc, char** argv) {
   LonestarStart(argc, argv, name, desc, url);
 
   initializeGraph(filename, sourceId, sinkId, &app);
+
+  // TODO: remove later
+  checkSorting ();
+
   if (relabelInt == 0) {
     app.global_relabel_interval = app.graph.size() * ALPHA + app.graph.sizeEdges() / 3;
   } else {

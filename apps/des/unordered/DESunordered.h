@@ -76,12 +76,12 @@ class DESunordered: public DESunorderedBase {
 
     void lockNeighborhood (GNode& activeNode) {
         // acquire locks on neighborhood: one shot
-        graph.getData (activeNode, Galois::MethodFlag::CHECK_CONFLICT);
+        graph.getData (activeNode, Galois::MethodFlag::WRITE);
 
-        // for (Graph::edge_iterator i = graph.edge_begin (activeNode, Galois::CHECK_CONFLICT)
-            // , ei = graph.edge_end (activeNode, Galois::CHECK_CONFLICT); i != ei; ++i) {
+        // for (Graph::edge_iterator i = graph.edge_begin (activeNode, Galois::MethodFlag::WRITE)
+            // , ei = graph.edge_end (activeNode, Galois::MethodFlag::WRITE); i != ei; ++i) {
           // GNode dst = graph.getEdgeDst (i);
-          // graph.getData (dst, Galois::CHECK_CONFLICT);
+          // graph.getData (dst, Galois::MethodFlag::WRITE);
         // }
 
     }
@@ -101,7 +101,7 @@ class DESunordered: public DESunorderedBase {
 
         lockNeighborhood (activeNode);
 
-        SimObj_ty* srcObj = static_cast<SimObj_ty*> (graph.getData (activeNode, Galois::MethodFlag::NONE));
+        SimObj_ty* srcObj = static_cast<SimObj_ty*> (graph.getData (activeNode, Galois::MethodFlag::UNPROTECTED));
         // should be past the fail-safe point by now
 
         if (DEBUG) {
@@ -113,11 +113,11 @@ class DESunordered: public DESunorderedBase {
         size_t proc = srcObj->simulate(graph, activeNode); // number of events processed
         numEvents += proc;
 
-        for (Graph::edge_iterator i = graph.edge_begin (activeNode, Galois::MethodFlag::NONE)
-            , ei = graph.edge_end (activeNode, Galois::MethodFlag::NONE); i != ei; ++i) {
+        for (Graph::edge_iterator i = graph.edge_begin (activeNode, Galois::MethodFlag::UNPROTECTED)
+            , ei = graph.edge_end (activeNode, Galois::MethodFlag::UNPROTECTED); i != ei; ++i) {
 
           const GNode dst = graph.getEdgeDst(i);
-          SimObj_ty* dstObj = static_cast<SimObj_ty*> (graph.getData (dst, Galois::MethodFlag::NONE));
+          SimObj_ty* dstObj = static_cast<SimObj_ty*> (graph.getData (dst, Galois::MethodFlag::UNPROTECTED));
 
           if (dstObj->isActive () 
               && !bool (onWLflags [dstObj->getID ()])
@@ -200,7 +200,7 @@ class DESunordered: public DESunorderedBase {
     for (Graph::iterator n = graph.begin (),
         endn = graph.end (); n != endn; ++n) {
 
-      SimObj_ty* so = static_cast<SimObj_ty*> (graph.getData (*n, Galois::MethodFlag::NONE));
+      SimObj_ty* so = static_cast<SimObj_ty*> (graph.getData (*n, Galois::MethodFlag::UNPROTECTED));
       if (so->isActive ()) {
         std::cout << "ERROR: Found Active: " << so->str () << std::endl
           << "onWLflags = " << onWLflags[so->getID ()] << ", numPendingEvents = " << so->numPendingEvents () 

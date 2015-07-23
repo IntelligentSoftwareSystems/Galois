@@ -238,6 +238,13 @@ template<typename T = bool>
 struct has_fixed_neighborhood: public trait_has_type<T>, has_fixed_neighborhood_tag {};
 
 /**
+ * Indicates that the operator uses the intent to read flag.
+ */
+struct has_intent_to_read_tag {};
+template<typename T = bool>
+struct has_intent_to_read: public trait_has_type<T>, has_intent_to_read_tag {};
+
+/**
  * Indicates the operator has a function that visits the neighborhood of the
  * operator without modifying it.
  */

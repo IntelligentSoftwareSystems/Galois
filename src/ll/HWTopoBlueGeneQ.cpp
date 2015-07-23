@@ -81,6 +81,7 @@ bool Galois::Runtime::LL::bindThreadToProcessor(int id) {
 }
 
 unsigned Galois::Runtime::LL::getProcessorForThread(int id) {
+  assert(size_t(id) < procmap.size ());
   return getPolicy().procmap[id];
 }
 

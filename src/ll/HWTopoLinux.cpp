@@ -33,13 +33,13 @@
 #include "Galois/Runtime/ll/EnvCheck.h"
 #include "Galois/Runtime/ll/gio.h"
 
-#include <vector>
-#include <functional>
 #include <algorithm>
 #include <cassert>
-#include <cstdio>
-#include <cstring>
 #include <cerrno>
+#include <cstring>
+#include <fstream>
+#include <functional>
+#include <vector>
 
 #include <sched.h>
 
@@ -79,37 +79,39 @@ static bool bindToProcessor(int proc) {
 static std::vector<cpuinfo> parseCPUInfo() {
   std::vector<cpuinfo> vals;
   vals.reserve(64);
+  
+  const int len = 1024;
+  std::vector<char> line(len);
 
-  FILE* f = fopen(sProcInfo, "r");
-  if (!f) {
+  std::ifstream procInfo(sProcInfo);
+  if (!procInfo) {
     GALOIS_SYS_DIE("failed opening ", sProcInfo);
     return vals; //Shouldn't get here
   }
 
-  const int len = 1024;
-  char* line = (char*)malloc(len);
   int cur = -1;
+  
+  while (true) {
+    procInfo.getline(line.data(), len);
+    if (!procInfo)
+      break;
 
-  while (fgets(line, len, f)) {
     int num;
-    if (sscanf(line, "processor : %d", &num) == 1) {
+    if (sscanf(line.data(), "processor : %d", &num) == 1) {
       assert(cur < num);
       cur = num;
       vals.resize(cur + 1);
       vals.at(cur).proc = num;
-    } else if (sscanf(line, "physical id : %d", &num) == 1) {
+    } else if (sscanf(line.data(), "physical id : %d", &num) == 1) {
       vals.at(cur).physid = num;
-    } else if (sscanf(line, "siblings : %d", &num) == 1) {
+    } else if (sscanf(line.data(), "siblings : %d", &num) == 1) {
       vals.at(cur).sib = num;
-    } else if (sscanf(line, "core id : %d", &num) == 1) {
+    } else if (sscanf(line.data(), "core id : %d", &num) == 1) {
       vals.at(cur).coreid = num;
-    } else if (sscanf(line, "cpu cores : %d", &num) == 1) {
+    } else if (sscanf(line.data(), "cpu cores : %d", &num) == 1) {
       vals.at(cur).cpucores = num;
     }
   }
-
-  free(line);
-  fclose(f);
 
   return vals;
 }
@@ -119,52 +121,41 @@ static std::vector<int> parseCPUSet() {
   std::vector<int> vals;
   vals.reserve(64);
 
-  //PARSE: /proc/self/cpuset
-  FILE* f = fopen(sCPUSet, "r");
-  if (!f) {
-    return vals;
-  }
-
+  //Parse: /proc/self/cpuset
   const int len = 1024;
-  char* path = (char*)malloc(len);
-  path[0] = '/';
-  path[1] = '\0';
-  if (!fgets(path, len, f)) {
-    fclose(f);
+  std::vector<char> name(len);
+  {
+    std::ifstream cpuSetName(sCPUSet);
+    if (!cpuSetName)
+      return vals;
+
+    //TODO: this will fail to read correctly if name contains newlines
+    cpuSetName.getline(name.data(), len);
+    if (!cpuSetName)
+      return vals;
+  }
+
+  if (strlen(name.data()) <= 1)
     return vals;
-  }
-  fclose(f);
 
-  if(char* t = index(path, '\n'))
-    *t = '\0';
+  //Parse: /dev/cpuset/<name>/cpus
+  std::string path("/dev/cpuset");
+  path += name.data();
+  path += "/cpus";
+  std::ifstream cpuSet(path);
 
-  if (strlen(path) == 1) {
-    free(path);
+  if (!cpuSet)
     return vals;
-  }
 
-  char* path2 = (char*)malloc(len);
-  strcpy(path2, "/dev/cpuset");
-  strcat(path2, path);
-  strcat(path2, "/cpus");
-
-  f = fopen(path2, "r");
-  if (!f) {
-    free(path2);
-    free(path);
-    GALOIS_SYS_DIE("failed opening ", path2);
-    return vals; //Shouldn't get here
-  }
-
-  //reuse path
-  char* np = path;
-  if (!fgets(np, len, f)) {
-    fclose(f);
+  std::vector<char> buffer(len);
+  cpuSet.getline(buffer.data(), len);
+  if (!cpuSet)
     return vals;
-  }
+
+  char* np = buffer.data();
   while (np && strlen(np)) {
     char* c = index(np, ',');  
-    if (c) { //slice string at comma (np is old string, c is next string
+    if (c) { //slice string at comma (np is old string, c is next string)
       *c = '\0';
       ++c;
     }
@@ -181,11 +172,8 @@ static std::vector<int> parseCPUSet() {
       vals.push_back(atoi(np));
     }
     np = c;
-  };
+  }
   
-  fclose(f);
-  free(path2);
-  free(path);
   return vals;
 }
 
@@ -384,11 +372,12 @@ static Policy& getPolicy() {
 } //namespace
 
 bool Galois::Runtime::LL::bindThreadToProcessor(int id) {
-  assert(id < (int)getPolicy().virtmap.size());
+  assert(size_t(id) < getPolicy().virtmap.size());
   return bindToProcessor(getPolicy().virtmap[id]);
 }
 
 unsigned Galois::Runtime::LL::getProcessorForThread(int id) {
+  assert(size_t(id) < getPolicy().virtmap.size());
   return getPolicy().virtmap[id];
 }
 
@@ -405,26 +394,26 @@ unsigned Galois::Runtime::LL::getMaxPackages() {
 }
 
 unsigned Galois::Runtime::LL::getPackageForThread(int id) {
-  assert(id < (int)getPolicy().packages.size());
+  assert(size_t(id) < getPolicy().packages.size());
   return getPolicy().packages[id];
 }
 
 unsigned Galois::Runtime::LL::getMaxPackageForThread(int id) {
-  assert(id < (int)getPolicy().maxPackage.size());
+  assert(size_t(id) < getPolicy().maxPackage.size());
   return getPolicy().maxPackage[id];
 }
 
 bool Galois::Runtime::LL::isPackageLeader(int id) {
-  assert(id < (int)getPolicy().packages.size());
+  assert(size_t(id) < getPolicy().packages.size());
   return getPolicy().leaders[getPolicy().packages[id]] == id;
 }
 
 unsigned Galois::Runtime::LL::getLeaderForThread(int id) {
-  assert(id < (int)getPolicy().packages.size());
+  assert(size_t(id) < getPolicy().packages.size());
   return getPolicy().leaders[getPolicy().packages[id]];
 }
 
 unsigned Galois::Runtime::LL::getLeaderForPackage(int id) {
-  assert(id < (int)getPolicy().leaders.size());
+  assert(size_t(id) < getPolicy().leaders.size());
   return getPolicy().leaders[id];
 }

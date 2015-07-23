@@ -7,9 +7,11 @@
 #include "Galois/config.h"
 #include "Galois/Bag.h"
 #include "Galois/Runtime/ROBexecutor.h"
+#include "Galois/Runtime/OrderedSpeculation.h"
 #include "Galois/Runtime/LevelExecutor.h"
 #include "Galois/Runtime/KDGtwoPhase.h"
 #include "Galois/Runtime/DAGexec.h"
+#include "Galois/Runtime/DAGexecAlt.h"
 #include "Galois/Runtime/TreeExec.h"
 #include "Galois/Runtime/Sampling.h"
 
@@ -693,20 +695,20 @@ struct TreeSummarizeSpeculative: public TypeDefHelper<SpecNodeBase> {
   struct VisitNhood {
     static const unsigned CHUNK_SIZE = 32;
 
-    void acquire (TreeNode* n) {
-      Galois::Runtime::acquire (n, Galois::CHECK_CONFLICT);
+    void acquire (TreeNode* n, Galois::MethodFlag f) {
+      Galois::Runtime::acquire (n, f);
     }
 
     template <typename C>
     void operator () (InterNode* node, C& ctx) {
 
       assert (!node->isLeaf ());
-      acquire (node);
+      acquire (node, Galois::MethodFlag::WRITE);
 
       for (unsigned i = 0; i < 8; ++i) {
         TreeNode* c = node->getChild (i);
         if (c != NULL) {
-          acquire (c);
+          acquire (c, Galois::MethodFlag::READ);
         }
       }
     }
@@ -742,7 +744,7 @@ struct TreeSummarizeSpeculative: public TypeDefHelper<SpecNodeBase> {
   template <typename I, typename InternalNodes>
   void operator () (InterNode* root, I bodbeg, I bodend, InternalNodes& internalNodes) const {
 
-    Galois::Runtime::for_each_ordered_rob (
+    Galois::Runtime::for_each_ordered_optim (
         Galois::Runtime::makeLocalRange (internalNodes),
         LevelComparator<TreeNode> (), VisitNhood (), OpFunc<true> ());
 
@@ -773,6 +775,9 @@ struct TreeSummarizeDataDAG: public TreeSummarizeTwoPhase {
     Galois::Runtime::for_each_ordered_dag (
         Galois::Runtime::makeLocalRange (internalNodes), 
         LevelComparator<TreeNode> (), Base::VisitNhood (), Base::OpFunc<false> ());
+    // Galois::Runtime::for_each_ordered_dag_alt (
+        // Galois::Runtime::makeLocalRange (internalNodes), 
+        // LevelComparator<TreeNode> (), Base::VisitNhood (), Base::OpFunc<false> ());
 
   }
 

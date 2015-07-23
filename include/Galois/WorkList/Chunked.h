@@ -264,7 +264,7 @@ public:
  * @tparam ChunkSize chunk size
  */
 template<int ChunkSize=64, typename T = int, bool Concurrent=true>
-class ChunkedFIFO : public detail::ChunkedMaster<T, ConExtLinkedQueue, false, false, ChunkSize, Concurrent> {};
+using ChunkedFIFO = detail::ChunkedMaster<T, ConExtLinkedQueue, false, false, ChunkSize, Concurrent>;
 GALOIS_WLCOMPILECHECK(ChunkedFIFO)
 
 /**
@@ -273,7 +273,7 @@ GALOIS_WLCOMPILECHECK(ChunkedFIFO)
  * @tparam ChunkSize chunk size
  */
 template<int ChunkSize=64, typename T = int, bool Concurrent=true>
-class ChunkedLIFO : public detail::ChunkedMaster<T, ConExtLinkedStack, false, true, ChunkSize, Concurrent> {};
+using ChunkedLIFO = detail::ChunkedMaster<T, ConExtLinkedStack, false, true, ChunkSize, Concurrent>;
 GALOIS_WLCOMPILECHECK(ChunkedLIFO)
 
 /**
@@ -282,7 +282,7 @@ GALOIS_WLCOMPILECHECK(ChunkedLIFO)
  * @tparam ChunkSize chunk size
  */
 template<int ChunkSize=64, typename T = int, bool Concurrent=true>
-class dChunkedFIFO : public detail::ChunkedMaster<T, ConExtLinkedQueue, true, false, ChunkSize, Concurrent> {};
+using dChunkedFIFO = detail::ChunkedMaster<T, ConExtLinkedQueue, true, false, ChunkSize, Concurrent>;
 GALOIS_WLCOMPILECHECK(dChunkedFIFO)
 
 /**
@@ -291,7 +291,7 @@ GALOIS_WLCOMPILECHECK(dChunkedFIFO)
  * @tparam chunksize chunk size
  */
 template<int ChunkSize=64, typename T = int, bool Concurrent=true>
-class dChunkedLIFO : public detail::ChunkedMaster<T, ConExtLinkedStack, true, true, ChunkSize, Concurrent> {};
+using dChunkedLIFO = detail::ChunkedMaster<T, ConExtLinkedStack, true, true, ChunkSize, Concurrent>;
 GALOIS_WLCOMPILECHECK(dChunkedLIFO)
 
 /**
@@ -301,7 +301,7 @@ GALOIS_WLCOMPILECHECK(dChunkedLIFO)
  * @tparam chunksize chunk size
  */
 template<int ChunkSize=64, typename T = int, bool Concurrent=true>
-class dChunkedBag : public detail::ChunkedMaster<T, ConExtLinkedQueue, true, true, ChunkSize, Concurrent> {};
+using dChunkedBag = detail::ChunkedMaster<T, ConExtLinkedQueue, true, true, ChunkSize, Concurrent>;
 GALOIS_WLCOMPILECHECK(dChunkedBag)
 
 

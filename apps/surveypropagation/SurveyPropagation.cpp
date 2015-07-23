@@ -145,12 +145,12 @@ void initialize_random_formula(int M, int N, int K) {
 
   for (int m = 0; m < M; ++m) {
     GNode node = graph.createNode(SPNode(m, true));
-    graph.addNode(node, Galois::MethodFlag::NONE);
+    graph.addNode(node, Galois::MethodFlag::UNPROTECTED);
     clauses[m] = std::make_pair(node, 0);
   }
   for (int n = 0; n < N; ++n) {
     GNode node = graph.createNode(SPNode(n, false));
-    graph.addNode(node, Galois::MethodFlag::NONE);
+    graph.addNode(node, Galois::MethodFlag::UNPROTECTED);
     literals[n] = node;
   }
 
@@ -162,7 +162,7 @@ void initialize_random_formula(int M, int N, int K) {
       int newK = (int)(((double)rand()/((double)RAND_MAX + 1)) * (double)(N));
       if (std::find(touse.begin(), touse.end(), newK) == touse.end()) {
 	touse.push_back(newK);
-	graph.getEdgeData(graph.addEdge(clauses[m].first, literals[newK], Galois::MethodFlag::NONE)) = SPEdge((bool)(rand() % 2));
+	graph.getEdgeData(graph.addEdge(clauses[m].first, literals[newK], Galois::MethodFlag::UNPROTECTED)) = SPEdge((bool)(rand() % 2));
       }
     }
   }
@@ -177,14 +177,14 @@ void print_formula() {
       std::cout << " & ";
     std::cout << "c" << m << "( ";
     GNode N = clauses[m].first;
-    for (Graph::edge_iterator ii = graph.edge_begin(N, Galois::MethodFlag::NONE), ee = graph.edge_end( N, Galois::MethodFlag::NONE); ii != ee; ++ii) {
-      if (ii != graph.edge_begin(N, Galois::MethodFlag::NONE))
+    for (Graph::edge_iterator ii = graph.edge_begin(N, Galois::MethodFlag::UNPROTECTED), ee = graph.edge_end( N, Galois::MethodFlag::UNPROTECTED); ii != ee; ++ii) {
+      if (ii != graph.edge_begin(N, Galois::MethodFlag::UNPROTECTED))
 	std::cout << " | ";
-      SPEdge& E = graph.getEdgeData(ii, Galois::MethodFlag::NONE);
+      SPEdge& E = graph.getEdgeData(ii, Galois::MethodFlag::UNPROTECTED);
       if (E.isNegative)
 	std::cout << "-";
       
-      SPNode& V = graph.getData(graph.getEdgeDst(ii), Galois::MethodFlag::NONE);
+      SPNode& V = graph.getData(graph.getEdgeDst(ii), Galois::MethodFlag::UNPROTECTED);
       std::cout << "v" << V.name;
       if (V.solved)
 	std::cout << "[" << (V.value ? 1 : 0) << "]";
@@ -199,7 +199,7 @@ void print_formula() {
 void print_fixed() {
   for (unsigned n = 0; n < literals.size(); ++n) {
     GNode N = literals[n];
-    SPNode& V = graph.getData(N, Galois::MethodFlag::NONE);
+    SPNode& V = graph.getData(N, Galois::MethodFlag::UNPROTECTED);
     if (V.solved)
       std::cout << V.name << "[" << (V.value ? 1 : 0) << "] ";
   }
@@ -210,7 +210,7 @@ int count_fixed() {
   int retval = 0;
   for (unsigned n = 0; n < literals.size(); ++n) {
     GNode N = literals[n];
-    SPNode& V = graph.getData(N, Galois::MethodFlag::NONE);
+    SPNode& V = graph.getData(N, Galois::MethodFlag::UNPROTECTED);
     if (V.solved)
       ++retval;
   }
@@ -222,20 +222,20 @@ struct update_eta {
   double eta_for_a_i(GNode a, GNode i) {
     double etaNew = 1.0;
     //for each j
-    for (Graph::edge_iterator jii = graph.edge_begin(a, Galois::MethodFlag::NONE), 
-	   jee = graph.edge_end(a, Galois::MethodFlag::NONE); jii != jee; ++jii) {
+    for (Graph::edge_iterator jii = graph.edge_begin(a, Galois::MethodFlag::UNPROTECTED), 
+	   jee = graph.edge_end(a, Galois::MethodFlag::UNPROTECTED); jii != jee; ++jii) {
       GNode j = graph.getEdgeDst(jii);
       if (j != i) {
-	bool ajNegative = graph.getEdgeData(jii, Galois::MethodFlag::NONE).isNegative;
+	bool ajNegative = graph.getEdgeData(jii, Galois::MethodFlag::UNPROTECTED).isNegative;
 	double prodP = 1.0;
 	double prodN = 1.0;
 	double prod0 = 1.0;
 	//for each b
-	for (Graph::edge_iterator bii = graph.edge_begin(j, Galois::MethodFlag::NONE), 
-	       bee = graph.edge_end(j, Galois::MethodFlag::NONE); 
+	for (Graph::edge_iterator bii = graph.edge_begin(j, Galois::MethodFlag::UNPROTECTED), 
+	       bee = graph.edge_end(j, Galois::MethodFlag::UNPROTECTED); 
 	     bii != bee; ++bii) {
 	  GNode b = graph.getEdgeDst(bii);
-	  SPEdge Ebj = graph.getEdgeData(bii, Galois::MethodFlag::NONE);
+	  SPEdge Ebj = graph.getEdgeData(bii, Galois::MethodFlag::UNPROTECTED);
 	  if (b != a)
 	    prod0 *= (1.0 - Ebj.eta);
 	  if (Ebj.isNegative)
@@ -266,7 +266,7 @@ struct update_eta {
   template<typename Context>
   void operator()(GNode a, Context& ctx) {
     //std::cerr << graph.getData(a).t << " ";
-    // if (graph.getData(a, Galois::MethodFlag::NONE).t >= tlimit)
+    // if (graph.getData(a, Galois::MethodFlag::UNPROTECTED).t >= tlimit)
     //   return;
 
     //    for (Graph::neighbor_iterator iii = graph.neighbor_begin(a), 
@@ -281,18 +281,18 @@ struct update_eta {
     ++graph.getData(a).t;
 
     //for each i
-    for (Graph::edge_iterator iii = graph.edge_begin(a, Galois::MethodFlag::NONE), 
-	   iee = graph.edge_end(a, Galois::MethodFlag::NONE); iii != iee; ++iii) {
+    for (Graph::edge_iterator iii = graph.edge_begin(a, Galois::MethodFlag::UNPROTECTED), 
+	   iee = graph.edge_end(a, Galois::MethodFlag::UNPROTECTED); iii != iee; ++iii) {
       GNode i = graph.getEdgeDst(iii);
       double e = eta_for_a_i(a, i);
-      double olde = graph.getEdgeData(iii, Galois::MethodFlag::NONE).eta;
+      double olde = graph.getEdgeData(iii, Galois::MethodFlag::UNPROTECTED).eta;
       graph.getEdgeData(iii).eta = e;
       //std::cout << olde << ',' << e << " ";
       if (fabs(olde - e) > epsilon) {
-	for (Graph::edge_iterator bii = graph.edge_begin(i, Galois::MethodFlag::NONE), 
-	   bee = graph.edge_end(i, Galois::MethodFlag::NONE); bii != bee; ++bii) {
+	for (Graph::edge_iterator bii = graph.edge_begin(i, Galois::MethodFlag::UNPROTECTED), 
+	   bee = graph.edge_end(i, Galois::MethodFlag::UNPROTECTED); bii != bee; ++bii) {
 	  GNode b = graph.getEdgeDst(bii);
-	  if (a != b) // && graph.getData(b, Galois::MethodFlag::NONE).t < tlimit)
+	  if (a != b) // && graph.getData(b, Galois::MethodFlag::UNPROTECTED).t < tlimit)
 	    ctx.push(std::make_pair(b,100-(int)(100.0*(olde - e))));
 	}
       }
@@ -303,7 +303,7 @@ struct update_eta {
 //compute biases on each node
 struct update_biases {
   void operator()(GNode i) const {
-    SPNode& idata = graph.getData(i, Galois::MethodFlag::NONE);
+    SPNode& idata = graph.getData(i, Galois::MethodFlag::UNPROTECTED);
     if (idata.solved) return;
 
     double pp1 = 1.0;
@@ -313,8 +313,8 @@ struct update_biases {
     double p0 = 1.0;
 
     //for each function a
-    for (Graph::edge_iterator aii = graph.edge_begin(i, Galois::MethodFlag::NONE), aee = graph.edge_end(i, Galois::MethodFlag::NONE); aii != aee; ++aii) {
-      SPEdge& aie = graph.getEdgeData(aii, Galois::MethodFlag::NONE);
+    for (Graph::edge_iterator aii = graph.edge_begin(i, Galois::MethodFlag::UNPROTECTED), aee = graph.edge_end(i, Galois::MethodFlag::UNPROTECTED); aii != aee; ++aii) {
+      SPEdge& aie = graph.getEdgeData(aii, Galois::MethodFlag::UNPROTECTED);
 
       double etaai = aie.eta;
       if (etaai > epsilon)

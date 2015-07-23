@@ -34,5 +34,11 @@ if [ "$1" != "min" ]; then
   module load gdb
   module load mkl
   module load mpich2
+  module load gnuplot
   module load doxygen
+  module load texlive
+  module load ghostscript
+  module load python
+  # module load screen #disabling for now because screen was compiled without proper color support
+  module load valgrind
 fi

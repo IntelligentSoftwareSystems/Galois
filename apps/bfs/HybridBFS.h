@@ -32,8 +32,8 @@ struct HybridBFS {
       graph(g), self(s), nextBag(n), newDist(d) { }
 
     void operator()(const GNode& n, Galois::UserContext<GNode>&) {
-      for (typename Graph::edge_iterator ii = graph.edge_begin(n, Galois::MethodFlag::NONE),
-            ei = graph.edge_end(n, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+      for (typename Graph::edge_iterator ii = graph.edge_begin(n, Galois::MethodFlag::UNPROTECTED),
+            ei = graph.edge_end(n, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
         processBS(ii, newDist, *nextBag);
       }
     }
@@ -44,15 +44,15 @@ struct HybridBFS {
 
     void operator()(const WorkItem& item, Galois::UserContext<WorkItem>& ctx) {
       GNode n = item.first;
-      for (typename Graph::edge_iterator ii = graph.edge_begin(n, Galois::MethodFlag::NONE),
-            ei = graph.edge_end(n, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+      for (typename Graph::edge_iterator ii = graph.edge_begin(n, Galois::MethodFlag::UNPROTECTED),
+            ei = graph.edge_end(n, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
         processAsync(ii, item.second, ctx);
       }
     }
 
     void processBS(const typename Graph::edge_iterator& ii, Dist nextDist, NodeBag& next) {
       GNode dst = graph.getEdgeDst(ii);
-      NodeData& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+      NodeData& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
 
       Dist oldDist;
       while (true) {
@@ -62,8 +62,8 @@ struct HybridBFS {
         if (__sync_bool_compare_and_swap(&ddata.dist, oldDist, nextDist)) {
           next.push(dst);
           self->count += 1 
-            + std::distance(graph.edge_begin(dst, Galois::MethodFlag::NONE),
-              graph.edge_end(dst, Galois::MethodFlag::NONE));
+            + std::distance(graph.edge_begin(dst, Galois::MethodFlag::UNPROTECTED),
+              graph.edge_end(dst, Galois::MethodFlag::UNPROTECTED));
           break;
         }
       }
@@ -71,7 +71,7 @@ struct HybridBFS {
 
     void processAsync(const typename Graph::edge_iterator& ii, Dist nextDist, Galois::UserContext<WorkItem>& next) {
       GNode dst = graph.getEdgeDst(ii);
-      NodeData& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+      NodeData& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
 
       Dist oldDist;
       while (true) {
@@ -101,21 +101,21 @@ struct HybridBFS {
     }
 
     void operator()(const GNode& n) const {
-      NodeData& sdata = graph.getData(n, Galois::MethodFlag::NONE);
+      NodeData& sdata = graph.getData(n, Galois::MethodFlag::UNPROTECTED);
       if (sdata.dist <= newDist)
         return;
 
-      for (typename Graph::in_edge_iterator ii = graph.in_edge_begin(n, Galois::MethodFlag::NONE),
-            ei = graph.in_edge_end(n, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+      for (typename Graph::in_edge_iterator ii = graph.in_edge_begin(n, Galois::MethodFlag::UNPROTECTED),
+            ei = graph.in_edge_end(n, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
         GNode dst = graph.getInEdgeDst(ii);
-        NodeData& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+        NodeData& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
 
         if (ddata.dist + 1 == newDist) {
           sdata.dist = newDist;
           nextBag->push(n);
           self->count += 1
-            + std::distance(graph.edge_begin(n, Galois::MethodFlag::NONE),
-              graph.edge_end(n, Galois::MethodFlag::NONE));
+            + std::distance(graph.edge_begin(n, Galois::MethodFlag::UNPROTECTED),
+              graph.edge_end(n, Galois::MethodFlag::UNPROTECTED));
           break;
         }
       }
@@ -153,8 +153,8 @@ struct HybridBFS {
       Galois::do_all_local(graph, BackwardProcess(graph, this, &bags[next], newDist));
       numBackward += 1;
     } else {
-      Galois::for_each(graph.out_edges(source, Galois::MethodFlag::NONE).begin(), 
-          graph.out_edges(source, Galois::MethodFlag::NONE).end(),
+      Galois::for_each(graph.out_edges(source, Galois::MethodFlag::UNPROTECTED).begin(), 
+          graph.out_edges(source, Galois::MethodFlag::UNPROTECTED).end(),
           ForwardProcess(graph, this, &bags[next], newDist));
       numForward += 1;
     }

@@ -49,8 +49,8 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
 
     template<typename GTy>
     bool operator()(GTy& graph, typename GTy::GraphNode src, typename GTy::GraphNode dst, typename GTy::edge_data_reference weight) {
-      LNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
-      LNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+      LNode& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
+      LNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
       
       while (true) {
         Dist newDist = sdata.dist + weight;

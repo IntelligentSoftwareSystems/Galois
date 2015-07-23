@@ -54,9 +54,6 @@ static cll::opt<std::string> outtreefile("outtreefile", cll::desc("Output tree f
 
 static cll::opt<bool> debug("debug", cll::desc("Debug mode"), cll::init(false));
 
-static cll::opt<int> maxRotations("maxRotations", cll::desc("Max rotations"),
-					cll::init(1000000));
-
 static cll::opt<Schedulers> scheduler("scheduler", cll::desc("Scheduler"),
                                       cll::values(
 #ifdef HAVE_CILK
@@ -71,8 +68,6 @@ static cll::opt<SolverMode> solverMode("solverMode", cll::desc("Elimination meth
                                            clEnumVal(LU, "LAPACK-based LU"),
                                            clEnumVal(CHOLESKY, "LAPACK-based Cholesky"),
                                            clEnumValEnd), cll::init(OLD));
-
-static cll::opt<bool> rotation("rotation", cll::desc("Rotation"), cll::init(false));
 
 #ifdef WITH_PAPI
 static cll::opt<bool> papi_supported("perfcounters", cll::desc("Enable performance counters"),
@@ -142,29 +137,9 @@ int main(int argc, char ** argv)
     gettimeofday(&t2, NULL);
     print_time("\tDOF enumeration", &t1, &t2);
 
-    //tree rotation
-    if (rotation){
-        //printf("Tree size %d\n\n", m->getRootNode()->treeSize());   // DEBUG
-        gettimeofday(&t1, NULL);
-        bool balanced=false;
-        int iter=0;
-        while ((!balanced) && (iter<maxRotations)){
-            //printf("rotating\n");
-            balanced=true;
-            Analysis::rotate(m->getRootNode(), NULL, m, &balanced);
-            //printf("checking balancing\n");
-            if (!balanced){
-                m->getRootNode()->isBalanced(&balanced);
-            }
-        }
-        gettimeofday(&t2, NULL);
-        //printf("\nTree size %d\n", m->getRootNode()->treeSize());   // DEBUG
-        print_time("\ttree rotation", &t1, &t2);
-	//m->saveToFile("/h1/mwozniak/dupa.txt");
-    }
-    
     if (outtreefile.size()){
         m->saveToFile(outtreefile.c_str());
+	exit(0);
     }
 
     gettimeofday(&t1, NULL);

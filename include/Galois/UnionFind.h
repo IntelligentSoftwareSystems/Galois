@@ -26,6 +26,8 @@
 #ifndef GALOIS_UNIONFIND_H
 #define GALOIS_UNIONFIND_H
 
+#include <atomic>
+
 namespace Galois {
 /**
  * Intrusive union-find implementation. Users subclass this to get disjoint
@@ -34,26 +36,26 @@ namespace Galois {
 template<typename T>
 class UnionFindNode {
   T* findImpl() const {
-    if (isRep()) return m_component;
+    if (isRep()) return m_component.load(std::memory_order_relaxed);
 
     T* rep = m_component;
     while (rep->m_component != rep) {
-      T* next = rep->m_component;
+      T* next = rep->m_component.load(std::memory_order_relaxed);
       rep = next;
     }
     return rep;
   }
 
 protected:
-  T* m_component;
+  std::atomic<T*> m_component;
 
-  UnionFindNode(): m_component(reinterpret_cast<T*>(this)) { }
+  UnionFindNode(T* s): m_component(s) { }
 
 public:
   typedef UnionFindNode<T> SuperTy;
 
   bool isRep() const {
-    return m_component == this;
+    return m_component.load(std::memory_order_relaxed) == this;
   }
 
   const T* find() const { return findImpl(); }
@@ -65,15 +67,15 @@ public:
     // compressions along two different paths to the root can create a cycle
     // in the union-find tree. Prevent that from happening by compressing
     // incrementally.
-    if (isRep()) return m_component;
+    if (isRep()) return m_component.load(std::memory_order_relaxed);
 
     T* rep = m_component;
     T* prev = 0;
-    while (rep->m_component != rep) {
-      T* next = rep->m_component;
+    while (rep->m_component.load(std::memory_order_relaxed) != rep) {
+      T* next = rep->m_component.load(std::memory_order_relaxed);
 
-      if (prev && prev->m_component == rep) {
-        prev->m_component = next;
+      if (prev && prev->m_component.load(std::memory_order_relaxed) == rep) {
+        prev->m_component.store(next, std::memory_order_relaxed);
       }
       prev = rep;
       rep = next;
@@ -83,7 +85,7 @@ public:
 
   //! Lock-free merge. Returns if merge was done.
   T* merge(T* b) {
-    T* a = m_component;
+    T* a = m_component.load(std::memory_order_relaxed);
     while (true) {
       a = a->findAndCompress();
       b = b->findAndCompress();
@@ -92,7 +94,7 @@ public:
       // Avoid cycles by directing edges consistently
       if (a > b)
         std::swap(a, b);
-      if (__sync_bool_compare_and_swap(&a->m_component, a, b)) {
+      if (a->m_component.compare_exchange_strong(a, b)) {
         return b;
       }
     }

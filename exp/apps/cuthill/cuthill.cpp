@@ -125,18 +125,18 @@ std::ostream& operator<<(std::ostream& os, const SNode& n) {
 
 struct GNodeIndexer: public std::unary_function<GNode,unsigned int> {
   unsigned int operator()(const GNode& val) const {
-    return graph.getData(val, Galois::MethodFlag::NONE).dist;// >> 2;
+    return graph.getData(val, Galois::MethodFlag::UNPROTECTED).dist;// >> 2;
   }
 };
 
 struct sortDegFn {
   bool operator()(const GNode& lhs, const GNode& rhs) const {
     return
-      std::distance(graph.edge_begin(lhs, Galois::MethodFlag::NONE),
-        graph.edge_end(lhs, Galois::MethodFlag::NONE))
+      std::distance(graph.edge_begin(lhs, Galois::MethodFlag::UNPROTECTED),
+        graph.edge_end(lhs, Galois::MethodFlag::UNPROTECTED))
       <
-      std::distance(graph.edge_begin(rhs, Galois::MethodFlag::NONE),
-        graph.edge_end(rhs, Galois::MethodFlag::NONE))
+      std::distance(graph.edge_begin(rhs, Galois::MethodFlag::UNPROTECTED),
+        graph.edge_end(rhs, Galois::MethodFlag::UNPROTECTED))
       ;
   }
 };
@@ -198,12 +198,12 @@ private:
 
     template<typename Context>
     void operator()(const GNode& n, Context& ctx) {
-      SNode& data = graph.getData(n, Galois::MethodFlag::NONE);
+      SNode& data = graph.getData(n, Galois::MethodFlag::UNPROTECTED);
       DistType newDist = data.dist + 1;
-      for (Graph::edge_iterator ii = graph.edge_begin(n, Galois::MethodFlag::NONE),
-             ei = graph.edge_end(n, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+      for (Graph::edge_iterator ii = graph.edge_begin(n, Galois::MethodFlag::UNPROTECTED),
+             ei = graph.edge_end(n, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
         GNode dst = graph.getEdgeDst(ii);
-        SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+        SNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
         DistType oldDist;
         while (true) {
           oldDist = ddata.dist;
@@ -234,7 +234,7 @@ private:
     explicit CountLevels(bool r, GR& c): counts(c), reset(r) { }
 
     void operator()(const GNode& n) const {
-      SNode& data = graph.getData(n, Galois::MethodFlag::NONE);
+      SNode& data = graph.getData(n, Galois::MethodFlag::UNPROTECTED);
       
       assert(data.dist != DIST_INFINITY);
       if (data.dist == DIST_INFINITY)
@@ -309,14 +309,14 @@ private:
 
 public:
   static void initNode(const GNode& n) {
-    SNode& data = graph.getData(n, Galois::MethodFlag::NONE);
-    data.degree = std::distance(graph.edge_begin(n, Galois::MethodFlag::NONE),
-        graph.edge_end(n, Galois::MethodFlag::NONE));
+    SNode& data = graph.getData(n, Galois::MethodFlag::UNPROTECTED);
+    data.degree = std::distance(graph.edge_begin(n, Galois::MethodFlag::UNPROTECTED),
+        graph.edge_end(n, Galois::MethodFlag::UNPROTECTED));
     resetNode(n);
   }
 
   static void resetNode(const GNode& n) {
-    SNode& data = graph.getData(n, Galois::MethodFlag::NONE);
+    SNode& data = graph.getData(n, Galois::MethodFlag::UNPROTECTED);
     data.dist = DIST_INFINITY;
     data.done = false;
   }
@@ -339,15 +339,15 @@ public:
 
     void operator()(const GNode& source) const {
       long int maxdiff = 0;
-      SNode& sdata = graph.getData(source, Galois::MethodFlag::NONE);
+      SNode& sdata = graph.getData(source, Galois::MethodFlag::UNPROTECTED);
 
-      for (Graph::edge_iterator ii = graph.edge_begin(source, Galois::MethodFlag::NONE), 
-          ei = graph.edge_end(source, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+      for (Graph::edge_iterator ii = graph.edge_begin(source, Galois::MethodFlag::UNPROTECTED), 
+          ei = graph.edge_end(source, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
 
         GNode dst = graph.getEdgeDst(ii);
-        SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+        SNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
 
-        long int diff = abs(sdata.id - ddata.id);
+        long int diff = abs(static_cast<long int>(sdata.id) - static_cast<long int>(ddata.id));
         //long int diff = (long int) sdata.id - (long int) ddata.id;
         maxdiff = diff > maxdiff ? diff : maxdiff;
       }
@@ -378,7 +378,7 @@ public:
     //std::cout << graph.size() << "Run: " << count++ << "\n";
 
     for (Graph::iterator src = graph.begin(), ei = graph.end(); src != ei; ++src) {
-      nodemap[graph.getData(*src, Galois::MethodFlag::NONE).id] = *src;
+      nodemap[graph.getData(*src, Galois::MethodFlag::UNPROTECTED).id] = *src;
     }
 
     //Computation of bandwidth and profile in parallel
@@ -391,11 +391,11 @@ public:
 
     //Computation of maximum and root-square-mean wavefront. Serial
     for (unsigned int i = 0; i < graph.size(); ++i) {
-      for (Graph::edge_iterator ii = graph.edge_begin(nodemap[i], Galois::MethodFlag::NONE), 
-          ei = graph.edge_end(nodemap[i], Galois::MethodFlag::NONE); ii != ei; ++ii) {
+      for (Graph::edge_iterator ii = graph.edge_begin(nodemap[i], Galois::MethodFlag::UNPROTECTED), 
+          ei = graph.edge_end(nodemap[i], Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
 
         GNode neigh = graph.getEdgeDst(ii);
-        SNode& ndata = graph.getData(neigh, Galois::MethodFlag::NONE);
+        SNode& ndata = graph.getData(neigh, Galois::MethodFlag::UNPROTECTED);
 
         //std::cerr << "neigh: " << ndata.id << "\n";
         if (visited[ndata.id] == false){
@@ -405,7 +405,7 @@ public:
         }
       }
 
-      SNode& idata = graph.getData(nodemap[i], Galois::MethodFlag::NONE);
+      SNode& idata = graph.getData(nodemap[i], Galois::MethodFlag::UNPROTECTED);
 
       if (visited[idata.id] == false) {
         visited[idata.id] = true;
@@ -434,16 +434,16 @@ public:
     nodemap.resize(graph.size());
 
     for (Graph::iterator src = graph.begin(), ei = graph.end(); src != ei; ++src) {
-      nodemap[graph.getData(*src, Galois::MethodFlag::NONE).id] = *src;
+      nodemap[graph.getData(*src, Galois::MethodFlag::UNPROTECTED).id] = *src;
     }
 
     unsigned int N = ordering.size() - 1;
 
     for (int i = N; i >= 0; --i) {
       // RCM
-      graph.getData(ordering[i], Galois::MethodFlag::NONE).id = N - i;
+      graph.getData(ordering[i], Galois::MethodFlag::UNPROTECTED).id = N - i;
       // CM
-      //graph.getData(ordering[i], Galois::MethodFlag::NONE).id = i;
+      //graph.getData(ordering[i], Galois::MethodFlag::UNPROTECTED).id = i;
     }
   }
 
@@ -717,10 +717,10 @@ struct CuthillUnordered {
             GNode next = perm[start];
             unsigned t_worig = t_wo;
             //find eligible nodes
-            for (Graph::edge_iterator ii = graph.edge_begin(next, Galois::MethodFlag::NONE),
-             ei = graph.edge_end(next, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+            for (Graph::edge_iterator ii = graph.edge_begin(next, Galois::MethodFlag::UNPROTECTED),
+             ei = graph.edge_end(next, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
               GNode dst = graph.getEdgeDst(ii);
-              SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+              SNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
               if (!ddata.done && (ddata.dist == n + 1)) {
                 ddata.done = true;
                 perm[t_wo] = dst;

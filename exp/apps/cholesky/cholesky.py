@@ -34,7 +34,7 @@ def load_matrix(filename):
     Supports whitespace separated table or MatrixMarket."""
     sparse = False
     try:
-        data = np.loadtxt(filename)
+        data = np.loadtxt(filename, ndmin=2)
     except ValueError, err:
         # Maybe it's a MatrixMarket file
         if '%%MatrixMarket' in str(err):
@@ -150,6 +150,8 @@ def ordering_least_degree(graph, tree=False):
         assert(best[0] > -1)
         if tree:
             assert(best[1] == 1) # Self-edge only
+        #else:
+        #    print best[0], best[1]
         done.add(best[0])
         yield best[0]
 
@@ -176,7 +178,8 @@ def write_edgelist(graph, filename=None):
     for src, dest, data in graph.edges_iter(data=True):
         line = "%d %d" % (src, dest)
         if 'weight' in data:
-            line += " %f" % data['weight']
+            # http://stackoverflow.com/questions/3481289/
+            line += " " + repr(data['weight'])
         outfh.write(line)
         outfh.write("\n")
     if filename:

@@ -271,7 +271,7 @@ struct MatchingFF {
   typedef std::deque<GraphNode, typename Galois::PerIterAllocTy::rebind<GraphNode>::other> Queue;
   typedef std::vector<GraphNode, typename Galois::PerIterAllocTy::rebind<GraphNode>::other> Preds;
   
-  static const Galois::MethodFlag flag = Concurrent ? Galois::MethodFlag::CHECK_CONFLICT : Galois::MethodFlag::NONE;
+  static const Galois::MethodFlag flag = Concurrent ? Galois::MethodFlag::WRITE : Galois::MethodFlag::UNPROTECTED;
 
   static const bool canRunIteratively = true;
 
@@ -294,7 +294,7 @@ struct MatchingFF {
 
       for (edge_iterator ii = g.edge_begin(src, flag), ei = g.edge_end(src, flag); ii != ei; ++ii) {
         GraphNode dst = g.getEdgeDst(ii);
-        node_data_type& ddst = g.getData(dst, Galois::MethodFlag::NONE);
+        node_data_type& ddst = g.getData(dst, Galois::MethodFlag::UNPROTECTED);
         if (ddst.reached)
           continue;
         
@@ -309,7 +309,7 @@ struct MatchingFF {
           ddst.free = false;
           GraphNode cur = dst;
           while (cur != root) {
-            GraphNode pred = preds[g.getData(cur, Galois::MethodFlag::NONE).pred];
+            GraphNode pred = preds[g.getData(cur, Galois::MethodFlag::UNPROTECTED).pred];
             revs.push_back(Edge(pred, cur));
             cur = pred;
           }
@@ -319,10 +319,10 @@ struct MatchingFF {
           for (edge_iterator jj = g.edge_begin(dst, flag), ej = g.edge_end(dst, flag); jj != ej; ++jj) {
             GraphNode cur = g.getEdgeDst(jj);
 
-            g.getData(cur, Galois::MethodFlag::NONE).pred = preds.size();
+            g.getData(cur, Galois::MethodFlag::UNPROTECTED).pred = preds.size();
             preds.push_back(dst);
 
-            g.getData(cur, Galois::MethodFlag::NONE).reached = true;
+            g.getData(cur, Galois::MethodFlag::UNPROTECTED).reached = true;
             reached.push_back(cur);
             
             queue.push_back(cur);
@@ -354,8 +354,8 @@ struct MatchingFF {
 
     void clear() {
       for (typename ReachedWrapper::Type::iterator ii = reached.begin(), ei = reached.end(); ii != ei; ++ii) {
-        assert(g.getData(*ii, Galois::MethodFlag::NONE).reached);
-        g.getData(*ii, Galois::MethodFlag::NONE).reached = false;
+        assert(g.getData(*ii, Galois::MethodFlag::UNPROTECTED).reached);
+        g.getData(*ii, Galois::MethodFlag::UNPROTECTED).reached = false;
       }
       reached.clear();
     }
@@ -367,14 +367,14 @@ struct MatchingFF {
     ReachedCleanup cleanup(g, reached);
 
     if (findAugmentingPath(g, src, ctx, revs, reached)) {
-      g.getData(src, Galois::MethodFlag::NONE).free = false;
+      g.getData(src, Galois::MethodFlag::UNPROTECTED).free = false;
 
       // Reverse edges in augmenting path
       for (typename RevsWrapper::Type::iterator jj = revs.begin(), ej = revs.end(); jj != ej; ++jj) {
-        auto edge = g.findEdge(jj->first, jj->second, Galois::MethodFlag::NONE);
+        auto edge = g.findEdge(jj->first, jj->second, Galois::MethodFlag::UNPROTECTED);
         assert(edge != g.edge_end(jj->first));
-        g.removeEdge(jj->first, edge, Galois::MethodFlag::NONE);
-        g.addEdge(jj->second, jj->first, Galois::MethodFlag::NONE);
+        g.removeEdge(jj->first, edge, Galois::MethodFlag::UNPROTECTED);
+        g.addEdge(jj->second, jj->first, Galois::MethodFlag::UNPROTECTED);
       }
       revs.clear();
 
@@ -441,7 +441,7 @@ struct MatchingABMP {
   typedef std::vector<Edge, typename Galois::PerIterAllocTy::rebind<Edge>::other> Revs;
   typedef std::pair<GraphNode,unsigned> WorkItem;
 
-  static const Galois::MethodFlag flag = Concurrent ? Galois::MethodFlag::CHECK_CONFLICT : Galois::MethodFlag::NONE;
+  static const Galois::MethodFlag flag = Concurrent ? Galois::MethodFlag::WRITE : Galois::MethodFlag::UNPROTECTED;
 
   static const bool canRunIteratively = true;
 
@@ -472,7 +472,7 @@ struct MatchingABMP {
   }
 
   bool nextEdge(G& g, const GraphNode& src, GraphNode& next) {
-    node_data_type& dsrc = g.getData(src, Galois::MethodFlag::NONE);
+    node_data_type& dsrc = g.getData(src, Galois::MethodFlag::UNPROTECTED);
     unsigned l = dsrc.layer - 1;
 
     // Start search where we last left off
@@ -480,7 +480,7 @@ struct MatchingABMP {
     edge_iterator ei = g.edge_end(src, flag);
     assert(dsrc.next <= std::distance(ii, ei));
     std::advance(ii, dsrc.next);
-    for (; ii != ei && g.getData(g.getEdgeDst(ii), Galois::MethodFlag::NONE).layer != l;
+    for (; ii != ei && g.getData(g.getEdgeDst(ii), Galois::MethodFlag::UNPROTECTED).layer != l;
         ++ii, ++dsrc.next) {
       ;
     }
@@ -503,17 +503,17 @@ struct MatchingABMP {
 
     while (true) {
       GraphNode next;
-      if (g.getData(cur, Galois::MethodFlag::NONE).free && g.getData(cur, Galois::MethodFlag::NONE).layer == 0) {
-        assert(g.getData(root, Galois::MethodFlag::NONE).free);
+      if (g.getData(cur, Galois::MethodFlag::UNPROTECTED).free && g.getData(cur, Galois::MethodFlag::UNPROTECTED).layer == 0) {
+        assert(g.getData(root, Galois::MethodFlag::UNPROTECTED).free);
         // (1) Breakthrough
-        g.getData(cur, Galois::MethodFlag::NONE).free = g.getData(root, Galois::MethodFlag::NONE).free = false;
+        g.getData(cur, Galois::MethodFlag::UNPROTECTED).free = g.getData(root, Galois::MethodFlag::UNPROTECTED).free = false;
         
         // Reverse edges in augmenting path
         for (typename Revs::iterator ii = revs.begin(), ei = revs.end(); ii != ei; ++ii) {
-          auto edge = g.findEdge(ii->first, ii->second, Galois::MethodFlag::NONE);
+          auto edge = g.findEdge(ii->first, ii->second, Galois::MethodFlag::UNPROTECTED);
           assert(edge != g.edge_end(ii->first));
-          g.removeEdge(ii->first, edge, Galois::MethodFlag::NONE);
-          g.addEdge(ii->second, ii->first, Galois::MethodFlag::NONE);
+          g.removeEdge(ii->first, edge, Galois::MethodFlag::UNPROTECTED);
+          g.addEdge(ii->second, ii->first, Galois::MethodFlag::UNPROTECTED);
         }
         //revs.clear();
         if (revs.size() > 1024) {
@@ -527,9 +527,9 @@ struct MatchingABMP {
         cur = next;
       } else {
         // (3) Retreat
-        unsigned& layer = g.getData(cur, Galois::MethodFlag::NONE).layer;
+        unsigned& layer = g.getData(cur, Galois::MethodFlag::UNPROTECTED).layer;
         layer += 2;
-        g.getData(cur, Galois::MethodFlag::NONE).next = 0;
+        g.getData(cur, Galois::MethodFlag::UNPROTECTED).next = 0;
         if (revs.empty()) {
           ctx.push(std::make_pair(cur, layer));
           return true;
@@ -632,7 +632,7 @@ struct MatchingMF {
   typedef typename G::iterator iterator;
   typedef typename G::node_data_type node_data_type;
   typedef typename G::edge_data_type edge_data_type;
-  static const Galois::MethodFlag flag = Concurrent ? Galois::MethodFlag::CHECK_CONFLICT : Galois::MethodFlag::NONE;
+  static const Galois::MethodFlag flag = Concurrent ? Galois::MethodFlag::WRITE : Galois::MethodFlag::UNPROTECTED;
   static const bool canRunIteratively = false;
 
   /**
@@ -668,7 +668,7 @@ struct MatchingMF {
     }
 
     while (true) {
-      Galois::MethodFlag f = relabeled ? Galois::MethodFlag::NONE : flag;
+      Galois::MethodFlag f = relabeled ? Galois::MethodFlag::UNPROTECTED : flag;
       bool finished = false;
       int current = 0;
 
@@ -678,13 +678,13 @@ struct MatchingMF {
         if (edge.cap == 0 || current < node.current) 
           continue;
 
-        node_data_type& dnode = g.getData(dst, Galois::MethodFlag::NONE);
+        node_data_type& dnode = g.getData(dst, Galois::MethodFlag::UNPROTECTED);
         if (node.height - 1 != dnode.height) 
           continue;
 
         // Push flow
         int amount = std::min(static_cast<int>(node.excess), edge.cap);
-        reduceCapacity(edge, g.getEdgeData(g.findEdge(dst, src, Galois::MethodFlag::NONE)), amount);
+        reduceCapacity(edge, g.getEdgeData(g.findEdge(dst, src, Galois::MethodFlag::UNPROTECTED)), amount);
 
         // Only add once
         if (dst != sink && dst != source && dnode.excess == 0) 
@@ -717,11 +717,11 @@ struct MatchingMF {
     int minEdge;
 
     int current = 0;
-    for (edge_iterator ii = g.edge_begin(src, Galois::MethodFlag::NONE), ei = g.edge_end(src, Galois::MethodFlag::NONE); ii != ei; ++ii, ++current) {
+    for (edge_iterator ii = g.edge_begin(src, Galois::MethodFlag::UNPROTECTED), ei = g.edge_end(src, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii, ++current) {
       GraphNode dst = g.getEdgeDst(ii);
       int cap = g.getEdgeData(ii).cap;
       if (cap > 0) {
-        node_data_type& dnode = g.getData(dst, Galois::MethodFlag::NONE);
+        node_data_type& dnode = g.getData(dst, Galois::MethodFlag::UNPROTECTED);
         if (dnode.height < minHeight) {
           minHeight = dnode.height;
           minEdge = current;
@@ -732,7 +732,7 @@ struct MatchingMF {
     assert(minHeight != std::numeric_limits<unsigned>::max());
     ++minHeight;
 
-    node_data_type& node = g.getData(src, Galois::MethodFlag::NONE);
+    node_data_type& node = g.getData(src, Galois::MethodFlag::UNPROTECTED);
     node.height = minHeight;
     node.current = minEdge;
   }
@@ -782,13 +782,13 @@ struct MatchingMF {
     //! Do reverse BFS on residual graph.
     void operator()(const GraphNode& src, Galois::UserContext<GraphNode>& ctx) {
       for (edge_iterator
-          ii = g.edge_begin(src, useCAS ? Galois::MethodFlag::NONE : flag),
-          ei = g.edge_end(src, useCAS ? Galois::MethodFlag::NONE : flag);
+          ii = g.edge_begin(src, useCAS ? Galois::MethodFlag::UNPROTECTED : flag),
+          ei = g.edge_end(src, useCAS ? Galois::MethodFlag::UNPROTECTED : flag);
           ii != ei; ++ii) {
         GraphNode dst = g.getEdgeDst(ii);
-        if (g.getEdgeData(g.findEdge(dst, src, Galois::MethodFlag::NONE)).cap > 0) {
-          node_data_type& node = g.getData(dst, Galois::MethodFlag::NONE);
-          unsigned newHeight = g.getData(src, Galois::MethodFlag::NONE).height + 1;
+        if (g.getEdgeData(g.findEdge(dst, src, Galois::MethodFlag::UNPROTECTED)).cap > 0) {
+          node_data_type& node = g.getData(dst, Galois::MethodFlag::UNPROTECTED);
+          unsigned newHeight = g.getData(src, Galois::MethodFlag::UNPROTECTED).height + 1;
           if (useCAS) {
             unsigned oldHeight;
             while (newHeight < (oldHeight = node.height)) {
@@ -813,7 +813,7 @@ struct MatchingMF {
 
     for (iterator ii = g.begin(), ei = g.end(); ii != ei; ++ii) {
       GraphNode src = *ii;
-      node_data_type& node = g.getData(src, Galois::MethodFlag::NONE);
+      node_data_type& node = g.getData(src, Galois::MethodFlag::UNPROTECTED);
       node.height = numNodes;
       node.current = 0;
       if (src == sink)
@@ -827,7 +827,7 @@ struct MatchingMF {
 
     for (iterator ii = g.begin(), ei = g.end(); ii != ei; ++ii) {
       GraphNode src = *ii;
-      node_data_type& node = g.getData(src, Galois::MethodFlag::NONE);
+      node_data_type& node = g.getData(src, Galois::MethodFlag::UNPROTECTED);
       if (src == sink || src == source)
         continue;
       if (node.excess > 0) 
@@ -864,22 +864,22 @@ struct MatchingMF {
       for (edge_iterator ii = g.edge_begin(*src), ei = g.edge_end(*src);
           ii != ei; ++ii) {
         GraphNode dst = g.getEdgeDst(ii);
-        g.getEdgeData(g.addMultiEdge(dst, *src, Galois::MethodFlag::ALL)) = edge_data_type(0);
+        g.getEdgeData(g.addMultiEdge(dst, *src, Galois::MethodFlag::WRITE)) = edge_data_type(0);
         ++numEdges;
       }
     }
 
     // Add edge from source to each node in A
     for (typename NodeList::iterator src = g.A.begin(), esrc = g.A.end(); src != esrc; ++src) {
-      g.getEdgeData(g.addMultiEdge(source, *src, Galois::MethodFlag::ALL)) = edge_data_type();
-      g.getEdgeData(g.addMultiEdge(*src, source, Galois::MethodFlag::ALL)) = edge_data_type(0);
+      g.getEdgeData(g.addMultiEdge(source, *src, Galois::MethodFlag::WRITE)) = edge_data_type();
+      g.getEdgeData(g.addMultiEdge(*src, source, Galois::MethodFlag::WRITE)) = edge_data_type(0);
       ++numEdges;
     }
 
     // Add edge to sink from each node in B
     for (typename NodeList::iterator src = g.B.begin(), esrc = g.B.end(); src != esrc; ++src) {
-      g.getEdgeData(g.addMultiEdge(*src, sink, Galois::MethodFlag::ALL)) = edge_data_type();
-      g.getEdgeData(g.addMultiEdge(sink, *src, Galois::MethodFlag::ALL)) = edge_data_type(0);
+      g.getEdgeData(g.addMultiEdge(*src, sink, Galois::MethodFlag::WRITE)) = edge_data_type();
+      g.getEdgeData(g.addMultiEdge(sink, *src, Galois::MethodFlag::WRITE)) = edge_data_type(0);
       ++numEdges;
     }
 

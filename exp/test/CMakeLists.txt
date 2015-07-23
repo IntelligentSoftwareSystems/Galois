@@ -1,2 +1,2 @@
 #makeTest(pairingheap)
-makeTest(skiplist)
+makeTest(ADD_TARGET skiplist)

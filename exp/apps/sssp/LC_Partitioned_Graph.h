@@ -22,8 +22,8 @@
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#ifndef GALOIS_GRAPH_LC_INOUT_GRAPH_H
-#define GALOIS_GRAPH_LC_INOUT_GRAPH_H
+#ifndef LC_PARTITIONED_GRAPH_H
+#define LC_PARTITIONED_GRAPH_H
 
 #include "Galois/Graph/Details.h"
 
@@ -78,6 +78,7 @@ class LC_Partitioned_Graph: public GraphTy::template with_id<true> {
 public:
   typedef uint32_t GraphNode;
   typedef typename MainGraph::edge_data_type edge_data_type;
+  typedef typename MainGraph::file_edge_data_type file_edge_data_type;
   typedef typename MainGraph::node_data_type node_data_type;
   typedef typename MainGraph::edge_data_reference edge_data_reference;
   typedef typename MainGraph::node_data_reference node_data_reference;
@@ -127,8 +128,8 @@ public:
   
   LC_InOut_Graph(): asymmetric(false) { }
 
-  edge_data_reference getInEdgeData(in_edge_iterator ni, MethodFlag mflag = MethodFlag::NONE) { 
-    Galois::Runtime::checkWrite(mflag, false);
+  edge_data_reference getInEdgeData(in_edge_iterator ni, MethodFlag mflag = MethodFlag::UNPROTECTED) { 
+    // Galois::Runtime::checkWrite(mflag, false);
     if (ni.type == 0) {
       return this->getEdgeData(boost::fusion::at_c<0>(ni.its));
     } else {
@@ -144,7 +145,7 @@ public:
     }
   }
 
-  in_edge_iterator in_edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+  in_edge_iterator in_edge_begin(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     this->acquireNode(N, mflag);
     if (!asymmetric) {
       if (Galois::Runtime::shouldLock(mflag)) {
@@ -164,7 +165,7 @@ public:
     }
   }
 
-  in_edge_iterator in_edge_end(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+  in_edge_iterator in_edge_end(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     this->acquireNode(N, mflag);
     if (!asymmetric) {
       return in_edge_iterator(this->raw_end(N));
@@ -173,7 +174,7 @@ public:
     }
   }
 
-  detail::InEdgesIterator<LC_InOut_Graph> in_edges(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+  detail::InEdgesIterator<LC_InOut_Graph> in_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     return detail::InEdgesIterator<LC_InOut_Graph>(*this, N, mflag);
   }
 

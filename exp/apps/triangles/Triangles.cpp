@@ -188,8 +188,8 @@ struct NodeIteratorAlgo {
     void operator()(const GNode& n) const {
       // Partition neighbors
       // [first, ea) [n] [bb, last)
-      Graph::edge_iterator first = graph.edge_begin(n, Galois::MethodFlag::NONE);
-      Graph::edge_iterator last = graph.edge_end(n, Galois::MethodFlag::NONE);
+      Graph::edge_iterator first = graph.edge_begin(n, Galois::MethodFlag::UNPROTECTED);
+      Graph::edge_iterator last = graph.edge_end(n, Galois::MethodFlag::UNPROTECTED);
       Graph::edge_iterator ea = lowerBound(first, last, LessThan<Graph>(graph, n));
       Graph::edge_iterator bb = lowerBound(first, last, GreaterThanOrEqual<Graph>(graph, n));
 
@@ -197,8 +197,8 @@ struct NodeIteratorAlgo {
         GNode B = graph.getEdgeDst(bb);
         for (auto aa = first; aa != ea; ++aa) {
           GNode A = graph.getEdgeDst(aa);
-          Graph::edge_iterator vv = graph.edge_begin(A, Galois::MethodFlag::NONE);
-          Graph::edge_iterator ev = graph.edge_end(A, Galois::MethodFlag::NONE);
+          Graph::edge_iterator vv = graph.edge_begin(A, Galois::MethodFlag::UNPROTECTED);
+          Graph::edge_iterator ev = graph.edge_end(A, Galois::MethodFlag::UNPROTECTED);
           Graph::edge_iterator it = lowerBound(vv, ev, LessThan<Graph>(graph, B));
           if (it != ev && graph.getEdgeDst(it) == B) {
             self->numTriangles += 1;
@@ -255,8 +255,8 @@ struct HybridAlgo {
     void operator()(const GNode& n) {
       // Partition neighbors
       // [first, ea) [n] [bb, last)
-      Graph::edge_iterator first = graph.edge_begin(n, Galois::MethodFlag::NONE);
-      Graph::edge_iterator last = graph.edge_end(n, Galois::MethodFlag::NONE);
+      Graph::edge_iterator first = graph.edge_begin(n, Galois::MethodFlag::UNPROTECTED);
+      Graph::edge_iterator last = graph.edge_end(n, Galois::MethodFlag::UNPROTECTED);
       Graph::edge_iterator ea = lowerBound(first, last, LessThan<Graph>(graph, n));
       Graph::edge_iterator bb = lowerBound(first, last, GreaterThanOrEqual<Graph>(graph, n));
 
@@ -270,8 +270,8 @@ struct HybridAlgo {
         GNode B = graph.getEdgeDst(bb);
         for (auto aa = first; aa != ea; ++aa) {
           GNode A = graph.getEdgeDst(aa);
-          Graph::edge_iterator vv = graph.edge_begin(A, Galois::MethodFlag::NONE);
-          Graph::edge_iterator ev = graph.edge_end(A, Galois::MethodFlag::NONE);
+          Graph::edge_iterator vv = graph.edge_begin(A, Galois::MethodFlag::UNPROTECTED);
+          Graph::edge_iterator ev = graph.edge_end(A, Galois::MethodFlag::UNPROTECTED);
           Graph::edge_iterator it = lowerBound(vv, ev, LessThan<Graph>(graph, B));
           if (it != ev && graph.getEdgeDst(it) == B) {
             self->numTriangles += 1;
@@ -286,16 +286,16 @@ struct HybridAlgo {
     size_t limitIdx;
 
     WriteAdjacency(HybridAlgo* s): self(s) { 
-      limitIdx = graph.getData(self->limit, Galois::MethodFlag::NONE);
+      limitIdx = graph.getData(self->limit, Galois::MethodFlag::UNPROTECTED);
     }
 
     void operator()(const GNode& n) const {
-      size_t nidx = graph.getData(n, Galois::MethodFlag::NONE) - limitIdx;
-      for (Graph::edge_iterator edge : graph.out_edges(n, Galois::MethodFlag::NONE)) {
+      size_t nidx = graph.getData(n, Galois::MethodFlag::UNPROTECTED) - limitIdx;
+      for (Graph::edge_iterator edge : graph.out_edges(n, Galois::MethodFlag::UNPROTECTED)) {
         GNode dst = graph.getEdgeDst(edge);
         if (dst < self->limit)
           continue;
-        size_t didx = graph.getData(dst, Galois::MethodFlag::NONE) - limitIdx;
+        size_t didx = graph.getData(dst, Galois::MethodFlag::UNPROTECTED) - limitIdx;
         self->adjacency(nidx, didx) = 1;
       }
     }
@@ -388,7 +388,7 @@ struct EdgeIteratorAlgo {
     Initialize(EdgeIteratorAlgo* s): self(s) { }
 
     void operator()(GNode n) const {
-      for (Graph::edge_iterator edge : graph.out_edges(n, Galois::MethodFlag::NONE)) {
+      for (Graph::edge_iterator edge : graph.out_edges(n, Galois::MethodFlag::UNPROTECTED)) {
         GNode dst = graph.getEdgeDst(edge);
         if (n < dst)
           self->items.push(WorkItem(n, dst));
@@ -404,10 +404,10 @@ struct EdgeIteratorAlgo {
     void operator()(const WorkItem& w, Galois::UserContext<WorkItem>&) { (*this)(w); }
     void operator()(const WorkItem& w) {
       // Compute intersection of range (w.src, w.dst) in neighbors of w.src and w.dst
-      Graph::edge_iterator abegin = graph.edge_begin(w.src, Galois::MethodFlag::NONE);
-      Graph::edge_iterator aend = graph.edge_end(w.src, Galois::MethodFlag::NONE);
-      Graph::edge_iterator bbegin = graph.edge_begin(w.dst, Galois::MethodFlag::NONE);
-      Graph::edge_iterator bend = graph.edge_end(w.dst, Galois::MethodFlag::NONE);
+      Graph::edge_iterator abegin = graph.edge_begin(w.src, Galois::MethodFlag::UNPROTECTED);
+      Graph::edge_iterator aend = graph.edge_end(w.src, Galois::MethodFlag::UNPROTECTED);
+      Graph::edge_iterator bbegin = graph.edge_begin(w.dst, Galois::MethodFlag::UNPROTECTED);
+      Graph::edge_iterator bend = graph.edge_end(w.dst, Galois::MethodFlag::UNPROTECTED);
 
       Graph::edge_iterator aa = lowerBound(abegin, aend, GreaterThanOrEqual<Graph>(graph, w.src));
       Graph::edge_iterator ea = lowerBound(abegin, aend, LessThan<Graph>(graph, w.dst));

@@ -25,7 +25,7 @@
 #define GALOIS_RUNTIME_KDG_TWO_PHASE_SUPPORT_H
 
 #include "Galois/AltBag.h"
-
+#include <boost/iterator/filter_iterator.hpp>
 #include <functional>
 #include <boost/iterator/filter_iterator.hpp>
 
@@ -72,7 +72,7 @@ public:
 
   T& getElem () { return active; }
 
-  virtual void subAcquire (Lockable* l) {
+  virtual void subAcquire (Lockable* l, Galois::MethodFlag) {
 
 
     if (Base::tryLock (l)) {
@@ -205,7 +205,7 @@ public:
           }
         },
         "safety_test_loop",
-        Galois::doall_chunk_size<DEFAULT_CHUNK_SIZE> ());
+        Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
   }
 };
 

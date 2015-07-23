@@ -31,7 +31,7 @@ struct BipartiteGraph: public Galois::Graph::FirstGraph<NodeTy,EdgeTy,true> {
   NodeList factors;
   NodeList variables;
 
-  void addNode(const typename Super::GraphNode& n, bool isFactor, Galois::MethodFlag mflag = Galois::MethodFlag::ALL) {
+  void addNode(const typename Super::GraphNode& n, bool isFactor, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) {
     if (isFactor) {
       factors.push_back(n);
     } else {
@@ -40,12 +40,12 @@ struct BipartiteGraph: public Galois::Graph::FirstGraph<NodeTy,EdgeTy,true> {
     Super::addNode(n, mflag);
   }
 
-  void addNode(const typename Super::GraphNode& n, Galois::MethodFlag mflag = Galois::MethodFlag::ALL) {
+  void addNode(const typename Super::GraphNode& n, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) {
     assert(0 && "Not supported in Bipartite Graph");
     abort();
   }
 
-  void removeNode(typename Super::GraphNode n, Galois::MethodFlag mflag = Galois::MethodFlag::ALL) {
+  void removeNode(typename Super::GraphNode n, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) {
     assert(0 && "Not supported in Bipartite Graph");
     abort();
   }
@@ -295,7 +295,7 @@ struct GBP {
   GBP(Graph& g): graph(g) { }
 
   void operator()(const Graph::GraphNode& src) {
-    Node& node = src.getData(Galois::MethodFlag::NONE);
+    Node& node = src.getData(Galois::MethodFlag::UNPROTECTED);
 
     node.prev_x = node.x;
     node.prev_prec = node.cur_prec;
@@ -305,9 +305,9 @@ struct GBP {
     assert(J_i != 0);
 
     // Incoming edges
-    for (Graph::neighbor_iterator dst = graph.neighbor_begin(src, Galois::MethodFlag::ALL),
-        edst = graph.neighbor_end(src, Galois::MethodFlag::ALL); dst != edst; ++dst) {
-      const Edge& edge = graph.getEdgeData(*dst, src, Galois::MethodFlag::NONE);
+    for (Graph::neighbor_iterator dst = graph.neighbor_begin(src, Galois::MethodFlag::WRITE),
+        edst = graph.neighbor_end(src, Galois::MethodFlag::WRITE); dst != edst; ++dst) {
+      const Edge& edge = graph.getEdgeData(*dst, src, Galois::MethodFlag::UNPROTECTED);
       mu_i += edge.mean;
       J_i += edge.prec;
     }
@@ -317,10 +317,10 @@ struct GBP {
     assert(!isnan(node.x));
     node.cur_prec = J_i;
 
-    for (Graph::neighbor_iterator dst = graph.neighbor_begin(src, Galois::MethodFlag::NONE),
-        edst = graph.neighbor_end(src, Galois::MethodFlag::NONE); dst != edst; ++dst) {
-      Edge& inEdge = graph.getEdgeData(*dst, src, Galois::MethodFlag::NONE);
-      Edge& outEdge = graph.getEdgeData(src, dst, Galois::MethodFlag::NONE);
+    for (Graph::neighbor_iterator dst = graph.neighbor_begin(src, Galois::MethodFlag::UNPROTECTED),
+        edst = graph.neighbor_end(src, Galois::MethodFlag::UNPROTECTED); dst != edst; ++dst) {
+      Edge& inEdge = graph.getEdgeData(*dst, src, Galois::MethodFlag::UNPROTECTED);
+      Edge& outEdge = graph.getEdgeData(src, dst, Galois::MethodFlag::UNPROTECTED);
 
       double mu_i_j = mu_i - inEdge.mean;
       double J_i_j = J_i - inEdge.prec;
@@ -371,7 +371,7 @@ struct GBP {
   GBP(Graph& g): graph(g) { }
 
   void operator()(const Graph::GraphNode& src) {
-    Node& node = src.getData(Galois::MethodFlag::NONE);
+    Node& node = src.getData(Galois::MethodFlag::UNPROTECTED);
     
     node.x_prev = node.x;
 
@@ -383,9 +383,9 @@ struct GBP {
     // Variance can not be zero (must be a diagonally dominant matrix)!
     //  assert(A(i,i) ~= 0);
     //  J(i) = A(i,i) + sum(MJ(:,i));
-    for (Graph::neighbor_iterator dst = graph.neighbor_begin(src, Galois::MethodFlag::ALL),
-        edst = graph.neighbor_end(src, Galois::MethodFlag::ALL); dst != edst; ++dst) {
-      const Edge& edge = graph.getEdgeData(*dst, src, Galois::MethodFlag::NONE);
+    for (Graph::neighbor_iterator dst = graph.neighbor_begin(src, Galois::MethodFlag::WRITE),
+        edst = graph.neighbor_end(src, Galois::MethodFlag::WRITE); dst != edst; ++dst) {
+      const Edge& edge = graph.getEdgeData(*dst, src, Galois::MethodFlag::UNPROTECTED);
       node.mean += edge.mean;
       node.prec += edge.prec;
     }
@@ -403,10 +403,10 @@ struct GBP {
     //      MJ(i,j) = (-A(j,i) / J_j) * A(i,j);
     //    end
     //  end
-    for (Graph::neighbor_iterator dst = graph.neighbor_begin(src, Galois::MethodFlag::NONE),
-        edst = graph.neighbor_end(src, Galois::MethodFlag::NONE); dst != edst; ++dst) {
-      Edge& inEdge = graph.getEdgeData(*dst, src, Galois::MethodFlag::NONE);
-      Edge& outEdge = graph.getEdgeData(src, dst, Galois::MethodFlag::NONE);
+    for (Graph::neighbor_iterator dst = graph.neighbor_begin(src, Galois::MethodFlag::UNPROTECTED),
+        edst = graph.neighbor_end(src, Galois::MethodFlag::UNPROTECTED); dst != edst; ++dst) {
+      Edge& inEdge = graph.getEdgeData(*dst, src, Galois::MethodFlag::UNPROTECTED);
+      Edge& outEdge = graph.getEdgeData(src, dst, Galois::MethodFlag::UNPROTECTED);
       
       double mean_j = node.mean - inEdge.mean;
       double prec_j = node.prec - inEdge.prec;

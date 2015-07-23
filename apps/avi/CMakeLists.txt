@@ -20,7 +20,7 @@ if(Fortran_FOUND)
   enable_language(Fortran OPTIONAL)
 endif()
 
-find_package(LAPACK)
+find_package(LAPACK QUIET)
 find_package(ZLIB)
 
 if(ZLIB_FOUND AND NOT ARCH STREQUAL "mic")

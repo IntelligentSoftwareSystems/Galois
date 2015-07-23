@@ -28,7 +28,6 @@
 #include "Galois/Bag.h"
 #include "Galois/Graph/FileGraph.h"
 #include "Galois/Graph/Details.h"
-#include "Galois/Runtime/MethodFlags.h"
 
 #include "llvm/ADT/SmallVector.h"
 
@@ -196,25 +195,33 @@ struct EdgeFactory<void> {
  * @tparam NodeTy Type of node data
  * @tparam EdgeTy Type of edge data
  * @tparam Directional true if graph is directed
- * @tparam SortNeighbors Keep neighbors sorted (for faster findEdge)
+ * @tparam SortedNeighbors Keep neighbors sorted (for faster findEdge)
  */
 template<typename NodeTy, typename EdgeTy, bool Directional,
-         bool HasNoLockable=false, bool SortNeighbors=false
+  bool HasNoLockable=false,
+  bool SortedNeighbors=false,
+  typename FileEdgeTy=EdgeTy
   >
 class FirstGraph : private boost::noncopyable {
 public:
   //! If true, do not use abstract locks in graph
   template<bool _has_no_lockable>
-  struct with_no_lockable { typedef FirstGraph<NodeTy,EdgeTy,Directional,_has_no_lockable> type; };
+  struct with_no_lockable { typedef FirstGraph<NodeTy,EdgeTy,Directional,_has_no_lockable,SortedNeighbors,FileEdgeTy> type; };
 
   template<typename _node_data>
-  struct with_node_data { typedef FirstGraph<_node_data,EdgeTy,Directional,HasNoLockable> type; };
+  struct with_node_data { typedef FirstGraph<_node_data,EdgeTy,Directional,HasNoLockable,SortedNeighbors,FileEdgeTy> type; };
 
   template<typename _edge_data>
-  struct with_edge_data { typedef FirstGraph<NodeTy,_edge_data,Directional,HasNoLockable> type; };
+  struct with_edge_data { typedef FirstGraph<NodeTy,_edge_data,Directional,HasNoLockable,SortedNeighbors,FileEdgeTy> type; };
+
+  template<typename _file_edge_data>
+  struct with_file_edge_data { typedef FirstGraph<NodeTy,EdgeTy,Directional,HasNoLockable,SortedNeighbors,_file_edge_data> type; };
 
   template<bool _directional>
-  struct with_directional { typedef FirstGraph<NodeTy,EdgeTy,_directional,HasNoLockable> type; };
+  struct with_directional { typedef FirstGraph<NodeTy,EdgeTy,_directional,HasNoLockable,SortedNeighbors,FileEdgeTy> type; };
+
+  template<bool _sorted_neighbors>
+  struct with_sorted_neighbors { typedef FirstGraph<NodeTy,EdgeTy,Directional,HasNoLockable,_sorted_neighbors,FileEdgeTy> type; };
 
   typedef read_with_aux_graph_tag read_tag;
 
@@ -275,7 +282,7 @@ private:
     iterator end() { return edges.end();  }
     
     void erase(iterator ii) {
-      if (SortNeighbors) {
+      if (SortedNeighbors) {
         // For sorted case remove the element, moving following
         // elements back to fill the space.
         edges.erase(ii);
@@ -294,7 +301,7 @@ private:
     }
 
     iterator find(gNode* N) {
-      if ( SortNeighbors ) {
+      if (SortedNeighbors) {
         iterator ei = edges.end();
         iterator ii = std::lower_bound(edges.begin(), ei, N,
                                        first_lt<gNode*>());
@@ -312,7 +319,7 @@ private:
     template<typename... Args>
     iterator createEdge(gNode* N, EdgeTy* v, Args&&... args) {
       iterator ii;
-      if ( SortNeighbors ) {
+      if (SortedNeighbors) {
         // If neighbors are sorted, find appropriate insertion point.
         // Insert before first neighbor that is too far.
         ii = std::upper_bound(edges.begin(), edges.end(), N,
@@ -327,7 +334,7 @@ private:
     iterator createEdgeWithReuse(gNode* N, EdgeTy* v, Args&&... args) {
       // First check for holes
       iterator ii, ei;
-      if ( SortNeighbors ) {
+      if (SortedNeighbors) {
         // If neighbors are sorted, find acceptable range for insertion.
         ii = std::lower_bound(edges.begin(), edges.end(), N,
                               first_lt<gNode*>());
@@ -383,6 +390,8 @@ public:
   typedef gNode* GraphNode;
   //! Edge data type
   typedef EdgeTy edge_data_type;
+  //! Edge data type of file we are loading this graph from
+  typedef FileEdgeTy file_edge_data_type;
   //! Node data type
   typedef NodeTy node_data_type;
   //! Edge iterator
@@ -402,7 +411,7 @@ private:
   edge_iterator createEdgeWithReuse(GraphNode src, GraphNode dst, Galois::MethodFlag mflag, Args&&... args) {
     assert(src);
     assert(dst);
-    Galois::Runtime::checkWrite(mflag, true);
+    // Galois::Runtime::checkWrite(mflag, true);
     src->acquire(mflag);
     typename gNode::iterator ii = src->find(dst);
     if (ii == src->end()) {
@@ -422,7 +431,7 @@ private:
   edge_iterator createEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag, Args&&... args) {
     assert(src);
     assert(dst);
-    Galois::Runtime::checkWrite(mflag, true);
+    // Galois::Runtime::checkWrite(mflag, true);
     src->acquire(mflag);
     typename gNode::iterator ii = src->end();
     if (ii == src->end()) {
@@ -436,6 +445,24 @@ private:
       }
     }
     return boost::make_filter_iterator(is_edge(), ii, src->end());
+  }
+
+  template<bool _A1 = LargeArray<EdgeTy>::has_value, bool _A2 = LargeArray<FileEdgeTy>::has_value>
+  void constructEdgeValue(FileGraph& graph, typename FileGraph::edge_iterator nn,
+      GraphNode src, GraphNode dst, typename std::enable_if<!_A1 || _A2>::type* = 0) {
+    typedef typename LargeArray<FileEdgeTy>::value_type FEDV;
+    typedef LargeArray<EdgeTy> ED;
+    if (ED::has_value) {
+      addMultiEdge(src, dst, Galois::MethodFlag::UNPROTECTED, graph.getEdgeData<FEDV>(nn));
+    } else {
+      addMultiEdge(src, dst, Galois::MethodFlag::UNPROTECTED);
+    }
+  }
+
+  template<bool _A1 = LargeArray<EdgeTy>::has_value, bool _A2 = LargeArray<FileEdgeTy>::has_value>
+  void constructEdgeValue(FileGraph& graph, typename FileGraph::edge_iterator nn,
+      GraphNode src, GraphNode dst, typename std::enable_if<_A1 && !_A2>::type* = 0) {
+    addMultiEdge(src, dst, Galois::MethodFlag::UNPROTECTED);
   }
 
 public:
@@ -453,22 +480,22 @@ public:
   /**
    * Adds a node to the graph.
    */
-  void addNode(const GraphNode& n, Galois::MethodFlag mflag = MethodFlag::ALL) {
-    Galois::Runtime::checkWrite(mflag, true);
+  void addNode(const GraphNode& n, Galois::MethodFlag mflag = MethodFlag::WRITE) {
+    // Galois::Runtime::checkWrite(mflag, true);
     n->acquire(mflag);
     n->active = true;
   }
 
   //! Gets the node data for a node.
-  node_data_reference getData(const GraphNode& n, Galois::MethodFlag mflag = MethodFlag::ALL) const {
+  node_data_reference getData(const GraphNode& n, Galois::MethodFlag mflag = MethodFlag::WRITE) const {
     assert(n);
-    Galois::Runtime::checkWrite(mflag, false);
+    // Galois::Runtime::checkWrite(mflag, false);
     n->acquire(mflag);
     return n->getData();
   }
 
   //! Checks if a node is in the graph
-  bool containsNode(const GraphNode& n, Galois::MethodFlag mflag = MethodFlag::ALL) const {
+  bool containsNode(const GraphNode& n, Galois::MethodFlag mflag = MethodFlag::WRITE) const {
     assert(n);
     n->acquire(mflag);
     return n->active;
@@ -479,15 +506,15 @@ public:
    * for undirected graphs or outgoing edges for directed graphs.
    */
   //FIXME: handle edge memory
-  void removeNode(GraphNode n, Galois::MethodFlag mflag = MethodFlag::ALL) {
+  void removeNode(GraphNode n, Galois::MethodFlag mflag = MethodFlag::WRITE) {
     assert(n);
-    Galois::Runtime::checkWrite(mflag, true);
+    // Galois::Runtime::checkWrite(mflag, true);
     n->acquire(mflag);
     gNode* N = n;
     if (N->active) {
       N->active = false;
       if (!Directional && edges.mustDel())
-	for (edge_iterator ii = edge_begin(n, MethodFlag::NONE), ee = edge_end(n, MethodFlag::NONE); ii != ee; ++ii)
+	for (edge_iterator ii = edge_begin(n, MethodFlag::UNPROTECTED), ee = edge_end(n, MethodFlag::UNPROTECTED); ii != ee; ++ii)
 	  edges.delEdge(ii->second());
       N->edges.clear();
     }
@@ -496,9 +523,9 @@ public:
   /**
    * Resize the edges of the node. For best performance, should be done serially.
    */
-  void resizeEdges(GraphNode src, size_t size, Galois::MethodFlag mflag = MethodFlag::ALL) {
+  void resizeEdges(GraphNode src, size_t size, Galois::MethodFlag mflag = MethodFlag::WRITE) {
     assert(src);
-    Galois::Runtime::checkWrite(mflag, false);
+    // Galois::Runtime::checkWrite(mflag, false);
     src->acquire(mflag);
     src->resizeEdges(size);
    }
@@ -510,7 +537,7 @@ public:
    * value if desired.  This frees us from dealing with the void edge data
    * problem in this API
    */
-  edge_iterator addEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = MethodFlag::ALL) {
+  edge_iterator addEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = MethodFlag::WRITE) {
     return createEdgeWithReuse(src, dst, mflag);
   }
 
@@ -521,9 +548,9 @@ public:
   }
 
   //! Removes an edge from the graph
-  void removeEdge(GraphNode src, edge_iterator dst, Galois::MethodFlag mflag = MethodFlag::ALL) {
+  void removeEdge(GraphNode src, edge_iterator dst, Galois::MethodFlag mflag = MethodFlag::WRITE) {
     assert(src);
-    Galois::Runtime::checkWrite(mflag, true);
+    // Galois::Runtime::checkWrite(mflag, true);
     src->acquire(mflag);
     if (Directional) {
       src->erase(dst.base());
@@ -537,7 +564,7 @@ public:
   }
 
   //! Finds if an edge between src and dst exists
-  edge_iterator findEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = MethodFlag::ALL) {
+  edge_iterator findEdge(GraphNode src, GraphNode dst, Galois::MethodFlag mflag = MethodFlag::WRITE) {
     assert(src);
     assert(dst);
     src->acquire(mflag);
@@ -558,13 +585,13 @@ public:
   /**
    * Returns the edge data associated with the edge. It is an error to
    * get the edge data for a non-existent edge.  It is an error to get
-   * edge data for inactive edges. By default, the mflag is Galois::NONE
+   * edge data for inactive edges. By default, the mflag is Galois::MethodFlag::UNPROTECTED
    * because edge_begin() dominates this call and should perform the
    * appropriate locking.
    */
-  edge_data_reference getEdgeData(edge_iterator ii, Galois::MethodFlag mflag = MethodFlag::NONE) const {
+  edge_data_reference getEdgeData(edge_iterator ii, Galois::MethodFlag mflag = MethodFlag::UNPROTECTED) const {
     assert(ii->first()->active);
-    Galois::Runtime::checkWrite(mflag, false);
+    // Galois::Runtime::checkWrite(mflag, false);
     ii->first()->acquire(mflag);
     return *ii->second();
   }
@@ -578,7 +605,7 @@ public:
   //// General Things ////
 
   //! Returns an iterator to the neighbors of a node 
-  edge_iterator edge_begin(GraphNode N, Galois::MethodFlag mflag = MethodFlag::ALL) {
+  edge_iterator edge_begin(GraphNode N, Galois::MethodFlag mflag = MethodFlag::WRITE) {
     assert(N);
     N->acquire(mflag);
 
@@ -592,7 +619,7 @@ public:
   }
 
   //! Returns the end of the neighbor iterator 
-  edge_iterator edge_end(GraphNode N, Galois::MethodFlag mflag = MethodFlag::ALL) {
+  edge_iterator edge_end(GraphNode N, Galois::MethodFlag mflag = MethodFlag::WRITE) {
     assert(N);
     // Acquiring lock is not necessary: no valid use for an end pointer should
     // ever require it
@@ -604,7 +631,7 @@ public:
    * An object with begin() and end() methods to iterate over the outgoing
    * edges of N.
    */
-  detail::EdgesIterator<FirstGraph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
+  detail::EdgesIterator<FirstGraph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     return detail::EdgesIterator<FirstGraph>(*this, N, mflag);
   }
 
@@ -663,7 +690,7 @@ public:
     auto r = graph.divideByNode(sizeof(gNode), sizeof(typename gNode::EdgeInfo), tid, total).first;
     for (FileGraph::iterator ii = r.first, ei = r.second; ii != ei; ++ii) {
       aux[*ii] = createNode();
-      addNode(aux[*ii], Galois::MethodFlag::NONE);
+      addNode(aux[*ii], Galois::MethodFlag::UNPROTECTED);
     }
   }
 
@@ -673,11 +700,7 @@ public:
 
     for (FileGraph::iterator ii = r.first, ei = r.second; ii != ei; ++ii) {
       for (FileGraph::edge_iterator nn = graph.edge_begin(*ii), en = graph.edge_end(*ii); nn != en; ++nn) {
-        if (gNode::EdgeInfo::sizeOfSecond()) {
-          addMultiEdge(aux[*ii], aux[graph.getEdgeDst(nn)], Galois::MethodFlag::NONE, graph.getEdgeData<value_type>(nn));
-        } else {
-          addMultiEdge(aux[*ii], aux[graph.getEdgeDst(nn)], Galois::MethodFlag::NONE);
-        }
+        constructEdgeValue(graph, nn, aux[*ii], aux[graph.getEdgeDst(nn)]);
       }
     }
   }

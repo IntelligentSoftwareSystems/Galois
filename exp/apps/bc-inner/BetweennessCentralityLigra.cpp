@@ -161,7 +161,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
     Graph& g;
     Initialize(Graph& g): g(g) { }
     void operator()(typename Graph::GraphNode n) const {
-      SNode& data = g.getData(n, Galois::MethodFlag::NONE);
+      SNode& data = g.getData(n, Galois::MethodFlag::UNPROTECTED);
       data.numPaths.write(0.0);
       data.dependencies.write(0.0);
       data.visited = false;
@@ -171,13 +171,13 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
   struct ForwardPass {
     template<typename GTy>
     bool cond(GTy& graph, typename GTy::GraphNode n) { 
-      return !graph.getData(n, Galois::MethodFlag::NONE).visited; 
+      return !graph.getData(n, Galois::MethodFlag::UNPROTECTED).visited; 
     }
 
     template<typename GTy>
     bool operator()(GTy& graph, typename GTy::GraphNode src, typename GTy::GraphNode dst, typename GTy::edge_data_reference) {
-      SNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
-      SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+      SNode& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
+      SNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
 
       float oldValue = ddata.numPaths.atomicIncrement(sdata.numPaths.read());
       return oldValue == 0.0;
@@ -187,13 +187,13 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
   struct BackwardPass {
     template<typename GTy>
     bool cond(GTy& graph, typename GTy::GraphNode n) { 
-      return !graph.getData(n, Galois::MethodFlag::NONE).visited; 
+      return !graph.getData(n, Galois::MethodFlag::UNPROTECTED).visited; 
     }
 
     template<typename GTy>
     bool operator()(GTy& graph, typename GTy::GraphNode src, typename GTy::GraphNode dst, typename GTy::edge_data_reference) {
-      SNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
-      SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+      SNode& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
+      SNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
       float oldValue = ddata.dependencies.atomicIncrement(sdata.dependencies.read());
       return oldValue == 0.0;
     }
@@ -217,7 +217,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
       //Galois::do_all_local(*output, [&](GNode n) {
       //Galois::do_all(output->begin(), output->end(), [&](GNode n) {
       Galois::for_each_local(*output, [&](size_t id, Galois::UserContext<size_t>&) {
-        SNode& d = graph.getData(graph.nodeFromId(id), Galois::MethodFlag::NONE);
+        SNode& d = graph.getData(graph.nodeFromId(id), Galois::MethodFlag::UNPROTECTED);
         d.visited = true;
         },Galois::wl<WL>()); 
       levels.push_back(output);
@@ -227,7 +227,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
     delete levels[round];
 
     Galois::do_all_local(graph, [&](GNode n) {
-        SNode& d = graph.getData(n, Galois::MethodFlag::NONE);
+        SNode& d = graph.getData(n, Galois::MethodFlag::UNPROTECTED);
         d.numPaths.write(1.0/d.numPaths.read());
         d.visited = false;
     });
@@ -236,7 +236,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
 
     //Galois::do_all_local(*frontier, [&](GNode n) {
     Galois::for_each_local(*frontier, [&](size_t id, Galois::UserContext<size_t>&) {
-      SNode& d = graph.getData(graph.nodeFromId(id), Galois::MethodFlag::NONE);
+      SNode& d = graph.getData(graph.nodeFromId(id), Galois::MethodFlag::UNPROTECTED);
       d.visited = true;
       d.dependencies.write(d.dependencies.read() + d.numPaths.read());
       }, Galois::wl<WL>());
@@ -248,7 +248,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
       frontier = levels[r];
       //Galois::do_all_local(*frontier, [&](GNode n) {
       Galois::for_each_local(*frontier, [&](size_t id, Galois::UserContext<size_t>&) {
-        SNode& d = graph.getData(graph.nodeFromId(id), Galois::MethodFlag::NONE);
+        SNode& d = graph.getData(graph.nodeFromId(id), Galois::MethodFlag::UNPROTECTED);
         d.visited = true;
         d.dependencies.write(d.dependencies.read() + d.numPaths.read());
         }, Galois::wl<WL>());
@@ -257,7 +257,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
     delete frontier;
 
     Galois::do_all_local(graph, [&](GNode n) {
-      SNode& d = graph.getData(n, Galois::MethodFlag::NONE);
+      SNode& d = graph.getData(n, Galois::MethodFlag::UNPROTECTED);
       d.dependencies.write((d.dependencies.read() - d.numPaths.read())
           / d.numPaths.read());
     });
