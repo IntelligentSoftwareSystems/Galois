@@ -24,7 +24,7 @@
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#include "Galois/config.h"
+
 #include "Galois/Accumulator.h"
 #include "Galois/Bag.h"
 #include "Galois/Galois.h"

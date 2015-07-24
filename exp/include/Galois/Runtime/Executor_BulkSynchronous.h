@@ -389,10 +389,10 @@ namespace WorkList {
 template<typename T=int>
 struct BulkSynchronousInline {
   template<bool _concurrent>
-  struct rethread { typedef BulkSynchronousInline<T> type; };
+  using rethread = BulkSynchronousInline<T>;
 
   template<typename _T>
-  struct retype { typedef BulkSynchronousInline<_T> type; };
+  using retype = BulkSynchronousInline<_T>;
 
   typedef T value_type;
 };

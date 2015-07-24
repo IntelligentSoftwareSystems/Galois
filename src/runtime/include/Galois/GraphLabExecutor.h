@@ -41,7 +41,7 @@ private:
 
   typedef std::pair<int,message_type> Message;
   typedef std::deque<Message> MyMessages;
-  typedef Galois::Runtime::PerPackageStorage<MyMessages> Messages;
+  typedef Galois::Substrate::PerPackageStorage<MyMessages> Messages;
 
   Galois::UserContext<WorkItem>* ctx;
   Graph* graph;
@@ -51,9 +51,6 @@ private:
 
   Context(Galois::UserContext<WorkItem>* c): ctx(c) { }
 
-#if defined(__IBMCPP__) && __IBMCPP__ <= 1210
-public:
-#endif
   Context(Graph* g, Galois::LargeArray<int>* s, Galois::InsertBag<GNode>* n, Messages* m):
     graph(g), scoreboard(s), next(n), messages(m) { }
 
@@ -191,7 +188,7 @@ class SyncEngine {
   typedef Galois::WorkList::dChunkedFIFO<256> WL;
   typedef std::pair<int,message_type> Message;
   typedef std::deque<Message> MyMessages;
-  typedef Galois::Runtime::PerPackageStorage<MyMessages> Messages;
+  typedef Galois::Substrate::PerPackageStorage<MyMessages> Messages;
 
   Graph& graph;
   Operator origOp;
@@ -199,7 +196,7 @@ class SyncEngine {
   Messages messages;
   Galois::LargeArray<int> scoreboard;
   Galois::InsertBag<GNode> wls[2];
-  Galois::Runtime::LL::SimpleLock lock;
+  Galois::Substrate::SimpleLock lock;
 
   struct Gather {
     SyncEngine* self;
@@ -275,8 +272,8 @@ class SyncEngine {
     Initialize(SyncEngine* s): self(s) { }
 
     void allocateMessages() {
-      unsigned tid = Galois::Runtime::LL::getTID();
-      if (!Galois::Runtime::LL::isPackageLeader(tid) || tid == 0)
+      unsigned tid = Galois::Substrate::ThreadPool::getTID();
+      if (!Galois::Substrate::ThreadPool::isLeader() || tid == 0)
         return;
       MyMessages& m = *self->messages.getLocal();
       self->lock.lock();
@@ -287,8 +284,9 @@ class SyncEngine {
     message_type getMessage(size_t id) {
       message_type ret;
       if (NeedMessages) {
+        auto& tp = Galois::Substrate::getSystemThreadPool();
         for (unsigned int i = 0; i < self->messages.size(); ++i) {
-          if (!Galois::Runtime::LL::isPackageLeader(i))
+          if (!tp.isLeader(i))
             continue;
           MyMessages& m = *self->messages.getRemote(i);
           if (m.empty())

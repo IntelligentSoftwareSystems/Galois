@@ -1,8 +1,8 @@
 #ifndef GALOIS_GRAPHCHIEXECUTOR_H
 #define GALOIS_GRAPHCHIEXECUTOR_H
 
-#include "Galois/Graph/OCGraph.h"
-#include "Galois/Graph/GraphNodeBag.h"
+#include "Galois/Graphs/OCGraph.h"
+#include "Galois/Graphs/GraphNodeBag.h"
 
 #include <boost/iterator/filter_iterator.hpp>
 #include <boost/utility.hpp>

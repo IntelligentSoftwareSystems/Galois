@@ -30,9 +30,9 @@
 #include "Galois/Bag.h"
 #include "Galois/Statistic.h"
 #include "Galois/Timer.h"
-#include "Galois/Graph/LCGraph.h"
-#include "Galois/Graph/TypeTraits.h"
-#include "Galois/ParallelSTL/ParallelSTL.h"
+#include "Galois/Graphs/LCGraph.h"
+#include "Galois/Graphs/TypeTraits.h"
+#include "Galois/ParallelSTL.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 
@@ -665,7 +665,7 @@ void run() {
 
   //Galois::preAlloc(numThreads + (3*graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::MM::hugePageSize);
   //Galois::preAlloc(8*(numThreads + (graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::MM::hugePageSize));
-  size_t baseAlloc = graph.size() * sizeof(typename Graph::node_data_type) / Galois::Runtime::MM::hugePageSize;
+  size_t baseAlloc = graph.size() * sizeof(typename Graph::node_data_type) / Galois::Runtime::hugePageSize;
   baseAlloc += numThreads;
   baseAlloc *= AllocationOverhead<Algo>::value;
   Galois::preAlloc(baseAlloc);

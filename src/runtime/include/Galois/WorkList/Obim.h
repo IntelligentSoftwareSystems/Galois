@@ -164,7 +164,7 @@ struct OrderedByIntegerMetric :
   //static_assert(std::is_integral<Index>::value, "only integral index types supported");
 
   template<typename _T>
-  using retype = OrderedByIntegerMetric<Indexer, typename Container::template retype<_T>::type, BlockPeriod, BSP, _T, typename std::result_of<Indexer(_T)>::type, UseBarrier, UseMonotonic, UseDescending, Concurrent>;
+  using retype = OrderedByIntegerMetric<Indexer, typename Container::template retype<_T>, BlockPeriod, BSP, _T, typename std::result_of<Indexer(_T)>::type, UseBarrier, UseMonotonic, UseDescending, Concurrent>;
 
   template<unsigned _period>
   struct with_block_period { typedef OrderedByIntegerMetric<Indexer, Container, _period, BSP, T, Index, UseBarrier, UseMonotonic, UseDescending, Concurrent> type; };
@@ -191,7 +191,7 @@ struct OrderedByIntegerMetric :
   typedef Index index_type;
 
 private:
-  typedef typename Container::template rethread<Concurrent>::type CTy;
+  typedef typename Container::template rethread<Concurrent> CTy;
   typedef detail::OrderedByIntegerMetricComparator<Index, UseDescending> Comparator;
   typedef typename Comparator::template with_local_map<CTy*>::type LMapTy;
 

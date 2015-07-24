@@ -71,6 +71,9 @@ struct ChunkedMaster : private boost::noncopyable {
   template<int _chunk_size>
   using with_chunk_size = ChunkedMaster<T, QT, Distributed, IsStack, _chunk_size, Concurrent>;
 
+  template<bool _Concurrent>
+  using rethread = ChunkedMaster<T, QT, Distributed, IsStack, ChunkSize, _Concurrent>;
+
 private:
   class Chunk : public FixedSizeRing<T, ChunkSize>, public QT<Chunk, Concurrent>::ListNode {};
 

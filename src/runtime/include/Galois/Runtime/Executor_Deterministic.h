@@ -1611,10 +1611,10 @@ namespace WorkList {
 template<typename T=int>
 struct Deterministic {
   template<bool _concurrent>
-  struct rethread { typedef Deterministic<T> type; };
+  using rethread = Deterministic<T>;
 
   template<typename _T>
-  struct retype { typedef Deterministic<_T> type; };
+  using retype = Deterministic<_T>;
 
   typedef T value_type;
 };

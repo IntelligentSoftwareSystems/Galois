@@ -2,9 +2,9 @@
 #define APPS_BFS_GRAPHLABALGO_H
 
 #include "Galois/DomainSpecificExecutors.h"
-#include "Galois/Graph/OCGraph.h"
-#include "Galois/Graph/LCGraph.h"
-#include "Galois/Graph/GraphNodeBag.h"
+#include "Galois/Graphs/OCGraph.h"
+#include "Galois/Graphs/LCGraph.h"
+#include "Galois/Graphs/GraphNodeBag.h"
 
 #include <random>
 #include <boost/mpl/if.hpp>
@@ -130,7 +130,7 @@ struct GraphLabDiameter {
     size_t hash_value() const {
       if (!gen) {
         gen = std::mt19937();
-        gen->seed(Galois::Runtime::LL::getTID());
+        gen->seed(Galois::Substrate::ThreadPool::getTID());
       }
       size_t ret = 0;
       while (dist(*gen) < 0.5) {
