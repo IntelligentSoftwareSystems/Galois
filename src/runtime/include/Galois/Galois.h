@@ -31,7 +31,6 @@
 #ifndef GALOIS_GALOIS_H
 #define GALOIS_GALOIS_H
 
-#include "Galois/config.h"
 #include "Galois/Runtime/Executor_Deterministic.h"
 #include "Galois/Runtime/Executor_DoAll.h"
 #include "Galois/Runtime/Executor_ForEach.h"

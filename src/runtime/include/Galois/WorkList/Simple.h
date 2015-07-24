@@ -49,6 +49,9 @@ public:
   template<typename _T>
   using retype = Wrapper<_T>;
 
+  template<bool b>
+  using rethread = Wrapper;
+
   typedef T value_type;
   
   void push(const value_type& val) {
@@ -84,16 +87,16 @@ public:
   }
 };
 
-template<typename T>
+template<typename T = int>
 using FIFO = Wrapper<T, std::deque<T>, false >;
 
-template<typename T>
+template<typename T = int>
 using GFIFO = Wrapper<T, Galois::gdeque<T>, false >;
 
-template<typename T>
+template<typename T = int>
 using LIFO = Wrapper<T, std::deque<T>, true >;
 
-template<typename T>
+template<typename T = int>
 using GLIFO = Wrapper<T, Galois::gdeque<T>, true >;
 
 

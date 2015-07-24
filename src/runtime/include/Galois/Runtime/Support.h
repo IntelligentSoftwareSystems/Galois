@@ -51,6 +51,11 @@ void reportPageAlloc(const char* category);
 //! Reports NUMA memory stats for all NUMA nodes
 void reportNumaAlloc(const char* category);
 
+
+void reportStatGlobal(const std::string& category, const std::string& val);
+void reportStatGlobal(const std::string& category, unsigned long val);
+
+
 //! Prints all stats
 void printStats();
 

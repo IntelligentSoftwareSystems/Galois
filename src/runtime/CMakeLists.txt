@@ -1,5 +1,3 @@
-project(gRuntime)
-
 set(sources
         src/Context.cpp
         src/PreAlloc.cpp

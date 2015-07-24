@@ -1,5 +1,3 @@
-project(gGraphs)
-
 set(sources
         src/FileGraph.cpp
         src/FileGraphParallel_cpp11.cpp
@@ -8,5 +6,6 @@ set(sources
 )
 
 add_library(galois_graphs STATIC ${sources})
+target_include_directories(galois_graphs PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
 
-#target_include_directories(galois_substrate PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_link_libraries(galois_graphs galois_runtime)

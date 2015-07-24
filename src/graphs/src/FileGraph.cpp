@@ -24,15 +24,14 @@
  * Copyright (C) 2015, The University of Texas at Austin. All rights
  * reserved.
  *
- * Documentation, or loss or inaccuracy of data of any kind.
- *
  * @section Description
  *
  * Graph serialized to a file.
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
-#include "Galois/Graph/FileGraph.h"
+
+#include "Galois/Graphs/FileGraph.h"
 #include "Galois/Runtime/Mem.h"
 
 #include <cassert>
@@ -232,7 +231,7 @@ void FileGraph::fromFile(const std::string& filename) {
 template<typename Mappings>
 static void* loadFromOffset(int fd, offset_t offset, size_t length, Mappings& mappings) {
   // mmap needs page-aligned offsets
-  offset_t aligned = offset & ~static_cast<offset_t>(Galois::Runtime::MM::pageSize - 1);
+  offset_t aligned = offset & ~static_cast<offset_t>(Galois::Runtime::pageSize - 1);
   offset_t alignment = offset - aligned;
   length += alignment;
   void *base = mmap_big(nullptr, length, PROT_READ, MAP_PRIVATE, fd, aligned);
@@ -307,7 +306,7 @@ FileGraph::divideByNode(size_t nodeSize, size_t edgeSize, size_t id, size_t tota
     ea = *edge_end(eb-1);
   }
   if (false) {
-    Runtime::LL::gInfo("(", id, "/", total, ") ", bb, " ", eb, " ", eb - bb);
+    Substrate::gInfo("(", id, "/", total, ") ", bb, " ", eb, " ", eb - bb);
   }
   return GraphRange(NodeRange(iterator(bb), iterator(eb)), EdgeRange(edge_iterator(aa), edge_iterator(ea)));
 }
@@ -324,7 +323,7 @@ FileGraph::divideByEdge(size_t nodeSize, size_t edgeSize, size_t id, size_t tota
   size_t eb = findIndex(0, 1, ea, bb, numNodes);
 
   if (true) {
-    Runtime::LL::gInfo("(", id, "/", total, ") [", bb, " ", eb, " ", eb - bb, "], [", aa, " ", ea, " ", ea - aa, "]");
+    Substrate::gInfo("(", id, "/", total, ") [", bb, " ", eb, " ", eb - bb, "], [", aa, " ", ea, " ", ea - aa, "]");
   }
   return GraphRange(NodeRange(iterator(bb), iterator(eb)), EdgeRange(edge_iterator(aa), edge_iterator(ea)));
 }
@@ -374,9 +373,9 @@ void FileGraph::pageInByNode(size_t id, size_t total, size_t sizeofEdgeData) {
   if (r.first != r.second)
     eend = *edge_end(*r.second - 1);
 
-  Runtime::MM::pageInReadOnly(outIdx + *r.first, std::distance(r.first, r.second) * sizeof(*outIdx), Runtime::MM::pageSize);
-  Runtime::MM::pageInReadOnly(outs + ebegin, (eend - ebegin) * sizeof(*outs), Runtime::MM::pageSize);
-  Runtime::MM::pageInReadOnly(edgeData + ebegin * sizeofEdgeData, (eend - ebegin) * sizeofEdgeData, Runtime::MM::pageSize);
+  Runtime::pageInReadOnly(outIdx + *r.first, std::distance(r.first, r.second) * sizeof(*outIdx), Runtime::pageSize);
+  Runtime::pageInReadOnly(outs + ebegin, (eend - ebegin) * sizeof(*outs), Runtime::pageSize);
+  Runtime::pageInReadOnly(edgeData + ebegin * sizeofEdgeData, (eend - ebegin) * sizeofEdgeData, Runtime::pageSize);
 }
 
 uint32_t* FileGraph::raw_neighbor_begin(GraphNode N) const {

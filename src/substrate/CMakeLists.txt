@@ -1,5 +1,3 @@
-project(gSubstrate)
-
 set(sources 
             src/gIO.cpp
             src/Barrier.cpp

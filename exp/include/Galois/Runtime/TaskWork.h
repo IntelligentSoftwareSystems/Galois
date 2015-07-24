@@ -2,21 +2,27 @@
  * @file
  * @section License
  *
- * Galois, a framework to exploit amorphous data-parallelism in irregular
- * programs.
+ * This file is part of Galois.  Galoisis a gramework to exploit
+ * amorphous data-parallelism in irregular programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
- * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
- * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
- * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
- * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
- * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
- * shall University be liable for incidental, special, indirect, direct or
- * consequential damages or loss of profits, interruption of business, or
- * related expenses which may arise from use of Software or Documentation,
- * including but not limited to those resulting from defects in Software and/or
- * Documentation, or loss or inaccuracy of data of any kind.
+ * Galois is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * Galois is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with Galois.  If not, see
+ * <http://www.gnu.org/licenses/>.
+ *
+ * @section Copyright
+ *
+ * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * reserved.
  *
  * @section Description
  *
@@ -225,7 +231,7 @@ protected:
   
   Galois::IterAllocBaseTy IterationAllocatorBase;
   Galois::PerIterAllocTy PerIterationAllocator;
-  Galois::Runtime::MM::FixedSizeHeap heap;
+  Galois::Runtime::FixedSizeHeap heap;
 
   UserTaskContext():
     PerIterationAllocator(&IterationAllocatorBase), 
@@ -379,11 +385,11 @@ struct WorklistPipeline: private boost::noncopyable {
   typedef typename TaskTraits<typename PipelineTy::Task4Type>::GTaskType GTask4Type;
   typedef typename TaskTraits<typename PipelineTy::Task5Type>::GTaskType GTask5Type;
 
-  typename PipelineTy::WorklistType::template retype<GTask1Type*>::type wl1;
-  typename PipelineTy::WorklistType::template retype<GTask2Type*>::type wl2;
-  typename PipelineTy::WorklistType::template retype<GTask3Type*>::type wl3;
-  typename PipelineTy::WorklistType::template retype<GTask4Type*>::type wl4;
-  typename PipelineTy::WorklistType::template retype<GTask5Type*>::type wl5;
+  typename PipelineTy::WorklistType::template retype<GTask1Type*> wl1;
+  typename PipelineTy::WorklistType::template retype<GTask2Type*> wl2;
+  typename PipelineTy::WorklistType::template retype<GTask3Type*> wl3;
+  typename PipelineTy::WorklistType::template retype<GTask4Type*> wl4;
+  typename PipelineTy::WorklistType::template retype<GTask5Type*> wl5;
 };
 
 template<typename PipelineTy,typename IterTy>
@@ -411,8 +417,8 @@ class Executor {
   // XXX scheduling type (infer?)
   WorklistPipeline<PipelineTy> wls;
 
-  TerminationDetection& term;
-  Barrier& barrier;
+  Substrate::TerminationDetection& term;
+  Substrate::Barrier& barrier;
   IterTy initialBegin;
   IterTy initialEnd;
   const char* loopname;
@@ -449,7 +455,7 @@ class Executor {
 #else
     } catch (ConflictFlag const& flag) { clearConflictLock(); result = flag; }
 #endif
-    clearReleasable(); 
+    //FIXME:    clearReleasable(); 
     switch (result) {
       case 0: break;
       case Galois::Runtime::CONFLICT:
@@ -499,7 +505,7 @@ class Executor {
   }
 
 public:
-  Executor(IterTy b, IterTy e, const char* ln): term(getSystemTermination()), barrier(getSystemBarrier()), initialBegin(b), initialEnd(e), loopname(ln) { 
+  Executor(IterTy b, IterTy e, const char* ln): term(Substrate::getSystemTermination(Galois::getActiveThreads())), barrier(Substrate::getSystemBarrier(Galois::getActiveThreads())), initialBegin(b), initialEnd(e), loopname(ln) { 
     barrier.reinit(Galois::getActiveThreads());
   }
 
@@ -509,7 +515,7 @@ public:
 
   void operator()() {
     ThreadLocalData tld(loopname);
-    std::pair<IterTy,IterTy> range = Galois::block_range(initialBegin, initialEnd, LL::getTID(), Galois::getActiveThreads());
+    std::pair<IterTy,IterTy> range = Galois::block_range(initialBegin, initialEnd, Substrate::ThreadPool::getTID(), Galois::getActiveThreads());
     tld.facing.push_initial(range.first, range.second, wls.wl1);
 
     barrier.wait();
@@ -583,7 +589,7 @@ static inline void for_each_task(IterTy b, IterTy e, const char* loopname = 0) {
   WorkTy W(b, e, loopname);
   
   using namespace Galois::Runtime;
-  getSystemThreadPool().run(activeThreads, std::bind(&WorkTy::initThread, std::ref(W)), std::ref(W));
+  Substrate::getSystemThreadPool().run(activeThreads, std::bind(&WorkTy::initThread, std::ref(W)), std::ref(W));
 }
 
 template<typename PipelineTy,typename TaskTy>

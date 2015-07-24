@@ -242,6 +242,8 @@ include(CheckEndian)
 
 ###### Build Hacks ######
 
+add_definitions(-D__STDC_LIMIT_MACROS)
+
 # XXX(ddn): Hack for lonestar machines
 if(NUMA_FOUND)
   if(NUMA_OLD)
@@ -280,8 +282,14 @@ function(app name)
 
   compileApp(${name} ${APP_UNPARSED_ARGUMENTS})
   target_link_libraries(${name} ${APP_EXTLIBS})
-  target_link_libraries(${name} galois)
+  target_link_libraries(${name} lonestar)
+  target_link_libraries(${name} galois_graphs)
+  target_link_libraries(${name} galois_runtime)
+  target_link_libraries(${name} galois_substrate)
+  target_link_libraries(${name} gllvm)
   target_link_libraries(${name} rt)
+  target_link_libraries(${name} ${CMAKE_THREAD_LIBS_INIT})
+
   if(INSTALL_APPS)
     install(TARGETS ${name} DESTINATION bin)
   endif()
@@ -311,7 +319,11 @@ function(makeTest)
 
   if(${APP_ADD_TARGET})
     add_executable(test-${name} ${name}.cpp)
+    target_link_libraries(test-${name} galois_graphs)
+    target_link_libraries(test-${name} galois_runtime)
     target_link_libraries(test-${name} galois_substrate)
+    target_link_libraries(test-${name} gllvm)
+#    target_link_libraries(test-${name} galois_substrate)
 #    target_link_libraries(test-${name} galois)
     list(APPEND commandline "$<TARGET_FILE:test-${name}>")
   elseif(${APP_TARGET}) 
@@ -348,6 +360,7 @@ add_subdirectory(src)
 add_subdirectory(tools)
 add_subdirectory(scripts)
 if(NOT SKIP_COMPILE_APPS)
+  add_subdirectory(lonestar)
   add_subdirectory(apps)
   add_subdirectory(inputs)
   add_subdirectory(test)
@@ -372,8 +385,8 @@ set(CPACK_PACKAGE_VERSION_PATCH ${GALOIS_VERSION_PATCH})
 include(CPack)
 
 ###### Installation ######
-export(TARGETS galois APPEND FILE "${PROJECT_BINARY_DIR}/GaloisTargets.cmake")
-export(PACKAGE Galois)
+#export(TARGETS galois APPEND FILE "${PROJECT_BINARY_DIR}/GaloisTargets.cmake")
+#export(PACKAGE Galois)
 
 # Galois include files
 file(RELATIVE_PATH rel_include_dir "${INSTALL_CMAKE_DIR}" "${INSTALL_INCLUDE_DIR}")
@@ -384,7 +397,7 @@ endif()
 
 set(GALOIS_INCLUDE_DIRS) # Galois include dependencies
 set(GALOIS_INCLUDE_DIR)  # Galois include provides
-get_target_property(defs galois INCLUDE_DIRECTORIES)
+#get_target_property(defs galois INCLUDE_DIRECTORIES)
 foreach(d ${defs})
   string(FIND ${d} ${PROJECT_BINARY_DIR} pos1)
   string(FIND ${d} ${PROJECT_SOURCE_DIR} pos2)

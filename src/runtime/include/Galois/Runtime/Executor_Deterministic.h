@@ -70,7 +70,7 @@ namespace Runtime {
 //! Implementation of deterministic execution
 namespace DeterministicImpl {
 
-extern __thread MM::SizedHeapFactory::SizedHeap* dagListHeap;
+extern __thread SizedHeapFactory::SizedHeap* dagListHeap;
 
 template<typename T, bool UseLocalState>
 class DItemBase {
@@ -357,7 +357,7 @@ public:
 
   static void initialize() {
     if (!dagListHeap)
-      dagListHeap = MM::SizedHeapFactory::getHeapForSize(sizeof(typename ContextList::block_type));
+      dagListHeap = SizedHeapFactory::getHeapForSize(sizeof(typename ContextList::block_type));
   }
 };
 
@@ -543,15 +543,15 @@ class DAGManagerBase<OptionsTy,true> {
     ThreadLocalData(): alloc(&heap), sortBuf(alloc) { }
   };
 
-  PerThreadStorage<ThreadLocalData> data;
+  Substrate::PerThreadStorage<ThreadLocalData> data;
   WL1 taskList;
   WL2 taskList2;
   WL3 sourceList;
-  TerminationDetection& term;
-  Barrier& barrier;
+  Substrate::TerminationDetection& term;
+  Substrate::Barrier& barrier;
 
 public:
-  DAGManagerBase(): term(getSystemTermination()), barrier(getSystemBarrier()) { }
+  DAGManagerBase(): term(Substrate::getSystemTermination(activeThreads)), barrier(Substrate::getSystemBarrier(activeThreads)) { }
 
   void destroyDAGManager() {
     data.getLocal()->heap.clear();
@@ -631,7 +631,7 @@ public:
 
       term.localTermination(oldCommitted != committed);
       oldCommitted = committed;
-      LL::asmPause();
+      Substrate::asmPause();
     } while (!term.globalTermination());
 
     if (OptionsTy::needsPia && OptionsTy::useLocalState)
@@ -732,16 +732,16 @@ template<typename OptionsTy>
 class BreakManagerBase<OptionsTy, true> {
   typedef typename get_type_by_supertype<has_deterministic_parallel_break_tag, typename OptionsTy::args_type>::type::type BreakFn;
   BreakFn breakFn;
-  Barrier& barrier;
-  LL::CacheLineStorage<volatile long> done;
+  Substrate::Barrier& barrier;
+  Substrate::CacheLineStorage<volatile long> done;
 
 public:
   BreakManagerBase(const OptionsTy& o): 
     breakFn(get_by_supertype<has_deterministic_parallel_break_tag>(o.args).value),
-    barrier(getSystemBarrier()) { }
+    barrier(Substrate::getSystemBarrier(activeThreads)) { }
 
   bool checkBreak() {
-    if (LL::getTID() == 0)
+    if (Substrate::ThreadPool::getTID() == 0)
       done.get() = breakFn();
     barrier.wait();
     return done.get();
@@ -764,11 +764,11 @@ template<typename OptionsTy>
 class IntentToReadManagerBase<OptionsTy, true> {
   typedef DeterministicContext<OptionsTy> Context;
   typedef Galois::gdeque<Context*> WL;
-  Galois::Runtime::PerThreadStorage<WL> pending;
-  Barrier& barrier;
+  Substrate::PerThreadStorage<WL> pending;
+  Substrate::Barrier& barrier;
 
 public:
-  IntentToReadManagerBase(): barrier(getSystemBarrier()) { }
+  IntentToReadManagerBase(): barrier(Substrate::getSystemBarrier(activeThreads)) { }
 
   void pushIntentToReadTask(Context* ctx) {
     pending.getLocal()->push_back(ctx);
@@ -815,7 +815,7 @@ public:
   };
 
 private:
-  PerThreadStorage<ThreadLocalData> data;
+  Substrate::PerThreadStorage<ThreadLocalData> data;
   unsigned numActive;
 
 public:
@@ -878,11 +878,11 @@ public:
 
     // Useful debugging info
     if (false) {
-      if (LL::getTID() == 0) {
+      if (Substrate::ThreadPool::getTID() == 0) {
         char buf[1024];
         snprintf(buf, 1024, "%d %.3f (%zu/%zu) window: %zu delta: %zu\n", 
             inner, commitRatio, allcommitted, alliterations, local.window, local.delta);
-        LL::gPrint(buf);
+        Substrate::gPrint(buf);
       }
     }
   }
@@ -978,11 +978,11 @@ class NewWorkManager: public IdManager<OptionsTy> {
 
   IterAllocBaseTy heap;
   PerIterAllocTy alloc;
-  PerThreadStorage<ThreadLocalData> data;
+  Substrate::PerThreadStorage<ThreadLocalData> data;
   NewWork new_;
   MergeBuf mergeBuf;
   DistributeBuf distributeBuf;
-  Barrier& barrier;
+  Substrate::Barrier& barrier;
   unsigned numActive;
 
   bool merge(int begin, int end) {
@@ -1214,7 +1214,7 @@ class NewWorkManager: public IdManager<OptionsTy> {
 
 public:
   NewWorkManager(const OptionsTy& o): 
-    IdManager<OptionsTy>(o), alloc(&heap), mergeBuf(alloc), distributeBuf(alloc), barrier(getSystemBarrier()) 
+    IdManager<OptionsTy>(o), alloc(&heap), mergeBuf(alloc), distributeBuf(alloc), barrier(Substrate::getSystemBarrier(activeThreads)) 
   {
     numActive = getActiveThreads();
   }
@@ -1247,16 +1247,16 @@ public:
       ThreadLocalData& local = *data.getLocal();
       size_t window = wm.initialWindow(dist, OptionsTy::MinDelta, local.minId);
       if (OptionsTy::hasFixedNeighborhood) {
-        copyMine(b, e, dist, wl, window, LL::getTID());
+        copyMine(b, e, dist, wl, window, Substrate::ThreadPool::getTID());
       } else {
         copyMine(
             boost::make_transform_iterator(mergeBuf.begin(), typename NewItem::GetValue()),
             boost::make_transform_iterator(mergeBuf.end(), typename NewItem::GetValue()),
-            mergeBuf.size(), wl, window, LL::getTID());
+            mergeBuf.size(), wl, window, Substrate::ThreadPool::getTID());
       }
     } else {
       size_t window = wm.initialWindow(dist, OptionsTy::MinDelta);
-      copyMineAfterRedistribute(b, e, dist, wl, window, LL::getTID());
+      copyMineAfterRedistribute(b, e, dist, wl, window, Substrate::ThreadPool::getTID());
     }
   }
 
@@ -1276,7 +1276,7 @@ public:
 
   template<typename WL>
   void distributeNewWork(WindowManager<OptionsTy>& wm, WL* wl) {
-    parallelSort(wm, wl, LL::getTID());
+    parallelSort(wm, wl, Substrate::ThreadPool::getTID());
   }
 };
 
@@ -1315,13 +1315,13 @@ class Executor:
   };
 
   OptionsTy options;
-  Barrier& barrier;
+  Substrate::Barrier& barrier;
   WL worklists[2];
   PendingWork pending;
   const char* loopname;
-  LL::CacheLineStorage<volatile long> innerDone;
-  LL::CacheLineStorage<volatile long> outerDone;
-  LL::CacheLineStorage<volatile long> hasNewWork;
+  Substrate::CacheLineStorage<volatile long> innerDone;
+  Substrate::CacheLineStorage<volatile long> outerDone;
+  Substrate::CacheLineStorage<volatile long> hasNewWork;
 
   bool pendingLoop(ThreadLocalData& tld);
   bool commitLoop(ThreadLocalData& tld);
@@ -1340,7 +1340,7 @@ public:
     BreakManager<OptionsTy>(o),
     NewWorkManager<OptionsTy>(o), 
     options(o),
-    barrier(getSystemBarrier()),
+    barrier(Substrate::getSystemBarrier(activeThreads)),
     loopname(get_by_supertype<loopname_tag>(o.args).value) 
   { 
     static_assert(!OptionsTy::needsBreak || OptionsTy::hasBreak,
@@ -1450,7 +1450,7 @@ void Executor<OptionsTy>::go() {
   this->clearNewWork();
   
   if (OptionsTy::needsStats) {
-    if (LL::getTID() == 0) {
+    if (Substrate::ThreadPool::getTID() == 0) {
       reportStat(loopname, "RoundsExecuted", tld.rounds);
       reportStat(loopname, "OuterRoundsExecuted", tld.outerRounds);
     }
@@ -1490,7 +1490,7 @@ bool Executor<OptionsTy>::pendingLoop(ThreadLocalData& tld)
 #else
     } catch (const ConflictFlag& flag) { clearConflictLock(); result = flag; }
 #endif
-    clearReleasable();
+    //FIXME:    clearReleasable();
     tld.facing.resetFirstPass();
     ctx->resetFirstPass();
     switch (result) {
@@ -1533,7 +1533,7 @@ bool Executor<OptionsTy>::executeTask(ThreadLocalData& tld, Context* ctx)
 #else
   } catch (const ConflictFlag& flag) { clearConflictLock(); result = flag; }
 #endif
-  clearReleasable();
+  //FIXME: clearReleasable();
   switch (result) {
     case 0: break;
     case CONFLICT: return false; break;
@@ -1542,7 +1542,7 @@ bool Executor<OptionsTy>::executeTask(ThreadLocalData& tld, Context* ctx)
 
   if (OptionsTy::needsPush) {
     unsigned long parent = ctx->item.id;
-    typedef typename UserContextAccess<value_type>::PushBufferTy::iterator iterator;
+    //    typedef typename UserContextAccess<value_type>::PushBufferTy::iterator iterator;
     unsigned count = 0;
     for (auto& item : tld.facing.getPushBuffer()) {
       this->pushNew(item, parent, ++count);

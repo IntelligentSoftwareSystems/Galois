@@ -200,6 +200,7 @@ protected:
 
   AbortHandler<value_type> aborted; 
   Substrate::TerminationDetection& term;
+  Substrate::Barrier& barrier;
 
   WorkListTy wl;
   FunctionTy origFunction;
@@ -335,7 +336,7 @@ protected:
       if (needsBreak && broke)
         break;
       term.initializeThread();
-      Substrate::getSystemBarrier().wait();
+      barrier.wait();
     }
 
     if (couldAbort)
@@ -345,6 +346,7 @@ protected:
   template<typename... WArgsTy>
   ForEachExecutor(const FunctionTy& f, const ArgsTy& args, int, const WArgsTy&... wargs):
     term(Substrate::getSystemTermination(activeThreads)),
+    barrier(Substrate::getSystemBarrier(activeThreads)),
     wl(wargs...),
     origFunction(f),
     loopname(get_by_supertype<loopname_tag>(args).value),
@@ -480,7 +482,7 @@ void for_each_impl(const RangeTy& range, const FunctionTy& fn, const ArgsTy& arg
   typedef typename std::iterator_traits<typename RangeTy::iterator>::value_type value_type; 
   typedef typename get_type_by_supertype<wl_tag, ArgsTy>::type::type BaseWorkListTy;
   typedef typename reiterator<BaseWorkListTy, typename RangeTy::iterator>::type
-    ::template retype<value_type>::type WorkListTy;
+    ::template retype<value_type> WorkListTy;
   typedef ForEachExecutor<WorkListTy, FunctionTy, ArgsTy> WorkTy;
 
   auto& barrier = Substrate::getSystemBarrier(activeThreads);

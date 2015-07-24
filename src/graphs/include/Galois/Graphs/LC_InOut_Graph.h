@@ -25,7 +25,7 @@
 #ifndef GALOIS_GRAPH_LC_INOUT_GRAPH_H
 #define GALOIS_GRAPH_LC_INOUT_GRAPH_H
 
-#include "Galois/Graph/Details.h"
+#include "Galois/Graphs/Details.h"
 
 #include <boost/iterator/iterator_facade.hpp>
 #include <boost/fusion/include/vector.hpp>

@@ -2,37 +2,41 @@
  * @file
  * @section License
  *
- * Graph which is like other LC graphs but allows adding edges.
+ * This file is part of Galois.  Galoisis a gramework to exploit
+ * amorphous data-parallelism in irregular programs.
  *
- * Galois, a framework to exploit amorphous data-parallelism in irregular
- * programs.
+ * Galois is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
- * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
- * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
- * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
- * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
- * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
- * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
- * shall University be liable for incidental, special, indirect, direct or
- * consequential damages or loss of profits, interruption of business, or
- * related expenses which may arise from use of Software or Documentation,
- * including but not limited to those resulting from defects in Software and/or
- * Documentation, or loss or inaccuracy of data of any kind.
+ * Galois is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with Galois.  If not, see
+ * <http://www.gnu.org/licenses/>.
+ *
+ * @section Copyright
+ *
+ * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * reserved.
  *
  * @author Nikunj Yadav nikunj@cs.utexas.edu
  */
+
 #ifndef GALOIS_GRAPH_LC_MORPH_GRAPH_H
 #define GALOIS_GRAPH_LC_MORPH_GRAPH_H
 
-#include "Galois/config.h"
 #include "Galois/Bag.h"
 #include "Galois/LargeArray.h"
-#include "Galois/Graph/FileGraph.h"
-#include "Galois/Graph/Details.h"
+#include "Galois/Graphs/FileGraph.h"
+#include "Galois/Graphs/Details.h"
 
 #include <boost/mpl/if.hpp>
-#include GALOIS_CXX11_STD_HEADER(type_traits)
+#include <type_traits>
 
 namespace Galois {
 namespace Graph {
@@ -126,7 +130,7 @@ public:
 
 protected:
   Nodes nodes;
-  Galois::Runtime::PerThreadStorage<EdgeHolder*> edges;
+  Galois::Substrate::PerThreadStorage<EdgeHolder*> edges;
 
   template<bool _A1 = HasNoLockable, bool _A2 = HasOutOfLineLockable>
   void acquireNode(GraphNode N, MethodFlag mflag, typename std::enable_if<!_A1 && !_A2>::type* = 0) {
@@ -247,7 +251,7 @@ public:
     EdgeHolder*& local_edges = *edges.getLocal();
     if (!local_edges || std::distance(local_edges->begin, local_edges->end) < nedges) {
       EdgeHolder* old = local_edges;
-      char* newblock = (char*)Runtime::MM::pageAlloc();
+      char* newblock = (char*)Runtime::pageAlloc();
       local_edges = (EdgeHolder*)newblock;
       local_edges->next = old;
       char* estart = newblock + sizeof(EdgeHolder);
@@ -259,7 +263,7 @@ public:
 #endif
 
       local_edges->begin = (EdgeInfo*)estart;
-      char* eend = newblock + Runtime::MM::hugePageSize;
+      char* eend = newblock + Runtime::hugePageSize;
       eend -= (uintptr_t)eend % sizeof(EdgeInfo);
       local_edges->end = (EdgeInfo*)eend;
     }

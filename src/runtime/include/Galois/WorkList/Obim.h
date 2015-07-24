@@ -64,7 +64,7 @@ protected:
 
   Substrate::Barrier& barrier;
 
-  OrderedByIntegerMetricData(): barrier(Runtime::getSystemBarrier()) { }
+  OrderedByIntegerMetricData(): barrier(Substrate::getSystemBarrier(Runtime::activeThreads)) { }
 
   bool hasStored(ThreadData& p, Index idx) {
     for (auto& e : p.stored) {
@@ -213,8 +213,8 @@ private:
 
   // NB: Place dynamically growing masterLog after fixed-size PerThreadStorage
   // members to give higher likelihood of reclaiming PerThreadStorage
-  Runtime::PerThreadStorage<ThreadData> data;
-  Runtime::LL::PaddedLock<Concurrent> masterLock;
+  Substrate::PerThreadStorage<ThreadData> data;
+  Substrate::PaddedLock<Concurrent> masterLock;
   MasterLog masterLog;
 
   std::atomic<unsigned int> masterVersion;
@@ -240,8 +240,7 @@ private:
 
   GALOIS_ATTRIBUTE_NOINLINE
   Galois::optional<T> slowPop(ThreadData& p) {
-    unsigned myID = Runtime::LL::getTID();
-    bool localLeader = Runtime::LL::isPackageLeaderForSelf(myID);
+    bool localLeader = Substrate::ThreadPool::isLeader();
     Index msS = this->identity;
     
     updateLocal(p);
@@ -255,7 +254,7 @@ private:
             msS = o;
         }
       } else {
-        Index o = data.getRemote(Runtime::LL::getLeaderForThread(myID))->scanStart;
+        Index o = data.getRemote(Substrate::ThreadPool::getLeader())->scanStart;
         if (this->compare(o, msS))
           msS = o;
       }

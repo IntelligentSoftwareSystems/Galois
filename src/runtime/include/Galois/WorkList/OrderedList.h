@@ -70,7 +70,7 @@ public:
 
   template<typename RangeTy>
   void push_initial(RangeTy range) {
-    if (Runtime::LL::getTID() == 0)
+    if (Substrate::ThreadPool::getTID() == 0)
       push(range.begin(), range.end());
   }
 

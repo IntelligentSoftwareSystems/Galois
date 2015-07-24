@@ -1,6 +1,4 @@
-project(gLLVM)
-
-add_library(gllvm OBJECT
+set(sources
                  src/Allocator.cpp
                  src/APFloat.cpp
                  src/APInt.cpp
@@ -12,6 +10,7 @@ add_library(gllvm OBJECT
                  src/Twine.cpp
 )
 
+add_library(gllvm STATIC ${sources})
 target_include_directories(gllvm PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-
+target_include_directories(gllvm PUBLIC ${CMAKE_CURRENT_BINARY_DIR}/include)
 include(llvm-extras)

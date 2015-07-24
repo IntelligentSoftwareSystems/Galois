@@ -2,21 +2,27 @@
  * @file
  * @section License
  *
- * Galois, a framework to exploit amorphous data-parallelism in irregular
- * programs.
+ * This file is part of Galois.  Galoisis a gramework to exploit
+ * amorphous data-parallelism in irregular programs.
  *
- * Copyright (C) 2013, The University of Texas at Austin. All rights reserved.
- * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
- * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
- * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
- * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
- * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
- * shall University be liable for incidental, special, indirect, direct or
- * consequential damages or loss of profits, interruption of business, or
- * related expenses which may arise from use of Software or Documentation,
- * including but not limited to those resulting from defects in Software and/or
- * Documentation, or loss or inaccuracy of data of any kind.
+ * Galois is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * Galois is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with Galois.  If not, see
+ * <http://www.gnu.org/licenses/>.
+ *
+ * @section Copyright
+ *
+ * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * reserved.
  *
  * @section Description
  *
@@ -32,7 +38,7 @@
 #include "Galois/NoDerefIterator.h"
 #include "Galois/Threads.h"
 #include "Galois/Runtime/Context.h"
-#include "Galois/Runtime/PerThreadStorage.h"
+#include "Galois/Substrate/PerThreadStorage.h"
 
 #include <boost/mpl/if.hpp>
 #include <algorithm>
@@ -78,7 +84,7 @@ namespace detail {
 template<bool Enable>
 class LocalIteratorFeature {
   typedef std::pair<uint64_t,uint64_t> Range;
-  Runtime::PerThreadStorage<Range> localIterators;
+  Substrate::PerThreadStorage<Range> localIterators;
 public:
   uint64_t localBegin(uint64_t numNodes) const {
     return localIterators.getLocal()->first;
@@ -98,13 +104,13 @@ public:
 template<>
 struct LocalIteratorFeature<false> {
   uint64_t localBegin(uint64_t numNodes) const {
-    unsigned int id = Galois::Runtime::LL::getTID();
+    unsigned int id = Substrate::ThreadPool::getTID();
     unsigned int num = Galois::getActiveThreads();
     return (numNodes + num - 1) / num * id;
   }
 
   uint64_t localEnd(uint64_t numNodes) const {
-    unsigned int id = Galois::Runtime::LL::getTID();
+    unsigned int id = Substrate::ThreadPool::getTID();
     unsigned int num = Galois::getActiveThreads();
     uint64_t end = (numNodes + num - 1) / num * (id + 1);
     return std::min(end, numNodes);

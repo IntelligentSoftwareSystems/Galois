@@ -25,11 +25,15 @@
 #ifndef GALOIS_VERSION_H
 #define GALOIS_VERSION_H
 
-#include "Galois/config.h"
 #ifdef GALOIS_USE_EMBEDDED_REVISION
 #include "Galois/revision.h"
 #else
+#define GALOIS_VERSION 2.4
+#define GALOIS_VERSION_STR "2.3"
 #define GALOIS_REVISION 0
+#define GALOIS_REVISION_STR "UNKNOWN"
+#define GALOIS_COPYRIGHT_YEAR 2015
+#define GALOIS_COPYRIGHT_YEAR_STRING "2015"
 #endif
 
 #endif
