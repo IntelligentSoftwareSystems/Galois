@@ -8,7 +8,7 @@
 
 #include <boost/mpl/if.hpp>
 
-#include "PageRank.h"
+#include "PageRankOld.h"
 
 template<bool UseGraphChi>
 struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {

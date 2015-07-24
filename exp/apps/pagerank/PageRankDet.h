@@ -20,7 +20,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 
-#include "PageRank.h"
+#include "PageRankOld.h"
 
 #include <cstdio>
 
