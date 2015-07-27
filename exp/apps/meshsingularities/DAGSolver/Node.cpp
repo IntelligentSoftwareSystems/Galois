@@ -105,19 +105,45 @@ void Node::fillin() const
 
 void Node::merge() const
 {
-    for (int j=getLeft()->getDofsToElim(); j<getLeft()->getDofs().size(); ++j) {
-        for (int i=getLeft()->getDofsToElim(); i<getLeft()->getDofs().size(); ++i) {
-            system->matrix[leftPlaces[j-getLeft()->getDofsToElim()]][leftPlaces[i-getLeft()->getDofsToElim()]] =
-                    left->system->matrix[j][i];
+    double ** M_right;
+    double ** M_left;
+    double ** M;
+
+    double * RHS_right;
+    double * RHS_left;
+    double * RHS;
+
+    int dofs_left;
+    int dofs_right;
+
+    int dofs_to_elim_left;
+    int dofs_to_elim_right;
+
+    M_right = right->system->matrix;
+    M_left = left->system->matrix;
+    M = system->matrix;
+
+    RHS_right = right->system->rhs;
+    RHS_left = left->system->rhs;
+    RHS = system->rhs;
+
+    dofs_left = getLeft()->getDofs().size();
+    dofs_right = getRight()->getDofs().size();
+
+    dofs_to_elim_left = getLeft()->getDofsToElim();
+    dofs_to_elim_right = getRight()->getDofsToElim();
+
+    for (int j=dofs_to_elim_left; j<dofs_left; ++j) {
+        for (int i=dofs_to_elim_left; i<dofs_left; ++i) {
+            M[leftPlaces[j-dofs_to_elim_left]][leftPlaces[i-dofs_to_elim_left]] = M_left[j][i];
         }
-        system->rhs[leftPlaces[j-getLeft()->getDofsToElim()]] = left->system->rhs[j];
+        RHS[leftPlaces[j-dofs_to_elim_left]] = RHS_left[j];
     }
-    for (int j=getRight()->getDofsToElim(); j<getRight()->getDofs().size(); ++j) {
-        for (int i=getRight()->getDofsToElim(); i<getRight()->getDofs().size(); ++i) {
-            system->matrix[rightPlaces[j-getRight()->getDofsToElim()]][rightPlaces[i-getRight()->getDofsToElim()]] +=
-                    right->system->matrix[j][i];
+    for (int j=dofs_to_elim_right; j<dofs_right; ++j) {
+        for (int i=dofs_to_elim_right; i<dofs_right; ++i) {
+            M[rightPlaces[j-dofs_to_elim_right]][rightPlaces[i-dofs_to_elim_right]] += M_right[j][i];
         }
-        system->rhs[rightPlaces[j-getRight()->getDofsToElim()]] += right->system->rhs[j];
+        RHS[rightPlaces[j-dofs_to_elim_right]] += RHS_right[j];
     }
 }
 
