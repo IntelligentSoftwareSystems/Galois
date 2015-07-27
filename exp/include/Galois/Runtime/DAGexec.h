@@ -28,7 +28,6 @@
 #ifndef GALOIS_RUNTIME_DAGEXEC_H
 #define GALOIS_RUNTIME_DAGEXEC_H
 
-#include "Galois/config.h"
 #include "Galois/GaloisForwardDecl.h"
 #include "Galois/Accumulator.h"
 #include "Galois/Atomic.h"
@@ -41,9 +40,9 @@
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/Executor_DoAll.h"
 #include "Galois/Runtime/OrderedLockable.h"
-#include "Galois/Runtime/ll/gio.h"
-#include "Galois/Runtime/ll/ThreadRWlock.h"
-#include "Galois/Runtime/mm/Mem.h"
+#include "Galois/Substrate/gio.h"
+#include "Galois/Runtime/ThreadRWlock.h"
+#include "Galois/Runtime/Mem.h"
 
 #include "llvm/Support/CommandLine.h"
 

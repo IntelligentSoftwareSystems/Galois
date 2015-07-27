@@ -26,7 +26,7 @@
 #include "Galois/Statistic.h"
 #include "Galois/Galois.h"
 #include "Galois/UserContext.h"
-#include "Galois/Graph/LCGraph.h"
+#include "Galois/Graphs/LCGraph.h"
 #include "Galois/WorkList/WorkList.h"
 
 #include "llvm/Support/CommandLine.h"
@@ -124,7 +124,7 @@ struct TempState  {
   }
 };
 
-Galois::Runtime::PerThreadStorage<TempState*> state;
+Galois::Substrate::PerThreadStorage<TempState*> state;
 
 void computeSucSize() {
   sucSize.resize(NumNodes);

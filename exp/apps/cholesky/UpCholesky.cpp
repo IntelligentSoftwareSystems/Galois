@@ -1,6 +1,6 @@
 #include "Galois/Statistic.h"
 #include "Galois/Galois.h"
-#include "Galois/Graph/LCGraph.h"
+#include "Galois/Graphs/LCGraph.h"
 #include "Galois/Runtime/TreeExec.h"
 
 #include "llvm/Support/CommandLine.h"

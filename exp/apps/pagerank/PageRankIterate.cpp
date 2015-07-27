@@ -25,8 +25,8 @@
 #include "Galois/Bag.h"
 #include "Galois/Statistic.h"
 #include "Galois/UnionFind.h"
-#include "Galois/Graph/FileGraph.h"
-#include "Galois/Graph/LCGraph.h"
+#include "Galois/Graphs/FileGraph.h"
+#include "Galois/Graphs/LCGraph.h"
 
 #include "Lonestar/BoilerPlate.h"
 

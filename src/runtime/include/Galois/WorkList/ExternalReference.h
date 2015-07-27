@@ -43,7 +43,7 @@ class ExternalReference {
 public:
   //! change the type the worklist holds
   template<typename _T>
-  using retype = ExternalReference<typename Container::template retype<_T>::type>;
+  using retype = ExternalReference<typename Container::template retype<_T>>;
 
   //! T is the value type of the WL
   typedef typename Container::value_type value_type;

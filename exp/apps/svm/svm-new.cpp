@@ -26,11 +26,11 @@
 #include "Galois/Bag.h"
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
-#include "Galois/Graph/Graph.h"
-#include "Galois/Graph/LCGraph.h"
+#include "Galois/Graphs/Graph.h"
+#include "Galois/Graphs/LCGraph.h"
 #include "Galois/Accumulator.h"
-#include "Galois/ParallelSTL/ParallelSTL.h"
-#include "Galois/Runtime/ll/PaddedLock.h"
+#include "Galois/ParallelSTL.h"
+#include "Galois/Substrate/PaddedLock.h"
 #include "Lonestar/BoilerPlate.h"
 #include <boost/iterator/transform_iterator.hpp>
 #include <boost/iterator/counting_iterator.hpp>

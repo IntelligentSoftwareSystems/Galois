@@ -31,8 +31,8 @@
 #include "Galois/Accumulator.h"
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
-#include "Galois/Graph/LCGraph.h"
-#include "Galois/Graph/Graph.h"
+#include "Galois/Graphs/LCGraph.h"
+#include "Galois/Graphs/Graph.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/ADT/SmallVector.h"
 #include "Lonestar/BoilerPlate.h"
@@ -40,9 +40,9 @@
 //kik 
 #include "Galois/Atomic.h"
 #include "Galois/Runtime/Context.h"
-#include "Galois/Runtime/ll/PtrLock.h"
-#include "Galois/Runtime/ll/SimpleLock.h"
-#include "Galois/Runtime/Barrier.h"
+#include "Galois/Substrate/PtrLock.h"
+#include "Galois/Substrate/SimpleLock.h"
+#include "Galois/Substrate/Barrier.h"
 
 #include <string>
 #include <sstream>

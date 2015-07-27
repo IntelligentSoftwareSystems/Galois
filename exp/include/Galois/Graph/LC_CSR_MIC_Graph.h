@@ -26,14 +26,13 @@
 #ifndef GALOIS_GRAPH_LC_CSR_MIC_GRAPH_H
 #define GALOIS_GRAPH_LC_CSR_MIC_GRAPH_H
 
-#include "Galois/config.h"
 #include "Galois/LargeArray.h"
-#include "Galois/Graph/FileGraph.h"
-#include "Galois/Graph/Details.h"
+#include "Galois/Graphs/FileGraph.h"
+#include "Galois/Graphs/Details.h"
 
 #include <xmmintrin.h>
 
-#include GALOIS_CXX11_STD_HEADER(type_traits)
+#include <type_traits>
 
 // #define _DO_INNER_PREFETCH 1
 

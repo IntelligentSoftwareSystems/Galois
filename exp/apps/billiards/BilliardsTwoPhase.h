@@ -28,7 +28,7 @@
 
 #include "Galois/PerThreadContainer.h"
 
-#include "Galois/Graph/Graph.h"
+#include "Galois/Graphs/Graph.h"
 
 #include "Galois/Runtime/KDGtwoPhase.h"
 

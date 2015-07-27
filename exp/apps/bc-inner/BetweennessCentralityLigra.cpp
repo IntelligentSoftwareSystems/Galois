@@ -24,23 +24,23 @@
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#include "Galois/config.h"
+
 #include "Galois/Galois.h"
 #include "Galois/Accumulator.h"
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
-#include "Galois/Graph/LCGraph.h"
-#include "Galois/ParallelSTL/ParallelSTL.h"
+#include "Galois/Graphs/LCGraph.h"
+#include "Galois/ParallelSTL.h"
 #ifdef GALOIS_USE_EXP
 #include <boost/mpl/if.hpp>
-#include "Galois/Graph/OCGraph.h"
-#include "Galois/Graph/GraphNodeBag.h"
+#include "Galois/Graphs/OCGraph.h"
+#include "Galois/Graphs/GraphNodeBag.h"
 #include "Galois/DomainSpecificExecutors.h"
 #endif
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 
-#include GALOIS_CXX11_STD_HEADER(atomic)
+#include <atomic>
 #include <string>
 #include <deque>
 #include <iostream>

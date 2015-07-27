@@ -30,8 +30,8 @@
 #include "Galois/Statistic.h"
 #include "Galois/Timer.h"
 #include "Galois/UserContext.h"
-#include "Galois/Graph/LCGraph.h"
-#include "Galois/Graph/TypeTraits.h"
+#include "Galois/Graphs/LCGraph.h"
+#include "Galois/Graphs/TypeTraits.h"
 #ifdef GALOIS_USE_EXP
 #include "Galois/WorkList/Partitioned.h"
 #endif

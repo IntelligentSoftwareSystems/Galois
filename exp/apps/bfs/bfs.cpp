@@ -31,8 +31,8 @@
 #include "Galois/Accumulator.h"
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
-#include "Galois/Graph/LCGraph.h"
-#include "Galois/ParallelSTL/ParallelSTL.h"
+#include "Galois/Graphs/LCGraph.h"
+#include "Galois/ParallelSTL.h"
 #ifdef GALOIS_USE_EXP
 #include "Galois/PriorityScheduling.h"
 #include "Galois/Runtime/BulkSynchronousWork.h"
@@ -736,7 +736,7 @@ void run() {
   AlgoTy algo;
   GNode source, report;
   readGraph(source, report);
-  Galois::preAlloc((numThreads + (graph.size() * sizeof(SNode) * 2) / Galois::Runtime::MM::hugePageSize)*8);
+  Galois::preAlloc((numThreads + (graph.size() * sizeof(SNode) * 2) / Galois::Runtime::hugePageSize)*8);
   Galois::reportPageAlloc("MeminfoPre");
 
   Galois::StatTimer T;

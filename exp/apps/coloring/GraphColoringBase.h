@@ -6,8 +6,8 @@
 #include "Galois/Statistic.h"
 #include "Galois/Galois.h"
 #include "Galois/DoAllWrap.h"
-#include "Galois/Graph/Util.h"
-#include "Galois/Graph/Graph.h"
+#include "Galois/Graphs/Util.h"
+#include "Galois/Graphs/Graph.h"
 #include "Galois/PerThreadContainer.h"
 // #include "Galois/Graph/FileGraph.h"
 
