@@ -2,22 +2,27 @@
  * @file
  * @section License
  *
- * Galois, a framework to exploit amorphous data-parallelism in irregular
- * programs.
+ * This file is part of Galois.  Galoisis a gramework to exploit
+ * amorphous data-parallelism in irregular programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
- * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
- * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
- * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
- * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
- * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
- * shall University be liable for incidental, special, indirect, direct or
- * consequential damages or loss of profits, interruption of business, or
- * related expenses which may arise from use of Software or Documentation,
- * including but not limited to those resulting from defects in Software and/or
- * Documentation, or loss or inaccuracy of data of any kind.
+ * Galois is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
+ * Galois is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with Galois.  If not, see
+ * <http://www.gnu.org/licenses/>.
+ *
+ * @section Copyright
+ *
+ * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * reserved.
  *
  * @author <ahassaan@ices.utexas.edu>
  */
@@ -29,7 +34,7 @@
 #include "Galois/RangePQ.h"
 #include "Galois/PerThreadContainer.h"
 
-#include "Galois/Runtime/ll/gio.h"
+#include "Galois/Substrate/gio.h"
 
 
 namespace Galois {
@@ -43,14 +48,14 @@ class SortedRangeWindowWL {
 
   Cmp cmp;
   PerThrdWL m_wl;
-  Galois::Runtime::PerThreadStorage<Range> wlRange;
+  Substrate::PerThreadStorage<Range> wlRange;
 
   size_t init_sz = 0;
 
 public:
 
   explicit SortedRangeWindowWL (const Cmp& cmp=Cmp ()): cmp (cmp) {
-    LL::gPrint("Using SortedRangeWindowWL\n");
+    Substrate::gPrint("Using SortedRangeWindowWL\n");
   }
 
   template <typename R>
@@ -210,7 +215,7 @@ public:
   explicit PQbasedWindowWL (const Cmp& cmp=Cmp ())
     : cmp (cmp), m_wl (cmp) 
   {
-    LL::gPrint("Using PQbasedWindowWL\n");
+    Substrate::gPrint("Using PQbasedWindowWL\n");
   }
 
 
@@ -349,7 +354,7 @@ public:
 template <typename T, typename Cmp> 
 class PartialPQbasedWindowWL {
 
-  using PerThrdWL = Galois::Runtime::PerThreadStorage<TreeBasedPartialPQ<T, Cmp> >;
+  using PerThrdWL = Substrate::PerThreadStorage<TreeBasedPartialPQ<T, Cmp> >;
 
   Cmp cmp;
   PerThrdWL m_wl;

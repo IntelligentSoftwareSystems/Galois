@@ -32,7 +32,7 @@
 #include "Galois/Galois.h"
 #include "Galois/Bag.h"
 #include "Galois/Statistic.h"
-#include "Galois/Graph/SpatialTree.h"
+#include "Galois/Graphs/SpatialTree.h"
 #include "Lonestar/BoilerPlate.h"
 #include "llvm/Support/CommandLine.h"
 
@@ -413,7 +413,7 @@ static void readInput(const std::string& filename) {
   Galois::preAlloc(2 * numThreads // some per-thread state
       + 2 * points.size() * sizeof(Element) // mesh is about 2x number of points (for random points)
       * 32 // include graph node size
-      / (Galois::Runtime::MM::hugePageSize) // in pages
+      / (Galois::Runtime::hugePageSize) // in pages
       );
   Galois::reportPageAlloc("MeminfoPre");
 

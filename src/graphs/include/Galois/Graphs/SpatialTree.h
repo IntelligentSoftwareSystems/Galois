@@ -78,7 +78,7 @@ class SpatialTree2d {
     }
   };
 
-  Galois::Runtime::MM::FixedSizeAllocator<Node> nodeAlloc;
+  Galois::Runtime::FixedSizeAllocator<Node> nodeAlloc;
   
   Node* root;
   Box2d bounds;

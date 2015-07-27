@@ -26,6 +26,7 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
+
 #ifndef GALOIS_WORKLIST_ALTCHUNKED_H
 #define GALOIS_WORKLIST_ALTCHUNKED_H
 
@@ -292,13 +293,13 @@ public:
 template<bool IsLocallyLIFO, int ChunkSize, typename Container, typename T>
 struct AltChunkedMaster : private boost::noncopyable {
   template<typename _T>
-  struct retype { typedef AltChunkedMaster<IsLocallyLIFO, ChunkSize, Container, _T> type; };
+  using retype = AltChunkedMaster<IsLocallyLIFO, ChunkSize, Container, _T>;
 
   template<bool _concurrent>
-  struct rethread { typedef AltChunkedMaster<IsLocallyLIFO, ChunkSize, Container, T> type; };
+  using rethread = AltChunkedMaster<IsLocallyLIFO, ChunkSize, Container, T>;
 
   template<int _chunk_size>
-  struct with_chunk_size { typedef AltChunkedMaster<IsLocallyLIFO, _chunk_size, Container, T> type; };
+  using with_chunk_size = AltChunkedMaster<IsLocallyLIFO, _chunk_size, Container, T>;
 
 private:
   class Chunk : public ChunkHeader, public Galois::FixedSizeRing<T, ChunkSize> {};

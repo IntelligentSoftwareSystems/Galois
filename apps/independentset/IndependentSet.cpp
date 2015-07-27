@@ -25,8 +25,8 @@
 #include "Galois/Accumulator.h"
 #include "Galois/Bag.h"
 #include "Galois/Statistic.h"
-#include "Galois/Graph/LCGraph.h"
-#include "Galois/ParallelSTL/ParallelSTL.h"
+#include "Galois/Graphs/LCGraph.h"
+#include "Galois/ParallelSTL.h"
 #include "llvm/Support/CommandLine.h"
 
 #include "Lonestar/BoilerPlate.h"
@@ -470,9 +470,9 @@ void run() {
   // Galois::preAlloc(numThreads + (graph.size() * sizeof(Node) * numThreads / 8) / Galois::Runtime::MM::hugePageSize);
   // Tighter upper bound
   if (std::is_same<Algo, DefaultAlgo<nondet> >::value) {
-    Galois::preAlloc(numThreads + 8*graph.size()/Galois::Runtime::MM::hugePageSize);
+    Galois::preAlloc(numThreads + 8*graph.size()/Galois::Runtime::hugePageSize);
   } else {
-    Galois::preAlloc(numThreads + 64*(sizeof(GNode) + sizeof(Node))*graph.size()/Galois::Runtime::MM::hugePageSize);
+    Galois::preAlloc(numThreads + 64*(sizeof(GNode) + sizeof(Node))*graph.size()/Galois::Runtime::hugePageSize);
   }
 
   Galois::reportPageAlloc("MeminfoPre");

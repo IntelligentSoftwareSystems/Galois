@@ -1,25 +1,31 @@
 /** Speculative Ordered Executor -*- C++ -*-
  * @file
- * FIXME
- *
  * @section License
  *
- * Galois, a framework to exploit amorphous data-parallelism in irregular
- * programs.
+ * This file is part of Galois.  Galoisis a gramework to exploit
+ * amorphous data-parallelism in irregular programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
- * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
- * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
- * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
- * DEALING OR USAGE OF TRADE. NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
- * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
- * shall University be liable for incidental, special, indirect, direct or
- * consequential damages or loss of profits, interruption of business, or
- * related expenses which may arise from use of Software or Documentation,
- * including but not limited to those resulting from defects in Software and/or
- * Documentation, or loss or inaccuracy of data of any kind.
+ * Galois is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * Galois is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with Galois.  If not, see
+ * <http://www.gnu.org/licenses/>.
+ *
+ * @section Copyright
+ *
+ * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * reserved.
+ *
  */
+
 #ifndef GALOIS_RUNTIME_ROB_EXECUTOR_H
 #define GALOIS_RUNTIME_ROB_EXECUTOR_H
 
@@ -32,7 +38,7 @@
 #include "Galois/Timer.h"
 #include "Galois/PerThreadContainer.h"
 
-#include "Galois/Runtime/Barrier.h"
+#include "Galois/Substrate/Barrier.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/Executor_DoAll.h"
 #include "Galois/Runtime/Executor_ParaMeter.h"
@@ -40,14 +46,13 @@
 #include "Galois/Runtime/Range.h"
 #include "Galois/Runtime/Sampling.h"
 #include "Galois/Runtime/Support.h"
-#include "Galois/Runtime/Termination.h"
-#include "Galois/Runtime/ThreadPool.h"
+#include "Galois/Substrate/Termination.h"
+#include "Galois/Substrate/ThreadPool.h"
 #include "Galois/Runtime/UserContextAccess.h"
-#include "Galois/Runtime/ll/gio.h"
-#include "Galois/Runtime/ll/ThreadRWlock.h"
-#include "Galois/Runtime/ll/CompilerSpecific.h"
-//#include "Galois/Runtime/ll/PthreadLock.h"
-#include "Galois/Runtime/mm/Mem.h"
+#include "Galois/Substrate/gio.h"
+#include "Galois/Runtime/ThreadRWlock.h"
+#include "Galois/Substrate/CompilerSpecific.h"
+#include "Galois/Runtime/Mem.h"
 
 #include <atomic>
 
@@ -86,7 +91,7 @@ namespace dbg {
     
     const bool DEBUG = false;
     if (DEBUG) {
-      LL::gDebug (std::forward<Args> (args)...);
+      Substrate::gDebug (std::forward<Args> (args)...);
     }
   }
 }
@@ -141,7 +146,7 @@ public:
       executor (e), 
       lostConflict (false),
       executed (false),
-      owner (LL::getTID ())
+      owner (Substrate::ThreadPool::getTID ())
 
   {}
 
@@ -214,7 +219,7 @@ public:
     executor.push (userHandle.getPushBuffer ().begin (), userHandle.getPushBuffer ().end ());
     userHandle.reset ();
 
-    LL::compilerBarrier ();
+    Substrate::compilerBarrier ();
 
     setState (State::COMMIT_DONE);
   }
@@ -230,7 +235,7 @@ public:
     executor.push_abort (active, owner);
     userHandle.reset ();
 
-    LL::compilerBarrier ();
+    Substrate::compilerBarrier ();
 
     setState (State::ABORT_DONE);
 
@@ -300,7 +305,7 @@ private:
                 
           }
 
-          LL::asmPause ();
+          Substrate::asmPause ();
         }
 
       } else if (that->casState (State::READY_TO_COMMIT, State::ABORT_HELP)) {
@@ -329,7 +334,7 @@ template <typename T, typename Cmp, typename NhFunc, typename OpFunc>
 class ROBexecutor: private boost::noncopyable {
 
   using Ctxt = ROBcontext<T, Cmp, ROBexecutor>;
-  using CtxtAlloc = MM::FixedSizeAllocator<Ctxt>;
+  using CtxtAlloc = FixedSizeAllocator<Ctxt>;
   using CtxtCmp = typename Ctxt::PtrComparator;
   using CtxtDeq = PerThreadDeque<Ctxt*>;
   using CtxtVec = PerThreadVector<Ctxt*>;
@@ -338,7 +343,7 @@ class ROBexecutor: private boost::noncopyable {
   using PerThrdPendingQ = PerThreadMinHeap<T, Cmp>;
   using ROB = Galois::MinHeap<Ctxt*, typename Ctxt::PtrComparator>;
 
-  using Lock_ty = Galois::Runtime::LL::SimpleLock;
+  using Lock_ty = Galois::Substrate::SimpleLock;
   // using Lock_ty = Galois::Runtime::LL::PthreadLock<true>;
 
 
@@ -349,7 +354,7 @@ class ROBexecutor: private boost::noncopyable {
 
   PerThrdPendingQ pending;
   ROB rob;
-  TerminationDetection& term;
+  Substrate::TerminationDetection& term;
 
 
   CtxtAlloc ctxtAlloc;
@@ -357,7 +362,7 @@ class ROBexecutor: private boost::noncopyable {
   CtxtDeq freeList;
 
   // GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE Lock_ty pendingMutex;
-  PerThreadStorage<Lock_ty> pendingMutex;
+  Substrate::PerThreadStorage<Lock_ty> pendingMutex;
 
   GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE Lock_ty robMutex;
 
@@ -386,7 +391,7 @@ public:
       ctxtCmp (itemCmp),
       pending (itemCmp),
       rob (ctxtCmp), 
-      term (getSystemTermination ())
+      term (Substrate::getSystemTermination (activeThreads))
   {}
 
   const Cmp& getItemCmp () const { return itemCmp; }
@@ -499,7 +504,7 @@ public:
 
           ctx->executed = true;
 
-          LL::compilerBarrier ();
+          Substrate::compilerBarrier ();
 
         }
 
@@ -549,13 +554,13 @@ public:
 
     double ar = double (numTotal.reduce () - numCommitted.reduce ()) / double (numTotal.reduce ());
     double totalAborts = double (abortSelfByConflict.reduce () + abortSelfBySignal.reduce () + abortByOther.reduce ());
-    LL::gPrint("Total Iterations: ", numTotal.reduce(), "\n");
-    LL::gPrint("Number Committed: ", numCommitted.reduce(), "\n");
-    LL::gPrint("Abort Ratio: ", ar, "\n");
-    LL::gPrint("abortSelfByConflict: ", abortSelfByConflict.reduce(), ", ", (100.0*abortSelfByConflict.reduce())/totalAborts, "%", "\n");
-    LL::gPrint("abortSelfBySignal: ", abortSelfBySignal.reduce(), ", ", (100.0*abortSelfBySignal.reduce())/totalAborts, "%", "\n");
-    LL::gPrint("abortByOther: ", abortByOther.reduce(), ", ", (100.0*abortByOther.reduce())/totalAborts, "%", "\n");
-    LL::gPrint("Number of Global Cleanups: ", numGlobalCleanups.reduce(), "\n");
+    Substrate::gPrint("Total Iterations: ", numTotal.reduce(), "\n");
+    Substrate::gPrint("Number Committed: ", numCommitted.reduce(), "\n");
+    Substrate::gPrint("Abort Ratio: ", ar, "\n");
+    Substrate::gPrint("abortSelfByConflict: ", abortSelfByConflict.reduce(), ", ", (100.0*abortSelfByConflict.reduce())/totalAborts, "%", "\n");
+    Substrate::gPrint("abortSelfBySignal: ", abortSelfBySignal.reduce(), ", ", (100.0*abortSelfBySignal.reduce())/totalAborts, "%", "\n");
+    Substrate::gPrint("abortByOther: ", abortByOther.reduce(), ", ", (100.0*abortByOther.reduce())/totalAborts, "%", "\n");
+    Substrate::gPrint("Number of Global Cleanups: ", numGlobalCleanups.reduce(), "\n");
   }
 
 private:
@@ -615,7 +620,7 @@ private:
               new (ctx) Ctxt (pending[minTID].pop (), *this);
 
               ctx->setState (Ctxt::State::SCHEDULED);
-              ctx->owner = LL::getTID ();
+              ctx->owner = Substrate::ThreadPool::getTID ();
               rob.push (ctx);
               numTotal += 1;
             }
@@ -642,7 +647,7 @@ private:
       robMutex.lock (); {
 
         if (!freeList.get ().empty ()) {
-          unsigned beg = LL::getTID ();
+          unsigned beg = Substrate::ThreadPool::getTID ();
           unsigned end = beg + getActiveThreads ();
 
           for (unsigned i = beg; i < end; ++i) {
@@ -659,7 +664,7 @@ private:
                 new (ctx) Ctxt (pending[tid].pop (), *this);
 
                 ctx->setState (Ctxt::State::SCHEDULED);
-                ctx->owner = LL::getTID ();
+                ctx->owner = Substrate::ThreadPool::getTID ();
                 rob.push (ctx);
                 numTotal += 1;
               }
@@ -890,7 +895,7 @@ template <typename T, typename Cmp, typename NhFunc, typename OpFunc>
 class ROBparaMeter: private boost::noncopyable {
 
   using Ctxt = ROBparamContext<T, Cmp, ROBparaMeter>;
-  using CtxtAlloc = MM::FixedSizeAllocator<Ctxt>;
+  using CtxtAlloc = FixedSizeAllocator<Ctxt>;
   using CtxtCmp = typename Ctxt::PtrComparator;
   using CtxtDeq = Galois::PerThreadDeque<Ctxt*>;
 
@@ -1025,10 +1030,10 @@ private:
 
   void finish (void) {
     for (const StepStats& s: execRcrds) {
-      s.dump (getStatsFile (), loopname);
+      //FIXME: s.dump (getStatsFile (), loopname);
     }
 
-    closeStatsFile ();
+    //FIXME: closeStatsFile ();
   }
 
   Ctxt* schedule () {

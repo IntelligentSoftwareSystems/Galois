@@ -166,6 +166,9 @@ struct OrderedByIntegerMetric :
   template<typename _T>
   using retype = OrderedByIntegerMetric<Indexer, typename Container::template retype<_T>, BlockPeriod, BSP, _T, typename std::result_of<Indexer(_T)>::type, UseBarrier, UseMonotonic, UseDescending, Concurrent>;
 
+  template<bool _b>
+  using rethread = OrderedByIntegerMetric<Indexer, Container, BlockPeriod, BSP, T,Index,UseBarrier,UseMonotonic,UseDescending,_b>;
+
   template<unsigned _period>
   struct with_block_period { typedef OrderedByIntegerMetric<Indexer, Container, _period, BSP, T, Index, UseBarrier, UseMonotonic, UseDescending, Concurrent> type; };
 

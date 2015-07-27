@@ -20,11 +20,12 @@
  *
  * @author Dimitrios Prountzos <dprountz@cs.utexas.edu>
  */
+
 #include "Galois/Galois.h"
 #include "Galois/Accumulator.h"
 #include "Galois/Statistic.h"
 #include "Galois/UserContext.h"
-#include "Galois/Graph/LCGraph.h"
+#include "Galois/Graphs/LCGraph.h"
 
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
@@ -58,11 +59,11 @@ typedef Graph::GraphNode GNode;
 Graph* G;
 int NumNodes;
 
-Galois::Runtime::PerThreadStorage<double*> CB;
-Galois::Runtime::PerThreadStorage<double*> perThreadSigma;
-Galois::Runtime::PerThreadStorage<int*> perThreadD;
-Galois::Runtime::PerThreadStorage<double*> perThreadDelta;
-Galois::Runtime::PerThreadStorage<Galois::gdeque<GNode>*> perThreadSucc;
+Galois::Substrate::PerThreadStorage<double*> CB;
+Galois::Substrate::PerThreadStorage<double*> perThreadSigma;
+Galois::Substrate::PerThreadStorage<int*> perThreadD;
+Galois::Substrate::PerThreadStorage<double*> perThreadDelta;
+Galois::Substrate::PerThreadStorage<Galois::gdeque<GNode>*> perThreadSucc;
 
 struct Process {
   typedef int tt_does_not_need_aborts;

@@ -24,7 +24,7 @@
 #include "Galois/Accumulator.h"
 #include "Galois/Statistic.h"
 #include "Galois/Bag.h"
-#include "Galois/Graph/LCGraph.h"
+#include "Galois/Graphs/LCGraph.h"
 #include "llvm/Support/CommandLine.h"
 
 #ifdef GALOIS_USE_EXP
@@ -505,7 +505,7 @@ bool discharge(const GNode& src, Galois::UserContext<GNode>& ctx) {
 
 struct Counter {
   Galois::GAccumulator<int> accum;
-  Galois::Runtime::PerThreadStorage<int> local;
+  Galois::Substrate::PerThreadStorage<int> local;
 };
 
 template<DetAlgo version>

@@ -151,6 +151,11 @@ void Galois::Runtime::reportStat(Galois::Statistic* value) {
   SM.get()->addToStat(value);
 }
 
+void Galois::Runtime::reportStatGlobal(const std::string&, const std::string&) {
+}
+void Galois::Runtime::reportStatGlobal(const std::string&, unsigned long) {
+}
+
 void Galois::Runtime::printStats() {
   SM.get()->printStats();
 }

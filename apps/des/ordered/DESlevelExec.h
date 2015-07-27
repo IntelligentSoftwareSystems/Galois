@@ -31,8 +31,8 @@
 #include "Galois/Galois.h"
 #include "Galois/PerThreadContainer.h"
 
-#include "Galois/Runtime/ll/PaddedLock.h"
-#include "Galois/Runtime/ll/CompilerSpecific.h"
+#include "Galois/Substrate/PaddedLock.h"
+#include "Galois/Substrate/CompilerSpecific.h"
 #include "Galois/Runtime/LevelExecutor.h"
 #include "Galois/Runtime/Range.h"
 

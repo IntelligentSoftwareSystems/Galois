@@ -27,7 +27,7 @@
 #define VERIFIER_H
 
 #include "Galois/Galois.h"
-#include "Galois/ParallelSTL/ParallelSTL.h"
+#include "Galois/ParallelSTL.h"
 
 #include <stack>
 #include <set>

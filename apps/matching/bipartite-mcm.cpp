@@ -33,9 +33,9 @@
 #include "Galois/Galois.h"
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
-#include "Galois/Graph/Graph.h"
-#include "Galois/Graph/LCGraph.h"
-#include "Galois/Graph/FileGraph.h"
+#include "Galois/Graphs/Graph.h"
+#include "Galois/Graphs/LCGraph.h"
+#include "Galois/Graphs/FileGraph.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 #ifdef GALOIS_USE_EXP
@@ -334,7 +334,7 @@ struct MatchingFF {
   }
 
   //! Makes sure that ``reached'' to properly reset even if we get aborted
-  struct ReachedCleanup: public Galois::Runtime::Releasable {
+  struct ReachedCleanup {
     G& g;
     typename ReachedWrapper::Type& reached;
 

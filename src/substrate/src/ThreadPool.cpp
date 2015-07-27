@@ -37,7 +37,7 @@
 // Forward declare this to avoid including PerThreadStorage.
 // We avoid this to stress that the thread Pool MUST NOT depend on PTS.
 namespace Galois {
-namespace Runtime {
+namespace Substrate {
 
 extern void initPTS();
 
@@ -47,7 +47,9 @@ extern void initPTS();
 
 using namespace Galois::Substrate;
 
-ThreadPool::ThreadPool(): mi(getHWTopo()->getMachineInfo()), starting(mi.maxThreads), masterFastmode(false), signals(nullptr), running(false) {
+thread_local ThreadPool::per_signal ThreadPool::my_box;
+
+ThreadPool::ThreadPool(): mi(getHWTopo()->getMachineInfo()), starting(mi.maxThreads), masterFastmode(false), signals(mi.maxThreads), running(false) {
   initThread();
 }
 
@@ -104,15 +106,16 @@ static T* getNth(std::atomic<T*>& headptr, unsigned off) {
 }
 
 void ThreadPool::initThread() {
-  atomic_append(signals, &my_box);
+  signals[my_box.topo.tid] = &my_box;
+  //  atomic_append(signals, &my_box);
   //my_box.id = findID(signals, &my_box, 0);
 
   // Initialize 
-  Runtime::initPTS();
+  Substrate::initPTS();
 
   if (!EnvCheck("GALOIS_DO_NOT_BIND_THREADS"))
-    if (topo.tid != 0 || !EnvCheck("GALOIS_DO_NOT_BIND_MAIN_THREAD"))
-      getHWTopo()->bindThreadToProcessor(topo.tid);
+    if (my_box.topo.tid != 0 || !EnvCheck("GALOIS_DO_NOT_BIND_MAIN_THREAD"))
+      getHWTopo()->bindThreadToProcessor(my_box.topo.tid);
 }
 
 void ThreadPool::threadLoop() {
@@ -121,12 +124,12 @@ void ThreadPool::threadLoop() {
   bool fastmode = false;
   do {
     if (fastmode) {
-      while (!signals[topo.tid].fastRelease.load(std::memory_order_relaxed)) {
+      while (!my_box.fastRelease.load(std::memory_order_relaxed)) {
         asmPause();
       }
-      signals[topo.tid].fastRelease = 0;
+      my_box.fastRelease = 0;
     } else {
-      threadWait(topo.tid);
+      threadWait(my_box.topo.tid);
     }
     cascade(fastmode);
     
@@ -145,13 +148,13 @@ void ThreadPool::threadLoop() {
 
 
 void ThreadPool::decascade() {
-  assert(topo.tid == 0 || my_box.done == 0);
+  assert(my_box.topo.tid == 0 || my_box.done == 0);
   const unsigned multiple = 3;
   unsigned limit = starting;
   for (unsigned i = 1; i <= multiple; ++i) {
-    unsigned n = topo.tid * multiple + i;
+    unsigned n = my_box.topo.tid * multiple + i;
     if (n < limit) {
-      auto& done_flag = getNth(signals, n)->done;
+      auto& done_flag = signals[n]->done;
       while (!done_flag) { asmPause(); }
     }
   }
@@ -162,9 +165,9 @@ void ThreadPool::cascade(bool fastmode) {
   unsigned limit = starting;
   const unsigned multiple = 3;
   for (unsigned i = 1; i <= multiple; ++i) {
-    unsigned n = topo.tid * multiple + i;
+    unsigned n = my_box.topo.tid * multiple + i;
     if (n < limit) {
-      auto nid = getNth(signals, n);
+      auto nid = signals[n];
       nid->done = 0;
       if (fastmode)
         nid->fastRelease = 1;
@@ -196,4 +199,23 @@ void ThreadPool::runInternal(unsigned num) {
   // Clean up
   work = nullptr;
   running = false;
+}
+
+bool ThreadPool::isLeader(unsigned tid) const {
+  return signals[tid]->topo.packageLeader == tid;
+}
+
+unsigned ThreadPool::getPackage(unsigned tid) const {
+  return signals[tid]->topo.package;
+}
+
+unsigned ThreadPool::getLeader(unsigned tid) const {
+  return signals[tid]->topo.packageLeader;
+}
+
+unsigned ThreadPool::getCumulativeMaxPackage(unsigned tid) const {
+  unsigned m = 0;
+  for (unsigned x = 0; x <= tid; ++x)
+    m = std::max(m, signals[tid]->topo.package);
+  return m;
 }

@@ -2,35 +2,41 @@
  * @file
  * @section License
  *
- * Galois, a framework to exploit amorphous data-parallelism in irregular
- * programs.
+ * This file is part of Galois.  Galoisis a gramework to exploit
+ * amorphous data-parallelism in irregular programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
- * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
- * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
- * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
- * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
- * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
- * shall University be liable for incidental, special, indirect, direct or
- * consequential damages or loss of profits, interruption of business, or
- * related expenses which may arise from use of Software or Documentation,
- * including but not limited to those resulting from defects in Software and/or
- * Documentation, or loss or inaccuracy of data of any kind.
+ * Galois is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * Galois is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with Galois.  If not, see
+ * <http://www.gnu.org/licenses/>.
+ *
+ * @section Copyright
+ *
+ * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * reserved.
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
+
 #ifndef GALOIS_QUEUE_H
 #define GALOIS_QUEUE_H
 
-#include "Galois/config.h"
 #include "Galois/optional.h"
-#include "Galois/Runtime/ll/PaddedLock.h"
-#include "Galois/Runtime/mm/Mem.h"
-#include "Galois/Runtime/PerThreadStorage.h"
+#include "Galois/Substrate/PaddedLock.h"
+#include "Galois/Runtime/Mem.h"
+#include "Galois/Substrate/PerThreadStorage.h"
 
 #include <boost/utility.hpp>
-#include GALOIS_CXX11_STD_HEADER(atomic)
+#include <atomic>
 #include <cstdlib>
 #include <limits>
 #include <vector>
@@ -316,12 +322,12 @@ class ConcurrentSkipListMap : private boost::noncopyable {
    * Seed for simple random number generator. Not volatile since it doesn't
    * matter too much if different threads don't see updates.
    */
-  Galois::Runtime::PerThreadStorage<int> randomSeed;
+  Galois::Substrate::PerThreadStorage<int> randomSeed;
   Compare comp;
 
-  Galois::Runtime::MM::FixedSizeHeap node_heap;
-  Galois::Runtime::MM::FixedSizeHeap index_heap;
-  Galois::Runtime::MM::FixedSizeHeap head_index_heap;
+  Galois::Runtime::FixedSizeHeap node_heap;
+  Galois::Runtime::FixedSizeHeap index_heap;
+  Galois::Runtime::FixedSizeHeap head_index_heap;
 
   /**
    * Initialize or reset state. Needed by constructors, clone, clear,
@@ -1638,9 +1644,9 @@ class FCPairingHeap: private boost::noncopyable {
     Slot(): req(NULL), next(NULL), prev(NULL) { }
   };
 
-  Galois::Runtime::PerThreadStorage<Slot*> localSlots;
-  Galois::Runtime::PerThreadStorage<std::vector<Op*> > ops;
-  Galois::Runtime::LL::PaddedLock<Concurrent> lock;
+  Galois::Substrate::PerThreadStorage<Slot*> localSlots;
+  Galois::Substrate::PerThreadStorage<std::vector<Op*> > ops;
+  Galois::Substrate::PaddedLock<Concurrent> lock;
   PairingHeap<T,Compare> heap;
   std::atomic<Slot*> slots;
   const int maxTries;
@@ -1768,7 +1774,7 @@ public:
       } else {
         //_GLIBCXX_WRITE_MEM_BARRIER;
         while (myReq.load(std::memory_order_acquire) == req) {
-	  Galois::Runtime::LL::asmPause();
+	  Galois::Substrate::asmPause();
         }
         //_GLIBCXX_READ_MEM_BARRIER;
         recycleOp(req);
@@ -1802,7 +1808,7 @@ public:
       } else {
         //_GLIBCXX_WRITE_MEM_BARRIER;
         while (myReq.load(std::memory_order_acquire) == req) {
-	  Galois::Runtime::LL::asmPause();
+	  Galois::Substrate::asmPause();
         }
         //_GLIBCXX_READ_MEM_BARRIER;
 	Galois::optional<T> retval = myReq.load(std::memory_order_acquire)->retval;

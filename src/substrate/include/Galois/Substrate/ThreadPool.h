@@ -72,18 +72,17 @@ protected:
   struct per_signal {
     std::atomic<int> done;
     std::atomic<int> fastRelease;
-    std::atomic<per_signal*> next;
+    HWTopo::threadInfo topo;
   };
 
   thread_local static per_signal my_box;
-  thread_local static HWTopo::threadInfo topo;
 
   HWTopo::machineInfo mi;
 
   std::function<void(void)> work; 
   std::atomic<unsigned> starting;
   unsigned masterFastmode;
-  std::atomic<per_signal*> signals;
+  std::vector<per_signal*> signals;
   bool running;
 
   ThreadPool();
@@ -162,11 +161,11 @@ public:
   unsigned getLeader(unsigned tid) const;
   unsigned getCumulativeMaxPackage(unsigned tid) const;
 
-  static unsigned getTID() { return topo.tid; }
-  static bool isLeader() { return topo.tid == topo.packageLeader; }
-  static unsigned getLeader() { return topo.packageLeader; }
-  static unsigned getPackage() { return topo.package; }
-  static unsigned getCumulativeMaxPackage() { return topo.cumulativeMaxPackage; }
+  static unsigned getTID() { return my_box.topo.tid; }
+  static bool isLeader() { return my_box.topo.tid == my_box.topo.packageLeader; }
+  static unsigned getLeader() { return my_box.topo.packageLeader; }
+  static unsigned getPackage() { return my_box.topo.package; }
+  static unsigned getCumulativeMaxPackage() { return my_box.topo.cumulativeMaxPackage; }
 
 };
 

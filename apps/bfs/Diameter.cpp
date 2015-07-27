@@ -30,12 +30,12 @@
 #include "Galois/Galois.h"
 #include "Galois/Statistic.h"
 #include "Galois/Timer.h"
-#include "Galois/Graph/LCGraph.h"
-#include "Galois/ParallelSTL/ParallelSTL.h"
+#include "Galois/Graphs/LCGraph.h"
+#include "Galois/ParallelSTL.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 
-#include GALOIS_CXX11_STD_HEADER(random)
+#include <random>
 #include <deque>
 #include <string>
 #include <limits>
