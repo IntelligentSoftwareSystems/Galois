@@ -19,7 +19,7 @@ static cll::opt<int> rounds("rounds", cll::desc ("number of rounds"), cll::init(
 static cll::opt<int> trials("trials", cll::desc ("number of trials"), cll::init(3));
 
 double runDoAllBurn(const std::vector<double>& vecA, const std::vector<double>& vecB) {
-  Galois::Runtime::getSystemThreadPool().burnPower(Galois::getActiveThreads());
+  Galois::Substrate::getSystemThreadPool().burnPower(Galois::getActiveThreads());
   AccumDouble result;
 
   for (int r = 0; r < rounds; ++r) {
@@ -27,7 +27,7 @@ double runDoAllBurn(const std::vector<double>& vecA, const std::vector<double>& 
         [&](int i) { result += vecA[i] * vecB[i]; });
   }
 
-  Galois::Runtime::getSystemThreadPool().beKind();
+  Galois::Substrate::getSystemThreadPool().beKind();
 
   return result.reduce();
 }
@@ -44,7 +44,7 @@ double runDoAll(const std::vector<double>& vecA, const std::vector<double>& vecB
 }
 
 double runExplicitThread(const std::vector<double>& vecA, const std::vector<double>& vecB) {
-  Galois::Runtime::Barrier& barrier = Galois::Runtime::getSystemBarrier();
+  Galois::Substrate::Barrier& barrier = Galois::Substrate::getSystemBarrier(Galois::Runtime::activeThreads);
   AccumDouble result;
   
   Galois::on_each([&](unsigned tid, unsigned total) {

@@ -31,6 +31,7 @@
 #define GALOIS_WORKLIST_FIFO_H
 
 #include "Galois/Substrate/PaddedLock.h"
+#include "Galois/gdeque.h"
 #include "WLCompileCheck.h"
 
 #include <deque>

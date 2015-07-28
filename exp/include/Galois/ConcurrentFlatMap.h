@@ -23,7 +23,6 @@
 #ifndef GALOIS_CONCURRENTFLATMAP_H
 #define GALOIS_CONCURRENTFLATMAP_H
 
-#include "Galois/config.h"
 #include "Galois/Bag.h"
 #include "Galois/FlatMap.h"
 #include "Galois/gdeque.h"
@@ -78,7 +77,7 @@ protected:
   typedef Galois::gdeque<Operation> LogTy;
   //typedef std::deque<Operation> LogTy;
   typedef Galois::InsertBag<value_type> ValuesTy;
-  typedef Runtime::LL::PaddedLock<true> LockTy;
+  typedef Substrate::PaddedLock<true> LockTy;
 
   struct PerThread {
     LocalMapTy localMap;
@@ -95,7 +94,7 @@ protected:
   };
 
   key_compare comp;
-  Runtime::PerThreadStorage<PerThread> pts;
+  Substrate::PerThreadStorage<PerThread> pts;
   ValuesTy values;
   LockTy logLock;
   LogTy log;

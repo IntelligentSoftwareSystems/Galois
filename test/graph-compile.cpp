@@ -1,4 +1,4 @@
-#include "Galois/Graph/Graph.h"
+#include "Galois/Graphs/Graph.h"
 
 struct NoDefault {
   int x;

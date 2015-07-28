@@ -62,6 +62,16 @@ public:
   //! get metadata for machine
   virtual const machineInfo& getMachineInfo() const = 0;
 
+  unsigned getMaxThreads() const {
+    return getMachineInfo().maxThreads;
+  }
+  unsigned getMaxCores() const {
+    return getMachineInfo().maxCores;
+  }
+  unsigned getMaxPackages() const {
+    return getMachineInfo().maxPackages;
+  }
+
 };
 
 std::unique_ptr<HWTopo> getHWTopo();

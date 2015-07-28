@@ -48,6 +48,9 @@ public:
   template<typename Tnew>
   using retype = OrderedList<Compare, Tnew, concurrent>;
 
+  template<bool b>
+  using rethread = OrderedList<Compare, T, b>;
+
   typedef T value_type;
 
   void push(value_type val) {

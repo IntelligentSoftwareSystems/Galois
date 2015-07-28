@@ -319,6 +319,7 @@ function(makeTest)
 
   if(${APP_ADD_TARGET})
     add_executable(test-${name} ${name}.cpp)
+    target_link_libraries(test-${name} lonestar)
     target_link_libraries(test-${name} galois_graphs)
     target_link_libraries(test-${name} galois_runtime)
     target_link_libraries(test-${name} galois_substrate)

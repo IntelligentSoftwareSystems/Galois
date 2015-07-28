@@ -1,6 +1,6 @@
 #include "Galois/Galois.h"
 #include "Galois/Accumulator.h"
-#include "Galois/Graph/Graph.h"
+#include "Galois/Graphs/Graph.h"
 #include <iostream>
 
 typedef Galois::Graph::LC_CSR_Graph<int, void> Graph;

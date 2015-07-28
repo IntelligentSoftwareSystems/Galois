@@ -40,28 +40,28 @@ namespace WorkList {
 template<typename T = int>
 struct NoGlobalQueue {
   template<bool _concurrent>
-  struct rethread { typedef NoGlobalQueue<T> type; };
+  using rethread = NoGlobalQueue<T>;
 
   template<typename _T>
-  struct retype { typedef NoGlobalQueue<_T> type; };
+  using retype = NoGlobalQueue<_T>;
 };
 
 template<typename Global = NoGlobalQueue<>, typename Local = GFIFO<int>, typename T = int>
 struct LocalQueue : private boost::noncopyable {
   template<bool _concurrent>
-  struct rethread { typedef LocalQueue<Global, Local, T> type; };
+  using rethread = LocalQueue<Global, Local, T>;
 
   template<typename _T>
-  struct retype { typedef LocalQueue<typename Global::template retype<_T>::type, typename Local::template retype<_T>::type, _T> type; };
+  using retype = LocalQueue<typename Global::template retype<_T>, typename Local::template retype<_T>, _T>;
 
   template<typename _global>
-  struct with_global { typedef LocalQueue<_global, Local, T> type; };
+  using with_global = LocalQueue<_global, Local, T>;
 
   template<typename _local>
-  struct with_local { typedef LocalQueue<Global, _local, T> type; };
+  using with_local = LocalQueue<Global, _local, T>;
 
 private:
-  typedef typename Local::template rethread<false>::type lWLTy;
+  typedef typename Local::template rethread<false> lWLTy;
   Substrate::PerThreadStorage<lWLTy> local;
   Global global;
 

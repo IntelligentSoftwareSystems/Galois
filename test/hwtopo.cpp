@@ -7,7 +7,7 @@ int main(int argc, char** argv) {
   std::cout << "T,C,P: " << t->getMaxThreads() << " " << t->getMaxCores() << " " << t->getMaxPackages() << "\n";
   for (unsigned i = 0; i < t->getMaxThreads(); ++i) {
     auto& c = t->getThreadInfo(i);
-    std::cout << "l,L,p,os: " << c.isPackageLeader << " " << c.packageLeader << " " << c.package << " " << c.hwContext << "\n";
+    std::cout << "tid,L,p,os,cmp: " << c.tid << " " << c.packageLeader << " " << c.package << " " << c.hwContext << " " << c.cumulativeMaxPackage << "\n";
   }
   return 0;
 }

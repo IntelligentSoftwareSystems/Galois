@@ -57,6 +57,9 @@ struct StableIterator {
   template<typename _T>
   using retype =  StableIterator<Steal, typename Container::template retype<_T>, Iterator>;
 
+  template<bool b>
+  using rethread = StableIterator<Steal, typename Container::template rethread<b>, Iterator>;
+
   template<typename _iterator>
   struct with_iterator { typedef StableIterator<Steal, Container, _iterator> type; };
 

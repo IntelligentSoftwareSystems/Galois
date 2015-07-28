@@ -114,15 +114,15 @@ template<typename T>
 class PerThreadStorage {
 protected:
   unsigned offset;
-  PerBackend& b;
+  PerBackend* b;
 
   void destruct() {
     if (offset == ~0U)
       return;
     
     for (unsigned n = 0; n < getSystemThreadPool().getMaxThreads(); ++n)
-      reinterpret_cast<T*>(b.getRemote(n, offset))->~T();
-    b.deallocOffset(offset, sizeof(T));
+      reinterpret_cast<T*>(b->getRemote(n, offset))->~T();
+    b->deallocOffset(offset, sizeof(T));
     offset = ~0U;
   }
 
@@ -130,49 +130,58 @@ protected:
 public:
   //construct on each thread
   template<typename... Args>
-  PerThreadStorage(Args&&... args) :b(getPTSBackend()) {
+  PerThreadStorage(Args&&... args) :b(&getPTSBackend()) {
     //in case we make one of these before initializing the thread pool
     //This will call initPTS for each thread if it hasn't already
     auto& tp = getSystemThreadPool();
 
-    offset = b.allocOffset(sizeof(T));
+    offset = b->allocOffset(sizeof(T));
     for (unsigned n = 0; n < tp.getMaxThreads(); ++n)
-      new (b.getRemote(n, offset)) T(std::forward<Args>(args)...);
+      new (b->getRemote(n, offset)) T(std::forward<Args>(args)...);
+  }
+
+  PerThreadStorage(PerThreadStorage&& rhs) :b(rhs.b), offset(rhs.offset) {
+    rhs.offset = ~0;
   }
 
   ~PerThreadStorage() {
     destruct();
   }
 
+  PerThreadStorage& operator=(PerThreadStorage&& rhs) {
+    std::swap(offset, rhs.offset);
+    std::swap(b, rhs.b);
+  }
+
   T* getLocal() {
-    void* ditem = b.getLocal(offset, ptsBase);
+    void* ditem = b->getLocal(offset, ptsBase);
     return reinterpret_cast<T*>(ditem);
   }
 
   const T* getLocal() const {
-    void* ditem = b.getLocal(offset, ptsBase);
+    void* ditem = b->getLocal(offset, ptsBase);
     return reinterpret_cast<T*>(ditem);
   }
 
   //! Like getLocal() but optimized for when you already know the thread id
   T* getLocal(unsigned int thread) {
-    void* ditem = b.getLocal(offset, thread);
+    void* ditem = b->getLocal(offset, thread);
     return reinterpret_cast<T*>(ditem);
   }
 
 
   const T* getLocal(unsigned int thread) const {
-    void* ditem = b.getLocal(offset, thread);
+    void* ditem = b->getLocal(offset, thread);
     return reinterpret_cast<T*>(ditem);
   }
 
   T* getRemote(unsigned int thread) {
-    void* ditem = b.getRemote(thread, offset);
+    void* ditem = b->getRemote(thread, offset);
     return reinterpret_cast<T*>(ditem);
   }
 
   const T* getRemote(unsigned int thread) const {
-    void* ditem = b.getRemote(thread, offset);
+    void* ditem = b->getRemote(thread, offset);
     return reinterpret_cast<T*>(ditem);
   }
 

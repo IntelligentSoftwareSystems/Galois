@@ -37,7 +37,10 @@ namespace WorkList {
 template<typename OwnerFn=DummyIndexer<int>, typename Container=ChunkedLIFO<>, typename T = int>
 struct OwnerComputes : private boost::noncopyable {
   template<typename _T>
-  using retype = OwnerComputes<OwnerFn, typename Container::template retype<_T>::type, _T>;
+  using retype = OwnerComputes<OwnerFn, typename Container::template retype<_T>, _T>;
+
+  template<bool b>
+  using rethread = OwnerComputes<OwnerFn, typename Container::template rethread<b>, T>;
 
   template<typename _container>
   struct with_container { typedef OwnerComputes<OwnerFn, _container, T> type; };
@@ -46,7 +49,7 @@ struct OwnerComputes : private boost::noncopyable {
   struct with_indexer { typedef OwnerComputes<_indexer, Container, T> type; };
 
 private:
-  typedef typename Container::template retype<T>::type lWLTy;
+  typedef typename Container::template retype<T> lWLTy;
 
   typedef lWLTy cWL;
   typedef lWLTy pWL;
