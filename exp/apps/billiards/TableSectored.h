@@ -63,7 +63,7 @@ public:
 
   TableSectored (unsigned numBalls, unsigned sectorSize, unsigned xSectors, unsigned ySectors) 
     :
-      Table (numBalls, (sectorSize * xSectors), (sectorSize * ySectors)),
+      Table (numBalls, sectorSize, xSectors, ySectors),
       sectorSize (sectorSize),
       xSectors (xSectors),
       ySectors (ySectors)
@@ -74,7 +74,7 @@ public:
   template <typename I>
   TableSectored (const I ballsBeg, const I ballsEnd, unsigned sectorSize, unsigned xSectors, unsigned ySectors) 
     :
-      Table (ballsBeg, ballsEnd, (sectorSize * xSectors), (sectorSize * ySectors)),
+      Table (ballsBeg, ballsEnd, sectorSize, xSectors, ySectors),
       sectorSize (sectorSize),
       xSectors (xSectors),
       ySectors (ySectors)

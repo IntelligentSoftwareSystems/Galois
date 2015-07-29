@@ -68,8 +68,8 @@ protected:
   Table& operator = (const Table& that) { abort (); return *this; }
 
 public:
-  Table (unsigned numBalls, const FP& length, const FP& width) 
-    : numBalls (numBalls), length (length), width (width), eventsPerBall (numBalls) {
+  Table (unsigned numBalls, unsigned sectorSize, unsigned xSectors, unsigned ySectors) 
+    : numBalls (numBalls), length (sectorSize * xSectors), width (sectorSize * ySectors), eventsPerBall (numBalls) {
 
     srand (0); // TODO: use time (nullptr) later 
     createCushions ();
@@ -77,8 +77,8 @@ public:
   }
 
   template <typename I>
-  Table (const I ballsBeg, const I ballsEnd, const FP& length, const FP& width)
-    : numBalls (std::distance (ballsBeg, ballsEnd)), length (length), width (width), eventsPerBall (numBalls)
+  Table (const I ballsBeg, const I ballsEnd, unsigned sectorSize, unsigned xSectors, unsigned ySectors) 
+    : numBalls (std::distance (ballsBeg, ballsEnd)), length (sectorSize * xSectors), width (sectorSize * ySectors), eventsPerBall (numBalls)
   {
     srand (0);
     createCushions ();

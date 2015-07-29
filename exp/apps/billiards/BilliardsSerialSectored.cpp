@@ -4,7 +4,7 @@ class BilliardsSerialSectored: public Billiards {
   typedef std::priority_queue<Event, std::vector<Event>, Event::ReverseComparator> PriorityQueue;
 public:
 
-  virtual const std::string version () const { return "Serial Ordered with Priority Queue"; }
+  virtual const std::string version () const { return "Serial Sectored"; }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE static void processEvent (Event& e, TableSectored& table, std::vector<Event>& addList, const FP& endtime) {
       addList.clear ();
