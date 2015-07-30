@@ -4,7 +4,7 @@
 #include "GraphColoringBase.h"
 
 #include "Galois/Runtime/KDGparaMeter.h"
-#include "Galois/Runtime/ll/CompilerSpecific.h"
+#include "Galois/Substrate/CompilerSpecific.h"
 
 #include <atomic>
 #include <random>

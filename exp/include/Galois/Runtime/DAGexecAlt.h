@@ -74,7 +74,7 @@ struct SharerVec {
 public:
   using Cont = typename ContainersWithGAlloc::Vector<Ctxt*>::type;
 
-  LL::SimpleLock mutex;
+  Substrate::SimpleLock mutex;
   Cont sharers;
 
   inline void addSharer (Ctxt* ctxt) {
@@ -358,7 +358,7 @@ protected:
   typedef FixedSizeAllocator<Ctxt> CtxtAlloc;
   typedef PerThreadBag<Ctxt*> CtxtWL;
   typedef UserContextAccess<T> UserCtx;
-  typedef PerThreadStorage<UserCtx> PerThreadUserCtx;
+  typedef Substrate::PerThreadStorage<UserCtx> PerThreadUserCtx;
 
 
   struct ApplyOperator {

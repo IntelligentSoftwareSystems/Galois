@@ -190,7 +190,7 @@ protected:
     };
 
 
-    Galois::Runtime::PerThreadStorage<RNG>  perThrdRNG;
+    Galois::Substrate::PerThreadStorage<RNG>  perThrdRNG;
 
     auto randPri = [&] (GN node) {
       auto& rng = *(perThrdRNG.getLocal ());
@@ -304,7 +304,7 @@ public:
 
     readGraph ();
 
-    Galois::preAlloc (Galois::getActiveThreads () + 2*sizeof(NodeData)*graph.size ()/Galois::Runtime::MM::hugePageSize);
+    Galois::preAlloc (Galois::getActiveThreads () + 2*sizeof(NodeData)*graph.size ()/Galois::Runtime::hugePageSize);
     Galois::reportPageAlloc("MeminfoPre");
 
     Galois::StatTimer t;

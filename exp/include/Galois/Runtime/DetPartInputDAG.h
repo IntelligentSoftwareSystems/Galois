@@ -151,7 +151,7 @@ struct InputGraphPartDAGexecutor {
   F func;
   M& dagManager;
   const char* loopname;
-  TerminationDetection& term;
+  Substrate::TerminationDetection& term;
 
   unsigned numPart;
   // std::vector<PartMetaData> partitions;

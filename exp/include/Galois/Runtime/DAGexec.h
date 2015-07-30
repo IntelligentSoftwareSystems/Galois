@@ -267,11 +267,11 @@ protected:
   using CtxtCmp = typename NItem::CtxtCmp;
   using NItemFactory = typename NItem::Factory;
 
-  using CtxtAlloc = MM::FixedSizeAllocator<Ctxt>;
-  using CtxtAdjAlloc = MM::Pow_2_BlockAllocator<Ctxt*>;
+  using CtxtAlloc = FixedSizeAllocator<Ctxt>;
+  using CtxtAdjAlloc = Pow_2_BlockAllocator<Ctxt*>;
   using CtxtWL = PerThreadBag<Ctxt*>;
   using UserCtx = UserContextAccess<T>;
-  using PerThreadUserCtx = PerThreadStorage<UserCtx>;
+  using PerThreadUserCtx = Substrate::PerThreadStorage<UserCtx>;
 
 
   struct ApplyOperator {

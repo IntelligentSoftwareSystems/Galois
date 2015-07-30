@@ -33,19 +33,19 @@
 #include "Galois/DoAllWrap.h"
 #include "Galois/PerThreadContainer.h"
 
-#include "Galois/Runtime/Barrier.h"
+#include "Galois/Substrate/Barrier.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/Executor_DoAll.h"
 #include "Galois/Runtime/Range.h"
 #include "Galois/Runtime/Support.h"
-#include "Galois/Runtime/Termination.h"
-#include "Galois/Runtime/ThreadPool.h"
+#include "Galois/Substrate/Termination.h"
+#include "Galois/Substrate/ThreadPool.h"
 #include "Galois/Runtime/KDGtwoPhaseSupport.h"
 #include "Galois/Runtime/UserContextAccess.h"
-#include "Galois/Runtime/ll/gio.h"
-#include "Galois/Runtime/ll/ThreadRWlock.h"
-#include "Galois/Runtime/ll/CompilerSpecific.h"
-#include "Galois/Runtime/mm/Mem.h"
+#include "Galois/Substrate/gio.h"
+#include "Galois/Runtime/ThreadRWlock.h"
+#include "Galois/Substrate/CompilerSpecific.h"
+#include "Galois/Runtime/Mem.h"
 
 #include <boost/iterator/transform_iterator.hpp>
 
@@ -60,12 +60,12 @@ template <typename T, typename Cmp, typename NhFunc, typename OpFunc, typename S
 class KDGtwoPhaseParaMeter {
 
   using Ctxt = TwoPhaseContext<T, Cmp>;
-  using CtxtAlloc = MM::FixedSizeAllocator<Ctxt>;
+  using CtxtAlloc = FixedSizeAllocator<Ctxt>;
   // using CtxtWL = PerThreadVector<Ctxt*>;
   using CtxtWL = PerThreadBag<Ctxt*>;
 
   using UserCtx = UserContextAccess<T>;
-  using PerThreadUserCtx = PerThreadStorage<UserCtx>;
+  using PerThreadUserCtx = Substrate::PerThreadStorage<UserCtx>;
 
   static const unsigned DEFAULT_CHUNK_SIZE = 16;
 

@@ -169,7 +169,7 @@ template <typename R, typename Cmp, typename NhoodFunc, typename OpFunc, typenam
 void for_each_det_kdg (const R& initRange, const Cmp& cmp, const NhoodFunc& nhoodVisitor, 
     const OpFunc& opFunc, G& graph, const char* loopname, const KDGexecType& kdgType) {
 
-  Galois::Runtime::getSystemThreadPool ().burnPower (Galois::getActiveThreads ());
+  Galois::Substrate::getSystemThreadPool ().burnPower (Galois::getActiveThreads ());
 
   typedef typename R::value_type T;
 
@@ -177,7 +177,7 @@ void for_each_det_kdg (const R& initRange, const Cmp& cmp, const NhoodFunc& nhoo
 
   executor.execute (initRange, kdgType);
 
-  Galois::Runtime::getSystemThreadPool ().beKind ();
+  Galois::Substrate::getSystemThreadPool ().beKind ();
 }
 
 template <typename T, typename Cmp, typename NhoodFunc, typename OpFunc, typename G>
@@ -267,7 +267,8 @@ struct DetKDG_AddRem_reuseDAG {
       }
       // std::printf ("DetKDG_AddRem_reuseDAG: round %d time taken: %ld\n", rounds, t_exec.get ());
 
-      dagExec->reinitDAG ();
+      abort();
+      //FIXME:      dagExec->reinitDAG ();
       numPushes.reset ();
     }
 
@@ -285,7 +286,7 @@ template <typename R, typename Cmp, typename NhoodFunc, typename OpFunc, typenam
 void for_each_det_kdg_ar_reuse (const R& initRange, const Cmp& cmp, const NhoodFunc& nhoodVisitor, 
     const OpFunc& opFunc, G& graph, const char* loopname) {
 
-  Galois::Runtime::getSystemThreadPool ().burnPower (Galois::getActiveThreads ());
+  Galois::Substrate::getSystemThreadPool().burnPower (Galois::getActiveThreads ());
 
   typedef typename R::value_type T;
 
@@ -293,7 +294,7 @@ void for_each_det_kdg_ar_reuse (const R& initRange, const Cmp& cmp, const NhoodF
 
   executor.execute (initRange);
 
-  Galois::Runtime::getSystemThreadPool ().beKind ();
+  Galois::Substrate::getSystemThreadPool ().beKind ();
 }
 
 } //end namespace Runtime

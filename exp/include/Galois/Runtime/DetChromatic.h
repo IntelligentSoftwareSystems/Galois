@@ -439,7 +439,7 @@ public:
     Galois::for_each(it, it,
         ActiveDAGoperator<F, U> {func, userCtx, *this, edgesVisited, edgesFlipped},
         Galois::loopname(loopname),
-        Galois::wl<WL>(&sources));
+                     Galois::wl<WL>(std::ref(sources)));
 
     // std::printf ("edgesVisited: %zd, edgesFlipped: %zd\n", edgesVisited.reduceRO (), edgesFlipped.reduceRO ());
 
@@ -536,7 +536,7 @@ public:
     Galois::for_each (it, it, 
         RunDAGcomp<F> {*this, func},
         Galois::loopname (loopname),
-        Galois::wl<WL_ty> (&initWL));
+                      Galois::wl<WL_ty> (std::ref(initWL)));
 
   }
 
@@ -1002,7 +1002,7 @@ struct DAGmanagerDefault: public DAGmanagerBase<G, A, InputDAGdata::VisitDAGsucc
   using GNode = typename G::GraphNode;
   using ND = typename G::node_data_type;
 
-  Galois::Runtime::MM::Pow_2_BlockAllocator<unsigned> dagSuccAlloc;
+  Galois::Runtime::Pow_2_BlockAllocator<unsigned> dagSuccAlloc;
 
   DAGmanagerDefault (G& graph, const A& visitAdj)
     : Base (graph, visitAdj, InputDAGdata::VisitDAGsuccessors ()) 
@@ -1135,7 +1135,7 @@ struct ChromaticExecutor {
   static const unsigned CHUNK_SIZE = F::CHUNK_SIZE;
   typedef Galois::WorkList::AltChunkedFIFO<CHUNK_SIZE, GNode> Inner_WL_ty;
   typedef Galois::WorkList::WLsizeWrapper<Inner_WL_ty> WL_ty;
-  typedef PerThreadStorage<UserContextAccess<GNode> > PerThreadUserCtx;
+  typedef Substrate::PerThreadStorage<UserContextAccess<GNode> > PerThreadUserCtx;
 
   G& graph;
   M& dagManager;
@@ -1286,7 +1286,7 @@ struct ChromaticExecutor {
       for_each(it, it,
           ApplyOperator {*this},
           Galois::loopname(loopname),
-          Galois::wl<WL>(nextWL));
+               Galois::wl<WL>(std::ref(*nextWL)));
 
       nextWL->reset_all ();
     }
@@ -1788,7 +1788,7 @@ struct InputGraphDAGtopologyDriven {
   static const unsigned CHUNK_SIZE = F::CHUNK_SIZE;
   typedef Galois::WorkList::AltChunkedFIFO<CHUNK_SIZE, GNode> Inner_WL_ty;
   typedef Galois::WorkList::WLsizeWrapper<Inner_WL_ty> WL_ty;
-  typedef PerThreadStorage<UserContextAccess<GNode> > PerThreadUserCtx;
+  typedef Substrate::PerThreadStorage<UserContextAccess<GNode> > PerThreadUserCtx;
 
 
   G& graph;

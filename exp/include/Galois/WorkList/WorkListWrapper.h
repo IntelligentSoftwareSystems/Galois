@@ -7,14 +7,12 @@ namespace WorkList {
 template <typename WL>
 class WLsizeWrapper: public WL {
 
-  Runtime::PerThreadStorage<size_t> size_cntr;
+  Substrate::PerThreadStorage<size_t> size_cntr;
 
 public:
 
   template <typename _T>
-  struct retype { 
-    typedef WLsizeWrapper<typename WL::template retype<_T>::type> type; 
-  };
+  using retype = WLsizeWrapper<typename WL::template retype<_T> >; 
   
 
   WLsizeWrapper (): WL () {

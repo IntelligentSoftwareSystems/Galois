@@ -60,10 +60,10 @@ public:
   //! push initial range onto the queue
   //! called with the same b and e on each thread
   template<typename RangeTy>
-  void push_initial(const RangeTy& r) { if (!IgnorePushInitial) wl->push_initial(r); }
+  void push_initial(const RangeTy& r) { if (!IgnorePushInitial) wl.push_initial(r); }
 
   //! pop a value from the queue.
-  Galois::optional<value_type> pop() { return wl->pop(); }
+  Galois::optional<value_type> pop() { return wl.pop(); }
 };
 
 }

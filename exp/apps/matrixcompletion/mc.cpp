@@ -30,10 +30,10 @@
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
 
-#include "Galois/Graph/Graph.h"
-#include "Galois/Graph/LCGraph.h"
+#include "Galois/Graphs/Graph.h"
+#include "Galois/Graphs/LCGraph.h"
 
-#include "Galois/Runtime/ll/PaddedLock.h"
+#include "Galois/Substrate/PaddedLock.h"
 
 #include "Lonestar/BoilerPlate.h"
 
@@ -784,7 +784,7 @@ void runBlockSlices(Graph& g, const LearnFN* lf) {
 	}
 }
 
-typedef Galois::Runtime::LL::PaddedLock<true> SpinLock;
+typedef Galois::Substrate::PaddedLock<true> SpinLock;
 
 struct sgd_march
 {

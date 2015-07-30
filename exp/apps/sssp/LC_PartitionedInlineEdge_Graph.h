@@ -27,8 +27,8 @@
 #define LC_PARTITIONEDINLINEEDGE_GRAPH_H
 
 #include "Galois/LargeArray.h"
-#include "Galois/Graph/FileGraph.h"
-#include "Galois/Graph/Details.h"
+#include "Galois/Graphs/FileGraph.h"
+#include "Galois/Graphs/Details.h"
 
 #include <boost/mpl/if.hpp>
 #include <type_traits>

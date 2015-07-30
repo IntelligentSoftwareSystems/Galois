@@ -169,8 +169,8 @@ unsigned variableNodeToId(GNode variable_node) {
   return ((unsigned) variable_node) - NUM_SAMPLES;
 }
 
-Galois::Runtime::PerThreadStorage<double*> thread_weights;
-Galois::Runtime::PerPackageStorage<double*> package_weights;
+Galois::Substrate::PerThreadStorage<double*> thread_weights;
+Galois::Substrate::PerPackageStorage<double*> package_weights;
 Galois::LargeArray<double> old_weights;
 
 //undef to test specialization for dense feature space
@@ -179,9 +179,9 @@ Galois::LargeArray<double> old_weights;
 
 template<typename T, UpdateType UT>
 class DiffractedCollection {
-  Galois::Runtime::PerThreadStorage<unsigned> counts;
-  Galois::Runtime::PerThreadStorage<T*> thread;
-  Galois::Runtime::PerPackageStorage<T*> package;
+  Galois::Substrate::PerThreadStorage<unsigned> counts;
+  Galois::Substrate::PerThreadStorage<T*> thread;
+  Galois::Substrate::PerPackageStorage<T*> package;
   Galois::LargeArray<T> old;
   size_t size;
   unsigned num_threads;
@@ -235,7 +235,7 @@ class DiffractedCollection {
           break;
         case UpdateType::CycleByPackage:
         case UpdateType::ReplicateByPackage:
-          if (tid && Galois::Runtime::LL::isPackageLeader(tid))
+          if (tid && Galois::Substrate::getSystemThreadPool().isLeader(tid))
             std::copy(local, local + size, *package.getLocal());
           break;
         default: abort();
@@ -246,7 +246,7 @@ class DiffractedCollection {
 public:
   DiffractedCollection(size_t n): size(n), block_size(0) {
     num_threads = Galois::getActiveThreads();
-    num_packages = Galois::Runtime::LL::getMaxPackageForThread(num_threads-1) + 1;
+    num_packages = Galois::Substrate::getSystemThreadPool().getCumulativeMaxPackage(num_threads-1) + 1;
     
     if (UT == UpdateType::Staleness)
       old.create(n);
@@ -259,7 +259,7 @@ public:
       });
     } else if (UT == UpdateType::ReplicateByPackage || UT == UpdateType::CycleByPackage) {
       Galois::on_each([n, this](unsigned tid, unsigned total) {
-	if (Galois::Runtime::LL::isPackageLeader(tid)) {
+          if (Galois::Substrate::getSystemThreadPool().isLeader(tid)) {
 	  T *p = new T[n];
 	  *package.getLocal() = p;
 	  std::fill(p, p + n, 0);
@@ -305,8 +305,8 @@ public:
   Accessor get() {
     // XXX
     if ((UT == UpdateType::ReplicateByPackage || UT == UpdateType::CycleByPackage) && num_packages > 1) {
-      unsigned tid = Galois::Runtime::LL::getTID();
-      unsigned my_package = Galois::Runtime::LL::getPackageForSelf(tid);
+      unsigned tid = Galois::Substrate::ThreadPool::getTID();
+      unsigned my_package = Galois::Substrate::ThreadPool::getPackage();
       if (UT == UpdateType::ReplicateByPackage || block_size == 0) {
 	unsigned next = (my_package + 1) % num_packages;
 	return Accessor { *package.getLocal(), *package.getLocal(), *package.getRemoteByPkg(next) };
@@ -381,7 +381,7 @@ struct LogisticRegression {
   double* baseEdgeData;
 #endif
   LogisticRegression(Graph& _g, double _lr, Galois::GAccumulator<size_t>& b) : g(_g), learningRate(_lr), bigUpdates(b) {
-    has_other = Galois::Runtime::LL::getMaxPackageForThread(Galois::getActiveThreads() - 1) > 1;
+    has_other = Galois::Substrate::getSystemThreadPool().getCumulativeMaxPackage(Galois::getActiveThreads() - 1) > 1;
   	alg_type = AlgoType::SGDL1;
 #ifdef DENSE
     baseNodeData = &g.getData(g.getEdgeDst(g.edge_begin(0)));
@@ -391,7 +391,7 @@ struct LogisticRegression {
   }
 
   LogisticRegression(Graph& _g, Galois::GAccumulator<size_t>& b, double *_alpha, double *_qd, bool useL1Loss) : g(_g), bigUpdates(b), alpha(_alpha), QD(_qd)  {
-    has_other = Galois::Runtime::LL::getMaxPackageForThread(Galois::getActiveThreads() - 1) > 1;
+    has_other = Galois::Substrate::getSystemThreadPool().getCumulativeMaxPackage(Galois::getActiveThreads() - 1) > 1;
 
 	diag = 0.5/creg;
 	C = std::numeric_limits<double>::max();
@@ -412,7 +412,7 @@ struct LogisticRegression {
   }
 
   LogisticRegression(Graph& _g, Galois::GAccumulator<size_t>& b, double *_alpha, double *_xTx, double _innereps, size_t *_newton_iter) : g(_g), bigUpdates(b), alpha(_alpha), xTx(_xTx), innereps(_innereps), newton_iter(_newton_iter)  {
-    has_other = Galois::Runtime::LL::getMaxPackageForThread(Galois::getActiveThreads() - 1) > 1;
+    has_other = Galois::Substrate::getSystemThreadPool().getCumulativeMaxPackage(Galois::getActiveThreads() - 1) > 1;
 
 	C = creg;
 	alg_type = AlgoType::DCDLR;
@@ -538,7 +538,7 @@ struct linearSVM_DCD {
 #endif
 
   linearSVM_DCD(Graph& _g, Galois::GAccumulator<size_t>& b, DCD_parameters *_params, Bag *_next_bag=NULL) : g(_g), bigUpdates(b), diag(_params->diag), C(_params->C), params(_params), next_bag(_next_bag) {
-    has_other = Galois::Runtime::LL::getMaxPackageForThread(Galois::getActiveThreads() - 1) > 1;
+    has_other = Galois::Substrate::getSystemThreadPool().getCumulativeMaxPackage(Galois::getActiveThreads() - 1) > 1;
 
 #ifdef DENSE
     baseNodeData = &g.getData(g.getEdgeDst(g.edge_begin(0)));
@@ -1143,7 +1143,7 @@ void runDCD(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<GNode>
 	}
 	if (updateType == UpdateType::ReplicateByPackage) {
 		Galois::on_each([](unsigned tid, unsigned total) {
-				if (Galois::Runtime::LL::isPackageLeader(tid)) {
+                    if (Galois::Substrate::getSystemThreadPool().isLeader(tid)) {
 				double *p = new double[NUM_VARIABLES];
 				*package_weights.getLocal() = p;
 				std::fill(p, p + NUM_VARIABLES, 0);

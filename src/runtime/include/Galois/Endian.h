@@ -31,6 +31,9 @@
 #define GALOIS_ENDIAN_H
 
 #include <cstdint>
+#ifndef _BSD_SOURCE
+#define _BSD_SOURCE 1
+#endif
 #include <endian.h>
 
 namespace Galois {
@@ -84,6 +87,27 @@ static inline uint32_t convert_htole32(uint32_t x) {
 #else
   return htole32(x);
 #endif
+}
+
+
+static inline uint32_t bswap32(uint32_t x) {
+  return
+    ((x << 24) & 0xff000000 ) |
+    ((x <<  8) & 0x00ff0000 ) |
+    ((x >>  8) & 0x0000ff00 ) |
+    ((x >> 24) & 0x000000ff );
+}
+
+static inline uint64_t bswap64(uint64_t x) {
+  return
+    ( (x << 56) & 0xff00000000000000UL ) |
+    ( (x << 40) & 0x00ff000000000000UL ) |
+    ( (x << 24) & 0x0000ff0000000000UL ) |
+    ( (x <<  8) & 0x000000ff00000000UL ) |
+    ( (x >>  8) & 0x00000000ff000000UL ) |
+    ( (x >> 24) & 0x0000000000ff0000UL ) |
+    ( (x >> 40) & 0x000000000000ff00UL ) |
+    ( (x >> 56) & 0x00000000000000ffUL );
 }
 
 }

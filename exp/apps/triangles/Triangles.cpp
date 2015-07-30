@@ -27,8 +27,8 @@
 #include "Galois/Accumulator.h"
 #include "Galois/Bag.h"
 #include "Galois/Statistic.h"
-#include "Galois/Graph/LCGraph.h"
-#include "Galois/ParallelSTL/ParallelSTL.h"
+#include "Galois/Graphs/LCGraph.h"
+#include "Galois/ParallelSTL.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 
@@ -513,7 +513,7 @@ int main(int argc, char** argv) {
       break;
 
     case edgeiterator: 
-      Galois::preAlloc(numThreads + 16*(graph.size() + graph.sizeEdges()) / Galois::Runtime::MM::pageSize);
+      Galois::preAlloc(numThreads + 16*(graph.size() + graph.sizeEdges()) / Galois::Runtime::pageSize);
       Galois::reportPageAlloc("MeminfoMid");
       run<EdgeIteratorAlgo>(); 
       break;

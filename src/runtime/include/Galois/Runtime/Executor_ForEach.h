@@ -344,7 +344,7 @@ protected:
   }
 
   template<typename... WArgsTy>
-  ForEachExecutor(const FunctionTy& f, const ArgsTy& args, int, const WArgsTy&... wargs):
+  ForEachExecutor(const FunctionTy& f, const ArgsTy& args, int, WArgsTy... wargs):
     term(Substrate::getSystemTermination(activeThreads)),
     barrier(Substrate::getSystemBarrier(activeThreads)),
     wl(wargs...),

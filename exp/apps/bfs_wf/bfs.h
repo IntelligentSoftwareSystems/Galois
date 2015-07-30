@@ -170,7 +170,7 @@ protected:
     Galois::StatTimer t_verify ("Verification time: ");
 
     t_verify.start ();
-    Galois::Runtime::PerThreadStorage<bool> result;
+    Galois::Substrate::PerThreadStorage<bool> result;
     for (unsigned i = 0; i < result.size (); ++i) {
       *result.getRemote(i) = true;
     }

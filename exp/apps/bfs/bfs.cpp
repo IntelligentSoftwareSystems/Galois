@@ -775,7 +775,7 @@ int main(int argc, char **argv) {
 
   switch (algo) {
     case serialAsync: run<SerialAsyncAlgo>(); break;
-    case serialMin: run<BarrierAlgo<GFIFO<int,false>,false> >(); break;
+    case serialMin: run<BarrierAlgo<GFIFO<int>,false> >(); break;
     case parallelAsync: run<AsyncAlgo>();  break;
     case parallelBarrierCas: run<BarrierAlgo<BSWL,true> >(); break;
     case parallelBarrier: run<BarrierAlgo<BSWL,false> >(); break;

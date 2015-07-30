@@ -38,7 +38,7 @@
 #include "Galois/Statistic.h"
 #include "Galois/Runtime/DoAllCoupled.h"
 #include "Galois/Runtime/Sampling.h"
-#include "Galois/Runtime/ll/CompilerSpecific.h"
+#include "Galois/Substrate/CompilerSpecific.h"
 
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
@@ -302,7 +302,7 @@ int main(int argc, char** argv) {
       break;
 
     case bh::CILK_TREE:
-      Galois::CilkInit ();
+      //FIXME:      Galois::CilkInit ();
       pos = bh::run<true> (bh::nbodies, bh::ntimesteps, bh::seed, bh::BuildSummarizeRecursive<bh::recursive::USE_CILK> ());
       break;
 
@@ -331,7 +331,7 @@ int main(int argc, char** argv) {
       break;
 
     case bh::RSUMM_CILK:
-      Galois::CilkInit ();
+      //FIXME:      Galois::CilkInit ();
       pos = bh::run<true> (bh::nbodies, bh::ntimesteps, bh::seed, bh::BuildLockFreeSummarizeRecursive<bh::recursive::USE_CILK> ());
       break;
 

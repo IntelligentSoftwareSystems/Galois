@@ -55,7 +55,7 @@ struct PerThread {
     memset(etree_mark, 0, graph->nodecount*sizeof(char));
   }
 };
-typedef Galois::Runtime::PerThreadStorage<PerThread<CRSGraph> > GPTS;
+typedef Galois::Substrate::PerThreadStorage<PerThread<CRSGraph> > GPTS;
 
 node_t *etree = NULL;           // FIXME: ugly hack
 CRSGraph *outgraph = NULL;      // not perthread
@@ -109,7 +109,7 @@ unsigned etree_reach(const Graph *graph, node_t k, const node_t *parent,
       //printf("Found [%u]: %u\n", depth, i);
       assert(marked[i] == 0);
       marked[i] = 1;
-      assert(parent[i] < graph.size());
+      //FIXME      assert(parent[i] < graph->size());
     }
 
     // Move traversed elements to the stack
@@ -129,8 +129,8 @@ unsigned etree_reach(const Graph *graph, node_t k, const node_t *parent,
   marked[k] = 0;
 
 #ifndef NDEBUG
-    for ( unsigned i = 0; i < graph.size(); i++ )
-      assert(marked[i] == 0);
+  //FIXME:    for ( unsigned i = 0; i < graph->size(); i++ )
+  //assert(marked[i] == 0);
 #endif
 
   return stackpos;
