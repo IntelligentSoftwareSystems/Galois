@@ -1,20 +1,29 @@
-#include "EquationSystem.h"
+#include "EquationSystem.hpp"
 #include <string>
 #include <cmath>
 #include <cstdlib>
+#include <iostream>
 
 extern "C" {
 #include <cblas.h>
 #include <clapack.h>
 }
 
-EquationSystem::EquationSystem(unsigned long n, SolverMode mode)
+EquationSystem::EquationSystem(unsigned long n, SolverMode mode) {
+  this->n    = n;
+  this->mode = mode;
+  
+  allocate();
+}
+  
+void EquationSystem::allocate()
 {
-    this->n = n;
-    this->mode = mode;
     unsigned long i;
-
     // we are working on continuous area of memory
+
+    //matrix = new double*[n];
+    //matrix[0] = new double[n*(n+1)]();
+
     posix_memalign((void**) &matrix, sizeof(double*), n*sizeof(double*));
     posix_memalign((void**) &matrix[0], sizeof(double), n*(n+1)*sizeof(double));
 
@@ -34,10 +43,11 @@ EquationSystem::EquationSystem(unsigned long n, SolverMode mode)
 EquationSystem::~EquationSystem()
 {
     if (matrix != NULL) {
+        //delete [] origPtr;
+        //delete [] matrix;
         free((void*)origPtr);
         free((void*)matrix);
     }
-
 }
 
 int EquationSystem::eliminate(const int rows)

@@ -1,9 +1,20 @@
-//#include <omp.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 #include <math.h>
 #include <sys/time.h>
+/*
+#include "Galois/Galois.h"
+#include "Galois/Accumulator.h"
+#include "Galois/Bag.h"
+#include "Galois/CilkInit.h"
+#include "Galois/Statistics.h"
+#include "Galois/Runtime/TreeExec.h"
+*/
+
+#define CACHE_LINE_SIZE (64)
+
+/* matrix operations */
 
 typedef enum {
     COL_IDX,
@@ -41,9 +52,11 @@ typedef struct
 sm * alloc_matrix(int nz, int n, idx indexing)
 {
     sm *mat = (sm*) calloc(1, sizeof(sm));
-    mat->x = (double*) calloc(nz, sizeof(double));
-    mat->ptr = (int *) calloc(n+1, sizeof(mat->ptr));
-    mat->ind = (int *) calloc(nz, sizeof(mat->ind));
+ 
+    posix_memalign((void**) &mat->x, CACHE_LINE_SIZE, sizeof(double)*nz);
+    posix_memalign((void**) &mat->ptr, CACHE_LINE_SIZE, sizeof(mat->ptr)*(n+1));
+    posix_memalign((void**) &mat->ind, CACHE_LINE_SIZE, sizeof(mat->ind)*nz);
+
     mat->n = n;
     mat->indexing = indexing;
     mat->nz = nz;
@@ -102,6 +115,8 @@ void fill_matrix(sm *matrix, in_data ** input_data, int nz)
         matrix->ptr[input_data[nz-1]->col+1] = nz;
     }
 }
+
+/* elimination tree */
 
 sm_util *elim_tree (const sm *A)
 {
@@ -246,6 +261,29 @@ void debug_matrix(sm *matrix)
 
 }
 
+void children_count(sm *matrix, sm_util *etree)
+{
+    int i = 0;
+    int max=-1;
+    int *w = (int*) calloc(matrix->n, sizeof(int));
+
+    if (w == NULL)
+        return;
+
+    for (i=0; i<matrix->n; ++i) {
+        if (etree->children[i] >= 0) {
+            w[etree->children[i]]++;
+            if (w[etree->children[i]] > max) {
+                max = w[etree->children[i]];
+            }
+        }
+    }
+
+    printf("Max: %d\n", max);
+
+    free(w);
+}
+
 void print_data(in_data ** data, int nz)
 {
     int i;
@@ -272,7 +310,6 @@ void chol(sm *mat, sm *mat_col)
         }
         mat->x[p] = sqrt(x);
 
-//        #pragma omp parallel for private(q,y,k,ki) schedule(dynamic, CHUNKSIZE)
         for (j=mat_col->ptr[i]+1; j<mat_col->ptr[i+1]; ++j) {
             // current hotspot - Tim Davies has answer :)
             q = bin_search(mat, mat_col->ind[j], i);
@@ -295,17 +332,18 @@ int chol_new(sm *mat, sm_util *util)
 {
     int *children = util->children;
     int *flying_ptrs = util->flying_ptrs;
+    int i, j, k;
 
-    for (int i=0; i<mat->n; ++i) {
+    for (i=0; i<mat->n; ++i) {
         int p = mat->ptr[i+1]-1;
         double x = mat->x[p];
-        for (int j=mat->ptr[i]; j<p; ++j) {
+        for (j=mat->ptr[i]; j<p; ++j) {
             // L_{i,i} = sqrt(L_{i,i} - sum_{j=0}^{i-1} L_{i,j})
             x -= mat->x[j]*mat->x[j];
         }
         mat->x[p] = sqrt(x);
 
-        for (int j=children[i]; j!=-1; j=children[j]) {
+        for (j=children[i]; j!=-1; j=children[j]) {
 
             while (mat->ind[flying_ptrs[j]] < i) {
                 ++(flying_ptrs[j]);
@@ -319,7 +357,7 @@ int chol_new(sm *mat, sm_util *util)
                 double y = mat->x[max_ki];
                 int max_k = mat->ptr[i+1]-2;
 
-                for (int k=mat->ptr[i]; k < max_k; ++k) {
+                for (k=mat->ptr[i]; k < max_k; ++k) {
                     while (ki < max_ki && mat->ind[ki] < mat->ind[k]) ++ki;
 
                     if (mat->ind[ki] == mat->ind[k]) {
@@ -372,7 +410,7 @@ int main(int argc, char ** argv)
     }
     fseek(fp, 0, SEEK_SET);
     ++n;;
-//    printf("Thr/proc #: %d / %d \n", omp_get_max_threads(), omp_get_num_procs());
+    
     printf("Mat stat: nz=%u n=%u\n", nz, n);
     matrix = alloc_matrix(nz, n, COL_IDX);
     if (old)
@@ -387,8 +425,8 @@ int main(int argc, char ** argv)
     }
 
     if (old) {
-    qsort((void*) input_data[0], nz, sizeof(in_data), indata_cmp_col);
-    fill_matrix(matrix_col, input_data, nz);
+        qsort((void*) input_data[0], nz, sizeof(in_data), indata_cmp_col);
+        fill_matrix(matrix_col, input_data, nz);
     }
     if (matrix->indexing == COL_IDX)
         qsort((void*) input_data[0], nz, sizeof(in_data), indata_cmp_row);
@@ -405,20 +443,9 @@ int main(int argc, char ** argv)
 
     printf("Creating tree...\n");
     sm_util *tree = elim_tree(matrix);
-    //tree->children[3]=5;
-//    printf("children = [");
-//    for (i=0; i<matrix->n; ++i) {
-//        printf("%d ", tree->children[i]);
-//    }
-//    printf("]\n");
-
-//    printf("flying_ptrs = [");
-//    for (i=0; i<matrix->n; ++i) {
-//        printf("%d ", tree->flying_ptrs[i]);
-//    }
-//    printf("]\n");
-
-
+    
+    children_count(matrix, tree);
+    
     printf("Solving...\n");
 
     if (!old) {
@@ -436,17 +463,11 @@ int main(int argc, char ** argv)
         printf("SOLVE time: ");
         print_time(&t1, &t2);
     }
-    //debug_matrix(matrix);
-
-    //for (i=0; i<matrix->n; ++i) {
-    //    for (j=matrix->ptr[i]; j<matrix->ptr[i+1]; ++j) {
-    //        printf("%d %d %E\n", i, matrix->ind[j], matrix->x[j]);
-    //    }
-    //}
-
+    
     free_matrix(matrix);
+
     if (old)
-    free_matrix(matrix_col);
+        free_matrix(matrix_col);
     return 0;
 
 }
