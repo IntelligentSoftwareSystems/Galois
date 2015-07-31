@@ -161,7 +161,7 @@ public:
 
 //TODO(ddn): Implement wrapper to allow calling without UserContext
 //TODO(ddn): Check for operators that implement both with and without context
-template<class WorkListTy, class FunctionTy, class ArgsTy>
+template<class WorkListTy, class FunctionTy, typename ArgsTy>
 class ForEachExecutor {
 public:
   static const bool needsStats = !exists_by_supertype<does_not_need_stats_tag, ArgsTy>::value;
@@ -346,7 +346,7 @@ protected:
   struct T1 {}; struct T2 {};
 
   template<typename... WArgsTy>
-  ForEachExecutor(const FunctionTy& f, const ArgsTy& args, int, WArgsTy... wargs):
+  ForEachExecutor(T2, const FunctionTy& f, const ArgsTy& args, WArgsTy... wargs):
     term(Substrate::getSystemTermination(activeThreads)),
     barrier(Substrate::getSystemBarrier(activeThreads)),
     wl(wargs...),

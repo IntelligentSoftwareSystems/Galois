@@ -22,20 +22,19 @@
  */
 // modified by Joyce Whang <joyce@cs.utexas.edu>
 
-#include "Galois/config.h"
 #include "Galois/Galois.h"
 #include "Galois/Accumulator.h"
 #include "Galois/Bag.h"
 #include "Galois/Statistic.h"
-#include "Galois/Graph/LCGraph.h"
-#include "Galois/Graph/TypeTraits.h"
+#include "Galois/Graphs/LCGraph.h"
+#include "Galois/Graphs/TypeTraits.h"
 #include "Lonestar/BoilerPlate.h"
 
 #ifdef GALOIS_USE_EXP
 #include "Galois/WorkList/WorkListDebug.h"
 #endif
 
-#include GALOIS_CXX11_STD_HEADER(atomic)
+#include <atomic>
 #include <string>
 #include <sstream>
 #include <limits>
@@ -963,7 +962,7 @@ void run() {
 
   algo.readGraph(graph);
 
-  Galois::preAlloc(numThreads + (graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::MM::hugePageSize);
+  Galois::preAlloc(numThreads + (graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::hugePageSize);
   Galois::reportPageAlloc("MeminfoPre");
 
   Galois::StatTimer T;
