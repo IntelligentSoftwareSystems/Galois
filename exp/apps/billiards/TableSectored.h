@@ -87,12 +87,12 @@ public:
   TableSectored (const TableSectored& that) 
     : Table (that), sectorSize (that.sectorSize), xSectors (that.xSectors), ySectors (that.ySectors) {
 
-      sectors.resize (that.sectors.size ());
-
-      assert (that.sectors.size () == that.xSectors);
-      for (size_t i = 0; i < that.sectors.size (); ++i) {
-        Table::copyVecPtr (that.sectors[i], this->sectors[i]);
+      // balls copied over from 'that' table have pointers to sectors in 'that' table
+      for (Ball* b: this->balls) {
+        b->removeAllSectors ();
       }
+
+      init ();
 
   }
 

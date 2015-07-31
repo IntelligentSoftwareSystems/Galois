@@ -147,6 +147,13 @@ public:
     return balls.contains (const_cast<Ball*> (b));
   }
 
+  void removeAllBalls (void) {
+    balls.clear ();
+  }
+
+  void removeAllCushions (void) {
+    cushions.clear ();
+  }
 
   bool intersects (const Ball* ball) const {
 

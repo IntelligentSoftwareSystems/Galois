@@ -133,6 +133,10 @@ public:
     assert (!sectors.contains (s));
   }
 
+  void removeAllSectors (void) {
+    sectors.clear ();
+  }
+
   bool hasSector (const Sector* s) const {
     assert (s);
     return sectors.contains (const_cast<Sector*> (s));
