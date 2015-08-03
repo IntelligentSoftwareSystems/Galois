@@ -34,12 +34,11 @@
 #include <fstream>
 
 #include "Metis.h"
-#include "Galois/Graph/Util.h"
+#include "Galois/Graphs/Util.h"
 #include "Galois/Statistic.h"
 //#include "GraphReader.h"
 #include "Lonestar/BoilerPlate.h"
-#include "Galois/config.h"
-#include "Galois/Graph/FileGraph.h"
+#include "Galois/Graphs/FileGraph.h"
 #include "Galois/LargeArray.h"
 
 namespace cll = llvm::cl;
@@ -167,7 +166,7 @@ struct order_by_degree {
     return wa < wb;
   }
 };
-typedef Galois::Runtime::PerThreadStorage<std::map<GNode,uint64_t> > PerThreadDegInfo;
+typedef Galois::Substrate::PerThreadStorage<std::map<GNode,uint64_t> > PerThreadDegInfo;
 struct OrderGraph {
   GGraph &graph;
   PerThreadDegInfo &threadDegInfo;
@@ -223,7 +222,7 @@ int main(int argc, char** argv) {
   //printGraphBeg(*graph);
 
   Galois::reportPageAlloc("MeminfoPre");
-  Galois::preAlloc(Galois::Runtime::MM::numPageAllocTotal() * 5);
+  Galois::preAlloc(Galois::Runtime::numPageAllocTotal() * 5);
   Partition(&metisGraph, numPartitions);
   Galois::reportPageAlloc("MeminfoPost");
 

@@ -1,3 +1,33 @@
+/** ?? -*- C++ -*-
+ * @file
+ * This is the only file to include for basic Galois functionality.
+ *
+ * @section License
+ *
+ * This file is part of Galois.  Galoisis a gramework to exploit
+ * amorphous data-parallelism in irregular programs.
+ *
+ * Galois is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * Galois is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with Galois.  If not, see
+ * <http://www.gnu.org/licenses/>.
+ *
+ * @section Copyright
+ *
+ * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * reserved.
+ *
+ */
+
 /**
  * Common support for worklist experiments.
  */
@@ -6,13 +36,15 @@
 
 #include "Galois/WorkList/WorkList.h"
 #include "Galois/WorkList/WorkListExperimental.h"
-#include "Galois/Runtime/ll/gio.h"
+#include "Galois/Substrate/gio.h"
 
 namespace Exp {
 
 __attribute__((weak)) llvm::cl::opt<std::string> WorklistName("wl", llvm::cl::desc("Worklist to use"), llvm::cl::init("DEFAULT"));
 
-using namespace Galois::Runtime::LL;
+//FIXME: using in a header
+using namespace Galois::Runtime;
+using namespace Galois::Substrate;
 using namespace Galois::WorkList;
 
 template<int CS, bool LF>
@@ -61,7 +93,7 @@ struct PriAuto {
 #define WLFOO2(__x)							\
     if (WorklistName == #__x) {						\
       if (!printed) {							\
-	gInfo("WorkList ", #__x);					\
+        Galois::Substrate::gInfo("WorkList ", #__x);                    \
 	printed = true;							\
       }									\
       Galois::for_each(b,e,f,std::forward<Args>(args)..., Galois::wl<__x>()); \
@@ -71,7 +103,7 @@ struct PriAuto {
 #define WLFOO2(__x)							\
     if (WorklistName == "NI_" #__x) {					\
       if (!printed) {							\
-	gInfo("WorkList ", "NI_" #__x);					\
+        Galois::Substrate::gInfo("WorkList ", "NI_" #__x);              \
 	printed = true;							\
       }									\
       Galois::for_each(b,e,f,std::forward<Args>(args)..., Galois::wl<NoInlineFilter<__x>>()); \

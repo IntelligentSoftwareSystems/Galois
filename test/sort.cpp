@@ -1,5 +1,5 @@
 #include "Galois/Galois.h"
-#include "Galois/ParallelSTL/ParallelSTL.h"
+#include "Galois/ParallelSTL.h"
 #include "Galois/Timer.h"
 
 #include <iostream>
@@ -17,7 +17,7 @@ int vectorSize = 1;
 
 int do_sort() {
 
-  unsigned M = Galois::Runtime::LL::getMaxThreads();
+  unsigned M = Galois::Substrate::getSystemThreadPool().getMaxThreads();
   std::cout << "sort:\n";
 
   while (M) {
@@ -68,7 +68,7 @@ int do_sort() {
 
 int do_count_if() {
 
-  unsigned M = Galois::Runtime::LL::getMaxThreads();
+  unsigned M = Galois::Substrate::getSystemThreadPool().getMaxThreads();
   std::cout << "count_if:\n";
 
   while (M) {
@@ -109,7 +109,7 @@ struct mymax : std:: binary_function<T,T,T> {
 
 int do_accumulate() {
 
-  unsigned M = Galois::Runtime::LL::getMaxThreads();
+  unsigned M = Galois::Substrate::getSystemThreadPool().getMaxThreads();
   std::cout << "accumulate:\n";
 
   while (M) {

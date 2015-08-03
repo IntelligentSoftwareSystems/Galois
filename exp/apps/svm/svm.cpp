@@ -25,11 +25,11 @@
 #include "Galois/Galois.h"
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
-#include "Galois/Graph/Graph.h"
-#include "Galois/Graph/LCGraph.h"
+#include "Galois/Graphs/Graph.h"
+#include "Galois/Graphs/LCGraph.h"
 #include "Galois/Accumulator.h"
-#include "Galois/ParallelSTL/ParallelSTL.h"
-#include "Galois/Runtime/ll/PaddedLock.h"
+#include "Galois/ParallelSTL.h"
+#include "Galois/Substrate/PaddedLock.h"
 #include "Lonestar/BoilerPlate.h"
 
 #ifdef HAS_EIGEN
@@ -120,8 +120,8 @@ unsigned variableNodeToId(GNode variable_node) {
 
 template<typename T, UpdateType UT>
 class DiffractedCollection {
-  Galois::Runtime::PerThreadStorage<T*> thread;
-  Galois::Runtime::PerPackageStorage<T*> package;
+  Galois::Substrate::PerThreadStorage<T*> thread;
+  Galois::Substrate::PerPackageStorage<T*> package;
   Galois::LargeArray<T> old;
   size_t size;
   unsigned num_threads;
@@ -154,7 +154,7 @@ class DiffractedCollection {
             std::copy(local, local + size, *thread.getLocal());
           break;
         case UpdateType::ReplicateByPackage:
-          if (tid && Galois::Runtime::LL::isPackageLeader(tid))
+          if (tid && Galois::Substrate::getSystemThreadPool().isLeader(tid))
             std::copy(local, local + size, *package.getLocal());
           break;
         default: abort();
@@ -165,7 +165,7 @@ class DiffractedCollection {
 public:
   DiffractedCollection(size_t n): size(n) {
     num_threads = Galois::getActiveThreads();
-    num_packages = Galois::Runtime::LL::getMaxPackageForThread(num_threads-1) + 1;
+    num_packages = Galois::Substrate::getSystemThreadPool().getCumulativeMaxPackage(num_threads-1) + 1;
 
     if (UT == UpdateType::Staleness)
       old.create(n);
@@ -179,7 +179,7 @@ public:
         });
       case UpdateType::ReplicateByPackage:
         Galois::on_each([n, this](unsigned tid, unsigned total) {
-          if (Galois::Runtime::LL::isPackageLeader(tid)) {
+            if (Galois::Substrate::getSystemThreadPool().isLeader(tid)) {
             T *p = new T[n];
             *package.getLocal() = p;
             std::fill(p, p + n, 0);
@@ -224,8 +224,8 @@ public:
 
   Accessor get() {
     if (num_packages > 1 && UT == UpdateType::ReplicateByPackage) {
-      unsigned tid = Galois::Runtime::LL::getTID();
-      unsigned my_package = Galois::Runtime::LL::getPackageForSelf(tid);
+      unsigned tid = Galois::Substrate::ThreadPool::getTID();
+      unsigned my_package = Galois::Substrate::ThreadPool::getPackage();
       unsigned next = (my_package + 1) % num_packages;
       return Accessor { *package.getLocal(), *package.getLocal(), *package.getRemoteByPkg(next) };
     }

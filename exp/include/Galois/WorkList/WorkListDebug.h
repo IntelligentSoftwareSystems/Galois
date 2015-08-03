@@ -2,24 +2,31 @@
  * @file
  * @section License
  *
- * Galois, a framework to exploit amorphous data-parallelism in irregular
- * programs.
+ * This file is part of Galois.  Galoisis a gramework to exploit
+ * amorphous data-parallelism in irregular programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
- * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
- * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
- * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
- * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
- * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
- * shall University be liable for incidental, special, indirect, direct or
- * consequential damages or loss of profits, interruption of business, or
- * related expenses which may arise from use of Software or Documentation,
- * including but not limited to those resulting from defects in Software and/or
- * Documentation, or loss or inaccuracy of data of any kind.
+ * Galois is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * Galois is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with Galois.  If not, see
+ * <http://www.gnu.org/licenses/>.
+ *
+ * @section Copyright
+ *
+ * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * reserved.
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
+
 #ifndef GALOIS_RUNTIME_WORKLISTDEBUG_H
 #define GALOIS_RUNTIME_WORKLISTDEBUG_H
 
@@ -40,18 +47,18 @@ class WorkListTracker {
   };
 
   //online collection of stats
-  Runtime::PerThreadStorage<p> tracking;
+  Substrate::PerThreadStorage<p> tracking;
   //global clock
-  Runtime::LL::CacheLineStorage<unsigned int> clock;
+  Substrate::CacheLineStorage<unsigned int> clock;
   //master thread counting towards a tick
-  Runtime::LL::CacheLineStorage<unsigned int> thread_clock;
+  Substrate::CacheLineStorage<unsigned int> thread_clock;
 
   realWL wl;
   Indexer I;
 
 public:
   template<typename Tnew>
-  struct retype { typedef WorkListTracker<Indexer, typename realWL::template retype<Tnew>::type, Tnew> type; };
+  using retype = WorkListTracker<Indexer, typename realWL::template retype<Tnew>, Tnew>;
 
   typedef T value_type;
 
@@ -121,7 +128,7 @@ public:
     }
     auto index = I(*ret);
     P.stat.insert(index);
-    if (Runtime::LL::getTID() == 0) {
+    if (Substrate::ThreadPool::getTID() == 0) {
       ++thread_clock.data;
       if (thread_clock.data == 1024*10) {
 	thread_clock.data = 0;
@@ -143,7 +150,7 @@ class LoadBalanceTracker {
   };
 
   //online collection of stats
-  Runtime::PerThreadStorage<p> tracking;
+  Substrate::PerThreadStorage<p> tracking;
 
   realWL wl;
   unsigned Pr;
@@ -159,7 +166,7 @@ class LoadBalanceTracker {
     unsigned multiple = 2;
     P.epoch = P.newEpoch;
     P.values.resize(P.epoch+1);
-    unsigned tid = Runtime::LL::getTID();
+    unsigned tid = Substrate::ThreadPool::getTID();
     for (unsigned i = 1; i <= multiple; ++i) {
       unsigned n = tid * multiple + i;
       if (n < Pr)
@@ -173,10 +180,10 @@ class LoadBalanceTracker {
 
 public:
   template<bool newconcurrent>
-  struct rethread { typedef LoadBalanceTracker<typename realWL::template rethread<newconcurrent>::type, perEpoch> type; };
+  using rethread = LoadBalanceTracker<typename realWL::template rethread<newconcurrent>, perEpoch>;
 
   template<typename Tnew>
-  struct retype { typedef LoadBalanceTracker<typename realWL::template retype<Tnew>::type, perEpoch> type; };
+  using retype = LoadBalanceTracker<typename realWL::template retype<Tnew>, perEpoch>;
 
   typedef typename realWL::value_type value_type;
 
@@ -246,10 +253,10 @@ public:
   typedef typename iWL::value_type value_type;
   
   template<bool concurrent>
-  struct rethread { typedef NoInlineFilter<typename iWL::template rethread<concurrent>::type> type; };
+  using rethread = NoInlineFilter<typename iWL::template rethread<concurrent> >;
 
   template<typename Tnew>
-  struct retype { typedef NoInlineFilter<typename iWL::template retype<Tnew>::type > type; };
+  using retype = NoInlineFilter<typename iWL::template retype<Tnew> >;
 
   //! push a value onto the queue
   GALOIS_ATTRIBUTE_NOINLINE

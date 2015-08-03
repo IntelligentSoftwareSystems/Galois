@@ -5,7 +5,7 @@ set(GALOIS_VERSION_MAJOR "2")
 set(GALOIS_VERSION_MINOR "2")
 set(GALOIS_VERSION_PATCH "2")
 set(GALOIS_VERSION ${GALOIS_VERSION_MAJOR}.${GALOIS_VERSION_MINOR}.${GALOIS_VERSION_PATCH})
-set(GALOIS_COPYRIGHT_YEAR "2014") # Also in COPYRIGHT
+set(GALOIS_COPYRIGHT_YEAR "2015") # Also in COPYRIGHT
 
 if(NOT CMAKE_BUILD_TYPE)
   message(STATUS "No build type selected, default to release")
@@ -235,12 +235,14 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CXX11_FLAGS}")
 
 include(CheckEndian)
 
-include(llvm-extras)
+#include(llvm-extras)
 #always import c99 stdint functions into c++
 #include(UseStdMacro) # HandleLLVMOptions.cmake (via llvm-extras) already does this for us
 #include_directories("${PROJECT_BINARY_DIR}/include") # llvm-extra already does this for us
 
 ###### Build Hacks ######
+
+add_definitions(-D__STDC_LIMIT_MACROS)
 
 # XXX(ddn): Hack for lonestar machines
 if(NUMA_FOUND)
@@ -280,8 +282,14 @@ function(app name)
 
   compileApp(${name} ${APP_UNPARSED_ARGUMENTS})
   target_link_libraries(${name} ${APP_EXTLIBS})
-  target_link_libraries(${name} galois)
+  target_link_libraries(${name} lonestar)
+  target_link_libraries(${name} galois_graphs)
+  target_link_libraries(${name} galois_runtime)
+  target_link_libraries(${name} galois_substrate)
+  target_link_libraries(${name} gllvm)
   target_link_libraries(${name} rt)
+  target_link_libraries(${name} ${CMAKE_THREAD_LIBS_INIT})
+
   if(INSTALL_APPS)
     install(TARGETS ${name} DESTINATION bin)
   endif()
@@ -311,7 +319,13 @@ function(makeTest)
 
   if(${APP_ADD_TARGET})
     add_executable(test-${name} ${name}.cpp)
-    target_link_libraries(test-${name} galois)
+    target_link_libraries(test-${name} lonestar)
+    target_link_libraries(test-${name} galois_graphs)
+    target_link_libraries(test-${name} galois_runtime)
+    target_link_libraries(test-${name} galois_substrate)
+    target_link_libraries(test-${name} gllvm)
+#    target_link_libraries(test-${name} galois_substrate)
+#    target_link_libraries(test-${name} galois)
     list(APPEND commandline "$<TARGET_FILE:test-${name}>")
   elseif(${APP_TARGET}) 
     get_filename_component(base ${name} NAME)
@@ -342,21 +356,22 @@ include_directories(include)
 if(USE_EXP)
   add_subdirectory(exp)
 endif()
-add_subdirectory(lib)
+#add_subdirectory(lib)
 add_subdirectory(src)
 add_subdirectory(tools)
 add_subdirectory(scripts)
 if(NOT SKIP_COMPILE_APPS)
+  add_subdirectory(lonestar)
   add_subdirectory(apps)
   add_subdirectory(inputs)
   add_subdirectory(test)
-  add_subdirectory(toolkit_ml)
+#  add_subdirectory(toolkit_ml)
 endif()
 
 ###### Documentation ######
 set(DOXYFILE_SOURCE_DIR "src\" \"include\" \"docs")
-find_package(UseDoxygen 1.8.0)
-if(NOT UseDoxygen_FOUND)
+find_package(Doxygen 1.8.0)
+if(NOT DOXYGEN_FOUND)
   message(STATUS "Could NOT find required doxygen version: doxygen missing or < 1.8.0") 
 endif()
 
@@ -371,8 +386,8 @@ set(CPACK_PACKAGE_VERSION_PATCH ${GALOIS_VERSION_PATCH})
 include(CPack)
 
 ###### Installation ######
-export(TARGETS galois APPEND FILE "${PROJECT_BINARY_DIR}/GaloisTargets.cmake")
-export(PACKAGE Galois)
+#export(TARGETS galois APPEND FILE "${PROJECT_BINARY_DIR}/GaloisTargets.cmake")
+#export(PACKAGE Galois)
 
 # Galois include files
 file(RELATIVE_PATH rel_include_dir "${INSTALL_CMAKE_DIR}" "${INSTALL_INCLUDE_DIR}")
@@ -383,7 +398,7 @@ endif()
 
 set(GALOIS_INCLUDE_DIRS) # Galois include dependencies
 set(GALOIS_INCLUDE_DIR)  # Galois include provides
-get_target_property(defs galois INCLUDE_DIRECTORIES)
+#get_target_property(defs galois INCLUDE_DIRECTORIES)
 foreach(d ${defs})
   string(FIND ${d} ${PROJECT_BINARY_DIR} pos1)
   string(FIND ${d} ${PROJECT_SOURCE_DIR} pos2)

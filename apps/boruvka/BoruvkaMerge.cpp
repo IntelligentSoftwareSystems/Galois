@@ -23,10 +23,10 @@
  */
 
 #include "Galois/Statistic.h"
-#include "Galois/Graph/Graph.h"
+#include "Galois/Graphs/Graph.h"
 #include "Galois/Timer.h"
 #include "Galois/Galois.h"
-#include "Galois/Graph/LCGraph.h"
+#include "Galois/Graphs/LCGraph.h"
 
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
@@ -171,7 +171,7 @@ void printGraph() {
 ///////////////////////////////////////////////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////
 //! [define per thread storage]
-Galois::Runtime::PerThreadStorage<long long> MSTWeight;
+Galois::Substrate::PerThreadStorage<long long> MSTWeight;
 //! [define per thread storage]
 struct process {
    template<typename ContextTy>

@@ -21,9 +21,9 @@
  * @author Dimitrios Prountzos <dprountz@cs.utexas.edu>
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#include "Galois/config.h"
+
 #include "Galois/LargeArray.h"
-#include "Galois/Graph/FileGraph.h"
+#include "Galois/Graphs/FileGraph.h"
 
 #include "llvm/Support/CommandLine.h"
 
@@ -35,7 +35,7 @@
 #include <limits>
 #include <stdint.h>
 #include <vector>
-#include GALOIS_CXX11_STD_HEADER(random)
+#include <random>
 
 #include <fcntl.h>
 #include <cstdlib>

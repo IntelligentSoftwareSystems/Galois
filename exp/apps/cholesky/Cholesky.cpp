@@ -32,9 +32,9 @@
 #include "Galois/Bag.h"
 #include "Galois/Statistic.h"
 #include "Galois/UnionFind.h"
-#include "Galois/Graph/LCGraph.h"
-#include "Galois/ParallelSTL/ParallelSTL.h"
-#include "Galois/Graph/Graph.h" // FirstGraph
+#include "Galois/Graphs/LCGraph.h"
+#include "Galois/ParallelSTL.h"
+#include "Galois/Graphs/Graph.h" // FirstGraph
 #include "llvm/Support/CommandLine.h"
 #include <float.h>              // For DBL_DIG, significant digits in double
 

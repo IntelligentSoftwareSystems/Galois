@@ -2,9 +2,9 @@
 #define APPS_CONNECTEDCOMPONENTS_LIGRAALGO_H
 
 #include "Galois/DomainSpecificExecutors.h"
-#include "Galois/Graph/OCGraph.h"
-#include "Galois/Graph/LCGraph.h"
-#include "Galois/Graph/GraphNodeBag.h"
+#include "Galois/Graphs/OCGraph.h"
+#include "Galois/Graphs/LCGraph.h"
+#include "Galois/Graphs/GraphNodeBag.h"
 #include "llvm/Support/CommandLine.h"
 
 #include <boost/mpl/if.hpp>

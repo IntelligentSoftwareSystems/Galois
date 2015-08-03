@@ -70,11 +70,11 @@ struct WID {
   unsigned tid;
   unsigned pid;
   WID(unsigned t): tid(t) {
-    pid = LL::getLeaderForThread(tid);
+    pid = Substrate::getSystemThreadPool().getLeader(tid);
   }
   WID() {
-    tid = LL::getTID();
-    pid = LL::getLeaderForThread(tid);
+    tid = Substrate::ThreadPool::getTID();
+    pid = Substrate::ThreadPool::getLeader();
   }
 };
 
@@ -82,7 +82,7 @@ template<typename T,template<typename,bool> class OuterTy, bool isLIFO,int Chunk
 class dChunkedMaster : private boost::noncopyable {
   class Chunk : public FixedSizeRingAdaptor<T,isLIFO,ChunkSize>, public OuterTy<Chunk,true>::ListNode {};
 
-  MM::FixedSizeAllocator<Chunk> alloc;
+  FixedSizeAllocator<Chunk> alloc;
 
   struct p {
     Chunk* next;
@@ -90,8 +90,8 @@ class dChunkedMaster : private boost::noncopyable {
 
   typedef OuterTy<Chunk, true> LevelItem;
 
-  PerThreadStorage<p> data;
-  PerPackageStorage<LevelItem> Q;
+  Substrate::PerThreadStorage<p> data;
+  Substrate::PerPackageStorage<LevelItem> Q;
 
   Chunk* mkChunk() {
     Chunk* ptr = alloc.allocate(1);
@@ -207,7 +207,7 @@ public:
     WID id;
     for (unsigned i = 0; i < data.size(); ++i) {
       id.tid = i;
-      id.pid = LL::getLeaderForThread(i);
+      id.pid = Substrate::getSystemThreadPool().getLeader(i);
       if (!empty(id))
         return false;
     }
@@ -281,8 +281,8 @@ class BSInlineExecutor {
   FunctionTy function;
   PreFunc preFunc;
   const char* loopname;
-  Galois::Runtime::Barrier& barrier;
-  LL::CacheLineStorage<volatile long> done;
+  Galois::Substrate::Barrier& barrier;
+  Substrate::CacheLineStorage<volatile long> done;
 
   bool empty(WLTy* wl) {
     return wl->sempty();
@@ -313,7 +313,7 @@ class BSInlineExecutor {
 #else
     } catch (const ConflictFlag& flag) { clearConflictLock(); result = flag; }
 #endif
-    clearReleasable(); 
+    //FIXME: clearReleasable(); 
     switch (result) {
     case 0: break;
     case Galois::Runtime::CONFLICT:
@@ -383,7 +383,7 @@ class BSInlineExecutor {
   void go() {
     ThreadLocalData tld(loopname);
     setThreadContext(&tld.ctx);
-    unsigned tid = LL::getTID();
+    unsigned tid = Substrate::ThreadPool::getTID();
     WID wid;
 
     WLTy* cur = &wls[0];
@@ -419,7 +419,7 @@ class BSInlineExecutor {
   }
 
 public:
-  BSInlineExecutor(const FunctionTy& f, const char* ln): function(f), preFunc (f), loopname(ln), barrier(getSystemBarrier()) {
+  BSInlineExecutor(const FunctionTy& f, const char* ln): function(f), preFunc (f), loopname(ln), barrier(Substrate::getSystemBarrier(activeThreads)) {
     if (Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsBreak) {
       assert(0 && "not supported by this executor");
       abort();
@@ -431,7 +431,7 @@ public:
       function(f), 
       preFunc (preFunc),
       loopname(ln), 
-      barrier(getSystemBarrier ()),
+      barrier(Substrate::getSystemBarrier (activeThreads)),
       done (false)
   { 
     if (Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsBreak) {
@@ -462,9 +462,9 @@ void for_each_bs (const R& range, const OpFunc& opFunc, const PreFunc& preFunc, 
   typedef Exp::BSInlineExecutor<T, OpFunc, PreFunc> Executor;
 
   Executor e (opFunc, preFunc, loopname);
-  Barrier& barrier = getSystemBarrier ();
+  Substrate::Barrier& barrier = Substrate::getSystemBarrier (activeThreads);
 
-  getSystemThreadPool ().run (activeThreads, 
+  Substrate::getSystemThreadPool ().run (activeThreads, 
     std::bind (&Executor::template AddInitialWork<R>, std::ref (e), range),
     std::ref (barrier),
     std::ref (e));

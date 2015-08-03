@@ -23,14 +23,14 @@
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#include "Galois/config.h"
+
 #include "Galois/Galois.h"
 #include "Galois/Accumulator.h"
 #include "Galois/Bag.h"
 #include "Galois/Statistic.h"
 #include "Galois/UnionFind.h"
-#include "Galois/Graph/LCGraph.h"
-#include "Galois/ParallelSTL/ParallelSTL.h"
+#include "Galois/Graphs/LCGraph.h"
+#include "Galois/ParallelSTL.h"
 #include "llvm/Support/CommandLine.h"
 
 #ifdef GALOIS_USE_EXP
@@ -39,7 +39,7 @@
 
 #include "Lonestar/BoilerPlate.h"
 
-#include GALOIS_CXX11_STD_HEADER(atomic)
+#include <atomic>
 #include <utility>
 #include <algorithm>
 #include <iostream>
@@ -446,7 +446,7 @@ int main(int argc, char** argv) {
   initializeGraph();
   Tinitial.stop();
 
-  Galois::preAlloc(Galois::Runtime::MM::numPageAllocTotal() * 10);
+  Galois::preAlloc(Galois::Runtime::numPageAllocTotal() * 10);
   Galois::reportPageAlloc("MeminfoPre");
   Galois::StatTimer T;
   T.start();

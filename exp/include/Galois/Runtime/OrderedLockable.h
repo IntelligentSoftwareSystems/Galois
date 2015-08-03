@@ -1,8 +1,36 @@
+/** ?? -*- C++ -*-
+ * @file
+ * @section License
+ *
+ * This file is part of Galois.  Galoisis a gramework to exploit
+ * amorphous data-parallelism in irregular programs.
+ *
+ * Galois is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * Galois is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with Galois.  If not, see
+ * <http://www.gnu.org/licenses/>.
+ *
+ * @section Copyright
+ *
+ * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * reserved.
+ *
+ */
+
 #ifndef GALOIS_RUNTIME_ORDERED_LOCKABLE_H
 #define GALOIS_RUNTIME_ORDERED_LOCKABLE_H
 
 #include "Galois/AltBag.h"
-#include "Galois/Runtime/ll/ThreadRWlock.h"
+#include "Galois/Runtime/ThreadRWlock.h"
 
 #include <unordered_map>
 
@@ -92,7 +120,7 @@ class PtrBasedNhoodMgr: boost::noncopyable {
 public:
   typedef typename NItem::Factory NItemFactory;
 
-  typedef MM::FixedSizeAllocator<NItem> NItemAlloc;
+  typedef FixedSizeAllocator<NItem> NItemAlloc;
   typedef Galois::PerThreadBag<NItem*> NItemWL;
 
 protected:
@@ -173,7 +201,7 @@ public:
 
   // typedef std::tr1::unordered_map<Lockable*, NItem> NhoodMap; 
   //
-  typedef MM::Pow_2_BlockAllocator<std::pair<Lockable*, NItem*> > MapAlloc;
+  typedef Pow_2_BlockAllocator<std::pair<Lockable*, NItem*> > MapAlloc;
 
   typedef std::unordered_map<
       Lockable*,
@@ -183,7 +211,7 @@ public:
       MapAlloc
     > NhoodMap;
 
-  typedef Galois::Runtime::LL::ThreadRWlock Lock_ty;
+  typedef Galois::Runtime::ThreadRWlock Lock_ty;
   typedef PtrBasedNhoodMgr<NItem> Base;
 
 protected:

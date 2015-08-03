@@ -222,7 +222,7 @@ private:
       ParCounter numAdds;
 
       ForEachFunctor<doLock, GaloisWL, Super_ty::NodeData_ty> l (graph, nextWL, numAdds);
-      Galois::for_each(it, it, l, Galois::wl<WL>(&currWL));
+      Galois::for_each(it, it, l, Galois::wl<WL>(std::ref(currWL)));
 
       return numAdds.reduce ();
     }
@@ -311,7 +311,7 @@ public:
     unsigned level = 0;
 
     ParCounter numAdds;
-    Galois::Runtime::getSystemThreadPool ().burnPower (Galois::getActiveThreads ());
+    Galois::Substrate::getSystemThreadPool ().burnPower (Galois::getActiveThreads ());
 
 #ifdef BFS_WF_USE_BAG
     while (!currWL->empty ()) {
@@ -333,7 +333,7 @@ public:
 #endif
       ++level;
     }
-    Galois::Runtime::getSystemThreadPool ().beKind ();
+    Galois::Substrate::getSystemThreadPool ().beKind ();
 
     numIter += numAdds.reduce ();
 

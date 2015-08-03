@@ -2,26 +2,33 @@
  * @file
  * @section License
  *
- * Galois, a framework to exploit amorphous data-parallelism in irregular
- * programs.
+ * This file is part of Galois.  Galoisis a gramework to exploit
+ * amorphous data-parallelism in irregular programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
- * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
- * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
- * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
- * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
- * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
- * shall University be liable for incidental, special, indirect, direct or
- * consequential damages or loss of profits, interruption of business, or
- * related expenses which may arise from use of Software or Documentation,
- * including but not limited to those resulting from defects in Software and/or
- * Documentation, or loss or inaccuracy of data of any kind.
+ * Galois is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * Galois is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with Galois.  If not, see
+ * <http://www.gnu.org/licenses/>.
+ *
+ * @section Copyright
+ *
+ * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * reserved.
  *
  * @section Description
  *
  * @author M. Amber Hassaan <ahassaan@ices.utexas.edu>
  */
+
 #ifndef GALOIS_RUNTIME_KDGTWOPHASE_H
 #define GALOIS_RUNTIME_KDGTWOPHASE_H
 
@@ -36,21 +43,21 @@
 #include "Galois/PerThreadContainer.h"
 #include "Galois/optional.h"
 
-#include "Galois/Runtime/Barrier.h"
+#include "Galois/Substrate/Barrier.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/Executor_DoAll.h"
 #include "Galois/Runtime/ForEachTraits.h"
 #include "Galois/Runtime/Range.h"
 #include "Galois/Runtime/Support.h"
-#include "Galois/Runtime/Termination.h"
-#include "Galois/Runtime/ThreadPool.h"
+#include "Galois/Substrate/Termination.h"
+#include "Galois/Substrate/ThreadPool.h"
 #include "Galois/Runtime/KDGtwoPhaseSupport.h"
 #include "Galois/Runtime/WindowWorkList.h"
 #include "Galois/Runtime/UserContextAccess.h"
-#include "Galois/Runtime/ll/gio.h"
-#include "Galois/Runtime/ll/ThreadRWlock.h"
-#include "Galois/Runtime/ll/CompilerSpecific.h"
-#include "Galois/Runtime/mm/Mem.h"
+#include "Galois/Substrate/gio.h"
+#include "Galois/Runtime/ThreadRWlock.h"
+#include "Galois/Substrate/CompilerSpecific.h"
+#include "Galois/Runtime/Mem.h"
 
 #include <boost/iterator/transform_iterator.hpp>
 
@@ -76,7 +83,7 @@ public:
   using CtxtWL = PerThreadBag<Ctxt*>;
 
   using UserCtxt = UserContextAccess<T>;
-  using PerThreadUserCtxt = PerThreadStorage<UserCtxt>;
+  using PerThreadUserCtxt = Substrate::PerThreadStorage<UserCtxt>;
 
 protected:
 
@@ -544,14 +551,14 @@ void for_each_ordered_2p_win (const R& range, const Cmp& cmp, const NhFunc& nhFu
   Exec e (cmp, nhFunc, opFunc);
 
   if (wakeupThreadPool) {
-    getSystemThreadPool ().burnPower (Galois::getActiveThreads ());
+    Substrate::getSystemThreadPool().burnPower (Galois::getActiveThreads ());
   }
 
   e.fill_initial (range);
   e.execute ();
 
   if (wakeupThreadPool) {
-    getSystemThreadPool ().beKind ();
+    Substrate::getSystemThreadPool().beKind();
   }
 }
 
@@ -566,14 +573,14 @@ void for_each_ordered_2p_win (const R& range, const Cmp& cmp, const NhFunc& nhFu
   Exec e (cmp, nhFunc, addFunc, execFunc);
 
   if (wakeupThreadPool) {
-    getSystemThreadPool ().burnPower (Galois::getActiveThreads ());
+    Substrate::getSystemThreadPool().burnPower(Galois::getActiveThreads ());
   }
 
   e.fill_initial (range);
   e.execute ();
 
   if (wakeupThreadPool) {
-    getSystemThreadPool ().beKind ();
+    Substrate::getSystemThreadPool().beKind ();
   }
 }
 

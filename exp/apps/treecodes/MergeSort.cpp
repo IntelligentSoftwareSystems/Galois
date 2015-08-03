@@ -311,7 +311,8 @@ struct SplitGaloisGeneric: public Galois::Runtime::TreeTaskBase {
 template <typename T, typename C>
 void mergeSortGaloisGeneric (T* array, T* tmp_array, const size_t L, const C& cmp) {
   SplitGaloisGeneric<T,C> init {array, tmp_array, cmp, 0, L};
-  Galois::Runtime::for_each_ordered_tree_generic (init, "mergesort-stack");
+  abort();
+  //FIXME: Galois::Runtime::for_each_ordered_tree_generic (init, "mergesort-stack");
 }
 
 
@@ -364,7 +365,7 @@ int main (int argc, char* argv[]) {
       break;
 
     case CILK:
-      Galois::CilkInit();
+      //FIXME:      Galois::CilkInit();
       mergeSortCilk (array, tmp_array, length, std::less<int> ());
       break;
 

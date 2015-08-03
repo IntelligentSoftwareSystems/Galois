@@ -24,18 +24,18 @@
  *
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
-#include "Galois/config.h"
+
 #include "Galois/Galois.h"
 #include "Galois/Accumulator.h"
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
-#include "Galois/Graph/LCGraph.h"
+#include "Galois/Graphs/LCGraph.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
-#include "Galois/Graph/GraphNodeBag.h"
+#include "Galois/Graphs/GraphNodeBag.h"
 #include "HybridBFS.h"
 
-#include GALOIS_CXX11_STD_HEADER(atomic)
+#include <atomic>
 #include <string>
 #include <deque>
 #include <iostream>
@@ -445,7 +445,7 @@ void run() {
   initialize(algo, graph, source);
 
   Galois::reportPageAlloc("MeminfoPre");
-  Galois::preAlloc(numThreads + (3*graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::MM::hugePageSize);
+  Galois::preAlloc(numThreads + (3*graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::hugePageSize);
   Galois::reportPageAlloc("MeminfoMid");
 
   Galois::StatTimer T;

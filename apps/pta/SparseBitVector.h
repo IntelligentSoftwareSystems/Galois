@@ -22,7 +22,7 @@ kind.
 #ifndef GALOIS_SPARSEBITVECTOR_H
 #define GALOIS_SPARSEBITVECTOR_H
 
-#include "Galois/Runtime/ll/SimpleLock.h"
+#include "Galois/Substrate/SimpleLock.h"
 
 #include <vector>
 #include <string>
@@ -38,7 +38,7 @@ namespace Galois {
  */
 struct SparseBitVector {
   typedef unsigned long WORD;
-  typedef Galois::Runtime::LL::SimpleLock LockType;
+  typedef Galois::Substrate::SimpleLock LockType;
   static const unsigned wordsize = sizeof(WORD)*8;
 
   struct OneWord {

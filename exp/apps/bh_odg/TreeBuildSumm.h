@@ -4,7 +4,6 @@
 #include "Point.h"
 #include "Octree.h"
 
-#include "Galois/config.h"
 #include "Galois/Bag.h"
 #include "Galois/Runtime/ROBexecutor.h"
 #include "Galois/Runtime/OrderedSpeculation.h"

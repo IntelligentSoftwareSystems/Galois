@@ -24,8 +24,9 @@
  *
  * @author Rashid Kaleem <rashid.kaleem@gmail.com>
  */
+
 #include "Galois/Statistic.h"
-#include "Galois/Graph/Graph.h"
+#include "Galois/Graphs/Graph.h"
 #include "Galois/Galois.h"
 #include "Galois/Accumulator.h"
 

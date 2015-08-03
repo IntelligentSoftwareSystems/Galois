@@ -21,7 +21,7 @@
  * @author Martin Burtscher <burtscher@txstate.edu>
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
-#include "Galois/config.h"
+
 #include "Galois/Galois.h"
 #include "Galois/Statistic.h"
 #include "Galois/Bag.h"
@@ -31,12 +31,12 @@
 #include <boost/math/constants/constants.hpp>
 #include <boost/iterator/transform_iterator.hpp>
 
-#include GALOIS_CXX11_STD_HEADER(array)
+#include <array>
 #include <limits>
 #include <iostream>
 #include <fstream>
 #include <random>
-#include GALOIS_CXX11_STD_HEADER(deque)
+#include <deque>
 
 #include <strings.h>
 
@@ -67,7 +67,7 @@ struct Body : public Node {
  * A node in an octree is either an internal node or a leaf.
  */
 struct Octree : public Node {
-  std::array<Galois::Runtime::LL::PtrLock<Node,true>, 8> child;
+  std::array<Galois::Substrate::PtrLock<Node>, 8> child;
   char cLeafs;
   char nChildren;
 
@@ -517,7 +517,7 @@ void run(Bodies& bodies, BodyPtrs& pBodies, size_t nbodies) {
   typedef Galois::WorkList::AltChunkedLIFO<32> WL;
   typedef Galois::WorkList::StableIterator<true> WLL;
 
-  Galois::preAlloc (Galois::getActiveThreads () + (3*sizeof (Octree) + 2*sizeof (Body))*nbodies/Galois::Runtime::MM::hugePageSize);
+  Galois::preAlloc (Galois::getActiveThreads () + (3*sizeof (Octree) + 2*sizeof (Body))*nbodies/Galois::Runtime::hugePageSize);
   Galois::reportPageAlloc("MeminfoPre");
 
   for (int step = 0; step < ntimesteps; step++) {

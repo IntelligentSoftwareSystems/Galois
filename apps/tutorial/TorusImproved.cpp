@@ -29,7 +29,7 @@
  */
 #include "Galois/Galois.h"
 #include "Galois/Timer.h"
-#include "Galois/Graph/Graph.h"
+#include "Galois/Graphs/Graph.h"
 #include <iostream>
 
 //! Graph has int node data, void edge data and is directed

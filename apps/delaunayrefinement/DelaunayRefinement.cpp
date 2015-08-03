@@ -31,7 +31,7 @@
 #include "Verifier.h"
 
 #include "Galois/Galois.h"
-#include "Galois/ParallelSTL/ParallelSTL.h"
+#include "Galois/ParallelSTL.h"
 #include "Galois/Bag.h"
 #include "Galois/Statistic.h"
 
@@ -152,10 +152,10 @@ int main(int argc, char** argv) {
   // e.g., Intel MIC. May not be enough for deterministic execution
   const size_t NODE_SIZE = sizeof(**graph->begin());
   if (detAlgo == nondet) {
-    Galois::preAlloc (5 * Galois::getActiveThreads () + NODE_SIZE * 8 * graph->size () / Galois::Runtime::MM::hugePageSize);
+    Galois::preAlloc (5 * Galois::getActiveThreads () + NODE_SIZE * 8 * graph->size () / Galois::Runtime::hugePageSize);
 
   } else {
-    Galois::preAlloc(Galois::getActiveThreads () + NODE_SIZE * 32 * graph->size () / Galois::Runtime::MM::hugePageSize);
+    Galois::preAlloc(Galois::getActiveThreads () + NODE_SIZE * 32 * graph->size () / Galois::Runtime::hugePageSize);
   }
   Galois::reportPageAlloc("MeminfoPre2");
 

@@ -2,50 +2,57 @@
  * @file
  * @section License
  *
- * Galois, a framework to exploit amorphous data-parallelism in irregular
- * programs.
+ * This file is part of Galois.  Galoisis a gramework to exploit
+ * amorphous data-parallelism in irregular programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
- * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
- * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
- * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
- * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
- * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
- * shall University be liable for incidental, special, indirect, direct or
- * consequential damages or loss of profits, interruption of business, or
- * related expenses which may arise from use of Software or Documentation,
- * including but not limited to those resulting from defects in Software and/or
- * Documentation, or loss or inaccuracy of data of any kind.
+ * Galois is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * Galois is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with Galois.  If not, see
+ * <http://www.gnu.org/licenses/>.
+ *
+ * @section Copyright
+ *
+ * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * reserved.
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 #ifndef GALOIS_RUNTIME_WORKLISTALT_H
 #define GALOIS_RUNTIME_WORKLISTALT_H
 
-#include "Galois/WorkList/GFifo.h"
-#include "Galois/Runtime/ll/CompilerSpecific.h"
+#include "Galois/WorkList/Simple.h"
+#include "Galois/Substrate/CompilerSpecific.h"
 
 namespace Galois {
 namespace WorkList {
 
 template<typename QueueTy>
 Galois::optional<typename QueueTy::value_type>
-stealHalfInPackage(Runtime::PerThreadStorage<QueueTy>& queues) {
-  unsigned id = Runtime::LL::getTID();
-  unsigned pkg = Runtime::LL::getPackageForSelf(id);
+stealHalfInPackage(Substrate::PerThreadStorage<QueueTy>& queues) {
+  unsigned id = Substrate::ThreadPool::getTID();
+  unsigned pkg = Substrate::ThreadPool::getPackage();
   unsigned num = Galois::getActiveThreads();
   QueueTy* me = queues.getLocal();
   Galois::optional<typename QueueTy::value_type> retval;
   
   //steal from this package
   //Having 2 loops avoids a modulo, though this is a slow path anyway
+  auto& tp = Substrate::getSystemThreadPool();
   for (unsigned i = id + 1; i < num; ++i)
-    if (Runtime::LL::getPackageForThread(i) == pkg)
+    if (tp.getPackage(i) == pkg)
       if ((retval = me->steal(*queues.getRemote(i), true, true)))
 	return retval;
   for (unsigned i = 0; i < id; ++i)
-    if (Runtime::LL::getPackageForThread(i) == pkg)
+    if (tp.getPackage(i) == pkg)
       if ((retval = me->steal(*queues.getRemote(i), true, true)))
 	return retval;
   return retval;
@@ -53,8 +60,8 @@ stealHalfInPackage(Runtime::PerThreadStorage<QueueTy>& queues) {
 
 template<typename QueueTy>
 Galois::optional<typename QueueTy::value_type>
-stealRemote(Runtime::PerThreadStorage<QueueTy>& queues) {
-  unsigned id = Runtime::LL::getTID();
+stealRemote(Substrate::PerThreadStorage<QueueTy>& queues) {
+  unsigned id = Substrate::ThreadPool::getTID();
   //  unsigned pkg = Runtime::LL::getPackageForThread(id);
   unsigned num = Galois::getActiveThreads();
   QueueTy* me = queues.getLocal();
@@ -77,7 +84,7 @@ public:
   typedef typename QueueTy::value_type value_type;
   
 private:
-  Runtime::PerThreadStorage<QueueTy> local;
+  Substrate::PerThreadStorage<QueueTy> local;
 
   Galois::optional<value_type> doSteal() {
     Galois::optional<value_type> retval = stealHalfInPackage(local);
@@ -89,7 +96,7 @@ private:
   template<typename Iter>
   void fill_work_l2(Iter& b, Iter& e) {
     unsigned int a = Galois::getActiveThreads();
-    unsigned int id = Runtime::LL::getTID();
+    unsigned int id = Substrate::ThreadPool::getTID();
     unsigned dist = std::distance(b, e);
     unsigned num = (dist + a - 1) / a; //round up
     unsigned int A = std::min(num * id, dist);
@@ -144,10 +151,10 @@ private:
 
 public:
   template<typename Tnew>
-  struct retype { typedef PerThreadQueues<typename QueueTy::template retype<Tnew>::type> type; };
+  using retype = PerThreadQueues<typename QueueTy::template retype<Tnew>::type>;
 
   template<bool newConcurrent>
-  struct rethread { typedef PerThreadQueues<typename QueueTy::template rethread<newConcurrent>::type> type; };
+  using rethread = PerThreadQueues<typename QueueTy::template rethread<newConcurrent>::type>;
 
   void push(const value_type& val) {
     local.getLocal()->push(val);
@@ -172,17 +179,17 @@ public:
 };
 //GALOIS_WLCOMPILECHECK(LocalQueues);
 
-template<typename WLTy = GFIFO<>, typename T = int>
+template<typename WLTy = GFIFO<int>, typename T = int>
 class LocalWorklist : private boost::noncopyable {
-  typedef typename WLTy::template rethread<false>::type lWLTy;
-  Runtime::PerThreadStorage<lWLTy> local;
+  typedef typename WLTy::template rethread<false> lWLTy;
+  Substrate::PerThreadStorage<lWLTy> local;
 
 public:
   template<bool newconcurrent>
-  struct rethread { typedef LocalWorklist<typename WLTy::template rethread<newconcurrent>::type, T> type; };
+  using rethread = LocalWorklist<typename WLTy::template rethread<newconcurrent>, T>;
 
   template<typename Tnew>
-  struct retype { typedef LocalWorklist<typename WLTy::template retype<Tnew>::type, Tnew> type; };
+  using retype = LocalWorklist<typename WLTy::template retype<Tnew>, Tnew>;
 
   typedef T value_type;
 
@@ -210,7 +217,7 @@ template<typename T, typename OwnerFn, template<typename, bool> class QT, bool d
 class OwnerComputeChunkedMaster : private boost::noncopyable {
   class Chunk : public Galois::FixedSizeRing<T, chunksize>, public QT<Chunk, concurrent>::ListNode {};
 
-  Runtime::MM::FixedSizeHeap heap;
+  Runtime::FixedSizeHeap heap;
   OwnerFn Fn;
 
   struct p {
@@ -220,8 +227,8 @@ class OwnerComputeChunkedMaster : private boost::noncopyable {
 
   typedef QT<Chunk, concurrent> LevelItem;
 
-  Runtime::PerThreadStorage<p> data;
-  detail::squeue<distributed, Runtime::PerPackageStorage, LevelItem> Q;
+  Substrate::PerThreadStorage<p> data;
+  detail::squeue<distributed, Substrate::PerPackageStorage, LevelItem> Q;
 
   Chunk* mkChunk() {
     return new (heap.allocate(sizeof(Chunk))) Chunk();
@@ -233,13 +240,13 @@ class OwnerComputeChunkedMaster : private boost::noncopyable {
   }
 
   void pushChunk(Chunk* C)  {
-    unsigned int tid = Runtime::LL::getTID();
+    unsigned int tid = Substrate::ThreadPool::getTID();
     unsigned int index = isStack ? Fn(C->back()) : Fn(C->front());
     if (tid == index) {
       LevelItem& I = Q.get();
       I.push(C);
     } else {
-      unsigned int mindex = Runtime::LL::getPackageForThread(index);
+      unsigned int mindex = Substrate::getSystemThreadPool().getPackage(index);
       LevelItem& I = Q.get(mindex);
       I.push(C);
     }
@@ -288,10 +295,10 @@ public:
   typedef T value_type;
 
   template<bool newconcurrent>
-  struct rethread { typedef OwnerComputeChunkedMaster<T, OwnerFn,QT, distributed, isStack, chunksize, newconcurrent> type; };
+  using rethread = OwnerComputeChunkedMaster<T, OwnerFn,QT, distributed, isStack, chunksize, newconcurrent>;
 
   template<typename Tnew>
-  struct retype { typedef OwnerComputeChunkedMaster<Tnew, OwnerFn, QT, distributed, isStack, chunksize, concurrent> type; };
+  using retype = OwnerComputeChunkedMaster<Tnew, OwnerFn, QT, distributed, isStack, chunksize, concurrent>;
 
   OwnerComputeChunkedMaster() : heap(sizeof(Chunk)) { }
 

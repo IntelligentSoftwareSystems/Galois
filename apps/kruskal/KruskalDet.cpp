@@ -1,8 +1,8 @@
 #include "Galois/Galois.h"
 #include "Galois/Bag.h"
 #include "Galois/Timer.h"
-#include "Galois/Graph/LCGraph.h"
-#include "Galois/Graph/TypeTraits.h"
+#include "Galois/Graphs/LCGraph.h"
+#include "Galois/Graphs/TypeTraits.h"
 #include "Lonestar/BoilerPlate.h"
 
 #include <deque>

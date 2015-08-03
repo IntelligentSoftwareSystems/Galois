@@ -28,7 +28,6 @@
 #ifndef GALOIS_RUNTIME_DAGEXEC_ALT_H
 #define GALOIS_RUNTIME_DAGEXEC_ALT_H
 
-#include "Galois/config.h"
 #include "Galois/GaloisForwardDecl.h"
 #include "Galois/Accumulator.h"
 #include "Galois/Atomic.h"
@@ -40,9 +39,9 @@
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/Executor_DoAll.h"
 #include "Galois/Runtime/OrderedLockable.h"
-#include "Galois/Runtime/ll/gio.h"
-#include "Galois/Runtime/ll/ThreadRWlock.h"
-#include "Galois/Runtime/mm/Mem.h"
+#include "Galois/Substrate/gio.h"
+#include "Galois/Runtime/ThreadRWlock.h"
+#include "Galois/Runtime/Mem.h"
 
 #include "llvm/Support/CommandLine.h"
 
@@ -75,7 +74,7 @@ struct SharerVec {
 public:
   using Cont = typename gstl::Vector<Ctxt*>;
 
-  LL::SimpleLock mutex;
+  Substrate::SimpleLock mutex;
   Cont sharers;
 
   inline void addSharer (Ctxt* ctxt) {
@@ -91,7 +90,7 @@ template <typename Ctxt>
 struct SharerList {
 public:
   using Cont =  Galois::concurrent_gslist<Ctxt*, 16>;
-  using FSHeap =  Galois::Runtime::MM::FixedSizeHeap;
+  using FSHeap =  Galois::Runtime::FixedSizeHeap;
 
   FSHeap heap;
   Cont sharers;
@@ -356,10 +355,10 @@ protected:
   using CtxtCmp = typename NItem::CtxtCmp;
   using NItemFactory = typename NItem::Factory;
 
-  typedef MM::FixedSizeAllocator<Ctxt> CtxtAlloc;
+  typedef FixedSizeAllocator<Ctxt> CtxtAlloc;
   typedef PerThreadBag<Ctxt*> CtxtWL;
   typedef UserContextAccess<T> UserCtx;
-  typedef PerThreadStorage<UserCtx> PerThreadUserCtx;
+  typedef Substrate::PerThreadStorage<UserCtx> PerThreadUserCtx;
 
 
   struct ApplyOperator {

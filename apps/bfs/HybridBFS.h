@@ -2,7 +2,7 @@
 #define APPS_BFS_HYBRIDBFS_H
 
 #include "Galois/Galois.h"
-#include "Galois/Graph/LCGraph.h"
+#include "Galois/Graphs/LCGraph.h"
 
 template<typename NodeData,typename Dist>
 struct HybridBFS {

@@ -4,24 +4,31 @@
  *
  * @section License
  *
- * Galois, a framework to exploit amorphous data-parallelism in irregular
- * programs.
+ * This file is part of Galois.  Galoisis a gramework to exploit
+ * amorphous data-parallelism in irregular programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
- * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
- * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
- * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
- * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
- * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
- * shall University be liable for incidental, special, indirect, direct or
- * consequential damages or loss of profits, interruption of business, or
- * related expenses which may arise from use of Software or Documentation,
- * including but not limited to those resulting from defects in Software and/or
- * Documentation, or loss or inaccuracy of data of any kind.
+ * Galois is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * Galois is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with Galois.  If not, see
+ * <http://www.gnu.org/licenses/>.
+ *
+ * @section Copyright
+ *
+ * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * reserved.
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
+
 #ifndef GALOIS_RUNTIME_WORKLISTEXPERIMENTAL_H
 #define GALOIS_RUNTIME_WORKLISTEXPERIMENTAL_H
 
@@ -31,11 +38,11 @@
 
 #include "Galois/WorkList/WorkList.h"
 #include "Galois/WorkList/WorkListDebug.h"
-#include "Galois/Runtime/PerThreadStorage.h"
-#include "Galois/Runtime/Termination.h"
-#include "Galois/Runtime/ThreadPool.h"
-#include "Galois/Runtime/ll/SimpleLock.h"
-#include "Galois/Runtime/ll/PaddedLock.h"
+#include "Galois/Substrate/PerThreadStorage.h"
+#include "Galois/Substrate/Termination.h"
+#include "Galois/Substrate/ThreadPool.h"
+#include "Galois/Substrate/SimpleLock.h"
+#include "Galois/Substrate/PaddedLock.h"
 
 #include "llvm/Support/CommandLine.h"
 
@@ -55,10 +62,10 @@ namespace WorkList {
 
 template<class T, class Indexer = DummyIndexer<T>, typename ContainerTy = GFIFO<T>, bool concurrent=true >
 class ApproxOrderByIntegerMetric : private boost::noncopyable {
-  typename ContainerTy::template rethread<concurrent>::type data[2048];
+  typename ContainerTy::template rethread<concurrent> data[2048];
   
   Indexer I;
-  Runtime::PerThreadStorage<unsigned int> cursor;
+  Substrate::PerThreadStorage<unsigned int> cursor;
 
   int num() {
     return 2048;
@@ -116,10 +123,10 @@ GALOIS_WLCOMPILECHECK(ApproxOrderByIntegerMetric)
 
 template<class T, class Indexer = DummyIndexer<T>, typename ContainerTy = GFIFO<T>, bool concurrent=true >
 class LogOrderByIntegerMetric : private boost::noncopyable {
-  typename ContainerTy::template rethread<concurrent>::type data[sizeof(unsigned int)*8 + 1];
+  typename ContainerTy::template rethread<concurrent> data[sizeof(unsigned int)*8 + 1];
   
   Indexer I;
-  Runtime::PerThreadStorage<unsigned int> cursor;
+  Substrate::PerThreadStorage<unsigned int> cursor;
 
   int num() {
     return sizeof(unsigned int)*8 + 1;
@@ -184,10 +191,10 @@ class LocalFilter {
   GlobalTy globalQ;
 
   struct p {
-    typename LocalTy::template rethread<false>::type Q;
+    typename LocalTy::template rethread<false> Q;
     unsigned int current;
   };
-  Runtime::PerThreadStorage<p> localQs;
+  Substrate::PerThreadStorage<p> localQs;
   Indexer I;
 
 public:
@@ -322,9 +329,9 @@ public:
   typedef T value_type;
 
 private:
-  Runtime::PerThreadStorage<typename LocalWL::template rethread<false>::type> localQueues;
-  Runtime::PerPackageStorage<GlobalWL> sharedQueues;
-  Runtime::PerPackageStorage<unsigned long> starvingFlags;
+  Substrate::PerThreadStorage<typename LocalWL::template rethread<false> > localQueues;
+  Substrate::PerPackageStorage<GlobalWL> sharedQueues;
+  Substrate::PerPackageStorage<unsigned long> starvingFlags;
   GlobalWL gwl;
   unsigned long gStarving;
 
@@ -388,7 +395,7 @@ GALOIS_WLCOMPILECHECK(RequestHierarchy)
 
 template<typename T, typename LocalWL, typename DistPolicy>
 class ReductionWL {
-  typedef Runtime::LL::CacheLineStorage<LocalWL> paddedLocalWL;
+  typedef Substrate::CacheLineStorage<LocalWL> paddedLocalWL;
 
   paddedLocalWL* WL;
   GFIFO<T> backup;
@@ -1172,14 +1179,12 @@ template<typename Partitioner = DummyIndexer<int>, typename T = int, typename Ch
 class PartitionedWL : private boost::noncopyable {
 
   Partitioner P;
-  Runtime::PerThreadStorage<ChildWLTy> Items;
+  Substrate::PerThreadStorage<ChildWLTy> Items;
   int active;
 
 public:
   template<bool newconcurrent>
-  struct rethread {
-    typedef PartitionedWL<T, Partitioner, ChildWLTy, newconcurrent> type;
-  };
+  using rethread = PartitionedWL<T, Partitioner, ChildWLTy, newconcurrent>;
 
   typedef T value_type;
   
@@ -1226,10 +1231,10 @@ class SkipListQueue : private boost::noncopyable {
 
 public:
   template<bool newconcurrent>
-  struct rethread { typedef SkipListQueue<Compare, T> type; };
+  using rethread = SkipListQueue<Compare, T>;
 
   template<typename Tnew>
-  struct retype { typedef SkipListQueue<Compare, Tnew> type; };
+  using retype = SkipListQueue<Compare, Tnew>;
 
   typedef T value_type;
 
@@ -1258,19 +1263,19 @@ GALOIS_WLCOMPILECHECK(SkipListQueue)
 
 
 template<class Compare = std::less<int>, typename T = int, bool concurrent = true>
-class SetQueue : private boost::noncopyable, private Runtime::LL::PaddedLock<concurrent> {
-  std::set<T, Compare, Runtime::MM::FixedSizeAllocator<T> > wl;
+class SetQueue : private boost::noncopyable, private Substrate::PaddedLock<concurrent> {
+  std::set<T, Compare, Runtime::FixedSizeAllocator<T> > wl;
 
-  using Runtime::LL::PaddedLock<concurrent>::lock;
-  using Runtime::LL::PaddedLock<concurrent>::try_lock;
-  using Runtime::LL::PaddedLock<concurrent>::unlock;
+  using Substrate::PaddedLock<concurrent>::lock;
+  using Substrate::PaddedLock<concurrent>::try_lock;
+  using Substrate::PaddedLock<concurrent>::unlock;
 
 public:
   template<bool newconcurrent>
-  struct rethread { typedef SetQueue<Compare, T, newconcurrent> type; };
+  using rethread = SetQueue<Compare, T, newconcurrent>;
 
   template<typename Tnew>
-  struct retype { typedef SetQueue<Compare, Tnew, concurrent> type; };
+  using retype = SetQueue<Compare, Tnew, concurrent>;
 
   typedef T value_type;
 
@@ -1290,7 +1295,7 @@ public:
 
   template<typename RangeTy>
   void push_initial(RangeTy range) {
-    if (Runtime::LL::getTID() == 0)
+    if (Substrate::ThreadPool::getTID() == 0)
       push(range.begin(), range.end());
   }
 
@@ -1314,10 +1319,10 @@ class FCPairingHeapQueue : private boost::noncopyable {
 
 public:
   template<bool newconcurrent>
-  struct rethread { typedef FCPairingHeapQueue<Compare, T> type; };
+  using rethread = FCPairingHeapQueue<Compare, T>;
 
   template<typename Tnew>
-  struct retype { typedef FCPairingHeapQueue<Compare, Tnew> type; };
+  using retype = FCPairingHeapQueue<Compare, Tnew>;
 
   typedef T value_type;
 
@@ -1346,11 +1351,11 @@ GALOIS_WLCOMPILECHECK(FCPairingHeapQueue)
 
 
 template<class Indexer, typename ContainerTy = Galois::WorkList::GFIFO<>, typename T = int, bool concurrent = true >
-class SimpleOrderedByIntegerMetric : private boost::noncopyable, private Galois::Runtime::LL::PaddedLock<concurrent> {
+class SimpleOrderedByIntegerMetric : private boost::noncopyable, private Galois::Substrate::PaddedLock<concurrent> {
 
-   using Galois::Runtime::LL::PaddedLock<concurrent>::lock;
-   using Galois::Runtime::LL::PaddedLock<concurrent>::try_lock;
-   using Galois::Runtime::LL::PaddedLock<concurrent>::unlock;
+   using Galois::Substrate::PaddedLock<concurrent>::lock;
+   using Galois::Substrate::PaddedLock<concurrent>::try_lock;
+   using Galois::Substrate::PaddedLock<concurrent>::unlock;
 
   typedef ContainerTy CTy;
 
@@ -1376,10 +1381,10 @@ class SimpleOrderedByIntegerMetric : private boost::noncopyable, private Galois:
 
  public:
   template<bool newconcurrent>
-  struct rethread { typedef SimpleOrderedByIntegerMetric<Indexer,ContainerTy,T,newconcurrent> type; };
+  using rethread = SimpleOrderedByIntegerMetric<Indexer,ContainerTy,T,newconcurrent>;
 
   template<typename Tnew>
-  struct retype { typedef SimpleOrderedByIntegerMetric<Indexer,typename ContainerTy::template retype<Tnew>::type,Tnew,concurrent> type; };
+  using retype = SimpleOrderedByIntegerMetric<Indexer,typename ContainerTy::template retype<Tnew>,Tnew,concurrent>;
   
   typedef T value_type;
   
@@ -1434,7 +1439,7 @@ class SimpleOrderedByIntegerMetric : private boost::noncopyable, private Galois:
 
 template<class Indexer, typename ContainerTy = Galois::WorkList::ChunkedLIFO<16>, bool BSP = true, typename T = int, bool concurrent = true>
 class CTOrderedByIntegerMetric : private boost::noncopyable {
-  typedef typename ContainerTy::template rethread<concurrent>::type CTy;
+  typedef typename ContainerTy::template rethread<concurrent> CTy;
 
   struct perItem {
     CTy* current;
@@ -1455,7 +1460,7 @@ class CTOrderedByIntegerMetric : private boost::noncopyable {
   int maxV;
 
   Indexer I;
-  Runtime::PerThreadStorage<perItem> current;
+  Substrate::PerThreadStorage<perItem> current;
 
   CTy* getOrCreate(int index) {
     CTy* r = wl.get(index);
@@ -1471,10 +1476,10 @@ class CTOrderedByIntegerMetric : private boost::noncopyable {
 
  public:
   template<bool newconcurrent>
-  struct rethread { typedef CTOrderedByIntegerMetric<Indexer,ContainerTy,BSP,T,newconcurrent> type; };
+  using rethread = CTOrderedByIntegerMetric<Indexer,ContainerTy,BSP,T,newconcurrent>;
 
   template<typename Tnew>
-  struct retype { typedef CTOrderedByIntegerMetric<Indexer,typename ContainerTy::template retype<Tnew>::type,BSP,Tnew,concurrent> type; };
+  using retype = CTOrderedByIntegerMetric<Indexer,typename ContainerTy::template retype<Tnew>,BSP,Tnew,concurrent>;
 
   typedef T value_type;
 
@@ -1526,8 +1531,7 @@ class CTOrderedByIntegerMetric : private boost::noncopyable {
       return retval;
 
     //Failed, find minimum bin
-    unsigned myID = Runtime::LL::getTID();
-    bool localLeader = Runtime::LL::isPackageLeaderForSelf(myID);
+    bool localLeader = Substrate::ThreadPool::isLeader();
 
     unsigned msS = 0;
     if (BSP) {
@@ -1536,7 +1540,7 @@ class CTOrderedByIntegerMetric : private boost::noncopyable {
 	for (int i = 0; i < (int) Galois::getActiveThreads(); ++i)
 	  msS = std::min(msS, current.getRemote(i)->scanStart);
       else
-	msS = std::min(msS, current.getRemote(Runtime::LL::getLeaderForThread(myID))->scanStart);
+	msS = std::min(msS, current.getRemote(Substrate::ThreadPool::getLeader())->scanStart);
     }
 
     for (int i = msS; i <= maxV; ++i) {
@@ -1559,7 +1563,7 @@ GALOIS_WLCOMPILECHECK(CTOrderedByIntegerMetric)
 #if _POSIX_BARRIERS > 0
 template<class Indexer, typename ContainerTy, bool concurrent = true, int binmax = 1024*1024 >
 class BarrierOBIM : private boost::noncopyable {
-  typedef typename ContainerTy::template rethread<concurrent>::type CTy;
+  typedef typename ContainerTy::template rethread<concurrent> CTy;
 
   volatile unsigned int current;
   volatile unsigned int pushmax;
@@ -1568,21 +1572,21 @@ class BarrierOBIM : private boost::noncopyable {
 
   Indexer I;
 
-  Galois::Runtime::TerminationDetection& term;
+  Substrate::TerminationDetection& term;
   pthread_barrier_t barr1;
   pthread_barrier_t barr2;
 
  public:
   template<bool newconcurrent>
-  struct rethread { typedef BarrierOBIM<Indexer,ContainerTy,newconcurrent,binmax> type; };
+  using rethread = BarrierOBIM<Indexer,ContainerTy,newconcurrent,binmax>;
 
   template<typename Tnew>
-  struct retype { typedef BarrierOBIM<Indexer,typename ContainerTy::template retype<Tnew>::type,concurrent, binmax> type; };
+  using retype = BarrierOBIM<Indexer,typename ContainerTy::template retype<Tnew>,concurrent, binmax>;
 
   typedef typename CTy::value_type value_type;
 
   BarrierOBIM(const Indexer& x = Indexer())
-    :current(0), pushmax(0), I(x), term(Runtime::getSystemTermination())
+    :current(0), pushmax(0), I(x), term(Substrate::getSystemTermination(Galois::getActiveThreads()))
   {
     B = new CTy[binmax];
     //std::cerr << "$"<<getSystemThreadPool().getActiveThreads() <<"$";
@@ -1638,7 +1642,7 @@ class BarrierOBIM : private boost::noncopyable {
       
       pthread_barrier_wait(&barr1);
       term.initializeThread();
-      if (Galois::Runtime::LL::getTID() == 0) {
+      if (Galois::Substrate::ThreadPool::getTID() == 0) {
 	//std::cerr << "inc: " << current << "\n";
 	if (current <= pushmax)
 	  __sync_fetch_and_add(&current, 1);
@@ -1652,10 +1656,10 @@ class BarrierOBIM : private boost::noncopyable {
 
 template<typename T = int, bool concurrent = true>
 class Random : private boost::noncopyable {
-  typedef typename std::conditional<concurrent, Runtime::LL::SimpleLock, Runtime::LL::DummyLock>::type LockTy;
+  typedef typename std::conditional<concurrent, Substrate::SimpleLock, Substrate::DummyLock>::type LockTy;
   std::pair<LockTy, std::deque<T> > wl[128];
   struct rstate { unsigned short d[3]; };
-  Runtime::PerThreadStorage<rstate > seeds;
+  Substrate::PerThreadStorage<rstate > seeds;
 
   unsigned int nextRand() {
     return nrand48(seeds.getLocal()->d);
@@ -1669,10 +1673,10 @@ public:
   Random() { }
 
   template<bool newconcurrent>
-  struct rethread { typedef Random<T, newconcurrent> type; };
+  using rethread = Random<T, newconcurrent>;
 
   template<typename Tnew>
-  struct retype { typedef Random<Tnew, concurrent> type; };
+  using retype = Random<Tnew, concurrent>;
 
   typedef T value_type;
 
@@ -1736,10 +1740,10 @@ class TbbFIFO : private boost::noncopyable  {
 
 public:
   template<bool newconcurrent>
-  struct rethread { typedef TbbFIFO<T> type; };
+  using rethread = TbbFIFO<T>;
 
   template<typename Tnew>
-  struct retype { typedef TbbFIFO<Tnew> type; };
+  using retype = TbbFIFO<Tnew>;
 
   typedef T value_type;
 
@@ -1794,10 +1798,10 @@ public:
   }
 
   template<bool newconcurrent>
-  struct rethread { typedef PTbb<Compare, T> type; };
+  using rethread = PTbb<Compare, T>;
 
   template<typename Tnew>
-  struct retype { typedef PTbb<Compare, Tnew> type; };
+  using retype = PTbb<Compare, Tnew>;
   
   typedef T value_type;
   
@@ -1861,10 +1865,10 @@ class STbb : private boost::noncopyable {
 
 public:
   template<bool newconcurrent>
-  struct rethread { typedef STbb<Compare, T> type; };
+  using rethread = STbb<Compare, T>;
 
   template<typename Tnew>
-  struct retype { typedef STbb<Compare, Tnew> type; };
+  using retype = STbb<Compare, Tnew>;
   
   typedef T value_type;
   
@@ -1901,10 +1905,10 @@ class TbbPriQueue : private boost::noncopyable {
 
 public:
   template<bool newconcurrent>
-  struct rethread { typedef TbbPriQueue<Compare, T> type; };
+  using rethread = TbbPriQueue<Compare, T>;
 
   template<typename Tnew>
-  struct retype { typedef TbbPriQueue<Compare, Tnew> type; };
+  using retype = TbbPriQueue<Compare, Tnew>;
 
   typedef T value_type;
 
@@ -1989,7 +1993,7 @@ public:
 };
 
 class LIFO_SB : private boost::noncopyable {
-  Runtime::LL::PtrLock<ChunkHeader, true> head;
+  Substrate::PtrLock<ChunkHeader> head;
 
 public:
 
@@ -2045,7 +2049,7 @@ public:
 };
 
 class LevelLocalAlt : private boost::noncopyable {
-  Runtime::PerPackageStorage<LIFO_SB> local;
+  Substrate::PerPackageStorage<LIFO_SB> local;
   
 public:
   void push(ChunkHeader* val) {
@@ -2062,7 +2066,7 @@ public:
 };
 
 class LevelStealingAlt : private boost::noncopyable {
-  Runtime::PerPackageStorage<LIFO_SB> local;
+  Substrate::PerPackageStorage<LIFO_SB> local;
   
 public:
   void push(ChunkHeader* val) {
@@ -2081,7 +2085,7 @@ public:
       return ret;
     
     //steal
-    int id = Runtime::LL::getPackageForSelf(Runtime::LL::getTID());
+    int id = Substrate::ThreadPool::getPackage();
     for (int i = 0; i < (int) local.size(); ++i) {
       ++id;
       id %= local.size();
@@ -2125,9 +2129,9 @@ template<typename gWL = LIFO_SB, int chunksize = 64, typename T = int>
 class ChunkedAdaptor : private boost::noncopyable {
   typedef Chunk<T, chunksize> ChunkTy;
 
-  Runtime::MM::FixedSizeHeap heap;
+  Runtime::FixedSizeHeap heap;
 
-  Runtime::PerThreadStorage<ChunkTy*> data;
+  Substrate::PerThreadStorage<ChunkTy*> data;
 
   gWL worklist;
 
@@ -2142,7 +2146,7 @@ class ChunkedAdaptor : private boost::noncopyable {
 
 public:
   template<typename Tnew>
-  struct retype { typedef ChunkedAdaptor<gWL, chunksize, Tnew> type; };
+  using retype = ChunkedAdaptor<gWL, chunksize, Tnew>;
 
   typedef T value_type;
 

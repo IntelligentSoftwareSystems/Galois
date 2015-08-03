@@ -26,9 +26,9 @@
  */
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
-#include "Galois/Graph/Graph.h"
+#include "Galois/Graphs/Graph.h"
 #include "Galois/Galois.h"
-#include "Galois/Graph/FileGraph.h"
+#include "Galois/Graphs/FileGraph.h"
 
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"

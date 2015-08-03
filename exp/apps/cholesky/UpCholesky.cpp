@@ -1,6 +1,6 @@
 #include "Galois/Statistic.h"
 #include "Galois/Galois.h"
-#include "Galois/Graph/LCGraph.h"
+#include "Galois/Graphs/LCGraph.h"
 #include "Galois/Runtime/TreeExec.h"
 
 #include "llvm/Support/CommandLine.h"
@@ -163,7 +163,7 @@ struct PerThread {
     }
   }
 };
-Galois::Runtime::PerThreadStorage<PerThread> *pts = NULL;
+Galois::Substrate::PerThreadStorage<PerThread> *pts = NULL;
 ETree *etree = NULL;
 SelfEdges *selfedges = NULL;
 
@@ -371,7 +371,7 @@ int main(int argc, char **argv) {
     }
   }
 
-  pts = new Galois::Runtime::PerThreadStorage<PerThread>();
+  pts = new Galois::Substrate::PerThreadStorage<PerThread>();
   etree = new ETree();
   selfedges = new SelfEdges();
   selfedges->find();

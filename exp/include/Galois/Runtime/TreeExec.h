@@ -28,10 +28,10 @@
 #include "Galois/Traits.h"
 #include "Galois/Runtime/Executor_DoAll.h"
 #include "Galois/Runtime/Support.h"
-#include "Galois/Runtime/Termination.h"
+#include "Galois/Substrate/Termination.h"
 #include "Galois/Runtime/UserContextAccess.h"
-#include "Galois/Runtime/ll/gio.h"
-#include "Galois/Runtime/mm/Mem.h"
+#include "Galois/Substrate/gio.h"
+#include "Galois/Runtime/Mem.h"
 #include "Galois/WorkList/AltChunked.h"
 #include "Galois/WorkList/ExternalReference.h"
 
@@ -85,9 +85,9 @@ protected:
 
   static const unsigned CHUNK_SIZE = 2;
   typedef Galois::WorkList::AltChunkedLIFO<CHUNK_SIZE, Task*> WL_ty;
-  typedef MM::FixedSizeAllocator<Task> TaskAlloc;
+  typedef FixedSizeAllocator<Task> TaskAlloc;
   typedef UserContextAccess<T> UserCtx;
-  typedef PerThreadStorage<UserCtx> PerThreadUserCtx;
+  typedef Substrate::PerThreadStorage<UserCtx> PerThreadUserCtx;
 
   // template <typename C>
   // class CtxWrapper: boost::noncopyable {
@@ -224,7 +224,7 @@ public:
     Galois::for_each (it, it,
         ApplyOperatorSinglePhase {*this},
         Galois::loopname(loopname.c_str()),
-        Galois::wl<WL>(&workList));
+                      Galois::wl<WL>(std::ref(workList)));
 
     // initialTasks deleted in ApplyOperatorSinglePhase,
   }
@@ -354,15 +354,15 @@ protected:
   }
 
   const char* loopname;
-  PerThreadStorage<PerThreadData> perThreadData;
-  TerminationDetection& term;
+  Substrate::PerThreadStorage<PerThreadData> perThreadData;
+  Substrate::TerminationDetection& term;
   WL_ty workList;
 
 public:
   TreeExecStack (const char* loopname):
     loopname (loopname),
     perThreadData (loopname),
-    term (getSystemTermination ())
+    term (Substrate::getSystemTermination (activeThreads))
   {}
 
   void initThread (void) {
@@ -381,7 +381,7 @@ public:
       applyOperatorRecursive ();
 
       term.localTermination (ptd.didWork);
-      LL::asmPause (); // Take a breath, let the token propagate
+      Substrate::asmPause (); // Take a breath, let the token propagate
     } while (!term.globalTermination ());
 
     ptd.reportStats ();
@@ -397,8 +397,8 @@ void for_each_ordered_tree_impl (F& initTask, const char* loopname=nullptr) {
 
   e.initWork (initTask);
 
-  getSystemThreadPool ().run (Galois::getActiveThreads (),
-      [&e] () { e.initThread (); },
+  Substrate::getSystemThreadPool().run (Galois::getActiveThreads(),
+      [&e] () { e.initThread(); },
       std::ref (e));
 }
 class TreeTaskBase;

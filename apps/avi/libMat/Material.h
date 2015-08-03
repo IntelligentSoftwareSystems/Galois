@@ -29,7 +29,7 @@
 #ifndef MATERIAL_H
 #define MATERIAL_H
 
-#include "Galois/Runtime/PerThreadStorage.h"
+#include "Galois/Substrate/PerThreadStorage.h"
 
 #include <vector>
 #include <string>

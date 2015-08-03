@@ -39,9 +39,9 @@
 // #undef GALOIS_USE_MIC_CSR_IMPL
 
 #ifdef GALOIS_USE_MIC_CSR_IMPL
-  #include "Galois/Graph/LC_CSR_MIC_Graph.h"
+  #include "Galois/Graphs/LC_CSR_MIC_Graph.h"
 #else
-  #include "Galois/Graph/LC_CSR_Graph.h"
+  #include "Galois/Graphs/LC_CSR_Graph.h"
 #endif
 
 #include "Galois/Accumulator.h"
@@ -49,13 +49,13 @@
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
 #include "Galois/Galois.h"
-#include "Galois/Graph/Util.h"
-#include "Galois/Graph/FileGraph.h"
+#include "Galois/Graphs/Util.h"
+#include "Galois/Graphs/FileGraph.h"
 #include "llvm/Support/CommandLine.h"
 
-#include "Galois/Runtime/ll/CacheLineStorage.h"
+#include "Galois/Substrate/CacheLineStorage.h"
 #include "Galois/Runtime/Sampling.h"
-#include "Galois/Runtime/ll/CompilerSpecific.h"
+#include "Galois/Substrate/CompilerSpecific.h"
 
 #include "Lonestar/BoilerPlate.h"
 
@@ -170,7 +170,7 @@ protected:
     Galois::StatTimer t_verify ("Verification time: ");
 
     t_verify.start ();
-    Galois::Runtime::PerThreadStorage<bool> result;
+    Galois::Substrate::PerThreadStorage<bool> result;
     for (unsigned i = 0; i < result.size (); ++i) {
       *result.getRemote(i) = true;
     }
@@ -241,9 +241,9 @@ public:
     // for node based versions
     // Galois::preAlloc (Galois::getActiveThreads () + 8*graph.size ()/Galois::Runtime::MM::hugePageSize);
     // // for edge based versions
-    unsigned p = Galois::getActiveThreads () + 8*graph.sizeEdges () / Galois::Runtime::MM::hugePageSize;
-    std::printf ("going to pre-alloc %u pages, hugePageSize=%d,\n", p, (unsigned)Galois::Runtime::MM::hugePageSize);
-    Galois::preAlloc (Galois::getActiveThreads () + 8*graph.sizeEdges ()/Galois::Runtime::MM::hugePageSize);
+    unsigned p = Galois::getActiveThreads () + 8*graph.sizeEdges () / Galois::Runtime::hugePageSize;
+    std::printf ("going to pre-alloc %u pages, hugePageSize=%d,\n", p, (unsigned)Galois::Runtime::hugePageSize);
+    Galois::preAlloc (Galois::getActiveThreads () + 8*graph.sizeEdges ()/Galois::Runtime::hugePageSize);
     Galois::reportPageAlloc("MeminfoPre");
 
     timer.start ();

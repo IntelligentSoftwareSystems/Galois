@@ -34,7 +34,7 @@
 #include "Galois/DynamicArray.h"
 
 #include "Galois/Runtime/KDGtwoPhase.h"
-#include "Galois/Runtime/ll/CompilerSpecific.h"
+#include "Galois/Substrate/CompilerSpecific.h"
 
 #include "Kruskal.h"
 
@@ -43,7 +43,7 @@ namespace kruskal {
 struct EdgeCtx;
 
 // typedef Galois::LazyDynamicArray<int>  VecRep_ty;
-typedef Galois::LazyDynamicArray<int, Galois::Runtime::MM::SerialNumaAllocator<int> >  VecRep_ty;
+typedef Galois::LazyDynamicArray<int, Galois::Runtime::SerialNumaAllocator<int> >  VecRep_ty;
 
 typedef Galois::PerThreadVector<Edge> EdgeWL;
 typedef Galois::PerThreadVector<EdgeCtx> EdgeCtxWL;
@@ -54,7 +54,7 @@ typedef Galois::GAccumulator<size_t> Accumulator;
 // typedef Galois::GAtomicPadded<EdgeCtx*> AtomicCtxPtr;
 typedef Galois::GAtomic<EdgeCtx*> AtomicCtxPtr;
 // typedef Galois::LazyDynamicArray<AtomicCtxPtr> VecAtomicCtxPtr;
-typedef Galois::LazyDynamicArray<AtomicCtxPtr, Galois::Runtime::MM::SerialNumaAllocator<AtomicCtxPtr> > VecAtomicCtxPtr;
+typedef Galois::LazyDynamicArray<AtomicCtxPtr, Galois::Runtime::SerialNumaAllocator<AtomicCtxPtr> > VecAtomicCtxPtr;
 
 static const int NULL_EDGE_ID = -1;
 
@@ -331,7 +331,7 @@ struct Range {
   typedef typename std::iterator_traits<Iter>::difference_type difference_type;
   typedef typename std::iterator_traits<Iter>::value_type value_type;
 
-  typedef Galois::Runtime::PerThreadStorage<Range> PTS;
+  typedef Galois::Substrate::PerThreadStorage<Range> PTS;
 
   Iter m_beg;
   Iter m_end;
@@ -613,7 +613,7 @@ void runMSTsimple (const size_t numNodes, const VecEdge& edges,
   VecAtomicCtxPtr repOwnerCtxVec (numNodes);
 
  
-  Galois::Runtime::getSystemThreadPool ().burnPower (Galois::getActiveThreads ());
+  Galois::Substrate::getSystemThreadPool().burnPower(Galois::getActiveThreads());
 
   fillUpTimer.start ();
   Galois::do_all (
@@ -655,7 +655,7 @@ void runMSTsimple (const size_t numNodes, const VecEdge& edges,
   std::cout << "Time taken by LinkUpLoop: " << linkUpTimer.get () << std::endl;
   std::cout << "Time taken by FillUp: " << fillUpTimer.get () << std::endl;
 
-  Galois::Runtime::getSystemThreadPool ().beKind ();
+  Galois::Substrate::getSystemThreadPool().beKind();
 }
 
 template <typename Iter>
@@ -806,7 +806,7 @@ void runMSTfilter (const size_t numNodes, const VecEdge& edges,
   Accumulator findIter;
   Accumulator linkUpIter;
 
-  Galois::Runtime::getSystemThreadPool ().burnPower (Galois::getActiveThreads ());
+  Galois::Substrate::getSystemThreadPool().burnPower(Galois::getActiveThreads());
 
 
   VecRep_ty repVec (numNodes);
@@ -868,7 +868,7 @@ void runMSTfilter (const size_t numNodes, const VecEdge& edges,
   std::cout << "Time taken by partitioning Loop: " << partitionTimer.get () << std::endl;
   std::cout << "Time taken by filter Loop: " << filterTimer.get () << std::endl;
 
-  Galois::Runtime::getSystemThreadPool ().beKind ();
+  Galois::Substrate::getSystemThreadPool().beKind();
 }
 
 

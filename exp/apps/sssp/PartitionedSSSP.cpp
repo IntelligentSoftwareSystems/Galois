@@ -30,8 +30,8 @@
 #include "Galois/Statistic.h"
 #include "Galois/Timer.h"
 #include "Galois/UserContext.h"
-#include "Galois/Graph/LCGraph.h"
-#include "Galois/Graph/TypeTraits.h"
+#include "Galois/Graphs/LCGraph.h"
+#include "Galois/Graphs/TypeTraits.h"
 #ifdef GALOIS_USE_EXP
 #include "Galois/WorkList/Partitioned.h"
 #endif
@@ -566,8 +566,8 @@ struct Algo2 {
     const int maxValue = 128;
     typedef dChunkedFIFO<128> Chunk;
     typedef Partitioned<Partitioner, Chunk>
-      ::with_block_period<blockPeriod>::type
-      ::with_max_value<maxValue>::type Part;
+      ::with_block_period<blockPeriod>
+      ::with_max_value<maxValue> Part;
     typedef OrderedByIntegerMetric<UpdateRequestIndexer<UpdateRequest>, Part, 10> OBIM;
 
     typedef Galois::InsertBag<UpdateRequest> Bag;
@@ -853,8 +853,8 @@ struct Algo4 {
     const int maxValue = 8;
     typedef dChunkedFIFO<128> Chunk;
     typedef Partitioned<Partitioner, Chunk>
-      ::with_block_period<blockPeriod>::type
-      ::with_max_value<maxValue>::type Part;
+      ::with_block_period<blockPeriod>
+      ::with_max_value<maxValue> Part;
     typedef OrderedByIntegerMetric<UpdateRequestIndexer<UpdateRequest>, Part, 10> OBIM;
 
     typedef Galois::InsertBag<UpdateRequest> Bag;
@@ -1436,7 +1436,7 @@ void run(bool prealloc = true) {
   size_t approxNodeData = graph.size() * 64;
   //size_t approxEdgeData = graph.sizeEdges() * sizeof(typename Graph::edge_data_type) * 2;
   if (prealloc)
-    Galois::preAlloc(numThreads + approxNodeData / Galois::Runtime::MM::hugePageSize);
+    Galois::preAlloc(numThreads + approxNodeData / Galois::Runtime::hugePageSize);
   Galois::reportPageAlloc("MeminfoPre");
 
   Galois::StatTimer T;

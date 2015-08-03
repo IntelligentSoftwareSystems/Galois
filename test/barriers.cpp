@@ -1,6 +1,6 @@
 #include "Galois/Timer.h"
 #include "Galois/Galois.h"
-#include "Galois/Runtime/Barrier.h"
+#include "Galois/Substrate/Barrier.h"
 
 #include <iostream>
 #include <cstdlib>
@@ -12,7 +12,7 @@ unsigned numThreads = 2;
 char bname[100];
 
 struct emp {
-  Galois::Runtime::Barrier& b;
+  Galois::Substrate::Barrier& b;
 
   void go() {
     for (unsigned i = 0; i < iter; ++i) {
@@ -34,7 +34,7 @@ struct emp {
   }
 };
 
-void test(Galois::Runtime::Barrier& b) {
+void test(Galois::Substrate::Barrier& b) {
   unsigned M = numThreads;
   if (M > 16) M /= 2;
   while (M) {   
@@ -55,16 +55,16 @@ int main(int argc, char** argv) {
   if (!iter)
     iter = 16*1024;
   if (argc > 2)
-    numThreads = Galois::Runtime::LL::getMaxThreads();
+    numThreads = Galois::Substrate::getSystemThreadPool().getMaxThreads();
 
   gethostname(bname, sizeof(bname));
-  using namespace Galois::Runtime::benchmarking;
+  using namespace Galois::Substrate::benchmarking;
 #if _POSIX_BARRIERS > 0
-  test(getPthreadBarrier());
+  //FIXME: test(getPthreadBarrier(1));
 #endif
-  test(getCountingBarrier());
-  test(getMCSBarrier());
-  test(getTopoBarrier());
-  test(getDisseminationBarrier());
+  test(getCountingBarrier(1));
+  test(getMCSBarrier(1));
+  test(getTopoBarrier(1));
+  test(getDisseminationBarrier(1));
   return 0;
 }

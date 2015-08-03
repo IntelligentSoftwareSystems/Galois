@@ -1,11 +1,11 @@
-#include "Galois/Runtime/PerThreadStorage.h"
+#include "Galois/Substrate/PerThreadStorage.h"
 #include "Galois/Timer.h"
 #include "Galois/Galois.h"
 
 #include <cstdlib>
 #include <iostream>
 
-using namespace Galois::Runtime;
+using namespace Galois::Substrate;
 
 int num = 1;
 
@@ -54,7 +54,7 @@ int main(int argc, char** argv) {
   if (num <= 0)
     num = 1024 * 1024 * 1024;
 
-  unsigned M = Galois::Runtime::LL::getMaxThreads();
+  unsigned M = Galois::Substrate::getSystemThreadPool().getMaxThreads();
 
   while (M) {
     Galois::setActiveThreads(M); //Galois::Runtime::LL::getMaxThreads());

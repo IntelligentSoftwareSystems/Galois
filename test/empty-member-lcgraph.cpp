@@ -1,4 +1,4 @@
-#include "Galois/Graph/LCGraph.h"
+#include "Galois/Graphs/LCGraph.h"
 
 int main() {
   constexpr size_t intvoid = sizeof(Galois::Graph::detail::EdgeInfoBase<int,void>);

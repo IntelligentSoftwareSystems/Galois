@@ -15,10 +15,6 @@ EquationSystem::EquationSystem(unsigned long n, SolverMode mode)
     unsigned long i;
 
     // we are working on continuous area of memory
-
-    //matrix = new double*[n];
-    //matrix[0] = new double[n*(n+1)]();
-
     posix_memalign((void**) &matrix, sizeof(double*), n*sizeof(double*));
     posix_memalign((void**) &matrix[0], sizeof(double), n*(n+1)*sizeof(double));
 
@@ -38,8 +34,6 @@ EquationSystem::EquationSystem(unsigned long n, SolverMode mode)
 EquationSystem::~EquationSystem()
 {
     if (matrix != NULL) {
-        //delete [] origPtr;
-        //delete [] matrix;
         free((void*)origPtr);
         free((void*)matrix);
     }

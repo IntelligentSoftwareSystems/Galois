@@ -2,21 +2,27 @@
  * @file
  * @section License
  *
- * Galois, a framework to exploit amorphous data-parallelism in irregular
- * programs.
+ * This file is part of Galois.  Galoisis a gramework to exploit
+ * amorphous data-parallelism in irregular programs.
  *
- * Copyright (C) 2011, The University of Texas at Austin. All rights reserved.
- * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
- * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
- * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
- * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
- * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
- * shall University be liable for incidental, special, indirect, direct or
- * consequential damages or loss of profits, interruption of business, or
- * related expenses which may arise from use of Software or Documentation,
- * including but not limited to those resulting from defects in Software and/or
- * Documentation, or loss or inaccuracy of data of any kind.
+ * Galois is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * Galois is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with Galois.  If not, see
+ * <http://www.gnu.org/licenses/>.
+ *
+ * @section Copyright
+ *
+ * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * reserved.
  *
  * @section Description
  *
@@ -24,6 +30,7 @@
  *
  * @author <ahassaan@ices.utexas.edu>
  */
+
 #ifndef GALOIS_RUNTIME_DOALLCOUPLED_H
 #define GALOIS_RUNTIME_DOALLCOUPLED_H
 
@@ -35,14 +42,14 @@
 #include <ctime>
 
 
-#include "Galois/Runtime/Barrier.h"
-#include "Galois/Runtime/PerThreadStorage.h"
+#include "Galois/Substrate/Barrier.h"
+#include "Galois/Substrate/PerThreadStorage.h"
 #include "Galois/Runtime/Support.h"
-#include "Galois/Runtime/Termination.h"
-#include "Galois/Runtime/ThreadPool.h"
-#include "Galois/Runtime/ll/PaddedLock.h"
-#include "Galois/Runtime/ll/CompilerSpecific.h"
-#include "Galois/Runtime/ll/gio.h"
+#include "Galois/Substrate/Termination.h"
+#include "Galois/Substrate/ThreadPool.h"
+#include "Galois/Substrate/PaddedLock.h"
+#include "Galois/Substrate/CompilerSpecific.h"
+#include "Galois/Substrate/gio.h"
 
 #include "Galois/Timer.h"
 
@@ -123,7 +130,7 @@ namespace Galois {
 
     void print (void) const { 
       
-      Runtime::LL::gPrint (m_name , " [" , m_values.size () , "]"
+      Substrate::gPrint (m_name , " [" , m_values.size () , "]"
         , ", max = " , m_max
         , ", min = " , m_min
         , ", sum = " , m_sum
@@ -131,13 +138,13 @@ namespace Galois {
         , ", range = " , range () 
         , "\n");
 
-      Runtime::LL::gPrint (m_name , " Values[" , m_values.size () , "] = [\n");
+      Substrate::gPrint (m_name , " Values[" , m_values.size () , "] = [\n");
 
       for (typename std::vector<T>::const_iterator i = m_values.begin (), endi = m_values.end ();
           i != endi; ++i) {
-        Runtime::LL::gPrint ( *i , ", ");
+        Substrate::gPrint ( *i , ", ");
       }
-      Runtime::LL::gPrint ("]\n");
+      Substrate::gPrint ("]\n");
     }
 
   };
@@ -163,7 +170,7 @@ class DoAllCoupledExec {
 
   struct ThreadContext {
 
-    GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE LL::SimpleLock work_mutex;
+    GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE Substrate::SimpleLock work_mutex;
     unsigned id;
 
     Iter shared_beg;
@@ -181,7 +188,7 @@ class DoAllCoupledExec {
     ThreadContext () 
       :
         work_mutex (),
-        id (LL::getMaxThreads ()), // TODO: fix this initialization problem, see initThread
+        id (Substrate::getSystemThreadPool().getMaxThreads ()), // TODO: fix this initialization problem, see initThread
         shared_beg (),
         shared_end (),
         m_size (0),
@@ -396,9 +403,11 @@ private:
     bool sawWork = false;
     bool stoleWork = false;
 
+    auto& tp = Substrate::getSystemThreadPool();
+
     const unsigned maxT = Galois::getActiveThreads ();
-    const unsigned my_pack = LL::getPackageForSelf (poor.id);
-    const unsigned per_pack = LL::getMaxThreads () / LL::getMaxPackages ();
+    const unsigned my_pack = Substrate::ThreadPool::getPackage ();
+    const unsigned per_pack = tp.getMaxThreads() / tp.getMaxPackages ();
 
     const unsigned pack_beg = my_pack * per_pack;
     const unsigned pack_end = (my_pack + 1) * per_pack;
@@ -429,14 +438,15 @@ private:
     bool sawWork = false;
     bool stoleWork = false;
 
-    unsigned myPkg = LL::getPackageForThread (poor.id);
+    auto& tp = Substrate::getSystemThreadPool();
+    unsigned myPkg = Substrate::ThreadPool::getPackage();
     // unsigned maxT = LL::getMaxThreads ();
     unsigned maxT = Galois::getActiveThreads ();
 
     for (unsigned i = 0; i < maxT; ++i) {
       ThreadContext& rich = *(workers.getRemote ((poor.id + i) % maxT));
 
-      if (LL::getPackageForThread (rich.id) != myPkg) {
+      if (tp.getPackage(rich.id) != myPkg) {
         if (rich.hasWorkWeak ()) {
           sawWork = true;
 
@@ -506,18 +516,18 @@ private:
 
     if (ret) { return true; }
 
-    LL::asmPause ();
+    Substrate::asmPause ();
 
-    if (LL::isPackageLeader(poor.id)) {
+    if (Substrate::getSystemThreadPool().isLeader(poor.id)) {
       ret = stealOutsidePackage (poor, HALF);
 
       if (ret) { return true; }
-      LL::asmPause ();
+      Substrate::asmPause ();
     }
 
     ret = stealOutsidePackage (poor, HALF);
     if (ret) { return true; } 
-    LL::asmPause ();
+    Substrate::asmPause ();
 
     return ret;
 
@@ -574,7 +584,7 @@ private:
     // work_timer.print ();
     // steal_timer.print ();
     // term_timer.print ();
-    LL::gPrint ("--------\n");
+    Substrate::gPrint ("--------\n");
   }
 
 
@@ -583,9 +593,9 @@ private:
   F func;
   const char* loopname;
   Diff_ty chunk_size;
-  Galois::Runtime::PerThreadStorage<ThreadContext> workers;
+  Substrate::PerThreadStorage<ThreadContext> workers;
 
-  TerminationDetection& term;
+  Substrate::TerminationDetection& term;
 
   // for stats
 
@@ -603,7 +613,7 @@ public:
       func (_func), 
       loopname (_loopname),
       chunk_size (_chunk_size),
-      term(getSystemTermination())
+      term(Substrate::getSystemTermination(activeThreads))
   {
 
     chunk_size = std::max (Diff_ty (1), Diff_ty (chunk_size));
@@ -615,7 +625,7 @@ public:
   void initThread (void) {
     term.initializeThread ();
 
-    unsigned id = LL::getTID ();
+    unsigned id = Substrate::ThreadPool::getTID ();
 
     *workers.getLocal (id) = ThreadContext (id, range.local_begin (), range.local_end ());
 
@@ -699,9 +709,9 @@ template <typename R, typename F>
 void do_all_coupled (const R& range, const F& func, const char* loopname=0, const size_t chunk_size=details::DEFAULT_CHUNK_SIZE) {
   details::DoAllCoupledExec<R, F> exec (range, func, loopname, chunk_size);
 
-  Barrier& barrier = getSystemBarrier();
+  Substrate::Barrier& barrier = Substrate::getSystemBarrier(activeThreads);
 
-  getSystemThreadPool().run(activeThreads, 
+  Substrate::getSystemThreadPool().run(activeThreads, 
       [&exec] (void) { exec.initThread (); },
       std::ref(barrier),
       std::ref(exec));

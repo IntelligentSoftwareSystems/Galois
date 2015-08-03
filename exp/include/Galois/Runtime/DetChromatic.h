@@ -8,7 +8,7 @@
 #include "Galois/Atomic.h"
 //#include "Galois/GaloisUnsafe.h"
 
-#include "Galois/Graph/Graph.h"
+#include "Galois/Graphs/Graph.h"
 
 #include "Galois/WorkList/WorkListWrapper.h"
 #include "Galois/WorkList/ExternalReference.h"
@@ -439,7 +439,7 @@ public:
     Galois::for_each(it, it,
         ActiveDAGoperator<F, U> {func, userCtx, *this, edgesVisited, edgesFlipped},
         Galois::loopname(loopname),
-        Galois::wl<WL>(&sources));
+                     Galois::wl<WL>(std::ref(sources)));
 
     // std::printf ("edgesVisited: %zd, edgesFlipped: %zd\n", edgesVisited.reduceRO (), edgesFlipped.reduceRO ());
 
@@ -536,7 +536,7 @@ public:
     Galois::for_each (it, it, 
         RunDAGcomp<F> {*this, func},
         Galois::loopname (loopname),
-        Galois::wl<WL_ty> (&initWL));
+                      Galois::wl<WL_ty> (std::ref(initWL)));
 
   }
 
@@ -639,7 +639,7 @@ public:
       nd.priority = nd.id % MAX_LEVELS;
     };
 
-    Galois::Runtime::PerThreadStorage<RNG>  perThrdRNG;
+    Galois::Substrate::PerThreadStorage<RNG>  perThrdRNG;
 
     // TODO: non-deterministic at the moment
     // can be fixed by making thread K call the generator
@@ -1002,7 +1002,7 @@ struct DAGmanagerDefault: public DAGmanagerBase<G, A, InputDAGdata::VisitDAGsucc
   using GNode = typename G::GraphNode;
   using ND = typename G::node_data_type;
 
-  Galois::Runtime::MM::Pow_2_BlockAllocator<unsigned> dagSuccAlloc;
+  Galois::Runtime::Pow_2_BlockAllocator<unsigned> dagSuccAlloc;
 
   DAGmanagerDefault (G& graph, const A& visitAdj)
     : Base (graph, visitAdj, InputDAGdata::VisitDAGsuccessors ()) 
@@ -1135,7 +1135,7 @@ struct ChromaticExecutor {
   static const unsigned CHUNK_SIZE = F::CHUNK_SIZE;
   typedef Galois::WorkList::AltChunkedFIFO<CHUNK_SIZE, GNode> Inner_WL_ty;
   typedef Galois::WorkList::WLsizeWrapper<Inner_WL_ty> WL_ty;
-  typedef PerThreadStorage<UserContextAccess<GNode> > PerThreadUserCtx;
+  typedef Substrate::PerThreadStorage<UserContextAccess<GNode> > PerThreadUserCtx;
 
   G& graph;
   M& dagManager;
@@ -1286,7 +1286,7 @@ struct ChromaticExecutor {
       for_each(it, it,
           ApplyOperator {*this},
           Galois::loopname(loopname),
-          Galois::wl<WL>(nextWL));
+               Galois::wl<WL>(std::ref(*nextWL)));
 
       nextWL->reset_all ();
     }
@@ -1300,14 +1300,14 @@ struct ChromaticExecutor {
 template <typename R, typename F, typename G, typename M>
 void for_each_det_chromatic (const R& range, const F& func, G& graph, M& dagManager, const char* loopname) {
 
-  Galois::Runtime::getSystemThreadPool ().burnPower (Galois::getActiveThreads ());
+  Galois::Substrate::getSystemThreadPool ().burnPower (Galois::getActiveThreads ());
 
 
   ChromaticExecutor<G, M, F> executor {graph, dagManager, func, loopname};
 
   executor.execute (range);
 
-  Galois::Runtime::getSystemThreadPool ().beKind ();
+  Galois::Substrate::getSystemThreadPool ().beKind ();
 
 }
 
@@ -1540,7 +1540,7 @@ struct InputGraphDAGexecutor {
   static const unsigned CHUNK_SIZE = F::CHUNK_SIZE;
   typedef Galois::WorkList::AltChunkedFIFO<CHUNK_SIZE, GNode> Inner_WL_ty;
   typedef Galois::WorkList::WLsizeWrapper<Inner_WL_ty> WL_ty;
-  typedef PerThreadStorage<UserContextAccess<GNode> > PerThreadUserCtx;
+  typedef Substrate::PerThreadStorage<UserContextAccess<GNode> > PerThreadUserCtx;
 
 
 
@@ -1744,13 +1744,13 @@ public:
 template <typename R, typename F, typename G, typename M>
 void for_each_det_edge_flip_ar (const R& range, const F& func, G& graph, M& dagManager, const char* loopname) {
 
-  Galois::Runtime::getSystemThreadPool ().burnPower (Galois::getActiveThreads ());
+  Galois::Substrate::getSystemThreadPool ().burnPower (Galois::getActiveThreads ());
 
   InputGraphDAGexecutor<G,F, M> executor {graph, func, dagManager, loopname};
 
   executor.execute (range);
 
-  Galois::Runtime::getSystemThreadPool ().beKind ();
+  Galois::Substrate::getSystemThreadPool ().beKind ();
 
 }
 
@@ -1788,7 +1788,7 @@ struct InputGraphDAGtopologyDriven {
   static const unsigned CHUNK_SIZE = F::CHUNK_SIZE;
   typedef Galois::WorkList::AltChunkedFIFO<CHUNK_SIZE, GNode> Inner_WL_ty;
   typedef Galois::WorkList::WLsizeWrapper<Inner_WL_ty> WL_ty;
-  typedef PerThreadStorage<UserContextAccess<GNode> > PerThreadUserCtx;
+  typedef Substrate::PerThreadStorage<UserContextAccess<GNode> > PerThreadUserCtx;
 
 
   G& graph;
@@ -1889,13 +1889,13 @@ public:
 template <typename R, typename F, typename G, typename M>
 void for_each_det_edge_flip_topo (const R& range, const F& func, G& graph, M& dagManager, const char* loopname) {
 
-  Galois::Runtime::getSystemThreadPool ().burnPower (Galois::getActiveThreads ());
+  Galois::Substrate::getSystemThreadPool ().burnPower (Galois::getActiveThreads ());
 
   InputGraphDAGtopologyDriven<G,F, M> executor {graph, func, dagManager, loopname};
 
   executor.execute (range);
 
-  Galois::Runtime::getSystemThreadPool ().beKind ();
+  Galois::Substrate::getSystemThreadPool ().beKind ();
 
 }
 
@@ -2324,13 +2324,13 @@ public:
 template <typename R, typename F, typename G, typename M>
 void for_each_det_input_hybrid (const R& range, const F& func, G& graph, M& dagManager, const char* loopname) {
 
-  Galois::Runtime::getSystemThreadPool ().burnPower (Galois::getActiveThreads ());
+  Galois::Substrate::getSystemThreadPool ().burnPower (Galois::getActiveThreads ());
 
   HybridInputDAGexecutor<G,F, M> executor {graph, func, dagManager, loopname};
 
   executor.execute (range);
 
-  Galois::Runtime::getSystemThreadPool ().beKind ();
+  Galois::Substrate::getSystemThreadPool ().beKind ();
 
 }
 

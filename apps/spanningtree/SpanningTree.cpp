@@ -28,8 +28,8 @@
 #include "Galois/Bag.h"
 #include "Galois/Statistic.h"
 #include "Galois/UnionFind.h"
-#include "Galois/Graph/LCGraph.h"
-#include "Galois/ParallelSTL/ParallelSTL.h"
+#include "Galois/Graphs/LCGraph.h"
+#include "Galois/ParallelSTL.h"
 #include "llvm/Support/CommandLine.h"
 
 #include "Lonestar/BoilerPlate.h"
@@ -191,7 +191,7 @@ struct BlockedAsyncAlgo {
 
     void operator()(const GNode& src) const {
       Graph::edge_iterator start = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED);
-      if (Galois::Runtime::LL::getPackageForSelf(Galois::Runtime::LL::getTID()) == 0) {
+      if (Galois::Substrate::ThreadPool::getPackage() == 0) {
         process<true, 0>(src, start, items);
       } else {
         process<true, 1>(src, start, items);

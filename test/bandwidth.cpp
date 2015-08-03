@@ -1,8 +1,7 @@
-#include "Galois/config.h"
 #include "Galois/Galois.h"
 #include "Galois/Timer.h"
 
-#include GALOIS_CXX11_STD_HEADER(random)
+#include <random>
 #include <cstdio>
 #include <time.h>
 
@@ -66,9 +65,9 @@ struct run_interleaved_helper {
 
 void run_interleaved(size_t seed, size_t mega, bool full) {
   size_t size = mega*1024*1024;
-  int *block = (int*) Galois::Runtime::MM::largeInterleavedAlloc(size*sizeof(*block), full);
+  int *block = (int*) Galois::Runtime::largeInterleavedAlloc(size*sizeof(*block), full);
   Galois::on_each(run_interleaved_helper(block, seed, size));
-  Galois::Runtime::MM::largeInterleavedFree(block, size*sizeof(*block));
+  Galois::Runtime::largeInterleavedFree(block, size*sizeof(*block));
 }
 
 template<typename Fn>
@@ -96,7 +95,7 @@ struct F2 {
 };
 
 int main(int argc, char** argv) {
-  unsigned M = Galois::Runtime::LL::getMaxThreads() / 2;
+  unsigned M = Galois::Substrate::getSystemThreadPool().getMaxThreads() / 2;
   size_t mega = 1;
   if (argc > 1)
     mega = atoi(argv[1]);

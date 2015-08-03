@@ -2,24 +2,31 @@
  * @file
  * @section License
  *
- * Galois, a framework to exploit amorphous data-parallelism in irregular
- * programs.
+ * This file is part of Galois.  Galoisis a gramework to exploit
+ * amorphous data-parallelism in irregular programs.
  *
- * Copyright (C) 2014, The University of Texas at Austin. All rights reserved.
- * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
- * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
- * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
- * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
- * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
- * shall University be liable for incidental, special, indirect, direct or
- * consequential damages or loss of profits, interruption of business, or
- * related expenses which may arise from use of Software or Documentation,
- * including but not limited to those resulting from defects in Software and/or
- * Documentation, or loss or inaccuracy of data of any kind.
+ * Galois is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * Galois is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with Galois.  If not, see
+ * <http://www.gnu.org/licenses/>.
+ *
+ * @section Copyright
+ *
+ * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * reserved.
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
+
 #ifndef GALOIS_RUNTIME_EXECUTOR_BULKSYNCHRONOUS_H
 #define GALOIS_RUNTIME_EXECUTOR_BULKSYNCHRONOUS_H
 
@@ -51,11 +58,11 @@ struct WID {
   unsigned tid;
   unsigned pid;
   WID(unsigned t): tid(t) {
-    pid = LL::getLeaderForThread(tid);
+    pid = Substrate::getSystemThreadPool().getLeader(tid);
   }
   WID() {
-    tid = LL::getTID();
-    pid = LL::getLeaderForThread(tid);
+    tid = Substrate::ThreadPool::getTID();
+    pid = Substrate::ThreadPool::getLeader();
   }
 };
 
@@ -63,7 +70,7 @@ template<typename T,template<typename,bool> class OuterTy, bool isLIFO,int Chunk
 class dChunkedMaster : private boost::noncopyable {
   class Chunk : public FixedSizeRingAdaptor<T,isLIFO,ChunkSize>, public OuterTy<Chunk,true>::ListNode {};
 
-  MM::FixedSizeAllocator<Chunk> alloc;
+  FixedSizeAllocator<Chunk> alloc;
 
   struct p {
     Chunk* next;
@@ -71,8 +78,8 @@ class dChunkedMaster : private boost::noncopyable {
 
   typedef OuterTy<Chunk, true> LevelItem;
 
-  PerThreadStorage<p> data;
-  PerPackageStorage<LevelItem> Q;
+  Substrate::PerThreadStorage<p> data;
+  Substrate::PerPackageStorage<LevelItem> Q;
 
   Chunk* mkChunk() {
     Chunk* ptr = alloc.allocate(1);
@@ -175,7 +182,7 @@ public:
     WID id;
     for (unsigned i = 0; i < data.size(); ++i) {
       id.tid = i;
-      id.pid = LL::getLeaderForThread(i);
+      id.pid = Substrate::getSystemThreadPool().getLeader(i);
       if (!empty(id))
         return false;
     }
@@ -253,8 +260,8 @@ class Executor {
   WLTy wls[2];
   FunctionTy function;
   const char* loopname;
-  Galois::Runtime::Barrier& barrier;
-  LL::CacheLineStorage<volatile long> done;
+  Substrate::Barrier& barrier;
+  Substrate::CacheLineStorage<volatile long> done;
 
   bool empty(WLTy* wl) {
     return wl->sempty();
@@ -285,7 +292,7 @@ class Executor {
 #else
     } catch (const ConflictFlag& flag) { clearConflictLock(); result = flag; }
 #endif
-    clearReleasable(); 
+    //FIXME:    clearReleasable(); 
     switch (result) {
     case 0: break;
     case Galois::Runtime::CONFLICT:
@@ -318,7 +325,7 @@ class Executor {
   void go() {
     ThreadLocalData tld(loopname);
     setThreadContext(&tld.ctx);
-    unsigned tid = LL::getTID();
+    unsigned tid = Substrate::ThreadPool::getTID();
     WID wid;
 
     WLTy* cur = &wls[0];
@@ -359,7 +366,7 @@ public:
   Executor(const FunctionTy& f, const ArgsTy& args):
     function(f), 
     loopname(get_by_supertype<loopname_tag>(args).value),
-    barrier(getSystemBarrier()) { }
+    barrier(Substrate::getSystemBarrier(activeThreads)) { }
 
   template<typename RangeTy>
   void init(const RangeTy& range) { }
@@ -382,10 +389,10 @@ namespace WorkList {
 template<typename T=int>
 struct BulkSynchronousInline {
   template<bool _concurrent>
-  struct rethread { typedef BulkSynchronousInline<T> type; };
+  using rethread = BulkSynchronousInline<T>;
 
   template<typename _T>
-  struct retype { typedef BulkSynchronousInline<_T> type; };
+  using retype = BulkSynchronousInline<_T>;
 
   typedef T value_type;
 };

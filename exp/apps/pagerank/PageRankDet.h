@@ -8,8 +8,8 @@
 #include "Galois/DoAllWrap.h"
 #include "Galois/PerThreadContainer.h"
 
-#include "Galois/Graph/Util.h"
-#include "Galois/Graph/Graph.h"
+#include "Galois/Graphs/Util.h"
+#include "Galois/Graphs/Graph.h"
 // #include "Galois/Graph/FileGraph.h"
 
 #include "Galois/Runtime/Sampling.h"
@@ -20,7 +20,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 
-#include "PageRank.h"
+#include "PageRankOld.h"
 
 #include <cstdio>
 
@@ -214,7 +214,7 @@ public:
 
     readGraph ();
 
-    Galois::preAlloc (Galois::getActiveThreads () + (4*sizeof(NodeData)*graph.size () + 2*graph.sizeEdges ())/Galois::Runtime::MM::hugePageSize);
+    Galois::preAlloc (Galois::getActiveThreads () + (4*sizeof(NodeData)*graph.size () + 2*graph.sizeEdges ())/Galois::Runtime::hugePageSize);
     Galois::reportPageAlloc("MeminfoPre");
 
     Galois::StatTimer t;

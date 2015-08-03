@@ -31,10 +31,10 @@
 #include "Galois/DomainSpecificExecutors.h"
 #include "Galois/Statistic.h"
 #include "Galois/UnionFind.h"
-#include "Galois/Graph/LCGraph.h"
-#include "Galois/Graph/OCGraph.h"
-#include "Galois/Graph/TypeTraits.h"
-#include "Galois/ParallelSTL/ParallelSTL.h"
+#include "Galois/Graphs/LCGraph.h"
+#include "Galois/Graphs/OCGraph.h"
+#include "Galois/Graphs/TypeTraits.h"
+#include "Galois/ParallelSTL.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 
@@ -520,7 +520,7 @@ struct BlockedAsyncAlgo {
 
     void operator()(const GNode& src) const {
       Graph::edge_iterator start = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED);
-      if (Galois::Runtime::LL::getPackageForSelf(Galois::Runtime::LL::getTID()) == 0) {
+      if (Galois::Substrate::ThreadPool::getPackage() == 0) {
         process<true, 0>(src, start, items);
       } else {
         process<true, 1>(src, start, items);
@@ -808,7 +808,7 @@ void run() {
     graph.getData(*ii).id = id;
   }
   
-  Galois::preAlloc(numThreads + (2 * graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::MM::hugePageSize);
+  Galois::preAlloc(numThreads + (2 * graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::hugePageSize);
   Galois::reportPageAlloc("MeminfoPre");
 
   Galois::StatTimer T;

@@ -28,7 +28,6 @@
 #ifndef GALOIS_RUNTIME_DAGEXEC_H
 #define GALOIS_RUNTIME_DAGEXEC_H
 
-#include "Galois/config.h"
 #include "Galois/GaloisForwardDecl.h"
 #include "Galois/Accumulator.h"
 #include "Galois/Atomic.h"
@@ -41,9 +40,9 @@
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/Executor_DoAll.h"
 #include "Galois/Runtime/OrderedLockable.h"
-#include "Galois/Runtime/ll/gio.h"
-#include "Galois/Runtime/ll/ThreadRWlock.h"
-#include "Galois/Runtime/mm/Mem.h"
+#include "Galois/Substrate/gio.h"
+#include "Galois/Runtime/ThreadRWlock.h"
+#include "Galois/Runtime/Mem.h"
 
 #include "llvm/Support/CommandLine.h"
 
@@ -268,11 +267,11 @@ protected:
   using CtxtCmp = typename NItem::CtxtCmp;
   using NItemFactory = typename NItem::Factory;
 
-  using CtxtAlloc = MM::FixedSizeAllocator<Ctxt>;
-  using CtxtAdjAlloc = MM::Pow_2_BlockAllocator<Ctxt*>;
+  using CtxtAlloc = FixedSizeAllocator<Ctxt>;
+  using CtxtAdjAlloc = Pow_2_BlockAllocator<Ctxt*>;
   using CtxtWL = PerThreadBag<Ctxt*>;
   using UserCtx = UserContextAccess<T>;
-  using PerThreadUserCtx = PerThreadStorage<UserCtx>;
+  using PerThreadUserCtx = Substrate::PerThreadStorage<UserCtx>;
 
 
   struct ApplyOperator {

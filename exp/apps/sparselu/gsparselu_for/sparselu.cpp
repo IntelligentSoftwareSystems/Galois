@@ -30,7 +30,7 @@
 #include "Galois/Galois.h"
 #include "Galois/Statistic.h"
 #include "Galois/LargeArray.h"
-#include "Galois/Graph/FileGraph.h"
+#include "Galois/Graphs/FileGraph.h"
 #include "Galois/Runtime/KDGtwoPhase.h"
 #include <boost/iterator/transform_iterator.hpp>
 #include <boost/iterator/counting_iterator.hpp>
@@ -309,7 +309,7 @@ static Galois::LargeArray<Galois::Runtime::Lockable> locks;
 void sparselu_init (float ***pBENCH, char *pass)
 {
    Galois::setActiveThreads(bots_arg_size_2);
-   Galois::Runtime::getSystemThreadPool().burnPower(bots_arg_size_2);
+   Galois::Substrate::getSystemThreadPool().burnPower(bots_arg_size_2);
    Galois::preAlloc(5*bots_arg_size_2);
    Galois::reportPageAlloc("MeminfoPre");
    *pBENCH = (float **) malloc(bots_arg_size*bots_arg_size*sizeof(float *));
@@ -634,7 +634,7 @@ void sparselu_par_call(float **BENCH)
 
 void sparselu_fini (float **BENCH, char *pass)
 {
-   Galois::Runtime::getSystemThreadPool().beKind();
+   Galois::Substrate::getSystemThreadPool().beKind();
    print_structure(pass, BENCH);
    locks.destroy();
    locks.deallocate();

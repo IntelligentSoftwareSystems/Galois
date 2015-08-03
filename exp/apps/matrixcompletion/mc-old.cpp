@@ -19,10 +19,9 @@
  * Author: Prad Nelluru <pradn@cs.utexas.edu>
 */
 
-#include "Galois/config.h"
 #include "Galois/Galois.h"
-#include "Galois/Graph/Graph.h"
-#include "Galois/Graph/LCGraph.h"
+#include "Galois/Graphs/Graph.h"
+#include "Galois/Graphs/LCGraph.h"
 #include "Galois/Statistic.h"
 #include "Galois/Timer.h"
 
@@ -546,7 +545,7 @@ void runBlockSlices(Graph& g, unsigned int threadCount, unsigned int usersPerBlo
 	}
 }
 
-typedef Galois::Runtime::LL::SimpleLock spinlock;
+typedef Galois::Substrate::SimpleLock spinlock;
 
 struct sgd_march
 {

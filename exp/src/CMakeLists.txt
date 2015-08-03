@@ -1,2 +1,2 @@
-add_internal_library(exp CilkInit.cpp DoAllWrap.cpp ParaMeter.cpp Queue.cpp
-  TreeExec.cpp)
+add_internal_library(exp DoAllWrap.cpp)
+# CilkInit.cpp DoAllWrap.cpp ParaMeter.cpp Queue.cpp TreeExec.cpp)

@@ -41,7 +41,7 @@
 #include "Collision.h"
 #include "Event.h"
 
-#include "Galois/Runtime/ll/gio.h"
+#include "Galois/Substrate/gio.h"
 
 class Table {
 

@@ -3,8 +3,8 @@
 
 #include "Galois/AltBag.h"
 
-#include "Galois/Runtime/ll/SimpleLock.h"
-#include "Galois/Runtime/Termination.h"
+#include "Galois/Substrate/SimpleLock.h"
+#include "Galois/Substrate/Termination.h"
 #include "Galois/Runtime/DetChromatic.h"
 #include "Galois/Runtime/DoAllCoupled.h"
 #include "Galois/Runtime/DetPartitioners.h"
@@ -46,7 +46,7 @@ struct InputGraphPartDAGexecutor {
     IncomingBoundaryWLmap incomingWLs;
 
     std::vector<PartMetaData*> neighbors;
-    LL::SimpleLock mutex;
+    Substrate::SimpleLock mutex;
 
     LocalWL* currInnerWL = new LocalWL ();
     LocalWL* nextInnerWL = new LocalWL ();
@@ -101,7 +101,7 @@ struct InputGraphPartDAGexecutor {
 
   struct ThreadWorker {
 
-    LL::SimpleLock stealLock;
+    Substrate::SimpleLock stealLock;
     Galois::gdeque<PartMetaData*> myPartitions;
 
     size_t innerIter = 0;
@@ -151,7 +151,7 @@ struct InputGraphPartDAGexecutor {
   F func;
   M& dagManager;
   const char* loopname;
-  TerminationDetection& term;
+  Substrate::TerminationDetection& term;
 
   unsigned numPart;
   // std::vector<PartMetaData> partitions;
@@ -164,7 +164,7 @@ struct InputGraphPartDAGexecutor {
       func (func),
       dagManager (dagManager),
       loopname (loopname),
-      term(getSystemTermination()), 
+      term(Substrate::getSystemTermination(Galois::getActiveThreads())), 
       numPart (PARTITION_MULT_FACTOR * Galois::getActiveThreads ())
   {
 
@@ -394,7 +394,7 @@ struct InputGraphPartDAGexecutor {
     texec.start ();
     fill_initial (range);
 
-    Galois::Runtime::PerThreadStorage<ThreadWorker> workers;
+    Galois::Substrate::PerThreadStorage<ThreadWorker> workers;
 
     Galois::Runtime::on_each_impl (
         [this, &workers] (const unsigned tid, const unsigned numT) {
@@ -496,13 +496,13 @@ struct InputGraphPartDAGexecutor {
 template <typename R, typename F, typename G, typename M>
 void for_each_det_input_part (const R& range, const F& func, G& graph, M& dagManager, const char* loopname) {
 
-  Galois::Runtime::getSystemThreadPool ().burnPower (Galois::getActiveThreads ());
+  Galois::Substrate::getSystemThreadPool ().burnPower (Galois::getActiveThreads ());
 
   InputGraphPartDAGexecutor<G, F, M> executor {graph, func, dagManager, loopname};
 
   executor.execute (range);
 
-  Galois::Runtime::getSystemThreadPool ().beKind ();
+  Galois::Substrate::getSystemThreadPool ().beKind ();
 
 }
 

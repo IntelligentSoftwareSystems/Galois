@@ -23,10 +23,10 @@
 #ifndef GALOIS_WORKLIST_PARTITIONED_H
 #define GALOIS_WORKLIST_PARTITIONED_H
 
-#include "Galois/WorkList/GFifo.h"
+#include "Galois/WorkList/Simple.h"
 #include "Galois/WorkList/WorkListHelpers.h"
-#include "Galois/Runtime/PerThreadStorage.h"
-#include "Galois/Runtime/ll/CacheLineStorage.h"
+#include "Galois/Substrate/PerThreadStorage.h"
+#include "Galois/Substrate/CacheLineStorage.h"
 
 #include <atomic>
 #include <deque>
@@ -43,33 +43,33 @@ struct Partitioned : private boost::noncopyable {
   static_assert(MaxValue > 0, "MaxValue must be positive");
 
   template<bool _concurrent>
-  struct rethread { typedef Partitioned<Indexer, Container, BlockPeriod, MaxValue, T, _concurrent> type; };
+  using rethread = Partitioned<Indexer, Container, BlockPeriod, MaxValue, T, _concurrent>;
 
   template<typename _T>
-  struct retype { typedef Partitioned<Indexer, typename Container::template retype<_T>::type, BlockPeriod, MaxValue, _T, Concurrent> type; };
+  using retype = Partitioned<Indexer, typename Container::template retype<_T>, BlockPeriod, MaxValue, _T, Concurrent>;
 
   template<int _period>
-  struct with_block_period { typedef Partitioned<Indexer, Container, _period, MaxValue, T, Concurrent> type; };
+  using with_block_period = Partitioned<Indexer, Container, _period, MaxValue, T, Concurrent>;
 
   template<int _max_value>
-  struct with_max_value { typedef Partitioned<Indexer, Container, BlockPeriod, _max_value, T, Concurrent> type; };
+  using with_max_value = Partitioned<Indexer, Container, BlockPeriod, _max_value, T, Concurrent>;
 
   template<typename _container>
-  struct with_container { typedef Partitioned<Indexer, _container, BlockPeriod, MaxValue, T, Concurrent> type; };
+  using with_container = Partitioned<Indexer, _container, BlockPeriod, MaxValue, T, Concurrent>;
 
   template<typename _indexer>
-  struct with_indexer { typedef Partitioned<_indexer, Container, BlockPeriod, MaxValue, T, Concurrent> type; };
+  using with_indexer = Partitioned<_indexer, Container, BlockPeriod, MaxValue, T, Concurrent>;
 
   typedef T value_type;
 
 private:
-  typedef typename Container::template rethread<Concurrent>::type CTy;
+  typedef typename Container::template rethread<Concurrent> CTy;
 
   //Runtime::PerThreadStorage<unsigned> numPops;
   std::deque<CTy> items;
   Indexer indexer;
-  Runtime::LL::CacheLineStorage<std::atomic_int> current;
-  Runtime::LL::CacheLineStorage<std::atomic_bool> empty;
+  Substrate::CacheLineStorage<std::atomic_int> current;
+  Substrate::CacheLineStorage<std::atomic_bool> empty;
 
   //XXX
   //if (BlockPeriod && (p.numPops++ & ((1<<BlockPeriod)-1)) == 0 && betterBucket(p))
@@ -144,21 +144,21 @@ template<typename Indexer = DummyIndexer<int>, typename Container = GFIFO<>,
   bool Concurrent=true>
 struct ThreadPartitioned : private boost::noncopyable {
   template<bool _concurrent>
-  struct rethread { typedef ThreadPartitioned<Indexer, Container, T, _concurrent> type; };
+  using rethread = ThreadPartitioned<Indexer, Container, T, _concurrent>;
 
   template<typename _T>
-  struct retype { typedef ThreadPartitioned<Indexer, typename Container::template retype<_T>::type, _T, Concurrent> type; };
+  using retype = ThreadPartitioned<Indexer, typename Container::template retype<_T>, _T, Concurrent>;
 
   template<typename _container>
-  struct with_container { typedef ThreadPartitioned<Indexer, _container, T, Concurrent> type; };
+  using with_container = ThreadPartitioned<Indexer, _container, T, Concurrent>;
 
   template<typename _indexer>
-  struct with_indexer { typedef ThreadPartitioned<_indexer, Container, T, Concurrent> type; };
+  using with_indexer = ThreadPartitioned<_indexer, Container, T, Concurrent>;
 
   typedef T value_type;
 
 private:
-  typedef typename Container::template rethread<Concurrent>::type CTy;
+  typedef typename Container::template rethread<Concurrent> CTy;
 
   struct Item {
     CTy wl;
@@ -166,10 +166,10 @@ private:
     Item(): empty(true) { }
   };
 
-  Runtime::PerThreadStorage<Item> items;
+  Substrate::PerThreadStorage<Item> items;
   std::deque<unsigned> mapping;
   Indexer indexer;
-  Runtime::LL::CacheLineStorage<std::atomic_bool> empty;
+  Substrate::CacheLineStorage<std::atomic_bool> empty;
   unsigned mask;
 
   //XXX

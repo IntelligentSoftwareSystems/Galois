@@ -1,4 +1,4 @@
-#include "Galois/Runtime/ll/SimpleLock.h"
+#include "Galois/Substrate/SimpleLock.h"
 
 #include <cstdlib>
 
@@ -10,7 +10,7 @@ int main(int argc, char** argv) {
     M = atoi(argv[1]);
   if (!M)
     M = 1000000000;
-  Galois::Runtime::LL::SimpleLock L;
+  Galois::Substrate::SimpleLock L;
   for (unsigned x = 0; x < M; ++x) {
     V = 0;
     L.lock();

@@ -1,14 +1,16 @@
-set(sources Barrier.cpp Barrier_MCS.cpp Barrier_Topo.cpp Barrier_Pthread.cpp
-  Barrier_Counting.cpp Barrier_Dissemination.cpp
-  Context.cpp FileGraph.cpp 
-  Deterministic.cpp
-  OCFileGraph.cpp PerThreadStorage.cpp PreAlloc.cpp Sampling.cpp Support.cpp
-  Termination.cpp Threads.cpp Timer.cpp ThreadPool.cpp)
-if(HAVE_CXX11_THREAD_YIELD)
-  set(sources ${sources} ThreadPool_cpp11.cpp FileGraphParallel_cpp11.cpp)
-else()
-  set(sources ${sources} ThreadPool_pthread.cpp FileGraphParallel_pthread.cpp)
-endif()
+ #Long term starts here
+add_subdirectory(substrate)
+add_subdirectory(runtime)
+add_subdirectory(graphs)
+add_subdirectory(llvm)
+#Long term ends here
+
+
+#if(HAVE_CXX11_THREAD_YIELD)
+#  set(sources ${sources} FileGraphParallel_cpp11.cpp)
+#else()
+#  set(sources ${sources} FileGraphParallel_pthread.cpp)
+#endif()
 
 function(add_galois_library name)
   set(options)
@@ -24,22 +26,25 @@ endfunction()
 
 set(exp_libs)
 if(USE_EXP)
-  set(exp_libs exp)
+#  set(exp_libs exp)
 endif()
 
-add_galois_library(galois ${sources} LIBS llvm mm ll ${exp_libs})
-add_galois_library(galois-nothreads FileGraph.cpp LIBS llvm mm-standalone ll ${exp_libs})
+#add_galois_library(galois ${sources} LIBS  ${exp_libs})
+#add_galois_library(galois-nothreads  LIBS  ${exp_libs})
 
-add_subdirectory(ll)
-add_subdirectory(llvm)
-add_subdirectory(mm)
-add_subdirectory(mm-standalone)
+#add_subdirectory(ll)
+#add_subdirectory(mm)
+#add_subdirectory(mm-standalone)
 
-target_link_libraries(galois ${CMAKE_THREAD_LIBS_INIT})
+#include_directories(${gSubstrate_SOURCE_DIR})
+#include_directories(${gRuntime_SOURCE_DIR})
+
+
+#target_link_libraries(galois_runtime ${CMAKE_THREAD_LIBS_INIT})
 
 if(NUMA_FOUND)
-  target_link_libraries(galois ${NUMA_LIBRARIES})
-  target_link_libraries(galois-nothreads ${NUMA_LIBRARIES})
+#  target_link_libraries(galois_runtime ${NUMA_LIBRARIES})
+#  target_link_libraries(galois-nothreads ${NUMA_LIBRARIES})
 endif()
 
 if(USE_VTUNE)
@@ -48,8 +53,8 @@ if(USE_VTUNE)
   if(VTune_FOUND)
     set(GALOIS_USE_VTUNE on)
     include_directories(${VTune_INCLUDE_DIRS})
-    target_link_libraries(galois ${VTune_LIBRARIES})
-    target_link_libraries(galois dl)
+#    target_link_libraries(galois_runtime ${VTune_LIBRARIES})
+#    target_link_libraries(galois_runtime dl)
   else()
     message(WARNING "VTUNE required but not found")
   endif()
@@ -63,7 +68,7 @@ if(USE_HPCTOOLKIT)
   if(HPCToolKit_FOUND)
     set(GALOIS_USE_HPCTOOLKIT on)
     include_directories(${HPCToolKit_INCLUDE_DIRS})
-    target_link_libraries(galois ${HPCToolKit_LIBRARIES})
+#    target_link_libraries(galois_runtime ${HPCToolKit_LIBRARIES})
   else()
     message(WARNING "HPCToolKit required but not found")
   endif()
@@ -80,21 +85,20 @@ if(USE_PAPI)
   if(PAPI_FOUND)
     set(GALOIS_USE_PAPI on)
     include_directories(${PAPI_INCLUDE_DIRS})
-    target_link_libraries(galois ${PAPI_LIBRARIES})
+#    target_link_libraries(galois_runtime ${PAPI_LIBRARIES})
   else()
     message(WARNING "PAPI required but not found")
   endif()
 endif()
 
 if(USE_EMBEDDED_REVISION)
-  add_dependencies(galois revision)
+#  add_dependencies(galois revision)
 endif()
 
-configure_file("${PROJECT_SOURCE_DIR}/include/Galois/config.h.in" "${PROJECT_BINARY_DIR}/include/Galois/config.h")
 
 ###### Installation ######
-install(TARGETS galois
-  EXPORT GaloisTargets
-  RUNTIME DESTINATION "${INSTALL_BIN_DIR}" COMPONENT bin
-  LIBRARY DESTINATION "${INSTALL_LIB_DIR}" COMPONENT shlib
-  ARCHIVE DESTINATION "${INSTALL_LIB_DIR}" COMPONENT dev)
+#install(TARGETS galois
+#  EXPORT GaloisTargets
+#  RUNTIME DESTINATION "${INSTALL_BIN_DIR}" COMPONENT bin
+#  LIBRARY DESTINATION "${INSTALL_LIB_DIR}" COMPONENT shlib
+#  ARCHIVE DESTINATION "${INSTALL_LIB_DIR}" COMPONENT dev)
