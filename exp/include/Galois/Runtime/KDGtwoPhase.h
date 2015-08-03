@@ -79,7 +79,7 @@ template <typename T, typename Cmp, typename NhFunc, typename OpFunc, typename W
 class KDGtwoPhaseStableExecutor {
 public:
   using Ctxt = TwoPhaseContext<T, Cmp>;
-  using CtxtAlloc = MM::FixedSizeAllocator<Ctxt>;
+  using CtxtAlloc = FixedSizeAllocator<Ctxt>;
   using CtxtWL = PerThreadBag<Ctxt*>;
 
   using UserCtxt = UserContextAccess<T>;

@@ -39,7 +39,7 @@
 
 #include "Galois/optional.h"
 
-#include "Galois/Runtime/ll/gio.h"
+#include "Galois/Substrate/gio.h"
 
 #include <vector>
 
