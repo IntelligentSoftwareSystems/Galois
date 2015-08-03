@@ -121,8 +121,8 @@ public:
   template <typename T>
   static Event makeEvent (const EventKind& kind, const Ball* ball, const T* collObj, const FP& time) {
 
-    assert (&ball != nullptr);
-    assert (&collObj != nullptr);
+    assert (ball != nullptr);
+    assert (collObj != nullptr);
 
     return Event (kind, const_cast<Ball*> (ball), const_cast<T*> (collObj), time);
   }

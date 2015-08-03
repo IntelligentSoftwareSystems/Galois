@@ -39,10 +39,10 @@ namespace Galois {
 namespace gstl {
 
   template<typename T>
-  using Pow2Alloc = typename Runtime::MM::Pow_2_BlockAllocator<T>; 
+  using Pow2Alloc = typename Runtime::Pow_2_BlockAllocator<T>; 
 
   template<typename T>
-  using FixedSizeAlloc = typename Runtime::MM::FixedSizeAllocator<T>; 
+  using FixedSizeAlloc = typename Runtime::FixedSizeAllocator<T>; 
 
   template<typename T>
   using Vector = std::vector<T, Pow2Alloc<T> >; 
