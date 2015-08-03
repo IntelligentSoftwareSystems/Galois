@@ -35,7 +35,7 @@
 #include "Billiards.h"
 #include "dependTest.h"
 
-class BilliardsTwoPhase: public Billiards {
+class BilliardsTwoPhase: public Billiards<BilliardsTwoPhase>  {
 
   using AddListTy = Galois::PerThreadVector<Event>;
 
@@ -69,17 +69,18 @@ class BilliardsTwoPhase: public Billiards {
     }
   };
 
+  template <typename Tbl_t>
   struct AddEvents {
 
     static const unsigned CHUNK_SIZE = 1;
 
-    Table& table;
+    Tbl_t& table;
     const FP& endtime;
     AddListTy& addList;
     Accumulator& iter;
 
     AddEvents (
-        Table& table,
+        Tbl_t& table,
         const FP& endtime,
         AddListTy& addList,
         Accumulator& iter)
@@ -124,7 +125,8 @@ public:
 
   virtual const std::string version () const { return "using IKDG"; }
 
-  virtual size_t runSim (TableSectored& table, std::vector<Event>& initEvents, const FP& endtime, bool enablePrints=false, bool logEvents=false) {
+  template <typename Tbl_t>
+  size_t runSim (Tbl_t& table, std::vector<Event>& initEvents, const FP& endtime, bool enablePrints=false, bool logEvents=false) {
 
     AddListTy addList;
     Accumulator iter;
@@ -136,7 +138,7 @@ public:
         Event::Comparator (),
         VisitNhood (),
         ExecSources (),
-        AddEvents (table, endtime, addList, iter));
+        AddEvents<Tbl_t> (table, endtime, addList, iter));
 
     return iter.reduce ();
 

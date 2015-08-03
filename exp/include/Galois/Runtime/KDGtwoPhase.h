@@ -270,7 +270,6 @@ protected:
   GALOIS_ATTRIBUTE_PROF_NOINLINE void prepareRound () {
     ++rounds;
     std::swap (currWL, nextWL);
-    nextWL->clear_all ();
 
     if (targetCommitRatio != 0.0) {
       size_t currCommits = numCommitted.reduce () - prevCommits;
@@ -279,6 +278,8 @@ protected:
       size_t prevWindowSize = nextWL->size_all ();
       refill (*currWL, currCommits, prevWindowSize);
     }
+
+    nextWL->clear_all ();
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhood () {
