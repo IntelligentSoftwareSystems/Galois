@@ -103,11 +103,6 @@ struct FPutilsGeneric: private boost::noncopyable {
       && checkError (original.getY (), measured.getY (), useAssert);
   }
 
-  static const T& truncate (const T& val) { return val; }
-
-  template <typename V>
-  static const V& truncate (const V& vec) { return vec; }
-
 };
 
 template <typename T>

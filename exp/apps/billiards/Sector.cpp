@@ -141,7 +141,7 @@ Galois::optional<Event> Sector::earliestSectorEntry (const Ball* ball, const FP&
 
     }
 
-    FP brad = FPutils::truncate (ball->radius ());
+    FP brad = ball->radius ();
     // to handle entry at the corners, we compute an imaginary boundary outside the actual 
     // one, that is brad away. 
     // so that entry from corners can be handled. e.g., a ball entring at 45 degrees
@@ -209,7 +209,7 @@ Galois::optional<Event> Sector::earliestSectorLeave (const Ball* ball, const FP&
     return retVal; // early Exit
   }
 
-  FP brad = FPutils::truncate (ball->radius ());
+  FP brad = ball->radius ();
 
   // for sector leaving, we compute an imaginary sector boundary outside
   // the actual boundary, such that the imaginary boundary is 1 ball diameter

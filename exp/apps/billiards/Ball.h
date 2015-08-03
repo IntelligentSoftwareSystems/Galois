@@ -82,20 +82,8 @@ public:
       assert (mass > FP (0.0));
       assert (radius > FP (0.0));
       assert (time >= FP (0.0));
-      
-      truncateAll ();
     } 
 
-
-private:
-
-  void truncateAll () {
-    m_pos = FPutils::truncate (m_pos);
-    m_vel = FPutils::truncate (m_vel);
-    m_mass = FPutils::truncate (m_mass);
-    m_radius = FPutils::truncate (m_radius);
-    m_timestamp = FPutils::truncate (m_timestamp);
-  }
 
 public:
 
@@ -160,10 +148,9 @@ public:
     Vec2 newPos = this->pos (time); 
 
 
-    m_pos = FPutils::truncate (newPos);
-    m_vel = FPutils::truncate (newVel);
-
-    m_timestamp = FPutils::truncate (time);
+    m_pos = newPos;
+    m_vel = newVel;
+    m_timestamp = time;
   }
 
   const Vec2& pos () const { return m_pos; }
