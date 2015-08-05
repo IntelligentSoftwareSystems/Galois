@@ -15,7 +15,7 @@ void Sector::simulate (const Event& e) {
 
   if (e.getKind () == Event::SECTOR_ENTRY) {
 
-    b->update (b->vel (), e.getTime ());
+    b->updateGhostPos (e.getTime ());
 
     // assert (intersects (b));
 
@@ -25,7 +25,7 @@ void Sector::simulate (const Event& e) {
 
   } else if (e.getKind () == Event::SECTOR_LEAVE) {
 
-    b->update (b->vel (), e.getTime ());
+    b->updateGhostPos (e.getTime ());
 
     // assert (!intersects (b));
 
@@ -101,7 +101,7 @@ Galois::optional<Event> Sector::earliestSectorEntry (const Ball* ball, const FP&
 
     }
 
-    std::pair<bool, FP> p = Collision::computeCollisionTime (*ball, sides[i]);
+    std::pair<bool, FP> p = Collision::computeCollisionTime (*ball, sides[i], true);
 
     if (p.first) {
 
@@ -151,7 +151,7 @@ Galois::optional<Event> Sector::earliestSectorEntry (const Ball* ball, const FP&
     Vec2 outerBeg = sides[i].getBegin () + R;
     Vec2 outerEnd = sides[i].getEnd () + R;
 
-    std::pair<bool, FP> p = Collision::computeCollisionTime (*ball, LineSegment (outerBeg, outerEnd));
+    std::pair<bool, FP> p = Collision::computeCollisionTime (*ball, LineSegment (outerBeg, outerEnd), true);
 
     if (p.first) {
 
@@ -231,7 +231,7 @@ Galois::optional<Event> Sector::earliestSectorLeave (const Ball* ball, const FP&
 
     LineSegment outer (outerBeg, outerEnd);
 
-    std::pair<bool, FP> p = Collision::computeCollisionTime (*ball, outer);
+    std::pair<bool, FP> p = Collision::computeCollisionTime (*ball, outer, true);
 
     if (p.first) {
       assert (p.second >= FP (0.0));

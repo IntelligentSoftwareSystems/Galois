@@ -192,14 +192,20 @@ public:
     return computeCollisionTime (ball, cush.getLineSegment ());
   }
 
-  static std::pair<bool, FP> computeCollisionTime (const Ball& ball, const LineSegment& lineSeg) {
+  static std::pair<bool, FP> computeCollisionTime (const Ball& ball, const LineSegment& lineSeg, const bool useGhostPos=false) {
 
     Vec2 L = lineSeg.lengthVec ();
 
-    Vec2    bpos =  ball.pos ();
     Vec2    bvel =  ball.vel ();
-    FP  btime = ball.time ();
     FP  brad =  ball.radius ();
+
+    Vec2 bpos = ball.pos  (); 
+    FP btime = ball.time ();
+    
+    if (useGhostPos) {
+      bpos = ball.ghostPos ();
+      btime = ball.ghostTime ();
+    }
 
     FP denominator = (bvel.getX () * L.getY ()) - (bvel.getY () * L.getX ());
 

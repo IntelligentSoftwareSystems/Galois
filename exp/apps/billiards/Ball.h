@@ -49,11 +49,13 @@ class Ball: public CollidingObject {
   unsigned m_id;
 
   Vec2 m_pos;
+  Vec2 m_ghost_pos;
   Vec2 m_vel;
 
   FP m_mass;
   FP m_radius;
   FP m_timestamp;
+  FP m_ghost_ts;
 
   unsigned m_collCntr;
 
@@ -61,6 +63,15 @@ class Ball: public CollidingObject {
 
   using SectorIterator = typename Galois::FlatSet<Sector*>::const_iterator;
 
+  void checkMonotony (const FP& t) const {
+    if (t < m_timestamp) {
+      if (!FPutils::almostEqual (t, m_timestamp)) {
+        assert (t >= m_timestamp);
+        std::cerr << "Time in the past" << std::endl;
+        abort ();
+      }
+    }
+  }
 
 public:
   Ball (
@@ -73,10 +84,12 @@ public:
 
     m_id (id),
     m_pos (pos),
+    m_ghost_pos (pos),
     m_vel (vel),
     m_mass (mass), 
     m_radius (radius), 
     m_timestamp (time),
+    m_ghost_ts (time),
     m_collCntr (0) {
 
       assert (mass > FP (0.0));
@@ -136,37 +149,35 @@ public:
 
   void update (const Vec2& newVel, const FP& time) {
 
-
-    if (time < m_timestamp) {
-      if (!FPutils::almostEqual (time, m_timestamp)) {
-        assert (time >= m_timestamp && "Time update in the past?");
-        std::cerr << "Time update in the past" << std::endl;
-        abort ();
-      }
-    }
-
+    checkMonotony (time);
     Vec2 newPos = this->pos (time); 
 
 
     m_pos = newPos;
     m_vel = newVel;
     m_timestamp = time;
+
+    m_ghost_pos = m_pos;
+    m_ghost_ts = m_timestamp;
+  }
+
+  void updateGhostPos (const FP& time) {
+    checkMonotony (time);
+    m_ghost_pos = this->pos (time);
+    m_ghost_ts = time;
   }
 
   const Vec2& pos () const { return m_pos; }
 
   Vec2 pos (const FP& t) const {
 
-    if (t < m_timestamp) {
-      if (!FPutils::almostEqual (t, m_timestamp)) {
-        assert (t >= m_timestamp);
-        std::cerr << "Time in the past" << std::endl;
-        abort ();
-      }
-    }
+    checkMonotony (t);
     return (m_pos + m_vel * t - m_vel * m_timestamp); 
   }
 
+  const Vec2& ghostPos (void) const { return m_ghost_pos; }
+
+  const FP& ghostTime (void) const { return m_ghost_ts; }
 
   const Vec2& vel () const { return m_vel; }
 
@@ -183,7 +194,6 @@ public:
   FP ke (const Vec2& _vel) const { return (_vel.magSqrd () * mass ())/FP (2.0); }
 
   FP ke () const { return ke (this->vel ()); }
-  
 
 };
 
