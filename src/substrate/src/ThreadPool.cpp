@@ -39,7 +39,7 @@
 namespace Galois {
 namespace Substrate {
 
-extern void initPTS();
+extern void initPTS(unsigned);
 
 }
 }
@@ -111,7 +111,7 @@ void ThreadPool::initThread() {
   //my_box.id = findID(signals, &my_box, 0);
 
   // Initialize 
-  Substrate::initPTS();
+  Substrate::initPTS(mi.maxThreads);
 
   if (!EnvCheck("GALOIS_DO_NOT_BIND_THREADS"))
     if (my_box.topo.tid != 0 || !EnvCheck("GALOIS_DO_NOT_BIND_MAIN_THREAD"))
