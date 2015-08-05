@@ -69,7 +69,7 @@ class PerBackend {
    */
   bool invalid; 
 
-  void initCommon();
+  void initCommon(unsigned maxT);
   static unsigned nextLog2(unsigned size);
 
 public:
@@ -86,8 +86,8 @@ public:
     invalid = true;
   }
 
-  char* initPerThread();
-  char* initPerPackage();
+  char* initPerThread(unsigned maxT);
+  char* initPerPackage(unsigned maxT);
 
   unsigned allocOffset(const unsigned size);
   void deallocOffset(const unsigned offset, const unsigned size);
@@ -108,7 +108,7 @@ PerBackend& getPTSBackend();
 extern __thread char* ppsBase;
 PerBackend& getPPSBackend();
 
-void initPTS();
+void initPTS(unsigned maxT);
 
 template<typename T>
 class PerThreadStorage {

@@ -137,24 +137,23 @@ void* Galois::Substrate::PerBackend::getRemote(unsigned thread, unsigned offset)
   return &rbase[offset];
 }
 
-void Galois::Substrate::PerBackend::initCommon() {
+void Galois::Substrate::PerBackend::initCommon(unsigned maxT) {
   if (!heads) {
     assert(ThreadPool::getTID() == 0);
-    unsigned n = getSystemThreadPool().getMaxThreads();
-    heads = new char*[n];
-    memset(heads, 0, sizeof(*heads)* n);
+    heads = new char*[maxT];
+    memset(heads, 0, sizeof(*heads)* maxT);
   }
 }
 
-char* Galois::Substrate::PerBackend::initPerThread() {
-  initCommon();
+char* Galois::Substrate::PerBackend::initPerThread(unsigned maxT) {
+  initCommon(maxT);
   char* b = heads[ThreadPool::getTID()] = (char*) alloc();
   memset(b, 0, allocSize);
   return b;
 }
 
-char* Galois::Substrate::PerBackend::initPerPackage() {
-  initCommon();
+char* Galois::Substrate::PerBackend::initPerPackage(unsigned maxT) {
+  initCommon(maxT);
   unsigned id = ThreadPool::getTID();
   unsigned leader = ThreadPool::getLeader();
   if (id == leader) {
@@ -169,14 +168,14 @@ char* Galois::Substrate::PerBackend::initPerPackage() {
   }
 }
 
-void Galois::Substrate::initPTS() {
+void Galois::Substrate::initPTS(unsigned maxT) {
   if (!ptsBase) {
     //unguarded initialization as initPTS will run in the master thread
     //before any other threads are generated
-    ptsBase = getPTSBackend().initPerThread();
+    ptsBase = getPTSBackend().initPerThread(maxT);
   }
   if (!ppsBase) {
-    ppsBase = getPPSBackend().initPerPackage();
+    ppsBase = getPPSBackend().initPerPackage(maxT);
   }
 }
 
