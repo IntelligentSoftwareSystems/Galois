@@ -1,25 +1,18 @@
 #include "Billiards.h"
-#include "SimLogger.h"
 
-class BilliardsSerialLog: public Billiards {
-
+class BilliardsSerialSectored: public Billiards {
   typedef std::priority_queue<Event, std::vector<Event>, Event::ReverseComparator> PriorityQueue;
 public:
 
-  virtual const std::string version () const { return "Serial Ordered with Event logging"; }
+  virtual const std::string version () const { return "Serial Sectored"; }
 
-  void printLogHeader (FILE* simLog) {
-    fprintf (simLog, "step, time, ball.id, ball.pos.x, ball.pos.y, ball.vel.x, ball.vel.y\n");
+  GALOIS_ATTRIBUTE_PROF_NOINLINE static void processEvent (Event& e, TableSectored& table, std::vector<Event>& addList, const FP& endtime) {
+      addList.clear ();
+      e.simulate ();
+      table.addNextEvents (e, addList, endtime);
   }
 
-
-
-  virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const FP& endtime, bool enablePrints=false) {
-
-    table.writeConfig ();
-    table.ballsToCSV ();
-
-    SimLogger simLog;
+  virtual size_t runSim (TableSectored& table, std::vector<Event>& initEvents, const FP& endtime, bool enablePrints=false, bool logEvents=false) {
 
     PriorityQueue pq;
 
@@ -31,7 +24,6 @@ public:
 
     size_t iter = 0;
     std::vector<Event> addList;
-    // FP simTime = 0.0;
 
     while (!pq.empty ()) {
 
@@ -42,15 +34,12 @@ public:
         std::cout << "Processing event=" << e.str () << std::endl;
       }
 
+      processEvent (e, table, addList, endtime);
 
-      // check staleness before simulating
-      const bool notStale = e.notStale ();
+      if (logEvents) {
+        table.logCollisionEvent (e);
+      }
 
-      addList.clear ();
-      e.simulate();
-      table.addNextEvents (e, addList, endtime);
-
-      // may need to add new events for balls in stale events
       for (std::vector<Event>::iterator i = addList.begin (), ei = addList.end ();
           i != ei; ++i) {
 
@@ -60,11 +49,6 @@ public:
           std::cout << "Adding event=" << i->str () << std::endl;
         }
       }
-
-      if (notStale) {
-        simLog.log (e);
-        simLog.incStep ();
-      } // end if notStale
 
       if (enablePrints) {
         table.printState (std::cout);
@@ -78,3 +62,8 @@ public:
   }
 };
 
+int main (int argc, char* argv[]) {
+  BilliardsSerialSectored s;
+  s.run (argc, argv);
+  return 0;
+}

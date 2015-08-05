@@ -35,13 +35,15 @@
 
 class BilliardsLevelExec: public Billiards {
 
+public:
+
   using Graph = Galois::Graph::FirstGraph<void*, void, true>;
   using GNode = Graph::GraphNode;
   using VecNodes = std::vector<GNode>;
   using AddListTy = Galois::PerThreadVector<Event>;
 
   struct GetEventTime {
-    double operator () (const Event& e) const { 
+    const FP& operator () (const Event& e) const { 
       return e.getTime ();
     }
   };
@@ -55,14 +57,14 @@ class BilliardsLevelExec: public Billiards {
     template <typename C>
     void operator () (const Event& e, C& ctx) const {
 
-      const Ball& b1 = e.getBall ();
-      assert (b1.getID () < nodes.size ());
-      graph.getData (nodes[b1.getID ()], Galois::MethodFlag::WRITE);
+      Ball* b1 = e.getBall ();
+      assert (b1->getID () < nodes.size ());
+      graph.getData (nodes[b1->getID ()], Galois::MethodFlag::WRITE);
 
       if (e.getKind () == Event::BALL_COLLISION) {
-        const Ball& b2 = e.getOtherBall ();
-        assert (b2.getID () < nodes.size ());
-        graph.getData (nodes[b2.getID ()], Galois::MethodFlag::WRITE);
+        Ball* b2 = e.getOtherBall ();
+        assert (b2->getID () < nodes.size ());
+        graph.getData (nodes[b2->getID ()], Galois::MethodFlag::WRITE);
       }
 
     }
@@ -73,13 +75,13 @@ class BilliardsLevelExec: public Billiards {
     static const unsigned CHUNK_SIZE = 1;
 
     Table& table;
-    const double endtime;
+    const FP& endtime;
     AddListTy& addList;
     Accumulator& iter;
 
     OpFunc (
         Table& table,
-        double endtime,
+        const FP& endtime,
         AddListTy& addList,
         Accumulator& iter)
       :
@@ -123,7 +125,7 @@ public:
 
   virtual const std::string version () const { return "using Level-by-Level Executor"; }
 
-  virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const double endtime, bool enablePrints=false) {
+  virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const FP& endtime, bool enablePrints=false) {
 
     Graph graph;
     VecNodes nodes;
@@ -135,7 +137,7 @@ public:
 
     Galois::Runtime::for_each_ordered_level (
         Galois::Runtime::makeStandardRange (initEvents.begin (), initEvents.end ()),
-        GetEventTime (), std::less<double> (),
+        GetEventTime (), std::less<FP> (),
         VisitNhood (graph, nodes),
         OpFunc (table, endtime, addList, iter));
 

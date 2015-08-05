@@ -74,7 +74,7 @@ public:
   virtual const std::string version () const { return "Parallel Partially Ordered with Unsorted workList"; }
 
 
-  virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const double endtime, bool enablePrints=false) {
+  virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const FP& endtime, bool enablePrints=false) {
 
     Galois::Substrate::getSystemThreadPool().burnPower (Galois::getActiveThreads ());
 
@@ -112,7 +112,7 @@ GALOIS_ATTRIBUTE_PROF_NOINLINE static void updateODG_clean (WLTy& workList, cons
 
 template <typename _FindIndepFunc, typename _SimulateFunc,
           typename _AddNextFunc, typename _CleanupFunc>
-static size_t runSimInternal (Table& table, WLTy& workList, const double endtime, bool enablePrints=false) {
+static size_t runSimInternal (Table& table, WLTy& workList, const FP& endtime, bool enablePrints=false) {
     // TODO: Explain separation of simulating events and adding
     // new events
 
@@ -275,14 +275,14 @@ private:
     WLTy& workList;
     AddListTy& addList;
     Table& table;
-    double endtime;
+    const FP& endtime;
     bool enablePrints;
 
     AddNextEvents (
         WLTy& _workList,
         AddListTy& _addList,
         Table& _table,
-        double _endtime,
+        const FP& _endtime,
         bool _enablePrints)
       :
         workList (_workList),
@@ -368,7 +368,7 @@ public:
 
 
 
-  virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const double endtime, bool enablePrints=false) {
+  virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const FP& endtime, bool enablePrints=false) {
 
     Galois::Substrate::getSystemThreadPool ().burnPower (Galois::getActiveThreads ());
 

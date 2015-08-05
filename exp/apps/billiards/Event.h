@@ -38,24 +38,29 @@
 #include <cstdio>
 #include <ctime>
 
-#include "Vec2.h"
+#include "GeomUtils.h"
 #include "FPutils.h"
+
+#include "CollidingObject.h"
 #include "Cushion.h"
 #include "Ball.h"
-#include "Collision.h"
+#include "Sector.h"
 
 // We use EventKind to identify
 // different types of Event. A common alternative
 // is to use virtual functions and hierarchy, but that
 // requires Event's being allocated on the heap.
 
+
 class Event {
   friend class Table;
 
 public:
   enum EventKind {
-    BALL_COLLISION,
-    CUSHION_COLLISION
+    BALL_COLLISION = 0,
+    CUSHION_COLLISION = 1,
+    SECTOR_ENTRY = 2,
+    SECTOR_LEAVE = 3
   };
 
 private:
@@ -64,7 +69,7 @@ private:
   Ball* ball;
   CollidingObject* otherObj;
 
-  double time;
+  FP time;
 
   // collision counter is used to maintain
   // the versions of state of the object. If
@@ -76,47 +81,99 @@ private:
   unsigned collCounterB;
 
   Event (
-      const EventKind kind, 
-      Ball& ball, 
-      CollidingObject& otherObj, 
-      const double time) 
+      const EventKind& kind, 
+      Ball* ball, 
+      CollidingObject* otherObj, 
+      const FP& time) 
     : 
     kind (kind),
-    ball (&ball),
-    otherObj (&otherObj),
+    ball (ball),
+    otherObj (otherObj),
     time (time) {
 
-      assert (time >= 0.0);
+      assert (time >= FP (0.0));
 
       collCounterA = this->ball->collCounter ();
       collCounterB = this->otherObj->collCounter ();
+
+      switch (kind) {
+        case BALL_COLLISION:
+          assert (dynamic_cast<Ball*> (otherObj) != nullptr);
+          break;
+
+        case CUSHION_COLLISION:
+          assert (dynamic_cast<Cushion*> (otherObj) != nullptr);
+          break;
+
+        case SECTOR_ENTRY:
+        case SECTOR_LEAVE:
+          assert (dynamic_cast<Sector*> (otherObj) != nullptr);
+          break;
+
+        default:
+          GALOIS_DIE ("shouldn't reach here");
+      }
 
     }
 
 public:
 
-  static Event makeBallCollision (const Ball& ball, const Ball& otherBall, const double time) {
+  template <typename T>
+  static Event makeEvent (const EventKind& kind, const Ball* ball, const T* collObj, const FP& time) {
 
-    assert (&ball != NULL);
-    assert (&otherBall != NULL);
+    assert (ball != nullptr);
+    assert (collObj != nullptr);
 
-    return Event (BALL_COLLISION, const_cast<Ball&> (ball), const_cast<Ball&> (otherBall), time);
+    return Event (kind, const_cast<Ball*> (ball), const_cast<T*> (collObj), time);
   }
 
-  static Event makeCushionCollision (const Ball& ball, const Cushion& c, const double time) {
+  // static Event makeCushionCollision (const Ball* ball, const Cushion* c, const FP& time) {
+// 
+    // assert (&ball != nullptr);
+    // assert (&c != nullptr);
+// 
+    // return Event (CUSHION_COLLISION, const_cast<Ball*> (ball), const_cast<Cushion*> (c), time);
+// 
+  // }
+// 
+  // static Event makeSectorEntry (const Ball* ball, const Sector* sector, const FP& time) {
+// 
+    // assert (&ball != nullptr);
+    // assert (&sector != nullptr);
+// 
+    // return Event (SECTOR_ENTRY, const_cast<Ball*> (ball), const_cast<Sector*> (sector), time);
+  // }
+// 
+  // static Event makeSectorLeave (const Ball* ball, const Sector* sector, const FP& time) {
+// 
+    // assert (&ball != nullptr);
+    // assert (&sector != nullptr);
+// 
+    // return Event (SECTOR_LEAVE, const_cast<Ball*> (ball), const_cast<Sector*> (sector), time);
+    // 
+  // }
 
-    assert (&ball != NULL);
-    assert (&c != NULL);
+  void simulate () {
+    // assert (notStale ());
 
-    return Event (CUSHION_COLLISION, const_cast<Ball&> (ball), const_cast<Cushion&>(c), time);
+    if (notStale ()) {
+      // update collision counters, such that event remains valid
+      ball->incrCollCounter ();
+      otherObj->incrCollCounter ();
 
+      this->collCounterA = ball->collCounter ();
+      this->collCounterB = otherObj->collCounter ();
+
+      otherObj->simulate (*this);
+    }
   }
 
-  void simulate ();
+  const FP& getTime () const { return time; }
 
-  double getTime () const { return time; }
-
-  const Ball& getBall () const { return *ball; }
+  Ball* getBall () const { 
+    assert (ball != nullptr);
+    return ball; 
+  }
 
   bool notStale () const { 
     return (ball->collCounter () == this->collCounterA && 
@@ -143,39 +200,55 @@ public:
 
   void updateOtherBall (const Ball& b) {
     assert (kind == BALL_COLLISION);
-    Ball& ob = downCast<Ball> (otherObj);
-    ob = b;
+    Ball* ob = downCast<Ball> (otherObj);
+    *ob = b;
     this->collCounterB = b.collCounter ();
   }
 
-  const Ball& getOtherBall () const { 
+  Ball* getOtherBall () const { 
     assert (kind == BALL_COLLISION);
 
     return downCast<Ball> (otherObj);
   }
 
-  const Cushion& getCushion () const {
+  Cushion* getCushion () const {
     assert (kind == CUSHION_COLLISION);
 
     return downCast<Cushion> (otherObj);
+  }
+
+  Sector* getSector () const {
+    assert (kind == SECTOR_ENTRY || kind == SECTOR_LEAVE);
+    
+    return downCast<Sector> (otherObj);
   }
 
   EventKind getKind () const { return kind; }
 
 
   std::string str () const {
-    const char* kindName = NULL;
+    const char* kindName = nullptr;
 
     std::string objBstr;
     switch (kind) {
       case BALL_COLLISION:
         kindName = "BALL_COLLISION";
-        objBstr = getOtherBall ().str ();
+        objBstr = getOtherBall ()->str ();
         break;
 
       case CUSHION_COLLISION:
         kindName = "CUSHION_COLLISION";
-        objBstr = getCushion ().str ();
+        objBstr = getCushion ()->str ();
+        break;
+
+      case SECTOR_ENTRY:
+        kindName = "SECTOR_ENTRY";
+        objBstr = getSector ()->str ();
+        break;
+
+      case SECTOR_LEAVE:
+        kindName = "SECTOR_LEAVE";
+        objBstr = getSector ()->str ();
         break;
 
       default:
@@ -186,7 +259,7 @@ public:
     std::ostringstream s;
 
     s.precision (10);
-    s << "[time=" << std::fixed <<  time << ", kind=" << kindName;
+    s << "[time=" << std::fixed <<  double (time) << ", kind=" << kindName;
 
     s << std::setw (20) << std::setfill (' ') << "ball=" << ball->str ();
 
@@ -205,15 +278,11 @@ public:
 
 private:
 
-  void simulateBallCollision (Ball& b2);
-
-  void simulateCushionCollision (Cushion& c);
-
   template <typename T>
-  static T& downCast (CollidingObject* obj) {
+  static T* downCast (CollidingObject* obj) {
     T* ptr = dynamic_cast<T*> (obj);
-    assert (ptr != NULL);
-    return *ptr;
+    assert (ptr != nullptr);
+    return ptr;
   }
 
 public:
@@ -228,10 +297,27 @@ public:
         cmp = e1.ball->getID () - e2.ball->getID ();
 
         if (cmp == 0) {
-          unsigned othid1 = (e1.otherObj == NULL) ? 0 : e1.otherObj->getID ();
-          unsigned othid2 = (e2.otherObj == NULL) ? 0 : e2.otherObj->getID ();
+          unsigned othid1 = (e1.otherObj == nullptr) ? 0 : e1.otherObj->getID ();
+          unsigned othid2 = (e2.otherObj == nullptr) ? 0 : e2.otherObj->getID ();
 
           cmp = othid1 - othid2;
+
+          if (cmp == 0) {
+            cmp = int (e1.getKind ()) - int (e2.getKind ());
+          }
+
+          // if (cmp == 0) {
+            // cmp = e2.collCounterA - e1.collCounterA; // prefer later event over earlier
+// 
+            // if (cmp == 0) {
+              // cmp = e2.collCounterB - e1.collCounterB; // prefer later event over earlier
+// 
+              // if (cmp == 0) {
+                // cmp = int (e1.getKind ()) - int (e2.getKind ());
+              // }
+// 
+            // }
+          // }
         }
 
       } else if (e1.time < e2.time) {
@@ -273,6 +359,10 @@ public:
 
   bool operator == (const Event& that) const { 
     return Comparator::compare (*this, that) == 0;
+  }
+
+  bool operator != (const Event& that) const {
+    return Comparator::compare (*this, that) != 0;
   }
 
   bool operator >= (const Event& that) const { 

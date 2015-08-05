@@ -35,7 +35,7 @@
 #include "Billiards.h"
 #include "dependTest.h"
 
-class BilliardsTwoPhase: public Billiards {
+class BilliardsTwoPhase: public Billiards<BilliardsTwoPhase>  {
 
   using AddListTy = Galois::PerThreadVector<Event>;
 
@@ -62,25 +62,26 @@ class BilliardsTwoPhase: public Billiards {
   };
 
 
-  struct SerialPart {
+  struct ExecSources {
 
     GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (const Event& e) const {
       const_cast<Event&> (e).simulate ();
     }
   };
 
-  struct OpFunc {
+  template <typename Tbl_t>
+  struct AddEvents {
 
     static const unsigned CHUNK_SIZE = 1;
 
-    Table& table;
-    const double endtime;
+    Tbl_t& table;
+    const FP& endtime;
     AddListTy& addList;
     Accumulator& iter;
 
-    OpFunc (
-        Table& table,
-        double endtime,
+    AddEvents (
+        Tbl_t& table,
+        const FP& endtime,
         AddListTy& addList,
         Accumulator& iter)
       :
@@ -124,7 +125,8 @@ public:
 
   virtual const std::string version () const { return "using IKDG"; }
 
-  virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const double endtime, bool enablePrints=false) {
+  template <typename Tbl_t>
+  size_t runSim (Tbl_t& table, std::vector<Event>& initEvents, const FP& endtime, bool enablePrints=false, bool logEvents=false) {
 
     AddListTy addList;
     Accumulator iter;
@@ -135,8 +137,8 @@ public:
         Galois::Runtime::makeStandardRange(initEvents.begin (), initEvents.end ()),
         Event::Comparator (),
         VisitNhood (),
-        OpFunc (table, endtime, addList, iter),
-        SerialPart ());
+        ExecSources (),
+        AddEvents<Tbl_t> (table, endtime, addList, iter));
 
     return iter.reduce ();
 

@@ -44,7 +44,7 @@
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 
-#include "Table.h"
+#include "TableSectored.h"
 
 namespace cll = llvm::cl;
 
@@ -52,12 +52,18 @@ static const char* const name = "Billiards Simulation";
 static const char* const desc = "Simulates elastic collisions between billiard balls on a table";
 static const char* const url = "billiards";
 
-static cll::opt<double>   length("length", cll::desc("length of the billiards table"), cll::init(400.0));
-static cll::opt<double>   width("width", cll::desc("width of the billiards table"), cll::init(200.0));
-static cll::opt<unsigned> numballs("balls", cll::desc("number of balls on the table"), cll::init(100.0));
-static cll::opt<double>   endtime("end", cll::desc("simulation end time"), cll::init(200.0));
+static cll::opt<unsigned>   sectorSize("secsize", cll::desc("size of a (square) sector"), cll::init(100));
+static cll::opt<unsigned>   xSectors("xsec", cll::desc("number of sectors along length"), cll::init(1));
+static cll::opt<unsigned>   ySectors("ysec", cll::desc("number of sectors along height"), cll::init(1));
+static cll::opt<unsigned> numballs("balls", cll::desc("number of balls on the table"), cll::init(100));
+static cll::opt<unsigned>   endtime("end", cll::desc("simulation end time"), cll::init(100));
+
+static cll::opt<bool> runFlat("flat", cll::desc("Run simulation without introducing sectors/partitions"), cll::init(false));
+
+static cll::opt<bool> veriFlat ("vflat", cll::desc ("Verify against serial flat simulation"), cll::init (false));
 
 
+template <typename Derived, bool isParallel=true>
 class Billiards {
 
 public:
@@ -65,17 +71,118 @@ public:
 
   virtual const std::string version () const = 0;
   //! @return number of events processed
-  virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const double endtime, bool enablePrints=false) = 0;
+  template <typename Tbl_t>
+  size_t runSim (Tbl_t& table, std::vector<Event>& initEvents, const FP& endtime, bool enablePrints=false, bool logEvents=false) {
+    GALOIS_DIE ("Derived classes must provide the implementation");
+  }
 
-  virtual void run (int argc, char* argv[]) {
-    
-    Galois::StatManager sm;
-    LonestarStart (argc, argv, name, desc, url);
+private:
+  template <typename Tbl_t>
+  void verify (const Tbl_t& initial, Tbl_t& final, size_t numEvents, const FP& endtime);
 
-    Table table (length, width, numballs);
-    Table verCopy (table);
+// #define CUSTOM_TESTS
+#ifdef CUSTOM_TESTS
 
-    bool enablePrints = false;
+  void testA (std::vector<Ball>& balls) {
+
+    sectorSize = 1;
+    xSectors = 2;
+    ySectors = 1;
+    endtime = 10.0;
+
+    balls.clear ();
+
+    balls.emplace_back (0, Vec2 (0.5, 0.5), Vec2 (1.0, 1.0), 1.0, 0.25);
+  }
+
+  void testB (std::vector<Ball>& balls) {
+
+    sectorSize = 1;
+    xSectors = 2;
+    ySectors = 1;
+    endtime = 10.0;
+
+    balls.clear ();
+
+    balls.emplace_back (0, Vec2 (0.5, 0.5), Vec2 (1.0, 1.0), 1.0, 0.25);
+    balls.emplace_back (1, Vec2 (1.5, 0.5), Vec2 (-1.0, 0.0), 1.0, 0.25);
+  }
+
+  void testC (std::vector<Ball>& balls) {
+
+    sectorSize = 1;
+    xSectors = 2;
+    ySectors = 2;
+    endtime = 10.0;
+
+    balls.clear ();
+
+    balls.emplace_back (0, Vec2 (0.5, 0.5), Vec2 (1.0, 1.0), 1.0, 0.25);
+    // balls.emplace_back (1, Vec2 (1.5, 0.5), Vec2 (-1.0, 0.0), 1.0, 0.25);
+  }
+
+  void testD (std::vector<Ball>& balls) {
+
+    sectorSize = 1;
+    xSectors = 2;
+    ySectors = 2;
+    endtime = 10.0;
+
+    balls.clear ();
+
+    balls.emplace_back (0, Vec2 (0.5, 0.5), Vec2 (1.0, -1.0), 1.0, 0.25);
+    // balls.emplace_back (1, Vec2 (1.5, 0.5), Vec2 (-1.0, 0.0), 1.0, 0.25);
+  }
+
+  void testE (std::vector<Ball>& balls) {
+
+    sectorSize = 1;
+    xSectors = 2;
+    ySectors = 2;
+    endtime = 10.0;
+
+    balls.clear ();
+
+    balls.emplace_back (0, Vec2 (0.5, 0.5), Vec2 (1.0, 1.0), 1.0, 0.25);
+    balls.emplace_back (1, Vec2 (1.5, 1.5), Vec2 (-1.0, -1.0), 1.0, 0.25);
+  }
+
+  void testF (std::vector<Ball>& balls) {
+
+    sectorSize = 10;
+    xSectors = 3;
+    ySectors = 3;
+    endtime = 100.0;
+
+    balls.clear ();
+
+    balls.emplace_back (0, Vec2 (0.5, 0.5), Vec2 (1.0, 1.0), 1.0, 0.25);
+    balls.emplace_back (1, Vec2 (1.5, 1.5), Vec2 (-1.0, -1.0), 1.0, 0.25);
+    balls.emplace_back (2, Vec2 (2.5, 2.5), Vec2 (-1.0, -1.0), 1.0, 0.25);
+  }
+#endif // CUSTOM_TESTS
+
+
+  template <typename Tbl_t>
+  void runImpl (void) {
+
+#ifdef CUSTOM_TESTS
+
+    std::vector<Ball> balls;
+
+    testF (balls);
+
+    Tbl_t table (balls.begin (), balls.end (), sectorSize, xSectors, ySectors);
+
+
+#else // CUSTOM_TESTS
+    Tbl_t table (numballs, sectorSize, xSectors, ySectors);
+#endif // CUSTOM_TESTS
+
+    Tbl_t verCopy (table);
+
+    bool enablePrints = true;
+    bool logEvents = true;
 
 
     if (enablePrints) {
@@ -83,7 +190,7 @@ public:
     }
 
     std::vector<Event> initEvents;
-    table.genInitialEvents (initEvents, endtime);
+    table.genInitialEvents (initEvents, unsigned (endtime));
 
     std::cout << "Number of initial events = " << initEvents.size () << std::endl;
 
@@ -91,37 +198,61 @@ public:
 
     timer.start ();
     Galois::Runtime::beginSampling ();
-    size_t numEvents = runSim (table, initEvents, endtime, enablePrints);
+    size_t numEvents = static_cast<Derived*> (this)->runSim (table, initEvents, unsigned (endtime), enablePrints, logEvents);
     Galois::Runtime::endSampling ();
     timer.stop ();
 
     std::cout << "Billiards " << version () << ", number of events processed=" << numEvents << std::endl;
 
     if (!skipVerify) {
-      verify (verCopy, table, numEvents, endtime);
+      if (veriFlat) {
+        verify (static_cast<const Table&> (verCopy), static_cast<Table&> (table), numEvents, unsigned (endtime));
+
+      } else {
+        verify (verCopy, table, numEvents, unsigned (endtime));
+
+      }
     }
 
   }
 
-private:
+public:
+  void run (int argc, char* argv[]) {
+    
+    Galois::StatManager sm;
+    LonestarStart (argc, argv, name, desc, url);
 
-  void verify (const Table& initial, Table& final, size_t numEvents, const double endtime);
+    if (runFlat) {
+      runImpl<Table> ();
+
+    } else {
+      runImpl<TableSectored> ();
+
+    }
+  }
+
 };
 
 
-class BilliardsSerialPQ: public Billiards {
+class BilliardsSerialPQ: public Billiards<BilliardsSerialPQ, false> {
+
   typedef std::priority_queue<Event, std::vector<Event>, Event::ReverseComparator> PriorityQueue;
 public:
 
   virtual const std::string version () const { return "Serial Ordered with Priority Queue"; }
 
-  GALOIS_ATTRIBUTE_PROF_NOINLINE static void processEvent (Event& e, Table& table, std::vector<Event>& addList, const double endtime) {
+  template <typename Tbl_t>
+  GALOIS_ATTRIBUTE_PROF_NOINLINE static void processEvent (Event& e, Tbl_t& table, std::vector<Event>& addList, const FP& endtime) {
+
       addList.clear ();
       e.simulate ();
       table.addNextEvents (e, addList, endtime);
   }
 
-  virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const double endtime, bool enablePrints=false) {
+  template <typename Tbl_t>
+  size_t runSim (Tbl_t& table, std::vector<Event>& initEvents, const FP& endtime, bool enablePrints=false, bool logEvents=false) {
+
+    std::printf ("BilliardsSerialPQ: number of initial events: %zd\n", initEvents.size ());
 
     PriorityQueue pq;
 
@@ -144,6 +275,10 @@ public:
       }
 
       processEvent (e, table, addList, endtime);
+
+      if (logEvents) {
+        table.logCollisionEvent (e);
+      }
 
       for (std::vector<Event>::iterator i = addList.begin (), ei = addList.end ();
           i != ei; ++i) {
@@ -168,16 +303,18 @@ public:
 };
 
 
-void Billiards::verify (const Table& initial, Table& final, size_t numEvents, const double endtime) {
+template <typename Derived, bool isParallel>
+template <typename Tbl_t>
+void Billiards<Derived, isParallel>::verify (const Tbl_t& initial, Tbl_t& final, size_t numEvents, const FP& endtime) {
 
-  double initEnergy = initial.sumEnergy ();
-  double finalEnergy = final.sumEnergy ();
+  FP initEnergy = initial.sumEnergy ();
+  FP finalEnergy = final.sumEnergy ();
 
   FPutils::checkError (initEnergy, finalEnergy);
 
 
   BilliardsSerialPQ serial;
-  Table serialTable(initial);
+  Tbl_t serialTable(initial);
 
   std::vector<Event> initEvents;
   serialTable.genInitialEvents (initEvents, endtime);
@@ -185,7 +322,7 @@ void Billiards::verify (const Table& initial, Table& final, size_t numEvents, co
   Galois::StatTimer timer ("Verfication time (Serial PQ simulation)= ");
   
   timer.start ();
-  size_t serEvents = serial.runSim(serialTable, initEvents, endtime, false);
+  size_t serEvents = serial.runSim(serialTable, initEvents, endtime, false, true);
   timer.stop ();
 
   std::cout << "Serial ordered numEvents=" << serEvents << std::endl;
@@ -195,18 +332,31 @@ void Billiards::verify (const Table& initial, Table& final, size_t numEvents, co
       << numEvents <<  " != verification=" << serEvents << std::endl;
   }
 
-  double serEnergy = serialTable.sumEnergy ();
+  FP serEnergy = serialTable.sumEnergy ();
 
   FPutils::checkError (serEnergy, initEnergy);
   FPutils::checkError (serEnergy, finalEnergy);
 
 
+  //advance both tables to same endtime
+  final.advance (endtime);
+  serialTable.advance (endtime);
+
   // check the end state of both simulations
   // pass true to print differences 
-  bool result = serialTable.cmpState<true> (final);
+  bool result = serialTable.template cmpState<true> (final);
 
   if (!result) {
     std::cerr << "ERROR, Comparison against serial ordered simulation failed due to above differences" << std::endl;
+
+    // std::cout << "<<<<<<<<<<< Event logs from Original Run >>>>>>>>>>>>>" << std::endl;
+    // final.printEventLogs ();
+// 
+    // std::cout << "<<<<<<<<<<< Event logs from Verification Run >>>>>>>>>>>>>" << std::endl;
+    // serialTable.printEventLogs ();
+
+    final.diffEventLogs (serialTable, "Serial Flat Run");
+
     abort ();
 
   } else {

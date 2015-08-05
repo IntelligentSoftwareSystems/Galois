@@ -120,7 +120,7 @@ public:
 
   virtual const std::string version () const { return "Partially Ordered with Unsorted workList"; }
 
-  virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const double endtime, bool enablePrints=false) {
+  virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const FP& endtime, bool enablePrints=false) {
 
     Galois::TimeAccumulator findTimer;
     Galois::TimeAccumulator simTimer;
@@ -226,7 +226,7 @@ private:
 
 
   void simulateIndepEvents (ILTy& indepList, WLTy& remainingList, 
-      std::vector<Event>& addList, Table& table, const double endtime, bool enablePrints) {
+      std::vector<Event>& addList, Table& table, const FP& endtime, bool enablePrints) {
 
     for (WLTy::iterator i = indepList.begin (), ei = indepList.end ();
         i != ei; ++i) {
@@ -344,7 +344,7 @@ public:
 
   virtual const std::string version () const { return "Partially Ordered with Unsorted workList"; }
 
-  virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const double endtime, bool enablePrints=false) {
+  virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const FP& endtime, bool enablePrints=false) {
 
 
     std::ofstream* statsFile = NULL;
@@ -487,7 +487,7 @@ protected:
 
 
   void simulateIndepEvents (ILTy& indepList, WLTy& workList, 
-      std::vector<Event>& addList, Table& table, const double endtime, SimLogger* logger, bool enablePrints) { 
+      std::vector<Event>& addList, Table& table, const FP& endtime, SimLogger* logger, bool enablePrints) { 
 
 
     for (ILTy::iterator i = indepList.begin (), ei = indepList.end ();

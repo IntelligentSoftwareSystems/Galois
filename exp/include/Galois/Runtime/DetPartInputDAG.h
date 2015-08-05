@@ -38,7 +38,7 @@ struct InputGraphPartDAGexecutor {
   struct PartMetaData: private boost::noncopyable {
 
     using LocalWL = Galois::gdeque<GNode, 64>;
-    // using LocalWL = typename ContainersWithGAlloc::Deque<GNode>::type;
+    // using LocalWL = typename gstl::Deque<GNode>;
     using IncomingBoundaryWLmap = std::vector<LocalWL>;
 
     unsigned id;
@@ -295,7 +295,7 @@ struct InputGraphPartDAGexecutor {
   template <typename R>
   void fill_initial (const R& range) {
 
-    using LocalContrib = typename Galois::ContainersWithGAlloc::Vector<Galois::gdeque<GNode, 64> >::type;
+    using LocalContrib = typename Galois::gstl::Vector<Galois::gdeque<GNode, 64> >;
 
     Galois::Runtime::on_each_impl (
         [this, &range] (unsigned tid, unsigned numT) {

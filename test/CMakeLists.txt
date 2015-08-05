@@ -34,6 +34,7 @@ makeTest(ADD_TARGET static DISTSAFE)
 makeTest(ADD_TARGET twoleveliteratora DISTSAFE)
 makeTest(ADD_TARGET wakeup-overhead)
 makeTest(ADD_TARGET worklists-compile DISTSAFE)
+makeTest(ADD_TARGET floatingPointErrors)
 makeTest(ADD_TARGET hwtopo DISTSAFE)
 
 makeTest(TARGET apps/avi/AVIodgExplicitNoLock -n 0 -d 2 -f "${BASE}/inputs/avi/squareCoarse.NEU.gz")

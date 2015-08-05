@@ -40,6 +40,7 @@
 
 namespace Galois {
 //! Parallel versions of STL library algorithms.
+// TODO: rename to gstl?
 namespace ParallelSTL {
 
 template<typename Predicate, typename TO>
