@@ -49,7 +49,7 @@ void FileGraph::fromFileInterleaved(const std::string& filename, size_t sizeofEd
   unsigned count = maxPackages;
 
   // Interleave across all NUMA nodes
-  tp.run(std::numeric_limits<unsigned int>::max(), [&]() {
+  tp.run(tp.getMaxThreads(), [&]() {
       std::unique_lock<std::mutex> lk(lock);
       if (Substrate::ThreadPool::isLeader()) {
         pageInByNode(Substrate::ThreadPool::getPackage(), maxPackages, sizeofEdgeData);

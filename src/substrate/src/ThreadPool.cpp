@@ -50,7 +50,7 @@ using namespace Galois::Substrate;
 thread_local ThreadPool::per_signal ThreadPool::my_box;
 
 ThreadPool::ThreadPool(): mi(getHWTopo()->getMachineInfo()), starting(mi.maxThreads), masterFastmode(false), signals(mi.maxThreads), running(false) {
-  initThread();
+  initThread(0);
 }
 
 ThreadPool::~ThreadPool() { }
@@ -105,22 +105,21 @@ static T* getNth(std::atomic<T*>& headptr, unsigned off) {
     return getNth(n->next, off - 1);
 }
 
-void ThreadPool::initThread() {
-  signals[my_box.topo.tid] = &my_box;
-  //  atomic_append(signals, &my_box);
-  //my_box.id = findID(signals, &my_box, 0);
-
+void ThreadPool::initThread(unsigned tid) {
+  signals[tid] = &my_box;
+  auto topo = getHWTopo();
+  my_box.topo = topo->getThreadInfo(tid);
   // Initialize 
   Substrate::initPTS(mi.maxThreads);
 
   if (!EnvCheck("GALOIS_DO_NOT_BIND_THREADS"))
     if (my_box.topo.tid != 0 || !EnvCheck("GALOIS_DO_NOT_BIND_MAIN_THREAD"))
-      getHWTopo()->bindThreadToProcessor(my_box.topo.tid);
+      topo->bindThreadToProcessor(my_box.topo.tid);
+  my_box.done = true;
 }
 
-void ThreadPool::threadLoop() {
-  initThread();
-  decascade();
+void ThreadPool::threadLoop(unsigned tid) {
+  initThread(tid);
   bool fastmode = false;
   do {
     if (fastmode) {

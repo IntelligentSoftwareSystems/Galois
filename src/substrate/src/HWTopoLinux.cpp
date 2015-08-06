@@ -281,7 +281,7 @@ public:
       unsigned pid = info[i].physid;
       mid = std::max(mid, pid);
       tInfo[i].cumulativeMaxPackage = mid;
-      tInfo[i].packageLeader = std::find_if(info.begin(), info.end(), [pid] (const cpuinfo& c) { return c.physid == pid; })->physid;
+      tInfo[i].packageLeader = std::distance(info.begin(), std::find_if(info.begin(), info.end(), [pid] (const cpuinfo& c) { return c.physid == pid; }));
     }
   }
 
