@@ -30,6 +30,7 @@
 #include "Galois/Substrate/CompilerSpecific.h"
 
 #include <thread>
+#include <algorithm>
 #include <condition_variable>
 
 namespace {
@@ -74,10 +75,13 @@ public:
     starts(getMaxThreads())
   {   
     for (unsigned i = 1; i < getMaxThreads(); ++i) {
-      std::thread t(&ThreadPool_cpp11::threadLoop, this);
+      std::thread t(&ThreadPool_cpp11::threadLoop, this, i);
       threads.emplace_back(std::move(t));
     }
-    decascade();
+    //we don't want signals to have to contain atomics, since they are set once
+    while (std::any_of(signals.begin(), signals.end(), [](per_signal* p) { return !p || !p->done; })) {
+      std::atomic_thread_fence(std::memory_order_seq_cst);
+    }
   }
 
   virtual ~ThreadPool_cpp11() {

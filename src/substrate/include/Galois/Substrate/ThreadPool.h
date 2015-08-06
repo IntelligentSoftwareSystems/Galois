@@ -97,10 +97,10 @@ protected:
   virtual void threadWakeup(unsigned tid) = 0;
 
   //! Initialize a thread
-  void initThread();
+  void initThread(unsigned tid);
 
   //!main thread loop
-  void threadLoop();
+  void threadLoop(unsigned tid);
 
   //! spin up for run
   void cascade(bool fastmode);
@@ -133,6 +133,7 @@ public:
     ExecuteTuple lwork(std::forward<Args>(args)...);
     work = std::ref(lwork);
     //work = std::function<void(void)>(ExecuteTuple(std::forward<Args>(args)...));
+    assert(num <= getMaxThreads());
     runInternal(num);
   }
 
