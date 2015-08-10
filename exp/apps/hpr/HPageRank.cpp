@@ -28,6 +28,7 @@
 #include "Galois/Graph/Util.h"
 #include "Lonestar/BoilerPlate.h"
 
+#include "PGraph.h"
 #include "cuda/hpr_cuda.h"
 #include "cuda/cuda_mtypes.h"
 #include "hpr.h"
@@ -68,7 +69,7 @@ static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file (
 static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations"), cll::init(4));
 static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"), cll::init(false));
 static cll::opt<int> gpudevice("gpu", cll::desc("Select GPU to run on, default is to choose automatically"), cll::init(-1));
-static cll::opt<float> cldevice("cldevice", cll::desc("Select OpenCL device to run on , default is 0.0 (OpenCL backend)"), cll::init(-1));
+static cll::opt<float> cldevice("cldevice", cll::desc("Select OpenCL device to run on , default is 0.0 (OpenCL backend)"), cll::init(0.0));
 static cll::opt<std::string> personality_set("pset", cll::desc("String specifying personality for each host. 'c'=CPU,'g'=GPU/CUDA and 'o'=GPU/OpenCL"), cll::init(""));
 
 struct LNode {
@@ -85,135 +86,21 @@ typedef Galois::OpenCL::LC_LinearArray_Graph<Galois::OpenCL::Array, LNode, void>
 
 struct CUDA_Context *cuda_ctx;
 struct OPENCL_Context<DeviceGraph> cl_ctx;
-/*********************************************************************************
- * Partitioned graph structure.
- **********************************************************************************/
-struct pGraph {
-   Graph& g;
-   unsigned g_offset; // LID + g_offset = GID
-   unsigned numOwned; // [0, numOwned) = global nodes owned, thus [numOwned, numNodes) are replicas
-   unsigned numNodes; // number of nodes (may differ from g.size() to simplify loading)
-   unsigned numEdges;
 
-   // [numNodes, g.size()) should be ignored
-   std::vector<unsigned> L2G; // GID = L2G[LID - numOwned]
-   unsigned id; // my hostid
-   std::vector<unsigned> lastNodes; //[ [i - 1], [i]) -> Node owned by host i
-   unsigned getHost(unsigned node) { // node is GID
-      return std::distance(lastNodes.begin(), std::upper_bound(lastNodes.begin(), lastNodes.end(), node));
-   }
-   unsigned G2L(unsigned GID) {
-      auto ii = std::find(L2G.begin(), L2G.end(), GID);
-      assert(ii != L2G.end());
-      return std::distance(L2G.begin(), ii) + numOwned;
-   }
-
-   pGraph(Graph& _g) :
-         g(_g), g_offset(0), numOwned(0), numNodes(0), id(0), numEdges(0) {
-   }
-};
-/*********************************************************************************
- * Given a partitioned graph  .
- * lastNodes maintains indices of nodes for each co-host. This is computed by
- * determining the number of nodes for each partition in 'pernum', and going over
- * all the nodes assigning the next 'pernum' nodes to the ith partition.
- * The lastNodes is used to find the host by a binary search.
- **********************************************************************************/
-
-void loadLastNodes(pGraph &g, size_t size, unsigned numHosts) {
-   if (numHosts == 1)
-      return;
-
-   auto p = Galois::block_range(0UL, size, 0, numHosts);
-   unsigned pernum = p.second - p.first;
-   unsigned pos = pernum;
-
-   while (pos < size) {
-      g.lastNodes.push_back(pos);
-      pos += pernum;
-   }
-#if _HETERO_DEBUG_
-   for (int i = 0; size < 10 && i < size; i++) {
-      printf("node %d owned by %d\n", i, g.getHost(i));
-   }
-#endif
-}
-/*********************************************************************************
- * Load a partitioned graph from a file.
- * @param file the graph filename to be loaded.
- * @param hostID the identifier of the current host.
- * @param numHosts the total number of hosts.
- * @param out A graph instance that stores the actual graph.
- * @return a partitioned graph backed by the #out instance.
- **********************************************************************************/
-pGraph loadGraph(std::string file, unsigned hostID, unsigned numHosts, Graph& out) {
-   pGraph retval { out };
-   Galois::Graph::FileGraph fg;
-   fg.fromFile(file);
-   auto p = Galois::block_range(0UL, fg.size(), hostID, numHosts);
-   retval.g_offset = p.first;
-   retval.numOwned = p.second - p.first;
-   retval.id = hostID;
-   std::vector<unsigned> perm(fg.size(), ~0); //[i (orig)] -> j (final)
-   unsigned nextSlot = 0;
-//   std::cout << fg.size() << " " << p.first << " " << p.second << "\n";
-   //Fill our partition
-   for (unsigned i = p.first; i < p.second; ++i) {
-      //printf("%d: owned: %d local: %d\n", hostID, i, nextSlot);
-      perm[i] = nextSlot++;
-   }
-   //find ghost cells
-   for (auto ii = fg.begin() + p.first; ii != fg.begin() + p.second; ++ii) {
-      for (auto jj = fg.edge_begin(*ii); jj != fg.edge_end(*ii); ++jj) {
-         //std::cout << *ii << " " << *jj << " " << nextSlot << " " << perm.size() << "\n";
-         //      assert(*jj < perm.size());
-         auto dst = fg.getEdgeDst(jj);
-         if (perm.at(dst) == ~0) {
-            //printf("%d: ghost: %d local: %d\n", hostID, dst, nextSlot);
-            perm[dst] = nextSlot++;
-            retval.L2G.push_back(dst);
-         }
-      }
-   }
-   retval.numNodes = nextSlot;
-
-   //Fill remainder of graph since permute doesn't support truncating
-   for (auto ii = fg.begin(); ii != fg.end(); ++ii)
-      if (perm[*ii] == ~0)
-         perm[*ii] = nextSlot++;
-//   std::cout << nextSlot << " " << fg.size() << "\n";
-   assert(nextSlot == fg.size());
-   //permute graph
-   Galois::Graph::FileGraph fg2;
-   Galois::Graph::permute<void>(fg, perm, fg2);
-   Galois::Graph::readGraph(retval.g, fg2);
-
-   loadLastNodes(retval, fg.size(), numHosts);
-
-   /* TODO: This still counts edges from ghosts to remote nodes,
-    ideally we only want edges from ghosts to local nodes.
-
-    See pGraphToMarshalGraph for one implementation.
-    */
-
-   retval.numEdges = std::distance(retval.g.edge_begin(*retval.g.begin()), retval.g.edge_end(*(retval.g.begin() + retval.numNodes - 1)));
-
-   return retval;
-}
 /*********************************************************************************
  *
  **********************************************************************************/
 struct InitializeGraph {
-   Graph* g;
-   void static go(Graph& _g, unsigned num) {
-      Galois::do_all(_g.begin(), _g.begin() + num, InitializeGraph { &_g }, Galois::loopname("init"));
+   pGraph<Graph>* g;
+   void static go(pGraph<Graph>& _g) {
+      Galois::do_all(_g.g.begin(), _g.g.begin() + _g.numOwned, InitializeGraph { &_g }, Galois::loopname("init"));
    }
    void operator()(GNode src) const {
-      LNode& sdata = g->getData(src);
+      LNode& sdata = g->g.getData(src);
       sdata.value = 1.0 - alpha;
       buffered_updates[src] = 0;
-      for (auto nbr = g->edge_begin(src); nbr != g->edge_end(src); ++nbr) {
-         __sync_fetch_and_add(&g->getData(g->getEdgeDst(*nbr)).nout, 1);
+      for (auto nbr = g->g.edge_begin(src); nbr != g->g.edge_end(src); ++nbr) {
+         __sync_fetch_and_add(&g->g.getData(g->g.getEdgeDst(*nbr)).nout, 1);
       }
    }
 };
@@ -221,29 +108,29 @@ struct InitializeGraph {
  * CPU PageRank operator implementation.
  **********************************************************************************/
 struct WriteBack {
-   Graph * g;
-   void static go(Graph& _g, unsigned num) {
-      Galois::do_all(_g.begin(), _g.begin() + num, WriteBack { &_g }, Galois::loopname("Writeback"));
+   pGraph<Graph> * g;
+   void static go(pGraph<Graph>& _g) {
+      Galois::do_all(_g.g.begin(), _g.g.begin() + _g.numOwned, WriteBack { &_g }, Galois::loopname("Writeback"));
    }
    void operator()(GNode src) const {
-      LNode& sdata = g->getData(src);
+      LNode& sdata = g->g.getData(src);
       sdata.value = buffered_updates[src];
       buffered_updates[src] = 0;
    }
 };
 struct PageRank {
-   Graph* g;
+   pGraph<Graph>* g;
 
-   void static go(Graph& _g, unsigned num) {
-      Galois::do_all(_g.begin(), _g.begin() + num, PageRank { &_g }, Galois::loopname("Page Rank"));
+   void static go(pGraph<Graph>& _g) {
+      Galois::do_all(_g.g.begin(), _g.g.begin() + _g.numOwned, PageRank { &_g }, Galois::loopname("Page Rank"));
    }
 
    void operator()(GNode src) const {
       double sum = 0;
-      LNode& sdata = g->getData(src);
-      for (auto jj = g->edge_begin(src), ej = g->edge_end(src); jj != ej; ++jj) {
-         GNode dst = g->getEdgeDst(jj);
-         LNode& ddata = g->getData(dst);
+      LNode& sdata = g->g.getData(src);
+      for (auto jj = g->g.edge_begin(src), ej = g->g.edge_end(src); jj != ej; ++jj) {
+         GNode dst = g->g.getEdgeDst(jj);
+         LNode& ddata = g->g.getData(dst);
          sum += ddata.value / ddata.nout;
       }
       float value = (1.0 - alpha) * sum + alpha;
@@ -259,12 +146,12 @@ struct PageRank {
 // [hostid] -> vector of GID that host has replicas of
 std::vector<std::vector<unsigned> > remoteReplicas;
 // [hostid] -> remote pGraph Structure (locally invalid)
-std::vector<pGraph*> magicPointer;
+std::vector<pGraph<Graph>*> magicPointer;
 /*********************************************************************************
  *
  **********************************************************************************/
 
-void setRemotePtr(uint32_t hostID, pGraph* p) {
+void setRemotePtr(uint32_t hostID, pGraph<Graph>* p) {
    if (hostID >= magicPointer.size())
       magicPointer.resize(hostID + 1);
    magicPointer[hostID] = p;
@@ -282,7 +169,7 @@ void recvNodeStatic(unsigned GID, uint32_t hostID) {
  *
  **********************************************************************************/
 
-void setNodeValue(pGraph* p, unsigned GID, float v) {
+void setNodeValue(pGraph<Graph>* p, unsigned GID, float v) {
    switch (personality) {
    case CPU:
       p->g.getData(p->G2L(GID)).value = v;
@@ -301,7 +188,7 @@ void setNodeValue(pGraph* p, unsigned GID, float v) {
  *
  **********************************************************************************/
 // could be merged with setNodeValue, but this is one-time only ...
-void setNodeAttr(pGraph *p, unsigned GID, unsigned nout) {
+void setNodeAttr(pGraph<Graph> *p, unsigned GID, unsigned nout) {
    switch (personality) {
    case CPU:
       p->g.getData(p->G2L(GID)).nout = nout;
@@ -320,7 +207,7 @@ void setNodeAttr(pGraph *p, unsigned GID, unsigned nout) {
  *
  **********************************************************************************/
 // send values for nout calculated on my node
-void setNodeAttr2(pGraph *p, unsigned GID, unsigned nout) {
+void setNodeAttr2(pGraph<Graph> *p, unsigned GID, unsigned nout) {
    auto LID = GID - p->g_offset;
    //printf("%d setNodeAttrs2 GID: %u nout: %u LID: %u\n", p->id, GID, nout, LID);
    switch (personality) {
@@ -340,7 +227,7 @@ void setNodeAttr2(pGraph *p, unsigned GID, unsigned nout) {
 /*********************************************************************************
  *
  **********************************************************************************/
-void sendGhostCellAttrs2(Galois::Runtime::NetworkInterface& net, pGraph& g) {
+void sendGhostCellAttrs2(Galois::Runtime::NetworkInterface& net, pGraph<Graph>& g) {
    for (auto n = g.g.begin() + g.numOwned; n != g.g.begin() + g.numNodes; ++n) {
       auto l2g_ndx = std::distance(g.g.begin(), n) - g.numOwned;
       auto x = g.getHost(g.L2G[l2g_ndx]);
@@ -366,7 +253,7 @@ void sendGhostCellAttrs2(Galois::Runtime::NetworkInterface& net, pGraph& g) {
  *
  **********************************************************************************/
 
-void sendGhostCellAttrs(Galois::Runtime::NetworkInterface& net, pGraph& g) {
+void sendGhostCellAttrs(Galois::Runtime::NetworkInterface& net, pGraph<Graph>& g) {
    for (unsigned x = 0; x < remoteReplicas.size(); ++x) {
       for (auto n : remoteReplicas[x]) {
          /* no per-personality needed but until nout is
@@ -395,7 +282,7 @@ void sendGhostCellAttrs(Galois::Runtime::NetworkInterface& net, pGraph& g) {
  * Note that we use the magicPointer array to obtain the reference of the graph object
  * where the node data is to be set.
  **********************************************************************************/
-void sendGhostCells(Galois::Runtime::NetworkInterface& net, pGraph& g) {
+void sendGhostCells(Galois::Runtime::NetworkInterface& net, pGraph<Graph>& g) {
    for (unsigned x = 0; x < remoteReplicas.size(); ++x) {
       for (auto n : remoteReplicas[x]) {
          switch (personality) {
@@ -420,7 +307,7 @@ void sendGhostCells(Galois::Runtime::NetworkInterface& net, pGraph& g) {
  *
  **********************************************************************************/
 
-MarshalGraph pGraph2MGraph(pGraph &g) {
+MarshalGraph pGraph2MGraph(pGraph<Graph> &g) {
    MarshalGraph m;
 
    m.nnodes = g.numNodes;
@@ -466,7 +353,7 @@ MarshalGraph pGraph2MGraph(pGraph &g) {
  *
  **********************************************************************************/
 
-void loadGraphNonCPU(pGraph &g) {
+void loadGraphNonCPU(pGraph<Graph> &g) {
    MarshalGraph m;
    assert(personality != CPU);
    switch (personality) {
@@ -511,8 +398,9 @@ void inner_main() {
    fprintf(stderr, "Pre-barrier - Host: %d, Personality %s\n",Galois::Runtime::NetworkInterface::ID ,personality_str(personality).c_str());
    barrier.wait();
    fprintf(stderr, "Post-barrier - Host: %d, Personality %s\n",Galois::Runtime::NetworkInterface::ID ,personality_str(personality).c_str());
-   Graph rg;
-   pGraph g = loadGraph(inputFile, Galois::Runtime::NetworkInterface::ID, Galois::Runtime::NetworkInterface::Num, rg);
+//   Graph rg;
+   pGraph<Graph> g;
+   g.loadGraph(inputFile);
 
    if (personality == GPU_CUDA) {
       cuda_ctx = get_CUDA_context(Galois::Runtime::NetworkInterface::ID);
@@ -529,7 +417,7 @@ void inner_main() {
 
    //local initialization
    if (personality == CPU) {
-      InitializeGraph::go(g.g, g.numOwned);
+      InitializeGraph::go(g);
    } else if (personality == GPU_CUDA) {
       initialize_graph_cuda(cuda_ctx);
    } else if (personality == GPU_OPENCL) {
@@ -576,8 +464,8 @@ void inner_main() {
       //Do pagerank
       switch (personality) {
       case CPU:
-         PageRank::go(g.g, g.numOwned);
-         WriteBack::go(g.g, g.numOwned);
+         PageRank::go(g);
+         WriteBack::go(g);
          break;
       case GPU_OPENCL:
          cl_ctx(g.numOwned);
