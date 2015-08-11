@@ -4,7 +4,7 @@
 # run as:
 # threads="1 2 4 8 16" vtune.sh program ARGS
 
-threads=${threads:="1 2 4 8 10 16 20 24 30 36 40"};
+threads=${threads:="1 4 8 12 16 20 24 28 32"};
 
 scriptsDir=$(dirname $0)
 
