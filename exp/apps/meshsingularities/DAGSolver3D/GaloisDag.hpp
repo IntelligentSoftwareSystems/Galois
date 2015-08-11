@@ -12,79 +12,78 @@
 #include "Node.hpp"
 #include "EquationSystem.hpp"
 
-struct GaloisElimination: public Galois::Runtime::TreeTaskBase
+struct GaloisEliminationDivide
 {
-    Node *node;
 
-    GaloisElimination (Node *_node):
-        Galois::Runtime::TreeTaskBase (),
-        node (_node)
-    {}
+    GaloisEliminationDivide () {}
 
-    virtual void operator () (Galois::Runtime::TreeTaskContext& ctx)
+    template <typename C>
+    void operator () (Node *node, C &ctx)
     {
         if (node->getLeft() != NULL && node->getRight() != NULL) {
-            GaloisElimination left {node->getLeft()};
-
-            GaloisElimination right {node->getRight()};
-            ctx.spawn (left);
-            ctx.spawn (right);
-
-            ctx.sync ();
+            ctx.spawn (node->getLeft());
+            ctx.spawn (node->getRight());
         }
-        node->eliminate();
-
     }
 };
 
-struct GaloisBackwardSubstitution: public Galois::Runtime::TreeTaskBase
+struct GaloisEliminationConquer
 {
-    Node *node;
+    GaloisEliminationConquer() {};
 
-    GaloisBackwardSubstitution (Node *_node):
-        Galois::Runtime::TreeTaskBase(),
-        node(_node)
-    {}
+    void operator() (Node *node)
+    {
+        node->eliminate();
+    }
+};
 
-    virtual void operator () (Galois::Runtime::TreeTaskContext &ctx)
+struct GaloisBackwardSubstitutionDivide
+{
+    GaloisBackwardSubstitutionDivide () {}
+    template
+    <typename C>
+    void operator () (Node *node, C &ctx)
     {
         node->bs();
         if (node->getLeft() != NULL && node->getRight() != NULL) {
-            // change to Galois::for_each (scales better)
-            GaloisBackwardSubstitution left { node->getLeft() };
-            GaloisBackwardSubstitution right { node->getRight() };
-
-            ctx.spawn(left);
-            ctx.spawn(right);
-            ctx.sync();
+            ctx.spawn(node->getLeft());
+            ctx.spawn(node->getRight());
         }
     }
 };
 
-struct GaloisAllocation: public Galois::Runtime::TreeTaskBase
+struct GaloisBackwardSubstitutionConquer
 {
-    Node *node;
-    SolverMode mode;
-    GaloisAllocation (Node *_node, SolverMode _mode):
-        Galois::Runtime::TreeTaskBase(),
-        node(_node), mode(mode)
-    {}
+    void operator () (Node *n)
+    {
+        // empty
+    }
+};
 
-    virtual void operator () (Galois::Runtime::TreeTaskContext &ctx)
+struct GaloisAllocationDivide
+{
+
+    template <typename C>
+    void operator () (Node *node, C &ctx)
+    {
+        if (node->getLeft() != NULL && node->getRight() != NULL) {
+            ctx.spawn(node->getLeft());
+            ctx.spawn(node->getRight());
+        }
+    }
+};
+
+struct GaloisAllocationConquer
+{
+    SolverMode mode;
+    GaloisAllocationConquer(SolverMode m): mode(m) {}
+
+    void operator() (Node *node)
     {
         node->allocateSystem(mode);
-        if (node->getLeft() != NULL && node->getRight() != NULL) {
-            GaloisAllocation left { node->getLeft(), mode };
-
-            GaloisAllocation right { node->getRight(), mode };
-            ctx.spawn(left);
-
-            ctx.spawn(right);
-
-            ctx.sync();
-        }
     }
 };
+
 
 void galoisAllocation(Node *node, SolverMode mode);
 void galoisElimination (Node *node);

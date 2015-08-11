@@ -2,18 +2,18 @@
 
 void galoisAllocation(Node *node, SolverMode mode)
 {
-    GaloisAllocation root {node, mode};
-    Galois::Runtime::for_each_ordered_tree_generic(root, "alloc-gen");
+    Galois::Runtime::for_each_ordered_tree(node, GaloisAllocationDivide(),
+        GaloisAllocationConquer(mode), "GaloisAllocation");
 }
 
 void galoisElimination (Node *node)
 {
-    GaloisElimination root {node};
-    Galois::Runtime::for_each_ordered_tree_generic (root, "elim-gen");
+    Galois::Runtime::for_each_ordered_tree(node, GaloisEliminationDivide(),
+        GaloisEliminationConquer(), "GaloisElimination");
 }
 
 void galoisBackwardSubstitution(Node *node)
 {
-    GaloisBackwardSubstitution root {node};
-    Galois::Runtime::for_each_ordered_tree_generic(root, "bs-gen");
+    Galois::Runtime::for_each_ordered_tree(node, GaloisBackwardSubstitutionDivide(),
+        GaloisBackwardSubstitutionConquer(), "GaloisBackwardSubstitution");
 }
