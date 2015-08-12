@@ -368,10 +368,16 @@ if(NOT SKIP_COMPILE_APPS)
 endif()
 
 ###### Documentation ######
-set(DOXYFILE_SOURCE_DIR "src\" \"include\" \"docs")
+set(DOXYFILE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src\" \"${CMAKE_CURRENT_SOURCE_DIR}/include\" \"${CMAKE_CURRENT_SOURCE_DIR}/docs")
 find_package(Doxygen 1.8.0)
 if(NOT DOXYGEN_FOUND)
   message(STATUS "Could NOT find required doxygen version: doxygen missing or < 1.8.0") 
+else()
+   configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in
+     ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile.in @ONLY)
+  add_custom_target(doc ${DOXYGEN_EXECUTABLE}
+     ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile.in WORKING_DIRECTORY
+     ${CMAKE_CURRENT_BINARY_DIR})
 endif()
 
 ###### Distribution ######
