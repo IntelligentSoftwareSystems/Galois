@@ -157,38 +157,74 @@ void Node::merge() const
 
     rrhs = right->system->rhs;
     lrhs = left->system->rhs;
-    for (j = left->getSupernodesToElim(); j < left->getSupernodes().size(); ++j) {
-        for (i = left->getSupernodesToElim(); i < left->getSupernodes().size(); ++i) {
+    if (system->mode != CHOLESKY) {
+        for (j = left->getSupernodesToElim(); j < left->getSupernodes().size(); ++j) {
+            for (i = left->getSupernodesToElim(); i < left->getSupernodes().size(); ++i) {
+                for (k = left->offsets[j]; k < left->offsets[j+1]; ++k) {
+                    uint64_t x;
+                    x = offsets[leftPlaces[j - left->getSupernodesToElim()]] + (k - left->offsets[j]);
+                    for (l = left->offsets[i]; l < left->offsets[i+1]; ++l) {
+    	                uint64_t y;
+                        y = offsets[leftPlaces[i - left->getSupernodesToElim()]] + (l - left->offsets[i]);
+                        matrix[x][y] = lmatrix[k][l];
+                    }
+                }
+            }
             for (k = left->offsets[j]; k < left->offsets[j+1]; ++k) {
-                uint64_t x;
-                x = offsets[leftPlaces[j - left->getSupernodesToElim()]] + (k - left->offsets[j]);
-                for (l = left->offsets[i]; l < left->offsets[i+1]; ++l) {
-	                uint64_t y;
-                    y = offsets[leftPlaces[i - left->getSupernodesToElim()]] + (l - left->offsets[i]);
-                    matrix[x][y] = lmatrix[k][l];
-                }
+                rhs[offsets[leftPlaces[j - left->getSupernodesToElim()]] + (k - left->offsets[j])] = lrhs[k];
             }
         }
-        for (k = left->offsets[j]; k < left->offsets[j+1]; ++k) {
-            rhs[offsets[leftPlaces[j - left->getSupernodesToElim()]] + (k - left->offsets[j])] = lrhs[k];
-        }
-    }
-
-    for (j=right->getSupernodesToElim(); j<right->getSupernodes().size(); ++j) {
-        for (i=right->getSupernodesToElim(); i<right->getSupernodes().size(); ++i) {
+    
+        for (j = right->getSupernodesToElim(); j < right->getSupernodes().size(); ++j) {
+            for (i = right->getSupernodesToElim(); i < right->getSupernodes().size(); ++i) {
+                for (k = right->offsets[j]; k < right->offsets[j+1]; ++k) {
+                    uint64_t x;
+                    x = offsets[rightPlaces[j - right->getSupernodesToElim()]] + (k - right->offsets[j]);
+                    for (l = right->offsets[i]; l < right->offsets[i+1]; ++l) {
+                        uint64_t y;
+                        y = offsets[rightPlaces[i-right->getSupernodesToElim()]]+(l-right->offsets[i]);
+                        matrix[x][y] += rmatrix[k][l];
+                    }
+                }
+            }
             for (k = right->offsets[j]; k < right->offsets[j+1]; ++k) {
-                uint64_t x;
-                x = offsets[rightPlaces[j - right->getSupernodesToElim()]] + (k - right->offsets[j]);
-                for (l = right->offsets[i]; l < right->offsets[i+1]; ++l) {
-                    uint64_t y;
-                    y = offsets[rightPlaces[i-right->getSupernodesToElim()]]+(l-right->offsets[i]);
-                    matrix[x][y] += rmatrix[k][l];
-                }
+                rhs[offsets[rightPlaces[j - right->getSupernodesToElim()]] + (k - right->offsets[j])] += rrhs[k];
             }
         }
-	for (k = right->offsets[j]; k < right->offsets[j+1]; ++k) {
-            rhs[offsets[rightPlaces[j-right->getSupernodesToElim()]] + (k-right->offsets[j])] += rrhs[k];
-	}
+    } else {
+        for (j = left->getSupernodesToElim(); j < left->getSupernodes().size(); ++j) {
+            for (i = j; i < left->getSupernodes().size(); ++i) {
+                for (k = left->offsets[j]; k < left->offsets[j+1]; ++k) {
+                    uint64_t x;
+                    x = offsets[leftPlaces[j - left->getSupernodesToElim()]] + (k - left->offsets[j]);
+                    for (l = i == j ? k : left->offsets[i]; l < left->offsets[i+1]; ++l) {
+    	                uint64_t y;
+                        y = offsets[leftPlaces[i - left->getSupernodesToElim()]] + (l - left->offsets[i]);
+                        matrix[x][y] = lmatrix[k][l];
+                    }
+                }
+            }
+            for (k = left->offsets[j]; k < left->offsets[j+1]; ++k) {
+                rhs[offsets[leftPlaces[j - left->getSupernodesToElim()]] + (k - left->offsets[j])] = lrhs[k];
+            }
+        }
+    
+        for (j = right->getSupernodesToElim(); j < right->getSupernodes().size(); ++j) {
+            for (i = j; i < right->getSupernodes().size(); ++i) {
+                for (k = right->offsets[j]; k < right->offsets[j+1]; ++k) {
+                    uint64_t x;
+                    x = offsets[rightPlaces[j - right->getSupernodesToElim()]] + (k - right->offsets[j]);
+                    for (l = right->offsets[i]; l < right->offsets[i+1]; ++l) {
+                        uint64_t y;
+                        y = offsets[rightPlaces[i-right->getSupernodesToElim()]]+(l-right->offsets[i]);
+                        matrix[x][y] += rmatrix[k][l];
+                    }
+                }
+            }
+            for (k = right->offsets[j]; k < right->offsets[j+1]; ++k) {
+                rhs[offsets[rightPlaces[j - right->getSupernodesToElim()]] + (k - right->offsets[j])] += rrhs[k];
+            }
+        }
     }
 
 }

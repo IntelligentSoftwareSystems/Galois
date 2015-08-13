@@ -115,28 +115,29 @@ int EquationSystem::eliminate(const int rows)
             return error;
         }
 
-        clapack_dpotrs (CblasColMajor,
-                        CblasUpper,
-                        m,
-                        k,
-                        matrix[0],
-                        n,
-                        matrix[m],
-                        n);
+        cblas_dtrsm(CblasColMajor,
+                      CblasLeft,
+                      CblasUpper,
+                      CblasTrans,
+                      CblasNonUnit,
+                      m,
+                      k,
+                      1.0,
+                      matrix[0],
+                      n,
+                      matrix[m],
+                      n);
 
-        cblas_dgemm(CblasColMajor,
-                    CblasNoTrans,
-                    CblasNoTrans,
-                    k,
+        cblas_dsyrk(CblasColMajor,
+                    CblasUpper,
+                    CblasTrans,
                     k,
                     m,
                     -1.0,
-                    matrix[0]+m,
-                    n,
-                    matrix[m], // B
+                    matrix[m],
                     n,
                     1.0,
-                    matrix[m]+m, // D
+                    matrix[m]+m,
                     n);
     } else {
         double maxX;
