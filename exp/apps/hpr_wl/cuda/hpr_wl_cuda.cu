@@ -8,7 +8,7 @@
 #include <stdio.h>
 #include "gg.h"
 #include "ggcuda.h"
-#include "hpr_cuda.h"
+#include "hpr_wl_cuda.h"
 #include "../hpr.h"
 #include "worklist.h" // import work list
 

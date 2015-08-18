@@ -29,4 +29,5 @@ add_subdirectory(delaunayrefinement_exp)
 add_subdirectory(hpr)
 add_subdirectory(hsssp)
 add_subdirectory(hprgen)
+add_subdirectory(hpr_wl)
 
