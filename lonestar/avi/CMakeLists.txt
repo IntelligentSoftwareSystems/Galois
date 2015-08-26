@@ -89,3 +89,6 @@ include_directories(libMeshInit/dgmechanics)
 include_directories(libMeshInit/femap)
 include_directories(libMat)
 include_directories(libElOp)
+
+add_test_scale(web AVIodgExplicitNoLock -d 2 -n 1 -e 0.1 -f "${BASEINPUT}/avi/10x10_42k.NEU.gz")
+add_test_scale(small AVIodgExplicitNoLock -d 2 -n 0 -f "${BASEINPUT}/avi/squareCoarse.NEU.gz")
