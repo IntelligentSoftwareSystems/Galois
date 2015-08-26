@@ -9,9 +9,11 @@ set(sources
         src/NumaMem.cpp
         src/PageAlloc.cpp
         src/Deterministic.cpp
-        ../../exp/src/DoAllWrap.cpp
-        ../../exp/src/Queue.cpp
 )
+
+if(USE_EXP)
+  set(sources ${sources} ../../exp/src/DoAllWrap.cpp ../../exp/src/Queue.cpp)
+endif()
 
 add_library(galois_runtime STATIC ${sources})
 target_include_directories(galois_runtime PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
