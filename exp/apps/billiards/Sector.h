@@ -30,6 +30,7 @@
 
 #include "Galois/FlatSet.h"
 #include "Galois/optional.h"
+#include "Galois/Substrate/SimpleLock.h"
 
 #include "GeomUtils.h"
 #include "CollidingObject.h"
@@ -37,6 +38,10 @@
 #include "Cushion.h"
 
 class Sector: public CollidingObject {
+
+  using Lock_t = Galois::Substrate::SimpleLock;
+
+  Lock_t mutex;
 
   unsigned id;
 
@@ -82,7 +87,7 @@ class Sector: public CollidingObject {
 public:
 
   Sector (unsigned id, const Vec2& bottomLeft, const FP& sectorSize)
-    : CollidingObject (), id (id) 
+    : CollidingObject (), mutex (), id (id) 
   {
     init (bottomLeft, sectorSize);
   }
@@ -129,17 +134,21 @@ public:
   }
 
   void addBall (Ball* b) {
+    mutex.lock ();
     assert (b != nullptr);
 
     balls.insert (b);
     assert (balls.contains (b));
+    mutex.unlock ();
   }
 
   void removeBall (Ball* b) {
+    mutex.lock ();
     assert (balls.contains (b));
     balls.erase (b);
 
     assert (!balls.contains (b));
+    mutex.unlock ();
   }
 
   bool hasBall (const Ball* b) const { 

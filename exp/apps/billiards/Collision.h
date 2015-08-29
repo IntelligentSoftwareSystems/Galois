@@ -76,15 +76,15 @@ public:
 
   static std::pair<bool, FP> computeCollisionTime (const Ball& ball1, const Ball& ball2) {
 
-    Vec2    b1pos =  FPutils::truncate (ball1.pos ());
-    Vec2    b1vel =  FPutils::truncate (ball1.vel ());
-    FP  b1time = FPutils::truncate (ball1.time ());
-    FP  b1rad =  FPutils::truncate (ball1.radius ());
+    Vec2    b1pos =  ball1.pos ();
+    Vec2    b1vel =  ball1.vel ();
+    FP  b1time = ball1.time ();
+    FP  b1rad =  ball1.radius ();
 
-    Vec2    b2pos =  FPutils::truncate (ball2.pos ());
-    Vec2    b2vel =  FPutils::truncate (ball2.vel ());
-    FP  b2time = FPutils::truncate (ball2.time ());
-    FP  b2rad =  FPutils::truncate (ball2.radius ());
+    Vec2    b2pos =  ball2.pos ();
+    Vec2    b2vel =  ball2.vel ();
+    FP  b2time = ball2.time ();
+    FP  b2rad =  ball2.radius ();
 
     Vec2 diffV = b1vel - b2vel;
 
@@ -131,9 +131,6 @@ public:
       // solution is real
       FP t1 = (-diffVdiffD - FPutils::sqrt (discr)) / diffV.magSqrd ();
       FP t2 = (-diffVdiffD + FPutils::sqrt (discr)) / diffV.magSqrd ();
-
-      t1 = FPutils::truncate (t1);
-      t2 = FPutils::truncate (t2);
 
       FP t = -1.0;
       bool valid = false;
@@ -195,14 +192,20 @@ public:
     return computeCollisionTime (ball, cush.getLineSegment ());
   }
 
-  static std::pair<bool, FP> computeCollisionTime (const Ball& ball, const LineSegment& lineSeg) {
+  static std::pair<bool, FP> computeCollisionTime (const Ball& ball, const LineSegment& lineSeg, const bool useGhostPos=false) {
 
-    Vec2 L = FPutils::truncate (lineSeg.lengthVec ());
+    Vec2 L = lineSeg.lengthVec ();
 
-    Vec2    bpos =  FPutils::truncate (ball.pos ());
-    Vec2    bvel =  FPutils::truncate (ball.vel ());
-    FP  btime = FPutils::truncate (ball.time ());
-    FP  brad =  FPutils::truncate (ball.radius ());
+    Vec2    bvel =  ball.vel ();
+    FP  brad =  ball.radius ();
+
+    Vec2 bpos = ball.pos  (); 
+    FP btime = ball.time ();
+    
+    if (useGhostPos) {
+      bpos = ball.ghostPos ();
+      btime = ball.ghostTime ();
+    }
 
     FP denominator = (bvel.getX () * L.getY ()) - (bvel.getY () * L.getX ());
 
@@ -212,7 +215,7 @@ public:
 
     Vec2 D = bpos - bvel * btime;
 
-    Vec2 R = FPutils::truncate (L.rightNormal ().unit ());
+    Vec2 R = L.rightNormal ().unit ();
     R *= brad;
 
     Vec2 common = D - lineSeg.getBegin () - R;
@@ -222,9 +225,6 @@ public:
 
     FP t = (L.getX () * common.getY ()) - (L.getY () * common.getX ());
     t /= denominator;
-
-    r = FPutils::truncate (r);
-    t = FPutils::truncate (t);
 
 
     if ((r < FP (0.0)) || (r > FP (1.0)) || (!isInFuture(btime, t))) {
@@ -269,11 +269,11 @@ public:
   //!
   static void simulateCollision (Ball& ball, Cushion& cush, const FP& time) {
 
-    Vec2 L = FPutils::truncate (cush.getLineSegment ().lengthVec ());
+    Vec2 L = cush.getLineSegment ().lengthVec ();
 
-    Vec2 bvel = FPutils::truncate (ball.vel ());
+    Vec2 bvel = ball.vel ();
 
-    FP t = FPutils::truncate (time);
+    FP t = time;
 
     // component along the length
     FP tangent = L.dot (bvel);
@@ -294,7 +294,6 @@ public:
     FPutils::checkError (ball.mom (ball.vel ()).mag (), ball.mom (v_a).mag ());
     FPutils::checkError (ball.ke (ball.vel ()), ball.ke (v_a));
 
-    v_a = FPutils::truncate (v_a);
     ball.update (v_a, t);
 
   }
@@ -324,23 +323,23 @@ public:
   //!
   static void simulateCollision (Ball& ball1, Ball& ball2, const FP& time) {
 
-    Vec2    b1pos =  FPutils::truncate (ball1.pos ());
-    Vec2    b1vel =  FPutils::truncate (ball1.vel ());
-    FP  b1time = FPutils::truncate (ball1.time ());
-    FP  b1mass = FPutils::truncate (ball1.mass ());
+    Vec2    b1pos =  ball1.pos ();
+    Vec2    b1vel =  ball1.vel ();
+    FP  b1time = ball1.time ();
+    FP  b1mass = ball1.mass ();
 
-    Vec2    b2pos =  FPutils::truncate (ball2.pos ());
-    Vec2    b2vel =  FPutils::truncate (ball2.vel ());
-    FP  b2time = FPutils::truncate (ball2.time ());
-    FP  b2mass = FPutils::truncate (ball2.mass ());
+    Vec2    b2pos =  ball2.pos ();
+    Vec2    b2vel =  ball2.vel ();
+    FP  b2time = ball2.time ();
+    FP  b2mass = ball2.mass ();
 
-    FP t = FPutils::truncate (time);
+    FP t = time;
 
 
     assert (t >= b1time && t >= b2time);
 
-    b1pos = FPutils::truncate (ball1.pos (t));
-    b2pos = FPutils::truncate (ball2.pos (t));
+    b1pos = ball1.pos (t);
+    b2pos = ball2.pos (t);
 
     Vec2 C = b2pos - b1pos;
 
@@ -384,9 +383,6 @@ public:
     FP keAfter = (ball1.ke (V1_after) + ball2.ke (V2_after));
 
     FPutils::checkError (keBefore, keAfter);
-
-    V1_after = FPutils::truncate (V1_after);
-    V2_after = FPutils::truncate (V2_after);
 
     ball1.update (V1_after, t);
     ball2.update (V2_after, t);
