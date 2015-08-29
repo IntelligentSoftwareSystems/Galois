@@ -379,6 +379,8 @@ void inner_main() {
    Galois::StatManager statManager;
    auto& barrier = Galois::Runtime::getSystemBarrier();
    const unsigned my_host_id = Galois::Runtime::NetworkInterface::ID;
+   Galois::Timer T_inner;
+   T_inner.start();
    //Parse arg string when running on multiple hosts and update/override personality
    //with corresponding value.
    if (personality_set.length() == Galois::Runtime::NetworkInterface::Num) {
@@ -508,13 +510,16 @@ void inner_main() {
       }
       out_file.close();
    }
+   T_inner.stop();
+   std::cout << "Total time taken : " << T_inner.get() << " (msec)\n";
+   net.terminate();
    std::cout.flush();
 
 }
 
 int main(int argc, char** argv) {
    LonestarStart(argc, argv, name, desc, url);
-   auto& net = Galois::Runtime::getSystemNetworkInterface();
+   //auto& net = Galois::Runtime::getSystemNetworkInterface();
    inner_main();
    return 0;
 }
