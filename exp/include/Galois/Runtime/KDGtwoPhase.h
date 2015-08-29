@@ -400,7 +400,7 @@ protected:
 };
 
 
-namespace impl {
+namespace hidden {
   template <bool B, typename T1, typename T2> 
   struct ChooseIf {
     using Ret_ty = T1;
@@ -410,7 +410,7 @@ namespace impl {
   struct ChooseIf<false, T1, T2> {
     using Ret_ty = T2;
   };
-} // end impl
+} // end hidden
 
 
 template <typename T, typename Cmp, typename NhFunc, typename OpFunc, typename ExFunc, typename WindowWL>
@@ -534,6 +534,78 @@ protected:
 };
 
 
+namespace hidden {
+
+struct DummyNhFunc {
+  static const unsigned CHUNK_SIZE = 4;
+  template <typename T, typename C>
+  inline void operator () (const T&, const C&) {}
+};
+
+} // end namespace hidden
+
+
+template <typename T, typename Cmp, typename SafetyPhase, typename OpFunc, typename ExFunc, typename WindowWL> 
+
+class IKDGunstableCustomSafety: public KDGtwoPhaseStableExecutor<T, Cmp, hidden::DummyNhFunc, OpFunc, WindowWL> {
+
+  using Base = KDGtwoPhaseStableExecutor<T, Cmp, hidden::DummyNhFunc, OpFunc, WindowWL>;
+  using Ctxt = typename Base::Ctxt;
+  using CtxtWL = typename Base::CtxtWL;
+
+
+  SafetyPhase safetyPhase;
+  ExFunc execFunc;
+
+public:
+  KDGtwoPhaseUnstableExecutor (
+      const Cmp& cmp, 
+      const SafetyPhase& safetyPhase,
+      const OpFunc& opFunc,
+      const ExFunc& execFunc)
+    :
+      Base (cmp, hidden::DummyNhFunc (), opFunc),
+      safetyPhase (safetyPhase),
+      execFunc (execFunc)
+  {}
+
+
+  void execute (void) {
+    execute_unstable ();
+  }
+
+private:
+
+  void execute_unstable (void) {
+
+    while (true) {
+
+      Base::prepareRound ();
+
+      if (Base::currWL->empty_all ()) {
+        break;
+      }
+
+      safetyPhase (makeLocalRange (*Base::currWL), Base::cmp);
+
+      Galois::do_all_choice (makeLocalRange (*Base::currWL),
+          [this] (Ctxt* ctx) {
+            if (ctx->isSrc ()) {
+              execFunc (ctx->getElem ());
+            }
+          }, 
+          "execute-safe-sources",
+          chunk_size<ExFunc::CHUNK_SIZE> ());
+
+      Base::applyOperator ();
+
+    } // end while
+
+  }
+
+};
+
+
 } // end anonymous namespace
 
 template <typename R, typename Cmp, typename NhFunc, typename OpFunc>
@@ -544,7 +616,7 @@ void for_each_ordered_2p_win (const R& range, const Cmp& cmp, const NhFunc& nhFu
   
   const bool ADDS = DEPRECATED::ForEachTraits<OpFunc>::NeedsPush;
 
-  using WindowWL = typename impl::ChooseIf<ADDS, PQbasedWindowWL<T, Cmp>, SortedRangeWindowWL<T, Cmp> >::Ret_ty;
+  using WindowWL = typename hidden::ChooseIf<ADDS, PQbasedWindowWL<T, Cmp>, SortedRangeWindowWL<T, Cmp> >::Ret_ty;
 
   using Exec = KDGtwoPhaseStableExecutor<T, Cmp, NhFunc, OpFunc, WindowWL>;
   
@@ -584,6 +656,31 @@ void for_each_ordered_2p_win (const R& range, const Cmp& cmp, const NhFunc& nhFu
   }
 }
 
+template <typename R, typename Cmp, typename SafetyPhase, typename AddFunc, typename ExFunc>
+void for_each_ordered_custom_safety (const R& range, const Cmp& cmp, const SafetyPhase& safetyPhase, 
+    const ExFunc& execFunc,  const AddFunc& addFunc, const char* loopname) {
+
+  using T = typename R::value_type;
+  using WindowWL = PQbasedWindowWL<T, Cmp>;
+
+  using Exec = IKDGunstableCustomSafety<Cmp, SafetyPhase, AddFunc, ExFunc, WindowWL>;
+  
+  Exec e (cmp, safetyPhase, addFunc, execFunc);
+
+  const bool wakeupThreadPool = true;
+
+  if (wakeupThreadPool) {
+    Substrate::getSystemThreadPool().burnPower(Galois::getActiveThreads ());
+  }
+
+  e.fill_initial (range);
+  e.execute ();
+
+  if (wakeupThreadPool) {
+    Substrate::getSystemThreadPool().beKind ();
+  }
+
+}
 
 
 } // end namespace Runtime
