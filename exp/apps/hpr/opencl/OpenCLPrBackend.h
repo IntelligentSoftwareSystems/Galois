@@ -15,9 +15,7 @@ struct OPENCL_Context {
    GraphType m_graph;
    Galois::OpenCL::CL_Kernel kernel;
    Galois::OpenCL::CL_Kernel wb_kernel;
-//   Galois::OpenCL::Array<float> *aux_array;
-   OPENCL_Context() /*:aux_array(nullptr)*/
-   {
+   OPENCL_Context() {
    }
 
    GraphType & get_graph() {
@@ -33,7 +31,6 @@ struct OPENCL_Context {
      }
    void init(int num_items, int num_inits) {
       Galois::OpenCL::CL_Kernel init_all, init_nout;
-//      aux_array = new Galois::OpenCL::Array<float>(m_graph.num_nodes());
       kernel.init("pagerank_kernel.cl", "pagerank");
       wb_kernel.init("pagerank_kernel.cl", "writeback");
       init_nout.init("pagerank_kernel.cl", "initialize_nout");
@@ -45,10 +42,10 @@ struct OPENCL_Context {
       wb_kernel.set_work_size(num_items);
       kernel.set_work_size(num_items);
 
-      init_nout.set_arg_list(&m_graph/*, aux_array*/);
-      init_all.set_arg_list(&m_graph/*, aux_array*/);
-      kernel.set_arg_list(&m_graph/*, aux_array*/);
-      wb_kernel.set_arg_list(&m_graph/*, aux_array*/);
+      init_nout.set_arg_list(&m_graph);
+      init_all.set_arg_list(&m_graph);
+      kernel.set_arg_list(&m_graph);
+      wb_kernel.set_arg_list(&m_graph);
       int num_nodes = m_graph.num_nodes();
 
       init_nout.set_arg(1, sizeof(cl_int), &num_items);
@@ -69,6 +66,5 @@ struct OPENCL_Context {
    NodeDataType & getData(unsigned ID){
       return m_graph.getData(ID);
    }
-
 };
 #endif /* GDIST_EXP_APPS_HPR_OPENCL_OPENCLPRBACKEND_H_ */

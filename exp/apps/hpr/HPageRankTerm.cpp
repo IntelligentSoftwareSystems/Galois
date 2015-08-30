@@ -137,12 +137,10 @@ struct dPageRank {
 //   Galois::OpenCL::Array<float> *aux_array;
    Galois::OpenCL::Array<float> *meta_array;
    dPageRank() :
-//         aux_array(nullptr),
          meta_array(nullptr) {
    }
    void init(int num_items, int num_inits) {
       Galois::OpenCL::CL_Kernel init_all, init_nout;
-//      aux_array = new Galois::OpenCL::Array<float>(dGraph.num_nodes());
       meta_array = new Galois::OpenCL::Array<float>(16);
       kernel.init("pagerank_kernel.cl", "pagerank_term");
       wb_kernel.init("pagerank_kernel.cl", "writeback");
@@ -155,10 +153,10 @@ struct dPageRank {
       wb_kernel.set_work_size(num_items);
       kernel.set_work_size(num_items);
 
-      init_nout.set_arg_list(&dGraph/*, aux_array*/);
-      init_all.set_arg_list(&dGraph/*, aux_array*/);
-      kernel.set_arg_list(&dGraph/*, aux_array*/, meta_array);
-      wb_kernel.set_arg_list(&dGraph/*, aux_array*/);
+      init_nout.set_arg_list(&dGraph);
+      init_all.set_arg_list(&dGraph);
+      kernel.set_arg_list(&dGraph, meta_array);
+      wb_kernel.set_arg_list(&dGraph);
       int num_nodes = dGraph.num_nodes();
 
       init_nout.set_arg(1, sizeof(cl_int), &num_items);
@@ -216,30 +214,6 @@ struct PageRank {
    }
 };
 
-//struct PageRank {
-//   Graph* g;
-//
-//   void static go(Graph& _g, unsigned num) {
-//      max_delta.reset();
-//      Galois::do_all(_g.begin(), _g.begin() + num, PageRank { &_g }, Galois::loopname("Page Rank"));
-//      max_delta.reduce();
-//   }
-//
-//   void operator()(GNode src) const {
-//      double sum = 0;
-//      LNode& sdata = g->getData(src);
-//      for (auto jj = g->edge_begin(src), ej = g->edge_end(src); jj != ej; ++jj) {
-//         GNode dst = g->getEdgeDst(jj);
-//         LNode& ddata = g->getData(dst);
-//         sum += ddata.value / ddata.nout;
-//      }
-//      float value = (1.0 - alpha) * sum + alpha;
-//      float diff = std::fabs(value - sdata.value);
-//      max_delta.update( diff);
-////      sdata.value = value;
-//      buffered_updates[src] = value;
-//   }
-//};
 /*********************************************************************************
  *
  **********************************************************************************/
