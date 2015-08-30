@@ -26,11 +26,25 @@
 #define alpha (1.0 - 0.85)
 
 typedef struct dPageRank {
-   float value;
+   int bsp_version;
+   float value[2]; /*ID=0*/
    unsigned int nout;
+
 } PRResidual;
+#define BSP_FIELD_PR_VALUE 0
+
 typedef void EdgeData;
 typedef PRResidual NodeData;
+
+void swap_version(__global NodeData * nd, int field_id){
+      nd->bsp_version ^= 1<<field_id;
+   }
+   int current_version(__global NodeData * nd, int field_id){
+      return nd->bsp_version& (1<<field_id);
+   }
+   int next_version(__global NodeData * nd, int field_id){
+      return !(nd->bsp_version&(1<<field_id));
+   }
 //#include "graph_header.h"
 //##########################################
 //Graph header, created ::Tue Jun  2 16:02:26 2015
@@ -85,7 +99,7 @@ void initialize(__local GraphType * graph, __global uint *mem_pool){
 }
 
 //##########################################
-__kernel void pagerank(__global int * graph_ptr,__global float* aux,  int num_items) {
+__kernel void pagerank(__global uint * graph_ptr,/*__global float* aux,  */int num_items) {
    int my_id = get_global_id(0);
    __local GraphType graph;
    initialize(&graph, graph_ptr);
@@ -95,42 +109,46 @@ __kernel void pagerank(__global int * graph_ptr,__global float* aux,  int num_it
       for(int i= out_neighbors_begin(&graph, my_id); i<out_neighbors_end(&graph, my_id); ++i) {
          int dst_id = out_neighbors(&graph, my_id, i);
          __global NodeData * ddata = node_data(&graph, dst_id);
-         sum+= ddata->value / ddata->nout;
+         sum+= ddata->value[current_version(ddata, BSP_FIELD_PR_VALUE)] / ddata->nout;
       }//end for
       float value= (1.0 - alpha) * sum + alpha;
-      float diff = fabs(value - sdata->value);
-      aux[my_id] = value;
+      float diff = fabs(value - sdata->value[next_version(sdata, BSP_FIELD_PR_VALUE)]);
+      sdata->value[next_version(sdata, BSP_FIELD_PR_VALUE)]=value;
+//      aux[my_id] = value;
    }//end if
 }//end kernel
 
-__kernel void writeback(__global int * graph_ptr,__global float * aux,  int num_items) {
+__kernel void writeback(__global uint * graph_ptr,/*__global float * aux,*/  int num_items) {
    int my_id = get_global_id(0);
    __local GraphType graph;
    initialize(&graph, graph_ptr);
    if(my_id < num_items) {
       __global NodeData * sdata = node_data(&graph, my_id);
-      sdata->value = aux[my_id];
+//      sdata->value = aux[my_id];
+      swap_version(sdata, BSP_FIELD_PR_VALUE);
    }//end if
 }//end kernel
 
-__kernel void initialize_all(__global int * graph_ptr, __global float* aux_array) {
+__kernel void initialize_all(__global uint * graph_ptr /*,__global float* aux_array*/) {
    int my_id = get_global_id(0);
    __local GraphType graph;
    initialize(&graph, graph_ptr);
    if(my_id < graph._num_nodes){
-      node_data(&graph, my_id)->value=1.0 - alpha;
-      aux_array[my_id] = 1.0 - alpha;
+      __global NodeData * ndata = node_data(&graph, my_id);
+      ndata->value[current_version(ndata, BSP_FIELD_PR_VALUE)]=1.0 - alpha;
+//      aux_array[my_id] = 1.0 - alpha;
       node_data(&graph, my_id)->nout=0;
    }//end if
 }//end kernel
 
-__kernel void initialize_nout(__global int * graph_ptr, __global float* aux_array, int num_items) {
+__kernel void initialize_nout(__global uint * graph_ptr, /*__global float* aux_array,*/ int num_items) {
    int my_id = get_global_id(0);
    __local GraphType graph;
    initialize(&graph, graph_ptr);
    if(my_id < graph._num_nodes){
-      node_data(&graph, my_id)->value=1.0 - alpha;
-      aux_array[my_id] = 1.0 - alpha;
+      __global NodeData * ndata = node_data(&graph, my_id);
+      ndata->value[current_version(ndata, BSP_FIELD_PR_VALUE)]=1.0 - alpha;
+//      aux_array[my_id] = 1.0 - alpha;
       if(my_id < num_items){
          for(int i= out_neighbors_begin(&graph, my_id); i<out_neighbors_end(&graph, my_id); ++i) {
             int dst_id = out_neighbors(&graph, my_id, i);
@@ -142,7 +160,8 @@ __kernel void initialize_nout(__global int * graph_ptr, __global float* aux_arra
    }//end if
 }//end kernel
 
-__kernel void pagerank_term(__global int * graph_ptr,__global float* aux,  __global float * meta, int num_items) {
+
+__kernel void pagerank_term(__global int * graph_ptr,/*__global float* aux,*/  __global float * meta, int num_items) {
    int my_id = get_global_id(0);
    __local GraphType graph;
    initialize(&graph, graph_ptr);
@@ -152,11 +171,12 @@ __kernel void pagerank_term(__global int * graph_ptr,__global float* aux,  __glo
       for(int i= out_neighbors_begin(&graph, my_id); i<out_neighbors_end(&graph, my_id); ++i) {
          int dst_id = out_neighbors(&graph, my_id, i);
          __global NodeData * ddata = node_data(&graph, dst_id);
-         sum+= ddata->value / ddata->nout;
+         sum+= ddata->value[current_version(ddata, BSP_FIELD_PR_VALUE)] / ddata->nout;
       }//end for
       float value= (1.0 - alpha) * sum + alpha;
-      float diff = fabs(value - sdata->value);
+      float diff = fabs(value - sdata->value[current_version(sdata, BSP_FIELD_PR_VALUE)]);
       atomic_max_float_global(&meta[0],diff);
-      aux[my_id] = value;
+      sdata->value[next_version(sdata, BSP_FIELD_PR_VALUE)]=value;
+//      aux[my_id] = value;
    }//end if
 }//end kernel

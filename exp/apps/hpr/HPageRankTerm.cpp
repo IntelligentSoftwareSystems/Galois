@@ -75,16 +75,29 @@ static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'p
 static cll::opt<int> gpudevice("gpu", cll::desc("Select GPU to run on, default is to choose automatically"), cll::init(-1));
 static cll::opt<float> cldevice("cldevice", cll::desc("Select OpenCL device to run on , default is 0.0 (OpenCL backend)"), cll::init(0.0));
 static cll::opt<std::string> personality_set("pset", cll::desc("String specifying personality for each host. 'c'=CPU,'g'=GPU/CUDA and 'o'=GPU/OpenCL"), cll::init(""));
+//////////////////////////////////////////////////////////////////////////////////////
 
+enum BSP_FIELD_NAMES {PR_VAL_FIELD=0};
 struct LNode {
-   float value;
+   int bsp_version;
+   float value[2]; /*ID=0*/
    unsigned int nout;
+   void swap_version(int field_id){
+      bsp_version ^= 1<<field_id;
+   }
+   int current_version(int field_id){
+      return bsp_version& (1<<field_id);
+   }
+   int next_version(int field_id){
+      return !(bsp_version&(1<<field_id));
+   }
 };
+//////////////////////////////////////////////////////////////////////////////////////
 
 typedef Galois::Graph::LC_CSR_Graph<LNode, void> Graph;
 typedef pGraph<Graph> PGraph;
 typedef typename Graph::GraphNode GNode;
-std::map<GNode, float> buffered_updates;
+//std::map<GNode, float> buffered_updates;
 Galois::GReduceMax<float> max_delta;
 
 //std::atomic<float> max_delta(0.0);
@@ -95,19 +108,20 @@ struct CUDA_Context *cuda_ctx;
  *
  **********************************************************************************/
 struct InitializeGraph {
-   Graph* g;
-   void static go(Graph& _g, unsigned num) {
-      Galois::do_all(_g.begin(), _g.begin() + num, InitializeGraph { &_g }, Galois::loopname("init"));
+   pGraph<Graph>* g;
+   void static go(pGraph<Graph>& _g) {
+      Galois::do_all(_g.g.begin(), _g.g.begin() + _g.numOwned, InitializeGraph { &_g }, Galois::loopname("init"));
    }
    void operator()(GNode src) const {
-      LNode& sdata = g->getData(src);
-      sdata.value = 1.0 - alpha;
-      buffered_updates[src] = 0;
-      for (auto nbr = g->edge_begin(src); nbr != g->edge_end(src); ++nbr) {
-         __sync_fetch_and_add(&g->getData(g->getEdgeDst(*nbr)).nout, 1);
+      LNode& sdata = g->g.getData(src);
+      sdata.value[0] = 1.0 - alpha; // sdata.value[0]
+      sdata.value[1] = 0;//sdata.value[1]
+      for (auto nbr = g->g.edge_begin(src); nbr != g->g.edge_end(src); ++nbr) {
+         __sync_fetch_and_add(&g->g.getData(g->g.getEdgeDst(*nbr)).nout, 1);
       }
    }
 };
+
 /************************************************************************************
  * OpenCL PageRank operator implementation.
  * Uses two kernels for the updates and one kernel for initialization.
@@ -120,14 +134,15 @@ DeviceGraph dGraph;
 struct dPageRank {
    Galois::OpenCL::CL_Kernel kernel;
    Galois::OpenCL::CL_Kernel wb_kernel;
-   Galois::OpenCL::Array<float> *aux_array;
+//   Galois::OpenCL::Array<float> *aux_array;
    Galois::OpenCL::Array<float> *meta_array;
    dPageRank() :
-         aux_array(nullptr), meta_array(nullptr) {
+//         aux_array(nullptr),
+         meta_array(nullptr) {
    }
    void init(int num_items, int num_inits) {
       Galois::OpenCL::CL_Kernel init_all, init_nout;
-      aux_array = new Galois::OpenCL::Array<float>(dGraph.num_nodes());
+//      aux_array = new Galois::OpenCL::Array<float>(dGraph.num_nodes());
       meta_array = new Galois::OpenCL::Array<float>(16);
       kernel.init("pagerank_kernel.cl", "pagerank_term");
       wb_kernel.init("pagerank_kernel.cl", "writeback");
@@ -140,15 +155,15 @@ struct dPageRank {
       wb_kernel.set_work_size(num_items);
       kernel.set_work_size(num_items);
 
-      init_nout.set_arg_list(&dGraph, aux_array);
-      init_all.set_arg_list(&dGraph, aux_array);
-      kernel.set_arg_list(&dGraph, aux_array, meta_array);
-      wb_kernel.set_arg_list(&dGraph, aux_array);
+      init_nout.set_arg_list(&dGraph/*, aux_array*/);
+      init_all.set_arg_list(&dGraph/*, aux_array*/);
+      kernel.set_arg_list(&dGraph/*, aux_array*/, meta_array);
+      wb_kernel.set_arg_list(&dGraph/*, aux_array*/);
       int num_nodes = dGraph.num_nodes();
 
-      init_nout.set_arg(2, sizeof(cl_int), &num_items);
-      wb_kernel.set_arg(2, sizeof(cl_int), &num_items);
-      kernel.set_arg(3, sizeof(cl_int), &num_items);
+      init_nout.set_arg(1, sizeof(cl_int), &num_items);
+      wb_kernel.set_arg(1, sizeof(cl_int), &num_items);
+      kernel.set_arg(2, sizeof(cl_int), &num_items);
 
       init_all();
       init_nout();
@@ -170,40 +185,61 @@ struct dPageRank {
  * CPU PageRank operator implementation.
  **********************************************************************************/
 struct WriteBack {
-   Graph * g;
-   void static go(Graph& _g, unsigned num) {
-      Galois::do_all(_g.begin(), _g.begin() + num, WriteBack { &_g }, Galois::loopname("Writeback"));
+   pGraph<Graph> * g;
+   void static go(pGraph<Graph>& _g) {
+      Galois::do_all(_g.g.begin(), _g.g.begin() + _g.numOwned, WriteBack { &_g }, Galois::loopname("Writeback"));
    }
    void operator()(GNode src) const {
-      LNode& sdata = g->getData(src);
-      sdata.value = buffered_updates[src];
-      buffered_updates[src] = 0;
+      LNode& sdata = g->g.getData(src);
+      sdata.swap_version(BSP_FIELD_NAMES::PR_VAL_FIELD);
    }
 };
 struct PageRank {
-   Graph* g;
-
-   void static go(Graph& _g, unsigned num) {
+   pGraph<Graph>* g;
+   void static go(pGraph<Graph>& _g) {
       max_delta.reset();
-      Galois::do_all(_g.begin(), _g.begin() + num, PageRank { &_g }, Galois::loopname("Page Rank"));
+      Galois::do_all(_g.g.begin(), _g.g.begin() + _g.numOwned, PageRank { &_g }, Galois::loopname("Page Rank"));
       max_delta.reduce();
    }
-
    void operator()(GNode src) const {
       double sum = 0;
-      LNode& sdata = g->getData(src);
-      for (auto jj = g->edge_begin(src), ej = g->edge_end(src); jj != ej; ++jj) {
-         GNode dst = g->getEdgeDst(jj);
-         LNode& ddata = g->getData(dst);
-         sum += ddata.value / ddata.nout;
+      LNode& sdata = g->g.getData(src);
+      for (auto jj = g->g.edge_begin(src), ej = g->g.edge_end(src); jj != ej; ++jj) {
+         GNode dst = g->g.getEdgeDst(jj);
+         LNode& ddata = g->g.getData(dst);
+         sum += ddata.value[ddata.current_version(BSP_FIELD_NAMES::PR_VAL_FIELD)] / ddata.nout;
       }
       float value = (1.0 - alpha) * sum + alpha;
-      float diff = std::fabs(value - sdata.value);
+      float diff = std::fabs(value - sdata.value[sdata.current_version(BSP_FIELD_NAMES::PR_VAL_FIELD)]);
       max_delta.update( diff);
-//      sdata.value = value;
-      buffered_updates[src] = value;
+      sdata.value[sdata.next_version(BSP_FIELD_NAMES::PR_VAL_FIELD)] = value;
    }
 };
+
+//struct PageRank {
+//   Graph* g;
+//
+//   void static go(Graph& _g, unsigned num) {
+//      max_delta.reset();
+//      Galois::do_all(_g.begin(), _g.begin() + num, PageRank { &_g }, Galois::loopname("Page Rank"));
+//      max_delta.reduce();
+//   }
+//
+//   void operator()(GNode src) const {
+//      double sum = 0;
+//      LNode& sdata = g->getData(src);
+//      for (auto jj = g->edge_begin(src), ej = g->edge_end(src); jj != ej; ++jj) {
+//         GNode dst = g->getEdgeDst(jj);
+//         LNode& ddata = g->getData(dst);
+//         sum += ddata.value / ddata.nout;
+//      }
+//      float value = (1.0 - alpha) * sum + alpha;
+//      float diff = std::fabs(value - sdata.value);
+//      max_delta.update( diff);
+////      sdata.value = value;
+//      buffered_updates[src] = value;
+//   }
+//};
 /*********************************************************************************
  *
  **********************************************************************************/
@@ -234,16 +270,16 @@ void recvNodeStatic(unsigned GID, uint32_t hostID) {
  *
  **********************************************************************************/
 
-void setNodeValue(PGraph* p, unsigned GID, float v) {
+void setNodeValue(pGraph<Graph>* p, unsigned GID, float v) {
    switch (personality) {
    case CPU:
-      p->g.getData(p->G2L(GID)).value = v;
+      p->g.getData(p->G2L(GID)).value[p->g.getData(p->G2L(GID)).current_version(BSP_FIELD_NAMES::PR_VAL_FIELD)] = v;
       break;
    case GPU_CUDA:
       setNodeValue_CUDA(cuda_ctx, p->G2L(GID), v);
       break;
    case GPU_OPENCL:
-      dGraph.getData()[p->G2L(GID)].value = v;
+      dGraph.getData(p->G2L(GID)).value[p->g.getData(p->G2L(GID)).current_version(BSP_FIELD_NAMES::PR_VAL_FIELD)] = v;
       break;
    default:
       break;
@@ -347,18 +383,18 @@ void sendGhostCellAttrs(Galois::Runtime::NetworkInterface& net, PGraph& g) {
  * Note that we use the magicPointer array to obtain the reference of the graph object
  * where the node data is to be set.
  **********************************************************************************/
-void sendGhostCells(Galois::Runtime::NetworkInterface& net, PGraph& g) {
+void sendGhostCells(Galois::Runtime::NetworkInterface& net, pGraph<Graph>& g) {
    for (unsigned x = 0; x < remoteReplicas.size(); ++x) {
       for (auto n : remoteReplicas[x]) {
          switch (personality) {
          case CPU:
-            net.sendAlt(x, setNodeValue, magicPointer[x], n, g.g.getData(n - g.g_offset).value);
+            net.sendAlt(x, setNodeValue, magicPointer[x], n, g.g.getData(n - g.g_offset).value[g.g.getData(n - g.g_offset).current_version(BSP_FIELD_NAMES::PR_VAL_FIELD)]);
             break;
          case GPU_CUDA:
             net.sendAlt(x, setNodeValue, magicPointer[x], n, getNodeValue_CUDA(cuda_ctx, n - g.g_offset));
             break;
          case GPU_OPENCL:
-            net.sendAlt(x, setNodeValue, magicPointer[x], n, dGraph.getData()[(n - g.g_offset)].value);
+            net.sendAlt(x, setNodeValue, magicPointer[x], n, dGraph.getData((n - g.g_offset)).value[dGraph.getData(n - g.g_offset).current_version(BSP_FIELD_NAMES::PR_VAL_FIELD)]);
             break;
          default:
             assert(false);
@@ -368,6 +404,7 @@ void sendGhostCells(Galois::Runtime::NetworkInterface& net, PGraph& g) {
    }
 
 }
+
 void recvMaxDelta(float other_max_delta){
    max_delta.update(other_max_delta);
    max_delta.reduce();
@@ -481,7 +518,7 @@ void inner_main() {
 
    //local initialization
    if (personality == CPU) {
-      InitializeGraph::go(g.g, g.numOwned);
+      InitializeGraph::go(g/*, g.numOwned*/);
    } else if (personality == GPU_CUDA) {
       initialize_graph_cuda(cuda_ctx);
    } else if (personality == GPU_OPENCL) {
@@ -522,8 +559,8 @@ void inner_main() {
       //Do pagerank
       switch (personality) {
       case CPU:
-         PageRank::go(g.g, g.numOwned);
-         WriteBack::go(g.g, g.numOwned);
+         PageRank::go(g/*, g.numOwned*/);
+         WriteBack::go(g/*, g.numOwned*/);
          break;
       case GPU_OPENCL:
          dOp(dGraph, g.numOwned);

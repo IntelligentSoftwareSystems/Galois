@@ -97,8 +97,8 @@ struct InitializeGraph {
    }
    void operator()(GNode src) const {
       LNode& sdata = g->g.getData(src);
-      sdata.value = 1.0 - alpha;
-      buffered_updates[src] = 0;
+      sdata.value = 1.0 - alpha; // sdata.value[0]
+      buffered_updates[src] = 0;//sdata.value[1]
       for (auto nbr = g->g.edge_begin(src); nbr != g->g.edge_end(src); ++nbr) {
          __sync_fetch_and_add(&g->g.getData(g->g.getEdgeDst(*nbr)).nout, 1);
       }
