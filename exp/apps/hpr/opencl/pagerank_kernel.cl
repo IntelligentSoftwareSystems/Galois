@@ -40,10 +40,10 @@ void swap_version(__global NodeData * nd, int field_id){
       nd->bsp_version ^= 1<<field_id;
    }
    int current_version(__global NodeData * nd, int field_id){
-      return nd->bsp_version& (1<<field_id);
+      return (nd->bsp_version& (1<<field_id))!=0;
    }
    int next_version(__global NodeData * nd, int field_id){
-      return !(nd->bsp_version&(1<<field_id));
+      return (~nd->bsp_version& (1<<field_id))!=0;
    }
 //#include "graph_header.h"
 //##########################################

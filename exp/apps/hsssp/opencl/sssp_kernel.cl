@@ -1,15 +1,29 @@
 /*
- * pagerank_kernel.cl
- * OpenCL kernels for PageRank on heterogeneous Galois.
+ * SSSP_kernel.cl
+ * OpenCL kernels for SSSP on heterogeneous Galois.
  *
  *  Created on: Jun 30, 2015
  *      Author: rashid
  */
 
-#define alpha (1.0 - 0.85)
+typedef struct _NodeData {
+   int bsp_version;
+   int dist[2];/*ID=0*/
+
+}NodeData;
+#define BSP_SSSP_DIST_FIELD 0
+void swap_version(__global NodeData * nd, unsigned int field_id){
+     nd->bsp_version ^= 1<<field_id;
+   }
+   unsigned current_version(__global NodeData * nd, unsigned int field_id){
+     return (nd->bsp_version& (1<<field_id))!=0;
+   }
+   unsigned next_version(__global NodeData * nd, unsigned int field_id){
+     return (~nd->bsp_version& (1<<field_id))!=0;
+   }
 
 typedef uint EdgeData;
-typedef uint NodeData;
+//typedef uint NodeData;
 //#include "graph_header.h"
 //##########################################
 //Graph header, created ::Tue Jun  2 16:02:26 2015
@@ -73,43 +87,45 @@ offset +=graph->_num_edges*graph->_edge_data_size;
 }
 
 //##########################################
-__kernel void sssp(__global int * graph_ptr,__global uint* aux, __global int * meta,  int num_items) {
+__kernel void sssp(__global uint * graph_ptr, __global int * meta,  int num_items) {
    int my_id = get_global_id(0);
    __local GraphType graph;
    initialize(&graph, graph_ptr);
    if(my_id < num_items) {
       __global NodeData * sdata = node_data(&graph, my_id);
-      NodeData min_dist=  *sdata;
+      int min_dist=  sdata->dist[current_version(sdata, BSP_SSSP_DIST_FIELD)];
       for(int i= out_neighbors_begin(&graph, my_id); i<out_neighbors_end(&graph, my_id); ++i) {
          int dst_id = out_neighbors(&graph, my_id, i);
-         NodeData ddata = *node_data(&graph, dst_id);
+         __global NodeData * ddata = node_data(&graph, dst_id);
          EdgeData ewt = *out_edge_data(&graph, my_id, i);
-         if(ewt + ddata < min_dist){
-            min_dist = ewt+ddata;
+         int ddist = ddata->dist[current_version(ddata, BSP_SSSP_DIST_FIELD)];
+         if(ewt + ddist < min_dist){
+            min_dist = ewt+ddist;
             meta[0]=1;
          }
-         //min_dist = min(min_dist, ewt+ddata);
-
       }//end for
-      aux[my_id] = min_dist;
+      sdata->dist[next_version(sdata, BSP_SSSP_DIST_FIELD)]=min_dist;
    }//end if
 }//end kernel
 
-__kernel void writeback(__global int * graph_ptr,__global uint* aux,  int num_items) {
+__kernel void writeback(__global uint * graph_ptr,  int num_items) {
    int my_id = get_global_id(0);
    __local GraphType graph;
    initialize(&graph, graph_ptr);
    if(my_id < num_items) {
       __global NodeData * sdata = node_data(&graph, my_id);
-      *sdata = aux[my_id];
+      swap_version(sdata, BSP_SSSP_DIST_FIELD);
+//      sdata->dist= aux[my_id];
    }//end if
 }//end kernel
 
-__kernel void initialize_nodes(__global int * graph_ptr,__global uint* aux,  int num_items) {
+__kernel void initialize_nodes(__global uint * graph_ptr, int num_items) {
    int my_id = get_global_id(0);
    __local GraphType graph;
    initialize(&graph, graph_ptr);
    if(my_id < graph._num_nodes){ // num_items) {
-      *node_data(&graph, my_id)=INT_MAX/2;
+      __global NodeData * nd = node_data(&graph, my_id);
+      nd->dist[current_version(nd, BSP_SSSP_DIST_FIELD)]=INT_MAX/2;
+      nd->dist[next_version(nd, BSP_SSSP_DIST_FIELD)]=INT_MAX/2;
    }//end if
 }//end kernel

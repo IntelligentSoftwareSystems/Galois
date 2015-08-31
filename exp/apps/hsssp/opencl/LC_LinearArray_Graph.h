@@ -197,7 +197,7 @@ struct LC_LinearArray_Graph {
             int node_counter = 0;
             for (auto n = ggraph.begin(); n != ggraph.begin()+gg_num_nodes; n++, node_counter++) {
                int src_node = *n;
-               getData()[src_node] = ggraph.getData(*n);
+               memcpy(&getData()[src_node], &ggraph.getData(*n), sizeof(NodeDataTy));
                outgoing_index()[src_node] = edge_counter;
                for (auto nbr = ggraph.edge_begin(*n); nbr != ggraph.edge_end(*n); ++nbr) {
    //               GNode dst = ggraph.getEdgeDst(*nbr);

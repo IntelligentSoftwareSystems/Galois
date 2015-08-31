@@ -66,5 +66,6 @@ struct OPENCL_Context {
    NodeDataType & getData(unsigned ID){
       return m_graph.getData(ID);
    }
+
 };
 #endif /* GDIST_EXP_APPS_HPR_OPENCL_OPENCLPRBACKEND_H_ */

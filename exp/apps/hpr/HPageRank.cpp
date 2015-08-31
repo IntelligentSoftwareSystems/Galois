@@ -76,8 +76,22 @@ static cll::opt<std::string> personality_set("pset", cll::desc("String specifyin
 ///////////////////////////////////////////
 enum BSP_FIELD_NAMES {PR_VAL_FIELD=0};
 struct LNode {
+  unsigned int bsp_version;
+  float value[2]; /*ID=0*/
+  unsigned int nout;
+  void swap_version(unsigned int field_id){
+    bsp_version ^= 1<<field_id;
+  }
+  unsigned current_version(unsigned int field_id){
+    return (bsp_version& (1<<field_id))!=0;
+  }
+  unsigned next_version(unsigned int field_id){
+    return (~bsp_version& (1<<field_id))!=0;
+  }
+};
+/*struct LNode {
    int bsp_version;
-   float value[2]; /*ID=0*/
+   float value[2]; ID=0
    unsigned int nout;
    void swap_version(int field_id){
       bsp_version ^= 1<<field_id;
@@ -88,7 +102,7 @@ struct LNode {
    int next_version(int field_id){
       return !(bsp_version&(1<<field_id));
    }
-};
+};*/
 //////////////////////////////////////////////////////////////////////////////////////
 typedef Galois::Graph::LC_CSR_Graph<LNode, void> Graph;
 typedef typename Graph::GraphNode GNode;
