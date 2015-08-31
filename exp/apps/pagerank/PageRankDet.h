@@ -184,7 +184,7 @@ protected:
 
   void verify (void) {
     if (skipVerify) {
-      std::printf ("Verification skipped\n");
+      std::printf ("WARNING, Verification skipped\n");
       return;
     }
 

@@ -11,43 +11,19 @@
 
 #include <set>
 
-#include <boost/archive/binary_oarchive.hpp>
-#include <boost/archive/binary_iarchive.hpp>
-#include <boost/serialization/vector.hpp>
-
 class Mesh;
 
 class Node {
     private:
-        friend class boost::serialization::access;
-
-        template<class Archive>
-        void serialize(Archive & ar, const unsigned int version) {
-          ar & node;
-          ar & left;
-          ar & right;
-          ar & parent;
-          ar & mergedElements;
-          ar & production;
-          ar & supernodes;
-          ar & supernodesToElim;
-          ar & n_left;
-          ar & n_right;
-          ar & l;
-          ar & r;
-          ar & leftPlaces;
-          ar & rightPlaces;
-        }
-
-        int node = -1;
+       int node = -1;
         Node *left = NULL;
         Node *right = NULL;
         Node *parent = NULL;
-	std::vector<uint64_t> *meshSupernodes;
-	std::vector<Element *> mergedElements;
+        std::vector<uint64_t> *meshSupernodes;
+        std::vector<Element *> mergedElements;
         std::string production;
         std::vector<uint64_t> supernodes;
-	std::vector<uint64_t> offsets;
+        std::vector<uint64_t> offsets;
         uint64_t supernodesToElim;
 
     public:
@@ -85,7 +61,7 @@ class Node {
         void addSupernode(uint64_t supernode);
         std::vector<uint64_t> &getSupernodes();
         void clearSupernodes();
-	void computeOffsets();
+        void computeOffsets();
 
         int getId() const;
 

@@ -24,3 +24,6 @@ include_directories(./common)
 include_directories(./logic)
 include_directories(./ordered)
 include_directories(./unordered)
+
+add_test_scale(small DESunordered "${BASEINPUTS}/des/multTree6bit.net")
+add_test_scale(web DESunordered "${BASEINPUT}/des/koggeStone64bit.net")

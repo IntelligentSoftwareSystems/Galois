@@ -44,7 +44,6 @@
 #include <boost/assert.hpp>
 #include <boost/static_assert.hpp>
 #include <boost/operators.hpp>
-#include <boost/concept_check.hpp>
 
 #include <limits>
 #include <type_traits>
@@ -143,12 +142,12 @@ class fixed_point
 	// the base type is not an integer type. Note: char does not qualify as an
 	// integer because of its uncertainty in definition. Use signed char or
 	// unsigned char to be explicit.
-	BOOST_CONCEPT_ASSERT((boost::Integer<B>));
+  static_assert (std::is_integral<B>::value, "argument type B must be integer");
 
 	// Make sure that the bit counts are ok. If this line triggers an error, the
 	// sum of the bit counts for the fractional and integer parts do not match 
 	// the bit count provided by the base type. The sign bit does not count.
-	BOOST_STATIC_ASSERT(I + F == NumDigits<B>::val);
+	static_assert (I + F == NumDigits<B>::val, "number of bits for Integer and Fraction part must add up to storage size");
 
 	/// Grant the fixed_point template access to private members. Types with
 	/// different template parameters are different types and without this
@@ -242,7 +241,7 @@ public:
 		T value)
 		: value_((B)value << F)
 	{ 
-		BOOST_CONCEPT_ASSERT((boost::Integer<T>));
+    static_assert (std::is_integral<T>::value, "argument type must be integer");
 	}
 
 	/// Converting constructor.

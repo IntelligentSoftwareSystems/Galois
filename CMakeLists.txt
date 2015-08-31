@@ -257,6 +257,17 @@ function(add_internal_library name)
   add_library(${name} OBJECT ${ARGN})
 endfunction()
 
+include(ProcessorCount)
+function(add_test_scale type app)
+  processorCount(N)
+  if (N EQUAL 0)
+    set(N 1)
+  endif()
+  foreach(thr RANGE 1 ${N})
+    add_test(test-${type}-${thr}-${app} ${app} ${ARGN} -t ${thr})
+  endforeach(thr)
+endfunction(add_test_scale)
+
 function(compileApp name)
   if(ARGN)
     set(Sources ${ARGN})
@@ -368,10 +379,16 @@ if(NOT SKIP_COMPILE_APPS)
 endif()
 
 ###### Documentation ######
-set(DOXYFILE_SOURCE_DIR "src\" \"include\" \"docs")
+set(DOXYFILE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src\" \"${CMAKE_CURRENT_SOURCE_DIR}/include\" \"${CMAKE_CURRENT_SOURCE_DIR}/docs")
 find_package(Doxygen 1.8.0)
 if(NOT DOXYGEN_FOUND)
   message(STATUS "Could NOT find required doxygen version: doxygen missing or < 1.8.0") 
+else()
+   configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in
+     ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile.in @ONLY)
+  add_custom_target(doc ${DOXYGEN_EXECUTABLE}
+     ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile.in WORKING_DIRECTORY
+     ${CMAKE_CURRENT_BINARY_DIR})
 endif()
 
 ###### Distribution ######

@@ -160,7 +160,7 @@ int main(int argc, char ** argv)
     gettimeofday(&t1, NULL);
     if (scheduler == GALOIS_DAG) {
         galoisAllocation(m->getRootNode(), solverMode);
-    }     else if (scheduler == CILK) {
+    } else if (scheduler == CILK) {
 #ifdef HAVE_CILK
         Galois::CilkInit();
         cilk_alloc_tree(m->getRootNode(), solverMode);

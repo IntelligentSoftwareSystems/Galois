@@ -21,7 +21,7 @@ module load vtune
 #    module load cmake
 #fi
 
-module load atc
+module load gcc/4.9.0
 module load cmake
 module load tbb
 module load boost

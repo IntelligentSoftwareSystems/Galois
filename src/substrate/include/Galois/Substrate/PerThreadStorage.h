@@ -39,7 +39,7 @@
 #include "Galois/Substrate/PaddedLock.h"
 
 #include <cstddef>
-#include <boost/utility.hpp>
+//#include <boost/utility.hpp>
 
 #include <cassert>
 #include <vector>

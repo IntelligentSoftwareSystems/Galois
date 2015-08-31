@@ -541,7 +541,7 @@ protected:
     FP r = double (rand () % 1024) / 1024.0;
     FP ret = lim_min + r*(lim_max - lim_min);
     
-    return FPutils::truncate (ret);
+    return ret;
   }
 
 

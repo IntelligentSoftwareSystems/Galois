@@ -41,6 +41,7 @@
 #include <atomic>
 #include <vector>
 #include <cassert>
+#include <cstdlib>
 
 namespace Galois {
 namespace Substrate {

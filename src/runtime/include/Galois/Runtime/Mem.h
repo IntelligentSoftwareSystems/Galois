@@ -47,6 +47,7 @@
 #include <map>
 #include <list>
 #include <cstddef>
+#include <cstdio>
 
 #include <memory.h>
 
@@ -800,7 +801,7 @@ class Pow_2_BlockHeap: private boost::noncopyable {
       if (USE_MALLOC_AS_BACKUP) {
         return malloc (allocSize);
       } else {
-        std::fprintf (stderr, "ERROR: block bigger than huge page size requested\n");
+        fprintf (stderr, "ERROR: block bigger than huge page size requested\n");
         throw std::bad_alloc();
       }
     } else {
@@ -816,7 +817,7 @@ class Pow_2_BlockHeap: private boost::noncopyable {
       if (USE_MALLOC_AS_BACKUP) {
         free (ptr);
       } else {
-        std::fprintf (stderr, "ERROR: block bigger than huge page size requested\n");
+        fprintf (stderr, "ERROR: block bigger than huge page size requested\n");
         throw std::bad_alloc();
       }
     } else {

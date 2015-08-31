@@ -80,6 +80,7 @@ bool operator< (const cpuinfo& lhs, const cpuinfo& rhs) {
 
 //! binds current thread to OS HW context "proc"
 static bool bindToProcessor(unsigned proc) {
+#ifndef __CYGWIN__
   cpu_set_t mask;
   /* CPU_ZERO initializes all the bits in the mask to zero. */
   CPU_ZERO(&mask);
@@ -94,6 +95,10 @@ static bool bindToProcessor(unsigned proc) {
     return false;
   }
   return true;
+#else
+  gWarn("No cpu affinity on Cygwin.  Performance will be bad.");
+  return false;
+#endif
 }
 
 //! Parse /proc/cpuinfo

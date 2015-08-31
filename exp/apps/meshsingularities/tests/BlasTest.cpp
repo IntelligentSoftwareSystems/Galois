@@ -238,16 +238,19 @@ void test_ll_fact()
 
 
 
-    clapack_dpotrs (CblasColMajor,
-                    CblasUpper,
-                    m,
-                    k,
-                    matrix[0],
-                    n,
-                    matrix[m],
-                    n);
-
-    printf("after DPOTRS matrix is: \n");
+    cblas_dtrsm(CblasColMajor,
+                CblasLeft,
+                CblasUpper,
+                CblasTrans,
+                CblasNonUnit,
+                m,
+                k,
+                1.0,
+                matrix[0],
+                n,
+                matrix[m],
+                n);
+    printf("after DTRSM matrix is: \n");
     for (int i=0; i<4; ++i) {
         for (int j=0; j<4; ++j) {
             printf("%8.3lf ", matrix[j][i]);
@@ -255,21 +258,19 @@ void test_ll_fact()
         printf (" | %8.3lf\n", rhs[i]);
     }
 
-    cblas_dgemm(CblasColMajor,
-                CblasNoTrans,
-                CblasNoTrans,
-                k,
+
+    cblas_dsyrk(CblasColMajor,
+                CblasUpper,
+                CblasTrans,
                 k,
                 m,
                 -1.0,
-                matrix[0]+m, // C
-                n,
-                matrix[m], // B
+                matrix[m], // L**(-1) * B
                 n,
                 1.0,
                 matrix[m]+m, // D
                 n);
-    printf("after DGEMM matrix is: \n");
+    printf("after DSYRK matrix is: \n");
     for (int i=0; i<4; ++i) {
         for (int j=0; j<4; ++j) {
             printf("%8.3lf ", matrix[j][i]);
