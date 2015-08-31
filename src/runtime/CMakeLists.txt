@@ -9,8 +9,6 @@ set(sources
         src/NumaMem.cpp
         src/PageAlloc.cpp
         src/Deterministic.cpp
-        ../../exp/src/DoAllWrap.cpp
-        ../../exp/src/Queue.cpp
 )
 
 add_library(galois_runtime STATIC ${sources})

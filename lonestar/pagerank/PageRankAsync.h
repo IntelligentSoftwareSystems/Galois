@@ -71,8 +71,8 @@ struct AsyncSet {
           GNode dst = graph.getEdgeDst(jj);
 	  LNode& ddata = graph.getData(dst, lockflag);
 	  // if the node is not in the worklist, then push
-          if(!ddata.flag)
-            if (0 == ddata.flag.exchange(1))
+          if(!ddata.flag.load(std::memory_order_relaxed))
+            if (0 == ddata.flag.exchange(1, std::memory_order_relaxed))
               ctx.push(dst);
         }
       }
