@@ -1,4 +1,5 @@
-set (Sources dependTest.cpp Ball.cpp Table.cpp Cushion.cpp Sector.cpp FPutils.cpp GeomUtils.cpp Event.cpp)
+set (Sources dependTest.cpp Ball.cpp Table.cpp Cushion.cpp Sector.cpp FPutils.cpp GeomUtils.cpp) 
+
 app (BilliardsSerialPQ BilliardsSerialPQ.cpp ${Sources})
 app (BilliardsSerialSectored BilliardsSerialSectored.cpp ${Sources})
 app (BilliardsSerialLog BilliardsSerialLog.cpp ${Sources})
