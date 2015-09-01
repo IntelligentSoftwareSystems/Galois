@@ -96,13 +96,14 @@ public:
 
   }
 
-  ~TableSectored () {
+  ~TableSectored (void) {
     assert (sectors.size () == xSectors);
     for (size_t i = 0; i < sectors.size (); ++i) {
       Table::freeVecPtr (sectors [i]);
     }
   }
 
+  size_t getNumSectors (void) const { return sectors.size (); }
 
   void genInitialEvents (std::vector<Event>& initEvents, const FP& endtime) {
 

@@ -558,7 +558,7 @@ class IKDGunstableCustomSafety: public KDGtwoPhaseStableExecutor<T, Cmp, hidden:
   ExFunc execFunc;
 
 public:
-  KDGtwoPhaseUnstableExecutor (
+  IKDGunstableCustomSafety (
       const Cmp& cmp, 
       const SafetyPhase& safetyPhase,
       const OpFunc& opFunc,
@@ -586,7 +586,7 @@ private:
         break;
       }
 
-      safetyPhase (makeLocalRange (*Base::currWL), Base::cmp);
+      safetyPhase (makeLocalRange (*Base::currWL), typename Ctxt::PtrComparator ());
 
       Galois::do_all_choice (makeLocalRange (*Base::currWL),
           [this] (Ctxt* ctx) {
@@ -657,13 +657,13 @@ void for_each_ordered_2p_win (const R& range, const Cmp& cmp, const NhFunc& nhFu
 }
 
 template <typename R, typename Cmp, typename SafetyPhase, typename AddFunc, typename ExFunc>
-void for_each_ordered_custom_safety (const R& range, const Cmp& cmp, const SafetyPhase& safetyPhase, 
+void for_each_ordered_ikdg_custom_safety (const R& range, const Cmp& cmp, const SafetyPhase& safetyPhase, 
     const ExFunc& execFunc,  const AddFunc& addFunc, const char* loopname) {
 
   using T = typename R::value_type;
   using WindowWL = PQbasedWindowWL<T, Cmp>;
 
-  using Exec = IKDGunstableCustomSafety<Cmp, SafetyPhase, AddFunc, ExFunc, WindowWL>;
+  using Exec = IKDGunstableCustomSafety<T, Cmp, SafetyPhase, AddFunc, ExFunc, WindowWL>;
   
   Exec e (cmp, safetyPhase, addFunc, execFunc);
 

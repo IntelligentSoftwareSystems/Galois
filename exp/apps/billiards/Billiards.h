@@ -39,6 +39,7 @@
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
 #include "Galois/Galois.h"
+#include "Galois/DoAllWrap.h"
 #include "Galois/Accumulator.h"
 #include "Galois/Runtime/Sampling.h"
 #include "llvm/Support/CommandLine.h"
@@ -63,11 +64,12 @@ static cll::opt<bool> runFlat("flat", cll::desc("Run simulation without introduc
 static cll::opt<bool> veriFlat ("vflat", cll::desc ("Verify against serial flat simulation"), cll::init (false));
 
 
+typedef Galois::GAccumulator<size_t> Accumulator;
+
 template <typename Derived, bool isParallel=true>
 class Billiards {
 
 public:
-  typedef Galois::GAccumulator<size_t> Accumulator;
 
   virtual const std::string version () const = 0;
   //! @return number of events processed
