@@ -1,4 +1,4 @@
-/** Page rank application -*- C++ -*-
+/** SSSP application -*- C++ -*-
  * @file
  * @section License
  *
@@ -19,6 +19,7 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  *
  * @author Andrew Lenharth <andrew@lenharth.org>
+ * @author Rashid Kaleem <rashid.kaleem@gmail.com>
  */
 
 #include "Galois/Galois.h"
@@ -28,6 +29,7 @@
 #include "Galois/Graph/Util.h"
 #include "Lonestar/BoilerPlate.h"
 #include "PGraph.h"
+#include "opencl/LC_LinearArray_Graph.h"
 #include "cuda/hsssp_cuda.h"
 #include "cuda/cuda_mtypes.h"
 #include "opencl/CLWrapper.h"
@@ -35,6 +37,7 @@
 #include <iostream>
 #include <typeinfo>
 #include <algorithm>
+#include "opencl/CLSSSP.h"
 
 #define _HETERO_DEBUG_ 0
 
@@ -67,6 +70,7 @@ static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum 
 static cll::opt<unsigned int> src_node("srcNodeId", cll::desc("ID of the source node"), cll::init(0));
 static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"), cll::init(false));
 static cll::opt<int> gpudevice("gpu", cll::desc("Select GPU to run on, default is to choose automatically"), cll::init(-1));
+static cll::opt<float> cldevice("cldevice", cll::desc("Select OpenCL device to run on , default is 0.0 (OpenCL backend)"), cll::init(0.0));
 static cll::opt<std::string> personality_set("pset", cll::desc("String specifying personality for each host. 'c'=CPU,'g'=GPU/CUDA and 'o'=GPU/OpenCL"), cll::init(""));
 ////////////////////////////////////////////
 enum BSP_FIELD_NAMES {
@@ -90,11 +94,12 @@ typedef NodeData NodeDataType;
 typedef Galois::Graph::LC_CSR_Graph<NodeDataType, unsigned int> Graph;
 typedef pGraph<Graph> PGraph;
 typedef typename Graph::GraphNode GNode;
-//std::map<GNode, NodeDataType> buffered_updates;
 bool hasChanged = false;
 
 //////////////////////////////////////////////////////////////////////////////////////
 struct CUDA_Context *cuda_ctx;
+typedef Galois::OpenCL::LC_LinearArray_Graph<Galois::OpenCL::Array, NodeData, unsigned int> DeviceGraph;
+struct OPENCL_Context<DeviceGraph> dOp;
 /*********************************************************************************
  *
  **********************************************************************************/
@@ -107,66 +112,6 @@ struct InitializeGraph {
       NodeDataType & sdata = g->getData(src);
       //TODO RK : Fix this to not initialize both fields.
       sdata.dist[0] = sdata.dist[1] = std::numeric_limits<int>::max() / 2;
-   }
-};
-/************************************************************************************
- * OpenCL PageRank operator implementation.
- * Uses two kernels for the updates and one kernel for initialization.
- * In order to support BSP semantics, an aux_array is created which will
- * be used to buffer the writes in 'kernel'. These updates will be
- * written to the node-data in the 'writeback' kernel.
- *************************************************************************************/
-typedef Galois::OpenCL::LC_LinearArray_Graph<Galois::OpenCL::Array, NodeData, unsigned int> DeviceGraph;
-DeviceGraph dGraph;
-/************************************************************
- *
- *************************************************************/
-struct dSSSP {
-   Galois::OpenCL::CL_Kernel kernel;
-   Galois::OpenCL::CL_Kernel wb_kernel;
-   Galois::OpenCL::Array<int> *meta_array;
-   dSSSP() :
-         meta_array(nullptr) {
-   }
-   void init(int num_items, int num_inits) {
-      Galois::OpenCL::CL_Kernel init_nodes;
-      init_nodes.init("sssp_kernel.cl", "initialize_nodes");
-      meta_array = new Galois::OpenCL::Array<int>(16);
-      kernel.init("sssp_kernel.cl", "sssp");
-      wb_kernel.init("sssp_kernel.cl", "writeback");
-      dGraph.copy_to_device();
-
-      wb_kernel.set_work_size(num_items);
-      kernel.set_work_size(num_items);
-      init_nodes.set_work_size(num_items);
-
-      kernel.set_arg_list(&dGraph, meta_array);
-      wb_kernel.set_arg_list(&dGraph);
-      init_nodes.set_arg_list(&dGraph);
-      int num_nodes = dGraph.num_nodes();
-
-      wb_kernel.set_arg(1, sizeof(cl_int), &num_items);
-      kernel.set_arg(2, sizeof(cl_int), &num_items);
-      init_nodes.set_arg(1, sizeof(cl_int), &num_items);
-      init_nodes();
-
-      dGraph.copy_to_host();
-      meta_array->host_ptr()[0] = hasChanged;
-      meta_array->copy_to_host();
-      hasChanged = meta_array->host_ptr()[0];
-   }
-   template<typename GraphType>
-   void operator()(GraphType & graph, int num_items) {
-      meta_array->host_ptr()[0] = hasChanged;
-      meta_array->copy_to_device();
-//      fprintf(stderr, "CL-Backend:: Src distance :%d %d /", graph.getData(0).dist[0],graph.getData(0).dist[1]);
-      graph.copy_to_device();
-      kernel();
-      wb_kernel();
-      graph.copy_to_host();
-      meta_array->copy_to_host();
-      hasChanged = meta_array->host_ptr()[0];
-//      fprintf(stderr, "[Changed=%d, %d, %d ]\n", hasChanged, graph.getData(0).dist[0],graph.getData(0).dist[1]);
    }
 };
 /*********************************************************************************
@@ -185,24 +130,14 @@ struct PrintNodes {
 /************************************************************
  *
  *************************************************************/
-struct Writeback {
-   Graph * g;
-   void static go(Graph& _g, unsigned num) {
-      Galois::do_all(_g.begin(), _g.begin() + num, Writeback { &_g }, Galois::loopname("Writeback"));
-   }
-   void operator()(GNode src) const {
-      NodeDataType & sdata = g->getData(src);
-      sdata.swap_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD);
-   }
-};
-/************************************************************
- *
- *************************************************************/
 struct SSSP {
    Graph* g;
 
    void static go(Graph& _g, unsigned num) {
+      //Perform computation
       Galois::do_all(_g.begin(), _g.begin() + num, SSSP { &_g }, Galois::loopname("SSSP"));
+      //Do commit
+      Galois::do_all(_g.begin(), _g.begin() + num, [&](GNode src){_g.getData(src).swap_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD);}, Galois::loopname("SSSP-Commit"));
    }
 
    void operator()(GNode src) const {
@@ -268,7 +203,7 @@ void setNodeValue(PGraph* p, unsigned GID, int v) {
       setNodeValue_CUDA(cuda_ctx, p->G2L(GID), v);
       break;
    case GPU_OPENCL:
-      dGraph.getData(p->G2L(GID)).dist[dGraph.getData(p->G2L(GID)).current_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)] = v;
+      dOp.getData(p->G2L(GID)).dist[dOp.getData(p->G2L(GID)).current_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)] = v;
       break;
    default:
       break;
@@ -292,7 +227,7 @@ void sendGhostCells(Galois::Runtime::NetworkInterface& net, PGraph& g) {
             net.sendAlt(x, setNodeValue, magicPointer[x], n, (int) getNodeValue_CUDA(cuda_ctx, n - g.g_offset));
             break;
          case GPU_OPENCL:
-            net.sendAlt(x, setNodeValue, magicPointer[x], n, dGraph.getData(n - g.g_offset).dist[dGraph.getData(n - g.g_offset).current_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)]);
+            net.sendAlt(x, setNodeValue, magicPointer[x], n, dOp.getData(n - g.g_offset).dist[dOp.getData(n - g.g_offset).current_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)]);
             break;
          default:
             assert(false);
@@ -350,7 +285,8 @@ void loadGraphNonCPU(PGraph &g) {
       load_graph_CUDA(cuda_ctx, m);
       break;
    case GPU_OPENCL:
-      dGraph.load_from_galois(g.g, g.numOwned, g.numEdges, g.numNodes - g.numOwned);
+//      dOp.loadGraphNonCPU(g.g, g.numOwned, g.numEdges, g.numNodes - g.numOwned);
+      dOp.loadGraphNonCPU(g);
       break;
    default:
       assert(false);
@@ -406,7 +342,8 @@ void inner_main() {
 #if _HETERO_DEBUG_
    std::cout << g.id << " graph loaded\n";
 #endif
-   dSSSP dOp;
+//   dSSSP dOp;
+//   OPENCL_Context<Graph> dOp;
 
    //local initialization
    if (personality == CPU) {
@@ -423,7 +360,7 @@ void inner_main() {
       dOp.init(g.numOwned, g.numNodes);
       if (g.getHost((src_node.Value)) == Galois::Runtime::NetworkInterface::ID) {
          fprintf(stderr, "Initialized src %d to zero at part %d\n", src_node.Value, Galois::Runtime::NetworkInterface::ID);
-         dGraph.getData(src_node).dist[dGraph.getData(src_node).current_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)] = 0;
+         dOp.getData(src_node).dist[dOp.getData(src_node).current_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)] = 0;
       }
    }
 #if _HETERO_DEBUG_
@@ -455,12 +392,10 @@ void inner_main() {
       switch (personality) {
       case CPU:
          SSSP::go(g.g, g.numOwned);
-         Writeback::go(g.g, g.numOwned);
 //         PrintNodes::go(g.g, g.numOwned);
-//         fprintf(stderr, "===============%d================\n", i);
          break;
       case GPU_OPENCL:
-         dOp(dGraph, g.numOwned);
+         dOp(g.numOwned, hasChanged);
          break;
       case GPU_CUDA:
          pagerank_cuda(cuda_ctx);
@@ -503,8 +438,8 @@ void inner_main() {
       case GPU_OPENCL: {
          int max_dist = 0;
          for (int n = 0; n < g.numOwned; ++n) {
-            max_dist = std::max(max_dist, dGraph.getData(n).dist[dGraph.getData(n).current_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)]);
-            out_file << n + g.g_offset << ", " << dGraph.getData(n).dist[dGraph.getData(n).current_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)] << "\n";
+            max_dist = std::max(max_dist, dOp.getData(n).dist[dOp.getData(n).current_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)]);
+            out_file << n + g.g_offset << ", " << dOp.getData(n).dist[dOp.getData(n).current_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)] << "\n";
          }
          fprintf(stderr, "Maxdist - %d\n", max_dist);
 //         dGraph.print_graph();
