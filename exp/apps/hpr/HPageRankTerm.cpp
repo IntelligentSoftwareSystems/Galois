@@ -26,14 +26,15 @@
 #include "Galois/Graph/FileGraph.h"
 #include "Galois/Graph/LC_CSR_Graph.h"
 #include "Galois/Graph/Util.h"
+#include "Galois/Accumulator.h"
+#include "PGraph.h"
+
 #include "Lonestar/BoilerPlate.h"
 
-#include "PGraph.h"
 #include "cuda/hpr_cuda.h"
 #include "cuda/cuda_mtypes.h"
 #include "hpr.h"
-
-#include "opencl/OpenCLPrBackend.h"
+#include "opencl/CLWrapper.h"
 
 #include <iostream>
 #include <typeinfo>
@@ -44,6 +45,9 @@
 static const char* const name = "Page Rank - Distributed Heterogeneous";
 static const char* const desc = "Computes PageRank on Distributed Galois.  Uses pull algorithm, takes the pre-transposed graph.";
 static const char* const url = 0;
+
+
+static const float tolerance = 0.0001;
 
 enum Personality {
    CPU, GPU_CUDA, GPU_OPENCL
@@ -67,13 +71,12 @@ static cll::opt<Personality> personality("personality", cll::desc("Personality")
       cll::init(CPU));
 static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file (transpose)>"), cll::Required);
 static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations"), cll::init(4));
-static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"), cll::init(true));
+static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"), cll::init(false));
 static cll::opt<int> gpudevice("gpu", cll::desc("Select GPU to run on, default is to choose automatically"), cll::init(-1));
 static cll::opt<float> cldevice("cldevice", cll::desc("Select OpenCL device to run on , default is 0.0 (OpenCL backend)"), cll::init(0.0));
 static cll::opt<std::string> personality_set("pset", cll::desc("String specifying personality for each host. 'c'=CPU,'g'=GPU/CUDA and 'o'=GPU/OpenCL"), cll::init(""));
+//////////////////////////////////////////////////////////////////////////////////////
 
-///////////////////
-///////////////////////////////////////////
 enum BSP_FIELD_NAMES {PR_VAL_FIELD=0};
 struct LNode {
   unsigned int bsp_version;
@@ -104,14 +107,17 @@ struct LNode {
    }
 };*/
 //////////////////////////////////////////////////////////////////////////////////////
+
 typedef Galois::Graph::LC_CSR_Graph<LNode, void> Graph;
+typedef pGraph<Graph> PGraph;
 typedef typename Graph::GraphNode GNode;
+//std::map<GNode, float> buffered_updates;
+Galois::GReduceMax<float> max_delta;
+
+//std::atomic<float> max_delta(0.0);
 //////////////////////////////////////////////////////////////////////////////////////
-typedef Galois::OpenCL::LC_LinearArray_Graph<Galois::OpenCL::Array, LNode, void> DeviceGraph;
 
 struct CUDA_Context *cuda_ctx;
-struct OPENCL_Context<DeviceGraph> cl_ctx;
-
 /*********************************************************************************
  *
  **********************************************************************************/
@@ -129,7 +135,65 @@ struct InitializeGraph {
       }
    }
 };
- /*********************************************************************************
+
+/************************************************************************************
+ * OpenCL PageRank operator implementation.
+ * Uses two kernels for the updates and one kernel for initialization.
+ * In order to support BSP semantics, an aux_array is created which will
+ * be used to buffer the writes in 'kernel'. These updates will be
+ * written to the node-data in the 'writeback' kernel.
+ *************************************************************************************/
+typedef Galois::OpenCL::LC_LinearArray_Graph<Galois::OpenCL::Array, LNode, void> DeviceGraph;
+DeviceGraph dGraph;
+struct dPageRank {
+   Galois::OpenCL::CL_Kernel kernel;
+   Galois::OpenCL::CL_Kernel wb_kernel;
+//   Galois::OpenCL::Array<float> *aux_array;
+   Galois::OpenCL::Array<float> *meta_array;
+   dPageRank() :
+         meta_array(nullptr) {
+   }
+   void init(int num_items, int num_inits) {
+      Galois::OpenCL::CL_Kernel init_all, init_nout;
+      meta_array = new Galois::OpenCL::Array<float>(16);
+      kernel.init("pagerank_kernel.cl", "pagerank_term");
+      wb_kernel.init("pagerank_kernel.cl", "writeback");
+      init_nout.init("pagerank_kernel.cl", "initialize_nout");
+      init_all.init("pagerank_kernel.cl", "initialize_all");
+      dGraph.copy_to_device();
+
+      init_all.set_work_size(dGraph.num_nodes());
+      init_nout.set_work_size(dGraph.num_nodes());
+      wb_kernel.set_work_size(num_items);
+      kernel.set_work_size(num_items);
+
+      init_nout.set_arg_list(&dGraph);
+      init_all.set_arg_list(&dGraph);
+      kernel.set_arg_list(&dGraph, meta_array);
+      wb_kernel.set_arg_list(&dGraph);
+      int num_nodes = dGraph.num_nodes();
+
+      init_nout.set_arg(1, sizeof(cl_int), &num_items);
+      wb_kernel.set_arg(1, sizeof(cl_int), &num_items);
+      kernel.set_arg(2, sizeof(cl_int), &num_items);
+
+      init_all();
+      init_nout();
+      dGraph.copy_to_host();
+   }
+   template<typename GraphType>
+   void operator()(GraphType & graph, int num_items) {
+      meta_array->host_ptr()[0]=max_delta.reduce();
+      graph.copy_to_device();
+      meta_array->copy_to_device();
+      kernel();
+      wb_kernel();
+      graph.copy_to_host();
+      meta_array->copy_to_host();
+      max_delta.update(meta_array->host_ptr()[0]);
+   }
+};
+/*********************************************************************************
  * CPU PageRank operator implementation.
  **********************************************************************************/
 struct WriteBack {
@@ -144,11 +208,11 @@ struct WriteBack {
 };
 struct PageRank {
    pGraph<Graph>* g;
-
    void static go(pGraph<Graph>& _g) {
+      max_delta.reset();
       Galois::do_all(_g.g.begin(), _g.g.begin() + _g.numOwned, PageRank { &_g }, Galois::loopname("Page Rank"));
+      max_delta.reduce();
    }
-
    void operator()(GNode src) const {
       double sum = 0;
       LNode& sdata = g->g.getData(src);
@@ -159,9 +223,11 @@ struct PageRank {
       }
       float value = (1.0 - alpha) * sum + alpha;
       float diff = std::fabs(value - sdata.value[sdata.current_version(BSP_FIELD_NAMES::PR_VAL_FIELD)]);
+      max_delta.update( diff);
       sdata.value[sdata.next_version(BSP_FIELD_NAMES::PR_VAL_FIELD)] = value;
    }
 };
+
 /*********************************************************************************
  *
  **********************************************************************************/
@@ -169,12 +235,12 @@ struct PageRank {
 // [hostid] -> vector of GID that host has replicas of
 std::vector<std::vector<unsigned> > remoteReplicas;
 // [hostid] -> remote pGraph Structure (locally invalid)
-std::vector<pGraph<Graph>*> magicPointer;
+std::vector<PGraph*> magicPointer;
 /*********************************************************************************
  *
  **********************************************************************************/
 
-void setRemotePtr(uint32_t hostID, pGraph<Graph>* p) {
+void setRemotePtr(uint32_t hostID, PGraph* p) {
    if (hostID >= magicPointer.size())
       magicPointer.resize(hostID + 1);
    magicPointer[hostID] = p;
@@ -201,7 +267,7 @@ void setNodeValue(pGraph<Graph>* p, unsigned GID, float v) {
       setNodeValue_CUDA(cuda_ctx, p->G2L(GID), v);
       break;
    case GPU_OPENCL:
-      cl_ctx.getData(p->G2L(GID)).value[p->g.getData(p->G2L(GID)).current_version(BSP_FIELD_NAMES::PR_VAL_FIELD)] = v;
+      dGraph.getData(p->G2L(GID)).value[p->g.getData(p->G2L(GID)).current_version(BSP_FIELD_NAMES::PR_VAL_FIELD)] = v;
       break;
    default:
       break;
@@ -211,7 +277,7 @@ void setNodeValue(pGraph<Graph>* p, unsigned GID, float v) {
  *
  **********************************************************************************/
 // could be merged with setNodeValue, but this is one-time only ...
-void setNodeAttr(pGraph<Graph> *p, unsigned GID, unsigned nout) {
+void setNodeAttr(PGraph *p, unsigned GID, unsigned nout) {
    switch (personality) {
    case CPU:
       p->g.getData(p->G2L(GID)).nout = nout;
@@ -220,7 +286,7 @@ void setNodeAttr(pGraph<Graph> *p, unsigned GID, unsigned nout) {
       setNodeAttr_CUDA(cuda_ctx, p->G2L(GID), nout);
       break;
    case GPU_OPENCL:
-      cl_ctx.getData(p->G2L(GID)).nout = nout;
+      dGraph.getData()[p->G2L(GID)].nout = nout;
       break;
    default:
       break;
@@ -230,7 +296,7 @@ void setNodeAttr(pGraph<Graph> *p, unsigned GID, unsigned nout) {
  *
  **********************************************************************************/
 // send values for nout calculated on my node
-void setNodeAttr2(pGraph<Graph> *p, unsigned GID, unsigned nout) {
+void setNodeAttr2(PGraph *p, unsigned GID, unsigned nout) {
    auto LID = GID - p->g_offset;
    //printf("%d setNodeAttrs2 GID: %u nout: %u LID: %u\n", p->id, GID, nout, LID);
    switch (personality) {
@@ -241,7 +307,7 @@ void setNodeAttr2(pGraph<Graph> *p, unsigned GID, unsigned nout) {
       setNodeAttr2_CUDA(cuda_ctx, LID, nout);
       break;
    case GPU_OPENCL:
-      cl_ctx.getData(LID).nout += nout;
+      dGraph.getData()[LID].nout += nout;
       break;
    default:
       break;
@@ -250,7 +316,7 @@ void setNodeAttr2(pGraph<Graph> *p, unsigned GID, unsigned nout) {
 /*********************************************************************************
  *
  **********************************************************************************/
-void sendGhostCellAttrs2(Galois::Runtime::NetworkInterface& net, pGraph<Graph>& g) {
+void sendGhostCellAttrs2(Galois::Runtime::NetworkInterface& net, PGraph& g) {
    for (auto n = g.g.begin() + g.numOwned; n != g.g.begin() + g.numNodes; ++n) {
       auto l2g_ndx = std::distance(g.g.begin(), n) - g.numOwned;
       auto x = g.getHost(g.L2G[l2g_ndx]);
@@ -263,7 +329,7 @@ void sendGhostCellAttrs2(Galois::Runtime::NetworkInterface& net, pGraph<Graph>& 
          net.sendAlt(x, setNodeAttr2, magicPointer[x], g.L2G[l2g_ndx], getNodeAttr2_CUDA(cuda_ctx, *n));
          break;
       case GPU_OPENCL:
-         net.sendAlt(x, setNodeAttr2, magicPointer[x], g.L2G[l2g_ndx], cl_ctx.getData(*n).nout);
+         net.sendAlt(x, setNodeAttr2, magicPointer[x], g.L2G[l2g_ndx], dGraph.getData()[*n].nout);
          break;
       default:
          assert(false);
@@ -276,7 +342,7 @@ void sendGhostCellAttrs2(Galois::Runtime::NetworkInterface& net, pGraph<Graph>& 
  *
  **********************************************************************************/
 
-void sendGhostCellAttrs(Galois::Runtime::NetworkInterface& net, pGraph<Graph>& g) {
+void sendGhostCellAttrs(Galois::Runtime::NetworkInterface& net, PGraph& g) {
    for (unsigned x = 0; x < remoteReplicas.size(); ++x) {
       for (auto n : remoteReplicas[x]) {
          /* no per-personality needed but until nout is
@@ -290,7 +356,7 @@ void sendGhostCellAttrs(Galois::Runtime::NetworkInterface& net, pGraph<Graph>& g
             net.sendAlt(x, setNodeAttr, magicPointer[x], n, getNodeAttr_CUDA(cuda_ctx, n - g.g_offset));
             break;
          case GPU_OPENCL:
-            net.sendAlt(x, setNodeAttr, magicPointer[x], n, cl_ctx.getData(n - g.g_offset).nout);
+            net.sendAlt(x, setNodeAttr, magicPointer[x], n, dGraph.getData()[n - g.g_offset].nout);
             break;
          default:
             assert(false);
@@ -316,7 +382,7 @@ void sendGhostCells(Galois::Runtime::NetworkInterface& net, pGraph<Graph>& g) {
             net.sendAlt(x, setNodeValue, magicPointer[x], n, getNodeValue_CUDA(cuda_ctx, n - g.g_offset));
             break;
          case GPU_OPENCL:
-            net.sendAlt(x, setNodeValue, magicPointer[x], n, cl_ctx.getData((n - g.g_offset)).value[g.g.getData(n - g.g_offset).current_version(BSP_FIELD_NAMES::PR_VAL_FIELD)]);
+            net.sendAlt(x, setNodeValue, magicPointer[x], n, dGraph.getData((n - g.g_offset)).value[dGraph.getData(n - g.g_offset).current_version(BSP_FIELD_NAMES::PR_VAL_FIELD)]);
             break;
          default:
             assert(false);
@@ -326,11 +392,20 @@ void sendGhostCells(Galois::Runtime::NetworkInterface& net, pGraph<Graph>& g) {
    }
 
 }
+
+void recvMaxDelta(float other_max_delta){
+   max_delta.update(other_max_delta);
+   max_delta.reduce();
+}
+void sendMaxDelta(Galois::Runtime::NetworkInterface& net) {
+   for (uint32_t x = 0; x < Galois::Runtime::NetworkInterface::Num; ++x)
+        net.sendAlt(x, recvMaxDelta, max_delta.reduce());
+}
 /*********************************************************************************
  *
  **********************************************************************************/
 
-MarshalGraph pGraph2MGraph(pGraph<Graph> &g) {
+MarshalGraph pGraph2MGraph(PGraph &g) {
    MarshalGraph m;
 
    m.nnodes = g.numNodes;
@@ -366,7 +441,7 @@ MarshalGraph pGraph2MGraph(pGraph<Graph> &g) {
  *
  **********************************************************************************/
 
-void loadGraphNonCPU(pGraph<Graph> &g) {
+void loadGraphNonCPU(PGraph &g) {
    MarshalGraph m;
    assert(personality != CPU);
    switch (personality) {
@@ -375,7 +450,7 @@ void loadGraphNonCPU(pGraph<Graph> &g) {
       load_graph_CUDA(cuda_ctx, m);
       break;
    case GPU_OPENCL:
-      cl_ctx.loadGraphNonCPU(g.g, g.numOwned, g.numEdges, g.numNodes - g.numOwned);
+      dGraph.load_from_galois(g.g, g.numOwned, g.numEdges, g.numNodes - g.numOwned);
       break;
    default:
       assert(false);
@@ -392,8 +467,6 @@ void inner_main() {
    Galois::StatManager statManager;
    auto& barrier = Galois::Runtime::getSystemBarrier();
    const unsigned my_host_id = Galois::Runtime::NetworkInterface::ID;
-   Galois::Timer T_inner;
-   T_inner.start();
    //Parse arg string when running on multiple hosts and update/override personality
    //with corresponding value.
    if (personality_set.length() == Galois::Runtime::NetworkInterface::Num) {
@@ -414,7 +487,7 @@ void inner_main() {
    barrier.wait();
    fprintf(stderr, "Post-barrier - Host: %d, Personality %s\n",Galois::Runtime::NetworkInterface::ID ,personality_str(personality).c_str());
 //   Graph rg;
-   pGraph<Graph> g;
+   PGraph g;
    g.loadGraph(inputFile);
 
    if (personality == GPU_CUDA) {
@@ -424,20 +497,20 @@ void inner_main() {
    } else if (personality == GPU_OPENCL) {
       Galois::OpenCL::cl_env.init(cldevice);
    }
-
    if (personality != CPU)
       loadGraphNonCPU(g);
 #if _HETERO_DEBUG_
    std::cout << g.id << " graph loaded\n";
 #endif
+   dPageRank dOp;
 
    //local initialization
    if (personality == CPU) {
-      InitializeGraph::go(g);
+      InitializeGraph::go(g/*, g.numOwned*/);
    } else if (personality == GPU_CUDA) {
       initialize_graph_cuda(cuda_ctx);
    } else if (personality == GPU_OPENCL) {
-      cl_ctx.init(g.numOwned, g.numNodes);
+      dOp.init(g.numOwned, g.numNodes);
    }
 #if _HETERO_DEBUG_
    std::cout << g.id << " initialized\n";
@@ -468,23 +541,17 @@ void inner_main() {
    barrier.wait();
 
    for (int i = 0; i < maxIterations; ++i) {
-#if _HETERO_DEBUG_
-      std::cout << "Starting " << i << "\n";
-#endif
       //communicate ghost cells
       sendGhostCells(net, g);
       barrier.wait();
-#if _HETERO_DEBUG_
-      std::cout << "Starting PR\n";
-#endif
       //Do pagerank
       switch (personality) {
       case CPU:
-         PageRank::go(g);
-         WriteBack::go(g);
+         PageRank::go(g/*, g.numOwned*/);
+         WriteBack::go(g/*, g.numOwned*/);
          break;
       case GPU_OPENCL:
-         cl_ctx(g.numOwned);
+         dOp(dGraph, g.numOwned);
          break;
       case GPU_CUDA:
          pagerank_cuda(cuda_ctx);
@@ -493,7 +560,16 @@ void inner_main() {
          break;
       }
       barrier.wait();
+      sendMaxDelta(net);
+      barrier.wait();
+      if(max_delta.reduce() <tolerance ){
+         fprintf(stderr, "Terminating after %d steps\n", i);
+         break;
+      }
+//      fprintf(stderr, "Continuing after %d steps, %6.6g \n", i, max_delta.reduce());
+      max_delta.reset();
    }
+
 
    //Final synchronization to ensure that all the nodes are updated.
    sendGhostCells(net, g);
@@ -506,13 +582,13 @@ void inner_main() {
       switch (personality) {
       case CPU: {
          for (auto n = g.g.begin(); n != g.g.begin() + g.numOwned; ++n) {
-            out_file << *n + g.g_offset << ", " << g.g.getData(*n).value[g.g.getData(*n).current_version(BSP_FIELD_NAMES::PR_VAL_FIELD)] << ", " << g.g.getData(*n).nout << "\n";
+            out_file << *n + g.g_offset << ", " << g.g.getData(*n).value << ", " << g.g.getData(*n).nout << "\n";
          }
          break;
       }
       case GPU_OPENCL: {
          for (int n = 0; n < g.numOwned; ++n) {
-            out_file << n + g.g_offset << ", " << cl_ctx.getData(n).value[cl_ctx.getData(n).current_version(BSP_FIELD_NAMES::PR_VAL_FIELD)] << ", " << cl_ctx.getData(n).nout << "\n";
+            out_file << n + g.g_offset << ", " << dGraph.getData()[n].value << ", " << dGraph.getData()[(n)].nout << "\n";
          }
          break;
       }
@@ -524,16 +600,13 @@ void inner_main() {
       }
       out_file.close();
    }
-   T_inner.stop();
-   std::cout << "Total time taken : " << T_inner.get() << " (msec)\n";
-   net.terminate();
    std::cout.flush();
 
 }
 
 int main(int argc, char** argv) {
    LonestarStart(argc, argv, name, desc, url);
-   //auto& net = Galois::Runtime::getSystemNetworkInterface();
+   auto& net = Galois::Runtime::getSystemNetworkInterface();
    inner_main();
    return 0;
 }

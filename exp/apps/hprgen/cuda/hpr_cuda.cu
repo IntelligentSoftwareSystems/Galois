@@ -3,10 +3,10 @@
 #include <stdio.h>
 #include "gg.h"
 #include "ggcuda.h"
-#include "hpr_cuda.h"
-#include "../hpr.h"
+#include "pr_cuda.h"
+#include "hpr.h"
 
-struct CUDA_Context {
+struct pr_CUDA_Context {
   int device;
   int id;
   int pr_it;
@@ -92,15 +92,15 @@ __global__ void test_graph(CSRGraphTy g, index_type nowned,
 }
 
 
-struct CUDA_Context *get_CUDA_context(int id) {
-  struct CUDA_Context *p;
-  p = (struct CUDA_Context *) calloc(1, sizeof(struct CUDA_Context));
+struct pr_CUDA_Context *get_CUDA_context(int id) {
+  struct pr_CUDA_Context *p;
+  p = (struct pr_CUDA_Context *) calloc(1, sizeof(struct pr_CUDA_Context));
   p->id = id;
   p->pr_it = 0;
   return p;
 }
 
-bool init_CUDA_context(struct CUDA_Context *ctx, int device) {
+bool init_CUDA_context(struct pr_CUDA_Context *ctx, int device) {
   struct cudaDeviceProp dev;
 
   if(device == -1) {
@@ -124,19 +124,19 @@ bool init_CUDA_context(struct CUDA_Context *ctx, int device) {
   return true;
 }
 
-float getNodeValue_CUDA(struct CUDA_Context *ctx, unsigned LID) {
+float get_PRNode_pr_CUDA(struct pr_CUDA_Context *ctx, unsigned LID) {
   float *pr = ctx->pr[ctx->pr_it].cpu_rd_ptr();
 
   return pr[LID];
 }
 
-void setNodeValue_CUDA(struct CUDA_Context *ctx, unsigned LID, float v) {
+void set_PRNode_pr_CUDA(struct pr_CUDA_Context *ctx, unsigned LID, float v) {
   float *pr = ctx->pr[ctx->pr_it].cpu_wr_ptr();
   
   pr[LID] = v;
 }
 
-void setNodeAttr_CUDA(struct CUDA_Context *ctx, unsigned LID, unsigned nout) {
+void set_PRNode_nout_CUDA(struct pr_CUDA_Context *ctx, unsigned LID, unsigned nout) {
   int *pnout = ctx->nout.cpu_wr_ptr();
 
   assert(LID >= ctx->nowned);
@@ -145,7 +145,7 @@ void setNodeAttr_CUDA(struct CUDA_Context *ctx, unsigned LID, unsigned nout) {
   pnout[LID] = nout;
 }
 
-void setNodeAttr2_CUDA(struct CUDA_Context *ctx, unsigned LID, unsigned nout) {
+void set_PRNode_nout_plus_CUDA(struct pr_CUDA_Context *ctx, unsigned LID, unsigned nout) {
   int *pnout = ctx->nout.cpu_wr_ptr();
 
   //printf("setting %d %d %d\n", ctx->id, LID, nout);
@@ -155,7 +155,7 @@ void setNodeAttr2_CUDA(struct CUDA_Context *ctx, unsigned LID, unsigned nout) {
   pnout[LID] += nout;
 }
 
-unsigned getNodeAttr_CUDA(struct CUDA_Context *ctx, unsigned LID) {
+unsigned getNodeAttr_CUDA(struct pr_CUDA_Context *ctx, unsigned LID) {
   int *pnout = ctx->nout.cpu_rd_ptr();
   
   assert(LID < ctx->nowned);
@@ -163,15 +163,15 @@ unsigned getNodeAttr_CUDA(struct CUDA_Context *ctx, unsigned LID) {
   return pnout[LID];
 }
 
-unsigned getNodeAttr2_CUDA(struct CUDA_Context *ctx, unsigned LID) {
+unsigned get_PRNode_nout_CUDA(struct pr_CUDA_Context *ctx, unsigned LID) {
   int *pnout = ctx->nout.cpu_rd_ptr();
   
-  assert(LID >= ctx->nowned);
+  //assert(LID >= ctx->nowned);
 
   return pnout[LID];
 }
 
-void load_graph_CUDA(struct CUDA_Context *ctx, MarshalGraph &g) {
+void load_graph_CUDA(struct pr_CUDA_Context *ctx, MarshalGraph &g) {
   CSRGraphTy &graph = ctx->hg;
 
   ctx->nowned = g.nowned;
@@ -203,7 +203,7 @@ void load_graph_CUDA(struct CUDA_Context *ctx, MarshalGraph &g) {
 	 ctx->nowned, graph.nnodes, graph.nedges);  
 }
 
-void initialize_graph_cuda(struct CUDA_Context *ctx) {  
+void initialize_node_cuda(struct pr_CUDA_Context *ctx) {  
   ctx->nout.zero_gpu();
   initialize_graph<<<14, 256>>>(ctx->gg, ctx->nowned, ctx->pr[0].gpu_wr_ptr(), ctx->pr[1].gpu_wr_ptr(), ctx->nout.gpu_wr_ptr());
 
@@ -211,7 +211,7 @@ void initialize_graph_cuda(struct CUDA_Context *ctx) {
   check_cuda(cudaDeviceSynchronize());
 }
 
-void pagerank_cuda(struct CUDA_Context *ctx) {  
+void pr_cuda(struct pr_CUDA_Context *ctx) {  
   pagerank<<<14, 256>>>(ctx->gg, ctx->nowned, 
 			ctx->pr[ctx->pr_it].gpu_wr_ptr(), 
 			ctx->pr[ctx->pr_it ^ 1].gpu_wr_ptr(), 
@@ -220,13 +220,13 @@ void pagerank_cuda(struct CUDA_Context *ctx) {
   check_cuda(cudaDeviceSynchronize());
 }
 
-void test_graph_cuda(struct CUDA_Context *ctx) {  
+void test_graph_cuda(struct pr_CUDA_Context *ctx) {  
   test_graph<<<14, 256>>>(ctx->gg, ctx->nowned, ctx->pr[0].gpu_wr_ptr(), ctx->pr[1].gpu_wr_ptr(), ctx->nout.gpu_wr_ptr(), ctx->id);
   check_cuda(cudaDeviceSynchronize());
 }
 
 
-void test_cuda(struct CUDA_Context *ctx) {
+void test_cuda(struct pr_CUDA_Context *ctx) {
   printf("hello from cuda!\n");
   CSRGraphTy &gg = ctx->gg;
 

@@ -94,7 +94,12 @@ public:
     }
     Galois::Runtime::printStats();
   }
-
+  void dump_stats(){
+    for (std::deque<Statistic*>::iterator ii = stats.begin(), ei = stats.end(); ii != ei; ++ii) {
+      (*ii)->report();
+    }
+    Galois::Runtime::printStats();
+  }
   //! Statistics that are not lexically scoped must be added explicitly
   void push(Statistic& s) {
     stats.push_back(&s);

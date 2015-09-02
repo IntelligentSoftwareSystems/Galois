@@ -14,8 +14,8 @@ extern "C"{
 }
 #include "CLError.h"
 
-//#define DEFAULT_CL_PLATFORM_ID 0
-//#define DEFAULT_CL_DEVICE_ID 0
+#define DEFAULT_CL_PLATFORM_ID 0
+#define DEFAULT_CL_DEVICE_ID 0
 namespace Galois{
 namespace OpenCL{
 struct CLEnvironment{
@@ -28,10 +28,8 @@ struct CLEnvironment{
 
    CLEnvironment():m_platform_id(0), m_device_id(0), m_context(0),m_command_queue(0),m_program(0){
    }
-   void init(float dev_id){
+   void init(){
       setenv("CUDA_CACHE_DISABLE", "1", 1);
-      const int DEFAULT_CL_PLATFORM_ID = (int)(dev_id)%10;
-      const int DEFAULT_CL_DEVICE_ID = (int)((dev_id*10))%10;
       char string_holder[4 * 256];
       cl_platform_id l_platforms[4];
       cl_uint num_platforms;

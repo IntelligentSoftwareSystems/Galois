@@ -119,7 +119,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
   void workerThread() {
     std::tie(netio, ID, Num) = makeNetworkIOMPI();
     ready = 1;
-    while (ready < 2) {};
+    while (ready < 2) {/*fprintf(stderr, "[WaitOnReady-2]");*/};
     while (ready != 3) {
       do {
         std::vector<uint8_t> rdata = netio->dequeue();
@@ -147,10 +147,14 @@ public:
   using NetworkInterface::ID;
   using NetworkInterface::Num;
 
-  NetworkInterfaceBuffered() {
+  NetworkInterfaceBuffered():netio(nullptr) {
     ready = 0;
     worker = std::thread(&NetworkInterfaceBuffered::workerThread, this);
+<<<<<<< HEAD
     while (ready != 1) {}
+=======
+    while (ready != 1) {/*fprintf(stderr, "[WaitOnReady-1]");*/};
+>>>>>>> 18b306172c1b845b30e5a68b3d6dde3f13c7499b
     decltype(sendData) v(Num);
     sendData.swap(v);
     ready = 2;
@@ -160,6 +164,7 @@ public:
     ready = 3;
     worker.join();
     delete netio;
+    netio=nullptr;
   }
 
   virtual void send(uint32_t dest, recvFuncTy recv, SendBuffer& buf) {
@@ -194,6 +199,7 @@ public:
     }
     return retval;
   }
+
 };
 
 } //namespace ""

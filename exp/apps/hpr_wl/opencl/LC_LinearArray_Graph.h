@@ -75,6 +75,7 @@ struct LC_LinearArray_Graph {
    typedef unsigned int EdgeIDType;
    size_t _num_nodes;
    size_t _num_edges;
+   size_t _work_size; //added work_size
    unsigned int _max_degree;
    const size_t SizeEdgeData;
    const size_t SizeNodeData;
@@ -185,6 +186,7 @@ struct LC_LinearArray_Graph {
    size_t size() {
       return gpu_graph->size();
    }
+
    NodeDataType * getData() {
       return (NodeDataType*) (gpu_graph->host_data + 4);
    }
@@ -270,6 +272,10 @@ struct LC_LinearArray_Graph {
       }
       std::cout << "\n";
       return;
+   }
+
+   unsigned int getWork() {
+      return _work_size;
    }
 /////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////
