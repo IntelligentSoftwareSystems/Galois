@@ -74,7 +74,7 @@ static cll::opt<float> cldevice("cldevice", cll::desc("Select OpenCL device to r
 static cll::opt<std::string> personality_set("pset", cll::desc("String specifying personality for each host. 'c'=CPU,'g'=GPU/CUDA and 'o'=GPU/OpenCL"), cll::init(""));
 ////////////////////////////////////////////
 enum BSP_FIELD_NAMES {
-   SSSP_DIST_FIELD = 0 /*, WORKLIST = 1*/
+   SSSP_DIST_FIELD = 0
 };
 struct NodeData {
    int bsp_version;
@@ -89,21 +89,6 @@ struct NodeData {
       return (~bsp_version & (1 << field_id)) != 0;
    }
 };
-/*template<typename ElTy>
-struct BSP_Worklist {
-   Galois::InsertBag<ElTy> items[2];
-   int bsp_version;
-   void swap_version(unsigned int field_id) {
-      bsp_version ^= 1 << field_id;
-   }
-   unsigned current_version(unsigned int field_id) {
-      return (bsp_version & (1 << field_id)) != 0;
-   }
-   unsigned next_version(unsigned int field_id) {
-      return (~bsp_version & (1 << field_id)) != 0;
-   }
-};*/
-////////////////////////////////////////////
 typedef NodeData NodeDataType;
 typedef Galois::Graph::LC_CSR_Graph<NodeDataType, unsigned int> Graph;
 typedef pGraph<Graph> PGraph;
@@ -117,6 +102,14 @@ struct OPENCL_Context<DeviceGraph> dOp;
 /*********************************************************************************
  *
  **********************************************************************************/
+// [hostid] -> vector of GID that host has replicas of
+std::vector<std::vector<unsigned> > remoteReplicas;
+// [hostid] -> remote pGraph Structure (locally invalid)
+std::vector<PGraph*> magicPointer;
+
+/*********************************************************************************
+ *
+ **********************************************************************************/
 struct InitializeGraph {
    Graph* g;
    void static go(Graph& _g, unsigned num) {
@@ -126,102 +119,32 @@ struct InitializeGraph {
       NodeDataType & sdata = g->getData(src);
       //TODO RK : Fix this to not initialize both fields.
       sdata.dist[0] = sdata.dist[1] = std::numeric_limits<int>::max() / 4;
-      sdata.bsp_version=0;
+      sdata.bsp_version = 0;
    }
 };
 /*********************************************************************************
  * CPU PageRank operator implementation.
  **********************************************************************************/
 struct PrintNodes {
-   Graph * g;
-   void static go(Graph& _g, unsigned num) {
-      Galois::do_all(_g.begin(), _g.begin() + num, PrintNodes { &_g }, Galois::loopname("PrintNodes"));
+   PGraph * g;
+   void static go(PGraph& _g, unsigned num) {
+      Galois::do_all(_g.g.begin(), _g.g.begin() + num, PrintNodes { &_g }, Galois::loopname("PrintNodes"));
    }
    void operator()(GNode src) const {
-      NodeDataType & sdata = g->getData(src);
-      fprintf(stderr, "GraphPrint:: %d [%d, %d]\n", src, sdata.dist[0], sdata.dist[1]);
+      NodeDataType & sdata = g->g.getData(src);
+      fprintf(stderr, "GraphPrint:: %d [curr=%d, next=%d]\n", g->local2Global(src), sdata.dist[sdata.current_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)], sdata.dist[sdata.next_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)]);
    }
 };
 /************************************************************
  *
  *************************************************************/
-struct SSSP_PUSH_Commit{
-   Graph * g;
-   void operator()(GNode src)const{
-      g->getData(src).dist[0]=g->getData(src).dist[1]=std::min(g->getData(src).dist[0],g->getData(src).dist[1]);
-      g->getData(src).swap_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD);
-   }
-};
-struct SSSP {
-   Graph* g;
-
-   void static go(Graph& _g, unsigned num) {
-      //Perform computation
-      Galois::do_all(_g.begin(), _g.begin() + num, SSSP { &_g }, Galois::loopname("SSSP"));
-      //Do commit
-//      fprintf(stderr, "===============================PHASE===================\n");
-//      Galois::do_all(_g.begin(), _g.begin() + num, [&](GNode src) {_g.getData(src).swap_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD);}, Galois::loopname("SSSP-Commit"));
-      Galois::do_all(_g.begin(), _g.begin() + num, SSSP_PUSH_Commit{&_g}, Galois::loopname("SSSP-Commit"));
-   }
-
-   void operator()(GNode src) const {
-      NodeDataType& sdata = g->getData(src);
-      int sdist = sdata.dist[sdata.current_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)];
-      for (auto jj = g->edge_begin(src), ej = g->edge_end(src); jj != ej; ++jj) {
-         GNode dst = g->getEdgeDst(jj);
-         NodeDataType & ddata = g->getData(dst);
-         int *ddst = &ddata.dist[ddata.next_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)];
-         int old_dist = *ddst;
-         int new_dist = g->getEdgeData(jj)+sdist;
-         while(new_dist < (old_dist = *ddst)){
-            if(__sync_bool_compare_and_swap(ddst, old_dist, new_dist)){
-               hasChanged = true;
-//               fprintf(stderr, "Edge::[src: %d(%d), dst: %d, ewt: %d [old: %d -> new: %d] ]\n", src, sdist, dst, g->getEdgeData(jj), old_dist, new_dist);
-               break;
-            }
-         }
-      }
-   }
-};
-/*********************************************************************************
- *
- **********************************************************************************/
-// [hostid] -> vector of GID that host has replicas of
-std::vector<std::vector<unsigned> > remoteReplicas;
-// [hostid] -> remote pGraph Structure (locally invalid)
-std::vector<PGraph*> magicPointer;
-/*********************************************************************************
- *
- **********************************************************************************/
-
-void setRemotePtr(uint32_t hostID, PGraph* p) {
-   if (hostID >= magicPointer.size())
-      magicPointer.resize(hostID + 1);
-   magicPointer[hostID] = p;
-}
-/*********************************************************************************
- *
- **********************************************************************************/
-
-void recvNodeStatic(unsigned GID, uint32_t hostID) {
-   if (hostID >= remoteReplicas.size())
-      remoteReplicas.resize(hostID + 1);
-   remoteReplicas[hostID].push_back(GID);
-}
-/*********************************************************************************
- *
- **********************************************************************************/
-
 void setNodeValue(PGraph* p, unsigned GID, int v) {
-   if (p->g.getData(p->G2L(GID)).dist[p->g.getData(p->G2L(GID)).current_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)] > v) {
-//      fprintf(stderr, "Lowered-ghost[%d, %d->%d]", p->G2L(GID), p->g.getData(p->G2L(GID)),v);
-   }
-//   else{
-//      return;
-//   }
    switch (personality) {
-   case CPU:
-      p->g.getData(p->G2L(GID)).dist[p->g.getData(p->G2L(GID)).current_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)] = v;
+   case CPU:{
+      NodeData & nd =p->g.getData(p->G2L(GID));
+      nd.dist[nd.current_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)] = std::min(v,nd.dist[nd.current_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)]);
+      nd.dist[nd.next_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)] = std::min(v,nd.dist[nd.next_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)]);
+   }
       break;
    case GPU_CUDA:
       setNodeValue_CUDA(cuda_ctx, p->G2L(GID), v);
@@ -233,6 +156,11 @@ void setNodeValue(PGraph* p, unsigned GID, int v) {
       break;
    }
 }
+
+/*********************************************************************************
+ *
+ **********************************************************************************/
+
 /*********************************************************************************
  * Send ghost-cell updates to all hosts that require it. Go over all the remote replica
  * arrays, and for each array, go over all the elements and send it to the host 'x'.
@@ -259,6 +187,147 @@ void sendGhostCells(Galois::Runtime::NetworkInterface& net, PGraph& g) {
          }
       }
    }
+}
+/****************************************************************************************
+ *
+ ****************************************************************************************/
+void setNextDistance(PGraph* p, unsigned GID, int v) {
+   switch (personality) {
+   case CPU: {
+      NodeData & nd = p->g.getData(p->G2L(GID));
+      nd.dist[nd.next_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)] = std::min(v, nd.dist[nd.next_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)]);
+   }
+      break;
+   case GPU_CUDA:
+      setNodeValue_CUDA(cuda_ctx, p->G2L(GID), v);
+      break;
+   case GPU_OPENCL: {
+      NodeData & nd = dOp.getData(p->G2L(GID));
+      nd.dist[nd.next_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)] = std::min(v, nd.dist[nd.next_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)]);
+   }
+      break;
+   default:
+      break;
+   }
+}
+/****************************************************************************************
+ *
+ ****************************************************************************************/
+void sendNextDistances(Galois::Runtime::NetworkInterface& net, PGraph& g) {
+   for (unsigned x = 0; x < remoteReplicas.size(); ++x) {
+      for (auto n : remoteReplicas[x]) {
+         switch (personality) {
+         case CPU: {
+            NodeData & nd = g.g.getData(n - g.g_offset);
+            net.sendAlt(x, setNextDistance, magicPointer[x], n, nd.dist[nd.next_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)]);
+         }
+            break;
+         case GPU_CUDA:
+            net.sendAlt(x, setNextDistance, magicPointer[x], n, (int) getNodeValue_CUDA(cuda_ctx, n - g.g_offset));
+            break;
+         case GPU_OPENCL: {
+            NodeData & nd = dOp.getData(n - g.g_offset);
+            net.sendAlt(x, setNextDistance, magicPointer[x], n,
+                  std::min(nd.dist[nd.next_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)], nd.dist[nd.current_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)]));
+         }
+            break;
+         default:
+            assert(false);
+            break;
+         }
+      }
+   }
+}
+/****************************************************************************************
+ * Send ghost-cells to owner nodes.
+ ****************************************************************************************/
+void sendGhostCellDistances(Galois::Runtime::NetworkInterface& net, PGraph & g) {
+      for (auto n = g.ghost_begin() ; n != g.ghost_end(); ++n) {
+      auto l2g_ndx = std::distance(g.g.begin(), n) - g.numOwned;
+      auto x = g.getHost(g.L2G[l2g_ndx]);
+      switch (personality) {
+      case CPU: {
+         NodeData & nd = g.g.getData(*n);
+         int msg = nd.dist[nd.next_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)];
+         net.sendAlt(x, setNextDistance, magicPointer[x], g.L2G[l2g_ndx],msg );
+      }
+         break;
+      case GPU_CUDA:
+//         net.sendAlt(x, setNextDistance, magicPointer[x], g.L2G[l2g_ndx], getNodeAttr2_CUDA(cuda_ctx, *n));
+         break;
+      case GPU_OPENCL: {
+         NodeData & nd = dOp.getData(*n);
+         net.sendAlt(x, setNextDistance, magicPointer[x], g.L2G[l2g_ndx], std::min(nd.dist[0], nd.dist[1]));
+      }
+         break;
+      default:
+         assert(false);
+         break;
+      }
+   }
+}
+/****************************************************************************************
+ *
+ ****************************************************************************************/
+struct SSSP_PUSH_Commit {
+   Graph * g;
+   void operator()(GNode src) const {
+      g->getData(src).dist[0] = g->getData(src).dist[1] = std::min(g->getData(src).dist[0], g->getData(src).dist[1]);
+      g->getData(src).swap_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD);
+   }
+};
+/****************************************************************************************
+ *
+ ****************************************************************************************/
+struct SSSP {
+   Graph* g;
+   void static go(PGraph& _g, unsigned num) {
+      //Perform computation
+      Galois::do_all(_g.begin(), _g.end(), SSSP { &_g.g }, Galois::loopname("SSSP"));
+      /////////////////////////////
+      Galois::Runtime::getSystemBarrier()();
+      sendGhostCellDistances(Galois::Runtime::getSystemNetworkInterface(), _g);
+      sendGhostCells(Galois::Runtime::getSystemNetworkInterface(), _g);
+      Galois::Runtime::getSystemBarrier()();
+      Galois::do_all(_g.begin(), _g.end() , SSSP_PUSH_Commit { &_g.g }, Galois::loopname("SSSP-Commit"));
+   }
+
+   void operator()(GNode src) const {
+      NodeDataType& sdata = g->getData(src);
+      int sdist = sdata.dist[sdata.current_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)];
+      for (auto jj = g->edge_begin(src), ej = g->edge_end(src); jj != ej; ++jj) {
+         GNode dst = g->getEdgeDst(jj);
+         NodeDataType & ddata = g->getData(dst);
+         int *ddst = &ddata.dist[ddata.next_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)];
+         int old_dist = *ddst;
+         int new_dist = g->getEdgeData(jj) + sdist;
+         while (new_dist < (old_dist = *ddst)) {
+            if (__sync_bool_compare_and_swap(ddst, old_dist, new_dist)) {
+               hasChanged = true;
+//               fprintf(stderr, "Edge::[src: %d(%d), dst: %d, ewt: %d [old: %d -> new: %d] ]\n", src, sdist, dst, g->getEdgeData(jj), old_dist, new_dist);
+               break;
+            }
+         }
+      }
+   }
+};
+/*********************************************************************************
+ *
+ **********************************************************************************/
+
+void setRemotePtr(uint32_t hostID, PGraph* p) {
+   if (hostID >= magicPointer.size())
+      magicPointer.resize(hostID + 1);
+   magicPointer[hostID] = p;
+}
+/*********************************************************************************
+ *
+ **********************************************************************************/
+
+void recvNodeStatic(unsigned GID, uint32_t hostID) {
+   if (hostID >= remoteReplicas.size())
+      remoteReplicas.resize(hostID + 1);
+   remoteReplicas[hostID].push_back(GID);
 }
 /*********************************************************************************
  *
@@ -371,7 +440,7 @@ void inner_main() {
       InitializeGraph::go(g.g, g.numNodes);
       if (g.getHost((src_node.Value)) == Galois::Runtime::NetworkInterface::ID) {
          fprintf(stderr, "Initialized src %d to zero at part %d\n", src_node.Value, Galois::Runtime::NetworkInterface::ID);
-         NodeData & ndata = g.g.getData(src_node);
+         NodeData & ndata = g.g.getData(src_node.Value);
          ndata.dist[ndata.current_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)] = 0;
          ndata.dist[ndata.current_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)] = 0;
       }
@@ -392,10 +461,10 @@ void inner_main() {
    //send pGraph pointers
    for (uint32_t x = 0; x < Galois::Runtime::NetworkInterface::Num; ++x)
       net.sendAlt(x, setRemotePtr, Galois::Runtime::NetworkInterface::ID, &g);
-
    //Ask for cells
    for (auto GID : g.L2G)
       net.sendAlt(g.getHost(GID), recvNodeStatic, GID, Galois::Runtime::NetworkInterface::ID);
+
 #if _HETERO_DEBUG_
    std::cout << "["<<my_host_id<< "]:ask for remote replicas\n";
 #endif
@@ -412,7 +481,7 @@ void inner_main() {
       //Do pagerank
       switch (personality) {
       case CPU:
-         SSSP::go(g.g, g.numOwned);
+         SSSP::go(g, g.numOwned);
          break;
       case GPU_OPENCL:
          dOp(g.numOwned, hasChanged);

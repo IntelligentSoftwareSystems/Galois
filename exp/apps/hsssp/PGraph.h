@@ -24,6 +24,9 @@ struct pGraph {
 
    typedef typename GraphTy::edge_data_type EdgeDataType;
    typedef typename GraphTy::node_data_type NodeDataType;
+   typedef typename GraphTy::iterator iterator;
+   typedef typename GraphTy::edge_iterator edge_iterator;
+
    GraphTy g;
    unsigned g_offset; // LID + g_offset = GID
    unsigned numOwned; // [0, numOwned) = global nodes owned, thus [numOwned, numNodes) are replicas
@@ -39,11 +42,47 @@ struct pGraph {
    }
    unsigned G2L(unsigned GID) {
       auto ii = std::find(L2G.begin(), L2G.end(), GID);
+      if(ii == L2G.end())return GID-g_offset;
       assert(ii != L2G.end());
       return std::distance(L2G.begin(), ii) + numOwned;
    }
-
    pGraph() : g_offset(0), numOwned(0), numNodes(0), id(0), numEdges(0) {
+   }
+   iterator begin() {
+      return g.begin();
+   }
+   iterator end() {
+      return g.begin() + numOwned;
+   }
+   iterator ghost_begin() {
+      return g.begin() + numOwned;
+   }
+   iterator ghost_end() {
+      return g.begin() + numNodes;
+   }
+   unsigned local2Global(iterator LID){
+      auto tx_lid = std::distance(g.begin(), LID);
+      unsigned retval = tx_lid < numOwned? tx_lid+g_offset: L2G[tx_lid];
+//      fprintf(stderr, "{Host:%d, numOwned:%d, TX_LID:%d,g_off=%d, L2G: %d, ret=%d}\n", Galois::Runtime::NetworkInterface::ID, numOwned, (int)tx_lid, g_offset, L2G[tx_lid], retval);
+      return retval;
+//      return L2G[LID];
+   }
+   void print(){
+      auto id= Galois::Runtime::NetworkInterface::ID;
+      fprintf(stderr, "H-%d::[g_offset=%d, numOwned=%d, numNodes=%d, numEdges=%d\n", id, g_offset, numOwned, numNodes, numEdges);
+//      for(auto n = 0; n < numNodes; ++n){
+//         fprintf(stderr,"H-%d::[n=%d,L2G[n]=%d] ", id, n, L2G[n] );
+//      }
+      for(auto n = g.begin(); n!=g.begin()+numOwned; ++n){
+         for(auto e = g.edge_begin(*n); e!=g.edge_end(*n); ++e){
+            auto dst = g.getEdgeDst(e);
+            auto wt = g.getEdgeData(e);
+            fprintf(stderr, "H-%d::[src:%d, dst:%d, wt:%d]\n", id, *n, dst, wt );
+         }
+      }
+      for (auto n =0; n<lastNodes.size(); ++n){
+         fprintf(stderr,"H-%d::[n=%d,lastNodes[n]=%d] ", id, n, lastNodes[n] );
+      }
    }
    /*********************************************************************************
     * Given a partitioned graph  .
@@ -125,7 +164,7 @@ struct pGraph {
       Galois::Graph::readGraph(this->g, fg2);
 
       ///RK: Print graph to debug.
-      /*for(auto n = this->g.begin(); n!=this->g.end(); ++n){
+/*      for(auto n = this->g.begin(); n!=this->g.end(); ++n){
          for(auto e = this->g.edge_begin(*n); e!=this->g.edge_end(*n); ++e){
             std::cout<<"Graph-Edge "<<*n << " , "<<this->g.getEdgeDst(e) << ", "<<this->g.getEdgeData(e) <<"\n";
          }
@@ -139,6 +178,7 @@ struct pGraph {
        See pGraphToMarshalGraph for one implementation.
        */
       this->numEdges = std::distance(this->g.edge_begin(*this->g.begin()), this->g.edge_end(*(this->g.begin() + this->numNodes - 1)));
+//      print();
       return;
    }
 };
