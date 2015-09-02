@@ -36,6 +36,6 @@
 //anchor vtable
 Galois::Substrate::Barrier::~Barrier() {}
 
-Galois::Substrate::Barrier& Galois::Substrate::getSystemBarrier(unsigned activeThreads) {
-  return benchmarking::getTopoBarrier(activeThreads);
-}
+//Galois::Substrate::Barrier& Galois::Substrate::getSystemBarrier(unsigned activeThreads) {
+//  return benchmarking::getTopoBarrier(activeThreads);
+//}

@@ -31,14 +31,19 @@
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 
-#include "Galois/Runtime/PerThreadStorage.h"
-#include "Galois/Substrate/Barrier.h"
+#include "Galois/Substrate/BarrierImpl.h"
 #include "Galois/Substrate/CompilerSpecific.h"
-#include "Galois/Runtime/ll/gio.h"
+#include "Galois/Substrate/gio.h"
 
+#if defined(GALOIS_HAVE_PTHREAD)
+
+#include <unistd.h>
 #include <pthread.h>
 
-#if _POSIX_BARRIERS > 0
+#endif
+
+
+#if defined(GALOIS_HAVE_PTHREAD) && defined(_POSIX_BARRIERS) && (_POSIX_BARRIERS > 0)
 
 namespace {
 
@@ -48,6 +53,11 @@ class PthreadBarrier: public Galois::Substrate::Barrier {
 public:
   PthreadBarrier() {
     if (pthread_barrier_init(&bar, 0, ~0))
+      GALOIS_DIE("PTHREAD");
+  }
+
+  PthreadBarrier(unsigned int v) {
+    if (pthread_barrier_init(&bar, 0, v))
       GALOIS_DIE("PTHREAD");
   }
 
@@ -74,14 +84,15 @@ public:
 
 }
 
-Galois::Substrate::Barrier& Galois::Substrate::benchmarking::getPthreadBarrier() {
-  static PthreadBarrier b;
-  static unsigned num = ~0;
-  if (activeThreads != num) {
-    num = activeThreads;
-    b.reinit(num);
-  }
-  return b;
+std::unique_ptr<Galois::Substrate::Barrier> Galois::Substrate::createPthreadBarrier(unsigned activeThreads) {
+  return std::unique_ptr<Barrier>(new PthreadBarrier(activeThreads));
+}
+
+#else
+
+std::unique_ptr<Galois::Substrate::Barrier> Galois::Substrate::createPthreadBarrier(unsigned activeThreads) {
+  return std::unique_ptr<Barrier>(nullptr);
 }
 
 #endif
+

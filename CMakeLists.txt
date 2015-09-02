@@ -362,12 +362,14 @@ function(makeTest)
 endfunction()
 
 ###### Source finding ######
-include_directories(include)
+#include_directories(include)
 
-if(USE_EXP)
-  add_subdirectory(exp)
-endif()
-#add_subdirectory(lib)
+add_subdirectory(libllvm)
+add_subdirectory(libsubstrate)
+add_subdirectory(libruntime)
+add_subdirectory(libgraphs)
+add_subdirectory(libexp)
+
 add_subdirectory(src)
 add_subdirectory(tools)
 add_subdirectory(scripts)

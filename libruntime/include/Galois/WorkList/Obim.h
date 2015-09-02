@@ -31,7 +31,7 @@
 #define GALOIS_WORKLIST_OBIM_H
 
 #include "Galois/FlatMap.h"
-#include "Galois/Substrate/Barrier.h"
+#include "Galois/Runtime/Substrate.h"
 #include "Galois/Substrate/PerThreadStorage.h"
 #include "Galois/Substrate/Termination.h"
 #include "Galois/WorkList/Chunked.h"
@@ -64,7 +64,7 @@ protected:
 
   Substrate::Barrier& barrier;
 
-  OrderedByIntegerMetricData(): barrier(Substrate::getSystemBarrier(Runtime::activeThreads)) { }
+  OrderedByIntegerMetricData(): barrier(Runtime::getBarrier(Runtime::activeThreads)) { }
 
   bool hasStored(ThreadData& p, Index idx) {
     for (auto& e : p.stored) {

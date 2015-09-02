@@ -32,7 +32,7 @@
  */
 
 #include "Galois/Substrate/ThreadPool.h"
-#include "Galois/Substrate/Barrier.h"
+#include "Galois/Substrate/BarrierImpl.h"
 #include "Galois/Substrate/CompilerSpecific.h"
 
 #include <atomic>
@@ -83,6 +83,11 @@ class MCSBarrier: public Galois::Substrate::Barrier {
   }
 
 public:
+
+  MCSBarrier(unsigned v) {
+    _reinit(v);
+  }
+
   virtual void reinit(unsigned val) {
     _reinit(val);
   }
@@ -115,12 +120,6 @@ public:
 
 }
 
-Galois::Substrate::Barrier& Galois::Substrate::benchmarking::getMCSBarrier(unsigned activeThreads) {
-  static MCSBarrier b;
-  static unsigned num = ~0;
-  if (activeThreads != num) {
-    num = activeThreads;
-    b.reinit(num);
-  }
-  return b;
+std::unique_ptr<Galois::Substrate::Barrier> Galois::Substrate::createMCSBarrier(unsigned activeThreads) {
+  return std::unique_ptr<Barrier>(new MCSBarrier(activeThreads));
 }

@@ -32,7 +32,7 @@
  */
 
 #include "Galois/Substrate/PerThreadStorage.h"
-#include "Galois/Substrate/Barrier.h"
+#include "Galois/Substrate/BarrierImpl.h"
 #include "Galois/Substrate/CompilerSpecific.h"
 
 #include <atomic>
@@ -88,6 +88,11 @@ class TopoBarrier : public Galois::Substrate::Barrier {
   }
 
 public:
+
+  TopoBarrier(unsigned v) {
+    _reinit(v);
+  }
+
   //not safe if any thread is in wait
   virtual void reinit(unsigned val) {
     _reinit(val);
@@ -134,13 +139,7 @@ public:
 
 }
 
-Galois::Substrate::Barrier& Galois::Substrate::benchmarking::getTopoBarrier(unsigned activeThreads) {
-  static TopoBarrier b;
-  static unsigned num = ~0;
-  if (activeThreads != num) {
-    num = activeThreads;
-    b.reinit(num);
-  }
-  return b;
+std::unique_ptr<Galois::Substrate::Barrier> Galois::Substrate::createTopoBarrier(unsigned activeThreads) {
+  return std::unique_ptr<Barrier>(new TopoBarrier(activeThreads));
 }
 

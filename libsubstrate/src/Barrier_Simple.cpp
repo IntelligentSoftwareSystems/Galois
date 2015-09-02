@@ -7,8 +7,8 @@
  *
  * Galois is free software: you can redistribute it and/or modify it
  * under the terms of the GNU Lesser General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
+ * published by the Free Software Foundation, version 2 of the
+ * License.
  *
  * Galois is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -27,35 +27,26 @@
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
 
-#include "Galois/Runtime/PerThreadStorage.h"
-#include "Galois/Substrate/Barrier.h"
-#include "Galois/Substrate/CompilerSpecific.h"
-#include "Galois/Runtime/ll/gio.h"
-#include <pthread.h>
+#include "Galois/Substrate/BarrierImpl.h"
+#include "Galois/Substrate/ThreadPool.h"
 
-#include <cstdlib>
-#include <cstdio>
+#include <mutex>
+#include <condition_variable>
 
-class OneWayBarrier: public Galois::Runtime::Barrier {
-  pthread_mutex_t lock;
-  pthread_cond_t cond;
+namespace {
+
+class OneWayBarrier: public Galois::Substrate::Barrier {
+  std::mutex lock;
+  std::condition_variable cond;
   unsigned count; 
   unsigned total;
 
 public:
-  OneWayBarrier(unsigned p = Galois::Runtime::activeThreads) {
-    if (pthread_mutex_init(&lock, NULL))
-      GALOIS_DIE("PTHREAD");
-    if (pthread_cond_init(&cond, NULL))
-      GALOIS_DIE("PTHREAD");
+  OneWayBarrier(unsigned p) {
     reinit(p);
   }
   
   virtual ~OneWayBarrier() {
-    if (pthread_mutex_destroy(&lock))
-      GALOIS_DIE("PTHREAD");
-    if (pthread_cond_destroy(&cond))
-      GALOIS_DIE("PTHREAD");
   }
 
   virtual void reinit(unsigned val) {
@@ -64,18 +55,10 @@ public:
   }
 
   virtual void wait() {
-    if (pthread_mutex_lock(&lock))
-      GALOIS_DIE("PTHREAD");
+    std::unique_lock<std::mutex> tmp(lock);
     count += 1;
-    while (count < total) {
-      if (pthread_cond_wait(&cond, &lock))
-        GALOIS_DIE("PTHREAD");
-    }
-    if (pthread_cond_broadcast(&cond))
-        GALOIS_DIE("PTHREAD");
-
-    if (pthread_mutex_unlock(&lock))
-      GALOIS_DIE("PTHREAD");
+    cond.wait(tmp, [this] () { return count >= total; });
+    cond.notify_all();
   }
 
   virtual const char* name() const { return "OneWayBarrier"; }
@@ -86,7 +69,7 @@ class SimpleBarrier: public Galois::Substrate::Barrier {
   OneWayBarrier barrier2;
   unsigned total;
 public:
-  SimpleBarrier(unsigned p = Galois::Runtime::activeThreads): barrier1(p), barrier2(p), total(p) { }
+  SimpleBarrier(unsigned p): barrier1(p), barrier2(p), total(p) { }
 
   virtual ~SimpleBarrier() { }
 
@@ -98,10 +81,10 @@ public:
 
   virtual void wait() {
     barrier1.wait();
-    if (Galois::Runtime::LL::getTID() == 0)
+    if (Galois::Substrate::ThreadPool::getTID() == 0)
       barrier1.reinit(total);
     barrier2.wait();
-    if (Galois::Runtime::LL::getTID() == 0)
+    if (Galois::Substrate::ThreadPool::getTID() == 0)
       barrier2.reinit(total);
   }
 
@@ -109,11 +92,9 @@ public:
 
 };
 
-std::unique_ptr<Galois::Substrate::Barrier> Galois::Substrate::createSimpleBarrier() {
-  //FIXME: allow pthread barrier again
-// #if _POSIX_BARRIERS > 1
-//   return new PthreadBarrier();
-// #else
-  return new SimpleBarrier();
-// #endif
+} // end anonymous namespace
+
+std::unique_ptr<Galois::Substrate::Barrier> Galois::Substrate::createSimpleBarrier(unsigned int v) {
+  return std::unique_ptr<Barrier>(new SimpleBarrier(v));
 }
+
