@@ -44,7 +44,7 @@ double runDoAll(const std::vector<double>& vecA, const std::vector<double>& vecB
 }
 
 double runExplicitThread(const std::vector<double>& vecA, const std::vector<double>& vecB) {
-  Galois::Substrate::Barrier& barrier = Galois::Substrate::getSystemBarrier(Galois::Runtime::activeThreads);
+  Galois::Substrate::Barrier& barrier = Galois::Runtime::getBarrier(Galois::Runtime::activeThreads);
   AccumDouble result;
   
   Galois::on_each([&](unsigned tid, unsigned total) {

@@ -33,8 +33,6 @@
 #ifndef GALOIS_SUBSTRATE_BARRIER_H
 #define GALOIS_SUBSTRATE_BARRIER_H
 
-#include <memory>
-
 namespace Galois {
 namespace Substrate {
 
@@ -54,41 +52,6 @@ public:
   //barrier type.
   virtual const char* name() const = 0;
 };
-
-/**
- * Have a pre-instantiated barrier available for use.
- * This is initialized to the current activeThreads. This barrier
- * is designed to be fast and should be used in the common
- * case. 
- *
- * However, there is a race if the number of active threads
- * is modified after using this barrier: some threads may still
- * be in the barrier while the main thread reinitializes this
- * barrier to the new number of active threads. If that may
- * happen, use {@link createSimpleBarrier()} instead. 
- */
-Barrier& getSystemBarrier(unsigned activeThreads);
-
-/**
- * Create specific types of barriers.  For benchmarking only.  Use
- * getSystemBarrier() for all production code
- */
-namespace benchmarking {
-Barrier& getPthreadBarrier(unsigned);
-Barrier& getMCSBarrier(unsigned);
-Barrier& getTopoBarrier(unsigned);
-Barrier& getCountingBarrier(unsigned);
-Barrier& getDisseminationBarrier(unsigned);
-}
-
-/**
- * Creates a new simple barrier. This barrier is not designed to be fast but
- * does gaurantee that all threads have left the barrier before returning
- * control. Useful when the number of active threads is modified to avoid a
- * race in {@link getSystemBarrier()}.  Client is reponsible for deallocating
- * returned barrier.
- */
-std::unique_ptr<Barrier> createSimpleBarrier();
 
 } // end namespace Substrate
 } // end namespace Galois

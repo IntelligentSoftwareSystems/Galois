@@ -32,7 +32,7 @@
  */
 
 #include "Galois/Substrate/ThreadPool.h"
-#include "Galois/Substrate/Barrier.h"
+#include "Galois/Substrate/BarrierImpl.h"
 #include "Galois/Substrate/CompilerSpecific.h"
 
 namespace {
@@ -52,6 +52,10 @@ class CountingBarrier: public Galois::Substrate::Barrier {
   }
 
 public:
+  CountingBarrier(unsigned int activeT) {
+    _reinit(activeT);
+  }
+
   virtual ~CountingBarrier() {}
 
   virtual void reinit(unsigned val) { _reinit(val); }
@@ -72,13 +76,7 @@ public:
 
 }
 
-Galois::Substrate::Barrier& Galois::Substrate::benchmarking::getCountingBarrier(unsigned activeThreads) {
-  static CountingBarrier b;
-  static unsigned num = ~0;
-  if (activeThreads != num) {
-    num = activeThreads;
-    b.reinit(num);
-  }
-  return b;
+std::unique_ptr<Galois::Substrate::Barrier> Galois::Substrate::createCountingBarrier(unsigned activeThreads) {
+  return std::unique_ptr<Barrier>(new CountingBarrier(activeThreads));
 }
 

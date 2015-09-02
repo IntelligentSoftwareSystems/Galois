@@ -38,7 +38,7 @@
 #include "Galois/TwoLevelIteratorA.h"
 #include "Galois/UnionFind.h"
 #include "Galois/ParallelSTL.h"
-#include "Galois/Substrate/Barrier.h"
+#include "Galois/Runtime/Substrate.h"
 #include "Galois/Runtime/Executor_ForEach.h"
 #include "Galois/Runtime/ForEachTraits.h"
 #include "Galois/Runtime/LoopStatistics.h"
@@ -551,7 +551,7 @@ class DAGManagerBase<OptionsTy,true> {
   Substrate::Barrier& barrier;
 
 public:
-  DAGManagerBase(): term(Substrate::getSystemTermination(activeThreads)), barrier(Substrate::getSystemBarrier(activeThreads)) { }
+  DAGManagerBase(): term(Substrate::getSystemTermination(activeThreads)), barrier(getBarrier(activeThreads)) { }
 
   void destroyDAGManager() {
     data.getLocal()->heap.clear();
@@ -738,7 +738,7 @@ class BreakManagerBase<OptionsTy, true> {
 public:
   BreakManagerBase(const OptionsTy& o): 
     breakFn(get_by_supertype<has_deterministic_parallel_break_tag>(o.args).value),
-    barrier(Substrate::getSystemBarrier(activeThreads)) { }
+    barrier(getBarrier(activeThreads)) { }
 
   bool checkBreak() {
     if (Substrate::ThreadPool::getTID() == 0)
@@ -768,7 +768,7 @@ class IntentToReadManagerBase<OptionsTy, true> {
   Substrate::Barrier& barrier;
 
 public:
-  IntentToReadManagerBase(): barrier(Substrate::getSystemBarrier(activeThreads)) { }
+  IntentToReadManagerBase(): barrier(getBarrier(activeThreads)) { }
 
   void pushIntentToReadTask(Context* ctx) {
     pending.getLocal()->push_back(ctx);
@@ -1214,7 +1214,7 @@ class NewWorkManager: public IdManager<OptionsTy> {
 
 public:
   NewWorkManager(const OptionsTy& o): 
-    IdManager<OptionsTy>(o), alloc(&heap), mergeBuf(alloc), distributeBuf(alloc), barrier(Substrate::getSystemBarrier(activeThreads)) 
+    IdManager<OptionsTy>(o), alloc(&heap), mergeBuf(alloc), distributeBuf(alloc), barrier(getBarrier(activeThreads)) 
   {
     numActive = getActiveThreads();
   }
@@ -1340,7 +1340,7 @@ public:
     BreakManager<OptionsTy>(o),
     NewWorkManager<OptionsTy>(o), 
     options(o),
-    barrier(Substrate::getSystemBarrier(activeThreads)),
+    barrier(getBarrier(activeThreads)),
     loopname(get_by_supertype<loopname_tag>(o.args).value) 
   { 
     static_assert(!OptionsTy::needsBreak || OptionsTy::hasBreak,

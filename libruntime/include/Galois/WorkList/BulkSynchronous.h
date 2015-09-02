@@ -23,7 +23,7 @@
 #ifndef GALOIS_WORKLIST_BULKSYNCHRONOUS_H
 #define GALOIS_WORKLIST_BULKSYNCHRONOUS_H
 
-#include "Galois/Substrate/Barrier.h"
+#include "Galois/Runtime/Substrate.h"
 #include "Chunked.h"
 #include "WLCompileCheck.h"
 
@@ -66,7 +66,7 @@ private:
  public:
   typedef T value_type;
 
-  BulkSynchronous(): barrier(Substrate::getSystemBarrier(Runtime::activeThreads)), some(false), isEmpty(false) { }
+  BulkSynchronous(): barrier(Runtime::getBarrier(Runtime::activeThreads)), some(false), isEmpty(false) { }
 
   void push(const value_type& val) {
     wls[(tlds.getLocal()->round + 1) & 1].push(val);

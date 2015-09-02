@@ -1,11 +1,3 @@
- #Long term starts here
-add_subdirectory(substrate)
-add_subdirectory(runtime)
-add_subdirectory(graphs)
-add_subdirectory(llvm)
-#Long term ends here
-
-
 #if(HAVE_CXX11_THREAD_YIELD)
 #  set(sources ${sources} FileGraphParallel_cpp11.cpp)
 #else()

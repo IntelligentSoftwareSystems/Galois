@@ -41,7 +41,7 @@
 #include "Galois/Statistic.h"
 #include "Galois/Threads.h"
 #include "Galois/Traits.h"
-#include "Galois/Substrate/Barrier.h"
+#include "Galois/Runtime/Substrate.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/ForEachTraits.h"
 #include "Galois/Runtime/Range.h"
@@ -348,7 +348,7 @@ protected:
   template<typename... WArgsTy>
   ForEachExecutor(T2, const FunctionTy& f, const ArgsTy& args, WArgsTy... wargs):
     term(Substrate::getSystemTermination(activeThreads)),
-    barrier(Substrate::getSystemBarrier(activeThreads)),
+    barrier(getBarrier(activeThreads)),
     wl(wargs...),
     origFunction(f),
     loopname(get_by_supertype<loopname_tag>(args).value),
@@ -492,7 +492,7 @@ void for_each_impl(const RangeTy& range, const FunctionTy& fn, const ArgsTy& arg
     ::template retype<value_type> WorkListTy;
   typedef ForEachExecutor<WorkListTy, FunctionTy, ArgsTy> WorkTy;
 
-  auto& barrier = Substrate::getSystemBarrier(activeThreads);
+  auto& barrier = getBarrier(activeThreads);
   WorkTy W(fn, args);
   W.init(range);
   Substrate::getSystemThreadPool().run(activeThreads,
