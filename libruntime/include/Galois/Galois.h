@@ -41,8 +41,8 @@
 #include "Galois/WorkList/WorkList.h"
 
 #ifdef GALOIS_USE_EXP
-#include "Galois/Runtime/Executor_BulkSynchronous.h"
-#include "Galois/Runtime/Executor_ParaMeter.h"
+//#include "Galois/Runtime/Executor_BulkSynchronous.h"
+//#include "Galois/Runtime/Executor_ParaMeter.h"
 #endif
 
 #include <utility>

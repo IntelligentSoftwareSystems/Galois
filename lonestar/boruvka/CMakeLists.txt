@@ -1,5 +1,5 @@
-app(boruvka Boruvka.cpp)
-app(boruvka-merge BoruvkaMerge.cpp)
+app(boruvka Boruvka.cpp EXP_OPT)
+app(boruvka-merge BoruvkaMerge.cpp EXP_OPT)
 
 add_test_scale(web boruvka "${BASEINPUT}/road/USA-road-d.USA.gr")
 add_test_scale(small boruvka "${BASEINPUT}/structured/rome99.gr")

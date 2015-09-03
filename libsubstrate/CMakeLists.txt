@@ -11,7 +11,6 @@ set(sources
             src/SimpleLock.cpp
             src/PtrLock.cpp
             src/ThreadPool_cpp11.cpp
-#            src/ThreadPool_pthread.cpp
             src/EnvCheck.cpp
             src/PerThreadStorage.cpp
             src/HWTopoLinux.cpp

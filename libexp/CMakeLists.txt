@@ -1,5 +1,6 @@
 set(sources
         src/DoAllWrap.cpp
+        src/Queue.cpp
 )
 
 add_library(galois_exp STATIC ${sources})
