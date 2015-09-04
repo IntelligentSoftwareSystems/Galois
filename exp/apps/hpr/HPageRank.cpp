@@ -72,15 +72,40 @@ static cll::opt<int> gpudevice("gpu", cll::desc("Select GPU to run on, default i
 static cll::opt<float> cldevice("cldevice", cll::desc("Select OpenCL device to run on , default is 0.0 (OpenCL backend)"), cll::init(0.0));
 static cll::opt<std::string> personality_set("pset", cll::desc("String specifying personality for each host. 'c'=CPU,'g'=GPU/CUDA and 'o'=GPU/OpenCL"), cll::init(""));
 
+///////////////////
+///////////////////////////////////////////
+enum BSP_FIELD_NAMES {PR_VAL_FIELD=0};
 struct LNode {
-   float value;
-   unsigned int nout;
+  unsigned int bsp_version;
+  float value[2]; /*ID=0*/
+  unsigned int nout;
+  void swap_version(unsigned int field_id){
+    bsp_version ^= 1<<field_id;
+  }
+  unsigned current_version(unsigned int field_id){
+    return (bsp_version& (1<<field_id))!=0;
+  }
+  unsigned next_version(unsigned int field_id){
+    return (~bsp_version& (1<<field_id))!=0;
+  }
 };
-
+/*struct LNode {
+   int bsp_version;
+   float value[2]; ID=0
+   unsigned int nout;
+   void swap_version(int field_id){
+      bsp_version ^= 1<<field_id;
+   }
+   int current_version(int field_id){
+      return bsp_version& (1<<field_id);
+   }
+   int next_version(int field_id){
+      return !(bsp_version&(1<<field_id));
+   }
+};*/
+//////////////////////////////////////////////////////////////////////////////////////
 typedef Galois::Graph::LC_CSR_Graph<LNode, void> Graph;
 typedef typename Graph::GraphNode GNode;
-std::map<GNode, float> buffered_updates;
-
 //////////////////////////////////////////////////////////////////////////////////////
 typedef Galois::OpenCL::LC_LinearArray_Graph<Galois::OpenCL::Array, LNode, void> DeviceGraph;
 
@@ -97,8 +122,8 @@ struct InitializeGraph {
    }
    void operator()(GNode src) const {
       LNode& sdata = g->g.getData(src);
-      sdata.value = 1.0 - alpha;
-      buffered_updates[src] = 0;
+      sdata.value[0] = 1.0 - alpha; // sdata.value[0]
+      sdata.value[1] = 0;//sdata.value[1]
       for (auto nbr = g->g.edge_begin(src); nbr != g->g.edge_end(src); ++nbr) {
          __sync_fetch_and_add(&g->g.getData(g->g.getEdgeDst(*nbr)).nout, 1);
       }
@@ -114,8 +139,7 @@ struct WriteBack {
    }
    void operator()(GNode src) const {
       LNode& sdata = g->g.getData(src);
-      sdata.value = buffered_updates[src];
-      buffered_updates[src] = 0;
+      sdata.swap_version(BSP_FIELD_NAMES::PR_VAL_FIELD);
    }
 };
 struct PageRank {
@@ -131,12 +155,11 @@ struct PageRank {
       for (auto jj = g->g.edge_begin(src), ej = g->g.edge_end(src); jj != ej; ++jj) {
          GNode dst = g->g.getEdgeDst(jj);
          LNode& ddata = g->g.getData(dst);
-         sum += ddata.value / ddata.nout;
+         sum += ddata.value[ddata.current_version(BSP_FIELD_NAMES::PR_VAL_FIELD)] / ddata.nout;
       }
       float value = (1.0 - alpha) * sum + alpha;
-      float diff = std::fabs(value - sdata.value);
-//      sdata.value = value;
-      buffered_updates[src] = value;
+      float diff = std::fabs(value - sdata.value[sdata.current_version(BSP_FIELD_NAMES::PR_VAL_FIELD)]);
+      sdata.value[sdata.next_version(BSP_FIELD_NAMES::PR_VAL_FIELD)] = value;
    }
 };
 /*********************************************************************************
@@ -172,13 +195,13 @@ void recvNodeStatic(unsigned GID, uint32_t hostID) {
 void setNodeValue(pGraph<Graph>* p, unsigned GID, float v) {
    switch (personality) {
    case CPU:
-      p->g.getData(p->G2L(GID)).value = v;
+      p->g.getData(p->G2L(GID)).value[p->g.getData(p->G2L(GID)).current_version(BSP_FIELD_NAMES::PR_VAL_FIELD)] = v;
       break;
    case GPU_CUDA:
       setNodeValue_CUDA(cuda_ctx, p->G2L(GID), v);
       break;
    case GPU_OPENCL:
-      cl_ctx.getData(p->G2L(GID)).value = v;
+      cl_ctx.getData(p->G2L(GID)).value[p->g.getData(p->G2L(GID)).current_version(BSP_FIELD_NAMES::PR_VAL_FIELD)] = v;
       break;
    default:
       break;
@@ -287,13 +310,13 @@ void sendGhostCells(Galois::Runtime::NetworkInterface& net, pGraph<Graph>& g) {
       for (auto n : remoteReplicas[x]) {
          switch (personality) {
          case CPU:
-            net.sendAlt(x, setNodeValue, magicPointer[x], n, g.g.getData(n - g.g_offset).value);
+            net.sendAlt(x, setNodeValue, magicPointer[x], n, g.g.getData(n - g.g_offset).value[g.g.getData(n - g.g_offset).current_version(BSP_FIELD_NAMES::PR_VAL_FIELD)]);
             break;
          case GPU_CUDA:
             net.sendAlt(x, setNodeValue, magicPointer[x], n, getNodeValue_CUDA(cuda_ctx, n - g.g_offset));
             break;
          case GPU_OPENCL:
-            net.sendAlt(x, setNodeValue, magicPointer[x], n, cl_ctx.getData((n - g.g_offset)).value);
+            net.sendAlt(x, setNodeValue, magicPointer[x], n, cl_ctx.getData((n - g.g_offset)).value[g.g.getData(n - g.g_offset).current_version(BSP_FIELD_NAMES::PR_VAL_FIELD)]);
             break;
          default:
             assert(false);
@@ -337,16 +360,6 @@ MarshalGraph pGraph2MGraph(pGraph<Graph> &g) {
 
    m.row_start[node_counter] = edge_counter;
    m.nedges = edge_counter;
-//   printf("dropped %u edges (g->r, g->l, g->g)\n", g.numEdges - m.nedges);
-   // for(int i = 0; i < node_counter; i++) {
-   //   printf("%u ", m.row_start[i]);
-   // }
-
-   // for(int i = 0; i < edge_counter; i++) {
-   //   printf("%u ", m.edge_dst[i]);
-   // }
-
-   // printf("nc: %zu ec: %zu\n", node_counter, edge_counter);
    return m;
 }
 /*********************************************************************************
@@ -499,13 +512,13 @@ void inner_main() {
       switch (personality) {
       case CPU: {
          for (auto n = g.g.begin(); n != g.g.begin() + g.numOwned; ++n) {
-            out_file << *n + g.g_offset << ", " << g.g.getData(*n).value << ", " << g.g.getData(*n).nout << "\n";
+            out_file << *n + g.g_offset << ", " << g.g.getData(*n).value[g.g.getData(*n).current_version(BSP_FIELD_NAMES::PR_VAL_FIELD)] << ", " << g.g.getData(*n).nout << "\n";
          }
          break;
       }
       case GPU_OPENCL: {
          for (int n = 0; n < g.numOwned; ++n) {
-            out_file << n + g.g_offset << ", " << cl_ctx.getData(n).value << ", " << cl_ctx.getData(n).nout << "\n";
+            out_file << n + g.g_offset << ", " << cl_ctx.getData(n).value[cl_ctx.getData(n).current_version(BSP_FIELD_NAMES::PR_VAL_FIELD)] << ", " << cl_ctx.getData(n).nout << "\n";
          }
          break;
       }
