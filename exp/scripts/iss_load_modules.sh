@@ -21,8 +21,8 @@ module load vtune
 #    module load cmake
 #fi
 
-module load gcc/4.9.0
-module load cmake
+module load gcc/4.8.1-scale
+module load cmake/3.2.3
 module load tbb
 module load boost
 module load eigen

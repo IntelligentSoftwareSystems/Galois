@@ -70,7 +70,7 @@ struct NumaAccess {
     }
 
     // eliminate uneven thread launching overhead
-    Galois::Substrate::Barrier& barrier = Galois::Substrate::getSystemBarrier(numThreads);
+    Galois::Substrate::Barrier& barrier = Galois::Runtime::getBarrier(numThreads);
     barrier.wait();
 
     Galois::StatTimer timer("AccessTime");

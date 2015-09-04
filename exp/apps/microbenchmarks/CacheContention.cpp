@@ -41,8 +41,10 @@ enum Algo {
   writeGlobal,
   nonAtomicRMW,
   fetchAndAdd,
-  cas, 
-  casWithPause
+  casBool, 
+  casBoolWithPause,
+  casVal, 
+  casValWithPause
 };
 
 namespace cll = llvm::cl;
@@ -52,9 +54,11 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
     clEnumValN(Algo::writeGlobal, "writeGlobal", "write to a global counter"),
     clEnumValN(Algo::nonAtomicRMW, "nonAtomicRMW", "non-atomic read-modify-write"), 
     clEnumValN(Algo::fetchAndAdd, "fetchAndAdd", "fetch and add"), 
-    clEnumValN(Algo::cas, "cas", "compare and swap (default)"),
-    clEnumValN(Algo::casWithPause, "casWithPause", "cas with pause when failed"),
-    clEnumValEnd), cll::init(Algo::cas));
+    clEnumValN(Algo::casBool, "casBool", "compare and swap returning bool"),
+    clEnumValN(Algo::casBoolWithPause, "casBoolWithPause", "casBool with pause when failed"),
+    clEnumValN(Algo::casVal, "casVal", "compare and swap returning value"), 
+    clEnumValN(Algo::casValWithPause, "casValWithPause", "casVal with pause when failed (default)"),
+    clEnumValEnd), cll::init(Algo::casValWithPause));
 
 static unsigned int globalAtomicCounter = 0;
 static volatile unsigned int globalCounter = 0;
@@ -67,8 +71,10 @@ struct Contention {
     }
 
     // to eliminate uneven thread launching overhead 
-    Galois::Substrate::Barrier& barrier = Galois::Substrate::getSystemBarrier(numThreads);
+    Galois::Substrate::Barrier& barrier = Galois::Runtime::getBarrier(numThreads);
     barrier.wait();
+
+    unsigned int oldV;
 
     switch (algo) {
     case Algo::writeGlobal:
@@ -86,10 +92,10 @@ struct Contention {
         __sync_fetch_and_add(&globalAtomicCounter, 1);
       }
       break;
-    case Algo::cas:
+    case Algo::casBool:
       for(unsigned int i = 0; i < upper; i++) {
         while(true) {
-          unsigned int oldV = globalAtomicCounter;
+          oldV = globalAtomicCounter;
           unsigned int newV = oldV + 1;
           if(__sync_bool_compare_and_swap(&globalAtomicCounter, oldV, newV)) {
             break;
@@ -97,15 +103,42 @@ struct Contention {
         }
       }
       break;
-    case Algo::casWithPause:
-    default:
+    case Algo::casBoolWithPause:
       for(unsigned int i = 0; i < upper; i++) {
         while(true) {
-          unsigned int oldV = globalAtomicCounter;
+          oldV = globalAtomicCounter;
           unsigned int newV = oldV + 1;
           if(__sync_bool_compare_and_swap(&globalAtomicCounter, oldV, newV)) {
             break;
           } else {
+            asm volatile("pause\n": : :"memory");
+          }
+        }
+      }
+      break;
+    case Algo::casVal:
+      oldV = globalAtomicCounter;
+      for(unsigned int i = 0; i < upper; i++) {
+        while(true) {
+          unsigned int newV = __sync_val_compare_and_swap(&globalAtomicCounter, oldV, oldV+1);
+          if(oldV == newV) {
+	    break;
+	  } else {
+	    oldV = newV;
+ 	  }
+        }
+      }
+      break;
+    case Algo::casValWithPause:
+    default:
+      oldV = globalAtomicCounter;
+      for(unsigned int i = 0; i < upper; i++) {
+        while(true) {
+          unsigned int newV = __sync_val_compare_and_swap(&globalAtomicCounter, oldV, oldV+1);
+          if(oldV == newV) {
+            break;
+          } else {
+            oldV = newV;
             asm volatile("pause\n": : :"memory");
           }
         }

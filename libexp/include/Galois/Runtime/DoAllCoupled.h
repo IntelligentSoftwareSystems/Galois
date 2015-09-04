@@ -709,7 +709,7 @@ template <typename R, typename F>
 void do_all_coupled (const R& range, const F& func, const char* loopname=0, const size_t chunk_size=details::DEFAULT_CHUNK_SIZE) {
   details::DoAllCoupledExec<R, F> exec (range, func, loopname, chunk_size);
 
-  Substrate::Barrier& barrier = Substrate::getSystemBarrier(activeThreads);
+  Substrate::Barrier& barrier = Runtime::getBarrier(activeThreads);
 
   Substrate::getSystemThreadPool().run(activeThreads, 
       [&exec] (void) { exec.initThread (); },
