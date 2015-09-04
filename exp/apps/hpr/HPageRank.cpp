@@ -379,8 +379,8 @@ void inner_main() {
    Galois::StatManager statManager;
    auto& barrier = Galois::Runtime::getSystemBarrier();
    const unsigned my_host_id = Galois::Runtime::NetworkInterface::ID;
-   Galois::Timer T_inner;
-   T_inner.start();
+   Galois::Timer T_total, T_graph_load, T_pagerank;
+   T_total.start();
    //Parse arg string when running on multiple hosts and update/override personality
    //with corresponding value.
    if (personality_set.length() == Galois::Runtime::NetworkInterface::Num) {
@@ -401,6 +401,7 @@ void inner_main() {
    barrier.wait();
    fprintf(stderr, "Post-barrier - Host: %d, Personality %s\n",Galois::Runtime::NetworkInterface::ID ,personality_str(personality).c_str());
 //   Graph rg;
+   T_graph_load.start();
    pGraph<Graph> g;
    g.loadGraph(inputFile);
 
@@ -417,6 +418,8 @@ void inner_main() {
    std::cout << g.id << " graph loaded\n";
 #endif
 
+   T_graph_load.stop();
+
    //local initialization
    if (personality == CPU) {
       InitializeGraph::go(g);
@@ -429,6 +432,8 @@ void inner_main() {
    std::cout << g.id << " initialized\n";
 #endif
    barrier.wait();
+   fprintf(stderr, "Post-barrier 2- Host: %d, Personality %s\n",Galois::Runtime::NetworkInterface::ID ,personality_str(personality).c_str());
+
 
    //send pGraph pointers
    for (uint32_t x = 0; x < Galois::Runtime::NetworkInterface::Num; ++x)
@@ -453,6 +458,7 @@ void inner_main() {
    sendGhostCellAttrs(net, g);
    barrier.wait();
 
+   T_pagerank.start();
    for (int i = 0; i < maxIterations; ++i) {
 #if _HETERO_DEBUG_
       std::cout << "Starting " << i << "\n";
@@ -481,6 +487,7 @@ void inner_main() {
       barrier.wait();
    }
 
+   T_pagerank.stop();
    //Final synchronization to ensure that all the nodes are updated.
    sendGhostCells(net, g);
    barrier.wait();
@@ -510,8 +517,8 @@ void inner_main() {
       }
       out_file.close();
    }
-   T_inner.stop();
-   std::cout << "Total time taken : " << T_inner.get() << " (msec)\n";
+   T_total.stop();
+   std::cout << "[" << Galois::Runtime::NetworkInterface::ID << "]" << " Total : " << T_total.get() << " Loading : " << T_graph_load.get() << " PagrRank : " << T_pagerank.get() << " (msec)\n";
    net.terminate();
    std::cout.flush();
 
