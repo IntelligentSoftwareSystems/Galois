@@ -222,7 +222,6 @@ if(USE_EXP)
         message(FATAL_ERROR "Need GGC_PATH ; set environment variable GCC_PATH to override")
       endif()
 
-      set(GGC_PATH "/org/centers/cdgc/repos/ggc")
       set(GGC_INCLUDE_PATH "${GGC_PATH}/rt/include")
       set(MGPU_PATH "${GGC_INCLUDE_PATH}/mgpu/include")
 
