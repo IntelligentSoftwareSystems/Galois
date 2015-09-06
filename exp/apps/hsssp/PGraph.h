@@ -26,6 +26,8 @@ struct pGraph {
    typedef typename GraphTy::node_data_type NodeDataType;
    typedef typename GraphTy::iterator iterator;
    typedef typename GraphTy::edge_iterator edge_iterator;
+   typedef unsigned GlobalIDType;
+   typedef iterator LocalIDType;
 
    GraphTy g;
    unsigned g_offset; // LID + g_offset = GID
@@ -34,20 +36,30 @@ struct pGraph {
    unsigned numEdges;
 
    // [numNodes, g.size()) should be ignored
-   std::vector<unsigned> L2G; // GID = L2G[LID - numOwned]
+   std::vector<unsigned> m_L2G; // GID = m_L2G[LID - numOwned]
    unsigned id; // my hostid
    std::vector<unsigned> lastNodes; //[ [i - 1], [i]) -> Node owned by host i
-   unsigned getHost(unsigned node) { // node is GID
+   unsigned getHost(GlobalIDType node) { // node is GID
       return std::distance(lastNodes.begin(), std::upper_bound(lastNodes.begin(), lastNodes.end(), node));
    }
-   unsigned G2L(unsigned GID) {
-      auto ii = std::find(L2G.begin(), L2G.end(), GID);
-      if(ii == L2G.end())return GID-g_offset;
-      assert(ii != L2G.end());
-      return std::distance(L2G.begin(), ii) + numOwned;
+   unsigned G2L(GlobalIDType GID) {
+      //Locally owned nodes
+      if(GID >= g_offset && GID < g_offset+numOwned) return GID-g_offset;
+      //Ghost cells.
+      auto ii = std::find(m_L2G.begin(), m_L2G.end(), GID);
+      assert(ii != m_L2G.end());
+      return std::distance(m_L2G.begin(), ii) + numOwned;
    }
+   unsigned L2G(iterator LID){
+         auto tx_lid = std::distance(g.begin(), LID);
+         return  tx_lid < numOwned? tx_lid+g_offset: m_L2G[tx_lid-numOwned];
+      }
    pGraph() : g_offset(0), numOwned(0), numNodes(0), id(0), numEdges(0) {
    }
+   /********************************************************************
+    * Make code more readable by using the following wrappers when iterating
+    * over either owned nodes or ghost nodes.
+    * ******************************************************************/
    iterator begin() {
       return g.begin();
    }
@@ -60,19 +72,16 @@ struct pGraph {
    iterator ghost_end() {
       return g.begin() + numNodes;
    }
-   unsigned local2Global(iterator LID){
-      auto tx_lid = std::distance(g.begin(), LID);
-      unsigned retval = tx_lid < numOwned? tx_lid+g_offset: L2G[tx_lid];
-//      fprintf(stderr, "{Host:%d, numOwned:%d, TX_LID:%d,g_off=%d, L2G: %d, ret=%d}\n", Galois::Runtime::NetworkInterface::ID, numOwned, (int)tx_lid, g_offset, L2G[tx_lid], retval);
-      return retval;
-//      return L2G[LID];
-   }
+
+//   unsigned locam_L2Global(unsigned tx_lid){
+//      return  tx_lid < numOwned? tx_lid+g_offset: m_L2G[tx_lid-numOwned];
+//   }
+   /*
+    * Debugging routine. Does not print the m_L2G.
+    * */
    void print(){
       auto id= Galois::Runtime::NetworkInterface::ID;
       fprintf(stderr, "H-%d::[g_offset=%d, numOwned=%d, numNodes=%d, numEdges=%d\n", id, g_offset, numOwned, numNodes, numEdges);
-//      for(auto n = 0; n < numNodes; ++n){
-//         fprintf(stderr,"H-%d::[n=%d,L2G[n]=%d] ", id, n, L2G[n] );
-//      }
       for(auto n = g.begin(); n!=g.begin()+numOwned; ++n){
          for(auto e = g.edge_begin(*n); e!=g.edge_end(*n); ++e){
             auto dst = g.getEdgeDst(e);
@@ -83,6 +92,10 @@ struct pGraph {
       for (auto n =0; n<lastNodes.size(); ++n){
          fprintf(stderr,"H-%d::[n=%d,lastNodes[n]=%d] ", id, n, lastNodes[n] );
       }
+      fprintf(stderr, "m_L2G[");
+      for(auto i : m_L2G)
+         fprintf(stderr,"%d, ", i );
+      fprintf(stderr, "]\n");
    }
    /*********************************************************************************
     * Given a partitioned graph  .
@@ -146,7 +159,7 @@ struct pGraph {
             if (perm.at(dst) == ~0) {
                //printf("%d: ghost: %d local: %d\n", hostID, dst, nextSlot);
                perm[dst] = nextSlot++;
-               this->L2G.push_back(dst);
+               this->m_L2G.push_back(dst);
             }
          }
       }
@@ -164,7 +177,7 @@ struct pGraph {
       Galois::Graph::readGraph(this->g, fg2);
 
       ///RK: Print graph to debug.
-/*      for(auto n = this->g.begin(); n!=this->g.end(); ++n){
+  /*    for(auto n = this->g.begin(); n!=this->g.end(); ++n){
          for(auto e = this->g.edge_begin(*n); e!=this->g.edge_end(*n); ++e){
             std::cout<<"Graph-Edge "<<*n << " , "<<this->g.getEdgeDst(e) << ", "<<this->g.getEdgeData(e) <<"\n";
          }
@@ -182,7 +195,4 @@ struct pGraph {
       return;
    }
 };
-
-
-
 #endif /* GDIST_EXP_APPS_HPR_PGRAPH_H_ */
