@@ -219,7 +219,7 @@ if(USE_EXP)
       endif()
       if (EXISTS ${GGC_PATH})
       else()
-        message(FATAL_ERROR "Need GGC_PATH ; set environment variable GCC_PATH to override")
+        message(FATAL_ERROR "GGC_PATH=${GGC_PATH} does not exist; set environment variable GGC_PATH to override")
       endif()
 
       set(GGC_INCLUDE_PATH "${GGC_PATH}/rt/include")
