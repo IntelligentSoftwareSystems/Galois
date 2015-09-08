@@ -10,6 +10,7 @@
 #include "Galois/Graph/LC_CSR_Graph.h"
 #include "Galois/Graph/Util.h"
 #include "Lonestar/BoilerPlate.h"
+#include "Galois/Bag.h"
 
 #ifndef GDIST_EXP_APPS_HPR_PGRAPH_H_
 #define GDIST_EXP_APPS_HPR_PGRAPH_H_
@@ -21,13 +22,9 @@
  **********************************************************************************/
 template<typename GraphTy>
 struct pGraph {
-
+   typedef typename GraphTy::GraphNode GraphNode;
    typedef typename GraphTy::edge_data_type EdgeDataType;
    typedef typename GraphTy::node_data_type NodeDataType;
-   typedef typename GraphTy::iterator iterator;
-   typedef typename GraphTy::edge_iterator edge_iterator;
-   typedef unsigned GlobalIDType;
-   typedef iterator LocalIDType;
 
    GraphTy g;
    unsigned g_offset; // LID + g_offset = GID
@@ -36,66 +33,29 @@ struct pGraph {
    unsigned numEdges;
 
    // [numNodes, g.size()) should be ignored
-   std::vector<unsigned> m_L2G; // GID = m_L2G[LID - numOwned]
+   std::vector<unsigned> L2G; // GID = L2G[LID - numOwned]
    unsigned id; // my hostid
    std::vector<unsigned> lastNodes; //[ [i - 1], [i]) -> Node owned by host i
-   unsigned getHost(GlobalIDType node) { // node is GID
+   unsigned getHost(unsigned node) { // node is GID
       return std::distance(lastNodes.begin(), std::upper_bound(lastNodes.begin(), lastNodes.end(), node));
    }
-   unsigned G2L(GlobalIDType GID) {
-      //Locally owned nodes
-      if(GID >= g_offset && GID < g_offset+numOwned) return GID-g_offset;
-      //Ghost cells.
-      auto ii = std::find(m_L2G.begin(), m_L2G.end(), GID);
-      assert(ii != m_L2G.end());
-      return std::distance(m_L2G.begin(), ii) + numOwned;
+   unsigned G2L(unsigned GID) {
+      if(GID>=g_offset && GID< g_offset+numOwned)
+         return GID-g_offset;
+      auto ii = std::find(L2G.begin(), L2G.end(), GID);
+      assert(ii != L2G.end());
+      return std::distance(L2G.begin(), ii) + numOwned;
    }
-   unsigned L2G(iterator LID){
-         auto tx_lid = std::distance(g.begin(), LID);
-         return  tx_lid < numOwned? tx_lid+g_offset: m_L2G[tx_lid-numOwned];
+   unsigned uid(unsigned lid){
+      assert(lid <numNodes);
+      if(lid < numOwned){
+         return lid + g_offset;
+      }else{
+         return L2G[lid-numOwned];
       }
-   pGraph() : g_offset(0), numOwned(0), numNodes(0), id(0), numEdges(0) {
-   }
-   /********************************************************************
-    * Make code more readable by using the following wrappers when iterating
-    * over either owned nodes or ghost nodes.
-    * ******************************************************************/
-   iterator begin() {
-      return g.begin();
-   }
-   iterator end() {
-      return g.begin() + numOwned;
-   }
-   iterator ghost_begin() {
-      return g.begin() + numOwned;
-   }
-   iterator ghost_end() {
-      return g.begin() + numNodes;
    }
 
-//   unsigned locam_L2Global(unsigned tx_lid){
-//      return  tx_lid < numOwned? tx_lid+g_offset: m_L2G[tx_lid-numOwned];
-//   }
-   /*
-    * Debugging routine. Does not print the m_L2G.
-    * */
-   void print(){
-      auto id= Galois::Runtime::NetworkInterface::ID;
-      fprintf(stderr, "H-%d::[g_offset=%d, numOwned=%d, numNodes=%d, numEdges=%d\n", id, g_offset, numOwned, numNodes, numEdges);
-      for(auto n = g.begin(); n!=g.begin()+numOwned; ++n){
-         for(auto e = g.edge_begin(*n); e!=g.edge_end(*n); ++e){
-            auto dst = g.getEdgeDst(e);
-            auto wt = g.getEdgeData(e);
-            fprintf(stderr, "H-%d::[src:%d, dst:%d, wt:%d]\n", id, *n, dst, wt );
-         }
-      }
-      for (auto n =0; n<lastNodes.size(); ++n){
-         fprintf(stderr,"H-%d::[n=%d,lastNodes[n]=%d] ", id, n, lastNodes[n] );
-      }
-      fprintf(stderr, "m_L2G[");
-      for(auto i : m_L2G)
-         fprintf(stderr,"%d, ", i );
-      fprintf(stderr, "]\n");
+   pGraph() : g_offset(0), numOwned(0), numNodes(0), id(0), numEdges(0) {
    }
    /*********************************************************************************
     * Given a partitioned graph  .
@@ -154,12 +114,10 @@ struct pGraph {
             //std::cout << *ii << " " << *jj << " " << nextSlot << " " << perm.size() << "\n";
             //      assert(*jj < perm.size());
             auto dst = fg.getEdgeDst(jj);
-            int edata  = fg.getEdgeData<int>(jj);
-//            std::cout<<" Edge :: "<< *ii <<", "<<dst << ", "<<edata << "\n";
             if (perm.at(dst) == ~0) {
                //printf("%d: ghost: %d local: %d\n", hostID, dst, nextSlot);
                perm[dst] = nextSlot++;
-               this->m_L2G.push_back(dst);
+               this->L2G.push_back(dst);
             }
          }
       }
@@ -176,13 +134,6 @@ struct pGraph {
       Galois::Graph::permute<EdgeDataType>(fg, perm, fg2);
       Galois::Graph::readGraph(this->g, fg2);
 
-      ///RK: Print graph to debug.
-  /*    for(auto n = this->g.begin(); n!=this->g.end(); ++n){
-         for(auto e = this->g.edge_begin(*n); e!=this->g.edge_end(*n); ++e){
-            std::cout<<"Graph-Edge "<<*n << " , "<<this->g.getEdgeDst(e) << ", "<<this->g.getEdgeData(e) <<"\n";
-         }
-      }*/
-
       loadLastNodes(fg.size(), numHosts);
 
       /* TODO: This still counts edges from ghosts to remote nodes,
@@ -191,7 +142,6 @@ struct pGraph {
        See pGraphToMarshalGraph for one implementation.
        */
       this->numEdges = std::distance(this->g.edge_begin(*this->g.begin()), this->g.edge_end(*(this->g.begin() + this->numNodes - 1)));
-//      print();
       return;
    }
 };
