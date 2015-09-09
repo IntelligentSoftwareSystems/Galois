@@ -212,7 +212,17 @@ if(USE_EXP)
       set(CUDA_SEPARABLE_COMPILATION on)
       set(CUDA_HOST_COMPILER g++)
 
-      set(GGC_PATH "/org/centers/cdgc/repos/ggc")
+      if(NOT "$ENV{GGC_PATH}" STREQUAL "")
+        set(GGC_PATH $ENV{GGC_PATH})
+        message(STATUS "GGC_PATH set to ${GGC_PATH}")
+      else()
+        set(GGC_PATH "/org/centers/cdgc/repos/ggc")
+      endif()
+      if (EXISTS ${GGC_PATH})
+      else()
+        message(FATAL_ERROR "GGC_PATH=${GGC_PATH} does not exist; set environment variable GGC_PATH to override")
+      endif()
+
       set(GGC_INCLUDE_PATH "${GGC_PATH}/rt/include")
       set(MGPU_PATH "${GGC_INCLUDE_PATH}/mgpu/include")
 
