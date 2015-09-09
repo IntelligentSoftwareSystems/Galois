@@ -19,6 +19,7 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  *
  * @author Andrew Lenharth <andrew@lenharth.org>
+ * @author Rashid Kaleem <rashid.kaleem@gmail.com>
  */
 
 #include "Galois/Galois.h"
@@ -196,21 +197,23 @@ struct dPageRank {
 /*********************************************************************************
  * CPU PageRank operator implementation.
  **********************************************************************************/
-struct WriteBack {
-   pGraph<Graph> * g;
-   void static go(pGraph<Graph>& _g) {
-      Galois::do_all(_g.g.begin(), _g.g.begin() + _g.numOwned, WriteBack { &_g }, Galois::loopname("Writeback"));
-   }
-   void operator()(GNode src) const {
-      LNode& sdata = g->g.getData(src);
-      sdata.swap_version(BSP_FIELD_NAMES::PR_VAL_FIELD);
-   }
-};
+//struct WriteBack {
+//   pGraph<Graph> * g;
+//   void static go(pGraph<Graph>& _g) {
+//      Galois::do_all(_g.g.begin(), _g.g.begin() + _g.numOwned, WriteBack { &_g }, Galois::loopname("Writeback"));
+//   }
+//   void operator()(GNode src) const {
+//      LNode& sdata = g->g.getData(src);
+//      sdata.swap_version(BSP_FIELD_NAMES::PR_VAL_FIELD);
+//   }
+//};
 struct PageRank {
    pGraph<Graph>* g;
    void static go(pGraph<Graph>& _g) {
       max_delta.reset();
       Galois::do_all(_g.g.begin(), _g.g.begin() + _g.numOwned, PageRank { &_g }, Galois::loopname("Page Rank"));
+      //Do commit
+      Galois::do_all(_g.g.begin(), _g.g.begin() + _g.numOwned, [&](GNode src){_g.g.getData(src).swap_version(BSP_FIELD_NAMES::PR_VAL_FIELD);}, Galois::loopname("SSSP-Commit"));
       max_delta.reduce();
    }
    void operator()(GNode src) const {
@@ -547,8 +550,8 @@ void inner_main() {
       //Do pagerank
       switch (personality) {
       case CPU:
-         PageRank::go(g/*, g.numOwned*/);
-         WriteBack::go(g/*, g.numOwned*/);
+         PageRank::go(g);
+//         WriteBack::go(g/*, g.numOwned*/);
          break;
       case GPU_OPENCL:
          dOp(dGraph, g.numOwned);

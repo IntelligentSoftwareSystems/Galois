@@ -19,6 +19,7 @@
  * Documentation, or loss or inaccuracy of data of any kind.
  *
  * @author Andrew Lenharth <andrew@lenharth.org>
+ * @author Rashid Kaleem <rashid.kaleem@gmail.com>
  */
 
 #include "Galois/Galois.h"
@@ -147,6 +148,8 @@ struct PageRank {
 
    void static go(pGraph<Graph>& _g) {
       Galois::do_all(_g.g.begin(), _g.g.begin() + _g.numOwned, PageRank { &_g }, Galois::loopname("Page Rank"));
+      //Do commit
+      Galois::do_all(_g.g.begin(), _g.g.begin() + _g.numOwned, [&](GNode src){_g.g.getData(src).swap_version(BSP_FIELD_NAMES::PR_VAL_FIELD);}, Galois::loopname("PR-Commit"));
    }
 
    void operator()(GNode src) const {
@@ -486,7 +489,7 @@ void inner_main() {
       switch (personality) {
       case CPU:
          PageRank::go(g);
-         WriteBack::go(g);
+//         WriteBack::go(g);
          break;
       case GPU_OPENCL:
          cl_ctx(g.numOwned);

@@ -10,6 +10,7 @@
 #include "Galois/Graph/LC_CSR_Graph.h"
 #include "Galois/Graph/Util.h"
 #include "Lonestar/BoilerPlate.h"
+#include "Galois/Bag.h"
 
 #ifndef GDIST_EXP_APPS_HPR_PGRAPH_H_
 #define GDIST_EXP_APPS_HPR_PGRAPH_H_
@@ -21,9 +22,10 @@
  **********************************************************************************/
 template<typename GraphTy>
 struct pGraph {
-
+   typedef typename GraphTy::GraphNode GraphNode;
    typedef typename GraphTy::edge_data_type EdgeDataType;
    typedef typename GraphTy::node_data_type NodeDataType;
+
    GraphTy g;
    unsigned g_offset; // LID + g_offset = GID
    unsigned numOwned; // [0, numOwned) = global nodes owned, thus [numOwned, numNodes) are replicas
@@ -38,9 +40,19 @@ struct pGraph {
       return std::distance(lastNodes.begin(), std::upper_bound(lastNodes.begin(), lastNodes.end(), node));
    }
    unsigned G2L(unsigned GID) {
+      if(GID>=g_offset && GID< g_offset+numOwned)
+         return GID-g_offset;
       auto ii = std::find(L2G.begin(), L2G.end(), GID);
       assert(ii != L2G.end());
       return std::distance(L2G.begin(), ii) + numOwned;
+   }
+   unsigned uid(unsigned lid){
+      assert(lid <numNodes);
+      if(lid < numOwned){
+         return lid + g_offset;
+      }else{
+         return L2G[lid-numOwned];
+      }
    }
 
    pGraph() : g_offset(0), numOwned(0), numNodes(0), id(0), numEdges(0) {
@@ -102,8 +114,6 @@ struct pGraph {
             //std::cout << *ii << " " << *jj << " " << nextSlot << " " << perm.size() << "\n";
             //      assert(*jj < perm.size());
             auto dst = fg.getEdgeDst(jj);
-            int edata  = fg.getEdgeData<int>(jj);
-//            std::cout<<" Edge :: "<< *ii <<", "<<dst << ", "<<edata << "\n";
             if (perm.at(dst) == ~0) {
                //printf("%d: ghost: %d local: %d\n", hostID, dst, nextSlot);
                perm[dst] = nextSlot++;
@@ -124,13 +134,6 @@ struct pGraph {
       Galois::Graph::permute<EdgeDataType>(fg, perm, fg2);
       Galois::Graph::readGraph(this->g, fg2);
 
-      ///RK: Print graph to debug.
-      /*for(auto n = this->g.begin(); n!=this->g.end(); ++n){
-         for(auto e = this->g.edge_begin(*n); e!=this->g.edge_end(*n); ++e){
-            std::cout<<"Graph-Edge "<<*n << " , "<<this->g.getEdgeDst(e) << ", "<<this->g.getEdgeData(e) <<"\n";
-         }
-      }*/
-
       loadLastNodes(fg.size(), numHosts);
 
       /* TODO: This still counts edges from ghosts to remote nodes,
@@ -142,7 +145,4 @@ struct pGraph {
       return;
    }
 };
-
-
-
 #endif /* GDIST_EXP_APPS_HPR_PGRAPH_H_ */
