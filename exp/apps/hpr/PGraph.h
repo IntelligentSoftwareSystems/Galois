@@ -88,10 +88,11 @@ struct pGraph {
       this->id = hostID;
       std::vector<unsigned> perm(fg.size(), ~0); //[i (orig)] -> j (final)
       unsigned nextSlot = 0;
-   //   std::cout << fg.size() << " " << p.first << " " << p.second << "\n";
+      //std::cout << fg.size() << " " << p.first << " " << p.second << "\n";
       //Fill our partition
       for (unsigned i = p.first; i < p.second; ++i) {
-         //printf("%d: owned: %d local: %d\n", hostID, i, nextSlot);
+         //if(hostID == 0)
+           //printf("%d: owned: %d local: %d\n", hostID, i, nextSlot);
          perm[i] = nextSlot++;
       }
       //find ghost cells
@@ -101,7 +102,8 @@ struct pGraph {
             //      assert(*jj < perm.size());
             auto dst = fg.getEdgeDst(jj);
             if (perm.at(dst) == ~0) {
-               //printf("%d: ghost: %d local: %d\n", hostID, dst, nextSlot);
+               //if (hostID == 0)
+                 //printf("%d: ghost: %d local: %d\n", hostID, dst, nextSlot);
                perm[dst] = nextSlot++;
                this->L2G.push_back(dst);
             }
