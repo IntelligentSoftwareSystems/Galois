@@ -40,6 +40,15 @@ struct pGraph {
       assert(ii != L2G.end());
       return std::distance(L2G.begin(), ii) + numOwned;
    }
+   unsigned uid(unsigned lid){
+      assert(lid <numNodes);
+      if(lid < numOwned){
+         return lid + g_offset;
+      }else{
+         return L2G[lid-numOwned];
+      }
+   }
+
 
    pGraph() : g_offset(0), numOwned(0), numNodes(0), id(0), numEdges(0) {
    }

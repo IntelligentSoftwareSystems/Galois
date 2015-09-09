@@ -168,18 +168,6 @@ struct InitializeGhostCells {
  /*********************************************************************************
  * CPU PageRank operator implementation.
  **********************************************************************************/
-struct WriteBack {
-   pGraph<Graph> * g;
-   void static go(pGraph<Graph>& _g) {
-      Galois::do_all(_g.g.begin(), _g.g.begin() + _g.numOwned, WriteBack { &_g }, Galois::loopname("Writeback"));
-   }
-   void operator()(GNode src) const {
-      LNode& sdata = g->g.getData(src);
-      //sdata.swap_version(BSP_FIELD_NAMES::PR_VAL_FIELD);
-   }
-};
-
-
 struct PageRank_push {
    pGraph<Graph>* g;
 
@@ -250,28 +238,58 @@ void reduceNodeValue(pGraph<Graph>* p, unsigned GID, PRTy residual) {
 /*********************************************************************************
  *Reduce all the values a ghost cells
  **********************************************************************************/
-void reduceGhostCells(Galois::Runtime::NetworkInterface& net, pGraph<Graph>& g) {
-   for (unsigned x = 0; x < remoteReplicas.size(); ++x) {
-      for (auto n : remoteReplicas[x]) {
-         /* no per-personality needed but until nout is
-          fixed for CPU and OpenCL ... */
+//XXX: Incorrect
+struct reduceGhostCells_struct {
+  pGraph<Graph>* g;
+  void static go(pGraph<Graph>& _g){
+      Galois::do_all(_g.g.begin() + _g.numOwned, _g.g.begin() + _g.numNodes, reduceGhostCells_struct { &_g }, Galois::loopname("init ghost cells"));
+  }
+  void operator()(GNode src) const {
+     Galois::Runtime::NetworkInterface& net = Galois::Runtime::getSystemNetworkInterface();
+     LNode& sdata = g->g.getData(src);
 
-         switch (personality) {
+     auto n = g->uid(src);
+     auto x = g->getHost(n);
+
+     switch (personality) {
          case CPU:
-            net.sendAlt(x, reduceNodeValue, magicPointer[x], n, g.g.getData(n - g.g_offset).residual.exchange(0.0));
-            break;
-         case GPU_CUDA:
-            //net.sendAlt(x, reduceNodeValue, magicPointer[x], n, getNodeValue_CUDA(cuda_ctx, n - g.g_offset));
-            break;
-         case GPU_OPENCL:
-            //net.sendAlt(x, reduceNodeValue, magicPointer[x], n, cl_ctx.getData((n - g.g_offset)).value[g.g.getData(n - g.g_offset).current_version(BSP_FIELD_NAMES::PR_VAL_FIELD)]);
+            net.sendAlt(x, reduceNodeValue, magicPointer[x], n, sdata.residual.exchange(0.0));
+            //if (Galois::Runtime::NetworkInterface::ID)
+              //std::cout << "In : " << g.g_offset<< " r : " << g.g.getData(n - g.g_offset).residual << "\n";
             break;
          default:
             assert(false);
             break;
          }
-      }
-   }
+  }
+};
+
+void reduceGhostCells(Galois::Runtime::NetworkInterface& net, pGraph<Graph>& g) {
+
+  for(auto ii = g.g.begin() + g.numOwned; ii != g.g.begin() + g.numNodes; ++ii){
+    auto n = g.uid(*ii);
+    auto x = g.getHost(n);
+    LNode& sdata = g.g.getData(*ii);
+
+#if _HETERO_DEBUG_
+    if (net.ID == 0)
+      std::cout << "src : " << *ii << " , n " << n << ", x "<< x << "\n";
+#endif
+    switch (personality) {
+      case CPU:
+        net.sendAlt(x, reduceNodeValue, magicPointer[x], n, sdata.residual.exchange(0.0));
+        break;
+      case GPU_CUDA:
+        //net.sendAlt(x, reduceNodeValue, magicPointer[x], n, getNodeValue_CUDA(cuda_ctx, n - g.g_offset));
+        break;
+      case GPU_OPENCL:
+        //net.sendAlt(x, reduceNodeValue, magicPointer[x], n, cl_ctx.getData((n - g.g_offset)).value[g.g.getData(n - g.g_offset).current_version(BSP_FIELD_NAMES::PR_VAL_FIELD)]);
+        break;
+      default:
+        assert(false);
+        break;
+    }
+  }
 }
 
 
@@ -282,36 +300,13 @@ struct clearGhostCells {
   pGraph<Graph>* g;
 
   void static go(pGraph<Graph>& _g){
-    Galois::do_all(_g.g.begin() + _g.numOwned, _g.g.begin() + _g.numNodes, InitializeGhostCells { &_g }, Galois::loopname("init ghost cells"));
+    Galois::do_all(_g.g.begin() + _g.numOwned, _g.g.begin() + _g.numNodes, InitializeGhostCells { &_g }, Galois::loopname("Clear residual on Ghost cells"));
   }
 
   void operator()(GNode src){
     PRTy oldResidual = g->g.getData(src).residual.exchange(0.0);
   }
 };
-void ClearGhostCells(Galois::Runtime::NetworkInterface& net, pGraph<Graph>& g) {
-   for (unsigned x = 0; x < remoteReplicas.size(); ++x) {
-      for (auto n : remoteReplicas[x]) {
-         /* no per-personality needed but until nout is
-          fixed for CPU and OpenCL ... */
-
-         switch (personality) {
-         case CPU:
-            net.sendAlt(x, reduceNodeValue, magicPointer[x], n, g.g.getData(n - g.g_offset).residual.load());
-            break;
-         case GPU_CUDA:
-            //net.sendAlt(x, reduceNodeValue, magicPointer[x], n, getNodeValue_CUDA(cuda_ctx, n - g.g_offset));
-            break;
-         case GPU_OPENCL:
-            //net.sendAlt(x, reduceNodeValue, magicPointer[x], n, cl_ctx.getData((n - g.g_offset)).value[g.g.getData(n - g.g_offset).current_version(BSP_FIELD_NAMES::PR_VAL_FIELD)]);
-            break;
-         default:
-            assert(false);
-            break;
-         }
-      }
-   }
-}
 /*********************************************************************************
  *
  **********************************************************************************/
@@ -479,10 +474,20 @@ void inner_main() {
       //Do pagerank
       switch (personality) {
       case CPU:
-         PageRank_push::go(g);
-         reduceGhostCells(net, g);
-         //clearGhostCells::go(g);
-         break;
+        PageRank_push::go(g);
+        reduceGhostCells(net,g);
+#if _HETERO_DEBUG_
+        if(my_host_id == 0)
+        {
+          for (auto n = g.g.begin() + g.numOwned; n != g.g.begin() + g.numNodes; ++n)
+          {
+            std::cout << *n + g.g_offset << "\n\t";
+            LNode& sdata = g.g.getData(*n);
+            std::cout << *n << " R : " << sdata.residual << " \n";
+          }
+        }
+#endif
+        break;
       case GPU_OPENCL:
          cl_ctx(g.numOwned);
          break;
