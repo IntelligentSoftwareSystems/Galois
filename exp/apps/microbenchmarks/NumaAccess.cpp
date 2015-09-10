@@ -50,7 +50,8 @@ typedef Galois::LargeArray<Element> Array;
 
 struct NumaAccess {
   Array& array;
-  NumaAccess(Array& _a): array(_a) {}
+  Galois::Substrate::Barrier& barrier;
+  NumaAccess(Array& _a, Galois::Substrate::Barrier& b): array(_a), barrier(b) {}
 
   void operator()(int tid, int numThreads) {
     unsigned seed = std::chrono::system_clock::now().time_since_epoch().count() + (unsigned int)tid;
@@ -70,7 +71,6 @@ struct NumaAccess {
     }
 
     // eliminate uneven thread launching overhead
-    Galois::Substrate::Barrier& barrier = Galois::Runtime::getBarrier(numThreads);
     barrier.wait();
 
     Galois::StatTimer timer("AccessTime");
@@ -104,7 +104,7 @@ int main(int argc, char **argv) {
   array.allocateInterleaved(numArrayEntry);
 
   T.start();
-  Galois::on_each(NumaAccess(array), Galois::loopname("NumaAccess"));
+  Galois::on_each(NumaAccess(array, Galois::Runtime::getBarrier(Galois::Runtime::activeThreads)), Galois::loopname("NumaAccess"));
   T.stop();
 
   totalTime.stop();

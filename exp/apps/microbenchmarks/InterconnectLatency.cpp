@@ -45,6 +45,10 @@ static cll::opt<unsigned int> secondCore("secondCore", cll::desc("the index of t
 static volatile unsigned int globalAtomicCounter = 0;
 
 struct PingPong {
+  Galois::Substrate::Barrier& barrier;
+
+  PingPong(Galois::Substrate::Barrier& b): barrier(b) {}
+
   void operator()(int tid, int numThreads) {
     unsigned int inc = (firstCore == secondCore) ? 1 : 2;
     unsigned int pos = (tid == firstCore) ? 0 : 1;
@@ -54,7 +58,6 @@ struct PingPong {
           ((tid == secondCore) ? (timesAdd/2) : 0);
 
     // to eliminate uneven thread launching overhead 
-    Galois::Substrate::Barrier& barrier = Galois::Runtime::getBarrier(numThreads);
     barrier.wait();
 
     for(unsigned int i = 0; i < upper; i++) {
@@ -73,7 +76,7 @@ int main(int argc, char **argv) {
 
   Galois::StatTimer T;
   T.start();
-  Galois::on_each(PingPong(), Galois::loopname("PingPong"));
+  Galois::on_each(PingPong(Galois::Runtime::getBarrier(Galois::Runtime::activeThreads)), Galois::loopname("PingPong"));
   T.stop();
 
   std::cout << "globalAtomicCounter = " << globalAtomicCounter << std::endl;

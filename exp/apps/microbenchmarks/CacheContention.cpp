@@ -64,6 +64,10 @@ static unsigned int globalAtomicCounter = 0;
 static volatile unsigned int globalCounter = 0;
 
 struct Contention {
+  Galois::Substrate::Barrier& barrier;
+
+  Contention(Galois::Substrate::Barrier& b): barrier(b) {}
+
   void operator()(int tid, int numThreads) {
     unsigned int upper = timesAdd / numThreads;
     if(tid < timesAdd % numThreads) {
@@ -71,7 +75,6 @@ struct Contention {
     }
 
     // to eliminate uneven thread launching overhead 
-    Galois::Substrate::Barrier& barrier = Galois::Runtime::getBarrier(numThreads);
     barrier.wait();
 
     unsigned int oldV;
@@ -154,7 +157,7 @@ int main(int argc, char **argv) {
 
   Galois::StatTimer T;
   T.start();
-  Galois::on_each(Contention(), Galois::loopname("Contention"));
+  Galois::on_each(Contention(Galois::Runtime::getBarrier(Galois::Runtime::activeThreads)), Galois::loopname("Contention"));
   T.stop();
 
   if(algo == Algo::nonAtomicRMW || algo == Algo::writeGlobal) {
