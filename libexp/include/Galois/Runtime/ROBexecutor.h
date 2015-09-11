@@ -446,6 +446,7 @@ public:
         // freeList[i].push_back (ctx);
       // }
     // }
+    term.initializeThread ();
   }
 
   void push_abort (const T& x, const unsigned owner) {
@@ -468,7 +469,6 @@ public:
 
   void execute () {
 
-    term.initializeThread ();
 
     do {
 
@@ -536,7 +536,7 @@ public:
 
       term.localTermination (didWork);
       
-    } while (term.globalTermination ());
+    } while (!term.globalTermination ());
   }
 
   void operator () () {

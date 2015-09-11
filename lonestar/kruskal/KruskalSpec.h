@@ -155,7 +155,7 @@ class KruskalSpec: public Kruskal {
     Galois::TimeAccumulator runningTime;
 
     runningTime.start ();
-    Galois::Runtime::for_each_ordered_rob (
+    Galois::Runtime::for_each_ordered_optim (
         Galois::Runtime::makeStandardRange(edges.begin (), edges.end ()),
         Edge::Comparator (), findLoop, linkUpLoop);
 
