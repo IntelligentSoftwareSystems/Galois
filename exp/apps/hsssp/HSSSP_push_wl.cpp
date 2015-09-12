@@ -323,7 +323,7 @@ void remote_wl_push(BSPWorklist * wl, GNode n){
    hasChanged=true;
 }
 void remote_wl_push_global(BSPWorklist * wl, PGraph * g, GNode n){
-   fprintf(stderr, "RemoteWLPush :: %d %d\n", n, g->G2L(n));
+//   fprintf(stderr, "RemoteWLPush :: %d %d\n", n, g->G2L(n));
    wl->current().push(g->G2L(n));
    hasChanged=true;
 }
@@ -347,7 +347,7 @@ struct SSSP {
                worklist.current().push(i);
             }else{
 //               net.sendAlt(_g.getHost(i), remote_wl_push, remote_wl[_g.getHost(i)],_g.L2G[i-_g.numOwned]);
-               net.sendAlt(_g.getHost(i), remote_wl_push_global, remote_wl[_g.getHost(i)],magicPointer[_g.getHost(i)],i);
+               net.sendAlt(owner, remote_wl_push_global, remote_wl[owner],magicPointer[owner],gid);
             }
          }
          worklist.next().clear();
@@ -369,7 +369,7 @@ struct SSSP {
          int new_dist = g->getEdgeData(jj) + sdist;
          while (new_dist < (old_dist = *ddst)) {
             if (__sync_bool_compare_and_swap(ddst, old_dist, new_dist)) {
-               fprintf(stderr, "Updating %d->%d, from %d to %d\n", src, dst, old_dist, new_dist);
+//               fprintf(stderr, "Updating %d->%d, from %d to %d\n", src, dst, old_dist, new_dist);
                hasChanged = true;
                worklist.next().push(dst);
                break;
