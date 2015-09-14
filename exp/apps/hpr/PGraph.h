@@ -40,6 +40,12 @@ struct pGraph {
       assert(ii != L2G.end());
       return std::distance(L2G.begin(), ii) + numOwned;
    }
+   //XXX: Hack
+   unsigned G2L_Local(unsigned GID){
+    assert((GID > g_offset));
+    assert(GID < (g_offset + numOwned));
+    return (GID - g_offset);
+   }
    unsigned uid(unsigned lid){
       assert(lid <numNodes);
       if(lid < numOwned){

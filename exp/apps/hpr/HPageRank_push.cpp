@@ -194,6 +194,9 @@ struct PageRank_push {
 
 // [hostid] -> vector of GID that host has replicas of
 std::vector<std::vector<unsigned> > remoteReplicas;
+// [hostid] -> vector of LID that host has replicas of
+std::vector<std::vector<unsigned> > remoteReplicas_L;
+pGraph<Graph>* g_Local;
 // [hostid] -> remote pGraph Structure (locally invalid)
 std::vector<pGraph<Graph>*> magicPointer;
 //[hostID] -> vector of replica residual
@@ -212,9 +215,12 @@ void setRemotePtr(uint32_t hostID, pGraph<Graph>* p) {
  **********************************************************************************/
 
 void recvNodeStatic(unsigned GID, uint32_t hostID) {
-   if (hostID >= remoteReplicas.size())
+   if (hostID >= remoteReplicas.size()){
       remoteReplicas.resize(hostID + 1);
+      remoteReplicas_L.resize(hostID + 1);
+   }
    remoteReplicas[hostID].push_back(GID);
+   remoteReplicas_L[hostID].push_back(g_Local->G2L_Local(GID));
 }
 
 /*********************************************************************************
@@ -276,9 +282,9 @@ struct applyResidual_struct {
   void operator()(unsigned i) const {
     //if (Galois::Runtime::NetworkInterface::ID == 1)
       //std::cout << (*RR_vec)[i] << "\n";
-    //atomicAdd(g->g.getData(g->G2L((*RR_vec)[i])).residual, (*RR_residual_vec)[i]);
-    PRTy old =  g->g.getData(g->G2L((*RR_vec)[i])).residual;
-    g->g.getData(g->G2L((*RR_vec)[i])).residual.store(old + (*RR_residual_vec)[i]);
+    atomicAdd(g->g.getData((*RR_vec)[i]).residual, (*RR_residual_vec)[i]);
+    //PRTy old =  g->g.getData(g->G2L((*RR_vec)[i])).residual;
+    //g->g.getData(g->G2L((*RR_vec)[i])).residual.store(old + (*RR_residual_vec)[i]);
   }
 
 };
@@ -294,10 +300,10 @@ void receiveGhostCellVectors(Galois::Runtime::RecvBuffer& buff){
   if(Galois::Runtime::NetworkInterface::ID == 1)
     for(auto x : residual_vec)
       std::cout << x << "\n";
-  std::cout << "Size : " << remoteReplicas[fromHostID].size() << " Size res : " << residual_vec.size() << "\n";
+  std::cout << "Size : " << remoteReplicas_L[fromHostID].size() << " Size res : " << residual_vec.size() << "\n";
 #endif
 
-  applyResidual_struct::go(remoteReplicas[fromHostID], residual_vec, *p);
+  applyResidual_struct::go(remoteReplicas_L[fromHostID], residual_vec, *p);
   /*
   unsigned i = 0;
   for(auto GID = remoteReplicas[fromHostID].begin(); GID != remoteReplicas[fromHostID].end(); ++GID, ++i){
@@ -454,6 +460,7 @@ void inner_main() {
    fprintf(stderr, "Post-barrier - Host: %d, Personality %s\n",Galois::Runtime::NetworkInterface::ID ,personality_str(personality).c_str());
    T_graph_load.start();
    pGraph<Graph> g;
+   g_Local = &g;
    g.loadGraph(inputFile);
 
    if (personality == GPU_CUDA) {
@@ -544,7 +551,15 @@ void inner_main() {
         {
            for(auto x = remoteReplicas.begin(); x != remoteReplicas.end(); ++x)
             for(auto y = x->begin(); y != x->end(); ++y)
-              std::cout << "remote on 1 - > " << *y << "\n";
+              std::cout << "remote on 1 - > " << *y << " : " << g.G2L_Local(*y) << "\n";
+
+          //for(auto  x : g.L2G){
+            //std::cout << "L2G - > " << x << "\n";
+          //}
+
+           for(auto x = remoteReplicas_L.begin(); x != remoteReplicas_L.end(); ++x)
+            for(auto y = x->begin(); y != x->end(); ++y)
+              std::cout << "remote LID on 1 - > " << *y << "\n";
 
         }
         if(my_host_id == 0)
@@ -552,6 +567,10 @@ void inner_main() {
           for(auto x = remoteReplicas_residual.begin(); x != remoteReplicas_residual.end(); ++x)
             for(auto y = x->begin(); y != x->end(); ++y)
               std::cout << "R for 1 - >"<< *y << "\n";
+
+          for(auto  x : g.L2G){
+            std::cout << "L2G - > " << x << "\n";
+          }
 
           int i = 0;
           for (auto n = g.g.begin() + g.numOwned; n != g.g.begin() + g.numNodes; ++n, ++i)
