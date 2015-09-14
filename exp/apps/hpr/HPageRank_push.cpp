@@ -264,6 +264,7 @@ struct reduceGhostCells_struct {
      if (x >= remoteReplicas_residual.size())
        remoteReplicas_residual.resize(x+1);
 
+     //remoteReplicas_residual[x][src - g->numNodes] = sdata.residual.exchange(0.0);
      remoteReplicas_residual[x].push_back(sdata.residual.exchange(0.0));
   }
 };
@@ -546,6 +547,9 @@ void inner_main() {
         PageRank_push::go(g);
         reduceGhostCells_struct::go(g);
         sendGhostCellVectors(net,g);
+        for(auto x = remoteReplicas_residual.begin(); x != remoteReplicas_residual.end(); ++x){
+          (*x).clear();
+        }
 #if _HETERO_DEBUG_
         if(my_host_id == 1)
         {
