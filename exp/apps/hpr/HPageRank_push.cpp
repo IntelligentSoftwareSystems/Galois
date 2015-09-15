@@ -262,7 +262,7 @@ struct reduceGhostCells_struct {
   //std::vector<PRTy> residual_vec;
 
   void static go(pGraph<Graph>& _g){
-      Galois::do_all(_g.g.begin() + _g.numOwned, _g.g.begin() + _g.numNodes, reduceGhostCells_struct { &_g }, Galois::loopname("init ghost cells"));
+      Galois::do_all(_g.g.begin() + _g.numOwned, _g.g.begin() + _g.numNodes, reduceGhostCells_struct { &_g }, Galois::loopname("ReduceGhost Cells"));
   }
   void operator()(GNode src) const {
      Galois::Runtime::NetworkInterface& net = Galois::Runtime::getSystemNetworkInterface();
