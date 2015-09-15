@@ -1,4 +1,4 @@
-/** BilliardsTwoPhase -*- C++ -*-
+/** BilliardsSectoredIKDG -*- C++ -*-
  * @file
  * @section License
  *
@@ -23,14 +23,14 @@
  * @author <ahassaan@ices.utexas.edu>
  */
 
-
-#include "Galois/Runtime/KDGtwoPhase.h"
-
 #include "Billiards.h"
 #include "dependTest.h"
 #include "BilliardsParallel.h"
+#include "BilliardsParallelSectored.h"
 
-class BilliardsTwoPhase: public Billiards<BilliardsTwoPhase>  {
+#include "Galois/Runtime/KDGtwoPhase.h"
+
+class BilliardsSectoredIKDG: public Billiards<BilliardsSectoredIKDG>  {
 
 
   // void createLocks (const Table& table, Graph& graph, VecNodes& nodes) {
@@ -44,7 +44,7 @@ class BilliardsTwoPhase: public Billiards<BilliardsTwoPhase>  {
 
 public:
 
-  virtual const std::string version () const { return "using IKDG"; }
+  virtual const std::string version () const { return "IKDG with custom safety test"; }
 
   template <typename Tbl_t>
   size_t runSim (Tbl_t& table, std::vector<Event>& initEvents, const FP& endtime, bool enablePrints=false, bool logEvents=false) {
@@ -54,12 +54,13 @@ public:
 
     // createLocks (table, graph, nodes);
 
-    Galois::Runtime::for_each_ordered_2p_win (
+    Galois::Runtime::for_each_ordered_ikdg_custom_safety (
         Galois::Runtime::makeStandardRange(initEvents.begin (), initEvents.end ()),
         Event::Comparator (),
-        VisitNhood (),
+        SectorLocalTest<Tbl_t> {table},
         ExecSources (),
-        AddEvents<Tbl_t> (table, endtime, addList, iter));
+        AddEvents<Tbl_t> (table, endtime, addList, iter),
+        "sectored-ikdg-custom-safety");
 
     return iter.reduce ();
 
@@ -67,7 +68,7 @@ public:
 };
 
 int main (int argc, char* argv[]) {
-  BilliardsTwoPhase s;
+  BilliardsSectoredIKDG s;
   s.run (argc, argv);
   return 0;
 }

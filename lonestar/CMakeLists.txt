@@ -1,5 +1,8 @@
 add_library(lonestar STATIC src/BoilerPlate.cpp)
 target_include_directories(lonestar PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+if(USE_EXP)
+  target_include_directories(lonestar PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/../libexp/include)
+endif()
 target_link_libraries(lonestar galois_runtime gllvm)
 
 #add_subdirectory(avi)

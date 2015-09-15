@@ -467,7 +467,7 @@ public:
   // compute earliest collision between a ball and some other object underTest
   // We don't want to create a collision with the object involved in previous collision
   template <typename I, typename T=typename std::remove_pointer<typename std::iterator_traits<I>::value_type>::type >
-  static Galois::optional<Event> computeNextEvent (const Event::EventKind& kind, const Ball* b, const I collObjsBeg, const I collObjsEnd, const FP& endtime) {
+  static Galois::optional<Event> computeNextEvent (const Event::EventKind& kind, const Ball* b, const I collObjsBeg, const I collObjsEnd, const FP& endtime, const Sector* sector) {
 
 
     Galois::optional<Event> retVal;
@@ -531,7 +531,7 @@ public:
     if (currMinTime > FP (0.0) && currMinTime <= endtime) { 
       assert (currMin != nullptr);
 
-      retVal = Event::makeEvent (kind, b, currMin, currMinTime);
+      retVal = Event::makeEvent (kind, b, currMin, currMinTime, sector);
 
     }
 

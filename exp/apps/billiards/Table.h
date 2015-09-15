@@ -95,16 +95,21 @@ public:
       copyVecPtr (that.balls, this->balls);
   }
 
-  ~Table () {
+  ~Table (void) {
     freeVecPtr (cushions);
     freeVecPtr (balls);
   }
 
-  unsigned getNumBalls () const { return numBalls; }
+  unsigned getNumBalls (void) const { return numBalls; }
 
-  const FP& getLength () const { return length; }
+  unsigned getNumSectors (void) const { 
+    std::abort ();
+    return 0;
+  }
 
-  const FP& getWidth () const { return width; }
+  const FP& getLength (void) const { return length; }
+
+  const FP& getWidth (void) const { return width; }
 
   Cushion* getCushion (RectSide side) const { 
     assert (int(side) < int (cushions.size ()));
@@ -582,8 +587,8 @@ protected:
 
     assert (ball != nullptr);
 
-    Galois::optional<Event> ballColl = Collision::computeNextEvent (Event::BALL_COLLISION, ball, this->balls.begin (), this->balls.end (), endtime);
-    Galois::optional<Event> cushColl = Collision::computeNextEvent (Event::CUSHION_COLLISION, ball, this->cushions.begin (), this->cushions.end (), endtime);
+    Galois::optional<Event> ballColl = Collision::computeNextEvent (Event::BALL_COLLISION, ball, this->balls.begin (), this->balls.end (), endtime, nullptr);
+    Galois::optional<Event> cushColl = Collision::computeNextEvent (Event::CUSHION_COLLISION, ball, this->cushions.begin (), this->cushions.end (), endtime, nullptr);
 
 
 

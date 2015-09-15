@@ -71,6 +71,8 @@ private:
 
   FP time;
 
+  const Sector* sector;
+
   // collision counter is used to maintain
   // the versions of state of the object. If
   // at the time of processing the event, the
@@ -84,12 +86,14 @@ private:
       const EventKind& kind, 
       Ball* ball, 
       CollidingObject* otherObj, 
-      const FP& time) 
+      const FP& time,
+      const Sector* sector)
     : 
     kind (kind),
     ball (ball),
     otherObj (otherObj),
-    time (time) {
+    time (time), 
+    sector (sector) {
 
       assert (time >= FP (0.0));
 
@@ -108,6 +112,7 @@ private:
         case SECTOR_ENTRY:
         case SECTOR_LEAVE:
           assert (dynamic_cast<Sector*> (otherObj) != nullptr);
+          assert (dynamic_cast<Sector*> (otherObj) == sector);
           break;
 
         default:
@@ -119,12 +124,12 @@ private:
 public:
 
   template <typename T>
-  static Event makeEvent (const EventKind& kind, const Ball* ball, const T* collObj, const FP& time) {
+  static Event makeEvent (const EventKind& kind, const Ball* ball, const T* collObj, const FP& time, const Sector* sector) {
 
     assert (ball != nullptr);
     assert (collObj != nullptr);
 
-    return Event (kind, const_cast<Ball*> (ball), const_cast<T*> (collObj), time);
+    return Event (kind, const_cast<Ball*> (ball), const_cast<T*> (collObj), time, sector);
   }
 
   // static Event makeCushionCollision (const Ball* ball, const Cushion* c, const FP& time) {
@@ -169,6 +174,8 @@ public:
   }
 
   const FP& getTime () const { return time; }
+
+  const Sector* enclosingSector (void) const { return sector; }
 
   Ball* getBall () const { 
     assert (ball != nullptr);

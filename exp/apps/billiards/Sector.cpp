@@ -51,10 +51,10 @@ Galois::optional<Event> Sector::computeEarliestEvent (const Ball* ball, const FP
   Event::Comparator cmp;
 
 
-  Galois::optional<Event> ballColl = Collision::computeNextEvent (Event::BALL_COLLISION, ball, balls.begin (), balls.end (), endtime);
+  Galois::optional<Event> ballColl = Collision::computeNextEvent (Event::BALL_COLLISION, ball, balls.begin (), balls.end (), endtime, this);
   minEvent = ballColl;
 
-  Galois::optional<Event> cushColl = Collision::computeNextEvent (Event::CUSHION_COLLISION, ball, cushions.begin (), cushions.end (), endtime);
+  Galois::optional<Event> cushColl = Collision::computeNextEvent (Event::CUSHION_COLLISION, ball, cushions.begin (), cushions.end (), endtime, this);
   if (cushColl) {
     if (!minEvent || cmp (*cushColl, *minEvent)) {
       minEvent = cushColl;
@@ -187,7 +187,7 @@ Galois::optional<Event> Sector::earliestSectorEntry (const Ball* ball, const FP&
     assert (!minSector->hasBall (ball));
 
     if (minTime < endtime) {
-      e = Event::makeEvent (Event::SECTOR_ENTRY, ball, minSector, minTime);
+      e = Event::makeEvent (Event::SECTOR_ENTRY, ball, minSector, minTime, minSector);
     }
   }
 
@@ -249,7 +249,7 @@ Galois::optional<Event> Sector::earliestSectorLeave (const Ball* ball, const FP&
     assert (ball->hasSector (this));
     assert (this->hasBall (ball));
 
-    retVal = Event::makeEvent (Event::SECTOR_LEAVE, ball, this, minTime);
+    retVal = Event::makeEvent (Event::SECTOR_LEAVE, ball, this, minTime, this);
   }
 
   return retVal;
