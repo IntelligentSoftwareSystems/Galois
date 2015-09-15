@@ -45,6 +45,7 @@ enum class ContextState: int {
     ABORT_SELF,
     ABORT_HELP,
     ABORTING,
+    COMMITTING, 
     COMMIT_DONE,
     ABORT_DONE,
     ABORTED_CHILD,
@@ -200,7 +201,7 @@ struct OptimContext: public SimpleRuntimeContext {
   using Lock_ty = Galois::Substrate::SimpleLock;
 
   T active;
-  ContextState state;
+  std::atomic<ContextState> state;
   Exec& exec;
   NhoodList nhood;
   bool abortSelf = false;
@@ -224,6 +225,11 @@ struct OptimContext: public SimpleRuntimeContext {
   bool hasState (const ContextState& s) const { return state == s; } 
 
   void setState (const ContextState& s) { state = s; } 
+
+  bool casState (ContextState s_old, const ContextState& s_new) { 
+    // return state.cas (s_old, s_new);
+    return state.compare_exchange_strong (s_old, s_new);
+  }
 
   bool isRunning (void) const {
     return hasState (ContextState::SCHEDULED) || hasState (ContextState::ABORT_SELF);
@@ -256,9 +262,8 @@ struct OptimContext: public SimpleRuntimeContext {
     }
   }
 
-  void schedule (const size_t step) {
+  void schedule (void) {
     setState (ContextState::SCHEDULED); 
-    this->step = step;
     nhood.clear ();
     userHandle.reset ();
     children.clear ();
@@ -373,54 +378,52 @@ struct OptimContext: public SimpleRuntimeContext {
 template <typename T, typename Cmp, typename NhFunc, typename OpFunc> 
 class OptimOrdExecutor: private boost::noncopyable {
 
-  friend class OptimContext<T, Cmp, OptimOrdExecutor>;
+  friend struct OptimContext<T, Cmp, OptimOrdExecutor>;
   using Ctxt = OptimContext<T, Cmp, OptimOrdExecutor>;
   using NhoodMgr = typename Ctxt::NhoodMgr;
   using CtxtCmp = typename Ctxt::CtxtCmp;
   using NItemFactory = typename Ctxt::NItem::Factory;
 
-  using CommitQ = Galois::gstl::List<Ctxt*>;
-  using PendingQ = Galois::ThreadSafeOrderedSet<Ctxt*, CtxtCmp>;
+  using CommitQ = Galois::PerThreadList<Ctxt*>;
+  using PendingQ = Galois::PerThreadMinHeap<Ctxt*, CtxtCmp>;
 
   using CtxtAlloc = Runtime::FixedSizeAllocator<Ctxt>;
-  using ExecutionRecords = std::vector<StepStats>;
 
-
-  struct ThreadLocalData {
-    PendingQ pending; 
-    CommitQ commit;
-    Ctxt* localFront;
-  };
 
   Cmp itemCmp;
   NhFunc nhFunc;
   OpFunc opFunc;
+  Substrate::Barrier& gvtBarrier;
   const char* loopname;
 
   CtxtCmp ctxtCmp;
+  PendingQ pendingQ; 
+  CommitQ commitQ;
   NItemFactory nitemFactory;
   NhoodMgr nhmgr;
-  Substrate::Barrier& gvtBarrier;
   Substrate::TerminationDetection& term;
+
 
   GAtomic<bool> startGVT;
   Ctxt* globalFront;
 
 
   CtxtAlloc ctxtAlloc;
-  PerThreadStorage<ThreadLocalData> perThrdData; 
+  Substrate::PerThreadStorage<Ctxt*> perThrdLocalFront; 
 
 public:
-  OptimOrdExecutor (const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const char* loopname)
+  OptimOrdExecutor (const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, Substrate::Barrier& barrier, const char* loopname)
     : 
       itemCmp (cmp), 
       nhFunc (nhFunc), 
       opFunc (opFunc), 
+      gvtBarrier (barrier),
       loopname (loopname),
       ctxtCmp (itemCmp),
+      pendingQ (ctxtCmp),
+      commitQ (),
       nitemFactory (ctxtCmp),
       nhmgr (nitemFactory),
-      gvtBarrier (Substrate::getSystemBarrier ()),
       term (Substrate::getSystemTermination (activeThreads))
   {
     if (!loopname) { loopname = "NULL"; }
@@ -453,7 +456,7 @@ public:
     Ctxt* ctxt = ctxtAlloc.allocate (1);
     assert (ctxt);
     ctxtAlloc.construct (ctxt, x, ContextState::UNSCHEDULED, *this);
-    perThrdData.getLocal ()->pending.push (ctxt); 
+    pendingQ.get ().push (ctxt); 
 
     return ctxt;
   }
@@ -463,7 +466,7 @@ public:
     assert (ctxt->hasState (ContextState::ABORT_DONE));
 
     ctxt->setState (ContextState::UNSCHEDULED);
-    perThrdData.getLocal ()->pending.push (ctxt);
+    pendingQ.get ().push (ctxt);
   }
 
   void execute () {
@@ -473,17 +476,15 @@ public:
     size_t totalIter = 0;
     size_t totalCommits = 0;
 
-    ThreadLocalData& tld = *(perThrdData.getLocal ());
-
     do {
       bool didWork = false;
 
 
       unsigned num_scheduled = 0;
 
-      for (; (num_scheduled < commit_interval) && !tld.pending.empty (); ++num_scheduled, ++totalIter) {
+      for (; (num_scheduled < commit_interval) && !pendingQ.get ().empty (); ++num_scheduled, ++totalIter) {
 
-        Ctxt* ctxt = schedule (tld);
+        Ctxt* ctxt = schedule ();
 
         if (ctxt) {
           didWork = true;
@@ -502,7 +503,7 @@ public:
 
 
             dbg::debug (ctxt, " adding self to commit queue");
-            tld.commit.push_back (ctxt);
+            commitQ.get ().push_back (ctxt);
             // publish remaining changes
             ctxt->publishChanges ();
 
@@ -513,17 +514,14 @@ public:
       }
 
       // TODO: do this after processing some tasks
-      unsigned numCommitted = localCommit (tld);
+      unsigned numCommitted = localCommit ();
       totalCommits += numCommitted;
 
-      if (numCommitted == 0) {
-
-        if (!computeGVT (tld)) {
-          reportGVT (tld);
-        }
+      if (!computeGVT ()) {
+        reportGVT ();
       }
 
-      if (!tld.commit.empty () || !tld.pending.empty ()) {
+      if (!commitQ.get ().empty () || !pendingQ.get ().empty ()) {
         continue;
       }
 
@@ -556,7 +554,7 @@ private:
     Galois::Runtime::setThreadContext (ctx);
     nhFunc (ctx->active, ctx->userHandle);
 
-    if (ctx->hasState (Ctxt::State::SCHEDULED)) {
+    if (ctx->hasState (ContextState::SCHEDULED)) {
       opFunc (ctx->active, ctx->userHandle);
     }
     Galois::Runtime::setThreadContext (nullptr);
@@ -569,18 +567,17 @@ private:
     ctxtAlloc.deallocate (ctxt, 1);
   }
 
-  Ctxt* schedule (ThreadLocalData& tld) {
+  Ctxt* schedule (void) {
 
-    while (!tld.pending.empty ()) {
+    while (!pendingQ.get ().empty ()) {
 
-      Ctxt* ctxt = tld.pending.pop ();
+      Ctxt* ctxt = pendingQ.get ().pop ();
 
       bool b = ctxt->hasState (ContextState::UNSCHEDULED) 
         || ctxt->hasState (ContextState::ABORTED_CHILD);
       assert (b);
 
       if (ctxt->hasState (ContextState::UNSCHEDULED)) {
-        assert (steps > 0);
         ctxt->schedule ();
         return ctxt;
 
@@ -595,12 +592,12 @@ private:
     return nullptr;
   }
 
-  void computeLocalFront (ThreadLocalData& tld) {
-    if (!tld.pending.empty ()) { 
-      tld.localFront = tld.pending.top ();
+  void computeLocalFront (void) {
+    if (!pendingQ.get ().empty ()) { 
+      *(perThrdLocalFront.getLocal ()) = pendingQ.get ().top ();
 
     } else {
-      tld.localFront = nullptr;
+      *(perThrdLocalFront.getLocal ()) = nullptr;
     }
   }
 
@@ -610,11 +607,11 @@ private:
 
     Ctxt* minp = nullptr;
 
-    for (unsigned i = 0; i < Galois::getActiveThreads; ++i) {
-      Ctxt* lf = perThrdData.getLocal ()->localFront;
+    for (unsigned i = 0; i < Galois::getActiveThreads (); ++i) {
+      Ctxt* lf = *(perThrdLocalFront.getRemote (i));
 
       if (lf && (!minp || ctxtCmp (lf, minp))) {
-        min = lf;
+        minp = lf;
       }
     }
 
@@ -622,10 +619,10 @@ private:
   }
 
 
-  bool computeGVT (ThreadLocalData& tld) {
+  bool computeGVT (void) {
     if (startGVT.cas (false, true)) {
 
-      computeLocalFront (tld);
+      computeLocalFront ();
 
       gvtBarrier ();
 
@@ -642,10 +639,10 @@ private:
     }
   }
 
-  void reportGVT (ThreadLocalData& tld) {
+  void reportGVT (void) {
 
     if (bool (startGVT)) {
-      computeLocalFront (tld);
+      computeLocalFront ();
 
       gvtBarrier ();
 
@@ -655,27 +652,28 @@ private:
   }
 
 
-  size_t localCommit (ThreadLocalData& tld) {
+  size_t localCommit (void) {
 
-    auto uniq_end = std::unique (tld.commit.begin (), tld.commit.end ());
+    auto uniq_end = std::unique (commitQ.get ().begin (), commitQ.get ().end ());
 
-    tld.commit.erase (uniq_end, tld.commit.end ());
+    commitQ.get ().erase (uniq_end, commitQ.get ().end ());
     
     Ctxt* gfront = globalFront;
+
+    size_t numCommitted = 0;
 
     if (gfront) {
 
       // all tasks lesser than globalMin
-      auto c_end = std::partition (tld.commit.begin (), tld.commit.end (), 
+      auto c_end = std::partition (commitQ.get ().begin (), commitQ.get ().end (), 
           [&] (Ctxt* c) { 
-          assert (c);
-          return ctxtCmp (c, gfront);
+            assert (c);
+            return ctxtCmp (c, gfront);
           });
 
 
-      size_t numCommitted = 0;
 
-      for (auto i = tld.commit.begin (); i != c_end; ++i) {
+      for (auto i = commitQ.get ().begin (); i != c_end; ++i) {
 
         assert (ctxtCmp (*i, gfront));
         assert ((*i)->hasState (ContextState::READY_TO_COMMIT));
@@ -686,9 +684,9 @@ private:
         }
       }
 
-      tld.commit.erase (tld.commit.begin (), c_end);
+      commitQ.get ().erase (commitQ.get ().begin (), c_end);
 
-      if (!tld.commit.empty ()) {
+      if (!commitQ.get ().empty ()) {
         // assert ( TODO
       }
 
@@ -702,14 +700,14 @@ private:
 
 
 template <typename R, typename Cmp, typename NhFunc, typename OpFunc>
-void for_each_ordered_optim_param (const R& range, Cmp cmp, NhFunc nhFunc, OpFunc opFunc, const char* loopname=0) {
+void for_each_ordered_optim (const R& range, Cmp cmp, NhFunc nhFunc, OpFunc opFunc, const char* loopname=0) {
 
   using T = typename R::value_type;
 
   unsigned numT = Galois::getActiveThreads ();
-  auto& barrier = Galois::Substrate::getBarrier (numT);
+  auto& barrier = getBarrier (numT);
 
-  OptimOrdExecutor<T, Cmp, NhFunc, OpFunc> exec (cmp, nhFunc, opFunc, loopname);
+  OptimOrdExecutor<T, Cmp, NhFunc, OpFunc> exec (cmp, nhFunc, opFunc, barrier, loopname);
 
   Substrate::getSystemThreadPool ().run (numT,
       [&exec, &range] (void) { exec.push_initial (range); },
@@ -721,6 +719,7 @@ void for_each_ordered_optim_param (const R& range, Cmp cmp, NhFunc nhFunc, OpFun
 
 namespace ParaMeter {
 
+template <typename Ctxt, typename CtxtCmp>
 struct OptimParamNhoodItem: public OrdLocBase<OptimParamNhoodItem<Ctxt, CtxtCmp>, Ctxt, CtxtCmp> {
 
   using Base = OrdLocBase<OptimParamNhoodItem, Ctxt, CtxtCmp>;

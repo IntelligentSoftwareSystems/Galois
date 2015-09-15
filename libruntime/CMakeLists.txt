@@ -17,3 +17,7 @@ target_include_directories(galois_runtime PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/inc
 
 target_link_libraries(galois_runtime galois_substrate)
 target_link_libraries(galois_runtime gllvm)
+
+if(USE_EXP)
+  target_link_libraries(galois_runtime galois_exp)
+endif()

@@ -1,5 +1,5 @@
-#include "Galois/CilkInit.h"
 #include "Galois/Threads.h"
+#include "Galois/CilkInit.h"
 #include "Galois/Runtime/PerThreadStorage.h"
 #include "Galois/Runtime/ThreadPool.h"
 #include "Galois/Runtime/ll/gio.h"
