@@ -85,6 +85,16 @@ PRTy atomicAdd(std::atomic<PRTy>& v, PRTy delta){
   return old;
 }
 
+PRTy atomicSub(std::atomic<PRTy>& v, PRTy delta){
+  PRTy old;
+  do {
+    old = v;
+  }while(!v.compare_exchange_strong(old, old - delta));
+
+  return old;
+}
+
+
 struct LNode {
   PRTy value;
   std::atomic<PRTy> residual;
@@ -481,10 +491,28 @@ void inner_main() {
 
    T_graph_init.start();
 
+   //send pGraph pointers
+   for (uint32_t x = 0; x < Galois::Runtime::NetworkInterface::Num; ++x)
+      net.sendAlt(x, setRemotePtr, Galois::Runtime::NetworkInterface::ID, &g);
+
+   //Ask for cells
+   for (auto GID : g.L2G)
+      net.sendAlt(g.getHost(GID), recvNodeStatic, GID, Galois::Runtime::NetworkInterface::ID);
+
+#if _HETERO_DEBUG_
+   std::cout << "["<<my_host_id<< "]:ask for remote replicas\n";
+#endif
+   barrier.wait();
+
    //local initialization
    if (personality == CPU) {
       InitializeGraph::go(g);
-      InitializeGhostCells::go(g);
+      // Propagate the residual collected in initialization phase.
+      reduceGhostCells_struct::go(g);
+      sendGhostCellVectors(net,g);
+      for(auto x = remoteReplicas_residual.begin(); x != remoteReplicas_residual.end(); ++x){
+        (*x).clear();
+      }
    } else if (personality == GPU_CUDA) {
       initialize_graph_cuda(cuda_ctx);
    } else if (personality == GPU_OPENCL) {
@@ -495,52 +523,13 @@ void inner_main() {
    std::cout << g.id << " initialized\n";
 #endif
    barrier.wait();
-
-   //send pGraph pointers
-   for (uint32_t x = 0; x < Galois::Runtime::NetworkInterface::Num; ++x)
-      net.sendAlt(x, setRemotePtr, Galois::Runtime::NetworkInterface::ID, &g);
-
-   //Ask for cells
-   for (auto GID : g.L2G)
-      net.sendAlt(g.getHost(GID), recvNodeStatic, GID, Galois::Runtime::NetworkInterface::ID);
-#if _HETERO_DEBUG_
-   std::cout << "["<<my_host_id<< "]:ask for remote replicas\n";
-#endif
-   barrier.wait();
-
-#if _HETERO_DEBUG_
-   //Checking the graph construction
-   if(my_host_id == 0)
-   {
-     for (auto n = g.g.begin() + g.numOwned; n != g.g.begin() + g.numNodes; ++n)
-     {
-       std::cout << *n + g.g_offset << "\n\t";
-       LNode& sdata = g.g.getData(*n);
-       std::cout << *n << " R : " << sdata.residual << " \n";
-       /*
-       for (auto jj = g.g.edge_begin(*n), ej = g.g.edge_end(*n); jj != ej; ++jj)
-       {
-            GNode dst = g.g.getEdgeDst(jj);
-            LNode& ddata = g.g.getData(dst);
-            std::cout << dst << " Redidual : " << ddata.residual << " | ";
-
-       }
-       std::cout << "\n";
-       */
-     }
-   }
-
-#endif
-
    T_graph_init.stop();
 
    std::cout << "[" << my_host_id << "] Starting PageRank" << "\n";
    T_pagerank.start();
    for (int i = 0; i < maxIterations; ++i) {
      //T_pagerank_perIter.start();
-#if _HETERO_DEBUG_
-      std::cout << "Starting PR" << i << "\n";
-#endif
+
       //Do pagerank
       switch (personality) {
       case CPU:
@@ -556,10 +545,6 @@ void inner_main() {
            for(auto x = remoteReplicas.begin(); x != remoteReplicas.end(); ++x)
             for(auto y = x->begin(); y != x->end(); ++y)
               std::cout << "remote on 1 - > " << *y << " : " << g.G2L_Local(*y) << "\n";
-
-          //for(auto  x : g.L2G){
-            //std::cout << "L2G - > " << x << "\n";
-          //}
 
            for(auto x = remoteReplicas_L.begin(); x != remoteReplicas_L.end(); ++x)
             for(auto y = x->begin(); y != x->end(); ++y)
