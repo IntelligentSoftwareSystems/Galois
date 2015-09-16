@@ -395,7 +395,7 @@ void inner_main() {
    Galois::StatManager statManager;
    auto& barrier = Galois::Runtime::getSystemBarrier();
    const unsigned my_host_id = Galois::Runtime::NetworkInterface::ID;
-   Galois::Timer T_total, T_graph_load, T_pagerank;
+   Galois::Timer T_total, T_graph_load, T_pagerank, T_graph_init;
    T_total.start();
    //Parse arg string when running on multiple hosts and update/override personality
    //with corresponding value.
@@ -437,6 +437,8 @@ void inner_main() {
 
    T_graph_load.stop();
 
+   T_graph_init.start();
+
    //local initialization
    if (personality == CPU) {
       InitializeGraph::go(g);
@@ -445,11 +447,12 @@ void inner_main() {
    } else if (personality == GPU_OPENCL) {
       cl_ctx.init(g.numOwned, g.numNodes);
    }
+
+
 #if _HETERO_DEBUG_
    std::cout << g.id << " initialized\n";
 #endif
    barrier.wait();
-   fprintf(stderr, "Post-barrier 2- Host: %d, Personality %s\n",Galois::Runtime::NetworkInterface::ID ,personality_str(personality).c_str());
 
 
    //send pGraph pointers
@@ -474,7 +477,10 @@ void inner_main() {
 #endif
    sendGhostCellAttrs(net, g);
    barrier.wait();
+   T_graph_init.stop();
 
+
+   std::cout << "[" << my_host_id << "] Starting PageRank" << "\n";
    T_pagerank.start();
    for (int i = 0; i < maxIterations; ++i) {
 #if _HETERO_DEBUG_
@@ -535,7 +541,9 @@ void inner_main() {
       out_file.close();
    }
    T_total.stop();
-   std::cout << "[" << Galois::Runtime::NetworkInterface::ID << "]" << " Total : " << T_total.get() << " Loading : " << T_graph_load.get() << " PagrRank : " << T_pagerank.get() << " (msec)\n";
+   std::cout << "[" << Galois::Runtime::NetworkInterface::ID << "]" << " Total : " << T_total.get() << " Loading : " << T_graph_load.get() << " Init : " << T_graph_init.get() << " PageRank (" << maxIterations << " iteration) : " << T_pagerank.get() << " (msec)\n";
+
+   std::cout << "Terminated on [ " << my_host_id << " ]\n";
    net.terminate();
    std::cout.flush();
 

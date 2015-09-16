@@ -8,3 +8,4 @@ static const double alpha = (1.0 - 0.85);
 
 //! maximum relative change until we deem convergence
 static const double TOLERANCE = 0.1;
+typedef double PRTy;
