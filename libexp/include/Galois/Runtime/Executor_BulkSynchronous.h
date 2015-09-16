@@ -366,7 +366,7 @@ public:
   Executor(const FunctionTy& f, const ArgsTy& args):
     function(f), 
     loopname(get_by_supertype<loopname_tag>(args).value),
-    barrier(Runtime::getBarrier(activeThreads)) { }
+    barrier(getBarrier(activeThreads)) { }
 
   template<typename RangeTy>
   void init(const RangeTy& range) { }

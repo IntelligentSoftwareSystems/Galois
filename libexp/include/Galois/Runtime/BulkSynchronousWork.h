@@ -459,7 +459,7 @@ class Executor {
   }
 
 public:
-  explicit Executor(const FnsTy& f, const InitialWorkTy& i, const char* l): fns(f), init(i), loopname(l), barrier(Substrate::getSystemBarrier(activeThreads)) 
+  explicit Executor(const FnsTy& f, const InitialWorkTy& i, const char* l): fns(f), init(i), loopname(l), barrier(getBarrier(activeThreads)) 
   { }
 
   void operator()() {
