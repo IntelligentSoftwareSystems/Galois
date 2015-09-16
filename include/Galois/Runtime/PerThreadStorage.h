@@ -121,7 +121,7 @@ protected:
   PerBackend& b;
 
   void destruct() {
-    if (offset == ~0)
+    if (offset == ~0U)
       return;
 
     for (unsigned n = 0; n < LL::getMaxThreads(); ++n)
