@@ -390,12 +390,12 @@ if(NOT SKIP_COMPILE_APPS)
 endif()
 
 ###### Documentation ######
-set(DOXYFILE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src\" \"${CMAKE_CURRENT_SOURCE_DIR}/include\" \"${CMAKE_CURRENT_SOURCE_DIR}/docs")
+set(DOXYFILE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src\" \"${CMAKE_CURRENT_SOURCE_DIR}/include\" \"${CMAKE_CURRENT_SOURCE_DIR}/docs\" \"${CMAKE_CURRENT_SOURCE_DIR}/libgraphs\" \"${CMAKE_CURRENT_SOURCE_DIR}/libllvm\" \"${CMAKE_CURRENT_SOURCE_DIR}/libruntime\" \"${CMAKE_CURRENT_SOURCE_DIR}/libsubstrate")
 find_package(Doxygen 1.8.0)
 if(NOT DOXYGEN_FOUND)
   message(STATUS "Could NOT find required doxygen version: doxygen missing or < 1.8.0") 
 else()
-   configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in
+  configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in
      ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile.in @ONLY)
   add_custom_target(doc ${DOXYGEN_EXECUTABLE}
      ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile.in WORKING_DIRECTORY
@@ -420,7 +420,7 @@ include(CPack)
 file(RELATIVE_PATH rel_include_dir "${INSTALL_CMAKE_DIR}" "${INSTALL_INCLUDE_DIR}")
 set(GALOIS_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/include" "${PROJECT_BINARY_DIR}/include")
 if(USE_EXP)
-  set(GALOIS_INCLUDE_DIR "${GALOIS_INCLUDE_DIR}" "${PROJECT_SOURCE_DIR}/exp/include")
+  set(GALOIS_INCLUDE_DIR "${GALOIS_INCLUDE_DIR}" "${PROJECT_SOURCE_DIR}/libexp/include")
 endif()
 
 set(GALOIS_INCLUDE_DIRS) # Galois include dependencies
