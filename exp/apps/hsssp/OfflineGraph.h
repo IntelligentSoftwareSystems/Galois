@@ -25,8 +25,11 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
+#include "Galois/Runtime/ll/SimpleLock.h"
+
 #include <cstdint>
 #include <fstream>
+#include <mutex>
 
 #include <boost/iterator/counting_iterator.hpp>
 
@@ -41,15 +44,15 @@
 //EdgeType[numEdges] {EdgeType size}
 
 
-
-
 class OfflineGraph {
   std::ifstream file;
   uint32_t numNodes;
   uint64_t numEdges;
   size_t length;
-
+  Galois::Runtime::LL::SimpleLock lock;
+  
   uint64_t outIndexs(uint64_t node) {
+    std::lock_guard<decltype(lock)> lg(lock);
     file.seekg((4 + node)*sizeof(uint64_t), file.beg);
     uint64_t retval;
     file.read(reinterpret_cast<char*>(&retval), sizeof(uint64_t));
@@ -57,6 +60,7 @@ class OfflineGraph {
   }
 
   uint32_t outEdges(uint64_t edge) {
+    std::lock_guard<decltype(lock)> lg(lock);
     file.seekg((4 + numNodes) * sizeof(uint64_t) + edge * sizeof(uint32_t), file.beg);
     uint32_t retval;
     file.read(reinterpret_cast<char*>(&retval), sizeof(uint32_t));

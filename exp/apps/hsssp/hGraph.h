@@ -23,13 +23,16 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
+#include "Galois/gstl.h"
+#include "Galois/Graph/LC_CSR_Graph.h"
+
 template<typename NodeTy, typename EdgeTy, bool BSPNode, bool BSPEdge>
 class hGraph {
 
-  typedef realNodeTy std::conditional<BSPNode, std::pair<NodeTy, NodeTy>,NodeTy>::type;
-  typedef realEdgeTy std::conditional<BSPNode, std::pair<EdgeTy, EdgeTy>,NodeTy>::type;
+  typedef typename std::conditional<BSPNode, std::pair<NodeTy, NodeTy>,NodeTy>::type realNodeTy;
+  typedef typename std::conditional<BSPNode, std::pair<EdgeTy, EdgeTy>,NodeTy>::type realEdgeTy;
 
-  typedef LC_CSR_Graph<realNodeTy, realEdgeTy> GraphTy;
+  typedef Galois::Graph::LC_CSR_Graph<realNodeTy, realEdgeTy> GraphTy;
 
   GraphTy graph;
   bool rount;
@@ -41,31 +44,66 @@ class hGraph {
   std::vector<unsigned> hostNodes; //[ i-1,i ) -> Node owned by host i
   
  public:
+  typedef typename GraphTy::GraphNode GraphNode;
+  typedef typename GraphTy::iterator iterator;
+  typedef typename GraphTy::const_iterator const_iterator;
+  typedef typename GraphTy::local_iterator local_iterator;
+  typedef typename GraphTy::const_local_iterator const_local_iterator;
+  typedef typename GraphTy::edge_iterator edge_iterator;
 
-  typedef GraphTy::iterator iterator;
-  typedef GraphTy::const_iterator const_iterator;
-  typedef GraphTy::local_iterator local_iterator;
-  typedef GraphTy::const_local_iterator const_local_iterator;
-  typedef GraphTy::edge_iterator edge_iterator;
-
-  hGraph(const std::string& filename, unsigned host, unsinged numHosts) {
+  hGraph(const std::string& filename, unsigned host, unsigned numHosts) {
     OfflineGraph g(filename);
-    auto baseNodes = Galois::block_range(g.begin(), g.end(), host, numHosts);
-    std::deque<OfflineGraph::GraphNode> Nodes(baseNodes.first, baseNodes.second);
+    auto baseNodes = Galois::block_range(0UL, g.size(), host, numHosts);
+    std::set<OfflineGraph::GraphNode> ghosts;
+    uint32_t numNodes = baseNodes.second - baseNodes.first;
+    uint64_t numEdges = 0;
+    for (auto n = baseNodes.first; n < baseNodes.second; ++n) {
+      for (auto ii = g.edge_begin(n), ee = g.edge_end(n); ii < ee; ++ii) {
+        ++numEdges;
+        ghosts.insert(g.getEdgeDst(ii));
+      }
+    }
+    //Logical -> File
+    auto trans = [&baseNodes, &ghosts] (uint32_t N) {
+      auto num = baseNodes.second - baseNodes.first;
+      if (N < num)
+        return baseNodes.first + N;
+      N -= num;
+      auto i = ghosts.begin();
+      std::advance(i, N);
+      return *i;
+    };
+    //File -> Logical
+    auto inv = [&baseNodes, &ghosts] (uint32_t N) {
+      if (N >= baseNodes.first && N < baseNodes.second)
+        return N - baseNodes.first;
+      auto i = ghosts.find(N);
+      return baseNodes.second - baseNodes.first + std::distance(ghosts.begin(), i);
+    };
+    
+    numNodes += ghosts.size();
+    graph = decltype(graph)(numNodes, numEdges,
+                            [&g, &trans] (uint32_t N) { return std::distance(g.edge_begin(trans(N)), g.edge_end(trans(N))); },
+                            [&g, &trans, &inv] (uint32_t N, uint64_t E) { inv(g.getEdgeDst(g.edge_begin(trans(N)) + E)); },
+                            [] (uint32_t N, uint64_t E) { return 0; }
+                            );
     
   }
 
-  NodeTy& getData(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
-    auto& r = graph.getData(N, flag);
-    if (BSPNode) {
-      return round ? r.first : r.second;
-    } else {
-      return r;
-    }
+  template<typename std::enable_if<BSPNode, int>::type = 0>
+  NodeTy& getData(GraphNode N, Galois::MethodFlag mflag = Galois::MethodFlag::ALL) {
+    auto& r = graph.getData(N, mflag);
+    return round ? r.first : r.second;
   }
 
-  EdgeTy& getEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::ALL) {
-    auto& r = graph.getEdgeData(ni, flag);
+  template<typename std::enable_if<!BSPNode, int>::type = 0>
+  NodeTy& getData(GraphNode N, Galois::MethodFlag mflag = Galois::MethodFlag::ALL) {
+    auto& r = graph.getData(N, mflag);
+    return r;
+  }
+
+  EdgeTy& getEdgeData(edge_iterator ni, Galois::MethodFlag mflag = Galois::MethodFlag::ALL) {
+    auto& r = graph.getEdgeData(ni, mflag);
     if (BSPEdge) {
       return round ? r.first : r.second;
     } else {

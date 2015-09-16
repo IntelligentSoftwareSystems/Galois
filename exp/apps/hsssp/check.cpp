@@ -1,4 +1,5 @@
 #include "OfflineGraph.h"
+#include "hGraph.h"
 
 #include <iostream>
 

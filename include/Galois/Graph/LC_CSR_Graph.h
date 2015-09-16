@@ -162,6 +162,38 @@ public:
   LC_CSR_Graph(LC_CSR_Graph&&) = default;
   LC_CSR_Graph() = default;
 
+  template<typename EdgeNumFnTy, typename EdgeDstFnTy, typename EdgeDataFnTy>
+    LC_CSR_Graph(uint32_t _numNodes, uint64_t _numEdges,
+                 EdgeNumFnTy edgeNum, EdgeDstFnTy edgeDst, EdgeDataFnTy edgeData)
+    :numNodes(_numNodes), numEdges(_numEdges)
+  {
+    
+    if (UseNumaAlloc) {
+      nodeData.allocateLocal(numNodes, false);
+      edgeIndData.allocateLocal(numNodes, false);
+      edgeDst.allocateLocal(numEdges, false);
+      edgeData.allocateLocal(numEdges, false);
+      this->outOfLineAllocateLocal(numNodes, false);
+    } else {
+      nodeData.allocateInterleaved(numNodes);
+      edgeIndData.allocateInterleaved(numNodes);
+      edgeDst.allocateInterleaved(numEdges);
+      edgeData.allocateInterleaved(numEdges);
+      this->outOfLineAllocateInterleaved(numNodes);
+    }
+    uint64_t cur = 0;
+    for (size_t n = 0; n < numNodes; ++n) {
+      nodeData.constructAt(n);
+      for (uint64_t e = 0, ee = edgeNum(n); e < ee; ++e) {
+        if (EdgeData::has_value)
+          edgeData.set(cur, edgeData(n, e));
+        edgeDst[cur] = edgeDst(n, e);
+        ++cur;
+      }
+      edgeIndData[n] = cur;
+    }
+  }
+  
   node_data_reference getData(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
     Galois::Runtime::checkWrite(mflag, false);
     NodeInfo& NI = nodeData[N];
