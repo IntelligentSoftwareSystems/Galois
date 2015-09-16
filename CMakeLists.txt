@@ -153,10 +153,7 @@ endif(USE_GPROF)
 if(USE_EXP)
   set(USE_VTUNE ON)
   add_definitions(-DGALOIS_USE_EXP)
-  include_directories("libruntime/include")
-  include_directories("libsubstrate/include")
-  include_directories("libllvm/include")
-  include_directories("libexp/include")
+  include_directories("exp/include")
 
   find_package(OpenMP)
   if(OPENMP_FOUND)
@@ -371,9 +368,7 @@ add_subdirectory(libllvm)
 add_subdirectory(libsubstrate)
 add_subdirectory(libruntime)
 add_subdirectory(libgraphs)
-if(USE_EXP)
-  add_subdirectory(libexp)
-endif()
+add_subdirectory(libexp)
 
 add_subdirectory(src)
 add_subdirectory(tools)
@@ -389,12 +384,12 @@ if(NOT SKIP_COMPILE_APPS)
 endif()
 
 ###### Documentation ######
-set(DOXYFILE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src\" \"${CMAKE_CURRENT_SOURCE_DIR}/include\" \"${CMAKE_CURRENT_SOURCE_DIR}/docs\" \"${CMAKE_CURRENT_SOURCE_DIR}/libgraphs\" \"${CMAKE_CURRENT_SOURCE_DIR}/libllvm\" \"${CMAKE_CURRENT_SOURCE_DIR}/libruntime\" \"${CMAKE_CURRENT_SOURCE_DIR}/libsubstrate")
+set(DOXYFILE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src\" \"${CMAKE_CURRENT_SOURCE_DIR}/include\" \"${CMAKE_CURRENT_SOURCE_DIR}/docs")
 find_package(Doxygen 1.8.0)
 if(NOT DOXYGEN_FOUND)
   message(STATUS "Could NOT find required doxygen version: doxygen missing or < 1.8.0") 
 else()
-  configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in
+   configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in
      ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile.in @ONLY)
   add_custom_target(doc ${DOXYGEN_EXECUTABLE}
      ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile.in WORKING_DIRECTORY
@@ -415,24 +410,15 @@ include(CPack)
 #export(TARGETS galois APPEND FILE "${PROJECT_BINARY_DIR}/GaloisTargets.cmake")
 #export(PACKAGE Galois)
 
-set(GALOIS_INCLUDE_DIRS) # Galois include dependencies
-set(GALOIS_INCLUDE_DIR)  # Galois include provides
-
 # Galois include files
 file(RELATIVE_PATH rel_include_dir "${INSTALL_CMAKE_DIR}" "${INSTALL_INCLUDE_DIR}")
-set(GALOIS_INCLUDE_DIR 
-  "${PROJECT_SOURCE_DIR}/libruntime/include"
-  "${PROJECT_SOURCE_DIR}/libsubstrate/include"
-  "${PROJECT_SOURCE_DIR}/libllvm/include"
-
-  "${PROJECT_BINARY_DIR}/libruntime/include"
-  "${PROJECT_BINARY_DIR}/libsubstrate/include"
-  "${PROJECT_BINARY_DIR}/libllvm/include"
-  )
+set(GALOIS_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/include" "${PROJECT_BINARY_DIR}/include")
 if(USE_EXP)
-  set(GALOIS_INCLUDE_DIR "${GALOIS_INCLUDE_DIR}" "${PROJECT_SOURCE_DIR}/libexp/include")
+  set(GALOIS_INCLUDE_DIR "${GALOIS_INCLUDE_DIR}" "${PROJECT_SOURCE_DIR}/exp/include")
 endif()
 
+set(GALOIS_INCLUDE_DIRS) # Galois include dependencies
+set(GALOIS_INCLUDE_DIR)  # Galois include provides
 #get_target_property(defs galois INCLUDE_DIRECTORIES)
 foreach(d ${defs})
   string(FIND ${d} ${PROJECT_BINARY_DIR} pos1)
