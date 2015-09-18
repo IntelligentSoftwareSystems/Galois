@@ -159,15 +159,17 @@ protected:
 
 public:
 
-  LC_CSR_Graph(LC_CSR_Graph&&) = default;
+  LC_CSR_Graph(LC_CSR_Graph&& rhs) = default;
   LC_CSR_Graph() = default;
+
+  LC_CSR_Graph& operator=(LC_CSR_Graph&&) = default;
 
   template<typename EdgeNumFnTy, typename EdgeDstFnTy, typename EdgeDataFnTy>
     LC_CSR_Graph(uint32_t _numNodes, uint64_t _numEdges,
-                 EdgeNumFnTy edgeNum, EdgeDstFnTy edgeDst, EdgeDataFnTy edgeData)
+                 EdgeNumFnTy edgeNum, EdgeDstFnTy _edgeDst, EdgeDataFnTy _edgeData)
     :numNodes(_numNodes), numEdges(_numEdges)
   {
-    
+    std::cerr << "\n**" << numNodes << " " << numEdges << "\n\n";
     if (UseNumaAlloc) {
       nodeData.allocateLocal(numNodes, false);
       edgeIndData.allocateLocal(numNodes, false);
@@ -181,17 +183,38 @@ public:
       edgeData.allocateInterleaved(numEdges);
       this->outOfLineAllocateInterleaved(numNodes);
     }
-    uint64_t cur = 0;
+    std::cerr << "Done Alloc\n";
     for (size_t n = 0; n < numNodes; ++n) {
       nodeData.constructAt(n);
-      for (uint64_t e = 0, ee = edgeNum(n); e < ee; ++e) {
-        if (EdgeData::has_value)
-          edgeData.set(cur, edgeData(n, e));
-        edgeDst[cur] = edgeDst(n, e);
-        ++cur;
-      }
+    }
+    std::cerr << "Done Node Construct\n";
+    uint64_t cur = 0;
+    for (size_t n = 0; n < numNodes; ++n) {
+      cur += edgeNum(n);
       edgeIndData[n] = cur;
     }
+    std::cerr << "Done Edge Reserve\n";
+    cur = 0;
+    for (size_t n = 0; n < numNodes; ++n) {
+      if (n % (1024*128) == 0)
+        std::cout << n << " " << cur << "\n";
+      for (uint64_t e = 0, ee = edgeNum(n); e < ee; ++e) {
+        if (EdgeData::has_value)
+          edgeData.set(cur, _edgeData(n, e));
+        edgeDst[cur] = _edgeDst(n, e);
+        ++cur;
+      }
+    }
+    std::cerr << "Done Construct\n";
+  }
+
+  friend void swap(LC_CSR_Graph& lhs, LC_CSR_Graph& rhs) {
+    swap(lhs.nodeData, rhs.nodeData);
+    swap(lhs.edgeIndData, rhs.edgeIndData);
+    swap(lhs.edgeDst, rhs.edgeDst);
+    swap(lhs.edgeData, rhs.edgeData);
+    std::swap(lhs.numNodes, rhs.numNodes);
+    std::swap(lhs.numEdges, rhs.numEdges);
   }
   
   node_data_reference getData(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {

@@ -26,11 +26,11 @@
 #include "Galois/gstl.h"
 #include "Galois/Graph/LC_CSR_Graph.h"
 
-template<typename NodeTy, typename EdgeTy, bool BSPNode, bool BSPEdge>
+template<typename NodeTy, typename EdgeTy, bool BSPNode=false, bool BSPEdge=false>
 class hGraph {
 
   typedef typename std::conditional<BSPNode, std::pair<NodeTy, NodeTy>,NodeTy>::type realNodeTy;
-  typedef typename std::conditional<BSPNode, std::pair<EdgeTy, EdgeTy>,NodeTy>::type realEdgeTy;
+  typedef typename std::conditional<BSPNode, std::pair<EdgeTy, EdgeTy>,EdgeTy>::type realEdgeTy;
 
   typedef Galois::Graph::LC_CSR_Graph<realNodeTy, realEdgeTy> GraphTy;
 
@@ -42,6 +42,19 @@ class hGraph {
   std::vector<unsigned> L2G; // GID = L2G[LID - numOwned]
   //GID to owner
   std::vector<unsigned> hostNodes; //[ i-1,i ) -> Node owned by host i
+
+  template<bool en, typename std::enable_if<en>::type* = nullptr>
+  NodeTy& getDataImpl(typename GraphTy::GraphNode N, Galois::MethodFlag mflag = Galois::MethodFlag::ALL) {
+    auto& r = graph.getData(N, mflag);
+    return round ? r.first : r.second;
+  }
+
+  template<bool en, typename std::enable_if<!en>::type* = nullptr>
+  NodeTy& getDataImpl(typename GraphTy::GraphNode N, Galois::MethodFlag mflag = Galois::MethodFlag::ALL) {
+    auto& r = graph.getData(N, mflag);
+    return r;
+  }
+
   
  public:
   typedef typename GraphTy::GraphNode GraphNode;
@@ -53,56 +66,66 @@ class hGraph {
 
   hGraph(const std::string& filename, unsigned host, unsigned numHosts) {
     OfflineGraph g(filename);
-    auto baseNodes = Galois::block_range(0UL, g.size(), host, numHosts);
-    std::set<OfflineGraph::GraphNode> ghosts;
-    uint32_t numNodes = baseNodes.second - baseNodes.first;
-    uint64_t numEdges = 0;
+    std::cerr << "Offline Graph Done\n";
+    auto baseNodes = Galois::block_range(0U, (unsigned)g.size(), host, numHosts);
+    numOwned = baseNodes.second - baseNodes.first;
+    uint64_t numEdges = g.edge_begin(baseNodes.second) - g.edge_begin(baseNodes.first); // depends on Offline graph impl
+    std::cerr << "Edge count Done\n";
+    std::vector<unsigned> _L2G;
     for (auto n = baseNodes.first; n < baseNodes.second; ++n) {
       for (auto ii = g.edge_begin(n), ee = g.edge_end(n); ii < ee; ++ii) {
-        ++numEdges;
-        ghosts.insert(g.getEdgeDst(ii));
+        auto dst = g.getEdgeDst(ii);
+        if (dst < baseNodes.first || dst >= baseNodes.second) {
+          auto ii = std::lower_bound(_L2G.begin(), _L2G.end(), dst);
+          if (ii == _L2G.end() || *ii != dst)
+            _L2G.insert(ii, dst);
+        }
       }
     }
+    uint32_t numNodes = numOwned + L2G.size();
+    std::cerr << "Ghost Generation Done\n";
+
     //Logical -> File
-    auto trans = [&baseNodes, &ghosts] (uint32_t N) {
+    //Valid for empty ghosts
+    auto L2F = [&baseNodes, _L2G] (uint32_t N) {
       auto num = baseNodes.second - baseNodes.first;
       if (N < num)
         return baseNodes.first + N;
       N -= num;
-      auto i = ghosts.begin();
-      std::advance(i, N);
-      return *i;
+      return _L2G[N];
     };
     //File -> Logical
-    auto inv = [&baseNodes, &ghosts] (uint32_t N) {
+    auto F2L = [&baseNodes, &_L2G] (uint32_t N) {
       if (N >= baseNodes.first && N < baseNodes.second)
         return N - baseNodes.first;
-      auto i = ghosts.find(N);
-      return baseNodes.second - baseNodes.first + std::distance(ghosts.begin(), i);
+      auto i = std::lower_bound(_L2G.begin(), _L2G.end(), N);
+      return (unsigned)(baseNodes.second - baseNodes.first + std::distance(_L2G.begin(), i));
+    };
+    //Local -> Num Edges
+    auto edgeNum = [&g, &L2F, &baseNodes] (uint32_t N) {
+      auto num = baseNodes.second - baseNodes.first;
+      if (N >= num) return 0L;
+      else return std::distance(g.edge_begin(L2F(N)), g.edge_end(L2F(N)));
+    };
+    //Local, EdgeOffset -> Local
+    auto edgeDst = [&g, &L2F, &F2L] (uint32_t N, uint64_t E) {
+      return F2L(g.getEdgeDst(g.edge_begin(L2F(N)) + E));
     };
     
-    numNodes += ghosts.size();
-    graph = decltype(graph)(numNodes, numEdges,
-                            [&g, &trans] (uint32_t N) { return std::distance(g.edge_begin(trans(N)), g.edge_end(trans(N))); },
-                            [&g, &trans, &inv] (uint32_t N, uint64_t E) { inv(g.getEdgeDst(g.edge_begin(trans(N)) + E)); },
-                            [] (uint32_t N, uint64_t E) { return 0; }
-                            );
-    
+    decltype(graph) ng(numNodes, numEdges,
+                       edgeNum,
+                       edgeDst,
+                       [] (uint32_t N, uint64_t E) { return 0; }
+                       );
+    L2G.swap(_L2G);
+    swap(graph,ng);
   }
 
-  template<typename std::enable_if<BSPNode, int>::type = 0>
   NodeTy& getData(GraphNode N, Galois::MethodFlag mflag = Galois::MethodFlag::ALL) {
-    auto& r = graph.getData(N, mflag);
-    return round ? r.first : r.second;
+    return getDataImpl<BSPNode>(N, mflag);
   }
 
-  template<typename std::enable_if<!BSPNode, int>::type = 0>
-  NodeTy& getData(GraphNode N, Galois::MethodFlag mflag = Galois::MethodFlag::ALL) {
-    auto& r = graph.getData(N, mflag);
-    return r;
-  }
-
-  EdgeTy& getEdgeData(edge_iterator ni, Galois::MethodFlag mflag = Galois::MethodFlag::ALL) {
+  typename GraphTy::edge_data_reference getEdgeData(edge_iterator ni, Galois::MethodFlag mflag = Galois::MethodFlag::ALL) {
     auto& r = graph.getEdgeData(ni, mflag);
     if (BSPEdge) {
       return round ? r.first : r.second;
