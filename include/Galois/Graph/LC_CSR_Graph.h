@@ -299,6 +299,44 @@ public:
     }
   }
 
+  void allocateFrom(uint32_t nNodes, uint64_t nEdges) {
+    numNodes = nNodes;
+    numEdges = nEdges;
+    if (UseNumaAlloc) {
+      nodeData.allocateLocal(numNodes, false);
+      edgeIndData.allocateLocal(numNodes, false);
+      edgeDst.allocateLocal(numEdges, false);
+      edgeData.allocateLocal(numEdges, false);
+      this->outOfLineAllocateLocal(numNodes, false);
+    } else {
+      nodeData.allocateInterleaved(numNodes);
+      edgeIndData.allocateInterleaved(numNodes);
+      edgeDst.allocateInterleaved(numEdges);
+      edgeData.allocateInterleaved(numEdges);
+      this->outOfLineAllocateInterleaved(numNodes);
+    }
+  }
+
+  void constructNodes() {
+    for (uint32_t x = 0; x < numNodes; ++x) {
+      nodeData.constructAt(x);
+      this->outOfLineConstructAt(x);
+    }
+  }
+
+  void constructEdge(uint64_t e, uint32_t dst, const typename EdgeData::value_type& val) {
+    edgeData.set(e, val);
+    edgeDst[e] = dst;
+  }
+
+  void constructEdge(uint64_t e, uint32_t dst) {
+    edgeDst[e] = dst;
+  }
+
+  void fixEndEdge(uint32_t n, uint64_t e) {
+    edgeIndData[n] = e;
+  }
+
   void constructFrom(FileGraph& graph, unsigned tid, unsigned total) {
     auto r = graph.divideByNode(
         NodeData::size_of::value + EdgeIndData::size_of::value + LC_CSR_Graph::size_of_out_of_line::value,

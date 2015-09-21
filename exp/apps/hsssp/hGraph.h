@@ -71,54 +71,56 @@ class hGraph {
     numOwned = baseNodes.second - baseNodes.first;
     uint64_t numEdges = g.edge_begin(baseNodes.second) - g.edge_begin(baseNodes.first); // depends on Offline graph impl
     std::cerr << "Edge count Done\n";
-    std::vector<unsigned> _L2G;
+    std::vector<bool> ghosts(g.size());
     for (auto n = baseNodes.first; n < baseNodes.second; ++n) {
       for (auto ii = g.edge_begin(n), ee = g.edge_end(n); ii < ee; ++ii) {
         auto dst = g.getEdgeDst(ii);
-        if (dst < baseNodes.first || dst >= baseNodes.second) {
-          auto ii = std::lower_bound(_L2G.begin(), _L2G.end(), dst);
-          if (ii == _L2G.end() || *ii != dst)
-            _L2G.insert(ii, dst);
-        }
+        ghosts[dst] = true;
       }
     }
-    uint32_t numNodes = numOwned + L2G.size();
-    std::cerr << "Ghost Generation Done\n";
+    std::cerr << "Ghost Finding Done\n";
+    for (uint64_t x = 0; x < g.size(); ++x) {
+      if (ghosts[x] && (x < baseNodes.first || x >= baseNodes.second)) {
+        L2G.push_back(x);
+      }
+    }
+    std::cerr << "L2G Done\n";
 
-    //Logical -> File
-    //Valid for empty ghosts
-    auto L2F = [&baseNodes, _L2G] (uint32_t N) {
-      auto num = baseNodes.second - baseNodes.first;
-      if (N < num)
-        return baseNodes.first + N;
-      N -= num;
-      return _L2G[N];
-    };
-    //File -> Logical
-    auto F2L = [&baseNodes, &_L2G] (uint32_t N) {
-      if (N >= baseNodes.first && N < baseNodes.second)
-        return N - baseNodes.first;
-      auto i = std::lower_bound(_L2G.begin(), _L2G.end(), N);
-      return (unsigned)(baseNodes.second - baseNodes.first + std::distance(_L2G.begin(), i));
-    };
-    //Local -> Num Edges
-    auto edgeNum = [&g, &L2F, &baseNodes] (uint32_t N) {
-      auto num = baseNodes.second - baseNodes.first;
-      if (N >= num) return 0L;
-      else return std::distance(g.edge_begin(L2F(N)), g.edge_end(L2F(N)));
-    };
-    //Local, EdgeOffset -> Local
-    auto edgeDst = [&g, &L2F, &F2L] (uint32_t N, uint64_t E) {
-      return F2L(g.getEdgeDst(g.edge_begin(L2F(N)) + E));
-    };
+    uint32_t numNodes = numOwned + L2G.size();
+    graph.allocateFrom(numNodes, numEdges);
+    std::cerr << "Allocate done\n";
     
-    decltype(graph) ng(numNodes, numEdges,
-                       edgeNum,
-                       edgeDst,
-                       [] (uint32_t N, uint64_t E) { return 0; }
-                       );
-    L2G.swap(_L2G);
-    swap(graph,ng);
+    graph.constructNodes();
+    std::cerr << "Construct nodes done\n";
+
+    uint64_t cur = 0;
+    for (auto n = baseNodes.first; n < baseNodes.second; ++n) {
+      for (auto ii = g.edge_begin(n), ee = g.edge_end(n); ii < ee; ++ii) {
+        auto dst = g.getEdgeDst(ii);
+        decltype(dst) rdst;
+        if (dst < baseNodes.first || dst >= baseNodes.second) {
+          auto i = std::lower_bound(L2G.begin(), L2G.end(), dst);
+          rdst = baseNodes.second - baseNodes.first + std::distance(L2G.begin(), i);
+        } else {
+          rdst = dst - baseNodes.first;
+        }
+        graph.constructEdge(cur++, rdst);
+      }
+      graph.fixEndEdge(n, cur);
+    }
+    std::cerr << "Construct edges done\n";
+    
+    /*
+    auto ii_f = g.begin() + baseNodes.first;
+    auto ii_m = graph.begin();
+    for (auto x = baseNodes.first; x < baseNodes.second; ++x) {
+      auto nf = std::distance(g.edge_begin(*ii_f), g.edge_end(*ii_f));
+      auto nm = std::distance(graph.edge_begin(*ii_m), graph.edge_end(*ii_m));
+      ++ii_f;
+      ++ii_m;
+      std::cout << x << " " << nf << " " << nm << "\n";
+    }
+    */
   }
 
   NodeTy& getData(GraphNode N, Galois::MethodFlag mflag = Galois::MethodFlag::ALL) {

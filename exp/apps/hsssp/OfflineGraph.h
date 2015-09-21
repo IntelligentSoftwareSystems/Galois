@@ -45,7 +45,7 @@
 
 
 class OfflineGraph {
-  std::ifstream file;
+  std::ifstream file1, file2;
   uint32_t numNodes;
   uint64_t numEdges;
   size_t length;
@@ -53,17 +53,21 @@ class OfflineGraph {
   
   uint64_t outIndexs(uint64_t node) {
     std::lock_guard<decltype(lock)> lg(lock);
-    file.seekg((4 + node)*sizeof(uint64_t), file.beg);
+    std::streamoff pos = (4 + node)*sizeof(uint64_t);
+    if (file1.tellg() != pos)
+      file1.seekg(pos, file1.beg);
     uint64_t retval;
-    file.read(reinterpret_cast<char*>(&retval), sizeof(uint64_t));
+    file1.read(reinterpret_cast<char*>(&retval), sizeof(uint64_t));
     return retval;
   }
 
   uint32_t outEdges(uint64_t edge) {
     std::lock_guard<decltype(lock)> lg(lock);
-    file.seekg((4 + numNodes) * sizeof(uint64_t) + edge * sizeof(uint32_t), file.beg);
+    std::streamoff pos = (4 + numNodes) * sizeof(uint64_t) + edge * sizeof(uint32_t);
+    if (file2.tellg() != pos)
+      file2.seekg(pos, file2.beg);
     uint32_t retval;
-    file.read(reinterpret_cast<char*>(&retval), sizeof(uint32_t));
+    file2.read(reinterpret_cast<char*>(&retval), sizeof(uint32_t));
     return retval;
   }
 
@@ -73,19 +77,20 @@ public:
   typedef uint32_t GraphNode;
 
   OfflineGraph(const std::string& name)
-    :file(name)
+    :file1(name), file2(name)
   {
-    if (!file.is_open() || !file.good()) throw "Bad filename";
+    if (!file1.is_open() || !file1.good()) throw "Bad filename";
+    if (!file2.is_open() || !file2.good()) throw "Bad filename";
     uint64_t ver = 0;
-    file.read(reinterpret_cast<char*>(&ver), sizeof(uint64_t));
-    file.seekg(sizeof(uint64_t), file.cur);
-    file.read(reinterpret_cast<char*>(&numNodes), sizeof(uint64_t));
-    file.read(reinterpret_cast<char*>(&numEdges), sizeof(uint64_t));
+    file1.read(reinterpret_cast<char*>(&ver), sizeof(uint64_t));
+    file1.seekg(sizeof(uint64_t), file1.cur);
+    file1.read(reinterpret_cast<char*>(&numNodes), sizeof(uint64_t));
+    file1.read(reinterpret_cast<char*>(&numEdges), sizeof(uint64_t));
     if (ver != 1) throw "Bad Version";
-    if (!file) throw "Out of data";
+    if (!file1) throw "Out of data";
     //File length
-    file.seekg(0, file.end);
-    length = file.tellg();
+    file1.seekg(0, file1.end);
+    length = file1.tellg();
     if (length < sizeof(uint64_t)*(4+numNodes) + sizeof(uint32_t)*numEdges)
       throw "File too small";
     
