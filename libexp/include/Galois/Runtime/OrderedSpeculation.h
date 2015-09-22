@@ -35,20 +35,48 @@
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/OrderedLockable.h"
 
+
 namespace Galois {
+
+namespace dbg {
+  template <typename... Args>
+  void debug (Args&&... args) {
+    
+    const bool DEBUG = true;
+    if (DEBUG) {
+      Substrate::gDebug (std::forward<Args> (args)...);
+    }
+  }
+}
+
 namespace Runtime {
 
 enum class ContextState: int {
-    UNSCHEDULED,
+    UNSCHEDULED = 0,
     SCHEDULED,
     READY_TO_COMMIT,
     ABORT_SELF,
     ABORT_HELP,
-    ABORTING,
     COMMITTING, 
     COMMIT_DONE,
+    READY_TO_ABORT,
+    ABORTING,
     ABORT_DONE,
     ABORTED_CHILD,
+};
+
+const char* ContextStateNames[] = {
+    "UNSCHEDULED",
+    "SCHEDULED",
+    "READY_TO_COMMIT",
+    "ABORT_SELF",
+    "ABORT_HELP",
+    "COMMITTING", 
+    "COMMIT_DONE",
+    "READY_TO_ABORT",
+    "ABORTING",
+    "ABORT_DONE",
+    "ABORTED_CHILD",
 };
 
 
@@ -80,56 +108,55 @@ struct OptimNhoodItem: public OrdLocBase<OptimNhoodItem<Ctxt, CtxtCmp>, Ctxt, Ct
       return true;
 
     } else {
-
+      
       while (!sharers.empty ()) {
         Ctxt* tail = sharers.back ();
         assert (tail);
-        
-        if (ctxtCmp (ctxt, tail)) { // ctxt < tail
-          assert (!tail->hasState (ContextState::COMMIT_DONE));
-          assert (!tail->hasState (ContextState::COMMITTING));
+
+        if (ctxtCmp (ctxt, tail)) {
 
           if (tail->isRunning ()) {
-            tail->abortSelf = true;
 
             mutex.unlock ();
+
+            tail->casState (ContextState::SCHEDULED, ContextState::ABORT_SELF);
+
             ctxt->waitFor (tail);
+
             mutex.lock ();
             continue;
 
           } else {
 
-            assert (!tail->hasState (ContextState::SCHEDULED));
-            assert (!tail->hasState (ContextState::ABORT_SELF));
-            assert (!tail->hasState (ContextState::ABORTING));
-
-            // TODO: abort tail, by only one thread, only once
-            continue;
-
-          }
-
-        } else { // ctxt >= tail
-
-          assert (ctxt != tail);
-
-          if (tail->isRunning ()) {
             mutex.unlock ();
-            ctxt->waitFor (tail);
+
+            if (tail->casState (ContextState::READY_TO_COMMIT, ContextState::READY_TO_ABORT)) {
+              tail->doAbort ();
+            }
+
             mutex.lock ();
             continue;
-
-          } else {
-            assert (!tail->isRunning ());
-            break;
           }
 
+        } else {
 
+          sharers.push_back (ctxt);
+
+          mutex.unlock ();
+
+          if (tail->isRunning ()) {
+            ctxt->waitFor (tail);
+          }
+
+          return true;
         }
       }
 
-      sharers.push_back (ctxt);
-      return true;
 
+      assert (sharers.empty ());
+      sharers.push_back (ctxt);
+      mutex.unlock ();
+      return true;
 
     }
 
@@ -157,8 +184,19 @@ struct OptimNhoodItem: public OrdLocBase<OptimNhoodItem<Ctxt, CtxtCmp>, Ctxt, Ct
         dbg::debug (ctxt, " removing self & aborting lower priority sharer ", tail);
 
         mutex.unlock ();
-        tail->doAbort ();
+
+        if (tail->hasState (ContextState::ABORT_SELF) || tail->casState (ContextState::SCHEDULED, ContextState::ABORT_SELF)) {
+          ctxt->waitFor (tail);
+
+        } else if (tail->casState (ContextState::READY_TO_COMMIT, ContextState::READY_TO_ABORT)) {
+          tail->doAbort ();
+
+        } else {
+          GALOIS_DIE ("shouldn't reach here");
+        }
+
         mutex.lock ();
+
       } else {
         assert (!found);
         GALOIS_DIE ("shouldn't reach here");
@@ -204,10 +242,8 @@ struct OptimContext: public SimpleRuntimeContext {
   std::atomic<ContextState> state;
   Exec& exec;
   NhoodList nhood;
-  bool abortSelf = false;
   Lock_ty mutex;
  
-  bool finished = false;
 
   // TODO: avoid using UserContextAccess and per-iteration allocator
   // use Pow of 2 block allocator instead. 
@@ -231,6 +267,8 @@ struct OptimContext: public SimpleRuntimeContext {
     return state.compare_exchange_strong (s_old, s_new);
   }
 
+  ContextState getState (void) const { return state; }
+
   bool isRunning (void) const {
     return hasState (ContextState::SCHEDULED) || hasState (ContextState::ABORT_SELF);
   }
@@ -249,14 +287,13 @@ struct OptimContext: public SimpleRuntimeContext {
     NItem& nitem = exec.nhmgr.getNhoodItem (l);
     assert (NItem::getOwner (l) == &nitem);
 
-    if (!abortSelf && std::find (nhood.begin (), nhood.end (), &nitem) == nhood.end ()) {
+    if (!hasState (ContextState::ABORT_SELF) && std::find (nhood.begin (), nhood.end (), &nitem) == nhood.end ()) {
 
       bool succ = nitem.add (this);
       if (succ) {
         nhood.push_back (&nitem);
 
       } else {
-        abortSelf = true;
         setState (ContextState::ABORT_SELF);
       }
     }
@@ -267,8 +304,6 @@ struct OptimContext: public SimpleRuntimeContext {
     nhood.clear ();
     userHandle.reset ();
     children.clear ();
-    abortSelf = false;
-    finished = false;
   }
 
   void publishChanges (void) {
@@ -334,6 +369,8 @@ struct OptimContext: public SimpleRuntimeContext {
       return;
     }
 
+    assert (hasState (ContextState::READY_TO_ABORT));
+
     setState (ContextState::ABORTING);
 
 
@@ -347,11 +384,14 @@ struct OptimContext: public SimpleRuntimeContext {
         || child->hasState (ContextState::ABORT_DONE);
       assert (c);
 
-      if (child->hasState (ContextState::READY_TO_COMMIT)) {
+      if (child->casState (ContextState::READY_TO_COMMIT, ContextState::READY_TO_ABORT)) {
+
         dbg::debug (this, " aborting child ", child);
         child->doAbort (false);
         exec.freeCtxt (child);
+
       } else {
+        assert (child->hasState (ContextState::ABORTING) || child->hasState (ContextState::ABORT_DONE));
         child->setState (ContextState::ABORTED_CHILD);
       }
     }
@@ -401,11 +441,11 @@ class OptimOrdExecutor: private boost::noncopyable {
   CommitQ commitQ;
   NItemFactory nitemFactory;
   NhoodMgr nhmgr;
-  Substrate::TerminationDetection& term;
-
-
-  GAtomic<bool> startGVT;
+  // Substrate::TerminationDetection& term;
+  std::atomic<bool> finish;
   Ctxt* globalFront;
+  GAtomic<bool> startGVT;
+
 
 
   CtxtAlloc ctxtAlloc;
@@ -424,7 +464,10 @@ public:
       commitQ (),
       nitemFactory (ctxtCmp),
       nhmgr (nitemFactory),
-      term (Substrate::getSystemTermination (activeThreads))
+      // term (Substrate::getSystemTermination (activeThreads)),
+      finish (false),
+      globalFront (nullptr),
+      startGVT (false)
   {
     if (!loopname) { loopname = "NULL"; }
   }
@@ -442,7 +485,7 @@ public:
 
     push (range.local_begin (), range.local_end ());
 
-    term.initializeThread ();
+    // term.initializeThread ();
   }
 
   template <typename Iter>
@@ -480,22 +523,22 @@ public:
       bool didWork = false;
 
 
-      unsigned num_scheduled = 0;
-
-      for (; (num_scheduled < commit_interval) && !pendingQ.get ().empty (); ++num_scheduled, ++totalIter) {
+      for (unsigned num_scheduled = 0; (num_scheduled < commit_interval) && !pendingQ.get ().empty () && !startGVT; ++num_scheduled, ++totalIter) {
 
         Ctxt* ctxt = schedule ();
 
         if (ctxt) {
+          dbg::debug (ctxt, " scheduled");
+
           didWork = true;
 
           applyOperator (ctxt);
 
           if (!ctxt->casState (ContextState::SCHEDULED, ContextState::READY_TO_COMMIT)) {
 
-            if (ctxt->casState (ContextState::ABORT_SELF, ContextState::ABORTING)) {
+            if (ctxt->casState (ContextState::ABORT_SELF, ContextState::READY_TO_ABORT)) {
 
-              dbg::debug (ctxt, " Shouldn't reach here with ABORT_SELF");
+              // dbg::debug (ctxt, " Shouldn't reach here with ABORT_SELF");
               ctxt->doAbort ();
 
             }
@@ -513,13 +556,16 @@ public:
 
       }
 
-      // TODO: do this after processing some tasks
-      unsigned numCommitted = localCommit ();
-      totalCommits += numCommitted;
 
       if (!computeGVT ()) {
         reportGVT ();
+
+      } else {
       }
+
+      // TODO: do this after processing some tasks
+      unsigned numCommitted = localCommit ();
+      totalCommits += numCommitted;
 
       if (!commitQ.get ().empty () || !pendingQ.get ().empty ()) {
         continue;
@@ -532,13 +578,13 @@ public:
       // TODO: insert stealing here
 
 
-      term.localTermination (didWork);
+      // term.localTermination (didWork);
 
-    } while (!term.globalTermination ());
+    } while (!finish);
 
 
 
-    std::printf ("OptimOrdExecutor: totalIter=%zd, totalCommits=%zd\n", totalIter, totalCommits);
+    dbg::debug ("OptimOrdExecutor: totalIter=%zd, totalCommits=%zd\n", totalIter, totalCommits);
   }
 
   void operator () (void) {
@@ -620,7 +666,9 @@ private:
 
 
   bool computeGVT (void) {
-    if (startGVT.cas (false, true)) {
+    if (!finish && startGVT.cas (false, true)) {
+
+      dbg::debug ("starting GVT");
 
       computeLocalFront ();
 
@@ -628,9 +676,16 @@ private:
 
       computeGlobalFront ();
 
-      startGVT = false;
+      if (!globalFront) {
+        finish = true;
+
+      } else {
+        startGVT = false;
+      }
 
       gvtBarrier ();
+
+      dbg::debug ("end computeGVT");
 
       return true;
 
@@ -641,55 +696,77 @@ private:
 
   void reportGVT (void) {
 
-    if (bool (startGVT)) {
+    if (bool (startGVT) && !finish) {
+
+      dbg::debug ("reporting GVT");
+
       computeLocalFront ();
 
       gvtBarrier ();
 
+      Substrate::asmPause ();
+
       gvtBarrier ();
-      assert (!bool (startGVT));
+      if (!finish) {
+        assert (!bool (startGVT));
+      }
+
+      dbg::debug ("end reportGVT");
     }
   }
 
 
   size_t localCommit (void) {
-
-    auto uniq_end = std::unique (commitQ.get ().begin (), commitQ.get ().end ());
-
-    commitQ.get ().erase (uniq_end, commitQ.get ().end ());
+    
+    // auto uniq_end = std::unique (commitQ.get ().begin (), commitQ.get ().end ());
+    // commitQ.get ().erase (uniq_end, commitQ.get ().end ());
     
     Ctxt* gfront = globalFront;
 
     size_t numCommitted = 0;
 
+    auto c_end = commitQ.get ().end ();
+
+
     if (gfront) {
 
       // all tasks lesser than globalMin
-      auto c_end = std::partition (commitQ.get ().begin (), commitQ.get ().end (), 
+      c_end = std::partition (commitQ.get ().begin (), commitQ.get ().end (), 
           [&] (Ctxt* c) { 
             assert (c);
             return ctxtCmp (c, gfront);
           });
 
+    }
 
 
-      for (auto i = commitQ.get ().begin (); i != c_end; ++i) {
+    for (auto i = commitQ.get ().begin (); i != c_end; ++i) {
 
-        assert (ctxtCmp (*i, gfront));
-        assert ((*i)->hasState (ContextState::READY_TO_COMMIT));
+      Ctxt* c = *i;
 
-        if ((*i)->hasState (ContextState::READY_TO_COMMIT)) {
-          (*i)->doCommit ();
-          ++numCommitted;
-        }
+      if (gfront) {
+        assert (ctxtCmp (c, gfront));
+
+        
+       bool check = (c->hasState (ContextState::READY_TO_COMMIT) || c->hasState (ContextState::COMMIT_DONE));
+       if (!check) {
+         dbg::debug (c, " found with unexpected state: ", ContextStateNames [int (c->getState ())]);
+         assert (check);
+       }
       }
 
-      commitQ.get ().erase (commitQ.get ().begin (), c_end);
+      assert (!c->isRunning ());
 
-      if (!commitQ.get ().empty ()) {
-        // assert ( TODO
-      }
+      if (c->hasState (ContextState::READY_TO_COMMIT)) {
+        c->doCommit ();
+        ++numCommitted;
+      } 
+    }
 
+    commitQ.get ().erase (commitQ.get ().begin (), c_end);
+
+    if (!commitQ.get ().empty ()) {
+      // assert ( TODO
     }
 
     return numCommitted;
