@@ -376,7 +376,7 @@ add_subdirectory(libruntime)
 add_subdirectory(libgraphs)
 add_subdirectory(libexp)
 
-add_subdirectory(src)
+#add_subdirectory(src)
 add_subdirectory(tools)
 add_subdirectory(scripts)
 if(NOT SKIP_COMPILE_APPS)
@@ -390,7 +390,7 @@ if(USE_EXP)
 endif()
 
 ###### Documentation ######
-set(DOXYFILE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/src\" \"${CMAKE_CURRENT_SOURCE_DIR}/include\" \"${CMAKE_CURRENT_SOURCE_DIR}/docs\" \"${CMAKE_CURRENT_SOURCE_DIR}/libgraphs\" \"${CMAKE_CURRENT_SOURCE_DIR}/libllvm\" \"${CMAKE_CURRENT_SOURCE_DIR}/libruntime\" \"${CMAKE_CURRENT_SOURCE_DIR}/libsubstrate")
+set(DOXYFILE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/include\" \"${CMAKE_CURRENT_SOURCE_DIR}/docs\" \"${CMAKE_CURRENT_SOURCE_DIR}/libgraphs\" \"${CMAKE_CURRENT_SOURCE_DIR}/libllvm\" \"${CMAKE_CURRENT_SOURCE_DIR}/libruntime\" \"${CMAKE_CURRENT_SOURCE_DIR}/libsubstrate")
 find_package(Doxygen 1.8.0)
 if(NOT DOXYGEN_FOUND)
   message(STATUS "Could NOT find required doxygen version: doxygen missing or < 1.8.0") 
@@ -441,11 +441,11 @@ install(DIRECTORY ${GALOIS_INCLUDE_DIR} DESTINATION "${INSTALL_INCLUDE_DIR}/.." 
 
 # Galois compiler definitions
 set(galois_defs)
-get_directory_property(defs DIRECTORY "${PROJECT_SOURCE_DIR}/src" COMPILE_DEFINITIONS)
+get_directory_property(defs DIRECTORY "${PROJECT_SOURCE_DIR}" COMPILE_DEFINITIONS)
 foreach(d ${defs})
   set(galois_defs "-D${d} ${galois_defs}")
 endforeach()
-get_directory_property(defs DIRECTORY "${PROJECT_SOURCE_DIR}/src" COMPILE_DEFINITIONS_${CMAKE_BUILD_TYPE})
+get_directory_property(defs DIRECTORY "${PROJECT_SOURCE_DIR}" COMPILE_DEFINITIONS_${CMAKE_BUILD_TYPE})
 foreach(d ${defs})
   set(galois_defs "-D${d} ${galois_defs}")
 endforeach()
