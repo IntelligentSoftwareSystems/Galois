@@ -26,8 +26,17 @@
 #include "Galois/gstl.h"
 #include "Galois/Graph/LC_CSR_Graph.h"
 
+class syncable {
+protected:
+  static syncable* curSync;
+  static void syncRecv(Galois::Runtime::RecvBuffer& buf) {
+    curSync->syncRecvImpl(buf);
+  }
+  virtual void syncRecvImpl(Galois::Runtime::RecvBuffer&) = 0;
+};
+
 template<typename NodeTy, typename EdgeTy, bool BSPNode=false, bool BSPEdge=false>
-class hGraph {
+class hGraph : public syncable{
 
   typedef typename std::conditional<BSPNode, std::pair<NodeTy, NodeTy>,NodeTy>::type realNodeTy;
   typedef typename std::conditional<BSPNode, std::pair<EdgeTy, EdgeTy>,EdgeTy>::type realEdgeTy;
@@ -36,12 +45,20 @@ class hGraph {
 
   GraphTy graph;
   bool rount;
-  unsigned numOwned; // [0, numOwned) = global nodes owned, thus [numOwned, numNodes are replicas
+  uint32_t numOwned; // [0, numOwned) = global nodes owned, thus [numOwned, numNodes are replicas
   unsigned id; // my hostid // FIXME: isn't this just Network::ID?
   //ghost cell ID translation
-  std::vector<unsigned> L2G; // GID = L2G[LID - numOwned]
+  std::vector<uint32_t> L2G; // GID = L2G[LID - numOwned]
   //GID to owner
-  std::vector<unsigned> hostNodes; //[ i-1,i ) -> Node owned by host i
+  std::vector<uint32_t> hostNodes; //[ i-1,i ) -> GID Node owned by host i
+
+  std::pair<uint32_t, uint32_t> nodes_by_host(uint32_t host) {
+    if (host == id)
+      return std::make_pair(0, numOwned);
+    if (host == 0)
+      return std::make_pair(numOwned, hostNodes[0]);
+    return std::make_pair(hostNodes[host-1], hostNodes[host]);
+  }
 
   template<bool en, typename std::enable_if<en>::type* = nullptr>
   NodeTy& getDataImpl(typename GraphTy::GraphNode N, Galois::MethodFlag mflag = Galois::MethodFlag::ALL) {
@@ -55,6 +72,24 @@ class hGraph {
     return r;
   }
 
+public:
+  virtual void syncRecvImpl(Galois::Runtime::RecvBuffer& buf) {
+    void (hGraph::*fn)(Galois::Runtime::RecvBuffer&);
+    Galois::Runtime::gDeserialize(buf, fn);
+    (this->*fn)(buf);
+  }
+
+  template<typename FnTy>
+  void syncRecvApply(Galois::Runtime::RecvBuffer& buf) {
+    uint32_t num;
+    Galois::Runtime::gDeserialize(buf, num);
+    for(; num ; --num) {
+      uint32_t gid;
+      typename FnTy::ValTy val;
+      Galois::Runtime::gDeserialize(buf, gid, val);
+      FnTy::reduce(getData(gid - numOwned), val);
+    }
+  }
   
  public:
   typedef typename GraphTy::GraphNode GraphNode;
@@ -69,6 +104,7 @@ class hGraph {
     std::cerr << "Offline Graph Done\n";
     auto baseNodes = Galois::block_range(0U, (unsigned)g.size(), host, numHosts);
     numOwned = baseNodes.second - baseNodes.first;
+    id = host;
     uint64_t numEdges = g.edge_begin(baseNodes.second) - g.edge_begin(baseNodes.first); // depends on Offline graph impl
     std::cerr << "Edge count Done\n";
     std::vector<bool> ghosts(g.size());
@@ -121,6 +157,7 @@ class hGraph {
       std::cout << x << " " << nf << " " << nm << "\n";
     }
     */
+    //FIXME: hostNodes
   }
 
   NodeTy& getData(GraphNode N, Galois::MethodFlag mflag = Galois::MethodFlag::ALL) {
@@ -148,15 +185,32 @@ class hGraph {
   const_iterator end() const { return graph.begin() + numOwned; }
   iterator end() { return graph.begin() + numOwned; } 
 
-  const_local_iterator local_begin() const;
-  local_iterator local_begin();
-  const_local_iterator local_end() const;
-  local_iterator local_end();
-
-  const_iterator ghost_begin() const { return end(); }
-  iterator ghost_begin() { return end(); }
+  const_iterator ghost_begin() const { return end; }
+  iterator ghost_begin() { return end; }
   const_iterator ghost_end() const { return graph.end(); }
   iterator ghost_end() { return graph.end(); }
   
-  void sync();
+  template<typename FnTy>
+  void sync_push() {
+    curSync = this;
+   void (hGraph::*fn)(Galois::Runtime::RecvBuffer&) = &hGraph::syncRecvApply<FnTy>;
+    auto& net = Galois::Runtime::getSystemNetworkInterface();
+    for (unsigned x = 0; x < hostNodes.size(); ++x) {
+      if (x == id) continue;
+      uint32_t start, end;
+      std::tie(start, end) = nodes_by_host(x);
+      if (start == end) continue;
+      Galois::Runtime::SendBuffer b;
+      gSerialize(b, fn, (uint32_t)(end-start));
+      for (; start != end; ++start) {
+        auto gid = L2G[start - numOwned];
+        gSerialize(b, gid, FnTy::extract(getData(gid)));
+        FnTy::reset(getData(gid));
+      }
+      net.send(x, syncRecv, b);
+    }
+    //Will force all messages to be processed before continuing
+    Galois::Runtime::getHostBarrier().wait();
+  }
+
 };
