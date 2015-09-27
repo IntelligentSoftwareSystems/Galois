@@ -249,5 +249,22 @@ static inline void reportPageAlloc(const char* label) {
   Runtime::reportPageAlloc(label);
 }
 
+
+/**
+ *Dummy functions for read_set and write_set
+ *
+ */
+template<typename... Args>
+int read_set(Args... args) {
+  // Nothing for now.
+   return 0;
+}
+
+template<typename... Args>
+int write_set(Args... args) {
+  // Nothing for now.
+   return 0;
+}
+
 } //namespace Galois
 #endif
