@@ -159,9 +159,64 @@ protected:
 
 public:
 
-  LC_CSR_Graph(LC_CSR_Graph&&) = default;
+  LC_CSR_Graph(LC_CSR_Graph&& rhs) = default;
   LC_CSR_Graph() = default;
 
+  LC_CSR_Graph& operator=(LC_CSR_Graph&&) = default;
+
+  template<typename EdgeNumFnTy, typename EdgeDstFnTy, typename EdgeDataFnTy>
+    LC_CSR_Graph(uint32_t _numNodes, uint64_t _numEdges,
+                 EdgeNumFnTy edgeNum, EdgeDstFnTy _edgeDst, EdgeDataFnTy _edgeData)
+    :numNodes(_numNodes), numEdges(_numEdges)
+  {
+    std::cerr << "\n**" << numNodes << " " << numEdges << "\n\n";
+    if (UseNumaAlloc) {
+      nodeData.allocateLocal(numNodes, false);
+      edgeIndData.allocateLocal(numNodes, false);
+      edgeDst.allocateLocal(numEdges, false);
+      edgeData.allocateLocal(numEdges, false);
+      this->outOfLineAllocateLocal(numNodes, false);
+    } else {
+      nodeData.allocateInterleaved(numNodes);
+      edgeIndData.allocateInterleaved(numNodes);
+      edgeDst.allocateInterleaved(numEdges);
+      edgeData.allocateInterleaved(numEdges);
+      this->outOfLineAllocateInterleaved(numNodes);
+    }
+    std::cerr << "Done Alloc\n";
+    for (size_t n = 0; n < numNodes; ++n) {
+      nodeData.constructAt(n);
+    }
+    std::cerr << "Done Node Construct\n";
+    uint64_t cur = 0;
+    for (size_t n = 0; n < numNodes; ++n) {
+      cur += edgeNum(n);
+      edgeIndData[n] = cur;
+    }
+    std::cerr << "Done Edge Reserve\n";
+    cur = 0;
+    for (size_t n = 0; n < numNodes; ++n) {
+      if (n % (1024*128) == 0)
+        std::cout << n << " " << cur << "\n";
+      for (uint64_t e = 0, ee = edgeNum(n); e < ee; ++e) {
+        if (EdgeData::has_value)
+          edgeData.set(cur, _edgeData(n, e));
+        edgeDst[cur] = _edgeDst(n, e);
+        ++cur;
+      }
+    }
+    std::cerr << "Done Construct\n";
+  }
+
+  friend void swap(LC_CSR_Graph& lhs, LC_CSR_Graph& rhs) {
+    swap(lhs.nodeData, rhs.nodeData);
+    swap(lhs.edgeIndData, rhs.edgeIndData);
+    swap(lhs.edgeDst, rhs.edgeDst);
+    swap(lhs.edgeData, rhs.edgeData);
+    std::swap(lhs.numNodes, rhs.numNodes);
+    std::swap(lhs.numEdges, rhs.numEdges);
+  }
+  
   node_data_reference getData(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
     Galois::Runtime::checkWrite(mflag, false);
     NodeInfo& NI = nodeData[N];
@@ -242,6 +297,44 @@ public:
       edgeData.allocateInterleaved(numEdges);
       this->outOfLineAllocateInterleaved(numNodes);
     }
+  }
+
+  void allocateFrom(uint32_t nNodes, uint64_t nEdges) {
+    numNodes = nNodes;
+    numEdges = nEdges;
+    if (UseNumaAlloc) {
+      nodeData.allocateLocal(numNodes, false);
+      edgeIndData.allocateLocal(numNodes, false);
+      edgeDst.allocateLocal(numEdges, false);
+      edgeData.allocateLocal(numEdges, false);
+      this->outOfLineAllocateLocal(numNodes, false);
+    } else {
+      nodeData.allocateInterleaved(numNodes);
+      edgeIndData.allocateInterleaved(numNodes);
+      edgeDst.allocateInterleaved(numEdges);
+      edgeData.allocateInterleaved(numEdges);
+      this->outOfLineAllocateInterleaved(numNodes);
+    }
+  }
+
+  void constructNodes() {
+    for (uint32_t x = 0; x < numNodes; ++x) {
+      nodeData.constructAt(x);
+      this->outOfLineConstructAt(x);
+    }
+  }
+
+  void constructEdge(uint64_t e, uint32_t dst, const typename EdgeData::value_type& val) {
+    edgeData.set(e, val);
+    edgeDst[e] = dst;
+  }
+
+  void constructEdge(uint64_t e, uint32_t dst) {
+    edgeDst[e] = dst;
+  }
+
+  void fixEndEdge(uint32_t n, uint64_t e) {
+    edgeIndData[n] = e;
   }
 
   void constructFrom(FileGraph& graph, unsigned tid, unsigned total) {

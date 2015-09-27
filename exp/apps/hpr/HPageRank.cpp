@@ -428,6 +428,7 @@ void inner_main() {
    } else if (personality == GPU_OPENCL) {
       Galois::OpenCL::cl_env.init(cldevice);
    }
+
    if (personality != CPU)
       loadGraphNonCPU(g);
 #if _HETERO_DEBUG_

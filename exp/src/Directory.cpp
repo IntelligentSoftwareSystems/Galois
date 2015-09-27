@@ -100,6 +100,7 @@ bool BaseDirectory::dirAcquire(Lockable* ptr) { // FIXME: propper RO
   case LockManagerBase::FAIL:      return false;
   case LockManagerBase::NEW_OWNER: return true;
   case LockManagerBase::ALREADY_OWNER: assert(0 && "Already owner?"); abort();
+  default: abort();
   }
 }
 
@@ -162,7 +163,7 @@ void RemoteDirectory::recvRequestImpl(fatPointer ptr, uint32_t dest, ResolveFlag
 }
 
 void RemoteDirectory::considerObject(metadata& md, fatPointer ptr, std::unique_lock<LL::SimpleLock>& lg) {
-  assert(md.recalled != ~0);
+  assert(md.recalled != ~0U);
   //contended objects are event driven, so drop request
   if (md.contended && md.recalled > NetworkInterface::ID)
     return;
@@ -223,7 +224,7 @@ void RemoteDirectory::clearContended(fatPointer ptr) {
   std::unique_lock<LL::SimpleLock> lg(md->lock, std::adopt_lock);
   trace("RemoteDirectory::clearContended % md %\n", ptr, *md);
   md->doClearContended(); //FIXME: simple transfer rather than check
-  if (md->recalled != ~0)
+  if (md->recalled != ~0U)
     considerObject(*md, ptr, lg);
 }
 
@@ -263,13 +264,13 @@ bool RemoteDirectory::notify(fatPointer ptr, ResolveFlag flag,
 ////////////////////////////////////////////////////////////////////////////////
 
 RemoteDirectory::metadata::metadata(detail::typeHelper* th) 
-  :state(INVALID), contended(false), recalled(~0), th(th)
+  :state(INVALID), contended(false), recalled(~0U), th(th)
 {}
 
 RemoteDirectory::metadata::~metadata() {
   assert(state == INVALID);
   assert(contended == false);
-  assert(recalled == ~0);
+  assert(recalled == ~0U);
   assert(lock.is_locked());
 }
 
@@ -345,7 +346,7 @@ ResolveFlag RemoteDirectory::metadata::doInvalidateRO() {
   assert(state == HERE_RO || state == UPGRADE);
   ResolveFlag ReqMode = state == HERE_RO ? RO : RW;
   state = INVALID;
-  recalled = ~0;
+  recalled = ~0U;
   if (contended)
     return ReqMode;
   else
@@ -355,7 +356,7 @@ ResolveFlag RemoteDirectory::metadata::doInvalidateRO() {
 bool RemoteDirectory::metadata::doWriteBack() {
   assert(state == HERE_RW);
   state = INVALID;
-  recalled = ~0;
+  recalled = ~0U;
   return contended;
 }
 
@@ -363,7 +364,7 @@ bool RemoteDirectory::metadata::doWriteBack() {
 bool RemoteDirectory::metadata::doClearContended() {
   assert(state != INVALID);
   contended = false;
-  return recalled != ~0;
+  return recalled != ~0U;
 }
 
 std::ostream& Galois::Runtime::operator<<(std::ostream& os, const RemoteDirectory::metadata& md) {
@@ -495,7 +496,7 @@ void LocalDirectory::recvRequestImpl(fatPointer ptr, uint32_t dest, ResolveFlag 
 
 
 void LocalDirectory::sendToReaders(metadata& md, fatPointer ptr) {
-  assert(md.locRW == ~0);
+  assert(md.locRW == ~0U);
   //assert(obj is RO locked);
   for (auto dest : md.reqsRO) {
     assert(md.locRO.count(dest) == 0);
@@ -506,7 +507,7 @@ void LocalDirectory::sendToReaders(metadata& md, fatPointer ptr) {
 }
 
 void LocalDirectory::invalidateReaders(metadata& md, fatPointer ptr, uint32_t nextDest) {
-  assert(md.locRW == ~0);
+  assert(md.locRW == ~0U);
   for (auto dest : md.locRO) {
     md.th->request(dest, ptr, nextDest, INV);
     //leave in locRO until ack comes in
@@ -539,10 +540,10 @@ void LocalDirectory::considerObject(metadata& md, fatPointer ptr, std::unique_lo
   trace("LocalDirectory::considerObject % has dest % RW % md %\n", ptr, p.first, p.second, md);
 
   //First check if we need to update a remote host with a new request
-  if (md.locRW != ~0 || !md.locRO.empty()) {
+  if (md.locRW != ~0U || !md.locRO.empty()) {
     if (md.recalled > p.first) {
-      if (md.locRW != ~0) {
-        md.th->request(md.locRW, ptr, p.first, (md.recalled != ~0 ) ? UP_RW : RW );
+      if (md.locRW != ~0U) {
+        md.th->request(md.locRW, ptr, p.first, (md.recalled != ~0U ) ? UP_RW : RW );
       } else {
         assert(!md.locRO.empty());
         invalidateReaders(md, ptr, p.first);
@@ -577,7 +578,7 @@ void LocalDirectory::considerObject(metadata& md, fatPointer ptr, std::unique_lo
 
   trace("LocalDirectory::considerObject 2 After fn(ptr) % has dest % RW % md %\n", ptr, p.first, p.second, md);
 
-  } else if (p.first != ~0) {
+  } else if (p.first != ~0U) {
     auto foo = NetworkInterface::ID;
     if (!dirOwns(obj)) {
       //Try acquiring lock.
@@ -601,11 +602,11 @@ void LocalDirectory::considerObject(metadata& md, fatPointer ptr, std::unique_lo
 
   p = md.getNextDest();
   trace("LocalDirectory::considerObject 3 % has dest % RW % md.locRW % md.locRO % md.ishere % md %\n", ptr, p.first, p.second, md.locRW, md.locRW, md.isHere(), md);
-  if (p.first == ~0 && !md.contended && md.isHere()) {
+  if (p.first == ~0U && !md.contended && md.isHere()) {
     trace("LocalDirectory::considerObject 3.5 EraseMD % has dest % RW % md.locRW % md.locRO % md.ishere % md %\n", ptr, p.first, p.second, md.locRW, md.locRW, md.isHere(), md);
     dir.eraseMD(ptr, lg);
   }
-  else if (p.first != ~0 && !md.isHere_contended()) {
+  else if (p.first != ~0U && !md.isHere_contended()) {
   //else if (p.first != ~0 && !md.contended) {
     trace("LocalDirectory::considerObject 4 inside else if % has dest % RW % md %\n", ptr, p.first, p.second, md);
     considerObject(md, ptr, lg);
@@ -668,7 +669,7 @@ void LocalDirectory::makeProgress() {
     if (md) {
       std::unique_lock<LL::SimpleLock> obj_lg(md->lock, std::adopt_lock);
       auto p = md->getNextDest();
-      if (p.first == ~0)
+      if (p.first == ~0U)
         continue;
       else if (md->isHere())
         considerObject(*md, ptr, obj_lg);
@@ -708,7 +709,7 @@ bool LocalDirectory::metadata::fetch(ResolveFlag flag, bool setContended) {
     contended = true;
   switch (flag) {
   case RW: 
-    if (locRW != ~0) {
+    if (locRW != ~0U) {
       reqsRW.insert(NetworkInterface::ID);
       return true;
     }
@@ -725,21 +726,21 @@ bool LocalDirectory::metadata::fetch(ResolveFlag flag, bool setContended) {
 }
 
 bool LocalDirectory::metadata::doWriteback() {
-  assert(locRW != ~0);
+  assert(locRW != ~0U);
   assert(locRW != NetworkInterface::ID);
   assert(locRO.empty());
-  locRW = ~0;
-  recalled = ~0;
+  locRW = ~0U;
+  recalled = ~0U;
   return !reqsRW.empty() || !reqsRO.empty();
 }
 
 void LocalDirectory::metadata::doSendTo(uint32_t dest, bool write) {
-  assert(locRO.empty() && locRW == ~0);
+  assert(locRO.empty() && locRW == ~0U);
   if (write) {
     assert(reqsRW.count(dest));
     reqsRW.erase(dest);
     if (dest == NetworkInterface::ID) {
-      locRW = ~0;
+      locRW = ~0U;
     } else {
       locRW = dest;
     }

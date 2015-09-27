@@ -153,7 +153,7 @@ public:
     while (ready != 1) {/*fprintf(stderr, "[WaitOnReady-1]");*/};
     decltype(sendData) v(Num);
     sendData.swap(v);
-    ready = 2; 
+    ready = 2;
   }
 
   virtual ~NetworkInterfaceBuffered() {

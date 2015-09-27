@@ -195,23 +195,23 @@ class LocalDirectory : public BaseDirectory {
 
     //Returns if object is present and there are no RO replicas
     bool isHere() const {
-      return locRW == ~0 && locRO.empty();
+      return locRW == ~0U && locRO.empty();
     }
 
     //Returns if object is present and there are no RO replicas and is contended
     bool isHere_contended() const {
-      return locRW == ~0 && locRO.empty() && contended;
+      return locRW == ~0U && locRO.empty() && contended;
     }
 
     //Returns if object has RO replicas and hasn't been recalled
     bool isRO() const {
-      return recalled == ~0 && !locRO.empty();
+      return recalled == ~0U && !locRO.empty();
     }
 
     metadata(detail::typeHelper* th) :locRW(~0), recalled(~0), contended(0), th(th) {}
     ~metadata() {
-      assert(locRW == ~0);
-      assert(recalled == ~0);
+      assert(locRW == ~0U);
+      assert(recalled == ~0U);
       assert(contended == false);
       assert(locRO.empty());
       assert(reqsRO.empty());
@@ -223,9 +223,9 @@ class LocalDirectory : public BaseDirectory {
       os << "locRO:<";
       std::copy(md.locRO.begin(), md.locRO.end(), out_it);
       os << ">,locRW:";
-      if (md.locRW != ~0) os << md.locRW;
+      if (md.locRW != ~0U) os << md.locRW;
       os << ",recalled:";
-      if (md.recalled != ~0) os << md.recalled;
+      if (md.recalled != ~0U) os << md.recalled;
       os << ",reqsRO:<";
       std::copy(md.reqsRO.begin(), md.reqsRO.end(), out_it);
       os << ">,reqsRW:<";
