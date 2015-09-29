@@ -8,3 +8,5 @@ app(PageRankIKDG PageRankIKDG.cpp)
 app(PageRankKDG PageRankKDG.cpp REQUIRES GCC_TUPLE_BUG_NOT_FOUND)
 
 app(PageRankAlamere PageRankAlamere.cpp REQUIRES GCC_TUPLE_BUG_NOT_FOUND)
+
+app(PageRankSet PageRankSet.cpp)
