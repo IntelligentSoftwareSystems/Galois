@@ -177,6 +177,14 @@ public:
     return graph.getEdgeDst(ni);
   }
 
+  edge_iterator edge_begin(GraphNode N) {
+    return graph.edge_begin(N);
+  }
+
+  edge_iterator edge_end(GraphNode N) {
+    return graph.edge_end(N);
+  }
+
   size_t size() const { return graph.size(); }
   size_t sizeEdges() const { return graph.sizeEdges(); }
 
