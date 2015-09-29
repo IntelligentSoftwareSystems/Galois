@@ -72,6 +72,18 @@ class hGraph : public syncable{
     return r;
   }
 
+  template<bool en, typename std::enable_if<en>::type* = nullptr>
+  typename GraphTy::edge_data_reference getEdgeDataImpl(typename GraphTy::edge_iterator ni, Galois::MethodFlag mflag = Galois::MethodFlag::ALL) {
+    auto r = graph.getEdgeData(ni, mflag);
+    return round ? r.first : r.second;
+  }
+
+  template<bool en, typename std::enable_if<!en>::type* = nullptr>
+  typename GraphTy::edge_data_reference getEdgeDataImpl(typename GraphTy::edge_iterator ni, Galois::MethodFlag mflag = Galois::MethodFlag::ALL) {
+    auto r = graph.getEdgeData(ni, mflag);
+    return r;
+  }
+
 public:
   virtual void syncRecvImpl(Galois::Runtime::RecvBuffer& buf) {
     void (hGraph::*fn)(Galois::Runtime::RecvBuffer&);
@@ -165,12 +177,7 @@ public:
   }
 
   typename GraphTy::edge_data_reference getEdgeData(edge_iterator ni, Galois::MethodFlag mflag = Galois::MethodFlag::ALL) {
-    auto& r = graph.getEdgeData(ni, mflag);
-    if (BSPEdge) {
-      return round ? r.first : r.second;
-    } else {
-      return r;
-    }
+    return getEdgeDataImpl<BSPEdge>(ni, mflag);
   }
 
   GraphNode getEdgeDst(edge_iterator ni) {
