@@ -50,14 +50,10 @@ class hGraph : public syncable{
   //ghost cell ID translation
   std::vector<uint32_t> L2G; // GID = L2G[LID - numOwned]
   //GID to owner
-  std::vector<uint32_t> hostNodes; //[ i-1,i ) -> GID Node owned by host i
+  std::vector<std::pair<uint32_t,uint32_t> > hostNodes; //LID Node owned by host i
 
   std::pair<uint32_t, uint32_t> nodes_by_host(uint32_t host) {
-    if (host == id)
-      return std::make_pair(0, numOwned);
-    if (host == 0)
-      return std::make_pair(numOwned, hostNodes[0]);
-    return std::make_pair(hostNodes[host-1], hostNodes[host]);
+    return hostNodes[host];
   }
 
   template<bool en, typename std::enable_if<en>::type* = nullptr>
@@ -133,6 +129,27 @@ public:
       }
     }
     std::cerr << "L2G Done\n";
+
+    std::vector<std::pair<uint32_t, uint32_t> gnodes;
+    for (auto i : numHosts)
+      gnodes.push_back(Galois::block_range(0U, (unsigned)g.size(), i, numHosts));
+
+    hostNodes.resize(numHosts, std::make_pair(~0,~0));
+    for (unsigned ln = 0; ln < L2G.size(); ++ln) {
+      auto gn = L2G[ln];
+      for (auto h = 0; h < gnodes.size(); ++h) {
+        auto& p = gnodes[h];
+        if (p >= p.first && p < p.second) {
+          hostNodes[h].first = std::min(hostNodes[h].first, ln);
+          hostNodes[h].second = ln;
+          break;
+        }
+        abort();
+      }
+    }
+    for (auto& p : hostNodes)
+      if (p.second != ~0) ++p.second;
+    std::cerr << "hostNodes Done\n";
 
     uint32_t numNodes = numOwned + L2G.size();
     graph.allocateFrom(numNodes, numEdges);
