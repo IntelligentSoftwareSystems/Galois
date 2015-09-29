@@ -69,6 +69,9 @@ private:
   Set orderedSet;
 
 public:
+  template<typename _T>
+  using retype = ThreadSafeOrderedSet<_T, std::less<_T>, Galois::FixedSizeAllocator<_T> >; // FIXME: loses Alloc and Cmp types
+
   explicit ThreadSafeOrderedSet(const Cmp& cmp=Cmp(), const Alloc& alloc=Alloc()):
       orderedSet(cmp, alloc)
   {}
