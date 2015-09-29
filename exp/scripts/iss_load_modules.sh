@@ -10,6 +10,7 @@ module purge
 
 module load sl6
 module use /net/faraday/workspace/local/modules/modulefiles
+module use /org/centers/cdgc/modules
 module load lapack
 module load vtune
 
@@ -21,8 +22,8 @@ module load vtune
 #    module load cmake
 #fi
 
-module load gcc/4.8.1-scale
-module load cmake/3.2.3
+module load gcc/5.2.0
+module load cmake/3.3.2
 module load tbb
 module load boost
 module load eigen
