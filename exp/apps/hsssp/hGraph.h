@@ -70,13 +70,13 @@ class hGraph : public syncable{
 
   template<bool en, typename std::enable_if<en>::type* = nullptr>
   typename GraphTy::edge_data_reference getEdgeDataImpl(typename GraphTy::edge_iterator ni, Galois::MethodFlag mflag = Galois::MethodFlag::ALL) {
-    auto r = graph.getEdgeData(ni, mflag);
+    auto& r = graph.getEdgeData(ni, mflag);
     return round ? r.first : r.second;
   }
 
   template<bool en, typename std::enable_if<!en>::type* = nullptr>
   typename GraphTy::edge_data_reference getEdgeDataImpl(typename GraphTy::edge_iterator ni, Galois::MethodFlag mflag = Galois::MethodFlag::ALL) {
-    auto r = graph.getEdgeData(ni, mflag);
+    auto& r = graph.getEdgeData(ni, mflag);
     return r;
   }
 
