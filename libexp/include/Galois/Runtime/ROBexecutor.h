@@ -53,6 +53,7 @@
 #include "Galois/Runtime/ThreadRWlock.h"
 #include "Galois/Substrate/CompilerSpecific.h"
 #include "Galois/Runtime/Mem.h"
+#include "Galois/Runtime/OrderedSpeculation.h"
 
 #include <atomic>
 
@@ -84,18 +85,6 @@ namespace Runtime {
   // on self aborts
   // TODO: memory management: other threads may refer to an iteration context that has
   // been deallocated after commit or abort
-
-namespace dbg {
-  template <typename... Args>
-  void debug (Args&&... args) {
-    
-    const bool DEBUG = false;
-    if (DEBUG) {
-      Substrate::gDebug (std::forward<Args> (args)...);
-    }
-  }
-}
-
 template <typename T, typename Cmp, typename Exec>
 class ROBcontext: public SimpleRuntimeContext {
 
@@ -446,6 +435,7 @@ public:
         // freeList[i].push_back (ctx);
       // }
     // }
+    term.initializeThread ();
   }
 
   void push_abort (const T& x, const unsigned owner) {
@@ -468,7 +458,6 @@ public:
 
   void execute () {
 
-    term.initializeThread ();
 
     do {
 
@@ -536,7 +525,7 @@ public:
 
       term.localTermination (didWork);
       
-    } while (term.globalTermination ());
+    } while (!term.globalTermination ());
   }
 
   void operator () () {

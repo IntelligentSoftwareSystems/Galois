@@ -35,22 +35,47 @@
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/OrderedLockable.h"
 
+
 namespace Galois {
+
+namespace dbg {
+  template <typename... Args>
+  void debug (Args&&... args) {
+    
+    const bool DEBUG = true;
+    if (DEBUG) {
+      Substrate::gDebug (std::forward<Args> (args)...);
+    }
+  }
+}
+
 namespace Runtime {
 
-
-namespace ParaMeter {
-
 enum class ContextState: int {
-    UNSCHEDULED,
+    UNSCHEDULED = 0,
     SCHEDULED,
     READY_TO_COMMIT,
     ABORT_SELF,
     ABORT_HELP,
-    ABORTING,
+    COMMITTING, 
     COMMIT_DONE,
+    ABORTING,
     ABORT_DONE,
     ABORTED_CHILD,
+};
+
+const char* ContextStateNames[] = {
+    "UNSCHEDULED",
+    "SCHEDULED",
+    "READY_TO_COMMIT",
+    "ABORT_SELF",
+    "ABORT_HELP",
+    "COMMITTING", 
+    "COMMIT_DONE",
+    "READY_TO_ABORT",
+    "ABORTING",
+    "ABORT_DONE",
+    "ABORTED_CHILD",
 };
 
 
@@ -60,6 +85,697 @@ struct OptimNhoodItem: public OrdLocBase<OptimNhoodItem<Ctxt, CtxtCmp>, Ctxt, Ct
   using Base = OrdLocBase<OptimNhoodItem, Ctxt, CtxtCmp>;
   using Factory = OrdLocFactoryBase<OptimNhoodItem, Ctxt, CtxtCmp>;
 
+  using Sharers = Galois::gstl::List<Ctxt*>;
+  using Lock_ty = Galois::Substrate::SimpleLock;
+
+
+  const CtxtCmp& ctxtCmp;
+  Sharers sharers;
+  Lock_ty mutex;
+
+
+  OptimNhoodItem (Lockable* l, const CtxtCmp& ctxtCmp): 
+    Base (l), 
+    ctxtCmp (ctxtCmp) {}
+
+  bool add (Ctxt* ctxt) {
+
+    mutex.lock ();
+    if (sharers.empty ()) {
+      sharers.push_back (ctxt);
+      mutex.unlock ();
+      return true;
+
+    } else {
+      
+      while (!sharers.empty ()) {
+        Ctxt* tail = sharers.back ();
+        assert (tail);
+
+        if (ctxtCmp (ctxt, tail)) {
+
+          if (tail->isRunning ()) {
+
+            mutex.unlock ();
+
+            // XXX: can tail remain in ABORT_SELF after finishing?
+            tail->casState (ContextState::SCHEDULED, ContextState::ABORT_SELF);
+
+            ctxt->waitFor (tail);
+
+            mutex.lock ();
+            continue;
+
+          } else {
+
+            mutex.unlock ();
+
+            if (tail->casState (ContextState::READY_TO_COMMIT, ContextState::ABORTING)) {
+              tail->doAbort ();
+            }
+
+            mutex.lock ();
+            continue;
+          }
+
+        } else {
+
+          sharers.push_back (ctxt);
+
+          mutex.unlock ();
+
+          if (tail->isRunning ()) {
+            ctxt->waitFor (tail);
+          }
+
+          return true;
+        }
+      }
+
+
+      assert (sharers.empty ());
+      sharers.push_back (ctxt);
+      mutex.unlock ();
+      return true;
+
+    }
+
+  }
+
+  void removeAbort (Ctxt* ctxt) {
+
+    mutex.lock ();
+
+    assert (std::find (sharers.begin (), sharers.end (), ctxt) != sharers.end ());
+
+    bool found = false;
+
+    while (!sharers.empty ()) {
+      Ctxt* tail = sharers.back ();
+      assert (tail);
+
+      if (ctxt == tail) {
+        sharers.pop_back (); 
+        found = true;
+        break;
+      }
+
+      if (ctxtCmp (ctxt, tail)) { // ctxt < tail
+        dbg::debug (ctxt, " removing self & aborting lower priority sharer ", tail);
+
+        mutex.unlock ();
+
+        if (tail->hasState (ContextState::ABORT_SELF) || tail->casState (ContextState::SCHEDULED, ContextState::ABORT_SELF)) {
+          ctxt->waitFor (tail);
+
+        } else if (tail->casState (ContextState::READY_TO_COMMIT, ContextState::ABORTING)) {
+          tail->doAbort ();
+
+        } else {
+          // GALOIS_DIE ("shouldn't reach here");
+          assert (!tail->isRunning ());
+        }
+
+        mutex.lock ();
+
+      } else {
+        assert (!found);
+        GALOIS_DIE ("shouldn't reach here");
+      }
+    }
+
+    assert (found);
+    assert (std::find (sharers.begin (), sharers.end (), ctxt) == sharers.end ());
+
+    mutex.unlock ();
+  }
+
+  void removeCommit (Ctxt* ctxt) {
+
+    mutex.lock ();
+
+    assert (std::find (sharers.begin (), sharers.end (), ctxt) != sharers.end ());
+    assert (!sharers.empty ());
+    assert (sharers.front () == ctxt);
+    sharers.pop_front ();
+
+    assert (std::find (sharers.begin (), sharers.end (), ctxt) == sharers.end ());
+
+    mutex.unlock ();
+  }
+
+};
+
+
+template <typename T, typename Cmp, typename Exec>
+struct OptimContext: public SimpleRuntimeContext {
+
+  using Base = SimpleRuntimeContext;
+
+  using CtxtCmp = ContextComparator<OptimContext, Cmp>;
+  using NItem = OptimNhoodItem<OptimContext, CtxtCmp>;
+  using NhoodMgr = PtrBasedNhoodMgr<NItem>;
+  using NhoodList = typename gstl::Vector<NItem*>;
+  using ChildList = typename gstl::Vector<OptimContext*>;
+  using Lock_ty = Galois::Substrate::SimpleLock;
+
+  T active;
+  std::atomic<ContextState> state;
+  Exec& exec;
+  NhoodList nhood;
+
+  // TODO: avoid using UserContextAccess and per-iteration allocator
+  // use Pow of 2 block allocator instead. 
+  UserContextAccess<T> userHandle;
+  ChildList children;
+
+
+  explicit OptimContext (const T& x, const ContextState& s, Exec& exec)
+  :
+    Base (true), active (x), state (s), exec (exec) 
+  {}
+
+  const T& getActive () const { return active; }
+
+  bool hasState (const ContextState& s) const { return state == s; } 
+
+  void setState (const ContextState& s) { state = s; } 
+
+  bool casState (ContextState s_old, const ContextState& s_new) { 
+    // return state.cas (s_old, s_new);
+    return state.compare_exchange_strong (s_old, s_new);
+  }
+
+  ContextState getState (void) const { return state; }
+
+  bool isRunning (void) const {
+    return hasState (ContextState::SCHEDULED) || hasState (ContextState::ABORT_SELF);
+  }
+
+  void waitFor (OptimContext* that) const {
+    assert (that);
+
+    while (that->isRunning ()) {
+      Substrate::asmPause ();
+    }
+  }
+
+  GALOIS_ATTRIBUTE_PROF_NOINLINE
+  virtual void subAcquire (Lockable* l, Galois::MethodFlag m) {
+
+    NItem& nitem = exec.nhmgr.getNhoodItem (l);
+    assert (NItem::getOwner (l) == &nitem);
+
+    if (!hasState (ContextState::ABORT_SELF) && std::find (nhood.begin (), nhood.end (), &nitem) == nhood.end ()) {
+
+      bool succ = nitem.add (this);
+      if (succ) {
+        nhood.push_back (&nitem);
+
+      } else {
+        setState (ContextState::ABORT_SELF);
+      }
+    }
+  }
+
+  void schedule (void) {
+    setState (ContextState::SCHEDULED); 
+    nhood.clear ();
+    userHandle.reset ();
+    children.clear ();
+  }
+
+  void publishChanges (void) {
+
+    userHandle.commit ();
+    for (auto i = userHandle.getPushBuffer ().begin (), 
+        end_i = userHandle.getPushBuffer ().end (); i != end_i; ++i) {
+
+      OptimContext* child = exec.push (*i);
+      dbg::debug (this, " creating child ", child);
+
+      children.push_back (child);
+    }
+  }
+
+  void doCommit () {
+
+    assert (hasState (ContextState::COMMITTING));
+
+    dbg::debug (this, " committing with item ", this->active);
+    for (NItem* n: nhood) {
+      n->removeCommit (this);
+    }
+
+    setState (ContextState::COMMIT_DONE);
+  }
+
+  void doAbort (bool addBack=true) {
+    // this can be in states READY_TO_COMMIT, ABORT_SELF
+    // children can be in UNSCHEDULED, READY_TO_COMMIT, ABORT_DONE
+
+    // first abort all the children recursively
+    // then abort self.
+    //
+
+    assert (hasState (ContextState::ABORTING));
+
+
+    for (OptimContext* child: children) {
+
+      assert (!child->hasState (ContextState::SCHEDULED));
+      assert (!child->hasState (ContextState::ABORTED_CHILD));
+
+      bool c = child->hasState (ContextState::UNSCHEDULED)
+        || child->hasState (ContextState::READY_TO_COMMIT)
+        || child->hasState (ContextState::ABORT_DONE);
+      assert (c);
+
+      if (child->casState (ContextState::READY_TO_COMMIT, ContextState::ABORTING)) {
+
+        dbg::debug (this, " aborting child ", child);
+        child->doAbort (false);
+        exec.freeCtxt (child);
+
+      } else {
+        assert (child->hasState (ContextState::ABORTING) || child->hasState (ContextState::ABORT_DONE));
+        child->setState (ContextState::ABORTED_CHILD);
+      }
+    }
+
+    dbg::debug (this, " aborting with item ", this->active);
+
+    userHandle.rollback ();
+
+    for (NItem* n: nhood) {
+      n->removeAbort (this);
+    }
+
+    if (addBack) {
+      setState (ContextState::ABORT_DONE);
+      exec.push_abort (this);
+    }
+
+
+  }
+
+};
+
+template <typename T, typename Cmp, typename NhFunc, typename OpFunc> 
+class OptimOrdExecutor: private boost::noncopyable {
+
+  friend struct OptimContext<T, Cmp, OptimOrdExecutor>;
+  using Ctxt = OptimContext<T, Cmp, OptimOrdExecutor>;
+  using NhoodMgr = typename Ctxt::NhoodMgr;
+  using CtxtCmp = typename Ctxt::CtxtCmp;
+  using NItemFactory = typename Ctxt::NItem::Factory;
+
+  using CommitQ = Galois::PerThreadList<Ctxt*>;
+  using PendingQ = Galois::PerThreadMinHeap<Ctxt*, CtxtCmp>;
+
+  using CtxtAlloc = Runtime::FixedSizeAllocator<Ctxt>;
+
+
+  Cmp itemCmp;
+  NhFunc nhFunc;
+  OpFunc opFunc;
+  Substrate::Barrier& gvtBarrier;
+  const char* loopname;
+
+  CtxtCmp ctxtCmp;
+  PendingQ pendingQ; 
+  CommitQ commitQ;
+  NItemFactory nitemFactory;
+  NhoodMgr nhmgr;
+  // Substrate::TerminationDetection& term;
+  std::atomic<bool> finish;
+  Ctxt* globalFront;
+  GAtomic<bool> startGVT;
+
+
+
+  CtxtAlloc ctxtAlloc;
+  Substrate::PerThreadStorage<Ctxt*> perThrdLocalFront; 
+
+public:
+  OptimOrdExecutor (const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, Substrate::Barrier& barrier, const char* loopname)
+    : 
+      itemCmp (cmp), 
+      nhFunc (nhFunc), 
+      opFunc (opFunc), 
+      gvtBarrier (barrier),
+      loopname (loopname),
+      ctxtCmp (itemCmp),
+      pendingQ (ctxtCmp),
+      commitQ (),
+      nitemFactory (ctxtCmp),
+      nhmgr (nitemFactory),
+      // term (Substrate::getSystemTermination (activeThreads)),
+      finish (false),
+      globalFront (nullptr),
+      startGVT (false)
+  {
+    if (!loopname) { loopname = "NULL"; }
+  }
+
+  ~OptimOrdExecutor (void) {
+  }
+
+  const Cmp& getItemCmp () const { return itemCmp; }
+
+  const CtxtCmp& getCtxtCmp () const { return ctxtCmp; }
+
+  // on each thread
+  template <typename R>
+  void push_initial (const R& range) {
+
+    push (range.local_begin (), range.local_end ());
+
+    // term.initializeThread ();
+  }
+
+  template <typename Iter>
+  void push (Iter beg, Iter end) {
+    for (Iter i = beg; i != end; ++i) {
+      push (*i);
+    }
+  }
+
+  Ctxt* push (const T& x) {
+    Ctxt* ctxt = ctxtAlloc.allocate (1);
+    assert (ctxt);
+    ctxtAlloc.construct (ctxt, x, ContextState::UNSCHEDULED, *this);
+    pendingQ.get ().push (ctxt); 
+
+    return ctxt;
+  }
+
+  void push_abort (Ctxt* ctxt) {
+    assert (ctxt);
+    assert (ctxt->hasState (ContextState::ABORT_DONE));
+
+    ctxt->setState (ContextState::UNSCHEDULED);
+    pendingQ.get ().push (ctxt);
+  }
+
+  void execute () {
+
+    static const unsigned commit_interval = 10;
+
+    size_t totalIter = 0;
+    size_t totalCommits = 0;
+
+    do {
+      bool didWork = false;
+
+
+      for (unsigned num_scheduled = 0; (num_scheduled < commit_interval) && !pendingQ.get ().empty (); ++num_scheduled, ++totalIter) {
+
+        Ctxt* ctxt = schedule ();
+
+        if (ctxt) {
+          dbg::debug (ctxt, " scheduled");
+
+          didWork = true;
+
+          applyOperator (ctxt);
+
+          if (!ctxt->casState (ContextState::SCHEDULED, ContextState::READY_TO_COMMIT)) {
+
+            if (ctxt->casState (ContextState::ABORT_SELF, ContextState::ABORTING)) {
+
+              // dbg::debug (ctxt, " Shouldn't reach here with ABORT_SELF");
+              ctxt->doAbort ();
+
+            }
+          } else {
+
+
+            dbg::debug (ctxt, " adding self to commit queue");
+            commitQ.get ().push_back (ctxt);
+            // publish remaining changes
+            ctxt->publishChanges ();
+
+          }
+
+        }
+
+      }
+
+
+      if (!computeGVT ()) {
+        reportGVT ();
+
+      } else {
+      }
+
+      // TODO: do this after processing some tasks
+      unsigned numCommitted = localCommit ();
+      totalCommits += numCommitted;
+
+      if (!commitQ.get ().empty () || !pendingQ.get ().empty ()) {
+        continue;
+      }
+
+
+      didWork = didWork || (numCommitted > 0);
+
+
+      // TODO: insert stealing here
+
+
+      // term.localTermination (didWork);
+
+    } while (!finish);
+
+
+
+    dbg::debug ("OptimOrdExecutor: totalIter= ", totalIter, " totalCommits= ", totalCommits);
+  }
+
+  void operator () (void) {
+    execute ();
+  }
+  
+private:
+
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void applyOperator (Ctxt* ctx) {
+
+    assert (ctx);
+
+    Galois::Runtime::setThreadContext (ctx);
+    nhFunc (ctx->active, ctx->userHandle);
+
+    if (ctx->hasState (ContextState::SCHEDULED)) {
+      opFunc (ctx->active, ctx->userHandle);
+    }
+    Galois::Runtime::setThreadContext (nullptr);
+
+  }
+
+
+  void freeCtxt (Ctxt* ctxt) {
+    ctxtAlloc.destroy (ctxt);
+    ctxtAlloc.deallocate (ctxt, 1);
+  }
+
+  Ctxt* schedule (void) {
+
+    while (!pendingQ.get ().empty ()) {
+
+      Ctxt* ctxt = pendingQ.get ().pop ();
+
+      bool b = ctxt->hasState (ContextState::UNSCHEDULED) 
+        || ctxt->hasState (ContextState::ABORTED_CHILD);
+      assert (b);
+
+      if (ctxt->hasState (ContextState::UNSCHEDULED)) {
+        ctxt->schedule ();
+        return ctxt;
+
+      } else {
+        assert (ctxt->hasState (ContextState::ABORTED_CHILD));
+        dbg::debug ("deleting aborted child: ", ctxt, " with item ", ctxt->active);
+        freeCtxt (ctxt);
+
+      }
+    } // end while
+
+    return nullptr;
+  }
+
+  void computeLocalFront (void) {
+    if (!pendingQ.get ().empty ()) { 
+      *(perThrdLocalFront.getLocal ()) = pendingQ.get ().top ();
+
+    } else {
+      *(perThrdLocalFront.getLocal ()) = nullptr;
+    }
+  }
+
+  void computeGlobalFront (void) {
+    assert (bool (startGVT));
+
+
+    Ctxt* minp = nullptr;
+
+    for (unsigned i = 0; i < Galois::getActiveThreads (); ++i) {
+      Ctxt* lf = *(perThrdLocalFront.getRemote (i));
+
+      if (lf && (!minp || ctxtCmp (lf, minp))) {
+        minp = lf;
+      }
+    }
+
+    globalFront = minp;
+  }
+
+
+  bool computeGVT (void) {
+    if (!finish && startGVT.cas (false, true)) {
+
+      dbg::debug ("starting GVT");
+
+      computeLocalFront ();
+
+      gvtBarrier ();
+
+      computeGlobalFront ();
+
+      if (!globalFront) {
+        finish = true;
+
+      } else {
+        startGVT = false;
+      }
+
+      gvtBarrier ();
+
+      dbg::debug ("end computeGVT");
+
+      return true;
+
+    } else {
+      return false;
+    }
+  }
+
+  void reportGVT (void) {
+
+    if (bool (startGVT) && !finish) {
+
+      dbg::debug ("reporting GVT");
+
+      computeLocalFront ();
+
+      gvtBarrier ();
+
+      dbg::debug ("end reportGVT");
+      Substrate::asmPause ();
+
+      gvtBarrier ();
+
+      if (!finish) {
+
+        // if (startGVT) {
+          // dbg::debug ("ERROR: startGVT found to be true");
+        // }
+        // assert (!bool (startGVT));
+      }
+
+    }
+  }
+
+
+  size_t localCommit (void) {
+    
+    // auto uniq_end = std::unique (commitQ.get ().begin (), commitQ.get ().end ());
+    // commitQ.get ().erase (uniq_end, commitQ.get ().end ());
+    
+    Ctxt* gfront = globalFront;
+
+    size_t numCommitted = 0;
+
+    auto c_end = commitQ.get ().end ();
+
+
+    if (gfront) {
+
+      // all tasks lesser than globalMin
+      c_end = std::partition (commitQ.get ().begin (), commitQ.get ().end (), 
+          [&] (Ctxt* c) { 
+            assert (c);
+            return ctxtCmp (c, gfront);
+          });
+
+    }
+
+
+    for (auto i = commitQ.get ().begin (); i != c_end; ++i) {
+
+      Ctxt* c = *i;
+
+      if (gfront) {
+        assert (ctxtCmp (c, gfront));
+
+        
+       bool check = (c->hasState (ContextState::READY_TO_COMMIT) 
+           || c->hasState (ContextState::COMMITTING)
+           || c->hasState (ContextState::COMMIT_DONE));
+
+       if (!check) {
+         dbg::debug (c, " found with unexpected state: ", ContextStateNames [int (c->getState ())]);
+         assert (check);
+       }
+      }
+
+      assert (!c->isRunning ());
+
+      if (c->casState (ContextState::READY_TO_COMMIT, ContextState::COMMITTING)) {
+        c->doCommit ();
+        ++numCommitted;
+      } 
+    }
+
+    commitQ.get ().erase (commitQ.get ().begin (), c_end);
+
+    if (!commitQ.get ().empty ()) {
+      // assert ( TODO
+    }
+
+    return numCommitted;
+
+  }
+
+};
+
+
+template <typename R, typename Cmp, typename NhFunc, typename OpFunc>
+void for_each_ordered_optim (const R& range, Cmp cmp, NhFunc nhFunc, OpFunc opFunc, const char* loopname=0) {
+
+  using T = typename R::value_type;
+
+  unsigned numT = Galois::getActiveThreads ();
+  auto& barrier = getBarrier (numT);
+
+  OptimOrdExecutor<T, Cmp, NhFunc, OpFunc> exec (cmp, nhFunc, opFunc, barrier, loopname);
+
+  Substrate::getSystemThreadPool ().run (numT,
+      [&exec, &range] (void) { exec.push_initial (range); },
+      std::ref (barrier),
+      std::ref (exec));
+
+}
+
+
+namespace ParaMeter {
+
+template <typename Ctxt, typename CtxtCmp>
+struct OptimParamNhoodItem: public OrdLocBase<OptimParamNhoodItem<Ctxt, CtxtCmp>, Ctxt, CtxtCmp> {
+
+  using Base = OrdLocBase<OptimParamNhoodItem, Ctxt, CtxtCmp>;
+  using Factory = OrdLocFactoryBase<OptimParamNhoodItem, Ctxt, CtxtCmp>;
+
   using Sharers = std::list<Ctxt*, Galois::Runtime::FixedSizeAllocator<Ctxt*> >;
 
 
@@ -67,7 +783,7 @@ struct OptimNhoodItem: public OrdLocBase<OptimNhoodItem<Ctxt, CtxtCmp>, Ctxt, Ct
   const CtxtCmp& ctxtCmp;
 
 
-  OptimNhoodItem (Lockable* l, const CtxtCmp& ctxtCmp): Base (l), ctxtCmp (ctxtCmp) {}
+  OptimParamNhoodItem (Lockable* l, const CtxtCmp& ctxtCmp): Base (l), ctxtCmp (ctxtCmp) {}
 
   bool add (Ctxt* ctxt) {
 
@@ -79,7 +795,7 @@ struct OptimNhoodItem: public OrdLocBase<OptimNhoodItem<Ctxt, CtxtCmp>, Ctxt, Ct
 
       while (!sharers.empty ()) {
         Ctxt* tail = sharers.back ();
-        assert (tail != nullptr);
+        assert (tail);
 
 
         if (ctxtCmp (ctxt, tail)) { // ctxt < tail
@@ -119,7 +835,7 @@ struct OptimNhoodItem: public OrdLocBase<OptimNhoodItem<Ctxt, CtxtCmp>, Ctxt, Ct
 
     while (!sharers.empty ()) {
       Ctxt* tail = sharers.back ();
-      assert (tail != nullptr);
+      assert (tail);
 
       if (ctxt == tail) {
         sharers.pop_back (); 
@@ -152,15 +868,15 @@ struct OptimNhoodItem: public OrdLocBase<OptimNhoodItem<Ctxt, CtxtCmp>, Ctxt, Ct
 };
 
 template <typename T, typename Cmp, typename Exec>
-struct OptimContext: public SimpleRuntimeContext {
+struct OptimParamContext: public SimpleRuntimeContext {
 
   using Base = SimpleRuntimeContext;
 
-  using CtxtCmp = ContextComparator<OptimContext, Cmp>;
-  using NItem = OptimNhoodItem<OptimContext, CtxtCmp>;
+  using CtxtCmp = ContextComparator<OptimParamContext, Cmp>;
+  using NItem = OptimParamNhoodItem<OptimParamContext, CtxtCmp>;
   using NhoodMgr = PtrBasedNhoodMgr<NItem>;
   using NhoodList = typename gstl::Vector<NItem*>;
-  using ChildList = typename gstl::Vector<OptimContext*>;
+  using ChildList = typename gstl::Vector<OptimParamContext*>;
 
   T active;
   ContextState state;
@@ -175,7 +891,7 @@ struct OptimContext: public SimpleRuntimeContext {
   ChildList children;
 
 
-  explicit OptimContext (const T& x, const ContextState& s, size_t step, Exec& exec)
+  explicit OptimParamContext (const T& x, const ContextState& s, size_t step, Exec& exec)
   :
     Base (true), active (x), state (s), step (step), exec (exec) 
   {}
@@ -216,7 +932,7 @@ struct OptimContext: public SimpleRuntimeContext {
     for (auto i = userHandle.getPushBuffer ().begin (), 
         end_i = userHandle.getPushBuffer ().end (); i != end_i; ++i) {
 
-      OptimContext* child = exec.push (*i);
+      OptimParamContext* child = exec.push (*i);
       dbg::debug (this, " creating child ", child);
 
       children.push_back (child);
@@ -248,7 +964,7 @@ struct OptimContext: public SimpleRuntimeContext {
     bool b = hasState (ContextState::ABORT_SELF) || hasState (ContextState::READY_TO_COMMIT);
     assert (b);
 
-    for (OptimContext* child: children) {
+    for (OptimParamContext* child: children) {
 
       assert (!child->hasState (ContextState::SCHEDULED));
       assert (!child->hasState (ContextState::ABORTED_CHILD));
@@ -288,8 +1004,8 @@ struct OptimContext: public SimpleRuntimeContext {
 template <typename T, typename Cmp, typename NhFunc, typename OpFunc> 
 class OptimParaMeterExecutor: private boost::noncopyable {
 
-  friend class OptimContext<T, Cmp, OptimParaMeterExecutor>;
-  using Ctxt = OptimContext<T, Cmp, OptimParaMeterExecutor>;
+  friend class OptimParamContext<T, Cmp, OptimParaMeterExecutor>;
+  using Ctxt = OptimParamContext<T, Cmp, OptimParaMeterExecutor>;
   using NhoodMgr = typename Ctxt::NhoodMgr;
   using CtxtCmp = typename Ctxt::CtxtCmp;
   using NItemFactory = typename Ctxt::NItem::Factory;
@@ -333,7 +1049,7 @@ public:
     nextPending = new PendingQ (ctxtCmp);
     steps = 0;
 
-    if (loopname == nullptr) { loopname = "NULL"; }
+    if (!loopname) { loopname = "NULL"; }
   }
 
   ~OptimParaMeterExecutor (void) {
@@ -361,7 +1077,7 @@ public:
 
   Ctxt*  push (const T& x) {
     Ctxt* ctxt = ctxtAlloc.allocate (1);
-    assert (ctxt != nullptr);
+    assert (ctxt);
     assert (steps >= 0);
     ctxtAlloc.construct (ctxt, x, ContextState::UNSCHEDULED, steps, *this);
     nextPending->push (ctxt);
@@ -370,7 +1086,7 @@ public:
   }
 
   void push_abort (Ctxt* ctxt) {
-    assert (ctxt != nullptr);
+    assert (ctxt);
     assert (ctxt->hasState (ContextState::ABORT_DONE));
 
     ctxt->setState (ContextState::UNSCHEDULED);
@@ -393,8 +1109,7 @@ public:
       while (!currPending->empty ()) {
         Ctxt* ctxt = schedule ();
 
-        // assert (ctxt != nullptr);
-        if (ctxt == nullptr) {
+        if (!ctxt) {
           assert (currPending->empty ());
           break;
         }
@@ -492,7 +1207,7 @@ private:
     // first remove all tasks that are not in READY_TO_COMMIT
     auto new_end = std::partition (rob.begin (), rob.end (), 
         [] (Ctxt* c) { 
-          assert (c != nullptr);
+          assert (c);
           return c->hasState (ContextState::READY_TO_COMMIT);
         });
 
@@ -501,8 +1216,8 @@ private:
 
     // now sort in reverse order
     auto revCmp = [this] (Ctxt* a, Ctxt* b) { 
-      assert (a != nullptr);
-      assert (b != nullptr);
+      assert (a);
+      assert (b);
       return !ctxtCmp (a, b);
     };
 
@@ -557,8 +1272,11 @@ private:
 
 } // end namespace ParaMeter
 
+
+
+
 template <typename R, typename Cmp, typename NhFunc, typename OpFunc>
-void for_each_ordered_optim (const R& range, Cmp cmp, NhFunc nhFunc, OpFunc opFunc, const char* loopname=0) {
+void for_each_ordered_optim_param (const R& range, Cmp cmp, NhFunc nhFunc, OpFunc opFunc, const char* loopname=0) {
 
   using T = typename R::value_type;
 
@@ -566,21 +1284,6 @@ void for_each_ordered_optim (const R& range, Cmp cmp, NhFunc nhFunc, OpFunc opFu
 
   exec.push_initial (range);
   exec.execute ();
-
-  // Galois::Runtime::beginSampling ();
-// 
-  // ROBexecutor<T, Cmp, NhFunc, OpFunc>  exec (cmp, nhFunc, opFunc, loopname);
-// 
-  // if (range.begin () != range.end ()) {
-// 
-    // exec.push_initial (range);
-// 
-    // getSystemThreadPool ().run (activeThreads, std::ref(exec));
-// 
-    // Galois::Runtime::endSampling ();
-// 
-    // exec.printStats ();
-  // }
 }
 
 
