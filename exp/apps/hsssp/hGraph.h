@@ -141,7 +141,7 @@ public:
         auto& p = gnodes[h];
         if (p >= p.first && p < p.second) {
           hostNodes[h].first = std::min(hostNodes[h].first, ln);
-          hostNodes[h].second = ln;
+          hostNodes[h].second = ln+1;
           break;
         }
         abort();
@@ -156,7 +156,9 @@ public:
     std::cerr << "Allocate done\n";
     
     graph.constructNodes();
-    std::cerr << "Construct nodes done\n";
+    std::cerr << "Construct nodes 
+
+done\n";
 
     uint64_t cur = 0;
     for (auto n = baseNodes.first; n < baseNodes.second; ++n) {
@@ -235,7 +237,7 @@ public:
       Galois::Runtime::SendBuffer b;
       gSerialize(b, fn, (uint32_t)(end-start));
       for (; start != end; ++start) {
-        auto gid = L2G[start - numOwned];
+        auto gid = L2G[start];
         gSerialize(b, gid, FnTy::extract(getData(gid)));
         FnTy::reset(getData(gid));
       }
