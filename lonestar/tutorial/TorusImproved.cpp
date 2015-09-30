@@ -45,6 +45,7 @@ struct IncrementNeighbors {
   //! Operator. Context parameter is unused in this example.
   void operator()(GNode n, Galois::UserContext<GNode>& ctx) {
     // For each outgoing edge (n, dst)
+    //for (auto ii : g.edges(n)) {
     for (Graph::edge_iterator ii = g.edge_begin(n), ei = g.edge_end(n); ii != ei; ++ii) {
       GNode dst = g.getEdgeDst(ii);
       int& data = g.getData(dst);

@@ -24,6 +24,7 @@
  * component to file.
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
+ * @author Yi-Shan Lu <yishanlu@cs.utexas.edu>
  */
 #include "Galois/Galois.h"
 #include "Galois/Accumulator.h"
@@ -47,10 +48,13 @@
 #include "LigraAlgo.h"
 #include "GraphLabAlgo.h"
 #include "GraphChiAlgo.h"
+#include "Galois/WorkList/WorkSet.h"
+#include "Galois/WorkList/MarkingSet.h"
 #endif
 
 #include <ostream>
 #include <fstream>
+#include <cmath>
 
 const char* name = "Connected Components";
 const char* desc = "Computes the connected components of a graph";
@@ -59,16 +63,79 @@ const char* url = 0;
 enum Algo {
   async,
   asyncOc,
+  asyncOSet,
+  asyncHSet,
   blockedasync,
   graphchi,
   graphlab,
   labelProp,
-  staleLp, 
-  pullLp, 
-  pullLpCas,
+  labelPropDivObim,
+  labelPropDivObimMSet,
+  labelPropDivObimOSet,
+  labelPropDivObimHSet,
+  labelPropLogObim,
+  labelPropLogObimMSet,
+  labelPropLogObimOSet,
+  labelPropLogObimHSet,
+  labelPropMSet,
+  labelPropOSet,
+  labelPropHSet,
+  labelPropShrObim,
+  labelPropShrObimMSet,
+  labelPropShrObimOSet,
+  labelPropShrObimHSet,
+  gLp,
+  gLpDivObim,
+  gLpDivObimMSet,
+  gLpDivObimOSet,
+  gLpDivObimHSet,
+  gLpLogObim,
+  gLpLogObimMSet,
+  gLpLogObimOSet,
+  gLpLogObimHSet,
+  gLpMSet,
+  gLpOSet,
+  gLpHSet,
+  gLpShrObim,
+  gLpShrObimMSet,
+  gLpShrObimOSet,
+  gLpShrObimHSet,
+  gPullLp,
   ligra,
   ligraChi,
+  pullLp,
+  pullLpDivObim,
+  pullLpDivObimMSet,
+  pullLpDivObimOSet,
+  pullLpDivObimHSet,
+  pullLpLogObim,
+  pullLpLogObimMSet,
+  pullLpLogObimOSet,
+  pullLpLogObimHSet,
+  pullLpMSet,
+  pullLpOSet,
+  pullLpHSet,
+  pullLpShrObim,
+  pullLpShrObimMSet,
+  pullLpShrObimOSet,
+  pullLpShrObimHSet,
   serial,
+  staleLp,
+  staleLpDivObim,
+  staleLpDivObimMSet,
+  staleLpDivObimOSet,
+  staleLpDivObimHSet,
+  staleLpLogObim,
+  staleLpLogObimMSet,
+  staleLpLogObimOSet,
+  staleLpLogObimHSet,
+  staleLpMSet,
+  staleLpOSet,
+  staleLpHSet,
+  staleLpShrObim,
+  staleLpShrObimMSet,
+  staleLpShrObimOSet,
+  staleLpShrObimHSet,
   synchronous
 };
 
@@ -86,6 +153,7 @@ static cll::opt<std::string> transposeGraphName("graphTranspose", cll::desc("Tra
 static cll::opt<bool> symmetricGraph("symmetricGraph", cll::desc("Input graph is symmetric"), cll::init(false));
 cll::opt<unsigned int> memoryLimit("memoryLimit",
     cll::desc("Memory limit for out-of-core algorithms (in MB)"), cll::init(~0U));
+static cll::opt<unsigned int> delta("delta", cll::desc("delta value for <algo>ShrObim"), cll::init(10U));
 static cll::opt<OutputEdgeType> writeEdgeType("edgeType", cll::desc("Input/Output edge type:"),
     cll::values(
       clEnumValN(OutputEdgeType::void_, "void", "no edge values"),
@@ -99,11 +167,74 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
       clEnumValN(Algo::asyncOc, "asyncOc", "Asynchronous out-of-core memory"),
       clEnumValN(Algo::labelProp, "labelProp", "Using label propagation algorithm"),
       clEnumValN(Algo::staleLp, "staleLp", "Using label propagation algorithm w/ possibly stale lables"),
-      clEnumValN(Algo::pullLp, "pullLp", "Using pull-based label propagation algorithm"),
-      clEnumValN(Algo::pullLpCas, "pullLpCas", "Using pull-based label propagation algorithm w/ CAS"),
       clEnumValN(Algo::serial, "serial", "Serial"),
       clEnumValN(Algo::synchronous, "sync", "Synchronous"),
 #ifdef GALOIS_USE_EXP
+      clEnumValN(Algo::asyncOSet, "asyncOSet", "async with a two-level set uni-set scheduler"),
+      clEnumValN(Algo::asyncHSet, "asyncHSet", "async with a two-level hash uni-set scheduler"),   
+      clEnumValN(Algo::labelPropDivObim, "labelPropDivObim", "labelProp with DivObim scheduling"),
+      clEnumValN(Algo::labelPropDivObimMSet, "labelPropDivObimMSet", "labelPropDivObim with an item-marking uni-set scheduler"),
+      clEnumValN(Algo::labelPropDivObimOSet, "labelPropDivObimOSet", "labelPropDivObim with a two-level set uni-set scheduler"),
+      clEnumValN(Algo::labelPropDivObimHSet, "labelPropDivObimHSet", "labelPropDivObim with a two-level hash uni-set scheduler"),
+      clEnumValN(Algo::labelPropLogObim, "labelPropLogObim", "labelProp with LogObim scheduling"),
+      clEnumValN(Algo::labelPropLogObimMSet, "labelPropLogObimMSet", "labelPropLogObim with an item-marking uni-set scheduler"),
+      clEnumValN(Algo::labelPropLogObimOSet, "labelPropLogObimOSet", "labelPropLogObim with a two-level set uni-set scheduler"),
+      clEnumValN(Algo::labelPropLogObimHSet, "labelPropLogObimHSet", "labelPropLogObim with a two-level hash uni-set scheduler"),
+      clEnumValN(Algo::labelPropMSet, "labelPropMSet", "labelProp with an item-marking uni-set scheduler"), 
+      clEnumValN(Algo::labelPropOSet, "labelPropOSet", "labelProp with a two-level set uni-set scheduler"), 
+      clEnumValN(Algo::labelPropHSet, "labelPropHSet", "labelProp with a two-level hash uni-set scheduler"), 
+      clEnumValN(Algo::labelPropShrObim, "labelPropShrObim", "labelProp with ShrObim scheduling"),
+      clEnumValN(Algo::labelPropShrObimMSet, "labelPropShrObimMSet", "labelPropShrObim with an item-marking uni-set scheduler"),
+      clEnumValN(Algo::labelPropShrObimOSet, "labelPropShrObimOSet", "labelPropShrObim with a two-level set uni-set scheduler"),
+      clEnumValN(Algo::labelPropShrObimHSet, "labelPropShrObimHSet", "labelPropShrObim with a two-level hash uni-set scheduler"),
+      clEnumValN(Algo::gLp, "gLp", "labelProp using Galois sync mechanism"),
+      clEnumValN(Algo::gLpDivObim, "gLpDivObim", "gLp with DivObim scheduling"),
+      clEnumValN(Algo::gLpDivObimMSet, "gLpDivObimMSet", "gLpDivObim with an item-marking uni-set scheduler"),
+      clEnumValN(Algo::gLpDivObimOSet, "gLpDivObimOSet", "gLpDivObim with a two-level set uni-set scheduler"),
+      clEnumValN(Algo::gLpDivObimHSet, "gLpDivObimHSet", "gLpDivObim with a two-level hash uni-set scheduler"),
+      clEnumValN(Algo::gLpLogObim, "gLpLogObim", "gLp with LogObim scheduling"),
+      clEnumValN(Algo::gLpLogObimMSet, "gLpLogObimMSet", "gLpLogObim with an item-marking uni-set scheduler"),
+      clEnumValN(Algo::gLpLogObimOSet, "gLpLogObimOSet", "gLpLogObim with a two-level set uni-set scheduler"),
+      clEnumValN(Algo::gLpLogObimHSet, "gLpLogObimHSet", "gLpLogObim with a two-level hash uni-set scheduler"),
+      clEnumValN(Algo::gLpMSet, "gLpMSet", "gLp with an item-marking uni-set scheduler"), 
+      clEnumValN(Algo::gLpOSet, "gLpOSet", "gLp with a two-level set uni-set scheduler"), 
+      clEnumValN(Algo::gLpHSet, "gLpHSet", "gLp with a two-level hash uni-set scheduler"), 
+      clEnumValN(Algo::gLpShrObim, "gLpShrObim", "gLp with ShrObim scheduling"),
+      clEnumValN(Algo::gLpShrObimMSet, "gLpShrObimMSet", "gLpShrObim with an item-marking uni-set scheduler"),
+      clEnumValN(Algo::gLpShrObimOSet, "gLpShrObimOSet", "gLpShrObim with a two-level set uni-set scheduler"),
+      clEnumValN(Algo::gLpShrObimHSet, "gLpShrObimHSet", "gLpShrObim with a two-level hash uni-set scheduler"),
+      clEnumValN(Algo::staleLpDivObim, "staleLpDivObim", "staleLp with DivObim scheduling"),
+      clEnumValN(Algo::staleLpDivObimMSet, "staleLpDivObimMSet", "staleLpDivObim with an item-marking uni-set scheduler"),
+      clEnumValN(Algo::staleLpDivObimOSet, "staleLpDivObimOSet", "staleLpDivObim with a two-level set uni-set scheduler"),
+      clEnumValN(Algo::staleLpDivObimHSet, "staleLpDivObimHSet", "staleLpDivObim with a two-level hash uni-set scheduler"),
+      clEnumValN(Algo::staleLpLogObim, "staleLpLogObim", "staleLp with LogObim scheduling"),
+      clEnumValN(Algo::staleLpLogObimMSet, "staleLpLogObimMSet", "staleLpLogObim with an item-marking uni-set scheduler"),
+      clEnumValN(Algo::staleLpLogObimOSet, "staleLpLogObimOSet", "staleLpLogObim with a two-level set uni-set scheduler"),
+      clEnumValN(Algo::staleLpLogObimHSet, "staleLpLogObimHSet", "staleLpLogObim with a two-level hash uni-set scheduler"),
+      clEnumValN(Algo::staleLpMSet, "staleLpMSet", "staleLp with an item-marking uni-set scheduler"), 
+      clEnumValN(Algo::staleLpOSet, "staleLpOSet", "staleLp with a two-level set uni-set scheduler"), 
+      clEnumValN(Algo::staleLpHSet, "staleLpHSet", "staleLp with a two-level hash uni-set scheduler"), 
+      clEnumValN(Algo::staleLpShrObim, "staleLpShrObim", "staleLp with ShrObim scheduling"),
+      clEnumValN(Algo::staleLpShrObimMSet, "staleLpShrObimMSet", "staleLpShrObim with an item-marking uni-set scheduler"),
+      clEnumValN(Algo::staleLpShrObimOSet, "staleLpShrObimOSet", "staleLpShrObim with a two-level set uni-set scheduler"),
+      clEnumValN(Algo::staleLpShrObimHSet, "staleLpShrObimHSet", "staleLpShrObim with a two-level hash uni-set scheduler"),
+      clEnumValN(Algo::gPullLp, "gPullLp", "Using pull-based label propagation algorithm"),
+      clEnumValN(Algo::pullLp, "pullLp", "Using pull-based label propagation algorithm w/ CAS"),
+      clEnumValN(Algo::pullLpDivObim, "pullLpDivObim", "pullLp with DivObim scheduling"),
+      clEnumValN(Algo::pullLpDivObimMSet, "pullLpDivObimMSet", "pullLpDivObim with an item-marking uni-set scheduler"),
+      clEnumValN(Algo::pullLpDivObimOSet, "pullLpDivObimOSet", "pullLpDivObim with a two-level set uni-set scheduler"),
+      clEnumValN(Algo::pullLpDivObimHSet, "pullLpDivObimHSet", "pullLpDivObim with a two-level hash uni-set scheduler"),
+      clEnumValN(Algo::pullLpLogObim, "pullLpLogObim", "pullLp with LogObim scheduling"),
+      clEnumValN(Algo::pullLpLogObimMSet, "pullLpLogObimMSet", "pullLpLogObim with an item-marking uni-set scheduler"),
+      clEnumValN(Algo::pullLpLogObimOSet, "pullLpLogObimOSet", "pullLpLogObim with a two-level set uni-set scheduler"),
+      clEnumValN(Algo::pullLpLogObimHSet, "pullLpLogObimHSet", "pullLpLogObim with a two-level hash uni-set scheduler"),
+      clEnumValN(Algo::pullLpMSet, "pullLpMSet", "pullLp with an item-marking uni-set scheduler"), 
+      clEnumValN(Algo::pullLpOSet, "pullLpOSet", "pullLp with a two-level set uni-set scheduler"), 
+      clEnumValN(Algo::pullLpHSet, "pullLpHSet", "pullLp with a two-level hash uni-set scheduler"), 
+      clEnumValN(Algo::pullLpShrObim, "pullLpShrObim", "pullLp with ShrObim scheduling"),
+      clEnumValN(Algo::pullLpShrObimMSet, "pullLpShrObimMSet", "pullLpShrObim with an item-marking uni-set scheduler"),
+      clEnumValN(Algo::pullLpShrObimOSet, "pullLpShrObimOSet", "pullLpShrObim with a two-level set uni-set scheduler"),
+      clEnumValN(Algo::pullLpShrObimHSet, "pullLpShrObimHSet", "pullLpShrObim with a two-level hash uni-set scheduler"),
       clEnumValN(Algo::graphchi, "graphchi", "Using GraphChi programming model"),
       clEnumValN(Algo::graphlab, "graphlab", "Using GraphLab programming model"),
       clEnumValN(Algo::ligraChi, "ligraChi", "Using Ligra and GraphChi programming model"),
@@ -289,19 +420,61 @@ struct SynchronousAlgo {
   }
 };
 
-template<bool UseStaleValue>
-struct LabelPropAlgo {
+#ifdef GALOIS_USE_EXP
+template<typename Graph, typename GNode=typename Graph::GraphNode>
+struct LabelDivIndexer: public std::unary_function<GNode, unsigned int> {
+  Graph& graph;
+  LabelDivIndexer(Graph& g): graph(g) {}
+
+  unsigned int operator() (const GNode n) const {
+    return graph.getData(n, Galois::MethodFlag::UNPROTECTED).comp / 1000;
+  }
+};
+
+template<typename Graph, typename GNode=typename Graph::GraphNode>
+struct LabelShrIndexer: public std::unary_function<GNode, unsigned int> {
+  Graph& graph;
+  LabelShrIndexer(Graph& g): graph(g) {}
+
+  unsigned int operator() (const GNode n) const {
+    return graph.getData(n, Galois::MethodFlag::UNPROTECTED).comp >> delta;
+  }
+};
+
+template<typename Graph, typename GNode=typename Graph::GraphNode>
+struct LabelLogIndexer: public std::unary_function<GNode, unsigned int> {
+  Graph& graph;
+  LabelLogIndexer(Graph& g): graph(g) {}
+
+  unsigned int operator() (const GNode n) const {
+    unsigned int value = graph.getData(n, Galois::MethodFlag::UNPROTECTED).comp;
+    return (unsigned int)floor(log((double)(value+1)));
+  }
+};
+
+// a set marker returns the bool* to the set marking field, i.e. inSet, for a GNode
+template<typename Graph, typename GNode=typename Graph::GraphNode>
+struct LabelSetMarker: public std::unary_function<GNode, bool*> {
+  Graph& graph;
+  LabelSetMarker(Graph& g): graph(g) {}
+
+  bool* operator()(const GNode n) const {
+    return &(graph.getData(n, Galois::MethodFlag::UNPROTECTED).inSet);
+  }
+};
+
+struct LabelPropNoCasAlgo {
   struct LNode {
     typedef unsigned int component_type;
     unsigned int id;
     unsigned int comp;
+    bool inSet;
     
     component_type component() { return comp; }
     bool isRep() { return id == comp; }
   };
 
   typedef typename Galois::Graph::LC_CSR_Graph<LNode,void>
-    ::template with_no_lockable<true>::type
     ::template with_numa_alloc<true>::type InnerGraph;
   typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
   typedef typename Graph::GraphNode GNode;
@@ -319,6 +492,243 @@ struct LabelPropAlgo {
     void operator()(GNode n) const {
       LNode& data = graph.getData(n, Galois::MethodFlag::UNPROTECTED);
       data.comp = data.id;
+      data.inSet = false;
+    }
+  };
+
+  template<bool Forward,bool Backward>
+  struct Process {
+    Graph& graph;
+    Process(Graph& g): graph(g) { }
+
+    template<typename Iterator,typename GetNeighbor>
+    void update(LNode& sdata, Iterator ii, Iterator ei, GetNeighbor get, Galois::UserContext<GNode>& ctx) {
+      component_type newV = sdata.comp;
+    
+      for(; ii != ei; ++ii) {
+        GNode dst = get(ii);
+        LNode& ddata = graph.getData(dst);
+        component_type old = ddata.comp;
+
+        if (old <= newV) {
+          if(traceWork) {
+            *EmptyWork += 1;
+          }
+          continue;
+        }
+
+        ddata.comp = newV;
+        if(traceWork) {
+          *GoodWork += 1;
+        }
+        ctx.push(dst);
+      }
+    }
+
+    struct BackwardUpdate {
+      Graph& graph;
+      BackwardUpdate(Graph& g): graph(g) { }
+      GNode operator()(typename Graph::in_edge_iterator ii) { return graph.getInEdgeDst(ii); }
+    };
+
+    struct ForwardUpdate {
+      Graph& graph;
+      ForwardUpdate(Graph& g): graph(g) { }
+      GNode operator()(typename Graph::edge_iterator ii) { return graph.getEdgeDst(ii); }
+    };
+
+    //! Add the next edge between components to the worklist
+    void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) {
+      LNode& sdata = graph.getData(src);
+
+      if (Backward) {
+        update(sdata, graph.in_edge_begin(src), graph.in_edge_end(src),
+            BackwardUpdate(graph), ctx);
+      } 
+      if (Forward) {
+        update(sdata, graph.edge_begin(src), graph.edge_end(src),
+            ForwardUpdate(graph), ctx);
+      }
+    }
+  };
+
+  void operator()(Graph& graph) {
+    using namespace Galois::WorkList;
+    typedef dChunkedFIFO<256> WL;
+    typedef dChunkedMarkingSetFIFO<LabelSetMarker<Graph>,256> MSet;
+    typedef dChunkedTwoLevelSetFIFO<256> OSet;
+    typedef dChunkedTwoLevelHashFIFO<256> HSet;
+    typedef OrderedByIntegerMetric<LabelDivIndexer<Graph> > DivObim;
+    typedef OrderedByIntegerMetric<LabelShrIndexer<Graph> > ShrObim;
+    typedef OrderedByIntegerMetric<LabelLogIndexer<Graph> > LogObim;
+    typedef detail::MarkingWorkSetMaster<GNode,LabelSetMarker<Graph>,DivObim> DivObimMSet;
+    typedef detail::WorkSetMaster<GNode,DivObim,Galois::ThreadSafeTwoLevelSet<GNode> > DivObimOSet;
+    typedef detail::WorkSetMaster<GNode,DivObim,Galois::ThreadSafeTwoLevelHash<GNode> > DivObimHSet;
+    typedef detail::MarkingWorkSetMaster<GNode,LabelSetMarker<Graph>,ShrObim> ShrObimMSet;
+    typedef detail::WorkSetMaster<GNode,ShrObim,Galois::ThreadSafeTwoLevelSet<GNode> > ShrObimOSet;
+    typedef detail::WorkSetMaster<GNode,ShrObim,Galois::ThreadSafeTwoLevelHash<GNode> > ShrObimHSet;
+    typedef detail::MarkingWorkSetMaster<GNode,LabelSetMarker<Graph>,LogObim> LogObimMSet;
+    typedef detail::WorkSetMaster<GNode,LogObim,Galois::ThreadSafeTwoLevelSet<GNode> > LogObimOSet;
+    typedef detail::WorkSetMaster<GNode,LogObim,Galois::ThreadSafeTwoLevelHash<GNode> > LogObimHSet;
+
+    auto marker = LabelSetMarker<Graph>(graph);
+    auto divIndexer = LabelDivIndexer<Graph>(graph);
+    auto logIndexer = LabelLogIndexer<Graph>(graph);
+    auto shrIndexer = LabelShrIndexer<Graph>(graph);
+
+    Galois::do_all_local(graph, Initialize(graph));
+    switch(algo) {
+    case Algo::gLpMSet:
+      if(symmetricGraph)
+        Galois::for_each_local(graph, Process<true,false>(graph), Galois::wl<MSet>(LabelSetMarker<Graph>(graph)));
+      else
+        Galois::for_each_local(graph, Process<true,true>(graph), Galois::wl<MSet>(LabelSetMarker<Graph>(graph)));
+      break;
+    case Algo::gLpOSet:
+      if(symmetricGraph)
+        Galois::for_each_local(graph, Process<true,false>(graph), Galois::wl<OSet>());
+      else
+        Galois::for_each_local(graph, Process<true,true>(graph), Galois::wl<OSet>());
+      break;
+    case Algo::gLpHSet:
+      if(symmetricGraph)
+        Galois::for_each_local(graph, Process<true,false>(graph), Galois::wl<HSet>());
+      else
+        Galois::for_each_local(graph, Process<true,true>(graph), Galois::wl<HSet>());
+      break;
+    case Algo::gLpDivObim:
+      std::cout << "using priority scheduling based on (label / 1000).\n";
+      if(symmetricGraph)
+        Galois::for_each_local(graph, Process<true,false>(graph), Galois::wl<DivObim>(divIndexer));
+      else
+        Galois::for_each_local(graph, Process<true, true>(graph), Galois::wl<DivObim>(divIndexer));
+      break;
+    case Algo::gLpDivObimMSet:
+      std::cout << "using priority scheduling based on (label / 1000).\n";
+      if(symmetricGraph)
+        Galois::for_each_local(graph, Process<true,false>(graph), Galois::wl<DivObimMSet>(marker,dummy,divIndexer));
+      else
+        Galois::for_each_local(graph, Process<true, true>(graph), Galois::wl<DivObimMSet>(marker,dummy,divIndexer));
+      break;
+    case Algo::gLpDivObimOSet:
+      std::cout << "using priority scheduling based on (label / 1000).\n";
+      if(symmetricGraph)
+        Galois::for_each_local(graph, Process<true,false>(graph), Galois::wl<DivObimOSet>(dummy,divIndexer));
+      else
+        Galois::for_each_local(graph, Process<true, true>(graph), Galois::wl<DivObimOSet>(dummy,divIndexer));
+      break;
+    case Algo::gLpDivObimHSet:
+      std::cout << "using priority scheduling based on (label / 1000).\n";
+      if(symmetricGraph)
+        Galois::for_each_local(graph, Process<true,false>(graph), Galois::wl<DivObimHSet>(dummy,divIndexer));
+      else
+        Galois::for_each_local(graph, Process<true, true>(graph), Galois::wl<DivObimHSet>(dummy,divIndexer));
+      break;
+    case Algo::gLpLogObim:
+      std::cout << "using priority scheduling based on floor(log(label+1)).\n";
+      if(symmetricGraph)
+        Galois::for_each_local(graph, Process<true,false>(graph), Galois::wl<LogObim>(logIndexer));
+      else
+        Galois::for_each_local(graph, Process<true, true>(graph), Galois::wl<LogObim>(logIndexer));
+      break;
+    case Algo::gLpLogObimMSet:
+      std::cout << "using priority scheduling based on floor(log(label+1)).\n";
+      if(symmetricGraph)
+        Galois::for_each_local(graph, Process<true,false>(graph), Galois::wl<LogObimMSet>(marker,dummy,logIndexer));
+      else
+        Galois::for_each_local(graph, Process<true, true>(graph), Galois::wl<LogObimMSet>(marker,dummy,logIndexer));
+      break;
+    case Algo::gLpLogObimOSet:
+      std::cout << "using priority scheduling based on floor(log(label+1)).\n";
+      if(symmetricGraph)
+        Galois::for_each_local(graph, Process<true,false>(graph), Galois::wl<LogObimOSet>(dummy,logIndexer));
+      else
+        Galois::for_each_local(graph, Process<true, true>(graph), Galois::wl<LogObimOSet>(dummy,logIndexer));
+      break;
+    case Algo::gLpLogObimHSet:
+      std::cout << "using priority scheduling based on floor(log(label+1)).\n";
+      if(symmetricGraph)
+        Galois::for_each_local(graph, Process<true,false>(graph), Galois::wl<LogObimHSet>(dummy,logIndexer));
+      else
+        Galois::for_each_local(graph, Process<true, true>(graph), Galois::wl<LogObimHSet>(dummy,logIndexer));
+      break;
+    case Algo::gLpShrObim:
+      std::cout << "using priority scheduling based on (label >> " << delta << ").\n";
+      std::cout << "default delta may not be the best for performance.\n";
+      if(symmetricGraph)
+        Galois::for_each_local(graph, Process<true,false>(graph), Galois::wl<ShrObim>(shrIndexer));
+      else
+        Galois::for_each_local(graph, Process<true, true>(graph), Galois::wl<ShrObim>(shrIndexer));
+      break;
+    case Algo::gLpShrObimMSet:
+      std::cout << "using priority scheduling based on (label >> " << delta << ").\n";
+      std::cout << "default delta may not be the best for performance.\n";
+      if(symmetricGraph)
+        Galois::for_each_local(graph, Process<true,false>(graph), Galois::wl<ShrObimMSet>(marker,dummy,shrIndexer));
+      else
+        Galois::for_each_local(graph, Process<true, true>(graph), Galois::wl<ShrObimMSet>(marker,dummy,shrIndexer));
+      break;
+    case Algo::gLpShrObimOSet:
+      std::cout << "using priority scheduling based on (label >> " << delta << ").\n";
+      std::cout << "default delta may not be the best for performance.\n";
+      if(symmetricGraph)
+        Galois::for_each_local(graph, Process<true,false>(graph), Galois::wl<ShrObimOSet>(dummy,shrIndexer));
+      else
+        Galois::for_each_local(graph, Process<true, true>(graph), Galois::wl<ShrObimOSet>(dummy,shrIndexer));
+      break;
+    case Algo::gLpShrObimHSet:
+      std::cout << "using priority scheduling based on (label >> " << delta << ").\n";
+      std::cout << "default delta may not be the best for performance.\n";
+      if(symmetricGraph)
+        Galois::for_each_local(graph, Process<true,false>(graph), Galois::wl<ShrObimHSet>(dummy,shrIndexer));
+      else
+        Galois::for_each_local(graph, Process<true, true>(graph), Galois::wl<ShrObimHSet>(dummy,shrIndexer));
+      break;
+    default:
+      if (symmetricGraph) {
+        Galois::for_each_local(graph, Process<true,false>(graph), Galois::wl<WL>());
+      } else {
+        Galois::for_each_local(graph, Process<true,true>(graph), Galois::wl<WL>());
+      }
+      break;
+    } // end switch
+  }
+};
+#endif
+
+template<bool UseStaleValue>
+struct LabelPropAlgo {
+  struct LNode {
+    typedef unsigned int component_type;
+    unsigned int id;
+    unsigned int comp;
+    bool inSet;
+    
+    component_type component() { return comp; }
+    bool isRep() { return id == comp; }
+  };
+
+  typedef typename Galois::Graph::LC_CSR_Graph<LNode,void>
+    ::template with_no_lockable<true>::type
+    ::template with_numa_alloc<true>::type InnerGraph;
+  typedef Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
+  typedef typename Graph::GraphNode GNode;
+  typedef typename LNode::component_type component_type;
+
+  template<typename G>
+  void readGraph(G& graph) {
+    readInOutGraph(graph);
+  }
+
+ 
+  struct Initialize {
+    Graph& graph;
+
+    Initialize(Graph& g): graph(g) { }
+    void operator()(GNode n) const {
+      LNode& data = graph.getData(n, Galois::MethodFlag::UNPROTECTED);
+      data.comp = data.id;
+      data.inSet = false;
     }
   };
 
@@ -350,7 +760,7 @@ struct LabelPropAlgo {
             }
             break;
           }
-          if (__sync_bool_compare_and_swap(&ddata.comp, old, newV)) {
+          if(__sync_bool_compare_and_swap(&ddata.comp, old, newV)) {
             if(traceWork) {
               *GoodWork += 1;
             }
@@ -389,17 +799,168 @@ struct LabelPropAlgo {
   };
 
   void operator()(Graph& graph) {
-    typedef Galois::WorkList::dChunkedFIFO<256> WL;
+    using namespace Galois::WorkList;
+    typedef dChunkedFIFO<256> WL;
+    typedef dChunkedMarkingSetFIFO<LabelSetMarker<Graph>,256> MSet;
+    typedef dChunkedTwoLevelSetFIFO<256> OSet;
+    typedef dChunkedTwoLevelHashFIFO<256> HSet;
+    typedef OrderedByIntegerMetric<LabelDivIndexer<Graph> > DivObim;
+    typedef OrderedByIntegerMetric<LabelShrIndexer<Graph> > ShrObim;
+    typedef OrderedByIntegerMetric<LabelLogIndexer<Graph> > LogObim;
+    typedef detail::MarkingWorkSetMaster<GNode,LabelSetMarker<Graph>,DivObim> DivObimMSet;
+    typedef detail::WorkSetMaster<GNode,DivObim,Galois::ThreadSafeTwoLevelSet<GNode> > DivObimOSet;
+    typedef detail::WorkSetMaster<GNode,DivObim,Galois::ThreadSafeTwoLevelHash<GNode> > DivObimHSet;
+    typedef detail::MarkingWorkSetMaster<GNode,LabelSetMarker<Graph>,ShrObim> ShrObimMSet;
+    typedef detail::WorkSetMaster<GNode,ShrObim,Galois::ThreadSafeTwoLevelSet<GNode> > ShrObimOSet;
+    typedef detail::WorkSetMaster<GNode,ShrObim,Galois::ThreadSafeTwoLevelHash<GNode> > ShrObimHSet;
+    typedef detail::MarkingWorkSetMaster<GNode,LabelSetMarker<Graph>,LogObim> LogObimMSet;
+    typedef detail::WorkSetMaster<GNode,LogObim,Galois::ThreadSafeTwoLevelSet<GNode> > LogObimOSet;
+    typedef detail::WorkSetMaster<GNode,LogObim,Galois::ThreadSafeTwoLevelHash<GNode> > LogObimHSet;
+
+    auto marker = LabelSetMarker<Graph>(graph);
+    auto divIndexer = LabelDivIndexer<Graph>(graph);
+    auto logIndexer = LabelLogIndexer<Graph>(graph);
+    auto shrIndexer = LabelShrIndexer<Graph>(graph);
 
     Galois::do_all_local(graph, Initialize(graph));
-    if (symmetricGraph) {
-      Galois::for_each_local(graph, Process<true,false>(graph), Galois::wl<WL>());
-    } else {
-      Galois::for_each_local(graph, Process<true,true>(graph), Galois::wl<WL>());
-    }
+#ifdef GALOIS_USE_EXP
+    switch(algo) {
+    case Algo::labelPropMSet:
+    case Algo::staleLpMSet:
+      if(symmetricGraph)
+        Galois::for_each_local(graph, Process<true,false>(graph), Galois::wl<MSet>(LabelSetMarker<Graph>(graph)));
+      else
+        Galois::for_each_local(graph, Process<true,true>(graph), Galois::wl<MSet>(LabelSetMarker<Graph>(graph)));
+      break;
+    case Algo::labelPropOSet:
+    case Algo::staleLpOSet:
+      if(symmetricGraph)
+        Galois::for_each_local(graph, Process<true,false>(graph), Galois::wl<OSet>());
+      else
+        Galois::for_each_local(graph, Process<true,true>(graph), Galois::wl<OSet>());
+      break;
+    case Algo::labelPropHSet:
+    case Algo::staleLpHSet:
+      if(symmetricGraph)
+        Galois::for_each_local(graph, Process<true,false>(graph), Galois::wl<HSet>());
+      else
+        Galois::for_each_local(graph, Process<true,true>(graph), Galois::wl<HSet>());
+      break;
+    case Algo::labelPropDivObim:
+    case Algo::staleLpDivObim:
+      std::cout << "using priority scheduling based on (label / 1000).\n";
+      if(symmetricGraph)
+        Galois::for_each_local(graph, Process<true,false>(graph), Galois::wl<DivObim>(divIndexer));
+      else
+        Galois::for_each_local(graph, Process<true, true>(graph), Galois::wl<DivObim>(divIndexer));
+      break;
+    case Algo::labelPropDivObimMSet:
+    case Algo::staleLpDivObimMSet:
+      std::cout << "using priority scheduling based on (label / 1000).\n";
+      if(symmetricGraph)
+        Galois::for_each_local(graph, Process<true,false>(graph), Galois::wl<DivObimMSet>(marker,dummy,divIndexer));
+      else
+        Galois::for_each_local(graph, Process<true, true>(graph), Galois::wl<DivObimMSet>(marker,dummy,divIndexer));
+      break;
+    case Algo::labelPropDivObimOSet:
+    case Algo::staleLpDivObimOSet:
+      std::cout << "using priority scheduling based on (label / 1000).\n";
+      if(symmetricGraph)
+        Galois::for_each_local(graph, Process<true,false>(graph), Galois::wl<DivObimOSet>(dummy,divIndexer));
+      else
+        Galois::for_each_local(graph, Process<true, true>(graph), Galois::wl<DivObimOSet>(dummy,divIndexer));
+      break;
+    case Algo::labelPropDivObimHSet:
+    case Algo::staleLpDivObimHSet:
+      std::cout << "using priority scheduling based on (label / 1000).\n";
+      if(symmetricGraph)
+        Galois::for_each_local(graph, Process<true,false>(graph), Galois::wl<DivObimHSet>(dummy,divIndexer));
+      else
+        Galois::for_each_local(graph, Process<true, true>(graph), Galois::wl<DivObimHSet>(dummy,divIndexer));
+      break;
+    case Algo::labelPropLogObim:
+    case Algo::staleLpLogObim:
+      std::cout << "using priority scheduling based on floor(log(label+1)).\n";
+      if(symmetricGraph)
+        Galois::for_each_local(graph, Process<true,false>(graph), Galois::wl<LogObim>(logIndexer));
+      else
+        Galois::for_each_local(graph, Process<true, true>(graph), Galois::wl<LogObim>(logIndexer));
+      break;
+    case Algo::labelPropLogObimMSet:
+    case Algo::staleLpLogObimMSet:
+      std::cout << "using priority scheduling based on floor(log(label+1)).\n";
+      if(symmetricGraph)
+        Galois::for_each_local(graph, Process<true,false>(graph), Galois::wl<LogObimMSet>(marker,dummy,logIndexer));
+      else
+        Galois::for_each_local(graph, Process<true, true>(graph), Galois::wl<LogObimMSet>(marker,dummy,logIndexer));
+      break;
+    case Algo::labelPropLogObimOSet:
+    case Algo::staleLpLogObimOSet:
+      std::cout << "using priority scheduling based on floor(log(label+1)).\n";
+      if(symmetricGraph)
+        Galois::for_each_local(graph, Process<true,false>(graph), Galois::wl<LogObimOSet>(dummy,logIndexer));
+      else
+        Galois::for_each_local(graph, Process<true, true>(graph), Galois::wl<LogObimOSet>(dummy,logIndexer));
+      break;
+    case Algo::labelPropLogObimHSet:
+    case Algo::staleLpLogObimHSet:
+      std::cout << "using priority scheduling based on floor(log(label+1)).\n";
+      if(symmetricGraph)
+        Galois::for_each_local(graph, Process<true,false>(graph), Galois::wl<LogObimHSet>(dummy,logIndexer));
+      else
+        Galois::for_each_local(graph, Process<true, true>(graph), Galois::wl<LogObimHSet>(dummy,logIndexer));
+      break;
+    case Algo::labelPropShrObim:
+    case Algo::staleLpShrObim:
+      std::cout << "using priority scheduling based on (label >> " << delta << ").\n";
+      std::cout << "default delta may not be the best for performance.\n";
+      if(symmetricGraph)
+        Galois::for_each_local(graph, Process<true,false>(graph), Galois::wl<ShrObim>(shrIndexer));
+      else
+        Galois::for_each_local(graph, Process<true, true>(graph), Galois::wl<ShrObim>(shrIndexer));
+      break;
+    case Algo::labelPropShrObimMSet:
+    case Algo::staleLpShrObimMSet:
+      std::cout << "using priority scheduling based on (label >> " << delta << ").\n";
+      std::cout << "default delta may not be the best for performance.\n";
+      if(symmetricGraph)
+        Galois::for_each_local(graph, Process<true,false>(graph), Galois::wl<ShrObimMSet>(marker,dummy,shrIndexer));
+      else
+        Galois::for_each_local(graph, Process<true, true>(graph), Galois::wl<ShrObimMSet>(marker,dummy,shrIndexer));
+      break;
+    case Algo::labelPropShrObimOSet:
+    case Algo::staleLpShrObimOSet:
+      std::cout << "using priority scheduling based on (label >> " << delta << ").\n";
+      std::cout << "default delta may not be the best for performance.\n";
+      if(symmetricGraph)
+        Galois::for_each_local(graph, Process<true,false>(graph), Galois::wl<ShrObimOSet>(dummy,shrIndexer));
+      else
+        Galois::for_each_local(graph, Process<true, true>(graph), Galois::wl<ShrObimOSet>(dummy,shrIndexer));
+      break;
+    case Algo::labelPropShrObimHSet:
+    case Algo::staleLpShrObimHSet:
+      std::cout << "using priority scheduling based on (label >> " << delta << ").\n";
+      std::cout << "default delta may not be the best for performance.\n";
+      if(symmetricGraph)
+        Galois::for_each_local(graph, Process<true,false>(graph), Galois::wl<ShrObimHSet>(dummy,shrIndexer));
+      else
+        Galois::for_each_local(graph, Process<true, true>(graph), Galois::wl<ShrObimHSet>(dummy,shrIndexer));
+      break;
+    default:
+#endif
+      if (symmetricGraph) {
+        Galois::for_each_local(graph, Process<true,false>(graph), Galois::wl<WL>());
+      } else {
+        Galois::for_each_local(graph, Process<true,true>(graph), Galois::wl<WL>());
+      }
+#ifdef GALOIS_USE_EXP
+      break;
+    } // end switch
+#endif
   }
 };
 
+#ifdef GALOIS_USE_EXP
 //! Assumes symmetric graph
 struct PullLPAlgo {
   struct LNode {
@@ -499,6 +1060,7 @@ struct PullLPCASAlgo {
     typedef unsigned int component_type;
     unsigned int id;
     unsigned int comp;
+    bool inSet;
     
     component_type component() { return comp; }
     bool isRep() { return id == comp; }
@@ -528,6 +1090,7 @@ struct PullLPCASAlgo {
     void operator()(GNode n) const {
       LNode& data = graph.getData(n, Galois::MethodFlag::UNPROTECTED);
       data.comp = data.id;
+      data.inSet = false;
     }
   };
 
@@ -540,7 +1103,6 @@ struct PullLPCASAlgo {
     void operator()(const GNode& n, Galois::UserContext<GNode>& ctx) {
       LNode& data = graph.getData(n, Galois::MethodFlag::UNPROTECTED);
       component_type old = data.comp, newV = data.comp;
-      unsigned int good = 0, empty = 0;
      
       //! Pull from incoming neighbors to update my own label 
       auto inIt = graph.in_edge_begin(n, Galois::MethodFlag::UNPROTECTED), inIe = graph.in_edge_end(n, Galois::MethodFlag::UNPROTECTED);
@@ -574,12 +1136,99 @@ struct PullLPCASAlgo {
   };
 
   void operator()(Graph& graph) {
-    typedef Galois::WorkList::dChunkedFIFO<256> WL;
+    using namespace Galois::WorkList;
+    typedef dChunkedFIFO<256> WL;
+    typedef dChunkedMarkingSetFIFO<LabelSetMarker<Graph>,256> MSet;
+    typedef dChunkedTwoLevelSetFIFO<256> OSet;
+    typedef dChunkedTwoLevelHashFIFO<256> HSet;
+    typedef OrderedByIntegerMetric<LabelDivIndexer<Graph> > DivObim;
+    typedef OrderedByIntegerMetric<LabelShrIndexer<Graph> > ShrObim;
+    typedef OrderedByIntegerMetric<LabelLogIndexer<Graph> > LogObim;
+    typedef detail::MarkingWorkSetMaster<GNode,LabelSetMarker<Graph>,DivObim> DivObimMSet;
+    typedef detail::WorkSetMaster<GNode,DivObim,Galois::ThreadSafeTwoLevelSet<GNode> > DivObimOSet;
+    typedef detail::WorkSetMaster<GNode,DivObim,Galois::ThreadSafeTwoLevelHash<GNode> > DivObimHSet;
+    typedef detail::MarkingWorkSetMaster<GNode,LabelSetMarker<Graph>,ShrObim> ShrObimMSet;
+    typedef detail::WorkSetMaster<GNode,ShrObim,Galois::ThreadSafeTwoLevelSet<GNode> > ShrObimOSet;
+    typedef detail::WorkSetMaster<GNode,ShrObim,Galois::ThreadSafeTwoLevelHash<GNode> > ShrObimHSet;
+    typedef detail::MarkingWorkSetMaster<GNode,LabelSetMarker<Graph>,LogObim> LogObimMSet;
+    typedef detail::WorkSetMaster<GNode,LogObim,Galois::ThreadSafeTwoLevelSet<GNode> > LogObimOSet;
+    typedef detail::WorkSetMaster<GNode,LogObim,Galois::ThreadSafeTwoLevelHash<GNode> > LogObimHSet;
+
+    auto marker = LabelSetMarker<Graph>(graph);
+    auto divIndexer = LabelDivIndexer<Graph>(graph);
+    auto logIndexer = LabelLogIndexer<Graph>(graph);
+    auto shrIndexer = LabelShrIndexer<Graph>(graph);
 
     Galois::do_all_local(graph, Initialize(graph));
-    Galois::for_each_local(graph, Process(graph), Galois::wl<WL>());
+    switch(algo) {
+    case Algo::pullLpMSet:
+      Galois::for_each_local(graph, Process(graph), Galois::wl<MSet>(LabelSetMarker<Graph>(graph)));
+      break;
+    case Algo::pullLpOSet:
+      Galois::for_each_local(graph, Process(graph), Galois::wl<OSet>());
+      break;
+    case Algo::pullLpHSet:
+      Galois::for_each_local(graph, Process(graph), Galois::wl<HSet>());
+      break;
+    case Algo::pullLpDivObim:
+      std::cout << "using priority scheduling based on (label / 1000).\n";
+      Galois::for_each_local(graph, Process(graph), Galois::wl<DivObim>(divIndexer));
+      break;
+    case Algo::pullLpDivObimMSet:
+      std::cout << "using priority scheduling based on (label / 1000).\n";
+      Galois::for_each_local(graph, Process(graph), Galois::wl<DivObimMSet>(marker,dummy,divIndexer));
+      break;
+    case Algo::pullLpDivObimOSet:
+      std::cout << "using priority scheduling based on (label / 1000).\n";
+      Galois::for_each_local(graph, Process(graph), Galois::wl<DivObimOSet>(dummy,divIndexer));
+      break;
+    case Algo::pullLpDivObimHSet:
+      std::cout << "using priority scheduling based on (label / 1000).\n";
+      Galois::for_each_local(graph, Process(graph), Galois::wl<DivObimHSet>(dummy,divIndexer));
+      break;
+    case Algo::pullLpLogObim:
+      std::cout << "using priority scheduling based on floor(log(label+1)).\n";
+      Galois::for_each_local(graph, Process(graph), Galois::wl<LogObim>(logIndexer));
+      break;
+    case Algo::pullLpLogObimMSet:
+      std::cout << "using priority scheduling based on floor(log(label+1)).\n";
+      Galois::for_each_local(graph, Process(graph), Galois::wl<LogObimMSet>(marker,dummy,logIndexer));
+      break;
+    case Algo::pullLpLogObimOSet:
+      std::cout << "using priority scheduling based on floor(log(label+1)).\n";
+      Galois::for_each_local(graph, Process(graph), Galois::wl<LogObimOSet>(dummy,logIndexer));
+      break;
+    case Algo::pullLpLogObimHSet:
+      std::cout << "using priority scheduling based on floor(log(label+1)).\n";
+      Galois::for_each_local(graph, Process(graph), Galois::wl<LogObimHSet>(dummy,logIndexer));
+      break;
+    case Algo::pullLpShrObim:
+      std::cout << "using priority scheduling based on (label >> " << delta << ").\n";
+      std::cout << "default delta may not be the best for performance.\n";
+      Galois::for_each_local(graph, Process(graph), Galois::wl<ShrObim>(shrIndexer));
+      break;
+    case Algo::pullLpShrObimMSet:
+      std::cout << "using priority scheduling based on (label >> " << delta << ").\n";
+      std::cout << "default delta may not be the best for performance.\n";
+      Galois::for_each_local(graph, Process(graph), Galois::wl<ShrObimMSet>(marker,dummy,shrIndexer));
+      break;
+    case Algo::pullLpShrObimOSet:
+      std::cout << "using priority scheduling based on (label >> " << delta << ").\n";
+      std::cout << "default delta may not be the best for performance.\n";
+      Galois::for_each_local(graph, Process(graph), Galois::wl<ShrObimOSet>(dummy,shrIndexer));
+      break;
+    case Algo::pullLpShrObimHSet:
+      std::cout << "using priority scheduling based on (label >> " << delta << ").\n";
+      std::cout << "default delta may not be the best for performance.\n";
+      Galois::for_each_local(graph, Process(graph), Galois::wl<ShrObimHSet>(dummy,shrIndexer));
+      break;
+    default:
+      Galois::for_each_local(graph, Process(graph), Galois::wl<WL>());
+      break;
+    } // end switch
   }
 };
+#endif
 
 struct AsyncOCAlgo {
   typedef Galois::Graph::OCImmutableEdgeGraph<Node,void> Graph;
@@ -672,7 +1321,17 @@ struct AsyncAlgo {
 
   void operator()(Graph& graph) {
     Galois::Statistic emptyMerges("EmptyMerges");
-    Galois::for_each_local(graph, Merge(graph, emptyMerges));
+#ifdef GALOIS_USE_EXP
+    if(algo == Algo::asyncOSet) {
+      Galois::for_each_local(graph, Merge(graph, emptyMerges), Galois::wl<Galois::WorkList::dChunkedTwoLevelSetFIFO<32> >());
+    } else if(algo == Algo::asyncHSet) {
+      Galois::for_each_local(graph, Merge(graph, emptyMerges), Galois::wl<Galois::WorkList::dChunkedTwoLevelHashFIFO<32> >());
+    } else {
+#endif
+      Galois::for_each_local(graph, Merge(graph, emptyMerges));
+#ifdef GALOIS_USE_EXP
+    }
+#endif
   }
 };
 
@@ -1010,7 +1669,7 @@ void run() {
   Graph graph;
 
   algo.readGraph(graph);
-  std::cout << "Read " << graph.size() << " nodes\n";
+  std::cout << "Read " << graph.size() << " nodes\n"; 
 
   unsigned int id = 0;
   for (typename Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii, ++id) {
@@ -1060,11 +1719,74 @@ int main(int argc, char** argv) {
     case Algo::blockedasync: run<BlockedAsyncAlgo>(); break;
     case Algo::labelProp: run<LabelPropAlgo<false> >(); break;
     case Algo::staleLp: run<LabelPropAlgo<true> >(); break;
-    case Algo::pullLp: run<PullLPAlgo>(); break;
-    case Algo::pullLpCas: run<PullLPCASAlgo>(); break;
     case Algo::serial: run<SerialAlgo>(); break;
     case Algo::synchronous: run<SynchronousAlgo>(); break;
 #ifdef GALOIS_USE_EXP
+    case Algo::asyncOSet: run<AsyncAlgo>(); break;
+    case Algo::asyncHSet: run<AsyncAlgo>(); break;
+    case Algo::labelPropMSet: run<LabelPropAlgo<false> >(); break;
+    case Algo::labelPropOSet: run<LabelPropAlgo<false> >(); break;
+    case Algo::labelPropHSet: run<LabelPropAlgo<false> >(); break;
+    case Algo::labelPropDivObim: run<LabelPropAlgo<false> >(); break;
+    case Algo::labelPropDivObimMSet: run<LabelPropAlgo<false> >(); break;
+    case Algo::labelPropDivObimOSet: run<LabelPropAlgo<false> >(); break;
+    case Algo::labelPropDivObimHSet: run<LabelPropAlgo<false> >(); break;
+    case Algo::labelPropLogObim: run<LabelPropAlgo<false> >(); break;
+    case Algo::labelPropLogObimMSet: run<LabelPropAlgo<false> >(); break;
+    case Algo::labelPropLogObimOSet: run<LabelPropAlgo<false> >(); break;
+    case Algo::labelPropLogObimHSet: run<LabelPropAlgo<false> >(); break;
+    case Algo::labelPropShrObim: run<LabelPropAlgo<false> >(); break;
+    case Algo::labelPropShrObimMSet: run<LabelPropAlgo<false> >(); break;
+    case Algo::labelPropShrObimOSet: run<LabelPropAlgo<false> >(); break;
+    case Algo::labelPropShrObimHSet: run<LabelPropAlgo<false> >(); break;
+    case Algo::gLp: run<LabelPropNoCasAlgo>(); break;
+    case Algo::gLpMSet: run<LabelPropNoCasAlgo>(); break;
+    case Algo::gLpOSet: run<LabelPropNoCasAlgo>(); break;
+    case Algo::gLpHSet: run<LabelPropNoCasAlgo>(); break;
+    case Algo::gLpDivObim: run<LabelPropNoCasAlgo>(); break;
+    case Algo::gLpDivObimMSet: run<LabelPropNoCasAlgo>(); break;
+    case Algo::gLpDivObimOSet: run<LabelPropNoCasAlgo>(); break;
+    case Algo::gLpDivObimHSet: run<LabelPropNoCasAlgo>(); break;
+    case Algo::gLpLogObim: run<LabelPropNoCasAlgo>(); break;
+    case Algo::gLpLogObimMSet: run<LabelPropNoCasAlgo>(); break;
+    case Algo::gLpLogObimOSet: run<LabelPropNoCasAlgo>(); break;
+    case Algo::gLpLogObimHSet: run<LabelPropNoCasAlgo>(); break;
+    case Algo::gLpShrObim: run<LabelPropNoCasAlgo>(); break;
+    case Algo::gLpShrObimMSet: run<LabelPropNoCasAlgo>(); break;
+    case Algo::gLpShrObimOSet: run<LabelPropNoCasAlgo>(); break;
+    case Algo::gLpShrObimHSet: run<LabelPropNoCasAlgo>(); break;
+    case Algo::staleLpMSet: run<LabelPropAlgo<true> >(); break;
+    case Algo::staleLpOSet: run<LabelPropAlgo<true> >(); break;
+    case Algo::staleLpHSet: run<LabelPropAlgo<true> >(); break;
+    case Algo::staleLpDivObim: run<LabelPropAlgo<true> >(); break;
+    case Algo::staleLpDivObimMSet: run<LabelPropAlgo<true> >(); break;
+    case Algo::staleLpDivObimOSet: run<LabelPropAlgo<true> >(); break;
+    case Algo::staleLpDivObimHSet: run<LabelPropAlgo<true> >(); break;
+    case Algo::staleLpLogObim: run<LabelPropAlgo<true> >(); break;
+    case Algo::staleLpLogObimMSet: run<LabelPropAlgo<true> >(); break;
+    case Algo::staleLpLogObimOSet: run<LabelPropAlgo<true> >(); break;
+    case Algo::staleLpLogObimHSet: run<LabelPropAlgo<true> >(); break;
+    case Algo::staleLpShrObim: run<LabelPropAlgo<true> >(); break;
+    case Algo::staleLpShrObimMSet: run<LabelPropAlgo<true> >(); break;
+    case Algo::staleLpShrObimOSet: run<LabelPropAlgo<true> >(); break;
+    case Algo::staleLpShrObimHSet: run<LabelPropAlgo<true> >(); break;
+    case Algo::gPullLp: run<PullLPAlgo>(); break;
+    case Algo::pullLp: run<PullLPCASAlgo>(); break;
+    case Algo::pullLpMSet: run<PullLPCASAlgo>(); break;
+    case Algo::pullLpOSet: run<PullLPCASAlgo>(); break;
+    case Algo::pullLpHSet: run<PullLPCASAlgo>(); break;
+    case Algo::pullLpDivObim: run<PullLPCASAlgo>(); break;
+    case Algo::pullLpDivObimMSet: run<PullLPCASAlgo>(); break;
+    case Algo::pullLpDivObimOSet: run<PullLPCASAlgo>(); break;
+    case Algo::pullLpDivObimHSet: run<PullLPCASAlgo>(); break;
+    case Algo::pullLpLogObim: run<PullLPCASAlgo>(); break;
+    case Algo::pullLpLogObimMSet: run<PullLPCASAlgo>(); break;
+    case Algo::pullLpLogObimOSet: run<PullLPCASAlgo>(); break;
+    case Algo::pullLpLogObimHSet: run<PullLPCASAlgo>(); break;
+    case Algo::pullLpShrObim: run<PullLPCASAlgo>(); break;
+    case Algo::pullLpShrObimMSet: run<PullLPCASAlgo>(); break;
+    case Algo::pullLpShrObimOSet: run<PullLPCASAlgo>(); break;
+    case Algo::pullLpShrObimHSet: run<PullLPCASAlgo>(); break;
     case Algo::graphchi: run<GraphChiAlgo>(); break;
     case Algo::graphlab: run<GraphLabAlgo>(); break;
     case Algo::ligraChi: run<LigraAlgo<true> >(); break;

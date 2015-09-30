@@ -24,6 +24,7 @@
  * Single source shortest paths.
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
+ * @author Yi-Shan Lu <yishanlu@cs.utexas.edu>
  */
 #include "Galois/Galois.h"
 #include "Galois/Accumulator.h"
@@ -34,6 +35,8 @@
 #include "Galois/Graphs/TypeTraits.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
+#include "Galois/WorkList/WorkSet.h"
+#include "Galois/WorkList/MarkingSet.h"
 
 #include <iostream>
 #include <deque>
@@ -53,7 +56,25 @@ static const char* url = "single_source_shortest_path";
 
 enum Algo {
   async,
+  asyncFifo,
+  asyncBlindObim,
+  asyncBlindFifo,
+  asyncBlindFifoHSet,
+  asyncBlindFifoMSet,
+  asyncBlindFifoOSet,
+  asyncBlindObimHSet,
+  asyncBlindObimMSet,
+  asyncBlindObimOSet,
   asyncWithCas,
+  asyncWithCasFifo,
+  asyncWithCasBlindObim,
+  asyncWithCasBlindFifo,
+  asyncWithCasBlindFifoHSet,
+  asyncWithCasBlindFifoMSet,
+  asyncWithCasBlindFifoOSet,
+  asyncWithCasBlindObimHSet,
+  asyncWithCasBlindObimMSet,
+  asyncWithCasBlindObimOSet,
   asyncPP,
   graphlab,
   ligra,
@@ -72,8 +93,26 @@ cll::opt<unsigned int> memoryLimit("memoryLimit",
 static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
     cll::values(
       clEnumValN(Algo::async, "async", "Asynchronous"),
+      clEnumValN(Algo::asyncFifo, "asyncFifo", "async with dChunkedFIFO scheduler"),
+      clEnumValN(Algo::asyncBlindObim, "asyncBlindObim", "async without discarding empty work"),
+      clEnumValN(Algo::asyncBlindFifo, "asyncBlindFifo", "asyncBlind with dChunkedFIFO scheduling"),
+      clEnumValN(Algo::asyncBlindFifoHSet, "asyncBlindFifoHSet", "asyncBlindFifo with two-level hash uni-set scheduler"),
+      clEnumValN(Algo::asyncBlindFifoMSet, "asyncBlindFifoMSet", "asyncBlindFifo with marking set uni-set scheduler"),
+      clEnumValN(Algo::asyncBlindFifoOSet, "asyncBlindFifoOSet", "asyncBlindFifo with two-level set uni-set scheduler"),
+      clEnumValN(Algo::asyncBlindObimHSet, "asyncBlindObimHSet", "asyncBlindObim with two-level hash uni-set scheduler"),
+      clEnumValN(Algo::asyncBlindObimMSet, "asyncBlindObimMSet", "asyncBlindObim with marking set uni-set scheduler"),
+      clEnumValN(Algo::asyncBlindObimOSet, "asyncBlindObimOSet", "asyncBlindObim with two-level set uni-set scheduler"),
       clEnumValN(Algo::asyncPP, "asyncPP", "Async, CAS, push-pull"),
       clEnumValN(Algo::asyncWithCas, "asyncWithCas", "Use compare-and-swap to update nodes"),
+      clEnumValN(Algo::asyncWithCasFifo, "asyncWithCasFifo", "asyncWithCas with dChunkedFIFO scheduler"),
+      clEnumValN(Algo::asyncWithCasBlindObim, "asyncWithCasBlindObim", "asyncWithCas without discarding empty work"),
+      clEnumValN(Algo::asyncWithCasBlindFifo, "asyncWithCasBlindFifo", "asyncWithCasBlind with dChunkedFIFO scheduling"),
+      clEnumValN(Algo::asyncWithCasBlindFifoHSet, "asyncWithCasBlindFifoHSet", "asyncWithCasBlindFifo with two-level hash uni-set scheduler"),
+      clEnumValN(Algo::asyncWithCasBlindFifoMSet, "asyncWithCasBlindFifoMSet", "asyncWithCasBlindFifo with marking set uni-set scheduler"),
+      clEnumValN(Algo::asyncWithCasBlindFifoOSet, "asyncWithCasBlindFifoOSet", "asyncWithCasBlindFifo with two-level set uni-set scheduler"),
+      clEnumValN(Algo::asyncWithCasBlindObimHSet, "asyncWithCasBlindObimHSet", "asyncWithCasBlindObim with two-level hash uni-set scheduler"),
+      clEnumValN(Algo::asyncWithCasBlindObimMSet, "asyncWithCasBlindObimMSet", "asyncWithCasBlindObim with marking set uni-set scheduler"),
+      clEnumValN(Algo::asyncWithCasBlindObimOSet, "asyncWithCasBlindObimOSet", "asyncWithCasBlindObim with two-level set uni-set scheduler"),
       clEnumValN(Algo::serial, "serial", "Serial"),
       clEnumValN(Algo::graphlab, "graphlab", "Use GraphLab programming model"),
       clEnumValN(Algo::ligraChi, "ligraChi", "Use Ligra and GraphChi programming model"),
@@ -146,7 +185,6 @@ struct UpdateRequestIndexer: public std::unary_function<UpdateRequest, unsigned 
     return t;
   }
 };
-
 
 template<typename Graph>
 bool verify(Graph& graph, typename Graph::GraphNode source) {
@@ -371,8 +409,178 @@ struct AsyncAlgo {
         graph.out_edges(source, Galois::MethodFlag::UNPROTECTED).begin(),
         graph.out_edges(source, Galois::MethodFlag::UNPROTECTED).end(),
         InitialProcess(this, graph, initial, graph.getData(source)));
-    Galois::for_each_local(initial, Process(this, graph), Galois::wl<OBIM>());
-//    Galois::for_each_local(initial, Process(this, graph), Galois::wl<Galois::WorkList::dChunkedFIFO<64> >());
+    if(algo == Algo::asyncFifo || algo == Algo::asyncWithCasFifo)
+      Galois::for_each_local(initial, Process(this, graph), Galois::wl<dChunkedFIFO<64> >());
+    else
+      Galois::for_each_local(initial, Process(this, graph), Galois::wl<OBIM>());
+  }
+};
+
+struct SetNode {
+  Dist dist;
+  bool inSet;
+};
+
+template<typename Graph>
+struct NodeIndexer: public std::unary_function<typename Graph::GraphNode, unsigned int> {
+  Graph& graph;
+  NodeIndexer(Graph& g): graph(g) {}
+
+  unsigned int operator() (const typename Graph::GraphNode n) const {
+    return graph.getData(n, Galois::MethodFlag::UNPROTECTED).dist >> stepShift;
+  }
+};
+
+template<typename Graph>
+struct NodeSetMarker: public std::unary_function<typename Graph::GraphNode, bool*> {
+  Graph& graph;
+  NodeSetMarker(Graph& g): graph(g) {}
+
+  bool* operator() (const typename Graph::GraphNode n) const {
+    return &(graph.getData(n, Galois::MethodFlag::UNPROTECTED).inSet);
+  }
+};
+
+template<bool UseCas>
+struct AsyncSetAlgo {
+  typedef SetNode Node;
+  
+  // ! [Define LC_InlineEdge_Graph]
+  typedef Galois::Graph::LC_InlineEdge_Graph<Node, uint32_t>
+    ::template with_out_of_line_lockable<true>::type
+    ::template with_compressed_node_ptr<true>::type
+    ::template with_numa_alloc<true>::type
+    Graph;
+  // ! [Define LC_InlineEdge_Graph]
+  
+  typedef typename Graph::GraphNode GNode;
+
+  std::string name() const {
+    return UseCas ? "Asynchronous Set with CAS" : "Asynchronous Set"; 
+  }
+
+  void readGraph(Graph& graph) { Galois::Graph::readGraph(graph, filename); }
+
+  struct Initialize {
+    Graph& g;
+    Initialize(Graph& g): g(g) { }
+    void operator()(typename Graph::GraphNode n) const {
+      auto& data = g.getData(n, Galois::MethodFlag::UNPROTECTED);
+      data.dist = DIST_INFINITY;
+      data.inSet = false;
+    }
+  };
+
+  template<typename Pusher>
+  void relaxEdge(Graph& graph, Node& sdata, typename Graph::edge_iterator ii, Pusher& pusher) {
+    GNode dst = graph.getEdgeDst(ii);
+    Dist d = graph.getEdgeData(ii);
+    Node& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
+    Dist newDist = sdata.dist + d;
+    Dist oldDist;
+    while (newDist < (oldDist = ddata.dist)) {
+      if (!UseCas || __sync_bool_compare_and_swap(&ddata.dist, oldDist, newDist)) {
+        if (!UseCas)
+          ddata.dist = newDist;
+        if (trackWork && oldDist != DIST_INFINITY)
+          *BadWork += 1;
+        pusher.push(dst);
+        break;
+      }
+    }
+  }
+
+  template<typename Pusher>
+  void relaxNode(Graph& graph, GNode req, Pusher& pusher) {
+    const Galois::MethodFlag flag = UseCas ? Galois::MethodFlag::UNPROTECTED : Galois::MethodFlag::WRITE;
+    Node& sdata = graph.getData(req, flag);
+
+    for (typename Graph::edge_iterator ii = graph.edge_begin(req, flag), ei = graph.edge_end(req, flag); ii != ei; ++ii) {
+      relaxEdge(graph, sdata, ii, pusher);
+    }
+  }
+
+  struct Process {
+    AsyncSetAlgo* self;
+    Graph& graph;
+    Process(AsyncSetAlgo* s, Graph& g): self(s), graph(g) { }
+    void operator()(GNode req, Galois::UserContext<GNode>& ctx) {
+      self->relaxNode(graph, req, ctx);
+    }
+  };
+
+  typedef Galois::InsertBag<GNode> Bag;
+
+  struct InitialProcess {
+    AsyncSetAlgo* self;
+    Graph& graph;
+    Bag& bag;
+    Node& sdata;
+    InitialProcess(AsyncSetAlgo* s, Graph& g, Bag& b, Node& d): self(s), graph(g), bag(b), sdata(d) { }
+    void operator()(typename Graph::edge_iterator ii) const {
+      self->relaxEdge(graph, sdata, ii, bag);
+    }
+  };
+
+  void operator()(Graph& graph, GNode source) {
+    using namespace Galois::WorkList;
+    typedef ChunkedFIFO<64> Chunk;
+    typedef OrderedByIntegerMetric<NodeIndexer<Graph>, Chunk, 10, false> OBIM;
+    typedef dChunkedMarkingSetFIFO<NodeSetMarker<Graph>,64> MSet;
+    typedef dChunkedTwoLevelSetFIFO<64> OSet;
+    typedef dChunkedTwoLevelHashFIFO<64> HSet;
+    typedef detail::MarkingWorkSetMaster<GNode,NodeSetMarker<Graph>,OBIM> ObimMSet;
+    typedef detail::WorkSetMaster<GNode,OBIM,Galois::ThreadSafeTwoLevelSet<GNode> > ObimOSet;
+    typedef detail::WorkSetMaster<GNode,OBIM,Galois::ThreadSafeTwoLevelHash<GNode> > ObimHSet;
+
+    Bag initial;
+    graph.getData(source).dist = 0;
+    Galois::do_all(
+        graph.out_edges(source, Galois::MethodFlag::UNPROTECTED).begin(),
+        graph.out_edges(source, Galois::MethodFlag::UNPROTECTED).end(),
+        InitialProcess(this, graph, initial, graph.getData(source)));
+
+    auto marker = NodeSetMarker<Graph>(graph);
+    auto indexer = NodeIndexer<Graph>(graph);
+
+    switch(algo) {
+    case Algo::asyncBlindFifoMSet:
+    case Algo::asyncWithCasBlindFifoMSet:
+      Galois::for_each_local(initial, Process(this, graph), Galois::wl<MSet>(marker));
+      break;
+    case Algo::asyncBlindFifoOSet:
+    case Algo::asyncWithCasBlindFifoOSet:
+      Galois::for_each_local(initial, Process(this, graph), Galois::wl<OSet>());
+      break;
+    case Algo::asyncBlindFifoHSet:
+    case Algo::asyncWithCasBlindFifoHSet:
+      Galois::for_each_local(initial, Process(this, graph), Galois::wl<HSet>());
+      break;
+    case Algo::asyncBlindFifo:
+    case Algo::asyncWithCasBlindFifo:
+      Galois::for_each_local(initial, Process(this, graph), Galois::wl<dChunkedFIFO<64> >());
+      break;
+    case Algo::asyncBlindObimMSet:
+    case Algo::asyncWithCasBlindObimMSet:
+      Galois::for_each_local(initial, Process(this, graph), Galois::wl<ObimMSet>(marker,dummy,indexer));
+      break;
+    case Algo::asyncBlindObimOSet:
+    case Algo::asyncWithCasBlindObimOSet:
+      Galois::for_each_local(initial, Process(this, graph), Galois::wl<ObimOSet>(dummy,indexer));
+      break;
+    case Algo::asyncBlindObimHSet:
+    case Algo::asyncWithCasBlindObimHSet:
+      Galois::for_each_local(initial, Process(this, graph), Galois::wl<ObimHSet>(dummy,indexer));
+      break;
+    case Algo::asyncBlindObim:
+    case Algo::asyncWithCasBlindObim:
+    default:
+      std::cout << "INFO: Using delta-step of " << (1 << stepShift) << "\n";
+      std::cout << "WARNING: Performance varies considerably due to delta parameter.\n";
+      std::cout << "WARNING: Do not expect the default to be good for your graph.\n";
+      Galois::for_each_local(initial, Process(this, graph), Galois::wl<OBIM>(NodeIndexer<Graph>(graph)));
+      break;
+    } // end switch
   }
 };
 
@@ -546,7 +754,25 @@ int main(int argc, char **argv) {
   switch (algo) {
     case Algo::serial: run<SerialAlgo>(); break;
     case Algo::async: run<AsyncAlgo<false> >(); break;
+    case Algo::asyncFifo: run<AsyncAlgo<false> >(); break;
+    case Algo::asyncBlindObim: run<AsyncSetAlgo<false> >(); break;
+    case Algo::asyncBlindFifo: run<AsyncSetAlgo<false> >(); break;
+    case Algo::asyncBlindFifoHSet: run<AsyncSetAlgo<false> >(); break;
+    case Algo::asyncBlindFifoMSet: run<AsyncSetAlgo<false> >(); break;
+    case Algo::asyncBlindFifoOSet: run<AsyncSetAlgo<false> >(); break;
+    case Algo::asyncBlindObimHSet: run<AsyncSetAlgo<false> >(); break;
+    case Algo::asyncBlindObimMSet: run<AsyncSetAlgo<false> >(); break;
+    case Algo::asyncBlindObimOSet: run<AsyncSetAlgo<false> >(); break;
     case Algo::asyncWithCas: run<AsyncAlgo<true> >(); break;
+    case Algo::asyncWithCasFifo: run<AsyncAlgo<true> >(); break;
+    case Algo::asyncWithCasBlindObim: run<AsyncSetAlgo<true> >(); break;
+    case Algo::asyncWithCasBlindFifo: run<AsyncSetAlgo<true> >(); break;
+    case Algo::asyncWithCasBlindFifoHSet: run<AsyncSetAlgo<true> >(); break;
+    case Algo::asyncWithCasBlindFifoMSet: run<AsyncSetAlgo<true> >(); break;
+    case Algo::asyncWithCasBlindFifoOSet: run<AsyncSetAlgo<true> >(); break;
+    case Algo::asyncWithCasBlindObimHSet: run<AsyncSetAlgo<true> >(); break;
+    case Algo::asyncWithCasBlindObimMSet: run<AsyncSetAlgo<true> >(); break;
+    case Algo::asyncWithCasBlindObimOSet: run<AsyncSetAlgo<true> >(); break;
     case Algo::asyncPP: run<AsyncAlgoPP>(); break;
 #if defined(__IBMCPP__) && __IBMCPP__ <= 1210
 #else

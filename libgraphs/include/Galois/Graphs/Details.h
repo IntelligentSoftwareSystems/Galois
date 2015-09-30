@@ -37,6 +37,7 @@
 #include "Galois/LazyObject.h"
 #include "Galois/NoDerefIterator.h"
 #include "Galois/Threads.h"
+#include "Galois/Runtime/Iterable.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Substrate/PerThreadStorage.h"
 
@@ -307,17 +308,24 @@ struct EdgeInfoBase: public LazyObject<EdgeTy>
  */
 template<typename GraphTy>
 class EdgesIterator {
-  GraphTy& g;
-  typename GraphTy::GraphNode n;
-  MethodFlag flag;
+  typename GraphTy::edge_iterator ii, ee;
+
 public:
   typedef NoDerefIterator<typename GraphTy::edge_iterator> iterator;
 
-  EdgesIterator(GraphTy& g, typename GraphTy::GraphNode n, MethodFlag f): g(g), n(n), flag(f) { }
+  EdgesIterator(GraphTy& g, typename GraphTy::GraphNode n, MethodFlag f)
+    : ii(g.edge_begin(n, f)), ee(g.edge_end(n,f)) {}
+  EdgesIterator(typename GraphTy::edge_iterator _ii, typename GraphTy::edge_iterator _ee)
+    :ii(_ii), ee(_ee) {}
 
-  iterator begin() { return make_no_deref_iterator(g.edge_begin(n, flag)); }
-  iterator end() { return make_no_deref_iterator(g.edge_end(n, flag)); }
+  iterator begin() { return make_no_deref_iterator(ii); }
+  iterator end()   { return make_no_deref_iterator(ee); }
 };
+
+template<typename ItTy>
+Runtime::iterable<NoDerefIterator<ItTy>> make_no_deref_range(ItTy ii, ItTy ee) {
+  return Runtime::make_iterable(make_no_deref_iterator(ii), make_no_deref_iterator(ee));
+}
 
 /**
  * Convenience wrapper around Graph.in_edge_begin and Graph.in_edge_end to allow

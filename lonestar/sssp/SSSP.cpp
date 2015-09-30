@@ -112,7 +112,7 @@ struct not_consistent<Graph, typename std::enable_if<!Galois::Graph::is_segmente
     if (dist == DIST_INFINITY)
       return false;
 
-    for (typename Graph::edge_iterator ii = g.edge_begin(n), ee = g.edge_end(n); ii != ee; ++ii) {
+    for (auto ii : g.edges(n)) {
       Dist ddist = g.getData(g.getEdgeDst(ii)).dist;
       Dist w = g.getEdgeData(ii);
       if (ddist > dist + w) {
@@ -248,10 +248,7 @@ struct SerialAlgo {
       SNode& data = graph.getData(req.n, Galois::MethodFlag::UNPROTECTED);
       if (req.w < data.dist) {
         data.dist = req.w;
-	for (Graph::edge_iterator
-	      ii = graph.edge_begin(req.n, Galois::MethodFlag::UNPROTECTED), 
-	      ee = graph.edge_end(req.n, Galois::MethodFlag::UNPROTECTED);
-	    ii != ee; ++ii) {
+        for (auto ii : graph.edges(req.n, Galois::MethodFlag::UNPROTECTED)) {
           GNode dst = graph.getEdgeDst(ii);
           Dist d = graph.getEdgeData(ii);
           Dist newDist = req.w + d;
@@ -324,7 +321,7 @@ struct AsyncAlgo {
       return;
     }
 
-    for (typename Graph::edge_iterator ii = graph.edge_begin(req.n, flag), ei = graph.edge_end(req.n, flag); ii != ei; ++ii) {
+    for (auto ii : graph.edges(req.n, flag)) {
       if (req.w != *sdist) {
         if (trackWork)
           *WLEmptyWork += 1;
@@ -368,8 +365,8 @@ struct AsyncAlgo {
     Bag initial;
     graph.getData(source).dist = 0;
     Galois::do_all(
-        graph.out_edges(source, Galois::MethodFlag::UNPROTECTED).begin(),
-        graph.out_edges(source, Galois::MethodFlag::UNPROTECTED).end(),
+        graph.edges(source, Galois::MethodFlag::UNPROTECTED).begin(),
+        graph.edges(source, Galois::MethodFlag::UNPROTECTED).end(),
         InitialProcess(this, graph, initial, graph.getData(source)));
     Galois::for_each_local(initial, Process(this, graph), Galois::wl<OBIM>());
   }
@@ -438,7 +435,7 @@ struct AsyncAlgoPP {
         return;
       }
 
-      for (Graph::edge_iterator ii = graph.edge_begin(req.n, flag), ei = graph.edge_end(req.n, flag); ii != ei; ++ii) {
+      for (auto ii : graph.edges(req.n, flag)) {
         self->relaxEdge(graph, sdist, ii, ctx);
       }
 
@@ -478,8 +475,8 @@ struct AsyncAlgoPP {
     Bag initial;
     graph.getData(source).dist = 0;
     Galois::do_all(
-        graph.out_edges(source, Galois::MethodFlag::UNPROTECTED).begin(),
-        graph.out_edges(source, Galois::MethodFlag::UNPROTECTED).end(),
+        graph.edges(source, Galois::MethodFlag::UNPROTECTED).begin(),
+        graph.edges(source, Galois::MethodFlag::UNPROTECTED).end(),
         InitialProcess(this, graph, initial));
     Galois::for_each_local(initial, Process(this, graph), Galois::wl<OBIM>());
   }

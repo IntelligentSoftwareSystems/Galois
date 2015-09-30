@@ -244,8 +244,12 @@ public:
     return N->edgeEnd();
   }
 
-  detail::EdgesIterator<LC_InlineEdge_Graph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
-    return detail::EdgesIterator<LC_InlineEdge_Graph>(*this, N, mflag);
+  Runtime::iterable<NoDerefIterator<edge_iterator>> edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
+    return detail::make_no_deref_range(edge_begin(N, mflag), edge_end(N, mflag));
+  }
+
+  Runtime::iterable<NoDerefIterator<edge_iterator>> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
+    return edges(N, mflag);
   }
 
 #if 0
