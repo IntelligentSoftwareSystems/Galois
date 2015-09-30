@@ -59,7 +59,6 @@ enum class ContextState: int {
     ABORT_HELP,
     COMMITTING, 
     COMMIT_DONE,
-    READY_TO_ABORT,
     ABORTING,
     ABORT_DONE,
     ABORTED_CHILD,
@@ -119,6 +118,7 @@ struct OptimNhoodItem: public OrdLocBase<OptimNhoodItem<Ctxt, CtxtCmp>, Ctxt, Ct
 
             mutex.unlock ();
 
+            // XXX: can tail remain in ABORT_SELF after finishing?
             tail->casState (ContextState::SCHEDULED, ContextState::ABORT_SELF);
 
             ctxt->waitFor (tail);
@@ -130,7 +130,7 @@ struct OptimNhoodItem: public OrdLocBase<OptimNhoodItem<Ctxt, CtxtCmp>, Ctxt, Ct
 
             mutex.unlock ();
 
-            if (tail->casState (ContextState::READY_TO_COMMIT, ContextState::READY_TO_ABORT)) {
+            if (tail->casState (ContextState::READY_TO_COMMIT, ContextState::ABORTING)) {
               tail->doAbort ();
             }
 
@@ -188,11 +188,12 @@ struct OptimNhoodItem: public OrdLocBase<OptimNhoodItem<Ctxt, CtxtCmp>, Ctxt, Ct
         if (tail->hasState (ContextState::ABORT_SELF) || tail->casState (ContextState::SCHEDULED, ContextState::ABORT_SELF)) {
           ctxt->waitFor (tail);
 
-        } else if (tail->casState (ContextState::READY_TO_COMMIT, ContextState::READY_TO_ABORT)) {
+        } else if (tail->casState (ContextState::READY_TO_COMMIT, ContextState::ABORTING)) {
           tail->doAbort ();
 
         } else {
-          GALOIS_DIE ("shouldn't reach here");
+          // GALOIS_DIE ("shouldn't reach here");
+          assert (!tail->isRunning ());
         }
 
         mutex.lock ();
@@ -242,8 +243,6 @@ struct OptimContext: public SimpleRuntimeContext {
   std::atomic<ContextState> state;
   Exec& exec;
   NhoodList nhood;
-  Lock_ty mutex;
- 
 
   // TODO: avoid using UserContextAccess and per-iteration allocator
   // use Pow of 2 block allocator instead. 
@@ -321,34 +320,14 @@ struct OptimContext: public SimpleRuntimeContext {
 
   void doCommit () {
 
-    if (hasState (ContextState::COMMIT_DONE) || hasState (ContextState::COMMITTING)) {
+    assert (hasState (ContextState::COMMITTING));
 
-      return;
-
-    } else {
-
-      mutex.lock ();
-      
-      if (hasState (ContextState::COMMIT_DONE) || hasState (ContextState::COMMITTING)) {
-        mutex.unlock ();
-        return;
-      }
-
-      assert (hasState (ContextState::READY_TO_COMMIT));
-      
-      setState (ContextState::COMMITTING);
-
-      dbg::debug (this, " committing with item ", this->active);
-      for (NItem* n: nhood) {
-        n->removeCommit (this);
-      }
-
-      setState (ContextState::COMMIT_DONE);
-
-      mutex.unlock ();
-
+    dbg::debug (this, " committing with item ", this->active);
+    for (NItem* n: nhood) {
+      n->removeCommit (this);
     }
 
+    setState (ContextState::COMMIT_DONE);
   }
 
   void doAbort (bool addBack=true) {
@@ -358,20 +337,8 @@ struct OptimContext: public SimpleRuntimeContext {
     // first abort all the children recursively
     // then abort self.
     //
-    if (hasState (ContextState::ABORT_DONE) || hasState (ContextState::ABORTING)) {
-      return;
-    }
 
-    mutex.lock ();
-
-    if (hasState (ContextState::ABORT_DONE) || hasState (ContextState::ABORTING)) { 
-      mutex.unlock ();
-      return;
-    }
-
-    assert (hasState (ContextState::READY_TO_ABORT));
-
-    setState (ContextState::ABORTING);
+    assert (hasState (ContextState::ABORTING));
 
 
     for (OptimContext* child: children) {
@@ -384,7 +351,7 @@ struct OptimContext: public SimpleRuntimeContext {
         || child->hasState (ContextState::ABORT_DONE);
       assert (c);
 
-      if (child->casState (ContextState::READY_TO_COMMIT, ContextState::READY_TO_ABORT)) {
+      if (child->casState (ContextState::READY_TO_COMMIT, ContextState::ABORTING)) {
 
         dbg::debug (this, " aborting child ", child);
         child->doAbort (false);
@@ -409,7 +376,6 @@ struct OptimContext: public SimpleRuntimeContext {
       exec.push_abort (this);
     }
 
-    mutex.unlock ();
 
   }
 
@@ -523,7 +489,7 @@ public:
       bool didWork = false;
 
 
-      for (unsigned num_scheduled = 0; (num_scheduled < commit_interval) && !pendingQ.get ().empty () && !startGVT; ++num_scheduled, ++totalIter) {
+      for (unsigned num_scheduled = 0; (num_scheduled < commit_interval) && !pendingQ.get ().empty (); ++num_scheduled, ++totalIter) {
 
         Ctxt* ctxt = schedule ();
 
@@ -536,7 +502,7 @@ public:
 
           if (!ctxt->casState (ContextState::SCHEDULED, ContextState::READY_TO_COMMIT)) {
 
-            if (ctxt->casState (ContextState::ABORT_SELF, ContextState::READY_TO_ABORT)) {
+            if (ctxt->casState (ContextState::ABORT_SELF, ContextState::ABORTING)) {
 
               // dbg::debug (ctxt, " Shouldn't reach here with ABORT_SELF");
               ctxt->doAbort ();
@@ -584,7 +550,7 @@ public:
 
 
 
-    dbg::debug ("OptimOrdExecutor: totalIter=%zd, totalCommits=%zd\n", totalIter, totalCommits);
+    dbg::debug ("OptimOrdExecutor: totalIter= ", totalIter, " totalCommits= ", totalCommits);
   }
 
   void operator () (void) {
@@ -704,14 +670,19 @@ private:
 
       gvtBarrier ();
 
+      dbg::debug ("end reportGVT");
       Substrate::asmPause ();
 
       gvtBarrier ();
+
       if (!finish) {
-        assert (!bool (startGVT));
+
+        // if (startGVT) {
+          // dbg::debug ("ERROR: startGVT found to be true");
+        // }
+        // assert (!bool (startGVT));
       }
 
-      dbg::debug ("end reportGVT");
     }
   }
 
@@ -748,7 +719,10 @@ private:
         assert (ctxtCmp (c, gfront));
 
         
-       bool check = (c->hasState (ContextState::READY_TO_COMMIT) || c->hasState (ContextState::COMMIT_DONE));
+       bool check = (c->hasState (ContextState::READY_TO_COMMIT) 
+           || c->hasState (ContextState::COMMITTING)
+           || c->hasState (ContextState::COMMIT_DONE));
+
        if (!check) {
          dbg::debug (c, " found with unexpected state: ", ContextStateNames [int (c->getState ())]);
          assert (check);
@@ -757,7 +731,7 @@ private:
 
       assert (!c->isRunning ());
 
-      if (c->hasState (ContextState::READY_TO_COMMIT)) {
+      if (c->casState (ContextState::READY_TO_COMMIT, ContextState::COMMITTING)) {
         c->doCommit ();
         ++numCommitted;
       } 
