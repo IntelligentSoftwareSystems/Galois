@@ -34,8 +34,7 @@
 namespace {
 
 void assertAllMatched(GNode node, GGraph* graph) {
-  for (auto jj = graph->edge_begin(node), eejj = graph->edge_end(node);
-       jj != eejj; ++jj)
+  for (auto jj : graph->edges(node))
     assert(node == graph->getEdgeDst(jj) || graph->getData(graph->getEdgeDst(jj)).isMatched());
 }
 
@@ -49,8 +48,7 @@ struct HEMmatch {
     GNode retval = node; // match self if nothing else
     int maxwgt = std::numeric_limits<int>::min();
     //    nume += std::distance(graph->edge_begin(node), graph->edge_end(node));
-    for (auto jj = graph->edge_begin(node, Galois::MethodFlag::UNPROTECTED), eejj = graph->edge_end(node);
-         jj != eejj; ++jj) {
+    for (auto jj : graph->edges(node, Galois::MethodFlag::UNPROTECTED)) {
       //      ++checked;
       GNode neighbor = graph->getEdgeDst(jj);
       MetisNode& neighMNode = graph->getData(neighbor, Galois::MethodFlag::UNPROTECTED);
@@ -70,8 +68,7 @@ struct HEMmatch {
 
 struct RMmatch {
   GNode operator()(GNode node, GGraph* graph) {
-    for (auto jj = graph->edge_begin(node, Galois::MethodFlag::UNPROTECTED), eejj = graph->edge_end(node);
-         jj != eejj; ++jj) {
+    for (auto jj : graph->edges(node, Galois::MethodFlag::UNPROTECTED)) {
       GNode neighbor = graph->getEdgeDst(jj);
       if (!graph->getData(neighbor, Galois::MethodFlag::UNPROTECTED).isMatched() && neighbor != node)
         return neighbor;
@@ -89,8 +86,7 @@ struct TwoHopMatcher {
   MatchingPolicy matcher;
   GNode operator()(GNode node, GGraph* graph) {
     std::pair<GNode, int> retval(node, std::numeric_limits<int>::min());
-    for (auto jj = graph->edge_begin(node, Galois::MethodFlag::UNPROTECTED), eejj = graph->edge_end(node);
-         jj != eejj; ++jj) {
+    for (auto jj : graph->edges(node, Galois::MethodFlag::UNPROTECTED)) {
       GNode neighbor = graph->getEdgeDst(jj);
       std::pair<GNode, int> tval = matcher(neighbor, graph, true);
       if (tval.first != node && tval.first != neighbor && tval.second > retval.second)
@@ -208,7 +204,7 @@ struct parallelPopulateEdges {
     GD edges(GD::allocator_type(lwl.getPerIterAlloc()));
 
     for (unsigned x = 0; x < nodeData.numChildren(); ++x)
-      for (auto ii = fineGGraph->edge_begin(nodeData.getChild(x), Galois::MethodFlag::UNPROTECTED), ee = fineGGraph->edge_end(nodeData.getChild(x)); ii != ee; ++ii) {
+      for (auto ii : fineGGraph->edges(nodeData.getChild(x), Galois::MethodFlag::UNPROTECTED)) {
         GNode dst = fineGGraph->getEdgeDst(ii);
         GNode p = fineGGraph->getData(dst, Galois::MethodFlag::UNPROTECTED).getParent();
         edges.emplace_back(p, fineGGraph->getEdgeData(ii, Galois::MethodFlag::UNPROTECTED));

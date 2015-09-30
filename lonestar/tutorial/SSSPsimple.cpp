@@ -68,8 +68,7 @@ struct SSSP {
     if (req.first > data) return;
    
     //![loop over neighbors] 
-    for (Graph::edge_iterator ii = graph.edge_begin(active_node),
-           ee = graph.edge_end(active_node); ii != ee; ++ii)
+    for (auto ii : graph.edges(active_node))
       relax_edge(data, ii, ctx);
     //![loop over neighbors] 
   }

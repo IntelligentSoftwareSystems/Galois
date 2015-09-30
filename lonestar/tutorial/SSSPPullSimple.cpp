@@ -54,16 +54,14 @@ struct SSSP {
     unsigned newValue = data;
 
     //![loop over neighbors to compute new value] 
-    for (Graph::edge_iterator ii = graph.edge_begin(active_node),
-           ee = graph.edge_end(active_node); ii != ee; ++ii) {
+    for (auto ii : graph.edges(active_node)) {
       GNode dst = graph.getEdgeDst(ii);
       newValue = std::min(newValue, graph.getData(dst) + graph.getEdgeData(ii));
     }
     //![set new value and add neighbors to wotklist
     if (newValue < data) {
       data = newValue;
-      for (Graph::edge_iterator ii = graph.edge_begin(active_node),
-	     ee = graph.edge_end(active_node); ii != ee; ++ii) {
+      for (auto ii : graph.edges(active_node)) {
 	GNode dst = graph.getEdgeDst(ii);
 	if (graph.getData(dst) > newValue)
 	  ctx.push(std::make_pair(newValue, dst));
@@ -106,7 +104,8 @@ int main(int argc, char **argv) {
   graph.getData(*graph.begin()) = 0;
   //! [for_each in SSSPPullsimple]
   std::vector<UpdateRequest> init;
-  for (auto ii = graph.edge_begin(*graph.begin()), ee = graph.edge_end(*graph.begin()); ii != ee; ++ii) 
+  init.reserve(std::distance(graph.edge_begin(*graph.begin()), graph.edge_end(*graph.begin())));
+  for (auto ii : graph.edges(*graph.begin()))
     init.push_back(std::make_pair(0, graph.getEdgeDst(ii)));
 
   Galois::for_each(init.begin(), init.end(), SSSP(), Galois::wl<OBIM>(), Galois::loopname("sssp_run_loop"));

@@ -140,7 +140,7 @@ struct parallelInitMorphGraph {
   GGraph &graph;
   parallelInitMorphGraph(GGraph &g):graph(g) {  }
   void operator()(GNode node) const {
-    for(GGraph::edge_iterator jj = graph.edge_begin(node),kk=graph.edge_end(node);jj!=kk;jj++) {
+    for (auto jj : graph.edges(node)) {
       graph.getEdgeData(jj)=1;
       // weight+=1;
     }
@@ -179,8 +179,7 @@ struct OrderGraph {
     typedef std::vector<std::pair<unsigned,GNode>, Galois::PerIterAllocTy::rebind<std::pair<unsigned,GNode> >::other> GD;
     //copy and translate all edges
     GD orderedNodes(GD::allocator_type(lwl.getPerIterAlloc()));
-    for (auto nb = graph.begin(), ne = graph.end(); nb != ne; nb++) { 
-      GNode n = *nb; 
+    for (auto n : graph) {
       auto &nd = graph.getData(n,flag); 
       if (static_cast<int>(nd.getPart()) == part) {
         int edges = std::distance(graph.edge_begin(n,flag), graph.edge_end(n,flag));
@@ -192,8 +191,8 @@ struct OrderGraph {
     std::map<GNode, uint64_t> &threadMap(*threadDegInfo.getLocal());
     for (auto p : orderedNodes) {
       GNode n = p.second;
-      threadMap[n] += index; 
-      for (auto eb = graph.edge_begin(n,flag), ee = graph.edge_end(n,flag); eb != ee; eb++) {
+      threadMap[n] += index;
+      for (auto eb : graph.edges(n, flag)) {
         GNode neigh = graph.getEdgeDst(eb);
         auto &nd = graph.getData(neigh,flag);
         if (static_cast<int>(nd.getPart()) == part) { 

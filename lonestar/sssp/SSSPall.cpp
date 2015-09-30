@@ -80,8 +80,7 @@ struct process {
       if (__sync_bool_compare_and_swap(&data.dist[req.c], v, req.w)) {
 	// if (v != DIST_INFINITY)
 	//   *BadWork += 1;
-	for (Graph::edge_iterator ii = graph.edge_begin(req.n, Galois::MethodFlag::UNPROTECTED),
-	       ee = graph.edge_end(req.n, Galois::MethodFlag::UNPROTECTED); ii != ee; ++ii) {
+        for (auto ii : graph.edges(req.n, Galois::MethodFlag::UNPROTECTED)) {
 	  GNode dst = graph.getEdgeDst(ii);
 	  int d = graph.getEdgeData(ii);
 	  unsigned int newDist = req.w + d;

@@ -144,6 +144,8 @@ class DEStwoPhase:
     Graph& graph;
     VecSobjInfo& sobjInfoVec;
 
+    static const int CHUNK_SIZE = 64;
+
     NhoodVisitor (Graph& graph, VecSobjInfo& sobjInfoVec)
       : graph (graph), sobjInfoVec (sobjInfoVec) 
     {}

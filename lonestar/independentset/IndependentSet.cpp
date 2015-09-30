@@ -29,6 +29,7 @@
 #include "Galois/ParallelSTL.h"
 #include "llvm/Support/CommandLine.h"
 
+
 #include "Lonestar/BoilerPlate.h"
 
 #include <utility>
@@ -92,8 +93,7 @@ struct SerialAlgo {
     if (me.flag != UNMATCHED)
       return false;
 
-    for (Graph::edge_iterator ii = graph.edge_begin(src),
-        ei = graph.edge_end(src); ii != ei; ++ii) {
+    for (auto ii : graph.edges(src)) {
       GNode dst = graph.getEdgeDst(ii);
       Node& data = graph.getData(dst);
       if (data.flag == MATCHED)
@@ -105,8 +105,7 @@ struct SerialAlgo {
 
   void match(Graph& graph, GNode src) {
     Node& me = graph.getData(src);
-    for (Graph::edge_iterator ii = graph.edge_begin(src),
-        ei = graph.edge_end(src); ii != ei; ++ii) {
+    for (auto ii : graph.edges(src)) {
       GNode dst = graph.getEdgeDst(ii);
       Node& data = graph.getData(dst);
       data.flag = OTHER_MATCHED;
@@ -152,8 +151,7 @@ struct Process {
     if (me.flag != UNMATCHED)
       return false;
 
-    for (typename Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED),
-        ei = graph.edge_end(src, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
+    for (auto ii : graph.edges(src, Galois::MethodFlag::UNPROTECTED)) {
       GNode dst = graph.getEdgeDst(ii);
       Node& data = graph.getData(dst, Flag);
       if (data.flag == MATCHED)
@@ -165,8 +163,7 @@ struct Process {
 
   void modify(GNode src) {
     Node& me = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
-    for (typename Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED),
-        ei = graph.edge_end(src, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
+    for (auto ii : graph.edges(src, Galois::MethodFlag::UNPROTECTED)) {
       GNode dst = graph.getEdgeDst(ii);
       Node& data = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
       data.flag = OTHER_MATCHED;
@@ -251,7 +248,7 @@ struct DefaultAlgo {
     typedef Galois::WorkList::Deterministic<> DWL;
 
 #ifdef GALOIS_USE_EXP
-    typedef Galois::WorkList::BulkSynchronousInline<> WL;
+    typedef Galois::WorkList::BulkSynchronous<> WL;
 #else
     typedef Galois::WorkList::dChunkedFIFO<256> WL;
 #endif
@@ -412,8 +409,7 @@ struct is_bad {
   bool operator()(GNode n) const {
     Node& me = graph.getData(n);
     if (me.flag == MATCHED) {
-      for (typename Graph::edge_iterator ii = graph.edge_begin(n),
-          ei = graph.edge_end(n); ii != ei; ++ii) {
+      for (auto ii : graph.edges(n)) {
         GNode dst = graph.getEdgeDst(ii);
         Node& data = graph.getData(dst);
         if (dst != n && data.flag == MATCHED) {
@@ -423,8 +419,7 @@ struct is_bad {
       }
     } else if (me.flag == UNMATCHED) {
       bool ok = false;
-      for (typename Graph::edge_iterator ii = graph.edge_begin(n),
-          ei = graph.edge_end(n); ii != ei; ++ii) {
+      for (auto ii : graph.edges(n)) {
         GNode dst = graph.getEdgeDst(ii);
         Node& data = graph.getData(dst);
         if (data.flag != UNMATCHED) {

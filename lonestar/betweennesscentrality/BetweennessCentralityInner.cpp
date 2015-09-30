@@ -148,8 +148,7 @@ struct AsyncAlgo {
       if (newDist > g.getData(n).dist + 1)
         return;
       
-      for (Graph::edge_iterator ii = g.edge_begin(n, Galois::MethodFlag::UNPROTECTED),
-            ei = g.edge_end(n, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
+      for (auto ii : g.edges(n, Galois::MethodFlag::UNPROTECTED)) {
         GNode dst = g.getEdgeDst(ii);
         SNode& ddata = g.getData(dst, Galois::MethodFlag::UNPROTECTED);
 
@@ -237,8 +236,7 @@ struct AsyncAlgo {
       while (sdata.dependencies == -std::numeric_limits<float>::max()) {
         float newDep = 0.0;
         bool allready = true;
-        for (Graph::edge_iterator ii = g.edge_begin(n, Galois::MethodFlag::UNPROTECTED),
-               ei = g.edge_end(n, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
+        for (auto ii : g.edges(n, Galois::MethodFlag::UNPROTECTED)) {
           GNode dst = g.getEdgeDst(ii);
           SNode& ddata = g.getData(dst, Galois::MethodFlag::UNPROTECTED);
           if (ddata.dist == sdata.dist + 1) {
@@ -330,8 +328,7 @@ struct LeveledAlgo {
 
     void operator()(GNode& n) const {
       auto& sdata = g.getData(n, Galois::MethodFlag::UNPROTECTED);
-      for (Graph::edge_iterator ii = g.edge_begin(n, Galois::MethodFlag::UNPROTECTED),
-             ei = g.edge_end(n, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
+      for (auto ii : g.edges(n, Galois::MethodFlag::UNPROTECTED)) {
         GNode dst = g.getEdgeDst(ii);
         SNode& ddata = g.getData(dst, Galois::MethodFlag::UNPROTECTED);
         if (ddata.dist.load(std::memory_order_relaxed) == std::numeric_limits<int>::max()) {
@@ -382,8 +379,7 @@ struct LeveledAlgo {
 
     void operator()(GNode& n) const {
       SNode& sdata = g.getData(n, Galois::MethodFlag::UNPROTECTED);
-      for (Graph::edge_iterator ii = g.edge_begin(n, Galois::MethodFlag::UNPROTECTED),
-             ei = g.edge_end(n, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
+      for (auto ii : g.edges(n, Galois::MethodFlag::UNPROTECTED)) {
         GNode dst = g.getEdgeDst(ii);
         SNode& ddata = g.getData(dst, Galois::MethodFlag::UNPROTECTED);
         if (ddata.dist == sdata.dist + 1)

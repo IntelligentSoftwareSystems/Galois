@@ -307,7 +307,7 @@ struct ParallelAlgo {
 struct is_bad_graph {
   bool operator()(const GNode& n) const {
     Node& me = graph.getData(n);
-    for (Graph::edge_iterator ii = graph.edge_begin(n), ei = graph.edge_end(n); ii != ei; ++ii) {
+    for (auto ii : graph.edges(n)) {
       GNode dst = graph.getEdgeDst(ii);
       Node& data = graph.getData(dst);
       if (me.findAndCompress() != data.findAndCompress()) {

@@ -160,7 +160,7 @@ struct MarkReachable {
       if (g.getData(cur).reachable)
         continue;
       g.getData(cur).reachable = true;
-      for (edge_iterator ii = g.edge_begin(cur), ei = g.edge_end(cur); ii != ei; ++ii) {
+      for (auto ii : g.edges(cur)) {
         GraphNode dst = g.getEdgeDst(ii);
         queue.push_back(dst);
       }
@@ -180,11 +180,11 @@ struct PrepareForVerifier {
   void operator()(G& g, Matching* matching) {
     Exists<G,Algo> exists;
 
-    for (typename NodeList::iterator src = g.B.begin(), esrc = g.B.end(); src != esrc; ++src) {
-      for (edge_iterator ii = g.edge_begin(*src), ei = g.edge_end(*src); ii != ei; ++ii) {
+    for (auto src : g.B) {
+      for (auto ii : g.edges(src)) {
         GraphNode dst = g.getEdgeDst(ii);
         if (exists(g, ii)) {
-          matching->push_back(Edge(*src, dst));
+          matching->push_back(Edge(src, dst));
         }
       }
     }
@@ -292,7 +292,7 @@ struct MatchingFF {
       GraphNode src = queue.front();
       queue.pop_front();
 
-      for (edge_iterator ii = g.edge_begin(src, flag), ei = g.edge_end(src, flag); ii != ei; ++ii) {
+      for (auto ii : g.edges(src, flag)) {
         GraphNode dst = g.getEdgeDst(ii);
         node_data_type& ddst = g.getData(dst, Galois::MethodFlag::UNPROTECTED);
         if (ddst.reached)
@@ -316,7 +316,7 @@ struct MatchingFF {
           return true;
         } else {
           assert(std::distance(g.edge_begin(dst), g.edge_end(dst)) == 1);
-          for (edge_iterator jj = g.edge_begin(dst, flag), ej = g.edge_end(dst, flag); jj != ej; ++jj) {
+          for (auto jj : g.edges(dst, flag)) {
             GraphNode cur = g.getEdgeDst(jj);
 
             g.getData(cur, Galois::MethodFlag::UNPROTECTED).pred = preds.size();
@@ -670,9 +670,10 @@ struct MatchingMF {
     while (true) {
       Galois::MethodFlag f = relabeled ? Galois::MethodFlag::UNPROTECTED : flag;
       bool finished = false;
-      int current = 0;
+      int current = -1;
 
-      for (edge_iterator ii = g.edge_begin(src, f), ei = g.edge_end(src, f); ii != ei; ++ii, ++current) {
+      for (auto ii : g.edges(src, f)) {
+        ++current;
         GraphNode dst = g.getEdgeDst(ii);
         edge_data_type& edge = g.getEdgeData(ii);
         if (edge.cap == 0 || current < node.current) 
@@ -716,8 +717,9 @@ struct MatchingMF {
     unsigned minHeight = std::numeric_limits<unsigned>::max();
     int minEdge;
 
-    int current = 0;
-    for (edge_iterator ii = g.edge_begin(src, Galois::MethodFlag::UNPROTECTED), ei = g.edge_end(src, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii, ++current) {
+    int current = -1;
+    for (auto ii : g.edges(src, Galois::MethodFlag::UNPROTECTED)) {
+      ++current;
       GraphNode dst = g.getEdgeDst(ii);
       int cap = g.getEdgeData(ii).cap;
       if (cap > 0) {
@@ -781,10 +783,7 @@ struct MatchingMF {
     UpdateHeights(G& _g): g(_g) { }
     //! Do reverse BFS on residual graph.
     void operator()(const GraphNode& src, Galois::UserContext<GraphNode>& ctx) {
-      for (edge_iterator
-          ii = g.edge_begin(src, useCAS ? Galois::MethodFlag::UNPROTECTED : flag),
-          ei = g.edge_end(src, useCAS ? Galois::MethodFlag::UNPROTECTED : flag);
-          ii != ei; ++ii) {
+      for (auto ii : g.edges(src, useCAS ? Galois::MethodFlag::UNPROTECTED : flag)) {
         GraphNode dst = g.getEdgeDst(ii);
         if (g.getEdgeData(g.findEdge(dst, src, Galois::MethodFlag::UNPROTECTED)).cap > 0) {
           node_data_type& node = g.getData(dst, Galois::MethodFlag::UNPROTECTED);
@@ -836,7 +835,7 @@ struct MatchingMF {
   }
 
   void initializePreflow(G& g, const GraphNode& source, std::vector<GraphNode>& initial) {
-    for (edge_iterator ii = g.edge_begin(source), ei = g.edge_end(source); ii != ei; ++ii) {
+    for (auto ii : g.edges(source)) {
       GraphNode dst = g.getEdgeDst(ii);
       edge_data_type& edge = g.getEdgeData(ii);
       int cap = edge.cap;
@@ -860,11 +859,10 @@ struct MatchingMF {
     g.addNode(sink);
 
     // Add reverse edge
-    for (typename NodeList::iterator src = g.A.begin(), esrc = g.A.end(); src != esrc; ++src) {
-      for (edge_iterator ii = g.edge_begin(*src), ei = g.edge_end(*src);
-          ii != ei; ++ii) {
+    for (auto src : g.A) {
+      for (auto ii : g.edges(src)) {
         GraphNode dst = g.getEdgeDst(ii);
-        g.getEdgeData(g.addMultiEdge(dst, *src, Galois::MethodFlag::WRITE)) = edge_data_type(0);
+        g.getEdgeData(g.addMultiEdge(dst, src, Galois::MethodFlag::WRITE)) = edge_data_type(0);
         ++numEdges;
       }
     }
@@ -888,11 +886,11 @@ struct MatchingMF {
 
   //! Extract matching from saturated edges
   void extractMatching(G& g) {
-    for (typename NodeList::iterator src = g.A.begin(), esrc = g.A.end(); src != esrc; ++src) {
-      for (edge_iterator ii = g.edge_begin(*src), ei = g.edge_end(*src); ii != ei; ++ii) {
+    for (auto src : g.A) {
+      for (auto ii : g.edges(src)) {
         GraphNode dst = g.getEdgeDst(ii);
         if (g.getEdgeData(ii).cap == 0) {
-          g.getData(*src).free = g.getData(dst).free = false;
+          g.getData(src).free = g.getData(dst).free = false;
         }
       }
     }
@@ -961,7 +959,7 @@ struct Verifier {
   typedef typename GraphTypes<G>::Matching Matching;
 
   bool hasCoveredNeighbors(G& g, const GraphNode& src) {
-    for (edge_iterator ii = g.edge_begin(src), ei = g.edge_end(src); ii != ei; ++ii) {
+    for (auto ii : g.edges(src)) {
       GraphNode dst = g.getEdgeDst(ii);
       if (!g.getData(dst).covered)
         return false;

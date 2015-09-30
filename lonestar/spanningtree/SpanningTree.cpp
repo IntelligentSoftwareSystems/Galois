@@ -91,8 +91,7 @@ struct DemoAlgo {
   Node* root;
 
   void operator()(GNode src, Galois::UserContext<GNode>& ctx) {
-    for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::WRITE),
-	   ei = graph.edge_end(src, Galois::MethodFlag::WRITE); ii != ei; ++ii) {
+    for (auto ii : graph.edges(src, Galois::MethodFlag::WRITE)) {
       GNode dst = graph.getEdgeDst(ii);
       Node& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
       if (ddata.component() == root)
@@ -122,8 +121,7 @@ struct AsyncAlgo {
 
     void operator()(const GNode& src) const {
       Node& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
-      for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED),
-          ei = graph.edge_end(src, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
+      for (auto ii : graph.edges(src, Galois::MethodFlag::UNPROTECTED)) {
         GNode dst = graph.getEdgeDst(ii);
         Node& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
         if (sdata.merge(&ddata)) {
@@ -169,10 +167,9 @@ struct BlockedAsyncAlgo {
     template<bool MakeContinuation, int Limit, typename Pusher>
     void process(const GNode& src, const Graph::edge_iterator& start, Pusher& pusher) const {
       Node& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
-      int count = 1;
-      for (Graph::edge_iterator ii = start, ei = graph.edge_end(src, Galois::MethodFlag::UNPROTECTED);
-          ii != ei; 
-          ++ii, ++count) {
+      int count = 0;
+      for (auto ii : graph.edges(src, Galois::MethodFlag::UNPROTECTED)) {
+        ++count;
         GNode dst = graph.getEdgeDst(ii);
         Node& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
         if (sdata.merge(&ddata)) {
@@ -224,7 +221,7 @@ struct BlockedAsyncAlgo {
 struct is_bad_graph {
   bool operator()(const GNode& n) const {
     Node& me = graph.getData(n);
-    for (Graph::edge_iterator ii = graph.edge_begin(n), ei = graph.edge_end(n); ii != ei; ++ii) {
+    for (auto ii : graph.edges(n)) {
       GNode dst = graph.getEdgeDst(ii);
       Node& data = graph.getData(dst);
       if (me.component() != data.component()) {

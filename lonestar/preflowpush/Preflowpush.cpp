@@ -152,8 +152,7 @@ void checkAugmentingPath() {
   while (!queue.empty()) {
     GNode& src = queue.front();
     queue.pop_front();
-    for (Graph::edge_iterator ii = app.graph.edge_begin(src),
-        ee = app.graph.edge_end(src); ii != ee; ++ii) {
+    for (auto ii : app.graph.edges(src)) {
       GNode dst = app.graph.getEdgeDst(ii);
       if (app.graph.getData(dst).id == 0
           && app.graph.getEdgeData(ii) > 0) {
@@ -174,8 +173,7 @@ void checkHeights() {
       ei = app.graph.end(); ii != ei; ++ii) {
     GNode src = *ii;
     int sh = app.graph.getData(src).height;
-    for (Graph::edge_iterator jj = app.graph.edge_begin(src),
-        ej = app.graph.edge_end(src); jj != ej; ++jj) {
+    for (auto jj : app.graph.edges(src)) {
       GNode dst = app.graph.getEdgeDst(jj);
       int64_t cap = app.graph.getEdgeData(jj);
       int dh = app.graph.getData(dst).height;
@@ -316,8 +314,7 @@ void checkConservation(Config& orig) {
     }
 
     int64_t sum = 0;
-    for (Graph::edge_iterator jj = app.graph.edge_begin(src),
-        ej = app.graph.edge_end(src); jj != ej; ++jj) {
+    for (auto jj : app.graph.edges(src)) {
       GNode dst = app.graph.getEdgeDst(jj);
       uint32_t dstId = app.graph.getData(dst).id;
       int64_t ocap = orig.graph.getEdgeData(findEdge(orig.graph, map[srcId], map[dstId]));
@@ -375,10 +372,7 @@ struct UpdateHeights {
     if (version != nondet) {
 
       if (ctx.isFirstPass()) {
-        for (Graph::edge_iterator
-            ii = app.graph.edge_begin(src, Galois::MethodFlag::WRITE),
-            ee = app.graph.edge_end(src, Galois::MethodFlag::WRITE);
-            ii != ee; ++ii) {
+        for (auto ii : app.graph.edges(src, Galois::MethodFlag::WRITE)) {
           GNode dst = app.graph.getEdgeDst(ii);
           int64_t rdata = app.graph.getEdgeData(findEdge(app.graph, dst, src));
           if (rdata > 0) {
@@ -395,10 +389,7 @@ struct UpdateHeights {
       }
     }
 
-    for (Graph::edge_iterator
-        ii = app.graph.edge_begin(src, useCAS ? Galois::MethodFlag::UNPROTECTED : Galois::MethodFlag::WRITE),
-        ee = app.graph.edge_end(src, useCAS ? Galois::MethodFlag::UNPROTECTED : Galois::MethodFlag::WRITE);
-        ii != ee; ++ii) {
+    for (auto ii : app.graph.edges(src, useCAS ? Galois::MethodFlag::UNPROTECTED : Galois::MethodFlag::WRITE)) {
       GNode dst = app.graph.getEdgeDst(ii);
       int64_t rdata = app.graph.getEdgeData(findEdge(app.graph, dst, src));
       if (rdata > 0) {
@@ -462,7 +453,7 @@ void globalRelabel(IncomingWL& incoming) {
   switch (detAlgo) {
     case nondet:
 #ifdef GALOIS_USE_EXP
-      Galois::for_each(app.sink, UpdateHeights<nondet>(), Galois::loopname("UpdateHeights"), Galois::wl<Galois::WorkList::BulkSynchronousInline<>>());
+      Galois::for_each(app.sink, UpdateHeights<nondet>(), Galois::loopname("UpdateHeights"), Galois::wl<Galois::WorkList::BulkSynchronous<>>());
 #else
       Galois::for_each(app.sink, UpdateHeights<nondet>(), Galois::loopname("UpdateHeights"));
 #endif
@@ -489,10 +480,7 @@ void globalRelabel(IncomingWL& incoming) {
 
 void acquire(const GNode& src) {
   // LC Graphs have a different idea of locking
-  for (Graph::edge_iterator 
-      ii = app.graph.edge_begin(src, Galois::MethodFlag::WRITE),
-      ee = app.graph.edge_end(src, Galois::MethodFlag::WRITE);
-      ii != ee; ++ii) {
+  for (auto ii : app.graph.edges(src, Galois::MethodFlag::WRITE)) {
     GNode dst = app.graph.getEdgeDst(ii);
     app.graph.getData(dst, Galois::MethodFlag::WRITE);
   }
@@ -503,10 +491,7 @@ void relabel(const GNode& src) {
   int minEdge = 0;
 
   int current = 0;
-  for (Graph::edge_iterator 
-      ii = app.graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED),
-      ee = app.graph.edge_end(src, Galois::MethodFlag::UNPROTECTED);
-      ii != ee; ++ii, ++current) {
+  for (auto ii : app.graph.edges(src, Galois::MethodFlag::UNPROTECTED)) {
     GNode dst = app.graph.getEdgeDst(ii);
     int64_t cap = app.graph.getEdgeData(ii);
     if (cap > 0) {
@@ -516,6 +501,7 @@ void relabel(const GNode& src) {
         minEdge = current;
       }
     }
+    ++current;
   }
 
   assert(minHeight != std::numeric_limits<int>::max());
@@ -705,8 +691,7 @@ void writePfpGraph(const std::string& inputFile, const std::string& outputFile) 
   size_t numEdges = 0;
   for (ReaderGraph::iterator ii = reader.begin(), ei = reader.end(); ii != ei; ++ii) {
     ReaderGNode rsrc = *ii;
-    for (ReaderGraph::edge_iterator jj = reader.edge_begin(rsrc),
-        ej = reader.edge_end(rsrc); jj != ej; ++jj) {
+    for (auto jj : reader.edges(rsrc)) {
       ReaderGNode rdst = reader.getEdgeDst(jj);
       if (rsrc == rdst) continue;
       if (!reader.hasNeighbor(rdst, rsrc)) 
@@ -722,8 +707,7 @@ void writePfpGraph(const std::string& inputFile, const std::string& outputFile) 
   p.phase1();
   for (ReaderGraph::iterator ii = reader.begin(), ei = reader.end(); ii != ei; ++ii) {
     ReaderGNode rsrc = *ii;
-    for (ReaderGraph::edge_iterator jj = reader.edge_begin(rsrc),
-        ej = reader.edge_end(rsrc); jj != ej; ++jj) {
+    for (auto jj : reader.edges(rsrc)) {
       ReaderGNode rdst = reader.getEdgeDst(jj);
       if (rsrc == rdst) continue;
       if (!reader.hasNeighbor(rdst, rsrc)) 
@@ -740,8 +724,7 @@ void writePfpGraph(const std::string& inputFile, const std::string& outputFile) 
   edgeData.create(numEdges);
   for (ReaderGraph::iterator ii = reader.begin(), ei = reader.end(); ii != ei; ++ii) {
     ReaderGNode rsrc = *ii;
-    for (ReaderGraph::edge_iterator jj = reader.edge_begin(rsrc),
-        ej = reader.edge_end(rsrc); jj != ej; ++jj) {
+    for (auto jj : reader.edges(rsrc)) {
       ReaderGNode rdst = reader.getEdgeDst(jj);
       if (rsrc == rdst) continue;
       if (!reader.hasNeighbor(rdst, rsrc)) 
@@ -772,10 +755,9 @@ void writePfpGraph(const std::string& inputFile, const std::string& outputFile) 
 void initializeGraph(std::string inputFile, uint32_t sourceId, uint32_t sinkId, Config *newApp) {
   if (useSymmetricDirectly) {
     Galois::Graph::readGraph(newApp->graph, inputFile);
-    for (Graph::iterator ss = newApp->graph.begin(), es = newApp->graph.end(); ss != es; ++ss) {
-      for (Graph::edge_iterator ii = newApp->graph.edge_begin(*ss), ei = newApp->graph.edge_end(*ss); ii != ei; ++ii)
+    for(auto ss : newApp->graph)
+      for (auto ii : newApp->graph.edges(ss))
         newApp->graph.getEdgeData(ii) = 1;
-    }
   } else {
     if (inputFile.find(".gr.pfp") != inputFile.size() - strlen(".gr.pfp")) {
       std::string pfpName = inputFile + ".pfp";
@@ -791,8 +773,8 @@ void initializeGraph(std::string inputFile, uint32_t sourceId, uint32_t sinkId, 
     // Assume that input edge data has already been converted instead
 #if 0//def HAVE_BIG_ENDIAN
     // Convert edge data to host ordering
-    for (Graph::iterator ss = newApp->graph.begin(), es = newApp->graph.end(); ss != es; ++ss) {
-      for (Graph::edge_iterator ii = newApp->graph.edge_begin(*ss), ei = newApp->graph.edge_end(*ss); ii != ei; ++ii) {
+    for (auto ss : newApp->graph) {
+      for (auto ii : newApp->graph.edges(ss)) {
         Graph::edge_data_type& cap = newApp->graph.getEdgeData(ii);
         static_assert(sizeof(cap) == sizeof(uint32_t), "Unexpected edge data size");
         cap = Galois::convert_le32toh(cap);
@@ -822,8 +804,7 @@ void initializeGraph(std::string inputFile, uint32_t sourceId, uint32_t sinkId, 
 
 template<typename C>
 void initializePreflow(C& initial) {
-  for (Graph::edge_iterator ii = app.graph.edge_begin(app.source),
-      ee = app.graph.edge_end(app.source); ii != ee; ++ii) {
+  for (auto ii : app.graph.edges(app.source)) {
     GNode dst = app.graph.getEdgeDst(ii);
     int64_t cap = app.graph.getEdgeData(ii);
     reduceCapacity(ii, app.source, dst, cap);
@@ -835,25 +816,17 @@ void initializePreflow(C& initial) {
 }
 
 void checkSorting (void) {
-
-  for (auto n = app.graph.begin (), end_n = app.graph.end (); n != end_n; ++n) {
+  for (auto n : app.graph) {
     Galois::optional<GNode> prevDst;
-
-    for (auto e = app.graph.edge_begin (*n, Galois::MethodFlag::UNPROTECTED)
-        , end_e = app.graph.edge_end (*n, Galois::MethodFlag::UNPROTECTED); e != end_e; ++e) {
-
+    for (auto e : app.graph.edges(n, Galois::MethodFlag::UNPROTECTED)) {
       GNode dst = app.graph.getEdgeDst (e);
-
       if (prevDst) {
         Node& prevNode = app.graph.getData (*prevDst, Galois::MethodFlag::UNPROTECTED);
         Node& currNode = app.graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
-
         GALOIS_ASSERT (prevNode.id < currNode.id, "Adjacency list unsorted");
       }
-
       prevDst = dst;
     }
-
   }
 }
 

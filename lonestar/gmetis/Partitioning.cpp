@@ -42,7 +42,7 @@ namespace {
 int gain_limited(GGraph& g, GNode n, unsigned newpart, Galois::MethodFlag flag) {
   int retval = 0;
   unsigned nPart = g.getData(n,flag).getPart();
-  for (auto ii = g.edge_begin(n,flag), ee =g.edge_end(n,flag); ii != ee; ++ii) {
+  for (auto ii : g.edges(n, flag)) {
     GNode neigh = g.getEdgeDst(ii);
     auto nData = g.getData(neigh,flag);
     if (nData.getPart() == nPart)
@@ -101,7 +101,7 @@ struct bisect_GGP {
         newWeight += g.getData(n, flag).getWeight();
         g.getData(n, flag).setPart(newPart.partNum);
         if(b) b->push_back(n);
-        for (auto ii = g.edge_begin(n, flag), ee = g.edge_end(n, flag); ii != ee; ++ii)
+        for (auto ii : g.edges(n, flag))
           if (g.getData(g.getEdgeDst(ii), flag).getPart() == oldPart.partNum)
             boundary.push_back(g.getEdgeDst(ii));
       }
@@ -142,7 +142,7 @@ struct bisect_GGGP {
         newWeight += g.getData(n, flag).getWeight();
         g.getData(n, flag).setPart(newPart.partNum);
         if(b) b->push_back(n);
-        for (auto ii = g.edge_begin(n, flag), ee = g.edge_end(n, flag); ii != ee; ++ii) {
+        for (auto ii : g.edges(n, flag)) {
           GNode dst = g.getEdgeDst(ii);
           auto gi = gains.find(dst);
           if (gi != gains.end()) { //update
@@ -166,9 +166,9 @@ struct bisect_GGGP {
 
 int computeEdgeCut(GGraph& g) {
   int cuts=0;
-  for (auto nn = g.begin(), en = g.end(); nn != en; ++nn) {
-    unsigned gPart = g.getData(*nn).getPart();
-    for (auto ii = g.edge_begin(*nn), ee = g.edge_end(*nn); ii != ee; ++ii) {
+  for (auto nn : g) {
+    unsigned gPart = g.getData(nn).getPart();
+    for (auto ii :g.edges(nn)) {
       auto& m = g.getData(g.getEdgeDst(ii));
       if (m.getPart() != gPart) {
         cuts += g.getEdgeData(ii);
@@ -181,7 +181,7 @@ int computeEdgeCut(GGraph& g) {
 int node_gain(GGraph &graph, GNode node) {
   auto nData = graph.getData(node,Galois::MethodFlag::UNPROTECTED); 
   int gain = 0;
-  for (auto ei = graph.edge_begin(node),ee=graph.edge_begin(node);ei!=ee;ei++) { 
+  for (auto ei : graph.edges(node)) {
     auto neigh = graph.getEdgeDst(ei); 
     int ew = graph.getEdgeData(ei); 
     auto neighData = graph.getData(neigh,Galois::MethodFlag::UNPROTECTED);
@@ -223,8 +223,7 @@ struct KLMatch {
       return;
     }
     
-    for (auto ei = graph.edge_begin(node,flag), 
-      ee = graph.edge_end(node,flag); ei != ee; ei++) {
+    for (auto ei : graph.edges(node, flag)) {
       int ew = graph.getEdgeData(ei,flag);
       GNode n = graph.getEdgeDst(ei);
       auto& nData = graph.getData(n,flag);
@@ -237,8 +236,7 @@ struct KLMatch {
         srcGain += ew;
       }
     }
-    for (auto ei = graph.edge_begin(node,flag), 
-      ee = graph.edge_end(node,flag); ei != ee; ei++) {
+    for (auto ei : graph.edges(node, flag)) {
       GNode n = graph.getEdgeDst(ei);
       auto nData = graph.getData(n,flag);
       int nw = graph.getEdgeData(ei,flag);
@@ -246,8 +244,7 @@ struct KLMatch {
       if (!isNodeOk(nData) || nData.getPart() == srcData.getPart()) {
         continue;
       }
-      for (auto nei = graph.edge_begin(n,flag),
-        nee = graph.edge_end(n,flag); nei != nee; nei++) {
+      for (auto nei : graph.edges(n, flag)) {
         int ew = graph.getEdgeData(nei,flag);
         GNode nn = graph.getEdgeDst(nei);
         auto nnData = graph.getData(nn,flag);
@@ -461,10 +458,9 @@ std::vector<partInfo> partition(MetisGraph* mcg, unsigned numPartitions, Initial
 namespace {
 int edgeCount(GGraph& g) {
   int count=0;
-  for (auto nn = g.begin(), en = g.end(); nn != en; ++nn) {
-    for (auto ii = g.edge_begin(*nn), ee = g.edge_end(*nn); ii != ee; ++ii)
-        count += g.getEdgeData(ii);
-  }
+  for (auto nn : g)
+    for (auto ii : g.edges(nn)) 
+      count += g.getEdgeData(ii);
   return count/2;
 }
 }
@@ -482,8 +478,8 @@ std::vector<partInfo> BisectAll(MetisGraph* mcg, unsigned numPartitions, unsigne
     std::vector<partInfo> partInfos(numPartitions);
     std::vector<std::map<int, std::set<GNode>>> boundary(numPartitions);
     std::map<int, std::set<int>> partitions;
-    for(GGraph::iterator ii = g.begin(),ee = g.end();ii!=ee;ii++)
-      g.getData(*ii).setPart(numPartitions+1);
+    for(auto ii : g) 
+      g.getData(ii).setPart(numPartitions+1);
     auto seedIter = g.begin();
     int k =0;
     //find one seed for each partition and do initialization 
@@ -496,7 +492,7 @@ std::vector<partInfo> BisectAll(MetisGraph* mcg, unsigned numPartitions, unsigne
 
       for(unsigned int j=0; j<i && k <50; j++){
         goodseed = goodseed && (*boundary[j][0].begin() != n);
-        for (auto ii = g.edge_begin(n, flag), ee = g.edge_end(n, flag); ii != ee; ++ii)
+        for (auto ii : g.edges(n, flag))
           goodseed = goodseed && (*boundary[j][0].begin() !=  g.getEdgeDst(ii));
       }
       if (!goodseed){
@@ -540,7 +536,7 @@ std::vector<partInfo> BisectAll(MetisGraph* mcg, unsigned numPartitions, unsigne
       partInfos[partToMod].partWeight += g.getData(n, flag).getWeight();
       partitions[partInfos[partToMod].partWeight].insert(partToMod);
       g.getData(n, flag).setPart(partToMod);
-      for (auto ii = g.edge_begin(n, flag), ee = g.edge_end(n, flag); ii != ee; ++ii) {
+      for (auto ii : g.edges(n, flag)) {
         GNode dst = g.getEdgeDst(ii);
         int newgain= gain_limited(g, dst, partToMod, flag);
         boundary[partToMod][newgain].insert(dst);

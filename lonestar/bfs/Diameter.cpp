@@ -336,7 +336,7 @@ struct PickKAlgo {
         }
 
         // Mark neighbors
-        for (Graph::edge_iterator nn = graph.edge_begin(n), en = graph.edge_end(n); nn != en; ++nn)
+        for (auto nn : graph.edges(n)) 
           graph.getData(graph.getEdgeDst(nn)).done = true;
       }
 

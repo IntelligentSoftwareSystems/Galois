@@ -151,8 +151,7 @@ struct SerialAlgo {
     void operator()(const GNode& src) const {
       Node& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
       
-      for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED),
-          ei = graph.edge_end(src, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
+      for (auto ii : graph.edges(src, Galois::MethodFlag::UNPROTECTED)) {
         GNode dst = graph.getEdgeDst(ii);
         Node& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
         sdata.merge(&ddata);
@@ -201,8 +200,7 @@ struct SynchronousAlgo {
 
     //! Add the first edge between components to the worklist
     void operator()(const GNode& src) const {
-      for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED),
-          ei = graph.edge_end(src, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
+      for (auto ii : graph.edges(src, Galois::MethodFlag::UNPROTECTED)) {
         GNode dst = graph.getEdgeDst(ii);
         if (symmetricGraph && src >= dst)
           continue;
@@ -396,8 +394,7 @@ struct AsyncOCAlgo {
     void operator()(GTy& graph, const GNode& src) const {
       Node& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
 
-      for (typename GTy::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED),
-          ei = graph.edge_end(src, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
+      for (auto ii : graph.edges(src, Galois::MethodFlag::UNPROTECTED)) {
         GNode dst = graph.getEdgeDst(ii);
         Node& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
 
@@ -447,8 +444,7 @@ struct AsyncAlgo {
     void operator()(const GNode& src) const {
       Node& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
 
-      for (Graph::edge_iterator ii = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED),
-          ei = graph.edge_end(src, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
+      for (auto ii : graph.edges(src, Galois::MethodFlag::UNPROTECTED)) {
         GNode dst = graph.getEdgeDst(ii);
         Node& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
 
@@ -552,7 +548,7 @@ struct is_bad {
     typedef typename Graph::node_data_reference node_data_reference;
 
     node_data_reference me = graph.getData(n);
-    for (typename Graph::edge_iterator ii = graph.edge_begin(n), ei = graph.edge_end(n); ii != ei; ++ii) {
+    for (auto ii : graph.edges(n)) {
       GNode dst = graph.getEdgeDst(ii);
       node_data_reference data = graph.getData(dst);
       if (data.component() != me.component()) {
@@ -655,15 +651,14 @@ void doWriteComponent(Graph& graph, typename Graph::node_data_type::component_ty
 
   if (largestComponentFilename != "") {
     p.phase2();
-    for (typename Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
-      node_data_reference data = graph.getData(*ii);
+    for (auto ii : graph) {
+      node_data_reference data = graph.getData(ii);
       if (data.component() != component)
         continue;
 
       size_t sid = data.id - 1;
 
-      for (typename Graph::edge_iterator jj = graph.edge_begin(*ii),
-          ej = graph.edge_end(*ii); jj != ej; ++jj) {
+      for (auto jj : graph.edges(ii)) {
         GNode dst = graph.getEdgeDst(jj);
         node_data_reference ddata = graph.getData(dst);
         size_t did = ddata.id - 1;

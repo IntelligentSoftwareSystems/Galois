@@ -122,7 +122,7 @@ struct SerialAlgo {
         GNode src = *ii;
         PNode& sdata = graph.getData(src);
         int neighbors = std::distance(graph.edge_begin(src), graph.edge_end(src));
-        for (auto jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj) {
+        for (auto jj : graph.edges(src)) {
           GNode dst = graph.getEdgeDst(jj);
           PNode& ddata = graph.getData(dst);
           float delta =  sdata.value / neighbors;
@@ -227,7 +227,7 @@ struct PullAlgo {
       LNode& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
       double sum = 0;
 
-      for (auto jj = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED), ej = graph.edge_end(src, Galois::MethodFlag::UNPROTECTED); jj != ej; ++jj) {
+      for (auto jj : graph.edges(src, Galois::MethodFlag::UNPROTECTED)) {
         GNode dst = graph.getEdgeDst(jj);
         float w = graph.getEdgeData(jj);
 
@@ -601,7 +601,7 @@ struct PrtRsd {
     void operator()(const GNode& src) {
       LNode& data = graph.getData(src);
       // for each out-going neighbour, add residuals
-      for (auto jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj){
+      for (auto jj : graph.edges(src)) {
         GNode dst = graph.getInEdgeDst(jj);
 	LNode& ddata = graph.getData(dst);
 	ddata.residual = (float) ddata.residual + (float) 1/data.nout;   
@@ -664,7 +664,7 @@ struct PrtRsd {
       unsigned nopush = 0;
 
       // update residual (consider each out-going edge)
-      for (auto jj = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED), ej = graph.edge_end(src, Galois::MethodFlag::UNPROTECTED); jj != ej; ++jj){
+      for (auto jj : graph.edges(src, Galois::MethodFlag::UNPROTECTED)) {
         GNode dst = graph.getEdgeDst(jj); 
         LNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
         float oldR = ddata.residual;
@@ -777,7 +777,7 @@ struct PrtDeg {
     void operator()(const GNode& src) {
       LNode& data = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
       // for each out-going neighbour, add residuals
-      for (auto jj = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED), ej = graph.edge_end(src, Galois::MethodFlag::UNPROTECTED); jj != ej; ++jj){
+      for (auto jj : graph.edges(src, Galois::MethodFlag::UNPROTECTED)) {
         GNode dst = graph.getInEdgeDst(jj);
 	LNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
 	ddata.residual = (float) ddata.residual + (float) 1/data.nout;   
@@ -837,7 +837,7 @@ struct PrtDeg {
       node->pagerank = alpha2*sum + (1-alpha2);
      
       // update residual (consider each out-going edge)
-      for (auto jj = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED), ej = graph.edge_end(src, Galois::MethodFlag::UNPROTECTED); jj != ej; ++jj){
+      for (auto jj : graph.edges(src, Galois::MethodFlag::UNPROTECTED)) {
         GNode dst = graph.getEdgeDst(jj); 
         LNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
         ddata.residual = (float) ddata.residual + (float) node->residual*alpha2/node->nout;
@@ -912,8 +912,7 @@ static void precomputePullData() {
     assert(sid < input.size());
 
     //size_t num_neighbors = std::distance(input.edge_begin(src), input.edge_end(src));
-
-    for (auto jj = input.edge_begin(src), ej = input.edge_end(src); jj != ej; ++jj) {
+    for (auto jj : input.edges(src)) {
       InputNode dst = input.getEdgeDst(jj);
       size_t did = input.getData(dst);
       assert(did < input.size());
@@ -934,7 +933,7 @@ static void precomputePullData() {
     size_t num_neighbors = std::distance(input.edge_begin(src), input.edge_end(src));
 
     float w = 1.0/num_neighbors;
-    for (auto jj = input.edge_begin(src), ej = input.edge_end(src); jj != ej; ++jj) {
+    for (auto jj : input.edges(src)) {
       InputNode dst = input.getEdgeDst(jj);
       size_t did = input.getData(dst);
       assert(did < input.size());
