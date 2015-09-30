@@ -379,7 +379,7 @@ private:
   typedef Galois::InsertBag<gNode> NodeListTy;
   NodeListTy nodes;
 
-  FirstGraphImpl::EdgeFactory<EdgeTy> edges;
+  FirstGraphImpl::EdgeFactory<EdgeTy> edgesF;
 
   //Helpers for iterator classes
   struct is_node : public std::unary_function<gNode&, bool>{
@@ -426,7 +426,7 @@ private:
 	ii = src->createEdgeWithReuse(dst, 0, std::forward<Args>(args)...);
       } else {
         dst->acquire(mflag);
-	EdgeTy* e = edges.mkEdge(std::forward<Args>(args)...);
+	EdgeTy* e = edgesF.mkEdge(std::forward<Args>(args)...);
 	ii = dst->createEdgeWithReuse(src, e, std::forward<Args>(args)...);
 	ii = src->createEdgeWithReuse(dst, e, std::forward<Args>(args)...);
       }
@@ -446,7 +446,7 @@ private:
 	ii = src->createEdge(dst, 0, std::forward<Args>(args)...);
       } else {
         dst->acquire(mflag);
-	EdgeTy* e = edges.mkEdge(std::forward<Args>(args)...);
+	EdgeTy* e = edgesF.mkEdge(std::forward<Args>(args)...);
 	ii = dst->createEdge(src, e, std::forward<Args>(args)...);
 	ii = src->createEdge(dst, e, std::forward<Args>(args)...);
       }
@@ -520,9 +520,9 @@ public:
     gNode* N = n;
     if (N->active) {
       N->active = false;
-      if (!Directional && edges.mustDel())
+      if (!Directional && edgesF.mustDel())
 	for (edge_iterator ii = edge_begin(n, MethodFlag::UNPROTECTED), ee = edge_end(n, MethodFlag::UNPROTECTED); ii != ee; ++ii)
-	  edges.delEdge(ii->second());
+	  edgesF.delEdge(ii->second());
       N->edges.clear();
     }
   }
@@ -564,7 +564,7 @@ public:
     } else {
       dst->first()->acquire(mflag);
       EdgeTy* e = dst->second();
-      edges.delEdge(e);
+      edgesF.delEdge(e);
       src->erase(dst.base());
       dst->first()->erase(src);
     }
@@ -632,6 +632,10 @@ public:
     // ever require it
     // N->acquire(mflag);
     return boost::make_filter_iterator(is_edge(), N->end(), N->end());
+  }
+
+  Runtime::iterable<NoDerefIterator<edge_iterator>> edges(GraphNode N, Galois::MethodFlag mflag = MethodFlag::WRITE) {
+    return detail::make_no_deref_range(edge_begin(N, mflag), edge_end(N, mflag));
   }
 
   /**

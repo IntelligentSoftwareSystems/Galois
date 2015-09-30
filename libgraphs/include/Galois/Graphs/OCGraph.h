@@ -106,8 +106,12 @@ public:
     return graph.edge_end(segment, N, mflag);
   }
 
-  detail::EdgesIterator<BindSegmentGraph> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
-    return detail::EdgesIterator<BindSegmentGraph>(*this, N, mflag);
+  Runtime::iterable<NoDerefIterator<edge_iterator>> edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
+    return detail::make_no_deref_range(edge_begin(N, mflag), edge_end(N, mflag));
+  }
+
+  Runtime::iterable<NoDerefIterator<edge_iterator>> out_edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
+    return edges(N, mflag);
   }
 
   edge_data_reference getInEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::UNPROTECTED) {

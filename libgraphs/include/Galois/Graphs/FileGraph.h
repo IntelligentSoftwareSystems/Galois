@@ -159,8 +159,12 @@ public:
   edge_iterator edge_begin(GraphNode N) const;
   edge_iterator edge_end(GraphNode N) const;
 
-  detail::EdgesWithNoFlagIterator<FileGraph> out_edges(GraphNode N) {
-    return detail::EdgesWithNoFlagIterator<FileGraph>(*this, N);
+  Runtime::iterable<NoDerefIterator<edge_iterator>> edges(GraphNode N) {
+    return detail::make_no_deref_range(edge_begin(N), edge_end(N));
+  }
+
+  Runtime::iterable<NoDerefIterator<edge_iterator>> out_edges(GraphNode N) {
+    return edges(N);
   }
 
   /**

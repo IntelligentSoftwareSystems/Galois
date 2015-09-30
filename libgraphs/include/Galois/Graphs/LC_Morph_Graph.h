@@ -130,7 +130,7 @@ public:
 
 protected:
   Nodes nodes;
-  Galois::Substrate::PerThreadStorage<EdgeHolder*> edges;
+  Galois::Substrate::PerThreadStorage<EdgeHolder*> edgesL;
 
   template<bool _A1 = HasNoLockable, bool _A2 = HasOutOfLineLockable>
   void acquireNode(GraphNode N, MethodFlag mflag, typename std::enable_if<!_A1 && !_A2>::type* = 0) {
@@ -235,6 +235,10 @@ public:
     return N->edgeEnd;
   }
 
+  Runtime::iterable<NoDerefIterator<edge_iterator>> edges(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
+    return detail::make_no_deref_range(edge_begin(N, mflag), edge_end(N, mflag));
+  }
+
   /**
    * An object with begin() and end() methods to iterate over the outgoing
    * edges of N.
@@ -248,7 +252,7 @@ public:
     // Galois::Runtime::checkWrite(MethodFlag::WRITE, true);
     NodeInfo* N = &nodes.emplace(std::forward<Args>(args)...);
     acquireNode(N, MethodFlag::WRITE);
-    EdgeHolder*& local_edges = *edges.getLocal();
+    EdgeHolder*& local_edges = *edgesL.getLocal();
     if (!local_edges || std::distance(local_edges->begin, local_edges->end) < nedges) {
       EdgeHolder* old = local_edges;
       char* newblock = (char*)Runtime::pageAlloc();
