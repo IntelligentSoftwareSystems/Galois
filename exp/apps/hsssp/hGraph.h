@@ -170,15 +170,17 @@ public:
     for (unsigned ln = 0; ln < ghostMap.size(); ++ln) {
       unsigned lid = ln + numOwned;
       auto gid = ghostMap[ln];
+      bool found = false;
       for (auto h = 0; h < gid2host.size(); ++h) {
         auto& p = gid2host[h];
         if (gid >= p.first && gid < p.second) {
           hostNodes[h].first = std::min(hostNodes[h].first, lid);
           hostNodes[h].second = lid+1;
+          found = true;
           break;
         }
-        abort();
       }
+      assert(found);
     }
     std::cerr << "hostNodes Done\n";
 
