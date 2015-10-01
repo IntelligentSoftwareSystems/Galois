@@ -419,7 +419,7 @@ class BSInlineExecutor {
   }
 
 public:
-  BSInlineExecutor(const FunctionTy& f, const char* ln): function(f), preFunc (f), loopname(ln), barrier(Substrate::getSystemBarrier(activeThreads)) {
+  BSInlineExecutor(const FunctionTy& f, const char* ln): function(f), preFunc (f), loopname(ln), barrier(Runtime::getBarrier(activeThreads)) {
     if (Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsBreak) {
       assert(0 && "not supported by this executor");
       abort();
@@ -431,7 +431,7 @@ public:
       function(f), 
       preFunc (preFunc),
       loopname(ln), 
-      barrier(Substrate::getSystemBarrier (activeThreads)),
+      barrier(Runtime::getBarrier (activeThreads)),
       done (false)
   { 
     if (Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsBreak) {
@@ -462,7 +462,7 @@ void for_each_bs (const R& range, const OpFunc& opFunc, const PreFunc& preFunc, 
   typedef Exp::BSInlineExecutor<T, OpFunc, PreFunc> Executor;
 
   Executor e (opFunc, preFunc, loopname);
-  Substrate::Barrier& barrier = Substrate::getSystemBarrier (activeThreads);
+  Substrate::Barrier& barrier = Runtime::getBarrier (activeThreads);
 
   Substrate::getSystemThreadPool ().run (activeThreads, 
     std::bind (&Executor::template AddInitialWork<R>, std::ref (e), range),

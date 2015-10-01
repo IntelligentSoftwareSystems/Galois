@@ -33,6 +33,7 @@
 
 #include "Galois/gdeque.h"
 #include "Galois/gslist.h"
+#include "Galois/Runtime/Substrate.h"
 #include "Galois/Runtime/LoopStatistics.h"
 
 // #include <array> if c++11
@@ -505,7 +506,7 @@ class Executor {
   }
 
 public:
-  Executor(IterTy b, IterTy e, const char* ln): term(Substrate::getSystemTermination(Galois::getActiveThreads())), barrier(Substrate::getSystemBarrier(Galois::getActiveThreads())), initialBegin(b), initialEnd(e), loopname(ln) { 
+  Executor(IterTy b, IterTy e, const char* ln): term(Substrate::getSystemTermination(Galois::getActiveThreads())), barrier(Runtime::getBarrier(Galois::getActiveThreads())), initialBegin(b), initialEnd(e), loopname(ln) { 
     barrier.reinit(Galois::getActiveThreads());
   }
 

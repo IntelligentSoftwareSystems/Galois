@@ -217,12 +217,12 @@ int main (int argc, char* argv[]) {
       const Vec2& p = b.pos ();
 
       // TODO: include radius for more precise check
-      if (p.getX() < 0.0 || p.getX () > conf.length) {
+      if (p.getX() < DoubleWrapper(0.0) || p.getX () > conf.length) {
         std::cerr << "!!!  ERROR: Ball out of X lim: " << b.str () << std::endl;
       }
 
       // TODO: include radius for more precise check
-      if (p.getY () < 0.0 || p.getY () > conf.width) {
+      if (p.getY () < DoubleWrapper(0.0) || p.getY () > conf.width) {
         std::cerr << "!!!  ERROR: Ball out of Y lim: " << b.str () << std::endl;
       }
 
@@ -230,7 +230,7 @@ int main (int argc, char* argv[]) {
         const Ball& othB = balls[j];
 
         FP d = p.dist (othB.pos ());
-        if (d < (2 * conf.ball_radius)) {
+        if (d < (DoubleWrapper(2) * conf.ball_radius)) {
           std::cerr << "!!!  ERROR: Balls overlap: ";
           std::cerr << b.str () << "    ";
           std::cerr << othB.str () << std::endl;

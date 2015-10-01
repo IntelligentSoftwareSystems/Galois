@@ -31,8 +31,8 @@
 #include "Galois/Accumulator.h"
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
-#include "Galois/Graph/LCGraph.h"
-#include "Galois/Graph/Graph.h"
+#include "Galois/Graphs/LCGraph.h"
+#include "Galois/Graphs/Graph.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/ADT/SmallVector.h"
 #include "Lonestar/BoilerPlate.h"
@@ -140,7 +140,7 @@ struct SNode {
 	unsigned int degree;
 	unsigned int status;
 	int prio;
-	Galois::Runtime::LL::SimpleLock<true> mutex;
+	Galois::Substrate::SimpleLock mutex;
 	//Galois::GAtomic<unsigned int>& status;
 	//unsigned int sum;
   //bool flag;
@@ -152,7 +152,7 @@ std::ostream& operator<<(std::ostream& out, const SNode& n) {
   return out;
 }
 
-typedef Galois::Graph::LC_CSR_Graph<SNode, void>::with_no_lockable<true>::with_numa_alloc<true> Graph;
+typedef Galois::Graph::LC_CSR_Graph<SNode, void>::_with_no_lockable<true>::_with_numa_alloc<true> Graph;
 typedef Graph::GraphNode GNode;
 
 Graph graph;
@@ -430,7 +430,7 @@ struct max_dist {
 
   void operator()(const GNode& n) const {
 		if(graph.getData(n).dist < DIST_INFINITY)
-			m.update(graph.getData(n).dist);
+                  m.update((unsigned long)graph.getData(n).dist);
   }
 };
 
@@ -664,7 +664,7 @@ struct SerialSloan {
 
 			graph.getData(source).dist = 0;
 			//std::cout << "max dist is " << maxDist << "\n";
-			Galois::for_each<OBIM>(source, bfsFn(), "BFS");
+			Galois::for_each(source, bfsFn(), Galois::loopname("BFS"), Galois::wl<OBIM>());
 			//std::cout << "max dist is " << maxDist << "\n";
 		}
 	};
@@ -803,7 +803,7 @@ struct SerialSloan {
 			//graph.getData(source).status = Galois::GAtomic<unsigned int>(PREACTIVE);
 
 			//std::cout << "max dist is " << maxDist << "\n";
-			Galois::for_each<OBIM>(UpdateRequest(source, graph.getData(source).prio), sloanFn(), "Sloan");
+			Galois::for_each(UpdateRequest(source, graph.getData(source).prio), sloanFn(), Galois::loopname("Sloan"), Galois::wl<OBIM>());
 			//std::cout << "max dist is " << maxDist << "\n";
 		}
 	};
@@ -933,11 +933,11 @@ int main(int argc, char **argv) {
   using namespace Galois::WorkList;
   typedef BulkSynchronous<dChunkedLIFO<256> > BSWL;
 
-#ifdef GALOIS_USE_EXP
-  typedef BulkSynchronousInline<> BSInline;
-#else
+  //#ifdef GALOIS_USE_EXP
+  //  typedef BulkSynchronousInline<> BSInline;
+  //#else
   typedef BSWL BSInline;
-#endif
+  //#endif
 
   switch (algo) {
 		case serialSloan: run(SerialSloan()); break;

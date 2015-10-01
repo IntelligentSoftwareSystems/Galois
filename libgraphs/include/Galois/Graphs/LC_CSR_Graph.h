@@ -86,10 +86,14 @@ public:
   //! If true, do not use abstract locks in graph
   template<bool _has_no_lockable>
   struct with_no_lockable { typedef LC_CSR_Graph<NodeTy,EdgeTy,_has_no_lockable,UseNumaAlloc,HasOutOfLineLockable,FileEdgeTy> type; };
+  template<bool _has_no_lockable>
+  using _with_no_lockable = LC_CSR_Graph<NodeTy,EdgeTy,_has_no_lockable,UseNumaAlloc,HasOutOfLineLockable,FileEdgeTy>;
 
   //! If true, use NUMA-aware graph allocation
   template<bool _use_numa_alloc>
   struct with_numa_alloc { typedef LC_CSR_Graph<NodeTy,EdgeTy,HasNoLockable,_use_numa_alloc,HasOutOfLineLockable,FileEdgeTy> type; };
+  template<bool _use_numa_alloc>
+  using _with_numa_alloc = LC_CSR_Graph<NodeTy,EdgeTy,HasNoLockable,_use_numa_alloc,HasOutOfLineLockable,FileEdgeTy>;
 
   //! If true, store abstract locks separate from nodes
   template<bool _has_out_of_line_lockable>

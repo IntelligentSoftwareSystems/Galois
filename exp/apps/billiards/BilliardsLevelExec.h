@@ -33,7 +33,7 @@
 
 #include "Billiards.h"
 
-class BilliardsLevelExec: public Billiards {
+class BilliardsLevelExec: public Billiards<BilliardsLevelExec> {
 
 public:
 

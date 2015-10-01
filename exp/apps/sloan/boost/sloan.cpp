@@ -31,8 +31,8 @@
 #include "Galois/Accumulator.h"
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
-#include "Galois/Graph/LCGraph.h"
-#include "Galois/Graph/Graph.h"
+#include "Galois/Graphs/LCGraph.h"
+#include "Galois/Graphs/Graph.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/ADT/SmallVector.h"
 #include "Lonestar/BoilerPlate.h"
@@ -143,7 +143,7 @@ struct Prefix {
 };
 
 //typedef Galois::Graph::LC_Linear_Graph<SNode, void> Graph;
-typedef Galois::Graph::LC_CSR_Graph<SNode, void>::with_no_lockable<true>::with_numa_alloc<true> Graph;
+typedef Galois::Graph::LC_CSR_Graph<SNode, void>::_with_no_lockable<true>::_with_numa_alloc<true> Graph;
 //typedef Galois::Graph::LC_CSRInline_Graph<SNode, char> Graph;
 //typedef Galois::Graph::FirstGraph<SNode, void, false> Graph;
 typedef Graph::GraphNode GNode;
@@ -419,7 +419,7 @@ struct max_dist {
 
   void operator()(const GNode& n) const {
 		if(graph.getData(n).dist < DIST_INFINITY)
-			m.update(graph.getData(n).dist);
+                  m.update((unsigned long)graph.getData(n).dist);
   }
 };
 
@@ -842,11 +842,11 @@ int main(int argc, char **argv) {
   using namespace Galois::WorkList;
   typedef BulkSynchronous<dChunkedLIFO<256> > BSWL;
 
-#ifdef GALOIS_USE_EXP
-  typedef BulkSynchronousInline<> BSInline;
-#else
+  //#ifdef GALOIS_USE_EXP
+  //  typedef BulkSynchronousInline<> BSInline;
+  //#else
   typedef BSWL BSInline;
-#endif
+  //#endif
 
   switch (algo) {
 		case serialSloan: run(BoostSloan()); break;

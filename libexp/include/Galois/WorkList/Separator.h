@@ -33,7 +33,7 @@
 namespace Galois {
 namespace WorkList {
 
-struct Separator {};
+struct Separator { constexpr Separator() {} };
 
 constexpr Separator dummy; 
 

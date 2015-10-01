@@ -151,6 +151,7 @@ public:
   PerThreadStorage& operator=(PerThreadStorage&& rhs) {
     std::swap(offset, rhs.offset);
     std::swap(b, rhs.b);
+    return *this;
   }
 
   T* getLocal() {
