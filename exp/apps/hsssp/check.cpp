@@ -5,10 +5,15 @@
 
 #include <iostream>
 
+struct nd {
+  int x;
+  double y;
+};
+
 struct Syncer {
-  static int extract(const int& i) { return i; }
-  static void reduce(int& i, int x) { i = std::min(i, x); }
-  static void reset(int& i) { }
+  static int extract(const nd& i) { return i.x; }
+  static void reduce(nd& i, int y) { i.x = std::min(i.x, y); }
+  static void reset(nd& i) { i.x = 0; }
   typedef int ValTy;
 };
 
@@ -19,7 +24,7 @@ int main(int argc, char** argv) {
     for (auto N : g)
       if (N % (1024*128) == 0)
         std::cout << N << " " << *g.edge_begin(N) << " " << *g.edge_end(N) << " " << std::distance(g.edge_begin(N), g.edge_end(N)) << "\n";
-    hGraph<int, void> hg(argv[1], 0, 4);
+    hGraph<nd, void> hg(argv[1], 0, 4);
 
     hg.sync_push<Syncer>();
 
@@ -30,4 +35,3 @@ int main(int argc, char** argv) {
   }
 }
 
-syncable* syncable::curSync;

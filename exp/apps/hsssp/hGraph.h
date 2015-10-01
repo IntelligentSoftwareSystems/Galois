@@ -26,17 +26,10 @@
 #include "Galois/gstl.h"
 #include "Galois/Graph/LC_CSR_Graph.h"
 
-class syncable {
-protected:
-  static syncable* curSync;
-  static void syncRecv(Galois::Runtime::RecvBuffer& buf) {
-    curSync->syncRecvImpl(buf);
-  }
-  virtual void syncRecvImpl(Galois::Runtime::RecvBuffer&) = 0;
-};
+#include "GlobalObj.h"
 
 template<typename NodeTy, typename EdgeTy, bool BSPNode=false, bool BSPEdge=false>
-class hGraph : public syncable{
+class hGraph : public GlobalObject {
 
   typedef typename std::conditional<BSPNode, std::pair<NodeTy, NodeTy>,NodeTy>::type realNodeTy;
   typedef typename std::conditional<BSPNode, std::pair<EdgeTy, EdgeTy>,EdgeTy>::type realEdgeTy;
@@ -44,16 +37,49 @@ class hGraph : public syncable{
   typedef Galois::Graph::LC_CSR_Graph<realNodeTy, realEdgeTy> GraphTy;
 
   GraphTy graph;
-  bool rount;
+  bool round;
   uint32_t numOwned; // [0, numOwned) = global nodes owned, thus [numOwned, numNodes are replicas
+  uint32_t globalOffset; // [numOwned, end) + globalOffset = GID
   unsigned id; // my hostid // FIXME: isn't this just Network::ID?
   //ghost cell ID translation
-  std::vector<uint32_t> L2G; // GID = L2G[LID - numOwned]
+  std::vector<uint32_t> ghostMap; // GID = ghostMap[LID - numOwned]
   //GID to owner
   std::vector<std::pair<uint32_t,uint32_t> > hostNodes; //LID Node owned by host i
+  //pointer for each host
+  std::vector<uintptr_t> hostPtrs;
 
-  std::pair<uint32_t, uint32_t> nodes_by_host(uint32_t host) {
+  //host -> (lid, lid]
+  std::pair<uint32_t, uint32_t> nodes_by_host(uint32_t host) const {
     return hostNodes[host];
+  }
+
+  uint32_t L2G(uint32_t lid) const {
+    assert(lid < graph.size());
+    if (lid < numOwned)
+      return lid + globalOffset;
+    return ghostMap[lid - numOwned];
+  }
+
+  uint32_t G2L(uint32_t gid) const {
+    if (gid >= globalOffset && gid < globalOffset + numOwned)
+      return gid - globalOffset;
+    auto ii = std::lower_bound(ghostMap.begin(), ghostMap.end(), gid);
+    assert(*ii == gid);
+    return std::distance(ghostMap.begin(), ii);
+  }
+
+  uint32_t L2H(uint32_t lid) const {
+    assert(lid < graph.size());
+    if (lid < numOwned)
+      return id;
+    for (int i = 0; i < hostNodes.size(); ++i)
+      if (hostNodes[i].first >= lid && lid < hostNodes[i].second)
+        return i;
+    abort();
+  }
+
+  bool isOwned(uint32_t gid) const {
+    return gid >=globalOffset && gid < globalOffset+numOwned;
   }
 
   template<bool en, typename std::enable_if<en>::type* = nullptr>
@@ -81,10 +107,12 @@ class hGraph : public syncable{
   }
 
 public:
-  virtual void syncRecvImpl(Galois::Runtime::RecvBuffer& buf) {
+  static void syncRecv(Galois::Runtime::RecvBuffer& buf) {
+    uint32_t oid;
     void (hGraph::*fn)(Galois::Runtime::RecvBuffer&);
-    Galois::Runtime::gDeserialize(buf, fn);
-    (this->*fn)(buf);
+    Galois::Runtime::gDeserialize(buf, oid, fn);
+    hGraph* obj = reinterpret_cast<hGraph*>(ptrForObj(oid));
+    (obj->*fn)(buf);
   }
 
   template<typename FnTy>
@@ -95,7 +123,8 @@ public:
       uint32_t gid;
       typename FnTy::ValTy val;
       Galois::Runtime::gDeserialize(buf, gid, val);
-      FnTy::reduce(getData(gid - numOwned), val);
+      assert(isOwned(gid));
+      FnTy::reduce(getData(gid - globalOffset), val);
     }
   }
   
@@ -107,88 +136,69 @@ public:
   typedef typename GraphTy::const_local_iterator const_local_iterator;
   typedef typename GraphTy::edge_iterator edge_iterator;
 
-  hGraph(const std::string& filename, unsigned host, unsigned numHosts) {
+
+  //hGraph construction is collective
+  hGraph(const std::string& filename, unsigned host, unsigned numHosts)
+    :GlobalObject(this), id(host)
+  {
     OfflineGraph g(filename);
     std::cerr << "Offline Graph Done\n";
-    auto baseNodes = Galois::block_range(0U, (unsigned)g.size(), host, numHosts);
-    numOwned = baseNodes.second - baseNodes.first;
-    id = host;
-    uint64_t numEdges = g.edge_begin(baseNodes.second) - g.edge_begin(baseNodes.first); // depends on Offline graph impl
+
+    //compute owners for all nodes
+    std::vector<std::pair<uint32_t, uint32_t>> gid2host;
+    for (unsigned i = 0; i < numHosts; ++i)
+      gid2host.push_back(Galois::block_range(0U, (unsigned)g.size(), i, numHosts));
+    numOwned = gid2host[id].second - gid2host[id].first;
+    globalOffset = gid2host[id].first;
+    std::cerr <<  "Global info done\n";
+
+    uint64_t numEdges = g.edge_begin(gid2host[id].second) - g.edge_begin(gid2host[id].first); // depends on Offline graph impl
     std::cerr << "Edge count Done\n";
+
     std::vector<bool> ghosts(g.size());
-    for (auto n = baseNodes.first; n < baseNodes.second; ++n) {
-      for (auto ii = g.edge_begin(n), ee = g.edge_end(n); ii < ee; ++ii) {
-        auto dst = g.getEdgeDst(ii);
-        ghosts[dst] = true;
-      }
-    }
+    for (auto n = gid2host[id].first; n < gid2host[id].second; ++n)
+      for (auto ii = g.edge_begin(n), ee = g.edge_end(n); ii < ee; ++ii)
+        ghosts[g.getEdgeDst(ii)] = true;
     std::cerr << "Ghost Finding Done\n";
-    for (uint64_t x = 0; x < g.size(); ++x) {
-      if (ghosts[x] && (x < baseNodes.first || x >= baseNodes.second)) {
-        L2G.push_back(x);
-      }
-    }
+
+    for (uint64_t x = 0; x < g.size(); ++x)
+      if (ghosts[x] && !isOwned(x))
+        ghostMap.push_back(x);
     std::cerr << "L2G Done\n";
 
-    std::vector<std::pair<uint32_t, uint32_t> gnodes;
-    for (auto i : numHosts)
-      gnodes.push_back(Galois::block_range(0U, (unsigned)g.size(), i, numHosts));
-
     hostNodes.resize(numHosts, std::make_pair(~0,~0));
-    for (unsigned ln = 0; ln < L2G.size(); ++ln) {
-      auto gn = L2G[ln];
-      for (auto h = 0; h < gnodes.size(); ++h) {
-        auto& p = gnodes[h];
-        if (p >= p.first && p < p.second) {
-          hostNodes[h].first = std::min(hostNodes[h].first, ln);
-          hostNodes[h].second = ln+1;
+    for (unsigned ln = 0; ln < ghostMap.size(); ++ln) {
+      unsigned lid = ln + numOwned;
+      auto gid = ghostMap[ln];
+      for (auto h = 0; h < gid2host.size(); ++h) {
+        auto& p = gid2host[h];
+        if (gid >= p.first && gid < p.second) {
+          hostNodes[h].first = std::min(hostNodes[h].first, lid);
+          hostNodes[h].second = lid+1;
           break;
         }
         abort();
       }
     }
-    for (auto& p : hostNodes)
-      if (p.second != ~0) ++p.second;
     std::cerr << "hostNodes Done\n";
 
-    uint32_t numNodes = numOwned + L2G.size();
+    uint32_t numNodes = numOwned + ghostMap.size();
     graph.allocateFrom(numNodes, numEdges);
     std::cerr << "Allocate done\n";
     
     graph.constructNodes();
-    std::cerr << "Construct nodes 
-
-done\n";
+    std::cerr << "Construct nodes done\n";
 
     uint64_t cur = 0;
-    for (auto n = baseNodes.first; n < baseNodes.second; ++n) {
+    for (auto n = gid2host[id].first; n < gid2host[id].second; ++n) {
       for (auto ii = g.edge_begin(n), ee = g.edge_end(n); ii < ee; ++ii) {
-        auto dst = g.getEdgeDst(ii);
-        decltype(dst) rdst;
-        if (dst < baseNodes.first || dst >= baseNodes.second) {
-          auto i = std::lower_bound(L2G.begin(), L2G.end(), dst);
-          rdst = baseNodes.second - baseNodes.first + std::distance(L2G.begin(), i);
-        } else {
-          rdst = dst - baseNodes.first;
-        }
-        graph.constructEdge(cur++, rdst);
+        auto gdst = g.getEdgeDst(ii);
+        decltype(gdst) ldst = G2L(gdst);
+        graph.constructEdge(cur++, ldst);
       }
       graph.fixEndEdge(n, cur);
     }
     std::cerr << "Construct edges done\n";
-    
-    /*
-    auto ii_f = g.begin() + baseNodes.first;
-    auto ii_m = graph.begin();
-    for (auto x = baseNodes.first; x < baseNodes.second; ++x) {
-      auto nf = std::distance(g.edge_begin(*ii_f), g.edge_end(*ii_f));
-      auto nm = std::distance(graph.edge_begin(*ii_m), graph.edge_end(*ii_m));
-      ++ii_f;
-      ++ii_m;
-      std::cout << x << " " << nf << " " << nm << "\n";
-    }
-    */
-    //FIXME: hostNodes
   }
 
   NodeTy& getData(GraphNode N, Galois::MethodFlag mflag = Galois::MethodFlag::ALL) {
@@ -226,8 +236,7 @@ done\n";
   
   template<typename FnTy>
   void sync_push() {
-    curSync = this;
-   void (hGraph::*fn)(Galois::Runtime::RecvBuffer&) = &hGraph::syncRecvApply<FnTy>;
+    void (hGraph::*fn)(Galois::Runtime::RecvBuffer&) = &hGraph::syncRecvApply<FnTy>;
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     for (unsigned x = 0; x < hostNodes.size(); ++x) {
       if (x == id) continue;
@@ -235,11 +244,11 @@ done\n";
       std::tie(start, end) = nodes_by_host(x);
       if (start == end) continue;
       Galois::Runtime::SendBuffer b;
-      gSerialize(b, fn, (uint32_t)(end-start));
+      gSerialize(b, idForSelf(), fn, (uint32_t)(end-start));
       for (; start != end; ++start) {
-        auto gid = L2G[start];
-        gSerialize(b, gid, FnTy::extract(getData(gid)));
-        FnTy::reset(getData(gid));
+        auto gid = L2G(start);
+        gSerialize(b, gid, FnTy::extract(getData(start)));
+        FnTy::reset(getData(start));
       }
       net.send(x, syncRecv, b);
     }
