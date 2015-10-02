@@ -10,6 +10,7 @@ set(sources
         src/PageAlloc.cpp
         src/Deterministic.cpp
         src/Substrate.cpp
+        src/Version.cpp
 )
 
 add_library(galois_runtime STATIC ${sources})
