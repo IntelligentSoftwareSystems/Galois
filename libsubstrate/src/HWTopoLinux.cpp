@@ -7,8 +7,8 @@
  *
  * Galois is free software: you can redistribute it and/or modify it
  * under the terms of the GNU Lesser General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
+ * published by the Free Software Foundation, either version 2.1 of the
+ * License.
  *
  * Galois is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -33,7 +33,7 @@
  * to processors.  Galois threads are assigned densely in each package before the next 
  * package.  SMT threads are bound after all real cores (assuming x86).
  *
- * @author Andrew Lenharth <andrewl@lenharth.org>
+ * @author Andrew Lenharth <andrew@lenharth.org>
  */
 #include "Galois/Substrate/HWTopo.h"
 #include "Galois/Substrate/EnvCheck.h"
