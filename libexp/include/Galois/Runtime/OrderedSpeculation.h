@@ -54,6 +54,7 @@ namespace Runtime {
 enum class ContextState: int {
     UNSCHEDULED = 0,
     SCHEDULED,
+    READY_TO_EXECUTE,
     READY_TO_COMMIT,
     ABORT_SELF,
     ABORT_HELP,
@@ -67,6 +68,7 @@ enum class ContextState: int {
 const char* ContextStateNames[] = {
     "UNSCHEDULED",
     "SCHEDULED",
+    "READY_TO_EXECUTE",
     "READY_TO_COMMIT",
     "ABORT_SELF",
     "ABORT_HELP",
@@ -90,20 +92,54 @@ struct OptimNhoodItem: public OrdLocBase<OptimNhoodItem<Ctxt, CtxtCmp>, Ctxt, Ct
 
 
   const CtxtCmp& ctxtCmp;
-  Sharers sharers;
-  Lock_ty mutex;
+  GAtomic<Ctxt*> minCtxt;
+  Sharers history;
 
 
   OptimNhoodItem (Lockable* l, const CtxtCmp& ctxtCmp): 
     Base (l), 
-    ctxtCmp (ctxtCmp) {}
+    ctxtCmp (ctxtCmp),
+    minCtxt (nullptr)
+  {}
 
-  bool add (Ctxt* ctxt) {
 
-    mutex.lock ();
+  bool markMin (Ctxt* ctxt) {
+    assert (ctxt);
+
+    Ctxt* other = nullptr;
+
+    do {
+
+      if (other == ctxt) {
+        return true;
+      }
+
+      if (other) {
+
+        if (ctxtCmp (other, ctxt)) {
+
+          ctxt->disableSrc ();
+          return false;
+        }
+      }
+      
+    } while (!minCtxt.cas (other, ctxt));
+
+    if (other) {
+      other->disableSrc ();
+    }
+
+    return true;
+  }
+
+  bool addToHistory (Ctxt* ctxt) {
+
+    if (!succ) {
+      return false;
+    } 
+
     if (sharers.empty ()) {
       sharers.push_back (ctxt);
-      mutex.unlock ();
       return true;
 
     } else {
@@ -240,6 +276,7 @@ struct OptimContext: public SimpleRuntimeContext {
   using Lock_ty = Galois::Substrate::SimpleLock;
 
   T active;
+  bool source;
   std::atomic<ContextState> state;
   Exec& exec;
   NhoodList nhood;
@@ -252,7 +289,7 @@ struct OptimContext: public SimpleRuntimeContext {
 
   explicit OptimContext (const T& x, const ContextState& s, Exec& exec)
   :
-    Base (true), active (x), state (s), exec (exec) 
+    Base (true), active (x), source (true), state (s), exec (exec) 
   {}
 
   const T& getActive () const { return active; }
@@ -268,16 +305,21 @@ struct OptimContext: public SimpleRuntimeContext {
 
   ContextState getState (void) const { return state; }
 
-  bool isRunning (void) const {
-    return hasState (ContextState::SCHEDULED) || hasState (ContextState::ABORT_SELF);
-  }
+  // bool isRunning (void) const {
+    // return hasState (ContextState::SCHEDULED) || hasState (ContextState::ABORT_SELF);
+  // }
+// 
+  // void waitFor (OptimContext* that) const {
+    // assert (that);
+// 
+    // while (that->isRunning ()) {
+      // Substrate::asmPause ();
+    // }
+  // }
 
-  void waitFor (OptimContext* that) const {
-    assert (that);
 
-    while (that->isRunning ()) {
-      Substrate::asmPause ();
-    }
+  void disableSrc (void) {
+    source = false;
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE
@@ -286,15 +328,9 @@ struct OptimContext: public SimpleRuntimeContext {
     NItem& nitem = exec.nhmgr.getNhoodItem (l);
     assert (NItem::getOwner (l) == &nitem);
 
-    if (!hasState (ContextState::ABORT_SELF) && std::find (nhood.begin (), nhood.end (), &nitem) == nhood.end ()) {
-
-      bool succ = nitem.add (this);
-      if (succ) {
-        nhood.push_back (&nitem);
-
-      } else {
-        setState (ContextState::ABORT_SELF);
-      }
+    if (std::find (nhood.begin (), nhood.end (), &nitem) == nhood.end ()) {
+      nhood.push_back (&nitem);
+      nitem.markMin (this);
     }
   }
 
@@ -381,7 +417,7 @@ struct OptimContext: public SimpleRuntimeContext {
 
 };
 
-template <typename T, typename Cmp, typename NhFunc, typename OpFunc> 
+template <typename T, typename Cmp, typename NhFunc, typename OpFunc, typename WindowWL> 
 class OptimOrdExecutor: private boost::noncopyable {
 
   friend struct OptimContext<T, Cmp, OptimOrdExecutor>;
@@ -393,13 +429,15 @@ class OptimOrdExecutor: private boost::noncopyable {
   using CommitQ = Galois::PerThreadList<Ctxt*>;
   using PendingQ = Galois::PerThreadMinHeap<Ctxt*, CtxtCmp>;
 
+  using CtxtWL = PerThreadBag<Ctxt*>;
   using CtxtAlloc = Runtime::FixedSizeAllocator<Ctxt>;
 
+  using UserCtxt = UserContextAccess<T>;
+  using PerThreadUserCtxt = Substrate::PerThreadStorage<UserCtxt>;
 
   Cmp itemCmp;
   NhFunc nhFunc;
   OpFunc opFunc;
-  Substrate::Barrier& gvtBarrier;
   const char* loopname;
 
   CtxtCmp ctxtCmp;
@@ -407,15 +445,21 @@ class OptimOrdExecutor: private boost::noncopyable {
   CommitQ commitQ;
   NItemFactory nitemFactory;
   NhoodMgr nhmgr;
-  // Substrate::TerminationDetection& term;
-  std::atomic<bool> finish;
-  Ctxt* globalFront;
-  GAtomic<bool> startGVT;
+  WindowWL winWL;
 
 
-
+  std::unique_ptr<CtxtWL> currWL;
+  std::unique_ptr<CtxtWL> nextWL;
   CtxtAlloc ctxtAlloc;
-  Substrate::PerThreadStorage<Ctxt*> perThrdLocalFront; 
+
+  size_t windowSize;
+  size_t rounds;
+  size_t prevCommits;
+  double targetCommitRatio;
+
+  PerThreadUserCtxt userHandles;
+  GAccumulator<size_t> numCommitted;
+  GAccumulator<size_t> total;
 
 public:
   OptimOrdExecutor (const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, Substrate::Barrier& barrier, const char* loopname)
@@ -430,12 +474,16 @@ public:
       commitQ (),
       nitemFactory (ctxtCmp),
       nhmgr (nitemFactory),
-      // term (Substrate::getSystemTermination (activeThreads)),
-      finish (false),
-      globalFront (nullptr),
-      startGVT (false)
   {
     if (!loopname) { loopname = "NULL"; }
+
+    if (targetCommitRatio < 0.0) {
+      targetCommitRatio = 0.0;
+    }
+    if (targetCommitRatio > 1.0) {
+      targetCommitRatio = 1.0;
+    }
+
   }
 
   ~OptimOrdExecutor (void) {
@@ -480,78 +528,242 @@ public:
 
   void execute () {
 
-    static const unsigned commit_interval = 10;
+    while (true) {
 
-    size_t totalIter = 0;
-    size_t totalCommits = 0;
+      prepareRound ();
 
-    do {
-      bool didWork = false;
-
-
-      for (unsigned num_scheduled = 0; (num_scheduled < commit_interval) && !pendingQ.get ().empty (); ++num_scheduled, ++totalIter) {
-
-        Ctxt* ctxt = schedule ();
-
-        if (ctxt) {
-          dbg::debug (ctxt, " scheduled");
-
-          didWork = true;
-
-          applyOperator (ctxt);
-
-          if (!ctxt->casState (ContextState::SCHEDULED, ContextState::READY_TO_COMMIT)) {
-
-            if (ctxt->casState (ContextState::ABORT_SELF, ContextState::ABORTING)) {
-
-              // dbg::debug (ctxt, " Shouldn't reach here with ABORT_SELF");
-              ctxt->doAbort ();
-
-            }
-          } else {
-
-
-            dbg::debug (ctxt, " adding self to commit queue");
-            commitQ.get ().push_back (ctxt);
-            // publish remaining changes
-            ctxt->publishChanges ();
-
-          }
-
-        }
-
+      if (currWL->empty_all ()) {
+        break;
       }
 
+      expandNhood ();
 
-      if (!computeGVT ()) {
-        reportGVT ();
+      serviceAborts ();
+
+      applyOperator ();
+
+      addNewElems ();
+
+      performCommits ();
+
+
+    }
+  }
+
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void spillAll (CtxtWL& wl) {
+    assert (targetCommitRatio != 0.0);
+    on_each(
+        [this, &wl] (const unsigned tid, const unsigned numT) {
+          while (!wl[tid].empty ()) {
+            Ctxt* c = wl[tid].back ();
+            wl[tid].pop_back ();
+
+            winWL.push (c->getElem ());
+            c->~Ctxt ();
+            ctxtAlloc.deallocate (c, 1);
+          }
+        });
+
+    assert (wl.empty_all ());
+    assert (!winWL.empty ());
+  }
+
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void refill (CtxtWL& wl, size_t currCommits, size_t prevWindowSize) {
+
+    assert (targetCommitRatio != 0.0);
+
+    const size_t INIT_MAX_ROUNDS = 500;
+    const size_t THREAD_MULT_FACTOR = 16;
+    const double TARGET_COMMIT_RATIO = targetCommitRatio;
+    const size_t MIN_WIN_SIZE = OpFunc::CHUNK_SIZE * getActiveThreads ();
+    // const size_t MIN_WIN_SIZE = 2000000; // OpFunc::CHUNK_SIZE * getActiveThreads ();
+    const size_t WIN_OVER_SIZE_FACTOR = 8;
+
+    if (prevWindowSize == 0) {
+      assert (currCommits == 0);
+
+      // initial settings
+      if (DEPRECATED::ForEachTraits<OpFunc>::NeedsPush) {
+        windowSize = std::max (
+            (winWL.initSize ()),
+            (THREAD_MULT_FACTOR * MIN_WIN_SIZE));
 
       } else {
+        windowSize = std::min (
+            (winWL.initSize () / INIT_MAX_ROUNDS),
+            (THREAD_MULT_FACTOR * MIN_WIN_SIZE));
       }
+    } else {
 
-      // TODO: do this after processing some tasks
-      unsigned numCommitted = localCommit ();
-      totalCommits += numCommitted;
+      assert (windowSize > 0);
 
-      if (!commitQ.get ().empty () || !pendingQ.get ().empty ()) {
-        continue;
+      double commitRatio = double (currCommits) / double (prevWindowSize);
+
+      if (commitRatio >= TARGET_COMMIT_RATIO) {
+        windowSize *= 2;
+        // windowSize = int (windowSize * commitRatio/TARGET_COMMIT_RATIO); 
+        // windowSize = windowSize + windowSize / 2;
+
+      } else {
+        windowSize = int (windowSize * commitRatio/TARGET_COMMIT_RATIO); 
+
+        // if (commitRatio / TARGET_COMMIT_RATIO < 0.90) {
+          // windowSize = windowSize - (windowSize / 10);
+// 
+        // } else {
+          // windowSize = int (windowSize * commitRatio/TARGET_COMMIT_RATIO); 
+        // }
       }
+    }
+
+    if (windowSize < MIN_WIN_SIZE) { 
+      windowSize = MIN_WIN_SIZE;
+    }
+
+    assert (windowSize > 0);
 
 
-      didWork = didWork || (numCommitted > 0);
+    if (DEPRECATED::ForEachTraits<OpFunc>::NeedsPush) {
+      if (winWL.empty () && (wl.size_all () > windowSize)) {
+        // a case where winWL is empty and all the new elements were going into 
+        // nextWL. When nextWL becomes bigger than windowSize, we must do something
+        // to control efficiency. One solution is to spill all elements into winWL
+        // and refill
+        //
 
+        spillAll (wl);
 
-      // TODO: insert stealing here
+      } else if (wl.size_all () > (WIN_OVER_SIZE_FACTOR * windowSize)) {
+        // too many adds. spill to control efficiency
+        spillAll (wl);
+      }
+    }
 
-
-      // term.localTermination (didWork);
-
-    } while (!finish);
-
-
-
-    dbg::debug ("OptimOrdExecutor: totalIter= ", totalIter, " totalCommits= ", totalCommits);
+    winWL.poll (wl, windowSize, wl.size_all (), ctxtMaker);
+    // std::cout << "Calculated Window size: " << windowSize << ", Actual: " << wl->size_all () << std::endl;
   }
+
+  // TODO: refactor prepareRound, refill, spillAll into a 
+  // common code-base 
+
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void prepareRound (void) {
+    ++rounds;
+    std::swap (currWL, nextWL);
+
+    if (targetCommitRatio != 0.0) {
+      size_t currCommits = numCommitted.reduce () - prevCommits;
+      prevCommits += currCommits;
+
+      size_t prevWindowSize = nextWL->size_all ();
+      refill (*currWL, currCommits, prevWindowSize);
+    }
+
+    nextWL->clear_all ();
+  }
+
+
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhood (void) {
+
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhood () {
+    Galois::do_all_choice (makeLocalRange (*currWL),
+        [this] (Ctxt* c) {
+          UserCtxt& uhand = *userHandles.getLocal ();
+          uhand.reset ();
+
+          // nhFunc (c, uhand);
+          runCatching (nhFunc, c, uhand);
+
+          total += 1;
+        },
+        "expandNhood",
+        chunk_size<NhFunc::CHUNK_SIZE> ());
+
+  }
+
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void applyOperator (void) {
+  }
+
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void addNewElems (void) {
+  }
+
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void serviceAborts (void) {
+  }
+
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void performCommits (void) {
+  }
+
+    // static const unsigned commit_interval = 10;
+// 
+    // size_t totalIter = 0;
+    // size_t totalCommits = 0;
+// 
+    // do {
+      // bool didWork = false;
+// 
+// 
+      // for (unsigned num_scheduled = 0; (num_scheduled < commit_interval) && !pendingQ.get ().empty (); ++num_scheduled, ++totalIter) {
+// 
+        // Ctxt* ctxt = schedule ();
+// 
+        // if (ctxt) {
+          // dbg::debug (ctxt, " scheduled");
+// 
+          // didWork = true;
+// 
+          // applyOperator (ctxt);
+// 
+          // if (!ctxt->casState (ContextState::SCHEDULED, ContextState::READY_TO_COMMIT)) {
+// 
+            // if (ctxt->casState (ContextState::ABORT_SELF, ContextState::ABORTING)) {
+// 
+              // // dbg::debug (ctxt, " Shouldn't reach here with ABORT_SELF");
+              // ctxt->doAbort ();
+// 
+            // }
+          // } else {
+// 
+// 
+            // dbg::debug (ctxt, " adding self to commit queue");
+            // commitQ.get ().push_back (ctxt);
+            // // publish remaining changes
+            // ctxt->publishChanges ();
+// 
+          // }
+// 
+        // }
+// 
+      // }
+// 
+// 
+      // if (!computeGVT ()) {
+        // reportGVT ();
+// 
+      // } else {
+      // }
+// 
+      // // TODO: do this after processing some tasks
+      // unsigned numCommitted = localCommit ();
+      // totalCommits += numCommitted;
+// 
+      // if (!commitQ.get ().empty () || !pendingQ.get ().empty ()) {
+        // continue;
+      // }
+// 
+// 
+      // didWork = didWork || (numCommitted > 0);
+// 
+// 
+      // // TODO: insert stealing here
+// 
+// 
+      // // term.localTermination (didWork);
+// 
+    // } while (!finish);
+// 
+// 
+// 
+    // dbg::debug ("OptimOrdExecutor: totalIter= ", totalIter, " totalCommits= ", totalCommits);
+  // }
 
   void operator () (void) {
     execute ();

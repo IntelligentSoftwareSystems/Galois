@@ -68,11 +68,6 @@
 namespace Galois {
 namespace Runtime {
 
-namespace cll = llvm::cl;
-
-static cll::opt<double> commitRatioArg("cratio", cll::desc("target commit ratio for two phase executor, 0.0 to disable windowing"), cll::init(0.80));
-
-// TODO: figure out when to call startIteration
 
 namespace {
 template <typename T, typename Cmp, typename NhFunc, typename OpFunc, typename WindowWL> 
@@ -301,7 +296,7 @@ protected:
           total += 1;
         },
         "expandNhood",
-        chunk_size<OpFunc::CHUNK_SIZE> ());
+        chunk_size<NhFunc::CHUNK_SIZE> ());
 
   }
 
