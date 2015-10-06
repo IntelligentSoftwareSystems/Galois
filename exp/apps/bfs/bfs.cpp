@@ -494,11 +494,11 @@ struct DetBarrierAlgo {
 
   void operator()(const GNode& source) const {
     typedef Galois::WorkList::Deterministic<> DWL;
-#ifdef GALOIS_USE_EXP
-    typedef Galois::WorkList::BulkSynchronousInline<> WL;
-#else
+    //#ifdef GALOIS_USE_EXP
+    //    typedef Galois::WorkList::BulkSynchronousInline<> WL;
+    //#else
   typedef Galois::WorkList::BulkSynchronous<Galois::WorkList::dChunkedLIFO<256> > WL;
-#endif
+  //#endif
     std::deque<ItemTy> initial;
 
     graph.getData(source).dist = 0;
@@ -767,11 +767,11 @@ int main(int argc, char **argv) {
   using namespace Galois::WorkList;
   typedef BulkSynchronous<dChunkedLIFO<256> > BSWL;
 
-#ifdef GALOIS_USE_EXP
-  typedef BulkSynchronousInline<> BSInline;
-#else
+  //#ifdef GALOIS_USE_EXP
+  //  typedef BulkSynchronousInline<> BSInline;
+  //#else
   typedef BSWL BSInline;
-#endif
+  //#endif
 
   switch (algo) {
     case serialAsync: run<SerialAsyncAlgo>(); break;

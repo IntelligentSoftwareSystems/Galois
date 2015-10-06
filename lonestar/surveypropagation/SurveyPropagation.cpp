@@ -33,10 +33,6 @@
 
 #include "Lonestar/BoilerPlate.h"
 
-#ifdef GALOIS_USE_EXP
-#include "Galois/PriorityScheduling.h"
-#endif
-
 #include <cstdlib>
 #include <iostream>
 
@@ -177,7 +173,7 @@ void print_formula() {
       std::cout << " & ";
     std::cout << "c" << m << "( ";
     GNode N = clauses[m].first;
-    for (Graph::edge_iterator ii = graph.edge_begin(N, Galois::MethodFlag::UNPROTECTED), ee = graph.edge_end( N, Galois::MethodFlag::UNPROTECTED); ii != ee; ++ii) {
+    for (auto ii : graph.edges(N, Galois::MethodFlag::UNPROTECTED)) {
       if (ii != graph.edge_begin(N, Galois::MethodFlag::UNPROTECTED))
 	std::cout << " | ";
       SPEdge& E = graph.getEdgeData(ii, Galois::MethodFlag::UNPROTECTED);
@@ -222,8 +218,7 @@ struct update_eta {
   double eta_for_a_i(GNode a, GNode i) {
     double etaNew = 1.0;
     //for each j
-    for (Graph::edge_iterator jii = graph.edge_begin(a, Galois::MethodFlag::UNPROTECTED), 
-	   jee = graph.edge_end(a, Galois::MethodFlag::UNPROTECTED); jii != jee; ++jii) {
+    for (auto jii : graph.edges(a, Galois::MethodFlag::UNPROTECTED)) {
       GNode j = graph.getEdgeDst(jii);
       if (j != i) {
 	bool ajNegative = graph.getEdgeData(jii, Galois::MethodFlag::UNPROTECTED).isNegative;
@@ -231,9 +226,7 @@ struct update_eta {
 	double prodN = 1.0;
 	double prod0 = 1.0;
 	//for each b
-	for (Graph::edge_iterator bii = graph.edge_begin(j, Galois::MethodFlag::UNPROTECTED), 
-	       bee = graph.edge_end(j, Galois::MethodFlag::UNPROTECTED); 
-	     bii != bee; ++bii) {
+        for (auto bii : graph.edges(j, Galois::MethodFlag::UNPROTECTED)) {
 	  GNode b = graph.getEdgeDst(bii);
 	  SPEdge Ebj = graph.getEdgeData(bii, Galois::MethodFlag::UNPROTECTED);
 	  if (b != a)
@@ -281,16 +274,14 @@ struct update_eta {
     ++graph.getData(a).t;
 
     //for each i
-    for (Graph::edge_iterator iii = graph.edge_begin(a, Galois::MethodFlag::UNPROTECTED), 
-	   iee = graph.edge_end(a, Galois::MethodFlag::UNPROTECTED); iii != iee; ++iii) {
+    for (auto iii : graph.edges(a, Galois::MethodFlag::UNPROTECTED)) {
       GNode i = graph.getEdgeDst(iii);
       double e = eta_for_a_i(a, i);
       double olde = graph.getEdgeData(iii, Galois::MethodFlag::UNPROTECTED).eta;
       graph.getEdgeData(iii).eta = e;
       //std::cout << olde << ',' << e << " ";
       if (fabs(olde - e) > epsilon) {
-	for (Graph::edge_iterator bii = graph.edge_begin(i, Galois::MethodFlag::UNPROTECTED), 
-	   bee = graph.edge_end(i, Galois::MethodFlag::UNPROTECTED); bii != bee; ++bii) {
+        for (auto bii : graph.edges(i, Galois::MethodFlag::UNPROTECTED)) {
 	  GNode b = graph.getEdgeDst(bii);
 	  if (a != b) // && graph.getData(b, Galois::MethodFlag::UNPROTECTED).t < tlimit)
 	    ctx.push(std::make_pair(b,100-(int)(100.0*(olde - e))));
@@ -313,7 +304,7 @@ struct update_biases {
     double p0 = 1.0;
 
     //for each function a
-    for (Graph::edge_iterator aii = graph.edge_begin(i, Galois::MethodFlag::UNPROTECTED), aee = graph.edge_end(i, Galois::MethodFlag::UNPROTECTED); aii != aee; ++aii) {
+    for (auto aii : graph.edges(i, Galois::MethodFlag::UNPROTECTED)) {
       SPEdge& aie = graph.getEdgeData(aii, Galois::MethodFlag::UNPROTECTED);
 
       double etaai = aie.eta;
@@ -380,11 +371,10 @@ void SP_algorithm() {
   //2) if t = tmax return un-converged.  if (t < tmax) then return the set of fixed point warnings sigma* a->i = sigma a->i (t)
   
   //  tlimit += tmax;
-#ifdef GALOIS_USE_EXP
-  Exp::PriAuto<64, EIndexer, WLWL, ELess, EGreater >::for_each(clauses.begin(), clauses.end(), update_eta(), Galois::loopname("update_eta"));
-#else
+
+  //FIXME: check obim again
+  //  Exp::PriAuto<64, EIndexer, WLWL, ELess, EGreater >::for_each(clauses.begin(), clauses.end(), update_eta(), Galois::loopname("update_eta"));
   Galois::for_each(clauses.begin(), clauses.end(), update_eta(), Galois::loopname("update_eta"), Galois::wl<WLWL>());
-#endif
 
   maxBias.reset();
   numBias.reset();
@@ -403,9 +393,7 @@ struct fix_variables {
       idata.solved = true;
       //TODO: simplify graph
       //for each b
-      for (Graph::edge_iterator bii = graph.edge_begin(i), 
-	     bee = graph.edge_end(i); 
-	   bii != bee; ++bii) {
+      for (auto bii : graph.edges(i)) {
 	graph.getData(graph.getEdgeDst(bii)).solved = true;
 	graph.getData(graph.getEdgeDst(bii)).value = true;
       }

@@ -904,7 +904,7 @@ struct BarrierNoDup {
 		unsigned int thr = Galois::getActiveThreads();
 		//Galois::Runtime::PthreadBarrier barrier(thr);
                 __attribute__((unused))
-		Galois::Substrate::Barrier& barrier = Galois::Substrate::getSystemBarrier(thr);
+		Galois::Substrate::Barrier& barrier = Galois::Runtime::getBarrier(thr);
 
 		while (true) {
 			unsigned next = (round + 1) & 1;

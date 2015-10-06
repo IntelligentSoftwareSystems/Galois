@@ -953,7 +953,7 @@ void bilinear_predict_full(const bilinear_problem* prob, const double *H, biline
 	for(size_t inst = 0; inst < nr_insts; ++inst){
 #endif
 #ifdef EXP_DOALL_GALOIS
-		int tid = Galois::Runtime::LL::getTID();
+		int tid = Galois::Substrate::ThreadPool::getTID();
 #else
 		int tid = omp_get_thread_num(); // thread ID
 #endif
@@ -1061,7 +1061,7 @@ void bilinear_predict(const bilinear_problem* prob, const double *W, const doubl
 	for(size_t inst = 0; inst < nr_insts; ++inst){
 #endif
 #ifdef EXP_DOALL_GALOIS
-		int tid = Galois::Runtime::LL::getTID();
+		int tid = Galois::Substrate::ThreadPool::getTID();
 #else
 		int tid = omp_get_thread_num(); // thread ID
 #endif

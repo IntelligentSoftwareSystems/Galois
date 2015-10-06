@@ -1,4 +1,4 @@
-/** Enviroment Checking Code -*- C++ -*-
+/** Implementation for Version Info -*- C++ -*-
  * @file
  * @section License
  *
@@ -7,8 +7,8 @@
  *
  * Galois is free software: you can redistribute it and/or modify it
  * under the terms of the GNU Lesser General Public License as
- * published by the Free Software Foundation, version 2.1 of the
- * License.
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
  *
  * Galois is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -27,21 +27,31 @@
  * @author Andrew Lenharth <andrew@lenharth.org>
  */
 
-#include "Galois/Substrate/EnvCheck.h"
+#include "Galois/Version.h"
 
-#include <cstdlib>
+#define QUOTE(name) #name
+#define STR(macro) QUOTE(macro)
 
-bool Galois::Substrate::EnvCheck(const char* parm) {
-  if (getenv(parm))
-    return true;
-  return false;
+std::string Galois::getVersion() {
+  return STR(GALOIS_VERSION);
 }
 
-bool Galois::Substrate::EnvCheck(const char* parm, int& val) {
-  char* t = getenv(parm);
-  if (t) {
-    val = atoi(t);
-    return true;
-  }
-  return false;
+std::string Galois::getRevision() {
+  return "unknown";
+}
+
+int Galois::getVersionMajor() {
+  return GALOIS_VERSION_MAJOR;
+}
+
+int Galois::getVersionMinor() {
+  return GALOIS_VERSION_MINOR;
+}
+
+int Galois::getVersionPatch() {
+  return GALOIS_VERSION_PATCH;
+}
+
+int Galois::getCopyrightYear() {
+  return GALOIS_COPYRIGHT_YEAR;
 }

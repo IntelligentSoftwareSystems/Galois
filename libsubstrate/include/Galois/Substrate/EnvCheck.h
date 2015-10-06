@@ -2,13 +2,13 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a gramework to exploit
+ * This file is part of Galois.  Galoisis a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
  * under the terms of the GNU Lesser General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
+ * published by the Free Software Foundation, version 2.1 of the
+ * License.
  *
  * Galois is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -24,8 +24,9 @@
  * Copyright (C) 2015, The University of Texas at Austin. All rights
  * reserved.
  *
- * @author Andrew Lenharth <andrewl@lenharth.org>
+ * @author Andrew Lenharth <andrew@lenharth.org>
  */
+
 #ifndef GALOIS_RUNTIME_LL_ENVCHECK_H
 #define GALOIS_RUNTIME_LL_ENVCHECK_H
 

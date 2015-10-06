@@ -2,13 +2,13 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a gramework to exploit
+ * This file is part of Galois.  Galoisis a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
  * under the terms of the GNU Lesser General Public License as
- * published by the Free Software Foundation, either version 3 of the
- * License, or (at your option) any later version.
+ * published by the Free Software Foundation, version 2.1 of the
+ * License.
  *
  * Galois is distributed in the hope that it will be useful, but
  * WITHOUT ANY WARRANTY; without even the implied warranty of
@@ -28,11 +28,13 @@
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
+
 #ifndef GALOIS_RUNTIME_TASKWORK_H
 #define GALOIS_RUNTIME_TASKWORK_H
 
 #include "Galois/gdeque.h"
 #include "Galois/gslist.h"
+#include "Galois/Runtime/Substrate.h"
 #include "Galois/Runtime/LoopStatistics.h"
 
 // #include <array> if c++11
@@ -505,7 +507,7 @@ class Executor {
   }
 
 public:
-  Executor(IterTy b, IterTy e, const char* ln): term(Substrate::getSystemTermination(Galois::getActiveThreads())), barrier(Substrate::getSystemBarrier(Galois::getActiveThreads())), initialBegin(b), initialEnd(e), loopname(ln) { 
+  Executor(IterTy b, IterTy e, const char* ln): term(Substrate::getSystemTermination(Galois::getActiveThreads())), barrier(Runtime::getBarrier(Galois::getActiveThreads())), initialBegin(b), initialEnd(e), loopname(ln) { 
     barrier.reinit(Galois::getActiveThreads());
   }
 

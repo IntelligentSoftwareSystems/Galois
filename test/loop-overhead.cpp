@@ -11,10 +11,10 @@ unsigned iter = 1;
 struct emp {
   template<typename T>
   void operator()(const T& t) const { 
-    Galois::Runtime::LL::compilerBarrier(); 
+    Galois::Substrate::compilerBarrier(); 
   }
   template<typename T, typename C>
-  void operator()(const T& t, const C& c) const { Galois::Runtime::LL::compilerBarrier(); }
+  void operator()(const T& t, const C& c) const { Galois::Substrate::compilerBarrier(); }
   typedef int tt_does_not_need_push;
   typedef int tt_does_not_need_stats;
   typedef int tt_does_not_need_aborts;
@@ -58,7 +58,7 @@ unsigned t_omp(std::vector<unsigned>& V, unsigned num, unsigned th) {
 unsigned t_doall(bool burn, bool steal, std::vector<unsigned>& V, unsigned num, unsigned th) {
   Galois::setActiveThreads(th); //Galois::Runtime::LL::getMaxThreads());
   if (burn)
-    Galois::Runtime::getSystemThreadPool().burnPower(th);
+    Galois::Substrate::getSystemThreadPool().burnPower(th);
    
   Galois::Timer t;
   t.start();
@@ -71,7 +71,7 @@ unsigned t_doall(bool burn, bool steal, std::vector<unsigned>& V, unsigned num, 
 unsigned t_foreach(bool burn, std::vector<unsigned>& V, unsigned num, unsigned th) {
   Galois::setActiveThreads(th);
   if (burn)
-    Galois::Runtime::getSystemThreadPool().burnPower(th);
+    Galois::Substrate::getSystemThreadPool().burnPower(th);
   
   Galois::Timer t;
   t.start();
@@ -115,7 +115,7 @@ int main(int argc, char** argv) {
   if (!maxVector)
     maxVector = 1024*1024;
 
-  unsigned M = Galois::Runtime::LL::getMaxThreads() / 2;
+  unsigned M = Galois::Substrate::getSystemThreadPool().getMaxThreads() / 2;
   test("inline\t",  1, 16, maxVector, [] (std::vector<unsigned>& V, unsigned num, unsigned th) { return t_inline(V, num); });
   test("stl\t",     1, 16, maxVector, [] (std::vector<unsigned>& V, unsigned num, unsigned th) { return t_stl(V, num); });
   test("omp\t",     M, 16, maxVector, t_omp);

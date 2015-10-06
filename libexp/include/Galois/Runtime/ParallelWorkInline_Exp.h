@@ -4,24 +4,31 @@
  *
  * @section License
  *
- * Galois, a framework to exploit amorphous data-parallelism in irregular
- * programs.
+ * This file is part of Galois.  Galoisis a framework to exploit
+ * amorphous data-parallelism in irregular programs.
  *
- * Copyright (C) 2012, The University of Texas at Austin. All rights reserved.
- * UNIVERSITY EXPRESSLY DISCLAIMS ANY AND ALL WARRANTIES CONCERNING THIS
- * SOFTWARE AND DOCUMENTATION, INCLUDING ANY WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR ANY PARTICULAR PURPOSE, NON-INFRINGEMENT AND WARRANTIES OF
- * PERFORMANCE, AND ANY WARRANTY THAT MIGHT OTHERWISE ARISE FROM COURSE OF
- * DEALING OR USAGE OF TRADE.  NO WARRANTY IS EITHER EXPRESS OR IMPLIED WITH
- * RESPECT TO THE USE OF THE SOFTWARE OR DOCUMENTATION. Under no circumstances
- * shall University be liable for incidental, special, indirect, direct or
- * consequential damages or loss of profits, interruption of business, or
- * related expenses which may arise from use of Software or Documentation,
- * including but not limited to those resulting from defects in Software and/or
- * Documentation, or loss or inaccuracy of data of any kind.
+ * Galois is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, version 2.1 of the
+ * License.
+ *
+ * Galois is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with Galois.  If not, see
+ * <http://www.gnu.org/licenses/>.
+ *
+ * @section Copyright
+ *
+ * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * reserved.
  *
  * @author Amber Hassaan <ahassaan@ices.utexas.edu>
  */
+
 #ifndef GALOIS_RUNTIME_PARALLELWORKINLINE_EXP_H
 #define GALOIS_RUNTIME_PARALLELWORKINLINE_EXP_H
 
@@ -419,7 +426,7 @@ class BSInlineExecutor {
   }
 
 public:
-  BSInlineExecutor(const FunctionTy& f, const char* ln): function(f), preFunc (f), loopname(ln), barrier(Substrate::getSystemBarrier(activeThreads)) {
+  BSInlineExecutor(const FunctionTy& f, const char* ln): function(f), preFunc (f), loopname(ln), barrier(Runtime::getBarrier(activeThreads)) {
     if (Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsBreak) {
       assert(0 && "not supported by this executor");
       abort();
@@ -431,7 +438,7 @@ public:
       function(f), 
       preFunc (preFunc),
       loopname(ln), 
-      barrier(Substrate::getSystemBarrier (activeThreads)),
+      barrier(Runtime::getBarrier (activeThreads)),
       done (false)
   { 
     if (Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsBreak) {
@@ -462,7 +469,7 @@ void for_each_bs (const R& range, const OpFunc& opFunc, const PreFunc& preFunc, 
   typedef Exp::BSInlineExecutor<T, OpFunc, PreFunc> Executor;
 
   Executor e (opFunc, preFunc, loopname);
-  Substrate::Barrier& barrier = Substrate::getSystemBarrier (activeThreads);
+  Substrate::Barrier& barrier = Runtime::getBarrier (activeThreads);
 
   Substrate::getSystemThreadPool ().run (activeThreads, 
     std::bind (&Executor::template AddInitialWork<R>, std::ref (e), range),

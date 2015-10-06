@@ -1,9 +1,9 @@
-cmake_minimum_required(VERSION 2.8.8)
+cmake_minimum_required(VERSION 3.2.0)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 project(Galois)
 set(GALOIS_VERSION_MAJOR "2")
-set(GALOIS_VERSION_MINOR "2")
-set(GALOIS_VERSION_PATCH "2")
+set(GALOIS_VERSION_MINOR "3")
+set(GALOIS_VERSION_PATCH "0")
 set(GALOIS_VERSION ${GALOIS_VERSION_MAJOR}.${GALOIS_VERSION_MINOR}.${GALOIS_VERSION_PATCH})
 set(GALOIS_COPYRIGHT_YEAR "2015") # Also in COPYRIGHT
 
@@ -150,6 +150,12 @@ endif(USE_GPROF)
 
 ###### Configure features ######
 
+add_definitions(-DGALOIS_VERSION_MAJOR=${GALOIS_VERSION_MAJOR})
+add_definitions(-DGALOIS_VERSION_MINOR=${GALOIS_VERSION_MINOR})
+add_definitions(-DGALOIS_VERSION_PATCH=${GALOIS_VERSION_PATCH})
+add_definitions(-DGALOIS_VERSION=${GALOIS_VERSION_MAJOR}.${GALOIS_VERSION_MINOR}.${GALOIS_VERSION_PATCH})
+add_definitions(-DGALOIS_COPYRIGHT_YEAR=${GALOIS_COPYRIGHT_YEAR})
+
 # Experimental features
 if(USE_EXP)
   set(USE_VTUNE ON)
@@ -230,9 +236,8 @@ endif()
 find_package(Boost 1.38.0 REQUIRED)
 include_directories(${Boost_INCLUDE_DIR})
 
-find_package(CXX11 REQUIRED)
-
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CXX11_FLAGS}")
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(CheckEndian)
 

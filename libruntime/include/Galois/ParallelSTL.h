@@ -3,7 +3,7 @@
  *
  * @section License
  *
- * This file is part of Galois.  Galoisis a gramework to exploit
+ * This file is part of Galois.  Galoisis a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it

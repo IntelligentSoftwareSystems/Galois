@@ -2,7 +2,7 @@
  * @file
  * @section License
  *
- * This file is part of Galois.  Galoisis a gramework to exploit
+ * This file is part of Galois.  Galois is a framework to exploit
  * amorphous data-parallelism in irregular programs.
  *
  * Galois is free software: you can redistribute it and/or modify it
@@ -32,6 +32,7 @@
  */
 
 #include "Lonestar/BoilerPlate.h"
+#include "Galois/Version.h"
 
 #include <iostream>
 #include <sstream>
@@ -41,7 +42,7 @@ llvm::cl::opt<bool> skipVerify("noverify", llvm::cl::desc("Skip verification ste
 llvm::cl::opt<int> numThreads("t", llvm::cl::desc("Number of threads"), llvm::cl::init(1));
 
 static void LonestarPrintVersion() {
-  std::cout << "Galois Benchmark Suite v" << GALOIS_VERSION_STR << " (" << GALOIS_REVISION << ")\n";
+  std::cout << "Galois Benchmark Suite v" << Galois::getVersion() << " (" << Galois::getRevision() << ")\n";
 }
 
 
@@ -54,7 +55,7 @@ void LonestarStart(int argc, char** argv,
   numThreads = Galois::setActiveThreads(numThreads); 
   
   LonestarPrintVersion();
-  std::cout << "Copyright (C) " << GALOIS_COPYRIGHT_YEAR_STRING << " The University of Texas at Austin\n";
+  std::cout << "Copyright (C) " << Galois::getCopyrightYear() << " The University of Texas at Austin\n";
   std::cout << "http://iss.ices.utexas.edu/galois/\n\n";
   std::cout << "application: " <<  (app ? app : "unspecified") << "\n";
   if (desc)
