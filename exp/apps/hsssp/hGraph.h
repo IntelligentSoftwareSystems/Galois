@@ -65,7 +65,7 @@ class hGraph : public GlobalObject {
       return gid - globalOffset;
     auto ii = std::lower_bound(ghostMap.begin(), ghostMap.end(), gid);
     assert(*ii == gid);
-    return std::distance(ghostMap.begin(), ii);
+    return std::distance(ghostMap.begin(), ii) + numOwned;
   }
 
   uint32_t L2H(uint32_t lid) const {
@@ -117,6 +117,8 @@ public:
 
   template<typename FnTy>
   void syncRecvApply(Galois::Runtime::RecvBuffer& buf) {
+
+    //hGraph* obj = reinterpret_cast<hGraph*>(ptrForObj(0));
     uint32_t num;
     Galois::Runtime::gDeserialize(buf, num);
     for(; num ; --num) {
@@ -124,10 +126,18 @@ public:
       typename FnTy::ValTy val;
       Galois::Runtime::gDeserialize(buf, gid, val);
       assert(isOwned(gid));
+      //if (Galois::Runtime::NetworkInterface::ID == 1){
+        //std::cout << "before syncRecvApply on : " << getData(gid - globalOffset).dist_current << "\n";
+      //}
+    //  std::cout << Galois::Runtime::NetworkInterface::ID << " " << " recv (" << gid << ") " << gid-globalOffset << " " << val << "\n";
       FnTy::reduce(getData(gid - globalOffset), val);
+
+      //if (Galois::Runtime::NetworkInterface::ID == 1){
+        //std::cout << "After syncRecvApply on : " << getData(gid - globalOffset).dist_current << "\n";
+      //}
     }
   }
-  
+
  public:
   typedef typename GraphTy::GraphNode GraphNode;
   typedef typename GraphTy::iterator iterator;
@@ -142,7 +152,7 @@ public:
     :GlobalObject(this), id(host)
   {
     OfflineGraph g(filename);
-    std::cerr << "Offline Graph Done\n";
+    //std::cerr << "Offline Graph Done\n";
 
     //compute owners for all nodes
     std::vector<std::pair<uint32_t, uint32_t>> gid2host;
@@ -150,21 +160,21 @@ public:
       gid2host.push_back(Galois::block_range(0U, (unsigned)g.size(), i, numHosts));
     numOwned = gid2host[id].second - gid2host[id].first;
     globalOffset = gid2host[id].first;
-    std::cerr <<  "Global info done\n";
+    //std::cerr <<  "Global info done\n";
 
     uint64_t numEdges = g.edge_begin(gid2host[id].second) - g.edge_begin(gid2host[id].first); // depends on Offline graph impl
-    std::cerr << "Edge count Done\n";
+    std::cerr << "Edge count Done " << numEdges << "\n";
 
     std::vector<bool> ghosts(g.size());
     for (auto n = gid2host[id].first; n < gid2host[id].second; ++n)
       for (auto ii = g.edge_begin(n), ee = g.edge_end(n); ii < ee; ++ii)
         ghosts[g.getEdgeDst(ii)] = true;
-    std::cerr << "Ghost Finding Done\n";
+    std::cerr << "Ghost Finding Done " << std::count(ghosts.begin(), ghosts.end(), true) << "\n";
 
     for (uint64_t x = 0; x < g.size(); ++x)
       if (ghosts[x] && !isOwned(x))
         ghostMap.push_back(x);
-    std::cerr << "L2G Done\n";
+    //std::cerr << "L2G Done\n";
 
     hostNodes.resize(numHosts, std::make_pair(~0,~0));
     for (unsigned ln = 0; ln < ghostMap.size(); ++ln) {
@@ -182,14 +192,14 @@ public:
       }
       assert(found);
     }
-    std::cerr << "hostNodes Done\n";
+    //std::cerr << "hostNodes Done\n";
 
     uint32_t numNodes = numOwned + ghostMap.size();
     graph.allocateFrom(numNodes, numEdges);
-    std::cerr << "Allocate done\n";
+    //std::cerr << "Allocate done\n";
     
     graph.constructNodes();
-    std::cerr << "Construct nodes done\n";
+    //std::cerr << "Construct nodes done\n";
 
     uint64_t cur = 0;
     for (auto n = gid2host[id].first; n < gid2host[id].second; ++n) {
@@ -198,13 +208,16 @@ public:
         decltype(gdst) ldst = G2L(gdst);
         graph.constructEdge(cur++, ldst);
       }
-      graph.fixEndEdge(n, cur);
+      graph.fixEndEdge(G2L(n), cur);
     }
-    std::cerr << "Construct edges done\n";
+    //std::cerr << "Construct edges done\n";
   }
 
   NodeTy& getData(GraphNode N, Galois::MethodFlag mflag = Galois::MethodFlag::ALL) {
-    return getDataImpl<BSPNode>(N, mflag);
+    auto& r = getDataImpl<BSPNode>(N, mflag);
+    auto i =Galois::Runtime::NetworkInterface::ID;
+    //std::cerr << i << " " << N << " " <<&r << " " << r.dist_current << "\n";
+    return r;
   }
 
   typename GraphTy::edge_data_reference getEdgeData(edge_iterator ni, Galois::MethodFlag mflag = Galois::MethodFlag::ALL) {
@@ -231,8 +244,8 @@ public:
   const_iterator end() const { return graph.begin() + numOwned; }
   iterator end() { return graph.begin() + numOwned; } 
 
-  const_iterator ghost_begin() const { return end; }
-  iterator ghost_begin() { return end; }
+  const_iterator ghost_begin() const { return end(); }
+  iterator ghost_begin() { return end(); }
   const_iterator ghost_end() const { return graph.end(); }
   iterator ghost_end() { return graph.end(); }
   
@@ -244,11 +257,13 @@ public:
       if (x == id) continue;
       uint32_t start, end;
       std::tie(start, end) = nodes_by_host(x);
+  //    std::cout << net.ID << " " << x << " " << start << " " << end << "\n";
       if (start == end) continue;
       Galois::Runtime::SendBuffer b;
       gSerialize(b, idForSelf(), fn, (uint32_t)(end-start));
       for (; start != end; ++start) {
         auto gid = L2G(start);
+//        std::cout << net.ID << " send (" << gid << ") " << start << " " << FnTy::extract(getData(start)) << "\n";
         gSerialize(b, gid, FnTy::extract(getData(start)));
         FnTy::reset(getData(start));
       }
