@@ -1,9 +1,11 @@
 /*
  * Author : Gurbinder Gill (gurbinder533@gmail.com)
  */
+
 #include <sstream>
 #include <climits>
 #include <vector>
+#include <map>
 #include "clang/Frontend/FrontendPluginRegistry.h"
 #include "clang/AST/AST.h"
 #include "clang/AST/ASTConsumer.h"
@@ -42,7 +44,7 @@ namespace {
     explicit GaloisFunctionsVisitor(CompilerInstance *CI) : astContext(&(CI->getASTContext())){}
 
     virtual bool VisitCXXRecordDecl(CXXRecordDecl* Dec){
-      Dec->dump();
+      //Dec->dump();
       return true;
     }
     virtual bool VisitFunctionDecl(FunctionDecl* func){
@@ -50,6 +52,21 @@ namespace {
       std::string funcName = func->getNameAsString();
       if (funcName == "foo"){
         llvm::errs() << "Found" << "\n";
+      }
+      return true;
+    }
+
+    virtual bool VisitCallExpr(CallExpr* call) {
+      if (call) {
+        auto t = call->getType().getTypePtrOrNull();
+        if (t) {
+          auto func = call->getDirectCallee();
+          if (func)
+            if (func->getNameAsString() == "getData"){
+              llvm::outs() << func->getNameInfo().getName().getAsString() << "\n";
+              call->dump();
+            }
+        }
       }
       return true;
     }
@@ -81,6 +98,110 @@ namespace {
       }
   };
 
+  struct getData_entry {
+    string NAME;
+    string TYPE;
+    bool LVALUE;
+  };
+
+  class InfoClass {
+    public:
+      map<string, vector<getData_entry>> getData_map;
+  };
+
+
+  class CallExprHandler : public MatchFinder::MatchCallback {
+    private:
+      ASTContext* astContext;
+      InfoClass *info;
+    public:
+      CallExprHandler(CompilerInstance*  CI, InfoClass* _info):astContext(&(CI->getASTContext())), info(_info){}
+
+      virtual void run(const MatchFinder::MatchResult &Results) {
+
+        auto call = Results.Nodes.getNodeAs<clang::CallExpr>("calleeName");
+        auto record = Results.Nodes.getNodeAs<clang::CXXRecordDecl>("callerInStruct");
+
+        if (call && record) {
+          string STRUCT = record->getNameAsString();
+          llvm::outs() << STRUCT << "\n\n";
+          string NAME = "";
+          string TYPE = "";
+          bool LVALUE = 0;
+
+          auto func = call->getDirectCallee();
+          if (func) {
+            string functionName = func->getNameAsString();
+            if (functionName == "getData") {
+              //record->dump();
+              //call->dump();
+              TYPE = call->getCallReturnType(*astContext).getAsString();
+              for (auto argument : call->arguments()) {
+                //argument->dump();
+                auto implCast = argument->IgnoreCasts();
+                //implCast->dump();
+                auto declref = dyn_cast<DeclRefExpr>(implCast);
+                if (declref) {
+                  LVALUE = declref->isLValue();
+                  NAME = declref->getNameInfo().getAsString();
+                }
+              }
+              //call->dumpColor();
+
+              //Storing information.
+              getData_entry entry;
+              entry.NAME = NAME;
+              entry.TYPE = TYPE;
+              entry.LVALUE = LVALUE;
+
+              info->getData_map[STRUCT].push_back(entry);
+            }
+            else if (functionName == "getEdgeDst") {
+              llvm::outs() << "Found getEdgeDst \n";
+              auto forStatement = Results.Nodes.getNodeAs<clang::ForStmt>("forLoopName");
+              forStatement->dump();
+            }
+          }
+        }
+      }
+  };
+
+  class FindOperatorHandler : public MatchFinder::MatchCallback {
+    private:
+      ASTContext* astContext;
+    public:
+      FindOperatorHandler(CompilerInstance *CI):astContext(&(CI->getASTContext())){}
+      virtual void run(const MatchFinder::MatchResult &Results) {
+        llvm::outs() << "I found one operator\n";
+
+        const CXXRecordDecl* recDecl = Results.Nodes.getNodeAs<clang::CXXRecordDecl>("GaloisOP");
+
+        if(recDecl){
+          //recDecl->dump();
+
+          for(auto method : recDecl->methods()){
+            if (method->getNameAsString() == "operator()") {
+              llvm::outs() << method->getNameAsString() << "\n";
+              //method->dump();
+              auto funcDecl = dyn_cast<clang::FunctionDecl>(method);
+              llvm::outs() << funcDecl->param_size() << "\n";
+              if (funcDecl->hasBody() && (funcDecl->param_size() == 1)){
+                auto paramValdecl = funcDecl->getParamDecl(0); // This is GNode src to operator. 
+                auto stmt = funcDecl->getBody();
+                if (stmt){
+                  //stmt->dumpColor();
+
+                  for(auto stmtChild : stmt->children()) {
+                    stmtChild->dump();
+                  }
+
+                }
+              }
+            }
+          }
+        }
+      }
+  };
   class FunctionCallHandler : public MatchFinder::MatchCallback {
     private:
       Rewriter &rewriter;
@@ -269,18 +390,79 @@ namespace {
     CompilerInstance &Instance;
     std::set<std::string> ParsedTemplates;
     GaloisFunctionsVisitor* Visitor;
-    MatchFinder Matchers;
-    ForStmtHandler forStmtHandler;
-    //NameSpaceHandler namespaceHandler;
+    MatchFinder Matchers, Matchers_op;
     FunctionCallHandler functionCallHandler;
+    FindOperatorHandler findOperator;
+    CallExprHandler callExprHandler;
+    InfoClass info;
   public:
-    GaloisFunctionsConsumer(CompilerInstance &Instance, std::set<std::string> ParsedTemplates, Rewriter &R): Instance(Instance), ParsedTemplates(ParsedTemplates), Visitor(new GaloisFunctionsVisitor(&Instance)), functionCallHandler(R) {
+    GaloisFunctionsConsumer(CompilerInstance &Instance, std::set<std::string> ParsedTemplates, Rewriter &R): Instance(Instance), ParsedTemplates(ParsedTemplates), Visitor(new GaloisFunctionsVisitor(&Instance)), functionCallHandler(R), findOperator(&Instance), callExprHandler(&Instance, &info) {
       //Matchers.addMatcher(unless(isExpansionInSystemHeader(callExpr(callee(functionDecl(hasName("for_each")))).bind("galoisLoop"))), &namespaceHandler);
-      Matchers.addMatcher(callExpr(callee(functionDecl(hasName("Galois::do_all"))),unless(isExpansionInSystemHeader())).bind("galoisLoop"), &functionCallHandler);
+      //Matchers.addMatcher(callExpr(callee(functionDecl(hasName("Galois::do_all"))),unless(isExpansionInSystemHeader())).bind("galoisLoop"), &functionCallHandler);
 
       
+      //Matchers.addMatcher(recordDecl(hasName("initializeGraph")).bind("op"), &findOperator);
+      //Matchers.addMatcher(recordDecl(has(methodDecl(hasName("operator()")), hasParameter(0, hasType(varDecl())))).bind("op"), &findOperator);
+      //Matchers.addMatcher(methodDecl(returns(asString("void"))).bind("op"), &findOperator); //****working
+      //Matchers.addMatcher(recordDecl(hasMethod(hasAnyParameter(hasName("x")))).bind("op"), &findOperator); // *** working
+      //Matchers.addMatcher(recordDecl(hasMethod(hasParameter(1, parmVarDecl(hasType(isInteger()))))).bind("op"), &findOperator); // *** working
+
+      /**************** Found it ********************/
+      //Matchers.addMatcher(callExpr(isExpansionInMainFile(), callee(functionDecl(hasName("getData"))), hasAncestor(binaryOperator(hasOperatorName("=")).bind("assignment"))).bind("getData"), &callExprHandler); //*** WORKS
+      //Matchers.addMatcher(recordDecl(hasDescendant(callExpr(isExpansionInMainFile(), callee(functionDecl(hasName("getData")))).bind("getData"))).bind("getDataInStruct"), &callExprHandler); //**** works
+
+      /** For matching the nodes in AST with getData function call ***/
+      Matchers.addMatcher(callExpr(isExpansionInMainFile(), callee(functionDecl(hasName("getData"))), hasAncestor(recordDecl().bind("callerInStruct"))).bind("calleeName"), &callExprHandler);
+
+      /** For matching the nodes in AST with getEdgeDst function call ***/
+      StatementMatcher Edge_beginCallMatcher = memberCallExpr(argumentCountIs(1), callee(methodDecl(hasName("edge_begin"))));
+      DeclarationMatcher InitDeclMatcher = varDecl(hasInitializer(anything())).bind("ForInitVarName");
+      DeclarationMatcher EndDeclMatcher = varDecl(hasInitializer(anything())).bind("ForEndVarName");
+      StatementMatcher Edge_endCallMatcher = memberCallExpr(argumentCountIs(1), callee(methodDecl(hasName("edge_end"))));
+
+      StatementMatcher IteratorBoundMatcher = expr(anyOf(ignoringParenImpCasts(declRefExpr(to(
+                                                  varDecl()))),
+                                                      ignoringParenImpCasts(
+                                                            expr(Edge_endCallMatcher)),
+                                                      materializeTemporaryExpr(ignoringParenImpCasts(
+                                                          expr(Edge_endCallMatcher)))));
+
+      StatementMatcher IteratorComparisonMatcher = expr(ignoringParenImpCasts(declRefExpr(to(
+                                                      varDecl()))));
+
+      StatementMatcher OverloadedNEQMatcher = operatorCallExpr(
+                                                hasOverloadedOperatorName("!="),
+                                                argumentCountIs(2),
+                                                hasArgument(0, IteratorComparisonMatcher),
+                                                hasArgument(1,IteratorBoundMatcher));
+
+      static const TypeMatcher AnyType = anything();
+      StatementMatcher EdgeForLoopMatcher = forStmt(hasLoopInit(anyOf(
+                                                  declStmt(declCountIs(2),
+                                                              containsDeclaration(0, InitDeclMatcher),
+                                                              containsDeclaration(1, EndDeclMatcher)),
+                                                  declStmt(hasSingleDecl(InitDeclMatcher)))),
+                                              hasCondition(anyOf(
+                                                  binaryOperator(hasOperatorName("!="),
+                                                                  hasLHS(IteratorComparisonMatcher),
+                                                                  hasRHS(IteratorBoundMatcher)),
+                                                  OverloadedNEQMatcher)),
+                                              hasIncrement(anyOf(
+                                                            unaryOperator(hasOperatorName("++"),
+                                                                              hasUnaryOperand(declRefExpr(to(
+                                                                                    varDecl(hasType(pointsTo(AnyType))))))),
+                                                            operatorCallExpr(
+                                                                hasOverloadedOperatorName("++"),
+                                                                hasArgument(0, declRefExpr(to(
+                                                                      varDecl()))))))).bind("forLoopName");
+
+
+      Matchers.addMatcher(callExpr(isExpansionInMainFile(), callee(functionDecl(hasName("getEdgeDst"))), hasAncestor(recordDecl().bind("callerInStruct")), hasAncestor(EdgeForLoopMatcher)).bind("calleeName"), &callExprHandler);
+
+      //Matchers_op.addMatcher(recordDecl(isExpansionInMainFile(), hasMethod(hasName("operator()")), hasMethod(returns(asString("void"))), hasMethod(hasParameter(0, parmVarDecl(hasType(isInteger()))))).bind("GaloisOP"), &findOperator); // *** working
+
+      //Matchers.addMatcher(methodDecl(hasAnyParameter(hasName("x"))).bind("op"), &findOperator); //***** works
       //Matchers.addMatcher(declRefExpr(to(functionDecl(hasName("do_all"))),unless(isExpansionInSystemHeader())).bind("galoisLoop"), &functionCallHandler);
-      //
       //Matchers.addMatcher(recordDecl(decl().bind("id"), hasName("::Galois")), &recordHandler);
       //Matchers.addMatcher(nestedNameSpecifier(specifiesNamespace(hasName("for_each"))).bind("galoisLoop"), &namespaceHandler);
       //Matchers.addMatcher(forStmt(nestedNameSpecifier(specifiesNamespace(hasName("Galois"))).bind("galoisLoop")), &namespaceHandler);
@@ -290,8 +472,10 @@ namespace {
     }
 
     virtual void HandleTranslationUnit(ASTContext &Context){
-      Matchers.matchAST(Context);
       //Visitor->TraverseDecl(Context.getTranslationUnitDecl());
+      Matchers.matchAST(Context);
+      llvm::outs() << " MAP SIZE : " << info.getData_map.size() << "\n";
+      Matchers_op.matchAST(Context);
     }
   };
 
@@ -302,12 +486,13 @@ namespace {
   protected:
 
     void EndSourceFileAction() override {
+      /*
       TheRewriter.getEditBuffer(TheRewriter.getSourceMgr().getMainFileID()).write(llvm::outs());
       if (!TheRewriter.overwriteChangedFiles())
       {
         llvm::outs() << "Successfully saved changes\n";
       }
-
+      */
     }
     std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance &CI, llvm::StringRef) override {
       TheRewriter.setSourceMgr(CI.getSourceManager(), CI.getLangOpts());
@@ -324,4 +509,4 @@ namespace {
 
 }
 
-static FrontendPluginRegistry::Add<GaloisFunctionsAction> X("galois-fns", "find galois function names");
+static FrontendPluginRegistry::Add<GaloisFunctionsAction> X("galois-analysis", "find galois function names");
