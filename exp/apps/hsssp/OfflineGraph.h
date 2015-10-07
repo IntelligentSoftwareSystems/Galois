@@ -45,7 +45,7 @@
 
 
 class OfflineGraph {
-  std::ifstream file1, file2;
+  std::ifstream file1;
   uint32_t numNodes;
   uint64_t numEdges;
   size_t length;
@@ -64,10 +64,24 @@ class OfflineGraph {
   uint32_t outEdges(uint64_t edge) {
     std::lock_guard<decltype(lock)> lg(lock);
     std::streamoff pos = (4 + numNodes) * sizeof(uint64_t) + edge * sizeof(uint32_t);
-    if (file2.tellg() != pos)
-      file2.seekg(pos, file2.beg);
+    if (file1.tellg() != pos)
+      file1.seekg(pos, file1.beg);
     uint32_t retval;
-    file2.read(reinterpret_cast<char*>(&retval), sizeof(uint32_t));
+    file1.read(reinterpret_cast<char*>(&retval), sizeof(uint32_t));
+    return retval;
+  }
+
+  template<typename T>
+  T edgeData(uint64_t edge) {
+    std::lock_guard<decltype(lock)> lg(lock);
+    std::streamoff pos = (4 + numNodes) * sizeof(uint64_t) + numEdges * sizeof(uint32_t);
+    //align
+    pos = (pos + 7) & ~7;
+    pos += edge * sizeof(T);
+    if (file1.tellg() != pos)
+      file1.seekg(pos, file1.beg);
+    T retval;
+    file1.read(reinterpret_cast<char*>(&retval), sizeof(T));
     return retval;
   }
 
@@ -77,10 +91,9 @@ public:
   typedef uint32_t GraphNode;
 
   OfflineGraph(const std::string& name)
-    :file1(name), file2(name)
+    :file1(name)
   {
     if (!file1.is_open() || !file1.good()) throw "Bad filename";
-    if (!file2.is_open() || !file2.good()) throw "Bad filename";
     uint64_t ver = 0;
     file1.read(reinterpret_cast<char*>(&ver), sizeof(uint64_t));
     file1.seekg(sizeof(uint64_t), file1.cur);
@@ -118,6 +131,11 @@ public:
 
   GraphNode getEdgeDst(edge_iterator ni) {
     return outEdges(*ni);
+  }
+
+  template<typename T>
+  T getEdgeData(edge_iterator ni) {
+    return edgeData<T>(ni);
   }
 
 };
