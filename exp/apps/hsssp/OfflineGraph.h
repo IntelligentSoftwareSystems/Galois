@@ -43,14 +43,24 @@
 //potential padding (32bit max) to Re-Align to 64bits
 //EdgeType[numEdges] {EdgeType size}
 
+//File format V2:
+//version (2) {uint64_t LE}
+//EdgeType size {uint64_t LE}
+//numNodes {uint64_t LE}
+//numEdges {uint64_t LE}
+//outindexs[numNodes] {uint64_t LE} (outindex[nodeid] is index of first edge for nodeid + 1 (end interator.  node 0 has an implicit start iterator of 0.
+//outedges[numEdges] {uint64_t LE}
+//EdgeType[numEdges] {EdgeType size}
+
 
 class OfflineGraph {
   std::ifstream file1;
-  uint32_t numNodes;
+  uint64_t numNodes;
   uint64_t numEdges;
   size_t length;
+  bool v2;
   Galois::Runtime::LL::SimpleLock lock;
-  
+
   uint64_t outIndexs(uint64_t node) {
     std::lock_guard<decltype(lock)> lg(lock);
     std::streamoff pos = (4 + node)*sizeof(uint64_t);
@@ -61,20 +71,26 @@ class OfflineGraph {
     return retval;
   }
 
-  uint32_t outEdges(uint64_t edge) {
+  uint64_t outEdges(uint64_t edge) {
     std::lock_guard<decltype(lock)> lg(lock);
-    std::streamoff pos = (4 + numNodes) * sizeof(uint64_t) + edge * sizeof(uint32_t);
+    std::streamoff pos = (4 + numNodes) * sizeof(uint64_t) + edge * (v2 ? sizeof(uint64_t) : sizeof(uint32_t));
     if (file1.tellg() != pos)
       file1.seekg(pos, file1.beg);
-    uint32_t retval;
-    file1.read(reinterpret_cast<char*>(&retval), sizeof(uint32_t));
-    return retval;
+    if (v2) {
+      uint64_t retval;
+      file1.read(reinterpret_cast<char*>(&retval), sizeof(uint64_t));
+      return retval;
+    } else {
+      uint32_t retval;
+      file1.read(reinterpret_cast<char*>(&retval), sizeof(uint32_t));
+      return retval;
+    }
   }
 
   template<typename T>
   T edgeData(uint64_t edge) {
     std::lock_guard<decltype(lock)> lg(lock);
-    std::streamoff pos = (4 + numNodes) * sizeof(uint64_t) + numEdges * sizeof(uint32_t);
+    std::streamoff pos = (4 + numNodes) * sizeof(uint64_t) + numEdges * (v2 ? sizeof(uint64_t) : sizeof(uint32_t));
     //align
     pos = (pos + 7) & ~7;
     pos += edge * sizeof(T);
@@ -99,12 +115,13 @@ public:
     file1.seekg(sizeof(uint64_t), file1.cur);
     file1.read(reinterpret_cast<char*>(&numNodes), sizeof(uint64_t));
     file1.read(reinterpret_cast<char*>(&numEdges), sizeof(uint64_t));
-    if (ver != 1) throw "Bad Version";
+    if (ver == 0 || ver > 2) throw "Bad Version";
+    v2 = ver == 2;
     if (!file1) throw "Out of data";
     //File length
     file1.seekg(0, file1.end);
     length = file1.tellg();
-    if (length < sizeof(uint64_t)*(4+numNodes) + sizeof(uint32_t)*numEdges)
+    if (length < sizeof(uint64_t)*(4+numNodes) + (v2 ? sizeof(uint64_t) : sizeof(uint32_t))*numEdges)
       throw "File too small";
     
   }

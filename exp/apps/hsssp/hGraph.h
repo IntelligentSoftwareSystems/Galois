@@ -39,10 +39,10 @@ class hGraph : public GlobalObject {
   GraphTy graph;
   bool round;
   uint32_t numOwned; // [0, numOwned) = global nodes owned, thus [numOwned, numNodes are replicas
-  uint32_t globalOffset; // [numOwned, end) + globalOffset = GID
+  uint64_t globalOffset; // [numOwned, end) + globalOffset = GID
   unsigned id; // my hostid // FIXME: isn't this just Network::ID?
   //ghost cell ID translation
-  std::vector<uint32_t> ghostMap; // GID = ghostMap[LID - numOwned]
+  std::vector<uint64_t> ghostMap; // GID = ghostMap[LID - numOwned]
   //GID to owner
   std::vector<std::pair<uint32_t,uint32_t> > hostNodes; //LID Node owned by host i
   //pointer for each host
@@ -53,14 +53,14 @@ class hGraph : public GlobalObject {
     return hostNodes[host];
   }
 
-  uint32_t L2G(uint32_t lid) const {
+  uint64_t L2G(uint32_t lid) const {
     assert(lid < graph.size());
     if (lid < numOwned)
       return lid + globalOffset;
     return ghostMap[lid - numOwned];
   }
 
-  uint32_t G2L(uint32_t gid) const {
+  uint32_t G2L(uint64_t gid) const {
     if (gid >= globalOffset && gid < globalOffset + numOwned)
       return gid - globalOffset;
     auto ii = std::lower_bound(ghostMap.begin(), ghostMap.end(), gid);
@@ -78,7 +78,7 @@ class hGraph : public GlobalObject {
     abort();
   }
 
-  bool isOwned(uint32_t gid) const {
+  bool isOwned(uint64_t gid) const {
     return gid >=globalOffset && gid < globalOffset+numOwned;
   }
 
@@ -120,7 +120,7 @@ public:
     uint32_t num;
     Galois::Runtime::gDeserialize(buf, num);
     for(; num ; --num) {
-      uint32_t gid;
+      uint64_t gid;
       typename FnTy::ValTy val;
       Galois::Runtime::gDeserialize(buf, gid, val);
       assert(isOwned(gid));
@@ -145,7 +145,7 @@ public:
     std::cerr << "Offline Graph Done\n";
 
     //compute owners for all nodes
-    std::vector<std::pair<uint32_t, uint32_t>> gid2host;
+    std::vector<std::pair<uint64_t, uint64_t>> gid2host;
     for (unsigned i = 0; i < numHosts; ++i)
       gid2host.push_back(Galois::block_range(0U, (unsigned)g.size(), i, numHosts));
     numOwned = gid2host[id].second - gid2host[id].first;
@@ -185,6 +185,7 @@ public:
     std::cerr << "hostNodes Done\n";
 
     uint32_t numNodes = numOwned + ghostMap.size();
+    assert((uint64_t)numOwned + (uint64_t)ghostMap.size() == (uint64_t)numNodes);
     graph.allocateFrom(numNodes, numEdges);
     std::cerr << "Allocate done\n";
     
