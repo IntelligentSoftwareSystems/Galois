@@ -60,7 +60,7 @@ class TopoBarrier : public Galois::Substrate::Barrier {
   Galois::Substrate::PerThreadStorage<unsigned> sense;
 
   void _reinit(unsigned P) {
-    auto& tp = Galois::Substrate::getSystemThreadPool();
+    auto& tp = Galois::Substrate::getThreadPool();
     unsigned pkgs = tp.getCumulativeMaxPackage(P-1) + 1;
     for (unsigned i = 0; i < pkgs; ++i) {
       treenode& n = *nodes.getRemoteByPkg(i);

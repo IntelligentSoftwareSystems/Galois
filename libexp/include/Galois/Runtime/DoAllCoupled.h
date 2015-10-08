@@ -188,7 +188,7 @@ class DoAllCoupledExec {
     ThreadContext () 
       :
         work_mutex (),
-        id (Substrate::getSystemThreadPool().getMaxThreads ()), // TODO: fix this initialization problem, see initThread
+        id (Substrate::getThreadPool().getMaxThreads ()), // TODO: fix this initialization problem, see initThread
         shared_beg (),
         shared_end (),
         m_size (0),
@@ -403,7 +403,7 @@ private:
     bool sawWork = false;
     bool stoleWork = false;
 
-    auto& tp = Substrate::getSystemThreadPool();
+    auto& tp = Substrate::getThreadPool();
 
     const unsigned maxT = Galois::getActiveThreads ();
     const unsigned my_pack = Substrate::ThreadPool::getPackage ();
@@ -438,7 +438,7 @@ private:
     bool sawWork = false;
     bool stoleWork = false;
 
-    auto& tp = Substrate::getSystemThreadPool();
+    auto& tp = Substrate::getThreadPool();
     unsigned myPkg = Substrate::ThreadPool::getPackage();
     // unsigned maxT = LL::getMaxThreads ();
     unsigned maxT = Galois::getActiveThreads ();
@@ -518,7 +518,7 @@ private:
 
     Substrate::asmPause ();
 
-    if (Substrate::getSystemThreadPool().isLeader(poor.id)) {
+    if (Substrate::getThreadPool().isLeader(poor.id)) {
       ret = stealOutsidePackage (poor, HALF);
 
       if (ret) { return true; }
@@ -711,7 +711,7 @@ void do_all_coupled (const R& range, const F& func, const char* loopname=0, cons
 
   Substrate::Barrier& barrier = getBarrier(activeThreads);
 
-  Substrate::getSystemThreadPool().run(activeThreads, 
+  Substrate::getThreadPool().run(activeThreads, 
       [&exec] (void) { exec.initThread (); },
       std::ref(barrier),
       std::ref(exec));

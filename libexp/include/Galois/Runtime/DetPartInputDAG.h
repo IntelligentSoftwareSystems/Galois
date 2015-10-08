@@ -524,13 +524,13 @@ struct InputGraphPartDAGexecutor {
 template <typename R, typename F, typename G, typename M>
 void for_each_det_input_part (const R& range, const F& func, G& graph, M& dagManager, const char* loopname) {
 
-  Galois::Substrate::getSystemThreadPool ().burnPower (Galois::getActiveThreads ());
+  Galois::Substrate::getThreadPool ().burnPower (Galois::getActiveThreads ());
 
   InputGraphPartDAGexecutor<G, F, M> executor {graph, func, dagManager, loopname};
 
   executor.execute (range);
 
-  Galois::Substrate::getSystemThreadPool ().beKind ();
+  Galois::Substrate::getThreadPool ().beKind ();
 
 }
 

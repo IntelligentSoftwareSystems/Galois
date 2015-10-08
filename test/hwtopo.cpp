@@ -4,10 +4,10 @@
 
 int main(int argc, char** argv) {
   auto t = Galois::Substrate::getHWTopo();
-  std::cout << "T,C,P: " << t->getMaxThreads() << " " << t->getMaxCores() << " " << t->getMaxPackages() << "\n";
-  for (unsigned i = 0; i < t->getMaxThreads(); ++i) {
-    auto& c = t->getThreadInfo(i);
-    std::cout << "tid,L,p,os,cmp: " << c.tid << " " << c.packageLeader << " " << c.package << " " << c.hwContext << " " << c.cumulativeMaxPackage << "\n";
+  std::cout << "T,C,P,N: " << t.first.maxThreads << " " << t.first.maxCores << " " << t.first.maxPackages << " " << t.first.maxNumaNodes << "\n";
+  for (unsigned i = 0; i < t.first.maxThreads; ++i) {
+    auto& c = t.second[i];
+    std::cout << "tid: " << c.tid << " leader: " << c.socketLeader << " socket: " << c.socket << " numaNode: " << c.numaNode << " cumulativeMaxSocket: " << c.cumulativeMaxSocket << " osContext: " << c.osContext << " osNumaNode: " << c.osNumaNode << "\n";
   }
   return 0;
 }

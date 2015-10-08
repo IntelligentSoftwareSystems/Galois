@@ -58,7 +58,7 @@ struct WID {
   unsigned tid;
   unsigned pid;
   WID(unsigned t): tid(t) {
-    pid = Substrate::getSystemThreadPool().getLeader(tid);
+    pid = Substrate::getThreadPool().getLeader(tid);
   }
   WID() {
     tid = Substrate::ThreadPool::getTID();
@@ -182,7 +182,7 @@ public:
     WID id;
     for (unsigned i = 0; i < data.size(); ++i) {
       id.tid = i;
-      id.pid = Substrate::getSystemThreadPool().getLeader(i);
+      id.pid = Substrate::getThreadPool().getLeader(i);
       if (!empty(id))
         return false;
     }

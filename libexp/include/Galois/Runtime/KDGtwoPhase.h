@@ -623,14 +623,14 @@ void for_each_ordered_2p_win (const R& range, const Cmp& cmp, const NhFunc& nhFu
   Exec e (cmp, nhFunc, opFunc);
 
   if (wakeupThreadPool) {
-    Substrate::getSystemThreadPool().burnPower (Galois::getActiveThreads ());
+    Substrate::getThreadPool().burnPower (Galois::getActiveThreads ());
   }
 
   e.fill_initial (range);
   e.execute ();
 
   if (wakeupThreadPool) {
-    Substrate::getSystemThreadPool().beKind();
+    Substrate::getThreadPool().beKind();
   }
 }
 
@@ -645,14 +645,14 @@ void for_each_ordered_2p_win (const R& range, const Cmp& cmp, const NhFunc& nhFu
   Exec e (cmp, nhFunc, addFunc, execFunc);
 
   if (wakeupThreadPool) {
-    Substrate::getSystemThreadPool().burnPower(Galois::getActiveThreads ());
+    Substrate::getThreadPool().burnPower(Galois::getActiveThreads ());
   }
 
   e.fill_initial (range);
   e.execute ();
 
   if (wakeupThreadPool) {
-    Substrate::getSystemThreadPool().beKind ();
+    Substrate::getThreadPool().beKind ();
   }
 }
 
@@ -670,14 +670,14 @@ void for_each_ordered_ikdg_custom_safety (const R& range, const Cmp& cmp, const 
   const bool wakeupThreadPool = true;
 
   if (wakeupThreadPool) {
-    Substrate::getSystemThreadPool().burnPower(Galois::getActiveThreads ());
+    Substrate::getThreadPool().burnPower(Galois::getActiveThreads ());
   }
 
   e.fill_initial (range);
   e.execute ();
 
   if (wakeupThreadPool) {
-    Substrate::getSystemThreadPool().beKind ();
+    Substrate::getThreadPool().beKind ();
   }
 
 }

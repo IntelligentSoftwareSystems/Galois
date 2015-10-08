@@ -95,7 +95,7 @@ struct F2 {
 };
 
 int main(int argc, char** argv) {
-  unsigned M = Galois::Substrate::getSystemThreadPool().getMaxThreads() / 2;
+  unsigned M = Galois::Substrate::getThreadPool().getMaxThreads() / 2;
   size_t mega = 1;
   if (argc > 1)
     mega = atoi(argv[1]);

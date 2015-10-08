@@ -202,14 +202,6 @@ endif()
 # PThreads
 find_package(Threads REQUIRED)
 
-# NUMA (linux)
-find_package(NUMA)
-if(NUMA_FOUND)
-  add_definitions(-DGALOIS_USE_NUMA=1)
-elseif(USE_STRICT_CONFIG)
-  message(FATAL_ERROR "Need libnuma")
-endif()
-
 #llvm ADT and command line parser
 #find_package(LLVM)
 
@@ -249,13 +241,6 @@ include(CheckEndian)
 ###### Build Hacks ######
 
 add_definitions(-D__STDC_LIMIT_MACROS)
-
-# XXX(ddn): Hack for lonestar machines
-if(NUMA_FOUND)
-  if(NUMA_OLD)
-    set(GALOIS_USE_NUMA_OLD on)
-  endif()
-endif()
 
 ###### Global Functions ######
 

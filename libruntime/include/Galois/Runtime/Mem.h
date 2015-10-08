@@ -76,8 +76,6 @@ int numPageAllocForThread(unsigned tid);
 
 //! Returns total small pages allocated by OS on a NUMA node
 int numNumaAllocForNode(unsigned nodeid);
-//! Returns number of NUMA nodes on machine
-int numNumaNodes();
 
 /**
  * Allocates memory interleaved across NUMA nodes. 

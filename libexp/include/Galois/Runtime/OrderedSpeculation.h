@@ -760,7 +760,7 @@ void for_each_ordered_optim (const R& range, Cmp cmp, NhFunc nhFunc, OpFunc opFu
 
   OptimOrdExecutor<T, Cmp, NhFunc, OpFunc> exec (cmp, nhFunc, opFunc, barrier, loopname);
 
-  Substrate::getSystemThreadPool ().run (numT,
+  Substrate::getThreadPool ().run (numT,
       [&exec, &range] (void) { exec.push_initial (range); },
       std::ref (barrier),
       std::ref (exec));

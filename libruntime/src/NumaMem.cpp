@@ -39,11 +39,6 @@
 #include <vector>
 
 #ifdef GALOIS_USE_NUMA
-#include <numa.h>
-#include <numaif.h>
-#endif
-
-#ifdef GALOIS_USE_NUMA
 static int isNumaAvailable;
 #endif
 
@@ -152,7 +147,7 @@ static inline int getNumaNode(unsigned tid) {
 #ifdef GALOIS_FORCE_STANDALONE
   unsigned proc = 0;
 #else
-  unsigned proc = getSystemThreadPool().getPackage(tid);
+  unsigned proc = getThreadPool().getPackage(tid);
 #endif
 
 #if defined(GALOIS_USE_NUMA_OLD)
@@ -284,8 +279,8 @@ void* Galois::Runtime::largeInterleavedAlloc(size_t len, bool full) {
   unsigned __attribute__((unused)) total = 1;
   bool inForEach = false;
 #else
-  unsigned total = full ? getSystemThreadPool().getMaxCores() : activeThreads;
-  bool inForEach = Substrate::getSystemThreadPool().isRunning();
+  unsigned total = full ? getThreadPool().getMaxCores() : activeThreads;
+  bool inForEach = Substrate::getThreadPool().isRunning();
 #endif
   bool numaAlloc = false;
 
@@ -311,7 +306,7 @@ void* Galois::Runtime::largeInterleavedAlloc(size_t len, bool full) {
     unsigned uniqueNodes;
     std::vector<int> mapping(total);
     createMapping(mapping, uniqueNodes);
-    Substrate::getSystemThreadPool().run(total, std::bind(pageInInterleaved, data, len, std::ref(mapping), uniqueNodes));
+    Substrate::getThreadPool().run(total, std::bind(pageInInterleaved, data, len, std::ref(mapping), uniqueNodes));
 #endif
   }
 

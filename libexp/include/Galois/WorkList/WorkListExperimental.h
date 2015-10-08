@@ -1589,7 +1589,7 @@ class BarrierOBIM : private boost::noncopyable {
     :current(0), pushmax(0), I(x), term(Substrate::getSystemTermination(Galois::getActiveThreads()))
   {
     B = new CTy[binmax];
-    //std::cerr << "$"<<getSystemThreadPool().getActiveThreads() <<"$";
+    //std::cerr << "$"<<getThreadPool().getActiveThreads() <<"$";
     pthread_barrier_init(&barr1, NULL, Galois::getActiveThreads());
     pthread_barrier_init(&barr2, NULL, Galois::getActiveThreads());
   }

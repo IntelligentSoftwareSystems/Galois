@@ -137,7 +137,7 @@ public:
 } // end namespace
 
 //! Implement the global threadpool
-ThreadPool& Galois::Runtime::getSystemThreadPool() {
+ThreadPool& Galois::Runtime::getThreadPool() {
   static ThreadPool_pthread pool;
   return pool;
 }

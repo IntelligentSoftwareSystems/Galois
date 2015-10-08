@@ -79,7 +79,7 @@ struct PAState {
   std::vector<int> counts;
   std::map<void*, HeadPtr*> ownerMap;
   PAState() { 
-    counts.resize(Galois::Substrate::getSystemThreadPool().getMaxThreads(), 0);
+    counts.resize(Galois::Substrate::getThreadPool().getMaxThreads(), 0);
   }
 };
 
