@@ -35,8 +35,47 @@ using namespace std;
 
 namespace {
 
+  /* Convert double to string with specified number of places after the decimal
+   *    and left padding. */
+  template<typename ty>
+  std::string prd(const ty x, const int width) {
+      stringstream ss;
+      ss << fixed << right;
+      ss.fill(' ');        // fill space around displayed #
+      ss.width(width);     // set  width around displayed #
+      ss << x;
+      return ss.str();
+  }
 
-  class GaloisFunctionsVisitor : public RecursiveASTVisitor<GaloisFunctionsVisitor> {
+
+
+/*! Center-aligns string within a field of width w. Pads with blank spaces
+ *     to enforce alignment. */
+std::string center(const string s, const int w) {
+  stringstream ss, spaces;
+  int padding = w - s.size();                 // count excess room to pad
+  for(int i=0; i<padding/2; ++i)
+    spaces << " ";
+  ss << spaces.str() << s << spaces.str();
+  if(padding>0 && padding%2!=0)               // if odd #, add 1 space
+    ss << " ";
+  return ss.str();
+}
+std::string center(const bool s, const int w) {
+  stringstream ss, spaces;
+  int padding = w - 1;                 // count excess room to pad
+  for(int i=0; i<padding/2; ++i)
+    spaces << " ";
+  ss << spaces.str() << s << spaces.str();
+  if(padding>0 && padding%2!=0)               // if odd #, add 1 space
+    ss << " ";
+  return ss.str();
+}
+
+
+
+
+class GaloisFunctionsVisitor : public RecursiveASTVisitor<GaloisFunctionsVisitor> {
   private:
     ASTContext* astContext;
 
@@ -99,9 +138,12 @@ namespace {
   };
 
   struct getData_entry {
-    string NAME;
-    string TYPE;
-    bool LVALUE;
+    string VAR_NAME;
+    string VAR_TYPE;
+    string SRC_NAME;
+    string RW_STATUS;
+    bool IS_REFERENCE;
+    bool IS_REFERENCED;
   };
 
   class InfoClass {
@@ -121,8 +163,17 @@ namespace {
 
         auto call = Results.Nodes.getNodeAs<clang::CallExpr>("calleeName");
         auto record = Results.Nodes.getNodeAs<clang::CXXRecordDecl>("callerInStruct");
+        auto binaryOP = Results.Nodes.getNodeAs<clang::Stmt>("getDataAssignment");
 
+        auto lhs_ref = Results.Nodes.getNodeAs<clang::Stmt>("LHSRefVariable");
+        auto lhs_nonref = Results.Nodes.getNodeAs<clang::Stmt>("LHSNonRefVariable");
+        auto vardecl = Results.Nodes.getNodeAs<clang::Stmt>("variableDecl_getData");
+        auto NonRefVardecl = Results.Nodes.getNodeAs<clang::Stmt>("nonRefVariableDecl_getData");
+
+        //record->dump();
         if (call && record) {
+
+          getData_entry DataEntry_obj;
           string STRUCT = record->getNameAsString();
           llvm::outs() << STRUCT << "\n\n";
           string NAME = "";
@@ -135,6 +186,54 @@ namespace {
             if (functionName == "getData") {
               //record->dump();
               //call->dump();
+              if (vardecl) {
+                llvm::outs() << "Reference Variable\n";
+                auto varName = Results.Nodes.getNodeAs<clang::VarDecl>("referencedVarName");
+                //varName->dump();
+                DataEntry_obj.VAR_NAME = varName->getNameAsString();
+                DataEntry_obj.VAR_TYPE = varName->getType().getAsString();
+                DataEntry_obj.IS_REFERENCED = varName->isReferenced();
+                DataEntry_obj.IS_REFERENCE = true;
+
+                llvm::outs() << " IS REFERENCED = > " << varName->isReferenced() << "\n";
+                llvm::outs() << varName->getNameAsString() << "\n";
+                llvm::outs() << varName->getType().getAsString() << "\n";
+              }
+              else if (NonRefVardecl) {
+                llvm::outs() << "Non Reference variable \n";
+                auto varName = Results.Nodes.getNodeAs<clang::VarDecl>("nonReferencedVarName");
+                //varName->dump();
+
+                DataEntry_obj.VAR_NAME = varName->getNameAsString();
+                DataEntry_obj.VAR_TYPE = varName->getType().getAsString();
+                DataEntry_obj.IS_REFERENCED = varName->isReferenced();
+                DataEntry_obj.IS_REFERENCE = false;
+
+                llvm::outs() << " IS REFERENCED = > " << varName->isReferenced() << "\n";
+                llvm::outs() << varName->getNameAsString() << "\n";
+                llvm::outs() << varName->getType().getAsString() << "\n";
+              }
+             /* if (lhs_ref) {
+                llvm::outs() << "REFERENCE VARIABLE FOUND\n";
+                lhs_ref->dump();
+              }
+              if (lhs_nonref) {
+                llvm::outs() << "NON REFERENCE VARIABLE FOUND\n";
+                //lhs_nonref->dump();
+              }
+              */
+              else if (binaryOP)
+              {
+                llvm::outs() << "Assignment Found\n";
+                //binaryOP->dump();
+
+                auto lhs = Results.Nodes.getNodeAs<clang::Stmt>("LHSNonRefVariable");
+                if(lhs)
+                  llvm::outs() << "NON REFERENCE VARIABLE FOUND\n";
+                //lhs->dump();
+
+              }
+
               TYPE = call->getCallReturnType(*astContext).getAsString();
               for (auto argument : call->arguments()) {
                 //argument->dump();
@@ -142,24 +241,20 @@ namespace {
                 //implCast->dump();
                 auto declref = dyn_cast<DeclRefExpr>(implCast);
                 if (declref) {
-                  LVALUE = declref->isLValue();
-                  NAME = declref->getNameInfo().getAsString();
+                  //LVALUE = declref->isLValue();
+                  DataEntry_obj.SRC_NAME = declref->getNameInfo().getAsString();
+                  llvm::outs() << " I NEED THIS : " << NAME << "\n";
                 }
               }
               //call->dumpColor();
 
               //Storing information.
-              getData_entry entry;
-              entry.NAME = NAME;
-              entry.TYPE = TYPE;
-              entry.LVALUE = LVALUE;
-
-              info->getData_map[STRUCT].push_back(entry);
+              info->getData_map[STRUCT].push_back(DataEntry_obj);
             }
             else if (functionName == "getEdgeDst") {
               llvm::outs() << "Found getEdgeDst \n";
               auto forStatement = Results.Nodes.getNodeAs<clang::ForStmt>("forLoopName");
-              forStatement->dump();
+              //forStatement->dump();
             }
           }
         }
@@ -412,7 +507,28 @@ namespace {
       //Matchers.addMatcher(recordDecl(hasDescendant(callExpr(isExpansionInMainFile(), callee(functionDecl(hasName("getData")))).bind("getData"))).bind("getDataInStruct"), &callExprHandler); //**** works
 
       /** For matching the nodes in AST with getData function call ***/
-      Matchers.addMatcher(callExpr(isExpansionInMainFile(), callee(functionDecl(hasName("getData"))), hasAncestor(recordDecl().bind("callerInStruct"))).bind("calleeName"), &callExprHandler);
+      static const TypeMatcher AnyType = anything();
+      StatementMatcher GetDataMatcher = callExpr(argumentCountIs(1), callee(methodDecl(hasName("getData"))));
+      StatementMatcher LHSRefVariable = expr(ignoringParenImpCasts(declRefExpr(to(
+                                        varDecl(hasType(references(AnyType))))))).bind("LHSRefVariable");
+
+      StatementMatcher LHSNonRefVariable = expr(ignoringParenImpCasts(declRefExpr(to(
+                                        varDecl())))).bind("LHSNonRefVariable");
+
+      Matchers.addMatcher(callExpr(
+                                          isExpansionInMainFile(),
+                                          callee(functionDecl(hasName("getData"))),
+                                          hasAncestor(recordDecl().bind("callerInStruct")),
+                                          anyOf(
+                                                hasAncestor(binaryOperator(hasOperatorName("="),
+                                                                              hasLHS(anyOf(
+                                                                                        LHSRefVariable,
+                                                                                        LHSNonRefVariable))).bind("getDataAssignment")
+                                                              ),
+                                                hasAncestor(declStmt(hasSingleDecl(varDecl(hasType(references(AnyType))).bind("referencedVarName"))).bind("variableDecl_getData")),
+                                                hasAncestor(declStmt(hasSingleDecl(varDecl(unless(hasType(references(AnyType)))).bind("nonReferencedVarName"))).bind("nonRefVariableDecl_getData"))
+                                            )
+                                     ).bind("calleeName"), &callExprHandler);
 
       /** For matching the nodes in AST with getEdgeDst function call ***/
       StatementMatcher Edge_beginCallMatcher = memberCallExpr(argumentCountIs(1), callee(methodDecl(hasName("edge_begin"))));
@@ -436,7 +552,6 @@ namespace {
                                                 hasArgument(0, IteratorComparisonMatcher),
                                                 hasArgument(1,IteratorBoundMatcher));
 
-      static const TypeMatcher AnyType = anything();
       StatementMatcher EdgeForLoopMatcher = forStmt(hasLoopInit(anyOf(
                                                   declStmt(declCountIs(2),
                                                               containsDeclaration(0, InitDeclMatcher),
@@ -475,6 +590,27 @@ namespace {
       //Visitor->TraverseDecl(Context.getTranslationUnitDecl());
       Matchers.matchAST(Context);
       llvm::outs() << " MAP SIZE : " << info.getData_map.size() << "\n";
+      for (auto i : info.getData_map)
+      {
+        llvm::outs() << i.first << " has " << i.second.size() << " references of getData \n";
+
+        int width = 20;
+        llvm::outs() << center(string("VAR_NAME"), width) << "|"
+                     <<  center(string("VAR_TYPE"), width) << "|"
+                     << center(string("SRC_NAME"), width) << "|"
+                     << center(string("IS_REFERENCE"), width) << "|"
+                     << center(string("IS_REFERENCED"), width) << "||"
+                     << center(string("RW_STATUS"), width) << "\n";
+        llvm::outs() << std::string(width*6 + 2*6, '-') << "\n";
+        for( auto j : i.second) {
+          llvm::outs() << center(j.VAR_NAME,  width) << "|"
+                       << center(j.VAR_TYPE,  width) << "|"
+                       << center(j.SRC_NAME,  width) << "|"
+                       << center(j.IS_REFERENCE,  width) << "|"
+                       << center(j.IS_REFERENCED,  width) << "|"
+                       << center(j.RW_STATUS,  width) << "\n";
+        }
+      }
       Matchers_op.matchAST(Context);
     }
   };
