@@ -33,6 +33,7 @@ using namespace clang::ast_matchers;
 using namespace llvm;
 using namespace std;
 
+static const TypeMatcher AnyType = anything();
 namespace {
 
   /* Convert double to string with specified number of places after the decimal
@@ -146,13 +147,59 @@ class GaloisFunctionsVisitor : public RecursiveASTVisitor<GaloisFunctionsVisitor
     bool IS_REFERENCED;
   };
 
+  struct Graph_entry {
+    string GRAPH_NAME;
+    string NODE_TYPE;
+    string EDGE_TYPE;
+  };
+
+  struct NodeField_entry {
+    string VAR_NAME;
+    string VAR_TYPE;
+    string FIELD_NAME;
+    string NODE_NAME;
+    string RW_STATUS;
+    bool IS_REFERENCE;
+    bool IS_REFERENCED;
+  };
+
   class InfoClass {
     public:
+      map<string, vector<Graph_entry>> graphs_map;
       map<string, vector<getData_entry>> getData_map;
+      map<string, vector<getData_entry>> edgeData_map;
+      map<string, vector<NodeField_entry>> fieldData_map;
   };
 
 
-  class CallExprHandler : public MatchFinder::MatchCallback {
+class TypedefHandler :  public MatchFinder::MatchCallback {
+  InfoClass* info;
+  public:
+    TypedefHandler(InfoClass* _info):info(_info){}
+    virtual void run(const MatchFinder::MatchResult & Results) {
+      auto typedefDecl = Results.Nodes.getNodeAs<clang::TypeDecl>("typedefDecl");
+
+      //llvm::outs() << "GlobalID : " << typedefDecl->getGlobalID() << "\n";
+      string Graph_name = typedefDecl->getNameAsString();
+      llvm::outs() << "--->" << Graph_name << "\n";
+      auto templatePtr = typedefDecl->getTypeForDecl()->getAs<TemplateSpecializationType>();
+      if (templatePtr) {
+        Graph_entry g_entry;
+        /**We only need NopeType and EdgeType**/
+        //templatePtr->getArg(0).getAsType().dump();
+        llvm::outs() << " ARGUMETNS : " << templatePtr->getNumArgs() << "\n";
+        g_entry.NODE_TYPE = templatePtr->getArg(0).getAsType().getBaseTypeIdentifier()->getName();
+        templatePtr->getArg(1).getAsType().dump();
+        g_entry.EDGE_TYPE = templatePtr->getArg(1).getAsType().getAsString();
+
+
+        info->graphs_map[Graph_name].push_back(g_entry);
+        llvm::outs() << "node is :" << g_entry.NODE_TYPE << ", edge is : " << g_entry.EDGE_TYPE << "\n";
+      }
+    }
+  };
+
+class CallExprHandler : public MatchFinder::MatchCallback {
     private:
       ASTContext* astContext;
       InfoClass *info;
@@ -163,12 +210,6 @@ class GaloisFunctionsVisitor : public RecursiveASTVisitor<GaloisFunctionsVisitor
 
         auto call = Results.Nodes.getNodeAs<clang::CallExpr>("calleeName");
         auto record = Results.Nodes.getNodeAs<clang::CXXRecordDecl>("callerInStruct");
-        auto binaryOP = Results.Nodes.getNodeAs<clang::Stmt>("getDataAssignment");
-
-        auto lhs_ref = Results.Nodes.getNodeAs<clang::Stmt>("LHSRefVariable");
-        auto lhs_nonref = Results.Nodes.getNodeAs<clang::Stmt>("LHSNonRefVariable");
-        auto vardecl = Results.Nodes.getNodeAs<clang::Stmt>("variableDecl_getData");
-        auto NonRefVardecl = Results.Nodes.getNodeAs<clang::Stmt>("nonRefVariableDecl_getData");
 
         //record->dump();
         if (call && record) {
@@ -178,57 +219,41 @@ class GaloisFunctionsVisitor : public RecursiveASTVisitor<GaloisFunctionsVisitor
           llvm::outs() << STRUCT << "\n\n";
           string NAME = "";
           string TYPE = "";
-          bool LVALUE = 0;
 
           auto func = call->getDirectCallee();
           if (func) {
             string functionName = func->getNameAsString();
             if (functionName == "getData") {
+
+              auto binaryOP = Results.Nodes.getNodeAs<clang::Stmt>("getDataAssignment");
+              auto refVardecl_stmt = Results.Nodes.getNodeAs<clang::Stmt>("refVariableDecl_getData");
+              auto nonRefVardecl_stmt = Results.Nodes.getNodeAs<clang::Stmt>("nonRefVariableDecl_getData");
+
+
+              auto varDecl_stmt_getData = (refVardecl_stmt)?refVardecl_stmt:nonRefVardecl_stmt;
+              DataEntry_obj.IS_REFERENCE = (refVardecl_stmt)?true:false;
+
               //record->dump();
               //call->dump();
-              if (vardecl) {
-                llvm::outs() << "Reference Variable\n";
-                auto varName = Results.Nodes.getNodeAs<clang::VarDecl>("referencedVarName");
+              if (varDecl_stmt_getData) {
+                auto varDecl_getData = Results.Nodes.getNodeAs<clang::VarDecl>("getData_varName");
                 //varName->dump();
-                DataEntry_obj.VAR_NAME = varName->getNameAsString();
-                DataEntry_obj.VAR_TYPE = varName->getType().getAsString();
-                DataEntry_obj.IS_REFERENCED = varName->isReferenced();
-                DataEntry_obj.IS_REFERENCE = true;
+                DataEntry_obj.VAR_NAME = varDecl_getData->getNameAsString();
+                DataEntry_obj.VAR_TYPE = varDecl_getData->getType().getAsString();
+                DataEntry_obj.IS_REFERENCED = varDecl_getData->isReferenced();
 
-                llvm::outs() << " IS REFERENCED = > " << varName->isReferenced() << "\n";
-                llvm::outs() << varName->getNameAsString() << "\n";
-                llvm::outs() << varName->getType().getAsString() << "\n";
+                llvm::outs() << " IS REFERENCED = > " << varDecl_getData->isReferenced() << "\n";
+                llvm::outs() << varDecl_getData->getNameAsString() << "\n";
+                llvm::outs() << varDecl_getData->getType().getAsString() << "\n";
               }
-              else if (NonRefVardecl) {
-                llvm::outs() << "Non Reference variable \n";
-                auto varName = Results.Nodes.getNodeAs<clang::VarDecl>("nonReferencedVarName");
-                //varName->dump();
-
-                DataEntry_obj.VAR_NAME = varName->getNameAsString();
-                DataEntry_obj.VAR_TYPE = varName->getType().getAsString();
-                DataEntry_obj.IS_REFERENCED = varName->isReferenced();
-                DataEntry_obj.IS_REFERENCE = false;
-
-                llvm::outs() << " IS REFERENCED = > " << varName->isReferenced() << "\n";
-                llvm::outs() << varName->getNameAsString() << "\n";
-                llvm::outs() << varName->getType().getAsString() << "\n";
-              }
-             /* if (lhs_ref) {
-                llvm::outs() << "REFERENCE VARIABLE FOUND\n";
-                lhs_ref->dump();
-              }
-              if (lhs_nonref) {
-                llvm::outs() << "NON REFERENCE VARIABLE FOUND\n";
-                //lhs_nonref->dump();
-              }
-              */
               else if (binaryOP)
               {
                 llvm::outs() << "Assignment Found\n";
                 //binaryOP->dump();
 
-                auto lhs = Results.Nodes.getNodeAs<clang::Stmt>("LHSNonRefVariable");
-                if(lhs)
+                auto lhs_ref = Results.Nodes.getNodeAs<clang::Stmt>("LHSRefVariable");
+                auto lhs_nonref = Results.Nodes.getNodeAs<clang::Stmt>("LHSNonRefVariable");
+                if(lhs_nonref)
                   llvm::outs() << "NON REFERENCE VARIABLE FOUND\n";
                 //lhs->dump();
 
@@ -241,7 +266,6 @@ class GaloisFunctionsVisitor : public RecursiveASTVisitor<GaloisFunctionsVisitor
                 //implCast->dump();
                 auto declref = dyn_cast<DeclRefExpr>(implCast);
                 if (declref) {
-                  //LVALUE = declref->isLValue();
                   DataEntry_obj.SRC_NAME = declref->getNameInfo().getAsString();
                   llvm::outs() << " I NEED THIS : " << NAME << "\n";
                 }
@@ -252,17 +276,64 @@ class GaloisFunctionsVisitor : public RecursiveASTVisitor<GaloisFunctionsVisitor
               info->getData_map[STRUCT].push_back(DataEntry_obj);
             }
             else if (functionName == "getEdgeDst") {
+              /** This is inside for loop which has getData as well. **/
               llvm::outs() << "Found getEdgeDst \n";
               auto forStatement = Results.Nodes.getNodeAs<clang::ForStmt>("forLoopName");
-              //forStatement->dump();
+              auto varDecl_edgeDst = Results.Nodes.getNodeAs<clang::VarDecl>("varDeclName");
+              //varDecl_edgeDst->dump();
+              string varName_edgeDst = varDecl_edgeDst->getNameAsString();
+              llvm::outs() << varName_edgeDst << "\n";
+
+              auto binaryOP = Results.Nodes.getNodeAs<clang::Stmt>("getDataAssignment");
+              auto refVardecl_stmt = Results.Nodes.getNodeAs<clang::Stmt>("refVariableDecl_getData");
+              auto nonRefVardecl_stmt = Results.Nodes.getNodeAs<clang::Stmt>("nonRefVariableDecl_getData");
+
+              auto varDecl_stmt_getData = (refVardecl_stmt)?refVardecl_stmt:nonRefVardecl_stmt;
+              DataEntry_obj.IS_REFERENCE = (refVardecl_stmt)?true:false;
+
+              auto call_getData = Results.Nodes.getNodeAs<clang::CallExpr>("calleeName_getEdgeDst");
+
+              string argument_getData;
+              for (auto argument : call_getData->arguments()) {
+                auto implCast = argument->IgnoreCasts();
+                auto declref = dyn_cast<DeclRefExpr>(implCast);
+                if (declref) {
+                  argument_getData = declref->getNameInfo().getAsString();
+                  DataEntry_obj.SRC_NAME = argument_getData;
+                  llvm::outs() << " Argument to getData : " << argument_getData << "\n";
+                }
+              }
+
+              /**To make sure that return value from getEdgeDst is being used in getData i.e edges are being used**/
+              if (varName_edgeDst == argument_getData)
+              {
+
+
+                if(varDecl_stmt_getData) {
+                  auto varDecl_getData = Results.Nodes.getNodeAs<clang::VarDecl>("getData_varName");
+                  llvm::outs() << "varname getData : "  << varDecl_getData->getNameAsString() << "\n";
+                  DataEntry_obj.VAR_NAME = varDecl_getData->getNameAsString();
+                  DataEntry_obj.VAR_TYPE = varDecl_getData->getType().getAsString();
+                  DataEntry_obj.IS_REFERENCED = varDecl_getData->isReferenced();
+
+                }
+                //call->dumpColor();
+
+                info->edgeData_map[STRUCT].push_back(DataEntry_obj);
+
+              }
+              else {
+                llvm::outs() << " Variable Declaration with getEdgeDst != variable used in getData!!\n";
+                //llvm::abort();
+              }
             }
           }
         }
       }
   };
 
-  class FindOperatorHandler : public MatchFinder::MatchCallback {
-    private:
+class FindOperatorHandler : public MatchFinder::MatchCallback {
+  private:
       ASTContext* astContext;
     public:
       FindOperatorHandler(CompilerInstance *CI):astContext(&(CI->getASTContext())){}
@@ -480,18 +551,76 @@ class GaloisFunctionsVisitor : public RecursiveASTVisitor<GaloisFunctionsVisitor
         }
       }
   };
-  class GaloisFunctionsConsumer : public ASTConsumer {
+
+void split(const string& s, char delim, std::vector<string>& elems) {
+  stringstream ss(s);
+  string item;
+  while(std::getline(ss, item, delim)) {
+    elems.push_back(item);
+  }
+}
+class FindingFieldHandler : public MatchFinder::MatchCallback {
+  private:
+      ASTContext* astContext;
+      InfoClass *info;
+    public:
+      FindingFieldHandler(CompilerInstance*  CI, InfoClass* _info):astContext(&(CI->getASTContext())), info(_info){}
+      virtual void run(const MatchFinder::MatchResult &Results) {
+
+        clang::LangOptions LangOpts;
+        LangOpts.CPlusPlus = true;
+        clang::PrintingPolicy Policy(LangOpts);
+
+        for(auto i : info->getData_map) {
+          for(auto j : i.second) {
+            llvm::outs() << j.VAR_NAME << "\n";
+            if(j.IS_REFERENCED && j.IS_REFERENCE){
+              auto field = Results.Nodes.getNodeAs<clang::VarDecl>(j.VAR_NAME);
+              if(field){
+                NodeField_entry field_entry;
+                field_entry.VAR_NAME = field->getNameAsString();
+                field_entry.VAR_TYPE = field->getType().getAsString();
+                field_entry.IS_REFERENCED = field->isReferenced();
+                field_entry.IS_REFERENCE = true;
+                //field->dump();
+                auto memExpr = Results.Nodes.getNodeAs<clang::Stmt>("fieldMemberExpr");
+                //memExpr->dump();
+                string str_field;
+                llvm::raw_string_ostream s(str_field);
+                /** Returns something like snode.field_name.operator **/
+                memExpr->printPretty(s, 0, Policy);
+
+                /** Split string at delims to get the field name **/
+                char delim = '.';
+                vector<string> elems;
+                split(s.str(), delim, elems);
+                //llvm::outs() << " ===> " << elems[1] << "\n";
+                field_entry.NODE_NAME = elems[0];
+                field_entry.FIELD_NAME = elems[1];
+
+                /*memExpr->dumpPretty(*astContext);*/
+                //llvm::outs() << " GLOBAL ID : " << field->getGlobalID() << "\n";
+                info->fieldData_map[i.first].push_back(field_entry);
+              }
+            }
+          }
+        }
+      }
+};
+class GaloisFunctionsConsumer : public ASTConsumer {
     private:
     CompilerInstance &Instance;
     std::set<std::string> ParsedTemplates;
     GaloisFunctionsVisitor* Visitor;
-    MatchFinder Matchers, Matchers_op;
+    MatchFinder Matchers, Matchers_op, Matchers_typedef, Matchers_gen;
     FunctionCallHandler functionCallHandler;
     FindOperatorHandler findOperator;
     CallExprHandler callExprHandler;
+    TypedefHandler typedefHandler;
+    FindingFieldHandler f_handler;
     InfoClass info;
   public:
-    GaloisFunctionsConsumer(CompilerInstance &Instance, std::set<std::string> ParsedTemplates, Rewriter &R): Instance(Instance), ParsedTemplates(ParsedTemplates), Visitor(new GaloisFunctionsVisitor(&Instance)), functionCallHandler(R), findOperator(&Instance), callExprHandler(&Instance, &info) {
+    GaloisFunctionsConsumer(CompilerInstance &Instance, std::set<std::string> ParsedTemplates, Rewriter &R): Instance(Instance), ParsedTemplates(ParsedTemplates), Visitor(new GaloisFunctionsVisitor(&Instance)), functionCallHandler(R), findOperator(&Instance), callExprHandler(&Instance, &info), typedefHandler(&info), f_handler(&Instance, &info) {
       //Matchers.addMatcher(unless(isExpansionInSystemHeader(callExpr(callee(functionDecl(hasName("for_each")))).bind("galoisLoop"))), &namespaceHandler);
       //Matchers.addMatcher(callExpr(callee(functionDecl(hasName("Galois::do_all"))),unless(isExpansionInSystemHeader())).bind("galoisLoop"), &functionCallHandler);
 
@@ -506,8 +635,8 @@ class GaloisFunctionsVisitor : public RecursiveASTVisitor<GaloisFunctionsVisitor
       //Matchers.addMatcher(callExpr(isExpansionInMainFile(), callee(functionDecl(hasName("getData"))), hasAncestor(binaryOperator(hasOperatorName("=")).bind("assignment"))).bind("getData"), &callExprHandler); //*** WORKS
       //Matchers.addMatcher(recordDecl(hasDescendant(callExpr(isExpansionInMainFile(), callee(functionDecl(hasName("getData")))).bind("getData"))).bind("getDataInStruct"), &callExprHandler); //**** works
 
+      Matchers_typedef.addMatcher(typedefDecl(isExpansionInMainFile()).bind("typedefDecl"), & typedefHandler);
       /** For matching the nodes in AST with getData function call ***/
-      static const TypeMatcher AnyType = anything();
       StatementMatcher GetDataMatcher = callExpr(argumentCountIs(1), callee(methodDecl(hasName("getData"))));
       StatementMatcher LHSRefVariable = expr(ignoringParenImpCasts(declRefExpr(to(
                                         varDecl(hasType(references(AnyType))))))).bind("LHSRefVariable");
@@ -515,20 +644,21 @@ class GaloisFunctionsVisitor : public RecursiveASTVisitor<GaloisFunctionsVisitor
       StatementMatcher LHSNonRefVariable = expr(ignoringParenImpCasts(declRefExpr(to(
                                         varDecl())))).bind("LHSNonRefVariable");
 
-      Matchers.addMatcher(callExpr(
-                                          isExpansionInMainFile(),
-                                          callee(functionDecl(hasName("getData"))),
-                                          hasAncestor(recordDecl().bind("callerInStruct")),
-                                          anyOf(
-                                                hasAncestor(binaryOperator(hasOperatorName("="),
-                                                                              hasLHS(anyOf(
-                                                                                        LHSRefVariable,
-                                                                                        LHSNonRefVariable))).bind("getDataAssignment")
-                                                              ),
-                                                hasAncestor(declStmt(hasSingleDecl(varDecl(hasType(references(AnyType))).bind("referencedVarName"))).bind("variableDecl_getData")),
-                                                hasAncestor(declStmt(hasSingleDecl(varDecl(unless(hasType(references(AnyType)))).bind("nonReferencedVarName"))).bind("nonRefVariableDecl_getData"))
-                                            )
-                                     ).bind("calleeName"), &callExprHandler);
+      StatementMatcher getDataCallExprMatcher = callExpr(
+                                                          isExpansionInMainFile(),
+                                                          callee(functionDecl(hasName("getData"))),
+                                                          hasAncestor(recordDecl().bind("callerInStruct")),
+                                                          anyOf(
+                                                                hasAncestor(binaryOperator(hasOperatorName("="),
+                                                                                              hasLHS(anyOf(
+                                                                                                        LHSRefVariable,
+                                                                                                        LHSNonRefVariable))).bind("getDataAssignment")
+                                                                              ),
+                                                                hasAncestor(declStmt(hasSingleDecl(varDecl(hasType(references(AnyType))).bind("getData_varName"))).bind("refVariableDecl_getData")),
+                                                                hasAncestor(declStmt(hasSingleDecl(varDecl(unless(hasType(references(AnyType)))).bind("getData_varName"))).bind("nonRefVariableDecl_getData"))
+                                                            )
+                                                     ).bind("calleeName");
+      Matchers.addMatcher(getDataCallExprMatcher, &callExprHandler);
 
       /** For matching the nodes in AST with getEdgeDst function call ***/
       StatementMatcher Edge_beginCallMatcher = memberCallExpr(argumentCountIs(1), callee(methodDecl(hasName("edge_begin"))));
@@ -552,6 +682,22 @@ class GaloisFunctionsVisitor : public RecursiveASTVisitor<GaloisFunctionsVisitor
                                                 hasArgument(0, IteratorComparisonMatcher),
                                                 hasArgument(1,IteratorBoundMatcher));
 
+
+      StatementMatcher getDataCallExprMatcher_insideFor = callExpr(
+                                                          isExpansionInMainFile(),
+                                                          callee(functionDecl(hasName("getData"))),
+                                                          hasAncestor(recordDecl().bind("callerInStruct")),
+                                                          anyOf(
+                                                                hasAncestor(binaryOperator(hasOperatorName("="),
+                                                                                              hasLHS(anyOf(
+                                                                                                        LHSRefVariable,
+                                                                                                        LHSNonRefVariable))).bind("getDataAssignment")
+                                                                              ),
+                                                                hasAncestor(declStmt(hasSingleDecl(varDecl(hasType(references(AnyType))).bind("getData_varName"))).bind("refVariableDecl_getData")),
+                                                                hasAncestor(declStmt(hasSingleDecl(varDecl(unless(hasType(references(AnyType)))).bind("getData_varName"))).bind("nonRefVariableDecl_getData"))
+                                                            )
+                                                     ).bind("calleeName_getEdgeDst");
+
       StatementMatcher EdgeForLoopMatcher = forStmt(hasLoopInit(anyOf(
                                                   declStmt(declCountIs(2),
                                                               containsDeclaration(0, InitDeclMatcher),
@@ -569,10 +715,22 @@ class GaloisFunctionsVisitor : public RecursiveASTVisitor<GaloisFunctionsVisitor
                                                             operatorCallExpr(
                                                                 hasOverloadedOperatorName("++"),
                                                                 hasArgument(0, declRefExpr(to(
-                                                                      varDecl()))))))).bind("forLoopName");
+                                                                      varDecl())))))),
+                                              hasDescendant(getDataCallExprMatcher_insideFor)
+                                              ).bind("forLoopName");
 
 
-      Matchers.addMatcher(callExpr(isExpansionInMainFile(), callee(functionDecl(hasName("getEdgeDst"))), hasAncestor(recordDecl().bind("callerInStruct")), hasAncestor(EdgeForLoopMatcher)).bind("calleeName"), &callExprHandler);
+      /** We only care about for loops which have getEdgeDst and getData. **/
+      Matchers.addMatcher(callExpr(
+                                    isExpansionInMainFile(),
+                                    callee(functionDecl(hasName("getEdgeDst"))),
+                                    hasAncestor(recordDecl().bind("callerInStruct")),
+                                    hasAncestor(EdgeForLoopMatcher),
+                                    hasAncestor(declStmt(hasSingleDecl(varDecl(hasType(AnyType)).bind("varDeclName"))).bind("variableDecl_getEdgeDst"))
+                                ).bind("calleeName"), &callExprHandler);
+
+
+
 
       //Matchers_op.addMatcher(recordDecl(isExpansionInMainFile(), hasMethod(hasName("operator()")), hasMethod(returns(asString("void"))), hasMethod(hasParameter(0, parmVarDecl(hasType(isInteger()))))).bind("GaloisOP"), &findOperator); // *** working
 
@@ -588,13 +746,14 @@ class GaloisFunctionsVisitor : public RecursiveASTVisitor<GaloisFunctionsVisitor
 
     virtual void HandleTranslationUnit(ASTContext &Context){
       //Visitor->TraverseDecl(Context.getTranslationUnitDecl());
+      Matchers_typedef.matchAST(Context);
       Matchers.matchAST(Context);
       llvm::outs() << " MAP SIZE : " << info.getData_map.size() << "\n";
       for (auto i : info.getData_map)
       {
-        llvm::outs() << i.first << " has " << i.second.size() << " references of getData \n";
+        llvm::outs() <<"\n" <<i.first << " has " << i.second.size() << " references of getData \n";
 
-        int width = 20;
+        int width = 30;
         llvm::outs() << center(string("VAR_NAME"), width) << "|"
                      <<  center(string("VAR_TYPE"), width) << "|"
                      << center(string("SRC_NAME"), width) << "|"
@@ -611,7 +770,76 @@ class GaloisFunctionsVisitor : public RecursiveASTVisitor<GaloisFunctionsVisitor
                        << center(j.RW_STATUS,  width) << "\n";
         }
       }
-      Matchers_op.matchAST(Context);
+
+      llvm::outs() << "\n\n Printing for getData in forLoop for all edges\n\n";
+      for (auto i : info.edgeData_map)
+      {
+        llvm::outs() << "\n" << i.first << " has " << i.second.size() << " references of getData \n";
+
+        int width = 25;
+        llvm::outs() << center(string("VAR_NAME"), width) << "|"
+                     <<  center(string("VAR_TYPE"), width) << "|"
+                     << center(string("SRC_NAME"), width) << "|"
+                     << center(string("IS_REFERENCE"), width) << "|"
+                     << center(string("IS_REFERENCED"), width) << "||"
+                     << center(string("RW_STATUS"), width) << "\n";
+        llvm::outs() << std::string(width*6 + 2*6, '-') << "\n";
+        for( auto j : i.second) {
+          llvm::outs() << center(j.VAR_NAME,  width) << "|"
+                       << center(j.VAR_TYPE,  width) << "|"
+                       << center(j.SRC_NAME,  width) << "|"
+                       << center(j.IS_REFERENCE,  width) << "|"
+                       << center(j.IS_REFERENCED,  width) << "|"
+                       << center(j.RW_STATUS,  width) << "\n";
+        }
+      }
+
+      /**Match to get fields of NodeData structure***/
+      for (auto i : info.getData_map) {
+        unsigned k = 0;
+        for(auto j : i.second) {
+          if(j.IS_REFERENCED && j.IS_REFERENCE) {
+            DeclarationMatcher f_1 = varDecl(isExpansionInMainFile(), hasInitializer(expr(anyOf(
+                                                                                                hasDescendant(memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.VAR_NAME)))))).bind("fieldMemberExpr")),
+                                                                                                memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.VAR_NAME)))))).bind("fieldMemberExpr")
+                                                                                                ))),
+                                                                      hasType(references(AnyType))
+                                                                  ).bind(j.VAR_NAME);
+            ++k;
+
+            Matchers_gen.addMatcher(f_1, &f_handler);
+          }
+        }
+      }
+
+      Matchers_gen.matchAST(Context);
+
+      llvm::outs() << "\n\n Printing for all fields found \n\n";
+      for (auto i : info.fieldData_map)
+      {
+        llvm::outs() << "\n" << i.first << " has " << i.second.size() << " Fields \n";
+
+        int width = 25;
+        llvm::outs() << center(string("VAR_NAME"), width) << "|"
+                     <<  center(string("VAR_TYPE"), width) << "|"
+                     << center(string("FIELD_NAME"), width) << "|"
+                     << center(string("NODE_NAME"), width) << "|"
+                     << center(string("IS_REFERENCE"), width) << "|"
+                     << center(string("IS_REFERENCED"), width) << "||"
+                     << center(string("RW_STATUS"), width) << "\n";
+        llvm::outs() << std::string(width*7 + 2*7, '-') << "\n";
+        for( auto j : i.second) {
+          llvm::outs() << center(j.VAR_NAME,  width) << "|"
+                       << center(j.VAR_TYPE,  width) << "|"
+                       << center(j.FIELD_NAME,  width) << "|"
+                       << center(j.NODE_NAME,  width) << "|"
+                       << center(j.IS_REFERENCE,  width) << "|"
+                       << center(j.IS_REFERENCED,  width) << "|"
+                       << center(j.RW_STATUS,  width) << "\n";
+        }
+      }
+
+      //Matchers_op.matchAST(Context);
     }
   };
 
