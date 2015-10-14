@@ -12,7 +12,7 @@ add_custom_command(TARGET hsssp-push POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy
 
 app(graphCheck check.cpp GlobalObj.cpp DISTSAFE)
 
-appcp(graphCheck_gen check_gen.cpp CLANGPLUGIN)
-app(graphCheck_gen check_gen.cpp GlobalObj.cpp DISTSAFE)
+#app(graphCheck_gen check_gen.cpp CLANGPLUGIN)
+#app(graphCheck_gen check_gen.cpp GlobalObj.cpp DISTSAFE)
 
-app(HSSSP_gen HSSSP_gen.cpp GlobalObj.cpp DISTSAFE)
+#app(HSSSP_gen HSSSP_gen.cpp GlobalObj.cpp DISTSAFE)
