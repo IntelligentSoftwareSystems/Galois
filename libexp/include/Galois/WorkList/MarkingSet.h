@@ -60,7 +60,7 @@ public:
 
   template<typename... Args>
   MarkingWorkSetMaster(const Marker& m, Separator dummy, Args... args)
-    :scheduler(args...), marker(m), duplicate(new Galois::Statistic("SchedulerDuplicates"))
+    :scheduler(std::forward<Args>(args)...), marker(m), duplicate(new Galois::Statistic("SchedulerDuplicates"))
   {
   }
 

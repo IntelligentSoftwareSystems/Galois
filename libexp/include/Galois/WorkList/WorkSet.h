@@ -61,7 +61,7 @@ public:
   WorkSetMaster() { duplicate = new Galois::Statistic("SchedulerDuplicates"); }
 
   template<typename... Args>
-  WorkSetMaster(Galois::WorkList::Separator dummy, Args... args): scheduler(args...)
+  WorkSetMaster(Galois::WorkList::Separator dummy, Args... args): scheduler(std::forward<Args>(args)...)
   {
     duplicate = new Galois::Statistic("SchedulerDuplicates");
   }
