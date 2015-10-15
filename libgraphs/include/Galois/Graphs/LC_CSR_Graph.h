@@ -268,11 +268,11 @@ public:
     numNodes = graph.size();
     numEdges = graph.sizeEdges();
     if (UseNumaAlloc) {
-      nodeData.allocateLocal(numNodes, false);
-      edgeIndData.allocateLocal(numNodes, false);
-      edgeDst.allocateLocal(numEdges, false);
-      edgeData.allocateLocal(numEdges, false);
-      this->outOfLineAllocateLocal(numNodes, false);
+      nodeData.allocateBlocked(numNodes);
+      edgeIndData.allocateBlocked(numNodes);
+      edgeDst.allocateBlocked(numEdges);
+      edgeData.allocateBlocked(numEdges);
+      this->outOfLineAllocateBlocked(numNodes);
     } else {
       nodeData.allocateInterleaved(numNodes);
       edgeIndData.allocateInterleaved(numNodes);

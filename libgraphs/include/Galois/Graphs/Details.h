@@ -273,11 +273,14 @@ public:
   void outOfLineAcquire(size_t n, MethodFlag mflag) {
     Galois::Runtime::acquire(&outOfLineLocks[n], mflag);
   }
-  void outOfLineAllocateLocal(size_t numNodes, bool preFault) {
-    outOfLineLocks.allocateLocal(numNodes, preFault);
+  void outOfLineAllocateLocal(size_t numNodes) {
+    outOfLineLocks.allocateLocal(numNodes);
   }
   void outOfLineAllocateInterleaved(size_t numNodes) {
     outOfLineLocks.allocateInterleaved(numNodes);
+  }
+  void outOfLineAllocateBlocked(size_t numNodes) {
+    outOfLineLocks.allocateBlocked(numNodes);
   }
   void outOfLineConstructAt(size_t n) {
     outOfLineLocks.constructAt(n);
@@ -291,8 +294,9 @@ public:
     static const size_t value = 0;
   };
   void outOfLineAcquire(size_t n, MethodFlag mflag) { }
-  void outOfLineAllocateLocal(size_t numNodes, bool preFault) { }
+  void outOfLineAllocateLocal(size_t numNodes) { }
   void outOfLineAllocateInterleaved(size_t numNodes) { }
+  void outOfLineAllocateBlocked(size_t) {}
   void outOfLineConstructAt(size_t n) { }
 };
 

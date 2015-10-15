@@ -152,10 +152,10 @@ int main(int argc, char** argv) {
   // e.g., Intel MIC. May not be enough for deterministic execution
   const size_t NODE_SIZE = sizeof(**graph->begin());
   if (detAlgo == nondet) {
-    Galois::preAlloc (5 * Galois::getActiveThreads () + NODE_SIZE * 8 * graph->size () / Galois::Runtime::hugePageSize);
+    Galois::preAlloc (5 * Galois::getActiveThreads () + NODE_SIZE * 8 * graph->size () / Galois::Runtime::pagePoolSize());
 
   } else {
-    Galois::preAlloc(Galois::getActiveThreads () + NODE_SIZE * 32 * graph->size () / Galois::Runtime::hugePageSize);
+    Galois::preAlloc(Galois::getActiveThreads () + NODE_SIZE * 32 * graph->size () / Galois::Runtime::pagePoolSize());
   }
   Galois::reportPageAlloc("MeminfoPre2");
 

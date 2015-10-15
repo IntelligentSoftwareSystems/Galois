@@ -255,7 +255,8 @@ public:
     EdgeHolder*& local_edges = *edgesL.getLocal();
     if (!local_edges || std::distance(local_edges->begin, local_edges->end) < nedges) {
       EdgeHolder* old = local_edges;
-      char* newblock = (char*)Runtime::pageAlloc();
+      //FIXME: this seems to leak
+      char* newblock = (char*)Runtime::pagePoolAlloc();
       local_edges = (EdgeHolder*)newblock;
       local_edges->next = old;
       char* estart = newblock + sizeof(EdgeHolder);
@@ -267,7 +268,7 @@ public:
 #endif
 
       local_edges->begin = (EdgeInfo*)estart;
-      char* eend = newblock + Runtime::hugePageSize;
+      char* eend = newblock + Runtime::pagePoolSize();
       eend -= (uintptr_t)eend % sizeof(EdgeInfo);
       local_edges->end = (EdgeInfo*)eend;
     }
@@ -329,8 +330,8 @@ public:
     size_t numNodes = graph.size();
     
     if (UseNumaAlloc) {
-      aux.allocateLocal(numNodes, false);
-      this->outOfLineAllocateLocal(numNodes, false);
+      aux.allocateLocal(numNodes);
+      this->outOfLineAllocateLocal(numNodes);
     } else {
       aux.allocateInterleaved(numNodes);
       this->outOfLineAllocateInterleaved(numNodes);

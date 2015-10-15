@@ -69,7 +69,7 @@ struct UpdateRequestCommon {
 };
 
 struct SNode {
-  Dist dist;
+  std::atomic<Dist> dist;
 };
 
 template<typename Graph>

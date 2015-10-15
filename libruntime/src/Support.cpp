@@ -81,16 +81,16 @@ public:
     for (unsigned x = 0; x < Galois::Runtime::activeThreads; ++x) {
       auto rStat = Stats.getRemote(x);
       std::lock_guard<Substrate::SimpleLock> lg(rStat->first);
-      rStat->second.emplace_back(loop, category, numPageAllocForThread(x));
+      rStat->second.emplace_back(loop, category, numPagePoolAllocForThread(x));
     }
   }
 
   void addNumaAllocToStat(const std::string& loop, const std::string& category) {
-    int nodes = Galois::Runtime::numNumaNodes();
+    int nodes = Galois::Substrate::getThreadPool().getMaxNumaNodes();
     for (int x = 0; x < nodes; ++x) {
       auto rStat = Stats.getRemote(x);
       std::lock_guard<Substrate::SimpleLock> lg(rStat->first);
-      rStat->second.emplace_back(loop, category, numNumaAllocForNode(x));
+      //      rStat->second.emplace_back(loop, category, numNumaAllocForNode(x));
     }
   }
 

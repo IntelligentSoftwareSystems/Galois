@@ -16,6 +16,7 @@ set(sources
             src/HWTopoLinux.cpp
             src/Termination.cpp
             src/NumaMem.cpp
+            src/PageAlloc.cpp
 )
 
 add_library(galois_substrate STATIC ${sources})

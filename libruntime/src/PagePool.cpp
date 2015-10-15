@@ -1,4 +1,4 @@
-/** Page Allocator Implementation -*- C++ -*-
+/** Page Pool  Implementation -*- C++ -*-
  * @file
  * @section License
  *
@@ -29,42 +29,19 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "Galois/Runtime/Mem.h"
+#include "Galois/Runtime/PagePool.h"
 #include "Galois/Substrate/gio.h"
-#include "Galois/Substrate/StaticInstance.h"
+#include "Galois/Substrate/SimpleLock.h"
+#include "Galois/Substrate/PtrLock.h"
+#include "Galois/Substrate/CacheLineStorage.h"
+#include "Galois/Substrate/PageAlloc.h"
+#include "Galois/Substrate/ThreadPool.h"
 
-#include <unistd.h>
-#include <map>
+#include <unordered_map>
 #include <vector>
-#include <numeric>
-#include <fstream>
-#include <sstream>
 #include <mutex>
-
-#ifdef __linux__
-#include <linux/mman.h>
-#endif
-#include <sys/mman.h>
-
-// mmap flags
-#if defined(MAP_ANONYMOUS)
-static const int _MAP_ANON = MAP_ANONYMOUS;
-#elif defined(MAP_ANON)
-static const int _MAP_ANON = MAP_ANON;
-#else
-// fail
-#endif
-static const int _PROT = PROT_READ | PROT_WRITE;
-static const int _MAP_BASE = _MAP_ANON | MAP_PRIVATE;
-#ifdef MAP_POPULATE
-static const int _MAP_POP  = MAP_POPULATE | _MAP_BASE;
-#endif
-#ifdef MAP_HUGETLB
-static const int _MAP_HUGE_POP = MAP_HUGETLB | _MAP_POP;
-static const int _MAP_HUGE = MAP_HUGETLB;
-#endif
-
-size_t Galois::Runtime::pageSize;
+#include <numeric>
+#include <deque>
 
 namespace {
 struct FreeNode {
@@ -75,191 +52,95 @@ typedef Galois::Substrate::PtrLock<FreeNode> HeadPtr;
 typedef Galois::Substrate::CacheLineStorage<HeadPtr> HeadPtrStorage;
 
 // Tracks pages allocated
-struct PAState {
-  std::vector<int> counts;
-  std::map<void*, HeadPtr*> ownerMap;
-  PAState() { 
-    counts.resize(Galois::Substrate::getThreadPool().getMaxThreads(), 0);
-  }
-};
+class PAState {  
+  std::deque<std::atomic<int>> counts;
+  std::vector<HeadPtrStorage> pool;
+  std::unordered_map<void*, int> ownerMap;
+  Galois::Substrate::SimpleLock mapLock;
 
-static Galois::Substrate::StaticInstance<PAState> PA;
-
-#ifdef __linux__
-typedef Galois::Substrate::SimpleLock AllocLock;
-#else
-typedef Galois::Substrate::DummyLock AllocLock;
-#endif
-static AllocLock allocLock;
-static Galois::Substrate::SimpleLock dataLock;
-static __thread HeadPtr* head = 0;
-
-void* allocFromOS() {
-  //linux mmap can introduce unbounded sleep!
-  void* ptr = 0;
-  {
-    std::lock_guard<AllocLock> ll(allocLock);
-
-#ifdef MAP_HUGETLB
-    //First try huge
-    ptr = mmap(0, Galois::Runtime::hugePageSize, _PROT, _MAP_HUGE_POP, -1, 0);
-#endif
-
-    //FIXME: improve failure case to ensure hugePageSize alignment
-#ifdef MAP_POPULATE
-    //Then try populate
-    if (!ptr || ptr == MAP_FAILED)
-      ptr = mmap(0, Galois::Runtime::hugePageSize, _PROT, _MAP_POP, -1, 0);
-#endif
-    //Then try normal
-    if (!ptr || ptr == MAP_FAILED) {
-      ptr = mmap(0, Galois::Runtime::hugePageSize, _PROT, _MAP_BASE, -1, 0);
-    }
-    if (!ptr || ptr == MAP_FAILED) {
-      GALOIS_SYS_DIE("Out of Memory");
-    }
-  }
-  
-  //protect the tracking structures
-  {
-    std::lock_guard<Galois::Substrate::SimpleLock> ll(dataLock);
-    HeadPtr*& h = head;
-    if (!h) { //first allocation
-      h = &((new HeadPtrStorage())->data);
-    }
-    PAState& p = *PA.get();
-    p.ownerMap[ptr] = h;
-    p.counts[Galois::Substrate::ThreadPool::getTID()] += 1;
+  void* allocFromOS() {
+    void* ptr = Galois::Substrate::allocPages(1, true);
+    assert(ptr);
+    auto tid = Galois::Substrate::ThreadPool::getTID();
+    counts[tid] += 1;
+    std::lock_guard<Galois::Substrate::SimpleLock> lg(mapLock);
+    ownerMap[ptr] = tid;
     return ptr;
   }
-}
-
-class PageSizeConf {
-#ifdef MAP_HUGETLB
-  void checkHuge() {
-    std::ifstream f("/proc/meminfo");
-
-    if (!f) 
-      return;
-
-    char line[2048];
-    size_t hugePageSizeKb = 0;
-    while (f.getline(line, sizeof(line)/sizeof(*line))) {
-      if (strstr(line, "Hugepagesize:") != line)
-        continue;
-      std::stringstream ss(line + strlen("Hugepagesize:"));
-      std::string kb;
-      ss >> hugePageSizeKb >> kb;
-      if (kb != "kB")
-        Galois::Substrate::gWarn("error parsing meminfo");
-      break;
-    }
-    if (hugePageSizeKb * 1024 != Galois::Runtime::hugePageSize)
-      Galois::Substrate::gWarn("System HugePageSize does not match compiled HugePageSize");
-  }
-#else
-  void checkHuge() { }
-#endif
 
 public:
-  PageSizeConf() {
-#ifdef _POSIX_PAGESIZE
-    Galois::Runtime::pageSize = _POSIX_PAGESIZE;
-#else
-    Galois::Runtime::pageSize = sysconf(_SC_PAGESIZE);
-#endif
-    checkHuge();
+  PAState() { 
+    auto num = Galois::Substrate::getThreadPool().getMaxThreads();
+    counts.resize(num);
+    pool.resize(num);
+  }
+
+  int count(int tid) const {
+    return counts[tid];
+  }
+
+  int countAll() const {
+    return std::accumulate(counts.begin(), counts.end(), 0);
+  }
+
+  void* pageAlloc() {
+    auto tid = Galois::Substrate::ThreadPool::getTID();
+    HeadPtr& hp = pool[tid].data;
+    if (hp.getValue()) {
+      hp.lock();
+      FreeNode* h = hp.getValue(); 
+      if (h) {
+        hp.unlock_and_set(h->next);
+        return h;
+      }
+      hp.unlock();
+    }
+    return allocFromOS();
+  }
+
+  void pageFree(void* ptr) {
+    assert(ptr);
+    mapLock.lock();
+    assert(ownerMap.count(ptr));
+    int i = ownerMap[ptr];
+    mapLock.unlock();
+    HeadPtr& hp = pool[i].data;
+    hp.lock();
+    FreeNode* nh = reinterpret_cast<FreeNode*>(ptr);
+    nh->next = hp.getValue();
+    hp.unlock_and_set(nh);
+  }
+
+  void pagePreAlloc() {
+    pageFree(allocFromOS());
   }
 };
 
-} // end anon namespace
+static PAState PA;
+} //end namespace ""
 
-static PageSizeConf pageSizeConf;
-
-void Galois::Runtime::pageInReadOnly(void* buf, size_t len, size_t stride) {
-  volatile char* ptr = reinterpret_cast<volatile char*>(buf);
-  for (size_t i = 0; i < len; i += stride)
-    ptr[i];
+int Galois::Runtime::numPagePoolAllocTotal() {
+  return PA.countAll();
 }
 
-void Galois::Runtime::pageIn(void* buf, size_t len, size_t stride) {
-  volatile char* ptr = reinterpret_cast<volatile char*>(buf);
-  for (size_t i = 0; i < len; i += stride)
-    ptr[i] = 0;
+int Galois::Runtime::numPagePoolAllocForThread(unsigned tid) {
+  return PA.count(tid);
 }
 
-void* Galois::Runtime::pageAlloc() {
-  HeadPtr* phead = head;
-  if (phead) {
-    phead->lock();
-    FreeNode* h = phead->getValue();
-    if (h) {
-      phead->unlock_and_set(h->next);
-      return h;
-    }
-    phead->unlock();
-  }
-  return allocFromOS();
+void* Galois::Runtime::pagePoolAlloc() {
+  return PA.pageAlloc();
 }
 
-void Galois::Runtime::pageFree(void* m) {
-  dataLock.lock();
-  HeadPtr* phead = PA.get()->ownerMap[m];
-  dataLock.unlock();
-  assert(phead);
-  phead->lock();
-  FreeNode* nh = reinterpret_cast<FreeNode*>(m);
-  nh->next = phead->getValue();
-  phead->unlock_and_set(nh);
+void Galois::Runtime::pagePoolPreAlloc(unsigned num) {
+  while (num--)
+    PA.pagePreAlloc();
 }
 
-void Galois::Runtime::pagePreAlloc(int numPages) {
-  while (numPages--)
-    Galois::Runtime::pageFree(allocFromOS());
+void Galois::Runtime::pagePoolFree(void* ptr) {
+  PA.pageFree(ptr);
 }
 
-int Galois::Runtime::numPageAllocTotal() {
-  PAState& p = *PA.get();
-  return std::accumulate(p.counts.begin(), p.counts.end(), 0);
+size_t Galois::Runtime::pagePoolSize() {
+  return Substrate::allocSize();
 }
 
-int Galois::Runtime::numPageAllocForThread(unsigned tid) {
-  return PA.get()->counts[tid];
-}
-
-void* Galois::Runtime::largeAlloc(size_t len, bool preFault) {
-  size_t size = (len + hugePageSize - 1) & ~static_cast<size_t>(hugePageSize - 1);
-  void * ptr = 0;
-
-  allocLock.lock();
-#ifdef MAP_HUGETLB
-  ptr = mmap(0, size, _PROT, preFault ? _MAP_HUGE_POP : _MAP_HUGE, -1, 0);
-# ifndef MAP_POPULATE
-  if (ptr != MAP_FAILED && ptr && preFault) {
-    pageIn(ptr, size, hugePageSize);
-  }
-# endif
-#endif
-#ifdef MAP_POPULATE
-  if (preFault && (!ptr || ptr == MAP_FAILED))
-    ptr = mmap(0, size, _PROT, _MAP_POP, -1, 0);
-#endif
-  if (!ptr || ptr == MAP_FAILED) {
-    ptr = mmap(0, size, _PROT, _MAP_BASE, -1, 0);
-    if (ptr != MAP_FAILED && ptr && preFault) {
-      pageIn(ptr, size, pageSize);
-    }
-  }
-  allocLock.unlock();
-
-  if (!ptr || ptr == MAP_FAILED)
-    GALOIS_SYS_DIE("Out of Memory");
-  return ptr;
-}
-
-void Galois::Runtime::largeFree(void* m, size_t len) {
-  size_t size = (len + hugePageSize - 1) & ~static_cast<size_t>(hugePageSize - 1);
-  allocLock.lock();
-  munmap(m, size);
-  allocLock.unlock();
-}

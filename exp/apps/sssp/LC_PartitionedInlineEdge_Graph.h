@@ -261,9 +261,9 @@ public:
     numEdges = graph.sizeEdges();
 
     if (UseNumaAlloc) {
-      nodeData.allocateLocal(numNodes, false);
-      edgeData.allocateLocal(numEdges, false);
-      this->outOfLineAllocateLocal(numNodes, false);
+      nodeData.allocateLocal(numNodes);
+      edgeData.allocateLocal(numEdges);
+      this->outOfLineAllocateLocal(numNodes);
     } else {
       nodeData.allocateInterleaved(numNodes);
       edgeData.allocateInterleaved(numEdges);

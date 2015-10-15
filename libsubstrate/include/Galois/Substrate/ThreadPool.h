@@ -150,6 +150,7 @@ public:
   unsigned getMaxThreads() const { return mi.maxThreads; }
   unsigned getMaxCores() const { return mi.maxCores; }
   unsigned getMaxPackages() const { return mi.maxPackages; }
+  unsigned getMaxNumaNodes() const { return mi.maxNumaNodes; }
 
   unsigned getLeaderForPackage(unsigned pid) const {
     for (unsigned i = 0; i < getMaxThreads(); ++i)

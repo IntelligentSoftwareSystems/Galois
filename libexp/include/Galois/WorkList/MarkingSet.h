@@ -60,9 +60,8 @@ public:
 
   template<typename... Args>
   MarkingWorkSetMaster(const Marker& m, Separator dummy, Args... args)
-    :marker(m), scheduler(args...)
+    :scheduler(args...), marker(m), duplicate(new Galois::Statistic("SchedulerDuplicates"))
   {
-    duplicate = new Galois::Statistic("SchedulerDuplicates");
   }
 
   ~MarkingWorkSetMaster() { delete duplicate; }

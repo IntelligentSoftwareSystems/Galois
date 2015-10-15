@@ -26,10 +26,12 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
+
 #include "Galois/Runtime/Executor_OnEach.h"
 #include "Galois/Runtime/Mem.h"
+#include "Galois/Runtime/PagePool.h"
 
 void Galois::Runtime::preAlloc_impl(unsigned num) {
   unsigned pagesPerThread = (num + activeThreads - 1) / activeThreads;
-  Substrate::getThreadPool().run(activeThreads, std::bind(pagePreAlloc, pagesPerThread));
+  Substrate::getThreadPool().run(activeThreads, std::bind(pagePoolPreAlloc, pagesPerThread));
 }

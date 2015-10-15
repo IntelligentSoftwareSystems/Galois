@@ -1676,7 +1676,7 @@ void run() {
     graph.getData(*ii).id = id;
   }
   
-  Galois::preAlloc(numThreads + (2 * graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::hugePageSize);
+  Galois::preAlloc(numThreads + (2 * graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::pagePoolSize());
   Galois::reportPageAlloc("MeminfoPre");
 
   Galois::StatTimer T;

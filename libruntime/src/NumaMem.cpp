@@ -113,80 +113,23 @@ static int numNumaPagesFor(unsigned nodeid) {
   return totalPages;
 }
 
-static int checkNuma() {
-#ifdef GALOIS_USE_NUMA
-  if (isNumaAvailable == 0) {
-    isNumaAvailable = numa_available() == -1 ? -1 : 1;
-    if (isNumaAvailable == -1)
-      gWarn("NUMA configured but not available");
-  }
-  return isNumaAvailable == 1;
-#else
-  return false;
-#endif
-}
-
 int Galois::Runtime::numNumaAllocForNode(unsigned nodeid) {
   return numNumaPagesFor(nodeid);
 }
 
-int Galois::Runtime::numNumaNodes() {
-  if (!checkNuma())
-    return 1;
-#ifdef GALOIS_USE_NUMA
-  return numa_num_configured_nodes();
-#else
-  return 1;
-#endif
-}
-
-static inline int getNumaNode(unsigned tid) {
-  if (!checkNuma())
-    return 0;
-
-#ifdef GALOIS_FORCE_STANDALONE
-  unsigned proc = 0;
-#else
-  unsigned proc = getThreadPool().getPackage(tid);
-#endif
-
-#if defined(GALOIS_USE_NUMA_OLD)
-  // Assume block distribution from physical processors to numa nodes
-  int numNodes = numa_num_configured_nodes();
-  return proc / numNodes;
-#elif defined(GALOIS_USE_NUMA)
-  return numa_node_of_cpu(proc);
-#else
-  proc = 0; // get rid of unused warning
-  return proc;
-#endif
-}
-
 #ifdef GALOIS_USE_NUMA
 static void *allocInterleaved(size_t len, unsigned num) {
-  void* data = 0;
-# if defined(GALOIS_USE_NUMA_OLD)
-  nodemask_t nm = numa_no_nodes;
-  for (unsigned i = 0; i < num; ++i) {
-    nodemask_set(&nm, getNumaNode(i));
-  }
-  data = numa_alloc_interleaved_subset(len, &nm);
-  // NB(ddn): Some strange bugs when empty interleaved mappings are
-  // coalesced. Eagerly fault in interleaved pages to circumvent.
-  if (data)
-    Galois::Runtime::pageIn(data, len, Galois::Runtime::pageSize);
-# else
+  auto& tp = Galois::Substrate::getThreadPool();
   bitmask* nm = numa_allocate_nodemask();
   for (unsigned i = 0; i < num; ++i) {
-    numa_bitmask_setbit(nm, getNumaNode(i));
+    numa_bitmask_setbit(nm, tp.getOSNumaNode(i));
   }
-  data = numa_alloc_interleaved_subset(len, nm);
+  void* data = numa_alloc_interleaved_subset(len, nm);
   numa_free_nodemask(nm);
   // NB(ddn): Some strange bugs when empty interleaved mappings are
   // coalesced. Eagerly fault in interleaved pages to circumvent.
   if (data)
     Galois::Runtime::pageIn(data, len, Galois::Runtime::pageSize);
-# endif
   return data;
 }
 #endif

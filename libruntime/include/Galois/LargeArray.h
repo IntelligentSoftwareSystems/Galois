@@ -35,10 +35,15 @@
 #include "Galois/gstl.h"
 #include "Galois/Substrate/gio.h"
 #include "Galois/Runtime/Mem.h"
+#include "Galois/Substrate/NumaMem.h"
 
 #include <utility>
 
 namespace Galois {
+
+namespace Runtime {
+extern unsigned activeThreads;
+} // end namespace Runtime
 
 /**
  * Large array of objects with proper specialization for void type and
@@ -48,9 +53,9 @@ namespace Galois {
  */
 template<typename T>
 class LargeArray {
+  Substrate::LAptr m_realdata;
   T* m_data;
   size_t m_size;
-  int allocated;
 
 public:
   typedef T raw_value_type;
@@ -71,34 +76,40 @@ public:
   };
 
 protected:
-  void allocate(size_type n, bool interleave, bool prefault) {
+  enum AllocType {Blocked, Local, Interleaved};
+  void allocate(size_type n, AllocType t) {
     assert(!m_data);
-    allocated = interleave ? 1 : 2;
     m_size = n;
-    if (interleave)
-      m_data = reinterpret_cast<T*>(Galois::Runtime::largeInterleavedAlloc(sizeof(T) * n));
-    else 
-      m_data = reinterpret_cast<T*>(Galois::Runtime::largeAlloc(sizeof(T) * n, prefault));
+    switch(t) {
+    case Blocked:
+      m_realdata = Substrate::largeMallocBlocked(n*sizeof(T), Runtime::activeThreads);
+      break;
+    case Interleaved:
+      m_realdata = Substrate::largeMallocInterleaved(n*sizeof(T), Runtime::activeThreads);
+    case Local:
+      m_realdata = Substrate::largeMallocLocal(n*sizeof(T));
+    };
+    m_data = reinterpret_cast<T*>(m_realdata.get());
   }
 
 public:
   /**
    * Wraps existing buffer in LargeArray interface.
    */
-  LargeArray(void* d, size_t s): m_data(reinterpret_cast<T*>(d)), m_size(s), allocated(0) { }
+  LargeArray(void* d, size_t s): m_data(reinterpret_cast<T*>(d)), m_size(s) { }
 
-  LargeArray(): m_data(0), m_size(0), allocated(0) { }
+  LargeArray(): m_data(0), m_size(0) { }
 
-  LargeArray(LargeArray&& o): m_data(0), m_size(0), allocated(0) {
+  LargeArray(LargeArray&& o): m_data(0), m_size(0) {
+    std::swap(this->m_realdata, o.m_realdata);
     std::swap(this->m_data, o.m_data);
     std::swap(this->m_size, o.m_size);
-    std::swap(this->allocated, o.allocated);
   }
 
   LargeArray& operator=(LargeArray&& o) {
+    std::swap(this->m_realdata, o.m_realdata);
     std::swap(this->m_data, o.m_data);
     std::swap(this->m_size, o.m_size);
-    std::swap(this->allocated, o.allocated);
     return *this;
   }
 
@@ -122,7 +133,7 @@ public:
   const_iterator end() const { return m_data + m_size; }
   
   //! Allocates interleaved across NUMA (memory) nodes.
-  void allocateInterleaved(size_type n) { allocate(n, true, true); }
+  void allocateInterleaved(size_type n) { allocate(n, Interleaved); }
 
   /**
    * Allocates using default memory policy (usually first-touch) 
@@ -132,7 +143,14 @@ public:
    *                   thread. By default, true because concurrent page-faulting can be a
    *                   scalability bottleneck.
    */
-  void allocateLocal(size_type n, bool prefault = true) { allocate(n, false, prefault); }
+  void allocateBlocked(size_type n) { allocate(n, Blocked); }
+
+  /**
+   * Allocates using Thread Local memory policy
+   *
+   * @param  n         number of elements to allocate 
+   */
+  void allocateLocal(size_type n) { allocate(n, Local); }
 
   template<typename... Args>
   void construct(Args&&... args) {
@@ -153,25 +171,17 @@ public:
   }
 
   void deallocate() {
-    if (!allocated) return;
-    if (allocated == 1)
-      Galois::Runtime::largeInterleavedFree(m_data, sizeof(T) * m_size);
-    else if (allocated == 2)
-      Galois::Runtime::largeFree(m_data, sizeof(T) * m_size);
-    else
-      GALOIS_DIE("Unknown allocation type");
+    m_realdata.reset();
     m_data = 0;
     m_size = 0;
   }
 
   void destroy() {
-    if (!allocated) return;
     if (!m_data) return;
     uninitialized_destroy(m_data, m_data + m_size);
   }
 
   void destroyAt(size_type n) {
-    assert(allocated);
     (&m_data[n])->~T();
   }
 
@@ -215,6 +225,7 @@ public:
   const_iterator end() const { return 0; }
 
   void allocateInterleaved(size_type n) { }
+  void allocateBlocked(size_type n) { }
   void allocateLocal(size_type n, bool prefault = true) { }
   template<typename... Args> void construct(Args&&... args) { }
   template<typename... Args> void constructAt(size_type n, Args&&... args) { }
