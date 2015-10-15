@@ -270,6 +270,10 @@ void runCatching (F& func, Ctxt* c, UserCtxt& uhand) {
 }
 
 
+// TODO: a common base class for IKDG executor
+// template <typename T, typename Ctxt,  
+
+
 } // end namespace Runtime
 } // end namespace Galois
 #endif // GALOIS_RUNTIME_KDG_TWO_PHASE_SUPPORT_H

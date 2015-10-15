@@ -281,7 +281,7 @@ protected:
       refill (*currWL, currCommits, prevWindowSize);
     }
 
-    nextWL->clear_all ();
+    nextWL->clear_all_parallel ();
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhood () {
@@ -331,7 +331,7 @@ protected:
               for (auto i = uhand.getPushBuffer ().begin ()
                   , endi = uhand.getPushBuffer ().end (); i != endi; ++i) {
 
-                if (!minElem || !cmp (*minElem, *i)) {
+                if ((targetCommitRatio == 0.0) || !minElem || !cmp (*minElem, *i)) {
                   // if *i >= *minElem
                   nextWL->push_back (ctxtMaker (*i));
                 } else {
