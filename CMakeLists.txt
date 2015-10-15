@@ -12,8 +12,6 @@ if(NOT CMAKE_BUILD_TYPE)
   # cmake default flags with relwithdebinfo is -O2 -g
   # cmake default flags with release is -O3 -DNDEBUG
   set(CMAKE_BUILD_TYPE "Release")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g")
 endif()
 
 ###### Options (alternatively pass as options to cmake -DName=Value) ######
@@ -51,6 +49,9 @@ set(USE_EMBEDDED_REVISION ON CACHE BOOL "Embed revision numbers")
 enable_testing()
 
 ###### Configure compiler ######
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g")
 
 if(NOT "$ENV{GCC_BIN}" STREQUAL "")
   # Preserve captured environment variable during reconfiguration
@@ -130,14 +131,11 @@ endif()
 
 # More warnings
 if(CMAKE_BUILD_TYPE MATCHES "Debug")
-  if(NOT CMAKE_CXX_COMPILER_ID MATCHES "XL")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
-  endif()
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
   if(CMAKE_COMPILER_IS_GNUCC)
-    if(GCC_VERSION VERSION_GREATER 4.8 OR GCC_VERSION VERSION_EQUAL 4.8)
-#      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-local-typedefs")
-    endif()
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Og")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Og")
   endif()
 endif()
 
