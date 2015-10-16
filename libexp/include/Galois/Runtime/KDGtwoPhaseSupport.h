@@ -79,9 +79,9 @@ public:
     source = true;
   }
 
-  const T& getElem () const { return active; }
+  const T& getActive () const { return active; }
 
-  T& getElem () { return active; }
+  T& getActive () { return active; }
 
   virtual void subAcquire (Lockable* l, Galois::MethodFlag) {
 
@@ -172,7 +172,7 @@ class SafetyTestLoop {
   struct GetActive: public std::unary_function<Ctxt, const T&> {
     const T& operator () (const Ctxt* c) const {
       assert (c != nullptr);
-      return c->getElem ();
+      return c->getActive ();
     }
   };
 
@@ -211,7 +211,7 @@ public:
           auto et = boost::make_transform_iterator (end_lesser, GetActive ());
 
 
-          if (!safetyTest (c->getElem (), bt, et)) {
+          if (!safetyTest (c->getActive (), bt, et)) {
             c->disableSrc ();
           }
         },
@@ -242,7 +242,7 @@ void runCatching (F& func, Ctxt* c, UserCtxt& uhand) {
 #else
     try {
 #endif
-      func (c->getElem (), uhand);
+      func (c->getActive (), uhand);
 
 #ifdef GALOIS_USE_LONGJMP
     } else {

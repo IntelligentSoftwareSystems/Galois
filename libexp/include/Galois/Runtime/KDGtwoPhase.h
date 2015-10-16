@@ -153,7 +153,7 @@ public:
   }
 
   template <typename R>
-  void fill_initial (const R& range) {
+  void push_initial (const R& range) {
     if (targetCommitRatio == 0.0) {
 
       Galois::do_all_choice (range,
@@ -183,7 +183,7 @@ protected:
             Ctxt* c = wl[tid].back ();
             wl[tid].pop_back ();
 
-            winWL.push (c->getElem ());
+            winWL.push (c->getActive ());
             c->~Ctxt ();
             ctxtAlloc.deallocate (c, 1);
           }
@@ -395,18 +395,6 @@ protected:
 };
 
 
-namespace hidden {
-  template <bool B, typename T1, typename T2> 
-  struct ChooseIf {
-    using Ret_ty = T1;
-  };
-
-  template <typename T1, typename T2>
-  struct ChooseIf<false, T1, T2> {
-    using Ret_ty = T2;
-  };
-} // end hidden
-
 
 template <typename T, typename Cmp, typename NhFunc, typename OpFunc, typename ExFunc, typename WindowWL>
 
@@ -437,7 +425,7 @@ protected:
   struct GetActive: public std::unary_function<Ctxt*, const T&> {
     const T& operator () (const Ctxt* c) const {
       assert (c != nullptr);
-      return c->getElem ();
+      return c->getActive ();
     }
   };
 
@@ -465,7 +453,7 @@ protected:
 #else
           try {
 #endif 
-            func (c->getElem (), uhand, m_beg, m_end);
+            func (c->getActive (), uhand, m_beg, m_end);
 
 #ifdef GALOIS_USE_LONGJMP
           } else {
@@ -514,7 +502,7 @@ protected:
       Galois::do_all_choice (makeLocalRange (*Base::currWL),
           [this] (Ctxt* ctx) {
             if (ctx->isSrc ()) {
-              execFunc (ctx->getElem ());
+              execFunc (ctx->getActive ());
             }
           }, 
           "execute-safe-sources",
@@ -586,7 +574,7 @@ private:
       Galois::do_all_choice (makeLocalRange (*Base::currWL),
           [this] (Ctxt* ctx) {
             if (ctx->isSrc ()) {
-              execFunc (ctx->getElem ());
+              execFunc (ctx->getActive ());
             }
           }, 
           "execute-safe-sources",
@@ -611,7 +599,7 @@ void for_each_ordered_2p_win (const R& range, const Cmp& cmp, const NhFunc& nhFu
   
   const bool ADDS = DEPRECATED::ForEachTraits<OpFunc>::NeedsPush;
 
-  using WindowWL = typename hidden::ChooseIf<ADDS, PQbasedWindowWL<T, Cmp>, SortedRangeWindowWL<T, Cmp> >::Ret_ty;
+  using WindowWL = typename std::conditional<ADDS, PQbasedWindowWL<T, Cmp>, SortedRangeWindowWL<T, Cmp> >::type;
 
   using Exec = KDGtwoPhaseStableExecutor<T, Cmp, NhFunc, OpFunc, WindowWL>;
   
@@ -621,7 +609,7 @@ void for_each_ordered_2p_win (const R& range, const Cmp& cmp, const NhFunc& nhFu
     Substrate::getSystemThreadPool().burnPower (Galois::getActiveThreads ());
   }
 
-  e.fill_initial (range);
+  e.push_initial (range);
   e.execute ();
 
   if (wakeupThreadPool) {
@@ -643,7 +631,7 @@ void for_each_ordered_2p_win (const R& range, const Cmp& cmp, const NhFunc& nhFu
     Substrate::getSystemThreadPool().burnPower(Galois::getActiveThreads ());
   }
 
-  e.fill_initial (range);
+  e.push_initial (range);
   e.execute ();
 
   if (wakeupThreadPool) {
@@ -668,7 +656,7 @@ void for_each_ordered_ikdg_custom_safety (const R& range, const Cmp& cmp, const 
     Substrate::getSystemThreadPool().burnPower(Galois::getActiveThreads ());
   }
 
-  e.fill_initial (range);
+  e.push_initial (range);
   e.execute ();
 
   if (wakeupThreadPool) {

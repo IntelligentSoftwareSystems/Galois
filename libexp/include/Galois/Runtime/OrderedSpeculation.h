@@ -31,10 +31,22 @@
 
 #include "Galois/PerThreadContainer.h"
 #include "Galois/PriorityQueue.h"
+#include "Galois/DoAllWrap.h"
+#include "Galois/Atomic.h"
+#include "Galois/Accumulator.h"
+#include "Galois/GaloisForwardDecl.h"
+#include "Galois/optional.h"
 
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/OrderedLockable.h"
+#include "Galois/Runtime/KDGtwoPhaseSupport.h"
+#include "Galois/Runtime/WindowWorkList.h"
+#include "Galois/Runtime/UserContextAccess.h"
+#include "Galois/Runtime/Mem.h"
 
+#include "Galois/Substrate/gio.h"
+#include "Galois/Substrate/PerThreadStorage.h"
+#include "Galois/Substrate/CompilerSpecific.h"
 
 namespace Galois {
 
@@ -63,6 +75,7 @@ enum class ContextState: int {
     ABORTING,
     ABORT_DONE,
     ABORTED_CHILD,
+    RECLAIM,
 };
 
 const char* ContextStateNames[] = {
@@ -77,6 +90,7 @@ const char* ContextStateNames[] = {
     "ABORTING",
     "ABORT_DONE",
     "ABORTED_CHILD",
+    "RECLAIM",
 };
 
 
@@ -92,7 +106,7 @@ struct OptimNhoodItem: public OrdLocBase<OptimNhoodItem<Ctxt, CtxtCmp>, Ctxt, Ct
 
   const CtxtCmp& ctxtCmp;
   GAtomic<Ctxt*> minCtxt;
-  Sharers history;
+  Sharers sharers;
 
 
   OptimNhoodItem (Lockable* l, const CtxtCmp& ctxtCmp): 
@@ -173,7 +187,7 @@ struct OptimNhoodItem: public OrdLocBase<OptimNhoodItem<Ctxt, CtxtCmp>, Ctxt, Ct
     }
   }
 
-  void findAborts (Ctxt* ctxt) {
+  bool findAborts (Ctxt* ctxt) {
 
     assert (getMin () == ctxt);
 
@@ -213,64 +227,33 @@ struct OptimNhoodItem: public OrdLocBase<OptimNhoodItem<Ctxt, CtxtCmp>, Ctxt, Ct
   // TODO: re-implement
   void removeAbort (Ctxt* ctxt) {
 
-    mutex.lock ();
-
+    assert (!sharers.empty ());
     assert (std::find (sharers.begin (), sharers.end (), ctxt) != sharers.end ());
 
-    bool found = false;
+    assert (ctxt->hasState (ContextState::ABORTING));
 
-    while (!sharers.empty ()) {
-      Ctxt* tail = sharers.back ();
-      assert (tail);
-
-      if (ctxt == tail) {
-        sharers.pop_back (); 
-        found = true;
-        break;
-      }
-
-      if (ctxtCmp (ctxt, tail)) { // ctxt < tail
-        dbg::debug (ctxt, " removing self & aborting lower priority sharer ", tail);
-
-        mutex.unlock ();
-
-        if (tail->hasState (ContextState::ABORT_SELF) || tail->casState (ContextState::SCHEDULED, ContextState::ABORT_SELF)) {
-          ctxt->waitFor (tail);
-
-        } else if (tail->casState (ContextState::READY_TO_COMMIT, ContextState::ABORTING)) {
-          tail->doAbort ();
-
-        } else {
-          // GALOIS_DIE ("shouldn't reach here");
-          assert (!tail->isRunning ());
-        }
-
-        mutex.lock ();
-
-      } else {
-        assert (!found);
-        GALOIS_DIE ("shouldn't reach here");
-      }
+    if (sharers.back () != ctxt) { 
+      GALOIS_DIE ("invalid state");
     }
 
-    assert (found);
+    assert (sharers.back () == ctxt);
+    sharers.pop_back ();
+
     assert (std::find (sharers.begin (), sharers.end (), ctxt) == sharers.end ());
 
-    mutex.unlock ();
   }
 
   void removeCommit (Ctxt* ctxt) {
 
-    mutex.lock ();
 
-    assert (std::find (sharers.begin (), sharers.end (), ctxt) != sharers.end ());
     assert (!sharers.empty ());
+    assert (std::find (sharers.begin (), sharers.end (), ctxt) != sharers.end ());
     assert (sharers.front () == ctxt);
+
     sharers.pop_front ();
 
     assert (std::find (sharers.begin (), sharers.end (), ctxt) == sharers.end ());
 
-    mutex.unlock ();
   }
 
 };
@@ -380,7 +363,7 @@ struct OptimContext: public SimpleRuntimeContext {
     // }
   }
 
-  void addChild (Ctxt* child) {
+  void addChild (OptimContext* child) {
 
     assert (std::find (children.begin (), children.end (), child) == children.end ());
 
@@ -427,7 +410,7 @@ struct OptimContext: public SimpleRuntimeContext {
 
         dbg::debug (this, " aborting child ", child);
         child->doAbort (false);
-        exec.freeCtxt (child);
+        child->setState (ContextState::ABORTED_CHILD);
 
       } else {
         assert (child->hasState (ContextState::ABORTING) || child->hasState (ContextState::ABORT_DONE));
@@ -468,7 +451,7 @@ struct OptimContext: public SimpleRuntimeContext {
 
     for (const NItem* ni: nhood) {
 
-      Ctxt* c = ni->getHistHead ();
+      OptimContext* c = ni->getHistHead ();
       assert (c != this);
 
       if (c && c->isCommitSrc () && c->onWL.cas (false, true)) {
@@ -551,13 +534,20 @@ struct OptimContext: public SimpleRuntimeContext {
   void resetMarks (void) {
 
     for (NItem* ni: nhood) {
-      ni->resetMin (c);
+      ni->resetMin (this);
+    }
+  }
+
+  void addToHistory (void) {
+
+    for (NItem* ni: nhood) {
+      ni->addToHistory (this);
     }
   }
 
 };
 
-template <typename T, typename Cmp, typename NhFunc, typename ExFunc, typename  OpFunc, typename WindowWL, bool HAS_EXEC_FUNC> 
+template <typename T, typename Cmp, typename NhFunc, typename ExFunc, typename  OpFunc, bool HAS_EXEC_FUNC> 
 class OptimOrdExecutor: private boost::noncopyable {
 
   friend struct OptimContext<T, Cmp, OptimOrdExecutor>;
@@ -566,8 +556,10 @@ class OptimOrdExecutor: private boost::noncopyable {
   using CtxtCmp = typename Ctxt::CtxtCmp;
   using NItemFactory = typename Ctxt::NItem::Factory;
 
+  static const bool ADDS = DEPRECATED::ForEachTraits<OpFunc>::NeedsPush;
+  using WindowWL = typename std::conditional<ADDS, PQbasedWindowWL<Ctxt*, CtxtCmp>, SortedRangeWindowWL<Ctxt*, CtxtCmp> >::type;
+
   using CommitQ = Galois::PerThreadVector<Ctxt*>;
-  using PendingQ = Galois::PerThreadMinHeap<Ctxt*, CtxtCmp>;
 
   using CtxtWL = PerThreadBag<Ctxt*>;
   using CtxtAlloc = Runtime::FixedSizeAllocator<Ctxt>;
@@ -577,6 +569,20 @@ class OptimOrdExecutor: private boost::noncopyable {
 
   static const unsigned DEFAULT_CHUNK_SIZE = 8;
 
+  struct CtxtMaker {
+    OptimOrdExecutor& outer;
+
+    Ctxt* operator () (const T& x) {
+
+      Ctxt* ctxt = outer.ctxtAlloc.allocate (1);
+      assert (ctxt);
+      outer.ctxtAlloc.construct (ctxt, x, ContextState::UNSCHEDULED, outer);
+
+      return ctxt;
+    }
+  };
+
+
   Cmp itemCmp;
   NhFunc nhFunc;
   ExFunc execFunc;
@@ -584,14 +590,14 @@ class OptimOrdExecutor: private boost::noncopyable {
   const char* loopname;
 
   CtxtCmp ctxtCmp;
-  CommitQ commitQ;
   NItemFactory nitemFactory;
   NhoodMgr nhmgr;
   WindowWL winWL;
-
-
   std::unique_ptr<CtxtWL> currWL;
   std::unique_ptr<CtxtWL> nextWL;
+  CtxtMaker ctxtMaker;
+
+
   CtxtAlloc ctxtAlloc;
 
   size_t windowSize;
@@ -599,6 +605,7 @@ class OptimOrdExecutor: private boost::noncopyable {
   size_t prevCommits;
   double targetCommitRatio;
 
+  CommitQ commitQ;
   PerThreadUserCtxt userHandles;
   GAccumulator<size_t> numCommitted;
   GAccumulator<size_t> total;
@@ -612,10 +619,12 @@ public:
       opFunc (opFunc), 
       loopname (loopname),
       ctxtCmp (itemCmp),
-      pendingQ (ctxtCmp),
-      commitQ (),
       nitemFactory (ctxtCmp),
       nhmgr (nitemFactory),
+      winWL (ctxtCmp),
+      currWL (new CtxtWL),
+      nextWL (new CtxtWL),
+      ctxtMaker {*this}
   {
     if (!loopname) { loopname = "NULL"; }
 
@@ -628,8 +637,7 @@ public:
 
   }
 
-  ~OptimOrdExecutor (void) {
-  }
+  ~OptimOrdExecutor (void) {}
 
   const Cmp& getItemCmp () const { return itemCmp; }
 
@@ -648,39 +656,10 @@ public:
 
   }
 
-  Ctxt* makeCtxtx (const T& x) {
-
-    Ctxt* ctxt = ctxtAlloc.allocate (1);
-    assert (ctxt);
-    ctxtAlloc.construct (ctxt, x, ContextState::UNSCHEDULED, *this);
-
-    return ctxt;
+  void operator () (void) {
+    execute ();
   }
-
-  Ctxt* push (const T& x) {
-    
-    Ctxt* ctxt = makeCtxtx (x);
-
-    if (targetCommitRatio == 0.0) {
-
-      nextWL->push (ctxt);
-
-    } else {
-      winWL.push (ctxt);
-          
-    }
-
-    return ctxt;
-  }
-
-  void push_abort (Ctxt* ctxt) {
-    assert (ctxt);
-    assert (ctxt->hasState (ContextState::ABORT_DONE));
-
-    ctxt->setState (ContextState::UNSCHEDULED);
-    nextWL->push (ctxt);
-  }
-
+  
   void execute () {
 
     while (true) {
@@ -709,6 +688,33 @@ public:
     }
   }
 
+private:
+
+
+  Ctxt* push (const T& x) {
+    
+    Ctxt* ctxt = ctxtMaker (x);
+
+    if (targetCommitRatio == 0.0) {
+
+      nextWL->push (ctxt);
+
+    } else {
+      winWL.push (ctxt);
+          
+    }
+
+    return ctxt;
+  }
+
+  void push_abort (Ctxt* ctxt) {
+    assert (ctxt);
+    assert (ctxt->hasState (ContextState::ABORT_DONE));
+
+    ctxt->setState (ContextState::UNSCHEDULED);
+    nextWL->push (ctxt);
+  }
+
   GALOIS_ATTRIBUTE_PROF_NOINLINE void spillAll (CtxtWL& wl) {
     assert (targetCommitRatio != 0.0);
     on_each(
@@ -717,7 +723,7 @@ public:
             Ctxt* c = wl[tid].back ();
             wl[tid].pop_back ();
 
-            winWL.push (c->getElem ());
+            winWL.push (c);
             c->~Ctxt ();
             ctxtAlloc.deallocate (c, 1);
           }
@@ -798,7 +804,9 @@ public:
       }
     }
 
-    winWL.poll (wl, windowSize, wl.size_all (), ctxtMaker);
+    auto noop = [] (Ctxt* const c) { return c; };
+
+    winWL.poll (wl, windowSize, wl.size_all (), noop);
     // std::cout << "Calculated Window size: " << windowSize << ", Actual: " << wl->size_all () << std::endl;
   }
 
@@ -846,10 +854,13 @@ public:
 
     if (HAS_EXEC_FUNC) {
 
-      Galois::do_all_choice (makeLocalRange (sources)),
+      Galois::do_all_choice (makeLocalRange (sources),
         [this] (Ctxt* ctxt) {
-          execFunc (ctxt->getElem ())
-        }
+          execFunc (ctxt->getActive ());
+        },
+        "exec-func",
+        Galois::chunk_size<ExFunc::CHUNK_SIZE> ());
+
     }
   }
 
@@ -881,12 +892,12 @@ public:
               for (auto i = uhand.getPushBuffer ().begin ()
                   , endi = uhand.getPushBuffer ().end (); i != endi; ++i) {
 
-                Ctxt* child = makeCtxtx (*i);
+                Ctxt* child = ctxtMaker (*i);
                 c->addChild (child);
 
                 if (!minElem || !ctxtCmp (minElem, child)) {
                   // if *i >= *minElem
-                  nextWL->push_back (ctxtMaker (child));
+                  nextWL->push_back (child);
                 } else {
                   winWL.push (child);
                 } 
@@ -912,12 +923,12 @@ public:
 
   Ctxt* computeGVT (void) {
 
-    PerThreadStorage<Ctxt*> perThrdMin;
+    Substrate::PerThreadStorage<Ctxt*> perThrdMin;
 
-    on_each_impl ([this] (const unsigned tid, const unsigned numT) {
+    on_each_impl ([this, &perThrdMin] (const unsigned tid, const unsigned numT) {
           
-          for (auto i = nextWL->begin_local ()
-            , end_i = nextWL->end_local (); i != end_i; ++i) {
+          for (auto i = nextWL->local_begin ()
+            , end_i = nextWL->local_end (); i != end_i; ++i) {
 
             Ctxt*& lm = *(perThrdMin.getLocal ());
 
@@ -980,20 +991,20 @@ public:
 
     Galois::Runtime::for_each_gen (
         makeLocalRange (abortWL),
-        [this, gvt] (Ctxt* c, UserContext<Ctxt*>& wlHandle) {
+        [this] (Ctxt* c, UserContext<Ctxt*>& wlHandle) {
 
           c->doAbort ();
           c->findAbortSrc (wlHandle);
         },
         std::make_tuple (
           Galois::loopname ("handle-aborts"),
-          Galois::does_not_need_aborts_tag,
-          Galois::wl<Galois::WorkList::dChunkedFIFO<NhFunc::CHUNK_SIZE> ()));
+          Galois::does_not_need_aborts_tag (),
+          Galois::wl<Galois::WorkList::dChunkedFIFO<NhFunc::CHUNK_SIZE> > ()));
     
 
   }
 
-  GALOIS_ATTRIBUTE_PROF_NOINLINE void performCommits (CtxtWL& commitQ) {
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void performCommits () {
 
     CtxtWL commitSources;
 
@@ -1023,8 +1034,8 @@ public:
         },
         std::make_tuple (
           Galois::loopname ("retire"),
-          Galois::does_not_need_aborts_tag,
-          Galois::wl<Galois::WorkList::dChunkedFIFO<DEFAULT_CHUNK_SIZE> ()));
+          Galois::does_not_need_aborts_tag (),
+          Galois::wl<Galois::WorkList::dChunkedFIFO<DEFAULT_CHUNK_SIZE> > ()));
 
 
 
@@ -1083,11 +1094,6 @@ public:
   }
 
 
-  void operator () (void) {
-    execute ();
-  }
-  
-private:
 
 
 };
@@ -1096,6 +1102,7 @@ private:
 namespace HIDDEN {
   
   struct DummyExecFunc {
+    static const unsigned CHUNK_SIZE = 1;
     template <typename T>
     void operator () (const T&) const {}
   };
@@ -1106,19 +1113,17 @@ void for_each_ordered_optim (const R& range, const Cmp& cmp, const NhFunc& nhFun
 
   using T = typename R::value_type;
 
-  const bool ADDS = DEPRECATED::ForEachTraits<OpFunc>::NeedsPush;
 
-  using WindowWL = typename hidden::ChooseIf<ADDS, PQbasedWindowWL<T, Cmp>, SortedRangeWindowWL<T, Cmp> >::Ret_ty;
 
   const bool HAS_EXEC_FUNC = std::is_same<ExFunc, HIDDEN::DummyExecFunc>::value;
 
-  using Exec = OptimOrdExecutor<T, Cmp, NhFunc, ExFunc, OpFunc, WindowWL, HAS_EXEC_FUNC>;
+  using Exec = OptimOrdExecutor<T, Cmp, NhFunc, ExFunc, OpFunc, HAS_EXEC_FUNC>;
   
   Exec e (cmp, nhFunc, execFunc, opFunc, loopname);
 
   Substrate::getSystemThreadPool().burnPower (Galois::getActiveThreads ());
 
-  e.fill_initial (range);
+  e.push_initial (range);
   e.execute ();
 
   Substrate::getSystemThreadPool().beKind();
@@ -1128,7 +1133,7 @@ template <typename R, typename Cmp, typename NhFunc, typename OpFunc>
 void for_each_ordered_optim (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const char* loopname=0) {
 
 
-  for_each_ordered_optim (range, cmp, nhFunc, DummyExecFunc (), opFunc, loopname);
+  for_each_ordered_optim (range, cmp, nhFunc, HIDDEN::DummyExecFunc (), opFunc, loopname);
 }
 
 
