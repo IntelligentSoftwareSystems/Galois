@@ -11,3 +11,8 @@ target_link_libraries(hsssp-push hsssp_cuda cudadevrt OpenCL )
 add_custom_command(TARGET hsssp-push POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/opencl/sssp_kernel.cl $<TARGET_FILE_DIR:hsssp>)                 
 
 app(graphCheck check.cpp GlobalObj.cpp DISTSAFE)
+
+#app(graphCheck_gen check_gen.cpp CLANGPLUGIN)
+#app(graphCheck_gen check_gen.cpp GlobalObj.cpp DISTSAFE)
+
+#app(HSSSP_gen HSSSP_gen.cpp GlobalObj.cpp DISTSAFE)

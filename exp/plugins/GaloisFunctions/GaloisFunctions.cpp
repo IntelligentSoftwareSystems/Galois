@@ -1,3 +1,6 @@
+/*
+ * Author : Gurbinder Gill (gurbinder533@gmail.com)
+ */
 #include <sstream>
 #include <climits>
 #include <vector>
