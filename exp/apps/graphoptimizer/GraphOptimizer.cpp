@@ -489,11 +489,11 @@ public:
     numNodes = graph.size();
     numEdges = graph.sizeEdges();
     if (UseNumaAlloc) {
-      nodeData.allocateLocal(numNodes, false);
-      edgeIndData.allocateLocal(numNodes, false);
-      edgeDst.allocateLocal(numEdges*sizeof(uint32_t), false);
-      edgeData.allocateLocal(numEdges, false);
-      this->outOfLineAllocateLocal(numNodes, false);
+      nodeData.allocateLocal(numNodes);
+      edgeIndData.allocateLocal(numNodes);
+      edgeDst.allocateLocal(numEdges*sizeof(uint32_t));
+      edgeData.allocateLocal(numEdges);
+      this->outOfLineAllocateLocal(numNodes);
     } else {
       nodeData.allocateInterleaved(numNodes);
       edgeIndData.allocateInterleaved(numNodes);
