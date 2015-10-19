@@ -23,7 +23,7 @@ set(USE_STRICT_CONFIG OFF CACHE BOOL "Instead of falling back gracefully, fail")
 set(USE_LONGJMP ON CACHE BOOL "Use longjmp instead of exceptions to signal aborts")
 set(INSTALL_APPS OFF CACHE BOOL "Install apps as well as library")
 set(SKIP_COMPILE_APPS OFF CACHE BOOL "Skip compilation of applications using Galois library")
-set(GRAPH_LOCATION /net/ohm/export/cdgc/inputs/release_tests CACHE PATH "Location of inputs for tests.  Clear to download inputs.")
+set(GRAPH_LOCATION "" CACHE PATH "Location of inputs for tests if downloaded/stored separately.")
 
 set(INSTALL_LIB_DIR lib CACHE PATH "Installation directory for libraries")
 set(INSTALL_BIN_DIR bin CACHE PATH "Installation directory for executables")
@@ -240,6 +240,24 @@ include(CheckEndian)
 
 add_definitions(-D__STDC_LIMIT_MACROS)
 
+###### Test Inputs ######
+if (GRAPH_LOCATION)
+  if (EXISTS ${GRAPH_LOCATION}/graph_readme.txt)
+    set(BASEINPUT ${GRAPH_LOCATION})
+    MESSAGE(STATUS "Using specified graph location ${GRAPH_LOCATION}")
+  else()
+    MESSAGE(FATAL_ERROR "Specified graph location does not appear to have input: ${GRAPH_LOCATION}")
+  endif()
+elseif(EXISTS /net/ohm/export/cdgc/inputs/reference/graph_readme.txt)
+  set(BASEINPUT /net/ohm/export/cdgc/inputs/reference)
+  MESSAGE(STATUS "Using ISS shared graph folder for inputs")
+else()
+  add_subdirectory(inputs)
+  set(BASEINPUT ${CMAKE_BINARY_DIR}/inputs/reference )
+  MESSAGE(STATUS "use make input to download inputs in the build directory")
+endif()
+set(GRAPH_INPUTS ${BASEINPUT}/graph_readme.txt)
+
 ###### Global Functions ######
 
 function(add_internal_library name)
@@ -254,6 +272,7 @@ function(add_test_scale type app)
   endif()
   foreach(thr RANGE 1 ${N})
     add_test(test-${type}-${thr}-${app} ${app} ${ARGN} -t ${thr})
+    set_tests_properties(test-${type}-${thr}-${app} PROPERTIES REQUIRED_FILES ${GRAPH_INPUTS})
   endforeach(thr)
 endfunction(add_test_scale)
 
@@ -376,13 +395,6 @@ if(NOT SKIP_COMPILE_APPS)
   if(USE_EXP)
    add_subdirectory(exp)
   endif()
-endif()
-
-if (GRAPH_LOCATION)
-  set(BASEINPUT GRAPH_LOCATION)
-else()
-  add_subdirectory(inputs)
-  set(BASEINPUT ${CMAKE_BINARY_DIR}/inputs/release_tests )
 endif()
 
 ###### Documentation ######
