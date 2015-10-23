@@ -123,6 +123,8 @@ struct OptimNhoodItem: public OrdLocBase<OptimNhoodItem<Ctxt, CtxtCmp>, Ctxt, Ct
 
     do {
 
+      other = minCtxt;
+
       if (other == ctxt) {
         return true;
       }
@@ -157,7 +159,7 @@ struct OptimNhoodItem: public OrdLocBase<OptimNhoodItem<Ctxt, CtxtCmp>, Ctxt, Ct
 
   void addToHistory (Ctxt* ctxt) {
 
-    assert (ctxt && ctxt->isSrc ());
+    assert (ctxt && ctxt->isSrc () && ctxt->hasState (ContextState::READY_TO_COMMIT));
     assert (std::find (sharers.begin (), sharers.end (), ctxt) == sharers.end ());
 
     if (!sharers.empty ()) {
@@ -602,11 +604,12 @@ class OptimOrdExecutor: private boost::noncopyable {
 
   size_t windowSize;
   size_t rounds;
-  size_t prevCommits;
+  size_t prevSources;
   double targetCommitRatio;
 
   CommitQ commitQ;
-  PerThreadUserCtxt userHandles;
+  // PerThreadUserCtxt userHandles;
+  GAccumulator<size_t> numSources;
   GAccumulator<size_t> numCommitted;
   GAccumulator<size_t> total;
 
@@ -624,7 +627,11 @@ public:
       winWL (ctxtCmp),
       currWL (new CtxtWL),
       nextWL (new CtxtWL),
-      ctxtMaker {*this}
+      ctxtMaker {*this},
+      windowSize (0),
+      rounds (0),
+      prevSources (0),
+      targetCommitRatio (commitRatioArg)
   {
     if (!loopname) { loopname = "NULL"; }
 
@@ -649,10 +656,19 @@ public:
 
     Galois::do_all_choice (range,
         [this] (const T& x) {
-          push (x);
+
+          Ctxt* c = ctxtMaker (x);
+          nextWL->push (c);
+
         }, 
         "init-fill",
-        chunk_size<NhFunc::CHUNK_SIZE> ());
+        chunk_size<DEFAULT_CHUNK_SIZE> ());
+
+    if (targetCommitRatio != 0.0) {
+
+      winWL.initfill (makeLocalRange (*nextWL));
+      nextWL->clear_all_parallel ();
+    }
 
   }
 
@@ -661,6 +677,8 @@ public:
   }
   
   void execute () {
+
+    rounds = 0;
 
     while (true) {
 
@@ -684,11 +702,20 @@ public:
 
       reclaimMemory (sources);
 
-
     }
+
+    printStats ();
   }
 
 private:
+
+  void printStats (void) {
+    std::cout << "OptimOrdExecutor, rounds: " << rounds << std::endl;
+    std::cout << "OptimOrdExecutor, commits: " << numCommitted.reduce () << std::endl;
+    std::cout << "OptimOrdExecutor, total: " << total.reduce () << std::endl;
+    std::cout << "OptimOrdExecutor, efficiency: " << double (numCommitted.reduce ()) / total.reduce () << std::endl;
+    std::cout << "OptimOrdExecutor, avg. parallelism: " << double (numCommitted.reduce ()) / rounds << std::endl;
+  }
 
 
   Ctxt* push (const T& x) {
@@ -818,8 +845,8 @@ private:
     std::swap (currWL, nextWL);
 
     if (targetCommitRatio != 0.0) {
-      size_t currCommits = numCommitted.reduce () - prevCommits;
-      prevCommits += currCommits;
+      size_t currCommits = numSources.reduce () - prevSources;
+      prevSources += currCommits;
 
       size_t prevWindowSize = nextWL->size_all ();
       refill (*currWL, currCommits, prevWindowSize);
@@ -885,7 +912,6 @@ private:
 
           if (commit) {
 
-            numCommitted += 1;
 
             if (DEPRECATED::ForEachTraits<OpFunc>::NeedsPush) { 
 
@@ -907,13 +933,18 @@ private:
               assert (uhand.getPushBuffer ().begin () == uhand.getPushBuffer ().end ());
             }
 
+            bool b = c->casState (ContextState::SCHEDULED, ContextState::READY_TO_COMMIT);
+
+            assert (b && "CAS shouldn't have failed");
+            numSources += 1;
+
             c->publishChanges ();
             c->addToHistory ();
+            commitQ.get ().push_back (c);
 
           } else {
 
             c->doAbort ();
-            push_abort (c);
           }
         },
         "applyOperator",
@@ -970,18 +1001,22 @@ private:
               if (c->findAborts ()) {
 
                 c->findAbortSrc (abortWL);
+                
+                c->setState (ContextState::ABORT_DONE);
                 push_abort (c);
 
               } else {
                 sources.push (c);
               }
 
+              c->resetMarks ();
+
             } else {
 
+              c->setState (ContextState::ABORT_DONE);
               push_abort (c);
             }
 
-            c->resetMarks ();
           }
 
         },
@@ -1015,7 +1050,7 @@ private:
 
           assert (c);
 
-          if (ctxtCmp (c, gvt) 
+          if ((!gvt || ctxtCmp (c, gvt))
             && c->isCommitSrc ()) {
 
             commitSources.push (c);
@@ -1027,10 +1062,20 @@ private:
 
     Galois::Runtime::for_each_gen (
         makeLocalRange (commitSources),
-        [this, gvt] (Ctxt* c, UserContext<Ctxt*>& wlHandle) {
+        [this] (Ctxt* c, UserContext<Ctxt*>& wlHandle) {
 
-          c->doCommit ();
-          c->findCommitSrc (wlHandle);
+          bool b = c->casState (ContextState::READY_TO_COMMIT, ContextState::COMMITTING);
+
+          if (b) {
+
+            assert (c->isCommitSrc ());
+            c->doCommit ();
+            c->findCommitSrc (wlHandle);
+            numCommitted += 1;
+
+          } else {
+            assert (c->hasState (ContextState::COMMIT_DONE));
+          }
         },
         std::make_tuple (
           Galois::loopname ("retire"),
