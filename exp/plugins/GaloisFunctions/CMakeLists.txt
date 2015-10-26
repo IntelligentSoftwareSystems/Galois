@@ -9,7 +9,9 @@ if( NOT MSVC ) # MSVC mangles symbols differently, and
   endif()
 endif()
 
-add_llvm_loadable_module(GaloisFunctions GaloisFunctions.cpp)
+add_llvm_loadable_module(GaloisFunctions 
+    GaloisFunctions.cpp
+    IrGLTranslator.cpp)
 
 target_link_libraries(GaloisFunctions ${cmake_2_8_12_PRIVATE} clangASTMatchers)
 
