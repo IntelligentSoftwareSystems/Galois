@@ -73,6 +73,14 @@ std::string center(const bool s, const int w) {
   return ss.str();
 }
 
+/** Function to split a string with a given delimiter **/
+void split(const string& s, char delim, std::vector<string>& elems) {
+  stringstream ss(s);
+  string item;
+  while(std::getline(ss, item, delim)) {
+    elems.push_back(item);
+  }
+}
 
 
 
@@ -113,31 +121,6 @@ class GaloisFunctionsVisitor : public RecursiveASTVisitor<GaloisFunctionsVisitor
   };
 
 
-  class NameSpaceHandler : public MatchFinder::MatchCallback {
-    //CompilerInstance &Instance;
-    clang::LangOptions& langOptions; //Instance.getLangOpts();
-  public:
-    NameSpaceHandler(clang::LangOptions &langOptions) : langOptions(langOptions){}
-    virtual void run(const MatchFinder::MatchResult &Results){
-      llvm::outs() << "It is coming here\n"
-                   << Results.Nodes.getNodeAs<clang::NestedNameSpecifier>("galoisLoop")->getAsNamespace()->getIdentifier()->getName();
-      if (const NestedNameSpecifier* NSDecl = Results.Nodes.getNodeAs<clang::NestedNameSpecifier>("galoisLoop")) {
-        llvm::outs() << "Found Galois Loop\n";
-        //NSDecl->dump(langOptions);
-      }
-    }
-  };
-
-  class ForStmtHandler : public MatchFinder::MatchCallback {
-    public:
-      virtual void run(const MatchFinder::MatchResult &Results) {
-        if (const ForStmt* FS = Results.Nodes.getNodeAs<clang::ForStmt>("forLoop")) {
-          llvm::outs() << "for loop found\n";
-          FS->dump();
-        }
-      }
-  };
-
   struct getData_entry {
     string VAR_NAME;
     string VAR_TYPE;
@@ -145,6 +128,7 @@ class GaloisFunctionsVisitor : public RecursiveASTVisitor<GaloisFunctionsVisitor
     string RW_STATUS;
     bool IS_REFERENCE;
     bool IS_REFERENCED;
+    string GRAPH_NAME;
   };
 
   struct Graph_entry {
@@ -158,9 +142,22 @@ class GaloisFunctionsVisitor : public RecursiveASTVisitor<GaloisFunctionsVisitor
     string VAR_TYPE;
     string FIELD_NAME;
     string NODE_NAME;
+    string NODE_TYPE;
     string RW_STATUS;
     bool IS_REFERENCE;
     bool IS_REFERENCED;
+    string GRAPH_NAME;
+    string RESET_VALTYPE;
+    string RESET_VAL;
+  };
+
+  struct ReductionOps_entry {
+    string NODE_TYPE;
+    string FIELD_NAME;
+    string OPERATION_EXPR;
+    string RESETVAL_EXPR;
+    string GRAPH_NAME;
+    string SYNC_TYPE;
   };
 
   class InfoClass {
@@ -169,6 +166,7 @@ class GaloisFunctionsVisitor : public RecursiveASTVisitor<GaloisFunctionsVisitor
       map<string, vector<getData_entry>> getData_map;
       map<string, vector<getData_entry>> edgeData_map;
       map<string, vector<NodeField_entry>> fieldData_map;
+      map<string, vector<ReductionOps_entry>> reductionOps_map;
   };
 
 
@@ -211,14 +209,29 @@ class CallExprHandler : public MatchFinder::MatchCallback {
         auto call = Results.Nodes.getNodeAs<clang::CallExpr>("calleeName");
         auto record = Results.Nodes.getNodeAs<clang::CXXRecordDecl>("callerInStruct");
 
+        clang::LangOptions LangOpts;
+        LangOpts.CPlusPlus = true;
+        clang::PrintingPolicy Policy(LangOpts);
+
         //record->dump();
         if (call && record) {
 
           getData_entry DataEntry_obj;
           string STRUCT = record->getNameAsString();
           llvm::outs() << STRUCT << "\n\n";
+          /* if (STRUCT == "InitializeGraph") {
+             record->dump();
+             }*/
           string NAME = "";
           string TYPE = "";
+
+          /** To get the graph name on which this getData is called **/
+          auto memExpr_graph = Results.Nodes.getNodeAs<clang::Stmt>("getData_memExpr_graph");
+          string str_field;
+          llvm::raw_string_ostream s(str_field);
+          /** Returns something like this->graphName **/
+          memExpr_graph->printPretty(s, 0, Policy);
+          DataEntry_obj.GRAPH_NAME = s.str();
 
           auto func = call->getDirectCallee();
           if (func) {
@@ -236,8 +249,8 @@ class CallExprHandler : public MatchFinder::MatchCallback {
               //record->dump();
               //call->dump();
               if (varDecl_stmt_getData) {
+
                 auto varDecl_getData = Results.Nodes.getNodeAs<clang::VarDecl>("getData_varName");
-                //varName->dump();
                 DataEntry_obj.VAR_NAME = varDecl_getData->getNameAsString();
                 DataEntry_obj.VAR_TYPE = varDecl_getData->getType().getAsString();
                 DataEntry_obj.IS_REFERENCED = varDecl_getData->isReferenced();
@@ -368,201 +381,54 @@ class FindOperatorHandler : public MatchFinder::MatchCallback {
         }
       }
   };
-  class FunctionCallHandler : public MatchFinder::MatchCallback {
-    private:
-      Rewriter &rewriter;
-    public:
-      FunctionCallHandler(Rewriter &rewriter) :  rewriter(rewriter){}
-      virtual void run(const MatchFinder::MatchResult &Results) {
-        const CallExpr* callFS = Results.Nodes.getNodeAs<clang::CallExpr>("galoisLoop");
-        llvm::outs() << "It is coming here\n" << callFS->getNumArgs() << "\n";
-
-        //llvm::outs() << callFS << "\n";
-                     //<< Results.Nodes.getNodeAs<clang::DeclRefExpr>("galoisLoop")->getQualifier()->getAsNamespace(); //->getIdentifier()->getName() << "\n";
+class FunctionCallHandler : public MatchFinder::MatchCallback {
+  private:
+    Rewriter &rewriter;
+    InfoClass* info;
+  public:
+    FunctionCallHandler(Rewriter &rewriter, InfoClass* _info ) :  rewriter(rewriter), info(_info){}
+    virtual void run(const MatchFinder::MatchResult &Results) {
+      const CallExpr* callFS = Results.Nodes.getNodeAs<clang::CallExpr>("galoisLoop");
 
 
-        if(callFS){
+      if(callFS){
+        auto callRecordDecl = Results.Nodes.getNodeAs<clang::CXXRecordDecl>("do_all_recordDecl");
+        string struct_name = callRecordDecl->getNameAsString();
 
-              SourceLocation ST_main = callFS->getSourceRange().getBegin();
+        SourceLocation ST_main = callFS->getSourceRange().getBegin();
+        clang::LangOptions LangOpts;
+        LangOpts.CPlusPlus = true;
+        clang::PrintingPolicy Policy(LangOpts);
 
-              llvm::outs() << "Galois::do_All loop found\n";
-              //callFS->dump();
+        //Add text before
+        //stringstream SSBefore;
+        //SSBefore << "/* Galois:: do_all before  */\n";
+        //SourceLocation ST = callFS->getSourceRange().getBegin();
+        //rewriter.InsertText(ST, "hello", true, true);
 
-              //Get the arguments:
-              clang::LangOptions LangOpts;
-              LangOpts.CPlusPlus = true;
-              clang::PrintingPolicy Policy(LangOpts);
-
-              // Vector to store read and write set.
-              vector<pair<string, string>>read_set_vec;
-              vector<pair<string,string>>write_set_vec;
-              vector<string>write_setGNode_vec;
-              unsigned write_setNum = 0;
-              string GraphNode;
-
-              for(int i = 0, j = callFS->getNumArgs(); i < j; ++i){
-                string str_arg;
-                llvm::raw_string_ostream s(str_arg);
-                callFS->getArg(i)->printPretty(s, 0, Policy);
-                //llvm::outs() << "arg : " << s.str() << "\n\n";
-
-                const CallExpr* callExpr = dyn_cast<CallExpr>(callFS->getArg(i));
-                if (callExpr) {
-                  const FunctionDecl* func = callExpr->getDirectCallee();
-                  if (func->getNameInfo().getName().getAsString() == "read_set"){
-                    llvm::outs() << "Inside arg read_set: " << i <<  s.str() << "\n\n";
-                    callExpr->dump();
-
-                    for(unsigned k = 0; k < callExpr->getNumArgs(); ++k ) {
-                      string str_sub_arg;
-                      llvm::raw_string_ostream s_sub(str_sub_arg);
-                      callExpr->getArg(k)->printPretty(s_sub, 0, Policy);
-                      //llvm::outs() << callExpr->getArg(k)->getType()->dump() << "\n";
-                      llvm::outs() << "Dumping READ set TYPE\n\n";
-                      callExpr->getArg(k)->getType().getNonReferenceType().dump();
-                      /*
-                       * To Find the GraphNode name to be used in Syncer() struct
-                       */
-                      auto ptype = callExpr->getArg(k)->getType().getTypePtrOrNull(); // dyn_cast<PointerType>(callExpr->getArg(k)->getType());
-                      if(ptype->isPointerType()){
-                        //ptype->getPointeeType().dump();
-                        auto templatePtr = dyn_cast<TemplateSpecializationType>(ptype->getPointeeType().getTypePtrOrNull());
-                        if (templatePtr) {
-                          templatePtr->getArg(0).getAsType().dump();
-                          //templatePtr->getArg(0).getAsType().getAsString();
-
-                          //llvm::outs() << "\t\tFINALYY : " << templatePtr->getArg(0).getAsType().getBaseTypeIdentifier()->getName() << "\n";
-                          GraphNode = templatePtr->getArg(0).getAsType().getBaseTypeIdentifier()->getName();
-                          //llvm::outs() << "\t\tFINALYY : " << (dyn_cast<RecordType>(templatePtr->getArg(0).getAsType().getTypePtrOrNull()))->getDecl()->getAsString();
-                          //llvm::outs() << "\t\tFINALYY : " << s_sub.str() << "\n";
-                          //llvm::outs() << "TEMPLATE ARGUEMENTS : " << templatePtr->getNumArgs() << "\n";
-                          //llvm::outs() << "Ptype : " << ptype->isPointerType() << "\n";
-                        }
-                      }
-                      //callExpr->getArg(k)->desugar();
-
-                      //const PointerType* pointerTy = dyn_cast<PointerType>(callExpr->getArg(k))
-                      llvm::outs() << "TYPE = > " << callExpr->getArg(k)->getType().getAsString()<<"\n";
-
-                      /*
-                       * Removing Quotes. Find better solution.
-                       */
-                      string temp_str = s_sub.str();
-                      if(temp_str.front() == '"'){
-                        temp_str.erase(0,1);
-                        temp_str.erase(temp_str.size()-1);
-                      }
-
-                      string argType = callExpr->getArg(k)->getType().getAsString();
-                      read_set_vec.push_back(make_pair(argType, temp_str));
-                      llvm::outs() << "\t Sub arg : " << s_sub.str() << "\n\n";
-
-                    }
-                  }
-                  else if (func->getNameInfo().getName().getAsString() == "write_set"){
-                    llvm::outs() << "Inside arg write_set: " << i <<  s.str() << "\n\n";
-                    callExpr->dump();
-
-                    for(unsigned k = 0; k < callExpr->getNumArgs(); ++k ) {
-                      string str_sub_arg;
-                      llvm::raw_string_ostream s_sub(str_sub_arg);
-                      callExpr->getArg(k)->printPretty(s_sub, 0, Policy);
-                      llvm::outs() << "Dumping WRITE set TYPE\n\n"; 
-                      callExpr->getArg(k)->getType()->dump();
-                      /*
-                       * To Find the GraphNode name to be used in Syncer() struct
-                       */
-                      auto ptype = callExpr->getArg(k)->getType().getTypePtrOrNull()->getUnqualifiedDesugaredType(); // dyn_cast<PointerType>(callExpr->getArg(k)->getType());
-                      //ptype->dump();
-                      if(ptype->isPointerType() && (k == 0)){
-                        ptype->getPointeeType().getTypePtrOrNull()->getUnqualifiedDesugaredType()->dump();
-                        //auto templatePtr = dyn_cast<TemplateSpecializationType>(ptype->getPointeeType().getTypePtrOrNull()->getUnqualifiedDesugaredType());
-                        auto templatePtr = ptype->getPointeeType().getTypePtrOrNull()->getAs<TemplateSpecializationType>();
-                        if (templatePtr) {
-                          templatePtr->getArg(0).getAsType().dump();
-                          string GraphNodeTy = templatePtr->getArg(0).getAsType().getBaseTypeIdentifier()->getName();
-                          write_setGNode_vec.push_back(GraphNodeTy);
-                        }
-                      }
-                      string argType = callExpr->getArg(k)->getType().getAsString();
-                      /*
-                       * Removing Quotes. Find better solution.
-                       */
-                      string temp_str = s_sub.str();
-                      if(temp_str.front() == '"'){
-                        temp_str.erase(0,1);
-                        temp_str.erase(temp_str.size()-1);
-                      }
-                      if(temp_str.front() == '&'){
-                        temp_str.erase(0,1);
-                      }
-                      write_set_vec.push_back(make_pair(argType,temp_str));
-                      write_setNum++;
-                      llvm::outs() << "\t Sub arg : " << s_sub.str() << "\n\n";
-
-                    }
-                  }
-                }
-                llvm::outs() <<"\n\n";
-              }
-
-              // Adding Syncer struct for synchronization.
-              stringstream SSSyncer;
-              for (unsigned i = 0; i < write_setGNode_vec.size(); ++i) {
-                SSSyncer << " struct Syncer_" << i << " {\n"
-                      << "\tstatic " << write_set_vec[4*i+3].first <<" extract( const " << write_setGNode_vec[i] <<"& node)" << "{ return " << "node." << write_set_vec[4*i+1].second <<  "; }\n"
-                      <<"\tstatic void reduce (" << write_setGNode_vec[i] << "& node, " << write_set_vec[4*i+3].first << " y) { node." << write_set_vec[4*i+1].second << " = " << write_set_vec[4*i+2].second << " ( node." << write_set_vec[4*i+1].second << ", y);}\n" 
-                      <<"\tstatic void reset (" << write_setGNode_vec[i] << "& node ) { node." << write_set_vec[4*i+1].second << " = " << write_set_vec[4*i+3].second << "; }\n" 
-                      <<"\ttypedef " << write_set_vec[4*i+3].first << " ValTy;\n"
-                      <<"};\n";
-
-                rewriter.InsertText(ST_main, SSSyncer.str(), true, true);
-                SSSyncer.str(string());
-                SSSyncer.clear();
-              }
-
-              //Add text before
-              stringstream SSBefore;
-              SSBefore << "/* Galois:: do_all before  */\n";
-              SourceLocation ST = callFS->getSourceRange().getBegin();
-              rewriter.InsertText(ST, SSBefore.str(), true, true);
-
-              // Adding Syn calls for read set
-             /* for (unsigned i = 0; i < read_set_vec.size(); i+=2) {
-                SSBefore.str(string());
-                SSBefore.clear();
-                SSBefore << "Syn(" << read_set_vec[i].second << " , " << read_set_vec[i+1].second << ")\n";
-                rewriter.InsertText(ST, SSBefore.str(), true, true);
-              }*/
-
-              //Add text after
+        //Add text after
+        for(auto i : info->reductionOps_map){
+          if((i.first == struct_name) &&  (i.second.size() > 0)){
+            for(auto j : i.second){
               stringstream SSAfter;
-              SSAfter << "\n/* Galois:: do_all After */\n";
-              ST = callFS->getSourceRange().getEnd().getLocWithOffset(2);
-              rewriter.InsertText(ST, SSAfter.str(), true, true);
+              if(j.SYNC_TYPE == "sync_push")
+                SSAfter << ", Galois::write_set( \"" << j.NODE_TYPE << "\", \"" << j.FIELD_NAME << "\", \"" << j.OPERATION_EXPR << "\", " << j.RESETVAL_EXPR << ", \"" << j.SYNC_TYPE << "\")";
+              else if(j.SYNC_TYPE == "sync_pull")
+                SSAfter << ", Galois::write_set( \"" << j.NODE_TYPE << "\", \"" << j.FIELD_NAME << "\" , \"" << j.SYNC_TYPE << "\")";
 
-              // Adding Syn calls for write set
-              for (unsigned i = 0; i < write_setGNode_vec.size(); i++) {
-                SSAfter.str(string());
-                SSAfter.clear();
-                SSAfter << write_set_vec[i*4].second << ".sync_push<Syncer_" << i << ">" <<"();\n";
-                rewriter.InsertText(ST, SSAfter.str(), true, true);
-              }
+              SourceLocation ST = callFS->getSourceRange().getEnd().getLocWithOffset(0);
+              rewriter.InsertText(ST, SSAfter.str(), true, true);
+            }
+          }
         }
       }
-  };
+    }
+};
 
-void split(const string& s, char delim, std::vector<string>& elems) {
-  stringstream ss(s);
-  string item;
-  while(std::getline(ss, item, delim)) {
-    elems.push_back(item);
-  }
-}
 class FindingFieldHandler : public MatchFinder::MatchCallback {
   private:
-      ASTContext* astContext;
-      InfoClass *info;
+    ASTContext* astContext;
+    InfoClass *info;
     public:
       FindingFieldHandler(CompilerInstance*  CI, InfoClass* _info):astContext(&(CI->getASTContext())), info(_info){}
       virtual void run(const MatchFinder::MatchResult &Results) {
@@ -573,22 +439,51 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
 
         for(auto i : info->getData_map) {
           for(auto j : i.second) {
-            llvm::outs() << j.VAR_NAME << "\n";
+            //llvm::outs() << j.VAR_NAME << "\n";
+            string str_memExpr = "memExpr_" + j.VAR_NAME+ "_" + i.first;
+            string str_assignment = "equalOp_" + j.VAR_NAME + "_" + i.first;
+            string str_plusOp = "plusEqualOp_" + j.VAR_NAME+ "_" + i.first;
+            string str_assign_plus = "assignplusOp_" + j.VAR_NAME+ "_" + i.first;
+            string str_varDecl = "varDecl_" + j.VAR_NAME+ "_" + i.first;
+
+
             if(j.IS_REFERENCED && j.IS_REFERENCE){
-              auto field = Results.Nodes.getNodeAs<clang::VarDecl>(j.VAR_NAME);
-              if(field){
+              auto field = Results.Nodes.getNodeAs<clang::VarDecl>(str_varDecl);
+              auto assignmentOP = Results.Nodes.getNodeAs<clang::Stmt>(str_assignment);
+              auto plusOP = Results.Nodes.getNodeAs<clang::Stmt>(str_plusOp);
+              auto assignplusOP = Results.Nodes.getNodeAs<clang::Stmt>(str_assign_plus);
+
+
+              /**Figure out variable type to set the reset value **/
+              auto memExpr = Results.Nodes.getNodeAs<clang::MemberExpr>(str_memExpr);
+
+              //memExpr->dump();
+              if(memExpr){
+                auto pType = memExpr->getType();
+                auto templatePtr = pType->getAs<TemplateSpecializationType>();
+                string Ty;
+                /** It is complex type e.g atomic<int>**/
+                if (templatePtr) {
+                  templatePtr->getArg(0).getAsType().dump();
+                  Ty = templatePtr->getArg(0).getAsType().getAsString();
+                  //llvm::outs() << "TYPE FOUND ---->" << Ty << "\n";
+                }
+                /** It is a simple builtIn type **/
+                else {
+                  Ty = pType->getLocallyUnqualifiedSingleStepDesugaredType().getAsString();
+                }
+
+                ReductionOps_entry reduceOP_entry;
                 NodeField_entry field_entry;
-                field_entry.VAR_NAME = field->getNameAsString();
-                field_entry.VAR_TYPE = field->getType().getAsString();
-                field_entry.IS_REFERENCED = field->isReferenced();
-                field_entry.IS_REFERENCE = true;
-                //field->dump();
-                auto memExpr = Results.Nodes.getNodeAs<clang::Stmt>("fieldMemberExpr");
-                //memExpr->dump();
+                field_entry.RESET_VALTYPE = Ty;
+                field_entry.NODE_TYPE = j.VAR_TYPE;
+                reduceOP_entry.NODE_TYPE = j.VAR_TYPE;
+
+                auto memExpr_stmt = Results.Nodes.getNodeAs<clang::Stmt>(str_memExpr);
                 string str_field;
                 llvm::raw_string_ostream s(str_field);
                 /** Returns something like snode.field_name.operator **/
-                memExpr->printPretty(s, 0, Policy);
+                memExpr_stmt->printPretty(s, 0, Policy);
 
                 /** Split string at delims to get the field name **/
                 char delim = '.';
@@ -596,47 +491,378 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
                 split(s.str(), delim, elems);
                 //llvm::outs() << " ===> " << elems[1] << "\n";
                 field_entry.NODE_NAME = elems[0];
-                field_entry.FIELD_NAME = elems[1];
 
-                /*memExpr->dumpPretty(*astContext);*/
-                //llvm::outs() << " GLOBAL ID : " << field->getGlobalID() << "\n";
-                info->fieldData_map[i.first].push_back(field_entry);
+                field_entry.FIELD_NAME = reduceOP_entry.FIELD_NAME = elems[1];
+                field_entry.GRAPH_NAME = reduceOP_entry.GRAPH_NAME = j.GRAPH_NAME;
+                reduceOP_entry.SYNC_TYPE = "sync_pull";
+                info->reductionOps_map[i.first].push_back(reduceOP_entry);
+
+                if(assignplusOP) {
+                  //assignplusOP->dump();
+                  field_entry.VAR_NAME = "+";
+                  field_entry.VAR_TYPE = "+";
+                  field_entry.IS_REFERENCED = true;
+                  field_entry.IS_REFERENCE = true;
+                  field_entry.GRAPH_NAME = j.GRAPH_NAME;
+                  field_entry.RESET_VAL = "0";
+
+                  info->fieldData_map[i.first].push_back(field_entry);
+                  break;
+                }
+                else if(plusOP) {
+                  field_entry.VAR_NAME = "+=";
+                  field_entry.VAR_TYPE = "+=";
+                  field_entry.IS_REFERENCED = true;
+                  field_entry.IS_REFERENCE = true;
+                  field_entry.GRAPH_NAME = j.GRAPH_NAME;
+                  field_entry.RESET_VAL = "0";
+
+                  info->fieldData_map[i.first].push_back(field_entry);
+                  break;
+
+                }
+                /** If this is a an expression like nodeData.fieldName = value **/
+                else if(assignmentOP) {
+
+                  field_entry.VAR_NAME = "DirectAssignment";
+                  field_entry.VAR_TYPE = "DirectAssignment";
+                  field_entry.IS_REFERENCED = true;
+                  field_entry.IS_REFERENCE = true;
+                  field_entry.GRAPH_NAME = j.GRAPH_NAME;
+                  field_entry.RESET_VAL = "0";
+
+                  info->fieldData_map[i.first].push_back(field_entry);
+                  break;
+                }
+                else if(field){
+
+                  field_entry.VAR_NAME = field->getNameAsString();
+                  field_entry.VAR_TYPE = field->getType().getAsString();
+                  field_entry.IS_REFERENCED = field->isReferenced();
+                  field_entry.IS_REFERENCE = true;
+                  field_entry.GRAPH_NAME = j.GRAPH_NAME;
+                  field_entry.RESET_VAL = "0";
+                  info->fieldData_map[i.first].push_back(field_entry);
+                  break;
+                }
               }
             }
           }
         }
       }
 };
-class GaloisFunctionsConsumer : public ASTConsumer {
-    private:
-    CompilerInstance &Instance;
-    std::set<std::string> ParsedTemplates;
-    GaloisFunctionsVisitor* Visitor;
-    MatchFinder Matchers, Matchers_op, Matchers_typedef, Matchers_gen;
-    FunctionCallHandler functionCallHandler;
-    FindOperatorHandler findOperator;
-    CallExprHandler callExprHandler;
-    TypedefHandler typedefHandler;
-    FindingFieldHandler f_handler;
-    InfoClass info;
-  public:
-    GaloisFunctionsConsumer(CompilerInstance &Instance, std::set<std::string> ParsedTemplates, Rewriter &R): Instance(Instance), ParsedTemplates(ParsedTemplates), Visitor(new GaloisFunctionsVisitor(&Instance)), functionCallHandler(R), findOperator(&Instance), callExprHandler(&Instance, &info), typedefHandler(&info), f_handler(&Instance, &info) {
-      //Matchers.addMatcher(unless(isExpansionInSystemHeader(callExpr(callee(functionDecl(hasName("for_each")))).bind("galoisLoop"))), &namespaceHandler);
-      //Matchers.addMatcher(callExpr(callee(functionDecl(hasName("Galois::do_all"))),unless(isExpansionInSystemHeader())).bind("galoisLoop"), &functionCallHandler);
 
-      
-      //Matchers.addMatcher(recordDecl(hasName("initializeGraph")).bind("op"), &findOperator);
-      //Matchers.addMatcher(recordDecl(has(methodDecl(hasName("operator()")), hasParameter(0, hasType(varDecl())))).bind("op"), &findOperator);
-      //Matchers.addMatcher(methodDecl(returns(asString("void"))).bind("op"), &findOperator); //****working
-      //Matchers.addMatcher(recordDecl(hasMethod(hasAnyParameter(hasName("x")))).bind("op"), &findOperator); // *** working
-      //Matchers.addMatcher(recordDecl(hasMethod(hasParameter(1, parmVarDecl(hasType(isInteger()))))).bind("op"), &findOperator); // *** working
+class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
+  private:
+      ASTContext* astContext;
+      InfoClass *info;
+    public:
+      FindingFieldInsideForLoopHandler(CompilerInstance*  CI, InfoClass* _info):astContext(&(CI->getASTContext())), info(_info){}
+      virtual void run(const MatchFinder::MatchResult &Results) {
 
-      /**************** Found it ********************/
-      //Matchers.addMatcher(callExpr(isExpansionInMainFile(), callee(functionDecl(hasName("getData"))), hasAncestor(binaryOperator(hasOperatorName("=")).bind("assignment"))).bind("getData"), &callExprHandler); //*** WORKS
-      //Matchers.addMatcher(recordDecl(hasDescendant(callExpr(isExpansionInMainFile(), callee(functionDecl(hasName("getData")))).bind("getData"))).bind("getDataInStruct"), &callExprHandler); //**** works
+        clang::LangOptions LangOpts;
+        LangOpts.CPlusPlus = true;
+        clang::PrintingPolicy Policy(LangOpts);
 
-      Matchers_typedef.addMatcher(typedefDecl(isExpansionInMainFile()).bind("typedefDecl"), & typedefHandler);
-      /** For matching the nodes in AST with getData function call ***/
+        
+        for(auto i : info->edgeData_map) {
+          for(auto j : i.second) {
+            //llvm::outs() << j.VAR_NAME << "\n";
+            string str_memExpr = "memExpr_" + j.VAR_NAME+ "_" + i.first;
+            string str_assignment = "equalOp_" + j.VAR_NAME + "_" + i.first;
+            string str_plusOp = "plusEqualOp_" + j.VAR_NAME+ "_" + i.first;
+            string str_assign_plus = "assignplusOp_" + j.VAR_NAME+ "_" + i.first;
+            string str_varDecl = "varDecl_" + j.VAR_NAME+ "_" + i.first;
+
+            string str_ifMin = "ifMin_" + j.VAR_NAME+ "_" + i.first;
+            string str_ifMinRHS = "ifMinRHS_" + j.VAR_NAME+ "_" + i.first;
+            string str_Cond_assignment = "Cond_equalOp_" + j.VAR_NAME+ "_" + i.first;
+            string str_Cond_assignmentRHS = "Cond_equalOpRHS_" + j.VAR_NAME+ "_" + i.first;
+            string str_Cond_RHSmemExpr = "Cond_RHSmemExpr_" + j.VAR_NAME+ "_" + i.first;
+            string str_Cond_RHSVarDecl = "Cond_RHSVarDecl_" + j.VAR_NAME+ "_" + i.first;
+
+            string str_whileCAS = "whileCAS_" + j.VAR_NAME + "_" + i.first;
+            string str_whileCAS_RHS = "whileCAS_RHS" + j.VAR_NAME + "_" + i.first;
+
+
+            if(j.IS_REFERENCED && j.IS_REFERENCE){
+              auto field = Results.Nodes.getNodeAs<clang::VarDecl>(str_varDecl);
+              auto assignmentOP = Results.Nodes.getNodeAs<clang::Stmt>(str_assignment);
+              auto plusOP = Results.Nodes.getNodeAs<clang::Stmt>(str_plusOp);
+              auto assignplusOP = Results.Nodes.getNodeAs<clang::Stmt>(str_assign_plus);
+
+              auto ifMinOp = Results.Nodes.getNodeAs<clang::Stmt>(str_ifMin);
+              auto whileCAS_op = Results.Nodes.getNodeAs<clang::Stmt>(str_whileCAS);
+
+              /**Figure out variable type to set the reset value **/
+              auto memExpr = Results.Nodes.getNodeAs<clang::MemberExpr>(str_memExpr);
+
+              //memExpr->dump();
+              if(memExpr){
+                auto pType = memExpr->getType();
+                auto templatePtr = pType->getAs<TemplateSpecializationType>();
+                string Ty;
+                /** It is complex type e.g atomic<int>**/
+                if (templatePtr) {
+                  templatePtr->getArg(0).getAsType().dump();
+                  Ty = templatePtr->getArg(0).getAsType().getAsString();
+                  //llvm::outs() << "TYPE FOUND ---->" << Ty << "\n";
+                }
+                /** It is a simple builtIn type **/
+                else {
+                  Ty = pType->getLocallyUnqualifiedSingleStepDesugaredType().getAsString();
+                }
+
+                NodeField_entry field_entry;
+                ReductionOps_entry reduceOP_entry;
+                field_entry.NODE_TYPE = j.VAR_TYPE;
+                reduceOP_entry.NODE_TYPE = j.VAR_TYPE;
+
+                field_entry.RESET_VALTYPE = Ty;
+
+                auto memExpr_stmt = Results.Nodes.getNodeAs<clang::Stmt>(str_memExpr);
+                string str_field;
+                llvm::raw_string_ostream s(str_field);
+                /** Returns something like snode.field_name.operator **/
+                memExpr_stmt->printPretty(s, 0, Policy);
+
+                /** Split string at delims to get the field name **/
+                char delim = '.';
+                vector<string> elems;
+                split(s.str(), delim, elems);
+
+                field_entry.NODE_NAME = elems[0];
+                field_entry.FIELD_NAME = reduceOP_entry.FIELD_NAME = elems[1];
+                field_entry.GRAPH_NAME = reduceOP_entry.GRAPH_NAME = j.GRAPH_NAME;
+                reduceOP_entry.SYNC_TYPE = "sync_push";
+
+
+
+                if(assignplusOP) {
+                  //assignplusOP->dump();
+                  field_entry.VAR_NAME = "+";
+                  field_entry.VAR_TYPE = "+";
+                  field_entry.IS_REFERENCED = true;
+                  field_entry.IS_REFERENCE = true;
+                  field_entry.RESET_VAL = "0";
+
+                  string reduceOP = "node." + field_entry.FIELD_NAME + "= node." + field_entry.FIELD_NAME + " + y ;";
+                  reduceOP_entry.OPERATION_EXPR = reduceOP;
+                  string resetVal = "0";
+                  reduceOP_entry.RESETVAL_EXPR = resetVal;
+
+                  info->reductionOps_map[i.first].push_back(reduceOP_entry);
+                  info->fieldData_map[i.first].push_back(field_entry);
+                  break;
+                }
+                else if(plusOP) {
+                  field_entry.VAR_NAME = "+=";
+                  field_entry.VAR_TYPE = "+=";
+                  field_entry.IS_REFERENCED = true;
+                  field_entry.IS_REFERENCE = true;
+                  field_entry.RESET_VAL = "0";
+
+                  string reduceOP = "node." + field_entry.FIELD_NAME + "+= y;";
+                  reduceOP_entry.OPERATION_EXPR = reduceOP;
+                  string resetVal = "0";
+                  reduceOP_entry.RESETVAL_EXPR = resetVal;
+
+                  info->reductionOps_map[i.first].push_back(reduceOP_entry);
+                  info->fieldData_map[i.first].push_back(field_entry);
+                  break;
+
+                }
+                /** If this is a an expression like nodeData.fieldName = value **/
+                else if(assignmentOP) {
+
+                  field_entry.VAR_NAME = "DirectAssignment";
+                  field_entry.VAR_TYPE = "DirectAssignment";
+                  field_entry.IS_REFERENCED = true;
+                  field_entry.IS_REFERENCE = true;
+                  field_entry.RESET_VAL = "0";
+
+
+                  string reduceOP = "node." + field_entry.FIELD_NAME + "= y;";
+                  reduceOP_entry.OPERATION_EXPR = reduceOP;
+                  string resetVal = "0";
+                  reduceOP_entry.RESETVAL_EXPR = resetVal;
+
+                  info->reductionOps_map[i.first].push_back(reduceOP_entry);
+                  info->fieldData_map[i.first].push_back(field_entry);
+                  break;
+                }
+                else if(ifMinOp){
+                  //ifMinOp->dump();
+                  auto ifMinRHS = Results.Nodes.getNodeAs<clang::Stmt>(str_ifMinRHS);
+                  auto condAssignLHS = Results.Nodes.getNodeAs<clang::Stmt>(str_memExpr);
+                  auto condAssignRHS = Results.Nodes.getNodeAs<clang::Stmt>(str_Cond_RHSmemExpr);
+                  auto varAssignRHS = Results.Nodes.getNodeAs<clang::VarDecl>(str_varDecl);
+                  auto varCondRHS = Results.Nodes.getNodeAs<clang::VarDecl>(str_Cond_RHSVarDecl);
+                  //ifMinRHS->dump();
+                  //condAssignLHS->dump();
+
+                  // It is min operation.
+                  if(varCondRHS == varAssignRHS) {
+                    //string reduceOP = "if(node." + field_entry.FIELD_NAME + " > y) { node." + field_entry.FIELD_NAME + " = y;}";
+                    string reduceOP = "{ node." + field_entry.FIELD_NAME + " = std::min(node." + field_entry.FIELD_NAME + ", y);}";
+                    reduceOP_entry.OPERATION_EXPR = reduceOP;
+                    string resetVal = "std::numeric_limits<" + field_entry.RESET_VALTYPE + ">::max()";
+                    reduceOP_entry.RESETVAL_EXPR = resetVal;
+                    varAssignRHS->dump();
+
+                    info->reductionOps_map[i.first].push_back(reduceOP_entry);
+                  }
+                  break;
+
+                }
+
+                else if(whileCAS_op){
+                  //whileCAS_op->dump();
+                  auto whileCAS_LHS = Results.Nodes.getNodeAs<clang::Stmt>(str_memExpr);
+
+                  //whileCAS_LHS->dump();
+                  break;
+                }
+
+                else if(field){
+
+                  field_entry.VAR_NAME = field->getNameAsString();
+                  field_entry.VAR_TYPE = field->getType().getAsString();
+                  field_entry.IS_REFERENCED = field->isReferenced();
+                  field_entry.IS_REFERENCE = true;
+                  field_entry.RESET_VAL = "0";
+                  info->fieldData_map[i.first].push_back(field_entry);
+                  break;
+                }
+              }
+            }
+          }
+        }
+      }
+};
+
+class FieldUsedInForLoop : public MatchFinder::MatchCallback {
+  private:
+      ASTContext* astContext;
+      InfoClass *info;
+    public:
+      FieldUsedInForLoop(CompilerInstance*  CI, InfoClass* _info):astContext(&(CI->getASTContext())), info(_info){}
+      virtual void run(const MatchFinder::MatchResult &Results) {
+
+        clang::LangOptions LangOpts;
+        LangOpts.CPlusPlus = true;
+        clang::PrintingPolicy Policy(LangOpts);
+
+        
+        for(auto i : info->fieldData_map) {
+          for(auto j : i.second) {
+            //llvm::outs() << j.VAR_NAME << "\n";
+            string str_memExpr = "memExpr_" + j.VAR_NAME+ "_" + i.first;
+            string str_assignment = "equalOp_" + j.VAR_NAME + "_" + i.first;
+            string str_plusOp = "plusEqualOp_" + j.VAR_NAME+ "_" + i.first;
+            string str_assign_plus = "assignplusOp_" + j.VAR_NAME+ "_" + i.first;
+            string str_varDecl = "varDecl_" + j.VAR_NAME+ "_" + i.first;
+
+            string str_ifMin = "ifMin_" + j.VAR_NAME+ "_" + i.first;
+            string str_ifMinLHS = "ifMinLHS_" + j.VAR_NAME+ "_" + i.first;
+            string str_ifMinRHS = "ifMinRHS_" + j.VAR_NAME+ "_" + i.first;
+            string str_Cond_assignment = "Cond_equalOp_" + j.VAR_NAME+ "_" + i.first;
+            string str_Cond_assignmentRHS = "Cond_equalOpRHS_" + j.VAR_NAME+ "_" + i.first;
+            string str_Cond_RHSmemExpr = "Cond_RHSmemExpr_" + j.VAR_NAME+ "_" + i.first;
+            string str_Cond_RHSVarDecl = "Cond_RHSVarDecl_" + j.VAR_NAME+ "_" + i.first;
+
+            string str_whileCAS = "whileCAS_" + j.VAR_NAME + "_" + i.first;
+            string str_whileCAS_RHS = "whileCAS_RHS" + j.VAR_NAME + "_" + i.first;
+
+
+            if(j.IS_REFERENCED && j.IS_REFERENCE){
+              auto field = Results.Nodes.getNodeAs<clang::VarDecl>(str_varDecl);
+              auto assignmentOP = Results.Nodes.getNodeAs<clang::Stmt>(str_assignment);
+              auto plusOP = Results.Nodes.getNodeAs<clang::Stmt>(str_plusOp);
+              auto assignplusOP = Results.Nodes.getNodeAs<clang::Stmt>(str_assign_plus);
+
+              auto ifMinOp = Results.Nodes.getNodeAs<clang::Stmt>(str_ifMin);
+              auto whileCAS_op = Results.Nodes.getNodeAs<clang::Stmt>(str_whileCAS);
+
+              /**Figure out variable type to set the reset value **/
+              auto memExpr = Results.Nodes.getNodeAs<clang::MemberExpr>(str_memExpr);
+
+                ReductionOps_entry reduceOP_entry;
+                reduceOP_entry.NODE_TYPE = j.NODE_TYPE;
+
+
+                reduceOP_entry.FIELD_NAME = j.FIELD_NAME ;
+                reduceOP_entry.GRAPH_NAME = j.GRAPH_NAME ;
+                reduceOP_entry.SYNC_TYPE = "sync_push";
+
+
+
+                if(assignplusOP) {
+                  string reduceOP = "node." + j.FIELD_NAME + "= node." + j.FIELD_NAME + " + y ;";
+                  reduceOP_entry.OPERATION_EXPR = reduceOP;
+                  string resetVal = "0";
+                  reduceOP_entry.RESETVAL_EXPR = resetVal;
+
+                  info->reductionOps_map[i.first].push_back(reduceOP_entry);
+                  break;
+                }
+                else if(plusOP) {
+                  string reduceOP = "node." + j.FIELD_NAME + "+= y;";
+                  reduceOP_entry.OPERATION_EXPR = reduceOP;
+                  string resetVal = "0";
+                  reduceOP_entry.RESETVAL_EXPR = resetVal;
+
+                  info->reductionOps_map[i.first].push_back(reduceOP_entry);
+                  break;
+
+                }
+                /** If this is a an expression like nodeData.fieldName = value **/
+                else if(assignmentOP) {
+
+                  string reduceOP = "node." + j.FIELD_NAME + "= y;";
+                  reduceOP_entry.OPERATION_EXPR = reduceOP;
+                  string resetVal = "0";
+                  reduceOP_entry.RESETVAL_EXPR = resetVal;
+
+                  info->reductionOps_map[i.first].push_back(reduceOP_entry);
+                  break;
+                }
+                else if(ifMinOp){
+                  ifMinOp->dump();
+                  auto lhs = Results.Nodes.getNodeAs<clang::DeclRefExpr>(str_ifMinLHS);
+                  lhs->dump();
+                  // It is min operation.
+                  //string reduceOP = "if(node." + j.FIELD_NAME + " > y) { node." + j.FIELD_NAME + " = y;}";
+                  string reduceOP = "{ node." + j.FIELD_NAME + " = std::min(node." + j.FIELD_NAME + ", y);}";
+                  reduceOP_entry.OPERATION_EXPR = reduceOP;
+                  string resetVal = "std::numeric_limits<" + j.RESET_VALTYPE + ">::max()";
+                  reduceOP_entry.RESETVAL_EXPR = resetVal;
+
+                  info->reductionOps_map[i.first].push_back(reduceOP_entry);
+                  break;
+
+                }
+
+                else if(whileCAS_op){
+                  whileCAS_op->dump();
+                  auto whileCAS_LHS = Results.Nodes.getNodeAs<clang::Stmt>(str_memExpr);
+                  string reduceOP = "{ node." + j.FIELD_NAME + " = std::min(node." + j.FIELD_NAME + ", y);}";
+                  reduceOP_entry.OPERATION_EXPR = reduceOP;
+                  string resetVal = "std::numeric_limits<" + j.RESET_VALTYPE + ">::max()";
+                  reduceOP_entry.RESETVAL_EXPR = resetVal;
+
+                  info->reductionOps_map[i.first].push_back(reduceOP_entry);
+                  whileCAS_LHS->dump();
+                  break;
+                }
+            }
+          }
+        }
+      }
+};
+
+
+/*COMMAN MATCHER STATEMENTS  :*************** To match Galois stype getData calls  *************************************/
       StatementMatcher GetDataMatcher = callExpr(argumentCountIs(1), callee(methodDecl(hasName("getData"))));
       StatementMatcher LHSRefVariable = expr(ignoringParenImpCasts(declRefExpr(to(
                                         varDecl(hasType(references(AnyType))))))).bind("LHSRefVariable");
@@ -644,23 +870,10 @@ class GaloisFunctionsConsumer : public ASTConsumer {
       StatementMatcher LHSNonRefVariable = expr(ignoringParenImpCasts(declRefExpr(to(
                                         varDecl())))).bind("LHSNonRefVariable");
 
-      StatementMatcher getDataCallExprMatcher = callExpr(
-                                                          isExpansionInMainFile(),
-                                                          callee(functionDecl(hasName("getData"))),
-                                                          hasAncestor(recordDecl().bind("callerInStruct")),
-                                                          anyOf(
-                                                                hasAncestor(binaryOperator(hasOperatorName("="),
-                                                                                              hasLHS(anyOf(
-                                                                                                        LHSRefVariable,
-                                                                                                        LHSNonRefVariable))).bind("getDataAssignment")
-                                                                              ),
-                                                                hasAncestor(declStmt(hasSingleDecl(varDecl(hasType(references(AnyType))).bind("getData_varName"))).bind("refVariableDecl_getData")),
-                                                                hasAncestor(declStmt(hasSingleDecl(varDecl(unless(hasType(references(AnyType)))).bind("getData_varName"))).bind("nonRefVariableDecl_getData"))
-                                                            )
-                                                     ).bind("calleeName");
-      Matchers.addMatcher(getDataCallExprMatcher, &callExprHandler);
+      /****************************************************************************************************************/
 
-      /** For matching the nodes in AST with getEdgeDst function call ***/
+
+      /*COMMAN MATCHER STATEMENTS  :*************** To match Galois stype for loops  *************************************/
       StatementMatcher Edge_beginCallMatcher = memberCallExpr(argumentCountIs(1), callee(methodDecl(hasName("edge_begin"))));
       DeclarationMatcher InitDeclMatcher = varDecl(hasInitializer(anything())).bind("ForInitVarName");
       DeclarationMatcher EndDeclMatcher = varDecl(hasInitializer(anything())).bind("ForEndVarName");
@@ -695,7 +908,8 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                                                                               ),
                                                                 hasAncestor(declStmt(hasSingleDecl(varDecl(hasType(references(AnyType))).bind("getData_varName"))).bind("refVariableDecl_getData")),
                                                                 hasAncestor(declStmt(hasSingleDecl(varDecl(unless(hasType(references(AnyType)))).bind("getData_varName"))).bind("nonRefVariableDecl_getData"))
-                                                            )
+                                                            ),
+                                                          hasDescendant(memberExpr(hasDescendant(memberExpr().bind("getData_memExpr_graph"))))
                                                      ).bind("calleeName_getEdgeDst");
 
       StatementMatcher EdgeForLoopMatcher = forStmt(hasLoopInit(anyOf(
@@ -719,6 +933,60 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                                               hasDescendant(getDataCallExprMatcher_insideFor)
                                               ).bind("forLoopName");
 
+      /****************************************************************************************************************/
+
+
+
+
+class GaloisFunctionsConsumer : public ASTConsumer {
+    private:
+    CompilerInstance &Instance;
+    std::set<std::string> ParsedTemplates;
+    GaloisFunctionsVisitor* Visitor;
+    MatchFinder Matchers, Matchers_doall, Matchers_op, Matchers_typedef, Matchers_gen, Matchers_gen_field;
+    FunctionCallHandler functionCallHandler;
+    FindOperatorHandler findOperator;
+    CallExprHandler callExprHandler;
+    TypedefHandler typedefHandler;
+    FindingFieldHandler f_handler;
+    FindingFieldInsideForLoopHandler insideForLoop_handler;
+    FieldUsedInForLoop insideForLoopField_handler;
+    InfoClass info;
+  public:
+    GaloisFunctionsConsumer(CompilerInstance &Instance, std::set<std::string> ParsedTemplates, Rewriter &R): Instance(Instance), ParsedTemplates(ParsedTemplates), Visitor(new GaloisFunctionsVisitor(&Instance)), functionCallHandler(R, &info), findOperator(&Instance), callExprHandler(&Instance, &info), typedefHandler(&info), f_handler(&Instance, &info), insideForLoop_handler(&Instance, &info), insideForLoopField_handler(&Instance, &info) {
+
+     /**************** Additional matchers ********************/
+      //Matchers.addMatcher(callExpr(isExpansionInMainFile(), callee(functionDecl(hasName("getData"))), hasAncestor(binaryOperator(hasOperatorName("=")).bind("assignment"))).bind("getData"), &callExprHandler); //*** WORKS
+      //Matchers.addMatcher(recordDecl(hasDescendant(callExpr(isExpansionInMainFile(), callee(functionDecl(hasName("getData")))).bind("getData"))).bind("getDataInStruct"), &callExprHandler); //**** works
+
+      /*MATCHER 1 :*************** Matcher to get the type of node defined by user *************************************/
+      Matchers_typedef.addMatcher(typedefDecl(isExpansionInMainFile()).bind("typedefDecl"), &typedefHandler);
+      /****************************************************************************************************************/
+
+      
+      /*MATCHER 2 :************* For matching the nodes in AST with getData function call *****************************/
+      StatementMatcher getDataCallExprMatcher = callExpr(
+                                                          isExpansionInMainFile(),
+                                                          callee(functionDecl(hasName("getData"))),
+                                                          hasAncestor(recordDecl().bind("callerInStruct")),
+                                                          anyOf(
+                                                                hasAncestor(binaryOperator(hasOperatorName("="),
+                                                                                              hasLHS(anyOf(
+                                                                                                        LHSRefVariable,
+                                                                                                        LHSNonRefVariable))).bind("getDataAssignment")
+                                                                              ),
+                                                                hasAncestor(declStmt(hasSingleDecl(varDecl(hasType(references(AnyType))).bind("getData_varName"))).bind("refVariableDecl_getData")),
+                                                                hasAncestor(declStmt(hasSingleDecl(varDecl(unless(hasType(references(AnyType)))).bind("getData_varName"))).bind("nonRefVariableDecl_getData"))
+                                                            ),
+                                                          hasDescendant(memberExpr(hasDescendant(memberExpr().bind("getData_memExpr_graph")))),
+                                                          unless(hasAncestor(EdgeForLoopMatcher))
+                                                     ).bind("calleeName");
+      Matchers.addMatcher(getDataCallExprMatcher, &callExprHandler);
+      /****************************************************************************************************************/
+
+
+
+      /*MATCHER 3 : ********************* For matching the nodes in AST with getEdgeDst function call and with getData inside it ******/
 
       /** We only care about for loops which have getEdgeDst and getData. **/
       Matchers.addMatcher(callExpr(
@@ -730,19 +998,9 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                                 ).bind("calleeName"), &callExprHandler);
 
 
+      /****************************************************************************************************************/
 
-
-      //Matchers_op.addMatcher(recordDecl(isExpansionInMainFile(), hasMethod(hasName("operator()")), hasMethod(returns(asString("void"))), hasMethod(hasParameter(0, parmVarDecl(hasType(isInteger()))))).bind("GaloisOP"), &findOperator); // *** working
-
-      //Matchers.addMatcher(methodDecl(hasAnyParameter(hasName("x"))).bind("op"), &findOperator); //***** works
-      //Matchers.addMatcher(declRefExpr(to(functionDecl(hasName("do_all"))),unless(isExpansionInSystemHeader())).bind("galoisLoop"), &functionCallHandler);
-      //Matchers.addMatcher(recordDecl(decl().bind("id"), hasName("::Galois")), &recordHandler);
-      //Matchers.addMatcher(nestedNameSpecifier(specifiesNamespace(hasName("for_each"))).bind("galoisLoop"), &namespaceHandler);
-      //Matchers.addMatcher(forStmt(nestedNameSpecifier(specifiesNamespace(hasName("Galois"))).bind("galoisLoop")), &namespaceHandler);
-      //Matchers.addMatcher(elaboratedType(hasQualifier(hasPrefix(specifiesNamespace(hasName("Galois"))))).bind("galoisLoop"), &namespaceHandler);
-      //Matchers.addMatcher(forStmt( hasLoopInit(declStmt(hasSingleDecl(varDecl(
-                      //hasInitializer(integerLiteral(equals(0)))))))).bind("forLoop"), &forStmtHandler);
-    }
+  }
 
     virtual void HandleTranslationUnit(ASTContext &Context){
       //Visitor->TraverseDecl(Context.getTranslationUnitDecl());
@@ -759,15 +1017,17 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                      << center(string("SRC_NAME"), width) << "|"
                      << center(string("IS_REFERENCE"), width) << "|"
                      << center(string("IS_REFERENCED"), width) << "||"
-                     << center(string("RW_STATUS"), width) << "\n";
-        llvm::outs() << std::string(width*6 + 2*6, '-') << "\n";
+                     << center(string("RW_STATUS"), width) << "||"
+                     << center(string("GRAPH_NAME"), width) << "\n";
+        llvm::outs() << std::string(width*7 + 2*7, '-') << "\n";
         for( auto j : i.second) {
           llvm::outs() << center(j.VAR_NAME,  width) << "|"
                        << center(j.VAR_TYPE,  width) << "|"
                        << center(j.SRC_NAME,  width) << "|"
                        << center(j.IS_REFERENCE,  width) << "|"
                        << center(j.IS_REFERENCED,  width) << "|"
-                       << center(j.RW_STATUS,  width) << "\n";
+                       << center(j.RW_STATUS,  width) << "|"
+                       << center(j.GRAPH_NAME,  width) << "\n";
         }
       }
 
@@ -782,37 +1042,267 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                      << center(string("SRC_NAME"), width) << "|"
                      << center(string("IS_REFERENCE"), width) << "|"
                      << center(string("IS_REFERENCED"), width) << "||"
-                     << center(string("RW_STATUS"), width) << "\n";
-        llvm::outs() << std::string(width*6 + 2*6, '-') << "\n";
+                     << center(string("RW_STATUS"), width) << "||"
+                     << center(string("GRAPH_NAME"), width) << "\n";
+        llvm::outs() << std::string(width*7 + 2*7, '-') << "\n";
         for( auto j : i.second) {
           llvm::outs() << center(j.VAR_NAME,  width) << "|"
                        << center(j.VAR_TYPE,  width) << "|"
                        << center(j.SRC_NAME,  width) << "|"
                        << center(j.IS_REFERENCE,  width) << "|"
-                       << center(j.IS_REFERENCED,  width) << "|"
-                       << center(j.RW_STATUS,  width) << "\n";
+                       << center(j.RW_STATUS,  width) << "|"
+                       << center(j.GRAPH_NAME,  width) << "\n";
         }
       }
 
-      /**Match to get fields of NodeData structure***/
+      /*MATCHER 5: *********************Match to get fields of NodeData structure being modified  but not in the Galois all edges forLoop *******************/
       for (auto i : info.getData_map) {
-        unsigned k = 0;
         for(auto j : i.second) {
           if(j.IS_REFERENCED && j.IS_REFERENCE) {
+            string str_memExpr = "memExpr_" + j.VAR_NAME+ "_" + i.first;
+            string str_assignment = "equalOp_" + j.VAR_NAME+ "_" + i.first;
+            string str_plusOp = "plusEqualOp_" + j.VAR_NAME+ "_" + i.first;
+            string str_assign_plus = "assignplusOp_" + j.VAR_NAME+ "_" + i.first;
+            string str_minusOp = "minusEqualOp_" + j.VAR_NAME+ "_" + i.first;
+            string str_varDecl = "varDecl_" + j.VAR_NAME+ "_" + i.first;
+
+            /** Only match references types, ignore read only **/
             DeclarationMatcher f_1 = varDecl(isExpansionInMainFile(), hasInitializer(expr(anyOf(
-                                                                                                hasDescendant(memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.VAR_NAME)))))).bind("fieldMemberExpr")),
-                                                                                                memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.VAR_NAME)))))).bind("fieldMemberExpr")
+                                                                                                hasDescendant(memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.VAR_NAME)))))).bind(str_memExpr)),
+                                                                                                memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.VAR_NAME)))))).bind(str_memExpr)
                                                                                                 ))),
-                                                                      hasType(references(AnyType))
-                                                                  ).bind(j.VAR_NAME);
-            ++k;
+                                                                      hasType(references(AnyType)),
+                                                                      hasAncestor(recordDecl(hasName(i.first)))
+                                                                  ).bind(str_varDecl);
+
+
+            StatementMatcher LHS_memExpr = memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.VAR_NAME)))))).bind(str_memExpr);
+            /** Order matters as the most generic ones should be at the last **/
+            StatementMatcher f_2 = expr(isExpansionInMainFile(), anyOf(
+                                                                      /** For builtInType : NodeData.field += val **/
+                                                                      binaryOperator(hasOperatorName("+="),
+                                                                            hasLHS(ignoringParenImpCasts(LHS_memExpr))).bind(str_plusOp),
+                                                                      /** For builtInType : NodeData.field = NodeData.field + val **/
+                                                                      binaryOperator(hasOperatorName("="),
+                                                                            hasLHS(ignoringParenImpCasts(LHS_memExpr)),
+                                                                            hasRHS(binaryOperator(hasOperatorName("+"),
+                                                                                                  hasLHS(ignoringParenImpCasts(LHS_memExpr))))).bind(str_assign_plus),
+                                                                      /** For builtInType : NodeData.field = val **/
+                                                                      binaryOperator(hasOperatorName("="),
+                                                                            hasLHS(ignoringParenImpCasts(LHS_memExpr))).bind(str_assignment),
+
+
+                                                                      /** For ComplexType : NodeData.field += val **/
+                                                                      operatorCallExpr(hasOverloadedOperatorName("+="),
+                                                                              hasDescendant(LHS_memExpr)).bind(str_plusOp),
+                                                                      /** For ComplexType : NodeData.field = NodeData.field + val **/
+                                                                      operatorCallExpr(hasOverloadedOperatorName("="),
+                                                                              hasDescendant(binaryOperator(hasOperatorName("+"),
+                                                                                                              hasLHS(hasDescendant(LHS_memExpr))))).bind(str_assign_plus),
+                                                                      /** For ComplexType : NodeData.field = val **/
+                                                                      operatorCallExpr(hasOverloadedOperatorName("="),
+                                                                             hasDescendant(LHS_memExpr)).bind(str_assignment)
+                                                                     ),
+                                                                     hasAncestor(recordDecl(hasName(i.first)))/*,
+                                                                     unless(hasAncestor(ifStmt(hasCondition(anything()))))*/);
 
             Matchers_gen.addMatcher(f_1, &f_handler);
+            Matchers_gen.addMatcher(f_2, &f_handler);
           }
         }
       }
 
+      /****************************************************************************************************************/
+
+      /*MATCHER 5: *********************Match to get fields of NodeData structure being modified inside the Galois all edges forLoop *******************/
+      for (auto i : info.edgeData_map) {
+        for(auto j : i.second) {
+          if(j.IS_REFERENCED && j.IS_REFERENCE) {
+            string str_memExpr = "memExpr_" + j.VAR_NAME+ "_" + i.first;
+            string str_assignment = "equalOp_" + j.VAR_NAME+ "_" + i.first;
+            string str_plusOp = "plusEqualOp_" + j.VAR_NAME+ "_" + i.first;
+            string str_assign_plus = "assignplusOp_" + j.VAR_NAME+ "_" + i.first;
+            string str_minusOp = "minusEqualOp_" + j.VAR_NAME+ "_" + i.first;
+            string str_varDecl = "varDecl_" + j.VAR_NAME+ "_" + i.first;
+
+            string str_ifMin = "ifMin_" + j.VAR_NAME+ "_" + i.first;
+            string str_ifMinRHS = "ifMinRHS_" + j.VAR_NAME+ "_" + i.first;
+            string str_Cond_assignment = "Cond_equalOp_" + j.VAR_NAME+ "_" + i.first;
+            string str_Cond_assignmentRHS = "Cond_equalOpRHS_" + j.VAR_NAME+ "_" + i.first;
+            string str_Cond_RHSmemExpr = "Cond_RHSmemExpr_" + j.VAR_NAME+ "_" + i.first;
+            string str_Cond_RHSVarDecl = "Cond_RHSVarDecl_" + j.VAR_NAME+ "_" + i.first;
+
+            string str_whileCAS = "whileCAS_" + j.VAR_NAME + "_" + i.first;
+            string str_whileCAS_RHS = "whileCAS_RHS" + j.VAR_NAME + "_" + i.first;
+
+            /** Only match references types, ignore read only **/
+            DeclarationMatcher f_1 = varDecl(isExpansionInMainFile(), hasInitializer(expr(anyOf(
+                                                                                                hasDescendant(memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.VAR_NAME)))))).bind(str_memExpr)),
+                                                                                                memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.VAR_NAME)))))).bind(str_memExpr)
+                                                                                                ))),
+                                                                      hasType(references(AnyType)),
+                                                                      hasAncestor(recordDecl(hasName(i.first)))
+                                                                  ).bind(str_varDecl);
+
+
+            StatementMatcher LHS_memExpr = memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.VAR_NAME))))), hasAncestor(recordDecl(hasName(i.first)))).bind(str_memExpr);
+            StatementMatcher Cond_notMemExpr = memberExpr(hasDescendant(declRefExpr(to(varDecl(unless(hasName(j.VAR_NAME))).bind(str_varDecl)))), hasAncestor(recordDecl(hasName(i.first)))).bind(str_Cond_RHSmemExpr);
+            StatementMatcher Cond_notDeclExpr = declRefExpr(to(varDecl(unless(hasName(j.VAR_NAME))).bind(str_varDecl)), hasAncestor(recordDecl(hasName(i.first)))).bind(str_Cond_RHSmemExpr);
+            /** Order matters as the most generic ones should be at the last **/
+            StatementMatcher f_2 = expr(isExpansionInMainFile(), anyOf(
+                                                                      /** For builtInType : NodeData.field += val **/
+                                                                      binaryOperator(hasOperatorName("+="),
+                                                                            hasLHS(ignoringParenImpCasts(LHS_memExpr))).bind(str_plusOp),
+                                                                      /** For builtInType : NodeData.field = NodeData.field + val **/
+                                                                      binaryOperator(hasOperatorName("="),
+                                                                            hasLHS(ignoringParenImpCasts(LHS_memExpr)),
+                                                                            hasRHS(binaryOperator(hasOperatorName("+"),
+                                                                                                  hasLHS(ignoringParenImpCasts(LHS_memExpr))))).bind(str_assign_plus),
+                                                                      /** For builtInType : NodeData.field = val **/
+                                                                      binaryOperator(hasOperatorName("="),
+                                                                            hasLHS(ignoringParenImpCasts(LHS_memExpr))).bind(str_assignment),
+
+
+                                                                      /** For ComplexType : NodeData.field += val **/
+                                                                      operatorCallExpr(hasOverloadedOperatorName("+="),
+                                                                              hasDescendant(LHS_memExpr)).bind(str_plusOp),
+                                                                      /** For ComplexType : NodeData.field = NodeData.field + val **/
+                                                                      operatorCallExpr(hasOverloadedOperatorName("="),
+                                                                              hasDescendant(binaryOperator(hasOperatorName("+"),
+                                                                                                              hasLHS(hasDescendant(LHS_memExpr))))).bind(str_assign_plus),
+                                                                      /** For ComplexType : NodeData.field = val **/
+                                                                      operatorCallExpr(hasOverloadedOperatorName("="),
+                                                                             hasDescendant(LHS_memExpr)).bind(str_assignment)
+                                                                     ),
+                                                                     hasAncestor(recordDecl(hasName(i.first))),
+                                                                     /** Only if condition inside EdgeForLoop should be considered**/
+                                                                     unless(hasAncestor(ifStmt(hasCondition(anything()), hasAncestor(EdgeForLoopMatcher)))));
+
+            /** Conditional modification within forEdgeLoop **/
+            StatementMatcher f_3 = ifStmt(isExpansionInMainFile(), hasCondition(allOf(binaryOperator(hasOperatorName(">"),
+                                                                                      hasLHS(hasDescendant(LHS_memExpr)),
+                                                                                      hasRHS(hasDescendant(declRefExpr(to(decl().bind(str_Cond_RHSVarDecl))).bind(str_ifMinRHS)))),
+                                                                                      hasAncestor(EdgeForLoopMatcher)
+                                                                                )), hasDescendant(compoundStmt(anyOf(hasDescendant(binaryOperator(hasOperatorName("="),
+                                                                                                                                                  hasLHS(ignoringParenImpCasts(LHS_memExpr)),
+                                                                                                                                                  hasRHS(hasDescendant(declRefExpr(to(decl(equalsBoundNode(str_Cond_RHSVarDecl)))))))),
+                                                                                                                                    hasDescendant(operatorCallExpr(hasOverloadedOperatorName("="),
+                                                                                                                                                  hasDescendant(LHS_memExpr),
+                                                                                                                                                  hasDescendant(Cond_notDeclExpr)))
+                                                                                                                                    )))).bind(str_ifMin);
+
+            StatementMatcher f_4 = whileStmt(isExpansionInMainFile(), hasCondition(binaryOperator(hasOperatorName(">"),
+                                                                                                  hasLHS(hasDescendant(LHS_memExpr)),
+                                                                                                  hasRHS(ignoringParenImpCasts(declRefExpr(to(decl().bind(str_whileCAS_RHS))))))),
+                                                                      hasBody(compoundStmt(hasDescendant(memberCallExpr(callee(methodDecl(matchesName(".compare_exchange_strong"))), hasAnyArgument(declRefExpr(to(decl(equalsBoundNode(str_whileCAS_RHS)))))))))).bind(str_whileCAS);
+            Matchers_gen.addMatcher(f_1, &insideForLoop_handler);
+            Matchers_gen.addMatcher(f_2, &insideForLoop_handler);
+            Matchers_gen.addMatcher(f_3, &insideForLoop_handler);
+            Matchers_gen.addMatcher(f_4, &insideForLoop_handler);
+          }
+        }
+      }
+
+      /****************************************************************************************************************/
+
       Matchers_gen.matchAST(Context);
+
+      for(auto i : info.fieldData_map){
+        for(auto j : i.second) {
+          if(j.IS_REFERENCED && j.IS_REFERENCE) {
+            string str_memExpr = "memExpr_" + j.VAR_NAME+ "_" + i.first;
+            string str_assignment = "equalOp_" + j.VAR_NAME+ "_" + i.first;
+            string str_plusOp = "plusEqualOp_" + j.VAR_NAME+ "_" + i.first;
+            string str_assign_plus = "assignplusOp_" + j.VAR_NAME+ "_" + i.first;
+            string str_minusOp = "minusEqualOp_" + j.VAR_NAME+ "_" + i.first;
+            string str_varDecl = "varDecl_" + j.VAR_NAME+ "_" + i.first;
+
+            string str_ifMin = "ifMin_" + j.VAR_NAME+ "_" + i.first;
+            string str_ifMinLHS = "ifMinLHS_" + j.VAR_NAME+ "_" + i.first;
+            string str_ifMinRHS = "ifMinRHS_" + j.VAR_NAME+ "_" + i.first;
+            string str_Cond_assignment = "Cond_equalOp_" + j.VAR_NAME+ "_" + i.first;
+            string str_Cond_assignmentRHS = "Cond_equalOpRHS_" + j.VAR_NAME+ "_" + i.first;
+            string str_Cond_RHSmemExpr = "Cond_RHSmemExpr_" + j.VAR_NAME+ "_" + i.first;
+            string str_Cond_RHSVarDecl = "Cond_RHSVarDecl_" + j.VAR_NAME+ "_" + i.first;
+
+            string str_whileCAS = "whileCAS_" + j.VAR_NAME + "_" + i.first;
+            string str_whileCAS_RHS = "whileCAS_RHS" + j.VAR_NAME + "_" + i.first;
+
+            /** Only match references types, ignore read only **/
+            DeclarationMatcher f_1 = varDecl(isExpansionInMainFile(), hasInitializer(expr(anyOf(
+                                                                                                hasDescendant(memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.VAR_NAME)))))).bind(str_memExpr)),
+                                                                                                memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.VAR_NAME)))))).bind(str_memExpr)
+                                                                                                ))),
+                                                                      hasType(references(AnyType)),
+                                                                      hasAncestor(recordDecl(hasName(i.first)))
+                                                                  ).bind(str_varDecl);
+
+
+
+            StatementMatcher LHS_memExpr = memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.VAR_NAME))))), hasAncestor(recordDecl(hasName(i.first)))).bind(str_memExpr);
+            StatementMatcher LHS_declRefExpr = declRefExpr(to(varDecl(hasName(j.VAR_NAME)))).bind(str_ifMinLHS);
+            StatementMatcher Cond_notDeclExpr = declRefExpr(to(varDecl(unless(hasName(j.VAR_NAME))).bind(str_varDecl)), hasAncestor(recordDecl(hasName(i.first)))).bind(str_Cond_RHSmemExpr);
+            /** Order matters as the most generic ones should be at the last **/
+            StatementMatcher f_2 = expr(isExpansionInMainFile(), anyOf(
+                                                                      /** For builtInType : NodeData.field += val **/
+                                                                      binaryOperator(hasOperatorName("+="),
+                                                                            hasLHS(ignoringParenImpCasts(LHS_memExpr))).bind(str_plusOp),
+                                                                      /** For builtInType : NodeData.field = NodeData.field + val **/
+                                                                      binaryOperator(hasOperatorName("="),
+                                                                            hasLHS(ignoringParenImpCasts(LHS_memExpr)),
+                                                                            hasRHS(binaryOperator(hasOperatorName("+"),
+                                                                                                  hasLHS(ignoringParenImpCasts(LHS_memExpr))))).bind(str_assign_plus),
+                                                                      /** For builtInType : NodeData.field = val **/
+                                                                      binaryOperator(hasOperatorName("="),
+                                                                            hasLHS(ignoringParenImpCasts(LHS_memExpr))).bind(str_assignment),
+
+
+                                                                      /** For ComplexType : NodeData.field += val **/
+                                                                      operatorCallExpr(hasOverloadedOperatorName("+="),
+                                                                              hasDescendant(LHS_memExpr)).bind(str_plusOp),
+                                                                      /** For ComplexType : NodeData.field = NodeData.field + val **/
+                                                                      operatorCallExpr(hasOverloadedOperatorName("="),
+                                                                              hasDescendant(binaryOperator(hasOperatorName("+"),
+                                                                                                              hasLHS(hasDescendant(LHS_memExpr))))).bind(str_assign_plus),
+                                                                      /** For ComplexType : NodeData.field = val **/
+                                                                      operatorCallExpr(hasOverloadedOperatorName("="),
+                                                                             hasDescendant(LHS_memExpr)).bind(str_assignment)
+                                                                     ),
+                                                                     hasAncestor(recordDecl(hasName(i.first))),
+                                                                     /** Only if condition inside EdgeForLoop should be considered**/
+                                                                     unless(hasAncestor(ifStmt(hasCondition(anything()), hasAncestor(EdgeForLoopMatcher)))));
+
+            /** Conditional modification within forEdgeLoop **/
+            StatementMatcher f_3 = ifStmt(isExpansionInMainFile(), hasCondition(binaryOperator(hasOperatorName(">"),
+                                                                                      hasLHS(anyOf(hasDescendant(LHS_memExpr), hasDescendant(LHS_declRefExpr))),
+                                                                                      hasRHS(hasDescendant(declRefExpr(to(decl().bind(str_Cond_RHSVarDecl))).bind(str_ifMinRHS))))
+                                                                                ), anyOf(hasDescendant(compoundStmt(anyOf(hasDescendant(binaryOperator(hasOperatorName("="),
+                                                                                                                                       hasLHS(hasDescendant(LHS_declRefExpr)),
+                                                                                                                                       hasRHS(hasDescendant(declRefExpr(to(decl(equalsBoundNode(str_Cond_RHSVarDecl)))))))),
+                                                                                                                    hasDescendant(operatorCallExpr(hasOverloadedOperatorName("="),
+                                                                                                                                  hasDescendant(LHS_declRefExpr),
+                                                                                                                                  hasDescendant(declRefExpr(to(decl(equalsBoundNode(str_Cond_RHSVarDecl)))))))))),
+                                                                                            hasDescendant(binaryOperator(hasOperatorName("="),
+                                                                                                        hasLHS(LHS_declRefExpr),
+                                                                                                        hasRHS(ignoringParenImpCasts(declRefExpr(to(decl(equalsBoundNode(str_Cond_RHSVarDecl))))))))
+                                                                                                    )
+                                                                                                ).bind(str_ifMin);
+
+            StatementMatcher f_4 = whileStmt(isExpansionInMainFile(), hasCondition(binaryOperator(hasOperatorName(">"),
+                                                                                                  hasLHS(hasDescendant(LHS_memExpr)),
+                                                                                                  hasRHS(ignoringParenImpCasts(declRefExpr(to(decl().bind(str_whileCAS_RHS))))))),
+                                                                      hasBody(compoundStmt(hasDescendant(memberCallExpr(callee(methodDecl(matchesName(".compare_exchange_strong"))), hasAnyArgument(declRefExpr(to(decl(equalsBoundNode(str_whileCAS_RHS)))))))))).bind(str_whileCAS);
+            Matchers_gen_field.addMatcher(f_1, &insideForLoopField_handler);
+            Matchers_gen_field.addMatcher(f_2, &insideForLoopField_handler);
+            Matchers_gen_field.addMatcher(f_3, &insideForLoopField_handler);
+            Matchers_gen_field.addMatcher(f_4, &insideForLoopField_handler);
+
+
+        }
+      }
+    }
+
+      Matchers_gen_field.matchAST(Context);
 
       llvm::outs() << "\n\n Printing for all fields found \n\n";
       for (auto i : info.fieldData_map)
@@ -826,8 +1316,11 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                      << center(string("NODE_NAME"), width) << "|"
                      << center(string("IS_REFERENCE"), width) << "|"
                      << center(string("IS_REFERENCED"), width) << "||"
-                     << center(string("RW_STATUS"), width) << "\n";
-        llvm::outs() << std::string(width*7 + 2*7, '-') << "\n";
+                     << center(string("RW_STATUS"), width) << "||"
+                     << center(string("RESET_VALTYPE"), width) << "||"
+                     << center(string("RESET_VAL"), width) << "||"
+                     << center(string("GRAPH_NAME"), width) << "\n";
+        llvm::outs() << std::string(width*10 + 2*10, '-') << "\n";
         for( auto j : i.second) {
           llvm::outs() << center(j.VAR_NAME,  width) << "|"
                        << center(j.VAR_TYPE,  width) << "|"
@@ -835,11 +1328,33 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                        << center(j.NODE_NAME,  width) << "|"
                        << center(j.IS_REFERENCE,  width) << "|"
                        << center(j.IS_REFERENCED,  width) << "|"
-                       << center(j.RW_STATUS,  width) << "\n";
+                       << center(j.RW_STATUS,  width) << "|"
+                       << center(j.RESET_VALTYPE,  width) << "|"
+                       << center(j.RESET_VAL,  width) << "|"
+                       << center(j.GRAPH_NAME,  width) << "\n";
         }
       }
 
-      //Matchers_op.matchAST(Context);
+
+      /** PRINTING FINAL REDUCTION OPERATIONS **/
+
+      llvm::outs() << "\n\n"; 
+      for (auto i : info.reductionOps_map){
+        llvm::outs() << "FOR >>>>> " << i.first << "\n";
+        for(auto j : i.second) {
+          string write_set = "write_set( " + j.NODE_TYPE + " , " + j.FIELD_NAME + " , " + j.OPERATION_EXPR + " , " +  j.RESETVAL_EXPR + ")";
+          llvm::outs() << write_set << "\n";
+        }
+      }
+
+
+      for (auto i : info.reductionOps_map){
+        if(i.second.size() > 0) {
+          Matchers_doall.addMatcher(callExpr(callee(functionDecl(hasName("Galois::do_all"))),unless(isExpansionInSystemHeader()), hasAncestor(recordDecl(hasName(i.first)).bind("do_all_recordDecl"))).bind("galoisLoop"), &functionCallHandler);
+        }
+      }
+
+      Matchers_doall.matchAST(Context);
     }
   };
 
@@ -850,9 +1365,8 @@ class GaloisFunctionsConsumer : public ASTConsumer {
   protected:
 
     void EndSourceFileAction() override {
-      /*
       TheRewriter.getEditBuffer(TheRewriter.getSourceMgr().getMainFileID()).write(llvm::outs());
-      if (!TheRewriter.overwriteChangedFiles())
+     /* if (!TheRewriter.overwriteChangedFiles())
       {
         llvm::outs() << "Successfully saved changes\n";
       }
