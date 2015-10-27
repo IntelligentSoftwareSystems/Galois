@@ -24,9 +24,6 @@
 #ifndef AVI_ORDERED_SPEC_H
 #define AVI_ORDERED_SPEC_H
 
-#include "Galois/Galois.h"
-#include "Galois/Runtime/PerThreadStorage.h"
-#include "Galois/WorkList/WorkList.h"
 #include "Galois/Runtime/ROBexecutor.h"
 #include "Galois/Runtime/OrderedSpeculation.h"
 
@@ -50,9 +47,9 @@
 
 class AVIorderedSpec: public AVIabstractMain {
 protected:
-  typedef Galois::Graph::FirstGraph<void*,void,true> Graph;
-  typedef Graph::GraphNode Lockable;
-  typedef std::vector<Lockable> Locks;
+  using Graph =  Galois::Graph::FirstGraph<void*,void,true>;
+  using Lockable =  Graph::GraphNode;
+  using Locks =  std::vector<Lockable>;
 
   Graph graph;
   Locks locks;
@@ -99,6 +96,9 @@ protected:
   };
 
   struct NhoodVisit {
+
+    static const unsigned CHUNK_SIZE = DEFAULT_CHUNK_SIZE;
+
     Graph& graph;
     Locks& locks;
 
@@ -122,16 +122,19 @@ protected:
   };
 
   struct Process {
+
+    static const unsigned CHUNK_SIZE = DEFAULT_CHUNK_SIZE;
+
     MeshInit& meshInit;
     GlobalVec& g;
-    Galois::Runtime::PerThreadStorage<LocalVec>& perIterLocalVec;
+    PerThrdLocalVec& perIterLocalVec;
     bool createSyncFiles;
     IterCounter& niter;
 
     Process(
         MeshInit& meshInit,
         GlobalVec& g,
-        Galois::Runtime::PerThreadStorage<LocalVec>& perIterLocalVec,
+        PerThrdLocalVec& perIterLocalVec,
         bool createSyncFiles,
         IterCounter& niter):
       meshInit(meshInit),
@@ -200,7 +203,7 @@ public:
     const size_t nrows = meshInit.getSpatialDim();
     const size_t ncols = meshInit.getNodesPerElem();
 
-    Galois::Runtime::PerThreadStorage<LocalVec> perIterLocalVec;
+    PerThrdLocalVec perIterLocalVec;
     for (unsigned int i = 0; i < perIterLocalVec.size(); ++i)
       *perIterLocalVec.getRemote(i) = LocalVec(nrows, ncols);
 
@@ -213,8 +216,8 @@ public:
     const std::vector<AVI*>& elems = meshInit.getAVIVec();
 
     // Galois::for_each_ordered (
-    Galois::Runtime::for_each_ordered_rob (
-    // Galois::Runtime::for_each_ordered_optim (
+    // Galois::Runtime::for_each_ordered_rob (
+    Galois::Runtime::for_each_ordered_optim (
         Galois::Runtime::makeStandardRange (
           boost::make_transform_iterator(elems.begin(), MakeUpdate()),
           boost::make_transform_iterator(elems.end(), MakeUpdate())), 
