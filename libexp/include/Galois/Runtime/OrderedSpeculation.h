@@ -262,9 +262,9 @@ struct OptimNhoodItem: public OrdLocBase<OptimNhoodItem<Ctxt, CtxtCmp>, Ctxt, Ct
 
 
 template <typename T, typename Cmp, typename Exec>
-struct OptimContext: public SimpleRuntimeContext {
+struct OptimContext: public OrderedContextBase<T> {
 
-  using Base = SimpleRuntimeContext;
+  using Base = OrderedContextBase;
 
   using CtxtCmp = ContextComparator<OptimContext, Cmp>;
   using NItem = OptimNhoodItem<OptimContext, CtxtCmp>;
@@ -273,7 +273,6 @@ struct OptimContext: public SimpleRuntimeContext {
   using ChildList = typename gstl::Vector<OptimContext*>;
   using Lock_ty = Galois::Substrate::SimpleLock;
 
-  T active;
   bool source;
   std::atomic<ContextState> state;
   Exec& exec;
@@ -288,8 +287,7 @@ struct OptimContext: public SimpleRuntimeContext {
 
   explicit OptimContext (const T& x, const ContextState& s, Exec& exec)
   :
-    Base (true), 
-    active (x), 
+    Base (x), 
     source (true), 
     state (s), 
     exec (exec),
@@ -1282,9 +1280,9 @@ struct OptimParamNhoodItem: public OrdLocBase<OptimParamNhoodItem<Ctxt, CtxtCmp>
 };
 
 template <typename T, typename Cmp, typename Exec>
-struct OptimParamContext: public SimpleRuntimeContext {
+struct OptimParamContext: public OrderedContextBase<T> {
 
-  using Base = SimpleRuntimeContext;
+  using Base = OrderedContextBase;
 
   using CtxtCmp = ContextComparator<OptimParamContext, Cmp>;
   using NItem = OptimParamNhoodItem<OptimParamContext, CtxtCmp>;
@@ -1292,7 +1290,6 @@ struct OptimParamContext: public SimpleRuntimeContext {
   using NhoodList = typename gstl::Vector<NItem*>;
   using ChildList = typename gstl::Vector<OptimParamContext*>;
 
-  T active;
   ContextState state;
   size_t step;
   Exec& exec;
@@ -1307,7 +1304,7 @@ struct OptimParamContext: public SimpleRuntimeContext {
 
   explicit OptimParamContext (const T& x, const ContextState& s, size_t step, Exec& exec)
   :
-    Base (true), active (x), state (s), step (step), exec (exec) 
+    Base (x), state (s), step (step), exec (exec) 
   {}
 
   const T& getActive () const { return active; }

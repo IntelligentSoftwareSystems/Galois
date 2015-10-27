@@ -86,9 +86,9 @@ namespace Runtime {
   // TODO: memory management: other threads may refer to an iteration context that has
   // been deallocated after commit or abort
 template <typename T, typename Cmp, typename Exec>
-class ROBcontext: public SimpleRuntimeContext {
+class ROBcontext: public OrderedContextBase<T> {
 
-  using Base = SimpleRuntimeContext;
+  using Base = OrderedContextBase;
   using NhoodList =  Galois::gdeque<Lockable*, 4>; // 2nd arg is chunk size
 
 public:
@@ -109,7 +109,6 @@ public:
 public:
   // GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE Galois::GAtomic<State> state;
   GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE std::atomic<State> state;
-  T active;
   Exec& executor;
 
   bool lostConflict;
@@ -129,9 +128,8 @@ public:
 
   explicit ROBcontext (const T& x, Exec& e)
     : 
-      Base (true), 
+      Base (x), 
       state (State::UNSCHEDULED), 
-      active (x), 
       executor (e), 
       lostConflict (false),
       executed (false),
@@ -230,19 +228,6 @@ public:
 
   }
 
-  struct PtrComparator {
-    const Cmp& cmp;
-
-    explicit PtrComparator (const Cmp& cmp): cmp (cmp) {}
-
-    inline bool operator () (const ROBcontext* left, const ROBcontext* right) const {
-      assert (left != nullptr);
-      assert (right != nullptr);
-
-      return cmp (left->active, right->active);
-    }
-  };
-
 private:
 
   void releaseLocks () {
@@ -324,13 +309,13 @@ class ROBexecutor: private boost::noncopyable {
 
   using Ctxt = ROBcontext<T, Cmp, ROBexecutor>;
   using CtxtAlloc = FixedSizeAllocator<Ctxt>;
-  using CtxtCmp = typename Ctxt::PtrComparator;
+  using CtxtCmp = typename ContextComparator<Ctxt, Cmp>;
   using CtxtDeq = PerThreadDeque<Ctxt*>;
   using CtxtVec = PerThreadVector<Ctxt*>;
 
   using PendingQ = Galois::MinHeap<T, Cmp>;
   using PerThrdPendingQ = PerThreadMinHeap<T, Cmp>;
-  using ROB = Galois::MinHeap<Ctxt*, typename Ctxt::PtrComparator>;
+  using ROB = Galois::MinHeap<Ctxt*, CtxtCmp>;
 
   using Lock_ty = Galois::Substrate::SimpleLock;
   // using Lock_ty = Galois::Runtime::LL::PthreadLock<true>;
@@ -885,7 +870,7 @@ class ROBparaMeter: private boost::noncopyable {
 
   using Ctxt = ROBparamContext<T, Cmp, ROBparaMeter>;
   using CtxtAlloc = FixedSizeAllocator<Ctxt>;
-  using CtxtCmp = typename Ctxt::PtrComparator;
+  using CtxtCmp = typename ContextComparator<Ctxt, Cmp>;
   using CtxtDeq = Galois::PerThreadDeque<Ctxt*>;
 
   using PendingQ = Galois::MinHeap<T, Cmp>;
