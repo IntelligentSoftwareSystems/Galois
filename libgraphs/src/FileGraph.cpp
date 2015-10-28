@@ -151,6 +151,10 @@ void FileGraph::fromMem(void* m, uint32_t node_offset, uint64_t edge_offset) {
   if (numEdges % 2)
     fptr32 += 1;
   edgeData = (char*)fptr32;
+  int* edgeData1 = (int*)edgeData;
+  printf("address: %p %p\n", edgeData, edgeData1);
+  printf("%d %d %d %d\n",outs[0],outs[1],outs[2],outs[3]);
+	printf("%d %d %d %d\n",edgeData1[0],edgeData1[1],edgeData1[2],edgeData1[3]);
 }
 
 static size_t rawBlockSize(size_t numNodes, size_t numEdges, size_t sizeofEdgeData) {
@@ -205,6 +209,10 @@ void* FileGraph::fromArrays(
 
   if (num_edges % 2)
     fptr32 += 1;
+
+  char* fptr0 = (char*) fptr32;
+  if (edge_data)
+    memcpy(fptr0, edge_data, sizeof_edge_data * num_edges);
 
   fromMem(base, node_offset, edge_offset);
   return edgeData;
