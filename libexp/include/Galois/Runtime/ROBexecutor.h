@@ -88,7 +88,7 @@ namespace Runtime {
 template <typename T, typename Cmp, typename Exec>
 class ROBcontext: public OrderedContextBase<T> {
 
-  using Base = OrderedContextBase;
+  using Base = OrderedContextBase<T>;
   using NhoodList =  Galois::gdeque<Lockable*, 4>; // 2nd arg is chunk size
 
 public:
@@ -154,7 +154,7 @@ public:
   virtual void subAcquire (Lockable* l, Galois::MethodFlag) {
 
     for (bool succ = false; !succ; ) {
-      Base::AcquireStatus acq = Base::tryAcquire (l);
+      typename Base::AcquireStatus acq = Base::tryAcquire (l);
 
       switch (acq) {
         case Base::FAIL: {
@@ -219,7 +219,7 @@ public:
 
     userHandle.rollback ();
     releaseLocks ();
-    executor.push_abort (active, owner);
+    executor.push_abort (Base::getActive (), owner);
     userHandle.reset ();
 
     Substrate::compilerBarrier ();
@@ -309,7 +309,7 @@ class ROBexecutor: private boost::noncopyable {
 
   using Ctxt = ROBcontext<T, Cmp, ROBexecutor>;
   using CtxtAlloc = FixedSizeAllocator<Ctxt>;
-  using CtxtCmp = typename ContextComparator<Ctxt, Cmp>;
+  using CtxtCmp = ContextComparator<Ctxt, Cmp>;
   using CtxtDeq = PerThreadDeque<Ctxt*>;
   using CtxtVec = PerThreadVector<Ctxt*>;
 
@@ -456,7 +456,7 @@ public:
 
           didWork = true;
 
-          dbg::debug (ctx, " scheduled with item ", ctx->active,
+          dbg::debug (ctx, " scheduled with item ", ctx->getActive (),
               " remaining contexts: ", freeList.get ().size ());
 
           applyOperator (ctx);
@@ -544,10 +544,10 @@ private:
     assert (ctx != nullptr);
 
     Galois::Runtime::setThreadContext (ctx);
-    nhFunc (ctx->active, ctx->userHandle);
+    nhFunc (ctx->getActive (), ctx->userHandle);
 
     if (ctx->hasState (Ctxt::State::SCHEDULED)) {
-      opFunc (ctx->active, ctx->userHandle);
+      opFunc (ctx->getActive (), ctx->userHandle);
     }
     Galois::Runtime::setThreadContext (nullptr);
 
@@ -694,7 +694,7 @@ private:
 
         }  else if (head->hasState (Ctxt::State::READY_TO_COMMIT)) {
 
-          if (isEarliest (head->active)) {
+          if (isEarliest (head->getActive ())) {
 
             head->setState (Ctxt::State::COMMITTING);
             head->doCommit ();
@@ -706,7 +706,7 @@ private:
             reclaim (t);
             didWork = true;
             numCommitted += 1;
-            dbg::debug (__ctxt, " committed: ", head, ", with active: ", head->active);
+            dbg::debug (__ctxt, " committed: ", head, ", with active: ", head->getActive ());
 
           } else {
             break;
@@ -870,7 +870,7 @@ class ROBparaMeter: private boost::noncopyable {
 
   using Ctxt = ROBparamContext<T, Cmp, ROBparaMeter>;
   using CtxtAlloc = FixedSizeAllocator<Ctxt>;
-  using CtxtCmp = typename ContextComparator<Ctxt, Cmp>;
+  using CtxtCmp = ContextComparator<Ctxt, Cmp>;
   using CtxtDeq = Galois::PerThreadDeque<Ctxt*>;
 
   using PendingQ = Galois::MinHeap<T, Cmp>;
@@ -959,15 +959,15 @@ public:
         Ctxt* ctx = schedule ();
         assert (ctx != nullptr);
 
-        dbg::debug (ctx, " scheduled with item ", ctx->active);
+        dbg::debug (ctx, " scheduled with item ", ctx->getActive ());
 
         ++totalIter;
 
         Galois::Runtime::setThreadContext (ctx);
-        nhFunc (ctx->active, ctx->userHandle);
+        nhFunc (ctx->getActive (), ctx->userHandle);
 
         if (ctx->hasState (Ctxt::State::SCHEDULED)) {
-          opFunc (ctx->active, ctx->userHandle);
+          opFunc (ctx->getActive (), ctx->userHandle);
         }
         Galois::Runtime::setThreadContext (nullptr);
 
@@ -1063,7 +1063,7 @@ private:
       dbg::debug ("head of rob ready to commit : ", head);
       bool earliest = false;
       if (!nextPending->empty ()) {
-        earliest = !itemCmp (nextPending->top (), head->active);
+        earliest = !itemCmp (nextPending->top (), head->getActive ());
 
       } else {
         earliest = true;
@@ -1110,7 +1110,7 @@ private:
 
         bool earliest = false;
         if (!nextPending->empty ()) {
-          earliest = !itemCmp (nextPending->top (), head->active);
+          earliest = !itemCmp (nextPending->top (), head->getActive ());
 
         } else {
           earliest = true;

@@ -264,7 +264,7 @@ struct OptimNhoodItem: public OrdLocBase<OptimNhoodItem<Ctxt, CtxtCmp>, Ctxt, Ct
 template <typename T, typename Cmp, typename Exec>
 struct OptimContext: public OrderedContextBase<T> {
 
-  using Base = OrderedContextBase;
+  using Base = OrderedContextBase<T>;
 
   using CtxtCmp = ContextComparator<OptimContext, Cmp>;
   using NItem = OptimNhoodItem<OptimContext, CtxtCmp>;
@@ -294,7 +294,6 @@ struct OptimContext: public OrderedContextBase<T> {
     onWL (false)
   {}
 
-  const T& getActive () const { return active; }
 
   bool hasState (const ContextState& s) const { return state == s; } 
 
@@ -377,7 +376,7 @@ struct OptimContext: public OrderedContextBase<T> {
 
     assert (hasState (ContextState::COMMITTING));
 
-    dbg::debug (this, " committing with item ", this->active);
+    dbg::debug (this, " committing with item ", this->getActive ());
     for (NItem* n: nhood) {
       n->removeCommit (this);
     }
@@ -418,7 +417,7 @@ struct OptimContext: public OrderedContextBase<T> {
       }
     }
 
-    dbg::debug (this, " aborting with item ", this->active);
+    dbg::debug (this, " aborting with item ", this->getActive ());
 
     userHandle.rollback ();
 
@@ -708,11 +707,11 @@ public:
 private:
 
   void printStats (void) {
-    std::cout << "OptimOrdExecutor, rounds: " << rounds << std::endl;
-    std::cout << "OptimOrdExecutor, commits: " << numCommitted.reduce () << std::endl;
-    std::cout << "OptimOrdExecutor, total: " << total.reduce () << std::endl;
-    std::cout << "OptimOrdExecutor, efficiency: " << double (numCommitted.reduce ()) / total.reduce () << std::endl;
-    std::cout << "OptimOrdExecutor, avg. parallelism: " << double (numCommitted.reduce ()) / rounds << std::endl;
+    std::printf ("OptimOrdExecutor, rounds: %zu\n", rounds);
+    std::printf ("OptimOrdExecutor, commits: %zu\n", numCommitted.reduce ());
+    std::printf ("OptimOrdExecutor, total: %zu\n", total.reduce ());
+    std::printf ("OptimOrdExecutor, efficiency: %g\n", double (numCommitted.reduce ()) / total.reduce ());
+    std::printf ("OptimOrdExecutor, avg. parallelism: %g\n", double (numCommitted.reduce ()) / rounds);
   }
 
 
@@ -1282,7 +1281,7 @@ struct OptimParamNhoodItem: public OrdLocBase<OptimParamNhoodItem<Ctxt, CtxtCmp>
 template <typename T, typename Cmp, typename Exec>
 struct OptimParamContext: public OrderedContextBase<T> {
 
-  using Base = OrderedContextBase;
+  using Base = OrderedContextBase<T>;
 
   using CtxtCmp = ContextComparator<OptimParamContext, Cmp>;
   using NItem = OptimParamNhoodItem<OptimParamContext, CtxtCmp>;
@@ -1306,8 +1305,6 @@ struct OptimParamContext: public OrderedContextBase<T> {
   :
     Base (x), state (s), step (step), exec (exec) 
   {}
-
-  const T& getActive () const { return active; }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE
   virtual void subAcquire (Lockable* l, Galois::MethodFlag m) {
@@ -1353,7 +1350,7 @@ struct OptimParamContext: public OrderedContextBase<T> {
   void doCommit () {
     assert (state == ContextState::READY_TO_COMMIT);
 
-    dbg::debug (this, " committing with item ", this->active);
+    dbg::debug (this, " committing with item ", this->getActive ());
     for (NItem* n: nhood) {
       n->removeCommit (this);
     }
@@ -1394,7 +1391,7 @@ struct OptimParamContext: public OrderedContextBase<T> {
       }
     }
 
-    dbg::debug (this, " aborting with item ", this->active);
+    dbg::debug (this, " aborting with item ", this->getActive ());
 
     userHandle.rollback ();
 
@@ -1525,15 +1522,15 @@ public:
           break;
         }
 
-        dbg::debug (ctxt, " scheduled with item ", ctxt->active);
+        dbg::debug (ctxt, " scheduled with item ", ctxt->getActive ());
 
         ++totalIter;
 
         Galois::Runtime::setThreadContext (ctxt);
-        nhFunc (ctxt->active, ctxt->userHandle);
+        nhFunc (ctxt->getActive (), ctxt->userHandle);
 
         if (ctxt->hasState (ContextState::SCHEDULED)) {
-          opFunc (ctxt->active, ctxt->userHandle);
+          opFunc (ctxt->getActive (), ctxt->userHandle);
         }
         Galois::Runtime::setThreadContext (nullptr);
 
@@ -1558,9 +1555,9 @@ public:
       totalCommits += numCommitted;
 
       if (numCommitted == 0) {
-        dbg::debug ("head of rob: ", rob.back (),  "  with item: ", rob.back ()->active);
+        dbg::debug ("head of rob: ", rob.back (),  "  with item: ", rob.back ()->getActive ());
 
-        dbg::debug ("head of nextPending: ", nextPending->top (),  "  with item: ", nextPending->top ()->active);
+        dbg::debug ("head of nextPending: ", nextPending->top (),  "  with item: ", nextPending->top ()->getActive ());
       }
       assert (numCommitted > 0);
 
@@ -1605,7 +1602,7 @@ private:
 
       } else {
         assert (ctxt->hasState (ContextState::ABORTED_CHILD));
-        dbg::debug ("deleting aborted child: ", ctxt, " with item ", ctxt->active);
+        dbg::debug ("deleting aborted child: ", ctxt, " with item ", ctxt->getActive ());
         freeCtxt (ctxt);
 
       }

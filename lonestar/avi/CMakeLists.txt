@@ -27,14 +27,8 @@ if(ZLIB_FOUND AND NOT ARCH STREQUAL "mic")
   add_definitions(-DGALOIS_HAS_ZLIB)
 endif()
 
-# TODO(ddn): CMake Boost module on BG/Q cannot be called multiple times. Skip
-# avi althogether for now.
-if(CMAKE_SYSTEM_NAME MATCHES "BlueGeneQ")
-  set(Boost_FOUND off)
-else()
-  # Needs a slightly higher version than other Galois apps
-  find_package(Boost 1.50.0 COMPONENTS system iostreams filesystem)
-endif()
+find_package(Boost 1.50.0 COMPONENTS system iostreams filesystem)
+
 
 if(CMAKE_Fortran_COMPILER_WORKS AND LAPACK_FOUND AND Boost_FOUND)
   include_directories(${ZLIB_INCLUDE_DIRS})
