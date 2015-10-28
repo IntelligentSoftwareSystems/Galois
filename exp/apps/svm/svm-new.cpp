@@ -235,7 +235,7 @@ class DiffractedCollection {
           break;
         case UpdateType::CycleByPackage:
         case UpdateType::ReplicateByPackage:
-          if (tid && Galois::Substrate::getSystemThreadPool().isLeader(tid))
+          if (tid && Galois::Substrate::getThreadPool().isLeader(tid))
             std::copy(local, local + size, *package.getLocal());
           break;
         default: abort();
@@ -246,7 +246,7 @@ class DiffractedCollection {
 public:
   DiffractedCollection(size_t n): size(n), block_size(0) {
     num_threads = Galois::getActiveThreads();
-    num_packages = Galois::Substrate::getSystemThreadPool().getCumulativeMaxPackage(num_threads-1) + 1;
+    num_packages = Galois::Substrate::getThreadPool().getCumulativeMaxPackage(num_threads-1) + 1;
     
     if (UT == UpdateType::Staleness)
       old.create(n);
@@ -259,7 +259,7 @@ public:
       });
     } else if (UT == UpdateType::ReplicateByPackage || UT == UpdateType::CycleByPackage) {
       Galois::on_each([n, this](unsigned tid, unsigned total) {
-          if (Galois::Substrate::getSystemThreadPool().isLeader(tid)) {
+          if (Galois::Substrate::getThreadPool().isLeader(tid)) {
 	  T *p = new T[n];
 	  *package.getLocal() = p;
 	  std::fill(p, p + n, 0);
@@ -381,7 +381,7 @@ struct LogisticRegression {
   double* baseEdgeData;
 #endif
   LogisticRegression(Graph& _g, double _lr, Galois::GAccumulator<size_t>& b) : g(_g), learningRate(_lr), bigUpdates(b) {
-    has_other = Galois::Substrate::getSystemThreadPool().getCumulativeMaxPackage(Galois::getActiveThreads() - 1) > 1;
+    has_other = Galois::Substrate::getThreadPool().getCumulativeMaxPackage(Galois::getActiveThreads() - 1) > 1;
   	alg_type = AlgoType::SGDL1;
 #ifdef DENSE
     baseNodeData = &g.getData(g.getEdgeDst(g.edge_begin(0)));
@@ -391,7 +391,7 @@ struct LogisticRegression {
   }
 
   LogisticRegression(Graph& _g, Galois::GAccumulator<size_t>& b, double *_alpha, double *_qd, bool useL1Loss) : g(_g), bigUpdates(b), alpha(_alpha), QD(_qd)  {
-    has_other = Galois::Substrate::getSystemThreadPool().getCumulativeMaxPackage(Galois::getActiveThreads() - 1) > 1;
+    has_other = Galois::Substrate::getThreadPool().getCumulativeMaxPackage(Galois::getActiveThreads() - 1) > 1;
 
 	diag = 0.5/creg;
 	C = std::numeric_limits<double>::max();
@@ -412,7 +412,7 @@ struct LogisticRegression {
   }
 
   LogisticRegression(Graph& _g, Galois::GAccumulator<size_t>& b, double *_alpha, double *_xTx, double _innereps, size_t *_newton_iter) : g(_g), bigUpdates(b), alpha(_alpha), xTx(_xTx), innereps(_innereps), newton_iter(_newton_iter)  {
-    has_other = Galois::Substrate::getSystemThreadPool().getCumulativeMaxPackage(Galois::getActiveThreads() - 1) > 1;
+    has_other = Galois::Substrate::getThreadPool().getCumulativeMaxPackage(Galois::getActiveThreads() - 1) > 1;
 
 	C = creg;
 	alg_type = AlgoType::DCDLR;
@@ -538,7 +538,7 @@ struct linearSVM_DCD {
 #endif
 
   linearSVM_DCD(Graph& _g, Galois::GAccumulator<size_t>& b, DCD_parameters *_params, Bag *_next_bag=NULL) : g(_g), bigUpdates(b), diag(_params->diag), C(_params->C), params(_params), next_bag(_next_bag) {
-    has_other = Galois::Substrate::getSystemThreadPool().getCumulativeMaxPackage(Galois::getActiveThreads() - 1) > 1;
+    has_other = Galois::Substrate::getThreadPool().getCumulativeMaxPackage(Galois::getActiveThreads() - 1) > 1;
 
 #ifdef DENSE
     baseNodeData = &g.getData(g.getEdgeDst(g.edge_begin(0)));
@@ -1143,7 +1143,7 @@ void runDCD(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<GNode>
 	}
 	if (updateType == UpdateType::ReplicateByPackage) {
 		Galois::on_each([](unsigned tid, unsigned total) {
-                    if (Galois::Substrate::getSystemThreadPool().isLeader(tid)) {
+                    if (Galois::Substrate::getThreadPool().isLeader(tid)) {
 				double *p = new double[NUM_VARIABLES];
 				*package_weights.getLocal() = p;
 				std::fill(p, p + NUM_VARIABLES, 0);
@@ -1782,7 +1782,7 @@ template<UpdateType UT>
 void runGLMNET_(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<GNode>& trainingSamples, std::vector<GNode>& testingSamples) { // {{{
 	Galois::TimeAccumulator accumTimer;
 	accumTimer.start();
-	//Galois::Runtime::getSystemThreadPool().burnPower(numThreads);
+	//Galois::Runtime::getThreadPool().burnPower(numThreads);
 
 	DiffractedCollection<double, UT> dstate(NUM_SAMPLES);
 
@@ -2082,7 +2082,7 @@ void runGLMNET_(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<GN
 		printf("\n");
 		accumTimer.start();
 	}
-	//Galois::Runtime::getSystemThreadPool().beKind();
+	//Galois::Runtime::getThreadPool().beKind();
 } // }}}
 
 void runGLMNET(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<GNode>& trainingSamples, std::vector<GNode>& testingSamples) {

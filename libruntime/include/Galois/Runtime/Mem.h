@@ -40,6 +40,8 @@
 #include "Galois/Substrate/SimpleLock.h"
 #include "Galois/Substrate/PtrLock.h"
 #include "Galois/Substrate/CacheLineStorage.h"
+#include "Galois/Substrate/NumaMem.h"
+#include "Galois/Runtime/PagePool.h"
 
 #include <boost/utility.hpp>
 #include <cstdlib>
@@ -53,15 +55,15 @@
 
 namespace Galois {
 namespace Runtime {
+
+extern unsigned activeThreads;
+
 //! Memory management functionality.
 
 void preAlloc_impl(unsigned num);
 
-extern size_t pageSize;
-const size_t hugePageSize = 2*1024*1024;
+//const size_t hugePageSize = 2*1024*1024;
 
-void* pageAlloc();
-void pageFree(void*);
 //! Preallocate numpages large pages for each thread
 void pagePreAlloc(int numpages);
 //! Forces the given block to be paged into physical memory
@@ -69,31 +71,8 @@ void pageIn(void *buf, size_t len, size_t stride);
 //! Forces the given readonly block to be paged into physical memory
 void pageInReadOnly(void *buf, size_t len, size_t stride);
 
-//! Returns total large pages allocated by Galois memory management subsystem
-int numPageAllocTotal();
-//! Returns total large pages allocated for thread by Galois memory management subsystem
-int numPageAllocForThread(unsigned tid);
-
 //! Returns total small pages allocated by OS on a NUMA node
 int numNumaAllocForNode(unsigned nodeid);
-//! Returns number of NUMA nodes on machine
-int numNumaNodes();
-
-/**
- * Allocates memory interleaved across NUMA nodes. 
- * 
- * If full, allocate across all NUMA nodes; otherwise,
- * allocate across NUMA nodes corresponding to active
- * threads.
- */
-void* largeInterleavedAlloc(size_t bytes, bool full = true);
-//! Frees memory allocated by {@link largeInterleavedAlloc()}
-void largeInterleavedFree(void* mem, size_t bytes);
-
-//! Allocates a large block of memory
-void* largeAlloc(size_t bytes, bool preFault = true);
-//! Frees memory allocated by {@link largeAlloc()}
-void largeFree(void* mem, size_t bytes);
 
 //! Print lines from /proc/pid/numa_maps that contain at least n (non-huge) pages
 void printInterleavedStats(int minPages = 16*1024);
@@ -553,17 +532,18 @@ public:
 //! It maintains a freelist of hunks acquired from the system
 class SystemHeap {
 public:
-  enum { AllocSize = hugePageSize };
+  //FIXME: actually check!
+  enum { AllocSize = 2*1024*1024 };
 
   SystemHeap();
   ~SystemHeap();
 
   inline void* allocate(size_t size) {
-    return pageAlloc();
+    return pagePoolAlloc();
   }
 
   inline void deallocate(void* ptr) {
-    pageFree(ptr);
+    pagePoolFree(ptr);
   }
 };
 
@@ -643,22 +623,20 @@ public:
 };
 
 class SerialNumaHeap {
-  enum { offset = (sizeof(size_t) + (sizeof(double) - 1)) & ~(sizeof(double) - 1) };
+  enum { offset = (sizeof(Substrate::LAptr) + (sizeof(double) - 1)) & ~(sizeof(double) - 1) };
 
 public:
   enum { AllocSize = 0 };
 
   void* allocate(size_t size) {
-    char* ptr = (char*) largeInterleavedAlloc(size + offset, true);
-    size_t* header = (size_t*) ptr;
-    *header = size;
-    return ptr + offset;
+    auto ptr = Substrate::largeMallocInterleaved(size+offset, activeThreads);
+    Substrate::LAptr* header = new ((char*)ptr.get()) Substrate::LAptr{std::move(ptr)};
+    return (char*)(header->get()) + offset;
   }
 
   void deallocate(void* ptr) {
     char* realPtr = ((char*)ptr - offset);
-    size_t* header = (size_t*) realPtr;
-    largeInterleavedFree(header, *header);
+    Substrate::LAptr dptr{std::move(*(Substrate::LAptr*)realPtr)};
   }
 };
 

@@ -661,7 +661,7 @@ void run() {
 
   //Galois::preAlloc(numThreads + (3*graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::MM::hugePageSize);
   //Galois::preAlloc(8*(numThreads + (graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::MM::hugePageSize));
-  size_t baseAlloc = graph.size() * sizeof(typename Graph::node_data_type) / Galois::Runtime::hugePageSize;
+  size_t baseAlloc = graph.size() * sizeof(typename Graph::node_data_type) / Galois::Runtime::pagePoolSize();
   baseAlloc += numThreads;
   baseAlloc *= AllocationOverhead<Algo>::value;
   Galois::preAlloc(baseAlloc);

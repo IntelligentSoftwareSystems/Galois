@@ -73,12 +73,12 @@ protected:
   struct per_signal {
     std::atomic<int> done;
     std::atomic<int> fastRelease;
-    HWTopo::threadInfo topo;
+    threadTopoInfo topo;
   };
 
   thread_local static per_signal my_box;
 
-  HWTopo::machineInfo mi;
+  machineTopoInfo mi;
 
   std::function<void(void)> work; 
   std::atomic<unsigned> starting;
@@ -150,6 +150,7 @@ public:
   unsigned getMaxThreads() const { return mi.maxThreads; }
   unsigned getMaxCores() const { return mi.maxCores; }
   unsigned getMaxPackages() const { return mi.maxPackages; }
+  unsigned getMaxNumaNodes() const { return mi.maxNumaNodes; }
 
   unsigned getLeaderForPackage(unsigned pid) const {
     for (unsigned i = 0; i < getMaxThreads(); ++i)
@@ -162,17 +163,19 @@ public:
   unsigned getPackage(unsigned tid) const;
   unsigned getLeader(unsigned tid) const;
   unsigned getCumulativeMaxPackage(unsigned tid) const;
+  unsigned getNumaNode(unsigned tid) const;
 
   static unsigned getTID() { return my_box.topo.tid; }
-  static bool isLeader() { return my_box.topo.tid == my_box.topo.packageLeader; }
-  static unsigned getLeader() { return my_box.topo.packageLeader; }
-  static unsigned getPackage() { return my_box.topo.package; }
-  static unsigned getCumulativeMaxPackage() { return my_box.topo.cumulativeMaxPackage; }
+  static bool isLeader() { return my_box.topo.tid == my_box.topo.socketLeader; }
+  static unsigned getLeader() { return my_box.topo.socketLeader; }
+  static unsigned getPackage() { return my_box.topo.socket; }
+  static unsigned getCumulativeMaxPackage() { return my_box.topo.cumulativeMaxSocket; }
+  static unsigned getNumaNode() { return my_box.topo.numaNode; }
 
 };
 
 //!Returns or creates the appropriate thread pool for the system
-ThreadPool& getSystemThreadPool();
+ThreadPool& getThreadPool();
 
 } //Substrate
 } //Galois

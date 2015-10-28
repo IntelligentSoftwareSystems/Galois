@@ -465,9 +465,9 @@ void run() {
   // Galois::preAlloc(numThreads + (graph.size() * sizeof(Node) * numThreads / 8) / Galois::Runtime::MM::hugePageSize);
   // Tighter upper bound
   if (std::is_same<Algo, DefaultAlgo<nondet> >::value) {
-    Galois::preAlloc(numThreads + 8*graph.size()/Galois::Runtime::hugePageSize);
+    Galois::preAlloc(numThreads + 8*graph.size()/Galois::Runtime::pagePoolSize());
   } else {
-    Galois::preAlloc(numThreads + 64*(sizeof(GNode) + sizeof(Node))*graph.size()/Galois::Runtime::hugePageSize);
+    Galois::preAlloc(numThreads + 64*(sizeof(GNode) + sizeof(Node))*graph.size()/Galois::Runtime::pagePoolSize());
   }
 
   Galois::reportPageAlloc("MeminfoPre");

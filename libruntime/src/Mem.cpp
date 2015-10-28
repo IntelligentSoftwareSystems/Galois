@@ -42,7 +42,10 @@
 using namespace Galois::Runtime;
 
 //Anchor the class
-SystemHeap::SystemHeap() {}
+SystemHeap::SystemHeap() {
+  assert(AllocSize == Runtime::pagePoolSize());
+}
+
 SystemHeap::~SystemHeap() {}
 
 #ifndef GALOIS_FORCE_STANDALONE

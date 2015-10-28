@@ -15,6 +15,8 @@ set(sources
             src/PerThreadStorage.cpp
             src/HWTopoLinux.cpp
             src/Termination.cpp
+            src/NumaMem.cpp
+            src/PageAlloc.cpp
 )
 
 add_library(galois_substrate STATIC ${sources})
@@ -23,4 +25,12 @@ target_include_directories(galois_substrate PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/i
 if (CMAKE_HAVE_PTHREAD_H)
    add_definitions(-DGALOIS_HAVE_PTHREAD)
    target_link_libraries(galois_substrate Threads::Threads)
+endif()
+
+find_package(NUMA)
+if(NUMA_FOUND)
+  add_definitions(-DGALOIS_USE_NUMA)
+  target_link_libraries(galois_substrate ${NUMA_LIBRARY})
+else()
+  message(WARNING "No NUMA Support.  Likely poor performance")
 endif()

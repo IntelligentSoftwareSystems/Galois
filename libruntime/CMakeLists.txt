@@ -6,11 +6,11 @@ set(sources
         src/Sampling.cpp
         src/Timer.cpp
         src/Mem.cpp
-        src/NumaMem.cpp
-        src/PageAlloc.cpp
+        src/PagePool.cpp
         src/Deterministic.cpp
         src/Substrate.cpp
         src/Version.cpp
+        src/PagePool.cpp
 )
 
 add_library(galois_runtime STATIC ${sources})

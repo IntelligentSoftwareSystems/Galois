@@ -302,22 +302,25 @@ struct AsyncAlgo {
   };
 
   template <typename Pusher>
-  void relaxEdge(Graph& graph, Node& sdata, typename Graph::edge_iterator ii,
+  void relaxEdge(Graph& graph, Dist sdist, typename Graph::edge_iterator ii,
                  Pusher& pusher) {
     GNode dst    = graph.getEdgeDst(ii);
     Dist d       = graph.getEdgeData(ii);
     Node& ddata  = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
-    Dist newDist = sdata.dist + d;
-    Dist oldDist;
-    while (newDist < (oldDist = ddata.dist)) {
-      if (!UseCas ||
-          __sync_bool_compare_and_swap(&ddata.dist, oldDist, newDist)) {
-        if (!UseCas)
-          ddata.dist = newDist;
-        if (trackWork && oldDist != DIST_INFINITY)
-          *BadWork += 1;
-        pusher.push(UpdateRequest(dst, newDist));
-        break;
+    Dist newDist = sdist + d;
+    Dist oldDist = ddata.dist;
+    if (!UseCas && newDist < oldDist) {
+      ddata.dist = newDist;
+      if (trackWork && oldDist != DIST_INFINITY)
+        *BadWork += 1;
+      pusher.push(UpdateRequest(dst, newDist));
+    } else {
+      while (newDist < oldDist) {
+        if (ddata.dist.compare_exchange_weak(oldDist, newDist, std::memory_order_acq_rel)) {
+          if (trackWork && oldDist != DIST_INFINITY)
+            *BadWork += 1;
+          pusher.push(UpdateRequest(dst, newDist));
+        }
       }
     }
   }
@@ -327,21 +330,15 @@ struct AsyncAlgo {
     const Galois::MethodFlag flag =
         UseCas ? Galois::MethodFlag::UNPROTECTED : Galois::MethodFlag::WRITE;
     Node& sdata          = graph.getData(req.n, flag);
-    volatile Dist* sdist = &sdata.dist;
 
-    if (req.w != *sdist) {
+    if (req.w != sdata.dist) {
       if (trackWork)
         *WLEmptyWork += 1;
       return;
     }
 
     for (auto ii : graph.edges(req.n, flag)) {
-      if (req.w != *sdist) {
-        if (trackWork)
-          *WLEmptyWork += 1;
-        break;
-      }
-      relaxEdge(graph, sdata, ii, pusher);
+      relaxEdge(graph, sdata.dist, ii, pusher);
     }
   }
 
@@ -365,13 +362,13 @@ struct AsyncAlgo {
     InitialProcess(AsyncAlgo* s, Graph& g, Bag& b, Node& d)
         : self(s), graph(g), bag(b), sdata(d) {}
     void operator()(typename Graph::edge_iterator ii) const {
-      self->relaxEdge(graph, sdata, ii, bag);
+      self->relaxEdge(graph, sdata.dist, ii, bag);
     }
   };
 
   void operator()(Graph& graph, GNode source) {
     using namespace Galois::WorkList;
-    typedef ChunkedFIFO<64> Chunk;
+    typedef dChunkedFIFO<64> Chunk;
     typedef OrderedByIntegerMetric<UpdateRequestIndexer<UpdateRequest>, Chunk,
                                    10, false> OBIM;
 
@@ -421,13 +418,13 @@ struct AsyncAlgoPP {
     Dist oldDist;
     if (newDist < (oldDist = ddata.dist)) {
       do {
-        if (__sync_bool_compare_and_swap(&ddata.dist, oldDist, newDist)) {
+        if (ddata.dist.compare_exchange_weak(oldDist, newDist)) {
           if (trackWork && oldDist != DIST_INFINITY)
             *BadWork += 1;
           pusher.push(UpdateRequest(dst, newDist));
           break;
         }
-      } while (newDist < (oldDist = ddata.dist));
+      } while (newDist < oldDist);
     } else {
       sdata = std::min(oldDist + d, sdata);
     }
@@ -442,8 +439,7 @@ struct AsyncAlgoPP {
                     Galois::UserContext<UpdateRequest>& ctx) {
       const Galois::MethodFlag flag = Galois::MethodFlag::UNPROTECTED;
       Node& sdata                   = graph.getData(req.n, flag);
-      volatile Dist* psdist         = &sdata.dist;
-      Dist sdist                    = *psdist;
+      Dist sdist                    = sdata.dist;
 
       if (req.w != sdist) {
         if (trackWork)
@@ -529,7 +525,7 @@ void run(bool prealloc = true) {
   // Graph::edge_data_type) * 2;
   if (prealloc)
     Galois::preAlloc(numThreads +
-                     approxNodeData / Galois::Runtime::hugePageSize);
+                     approxNodeData / Galois::Runtime::pagePoolSize());
   Galois::reportPageAlloc("MeminfoPre");
 
   Galois::StatTimer T;
@@ -578,18 +574,16 @@ int main(int argc, char** argv) {
   case Algo::asyncPP:
     run<AsyncAlgoPP>();
     break;
-#if defined(__IBMCPP__) && __IBMCPP__ <= 1210
-#else
-  case Algo::ligra:
-    run<LigraAlgo<false>>();
-    break;
-  case Algo::ligraChi:
-    run<LigraAlgo<true>>(false);
-    break;
+    //Fixme: ligra still asumes gcc sync builtins
+    //  case Algo::ligra:
+    //    run<LigraAlgo<false>>();
+    //    break;
+    //  case Algo::ligraChi:
+    //    run<LigraAlgo<true>>(false);
+    //    break;
   case Algo::graphlab:
     run<GraphLabAlgo>();
     break;
-#endif
   default:
     std::cerr << "Unknown algorithm\n";
     abort();

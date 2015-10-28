@@ -54,7 +54,7 @@ void FileGraph::fromFileInterleaved(const std::string& filename, size_t sizeofEd
 
   // Interleave across all NUMA nodes
   // FileGraphAllocator fn { lock, cond, this, sizeofEdgeData, maxPackages, count };
-  Galois::Runtime::getSystemThreadPool().run(std::numeric_limits<unsigned int>::max(), [&]() {
+  Galois::Runtime::getThreadPool().run(std::numeric_limits<unsigned int>::max(), [&]() {
     unsigned tid = Galois::Runtime::LL::getTID();
     if (pthread_mutex_lock(&lock))
       GALOIS_DIE("PTHREAD");

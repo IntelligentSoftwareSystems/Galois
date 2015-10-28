@@ -308,6 +308,7 @@ struct AsyncAlgo {
   
   // ! [Define LC_InlineEdge_Graph]
   typedef Galois::Graph::LC_InlineEdge_Graph<Node, uint32_t>
+//    ::template with_no_lockable<true>::type // for testing pure serial case
     ::template with_out_of_line_lockable<true>::type
     ::template with_compressed_node_ptr<true>::type
     ::template with_numa_alloc<true>::type
@@ -332,16 +333,16 @@ struct AsyncAlgo {
   };
 
   template<typename Pusher>
-  void relaxEdge(Graph& graph, Node& sdata, typename Graph::edge_iterator ii, Pusher& pusher) {
+  void relaxEdge(Graph& graph, Dist sdist, typename Graph::edge_iterator ii, Pusher& pusher) {
     GNode dst = graph.getEdgeDst(ii);
     Dist d = graph.getEdgeData(ii);
-    Node& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
-    Dist newDist = sdata.dist + d;
+    auto& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED).dist;
+    Dist newDist = sdist + d;
     Dist oldDist;
-    while (newDist < (oldDist = ddata.dist)) {
-      if (!UseCas || __sync_bool_compare_and_swap(&ddata.dist, oldDist, newDist)) {
+    while (newDist < (oldDist = ddata)) {
+      if (!UseCas || ddata.compare_exchange_weak(oldDist, newDist, std::memory_order_acq_rel)) { // __sync_bool_compare_and_swap(&ddata.dist, oldDist, newDist)) {
         if (!UseCas)
-          ddata.dist = newDist;
+          ddata = newDist;
         if (trackWork && oldDist != DIST_INFINITY)
           *BadWork += 1;
         pusher.push(UpdateRequest(dst, newDist));
@@ -352,23 +353,23 @@ struct AsyncAlgo {
 
   template<typename Pusher>
   void relaxNode(Graph& graph, UpdateRequest& req, Pusher& pusher) {
+//    const Galois::MethodFlag flag = Galois::MethodFlag::UNPROTECTED; // for testing pure serial case
     const Galois::MethodFlag flag = UseCas ? Galois::MethodFlag::UNPROTECTED : Galois::MethodFlag::WRITE;
-    Node& sdata = graph.getData(req.n, flag);
-    volatile Dist* sdist = &sdata.dist;
+    auto& sdist = graph.getData(req.n, flag).dist;
 
-    if (req.w != *sdist) {
+    if (req.w != sdist) {
       if (trackWork)
         *WLEmptyWork += 1;
       return;
     }
 
     for (typename Graph::edge_iterator ii = graph.edge_begin(req.n, flag), ei = graph.edge_end(req.n, flag); ii != ei; ++ii) {
-      if (req.w != *sdist) {
+      if (req.w != sdist) {
         if (trackWork)
           *WLEmptyWork += 1;
         break;
       }
-      relaxEdge(graph, sdata, ii, pusher);
+      relaxEdge(graph, sdist, ii, pusher);
     }
   }
 
@@ -390,13 +391,13 @@ struct AsyncAlgo {
     Node& sdata;
     InitialProcess(AsyncAlgo* s, Graph& g, Bag& b, Node& d): self(s), graph(g), bag(b), sdata(d) { }
     void operator()(typename Graph::edge_iterator ii) const {
-      self->relaxEdge(graph, sdata, ii, bag);
+      self->relaxEdge(graph, sdata.dist, ii, bag);
     }
   };
 
   void operator()(Graph& graph, GNode source) {
     using namespace Galois::WorkList;
-    typedef ChunkedFIFO<64> Chunk;
+    typedef dChunkedFIFO<64> Chunk;
     typedef OrderedByIntegerMetric<UpdateRequestIndexer<UpdateRequest>, Chunk, 10, false> OBIM;
 
     std::cout << "INFO: Using delta-step of " << (1 << stepShift) << "\n";
@@ -524,7 +525,7 @@ struct AsyncSetAlgo {
 
   void operator()(Graph& graph, GNode source) {
     using namespace Galois::WorkList;
-    typedef ChunkedFIFO<64> Chunk;
+    typedef dChunkedFIFO<64> Chunk;
     typedef OrderedByIntegerMetric<NodeIndexer<Graph>, Chunk, 10, false> OBIM;
     typedef dChunkedMarkingSetFIFO<NodeSetMarker<Graph>,64> MSet;
     typedef dChunkedTwoLevelSetFIFO<64> OSet;
@@ -618,7 +619,7 @@ struct AsyncAlgoPP {
       Dist oldDist;
       if (newDist < (oldDist = ddata.dist)) {
         do {
-          if (__sync_bool_compare_and_swap(&ddata.dist, oldDist, newDist)) {
+          if (ddata.dist.compare_exchange_weak(oldDist, newDist, std::memory_order_acq_rel)) { //__sync_bool_compare_and_swap(&ddata.dist, oldDist, newDist)) {
             if (trackWork && oldDist != DIST_INFINITY)
               *BadWork += 1;
             pusher.push(UpdateRequest(dst, newDist));
@@ -638,8 +639,8 @@ struct AsyncAlgoPP {
     void operator()(UpdateRequest& req, Galois::UserContext<UpdateRequest>& ctx) {
       const Galois::MethodFlag flag = Galois::MethodFlag::UNPROTECTED;
       Node& sdata = graph.getData(req.n, flag);
-      volatile Dist* psdist = &sdata.dist;
-      Dist sdist = *psdist;
+      auto& psdist = sdata.dist;
+      Dist sdist = psdist;
 
       if (req.w != sdist) {
         if (trackWork)
@@ -716,7 +717,7 @@ void run(bool prealloc = true) {
   size_t approxNodeData = graph.size() * 64;
   //size_t approxEdgeData = graph.sizeEdges() * sizeof(typename Graph::edge_data_type) * 2;
   if (prealloc)
-    Galois::preAlloc(numThreads + approxNodeData / Galois::Runtime::hugePageSize);
+    Galois::preAlloc(numThreads + approxNodeData / Galois::Runtime::pagePoolSize());
   Galois::reportPageAlloc("MeminfoPre");
 
   Galois::StatTimer T;
@@ -774,12 +775,9 @@ int main(int argc, char **argv) {
     case Algo::asyncWithCasBlindObimMSet: run<AsyncSetAlgo<true> >(); break;
     case Algo::asyncWithCasBlindObimOSet: run<AsyncSetAlgo<true> >(); break;
     case Algo::asyncPP: run<AsyncAlgoPP>(); break;
-#if defined(__IBMCPP__) && __IBMCPP__ <= 1210
-#else
-    case Algo::ligra: run<LigraAlgo<false> >(); break;
-    case Algo::ligraChi: run<LigraAlgo<true> >(false); break;
+      //    case Algo::ligra: run<LigraAlgo<false> >(); break;
+      //    case Algo::ligraChi: run<LigraAlgo<true> >(false); break;
     case Algo::graphlab: run<GraphLabAlgo>(); break;
-#endif
     default: std::cerr << "Unknown algorithm\n"; abort();
   }
   T.stop();

@@ -19,7 +19,7 @@ static cll::opt<int> rounds("rounds", cll::desc ("number of rounds"), cll::init(
 static cll::opt<int> trials("trials", cll::desc ("number of trials"), cll::init(3));
 
 double runDoAllBurn(const std::vector<double>& vecA, const std::vector<double>& vecB) {
-  Galois::Substrate::getSystemThreadPool().burnPower(Galois::getActiveThreads());
+  Galois::Substrate::getThreadPool().burnPower(Galois::getActiveThreads());
   AccumDouble result;
 
   for (int r = 0; r < rounds; ++r) {
@@ -27,7 +27,7 @@ double runDoAllBurn(const std::vector<double>& vecA, const std::vector<double>& 
         [&](int i) { result += vecA[i] * vecB[i]; });
   }
 
-  Galois::Substrate::getSystemThreadPool().beKind();
+  Galois::Substrate::getThreadPool().beKind();
 
   return result.reduce();
 }

@@ -45,17 +45,19 @@
 #include <cstring>
 #include <fstream>
 #include <functional>
-#include <vector>
 #include <set>
+
+#ifdef GALOIS_USE_NUMA
+#include <numa.h>
+#include <numaif.h>
+#endif
 
 #include <sched.h>
 
 using namespace Galois::Substrate;
 
-namespace {
 
-static const char* sProcInfo = "/proc/cpuinfo";
-static const char* sCPUSet   = "/proc/self/cpuset";
+namespace {
 
 struct cpuinfo {
   // fields filled in from OS files
@@ -64,11 +66,12 @@ struct cpuinfo {
   unsigned sib;
   unsigned coreid;
   unsigned cpucores;
+  unsigned numaNode; //from libnuma
   bool valid; // from cpuset
-  bool smt;
+  bool smt; //computed
 };
 
-bool operator< (const cpuinfo& lhs, const cpuinfo& rhs) {
+static bool operator< (const cpuinfo& lhs, const cpuinfo& rhs) {
   if (lhs.smt != rhs.smt)
     return lhs.smt < rhs.smt;
   if (lhs.physid != rhs.physid)
@@ -78,26 +81,29 @@ bool operator< (const cpuinfo& lhs, const cpuinfo& rhs) {
   return lhs.proc < rhs.proc;
 }
 
-//! binds current thread to OS HW context "proc"
-static bool bindToProcessor(unsigned proc) {
-#ifndef __CYGWIN__
-  cpu_set_t mask;
-  /* CPU_ZERO initializes all the bits in the mask to zero. */
-  CPU_ZERO(&mask);
-  
-  /* CPU_SET sets only the bit corresponding to cpu. */
-  // void to cancel unused result warning
-  (void)CPU_SET(proc, &mask);
-  
-  /* sched_setaffinity returns 0 in success */
-  if (sched_setaffinity(0, sizeof(mask), &mask ) == -1) {
-    gWarn("Could not set CPU affinity for thread ", proc, "(", strerror(errno), ")");
-    return false;
-  }
-  return true;
+static unsigned getNumaNode(cpuinfo& c) {
+  static bool numaAvail = false;
+  static bool warnOnce = false;
+  if (!warnOnce) {
+    warnOnce = true;
+#ifdef GALOIS_USE_NUMA
+    numaAvail = numa_available() >= 0;
+    if (!numaAvail)
+      gWarn("Numa support configured but not present at runtime.  Assuming numa topology matches socket topology.");
 #else
-  gWarn("No cpu affinity on Cygwin.  Performance will be bad.");
-  return false;
+    gWarn("Numa Support Not configured (install libnuma-dev).  Assuming numa topology matches socket topology.");
+#endif
+  }
+
+#ifdef GALOIS_USE_NUMA
+  if (!numaAvail)
+    return c.physid;
+  int i = numa_node_of_cpu(c.proc);
+  if (i < 0)
+    GALOIS_SYS_DIE("failed finding numa node for ", c.proc);
+  return i;
+#else
+  return c.physid;
 #endif
 }
 
@@ -108,9 +114,9 @@ static std::vector<cpuinfo> parseCPUInfo() {
   const int len = 1024;
   std::array<char, len> line;
   
-  std::ifstream procInfo(sProcInfo);
+  std::ifstream procInfo("/proc/cpuinfo");
   if (!procInfo)
-    GALOIS_SYS_DIE("failed opening ", sProcInfo);
+    GALOIS_SYS_DIE("failed opening /proc/cpuinfo");
   
   int cur = -1;
   
@@ -136,6 +142,9 @@ static std::vector<cpuinfo> parseCPUInfo() {
     }
   }
   
+  for (auto& c : vals)
+    c.numaNode = getNumaNode(c);
+
   return vals;
 }
 
@@ -146,7 +155,7 @@ static std::vector<int> parseCPUSet() {
   //Parse: /proc/self/cpuset
   std::string name;
   {
-    std::ifstream cpuSetName(sCPUSet);
+    std::ifstream cpuSetName("/proc/self/cpuset");
     if (!cpuSetName)
       return vals;
     
@@ -196,115 +205,124 @@ static std::vector<int> parseCPUSet() {
   return vals;
 }
 
-class HWTopoLinux : public HWTopo {
-  std::vector<threadInfo> tInfo;
-  machineInfo mi;
+static unsigned countPackages(const std::vector<cpuinfo>& info) {
+  std::set<unsigned> pkgs;
+  for (auto& c : info)
+    pkgs.insert(c.physid);
+  return pkgs.size();
+}
 
-  //  std::vector<int> packages;
-  //  std::vector<int> maxPackage;
-  //  std::vector<int> virtmap;
-  //  std::vector<int> leaders;
+static unsigned countCores(const std::vector<cpuinfo>& info) {
+  std::set<std::pair<int, int> > cores;
+  for (auto& c : info)
+    cores.insert(std::make_pair(c.physid, c.coreid));
+  return cores.size();
+}
 
-  unsigned countPackages(const std::vector<cpuinfo>& info) const {
-    std::set<unsigned> pkgs;
+static unsigned countNumaNodes(const std::vector<cpuinfo>& info) {
+  std::set<unsigned > nodes;
+  for (auto& c : info)
+    nodes.insert(c.numaNode);
+  return nodes.size();
+}
+
+static void markSMT(std::vector<cpuinfo>& info) {
+  for (int i = 1 ; i < info.size(); ++i)
+    if (info[i - 1].physid == info[i].physid &&
+        info[i - 1].coreid == info[i].coreid)
+      info[i].smt = true;
+    else
+      info[i].smt = false;
+}
+
+static void markValid(std::vector<cpuinfo>& info) {
+  auto v = parseCPUSet();
+  if (v.empty()) {
     for (auto& c : info)
-      pkgs.insert(c.physid);
-    return pkgs.size();
-  }
-
-  unsigned countCores(const std::vector<cpuinfo>& info) const {
-    std::set<std::pair<int, int> > cores;
+      c.valid = true;
+  } else {
+    std::sort(v.begin(), v.end());
     for (auto& c : info)
-      cores.insert(std::make_pair(c.physid, c.coreid));
-    return cores.size();
+      c.valid = std::binary_search(v.begin(), v.end(), c.proc);
+  }
+}
+
+//FIXME: handle MIC
+std::vector<cpuinfo> transform(std::vector<cpuinfo>& info) {
+  const bool isMIC = false;
+  if (isMIC) {
+  }
+  return info;
+}
+
+} //namespace ""
+
+std::pair<machineTopoInfo, std::vector<threadTopoInfo> > Galois::Substrate::getHWTopo() {
+  machineTopoInfo retMTI;
+
+  auto rawInfo = parseCPUInfo();
+  std::sort(rawInfo.begin(), rawInfo.end());
+  markSMT(rawInfo);
+  markValid(rawInfo);
+
+  //Now compute transformed (filtered, reordered, etc) version
+  auto info = transform(rawInfo);
+  info.erase(std::partition(info.begin(), info.end(), [] (const cpuinfo& c) { return  c.valid; }), info.end());
+
+  std::sort(info.begin(), info.end());
+  markSMT(info);
+  retMTI.maxPackages = countPackages(info);
+  retMTI.maxThreads = info.size();
+  retMTI.maxCores = countCores(info);
+  retMTI.maxNumaNodes = countNumaNodes(info);
+
+  std::vector<threadTopoInfo> retTTI;
+  retTTI.reserve(retMTI.maxThreads);
+  //compute renumberings
+  std::set<unsigned> sockets;
+  std::set<unsigned> numaNodes;
+  for (auto& i : info) {
+    sockets.insert(i.physid);
+    numaNodes.insert(i.numaNode);
+  }
+  unsigned mid = 0; // max package id
+  for (unsigned i = 0; i < info.size(); ++i) {
+    unsigned pid = info[i].physid;
+    unsigned repid = std::distance(sockets.begin(), sockets.find(info[i].physid));
+    mid = std::max(mid, repid);
+    unsigned leader = std::distance(info.begin(), std::find_if(info.begin(), info.end(), [pid] (const cpuinfo& c) { return c.physid == pid; }));
+    retTTI.push_back(threadTopoInfo{i,
+          leader,
+          repid,
+          (unsigned)std::distance(numaNodes.begin(), numaNodes.find(info[i].numaNode)),
+          mid,
+          info[i].proc,
+          info[i].numaNode
+          });
   }
 
-  void markSMT(std::vector<cpuinfo>& info) {
-    for (int i = 1 ; i < info.size(); ++i)
-      if (info[i - 1].physid == info[i].physid &&
-          info[i - 1].coreid == info[i].coreid)
-        info[i].smt = true;
-      else
-        info[i].smt = false;
+  return std::make_pair(retMTI, retTTI);
+} 
+
+//! binds current thread to OS HW context "proc"
+bool Galois::Substrate::bindThreadSelf(unsigned osContext) {
+#ifndef __CYGWIN__
+  cpu_set_t mask;
+  /* CPU_ZERO initializes all the bits in the mask to zero. */
+  CPU_ZERO(&mask);
+  
+  /* CPU_SET sets only the bit corresponding to cpu. */
+  // void to cancel unused result warning
+  (void)CPU_SET(osContext, &mask);
+  
+  /* sched_setaffinity returns 0 in success */
+  if (sched_setaffinity(0, sizeof(mask), &mask ) == -1) {
+    gWarn("Could not set CPU affinity to ", osContext, "(", strerror(errno), ")");
+    return false;
   }
-
-
-  void markValid(std::vector<cpuinfo>& info) {
-    auto v = parseCPUSet();
-    if (v.empty()) {
-      for (auto& c : info)
-        c.valid = true;
-    } else {
-      std::sort(v.begin(), v.end());
-      for (auto& c : info)
-        c.valid = std::binary_search(v.begin(), v.end(), c.proc);
-    }
-  }
-
-  void renumber(std::vector<cpuinfo>& info) {
-    std::set<unsigned> pkgNum;
-    for (auto& c : info)
-      pkgNum.insert(c.physid);
-    for (auto& c : info)
-      c.physid = std::distance(pkgNum.begin(), pkgNum.find(c.physid));
-  }
-
-  //FIXME: handle MIC
-  std::vector<cpuinfo> transform(std::vector<cpuinfo>& info) {
-    const bool isMIC = false;
-    if (isMIC) {
-    }
-    return info;
-  }
-
-public:
-  HWTopoLinux() {
-    std::vector<cpuinfo> rawInfo = parseCPUInfo();
-    std::sort(rawInfo.begin(), rawInfo.end());
-    markSMT(rawInfo);
-    markValid(rawInfo);
-
-    //Now compute transformed (filtered, reordered, etc) version
-    auto info = transform(rawInfo);
-    //filter invalid
-    info.erase(std::partition(info.begin(), info.end(), [] (const cpuinfo& c) { return  c.valid; }), info.end());
-    //densly number packages
-    std::sort(info.begin(), info.end());
-    markSMT(info);
-    renumber(info);
-
-    mi.maxThreads = info.size();
-    mi.maxCores = countCores(info);
-    mi.maxPackages = countPackages(info);
-
-    tInfo.resize(mi.maxThreads);
-    unsigned mid = 0;
-    for (unsigned i = 0; i < mi.maxThreads; ++i) {
-      tInfo[i].tid = i;
-      tInfo[i].hwContext = info[i].proc;
-      tInfo[i].package = info[i].physid;
-      unsigned pid = info[i].physid;
-      mid = std::max(mid, pid);
-      tInfo[i].cumulativeMaxPackage = mid;
-      tInfo[i].packageLeader = std::distance(info.begin(), std::find_if(info.begin(), info.end(), [pid] (const cpuinfo& c) { return c.physid == pid; }));
-    }
-  }
-
-  virtual const threadInfo& getThreadInfo(unsigned tid) const {    
-    return tInfo[tid];
-  }
-
-  virtual const machineInfo& getMachineInfo() const {
-    return mi;
-  }
-
-  virtual bool bindThreadToProcessor(unsigned galois_thread_id) const {
-    return bindToProcessor(getThreadInfo(galois_thread_id).hwContext);
-  }
-};
-
-} //namespace
-
-std::unique_ptr<Galois::Substrate::HWTopo> Galois::Substrate::getHWTopo() {
-  return std::unique_ptr<Galois::Substrate::HWTopo>(new HWTopoLinux());
+  return true;
+#else
+  gWarn("No cpu affinity on Cygwin.  Performance will be bad.");
+  return false;
+#endif
 }

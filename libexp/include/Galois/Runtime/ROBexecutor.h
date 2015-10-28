@@ -1168,7 +1168,7 @@ void for_each_ordered_rob (const R& range, Cmp cmp, NhFunc nhFunc, OpFunc opFunc
 // 
     // exec.push_initial (range);
 // 
-    // getSystemThreadPool ().run (activeThreads, std::ref(exec));
+    // getThreadPool ().run (activeThreads, std::ref(exec));
 // 
     // Galois::Runtime::endSampling ();
 // 

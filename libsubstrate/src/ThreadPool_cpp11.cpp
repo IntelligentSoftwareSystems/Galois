@@ -94,7 +94,7 @@ public:
 } // end namespace
 
 //! Implement the global threadpool
-Galois::Substrate::ThreadPool& Galois::Substrate::getSystemThreadPool() {
+Galois::Substrate::ThreadPool& Galois::Substrate::getThreadPool() {
   static ThreadPool_cpp11 pool;
   return pool;
 }

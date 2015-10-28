@@ -513,7 +513,7 @@ int main(int argc, char** argv) {
       break;
 
     case edgeiterator: 
-      Galois::preAlloc(numThreads + 16*(graph.size() + graph.sizeEdges()) / Galois::Runtime::pageSize);
+      Galois::preAlloc(numThreads + 16*(graph.size() + graph.sizeEdges()) / Galois::Runtime::pagePoolSize());
       Galois::reportPageAlloc("MeminfoMid");
       run<EdgeIteratorAlgo>(); 
       break;

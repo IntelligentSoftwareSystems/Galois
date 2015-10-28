@@ -76,7 +76,7 @@ class AbortHandler {
    * Policy: serialize via tree over packages.
    */
   void basicPolicy(const Item& item) {
-    auto& tp = Substrate::getSystemThreadPool();
+    auto& tp = Substrate::getThreadPool();
     unsigned package = tp.getPackage();
     queues.getRemote(tp.getLeaderForPackage(package / 2))->push(item);
   }
@@ -93,7 +93,7 @@ class AbortHandler {
     } 
     
     unsigned tid = Substrate::ThreadPool::getTID();
-    auto& tp = Substrate::getSystemThreadPool();
+    auto& tp = Substrate::getThreadPool();
     unsigned package = Substrate::ThreadPool::getPackage();
     unsigned leader = Substrate::ThreadPool::getLeader();
     if (tid != leader) {
@@ -116,7 +116,7 @@ class AbortHandler {
     } 
     
     unsigned tid = Substrate::ThreadPool::getTID();
-    auto& tp = Substrate::getSystemThreadPool();
+    auto& tp = Substrate::getThreadPool();
     unsigned package = Substrate::ThreadPool::getPackage();
     unsigned leader = tp.getLeaderForPackage(package);
     if (retries < 5 && tid != leader) {
@@ -137,7 +137,7 @@ class AbortHandler {
 public:
   AbortHandler() {
     // XXX(ddn): Implement smarter adaptive policy
-    useBasicPolicy = Substrate::getSystemThreadPool().getMaxPackages() > 2;
+    useBasicPolicy = Substrate::getThreadPool().getMaxPackages() > 2;
   }
 
   value_type& value(Item& item) const { return item.val; }
@@ -458,7 +458,7 @@ struct reiterator<WLTy, IterTy,
 //   Barrier& barrier = getSystemBarrier();
 //   WorkTy W(fn, args);
 //   W.init(range);
-//   getSystemThreadPool().run(activeThreads,
+//   getThreadPool().run(activeThreads,
 //                             [&W, &range]() { W.initThread(range); },
 //                             std::ref(barrier),
 //                             std::ref(W));
@@ -477,7 +477,7 @@ struct reiterator<WLTy, IterTy,
 //   Barrier& barrier = getSystemBarrier();
 //   WorkTy W(WrappedFunction {fn}, newArgs);
 //   W.init(range);
-//   getSystemThreadPool().run(activeThreads,
+//   getThreadPool().run(activeThreads,
 //                             [&W, &range]() { W.initThread(range); },
 //                             std::ref(barrier),
 //                             std::ref(W));
@@ -495,7 +495,7 @@ void for_each_impl(const RangeTy& range, const FunctionTy& fn, const ArgsTy& arg
   auto& barrier = getBarrier(activeThreads);
   WorkTy W(fn, args);
   W.init(range);
-  Substrate::getSystemThreadPool().run(activeThreads,
+  Substrate::getThreadPool().run(activeThreads,
              [&W, &range]() { W.initThread(range); },
              std::ref(barrier),
              std::ref(W));

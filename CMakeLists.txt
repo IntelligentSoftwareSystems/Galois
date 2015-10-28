@@ -12,8 +12,6 @@ if(NOT CMAKE_BUILD_TYPE)
   # cmake default flags with relwithdebinfo is -O2 -g
   # cmake default flags with release is -O3 -DNDEBUG
   set(CMAKE_BUILD_TYPE "Release")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g")
 endif()
 
 ###### Options (alternatively pass as options to cmake -DName=Value) ######
@@ -25,7 +23,7 @@ set(USE_STRICT_CONFIG OFF CACHE BOOL "Instead of falling back gracefully, fail")
 set(USE_LONGJMP ON CACHE BOOL "Use longjmp instead of exceptions to signal aborts")
 set(INSTALL_APPS OFF CACHE BOOL "Install apps as well as library")
 set(SKIP_COMPILE_APPS OFF CACHE BOOL "Skip compilation of applications using Galois library")
-set(GRAPH_LOCATION /net/ohm/export/cdgc/inputs/release_tests CACHE PATH "Location of inputs for tests.  Clear to download inputs.")
+set(GRAPH_LOCATION "" CACHE PATH "Location of inputs for tests if downloaded/stored separately.")
 
 set(INSTALL_LIB_DIR lib CACHE PATH "Installation directory for libraries")
 set(INSTALL_BIN_DIR bin CACHE PATH "Installation directory for executables")
@@ -51,6 +49,9 @@ set(USE_EMBEDDED_REVISION ON CACHE BOOL "Embed revision numbers")
 enable_testing()
 
 ###### Configure compiler ######
+
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g")
 
 if(NOT "$ENV{GCC_BIN}" STREQUAL "")
   # Preserve captured environment variable during reconfiguration
@@ -130,14 +131,11 @@ endif()
 
 # More warnings
 if(CMAKE_BUILD_TYPE MATCHES "Debug")
-  if(NOT CMAKE_CXX_COMPILER_ID MATCHES "XL")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
-  endif()
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
   if(CMAKE_COMPILER_IS_GNUCC)
-    if(GCC_VERSION VERSION_GREATER 4.8 OR GCC_VERSION VERSION_EQUAL 4.8)
-#      set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-unused-local-typedefs")
-    endif()
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Og")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Og")
   endif()
 endif()
 
@@ -202,14 +200,6 @@ endif()
 # PThreads
 find_package(Threads REQUIRED)
 
-# NUMA (linux)
-find_package(NUMA)
-if(NUMA_FOUND)
-  add_definitions(-DGALOIS_USE_NUMA=1)
-elseif(USE_STRICT_CONFIG)
-  message(FATAL_ERROR "Need libnuma")
-endif()
-
 #llvm ADT and command line parser
 #find_package(LLVM)
 
@@ -250,12 +240,23 @@ include(CheckEndian)
 
 add_definitions(-D__STDC_LIMIT_MACROS)
 
-# XXX(ddn): Hack for lonestar machines
-if(NUMA_FOUND)
-  if(NUMA_OLD)
-    set(GALOIS_USE_NUMA_OLD on)
+###### Test Inputs ######
+if (GRAPH_LOCATION)
+  if (EXISTS ${GRAPH_LOCATION}/graph_readme.txt)
+    set(BASEINPUT ${GRAPH_LOCATION})
+    MESSAGE(STATUS "Using specified graph location ${GRAPH_LOCATION}")
+  else()
+    MESSAGE(FATAL_ERROR "Specified graph location does not appear to have input: ${GRAPH_LOCATION}")
   endif()
+elseif(EXISTS /net/ohm/export/cdgc/inputs/reference/graph_readme.txt)
+  set(BASEINPUT /net/ohm/export/cdgc/inputs/reference)
+  MESSAGE(STATUS "Using ISS shared graph folder for inputs")
+else()
+  add_subdirectory(inputs)
+  set(BASEINPUT ${CMAKE_BINARY_DIR}/inputs/reference )
+  MESSAGE(STATUS "use make input to download inputs in the build directory")
 endif()
+set(GRAPH_INPUTS ${BASEINPUT}/graph_readme.txt)
 
 ###### Global Functions ######
 
@@ -271,6 +272,7 @@ function(add_test_scale type app)
   endif()
   foreach(thr RANGE 1 ${N})
     add_test(test-${type}-${thr}-${app} ${app} ${ARGN} -t ${thr})
+    set_tests_properties(test-${type}-${thr}-${app} PROPERTIES REQUIRED_FILES ${GRAPH_INPUTS})
   endforeach(thr)
 endfunction(add_test_scale)
 
@@ -387,6 +389,7 @@ add_subdirectory(tools)
 add_subdirectory(scripts)
 if(NOT SKIP_COMPILE_APPS)
   add_subdirectory(lonestar)
+  add_subdirectory(examples)
   add_subdirectory(test)
 #  add_subdirectory(toolkit_ml)
   if(USE_EXP)
@@ -394,15 +397,8 @@ if(NOT SKIP_COMPILE_APPS)
   endif()
 endif()
 
-if (GRAPH_LOCATION)
-  set(BASEINPUT GRAPH_LOCATION)
-else()
-  add_subdirectory(inputs)
-  set(BASEINPUT ${CMAKE_BINARY_DIR}/inputs/release_tests )
-endif()
-
 ###### Documentation ######
-set(DOXYFILE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/include\" \"${CMAKE_CURRENT_SOURCE_DIR}/docs\" \"${CMAKE_CURRENT_SOURCE_DIR}/libgraphs\" \"${CMAKE_CURRENT_SOURCE_DIR}/libllvm\" \"${CMAKE_CURRENT_SOURCE_DIR}/libruntime\" \"${CMAKE_CURRENT_SOURCE_DIR}/libsubstrate")
+set(DOXYFILE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/docs\" \"${CMAKE_CURRENT_SOURCE_DIR}/libgraphs\" \"${CMAKE_CURRENT_SOURCE_DIR}/libllvm\" \"${CMAKE_CURRENT_SOURCE_DIR}/libruntime\" \"${CMAKE_CURRENT_SOURCE_DIR}/libsubstrate")
 find_package(Doxygen 1.8.0)
 if(NOT DOXYGEN_FOUND)
   message(STATUS "Could NOT find required doxygen version: doxygen missing or < 1.8.0") 

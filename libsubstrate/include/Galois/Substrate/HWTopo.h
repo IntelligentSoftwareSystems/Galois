@@ -33,76 +33,33 @@
 #ifndef GALOIS_SUBSTRATE_HWTOPO_H
 #define GALOIS_SUBSTRATE_HWTOPO_H
 
-#include <memory>
+#include <vector>
 
 namespace Galois {
 namespace Substrate {
 
-class HWTopo {
-public:
-
-  struct threadInfo {
-    unsigned tid;//tid == this thread
-    unsigned packageLeader; // first thread id in tid's package
-    unsigned package; // package of tid
-    unsigned hwContext; // OS HW context numbering for bound thread
-    unsigned cumulativeMaxPackage; // max package id up to this point
-  };
-
-  struct machineInfo {
-    unsigned maxThreads;
-    unsigned maxCores;
-    unsigned maxPackages;
-  };
-
-  //! Get metadata for thread
-  virtual const threadInfo& getThreadInfo(unsigned galois_thread_id) const = 0;
-  //! Bind thread specified by id to the correct OS thread
-  virtual bool bindThreadToProcessor(unsigned galois_thread_id) const = 0;
-  //! get metadata for machine
-  virtual const machineInfo& getMachineInfo() const = 0;
-
-  unsigned getMaxThreads() const {
-    return getMachineInfo().maxThreads;
-  }
-  unsigned getMaxCores() const {
-    return getMachineInfo().maxCores;
-  }
-  unsigned getMaxPackages() const {
-    return getMachineInfo().maxPackages;
-  }
-
+struct threadTopoInfo {
+  unsigned tid; // this thread (galois id)
+  unsigned socketLeader; //first thread id in tid's package
+  unsigned socket; // socket (L3 normally) of thread
+  unsigned numaNode; // memory bank.  may be different than socket.
+  unsigned cumulativeMaxSocket; // max package id seen from [0, tid]
+  unsigned osContext; // OS ID to use for thread binding
+  unsigned osNumaNode; // OS ID for numa node
 };
 
-std::unique_ptr<HWTopo> getHWTopo();
+struct machineTopoInfo {
+  unsigned maxThreads;
+  unsigned maxCores;
+  unsigned maxPackages;
+  unsigned maxNumaNodes;
+};
 
-// extern __thread unsigned PACKAGE_ID;
-
-// static inline unsigned fillPackageID(int galois_thread_id) {
-//   unsigned x = getPackageForThread(galois_thread_id);
-//   bool y = isPackageLeader(galois_thread_id);
-//   x = (x << 2) | ((y ? 1 : 0) << 1) | 1;
-//   PACKAGE_ID = x;
-//   return x;
-// }
-
-// //! Optimized when galois_thread_id corresponds to the executing thread
-// static inline unsigned getPackageForSelf(int galois_thread_id) {
-//   unsigned x = PACKAGE_ID;
-//   if (x & 1)
-//     return x >> 2;
-//   x = fillPackageID(galois_thread_id);
-//   return x >> 2;
-// }
-
-// //! Optimized when galois_thread_id corresponds to the executing thread
-// static inline bool isPackageLeaderForSelf(int galois_thread_id) {
-//   unsigned x = PACKAGE_ID;
-//   if (x & 1)
-//     return (x >> 1) & 1;
-//   x = fillPackageID(galois_thread_id);
-//   return (x >> 1) & 1;
-// }
+//parse machine topology
+std::pair<machineTopoInfo,std::vector<threadTopoInfo>> getHWTopo();
+//bind a thread to a hwContext (returned by getHWTopo)
+bool bindThreadSelf(unsigned osContext);
+  
 
 } // end namespace Substrate
 } // end namespace Galois

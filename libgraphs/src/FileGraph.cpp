@@ -32,7 +32,7 @@
  */
 
 #include "Galois/Graphs/FileGraph.h"
-#include "Galois/Runtime/Mem.h"
+#include "Galois/Substrate/PageAlloc.h"
 
 #include <cassert>
 #include <fstream>
@@ -206,6 +206,10 @@ void* FileGraph::fromArrays(
   if (num_edges % 2)
     fptr32 += 1;
 
+  char* fptr0 = (char*) fptr32;
+  if (edge_data)
+    memcpy(fptr0, edge_data, sizeof_edge_data * num_edges);
+
   fromMem(base, node_offset, edge_offset);
   return edgeData;
 }
@@ -231,7 +235,7 @@ void FileGraph::fromFile(const std::string& filename) {
 template<typename Mappings>
 static void* loadFromOffset(int fd, offset_t offset, size_t length, Mappings& mappings) {
   // mmap needs page-aligned offsets
-  offset_t aligned = offset & ~static_cast<offset_t>(Galois::Runtime::pageSize - 1);
+  offset_t aligned = offset & ~static_cast<offset_t>(Galois::Substrate::allocSize() - 1);
   offset_t alignment = offset - aligned;
   length += alignment;
   void *base = mmap_big(nullptr, length, PROT_READ, MAP_PRIVATE, fd, aligned);
@@ -362,6 +366,12 @@ uint64_t FileGraph::getEdgeIdx(GraphNode src, GraphNode dst) const {
   return ~static_cast<uint64_t>(0);
 }
 
+static void pageInReadOnly(void* buf, size_t len, size_t stride) {
+  volatile char* ptr = reinterpret_cast<volatile char*>(buf);
+  for (size_t i = 0; i < len; i += stride)
+    ptr[i];
+}
+
 void FileGraph::pageInByNode(size_t id, size_t total, size_t sizeofEdgeData) {
   auto r = divideByNode(
     sizeof(uint64_t),
@@ -373,9 +383,9 @@ void FileGraph::pageInByNode(size_t id, size_t total, size_t sizeofEdgeData) {
   if (r.first != r.second)
     eend = *edge_end(*r.second - 1);
 
-  Runtime::pageInReadOnly(outIdx + *r.first, std::distance(r.first, r.second) * sizeof(*outIdx), Runtime::pageSize);
-  Runtime::pageInReadOnly(outs + ebegin, (eend - ebegin) * sizeof(*outs), Runtime::pageSize);
-  Runtime::pageInReadOnly(edgeData + ebegin * sizeofEdgeData, (eend - ebegin) * sizeofEdgeData, Runtime::pageSize);
+  pageInReadOnly(outIdx + *r.first, std::distance(r.first, r.second) * sizeof(*outIdx), Runtime::pagePoolSize());
+  pageInReadOnly(outs + ebegin, (eend - ebegin) * sizeof(*outs), Runtime::pagePoolSize());
+  pageInReadOnly(edgeData + ebegin * sizeofEdgeData, (eend - ebegin) * sizeofEdgeData, Runtime::pagePoolSize());
 }
 
 uint32_t* FileGraph::raw_neighbor_begin(GraphNode N) const {

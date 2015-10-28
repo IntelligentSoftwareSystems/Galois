@@ -58,7 +58,7 @@ struct OnEachExecutor {
 
 template<typename FunctionTy>
 void on_each_impl(const FunctionTy& fn, const char* loopname = nullptr) {
-  Substrate::getSystemThreadPool().run(activeThreads, OnEachExecutor<FunctionTy>(fn));
+  Substrate::getThreadPool().run(activeThreads, OnEachExecutor<FunctionTy>(fn));
 }
 
 template<typename FunctionTy, typename TupleTy>

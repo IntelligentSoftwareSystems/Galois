@@ -154,7 +154,7 @@ class DiffractedCollection {
             std::copy(local, local + size, *thread.getLocal());
           break;
         case UpdateType::ReplicateByPackage:
-          if (tid && Galois::Substrate::getSystemThreadPool().isLeader(tid))
+          if (tid && Galois::Substrate::getThreadPool().isLeader(tid))
             std::copy(local, local + size, *package.getLocal());
           break;
         default: abort();
@@ -165,7 +165,7 @@ class DiffractedCollection {
 public:
   DiffractedCollection(size_t n): size(n) {
     num_threads = Galois::getActiveThreads();
-    num_packages = Galois::Substrate::getSystemThreadPool().getCumulativeMaxPackage(num_threads-1) + 1;
+    num_packages = Galois::Substrate::getThreadPool().getCumulativeMaxPackage(num_threads-1) + 1;
 
     if (UT == UpdateType::Staleness)
       old.create(n);
@@ -179,7 +179,7 @@ public:
         });
       case UpdateType::ReplicateByPackage:
         Galois::on_each([n, this](unsigned tid, unsigned total) {
-            if (Galois::Substrate::getSystemThreadPool().isLeader(tid)) {
+            if (Galois::Substrate::getThreadPool().isLeader(tid)) {
             T *p = new T[n];
             *package.getLocal() = p;
             std::fill(p, p + n, 0);

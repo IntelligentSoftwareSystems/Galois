@@ -461,7 +461,7 @@ void for_each_ordered_level (const R& range, const KeyFn& keyFn, const KeyCmp& k
   Exec_ty exec (keyFn, kcmp, nhVisit, opFunc, loopname);
   Barrier& barrier = getSystemBarrier ();
 
-  getSystemThreadPool ().run (Galois::getActiveThreads (),
+  getThreadPool ().run (Galois::getActiveThreads (),
     std::bind (&Exec_ty::template fill_initial<R>, std::ref (exec), range),
     std::ref (barrier),
     std::ref (exec));

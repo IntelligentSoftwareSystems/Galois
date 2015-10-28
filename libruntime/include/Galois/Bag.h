@@ -161,7 +161,7 @@ private:
     if (BlockSize) {
       return newHeaderFromHeap(heap.allocate(BlockSize), BlockSize);
     } else {
-      return newHeaderFromHeap(Galois::Runtime::pageAlloc(), Galois::Runtime::hugePageSize);
+      return newHeaderFromHeap(Galois::Runtime::pagePoolAlloc(), Galois::Runtime::pagePoolSize());
     }
   }
 
@@ -176,7 +176,7 @@ private:
         if (BlockSize)
           heap.deallocate(h2);
         else
-          Galois::Runtime::pageFree(h2);
+          Galois::Runtime::pagePoolFree(h2);
       }
       hpair.second = 0;
     }

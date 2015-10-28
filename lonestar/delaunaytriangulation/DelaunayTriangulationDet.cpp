@@ -569,7 +569,7 @@ static void readInput(const std::string& filename, bool addBoundary) {
 #if 1
   Galois::preAlloc(
       32 * points.size() * sizeof(Element) * 1.5 // mesh is about 2x number of points (for random points)
-      / (Galois::Runtime::hugePageSize) // in pages
+      / (Galois::Runtime::pagePoolSize()) // in pages
       );
 #else
   Galois::preAlloc(1 * numThreads // some per-thread state

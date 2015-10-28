@@ -241,9 +241,9 @@ public:
     // for node based versions
     // Galois::preAlloc (Galois::getActiveThreads () + 8*graph.size ()/Galois::Runtime::MM::hugePageSize);
     // // for edge based versions
-    unsigned p = Galois::getActiveThreads () + 8*graph.sizeEdges () / Galois::Runtime::hugePageSize;
-    std::printf ("going to pre-alloc %u pages, hugePageSize=%d,\n", p, (unsigned)Galois::Runtime::hugePageSize);
-    Galois::preAlloc (Galois::getActiveThreads () + 8*graph.sizeEdges ()/Galois::Runtime::hugePageSize);
+    unsigned p = Galois::getActiveThreads () + 8*graph.sizeEdges () / Galois::Runtime::pagePoolSize();
+    std::printf ("going to pre-alloc %u pages, hugePageSize=%d,\n", p, (unsigned)Galois::Runtime::pagePoolSize());
+    Galois::preAlloc (Galois::getActiveThreads () + 8*graph.sizeEdges ()/Galois::Runtime::pagePoolSize());
     Galois::reportPageAlloc("MeminfoPre");
 
     timer.start ();

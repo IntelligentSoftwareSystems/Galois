@@ -192,7 +192,7 @@ struct LogisticRegression {
   double C;
 
   LogisticRegression(Graph& _g, double _innereps, size_t *_newton_iter) : g(_g), innereps(_innereps), newton_iter(_newton_iter)  {
-    has_other = Galois::Substrate::getSystemThreadPool().getCumulativeMaxPackage(Galois::getActiveThreads() - 1) > 1;
+    has_other = Galois::Substrate::getThreadPool().getCumulativeMaxPackage(Galois::getActiveThreads() - 1) > 1;
 	C = creg;
 	alg_type = AlgoType::DCDLR;
   }
@@ -303,7 +303,7 @@ struct linearSVM_DCD {
   DCD_parameters *params;
 
   linearSVM_DCD(Graph& _g, DCD_parameters *_params, Bag *_next_bag=NULL) : g(_g), diag(_params->diag), C(_params->C), params(_params), next_bag(_next_bag) {
-    has_other = Galois::Substrate::getSystemThreadPool().getCumulativeMaxPackage(Galois::getActiveThreads() - 1) > 1;
+    has_other = Galois::Substrate::getThreadPool().getCumulativeMaxPackage(Galois::getActiveThreads() - 1) > 1;
 
   }
 
@@ -378,7 +378,7 @@ struct linearSGD_Wild {
   double* baseEdgeData;
 #endif
   linearSGD_Wild(Graph& _g, double _lr) : g(_g), learningRate(_lr) {
-    has_other = Galois::Substrate::getSystemThreadPool().getCumulativeMaxPackage(Galois::getActiveThreads() - 1) > 1;
+    has_other = Galois::Substrate::getThreadPool().getCumulativeMaxPackage(Galois::getActiveThreads() - 1) > 1;
 #ifdef DENSE
     baseNodeData = &g.getData(g.getEdgeDst(g.edge_begin(0)));
     edgeOffset = std::distance(&g.getData(NUM_SAMPLES), baseNodeData);
@@ -446,7 +446,7 @@ struct linearSGD {
   double* baseEdgeData;
 #endif
   linearSGD(Graph& _g, double _lr, Galois::GAccumulator<size_t>& b) : g(_g), learningRate(_lr), bigUpdates(b) {
-    has_other = Galois::Substrate::getSystemThreadPool().getCumulativeMaxPackage(Galois::getActiveThreads() - 1) > 1;
+    has_other = Galois::Substrate::getThreadPool().getCumulativeMaxPackage(Galois::getActiveThreads() - 1) > 1;
 #ifdef DENSE
     baseNodeData = &g.getData(g.getEdgeDst(g.edge_begin(0)));
     edgeOffset = std::distance(&g.getData(NUM_SAMPLES), baseNodeData);
@@ -1099,7 +1099,7 @@ void runPrimalSgd(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<
   }
   if (updateType == UpdateType::ReplicateByPackage) {
     Galois::on_each([](unsigned tid, unsigned total) {
-        if (Galois::Substrate::getSystemThreadPool().isLeader(tid)) {
+        if (Galois::Substrate::getThreadPool().isLeader(tid)) {
         double *p = new double[NUM_VARIABLES];
         *package_weights.getLocal() = p;
         std::fill(p, p + NUM_VARIABLES, 0);
@@ -1170,7 +1170,7 @@ void runPrimalSgd(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<
       bool byThread = type == UpdateType::ReplicateByThread || type == UpdateType::Staleness;
       double *localw = byThread ? *thread_weights.getLocal() : *package_weights.getLocal();
       unsigned num_threads = Galois::getActiveThreads();
-      unsigned num_packages = Galois::Substrate::getSystemThreadPool().getCumulativeMaxPackage(num_threads-1) + 1;
+      unsigned num_packages = Galois::Substrate::getThreadPool().getCumulativeMaxPackage(num_threads-1) + 1;
       Galois::do_all(boost::counting_iterator<unsigned>(0), boost::counting_iterator<unsigned>(NUM_VARIABLES), [&](unsigned i) {
         unsigned n = byThread ? num_threads : num_packages;
         for (unsigned j = 1; j < n; j++) {
@@ -1193,7 +1193,7 @@ void runPrimalSgd(Graph& g_train, Graph& g_test, std::mt19937& gen, std::vector<
               std::copy(localw, localw + NUM_VARIABLES, *thread_weights.getLocal());
           break;
           case UpdateType::ReplicateByPackage:
-            if (tid && Galois::Substrate::getSystemThreadPool().isLeader(tid))
+            if (tid && Galois::Substrate::getThreadPool().isLeader(tid))
               std::copy(localw, localw + NUM_VARIABLES, *package_weights.getLocal());
           break;
           default: abort();

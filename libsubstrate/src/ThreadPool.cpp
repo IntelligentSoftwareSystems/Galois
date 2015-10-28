@@ -49,7 +49,7 @@ using namespace Galois::Substrate;
 
 thread_local ThreadPool::per_signal ThreadPool::my_box;
 
-ThreadPool::ThreadPool(): mi(getHWTopo()->getMachineInfo()), starting(mi.maxThreads), masterFastmode(false), signals(mi.maxThreads), running(false) {
+ThreadPool::ThreadPool() :mi(getHWTopo().first), starting(mi.maxThreads), masterFastmode(false), signals(mi.maxThreads), running(false) {
   initThread(0);
 }
 
@@ -107,14 +107,13 @@ static T* getNth(std::atomic<T*>& headptr, unsigned off) {
 
 void ThreadPool::initThread(unsigned tid) {
   signals[tid] = &my_box;
-  auto topo = getHWTopo();
-  my_box.topo = topo->getThreadInfo(tid);
+  my_box.topo = getHWTopo().second[tid];
   // Initialize 
   Substrate::initPTS(mi.maxThreads);
 
   if (!EnvCheck("GALOIS_DO_NOT_BIND_THREADS"))
     if (my_box.topo.tid != 0 || !EnvCheck("GALOIS_DO_NOT_BIND_MAIN_THREAD"))
-      topo->bindThreadToProcessor(my_box.topo.tid);
+      bindThreadSelf(my_box.topo.osContext);
   my_box.done = true;
 }
 
@@ -201,20 +200,17 @@ void ThreadPool::runInternal(unsigned num) {
 }
 
 bool ThreadPool::isLeader(unsigned tid) const {
-  return signals[tid]->topo.packageLeader == tid;
+  return signals[tid]->topo.socketLeader == tid;
 }
 
 unsigned ThreadPool::getPackage(unsigned tid) const {
-  return signals[tid]->topo.package;
+  return signals[tid]->topo.socket;
 }
 
 unsigned ThreadPool::getLeader(unsigned tid) const {
-  return signals[tid]->topo.packageLeader;
+  return signals[tid]->topo.socketLeader;
 }
 
 unsigned ThreadPool::getCumulativeMaxPackage(unsigned tid) const {
-  unsigned m = 0;
-  for (unsigned x = 0; x <= tid; ++x)
-    m = std::max(m, signals[tid]->topo.package);
-  return m;
+  return signals[tid]->topo.cumulativeMaxSocket;
 }

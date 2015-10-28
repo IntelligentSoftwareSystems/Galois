@@ -32,7 +32,7 @@ unsigned int activeThreads = 1;
 }
 
 unsigned int Galois::setActiveThreads(unsigned int num) noexcept {
-  num = std::min(num, Galois::Substrate::getSystemThreadPool().getMaxThreads());
+  num = std::min(num, Galois::Substrate::getThreadPool().getMaxThreads());
   num = std::max(num, 1U);
   Galois::Runtime::activeThreads = num;
   return num;
