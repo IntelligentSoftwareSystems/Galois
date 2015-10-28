@@ -1163,12 +1163,12 @@ void for_each_ordered_optim (const R& range, const Cmp& cmp, const NhFunc& nhFun
   
   Exec e (cmp, nhFunc, execFunc, opFunc, loopname);
 
-  Substrate::getSystemThreadPool().burnPower (Galois::getActiveThreads ());
+  Substrate::getThreadPool().burnPower (Galois::getActiveThreads ());
 
   e.push_initial (range);
   e.execute ();
 
-  Substrate::getSystemThreadPool().beKind();
+  Substrate::getThreadPool().beKind();
 }
 
 template <typename R, typename Cmp, typename NhFunc, typename OpFunc>
