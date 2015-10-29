@@ -81,6 +81,16 @@ namespace {
       }
   };
 
+  struct Write_set_PUSH {
+    string GRAPH_NAME;
+    string NODE_TYPE;
+    string FIELD_TYPE;
+    string FIELD_NAME;
+    string REDUCE_OP_EXPR;
+    string VAL_TYPE;
+    string RESET_VAL_EXPR;
+  };
+
   class FunctionCallHandler : public MatchFinder::MatchCallback {
     private:
       Rewriter &rewriter;
@@ -90,180 +100,118 @@ namespace {
         const CallExpr* callFS = Results.Nodes.getNodeAs<clang::CallExpr>("galoisLoop");
         llvm::outs() << "It is coming here\n" << callFS->getNumArgs() << "\n";
 
-        //llvm::outs() << callFS << "\n";
-                     //<< Results.Nodes.getNodeAs<clang::DeclRefExpr>("galoisLoop")->getQualifier()->getAsNamespace(); //->getIdentifier()->getName() << "\n";
-
-
         if(callFS){
 
-              SourceLocation ST_main = callFS->getSourceRange().getBegin();
+          SourceLocation ST_main = callFS->getSourceRange().getBegin();
 
-              llvm::outs() << "Galois::do_All loop found\n";
-              //callFS->dump();
+          llvm::outs() << "Galois::do_All loop found\n";
 
-              //Get the arguments:
-              clang::LangOptions LangOpts;
-              LangOpts.CPlusPlus = true;
-              clang::PrintingPolicy Policy(LangOpts);
+          //Get the arguments:
+          clang::LangOptions LangOpts;
+          LangOpts.CPlusPlus = true;
+          clang::PrintingPolicy Policy(LangOpts);
 
-              // Vector to store read and write set.
-              vector<pair<string, string>>read_set_vec;
-              vector<pair<string,string>>write_set_vec;
-              vector<string>write_setGNode_vec;
-              unsigned write_setNum = 0;
-              string GraphNode;
+          // Vector to store read and write set.
+          vector<pair<string, string>>read_set_vec;
+          vector<pair<string,string>>write_set_vec;
+          vector<string>write_setGNode_vec;
+          unsigned write_setNum = 0;
+          string GraphNode;
 
-              for(int i = 0, j = callFS->getNumArgs(); i < j; ++i){
-                string str_arg;
-                llvm::raw_string_ostream s(str_arg);
-                callFS->getArg(i)->printPretty(s, 0, Policy);
-                //llvm::outs() << "arg : " << s.str() << "\n\n";
+          vector<Write_set_PUSH> write_set_vec_PUSH;
 
-                const CallExpr* callExpr = dyn_cast<CallExpr>(callFS->getArg(i));
-                if (callExpr) {
-                  const FunctionDecl* func = callExpr->getDirectCallee();
-                  if (func->getNameInfo().getName().getAsString() == "read_set"){
-                    llvm::outs() << "Inside arg read_set: " << i <<  s.str() << "\n\n";
-                    callExpr->dump();
+          string str_first;
+          llvm::raw_string_ostream s_first(str_first);
+          callFS->getArg(0)->printPretty(s_first, 0, Policy);
+          llvm::outs() << " //////// > " << s_first.str() << "\n";
+          callFS->getArg(0)->dump();
 
-                    for(unsigned k = 0; k < callExpr->getNumArgs(); ++k ) {
-                      string str_sub_arg;
-                      llvm::raw_string_ostream s_sub(str_sub_arg);
-                      callExpr->getArg(k)->printPretty(s_sub, 0, Policy);
-                      //llvm::outs() << callExpr->getArg(k)->getType()->dump() << "\n";
-                      llvm::outs() << "Dumping READ set TYPE\n\n";
-                      callExpr->getArg(k)->getType().getNonReferenceType().dump();
-                      /*
-                       * To Find the GraphNode name to be used in Syncer() struct
-                       */
-                      auto ptype = callExpr->getArg(k)->getType().getTypePtrOrNull(); // dyn_cast<PointerType>(callExpr->getArg(k)->getType());
-                      if(ptype->isPointerType()){
-                        //ptype->getPointeeType().dump();
-                        auto templatePtr = dyn_cast<TemplateSpecializationType>(ptype->getPointeeType().getTypePtrOrNull());
-                        if (templatePtr) {
-                          templatePtr->getArg(0).getAsType().dump();
-                          //templatePtr->getArg(0).getAsType().getAsString();
 
-                          //llvm::outs() << "\t\tFINALYY : " << templatePtr->getArg(0).getAsType().getBaseTypeIdentifier()->getName() << "\n";
-                          GraphNode = templatePtr->getArg(0).getAsType().getBaseTypeIdentifier()->getName();
-                          //llvm::outs() << "\t\tFINALYY : " << (dyn_cast<RecordType>(templatePtr->getArg(0).getAsType().getTypePtrOrNull()))->getDecl()->getAsString();
-                          //llvm::outs() << "\t\tFINALYY : " << s_sub.str() << "\n";
-                          //llvm::outs() << "TEMPLATE ARGUEMENTS : " << templatePtr->getNumArgs() << "\n";
-                          //llvm::outs() << "Ptype : " << ptype->isPointerType() << "\n";
-                        }
-                      }
-                      //callExpr->getArg(k)->desugar();
+          for(int i = 0, j = callFS->getNumArgs(); i < j; ++i){
+            string str_arg;
+            llvm::raw_string_ostream s(str_arg);
+            callFS->getArg(i)->printPretty(s, 0, Policy);
 
-                      //const PointerType* pointerTy = dyn_cast<PointerType>(callExpr->getArg(k))
-                      llvm::outs() << "TYPE = > " << callExpr->getArg(k)->getType().getAsString()<<"\n";
+            const CallExpr* callExpr = dyn_cast<CallExpr>(callFS->getArg(i));
+            callExpr->dump();
+            if (callExpr) {
+              const FunctionDecl* func = callExpr->getDirectCallee();
+              if(func) {
+              if (func->getNameInfo().getName().getAsString() == "read_set"){
+                llvm::outs() << "Inside arg read_set: " << i <<  s.str() << "\n\n";
+              }
+              if (func->getNameInfo().getName().getAsString() == "write_set"){
+                llvm::outs() << "Inside arg write_set: " << i <<  s.str() << "\n\n";
 
-                      /*
-                       * Removing Quotes. Find better solution.
-                       */
-                      string temp_str = s_sub.str();
-                      if(temp_str.front() == '"'){
-                        temp_str.erase(0,1);
-                        temp_str.erase(temp_str.size()-1);
-                      }
+                //SYNC_PUSH
+                vector<string> Temp_vec_PUSH;
+                if(callExpr->getNumArgs() == 8) {
+                  for(unsigned i = 0; i < callExpr->getNumArgs(); ++i){
+                    string str_sub_arg;
+                    llvm::raw_string_ostream s_sub(str_sub_arg);
+                    callExpr->getArg(i)->printPretty(s_sub, 0, Policy);
 
-                      string argType = callExpr->getArg(k)->getType().getAsString();
-                      read_set_vec.push_back(make_pair(argType, temp_str));
-                      llvm::outs() << "\t Sub arg : " << s_sub.str() << "\n\n";
-
+                    string temp_str = s_sub.str();
+                    if(temp_str.front() == '"'){
+                      temp_str.erase(0,1);
+                      temp_str.erase(temp_str.size()-1);
                     }
-                  }
-                  else if (func->getNameInfo().getName().getAsString() == "write_set"){
-                    llvm::outs() << "Inside arg write_set: " << i <<  s.str() << "\n\n";
-                    callExpr->dump();
-
-                    for(unsigned k = 0; k < callExpr->getNumArgs(); ++k ) {
-                      string str_sub_arg;
-                      llvm::raw_string_ostream s_sub(str_sub_arg);
-                      callExpr->getArg(k)->printPretty(s_sub, 0, Policy);
-                      llvm::outs() << "Dumping WRITE set TYPE\n\n"; 
-                      callExpr->getArg(k)->getType()->dump();
-                      /*
-                       * To Find the GraphNode name to be used in Syncer() struct
-                       */
-                      auto ptype = callExpr->getArg(k)->getType().getTypePtrOrNull()->getUnqualifiedDesugaredType(); // dyn_cast<PointerType>(callExpr->getArg(k)->getType());
-                      //ptype->dump();
-                      if(ptype->isPointerType() && (k == 0)){
-                        ptype->getPointeeType().getTypePtrOrNull()->getUnqualifiedDesugaredType()->dump();
-                        //auto templatePtr = dyn_cast<TemplateSpecializationType>(ptype->getPointeeType().getTypePtrOrNull()->getUnqualifiedDesugaredType());
-                        auto templatePtr = ptype->getPointeeType().getTypePtrOrNull()->getAs<TemplateSpecializationType>();
-                        if (templatePtr) {
-                          templatePtr->getArg(0).getAsType().dump();
-                          string GraphNodeTy = templatePtr->getArg(0).getAsType().getBaseTypeIdentifier()->getName();
-                          write_setGNode_vec.push_back(GraphNodeTy);
-                        }
-                      }
-                      string argType = callExpr->getArg(k)->getType().getAsString();
-                      /*
-                       * Removing Quotes. Find better solution.
-                       */
-                      string temp_str = s_sub.str();
-                      if(temp_str.front() == '"'){
-                        temp_str.erase(0,1);
-                        temp_str.erase(temp_str.size()-1);
-                      }
-                      if(temp_str.front() == '&'){
-                        temp_str.erase(0,1);
-                      }
-                      write_set_vec.push_back(make_pair(argType,temp_str));
-                      write_setNum++;
-                      llvm::outs() << "\t Sub arg : " << s_sub.str() << "\n\n";
-
+                    if(temp_str.front() == '&'){
+                      temp_str.erase(0,1);
                     }
+
+                    llvm::outs() << " ------- > " << temp_str << "\n";
+                    Temp_vec_PUSH.push_back(temp_str);
+
                   }
+                  Write_set_PUSH WR_entry;
+                  WR_entry.GRAPH_NAME = Temp_vec_PUSH[0];
+                  WR_entry.NODE_TYPE = Temp_vec_PUSH[1];
+                  WR_entry.FIELD_TYPE = Temp_vec_PUSH[2];
+                  WR_entry.FIELD_NAME = Temp_vec_PUSH[3];
+                  WR_entry.VAL_TYPE = Temp_vec_PUSH[4];
+                  WR_entry.REDUCE_OP_EXPR = Temp_vec_PUSH[5];
+                  WR_entry.RESET_VAL_EXPR = Temp_vec_PUSH[6];
+
+                  write_set_vec_PUSH.push_back(WR_entry);
                 }
-                llvm::outs() <<"\n\n";
               }
+            }
+          }
+          }
 
-              // Adding Syncer struct for synchronization.
-              stringstream SSSyncer;
-              for (unsigned i = 0; i < write_setGNode_vec.size(); ++i) {
-                SSSyncer << " struct Syncer_" << i << " {\n"
-                      << "\tstatic " << write_set_vec[4*i+3].first <<" extract( const " << write_setGNode_vec[i] <<"& node)" << "{ return " << "node." << write_set_vec[4*i+1].second <<  "; }\n"
-                      <<"\tstatic void reduce (" << write_setGNode_vec[i] << "& node, " << write_set_vec[4*i+3].first << " y) { node." << write_set_vec[4*i+1].second << " = " << write_set_vec[4*i+2].second << " ( node." << write_set_vec[4*i+1].second << ", y);}\n" 
-                      <<"\tstatic void reset (" << write_setGNode_vec[i] << "& node ) { node." << write_set_vec[4*i+1].second << " = " << write_set_vec[4*i+3].second << "; }\n" 
-                      <<"\ttypedef " << write_set_vec[4*i+3].first << " ValTy;\n"
-                      <<"};\n";
+            stringstream SSSyncer;
+            unsigned counter = 0;
+            for(auto i : write_set_vec_PUSH) {
+              SSSyncer << " struct Syncer_" << counter << " {\n"
+                << "\tstatic " << i.VAL_TYPE <<" extract( const " << i.NODE_TYPE << " node)" << "{ return " << "node." << i.FIELD_NAME <<  "; }\n"
+                <<"\tstatic void reduce (" << i.NODE_TYPE << " node, " << i.VAL_TYPE << " y) "
+                << i.REDUCE_OP_EXPR << "\n"
+                <<"\tstatic void reset (" << i.NODE_TYPE << " node ) { node." << i.FIELD_NAME << " = " << i.RESET_VAL_EXPR << "; }\n" 
+                <<"\ttypedef " << i.VAL_TYPE << " ValTy;\n"
+                <<"};\n";
 
-                rewriter.InsertText(ST_main, SSSyncer.str(), true, true);
-                SSSyncer.str(string());
-                SSSyncer.clear();
-              }
-
-              //Add text before
-              stringstream SSBefore;
-              SSBefore << "/* Galois:: do_all before  */\n";
-              SourceLocation ST = callFS->getSourceRange().getBegin();
-              rewriter.InsertText(ST, SSBefore.str(), true, true);
-
-              // Adding Syn calls for read set
-             /* for (unsigned i = 0; i < read_set_vec.size(); i+=2) {
-                SSBefore.str(string());
-                SSBefore.clear();
-                SSBefore << "Syn(" << read_set_vec[i].second << " , " << read_set_vec[i+1].second << ")\n";
-                rewriter.InsertText(ST, SSBefore.str(), true, true);
-              }*/
-
-              //Add text after
-              stringstream SSAfter;
-              SSAfter << "\n/* Galois:: do_all After */\n";
-              ST = callFS->getSourceRange().getEnd().getLocWithOffset(2);
-              rewriter.InsertText(ST, SSAfter.str(), true, true);
-
-              // Adding Syn calls for write set
-              for (unsigned i = 0; i < write_setGNode_vec.size(); i++) {
-                SSAfter.str(string());
-                SSAfter.clear();
-                SSAfter << write_set_vec[i*4].second << ".sync_push<Syncer_" << i << ">" <<"();\n";
-                rewriter.InsertText(ST, SSAfter.str(), true, true);
-              }
+              rewriter.InsertText(ST_main, SSSyncer.str(), true, true);
+              SSSyncer.str(string());
+              SSSyncer.clear();
+              ++counter;
+            }
+          // Adding Syn calls for write set
+          stringstream SSAfter;
+          SourceLocation ST = callFS->getSourceRange().getEnd().getLocWithOffset(2);
+          for (unsigned i = 0; i < write_set_vec_PUSH.size(); i++) {
+            SSAfter.str(string());
+            SSAfter.clear();
+            //SSAfter <<"\n" <<write_set_vec_PUSH[i].GRAPH_NAME<< ".sync_push<Syncer_" << i << ">" <<"();\n";
+            SSAfter <<"\n" << "_graph.sync_push<Syncer_" << i << ">" <<"();\n";
+            rewriter.InsertText(ST, SSAfter.str(), true, true);
+          }
         }
       }
   };
+
+
+
   class GaloisFunctionsConsumer : public ASTConsumer {
     private:
     CompilerInstance &Instance;
@@ -275,23 +223,11 @@ namespace {
     FunctionCallHandler functionCallHandler;
   public:
     GaloisFunctionsConsumer(CompilerInstance &Instance, std::set<std::string> ParsedTemplates, Rewriter &R): Instance(Instance), ParsedTemplates(ParsedTemplates), Visitor(new GaloisFunctionsVisitor(&Instance)), functionCallHandler(R) {
-      //Matchers.addMatcher(unless(isExpansionInSystemHeader(callExpr(callee(functionDecl(hasName("for_each")))).bind("galoisLoop"))), &namespaceHandler);
-      Matchers.addMatcher(callExpr(callee(functionDecl(hasName("Galois::do_all"))),unless(isExpansionInSystemHeader())).bind("galoisLoop"), &functionCallHandler);
-
-      
-      //Matchers.addMatcher(declRefExpr(to(functionDecl(hasName("do_all"))),unless(isExpansionInSystemHeader())).bind("galoisLoop"), &functionCallHandler);
-      //
-      //Matchers.addMatcher(recordDecl(decl().bind("id"), hasName("::Galois")), &recordHandler);
-      //Matchers.addMatcher(nestedNameSpecifier(specifiesNamespace(hasName("for_each"))).bind("galoisLoop"), &namespaceHandler);
-      //Matchers.addMatcher(forStmt(nestedNameSpecifier(specifiesNamespace(hasName("Galois"))).bind("galoisLoop")), &namespaceHandler);
-      //Matchers.addMatcher(elaboratedType(hasQualifier(hasPrefix(specifiesNamespace(hasName("Galois"))))).bind("galoisLoop"), &namespaceHandler);
-      //Matchers.addMatcher(forStmt( hasLoopInit(declStmt(hasSingleDecl(varDecl(
-                      //hasInitializer(integerLiteral(equals(0)))))))).bind("forLoop"), &forStmtHandler);
+      Matchers.addMatcher(callExpr(isExpansionInMainFile(), callee(functionDecl(hasName("Galois::do_all")))).bind("galoisLoop"), &functionCallHandler);
     }
 
     virtual void HandleTranslationUnit(ASTContext &Context){
       Matchers.matchAST(Context);
-      //Visitor->TraverseDecl(Context.getTranslationUnitDecl());
     }
   };
 
