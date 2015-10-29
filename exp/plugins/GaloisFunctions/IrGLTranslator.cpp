@@ -46,7 +46,7 @@ public:
     bool traverse = RecursiveASTVisitor<IrGLFunctionsVisitor>::TraverseDecl(D);
     if (traverse && D && isa<CXXMethodDecl>(D)) {
       llvm::errs() << "]),\n"; // end ForAll
-      llvm::errs() << "])\n"; // end kernel
+      llvm::errs() << "]),\n"; // end kernel
     }
     return traverse;
   }
@@ -54,7 +54,7 @@ public:
   virtual bool TraverseStmt(Stmt *S) {
     bool traverse = RecursiveASTVisitor<IrGLFunctionsVisitor>::TraverseStmt(S);
     if (traverse && S && isa<CXXForRangeStmt>(S)) {
-      llvm::errs() << "])\n"; // end ForAll
+      llvm::errs() << "]),\n"; // end ForAll
     }
     return traverse;
   }
@@ -83,7 +83,7 @@ public:
       }
     }
     llvm::errs() << "ForAll(\"" << forStmt->getLoopVariable()->getNameAsString() 
-      << "\", G.edges(\"node\"),\n[\n";
+      << "\", G.edges(\"vertex\"),\n[\n";
     return true;
   }
 
@@ -107,10 +107,14 @@ public:
     return true;
   }
 
-  virtual bool VisitCompoundAssignOperator(CompoundAssignOperator *assignOp) {
-    skipStmts.insert(assignOp->getRHS());
-    SourceRange range(assignOp->getLocStart(), assignOp->getLocEnd());
-    llvm::errs() << "CBlock([\"" << rewriter.getRewrittenText(range) << "\"]),\n";
+  virtual bool VisitBinaryOperator(BinaryOperator *binaryOp) {
+    skipStmts.insert(binaryOp->getLHS());
+    skipStmts.insert(binaryOp->getRHS());
+    if (skipStmts.find(binaryOp) == skipStmts.end()) {
+      assert(binaryOp.isAssignmentOp());
+      SourceRange range(binaryOp->getLocStart(), binaryOp->getLocEnd());
+      llvm::errs() << "CBlock([\"" << rewriter.getRewrittenText(range) << "\"]),\n";
+    }
     return true;
   }
 
@@ -119,12 +123,6 @@ public:
       SourceRange range(callExpr->getLocStart(), callExpr->getLocEnd());
       llvm::errs() << "CBlock([\"" << rewriter.getRewrittenText(range) << "\"]),\n";
     }
-    return true;
-  }
-
-  virtual bool VisitBinaryOperator(BinaryOperator *binaryOp) {
-    skipStmts.insert(binaryOp->getLHS());
-    skipStmts.insert(binaryOp->getRHS());
     return true;
   }
 
@@ -138,6 +136,13 @@ public:
   virtual bool VisitMaterializeTemporaryExpr(MaterializeTemporaryExpr *tempExpr) {
     if (skipStmts.find(tempExpr) != skipStmts.end()) {
       skipStmts.insert(tempExpr->GetTemporaryExpr());
+    }
+    return true;
+  }
+
+  virtual bool VisitParenExpr(ParenExpr *parenExpr) {
+    if (skipStmts.find(parenExpr) != skipStmts.end()) {
+      skipStmts.insert(parenExpr->getSubExpr());
     }
     return true;
   }
