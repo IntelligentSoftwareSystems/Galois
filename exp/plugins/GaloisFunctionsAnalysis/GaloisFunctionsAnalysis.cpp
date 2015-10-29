@@ -154,6 +154,8 @@ class GaloisFunctionsVisitor : public RecursiveASTVisitor<GaloisFunctionsVisitor
   struct ReductionOps_entry {
     string NODE_TYPE;
     string FIELD_NAME;
+    string FIELD_TYPE;
+    string VAL_TYPE;
     string OPERATION_EXPR;
     string RESETVAL_EXPR;
     string GRAPH_NAME;
@@ -412,9 +414,9 @@ class FunctionCallHandler : public MatchFinder::MatchCallback {
             for(auto j : i.second){
               stringstream SSAfter;
               if(j.SYNC_TYPE == "sync_push")
-                SSAfter << ", Galois::write_set( \"" << j.NODE_TYPE << "\", \"" << j.FIELD_NAME << "\", \"" << j.OPERATION_EXPR << "\", " << j.RESETVAL_EXPR << ", \"" << j.SYNC_TYPE << "\")";
+                SSAfter << ", Galois::write_set( \"" << j.GRAPH_NAME << "\", \"" << j.NODE_TYPE << "\", \"" << j.FIELD_TYPE << "\" , \"" << j.FIELD_NAME << "\", \"" << j.VAL_TYPE << "\" , \"" << j.OPERATION_EXPR << "\",  \"" << j.RESETVAL_EXPR << "\", \"" << j.SYNC_TYPE << "\")";
               else if(j.SYNC_TYPE == "sync_pull")
-                SSAfter << ", Galois::write_set( \"" << j.NODE_TYPE << "\", \"" << j.FIELD_NAME << "\" , \"" << j.SYNC_TYPE << "\")";
+                SSAfter << ", Galois::write_set( \"" << j.GRAPH_NAME << "\", \""<< j.NODE_TYPE << "\", \"" << j.FIELD_NAME << "\" , \"" << j.SYNC_TYPE << "\")";
 
               SourceLocation ST = callFS->getSourceRange().getEnd().getLocWithOffset(0);
               rewriter.InsertText(ST, SSAfter.str(), true, true);
@@ -618,7 +620,7 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                 field_entry.NODE_TYPE = j.VAR_TYPE;
                 reduceOP_entry.NODE_TYPE = j.VAR_TYPE;
 
-                field_entry.RESET_VALTYPE = Ty;
+                field_entry.VAR_TYPE = field_entry.RESET_VALTYPE = reduceOP_entry.VAL_TYPE = Ty;
 
                 auto memExpr_stmt = Results.Nodes.getNodeAs<clang::Stmt>(str_memExpr);
                 string str_field;
@@ -641,7 +643,6 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                 if(assignplusOP) {
                   //assignplusOP->dump();
                   field_entry.VAR_NAME = "+";
-                  field_entry.VAR_TYPE = "+";
                   field_entry.IS_REFERENCED = true;
                   field_entry.IS_REFERENCE = true;
                   field_entry.RESET_VAL = "0";
@@ -657,7 +658,6 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                 }
                 else if(plusOP) {
                   field_entry.VAR_NAME = "+=";
-                  field_entry.VAR_TYPE = "+=";
                   field_entry.IS_REFERENCED = true;
                   field_entry.IS_REFERENCE = true;
                   field_entry.RESET_VAL = "0";
@@ -676,7 +676,6 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                 else if(assignmentOP) {
 
                   field_entry.VAR_NAME = "DirectAssignment";
-                  field_entry.VAR_TYPE = "DirectAssignment";
                   field_entry.IS_REFERENCED = true;
                   field_entry.IS_REFERENCE = true;
                   field_entry.RESET_VAL = "0";
@@ -704,7 +703,7 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                   // It is min operation.
                   if(varCondRHS == varAssignRHS) {
                     //string reduceOP = "if(node." + field_entry.FIELD_NAME + " > y) { node." + field_entry.FIELD_NAME + " = y;}";
-                    string reduceOP = "{ node." + field_entry.FIELD_NAME + " = std::min(node." + field_entry.FIELD_NAME + ", y);}";
+                    string reduceOP = "{  Galois::min(node." + field_entry.FIELD_NAME + ", y);}";
                     reduceOP_entry.OPERATION_EXPR = reduceOP;
                     string resetVal = "std::numeric_limits<" + field_entry.RESET_VALTYPE + ">::max()";
                     reduceOP_entry.RESETVAL_EXPR = resetVal;
@@ -795,6 +794,8 @@ class FieldUsedInForLoop : public MatchFinder::MatchCallback {
                 reduceOP_entry.GRAPH_NAME = j.GRAPH_NAME ;
                 reduceOP_entry.SYNC_TYPE = "sync_push";
 
+                reduceOP_entry.FIELD_TYPE = j.VAR_TYPE;
+                reduceOP_entry.VAL_TYPE = j.RESET_VALTYPE;
 
 
                 if(assignplusOP) {
@@ -833,7 +834,7 @@ class FieldUsedInForLoop : public MatchFinder::MatchCallback {
                   lhs->dump();
                   // It is min operation.
                   //string reduceOP = "if(node." + j.FIELD_NAME + " > y) { node." + j.FIELD_NAME + " = y;}";
-                  string reduceOP = "{ node." + j.FIELD_NAME + " = std::min(node." + j.FIELD_NAME + ", y);}";
+                  string reduceOP = "{ Galois::min(node." + j.FIELD_NAME + ", y);}";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
                   string resetVal = "std::numeric_limits<" + j.RESET_VALTYPE + ">::max()";
                   reduceOP_entry.RESETVAL_EXPR = resetVal;
@@ -846,7 +847,7 @@ class FieldUsedInForLoop : public MatchFinder::MatchCallback {
                 else if(whileCAS_op){
                   whileCAS_op->dump();
                   auto whileCAS_LHS = Results.Nodes.getNodeAs<clang::Stmt>(str_memExpr);
-                  string reduceOP = "{ node." + j.FIELD_NAME + " = std::min(node." + j.FIELD_NAME + ", y);}";
+                  string reduceOP = "{Galois::min(node." + j.FIELD_NAME + ", y);}";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
                   string resetVal = "std::numeric_limits<" + j.RESET_VALTYPE + ">::max()";
                   reduceOP_entry.RESETVAL_EXPR = resetVal;
@@ -1366,11 +1367,10 @@ class GaloisFunctionsConsumer : public ASTConsumer {
 
     void EndSourceFileAction() override {
       TheRewriter.getEditBuffer(TheRewriter.getSourceMgr().getMainFileID()).write(llvm::outs());
-     /* if (!TheRewriter.overwriteChangedFiles())
+      if (!TheRewriter.overwriteChangedFiles())
       {
         llvm::outs() << "Successfully saved changes\n";
       }
-      */
     }
     std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance &CI, llvm::StringRef) override {
       TheRewriter.setSourceMgr(CI.getSourceManager(), CI.getLangOpts());
