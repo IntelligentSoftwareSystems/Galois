@@ -496,8 +496,10 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
 
                 field_entry.FIELD_NAME = reduceOP_entry.FIELD_NAME = elems[1];
                 field_entry.GRAPH_NAME = reduceOP_entry.GRAPH_NAME = j.GRAPH_NAME;
-                reduceOP_entry.SYNC_TYPE = "sync_pull";
-                info->reductionOps_map[i.first].push_back(reduceOP_entry);
+                if(!field) {
+                  reduceOP_entry.SYNC_TYPE = "sync_pull";
+                  info->reductionOps_map[i.first].push_back(reduceOP_entry);
+                }
 
                 if(assignplusOP) {
                   //assignplusOP->dump();

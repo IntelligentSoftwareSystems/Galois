@@ -30,6 +30,7 @@ namespace Galois {
   template<typename Ty>
     const Ty min(std::atomic<Ty>& a, const Ty& b){
       Ty old_a = a;
+      //std::cout << " b : " << b <<"\n";
       while(a > b){
         a.compare_exchange_strong(old_a, b);
       }
