@@ -414,9 +414,9 @@ class FunctionCallHandler : public MatchFinder::MatchCallback {
             for(auto j : i.second){
               stringstream SSAfter;
               if(j.SYNC_TYPE == "sync_push")
-                SSAfter << ", Galois::write_set( \"" << j.GRAPH_NAME << "\", \"" << j.NODE_TYPE << "\", \"" << j.FIELD_TYPE << "\" , \"" << j.FIELD_NAME << "\", \"" << j.VAL_TYPE << "\" , \"" << j.OPERATION_EXPR << "\",  \"" << j.RESETVAL_EXPR << "\", \"" << j.SYNC_TYPE << "\")";
+                SSAfter << ", Galois::write_set(\"" << j.SYNC_TYPE << "\", \"" << j.GRAPH_NAME << "\", \"" << j.NODE_TYPE << "\", \"" << j.FIELD_TYPE << "\" , \"" << j.FIELD_NAME << "\", \"" << j.VAL_TYPE << "\" , \"" << j.OPERATION_EXPR << "\",  \"" << j.RESETVAL_EXPR << "\")";
               else if(j.SYNC_TYPE == "sync_pull")
-                SSAfter << ", Galois::write_set( \"" << j.GRAPH_NAME << "\", \""<< j.NODE_TYPE << "\", \"" << j.FIELD_NAME << "\" , \"" << j.SYNC_TYPE << "\")";
+                SSAfter << ", Galois::write_set(\"" << j.SYNC_TYPE << "\", \"" << j.GRAPH_NAME << "\", \""<< j.NODE_TYPE << "\", \"" << j.FIELD_TYPE << "\", \"" << j.FIELD_NAME << "\" , \"" << j.VAL_TYPE << "\")";
 
               SourceLocation ST = callFS->getSourceRange().getEnd().getLocWithOffset(0);
               rewriter.InsertText(ST, SSAfter.str(), true, true);
@@ -477,7 +477,7 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
 
                 ReductionOps_entry reduceOP_entry;
                 NodeField_entry field_entry;
-                field_entry.RESET_VALTYPE = Ty;
+                field_entry.RESET_VALTYPE = reduceOP_entry.VAL_TYPE = Ty;
                 field_entry.NODE_TYPE = j.VAR_TYPE;
                 reduceOP_entry.NODE_TYPE = j.VAR_TYPE;
 
