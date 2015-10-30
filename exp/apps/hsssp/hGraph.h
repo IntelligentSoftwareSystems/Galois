@@ -48,6 +48,8 @@ class hGraph : public GlobalObject {
   //pointer for each host
   std::vector<uintptr_t> hostPtrs;
 
+  uint32_t num_recv_expected; // Number of receives expected for local completion.
+
   //host -> (lid, lid]
   std::pair<uint32_t, uint32_t> nodes_by_host(uint32_t host) const {
     return hostNodes[host];
@@ -112,13 +114,12 @@ public:
     void (hGraph::*fn)(Galois::Runtime::RecvBuffer&);
     Galois::Runtime::gDeserialize(buf, oid, fn);
     hGraph* obj = reinterpret_cast<hGraph*>(ptrForObj(oid));
+    --(obj->num_recv_expected);
     (obj->*fn)(buf);
   }
 
   template<typename FnTy>
   void syncRecvApply(Galois::Runtime::RecvBuffer& buf) {
-
-    //hGraph* obj = reinterpret_cast<hGraph*>(ptrForObj(0));
     uint32_t num;
     Galois::Runtime::gDeserialize(buf, num);
     for(; num ; --num) {
@@ -126,15 +127,47 @@ public:
       typename FnTy::ValTy val;
       Galois::Runtime::gDeserialize(buf, gid, val);
       assert(isOwned(gid));
-      //if (Galois::Runtime::NetworkInterface::ID == 1){
-        //std::cout << "before syncRecvApply on : " << getData(gid - globalOffset).dist_current << "\n";
-      //}
-    //  std::cout << Galois::Runtime::NetworkInterface::ID << " " << " recv (" << gid << ") " << gid-globalOffset << " " << val << "\n";
       FnTy::reduce(getData(gid - globalOffset), val);
+    }
+  }
 
-      //if (Galois::Runtime::NetworkInterface::ID == 1){
-        //std::cout << "After syncRecvApply on : " << getData(gid - globalOffset).dist_current << "\n";
+  template<typename FnTy>
+  void syncPullRecvReply(Galois::Runtime::RecvBuffer& buf) {
+    void (hGraph::*fn)(Galois::Runtime::RecvBuffer&) = &hGraph::syncPullRecvApply<FnTy>;
+    auto& net = Galois::Runtime::getSystemNetworkInterface();
+    uint32_t num;
+    unsigned from_id;
+    Galois::Runtime::gDeserialize(buf, from_id, num);
+    Galois::Runtime::SendBuffer b;
+    gSerialize(b, idForSelf(), fn, num);
+    for(; num; --num){
+      uint64_t gid;
+      typename FnTy::ValTy old_val, val;
+      Galois::Runtime::gDeserialize(buf, gid, old_val);
+      assert(isOwned(gid));
+      val = FnTy::extract(getData((gid - globalOffset)));
+      //std::cout << "PullApply step1 : [" << net.ID << "] "<< " to : " << from_id << " : [" << gid << "] : " << val << "\n";
+      //For now just send all.
+      //if(val != old_val){
+      Galois::Runtime::gSerialize(b, gid, val);
       //}
+    }
+    net.send(from_id, syncRecv, b);
+  }
+
+  template<typename FnTy>
+  void syncPullRecvApply(Galois::Runtime::RecvBuffer& buf) {
+    uint32_t num;
+    Galois::Runtime::gDeserialize(buf, num);
+    auto& net = Galois::Runtime::getSystemNetworkInterface();
+    for(; num; --num) {
+      uint64_t gid;
+      typename FnTy::ValTy val;
+      Galois::Runtime::gDeserialize(buf, gid, val);
+      //assert(isGhost(gid));
+      auto LocalId = G2L(gid);
+      //std::cout << "PullApply Step2 : [" << net.ID << "]  : [" << LocalId << "] : " << val << "\n";
+      FnTy::setVal(getData(LocalId), val);
     }
   }
 
@@ -254,6 +287,7 @@ public:
   void sync_push() {
     void (hGraph::*fn)(Galois::Runtime::RecvBuffer&) = &hGraph::syncRecvApply<FnTy>;
     auto& net = Galois::Runtime::getSystemNetworkInterface();
+    num_recv_expected = 0;
     for (unsigned x = 0; x < hostNodes.size(); ++x) {
       if (x == id) continue;
       uint32_t start, end;
@@ -264,13 +298,43 @@ public:
       gSerialize(b, idForSelf(), fn, (uint32_t)(end-start));
       for (; start != end; ++start) {
         auto gid = L2G(start);
-//        std::cout << net.ID << " send (" << gid << ") " << start << " " << FnTy::extract(getData(start)) << "\n";
+        //std::cout << net.ID << " send (" << gid << ") " << start << " " << FnTy::extract(getData(start)) << "\n";
         gSerialize(b, gid, FnTy::extract(getData(start)));
         FnTy::reset(getData(start));
       }
+      ++num_recv_expected;
       net.send(x, syncRecv, b);
     }
     //Will force all messages to be processed before continuing
+    Galois::Runtime::getHostBarrier().wait();
+  }
+
+  template<typename FnTy>
+  void sync_pull(){
+    void (hGraph::*fn)(Galois::Runtime::RecvBuffer&) = &hGraph::syncPullRecvReply<FnTy>;
+    auto& net = Galois::Runtime::getSystemNetworkInterface();
+    num_recv_expected = 0;
+    for(unsigned x = 0; x < hostNodes.size(); ++x){
+      if(x == id) continue;
+      uint32_t start, end;
+      std::tie(start, end) = nodes_by_host(x);
+      //std::cout << "end - start" << (end - start) << "\n";
+      if(start == end) continue;
+      Galois::Runtime::SendBuffer b;
+      gSerialize(b, idForSelf(), fn, net.ID, (uint32_t)(end-start));
+      for (; start != end; ++start) {
+        auto gid = L2G(start);
+        //std::cout << net.ID << " PULL send (" << gid << ") " << start << " " << FnTy::extract(getData(start)) << "\n";
+        gSerialize(b, gid, FnTy::extract(getData(start)));
+      }
+      ++num_recv_expected;
+      net.send(x, syncRecv, b);
+    }
+
+    while(num_recv_expected) {
+      net.handleReceives();
+    }
+    //Galois::Runtime::getHostBarrier().wait();
     Galois::Runtime::getHostBarrier().wait();
   }
 
