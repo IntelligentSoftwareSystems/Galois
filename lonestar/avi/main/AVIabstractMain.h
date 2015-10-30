@@ -47,10 +47,13 @@
 
 
 #include "Galois/Accumulator.h"
+#include "Galois/Atomic.h"
 #include "Galois/Galois.h"
-#include "Galois/Graph/Graph.h"
+#include "Galois/Graphs/Graph.h"
+#include "Galois/Graphs/LCGraph.h"
 #include "Galois/Statistic.h"
 #include "Galois/Runtime/Sampling.h"
+#include "Galois/Substrate/PerThreadStorage.h"
 #include "llvm/Support/CommandLine.h"
 
 #include "Lonestar/BoilerPlate.h"
@@ -99,10 +102,13 @@ private:
 
 
 protected:
-  static const int DEFAULT_CHUNK_SIZE = 32;
-  typedef Galois::WorkList::dChunkedFIFO<DEFAULT_CHUNK_SIZE> AVIWorkList;
+  using PerThrdLocalVec = Galois::Substrate::PerThreadStorage<LocalVec>;
+  using AtomicInteger =  Galois::GAtomic<int>;
+  using IterCounter = Galois::GAccumulator<size_t>;
 
-  typedef Galois::GAccumulator<size_t> IterCounter;
+  static const int DEFAULT_CHUNK_SIZE = 16;
+  using AVIWorkList =  Galois::WorkList::dChunkedFIFO<DEFAULT_CHUNK_SIZE>;
+
 
   std::string wltype;
 

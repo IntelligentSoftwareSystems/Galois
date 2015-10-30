@@ -25,14 +25,6 @@
 #define AVI_UNORDERED_NO_LOCK_H_
 
 
-#include "Galois/Graph/Graph.h"
-#include "Galois/Graph/FileGraph.h"
-
-#include "Galois/Galois.h"
-#include "Galois/Atomic.h"
-
-#include "Galois/Runtime/PerThreadStorage.h"
-
 #include <string>
 #include <sstream>
 #include <limits>
@@ -54,7 +46,6 @@
  * and no abstract locks
  */
 class AVIodgExplicitNoLock: public AVIodgExplicit {
-  typedef Galois::GAtomicPadded<int> AtomicInteger;
 
 protected:
 
@@ -73,7 +64,7 @@ protected:
     std::vector<AtomicInteger>& inDegVec;
     MeshInit& meshInit;
     GlobalVec& g;
-    Galois::Runtime::PerThreadStorage<LocalVec>& perIterLocalVec;
+    PerThrdLocalVec& perIterLocalVec;
     bool createSyncFiles;
     IterCounter& iter;
 
@@ -82,7 +73,7 @@ protected:
         std::vector<AtomicInteger>& inDegVec,
         MeshInit& meshInit,
         GlobalVec& g,
-        Galois::Runtime::PerThreadStorage<LocalVec>& perIterLocalVec,
+        PerThrdLocalVec& perIterLocalVec,
         bool createSyncFiles,
         IterCounter& iter):
 
@@ -233,7 +224,7 @@ public:
     size_t nrows = meshInit.getSpatialDim ();
     size_t ncols = meshInit.getNodesPerElem();
 
-    Galois::Runtime::PerThreadStorage<LocalVec> perIterLocalVec;
+    PerThrdLocalVec perIterLocalVec;
     for (unsigned int i = 0; i < perIterLocalVec.size(); ++i)
       *perIterLocalVec.getRemote(i) = LocalVec(nrows, ncols);
 

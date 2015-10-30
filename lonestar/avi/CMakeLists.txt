@@ -27,14 +27,8 @@ if(ZLIB_FOUND AND NOT ARCH STREQUAL "mic")
   add_definitions(-DGALOIS_HAS_ZLIB)
 endif()
 
-# TODO(ddn): CMake Boost module on BG/Q cannot be called multiple times. Skip
-# avi althogether for now.
-if(CMAKE_SYSTEM_NAME MATCHES "BlueGeneQ")
-  set(Boost_FOUND off)
-else()
-  # Needs a slightly higher version than other Galois apps
-  find_package(Boost 1.50.0 COMPONENTS system iostreams filesystem)
-endif()
+find_package(Boost 1.50.0 COMPONENTS system iostreams filesystem)
+
 
 if(CMAKE_Fortran_COMPILER_WORKS AND LAPACK_FOUND AND Boost_FOUND)
   include_directories(${ZLIB_INCLUDE_DIRS})
@@ -45,53 +39,56 @@ if(CMAKE_Fortran_COMPILER_WORKS AND LAPACK_FOUND AND Boost_FOUND)
     target_link_libraries(AVI ${Boost_LIBRARIES})
   endif()
 
+  target_link_libraries(AVI galois_runtime)
+  target_link_libraries(AVI galois_substrate)
+
   set(AVI_FOUND TRUE)
 endif()
 
 if (AVI_FOUND)
-app(AVIorderedSerial main/AVIorderedSerial.cpp
-  REQUIRES AVI_FOUND
-  EXTLIBS AVI ${LAPACK_LIBRARIES})
-
-app(AVIodgExplicit main/AVIodgExplicit.cpp
-  REQUIRES AVI_FOUND
-  EXTLIBS AVI ${LAPACK_LIBRARIES})
-
-app(AVIodgExplicitNoLock main/AVIodgExplicitNoLock.cpp
-  REQUIRES AVI_FOUND
-  EXTLIBS AVI ${LAPACK_LIBRARIES})
-
-# the files may be removed from the release without causing error in cmake
-if(USE_EXP)
-  app(AVIodgOrdered main/AVIodgOrdered.cpp 
-    REQUIRES AVI_FOUND 
+  app(AVIorderedSerial main/AVIorderedSerial.cpp
+    REQUIRES AVI_FOUND EXP_OPT
     EXTLIBS AVI ${LAPACK_LIBRARIES})
 
-  app(AVIorderedSpec exp/AVIorderedSpec.cpp 
-    REQUIRES AVI_FOUND 
+  app(AVIodgExplicit main/AVIodgExplicit.cpp
+    REQUIRES AVI_FOUND EXP_OPT
     EXTLIBS AVI ${LAPACK_LIBRARIES})
 
-  app(AVIlevelExec exp/AVIlevelExec.cpp 
-    REQUIRES AVI_FOUND 
+  app(AVIodgExplicitNoLock main/AVIodgExplicitNoLock.cpp
+    REQUIRES AVI_FOUND EXP_OPT
     EXTLIBS AVI ${LAPACK_LIBRARIES})
-endif()
 
-include_directories(util)
-include_directories(main)
-include_directories(libElm)
-include_directories(libElm/libQuad)
-include_directories(libElm/libGeom)
-include_directories(libElm/libShapesEvaluated)
-include_directories(libElm/libShape)
-include_directories(libElm/libElement)
-include_directories(libAVI)
-include_directories(libMeshInit)
-include_directories(libMeshInit/dgmechanics)
-include_directories(libMeshInit/femap)
-include_directories(libMat)
-include_directories(libElOp)
+  # the files may be removed from the release without causing error in cmake
+  if(USE_EXP)
+    app(AVIodgOrdered main/AVIodgOrdered.cpp 
+      REQUIRES AVI_FOUND EXP_OPT
+      EXTLIBS AVI ${LAPACK_LIBRARIES})
 
-add_test_scale(web   AVIodgExplicitNoLock -d 2 -n 1 -e 0.1 -f "${BASEINPUT}/avi/10x10_42k.NEU.gz")
-add_test_scale(small AVIodgExplicitNoLock -d 2 -n 0 -f "${BASEINPUT}/avi/squareCoarse.NEU.gz")
+    app(AVIorderedSpec exp/AVIorderedSpec.cpp 
+      REQUIRES AVI_FOUND EXP_OPT
+      EXTLIBS AVI ${LAPACK_LIBRARIES})
+
+    app(AVIlevelExec exp/AVIlevelExec.cpp 
+      REQUIRES AVI_FOUND EXP_OPT
+      EXTLIBS AVI ${LAPACK_LIBRARIES})
+  endif()
+
+  include_directories(util)
+  include_directories(main)
+  include_directories(libElm)
+  include_directories(libElm/libQuad)
+  include_directories(libElm/libGeom)
+  include_directories(libElm/libShapesEvaluated)
+  include_directories(libElm/libShape)
+  include_directories(libElm/libElement)
+  include_directories(libAVI)
+  include_directories(libMeshInit)
+  include_directories(libMeshInit/dgmechanics)
+  include_directories(libMeshInit/femap)
+  include_directories(libMat)
+  include_directories(libElOp)
+
+  add_test_scale(web   AVIodgExplicitNoLock -d 2 -n 1 -e 0.1 -f "${BASEINPUT}/avi/10x10_42k.NEU.gz")
+  add_test_scale(small AVIodgExplicitNoLock -d 2 -n 0 -f "${BASEINPUT}/avi/squareCoarse.NEU.gz")
 
 endif()

@@ -38,14 +38,20 @@
 namespace Galois {
 namespace Runtime {
 
+namespace cll = llvm::cl;
+
+static cll::opt<double> commitRatioArg("cratio", cll::desc("target commit ratio for two phase executor, 0.0 to disable windowing"), cll::init(0.80));
+
+// TODO: figure out when to call startIteration
+
 template <typename T, typename Cmp>
-class TwoPhaseContext: public SimpleRuntimeContext {
+class TwoPhaseContext: public OrderedContextBase<T> {
 
-  using Base = SimpleRuntimeContext;
+  using Base = OrderedContextBase<T>;
   // using NhoodList =  Galois::gdeque<Lockable*, 4>;
+  using CtxtCmp = ContextComparator<TwoPhaseContext, Cmp>;
 
-  T active;
-  const Cmp& cmp;
+  CtxtCmp ctxtCmp;
   bool source = true;
 
 public:
@@ -54,12 +60,10 @@ public:
 
   explicit TwoPhaseContext (const T& x, const Cmp& cmp)
     : 
-      Base (true),  // pass true so that Base::acquire invokes virtual subAcquire
-      active (x), 
-      cmp (cmp),
+      Base (x),  // pass true so that Base::acquire invokes virtual subAcquire
+      ctxtCmp (cmp),
       source (true) 
-  {
-  }
+  {}
 
   bool isSrc (void) const {
     return source;
@@ -72,10 +76,6 @@ public:
   void reset () { 
     source = true;
   }
-
-  const T& getElem () const { return active; }
-
-  T& getElem () { return active; }
 
   virtual void subAcquire (Lockable* l, Galois::MethodFlag) {
 
@@ -94,7 +94,7 @@ public:
       }
 
       if (other) {
-        bool conflict = PtrComparator::compare (other, this); // *other < *this
+        bool conflict = ctxtCmp (other, this); // *other < *this
         if (conflict) {
           // A lock that I want but can't get
           this->source = false;
@@ -141,20 +141,6 @@ public:
   } // end subAcquire
 
 
-  struct PtrComparator {
-
-    static inline bool compare (const TwoPhaseContext* left, const TwoPhaseContext* right) {
-      assert (left != nullptr);
-      assert (right != nullptr);
-      assert (&left->cmp == &right->cmp);
-
-      return left->cmp (left->active, right->active);
-    }
-
-    inline bool operator () (const TwoPhaseContext* left, const TwoPhaseContext* right) const {
-      return compare (left, right);
-    }
-  };
 
 };
 
@@ -166,7 +152,7 @@ class SafetyTestLoop {
   struct GetActive: public std::unary_function<Ctxt, const T&> {
     const T& operator () (const Ctxt* c) const {
       assert (c != nullptr);
-      return c->getElem ();
+      return c->getActive ();
     }
   };
 
@@ -205,7 +191,7 @@ public:
           auto et = boost::make_transform_iterator (end_lesser, GetActive ());
 
 
-          if (!safetyTest (c->getElem (), bt, et)) {
+          if (!safetyTest (c->getActive (), bt, et)) {
             c->disableSrc ();
           }
         },
@@ -236,7 +222,7 @@ void runCatching (F& func, Ctxt* c, UserCtxt& uhand) {
 #else
     try {
 #endif
-      func (c->getElem (), uhand);
+      func (c->getActive (), uhand);
 
 #ifdef GALOIS_USE_LONGJMP
     } else {
@@ -262,6 +248,10 @@ void runCatching (F& func, Ctxt* c, UserCtxt& uhand) {
 
   Galois::Runtime::setThreadContext (NULL);
 }
+
+
+// TODO: a common base class for IKDG executor
+// template <typename T, typename Ctxt,  
 
 
 } // end namespace Runtime

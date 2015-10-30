@@ -206,6 +206,10 @@ void* FileGraph::fromArrays(
   if (num_edges % 2)
     fptr32 += 1;
 
+  char* fptr0 = (char*) fptr32;
+  if (edge_data)
+    memcpy(fptr0, edge_data, sizeof_edge_data * num_edges);
+
   fromMem(base, node_offset, edge_offset);
   return edgeData;
 }
