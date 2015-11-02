@@ -16,3 +16,10 @@ app(graphCheck check.cpp GlobalObj.cpp DISTSAFE)
 #app(graphCheck_gen check_gen.cpp GlobalObj.cpp DISTSAFE)
 
 #app(HSSSP_gen HSSSP_gen.cpp GlobalObj.cpp DISTSAFE)
+#app(HSSSP_gen2 HSSSP_gen2.cpp GlobalObj.cpp DISTSAFE)
+
+#Working HSSSP
+app(HSSSP_gen3 HSSSP_gen3.cpp GlobalObj.cpp DISTSAFE)
+
+#pageRank
+app(PageRank pageRank_gen.cpp GlobalObj.cpp DISTSAFE)

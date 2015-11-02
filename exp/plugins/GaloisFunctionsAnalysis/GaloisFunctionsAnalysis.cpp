@@ -154,6 +154,8 @@ class GaloisFunctionsVisitor : public RecursiveASTVisitor<GaloisFunctionsVisitor
   struct ReductionOps_entry {
     string NODE_TYPE;
     string FIELD_NAME;
+    string FIELD_TYPE;
+    string VAL_TYPE;
     string OPERATION_EXPR;
     string RESETVAL_EXPR;
     string GRAPH_NAME;
@@ -412,9 +414,9 @@ class FunctionCallHandler : public MatchFinder::MatchCallback {
             for(auto j : i.second){
               stringstream SSAfter;
               if(j.SYNC_TYPE == "sync_push")
-                SSAfter << ", Galois::write_set( \"" << j.NODE_TYPE << "\", \"" << j.FIELD_NAME << "\", \"" << j.OPERATION_EXPR << "\", " << j.RESETVAL_EXPR << ", \"" << j.SYNC_TYPE << "\")";
+                SSAfter << ", Galois::write_set(\"" << j.SYNC_TYPE << "\", \"" << j.GRAPH_NAME << "\", \"" << j.NODE_TYPE << "\", \"" << j.FIELD_TYPE << "\" , \"" << j.FIELD_NAME << "\", \"" << j.VAL_TYPE << "\" , \"" << j.OPERATION_EXPR << "\",  \"" << j.RESETVAL_EXPR << "\")";
               else if(j.SYNC_TYPE == "sync_pull")
-                SSAfter << ", Galois::write_set( \"" << j.NODE_TYPE << "\", \"" << j.FIELD_NAME << "\" , \"" << j.SYNC_TYPE << "\")";
+                SSAfter << ", Galois::write_set(\"" << j.SYNC_TYPE << "\", \"" << j.GRAPH_NAME << "\", \""<< j.NODE_TYPE << "\", \"" << j.FIELD_TYPE << "\", \"" << j.FIELD_NAME << "\" , \"" << j.VAL_TYPE << "\")";
 
               SourceLocation ST = callFS->getSourceRange().getEnd().getLocWithOffset(0);
               rewriter.InsertText(ST, SSAfter.str(), true, true);
@@ -445,6 +447,7 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
             string str_plusOp = "plusEqualOp_" + j.VAR_NAME+ "_" + i.first;
             string str_assign_plus = "assignplusOp_" + j.VAR_NAME+ "_" + i.first;
             string str_varDecl = "varDecl_" + j.VAR_NAME+ "_" + i.first;
+            string str_atomicAdd = "atomicAdd_" + j.VAR_NAME + "_" + i.first;
 
 
             if(j.IS_REFERENCED && j.IS_REFERENCE){
@@ -452,6 +455,7 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
               auto assignmentOP = Results.Nodes.getNodeAs<clang::Stmt>(str_assignment);
               auto plusOP = Results.Nodes.getNodeAs<clang::Stmt>(str_plusOp);
               auto assignplusOP = Results.Nodes.getNodeAs<clang::Stmt>(str_assign_plus);
+              auto atomicAdd_op = Results.Nodes.getNodeAs<clang::Stmt>(str_atomicAdd);
 
 
               /**Figure out variable type to set the reset value **/
@@ -475,9 +479,10 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
 
                 ReductionOps_entry reduceOP_entry;
                 NodeField_entry field_entry;
-                field_entry.RESET_VALTYPE = Ty;
+                field_entry.RESET_VALTYPE = reduceOP_entry.VAL_TYPE = Ty;
                 field_entry.NODE_TYPE = j.VAR_TYPE;
                 reduceOP_entry.NODE_TYPE = j.VAR_TYPE;
+                reduceOP_entry.FIELD_TYPE = j.VAR_TYPE;
 
                 auto memExpr_stmt = Results.Nodes.getNodeAs<clang::Stmt>(str_memExpr);
                 string str_field;
@@ -494,8 +499,10 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
 
                 field_entry.FIELD_NAME = reduceOP_entry.FIELD_NAME = elems[1];
                 field_entry.GRAPH_NAME = reduceOP_entry.GRAPH_NAME = j.GRAPH_NAME;
-                reduceOP_entry.SYNC_TYPE = "sync_pull";
-                info->reductionOps_map[i.first].push_back(reduceOP_entry);
+                if(!field && (assignplusOP || plusOP || assignmentOP || atomicAdd_op)) {
+                  reduceOP_entry.SYNC_TYPE = "sync_pull";
+                  info->reductionOps_map[i.first].push_back(reduceOP_entry);
+                }
 
                 if(assignplusOP) {
                   //assignplusOP->dump();
@@ -506,7 +513,7 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
                   field_entry.GRAPH_NAME = j.GRAPH_NAME;
                   field_entry.RESET_VAL = "0";
 
-                  info->fieldData_map[i.first].push_back(field_entry);
+                  //info->fieldData_map[i.first].push_back(field_entry);
                   break;
                 }
                 else if(plusOP) {
@@ -517,7 +524,7 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
                   field_entry.GRAPH_NAME = j.GRAPH_NAME;
                   field_entry.RESET_VAL = "0";
 
-                  info->fieldData_map[i.first].push_back(field_entry);
+                  //info->fieldData_map[i.first].push_back(field_entry);
                   break;
 
                 }
@@ -531,8 +538,21 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
                   field_entry.GRAPH_NAME = j.GRAPH_NAME;
                   field_entry.RESET_VAL = "0";
 
-                  info->fieldData_map[i.first].push_back(field_entry);
+                  //info->fieldData_map[i.first].push_back(field_entry);
                   break;
+                }
+                else if(atomicAdd_op){
+                  atomicAdd_op->dump();
+                  field_entry.VAR_NAME = "AtomicAdd";
+                  field_entry.VAR_TYPE = "AtomicAdd";
+                  field_entry.IS_REFERENCED = true;
+                  field_entry.IS_REFERENCE = true;
+                  field_entry.GRAPH_NAME = j.GRAPH_NAME;
+                  field_entry.RESET_VAL = "0";
+
+                  //info->fieldData_map[i.first].push_back(field_entry);
+                  break;
+
                 }
                 else if(field){
 
@@ -584,6 +604,7 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
             string str_whileCAS = "whileCAS_" + j.VAR_NAME + "_" + i.first;
             string str_whileCAS_RHS = "whileCAS_RHS" + j.VAR_NAME + "_" + i.first;
 
+            string str_atomicAdd = "atomicAdd_" + j.VAR_NAME + "_" + i.first;
 
             if(j.IS_REFERENCED && j.IS_REFERENCE){
               auto field = Results.Nodes.getNodeAs<clang::VarDecl>(str_varDecl);
@@ -593,6 +614,8 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
 
               auto ifMinOp = Results.Nodes.getNodeAs<clang::Stmt>(str_ifMin);
               auto whileCAS_op = Results.Nodes.getNodeAs<clang::Stmt>(str_whileCAS);
+
+              auto atomicAdd_op = Results.Nodes.getNodeAs<clang::Stmt>(str_atomicAdd);
 
               /**Figure out variable type to set the reset value **/
               auto memExpr = Results.Nodes.getNodeAs<clang::MemberExpr>(str_memExpr);
@@ -617,8 +640,9 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                 ReductionOps_entry reduceOP_entry;
                 field_entry.NODE_TYPE = j.VAR_TYPE;
                 reduceOP_entry.NODE_TYPE = j.VAR_TYPE;
+                reduceOP_entry.FIELD_TYPE = j.VAR_TYPE;
 
-                field_entry.RESET_VALTYPE = Ty;
+                field_entry.VAR_TYPE = field_entry.RESET_VALTYPE = reduceOP_entry.VAL_TYPE = Ty;
 
                 auto memExpr_stmt = Results.Nodes.getNodeAs<clang::Stmt>(str_memExpr);
                 string str_field;
@@ -641,7 +665,6 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                 if(assignplusOP) {
                   //assignplusOP->dump();
                   field_entry.VAR_NAME = "+";
-                  field_entry.VAR_TYPE = "+";
                   field_entry.IS_REFERENCED = true;
                   field_entry.IS_REFERENCE = true;
                   field_entry.RESET_VAL = "0";
@@ -652,12 +675,11 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                   reduceOP_entry.RESETVAL_EXPR = resetVal;
 
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
-                  info->fieldData_map[i.first].push_back(field_entry);
+                  //info->fieldData_map[i.first].push_back(field_entry);
                   break;
                 }
                 else if(plusOP) {
                   field_entry.VAR_NAME = "+=";
-                  field_entry.VAR_TYPE = "+=";
                   field_entry.IS_REFERENCED = true;
                   field_entry.IS_REFERENCE = true;
                   field_entry.RESET_VAL = "0";
@@ -668,7 +690,7 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                   reduceOP_entry.RESETVAL_EXPR = resetVal;
 
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
-                  info->fieldData_map[i.first].push_back(field_entry);
+                  //info->fieldData_map[i.first].push_back(field_entry);
                   break;
 
                 }
@@ -676,7 +698,6 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                 else if(assignmentOP) {
 
                   field_entry.VAR_NAME = "DirectAssignment";
-                  field_entry.VAR_TYPE = "DirectAssignment";
                   field_entry.IS_REFERENCED = true;
                   field_entry.IS_REFERENCE = true;
                   field_entry.RESET_VAL = "0";
@@ -688,7 +709,7 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                   reduceOP_entry.RESETVAL_EXPR = resetVal;
 
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
-                  info->fieldData_map[i.first].push_back(field_entry);
+                  //info->fieldData_map[i.first].push_back(field_entry);
                   break;
                 }
                 else if(ifMinOp){
@@ -704,7 +725,7 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                   // It is min operation.
                   if(varCondRHS == varAssignRHS) {
                     //string reduceOP = "if(node." + field_entry.FIELD_NAME + " > y) { node." + field_entry.FIELD_NAME + " = y;}";
-                    string reduceOP = "{ node." + field_entry.FIELD_NAME + " = std::min(node." + field_entry.FIELD_NAME + ", y);}";
+                    string reduceOP = "{  Galois::min(node." + field_entry.FIELD_NAME + ", y);}";
                     reduceOP_entry.OPERATION_EXPR = reduceOP;
                     string resetVal = "std::numeric_limits<" + field_entry.RESET_VALTYPE + ">::max()";
                     reduceOP_entry.RESETVAL_EXPR = resetVal;
@@ -715,15 +736,28 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                   break;
 
                 }
-
                 else if(whileCAS_op){
-                  //whileCAS_op->dump();
                   auto whileCAS_LHS = Results.Nodes.getNodeAs<clang::Stmt>(str_memExpr);
+                  //whileCAS_LHS->dump();
+                  string reduceOP = "{Galois::min(node." + field_entry.FIELD_NAME + ", y);}";
+                  reduceOP_entry.OPERATION_EXPR = reduceOP;
+                  string resetVal = "std::numeric_limits<" + field_entry.RESET_VALTYPE + ">::max()";
+                  reduceOP_entry.RESETVAL_EXPR = resetVal;
 
+                  info->reductionOps_map[i.first].push_back(reduceOP_entry);
                   //whileCAS_LHS->dump();
                   break;
                 }
 
+                else if(atomicAdd_op){
+                  string reduceOP = "{ Galois::atomicAdd(node." + field_entry.FIELD_NAME + ", y);}";
+                  reduceOP_entry.OPERATION_EXPR = reduceOP;
+                  string resetVal = "0";
+                  reduceOP_entry.RESETVAL_EXPR = resetVal;
+
+                  info->reductionOps_map[i.first].push_back(reduceOP_entry);
+                  break;
+                }
                 else if(field){
 
                   field_entry.VAR_NAME = field->getNameAsString();
@@ -774,6 +808,8 @@ class FieldUsedInForLoop : public MatchFinder::MatchCallback {
             string str_whileCAS = "whileCAS_" + j.VAR_NAME + "_" + i.first;
             string str_whileCAS_RHS = "whileCAS_RHS" + j.VAR_NAME + "_" + i.first;
 
+            string str_atomicAdd = "atomicAdd_" + j.VAR_NAME + "_" + i.first;
+
 
             if(j.IS_REFERENCED && j.IS_REFERENCE){
               auto field = Results.Nodes.getNodeAs<clang::VarDecl>(str_varDecl);
@@ -783,6 +819,7 @@ class FieldUsedInForLoop : public MatchFinder::MatchCallback {
 
               auto ifMinOp = Results.Nodes.getNodeAs<clang::Stmt>(str_ifMin);
               auto whileCAS_op = Results.Nodes.getNodeAs<clang::Stmt>(str_whileCAS);
+              auto atomicAdd_op = Results.Nodes.getNodeAs<clang::Stmt>(str_atomicAdd);
 
               /**Figure out variable type to set the reset value **/
               auto memExpr = Results.Nodes.getNodeAs<clang::MemberExpr>(str_memExpr);
@@ -795,6 +832,8 @@ class FieldUsedInForLoop : public MatchFinder::MatchCallback {
                 reduceOP_entry.GRAPH_NAME = j.GRAPH_NAME ;
                 reduceOP_entry.SYNC_TYPE = "sync_push";
 
+                reduceOP_entry.FIELD_TYPE = j.VAR_TYPE;
+                reduceOP_entry.VAL_TYPE = j.RESET_VALTYPE;
 
 
                 if(assignplusOP) {
@@ -833,7 +872,7 @@ class FieldUsedInForLoop : public MatchFinder::MatchCallback {
                   lhs->dump();
                   // It is min operation.
                   //string reduceOP = "if(node." + j.FIELD_NAME + " > y) { node." + j.FIELD_NAME + " = y;}";
-                  string reduceOP = "{ node." + j.FIELD_NAME + " = std::min(node." + j.FIELD_NAME + ", y);}";
+                  string reduceOP = "{ Galois::min(node." + j.FIELD_NAME + ", y);}";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
                   string resetVal = "std::numeric_limits<" + j.RESET_VALTYPE + ">::max()";
                   reduceOP_entry.RESETVAL_EXPR = resetVal;
@@ -846,7 +885,7 @@ class FieldUsedInForLoop : public MatchFinder::MatchCallback {
                 else if(whileCAS_op){
                   whileCAS_op->dump();
                   auto whileCAS_LHS = Results.Nodes.getNodeAs<clang::Stmt>(str_memExpr);
-                  string reduceOP = "{ node." + j.FIELD_NAME + " = std::min(node." + j.FIELD_NAME + ", y);}";
+                  string reduceOP = "{Galois::min(node." + j.FIELD_NAME + ", y);}";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
                   string resetVal = "std::numeric_limits<" + j.RESET_VALTYPE + ">::max()";
                   reduceOP_entry.RESETVAL_EXPR = resetVal;
@@ -855,6 +894,16 @@ class FieldUsedInForLoop : public MatchFinder::MatchCallback {
                   whileCAS_LHS->dump();
                   break;
                 }
+               else if(atomicAdd_op){
+                  string reduceOP = "{ Galois::atomicAdd(node." + j.FIELD_NAME + ", y);}";
+                  reduceOP_entry.OPERATION_EXPR = reduceOP;
+                  string resetVal = "0";
+                  reduceOP_entry.RESETVAL_EXPR = resetVal;
+
+                  info->reductionOps_map[i.first].push_back(reduceOP_entry);
+                  break;
+                }
+
             }
           }
         }
@@ -1066,6 +1115,8 @@ class GaloisFunctionsConsumer : public ASTConsumer {
             string str_minusOp = "minusEqualOp_" + j.VAR_NAME+ "_" + i.first;
             string str_varDecl = "varDecl_" + j.VAR_NAME+ "_" + i.first;
 
+            string str_atomicAdd = "atomicAdd_" + j.VAR_NAME + "_" + i.first;
+
             /** Only match references types, ignore read only **/
             DeclarationMatcher f_1 = varDecl(isExpansionInMainFile(), hasInitializer(expr(anyOf(
                                                                                                 hasDescendant(memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.VAR_NAME)))))).bind(str_memExpr)),
@@ -1101,7 +1152,10 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                                                                                                               hasLHS(hasDescendant(LHS_memExpr))))).bind(str_assign_plus),
                                                                       /** For ComplexType : NodeData.field = val **/
                                                                       operatorCallExpr(hasOverloadedOperatorName("="),
-                                                                             hasDescendant(LHS_memExpr)).bind(str_assignment)
+                                                                             hasDescendant(LHS_memExpr)).bind(str_assignment),
+
+                                                                      /** Atomic Add **/
+                                                                      callExpr(argumentCountIs(2), (callee(functionDecl(hasName("atomicAdd"))), hasAnyArgument(LHS_memExpr))).bind(str_atomicAdd)
                                                                      ),
                                                                      hasAncestor(recordDecl(hasName(i.first)))/*,
                                                                      unless(hasAncestor(ifStmt(hasCondition(anything()))))*/);
@@ -1134,6 +1188,8 @@ class GaloisFunctionsConsumer : public ASTConsumer {
 
             string str_whileCAS = "whileCAS_" + j.VAR_NAME + "_" + i.first;
             string str_whileCAS_RHS = "whileCAS_RHS" + j.VAR_NAME + "_" + i.first;
+
+            string str_atomicAdd = "atomicAdd_" + j.VAR_NAME + "_" + i.first;
 
             /** Only match references types, ignore read only **/
             DeclarationMatcher f_1 = varDecl(isExpansionInMainFile(), hasInitializer(expr(anyOf(
@@ -1172,7 +1228,8 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                                                                                                               hasLHS(hasDescendant(LHS_memExpr))))).bind(str_assign_plus),
                                                                       /** For ComplexType : NodeData.field = val **/
                                                                       operatorCallExpr(hasOverloadedOperatorName("="),
-                                                                             hasDescendant(LHS_memExpr)).bind(str_assignment)
+                                                                             hasDescendant(LHS_memExpr)).bind(str_assignment),
+                                                                      callExpr(isExpansionInMainFile(), argumentCountIs(2), (callee(functionDecl(hasName("atomicAdd"))), hasAnyArgument(LHS_memExpr))).bind(str_atomicAdd)
                                                                      ),
                                                                      hasAncestor(recordDecl(hasName(i.first))),
                                                                      /** Only if condition inside EdgeForLoop should be considered**/
@@ -1195,10 +1252,13 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                                                                                                   hasLHS(hasDescendant(LHS_memExpr)),
                                                                                                   hasRHS(ignoringParenImpCasts(declRefExpr(to(decl().bind(str_whileCAS_RHS))))))),
                                                                       hasBody(compoundStmt(hasDescendant(memberCallExpr(callee(methodDecl(matchesName(".compare_exchange_strong"))), hasAnyArgument(declRefExpr(to(decl(equalsBoundNode(str_whileCAS_RHS)))))))))).bind(str_whileCAS);
+
+            //StatementMatcher f_5 = callExpr(isExpansionInMainFile(), argumentCountIs(2), (callee(functionDecl(hasName("atomicAdd"))), hasAnyArgument(LHS_memExpr))).bind(str_atomicAdd);
             Matchers_gen.addMatcher(f_1, &insideForLoop_handler);
             Matchers_gen.addMatcher(f_2, &insideForLoop_handler);
             Matchers_gen.addMatcher(f_3, &insideForLoop_handler);
             Matchers_gen.addMatcher(f_4, &insideForLoop_handler);
+            //Matchers_gen.addMatcher(f_5, &insideForLoop_handler);
           }
         }
       }
@@ -1227,6 +1287,8 @@ class GaloisFunctionsConsumer : public ASTConsumer {
 
             string str_whileCAS = "whileCAS_" + j.VAR_NAME + "_" + i.first;
             string str_whileCAS_RHS = "whileCAS_RHS" + j.VAR_NAME + "_" + i.first;
+
+            string str_atomicAdd = "atomicAdd_" + j.VAR_NAME + "_" + i.first;
 
             /** Only match references types, ignore read only **/
             DeclarationMatcher f_1 = varDecl(isExpansionInMainFile(), hasInitializer(expr(anyOf(
@@ -1266,7 +1328,9 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                                                                                                               hasLHS(hasDescendant(LHS_memExpr))))).bind(str_assign_plus),
                                                                       /** For ComplexType : NodeData.field = val **/
                                                                       operatorCallExpr(hasOverloadedOperatorName("="),
-                                                                             hasDescendant(LHS_memExpr)).bind(str_assignment)
+                                                                             hasDescendant(LHS_memExpr)).bind(str_assignment),
+
+                                                                      callExpr(isExpansionInMainFile(), argumentCountIs(2), (callee(functionDecl(hasName("atomicAdd"))), hasAnyArgument(LHS_declRefExpr))).bind(str_atomicAdd)
                                                                      ),
                                                                      hasAncestor(recordDecl(hasName(i.first))),
                                                                      /** Only if condition inside EdgeForLoop should be considered**/
@@ -1292,10 +1356,14 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                                                                                                   hasLHS(hasDescendant(LHS_memExpr)),
                                                                                                   hasRHS(ignoringParenImpCasts(declRefExpr(to(decl().bind(str_whileCAS_RHS))))))),
                                                                       hasBody(compoundStmt(hasDescendant(memberCallExpr(callee(methodDecl(matchesName(".compare_exchange_strong"))), hasAnyArgument(declRefExpr(to(decl(equalsBoundNode(str_whileCAS_RHS)))))))))).bind(str_whileCAS);
+
+            //StatementMatcher f_5 = callExpr(isExpansionInMainFile(), argumentCountIs(2), (callee(functionDecl(hasName("atomicAdd")))[>, hasAnyArgument(LHS_memExpr)<])).bind(str_atomicAdd);
+
             Matchers_gen_field.addMatcher(f_1, &insideForLoopField_handler);
             Matchers_gen_field.addMatcher(f_2, &insideForLoopField_handler);
             Matchers_gen_field.addMatcher(f_3, &insideForLoopField_handler);
             Matchers_gen_field.addMatcher(f_4, &insideForLoopField_handler);
+            //Matchers_gen_field.addMatcher(f_5, &insideForLoopField_handler);
 
 
         }
@@ -1366,11 +1434,10 @@ class GaloisFunctionsConsumer : public ASTConsumer {
 
     void EndSourceFileAction() override {
       TheRewriter.getEditBuffer(TheRewriter.getSourceMgr().getMainFileID()).write(llvm::outs());
-     /* if (!TheRewriter.overwriteChangedFiles())
+      if (!TheRewriter.overwriteChangedFiles())
       {
         llvm::outs() << "Successfully saved changes\n";
       }
-      */
     }
     std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance &CI, llvm::StringRef) override {
       TheRewriter.setSourceMgr(CI.getSourceManager(), CI.getLangOpts());
