@@ -17,6 +17,7 @@ namespace cll = llvm::cl;
 static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations"), cll::init(4));
 static cll::opt<unsigned int> src_node("srcNodeId", cll::desc("ID of the source node"), cll::init(0));
+static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"), cll::init(false));
 
 
 struct NodeData {
@@ -90,39 +91,59 @@ int main(int argc, char** argv) {
   try {
     LonestarStart(argc, argv, name, desc, url);
     auto& net = Galois::Runtime::getSystemNetworkInterface();
+    Galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_HSSSP;
 
+    T_total.start();
+
+    T_offlineGraph_init.start();
     OfflineGraph g(inputFile);
+    T_offlineGraph_init.stop();
     std::cout << g.size() << " " << g.sizeEdges() << "\n";
 
+    T_hGraph_init.start();
     Graph hg(inputFile, net.ID, net.Num);
+    T_hGraph_init.stop();
 
     std::cout << "InitializeGraph::go called\n";
+    T_init.start();
     InitializeGraph::go(hg);
+    T_init.stop();
 
     // Set node 0 to be source.
     if(net.ID == 0)
       hg.getData(src_node).dist_current = 0;
 
     // Verify
-  /*  if(net.ID == 0) {
-      for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
-        std::cout << "[" << *ii << "]  " << hg.getData(*ii).dist_current << "\n";
+    if(verify){
+      if(net.ID == 0) {
+        for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
+          std::cout << "[" << *ii << "]  " << hg.getData(*ii).dist_current << "\n";
+        }
       }
     }
-    */
+
 
     std::cout << "SSSP::go called\n";
+    T_HSSSP.start();
     for (int i = 0; i < maxIterations; ++i) {
       std::cout << " Iteration : " << i << "\n";
       SSSP::go(hg);
     }
+    T_HSSSP.stop();
 
     // Verify
-    if(net.ID == 0) {
-      for(auto ii = hg.begin(); ii != hg.begin() + 8; ++ii) {
-        std::cout << "[" << *ii << "]  " << hg.getData(*ii).dist_current << "\n";
+    if(verify){
+      if(net.ID == 0) {
+        for(auto ii = hg.begin(); ii != hg.begin() + 8; ++ii) {
+          std::cout << "[" << *ii << "]  " << hg.getData(*ii).dist_current << "\n";
+        }
       }
     }
+
+
+   T_total.stop();
+
+    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " HSSSP (" << maxIterations << ") : " << T_HSSSP.get() << "(msec)\n\n";
 
     return 0;
   } catch(const char* c) {
