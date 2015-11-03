@@ -91,6 +91,14 @@ namespace {
     string RESET_VAL_EXPR;
   };
 
+  struct Write_set_PULL {
+    string GRAPH_NAME;
+    string NODE_TYPE;
+    string FIELD_TYPE;
+    string FIELD_NAME;
+    string VAL_TYPE;
+  };
+
   class FunctionCallHandler : public MatchFinder::MatchCallback {
     private:
       Rewriter &rewriter;
@@ -119,13 +127,15 @@ namespace {
           string GraphNode;
 
           vector<Write_set_PUSH> write_set_vec_PUSH;
+          vector<Write_set_PULL> write_set_vec_PULL;
 
-          string str_first;
-          llvm::raw_string_ostream s_first(str_first);
-          callFS->getArg(0)->printPretty(s_first, 0, Policy);
-          llvm::outs() << " //////// > " << s_first.str() << "\n";
+          /*
+             string str_first;
+             llvm::raw_string_ostream s_first(str_first);
+             callFS->getArg(0)->printPretty(s_first, 0, Policy);
+          //llvm::outs() << " //////// > " << s_first.str() << "\n";
           callFS->getArg(0)->dump();
-
+          */
 
           for(int i = 0, j = callFS->getNumArgs(); i < j; ++i){
             string str_arg;
@@ -133,52 +143,94 @@ namespace {
             callFS->getArg(i)->printPretty(s, 0, Policy);
 
             const CallExpr* callExpr = dyn_cast<CallExpr>(callFS->getArg(i));
-            callExpr->dump();
+            //callExpr->dump();
             if (callExpr) {
               const FunctionDecl* func = callExpr->getDirectCallee();
               if(func) {
-              if (func->getNameInfo().getName().getAsString() == "read_set"){
-                llvm::outs() << "Inside arg read_set: " << i <<  s.str() << "\n\n";
-              }
-              if (func->getNameInfo().getName().getAsString() == "write_set"){
-                llvm::outs() << "Inside arg write_set: " << i <<  s.str() << "\n\n";
+                if (func->getNameInfo().getName().getAsString() == "read_set"){
+                  llvm::outs() << "Inside arg read_set: " << i <<  s.str() << "\n\n";
+                }
+                if (func->getNameInfo().getName().getAsString() == "write_set"){
+                  llvm::outs() << "Inside arg write_set: " << i <<  s.str() << "\n\n";
 
-                //SYNC_PUSH
-                vector<string> Temp_vec_PUSH;
-                if(callExpr->getNumArgs() == 8) {
-                  for(unsigned i = 0; i < callExpr->getNumArgs(); ++i){
-                    string str_sub_arg;
-                    llvm::raw_string_ostream s_sub(str_sub_arg);
-                    callExpr->getArg(i)->printPretty(s_sub, 0, Policy);
+                  // Take out first argument to see if it is push or pull
+                  string str_sub_arg;
+                  llvm::raw_string_ostream s_sub(str_sub_arg);
+                  callExpr->getArg(0)->printPretty(s_sub, 0, Policy);
 
-                    string temp_str = s_sub.str();
-                    if(temp_str.front() == '"'){
-                      temp_str.erase(0,1);
-                      temp_str.erase(temp_str.size()-1);
-                    }
-                    if(temp_str.front() == '&'){
-                      temp_str.erase(0,1);
-                    }
-
-                    llvm::outs() << " ------- > " << temp_str << "\n";
-                    Temp_vec_PUSH.push_back(temp_str);
-
+                  string str_sync_type = s_sub.str();
+                  if(str_sync_type.front() == '"'){
+                    str_sync_type.erase(0,1);
+                    str_sync_type.erase(str_sync_type.size()-1);
                   }
-                  Write_set_PUSH WR_entry;
-                  WR_entry.GRAPH_NAME = Temp_vec_PUSH[0];
-                  WR_entry.NODE_TYPE = Temp_vec_PUSH[1];
-                  WR_entry.FIELD_TYPE = Temp_vec_PUSH[2];
-                  WR_entry.FIELD_NAME = Temp_vec_PUSH[3];
-                  WR_entry.VAL_TYPE = Temp_vec_PUSH[4];
-                  WR_entry.REDUCE_OP_EXPR = Temp_vec_PUSH[5];
-                  WR_entry.RESET_VAL_EXPR = Temp_vec_PUSH[6];
 
-                  write_set_vec_PUSH.push_back(WR_entry);
+                  //SYNC_PUSH
+                  //if(callExpr->getNumArgs() == 8) {
+                  if(str_sync_type == "sync_push") {
+                    vector<string> Temp_vec_PUSH;
+                    for(unsigned i = 0; i < callExpr->getNumArgs(); ++i){
+                      string str_sub_arg;
+                      llvm::raw_string_ostream s_sub(str_sub_arg);
+                      callExpr->getArg(i)->printPretty(s_sub, 0, Policy);
+
+                      string temp_str = s_sub.str();
+                      if(temp_str.front() == '"'){
+                        temp_str.erase(0,1);
+                        temp_str.erase(temp_str.size()-1);
+                      }
+                      if(temp_str.front() == '&'){
+                        temp_str.erase(0,1);
+                      }
+
+                      llvm::outs() << " ------- > " << temp_str << "\n";
+                      Temp_vec_PUSH.push_back(temp_str);
+
+                    }
+                    Write_set_PUSH WR_entry;
+                    WR_entry.GRAPH_NAME = Temp_vec_PUSH[1];
+                    WR_entry.NODE_TYPE = Temp_vec_PUSH[2];
+                    WR_entry.FIELD_TYPE = Temp_vec_PUSH[3];
+                    WR_entry.FIELD_NAME = Temp_vec_PUSH[4];
+                    WR_entry.VAL_TYPE = Temp_vec_PUSH[5];
+                    WR_entry.REDUCE_OP_EXPR = Temp_vec_PUSH[6];
+                    WR_entry.RESET_VAL_EXPR = Temp_vec_PUSH[7];
+
+                    write_set_vec_PUSH.push_back(WR_entry);
+                  }
+
+                  //SYNC_PULL
+                  else if(str_sync_type == "sync_pull") {
+                    vector<string> Temp_vec_PULL;
+                    for(unsigned i = 0; i < callExpr->getNumArgs(); ++i){
+                      string str_sub_arg;
+                      llvm::raw_string_ostream s_sub(str_sub_arg);
+                      callExpr->getArg(i)->printPretty(s_sub, 0, Policy);
+
+                      string temp_str = s_sub.str();
+                      if(temp_str.front() == '"'){
+                        temp_str.erase(0,1);
+                        temp_str.erase(temp_str.size()-1);
+                      }
+                      if(temp_str.front() == '&'){
+                        temp_str.erase(0,1);
+                      }
+
+                      Temp_vec_PULL.push_back(temp_str);
+
+                    }
+                    Write_set_PULL WR_entry;
+                    WR_entry.GRAPH_NAME = Temp_vec_PULL[1];
+                    WR_entry.NODE_TYPE = Temp_vec_PULL[2];
+                    WR_entry.FIELD_TYPE = Temp_vec_PULL[3];
+                    WR_entry.FIELD_NAME = Temp_vec_PULL[4];
+                    WR_entry.VAL_TYPE = Temp_vec_PULL[5];
+
+                    write_set_vec_PULL.push_back(WR_entry);
+                  }
+                 }
                 }
               }
             }
-          }
-          }
 
             stringstream SSSyncer;
             unsigned counter = 0;
@@ -196,19 +248,44 @@ namespace {
               SSSyncer.clear();
               ++counter;
             }
-          // Adding Syn calls for write set
-          stringstream SSAfter;
-          SourceLocation ST = callFS->getSourceRange().getEnd().getLocWithOffset(2);
-          for (unsigned i = 0; i < write_set_vec_PUSH.size(); i++) {
-            SSAfter.str(string());
-            SSAfter.clear();
-            //SSAfter <<"\n" <<write_set_vec_PUSH[i].GRAPH_NAME<< ".sync_push<Syncer_" << i << ">" <<"();\n";
-            SSAfter <<"\n" << "_graph.sync_push<Syncer_" << i << ">" <<"();\n";
-            rewriter.InsertText(ST, SSAfter.str(), true, true);
+
+            // Addding structure for pull sync
+            stringstream SSSyncer_pull;
+            counter = 0;
+            for(auto i : write_set_vec_PULL) {
+              SSSyncer_pull << " struct SyncerPull_" << counter << " {\n"
+                << "\tstatic " << i.VAL_TYPE <<" extract( const " << i.NODE_TYPE << " node)" << "{ return " << "node." << i.FIELD_NAME <<  "; }\n"
+                <<"\tstatic void setVal (" << i.NODE_TYPE << " node, " << i.VAL_TYPE << " y) "
+                << "{node." << i.FIELD_NAME << " = y; }\n"
+                <<"\ttypedef " << i.VAL_TYPE << " ValTy;\n"
+                <<"};\n";
+
+              rewriter.InsertText(ST_main, SSSyncer_pull.str(), true, true);
+              SSSyncer_pull.str(string());
+              SSSyncer_pull.clear();
+              ++counter;
+            }
+
+            // Adding Syn calls for write set
+            stringstream SSAfter;
+            SourceLocation ST = callFS->getSourceRange().getEnd().getLocWithOffset(2);
+            for (unsigned i = 0; i < write_set_vec_PUSH.size(); i++) {
+              SSAfter.str(string());
+              SSAfter.clear();
+              //SSAfter <<"\n" <<write_set_vec_PUSH[i].GRAPH_NAME<< ".sync_push<Syncer_" << i << ">" <<"();\n";
+              SSAfter <<"\n" << "_graph.sync_push<Syncer_" << i << ">" <<"();\n";
+              rewriter.InsertText(ST, SSAfter.str(), true, true);
+            }
+            //For sync Pull
+            for (unsigned i = 0; i < write_set_vec_PULL.size(); i++) {
+              SSAfter.str(string());
+              SSAfter.clear();
+              SSAfter <<"\n" << "_graph.sync_pull<SyncerPull_" << i << ">" <<"();\n";
+              rewriter.InsertText(ST, SSAfter.str(), true, true);
+            }
           }
         }
-      }
-  };
+      };
 
 
 
