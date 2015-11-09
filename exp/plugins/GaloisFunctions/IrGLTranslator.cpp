@@ -30,7 +30,7 @@ using namespace llvm;
 #define VARIABLE_NAME_CHARACTERS "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"
 namespace {
 
-class IrGLFunctionsVisitor : public RecursiveASTVisitor<IrGLFunctionsVisitor> {
+class IrGLOperatorVisitor : public RecursiveASTVisitor<IrGLOperatorVisitor> {
 private:
   ASTContext* astContext;
   Rewriter &rewriter; // FIXME: is this necessary? can ASTContext give source code?
@@ -42,7 +42,7 @@ private:
   std::map<std::string, std::string> parameterToTypeMap;
 
 public:
-  explicit IrGLFunctionsVisitor(CompilerInstance &CI, Rewriter &R) : 
+  explicit IrGLOperatorVisitor(CompilerInstance &CI, Rewriter &R) : 
     astContext(&(CI.getASTContext())),
     rewriter(R),
     entryOnce(false)
@@ -72,7 +72,7 @@ public:
   }
 
   virtual bool TraverseDecl(Decl *D) {
-    bool traverse = RecursiveASTVisitor<IrGLFunctionsVisitor>::TraverseDecl(D);
+    bool traverse = RecursiveASTVisitor<IrGLOperatorVisitor>::TraverseDecl(D);
     if (traverse && D && isa<CXXMethodDecl>(D)) {
       bodyString << "]),\n"; // end ForAll
       bodyString << "]),\n"; // end kernel
@@ -88,7 +88,7 @@ public:
   }
 
   virtual bool TraverseStmt(Stmt *S) {
-    bool traverse = RecursiveASTVisitor<IrGLFunctionsVisitor>::TraverseStmt(S);
+    bool traverse = RecursiveASTVisitor<IrGLOperatorVisitor>::TraverseStmt(S);
     if (traverse && S && isa<CXXForRangeStmt>(S)) {
       bodyString << "]),\n"; // end ForAll
     }
@@ -212,19 +212,21 @@ class FunctionDeclHandler : public MatchFinder::MatchCallback {
 private:
   CompilerInstance &Instance;
   Rewriter &rewriter;
-  IrGLFunctionsVisitor visitor;
+  IrGLOperatorVisitor operatorVisitor;
 public:
-  FunctionDeclHandler(CompilerInstance &CI, Rewriter &R): Instance(CI), rewriter(R), visitor(CI, R) {}
+  FunctionDeclHandler(CompilerInstance &CI, Rewriter &R): 
+    Instance(CI), rewriter(R), operatorVisitor(CI, R) {}
   virtual void run(const MatchFinder::MatchResult &Results) {
-    const CXXMethodDecl* decl = Results.Nodes.getNodeAs<clang::CXXMethodDecl>("graphOperator");
-    if (decl)
-      llvm::errs() << "Graph operator:\n" << rewriter.getRewrittenText(decl->getSourceRange()) << "\n";
-    else {
-      decl = Results.Nodes.getNodeAs<clang::CXXMethodDecl>("nodeOperator");
-      if (decl)
-        llvm::errs() << "Node operator:\n" << rewriter.getRewrittenText(decl->getSourceRange()) << "\n";
-      //decl->dump();
-      visitor.TraverseDecl(const_cast<CXXMethodDecl *>(decl));
+    const CXXMethodDecl* decl = Results.Nodes.getNodeAs<clang::CXXMethodDecl>("orchestrator");
+    if (decl) {
+      llvm::errs() << "Orchestrator (main function):\n" << rewriter.getRewrittenText(decl->getSourceRange()) << "\n";
+    } else {
+      decl = Results.Nodes.getNodeAs<clang::CXXMethodDecl>("operator");
+      if (decl) {
+        llvm::errs() << "Operator (kernel function):\n" << rewriter.getRewrittenText(decl->getSourceRange()) << "\n";
+        //decl->dump();
+        operatorVisitor.TraverseDecl(const_cast<CXXMethodDecl *>(decl));
+      }
     }
   }
 };
@@ -240,12 +242,12 @@ public:
     // FIXME: Design a standard to identify graph and node operators
     Matchers.addMatcher(functionDecl(
           hasOverloadedOperatorName("()"),
-          hasAnyParameter(hasType(references(recordDecl(matchesName("Galois::Graph")))))).
-          bind("graphOperator"), &functionDeclHandler);
+          hasAnyParameter(hasName("graph_main"))).
+          bind("orchestrator"), &functionDeclHandler);
     Matchers.addMatcher(functionDecl(
           hasOverloadedOperatorName("()"),
           hasAnyParameter(hasName("vertex"))).
-          bind("nodeOperator"), &functionDeclHandler);
+          bind("operator"), &functionDeclHandler);
   }
 
   virtual void HandleTranslationUnit(ASTContext &Context){
