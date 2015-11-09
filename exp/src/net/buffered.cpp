@@ -26,6 +26,7 @@
 
 #include <thread>
 #include <mutex>
+#include <iostream>
 
 using namespace Galois::Runtime;
 
@@ -41,7 +42,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
     std::deque<uint8_t> data;
     LL::SimpleLock lock;
     
-    std::pair<std::deque<uint8_t>::iterator, std::deque<uint8_t>::iterator>
+/*    std::pair<std::deque<uint8_t>::iterator, std::deque<uint8_t>::iterator>
     nextMsg() {
       std::lock_guard<LL::SimpleLock> lg(lock);
       if (data.empty())
@@ -50,6 +51,18 @@ class NetworkInterfaceBuffered : public NetworkInterface {
       union { uint8_t a[4]; uint32_t b; } c;
       std::copy_n(data.begin(), 4, &c.a[0]);
       return std::make_pair(data.begin() + 4, data.begin() + 4 + c.b);
+    }
+*/
+    //std::vector<std::deque<uint8_t>>
+    DeSerializeBuffer
+    nextMsg() {
+      std::lock_guard<LL::SimpleLock> lg(lock);
+      if (data.empty())
+        return DeSerializeBuffer(data.end(), data.end());
+      assert(data.size() >= 8);
+      union { uint8_t a[4]; uint32_t b; } c;
+      std::copy_n(data.begin(), 4, &c.a[0]);
+      return DeSerializeBuffer(data.begin() + 4, data.begin() + 4 + c.b);
     }
 
     void popMsg() {
@@ -179,10 +192,11 @@ public:
     bool retval = false;
     if (recvLock.try_lock()) {
       std::lock_guard<LL::SimpleLock> lg(recvLock, std::adopt_lock);
-      auto p = recvData.nextMsg();
-      if (p.first != p.second) {
+      auto buf = recvData.nextMsg();
+      //if (p.first != p.second) {
+      if(!buf.empty()){
         retval = true;
-        DeSerializeBuffer buf(p.first, p.second);
+        //DeSerializeBuffer buf(p);
         statRecvNum += 1;
         statRecvBytes += buf.size();
         recvData.popMsg();

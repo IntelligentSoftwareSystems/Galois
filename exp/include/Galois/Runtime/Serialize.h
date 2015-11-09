@@ -175,6 +175,8 @@ public:
 
   unsigned size() const { return bufdata.size(); }
 
+  bool empty() const {return bufdata.empty(); }
+
   unsigned char pop() {
     return bufdata.at(offset++);
   }

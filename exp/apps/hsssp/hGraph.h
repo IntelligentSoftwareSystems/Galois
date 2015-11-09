@@ -129,10 +129,13 @@ public:
       uint64_t gid;
       typename FnTy::ValTy val;
       Galois::Runtime::gDeserialize(buf, gid, val);
+      /*
       if(!isOwned(gid)){
         std::cout <<"[" << Galois::Runtime::getSystemNetworkInterface().ID <<"]" <<  " GID " << gid  << " num  : " << num << "\n";
         assert(isOwned(gid));
       }
+      */
+      assert(isOwned(gid));
       FnTy::reduce(getData(gid - globalOffset), val);
     }
   }
@@ -167,7 +170,7 @@ public:
     uint32_t num;
     Galois::Runtime::gDeserialize(buf, num);
     auto& net = Galois::Runtime::getSystemNetworkInterface();
-    std::cout << "In Apply : [" << net.ID <<"] num_recv_expected : "<< num_recv_expected << "\n";
+    //std::cout << "In Apply : [" << net.ID <<"] num_recv_expected : "<< num_recv_expected << "\n";
     --num_recv_expected;
 
     for(; num; --num) {
@@ -349,17 +352,13 @@ public:
       net.send(x, syncRecv, b);
     }
 
-    std::cout << "[" << net.ID <<"] num_recv_expected : "<< num_recv_expected << "\n";  
+    //std::cout << "[" << net.ID <<"] num_recv_expected : "<< num_recv_expected << "\n";  
 
     while(num_recv_expected) {
-
-      //std::cout << "[ " << Galois::Runtime::getSystemNetworkInterface().ID << "] " << " NUM RECV EXPECTED : " << (num_recv_expected) << "\n";
-      //std::cout << " -- > " << net.handleReceives() << "\n";
       net.handleReceives();
     }
 
     assert(num_recv_expected == 0);
-    //Galois::Runtime::getHostBarrier().wait();
     Galois::Runtime::getHostBarrier().wait();
   }
 
