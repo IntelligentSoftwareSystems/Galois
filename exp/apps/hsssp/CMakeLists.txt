@@ -23,3 +23,6 @@ app(HSSSP_gen3 HSSSP_gen3.cpp GlobalObj.cpp DISTSAFE)
 
 #pageRank
 app(PageRank pageRank_gen.cpp GlobalObj.cpp DISTSAFE)
+
+#LabelPropAlgo
+app(CC_LabelProp connectedComponent_gen.cpp GlobalObj.cpp DISTSAFE)
