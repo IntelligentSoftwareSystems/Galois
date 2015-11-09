@@ -55,12 +55,16 @@ public:
     // FIXME: does not handle scoped variables (nesting with same variable name)
     for (auto& nodeVar : nodeMap) {
       std::size_t pos = text.find(nodeVar.first);
-      if (pos != std::string::npos) {
+      while (pos != std::string::npos) {
         std::size_t end = text.find(".", pos);
         text.erase(pos, end - pos + 1);
         end = text.find_first_not_of(VARIABLE_NAME_CHARACTERS, pos); 
-        text.insert(end, "[" + nodeVar.second + "]");
+        if (end == std::string::npos)
+          text.append("[" + nodeVar.second + "]");
+        else
+          text.insert(end, "[" + nodeVar.second + "]");
         text.insert(pos, "p_");
+        pos = text.find(nodeVar.first);
       }
     }
 
@@ -69,7 +73,7 @@ public:
 
   virtual bool TraverseDecl(Decl *D) {
     bool traverse = RecursiveASTVisitor<IrGLFunctionsVisitor>::TraverseDecl(D);
-    if (traverse && D && isa<FunctionDecl>(D)) {
+    if (traverse && D && isa<CXXMethodDecl>(D)) {
       bodyString << "]),\n"; // end ForAll
       bodyString << "]),\n"; // end kernel
       for (auto& param : parameterToTypeMap) {
@@ -91,7 +95,7 @@ public:
     return traverse;
   }
 
-  virtual bool VisitFunctionDecl(FunctionDecl* func) {
+  virtual bool VisitCXXMethodDecl(CXXMethodDecl* func) {
     assert(!entryOnce);
     entryOnce = true;
     skipStmts.clear();
@@ -99,7 +103,7 @@ public:
     nodeMap.clear();
     declString.str("");
     bodyString.str("");
-    std::string funcName = func->getNameAsString();
+    std::string funcName = func->getParent()->getNameAsString();
     llvm::errs() << "\nIrGL Function:\n";
     declString << "Kernel(\"" << funcName << "\", [G.param()";
     bodyString << "[ForAll(\"vertex\", G.nodes(),\n[\n";
