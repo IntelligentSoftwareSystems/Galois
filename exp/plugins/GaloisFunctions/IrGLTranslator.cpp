@@ -30,6 +30,10 @@ using namespace llvm;
 #define VARIABLE_NAME_CHARACTERS "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"
 namespace {
 
+// FIXME: reinitialize after every main/orchestration code
+std::map<std::string, std::string> SharedVariablesToTypeMap;
+std::map<std::string, std::vector<std::string> > KernelToArgumentsMap;
+
 class IrGLOperatorVisitor : public RecursiveASTVisitor<IrGLOperatorVisitor> {
 private:
   ASTContext* astContext;
@@ -38,6 +42,7 @@ private:
   std::unordered_set<const Decl *> skipDecls;
   std::map<std::string, std::string> nodeMap;
   bool entryOnce;
+  std::string funcName;
   std::stringstream declString, bodyString;
   std::map<std::string, std::string> parameterToTypeMap;
 
@@ -76,10 +81,15 @@ public:
     if (traverse && D && isa<CXXMethodDecl>(D)) {
       bodyString << "]),\n"; // end ForAll
       bodyString << "]),\n"; // end kernel
+      std::vector<std::string> arguments;
       for (auto& param : parameterToTypeMap) {
         declString << ", ('" << param.second << " *', 'p_" << param.first << "')";
+        arguments.push_back(param.first);
+        // FIXME: assert type matches if it exists
+        SharedVariablesToTypeMap[param.first] = param.second;
       }
-      declString << "],\n";
+      KernelToArgumentsMap[funcName] = arguments;
+      declString << "],\n[\n";
       llvm::errs() << declString.str();
       llvm::errs() << bodyString.str();
       entryOnce = false;
@@ -103,10 +113,9 @@ public:
     nodeMap.clear();
     declString.str("");
     bodyString.str("");
-    std::string funcName = func->getParent()->getNameAsString();
-    llvm::errs() << "\nIrGL Function:\n";
+    funcName = func->getParent()->getNameAsString();
     declString << "Kernel(\"" << funcName << "\", [G.param()";
-    bodyString << "[ForAll(\"vertex\", G.nodes(),\n[\n";
+    bodyString << "ForAll(\"vertex\", G.nodes(),\n[\n";
     return true;
   }
 
@@ -208,23 +217,173 @@ public:
   }
 };
 
+class IrGLOrchestratorVisitor : public RecursiveASTVisitor<IrGLOrchestratorVisitor> {
+private:
+  ASTContext* astContext;
+  Rewriter &rewriter; // FIXME: is this necessary? can ASTContext give source code?
+  std::unordered_set<const Stmt *> skipStmts;
+  std::unordered_set<const Decl *> skipDecls;
+  bool entryOnce;
+
+public:
+  explicit IrGLOrchestratorVisitor(CompilerInstance &CI, Rewriter &R) : 
+    astContext(&(CI.getASTContext())),
+    rewriter(R),
+    entryOnce(false)
+  {}
+  
+  void WriteCBlock(std::string text) {
+    llvm::errs() << "CBlock([\"" << text << "\"]),\n";
+  }
+
+  virtual bool TraverseDecl(Decl *D) {
+    bool traverse = RecursiveASTVisitor<IrGLOrchestratorVisitor>::TraverseDecl(D);
+    if (traverse && D && isa<CXXMethodDecl>(D)) {
+      llvm::errs() << "]),\n"; // end kernel
+      entryOnce = false;
+    }
+    return traverse;
+  }
+
+  virtual bool TraverseStmt(Stmt *S) {
+    bool traverse = RecursiveASTVisitor<IrGLOrchestratorVisitor>::TraverseStmt(S);
+    if (traverse && S && isa<WhileStmt>(S)) {
+      llvm::errs() << "]),\n"; // end DoWhile
+    }
+    return traverse;
+  }
+
+  virtual bool VisitCXXMethodDecl(CXXMethodDecl* func) {
+    assert(!entryOnce);
+    entryOnce = true;
+    skipStmts.clear();
+    skipDecls.clear();
+    llvm::errs() << "Kernel(\"" << "gg_main" << "\", ";
+    llvm::errs() << "[GraphParam('hg', True), GraphParam('gg', True)],\n[\n";
+    for (auto& var : SharedVariablesToTypeMap) {
+      llvm::errs() << "CDecl((\"Shared<" << var.second << ">\", \"p_" << var.first << "\"";
+      llvm::errs() << ", \"= Shared<" << var.second << "> (hg.nnodes)\")),\n";
+    }
+    return true;
+  }
+
+  virtual bool VisitWhileStmt(WhileStmt* whileStmt) {
+    Expr *cond = whileStmt->getCond();
+    skipStmts.insert(cond);
+    SourceRange range(cond->getLocStart(), cond->getLocEnd());
+    std::string condText = rewriter.getRewrittenText(range);
+    if (condText.empty()) condText = "true";
+    llvm::errs() << "DoWhile(\"" << condText << "\",\n[\n";
+    return true;
+  }
+
+  virtual bool VisitDeclStmt(DeclStmt *declStmt) {
+    for (auto decl : declStmt->decls()) {
+      if (VarDecl *varDecl = dyn_cast<VarDecl>(decl)) {
+        const Expr *expr = varDecl->getAnyInitializer();
+        skipStmts.insert(expr);
+        if (skipDecls.find(varDecl) == skipDecls.end()) {
+          llvm::errs() << "CDecl([(\"" << varDecl->getType().getAsString() 
+            << "\", \"" << varDecl->getNameAsString() << "\", \"\")]),\n";
+          if (expr != NULL) {
+            SourceRange range(expr->getLocStart(), expr->getLocEnd());
+            std::string initText = rewriter.getRewrittenText(range);
+            WriteCBlock(varDecl->getNameAsString() + " = " + initText);
+          }
+        }
+      }
+    }
+    return true;
+  }
+
+  virtual bool VisitBinaryOperator(BinaryOperator *binaryOp) {
+    skipStmts.insert(binaryOp->getLHS());
+    skipStmts.insert(binaryOp->getRHS());
+    if (skipStmts.find(binaryOp) == skipStmts.end()) {
+      assert(binaryOp.isAssignmentOp());
+      SourceRange range(binaryOp->getLocStart(), binaryOp->getLocEnd());
+      WriteCBlock(rewriter.getRewrittenText(range));
+    }
+    return true;
+  }
+
+  virtual bool VisitCallExpr(CallExpr *callExpr) {
+    if (skipStmts.find(callExpr) == skipStmts.end()) {
+      SourceRange range(callExpr->getLocStart(), callExpr->getLocEnd());
+      std::string text = rewriter.getRewrittenText(range);
+      std::size_t begin = text.find("do_all");
+      if (begin == std::string::npos) begin = text.find("for_each");
+      if (begin == std::string::npos) {
+        WriteCBlock(text);
+      } else {
+        begin = text.find(",", begin);
+        ++begin;
+        std::size_t end = text.find("(", begin);
+        --end;
+        // remove whitespace
+        while (text[begin] == ' ') ++begin;
+        while (text[end] == ' ') --end; 
+        std::string kernelName = text.substr(begin, end-begin+1);
+        llvm::errs() << "Invoke(\"" << kernelName << "\", ";
+        llvm::errs() << "(\"gg\"";
+        auto& arguments = KernelToArgumentsMap[kernelName];
+        for (auto& argument : arguments) {
+          llvm::errs() << ", \"p_" << argument << ".gpu_wr_ptr()\"";
+        }
+        llvm::errs() << ")),\n";
+      }
+    }
+    return true;
+  }
+
+  virtual bool VisitCastExpr(CastExpr *castExpr) {
+    if (skipStmts.find(castExpr) != skipStmts.end()) {
+      skipStmts.insert(castExpr->getSubExpr());
+    }
+    return true;
+  }
+
+  virtual bool VisitMaterializeTemporaryExpr(MaterializeTemporaryExpr *tempExpr) {
+    if (skipStmts.find(tempExpr) != skipStmts.end()) {
+      skipStmts.insert(tempExpr->GetTemporaryExpr());
+    }
+    return true;
+  }
+
+  virtual bool VisitParenExpr(ParenExpr *parenExpr) {
+    if (skipStmts.find(parenExpr) != skipStmts.end()) {
+      skipStmts.insert(parenExpr->getSubExpr());
+    }
+    return true;
+  }
+};
+  
 class FunctionDeclHandler : public MatchFinder::MatchCallback {
 private:
   CompilerInstance &Instance;
   Rewriter &rewriter;
   IrGLOperatorVisitor operatorVisitor;
+  IrGLOrchestratorVisitor orchestratorVisitor;
 public:
   FunctionDeclHandler(CompilerInstance &CI, Rewriter &R): 
-    Instance(CI), rewriter(R), operatorVisitor(CI, R) {}
+    Instance(CI), 
+    rewriter(R), 
+    operatorVisitor(CI, R),
+    orchestratorVisitor(CI, R) 
+  {}
   virtual void run(const MatchFinder::MatchResult &Results) {
-    const CXXMethodDecl* decl = Results.Nodes.getNodeAs<clang::CXXMethodDecl>("orchestrator");
+    const CXXMethodDecl* decl = Results.Nodes.getNodeAs<clang::CXXMethodDecl>("graphOperator");
     if (decl) {
-      llvm::errs() << "Orchestrator (main function):\n" << rewriter.getRewrittenText(decl->getSourceRange()) << "\n";
+      llvm::errs() << "\nGraph Operator:\n" << rewriter.getRewrittenText(decl->getSourceRange()) << "\n";
+      //decl->dump();
+      llvm::errs() << "\nIrGL Orchestrator:\n";
+      orchestratorVisitor.TraverseDecl(const_cast<CXXMethodDecl *>(decl));
     } else {
-      decl = Results.Nodes.getNodeAs<clang::CXXMethodDecl>("operator");
+      decl = Results.Nodes.getNodeAs<clang::CXXMethodDecl>("vertexOperator");
       if (decl) {
-        llvm::errs() << "Operator (kernel function):\n" << rewriter.getRewrittenText(decl->getSourceRange()) << "\n";
+        llvm::errs() << "\nVertex Operator:\n" << rewriter.getRewrittenText(decl->getSourceRange()) << "\n";
         //decl->dump();
+        llvm::errs() << "\nIrGL Operator:\n";
         operatorVisitor.TraverseDecl(const_cast<CXXMethodDecl *>(decl));
       }
     }
@@ -243,11 +402,11 @@ public:
     Matchers.addMatcher(functionDecl(
           hasOverloadedOperatorName("()"),
           hasAnyParameter(hasName("graph_main"))).
-          bind("orchestrator"), &functionDeclHandler);
+          bind("graphOperator"), &functionDeclHandler);
     Matchers.addMatcher(functionDecl(
           hasOverloadedOperatorName("()"),
           hasAnyParameter(hasName("vertex"))).
-          bind("operator"), &functionDeclHandler);
+          bind("vertexOperator"), &functionDeclHandler);
   }
 
   virtual void HandleTranslationUnit(ASTContext &Context){
