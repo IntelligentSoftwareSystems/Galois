@@ -37,7 +37,7 @@
 #include <cstdio>
 #include <cmath>
 
-#ifdef GALOIS_HAS_ZLIB
+#ifdef GALOIS_HAS_GZ_SUPP
 #include <boost/iostreams/filtering_stream.hpp>
 #include <boost/iostreams/copy.hpp>
 #include <boost/iostreams/filter/gzip.hpp>
@@ -116,7 +116,7 @@ class FemapInput : public Femap {
 
  private:
 
-#ifdef GALOIS_HAS_ZLIB
+#ifdef GALOIS_HAS_GZ_SUPP
   boost::iostreams::filtering_istream m_ifs;
 #else 
   std::ifstream m_ifs;

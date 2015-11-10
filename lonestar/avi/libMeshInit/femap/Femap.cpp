@@ -9,7 +9,7 @@
 //   and calls appropriate function to deal with the record.
 //
 
-#ifdef GALOIS_HAS_ZLIB
+#ifdef GALOIS_HAS_GZ_SUPP
 FemapInput::FemapInput(const char* fileName) : m_ifs() {
 
   std::ifstream gzfile (fileName, std::ios_base::in | std::ios_base::binary);

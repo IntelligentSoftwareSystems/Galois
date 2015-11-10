@@ -22,19 +22,21 @@ endif()
 
 find_package(LAPACK QUIET)
 find_package(ZLIB)
-
-if(ZLIB_FOUND AND NOT ARCH STREQUAL "mic")
-  add_definitions(-DGALOIS_HAS_ZLIB)
-endif()
-
 find_package(Boost 1.50.0 COMPONENTS system iostreams filesystem)
 
+# XXX: Disabling reading of GZ input files for now. 
+# if(Boos_FOUND AND ZLIB_FOUND AND NOT ARCH STREQUAL "mic")
+  # add_definitions(-DGALOIS_HAS_GZ_SUPP)
+  # set(HAS_GZ_SUPP TRUE)
+# endif()
+set(HAS_GZ_SUPP FALSE)
 
-if(CMAKE_Fortran_COMPILER_WORKS AND LAPACK_FOUND AND Boost_FOUND)
+
+if(CMAKE_Fortran_COMPILER_WORKS AND LAPACK_FOUND)
   include_directories(${ZLIB_INCLUDE_DIRS})
   add_library(AVI ${Sources})
 
-  if (ZLIB_FOUND AND NOT ARCH STREQUAL "mic") 
+  if (HAS_GZ_SUPP) 
     target_link_libraries(AVI ${ZLIB_LIBRARIES})
     target_link_libraries(AVI ${Boost_LIBRARIES})
   endif()
