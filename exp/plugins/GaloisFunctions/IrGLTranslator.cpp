@@ -180,8 +180,42 @@ public:
 
   virtual bool VisitCXXMemberCallExpr(CXXMemberCallExpr *callExpr) {
     if (skipStmts.find(callExpr) == skipStmts.end()) {
-      SourceRange range(callExpr->getLocStart(), callExpr->getLocEnd());
-      WriteCBlock(rewriter.getRewrittenText(range));
+      CXXRecordDecl *record = callExpr->getRecordDecl();
+      std::string recordName = record->getNameAsString();
+      if (recordName.compare("GReducible") == 0) {
+        Expr *implicit = callExpr->getImplicitObjectArgument();
+        if (CastExpr *cast = dyn_cast<CastExpr>(implicit)) {
+          implicit = cast->getSubExpr();
+        }
+        SourceLocation start;
+        if (MemberExpr *member = dyn_cast<MemberExpr>(implicit)) {
+          start = member->getMemberLoc();
+        } else {
+          start = implicit->getLocStart();
+        }
+        SourceRange range(start, implicit->getLocEnd());
+        std::string reduceVar = rewriter.getRewrittenText(range);
+
+        assert(callExpr->getNumArgs() == 1);
+        Expr *argument = callExpr->getArg(0);
+        SourceRange range2(argument->getLocStart(), argument->getLocEnd());
+        std::string var = rewriter.getRewrittenText(range2);
+
+        WriteCBlock("p_" + reduceVar + "[vertex] = " + var);
+        parameterToTypeMap[reduceVar] = argument->getType().getUnqualifiedType().getAsString();
+      } else {
+        SourceRange range(callExpr->getLocStart(), callExpr->getLocEnd());
+        WriteCBlock(rewriter.getRewrittenText(range));
+      }
+    }
+    return true;
+  }
+
+  virtual bool VisitCallExpr(CallExpr *callExpr) {
+    if (skipStmts.find(callExpr) != skipStmts.end()) {
+      for (unsigned i = 0; i < callExpr->getNumArgs(); ++i) {
+        skipStmts.insert(callExpr->getArg(i));
+      }
     }
     return true;
   }
@@ -211,7 +245,8 @@ public:
     SourceRange range(memberExpr->getBase()->getLocStart(), memberExpr->getBase()->getLocEnd());
     std::string objectName = rewriter.getRewrittenText(range);
     if (nodeMap.find(objectName) != nodeMap.end()) {
-      parameterToTypeMap[memberExpr->getMemberNameInfo().getAsString()] = memberExpr->getMemberDecl()->getType().getAsString();
+      parameterToTypeMap[memberExpr->getMemberNameInfo().getAsString()] = 
+        memberExpr->getMemberDecl()->getType().getUnqualifiedType().getAsString();
     }
     return true;
   }
@@ -301,8 +336,50 @@ public:
     skipStmts.insert(binaryOp->getRHS());
     if (skipStmts.find(binaryOp) == skipStmts.end()) {
       assert(binaryOp.isAssignmentOp());
-      SourceRange range(binaryOp->getLocStart(), binaryOp->getLocEnd());
-      WriteCBlock(rewriter.getRewrittenText(range));
+      bool skip = false;
+      Expr *rhs = binaryOp->getRHS();
+      if (CastExpr *cast = dyn_cast<CastExpr>(rhs)) {
+        rhs = cast->getSubExpr();
+      }
+      if (CXXMemberCallExpr *callExpr = dyn_cast<CXXMemberCallExpr>(rhs)) {
+        CXXRecordDecl *record = callExpr->getRecordDecl();
+        std::string recordName = record->getNameAsString();
+        if (recordName.compare("GReducible") == 0) {
+          skip = true;
+          assert(!record->getMethodDecl()->getNameAsString().compare("reduce"));
+
+          Expr *implicit = callExpr->getImplicitObjectArgument();
+          if (CastExpr *cast = dyn_cast<CastExpr>(implicit)) {
+            implicit = cast->getSubExpr();
+          }
+          SourceLocation start;
+          if (MemberExpr *member = dyn_cast<MemberExpr>(implicit)) {
+            start = member->getMemberLoc();
+          } else {
+            start = implicit->getLocStart();
+          }
+          SourceRange range(start, implicit->getLocEnd());
+          std::string reduceVar = rewriter.getRewrittenText(range);
+
+          SourceRange range2(binaryOp->getLHS()->getLocStart(), binaryOp->getLHS()->getLocEnd());
+          std::string var = rewriter.getRewrittenText(range2);
+
+          std::ostringstream reduceCall;
+          // FIXME: choose matching reduction operation
+          reduceCall << "mgpu::Reduce(p_" << reduceVar << ".gpu_rd_ptr(), hg.nnodes";
+          reduceCall << ", (" << SharedVariablesToTypeMap[reduceVar] << ")0";
+          reduceCall << ", mgpu::plus<" << SharedVariablesToTypeMap[reduceVar] << ">()";
+          reduceCall << ", (" << SharedVariablesToTypeMap[reduceVar] << "*)0";
+          reduceCall << ", &" << var << ", *mgc)";
+
+          // FIXME: Add "parse=False"
+          WriteCBlock(reduceCall.str());
+        }
+      }
+      if (!skip) {
+        SourceRange range(binaryOp->getLocStart(), binaryOp->getLocEnd());
+        WriteCBlock(rewriter.getRewrittenText(range));
+      }
     }
     return true;
   }
@@ -314,7 +391,19 @@ public:
       std::size_t begin = text.find("do_all");
       if (begin == std::string::npos) begin = text.find("for_each");
       if (begin == std::string::npos) {
-        WriteCBlock(text);
+        bool skip = false;
+        Expr *expr = callExpr;
+        if (CastExpr *cast = dyn_cast<CastExpr>(expr)) {
+          expr = cast->getSubExpr();
+        }
+        if (CXXMemberCallExpr *memberCallExpr = dyn_cast<CXXMemberCallExpr>(expr)) {
+          CXXRecordDecl *record = memberCallExpr->getRecordDecl();
+          std::string recordName = record->getNameAsString();
+          if (recordName.compare("GReducible") == 0) {
+            skip = true;
+          }
+        }
+        if (!skip) WriteCBlock(text);
       } else {
         begin = text.find(",", begin);
         ++begin;
@@ -331,6 +420,21 @@ public:
           llvm::errs() << ", \"p_" << argument << ".gpu_wr_ptr()\"";
         }
         llvm::errs() << ")),\n";
+      }
+    } else {
+      for (unsigned i = 0; i < callExpr->getNumArgs(); ++i) {
+        skipStmts.insert(callExpr->getArg(i));
+      }
+    }
+    return true;
+  }
+
+  virtual bool VisitCXXMemberCallExpr(CXXMemberCallExpr *callExpr) {
+    if (skipStmts.find(callExpr) == skipStmts.end()) {
+      CXXRecordDecl *record = callExpr->getRecordDecl();
+      std::string recordName = record->getNameAsString();
+      if (recordName.compare("GReducible") == 0) {
+        skipStmts.insert(callExpr);
       }
     }
     return true;
