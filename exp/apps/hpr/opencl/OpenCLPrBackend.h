@@ -8,7 +8,8 @@
 #ifndef GDIST_EXP_APPS_HPR_OPENCL_OPENCLPRBACKEND_H_
 #define GDIST_EXP_APPS_HPR_OPENCL_OPENCLPRBACKEND_H_
 
-#include "CLWrapper.h"
+#include <OpenCL/CLWrapper.h>
+
 template<typename GraphType>
 struct OPENCL_Context {
    typedef typename GraphType::NodeDataType NodeDataType;
@@ -29,12 +30,26 @@ struct OPENCL_Context {
      void loadGraphNonCPU(GaloisGraph &g) {
         m_graph.load_from_galois(g.g, g.numOwned, g.numEdges, g.numNodes - g.numOwned);
      }
+   std::string self_directory(){
+      char buffer[1024];
+      size_t len = readlink("/proc/self/exe", buffer, 1024);
+      if(len != -1){
+         char * filename = dirname(buffer);
+         return std::string(filename);
+      }
+      assert(false);
+      return std::string(buffer);
+   }
    void init(int num_items, int num_inits) {
       Galois::OpenCL::CL_Kernel init_all, init_nout;
-      kernel.init("pagerank_kernel.cl", "pagerank");
-      wb_kernel.init("pagerank_kernel.cl", "writeback");
-      init_nout.init("pagerank_kernel.cl", "initialize_nout");
-      init_all.init("pagerank_kernel.cl", "initialize_all");
+      std::string filename = "/pagerank_kernel.cl";
+      std::string dirname = self_directory();
+      std::string pathname = dirname;
+      pathname.append(filename);
+      kernel.init(pathname.c_str(), "pagerank");
+      wb_kernel.init(pathname.c_str(), "writeback");
+      init_nout.init(pathname.c_str(), "initialize_nout");
+      init_all.init(pathname.c_str(), "initialize_all");
       m_graph.copy_to_device();
 
       init_all.set_work_size(m_graph.num_nodes());
