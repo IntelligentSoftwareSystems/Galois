@@ -189,7 +189,8 @@ struct OptimNhoodItem: public OrdLocBase<OptimNhoodItem<Ctxt, CtxtCmp>, Ctxt, Ct
     }
   }
 
-  bool findAborts (Ctxt* ctxt) {
+  template <typename WL>
+  bool findAborts (Ctxt* ctxt, WL& abortWL) {
 
     assert (getMin () == ctxt);
 
@@ -199,7 +200,7 @@ struct OptimNhoodItem: public OrdLocBase<OptimNhoodItem<Ctxt, CtxtCmp>, Ctxt, Ct
       --i;
       if (ctxtCmp (ctxt, *i)) {
         ret = true;
-        (*i)->markForAbortRecursive ();
+        (*i)->markForAbortRecursive (abortWL);
 
       } else {
         break;
@@ -210,19 +211,25 @@ struct OptimNhoodItem: public OrdLocBase<OptimNhoodItem<Ctxt, CtxtCmp>, Ctxt, Ct
   }
 
   //! mark all sharers later than ctxt for abort
-  void markForAbort (Ctxt* ctxt) {
+  template <typename WL>
+  void markForAbort (Ctxt* ctxt, WL& abortWL) {
 
     assert (std::find (sharers.begin (), sharers.end (), ctxt) != sharers.end ());
+
+    bool succ = false;
 
     for (auto i = sharers.end (), beg_i = sharers.begin (); beg_i != i; ) {
       --i;
       if (ctxt == *i) {
+        succ = true;
         break;
 
       } else {
-        (*i)->markForAbortRecursive ();
+        (*i)->markForAbortRecursive (abortWL);
       }
     }
+
+    assert (succ);
 
   }
 
@@ -276,6 +283,7 @@ struct OptimContext: public OrderedContextBase<T> {
   bool source;
   std::atomic<ContextState> state;
   Exec& exec;
+  bool addBack; // set to false by parent when parent is marked for abort, see markAbortRecursive
   Galois::GAtomic<bool> onWL;
   NhoodList nhood;
 
@@ -291,6 +299,7 @@ struct OptimContext: public OrderedContextBase<T> {
     source (true), 
     state (s), 
     exec (exec),
+    addBack (false),
     onWL (false)
   {}
 
@@ -343,6 +352,7 @@ struct OptimContext: public OrderedContextBase<T> {
     setState (ContextState::SCHEDULED); 
     onWL = false;
     source = true;
+    addBack = true;
     nhood.clear ();
     userHandle.reset ();
     children.clear ();
@@ -384,7 +394,7 @@ struct OptimContext: public OrderedContextBase<T> {
     setState (ContextState::COMMIT_DONE);
   }
 
-  void doAbort (bool addBack=true) {
+  void doAbort () {
     // this can be in states READY_TO_COMMIT, ABORT_SELF
     // children can be in UNSCHEDULED, READY_TO_COMMIT, ABORT_DONE
 
@@ -394,29 +404,6 @@ struct OptimContext: public OrderedContextBase<T> {
 
     assert (hasState (ContextState::ABORTING));
 
-
-    for (OptimContext* child: children) {
-
-      assert (!child->hasState (ContextState::SCHEDULED));
-      assert (!child->hasState (ContextState::ABORTED_CHILD));
-
-      bool c = child->hasState (ContextState::UNSCHEDULED)
-        || child->hasState (ContextState::READY_TO_COMMIT)
-        || child->hasState (ContextState::ABORT_DONE);
-      assert (c);
-
-      if (child->casState (ContextState::READY_TO_COMMIT, ContextState::ABORTING)) {
-
-        dbg::debug (this, " aborting child ", child);
-        child->doAbort (false);
-        child->setState (ContextState::ABORTED_CHILD);
-
-      } else {
-        assert (child->hasState (ContextState::ABORTING) || child->hasState (ContextState::ABORT_DONE));
-        child->setState (ContextState::ABORTED_CHILD);
-      }
-    }
-
     dbg::debug (this, " aborting with item ", this->getActive ());
 
     userHandle.rollback ();
@@ -425,11 +412,15 @@ struct OptimContext: public OrderedContextBase<T> {
       ni->removeAbort (this);
     }
 
-    if (addBack) {
+    if (this->addBack) {
+
       setState (ContextState::ABORT_DONE);
       exec.push_abort (this);
-    }
 
+    } else {
+      // is an aborted child whose parent also aborted
+      setState (ContextState::ABORTED_CHILD);
+    }
 
   }
 
@@ -477,6 +468,11 @@ struct OptimContext: public OrderedContextBase<T> {
 
   template <typename WL>
   void findAbortSrc (WL& wl) const {
+
+    // XXX: if a task has children that don't share neighborhood with
+    // it, should it be an abort source? Yes, because the end goal in 
+    // finding abort sources is that tasks may abort and restore state
+    // in isolation. 
     
     for (const NItem* ni: nhood) {
 
@@ -500,33 +496,48 @@ struct OptimContext: public OrderedContextBase<T> {
     return true;
   }
 
-  bool findAborts (void) {
+  template <typename WL>
+  bool findAborts (WL& abortWL) {
 
     assert (isSrcSlowCheck ());
 
     bool ret = false;
 
     for (NItem* ni: nhood) {
-      ret = ni->findAborts (this) || ret;
+      ret = ni->findAborts (this, abortWL) || ret;
     }
 
     return ret;
   }
 
-  void markForAbortRecursive (void) {
+
+  template <typename WL>
+  void markForAbortRecursive (WL& abortWL) {
     if (casState (ContextState::READY_TO_COMMIT, ContextState::READY_TO_ABORT)) {
 
       for (NItem* ni: nhood) {
-        ni->markForAbort (this);
+        ni->markForAbort (this, abortWL);
+      }
+
+      if (isAbortSrc () && onWL.cas (false, true)) {
+        abortWL.push (this);
       }
 
       for (OptimContext* c: children) {
-        c->markForAbortRecursive ();
+        c->markForAbortRecursive (abortWL);
+        c->addBack = false;
       }
 
+    } else if (casState (ContextState::SCHEDULED, ContextState::ABORTED_CHILD)) {
+      // a SCHEDULED task can only be aborted recursively if it's a child
+
+    } else if (casState (ContextState::UNSCHEDULED, ContextState::ABORTED_CHILD)) {
+
     } else {
-      casState (ContextState::UNSCHEDULED, ContextState::ABORTED_CHILD);
+      assert (hasState (ContextState::READY_TO_ABORT) || hasState (ContextState::ABORTED_CHILD));
     }
+
+    assert (hasState (ContextState::READY_TO_ABORT) || hasState (ContextState::ABORTED_CHILD));
 
   }
 
@@ -859,7 +870,11 @@ private:
         [this] (Ctxt* c) {
 
           if (!c->hasState (ContextState::ABORTED_CHILD)) {
+
+            assert (!c->hasState (ContextState::RECLAIM));
             c->schedule ();
+
+            dbg::debug ("scheduling: ", c, " with item: ", c->getActive ());
 
             UserCtxt& uhand = c->userHandle;
 
@@ -880,6 +895,10 @@ private:
 
       Galois::do_all_choice (makeLocalRange (sources),
         [this] (Ctxt* ctxt) {
+          assert (ctxt->isSrc ());
+          assert (!ctxt->hasState (ContextState::RECLAIM));
+          assert (!ctxt->hasState (ContextState::ABORTED_CHILD));
+
           execFunc (ctxt->getActive ());
         },
         "exec-func",
@@ -903,6 +922,8 @@ private:
           UserCtxt& uhand = c->userHandle;
 
           assert (c->isSrc ());
+          assert (!c->hasState (ContextState::RECLAIM));
+          assert (!c->hasState (ContextState::ABORTED_CHILD));
 
           runCatching (opFunc, c, uhand);
           bool commit = c->isSrc (); // in case opFunc signalled abort
@@ -941,7 +962,12 @@ private:
 
           } else {
 
-            c->doAbort ();
+            if (c->casState (ContextState::SCHEDULED, ContextState::ABORTING)) {
+              c->doAbort ();
+
+            } else {
+              assert (c->hasState (ContextState::ABORTING) || c->hasState (ContextState::ABORT_DONE));
+            }
           }
         },
         "applyOperator",
@@ -985,39 +1011,39 @@ private:
 
   }
 
+  void quickAbort (Ctxt* c) {
+    assert (c);
+    bool b= c->hasState (ContextState::SCHEDULED) || c->hasState (ContextState::ABORTED_CHILD) || c->hasState (ContextState::ABORT_DONE);
+
+    assert (b);
+
+    if (c->casState (ContextState::SCHEDULED, ContextState::ABORT_DONE)) {
+      push_abort (c);
+
+    } else {
+      assert (c->hasState (ContextState::ABORTED_CHILD)); 
+    }
+  }
+
   GALOIS_ATTRIBUTE_PROF_NOINLINE void serviceAborts (CtxtWL& sources) {
     
     CtxtWL abortWL;
 
     Galois::do_all_choice (makeLocalRange (*currWL),
-        [this, &abortWL, &sources] (Ctxt* c) {
+        [this, &abortWL] (Ctxt* c) {
 
-          if (!c->hasState (ContextState::ABORTED_CHILD)) {
-            if (c->isSrc ()) {
+          if (c->isSrc ()) {
 
-              if (c->findAborts ()) {
+            if (c->findAborts (abortWL)) {
+              // XXX: c does not need to abort if it's neighborhood
+              // isn't dependent on values computed by other tasks
 
-                c->findAbortSrc (abortWL);
-                
-                c->setState (ContextState::ABORT_DONE);
-                push_abort (c);
-
-              } else {
-                sources.push (c);
-              }
-
-              c->resetMarks ();
-
-            } else {
-
-              c->setState (ContextState::ABORT_DONE);
-              push_abort (c);
+              c->disableSrc ();
             }
 
-          }
-
+          } 
         },
-        "collect-sources",
+        "mark-aborts",
         Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
 
 
@@ -1025,14 +1051,41 @@ private:
         makeLocalRange (abortWL),
         [this] (Ctxt* c, UserContext<Ctxt*>& wlHandle) {
 
-          c->doAbort ();
-          c->findAbortSrc (wlHandle);
+          if (c->casState (ContextState::READY_TO_ABORT, ContextState::ABORTING)) {
+            c->doAbort ();
+            c->findAbortSrc (wlHandle);
+          
+          } else {
+            assert (c->hasState (ContextState::ABORTING) || c->hasState (ContextState::ABORT_DONE));
+          }
         },
         std::make_tuple (
           Galois::loopname ("handle-aborts"),
           Galois::does_not_need_aborts_tag (),
           Galois::wl<Galois::WorkList::dChunkedFIFO<NhFunc::CHUNK_SIZE> > ()));
     
+
+    Galois::do_all_choice (makeLocalRange (*currWL),
+
+        [this, &sources] (Ctxt* c) {
+          if (c->isSrc () && !c->hasState (ContextState::ABORTED_CHILD)) {
+            assert (c->hasState (ContextState::SCHEDULED));
+
+            c->resetMarks ();
+            sources.push (c);
+
+          } else if (c->hasState (ContextState::ABORTED_CHILD)) {
+            commitQ.get ().push_back (c); // for reclaiming memory 
+
+          } else {
+            assert (!c->hasState (ContextState::ABORTED_CHILD));
+            quickAbort (c);
+          }
+        },
+
+        "collect-sources",
+        Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
+
 
   }
 
@@ -1097,17 +1150,6 @@ private:
     // should be done in a separate loop, after enforcing set semantics
     // among all threads
 
-    Galois::do_all_choice (makeLocalRange (*currWL),
-        [this] (Ctxt* c) {
-
-          if (c->casState (ContextState::ABORTED_CHILD, ContextState::RECLAIM)) {
-
-          freeCtxt (c);
-          }
-        },
-        "remove-aborted-child",
-        Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
-    
 
     Galois::Runtime::on_each_impl (
         [this] (const unsigned tid, const unsigned numT) {
@@ -1125,6 +1167,7 @@ private:
 
             if ((*i)->casState (ContextState::ABORTED_CHILD, ContextState::RECLAIM)
               || (*i)->casState (ContextState::COMMIT_DONE, ContextState::RECLAIM)) {
+              dbg::debug ("Ctxt destroyed from commitQ: ", *i);
               freeCtxt (*i);
             }
           }
