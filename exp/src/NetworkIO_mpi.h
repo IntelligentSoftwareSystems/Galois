@@ -102,6 +102,7 @@ public:
       handleError(rv);
       assert(nbytes != MPI_UNDEFINED);
       std::vector<char> d(nbytes);
+      std::cerr << _ID << " mpi_recv " << nbytes << " " << status.MPI_SOURCE << "\n";
       rv = MPI_Recv(d.data(), nbytes, MPI_BYTE, status.MPI_SOURCE, status.MPI_TAG, MPI_COMM_WORLD, &status);
       //printBuffer(true, _ID, status.MPI_SOURCE, d);
       handleError(rv);
