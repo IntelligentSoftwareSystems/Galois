@@ -182,7 +182,7 @@ struct DAGcontext: public OrderedContextBase<T> {
 
 
   explicit DAGcontext (const T& t, NhoodMgr& nhmgr): 
-    OrderedContextBase {t},
+    OrderedContextBase<T> {t},
     onWL {false},
     nhmgr {nhmgr}
   {}
