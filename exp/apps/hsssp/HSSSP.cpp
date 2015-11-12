@@ -29,10 +29,10 @@
 #include "Galois/Graph/Util.h"
 #include "Lonestar/BoilerPlate.h"
 #include "PGraph.h"
-#include "opencl/LC_LinearArray_Graph.h"
+#include "OpenCL/LC_LinearArray_Graph.h"
 #include "cuda/hsssp_cuda.h"
 #include "cuda/cuda_mtypes.h"
-#include "opencl/CLWrapper.h"
+#include "OpenCL/CLWrapper.h"
 
 #include <iostream>
 #include <typeinfo>
@@ -41,6 +41,7 @@
 
 #define _HETERO_DEBUG_ 0
 
+static const char* const name_short = "HSSSP";
 static const char* const name = "SSSP - Distributed Heterogeneous";
 static const char* const desc = "Bellman-Ford SSSP on Distributed Galois.";
 static const char* const url = 0;
@@ -308,6 +309,9 @@ void sendChangeFlag(Galois::Runtime::NetworkInterface & net) {
 void inner_main() {
    auto& net = Galois::Runtime::getSystemNetworkInterface();
    Galois::StatManager statManager;
+   Galois::Timer alg_timer, kernel_timer, init_timer;
+   float alg_time=0, kernel_time=0, init_time=0;
+
    auto& barrier = Galois::Runtime::getSystemBarrier();
    const unsigned my_host_id = Galois::Runtime::NetworkInterface::ID;
    //Parse arg string when running on multiple hosts and update/override personality
@@ -327,6 +331,8 @@ void inner_main() {
       }
    }
    barrier.wait();
+   init_timer.start();
+   alg_timer.start();
    PGraph g;
    g.loadGraph(inputFile);
 
@@ -335,7 +341,7 @@ void inner_main() {
       if (!init_CUDA_context(cuda_ctx, gpudevice))
          return;
    } else if (personality == GPU_OPENCL) {
-      Galois::OpenCL::cl_env.init();
+      Galois::OpenCL::cl_env.init(cldevice.Value);
    }
    if (personality != CPU)
       loadGraphNonCPU(g);
@@ -367,7 +373,8 @@ void inner_main() {
    std::cout << g.id << " initialized\n";
 #endif
    barrier.wait();
-
+   init_timer.stop();
+   init_time = init_timer.get();
    //send pGraph pointers
    for (uint32_t x = 0; x < Galois::Runtime::NetworkInterface::Num; ++x)
       net.sendAlt(x, setRemotePtr, Galois::Runtime::NetworkInterface::ID, &g);
@@ -384,6 +391,7 @@ void inner_main() {
    std::cout << "["<<my_host_id<< "]:ask for ghost cell attrs\n";
 #endif
 
+   kernel_timer.start();
    for (int i = 0; i < maxIterations; ++i) {
       //communicate ghost cells
       sendGhostCells(net, g);
@@ -411,11 +419,15 @@ void inner_main() {
       }
       hasChanged = false;
    }
-   if (hasChanged)
+   kernel_timer.stop();
+   kernel_time = kernel_timer.get();
+//   if (hasChanged)
       fprintf(stderr, "Terminating after max=%d steps\n", maxIterations.Value);
    //Final synchronization to ensure that all the nodes are updated.
    sendGhostCells(net, g);
    barrier.wait();
+   alg_timer.stop();
+   alg_time = alg_timer.get();
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////
    if (verify) {
       std::stringstream ss;
@@ -452,7 +464,12 @@ void inner_main() {
          break;
       }
       out_file.close();
+
    }
+   fprintf(stderr, "HEADER2,app,input,pset,id,alg_time, init_time, kernel_time\n");
+   fprintf(stderr, "STAT2,%s,%s,%s,%d,%6.6g,%6.6g,%6.6g\n", name_short, inputFile.c_str(),personality_set.c_str(), my_host_id,
+         alg_time, init_time, kernel_time);
+
    std::cout.flush();
 
 }

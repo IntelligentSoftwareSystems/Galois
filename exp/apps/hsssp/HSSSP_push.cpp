@@ -29,10 +29,10 @@
 #include "Galois/Graph/Util.h"
 #include "Lonestar/BoilerPlate.h"
 #include "PGraph.h"
-#include "opencl/LC_LinearArray_Graph.h"
+#include "OpenCL/LC_LinearArray_Graph.h"
 #include "cuda/hsssp_cuda.h"
 #include "cuda/cuda_mtypes.h"
-#include "opencl/CLWrapper.h"
+#include "OpenCL/CLWrapper.h"
 
 #include <iostream>
 #include <typeinfo>
@@ -463,7 +463,7 @@ int main(int argc, char** argv) {
       if (!init_CUDA_context(cuda_ctx, gpudevice))
          exit(-1);
    } else if (personality == GPU_OPENCL) {
-      Galois::OpenCL::cl_env.init();
+      Galois::OpenCL::cl_env.init(cldevice.Value);
    }
    if (personality != CPU)
       loadGraphNonCPU(g);
