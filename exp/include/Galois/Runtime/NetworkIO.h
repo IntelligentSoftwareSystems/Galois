@@ -27,23 +27,29 @@
 #include <cstdint>
 #include <vector>
 #include <tuple>
+#include <memory>
 
 namespace Galois {
 namespace Runtime {
 
 class NetworkIO {
- public:
- struct message {
-    uint32_t dest;
-    std::vector<char> data;
-    bool urgent;
+public:
+
+  struct message {
+    uint32_t host;
+    std::unique_ptr<uint8_t[]> data;
+    size_t len;
+    bool valid() const { return data.get() != nullptr; }
   };
+
   virtual ~NetworkIO();
   
-  //destructive of data buffer
-  virtual void enqueue(uint32_t dest, std::vector<uint8_t>& data) = 0;
+  //takes ownership of data buffer
+  virtual void enqueue(message m) = 0;
   //returns empty if no message
-  virtual std::vector<uint8_t> dequeue() = 0;
+  virtual message dequeue() = 0;
+  //make progress.  other functions don't have to
+  virtual void progress() = 0;
 
   //void operator() () -- make progress
   //bool readySend() -- can send
@@ -52,7 +58,7 @@ class NetworkIO {
   //message recv() -- recieve data
 };
 
-std::tuple<NetworkIO*, uint32_t, uint32_t> makeNetworkIOMPI();
+std::tuple<std::unique_ptr<NetworkIO>, uint32_t, uint32_t> makeNetworkIOMPI();
 
 } //namespace Runtime
 } //namespace Galois

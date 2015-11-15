@@ -28,9 +28,11 @@ int main(int argc, char** argv) {
   NetworkInterface& net = getSystemNetworkInterface();
   Galois::StatManager sm;
 
+  std::cerr << "Using " << net.Num << "\n";
+
   for (int num = 3; num < net.Num; ++num) {
 
-    std::cout << "Sending " << trials << " between every host.  " << trials * (num - 1) << " total messages per host.\n";
+    std::cerr << "Sending " << trials << " between every host.  " << trials * (num - 1) << " total messages per host.\n";
     
     getSystemBarrier().wait();
 
