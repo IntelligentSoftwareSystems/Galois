@@ -6,6 +6,7 @@
 #include <climits>
 #include <vector>
 #include <map>
+#include <regex>
 #include "clang/Frontend/FrontendPluginRegistry.h"
 #include "clang/AST/AST.h"
 #include "clang/AST/ASTConsumer.h"
@@ -149,6 +150,8 @@ class GaloisFunctionsVisitor : public RecursiveASTVisitor<GaloisFunctionsVisitor
     string GRAPH_NAME;
     string RESET_VALTYPE;
     string RESET_VAL;
+    string SYNC_TYPE;
+    bool IS_VEC;
   };
 
   struct ReductionOps_entry {
@@ -254,7 +257,7 @@ class CallExprHandler : public MatchFinder::MatchCallback {
 
                 auto varDecl_getData = Results.Nodes.getNodeAs<clang::VarDecl>("getData_varName");
                 DataEntry_obj.VAR_NAME = varDecl_getData->getNameAsString();
-                DataEntry_obj.VAR_TYPE = varDecl_getData->getType().getAsString();
+                DataEntry_obj.VAR_TYPE = varDecl_getData->getType().getNonReferenceType().getAsString();
                 DataEntry_obj.IS_REFERENCED = varDecl_getData->isReferenced();
 
                 llvm::outs() << " IS REFERENCED = > " << varDecl_getData->isReferenced() << "\n";
@@ -328,7 +331,7 @@ class CallExprHandler : public MatchFinder::MatchCallback {
                   auto varDecl_getData = Results.Nodes.getNodeAs<clang::VarDecl>("getData_varName");
                   llvm::outs() << "varname getData : "  << varDecl_getData->getNameAsString() << "\n";
                   DataEntry_obj.VAR_NAME = varDecl_getData->getNameAsString();
-                  DataEntry_obj.VAR_TYPE = varDecl_getData->getType().getAsString();
+                  DataEntry_obj.VAR_TYPE = varDecl_getData->getType().getNonReferenceType().getAsString();
                   DataEntry_obj.IS_REFERENCED = varDecl_getData->isReferenced();
 
                 }
@@ -427,6 +430,26 @@ class FunctionCallHandler : public MatchFinder::MatchCallback {
     }
 };
 
+
+/** Helping Functions **/
+bool is_vector_type(string inputStr, string& Type, string& Num_ele) {
+  /** Check if type is suppose to be a vector **/
+  //llvm::outs()<< "inside is_vec : " <<  inputStr << "\n ";
+  //std::regex re("([(a-z)]+)[[:space:]&]*(\[[0-9][[:d:]]*\])");
+  std::regex re("(.*)(\[[0-9][[:d:]]*\])");
+  std::smatch sm;
+  if(std::regex_match(inputStr, sm, re)) {
+    Type = "std::vector<" + sm[1].str() + ">";
+    llvm::outs() << "INSIDE ALSO : " << Type << "\n";
+    Num_ele = sm[2].str();
+    Num_ele.erase(0,1);
+    Num_ele.erase(Num_ele.size() -1);
+    return true;
+  }
+  return false;
+}
+
+
 class FindingFieldHandler : public MatchFinder::MatchCallback {
   private:
     ASTContext* astContext;
@@ -439,6 +462,8 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
         LangOpts.CPlusPlus = true;
         clang::PrintingPolicy Policy(LangOpts);
 
+        auto forVector = Results.Nodes.getNodeAs<clang::CXXBindTemporaryExpr>("forVector");
+        forVector->dump();
         for(auto i : info->getData_map) {
           for(auto j : i.second) {
             //llvm::outs() << j.VAR_NAME << "\n";
@@ -448,7 +473,8 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
             string str_assign_plus = "assignplusOp_" + j.VAR_NAME+ "_" + i.first;
             string str_varDecl = "varDecl_" + j.VAR_NAME+ "_" + i.first;
             string str_atomicAdd = "atomicAdd_" + j.VAR_NAME + "_" + i.first;
-
+            string str_plusOp_vec = "plusEqualOpVec_" + j.VAR_NAME+ "_" + i.first;
+            string str_assignment_vec = "equalOpVec_" + j.VAR_NAME+ "_" + i.first;
 
             if(j.IS_REFERENCED && j.IS_REFERENCE){
               auto field = Results.Nodes.getNodeAs<clang::VarDecl>(str_varDecl);
@@ -457,12 +483,16 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
               auto assignplusOP = Results.Nodes.getNodeAs<clang::Stmt>(str_assign_plus);
               auto atomicAdd_op = Results.Nodes.getNodeAs<clang::Stmt>(str_atomicAdd);
 
+              /** Vector operations **/
+              auto plusOP_vec = Results.Nodes.getNodeAs<clang::Stmt>(str_plusOp_vec);
+              auto assignmentOP_vec = Results.Nodes.getNodeAs<clang::Stmt>(str_assignment_vec);
+
 
               /**Figure out variable type to set the reset value **/
               auto memExpr = Results.Nodes.getNodeAs<clang::MemberExpr>(str_memExpr);
-
               //memExpr->dump();
               if(memExpr){
+                //memExpr->dump();
                 auto pType = memExpr->getType();
                 auto templatePtr = pType->getAs<TemplateSpecializationType>();
                 string Ty;
@@ -477,10 +507,28 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
                   Ty = pType->getLocallyUnqualifiedSingleStepDesugaredType().getAsString();
                 }
 
+                /** Check if type is suppose to be a vector **/
+                string Type = Ty;
+                if (plusOP_vec || assignmentOP_vec){
+                  Type = "std::vector<" + Ty + ">";
+                }
+                string Num_ele = "0";
+                bool is_vector = is_vector_type(Ty, Type, Num_ele);
+                /*
+                std::regex re("([(a-z)]+)[[:space:]&]*(\[[0-9][[:d:]]*\])");
+                std::smatch sm;
+                if(std::regex_match(Ty, sm, re)) {
+                   Type = "std::vector<" + sm[1].str() + ">";
+                   Num_ele = sm[2].str();
+                   Num_ele.erase(0,1);
+                   Num_ele.erase(Num_ele.size() -1);
+                }*/
+
                 ReductionOps_entry reduceOP_entry;
                 NodeField_entry field_entry;
-                field_entry.RESET_VALTYPE = reduceOP_entry.VAL_TYPE = Ty;
+                field_entry.RESET_VALTYPE = reduceOP_entry.VAL_TYPE = Type;
                 field_entry.NODE_TYPE = j.VAR_TYPE;
+                field_entry.IS_VEC = is_vector;
                 reduceOP_entry.NODE_TYPE = j.VAR_TYPE;
                 reduceOP_entry.FIELD_TYPE = j.VAR_TYPE;
 
@@ -499,11 +547,14 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
 
                 field_entry.FIELD_NAME = reduceOP_entry.FIELD_NAME = elems[1];
                 field_entry.GRAPH_NAME = reduceOP_entry.GRAPH_NAME = j.GRAPH_NAME;
-                if(!field && (assignplusOP || plusOP || assignmentOP || atomicAdd_op)) {
+                if(assignmentOP_vec) {
+                  assignmentOP_vec->dump();
+                }
+                if(!field && (assignplusOP || plusOP || assignmentOP || atomicAdd_op || plusOP_vec || assignmentOP_vec)) {
                   reduceOP_entry.SYNC_TYPE = "sync_pull";
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
                 }
-
+                /*
                 if(assignplusOP) {
                   //assignplusOP->dump();
                   field_entry.VAR_NAME = "+";
@@ -528,7 +579,7 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
                   break;
 
                 }
-                /** If this is a an expression like nodeData.fieldName = value **/
+                // If this is a an expression like nodeData.fieldName = value
                 else if(assignmentOP) {
 
                   field_entry.VAR_NAME = "DirectAssignment";
@@ -554,14 +605,16 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
                   break;
 
                 }
+                */
                 else if(field){
 
                   field_entry.VAR_NAME = field->getNameAsString();
-                  field_entry.VAR_TYPE = field->getType().getAsString();
+                  field_entry.VAR_TYPE = field->getType().getNonReferenceType().getAsString();
                   field_entry.IS_REFERENCED = field->isReferenced();
                   field_entry.IS_REFERENCE = true;
                   field_entry.GRAPH_NAME = j.GRAPH_NAME;
                   field_entry.RESET_VAL = "0";
+                  field_entry.SYNC_TYPE = "sync_pull";
                   info->fieldData_map[i.first].push_back(field_entry);
                   break;
                 }
@@ -606,6 +659,10 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
 
             string str_atomicAdd = "atomicAdd_" + j.VAR_NAME + "_" + i.first;
 
+            /** For vector operations **/
+            string str_assignment_vec = "equalOpVec_" + j.VAR_NAME+ "_" + i.first;
+            string str_plusOp_vec = "plusEqualOpVec_" + j.VAR_NAME+ "_" + i.first;
+
             if(j.IS_REFERENCED && j.IS_REFERENCE){
               auto field = Results.Nodes.getNodeAs<clang::VarDecl>(str_varDecl);
               auto assignmentOP = Results.Nodes.getNodeAs<clang::Stmt>(str_assignment);
@@ -619,6 +676,10 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
 
               /**Figure out variable type to set the reset value **/
               auto memExpr = Results.Nodes.getNodeAs<clang::MemberExpr>(str_memExpr);
+
+              /** Vector operations **/
+              auto plusOP_vec = Results.Nodes.getNodeAs<clang::Stmt>(str_plusOp_vec);
+              auto assignmentOP_vec = Results.Nodes.getNodeAs<clang::Stmt>(str_assignment_vec);
 
               //memExpr->dump();
               if(memExpr){
@@ -636,13 +697,23 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                   Ty = pType->getLocallyUnqualifiedSingleStepDesugaredType().getAsString();
                 }
 
+                /** Check if type is suppose to be a vector **/
+                string Type = Ty;
+                if (plusOP_vec || assignmentOP_vec){
+                  Type = "std::vector<" + Ty + ">";
+                }
+                string Num_ele = "0";
+                bool is_vector = is_vector_type(Ty, Type, Num_ele);
+
+
                 NodeField_entry field_entry;
                 ReductionOps_entry reduceOP_entry;
                 field_entry.NODE_TYPE = j.VAR_TYPE;
+                field_entry.IS_VEC = is_vector;
                 reduceOP_entry.NODE_TYPE = j.VAR_TYPE;
                 reduceOP_entry.FIELD_TYPE = j.VAR_TYPE;
 
-                field_entry.VAR_TYPE = field_entry.RESET_VALTYPE = reduceOP_entry.VAL_TYPE = Ty;
+                field_entry.VAR_TYPE = field_entry.RESET_VALTYPE = reduceOP_entry.VAL_TYPE = Type;
 
                 auto memExpr_stmt = Results.Nodes.getNodeAs<clang::Stmt>(str_memExpr);
                 string str_field;
@@ -669,10 +740,10 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                   field_entry.IS_REFERENCE = true;
                   field_entry.RESET_VAL = "0";
 
-                  string reduceOP = "node." + field_entry.FIELD_NAME + "= node." + field_entry.FIELD_NAME + " + y ;";
+                  string reduceOP = "{node." + field_entry.FIELD_NAME + "= node." + field_entry.FIELD_NAME + " + y;}";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
-                  string resetVal = "0";
-                  reduceOP_entry.RESETVAL_EXPR = resetVal;
+                  string resetValExpr = "{node." + field_entry.FIELD_NAME + " = 0 ; }";
+                  reduceOP_entry.RESETVAL_EXPR = resetValExpr;
 
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
                   //info->fieldData_map[i.first].push_back(field_entry);
@@ -684,11 +755,19 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                   field_entry.IS_REFERENCE = true;
                   field_entry.RESET_VAL = "0";
 
-                  string reduceOP = "node." + field_entry.FIELD_NAME + "+= y;";
-                  reduceOP_entry.OPERATION_EXPR = reduceOP;
-                  string resetVal = "0";
-                  reduceOP_entry.RESETVAL_EXPR = resetVal;
+                  string reduceOP, resetValExpr;
 
+                  if(is_vector){
+                    reduceOP = "{Galois::pairWiseAvg_vec(node." + field_entry.FIELD_NAME + ", y); }";
+                    resetValExpr = "{Galois::resetVec(node." + field_entry.FIELD_NAME + "); }";
+                  }
+                  else {
+                    reduceOP = "{node." + field_entry.FIELD_NAME + "+= y;}";
+                    resetValExpr = "{node." + field_entry.FIELD_NAME + " = 0 ; }";
+                  }
+
+                  reduceOP_entry.OPERATION_EXPR = reduceOP;
+                  reduceOP_entry.RESETVAL_EXPR = resetValExpr;
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
                   //info->fieldData_map[i.first].push_back(field_entry);
                   break;
@@ -703,10 +782,11 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                   field_entry.RESET_VAL = "0";
 
 
-                  string reduceOP = "node." + field_entry.FIELD_NAME + "= y;";
+                  string reduceOP = "{node." + field_entry.FIELD_NAME + " = y;}";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
-                  string resetVal = "0";
-                  reduceOP_entry.RESETVAL_EXPR = resetVal;
+
+                  string resetValExpr = "{node." + field_entry.FIELD_NAME + " = 0 ; }";
+                  reduceOP_entry.RESETVAL_EXPR = resetValExpr;
 
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
                   //info->fieldData_map[i.first].push_back(field_entry);
@@ -727,8 +807,8 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                     //string reduceOP = "if(node." + field_entry.FIELD_NAME + " > y) { node." + field_entry.FIELD_NAME + " = y;}";
                     string reduceOP = "{  Galois::min(node." + field_entry.FIELD_NAME + ", y);}";
                     reduceOP_entry.OPERATION_EXPR = reduceOP;
-                    string resetVal = "std::numeric_limits<" + field_entry.RESET_VALTYPE + ">::max()";
-                    reduceOP_entry.RESETVAL_EXPR = resetVal;
+                    string resetValExpr = "{node." + field_entry.FIELD_NAME + " = std::numeric_limits<" + field_entry.RESET_VALTYPE + ">::max()";
+                    reduceOP_entry.RESETVAL_EXPR = resetValExpr;
                     varAssignRHS->dump();
 
                     info->reductionOps_map[i.first].push_back(reduceOP_entry);
@@ -741,8 +821,8 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                   //whileCAS_LHS->dump();
                   string reduceOP = "{Galois::min(node." + field_entry.FIELD_NAME + ", y);}";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
-                  string resetVal = "std::numeric_limits<" + field_entry.RESET_VALTYPE + ">::max()";
-                  reduceOP_entry.RESETVAL_EXPR = resetVal;
+                  string resetValExpr = "{node." + field_entry.FIELD_NAME + " = std::numeric_limits<" + field_entry.RESET_VALTYPE + ">::max()";
+                  reduceOP_entry.RESETVAL_EXPR = resetValExpr;
 
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
                   //whileCAS_LHS->dump();
@@ -750,21 +830,43 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                 }
 
                 else if(atomicAdd_op){
+                  llvm::outs() << "NOT  INSIDE  FIELD \n";
+                  atomicAdd_op->dump();
                   string reduceOP = "{ Galois::atomicAdd(node." + field_entry.FIELD_NAME + ", y);}";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
-                  string resetVal = "0";
-                  reduceOP_entry.RESETVAL_EXPR = resetVal;
+                  string resetValExpr = "{node." + field_entry.FIELD_NAME + " = 0 ; }";
+                  reduceOP_entry.RESETVAL_EXPR = resetValExpr;
 
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
                   break;
                 }
+                else if(assignmentOP_vec){
+                  string reduceOP = "{node." + field_entry.FIELD_NAME + "= y;}";
+                  reduceOP_entry.OPERATION_EXPR = reduceOP;
+                  string resetValExpr = "{node." + field_entry.FIELD_NAME + " = 0 ; }";
+                  reduceOP_entry.RESETVAL_EXPR = resetValExpr;
+
+                  info->reductionOps_map[i.first].push_back(reduceOP_entry);
+                  break;
+                }
+                else if(plusOP_vec){
+                  string reduceOP, resetValExpr;
+                  reduceOP = "{Galois::pairWiseAvg_vec(node." + field_entry.FIELD_NAME + ", y); }";
+                  resetValExpr = "{Galois::resetVec(node." + field_entry.FIELD_NAME + "); }";
+                  reduceOP_entry.OPERATION_EXPR = reduceOP;
+                  reduceOP_entry.RESETVAL_EXPR = resetValExpr;
+                  info->reductionOps_map[i.first].push_back(reduceOP_entry);
+                  break;
+
+                }
                 else if(field){
 
                   field_entry.VAR_NAME = field->getNameAsString();
-                  field_entry.VAR_TYPE = field->getType().getAsString();
+                  field_entry.VAR_TYPE = field->getType().getNonReferenceType().getAsString();
                   field_entry.IS_REFERENCED = field->isReferenced();
                   field_entry.IS_REFERENCE = true;
                   field_entry.RESET_VAL = "0";
+                  field_entry.SYNC_TYPE = "sync_push";
                   info->fieldData_map[i.first].push_back(field_entry);
                   break;
                 }
@@ -810,6 +912,17 @@ class FieldUsedInForLoop : public MatchFinder::MatchCallback {
 
             string str_atomicAdd = "atomicAdd_" + j.VAR_NAME + "_" + i.first;
 
+            /** For vector operations **/
+            string str_assignment_vec = "equalOpVec_" + j.VAR_NAME+ "_" + i.first;
+            string str_plusOp_vec = "plusEqualOpVec_" + j.VAR_NAME+ "_" + i.first;
+
+            
+            auto vectorOp = Results.Nodes.getNodeAs<clang::Stmt>("vectorOp");
+            if(vectorOp){
+              vectorOp->dump();
+              return;
+            }
+           
 
             if(j.IS_REFERENCED && j.IS_REFERENCE){
               auto field = Results.Nodes.getNodeAs<clang::VarDecl>(str_varDecl);
@@ -821,6 +934,9 @@ class FieldUsedInForLoop : public MatchFinder::MatchCallback {
               auto whileCAS_op = Results.Nodes.getNodeAs<clang::Stmt>(str_whileCAS);
               auto atomicAdd_op = Results.Nodes.getNodeAs<clang::Stmt>(str_atomicAdd);
 
+              auto assignmentOP_vec = Results.Nodes.getNodeAs<clang::Stmt>(str_assignment_vec);
+              auto plusOP_vec = Results.Nodes.getNodeAs<clang::Stmt>(str_plusOp_vec);
+
               /**Figure out variable type to set the reset value **/
               auto memExpr = Results.Nodes.getNodeAs<clang::MemberExpr>(str_memExpr);
 
@@ -830,27 +946,43 @@ class FieldUsedInForLoop : public MatchFinder::MatchCallback {
 
                 reduceOP_entry.FIELD_NAME = j.FIELD_NAME ;
                 reduceOP_entry.GRAPH_NAME = j.GRAPH_NAME ;
-                reduceOP_entry.SYNC_TYPE = "sync_push";
+                reduceOP_entry.SYNC_TYPE =  j.SYNC_TYPE; //"sync_push";
 
                 reduceOP_entry.FIELD_TYPE = j.VAR_TYPE;
                 reduceOP_entry.VAL_TYPE = j.RESET_VALTYPE;
 
 
                 if(assignplusOP) {
-                  string reduceOP = "node." + j.FIELD_NAME + "= node." + j.FIELD_NAME + " + y ;";
+                  string reduceOP = "{ node." + j.FIELD_NAME + "= node." + j.FIELD_NAME + " + y ;}";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
-                  string resetVal = "0";
-                  reduceOP_entry.RESETVAL_EXPR = resetVal;
+                  string resetValExpr = "{node." + j.FIELD_NAME + " = 0 ; }";
+                  reduceOP_entry.RESETVAL_EXPR = resetValExpr;
 
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
                   break;
                 }
                 else if(plusOP) {
+
+                  /*
                   string reduceOP = "node." + j.FIELD_NAME + "+= y;";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
                   string resetVal = "0";
                   reduceOP_entry.RESETVAL_EXPR = resetVal;
+                  */
+                  string reduceOP, resetValExpr;
 
+                  if(j.IS_VEC){
+                    reduceOP = "{Galois::pairWiseAvg_vec(node." + j.FIELD_NAME + ", y); }";
+                    resetValExpr = "{Galois::resetVec(node." + j.FIELD_NAME + "); }";
+                  }
+                  else {
+                    reduceOP = "{node." + j.FIELD_NAME + "+= y;}";
+                    resetValExpr = "{node." + j.FIELD_NAME + "= 0 ; }";
+                  }
+
+                  llvm::outs() << " HERERERERER : " <<  resetValExpr << "\n\n";
+                  reduceOP_entry.OPERATION_EXPR = reduceOP;
+                  reduceOP_entry.RESETVAL_EXPR = resetValExpr;
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
                   break;
 
@@ -858,10 +990,10 @@ class FieldUsedInForLoop : public MatchFinder::MatchCallback {
                 /** If this is a an expression like nodeData.fieldName = value **/
                 else if(assignmentOP) {
 
-                  string reduceOP = "node." + j.FIELD_NAME + "= y;";
+                  string reduceOP = "{node." + j.FIELD_NAME + "= y;}";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
-                  string resetVal = "0";
-                  reduceOP_entry.RESETVAL_EXPR = resetVal;
+                  string resetValExpr = "{node." + j.FIELD_NAME + " = 0 ; }";
+                  reduceOP_entry.RESETVAL_EXPR = resetValExpr;
 
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
                   break;
@@ -874,8 +1006,9 @@ class FieldUsedInForLoop : public MatchFinder::MatchCallback {
                   //string reduceOP = "if(node." + j.FIELD_NAME + " > y) { node." + j.FIELD_NAME + " = y;}";
                   string reduceOP = "{ Galois::min(node." + j.FIELD_NAME + ", y);}";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
-                  string resetVal = "std::numeric_limits<" + j.RESET_VALTYPE + ">::max()";
-                  reduceOP_entry.RESETVAL_EXPR = resetVal;
+
+                  string resetValExpr = "{node." + j.FIELD_NAME + " = std::numeric_limits<" + j.RESET_VALTYPE + ">::max()";
+                  reduceOP_entry.RESETVAL_EXPR = resetValExpr;
 
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
                   break;
@@ -887,21 +1020,44 @@ class FieldUsedInForLoop : public MatchFinder::MatchCallback {
                   auto whileCAS_LHS = Results.Nodes.getNodeAs<clang::Stmt>(str_memExpr);
                   string reduceOP = "{Galois::min(node." + j.FIELD_NAME + ", y);}";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
-                  string resetVal = "std::numeric_limits<" + j.RESET_VALTYPE + ">::max()";
-                  reduceOP_entry.RESETVAL_EXPR = resetVal;
+
+                  string resetValExpr = "{node." + j.FIELD_NAME + " = std::numeric_limits<" + j.RESET_VALTYPE + ">::max()";
+                  reduceOP_entry.RESETVAL_EXPR = resetValExpr;
 
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
                   whileCAS_LHS->dump();
                   break;
                 }
-               else if(atomicAdd_op){
+                else if(atomicAdd_op){
+                  llvm::outs() << "INSIDE  FIELD \n";
+                  atomicAdd_op->dump();
                   string reduceOP = "{ Galois::atomicAdd(node." + j.FIELD_NAME + ", y);}";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
-                  string resetVal = "0";
-                  reduceOP_entry.RESETVAL_EXPR = resetVal;
+
+                  string resetValExpr = "{node." + j.FIELD_NAME + " = 0 ; }";
+                  reduceOP_entry.RESETVAL_EXPR = resetValExpr;
 
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
                   break;
+                }
+                else if(assignmentOP_vec){
+                  string reduceOP = "{node." + j.FIELD_NAME + "= y;}";
+                  reduceOP_entry.OPERATION_EXPR = reduceOP;
+                  string resetValExpr = "{node." + j.FIELD_NAME + " = 0 ; }";
+                  reduceOP_entry.RESETVAL_EXPR = resetValExpr;
+
+                  info->reductionOps_map[i.first].push_back(reduceOP_entry);
+                  break;
+                }
+                else if(plusOP_vec){
+                  string reduceOP, resetValExpr;
+                  reduceOP = "{Galois::pairWiseAvg_vec(node." + j.FIELD_NAME + ", y); }";
+                  resetValExpr = "{Galois::resetVec(node." + j.FIELD_NAME + "); }";
+                  reduceOP_entry.OPERATION_EXPR = reduceOP;
+                  reduceOP_entry.RESETVAL_EXPR = resetValExpr;
+                  info->reductionOps_map[i.first].push_back(reduceOP_entry);
+                  break;
+
                 }
 
             }
@@ -1116,6 +1272,8 @@ class GaloisFunctionsConsumer : public ASTConsumer {
             string str_varDecl = "varDecl_" + j.VAR_NAME+ "_" + i.first;
 
             string str_atomicAdd = "atomicAdd_" + j.VAR_NAME + "_" + i.first;
+            string str_plusOp_vec = "plusEqualOpVec_" + j.VAR_NAME+ "_" + i.first;
+            string str_assignment_vec = "equalOpVec_" + j.VAR_NAME+ "_" + i.first;
 
             /** Only match references types, ignore read only **/
             DeclarationMatcher f_1 = varDecl(isExpansionInMainFile(), hasInitializer(expr(anyOf(
@@ -1154,8 +1312,18 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                                                                       operatorCallExpr(hasOverloadedOperatorName("="),
                                                                              hasDescendant(LHS_memExpr)).bind(str_assignment),
 
+                                                                      binaryOperator(hasOperatorName("="), hasLHS(operatorCallExpr(hasDescendant(declRefExpr(to(methodDecl(hasName("operator[]"))))), hasDescendant(LHS_memExpr)))).bind(str_assignment_vec),
+                                                                      binaryOperator(hasOperatorName("+="), hasLHS(operatorCallExpr(hasDescendant(declRefExpr(to(methodDecl(hasName("operator[]"))))), hasDescendant(LHS_memExpr)))).bind(str_plusOp_vec),
                                                                       /** Atomic Add **/
-                                                                      callExpr(argumentCountIs(2), (callee(functionDecl(hasName("atomicAdd"))), hasAnyArgument(LHS_memExpr))).bind(str_atomicAdd)
+                                                                      callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("atomicAdd"))))), hasAnyArgument(LHS_memExpr)).bind(str_atomicAdd),
+                                                                      //callExpr(argumentCountIs(2), (callee(functionDecl(hasName("atomicAdd"))), hasAnyArgument(LHS_memExpr))).bind(str_atomicAdd),
+
+                                                                      binaryOperator(hasOperatorName("="), hasDescendant(arraySubscriptExpr(hasDescendant(LHS_memExpr)).bind("arraySub"))).bind(str_assignment),
+                                                                      binaryOperator(hasOperatorName("+="), hasDescendant(arraySubscriptExpr(hasDescendant(LHS_memExpr)).bind("arraySub"))).bind(str_plusOp),
+
+                                                                     /** For vectors **/
+                                                                      binaryOperator(hasOperatorName("+="), hasDescendant(operatorCallExpr().bind("forVector"))).bind("OpforVector")
+
                                                                      ),
                                                                      hasAncestor(recordDecl(hasName(i.first)))/*,
                                                                      unless(hasAncestor(ifStmt(hasCondition(anything()))))*/);
@@ -1190,6 +1358,9 @@ class GaloisFunctionsConsumer : public ASTConsumer {
             string str_whileCAS_RHS = "whileCAS_RHS" + j.VAR_NAME + "_" + i.first;
 
             string str_atomicAdd = "atomicAdd_" + j.VAR_NAME + "_" + i.first;
+
+            string str_plusOp_vec = "plusEqualOpVec_" + j.VAR_NAME+ "_" + i.first;
+            string str_assignment_vec = "equalOpVec_" + j.VAR_NAME+ "_" + i.first;
 
             /** Only match references types, ignore read only **/
             DeclarationMatcher f_1 = varDecl(isExpansionInMainFile(), hasInitializer(expr(anyOf(
@@ -1229,7 +1400,16 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                                                                       /** For ComplexType : NodeData.field = val **/
                                                                       operatorCallExpr(hasOverloadedOperatorName("="),
                                                                              hasDescendant(LHS_memExpr)).bind(str_assignment),
-                                                                      callExpr(isExpansionInMainFile(), argumentCountIs(2), (callee(functionDecl(hasName("atomicAdd"))), hasAnyArgument(LHS_memExpr))).bind(str_atomicAdd)
+
+                                                                      /** for vector operations NodeData.field[i] += val **/
+                                                                      binaryOperator(hasOperatorName("="), hasLHS(operatorCallExpr(hasDescendant(declRefExpr(to(methodDecl(hasName("operator[]"))))), hasDescendant(LHS_memExpr)))).bind(str_assignment_vec),
+                                                                      binaryOperator(hasOperatorName("+="), hasLHS(operatorCallExpr(hasDescendant(declRefExpr(to(methodDecl(hasName("operator[]"))))), hasDescendant(LHS_memExpr)))).bind(str_plusOp_vec),
+
+                                                                      /** Atomic Add **/
+                                                                      callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("atomicAdd"))))), hasAnyArgument(LHS_memExpr)).bind(str_atomicAdd),
+
+                                                                      binaryOperator(hasOperatorName("="), hasDescendant(arraySubscriptExpr(hasDescendant(LHS_memExpr)).bind("arraySub"))).bind(str_assignment),
+                                                                      binaryOperator(hasOperatorName("+="), hasDescendant(arraySubscriptExpr(hasDescendant(LHS_memExpr)).bind("arraySub"))).bind(str_plusOp)
                                                                      ),
                                                                      hasAncestor(recordDecl(hasName(i.first))),
                                                                      /** Only if condition inside EdgeForLoop should be considered**/
@@ -1290,6 +1470,9 @@ class GaloisFunctionsConsumer : public ASTConsumer {
 
             string str_atomicAdd = "atomicAdd_" + j.VAR_NAME + "_" + i.first;
 
+            string str_plusOp_vec = "plusEqualOpVec_" + j.VAR_NAME+ "_" + i.first;
+            string str_assignment_vec = "equalOpVec_" + j.VAR_NAME+ "_" + i.first;
+
             /** Only match references types, ignore read only **/
             DeclarationMatcher f_1 = varDecl(isExpansionInMainFile(), hasInitializer(expr(anyOf(
                                                                                                 hasDescendant(memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.VAR_NAME)))))).bind(str_memExpr)),
@@ -1303,6 +1486,7 @@ class GaloisFunctionsConsumer : public ASTConsumer {
 
             StatementMatcher LHS_memExpr = memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.VAR_NAME))))), hasAncestor(recordDecl(hasName(i.first)))).bind(str_memExpr);
             StatementMatcher LHS_declRefExpr = declRefExpr(to(varDecl(hasName(j.VAR_NAME)))).bind(str_ifMinLHS);
+            StatementMatcher LHS_declRefExprVector = declRefExpr(to(varDecl(hasName(j.VAR_NAME), hasType(asString(j.VAR_TYPE)))));
             StatementMatcher Cond_notDeclExpr = declRefExpr(to(varDecl(unless(hasName(j.VAR_NAME))).bind(str_varDecl)), hasAncestor(recordDecl(hasName(i.first)))).bind(str_Cond_RHSmemExpr);
             /** Order matters as the most generic ones should be at the last **/
             StatementMatcher f_2 = expr(isExpansionInMainFile(), anyOf(
@@ -1330,7 +1514,24 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                                                                       operatorCallExpr(hasOverloadedOperatorName("="),
                                                                              hasDescendant(LHS_memExpr)).bind(str_assignment),
 
-                                                                      callExpr(isExpansionInMainFile(), argumentCountIs(2), (callee(functionDecl(hasName("atomicAdd"))), hasAnyArgument(LHS_declRefExpr))).bind(str_atomicAdd)
+                                                                      //callExpr(hasAnyArgument(declRefExpr(to(varDecl(hasName(j.VAR_NAME)[>, hasType(asString("class std::vector"))<]))))).bind("vectorOp"),
+                                                                      binaryOperator(hasOperatorName("+="), hasLHS(operatorCallExpr(hasDescendant(declRefExpr(to(methodDecl(hasName("operator[]"))))), hasDescendant(LHS_declRefExpr)))).bind(str_plusOp_vec),
+                                                                      binaryOperator(hasOperatorName("="), hasLHS(operatorCallExpr(hasDescendant(declRefExpr(to(methodDecl(hasName("operator[]"))))), hasDescendant(LHS_declRefExpr)))).bind(str_assignment_vec),
+
+                                                                       /** Galois::atomicAdd(field, val) **/
+                                                                      callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("atomicAdd"))))), hasAnyArgument(LHS_declRefExpr)).bind(str_atomicAdd),
+
+                                                                      /** For arrays: field[i] += val **/
+                                                                      binaryOperator(hasOperatorName("=") , hasLHS(arraySubscriptExpr(hasDescendant(LHS_declRefExpr)).bind("arraySub"))).bind(str_assignment),
+                                                                      binaryOperator(hasOperatorName("+=") , hasLHS(arraySubscriptExpr(hasDescendant(LHS_declRefExpr)).bind("arraySub"))).bind(str_plusOp),
+
+                                                                      /** For builtInType : field = val **/
+                                                                      binaryOperator(hasOperatorName("="),
+                                                                            hasLHS(ignoringParenImpCasts(LHS_declRefExpr))).bind(str_assignment),
+
+                                                                      /** For builtInType : field += val **/
+                                                                      binaryOperator(hasOperatorName("+="),
+                                                                            hasLHS(ignoringParenImpCasts(LHS_declRefExpr))).bind(str_plusOp)
                                                                      ),
                                                                      hasAncestor(recordDecl(hasName(i.first))),
                                                                      /** Only if condition inside EdgeForLoop should be considered**/
@@ -1357,6 +1558,7 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                                                                                                   hasRHS(ignoringParenImpCasts(declRefExpr(to(decl().bind(str_whileCAS_RHS))))))),
                                                                       hasBody(compoundStmt(hasDescendant(memberCallExpr(callee(methodDecl(matchesName(".compare_exchange_strong"))), hasAnyArgument(declRefExpr(to(decl(equalsBoundNode(str_whileCAS_RHS)))))))))).bind(str_whileCAS);
 
+            //StatementMatcher f_5 = forStmt(isExpansionInMainFile()).bind("arraySub");
             //StatementMatcher f_5 = callExpr(isExpansionInMainFile(), argumentCountIs(2), (callee(functionDecl(hasName("atomicAdd")))[>, hasAnyArgument(LHS_memExpr)<])).bind(str_atomicAdd);
 
             Matchers_gen_field.addMatcher(f_1, &insideForLoopField_handler);
@@ -1434,10 +1636,11 @@ class GaloisFunctionsConsumer : public ASTConsumer {
 
     void EndSourceFileAction() override {
       TheRewriter.getEditBuffer(TheRewriter.getSourceMgr().getMainFileID()).write(llvm::outs());
-      if (!TheRewriter.overwriteChangedFiles())
+/*      if (!TheRewriter.overwriteChangedFiles())
       {
         llvm::outs() << "Successfully saved changes\n";
       }
+*/
     }
     std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance &CI, llvm::StringRef) override {
       TheRewriter.setSourceMgr(CI.getSourceManager(), CI.getLangOpts());
