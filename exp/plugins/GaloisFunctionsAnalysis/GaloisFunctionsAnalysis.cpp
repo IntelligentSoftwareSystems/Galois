@@ -257,12 +257,12 @@ class CallExprHandler : public MatchFinder::MatchCallback {
 
                 auto varDecl_getData = Results.Nodes.getNodeAs<clang::VarDecl>("getData_varName");
                 DataEntry_obj.VAR_NAME = varDecl_getData->getNameAsString();
-                DataEntry_obj.VAR_TYPE = varDecl_getData->getType().getNonReferenceType().getAsString();
+                DataEntry_obj.VAR_TYPE = varDecl_getData->getType().getAsString();
                 DataEntry_obj.IS_REFERENCED = varDecl_getData->isReferenced();
 
-                llvm::outs() << " IS REFERENCED = > " << varDecl_getData->isReferenced() << "\n";
-                llvm::outs() << varDecl_getData->getNameAsString() << "\n";
-                llvm::outs() << varDecl_getData->getType().getAsString() << "\n";
+                //llvm::outs() << " IS REFERENCED = > " << varDecl_getData->isReferenced() << "\n";
+                //llvm::outs() << varDecl_getData->getNameAsString() << "\n";
+                llvm::outs() << "THIS IS TYPE : " << varDecl_getData->getType().getAsString() << "\n";
               }
               else if (binaryOP)
               {
@@ -331,7 +331,7 @@ class CallExprHandler : public MatchFinder::MatchCallback {
                   auto varDecl_getData = Results.Nodes.getNodeAs<clang::VarDecl>("getData_varName");
                   llvm::outs() << "varname getData : "  << varDecl_getData->getNameAsString() << "\n";
                   DataEntry_obj.VAR_NAME = varDecl_getData->getNameAsString();
-                  DataEntry_obj.VAR_TYPE = varDecl_getData->getType().getNonReferenceType().getAsString();
+                  DataEntry_obj.VAR_TYPE = varDecl_getData->getType().getAsString();
                   DataEntry_obj.IS_REFERENCED = varDecl_getData->isReferenced();
 
                 }
@@ -553,6 +553,7 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
                 if(!field && (assignplusOP || plusOP || assignmentOP || atomicAdd_op || plusOP_vec || assignmentOP_vec)) {
                   reduceOP_entry.SYNC_TYPE = "sync_pull";
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
+                  break;
                 }
                 /*
                 if(assignplusOP) {
@@ -609,7 +610,8 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
                 else if(field){
 
                   field_entry.VAR_NAME = field->getNameAsString();
-                  field_entry.VAR_TYPE = field->getType().getNonReferenceType().getAsString();
+                  field_entry.VAR_TYPE = field_entry.RESET_VALTYPE = field->getType().getNonReferenceType().getAsString();
+                  llvm::outs() << " VAR TYPE in getdata not in loop :" << field_entry.VAR_TYPE << "\n";
                   field_entry.IS_REFERENCED = field->isReferenced();
                   field_entry.IS_REFERENCE = true;
                   field_entry.GRAPH_NAME = j.GRAPH_NAME;
@@ -863,9 +865,11 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
 
                   field_entry.VAR_NAME = field->getNameAsString();
                   field_entry.VAR_TYPE = field->getType().getNonReferenceType().getAsString();
+                  llvm::outs() << " VAR TYPE in getdata IN loop :" << field_entry.VAR_TYPE << "\n";
                   field_entry.IS_REFERENCED = field->isReferenced();
                   field_entry.IS_REFERENCE = true;
                   field_entry.RESET_VAL = "0";
+                  field_entry.RESET_VALTYPE = field_entry.VAR_TYPE;
                   field_entry.SYNC_TYPE = "sync_push";
                   info->fieldData_map[i.first].push_back(field_entry);
                   break;
@@ -939,29 +943,33 @@ class FieldUsedInForLoop : public MatchFinder::MatchCallback {
 
               /**Figure out variable type to set the reset value **/
               auto memExpr = Results.Nodes.getNodeAs<clang::MemberExpr>(str_memExpr);
-
-                ReductionOps_entry reduceOP_entry;
-                reduceOP_entry.NODE_TYPE = j.NODE_TYPE;
-
-
-                reduceOP_entry.FIELD_NAME = j.FIELD_NAME ;
-                reduceOP_entry.GRAPH_NAME = j.GRAPH_NAME ;
-                reduceOP_entry.SYNC_TYPE =  j.SYNC_TYPE; //"sync_push";
-
-                reduceOP_entry.FIELD_TYPE = j.VAR_TYPE;
-                reduceOP_entry.VAL_TYPE = j.RESET_VALTYPE;
+              /** Check if type is suppose to be a vector **/
+              string Type = j.VAR_TYPE;
+              if (plusOP_vec || assignmentOP_vec){
+                Type = "std::vector<" + j.VAR_TYPE + ">";
+              }
+              ReductionOps_entry reduceOP_entry;
+              reduceOP_entry.NODE_TYPE = j.NODE_TYPE;
 
 
-                if(assignplusOP) {
-                  string reduceOP = "{ node." + j.FIELD_NAME + "= node." + j.FIELD_NAME + " + y ;}";
-                  reduceOP_entry.OPERATION_EXPR = reduceOP;
-                  string resetValExpr = "{node." + j.FIELD_NAME + " = 0 ; }";
-                  reduceOP_entry.RESETVAL_EXPR = resetValExpr;
+              reduceOP_entry.FIELD_NAME = j.FIELD_NAME ;
+              reduceOP_entry.GRAPH_NAME = j.GRAPH_NAME ;
+              reduceOP_entry.SYNC_TYPE =  j.SYNC_TYPE; //"sync_push";
 
-                  info->reductionOps_map[i.first].push_back(reduceOP_entry);
-                  break;
-                }
-                else if(plusOP) {
+              reduceOP_entry.FIELD_TYPE = Type;
+              reduceOP_entry.VAL_TYPE = j.RESET_VALTYPE;
+
+
+              if(assignplusOP) {
+                string reduceOP = "{ node." + j.FIELD_NAME + "= node." + j.FIELD_NAME + " + y ;}";
+                reduceOP_entry.OPERATION_EXPR = reduceOP;
+                string resetValExpr = "{node." + j.FIELD_NAME + " = 0 ; }";
+                reduceOP_entry.RESETVAL_EXPR = resetValExpr;
+
+                info->reductionOps_map[i.first].push_back(reduceOP_entry);
+                break;
+              }
+              else if(plusOP) {
 
                   /*
                   string reduceOP = "node." + j.FIELD_NAME + "+= y;";
@@ -980,7 +988,6 @@ class FieldUsedInForLoop : public MatchFinder::MatchCallback {
                     resetValExpr = "{node." + j.FIELD_NAME + "= 0 ; }";
                   }
 
-                  llvm::outs() << " HERERERERER : " <<  resetValExpr << "\n\n";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
                   reduceOP_entry.RESETVAL_EXPR = resetValExpr;
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
@@ -1636,11 +1643,11 @@ class GaloisFunctionsConsumer : public ASTConsumer {
 
     void EndSourceFileAction() override {
       TheRewriter.getEditBuffer(TheRewriter.getSourceMgr().getMainFileID()).write(llvm::outs());
-/*      if (!TheRewriter.overwriteChangedFiles())
+      if (!TheRewriter.overwriteChangedFiles())
       {
         llvm::outs() << "Successfully saved changes\n";
       }
-*/
+
     }
     std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance &CI, llvm::StringRef) override {
       TheRewriter.setSourceMgr(CI.getSourceManager(), CI.getLangOpts());
