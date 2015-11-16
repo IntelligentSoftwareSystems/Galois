@@ -24,6 +24,9 @@
 #define GALOIS_RUNTIME_COMPILER_HELPER_FUNCTIONS_H
 
 #include <atomic>
+#include <algorithm>
+#include <vector>
+
 namespace Galois {
 
   /** Galois::min **/
@@ -56,5 +59,33 @@ namespace Galois {
 
       return old_val;
     }
+
+  /** Pair Wise Average function **/
+  template<typename Ty>
+  const Ty pairWiseAvg(Ty a, Ty b) {
+    return (a+b)/2.0;
+  }
+
+  template<typename Ty>
+  void pairWiseAvg_vec(std::vector<Ty>& a_vec, std::vector<Ty>& b_vec) {
+    for(unsigned i = 0; i < a_vec.size(); ++i) {
+      a_vec[i] = (a_vec[i] + b_vec[i])/2.0;
+    }
+  }
+
+  template<typename Ty>
+  void resetVec(std::vector<Ty>& a_vec) {
+    std::for_each(a_vec.begin(), a_vec.end(),[](Ty &ele){ele = 0;} ); 
+  }
+
+  //like std::inner_product
+  template<typename ItrTy, typename Ty >
+  Ty innerProduct(ItrTy a_begin, ItrTy a_end, ItrTy b_begin, Ty init_value) {
+    auto jj = b_begin;
+    for(auto ii = a_begin; ii != a_end; ++ii, ++jj){
+      init_value += (*ii) * (*jj);
+    }
+    return init_value;
+  }
 }
 #endif
