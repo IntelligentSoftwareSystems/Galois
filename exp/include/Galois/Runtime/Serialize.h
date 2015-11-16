@@ -38,10 +38,10 @@
 //from libc++, clang specific
 namespace std {
 #ifdef __clang__
-//template <class T> struct is_trivially_copyable;
-//template <class _Tp> struct is_trivially_copyable
-//  : public std::integral_constant<bool, __is_trivially_copyable(_Tp)>
-//{};
+template <class T> struct is_trivially_copyable;
+template <class _Tp> struct is_trivially_copyable
+  : public std::integral_constant<bool, __is_trivially_copyable(_Tp)>
+{};
 #else
 template<class T>
 using is_trivially_copyable = is_trivial<T>;
