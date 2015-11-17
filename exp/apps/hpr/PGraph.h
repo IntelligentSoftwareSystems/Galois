@@ -42,7 +42,8 @@ struct pGraph {
    }
    //XXX: Hack
    unsigned G2L_Local(unsigned GID){
-    assert((GID > g_offset));
+    //std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] " << GID << ", " << g_offset << "\n";
+    assert((GID >= g_offset));
     assert(GID < (g_offset + numOwned));
     return (GID - g_offset);
    }
