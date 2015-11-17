@@ -248,6 +248,7 @@ struct CL_Kernel {
       global = local = 0;
       std::string dirname = self_directory();
       std::string pathname = dirname;
+      pathname.append("/");
       pathname.append(filename);
       kernel = Galois::OpenCL::CL_Kernel_Helper::load_kernel(pathname.c_str(), kernel_name);
    }
