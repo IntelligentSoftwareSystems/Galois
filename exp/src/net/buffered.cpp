@@ -136,7 +136,8 @@ class NetworkInterfaceBuffered : public NetworkInterface {
     LL::SimpleLock lock;
 
     void markUrgent() {
-      urgent = true;
+      if (numBytes)
+        urgent = true;
     }
 
     void add(uintptr_t fp, size_t offset, std::vector<uint8_t>& b) {
