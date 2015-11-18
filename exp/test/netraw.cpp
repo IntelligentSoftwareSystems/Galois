@@ -4,7 +4,7 @@
 
 int main() {
   uint32_t ID, Num;
-  Galois::Runtime::NetworkIO* net;
+  std::unique_ptr<Galois::Runtime::NetworkIO> net;
 
   std::tie(net,ID,Num) = Galois::Runtime::makeNetworkIOMPI();
 
@@ -13,20 +13,23 @@ int main() {
   for (int x = 1; x <= 100; ++x) {
 
     for (int i = 0; i < Num; ++i) {
-      std::vector<uint8_t> data;
+      Galois::Runtime::NetworkIO::message m;
+      m.len = x;
+      m.data.reset(new uint8_t[x]);
+      m.host = i;
       for (int y = 0; y < x; ++y)
-        data.push_back(ID);
-      net->enqueue(i, data);
+        m.data[y] = ID;
+      net->enqueue(std::move(m));
     }
     
     for (int i = 0; i < Num; ++i) {
-      std::vector<uint8_t> data;
+      Galois::Runtime::NetworkIO::message m;
       do {
-        data = net->dequeue();
-      } while (data.empty());
-      std::cout << ID << ":" << data.size() << ":";
-      for (auto d : data)
-        std::cout << " " << (char)(d + '0');
+        m = net->dequeue();
+      } while (!m.len);
+      std::cout << ID << ":" << m.len << ":";
+      for (int y = 0; y < m.len; ++y)
+        std::cout << " " << (char)(m.data[y] + '0');
       std::cout << "\n";
     }
   }

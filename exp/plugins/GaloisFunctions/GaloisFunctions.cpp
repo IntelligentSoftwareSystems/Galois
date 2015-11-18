@@ -239,9 +239,11 @@ namespace {
                 << "\tstatic " << i.VAL_TYPE <<" extract( const " << i.NODE_TYPE << " node)" << "{ return " << "node." << i.FIELD_NAME <<  "; }\n"
                 <<"\tstatic void reduce (" << i.NODE_TYPE << " node, " << i.VAL_TYPE << " y) "
                 << i.REDUCE_OP_EXPR << "\n"
-                <<"\tstatic void reset (" << i.NODE_TYPE << " node ) { node." << i.FIELD_NAME << " = " << i.RESET_VAL_EXPR << "; }\n" 
+                //<<"\tstatic void reset (" << i.NODE_TYPE << " node ) { node." << i.FIELD_NAME << " = " << i.RESET_VAL_EXPR << "; }\n" 
+                <<"\tstatic void reset (" << i.NODE_TYPE << " node )" << i.RESET_VAL_EXPR << "\n"
                 <<"\ttypedef " << i.VAL_TYPE << " ValTy;\n"
                 <<"};\n";
+
 
               rewriter.InsertText(ST_main, SSSyncer.str(), true, true);
               SSSyncer.str(string());

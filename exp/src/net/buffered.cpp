@@ -30,125 +30,193 @@
 
 using namespace Galois::Runtime;
 
+unsigned _ID = ~0;
+
 namespace {
 
 class NetworkInterfaceBuffered : public NetworkInterface {
   static const int COMM_MIN = 1400; // bytes (sligtly smaller than an ethernet packet)
-  static const int COMM_DELAY = 100; //microseconds
-
-  Galois::Runtime::NetworkIO* netio;
+  static const int COMM_DELAY = 10; //microseconds
 
   struct recvBuffer {
-    std::deque<uint8_t> data;
-    LL::SimpleLock lock;
-    
-/*    std::pair<std::deque<uint8_t>::iterator, std::deque<uint8_t>::iterator>
-    nextMsg() {
-      std::lock_guard<LL::SimpleLock> lg(lock);
-      if (data.empty())
-        return std::make_pair(data.end(), data.end());
-      assert(data.size() >= 8);
-      union { uint8_t a[4]; uint32_t b; } c;
-      std::copy_n(data.begin(), 4, &c.a[0]);
-      return std::make_pair(data.begin() + 4, data.begin() + 4 + c.b);
-    }
-*/
-    //std::vector<std::deque<uint8_t>>
-    DeSerializeBuffer
-    nextMsg() {
-      std::lock_guard<LL::SimpleLock> lg(lock);
-      if (data.empty())
-        return DeSerializeBuffer(data.end(), data.end());
-      assert(data.size() >= 8);
-      union { uint8_t a[4]; uint32_t b; } c;
-      std::copy_n(data.begin(), 4, &c.a[0]);
-      return DeSerializeBuffer(data.begin() + 4, data.begin() + 4 + c.b);
+    std::deque<NetworkIO::message> data;
+    size_t frontOffset;
+    LL::SimpleLock qlock;
+    LL::SimpleLock rlock;
+
+    bool sizeAtLeast(size_t n) {
+      size_t tot = -frontOffset;
+      for (auto & v : data) {
+        tot += v.len;
+        if (tot >= n)
+          return true;
+      }
+      return false;
     }
 
-    void popMsg() {
-      std::lock_guard<LL::SimpleLock> lg(lock);
-      assert(data.size() >= 8);
+    size_t size() {
+      size_t tot = 0;
+      for (auto & v : data)
+        tot += v.len;
+      return tot - frontOffset;
+    }
+
+    template<typename IterTy>
+    void copyOut(IterTy it, size_t n) {
+      assert(sizeAtLeast(n));
+      if (n == 0)
+        return;
+      for (int j = 0; j < data.size(); ++j) {
+        auto& v = data[j];
+        for (int k = j == 0 ? frontOffset : 0; k < v.len; ++k) {
+          *it++ = v.data[k];
+          --n;
+          if (n == 0)
+            return;
+        }
+      }
+      abort();
+    }
+    
+    void erase(size_t n) {
+      frontOffset += n;
+      while (frontOffset && frontOffset >= data.front().len) {
+        frontOffset -= data.front().len;
+        data.pop_front();
+      }
+    }
+
+    uint32_t getLenFromFront() {
+      assert(sizeAtLeast(4));
       union { uint8_t a[4]; uint32_t b; } c;
-      std::copy_n(data.begin(), 4, &c.a[0]);
-      data.erase(data.begin(), data.begin() + 4 + c.b);
+      copyOut(&c.a[0], 4);
+      return c.b;
+    }
+
+    bool popMsg(std::vector<uint8_t>& vec) {
+      std::lock_guard<LL::SimpleLock> lg(qlock);
+      if (!sizeAtLeast(4))
+        return false;
+      uint32_t len = getLenFromFront();
+      if (!sizeAtLeast(4 + len))
+        return false;
+      //std::cerr << _ID << " pm " << frontOffset << " " << size() << " " << len << "\n";
+      erase(4);
+      vec.reserve(len);
+      //FIXME: This is slows things down 25%
+      copyOut(std::back_inserter(vec), len);
+      erase(len);
+      //      std::cerr << _ID << " pp len " << len << " fp " << frontOffset << " sz " << size() << "\n";
+      return true;
     }
 
     //Worker thread interface
-    void add(std::vector<uint8_t>& buf) {
-      std::lock_guard<LL::SimpleLock> lg(lock);
-      data.insert(data.end(), buf.begin(), buf.end());
+    void add(NetworkIO::message m) {
+      std::lock_guard<LL::SimpleLock> lg(qlock);
+      data.emplace_back(std::move(m));
     }
   };
 
-  recvBuffer recvData;
-  LL::SimpleLock recvLock;
+  std::vector<recvBuffer> recvData;
 
   struct sendBuffer {
-    std::vector<uint8_t> data;
+    struct msg {
+      uintptr_t fp; // function pointer
+      size_t offset; // offset in case ther eis spare space at the front of the buffer
+      std::vector<uint8_t> data;
+      msg(uintptr_t _fp, size_t _offset, std::vector<uint8_t>& _data) :fp(_fp), offset(_offset) {
+        data.swap(_data);
+      }
+    };
+
+    std::deque<msg> messages;
+    std::atomic<size_t> numBytes;
     std::chrono::high_resolution_clock::time_point time;
     std::atomic<bool> urgent;
     LL::SimpleLock lock;
 
     void markUrgent() {
-      urgent = true;
+      if (numBytes)
+        urgent = true;
     }
 
-    void add(SendBuffer& b) {
+    void add(uintptr_t fp, size_t offset, std::vector<uint8_t>& b) {
       std::lock_guard<LL::SimpleLock> lg(lock);
-      if (data.empty())
+      if (messages.empty())
         time = std::chrono::high_resolution_clock::now();
-      union { uint8_t a[4]; uint32_t b; } c;
-      c.b = b.size();
-      data.insert(data.end(), &c.a[0], &c.a[4]);
-      data.insert(data.end(), (uint8_t*)b.linearData(), (uint8_t*)b.linearData() + b.size());
+      numBytes += b.size() - offset + sizeof(uint32_t) + sizeof(uintptr_t);
+      messages.emplace_back(fp, offset, b);
     }
 
     //Worker thread Interface
     bool ready() {
-      std::lock_guard<LL::SimpleLock> lg(lock);
-      if (data.empty())
+      if (numBytes == 0)
         return false;
       if (urgent)
         return true;
-      if (data.size() > COMM_MIN)
+      if (numBytes > COMM_MIN)
         return true;
+      std::lock_guard<LL::SimpleLock> lg(lock);
       auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - time);
       if (elapsed.count() > COMM_DELAY)
         return true;
       return false;
     }
-
+    
+    std::pair<std::unique_ptr<uint8_t[]>, size_t> assemble() {
+      std::lock_guard<LL::SimpleLock> lg(lock);
+      std::pair<std::unique_ptr<uint8_t[]>, size_t> retval;
+      retval.second = numBytes;
+      retval.first.reset(new uint8_t[numBytes.load()]);
+      auto* ii = retval.first.get();
+      for (auto& m : messages) {
+        uint32_t len = m.data.size() - m.offset + sizeof(uintptr_t);
+        for (int i = 0; i < sizeof(uint32_t); ++i)
+          *ii++ = ((char*)&len)[i];
+        for (int i = 0; i < sizeof(uintptr_t); ++i)
+          *ii++ = ((char*)&m.fp)[i];
+        for (int i = m.offset; i < m.data.size(); ++i)
+          *ii++ = m.data[i];
+      }
+      messages.clear();
+      numBytes = 0;
+      urgent = false;
+      //      std::cerr << _ID << " as " << retval.second << "\n";
+      return retval;
+    }
+    
   };
+    
+    std::vector<sendBuffer> sendData;
 
-  std::vector<sendBuffer> sendData;
-
-  void isend(uint32_t dest, SendBuffer& buf) {
-    statSendNum += 1;
-    statSendBytes += buf.size();
-    auto& sd = sendData[dest];
-    sd.add(buf);
-  }
+    void isend(uint32_t dest, uintptr_t fp, SendBuffer& buf) {
+      statSendNum += 1;
+      statSendBytes += buf.size();
+      auto& sd = sendData[dest];
+      sd.add(fp, buf.getOffset(), buf.getVec());
+    }
 
   void workerThread() {
+    std::unique_ptr<Galois::Runtime::NetworkIO> netio;
     std::tie(netio, ID, Num) = makeNetworkIOMPI();
+    _ID = ID;
     ready = 1;
     while (ready < 2) {/*fprintf(stderr, "[WaitOnReady-2]");*/};
     while (ready != 3) {
-      do {
-        std::vector<uint8_t> rdata = netio->dequeue();
-        if (rdata.empty())
-          break;
-        else
-          recvData.add(rdata);
-      } while (true);
       for(int i = 0; i < sendData.size(); ++i) {
+        netio->progress();
+        //handle send queue i
         auto& sd = sendData[i];
         if (sd.ready()) {
-          std::lock_guard<LL::SimpleLock> lg(sd.lock);
-          netio->enqueue(i, sd.data);
-          assert(sd.data.empty());
-          sd.urgent = false;
+          NetworkIO::message msg;
+          msg.host = i;
+          std::tie(msg.data,msg.len) = sd.assemble();
+          netio->enqueue(std::move(msg));
         }
+        //handle recieve
+        NetworkIO::message rdata = netio->dequeue();
+        if (rdata.len)
+          recvData[rdata.host].add(std::move(rdata));
       }
     }
   }
@@ -160,27 +228,27 @@ public:
   using NetworkInterface::ID;
   using NetworkInterface::Num;
 
-  NetworkInterfaceBuffered():netio(nullptr) {
+  NetworkInterfaceBuffered() {
     ready = 0;
     worker = std::thread(&NetworkInterfaceBuffered::workerThread, this);
     while (ready != 1) {/*fprintf(stderr, "[WaitOnReady-1]");*/};
-    decltype(sendData) v(Num);
-    sendData.swap(v);
+    decltype(sendData) v1(Num);
+    decltype(recvData) v2(Num);
+    sendData.swap(v1);
+    recvData.swap(v2);
     ready = 2;
   }
 
   virtual ~NetworkInterfaceBuffered() {
     ready = 3;
     worker.join();
-    delete netio;
-    netio=nullptr;
   }
 
   virtual void send(uint32_t dest, recvFuncTy recv, SendBuffer& buf) {
     assert(recv);
     assert(dest < Num);
-    buf.serialize_header((void*)recv);
-    isend(dest, buf);
+    //    std::cerr << _ID << " s  " << buf.size() << "\n";
+    isend(dest, reinterpret_cast<uintptr_t>(recv), buf);
   }
 
   virtual void flush() {
@@ -190,21 +258,22 @@ public:
 
   virtual bool handleReceives() {
     bool retval = false;
-    if (recvLock.try_lock()) {
-      std::lock_guard<LL::SimpleLock> lg(recvLock, std::adopt_lock);
-      auto buf = recvData.nextMsg();
-      //if (p.first != p.second) {
-      if(!buf.empty()){
-        retval = true;
-        //DeSerializeBuffer buf(p);
-        statRecvNum += 1;
-        statRecvBytes += buf.size();
-        recvData.popMsg();
-        uintptr_t fp = 0;
-        gDeserialize(buf, fp);
-        assert(fp);
-        recvFuncTy f = (recvFuncTy)fp;
-        f(buf);
+    for (auto& rq : recvData) {
+      if (rq.rlock.try_lock()) {
+        std::lock_guard<LL::SimpleLock> lg(rq.rlock, std::adopt_lock);
+        std::vector<uint8_t> data;
+        if (rq.popMsg(data)) {
+          //          std::cerr << _ID << " hR " << data.size() << "\n";
+          retval = true;
+          DeSerializeBuffer buf(data);
+          statRecvNum += 1;
+          statRecvBytes += buf.size();
+          uintptr_t fp = 0;
+          gDeserialize(buf, fp);
+          assert(fp);
+          recvFuncTy f = (recvFuncTy)fp;
+          f(buf);
+        }
       }
     }
     return retval;
