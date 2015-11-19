@@ -72,16 +72,24 @@ struct InitializeGraph {
     	static void setVal (struct PR_NodeData & node, float y) {node.value = y; }
     	typedef float ValTy;
     };
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ &_graph }, Galois::loopname("Init"), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "value" , "float"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "nout", "int" , "{ Galois::atomicAdd(node.nout, y);}",  "{node.nout = 0 ; }"));
+     struct SyncerPull_1 {
+    	static int extract( const struct PR_NodeData & node){ return node.nout; }
+    	static void setVal (struct PR_NodeData & node, int y) {node.nout = y; }
+    	typedef int ValTy;
+    };
+    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ &_graph }, Galois::loopname("Init"), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "value" , "float"), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "nout" , "int"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "nout", "int" , "{ Galois::atomicAdd(node.nout, y);}",  "{node.nout = 0 ; }"));
     _graph.sync_push<Syncer_0>();
     
     _graph.sync_pull<SyncerPull_0>();
+    
+    _graph.sync_pull<SyncerPull_1>();
     
   }
 
   void operator()(GNode src) const {
     PR_NodeData& sdata = graph->getData(src);
     sdata.value = 1.0 - alpha;
+    Galois::atomicAdd(sdata.nout, 0);
     for(auto nbr = graph->edge_begin(src); nbr != graph->edge_end(src); ++nbr){
       GNode dst = graph->getEdgeDst(nbr);
       PR_NodeData& ddata = graph->getData(dst);
@@ -96,14 +104,14 @@ struct PageRank_pull {
 
   void static go(Graph& _graph) {
 
-     struct SyncerPull_0 {
-    	static float extract( const struct PR_NodeData & node){ return node.value; }
-    	static void setVal (struct PR_NodeData & node, float y) {node.value = y; }
-    	typedef float ValTy;
-    };
-    Galois::do_all(_graph.begin(), _graph.end(), PageRank_pull { &_graph }, Galois::loopname("pageRank"), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "value" , "float"));
-    _graph.sync_pull<SyncerPull_0>();
-    
+       struct SyncerPull_0 {
+      	static float extract( const struct PR_NodeData & node){ return node.value; }
+      	static void setVal (struct PR_NodeData & node, float y) {node.value = y; }
+      	typedef float ValTy;
+      };
+      Galois::do_all(_graph.begin(), _graph.end(), PageRank_pull { &_graph }, Galois::loopname("pageRank"), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "value" , "float"));
+      _graph.sync_pull<SyncerPull_0>();
+      
   }
 
   void operator()(GNode src)const {
