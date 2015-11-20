@@ -1,4 +1,5 @@
 #include <sstream>
+#include <fstream>
 #include <climits>
 #include <vector>
 #include <unordered_set>
@@ -33,6 +34,17 @@ namespace {
 // FIXME: reinitialize after every main/orchestration code
 std::map<std::string, std::string> SharedVariablesToTypeMap;
 std::map<std::string, std::vector<std::string> > KernelToArgumentsMap;
+std::ofstream Output;
+
+void findAndReplace(std::string &str, 
+    const std::string &toReplace, 
+    const std::string &replaceWith) 
+{
+  size_t found = str.find(toReplace);
+  if (found != std::string::npos) {
+    str = str.replace(found, toReplace.length(), replaceWith);
+  }
+}
 
 class IrGLOperatorVisitor : public RecursiveASTVisitor<IrGLOperatorVisitor> {
 private:
@@ -73,7 +85,19 @@ public:
       }
     }
 
-    bodyString << "CBlock([\"" << text << "\"]),\n";
+    // FIXME: assumes only one occurrence
+    findAndReplace(text, "getEdgeDst", "getAbsDestination");
+    findAndReplace(text, "getEdgeData", "getAbsWeight");
+    findAndReplace(text, "std::fabs", "fabs");
+    // FIXME: should it be only withint quoted strings?
+    findAndReplace(text, "\\", "\\\\");
+
+    size_t found = text.find("printf");
+    if (found != std::string::npos) {
+      bodyString << "CBlock(['" << text << "']),\n";
+    } else {
+      bodyString << "CBlock([\"" << text << "\"]),\n";
+    }
   }
 
   virtual bool TraverseDecl(Decl *D) {
@@ -90,8 +114,8 @@ public:
       }
       KernelToArgumentsMap[funcName] = arguments;
       declString << "],\n[\n";
-      llvm::errs() << declString.str();
-      llvm::errs() << bodyString.str();
+      Output << declString.str();
+      Output << bodyString.str();
       entryOnce = false;
     }
     return traverse;
@@ -147,7 +171,9 @@ public:
             pos = initText.find("graph.getData");
           }
           if (pos == std::string::npos) {
-            bodyString << "CDecl([(\"" << varDecl->getType().getAsString() 
+            std::string decl = varDecl->getType().getAsString();
+            findAndReplace(decl, "GNode", "index_type");
+            bodyString << "CDecl([(\"" << decl 
               << "\", \"" << varDecl->getNameAsString() << "\", \"\")]),\n";
 
             if (!initText.empty()) {
@@ -171,7 +197,7 @@ public:
     skipStmts.insert(binaryOp->getLHS());
     skipStmts.insert(binaryOp->getRHS());
     if (skipStmts.find(binaryOp) == skipStmts.end()) {
-      assert(binaryOp.isAssignmentOp());
+      assert(binaryOp->isAssignmentOp());
       SourceRange range(binaryOp->getLocStart(), binaryOp->getLocEnd());
       WriteCBlock(rewriter.getRewrittenText(range));
     }
@@ -268,13 +294,27 @@ public:
   {}
   
   void WriteCBlock(std::string text) {
-    llvm::errs() << "CBlock([\"" << text << "\"]),\n";
+    // FIXME: assumes only one occurrence
+    // FIXME: should it be only withint quoted strings?
+    findAndReplace(text, "\\", "\\\\");
+
+    size_t found = text.find("printf");
+    if (found != std::string::npos) {
+      Output << "CBlock(['" << text << "']),\n";
+    } else {
+      found = text.find("mgpu::Reduce");
+      if (found != std::string::npos) {
+        Output << "CBlock([\"" << text << "\"], parse=False),\n";
+      } else {
+        Output << "CBlock([\"" << text << "\"]),\n";
+      }
+    }
   }
 
   virtual bool TraverseDecl(Decl *D) {
     bool traverse = RecursiveASTVisitor<IrGLOrchestratorVisitor>::TraverseDecl(D);
     if (traverse && D && isa<CXXMethodDecl>(D)) {
-      llvm::errs() << "]),\n"; // end kernel
+      Output << "]),\n"; // end kernel
       entryOnce = false;
     }
     return traverse;
@@ -283,7 +323,7 @@ public:
   virtual bool TraverseStmt(Stmt *S) {
     bool traverse = RecursiveASTVisitor<IrGLOrchestratorVisitor>::TraverseStmt(S);
     if (traverse && S && isa<WhileStmt>(S)) {
-      llvm::errs() << "]),\n"; // end DoWhile
+      Output << "]),\n"; // end DoWhile
     }
     return traverse;
   }
@@ -293,11 +333,11 @@ public:
     entryOnce = true;
     skipStmts.clear();
     skipDecls.clear();
-    llvm::errs() << "Kernel(\"" << "gg_main" << "\", ";
-    llvm::errs() << "[GraphParam('hg', True), GraphParam('gg', True)],\n[\n";
+    Output << "Kernel(\"" << "gg_main" << "\", ";
+    Output << "[GraphParam('hg', True), GraphParam('gg', True)],\n[\n";
     for (auto& var : SharedVariablesToTypeMap) {
-      llvm::errs() << "CDecl((\"Shared<" << var.second << ">\", \"p_" << var.first << "\"";
-      llvm::errs() << ", \"= Shared<" << var.second << "> (hg.nnodes)\")),\n";
+      Output << "CDecl((\"Shared<" << var.second << ">\", \"p_" << var.first << "\"";
+      Output << ", \"= Shared<" << var.second << "> (hg.nnodes)\")),\n";
     }
     return true;
   }
@@ -308,7 +348,7 @@ public:
     SourceRange range(cond->getLocStart(), cond->getLocEnd());
     std::string condText = rewriter.getRewrittenText(range);
     if (condText.empty()) condText = "true";
-    llvm::errs() << "DoWhile(\"" << condText << "\",\n[\n";
+    Output << "DoWhile(\"" << condText << "\",\n[\n";
     return true;
   }
 
@@ -318,7 +358,7 @@ public:
         const Expr *expr = varDecl->getAnyInitializer();
         skipStmts.insert(expr);
         if (skipDecls.find(varDecl) == skipDecls.end()) {
-          llvm::errs() << "CDecl([(\"" << varDecl->getType().getAsString() 
+          Output << "CDecl([(\"" << varDecl->getType().getAsString() 
             << "\", \"" << varDecl->getNameAsString() << "\", \"\")]),\n";
           if (expr != NULL) {
             SourceRange range(expr->getLocStart(), expr->getLocEnd());
@@ -368,7 +408,7 @@ public:
           // FIXME: choose matching reduction operation
           reduceCall << "mgpu::Reduce(p_" << reduceVar << ".gpu_rd_ptr(), hg.nnodes";
           reduceCall << ", (" << SharedVariablesToTypeMap[reduceVar] << ")0";
-          reduceCall << ", mgpu::plus<" << SharedVariablesToTypeMap[reduceVar] << ">()";
+          reduceCall << ", mgpu::maximum<" << SharedVariablesToTypeMap[reduceVar] << ">()";
           reduceCall << ", (" << SharedVariablesToTypeMap[reduceVar] << "*)0";
           reduceCall << ", &" << var << ", *mgc)";
 
@@ -413,13 +453,13 @@ public:
         while (text[begin] == ' ') ++begin;
         while (text[end] == ' ') --end; 
         std::string kernelName = text.substr(begin, end-begin+1);
-        llvm::errs() << "Invoke(\"" << kernelName << "\", ";
-        llvm::errs() << "(\"gg\"";
+        Output << "Invoke(\"" << kernelName << "\", ";
+        Output << "(\"gg\"";
         auto& arguments = KernelToArgumentsMap[kernelName];
         for (auto& argument : arguments) {
-          llvm::errs() << ", \"p_" << argument << ".gpu_wr_ptr()\"";
+          Output << ", \"p_" << argument << ".gpu_wr_ptr()\"";
         }
-        llvm::errs() << ")),\n";
+        Output << ")),\n";
       }
     } else {
       for (unsigned i = 0; i < callExpr->getNumArgs(); ++i) {
@@ -478,16 +518,16 @@ public:
   virtual void run(const MatchFinder::MatchResult &Results) {
     const CXXMethodDecl* decl = Results.Nodes.getNodeAs<clang::CXXMethodDecl>("graphOperator");
     if (decl) {
-      llvm::errs() << "\nGraph Operator:\n" << rewriter.getRewrittenText(decl->getSourceRange()) << "\n";
+      //llvm::errs() << "\nGraph Operator:\n" << rewriter.getRewrittenText(decl->getSourceRange()) << "\n";
       //decl->dump();
-      llvm::errs() << "\nIrGL Orchestrator:\n";
+      //llvm::errs() << "\nIrGL Orchestrator Kernel:\n";
       orchestratorVisitor.TraverseDecl(const_cast<CXXMethodDecl *>(decl));
     } else {
       decl = Results.Nodes.getNodeAs<clang::CXXMethodDecl>("vertexOperator");
       if (decl) {
-        llvm::errs() << "\nVertex Operator:\n" << rewriter.getRewrittenText(decl->getSourceRange()) << "\n";
+        //llvm::errs() << "\nVertex Operator:\n" << rewriter.getRewrittenText(decl->getSourceRange()) << "\n";
         //decl->dump();
-        llvm::errs() << "\nIrGL Operator:\n";
+        //llvm::errs() << "\nIrGL Kernel for Vertex Operators:\n";
         operatorVisitor.TraverseDecl(const_cast<CXXMethodDecl *>(decl));
       }
     }
@@ -514,7 +554,17 @@ public:
   }
 
   virtual void HandleTranslationUnit(ASTContext &Context){
+    // FIXME: Build file name from source file
+    Output.open("irgl.py");
+    Output << "from gg.ast import *\n";
+    Output << "from gg.lib.graph import Graph\n";
+    Output << "from gg.ast.params import GraphParam\n";
+    Output << "import cgen\n";
+    Output << "G = Graph(\"graph\")\n";
+    Output << "ast = Module([\n";
     Matchers.matchAST(Context);
+    Output << "])\n";
+    Output.close();
   }
 };
 
