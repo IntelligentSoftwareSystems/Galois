@@ -21,6 +21,7 @@
  * @section Description
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
+ * @author Gurbinder Gill <gurbinder533@gmail.com>
  */
 
 #include "Galois/gstl.h"
@@ -38,6 +39,7 @@ class hGraph : public GlobalObject {
 
   GraphTy graph;
   bool round;
+  uint64_t totalNodes; // Total nodes in the complete graph.
   uint32_t numOwned; // [0, numOwned) = global nodes owned, thus [numOwned, numNodes are replicas
   uint64_t globalOffset; // [numOwned, end) + globalOffset = GID
   unsigned id; // my hostid // FIXME: isn't this just Network::ID?
@@ -114,8 +116,9 @@ public:
     void (hGraph::*fn)(Galois::Runtime::RecvBuffer&);
     Galois::Runtime::gDeserialize(buf, oid, fn);
     hGraph* obj = reinterpret_cast<hGraph*>(ptrForObj(oid));
-    --(obj->num_recv_expected);
     (obj->*fn)(buf);
+    //--(obj->num_recv_expected);
+    //std::cout << "[ " << Galois::Runtime::getSystemNetworkInterface().ID << "] " << " NUM RECV EXPECTED : " << (obj->num_recv_expected) << "\n";
   }
 
   template<typename FnTy>
@@ -126,6 +129,12 @@ public:
       uint64_t gid;
       typename FnTy::ValTy val;
       Galois::Runtime::gDeserialize(buf, gid, val);
+      /*
+      if(!isOwned(gid)){
+        std::cout <<"[" << Galois::Runtime::getSystemNetworkInterface().ID <<"]" <<  " GID " << gid  << " num  : " << num << "\n";
+        assert(isOwned(gid));
+      }
+      */
       assert(isOwned(gid));
       FnTy::reduce(getData(gid - globalOffset), val);
     }
@@ -157,9 +166,13 @@ public:
 
   template<typename FnTy>
   void syncPullRecvApply(Galois::Runtime::RecvBuffer& buf) {
+    assert(num_recv_expected > 0);
     uint32_t num;
     Galois::Runtime::gDeserialize(buf, num);
     auto& net = Galois::Runtime::getSystemNetworkInterface();
+    //std::cout << "In Apply : [" << net.ID <<"] num_recv_expected : "<< num_recv_expected << "\n";
+    --num_recv_expected;
+
     for(; num; --num) {
       uint64_t gid;
       typename FnTy::ValTy val;
@@ -187,6 +200,9 @@ public:
     OfflineGraph g(filename);
     //std::cerr << "Offline Graph Done\n";
 
+    num_recv_expected = 0;
+    totalNodes = g.size();
+    std::cout << "Total nodes : " << totalNodes << "\n";
     //compute owners for all nodes
     std::vector<std::pair<uint64_t, uint64_t>> gid2host;
     for (unsigned i = 0; i < numHosts; ++i)
@@ -287,7 +303,7 @@ public:
   void sync_push() {
     void (hGraph::*fn)(Galois::Runtime::RecvBuffer&) = &hGraph::syncRecvApply<FnTy>;
     auto& net = Galois::Runtime::getSystemNetworkInterface();
-    num_recv_expected = 0;
+    //num_recv_expected = 0;
     for (unsigned x = 0; x < hostNodes.size(); ++x) {
       if (x == id) continue;
       uint32_t start, end;
@@ -298,11 +314,16 @@ public:
       gSerialize(b, idForSelf(), fn, (uint32_t)(end-start));
       for (; start != end; ++start) {
         auto gid = L2G(start);
+        if( gid > totalNodes){
+          std::cout << "[" << net.ID << "] GID : " << gid << " size : " << graph.size() << "\n";
+
+          assert(gid < totalNodes);
+        }
         //std::cout << net.ID << " send (" << gid << ") " << start << " " << FnTy::extract(getData(start)) << "\n";
         gSerialize(b, gid, FnTy::extract(getData(start)));
         FnTy::reset(getData(start));
       }
-      ++num_recv_expected;
+      //++num_recv_expected;
       net.send(x, syncRecv, b);
     }
     //Will force all messages to be processed before continuing
@@ -313,7 +334,7 @@ public:
   void sync_pull(){
     void (hGraph::*fn)(Galois::Runtime::RecvBuffer&) = &hGraph::syncPullRecvReply<FnTy>;
     auto& net = Galois::Runtime::getSystemNetworkInterface();
-    num_recv_expected = 0;
+    //num_recv_expected = 0;
     for(unsigned x = 0; x < hostNodes.size(); ++x){
       if(x == id) continue;
       uint32_t start, end;
@@ -331,11 +352,17 @@ public:
       net.send(x, syncRecv, b);
     }
 
+    //std::cout << "[" << net.ID <<"] num_recv_expected : "<< num_recv_expected << "\n";  
+
     while(num_recv_expected) {
       net.handleReceives();
     }
-    //Galois::Runtime::getHostBarrier().wait();
+
+    assert(num_recv_expected == 0);
     Galois::Runtime::getHostBarrier().wait();
   }
 
+  uint64_t getGID(uint32_t nodeID) const {
+    return L2G(nodeID);
+  }
 };

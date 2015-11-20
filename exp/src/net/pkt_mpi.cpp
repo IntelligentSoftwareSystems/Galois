@@ -25,7 +25,9 @@
 
 #include <mpi.h>
 #include <deque>
-//#include <iostream>
+#include <iostream>
+
+static int _ID;
 
 class NetworkIOMPI : public Galois::Runtime::NetworkIO {
 
@@ -44,23 +46,24 @@ class NetworkIOMPI : public Galois::Runtime::NetworkIO {
     int numTasks, taskRank;
     MPI_Comm_size(MPI_COMM_WORLD, &numTasks);
     MPI_Comm_rank(MPI_COMM_WORLD, &taskRank);
+
+    _ID = taskRank;
     
     return std::make_pair(taskRank, numTasks);
   }
 
+  struct mpiMessage {
+    message m;
+    MPI_Request req;
+    mpiMessage(message&& _m, MPI_Request _req) : m(std::move(_m)), req(_req) {}
+    mpiMessage(uint32_t host, std::unique_ptr<uint8_t[]>&& data, size_t len) :m{host, std::move(data), len} {}
+  };
 
   struct sendQueueTy {
-    struct mpiMessage {
-      std::vector<uint8_t> data;
-      MPI_Request req;
-      mpiMessage(std::vector<uint8_t>& m) { data.swap(m); }
-    };
-
-    uint32_t myDest;
     std::deque<mpiMessage> inflight;
 
     void complete() {
-      while (!inflight.empty()) {
+      if (!inflight.empty()) {
         int flag = 0;
         MPI_Status status;
         auto& f = inflight.front();
@@ -68,79 +71,44 @@ class NetworkIOMPI : public Galois::Runtime::NetworkIO {
         if (flag) {
           inflight.pop_front();
           //          std::cerr << "S";
-        } else {
-          break;
         }
       }
     }
 
-    void send(std::vector<uint8_t>& m) {
-      inflight.push_back({m});
-      auto& mb = inflight.back();
-      int rv = MPI_Isend(mb.data.data(), mb.data.size(), MPI_BYTE, myDest, 0, MPI_COMM_WORLD, &mb.req);
+    void send(message m) {
+      //      std::cerr << _ID << " mpi_isend " << m.len << " " << m.host << "\n";
+      MPI_Request req;
+      int rv = MPI_Isend(m.data.get(), m.len, MPI_BYTE, m.host, 0, MPI_COMM_WORLD, &req);
+      inflight.emplace_back(std::move(m), req);
       //      std::cerr << "s";
       handleError(rv);
     }
   };
 
   struct recvQueueTy {
-    struct mpiMessage {
-      std::vector<uint8_t> data;
-      MPI_Request req;
-      mpiMessage(uint32_t n) :data(n) {}
-    };
-
-    std::deque<mpiMessage> inflight;
-    std::deque<std::vector<uint8_t> > done;
+    std::deque<mpiMessage> done;
 
     void probe() {
       int flag = 0;
-      do {
-        MPI_Status status;
-        int rv = MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &flag, &status);
-        handleError(rv);
-        if (flag) {
-          int nbytes;
-          rv = MPI_Get_count(&status, MPI_BYTE, &nbytes);
-          handleError(rv);
-          inflight.push_back(mpiMessage{static_cast<uint32_t>(nbytes)});
-          auto& r = inflight.back();
-          rv = MPI_Irecv(r.data.data(), nbytes, MPI_BYTE, status.MPI_SOURCE, status.MPI_TAG, MPI_COMM_WORLD, &r.req);
-          //          std::cerr << "r";
-          handleError(rv);
-        }
-      } while(flag);
-    }
-
-    void complete() {
-      while (!inflight.empty()) {
-        int flag;
-        MPI_Status status;
-        auto& r = inflight.front();
-        int rv = MPI_Test(&r.req, &flag, &status);
-        handleError(rv);
-        if (!flag)
-          break;
+      MPI_Status status;
+      int rv = MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &flag, &status);
+      handleError(rv);
+      if (flag) {
         int nbytes;
         rv = MPI_Get_count(&status, MPI_BYTE, &nbytes);
         handleError(rv);
-        //        std::cerr << "R";
-        done.emplace_back(std::move(r.data));
-        inflight.pop_front();
+        std::unique_ptr<uint8_t[]> ptr{new uint8_t[nbytes]};
+        //        std::cerr << _ID << " mpi_recv " << nbytes << " " << status.MPI_SOURCE << "\n";
+        rv = MPI_Recv(ptr.get(), nbytes, MPI_BYTE, status.MPI_SOURCE, status.MPI_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        handleError(rv);
+        done.emplace_back(status.MPI_SOURCE, std::move(ptr), nbytes);
       }
     }
   };
 
-  std::vector<sendQueueTy> sendQueues;
+  sendQueueTy sendQueue;
   recvQueueTy recvQueue;
 
-
-  void progress() {
-    for(auto& q : sendQueues)
-      q.complete();
-    recvQueue.complete();
-    recvQueue.probe();
-  }
 
 public:
 
@@ -148,10 +116,6 @@ public:
     auto p = initMPI();
     ID = p.first;
     NUM = p.second;
-    sendQueues.resize(NUM);
-    for (uint32_t i = 0; i < NUM; ++i) {
-      sendQueues[i].myDest = i;
-    }
   }
 
   ~NetworkIOMPI() {
@@ -159,27 +123,30 @@ public:
     handleError(rv);
   }
   
-  virtual void enqueue(uint32_t dest, std::vector<uint8_t>& data) {
-    progress();
-    auto& sq = sendQueues[dest];
-    sq.send(data);
+  virtual void enqueue(message m) {
+    sendQueue.send(std::move(m));
   }
 
-  virtual std::vector<uint8_t> dequeue() {
-    progress();
-    std::vector<uint8_t> retval;
+  virtual message dequeue() {
     if (!recvQueue.done.empty()) {
-      retval.swap(recvQueue.done.front());
+      auto& msg = recvQueue.done.front();
+      message retval(std::move(msg.m));
       recvQueue.done.pop_front();
+      return retval;
     }
-    return retval;
+    return message{};
+  }
+
+  virtual void progress() {
+    sendQueue.complete();
+    recvQueue.probe();
   }
 
 };
 
-std::tuple<Galois::Runtime::NetworkIO*,uint32_t,uint32_t> Galois::Runtime::makeNetworkIOMPI() {
+std::tuple<std::unique_ptr<Galois::Runtime::NetworkIO>,uint32_t,uint32_t> Galois::Runtime::makeNetworkIOMPI() {
   uint32_t ID, NUM;
-  Galois::Runtime::NetworkIO* n = new NetworkIOMPI(ID, NUM);
-  return std::make_tuple(n, ID, NUM);
+  std::unique_ptr<Galois::Runtime::NetworkIO> n{new NetworkIOMPI(ID, NUM)};
+  return std::make_tuple(std::move(n), ID, NUM);
 }
 
