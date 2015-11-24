@@ -254,9 +254,9 @@ elseif(EXISTS /net/ohm/export/cdgc/inputs/reference/graph_readme.txt)
 else()
   add_subdirectory(inputs)
   set(BASEINPUT ${CMAKE_BINARY_DIR}/inputs/reference )
-  MESSAGE(STATUS "use make input to download inputs in the build directory")
+  MESSAGE(STATUS "Tests cannot run without inputs.  \"make inputs\" to download inputs")
 endif()
-set(GRAPH_INPUTS ${BASEINPUT}/graph_readme.txt)
+#set(GRAPH_INPUTS ${BASEINPUT}/graph_readme.txt)
 
 ###### Global Functions ######
 
@@ -272,7 +272,7 @@ function(add_test_scale type app)
   endif()
   foreach(thr RANGE 1 ${N})
     add_test(test-${type}-${thr}-${app} ${app} ${ARGN} -t ${thr})
-    set_tests_properties(test-${type}-${thr}-${app} PROPERTIES REQUIRED_FILES ${GRAPH_INPUTS})
+#    set_tests_properties(test-${type}-${thr}-${app} PROPERTIES REQUIRED_FILES ${GRAPH_INPUTS})
   endforeach(thr)
 endfunction(add_test_scale)
 
