@@ -50,17 +50,6 @@
 
 namespace Galois {
 
-namespace dbg {
-  template <typename... Args>
-  void debug (Args&&... args) {
-    
-    const bool DEBUG = true;
-    if (DEBUG) {
-      Substrate::gDebug (std::forward<Args> (args)...);
-    }
-  }
-}
-
 namespace Runtime {
 
 enum class ContextState: int {
@@ -696,6 +685,9 @@ public:
         break;
       }
 
+      // std::printf ("Round: %d, currWL size = %zd, commitQ size = %zd\n",
+          // rounds, currWL->size_all (), commitQ.size_all ());
+
       expandNhood ();
 
       CtxtWL sources;
@@ -759,8 +751,6 @@ private:
             wl[tid].pop_back ();
 
             winWL.push (c);
-            c->~Ctxt ();
-            ctxtAlloc.deallocate (c, 1);
           }
         });
 
@@ -1100,8 +1090,9 @@ private:
 
           assert (c);
 
-          if ((!gvt || ctxtCmp (c, gvt))
-            && c->isCommitSrc ()) {
+          if (c->hasState (ContextState::READY_TO_COMMIT) 
+              && (!gvt || ctxtCmp (c, gvt))
+              && c->isCommitSrc ()) {
 
             commitSources.push (c);
           }
