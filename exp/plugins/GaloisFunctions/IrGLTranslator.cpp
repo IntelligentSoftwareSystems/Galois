@@ -29,12 +29,15 @@ using namespace clang::ast_matchers;
 using namespace llvm;
 
 #define VARIABLE_NAME_CHARACTERS "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789_"
+#define COMPUTE_FILENAME "._compute_kernels"
+#define ORCHESTRATOR_FILENAME "._orchestrator_kernel"
+
 namespace {
 
 // FIXME: reinitialize after every main/orchestration code
+std::map<std::string, std::string> GlobalVariablesToTypeMap;
 std::map<std::string, std::string> SharedVariablesToTypeMap;
 std::map<std::string, std::vector<std::string> > KernelToArgumentsMap;
-std::ofstream Output;
 
 void findAndReplace(std::string &str, 
     const std::string &toReplace, 
@@ -57,6 +60,8 @@ private:
   std::string funcName;
   std::stringstream declString, bodyString;
   std::map<std::string, std::string> parameterToTypeMap;
+  std::unordered_set<std::string> symbolTable; // FIXME: does not handle scoped variables (nesting with same variable name)
+  std::ofstream Output;
 
 public:
   explicit IrGLOperatorVisitor(CompilerInstance &CI, Rewriter &R) : 
@@ -114,8 +119,10 @@ public:
       }
       KernelToArgumentsMap[funcName] = arguments;
       declString << "],\n[\n";
+      Output.open(COMPUTE_FILENAME, std::ios::app);
       Output << declString.str();
       Output << bodyString.str();
+      Output.close();
       entryOnce = false;
     }
     return traverse;
@@ -135,11 +142,13 @@ public:
     skipStmts.clear();
     skipDecls.clear();
     nodeMap.clear();
+    symbolTable.clear();
     declString.str("");
     bodyString.str("");
     funcName = func->getParent()->getNameAsString();
     declString << "Kernel(\"" << funcName << "\", [G.param()";
     bodyString << "ForAll(\"vertex\", G.nodes(),\n[\n";
+    symbolTable.insert("vertex");
     return true;
   }
 
@@ -152,6 +161,7 @@ public:
         skipStmts.insert(expr);
       }
     }
+    symbolTable.insert(forStmt->getLoopVariable()->getNameAsString());
     bodyString << "ForAll(\"" << forStmt->getLoopVariable()->getNameAsString() 
       << "\", G.edges(\"vertex\"),\n[\n";
     return true;
@@ -163,6 +173,7 @@ public:
         const Expr *expr = varDecl->getAnyInitializer();
         skipStmts.insert(expr);
         if (skipDecls.find(varDecl) == skipDecls.end()) {
+          symbolTable.insert(varDecl->getNameAsString());
           std::size_t pos = std::string::npos;
           std::string initText;
           if (expr != NULL) {
@@ -205,6 +216,7 @@ public:
   }
 
   virtual bool VisitCXXMemberCallExpr(CXXMemberCallExpr *callExpr) {
+    symbolTable.insert(callExpr->getCalleeDecl()->getAsFunction()->getNameAsString());
     if (skipStmts.find(callExpr) == skipStmts.end()) {
       CXXRecordDecl *record = callExpr->getRecordDecl();
       std::string recordName = record->getNameAsString();
@@ -233,6 +245,9 @@ public:
         SourceRange range(callExpr->getLocStart(), callExpr->getLocEnd());
         WriteCBlock(rewriter.getRewrittenText(range));
       }
+    }
+    for (unsigned i = 0; i < callExpr->getNumArgs(); ++i) {
+      skipStmts.insert(callExpr->getArg(i));
     }
     return true;
   }
@@ -276,6 +291,17 @@ public:
     }
     return true;
   }
+
+  virtual bool VisitDeclRefExpr(DeclRefExpr *declRefExpr) {
+    const ValueDecl *decl = declRefExpr->getDecl();
+    const std::string &varName = decl->getNameAsString();
+    if (symbolTable.find(varName) == symbolTable.end()) {
+      if (GlobalVariablesToTypeMap.find(varName) == GlobalVariablesToTypeMap.end()) {
+        GlobalVariablesToTypeMap[varName] = decl->getType().getAsString();
+      }
+    }
+    return true;
+  }
 };
 
 class IrGLOrchestratorVisitor : public RecursiveASTVisitor<IrGLOrchestratorVisitor> {
@@ -285,6 +311,8 @@ private:
   std::unordered_set<const Stmt *> skipStmts;
   std::unordered_set<const Decl *> skipDecls;
   bool entryOnce;
+  std::unordered_set<std::string> symbolTable; // FIXME: does not handle scoped variables (nesting with same variable name)
+  std::ofstream Output;
 
 public:
   explicit IrGLOrchestratorVisitor(CompilerInstance &CI, Rewriter &R) : 
@@ -314,7 +342,15 @@ public:
   virtual bool TraverseDecl(Decl *D) {
     bool traverse = RecursiveASTVisitor<IrGLOrchestratorVisitor>::TraverseDecl(D);
     if (traverse && D && isa<CXXMethodDecl>(D)) {
+      for (auto& var : SharedVariablesToTypeMap) {
+        std::string upper = var.first;
+        std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
+        Output << "CBlock([\"" << "P_" << upper << " = p_" 
+          << var.first << ".cpu_rd_ptr()" << "\"]),\n";
+      }
       Output << "]),\n"; // end kernel
+      Output << "])\n"; // end Module
+      Output.close();
       entryOnce = false;
     }
     return traverse;
@@ -331,14 +367,17 @@ public:
   virtual bool VisitCXXMethodDecl(CXXMethodDecl* func) {
     assert(!entryOnce);
     entryOnce = true;
+    Output.open(ORCHESTRATOR_FILENAME, std::ios::app);
     skipStmts.clear();
     skipDecls.clear();
+    symbolTable.clear();
     Output << "Kernel(\"" << "gg_main" << "\", ";
     Output << "[GraphParam('hg', True), GraphParam('gg', True)],\n[\n";
     for (auto& var : SharedVariablesToTypeMap) {
       Output << "CDecl((\"Shared<" << var.second << ">\", \"p_" << var.first << "\"";
       Output << ", \"= Shared<" << var.second << "> (hg.nnodes)\")),\n";
     }
+    symbolTable.insert("graph_main");
     return true;
   }
 
@@ -360,6 +399,7 @@ public:
         if (skipDecls.find(varDecl) == skipDecls.end()) {
           Output << "CDecl([(\"" << varDecl->getType().getAsString() 
             << "\", \"" << varDecl->getNameAsString() << "\", \"\")]),\n";
+          symbolTable.insert(varDecl->getNameAsString());
           if (expr != NULL) {
             SourceRange range(expr->getLocStart(), expr->getLocEnd());
             std::string initText = rewriter.getRewrittenText(range);
@@ -425,6 +465,7 @@ public:
   }
 
   virtual bool VisitCallExpr(CallExpr *callExpr) {
+    symbolTable.insert(callExpr->getCalleeDecl()->getAsFunction()->getNameAsString());
     if (skipStmts.find(callExpr) == skipStmts.end()) {
       SourceRange range(callExpr->getLocStart(), callExpr->getLocEnd());
       std::string text = rewriter.getRewrittenText(range);
@@ -461,10 +502,9 @@ public:
         }
         Output << ")),\n";
       }
-    } else {
-      for (unsigned i = 0; i < callExpr->getNumArgs(); ++i) {
-        skipStmts.insert(callExpr->getArg(i));
-      }
+    }
+    for (unsigned i = 0; i < callExpr->getNumArgs(); ++i) {
+      skipStmts.insert(callExpr->getArg(i));
     }
     return true;
   }
@@ -497,6 +537,17 @@ public:
   virtual bool VisitParenExpr(ParenExpr *parenExpr) {
     if (skipStmts.find(parenExpr) != skipStmts.end()) {
       skipStmts.insert(parenExpr->getSubExpr());
+    }
+    return true;
+  }
+
+  virtual bool VisitDeclRefExpr(DeclRefExpr *declRefExpr) {
+    const ValueDecl *decl = declRefExpr->getDecl();
+    const std::string &varName = decl->getNameAsString();
+    if (symbolTable.find(varName) == symbolTable.end()) {
+      if (GlobalVariablesToTypeMap.find(varName) == GlobalVariablesToTypeMap.end()) {
+        GlobalVariablesToTypeMap[varName] = decl->getType().getAsString();
+      }
     }
     return true;
   }
@@ -554,7 +605,10 @@ public:
   }
 
   virtual void HandleTranslationUnit(ASTContext &Context){
+    Matchers.matchAST(Context);
+
     // FIXME: Build file name from source file
+    std::ofstream Output;
     Output.open("irgl.py");
     Output << "from gg.ast import *\n";
     Output << "from gg.lib.graph import Graph\n";
@@ -562,8 +616,30 @@ public:
     Output << "import cgen\n";
     Output << "G = Graph(\"graph\")\n";
     Output << "ast = Module([\n";
-    Matchers.matchAST(Context);
-    Output << "])\n";
+    for (auto& var : SharedVariablesToTypeMap) {
+      std::string upper = var.first;
+      std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
+      Output << "CDecl([(\"" << var.second 
+        << " *\", \"P_" << upper << "\", \"\")]),\n";
+    }
+    for (auto& var : GlobalVariablesToTypeMap) {
+      size_t found = var.second.find("Galois::");
+      if (found == std::string::npos) {
+        Output << "CDecl([(\"extern " << var.second 
+          << "\", \"" << var.first << "\", \"\")]),\n";
+      }
+    }
+
+    std::ifstream compute(COMPUTE_FILENAME);
+    Output << compute.rdbuf(); 
+    compute.close();
+    remove(COMPUTE_FILENAME);
+
+    std::ifstream orchestrator(ORCHESTRATOR_FILENAME);
+    Output << orchestrator.rdbuf();
+    orchestrator.close();
+    remove(ORCHESTRATOR_FILENAME);
+
     Output.close();
   }
 };
