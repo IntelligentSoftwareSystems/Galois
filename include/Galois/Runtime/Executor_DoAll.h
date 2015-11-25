@@ -178,8 +178,8 @@ public:
       // range has not been initialized yet
       barrier.wait();
     }
-
-    setThreadContext(&thisTLD.cnx);
+// RK : Commented line below because a do_all doesn't need a context for HETERO branch.
+//    setThreadContext(&thisTLD.cnx);
 
     do {
       processRange(thisTLD);
