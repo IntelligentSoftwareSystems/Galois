@@ -1,5 +1,6 @@
 add_subdirectory(cuda)
 include_directories(${CUDA_INCLUDE_DIRS} )
+include_directories(${OPENCL_INCLUDE_DIRS})
 
 app(hsssp HSSSP.cpp DISTSAFE)
 target_link_libraries(hsssp hsssp_cuda cudadevrt OpenCL )
