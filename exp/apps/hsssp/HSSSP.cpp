@@ -312,7 +312,7 @@ void inner_main() {
    Galois::Timer alg_timer, kernel_timer, init_timer;
    float alg_time=0, kernel_time=0, init_time=0;
 
-   auto& barrier = Galois::Runtime::getSystemBarrier();
+   auto& barrier = Galois::Runtime::getHostBarrier() ;//getSystemBarrier();
    const unsigned my_host_id = Galois::Runtime::NetworkInterface::ID;
    //Parse arg string when running on multiple hosts and update/override personality
    //with corresponding value.

@@ -42,14 +42,10 @@ struct OPENCL_Context {
    }
    void init(int num_items, int num_inits) {
       Galois::OpenCL::CL_Kernel init_all, init_nout;
-      std::string filename = "/pagerank_kernel.cl";
-      std::string dirname = self_directory();
-      std::string pathname = dirname;
-      pathname.append(filename);
-      kernel.init(pathname.c_str(), "pagerank");
-      wb_kernel.init(pathname.c_str(), "writeback");
-      init_nout.init(pathname.c_str(), "initialize_nout");
-      init_all.init(pathname.c_str(), "initialize_all");
+      kernel.init("pagerank_kernel.cl", "pagerank");
+      wb_kernel.init("pagerank_kernel.cl", "writeback");
+      init_nout.init("pagerank_kernel.cl", "initialize_nout");
+      init_all.init("pagerank_kernel.cl", "initialize_all");
       m_graph.copy_to_device();
 
       init_all.set_work_size(m_graph.num_nodes());
