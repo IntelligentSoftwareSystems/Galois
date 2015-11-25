@@ -155,6 +155,7 @@ void CHECK_CL_ERROR(T err, const char * const err_string) {
 #ifndef _GOPT_DEBUG
 #endif
       assert(false);
+      throw int(-1);
    }
    return;
 }

@@ -36,6 +36,7 @@ struct Array {
       allocation_flags = CL_MEM_READ_WRITE | CL_MEM_USE_HOST_PTR;
       device_data = clCreateBuffer(cl_env.m_context, allocation_flags, sizeof(T) * num_elements, host_data, &err);
       Galois::OpenCL::CHECK_CL_ERROR(err, "Allocation failure...!");
+//      fprintf(stderr, "Allocated@1 on device %d\n", sizeof(T)*num_elements);
    }
    ////////////////////////////////////////////////
    ~Array(){
@@ -50,37 +51,45 @@ struct Array {
    }
    ////////////////////////////////////////////////
    void copy_to_device(size_t sz) {
+//      fprintf(stderr, "Copying@1 to device %d\n", sizeof(T)*sz);
       CHECK_CL_ERROR(err = clEnqueueWriteBuffer(cl_env.m_command_queue, device_data, CL_TRUE, 0, sizeof(T) * sz, (void*) (host_data), 0, NULL, NULL), " Copying to device ");
    }
 
    void copy_to_device() {
+//      fprintf(stderr, "Copying@2 to device %d\n", sizeof(T)*num_elements);
       CHECK_CL_ERROR(err = clEnqueueWriteBuffer(cl_env.m_command_queue, device_data, CL_TRUE, 0, sizeof(T) * num_elements, (void*) (host_data), 0, NULL, NULL),
             " Copying to device ");
    }
    ////////////////////////////////////////////////
    void copy_to_device(cl_event * event) {
+//      fprintf(stderr, "Copying@3 to device %d\n", sizeof(T)*num_elements);
       CHECK_CL_ERROR(err = clEnqueueWriteBuffer(cl_env.m_command_queue, device_data, CL_FALSE, 0, sizeof(T) * num_elements, (void*) (host_data), 0, NULL, event),
             " Copying async. to device ");
    }
    ////////////////////////////////////////////////
    void copy_to_device(void * aux) {
+//      fprintf(stderr, "Copying to device %d\n", sizeof(T)*num_elements);
       CHECK_CL_ERROR(err = clEnqueueWriteBuffer(cl_env.m_command_queue, device_data, CL_TRUE, 0, sizeof(T) * num_elements, (void*) (aux), 0, NULL, NULL),
             " Copying aux to device ");
    }
    ////////////////////////////////////////////////
    void copy_to_device(void * aux, size_t sz) {
+//      fprintf(stderr, "Copying to device %d\n", sizeof(T)*sz);
       CHECK_CL_ERROR(err = clEnqueueWriteBuffer(cl_env.m_command_queue, device_data, CL_TRUE, 0, sizeof(T) * sz, (void*) (aux), 0, NULL, NULL), " Copying aux to device ");
    }
    ////////////////////////////////////////////////
 
    void copy_to_host(size_t sz) {
+//      fprintf(stderr, "Copying-@1 to host %d\n", sizeof(T)*sz);
       CHECK_CL_ERROR(err = clEnqueueReadBuffer(cl_env.m_command_queue, device_data, CL_TRUE, 0, sizeof(T) * sz, (void*) (host_data), 0, NULL, NULL), "Copying to host ");
    }
    void copy_to_host(size_t sz, cl_event *event) {
+//      fprintf(stderr, "Copying-@2 to host %d\n", sizeof(T)*sz);
       CHECK_CL_ERROR(err = clEnqueueReadBuffer(cl_env.m_command_queue, device_data, CL_FALSE, 0, sizeof(T) * sz, (void*) (host_data), 0, NULL, event), "Copying to host ");
    }
 
    void copy_to_host() {
+//      fprintf(stderr, "Copying-@3 to host %d\n", sizeof(T)*num_elements);
       CHECK_CL_ERROR(err = clEnqueueReadBuffer(cl_env.m_command_queue, device_data, CL_TRUE, 0, sizeof(T) * num_elements, (void*) (host_data), 0, NULL, NULL), "Copying to host ");
    }
    ////////////////////////////////////////////////
