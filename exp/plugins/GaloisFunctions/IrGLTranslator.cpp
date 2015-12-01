@@ -34,11 +34,6 @@ using namespace llvm;
 
 namespace {
 
-// FIXME: reinitialize after every main/orchestration code
-std::map<std::string, std::string> GlobalVariablesToTypeMap;
-std::map<std::string, std::string> SharedVariablesToTypeMap;
-std::map<std::string, std::vector<std::string> > KernelToArgumentsMap;
-
 void findAndReplace(std::string &str, 
     const std::string &toReplace, 
     const std::string &replaceWith) 
@@ -56,18 +51,26 @@ private:
   std::unordered_set<const Stmt *> skipStmts;
   std::unordered_set<const Decl *> skipDecls;
   std::map<std::string, std::string> nodeMap;
-  bool entryOnce;
   std::string funcName;
   std::stringstream declString, bodyString;
   std::map<std::string, std::string> parameterToTypeMap;
   std::unordered_set<std::string> symbolTable; // FIXME: does not handle scoped variables (nesting with same variable name)
   std::ofstream Output;
 
+  std::map<std::string, std::string> &GlobalVariablesToTypeMap;
+  std::map<std::string, std::string> &SharedVariablesToTypeMap;
+  std::map<std::string, std::vector<std::string> > &KernelToArgumentsMap;
+
 public:
-  explicit IrGLOperatorVisitor(CompilerInstance &CI, Rewriter &R) : 
-    astContext(&(CI.getASTContext())),
+  explicit IrGLOperatorVisitor(ASTContext *context, Rewriter &R, 
+      std::map<std::string, std::string> &globalVariables,
+      std::map<std::string, std::string> &sharedVariables,
+      std::map<std::string, std::vector<std::string> > &kernels) : 
+    astContext(context),
     rewriter(R),
-    entryOnce(false)
+    GlobalVariablesToTypeMap(globalVariables),
+    SharedVariablesToTypeMap(sharedVariables),
+    KernelToArgumentsMap(kernels)
   {}
   
   void WriteCBlock(std::string text) {
@@ -123,7 +126,6 @@ public:
       Output << declString.str();
       Output << bodyString.str();
       Output.close();
-      entryOnce = false;
     }
     return traverse;
   }
@@ -137,12 +139,7 @@ public:
   }
 
   virtual bool VisitCXXMethodDecl(CXXMethodDecl* func) {
-    assert(!entryOnce);
-    entryOnce = true;
-    skipStmts.clear();
-    skipDecls.clear();
-    nodeMap.clear();
-    symbolTable.clear();
+    assert(declString.empty());
     declString.str("");
     bodyString.str("");
     funcName = func->getParent()->getNameAsString();
@@ -310,15 +307,17 @@ private:
   Rewriter &rewriter; // FIXME: is this necessary? can ASTContext give source code?
   std::unordered_set<const Stmt *> skipStmts;
   std::unordered_set<const Decl *> skipDecls;
-  bool entryOnce;
   std::unordered_set<std::string> symbolTable; // FIXME: does not handle scoped variables (nesting with same variable name)
   std::ofstream Output;
 
+  std::map<std::string, std::string> GlobalVariablesToTypeMap;
+  std::map<std::string, std::string> SharedVariablesToTypeMap;
+  std::map<std::string, std::vector<std::string> > KernelToArgumentsMap;
+
 public:
-  explicit IrGLOrchestratorVisitor(CompilerInstance &CI, Rewriter &R) : 
-    astContext(&(CI.getASTContext())),
-    rewriter(R),
-    entryOnce(false)
+  explicit IrGLOrchestratorVisitor(ASTContext *context, Rewriter &R) : 
+    astContext(context),
+    rewriter(R)
   {}
   
   void WriteCBlock(std::string text) {
@@ -342,16 +341,71 @@ public:
   virtual bool TraverseDecl(Decl *D) {
     bool traverse = RecursiveASTVisitor<IrGLOrchestratorVisitor>::TraverseDecl(D);
     if (traverse && D && isa<CXXMethodDecl>(D)) {
+      Output.close();
+
+      // FIXME: Build file name from source file
+      std::ofstream CombinedOutput;
+      CXXMethodDecl *method = dyn_cast<CXXMethodDecl>(D);
+      CombinedOutput.open(method->getParent()->getNameAsString() + ".py");
+      CombinedOutput << "from gg.ast import *\n";
+      CombinedOutput << "from gg.lib.graph import Graph\n";
+      CombinedOutput << "from gg.ast.params import GraphParam\n";
+      CombinedOutput << "import cgen\n";
+      CombinedOutput << "G = Graph(\"graph\")\n";
+      CombinedOutput << "ast = Module([\n";
+      CombinedOutput << "CBlock([cgen.Include(\"kernels/reduce.cuh\", "
+        << "system = False)], parse = False),\n";
       for (auto& var : SharedVariablesToTypeMap) {
         std::string upper = var.first;
         std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
-        Output << "CBlock([\"" << "P_" << upper << " = p_" 
+        CombinedOutput << "CDecl([(\"" << var.second 
+          << " *\", \"P_" << upper << "\", \"\")]),\n";
+      }
+      for (auto& var : GlobalVariablesToTypeMap) {
+        size_t found = var.second.find("Galois::");
+        if (found == std::string::npos) {
+          found = var.second.find("cll::opt");
+          std::string type;
+          if (found == std::string::npos) {
+            type = var.second;
+          } else {
+            size_t start = var.second.find("<", found);
+            // FIXME: nested < < > >
+            size_t end = var.second.find(">", found);
+            type = var.second.substr(start+1, end-start-1);
+          }
+          // FIXME: initialization value?
+          CombinedOutput << "CDecl([(\"extern " << type 
+            << "\", \"" << var.first << "\", \"\")]),\n";
+        }
+      }
+
+      std::ifstream compute(COMPUTE_FILENAME);
+      CombinedOutput << compute.rdbuf(); 
+      compute.close();
+      remove(COMPUTE_FILENAME);
+
+      CombinedOutput << "Kernel(\"" << "gg_main" << "\", ";
+      CombinedOutput << "[GraphParam('hg', True), GraphParam('gg', True)],\n[\n";
+      // should wait for all operators to be generated before reading shared variables
+      for (auto& var : SharedVariablesToTypeMap) {
+        CombinedOutput << "CDecl((\"Shared<" << var.second << ">\", \"p_" << var.first << "\"";
+        CombinedOutput << ", \"= Shared<" << var.second << "> (hg.nnodes)\")),\n";
+      }
+      std::ifstream orchestrator(ORCHESTRATOR_FILENAME);
+      CombinedOutput << orchestrator.rdbuf();
+      orchestrator.close();
+      for (auto& var : SharedVariablesToTypeMap) {
+        std::string upper = var.first;
+        std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
+        CombinedOutput << "CBlock([\"" << "P_" << upper << " = p_" 
           << var.first << ".cpu_rd_ptr()" << "\"]),\n";
       }
-      Output << "]),\n"; // end kernel
-      Output << "])\n"; // end Module
-      Output.close();
-      entryOnce = false;
+      CombinedOutput << "]),\n"; // end kernel
+      remove(ORCHESTRATOR_FILENAME);
+
+      CombinedOutput << "])\n"; // end Module
+      CombinedOutput.close();
     }
     return traverse;
   }
@@ -365,19 +419,12 @@ public:
   }
 
   virtual bool VisitCXXMethodDecl(CXXMethodDecl* func) {
-    assert(!entryOnce);
-    entryOnce = true;
-    Output.open(ORCHESTRATOR_FILENAME, std::ios::app);
+    assert(symbolTable.empty());
+    Output.open(ORCHESTRATOR_FILENAME);
     skipStmts.clear();
     skipDecls.clear();
     symbolTable.clear();
-    Output << "Kernel(\"" << "gg_main" << "\", ";
-    Output << "[GraphParam('hg', True), GraphParam('gg', True)],\n[\n";
-    for (auto& var : SharedVariablesToTypeMap) {
-      Output << "CDecl((\"Shared<" << var.second << ">\", \"p_" << var.first << "\"";
-      Output << ", \"= Shared<" << var.second << "> (hg.nnodes)\")),\n";
-    }
-    symbolTable.insert("graph_main");
+    symbolTable.insert("_graph");
     return true;
   }
 
@@ -452,7 +499,6 @@ public:
           reduceCall << ", (" << SharedVariablesToTypeMap[reduceVar] << "*)0";
           reduceCall << ", &" << var << ", *mgc)";
 
-          // FIXME: Add "parse=False"
           WriteCBlock(reduceCall.str());
         }
       }
@@ -486,6 +532,29 @@ public:
         }
         if (!skip) WriteCBlock(text);
       } else {
+        // generate kernel for operator
+        assert(callExpr->getNumArgs() > 1);
+        Expr *op = callExpr->getArg(1);
+        RecordDecl *record = op->getType().getTypePtr()->getAsStructureType()->getDecl();
+        CXXRecordDecl *cxxrecord = dyn_cast<CXXRecordDecl>(record);
+        for (auto method : cxxrecord->methods()) {
+          if (method->getNameAsString().compare("operator()") == 0) {
+            // FIXME: determine whether it is topological or data-driven
+            if (method->getNumParams() == 1) {
+              //llvm::errs() << "\nVertex Operator:\n" << 
+              //  rewriter.getRewrittenText(method->getSourceRange()) << "\n";
+              //method->dump();
+              IrGLOperatorVisitor operatorVisitor(astContext, rewriter,
+                  GlobalVariablesToTypeMap,
+                  SharedVariablesToTypeMap,
+                  KernelToArgumentsMap);
+              operatorVisitor.TraverseDecl(method);
+              break;
+            }
+          }
+        }
+
+        // generate call to kernel
         begin = text.find(",", begin);
         ++begin;
         std::size_t end = text.find("(", begin);
@@ -555,92 +624,43 @@ public:
   
 class FunctionDeclHandler : public MatchFinder::MatchCallback {
 private:
-  CompilerInstance &Instance;
+  ASTContext *astContext;
   Rewriter &rewriter;
-  IrGLOperatorVisitor operatorVisitor;
-  IrGLOrchestratorVisitor orchestratorVisitor;
 public:
-  FunctionDeclHandler(CompilerInstance &CI, Rewriter &R): 
-    Instance(CI), 
-    rewriter(R), 
-    operatorVisitor(CI, R),
-    orchestratorVisitor(CI, R) 
+  FunctionDeclHandler(ASTContext *context, Rewriter &R): 
+    astContext(context),
+    rewriter(R)
   {}
   virtual void run(const MatchFinder::MatchResult &Results) {
-    const CXXMethodDecl* decl = Results.Nodes.getNodeAs<clang::CXXMethodDecl>("graphOperator");
+    const CXXMethodDecl* decl = Results.Nodes.getNodeAs<clang::CXXMethodDecl>("graphAlgorithm");
     if (decl) {
-      //llvm::errs() << "\nGraph Operator:\n" << rewriter.getRewrittenText(decl->getSourceRange()) << "\n";
+      //llvm::errs() << "\nGraph Operator:\n" << 
+      //  rewriter.getRewrittenText(decl->getSourceRange()) << "\n";
       //decl->dump();
-      //llvm::errs() << "\nIrGL Orchestrator Kernel:\n";
+      IrGLOrchestratorVisitor orchestratorVisitor(astContext, rewriter);
       orchestratorVisitor.TraverseDecl(const_cast<CXXMethodDecl *>(decl));
-    } else {
-      decl = Results.Nodes.getNodeAs<clang::CXXMethodDecl>("vertexOperator");
-      if (decl) {
-        //llvm::errs() << "\nVertex Operator:\n" << rewriter.getRewrittenText(decl->getSourceRange()) << "\n";
-        //decl->dump();
-        //llvm::errs() << "\nIrGL Kernel for Vertex Operators:\n";
-        operatorVisitor.TraverseDecl(const_cast<CXXMethodDecl *>(decl));
-      }
     }
   }
 };
 
 class IrGLFunctionsConsumer : public ASTConsumer {
 private:
-  CompilerInstance &Instance;
   Rewriter &rewriter;
   MatchFinder Matchers;
   FunctionDeclHandler functionDeclHandler;
 public:
-  IrGLFunctionsConsumer(CompilerInstance &CI, Rewriter &R): Instance(CI), rewriter(R), functionDeclHandler(CI, R) {
-    // FIXME: Design a standard to identify graph and node operators
+  IrGLFunctionsConsumer(CompilerInstance &CI, Rewriter &R): 
+    rewriter(R), 
+    functionDeclHandler(&(CI.getASTContext()), R) 
+  {
     Matchers.addMatcher(functionDecl(
           hasOverloadedOperatorName("()"),
-          hasAnyParameter(hasName("graph_main"))).
-          bind("graphOperator"), &functionDeclHandler);
-    Matchers.addMatcher(functionDecl(
-          hasOverloadedOperatorName("()"),
-          hasAnyParameter(hasName("vertex"))).
-          bind("vertexOperator"), &functionDeclHandler);
+          hasAnyParameter(hasName("_graph"))).
+          bind("graphAlgorithm"), &functionDeclHandler);
   }
 
   virtual void HandleTranslationUnit(ASTContext &Context){
     Matchers.matchAST(Context);
-
-    // FIXME: Build file name from source file
-    std::ofstream Output;
-    Output.open("irgl.py");
-    Output << "from gg.ast import *\n";
-    Output << "from gg.lib.graph import Graph\n";
-    Output << "from gg.ast.params import GraphParam\n";
-    Output << "import cgen\n";
-    Output << "G = Graph(\"graph\")\n";
-    Output << "ast = Module([\n";
-    for (auto& var : SharedVariablesToTypeMap) {
-      std::string upper = var.first;
-      std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
-      Output << "CDecl([(\"" << var.second 
-        << " *\", \"P_" << upper << "\", \"\")]),\n";
-    }
-    for (auto& var : GlobalVariablesToTypeMap) {
-      size_t found = var.second.find("Galois::");
-      if (found == std::string::npos) {
-        Output << "CDecl([(\"extern " << var.second 
-          << "\", \"" << var.first << "\", \"\")]),\n";
-      }
-    }
-
-    std::ifstream compute(COMPUTE_FILENAME);
-    Output << compute.rdbuf(); 
-    compute.close();
-    remove(COMPUTE_FILENAME);
-
-    std::ifstream orchestrator(ORCHESTRATOR_FILENAME);
-    Output << orchestrator.rdbuf();
-    orchestrator.close();
-    remove(ORCHESTRATOR_FILENAME);
-
-    Output.close();
   }
 };
 
