@@ -7,7 +7,7 @@
 
 // debug categories
 typedef enum debug_category {
-    DEBUG_NONE = 0, //
+    DEBUG_MethodFlag::UNPROTECTED = 0, //
     DEBUG_MUTEX = ( 1 << 1 ),
     DEBUG_LIFEDEATH = ( 1 << 2 ),
     DEBUG_CONDVAR = ( 1 << 3 ),
@@ -21,7 +21,7 @@ typedef enum debug_category {
 extern int DEBUG_CATEGORY;
 
 static inline void NO_DEBUG( void ) {
-    DEBUG_CATEGORY = DEBUG_NONE;
+    DEBUG_CATEGORY = DEBUG_MethodFlag::UNPROTECTED;
 }
 static inline void ALL_DEBUG( void ) {
     DEBUG_CATEGORY = DEBUG_ALL;

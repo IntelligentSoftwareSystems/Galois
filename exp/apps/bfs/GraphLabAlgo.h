@@ -2,9 +2,9 @@
 #define APPS_BFS_GRAPHLABALGO_H
 
 #include "Galois/DomainSpecificExecutors.h"
-#include "Galois/Graph/OCGraph.h"
-#include "Galois/Graph/LCGraph.h"
-#include "Galois/Graph/GraphNodeBag.h"
+#include "Galois/Graphs/OCGraph.h"
+#include "Galois/Graphs/LCGraph.h"
+#include "Galois/Graphs/GraphNodeBag.h"
 
 #include <random>
 #include <boost/mpl/if.hpp>
@@ -52,7 +52,7 @@ struct GraphLabBFS {
 
     void apply(Graph& graph, GNode node, const gather_type&) {
       changed = false;
-      SNode& sdata = graph.getData(node, Galois::MethodFlag::NONE);
+      SNode& sdata = graph.getData(node, Galois::MethodFlag::UNPROTECTED);
       if (sdata.dist > received_dist) {
         changed = true;
         sdata.dist = received_dist;
@@ -67,10 +67,10 @@ struct GraphLabBFS {
 
     void scatter(Graph& graph, GNode node, GNode src, GNode dst,
         Galois::GraphLab::Context<Graph,Program>& ctx, typename Graph::edge_data_reference) {
-      SNode& sdata = graph.getData(node, Galois::MethodFlag::NONE);
+      SNode& sdata = graph.getData(node, Galois::MethodFlag::UNPROTECTED);
       Dist newDist = sdata.dist + 1;
 
-      if (graph.getData(dst, Galois::MethodFlag::NONE).dist > newDist) {
+      if (graph.getData(dst, Galois::MethodFlag::UNPROTECTED).dist > newDist) {
         ctx.push(dst, message_type(newDist));
       }
     }
@@ -130,7 +130,7 @@ struct GraphLabDiameter {
     size_t hash_value() const {
       if (!gen) {
         gen = std::mt19937();
-        gen->seed(Galois::Runtime::LL::getTID());
+        gen->seed(Galois::Substrate::ThreadPool::getTID());
       }
       size_t ret = 0;
       while (dist(*gen) < 0.5) {
@@ -162,7 +162,7 @@ struct GraphLabDiameter {
     }
 
     void operator()(GNode n) const {
-      LNode& data = graph.getData(n, Galois::MethodFlag::NONE);
+      LNode& data = graph.getData(n, Galois::MethodFlag::UNPROTECTED);
       if (UseHashed)
         initHashed(data);
       else
@@ -191,8 +191,8 @@ struct GraphLabDiameter {
     typedef int tt_needs_gather_out_edges;
     
     void gather(Graph& graph, GNode node, GNode src, GNode dst, gather_type& gather, typename Graph::edge_data_reference) {
-      LNode& sdata = graph.getData(node, Galois::MethodFlag::NONE);
-      LNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+      LNode& sdata = graph.getData(node, Galois::MethodFlag::UNPROTECTED);
+      LNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
       if (sdata.odd_iteration) {
         bitwise_or(gather.bitmask, ddata.bitmask2);
         //gather += gather_type(ddata.bitmask2);
@@ -203,7 +203,7 @@ struct GraphLabDiameter {
     }
 
     void apply(Graph& graph, GNode node, const gather_type& total) {
-      LNode& data = graph.getData(node, Galois::MethodFlag::NONE);
+      LNode& data = graph.getData(node, Galois::MethodFlag::UNPROTECTED);
       if (data.odd_iteration) {
         if (total.bitmask.size() > 0)
           bitwise_or(data.bitmask1, total.bitmask);

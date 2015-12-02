@@ -3,8 +3,9 @@
 
 #include "bfs.h"
 
+#include "Galois/PerThreadContainer.h"
+
 #include "Galois/Runtime/ParallelWorkInline_Exp.h"
-#include "Galois/Runtime/PerThreadWorkList.h"
 #include "Galois/Runtime/CoupledExecutor.h"
 
 typedef uint32_t ND_ty;
@@ -21,7 +22,7 @@ protected:
     Update (GNode node, ND_ty level): node (node), level (level) {}
   };
 
-  typedef Galois::Runtime::PerThreadVector<Update> WL_ty;
+  typedef Galois::PerThreadVector<Update> WL_ty;
 
   struct PftchFunc {
     typedef int tt_does_not_need_aborts;
@@ -58,8 +59,8 @@ protected:
     template <typename C>
     GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (const Update& up, C& wl) {
       bool updated = false;
-      if (graph.getData (up.node, Galois::NONE) == BFS_LEVEL_INFINITY) {
-        graph.getData (up.node, Galois::NONE) = up.level;
+      if (graph.getData (up.node, Galois::MethodFlag::UNPROTECTED) == BFS_LEVEL_INFINITY) {
+        graph.getData (up.node, Galois::MethodFlag::UNPROTECTED) = up.level;
         updated = true;
       }
 
@@ -68,10 +69,10 @@ protected:
 
         graph.mapOutEdges (up.node,
             [dstLevel, &wl] (GNode dst) {
-              // wl.push (Update (dst, dstLevel));
-              wl.emplace_back (dst, dstLevel);
+              wl.push (dst, dstLevel);
+              //wl.emplace(dst, dstLevel);
             },
-            Galois::NONE);
+            Galois::MethodFlag::UNPROTECTED);
       }
     }
   };

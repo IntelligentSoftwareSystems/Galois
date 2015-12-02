@@ -21,7 +21,7 @@ class AbstractProduction {
 	AbstractProduction(std::vector<int>* productionParameters, std::vector<EquationSystem*> *inputData) : productionParameters(productionParameters)
     {
 
-  	};
+    }
 
 	virtual ~AbstractProduction() {
 		delete graph;

@@ -208,7 +208,7 @@ int TRON::trcg(double delta, double *g, double *s, double *r)
 		r[i] = -g[i];
 		d[i] = r[i];
 #ifdef EXP_DOALL_GALOIS
-        }, Galois::do_all_steal(false));
+        });
 #else
 	}
 #endif

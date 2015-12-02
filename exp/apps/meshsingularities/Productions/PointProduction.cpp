@@ -21,9 +21,9 @@ GraphNode PointProduction::addNode(int incomingEdges,
 	GraphNode graph_node = graph->createNode(outgoingEdges,node);
 
 	if(src == NULL)
-		graph->addEdge(graph_node,dst,Galois::MethodFlag::NONE);
+		graph->addEdge(graph_node,dst,Galois::MethodFlag::UNPROTECTED);
 	else
-		graph->addEdge(src,graph_node,Galois::MethodFlag::NONE);
+		graph->addEdge(src,graph_node,Galois::MethodFlag::UNPROTECTED);
 
 	return graph_node;
 }

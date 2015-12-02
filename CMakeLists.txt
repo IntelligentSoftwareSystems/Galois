@@ -1,11 +1,11 @@
-cmake_minimum_required(VERSION 2.8.9)
+cmake_minimum_required(VERSION 3.2.0)
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake/Modules/")
 project(Galois)
 set(GALOIS_VERSION_MAJOR "2")
-set(GALOIS_VERSION_MINOR "2")
-set(GALOIS_VERSION_PATCH "2")
+set(GALOIS_VERSION_MINOR "3")
+set(GALOIS_VERSION_PATCH "0")
 set(GALOIS_VERSION ${GALOIS_VERSION_MAJOR}.${GALOIS_VERSION_MINOR}.${GALOIS_VERSION_PATCH})
-set(GALOIS_COPYRIGHT_YEAR "2014") # Also in COPYRIGHT
+set(GALOIS_COPYRIGHT_YEAR "2015") # Also in COPYRIGHT
 
 #adding additional compiler flags for mpip profiling
 #set(LIBUNWIND_DIR "/net/ohm/export/cdgc/gill/modules/usr/local/lib")
@@ -19,8 +19,6 @@ if(NOT CMAKE_BUILD_TYPE)
   # cmake default flags with relwithdebinfo is -O2 -g
   # cmake default flags with release is -O3 -DNDEBUG
   set(CMAKE_BUILD_TYPE "Release")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
-  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g")
 endif()
 
 set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
@@ -37,6 +35,7 @@ set(USE_STRICT_CONFIG OFF CACHE BOOL "Instead of falling back gracefully, fail")
 set(USE_LONGJMP ON CACHE BOOL "Use longjmp instead of exceptions to signal aborts")
 set(INSTALL_APPS OFF CACHE BOOL "Install apps as well as library")
 set(SKIP_COMPILE_APPS OFF CACHE BOOL "Skip compilation of applications using Galois library")
+set(GRAPH_LOCATION "" CACHE PATH "Location of inputs for tests if downloaded/stored separately.")
 
 set(INSTALL_LIB_DIR lib CACHE PATH "Installation directory for libraries")
 set(INSTALL_BIN_DIR bin CACHE PATH "Installation directory for executables")
@@ -64,30 +63,36 @@ enable_testing()
 
 ###### Configure compiler ######
 
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g")
+
+if(NOT "$ENV{GCC_BIN}" STREQUAL "")
+  # Preserve captured environment variable during reconfiguration
+  set(CXX_TOOLCHAIN "$ENV{GCC_BIN}" CACHE STRING "GCC Toolchain")
+endif()
+
 # ICC
 if(CMAKE_CXX_COMPILER_ID MATCHES "Intel")
   execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion
                   OUTPUT_VARIABLE ICC_VERSION)
-  if(ICC_VERSION VERSION_GREATER 13.0 OR ICC_VERSION VERSION_EQUAL 13.0)
-    #message(STATUS "ICC Version >= 13.0")
-  else()
+  if(ICC_VERSION VERSION_LESS 13.0)
     message(FATAL_ERROR "ICC must be 13.0 or higher; found: ${ICC_VERSION} instead")
   endif()
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -wd68 -wd981 -wd383 -wd869 -wd2196 -wd279 -wd2504 -wd2943 -wd32013")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -wd68 -wd981 -wd383 -wd869 -wd2196 -wd279 -wd2504 -wd2943 -wd32013 -wd3373")
 
-  if("$ENV{GCC_BIN}" STREQUAL "")
-    message(STATUS "Using default GCC toolchain; set environment variable GCC_BIN to override")
+  if(CXX_TOOLCHAIN)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -gxx-name=${CXX_TOOLCHAIN}/g++")
   else()
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -gxx-name=$ENV{GCC_BIN}/g++")
+    message(STATUS "Using default GCC toolchain; set environment variable GCC_BIN to override")
   endif()
 endif()
 
 # Clang
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
-  if("$ENV{GCC_BIN}" STREQUAL "")
-    message(STATUS "Using default GCC toolchain; set environment variable GCC_BIN to override")
+  if(CXX_TOOLCHAIN)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -gcc-toolchain ${CXX_TOOLCHAIN}/..")
   else()
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -gcc-toolchain $ENV{GCC_BIN}/..")
+    message(STATUS "Using default GCC toolchain; set environment variable GCC_BIN to override")
   endif()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fcolor-diagnostics")
   if(CMAKE_BUILD_TYPE MATCHES "Debug")
@@ -106,24 +111,26 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "XL")
   if(XLC_VERSION VERSION_GREATER 12.0)
     #message(STATUS "XLC Version > 12.0")
   else()
-    message(FATAL_ERROR "XLC must be higher than 12.0")
+    message(FATAL_ERROR "XLC must be higher than 12.0; found ${XLC_VERSION} instead")
   endif()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -qsuppress=1540-0724 -qsuppress=1500-029 -qmaxmem=-1 -qalias=noansi -qsmp=omp")
 endif()
 
 if(CYGWIN)
   message(STATUS "On Cygwin")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -U__STRICT_ANSI__")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -U__STRICT_ANSI__ -Werror")
 endif()
 
 # check for incompatible GCC
+set(GCC_TUPLE_BUG_NOT_FOUND TRUE)
 if(CMAKE_COMPILER_IS_GNUCC)
   execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion
                   OUTPUT_VARIABLE GCC_VERSION)
-  if(GCC_VERSION VERSION_GREATER 4.7 OR GCC_VERSION VERSION_EQUAL 4.7)
-    #message(STATUS "GCC Version >= 4.7")
-  else()
+  if(GCC_VERSION VERSION_LESS 4.7)
     message(FATAL_ERROR "GCC must be 4.7 or higher")
+  endif()
+  if(GCC_VERSION VERSION_LESS 4.7.3)
+    set(GCC_TUPLE_BUG_NOT_FOUND)
   endif()
 endif()
 
@@ -143,6 +150,16 @@ if(NOT USE_HETERO)
   endif()
 endif()
 
+# More warnings
+if(CMAKE_BUILD_TYPE MATCHES "Debug")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
+  if(CMAKE_COMPILER_IS_GNUCC)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Og")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Og")
+  endif()
+endif()
+
 #Boost
 #not needed now but will be needed for newer version of Boost after 1.4X ish
 set(Boost_ADDITIONAL_VERSIONS "1.40" "1.40.0" "1.47" "1.47.0" "1.49" "1.49.0" "1.51.0")
@@ -155,6 +172,12 @@ find_package(Boost 1.38.0 REQUIRED)
 include_directories(${Boost_INCLUDE_DIR})
 
 ###### Configure features ######
+
+add_definitions(-DGALOIS_VERSION_MAJOR=${GALOIS_VERSION_MAJOR})
+add_definitions(-DGALOIS_VERSION_MINOR=${GALOIS_VERSION_MINOR})
+add_definitions(-DGALOIS_VERSION_PATCH=${GALOIS_VERSION_PATCH})
+add_definitions(-DGALOIS_VERSION=${GALOIS_VERSION_MAJOR}.${GALOIS_VERSION_MINOR}.${GALOIS_VERSION_PATCH})
+add_definitions(-DGALOIS_COPYRIGHT_YEAR=${GALOIS_COPYRIGHT_YEAR})
 
 # Experimental features
 if(USE_EXP)
@@ -174,6 +197,16 @@ if(USE_EXP)
   if(OPENMP_FOUND)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+  endif()
+
+  find_package(TBB)
+  if(TBB_FOUND)
+    include_directories(${TBB_INCLUDE_DIRS})
+  endif()
+  
+  find_package(CBLAS)
+  if(CBLAS_FOUND)
+    include_directories(${BLAS_INCLUDE_DIRS})
   endif()
 
   if(USE_PROF)
@@ -238,17 +271,6 @@ endif()
 # PThreads
 find_package(Threads REQUIRED)
 
-# NUMA (linux)
-# currently not available on MIC (and not helpful either)
-#if(NOT ARCH STREQUAL "mic")
-  find_package(NUMA)
-  if(NUMA_FOUND)
-    set(GALOIS_USE_NUMA on)
-  elseif(USE_STRICT_CONFIG)
-    message(FATAL_ERROR "Need libnuma")
-  endif()
-#endif()
-
 #llvm ADT and command line parser
 #find_package(LLVM)
 
@@ -268,6 +290,7 @@ endif()
 
 # Boost
 set(Boost_ADDITIONAL_VERSIONS "1.40" "1.40.0" "1.47" "1.47.0" "1.49" "1.49.0" "1.51.0")
+set(Boost_USE_MULTITHREADED OFF)
 if(NOT "$ENV{BOOST_DIR}" STREQUAL "")
   set(BOOST_ROOT $ENV{BOOST_DIR})
 endif()
@@ -283,27 +306,55 @@ if(CMAKE_BUILD_TYPE MATCHES "Debug")
   endif()
 endif()
 
-find_package(CXX11 REQUIRED)
-
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${CXX11_FLAGS}")
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(CheckEndian)
 
-include(llvm-extras)
+#include(llvm-extras)
 #always import c99 stdint functions into c++
 #include(UseStdMacro) # HandleLLVMOptions.cmake (via llvm-extras) already does this for us
 #include_directories("${PROJECT_BINARY_DIR}/include") # llvm-extra already does this for us
 
 ###### Build Hacks ######
 
-# XXX(ddn): Hack for lonestar machines
-if(NUMA_FOUND)
-  if(NUMA_OLD)
-    set(GALOIS_USE_NUMA_OLD on)
+add_definitions(-D__STDC_LIMIT_MACROS)
+
+###### Test Inputs ######
+if (GRAPH_LOCATION)
+  if (EXISTS ${GRAPH_LOCATION}/graph_readme.txt)
+    set(BASEINPUT ${GRAPH_LOCATION})
+    MESSAGE(STATUS "Using specified graph location ${GRAPH_LOCATION}")
+  else()
+    MESSAGE(FATAL_ERROR "Specified graph location does not appear to have input: ${GRAPH_LOCATION}")
   endif()
+elseif(EXISTS /net/ohm/export/cdgc/inputs/reference/graph_readme.txt)
+  set(BASEINPUT /net/ohm/export/cdgc/inputs/reference)
+  MESSAGE(STATUS "Using ISS shared graph folder for inputs")
+else()
+  add_subdirectory(inputs)
+  set(BASEINPUT ${CMAKE_BINARY_DIR}/inputs/reference )
+  MESSAGE(STATUS "Tests cannot run without inputs.  \"make inputs\" to download inputs")
 endif()
+#set(GRAPH_INPUTS ${BASEINPUT}/graph_readme.txt)
 
 ###### Global Functions ######
+
+function(add_internal_library name)
+  add_library(${name} OBJECT ${ARGN})
+endfunction()
+
+include(ProcessorCount)
+function(add_test_scale type app)
+  processorCount(N)
+  if (N EQUAL 0)
+    set(N 1)
+  endif()
+  foreach(thr RANGE 1 ${N})
+    add_test(test-${type}-${thr}-${app} ${app} ${ARGN} -t ${thr})
+#    set_tests_properties(test-${type}-${thr}-${app} PROPERTIES REQUIRED_FILES ${GRAPH_INPUTS})
+  endforeach(thr)
+endfunction(add_test_scale)
 
 function(compileApp name)
   if(ARGN)
@@ -315,7 +366,7 @@ function(compileApp name)
 endfunction(compileApp)
 
 function(app name)
-  set(options DISTSAFE)
+  set(options DISTSAFE EXP_OPT)
   set(oneValueArgs)
   set(multiValueArgs REQUIRES EXTLIBS)
   cmake_parse_arguments(APP "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
@@ -329,24 +380,33 @@ function(app name)
   foreach(required ${APP_REQUIRES})
     if(${${required}} MATCHES "TRUE")
     else()
-      message("-- NOT compiling ${name} (missing: ${required})")
+      message(STATUS "NOT compiling ${name} (missing: ${required})")
       return()
     endif()
   endforeach()
 
   compileApp(${name} ${APP_UNPARSED_ARGUMENTS})
+  if(${APP_EXP_OPT})
+    target_link_libraries(${name} galois_exp)
+  endif()
   target_link_libraries(${name} ${APP_EXTLIBS})
-  target_link_libraries(${name} galois)
+  target_link_libraries(${name} lonestar)
+  target_link_libraries(${name} galois_graphs)
+  target_link_libraries(${name} galois_runtime)
+  target_link_libraries(${name} galois_substrate)
+  target_link_libraries(${name} gllvm)
   target_link_libraries(${name} rt)
+  target_link_libraries(${name} ${CMAKE_THREAD_LIBS_INIT})
+
   if(INSTALL_APPS)
     install(TARGETS ${name} DESTINATION bin)
   endif()
 endfunction(app)
 
-function(makeTest name)
-  set(options DISTSAFE)
+function(makeTest)
+  set(options DISTSAFE ADD_TARGET TARGET EXP_OPT)
   set(oneValueArgs)
-  set(multiValueArgs REQUIRES COMMAND_PREFIX COMMAND_SUFFIX)
+  set(multiValueArgs REQUIRES COMMAND_PREFIX)
   cmake_parse_arguments(APP "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
   if(${APP_DISTSAFE})
@@ -355,10 +415,13 @@ function(makeTest name)
     return()
   endif()
   
+  list(GET APP_UNPARSED_ARGUMENTS 0 name)
+  list(REMOVE_AT APP_UNPARSED_ARGUMENTS 0)
+
   foreach(required ${APP_REQUIRES})
     if(${${required}} MATCHES "TRUE")
     else()
-      message("-- NOT compiling ${name} (missing: ${required})")
+      message(STATUS "NOT compiling ${name} (missing: ${required})")
       return()
     endif()
   endforeach()
@@ -367,41 +430,76 @@ function(makeTest name)
   foreach(f ${APP_COMMAND_PREFIX})
     list(APPEND commandline ${f})
   endforeach()
-  list(APPEND commandline "$<TARGET_FILE:test-${name}>")
-  foreach(f ${APP_COMMAND_SUFFIX})
+
+  if(${APP_ADD_TARGET})
+    add_executable(test-${name} ${name}.cpp)
+    if (${APP_EXP_OPT})
+      target_link_libraries(test-${name} galois_exp)
+    endif()
+    target_link_libraries(test-${name} lonestar)
+    target_link_libraries(test-${name} galois_graphs)
+    target_link_libraries(test-${name} galois_runtime)
+    target_link_libraries(test-${name} galois_substrate)
+    target_link_libraries(test-${name} gllvm)
+#    target_link_libraries(test-${name} galois_substrate)
+#    target_link_libraries(test-${name} galois)
+    list(APPEND commandline "$<TARGET_FILE:test-${name}>")
+  elseif(${APP_TARGET}) 
+    get_filename_component(base ${name} NAME)
+    if(TARGET ${base})
+      list(APPEND commandline "$<TARGET_FILE:${base}>")
+    else()
+      message(STATUS "NOT adding test ${name} (missing target: ${base})")
+      return()
+    endif()
+  else()
+    list(APPEND commandline ${name})
+  endif()
+  
+  foreach(f ${APP_UNPARSED_ARGUMENTS})
     list(APPEND commandline ${f})
   endforeach()
 
-  add_executable(test-${name} ${name}.cpp)
-  target_link_libraries(test-${name} galois)
   add_test(NAME ${name} COMMAND ${commandline})
+
   # Allow parallel tests
   set_tests_properties(${name} PROPERTIES ENVIRONMENT
     GALOIS_DO_NOT_BIND_THREADS=1)
 endfunction()
 
 ###### Source finding ######
-include_directories(include)
+#include_directories(include)
 
-add_subdirectory(lib)
-add_subdirectory(src)
+add_subdirectory(libllvm)
+add_subdirectory(libsubstrate)
+add_subdirectory(libruntime)
+add_subdirectory(libgraphs)
+add_subdirectory(libexp)
+
+#add_subdirectory(src)
 add_subdirectory(tools)
 add_subdirectory(scripts)
 if(NOT SKIP_COMPILE_APPS)
-  add_subdirectory(apps)
-  add_subdirectory(inputs)
+  add_subdirectory(lonestar)
+  add_subdirectory(examples)
   add_subdirectory(test)
-  add_subdirectory(toolkit_ml)
-endif()
-if(USE_EXP)
-  add_subdirectory(exp)
+#  add_subdirectory(toolkit_ml)
+  if(USE_EXP)
+   add_subdirectory(exp)
+  endif()
 endif()
 
 ###### Documentation ######
-set(DOXYFILE_SOURCE_DIR "src\" \"include\" \"docs")
-find_package(UseDoxygen 1.8.0)
-if(NOT UseDoxygen_FOUND)
+set(DOXYFILE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/docs\" \"${CMAKE_CURRENT_SOURCE_DIR}/libgraphs\" \"${CMAKE_CURRENT_SOURCE_DIR}/libllvm\" \"${CMAKE_CURRENT_SOURCE_DIR}/libruntime\" \"${CMAKE_CURRENT_SOURCE_DIR}/libsubstrate")
+find_package(Doxygen 1.8.0)
+if(NOT DOXYGEN_FOUND)
   message(STATUS "Could NOT find required doxygen version: doxygen missing or < 1.8.0") 
+else()
+  configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in
+     ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile.in @ONLY)
+  add_custom_target(doc ${DOXYGEN_EXECUTABLE}
+     ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile.in WORKING_DIRECTORY
+     ${CMAKE_CURRENT_BINARY_DIR})
 endif()
 
 ###### Distribution ######
@@ -415,35 +513,39 @@ set(CPACK_PACKAGE_VERSION_PATCH ${GALOIS_VERSION_PATCH})
 include(CPack)
 
 ###### Installation ######
-
-export(TARGETS galois APPEND FILE "${PROJECT_BINARY_DIR}/GaloisTargets.cmake")
-export(PACKAGE Galois)
+#export(TARGETS galois APPEND FILE "${PROJECT_BINARY_DIR}/GaloisTargets.cmake")
+#export(PACKAGE Galois)
 
 # Galois include files
 file(RELATIVE_PATH rel_include_dir "${INSTALL_CMAKE_DIR}" "${INSTALL_INCLUDE_DIR}")
 set(GALOIS_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/include" "${PROJECT_BINARY_DIR}/include")
 if(USE_EXP)
-  set(GALOIS_INCLUDE_DIR "${GALOIS_INCLUDE_DIR}" "${PROJECT_SOURCE_DIR}/exp/include")
+  set(GALOIS_INCLUDE_DIR "${GALOIS_INCLUDE_DIR}" "${PROJECT_SOURCE_DIR}/libexp/include")
 endif()
 
-# Galois include dependencies
-set(GALOIS_INCLUDE_DIRS)
-get_target_property(defs galois INCLUDE_DIRECTORIES)
+set(GALOIS_INCLUDE_DIRS) # Galois include dependencies
+set(GALOIS_INCLUDE_DIR)  # Galois include provides
+#get_target_property(defs galois INCLUDE_DIRECTORIES)
 foreach(d ${defs})
   string(FIND ${d} ${PROJECT_BINARY_DIR} pos1)
   string(FIND ${d} ${PROJECT_SOURCE_DIR} pos2)
   if(NOT ${pos1} EQUAL 0 AND NOT ${pos2} EQUAL 0)
     set(GALOIS_INCLUDE_DIRS ${GALOIS_INCLUDE_DIRS} ${d})
+  else()
+    set(GALOIS_INCLUDE_DIR ${GALOIS_INCLUDE_DIR} ${d})
   endif()
 endforeach()
+install(DIRECTORY ${GALOIS_INCLUDE_DIR} DESTINATION "${INSTALL_INCLUDE_DIR}/.." COMPONENT dev
+  FILES_MATCHING PATTERN "*.h"
+  PATTERN ".svn" EXCLUDE)
 
 # Galois compiler definitions
 set(galois_defs)
-get_directory_property(defs DIRECTORY "${PROJECT_SOURCE_DIR}/src" COMPILE_DEFINITIONS)
+get_directory_property(defs DIRECTORY "${PROJECT_SOURCE_DIR}" COMPILE_DEFINITIONS)
 foreach(d ${defs})
   set(galois_defs "-D${d} ${galois_defs}")
 endforeach()
-get_directory_property(defs DIRECTORY "${PROJECT_SOURCE_DIR}/src" COMPILE_DEFINITIONS_${CMAKE_BUILD_TYPE})
+get_directory_property(defs DIRECTORY "${PROJECT_SOURCE_DIR}" COMPILE_DEFINITIONS_${CMAKE_BUILD_TYPE})
 foreach(d ${defs})
   set(galois_defs "-D${d} ${galois_defs}")
 endforeach()

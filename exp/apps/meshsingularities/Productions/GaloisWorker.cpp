@@ -13,6 +13,7 @@
 #include "Galois/MethodFlags.h"
 
 #include "Node.h"
+
 //Galois::Runtime::LL::SimpleLock<true> foo;
 
 template<typename Context>
@@ -23,7 +24,7 @@ void ProductionProcess::operator()(Graph::GraphNode src, Context& ctx)
 	// node-related work is here:
 	node.execute();
 
-	for(LCM_edge_iterator ii = graph->edge_begin(src, Galois::MethodFlag::NONE), ei = graph->edge_end(src, Galois::MethodFlag::NONE); ii != ei; ++ii)
+	for(LCM_edge_iterator ii = graph->edge_begin(src, Galois::MethodFlag::UNPROTECTED), ei = graph->edge_end(src, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii)
 	{
 		GraphNode graphNode = graph->getEdgeDst(ii);
 		int nr_of_incoming_edges = atomic_dec(&(graphNode->getData().incomingEdges));
@@ -60,6 +61,17 @@ double test_function(int dim, ...)
 	return result;
 }
 
+void printVertices(Vertex *v, std::string space)
+{
+    printf("%ssize: %d x %d\n", space.c_str(), v->system->n, v->system->n);
+    if (v->left != NULL) {
+        printVertices(v->left, space+" ");
+    }
+    if (v->right != NULL) {
+        printVertices(v->right, space+" ");
+    }
+}
+
 int ProductionProcess::leftRange(int tasks, int cpus, int i)
 {
 	if (i == 0) {
@@ -78,7 +90,23 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
 	AbstractProduction *production;
 	Vertex *S;
 	Galois::StatTimer TMain;
-	TMain.start();
+    //TMain.start();
+	
+#ifdef WITH_PAPI
+	long long fpops = 0;
+	bool papi_supported = true;
+	int events[1] = {PAPI_FP_OPS};
+    int papi_err;
+    if (PAPI_library_init(PAPI_VER_CURRENT) != PAPI_VER_CURRENT) {
+        fprintf(stderr, "PAPI is unsupported.\n");
+        papi_supported = false; 
+    }
+
+    if (PAPI_num_counters() < 2) {
+        fprintf(stderr, "PAPI is unsupported.\n");
+        papi_supported = false;
+    }
+#endif
 
 	GenericMatrixGenerator* matrixGenerator;
 
@@ -153,14 +181,15 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
 	struct timeval start_time; 
 	struct timeval end_time; 
 
-
-
     if(edge)
     	production = new EdgeProduction(vec, inputMatrices);
     else
         production = new PointProduction(vec, inputMatrices);
 
 	S = production->getRootVertex();
+    //printVertices(S, "");
+	printf("Allocated: %lu bytes \n", this->getAllocatedSize(S));
+    printf("Root size: %d\n", S->system->n);
 	timerSolution.start();
 	int xx = gettimeofday(&start_time, NULL);
 	graph = production->getGraph();
@@ -175,52 +204,29 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
 
 	std::vector<GraphNode>::iterator iii = initial_nodes_vector.begin();
 
-	/*const int maxPackages = Galois::Runtime::LL::getMaxPackages();
-	const int coresPerPackages = Galois::Runtime::LL::getMaxCores()/maxPackages;
+#ifdef WITH_PAPI
+    if (papi_supported) {
+        if ((papi_err = PAPI_start_counters(events, 1)) != PAPI_OK) {
+            fprintf(stderr, "Could not start counters: %s\n", PAPI_strerror(papi_err));
+        }
+    }
+#endif
+    if (taskDescription.scheduler == OLD) {
+        Galois::for_each(initial_nodes_vector.begin(), initial_nodes_vector.end(), *this, Galois::wl<WL>());
+    } else if (taskDescription.scheduler == CILK) {
+        // TODO: implement CILK
 
-	const int activePackages = std::ceil(Galois::Runtime::activeThreads*1.0/coresPerPackages);
-
-	printf("Active threads: %d\n",Galois::Runtime::activeThreads);
-	printf("Max cores: %d\n", Galois::Runtime::LL::getMaxCores());
-	printf("Active packages: %d\n", activePackages);
-	const int tasks = initial_nodes_vector.size();
-
-	for (int pack=0; pack < activePackages; ++pack) {
-		std::vector<GraphNode> packNodes;
-		printf("%d -> %d\n", leftRange(tasks, activePackages, pack), rightRange(tasks, activePackages, pack));
-		for (int i=leftRange(tasks, activePackages, pack); i<rightRange(tasks, activePackages, pack); ++i) {
-			packNodes.push_back(*iii);
-			++iii;
-			printf("adding %d to %d\n", i, pack);
-
-		}
-		pps.getRemoteByPkg(pack)->
-				push(packNodes.begin(), packNodes.end());
-
-	} */
-
-
-	Galois::for_each(initial_nodes_vector.begin(), initial_nodes_vector.end(), *this, Galois::wl<WL>());
-	//Galois::do_all(initial_nodes_vector.begin(), initial_nodes_vector.end(), *this);
-	//for (;iii != initial_nodes_vector.end(); ++iii) {
-	//	(*this)(*iii);
-	//}
-
-	//Galois::on_each([&] (unsigned tid, unsigned totalThreads) {
-	//	printf("Hello from: [%d, %d]\n", tid, totalThreads);
-	//	Galois::Runtime::getSystemTermination().initializeThread();
-	//	if (Galois::Runtime::LL::isPackageLeaderForSelf(tid)) {
-	//		do {
-	//			printf("TID: %d is leader\n", tid);
-	//			GraphNode graphNode = pps.getLocal(tid)->pop().get();
-	//
-	//			Node &node = graphNode->data;
-	//			node.execute();
-	//		} while(!Galois::Runtime::getSystemTermination().globalTermination());
-
-	//	}
-	//	Galois::Runtime::getSystemTermination().localTermination(true);
-	//});
+    } else {
+        // TODO: implement Galois-DAG
+    }
+#ifdef WITH_PAPI	
+	if (papi_supported) {
+    	if ((papi_err = PAPI_read_counters(&fpops, 1)) != PAPI_OK) {
+            fprintf(stderr, "Could not get values: %s\n", PAPI_strerror(papi_err));
+        }
+        printf("FLOPS: %ld\n", fpops);
+    }
+#endif
 
 	timerSolution.stop();
 	printf("SOLUTION READY\n"); 
@@ -258,7 +264,7 @@ std::vector<double> *ProductionProcess::operator()(TaskDescription &taskDescript
 	delete S;
 	delete tiers;
 
-	TMain.stop();
+    //TMain.stop();
 
 	return result;
 }
@@ -267,7 +273,7 @@ unsigned long ProductionProcess::getAllocatedSize(Vertex *root)
 {
     unsigned long total = 0;
     if (root != NULL) {
-        unsigned long total = (root->system->n+1)*root->system->n*sizeof(double);
+        total = (root->system->n+1)*root->system->n*sizeof(double);
         total += getAllocatedSize(root->left)+getAllocatedSize(root->right);
     }
     return total;

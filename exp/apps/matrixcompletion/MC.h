@@ -5,7 +5,8 @@
 #include <string>
 
 typedef double LatentValue;
-static const int LATENT_VECTOR_SIZE = 100; // Purdue, CSGD: 100; Intel: 20
+//static const int LATENT_VECTOR_SIZE = 100; // Purdue, CSGD: 100; Intel: 20
+static const int LATENT_VECTOR_SIZE = 20; // Purdue, CSGD: 100; Intel: 20
 
 // like std::inner_product but rewritten here to check vectorization
 template<typename T>

@@ -32,8 +32,8 @@
 #include "Galois/Bag.h"
 #include "Galois/Statistic.h"
 #include "Galois/UnionFind.h"
-#include "Galois/Graph/LCGraph.h"
-#include "Galois/ParallelSTL/ParallelSTL.h"
+#include "Galois/Graphs/LCGraph.h"
+#include "Galois/ParallelSTL.h"
 #include "llvm/Support/CommandLine.h"
 
 #include "Lonestar/BoilerPlate.h"
@@ -91,8 +91,8 @@ std::ostream& operator<<(std::ostream& os, const Node& n) {
 
 // Adapted from preflowpush/Preflowpush.cpp
 Graph::edge_iterator findEdge(Graph& g, GNode src, GNode dst, bool *hasEdge) {
-  Graph::edge_iterator ii = g.edge_begin(src, Galois::MethodFlag::NONE),
-                       ei = g.edge_end(src, Galois::MethodFlag::NONE);
+  Graph::edge_iterator ii = g.edge_begin(src, Galois::MethodFlag::UNPROTECTED),
+                       ei = g.edge_end(src, Galois::MethodFlag::UNPROTECTED);
   *hasEdge = false;
   for (; ii != ei; ++ii) {
     if (g.getEdgeDst(ii) == dst) {
@@ -126,8 +126,8 @@ bool outputTextEdgeData(const char* ofile, Graph& G) {
  */
 struct Cmp {
   bool operator()(const GNode& node1, const GNode& node2) const {
-    Node &node1d = graph.getData(node1, Galois::MethodFlag::NONE);
-    Node &node2d = graph.getData(node2, Galois::MethodFlag::NONE);
+    Node &node1d = graph.getData(node1, Galois::MethodFlag::UNPROTECTED);
+    Node &node2d = graph.getData(node2, Galois::MethodFlag::UNPROTECTED);
     int pos1 = -1, pos2 = -1;
 
     // Check the total ordering to determine if item1 <= item2
@@ -178,7 +178,7 @@ struct DemoAlgo {
     // Find self-edge for this node, update it
     bool hasEdge = false;
     edgedata& factor = graph.getEdgeData(findEdge(graph, node, node, &hasEdge),
-                                         Galois::MethodFlag::NONE);
+                                         Galois::MethodFlag::UNPROTECTED);
     assert(hasEdge);
     assert(factor > 0);
     factor = sqrt(factor);
@@ -200,7 +200,7 @@ struct DemoAlgo {
       GNode dst = graph.getEdgeDst(ii);
       Node &dstd = graph.getData(dst);
       if ( !dstd.seen && dst != node ) {
-        edgedata &ed = graph.getEdgeData(ii, Galois::MethodFlag::NONE);
+        edgedata &ed = graph.getEdgeData(ii, Galois::MethodFlag::UNPROTECTED);
         ed /= factor;
         //printf("N-EDGE %4d %4d %10.5f\n", noded.id, graph.getData(dst).id, ed);
         //std::cout << noded.id << " " << dstd.id << " " << ed << "\n";
@@ -215,7 +215,7 @@ struct DemoAlgo {
       GNode src = graph.getEdgeDst(iis);
       Node &srcd = graph.getData(src);
       if ( srcd.seen || src == node ) continue;
-      edgedata& eds = graph.getEdgeData(iis, Galois::MethodFlag::NONE);
+      edgedata& eds = graph.getEdgeData(iis, Galois::MethodFlag::UNPROTECTED);
 
       // Enumerate all other neighbors
       for (Graph::edge_iterator iid = graph.edge_begin(node),
@@ -231,8 +231,8 @@ struct DemoAlgo {
         if ( !hasEdge ) continue;
 
         // Update the weight of the bridge edge
-        edgedata &edd = graph.getEdgeData(iid, Galois::MethodFlag::NONE),
-          &edb = graph.getEdgeData(bridge, Galois::MethodFlag::NONE);
+        edgedata &edd = graph.getEdgeData(iid, Galois::MethodFlag::UNPROTECTED),
+          &edb = graph.getEdgeData(bridge, Galois::MethodFlag::UNPROTECTED);
         edb -= eds*edd;
 
         //printf("I-EDGE %4d %4d %10.5f\n", srcd.id, dstd.id, edb);

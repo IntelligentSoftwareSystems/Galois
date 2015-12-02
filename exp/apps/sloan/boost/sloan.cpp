@@ -31,11 +31,8 @@
 #include "Galois/Accumulator.h"
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
-#include "Galois/Graph/LCGraph.h"
-#include "Galois/Graph/Graph.h"
-#ifdef GALOIS_USE_EXP
-#include "Galois/Runtime/ParallelWorkInline.h"
-#endif
+#include "Galois/Graphs/LCGraph.h"
+#include "Galois/Graphs/Graph.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/ADT/SmallVector.h"
 #include "Lonestar/BoilerPlate.h"
@@ -146,7 +143,7 @@ struct Prefix {
 };
 
 //typedef Galois::Graph::LC_Linear_Graph<SNode, void> Graph;
-typedef Galois::Graph::LC_CSR_Graph<SNode, void>::with_no_lockable<true>::with_numa_alloc<true> Graph;
+typedef Galois::Graph::LC_CSR_Graph<SNode, void>::_with_no_lockable<true>::_with_numa_alloc<true> Graph;
 //typedef Galois::Graph::LC_CSRInline_Graph<SNode, char> Graph;
 //typedef Galois::Graph::FirstGraph<SNode, void, false> Graph;
 typedef Graph::GraphNode GNode;
@@ -193,19 +190,19 @@ struct UpdateRequestIndexer {
 
 struct GNodeIndexer {
   unsigned int operator()(const GNode& val) const {
-    return graph.getData(val, Galois::MethodFlag::NONE).dist;
+    return graph.getData(val, Galois::MethodFlag::UNPROTECTED).dist;
   }
 };
 
 struct GNodeLess {
   bool operator()(const GNode& a, const GNode& b) const {
-    return graph.getData(a, Galois::MethodFlag::NONE).dist < graph.getData(b, Galois::MethodFlag::NONE).dist;
+    return graph.getData(a, Galois::MethodFlag::UNPROTECTED).dist < graph.getData(b, Galois::MethodFlag::UNPROTECTED).dist;
   }
 };
 
 struct GNodeGreater {
   bool operator()(const GNode& a, const GNode& b) const {
-    return graph.getData(a, Galois::MethodFlag::NONE).dist > graph.getData(b, Galois::MethodFlag::NONE).dist;
+    return graph.getData(a, Galois::MethodFlag::UNPROTECTED).dist > graph.getData(b, Galois::MethodFlag::UNPROTECTED).dist;
   }
 };
 
@@ -274,10 +271,10 @@ static void printAccess(std::string msg){
 
 		std::cerr << sdata.id << " connected with (" << degree(*src) << "): ";
 
-		for (Graph::edge_iterator ii = graph.edge_begin(*src, Galois::MethodFlag::NONE), 
-				ei = graph.edge_end(*src, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+		for (Graph::edge_iterator ii = graph.edge_begin(*src, Galois::MethodFlag::UNPROTECTED), 
+				ei = graph.edge_end(*src, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
 			GNode dst = graph.getEdgeDst(ii);
-			SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+			SNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
 
 			unsigned int diff = abs(sdata.id - ddata.id);
 
@@ -422,7 +419,7 @@ struct max_dist {
 
   void operator()(const GNode& n) const {
 		if(graph.getData(n).dist < DIST_INFINITY)
-			m.update(graph.getData(n).dist);
+                  m.update((unsigned long)graph.getData(n).dist);
   }
 };
 
@@ -481,7 +478,7 @@ static void printDegreeDistribution() {
 
 	for (Graph::iterator n = graph.begin(), ei = graph.end(); n != ei; ++n) {
 			distr[degree(*n)]++;
-			//std::cerr << graph.getData(*n, Galois::MethodFlag::NONE).id << "	" << graph.getData(*n, Galois::MethodFlag::NONE).dist << "\n";
+			//std::cerr << graph.getData(*n, Galois::MethodFlag::UNPROTECTED).id << "	" << graph.getData(*n, Galois::MethodFlag::UNPROTECTED).dist << "\n";
 	}
 
 	std::cerr << "Degree	Count\n";
@@ -503,17 +500,17 @@ static void readGraph(GNode& source, GNode& report) {
   bgraph = new BGraph(nnodes);
 
   for (Graph::iterator src = graph.begin(), ei = graph.end(); src != ei; ++src) {
-    SNode& node = graph.getData(*src, Galois::MethodFlag::NONE);
+    SNode& node = graph.getData(*src, Galois::MethodFlag::UNPROTECTED);
     node.id = id++;
   }
 
   std::cout << "Read binary graph\n";
 
 	for (Graph::iterator src = graph.begin(), ei = graph.end(); src != ei; ++src) {
-		SNode& dsrc = graph.getData(*src, Galois::MethodFlag::NONE);
-		for (Graph::edge_iterator ii = graph.edge_begin(*src, Galois::MethodFlag::NONE), ei = graph.edge_end(*src, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+		SNode& dsrc = graph.getData(*src, Galois::MethodFlag::UNPROTECTED);
+		for (Graph::edge_iterator ii = graph.edge_begin(*src, Galois::MethodFlag::UNPROTECTED), ei = graph.edge_end(*src, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
 			GNode dst = graph.getEdgeDst(ii);
-			SNode& ddst = graph.getData(dst, Galois::MethodFlag::NONE);
+			SNode& ddst = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
 			boost::add_edge(dsrc.id, ddst.id, *bgraph);
 		}
 	}
@@ -845,11 +842,11 @@ int main(int argc, char **argv) {
   using namespace Galois::WorkList;
   typedef BulkSynchronous<dChunkedLIFO<256> > BSWL;
 
-#ifdef GALOIS_USE_EXP
-  typedef BulkSynchronousInline<> BSInline;
-#else
+  //#ifdef GALOIS_USE_EXP
+  //  typedef BulkSynchronousInline<> BSInline;
+  //#else
   typedef BSWL BSInline;
-#endif
+  //#endif
 
   switch (algo) {
 		case serialSloan: run(BoostSloan()); break;

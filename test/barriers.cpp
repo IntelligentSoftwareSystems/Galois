@@ -1,6 +1,6 @@
 #include "Galois/Timer.h"
 #include "Galois/Galois.h"
-#include "Galois/Runtime/Barrier.h"
+#include "Galois/Substrate/BarrierImpl.h"
 
 #include <iostream>
 #include <cstdlib>
@@ -12,7 +12,7 @@ unsigned numThreads = 2;
 char bname[100];
 
 struct emp {
-  Galois::Runtime::Barrier& b;
+  Galois::Substrate::Barrier& b;
 
   void go() {
     for (unsigned i = 0; i < iter; ++i) {
@@ -34,17 +34,17 @@ struct emp {
   }
 };
 
-void test(Galois::Runtime::Barrier& b) {
+void test(std::unique_ptr<Galois::Substrate::Barrier> b) {
   unsigned M = numThreads;
   if (M > 16) M /= 2;
   while (M) {   
     Galois::setActiveThreads(M); //Galois::Runtime::LL::getMaxThreads());
-    b.reinit(M);
+    b->reinit(M);
     Galois::Timer t;
     t.start();
-    Galois::on_each(emp{b});
+    Galois::on_each(emp{*b.get()});
     t.stop();
-    std::cout << bname << "," << b.name() << "," << M << "," << t.get() << "\n";
+    std::cout << bname << "," << b->name() << "," << M << "," << t.get() << "\n";
     M -= 1;
   }
 }
@@ -55,16 +55,14 @@ int main(int argc, char** argv) {
   if (!iter)
     iter = 16*1024;
   if (argc > 2)
-    numThreads = Galois::Runtime::LL::getMaxThreads();
+    numThreads = Galois::Substrate::getThreadPool().getMaxThreads();
 
   gethostname(bname, sizeof(bname));
-  using namespace Galois::Runtime::benchmarking;
-#if _POSIX_BARRIERS > 0
-  test(getPthreadBarrier());
-#endif
-  test(getCountingBarrier());
-  test(getMCSBarrier());
-  test(getTopoBarrier());
-  test(getDisseminationBarrier());
+  using namespace Galois::Substrate;
+  test(createPthreadBarrier(1));
+  test(createCountingBarrier(1));
+  test(createMCSBarrier(1));
+  test(createTopoBarrier(1));
+  test(createDisseminationBarrier(1));
   return 0;
 }

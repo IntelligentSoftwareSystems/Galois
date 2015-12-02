@@ -19,10 +19,9 @@
  * Author: Prad Nelluru <pradn@cs.utexas.edu>
 */
 
-#include "Galois/config.h"
 #include "Galois/Galois.h"
-#include "Galois/Graph/Graph.h"
-#include "Galois/Graph/LCGraph.h"
+#include "Galois/Graphs/Graph.h"
+#include "Galois/Graphs/LCGraph.h"
 #include "Galois/Statistic.h"
 #include "Galois/Timer.h"
 
@@ -123,8 +122,8 @@ struct sgd_block
 			Node& movie_data = g.getData(movie);
 			
 			//for each edge in the range
-			Graph::edge_iterator edge_it = g.edge_begin(movie, Galois::NONE) + movie_data.edge_offset;
-			Graph::edge_iterator edge_end = g.edge_end(movie, Galois::NONE);
+			Graph::edge_iterator edge_it = g.edge_begin(movie, Galois::MethodFlag::UNPROTECTED) + movie_data.edge_offset;
+			Graph::edge_iterator edge_end = g.edge_end(movie, Galois::MethodFlag::UNPROTECTED);
 			if(edge_it == edge_end) last_edge_reached++;
 			for(;edge_it != edge_end; ++edge_it, ++movie_data.edge_offset)
 			{
@@ -134,8 +133,8 @@ struct sgd_block
 				if(user > userRangeEnd)
 					break;
 				
-				Node& user_data = g.getData(user, Galois::NONE);
-				unsigned int edge_rating = g.getEdgeData(edge_it, Galois::NONE);	
+				Node& user_data = g.getData(user, Galois::MethodFlag::UNPROTECTED);
+				unsigned int edge_rating = g.getEdgeData(edge_it, Galois::MethodFlag::UNPROTECTED);	
 				
 				//do gradient step
 				doGradientUpdate(movie_data, user_data, edge_rating);
@@ -198,8 +197,8 @@ struct sgd_block_users
 				unsigned int currentBlockSliceEndUserId = currentBlockSliceEnd + NUM_MOVIE_NODES;// + 1;
 				
 				//for each edge in the range
-				Graph::edge_iterator edge_it = g.edge_begin(movie, Galois::NONE) + movie_data.edge_offset;
-				Graph::edge_iterator edge_end = g.edge_end(movie, Galois::NONE);
+				Graph::edge_iterator edge_it = g.edge_begin(movie, Galois::MethodFlag::UNPROTECTED) + movie_data.edge_offset;
+				Graph::edge_iterator edge_end = g.edge_end(movie, Galois::MethodFlag::UNPROTECTED);
 				if(edge_it == edge_end) last_edge_reached++;
 				for(;edge_it != edge_end; ++edge_it, ++movie_data.edge_offset)
 				{
@@ -209,8 +208,8 @@ struct sgd_block_users
 					if(user > currentBlockSliceEndUserId)
 						break;
 					
-					Node& user_data = g.getData(user, Galois::NONE);
-					unsigned int edge_rating = g.getEdgeData(edge_it, Galois::NONE);	
+					Node& user_data = g.getData(user, Galois::MethodFlag::UNPROTECTED);
+					unsigned int edge_rating = g.getEdgeData(edge_it, Galois::MethodFlag::UNPROTECTED);	
 					
 					//do gradient step
 					doGradientUpdate(movie_data, user_data, edge_rating);
@@ -282,8 +281,8 @@ struct sgd_block_users_movies
 					unsigned int currentBlockSliceEndUserId = currentBlockSliceEnd + NUM_MOVIE_NODES;// + 1;
 					
 					//for each edge in the range
-					Graph::edge_iterator edge_it = g.edge_begin(movie, Galois::NONE) + movie_data.edge_offset;
-					Graph::edge_iterator edge_end = g.edge_end(movie, Galois::NONE);
+					Graph::edge_iterator edge_it = g.edge_begin(movie, Galois::MethodFlag::UNPROTECTED) + movie_data.edge_offset;
+					Graph::edge_iterator edge_end = g.edge_end(movie, Galois::MethodFlag::UNPROTECTED);
 					for(;edge_it != edge_end; ++edge_it, ++movie_data.edge_offset)
 					{
 						Graph::GraphNode user = g.getEdgeDst(edge_it);
@@ -292,8 +291,8 @@ struct sgd_block_users_movies
 						if(user > currentBlockSliceEndUserId)
 							break;
 						
-						Node& user_data = g.getData(user, Galois::NONE);
-						unsigned int edge_rating = g.getEdgeData(edge_it, Galois::NONE);	
+						Node& user_data = g.getData(user, Galois::MethodFlag::UNPROTECTED);
+						unsigned int edge_rating = g.getEdgeData(edge_it, Galois::MethodFlag::UNPROTECTED);	
 						
 						//do gradient step
 						doGradientUpdate(movie_data, user_data, edge_rating);
@@ -344,8 +343,8 @@ struct advance_edge_iterators
 			Node& movie_data = g.getData(movie);
 
 			//for each edge in the range
-			Graph::edge_iterator edge_it = g.edge_begin(movie, Galois::NONE) + movie_data.edge_offset;
-			Graph::edge_iterator edge_end = g.edge_end(movie, Galois::NONE);
+			Graph::edge_iterator edge_it = g.edge_begin(movie, Galois::MethodFlag::UNPROTECTED) + movie_data.edge_offset;
+			Graph::edge_iterator edge_end = g.edge_end(movie, Galois::MethodFlag::UNPROTECTED);
 			for(;edge_it != edge_end; ++edge_it, ++movie_data.edge_offset)
 			{
 				Graph::GraphNode user = g.getEdgeDst(edge_it);
@@ -373,8 +372,8 @@ void count_ratings(Graph& g, unsigned threadCount)
 		Node& movie_data = g.getData(movie);
 
 		//for each edge in the range
-		Graph::edge_iterator edge_it = g.edge_begin(movie, Galois::NONE) + movie_data.edge_offset;
-		Graph::edge_iterator edge_end = g.edge_end(movie, Galois::NONE);
+		Graph::edge_iterator edge_it = g.edge_begin(movie, Galois::MethodFlag::UNPROTECTED) + movie_data.edge_offset;
+		Graph::edge_iterator edge_end = g.edge_end(movie, Galois::MethodFlag::UNPROTECTED);
 		for(;edge_it != edge_end; ++edge_it, ++movie_data.edge_offset)
 		{
 			Graph::GraphNode user = g.getEdgeDst(edge_it);
@@ -446,7 +445,7 @@ unsigned int initializeGraphData(Graph& g)
 		
 		//count number of movies we've seen; only movies nodes have edges
 		unsigned int num_edges = 
-			g.edge_end(gnode, Galois::NONE) - g.edge_begin(gnode, Galois::NONE);
+			g.edge_end(gnode, Galois::MethodFlag::UNPROTECTED) - g.edge_begin(gnode, Galois::MethodFlag::UNPROTECTED);
 		if(num_edges > 0)
 			numMovieNodes++;
 		
@@ -546,7 +545,7 @@ void runBlockSlices(Graph& g, unsigned int threadCount, unsigned int usersPerBlo
 	}
 }
 
-typedef Galois::Runtime::LL::SimpleLock spinlock;
+typedef Galois::Substrate::SimpleLock spinlock;
 
 struct sgd_march
 {
@@ -606,8 +605,8 @@ struct sgd_march
 				//printf("movie %d edge_offset %d\n", movie, movie_data.edge_offset);
 
 				//for each edge in the range
-				Graph::edge_iterator edge_it = g.edge_begin(movie, Galois::NONE) + movie_data.edge_offset;
-				Graph::edge_iterator edge_end = g.edge_end(movie, Galois::NONE);
+				Graph::edge_iterator edge_it = g.edge_begin(movie, Galois::MethodFlag::UNPROTECTED) + movie_data.edge_offset;
+				Graph::edge_iterator edge_end = g.edge_end(movie, Galois::MethodFlag::UNPROTECTED);
 				for(;edge_it != edge_end; ++edge_it, ++movie_data.edge_offset)
 				{
 					Graph::GraphNode user = g.getEdgeDst(edge_it);
@@ -618,8 +617,8 @@ struct sgd_march
 						break;
 					//printf("okay user %d\n", user - NUM_MOVIE_NODES);
 					
-					Node& user_data = g.getData(user, Galois::NONE);
-					unsigned int edge_rating = g.getEdgeData(edge_it, Galois::NONE);	
+					Node& user_data = g.getData(user, Galois::MethodFlag::UNPROTECTED);
+					unsigned int edge_rating = g.getEdgeData(edge_it, Galois::MethodFlag::UNPROTECTED);	
 					
 					//do gradient step
 					doGradientUpdate(movie_data, user_data, edge_rating);

@@ -41,20 +41,20 @@
 
 struct Config {
   // config keys, in the same order as the file
-  double length;
-  double width;
+  FP length;
+  FP width;
   unsigned num_balls;
-  double ball_mass;
-  double ball_radius;
+  FP ball_mass;
+  FP ball_radius;
 };
 
 struct BallUpdate {
   unsigned id;
-  double time;
+  FP time;
   Vec2 pos;
   Vec2 vel;
 
-  BallUpdate (unsigned id, double time, const Vec2& pos, const Vec2& vel)
+  BallUpdate (unsigned id, const FP& time, const Vec2& pos, const Vec2& vel)
     : id (id), time (time), pos (pos), vel (vel) 
   {}
 
@@ -142,7 +142,7 @@ void readSimLog (std::deque<BallUpdate>& updates, const std::string& logName="si
     unsigned id = std::stoi (line_tokens[0]);
 
 
-    double time = std::stod (line_tokens[1]);
+    FP time = FP (std::stod (line_tokens[1]));
     Vec2 pos (std::stod (line_tokens[2]), std::stod (line_tokens[3]));
     Vec2 vel (std::stod (line_tokens[4]), std::stod (line_tokens[5]));
 
@@ -178,8 +178,8 @@ int main (int argc, char* argv[]) {
 
   // dummy simulation loop;
 
-  double total_time = 0.0;
-  double delta = 0.1;
+  FP total_time = 0.0;
+  FP delta = 0.1;
 
   while (!updates.empty ()) {
 
@@ -217,20 +217,20 @@ int main (int argc, char* argv[]) {
       const Vec2& p = b.pos ();
 
       // TODO: include radius for more precise check
-      if (p.getX() < 0.0 || p.getX () > conf.length) {
+      if (p.getX() < DoubleWrapper(0.0) || p.getX () > conf.length) {
         std::cerr << "!!!  ERROR: Ball out of X lim: " << b.str () << std::endl;
       }
 
       // TODO: include radius for more precise check
-      if (p.getY () < 0.0 || p.getY () > conf.width) {
+      if (p.getY () < DoubleWrapper(0.0) || p.getY () > conf.width) {
         std::cerr << "!!!  ERROR: Ball out of Y lim: " << b.str () << std::endl;
       }
 
       for (size_t j = i + 1; j < balls.size (); ++i) {
         const Ball& othB = balls[j];
 
-        double d = p.dist (othB.pos ());
-        if (d < (2 * conf.ball_radius)) {
+        FP d = p.dist (othB.pos ());
+        if (d < (DoubleWrapper(2) * conf.ball_radius)) {
           std::cerr << "!!!  ERROR: Balls overlap: ";
           std::cerr << b.str () << "    ";
           std::cerr << othB.str () << std::endl;

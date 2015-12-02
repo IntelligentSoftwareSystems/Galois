@@ -1,18 +1,13 @@
-#include "Galois/config.h"
 #include "Galois/Galois.h"
 #include "Galois/Timer.h"
 
-#include GALOIS_CXX11_STD_HEADER(random)
+#include <random>
 #include <cstdio>
 #include <time.h>
 
 template<typename Gen>
 void random_access(Gen& gen, int* buf, size_t size, size_t accesses) {
-#if __cplusplus >= 201103L || defined(HAVE_CXX11_UNIFORM_INT_DISTRIBUTION)
   std::uniform_int_distribution<size_t> randIndex(0, size - 1);
-#else
-  std::uniform_int<size_t> randIndex(0, size - 1);
-#endif
   for (unsigned i = 0; i < accesses; ++i) {
     size_t idx = randIndex(gen);
     buf[idx] += 1;
@@ -27,11 +22,7 @@ struct run_local_helper {
   run_local_helper() {}
   void operator()(unsigned int tid, unsigned int num) {
     std::mt19937 gen(seed + tid);
-#if __cplusplus >= 201103L || defined(HAVE_CXX11_UNIFORM_INT_DISTRIBUTION)
     std::uniform_int_distribution<int> randSeed;
-#else
-    std::uniform_int<int> randSeed;
-#endif
     auto r = Galois::block_range(block, block + size, tid, num);
     size_t d = std::distance(r.first, r.second);
     random_access(gen, r.first, d, d);
@@ -55,11 +46,7 @@ struct run_interleaved_helper {
   run_interleaved_helper() {}
   void operator()(unsigned int tid, unsigned int num) {
     std::mt19937 gen(seed + tid);
-#if __cplusplus >= 201103L || defined(HAVE_CXX11_UNIFORM_INT_DISTRIBUTION)
     std::uniform_int_distribution<int> randSeed;
-#else
-    std::uniform_int<int> randSeed;
-#endif
     auto r = Galois::block_range(block, block + size, tid, num);
     size_t d = std::distance(r.first, r.second);
     random_access(gen, block, size, d);
@@ -68,9 +55,9 @@ struct run_interleaved_helper {
 
 void run_interleaved(size_t seed, size_t mega, bool full) {
   size_t size = mega*1024*1024;
-  int *block = (int*) Galois::Runtime::MM::largeInterleavedAlloc(size*sizeof(*block), full);
+  auto ptr = Galois::Substrate::largeMallocInterleaved(size * sizeof(int), full ? Galois::Substrate::getThreadPool().getMaxThreads() : Galois::Runtime::activeThreads);
+  int *block = (int*)ptr.get();
   Galois::on_each(run_interleaved_helper(block, seed, size));
-  Galois::Runtime::MM::largeInterleavedFree(block, size*sizeof(*block));
 }
 
 template<typename Fn>
@@ -98,7 +85,7 @@ struct F2 {
 };
 
 int main(int argc, char** argv) {
-  unsigned M = Galois::Runtime::LL::getMaxThreads() / 2;
+  unsigned M = Galois::Substrate::getThreadPool().getMaxThreads() / 2;
   size_t mega = 1;
   if (argc > 1)
     mega = atoi(argv[1]);
