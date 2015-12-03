@@ -200,7 +200,7 @@ struct CheckedLockObj {
   CheckedLockObj(Galois::MethodFlag _m) :m(_m) {}
   void operator()(Lockable* lockable) const {
     acquire(lockable, m);
-}
+  }
 };
 
 void signalConflict(Lockable* = nullptr);

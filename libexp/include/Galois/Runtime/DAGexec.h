@@ -105,13 +105,10 @@ public:
 
 
 template <typename T, typename Derived, typename NItem_tp>
-struct DAGcontextBase: public OrderedContextBase<T> {
-
-  using Base = OrderedContextBase<T>;
+struct DAGcontextBase: public SimpleRuntimeContext {
 
   typedef NItem_tp NItem;
   typedef PtrBasedNhoodMgr<NItem> NhoodMgr;
-
 
 public:
   typedef Galois::ThreadSafeOrderedSet<Derived*, std::less<Derived*> > AdjSet;
@@ -123,6 +120,7 @@ public:
   ParCounter inDeg;
   int origInDeg;
   NhoodMgr& nhmgr;
+  T elem;
   unsigned outDeg;
   Derived** outNeighbors;
 
@@ -130,13 +128,16 @@ public:
 
 public:
   explicit DAGcontextBase (const T& t, NhoodMgr& nhmgr): 
-    Base (t), 
+    SimpleRuntimeContext (true), // true to call subAcquire
     inDeg (0),
     origInDeg (0), 
     nhmgr (nhmgr),
+    elem (t),
     outDeg (0),
     outNeighbors (nullptr)
   {}
+
+  const T& getElem () const { return elem; }
 
   //! returns true on success
   bool addOutNeigh (Derived* that) {
@@ -292,7 +293,7 @@ protected:
       // printf ("processing source: %p, item: %d\n", src, src->elem);
 
       UserCtx& uctx = *(outer.userCtxts.getLocal ());
-      outer.opFunc (src->getActive (), uctx);
+      outer.opFunc (src->getElem (), uctx);
 
       for (auto i = src->neighbor_begin (), i_end = src->neighbor_end ();
           i != i_end; ++i) {
@@ -358,7 +359,7 @@ public:
     }
 
     // a < b ? a : b
-    Ctxt* src = cmp (a->getActive () , b->getActive ()) ? a : b;
+    Ctxt* src = cmp (a->getElem () , b->getElem ()) ? a : b;
     Ctxt* dst = (src == a) ? b : a;
 
     // avoid adding same edge multiple times
@@ -393,7 +394,7 @@ public:
           Galois::Runtime::setThreadContext (ctxt);
 
           UserCtx& uctx = *(userCtxts.getLocal ());
-          nhVisitor (ctxt->getActive (), uctx);
+          nhVisitor (ctxt->getElem (), uctx);
           Galois::Runtime::setThreadContext (NULL);
 
           // printf ("Created context:%p for item: %d\n", ctxt, x);

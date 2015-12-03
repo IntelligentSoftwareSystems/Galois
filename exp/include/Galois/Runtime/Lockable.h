@@ -25,7 +25,7 @@
 #ifndef GALOIS_RUNTIME_LOCKABLE_H
 #define GALOIS_RUNTIME_LOCKABLE_H
 
-#include "Galois/Runtime/ll/PtrRWLock.h"
+#include "Galois/Runtime/PtrRWLock.h"
 #include "Galois/gdeque.h"
 
 #include <boost/utility.hpp>

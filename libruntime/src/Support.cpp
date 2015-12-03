@@ -139,7 +139,7 @@ static Substrate::StaticInstance<StatManager> SM;
 
 void Galois::Runtime::reportStat(const char* loopname, const char* category, unsigned long value) {
   SM.get()->addToStat(std::string(loopname ? loopname : "(NULL)"), 
-		     std::string(category ? category : "(NULL)"),
+		      std::string(category ? category : "(NULL)"),
 		      value);
 }
 
@@ -158,4 +158,12 @@ void Galois::Runtime::reportStatGlobal(const std::string&, unsigned long) {
 
 void Galois::Runtime::printStats() {
   SM.get()->printStats();
+}
+
+void Galois::Runtime::reportPageAlloc(const char* category) {
+  SM.get()->addPageAllocToStat(std::string("(NULL)"), std::string(category ? category : "(NULL)"));
+}
+
+void Galois::Runtime::reportNumaAlloc(const char* category) {
+  SM.get()->addNumaAllocToStat(std::string("(NULL)"), std::string(category ? category : "(NULL)"));
 }

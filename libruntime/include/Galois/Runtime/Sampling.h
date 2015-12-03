@@ -30,8 +30,7 @@ void beginSampling();
 void endSampling();
 void beginThreadSampling();
 void endThreadSampling();
-void beginLoopSampling(const char*);
-void endLoopSampling(const char*);
+
 }
 } // end namespace Galois
 

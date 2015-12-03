@@ -33,9 +33,9 @@
 #include "Galois/Runtime/Network.h"
 #include "Galois/Runtime/Support.h"
 #include "Galois/Runtime/Tracer.h"
-#include "Galois/Runtime/ll/gio.h"
-#include "Galois/Runtime/ll/SimpleLock.h"
-#include "Galois/Runtime/ll/TID.h"
+#include "Galois/Runtime/gio.h"
+#include "Galois/Substrate/SimpleLock.h"
+#include "Galois/Runtime//TID.h"
 
 #include "Galois/Runtime/Barrier.h"
 

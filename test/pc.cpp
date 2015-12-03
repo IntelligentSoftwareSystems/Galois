@@ -11,26 +11,24 @@ int num = 1;
 
 template<typename T>
 struct testL {
-  PerThreadStorage<T>* b;
+  PerThreadStorage<T>& b;
 
-  testL(PerThreadStorage<T>& B) :b(&B) {}
-  testL() {}
+  testL(PerThreadStorage<T>& B) :b(B) {}
   void operator()(unsigned t, unsigned n) {
     for (int x = 0; x < num; ++x) {
-      *b->getLocal() += x;
+      *b.getLocal() += x;
     }
   }
 };
 
 template<typename T>
 struct testR {
-  PerThreadStorage<T>* b;
+  PerThreadStorage<T>& b;
 
-  testR(PerThreadStorage<T>& B) :b(&B) {}
-  testR() {}
+  testR(PerThreadStorage<T>& B) :b(B) {}
   void operator()(unsigned t, unsigned n) {
     for (int x = 0; x < num; ++x) {
-      *b->getRemote((t + 1) % n) += x;
+      *b.getRemote((t + 1) % n) += x;
     }
   }
 };

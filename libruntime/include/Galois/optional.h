@@ -31,8 +31,6 @@
 
 namespace Galois {
 
-struct optional_default_t {};
-
 /**
  * Galois version of <code>boost::optional</code>.
  */
@@ -61,12 +59,7 @@ class optional {
 public:
   typedef bool (optional::*unspecified_bool_type)() const;
 
-  optional(): initialized_(false) {
-  }
-
-  explicit optional(optional_default_t) :initialized_(true) {
-    data_.construct();
-  }
+  optional(): initialized_(false) { }
 
   optional(const T& val): initialized_(false) {
     construct(val);
@@ -75,11 +68,6 @@ public:
   optional(const optional& rhs): initialized_(false) {
     if (rhs.is_initialized())
       construct(rhs.get_impl());
-  }
-
-  optional(optional&& rhs) : initialized_(rhs.initialized_) {
-    if (initialized_)
-      data_.move_in(std::move(rhs.data_));
   }
 
   template<typename U>
@@ -114,7 +102,7 @@ public:
     }
   }
 
-  void assign(T&& val) {
+  void assign(const T& val) {
     if (is_initialized())
       assign_impl(val);
     else

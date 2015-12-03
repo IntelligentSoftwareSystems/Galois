@@ -2374,7 +2374,7 @@ int main(int argc, char** argv) {
     case gr2metis: convert<Gr2Metis>(); break;
     case gr2sgr: convert<MakeSymmetric>(); break;
     case gr2sorteddegreegr: convert<SortByDegree>(); break;
-    case gr2sorteddstgr: convert<SortEdges<IdLess, true> >(); break; 
+    case gr2sorteddstgr: convert<SortEdges<IdLess, false> >(); break; 
     case gr2sortedparentdegreegr: convert<SortByHighDegreeParent>(); break;
     case gr2sortedweightgr: convert<SortEdges<WeightLess, true> >(); break;
     case gr2streegr: convert<AddTree<true>>(); break; 

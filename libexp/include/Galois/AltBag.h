@@ -211,7 +211,7 @@ class SerialBag {
 
   void popBackBlock (void) {
 
-    assert (tail != nullptr && tail != &sentinel && tail->chunk.empty ());
+    assert (tail != nullptr && tail != &sentinel && !tail->chunk.empty ());
     assert (tail->next == &sentinel);
 
     Block* t = tail;

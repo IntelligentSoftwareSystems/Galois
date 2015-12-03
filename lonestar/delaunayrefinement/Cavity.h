@@ -57,7 +57,7 @@ class Cavity {
       //Edge& edgeData = graph->getEdgeData(node, neighbor);
       Edge edgeData = element.getRelatedEdge(graph->getData(neighbor, Galois::MethodFlag::WRITE));
       if (elementTuple != edgeData.getPoint(0) && elementTuple != edgeData.getPoint(1)) {
-        return neighbor;
+	return neighbor;
       }
     }
     GALOIS_DIE("unreachable");
@@ -71,14 +71,14 @@ class Cavity {
       // isMember says next is part of the cavity, and we're not the second
       // segment encroaching on this cavity
       if ((nextElement.dim() == 2) && (dim != 2)) {
-        // is segment, and we are encroaching
-        initialize(next);
-        build();
+	// is segment, and we are encroaching
+	initialize(next);
+	build();
       } else {
-        if (!pre.containsNode(next)) {
-          pre.addNode(next);
-          frontier.push_back(next);
-        }
+	if (!pre.containsNode(next)) {
+	  pre.addNode(next);
+	  frontier.push_back(next);
+	}
       }
     } else {
       // not a member
@@ -86,7 +86,7 @@ class Cavity {
       Edge edgeData = nextElement.getRelatedEdge(graph->getData(node, Galois::MethodFlag::WRITE));
       EdgeTuple edge(node, next, edgeData);
       if (std::find(connections.begin(), connections.end(), edge) == connections.end()) {
-        connections.push_back(edge);
+	connections.push_back(edge);
       }
     }
   }
@@ -157,7 +157,7 @@ public:
         Element& element = graph->getData(node, Galois::MethodFlag::WRITE);
         if (element.isRelated(newElement)) {
           const Edge& edge = newElement.getRelatedEdge(element);
-          post.addEdge(newNode, node, edge);
+	  post.addEdge(newNode, node, edge);
         }
       }
       post.addNode(newNode);

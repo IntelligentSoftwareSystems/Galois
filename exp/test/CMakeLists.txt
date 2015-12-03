@@ -1,6 +1,4 @@
 #makeTest(pairingheap)
-makeTest(ADD_TARGET skiplist EXP_OPT)
-#makeTest(skiplist)
 #makeTest(dist)
 makeTest(distforeach DISTSAFE COMMAND_PREFIX ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 2)
 makeTest(thirdgraph DISTSAFE COMMAND_PREFIX ${MPIEXEC} ${MPIEXEC_NUMPROC_FLAG} 2)

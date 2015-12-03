@@ -59,12 +59,11 @@ void readGraphDispatch(GraphTy& graph, read_default_graph_tag tag, const std::st
 
 template<typename GraphTy>
 struct ReadGraphConstructFrom {
-  GraphTy* graph;
-  FileGraph* f;
-  ReadGraphConstructFrom(GraphTy& g, FileGraph& _f): graph(&g), f(&_f) { }
-  ReadGraphConstructFrom() = default;
+  GraphTy& graph;
+  FileGraph& f;
+  ReadGraphConstructFrom(GraphTy& g, FileGraph& _f): graph(g), f(_f) { }
   void operator()(unsigned tid, unsigned total) {
-    graph->constructFrom(*f, tid, total);
+    graph.constructFrom(f, tid, total);
   }
 };
 

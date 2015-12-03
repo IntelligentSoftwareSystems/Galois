@@ -107,6 +107,8 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
   //ICC v13.1 doesn't yet support std::atomic<float> completely, emmulate its
   //behavor with std::atomic<int>
   struct atomic_float : public std::atomic<int> {
+  private:
+    operator int() const;
     static_assert(sizeof(int) == sizeof(float), "int and float must be the same size");
   public:
     atomic_float() { }
@@ -116,7 +118,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
         union { float as_float; int as_int; } oldValue = { read() };
         union { float as_float; int as_int; } newValue = { oldValue.as_float + value };
         if (this->compare_exchange_strong(oldValue.as_int, newValue.as_int))
-          return newValue.as_float;
+          return oldValue.as_float;
       }
     }
 
@@ -135,7 +137,6 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
     atomic_float numPaths;
     atomic_float dependencies;
     bool visited;
-    SNode() { }
   };
 
   typedef typename Galois::Graph::LC_CSR_Graph<SNode,void>
@@ -178,7 +179,7 @@ struct LigraAlgo: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
       SNode& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
       SNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
 
-      float oldValue = ddata.numPaths.atomicIncrement(sdata.numPaths);
+      float oldValue = ddata.numPaths.atomicIncrement(sdata.numPaths.read());
       return oldValue == 0.0;
     }
   };
@@ -289,11 +290,16 @@ void run() {
 
   if (!skipVerify) {
     int count = 0;
-    for (typename Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei && count < 10; ++ii, ++count) {
+    for (typename Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei && count < 20; ++ii, ++count) {
       std::cout << count << ": "
-        << std::setiosflags(std::ios::fixed) << std::setprecision(6) << graph.getData(*ii).dependencies
-        << "\n";
+        << std::setiosflags(std::ios::fixed) << std::setprecision(6) << graph.getData(*ii).dependencies.read()
+                << " " << (int)round(1.0 / graph.getData(*ii).numPaths.read())
+                << "\n";
     }
+    count = 0;
+    // for (typename Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii, ++count)
+    //   std::cout << ((count % 128 == 0) ? "\n" : " ") << (int)round(1.0 / graph.getData(*ii).numPaths.read());
+    std::cout << "\n";
   }
 }
 

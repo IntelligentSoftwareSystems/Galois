@@ -33,8 +33,6 @@
 #include "Galois/Substrate/ThreadPool.h"
 #include "Galois/Substrate/gio.h"
 #include <cstdlib>
-#include <cassert>
-#include <map>
 
 static void endPeriod() {
   int val;
@@ -55,31 +53,23 @@ static void beginPeriod() {
 #include "Galois/Runtime/ll/TID.h"
 
 namespace vtune {
-static std::map<std::string, __itt_domain*> loopdoms;
-
-static void begin(const char* rdom) {
-  const char* dom = rdom ? rdom : "NULL";
-  assert(Galois::Runtime::LL::getTID() == 0);
-  auto& rec = loopdoms[dom];
-  if (!rec) {
-    rec = __itt_domain_create(dom);
-    rec->flags = 1;
-  }
-  __itt_frame_begin_v3(rec, nullptr);
+static bool isOn;
+static void begin() {
+  if (!isOn && Galois::Runtime::LL::getTID() == 0)
+    __itt_resume();
+  isOn = true;
 }
 
-static void end(const char* rdom) {
-  const char* dom = rdom ? rdom : "NULL";
-  assert(Galois::Runtime::LL::getTID() == 0);
-  auto& rec = loopdoms[dom];
-  assert(rec);
-  __itt_frame_end_v3(rec, nullptr);
+static void end() {
+  if (isOn && Galois::Runtime::LL::getTID() == 0)
+    __itt_pause();
+  isOn = false;
 }
-} // namespace vtune
+}
 #else
 namespace vtune {
-static void begin(const char*) {}
-static void end(const char*) {}
+static void begin() {}
+static void end() {}
 }
 #endif
 
@@ -209,15 +199,6 @@ static void end(bool) {}
 }
 #endif
 
-void Galois::Runtime::beginLoopSampling(const char* dom) {
-  vtune::begin(dom);
-}
-
-void Galois::Runtime::endLoopSampling(const char* dom) {
-  vtune::end(dom);
-}
-
-
 void Galois::Runtime::beginThreadSampling() {
   papi::begin(false);
 }
@@ -229,11 +210,13 @@ void Galois::Runtime::endThreadSampling() {
 void Galois::Runtime::beginSampling() {
   beginPeriod();
   papi::begin(true);
+  vtune::begin();
   hpctoolkit::begin();
 }
 
 void Galois::Runtime::endSampling() {
   hpctoolkit::end();
+  vtune::end();
   papi::end(true);
   endPeriod();
 }

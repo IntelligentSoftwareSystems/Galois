@@ -177,7 +177,7 @@ struct BuildOctree {
       insert(b, static_cast<Octree*>(child), radius);
       return;
     }
-    
+
     node->child[index].lock();
     child = node->child[index].getValue();
     
@@ -197,7 +197,7 @@ struct BuildOctree {
 	assert(jitter < radius);
 	b->pos += (new_node->pos - b->pos) * jitter;
       }
-      
+
       //assert(node->pos != b->pos);
       //node->child[index].unlock_and_set(new_node);
       insert(b, new_node, radius);
@@ -211,13 +211,13 @@ struct BuildOctree {
 };
 
 unsigned computeCenterOfMass(Octree* node) {
-    double mass = 0.0;
+  double mass = 0.0;
   Point accum;
   unsigned num = 1;
 
   //Reorganize leaves to be dense
   //remove copies values
-    int index = 0;
+  int index = 0;
   for (int i = 0; i < 8; ++i)
     if (node->child[i].getValue())
       node->child[index++].setValue(node->child[i].getValue());
@@ -229,20 +229,20 @@ unsigned computeCenterOfMass(Octree* node) {
     Node* child = node->child[i].getValue();
     if (!child->Leaf) {
       num += computeCenterOfMass(static_cast<Octree*>(child));
-      } else {
+    } else {
       node->cLeafs |= (1 << i);
       ++num;
-      }
+    }
     mass += child->mass;
     accum += child->pos * child->mass;
-    }
-
-    node->mass = mass;
-    
+  }
+  
+  node->mass = mass;
+  
   if (mass > 0.0)
     node->pos = accum / mass;
   return num;
-    }
+}
 
 /*
 void printRec(std::ofstream& file, Node* node, unsigned level) {
@@ -262,7 +262,7 @@ void printRec(std::ofstream& file, Node* node, unsigned level) {
       printRec(file, node2->child[i], level + 1);
       if (level == 3 || level == 6)
        	file << "}\n";
-  }
+    }
   }
 }
 
@@ -349,7 +349,7 @@ struct ComputeForces {
 	  stack.push_back(Frame(static_cast<Octree*>(n), dsq));
 #endif
 	  __builtin_prefetch(n);
-        }
+	}
       }
     }
   }

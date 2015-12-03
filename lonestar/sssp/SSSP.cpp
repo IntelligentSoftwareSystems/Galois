@@ -329,16 +329,16 @@ struct AsyncAlgo {
   void relaxNode(Graph& graph, UpdateRequest& req, Pusher& pusher) {
     const Galois::MethodFlag flag =
         UseCas ? Galois::MethodFlag::UNPROTECTED : Galois::MethodFlag::WRITE;
-    Node& sdata          = graph.getData(req.n, flag);
+    Dist sdist          = graph.getData(req.n, flag).dist;
 
-    if (req.w != sdata.dist) {
+    if (req.w != sdist) {
       if (trackWork)
         *WLEmptyWork += 1;
       return;
     }
 
     for (auto ii : graph.edges(req.n, flag)) {
-      relaxEdge(graph, sdata.dist, ii, pusher);
+      relaxEdge(graph, sdist, ii, pusher);
     }
   }
 

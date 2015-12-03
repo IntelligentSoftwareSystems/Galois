@@ -38,10 +38,6 @@
 #include "Galois/UserContext.h"
 #include "Galois/WorkList/Chunked.h"
 
-#ifdef GALOIS_USE_EXP
-#include "Galois/Runtime/ParallelWorkDistributed.h"
-#endif
-
 namespace Galois {
 //! Parallel versions of STL library algorithms.
 // TODO: rename to gstl?
@@ -65,31 +61,6 @@ ptrdiff_t count_if(InputIterator first, InputIterator last, Predicate pred)
   GReducible<ptrdiff_t,decltype(R)> count(R);
   do_all(first, last, count_if_helper<Predicate, decltype(R)>(pred, count));
   return count.reduce();
-}
-
-template<typename ConTy, class Predicate>
-ptrdiff_t count_if_local(ConTy& c, Predicate pred)
-{
-#if GALOIS_USE_EXP
-  assert(0 && "not implemented");
-  abort();
-#if 0
-  count_if_R  r;
-  count_if_R* ptr_r;
-  ptrdiff_t   retval;
-  Runtime::gptr<count_if_R> loc_r(&r);
-  Galois::Runtime::do_all_impl_dist(c, count_if_helper_dist<Predicate>(pred),
-                                              count_if_reducer_dist(&r), true);
-  // get the modified count back
-  ptr_r  = Runtime::transientAcquire(loc_r);
-  retval = ptr_r->i;
-  Runtime::transientRelease(loc_r);
-  return retval;
-#endif
-#else
-  return Galois::Runtime::do_all_impl(Galois::Runtime::makeLocalRange(c),
-               count_if_helper<Predicate>(pred), count_if_reducer(), true).ret;
-#endif
 }
 
 template<typename InputIterator, class Predicate>

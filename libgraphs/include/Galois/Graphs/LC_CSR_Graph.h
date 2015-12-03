@@ -66,7 +66,7 @@ template<typename NodeTy, typename EdgeTy,
   bool HasOutOfLineLockable=false,
   typename FileEdgeTy=EdgeTy>
 class LC_CSR_Graph:
-    //    private boost::noncopyable,
+    private boost::noncopyable,
     private detail::LocalIteratorFeature<UseNumaAlloc>,
     private detail::OutOfLineLockableFeature<HasOutOfLineLockable && !HasNoLockable> {
   template<typename Graph> friend class LC_InOut_Graph;
@@ -197,12 +197,12 @@ public:
                  EdgeNumFnTy edgeNum, EdgeDstFnTy _edgeDst, EdgeDataFnTy _edgeData)
     :numNodes(_numNodes), numEdges(_numEdges)
   {
-    std::cerr << "\n**" << numNodes << " " << numEdges << "\n\n";
+//    std::cerr << "\n**" << numNodes << " " << numEdges << "\n\n";
     if (UseNumaAlloc) {
-      nodeData.allocateLocal(numNodes, false);
-      edgeIndData.allocateLocal(numNodes, false);
-      edgeDst.allocateLocal(numEdges, false);
-      edgeData.allocateLocal(numEdges, false);
+      nodeData.allocateLocal(numNodes);
+      edgeIndData.allocateLocal(numNodes);
+      edgeDst.allocateLocal(numEdges);
+      edgeData.allocateLocal(numEdges);
       this->outOfLineAllocateLocal(numNodes, false);
     } else {
       nodeData.allocateInterleaved(numNodes);
@@ -211,21 +211,21 @@ public:
       edgeData.allocateInterleaved(numEdges);
       this->outOfLineAllocateInterleaved(numNodes);
     }
-    std::cerr << "Done Alloc\n";
+//    std::cerr << "Done Alloc\n";
     for (size_t n = 0; n < numNodes; ++n) {
       nodeData.constructAt(n);
     }
-    std::cerr << "Done Node Construct\n";
+//    std::cerr << "Done Node Construct\n";
     uint64_t cur = 0;
     for (size_t n = 0; n < numNodes; ++n) {
       cur += edgeNum(n);
       edgeIndData[n] = cur;
     }
-    std::cerr << "Done Edge Reserve\n";
+//    std::cerr << "Done Edge Reserve\n";
     cur = 0;
     for (size_t n = 0; n < numNodes; ++n) {
-      if (n % (1024*128) == 0)
-        std::cout << n << " " << cur << "\n";
+//      if (n % (1024*128) == 0)
+//        std::cout << n << " " << cur << "\n";
       for (uint64_t e = 0, ee = edgeNum(n); e < ee; ++e) {
         if (EdgeData::has_value)
           edgeData.set(cur, _edgeData(n, e));
@@ -233,7 +233,7 @@ public:
         ++cur;
       }
     }
-    std::cerr << "Done Construct\n";
+//    std::cerr << "Done Construct\n";
   }
 
   friend void swap(LC_CSR_Graph& lhs, LC_CSR_Graph& rhs) {
@@ -245,15 +245,15 @@ public:
     std::swap(lhs.numEdges, rhs.numEdges);
   }
   
-  node_data_reference getData(GraphNode N, MethodFlag mflag = MethodFlag::ALL) {
-    //Galois::Runtime::checkWrite(mflag, false);
+  node_data_reference getData(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
+    // Galois::Runtime::checkWrite(mflag, false);
     NodeInfo& NI = nodeData[N];
     acquireNode(N, mflag);
     return NI.getData();
   }
 
   edge_data_reference getEdgeData(edge_iterator ni, MethodFlag mflag = MethodFlag::UNPROTECTED) {
-    //Galois::Runtime::checkWrite(mflag, false);
+    // Galois::Runtime::checkWrite(mflag, false);
     return edgeData[*ni];
   }
 
@@ -345,10 +345,10 @@ public:
     numNodes = nNodes;
     numEdges = nEdges;
     if (UseNumaAlloc) {
-      nodeData.allocateLocal(numNodes, false);
-      edgeIndData.allocateLocal(numNodes, false);
-      edgeDst.allocateLocal(numEdges, false);
-      edgeData.allocateLocal(numEdges, false);
+      nodeData.allocateLocal(numNodes);
+      edgeIndData.allocateLocal(numNodes);
+      edgeDst.allocateLocal(numEdges);
+      edgeData.allocateLocal(numEdges);
       this->outOfLineAllocateLocal(numNodes, false);
     } else {
       nodeData.allocateInterleaved(numNodes);

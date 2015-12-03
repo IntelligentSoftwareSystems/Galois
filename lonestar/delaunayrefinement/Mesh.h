@@ -349,7 +349,7 @@ private:
     fclose(pFile);
     fclose(oFile);
   }
-
+  
   void addElement(Graph* mesh, GNode node, std::map<Edge, GNode>& edge_map) {
     Element& element = mesh->getData(node);
     for (int i = 0; i < element.numEdges(); i++) {

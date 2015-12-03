@@ -74,7 +74,7 @@ class DoAllExecutor {
         stealBegin = end = Galois::split_range(begin, end);
       }
       stealLock.unlock();
-  }
+    }
 
     bool doSteal(iterator& begin, iterator& end, int minSteal) {
       if (avail) {

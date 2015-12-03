@@ -68,6 +68,11 @@
 namespace Galois {
 namespace Runtime {
 
+namespace cll = llvm::cl;
+
+static cll::opt<double> commitRatioArg("cratio", cll::desc("target commit ratio for two phase executor, 0.0 to disable windowing"), cll::init(0.80));
+
+// TODO: figure out when to call startIteration
 
 namespace {
 template <typename T, typename Cmp, typename NhFunc, typename OpFunc, typename WindowWL> 
@@ -153,7 +158,7 @@ public:
   }
 
   template <typename R>
-  void push_initial (const R& range) {
+  void fill_initial (const R& range) {
     if (targetCommitRatio == 0.0) {
 
       Galois::do_all_choice (range,
@@ -183,7 +188,7 @@ protected:
             Ctxt* c = wl[tid].back ();
             wl[tid].pop_back ();
 
-            winWL.push (c->getActive ());
+            winWL.push (c->getElem ());
             c->~Ctxt ();
             ctxtAlloc.deallocate (c, 1);
           }
@@ -281,7 +286,7 @@ protected:
       refill (*currWL, currCommits, prevWindowSize);
     }
 
-    nextWL->clear_all_parallel ();
+    nextWL->clear_all ();
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhood () {
@@ -296,7 +301,7 @@ protected:
           total += 1;
         },
         "expandNhood",
-        chunk_size<NhFunc::CHUNK_SIZE> ());
+        chunk_size<OpFunc::CHUNK_SIZE> ());
 
   }
 
@@ -331,7 +336,7 @@ protected:
               for (auto i = uhand.getPushBuffer ().begin ()
                   , endi = uhand.getPushBuffer ().end (); i != endi; ++i) {
 
-                if ((targetCommitRatio == 0.0) || !minElem || !cmp (*minElem, *i)) {
+                if (!minElem || !cmp (*minElem, *i)) {
                   // if *i >= *minElem
                   nextWL->push_back (ctxtMaker (*i));
                 } else {
@@ -395,6 +400,18 @@ protected:
 };
 
 
+namespace hidden {
+  template <bool B, typename T1, typename T2> 
+  struct ChooseIf {
+    using Ret_ty = T1;
+  };
+
+  template <typename T1, typename T2>
+  struct ChooseIf<false, T1, T2> {
+    using Ret_ty = T2;
+  };
+} // end hidden
+
 
 template <typename T, typename Cmp, typename NhFunc, typename OpFunc, typename ExFunc, typename WindowWL>
 
@@ -425,7 +442,7 @@ protected:
   struct GetActive: public std::unary_function<Ctxt*, const T&> {
     const T& operator () (const Ctxt* c) const {
       assert (c != nullptr);
-      return c->getActive ();
+      return c->getElem ();
     }
   };
 
@@ -453,7 +470,7 @@ protected:
 #else
           try {
 #endif 
-            func (c->getActive (), uhand, m_beg, m_end);
+            func (c->getElem (), uhand, m_beg, m_end);
 
 #ifdef GALOIS_USE_LONGJMP
           } else {
@@ -502,7 +519,7 @@ protected:
       Galois::do_all_choice (makeLocalRange (*Base::currWL),
           [this] (Ctxt* ctx) {
             if (ctx->isSrc ()) {
-              execFunc (ctx->getActive ());
+              execFunc (ctx->getElem ());
             }
           }, 
           "execute-safe-sources",
@@ -574,7 +591,7 @@ private:
       Galois::do_all_choice (makeLocalRange (*Base::currWL),
           [this] (Ctxt* ctx) {
             if (ctx->isSrc ()) {
-              execFunc (ctx->getActive ());
+              execFunc (ctx->getElem ());
             }
           }, 
           "execute-safe-sources",
@@ -599,7 +616,7 @@ void for_each_ordered_2p_win (const R& range, const Cmp& cmp, const NhFunc& nhFu
   
   const bool ADDS = DEPRECATED::ForEachTraits<OpFunc>::NeedsPush;
 
-  using WindowWL = typename std::conditional<ADDS, PQbasedWindowWL<T, Cmp>, SortedRangeWindowWL<T, Cmp> >::type;
+  using WindowWL = typename hidden::ChooseIf<ADDS, PQbasedWindowWL<T, Cmp>, SortedRangeWindowWL<T, Cmp> >::Ret_ty;
 
   using Exec = KDGtwoPhaseStableExecutor<T, Cmp, NhFunc, OpFunc, WindowWL>;
   
@@ -609,7 +626,7 @@ void for_each_ordered_2p_win (const R& range, const Cmp& cmp, const NhFunc& nhFu
     Substrate::getThreadPool().burnPower (Galois::getActiveThreads ());
   }
 
-  e.push_initial (range);
+  e.fill_initial (range);
   e.execute ();
 
   if (wakeupThreadPool) {
@@ -631,7 +648,7 @@ void for_each_ordered_2p_win (const R& range, const Cmp& cmp, const NhFunc& nhFu
     Substrate::getThreadPool().burnPower(Galois::getActiveThreads ());
   }
 
-  e.push_initial (range);
+  e.fill_initial (range);
   e.execute ();
 
   if (wakeupThreadPool) {
@@ -656,7 +673,7 @@ void for_each_ordered_ikdg_custom_safety (const R& range, const Cmp& cmp, const 
     Substrate::getThreadPool().burnPower(Galois::getActiveThreads ());
   }
 
-  e.push_initial (range);
+  e.fill_initial (range);
   e.execute ();
 
   if (wakeupThreadPool) {

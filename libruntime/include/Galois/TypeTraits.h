@@ -57,8 +57,6 @@
 #include "Galois/Substrate/CompilerSpecific.h"
 #include <boost/mpl/has_xxx.hpp>
 
-#include <type_traits>
-
 namespace Galois {
 namespace DEPRECATED {
 #define GALOIS_HAS_MEM_FUNC(func, name) \

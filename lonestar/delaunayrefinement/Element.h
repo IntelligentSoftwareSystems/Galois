@@ -38,11 +38,10 @@
 #include <stdlib.h>
 
 #include "Edge.h"
-#include "Galois/Runtime/Serialize.h"
 
 #define MINANGLE 30.0
 
-class Element : public Galois::Runtime::Lockable {
+class Element {
   Tuple coords[3]; // The three endpoints of the triangle
   // if the triangle has an obtuse angle
   // obtuse - 1 is which one
@@ -51,32 +50,8 @@ class Element : public Galois::Runtime::Lockable {
   int id;
 
 public:
-
-//NOTE!!! serialize and deserialize the data
-  // serialization functions
-  typedef int tt_has_serialize;
-  void serialize(Galois::Runtime::SerializeBuffer& s) const {
-    gSerialize(s,coords[0]);
-    gSerialize(s,coords[1]);
-    gSerialize(s,coords[2]);
-    gSerialize(s,obtuse);
-    gSerialize(s,bDim);
-    gSerialize(s,id);
-  }
-  void deserialize(Galois::Runtime::DeSerializeBuffer& s) {
-    gDeserialize(s,coords[0]);
-    gDeserialize(s,coords[1]);
-    gDeserialize(s,coords[2]);
-    gDeserialize(s,obtuse);
-    gDeserialize(s,bDim);
-    gDeserialize(s,id);
-  }
-
-  // required by the new in DataLandingPad in Directory.h
-  Element() = default; //noexcept :obtuse(0), bDim(true), id(0) {}
-
   //! Constructor for Triangles
-  Element(const Tuple& a, const Tuple& b, const Tuple& c, int _id = 0) noexcept
+  Element(const Tuple& a, const Tuple& b, const Tuple& c, int _id = 0)
    :obtuse(0), bDim(true), id(_id) 
   { 
     coords[0] = a;
@@ -103,8 +78,7 @@ public:
   }
 
   //! Constructor for segments
-  Element(const Tuple& a, const Tuple& b, int _id = 0) noexcept
-  : obtuse(0), bDim(false), id(_id) {
+  Element(const Tuple& a, const Tuple& b, int _id = 0): obtuse(0), bDim(false), id(_id) {
     coords[0] = a;
     coords[1] = b;
     if (b < a) {
@@ -144,10 +118,6 @@ public:
 
   double get_radius_squared(const Tuple& center) const {
     return center.distance_squared(coords[0]);
-  }
-
-  bool operator==(const Element& rhs) const {
-    return id == rhs.id;
   }
 
   bool operator<(const Element& rhs) const {
@@ -259,7 +229,7 @@ public:
     Tuple d[2];
     for(int i = 0; i < dim(); ++i)
       for(int j = 0; j < e.dim(); ++j)
-        if (coords[i] == e.coords[j])
+	if (coords[i] == e.coords[j])
 	  d[at++] = coords[i];
     assert(at == 2);
     return Edge(d[0], d[1]);

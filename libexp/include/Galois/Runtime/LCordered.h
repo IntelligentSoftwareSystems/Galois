@@ -108,7 +108,7 @@ public:
 
 
 template <typename T, typename Cmp>
-class LCorderedContext: public OrderedContextBase<T> {
+class LCorderedContext: public SimpleRuntimeContext {
 
 public:
   typedef T value_type;
@@ -124,6 +124,7 @@ public:
 
   // TODO: fix visibility below
 public:
+  T active;
   // FIXME: nhood should be a set instead of list
   NhoodList nhood;
   NhoodMgr& nhmgr;
@@ -133,11 +134,14 @@ public:
 
   LCorderedContext (const T& active, NhoodMgr& nhmgr)
     : 
-      OrderedContextBase (active), // to make acquire call virtual function sub_acquire
+      SimpleRuntimeContext (true), // to make acquire call virtual function sub_acquire
+      active (active), 
       nhood (), 
       nhmgr (nhmgr), 
       onWL (false) 
   {}
+
+  const T& getActive () const { return active; }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE
   virtual void subAcquire (Lockable* l, Galois::MethodFlag) {

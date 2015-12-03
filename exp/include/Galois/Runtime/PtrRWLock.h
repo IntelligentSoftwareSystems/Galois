@@ -36,12 +36,12 @@
 #ifndef GALOIS_RUNTIME_LL_PTRRWLOCK_H
 #define GALOIS_RUNTIME_LL_PTRRWLOCK_H
 
-#include "Galois/config.h"
-#include "Galois/Runtime/ll/CompilerSpecific.h"
+//#include "Galois/config.h"
+#include "Galois/Substrate/CompilerSpecific.h"
 
 #include <stdint.h>
 #include <cassert>
-#include GALOIS_CXX11_STD_HEADER(atomic)
+#include <atomic>
 
 namespace Galois {
 namespace Runtime {

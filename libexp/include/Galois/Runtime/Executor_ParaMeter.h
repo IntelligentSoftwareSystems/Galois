@@ -189,12 +189,32 @@ class ParaMeterExecutor {
       while ((item = workList.getCurr().pop())) {
         IterationContext& it = newIteration();
 
+        bool doabort = false;
         try {
           function(*item, it.facing.data ());
-	  commitQueue.push_back(&it);
-        } catch (const conflict_ex& ex) {
-	  abortIteration(it, *item);
-	}
+
+        } catch (ConflictFlag flag) {
+          clearConflictLock();
+          switch (flag) {
+            case Galois::Runtime::CONFLICT:
+              doabort = true;
+              break;
+
+            case Galois::Runtime::BREAK:
+              GALOIS_DIE("can't handle breaks yet");
+              break;
+
+            default:
+              abort ();
+          }
+        }
+
+        if (doabort) {
+          abortIteration(it, *item);
+
+        } else {
+          commitQueue.push_back(&it);
+        }
 
         ++numIter;
       }
@@ -207,7 +227,7 @@ class ParaMeterExecutor {
       size_t numActivities = commitQueue.size();
 
       if (numActivities == 0) {
-        GALOIS_DIE("no progress made in step %d", currStep);
+        GALOIS_DIE("no progress made in step ", currStep);
       }
 
       double avgLocks = 0;
@@ -272,6 +292,7 @@ class ParaMeterExecutor {
   }
 
   unsigned abortIteration(IterationContext& it, value_type& item) {
+    clearConflictLock();
     workList.getNext().push(item);
     return retireIteration(it, true);
   }

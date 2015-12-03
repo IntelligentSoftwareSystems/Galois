@@ -21,11 +21,6 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "Release")
 endif()
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g")
-
-#set(CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS} ${GCC_MPIP_LINK_FLAGS}" )
-
 ###### Options (alternatively pass as options to cmake -DName=Value) ######
 set(USE_GPROF OFF CACHE BOOL "Enable GCC profiling")
 set(USE_VTUNE OFF CACHE BOOL "Use VTune for profiling")
@@ -160,16 +155,12 @@ if(CMAKE_BUILD_TYPE MATCHES "Debug")
   endif()
 endif()
 
-#Boost
-#not needed now but will be needed for newer version of Boost after 1.4X ish
-set(Boost_ADDITIONAL_VERSIONS "1.40" "1.40.0" "1.47" "1.47.0" "1.49" "1.49.0" "1.51.0")
-#set(Boost_USE_MULTITHREADED OFF) # newer boost builds don't use -mt extension
-
-if(NOT "$ENV{BOOST_DIR}" STREQUAL "") 
-  set(BOOST_ROOT $ENV{BOOST_DIR})
-endif()
-find_package(Boost 1.38.0 REQUIRED)
-include_directories(${Boost_INCLUDE_DIR})
+# GNU profiling
+if(USE_GPROF)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pg")
+  set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pg")
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pg")
+endif(USE_GPROF)
 
 ###### Configure features ######
 
@@ -228,15 +219,6 @@ if(USE_EXP)
       message(FATAL_ERROR "Hardware transactional memory not supported")
     endif()
   endif()
-
-  # Experimental Deterministic features
-  if(USE_DET_INORDER)
-    add_definitions(-DGALOIS_USE_DET_INORDER)
-  endif()
-  if(USE_DET_FIXED_WINDOW)
-    add_definitions(-DGALOIS_USE_DET_FIXED_WINDOW)
-  endif()
-
   if(USE_HETERO)
     find_package(CUDA REQUIRED)
     find_package(OpenCL REQUIRED)
@@ -294,17 +276,8 @@ set(Boost_USE_MULTITHREADED OFF)
 if(NOT "$ENV{BOOST_DIR}" STREQUAL "")
   set(BOOST_ROOT $ENV{BOOST_DIR})
 endif()
-set(BOOST_LIBS system iostreams filesystem)
-find_package(Boost 1.38.0 COMPONENTS ${BOOST_LIBS} REQUIRED)
+find_package(Boost 1.38.0 REQUIRED)
 include_directories(${Boost_INCLUDE_DIR})
-
-#more warnings
-if(CMAKE_BUILD_TYPE MATCHES "Debug")
-  if(NOT CMAKE_CXX_COMPILER_ID MATCHES "XL")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall") # -fsanitize=address")
-    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wall")
-  endif()
-endif()
 
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -334,9 +307,9 @@ elseif(EXISTS /net/ohm/export/cdgc/inputs/reference/graph_readme.txt)
 else()
   add_subdirectory(inputs)
   set(BASEINPUT ${CMAKE_BINARY_DIR}/inputs/reference )
-  MESSAGE(STATUS "Tests cannot run without inputs.  \"make inputs\" to download inputs")
+  MESSAGE(STATUS "use make input to download inputs in the build directory")
 endif()
-#set(GRAPH_INPUTS ${BASEINPUT}/graph_readme.txt)
+set(GRAPH_INPUTS ${BASEINPUT}/graph_readme.txt)
 
 ###### Global Functions ######
 
@@ -352,7 +325,7 @@ function(add_test_scale type app)
   endif()
   foreach(thr RANGE 1 ${N})
     add_test(test-${type}-${thr}-${app} ${app} ${ARGN} -t ${thr})
-#    set_tests_properties(test-${type}-${thr}-${app} PROPERTIES REQUIRED_FILES ${GRAPH_INPUTS})
+    set_tests_properties(test-${type}-${thr}-${app} PROPERTIES REQUIRED_FILES ${GRAPH_INPUTS})
   endforeach(thr)
 endfunction(add_test_scale)
 
@@ -370,12 +343,6 @@ function(app name)
   set(oneValueArgs)
   set(multiValueArgs REQUIRES EXTLIBS)
   cmake_parse_arguments(APP "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
-
-  if(${APP_DISTSAFE})
-  else()
-    message("-- NOT compiling ${name} (not safe for distributed branch)")
-    return()
-  endif()
 
   foreach(required ${APP_REQUIRES})
     if(${${required}} MATCHES "TRUE")
@@ -409,12 +376,6 @@ function(makeTest)
   set(multiValueArgs REQUIRES COMMAND_PREFIX)
   cmake_parse_arguments(APP "${options}" "${oneValueArgs}" "${multiValueArgs}" ${ARGN})
 
-  if(${APP_DISTSAFE})
-  else()
-    message("-- NOT compiling ${name} (not safe for distributed branch)")
-    return()
-  endif()
-  
   list(GET APP_UNPARSED_ARGUMENTS 0 name)
   list(REMOVE_AT APP_UNPARSED_ARGUMENTS 0)
 

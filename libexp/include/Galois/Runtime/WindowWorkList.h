@@ -294,11 +294,11 @@ public:
 
 
       if (!workList[i].empty ()) {
-        const T& last = (const T&) (workList[i].back ());
-        assert (&last != nullptr);
+        const T* last = &(workList[i].back ()->getElem ());
+        assert (last != nullptr);
 
-        if (windowLim == nullptr || cmp (*windowLim, last)) {
-          windowLim = &last;
+        if (windowLim == nullptr || cmp (*windowLim, *last)) {
+          windowLim = last;
         }
       }
     }

@@ -172,7 +172,7 @@ int main(int argc, char** argv) {
     std::for_each(graph->begin(), graph->end(), Preprocess(initialBad));
 
   Galois::reportPageAlloc("MeminfoMid");
-
+  
   Galois::StatTimer Trefine("refine");
   Trefine.start();
   using namespace Galois::WorkList;
@@ -201,9 +201,9 @@ int main(int argc, char** argv) {
   }
   Trefine.stop();
   T.stop();
-
+  
   Galois::reportPageAlloc("MeminfoPost");
-
+  
   if (!skipVerify) {
     int size = Galois::ParallelSTL::count_if(graph->begin(), graph->end(), is_bad(graph));
     if (size != 0) {

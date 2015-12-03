@@ -1,3 +1,5 @@
+#file(DOWNLOAD http://iss.ices.utexas.edu/projects/galois/downloads/lonestar-cpu-inputs.tar.xz ${CMAKE_CURRENT_BINARY_DIR}/lonestar-cpu-inputs.tar.xz SHOW_PROGRESS)
+
 file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/download.cmake "file(DOWNLOAD  http://iss.ices.utexas.edu/projects/galois/downloads/lonestar-cpu-inputs.tar.xz ${CMAKE_CURRENT_BINARY_DIR}/lonestar-cpu-inputs.tar.xz SHOW_PROGRESS)")
 
 add_custom_command(
@@ -14,4 +16,4 @@ COMMENT "Unpacking lonestar-cpu-inputs.tar.xz"
 VERBATIM
 )
 
-add_custom_target(inputs DEPENDS reference/graph_readme.txt)
+add_custom_target(input ALL DEPENDS reference/graph_readme.txt)

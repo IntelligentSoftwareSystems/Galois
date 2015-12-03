@@ -37,45 +37,6 @@
 namespace Galois {
 namespace Runtime {
 
-namespace dbg {
-  template <typename... Args>
-  void debug (Args&&... args) {
-    
-    const bool DEBUG = false;
-    if (DEBUG) {
-      Substrate::gDebug (std::forward<Args> (args)...);
-    }
-  }
-}
-
-
-template <typename T>
-class OrderedContextBase: public SimpleRuntimeContext {
-  using Base = SimpleRuntimeContext;
-
-  T active;
-
-public:
-
-  explicit OrderedContextBase (const T& x): 
-    Base (true), // call overriden subAcquire
-    active (x)
-  {}
-
-  const T& getActive (void) const { return active; }
-
-  // XXX: disable this. It will only work for modifications that don't change the priority
-  T& getActive () { return active; }
-
-  operator const T& (void) const { return getActive (); }
-
-  operator T (void) const { return getActive (); }
-
-  // XXX: disable this. It will only work for modifications that don't change the priority
-  operator T& (void) const { return getActive (); }
-
-};
-
 // TODO: change comparator to three valued int instead of bool
 template <typename Ctxt, typename Cmp>
 struct ContextComparator {
