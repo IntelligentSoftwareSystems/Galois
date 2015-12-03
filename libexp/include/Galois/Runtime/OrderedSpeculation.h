@@ -533,7 +533,9 @@ struct OptimContext: public OrderedContextBase<T> {
   void resetMarks (void) {
 
     for (NItem* ni: nhood) {
-      ni->resetMin (this);
+      if (ni->getMin () == this) {
+        ni->resetMin (this);
+      }
     }
   }
 
@@ -1061,7 +1063,6 @@ private:
           if (c->isSrc () && !c->hasState (ContextState::ABORTED_CHILD)) {
             assert (c->hasState (ContextState::SCHEDULED));
 
-            c->resetMarks ();
             sources.push (c);
 
           } else if (c->hasState (ContextState::ABORTED_CHILD)) {
@@ -1071,6 +1072,8 @@ private:
             assert (!c->hasState (ContextState::ABORTED_CHILD));
             quickAbort (c);
           }
+
+          c->resetMarks ();
         },
 
         "collect-sources",
