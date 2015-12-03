@@ -349,7 +349,7 @@ public:
       edgeIndData.allocateLocal(numNodes);
       edgeDst.allocateLocal(numEdges);
       edgeData.allocateLocal(numEdges);
-      this->outOfLineAllocateLocal(numNodes, false);
+      this->outOfLineAllocateLocal(numNodes);
     } else {
       nodeData.allocateInterleaved(numNodes);
       edgeIndData.allocateInterleaved(numNodes);

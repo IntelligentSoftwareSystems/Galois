@@ -25,7 +25,9 @@
  */
 
 #include "Galois/gstl.h"
-#include "Galois/Graph/LC_CSR_Graph.h"
+#include "Galois/Graphs/LC_CSR_Graph.h"
+#include "Galois/Runtime/Network.h"
+#include "Galois/Runtime/Serialize.h"
 
 #include "GlobalObj.h"
 
@@ -87,25 +89,25 @@ class hGraph : public GlobalObject {
   }
 
   template<bool en, typename std::enable_if<en>::type* = nullptr>
-  NodeTy& getDataImpl(typename GraphTy::GraphNode N, Galois::MethodFlag mflag = Galois::MethodFlag::ALL) {
+  NodeTy& getDataImpl(typename GraphTy::GraphNode N, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) {
     auto& r = graph.getData(N, mflag);
     return round ? r.first : r.second;
   }
 
   template<bool en, typename std::enable_if<!en>::type* = nullptr>
-  NodeTy& getDataImpl(typename GraphTy::GraphNode N, Galois::MethodFlag mflag = Galois::MethodFlag::ALL) {
+  NodeTy& getDataImpl(typename GraphTy::GraphNode N, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) {
     auto& r = graph.getData(N, mflag);
     return r;
   }
 
   template<bool en, typename std::enable_if<en>::type* = nullptr>
-  typename GraphTy::edge_data_reference getEdgeDataImpl(typename GraphTy::edge_iterator ni, Galois::MethodFlag mflag = Galois::MethodFlag::ALL) {
+  typename GraphTy::edge_data_reference getEdgeDataImpl(typename GraphTy::edge_iterator ni, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) {
     auto& r = graph.getEdgeData(ni, mflag);
     return round ? r.first : r.second;
   }
 
   template<bool en, typename std::enable_if<!en>::type* = nullptr>
-  typename GraphTy::edge_data_reference getEdgeDataImpl(typename GraphTy::edge_iterator ni, Galois::MethodFlag mflag = Galois::MethodFlag::ALL) {
+  typename GraphTy::edge_data_reference getEdgeDataImpl(typename GraphTy::edge_iterator ni, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) {
     auto& r = graph.getEdgeData(ni, mflag);
     return r;
   }
@@ -263,14 +265,14 @@ public:
     //std::cerr << "Construct edges done\n";
   }
 
-  NodeTy& getData(GraphNode N, Galois::MethodFlag mflag = Galois::MethodFlag::ALL) {
+  NodeTy& getData(GraphNode N, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) {
     auto& r = getDataImpl<BSPNode>(N, mflag);
     auto i =Galois::Runtime::NetworkInterface::ID;
     //std::cerr << i << " " << N << " " <<&r << " " << r.dist_current << "\n";
     return r;
   }
 
-  typename GraphTy::edge_data_reference getEdgeData(edge_iterator ni, Galois::MethodFlag mflag = Galois::MethodFlag::ALL) {
+  typename GraphTy::edge_data_reference getEdgeData(edge_iterator ni, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) {
     return getEdgeDataImpl<BSPEdge>(ni, mflag);
   }
 

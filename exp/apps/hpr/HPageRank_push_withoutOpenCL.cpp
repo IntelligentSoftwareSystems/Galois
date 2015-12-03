@@ -24,15 +24,16 @@
 
 #include "Galois/Galois.h"
 #include "Galois/gstl.h"
-#include "Galois/Graph/FileGraph.h"
-#include "Galois/Graph/LC_CSR_Graph.h"
-#include "Galois/Graph/Util.h"
+#include "Galois/Graphs/FileGraph.h"
+#include "Galois/Graphs/LC_CSR_Graph.h"
+#include "Galois/Graphs/Util.h"
 #include "Lonestar/BoilerPlate.h"
 
 #include "PGraph.h"
 #include "hpr.h"
 
 #include <iostream>
+#include <fstream>
 #include <typeinfo>
 #include <algorithm>
 #include <atomic>
@@ -367,7 +368,7 @@ struct clearGhostCells {
 void inner_main() {
    auto& net = Galois::Runtime::getSystemNetworkInterface();
    Galois::StatManager statManager;
-   auto& barrier = Galois::Runtime::getSystemBarrier();
+   auto& barrier = Galois::Runtime::getBarrier(Galois::getActiveThreads());
    const unsigned my_host_id = Galois::Runtime::NetworkInterface::ID;
    Galois::Timer T_total, T_graph_load, T_pagerank, T_pagerank_perIter, T_graph_init;
    T_total.start();
