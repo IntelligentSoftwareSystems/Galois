@@ -320,6 +320,70 @@ public:
     rewriter(R)
   {}
   
+  void GenerateIrGLASTToFile(std::string filename) {
+    std::ofstream IrGLAST;
+    IrGLAST.open(filename);
+    IrGLAST << "from gg.ast import *\n";
+    IrGLAST << "from gg.lib.graph import Graph\n";
+    IrGLAST << "from gg.ast.params import GraphParam\n";
+    IrGLAST << "import cgen\n";
+    IrGLAST << "G = Graph(\"graph\")\n";
+    IrGLAST << "ast = Module([\n";
+    IrGLAST << "CBlock([cgen.Include(\"kernels/reduce.cuh\", "
+      << "system = False)], parse = False),\n";
+    for (auto& var : SharedVariablesToTypeMap) {
+      std::string upper = var.first;
+      std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
+      IrGLAST << "CDeclGlobal([(\"" << var.second 
+        << " *\", \"P_" << upper << "\", \"\")]),\n";
+    }
+    for (auto& var : GlobalVariablesToTypeMap) {
+      size_t found = var.second.find("Galois::");
+      if (found == std::string::npos) {
+        found = var.second.find("cll::opt");
+        std::string type;
+        if (found == std::string::npos) {
+          type = var.second;
+        } else {
+          size_t start = var.second.find("<", found);
+          // FIXME: nested < < > >
+          size_t end = var.second.find(">", found);
+          type = var.second.substr(start+1, end-start-1);
+        }
+        // FIXME: initialization value?
+        IrGLAST << "CDecl([(\"extern " << type 
+          << "\", \"" << var.first << "\", \"\")]),\n";
+      }
+    }
+
+    std::ifstream compute(COMPUTE_FILENAME);
+    IrGLAST << compute.rdbuf(); 
+    compute.close();
+    remove(COMPUTE_FILENAME);
+
+    IrGLAST << "Kernel(\"" << "gg_main" << "\", ";
+    IrGLAST << "[GraphParam('hg', True), GraphParam('gg', True)],\n[\n";
+    // should wait for all operators to be generated before reading shared variables
+    for (auto& var : SharedVariablesToTypeMap) {
+      IrGLAST << "CDecl((\"Shared<" << var.second << ">\", \"p_" << var.first << "\"";
+      IrGLAST << ", \"= Shared<" << var.second << "> (hg.nnodes)\")),\n";
+    }
+    std::ifstream orchestrator(ORCHESTRATOR_FILENAME);
+    IrGLAST << orchestrator.rdbuf();
+    orchestrator.close();
+    for (auto& var : SharedVariablesToTypeMap) {
+      std::string upper = var.first;
+      std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
+      IrGLAST << "CBlock([\"" << "P_" << upper << " = p_" 
+        << var.first << ".cpu_rd_ptr()" << "\"]),\n";
+    }
+    IrGLAST << "]),\n"; // end kernel
+    remove(ORCHESTRATOR_FILENAME);
+
+    IrGLAST << "])\n"; // end Module
+    IrGLAST.close();
+  }
+
   void WriteCBlock(std::string text) {
     // FIXME: assumes only one occurrence
     // FIXME: should it be only withint quoted strings?
@@ -343,69 +407,9 @@ public:
     if (traverse && D && isa<CXXMethodDecl>(D)) {
       Output.close();
 
-      // FIXME: Build file name from source file
-      std::ofstream CombinedOutput;
       CXXMethodDecl *method = dyn_cast<CXXMethodDecl>(D);
-      CombinedOutput.open(method->getParent()->getNameAsString() + ".py");
-      CombinedOutput << "from gg.ast import *\n";
-      CombinedOutput << "from gg.lib.graph import Graph\n";
-      CombinedOutput << "from gg.ast.params import GraphParam\n";
-      CombinedOutput << "import cgen\n";
-      CombinedOutput << "G = Graph(\"graph\")\n";
-      CombinedOutput << "ast = Module([\n";
-      CombinedOutput << "CBlock([cgen.Include(\"kernels/reduce.cuh\", "
-        << "system = False)], parse = False),\n";
-      for (auto& var : SharedVariablesToTypeMap) {
-        std::string upper = var.first;
-        std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
-        CombinedOutput << "CDecl([(\"" << var.second 
-          << " *\", \"P_" << upper << "\", \"\")]),\n";
-      }
-      for (auto& var : GlobalVariablesToTypeMap) {
-        size_t found = var.second.find("Galois::");
-        if (found == std::string::npos) {
-          found = var.second.find("cll::opt");
-          std::string type;
-          if (found == std::string::npos) {
-            type = var.second;
-          } else {
-            size_t start = var.second.find("<", found);
-            // FIXME: nested < < > >
-            size_t end = var.second.find(">", found);
-            type = var.second.substr(start+1, end-start-1);
-          }
-          // FIXME: initialization value?
-          CombinedOutput << "CDecl([(\"extern " << type 
-            << "\", \"" << var.first << "\", \"\")]),\n";
-        }
-      }
-
-      std::ifstream compute(COMPUTE_FILENAME);
-      CombinedOutput << compute.rdbuf(); 
-      compute.close();
-      remove(COMPUTE_FILENAME);
-
-      CombinedOutput << "Kernel(\"" << "gg_main" << "\", ";
-      CombinedOutput << "[GraphParam('hg', True), GraphParam('gg', True)],\n[\n";
-      // should wait for all operators to be generated before reading shared variables
-      for (auto& var : SharedVariablesToTypeMap) {
-        CombinedOutput << "CDecl((\"Shared<" << var.second << ">\", \"p_" << var.first << "\"";
-        CombinedOutput << ", \"= Shared<" << var.second << "> (hg.nnodes)\")),\n";
-      }
-      std::ifstream orchestrator(ORCHESTRATOR_FILENAME);
-      CombinedOutput << orchestrator.rdbuf();
-      orchestrator.close();
-      for (auto& var : SharedVariablesToTypeMap) {
-        std::string upper = var.first;
-        std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
-        CombinedOutput << "CBlock([\"" << "P_" << upper << " = p_" 
-          << var.first << ".cpu_rd_ptr()" << "\"]),\n";
-      }
-      CombinedOutput << "]),\n"; // end kernel
-      remove(ORCHESTRATOR_FILENAME);
-
-      CombinedOutput << "])\n"; // end Module
-      CombinedOutput.close();
+      // FIXME: Build file name from source file
+      GenerateIrGLASTToFile(method->getParent()->getNameAsString() + ".py");
     }
     return traverse;
   }
