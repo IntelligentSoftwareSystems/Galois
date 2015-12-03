@@ -85,17 +85,6 @@ public:
 
   virtual void flush() = 0;
 
-  //! start a listen loop if not the lead process
-  //! FIXME: should this be split out?
-  static void start();
-
-  //! terminate all processes
-  //! FIXME: should this be split out?
-  static void terminate();
-
-  //! send a top level loop item (executed in the top level event loop)
-  //! FIXME: Why does this exist?
-  static void sendLoop(uint32_t dest, recvFuncTy recv, SendBuffer& buf);
   unsigned long reportSendBytes();
 };
 

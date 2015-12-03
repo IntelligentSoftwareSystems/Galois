@@ -29,6 +29,7 @@
 #include <iostream>
 
 using namespace Galois::Runtime;
+using namespace Galois::Substrate;
 
 unsigned _ID = ~0;
 
@@ -41,8 +42,8 @@ class NetworkInterfaceBuffered : public NetworkInterface {
   struct recvBuffer {
     std::deque<NetworkIO::message> data;
     size_t frontOffset;
-    LL::SimpleLock qlock;
-    LL::SimpleLock rlock;
+    SimpleLock qlock;
+    SimpleLock rlock;
 
     bool sizeAtLeast(size_t n) {
       size_t tot = -frontOffset;
@@ -94,7 +95,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
     }
 
     bool popMsg(std::vector<uint8_t>& vec) {
-      std::lock_guard<LL::SimpleLock> lg(qlock);
+      std::lock_guard<SimpleLock> lg(qlock);
       if (!sizeAtLeast(4))
         return false;
       uint32_t len = getLenFromFront();
@@ -112,7 +113,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
 
     //Worker thread interface
     void add(NetworkIO::message m) {
-      std::lock_guard<LL::SimpleLock> lg(qlock);
+      std::lock_guard<SimpleLock> lg(qlock);
       data.emplace_back(std::move(m));
     }
   };
@@ -133,7 +134,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
     std::atomic<size_t> numBytes;
     std::chrono::high_resolution_clock::time_point time;
     std::atomic<bool> urgent;
-    LL::SimpleLock lock;
+    SimpleLock lock;
 
     void markUrgent() {
       if (numBytes)
@@ -141,7 +142,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
     }
 
     void add(uintptr_t fp, size_t offset, std::vector<uint8_t>& b) {
-      std::lock_guard<LL::SimpleLock> lg(lock);
+      std::lock_guard<SimpleLock> lg(lock);
       if (messages.empty())
         time = std::chrono::high_resolution_clock::now();
       numBytes += b.size() - offset + sizeof(uint32_t) + sizeof(uintptr_t);
@@ -156,7 +157,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
         return true;
       if (numBytes > COMM_MIN)
         return true;
-      std::lock_guard<LL::SimpleLock> lg(lock);
+      std::lock_guard<SimpleLock> lg(lock);
       auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - time);
       if (elapsed.count() > COMM_DELAY)
         return true;
@@ -164,7 +165,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
     }
     
     std::pair<std::unique_ptr<uint8_t[]>, size_t> assemble() {
-      std::lock_guard<LL::SimpleLock> lg(lock);
+      std::lock_guard<SimpleLock> lg(lock);
       std::pair<std::unique_ptr<uint8_t[]>, size_t> retval;
       retval.second = numBytes;
       retval.first.reset(new uint8_t[numBytes.load()]);
@@ -260,7 +261,7 @@ public:
     bool retval = false;
     for (auto& rq : recvData) {
       if (rq.rlock.try_lock()) {
-        std::lock_guard<LL::SimpleLock> lg(rq.rlock, std::adopt_lock);
+        std::lock_guard<SimpleLock> lg(rq.rlock, std::adopt_lock);
         std::vector<uint8_t> data;
         if (rq.popMsg(data)) {
           //          std::cerr << _ID << " hR " << data.size() << "\n";

@@ -22,9 +22,8 @@
  */
 
 #include "Galois/Runtime/Tracer.h"
-#include "Galois/Runtime/Network.h"
-#include "Galois/Runtime/ll/SimpleLock.h"
-#include "Galois/Runtime/ll/EnvCheck.h"
+#include "Galois/Substrate/SimpleLock.h"
+#include "Galois/Substrate/EnvCheck.h"
 
 #include <fstream>
 #include <cassert>
@@ -35,12 +34,24 @@
 #include <sys/types.h>
 #include <unistd.h>
 
+using namespace Galois::Substrate;
+
+
 static bool doCerr = false;
 static bool doCerrInit = false;
 
+namespace Galois { 
+namespace Runtime {
+uint32_t getHostID() __attribute__((weak));
+} // end namespace Runtime
+} // end namespace Galois
+uint32_t Galois::Runtime::getHostID() {
+  return 0;
+}
+
 static std::ostream& openIfNot() {
   if (!doCerrInit) {
-    doCerr = Galois::Runtime::LL::EnvCheck("GALOIS_DEBUG_TRACE_STDERR");
+    doCerr = EnvCheck("GALOIS_DEBUG_TRACE_STDERR");
     doCerrInit = true;
   }
   if (doCerr)
@@ -60,15 +71,15 @@ static std::ostream& openIfNot() {
 
 void Galois::Runtime::detail::printTrace(std::ostringstream& os) {
   using namespace std::chrono;
-  static LL::SimpleLock lock;
-  std::lock_guard<LL::SimpleLock> lg(lock);
+  static SimpleLock lock;
+  std::lock_guard<SimpleLock> lg(lock);
   auto& out = openIfNot();
   auto dtn = system_clock::now().time_since_epoch();
   out << "<" << dtn.count() << "," << getHostID() << "> ";
   out << os.str();
   out.flush();
   static int iSleep = 0;
-  static bool doSleep = Galois::Runtime::LL::EnvCheck("GALOIS_DEBUG_TRACE_PAUSE", iSleep);
+  static bool doSleep = EnvCheck("GALOIS_DEBUG_TRACE_PAUSE", iSleep);
   if (doSleep)
     usleep(iSleep ? iSleep : 10);
 }

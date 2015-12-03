@@ -22,8 +22,8 @@
  */
 
 #include "Galois/Runtime/Tracer.h"
-#include "Galois/Runtime/Barrier.h"
-#include "Galois/Runtime/Directory.h"
+//#include "Galois/Runtime/Barrier.h"
+//#include "Galois/Runtime/Directory.h"
 #include "Galois/Runtime/Network.h"
 #include "Galois/Runtime/NetworkIO.h"
 #include "Galois/Runtime/NetworkBackend.h"
@@ -31,8 +31,7 @@
 #include <type_traits>
 #include <cassert>
 #include <iostream>
-
-#include <iostream>
+#include <mutex>
 
 using namespace Galois::Runtime;
 
@@ -42,60 +41,6 @@ uint32_t Galois::Runtime::NetworkInterface::Num = 1;
 uint32_t Galois::Runtime::getHostID() { return NetworkInterface::ID; }
 
 Galois::Runtime::NetworkIO::~NetworkIO() {}
-
-//FIXME: move top level loop out of network interface
-
-static std::atomic<bool> ourexit;
-
-//FIXME: synchronize this
-static std::deque<std::pair<recvFuncTy, RecvBuffer>> loopwork;
-
-
-//landing pad for Router
-static void fake_landing() {
-  std::cout << "I am Router\n";
-}
-
-//!landing pad for worker hosts
-static void networkExit() {
-  assert(NetworkInterface::Num > 1);
-  assert(NetworkInterface::ID > 0);
-  ourexit = true;
-
-  //if (NetworkInterface::ID == 2) {
-    //getSystemNetworkInterface().sendAlt(NetworkInterface::Num + 1, &fake_landing);
-  //}
-}
-
-static void loop_pad(::RecvBuffer& b) {
-  uintptr_t f;
-  gDeserialize(b, f);
-  trace("Loop Recieved %\n", (void*)f);
-  trace("Loop RecvBuffer %\n", b);
-  loopwork.emplace_back((recvFuncTy)f, std::move(b));
-}
-
-void NetworkInterface::start() {
-  ourexit = false;
-  getSystemBarrier(); // initialize barrier before anyone might be at it
-  auto& net = getSystemNetworkInterface();
-  auto& ldir = getLocalDirectory();
-  auto& rdir = getRemoteDirectory();
-  if (NetworkInterface::ID != 0) {
-    while (!ourexit) {
-      doNetworkWork();
-      if (!loopwork.empty()) {
-        auto& p = loopwork.front();
-        trace("Loop Executing %\n", (void*)p.first);
-        p.first(p.second);
-        loopwork.pop_front();
-      }
-    }
-    getSystemNetworkInterface().reportStats();
-    getSystemThreadPool().run(activeThreads, []() { Galois::Runtime::getSystemBarrier().wait(); });
-    exit(0);
-  }
-}
 
 void NetworkInterface::reportStats() {
   statRecvNum.report();
@@ -114,24 +59,6 @@ void NetworkInterface::dumpStats() const {
 
 unsigned long NetworkInterface::reportSendBytes() {
   return statSendBytes.getVal();
-}
-
-void NetworkInterface::terminate() {
-  getSystemNetworkInterface().reportStats();
-
-  //return if just one host is running
-  if (NetworkInterface::Num == 1)
-    return;
-  assert(NetworkInterface::ID == 0);
-  getSystemNetworkInterface().broadcastAlt(&networkExit);
-  getSystemThreadPool().run(activeThreads, []() { Galois::Runtime::getSystemBarrier().wait(); });
-}
-
-void NetworkInterface::sendLoop(uint32_t dest, recvFuncTy recv, SendBuffer& buf) {
-  trace("Loop Sent % to % pad %\n", (void*)recv, dest, (void*)&loop_pad);
-  buf.serialize_header((void*)recv);
-  trace("Loop SendBuffer %\n", buf);
-  getSystemNetworkInterface().send(dest, &loop_pad, buf);
 }
 
 //anchor vtable
@@ -168,7 +95,7 @@ void NetworkInterface::flush() { }
 
 NetworkBackend::SendBlock* NetworkBackend::allocSendBlock() {
   //FIXME: review for TBAA rules
-  std::lock_guard<LL::SimpleLock> lg(flLock);
+  std::lock_guard<Substrate::SimpleLock> lg(flLock);
   SendBlock* retval = nullptr;
   if (freelist.empty()) {
     unsigned char* data = (unsigned char*)malloc(sizeof(SendBlock) + size());
@@ -183,7 +110,7 @@ NetworkBackend::SendBlock* NetworkBackend::allocSendBlock() {
 }
 
 void NetworkBackend::freeSendBlock(SendBlock* sb) {
-  std::lock_guard<LL::SimpleLock> lg(flLock);
+  std::lock_guard<Substrate::SimpleLock> lg(flLock);
   freelist.push_front(*sb);
 }
 

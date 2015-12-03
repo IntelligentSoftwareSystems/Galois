@@ -60,7 +60,7 @@ extern bool initTrace;
 template<typename... Args>
 static inline void trace(const char* format, Args&&... args) {
   if (!detail::initTrace) {
-    detail::doTrace = LL::EnvCheck("GALOIS_DEBUG_TRACE");
+    detail::doTrace = Substrate::EnvCheck("GALOIS_DEBUG_TRACE");
     detail::initTrace = true;
   }
   if (detail::doTrace) {

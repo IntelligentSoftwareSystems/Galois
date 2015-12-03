@@ -24,7 +24,7 @@
 #ifndef GALOIS_RUNTIME_NETWORKBACKEND_H
 #define GALOIS_RUNTIME_NETWORKBACKEND_H
 
-#include "Galois/Runtime/ll/SimpleLock.h"
+#include "Galois/Substrate/SimpleLock.h"
 
 #include <cstdint>
 
@@ -45,7 +45,7 @@ public:
 
 protected:
   uint32_t sz, _ID, _Num;
-  LL::SimpleLock flLock;
+  Substrate::SimpleLock flLock;
   BlockList freelist;
 
   NetworkBackend(unsigned size);
