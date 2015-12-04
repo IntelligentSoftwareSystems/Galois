@@ -24,9 +24,9 @@
 
 #include "Galois/Galois.h"
 #include "Galois/gstl.h"
-#include "Galois/Graph/FileGraph.h"
-#include "Galois/Graph/LC_CSR_Graph.h"
-#include "Galois/Graph/Util.h"
+#include "Galois/Graphs/FileGraph.h"
+#include "Galois/Graphs/LC_CSR_Graph.h"
+#include "Galois/Graphs/Util.h"
 #include "Lonestar/BoilerPlate.h"
 #include "PGraph.h"
 #include "OpenCL/LC_LinearArray_Graph.h"

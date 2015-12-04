@@ -28,6 +28,7 @@
 #include "Galois/Graphs/LC_CSR_Graph.h"
 #include "Galois/Runtime/Substrate.h"
 #include "Galois/Runtime/Network.h"
+//#include "Galois/Runtime/Barrier.h"
 #include "Galois/Runtime/Serialize.h"
 
 #include "GlobalObj.h"
@@ -330,6 +331,7 @@ public:
       net.send(x, syncRecv, b);
     }
     //Will force all messages to be processed before continuing
+    //Galois::Runtime::getHostBarrier().wait();
     Galois::Runtime::getHostBarrier().wait();
   }
 
@@ -362,6 +364,7 @@ public:
     }
 
     assert(num_recv_expected == 0);
+    //Galois::Runtime::getHostBarrier().wait();
     Galois::Runtime::getHostBarrier().wait();
   }
 

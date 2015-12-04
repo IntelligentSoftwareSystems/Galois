@@ -3,6 +3,7 @@ set(sources
         src/routed.cpp
         src/pkt_mpi.cpp
         src/Network.cpp
+	src/Barrier.cpp
 )
 
 add_library(galois_net STATIC ${sources})
