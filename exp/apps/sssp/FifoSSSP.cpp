@@ -308,6 +308,7 @@ struct AsyncAlgo {
   
   // ! [Define LC_InlineEdge_Graph]
   typedef Galois::Graph::LC_InlineEdge_Graph<Node, uint32_t>
+//    ::template with_no_lockable<true>::type // for testing pure serial case
     ::template with_out_of_line_lockable<true>::type
     ::template with_compressed_node_ptr<true>::type
     ::template with_numa_alloc<true>::type
@@ -352,6 +353,7 @@ struct AsyncAlgo {
 
   template<typename Pusher>
   void relaxNode(Graph& graph, UpdateRequest& req, Pusher& pusher) {
+//    const Galois::MethodFlag flag = Galois::MethodFlag::UNPROTECTED; // for testing pure serial case
     const Galois::MethodFlag flag = UseCas ? Galois::MethodFlag::UNPROTECTED : Galois::MethodFlag::WRITE;
     auto& sdist = graph.getData(req.n, flag).dist;
 
@@ -395,7 +397,7 @@ struct AsyncAlgo {
 
   void operator()(Graph& graph, GNode source) {
     using namespace Galois::WorkList;
-    typedef ChunkedFIFO<64> Chunk;
+    typedef dChunkedFIFO<64> Chunk;
     typedef OrderedByIntegerMetric<UpdateRequestIndexer<UpdateRequest>, Chunk, 10, false> OBIM;
 
     std::cout << "INFO: Using delta-step of " << (1 << stepShift) << "\n";
@@ -523,7 +525,7 @@ struct AsyncSetAlgo {
 
   void operator()(Graph& graph, GNode source) {
     using namespace Galois::WorkList;
-    typedef ChunkedFIFO<64> Chunk;
+    typedef dChunkedFIFO<64> Chunk;
     typedef OrderedByIntegerMetric<NodeIndexer<Graph>, Chunk, 10, false> OBIM;
     typedef dChunkedMarkingSetFIFO<NodeSetMarker<Graph>,64> MSet;
     typedef dChunkedTwoLevelSetFIFO<64> OSet;

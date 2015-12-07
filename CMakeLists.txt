@@ -260,9 +260,9 @@ elseif(EXISTS /net/ohm/export/cdgc/inputs/reference/graph_readme.txt)
 else()
   add_subdirectory(inputs)
   set(BASEINPUT ${CMAKE_BINARY_DIR}/inputs/reference )
-  MESSAGE(STATUS "use make input to download inputs in the build directory")
+  MESSAGE(STATUS "Tests cannot run without inputs.  \"make inputs\" to download inputs")
 endif()
-set(GRAPH_INPUTS ${BASEINPUT}/graph_readme.txt)
+#set(GRAPH_INPUTS ${BASEINPUT}/graph_readme.txt)
 
 ###### Global Functions ######
 
@@ -278,7 +278,7 @@ function(add_test_scale type app)
   endif()
   foreach(thr RANGE 1 ${N})
     add_test(test-${type}-${thr}-${app} ${app} ${ARGN} -t ${thr})
-    set_tests_properties(test-${type}-${thr}-${app} PROPERTIES REQUIRED_FILES ${GRAPH_INPUTS})
+#    set_tests_properties(test-${type}-${thr}-${app} PROPERTIES REQUIRED_FILES ${GRAPH_INPUTS})
   endforeach(thr)
 endfunction(add_test_scale)
 
@@ -404,7 +404,7 @@ if(NOT SKIP_COMPILE_APPS)
 endif()
 
 ###### Documentation ######
-set(DOXYFILE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/include\" \"${CMAKE_CURRENT_SOURCE_DIR}/docs\" \"${CMAKE_CURRENT_SOURCE_DIR}/libgraphs\" \"${CMAKE_CURRENT_SOURCE_DIR}/libllvm\" \"${CMAKE_CURRENT_SOURCE_DIR}/libruntime\" \"${CMAKE_CURRENT_SOURCE_DIR}/libsubstrate")
+set(DOXYFILE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/docs\" \"${CMAKE_CURRENT_SOURCE_DIR}/libgraphs\" \"${CMAKE_CURRENT_SOURCE_DIR}/libllvm\" \"${CMAKE_CURRENT_SOURCE_DIR}/libruntime\" \"${CMAKE_CURRENT_SOURCE_DIR}/libsubstrate")
 find_package(Doxygen 1.8.0)
 if(NOT DOXYGEN_FOUND)
   message(STATUS "Could NOT find required doxygen version: doxygen missing or < 1.8.0") 
