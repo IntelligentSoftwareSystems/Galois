@@ -64,7 +64,7 @@ public:
     valid = false;
   }
 
-  unsigned long getValue(unsigned tid) {
+  unsigned long getValue(unsigned tid) const {
     return *val.getRemote(tid);
   }
 
@@ -74,6 +74,10 @@ public:
 
   std::string& getStatname() {
     return statname;
+  }
+
+  unsigned long getVal() const {
+    return *val.getLocal();
   }
 
   Statistic& operator+=(unsigned long v) {
@@ -96,7 +100,12 @@ public:
     }
     Galois::Runtime::printStats();
   }
-
+  void dump_stats(){
+    for (std::deque<Statistic*>::iterator ii = stats.begin(), ei = stats.end(); ii != ei; ++ii) {
+      (*ii)->report();
+    }
+    Galois::Runtime::printStats();
+  }
   //! Statistics that are not lexically scoped must be added explicitly
   void push(Statistic& s) {
     stats.push_back(&s);

@@ -266,7 +266,6 @@ void sort(RandomAccessIterator first, RandomAccessIterator last) {
   Galois::ParallelSTL::sort(first, last, std::less<typename std::iterator_traits<RandomAccessIterator>::value_type>());
 }
 
-//FIXME: init is ignored
 template <class InputIterator, class T, typename BinaryOperation>
 T accumulate (InputIterator first, InputIterator last, T init, const BinaryOperation& binary_op) {
   struct updater {
@@ -275,6 +274,7 @@ T accumulate (InputIterator first, InputIterator last, T init, const BinaryOpera
     void operator()(T& lhs, const T& rhs) { lhs = this->op(lhs, rhs); }
   };
   GReducible<T, updater> R{updater(binary_op)};
+  R.update(init);
   do_all(first, last, [&R] (const T& v) { R.update(v); });
   return R.reduce(updater(binary_op));
 }

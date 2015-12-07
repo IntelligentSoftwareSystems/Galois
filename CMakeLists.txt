@@ -81,7 +81,13 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
   else()
     message(STATUS "Using default GCC toolchain; set environment variable GCC_BIN to override")
   endif()
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fcolor-diagnostics")
+  if(CMAKE_BUILD_TYPE MATCHES "Debug")
+#    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-omit-frame-pointer -fno-optimize-sibling-calls -O0")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-omit-frame-pointer -fno-optimize-sibling-calls -O0")
+  endif()
 endif()
+#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-omit-frame-pointer -fno-optimize-sibling-calls -O0")
 
 # XL
 if(CMAKE_CXX_COMPILER_ID MATCHES "XL")
