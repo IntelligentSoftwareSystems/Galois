@@ -76,6 +76,7 @@ enum ConvertMode {
   gr2tgr,
   gr2treegr,
   gr2trigr,
+  gr2totem,
   mtx2gr,
   nodelist2gr,
   pbbs2gr,
@@ -147,6 +148,7 @@ static cll::opt<ConvertMode> convertMode(cll::desc("Conversion mode:"),
       clEnumVal(gr2tgr, "Transpose binary gr"),
       clEnumVal(gr2treegr, "Overlay tree"),
       clEnumVal(gr2trigr, "Convert symmetric binary gr to triangular form by removing reverse edges"),
+      clEnumVal(gr2totem, "Convert binary gr totem input format"),
       clEnumVal(mtx2gr, "Convert matrix market format to binary gr"),
       clEnumVal(nodelist2gr, "Convert node list to binary gr"),
       clEnumVal(pbbs2gr, "Convert pbbs graph to binary gr"),
@@ -2028,7 +2030,82 @@ struct Gr2Rmat: public HasNoVoidSpecialization {
     printStatus(graph.size(), graph.sizeEdges());
   }
 };
+template<template<typename,typename> class SortBy>
+struct Gr2Totem: public HasNoVoidSpecialization {
+  template<typename EdgeTy>
+  void convert(const std::string& infilename, const std::string& outfilename) {
+    typedef Galois::Graph::FileGraph Graph;
+    typedef Graph::GraphNode GNode;
 
+    Graph orig,graph;
+    {
+      // Original FileGraph is immutable because it is backed by a file
+      orig.fromFile(infilename);
+      graph = orig;
+    }
+    
+    const uint32_t BINARY_MAGIC_WORD = 0x10102048;
+    FILE* outfile;
+    outfile = fopen(outfilename.c_str(), "wr");
+
+    typedef uint32_t vid_t;
+    typedef uint32_t eid_t;
+    typedef uint32_t weight_t;
+    fwrite(&BINARY_MAGIC_WORD,sizeof(uint32_t),1,outfile);
+
+    uint32_t vid_size = sizeof(vid_t);
+    fwrite(&vid_size,sizeof(uint32_t),1, outfile);
+    uint32_t eid_size = sizeof(vid_t);
+    fwrite(&eid_size,sizeof(uint32_t),1, outfile);
+
+    vid_t vertex_count = graph.size();
+    fwrite(&vertex_count, sizeof(vid_t), 1, outfile);
+    eid_t edge_count = graph.sizeEdges();
+    fwrite(&edge_count, sizeof(eid_t), 1, outfile);
+
+    bool valued = false;
+    fwrite(&valued, sizeof(bool), 1, outfile);
+    bool weighted = true;
+    fwrite(&weighted, sizeof(bool), 1, outfile);
+    bool directed = true;
+    fwrite(&directed, sizeof(bool), 1, outfile);
+
+    vid_t* nodes = (vid_t* )malloc(sizeof(vid_t)*(vertex_count + 1));
+    eid_t* edges = (eid_t* )malloc(sizeof(vid_t)*edge_count);
+    weight_t* weights = (weight_t* )malloc(sizeof(vid_t)*edge_count);
+    memset(nodes,0,sizeof(vid_t)*(vertex_count + 1));
+    memset(edges,0,sizeof(vid_t)*eid_size);
+    memset(weights,0,sizeof(vid_t)*eid_size);
+    vid_t vid = 0;
+    eid_t eid = 0;
+
+    Graph::iterator e_start = graph.edge_begin(*graph.begin());
+
+    for (Graph::iterator ii = graph.begin(), ei = graph.end(); ii != ei; ++ii, vid++) {
+      GNode src = *ii;
+      nodes[vid] = std::distance(e_start, graph.edge_begin(src));
+      graph.sortEdges<EdgeTy>(src, SortBy<GNode,EdgeTy>());
+      for (Graph::edge_iterator jj = graph.edge_begin(src), ej = graph.edge_end(src); jj != ej; ++jj, eid++) {
+        GNode dst = graph.getEdgeDst(jj);
+        edges[eid] = (vid_t) dst;
+        weights[eid] = (uint32_t)graph.getEdgeData<EdgeTy>(jj);
+        //printf("%d %d %u \n", vid, edges[eid], weights[eid]);      
+      }
+    }
+    nodes[vertex_count] = graph.sizeEdges();
+    fwrite(nodes, sizeof(vid_t), vertex_count + 1, outfile);
+    fwrite(edges, sizeof(eid_t), edge_count, outfile);
+    fwrite(weights, sizeof(weight_t), edge_count, outfile);
+    //printf("nodes: %d %d %d\n", nodes[0],nodes[1],nodes[2]);
+
+    //printf("nodes: %d %d %d\n", edges[0],edges[1],edges[2]);
+    //printf("nodes: %d %d %d\n", weights[0],weights[1],weights[2]);
+
+    fclose(outfile);
+
+    printStatus(graph.size(), graph.sizeEdges());
+  }
+};
 /**
  * METIS format (1-indexed). See METIS 4.10 manual, section 4.5.
  *  % comment prefix
@@ -2078,6 +2155,7 @@ struct Gr2Metis: public HasOnlyVoidSpecialization {
     printStatus(graph.size(), nedges);
   }
 };
+
 
 /**
  * GR to Binary Sparse MATLAB matrix.
@@ -2303,6 +2381,7 @@ int main(int argc, char** argv) {
     case gr2tgr: convert<Transpose>(); break;
     case gr2treegr: convert<AddTree<false>>(); break; 
     case gr2trigr: convert<MakeUnsymmetric>(); break;
+    case gr2totem: convert<Gr2Totem<IdLess>>(); break;
     case mtx2gr: convert<Mtx2Gr>(); break;
     case nodelist2gr: convert<Nodelist2Gr>(); break;
     case pbbs2gr: convert<Pbbs2Gr>(); break;
