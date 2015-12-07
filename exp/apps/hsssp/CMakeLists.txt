@@ -30,3 +30,6 @@ app(CC_LabelProp connectedComponent_gen.cpp GlobalObj.cpp DISTSAFE)
 
 #sgd
 app(SGD_gen sgd_gen.cpp GlobalObj.cpp DISTSAFE)
+
+#pageRank_pull
+app(PageRank_pull pageRankPull_gen.cpp GlobalObj.cpp DISTSAFE)

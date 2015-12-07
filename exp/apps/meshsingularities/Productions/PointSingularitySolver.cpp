@@ -55,6 +55,14 @@ static cll::opt<double> size("size", cll::desc("Size of the shape"), cll::init(1
 static cll::opt<bool> performTests("performTests", cll::desc("Run extended tests of computed solution"), cll::init(true));
 
 static cll::opt<bool> quad("quad", cll::desc("Special case for edge singularity"), cll::init(false));
+static cll::opt<std::string> productions("productions", cll::desc("Shared library with productions code:"), cll::init("pointproductions.so"));
+
+static cll::opt<Schedulers> scheduler("scheduler", cll::desc("Scheduler used for solver to parallelize execution"),
+                            cll::values(
+                                clEnumVal(OLD, "Old queue-based scheduler"),
+                                clEnumVal(CILK, "CILK version"),
+                                clEnumVal(GALOIS_DAG, "Galois-DAG scheduler")),
+                            cll::init(OLD));
 
 //#define WITH_MUMPS_ENABLED 0
 
@@ -78,7 +86,6 @@ extern int execute_mumps(int argc, char** argv, TaskDescription &taskDescription
 
 int main(int argc, char** argv)
 {
-	Galois::StatManager statManager;
  	LonestarStart(argc, argv, name, desc, url);
 
  	TaskDescription taskDescription;
@@ -93,7 +100,7 @@ int main(int argc, char** argv)
  	taskDescription.z = coord_z;
  	taskDescription.quad = quad;
  	taskDescription.singularity = singularity;
-
+    taskDescription.scheduler = scheduler;
  	taskDescription.performTests = performTests;
 
 #ifdef WITH_MUMPS_ENABLED
@@ -103,8 +110,8 @@ int main(int argc, char** argv)
 #endif
  	{
 		std::vector<double> *result = run<ProductionProcess>(taskDescription);
-		// in result we have an output from solver,
-		// do whatever you want with it.
+        // in result we have an output from solver,
+        // do whatever you want with it.
 		delete result;
  	}
 	return 0;

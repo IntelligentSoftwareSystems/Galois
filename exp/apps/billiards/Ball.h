@@ -30,63 +30,73 @@
 #ifndef _BALL_H_
 #define _BALL_H_
 
+#include "GeomUtils.h"
+#include "FPutils.h"
+#include "CollidingObject.h"
+
+#include "Galois/FlatSet.h"
+
+
 #include <iostream>
 #include <string>
 
 #include <cassert>
 
-#include "Vec2.h"
-#include "FPutils.h"
-#include "CollidingObject.h"
+class Sector;
 
 class Ball: public CollidingObject {
 
   unsigned m_id;
 
   Vec2 m_pos;
+  Vec2 m_ghost_pos;
   Vec2 m_vel;
 
-  double m_mass;
-  double m_radius;
-  double m_timestamp;
+  FP m_mass;
+  FP m_radius;
+  FP m_timestamp;
+  FP m_ghost_ts;
 
   unsigned m_collCntr;
 
+  Galois::FlatSet<Sector*> sectors;
+
+  using SectorIterator = typename Galois::FlatSet<Sector*>::const_iterator;
+
+  void checkMonotony (const FP& t) const {
+    if (t < m_timestamp) {
+      if (!FPutils::almostEqual (t, m_timestamp)) {
+        assert (t >= m_timestamp);
+        std::cerr << "Time in the past" << std::endl;
+        abort ();
+      }
+    }
+  }
 
 public:
   Ball (
       const unsigned id,
       const Vec2& pos,
       const Vec2& vel,
-      double mass, 
-      double radius,
-      double time=0.0):
+      const FP& mass, 
+      const FP& radius,
+      const FP& time=0.0):
 
     m_id (id),
     m_pos (pos),
+    m_ghost_pos (pos),
     m_vel (vel),
     m_mass (mass), 
     m_radius (radius), 
     m_timestamp (time),
+    m_ghost_ts (time),
     m_collCntr (0) {
 
-      assert (mass > 0.0);
-      assert (radius > 0.0);
-      assert (time >= 0.0);
-      
-      truncateAll ();
-    }
+      assert (mass > FP (0.0));
+      assert (radius > FP (0.0));
+      assert (time >= FP (0.0));
+    } 
 
-
-private:
-
-  void truncateAll () {
-    m_pos = FPutils::truncate (m_pos);
-    m_vel = FPutils::truncate (m_vel);
-    m_mass = FPutils::truncate (m_mass);
-    m_radius = FPutils::truncate (m_radius);
-    m_timestamp = FPutils::truncate (m_timestamp);
-  }
 
 public:
 
@@ -105,55 +115,85 @@ public:
   virtual std::string str () const {
     char s [1024];
     sprintf (s, "[Ball-%d,ts=%10.10f,pos=%s,vel=%s,cc=%d]"
-        , m_id, m_timestamp, m_pos.str ().c_str (), m_vel.str ().c_str (), m_collCntr);
+        , m_id, double (m_timestamp), m_pos.str ().c_str (), m_vel.str ().c_str (), m_collCntr);
 
     return s;
   }
 
+  virtual void simulate (const Event& e);
 
-  void update (const Vec2& newVel, const double time) {
+  void addSector (Sector* s) {
+    assert (s != nullptr);
+    sectors.insert (s);
+    assert (sectors.contains (s));
+  }
 
-    assert (time > m_timestamp && "Time update in the past?");
+  void removeSector (Sector* s) {
+    assert (sectors.contains (s));
+    sectors.erase (s);
+    assert (!sectors.contains (s));
+  }
 
-    if (time < m_timestamp) {
-      std::cerr << "Time update in the past" << std::endl;
-      abort ();
-    }
+  void removeAllSectors (void) {
+    sectors.clear ();
+  }
 
+  bool hasSector (const Sector* s) const {
+    assert (s);
+    return sectors.contains (const_cast<Sector*> (s));
+  }
+
+  std::pair<SectorIterator, SectorIterator> sectorRange (void) const {
+    return std::make_pair (sectors.begin (), sectors.end ());
+  }
+
+  void update (const Vec2& newVel, const FP& time) {
+
+    checkMonotony (time);
     Vec2 newPos = this->pos (time); 
 
 
-    m_pos = FPutils::truncate (newPos);
-    m_vel = FPutils::truncate (newVel);
+    m_pos = newPos;
+    m_vel = newVel;
+    m_timestamp = time;
 
-    m_timestamp = FPutils::truncate (time);
+    m_ghost_pos = m_pos;
+    m_ghost_ts = m_timestamp;
+  }
+
+  void updateGhostPos (const FP& time) {
+    checkMonotony (time);
+    m_ghost_pos = this->pos (time);
+    m_ghost_ts = time;
   }
 
   const Vec2& pos () const { return m_pos; }
 
-  Vec2 pos (const double t) const {
+  Vec2 pos (const FP& t) const {
 
-    assert (t >= m_timestamp);
-    return (m_pos + m_vel * (t - m_timestamp)); 
+    checkMonotony (t);
+    return (m_pos + m_vel * t - m_vel * m_timestamp); 
   }
 
+  const Vec2& ghostPos (void) const { return m_ghost_pos; }
+
+  const FP& ghostTime (void) const { return m_ghost_ts; }
 
   const Vec2& vel () const { return m_vel; }
 
-  double mass () const { return m_mass; }
+  const FP& mass () const { return m_mass; }
 
-  double time () const { return m_timestamp; }
+  const FP& time () const { return m_timestamp; }
 
-  double radius () const { return m_radius; }
+  const FP& radius () const { return m_radius; }
 
   Vec2 mom (const Vec2& _vel) const { return (mass () * (_vel )); }
 
   Vec2 mom () const { return mom (this->vel ()); }
 
-  double ke (const Vec2& _vel) const { return (_vel.magSqrd () * mass ())/2.0; }
+  FP ke (const Vec2& _vel) const { return (_vel.magSqrd () * mass ())/FP (2.0); }
 
-  double ke () const { return ke (this->vel ()); }
-  
+  FP ke () const { return ke (this->vel ()); }
 
 };
 

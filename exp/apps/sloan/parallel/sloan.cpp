@@ -31,11 +31,8 @@
 #include "Galois/Accumulator.h"
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
-#include "Galois/Graph/LCGraph.h"
-#include "Galois/Graph/Graph.h"
-#ifdef GALOIS_USE_EXP
-#include "Galois/Runtime/ParallelWorkInline.h"
-#endif
+#include "Galois/Graphs/LCGraph.h"
+#include "Galois/Graphs/Graph.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/ADT/SmallVector.h"
 #include "Lonestar/BoilerPlate.h"
@@ -143,7 +140,7 @@ struct SNode {
 	unsigned int degree;
 	unsigned int status;
 	int prio;
-	Galois::Runtime::LL::SimpleLock<true> mutex;
+	Galois::Substrate::SimpleLock mutex;
 	//Galois::GAtomic<unsigned int>& status;
 	//unsigned int sum;
   //bool flag;
@@ -155,7 +152,7 @@ std::ostream& operator<<(std::ostream& out, const SNode& n) {
   return out;
 }
 
-typedef Galois::Graph::LC_CSR_Graph<SNode, void>::with_no_lockable<true>::with_numa_alloc<true> Graph;
+typedef Galois::Graph::LC_CSR_Graph<SNode, void>::_with_no_lockable<true>::_with_numa_alloc<true> Graph;
 typedef Graph::GraphNode GNode;
 
 Graph graph;
@@ -192,7 +189,7 @@ struct UpdateRequestLess {
     return a.prio <= b.prio;
 		/*
 		if(a.prio == b.prio)
-			return graph.getData(a.node, Galois::MethodFlag::NONE).degree <= graph.getData(b.node, Galois::MethodFlag::NONE).degree;
+			return graph.getData(a.node, Galois::MethodFlag::UNPROTECTED).degree <= graph.getData(b.node, Galois::MethodFlag::UNPROTECTED).degree;
     return a.prio < b.prio;
 		*/
   }
@@ -200,19 +197,19 @@ struct UpdateRequestLess {
 
 struct GNodeIndexer: public std::unary_function<GNode,int> {
   int operator()(const GNode& node) const {
-    return graph.getData(node, Galois::MethodFlag::NONE).prio;
+    return graph.getData(node, Galois::MethodFlag::UNPROTECTED).prio;
   }
 };
 
 struct GNodeLess {
   bool operator()(const GNode& a, const GNode& b) const {
-    return graph.getData(a, Galois::MethodFlag::NONE).prio < graph.getData(b, Galois::MethodFlag::NONE).prio;
+    return graph.getData(a, Galois::MethodFlag::UNPROTECTED).prio < graph.getData(b, Galois::MethodFlag::UNPROTECTED).prio;
   }
 };
 
 struct GNodeGreater {
   bool operator()(const GNode& a, const GNode& b) const {
-    return graph.getData(a, Galois::MethodFlag::NONE).prio > graph.getData(b, Galois::MethodFlag::NONE).prio;
+    return graph.getData(a, Galois::MethodFlag::UNPROTECTED).prio > graph.getData(b, Galois::MethodFlag::UNPROTECTED).prio;
   }
 };
 
@@ -285,10 +282,10 @@ static void printAccess(std::string msg){
 
 		std::cerr << sdata.id << " connected with (" << degree(*src) << "): ";
 
-		for (Graph::edge_iterator ii = graph.edge_begin(*src, Galois::MethodFlag::NONE), 
-				ei = graph.edge_end(*src, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+		for (Graph::edge_iterator ii = graph.edge_begin(*src, Galois::MethodFlag::UNPROTECTED), 
+				ei = graph.edge_end(*src, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
 			GNode dst = graph.getEdgeDst(ii);
-			SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+			SNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
 
 			unsigned int diff = abs(sdata.id - ddata.id);
 
@@ -433,7 +430,7 @@ struct max_dist {
 
   void operator()(const GNode& n) const {
 		if(graph.getData(n).dist < DIST_INFINITY)
-			m.update(graph.getData(n).dist);
+                  m.update((unsigned long)graph.getData(n).dist);
   }
 };
 
@@ -481,12 +478,12 @@ struct banddiff {
 
   void operator()(const GNode& source) const {
 
-		SNode& sdata = graph.getData(source, Galois::MethodFlag::NONE);
-		for (Graph::edge_iterator ii = graph.edge_begin(source, Galois::MethodFlag::NONE), 
-				 ei = graph.edge_end(source, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+		SNode& sdata = graph.getData(source, Galois::MethodFlag::UNPROTECTED);
+		for (Graph::edge_iterator ii = graph.edge_begin(source, Galois::MethodFlag::UNPROTECTED), 
+				 ei = graph.edge_end(source, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
 
       GNode dst = graph.getEdgeDst(ii);
-      SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+      SNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
 
 			unsigned int diff = abs(sdata.id - ddata.id);
 			unsigned int max = maxband;
@@ -511,13 +508,13 @@ struct profileFn {
 	void operator()(const GNode& source) const {
 
 		unsigned int max = 0;
-		SNode& sdata = graph.getData(source, Galois::MethodFlag::NONE);
+		SNode& sdata = graph.getData(source, Galois::MethodFlag::UNPROTECTED);
 
-		for (Graph::edge_iterator ii = graph.edge_begin(source, Galois::MethodFlag::NONE), 
-				ei = graph.edge_end(source, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+		for (Graph::edge_iterator ii = graph.edge_begin(source, Galois::MethodFlag::UNPROTECTED), 
+				ei = graph.edge_end(source, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
 
 			GNode dst = graph.getEdgeDst(ii);
-			SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+			SNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
 
 			unsigned int diff = abs(sdata.id - ddata.id);
 
@@ -560,7 +557,7 @@ static void printDegreeDistribution() {
 
 	for (Graph::iterator n = graph.begin(), ei = graph.end(); n != ei; ++n) {
 			distr[degree(*n)]++;
-			//std::cerr << graph.getData(*n, Galois::MethodFlag::NONE).id << "	" << graph.getData(*n, Galois::MethodFlag::NONE).dist << "\n";
+			//std::cerr << graph.getData(*n, Galois::MethodFlag::UNPROTECTED).id << "	" << graph.getData(*n, Galois::MethodFlag::UNPROTECTED).dist << "\n";
 	}
 
 	std::cerr << "Degree	Count\n";
@@ -588,7 +585,7 @@ static void readGraph(GNode& source, GNode& terminal) {
   for (Graph::iterator src = graph.begin(), ei =
       graph.end(); src != ei; ++src) {
 
-    SNode& node = graph.getData(*src, Galois::MethodFlag::NONE);
+    SNode& node = graph.getData(*src, Galois::MethodFlag::UNPROTECTED);
     node.dist = DIST_INFINITY;
     node.id = id;
     //node.status = INACTIVE;
@@ -634,17 +631,17 @@ struct SerialSloan {
 		typedef int tt_does_not_need_aborts;
 
 		void operator()(GNode& n, Galois::UserContext<GNode>& ctx) const {
-			SNode& data = graph.getData(n, Galois::MethodFlag::NONE);
+			SNode& data = graph.getData(n, Galois::MethodFlag::UNPROTECTED);
 			unsigned int old_max;
 			while ((old_max = maxDist) < data.dist)
 				__sync_bool_compare_and_swap(&maxDist, old_max, data.dist);
 
 			unsigned int newDist = data.dist + 1;
 
-			for (Graph::edge_iterator ii = graph.edge_begin(n, Galois::MethodFlag::NONE),
-					ei = graph.edge_end(n, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+			for (Graph::edge_iterator ii = graph.edge_begin(n, Galois::MethodFlag::UNPROTECTED),
+					ei = graph.edge_end(n, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
 				GNode dst = graph.getEdgeDst(ii);
-				SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+				SNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
 
 				unsigned int oldDist;
 				while (true) {
@@ -667,14 +664,14 @@ struct SerialSloan {
 
 			graph.getData(source).dist = 0;
 			//std::cout << "max dist is " << maxDist << "\n";
-			Galois::for_each<OBIM>(source, bfsFn(), "BFS");
+			Galois::for_each(source, bfsFn(), Galois::loopname("BFS"), Galois::wl<OBIM>());
 			//std::cout << "max dist is " << maxDist << "\n";
 		}
 	};
 	
 	struct initFn {
 		void operator()(const GNode& n) const {
-			SNode& data = graph.getData(n, Galois::MethodFlag::NONE);
+			SNode& data = graph.getData(n, Galois::MethodFlag::UNPROTECTED);
 			data.status = INACTIVE;
 			//data.status = Galois::GAtomic<unsigned int>(INACTIVE);
 			data.degree = degree(n);
@@ -699,7 +696,7 @@ struct SerialSloan {
 
 			unsigned int status;
 			GNode parent = next.node;
-			SNode& pdata = graph.getData(parent, Galois::MethodFlag::NONE);
+			SNode& pdata = graph.getData(parent, Galois::MethodFlag::UNPROTECTED);
 
 			pdata.mutex.lock();
 			//std::cerr << "[" << perm.size() << "] Extracting node: " << pdata.id << " with status: " << pdata.status << " and priority: " << pdata.prio << "\n";
@@ -716,10 +713,10 @@ struct SerialSloan {
 				//std::cerr << "[" << perm.size() << "] Will process node: " << pdata.id << " with status: " << pdata.status << " and priority: " << pdata.prio << "\n";
 
 				if(status == PREACTIVE){
-					for (Graph::edge_iterator ii = graph.edge_begin(parent, Galois::MethodFlag::NONE), ei = graph.edge_end(parent, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+					for (Graph::edge_iterator ii = graph.edge_begin(parent, Galois::MethodFlag::UNPROTECTED), ei = graph.edge_end(parent, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
 
 						GNode child = graph.getEdgeDst(ii);
-						SNode& cdata = graph.getData(child, Galois::MethodFlag::NONE);
+						SNode& cdata = graph.getData(child, Galois::MethodFlag::UNPROTECTED);
 
 						cdata.mutex.lock();
 						if(cdata.status != NUMBERED){
@@ -750,10 +747,10 @@ struct SerialSloan {
 					}
 				}
 
-				for (Graph::edge_iterator ii = graph.edge_begin(parent, Galois::MethodFlag::NONE), ei = graph.edge_end(parent, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+				for (Graph::edge_iterator ii = graph.edge_begin(parent, Galois::MethodFlag::UNPROTECTED), ei = graph.edge_end(parent, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
 
 					GNode child = graph.getEdgeDst(ii);
-					SNode& cdata = graph.getData(child, Galois::MethodFlag::NONE);
+					SNode& cdata = graph.getData(child, Galois::MethodFlag::UNPROTECTED);
 
 					if(cdata.status == PREACTIVE){
 						cdata.mutex.lock();
@@ -764,9 +761,9 @@ struct SerialSloan {
 						ctx.push(UpdateRequest(child, cdata.prio));
 						//std::cerr << "[" << perm.size() << "] Adding: " << cdata.id << " with status: " << cdata.status << " and priority: " << cdata.prio << "\n";
 
-						for (Graph::edge_iterator ij = graph.edge_begin(child, Galois::MethodFlag::NONE), ej = graph.edge_end(child, Galois::MethodFlag::NONE); ij != ej; ++ij) {
+						for (Graph::edge_iterator ij = graph.edge_begin(child, Galois::MethodFlag::UNPROTECTED), ej = graph.edge_end(child, Galois::MethodFlag::UNPROTECTED); ij != ej; ++ij) {
 							GNode grandchild = graph.getEdgeDst(ij);
-							SNode& gdata = graph.getData(grandchild, Galois::MethodFlag::NONE);
+							SNode& gdata = graph.getData(grandchild, Galois::MethodFlag::UNPROTECTED);
 
 							gdata.mutex.lock();
 							if(gdata.status != NUMBERED){
@@ -790,7 +787,7 @@ struct SerialSloan {
 		static void printpq() {
 				std::cerr << "Queue: ";
 				for(std::priority_queue<UpdateRequest>::iterator ii = pq.begin(), ei = pq.end(); ii != ei; ++ii){
-						std::cerr << graph.getData(ii->node, Galois::MethodFlag::NONE).id << "(" <<  ii->prio << ") ";
+						std::cerr << graph.getData(ii->node, Galois::MethodFlag::UNPROTECTED).id << "(" <<  ii->prio << ") ";
 				}
 				std::cerr << "\n";
 		}
@@ -806,7 +803,7 @@ struct SerialSloan {
 			//graph.getData(source).status = Galois::GAtomic<unsigned int>(PREACTIVE);
 
 			//std::cout << "max dist is " << maxDist << "\n";
-			Galois::for_each<OBIM>(UpdateRequest(source, graph.getData(source).prio), sloanFn(), "Sloan");
+			Galois::for_each(UpdateRequest(source, graph.getData(source).prio), sloanFn(), Galois::loopname("Sloan"), Galois::wl<OBIM>());
 			//std::cout << "max dist is " << maxDist << "\n";
 		}
 	};
@@ -936,11 +933,11 @@ int main(int argc, char **argv) {
   using namespace Galois::WorkList;
   typedef BulkSynchronous<dChunkedLIFO<256> > BSWL;
 
-#ifdef GALOIS_USE_EXP
-  typedef BulkSynchronousInline<> BSInline;
-#else
+  //#ifdef GALOIS_USE_EXP
+  //  typedef BulkSynchronousInline<> BSInline;
+  //#else
   typedef BSWL BSInline;
-#endif
+  //#endif
 
   switch (algo) {
 		case serialSloan: run(SerialSloan()); break;

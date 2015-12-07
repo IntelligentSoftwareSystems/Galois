@@ -1,4 +1,4 @@
 #include "dependTest.h"
 
 
-const double OrderDepTest::V_MAX = 30.0;
+const FP OrderDepTest::V_MAX = 30.0;

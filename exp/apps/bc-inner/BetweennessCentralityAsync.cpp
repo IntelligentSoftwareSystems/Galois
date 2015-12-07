@@ -2,7 +2,7 @@
 #include "Galois/Timer.h"
 #include "Galois/Statistic.h"
 #include "Galois/Bag.h"
-#include "Galois/Runtime/ll/CacheLineStorage.h"
+#include "Galois/Substrate/CacheLineStorage.h"
 #include "Lonestar/BoilerPlate.h"
 
 #include <boost/tuple/tuple.hpp>
@@ -707,7 +707,7 @@ PerCPU<int> fringeCnts;
 //std::vector<f2Item> *fringeBuffs;
 Galois::InsertBag<ND*>* fringewl;
 //GaloisRuntime::WorkList::SimpleOrderedByIntegerMetric<ND*, RevNodeIndexer, GaloisRuntime::WorkList::ChunkedFIFO<ND*, 256, true>, true> *fringewl;
-Galois::Runtime::LL::CacheLineStorage<ND> *gnodes;
+Galois::Substrate::CacheLineStorage<ND> *gnodes;
 
 //void fringeFindOMP() {
 //  int gsize = graph->size();

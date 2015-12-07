@@ -28,10 +28,10 @@ int run = 1;
 
 template<typename T2>
 struct checker {
-  typedef typename T2::template retype<int>::type T;
+  typedef typename T2::template retype<int> T;
   T wl;
-  typename T::template rethread<true>::type wl2;
-  typename T::template rethread<false>::type wl3;
+  typename T::template rethread<true> wl2;
+  typename T::template rethread<false> wl3;
 
   checker() {
     int a[4] = {1,2,3,0};

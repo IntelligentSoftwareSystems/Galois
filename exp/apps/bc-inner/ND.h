@@ -14,7 +14,7 @@
 #include <pthread.h>
 #endif
 
-#include "Galois/Runtime/ll/SimpleLock.h"
+#include "Galois/Substrate/SimpleLock.h"
 #include "llvm/ADT/SmallVector.h"
 #include "control.h"
 //#include "datatypes.h"
@@ -28,7 +28,7 @@ struct ND {
 #if USEPTHREADSM
   pthread_mutex_t spinLock;
 #else 
-  Galois::Runtime::LL::SimpleLock spinLock;
+  Galois::Substrate::SimpleLock spinLock;
 #endif
 #else
   unsigned char spinLock;

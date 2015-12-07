@@ -1,4 +1,2 @@
 find_package(SDL)
-if(SDL_FOUND)
-  app(drawgraph drawgraph.cpp EXTLIBS SDL)
-endif()
+app(drawgraph drawgraph.cpp REQUIRES SDL_FOUND EXTLIBS SDL)

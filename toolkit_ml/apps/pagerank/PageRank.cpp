@@ -118,7 +118,7 @@ struct SerialAlgo {
 
       for (auto ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
         GNode src = *ii;
-        PNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
+        PNode& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
         float value = (1.0 - alpha) * sdata.accum.read() + alpha;
         float diff = std::fabs(value - sdata.value);
         if (diff <= tolerance)
@@ -183,7 +183,7 @@ struct PullAlgo {
     Graph& g;
     Initialize(Graph& g): g(g) { }
     void operator()(Graph::GraphNode n) const {
-      LNode& data = g.getData(n, Galois::MethodFlag::NONE);
+      LNode& data = g.getData(n, Galois::MethodFlag::UNPROTECTED);
       data.value[0] = 1.0;
       data.value[1] = 1.0;
     }
@@ -193,7 +193,7 @@ struct PullAlgo {
     Graph& g;
     Copy(Graph& g): g(g) { }
     void operator()(Graph::GraphNode n) const {
-      LNode& data = g.getData(n, Galois::MethodFlag::NONE);
+      LNode& data = g.getData(n, Galois::MethodFlag::UNPROTECTED);
       data.value[1] = data.value[0];
     }
   };
@@ -210,14 +210,14 @@ struct PullAlgo {
     }
 
     void operator()(const GNode& src) const {
-      LNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
+      LNode& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
       double sum = 0;
 
-      for (auto jj = graph.edge_begin(src, Galois::MethodFlag::NONE), ej = graph.edge_end(src, Galois::MethodFlag::NONE); jj != ej; ++jj) {
+      for (auto jj = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED), ej = graph.edge_end(src, Galois::MethodFlag::UNPROTECTED); jj != ej; ++jj) {
         GNode dst = graph.getEdgeDst(jj);
         float w = graph.getEdgeData(jj);
 
-        LNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+        LNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
         sum += ddata.getPageRank(iteration) * w;
       }
 
@@ -302,10 +302,10 @@ struct PullAlgo2 {
     Graph& g;
     Initialize(Graph& g): g(g) { }
     void operator()(Graph::GraphNode n) const {
-      LNode& data = g.getData(n, Galois::MethodFlag::NONE);
+      LNode& data = g.getData(n, Galois::MethodFlag::UNPROTECTED);
       data.value[0] = 1.0;
       data.value[1] = 1.0;
-      int outs = std::distance(g.edge_begin(n, Galois::MethodFlag::NONE), g.edge_end(n, Galois::MethodFlag::NONE));
+      int outs = std::distance(g.edge_begin(n, Galois::MethodFlag::UNPROTECTED), g.edge_end(n, Galois::MethodFlag::UNPROTECTED));
       data.nout = outs;
     }
   };
@@ -314,7 +314,7 @@ struct PullAlgo2 {
     Graph& g;
     Copy(Graph& g): g(g) { }
     void operator()(Graph::GraphNode n) const {
-      LNode& data = g.getData(n, Galois::MethodFlag::NONE);
+      LNode& data = g.getData(n, Galois::MethodFlag::UNPROTECTED);
       data.value[1] = data.value[0];
     }
   };
@@ -332,13 +332,13 @@ struct PullAlgo2 {
 
     void operator()(const GNode& src) const {
 
-      LNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
+      LNode& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
 
       double sum = 0;
-      for (auto jj = graph.in_edge_begin(src, Galois::MethodFlag::NONE), ej = graph.in_edge_end(src, Galois::MethodFlag::NONE);
+      for (auto jj = graph.in_edge_begin(src, Galois::MethodFlag::UNPROTECTED), ej = graph.in_edge_end(src, Galois::MethodFlag::UNPROTECTED);
           jj != ej; ++jj) {
         GNode dst = graph.getInEdgeDst(jj);
-        LNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+        LNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
         sum += ddata.getPageRank(iteration) / ddata.nout;
       }
 
@@ -679,7 +679,7 @@ struct PrtRsd {
     void operator()(const UpdateRequest& srcRq, Galois::UserContext<UpdateRequest>& ctx) const {
       GNode src = srcRq.second;
       
-      LNode* node = &graph.getData(src); //, Galois::MethodFlag::NONE);
+      LNode* node = &graph.getData(src); //, Galois::MethodFlag::UNPROTECTED);
       if (node->residual < tolerance || pri(*node) != srcRq.first){ // degree biased residual
 	post +=1;
         return;
@@ -689,8 +689,8 @@ struct PrtRsd {
       
       node = &graph.getData(src);
 
-      //Galois::MethodFlag flag = Galois::MethodFlag::NONE;
-      Galois::MethodFlag flag = Galois::MethodFlag::ALL;
+      //Galois::MethodFlag flag = Galois::MethodFlag::UNPROTECTED;
+      Galois::MethodFlag flag = Galois::MethodFlag::WRITE;
 
       // update pagerank (consider each in-coming edge)
       double sum = 0;
@@ -830,18 +830,18 @@ struct Async {
       sdata.flag = false;
 
       double sum = 0;
-      for (auto jj = graph.in_edge_begin(src, Galois::MethodFlag::NONE), ej = graph.in_edge_end(src, Galois::MethodFlag::NONE); jj != ej; ++jj) {
+      for (auto jj = graph.in_edge_begin(src, Galois::MethodFlag::UNPROTECTED), ej = graph.in_edge_end(src, Galois::MethodFlag::UNPROTECTED); jj != ej; ++jj) {
         GNode dst = graph.getInEdgeDst(jj);
-        LNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+        LNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
         sum += ddata.value / ddata.nout;
       }
       float value = (1.0 - alpha) * sum + alpha;
       float diff = std::fabs(value - sdata.value);
       if (diff > tolerance) {
         sdata.value = value;
-        for (auto jj = graph.edge_begin(src, Galois::MethodFlag::NONE), ej = graph.edge_end(src, Galois::MethodFlag::NONE); jj != ej; ++jj) {
+        for (auto jj = graph.edge_begin(src, Galois::MethodFlag::UNPROTECTED), ej = graph.edge_end(src, Galois::MethodFlag::UNPROTECTED); jj != ej; ++jj) {
           GNode dst = graph.getEdgeDst(jj);
-	  LNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+	  LNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
 	  // if the node is not in the worklist, then push
 	  if(!ddata.flag) {
 	    ddata.flag = true;

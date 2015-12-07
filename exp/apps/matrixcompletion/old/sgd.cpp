@@ -16,9 +16,9 @@
  *
  * Stochastic gradient descent for matrix factorization, implemented with Distributed Galois.
  * 
- * Authors: Gurbinder Gill <gill@cs.utexas.edu>
- *	    Bharat Naik    <bharatpn@cs.utexas.edu>
- *
+ * Author: Gurbinder Gill <gill@cs.utexas.edu>
+ * Author: Bharat Naik    <bharatpn@cs.utexas.edu>
+ * Author: Prad Nelluru <pradn@cs.utexas.edu>
 */
 
 #include <iostream>
@@ -326,9 +326,9 @@ struct Process : public Galois::Runtime::Lockable {
 	Node& user_data = g->getData(user);
 	
 	unsigned int edge_rating = edge_it->getValue();
-    
-	doGradientUpdate(movie_data, user_data, edge_rating);
-	++movie_data.edge_offset;
+		
+		doGradientUpdate(movie_data, user_data, edge_rating);
+		++movie_data.edge_offset;
     }
     
     numNodes += 1;
@@ -336,8 +336,8 @@ struct Process : public Galois::Runtime::Lockable {
     printf("Processed = %lu\t , hostID = %d\n", Processed_movie_nodes, Galois::Runtime::NetworkInterface::ID);
     if(movie_data.edge_offset == movie_data.number_of_edges)
 	++movie_data.updates;
-    if(movie_data.updates < MAX_MOVIE_UPDATES)
-	ctx.push(movie);
+			if(movie_data.updates < MAX_MOVIE_UPDATES)
+				ctx.push(movie);
 
 */
 
@@ -350,7 +350,7 @@ struct Process : public Galois::Runtime::Lockable {
      if(edge_it != edge_end) {
 	edge_rating = edge_it->getValue();
 	dstID = edge_rating/10;
-    }
+		}
      //cout<<"Iterating till start.."<<endl;
      while(dstID < startRange && edge_it != edge_end){
 	edge_rating = edge_it->getValue();
@@ -392,16 +392,16 @@ struct Process : public Galois::Runtime::Lockable {
 	    ctx.push(movie);
      }            
      /*else
-     {
-	    ctx.push(movie);
+		{
+			ctx.push(movie);
 
      }*/
 
-}
-
+		}
+		
 void print(){
     std::cout << "hello\n";
-}
+	} 
 
 typedef int tt_has_serialize;
 void serialize(Galois::Runtime::SerializeBuffer& s) const {

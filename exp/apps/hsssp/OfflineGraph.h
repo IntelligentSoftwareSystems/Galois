@@ -25,7 +25,7 @@
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
-#include "Galois/Runtime/ll/SimpleLock.h"
+#include "Galois/Substrate/SimpleLock.h"
 
 #include <cstdint>
 #include <fstream>
@@ -59,7 +59,7 @@ class OfflineGraph {
   uint64_t numEdges;
   size_t length;
   bool v2;
-  Galois::Runtime::LL::SimpleLock lock;
+  Galois::Substrate::SimpleLock lock;
 
   uint64_t outIndexs(uint64_t node) {
     std::lock_guard<decltype(lock)> lg(lock);

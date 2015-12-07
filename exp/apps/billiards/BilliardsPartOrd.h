@@ -41,12 +41,12 @@
 
 
 #include "Galois/Accumulator.h"
-
-#include "Galois/Runtime/PerThreadWorkList.h"
-#include "Galois/Runtime/Executor_OnEach.h"
-#include "Galois/DoAllWrap.h"
-#include "Galois/Runtime/ll/CompilerSpecific.h"
 #include "Galois/Markable.h"
+#include "Galois/DoAllWrap.h"
+#include "Galois/PerThreadContainer.h"
+
+#include "Galois/Runtime/Executor_OnEach.h"
+#include "Galois/Substrate/CompilerSpecific.h"
 
 
 #include "dependTest.h"
@@ -58,10 +58,10 @@ class BilliardsPOsortedVec;
 class BilliardsPOunsorted: public Billiards {
 
   typedef Galois::Markable<Event> MEvent;
-  typedef Galois::Runtime::PerThreadVector<MEvent> WLTy;
-  typedef Galois::Runtime::PerThreadVector<Event> ILTy;
+  typedef Galois::PerThreadVector<MEvent> WLTy;
+  typedef Galois::PerThreadVector<Event> ILTy;
 
-  typedef Galois::Runtime::PerThreadVector<Event> AddListTy;
+  typedef Galois::PerThreadVector<Event> AddListTy;
 
   friend class BilliardsPOsortedVec;
 
@@ -74,9 +74,9 @@ public:
   virtual const std::string version () const { return "Parallel Partially Ordered with Unsorted workList"; }
 
 
-  virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const double endtime, bool enablePrints=false) {
+  virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const FP& endtime, bool enablePrints=false) {
 
-    Galois::Runtime::getSystemThreadPool ().burnPower (Galois::getActiveThreads ());
+    Galois::Substrate::getThreadPool().burnPower (Galois::getActiveThreads ());
 
     WLTy workList;
     // workList.fill_serial (initEvents.begin (), initEvents.end (), &WLTy::Cont_ty::push_back);
@@ -86,13 +86,13 @@ public:
           workList.get ().push_back (MEvent (e));
         },
         "fill_init",
-        Galois::doall_chunk_size<32> ());
+        Galois::chunk_size<32> ());
 
 
     size_t i = runSimInternal<FindIndepEvents, SimulateIndepEvents, AddNextEvents, RemoveSimulatedEvents> (
         table, workList, endtime, enablePrints);
 
-    Galois::Runtime::getSystemThreadPool ().beKind ();
+    Galois::Substrate::getThreadPool ().beKind ();
 
     return i;
   }
@@ -112,7 +112,7 @@ GALOIS_ATTRIBUTE_PROF_NOINLINE static void updateODG_clean (WLTy& workList, cons
 
 template <typename _FindIndepFunc, typename _SimulateFunc,
           typename _AddNextFunc, typename _CleanupFunc>
-static size_t runSimInternal (Table& table, WLTy& workList, const double endtime, bool enablePrints=false) {
+static size_t runSimInternal (Table& table, WLTy& workList, const FP& endtime, bool enablePrints=false) {
     // TODO: Explain separation of simulating events and adding
     // new events
 
@@ -138,7 +138,7 @@ static size_t runSimInternal (Table& table, WLTy& workList, const double endtime
       findTimer.start ();
       Galois::do_all_choice (Galois::Runtime::makeLocalRange (workList),
           _FindIndepFunc (indepList, workList, currStep, findIter), 
-          "find_indep_events", Galois::doall_chunk_size<1> ());
+          "find_indep_events", Galois::chunk_size<1> ());
 
       findTimer.stop ();
 
@@ -155,7 +155,7 @@ static size_t runSimInternal (Table& table, WLTy& workList, const double endtime
       // Galois::Runtime::do_all_coupled (indepList, 
       Galois::do_all_choice (Galois::Runtime::makeLocalRange (indepList), 
           _AddNextFunc (workList, addList, table, endtime, enablePrints), 
-          "add_next_events", Galois::doall_chunk_size<1> ());
+          "add_next_events", Galois::chunk_size<1> ());
       addTimer.stop ();
 
 
@@ -275,14 +275,14 @@ private:
     WLTy& workList;
     AddListTy& addList;
     Table& table;
-    double endtime;
+    const FP& endtime;
     bool enablePrints;
 
     AddNextEvents (
         WLTy& _workList,
         AddListTy& _addList,
         Table& _table,
-        double _endtime,
+        const FP& _endtime,
         bool _enablePrints)
       :
         workList (_workList),
@@ -334,6 +334,8 @@ private:
 
           workList[r].erase (tmp);
 
+          if (i == tmp) { break; }
+
           ei = workList[r].end ();
 
         } else {
@@ -366,9 +368,9 @@ public:
 
 
 
-  virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const double endtime, bool enablePrints=false) {
+  virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const FP& endtime, bool enablePrints=false) {
 
-    Galois::Runtime::getSystemThreadPool ().burnPower (Galois::getActiveThreads ());
+    Galois::Substrate::getThreadPool ().burnPower (Galois::getActiveThreads ());
 
     WLTy workList;
     // workList.fill_serial (initEvents.begin (), initEvents.end (), &WLTy::Cont_ty::push_back);
@@ -377,7 +379,7 @@ public:
         [&workList] (const Event& e) {
           workList.get ().push_back (MEvent (e));
         },
-        "fill_init", Galois::doall_chunk_size<32> ());
+        "fill_init", Galois::chunk_size<32> ());
 
     // sort events
     // for (unsigned r = 0; r < workList.numRows (); ++r) {
@@ -399,7 +401,7 @@ public:
            BilliardsPOunsorted::AddNextEvents, RemoveAndSortEvents> 
              (table, workList, endtime, enablePrints);
 
-    Galois::Runtime::getSystemThreadPool ().beKind ();
+    Galois::Substrate::getThreadPool ().beKind ();
 
     return i;
   }

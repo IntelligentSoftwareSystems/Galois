@@ -8,14 +8,14 @@
 
 find_package(ZLIB)
 include_directories(${ZLIB_INCLUDE_DIR})
-find_package(BLAS)
-find_package(LAPACK)
-if(OPENMP_FOUND)
-  add_executable(test-smat test-smat.cpp smat.cpp zlib_util.cpp)
+find_package(BLAS QUIET)
+find_package(LAPACK QUIET)
+if(OPENMP_FOUND AND BLAS_FOUND AND LAPACK_FOUND)
+  app(test-smat test-smat.cpp smat.cpp zlib_util.cpp)
   target_link_libraries(test-smat ${ZLIB_LIBRARIES})
-  add_executable(test-blas test-blas.cpp dmat.cpp)
+  app(test-blas test-blas.cpp dmat.cpp)
   target_link_libraries(test-blas ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES})
-  add_executable(train-ml train-ml.cpp multilabel.cpp wsabie.cpp 
+  app(train-ml train-ml.cpp multilabel.cpp wsabie.cpp 
     bilinear.cpp multiple_linear.cpp smat.cpp dmat.cpp zlib_util.cpp tron.cpp)
   target_link_libraries(train-ml ${ZLIB_LIBRARIES} ${BLAS_LIBRARIES} ${LAPACK_LIBRARIES})
   add_subdirectory(galois)

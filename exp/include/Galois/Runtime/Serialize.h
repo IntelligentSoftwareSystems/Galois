@@ -43,8 +43,10 @@ template <class _Tp> struct is_trivially_copyable
   : public std::integral_constant<bool, __is_trivially_copyable(_Tp)>
 {};
 #else
+#if __GNUC__ < 5
 template<class T>
 using is_trivially_copyable = is_trivial<T>;
+#endif
 #endif
 }
 

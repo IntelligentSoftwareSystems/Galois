@@ -34,82 +34,57 @@
 #include <iostream>
 
 #include <boost/noncopyable.hpp>
+#include <boost/rational.hpp>
 
 #include <cstdlib>
 #include <cstdio>
 #include <cmath>
 #include <cassert>
-// cstdint requires c++0x
-#include <stdint.h>
+#include <cstdint>
 
-#include "Vec2.h"
+#include "fixed_point.h"
+#include "FPwrapper.h"
 
-struct FPutils: private boost::noncopyable {
+template <typename T>
+struct FPutilsGeneric: private boost::noncopyable {
 
-  static const double EPSILON;
+  static const T EPSILON;
+  static const T ERROR_LIMIT;
 
-  // We want to truncate double such that results of simple operations e.g.
-  // addition/multiplication does not get affected by rounding.
-  //
-  // - First we truncat the inputs to an opteration. 
-  // - In addition, the difference between exponents dictates how much the smaller 
-  // quantity will be shifted to the right. This means that if largest possible difference between
-  // exponents of two number is X then we should truncate the fraction with X zeros to the right
-  //
-  // - In multiplication, the number of non-zero digits in fractional part of the result is
-  // the sum of the nuber of digits in fractional part of operands. If the machine format allows N
-  // bits of fraction, the the operands should be truncated to N/2 bits of fraction so that the
-  // result doesn't get rounded. Intel's 80-bit format allows 64 bits of fraction, which means
-  // operands should be truncated to 32 bits of fraction
-  //
-  // - The result of division and square root can have infinite digits in fraction
-  //
-  // 32 bits give us a precision of 2^(-32) = 2.0e-10
-private:
-  static const unsigned HALF_FRACTION_BITS;
-  static const uint64_t PRECISION_64;
+  static T sqrt (const T& t) {
+    double d = std::sqrt (double (t));
+    T r = T::sqrt (t);
+    
+    assert (std::fabs ((r.dval () - d) / d) < 1e-5);
 
-public:
-  static const double TRUNCATE_PRECISION;
-
-  static double truncate (const double d) {
-    return (double (int64_t (d * TRUNCATE_PRECISION)) / TRUNCATE_PRECISION);
+    return r;
   }
 
-  static Vec2 truncate (const Vec2& v) {
-    return Vec2 (truncate (v.getX ()), truncate (v.getY ()));
+  static bool almostEqual (const T& d1, const T& d2) {
+    return (T::fabs (d1 - d2) < EPSILON);
   }
 
 
-  static bool almostEqual (const double d1, const double d2) {
-    return (fabs (d1 - d2) < EPSILON);
-  }
-
-  static bool almostEqual (const Vec2& v1, const Vec2& v2) {
+  template <typename V>
+  static bool almostEqual (const V& v1, const V& v2) {
     return almostEqual (v1.getX (), v2.getX ()) && almostEqual (v1.getY (), v2.getY ());
   }
 
 
-  // It can be shown for basic operations that after truncation, the 
-  // relative error remains within a small constant factor of TRUNCATE_PRECISION
-  static inline double FP_ERR_LIM () {
-    return 128.0 / (TRUNCATE_PRECISION);
-  } 
-
   //! checks relative error
-  static bool checkError (const double original, const double measured, bool useAssert=true) {
+  static bool checkError (const T& original, const T& measured, bool useAssert=true) {
 
-    double err = fabs (measured - original);
-    if (original != 0.0) {
-      err = fabs ((measured - original) / original);
+    T err = T::fabs (measured - original);
+    if (original != T (0.0)) {
+      err = T::fabs ((measured - original) / original);
     }
 
-    bool withinLim = err < FP_ERR_LIM ();
+    bool withinLim = err < ERROR_LIMIT;
 
 
     if (!withinLim) {
-      fprintf (stderr, "WARNING: FPutils::checkError, relative error=%10.20g above limit, FP_ERR_LIM=%10.20g\n"
-          , err, FP_ERR_LIM ());
+      fprintf (stderr, "WARNING: FPutils::checkError, relative error=%10.20g above limit, ERROR_LIMIT=%10.20g\n"
+          , double (err), double (ERROR_LIMIT));
     }
 
     if (useAssert) {
@@ -121,12 +96,26 @@ public:
   }
 
 
-  static bool checkError (const Vec2& original, const Vec2& measured, bool useAssert=true) {
 
+  template <typename V>
+  static bool checkError (const V& original, const V& measured, bool useAssert=true) {
     return checkError (original.getX (), measured.getX (), useAssert) 
       && checkError (original.getY (), measured.getY (), useAssert);
   }
 
 };
+
+template <typename T>
+const T FPutilsGeneric<T>::EPSILON = double (1.0 / (1 << 30));
+
+template <typename T>
+const T FPutilsGeneric<T>::ERROR_LIMIT = double (1.0 / (1 << 18));
+
+
+
+// using FP = fpml::fixed_point<int64_t, 31, 32>;
+using FP = DoubleWrapper;
+using FPutils = FPutilsGeneric<FP>;
+
 
 #endif // _FP_UTILS_H_

@@ -14,7 +14,7 @@ public:
 
 
 
-  virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const double endtime, bool enablePrints=false) {
+  virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const FP& endtime, bool enablePrints=false) {
 
     table.writeConfig ();
     table.ballsToCSV ();
@@ -31,7 +31,7 @@ public:
 
     size_t iter = 0;
     std::vector<Event> addList;
-    // double simTime = 0.0;
+    // FP simTime = 0.0;
 
     while (!pq.empty ()) {
 

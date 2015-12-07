@@ -2,9 +2,9 @@
 #define APPS_BFS_LIGRAALGO_H
 
 #include "Galois/DomainSpecificExecutors.h"
-#include "Galois/Graph/OCGraph.h"
-#include "Galois/Graph/LCGraph.h"
-#include "Galois/Graph/GraphNodeBag.h"
+#include "Galois/Graphs/OCGraph.h"
+#include "Galois/Graphs/LCGraph.h"
+#include "Galois/Graphs/GraphNodeBag.h"
 
 #include <boost/mpl/if.hpp>
 
@@ -34,12 +34,12 @@ struct LigraBFS: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> {
 
     template<typename GTy>
     bool cond(GTy& graph, typename GTy::GraphNode n) { 
-      return graph.getData(n, Galois::MethodFlag::NONE).dist == DIST_INFINITY;
+      return graph.getData(n, Galois::MethodFlag::UNPROTECTED).dist == DIST_INFINITY;
     }
 
     template<typename GTy>
     bool operator()(GTy& graph, typename GTy::GraphNode src, typename GTy::GraphNode dst, typename GTy::edge_data_reference) {
-      SNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+      SNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
 
       Dist oldDist;
       while (true) {
@@ -96,7 +96,7 @@ struct LigraDiameter: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> 
     Graph& graph;
     Initialize(Graph& g): graph(g) { }
     void operator()(GNode n) const {
-      LNode& data = graph.getData(n, Galois::MethodFlag::NONE);
+      LNode& data = graph.getData(n, Galois::MethodFlag::UNPROTECTED);
       data.dist = DIST_INFINITY;
       data.visited[0] = data.visited[1] = 0;
     }
@@ -114,8 +114,8 @@ struct LigraDiameter: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> 
 
     template<typename GTy>
     bool operator()(GTy& graph, typename GTy::GraphNode src, typename GTy::GraphNode dst, typename GTy::edge_data_reference) {
-      LNode& sdata = graph.getData(src, Galois::MethodFlag::NONE);
-      LNode& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+      LNode& sdata = graph.getData(src, Galois::MethodFlag::UNPROTECTED);
+      LNode& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
       Visited toWrite = sdata.visited[cur] | ddata.visited[cur];
 
       if (toWrite != ddata.visited[cur]) {
@@ -143,7 +143,7 @@ struct LigraDiameter: public Galois::LigraGraphChi::ChooseExecutor<UseGraphChi> 
     Update(LigraDiameter* s, Graph& g, int c, int n): self(s), graph(g), cur(c), next(n) { 
     }
     void operator()(size_t id) const {
-      LNode& data = graph.getData(graph.nodeFromId(id), Galois::MethodFlag::NONE);
+      LNode& data = graph.getData(graph.nodeFromId(id), Galois::MethodFlag::UNPROTECTED);
       data.visited[next] |= data.visited[cur];
     }
   };

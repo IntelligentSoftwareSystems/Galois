@@ -6,8 +6,8 @@
 #include "Galois/ConcurrentFlatMap.h"
 #endif
 #include "Galois/LargeArray.h"
-#include "Galois/Runtime/mm/Mem.h"
-#include "Galois/Runtime/PerThreadStorage.h"
+#include "Galois/Runtime/Mem.h"
+#include "Galois/Substrate/PerThreadStorage.h"
 
 struct MoveOnly {
   MoveOnly() = default;
@@ -43,7 +43,7 @@ void testContainerA(T&& x, U&& y) {
 
 template<typename T, typename U>
 void testContainerAA(T&& x, U&& y) {
-  Galois::Runtime::MM::FixedSizeHeap heap(sizeof(typename T::block_type));
+  Galois::Runtime::FixedSizeHeap heap(sizeof(typename T::block_type));
 
   T a = std::move(x);
   T b;
@@ -77,8 +77,8 @@ int main() {
   test(Galois::concurrent_gslist<MoveOnly>());
   test(Galois::InsertBag<MoveOnly>());
   test(Galois::LargeArray<MoveOnly>());
-  test(Galois::Runtime::PerPackageStorage<MoveOnly>());
-  test(Galois::Runtime::PerThreadStorage<MoveOnly>());
+  test(Galois::Substrate::PerPackageStorage<MoveOnly>());
+  test(Galois::Substrate::PerThreadStorage<MoveOnly>());
 #ifdef GALOIS_USE_EXP
   test(Galois::concurrent_flat_map<int, MoveOnly>());
 #endif

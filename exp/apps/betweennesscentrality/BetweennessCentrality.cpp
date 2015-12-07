@@ -26,7 +26,7 @@
 #include "Galois/Statistic.h"
 #include "Galois/Galois.h"
 #include "Galois/UserContext.h"
-#include "Galois/Graph/LCGraph.h"
+#include "Galois/Graphs/LCGraph.h"
 #include "Galois/WorkList/WorkList.h"
 
 #include "llvm/Support/CommandLine.h"
@@ -124,13 +124,13 @@ struct TempState  {
   }
 };
 
-Galois::Runtime::PerThreadStorage<TempState*> state;
+Galois::Substrate::PerThreadStorage<TempState*> state;
 
 void computeSucSize() {
   sucSize.resize(NumNodes);
   for (Graph::iterator ii = G->begin(), ee = G->end(); ii != ee; ++ii)
-    sucSize[*ii] = std::distance(G->edge_begin(*ii, Galois::MethodFlag::NONE),
-				 G->edge_end(*ii, Galois::MethodFlag::NONE));
+    sucSize[*ii] = std::distance(G->edge_begin(*ii, Galois::MethodFlag::UNPROTECTED),
+				 G->edge_end(*ii, Galois::MethodFlag::UNPROTECTED));
 }
 
 struct popstate {
@@ -163,8 +163,8 @@ struct process {
       GNode _v = SQ[QAt++];
       int v = _v;
       for (Graph::edge_iterator
-          ii = G->edge_begin(_v, Galois::MethodFlag::NONE),
-          ee = G->edge_end(_v, Galois::MethodFlag::NONE); ii != ee; ++ii) {
+          ii = G->edge_begin(_v, Galois::MethodFlag::UNPROTECTED),
+          ee = G->edge_end(_v, Galois::MethodFlag::UNPROTECTED); ii != ee; ++ii) {
 	GNode _w = G->getEdgeDst(ii);
 	int w = _w;
 	if (!d[w]) {

@@ -26,21 +26,24 @@
 #ifndef BILLIARDS_LEVEL_EXEC_H
 #define BILLIARDS_LEVEL_EXEC_H
 
-#include "Galois/Graph/Graph.h"
-#include "Galois/Runtime/PerThreadWorkList.h"
+#include "Galois/Graphs/Graph.h"
+#include "Galois/PerThreadContainer.h"
+
 #include "Galois/Runtime/LevelExecutor.h"
 
 #include "Billiards.h"
 
-class BilliardsLevelExec: public Billiards {
+class BilliardsLevelExec: public Billiards<BilliardsLevelExec> {
+
+public:
 
   using Graph = Galois::Graph::FirstGraph<void*, void, true>;
   using GNode = Graph::GraphNode;
   using VecNodes = std::vector<GNode>;
-  using AddListTy = Galois::Runtime::PerThreadVector<Event>;
+  using AddListTy = Galois::PerThreadVector<Event>;
 
   struct GetEventTime {
-    double operator () (const Event& e) const { 
+    const FP& operator () (const Event& e) const { 
       return e.getTime ();
     }
   };
@@ -52,16 +55,16 @@ class BilliardsLevelExec: public Billiards {
     VisitNhood (Graph& graph, VecNodes& nodes): graph (graph), nodes (nodes) {}
 
     template <typename C>
-    void operator () (const Event& e, C& ctx) {
+    void operator () (const Event& e, C& ctx) const {
 
-      const Ball& b1 = e.getBall ();
-      assert (b1.getID () < nodes.size ());
-      graph.getData (nodes[b1.getID ()], Galois::CHECK_CONFLICT);
+      Ball* b1 = e.getBall ();
+      assert (b1->getID () < nodes.size ());
+      graph.getData (nodes[b1->getID ()], Galois::MethodFlag::WRITE);
 
       if (e.getKind () == Event::BALL_COLLISION) {
-        const Ball& b2 = e.getOtherBall ();
-        assert (b2.getID () < nodes.size ());
-        graph.getData (nodes[b2.getID ()], Galois::CHECK_CONFLICT);
+        Ball* b2 = e.getOtherBall ();
+        assert (b2->getID () < nodes.size ());
+        graph.getData (nodes[b2->getID ()], Galois::MethodFlag::WRITE);
       }
 
     }
@@ -72,13 +75,13 @@ class BilliardsLevelExec: public Billiards {
     static const unsigned CHUNK_SIZE = 1;
 
     Table& table;
-    const double endtime;
+    const FP& endtime;
     AddListTy& addList;
     Accumulator& iter;
 
     OpFunc (
         Table& table,
-        double endtime,
+        const FP& endtime,
         AddListTy& addList,
         Accumulator& iter)
       :
@@ -90,7 +93,7 @@ class BilliardsLevelExec: public Billiards {
 
 
     template <typename C>
-    void operator () (const Event& e, C& ctx) {
+    void operator () (const Event& e, C& ctx) const {
 
       addList.get ().clear ();
 
@@ -122,7 +125,7 @@ public:
 
   virtual const std::string version () const { return "using Level-by-Level Executor"; }
 
-  virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const double endtime, bool enablePrints=false) {
+  virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const FP& endtime, bool enablePrints=false) {
 
     Graph graph;
     VecNodes nodes;
@@ -134,7 +137,7 @@ public:
 
     Galois::Runtime::for_each_ordered_level (
         Galois::Runtime::makeStandardRange (initEvents.begin (), initEvents.end ()),
-        GetEventTime (), std::less<double> (),
+        GetEventTime (), std::less<FP> (),
         VisitNhood (graph, nodes),
         OpFunc (table, endtime, addList, iter));
 

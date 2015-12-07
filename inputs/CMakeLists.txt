@@ -1,14 +1,19 @@
-add_custom_target(more-inputs)
+#file(DOWNLOAD http://iss.ices.utexas.edu/projects/galois/downloads/lonestar-cpu-inputs.tar.xz ${CMAKE_CURRENT_BINARY_DIR}/lonestar-cpu-inputs.tar.xz SHOW_PROGRESS)
 
-file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/copyinputs.cmake
-  "file(COPY ${CMAKE_CURRENT_SOURCE_DIR} DESTINATION ${CMAKE_CURRENT_BINARY_DIR} PATTERN .svn EXCLUDE
-  PATTERN CMakeLists.txt EXCLUDE)")
-add_custom_target(more-base-graphs COMMAND ${CMAKE_COMMAND} -P
-  ${CMAKE_CURRENT_BINARY_DIR}/copyinputs.cmake)
-add_dependencies(more-inputs more-base-graphs)
+file(WRITE ${CMAKE_CURRENT_BINARY_DIR}/download.cmake "file(DOWNLOAD  http://iss.ices.utexas.edu/projects/galois/downloads/lonestar-cpu-inputs.tar.xz ${CMAKE_CURRENT_BINARY_DIR}/lonestar-cpu-inputs.tar.xz SHOW_PROGRESS)")
 
-add_subdirectory(avi)
-add_subdirectory(meshes)
-add_subdirectory(random)
-add_subdirectory(road)
-add_subdirectory(scalefree)
+add_custom_command(
+OUTPUT lonestar-cpu-inputs.tar.xz
+COMMAND ${CMAKE_COMMAND} -P ${CMAKE_CURRENT_BINARY_DIR}/download.cmake
+)
+
+add_custom_command(
+OUTPUT reference/graph_readme.txt
+COMMAND ${CMAKE_COMMAND} -E tar xJf lonestar-cpu-inputs.tar.xz
+DEPENDS lonestar-cpu-inputs.tar.xz
+WORKING_DIRECTORY ${CMAKE_BINARY_DIR}/inputs
+COMMENT "Unpacking lonestar-cpu-inputs.tar.xz"
+VERBATIM
+)
+
+add_custom_target(input ALL DEPENDS reference/graph_readme.txt)

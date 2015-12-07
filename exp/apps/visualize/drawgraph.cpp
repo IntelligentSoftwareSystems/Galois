@@ -2,7 +2,7 @@
 
 #include "Galois/Statistic.h"
 #include "Galois/Galois.h"
-#include "Galois/Graph/LCGraph.h"
+#include "Galois/Graphs/LCGraph.h"
 #include <iostream>
 #include <stdlib.h>
 #include "llvm/Support/CommandLine.h"
@@ -261,7 +261,7 @@ Point<double> computeForceRepulsive(int which, Point<double> position, GNode n, 
   Point<double> fRepulse = {0.0,0.0};
   for (Graph::iterator jj = g.begin(), ej = g.end(); jj!=ej; jj++) {
     if (n != *jj) {
-      Vertex& u = g.getData(*jj, Galois::NONE);
+      Vertex& u = g.getData(*jj, Galois::MethodFlag::UNPROTECTED);
       auto change = position - u.position(which);
       double lenSQ = change.lengthSQ();
       if (lenSQ < lenLimit) { // not stable
@@ -311,11 +311,11 @@ struct computeImpulse {
   Graph& g;
   int which;
   double stepSize;
-  Galois::Runtime::PerThreadStorage<double>& maxForceSQ;
-  Galois::Runtime::PerThreadStorage<Point<double> >& totalForce;
+  Galois::Substrate::PerThreadStorage<double>& maxForceSQ;
+  Galois::Substrate::PerThreadStorage<Point<double> >& totalForce;
 
-  computeImpulse(Graph& _g, int w, double ss, Galois::Runtime::PerThreadStorage<double>& mf, 
-                 Galois::Runtime::PerThreadStorage<Point<double>>& tf)
+  computeImpulse(Graph& _g, int w, double ss, Galois::Substrate::PerThreadStorage<double>& mf, 
+                 Galois::Substrate::PerThreadStorage<Point<double>>& tf)
                  :g(_g), which(w), stepSize(ss), maxForceSQ(mf), totalForce(tf) {}
 
   void operator()(GNode& n) const {
@@ -444,8 +444,8 @@ int main(int argc, char **argv) {
   double mf = 0.0;
   do {
     //Compute v's impulse
-    Galois::Runtime::PerThreadStorage<double> maxForceSQ;
-    Galois::Runtime::PerThreadStorage<Point<double>> totalForce;
+    Galois::Substrate::PerThreadStorage<double> maxForceSQ;
+    Galois::Substrate::PerThreadStorage<Point<double>> totalForce;
     double step = natStepSize;
     //Vertex& v = graph.getData(*graph.begin());
     //v.dump();

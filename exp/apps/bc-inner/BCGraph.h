@@ -2,7 +2,7 @@
 #define _BCGRAPH_H_
 
 #include "Galois/Bag.h"
-#include "Galois/Runtime/ll/CacheLineStorage.h"
+#include "Galois/Substrate/CacheLineStorage.h"
 
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -35,7 +35,7 @@
 class BCGraph {
     public:
 //	private:
-      Galois::Runtime::LL::CacheLineStorage<ND> * nodes;
+      Galois::Substrate::CacheLineStorage<ND> * nodes;
 		ED * edgeData;
 		int * inIdx;
 		int * ins;
@@ -93,7 +93,7 @@ class BCGraph {
     }
 
     BCGraph(const char * filename)  {
-      std::cout << "Node Size " << sizeof(ND) << " uses " << sizeof(Galois::Runtime::LL::CacheLineStorage<ND>) << "\n";
+      std::cout << "Node Size " << sizeof(ND) << " uses " << sizeof(Galois::Substrate::CacheLineStorage<ND>) << "\n";
       std::cout << "Edge Size " << sizeof(ED) << "\n";
       std::string tmp(filename);
       std::string fname1 = tmp + "1.gr";
@@ -146,7 +146,7 @@ class BCGraph {
       if (numEdges % 2)
         fptr32 += 1;
       
-      nodes = new Galois::Runtime::LL::CacheLineStorage<ND>[nnodes];
+      nodes = new Galois::Substrate::CacheLineStorage<ND>[nnodes];
       for (int i =0; i<nnodes; ++i) {
         nodes[i].data.id = i;
       }
@@ -183,7 +183,7 @@ class BCGraph {
 
     BCGraph(int _nnodes, int _nedges, const std::map<int, std::set<int>*> & _succs, const std::map<int, std::set<int>*> & _preds)
 
-      : nodes(new Galois::Runtime::LL::CacheLineStorage<ND>[_nnodes]), edgeData(new ED[_nedges]), inIdx(new int[_nnodes+1]), 
+      : nodes(new Galois::Substrate::CacheLineStorage<ND>[_nnodes]), edgeData(new ED[_nedges]), inIdx(new int[_nnodes+1]), 
         ins(new int[_nedges]), outIdx(new int[_nnodes+1]), nnodes(_nnodes), 
         nedges(_nedges), ninIdx(_nnodes+1), nins(_nedges), noutIdx(_nnodes+1), masterMapping(0), masterLength(0), masterFD(0) {
         
@@ -290,7 +290,7 @@ class BCGraph {
   ND * getNode(int id) {
 	return &nodes[id].data;
   }
-  Galois::Runtime::LL::CacheLineStorage<ND> * getNodes() const {
+  Galois::Substrate::CacheLineStorage<ND> * getNodes() const {
 		return nodes;
 	}
  

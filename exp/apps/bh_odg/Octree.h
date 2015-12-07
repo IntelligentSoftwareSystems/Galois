@@ -91,6 +91,8 @@ struct Octree: public B {
 
   // virtual ~Octree() { }
   virtual bool isLeaf() const = 0;
+
+  virtual ~Octree (void) {}
 };
 
 template <typename B>
@@ -193,8 +195,8 @@ struct Body: public Octree<B>  {
 };
 
 
-inline int getIndex(const Point& a, const Point& b) {
-  int index = 0;
+inline unsigned  getIndex(const Point& a, const Point& b) {
+  unsigned  index = 0;
   if (a.x < b.x)
     index += 1;
   if (a.y < b.y)
@@ -255,11 +257,11 @@ void compareTrees (const OctreeInternal<B1>* ref, const OctreeInternal<B2>* obs)
   assert (!obs->isLeaf ());
 
   if (!checkRelativeError (ref->pos, obs->pos)) {
-    GALOIS_DIE ("different value for position");
+    GALOIS_DIE ("different value for position ", ref->pos, " ", obs->pos);
   }
 
   if (!checkRelativeError (ref->mass, obs->mass)) {
-    GALOIS_DIE ("different value for mass");
+    GALOIS_DIE ("different value for mass ", ref->mass, " ", obs->mass);
   }
 
   for (unsigned i = 0; i < 8; ++i) {
