@@ -33,13 +33,12 @@
 #include <boost/iterator/transform_iterator.hpp>
 
 #include "Galois/Galois.h"
-#include "Galois/GaloisUnsafe.h"
 #include "Galois/Atomic.h"
 #include "Galois/CilkInit.h"
 #include "Galois/Statistic.h"
 #include "Galois/Runtime/DoAllCoupled.h"
 #include "Galois/Runtime/Sampling.h"
-#include "Galois/Runtime/ll/CompilerSpecific.h"
+#include "Galois/Substrate/CompilerSpecific.h"
 
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
@@ -201,7 +200,7 @@ Point run(int nbodies, int ntimesteps, int seed, const TB& treeBuilder) {
 
     t_bbox.start ();
     Galois::do_all(beg, end,
-        ReduceBoxes (bbox), Galois::do_all_steal(true));
+        ReduceBoxes (bbox), Galois::do_all_steal<true>());
     t_bbox.stop ();
 
     BoundingBox box(bbox.reduce ());
@@ -279,7 +278,7 @@ int main(int argc, char** argv) {
 
   std::cout.setf(std::ios::right|std::ios::scientific|std::ios::showpoint);
 
-  std::cerr << "configuration: "
+  std::cout << "configuration: "
             << bh::nbodies << " bodies, "
             << bh::ntimesteps << " time steps" << std::endl << std::endl;
   std::cout << "Num. of threads: " << numThreads << std::endl;
@@ -303,7 +302,7 @@ int main(int argc, char** argv) {
       break;
 
     case bh::CILK_TREE:
-      Galois::CilkInit ();
+      //FIXME:      Galois::CilkInit ();
       pos = bh::run<true> (bh::nbodies, bh::ntimesteps, bh::seed, bh::BuildSummarizeRecursive<bh::recursive::USE_CILK> ());
       break;
 
@@ -332,7 +331,7 @@ int main(int argc, char** argv) {
       break;
 
     case bh::RSUMM_CILK:
-      Galois::CilkInit ();
+      //FIXME:      Galois::CilkInit ();
       pos = bh::run<true> (bh::nbodies, bh::ntimesteps, bh::seed, bh::BuildLockFreeSummarizeRecursive<bh::recursive::USE_CILK> ());
       break;
 

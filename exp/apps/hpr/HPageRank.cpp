@@ -43,6 +43,7 @@
 #define _HETERO_DEBUG_ 0
 
 static const char* const name = "Page Rank - Distributed Heterogeneous";
+static const char* const name_short = "HPageRank";
 static const char* const desc = "Computes PageRank on Distributed Galois.  Uses pull algorithm, takes the pre-transposed graph.";
 static const char* const url = 0;
 
@@ -395,7 +396,7 @@ void inner_main() {
    Galois::StatManager statManager;
    auto& barrier = Galois::Runtime::getSystemBarrier();
    const unsigned my_host_id = Galois::Runtime::NetworkInterface::ID;
-   Galois::Timer T_total, T_graph_load, T_pagerank, T_graph_init;
+   Galois::Timer T_total, T_graph_load, T_pagerank, T_graph_init, T_postSyncKernel;
    T_total.start();
    //Parse arg string when running on multiple hosts and update/override personality
    //with corresponding value.
@@ -482,6 +483,7 @@ void inner_main() {
 
    std::cout << "[" << my_host_id << "] Starting PageRank" << "\n";
    T_pagerank.start();
+   T_postSyncKernel.start();
    for (int i = 0; i < maxIterations; ++i) {
 #if _HETERO_DEBUG_
       std::cout << "Starting " << i << "\n";
@@ -514,6 +516,7 @@ void inner_main() {
    //Final synchronization to ensure that all the nodes are updated.
    sendGhostCells(net, g);
    barrier.wait();
+   T_postSyncKernel.stop();
 
    if (verify) {
       std::stringstream ss;
@@ -542,7 +545,11 @@ void inner_main() {
    }
    T_total.stop();
    std::cout << "[" << Galois::Runtime::NetworkInterface::ID << "]" << " Total : " << T_total.get() << " Loading : " << T_graph_load.get() << " Init : " << T_graph_init.get() << " PageRank (" << maxIterations << " iteration) : " << T_pagerank.get() << " (msec)\n";
-
+//   if(my_host_id == 0)
+   {
+      fprintf(stderr, "HEADER2,filename,TotalTime,Loadtime,InitTime,KernelTime, KernelPostSyncTime\n");
+      fprintf(stderr, "STAT2,%s,%ld,%ld,%ld,%ld,%ld\n",inputFile.getValue().c_str(),T_total.get(), T_graph_load.get(), T_graph_init.get(), T_pagerank.get(), T_postSyncKernel.get());
+   }
    std::cout << "Terminated on [ " << my_host_id << " ]\n";
    net.terminate();
    std::cout.flush();

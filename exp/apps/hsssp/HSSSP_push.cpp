@@ -24,15 +24,15 @@
 
 #include "Galois/Galois.h"
 #include "Galois/gstl.h"
-#include "Galois/Graph/FileGraph.h"
-#include "Galois/Graph/LC_CSR_Graph.h"
-#include "Galois/Graph/Util.h"
+#include "Galois/Graphs/FileGraph.h"
+#include "Galois/Graphs/LC_CSR_Graph.h"
+#include "Galois/Graphs/Util.h"
 #include "Lonestar/BoilerPlate.h"
 #include "PGraph.h"
-#include "opencl/LC_LinearArray_Graph.h"
+#include "OpenCL/LC_LinearArray_Graph.h"
 #include "cuda/hsssp_cuda.h"
 #include "cuda/cuda_mtypes.h"
-#include "opencl/CLWrapper.h"
+#include "OpenCL/CLWrapper.h"
 
 #include <iostream>
 #include <typeinfo>
@@ -291,10 +291,10 @@ struct SSSP {
       //Perform computation
       Galois::do_all(_g.g.begin(), _g.g.begin()+_g.numOwned, SSSP { &_g.g }, Galois::loopname("SSSP"));
       /////////////////////////////
-      Galois::Runtime::getSystemBarrier()();
+      Galois::Runtime::getBarrier(Galois::Runtime::activeThreads);
       sendGhostCellDistances(Galois::Runtime::getSystemNetworkInterface(), _g);
       sync_distances(Galois::Runtime::getSystemNetworkInterface(), _g);
-      Galois::Runtime::getSystemBarrier()();
+      Galois::Runtime::getBarrier(Galois::Runtime::activeThreads);
       Galois::do_all(_g.g.begin(), _g.g.begin()+_g.numOwned, SSSP_PUSH_Commit { &_g.g }, Galois::loopname("SSSP-Commit"));
    }
    void operator()(GNode src) const {
@@ -436,7 +436,7 @@ int main(int argc, char** argv) {
 
    auto& net = Galois::Runtime::getSystemNetworkInterface();
    Galois::StatManager statManager;
-   auto& barrier = Galois::Runtime::getSystemBarrier();
+   auto& barrier = Galois::Runtime::getBarrier(Galois::Runtime::activeThreads);
    const unsigned my_host_id = Galois::Runtime::NetworkInterface::ID;
    //Parse arg string when running on multiple hosts and update/override personality
    //with corresponding value.
@@ -463,7 +463,7 @@ int main(int argc, char** argv) {
       if (!init_CUDA_context(cuda_ctx, gpudevice))
          exit(-1);
    } else if (personality == GPU_OPENCL) {
-      Galois::OpenCL::cl_env.init();
+      Galois::OpenCL::cl_env.init(cldevice.Value);
    }
    if (personality != CPU)
       loadGraphNonCPU(g);
@@ -578,6 +578,5 @@ int main(int argc, char** argv) {
       out_file.close();
    }
    std::cout.flush();
-   net.terminate();
    return 0;
 }

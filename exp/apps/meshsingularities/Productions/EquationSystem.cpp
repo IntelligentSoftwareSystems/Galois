@@ -1,8 +1,13 @@
 #include "EquationSystem.h"
+#include <string>
 #include <cmath>
 
-#include <Galois/Galois.h>
-#include <boost/iterator.hpp>
+#ifdef WITH_BLAS
+extern "C" {
+  #include <cblas.h>
+  #include <clapack.h>
+}
+#endif
 
 EquationSystem::EquationSystem(unsigned long n)
 {
@@ -69,14 +74,135 @@ EquationSystem::~EquationSystem()
 
 void EquationSystem::eliminate(const int rows)
 {
+#ifdef WITH_BLAS
+//    int clapack_dgetrf(const enum CBLAS_ORDER Order, const int M, const int N,
+//                       double *A, const int lda, int *ipiv);
+    int ipiv[rows];
+    const int m = rows;
+    const int k = n-rows;
+    int error = 0;
+    error = clapack_dgetrf(CblasRowMajor,
+            m, // size
+            m,
+            matrix[0], // pointer to data
+            n, // LDA = matrix_size
+            ipiv); // pivot vector
 
+    if (error != 0) {
+        printf("DGETRF error: %d\n", error);
+    }
 
+    //int clapack_dgetrs
+    //   (const enum CBLAS_ORDER Order,
+    //    const enum CBLAS_TRANSPOSE Trans,
+    //    const int N,
+    //    const int NRHS,
+    //    const double *A,
+    //    const int lda,
+    //    const int *ipiv,
+    //    double *B,
+    //    const int ldb);
+
+    error = clapack_dgetrs (CblasRowMajor,
+                    CblasNoTrans,
+                    m,
+                    k,
+                    matrix[0],
+                    n,
+                    ipiv,
+                    matrix[0]+m,
+                    n);
+
+    if (error != 0) {
+        printf("DGETRS error: %d\n", error);
+    }
+
+    error = clapack_dgetrs (CblasRowMajor,
+                    CblasNoTrans,
+                    m,
+                    1,
+                    matrix[0],
+                    n,
+                    ipiv,
+                    rhs,
+                    n);
+
+    if (error != 0) {
+        printf("DGETRS error: %d\n", error);
+    }
+
+    //void cblas_dgemm(const enum CBLAS_ORDER Order,
+    //                 const enum CBLAS_TRANSPOSE TransA,
+    //                 const enum CBLAS_TRANSPOSE TransB,
+    //                 const int M,
+    //                 const int N,
+    //                 const int K,
+    //                 const double alpha,
+    //                 const double *A,
+    //                 const int lda,
+    //                 const double *B,
+    //                 const int ldb,
+    //                 const double beta,
+    //                 double *C,
+    //                 const int ldc);
+    cblas_dgemm(CblasRowMajor,
+                CblasNoTrans,
+                CblasNoTrans,
+                k,
+                k,
+                m,
+                -1.0,
+                matrix[m], // C
+                n,
+                matrix[0]+m, // B
+                n,
+                1.0,
+                matrix[m]+m, // D
+                n);
+
+    //void cblas_dgemv(const enum CBLAS_ORDER Order,
+    //                 const enum CBLAS_TRANSPOSE TransA,
+    //                 const int M,
+    //                 const int N,
+    //                 const double alpha,
+    //                 const double *A,
+    //                 const int lda,
+    //                 const double *X,
+    //                 const int incX,
+    //                 const double beta,
+    //                 double *Y,
+    //                 const int incY);
+    cblas_dgemv(CblasRowMajor,
+                CblasNoTrans,
+                k,
+                m,
+                -1.0,
+                matrix[m],
+                n,
+                rhs,
+                1,
+                1.0,
+                rhs+m,
+                1);
+
+    for (int i=0;i<m;++i) {
+        for (int j=0;j<m;++j) {
+            matrix[i][j] = i == j ? 1.0 : 0.0;
+        }
+    }
+
+    for (int i=m;i<n;++i) {
+        for (int j=0;j<m;++j) {
+            matrix[i][j] = 0.0;
+        }
+    }
+
+#else
 	double maxX;
 	register int maxRow;
 	double x;
-	int i, j;
 
-	for (i=0;i<rows;++i) {
+    for (int i=0;i<rows;++i) {
 		maxX = fabs(matrix[i][i]);
 		maxRow = i;
 
@@ -93,32 +219,25 @@ void EquationSystem::eliminate(const int rows)
 
 		x = matrix[i][i];
 		// on diagonal - only 1.0
-		matrix[i][i] = 1.0;
+        matrix[i][i] = 1.0;
 
-		for (j=i+1;j<n;++j) {
+        for (int j=i+1;j<n;++j) {
 			matrix[i][j] /= x;
 		}
 
 		rhs[i] /= x;
-		/*Galois::do_all(boost::counting_iterator<int>(i+1),
-				boost::counting_iterator<int>(n), [&] (int j) {
-				x = matrix[j][i];
-				for (int k = i+1; k<n; ++k) {
-					matrix[j][k] -= x*matrix[i][k];
-				}
-				rhs[j] -= x*rhs[i];
-			}); */
-		for (j=i+1; j<n; ++j) {
+        for (int j=i+1; j<n; ++j) {
 			x = matrix[j][i];
 
 			for (int k = i+1; k<n; ++k) {
 				matrix[j][k] -= x*matrix[i][k];
 			}
 			//xyz
-			matrix[j][i] = 0;
-			rhs[j] -= x*rhs[i];
+            //matrix[j][i] = 0;
+            rhs[j] -= x*rhs[i];
 		}
 	}
+#endif
 }
 
 void EquationSystem::backwardSubstitute(const int startingRow)

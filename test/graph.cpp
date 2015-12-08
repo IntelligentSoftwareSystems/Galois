@@ -1,4 +1,4 @@
-#include "Galois/Graph/Graph.h"
+#include "Galois/Graphs/Graph.h"
 #include <string>
 
 int useGraph(std::string inputfile) {
@@ -59,4 +59,3 @@ int main(int argc, char** argv) {
   }
   return 0;
 }
-

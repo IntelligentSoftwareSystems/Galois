@@ -30,12 +30,15 @@
 
 #include "bfs.h"
 
+#include "Galois/PerThreadContainer.h"
+
 #include "Galois/Runtime/ParallelWorkInline_Exp.h"
-#include "Galois/Runtime/PerThreadWorkList.h"
 
 typedef uint32_t ND_ty;
 
 class WavefrontBulkSync: public BFS<ND_ty> {
+
+  using Base = BFS<ND_ty>;
 
 protected:
   virtual const std::string getVersion () const { return "Wavefront using Bulk Synchronous Executor"; }
@@ -69,7 +72,7 @@ protected:
   struct OpFunc {
     typedef int tt_does_not_need_aborts;
     // typedef char tt_does_not_need_push;
-    static const unsigned CHUNK_SIZE = 128;
+    static const unsigned CHUNK_SIZE = DEFAULT_CHUNK_SIZE;
 
 
     Graph& graph;
@@ -81,15 +84,15 @@ protected:
 
       graph.mapOutNeighbors (up.src, 
           [&up,this, &wl] (GNode dst) {
-            ND_ty dstLevel = graph.getData (dst, Galois::NONE);
+            ND_ty dstLevel = graph.getData (dst, Galois::MethodFlag::UNPROTECTED);
 
             if (dstLevel == BFS_LEVEL_INFINITY) {
-              graph.getData (dst, Galois::NONE) = up.srcLevel + 1;
+              graph.getData (dst, Galois::MethodFlag::UNPROTECTED) = up.srcLevel + 1;
               wl.push (Update (dst, up.srcLevel + 1));
               // wl.push_back (dst);
             }
           },
-          Galois::NONE);
+          Galois::MethodFlag::UNPROTECTED);
 
     }
   };
@@ -100,7 +103,7 @@ protected:
     // typedef Galois::WorkList::BulkSynchronousInline<> WL_ty;
 
     ParCounter numAdds;
-    graph.getData (startNode, Galois::NONE) = 0;
+    graph.getData (startNode, Galois::MethodFlag::UNPROTECTED) = 0;
 
     Update init[] = { Update (startNode, 0) };
 

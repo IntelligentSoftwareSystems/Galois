@@ -26,49 +26,31 @@
 #ifndef BILLIARDS_SPEC_H
 #define BILLIARDS_SPEC_H
 
-#include "Galois/Graph/Graph.h"
-#include "Galois/Runtime/PerThreadWorkList.h"
+#include "Galois/PerThreadContainer.h"
+
+#include "Galois/Graphs/Graph.h"
+
 #include "Galois/Runtime/ROBexecutor.h"
 
 #include "Billiards.h"
+#include "BilliardsLevelExec.h"
 
 class BilliardsSpec: public Billiards {
   using Graph = Galois::Graph::FirstGraph<void*, void, true>;
   using GNode = Graph::GraphNode;
   using VecNodes = std::vector<GNode>;
-  using AddListTy = Galois::Runtime::PerThreadVector<Event>;
+  using AddListTy = Galois::PerThreadVector<Event>;
 
-  struct VisitNhood {
-    Graph& graph;
-    VecNodes& nodes;
-
-    VisitNhood (Graph& graph, VecNodes& nodes): graph (graph), nodes (nodes) {}
-
-    template <typename C>
-    void operator () (const Event& e, C& ctx) {
-
-      const Ball& b1 = e.getBall ();
-      assert (b1.getID () < nodes.size ());
-      graph.getData (nodes[b1.getID ()], Galois::CHECK_CONFLICT);
-
-      if (e.getKind () == Event::BALL_COLLISION) {
-        const Ball& b2 = e.getOtherBall ();
-        assert (b2.getID () < nodes.size ());
-        graph.getData (nodes[b2.getID ()], Galois::CHECK_CONFLICT);
-      }
-
-    }
-  };
 
   struct OpFunc {
 
     Table& table;
-    const double endtime;
+    const FP& endtime;
     Accumulator& iter;
 
     OpFunc (
         Table& table,
-        double endtime,
+        const FP& endtime,
         Accumulator& iter)
       :
         table (table),
@@ -97,19 +79,19 @@ class BilliardsSpec: public Billiards {
         BallAlloc ballAlloc (alloc);
 
         b1 = ballAlloc.allocate (1);
-        ballAlloc.construct (b1, e.getBall ());
+        ballAlloc.construct (b1, *(e.getBall ()));
 
 
         if (e.getKind () == Event::BALL_COLLISION) {
           b2 = ballAlloc.allocate (1);
-          ballAlloc.construct (b2, e.getOtherBall ());
+          ballAlloc.construct (b2, *(e.getOtherBall ()));
 
-          Event copyEvent = Event::makeBallCollision (*b1, *b2, e.getTime ());
+          Event copyEvent = Event::makeBallCollision (b1, b2, e.getTime ());
           copyEvent.simulate ();
 
         } else if (e.getKind () == Event::CUSHION_COLLISION) {
-          const Cushion& c = e.getCushion ();
-          Event copyEvent = Event::makeCushionCollision (*b1, c, e.getTime ());
+          Cushion* c = e.getCushion ();
+          Event copyEvent = Event::makeCushionCollision (b1, c, e.getTime ());
           copyEvent.simulate ();
 
         }
@@ -162,7 +144,7 @@ public:
 
   virtual const std::string version () const { return "using Speculative Executor"; }
 
-  virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const double endtime, bool enablePrints=false) {
+  virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const FP& endtime, bool enablePrints=false) {
 
     Graph graph;
     VecNodes nodes;
@@ -174,7 +156,7 @@ public:
     Galois::Runtime::for_each_ordered_rob (
         Galois::Runtime::makeStandardRange(initEvents.begin (), initEvents.end ()),
         Event::Comparator (),
-        VisitNhood (graph, nodes),
+        BilliardsLevelExec::VisitNhood (graph, nodes),
         OpFunc (table, endtime, iter));
 
     return iter.reduce ();

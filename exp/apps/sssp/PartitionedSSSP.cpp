@@ -30,8 +30,8 @@
 #include "Galois/Statistic.h"
 #include "Galois/Timer.h"
 #include "Galois/UserContext.h"
-#include "Galois/Graph/LCGraph.h"
-#include "Galois/Graph/TypeTraits.h"
+#include "Galois/Graphs/LCGraph.h"
+#include "Galois/Graphs/TypeTraits.h"
 #ifdef GALOIS_USE_EXP
 #include "Galois/WorkList/Partitioned.h"
 #endif
@@ -256,7 +256,7 @@ struct AsyncAlgo {
     Graph& g;
     Initialize(Graph& g): g(g) { }
     void operator()(typename Graph::GraphNode n) const {
-      g.getData(n, Galois::MethodFlag::NONE).dist = DIST_INFINITY;
+      g.getData(n, Galois::MethodFlag::UNPROTECTED).dist = DIST_INFINITY;
     }
   };
 
@@ -265,7 +265,7 @@ struct AsyncAlgo {
   void relaxEdge(Graph& graph, Node& sdata, typename Graph::edge_iterator ii, Pusher& pusher) {
     GNode dst = graph.getEdgeDst(ii);
     Dist d = graph.getEdgeData(ii);
-    Node& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+    Node& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
     Dist newDist = sdata.dist + d;
     Dist oldDist;
     while (newDist < (oldDist = ddata.dist)) {
@@ -285,7 +285,7 @@ struct AsyncAlgo {
     int id = graph.idFromNode(dst) >> partitionShift;
 
     Dist d = graph.getEdgeData(ii);
-    Node& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+    Node& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
     Dist newDist = sdata.dist + d;
     Dist oldDist;
     while (newDist < (oldDist = ddata.dist)) {
@@ -306,7 +306,7 @@ struct AsyncAlgo {
     int id = graph.idFromNode(dst) >> partitionShift;
     
     Dist d = graph.getEdgeData(ii);
-    Node& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+    Node& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
     Dist newDist = sdata.dist + d;
     Dist oldDist;
     while (newDist < (oldDist = ddata.dist)) {
@@ -336,7 +336,7 @@ struct AsyncAlgo {
   // Without partitioning
   template<typename Pusher>
   void relaxNode(Graph& graph, GNode src, Dist prevDist, Pusher& pusher) {
-    const Galois::MethodFlag flag = Galois::MethodFlag::NONE;
+    const Galois::MethodFlag flag = Galois::MethodFlag::UNPROTECTED;
     Node& sdata = graph.getData(src, flag);
 
     if (prevDist > sdata.dist) {
@@ -353,7 +353,7 @@ struct AsyncAlgo {
   // With partitioning
   void relaxNode(Graph& graph, GNode src, Dist prevDist, 
       int scale, int cur, Bags& bags, Galois::UserContext<UpdateRequest>& pusher) {
-    const Galois::MethodFlag flag = Galois::MethodFlag::NONE;
+    const Galois::MethodFlag flag = Galois::MethodFlag::UNPROTECTED;
     Node& sdata = graph.getData(src, flag);
 
     if (prevDist > sdata.dist) {
@@ -438,8 +438,8 @@ struct AsyncAlgo {
     Node& sourceData = graph.getData(source);
     sourceData.dist = 0;
     Galois::do_all(
-        graph.out_edges(source, Galois::MethodFlag::NONE).begin(),
-        graph.out_edges(source, Galois::MethodFlag::NONE).end(),
+        graph.out_edges(source, Galois::MethodFlag::UNPROTECTED).begin(),
+        graph.out_edges(source, Galois::MethodFlag::UNPROTECTED).end(),
         [&](typename Graph::edge_iterator ii) {
           if (WithPartitioning)
             self->relaxEdge(graph, sourceData, ii, rangeScale, bags);
@@ -505,7 +505,7 @@ struct Algo2 {
     Graph& g;
     Initialize(Graph& g): g(g) { }
     void operator()(Graph::GraphNode n) const {
-      g.getData(n, Galois::MethodFlag::NONE).dist = DIST_INFINITY;
+      g.getData(n, Galois::MethodFlag::UNPROTECTED).dist = DIST_INFINITY;
     }
   };
 
@@ -516,7 +516,7 @@ struct Algo2 {
     int id = graph.idFromNode(dst) >> partitionShift;
 
     Dist d = graph.getEdgeData(ii);
-    Node& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+    Node& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
     Dist newDist = sdata.dist + d;
     Dist oldDist;
     while (newDist < (oldDist = ddata.dist)) {
@@ -531,7 +531,7 @@ struct Algo2 {
 
   template<typename Pusher>
   void relaxNode(Graph& graph, GNode src, Dist prevDist, Pusher& pusher) {
-    const Galois::MethodFlag flag = Galois::MethodFlag::NONE;
+    const Galois::MethodFlag flag = Galois::MethodFlag::UNPROTECTED;
     Node& sdata = graph.getData(src, flag);
 
     if (prevDist > sdata.dist) {
@@ -566,8 +566,8 @@ struct Algo2 {
     const int maxValue = 128;
     typedef dChunkedFIFO<128> Chunk;
     typedef Partitioned<Partitioner, Chunk>
-      ::with_block_period<blockPeriod>::type
-      ::with_max_value<maxValue>::type Part;
+      ::with_block_period<blockPeriod>
+      ::with_max_value<maxValue> Part;
     typedef OrderedByIntegerMetric<UpdateRequestIndexer<UpdateRequest>, Part, 10> OBIM;
 
     typedef Galois::InsertBag<UpdateRequest> Bag;
@@ -585,8 +585,8 @@ struct Algo2 {
     Node& sourceData = graph.getData(source);
     sourceData.dist = 0;
     Galois::do_all(
-        graph.out_edges(source, Galois::MethodFlag::NONE).begin(),
-        graph.out_edges(source, Galois::MethodFlag::NONE).end(),
+        graph.out_edges(source, Galois::MethodFlag::UNPROTECTED).begin(),
+        graph.out_edges(source, Galois::MethodFlag::UNPROTECTED).end(),
         [&](Graph::edge_iterator ii) {
             self->relaxEdge(graph, sourceData, ii, bag);
         });
@@ -624,13 +624,13 @@ struct Algo3 {
     Graph& g;
     Initialize(Graph& g): g(g) { }
     void operator()(Graph::GraphNode n) const {
-      g.getData(n, Galois::MethodFlag::NONE).dist = DIST_INFINITY;
+      g.getData(n, Galois::MethodFlag::UNPROTECTED).dist = DIST_INFINITY;
     }
   };
 
   template<typename Pusher>
   void relaxEdge(Graph& graph, Node& sdata, const GNode& dst, const Dist& d, Pusher& pusher) {
-    Node& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+    Node& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
     Dist newDist = sdata.dist + d;
     Dist oldDist;
     while (newDist < (oldDist = ddata.dist)) {
@@ -645,7 +645,7 @@ struct Algo3 {
 
   template<typename Pusher1, typename Pusher2>
   void relaxNode(Graph& graph, GNode src, Dist prevDist, int curId, Graph::edge_iterator begin, Pusher1& pusher1, Pusher2& pusher2) {
-    const Galois::MethodFlag flag = Galois::MethodFlag::NONE;
+    const Galois::MethodFlag flag = Galois::MethodFlag::UNPROTECTED;
     Node& sdata = graph.getData(src, flag);
 
     if (prevDist > sdata.dist) {
@@ -681,7 +681,7 @@ struct Algo3 {
 
     void operator()(UpdateRequest& req, Galois::UserContext<UpdateRequest>&) {
       if (First)
-        self->relaxNode(graph, req.n, req.w, id, graph.edge_begin(req.n, Galois::MethodFlag::NONE), *innerBag, *bag);
+        self->relaxNode(graph, req.n, req.w, id, graph.edge_begin(req.n, Galois::MethodFlag::UNPROTECTED), *innerBag, *bag);
       else
         self->relaxNode(graph, req.n, req.w, id, req.begin, *innerBag, *bag);
     }
@@ -710,8 +710,8 @@ struct Algo3 {
     Node& sourceData = graph.getData(source);
     sourceData.dist = 0;
     Galois::do_all(
-        graph.out_edges(source, Galois::MethodFlag::NONE).begin(),
-        graph.out_edges(source, Galois::MethodFlag::NONE).end(),
+        graph.out_edges(source, Galois::MethodFlag::UNPROTECTED).begin(),
+        graph.out_edges(source, Galois::MethodFlag::UNPROTECTED).end(),
         [&](Graph::edge_iterator ii) {
             self->relaxEdge(graph, sourceData, graph.getEdgeDst(ii), graph.getEdgeData(ii), *cur);
         });
@@ -779,13 +779,13 @@ struct Algo4 {
     Graph& g;
     Initialize(Graph& g): g(g) { }
     void operator()(Graph::GraphNode n) const {
-      g.getData(n, Galois::MethodFlag::NONE).dist = DIST_INFINITY;
+      g.getData(n, Galois::MethodFlag::UNPROTECTED).dist = DIST_INFINITY;
     }
   };
 
   template<typename Pusher>
   void relaxEdge(Graph& graph, const GNode& src, const GNode& dst, const Dist& newDist, Pusher& pusher) {
-    const Galois::MethodFlag flag = Galois::MethodFlag::NONE;
+    const Galois::MethodFlag flag = Galois::MethodFlag::UNPROTECTED;
     Node& ddata = graph.getData(dst, flag);
     Dist oldDist;
     while (newDist < (oldDist = ddata.dist)) {
@@ -800,7 +800,7 @@ struct Algo4 {
 
   template<typename Pusher1, typename Pusher2>
   void relaxNode(Graph& graph, const UpdateRequest& req, Pusher1& pusher1, Pusher2& pusher2) {
-    const Galois::MethodFlag flag = Galois::MethodFlag::NONE;
+    const Galois::MethodFlag flag = Galois::MethodFlag::UNPROTECTED;
 
     int srcPart = graph.idFromNode(req.src) >> partitionShift;
     const bool check = true || srcPart == req.part;
@@ -853,8 +853,8 @@ struct Algo4 {
     const int maxValue = 8;
     typedef dChunkedFIFO<128> Chunk;
     typedef Partitioned<Partitioner, Chunk>
-      ::with_block_period<blockPeriod>::type
-      ::with_max_value<maxValue>::type Part;
+      ::with_block_period<blockPeriod>
+      ::with_max_value<maxValue> Part;
     typedef OrderedByIntegerMetric<UpdateRequestIndexer<UpdateRequest>, Part, 10> OBIM;
 
     typedef Galois::InsertBag<UpdateRequest> Bag;
@@ -872,8 +872,8 @@ struct Algo4 {
     Node& sourceData = graph.getData(source);
     sourceData.dist = 0;
     Galois::do_all(
-        graph.out_edges(source, Galois::MethodFlag::NONE).begin(),
-        graph.out_edges(source, Galois::MethodFlag::NONE).end(),
+        graph.out_edges(source, Galois::MethodFlag::UNPROTECTED).begin(),
+        graph.out_edges(source, Galois::MethodFlag::UNPROTECTED).end(),
         [&](Graph::edge_iterator ii) {
             self->relaxEdge(graph, source, graph.getEdgeDst(ii), sourceData.dist + graph.getEdgeData(ii), *cur);
         });
@@ -916,13 +916,13 @@ struct Algo5 {
     Graph& g;
     Initialize(Graph& g): g(g) { }
     void operator()(Graph::GraphNode n) const {
-      g.getData(n, Galois::MethodFlag::NONE).dist = DIST_INFINITY;
+      g.getData(n, Galois::MethodFlag::UNPROTECTED).dist = DIST_INFINITY;
     }
   };
 
   template<typename Pusher>
   void relaxEdge(Graph& graph, const GNode& src, const GNode& dst, const Dist& newDist, Pusher& pusher) {
-    const Galois::MethodFlag flag = Galois::MethodFlag::NONE;
+    const Galois::MethodFlag flag = Galois::MethodFlag::UNPROTECTED;
     Node& ddata = graph.getData(dst, flag);
     Dist oldDist;
     while (newDist < (oldDist = ddata.dist)) {
@@ -945,7 +945,7 @@ struct Algo5 {
 
   template<typename Pusher1, typename Pusher2>
   void relaxNode(Graph& graph, const UpdateRequest& req, Pusher1& pusher1, Pusher2& pusher2) {
-    const Galois::MethodFlag flag = Galois::MethodFlag::NONE;
+    const Galois::MethodFlag flag = Galois::MethodFlag::UNPROTECTED;
 
     int srcPart = graph.idFromNode(req.src) >> partitionShift;
     const bool check = true || srcPart == req.part;
@@ -1015,8 +1015,8 @@ struct Algo5 {
     Node& sourceData = graph.getData(source);
     sourceData.dist = 0;
     std::for_each(
-        graph.out_edges(source, Galois::MethodFlag::NONE).begin(),
-        graph.out_edges(source, Galois::MethodFlag::NONE).end(),
+        graph.out_edges(source, Galois::MethodFlag::UNPROTECTED).begin(),
+        graph.out_edges(source, Galois::MethodFlag::UNPROTECTED).end(),
         [&](Graph::edge_iterator ii) {
             self->relaxEdge(graph, source, graph.getEdgeDst(ii), sourceData.dist + graph.getEdgeData(ii), *cur);
         });
@@ -1093,13 +1093,13 @@ struct Algo6 {
     Graph& g;
     Initialize(Graph& g): g(g) { }
     void operator()(Graph::GraphNode n) const {
-      g.getData(n, Galois::MethodFlag::NONE).dist = DIST_INFINITY;
+      g.getData(n, Galois::MethodFlag::UNPROTECTED).dist = DIST_INFINITY;
     }
   };
 
   template<typename Pusher>
   void relaxEdge(Graph& graph, const GNode& src, const GNode& dst, const Dist& newDist, Pusher& pusher) {
-    const Galois::MethodFlag flag = Galois::MethodFlag::NONE;
+    const Galois::MethodFlag flag = Galois::MethodFlag::UNPROTECTED;
     Node& ddata = graph.getData(dst, flag);
     Dist oldDist;
     while (newDist < (oldDist = ddata.dist)) {
@@ -1122,7 +1122,7 @@ struct Algo6 {
 
   template<typename Pusher1, typename Pusher2>
   void relaxNode(Graph& graph, const UpdateRequest& req, Pusher1& pusher1, Pusher2& pusher2) {
-    const Galois::MethodFlag flag = Galois::MethodFlag::NONE;
+    const Galois::MethodFlag flag = Galois::MethodFlag::UNPROTECTED;
 
     const bool check = true;
     volatile Dist* srcDist = &graph.getData(req.n, flag).dist;
@@ -1183,8 +1183,8 @@ struct Algo6 {
     GNode source0 = parts[0].nodeFromId(graph.idFromNode(source));
     Node& sourceData = parts[0].getData(source0);
     sourceData.dist = 0;
-    for (Graph::edge_iterator ii = graph.edge_begin(source, Galois::MethodFlag::NONE),
-        ei = graph.edge_end(source, Galois::MethodFlag::NONE); ii != ei; ++ii) {
+    for (Graph::edge_iterator ii = graph.edge_begin(source, Galois::MethodFlag::UNPROTECTED),
+        ei = graph.edge_end(source, Galois::MethodFlag::UNPROTECTED); ii != ei; ++ii) {
       GNode dst = graph.getEdgeDst(ii);
       Dist newDist = graph.getEdgeData(ii);
       GNode dst0 = parts[0].nodeFromId(graph.idFromNode(dst));
@@ -1210,7 +1210,7 @@ struct Algo6 {
           Dist newDist = self->parts[i-1].getData(n).dist;
           if (newDist != self->parts[i].getData(nn).dist) {
             self->parts[i].getData(nn).dist = newDist;
-            if (self->parts[i].edge_begin(nn, Galois::MethodFlag::NONE) != self->parts[i].edge_end(nn, Galois::MethodFlag::NONE))
+            if (self->parts[i].edge_begin(nn, Galois::MethodFlag::UNPROTECTED) != self->parts[i].edge_end(nn, Galois::MethodFlag::UNPROTECTED))
               cur->push(UpdateRequest(nn, newDist));
           }
         });
@@ -1228,7 +1228,7 @@ struct Algo6 {
           Dist newDist = self->parts[t].getData(n).dist;
           if (newDist != self->parts[i].getData(nn).dist) {
             self->parts[i].getData(nn).dist = newDist;
-            if (self->parts[i].edge_begin(nn, Galois::MethodFlag::NONE) != self->parts[i].edge_end(nn, Galois::MethodFlag::NONE))
+            if (self->parts[i].edge_begin(nn, Galois::MethodFlag::UNPROTECTED) != self->parts[i].edge_end(nn, Galois::MethodFlag::UNPROTECTED))
               cur->push(UpdateRequest(nn, newDist));
           }
         });
@@ -1277,7 +1277,7 @@ struct Algo7 {
     Graph& g;
     Initialize(Graph& g): g(g) { }
     void operator()(Graph::GraphNode n) const {
-      Node& node = g.getData(n, Galois::MethodFlag::NONE);
+      Node& node = g.getData(n, Galois::MethodFlag::UNPROTECTED);
       node.dist = DIST_INFINITY;
       node.start = std::numeric_limits<int>::max();
     }
@@ -1286,7 +1286,7 @@ struct Algo7 {
   template<typename Pusher>
   void relaxEdge(Graph& graph, typename Graph::edge_iterator ii, const Dist& newDist, Pusher& pusher) {
     GNode dst = graph.getEdgeDst(ii);
-    Node& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+    Node& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
     Dist oldDist;
     while (newDist < (oldDist = ddata.dist)) {
       if (__sync_bool_compare_and_swap(&ddata.dist, oldDist, newDist)) {
@@ -1301,7 +1301,7 @@ struct Algo7 {
   template<typename Pusher>
   void relaxEdge2(Graph& graph, typename Graph::edge_iterator ii, const Dist& newDist, Pusher& pusher) {
     GNode dst = graph.getEdgeDst(ii);
-    Node& ddata = graph.getData(dst, Galois::MethodFlag::NONE);
+    Node& ddata = graph.getData(dst, Galois::MethodFlag::UNPROTECTED);
     Dist oldDist;
     while (newDist < (oldDist = ddata.dist)) {
       if (__sync_bool_compare_and_swap(&ddata.dist, oldDist, newDist)) {
@@ -1310,7 +1310,7 @@ struct Algo7 {
         if (ddata.start == -1)
           break;
 
-        typename Graph::edge_iterator next = graph.edge_begin(dst, Galois::MethodFlag::NONE);
+        typename Graph::edge_iterator next = graph.edge_begin(dst, Galois::MethodFlag::UNPROTECTED);
         if (ddata.start != std::numeric_limits<int>::max())
           std::advance(next, ddata.start);
         pusher.push(UpdateRequest2(dst, newDist, next));
@@ -1342,7 +1342,7 @@ struct Algo7 {
     }
 
     void operator()(const UpdateRequest& req, Galois::UserContext<UpdateRequest>& ctx) {
-      const Galois::MethodFlag flag = Galois::MethodFlag::NONE;
+      const Galois::MethodFlag flag = Galois::MethodFlag::UNPROTECTED;
       Node& sdata = graph.getData(req.n, flag);
       volatile Dist* sdist = &sdata.dist;
 
@@ -1372,7 +1372,7 @@ struct Algo7 {
     }
 
     void operator()(const UpdateRequest2& req, Galois::UserContext<UpdateRequest2>& ctx) {
-      const Galois::MethodFlag flag = Galois::MethodFlag::NONE;
+      const Galois::MethodFlag flag = Galois::MethodFlag::UNPROTECTED;
       Node& sdata = graph.getData(req.n, flag);
       volatile Dist* sdist = &sdata.dist;
 
@@ -1410,8 +1410,8 @@ struct Algo7 {
     Node& sourceData = graph.getData(source);
     sourceData.dist = 0;
     Galois::do_all(
-        graph.out_edges(source, Galois::MethodFlag::NONE).begin(),
-        graph.out_edges(source, Galois::MethodFlag::NONE).end(),
+        graph.out_edges(source, Galois::MethodFlag::UNPROTECTED).begin(),
+        graph.out_edges(source, Galois::MethodFlag::UNPROTECTED).end(),
         [&](Graph::edge_iterator ii) {
             self->relaxEdge(graph, ii, sourceData.dist + graph.getEdgeData(ii), initial);
         });
@@ -1436,7 +1436,7 @@ void run(bool prealloc = true) {
   size_t approxNodeData = graph.size() * 64;
   //size_t approxEdgeData = graph.sizeEdges() * sizeof(typename Graph::edge_data_type) * 2;
   if (prealloc)
-    Galois::preAlloc(numThreads + approxNodeData / Galois::Runtime::MM::hugePageSize);
+    Galois::preAlloc(numThreads + approxNodeData / Galois::Runtime::pagePoolSize());
   Galois::reportPageAlloc("MeminfoPre");
 
   Galois::StatTimer T;

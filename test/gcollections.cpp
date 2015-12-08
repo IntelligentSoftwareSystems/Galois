@@ -2,8 +2,8 @@
 #include "Galois/gdeque.h"
 #include "Galois/gslist.h"
 #include "Galois/Timer.h"
-#include "Galois/Runtime/ll/gio.h"
-#include "Galois/Runtime/mm/Mem.h"
+#include "Galois/Substrate/gio.h"
+#include "Galois/Runtime/Mem.h"
 
 #include <boost/iterator/counting_iterator.hpp>
 
@@ -59,7 +59,7 @@ struct Heap { };
 
 template<typename C>
 struct Heap<C, true> {
-  Galois::Runtime::MM::FixedSizeHeap heap;
+  Galois::Runtime::FixedSizeHeap heap;
   Heap(): heap(sizeof(typename C::block_type)) { }
 };
 

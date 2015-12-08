@@ -341,7 +341,7 @@ int multiple_l2r_ls_chol_full_weight(multiple_linear_problem *prob, multiple_lin
 		long nnz_j = Y.col_ptr[j+1] - Y.col_ptr[j];
 		if(nnz_j) {
 #ifdef EXP_DOALL_GALOIS
-                        int tid = Galois::Runtime::LL::getTID();
+                  int tid = Galois::Substrate::ThreadPool::getTID();
 #else
                         int tid = omp_get_thread_num(); // thread ID
 #endif
@@ -363,7 +363,7 @@ int multiple_l2r_ls_chol_full_weight(multiple_linear_problem *prob, multiple_lin
                         ls_solve_chol_matrix(Hessian, Wj, k);
                 }
 #ifdef EXP_DOALL_GALOIS
-        }, Galois::do_all_steal(false));
+        });
 #else
 	}
 #endif
@@ -432,7 +432,7 @@ int multiple_l2r_ls_chol(multiple_linear_problem *prob, multiple_linear_paramete
 		long nnz_j = Y.col_ptr[j+1] - Y.col_ptr[j];
 		if(nnz_j) {
 #ifdef EXP_DOALL_GALOIS
-                        int tid = Galois::Runtime::LL::getTID();
+                        int tid = Galois::Substrate::ThreadPool::getTID();
 #else
                         int tid = omp_get_thread_num(); // thread ID
 #endif
@@ -459,7 +459,7 @@ int multiple_l2r_ls_chol(multiple_linear_problem *prob, multiple_linear_paramete
                         ls_solve_chol_matrix(Hessian, y, k);
                 }
 #ifdef EXP_DOALL_GALOIS
-        }, Galois::do_all_steal(false));
+        });
 #else
 	}
 #endif
@@ -509,7 +509,7 @@ int multiple_l2r_ls_tron(multiple_linear_problem *prob, multiple_linear_paramete
                         tron_obj.tron(Wj, false); 
                 }
 #ifdef EXP_DOALL_GALOIS
-        }, Galois::do_all_steal(false));
+        });
 #else
 	}
 #endif
@@ -556,7 +556,7 @@ int multiple_l2r_lr_tron(multiple_linear_problem *prob, multiple_linear_paramete
                         tron_obj.tron(Wj, false); 
                 }
 #ifdef EXP_DOALL_GALOIS
-        }, Galois::do_all_steal(false));
+        });
 #else
 	}
 #endif
@@ -604,7 +604,7 @@ int multiple_l2r_l2svc_tron(multiple_linear_problem *prob, multiple_linear_param
                         tron_obj.tron(Wj, false); 
                 }
 #ifdef EXP_DOALL_GALOIS
-        }, Galois::do_all_steal(false));
+        });
 #else
 	}
 #endif

@@ -28,21 +28,20 @@
 #ifndef WAVEFRONT_BFS_H_
 #define WAVEFRONT_BFS_H_
 
+#include "Galois/Accumulator.h"
+#include "Galois/AltBag.h"
+#include "Galois/DoAllWrap.h"
+#include "Galois/PerThreadContainer.h"
+
+#include "Galois/WorkList/ExternalReference.h"
+
+#include "bfs.h"
+
 #include <string>
 #include <sstream>
 #include <limits>
 #include <iostream>
 #include <set>
-
-#include "Galois/GaloisUnsafe.h"
-#include "Galois/Accumulator.h"
-#include "Galois/Bag.h"
-
-#include "Galois/Runtime/PerThreadWorkList.h"
-#include "Galois/DoAllWrap.h"
-
-#include "bfs.h"
-
 
 class AbstractWavefrontBFS: public BFS<unsigned> {
 
@@ -59,7 +58,7 @@ protected:
     WL* currWL = new WL ();
     WL* nextWL = new WL ();
 
-    graph.getData (startNode, Galois::NONE) = 0;
+    graph.getData (startNode, Galois::MethodFlag::UNPROTECTED) = 0;
     currWL->push_back (startNode);
     size_t numIter = 1; //  counting the start node
 
@@ -205,26 +204,25 @@ class BFSwavefrontNolock;
 
 class BFSwavefrontLock: public AbstractWavefrontBFS {
 protected:
-  typedef GaloisWLwrapper< Galois::WorkList::dChunkedFIFO<CHUNK_SIZE, GNode> > GaloisWL;
+  typedef GaloisWLwrapper< Galois::WorkList::dChunkedFIFO<DEFAULT_CHUNK_SIZE, GNode> > GaloisWL;
 
   typedef AbstractWavefrontBFS::Super_ty BaseBFS;
 
   friend class BFSwavefrontNolock;
 
 private:
-
-
-
-
   template <bool doLock>
   struct ParallelInnerLoop {
     GALOIS_ATTRIBUTE_PROF_NOINLINE unsigned operator () (Graph& graph, GaloisWL& currWL, GaloisWL& nextWL) const {
+      typedef typename GaloisWL::value_type value_type;
+      typedef Galois::WorkList::ExternalReference<GaloisWL> WL;
+
+      value_type *it = nullptr;
 
       ParCounter numAdds;
 
       ForEachFunctor<doLock, GaloisWL, Super_ty::NodeData_ty> l (graph, nextWL, numAdds);
-      Galois::for_each_wl (currWL, l);
-      // Galois::for_each_wl <Galois::Runtime::WorkList::ParaMeter<GaloisWL> > (currWL, l);
+      Galois::for_each(it, it, l, Galois::wl<WL>(std::ref(currWL)));
 
       return numAdds.reduce ();
     }
@@ -258,7 +256,14 @@ class BFSwavefrontNolock: public AbstractWavefrontBFS {
 
 class BFSwavefrontCoupled: public AbstractWavefrontBFS {
 
-  typedef Galois::Runtime::PerThreadVector<GNode> WL_ty;
+// #define BFS_WF_USE_BAG 1
+
+#ifdef BFS_WF_USE_BAG
+  typedef Galois::InsertBag<GNode> WL_ty;
+#else
+  typedef Galois::PerThreadBag<GNode> WL_ty;
+  // typedef Galois::PerThreadBag<GNode, 64> WL_ty;
+#endif // BFS_WF_USE_BAG
 
   struct ParallelInnerLoop {
     Graph& graph;
@@ -276,7 +281,11 @@ class BFSwavefrontCoupled: public AbstractWavefrontBFS {
     {} 
 
     GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (GNode src) const {
+#ifdef BFS_WF_USE_BAG
+      numAdds += Super_ty::bfsOperator<false> (graph, src, nextWL);
+#else
       numAdds += Super_ty::bfsOperator<false> (graph, src, nextWL.get ());
+#endif
     }
   };
 
@@ -290,27 +299,41 @@ public:
     WL_ty* currWL = new WL_ty ();
     WL_ty* nextWL = new WL_ty ();
 
-    graph.getData (startNode, Galois::NONE) = 0;
+    graph.getData (startNode, Galois::MethodFlag::UNPROTECTED) = 0;
+#ifdef BFS_WF_USE_BAG
+    currWL->push_back (startNode);
+#else
     currWL->get ().push_back (startNode);
+#endif
 
     size_t numIter = 1;
 
     unsigned level = 0;
 
     ParCounter numAdds;
-    Galois::Runtime::getSystemThreadPool ().burnPower (Galois::getActiveThreads ());
+    Galois::Substrate::getThreadPool ().burnPower (Galois::getActiveThreads ());
+
+#ifdef BFS_WF_USE_BAG
+    while (!currWL->empty ()) {
+#else
     while (!currWL->empty_all ()) {
+#endif
 
       Galois::do_all_choice (Galois::Runtime::makeLocalRange(*currWL), 
           ParallelInnerLoop (graph, *nextWL, numAdds), 
           "wavefront_inner_loop",
-          Galois::doall_chunk_size<CHUNK_SIZE> ());
+          Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
 
       std::swap (currWL, nextWL);
-      nextWL->clear_all ();
+
+#ifdef BFS_WF_USE_BAG
+      nextWL->clear ();
+#else
+      nextWL->clear_all_parallel ();
+#endif
       ++level;
     }
-    Galois::Runtime::getSystemThreadPool ().beKind ();
+    Galois::Substrate::getThreadPool ().beKind ();
 
     numIter += numAdds.reduce ();
 

@@ -1,5 +1,5 @@
-#include "Galois/Graph/Graph.h"
-#include "Galois/Graph/LCGraph.h"
+#include "Galois/Graphs/Graph.h"
+#include "Galois/Graphs/LCGraph.h"
 
 struct Node1;
 typedef Galois::Graph::FirstGraph<Node1, void, true> Graph1;

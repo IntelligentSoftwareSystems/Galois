@@ -17,7 +17,7 @@
 void Node::execute()
 {
 
-	productions->Execute(productionToExecute,v,input);
+    productions->Execute(productionToExecute,v,input);
 	//struct timeval t1, t2;
 
 	//gettimeofday(&t1, NULL);
