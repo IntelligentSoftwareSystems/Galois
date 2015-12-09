@@ -78,6 +78,7 @@ endif()
 
 # Clang
 if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
+  set(USE_GOLD_LINKER "ON")
   if(CXX_TOOLCHAIN)
     set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -gcc-toolchain ${CXX_TOOLCHAIN}/..")
   else()

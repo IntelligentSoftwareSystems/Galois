@@ -25,8 +25,7 @@
 
 
 #include "Galois/Galois.h"
-#include "Galois/Accumulator.h"
-#include "Galois/Bag.h"
+//#include "Galois/Accumulator.h"
 #include "Galois/Statistic.h"
 #include "Galois/Graphs/LCGraph.h"
 #include "Galois/Graphs/TypeTraits.h"
@@ -42,13 +41,6 @@
 #include <sstream>
 #include <set>
 
-#include "PageRank.h"
-#include "PageRankAsync.h"
-#include "PageRankAsyncResidual.h"
-#include "PageRankAsyncPri.h"
-#include "PageRankAsyncPriSet.h"
-#include "PageRankEdge.h"
-#include "PPR.h"
 
 namespace cll = llvm::cl;
 
@@ -56,181 +48,26 @@ static const char* name = "Page Rank";
 static const char* desc = "Computes page ranks a la Page and Brin";
 static const char* url = 0;
 
-enum Algo {
-  sync_coord,
-  sync_aut,
-  async,
-  async_rsd,
-  async_prt,
-  async_prs,
-  async_edge,
-  async_edge_prs,
-  async_ppr_rsd
-};
-
 cll::opt<std::string> filename(cll::Positional, cll::desc("<input graph>"), cll::Required);
-static cll::opt<std::string> transposeGraphName("graphTranspose", cll::desc("Transpose of input graph"));
-cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations"), cll::init(10000000));
-cll::opt<unsigned int> memoryLimit("memoryLimit",
-    cll::desc("Memory limit for out-of-core algorithms (in MB)"), cll::init(~0U));
-static cll::opt<float> amp("amp", cll::desc("amp for priority"), cll::init(100));
 static cll::opt<float> tolerance("tolerance", cll::desc("tolerance"), cll::init(0.01));
-static cll::opt<bool> dbg("dbg", cll::desc("dbg"), cll::init(false));
-static cll::opt<std::string> algo_str("algo_str", cll::desc("algo_str"), cll::init("NA"));
-static cll::opt<bool> outOnlyP("outdeg", cll::desc("Out degree only for priority"), cll::init(false));
-static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
-    cll::values(
-      clEnumValN(Algo::sync_coord, "sync_coord", "Synchronous version, coordinated..."),
-      clEnumValN(Algo::sync_aut, "sync_aut", "Synchronous version, autonomous..."),
-      clEnumValN(Algo::async, "async", "Asynchronous versoin..."),
-      clEnumValN(Algo::async_rsd, "async_rsd", "Residual-based asynchronous version..."),
-      clEnumValN(Algo::async_prt, "async_prt", "Prioritized (degree biased residual) version..."),
-      clEnumValN(Algo::async_prs, "async_prs", "Prioritized Bulk Sync version..."),
-      clEnumValN(Algo::async_edge, "async_edge", "Edge based"),
-      clEnumValN(Algo::async_edge_prs, "async_edge_prs", "Edge based"),
-      clEnumValN(Algo::async_ppr_rsd, "async_ppr_rsd", "Asyncronous PPR"),
-      clEnumValEnd), cll::init(Algo::async));
 
-bool outOnly;
+static const float alpha = 0.85; 
+typedef double PRTy;
 
-template<bool coord>
-struct Sync {
-  struct LNode {
-    std::array<float, coord ? 2 : 1> value;
-    void init() { 
-      std::fill(value.begin(), value.end(), 1.0 - alpha);
-    }
-    float getPageRank() { 
-      //      std::cout << 'b';
-      return value[coord ? 1 : 0];
-    }
-    float getPageRank(unsigned int it) { 
-      it = coord ? (it & 1) : 0;
-      //      std::cout << it;
-      return value[it];
-    }
-    void setPageRank(unsigned it, float v) { 
-      it = coord ? ((it + 1) & 1) : 0;
-      //      std::cout << 2+it;
-      value[it] = v;
-    }
-    friend std::ostream& operator<<(std::ostream& os, const LNode& n) {
-      os << "{PR " << n.value[0];
-      if (coord)
-        os << "," << n.value[1];
-      os << "}";
-      return os;
-    }
-  };
 
-  typedef typename Galois::Graph::LC_CSR_Graph<LNode,void>
-    ::template with_numa_alloc<true>::type
-    InnerGraph;
-  typedef typename Galois::Graph::LC_InOut_Graph<InnerGraph> Graph;
-  typedef typename Graph::GraphNode GNode;
-
-  std::string name() const { return coord ? "Sync_c" : "Sync_a"; }
-
-  Galois::GReduceMax<float> max_delta;
-  Galois::GAccumulator<unsigned int> small_delta;
-
-  void readGraph(Graph& graph, std::string filename, std::string transposeGraphName) {
-    if (transposeGraphName.size()) {
-      Galois::Graph::readGraph(graph, filename, transposeGraphName); 
-    } else {
-      std::cerr << "Need to pass precomputed graph through -graphTranspose option\n";
-      abort();
-    }
-  }
-
-  struct Initialize {
-    Graph& g;
-    Initialize(Graph& g): g(g) { }
-    void operator()(GNode n) const {
-      LNode& data = g.getData(n, Galois::MethodFlag::UNPROTECTED);
-      std::fill(data.value.begin(), data.value.end(), 1.0 - alpha);
-    }
-  };
-
-  struct Copy {
-    Graph& g;
-    Copy(Graph& g): g(g) { }
-    void operator()(GNode n) const {
-      LNode& data = g.getData(n, Galois::MethodFlag::UNPROTECTED);
-      assert(coord);
-      data.value[1] = data.value[0];
-    }
-  };
-
-  struct Process {
-    Sync* self;
-    Graph& graph;
-    unsigned int iteration;
-
-    Process(Sync* s, Graph& g, unsigned int i): self(s), graph(g), iteration(i) { }
-
-    void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) const {
-      (*this)(src);
-    }
-
-    void operator()(const GNode& src) const {
-
-      LNode& sdata = graph.getData(src);
-
-      Galois::MethodFlag lockflag = Galois::MethodFlag::UNPROTECTED;
-      double value = computePageRankInOut(graph, src, iteration, lockflag);
-
-      //float value = alpha*sum + (1.0 - alpha);
-      float diff = std::fabs(value - sdata.getPageRank(iteration));
-      sdata.setPageRank(iteration, value);
-      if (diff < tolerance)
-        self->small_delta += 1;
-      self->max_delta.update(diff);
-    }
-  };
-
-  void operator()(Graph& graph, PRTy, PRTy) {
-    unsigned int iteration = 0;
-    auto numNodes = graph.size();
-    while (true) {
-      Galois::do_all_local(graph, Process(this, graph, iteration));
-      iteration += 1;
-
-      float delta = max_delta.reduce();
-      size_t sdelta = small_delta.reduce();
-
-      std::cout << "iteration: " << iteration
-        << " max delta: " << delta
-        << " small delta: " << sdelta
-        << " (" << sdelta / numNodes << ")"
-                << "\n";
-        //<< graph.getData(*graph.begin()) << "\n";
-
-      if (delta < tolerance || iteration >= maxIterations) {
-        break;
-      }
-      max_delta.reset();
-      small_delta.reset();
-    }
-
-    if (iteration >= maxIterations) {
-      std::cout << "Failed to converge\n";
-    }
-
-    if (iteration & 1) {
-      // Result already in right place
-    } else {
-      if (coord)
-        Galois::do_all_local(graph, Copy(graph));
-    }
-  }
-
-  void verify(Graph& graph, PRTy tolerance) {
-    //verifyInOut(graph, tolerance);
+struct LNode {
+  PRTy value;
+  std::atomic<PRTy> residual; 
+  void init() { value = 1.0 - alpha; residual = 0.0; }
+  friend std::ostream& operator<<(std::ostream& os, const LNode& n) {
+    os << "{PR " << n.value << ", residual " << n.residual << "}";
+    return os;
   }
 };
 
 
+typedef Galois::Graph::LC_CSR_Graph<LNode,void>::with_numa_alloc<true>::type Graph;
+typedef typename Graph::GraphNode GNode;
 
 //! Make values unique
 template<typename GNode>
@@ -261,31 +98,18 @@ static void printTop(Graph& graph, int topn, const char *algo_name, int numThrea
   for (auto ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
     GNode src = *ii;
     node_data_reference n = graph.getData(src);
-    float value = n.getPageRank(0);
-    sum += value;
+    sum += n.value;
   }
 
   Top top;
   
-  std::ofstream myfile;
-  if(dbg){
-    char filename[256];
-    int tamp = amp;
-    float ttol = tolerance;
-    sprintf(filename,"/scratch/01982/joyce/tmp/%s_t_%d_tol_%f_amp_%d", algo_name,numThreads,ttol,tamp);
-    myfile.open (filename);
-  }
-
   //std::cout<<"print PageRank\n";
   for (auto ii = graph.begin(), ei = graph.end(); ii != ei; ++ii) {
     GNode src = *ii;
     node_data_reference n = graph.getData(src);
-    float value = n.getPageRank(0)/sum; // normalized PR (divide PR by sum)
+    float value = n.value/sum; // normalized PR (divide PR by sum)
     //float value = n.getPageRank(); // raw PR 
     //std::cout<<value<<" "; 
-    if(dbg){
-      myfile << value <<" ";
-    }
     Pair key(value, src);
 
     if ((int) top.size() < topn) {
@@ -298,9 +122,6 @@ static void printTop(Graph& graph, int topn, const char *algo_name, int numThrea
       top.insert(std::make_pair(key, src));
     }
   }
-  if(dbg){
-    myfile.close();
-  }
   //std::cout<<"\nend of print\n";
 
   int rank = 1;
@@ -310,122 +131,98 @@ static void printTop(Graph& graph, int topn, const char *algo_name, int numThrea
   }
 }
 
+PRTy atomicAdd(std::atomic<PRTy>& v, PRTy delta) {
+  PRTy old;
+  do {
+    old = v;
+  } while (!v.compare_exchange_strong(old, old + delta));
+  return old;
+}
 
 
-template<typename Algo>
-void run() {
-  typedef typename Algo::Graph Graph;
-
-  Algo algo;
-  Graph graph;
-
-  algo.readGraph(graph, filename, transposeGraphName);
-
-  Galois::preAlloc(numThreads + (2*graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::pagePoolSize());
-  Galois::reportPageAlloc("MeminfoPre");
-
-  Galois::StatTimer T;
-  auto eamp = -amp;///tolerance;
-  std::cout << "Running " << algo.name() << " version\n";
-  std::cout << "tolerance: " << tolerance << "\n";
-  std::cout << "effective amp: " << eamp << "\n";
-  T.start();
-  Galois::do_all_local(graph, [&graph] (typename Graph::GraphNode n) { graph.getData(n).init(); });
-  algo(graph, tolerance, eamp);
-  T.stop();
+struct PageRank {
+  Graph& graph;
+  PRTy tolerance;
   
-  Galois::reportPageAlloc("MeminfoPost");
-
-  if (!skipVerify) {
-    algo.verify(graph, tolerance);
-    printTop(graph, 10, algo.name().c_str(), numThreads);
+  PageRank(Graph& g, PRTy t) : graph(g), tolerance(t) {}
+  
+  void operator()(const GNode& src, Galois::UserContext<GNode>& ctx) const {
+    LNode& sdata = graph.getData(src);      
+    Galois::MethodFlag flag = Galois::MethodFlag::UNPROTECTED;
+    
+    if (std::fabs(sdata.residual) > tolerance) {
+      PRTy oldResidual = sdata.residual.exchange(0.0);
+      sdata.value += oldResidual;
+      int src_nout = std::distance(graph.edge_begin(src, flag), graph.edge_end(src,flag));
+      PRTy delta = oldResidual*alpha/src_nout;
+      // for each out-going neighbors
+      for (auto jj : graph.edges(src, flag)) {
+        GNode dst = graph.getEdgeDst(jj);
+        LNode& ddata = graph.getData(dst, flag);
+        auto old = atomicAdd(ddata.residual, delta);
+        if (std::fabs(old) <= tolerance && std::fabs(old + delta) >= tolerance)
+          ctx.push(dst);
+      }
+    } else { // might need to reschedule self
+      //Why?
+      //      ctx.push(src);
+    }
   }
+};
+
+
+void initResidual(Graph& graph) {
+
+  //use residual for the partial, scaled initial residual
+  Galois::do_all_local(graph, [&graph] (const typename Graph::GraphNode& src) {
+      //contribute residual
+      auto nout = std::distance(graph.edge_begin(src), graph.edge_end(src));
+      for (auto ii : graph.edges(src)) {
+        auto dst = graph.getEdgeDst(src);
+        auto& ddata = graph.getData(dst);
+        atomicAdd(ddata.residual, 1.0/nout);
+      }
+    }, Galois::do_all_steal<true>());
+  //scale residual
+  Galois::do_all_local(graph, [&graph] (const typename Graph::GraphNode& src) {
+      auto& data = graph.getData(src);
+      data.residual = data.residual * alpha * (1.0-alpha);
+    }, Galois::do_all_steal<true>());
 }
-
-
-
-template<typename Algo>
-void runPPR() {
-  typedef typename Algo::Graph Graph;
-
-  Algo algo;
-  Graph graph;
-
-  algo.readGraph(graph, filename, transposeGraphName);
-
-  std::cout << "Read " << std::distance(graph.begin(), graph.end()) << " Nodes\n";
-
-  Galois::preAlloc(numThreads + (graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::pagePoolSize());
-  Galois::reportPageAlloc("MeminfoPre");
-
-  unsigned numSeeds = 2;
-
-  Galois::StatTimer Tt;
-  Tt.start();
-  auto seeds = findPPRSeeds(graph, numSeeds);
-  Tt.stop();
-  std::cout << "Find " << numSeeds << " seeds (found " << seeds.size() << ") in " << Tt.get() << "ms\n";
-
-  std::map<typename Graph::GraphNode, std::deque<unsigned> > clusters;
-
-  unsigned counter = 0;
-  for (auto seed : seeds) {
-
-    Galois::StatTimer T1, T2, T3;
-    std::cout << "Running " << algo.name() << " version\n";
-    T1.start();
-    Galois::do_all_local(graph, [&graph] (typename Graph::GraphNode n) { graph.getData(n).init(); });
-    T1.stop();
-    T2.start();
-    algo(graph, seed);
-    T2.stop();
-    T3.start();
-    auto c = algo.cluster_from_sweep(graph);
-    T3.stop();
-    std::cout << T1.get() << " " << T2.get() << " " << T3.get() << "\n";
-
-    std::cout << seed << " : " << c.size() << "\n";
-    // for (auto n : c)
-    //   std::cout << n << " ";
-    // std::cout << "\n";
-
-    for (auto n : c)
-      clusters[n].push_back(counter);
-    ++counter;
-
-    Galois::reportPageAlloc("MeminfoPost");
-  }
-
-  for (auto np : clusters) {
-    std::cout << np.first << ": ";
-    for (auto n : np.second)
-      std::cout << n << " ";
-    std::cout << "\n";
-  }
-}
-
-
 
 int main(int argc, char **argv) {
   LonestarStart(argc, argv, name, desc, url);
   Galois::StatManager statManager;
 
-  outOnly = outOnlyP;
-
-  Galois::StatTimer T("TotalTime");
+  Galois::StatTimer T("OverheadTime");
   T.start();
-  switch (algo) {
-  case Algo::sync_coord: run<Sync<true>>(); break;
-  case Algo::sync_aut: run<Sync<false>>(); break;
-    case Algo::async: run<AsyncSet>(); break;
-    case Algo::async_rsd: run<AsyncRsd>(); break;
-    case Algo::async_prt: run<AsyncPri>(); break;
-    case Algo::async_prs: run<AsyncPriSet>(); break;
-    case Algo::async_edge: run<AsyncEdge>(); break;
-    case Algo::async_edge_prs:run<AsyncEdgePriSet>(); break;
-    case Algo::async_ppr_rsd: runPPR<PPRAsyncRsd>(); break;
-    default: std::cerr << "Unknown algorithm\n"; abort();
+
+  Graph graph;
+  
+  Galois::Graph::readGraph(graph, filename);
+
+  std::cout << "Read " << std::distance(graph.begin(), graph.end()) << " Nodes\n";
+
+  Galois::preAlloc(numThreads + (2*graph.size() * sizeof(typename Graph::node_data_type)) / Galois::Runtime::pagePoolSize());
+  Galois::reportPageAlloc("MeminfoPre");
+
+  std::cout << "Running Edge Async version\n";
+  std::cout << "tolerance: " << tolerance << "\n";
+  Galois::do_all_local(graph, [&graph] (typename Graph::GraphNode n) { graph.getData(n).init(); });
+  initResidual(graph);
+
+  Galois::StatTimer Tmain;
+  Tmain.start();  
+  typedef Galois::WorkList::dChunkedFIFO<256> WL;
+  Galois::for_each_local(graph, PageRank{graph, tolerance}, Galois::wl<WL>());
+  Tmain.stop();
+  
+  Galois::reportPageAlloc("MeminfoPost");
+  
+  if (!skipVerify) {
+    printTop(graph, 10, "EdgeAsync", numThreads);
   }
+
   T.stop();
 
   return 0;
