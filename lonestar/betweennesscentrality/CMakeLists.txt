@@ -1,5 +1,4 @@
 app(betweennesscentrality-outer BetweennessCentralityOuter.cpp)
-include_directories(../bfs)
 app(betweennesscentrality-inner BetweennessCentralityInner.cpp)
 
 add_test_scale(web betweennesscentrality-outer "${BASEINPUT}/scalefree/rmat8-2e14.gr")
