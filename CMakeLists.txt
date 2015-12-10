@@ -28,6 +28,7 @@ set(USE_PAPI OFF CACHE BOOL "Use PAPI counters for profiling")
 set(USE_HPCTOOLKIT OFF CACHE BOOL "Use HPCToolKit for profiling")
 set(USE_STRICT_CONFIG OFF CACHE BOOL "Instead of falling back gracefully, fail")
 set(USE_LONGJMP ON CACHE BOOL "Use longjmp instead of exceptions to signal aborts")
+set(USE_SANATIZER OFF CACHE BOOL "Use address and memory sanatizer")
 set(INSTALL_APPS OFF CACHE BOOL "Install apps as well as library")
 set(SKIP_COMPILE_APPS OFF CACHE BOOL "Skip compilation of applications using Galois library")
 set(GRAPH_LOCATION "" CACHE PATH "Location of inputs for tests if downloaded/stored separately.")
@@ -58,8 +59,9 @@ enable_testing()
 
 ###### Configure compiler ######
 
-set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g")
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g")
+#Always include debug info and aggressive warnings
+set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -g -Wall")
+set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -g -Wall")
 
 if(NOT "$ENV{GCC_BIN}" STREQUAL "")
   # Preserve captured environment variable during reconfiguration
@@ -90,25 +92,6 @@ if(CMAKE_CXX_COMPILER_ID MATCHES "Clang")
     message(STATUS "Using default GCC toolchain; set environment variable GCC_BIN to override")
   endif()
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fcolor-diagnostics")
-  if(CMAKE_BUILD_TYPE MATCHES "Debug")
-#    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-omit-frame-pointer -fno-optimize-sibling-calls -O0")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-omit-frame-pointer -fno-optimize-sibling-calls -O0")
-  endif()
-endif()
-#set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-omit-frame-pointer -fno-optimize-sibling-calls -O0")
-
-# XL
-if(CMAKE_CXX_COMPILER_ID MATCHES "XL")
-  execute_process(COMMAND ${CMAKE_CXX_COMPILER} -qversion
-                  COMMAND sed 1d
-                  COMMAND sed s/Version://
-                  OUTPUT_VARIABLE XLC_VERSION)
-  if(XLC_VERSION VERSION_GREATER 12.0)
-    #message(STATUS "XLC Version > 12.0")
-  else()
-    message(FATAL_ERROR "XLC must be higher than 12.0; found ${XLC_VERSION} instead")
-  endif()
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -qsuppress=1540-0724 -qsuppress=1500-029 -qmaxmem=-1 -qalias=noansi -qsmp=omp")
 endif()
 
 if(CYGWIN)
@@ -117,22 +100,17 @@ if(CYGWIN)
 endif()
 
 # check for incompatible GCC
-set(GCC_TUPLE_BUG_NOT_FOUND TRUE)
 if(CMAKE_COMPILER_IS_GNUCC)
   execute_process(COMMAND ${CMAKE_CXX_COMPILER} -dumpversion
                   OUTPUT_VARIABLE GCC_VERSION)
   if(GCC_VERSION VERSION_LESS 4.7)
     message(FATAL_ERROR "GCC must be 4.7 or higher")
   endif()
-  if(GCC_VERSION VERSION_LESS 4.7.3)
-    set(GCC_TUPLE_BUG_NOT_FOUND)
+  #new debugging optimization level
+  if(CMAKE_BUILD_TYPE MATCHES "Debug")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Og")
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Og")
   endif()
-endif()
-
-# solaris
-if(CMAKE_SYSTEM MATCHES "SunOS.*")
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -m64 -mcpu=niagara2 -lposix4")
-  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -m64 -lposix4")
 endif()
 
 # Enable architecture-specific optimizations
@@ -161,6 +139,13 @@ if(USE_GPROF)
   set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -pg")
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} -pg")
 endif(USE_GPROF)
+
+if(USE_SANATIZER)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsanitize=address -fno-omit-frame-pointer -fno-optimize-sibling-calls")
+endif()
+
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 ###### Configure features ######
 
@@ -275,9 +260,6 @@ if(NOT "$ENV{BOOST_DIR}" STREQUAL "")
 endif()
 find_package(Boost 1.38.0 REQUIRED)
 include_directories(${Boost_INCLUDE_DIR})
-
-set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 include(CheckEndian)
 
@@ -437,11 +419,11 @@ add_subdirectory(libgraphs)
 add_subdirectory(libnet)
 add_subdirectory(libexp)
 
-#add_subdirectory(src)
 add_subdirectory(tools)
 add_subdirectory(scripts)
 if(NOT SKIP_COMPILE_APPS)
   add_subdirectory(lonestar)
+  add_subdirectory(apps)
   add_subdirectory(examples)
   add_subdirectory(test)
 #  add_subdirectory(toolkit_ml)
