@@ -247,11 +247,9 @@ struct DefaultAlgo {
   void operator()(Graph& graph) {
     typedef Galois::WorkList::Deterministic<> DWL;
 
-#ifdef GALOIS_USE_EXP
     typedef Galois::WorkList::BulkSynchronous<> WL;
-#else
-    typedef Galois::WorkList::dChunkedFIFO<256> WL;
-#endif
+    //    typedef Galois::WorkList::dChunkedFIFO<256> WL;
+
     switch (algo) {
       case nondet: 
         Galois::for_each(graph.begin(), graph.end(), Process<>(graph), Galois::wl<WL>());
@@ -262,11 +260,7 @@ struct DefaultAlgo {
       case detPrefix:
         Galois::for_each(graph.begin(), graph.end(), Process<>(graph),
             Galois::wl<DWL>(),
-#if defined(__INTEL_COMPILER) && __INTEL_COMPILER <= 1400
-            Galois::has_neighborhood_visitor<Process<detPrefix>>(Process<detPrefix>(graph))
-#else
             Galois::make_trait_with_args<Galois::has_neighborhood_visitor>(Process<detPrefix>(graph))
-#endif
             );
         break;
       case detDisjoint:

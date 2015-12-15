@@ -38,9 +38,6 @@
 #include "Galois/Graphs/FileGraph.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
-#ifdef GALOIS_USE_EXP
-#include "Galois/PriorityScheduling.h"
-#endif
 
 #include <algorithm>
 #include <iostream>
@@ -588,12 +585,7 @@ struct MatchingABMP {
     typedef dChunkedFIFO<1024> dChunk;
     typedef OrderedByIntegerMetric<Indexer,dChunk> OBIM;
     
-#ifdef GALOIS_USE_EXP
-    Exp::PriAuto<1024,Indexer,OBIM,Less,Greater>::for_each(
-	 initial.begin(), initial.end(), Process(*this, g, maxLayer, size));
-#else
     Galois::for_each(initial.begin(), initial.end(), Process(*this, g, maxLayer, size), Galois::wl<OBIM>());
-#endif
     
     t.start();
     MatchingFF<G,false> algo;
