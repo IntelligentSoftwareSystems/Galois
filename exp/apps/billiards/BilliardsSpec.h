@@ -144,7 +144,7 @@ public:
 
   virtual const std::string version () const { return "using Speculative Executor"; }
 
-  virtual size_t runSim (Table& table, std::vector<Event>& initEvents, const FP& endtime, bool enablePrints=false) {
+  size_t runSim (Table& table, std::vector<Event>& initEvents, const FP& endtime, bool enablePrints=false) {
 
     Graph graph;
     VecNodes nodes;

@@ -43,6 +43,9 @@
 
 #include "Galois/Substrate/gio.h"
 
+#include <boost/iterator/transform_iterator.hpp>
+
+template <typename B>
 class Table {
 
 public:
@@ -53,6 +56,7 @@ public:
     static const FP MAX_SPEED;
   };
 
+  using Ball_t = B;
 
 protected:
   unsigned numBalls;
@@ -62,7 +66,7 @@ protected:
   
 
   std::vector<Cushion*> cushions;
-  std::vector<Ball*> balls;
+  std::vector<Ball_t*> balls;
 
 
   Table& operator = (const Table& that) { abort (); return *this; }
@@ -84,7 +88,7 @@ public:
     createCushions ();
 
     for (I i = ballsBeg; i != ballsEnd; ++i) {
-      balls.push_back (new Ball (*i));
+      balls.push_back (new Ball_t (*i));
     }
   }
 
@@ -116,7 +120,7 @@ public:
     return cushions [int (side)];
   }
 
-  const Ball& getBallByID (unsigned id) const {
+  const Ball_t& getBallByID (unsigned id) const {
     assert (id < balls.size ());
 
     // XXX: assumes ball ids and indices are same
@@ -189,15 +193,13 @@ public:
 
     initEvents.clear ();
 
-    for (std::vector<Ball*>::iterator i = balls.begin (), ei = balls.end ();
-        i != ei; ++i) {
-
-      addNextEventIntern (initEvents, *i, endtime); 
+    for (Ball_t* b: balls) {
+      addNextEventIntern (initEvents, b, endtime); 
     }
   }
 
   void advance (const FP& simTime) {
-    for (Ball* b: balls) {
+    for (Ball_t* b: balls) {
       if (simTime > b->time ()) {
         b->update (b->vel (), simTime);
 
@@ -210,7 +212,7 @@ public:
   void check () const {
 
     for (size_t i = 0; i < balls.size (); ++i) {
-      const Ball* b0 = balls[i];
+      const Ball_t* b0 = balls[i];
       FP px = b0->pos ().getX ();
       FP py = b0->pos ().getY ();
 
@@ -225,7 +227,7 @@ public:
 
       // check for overlap
       for (size_t j = i + 1; j < balls.size (); ++j) {
-        const Ball* b1 = balls[j];
+        const Ball_t* b1 = balls[j];
 
         FP d = b0->pos ().dist (b1->pos ());
 
@@ -271,10 +273,8 @@ public:
 
     FP sumKE = 0.0;
 
-    for (std::vector<Ball*>::const_iterator i = balls.begin (), ei = balls.end ();
-        i != ei; ++i) {
-
-      sumKE += (*i)->ke ();
+    for (const Ball_t* b: balls) {
+      sumKE += b->ke ();
     }
 
     return sumKE;
@@ -295,8 +295,8 @@ public:
 
 
     for (size_t i = 0; i < numBalls; ++i) {
-      const Ball& b1 = *(this->balls[i]);
-      const Ball& b2 = *(that.balls[i]);
+      const Ball_t& b1 = *(this->balls[i]);
+      const Ball_t& b2 = *(that.balls[i]);
       
       if (b1.getID () != b2.getID ()) {
         std::cerr << "Balls with different ID at same index i" << std::endl;
@@ -405,18 +405,16 @@ public:
     // fprintf (ballsFH, "ball_id, mass, radius, pos_x, pos_y, vel_x, vel_y\n");
     fprintf (ballsFH, "ball.id, ball.pos.x, ball.pos.y, ball.vel.x, ball.vel.y\n");
 
-    for (std::vector<Ball*>::const_iterator i = balls.begin ()
-        , ei = balls.end (); i != ei; ++i) {
-      const Ball& b = *(*i);
+    for (const Ball_t* b: balls) {
       
 //       fprintf (ballsFH, "%d, %g, %g, %g, %g, %g, %g\n"
   //         , b.getID (), b.mass (), b.radius (), b.pos ().getX (), b.pos ().getY (), b.vel ().getX (), b.vel ().getY ());
       fprintf (ballsFH, "%d, %e, %e, %e, %e\n", 
-          b.getID (), 
-          double (b.pos ().getX ()), 
-          double (b.pos ().getY ()), 
-          double (b.vel ().getX ()), 
-          double (b.vel ().getY ()));
+          b->getID (), 
+          double (b->pos ().getX ()), 
+          double (b->pos ().getY ()), 
+          double (b->vel ().getX ()), 
+          double (b->vel ().getY ()));
     }
     
     fclose (ballsFH);
@@ -430,13 +428,11 @@ public:
 
     fprintf (cushionsFH, "cushion_id, start_x, start_y, end_x, end_y\n");
 
-    for (std::vector<Cushion*>::const_iterator i = cushions.begin ()
-        , ei = cushions.end (); i != ei; ++i) {
-      const Cushion& c = *(*i);
-      const LineSegment& l = c.getLineSegment ();
+    for (Cushion* c: cushions) {
+      const LineSegment& l = c->getLineSegment ();
 
       fprintf (cushionsFH, "%d, %g, %g, %g, %g"
-          , c.getID (), 
+          , c->getID (), 
           double (l.getBegin ().getX ()), 
           double (l.getBegin ().getY ()), 
           double (l.getEnd ().getX ()), 
@@ -492,7 +488,7 @@ protected:
 
       assert (vel.mag () < (FP (2.0) * DefaultValues::MAX_SPEED));
 
-      Ball* b = new Ball (i, pos, vel, DefaultValues::BALL_MASS, radius);
+      Ball_t* b = new Ball_t (i, pos, vel, DefaultValues::BALL_MASS, radius);
 
       balls.push_back (b);
     }
@@ -555,8 +551,8 @@ protected:
 
     assert (e.getKind () == Event::BALL_COLLISION);
 
-    const Ball* b1 = e.getBall ();
-    const Ball* b2 = e.getOtherBall ();
+    const Ball_t* b1 = static_cast<Ball_t*> (e.getBall ());
+    const Ball_t* b2 = static_cast<Ball_t*> (e.getOtherBall ());
     
     // firstBallChanged or otherBallChanged should return true 
     // for an invalid event 'e'
@@ -578,16 +574,37 @@ protected:
 
     assert (e.getKind () == Event::CUSHION_COLLISION);
     if (!e.firstBallChanged ()) {
-      addNextEventIntern (addList, e.getBall (), endtime, &e);
+      addNextEventIntern (addList, static_cast<Ball_t*> (e.getBall ()), endtime, &e);
     }
   }
 
   template <typename C>
-  void addNextEventIntern (C& addList, const Ball* ball, const FP& endtime, const Event* prevEvent=nullptr) const {
+  void addNextEventIntern (C& addList, const Ball_t* ball, const FP& endtime, const Event* prevEvent=nullptr) const {
 
     assert (ball != nullptr);
 
-    Galois::optional<Event> ballColl = Collision::computeNextEvent (Event::BALL_COLLISION, ball, this->balls.begin (), this->balls.end (), endtime, nullptr);
+    struct BallReader: public std::unary_function<const Ball_t*, const Ball*> {
+      const Event* prev;
+
+      BallReader (const Event* p): prev (p) {}
+
+      const Ball* operator () (const Ball_t* b) const {
+
+        if (prev) {
+          return b->readWeak (*prev);
+
+        } else {
+          return b;
+        }
+      }
+
+    };
+
+    auto bbeg = boost::make_transform_iterator (balls.begin (), BallReader (prevEvent));
+    auto bend = boost::make_transform_iterator (balls.end (), BallReader (prevEvent));
+
+    Galois::optional<Event> ballColl = Collision::computeNextEvent (Event::BALL_COLLISION, ball, bbeg, bend, endtime, nullptr);
+
     Galois::optional<Event> cushColl = Collision::computeNextEvent (Event::CUSHION_COLLISION, ball, this->cushions.begin (), this->cushions.end (), endtime, nullptr);
 
 
@@ -620,11 +637,11 @@ protected:
 
 
   // template <typename C>
-  // void addNextEventIntern (C& addList, const Ball* ball, const Ball* prevBall, const Cushion* prevCushion, const FP& endtime) const {
+  // void addNextEventIntern (C& addList, const Ball_t* ball, const Ball_t* prevBall, const Cushion* prevCushion, const FP& endtime) const {
 // 
     // assert (ball != nullptr);
 // 
-    // std::pair<const Ball*, FP> ballColl = Collision::computeNextCollision (ball, this->balls.begin (), this->balls.end (), prevBall, endtime);
+    // std::pair<const Ball_t*, FP> ballColl = Collision::computeNextCollision (ball, this->balls.begin (), this->balls.end (), prevBall, endtime);
     // std::pair<const Cushion*, FP> cushColl = Collision::computeNextCollision (ball, this->cushions.begin (), this->cushions.end (), prevCushion, endtime);
 // 
     // if (ballColl.first != nullptr && cushColl.first != nullptr) {
@@ -677,11 +694,10 @@ protected:
 
   template <typename T>
   static void freeVecPtr (std::vector<T*>& vec) {
-    for (typename std::vector<T*>::iterator i = vec.begin (), ei = vec.end ();
-        i != ei; ++i) {
+    for (T*& ptr: vec) {
 
-      delete *i;
-      *i = nullptr;
+      delete ptr;
+      ptr = nullptr;
     }
   }
 
@@ -689,10 +705,9 @@ protected:
   static StrmTy& printVecPtr (StrmTy& out, std::vector<T*>& vec) {
 
     out << "[" << std::endl;
-    for (typename std::vector<T*>::const_iterator i = vec.begin (), ei = vec.end ();
-        i != ei; ++i) {
+    for (T* e: vec) {
 
-      out << (*i)->str () << ", " << std::endl;
+      out << e->str () << ", " << std::endl;
     }
     out << "]"  << std::endl;
     
@@ -717,5 +732,14 @@ protected:
   }
 };
 
+template <typename B>
+const FP Table<B>::DefaultValues::BALL_MASS = 1.0;
+template <typename B>
+const FP Table<B>::DefaultValues::BALL_RADIUS = 1.0;
+
+template <typename B>
+const FP Table<B>::DefaultValues::MIN_SPEED = 1.0;
+template <typename B>
+const FP Table<B>::DefaultValues::MAX_SPEED = 10.0;
 
 #endif //  _TABLE_H_

@@ -11,7 +11,7 @@ void Sector::simulate (const Event& e) {
 
 
 
-  Ball* b = e.getBall ();
+  Ball_t* b = static_cast<Ball_t*> (e.getBall ());
 
   if (e.getKind () == Event::SECTOR_ENTRY) {
 
@@ -39,7 +39,7 @@ void Sector::simulate (const Event& e) {
 
 }
 
-Galois::optional<Event> Sector::computeEarliestEvent (const Ball* ball, const FP& endtime) const {
+Galois::optional<Event> Sector::computeEarliestEvent (const Ball_t* ball, const FP& endtime) const {
 
   // Minimum of:  
   // 1. earliest ball event
@@ -81,7 +81,7 @@ Galois::optional<Event> Sector::computeEarliestEvent (const Ball* ball, const FP
   return minEvent;
 }
 
-Galois::optional<Event> Sector::earliestSectorEntry (const Ball* ball, const FP& endtime) const {
+Galois::optional<Event> Sector::earliestSectorEntry (const Ball_t* ball, const FP& endtime) const {
 
   assert (ball);
 
@@ -195,7 +195,7 @@ Galois::optional<Event> Sector::earliestSectorEntry (const Ball* ball, const FP&
 
 }
 
-Galois::optional<Event> Sector::earliestSectorLeave (const Ball* ball, const FP& endtime) const {
+Galois::optional<Event> Sector::earliestSectorLeave (const Ball_t* ball, const FP& endtime) const {
 
   assert (ball);
 

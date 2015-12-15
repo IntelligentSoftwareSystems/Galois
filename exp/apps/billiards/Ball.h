@@ -49,19 +49,15 @@ class Ball: public CollidingObject {
   unsigned m_id;
 
   Vec2 m_pos;
-  Vec2 m_ghost_pos;
   Vec2 m_vel;
 
   FP m_mass;
   FP m_radius;
   FP m_timestamp;
-  FP m_ghost_ts;
 
   unsigned m_collCntr;
 
-  Galois::FlatSet<Sector*> sectors;
-
-  using SectorIterator = typename Galois::FlatSet<Sector*>::const_iterator;
+protected:
 
   void checkMonotony (const FP& t) const {
     if (t < m_timestamp) {
@@ -84,12 +80,10 @@ public:
 
     m_id (id),
     m_pos (pos),
-    m_ghost_pos (pos),
     m_vel (vel),
     m_mass (mass), 
     m_radius (radius), 
     m_timestamp (time),
-    m_ghost_ts (time),
     m_collCntr (0) {
 
       assert (mass > FP (0.0));
@@ -122,6 +116,84 @@ public:
 
   virtual void simulate (const Event& e);
 
+
+  void update (const Vec2& newVel, const FP& time) {
+
+    checkMonotony (time);
+    Vec2 newPos = this->pos (time); 
+
+
+    m_pos = newPos;
+    m_vel = newVel;
+    m_timestamp = time;
+
+  }
+
+
+  const Vec2& pos () const { return m_pos; }
+
+  Vec2 pos (const FP& t) const {
+
+    checkMonotony (t);
+    return (m_pos + m_vel * t - m_vel * m_timestamp); 
+  }
+
+  const Vec2& vel () const { return m_vel; }
+
+  const FP& mass () const { return m_mass; }
+
+  const FP& time () const { return m_timestamp; }
+
+  const FP& radius () const { return m_radius; }
+
+  Vec2 mom (const Vec2& _vel) const { return (mass () * (_vel )); }
+
+  Vec2 mom () const { return mom (this->vel ()); }
+
+  FP ke (const Vec2& _vel) const { return (_vel.magSqrd () * mass ())/FP (2.0); }
+
+  FP ke () const { return ke (this->vel ()); }
+
+  // TODO: move to runtime
+
+  const Ball* readWeak (const Event& e) const {
+    return this;
+  }
+
+  // TODO: fix this anomaly
+  const FP& ghostTime (void) const { return time (); }
+
+  const Vec2& ghostPos (void) const { return pos (); }
+};
+
+
+
+class BallSectored: public Ball {
+
+  using SectorSet = Galois::FlatSet<Sector*>;
+  using SectorIterator = typename SectorSet::const_iterator;
+
+  Vec2 m_ghost_pos;
+  FP m_ghost_ts;
+
+  SectorSet sectors;
+
+public:
+
+  BallSectored (
+      const unsigned id,
+      const Vec2& pos,
+      const Vec2& vel,
+      const FP& mass, 
+      const FP& radius,
+      const FP& time=0.0):
+
+    Ball (id, pos, vel, mass, radius, time),
+    m_ghost_pos (pos),
+    m_ghost_ts (time)
+
+    {}
+  
   void addSector (Sector* s) {
     assert (s != nullptr);
     sectors.insert (s);
@@ -147,57 +219,104 @@ public:
     return std::make_pair (sectors.begin (), sectors.end ());
   }
 
-  void update (const Vec2& newVel, const FP& time) {
-
-    checkMonotony (time);
-    Vec2 newPos = this->pos (time); 
-
-
-    m_pos = newPos;
-    m_vel = newVel;
-    m_timestamp = time;
-
-    m_ghost_pos = m_pos;
-    m_ghost_ts = m_timestamp;
-  }
-
   void updateGhostPos (const FP& time) {
     checkMonotony (time);
     m_ghost_pos = this->pos (time);
     m_ghost_ts = time;
   }
 
-  const Vec2& pos () const { return m_pos; }
+  void update (const Vec2& newVel, const FP& time) {
 
-  Vec2 pos (const FP& t) const {
+    Ball::update (newVel, time);
 
-    checkMonotony (t);
-    return (m_pos + m_vel * t - m_vel * m_timestamp); 
+    m_ghost_pos = Ball::pos ();
+    m_ghost_ts = Ball::time ();
   }
 
   const Vec2& ghostPos (void) const { return m_ghost_pos; }
 
   const FP& ghostTime (void) const { return m_ghost_ts; }
 
-  const Vec2& vel () const { return m_vel; }
-
-  const FP& mass () const { return m_mass; }
-
-  const FP& time () const { return m_timestamp; }
-
-  const FP& radius () const { return m_radius; }
-
-  Vec2 mom (const Vec2& _vel) const { return (mass () * (_vel )); }
-
-  Vec2 mom () const { return mom (this->vel ()); }
-
-  FP ke (const Vec2& _vel) const { return (_vel.magSqrd () * mass ())/FP (2.0); }
-
-  FP ke () const { return ke (this->vel ()); }
 
 };
 
 
+template <typename B=Ball, typename E=Event>
+class BallOptim: public B {
+
+  using BallAlloc = Galois::FixedSizeAllocator<Ball>;
+  using CheckP = std::pair<E, Ball*>;
+  using StateLog = Galois::gstl::List<CheckP>;
+
+  BallAlloc m_alloc;
+  StateLog m_hist;
+
+public:
+
+  BallOptim (
+      const unsigned id,
+      const Vec2& pos,
+      const Vec2& vel,
+      const FP& mass, 
+      const FP& radius,
+      const FP& time=0.0)
+    :
+
+      B (id, pos, vel, mass, radius, time)
+  {}
+
+
+  B* checkpoint (const E& e) {
+
+    B* b = m_alloc.allocate (1);
+    m_alloc.construct (b, static_cast<B&> (*this));
+
+    m_hist.push_back (CheckP (e, b));
+
+    return b;
+  }
+
+  void restore (const B* b) {
+    assert (b);
+    assert (this->getID () == b->getID ());
+    
+    B::operator = (*b);
+  }
+
+  void reclaim (const E& e, B* b) {
+
+    assert (!m_hist.empty ());
+    CheckP& head = m_hist.front ();
+
+    assert (head.first == e);
+    assert (head.second == b);
+
+    if (head.second != b) { 
+      std::abort ();
+    }
+
+    m_hist.pop_front ();
+
+    m_alloc.destroy (b);
+    m_alloc.deallocate (b, 1);
+
+  }
+
+  const B* readWeak (const E& e) const {
+
+    typename E::Comparator cmp;
+
+    for (const CheckP& p: m_hist) {
+      if (cmp (e, p.first)) { // first entry larger than e
+        return p.second;
+      }
+    }
+
+    return this;
+  }
+
+
+};
 
 
 

@@ -47,9 +47,13 @@
 #include <cstdio>
 #include <ctime>
 
-class TableSectored: public Table {
+template <typename B>
+class TableSectored: public Table<B> {
 
 private:
+
+  using Base = Table<B>;
+  using Ball_t = typename Base::Ball_t;
   
   unsigned sectorSize;
   unsigned xSectors;
@@ -57,13 +61,13 @@ private:
 
   std::vector<std::vector<Sector*> > sectors;
 
-  Table& operator = (const Table& that) { abort (); return *this; }
+  TableSectored& operator = (const TableSectored& that) { abort (); return *this; }
 
 public:
 
   TableSectored (unsigned numBalls, unsigned sectorSize, unsigned xSectors, unsigned ySectors) 
     :
-      Table (numBalls, sectorSize, xSectors, ySectors),
+      Base (numBalls, sectorSize, xSectors, ySectors),
       sectorSize (sectorSize),
       xSectors (xSectors),
       ySectors (ySectors)
@@ -74,7 +78,7 @@ public:
   template <typename I>
   TableSectored (const I ballsBeg, const I ballsEnd, unsigned sectorSize, unsigned xSectors, unsigned ySectors) 
     :
-      Table (ballsBeg, ballsEnd, sectorSize, xSectors, ySectors),
+      Base (ballsBeg, ballsEnd, sectorSize, xSectors, ySectors),
       sectorSize (sectorSize),
       xSectors (xSectors),
       ySectors (ySectors)
@@ -85,10 +89,10 @@ public:
 
 
   TableSectored (const TableSectored& that) 
-    : Table (that), sectorSize (that.sectorSize), xSectors (that.xSectors), ySectors (that.ySectors) {
+    : Base (that), sectorSize (that.sectorSize), xSectors (that.xSectors), ySectors (that.ySectors) {
 
       // balls copied over from 'that' table have pointers to sectors in 'that' table
-      for (Ball* b: this->balls) {
+      for (Ball_t* b: this->balls) {
         b->removeAllSectors ();
       }
 
@@ -99,7 +103,7 @@ public:
   ~TableSectored (void) {
     assert (sectors.size () == xSectors);
     for (size_t i = 0; i < sectors.size (); ++i) {
-      Table::freeVecPtr (sectors [i]);
+      Base::freeVecPtr (sectors [i]);
     }
   }
 
@@ -109,10 +113,9 @@ public:
 
     initEvents.clear ();
 
-    for (std::vector<Ball*>::iterator i = balls.begin (), ei = balls.end ();
-        i != ei; ++i) {
+    for (Ball_t* b: Base::balls) {
 
-      addEventsForOneBall (initEvents, *i, endtime);
+      addEventsForOneBall (initEvents, b, endtime);
 
     }
   }
@@ -213,22 +216,22 @@ private:
       for (size_t j = 0; j < ySectors; ++j) {
 
         if (i == 0) {
-          sectors[i][j]->addCushion (Table::getCushion (RectSide::LEFT));
+          sectors[i][j]->addCushion (Base::getCushion (RectSide::LEFT));
         }
 
         if (i == (xSectors - 1)) {
           assert (xSectors > 0);
 
-          sectors[i][j]->addCushion (Table::getCushion (RectSide::RIGHT));
+          sectors[i][j]->addCushion (Base::getCushion (RectSide::RIGHT));
         }
 
         if (j == 0) {
-          sectors[i][j]->addCushion (Table::getCushion (RectSide::BOTTOM));
+          sectors[i][j]->addCushion (Base::getCushion (RectSide::BOTTOM));
         }
 
         if (j == (ySectors - 1)) {
           assert (ySectors > 0);
-          sectors[i][j]->addCushion (Table::getCushion (RectSide::TOP));
+          sectors[i][j]->addCushion (Base::getCushion (RectSide::TOP));
         }
       }
     }
@@ -240,7 +243,7 @@ private:
   void addBallsToSectors () {
 
     // add balls to sectors
-    for (Ball* b: balls) {
+    for (Ball_t* b: Base::balls) {
 
       for (size_t i = 0; i < xSectors; ++i) {
         for (size_t j = 0; j < ySectors; ++j) {
@@ -255,7 +258,7 @@ private:
   }
 
 
-  Galois::optional<Event> computeEarliestEvent (Ball* ball, const FP& endtime) const {
+  Galois::optional<Event> computeEarliestEvent (Ball_t* ball, const FP& endtime) const {
 
     auto range = ball->sectorRange ();
 
@@ -276,7 +279,7 @@ private:
   }
 
   template <typename C>
-  void addEventsForTwoBalls (C& addList, Ball* b1, Ball* b2, const FP& endtime, const Event* prevEvent) const {
+  void addEventsForTwoBalls (C& addList, Ball_t* b1, Ball_t* b2, const FP& endtime, const Event* prevEvent) const {
 
     assert (prevEvent != nullptr);
     assert (prevEvent->getKind () == Event::BALL_COLLISION);
@@ -308,7 +311,7 @@ private:
   }
 
   template <typename C>
-  void addEventsForOneBall (C& addList, Ball* b, const FP& endtime, const Event* prevEvent=nullptr) const {
+  void addEventsForOneBall (C& addList, Ball_t* b, const FP& endtime, const Event* prevEvent=nullptr) const {
 
     if (prevEvent && prevEvent->firstBallChanged ()) {
       assert (prevEvent->getKind () != Event::BALL_COLLISION);

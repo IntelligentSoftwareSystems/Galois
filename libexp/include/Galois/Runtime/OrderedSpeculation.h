@@ -349,7 +349,6 @@ struct OptimContext: public OrderedContextBase<T> {
 
   void publishChanges (void) {
 
-    userHandle.commit ();
 
     // for (auto i = userHandle.getPushBuffer ().begin (), 
         // end_i = userHandle.getPushBuffer ().end (); i != end_i; ++i) {
@@ -376,6 +375,9 @@ struct OptimContext: public OrderedContextBase<T> {
     assert (hasState (ContextState::COMMITTING));
 
     dbg::debug (this, " committing with item ", this->getActive ());
+
+    userHandle.commit (); // TODO: rename to retire
+
     for (NItem* n: nhood) {
       n->removeCommit (this);
     }
@@ -891,7 +893,7 @@ private:
           assert (!ctxt->hasState (ContextState::RECLAIM));
           assert (!ctxt->hasState (ContextState::ABORTED_CHILD));
 
-          execFunc (ctxt->getActive ());
+          execFunc (ctxt->getActive (), ctxt->userHandle);
         },
         "exec-func",
         Galois::chunk_size<ExFunc::CHUNK_SIZE> ());

@@ -53,6 +53,7 @@
 
 
 class Event {
+  template <typename B>
   friend class Table;
 
 public:
@@ -200,17 +201,17 @@ public:
     }
   }
 
-  void updateFirstBall (const Ball& b) {
-    *(this->ball) = b;
-    this->collCounterA = b.collCounter ();
-  }
-
-  void updateOtherBall (const Ball& b) {
-    assert (kind == BALL_COLLISION);
-    Ball* ob = downCast<Ball> (otherObj);
-    *ob = b;
-    this->collCounterB = b.collCounter ();
-  }
+  // void updateFirstBall (const Ball& b) {
+    // *(this->ball) = b;
+    // this->collCounterA = b.collCounter ();
+  // }
+// 
+  // void updateOtherBall (const Ball& b) {
+    // assert (kind == BALL_COLLISION);
+    // Ball* ob = downCast<Ball> (otherObj);
+    // *ob = b;
+    // this->collCounterB = b.collCounter ();
+  // }
 
   Ball* getOtherBall () const { 
     assert (kind == BALL_COLLISION);

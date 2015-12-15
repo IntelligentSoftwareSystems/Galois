@@ -32,16 +32,6 @@
 
 class BilliardsTwoPhase: public Billiards<BilliardsTwoPhase>  {
 
-
-  // void createLocks (const Table& table, Graph& graph, VecNodes& nodes) {
-    // nodes.reserve (table.getNumBalls ());
-// 
-    // for (unsigned i = 0; i < table.getNumBalls (); ++i) {
-      // nodes.push_back (graph.createNode (nullptr));
-    // }
-// 
-  // };
-
 public:
 
   virtual const std::string version () const { return "using IKDG"; }
@@ -51,8 +41,6 @@ public:
 
     AddListTy addList;
     Accumulator iter;
-
-    // createLocks (table, graph, nodes);
 
     Galois::Runtime::for_each_ordered_2p_win (
         Galois::Runtime::makeStandardRange(initEvents.begin (), initEvents.end ()),

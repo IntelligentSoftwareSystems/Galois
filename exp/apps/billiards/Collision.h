@@ -74,6 +74,7 @@ public:
   //!
   //! Solving the resulting quadratic equation gives us the result
 
+
   static std::pair<bool, FP> computeCollisionTime (const Ball& ball1, const Ball& ball2) {
 
     Vec2    b1pos =  ball1.pos ();
@@ -95,7 +96,11 @@ public:
     // D =  pos () - time ()*vel ()
     // diffD = D1 - D2
     Vec2 diffD =  (b1pos - b1vel * b1time) - (b2pos - b2vel * b2time);
-    assert (diffD.magSqrd () > (b1rad + b2rad));
+
+    // if (diffD.mag () < (b1rad + b2rad)) {
+      // std::printf ("diffD.magSqrd (): %g\n", double (diffD.magSqrd ()));
+    // }
+    // assert (diffD.mag () >= (b1rad + b2rad));
 
     FP sumRadius = (b1rad + b2rad);
     FP sumRadiusSqrd =  sumRadius * sumRadius;

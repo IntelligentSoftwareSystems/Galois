@@ -2,13 +2,15 @@
 #define BILLIARDS_PARALLEL_H
 
 #include "Billiards.h"
+#include "dependTest.h"
+
 #include "Galois/PerThreadContainer.h"
 #include "Galois/Graphs/Graph.h"
 
 
 using AddListTy = Galois::PerThreadVector<Event>;
 
-struct VisitNhood {
+struct VisitNhoodSafetyTest {
   static const unsigned CHUNK_SIZE = 1;
 
   template <typename C, typename I>
@@ -32,8 +34,46 @@ struct VisitNhood {
 };
 
 
+template <typename Tbl_t, typename Graph, typename VecNodes>
+void createLocks (const Tbl_t& table, Graph& graph, VecNodes& nodes) {
+  nodes.reserve (table.getNumBalls ());
+
+  for (unsigned i = 0; i < table.getNumBalls (); ++i) {
+    nodes.push_back (graph.createNode (nullptr));
+  }
+
+};
+
+
+template <typename Graph, typename VecNodes>
+struct VisitNhoodLocks {
+
+  static const unsigned CHUNK_SIZE = DEFAULT_CHUNK_SIZE;
+
+  Graph& graph;
+  VecNodes& nodes;
+
+  VisitNhoodLocks (Graph& graph, VecNodes& nodes): graph (graph), nodes (nodes) {}
+
+  template <typename C>
+  void operator () (const Event& e, C& ctx) const {
+
+    Ball* b1 = e.getBall ();
+    assert (b1->getID () < nodes.size ());
+    graph.getData (nodes[b1->getID ()], Galois::MethodFlag::WRITE);
+
+    if (e.getKind () == Event::BALL_COLLISION) {
+      Ball* b2 = e.getOtherBall ();
+      assert (b2->getID () < nodes.size ());
+      graph.getData (nodes[b2->getID ()], Galois::MethodFlag::WRITE);
+    }
+
+  }
+};
+
+
 struct ExecSources {
-  static const unsigned CHUNK_SIZE = 4;
+  static const unsigned CHUNK_SIZE = DEFAULT_CHUNK_SIZE;
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (const Event& e) const {
     const_cast<Event&> (e).simulate ();
