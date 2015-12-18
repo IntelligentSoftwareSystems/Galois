@@ -116,6 +116,7 @@ struct AddEvents {
     for (auto i = addList.get ().begin ()
         , endi = addList.get ().end (); i != endi; ++i) {
 
+      std::cout << "Adding event=" << i->str () << std::endl;
       ctx.push (*i);
     }
 

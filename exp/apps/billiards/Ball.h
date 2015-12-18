@@ -244,8 +244,8 @@ public:
 template <typename B=Ball, typename E=Event>
 class BallOptim: public B {
 
-  using BallAlloc = Galois::FixedSizeAllocator<Ball>;
-  using CheckP = std::pair<E, Ball*>;
+  using BallAlloc = Galois::FixedSizeAllocator<B>;
+  using CheckP = std::pair<E, B*>;
   using StateLog = Galois::gstl::List<CheckP>;
 
   BallAlloc m_alloc;
@@ -268,6 +268,8 @@ public:
 
   B* checkpoint (const E& e) {
 
+    std::printf ("checkpoint called on %s\n", B::str ().c_str ());
+
     B* b = m_alloc.allocate (1);
     m_alloc.construct (b, static_cast<B&> (*this));
 
@@ -277,6 +279,7 @@ public:
   }
 
   void restore (const B* b) {
+    std::printf ("restore called on %s\n", B::str ().c_str ());
     assert (b);
     assert (this->getID () == b->getID ());
     
@@ -285,6 +288,7 @@ public:
 
   void reclaim (const E& e, B* b) {
 
+    std::printf ("reclaim called on %s\n", B::str ().c_str ());
     assert (!m_hist.empty ());
     CheckP& head = m_hist.front ();
 
