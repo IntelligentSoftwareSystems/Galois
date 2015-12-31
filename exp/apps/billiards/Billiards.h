@@ -320,7 +320,7 @@ void Billiards<Derived, Tbl_t>::verify (const T& initial, T& final, size_t numEv
   Galois::StatTimer timer ("Verfication time (Serial PQ simulation)= ");
   
   timer.start ();
-  size_t serEvents = serial.runSim(serialTable, initEvents, endtime, false, true);
+  size_t serEvents = serial.runSim(serialTable, initEvents, endtime, true, true);
   timer.stop ();
 
   std::cout << "Serial ordered numEvents=" << serEvents << std::endl;

@@ -132,7 +132,8 @@ public:
 
    
 
-    if (e.notStale () && (e.getKind () == Event::BALL_COLLISION || e.getKind () == Event::CUSHION_COLLISION)) {
+    // if (e.notStale () && (e.getKind () == Event::BALL_COLLISION || e.getKind () == Event::CUSHION_COLLISION)) {
+    if ((e.getKind () == Event::BALL_COLLISION || e.getKind () == Event::CUSHION_COLLISION)) {
       
       assert (eventsPerBall.size () == getNumBalls ());
 
@@ -590,15 +591,29 @@ protected:
 
       const Ball* operator () (const Ball_t* b) const {
 
+        assert (b);
+
+        auto* bw = b->getWrapper ();
+        assert (bw);
+
+        const Ball* ret = nullptr;
+
         if (prev) {
-          return b->readWeak (*prev);
+          ret =  bw->readWeak (*prev);
 
         } else {
-          return b;
+          ret =  b;
         }
+
+        std::cout << "Reading state: " << ret->str () << std::endl;
+
+        return ret;
       }
 
     };
+
+    std::cout << "Generating next events for ball: " << ball->str () << std::endl;
+
 
     auto bbeg = boost::make_transform_iterator (balls.begin (), BallReader (prevEvent));
     auto bend = boost::make_transform_iterator (balls.end (), BallReader (prevEvent));
@@ -607,6 +622,13 @@ protected:
 
     Galois::optional<Event> cushColl = Collision::computeNextEvent (Event::CUSHION_COLLISION, ball, this->cushions.begin (), this->cushions.end (), endtime, nullptr);
 
+    // FIXME: fixing the pointer to balls for optimistic executor, which may read a checkpointed copy of the ball
+    if (ballColl) {
+      const Ball* b1 = ballColl->getBall ();
+      const Ball* b2 = ballColl->getOtherBall ();
+
+      ballColl = Event::makeEvent (Event::BALL_COLLISION, balls [b1->getID ()], balls [b2->getID ()], ballColl->getTime (), ballColl->enclosingSector ());
+    }
 
 
     if (ballColl && prevEvent && prevEvent->notStale ()) {
