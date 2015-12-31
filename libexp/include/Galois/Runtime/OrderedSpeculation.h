@@ -428,14 +428,16 @@ struct OptimContext: public OrderedContextBase<T> {
   }
 
   template <typename WL>
-  void findCommitSrc (WL& wl) const {
+  void findCommitSrc (const OptimContext* gvt, WL& wl) const {
 
     for (const NItem* ni: nhood) {
 
       OptimContext* c = ni->getHistHead ();
       assert (c != this);
 
-      if (c && c->isCommitSrc () && c->onWL.cas (false, true)) {
+      if (c && (!gvt || exec.ctxtCmp (c, gvt)) 
+          && c->isCommitSrc () 
+          && c->onWL.cas (false, true)) {
         wl.push (c);
       }
     }
@@ -1001,6 +1003,21 @@ private:
       }
     }
 
+    Ctxt* const* minElem = winWL.getMin ();
+
+    if (minElem) {
+      if (!ret || ctxtCmp (*minElem, ret)) {
+        ret = *minElem;
+      }
+    }
+
+    if (ret) {
+      dbg::debug ("GVT computed as: ", ret, ", with elem: ", ret->getActive ());
+
+    } else {
+      dbg::debug ("GVT computed as NULL");
+    }
+
     return ret;
 
   }
@@ -1108,7 +1125,7 @@ private:
 
     Galois::Runtime::for_each_gen (
         makeLocalRange (commitSources),
-        [this] (Ctxt* c, UserContext<Ctxt*>& wlHandle) {
+        [this, gvt] (Ctxt* c, UserContext<Ctxt*>& wlHandle) {
 
           bool b = c->casState (ContextState::READY_TO_COMMIT, ContextState::COMMITTING);
 
@@ -1116,7 +1133,7 @@ private:
 
             assert (c->isCommitSrc ());
             c->doCommit ();
-            c->findCommitSrc (wlHandle);
+            c->findCommitSrc (gvt, wlHandle);
             numCommitted += 1;
 
           } else {
