@@ -558,12 +558,12 @@ protected:
     // firstBallChanged or otherBallChanged should return true 
     // for an invalid event 'e'
 
-    if (!e.firstBallChanged ()) {
+    if (Event::SKIP_STALE_CHECK || !e.firstBallChanged ()) {
 
       addNextEventIntern  (addList, b1, endtime, &e);
     }
 
-    if (!e.otherBallChanged ()) {
+    if (Event::SKIP_STALE_CHECK || !e.otherBallChanged ()) {
       // b2 has not collided with anything yet
       addNextEventIntern (addList, b2, endtime, &e);
 
@@ -574,7 +574,7 @@ protected:
   void addEventsForCushColl (const Event& e, C& addList, const FP& endtime) const {
 
     assert (e.getKind () == Event::CUSHION_COLLISION);
-    if (!e.firstBallChanged ()) {
+    if (Event::SKIP_STALE_CHECK || !e.firstBallChanged ()) {
       addNextEventIntern (addList, static_cast<Ball_t*> (e.getBall ()), endtime, &e);
     }
   }

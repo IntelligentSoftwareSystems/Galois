@@ -64,6 +64,8 @@ public:
     SECTOR_LEAVE = 3
   };
 
+  static const bool SKIP_STALE_CHECK = false;
+
 private:
   EventKind kind;
 
@@ -163,14 +165,27 @@ public:
     // assert (notStale ());
 
     if (notStale ()) {
-      // update collision counters, such that event remains valid
+      
+      otherObj->simulate (*this);
+
       ball->incrCollCounter ();
       otherObj->incrCollCounter ();
 
-      this->collCounterA = ball->collCounter ();
-      this->collCounterB = otherObj->collCounter ();
+      if (!SKIP_STALE_CHECK) {
+        this->collCounterA = ball->collCounter ();
+        this->collCounterB = otherObj->collCounter ();
+      }
 
-      otherObj->simulate (*this);
+    }
+  }
+
+  void decrCounterCopies (void) {
+    assert (int (collCounterA) > 0);
+    --collCounterA;
+
+    if (collCounterB != 0) {
+      assert (int (collCounterB) > 0);
+      --collCounterB;
     }
   }
 
