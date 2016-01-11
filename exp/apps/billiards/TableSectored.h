@@ -50,6 +50,9 @@
 template <typename B>
 class TableSectored: public Table<B> {
 
+public:
+  using SerialTable = TableSectored<Ball>;
+
 private:
 
   using Base = Table<B>;
@@ -88,7 +91,8 @@ public:
   }
 
 
-  TableSectored (const TableSectored& that) 
+  template <typename B2>
+  TableSectored (const TableSectored<B2>& that) 
     : Base (that), sectorSize (that.sectorSize), xSectors (that.xSectors), ySectors (that.ySectors) {
 
       // balls copied over from 'that' table have pointers to sectors in 'that' table

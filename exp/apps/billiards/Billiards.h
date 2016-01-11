@@ -83,8 +83,8 @@ public:
   }
 
 private:
-  template <typename T>
-  void verify (const T& initial, T& final, size_t numEvents, const FP& endtime);
+  template <typename ST>
+  void verify (const Tbl_t& initial, Tbl_t& final, size_t numEvents, const FP& endtime);
 
 // #define CUSTOM_TESTS
 #ifdef CUSTOM_TESTS
@@ -211,10 +211,10 @@ private:
 
     if (!skipVerify) {
       if (veriFlat) {
-        verify (static_cast<const Table<Ball_t>&> (verCopy), static_cast<Table<Ball_t>&> (table), numEvents, unsigned (endtime));
+        verify <typename Tbl_t::SerialFlatTable> (static_cast<const Table<Ball_t>&> (verCopy), static_cast<Table<Ball_t>&> (table), numEvents, unsigned (endtime));
 
       } else {
-        verify (verCopy, table, numEvents, unsigned (endtime));
+        verify <typename Tbl_t::SerialTable> (verCopy, table, numEvents, unsigned (endtime));
 
       }
     }
@@ -303,7 +303,7 @@ public:
 
 template <typename Derived, typename Tbl_t>
 template <typename T>
-void Billiards<Derived, Tbl_t>::verify (const T& initial, T& final, size_t numEvents, const FP& endtime) {
+void Billiards<Derived, Tbl_t>::verify (const Tbl_t& initial, Tbl_t& final, size_t numEvents, const FP& endtime) {
 
   FP initEnergy = initial.sumEnergy ();
   FP finalEnergy = final.sumEnergy ();

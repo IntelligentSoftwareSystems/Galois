@@ -58,7 +58,14 @@ public:
 
   using Ball_t = B;
 
+  using SerialFlatTable = Table<Ball>;
+  using SerialTable = Table<Ball>;
+
 protected:
+
+  template <typename B2> friend class Table;
+
+
   unsigned numBalls;
   FP length;
   FP width;
@@ -98,6 +105,15 @@ public:
       copyVecPtr (that.cushions, this->cushions);
       copyVecPtr (that.balls, this->balls);
   }
+
+  template <typename B2>
+  Table (const Table<B2>& that) 
+    : numBalls (that.getNumBalls ()), length (that.getLength ()), width (that.getWidth ()), eventsPerBall (that.eventsPerBall) {
+
+      copyVecPtr (that.cushions, this->cushions);
+      copyVecPtr (that.balls, this->balls);
+  }
+
 
   ~Table (void) {
     freeVecPtr (cushions);
@@ -157,7 +173,8 @@ public:
     }
   }
 
-  void diffEventLogs (const Table& that, const char* const thatName) {
+  template <typename B2>
+  void diffEventLogs (const Table<B2>& that, const char* const thatName) {
 
     for (size_t i = 0; i < numBalls; ++i) {
       std::printf ("===== Events for Ball %zd =======\n", i);
@@ -281,8 +298,8 @@ public:
     return sumKE;
   }
 
-  template <bool printDiff>
-  bool cmpState (const Table& that) const {
+  template <bool printDiff, typename B2>
+  bool cmpState (const Table<B2>& that) const {
 
     bool equal = true;
 
@@ -297,7 +314,7 @@ public:
 
     for (size_t i = 0; i < numBalls; ++i) {
       const Ball_t& b1 = *(this->balls[i]);
-      const Ball_t& b2 = *(that.balls[i]);
+      const B2& b2 = *(that.balls[i]);
       
       if (b1.getID () != b2.getID ()) {
         std::cerr << "Balls with different ID at same index i" << std::endl;
@@ -706,12 +723,24 @@ protected:
   // }
 
 
-  template <typename T>
-  static void copyVecPtr (const std::vector<T*>& src, std::vector<T*>& dst) {
+  template <typename T1, typename T2>
+  static void copyVecPtr (const std::vector<T1*>& src, std::vector<T2*>& dst) {
     dst.resize (src.size (), nullptr);
     for (size_t i = 0; i < src.size (); ++i) {
-      dst[i] = new T(*(src[i]));
+      dst[i] = new T2(*(src[i]));
     }
+  }
+
+  template <typename T, typename I>
+  static void copyPtrRange (std::vector<T*>& dst, const I beg, const I end) {
+
+    assert (dst.empty ());
+
+    for (auto i = beg; i != end; ++i) {
+      dst.push_back (new T (*i));
+    }
+    
+    assert (dst.size () == std::distance (beg, end ));
   }
 
   template <typename T>
