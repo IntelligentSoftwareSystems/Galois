@@ -284,6 +284,8 @@ public:
     s.precision (10);
     s << "[time=" << std::fixed <<  double (time) << ", kind=" << kindName;
 
+    s << ", ccA=" << collCounterA << ", ccB=" << collCounterB;
+
     s << std::setw (20) << std::setfill (' ') << "ball=" << ball->str ();
 
     s << std::setw (20) << std::setfill (' ') << "otherObj=" << objBstr;
