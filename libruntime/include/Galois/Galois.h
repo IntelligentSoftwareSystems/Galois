@@ -83,10 +83,24 @@ void for_each(const IterTy& b, const IterTy& e, const FunctionTy& fn, const Args
  * @param fn operator
  * @param args optional arguments to loop
  */
+/**This is original correct one:**/
+/*
 template<typename ItemTy, typename FunctionTy, typename... Args>
 void for_each(const ItemTy& i, const FunctionTy& fn, const Args&... args) {
   ItemTy iwl[1] = {i};
   Runtime::for_each_gen(Runtime::makeStandardRange(&iwl[0], &iwl[1]), fn, std::make_tuple(args...));
+}
+*/
+
+/**
+ * for_each for distributed: Takes Graph as an argument.
+ *
+ */
+
+template<typename ItemTy, typename FunctionTy, typename... Args>
+void for_each(const ItemTy& i, const FunctionTy& fn, const Args&... args) {
+  ItemTy iwl[1] = {i};
+  Runtime::for_each_gen_dist(Runtime::makeStandardRange(&iwl[0], &iwl[1]), fn, std::make_tuple(args...));
 }
 
 /**

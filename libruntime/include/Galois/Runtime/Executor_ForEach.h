@@ -52,10 +52,19 @@
 #include "Galois/WorkList/Chunked.h"
 #include "Galois/WorkList/Simple.h"
 
+#include "Galois/Runtime/Network.h"
+#include "Galois/Runtime/Serialize.h"
+
+#include "Galois/Bag.h"
+//#include "Galois/WorkList/WorkListDist.h"
+//#include "Galois/WorkList/WorkListWrapper.h"
+#include "Galois/WorkList/WorkListDist.h"
+
 #include <algorithm>
 #include <functional>
 #include <memory>
 #include <utility>
+#include <iostream>
 
 namespace Galois {
 //! Internal Galois functionality - Use at your own risk.
@@ -349,7 +358,7 @@ protected:
   ForEachExecutor(T2, const FunctionTy& f, const ArgsTy& args, WArgsTy... wargs):
     term(Substrate::getSystemTermination(activeThreads)),
     barrier(getBarrier(activeThreads)),
-    wl(wargs...),
+    wl(std::forward<WArgsTy>(wargs)...),
     origFunction(f),
     loopname(get_by_supertype<loopname_tag>(args).value),
     broke(false) { }
@@ -488,8 +497,11 @@ template<typename RangeTy, typename FunctionTy, typename ArgsTy>
 void for_each_impl(const RangeTy& range, const FunctionTy& fn, const ArgsTy& args) {
   typedef typename std::iterator_traits<typename RangeTy::iterator>::value_type value_type; 
   typedef typename get_type_by_supertype<wl_tag, ArgsTy>::type::type BaseWorkListTy;
+
   typedef typename reiterator<BaseWorkListTy, typename RangeTy::iterator>::type
     ::template retype<value_type> WorkListTy;
+
+  typedef typename WorkListTy::value_type g;
   typedef ForEachExecutor<WorkListTy, FunctionTy, ArgsTy> WorkTy;
 
   auto& barrier = getBarrier(activeThreads);
@@ -499,8 +511,29 @@ void for_each_impl(const RangeTy& range, const FunctionTy& fn, const ArgsTy& arg
              [&W, &range]() { W.initThread(range); },
              std::ref(barrier),
              std::ref(W));
+
   //  for_each_impl_<WorkListTy, value_type>(range, fn, args);
 }
+
+
+//TODO(ggill): Try to remove for_each_impl_dist and just it with for_each_impl
+template<typename RangeTy, typename FunctionTy, typename ArgsTy>
+void for_each_impl_dist(const RangeTy& range, const FunctionTy& fn, const ArgsTy& args) {
+  typedef typename get_type_by_supertype<wl_tag, ArgsTy>::type::type WorkListTy;
+  typedef ForEachExecutor<WorkListTy, FunctionTy, ArgsTy> WorkTy;
+
+  auto& barrier = getBarrier(activeThreads);
+  WorkTy W(fn, args);
+
+  W.init(range);
+  Substrate::getThreadPool().run(activeThreads,
+             [&W, &range]() { W.initThread(range); },
+             std::ref(barrier),
+             std::ref(W));
+
+  //  for_each_impl_<WorkListTy, value_type>(range, fn, args);
+}
+
 
 //! Normalize arguments to for_each
 template<typename RangeTy, typename FunctionTy, typename TupleTy>
@@ -535,6 +568,169 @@ void for_each_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
             std::make_tuple(loopname {}, wl<defaultWL>()))));
   }
 }
+
+
+/**Landing pad for bagItems **/
+static uint32_t num_Hosts_recvd = 0;
+static std::vector<std::pair<int, int>> workItem_recv_vec;
+static std::vector<bool> hosts_didWork_vec;
+
+static void recv_BagItems(Galois::Runtime::RecvBuffer& buf){
+  bool x_didWork;
+  unsigned x_ID;
+  std::vector<std::pair<int, int>> vec;
+
+  gDeserialize(buf, x_ID, x_didWork, vec);
+  workItem_recv_vec.insert(workItem_recv_vec.end(), vec.begin(), vec.end());
+  hosts_didWork_vec.push_back(x_didWork);
+  num_Hosts_recvd++;
+}
+
+
+
+/** For distributed worklist **/
+  template<typename RangeTy, typename FunctionTy, typename TupleTy>
+  void for_each_gen_dist(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
+  static_assert(!exists_by_supertype<char*, TupleTy>::value, "old loopname");
+  static_assert(!exists_by_supertype<char const *, TupleTy>::value, "old loopname");
+  static_assert(!exists_by_supertype<bool, TupleTy>::value, "old steal");
+
+
+  if(exists_by_supertype<op_tag, TupleTy>::value)
+  {
+    auto helper_fn = get_by_supertype<op_tag>(tpl);
+
+    static const bool forceNew = false;
+    static_assert(!forceNew || Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsAborts, "old type trait");
+    static_assert(!forceNew || Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsStats, "old type trait");
+    static_assert(!forceNew || Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPush, "old type trait");
+    static_assert(!forceNew || !Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsBreak, "old type trait");
+    static_assert(!forceNew || !Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPIA, "old type trait");
+
+    /** Take out base worklist type to wrap it **/
+    typedef typename get_type_by_supertype<wl_tag, TupleTy>::type::type BaseWorkListTy;
+    typedef typename std::iterator_traits<typename RangeTy::iterator>::value_type value_type; 
+
+
+    typedef typename reiterator<BaseWorkListTy, typename RangeTy::iterator>::type
+    ::template retype<value_type> WorkListTy;
+
+    /** Construct new worklist **/
+    typedef Galois::InsertBag<value_type> Bag;
+    Bag bag;
+    auto ytpl = get_tuple_without(wl_tag{}, tpl);
+    auto ztpl = std::tuple_cat(ytpl, std::make_tuple(wl<Galois::WorkList::WLdistributed<WorkListTy>>(&bag)));
+    auto xtpl = std::tuple_cat(ztpl, typename function_traits<FunctionTy>::type {});
+
+    Runtime::for_each_impl_dist(r, fn,
+        std::tuple_cat(xtpl,
+          get_default_trait_values(ztpl,
+            std::make_tuple(loopname_tag {}, wl_tag {}),
+            std::make_tuple(loopname {}, wl<defaultWL>()))));
+
+     auto& net = Galois::Runtime::getSystemNetworkInterface();
+     bool Canterminate = false;
+     bool didWork = !bag.empty();
+     int num_iter = 1;
+
+     /** loop while work in the worklist **/
+     while(!Canterminate) {
+
+      // Sync
+      helper_fn.sync_push();
+
+      // seperate out nodes to work locally and to send to remote destinaton.
+      std::vector<std::vector<value_type>> bagItems_vec;
+
+      if(bagItems_vec.size() < net.Num)
+        bagItems_vec.resize(net.Num);
+
+      for(auto ii = bag.begin(); ii != bag.end(); ++ii)
+      {
+        bagItems_vec[helper_fn((*ii).first)].push_back((*ii));
+      }
+
+      //send things to other hosts.
+      for(auto x = 0; x < net.Num; ++x){
+        if(x == net.ID)
+          continue;
+        Galois::Runtime::SendBuffer b;
+        gSerialize(b, net.ID,didWork, bagItems_vec[x]);
+        net.send(x, recv_BagItems, b);
+      }
+      net.flush();
+      while(num_Hosts_recvd < (net.Num - 1)){
+        net.handleReceives();
+      }
+
+      //XXX: Check: Can cause problem if one host is very fast.
+      num_Hosts_recvd = 0;
+      workItem_recv_vec.insert(workItem_recv_vec.end(), bagItems_vec[net.ID].begin(), bagItems_vec[net.ID].end());
+
+      assert((hosts_didWork_vec.size() == (net.Num - 1)));
+      bag.clear();
+
+      Canterminate = !didWork;
+      if(Canterminate)
+        for(auto x : hosts_didWork_vec)
+          Canterminate = (Canterminate && !x);
+
+      // call for_each again.
+      if(!workItem_recv_vec.empty()){
+
+        //XXX: Loop to change global IDs to local IDs. There can be a better way: Using transform iterators
+        std::transform(workItem_recv_vec.begin(), workItem_recv_vec.end(), workItem_recv_vec.begin(), [&](value_type i)->value_type {return std::make_pair(helper_fn.getLocalID(i.first), i.second);});
+
+        Runtime::for_each_impl_dist(Runtime::makeStandardRange(workItem_recv_vec.begin(), workItem_recv_vec.end()), fn,
+            std::tuple_cat(xtpl,
+                get_default_trait_values(ztpl,
+                std::make_tuple(loopname_tag {}, wl_tag {}),
+                std::make_tuple(loopname {}, wl<defaultWL>()))));
+      }
+
+      didWork = !bag.empty();
+      hosts_didWork_vec.clear();
+      workItem_recv_vec.clear();
+
+      //num_iter++;
+      Galois::Runtime::getHostBarrier().wait();
+    }
+
+     std::cout << "\n\n TERMINATING on : " << net.ID << "\n\n";
+
+  }
+  else{
+    /**CHECK with exist with exist_by_supertype to call special gen_dist . which will extract from tupe OP. get_by_super<foo_tag> **/
+    static const bool forceNew = false;
+    static_assert(!forceNew || Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsAborts, "old type trait");
+    static_assert(!forceNew || Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsStats, "old type trait");
+    static_assert(!forceNew || Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPush, "old type trait");
+    static_assert(!forceNew || !Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsBreak, "old type trait");
+    static_assert(!forceNew || !Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPIA, "old type trait");
+    if (forceNew) {
+      auto xtpl = std::tuple_cat(tpl, typename function_traits<FunctionTy>::type {});
+      Runtime::for_each_impl(r, fn,
+          std::tuple_cat(xtpl,
+          get_default_trait_values(tpl,
+            std::make_tuple(loopname_tag {}, wl_tag {}),
+            std::make_tuple(loopname {}, wl<defaultWL>()))));
+  } else {
+    auto tags = typename DEPRECATED::ExtractForEachTraits<FunctionTy>::tags_type {};
+    auto values = typename DEPRECATED::ExtractForEachTraits<FunctionTy>::values_type {};
+    auto ttpl = get_default_trait_values(tpl, tags, values);
+    auto dtpl = std::tuple_cat(tpl, ttpl);
+    auto xtpl = std::tuple_cat(dtpl, typename function_traits<FunctionTy>::type {});
+    Runtime::for_each_impl(r, fn,
+        std::tuple_cat(xtpl,
+          get_default_trait_values(dtpl,
+            std::make_tuple(loopname_tag {}, wl_tag {}),
+            std::make_tuple(loopname {}, wl<defaultWL>()))));
+  }
+
+  }
+}
+
+
 
 } // end namespace Runtime
 } // end namespace Galois

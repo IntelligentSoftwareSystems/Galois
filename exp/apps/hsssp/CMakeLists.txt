@@ -33,3 +33,6 @@ app(SGD_gen sgd_gen.cpp GlobalObj.cpp DISTSAFE)
 
 #pageRank_pull
 app(PageRank_pull pageRankPull_gen.cpp GlobalObj.cpp DISTSAFE)
+
+#HSSSP with worklist
+app(HSSSP_wl HSSSP_wl.cpp GlobalObj.cpp DISTSAFE)

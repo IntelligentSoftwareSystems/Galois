@@ -28,8 +28,10 @@
 #include "Galois/Graphs/LC_CSR_Graph.h"
 #include "Galois/Runtime/Substrate.h"
 #include "Galois/Runtime/Network.h"
+
 //#include "Galois/Runtime/Barrier.h"
 #include "Galois/Runtime/Serialize.h"
+
 
 #include "GlobalObj.h"
 
@@ -49,16 +51,22 @@ class hGraph : public GlobalObject {
   unsigned id; // my hostid // FIXME: isn't this just Network::ID?
   //ghost cell ID translation
   std::vector<uint64_t> ghostMap; // GID = ghostMap[LID - numOwned]
-  //GID to owner
   std::vector<std::pair<uint32_t,uint32_t> > hostNodes; //LID Node owned by host i
   //pointer for each host
   std::vector<uintptr_t> hostPtrs;
+
+  //GID to owner
+  std::vector<std::pair<uint64_t, uint64_t>> gid2host;
 
   uint32_t num_recv_expected; // Number of receives expected for local completion.
 
   //host -> (lid, lid]
   std::pair<uint32_t, uint32_t> nodes_by_host(uint32_t host) const {
     return hostNodes[host];
+  }
+
+  std::pair<uint64_t, uint64_t> nodes_by_host_G(uint32_t host) const {
+    return gid2host[host];
   }
 
   uint64_t L2G(uint32_t lid) const {
@@ -159,7 +167,8 @@ public:
       Galois::Runtime::gDeserialize(buf, gid, old_val);
       assert(isOwned(gid));
       val = FnTy::extract(getData((gid - globalOffset)));
-      //std::cout << "PullApply step1 : [" << net.ID << "] "<< " to : " << from_id << " : [" << gid << "] : " << val << "\n";
+      //if (net.ID == 0)
+        //std::cout << "PullApply step1 : [" << net.ID << "] "<< " to : " << from_id << " : [" << gid - globalOffset << "] : " << val << "\n";
       //For now just send all.
       //if(val != old_val){
       Galois::Runtime::gSerialize(b, gid, val);
@@ -183,7 +192,8 @@ public:
       Galois::Runtime::gDeserialize(buf, gid, val);
       //assert(isGhost(gid));
       auto LocalId = G2L(gid);
-      //std::cout << "PullApply Step2 : [" << net.ID << "]  : [" << LocalId << "] : " << val << "\n";
+      //if (net.ID == 1)
+        //std::cout << "PullApply Step2 : [" << net.ID << "]  : [" << LocalId << "] : " << val << "\n";
       FnTy::setVal(getData(LocalId), val);
     }
   }
@@ -208,7 +218,6 @@ public:
     totalNodes = g.size();
     std::cout << "Total nodes : " << totalNodes << "\n";
     //compute owners for all nodes
-    std::vector<std::pair<uint64_t, uint64_t>> gid2host;
     for (unsigned i = 0; i < numHosts; ++i)
       gid2host.push_back(Galois::block_range(0U, (unsigned)g.size(), i, numHosts));
     numOwned = gid2host[id].second - gid2host[id].first;
@@ -331,7 +340,6 @@ public:
       net.send(x, syncRecv, b);
     }
     //Will force all messages to be processed before continuing
-    //Galois::Runtime::getHostBarrier().wait();
     Galois::Runtime::getHostBarrier().wait();
   }
 
@@ -339,6 +347,7 @@ public:
   void sync_pull(){
     void (hGraph::*fn)(Galois::Runtime::RecvBuffer&) = &hGraph::syncPullRecvReply<FnTy>;
     auto& net = Galois::Runtime::getSystemNetworkInterface();
+    Galois::Runtime::getHostBarrier().wait();
     //num_recv_expected = 0;
     for(unsigned x = 0; x < hostNodes.size(); ++x){
       if(x == id) continue;
@@ -357,18 +366,31 @@ public:
       net.send(x, syncRecv, b);
     }
 
-    //std::cout << "[" << net.ID <<"] num_recv_expected : "<< num_recv_expected << "\n";  
+    //std::cout << "[" << net.ID <<"] num_recv_expected : "<< num_recv_expected << "\n";
 
     while(num_recv_expected) {
       net.handleReceives();
     }
 
     assert(num_recv_expected == 0);
-    //Galois::Runtime::getHostBarrier().wait();
     Galois::Runtime::getHostBarrier().wait();
   }
 
   uint64_t getGID(uint32_t nodeID) const {
     return L2G(nodeID);
   }
+  uint32_t getLID(uint64_t nodeID) const {
+    return G2L(nodeID);
+  }
+  unsigned getHostID(uint64_t gid){
+    for(auto i = 0; i < hostNodes.size(); ++i){
+      uint64_t start, end;
+      std::tie(start, end) = nodes_by_host_G(i);
+      if(gid >= start && gid  < end){
+        return i;
+      }
+    }
+    return -1;
+  }
+
 };

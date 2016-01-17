@@ -164,6 +164,19 @@ auto get_by_indices(std::tuple<Ts...>&& tpl, int_seq<Is...>)
   return std::move(std::make_tuple(std::get<Is>(tpl)...));
 }
 
+template<int Offset, typename... Ts, int... Is>
+auto get_by_offset(const std::tuple<Ts...>& tpl, int_seq<Is...>)
+  -> typename tuple_elements<std::tuple<Ts...>, int_seq<Is...> >::type {  
+  return std::make_tuple(std::get<Is + Offset>(tpl)...);
+}
+
+
+template<int Offset, typename... Ts, int... Is>
+auto get_by_offset(std::tuple<Ts...>&& tpl, int_seq<Is...>)
+  -> typename tuple_elements<std::tuple<Ts...>, int_seq<Is...> >::type&& {  
+  return std::move(std::make_tuple(std::get<Is + Offset>(tpl)...));
+}
+
 //! Get declared type of type T in tuple (which may be a subtype of T)
 template<typename T, typename Tuple>
 struct get_type_by_supertype {
