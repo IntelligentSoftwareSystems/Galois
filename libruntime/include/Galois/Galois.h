@@ -70,7 +70,7 @@ namespace Galois {
  */
 template<typename IterTy, typename FunctionTy, typename... Args>
 void for_each(const IterTy& b, const IterTy& e, const FunctionTy& fn, const Args&... args) {
-  Runtime::for_each_gen(Runtime::makeStandardRange(b,e), fn, std::make_tuple(args...));
+  Runtime::for_each_gen_dist(Runtime::makeStandardRange(b,e), fn, std::make_tuple(args...));
 }
 
 /**

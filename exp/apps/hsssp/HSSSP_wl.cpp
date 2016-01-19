@@ -54,7 +54,7 @@ struct NodeData {
 typedef hGraph<NodeData, unsigned int> Graph;
 typedef typename Graph::GraphNode GNode;
 
-typedef std::pair<GNode, unsigned int> WorkItem;
+typedef GNode WorkItem;
 
 
 struct InitializeGraph {
@@ -145,11 +145,11 @@ struct SSSP {
     else
       _graph.getData(src_node).dist_current = std::numeric_limits<int>::max()/4;
 
-    Galois::for_each(WorkItem(src_node, 1), SSSP(&_graph), Get_info_functor<Graph>(_graph), Galois::wl<dChunk>());
+    Galois::for_each(WorkItem(src_node), SSSP(&_graph), Get_info_functor<Graph>(_graph), Galois::wl<dChunk>());
   }
 
-  void operator()(WorkItem& item, Galois::UserContext<WorkItem>& ctx) const {
-    GNode src = item.first;
+  void operator()(WorkItem& src, Galois::UserContext<WorkItem>& ctx) const {
+    //GNode src = item.first;
     NodeData& snode = graph->getData(src);
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     auto& sdist = snode.dist_current;
@@ -162,7 +162,7 @@ struct SSSP {
       int new_dist = sdist + 1;
       while (old_dist > new_dist){
         if(ddist.compare_exchange_strong(old_dist, new_dist)) {
-          ctx.push(WorkItem(graph->getGID(dst), new_dist));
+          ctx.push(WorkItem(graph->getGID(dst)));
           break;
         }
       }

@@ -572,13 +572,18 @@ void for_each_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
 
 /**Landing pad for bagItems **/
 static uint32_t num_Hosts_recvd = 0;
-static std::vector<std::pair<int, int>> workItem_recv_vec;
+//XXX: Why is the type a pair?? How can I get type up here?
+//static std::vector<std::pair<int, int>> workItem_recv_vec;
+static std::vector<uint64_t> workItem_recv_vec;
 static std::vector<bool> hosts_didWork_vec;
 
 static void recv_BagItems(Galois::Runtime::RecvBuffer& buf){
   bool x_didWork;
   unsigned x_ID;
-  std::vector<std::pair<int, int>> vec;
+  //XXX: Why pair?
+  //std::vector<std::pair<int, int>> vec;
+  //TODO: get graphNode type or value type up here.
+  std::vector<uint64_t> vec;
 
   gDeserialize(buf, x_ID, x_didWork, vec);
   workItem_recv_vec.insert(workItem_recv_vec.end(), vec.begin(), vec.end());
@@ -647,7 +652,8 @@ static void recv_BagItems(Galois::Runtime::RecvBuffer& buf){
 
       for(auto ii = bag.begin(); ii != bag.end(); ++ii)
       {
-        bagItems_vec[helper_fn((*ii).first)].push_back((*ii));
+        //helper_fn get the hostID for this node.
+        bagItems_vec[helper_fn((*ii))].push_back((*ii));
       }
 
       //send things to other hosts.
@@ -678,8 +684,10 @@ static void recv_BagItems(Galois::Runtime::RecvBuffer& buf){
       // call for_each again.
       if(!workItem_recv_vec.empty()){
 
-        //XXX: Loop to change global IDs to local IDs. There can be a better way: Using transform iterators
-        std::transform(workItem_recv_vec.begin(), workItem_recv_vec.end(), workItem_recv_vec.begin(), [&](value_type i)->value_type {return std::make_pair(helper_fn.getLocalID(i.first), i.second);});
+        //XXX: Loop to change global IDs to local IDs. There can be a better way: Using transform iterators. Why are assuming it to be a pair.
+        //std::transform(workItem_recv_vec.begin(), workItem_recv_vec.end(), workItem_recv_vec.begin(), [&](value_type i)->value_type {return std::make_pair(helper_fn.getLocalID(i.first), i.second);});
+
+        std::transform(workItem_recv_vec.begin(), workItem_recv_vec.end(), workItem_recv_vec.begin(), [&](value_type i)->value_type {return helper_fn.getLocalID(i);});
 
         Runtime::for_each_impl_dist(Runtime::makeStandardRange(workItem_recv_vec.begin(), workItem_recv_vec.end()), fn,
             std::tuple_cat(xtpl,
