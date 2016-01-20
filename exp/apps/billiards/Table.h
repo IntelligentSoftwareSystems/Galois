@@ -596,57 +596,70 @@ protected:
     }
   }
 
+
+  Galois::optional<Event>  computeHistCollisions (const BallOptim<Ball>* ball, const FP& endtime, const Event* prevEvent=nullptr) const {
+
+    Galois::optional<Event> minBallColl;
+
+    for (BallOptim<Ball>* b: balls) {
+      if (ball != b) {
+        auto bw = b->getWrapper ();
+        assert (bw);
+
+        Galois::optional<Event> ballColl = Collision::computeNextEvent (Event::BALL_COLLISION, ball, bw->ballHistBeg (), bw->ballHistEnd (), endtime, nullptr); 
+
+        if (ballColl) {
+          if (!minBallColl || (*ballColl < *minBallColl)) {
+            minBallColl = ballColl;
+          }
+        }
+      }
+    }
+
+    if (minBallColl) {
+      Ball* b1 = minBallColl->getBall ();
+      assert (b1);
+      minBallColl->setFirstBall (balls [b1->getID ()]);
+
+      Ball* b2 = minBallColl->getOtherBall ();
+      assert (b2);
+      minBallColl->setOtherBall (balls [b2->getID ()]);
+    }
+
+    return minBallColl;
+
+  }
+
+  template <typename B2>
+  Galois::optional<Event>  computeHistCollisions (const B2* ball, const FP& endtime, const Event* prevEvent=nullptr) const {
+
+    return Galois::optional<Event> ();
+  }
+
   template <typename C>
   void addNextEventIntern (C& addList, const Ball_t* ball, const FP& endtime, const Event* prevEvent=nullptr) const {
 
-    assert (ball != nullptr);
+    assert (ball);
 
-    struct BallReader: public std::unary_function<const Ball_t*, const Ball*> {
-      const Event* prev;
-
-      BallReader (const Event* p): prev (p) {}
-
-      const Ball* operator () (const Ball_t* b) const {
-
-        assert (b);
-
-        auto* bw = b->getWrapper ();
-        assert (bw);
-
-        const Ball* ret = nullptr;
-
-        if (prev) {
-          ret =  bw->readWeak (*prev);
-
-        } else {
-          ret =  b;
-        }
-
-        std::cout << "Reading state: " << ret->str () << std::endl;
-
-        return ret;
-      }
-
-    };
-
-    std::cout << "Generating next events for ball: " << ball->str () << std::endl;
-
-
-    auto bbeg = boost::make_transform_iterator (balls.begin (), BallReader (prevEvent));
-    auto bend = boost::make_transform_iterator (balls.end (), BallReader (prevEvent));
-
-    Galois::optional<Event> ballColl = Collision::computeNextEvent (Event::BALL_COLLISION, ball, bbeg, bend, endtime, nullptr);
+    Galois::optional<Event> ballColl = Collision::computeNextEvent (Event::BALL_COLLISION, ball, this->balls.begin (), this->balls.end (), endtime, nullptr);
 
     Galois::optional<Event> cushColl = Collision::computeNextEvent (Event::CUSHION_COLLISION, ball, this->cushions.begin (), this->cushions.end (), endtime, nullptr);
 
-    // FIXME: fixing the pointer to balls for optimistic executor, which may read a checkpointed copy of the ball
-    if (ballColl) {
-      const Ball* b1 = ballColl->getBall ();
-      const Ball* b2 = ballColl->getOtherBall ();
+    // // FIXME: fixing the pointer to balls for optimistic executor, which may read a checkpointed copy of the ball
+    // if (ballColl) {
+      // const Ball* b1 = ballColl->getBall ();
+      // const Ball* b2 = ballColl->getOtherBall ();
+// 
+      // ballColl = Event::makeEvent (Event::BALL_COLLISION, balls [b1->getID ()], balls [b2->getID ()], ballColl->getTime (), ballColl->enclosingSector ());
+    // }
 
-      ballColl = Event::makeEvent (Event::BALL_COLLISION, balls [b1->getID ()], balls [b2->getID ()], ballColl->getTime (), ballColl->enclosingSector ());
+    Galois::optional<Event> histColl = computeHistCollisions (ball, endtime);
+
+    if (histColl) {
+      if (!ballColl || (*histColl < *ballColl)) {
+        ballColl = histColl;
+      }
     }
-
 
     if (ballColl && prevEvent && prevEvent->notStale ()) {
       assert (*ballColl != *prevEvent);
@@ -673,6 +686,11 @@ protected:
 
 
   }
+
+
+
+
+  
 
 
   // template <typename C>

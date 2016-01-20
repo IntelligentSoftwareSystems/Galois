@@ -36,6 +36,7 @@
 
 #include "Galois/FlatSet.h"
 
+#include <boost/iterator/transform_iterator.hpp>
 
 #include <iostream>
 #include <string>
@@ -313,6 +314,23 @@ public:
     m_alloc.destroy (b);
     m_alloc.deallocate (b, 1);
 
+  }
+
+  struct BallReader: std::unary_function<const CheckP, const B*> {
+
+    const B* operator () (const CheckP& p) const {
+      return p.second;
+    }
+  };
+
+  using BallHistIter = boost::transform_iterator <BallReader, typename StateLog::const_iterator>;
+
+  BallHistIter ballHistBeg (void) const { 
+    return boost::make_transform_iterator (m_hist.begin (), BallReader ());
+  }
+  
+  BallHistIter ballHistEnd (void) const { 
+    return boost::make_transform_iterator (m_hist.end (), BallReader ());
   }
 
   const B* readWeak (const E& e) const {

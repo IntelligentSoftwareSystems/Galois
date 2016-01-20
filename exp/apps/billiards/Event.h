@@ -216,6 +216,17 @@ public:
     }
   }
 
+  void setFirstBall (Ball* b) {
+    assert (b);
+    this->ball = b;
+  }
+
+  void setOtherBall (Ball* b) {
+    assert (b);
+    assert (kind == BALL_COLLISION);
+    this->otherObj = b;
+  }
+
   // void updateFirstBall (const Ball& b) {
     // *(this->ball) = b;
     // this->collCounterA = b.collCounter ();
