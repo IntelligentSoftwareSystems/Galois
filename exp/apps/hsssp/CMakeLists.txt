@@ -23,7 +23,7 @@ app(graphCheck check.cpp GlobalObj.cpp DISTSAFE)
 app(HSSSP_gen3 HSSSP_gen3.cpp GlobalObj.cpp DISTSAFE)
 
 #pageRank
-app(PageRank pageRank_gen.cpp GlobalObj.cpp DISTSAFE)
+app(PageRank_push pageRank_gen.cpp GlobalObj.cpp DISTSAFE)
 
 #LabelPropAlgo
 app(CC_LabelProp connectedComponent_gen.cpp GlobalObj.cpp DISTSAFE)
@@ -36,3 +36,7 @@ app(PageRank_pull pageRankPull_gen.cpp GlobalObj.cpp DISTSAFE)
 
 #HSSSP with worklist
 app(HSSSP_wl HSSSP_wl.cpp GlobalObj.cpp DISTSAFE)
+
+
+#PageRank with worklist
+app(pageRank_wl pageRank_wl.cpp GlobalObj.cpp DISTSAFE)

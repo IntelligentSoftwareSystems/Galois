@@ -27,6 +27,8 @@
 
 #include <iostream>
 #include <limits>
+#include <algorithm>
+#include <vector>
 #include "Galois/Galois.h"
 #include "Lonestar/BoilerPlate.h"
 #include "Galois/gstl.h"
@@ -42,13 +44,14 @@ static const char* const url = 0;
 
 namespace cll = llvm::cl;
 static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
-static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations"), cll::init(1000));
+static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations"), cll::init(4));
 static cll::opt<unsigned int> src_node("srcNodeId", cll::desc("ID of the source node"), cll::init(0));
 static cll::opt<float> tolerance("tolerance", cll::desc("tolerance"), cll::init(0.01));
 static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"), cll::init(false));
 
 
 static const float alpha = (1.0 - 0.85);
+//static const float TOLERANCE = 0.01;
 struct PR_NodeData {
   float value;
   std::atomic<float> residual;
@@ -58,6 +61,8 @@ struct PR_NodeData {
 
 typedef hGraph<PR_NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
+
+typedef GNode WorkItem;
 
 struct InitializeGraph {
   Graph* graph;
@@ -105,42 +110,57 @@ struct InitializeGraph {
 };
 
 
-static uint32_t num_Hosts_recvd = 0;
-static bool didWork = false;
-static std::vector<bool> others_didWork_vec;
+template <typename GraphTy>
+struct Get_info_functor : public Galois::op_tag {
+  GraphTy &graph;
 
-static void didWork_landingPad(Galois::Runtime::RecvBuffer& buf){
-  //receive didWork from all and decide.
-  uint32_t x_id;
-  bool x_didWork;
+  struct Syncer_0 {
+    static float extract( const struct PR_NodeData & node){ return node.residual; }
+    static void reduce (struct PR_NodeData & node, float y) { Galois::atomicAdd(node.residual, y);}
+    static void reset (struct PR_NodeData & node ) { node.residual = 0; }
+    typedef float ValTy;
+  };
 
-  gDeserialize(buf, x_id, x_didWork);
-  ++num_Hosts_recvd;
-  others_didWork_vec.push_back(x_didWork);
-}
+  struct SyncerPull_0 {
+    static float extract( const struct PR_NodeData & node){ return node.value; }
+    static void setVal (struct PR_NodeData & node, float y) {node.value = y; }
+    typedef float ValTy;
+  };
+
+  Get_info_functor(GraphTy& _g): graph(_g){}
+  unsigned operator()(GNode n){
+    return graph.getHostID(n);
+  }
+
+  uint32_t getLocalID(GNode n){
+    return graph.getLID(n);
+  }
+
+  void sync_push(){
+    sync_push_static(graph);
+    //XXX: Why this is not working?
+    //graph.sync_push<Syncer_0>();
+  }
+  void static sync_push_static(Graph& _g){
+    _g.sync_push<Syncer_0>();
+    _g.sync_pull<SyncerPull_0>();
+  }
+};
+
+
 struct PageRank {
   Graph* graph;
 
+  PageRank(Graph* _g): graph(_g){}
   void static go(Graph& _graph) {
-     struct Syncer_0 {
-    	static float extract( const struct PR_NodeData & node){ return node.residual; }
-    	static void reduce (struct PR_NodeData & node, float y) { Galois::atomicAdd(node.residual, y);}
-    	static void reset (struct PR_NodeData & node ) { node.residual = 0; }
-    	typedef float ValTy;
-    };
-     struct SyncerPull_0 {
-    	static float extract( const struct PR_NodeData & node){ return node.value; }
-    	static void setVal (struct PR_NodeData & node, float y) {node.value = y; }
-    	typedef float ValTy;
-    };
-    Galois::do_all(_graph.begin(), _graph.end(), PageRank { &_graph }, Galois::loopname("pageRank"), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "value" , "float"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ Galois::atomicAdd(node.residual, y);}",  "0"));
-    _graph.sync_push<Syncer_0>();
-    
-    _graph.sync_pull<SyncerPull_0>();
-    
+     using namespace Galois::WorkList;
+     typedef dChunkedFIFO<64> dChunk;
+
+     Galois::for_each(_graph.begin(), _graph.end(), PageRank(&_graph), Get_info_functor<Graph>(_graph), Galois::wl<dChunk>());
+
   }
 
-  void operator()(GNode src)const {
+  void operator()(WorkItem& src, Galois::UserContext<WorkItem>& ctx) const {
     PR_NodeData& sdata = graph->getData(src);
     float residual_old = sdata.residual.exchange(0.0);
     sdata.value += residual_old;
@@ -151,8 +171,12 @@ struct PageRank {
         GNode dst = graph->getEdgeDst(nbr);
         PR_NodeData& ddata = graph->getData(dst);
         auto dst_residual_old = Galois::atomicAdd(ddata.residual, delta);
-        if(!didWork && (dst_residual_old <= tolerance) && ((dst_residual_old + delta) >= tolerance)) {
-          didWork = true;
+
+        //Schedule TOLERANCE threshold crossed.
+          //std::cout << "out  : " << (dst_residual_old + delta) << "\n";
+        if((dst_residual_old <= tolerance) && ((dst_residual_old + delta) >= tolerance)) {
+            //std::cout << "pushed : " << graph->getGID(dst) << " host : " << graph->getHostID(graph->getGID(dst)) << "\n";
+          ctx.push(WorkItem(graph->getGID(dst)));
         }
       }
     }
@@ -192,43 +216,11 @@ int main(int argc, char** argv) {
       }
     }
 
-    std::cout << "PageRank::go called  on " << net.ID << "\n";
+    std::cout << "PageRank::go called\n";
     T_pageRank.start();
-    for (int i = 0; i < maxIterations; ++i) {
-      std::cout << " Iteration : " << i << "\n";
-      PageRank::go(hg);
-
-      //broadcast
-      //net.broadcast(didWork_landingPad, b);
-      for(auto x = 0; x < net.Num; ++x){
-        if(x == net.ID)
-          continue;
-        //Exchange didWorks to decide if done.
-        Galois::Runtime::SendBuffer b;
-        gSerialize(b, net.ID, didWork);
-        net.send(x,didWork_landingPad, b);
-      }
-
-      net.flush();
-      while(num_Hosts_recvd < (net.Num - 1)){
-        net.handleReceives();
-      }
-
-      assert(others_didWork_vec.size() == (net.Num -1));
-      bool CanTerminate = !didWork;
-      for(auto x : others_didWork_vec){
-        CanTerminate = (CanTerminate && !x);
-        x = false;
-      }
-
-      if(CanTerminate){
-        break;
-      }
-
-      didWork = false;
-      num_Hosts_recvd = 0;
-      others_didWork_vec.clear();
-    }
+    std::cout << " Starting PageRank with worklist. " << "\n";
+    PageRank::go(hg);
+    std::cout << " Done. " << "\n";
     T_pageRank.stop();
 
     // Verify

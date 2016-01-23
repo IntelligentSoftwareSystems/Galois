@@ -66,6 +66,9 @@
 #include <utility>
 #include <iostream>
 
+// DELETE these
+#include <typeinfo>
+
 namespace Galois {
 //! Internal Galois functionality - Use at your own risk.
 namespace Runtime {
@@ -574,7 +577,7 @@ void for_each_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
 static uint32_t num_Hosts_recvd = 0;
 //XXX: Why is the type a pair?? How can I get type up here?
 //static std::vector<std::pair<int, int>> workItem_recv_vec;
-static std::vector<uint64_t> workItem_recv_vec;
+static std::vector<uint32_t> workItem_recv_vec;
 static std::vector<bool> hosts_didWork_vec;
 
 static void recv_BagItems(Galois::Runtime::RecvBuffer& buf){
@@ -583,7 +586,7 @@ static void recv_BagItems(Galois::Runtime::RecvBuffer& buf){
   //XXX: Why pair?
   //std::vector<std::pair<int, int>> vec;
   //TODO: get graphNode type or value type up here.
-  std::vector<uint64_t> vec;
+  std::vector<uint32_t> vec;
 
   gDeserialize(buf, x_ID, x_didWork, vec);
   workItem_recv_vec.insert(workItem_recv_vec.end(), vec.begin(), vec.end());
@@ -614,12 +617,13 @@ static void recv_BagItems(Galois::Runtime::RecvBuffer& buf){
 
     /** Take out base worklist type to wrap it **/
     typedef typename get_type_by_supertype<wl_tag, TupleTy>::type::type BaseWorkListTy;
-    typedef typename std::iterator_traits<typename RangeTy::iterator>::value_type value_type; 
+    typedef typename std::iterator_traits<typename RangeTy::iterator>::value_type value_type;
 
 
     typedef typename reiterator<BaseWorkListTy, typename RangeTy::iterator>::type
     ::template retype<value_type> WorkListTy;
 
+    typedef typename BaseWorkListTy::value_type value_type_base;
     /** Construct new worklist **/
     typedef Galois::InsertBag<value_type> Bag;
     Bag bag;
@@ -687,13 +691,23 @@ static void recv_BagItems(Galois::Runtime::RecvBuffer& buf){
         //XXX: Loop to change global IDs to local IDs. There can be a better way: Using transform iterators. Why are assuming it to be a pair.
         //std::transform(workItem_recv_vec.begin(), workItem_recv_vec.end(), workItem_recv_vec.begin(), [&](value_type i)->value_type {return std::make_pair(helper_fn.getLocalID(i.first), i.second);});
 
-        std::transform(workItem_recv_vec.begin(), workItem_recv_vec.end(), workItem_recv_vec.begin(), [&](value_type i)->value_type {return helper_fn.getLocalID(i);});
+        /*
+        std::cout << " TYPE NAME : " << typeid(value_type()).name() << "\n";
+        for(auto i = 0; i < workItem_recv_vec.size(); ++i){
+          if(workItem_recv_vec[i] == 2069)
+            std::cout << "haiga \n";
+
+          workItem_recv_vec[i] = helper_fn.getLocalID(workItem_recv_vec[i]);
+        }
+        */
+        std::transform(workItem_recv_vec.begin(), workItem_recv_vec.end(), workItem_recv_vec.begin(), [&](value_type i)->value_type {if(i == 2069) std::cout << "found it : " << net.ID  <<"\n"; return helper_fn.getLocalID(i);});
 
         Runtime::for_each_impl_dist(Runtime::makeStandardRange(workItem_recv_vec.begin(), workItem_recv_vec.end()), fn,
             std::tuple_cat(xtpl,
                 get_default_trait_values(ztpl,
                 std::make_tuple(loopname_tag {}, wl_tag {}),
                 std::make_tuple(loopname {}, wl<defaultWL>()))));
+
       }
 
       didWork = !bag.empty();
