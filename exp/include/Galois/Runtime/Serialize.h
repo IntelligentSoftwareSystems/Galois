@@ -38,6 +38,10 @@
 //from libc++, clang specific
 namespace std {
 #ifdef __clang__
+template <class T> struct is_trivially_copyable;
+template <class _Tp> struct is_trivially_copyable
+  : public std::integral_constant<bool, __is_trivially_copyable(_Tp)>
+{};
 #else
 #if __GNUC__ < 5
 template<class T>
