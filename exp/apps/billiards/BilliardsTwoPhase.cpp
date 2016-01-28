@@ -23,7 +23,48 @@
  * @author <ahassaan@ices.utexas.edu>
  */
 
-#include "BilliardsTwoPhase.h"
+
+#include "Galois/Runtime/KDGtwoPhase.h"
+
+#include "Billiards.h"
+#include "dependTest.h"
+#include "BilliardsParallel.h"
+
+class BilliardsTwoPhase: public Billiards<BilliardsTwoPhase>  {
+
+
+  // void createLocks (const Table& table, Graph& graph, VecNodes& nodes) {
+    // nodes.reserve (table.getNumBalls ());
+// 
+    // for (unsigned i = 0; i < table.getNumBalls (); ++i) {
+      // nodes.push_back (graph.createNode (nullptr));
+    // }
+// 
+  // };
+
+public:
+
+  virtual const std::string version () const { return "using IKDG"; }
+
+  template <typename Tbl_t>
+  size_t runSim (Tbl_t& table, std::vector<Event>& initEvents, const FP& endtime, bool enablePrints=false, bool logEvents=false) {
+
+    AddListTy addList;
+    Accumulator iter;
+
+    // createLocks (table, graph, nodes);
+
+    Galois::Runtime::for_each_ordered_2p_win (
+        Galois::Runtime::makeStandardRange(initEvents.begin (), initEvents.end ()),
+        Event::Comparator (),
+        VisitNhood (),
+        ExecSources (),
+        AddEvents<Tbl_t> (table, endtime, addList, iter));
+
+    return iter.reduce ();
+
+  }
+};
 
 int main (int argc, char* argv[]) {
   BilliardsTwoPhase s;

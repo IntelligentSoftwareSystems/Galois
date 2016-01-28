@@ -126,7 +126,7 @@ printtree (n)
       for (k = 0; k < NSUB; k++) {
 	 printf("Child #%d: ", k);
 	 if (Subp(c)[k] == NULL) {
-	    printf("NONE");
+	    printf("MethodFlag::UNPROTECTED");
 	 }
 	 else {
 	    if (Type(Subp(c)[k]) == CELL) {

@@ -7,7 +7,6 @@
 int main(int argc, char** argv) {
   Galois::Runtime::SimpleRuntimeContext S;
   Galois::Runtime::Lockable L;
-  Galois::Runtime::setThreadContext(&S);
 
   int numAcquires = 1;
   if (argc > 1)
@@ -19,7 +18,7 @@ int main(int argc, char** argv) {
   t.start();
  
   for (int x = 0; x < numAcquires; ++x)
-    Galois::Runtime::acquire(&L, Galois::ALL);
+    Galois::Runtime::acquire(&L, Galois::MethodFlag::WRITE);
   
   t.stop();
   std::cout << "Locking time: " << t.get() << " ms after " << numAcquires << "\n";

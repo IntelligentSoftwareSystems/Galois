@@ -35,7 +35,7 @@
 #include "cuda/hpr_cuda.h"
 #include "cuda/cuda_mtypes.h"
 #include "hpr.h"
-#include "opencl/CLWrapper.h"
+#include "OpenCL/CLWrapper.h"
 
 #include <iostream>
 #include <typeinfo>

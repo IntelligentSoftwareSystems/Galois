@@ -1,36 +1,34 @@
-#include "Galois/Runtime/PerThreadStorage.h"
+#include "Galois/Substrate/PerThreadStorage.h"
 #include "Galois/Timer.h"
 #include "Galois/Galois.h"
 
 #include <cstdlib>
 #include <iostream>
 
-using namespace Galois::Runtime;
+using namespace Galois::Substrate;
 
 int num = 1;
 
 template<typename T>
 struct testL {
-  PerThreadStorage<T>* b;
+  PerThreadStorage<T>& b;
 
-  testL(PerThreadStorage<T>& B) :b(&B) {}
-  testL() {}
+  testL(PerThreadStorage<T>& B) :b(B) {}
   void operator()(unsigned t, unsigned n) {
     for (int x = 0; x < num; ++x) {
-      *b->getLocal() += x;
+      *b.getLocal() += x;
     }
   }
 };
 
 template<typename T>
 struct testR {
-  PerThreadStorage<T>* b;
+  PerThreadStorage<T>& b;
 
-  testR(PerThreadStorage<T>& B) :b(&B) {}
-  testR() {}
+  testR(PerThreadStorage<T>& B) :b(B) {}
   void operator()(unsigned t, unsigned n) {
     for (int x = 0; x < num; ++x) {
-      *b->getRemote((t + 1) % n) += x;
+      *b.getRemote((t + 1) % n) += x;
     }
   }
 };
@@ -56,7 +54,7 @@ int main(int argc, char** argv) {
   if (num <= 0)
     num = 1024 * 1024 * 1024;
 
-  unsigned M = Galois::Runtime::LL::getMaxThreads();
+  unsigned M = Galois::Substrate::getThreadPool().getMaxThreads();
 
   while (M) {
     Galois::setActiveThreads(M); //Galois::Runtime::LL::getMaxThreads());

@@ -1,13 +1,13 @@
 #include "Galois/Galois.h"
 #include "Galois/gslist.h"
-#include "Galois/Runtime/ll/gio.h"
-#include "Galois/Runtime/mm/Mem.h"
+#include "Galois/Substrate/gio.h"
+#include "Galois/Runtime/Mem.h"
 #include <map>
 
 int main(int argc, char** argv) {
-  typedef Galois::Runtime::MM::FixedSizeHeap Heap;
+  typedef Galois::Runtime::FixedSizeHeap Heap;
   typedef std::unique_ptr<Heap> HeapPtr;
-  typedef Galois::Runtime::PerThreadStorage<HeapPtr> Heaps;
+  typedef Galois::Substrate::PerThreadStorage<HeapPtr> Heaps;
   typedef Galois::concurrent_gslist<int> Collection;
   int numThreads = 2;
   unsigned size = 100;

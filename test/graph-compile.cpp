@@ -1,4 +1,4 @@
-#include "Galois/Graph/Graph.h"
+#include "Galois/Graphs/Graph.h"
 
 struct NoDefault {
   int x;
@@ -17,7 +17,7 @@ void check() {
   GNode n2 = g.createNode(v);
   g.addNode(n1);
   g.addNode(n2);
-  g.addMultiEdge(n1, n2, Galois::MethodFlag::ALL, v);
+  g.addMultiEdge(n1, n2, Galois::MethodFlag::WRITE, v);
 }
 
 int main() {

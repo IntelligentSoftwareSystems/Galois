@@ -1,2 +1,2 @@
-app(sssp-all SSSPall.cpp)
-app(sssp SSSP.cpp)
+app(app-sssp-all SSSPall.cpp)
+app(app-sssp SSSP.cpp)

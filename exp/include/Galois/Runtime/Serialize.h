@@ -43,8 +43,10 @@ template <class _Tp> struct is_trivially_copyable
   : public std::integral_constant<bool, __is_trivially_copyable(_Tp)>
 {};
 #else
+#if __GNUC__ < 5
 template<class T>
 using is_trivially_copyable = is_trivial<T>;
+#endif
 #endif
 }
 
@@ -79,7 +81,7 @@ class DeSerializeBuffer;
 
 class SerializeBuffer {
   friend DeSerializeBuffer;
-  typedef std::vector<char> vTy;
+  typedef std::vector<uint8_t> vTy;
   vTy bufdata;
   unsigned start;
 public:
@@ -100,7 +102,7 @@ public:
     bufdata.push_back(c);
   }
 
-  void insert(const char* c, size_t bytes) {
+  void insert(const uint8_t* c, size_t bytes) {
     bufdata.insert(bufdata.end(), c, c+bytes);
   }
 
@@ -116,8 +118,10 @@ public:
       bufdata[start + i] = pdata[i];
   }
 
-  const char* linearData() const { return &bufdata[start]; }
-
+  const uint8_t* linearData() const { return &bufdata[start]; }
+  unsigned getOffset() const { return start; }
+  std::vector<uint8_t>& getVec() { return bufdata; }
+  
   vTy::const_iterator begin() const { return bufdata.cbegin() + start; }
   vTy::const_iterator end() const { return bufdata.cend(); }
 
@@ -143,12 +147,17 @@ public:
 class DeSerializeBuffer {
   friend SerializeBuffer;
 
-  std::vector<char> bufdata;
+  std::vector<uint8_t> bufdata;
   int offset;
 public:
 
   DeSerializeBuffer() :offset(0) {}
   DeSerializeBuffer(DeSerializeBuffer&&) = default; //disable copy constructor
+
+  explicit DeSerializeBuffer(std::vector<uint8_t>& data) {
+    bufdata.swap(data);
+    offset = 0;
+  }
 
   explicit DeSerializeBuffer(int count) {
     offset = 0;
@@ -175,6 +184,8 @@ public:
 
   unsigned size() const { return bufdata.size(); }
 
+  bool empty() const {return bufdata.empty(); }
+
   unsigned char pop() {
     return bufdata.at(offset++);
   }
@@ -186,7 +197,7 @@ public:
 
   void* linearData() { return &bufdata[0]; }
 
-  const char* r_linearData() const { return &bufdata[offset]; }
+  const uint8_t* r_linearData() const { return &bufdata[offset]; }
   size_t r_size() const { return bufdata.size() - offset; }
 
   //Utility
@@ -213,7 +224,7 @@ template<typename T>
 __attribute__((always_inline)) void gSerializeObj(SerializeBuffer& buf, const T& data,
                    typename std::enable_if<is_memory_copyable<T>::value>::type* = 0)
 {
-  char* pdata = (char*)&data;
+  uint8_t* pdata = (uint8_t*)&data;
   buf.insert(pdata, sizeof(T));
 }
 
@@ -260,7 +271,7 @@ void gSerializeObj(SerializeBuffer& buf, const Galois::gdeque<T,CS>& data) {
 }
 
 inline void gSerializeObj(SerializeBuffer& buf, const std::string& data) {
-  buf.insert(data.data(), data.length()+1);
+  buf.insert((uint8_t*)data.data(), data.length()+1);
 }
 
 inline void gSerializeObj(SerializeBuffer& buf, const SerializeBuffer& data) {

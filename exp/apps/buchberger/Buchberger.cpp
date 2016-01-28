@@ -29,7 +29,7 @@
 #include "Galois/Galois.h"
 #include "Galois/Bag.h"
 #include "Galois/Statistic.h"
-
+#include "Galois/ParallelSTL.h"
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 
@@ -881,9 +881,9 @@ void buchberger(PolySet& ideal, PolySet& basis, R& ring) {
       continue;
     update(*ii, basis, pairs, ring, ring, initial);
   }
-  using namespace Galois::Runtime::WorkList;
+  using namespace Galois::WorkList;
   typedef OrderedByIntegerMetric<Indexer,dChunkedLIFO<8> > OBIM;
-  Galois::for_each<OBIM>(initial.begin(), initial.end(), Process<R>(basis, pairs, ring));
+  Galois::for_each(initial.begin(), initial.end(), Process<R>(basis, pairs, ring), Galois::wl<OBIM>());
 
   interReduce(basis, ring);
 }
@@ -1218,7 +1218,7 @@ void run() {
     Galois::InsertBag<PolyPair> pairs;
     allPairs(basis, pairs, P.ring());
     Verifier<typename ParserTy::RingTy> v(basis, P.ring());
-    if (Galois::find_if(pairs.begin(), pairs.end(), v) != pairs.end()) {
+    if (Galois::ParallelSTL::find_if(pairs.begin(), pairs.end(), v) != pairs.end()) {
       std::cerr << "Basis is not Groebner.\n";
       assert(0 && "Triangulation failed");
       abort();

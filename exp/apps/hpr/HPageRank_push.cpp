@@ -74,52 +74,52 @@ static cll::opt<int> gpudevice("gpu", cll::desc("Select GPU to run on, default i
 static cll::opt<float> cldevice("cldevice", cll::desc("Select OpenCL device to run on , default is 0.0 (OpenCL backend)"), cll::init(0.0));
 static cll::opt<std::string> personality_set("pset", cll::desc("String specifying personality for each host. 'c'=CPU,'g'=GPU/CUDA and 'o'=GPU/OpenCL"), cll::init(""));
 
-
 //typedef double PRTy;
-PRTy atomicAdd(std::atomic<PRTy>& v, PRTy delta){
-  PRTy old;
-  do {
-    old = v;
-  }while(!v.compare_exchange_strong(old, old + delta));
+PRTy atomicAdd(std::atomic<PRTy>& v, PRTy delta) {
+   PRTy old;
+   do {
+      old = v;
+   } while (!v.compare_exchange_strong(old, old + delta));
 
-  return old;
+   return old;
 }
 
-PRTy atomicSub(std::atomic<PRTy>& v, PRTy delta){
-  PRTy old;
-  do {
-    old = v;
-  }while(!v.compare_exchange_strong(old, old - delta));
+PRTy atomicSub(std::atomic<PRTy>& v, PRTy delta) {
+   PRTy old;
+   do {
+      old = v;
+   } while (!v.compare_exchange_strong(old, old - delta));
 
-  return old;
+   return old;
 }
-
 
 struct LNode {
-  PRTy value;
-  std::atomic<PRTy> residual;
-  //PRTy residual;
-  unsigned int nout;
+   PRTy value;
+   std::atomic<PRTy> residual;
+   //PRTy residual;
+   unsigned int nout;
 
-  LNode(){
-    value = 1.0 - alpha;
-    residual = 0.0;
-    nout = 0.0;
-  }
-  LNode(const LNode& rhs){
-    value = rhs.value;
-    nout = rhs.nout;
-    residual = rhs.residual.load();
-  }
+   LNode() {
+      value = 1.0 - alpha;
+      residual = 0.0;
+      nout = 0.0;
+   }
+   LNode(const LNode& rhs) {
+      value = rhs.value;
+      nout = rhs.nout;
+      residual = rhs.residual.load();
+   }
 
-  LNode& operator=(const LNode& rhs){
-    value = rhs.value;
-    nout = rhs.nout;
-    residual = rhs.residual.load();
-    return *this;
-  }
-  //void init(){value = 1.0 - alpha; residual = 0.0; nout = 0;}
-  PRTy getPagerank(int x = 0){ return value;}
+   LNode& operator=(const LNode& rhs) {
+      value = rhs.value;
+      nout = rhs.nout;
+      residual = rhs.residual.load();
+      return *this;
+   }
+   //void init(){value = 1.0 - alpha; residual = 0.0; nout = 0;}
+   PRTy getPagerank(int x = 0) {
+      return value;
+   }
 };
 
 //////////////////////////////////////////////////////////////////////////////////////
@@ -145,37 +145,37 @@ struct InitializeGraph {
       sdata.nout = std::distance(g->g.edge_begin(src), g->g.edge_end(src));
 #if _HETERO_DEBUG_
       if(Galois::Runtime::NetworkInterface::ID == 0)
-        std::cout << "Src : " << src << " nout : " <<sdata.nout << "\n"; 
+      std::cout << "Src : " << src << " nout : " <<sdata.nout << "\n";
 #endif
       //Initializing Residual is like running one round of pagerank
-      if(sdata.nout > 0) {
-        PRTy delta = sdata.value*alpha/sdata.nout;
-        for(auto nbr = g->g.edge_begin(src); nbr != g->g.edge_end(src); ++nbr){
-          GNode dst = g->g.getEdgeDst(*nbr);
-          LNode& ddata = g->g.getData(dst);
-          atomicAdd(ddata.residual, delta);
-        }
+      if (sdata.nout > 0) {
+         PRTy delta = sdata.value * alpha / sdata.nout;
+         for (auto nbr = g->g.edge_begin(src); nbr != g->g.edge_end(src); ++nbr) {
+            GNode dst = g->g.getEdgeDst(*nbr);
+            LNode& ddata = g->g.getData(dst);
+            atomicAdd(ddata.residual, delta);
+         }
       }
    }
 };
 
 struct InitializeGhostCells {
-  pGraph<Graph>* g;
-  void static go(pGraph<Graph>& _g){
+   pGraph<Graph>* g;
+   void static go(pGraph<Graph>& _g) {
       Galois::do_all(_g.g.begin() + _g.numOwned, _g.g.begin() + _g.numNodes, InitializeGhostCells { &_g }, Galois::loopname("init ghost cells"));
-  }
-  void operator()(GNode src) const {
-    //Residual for ghost cells should start from zero.
+   }
+   void operator()(GNode src) const {
+      //Residual for ghost cells should start from zero.
 #if _HETERO_DEBUG_
       if (Galois::Runtime::NetworkInterface::ID == 0)
-        std::cout << " Ghost : " << src << "\n";
+      std::cout << " Ghost : " << src << "\n";
 #endif
       LNode& sdata = g->g.getData(src);
       sdata.residual = 0.0;
-  }
+   }
 };
 
- /*********************************************************************************
+/*********************************************************************************
  * CPU PageRank operator implementation.
  **********************************************************************************/
 struct PageRank_push {
@@ -189,7 +189,7 @@ struct PageRank_push {
       LNode& sdata = g->g.getData(src);
       PRTy oldResidual = sdata.residual.exchange(0.0);
       sdata.value += oldResidual;
-      PRTy delta = oldResidual*alpha/sdata.nout;
+      PRTy delta = oldResidual * alpha / sdata.nout;
       for (auto jj = g->g.edge_begin(src), ej = g->g.edge_end(src); jj != ej; ++jj) {
          GNode dst = g->g.getEdgeDst(jj);
          LNode& ddata = g->g.getData(dst);
@@ -225,7 +225,7 @@ void setRemotePtr(uint32_t hostID, pGraph<Graph>* p) {
  **********************************************************************************/
 
 void recvNodeStatic(unsigned GID, uint32_t hostID) {
-   if (hostID >= remoteReplicas.size()){
+   if (hostID >= remoteReplicas.size()) {
       remoteReplicas.resize(hostID + 1);
       remoteReplicas_L.resize(hostID + 1);
    }
@@ -257,130 +257,129 @@ void reduceNodeValue(pGraph<Graph>* p, unsigned GID, PRTy residual) {
  *Reduce all the values a ghost cells
  **********************************************************************************/
 struct reduceGhostCells_struct {
-  pGraph<Graph>* g;
-  //std::vector<unsigned> uid_vec;
-  //std::vector<PRTy> residual_vec;
+   pGraph<Graph>* g;
+   //std::vector<unsigned> uid_vec;
+   //std::vector<PRTy> residual_vec;
 
-  void static go(pGraph<Graph>& _g){
+   void static go(pGraph<Graph>& _g) {
       Galois::do_all(_g.g.begin() + _g.numOwned, _g.g.begin() + _g.numNodes, reduceGhostCells_struct { &_g }, Galois::loopname("ReduceGhost Cells"));
-  }
-  void operator()(GNode src) const {
-     Galois::Runtime::NetworkInterface& net = Galois::Runtime::getSystemNetworkInterface();
-     LNode& sdata = g->g.getData(src);
+   }
+   void operator()(GNode src) const {
+      Galois::Runtime::NetworkInterface& net = Galois::Runtime::getSystemNetworkInterface();
+      LNode& sdata = g->g.getData(src);
 
-     auto n = g->uid(src);
-     auto x = g->getHost(n);
+      auto n = g->uid(src);
+      auto x = g->getHost(n);
 
-     if (x >= remoteReplicas_residual.size())
-       remoteReplicas_residual.resize(x+1);
+      if (x >= remoteReplicas_residual.size())
+         remoteReplicas_residual.resize(x + 1);
 
-     //remoteReplicas_residual[x][src - g->numNodes] = sdata.residual.exchange(0.0);
-     remoteReplicas_residual[x].push_back(sdata.residual.exchange(0.0));
-  }
+      //remoteReplicas_residual[x][src - g->numNodes] = sdata.residual.exchange(0.0);
+      remoteReplicas_residual[x].push_back(sdata.residual.exchange(0.0));
+   }
 };
-
 
 struct applyResidual_struct {
-  std::vector<unsigned>* RR_vec;
-  std::vector<PRTy>* RR_residual_vec;
-  pGraph<Graph>* g;
+   std::vector<unsigned>* RR_vec;
+   std::vector<PRTy>* RR_residual_vec;
+   pGraph<Graph>* g;
 
-  void static go(std::vector<unsigned>& _remoteReplicas_vec, std::vector<PRTy>& _remoteReplicas_residual_vec, pGraph<Graph>& _g){
-    //Galois::do_all(_remoteReplicas_vec.begin(), _remoteReplicas_vec.end(), applyResidual_struct { &_remoteReplicas_vec, &_remoteReplicas_residual_vec, &_g }, Galois::loopname("Apply residual struct"));
-    Galois::do_all(boost::counting_iterator<unsigned>(0), boost::counting_iterator<unsigned>(_remoteReplicas_vec.size()) , applyResidual_struct { &_remoteReplicas_vec, &_remoteReplicas_residual_vec, &_g }, Galois::loopname("Apply residual struct"));
-  }
+   void static go(std::vector<unsigned>& _remoteReplicas_vec, std::vector<PRTy>& _remoteReplicas_residual_vec, pGraph<Graph>& _g) {
+      //Galois::do_all(_remoteReplicas_vec.begin(), _remoteReplicas_vec.end(), applyResidual_struct { &_remoteReplicas_vec, &_remoteReplicas_residual_vec, &_g }, Galois::loopname("Apply residual struct"));
+      Galois::do_all(boost::counting_iterator<unsigned>(0), boost::counting_iterator<unsigned>(_remoteReplicas_vec.size()), applyResidual_struct { &_remoteReplicas_vec,
+            &_remoteReplicas_residual_vec, &_g }, Galois::loopname("Apply residual struct"));
+   }
 
-  void operator()(unsigned i) const {
-    //if (Galois::Runtime::NetworkInterface::ID == 1)
+   void operator()(unsigned i) const {
+      //if (Galois::Runtime::NetworkInterface::ID == 1)
       //std::cout << (*RR_vec)[i] << "\n";
-    atomicAdd(g->g.getData((*RR_vec)[i]).residual, (*RR_residual_vec)[i]);
-    //PRTy old =  g->g.getData(g->G2L((*RR_vec)[i])).residual;
-    //g->g.getData(g->G2L((*RR_vec)[i])).residual.store(old + (*RR_residual_vec)[i]);
-  }
+      atomicAdd(g->g.getData((*RR_vec)[i]).residual, (*RR_residual_vec)[i]);
+      //PRTy old =  g->g.getData(g->G2L((*RR_vec)[i])).residual;
+      //g->g.getData(g->G2L((*RR_vec)[i])).residual.store(old + (*RR_residual_vec)[i]);
+   }
 
 };
-void receiveGhostCellVectors(Galois::Runtime::RecvBuffer& buff){
-  std::vector<PRTy> residual_vec;
-  unsigned fromHostID;
-  gDeserialize(buff, fromHostID, residual_vec);
-  auto& net = Galois::Runtime::getSystemNetworkInterface();
-  pGraph<Graph>* p = magicPointer[net.ID];
+void receiveGhostCellVectors(Galois::Runtime::RecvBuffer& buff) {
+   std::vector<PRTy> residual_vec;
+   unsigned fromHostID;
+   gDeserialize(buff, fromHostID, residual_vec);
+   auto& net = Galois::Runtime::getSystemNetworkInterface();
+   pGraph<Graph>* p = magicPointer[net.ID];
 
 #if _HETERO_DEBUG_
-  std::cout << "RECEIVED from " << fromHostID << " ON : " << net.ID << "\n";
-  if(Galois::Runtime::NetworkInterface::ID == 1)
-    for(auto x : residual_vec)
-      std::cout << x << "\n";
-  std::cout << "Size : " << remoteReplicas_L[fromHostID].size() << " Size res : " << residual_vec.size() << "\n";
+   std::cout << "RECEIVED from " << fromHostID << " ON : " << net.ID << "\n";
+   if(Galois::Runtime::NetworkInterface::ID == 1)
+   for(auto x : residual_vec)
+   std::cout << x << "\n";
+   std::cout << "Size : " << remoteReplicas_L[fromHostID].size() << " Size res : " << residual_vec.size() << "\n";
 #endif
 
-  applyResidual_struct::go(remoteReplicas_L[fromHostID], residual_vec, *p);
-  /*
-  unsigned i = 0;
-  for(auto GID = remoteReplicas[fromHostID].begin(); GID != remoteReplicas[fromHostID].end(); ++GID, ++i){
+   applyResidual_struct::go(remoteReplicas_L[fromHostID], residual_vec, *p);
+   /*
+    unsigned i = 0;
+    for(auto GID = remoteReplicas[fromHostID].begin(); GID != remoteReplicas[fromHostID].end(); ++GID, ++i){
     //if(net.ID == 1)
-      //std::cout << *GID << " " << residual_vec[i] << "\n";
+    //std::cout << *GID << " " << residual_vec[i] << "\n";
     atomicAdd(p->g.getData(p->G2L(*GID)).residual, residual_vec[i]);
-  }
-  */
+    }
+    */
 }
 
 void sendGhostCellVectors(Galois::Runtime::NetworkInterface& net, pGraph<Graph>& g) {
 
-  unsigned remoteHostID = 0;
-  for(auto x = remoteReplicas_residual.begin(); x != remoteReplicas_residual.end(); ++x, ++remoteHostID){
-    if(remoteHostID == net.ID)
-      continue;
+   unsigned remoteHostID = 0;
+   for (auto x = remoteReplicas_residual.begin(); x != remoteReplicas_residual.end(); ++x, ++remoteHostID) {
+      if (remoteHostID == net.ID)
+         continue;
 
-    Galois::Runtime::SendBuffer buff;
-    gSerialize(buff, net.ID, *x);
-    net.send(remoteHostID, receiveGhostCellVectors, buff);
-  }
-  //std::cout << " SENT from " << net.ID << "\n";
+      Galois::Runtime::SendBuffer buff;
+      gSerialize(buff, net.ID, *x);
+      net.send(remoteHostID, receiveGhostCellVectors, buff);
+   }
+   //std::cout << " SENT from " << net.ID << "\n";
 }
 
 void reduceGhostCells(Galois::Runtime::NetworkInterface& net, pGraph<Graph>& g) {
 
-  for(auto ii = g.g.begin() + g.numOwned; ii != g.g.begin() + g.numNodes; ++ii){
-    auto n = g.uid(*ii);
-    auto x = g.getHost(n);
-    LNode& sdata = g.g.getData(*ii);
+   for (auto ii = g.g.begin() + g.numOwned; ii != g.g.begin() + g.numNodes; ++ii) {
+      auto n = g.uid(*ii);
+      auto x = g.getHost(n);
+      LNode& sdata = g.g.getData(*ii);
 
 #if _HETERO_DEBUG_
-    if (net.ID == 0)
+      if (net.ID == 0)
       std::cout << "src : " << *ii << " , n " << n << ", x "<< x << "\n";
 #endif
-    switch (personality) {
+      switch (personality) {
       case CPU:
-        net.sendAlt(x, reduceNodeValue, magicPointer[x], n, sdata.residual.exchange(0.0));
-        break;
+         net.sendAlt(x, reduceNodeValue, magicPointer[x], n, sdata.residual.exchange(0.0));
+         break;
       case GPU_CUDA:
-        //net.sendAlt(x, reduceNodeValue, magicPointer[x], n, getNodeValue_CUDA(cuda_ctx, n - g.g_offset));
-        break;
+         //net.sendAlt(x, reduceNodeValue, magicPointer[x], n, getNodeValue_CUDA(cuda_ctx, n - g.g_offset));
+         break;
       case GPU_OPENCL:
-        //net.sendAlt(x, reduceNodeValue, magicPointer[x], n, cl_ctx.getData((n - g.g_offset)).value[g.g.getData(n - g.g_offset).current_version(BSP_FIELD_NAMES::PR_VAL_FIELD)]);
-        break;
+         //net.sendAlt(x, reduceNodeValue, magicPointer[x], n, cl_ctx.getData((n - g.g_offset)).value[g.g.getData(n - g.g_offset).current_version(BSP_FIELD_NAMES::PR_VAL_FIELD)]);
+         break;
       default:
-        assert(false);
-        break;
-    }
-  }
+         assert(false);
+         break;
+      }
+   }
 }
-
 
 /*********************************************************************************
  *Make Ghost cells residual zero
  **********************************************************************************/
 struct clearGhostCells {
-  pGraph<Graph>* g;
+   pGraph<Graph>* g;
 
-  void static go(pGraph<Graph>& _g){
-    Galois::do_all(_g.g.begin() + _g.numOwned, _g.g.begin() + _g.numNodes, InitializeGhostCells { &_g }, Galois::loopname("Clear residual on Ghost cells"));
-  }
+   void static go(pGraph<Graph>& _g) {
+      Galois::do_all(_g.g.begin() + _g.numOwned, _g.g.begin() + _g.numNodes, InitializeGhostCells { &_g }, Galois::loopname("Clear residual on Ghost cells"));
+   }
 
-  void operator()(GNode src){
-    PRTy oldResidual = g->g.getData(src).residual.exchange(0.0);
-  }
+   void operator()(GNode src) {
+      PRTy oldResidual = g->g.getData(src).residual.exchange(0.0);
+   }
 };
 /*********************************************************************************
  *
@@ -466,9 +465,9 @@ void inner_main() {
          break;
       }
    }
-   fprintf(stderr, "Pre-barrier - Host: %d, Personality %s\n",Galois::Runtime::NetworkInterface::ID ,personality_str(personality).c_str());
+   fprintf(stderr, "Pre-barrier - Host: %d, Personality %s\n", Galois::Runtime::NetworkInterface::ID, personality_str(personality).c_str());
    barrier.wait();
-   fprintf(stderr, "Post-barrier - Host: %d, Personality %s\n",Galois::Runtime::NetworkInterface::ID ,personality_str(personality).c_str());
+   fprintf(stderr, "Post-barrier - Host: %d, Personality %s\n", Galois::Runtime::NetworkInterface::ID, personality_str(personality).c_str());
    T_graph_load.start();
    pGraph<Graph> g;
    g_Local = &g;
@@ -477,7 +476,7 @@ void inner_main() {
    if (personality == GPU_CUDA) {
       cuda_ctx = get_CUDA_context(Galois::Runtime::NetworkInterface::ID);
       if (!init_CUDA_context(cuda_ctx, gpudevice))
-         return ;
+         return;
    } else if (personality == GPU_OPENCL) {
       Galois::OpenCL::cl_env.init(cldevice);
    }
@@ -509,9 +508,9 @@ void inner_main() {
       InitializeGraph::go(g);
       // Propagate the residual collected in initialization phase.
       reduceGhostCells_struct::go(g);
-      sendGhostCellVectors(net,g);
-      for(auto x = remoteReplicas_residual.begin(); x != remoteReplicas_residual.end(); ++x){
-        (*x).clear();
+      sendGhostCellVectors(net, g);
+      for (auto x = remoteReplicas_residual.begin(); x != remoteReplicas_residual.end(); ++x) {
+         (*x).clear();
       }
    } else if (personality == GPU_CUDA) {
       initialize_graph_cuda(cuda_ctx);
@@ -528,49 +527,49 @@ void inner_main() {
    std::cout << "[" << my_host_id << "] Starting PageRank" << "\n";
    T_pagerank.start();
    for (int i = 0; i < maxIterations; ++i) {
-     //T_pagerank_perIter.start();
+      //T_pagerank_perIter.start();
 
       //Do pagerank
       switch (personality) {
       case CPU:
-        PageRank_push::go(g);
-        reduceGhostCells_struct::go(g);
-        sendGhostCellVectors(net,g);
-        for(auto x = remoteReplicas_residual.begin(); x != remoteReplicas_residual.end(); ++x){
-          (*x).clear();
-        }
+         PageRank_push::go(g);
+         reduceGhostCells_struct::go(g);
+         sendGhostCellVectors(net, g);
+         for (auto x = remoteReplicas_residual.begin(); x != remoteReplicas_residual.end(); ++x) {
+            (*x).clear();
+         }
 #if _HETERO_DEBUG_
-        if(my_host_id == 1)
-        {
-           for(auto x = remoteReplicas.begin(); x != remoteReplicas.end(); ++x)
+         if(my_host_id == 1)
+         {
+            for(auto x = remoteReplicas.begin(); x != remoteReplicas.end(); ++x)
             for(auto y = x->begin(); y != x->end(); ++y)
-              std::cout << "remote on 1 - > " << *y << " : " << g.G2L_Local(*y) << "\n";
+            std::cout << "remote on 1 - > " << *y << " : " << g.G2L_Local(*y) << "\n";
 
-           for(auto x = remoteReplicas_L.begin(); x != remoteReplicas_L.end(); ++x)
+            for(auto x = remoteReplicas_L.begin(); x != remoteReplicas_L.end(); ++x)
             for(auto y = x->begin(); y != x->end(); ++y)
-              std::cout << "remote LID on 1 - > " << *y << "\n";
+            std::cout << "remote LID on 1 - > " << *y << "\n";
 
-        }
-        if(my_host_id == 0)
-        {
-          for(auto x = remoteReplicas_residual.begin(); x != remoteReplicas_residual.end(); ++x)
+         }
+         if(my_host_id == 0)
+         {
+            for(auto x = remoteReplicas_residual.begin(); x != remoteReplicas_residual.end(); ++x)
             for(auto y = x->begin(); y != x->end(); ++y)
-              std::cout << "R for 1 - >"<< *y << "\n";
+            std::cout << "R for 1 - >"<< *y << "\n";
 
-          for(auto  x : g.L2G){
-            std::cout << "L2G - > " << x << "\n";
-          }
+            for(auto x : g.L2G) {
+               std::cout << "L2G - > " << x << "\n";
+            }
 
-          int i = 0;
-          for (auto n = g.g.begin() + g.numOwned; n != g.g.begin() + g.numNodes; ++n, ++i)
-          {
-            LNode& sdata = g.g.getData(*n);
+            int i = 0;
+            for (auto n = g.g.begin() + g.numOwned; n != g.g.begin() + g.numNodes; ++n, ++i)
+            {
+               LNode& sdata = g.g.getData(*n);
 
-            std::cout << *n << " R : " << sdata.residual <<" L2G vec : " << g.L2G[*n - g.numOwned] <<" From vec : " << sdata.residual << " \n";
-          }
-        }
+               std::cout << *n << " R : " << sdata.residual <<" L2G vec : " << g.L2G[*n - g.numOwned] <<" From vec : " << sdata.residual << " \n";
+            }
+         }
 #endif
-        break;
+         break;
       case GPU_OPENCL:
          cl_ctx(g.numOwned);
          break;
@@ -595,29 +594,30 @@ void inner_main() {
       switch (personality) {
       case CPU: {
          for (auto n = g.g.begin(); n != g.g.begin() + g.numOwned; ++n) {
-            out_file << *n + g.g_offset << ", " << g.g.getData(*n).value<< ", " << g.g.getData(*n).nout << "\n";
+            out_file << *n + g.g_offset << ", " << g.g.getData(*n).value << ", " << g.g.getData(*n).nout << "\n";
          }
          break;
       }
-      /*
-      case GPU_OPENCL: {
-         for (int n = 0; n < g.numOwned; ++n) {
-            out_file << n + g.g_offset << ", " << cl_ctx.getData(n).value[cl_ctx.getData(n).current_version(BSP_FIELD_NAMES::PR_VAL_FIELD)] << ", " << cl_ctx.getData(n).nout << "\n";
-         }
-         break;
-      }
-      case GPU_CUDA:
-         for (int n = 0; n < g.numOwned; n++) {
-            out_file << n + g.g_offset << ", " << getNodeValue_CUDA(cuda_ctx, n) << ", " << getNodeAttr_CUDA(cuda_ctx, n) << "\n";
-         }
-         break;
-      */
+         /*
+          case GPU_OPENCL: {
+          for (int n = 0; n < g.numOwned; ++n) {
+          out_file << n + g.g_offset << ", " << cl_ctx.getData(n).value[cl_ctx.getData(n).current_version(BSP_FIELD_NAMES::PR_VAL_FIELD)] << ", " << cl_ctx.getData(n).nout << "\n";
+          }
+          break;
+          }
+          case GPU_CUDA:
+          for (int n = 0; n < g.numOwned; n++) {
+          out_file << n + g.g_offset << ", " << getNodeValue_CUDA(cuda_ctx, n) << ", " << getNodeAttr_CUDA(cuda_ctx, n) << "\n";
+          }
+          break;
+          */
       }
       out_file.close();
    }
 
    T_total.stop();
-   std::cout << "[" << Galois::Runtime::NetworkInterface::ID << "]" << " Total : " << T_total.get() << " Loading : " << T_graph_load.get() << " Init : " << T_graph_init.get() << " PageRank (" << maxIterations << " iteration) : " << T_pagerank.get() << " (msec)\n";
+   std::cout << "[" << Galois::Runtime::NetworkInterface::ID << "]" << " Total : " << T_total.get() << " Loading : " << T_graph_load.get() << " Init : " << T_graph_init.get()
+         << " PageRank (" << maxIterations << " iteration) : " << T_pagerank.get() << " (msec)\n";
 
    std::cout << "Terminated on [ " << my_host_id << " ]\n";
    net.terminate();

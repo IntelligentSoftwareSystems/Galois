@@ -6,11 +6,12 @@
  */
 #include "Galois/Galois.h"
 #include "Galois/gstl.h"
-#include "Galois/Graph/FileGraph.h"
-#include "Galois/Graph/LC_CSR_Graph.h"
-#include "Galois/Graph/Util.h"
+#include "Galois/Graphs/FileGraph.h"
+#include "Galois/Graphs/LC_CSR_Graph.h"
+#include "Galois/Graphs/Util.h"
 #include "Lonestar/BoilerPlate.h"
 #include "Galois/Bag.h"
+#include "Galois/Runtime/Network.h"
 
 #ifndef GDIST_EXP_APPS_HPR_PGRAPH_H_
 #define GDIST_EXP_APPS_HPR_PGRAPH_H_

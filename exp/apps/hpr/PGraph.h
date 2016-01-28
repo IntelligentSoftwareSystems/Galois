@@ -6,10 +6,11 @@
  */
 #include "Galois/Galois.h"
 #include "Galois/gstl.h"
-#include "Galois/Graph/FileGraph.h"
-#include "Galois/Graph/LC_CSR_Graph.h"
-#include "Galois/Graph/Util.h"
+#include "Galois/Graphs/FileGraph.h"
+#include "Galois/Graphs/LC_CSR_Graph.h"
+#include "Galois/Graphs/Util.h"
 #include "Lonestar/BoilerPlate.h"
+#include "Galois/Runtime/Network.h"
 
 #ifndef GDIST_EXP_APPS_HPR_PGRAPH_H_
 #define GDIST_EXP_APPS_HPR_PGRAPH_H_
@@ -42,7 +43,8 @@ struct pGraph {
    }
    //XXX: Hack
    unsigned G2L_Local(unsigned GID){
-    assert((GID > g_offset));
+    //std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] " << GID << ", " << g_offset << "\n";
+    assert((GID >= g_offset));
     assert(GID < (g_offset + numOwned));
     return (GID - g_offset);
    }
