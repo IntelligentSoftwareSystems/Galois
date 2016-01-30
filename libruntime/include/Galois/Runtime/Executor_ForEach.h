@@ -572,6 +572,11 @@ void for_each_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
   }
 }
 
+//Tag dispatching
+template<typename RangeTy, typename FunctionTy, typename TupleTy>
+void for_each_gen_dist(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl){
+  for_each_gen_dist_impl(r, fn, tpl, std::integral_constant<bool, exists_by_supertype<op_tag, TupleTy>::value>());
+}
 
 /**Landing pad for bagItems **/
 static uint32_t num_Hosts_recvd = 0;
@@ -595,10 +600,9 @@ static void recv_BagItems(Galois::Runtime::RecvBuffer& buf){
 }
 
 
-
 /** For distributed worklist **/
   template<typename RangeTy, typename FunctionTy, typename TupleTy>
-  void for_each_gen_dist(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
+  void for_each_gen_dist_impl(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl, std::true_type) {
   static_assert(!exists_by_supertype<char*, TupleTy>::value, "old loopname");
   static_assert(!exists_by_supertype<char const *, TupleTy>::value, "old loopname");
   static_assert(!exists_by_supertype<bool, TupleTy>::value, "old steal");
@@ -646,7 +650,7 @@ static void recv_BagItems(Galois::Runtime::RecvBuffer& buf){
      while(!Canterminate) {
 
       // Sync
-      helper_fn.sync_push();
+      helper_fn.sync_graph();
 
       // seperate out nodes to work locally and to send to remote destinaton.
       std::vector<std::vector<value_type>> bagItems_vec;
@@ -752,6 +756,38 @@ static void recv_BagItems(Galois::Runtime::RecvBuffer& buf){
   }
 }
 
+//basic template if no op_tag helper function is provided.
+template<typename RangeTy, typename FunctionTy, typename TupleTy>
+void for_each_gen_dist_impl(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl, std::false_type) {
+  static const bool forceNew = false;
+
+  static_assert(!forceNew || Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsAborts, "old type trait");
+  static_assert(!forceNew || Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsStats, "old type trait");
+  static_assert(!forceNew || Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPush, "old type trait");
+  static_assert(!forceNew || !Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsBreak, "old type trait");
+  static_assert(!forceNew || !Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPIA, "old type trait");
+  if (forceNew) {
+    auto xtpl = std::tuple_cat(tpl, typename function_traits<FunctionTy>::type {});
+    Runtime::for_each_impl(r, fn,
+        std::tuple_cat(xtpl,
+          get_default_trait_values(tpl,
+            std::make_tuple(loopname_tag {}, wl_tag {}),
+            std::make_tuple(loopname {}, wl<defaultWL>()))));
+  } else {
+    auto tags = typename DEPRECATED::ExtractForEachTraits<FunctionTy>::tags_type {};
+    auto values = typename DEPRECATED::ExtractForEachTraits<FunctionTy>::values_type {};
+    auto ttpl = get_default_trait_values(tpl, tags, values);
+    auto dtpl = std::tuple_cat(tpl, ttpl);
+    auto xtpl = std::tuple_cat(dtpl, typename function_traits<FunctionTy>::type {});
+    Runtime::for_each_impl(r, fn,
+        std::tuple_cat(xtpl,
+          get_default_trait_values(dtpl,
+            std::make_tuple(loopname_tag {}, wl_tag {}),
+            std::make_tuple(loopname {}, wl<defaultWL>()))));
+  }
+
+
+}
 
 
 } // end namespace Runtime
