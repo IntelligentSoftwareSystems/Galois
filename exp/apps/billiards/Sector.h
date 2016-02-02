@@ -189,7 +189,7 @@ public:
 
   virtual void simulate (const Event& e);
 
-  Galois::optional<Event> computeEarliestEvent (const Ball_t* ball, const FP& endtime) const;
+  Galois::optional<Event> computeEarliestEvent (const Ball_t* ball, const FP& endtime, const Event* prevEvent) const;
 
 
   Galois::optional<Event> earliestSectorEntry (const Ball_t* ball, const FP& endtime) const;

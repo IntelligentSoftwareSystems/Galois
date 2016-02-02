@@ -179,16 +179,6 @@ public:
     }
   }
 
-  void decrCounterCopies (void) {
-    assert (int (collCounterA) > 0);
-    --collCounterA;
-
-    if (collCounterB != 0) {
-      assert (int (collCounterB) > 0);
-      --collCounterB;
-    }
-  }
-
   const FP& getTime () const { return time; }
 
   const Sector* enclosingSector (void) const { return sector; }
@@ -239,6 +229,10 @@ public:
     // this->collCounterB = b.collCounter ();
   // }
 
+  CollidingObject* getOtherObj (void) const {
+    return otherObj;
+  }
+
   Ball* getOtherBall () const { 
     assert (kind == BALL_COLLISION);
 
@@ -258,6 +252,18 @@ public:
   }
 
   EventKind getKind () const { return kind; }
+
+  std::pair<unsigned, unsigned>  getCounterCopies (void) const {
+    return std::make_pair (collCounterA, collCounterB);
+  }
+
+  void restoreCounters (const std::pair<unsigned, unsigned>& p) {
+    assert (collCounterA >= p.first);
+    assert (collCounterB >= p.second);
+
+    collCounterA = p.first;
+    collCounterB = p.second;
+  }
 
 
   std::string str () const {

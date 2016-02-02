@@ -75,14 +75,17 @@ class BilliardsOptim: public Billiards<BilliardsOptim, Table<BallOptim<> > > {
         b2 = bw2->checkpoint (e);
       }
 
-      auto restore = [bw1, bw2, b1, b2, &e] (void) {
+      auto ccopy = e.getCounterCopies ();
+
+      auto restore = [bw1, bw2, b1, b2, &e, ccopy] (void) {
         bw1->restore (b1);
         
         if (bw2) {
           assert (b2);
           bw2->restore (b2);
         }
-        const_cast<Event&> (e).decrCounterCopies ();
+
+        const_cast<Event&> (e).restoreCounters (ccopy);
       };
 
       ctx.addUndoAction (restore);

@@ -472,13 +472,15 @@ public:
   // compute earliest collision between a ball and some other object underTest
   // We don't want to create a collision with the object involved in previous collision
   template <typename I, typename T=typename std::remove_pointer<typename std::iterator_traits<I>::value_type>::type >
-  static Galois::optional<Event> computeNextEvent (const Event::EventKind& kind, const Ball* b, const I collObjsBeg, const I collObjsEnd, const FP& endtime, const Sector* sector) {
+  static Galois::optional<Event> computeNextEvent (const Event::EventKind& kind, const Ball* b, const I collObjsBeg, const I collObjsEnd, const FP& endtime, const Event* prevEvent, const Sector* sector) {
+
+    std::cout << "Computing future events for ball: " << b->str () << std::endl;
 
 
     Galois::optional<Event> retVal;
 
-    const T* currMin = nullptr;
-    FP currMinTime = -1.0;
+    // const T* currMin = nullptr;
+    // FP currMinTime = -1.0;
 
     for (I i = collObjsBeg; i != collObjsEnd; ++i) {
 
@@ -492,53 +494,80 @@ public:
 
         std::pair <bool, FP> p = Collision::computeCollisionTime (*b, *underTest);
 
+        if (p.first && p.second <= endtime) {
 
-        if (p.first) { // collision possible
+          Event e = Event::makeEvent (kind, b, underTest, p.second, sector);
 
-          assert (p.second > FP (0.0));
 
-          // it may happen that a ball collides two balls or
-          // two cushions simulatneously. In such cases,
-          // we break the tie by choosing the object with smaller id
-          if (FPutils::almostEqual (p.second, currMinTime)) {
-            if (underTest->getID () < currMin->getID ()) {
-              currMin = underTest;
-              currMinTime = p.second;
+          if (prevEvent && *prevEvent == e) {
+            continue;
+          }
+
+          std::cout << "Possible future Event: " << e.str () << std::endl;
+
+          if (retVal && FPutils::almostEqual (retVal->getTime (), e.getTime ())) {
+            if (e.getOtherObj ()->getID () < retVal->getOtherObj ()->getID ()) {
+              retVal = e;
             }
 
-          } else  if ((currMin == NULL) || (p.second < currMinTime)) {
-            // colliding == NULL for the first time
-            currMin = underTest;
-            currMinTime = p.second;
+          } else  if (!retVal || e < *retVal) {
+            retVal = e;
 
           } else {
-            assert (p.second > currMinTime);
-            // do nothing?
+            assert (retVal);
+            assert (*retVal < e);
           }
-
-          if (false) {
-            std::cout.precision (10);
-            std::cout << "At time: " << std::fixed << double (p.second) << " Ball b=" << b->str () << 
-              " can collide with=" << underTest->str () << std::endl;
-          }
-
-        }
-
-
-
-      } // end outer if
-    } // end for
-
-
-    if (currMin != NULL) { assert (currMinTime > FP (0.0)); }
-
-
-    if (currMinTime > FP (0.0) && currMinTime <= endtime) { 
-      assert (currMin != nullptr);
-
-      retVal = Event::makeEvent (kind, b, currMin, currMinTime, sector);
-
+        } // end if p.first
+      }
     }
+// 
+// 
+        // if (p.first) { // collision possible
+// 
+          // assert (p.second > FP (0.0));
+// 
+          // // it may happen that a ball collides two balls or
+          // // two cushions simulatneously. In such cases,
+          // // we break the tie by choosing the object with smaller id
+          // if (FPutils::almostEqual (p.second, currMinTime)) {
+            // if (underTest->getID () < currMin->getID ()) {
+              // currMin = underTest;
+              // currMinTime = p.second;
+            // }
+// 
+          // } else  if ((currMin == NULL) || (p.second < currMinTime)) {
+            // // colliding == NULL for the first time
+            // currMin = underTest;
+            // currMinTime = p.second;
+// 
+          // } else {
+            // assert (p.second > currMinTime);
+            // // do nothing?
+          // }
+// 
+          // if (false) {
+            // std::cout.precision (10);
+            // std::cout << "At time: " << std::fixed << double (p.second) << " Ball b=" << b->str () << 
+              // " can collide with=" << underTest->str () << std::endl;
+          // }
+// 
+        // }
+// 
+// 
+
+      // } // end outer if
+    // } // end for
+
+// 
+    // if (currMin != NULL) { assert (currMinTime > FP (0.0)); }
+// 
+// 
+    // if (currMinTime > FP (0.0) && currMinTime <= endtime) { 
+      // assert (currMin != nullptr);
+// 
+      // retVal = Event::makeEvent (kind, b, currMin, currMinTime, sector);
+// 
+    // }
 
     return retVal;
   }

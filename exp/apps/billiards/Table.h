@@ -597,7 +597,7 @@ protected:
   }
 
 
-  Galois::optional<Event>  computeHistCollisions (const BallOptim<Ball>* ball, const FP& endtime, const Event* prevEvent=nullptr) const {
+  Galois::optional<Event>  computeHistCollisions (const BallOptim<Ball>* ball, const FP& endtime, const Event* prevEvent) const {
 
     Galois::optional<Event> minBallColl;
 
@@ -606,7 +606,7 @@ protected:
         auto bw = b->getWrapper ();
         assert (bw);
 
-        Galois::optional<Event> ballColl = Collision::computeNextEvent (Event::BALL_COLLISION, ball, bw->ballHistBeg (), bw->ballHistEnd (), endtime, nullptr); 
+        Galois::optional<Event> ballColl = Collision::computeNextEvent (Event::BALL_COLLISION, ball, bw->ballHistBeg (), bw->ballHistEnd (), endtime, prevEvent, nullptr); 
 
         if (ballColl) {
           if (!minBallColl || (*ballColl < *minBallColl)) {
@@ -631,7 +631,7 @@ protected:
   }
 
   template <typename B2>
-  Galois::optional<Event>  computeHistCollisions (const B2* ball, const FP& endtime, const Event* prevEvent=nullptr) const {
+  Galois::optional<Event>  computeHistCollisions (const B2* ball, const FP& endtime, const Event* prevEvent) const {
 
     return Galois::optional<Event> ();
   }
@@ -641,9 +641,9 @@ protected:
 
     assert (ball);
 
-    Galois::optional<Event> ballColl = Collision::computeNextEvent (Event::BALL_COLLISION, ball, this->balls.begin (), this->balls.end (), endtime, nullptr);
+    Galois::optional<Event> ballColl = Collision::computeNextEvent (Event::BALL_COLLISION, ball, this->balls.begin (), this->balls.end (), endtime, prevEvent, nullptr);
 
-    Galois::optional<Event> cushColl = Collision::computeNextEvent (Event::CUSHION_COLLISION, ball, this->cushions.begin (), this->cushions.end (), endtime, nullptr);
+    Galois::optional<Event> cushColl = Collision::computeNextEvent (Event::CUSHION_COLLISION, ball, this->cushions.begin (), this->cushions.end (), endtime, prevEvent, nullptr);
 
     // // FIXME: fixing the pointer to balls for optimistic executor, which may read a checkpointed copy of the ball
     // if (ballColl) {
@@ -653,7 +653,7 @@ protected:
       // ballColl = Event::makeEvent (Event::BALL_COLLISION, balls [b1->getID ()], balls [b2->getID ()], ballColl->getTime (), ballColl->enclosingSector ());
     // }
 
-    Galois::optional<Event> histColl = computeHistCollisions (ball, endtime);
+    Galois::optional<Event> histColl = computeHistCollisions (ball, endtime, prevEvent);
 
     if (histColl) {
       if (!ballColl || (*histColl < *ballColl)) {
@@ -661,12 +661,12 @@ protected:
       }
     }
 
-    if (ballColl && prevEvent && prevEvent->notStale ()) {
+    if (ballColl && prevEvent) {
       assert (*ballColl != *prevEvent);
     }
 
 
-    if (cushColl && prevEvent && prevEvent->notStale ()) {
+    if (cushColl && prevEvent) {
       assert (*cushColl != *prevEvent);
     }
 

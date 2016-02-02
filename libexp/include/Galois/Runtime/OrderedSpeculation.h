@@ -188,6 +188,7 @@ struct OptimNhoodItem: public OrdLocBase<OptimNhoodItem<Ctxt, CtxtCmp>, Ctxt, Ct
     for (auto i = sharers.end (), beg_i = sharers.begin (); beg_i != i; ) {
       --i;
       if (ctxtCmp (ctxt, *i)) {
+        dbg::debug (ctxt, " causing sharer to abort ", *i);
         ret = true;
         (*i)->markForAbortRecursive (abortWL);
 
@@ -214,6 +215,7 @@ struct OptimNhoodItem: public OrdLocBase<OptimNhoodItem<Ctxt, CtxtCmp>, Ctxt, Ct
         break;
 
       } else {
+        dbg::debug (ctxt, " causing sharer to abort ", *i);
         (*i)->markForAbortRecursive (abortWL);
       }
     }
@@ -517,6 +519,7 @@ struct OptimContext: public OrderedContextBase<T> {
       }
 
       for (OptimContext* c: children) {
+        dbg::debug (this, " causing abort on child ", c);
         c->markForAbortRecursive (abortWL);
         c->addBack = false;
       }
