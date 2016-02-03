@@ -565,40 +565,59 @@ void for_each_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
     auto dtpl = std::tuple_cat(tpl, ttpl);
     auto xtpl = std::tuple_cat(dtpl, typename function_traits<FunctionTy>::type {});
     Runtime::for_each_impl(r, fn,
-        std::tuple_cat(xtpl, 
+        std::tuple_cat(xtpl,
           get_default_trait_values(dtpl,
             std::make_tuple(loopname_tag {}, wl_tag {}),
             std::make_tuple(loopname {}, wl<defaultWL>()))));
   }
 }
 
+//Tag dispatching
+template<typename RangeTy, typename FunctionTy, typename TupleTy>
+void for_each_gen_dist(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl){
 
-/**Landing pad for bagItems **/
-static uint32_t num_Hosts_recvd = 0;
-//XXX: Why is the type a pair?? How can I get type up here?
-//static std::vector<std::pair<int, int>> workItem_recv_vec;
-static std::vector<uint32_t> workItem_recv_vec;
-static std::vector<bool> hosts_didWork_vec;
-
-static void recv_BagItems(Galois::Runtime::RecvBuffer& buf){
-  bool x_didWork;
-  unsigned x_ID;
-  //XXX: Why pair?
-  //std::vector<std::pair<int, int>> vec;
-  //TODO: get graphNode type or value type up here.
-  std::vector<uint32_t> vec;
-
-  gDeserialize(buf, x_ID, x_didWork, vec);
-  workItem_recv_vec.insert(workItem_recv_vec.end(), vec.begin(), vec.end());
-  hosts_didWork_vec.push_back(x_didWork);
-  num_Hosts_recvd++;
+  auto dtpl = std::tuple_cat(tpl, get_default_trait_values(tpl, std::make_tuple(wl_tag{}), std::make_tuple(wl<defaultWL>())));
+  for_each_gen_dist_impl(r, fn, dtpl, std::integral_constant<bool, exists_by_supertype<op_tag, TupleTy>::value>());
 }
 
+/**Landing pad for bagItems **/
+template<typename Ty>
+struct global_var_sturct{
+  static uint32_t num_Hosts_recvd;
+  //XXX: Why is the type a pair?? How can I get type up here?
+  //static std::vector<std::pair<int, int>> workItem_recv_vec;
+  static std::vector<Ty> workItem_recv_vec;
+  //static std::vector<uint32_t> workItem_recv_vec;
+  static std::vector<bool> hosts_didWork_vec;
 
+  static void recv_BagItems(Galois::Runtime::RecvBuffer& buf){
+    bool x_didWork;
+    unsigned x_ID;
+    //XXX: Why pair?
+    //std::vector<std::pair<int, int>> vec;
+    //TODO: get graphNode type or value type up here.
+    std::vector<Ty> vec;
+
+    gDeserialize(buf, x_ID, x_didWork, vec);
+    workItem_recv_vec.insert(workItem_recv_vec.end(), vec.begin(), vec.end());
+    hosts_didWork_vec.push_back(x_didWork);
+    num_Hosts_recvd++;
+  }
+
+};
+
+template<typename Ty>
+uint32_t global_var_sturct<Ty>::num_Hosts_recvd;
+
+template<typename Ty>
+std::vector<Ty> global_var_sturct<Ty>::workItem_recv_vec;
+
+template<typename Ty>
+std::vector<bool> global_var_sturct<Ty>::hosts_didWork_vec;
 
 /** For distributed worklist **/
-  template<typename RangeTy, typename FunctionTy, typename TupleTy>
-  void for_each_gen_dist(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
+template<typename RangeTy, typename FunctionTy, typename TupleTy>
+  void for_each_gen_dist_impl(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl, std::true_type) {
   static_assert(!exists_by_supertype<char*, TupleTy>::value, "old loopname");
   static_assert(!exists_by_supertype<char const *, TupleTy>::value, "old loopname");
   static_assert(!exists_by_supertype<bool, TupleTy>::value, "old steal");
@@ -615,8 +634,7 @@ static void recv_BagItems(Galois::Runtime::RecvBuffer& buf){
     static_assert(!forceNew || !Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsBreak, "old type trait");
     static_assert(!forceNew || !Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPIA, "old type trait");
 
-    /** Take out base worklist type to wrap it **/
-    typedef typename get_type_by_supertype<wl_tag, TupleTy>::type::type BaseWorkListTy;
+     typedef typename get_type_by_supertype<wl_tag, TupleTy>::type::type BaseWorkListTy;
     typedef typename std::iterator_traits<typename RangeTy::iterator>::value_type value_type;
 
 
@@ -641,12 +659,13 @@ static void recv_BagItems(Galois::Runtime::RecvBuffer& buf){
      bool Canterminate = false;
      bool didWork = !bag.empty();
      int num_iter = 1;
+     global_var_sturct<value_type>::num_Hosts_recvd = 0;
 
      /** loop while work in the worklist **/
      while(!Canterminate) {
 
       // Sync
-      helper_fn.sync_push();
+      helper_fn.sync_graph();
 
       // seperate out nodes to work locally and to send to remote destinaton.
       std::vector<std::vector<value_type>> bagItems_vec;
@@ -666,43 +685,43 @@ static void recv_BagItems(Galois::Runtime::RecvBuffer& buf){
           continue;
         Galois::Runtime::SendBuffer b;
         gSerialize(b, net.ID,didWork, bagItems_vec[x]);
-        net.send(x, recv_BagItems, b);
+        net.send(x, global_var_sturct<value_type>::recv_BagItems, b);
       }
       net.flush();
-      while(num_Hosts_recvd < (net.Num - 1)){
+      while(global_var_sturct<value_type>::num_Hosts_recvd < (net.Num - 1)){
         net.handleReceives();
       }
 
       //XXX: Check: Can cause problem if one host is very fast.
-      num_Hosts_recvd = 0;
-      workItem_recv_vec.insert(workItem_recv_vec.end(), bagItems_vec[net.ID].begin(), bagItems_vec[net.ID].end());
+      global_var_sturct<value_type>::num_Hosts_recvd = 0;
+      global_var_sturct<value_type>::workItem_recv_vec.insert(global_var_sturct<value_type>::workItem_recv_vec.end(), bagItems_vec[net.ID].begin(), bagItems_vec[net.ID].end());
 
-      assert((hosts_didWork_vec.size() == (net.Num - 1)));
+      assert((global_var_sturct<value_type>::hosts_didWork_vec.size() == (net.Num - 1)));
       bag.clear();
 
       Canterminate = !didWork;
       if(Canterminate)
-        for(auto x : hosts_didWork_vec)
+        for(auto x : global_var_sturct<value_type>::hosts_didWork_vec)
           Canterminate = (Canterminate && !x);
 
       // call for_each again.
-      if(!workItem_recv_vec.empty()){
+      if(!global_var_sturct<value_type>::workItem_recv_vec.empty()){
 
         //XXX: Loop to change global IDs to local IDs. There can be a better way: Using transform iterators. Why are assuming it to be a pair.
-        //std::transform(workItem_recv_vec.begin(), workItem_recv_vec.end(), workItem_recv_vec.begin(), [&](value_type i)->value_type {return std::make_pair(helper_fn.getLocalID(i.first), i.second);});
+        //std::transform(global_var_sturct<value_type>::workItem_recv_vec.begin(), global_var_sturct<value_type>::workItem_recv_vec.end(), global_var_sturct<value_type>::workItem_recv_vec.begin(), [&](value_type i)->value_type {return std::make_pair(helper_fn.getLocalID(i.first), i.second);});
 
         /*
         std::cout << " TYPE NAME : " << typeid(value_type()).name() << "\n";
-        for(auto i = 0; i < workItem_recv_vec.size(); ++i){
+        for(auto i = 0; i < global_var_sturct<value_type>::workItem_recv_vec.size(); ++i){
           if(workItem_recv_vec[i] == 2069)
             std::cout << "haiga \n";
 
           workItem_recv_vec[i] = helper_fn.getLocalID(workItem_recv_vec[i]);
         }
         */
-        std::transform(workItem_recv_vec.begin(), workItem_recv_vec.end(), workItem_recv_vec.begin(), [&](value_type i)->value_type {if(i == 2069) std::cout << "found it : " << net.ID  <<"\n"; return helper_fn.getLocalID(i);});
+        std::transform(global_var_sturct<value_type>::workItem_recv_vec.begin(), global_var_sturct<value_type>::workItem_recv_vec.end(), global_var_sturct<value_type>::workItem_recv_vec.begin(), [&](value_type i)->value_type {return helper_fn.getLocalID(i);});
 
-        Runtime::for_each_impl_dist(Runtime::makeStandardRange(workItem_recv_vec.begin(), workItem_recv_vec.end()), fn,
+        Runtime::for_each_impl_dist(Runtime::makeStandardRange(global_var_sturct<value_type>::workItem_recv_vec.begin(), global_var_sturct<value_type>::workItem_recv_vec.end()), fn,
             std::tuple_cat(xtpl,
                 get_default_trait_values(ztpl,
                 std::make_tuple(loopname_tag {}, wl_tag {}),
@@ -711,8 +730,8 @@ static void recv_BagItems(Galois::Runtime::RecvBuffer& buf){
       }
 
       didWork = !bag.empty();
-      hosts_didWork_vec.clear();
-      workItem_recv_vec.clear();
+      global_var_sturct<value_type>::hosts_didWork_vec.clear();
+      global_var_sturct<value_type>::workItem_recv_vec.clear();
 
       //num_iter++;
       Galois::Runtime::getHostBarrier().wait();
@@ -752,6 +771,38 @@ static void recv_BagItems(Galois::Runtime::RecvBuffer& buf){
   }
 }
 
+//basic template if no op_tag helper function is provided.
+template<typename RangeTy, typename FunctionTy, typename TupleTy>
+void for_each_gen_dist_impl(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl, std::false_type) {
+  static const bool forceNew = false;
+
+  static_assert(!forceNew || Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsAborts, "old type trait");
+  static_assert(!forceNew || Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsStats, "old type trait");
+  static_assert(!forceNew || Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPush, "old type trait");
+  static_assert(!forceNew || !Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsBreak, "old type trait");
+  static_assert(!forceNew || !Runtime::DEPRECATED::ForEachTraits<FunctionTy>::NeedsPIA, "old type trait");
+  if (forceNew) {
+    auto xtpl = std::tuple_cat(tpl, typename function_traits<FunctionTy>::type {});
+    Runtime::for_each_impl(r, fn,
+        std::tuple_cat(xtpl,
+          get_default_trait_values(tpl,
+            std::make_tuple(loopname_tag {}, wl_tag {}),
+            std::make_tuple(loopname {}, wl<defaultWL>()))));
+  } else {
+    auto tags = typename DEPRECATED::ExtractForEachTraits<FunctionTy>::tags_type {};
+    auto values = typename DEPRECATED::ExtractForEachTraits<FunctionTy>::values_type {};
+    auto ttpl = get_default_trait_values(tpl, tags, values);
+    auto dtpl = std::tuple_cat(tpl, ttpl);
+    auto xtpl = std::tuple_cat(dtpl, typename function_traits<FunctionTy>::type {});
+    Runtime::for_each_impl(r, fn,
+        std::tuple_cat(xtpl,
+          get_default_trait_values(dtpl,
+            std::make_tuple(loopname_tag {}, wl_tag {}),
+            std::make_tuple(loopname {}, wl<defaultWL>()))));
+  }
+
+
+}
 
 
 } // end namespace Runtime

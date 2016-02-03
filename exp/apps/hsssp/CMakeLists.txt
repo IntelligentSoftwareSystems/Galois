@@ -40,3 +40,6 @@ app(HSSSP_wl HSSSP_wl.cpp GlobalObj.cpp DISTSAFE)
 
 #PageRank with worklist
 app(pageRank_wl pageRank_wl.cpp GlobalObj.cpp DISTSAFE)
+
+#PageRank generated with worklist
+app(pageRank_wl_gen pageRank_wl_gen.cpp GlobalObj.cpp DISTSAFE)

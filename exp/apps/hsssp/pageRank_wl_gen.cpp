@@ -68,29 +68,31 @@ struct InitializeGraph {
   Graph* graph;
 
   void static go(Graph& _graph) {
-     struct Syncer_0 {
-    	static float extract( const struct PR_NodeData & node){ return node.residual; }
-    	static void reduce (struct PR_NodeData & node, float y) { Galois::atomicAdd(node.residual, y);}
-    	static void reset (struct PR_NodeData & node ) { node.residual = 0; }
-    	typedef float ValTy;
-    };
-     struct SyncerPull_0 {
-    	static float extract( const struct PR_NodeData & node){ return node.value; }
-    	static void setVal (struct PR_NodeData & node, float y) {node.value = y; }
-    	typedef float ValTy;
-    };
-     struct SyncerPull_1 {
-    	static unsigned int extract( const struct PR_NodeData & node){ return node.nout; }
-    	static void setVal (struct PR_NodeData & node, unsigned int y) {node.nout = y; }
-    	typedef unsigned int ValTy;
-    };
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ &_graph }, Galois::loopname("Init"), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "value" , "float"), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "nout" , "unsigned int"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ Galois::atomicAdd(node.residual, y);}",  "0"));
-    _graph.sync_push<Syncer_0>();
-    
-    _graph.sync_pull<SyncerPull_0>();
-    
-    _graph.sync_pull<SyncerPull_1>();
-    
+
+       struct Syncer_0 {
+      	static float extract( const struct PR_NodeData & node){ return node.residual; }
+      	static void reduce (struct PR_NodeData & node, float y) { Galois::atomicAdd(node.residual, y);}
+      	static void reset (struct PR_NodeData & node ){node.residual = 0 ; }
+      	typedef float ValTy;
+      };
+       struct SyncerPull_0 {
+      	static float extract( const struct PR_NodeData & node){ return node.value; }
+      	static void setVal (struct PR_NodeData & node, float y) {node.value = y; }
+      	typedef float ValTy;
+      };
+       struct SyncerPull_1 {
+      	static unsigned int extract( const struct PR_NodeData & node){ return node.nout; }
+      	static void setVal (struct PR_NodeData & node, unsigned int y) {node.nout = y; }
+      	typedef unsigned int ValTy;
+      };
+      Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ &_graph }, Galois::loopname("Init"), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "value" , "float"), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "nout" , "unsigned int"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ Galois::atomicAdd(node.residual, y);}",  "{node.residual = 0 ; }"));
+      _graph.sync_push<Syncer_0>();
+      
+      _graph.sync_pull<SyncerPull_0>();
+      
+      _graph.sync_pull<SyncerPull_1>();
+      
+      
   }
 
   void operator()(GNode src) const {
@@ -108,57 +110,89 @@ struct InitializeGraph {
     }
   }
 };
+/*
+
+template <typename GraphTy>
+struct Get_info_functor : public Galois::op_tag {
+  GraphTy &graph;
+
+  struct Syncer_0 {
+    static float extract( const struct PR_NodeData & node){ return node.residual; }
+    static void reduce (struct PR_NodeData & node, float y) { Galois::atomicAdd(node.residual, y);}
+    static void reset (struct PR_NodeData & node ) { node.residual = 0; }
+    typedef float ValTy;
+  };
+
+  struct SyncerPull_0 {
+    static float extract( const struct PR_NodeData & node){ return node.value; }
+    static void setVal (struct PR_NodeData & node, float y) {node.value = y; }
+    typedef float ValTy;
+  };
+
+  Get_info_functor(GraphTy& _g): graph(_g){}
+  unsigned operator()(GNode n){
+    return graph.getHostID(n);
+  }
+
+  uint32_t getLocalID(GNode n){
+    return graph.getLID(n);
+  }
+
+  void sync_push(){
+    sync_push_static(graph);
+    //XXX: Why this is not working?
+    //graph.sync_push<Syncer_0>();
+  }
+  void static sync_push_static(Graph& _g){
+    _g.sync_push<Syncer_0>();
+    _g.sync_pull<SyncerPull_0>();
+  }
+};
+*/
 
 
+template <typename GraphTy>
+struct Get_info_functor : public Galois::op_tag {
+	GraphTy &graph;
+	struct Syncer_0 {
+		static float extract( const struct PR_NodeData & node){ return node.residual; }
+		static void reduce (struct PR_NodeData & node, float y) { Galois::atomicAdd(node.residual, y);}
+		static void reset (struct PR_NodeData & node ){node.residual = 0 ; }
+		typedef float ValTy;
+	};
+	struct SyncerPull_0 {
+		static float extract( const struct PR_NodeData & node){ return node.value; }
+		static void setVal (struct PR_NodeData & node, float y) {node.value = y; }
+		typedef float ValTy;
+	};
+	Get_info_functor(GraphTy& _g): graph(_g){}
+	unsigned operator()(GNode n) {
+		return graph.getHostID(n);
+	}
+	uint32_t getLocalID(GNode n){
+		return graph.getLID(n);
+	}
+	void sync_graph(){
+		 sync_graph_static(graph);
+	}
+	void static sync_graph_static(Graph& _graph) {
+
+		_graph.sync_push<Syncer_0>();
+
+		_graph.sync_pull<SyncerPull_0>();
+	}
+};
 
 struct PageRank {
   Graph* graph;
 
   PageRank(Graph* _g): graph(_g){}
-
-  template <typename GraphTy>
-    struct Get_info_functor : public Galois::op_tag {
-      GraphTy &graph;
-
-      struct Syncer_0 {
-        static float extract( const struct PR_NodeData & node){ return node.residual; }
-        static void reduce (struct PR_NodeData & node, float y) { Galois::atomicAdd(node.residual, y);}
-        static void reset (struct PR_NodeData & node ) { node.residual = 0; }
-        typedef float ValTy;
-      };
-
-      struct SyncerPull_0 {
-        static float extract( const struct PR_NodeData & node){ return node.value; }
-        static void setVal (struct PR_NodeData & node, float y) {node.value = y; }
-        typedef float ValTy;
-      };
-
-      Get_info_functor(GraphTy& _g): graph(_g){}
-      unsigned operator()(GNode n){
-        return graph.getHostID(n);
-      }
-
-      uint32_t getLocalID(GNode n){
-        return graph.getLID(n);
-      }
-
-      void sync_graph(){
-        sync_graph_static(graph);
-        //XXX: Why this is not working?
-        //graph.sync_push<Syncer_0>();
-      }
-      void static sync_graph_static(Graph& _g){
-        _g.sync_push<Syncer_0>();
-        _g.sync_pull<SyncerPull_0>();
-      }
-    };
-
-
   void static go(Graph& _graph) {
-    using namespace Galois::WorkList;
-    typedef dChunkedFIFO<64> dChunk;
+     using namespace Galois::WorkList;
+     typedef dChunkedFIFO<64> dChunk;
 
-    Galois::for_each(_graph.begin(), _graph.end(), PageRank(&_graph), Get_info_functor<Graph>(_graph), Galois::wl<dChunk>());
+     //Galois::for_each(_graph.begin(), _graph.end(), PageRank(&_graph), Get_info_functor<Graph>(_graph), Galois::wl<dChunk>());
+     Galois::for_each(_graph.begin(), _graph.end(), PageRank(&_graph), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "value" , "float"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ Galois::atomicAdd(node.residual, y);}",  "{node.residual = 0 ; }"), Get_info_functor<Graph>(_graph), Galois::wl<dChunk>());
 
   }
 

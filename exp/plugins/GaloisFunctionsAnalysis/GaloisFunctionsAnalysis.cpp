@@ -185,6 +185,7 @@ class TypedefHandler :  public MatchFinder::MatchCallback {
       //llvm::outs() << "GlobalID : " << typedefDecl->getGlobalID() << "\n";
       string Graph_name = typedefDecl->getNameAsString();
       llvm::outs() << "--->" << Graph_name << "\n";
+      typedefDecl->dump();
       auto templatePtr = typedefDecl->getTypeForDecl()->getAs<TemplateSpecializationType>();
       if (templatePtr) {
         Graph_entry g_entry;
@@ -1172,7 +1173,7 @@ class GaloisFunctionsConsumer : public ASTConsumer {
       //Matchers.addMatcher(recordDecl(hasDescendant(callExpr(isExpansionInMainFile(), callee(functionDecl(hasName("getData")))).bind("getData"))).bind("getDataInStruct"), &callExprHandler); //**** works
 
       /*MATCHER 1 :*************** Matcher to get the type of node defined by user *************************************/
-      Matchers_typedef.addMatcher(typedefDecl(isExpansionInMainFile()).bind("typedefDecl"), &typedefHandler);
+      //Matchers_typedef.addMatcher(typedefDecl(isExpansionInMainFile()).bind("typedefDecl"), &typedefHandler);
       /****************************************************************************************************************/
 
       
@@ -1627,7 +1628,7 @@ class GaloisFunctionsConsumer : public ASTConsumer {
 
       for (auto i : info.reductionOps_map){
         if(i.second.size() > 0) {
-          Matchers_doall.addMatcher(callExpr(callee(functionDecl(hasName("Galois::do_all"))),unless(isExpansionInSystemHeader()), hasAncestor(recordDecl(hasName(i.first)).bind("do_all_recordDecl"))).bind("galoisLoop"), &functionCallHandler);
+          Matchers_doall.addMatcher(callExpr(callee(functionDecl(anyOf(hasName("Galois::do_all"), hasName("Galois::for_each")))),unless(isExpansionInSystemHeader()), hasAncestor(recordDecl(hasName(i.first)).bind("do_all_recordDecl"))).bind("galoisLoop"), &functionCallHandler);
         }
       }
 
