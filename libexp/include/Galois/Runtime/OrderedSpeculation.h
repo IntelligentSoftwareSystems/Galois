@@ -188,7 +188,7 @@ struct OptimNhoodItem: public OrdLocBase<OptimNhoodItem<Ctxt, CtxtCmp>, Ctxt, Ct
     for (auto i = sharers.end (), beg_i = sharers.begin (); beg_i != i; ) {
       --i;
       if (ctxtCmp (ctxt, *i)) {
-        dbg::debug (ctxt, " causing sharer to abort ", *i);
+        dbg::print (ctxt, " causing sharer to abort ", *i);
         ret = true;
         (*i)->markForAbortRecursive (abortWL);
 
@@ -215,7 +215,7 @@ struct OptimNhoodItem: public OrdLocBase<OptimNhoodItem<Ctxt, CtxtCmp>, Ctxt, Ct
         break;
 
       } else {
-        dbg::debug (ctxt, " causing sharer to abort ", *i);
+        dbg::print (ctxt, " causing sharer to abort ", *i);
         (*i)->markForAbortRecursive (abortWL);
       }
     }
@@ -356,7 +356,7 @@ struct OptimContext: public OrderedContextBase<T> {
         // end_i = userHandle.getPushBuffer ().end (); i != end_i; ++i) {
 // 
       // OptimContext* child = exec.push (*i);
-      // dbg::debug (this, " creating child ", child);
+      // dbg::print (this, " creating child ", child);
 // 
       // children.push_back (child);
     // }
@@ -366,7 +366,7 @@ struct OptimContext: public OrderedContextBase<T> {
 
     assert (std::find (children.begin (), children.end (), child) == children.end ());
 
-    dbg::debug (this, " creating child ", child);
+    dbg::print (this, " creating child ", child);
 
     children.push_back (child);
 
@@ -376,7 +376,7 @@ struct OptimContext: public OrderedContextBase<T> {
 
     assert (hasState (ContextState::COMMITTING));
 
-    dbg::debug (this, " committing with item ", this->getActive ());
+    dbg::print (this, " committing with item ", this->getActive ());
 
     userHandle.commit (); // TODO: rename to retire
 
@@ -397,7 +397,7 @@ struct OptimContext: public OrderedContextBase<T> {
 
     assert (hasState (ContextState::ABORTING));
 
-    dbg::debug (this, " aborting with item ", this->getActive ());
+    dbg::print (this, " aborting with item ", this->getActive ());
 
     userHandle.rollback ();
 
@@ -519,7 +519,7 @@ struct OptimContext: public OrderedContextBase<T> {
       }
 
       for (OptimContext* c: children) {
-        dbg::debug (this, " causing abort on child ", c);
+        dbg::print (this, " causing abort on child ", c);
         c->markForAbortRecursive (abortWL);
         c->addBack = false;
       }
@@ -873,7 +873,7 @@ private:
             assert (!c->hasState (ContextState::RECLAIM));
             c->schedule ();
 
-            dbg::debug ("scheduling: ", c, " with item: ", c->getActive ());
+            dbg::print ("scheduling: ", c, " with item: ", c->getActive ());
 
             UserCtxt& uhand = c->userHandle;
 
@@ -1015,10 +1015,10 @@ private:
     }
 
     if (ret) {
-      dbg::debug ("GVT computed as: ", ret, ", with elem: ", ret->getActive ());
+      dbg::print ("GVT computed as: ", ret, ", with elem: ", ret->getActive ());
 
     } else {
-      dbg::debug ("GVT computed as NULL");
+      dbg::print ("GVT computed as NULL");
     }
 
     return ret;
@@ -1183,7 +1183,7 @@ private:
 
             if ((*i)->casState (ContextState::ABORTED_CHILD, ContextState::RECLAIM)
               || (*i)->casState (ContextState::COMMIT_DONE, ContextState::RECLAIM)) {
-              dbg::debug ("Ctxt destroyed from commitQ: ", *i);
+              dbg::print ("Ctxt destroyed from commitQ: ", *i);
               freeCtxt (*i);
             }
           }
@@ -1273,7 +1273,7 @@ struct OptimParamNhoodItem: public OrdLocBase<OptimParamNhoodItem<Ctxt, CtxtCmp>
         if (ctxtCmp (ctxt, tail)) { // ctxt < tail
           // tail should not be running
           assert (tail->hasState (ContextState::READY_TO_COMMIT));
-          dbg::debug (ctxt, " aborting lower priority sharer ", tail);
+          dbg::print (ctxt, " aborting lower priority sharer ", tail);
           tail->doAbort ();
 
         } else { // ctxt >= tail
@@ -1281,7 +1281,7 @@ struct OptimParamNhoodItem: public OrdLocBase<OptimParamNhoodItem<Ctxt, CtxtCmp>
           assert (ctxt->step >= tail->step);
           if (ctxt->step == tail->step) {
             assert (!ctxtCmp (ctxt, tail)); // ctxt >= tail
-            dbg::debug (ctxt, " lost conflict to  ", tail);
+            dbg::print (ctxt, " lost conflict to  ", tail);
             return false;
           }
           else {
@@ -1316,7 +1316,7 @@ struct OptimParamNhoodItem: public OrdLocBase<OptimParamNhoodItem<Ctxt, CtxtCmp>
       }
 
       if (ctxtCmp (ctxt, tail)) { // ctxt < tail
-        dbg::debug (ctxt, " removing self & aborting lower priority sharer ", tail);
+        dbg::print (ctxt, " removing self & aborting lower priority sharer ", tail);
         tail->doAbort ();
       } else {
         assert (!found);
@@ -1402,7 +1402,7 @@ struct OptimParamContext: public OrderedContextBase<T> {
         end_i = userHandle.getPushBuffer ().end (); i != end_i; ++i) {
 
       OptimParamContext* child = exec.push (*i);
-      dbg::debug (this, " creating child ", child);
+      dbg::print (this, " creating child ", child);
 
       children.push_back (child);
     }
@@ -1411,7 +1411,7 @@ struct OptimParamContext: public OrderedContextBase<T> {
   void doCommit () {
     assert (state == ContextState::READY_TO_COMMIT);
 
-    dbg::debug (this, " committing with item ", this->getActive ());
+    dbg::print (this, " committing with item ", this->getActive ());
     for (NItem* n: nhood) {
       n->removeCommit (this);
     }
@@ -1444,7 +1444,7 @@ struct OptimParamContext: public OrderedContextBase<T> {
       assert (c);
 
       if (child->hasState (ContextState::READY_TO_COMMIT)) {
-        dbg::debug (this, " aborting child ", child);
+        dbg::print (this, " aborting child ", child);
         child->doAbort (false);
         // exec.freeCtxt (child); // TODO: free memory at the right point
       } else {
@@ -1452,7 +1452,7 @@ struct OptimParamContext: public OrderedContextBase<T> {
       }
     }
 
-    dbg::debug (this, " aborting with item ", this->getActive ());
+    dbg::print (this, " aborting with item ", this->getActive ());
 
     userHandle.rollback ();
 
@@ -1583,7 +1583,7 @@ public:
           break;
         }
 
-        dbg::debug (ctxt, " scheduled with item ", ctxt->getActive ());
+        dbg::print (ctxt, " scheduled with item ", ctxt->getActive ());
 
         ++totalIter;
 
@@ -1601,13 +1601,13 @@ public:
           // publish remaining changes
           ctxt->publishChanges ();
 
-          dbg::debug (ctxt, " adding self to rob");
+          dbg::print (ctxt, " adding self to rob");
           rob.push_back (ctxt);
           assert (std::find (rob.begin (), rob.end (), ctxt) != rob.end ());
 
         } else {
           assert (ctxt->hasState (ContextState::ABORT_SELF));
-          dbg::debug (ctxt, " aborting self");
+          dbg::print (ctxt, " aborting self");
           ctxt->doAbort ();
         }
       }
@@ -1616,9 +1616,9 @@ public:
       totalCommits += numCommitted;
 
       if (numCommitted == 0) {
-        dbg::debug ("head of rob: ", rob.back (),  "  with item: ", rob.back ()->getActive ());
+        dbg::print ("head of rob: ", rob.back (),  "  with item: ", rob.back ()->getActive ());
 
-        dbg::debug ("head of nextPending: ", nextPending->top (),  "  with item: ", nextPending->top ()->getActive ());
+        dbg::print ("head of nextPending: ", nextPending->top (),  "  with item: ", nextPending->top ()->getActive ());
       }
       assert (numCommitted > 0);
 
@@ -1663,7 +1663,7 @@ private:
 
       } else {
         assert (ctxt->hasState (ContextState::ABORTED_CHILD));
-        dbg::debug ("deleting aborted child: ", ctxt, " with item ", ctxt->getActive ());
+        dbg::print ("deleting aborted child: ", ctxt, " with item ", ctxt->getActive ());
         freeCtxt (ctxt);
 
       }
@@ -1703,7 +1703,7 @@ private:
 
       assert (head->hasState (ContextState::READY_TO_COMMIT));
 
-      dbg::debug ("head of rob ready to commit : ", head);
+      dbg::print ("head of rob ready to commit : ", head);
       bool earliest = false;
       if (!nextPending->empty ()) {
         earliest = !ctxtCmp (nextPending->top (), head);
@@ -1725,7 +1725,7 @@ private:
 
 
       } else {
-        dbg::debug ("head of rob could not commit : ", head);
+        dbg::print ("head of rob could not commit : ", head);
         break;
       }
 

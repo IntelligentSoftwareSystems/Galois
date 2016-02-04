@@ -37,17 +37,7 @@
 namespace Galois {
 namespace Runtime {
 
-namespace dbg {
-  template <typename... Args>
-  void debug (Args&&... args) {
-    
-    const bool DEBUG = true;
-    if (DEBUG) {
-      Substrate::gDebug (std::forward<Args> (args)...);
-    }
-  }
-}
-
+using dbg = Galois::Substrate::debug<0>;
 
 template <typename T>
 class OrderedContextBase: public SimpleRuntimeContext {

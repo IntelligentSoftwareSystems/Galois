@@ -122,6 +122,7 @@ public:
     // discr = (x1y2 - x2y1)^2 - sumRadiusSqrd (x1^2 + y1^2);
 
     // FP discr = (diffVdiffD * diffVdiffD) - (diffV.magSqrd ()) * (diffD.magSqrd () - sumRadiusSqrd);
+    
     FP x1 = diffV.getX ();
     FP y1 = diffV.getY ();
 
@@ -394,6 +395,48 @@ public:
 
   }
 
+  static bool isValidCollision (const Ball* b1, const Ball* b2, const FP& time) {
+    assert (b1);
+    assert (b2);
+
+    Vec2 pos1 = b1->pos (time);
+    Vec2 pos2 = b2->pos (time);
+
+    if (FPutils::almostEqual (pos1.dist (pos2), b1->radius () + b2->radius ())) {
+      return true;
+    }
+
+    return false;
+  }
+
+  static bool isValidCollision (const Ball* b1, const Cushion* c, const FP& time) {
+    assert (b1);
+    assert (c);
+
+    Vec2 p = b1->pos (time);
+
+    if (FPutils::almostEqual (c->getLineSegment ().distanceFrom (p), b1->radius ())) {
+      return true;
+    }
+
+    return false;
+
+
+  }
+
+  static bool isValidCollision (const Event& e) {
+    if (e.getKind () == Event::BALL_COLLISION) {
+      return isValidCollision (e.getBall (), e.getOtherBall (), e.getTime ());
+
+    } else if (e.getKind () == Event::CUSHION_COLLISION) {
+      return isValidCollision (e.getBall (), e.getCushion (), e.getTime ());
+
+    } else {
+      std::abort ();
+      return false;
+    }
+  }
+
 private:
 
   //! The time for collision is estimated by extending the lines of
@@ -474,7 +517,7 @@ public:
   template <typename I, typename T=typename std::remove_pointer<typename std::iterator_traits<I>::value_type>::type >
   static Galois::optional<Event> computeNextEvent (const Event::EventKind& kind, const Ball* b, const I collObjsBeg, const I collObjsEnd, const FP& endtime, const Event* prevEvent, const Sector* sector) {
 
-    std::cout << "Computing future events for ball: " << b->str () << std::endl;
+    // std::cout << "Computing future events for ball: " << b->str () << std::endl;
 
 
     Galois::optional<Event> retVal;
@@ -503,7 +546,7 @@ public:
             continue;
           }
 
-          std::cout << "Possible future Event: " << e.str () << std::endl;
+          // std::cout << "Possible future Event: " << e.str () << std::endl;
 
           if (retVal && FPutils::almostEqual (retVal->getTime (), e.getTime ())) {
             if (e.getOtherObj ()->getID () < retVal->getOtherObj ()->getID ()) {

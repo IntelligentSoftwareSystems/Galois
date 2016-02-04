@@ -35,6 +35,7 @@
 #include "CollidingObject.h"
 
 #include "Galois/FlatSet.h"
+#include "Galois/Substrate/gio.h"
 
 #include <boost/iterator/transform_iterator.hpp>
 
@@ -250,6 +251,8 @@ class BallOptimWrapper  {
   using CheckP = std::pair<E, B*>;
   using StateLog = Galois::gstl::List<CheckP>;
 
+  using dbg = Galois::Substrate::debug<0>;
+
   B* m_ball;
   BallAlloc m_alloc;
   StateLog m_hist;
@@ -263,7 +266,7 @@ public:
 
   B* checkpoint (const E& e) {
 
-    std::printf ("checkpoint called on %s\n", m_ball->str ().c_str ());
+    dbg::print ("checkpoint called on ", m_ball->str ());
 
     B* bcpy = m_alloc.allocate (1);
     m_alloc.construct (bcpy, static_cast<B&> (*m_ball));
@@ -274,9 +277,8 @@ public:
   }
 
   void restore (B* bcpy) {
-    std::printf ("restore called on %s, restoring from %s\n", 
-        m_ball->str ().c_str (), bcpy->str ().c_str ());
-
+    dbg::print ("restore called on ", m_ball->str (), ", restoring from ", bcpy->str ());
+ 
     assert (bcpy);
     assert (m_ball->getID () == bcpy->getID ());
     
@@ -296,8 +298,8 @@ public:
   void reclaim (const E& e, B* b) {
     assert (b);
 
-    std::printf ("reclaim called on %s, removing copy: %s\n", 
-        m_ball->str ().c_str (), b->str ().c_str ());
+    dbg::print ("reclaim called on ", m_ball->str (), ", removing copy: ", b->str ());
+
     assert (!m_hist.empty ());
     CheckP& head = m_hist.front ();
 

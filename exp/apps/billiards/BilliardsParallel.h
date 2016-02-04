@@ -89,17 +89,20 @@ struct AddEvents {
   const FP& endtime;
   AddListTy& addList;
   Accumulator& iter;
+  bool enablePrints;
 
   AddEvents (
       Tbl_t& table,
       const FP& endtime,
       AddListTy& addList,
-      Accumulator& iter)
+      Accumulator& iter,
+      bool enablePrints)
     :
       table (table),
       endtime (endtime),
       addList (addList),
-      iter (iter)
+      iter (iter),
+      enablePrints (enablePrints)
   {}
 
 
@@ -116,8 +119,11 @@ struct AddEvents {
     for (auto i = addList.get ().begin ()
         , endi = addList.get ().end (); i != endi; ++i) {
 
-      std::cout << "Adding event=" << i->str () << std::endl;
       ctx.push (*i);
+
+      if (enablePrints) {
+        std::cout << "Adding event=" << i->str () << std::endl;
+      }
     }
 
     iter += 1;

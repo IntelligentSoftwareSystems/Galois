@@ -186,7 +186,7 @@ private:
 
     Tbl_t verCopy (table);
 
-    bool enablePrints = true;
+    bool enablePrints = false;
     bool logEvents = true;
 
 

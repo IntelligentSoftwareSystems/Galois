@@ -99,14 +99,23 @@ class BilliardsOptim: public Billiards<BilliardsOptim, Table<BallOptim<> > > {
         }
 
         if (logEvents) {
-          std::cout << "Committing event=" << e.str () << std::endl;
           table.logCollisionEvent (e);
+        }
+
+        if (enablePrints) {
+          std::cout << "Committing event=" << e.str () << std::endl;
         }
       };
 
       ctx.addCommitAction (reclaim);
 
-      const_cast<Event&> (e).simulate ();
+      if (e.notStale ()) {
+        // assert (Collision::isValidCollision (e));
+      }
+
+      if (e.notStale () && Collision::isValidCollision (e)) {
+        const_cast<Event&> (e).simulate ();
+      }
     }
   };
 
@@ -131,7 +140,7 @@ public:
         Event::Comparator (),
         VisitNhoodLocks<Graph, VecNodes> (graph, nodes),
         ExecSourcesOptim {table, enablePrints, logEvents},
-        AddEvents<Tbl_t> (table, endtime, addList, iter));
+        AddEvents<Tbl_t> (table, endtime, addList, iter, enablePrints));
 
 
     for (unsigned i = 0; i < table.getNumBalls (); ++i) {
