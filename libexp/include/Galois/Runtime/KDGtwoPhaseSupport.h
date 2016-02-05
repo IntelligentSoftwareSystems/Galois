@@ -31,6 +31,9 @@
 #define GALOIS_RUNTIME_KDG_TWO_PHASE_SUPPORT_H
 
 #include "Galois/AltBag.h"
+
+#include "Galois/Runtime/OrderedLockable.h"
+
 #include <boost/iterator/filter_iterator.hpp>
 #include <functional>
 #include <boost/iterator/filter_iterator.hpp>

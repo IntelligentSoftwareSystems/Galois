@@ -30,13 +30,14 @@
 #include "dependTest.h"
 #include "BilliardsParallel.h"
 
-class BilliardsTwoPhase: public Billiards<BilliardsTwoPhase>  {
+class BilliardsTwoPhase: public Billiards<BilliardsTwoPhase, Table<Ball> >  {
 
 public:
 
+  using Tbl_t = Table<Ball>;
+
   virtual const std::string version () const { return "using IKDG"; }
 
-  template <typename Tbl_t>
   size_t runSim (Tbl_t& table, std::vector<Event>& initEvents, const FP& endtime, bool enablePrints=false, bool logEvents=false) {
 
     AddListTy addList;
@@ -45,9 +46,9 @@ public:
     Galois::Runtime::for_each_ordered_2p_win (
         Galois::Runtime::makeStandardRange(initEvents.begin (), initEvents.end ()),
         Event::Comparator (),
-        VisitNhood (),
+        VisitNhoodSafetyTest (),
         ExecSources (),
-        AddEvents<Tbl_t> (table, endtime, addList, iter));
+        AddEvents<Tbl_t> (table, endtime, addList, iter, enablePrints));
 
     return iter.reduce ();
 
