@@ -59,10 +59,21 @@ public:
   
   virtual void run(const MatchFinder::MatchResult& Result) {
     const CallExpr* FS = Result.Nodes.getNodeAs<clang::CallExpr>("gLoop");
-    auto* gFunc = Result.Nodes.getNodeAs<clang::DeclRefExpr>("gLoopType");
-    gFunc->dump();
-    llvm::outs() << "\n**\n";
-    FS->dump();
+    auto* gFunc = Result.Nodes.getNodeAs<clang::FunctionDecl>("gLoopType");
+    auto name = gFunc->getNameInfo().getName().getAsString();
+
+    bool forEach = std::string::npos != name.find("for_each");
+    bool isLocal = std::string::npos != name.find("local");
+
+    llvm::outs() << name << " " << forEach << " " << isLocal << "\n**\n";
+    //gFunc->dump();
+    //llvm::outs() << "**\n";
+    auto* gOp = FS->getArg(isLocal ? 1 : 2);
+
+    if (const MaterializeTemporaryExpr* t = dyn_cast<const MaterializeTemporaryExpr>(gOp))
+      gOp = t->GetTemporaryExpr();
+
+    gOp->dump();
     llvm::outs() << "\n\n";
 
     Loops.emplace_back(FS);
