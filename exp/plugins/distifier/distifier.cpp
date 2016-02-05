@@ -33,8 +33,15 @@ static cl::extrahelp MoreHelp("\nMore help text...");
 class LoopMatcher : public MatchFinder::MatchCallback {
 public:
 
-  StatementMatcher Matcher;
+  struct LoopInfo {
+    const CallExpr* CallSite;
 
+    LoopInfo(const CallExpr* cs) : CallSite(cs) {}
+  };
+  
+  StatementMatcher Matcher;
+  std::vector<LoopInfo> Loops;
+  
   LoopMatcher()
     :Matcher{
     callExpr(callee(functionDecl(
@@ -71,6 +78,8 @@ public:
 
     gOp->dump();
     llvm::outs() << "\n\n";
+
+    Loops.emplace_back(FS);
   }
 };
 
