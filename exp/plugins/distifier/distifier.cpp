@@ -66,6 +66,9 @@ public:
     if (const MaterializeTemporaryExpr* t = dyn_cast<const MaterializeTemporaryExpr>(gOp))
       gOp = t->GetTemporaryExpr();
 
+    if (const ImplicitCastExpr* t = dyn_cast<const ImplicitCastExpr>(gOp))
+      gOp = t->getSubExpr();
+
     gOp->dump();
     llvm::outs() << "\n\n";
   }
