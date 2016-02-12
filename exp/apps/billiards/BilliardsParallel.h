@@ -75,7 +75,8 @@ struct VisitNhoodLocks {
 struct ExecSources {
   static const unsigned CHUNK_SIZE = DEFAULT_CHUNK_SIZE;
 
-  GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (const Event& e) const {
+  template <typename C>
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (const Event& e, C& ctx) const {
     const_cast<Event&> (e).simulate ();
   }
 };

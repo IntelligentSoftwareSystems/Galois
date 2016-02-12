@@ -43,12 +43,13 @@ public:
     AddListTy addList;
     Accumulator iter;
 
-    Galois::Runtime::for_each_ordered_2p_win (
+    Galois::Runtime::for_each_ordered_ikdg (
         Galois::Runtime::makeStandardRange(initEvents.begin (), initEvents.end ()),
         Event::Comparator (),
         VisitNhoodSafetyTest (),
         ExecSources (),
-        AddEvents<Tbl_t> (table, endtime, addList, iter, enablePrints));
+        AddEvents<Tbl_t> (table, endtime, addList, iter, enablePrints), 
+        "billiards-ikdg");
 
     return iter.reduce ();
 

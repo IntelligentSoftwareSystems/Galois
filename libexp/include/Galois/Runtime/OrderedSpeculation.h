@@ -1200,17 +1200,6 @@ private:
 };
 
 
-namespace HIDDEN {
-  
-  struct DummyExecFunc {
-    static const unsigned CHUNK_SIZE = 1;
-    template <typename T>
-    void operator () (const T&) const {
-      std::printf ("Warning: DummyExecFunc shouldn't be executed\n");
-    }
-  };
-}
-
 template <typename R, typename Cmp, typename NhFunc, typename ExFunc, typename OpFunc>
 void for_each_ordered_optim (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const ExFunc& execFunc, const OpFunc& opFunc, const char* loopname=0) {
 

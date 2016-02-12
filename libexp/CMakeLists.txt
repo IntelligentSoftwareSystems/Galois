@@ -1,5 +1,6 @@
 set(sources
         src/DoAllWrap.cpp
+        src/ParaMeter.cpp
         src/Queue.cpp
 )
 
