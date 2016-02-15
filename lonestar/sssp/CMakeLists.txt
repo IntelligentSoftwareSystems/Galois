@@ -1,4 +1,3 @@
-app(sssp-all SSSPall.cpp)
 app(sssp SSSP.cpp)
 
 add_test_scale(small sssp "${BASEINPUT}/structured/rome99.gr")

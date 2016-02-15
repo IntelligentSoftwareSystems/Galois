@@ -1,1 +1,10 @@
-app(sssp-push-simple SSSPPushSimple.cpp)
+app(example-sssp-push-simple SSSPPushSimple.cpp)
+app(example-sssp-simple SSSPsimple.cpp)
+app(example-sssp-pull-simple SSSPPullSimple.cpp)
+app(example-hello-world HelloWorld.cpp)
+app(example-torus Torus.cpp)
+app(example-torus-improved TorusImproved.cpp)
+
+add_test_scale(small example-hello-world 2 10)
+add_test_scale(small example-torus 2 100)
+add_test_scale(small example-torus-improved 2 100)

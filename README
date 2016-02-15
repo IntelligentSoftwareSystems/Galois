@@ -27,6 +27,14 @@ in the build tree without installing anything. Just add a subdirectory under
 apps and copy a CMakeLists.txt file from another application.
 
 
+==== Organization ====
+Lonestar applications are in lonestar.
+Many other applications are in apps.
+libsubstrate is the basic threading and machine and OS support functions.
+libruntime contains galois proper.
+libgraphs contain galois data structures.
+libllvm contain a couple pieces of llvm.
+
 ==== Installing ====
 If you want to install Galois as a library,
 
