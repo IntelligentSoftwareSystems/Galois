@@ -135,12 +135,13 @@ public:
 
     createLocks (table, graph, nodes);
 
-    Galois::Runtime::for_each_ordered_optim_param (
+    Galois::Runtime::for_each_ordered_optim (
         Galois::Runtime::makeStandardRange(initEvents.begin (), initEvents.end ()),
         Event::Comparator (),
         VisitNhoodLocks<Graph, VecNodes> (graph, nodes),
         ExecSourcesOptim {table, enablePrints, logEvents},
-        AddEvents<Tbl_t> (table, endtime, addList, iter, enablePrints));
+        AddEvents<Tbl_t> (table, endtime, addList, iter, enablePrints),
+        "billiards-optimistic");
 
 
     for (unsigned i = 0; i < table.getNumBalls (); ++i) {

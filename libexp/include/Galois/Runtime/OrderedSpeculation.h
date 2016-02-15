@@ -276,6 +276,7 @@ struct OptimContext: public OrderedContextBase<T> {
   Exec& exec;
   bool addBack; // set to false by parent when parent is marked for abort, see markAbortRecursive
   Galois::GAtomic<bool> onWL;
+  unsigned execRound;
   NhoodList nhood;
 
   // TODO: avoid using UserContextAccess and per-iteration allocator
@@ -291,7 +292,8 @@ struct OptimContext: public OrderedContextBase<T> {
     state (s), 
     exec (exec),
     addBack (false),
-    onWL (false)
+    onWL (false),
+    execRound (0)
   {}
 
 
@@ -302,6 +304,15 @@ struct OptimContext: public OrderedContextBase<T> {
   bool casState (ContextState s_old, const ContextState& s_new) { 
     // return state.cas (s_old, s_new);
     return state.compare_exchange_strong (s_old, s_new);
+  }
+
+  void markExecRound (unsigned r) {
+    assert (r >= execRound);
+    execRound = r;
+  }
+
+  unsigned getExecRound (void) const {
+    return execRound;
   }
 
   ContextState getState (void) const { return state; }
@@ -555,7 +566,7 @@ struct OptimContext: public OrderedContextBase<T> {
 
 };
 
-template <typename T, typename Cmp, typename NhFunc, typename ExFunc, typename  OpFunc, bool HAS_EXEC_FUNC> 
+template <typename T, typename Cmp, typename NhFunc, typename ExFunc, typename  OpFunc, bool NEEDS_PUSH, bool HAS_EXEC_FUNC, bool ENABLE_PARAMETER> 
 class OptimOrdExecutor: private boost::noncopyable {
 
   friend struct OptimContext<T, Cmp, OptimOrdExecutor>;
@@ -564,8 +575,7 @@ class OptimOrdExecutor: private boost::noncopyable {
   using CtxtCmp = typename Ctxt::CtxtCmp;
   using NItemFactory = typename Ctxt::NItem::Factory;
 
-  static const bool ADDS = DEPRECATED::ForEachTraits<OpFunc>::NeedsPush;
-  using WindowWL = typename std::conditional<ADDS, PQbasedWindowWL<Ctxt*, CtxtCmp>, SortedRangeWindowWL<Ctxt*, CtxtCmp> >::type;
+  using WindowWL = typename std::conditional<NEEDS_PUSH, PQbasedWindowWL<Ctxt*, CtxtCmp>, SortedRangeWindowWL<Ctxt*, CtxtCmp> >::type;
 
   using CommitQ = Galois::PerThreadVector<Ctxt*>;
 
@@ -574,6 +584,7 @@ class OptimOrdExecutor: private boost::noncopyable {
 
   using UserCtxt = UserContextAccess<T>;
   using PerThreadUserCtxt = Substrate::PerThreadStorage<UserCtxt>;
+  using ExecutionRecords = std::vector<ParaMeter::StepStats>;
 
   static const unsigned DEFAULT_CHUNK_SIZE = 8;
 
@@ -610,14 +621,16 @@ class OptimOrdExecutor: private boost::noncopyable {
 
   size_t windowSize;
   size_t rounds;
-  size_t prevSources;
+  size_t totalTasks;
+  size_t totalCommits;
   double targetCommitRatio;
 
   CommitQ commitQ;
   // PerThreadUserCtxt userHandles;
-  GAccumulator<size_t> numSources;
-  GAccumulator<size_t> numCommitted;
-  GAccumulator<size_t> total;
+  GAccumulator<size_t> roundTasks;;
+  GAccumulator<size_t> roundCommits;
+  GAccumulator<size_t> totalRetires;
+  ExecutionRecords execRcrds;
 
 public:
   OptimOrdExecutor (const Cmp& cmp, const NhFunc& nhFunc, const ExFunc& execFunc, const OpFunc& opFunc, const char* loopname)
@@ -636,7 +649,8 @@ public:
       ctxtMaker {*this},
       windowSize (0),
       rounds (0),
-      prevSources (0),
+      totalTasks (0),
+      totalCommits (0),
       targetCommitRatio (commitRatioArg)
   {
     if (!loopname) { loopname = "NULL"; }
@@ -646,6 +660,10 @@ public:
     }
     if (targetCommitRatio > 1.0) {
       targetCommitRatio = 1.0;
+    }
+
+    if (ENABLE_PARAMETER) {
+      assert (targetCommitRatio == 0.0);
     }
 
   }
@@ -688,14 +706,11 @@ public:
 
     while (true) {
 
-      prepareRound ();
+      beginRound ();
 
       if (currWL->empty_all ()) {
         break;
       }
-
-      // std::printf ("Round: %d, currWL size = %zd, commitQ size = %zd\n",
-          // rounds, currWL->size_all (), commitQ.size_all ());
 
       expandNhood ();
 
@@ -711,6 +726,8 @@ public:
 
       reclaimMemory (sources);
 
+      endRound ();
+
     }
 
     printStats ();
@@ -718,13 +735,27 @@ public:
 
 private:
 
+  void dumpParaMeterStats (void) {
+    for (const ParaMeter::StepStats& s: execRcrds) {
+      s.dump (ParaMeter::getStatsFile (), loopname);
+    }
+
+    ParaMeter::closeStatsFile ();
+  }
+
   void printStats (void) {
     std::printf ("OptimOrdExecutor, rounds: %zu\n", rounds);
-    std::printf ("OptimOrdExecutor, commits: %zu\n", numCommitted.reduce ());
-    std::printf ("OptimOrdExecutor, total: %zu\n", total.reduce ());
-    std::printf ("OptimOrdExecutor, efficiency: %g\n", double (numCommitted.reduce ()) / total.reduce ());
-    std::printf ("OptimOrdExecutor, avg. parallelism: %g\n", double (numCommitted.reduce ()) / rounds);
+    std::printf ("OptimOrdExecutor, retired: %zu\n", totalRetires.reduce ());
+    std::printf ("OptimOrdExecutor, committed: %zu\n", totalCommits);
+    std::printf ("OptimOrdExecutor, total: %zu\n", totalTasks);
+    std::printf ("OptimOrdExecutor, efficiency: %g\n", double (totalRetires.reduce ()) / totalTasks);
+    std::printf ("OptimOrdExecutor, avg. parallelism: %g\n", double (totalRetires.reduce ()) / rounds);
+
+    if (ENABLE_PARAMETER) {
+      dumpParaMeterStats ();
+    }
   }
+
 
 
   Ctxt* push (const T& x) {
@@ -847,21 +878,31 @@ private:
   // TODO: refactor prepareRound, refill, spillAll into a 
   // common code-base 
 
-  GALOIS_ATTRIBUTE_PROF_NOINLINE void prepareRound (void) {
-    ++rounds;
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void beginRound () {
     std::swap (currWL, nextWL);
 
     if (targetCommitRatio != 0.0) {
-      size_t currCommits = numSources.reduce () - prevSources;
-      prevSources += currCommits;
+      size_t currCommits = roundCommits.reduceRO (); 
 
-      size_t prevWindowSize = nextWL->size_all ();
+      size_t prevWindowSize = roundTasks.reduceRO ();
       refill (*currWL, currCommits, prevWindowSize);
     }
 
+
+    roundCommits.reset ();
+    roundTasks.reset ();
     nextWL->clear_all_parallel ();
+
+    if (ENABLE_PARAMETER) {
+      execRcrds.emplace_back (rounds, currWL->size_all ());
+    }
   }
 
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void endRound () {
+    ++rounds;
+    totalCommits += roundCommits.reduceRO ();
+    totalTasks += roundTasks.reduceRO ();
+  }
 
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhood (void) {
@@ -880,7 +921,7 @@ private:
             // nhFunc (c, uhand);
             runCatching (nhFunc, c, uhand);
 
-            total += 1;
+            roundTasks += 1;
           }
         },
         "expandNhood",
@@ -953,11 +994,15 @@ private:
             bool b = c->casState (ContextState::SCHEDULED, ContextState::READY_TO_COMMIT);
 
             assert (b && "CAS shouldn't have failed");
-            numSources += 1;
+            roundCommits += 1;
 
             c->publishChanges ();
             c->addToHistory ();
             commitQ.get ().push_back (c);
+
+            if (ENABLE_PARAMETER) {
+              c->markExecRound (rounds);
+            }
 
           } else {
 
@@ -1137,7 +1182,12 @@ private:
             assert (c->isCommitSrc ());
             c->doCommit ();
             c->findCommitSrc (gvt, wlHandle);
-            numCommitted += 1;
+            totalRetires += 1;
+
+            if (ENABLE_PARAMETER) {
+              assert (c->getExecRound () < execRcrds.size ());
+              execRcrds[c->getExecRound ()].parallelism += 1;
+            }
 
           } else {
             assert (c->hasState (ContextState::COMMIT_DONE));
@@ -1201,15 +1251,17 @@ private:
 
 
 template <typename R, typename Cmp, typename NhFunc, typename ExFunc, typename OpFunc>
-void for_each_ordered_optim (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const ExFunc& execFunc, const OpFunc& opFunc, const char* loopname=0) {
+void for_each_ordered_optim (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const ExFunc& execFunc, const OpFunc& opFunc, const char* loopname) {
 
   using T = typename R::value_type;
 
-
+  const bool NEEDS_PUSH = DEPRECATED::ForEachTraits<OpFunc>::NeedsPush;
 
   const bool HAS_EXEC_FUNC = !(std::is_same<ExFunc, HIDDEN::DummyExecFunc>::value);
 
-  using Exec = OptimOrdExecutor<T, Cmp, NhFunc, ExFunc, OpFunc, HAS_EXEC_FUNC>;
+  const bool ENABLE_PARAMETER = true;
+
+  using Exec = OptimOrdExecutor<T, Cmp, NhFunc, ExFunc, OpFunc, NEEDS_PUSH, HAS_EXEC_FUNC, ENABLE_PARAMETER>;
   
   Exec e (cmp, nhFunc, execFunc, opFunc, loopname);
 
@@ -1222,7 +1274,7 @@ void for_each_ordered_optim (const R& range, const Cmp& cmp, const NhFunc& nhFun
 }
 
 template <typename R, typename Cmp, typename NhFunc, typename OpFunc>
-void for_each_ordered_optim (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const char* loopname=0) {
+void for_each_ordered_optim (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const char* loopname) {
 
 
   for_each_ordered_optim (range, cmp, nhFunc, HIDDEN::DummyExecFunc (), opFunc, loopname);
@@ -1459,7 +1511,7 @@ struct OptimParamContext: public OrderedContextBase<T> {
 };
 
 
-template <typename T, typename Cmp, typename NhFunc, typename OpFunc> 
+template <typename T, typename Cmp, typename NhFunc, typename ExFunc, typename OpFunc, bool HAS_EXEC_FUNC> 
 class OptimParaMeterExecutor: private boost::noncopyable {
 
   friend class OptimParamContext<T, Cmp, OptimParaMeterExecutor>;
@@ -1476,6 +1528,7 @@ class OptimParaMeterExecutor: private boost::noncopyable {
 
   Cmp itemCmp;
   NhFunc nhFunc;
+  ExFunc execFunc;
   OpFunc opFunc;
   const char* loopname;
 
@@ -1493,10 +1546,11 @@ class OptimParaMeterExecutor: private boost::noncopyable {
 
 
 public:
-  OptimParaMeterExecutor (const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const char* loopname)
+  OptimParaMeterExecutor (const Cmp& cmp, const NhFunc& nhFunc, const ExFunc& execFunc, const OpFunc& opFunc, const char* loopname)
     : 
       itemCmp (cmp), 
       nhFunc (nhFunc), 
+      execFunc (execFunc), 
       opFunc (opFunc), 
       loopname (loopname),
       ctxtCmp (itemCmp),
@@ -1577,11 +1631,18 @@ public:
         ++totalIter;
 
         Galois::Runtime::setThreadContext (ctxt);
+
         nhFunc (ctxt->getActive (), ctxt->userHandle);
 
         if (ctxt->hasState (ContextState::SCHEDULED)) {
+
+          if (HAS_EXEC_FUNC) {
+            execFunc (ctxt->getActive (), ctxt->userHandle);
+          }
+
           opFunc (ctxt->getActive (), ctxt->userHandle);
         }
+
         Galois::Runtime::setThreadContext (nullptr);
 
         if (ctxt->hasState (ContextState::SCHEDULED)) {
@@ -1628,10 +1689,10 @@ private:
 
   void finish (void) {
     for (const StepStats& s: execRcrds) {
-      //FIXME:      s.dump (getStatsFile (), loopname);
+      s.dump (getStatsFile (), loopname);
     }
 
-    //FIXME: closeStatsFile ();
+    closeStatsFile ();
   }
 
   Ctxt* schedule () {
@@ -1733,18 +1794,25 @@ private:
 
 
 
-template <typename R, typename Cmp, typename NhFunc, typename OpFunc>
-void for_each_ordered_optim_param (const R& range, Cmp cmp, NhFunc nhFunc, OpFunc opFunc, const char* loopname=0) {
+template <typename R, typename Cmp, typename NhFunc, typename ExFunc, typename OpFunc>
+void for_each_ordered_optim_param (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const ExFunc& execFunc, const OpFunc& opFunc, const char* loopname) {
 
   using T = typename R::value_type;
 
-  ParaMeter::OptimParaMeterExecutor<T, Cmp, NhFunc, OpFunc> exec (cmp, nhFunc, opFunc, loopname);
+  const bool HAS_EXEC_FUNC = !(std::is_same<ExFunc, HIDDEN::DummyExecFunc>::value);
+
+  ParaMeter::OptimParaMeterExecutor<T, Cmp, NhFunc, ExFunc, OpFunc, HAS_EXEC_FUNC> exec (cmp, nhFunc, execFunc, opFunc, loopname);
 
   exec.push_initial (range);
   exec.execute ();
 }
 
 
+template <typename R, typename Cmp, typename NhFunc, typename OpFunc>
+void for_each_ordered_optim_param (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const char* loopname) {
+
+  for_each_ordered_optim_param (range, cmp, nhFunc, HIDDEN::DummyExecFunc (), opFunc, loopname);
+}
 
 
 } // end namespace Runtime

@@ -121,8 +121,8 @@ protected:
   double targetCommitRatio;
 
   PerThreadUserCtxt userHandles;
-  GAccumulator<size_t> roundCommits;
   GAccumulator<size_t> roundTasks;
+  GAccumulator<size_t> roundCommits;
 
 public:
   IKDGtwoPhaseExecutor (
@@ -297,7 +297,7 @@ protected:
     if (targetCommitRatio != 0.0) {
       size_t currCommits = roundCommits.reduceRO (); 
 
-      size_t prevWindowSize = nextWL->size_all ();
+      size_t prevWindowSize = roundTasks.reduceRO ();
       refill (*currWL, currCommits, prevWindowSize);
     }
 

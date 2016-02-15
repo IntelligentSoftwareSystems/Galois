@@ -221,7 +221,8 @@ public:
         Galois::Runtime::makeStandardRange (
           boost::make_transform_iterator(elems.begin(), MakeUpdate()),
           boost::make_transform_iterator(elems.end(), MakeUpdate())), 
-        Comparator(), nhVisitor, p);
+        Comparator(), nhVisitor, p,
+        "avi-optim");
 
 
     printf("iterations = %lu\n", niter.reduce());
