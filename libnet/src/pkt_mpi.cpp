@@ -24,6 +24,7 @@
 #include "Galois/Runtime/NetworkIO.h"
 #include "hash/crc32.h"
 
+#include <cassert>
 #include <cstring>
 #include <mpi.h>
 #include <deque>
@@ -78,6 +79,9 @@ class NetworkIOMPI : public Galois::Runtime::NetworkIO {
         handleError(rv);
         if (flag) {
           if (debugMPI) {
+            uint32_t h;
+            memcpy(&h, f.m.data.get() + (f.m.len - 4), 4);
+            assert(h == CRC32::hash(f.m.data.get(), f.m.len - 4));
             if (debugPrint)
               std::cerr << getNum() << " C " << std::hex << (uintptr_t)f.m.data.get() << " " << CRC32::hash(f.m.data.get(), f.m.len - 4) << std::dec << " " << f.m.len << "\n";
           }
