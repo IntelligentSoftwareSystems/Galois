@@ -67,7 +67,8 @@ class NetworkIOMPI : public Galois::Runtime::NetworkIO {
         int flag = 0;
         MPI_Status status;
         auto& f = inflight.front();
-        MPI_Test(&f.req, &flag, &status);
+        int rv = MPI_Test(&f.req, &flag, &status);
+        handleError(rv);
         if (flag) {
           inflight.pop_front();
           //          std::cerr << "S";
