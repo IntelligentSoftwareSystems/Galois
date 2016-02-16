@@ -22,12 +22,16 @@
  */
 
 #include "Galois/Runtime/NetworkIO.h"
+#include "hash/crc32.h"
 
+#include <cassert>
+#include <cstring>
 #include <mpi.h>
 #include <deque>
 #include <iostream>
 
-static int _ID;
+static const bool debugMPI = true;
+static const bool debugPrint  = true;
 
 class NetworkIOMPI : public Galois::Runtime::NetworkIO {
 
@@ -37,19 +41,24 @@ class NetworkIOMPI : public Galois::Runtime::NetworkIO {
       MPI_Abort(MPI_COMM_WORLD, rc);
     }
   }
+
+  static int getID() {
+    int taskRank;
+    handleError(MPI_Comm_rank(MPI_COMM_WORLD, &taskRank));
+    return taskRank;
+  }
+
+  static int getNum() {
+    int numTasks;
+    handleError(MPI_Comm_size(MPI_COMM_WORLD, &numTasks));
+    return numTasks;
+  }
   
   std::pair<int, int> initMPI() {
     int provided;
-    int rc = MPI_Init_thread (NULL, NULL, MPI_THREAD_FUNNELED, &provided);
-    handleError(rc);
-    
-    int numTasks, taskRank;
-    MPI_Comm_size(MPI_COMM_WORLD, &numTasks);
-    MPI_Comm_rank(MPI_COMM_WORLD, &taskRank);
-
-    _ID = taskRank;
-    
-    return std::make_pair(taskRank, numTasks);
+    handleError(MPI_Init_thread (NULL, NULL, MPI_THREAD_FUNNELED, &provided));
+    assert(provided >= MPI_THREAD_FUNNELED);
+    return std::make_pair(getID(), getNum());
   }
 
   struct mpiMessage {
@@ -67,20 +76,37 @@ class NetworkIOMPI : public Galois::Runtime::NetworkIO {
         int flag = 0;
         MPI_Status status;
         auto& f = inflight.front();
-        MPI_Test(&f.req, &flag, &status);
+        int rv = MPI_Test(&f.req, &flag, &status);
+        handleError(rv);
         if (flag) {
+          if (debugMPI) {
+            uint32_t h;
+            memcpy(&h, f.m.data.get() + (f.m.len - 4), 4);
+            assert(h == CRC32::hash(f.m.data.get(), f.m.len - 4));
+            if (debugPrint)
+              std::cerr << getNum() << " C " << std::hex << (uintptr_t)f.m.data.get() << " " << CRC32::hash(f.m.data.get(), f.m.len - 4) << std::dec << " " << f.m.len << "\n";
+          }
           inflight.pop_front();
-          //          std::cerr << "S";
         }
       }
     }
 
     void send(message m) {
-      //      std::cerr << _ID << " mpi_isend " << m.len << " " << m.host << "\n";
+      //if debugging, make a hash value
+      if (debugMPI) {
+        uint8_t* data = new uint8_t[m.len + 4];
+        memcpy(data, m.data.get(), m.len);
+        uint32_t hash = CRC32::hash(data, m.len);
+        memcpy(data+m.len, &hash, 4);
+        m.len += 4;
+        m.data.reset(data);
+        if (debugPrint)
+          std::cerr << getNum() << " S " << std::hex <<  (uintptr_t)m.data.get()  << " " << hash << std::dec << " " << m.len << "\n";
+      }
+
       MPI_Request req;
       int rv = MPI_Isend(m.data.get(), m.len, MPI_BYTE, m.host, 0, MPI_COMM_WORLD, &req);
       inflight.emplace_back(std::move(m), req);
-      //      std::cerr << "s";
       handleError(rv);
     }
   };
@@ -98,9 +124,16 @@ class NetworkIOMPI : public Galois::Runtime::NetworkIO {
         rv = MPI_Get_count(&status, MPI_BYTE, &nbytes);
         handleError(rv);
         std::unique_ptr<uint8_t[]> ptr{new uint8_t[nbytes]};
-        //        std::cerr << _ID << " mpi_recv " << nbytes << " " << status.MPI_SOURCE << "\n";
         rv = MPI_Recv(ptr.get(), nbytes, MPI_BYTE, status.MPI_SOURCE, status.MPI_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         handleError(rv);
+        if (debugMPI) {
+          uint32_t h;
+          memcpy(&h, ptr.get() + (nbytes - 4), 4);
+          if (debugPrint)
+            std::cerr << getNum() << " R " << std::hex << (uintptr_t)ptr.get() << " " << CRC32::hash(ptr.get(), nbytes - 4) << " " << h << std::dec << " " << nbytes << "\n";
+          assert(h == CRC32::hash(ptr.get(), nbytes - 4));
+          nbytes -= 4;
+        }
         done.emplace_back(status.MPI_SOURCE, std::move(ptr), nbytes);
       }
     }

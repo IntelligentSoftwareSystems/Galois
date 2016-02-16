@@ -35,8 +35,12 @@ public:
 
   struct LoopInfo {
     const CallExpr* CallSite;
+    const QualType Operator;
+    const Decl* OpDecl;
+    const LambdaExpr* OpLambda;
 
-    LoopInfo(const CallExpr* cs) : CallSite(cs) {}
+    LoopInfo(const CallExpr* cs, const QualType op, const Decl* decl, const LambdaExpr* lam)
+      : CallSite(cs), Operator(op), OpDecl(decl), OpLambda(lam) {}
   };
   
   StatementMatcher Matcher;
@@ -65,7 +69,7 @@ public:
     bool forEach = std::string::npos != name.find("for_each");
     bool isLocal = std::string::npos != name.find("local");
 
-    llvm::outs() << name << " " << forEach << " " << isLocal << "\n**\n";
+    llvm::outs() << name << " " << forEach << " " << isLocal << "\n";
     //gFunc->dump();
     //llvm::outs() << "**\n";
     auto* gOp = FS->getArg(isLocal ? 1 : 2);
@@ -73,13 +77,77 @@ public:
     if (const MaterializeTemporaryExpr* t = dyn_cast<const MaterializeTemporaryExpr>(gOp))
       gOp = t->GetTemporaryExpr();
 
-    gOp->dump();
-    llvm::outs() << "\n\n";
+    if (const ImplicitCastExpr* t = dyn_cast<const ImplicitCastExpr>(gOp))
+      gOp = t->getSubExpr();
 
-    Loops.emplace_back(FS);
+    if (const CXXFunctionalCastExpr* t = dyn_cast<const CXXFunctionalCastExpr>(gOp))
+      gOp = t->getSubExpr();
+
+    //Handle common types
+    auto* gOpTyPtr = gOp->getType().getTypePtr();
+    Decl* dOp = nullptr;
+    const LambdaExpr* lOp = dyn_cast<const LambdaExpr>(gOp);
+
+    if (auto* stOp = gOpTyPtr->getAsStructureType()) {
+      dOp = stOp->getDecl();
+      llvm::outs() << "Op is Decl structure\n";
+    } else if (lOp) {
+      llvm::outs() << "Op is Lambda\n";      
+    } else {
+        gOp->dump();
+        llvm::outs() << "**\n";
+        if (gOp->getType().getTypePtr()->isRecordType()) {
+          auto* op = gOp->getType().getTypePtr()->getAsStructureType();
+          if (op) {
+            op->dump();
+            if (op->getDecl())
+              op->getDecl()->dump();
+            else
+              llvm::outs() << "Not RecordType with Decl\n";
+          }
+          gOp->getType().getTypePtr()->dump();
+        }
+    }
+    
+    llvm::outs() << "\n\n";
+    Loops.emplace_back(FS, gOp->getType(), dOp, lOp);
   }
 };
 
+class GraphNodeMatcher : public MatchFinder::MatchCallback {
+public:
+
+  struct VarInfo {
+  };
+  
+  StatementMatcher Matcher;
+  std::vector<VarInfo> GraphVars;
+  
+  GraphNodeMatcher()
+    :Matcher{
+    callExpr(callee(functionDecl(
+                                 anyOf(
+                                       hasName("getData"),
+                                       hasName("edge_begin"),
+                                       hasName("edge_end")
+                                       )
+                                 )
+                    ),
+             hasArgument(0, expr().bind("var"))
+             ).bind("varUse")
+      }
+  {}
+  
+  virtual void run(const MatchFinder::MatchResult& Result) {
+    auto* varA = Result.Nodes.getNodeAs<clang::CallExpr>("varUse");
+    auto* varE = Result.Nodes.getNodeAs<clang::Expr>("var");
+
+    varA->dump();
+    llvm::outs() << "**\n";
+    varE->dump();
+    llvm::outs() << "++\n\n\n";
+  }
+};
 
 
 
@@ -89,9 +157,12 @@ int main(int argc, const char **argv) {
                  OptionsParser.getSourcePathList());
   
   LoopMatcher GFinder;
+  GraphNodeMatcher GNodeFinder;
   MatchFinder Finder;
   Finder.addMatcher(GFinder.Matcher, &GFinder);
+  Finder.addMatcher(GNodeFinder.Matcher, &GNodeFinder);
 
-  return Tool.run(newFrontendActionFactory(&Finder).get());
+  Tool.run(newFrontendActionFactory(&Finder).get());
+  return 0;
 }
 

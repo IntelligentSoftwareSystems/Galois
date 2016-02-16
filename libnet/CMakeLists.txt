@@ -4,6 +4,7 @@ set(sources
         src/pkt_mpi.cpp
         src/Network.cpp
 	src/Barrier.cpp
+        src/hash/crc32.cpp
 )
 
 add_library(galois_net STATIC ${sources})
