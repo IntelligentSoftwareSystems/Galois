@@ -533,6 +533,7 @@ namespace {
   public:
     GaloisFunctionsConsumer(CompilerInstance &Instance, std::set<std::string> ParsedTemplates, Rewriter &R): Instance(Instance), ParsedTemplates(ParsedTemplates), Visitor(new GaloisFunctionsVisitor(&Instance)), functionCallHandler(R), forEachHandler(R) {
       Matchers.addMatcher(callExpr(isExpansionInMainFile(), callee(functionDecl(hasName("Galois::do_all")))).bind("galoisLoop"), &functionCallHandler);
+
       /** for Galois::for_each. Needs different treatment. **/
       Matchers.addMatcher(callExpr(isExpansionInMainFile(), callee(functionDecl(hasName("Galois::for_each"))), hasAncestor(recordDecl().bind("forEach_caller"))).bind("galoisLoop_forEach"), &forEachHandler);
     }
