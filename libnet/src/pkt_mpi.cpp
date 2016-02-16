@@ -63,6 +63,7 @@ class NetworkIOMPI : public Galois::Runtime::NetworkIO {
   std::pair<int, int> initMPI() {
     int provided;
     handleError(MPI_Init_thread (NULL, NULL, MPI_THREAD_FUNNELED, &provided));
+    assert(provided >= MPI_THREAD_FUNNELED);
     return std::make_pair(getID(), getNum());
   }
 
