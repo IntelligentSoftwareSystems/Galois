@@ -127,7 +127,7 @@ void dummy_func(SGD_NodeData& user, SGD_NodeData& movie){
 static const double MINVAL = -1e+100;
 static const double MAXVAL = 1e+100;
 double calcPrediction (const SGD_NodeData& movie_data, const SGD_NodeData& user_data) {
-  double pred = Galois::innerProduct(movie_data, user_data);
+  double pred = Galois::innerProduct(movie_data.latent_vector.begin(),  movie_data.latent_vector.begin(),user_data.latent_vector.begin(),0.0);
   double p = pred;
   pred = std::min (MAXVAL, pred);
   pred = std::max (MINVAL, pred);
@@ -184,7 +184,7 @@ struct Sgd {
        movie_node[i] += step_size * (cur_error * prevUser - LAMBDA * prevMovie);
        assert(std::isnormal(movie_node[i]));
      }
-     double cur_error2 = edge_rating - calcPrediction(movie_node, user_node);
+     double cur_error2 = edge_rating - calcPrediction(sdata, ddata);
      if(std::abs(cur_error - cur_error2) > 20){
       //push.
       std::cerr << "A" << std::abs(cur_error - cur_error2) << "\n";

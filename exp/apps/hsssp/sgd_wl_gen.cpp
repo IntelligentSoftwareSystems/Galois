@@ -175,7 +175,7 @@ struct Sgd {
   Sgd(Graph* _graph, double _step_size ):graph(_graph), step_size(_step_size){}
   void static go(Graph& _graph, double _step_size) {
 
-      std::deque<SGD_NodeData> Movies;
+      std::deque<GNode> Movies;
       for(auto ii : _graph){
         if(std::distance(_graph.edge_begin(ii), _graph.edge_end(ii))){
           Movies.push_back(ii);
