@@ -99,6 +99,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
       if (!sizeAtLeast(4))
         return false;
       uint32_t len = getLenFromFront();
+      assert(len > 0);
       if (!sizeAtLeast(4 + len))
         return false;
       //std::cerr << _ID << " pm " << frontOffset << " " << size() << " " << len << "\n";
