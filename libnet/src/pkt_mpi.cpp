@@ -36,8 +36,8 @@
 #include <unistd.h>
 #include <vector>
 
-static const bool debugMPI = true;
-static const bool debugPrint  = true;
+static const bool debugMPI = false;
+static const bool debugPrint  = false;
 
 class NetworkIOMPI : public Galois::Runtime::NetworkIO {
 
