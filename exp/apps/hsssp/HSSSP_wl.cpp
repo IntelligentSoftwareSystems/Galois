@@ -121,12 +121,12 @@ struct Get_info_functor : public Galois::op_tag {
     return graph.getLID(n);
   }
 
-  void sync_push(){
-    sync_push_static(graph);
+  void sync_graph(){
+    sync_graph_static(graph);
     //XXX: Why this is not working?
     //graph.sync_push<Syncer_0>();
   }
-  void static sync_push_static(Graph& _g){
+  void static sync_graph_static(Graph& _g){
     _g.sync_push<Syncer_0>();
   }
 };
