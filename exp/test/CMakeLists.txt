@@ -24,3 +24,5 @@ makeTest(netbuffered DISTSAFE)
 makeTest(mpi DISTSAFE)
 makeTest(netband2 DISTSAFE)
 makeTest(netbandmpi DISTSAFE)
+
+app(TestNetBandWidth netbandwidth.cpp DISTSAFE)
