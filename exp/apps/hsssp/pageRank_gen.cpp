@@ -133,11 +133,22 @@ struct PageRank {
     	static void setVal (struct PR_NodeData & node, float y) {node.value = y; }
     	typedef float ValTy;
     };
+
+     Galois::Timer T_compute, T_comm;
+
+    T_compute.start(); 
     Galois::do_all(_graph.begin(), _graph.end(), PageRank { &_graph }, Galois::loopname("pageRank"), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "value" , "float"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ Galois::atomicAdd(node.residual, y);}",  "0"));
+    T_compute.stop();
+
+    T_comm.start();
     _graph.sync_push<Syncer_0>();
-    
+
     _graph.sync_pull<SyncerPull_0>();
-    
+    T_comm.stop();
+
+
+    std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID  << "] T_compute : " << T_compute.get() << "(msec)  T_comm : " << T_comm.get() << "(msec)\n";
+
   }
 
   void operator()(GNode src)const {
