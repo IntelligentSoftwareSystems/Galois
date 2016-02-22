@@ -6,9 +6,14 @@ if [ "$(basename -- $0)" == "iss_load_modules.sh" ]; then
 fi
 
 # first up remove everything
-module purge
+#module purge
 
-module load sl6
+if [ $(lsb_release -si) = "CentOS" ] ; then
+    module load c7
+else
+    module load sl6
+fi
+
 module use /net/faraday/workspace/local/modules/modulefiles
 module use /org/centers/cdgc/modules
 module load lapack
