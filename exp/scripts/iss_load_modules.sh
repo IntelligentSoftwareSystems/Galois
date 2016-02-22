@@ -27,7 +27,7 @@ module load vtune
 #    module load cmake
 #fi
 
-module load atc/1.1
+module load atc/1.2
 module load cmake/3.3.2
 module load tbb
 module load boost
