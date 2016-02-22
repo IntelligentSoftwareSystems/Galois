@@ -33,18 +33,25 @@ module load tbb
 module load boost
 module load eigen
 module load neon
+if [ "$SYSTEMTYPE" == "c7" ] ; then
+  module load module-git
+  module load serf
+else
+  module load git
+fi
 module load subversion
-module load git
 
 if [ "$1" != "min" ]; then
   module load gdb
   module load mkl
   module load mpich2
-  module load gnuplot
-  module load doxygen
   module load texlive
-  module load ghostscript
   module load python
-  # module load screen #disabling for now because screen was compiled without proper color support
-  module load valgrind
+  if [ "$SYSTEMTYPE" != "c7" ] ; then
+    module load gnuplot
+    module load doxygen
+    module load ghostscript
+    # module load screen #disabling for now because screen was compiled without proper color support
+    module load valgrind
+  fi
 fi

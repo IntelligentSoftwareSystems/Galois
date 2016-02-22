@@ -23,15 +23,21 @@
 
 #include "Galois/Runtime/NetworkIO.h"
 #include "hash/crc32.h"
+#include "Galois/Runtime/Tracer.h"
+#include "Galois/Substrate/SimpleLock.h"
 
 #include <cassert>
 #include <cstring>
 #include <mpi.h>
 #include <deque>
 #include <iostream>
+#include <string>
+#include <fstream>
+#include <unistd.h>
+#include <vector>
 
-static const bool debugMPI = true;
-static const bool debugPrint  = true;
+static const bool debugMPI = false;
+static const bool debugPrint  = false;
 
 class NetworkIOMPI : public Galois::Runtime::NetworkIO {
 
@@ -103,10 +109,17 @@ class NetworkIOMPI : public Galois::Runtime::NetworkIO {
         if (debugPrint)
           std::cerr << getNum() << " S " << std::hex <<  (uintptr_t)m.data.get()  << " " << hash << std::dec << " " << m.len << "\n";
       }
-
       MPI_Request req;
-      int rv = MPI_Isend(m.data.get(), m.len, MPI_BYTE, m.host, 0, MPI_COMM_WORLD, &req);
       inflight.emplace_back(std::move(m), req);
+      auto& f = inflight.back();
+      int rv = MPI_Isend(f.m.data.get(), f.m.len, MPI_BYTE, f.m.host, 0, MPI_COMM_WORLD, &f.req);
+      //inflight.emplace_back(std::move(m), req);
+
+      //std::vector<uint8_t> send_vec(ptr, ptr + 10);
+      //Galois::Runtime::print_send(send_vec, m.len, m.host);
+
+      Galois::Runtime::trace("MPI_SEND: to % len % data: %", m.host, m.len, m.data.get());
+      //      std::cerr << "s";
       handleError(rv);
     }
   };
@@ -134,7 +147,13 @@ class NetworkIOMPI : public Galois::Runtime::NetworkIO {
           assert(h == CRC32::hash(ptr.get(), nbytes - 4));
           nbytes -= 4;
         }
+
+        //auto* ptr_data = ptr.get();
+                //std::cerr <<"\n" <<_ID << " mpi_recv " << nbytes << " " << status.MPI_SOURCE << "\n";
         done.emplace_back(status.MPI_SOURCE, std::move(ptr), nbytes);
+
+        //std::vector<uint8_t> recv_vec(ptr_data, ptr_data + 10);
+        //Galois::Runtime::print_recv(recv_vec, nbytes, status.MPI_SOURCE);
       }
     }
   };

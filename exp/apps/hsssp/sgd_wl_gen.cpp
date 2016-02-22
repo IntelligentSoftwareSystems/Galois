@@ -44,7 +44,6 @@ static const char* const url = 0;
 namespace cll = llvm::cl;
 static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations"), cll::init(4));
-static cll::opt<unsigned int> src_node("srcNodeId", cll::desc("ID of the source node"), cll::init(0));
 static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"), cll::init(false));
 
 #define LATENT_VECTOR_SIZE 2
@@ -65,6 +64,7 @@ struct SGD_NodeData {
 typedef hGraph<SGD_NodeData, int> Graph;
 typedef typename Graph::GraphNode GNode;
 
+typedef GNode WorkItem;
 static double genRand () {
   // generate a random double in (-1,1)
   return 2.0 * ((double)std::rand () / (double)RAND_MAX) - 1.0;
@@ -136,31 +136,59 @@ double calcPrediction (const SGD_NodeData& movie_data, const SGD_NodeData& user_
   return pred;
 }
 
+template <typename GraphTy>
+struct Get_info_functor : public Galois::op_tag {
+	GraphTy &graph;
+	struct Syncer_0 {
+		static class std::vector<double, class std::allocator<double> > extract( const struct SGD_NodeData & node){ return node.latent_vector; }
+		static void reduce (struct SGD_NodeData & node, class std::vector<double, class std::allocator<double> > y) {Galois::pairWiseAvg_vec(node.latent_vector, y); }
+		static void reset (struct SGD_NodeData & node ){Galois::resetVec(node.latent_vector); }
+		typedef class std::vector<double, class std::allocator<double> > ValTy;
+	};
+	struct SyncerPull_0 {
+		static class std::vector<double, class std::allocator<double> > extract( const struct SGD_NodeData & node){ return node.latent_vector; }
+		static void setVal (struct SGD_NodeData & node, class std::vector<double, class std::allocator<double> > y) {node.latent_vector = y; }
+		typedef class std::vector<double, class std::allocator<double> > ValTy;
+	};
+	Get_info_functor(GraphTy& _g): graph(_g){}
+	unsigned operator()(GNode n) {
+		return graph.getHostID(n);
+	}
+	uint32_t getLocalID(GNode n){
+		return graph.getLID(n);
+	}
+	void sync_graph(){
+		 sync_graph_static(graph);
+	}
+	void static sync_graph_static(Graph& _graph) {
+
+		_graph.sync_push<Syncer_0>();
+
+		_graph.sync_pull<SyncerPull_0>();
+	}
+};
+
 struct Sgd {
   Graph* graph;
   double step_size;
 
+  Sgd(Graph* _graph, double _step_size ):graph(_graph), step_size(_step_size){}
   void static go(Graph& _graph, double _step_size) {
 
-       struct Syncer_0 {
-      	static class std::vector<double, class std::allocator<double> > extract( const struct SGD_NodeData & node){ return node.latent_vector; }
-      	static void reduce (struct SGD_NodeData & node, class std::vector<double, class std::allocator<double> > y) {Galois::pairWiseAvg_vec(node.latent_vector, y); }
-      	static void reset (struct SGD_NodeData & node ){Galois::resetVec(node.latent_vector); }
-      	typedef class std::vector<double, class std::allocator<double> > ValTy;
-      };
-       struct SyncerPull_0 {
-      	static class std::vector<double, class std::allocator<double> > extract( const struct SGD_NodeData & node){ return node.latent_vector; }
-      	static void setVal (struct SGD_NodeData & node, class std::vector<double, class std::allocator<double> > y) {node.latent_vector = y; }
-      	typedef class std::vector<double, class std::allocator<double> > ValTy;
-      };
-      Galois::do_all(_graph.begin(), _graph.end(), Sgd{&_graph, _step_size}, Galois::loopname("SGD"), Galois::write_set("sync_push", "this->graph", "struct SGD_NodeData &", "std::vector<class std::vector<double, class std::allocator<double> >>" , "latent_vector", "class std::vector<double, class std::allocator<double> >" , "{Galois::pairWiseAvg_vec(node.latent_vector, y); }",  "{Galois::resetVec(node.latent_vector); }"), Galois::write_set("sync_pull", "this->graph", "struct SGD_NodeData &", "std::vector<class std::vector<double, class std::allocator<double> >>", "latent_vector" , "class std::vector<double, class std::allocator<double> >"));
-      _graph.sync_push<Syncer_0>();
-      
-      _graph.sync_pull<SyncerPull_0>();
-      
+      std::deque<GNode> Movies;
+      for(auto ii : _graph){
+        if(std::distance(_graph.edge_begin(ii), _graph.edge_end(ii))){
+          Movies.push_back(ii);
+        }
+      }
+
+      using namespace Galois::WorkList;
+      typedef dChunkedFIFO<64> dChunk;
+      Galois::for_each(_graph.begin(), _graph.end(), Sgd(&_graph, _step_size), Galois::write_set("sync_push", "this->graph", "struct SGD_NodeData &", "std::vector<class std::vector<double, class std::allocator<double> >>" , "latent_vector", "class std::vector<double, class std::allocator<double> >" , "{Galois::pairWiseAvg_vec(node.latent_vector, y); }",  "{Galois::resetVec(node.latent_vector); }"), Galois::write_set("sync_pull", "this->graph", "struct SGD_NodeData &", "std::vector<class std::vector<double, class std::allocator<double> >>", "latent_vector" , "class std::vector<double, class std::allocator<double> >"), Get_info_functor<Graph>(_graph), Galois::wl<dChunk>());
+
   }
 
-  void operator()(GNode src) const {
+  void operator()(WorkItem src, Galois::UserContext<WorkItem>& ctx) const {
     SGD_NodeData& sdata= graph->getData(src);
     auto& movie_node = sdata.latent_vector;
 
@@ -174,22 +202,26 @@ struct Sgd {
       //doGradientUpdate
      double old_dp = Galois::innerProduct(user_node.begin(), user_node.end(), movie_node.begin(), 0.0);
      double cur_error = edge_rating - old_dp;
-     assert(cur_error < 1000 && cur_error > -1000);
      for(int i = 0; i < LATENT_VECTOR_SIZE; ++i) {
        double prevUser = user_node[i];
        double prevMovie = movie_node[i];
 
        user_node[i] += step_size * (cur_error * prevMovie - LAMBDA * prevUser);
+       std::cout << " prevU : " << prevUser << ", newU : " << user_node[i] <<"\n";
        assert(std::isnormal(user_node[i]));
        movie_node[i] += step_size * (cur_error * prevUser - LAMBDA * prevMovie);
        assert(std::isnormal(movie_node[i]));
      }
+
      double cur_error2 = edge_rating - calcPrediction(sdata, ddata);
+     std::cout << "cur_error : " << cur_error <<" , cur_error2 : "<< cur_error2 <<"\n";
      if(std::abs(cur_error - cur_error2) > 20){
-      //push.
-      std::cerr << "A" << std::abs(cur_error - cur_error2) << "\n";
-      //didWork = true;
+       //push.
+       std::cerr << "A" << std::abs(cur_error - cur_error2) << "\n";
+       //ctx.push(WorkItem(graph->getGID(dst)));
+       ctx.push(WorkItem(graph->getGID(src)));
      }
+
     }
   }
 };
@@ -212,11 +244,12 @@ int main(int argc, char** argv) {
       }
     }
 
-    for(unsigned iter = 0; iter < maxIterations; ++iter) {
+    //for(unsigned iter = 0; iter < maxIterations; ++iter) {
+      unsigned iter = 0;
       auto step_size = getstep_size(iter);
       std::cout << " Iter :" << iter << " step_size :" << step_size << "\n";
       Sgd::go(hg, step_size);
-    }
+    //}
 
     if(verify) {
       if(net.ID == 0) {
