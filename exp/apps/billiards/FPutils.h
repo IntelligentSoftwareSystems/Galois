@@ -55,7 +55,9 @@ struct FPutilsGeneric: private boost::noncopyable {
     double d = std::sqrt (double (t));
     T r = T::sqrt (t);
     
-    assert (std::fabs ((r.dval () - d) / d) < 1e-5);
+    if (d != 0.0) {
+      assert (std::fabs ((r.dval () - d) / d) < 1e-5);
+    }
 
     return r;
   }

@@ -46,6 +46,7 @@
 #include "Galois/Substrate/Barrier.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/Executor_DoAll.h"
+#include "Galois/Runtime/Executor_ParaMeter.h"
 #include "Galois/Runtime/ForEachTraits.h"
 #include "Galois/Runtime/Range.h"
 #include "Galois/Runtime/Support.h"
@@ -70,8 +71,8 @@ namespace Runtime {
 
 
 namespace {
-template <typename T, typename Cmp, typename NhFunc, typename OpFunc, typename WindowWL> 
-class KDGtwoPhaseStableExecutor {
+template <typename T, typename Cmp, typename NhFunc, typename ExFunc, typename OpFunc, typename WindowWL, bool NEEDS_PUSH, bool HAS_EXEC_FUNC, bool ENABLE_PARAMETER> 
+class IKDGtwoPhaseExecutor {
 public:
   using Ctxt = TwoPhaseContext<T, Cmp>;
   using CtxtAlloc = FixedSizeAllocator<Ctxt>;
@@ -103,7 +104,9 @@ protected:
 
   Cmp cmp;
   NhFunc nhFunc;
+  ExFunc execFunc;
   OpFunc opFunc;
+  const char* loopname;
   WindowWL winWL;
   CtxtAlloc ctxtAlloc;
   MakeContext ctxtMaker;
@@ -113,29 +116,35 @@ protected:
 
   size_t windowSize;
   size_t rounds;
-  size_t prevCommits;
+  size_t totalTasks;
+  size_t totalCommits;
   double targetCommitRatio;
 
   PerThreadUserCtxt userHandles;
-  GAccumulator<size_t> numCommitted;
-  GAccumulator<size_t> total;
+  GAccumulator<size_t> roundTasks;
+  GAccumulator<size_t> roundCommits;
 
 public:
-  KDGtwoPhaseStableExecutor (
+  IKDGtwoPhaseExecutor (
       const Cmp& cmp, 
       const NhFunc& nhFunc,
-      const OpFunc& opFunc)
+      const ExFunc& execFunc,
+      const OpFunc& opFunc,
+      const char* ln)
     :
       cmp (cmp),
       nhFunc (nhFunc),
+      execFunc (execFunc),
       opFunc (opFunc),
+      loopname (ln),
       winWL (cmp),
       ctxtMaker (cmp, ctxtAlloc),
       currWL (new CtxtWL),
       nextWL (new CtxtWL),
       windowSize(0),
       rounds(0),
-      prevCommits(0),
+      totalTasks(0),
+      totalCommits(0),
       targetCommitRatio (commitRatioArg)
   {
     if (targetCommitRatio < 0.0) {
@@ -144,9 +153,22 @@ public:
     if (targetCommitRatio > 1.0) {
       targetCommitRatio = 1.0;
     }
+
+    if (ENABLE_PARAMETER) {
+      assert (targetCommitRatio == 0.0);
+    }
+
+    if (loopname == nullptr) {
+      loopname = "NULL";
+    }
   }
 
-  ~KDGtwoPhaseStableExecutor () {
+  ~IKDGtwoPhaseExecutor () {
+
+    if (ENABLE_PARAMETER) {
+      ParaMeter::closeStatsFile ();
+    }
+
     printStats ();
     assert (currWL->empty_all ());
     assert (nextWL->empty_all ());
@@ -171,7 +193,7 @@ public:
   }
 
   void execute () {
-    execute_stable ();
+    execute_impl ();
   }
 
 protected:
@@ -208,7 +230,7 @@ protected:
       assert (currCommits == 0);
 
       // initial settings
-      if (DEPRECATED::ForEachTraits<OpFunc>::NeedsPush) {
+      if (NEEDS_PUSH) {
         windowSize = std::max (
             (winWL.initSize ()),
             (THREAD_MULT_FACTOR * MIN_WIN_SIZE));
@@ -248,7 +270,7 @@ protected:
     assert (windowSize > 0);
 
 
-    if (DEPRECATED::ForEachTraits<OpFunc>::NeedsPush) {
+    if (NEEDS_PUSH) {
       if (winWL.empty () && (wl.size_all () > windowSize)) {
         // a case where winWL is empty and all the new elements were going into 
         // nextWL. When nextWL becomes bigger than windowSize, we must do something
@@ -269,22 +291,35 @@ protected:
   }
 
 
-  GALOIS_ATTRIBUTE_PROF_NOINLINE void prepareRound () {
-    ++rounds;
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void beginRound () {
     std::swap (currWL, nextWL);
 
     if (targetCommitRatio != 0.0) {
-      size_t currCommits = numCommitted.reduce () - prevCommits;
-      prevCommits += currCommits;
+      size_t currCommits = roundCommits.reduceRO (); 
 
-      size_t prevWindowSize = nextWL->size_all ();
+      size_t prevWindowSize = roundTasks.reduceRO ();
       refill (*currWL, currCommits, prevWindowSize);
     }
 
+    roundCommits.reset ();
+    roundTasks.reset ();
     nextWL->clear_all_parallel ();
   }
 
-  GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhood () {
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void endRound () {
+    ++rounds;
+    totalCommits += roundCommits.reduceRO ();
+    totalTasks += roundTasks.reduceRO ();
+
+    if (ENABLE_PARAMETER) {
+      ParaMeter::StepStats s (rounds, roundCommits.reduceRO (), roundTasks.reduceRO ());
+      s.dump (ParaMeter::getStatsFile (), loopname);
+    }
+  }
+
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhoodImpl (HIDDEN::DummyExecFunc*) {
+    // for stable case
+
     Galois::do_all_choice (makeLocalRange (*currWL),
         [this] (Ctxt* c) {
           UserCtxt& uhand = *userHandles.getLocal ();
@@ -293,17 +328,76 @@ protected:
           // nhFunc (c, uhand);
           runCatching (nhFunc, c, uhand);
 
-          total += 1;
+          roundTasks += 1;
         },
         "expandNhood",
         chunk_size<NhFunc::CHUNK_SIZE> ());
+  }
 
+  struct GetActive: public std::unary_function<Ctxt*, const T&> {
+    const T& operator () (const Ctxt* c) const {
+      assert (c != nullptr);
+      return c->getActive ();
+    }
+  };
+
+  template <typename F>
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhoodImpl (F*) {
+    // for unstable case
+    auto m_beg = boost::make_transform_iterator (currWL->begin_all (), GetActive ());
+    auto m_end = boost::make_transform_iterator (currWL->end_all (), GetActive ());
+
+    Galois::do_all_choice (makeLocalRange (*currWL),
+        [m_beg, m_end, this] (Ctxt* c) {
+          UserCtxt& uhand = *userHandles.getLocal ();
+          uhand.reset ();
+
+          runCatching (nhFunc, c, uhand, m_beg, m_end);
+
+          roundTasks += 1;
+        },
+        "expandNhoodUnstable",
+        chunk_size<NhFunc::CHUNK_SIZE> ());
+  }
+
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhood () {
+    // using ptr to execFunc to choose the right impl. 
+    // relying on the fact that for stable case, the execFunc is DummyExecFunc. 
+    expandNhoodImpl (&execFunc); 
+  }
+
+  inline void executeSourcesImpl (HIDDEN::DummyExecFunc*) {
+  }
+
+  template <typename F>
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void executeSourcesImpl (F*) {
+    assert (HAS_EXEC_FUNC);
+
+    Galois::do_all_choice (makeLocalRange (*currWL),
+      [this] (Ctxt* ctxt) {
+
+        UserCtxt& uhand = *userHandles.getLocal ();
+        uhand.reset ();
+
+        if (ctxt->isSrc ()) {
+          execFunc (ctxt->getActive (), uhand);
+        }
+      },
+      "exec-sources",
+      Galois::chunk_size<ExFunc::CHUNK_SIZE> ());
+
+  }
+
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void executeSources (void) {
+    // using ptr to execFunc to choose the right impl. 
+    // relying on the fact that for stable case, the execFunc is DummyExecFunc. 
+    executeSourcesImpl (&execFunc);
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void applyOperator () {
     Galois::optional<T> minElem;
 
-    if (DEPRECATED::ForEachTraits<OpFunc>::NeedsPush) {
+    if (NEEDS_PUSH) {
       if (targetCommitRatio != 0.0 && !winWL.empty ()) {
         minElem = *winWL.getMin();
       }
@@ -326,8 +420,8 @@ protected:
           }
 
           if (commit) {
-            numCommitted += 1;
-            if (DEPRECATED::ForEachTraits<OpFunc>::NeedsPush) { 
+            roundCommits += 1;
+            if (NEEDS_PUSH) { 
               for (auto i = uhand.getPushBuffer ().begin ()
                   , endi = uhand.getPushBuffer ().end (); i != endi; ++i) {
 
@@ -356,10 +450,10 @@ protected:
   }
 
 
-  void execute_stable () {
+  void execute_impl () {
 
     while (true) {
-      prepareRound ();
+      beginRound ();
 
       if (currWL->empty_all ()) {
         break;
@@ -374,7 +468,11 @@ protected:
 
       expandNhood ();
 
+      executeSources ();
+
       applyOperator ();
+
+      endRound ();
 
       if (DETAILED_STATS) {
         t.stop ();
@@ -386,16 +484,17 @@ protected:
 
   void printStats (void) {
     std::cout << "Two Phase Window executor, rounds: " << rounds << std::endl;
-    std::cout << "Two Phase Window executor, commits: " << numCommitted.reduce () << std::endl;
-    std::cout << "Two Phase Window executor, total: " << total.reduce () << std::endl;
-    std::cout << "Two Phase Window executor, efficiency: " << double (numCommitted.reduce ()) / total.reduce () << std::endl;
-    std::cout << "Two Phase Window executor, avg. parallelism: " << double (numCommitted.reduce ()) / rounds << std::endl;
+    std::cout << "Two Phase Window executor, commits: " << totalCommits << std::endl;
+    std::cout << "Two Phase Window executor, total: " << totalTasks << std::endl;
+    std::cout << "Two Phase Window executor, efficiency: " << double (totalCommits) / totalTasks << std::endl;
+    std::cout << "Two Phase Window executor, avg. parallelism: " << double (totalCommits) / rounds << std::endl;
   }
   
 };
 
 
 
+/*
 template <typename T, typename Cmp, typename NhFunc, typename OpFunc, typename ExFunc, typename WindowWL>
 
 class KDGtwoPhaseUnstableExecutor: public KDGtwoPhaseStableExecutor<T, Cmp, NhFunc, OpFunc, WindowWL>  {
@@ -588,67 +687,28 @@ private:
 
 };
 
+*/
 
 } // end anonymous namespace
 
-template <typename R, typename Cmp, typename NhFunc, typename OpFunc>
-void for_each_ordered_2p_win (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const char* loopname=0, bool wakeupThreadPool=true) {
-
-  using T = typename R::value_type;
-  // using WindowWL = SortedRangeWindowWL<T, Cmp>;
-  
-  const bool ADDS = DEPRECATED::ForEachTraits<OpFunc>::NeedsPush;
-
-  using WindowWL = typename std::conditional<ADDS, PQbasedWindowWL<T, Cmp>, SortedRangeWindowWL<T, Cmp> >::type;
-
-  using Exec = KDGtwoPhaseStableExecutor<T, Cmp, NhFunc, OpFunc, WindowWL>;
-  
-  Exec e (cmp, nhFunc, opFunc);
-
-  if (wakeupThreadPool) {
-    Substrate::getThreadPool().burnPower (Galois::getActiveThreads ());
-  }
-
-  e.push_initial (range);
-  e.execute ();
-
-  if (wakeupThreadPool) {
-    Substrate::getThreadPool().beKind();
-  }
-}
-
-template <typename R, typename Cmp, typename NhFunc, typename AddFunc, typename ExFunc>
-void for_each_ordered_2p_win (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const ExFunc& execFunc, const AddFunc& addFunc, const char* loopname=0, bool wakeupThreadPool=true) {
+template <typename R, typename Cmp, typename NhFunc, typename OpFunc, typename ExFunc>
+void for_each_ordered_ikdg (const R& range, const Cmp& cmp, const NhFunc& nhFunc, 
+    const ExFunc& execFunc,  const OpFunc& opFunc, const char* loopname) {
 
   using T = typename R::value_type;
   using WindowWL = PQbasedWindowWL<T, Cmp>;
 
-  using Exec = KDGtwoPhaseUnstableExecutor<T, Cmp, NhFunc, AddFunc, ExFunc, WindowWL>;
   
-  Exec e (cmp, nhFunc, addFunc, execFunc);
+  const bool NEEDS_PUSH = DEPRECATED::ForEachTraits<OpFunc>::NeedsPush;
 
-  if (wakeupThreadPool) {
-    Substrate::getThreadPool().burnPower(Galois::getActiveThreads ());
-  }
+  using WindowWL = typename std::conditional<NEEDS_PUSH, PQbasedWindowWL<T, Cmp>, SortedRangeWindowWL<T, Cmp> >::type;
+  const bool HAS_EXEC_FUNC = !(std::is_same<ExFunc, HIDDEN::DummyExecFunc>::value);
 
-  e.push_initial (range);
-  e.execute ();
+  const bool ENABLE_PARAMETER = true;
 
-  if (wakeupThreadPool) {
-    Substrate::getThreadPool().beKind ();
-  }
-}
-
-template <typename R, typename Cmp, typename SafetyPhase, typename AddFunc, typename ExFunc>
-void for_each_ordered_ikdg_custom_safety (const R& range, const Cmp& cmp, const SafetyPhase& safetyPhase, 
-    const ExFunc& execFunc,  const AddFunc& addFunc, const char* loopname) {
-
-  using T = typename R::value_type;
-  using WindowWL = PQbasedWindowWL<T, Cmp>;
-
-  using Exec = IKDGunstableCustomSafety<T, Cmp, SafetyPhase, AddFunc, ExFunc, WindowWL>;
+  using Exec = IKDGtwoPhaseExecutor<T, Cmp, NhFunc, ExFunc, OpFunc, WindowWL, NEEDS_PUSH, HAS_EXEC_FUNC, ENABLE_PARAMETER>;
   
-  Exec e (cmp, safetyPhase, addFunc, execFunc);
+  Exec e (cmp, nhFunc, execFunc, opFunc, loopname);
 
   const bool wakeupThreadPool = true;
 
@@ -665,6 +725,12 @@ void for_each_ordered_ikdg_custom_safety (const R& range, const Cmp& cmp, const 
 
 }
 
+
+template <typename R, typename Cmp, typename NhFunc, typename OpFunc, typename ExFunc>
+void for_each_ordered_ikdg (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const char* loopname) {
+
+  for_each_ordered_ikdg (range, cmp, nhFunc, HIDDEN::DummyExecFunc (), opFunc, loopname);
+}
 
 } // end namespace Runtime
 } // end namespace Galois

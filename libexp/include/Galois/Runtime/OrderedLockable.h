@@ -37,17 +37,7 @@
 namespace Galois {
 namespace Runtime {
 
-namespace dbg {
-  template <typename... Args>
-  void debug (Args&&... args) {
-    
-    const bool DEBUG = false;
-    if (DEBUG) {
-      Substrate::gDebug (std::forward<Args> (args)...);
-    }
-  }
-}
-
+using dbg = Galois::Substrate::debug<0>;
 
 template <typename T>
 class OrderedContextBase: public SimpleRuntimeContext {
@@ -304,6 +294,20 @@ public:
   }
 
 };
+
+
+
+namespace HIDDEN {
+  
+  struct DummyExecFunc {
+    static const unsigned CHUNK_SIZE = 1;
+    template <typename T, typename C>
+    void operator () (const T&, C&) const {
+      std::printf ("Warning: DummyExecFunc shouldn't be executed\n");
+    }
+  };
+}
+
 
 } // end namespace Runtime
 } // end namespace Galois

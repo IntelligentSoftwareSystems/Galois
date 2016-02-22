@@ -38,6 +38,8 @@
 #include "Cushion.h"
 
 class Sector: public CollidingObject {
+public: 
+  using Ball_t = BallSectored;
 
   using Lock_t = Galois::Substrate::SimpleLock;
 
@@ -55,7 +57,7 @@ class Sector: public CollidingObject {
   BoundingBox boundbox;
 
   Galois::FlatSet<Cushion*> cushions;
-  Galois::FlatSet<Ball*> balls;
+  Galois::FlatSet<Ball_t*> balls;
 
   void init (const Vec2& bottomLeft, const FP& sectorSize) {
 
@@ -133,7 +135,7 @@ public:
     cushions.insert (c);
   }
 
-  void addBall (Ball* b) {
+  void addBall (Ball_t* b) {
     mutex.lock ();
     assert (b != nullptr);
 
@@ -142,7 +144,7 @@ public:
     mutex.unlock ();
   }
 
-  void removeBall (Ball* b) {
+  void removeBall (Ball_t* b) {
     mutex.lock ();
     assert (balls.contains (b));
     balls.erase (b);
@@ -151,9 +153,9 @@ public:
     mutex.unlock ();
   }
 
-  bool hasBall (const Ball* b) const { 
+  bool hasBall (const Ball_t* b) const { 
     assert (b);
-    return balls.contains (const_cast<Ball*> (b));
+    return balls.contains (const_cast<Ball_t*> (b));
   }
 
   void removeAllBalls (void) {
@@ -164,7 +166,7 @@ public:
     cushions.clear ();
   }
 
-  bool intersects (const Ball* ball) const {
+  bool intersects (const Ball_t* ball) const {
 
     const Vec2& p = ball->pos ();
 
@@ -187,13 +189,13 @@ public:
 
   virtual void simulate (const Event& e);
 
-  Galois::optional<Event> computeEarliestEvent (const Ball* ball, const FP& endtime) const;
+  Galois::optional<Event> computeEarliestEvent (const Ball_t* ball, const FP& endtime, const Event* prevEvent) const;
 
 
-  Galois::optional<Event> earliestSectorEntry (const Ball* ball, const FP& endtime) const;
+  Galois::optional<Event> earliestSectorEntry (const Ball_t* ball, const FP& endtime) const;
 
 
-  Galois::optional<Event> earliestSectorLeave (const Ball* b, const FP& endtime) const;
+  Galois::optional<Event> earliestSectorLeave (const Ball_t* b, const FP& endtime) const;
 
 
 };

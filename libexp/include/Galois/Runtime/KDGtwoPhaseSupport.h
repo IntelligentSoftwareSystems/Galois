@@ -31,9 +31,14 @@
 #define GALOIS_RUNTIME_KDG_TWO_PHASE_SUPPORT_H
 
 #include "Galois/AltBag.h"
+
+#include "Galois/Runtime/OrderedLockable.h"
+
 #include <boost/iterator/filter_iterator.hpp>
+#include <boost/iterator/filter_iterator.hpp>
+
+#include <utility>
 #include <functional>
-#include <boost/iterator/filter_iterator.hpp>
 
 namespace Galois {
 namespace Runtime {
@@ -211,8 +216,8 @@ struct SafetyTestLoop<Ctxt, int> {
 };
 
 
-template <typename F, typename Ctxt, typename UserCtxt>
-void runCatching (F& func, Ctxt* c, UserCtxt& uhand) {
+template <typename F, typename Ctxt, typename UserCtxt, typename... Args>
+void runCatching (F& func, Ctxt* c, UserCtxt& uhand, Args&&... args) {
   Galois::Runtime::setThreadContext (c);
 
   int result = 0;
@@ -222,7 +227,7 @@ void runCatching (F& func, Ctxt* c, UserCtxt& uhand) {
 #else
     try {
 #endif
-      func (c->getActive (), uhand);
+      func (c->getActive (), uhand, std::forward<Args> (args)...);
 
 #ifdef GALOIS_USE_LONGJMP
     } else {
