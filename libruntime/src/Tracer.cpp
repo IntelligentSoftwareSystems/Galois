@@ -111,6 +111,20 @@ static std::ofstream& openIfNot_send() {
   return MPIsend_file;
 }
 
+static std::ofstream& openIfNot_output() {
+  static std::ofstream output_file;
+  if(!output_file.is_open()){
+    char name[100] = "";
+    gethostname(name, sizeof(name));
+    char fname[120];
+    snprintf(fname, sizeof(fname), "output_%s.log", name);
+    output_file.open(fname, std::ios_base::app);
+  }
+  assert(output_file.is_open());
+  return output_file;
+}
+
+
 void Galois::Runtime::detail::print_recv_impl(std::vector<uint8_t> recv_vec, size_t len, unsigned host){
   using namespace Galois::Runtime;
   static SimpleLock lock1;
@@ -141,5 +155,16 @@ void Galois::Runtime::detail::print_send_impl(std::vector<uint8_t> send_vec, siz
   //auto& out = openIfNot_send();
   //out.write(reinterpret_cast<const char*>(&send_vec[0]), send_vec.size());
 }
+
+
+void Galois::Runtime::detail::print_output_impl(std::ostringstream& os){
+  using namespace Galois::Runtime;
+  static SimpleLock lock2;
+  std::lock_guard<SimpleLock> lg(lock2);
+  auto& out = openIfNot_output();
+  out << os.str();
+  out.flush();
+}
+
 bool Galois::Runtime::detail::doTrace = false;
 bool Galois::Runtime::detail::initTrace = false;
