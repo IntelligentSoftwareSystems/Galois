@@ -52,6 +52,7 @@ static inline void traceImpl(std::ostringstream& os, const char* format, T&& val
 }
 
 void printTrace(std::ostringstream&);
+void print_output_impl(std::ostringstream&);
 void print_send_impl(std::vector<uint8_t>, size_t, unsigned);
 void print_recv_impl(std::vector<uint8_t>, size_t, unsigned);
 
@@ -71,6 +72,13 @@ static inline void trace(const char* format, Args&&... args) {
     detail::traceImpl(os, format, std::forward<Args>(args)...);
     detail::printTrace(os);
   }
+}
+
+template<typename... Args>
+static inline void printOutput(const char* format, Args&&... args) {
+    std::ostringstream os;
+    detail::traceImpl(os, format, std::forward<Args>(args)...);
+    detail::print_output_impl(os);
 }
 
 static void print_send(std::vector<uint8_t> vec, size_t len, unsigned host){
