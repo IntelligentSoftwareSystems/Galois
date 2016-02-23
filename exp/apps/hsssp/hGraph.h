@@ -184,7 +184,6 @@ public:
     Galois::Runtime::gDeserialize(buf, num);
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     //std::cout << "In Apply : [" << net.ID <<"] num_recv_expected : "<< num_recv_expected << "\n";
-    --num_recv_expected;
 
     for(; num; --num) {
       uint64_t gid;
@@ -196,6 +195,7 @@ public:
         //std::cout << "PullApply Step2 : [" << net.ID << "]  : [" << LocalId << "] : " << val << "\n";
       FnTy::setVal(getData(LocalId), val);
     }
+    --num_recv_expected;
   }
 
  public:
@@ -316,7 +316,6 @@ public:
   void sync_push() {
     void (hGraph::*fn)(Galois::Runtime::RecvBuffer&) = &hGraph::syncRecvApply<FnTy>;
     auto& net = Galois::Runtime::getSystemNetworkInterface();
-    //num_recv_expected = 0;
     for (unsigned x = 0; x < hostNodes.size(); ++x) {
       if (x == id) continue;
       uint32_t start, end;
@@ -336,7 +335,6 @@ public:
         gSerialize(b, gid, FnTy::extract(getData(start)));
         FnTy::reset(getData(start));
       }
-      //++num_recv_expected;
       net.send(x, syncRecv, b);
     }
     //Will force all messages to be processed before continuing
@@ -348,7 +346,7 @@ public:
     void (hGraph::*fn)(Galois::Runtime::RecvBuffer&) = &hGraph::syncPullRecvReply<FnTy>;
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     Galois::Runtime::getHostBarrier().wait();
-    //num_recv_expected = 0;
+    num_recv_expected = 0;
     for(unsigned x = 0; x < hostNodes.size(); ++x){
       if(x == id) continue;
       uint32_t start, end;
@@ -362,12 +360,13 @@ public:
         //std::cout << net.ID << " PULL send (" << gid << ") " << start << " " << FnTy::extract(getData(start)) << "\n";
         gSerialize(b, gid, FnTy::extract(getData(start)));
       }
-      ++num_recv_expected;
       net.send(x, syncRecv, b);
+      ++num_recv_expected;
     }
 
     //std::cout << "[" << net.ID <<"] num_recv_expected : "<< num_recv_expected << "\n";
 
+    net.flush();
     while(num_recv_expected) {
       net.handleReceives();
     }

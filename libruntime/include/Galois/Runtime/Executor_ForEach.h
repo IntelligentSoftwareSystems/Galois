@@ -737,7 +737,7 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
       Galois::Runtime::getHostBarrier().wait();
     }
 
-     std::cout << "\n\n TERMINATING on : " << net.ID << "\n\n";
+     //std::cout << "\n\n TERMINATING on : " << net.ID << "\n\n";
 
   }
   else{

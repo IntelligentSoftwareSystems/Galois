@@ -32,6 +32,7 @@
 #include "Galois/gstl.h"
 
 #include "Galois/Runtime/CompilerHelperFunctions.h"
+#include "Galois/Runtime/Tracer.h"
 
 #include "OfflineGraph.h"
 #include "hGraph.h"
@@ -133,11 +134,22 @@ struct PageRank {
     	static void setVal (struct PR_NodeData & node, float y) {node.value = y; }
     	typedef float ValTy;
     };
+
+     Galois::Timer T_compute, T_comm;
+
+    T_compute.start(); 
     Galois::do_all(_graph.begin(), _graph.end(), PageRank { &_graph }, Galois::loopname("pageRank"), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "value" , "float"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ Galois::atomicAdd(node.residual, y);}",  "0"));
+    T_compute.stop();
+
+    T_comm.start();
     _graph.sync_push<Syncer_0>();
-    
+
     _graph.sync_pull<SyncerPull_0>();
-    
+    T_comm.stop();
+
+
+    std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID  << "] T_compute : " << T_compute.get() << "(msec)  T_comm : " << T_comm.get() << "(msec)\n";
+
   }
 
   void operator()(GNode src)const {
@@ -184,6 +196,7 @@ int main(int argc, char** argv) {
     T_init.stop();
 
     // Verify
+    /*
     if(verify){
       if(net.ID == 0) {
         for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
@@ -191,6 +204,7 @@ int main(int argc, char** argv) {
         }
       }
     }
+    */
 
     std::cout << "PageRank::go called  on " << net.ID << "\n";
     T_pageRank.start();
@@ -232,6 +246,7 @@ int main(int argc, char** argv) {
     T_pageRank.stop();
 
     // Verify
+    /*
     if(verify){
       if(net.ID == 0) {
         for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
@@ -239,11 +254,17 @@ int main(int argc, char** argv) {
         }
       }
     }
+    */
 
     T_total.stop();
 
     std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " PageRank (" << maxIterations << ") : " << T_pageRank.get() << "(msec)\n\n";
 
+    if(verify){
+      for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
+        Galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).value);
+      }
+    }
     return 0;
   } catch (const char* c) {
       std::cerr << "Error: " << c << "\n";
