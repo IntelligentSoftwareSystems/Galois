@@ -262,7 +262,7 @@ int main(int argc, char** argv) {
 
     if(verify){
       for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
-        Galois::Runtime::printOutput("% %\n", *ii, hg.getData(*ii).value);
+        Galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).value);
       }
     }
     return 0;
