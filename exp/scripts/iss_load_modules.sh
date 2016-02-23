@@ -6,9 +6,14 @@ if [ "$(basename -- $0)" == "iss_load_modules.sh" ]; then
 fi
 
 # first up remove everything
-module purge
+#module purge
 
-module load sl6
+if [ $(lsb_release -si) = "CentOS" ] ; then
+    module load c7
+else
+    module load sl6
+fi
+
 module use /net/faraday/workspace/local/modules/modulefiles
 module use /org/centers/cdgc/modules
 module load lapack
@@ -22,24 +27,31 @@ module load vtune
 #    module load cmake
 #fi
 
-module load atc/1.1
+module load atc/1.2
 module load cmake/3.3.2
 module load tbb
 module load boost
 module load eigen
 module load neon
+if [ "$SYSTEMTYPE" == "c7" ] ; then
+  module load module-git
+  module load serf
+else
+  module load git
+fi
 module load subversion
-module load git
 
 if [ "$1" != "min" ]; then
   module load gdb
   module load mkl
   module load mpich2
-  module load gnuplot
-  module load doxygen
   module load texlive
-  module load ghostscript
   module load python
-  # module load screen #disabling for now because screen was compiled without proper color support
-  module load valgrind
+  if [ "$SYSTEMTYPE" != "c7" ] ; then
+    module load gnuplot
+    module load doxygen
+    module load ghostscript
+    # module load screen #disabling for now because screen was compiled without proper color support
+    module load valgrind
+  fi
 fi
