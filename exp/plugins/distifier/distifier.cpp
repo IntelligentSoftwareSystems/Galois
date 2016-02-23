@@ -1,21 +1,22 @@
 //Master tool for conversion
 
-// Declares clang::SyntaxOnlyAction.
 #include "clang/Frontend/FrontendActions.h"
+#include "clang/Frontend/CompilerInstance.h"
 #include "clang/ASTMatchers/ASTMatchers.h"
 #include "clang/ASTMatchers/ASTMatchFinder.h"
-
-
-
+#include "clang/Rewrite/Core/Rewriter.h"
 #include "clang/Tooling/CommonOptionsParser.h"
 #include "clang/Tooling/Tooling.h"
-// Declares llvm::cl::extrahelp.
 #include "llvm/Support/CommandLine.h"
+
 
 using namespace clang;
 using namespace clang::ast_matchers;
 using namespace clang::tooling;
 using namespace llvm;
+
+#include "patterns.h"
+
 
 // Apply a custom category to all command-line options so that they are the
 // only ones displayed.
@@ -43,23 +44,7 @@ public:
       : CallSite(cs), Operator(op), OpDecl(decl), OpLambda(lam) {}
   };
   
-  StatementMatcher Matcher;
   std::vector<LoopInfo> Loops;
-  
-  LoopMatcher()
-    :Matcher{
-    callExpr(callee(functionDecl(
-                                 anyOf(
-                                       hasName("for_each"),
-                                       hasName("for_each_local"),
-                                       hasName("do_all"),
-                                       hasName("do_all_local")
-                                       )
-                                 ).bind("gLoopType")
-                    )
-             ).bind("gLoop")
-      }
-  {}
   
   virtual void run(const MatchFinder::MatchResult& Result) {
     const CallExpr* FS = Result.Nodes.getNodeAs<clang::CallExpr>("gLoop");
@@ -114,29 +99,17 @@ public:
   }
 };
 
+#if 0
+
 class GraphNodeMatcher : public MatchFinder::MatchCallback {
 public:
 
   struct VarInfo {
   };
   
-  StatementMatcher Matcher;
+  static constexpr StatementMatcher Matcher = callExpr(callee(functionDecl(anyOf(hasName("getData"),hasName("edge_begin"),hasName("edge_end")))),hasArgument(0, expr().bind("var"))).bind("varUse")
+
   std::vector<VarInfo> GraphVars;
-  
-  GraphNodeMatcher()
-    :Matcher{
-    callExpr(callee(functionDecl(
-                                 anyOf(
-                                       hasName("getData"),
-                                       hasName("edge_begin"),
-                                       hasName("edge_end")
-                                       )
-                                 )
-                    ),
-             hasArgument(0, expr().bind("var"))
-             ).bind("varUse")
-      }
-  {}
   
   virtual void run(const MatchFinder::MatchResult& Result) {
     auto* varA = Result.Nodes.getNodeAs<clang::CallExpr>("varUse");
@@ -149,20 +122,61 @@ public:
   }
 };
 
+class GraphValueMatcher : public MatchFinder::MatchCallback {
+
+  StatementMatcher Matcher;
+  
+
+};
+#endif
+
+
+
+
+class OpenCLKernelConsumer : public ASTConsumer {
+public:
+  OpenCLKernelConsumer(Rewriter& R) {
+    OpFinder.addMatcher(galoisLoop, &OpMatcher);
+  }
+
+  void HandleTranslationUnit(ASTContext & Context) override {
+    OpFinder.matchAST(Context);
+  }
+
+private:
+  MatchFinder OpFinder;
+  LoopMatcher OpMatcher;
+};
+
+class OpenCLKernelAction : public ASTFrontendAction {
+public:
+  void EndSourceFileAction() override {
+    TheRewriter.getEditBuffer(TheRewriter.getSourceMgr().getMainFileID()).write(llvm::outs());
+  }
+
+  std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance &CI, StringRef file) override {
+    TheRewriter.setSourceMgr(CI.getSourceManager(), CI.getLangOpts());
+    return llvm::make_unique<OpenCLKernelConsumer>(TheRewriter);
+  }
+
+private:
+  Rewriter TheRewriter;
+};
 
 
 int main(int argc, const char **argv) {
   CommonOptionsParser OptionsParser(argc, argv, MyToolCategory);
-  ClangTool Tool(OptionsParser.getCompilations(),
-                 OptionsParser.getSourcePathList());
+  ClangTool Tool(OptionsParser.getCompilations(), OptionsParser.getSourcePathList());
   
-  LoopMatcher GFinder;
-  GraphNodeMatcher GNodeFinder;
-  MatchFinder Finder;
-  Finder.addMatcher(GFinder.Matcher, &GFinder);
-  Finder.addMatcher(GNodeFinder.Matcher, &GNodeFinder);
+  //  LoopMatcher GFinder;
+  //  GraphNodeMatcher GNodeFinder;
+  //  MatchFinder Finder;
+  //  Finder.addMatcher(GFinder.Matcher, &GFinder);
+  //  Finder.addMatcher(GNodeFinder.Matcher, &GNodeFinder);
 
-  Tool.run(newFrontendActionFactory(&Finder).get());
-  return 0;
+  //  Tool.run(newFrontendActionFactory(&Finder).get());
+  //  return 0;
+
+  return Tool.run(newFrontendActionFactory<OpenCLKernelAction>().get());
 }
 
