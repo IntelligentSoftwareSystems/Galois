@@ -22,7 +22,6 @@
 
 #include "clang/ASTMatchers/ASTMatchers.h"
 #include "clang/ASTMatchers/ASTMatchFinder.h"
-//#include "clang/Sema/TreeTransform.h"
 
 /*
  * Rewriter
@@ -31,11 +30,8 @@
 #include "clang/Rewrite/Core/Rewriter.h"
 
 #include "Analysis.h"
-#include "Generation.h"
 #include "ClangUtils.h"
-#include "GaloisCLGen.h"
 #include "GaloisAST.h"
-//#include "AOSToSOA.h"
 
 using namespace clang;
 using namespace clang::ast_matchers;
@@ -117,14 +113,6 @@ public:
             Matchers.matchAST(Context);
             //#################End find kernels/operators via do_all calls
       }
-
-//      OpenCLOperatorVisitor codeGen(&Context, R, graphDeclHandler.typeDecls);
-//            clang::SourceManager & SourceManager = Instance.getSourceManager();
-//            for (auto call : app_data.doAllCalls) {
-//               CXXRecordDecl * op_decl = const_cast<CXXRecordDecl*>(call->kernel->kernel);
-//               codeGen.TraverseDecl(op_decl);
-////               codeGen.generate_operator_code(op_decl);
-//            }
    }//End HandleTranslationUnit
  };
 /********************************************************************************************************
@@ -143,7 +131,6 @@ protected:
          llvm::outs() << "PARSED-TEMPLATE:: " << s << "\n";
       }
       //Write the transformed AST to llvm::outs()
-      //TheRewriter.getEditBuffer(TheRewriter.getSourceMgr().getMainFileID()).write(llvm::outs());
       if (!TheRewriter.overwriteChangedFiles()) {
          llvm::outs() << "Successfully saved changes\n";
       }
