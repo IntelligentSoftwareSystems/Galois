@@ -1,0 +1,402 @@
+/*
+ * Generation.h
+ *
+ *  Created on: Dec 8, 2015
+ *      Author: rashid
+ */
+
+#include "clang/Frontend/FrontendPluginRegistry.h"
+#include "clang/AST/AST.h"
+#include "clang/AST/ASTConsumer.h"
+#include "clang/AST/RecursiveASTVisitor.h"
+#include "clang/Frontend/CompilerInstance.h"
+#include "clang/Sema/Sema.h"
+#include "llvm/Support/raw_ostream.h"
+#include <unordered_set>
+#include <fstream>
+
+/*
+ *  * Matchers
+ *   */
+
+#include "clang/ASTMatchers/ASTMatchers.h"
+#include "clang/ASTMatchers/ASTMatchFinder.h"
+
+/*
+ * Rewriter
+ */
+
+#include "clang/Rewrite/Core/Rewriter.h"
+
+#ifndef SRC_PLUGINS_OPENCLCODEGEN_GENERATION_H_
+#define SRC_PLUGINS_OPENCLCODEGEN_GENERATION_H_
+
+using namespace clang;
+using namespace clang::ast_matchers;
+using namespace llvm;
+
+namespace {
+
+//#################################################################################################################//
+//#################################################################################################################//
+class OpenCLDeviceVisitor: public RecursiveASTVisitor<OpenCLDeviceVisitor> {
+   std::vector<FieldDecl *> * fields;
+   ASTContext * astContext;
+   Rewriter & rewriter;
+   std::ofstream & cl_file;
+   clang::Stmt * cl_impl;
+   std::map<string, string> symbol_map;
+   int counter;
+public:
+   explicit OpenCLDeviceVisitor(ASTContext * context, Rewriter & R, std::ofstream & f) :
+         fields(nullptr), astContext(context), rewriter(R), cl_file(f), cl_impl(nullptr), counter(0) {
+
+   }
+   virtual ~OpenCLDeviceVisitor() {
+//      rewriter.getEditBuffer(rewriter.getSourceMgr().getMainFileID()).write(llvm::outs());
+   }
+   /*
+    * Entry point for device code generator. This is supposed to go over the
+    * method declaration.
+    * */
+   void process_method(std::vector<FieldDecl *> * f, CXXMethodDecl * method) {
+      fields = f;
+      symbol_map.clear();
+      for (auto field : *fields) {
+         symbol_map[field->getNameAsString()] = field->getNameAsString();
+      }
+      RecursiveASTVisitor<OpenCLDeviceVisitor>::TraverseDecl(method);
+      cl_file << "/****************************************/\n" << method->getNameAsString() << " \n";
+//      cl_file << rewriter.getRewrittenText(method->getSourceRange());
+   }
+
+   virtual bool VisitVarDecl(VarDecl * Decl) {
+      string var_name = Decl->getNameAsString();
+      cl_file << " [@VarDecl]";
+      if (symbol_map.find(var_name) != symbol_map.end()) {
+         llvm::outs() << "ERROR Duplicate symbols? '" << var_name << "'\n";
+         cl_file << "UNDECLARED(" << var_name << " )";
+      } else {
+         char tmp_var[128];
+         sprintf(tmp_var, "tmp%d_%s", counter++, var_name.c_str());
+         string s(tmp_var);
+         symbol_map[var_name] = s;
+//         cl_file << "Variable declared :: " << var_name << "  :: MAPPED :: " << tmp_var << "\n";
+         cl_file << QualType::getAsString(Decl->getType().split()) << " " << var_name << ";\n";
+      }
+//      RecursiveASTVisitor<OpenCLDeviceVisitor>::VisitVarDecl(Decl);
+      return true;
+   }
+   virtual bool VisitParmVarDecl(ParmVarDecl * Decl) {
+      string var_name = Decl->getNameAsString();
+      cl_file << " [@ParamVarDecl]";
+      if (symbol_map.find(var_name) != symbol_map.end()) {
+         llvm::outs() << "ERROR Duplicate symbols? '" << var_name << "'\n";
+         cl_file << "(" << var_name << " )" << symbol_map[var_name] << " ";
+      } else {
+         char tmp_var[128];
+         sprintf(tmp_var, "tmp%d_%s", counter++, var_name.c_str());
+         string s(tmp_var);
+         symbol_map[var_name] = s;
+         //         cl_file << "Variable declared :: " << var_name << "  :: MAPPED :: " << tmp_var << "\n";
+         cl_file << QualType::getAsString(Decl->getType().split()) << " " << var_name << ";\n";
+      }
+      return true;
+   }
+   virtual bool VisitBinaryOperator(BinaryOperator * Bop){
+      cl_file << " (BINOP " << Bop->getOpcodeStr().str() << " )";
+      return true;
+   }
+   virtual bool _VisitDeclRefExpr(DeclRefExpr * Decl) {
+      string var_name = Decl->getNameInfo().getName().getAsString();
+      if (symbol_map.find(var_name) != symbol_map.end()) {
+//         rewriter.ReplaceText(Decl->getSourceRange(), symbol_map[var_name]);
+//         cl_file << "ACESSED :: " << symbol_map[var_name] << "(" << var_name << " ) \n";
+         cl_file << symbol_map[var_name] << " ";
+      } else {
+         cl_file << "UNDECLARED(" << var_name << ") ";
+      }
+      return true;
+   }
+   virtual bool _VisitFunctionDecl(FunctionDecl * Decl) {
+//      rewriter.ReplaceText(Decl->getSourceRange(), "__kernel void impl");
+      cl_file << "@@@@@@==" << Decl->getNameAsString() << "===@@@@@\n";
+      return true;
+   }
+   virtual bool VisitIfStmt(IfStmt * Stmt) {
+      cl_file << " /*GEN*/ if ( ";
+//      RecursiveASTVisitor<OpenCLDeviceVisitor>::TraverseStmt(Stmt->getCond());
+      cl_file << " ) { \n";
+//      RecursiveASTVisitor<OpenCLDeviceVisitor>::TraverseStmt(Stmt->getThen());
+      cl_file << " } else{ \n";
+//      RecursiveASTVisitor<OpenCLDeviceVisitor>::TraverseStmt(Stmt->getElse());
+      cl_file << " } \n";
+      return true;
+   }
+   virtual bool _VisitForStmt(ForStmt * Stmt) {
+      cl_file << "  /*GEN*/ for (";
+      RecursiveASTVisitor<OpenCLDeviceVisitor>::TraverseStmt(Stmt->getInit());
+      cl_file << " ;";
+      RecursiveASTVisitor<OpenCLDeviceVisitor>::TraverseStmt(Stmt->getCond());
+      cl_file << " ;";
+      RecursiveASTVisitor<OpenCLDeviceVisitor>::TraverseStmt(Stmt->getInc());
+      cl_file << " ){\n";
+      RecursiveASTVisitor<OpenCLDeviceVisitor>::TraverseStmt(Stmt->getBody());
+      cl_file << " }\n";
+
+      return true;
+   }
+   virtual bool VisitCXXMethodDecl(CXXMethodDecl * Decl) {
+//      rewriter.ReplaceText(Decl->getSourceRange(), "__kernel void impl_CXX_");
+//      Decl->getSourceRange()
+      cl_impl = Decl->getBody();
+      const string & className = Decl->getParent()->getNameAsString();
+      cl_file << " __kernel void " << className << " ( ";
+      bool isFirst = true;
+      for (auto & P : *fields) {
+         cl_file << " FIELD* ";
+         if (isFirst) {
+            isFirst = false;
+         } else {
+            cl_file << ", ";
+         }
+         cl_file << QualType::getAsString(P->getType().split()) << " " << P->getNameAsString();
+         cl_file << " *,  ";
+      }
+      for (auto & P : Decl->params()) {
+         cl_file << " Params* ";
+         if (isFirst) {
+            isFirst = false;
+         } else {
+            cl_file << ", ";
+         }
+         RecursiveASTVisitor<OpenCLDeviceVisitor>::TraverseDecl(P);
+         cl_file << " *, ";
+      }
+      cl_file << "){\n";
+      RecursiveASTVisitor<OpenCLDeviceVisitor>::TraverseStmt(Decl->getBody());
+      cl_file << " }//End kernel " << Decl->getNameAsString() << "\n";
+      return true;
+   }
+   /*virtual bool TraverseCXXMethodDecl(CXXMethodDecl * Decl) {
+    //      RecursiveASTVisitor<OpenCLDeviceVisitor>::TraverseCXXMethodDecl(Decl);
+    //      DeclarationNameInfo & D = Decl->getDeclName();
+    rewriter.ReplaceText(Decl->getSourceRange(), "__kernel void impl_CXX_");
+    cl_impl = Decl->getBody();
+    const string & className = Decl->getParent()->getNameAsString();
+    cl_file << " __kernel void " << className << " ( ";
+    bool isFirst = true;
+    for (auto & P : *fields) {
+    if (isFirst) {
+    isFirst = false;
+    } else {
+    cl_file << ", ";
+    }
+    cl_file << QualType::getAsString(P->getType().split()) << " " << P->getNameAsString();
+    }
+    for (auto & P : Decl->params()) {
+    if (isFirst) {
+    isFirst = false;
+    } else {
+    cl_file << ", ";
+    }
+    RecursiveASTVisitor<OpenCLDeviceVisitor>::TraverseDecl(P);
+    }
+    cl_file << "){\n";
+    //      RecursiveASTVisitor<OpenCLDeviceVisitor>::TraverseCXXMethodDecl(Decl);
+    RecursiveASTVisitor<OpenCLDeviceVisitor>::TraverseStmt(Decl->getBody());
+    cl_file << " }//End kernel " << Decl->getNameAsString() << "\n";
+    return true;
+    }*/
+
+   string toString(Stmt * S) {
+      string s;
+#if 1
+      llvm::raw_string_ostream raw_s(s);
+      S->dump(raw_s);
+      return raw_s.str();
+#endif
+      return s;
+   }
+//   virtual bool VisitVarDecl(VarDecl * Decl) {
+//      cl_file << QualType::getAsString(Decl->getType().split()) << " " << Decl->getNameAsString() << " ";
+//      RecursiveASTVisitor<OpenCLDeviceVisitor>::VisitStmt(Decl->getInit());
+//      return true;
+//   }
+   virtual bool _VisitCallExpr(CallExpr * CE) {
+//      cl_file << "### " << toString(CE->getCallee()) << "\n";
+      cl_file << CE->getCalleeDecl()->getAsFunction()->getNameAsString() << " (";
+      std::vector<string> args;
+      int arg_offset = 0;
+      if (isa<CXXOperatorCallExpr>(CE) || isa<CXXMethodDecl>(CE->getDirectCallee())) {
+         args.push_back("THIS");
+         cl_file << " THIS , ";
+//         arg_offset=1;
+      }
+      for (; arg_offset < CE->getNumArgs(); ++arg_offset) {
+         RecursiveASTVisitor<OpenCLDeviceVisitor>::VisitStmt(CE->getArg(arg_offset));
+//         cl_file << toString(CE->getArg(arg_offset));
+         cl_file << "/* " << arg_offset << " */, ";
+      }
+      cl_file << " )\n";
+      return true;
+   }
+   virtual bool _VisitAttributedStmt(AttributedStmt * S) {
+//      cl_file << " Attribute :: " << toString(S) << "\n";
+      RecursiveASTVisitor<OpenCLDeviceVisitor>::VisitAttributedStmt(S);
+      return true;
+   }
+   virtual bool _VisitBinaryOperator(BinaryOperator * BO) {
+//      cl_file << toString(BO->getLHS()) << " ";
+//      cl_file << BO->getOpcodeStr().str();
+//      cl_file << toString(BO->getRHS()) << "\n";
+      cl_file << "/*BOP*/";
+      RecursiveASTVisitor<OpenCLDeviceVisitor>::VisitStmt(BO->getLHS());
+      cl_file << BO->getOpcodeStr().str();
+      RecursiveASTVisitor<OpenCLDeviceVisitor>::VisitStmt(BO->getRHS());
+      return true;
+   }
+
+};
+//#################################################################################################################//
+//#################################################################################################################//
+/*
+ * This class should visit the AST to scan for operator implementations. For each
+ * operator, it calls the OpenCLDeviceVisitor to generate device specific code.
+ * This requires a list of arguments to be generated for each member of the class.
+ * A mapping from CPU-Members to CL-Members is created for the operator object, and passed
+ * to the CL code generator.
+ * */
+class OpenCLOperatorVisitor: public RecursiveASTVisitor<OpenCLOperatorVisitor> {
+private:
+   int declDepthCounter;
+   ASTContext* astContext;
+   Rewriter &rewriter;
+   std::ofstream header_file;
+   std::ofstream cl_file;
+   std::ofstream ast_file;
+   OpenCLDeviceVisitor device_visitor;
+   std::vector<CXXRecordDecl *> op_classes;
+   std::vector<std::vector<FieldDecl *> *> op_class_fields;
+   CXXRecordDecl * operator_class;
+
+public:
+   explicit OpenCLOperatorVisitor(ASTContext *context, Rewriter &R) :
+         declDepthCounter(0), astContext(context), rewriter(R), device_visitor(context, R, cl_file), operator_class(nullptr) {
+      header_file.open("cl_header.h");
+      cl_file.open("cl_implementation.cl");
+      ast_file.open("source.ast");
+   }
+   //Destructor
+   virtual ~OpenCLOperatorVisitor() {
+      header_file.close();
+      cl_file.close();
+      ast_file.close();
+
+      for (auto c : op_classes) {
+         llvm::outs() << "Operator class :: " << c->getNameAsString() << "\n";
+      }
+   }
+   string toString(Stmt * S) {
+      string s;
+#if 1
+      llvm::raw_string_ostream raw_s(s);
+      S->dump(raw_s);
+      return raw_s.str();
+#endif
+      return s;
+   }
+   string toString(Decl * S) {
+      string s;
+#if 1
+      llvm::raw_string_ostream raw_s(s);
+      S->dump(raw_s);
+      return raw_s.str();
+#endif
+      return s;
+   }
+   string convertName(const string & str) {
+      string res("HGCL_");
+      return res.append(str);
+   }
+   virtual bool createDeviceImplementation(CXXMethodDecl * Decl) {
+      if (!Decl->getNameAsString().compare("operator()"))
+         return true;
+      return false;
+   }
+
+   void write_code() {
+      string class_name = operator_class->getNameAsString();
+      header_file << " struct " << class_name << " { \n";
+      assert(op_class_fields.size() >= 1);
+      for (auto field : *op_class_fields[op_class_fields.size() - 1]) {
+         header_file << QualType::getAsString(field->getType().split()) << "  " << field->getNameAsString() << ";\n";
+      }
+      header_file << " } ; // End struct  " << class_name << " \n";
+   }
+   bool generate_operator_code(CXXRecordDecl * Decl) {
+      size_t num_fields = std::distance(Decl->field_begin(), Decl->field_end());
+      llvm::outs() << "About to traverse CXXRecord :: " << Decl->getNameAsString() << " " << num_fields << "\n";
+      this->TraverseCXXRecordDecl(Decl);
+      this->write_code();
+      ast_file << " \n=====================================================================\n";
+      ast_file << toString(Decl);
+      ast_file << " \n============================END======================================\n";
+      op_class_fields.pop_back();
+      llvm::outs() << "Done traversing CXXRecord :: " << Decl->getNameAsString() << "\n";
+      operator_class = nullptr;
+      return true;
+   }
+
+   virtual bool TraverseCXXRecordDecl(CXXRecordDecl * Decl) {
+      if (operator_class) {
+         return true;
+      } // For now we avoid recursing into structures.
+      operator_class = Decl;
+      op_class_fields.push_back(new std::vector<FieldDecl *>());
+      RecursiveASTVisitor<OpenCLOperatorVisitor>::TraverseCXXRecordDecl(Decl);
+      return true;
+   }
+   virtual bool TraverseCXXMethodDecl(CXXMethodDecl * Decl) {
+      if (createDeviceImplementation(Decl)) {
+         op_classes.push_back(Decl->getParent());
+         device_visitor.process_method(op_class_fields[op_class_fields.size() - 1], Decl);
+//         llvm::outs() << "Generating device implementation for " << Decl->getParent()->getNameAsString() << " with " << op_class_fields.size() << " fields\n";
+//         device_visitor.TraverseCXXMethodDecl(Decl);
+//         llvm::outs() << "Done device implementation for " << Decl->getParent()->getNameAsString() << ".\n";
+      } else {
+
+      }
+      RecursiveASTVisitor<OpenCLOperatorVisitor>::TraverseCXXMethodDecl(Decl);
+//      header_file << " }//End method " << convertName(Decl->getNameAsString()) << "\n";
+      return true;
+   }
+   virtual bool VisitCXXMethodDecl(CXXMethodDecl * Decl) {
+      string ret_type = QualType::getAsString(Decl->getReturnType().split());
+//      header_file << "\n" << ret_type << " " << Decl->getNameAsString() << " (";
+      for (auto & p : Decl->params()) {
+//         header_file << QualType::getAsString(p->getType().split()) << " " << p->getNameAsString() << ",";
+      }
+//      header_file << " ){\n";
+      return true;
+   }
+   virtual bool VisitVarDecl(VarDecl * Decl) {
+      llvm::outs() << "Visiting VarDecl :: " << Decl->getNameAsString() << "\n";
+//      header_file << QualType::getAsString(Decl->getType().split() )   << " " <<Decl->getNameAsString() << "\n";
+      return true;
+   }
+   virtual bool VisitFieldDecl(FieldDecl * Decl) {
+//      header_file << "####Visiting FieldDecl :: " << Decl->getNameAsString() << "\n";
+      llvm::outs() << "####Visiting FieldDecl :: " << Decl->getNameAsString() << "\n";
+//      header_file << QualType::getAsString(Decl->getType().split() )  << "  " << Decl->getNameAsString() << ";\n";
+      op_class_fields[op_class_fields.size() - 1]->push_back(Decl);
+      return true;
+   }
+};
+//End class OpenCLOperatorVisitor
+//#################################################################################################################//
+//#################################################################################################################//
+
+}//End anonymous namespace
+
+#endif /* SRC_PLUGINS_OPENCLCODEGEN_GENERATION_H_ */
