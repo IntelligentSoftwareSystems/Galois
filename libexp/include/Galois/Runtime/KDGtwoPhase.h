@@ -696,15 +696,13 @@ void for_each_ordered_ikdg (const R& range, const Cmp& cmp, const NhFunc& nhFunc
     const ExFunc& execFunc,  const OpFunc& opFunc, const char* loopname) {
 
   using T = typename R::value_type;
-  using WindowWL = PQbasedWindowWL<T, Cmp>;
-
   
   const bool NEEDS_PUSH = DEPRECATED::ForEachTraits<OpFunc>::NeedsPush;
 
   using WindowWL = typename std::conditional<NEEDS_PUSH, PQbasedWindowWL<T, Cmp>, SortedRangeWindowWL<T, Cmp> >::type;
   const bool HAS_EXEC_FUNC = !(std::is_same<ExFunc, HIDDEN::DummyExecFunc>::value);
 
-  const bool ENABLE_PARAMETER = true;
+  const bool ENABLE_PARAMETER = false;
 
   using Exec = IKDGtwoPhaseExecutor<T, Cmp, NhFunc, ExFunc, OpFunc, WindowWL, NEEDS_PUSH, HAS_EXEC_FUNC, ENABLE_PARAMETER>;
   

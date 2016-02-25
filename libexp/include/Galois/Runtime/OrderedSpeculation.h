@@ -1259,7 +1259,7 @@ void for_each_ordered_optim (const R& range, const Cmp& cmp, const NhFunc& nhFun
 
   const bool HAS_EXEC_FUNC = !(std::is_same<ExFunc, HIDDEN::DummyExecFunc>::value);
 
-  const bool ENABLE_PARAMETER = true;
+  const bool ENABLE_PARAMETER = false;
 
   using Exec = OptimOrdExecutor<T, Cmp, NhFunc, ExFunc, OpFunc, NEEDS_PUSH, HAS_EXEC_FUNC, ENABLE_PARAMETER>;
   
