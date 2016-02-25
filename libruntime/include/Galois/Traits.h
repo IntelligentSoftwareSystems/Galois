@@ -167,6 +167,10 @@ struct loopname: public trait_has_value<const char*>, loopname_tag {
   loopname(const char* p = 0): trait_has_value<const char*>(p) { }
 };
 
+struct default_loopname: public loopname {
+  default_loopname (void): loopname ("loopname") {}
+}
+
 /**
  * Indicate whether @{link do_all()} loops should perform work-stealing. Optional
  * argument to {@link do_all()} loops.

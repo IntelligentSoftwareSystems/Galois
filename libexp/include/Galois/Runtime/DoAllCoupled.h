@@ -52,6 +52,7 @@
 #include "Galois/Substrate/gio.h"
 
 #include "Galois/Timer.h"
+#include "Galois/OrderedTraits.h"
 
 
 namespace Galois {
@@ -156,9 +157,7 @@ namespace Runtime {
 
 namespace details {
 
-static const unsigned DEFAULT_CHUNK_SIZE = 16;
-
-template <typename R, typename F>
+template <typename R, typename F, typename ArgsTuple>
 class DoAllCoupledExec {
 
   typedef typename R::local_iterator Iter;
@@ -589,6 +588,10 @@ private:
 
 
 private:
+  static const bool HAS_RT_CHUNK_SIZE = exists_by_supertype<rt_chunk_size_tag, ArgsTuple>::value;
+  static const unsigned CHUNK_SIZE = get_type_by_supertype<chunk_size_tag, ArgsTuple>::value; 
+
+
   R range;
   F func;
   const char* loopname;
@@ -606,19 +609,16 @@ public:
   DoAllCoupledExec (
       const R& _range,
       const F& _func, 
-      const char* _loopname,
-      const size_t _chunk_size)
+      const ArgsTuple& argsTuple)
     : 
       range (_range),
       func (_func), 
-      loopname (_loopname),
-      chunk_size (_chunk_size),
+      loopname (get_by_supertype<loopname_tag> (argsTuple).value),
+      chunk_size ((HAS_RT_CHUNK_SIZE)? get_by_supertype<rt_chunk_size_tag> (argsTuple).value: CHUNK_SIZE),
       term(Substrate::getSystemTermination(activeThreads))
   {
-
-    chunk_size = std::max (Diff_ty (1), Diff_ty (chunk_size));
     assert (chunk_size > 0);
-
+    std::printf ("DoAllCoupledExec chunk_size: %u\n", chunk_size);
   }
 
   // parallel call
@@ -705,9 +705,14 @@ public:
 } // end namespace details
 
 
-template <typename R, typename F>
-void do_all_coupled (const R& range, const F& func, const char* loopname=0, const size_t chunk_size=details::DEFAULT_CHUNK_SIZE) {
-  details::DoAllCoupledExec<R, F> exec (range, func, loopname, chunk_size);
+template <typename R, typename F, typename... Args>
+void do_all_coupled (const R& range, const F& func, const Args&... args) {
+
+  auto argsTuple = std::make_tuple (args..., default_loopname {}, default_chunk_size {});
+  using ArgsTuple = decltype (argsTuple);
+
+
+  details::DoAllCoupledExec<R, F, ArgsTuple> exec (range, func, argsTuple);
 
   Substrate::Barrier& barrier = getBarrier(activeThreads);
 
@@ -717,10 +722,13 @@ void do_all_coupled (const R& range, const F& func, const char* loopname=0, cons
       std::ref(exec));
 }
 
-template <typename R, typename F>
-void do_all_coupled_alt (const R& range, const F& func, const char* loopname=0, const size_t chunk_size=details::DEFAULT_CHUNK_SIZE) {
+template <typename R, typename F, typename... Args>
+void do_all_coupled_detailed (const R& range, const F& func, const Args&... args) {
 
-  details::DoAllCoupledExec<R, F> exec (range, func, loopname, chunk_size);
+  auto argsTuple = std::make_tuple (args..., default_loopname {}, default_chunk_size {});
+  using ArgsTuple = decltype (argsTuple);
+
+  details::DoAllCoupledExec<R, F> exec (range, func, argsTuple);
 
   Runtime::on_each_impl (
       [&exec] (const unsigned tid, const unsigned numT) {
