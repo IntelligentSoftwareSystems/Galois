@@ -1,0 +1,241 @@
+/**
+ * @file
+ * @section License
+ *
+ * This file is part of Galois.  Galois is a framework to exploit
+ * amorphous data-parallelism in irregular programs.
+ *
+ * Galois is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, version 2.1 of the
+ * License.
+ *
+ * Galois is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with Galois.  If not, see
+ * <http://www.gnu.org/licenses/>.
+ *
+ * @section Copyright
+ *
+ * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * reserved.
+ *
+ * @section Description
+ *
+ * @author Rashid Kaleem<rashid.kaleem@gmail.com>
+ */
+#include "CL_Header.h"
+#include <map>
+#ifndef CL_LC_GRAPH_H
+#define CL_LC_GRAPH_H
+//#undef max(a,b)
+
+namespace Galois {
+namespace OpenCL {
+namespace Graphs{
+struct LC_Graph_GPU {
+   cl_mem outgoing_index;
+   cl_mem node_data;
+   cl_mem neighbors;
+   cl_mem edge_data;
+   cl_uint num_nodes;
+   cl_uint num_edges;
+
+};
+using namespace Galois::OpenCL;
+template<typename NodeData = cl_uint, typename EdgeData = cl_uint>
+struct CL_LC_Graph {
+   size_t num_nodes;
+   size_t num_edges;
+   unsigned int * outgoing_index;
+   unsigned int * neighbors;
+   NodeData * node_data;
+   EdgeData * edge_data;
+   LC_Graph_GPU gpu_wrapper;
+   cl_context ctx = getCLContext()->get_default_device()->context();
+   cl_command_queue queue = getCLContext()->get_default_device()->command_queue();
+/////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////
+   void init(size_t n_n, size_t n_e) {
+      num_nodes = n_n;
+      num_edges = n_e;
+      outgoing_index = new unsigned int[num_nodes + 1];
+      neighbors = new unsigned int[num_edges];
+      node_data = new NodeData[num_nodes];
+      edge_data = new EdgeData[num_edges];
+      allocate_on_gpu();
+   }
+/////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////
+   void print_node(unsigned int idx) {
+      if (idx < num_nodes) {
+         std::cout << "N-" << idx << "(" << node_data[idx] << ")" << " :: [";
+         for (size_t i = outgoing_index[idx]; i < outgoing_index[idx + 1]; ++i) {
+            std::cout << " " << neighbors[i] << "(" << edge_data[i] << "), ";
+         }
+         std::cout << "]";
+      }
+      return;
+   }
+   /////////////////////////////////////////////////////////////////////////////////////////////
+   /////////////////////////////////////////////////////////////////////////////////////////////
+
+   void allocate_on_gpu() {
+
+      fprintf(stderr, "Buffer sizes : %d , %d \n", num_nodes, num_edges);
+      int err;
+      cl_mem_flags flags = 0; //CL_MEM_READ_WRITE  ;
+      cl_mem_flags flags_read = 0; //CL_MEM_READ_ONLY ;
+      gpu_wrapper.outgoing_index = clCreateBuffer(ctx, flags_read, sizeof(cl_uint) * num_nodes + 1, outgoing_index, &err);
+      CHECK_CL_ERROR(err, "Error: clCreateBuffer of SVM - 0\n");
+      gpu_wrapper.node_data = clCreateBuffer(ctx, flags, sizeof(cl_uint) * num_nodes, node_data, &err);
+      CHECK_CL_ERROR(err, "Error: clCreateBuffer of SVM - 1\n");
+      gpu_wrapper.neighbors = clCreateBuffer(ctx, flags_read, sizeof(cl_uint) * num_edges, neighbors, &err);
+      CHECK_CL_ERROR(err, "Error: clCreateBuffer of SVM - 2\n");
+      gpu_wrapper.edge_data = clCreateBuffer(ctx, flags_read, sizeof(cl_uint) * num_edges, edge_data, &err);
+      CHECK_CL_ERROR(err, "Error: clCreateBuffer of SVM - 3\n");
+      ////////////Initialize kernel here.
+      return;
+   }
+   /////////////////////////////////////////////////////////////////////////////////////////////
+   /////////////////////////////////////////////////////////////////////////////////////////////
+
+   void copy_to_host() {
+      int err;
+      err = clEnqueueReadBuffer(queue, gpu_wrapper.outgoing_index, CL_TRUE, 0, sizeof(cl_uint) * num_nodes + 1, outgoing_index, 0, NULL, NULL);
+      CHECK_CL_ERROR(err, "Error copying 0\n");
+      err = clEnqueueReadBuffer(queue, gpu_wrapper.node_data, CL_TRUE, 0, sizeof(cl_uint) * num_nodes, node_data, 0, NULL, NULL);
+      CHECK_CL_ERROR(err, "Error copying 1\n");
+      err = clEnqueueReadBuffer(queue, gpu_wrapper.neighbors, CL_TRUE, 0, sizeof(cl_uint) * num_edges, neighbors, 0, NULL, NULL);
+      CHECK_CL_ERROR(err, "Error copying 2\n");
+      err = clEnqueueReadBuffer(queue, gpu_wrapper.edge_data, CL_TRUE, 0, sizeof(cl_uint) * num_edges, edge_data, 0, NULL, NULL);
+      CHECK_CL_ERROR(err, "Error copying 3\n");
+   }
+   /////////////////////////////////////////////////////////////////////////////////////////////
+   /////////////////////////////////////////////////////////////////////////////////////////////
+   void copy_to_device() {
+      int err;
+      fprintf(stderr, "Buffer sizes : %d , %d \n", num_nodes, num_edges);
+      err = clEnqueueWriteBuffer(queue, gpu_wrapper.outgoing_index, CL_TRUE, 0, sizeof(cl_uint) * num_nodes + 1, outgoing_index, 0, NULL, NULL);
+      CHECK_CL_ERROR(err, "Error copying 0\n");
+      err = clEnqueueWriteBuffer(queue, gpu_wrapper.node_data, CL_TRUE, 0, sizeof(cl_uint) * num_nodes, node_data, 0, NULL, NULL);
+      CHECK_CL_ERROR(err, "Error copying 1\n");
+      err = clEnqueueWriteBuffer(queue, gpu_wrapper.neighbors, CL_TRUE, 0, sizeof(cl_uint) * num_edges, neighbors, 0, NULL, NULL);
+      CHECK_CL_ERROR(err, "Error copying 2\n");
+      err = clEnqueueWriteBuffer(queue, gpu_wrapper.edge_data, CL_TRUE, 0, sizeof(cl_uint) * num_edges, edge_data, 0, NULL, NULL);
+      CHECK_CL_ERROR(err, "Error copying 3\n");
+      ////////////Initialize kernel here.
+      return;
+   }
+/////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////
+   void print_graph(void) {
+      std::cout << "\n====Printing graph (" << num_nodes << " , " << num_edges << ")=====\n";
+      for (size_t i = 0; i < num_nodes; ++i) {
+         print_node(i);
+         std::cout << "\n";
+      }
+      return;
+   }
+/////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////
+   void print_compact(void) {
+      std::cout << "\nOut-index [";
+      for (size_t i = 0; i < num_nodes + 1; ++i) {
+         std::cout << " " << outgoing_index[i] << ",";
+      }
+      std::cout << "]\nNeigh[";
+      for (size_t i = 0; i < num_edges; ++i) {
+         std::cout << " " << neighbors[i] << ",";
+      }
+      std::cout << "]\nEData [";
+      for (size_t i = 0; i < num_edges; ++i) {
+         std::cout << " " << edge_data[i] << ",";
+      }
+      std::cout << "]";
+   }
+   ;
+/////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////
+   void read_graph(const char * filename) {
+      std::ifstream in_file;
+      in_file.open(filename);
+      std::string buffer;
+      std::pair<int, int> e_buffer;
+      getline(in_file, buffer);
+      while (DIMACS_GR_Challenge9_Format<unsigned int, unsigned int>::is_comment(buffer)) {
+         getline(in_file, buffer);
+      }
+      e_buffer = DIMACS_GR_Challenge9_Format<unsigned int, unsigned int>::parse_header(buffer);
+      //Read in number of nodes and vertices.
+      std::cout << "Read header line " << buffer << " \n";
+      //Undirected edges = twice directed edges!
+      // Now the tricky part. We need to accumulate the edge-count for each
+      // node, and then use those in a sorted manner to palce edges in the
+      // neighbors and edge_data array.
+      typedef std::map<unsigned int, unsigned int> EdgeListBuffer;
+      typedef std::map<unsigned int, EdgeListBuffer *> GraphBuffer;
+      GraphBuffer all_edges;
+      size_t num_nodes_l = e_buffer.first + 1, num_edges_l = 0;
+      std::cout << "Number of nodes " << num_nodes_l << "\n";
+      for (size_t i = 0; i < num_nodes_l; ++i) {
+         all_edges[i] = new EdgeListBuffer();
+      }
+      std::pair<unsigned int, std::pair<unsigned int, unsigned int> > e_vec_buffer;
+      do {
+         getline(in_file, buffer);
+         if (buffer.size() > 0 && DIMACS_GR_Challenge9_Format<unsigned int, unsigned int>::is_comment(buffer) == false) {
+            e_vec_buffer = DIMACS_GR_Challenge9_Format<unsigned int, unsigned int>::parse_edge_pair(buffer);
+            (*all_edges[e_vec_buffer.first])[e_vec_buffer.second.first] = e_vec_buffer.second.second;
+            (*all_edges[e_vec_buffer.second.first])[e_vec_buffer.first] = e_vec_buffer.second.second;
+            num_edges_l += 2;
+         }
+      } while (in_file.good());
+      num_edges_l = 0;
+      for (GraphBuffer::iterator it = all_edges.begin(); it != all_edges.end(); ++it) {
+         num_edges_l += it->second->size();
+      }
+      ////Now we are going to populate the edges.
+      std::cout << "Number of edges" << num_edges_l << "\n";
+      init(num_nodes_l, num_edges_l);
+      size_t curr_edge_count = 0;
+      size_t l_max_degree = 0;
+      for (size_t i = 0; i < num_nodes; ++i) {
+         outgoing_index[i] = curr_edge_count;
+         node_data[i] = (std::numeric_limits<unsigned int>::max()) / 2;
+         if (all_edges[i]->size() > l_max_degree)
+            l_max_degree = all_edges[i]->size();
+         for (EdgeListBuffer::iterator it = all_edges[i]->begin(); it != all_edges[i]->end(); ++it) {
+            neighbors[curr_edge_count] = it->first;
+            edge_data[curr_edge_count] = it->second;
+            ++curr_edge_count;
+         }
+      }
+      std::cout << "Max degree enountered is " << l_max_degree << "\n";
+      outgoing_index[num_nodes] = num_edges;
+      //assert(num_edges == curr_edge_count);
+      ///Clean-up : VERY VERY SLOW!!!!
+      for (size_t i = 0; i < num_nodes; ++i) {
+         delete all_edges[i];
+      }
+   }
+/////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////
+   void deallocate(void) {
+      delete[] outgoing_index;
+      delete[] node_data;
+      delete[] neighbors;
+      delete[] edge_data;
+   }
+};
+}//End namespace Graphs
+}      //End namespace OpenCL
+} //End namespace Galois
+//End CL_LC_Graph
+/////////////////////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////////////////
+#endif
