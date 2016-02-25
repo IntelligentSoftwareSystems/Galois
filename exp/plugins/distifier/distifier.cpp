@@ -97,6 +97,41 @@ public:
     llvm::outs() << "\n\n";
     Loops.emplace_back(FS, gOp->getType(), dOp, lOp);
   }
+
+  void reset() {
+    Loops.clear();
+  }
+};
+
+class LoopRewriter : public MatchFinder::MatchCallback {
+public:
+  LoopRewriter(Rewriter& Rewrite) : Rewrite(Rewrite) {}
+
+  virtual void run(const MatchFinder::MatchResult& Result) {
+    const MemberExpr* fieldRef = Result.Nodes.getNodeAs<MemberExpr>("fieldRef");
+    const Expr* fieldUse = Result.Nodes.getNodeAs<Expr>("fieldUse");
+    const DeclRefExpr* graphDataVar = Result.Nodes.getNodeAs<DeclRefExpr>("getDataVar");
+    const NamedDecl* graphVar = Result.Nodes.getNodeAs<NamedDecl>("graphVar");
+    if (!fieldUse)
+      fieldUse = fieldRef;
+    for (auto& N : Result.Nodes.getMap()) {
+      llvm::outs() << N.first << " ";
+      N.second.dump(llvm::outs(), *Result.SourceManager);
+    }
+    
+    llvm::outs() << fieldRef << " " << fieldUse << " " << graphDataVar << " " << graphVar << "\n";
+    assert(graphVar && fieldUse && fieldRef);
+
+    auto str1 = fieldRef->getMemberDecl()->getNameAsString();
+    auto str2 = graphDataVar->getFoundDecl()->getNameAsString();
+    auto str3 = graphVar->getNameAsString();
+    llvm::outs() << "** " << str1 << " " << str2 << " " << str3 << "\n\n";
+    //    Rewrite.ReplaceText(fieldUse->getSourceRange(), "\\test\\");
+    Rewrite.ReplaceText(fieldUse->getSourceRange(), str3 + "_" + str1 + "[" + str2 + "]");
+  }
+
+private:
+  Rewriter& Rewrite;
 };
 
 #if 0
@@ -135,17 +170,31 @@ class GraphValueMatcher : public MatchFinder::MatchCallback {
 
 class OpenCLKernelConsumer : public ASTConsumer {
 public:
-  OpenCLKernelConsumer(Rewriter& R) {
+  OpenCLKernelConsumer(Rewriter& R) : OpMatcherRewrite(R) {
     OpFinder.addMatcher(galoisLoop, &OpMatcher);
+    OpFinderRewrite.addMatcher(allFields, &OpMatcherRewrite);
   }
 
   void HandleTranslationUnit(ASTContext & Context) override {
+    OpMatcher.reset();
     OpFinder.matchAST(Context);
+    OpFinderRewrite.matchAST(Context);
+
+    // for (auto& L : OpMatcher.Loops) {
+    //   if (L.OpDecl)
+    //     OpFinderRewrite.matchAST(L.OpDecl);
+    //   if (L.OpLambda)
+    //     OpFinderRewrite.matchAST(L.OpLambda);
+    // }
   }
 
 private:
   MatchFinder OpFinder;
   LoopMatcher OpMatcher;
+
+  MatchFinder OpFinderRewrite;
+  LoopRewriter OpMatcherRewrite;
+
 };
 
 class OpenCLKernelAction : public ASTFrontendAction {

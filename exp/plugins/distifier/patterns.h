@@ -3,7 +3,8 @@ StatementMatcher galoisLoop = callExpr(callee(functionDecl(anyOf(hasName("for_ea
 
 //Matches calls to getdat and binds getDataVar to the valiable expression which is the node
 //g.getData(foo) // binds here, foo bound to getDataVar
-StatementMatcher findGetData = callExpr(callee(functionDecl(hasName("getData"))), hasArgument(0, expr().bind("getDataVar")));
+StatementMatcher findGetDataAll = memberCallExpr(callee(functionDecl(hasName("getData"))), hasArgument(0, expr().bind("getDataVar")));
+StatementMatcher findGetData    = memberCallExpr(callee(functionDecl(hasName("getData"))), hasArgument(0, declRefExpr().bind("getDataVar")), on(anyOf(memberExpr(hasDeclaration(decl().bind("graphVar"))), declRefExpr(hasDeclaration(decl().bind("graphVar"))))));
 
 //finds field indexing of references to graph nodes
 //N& = g.getData(foo); // foo bound to getDataVar
@@ -13,12 +14,13 @@ StatementMatcher findFieldOfNodeRef = memberExpr(has(declRefExpr(to(varDecl(hasI
 //finds references to fields of a graph node
 //N& = g.getData(foo).f // foo bound to getDataVar, fieldRef bound here
 //N // binds here
-StatementMatcher findRefOfFieldRef = declRefExpr(to(varDecl(hasInitializer(memberExpr(has(findGetData)).bind("fieldRef")))));
+StatementMatcher findRefOfFieldRef = declRefExpr(to(varDecl(hasInitializer(memberExpr(has(findGetData)).bind("fieldRef"))))).bind("fieldUse");
 
 //finds direct uses of fields not assigned to references
 // g.getData(foo).f 
 StatementMatcher findFieldUseDirect = memberExpr(has(findGetData), unless(hasAncestor(varDecl(hasType(referenceType()))))).bind("fieldRef");
 
-
+//Match all uses of node data
+StatementMatcher allFields = anyOf(findFieldOfNodeRef, findRefOfFieldRef, findFieldUseDirect);
 
 

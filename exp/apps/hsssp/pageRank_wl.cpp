@@ -34,6 +34,7 @@
 #include "Galois/gstl.h"
 
 #include "Galois/Runtime/CompilerHelperFunctions.h"
+#include "Galois/Runtime/Tracer.h"
 
 #include "OfflineGraph.h"
 #include "hGraph.h"
@@ -210,6 +211,7 @@ int main(int argc, char** argv) {
     T_init.stop();
 
     // Verify
+   /*
     if(verify){
       if(net.ID == 0) {
         for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
@@ -217,6 +219,7 @@ int main(int argc, char** argv) {
         }
       }
     }
+    */
 
     std::cout << "PageRank::go called\n";
     T_pageRank.start();
@@ -226,6 +229,7 @@ int main(int argc, char** argv) {
     T_pageRank.stop();
 
     // Verify
+   /*
     if(verify){
       if(net.ID == 0) {
         for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
@@ -233,14 +237,20 @@ int main(int argc, char** argv) {
         }
       }
     }
+    */
 
     T_total.stop();
 
     std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " PageRank (" << maxIterations << ") : " << T_pageRank.get() << "(msec)\n\n";
 
+    if(verify){
+      for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
+        Galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).value);
+      }
+    }
     return 0;
   } catch (const char* c) {
-      std::cerr << "Error: " << c << "\n";
-      return 1;
+    std::cerr << "Error: " << c << "\n";
+    return 1;
   }
 }
