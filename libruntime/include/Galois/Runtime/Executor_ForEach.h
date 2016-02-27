@@ -641,6 +641,7 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
     typedef typename reiterator<BaseWorkListTy, typename RangeTy::iterator>::type
     ::template retype<value_type> WorkListTy;
 
+     Galois::Timer T_compute, T_comm_syncGraph, T_bag_extraWork, T_comm_bag;
     typedef typename BaseWorkListTy::value_type value_type_base;
     /** Construct new worklist **/
     typedef Galois::InsertBag<value_type> Bag;
@@ -649,11 +650,14 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
     auto ztpl = std::tuple_cat(ytpl, std::make_tuple(wl<Galois::WorkList::WLdistributed<WorkListTy>>(&bag)));
     auto xtpl = std::tuple_cat(ztpl, typename function_traits<FunctionTy>::type {});
 
+    T_compute.start();
     Runtime::for_each_impl_dist(r, fn,
         std::tuple_cat(xtpl,
           get_default_trait_values(ztpl,
             std::make_tuple(loopname_tag {}, wl_tag {}),
             std::make_tuple(loopname {}, wl<defaultWL>()))));
+    T_compute.stop();
+    std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID  << "] 1st Iter : T_compute : " << T_compute.get() << "(msec)\n";
 
      auto& net = Galois::Runtime::getSystemNetworkInterface();
      bool Canterminate = false;
@@ -665,9 +669,13 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
      while(!Canterminate) {
 
       // Sync
+      T_comm_syncGraph.start();
       helper_fn.sync_graph();
+      T_comm_syncGraph.stop();
 
       // seperate out nodes to work locally and to send to remote destinaton.
+
+      T_comm_bag.start();
       std::vector<std::vector<value_type>> bagItems_vec;
 
       if(bagItems_vec.size() < net.Num)
@@ -696,14 +704,17 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
       global_var_sturct<value_type>::num_Hosts_recvd = 0;
       global_var_sturct<value_type>::workItem_recv_vec.insert(global_var_sturct<value_type>::workItem_recv_vec.end(), bagItems_vec[net.ID].begin(), bagItems_vec[net.ID].end());
 
+
       assert((global_var_sturct<value_type>::hosts_didWork_vec.size() == (net.Num - 1)));
       bag.clear();
+      T_comm_bag.stop();
 
       Canterminate = !didWork;
       if(Canterminate)
         for(auto x : global_var_sturct<value_type>::hosts_didWork_vec)
           Canterminate = (Canterminate && !x);
 
+      std::cout << "["<< Galois::Runtime::getSystemNetworkInterface().ID <<"] Iter: " << num_iter <<" Total items to work on : " << global_var_sturct<value_type>::workItem_recv_vec.size() << "\n";
       // call for_each again.
       if(!global_var_sturct<value_type>::workItem_recv_vec.empty()){
 
@@ -719,6 +730,8 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
           workItem_recv_vec[i] = helper_fn.getLocalID(workItem_recv_vec[i]);
         }
         */
+        T_compute.start();
+
         std::transform(global_var_sturct<value_type>::workItem_recv_vec.begin(), global_var_sturct<value_type>::workItem_recv_vec.end(), global_var_sturct<value_type>::workItem_recv_vec.begin(), [&](value_type i)->value_type {return helper_fn.getLocalID(i);});
 
         Runtime::for_each_impl_dist(Runtime::makeStandardRange(global_var_sturct<value_type>::workItem_recv_vec.begin(), global_var_sturct<value_type>::workItem_recv_vec.end()), fn,
@@ -727,13 +740,15 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
                 std::make_tuple(loopname_tag {}, wl_tag {}),
                 std::make_tuple(loopname {}, wl<defaultWL>()))));
 
+        T_compute.stop();
       }
 
       didWork = !bag.empty();
       global_var_sturct<value_type>::hosts_didWork_vec.clear();
       global_var_sturct<value_type>::workItem_recv_vec.clear();
 
-      //num_iter++;
+      std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID  << "] Iter : " << num_iter << "  T_compute : " << T_compute.get() << "(msec)  T_comm_syncGraph : " << T_comm_syncGraph.get() << "(msec) T_comm_bag : "<< T_comm_bag.get() << "(msec)\n";
+      num_iter++;
       Galois::Runtime::getHostBarrier().wait();
     }
 
