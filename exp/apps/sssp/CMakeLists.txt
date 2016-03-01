@@ -1,5 +1,5 @@
 if(USE_EXP)
-  include_directories(../../../lonestar/sssp .)
+  include_directories(${CMAKE_SOURCE_DIR}/apps/sssp .)
 endif()
 app(delta-stepping DeltaStepping.cpp)
 #app(distributed-boost-delta-stepping DistributedBoostDeltaStepping.cpp)
