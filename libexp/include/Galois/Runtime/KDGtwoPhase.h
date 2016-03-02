@@ -71,107 +71,184 @@ namespace Runtime {
 
 
 namespace {
-template <typename T, typename Cmp, typename NhFunc, typename ExFunc, typename OpFunc, typename WindowWL, bool NEEDS_PUSH, bool HAS_EXEC_FUNC, bool ENABLE_PARAMETER> 
-class IKDGtwoPhaseExecutor {
-public:
-  using Ctxt = TwoPhaseContext<T, Cmp>;
-  using CtxtAlloc = FixedSizeAllocator<Ctxt>;
-  using CtxtWL = PerThreadBag<Ctxt*>;
 
-  using UserCtxt = UserContextAccess<T>;
-  using PerThreadUserCtxt = Substrate::PerThreadStorage<UserCtxt>;
+template <typename T, typename Cmp>
+class TwoPhaseContext: public OrderedContextBase<T> {
+
+  using Base = OrderedContextBase<T>;
+  // using NhoodList =  Galois::gdeque<Lockable*, 4>;
+  using CtxtCmp = ContextComparator<TwoPhaseContext, Cmp>;
+
+  CtxtCmp ctxtCmp;
+  bool source = true;
+
+public:
+
+  using value_type = T;
+
+  explicit TwoPhaseContext (const T& x, const Cmp& cmp)
+    : 
+      Base (x),  // pass true so that Base::acquire invokes virtual subAcquire
+      ctxtCmp (cmp),
+      source (true) 
+  {}
+
+  bool isSrc (void) const {
+    return source;
+  }
+
+  void disableSrc (void) {
+    source = false;
+  }
+
+  void reset () { 
+    source = true;
+  }
+
+  virtual void subAcquire (Lockable* l, Galois::MethodFlag) {
+
+
+    if (Base::tryLock (l)) {
+      Base::addToNhood (l);
+    }
+
+    TwoPhaseContext* other = nullptr;
+
+    do {
+      other = static_cast<TwoPhaseContext*> (Base::getOwner (l));
+
+      if (other == this) {
+        return;
+      }
+
+      if (other) {
+        bool conflict = ctxtCmp (other, this); // *other < *this
+        if (conflict) {
+          // A lock that I want but can't get
+          this->source = false;
+          return; 
+        }
+      }
+    } while (!this->stealByCAS(l, other));
+
+    // Disable loser
+    if (other) {
+      other->source = false; // Only need atomic write
+    }
+
+    return;
+
+
+    // bool succ = false;
+    // if (Base::tryAcquire (l) == Base::NEW_OWNER) {
+      // Base::addToNhood (l);
+      // succ = true;
+    // }
+// 
+    // assert (Base::getOwner (l) != NULL);
+// 
+    // if (!succ) {
+      // while (true) {
+        // TwoPhaseContext* that = static_cast<TwoPhaseContext*> (Base::getOwner (l));
+// 
+        // assert (that != NULL);
+        // assert (this != that);
+// 
+        // if (PtrComparator::compare (this, that)) { // this < that
+          // if (Base::stealByCAS (that, this)) {
+            // that->source = false;
+            // break;
+          // }
+// 
+        // } else { // this >= that
+          // this->source = false; 
+          // break;
+        // }
+      // }
+    // } // end outer if
+  } // end subAcquire
+
+
+
+};
+
+template <typename T, typename Cmp, typename NhFunc, typename ExFunc, typename OpFunc, typename ArgsTuple>
+class IKDGtwoPhaseExecutor: public IKDGbase<T, Cmp, NhFunc, ExFunc, OpFunc, ArgsTuple, IKDGtwoPhaseExecutor<T, Cmp, NhFunc, ExFunc, OpFunc, ArgsTuple> > {
+
+public:
+  using Base = IKDGbase <T, Cmp, NhFunc, ExFunc, OpFunc, ArgsTuple, IKDGtwoPhaseExecutor>;
+  using Ctxt = TwoPhaseContext<T, Cmp>;
+
+  using WindowWL = typename std::conditional<Base::NEEDS_PUSH, PQbasedWindowWL<T, Cmp>, SortedRangeWindowWL<T, Cmp> >::type;
+
+
 
 protected:
 
   static const bool DETAILED_STATS = false;
 
-  struct MakeContext {
-    const Cmp& cmp;
-    CtxtAlloc& ctxtAlloc;
-
-    MakeContext (const Cmp& cmp, CtxtAlloc& ctxtAlloc)
-      : cmp (cmp), ctxtAlloc (ctxtAlloc)
-    {}
+  struct CtxtMaker {
+    IKDGtwoPhaseExecutor& outer;
 
     Ctxt* operator () (const T& x) {
-      Ctxt* ctx = ctxtAlloc.allocate (1);
-      assert (ctx != nullptr);
-      ctxtAlloc.construct (ctx, x, cmp);
 
-      return ctx;
+      Ctxt* ctxt = outer.ctxtAlloc.allocate (1);
+      assert (ctxt);
+      outer.ctxtAlloc.construct (ctxt, x, outer.cmp);
+
+      return ctxt;
     }
   };
 
-  Cmp cmp;
-  NhFunc nhFunc;
-  ExFunc execFunc;
-  OpFunc opFunc;
-  const char* loopname;
-  WindowWL winWL;
-  CtxtAlloc ctxtAlloc;
+  struct WindowWLwrapper: public WindowWL {
+    IKDGtwoPhaseExecutor& outer;
+
+    WindowWLwrapper (IKDGtwoPhaseExecutor& outer, const Cmp& cmp):
+      WindowWL (cmp), outer (outer) {}
+
+    void push (const T& x) {
+      WindowWL::push (x);
+    }
+
+    // TODO: complete this class
+    void push (Ctxt* c) {
+      assert (c);
+
+      WindowWL::push (c->getActive ());
+
+      // destroy and deallocate c
+      outer.ctxtAlloc.destroy (c);
+      outer.ctxtAlloc.deallocate (c, 1);
+    }
+
+    void poll (CtxtWL& wl, size_t newSize, size_t origSize) {
+      WindowWL::poll (wl, newSize, origSize, outer.ctxtMaker);
+    }
+  };
+
+  WindowWLwrapper winWLwrapper;
   MakeContext ctxtMaker;
-  std::unique_ptr<CtxtWL> currWL;
-  std::unique_ptr<CtxtWL> nextWL;
 
-
-  size_t windowSize;
-  size_t rounds;
-  size_t totalTasks;
-  size_t totalCommits;
-  double targetCommitRatio;
-
-  PerThreadUserCtxt userHandles;
-  GAccumulator<size_t> roundTasks;
-  GAccumulator<size_t> roundCommits;
 
 public:
   IKDGtwoPhaseExecutor (
       const Cmp& cmp, 
       const NhFunc& nhFunc,
-      const ExFunc& execFunc,
+      const ExFunc& exFunc,
       const OpFunc& opFunc,
-      const char* ln)
+      const ArgsTuple& argsTuple)
     :
-      cmp (cmp),
-      nhFunc (nhFunc),
-      execFunc (execFunc),
-      opFunc (opFunc),
-      loopname (ln),
-      winWL (cmp),
-      ctxtMaker (cmp, ctxtAlloc),
-      currWL (new CtxtWL),
-      nextWL (new CtxtWL),
-      windowSize(0),
-      rounds(0),
-      totalTasks(0),
-      totalCommits(0),
-      targetCommitRatio (commitRatioArg)
+      Base (cmp, nhFunc, exFunc, opFunc, argsTuple)
+      winWLwrapper (*this, cmp),
+      ctxtMaker {*this}
   {
-    if (targetCommitRatio < 0.0) {
-      targetCommitRatio = 0.0;
-    }
-    if (targetCommitRatio > 1.0) {
-      targetCommitRatio = 1.0;
-    }
-
-    if (ENABLE_PARAMETER) {
-      assert (targetCommitRatio == 0.0);
-    }
-
-    if (loopname == nullptr) {
-      loopname = "NULL";
-    }
   }
 
   ~IKDGtwoPhaseExecutor () {
 
-    if (ENABLE_PARAMETER) {
+    if (Base::ENABLE_PARAMETER) {
       ParaMeter::closeStatsFile ();
     }
-
-    printStats ();
-    assert (currWL->empty_all ());
-    assert (nextWL->empty_all ());
   }
 
   template <typename R>
@@ -180,7 +257,7 @@ public:
 
       Galois::do_all_choice (range,
           [this] (const T& x) {
-            nextWL->push_back (ctxtMaker (x));
+          Base::getNextWL ().push_back (ctxtMaker (x));
           }, 
           "init-fill",
           chunk_size<NhFunc::CHUNK_SIZE> ());
@@ -197,6 +274,7 @@ public:
   }
 
 protected:
+  /*
   GALOIS_ATTRIBUTE_PROF_NOINLINE void spillAll (CtxtWL& wl) {
     assert (targetCommitRatio != 0.0);
     on_each(
@@ -306,10 +384,10 @@ protected:
     nextWL->clear_all_parallel ();
   }
 
+  */
+
   GALOIS_ATTRIBUTE_PROF_NOINLINE void endRound () {
-    ++rounds;
-    totalCommits += roundCommits.reduceRO ();
-    totalTasks += roundTasks.reduceRO ();
+    Base::endRound ();
 
     if (ENABLE_PARAMETER) {
       ParaMeter::StepStats s (rounds, roundCommits.reduceRO (), roundTasks.reduceRO ());
@@ -320,7 +398,7 @@ protected:
   GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhoodImpl (HIDDEN::DummyExecFunc*) {
     // for stable case
 
-    Galois::do_all_choice (makeLocalRange (*currWL),
+    Galois::do_all_choice (makeLocalRange (Base::getCurrWL ())
         [this] (Ctxt* c) {
           UserCtxt& uhand = *userHandles.getLocal ();
           uhand.reset ();
@@ -344,10 +422,10 @@ protected:
   template <typename F>
   GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhoodImpl (F*) {
     // for unstable case
-    auto m_beg = boost::make_transform_iterator (currWL->begin_all (), GetActive ());
-    auto m_end = boost::make_transform_iterator (currWL->end_all (), GetActive ());
+    auto m_beg = boost::make_transform_iterator (Base::getCurrWL ().begin_all (), GetActive ());
+    auto m_end = boost::make_transform_iterator (Base::getCurrWL ().end_all (), GetActive ());
 
-    Galois::do_all_choice (makeLocalRange (*currWL),
+    Galois::do_all_choice (makeLocalRange (Base::getCurrWL ()),
         [m_beg, m_end, this] (Ctxt* c) {
           UserCtxt& uhand = *userHandles.getLocal ();
           uhand.reset ();
@@ -361,9 +439,9 @@ protected:
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhood () {
-    // using ptr to execFunc to choose the right impl. 
-    // relying on the fact that for stable case, the execFunc is DummyExecFunc. 
-    expandNhoodImpl (&execFunc); 
+    // using ptr to exFunc to choose the right impl. 
+    // relying on the fact that for stable case, the exFunc is DummyExecFunc. 
+    expandNhoodImpl (&exFunc); 
   }
 
   inline void executeSourcesImpl (HIDDEN::DummyExecFunc*) {
@@ -373,14 +451,14 @@ protected:
   GALOIS_ATTRIBUTE_PROF_NOINLINE void executeSourcesImpl (F*) {
     assert (HAS_EXEC_FUNC);
 
-    Galois::do_all_choice (makeLocalRange (*currWL),
+    Galois::do_all_choice (makeLocalRange (Base::getCurrWL ()),
       [this] (Ctxt* ctxt) {
 
         UserCtxt& uhand = *userHandles.getLocal ();
         uhand.reset ();
 
         if (ctxt->isSrc ()) {
-          execFunc (ctxt->getActive (), uhand);
+          exFunc (ctxt->getActive (), uhand);
         }
       },
       "exec-sources",
@@ -389,9 +467,9 @@ protected:
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void executeSources (void) {
-    // using ptr to execFunc to choose the right impl. 
-    // relying on the fact that for stable case, the execFunc is DummyExecFunc. 
-    executeSourcesImpl (&execFunc);
+    // using ptr to exFunc to choose the right impl. 
+    // relying on the fact that for stable case, the exFunc is DummyExecFunc. 
+    executeSourcesImpl (&exFunc);
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void applyOperator () {
@@ -404,7 +482,7 @@ protected:
     }
 
 
-    Galois::do_all_choice (makeLocalRange (*currWL),
+    Galois::do_all_choice (makeLocalRange (Base::getCurrWL ()),
         [this, &minElem] (Ctxt* c) {
           bool commit = false;
 
@@ -427,7 +505,7 @@ protected:
 
                 if ((targetCommitRatio == 0.0) || !minElem || !cmp (*minElem, *i)) {
                   // if *i >= *minElem
-                  nextWL->push_back (ctxtMaker (*i));
+                  Base::getNextWL ().push_back (ctxtMaker (*i));
                 } else {
                   winWL.push (*i);
                 } 
@@ -442,7 +520,7 @@ protected:
           } else {
             c->cancelIteration ();
             c->reset ();
-            nextWL->push_back (c);
+            Base::getNextWL ().push_back (c);
           }
         },
         "applyOperator",
@@ -453,16 +531,16 @@ protected:
   void execute_impl () {
 
     while (true) {
-      beginRound ();
+      beginRound (winWLwrapper);
 
-      if (currWL->empty_all ()) {
+      if (Base::getCurrWL ().empty_all ()) {
         break;
       }
 
       Timer t;
 
       if (DETAILED_STATS) {
-        std::printf ("trying to execute %zd elements\n", currWL->size_all ());
+        std::printf ("trying to execute %zd elements\n", Base::getCurrWL ().size_all ());
         t.start ();
       }
 
@@ -481,14 +559,6 @@ protected:
       
     }
   }
-
-  void printStats (void) {
-    std::cout << "Two Phase Window executor, rounds: " << rounds << std::endl;
-    std::cout << "Two Phase Window executor, commits: " << totalCommits << std::endl;
-    std::cout << "Two Phase Window executor, total: " << totalTasks << std::endl;
-    std::cout << "Two Phase Window executor, efficiency: " << double (totalCommits) / totalTasks << std::endl;
-    std::cout << "Two Phase Window executor, avg. parallelism: " << double (totalCommits) / rounds << std::endl;
-  }
   
 };
 
@@ -502,17 +572,17 @@ class KDGtwoPhaseUnstableExecutor: public KDGtwoPhaseStableExecutor<T, Cmp, NhFu
   using Ctxt = typename Base::Ctxt;
   using CtxtWL = typename Base::CtxtWL;
 
-  ExFunc execFunc;
+  ExFunc exFunc;
 
 public:
   KDGtwoPhaseUnstableExecutor (
       const Cmp& cmp, 
       const NhFunc& nhFunc,
       const OpFunc& opFunc,
-      const ExFunc& execFunc)
+      const ExFunc& exFunc)
     :
       Base (cmp, nhFunc, opFunc),
-      execFunc (execFunc)
+      exFunc (exFunc)
   {}
 
 
@@ -601,7 +671,7 @@ protected:
       Galois::do_all_choice (makeLocalRange (*Base::currWL),
           [this] (Ctxt* ctx) {
             if (ctx->isSrc ()) {
-              execFunc (ctx->getActive ());
+              exFunc (ctx->getActive ());
             }
           }, 
           "execute-safe-sources",
@@ -637,18 +707,18 @@ class IKDGunstableCustomSafety: public KDGtwoPhaseStableExecutor<T, Cmp, hidden:
 
 
   SafetyPhase safetyPhase;
-  ExFunc execFunc;
+  ExFunc exFunc;
 
 public:
   IKDGunstableCustomSafety (
       const Cmp& cmp, 
       const SafetyPhase& safetyPhase,
       const OpFunc& opFunc,
-      const ExFunc& execFunc)
+      const ExFunc& exFunc)
     :
       Base (cmp, hidden::DummyNhFunc (), opFunc),
       safetyPhase (safetyPhase),
-      execFunc (execFunc)
+      exFunc (exFunc)
   {}
 
 
@@ -673,7 +743,7 @@ private:
       Galois::do_all_choice (makeLocalRange (*Base::currWL),
           [this] (Ctxt* ctx) {
             if (ctx->isSrc ()) {
-              execFunc (ctx->getActive ());
+              exFunc (ctx->getActive ());
             }
           }, 
           "execute-safe-sources",
@@ -691,22 +761,22 @@ private:
 
 } // end anonymous namespace
 
-template <typename R, typename Cmp, typename NhFunc, typename OpFunc, typename ExFunc>
+template <typename R, typename Cmp, typename NhFunc, typename OpFunc, typename ExFunc, typename _ArgsTuple>
 void for_each_ordered_ikdg (const R& range, const Cmp& cmp, const NhFunc& nhFunc, 
-    const ExFunc& execFunc,  const OpFunc& opFunc, const char* loopname) {
+    const ExFunc& exFunc,  const OpFunc& opFunc, const ArgsTuple& argsTuple) {
+
+  auto argsT = std::tuple_cat (argsTuple, 
+      get_default_trait_values (argsTuple,
+        std::make_tuple (loopname_tag {}, enable_parameter_tag {}),
+        std::make_tuple (default_loopname {}, enable_parameter<false> {})));
+  using ArgsT = decltype (argsT);
 
   using T = typename R::value_type;
   
-  const bool NEEDS_PUSH = DEPRECATED::ForEachTraits<OpFunc>::NeedsPush;
 
-  using WindowWL = typename std::conditional<NEEDS_PUSH, PQbasedWindowWL<T, Cmp>, SortedRangeWindowWL<T, Cmp> >::type;
-  const bool HAS_EXEC_FUNC = !(std::is_same<ExFunc, HIDDEN::DummyExecFunc>::value);
-
-  const bool ENABLE_PARAMETER = false;
-
-  using Exec = IKDGtwoPhaseExecutor<T, Cmp, NhFunc, ExFunc, OpFunc, WindowWL, NEEDS_PUSH, HAS_EXEC_FUNC, ENABLE_PARAMETER>;
+  using Exec = IKDGtwoPhaseExecutor<T, Cmp, NhFunc, ExFunc, OpFunc, ArgsT>
   
-  Exec e (cmp, nhFunc, execFunc, opFunc, loopname);
+  Exec e (cmp, nhFunc, exFunc, opFunc, argsT);
 
   const bool wakeupThreadPool = true;
 
@@ -724,10 +794,10 @@ void for_each_ordered_ikdg (const R& range, const Cmp& cmp, const NhFunc& nhFunc
 }
 
 
-template <typename R, typename Cmp, typename NhFunc, typename OpFunc, typename ExFunc>
-void for_each_ordered_ikdg (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const char* loopname) {
+template <typename R, typename Cmp, typename NhFunc, typename OpFunc, typename ExFunc, typename ArgsTuple>
+void for_each_ordered_ikdg (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const ArgsTuple& argsTuple) {
 
-  for_each_ordered_ikdg (range, cmp, nhFunc, HIDDEN::DummyExecFunc (), opFunc, loopname);
+  for_each_ordered_ikdg (range, cmp, nhFunc, HIDDEN::DummyExecFunc (), opFunc, argsTuple);
 }
 
 } // end namespace Runtime

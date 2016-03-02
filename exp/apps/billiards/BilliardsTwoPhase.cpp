@@ -49,7 +49,7 @@ public:
         VisitNhoodSafetyTest (),
         ExecSources (),
         AddEvents<Tbl_t> (table, endtime, addList, iter, enablePrints), 
-        "billiards-ikdg");
+        std::make_tuple (Galois::enable_parameter<true> {}, Galois::loopname ("billiards-ikdg")));
 
     return iter.reduce ();
 

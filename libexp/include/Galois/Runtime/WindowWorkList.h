@@ -118,6 +118,10 @@ public:
     return minElem;
   }
 
+  template <typename WL>
+  void poll (WL& workList, const size_t newSize, const size_t origSize) {
+    poll (workList, newSize, origSize, [] (const T& x) { return x; });
+  }
 
   template <typename WL, typename CtxtMaker>
   void poll (WL& workList, const size_t newSize, const size_t origSize, CtxtMaker& ctxtMaker ) {
@@ -258,6 +262,11 @@ public:
 
   bool empty (void) const {
     return m_wl.empty_all ();
+  }
+
+  template <typename WL>
+  void poll (WL& workList, const size_t newSize, const size_t origSize) {
+    poll (workList, newSize, origSize, [] (const T& x) { return x; });
   }
 
   template <typename WL, typename CtxtMaker>
