@@ -589,7 +589,7 @@ private:
 
 private:
   static const bool HAS_RT_CHUNK_SIZE = exists_by_supertype<rt_chunk_size_tag, ArgsTuple>::value;
-  static const unsigned CHUNK_SIZE = get_type_by_supertype<chunk_size_tag, ArgsTuple>::value; 
+  static const unsigned CHUNK_SIZE = get_type_by_supertype<chunk_size_tag, ArgsTuple>::type::value; 
 
 
   R range;
@@ -619,6 +619,13 @@ public:
   {
     assert (chunk_size > 0);
     std::printf ("DoAllCoupledExec chunk_size: %u\n", chunk_size);
+
+
+
+    static_assert(!exists_by_supertype<char*, ArgsTuple>::value, "old loopname");
+    static_assert(!exists_by_supertype<char const *, ArgsTuple>::value, "old loopname");
+    static_assert(!exists_by_supertype<bool, ArgsTuple>::value, "old steal");
+
   }
 
   // parallel call
@@ -705,14 +712,15 @@ public:
 } // end namespace details
 
 
-template <typename R, typename F, typename... Args>
-void do_all_coupled (const R& range, const F& func, const Args&... args) {
+template <typename R, typename F, typename _ArgsTuple>
+void do_all_coupled (const R& range, const F& func, const _ArgsTuple& argsTuple) {
 
-  auto argsTuple = std::make_tuple (args..., default_loopname {}, default_chunk_size {});
-  using ArgsTuple = decltype (argsTuple);
-
-
-  details::DoAllCoupledExec<R, F, ArgsTuple> exec (range, func, argsTuple);
+  auto argsT = std::tuple_cat (argsTuple, 
+      get_default_trait_values (argsTuple,
+        std::make_tuple (loopname_tag {}, chunk_size_tag {}, rt_chunk_size_tag {}), 
+        std::make_tuple (default_loopname {}, default_chunk_size {}, rt_chunk_size {default_chunk_size::value} )));
+  using ArgsT = decltype (argsT);
+  details::DoAllCoupledExec<R, F, ArgsT> exec (range, func, argsT);
 
   Substrate::Barrier& barrier = getBarrier(activeThreads);
 
@@ -722,13 +730,15 @@ void do_all_coupled (const R& range, const F& func, const Args&... args) {
       std::ref(exec));
 }
 
-template <typename R, typename F, typename... Args>
-void do_all_coupled_detailed (const R& range, const F& func, const Args&... args) {
+template <typename R, typename F, typename _ArgsTuple>
+void do_all_coupled_detailed (const R& range, const F& func, const _ArgsTuple& argsTuple) {
 
-  auto argsTuple = std::make_tuple (args..., default_loopname {}, default_chunk_size {});
-  using ArgsTuple = decltype (argsTuple);
-
-  details::DoAllCoupledExec<R, F> exec (range, func, argsTuple);
+  auto argsT = std::tuple_cat (argsTuple, 
+      get_default_trait_values (argsTuple,
+        std::make_tuple (loopname_tag {}, chunk_size_tag {}, rt_chunk_size_tag {}), 
+        std::make_tuple (default_loopname {}, default_chunk_size {}, rt_chunk_size {default_chunk_size::value} )));
+  using ArgsT = decltype (argsT);
+  details::DoAllCoupledExec<R, F, ArgsT> exec (range, func, argsT);
 
   Runtime::on_each_impl (
       [&exec] (const unsigned tid, const unsigned numT) {
@@ -755,10 +765,12 @@ void do_all_coupled_detailed (const R& range, const F& func, const Args&... args
     }
   }
 
+  const char* const ln = get_by_supertype<loopname_tag> (argsT).value;
+
   Runtime::on_each_impl( 
-      [&maxTime, &perThrdTimer, &loopname] (const unsigned tid, const unsigned numT) {
+      [&maxTime, &perThrdTimer, ln] (const unsigned tid, const unsigned numT) {
         GALOIS_ASSERT ((maxTime - perThrdTimer[tid].get_nsec ()) >= 0);
-        Runtime::reportStat (loopname, "LoadImbalance", maxTime - perThrdTimer[tid].get_nsec ());
+        Runtime::reportStat (ln, "LoadImbalance", maxTime - perThrdTimer[tid].get_nsec ());
       });
 
 

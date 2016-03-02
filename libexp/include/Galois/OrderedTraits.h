@@ -1,8 +1,10 @@
 #ifndef GALOIS_ORDERED_TRAITS_H
 #define GALOIS_ORDERED_TRAITS_H
 
-#include "Galios/Traits.h"
-#include "Galios/gtuple.h"
+#include "Galois/Traits.h"
+#include "Galois/gtuple.h"
+
+namespace Galois {
 
 struct enable_parameter_tag {};
 template <bool V=false>
@@ -24,19 +26,19 @@ struct chunk_size_tag {
 };
 
 namespace HIDDEN {
-  template <unsigned V, unsigned MIN, unsigned MAX> {
+  template <unsigned V, unsigned MIN, unsigned MAX> 
   struct bring_within_limits {
   private:
     static const unsigned LB = (V < MIN) ? MIN : V;
-    static const UB = (LB > MAX) ? MAX : LB;
+    static const unsigned UB = (LB > MAX) ? MAX : LB;
 
   public:
-    static const value = UB;
+    static const unsigned value = UB;
   };
 
   template <unsigned V>
   struct regulate_chunk_size {
-    static const unsigned value = bring_within_limits<SZ, chunk_size_tag::MIN, chunk_size_tag::MAX>::value;
+    static const unsigned value = bring_within_limits<V, chunk_size_tag::MIN, chunk_size_tag::MAX>::value;
   };
 }
 
@@ -65,6 +67,7 @@ struct rt_chunk_size: public trait_has_value<const unsigned>, rt_chunk_size_tag 
 };
 
 
+} // end namespace Galois
 
 // TODO: add 
 #endif // GALOIS_ORDERED_TRAITS_H
