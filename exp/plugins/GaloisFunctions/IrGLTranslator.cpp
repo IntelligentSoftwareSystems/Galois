@@ -54,7 +54,7 @@ void findAndReplace(std::string &str,
 
 class IrGLOperatorVisitor : public RecursiveASTVisitor<IrGLOperatorVisitor> {
 private:
-  ASTContext* astContext;
+  //ASTContext* astContext;
   Rewriter &rewriter; // FIXME: is this necessary? can ASTContext give source code?
   bool isTopological;
   std::unordered_set<const Stmt *> skipStmts;
@@ -76,7 +76,7 @@ public:
       std::map<std::string, std::string> &globalVariables,
       std::map<std::string, std::string> &sharedVariables,
       std::map<std::string, std::vector<std::string> > &kernels) : 
-    astContext(context),
+    //astContext(context),
     rewriter(R),
     isTopological(isTopo),
     GlobalVariablesToTypeMap(globalVariables),
@@ -84,6 +84,8 @@ public:
     KernelToArgumentsMap(kernels)
   {}
   
+  virtual ~IrGLOperatorVisitor() {}
+
   std::string FormatCBlock(std::string text) {
     assert(text.find("graph.getData") == std::string::npos);
 
@@ -178,7 +180,7 @@ public:
   }
 
   virtual bool VisitCXXMethodDecl(CXXMethodDecl* func) {
-    assert(declString.empty());
+    assert(declString.rdbuf()->in_avail() == 0);
     declString.str("");
     bodyString.str("");
     funcName = func->getParent()->getNameAsString();
@@ -390,6 +392,8 @@ public:
     rewriter(R)
   {}
   
+  virtual ~IrGLOrchestratorVisitor() {}
+
   void GenerateIrGLASTToFile(std::string filename) {
     std::ofstream IrGLAST;
     IrGLAST.open(filename);
@@ -538,7 +542,7 @@ public:
     skipStmts.insert(binaryOp->getLHS());
     skipStmts.insert(binaryOp->getRHS());
     if (skipStmts.find(binaryOp) == skipStmts.end()) {
-      assert(binaryOp.isAssignmentOp());
+      assert(binaryOp->isAssignmentOp());
       bool skip = false;
       Expr *rhs = binaryOp->getRHS();
       if (CastExpr *cast = dyn_cast<CastExpr>(rhs)) {
@@ -549,7 +553,7 @@ public:
         std::string recordName = record->getNameAsString();
         if (recordName.compare("GReducible") == 0) {
           skip = true;
-          assert(!record->getMethodDecl()->getNameAsString().compare("reduce"));
+          //assert(!record->getMethodDecl()->getNameAsString().compare("reduce"));
 
           Expr *implicit = callExpr->getImplicitObjectArgument();
           if (CastExpr *cast = dyn_cast<CastExpr>(implicit)) {
@@ -750,12 +754,12 @@ public:
 
 class IrGLFunctionsConsumer : public ASTConsumer {
 private:
-  Rewriter &rewriter;
+  //Rewriter &rewriter;
   MatchFinder Matchers;
   FunctionDeclHandler functionDeclHandler;
 public:
   IrGLFunctionsConsumer(CompilerInstance &CI, Rewriter &R): 
-    rewriter(R), 
+    //rewriter(R), 
     functionDeclHandler(&(CI.getASTContext()), R) 
   {
     Matchers.addMatcher(functionDecl(
