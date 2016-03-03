@@ -39,7 +39,7 @@
 
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/OrderedLockable.h"
-#include "Galois/Runtime/KDGtwoPhaseSupport.h"
+#include "Galois/Runtime/IKDGbase.h"
 #include "Galois/Runtime/WindowWorkList.h"
 #include "Galois/Runtime/UserContextAccess.h"
 #include "Galois/Runtime/Mem.h"
@@ -567,22 +567,25 @@ struct OptimContext: public OrderedContextBase<T> {
 };
 
 template <typename T, typename Cmp, typename NhFunc, typename ExFunc, typename  OpFunc, typename ArgsTuple>
-class OptimOrdExecutor: public IKDGbase<T, Cmp, NhFunc, ExFunc, OpFunc, ArgsTuple, OptimOrdExecutor<T, Cmp, NhFunc, ExFunc, OpFunc, ArgsTuple> > {
+class OptimOrdExecutor: public IKDGbase<T, Cmp, 
+  OptimContext<T, Cmp, OptimOrdExecutor<T, Cmp, NhFunc, ExFunc, OpFunc, ArgsTuple> >,
+  NhFunc, ExFunc, OpFunc, ArgsTuple> {
 
 public:
 
-  using Base = IKDGbase <T, Cmp, NhFunc, ExFunc, OpFunc, ArgsTuple, OptimOrdExecutor>;
-
   friend struct OptimContext<T, Cmp, OptimOrdExecutor>;
   using Ctxt = OptimContext<T, Cmp, OptimOrdExecutor>;
+  using Base = IKDGbase <T, Cmp, Ctxt, NhFunc, ExFunc, OpFunc, ArgsTuple>;
+
   using NhoodMgr = typename Ctxt::NhoodMgr;
   using CtxtCmp = typename Ctxt::CtxtCmp;
   using NItemFactory = typename Ctxt::NItem::Factory;
   using CtxtWL = typename Base::CtxtWL;
 
-  using WindowWL = typename std::conditional<NEEDS_PUSH, PQbasedWindowWL<Ctxt*, CtxtCmp>, SortedRangeWindowWL<Ctxt*, CtxtCmp> >::type;
+  using WindowWL = typename std::conditional<Base::NEEDS_PUSH, PQbasedWindowWL<Ctxt*, CtxtCmp>, SortedRangeWindowWL<Ctxt*, CtxtCmp> >::type;
 
   using CommitQ = Galois::PerThreadVector<Ctxt*>;
+  using ExecutionRecords = std::vector<ParaMeter::StepStats>;
 
   static const unsigned DEFAULT_CHUNK_SIZE = 8;
 
@@ -606,8 +609,8 @@ public:
   CtxtMaker ctxtMaker;
 
 
-  CommitQ commitQ;
   GAccumulator<size_t> totalRetires;
+  CommitQ commitQ;
   ExecutionRecords execRcrds;
 
 public:
@@ -636,10 +639,11 @@ public:
           Base::getNextWL ().push (c);
 
         }, 
-        "init-fill",
-        chunk_size<DEFAULT_CHUNK_SIZE> ());
+        std::make_tuple (
+          Galois::loopname ("init-fill"),
+          chunk_size<DEFAULT_CHUNK_SIZE> ()));
 
-    if (targetCommitRatio != 0.0) {
+    if (Base::targetCommitRatio != 0.0) {
 
       winWL.initfill (makeLocalRange (Base::getNextWL ()));
       Base::getNextWL ().clear_all_parallel ();
@@ -653,19 +657,17 @@ public:
   
   void execute () {
 
-    rounds = 0;
-
     while (true) {
 
-      beginRound (winWL);
+      beginRound ();
 
-      if (Base::getCurr ().empty_all ()) {
+      if (Base::getCurrWL ().empty_all ()) {
         break;
       }
 
       expandNhood ();
 
-      Base::CtxtWL sources;
+      typename Base::CtxtWL sources;
 
       serviceAborts (sources);
 
@@ -677,7 +679,7 @@ public:
 
       reclaimMemory (sources);
 
-      endRound ();
+      Base::endRound ();
 
     }
   }
@@ -695,9 +697,11 @@ private:
 
   void dumpStats (void) {
 
-    reportStat (loopname, "retired", totalRetires.reduce ());
+    reportStat (Base::loopname, "retired", totalRetires.reduce ());
+    reportStat (Base::loopname, "efficiency", double (totalRetires.reduce ()) / Base::totalTasks);
+    reportStat (Base::loopname, "avg. parallelism", double (totalRetires.reduce ()) / Base::rounds);
 
-    if (ENABLE_PARAMETER) {
+    if (Base::ENABLE_PARAMETER) {
       dumpParaMeterStats ();
     }
   }
@@ -706,7 +710,7 @@ private:
     
     Ctxt* ctxt = ctxtMaker (x);
 
-    if (targetCommitRatio == 0.0) {
+    if (Base::targetCommitRatio == 0.0) {
 
       Base::getNextWL ().push (ctxt);
 
@@ -798,7 +802,7 @@ private:
     assert (windowSize > 0);
 
 
-    if (BASE::NEEDS_PUSH) {
+    if (Base::NEEDS_PUSH) {
       if (winWL.empty () && (wl.size_all () > windowSize)) {
         // a case where winWL is empty and all the new elements were going into 
         // nextWL. When nextWL becomes bigger than windowSize, we must do something
@@ -836,8 +840,8 @@ private:
   GALOIS_ATTRIBUTE_PROF_NOINLINE void beginRound () {
     Base::beginRound (winWL);
 
-    if (ENABLE_PARAMETER) {
-      execRcrds.emplace_back (rounds, Base::getCurrWL ().size_all ());
+    if (Base::ENABLE_PARAMETER) {
+      execRcrds.emplace_back (Base::rounds, Base::getCurrWL ().size_all ());
     }
   }
 
@@ -852,16 +856,17 @@ private:
 
             dbg::print ("scheduling: ", c, " with item: ", c->getActive ());
 
-            UserCtxt& uhand = c->userHandle;
+            typename Base::UserCtxt& uhand = c->userHandle;
 
             // nhFunc (c, uhand);
-            runCatching (nhFunc, c, uhand);
+            runCatching (Base::nhFunc, c, uhand);
 
-            roundTasks += 1;
+            Base::roundTasks += 1;
           }
         },
-        "expandNhood",
-        chunk_size<NhFunc::CHUNK_SIZE> ());
+        std::make_tuple (
+          Galois::loopname ("expandNhood"),
+          chunk_size<NhFunc::CHUNK_SIZE> ()));
 
   }
 
@@ -875,10 +880,11 @@ private:
           assert (!ctxt->hasState (ContextState::RECLAIM));
           assert (!ctxt->hasState (ContextState::ABORTED_CHILD));
 
-          exFunc (ctxt->getActive (), ctxt->userHandle);
+          Base::exFunc (ctxt->getActive (), ctxt->userHandle);
         },
-        "exec-func",
-        Galois::chunk_size<ExFunc::CHUNK_SIZE> ());
+        std::make_tuple (
+          Galois::loopname ("exec-func"),
+          Galois::chunk_size<ExFunc::CHUNK_SIZE> ()));
 
     }
   }
@@ -886,8 +892,8 @@ private:
   GALOIS_ATTRIBUTE_PROF_NOINLINE void applyOperator (CtxtWL& sources) {
     Ctxt* minElem = nullptr;
 
-    if (BASE::NEEDS_PUSH) {
-      if (targetCommitRatio != 0.0 && !winWL.empty ()) {
+    if (Base::NEEDS_PUSH) {
+      if (Base::targetCommitRatio != 0.0 && !winWL.empty ()) {
         minElem = *winWL.getMin();
       }
     }
@@ -895,7 +901,7 @@ private:
     Galois::do_all_choice (makeLocalRange (sources),
         [this, minElem] (Ctxt* c) {
 
-          UserCtxt& uhand = c->userHandle;
+          typename Base::UserCtxt& uhand = c->userHandle;
 
           assert (c->isSrc ());
           assert (!c->hasState (ContextState::RECLAIM));
@@ -904,18 +910,17 @@ private:
           bool commit = true;
 
           if (Base::OPERATOR_CAN_ABORT) {
-            runCatching (opFunc, c, uhand);
+            runCatching (Base::opFunc, c, uhand);
             commit = c->isSrc (); // in case opFunc signalled abort
 
           } else {
-            opFunc (c->getActive (), uhand);
+            Base::opFunc (c->getActive (), uhand);
             commit = true;
           }
 
           if (commit) {
 
-
-            if (BASE::NEEDS_PUSH) {
+            if (Base::NEEDS_PUSH) {
 
               for (auto i = uhand.getPushBuffer ().begin ()
                   , endi = uhand.getPushBuffer ().end (); i != endi; ++i) {
@@ -923,7 +928,7 @@ private:
                 Ctxt* child = ctxtMaker (*i);
                 c->addChild (child);
 
-                if (!minElem || !ctxtCmp (minElem, child)) {
+                if (!minElem || !Base::ctxtCmp (minElem, child)) {
                   // if *i >= *minElem
                   Base::getNextWL ().push_back (child);
                 } else {
@@ -938,14 +943,14 @@ private:
             bool b = c->casState (ContextState::SCHEDULED, ContextState::READY_TO_COMMIT);
 
             assert (b && "CAS shouldn't have failed");
-            roundCommits += 1;
+            Base::roundCommits += 1;
 
             c->publishChanges ();
             c->addToHistory ();
             commitQ.get ().push_back (c);
 
-            if (ENABLE_PARAMETER) {
-              c->markExecRound (rounds);
+            if (Base::ENABLE_PARAMETER) {
+              c->markExecRound (Base::rounds);
             }
 
           } else {
@@ -958,8 +963,9 @@ private:
             }
           }
         },
-        "applyOperator",
-        chunk_size<OpFunc::CHUNK_SIZE> ());
+        std::make_tuple (
+          Galois::loopname ("applyOperator"),
+          Galois::chunk_size<OpFunc::CHUNK_SIZE> ()));
 
   }
 
@@ -974,7 +980,7 @@ private:
 
             Ctxt*& lm = *(perThrdMin.getLocal ());
 
-            if (!lm || ctxtCmp (*i, lm)) {
+            if (!lm || Base::ctxtCmp (*i, lm)) {
               lm = *i;
             }
           }
@@ -989,7 +995,7 @@ private:
       Ctxt* lm = *(perThrdMin.getRemote (i));
 
       if (lm) {
-        if (!ret || ctxtCmp (lm, ret)) {
+        if (!ret || Base::ctxtCmp (lm, ret)) {
           ret = lm;
         }
       }
@@ -998,7 +1004,7 @@ private:
     Ctxt* const* minElem = winWL.getMin ();
 
     if (minElem) {
-      if (!ret || ctxtCmp (*minElem, ret)) {
+      if (!ret || Base::ctxtCmp (*minElem, ret)) {
         ret = *minElem;
       }
     }
@@ -1046,8 +1052,9 @@ private:
 
           } 
         },
-        "mark-aborts",
-        Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
+        std::make_tuple (
+          Galois::loopname ("mark-aborts"),
+          Galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
 
 
     Galois::Runtime::for_each_gen (
@@ -1086,9 +1093,9 @@ private:
 
           c->resetMarks ();
         },
-
-        "collect-sources",
-        Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
+        std::make_tuple ( 
+          Galois::loopname ("collect-sources"),
+          Galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
 
 
   }
@@ -1105,14 +1112,15 @@ private:
           assert (c);
 
           if (c->hasState (ContextState::READY_TO_COMMIT) 
-              && (!gvt || ctxtCmp (c, gvt))
+              && (!gvt || Base::ctxtCmp (c, gvt))
               && c->isCommitSrc ()) {
 
             commitSources.push (c);
           }
         },
-        "find-commit-srcs",
-        Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
+        std::make_tuple (
+          Galois::loopname ("find-commit-srcs"),
+          Galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
         
 
     Galois::Runtime::for_each_gen (
@@ -1128,7 +1136,7 @@ private:
             c->findCommitSrc (gvt, wlHandle);
             totalRetires += 1;
 
-            if (ENABLE_PARAMETER) {
+            if (Base::ENABLE_PARAMETER) {
               assert (c->getExecRound () < execRcrds.size ());
               execRcrds[c->getExecRound ()].parallelism += 1;
             }
@@ -1147,8 +1155,8 @@ private:
   }
 
   void freeCtxt (Ctxt* ctxt) {
-    ctxtAlloc.destroy (ctxt);
-    ctxtAlloc.deallocate (ctxt, 1);
+    Base::ctxtAlloc.destroy (ctxt);
+    Base::ctxtAlloc.deallocate (ctxt, 1);
   }
 
   void reclaimMemory (CtxtWL& sources) {
@@ -1209,7 +1217,7 @@ void for_each_ordered_optim (const R& range, const Cmp& cmp, const NhFunc& nhFun
 
   using Exec = OptimOrdExecutor<T, Cmp, NhFunc, ExFunc, OpFunc, ArgsT>;
   
-  Exec e (cmp, nhFunc, exFunc, opFunc, loopname);
+  Exec e (cmp, nhFunc, exFunc, opFunc, argsT);
 
   Substrate::getThreadPool().burnPower (Galois::getActiveThreads ());
 

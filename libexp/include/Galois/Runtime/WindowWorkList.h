@@ -266,7 +266,9 @@ public:
 
   template <typename WL>
   void poll (WL& workList, const size_t newSize, const size_t origSize) {
-    poll (workList, newSize, origSize, [] (const T& x) { return x; });
+
+    auto f = [] (const T& x) { return x; };
+    poll (workList, newSize, origSize, f);
   }
 
   template <typename WL, typename CtxtMaker>

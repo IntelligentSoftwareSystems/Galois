@@ -21,9 +21,9 @@ struct operator_can_abort: public trait_has_type<T>, operator_can_abort_tag {};
 
 
 struct chunk_size_tag {
-  static const unsigned MIN = 1;
-  static const unsigned MAX = 4096;
+  enum { MIN = 1, MAX = 4096 };
 };
+
 
 namespace HIDDEN {
   template <unsigned V, unsigned MIN, unsigned MAX> 
@@ -43,28 +43,46 @@ namespace HIDDEN {
 }
 
 /**
- * specify chunk size for do_all_coupled & do_all_choice at compile time
+ * specify chunk size for do_all_coupled & do_all_choice at compile time or
+ * at runtime
+ * For compile time, use the template argument, e.g., Galois::chunk_size<16> ()
+ * Additionally, user may provide a runtime argument, e.g, Galois::chunk_size<16> (8)
+ *
+ * Currently, only do_all_coupled can take advantage of the runtime argument. 
+ * TODO: allow runtime provision/tuning of chunk_size in other loop executors
+ *
  * chunk size is regulated to be within [chunk_size_tag::MIN, chunk_size_tag::MAX]
  */
+
 template <unsigned SZ> 
 struct chunk_size: 
-  public trait_has_svalue<unsigned, HIDDEN::regulate_chunk_size<SZ>::value>, chunk_size_tag {};
+  // public trait_has_svalue<unsigned, HIDDEN::regulate_chunk_size<SZ>::value>, trait_has_value<unsigned>, chunk_size_tag {    
+  public trait_has_value<unsigned>, chunk_size_tag {    
+
+  static const unsigned value = HIDDEN::regulate_chunk_size<SZ>::value;
+
+  unsigned regulate (const unsigned cs) const {
+    return std::min (std::max (unsigned (chunk_size_tag::MIN), cs), unsigned (chunk_size_tag::MAX));
+  }
+
+  chunk_size (unsigned cs=SZ): trait_has_value (regulate (cs)) {}
+};
 
 struct default_chunk_size: public chunk_size<16> {};
 
-struct rt_chunk_size_tag {};
-
-/**
- * specify chunk size for do_all_coupled & do_all_choice at run time
- * chunk size is regulated to be within [chunk_size_tag::MIN, chunk_size_tag::MAX]
- */
-struct rt_chunk_size: public trait_has_value<const unsigned>, rt_chunk_size_tag {
-  unsigned regulate (const unsigned cs) const {
-    return std::min (std::max (chunk_size_tag::MIN, cs), chunk_size_tag::MAX);
-  }
-
-  rt_chunk_size (const unsigned cs): trait_has_value<const unsigned> (regulate (cs)) {} 
-};
+// struct rt_chunk_size_tag {};
+// 
+// /**
+ // * specify chunk size for do_all_coupled & do_all_choice at run time
+ // * chunk size is regulated to be within [chunk_size_tag::MIN, chunk_size_tag::MAX]
+ // */
+// struct rt_chunk_size: public trait_has_value<const unsigned>, rt_chunk_size_tag {
+  // unsigned regulate (const unsigned cs) const {
+    // return std::min (std::max (unsigned (chunk_size_tag::MIN), cs), unsigned (chunk_size_tag::MAX));
+  // }
+// 
+  // rt_chunk_size (const unsigned cs): trait_has_value<const unsigned> (regulate (cs)) {} 
+// };
 
 
 } // end namespace Galois

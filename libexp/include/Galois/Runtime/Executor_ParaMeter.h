@@ -57,8 +57,8 @@ namespace ParaMeter {
 struct StepStats {
 
   size_t step;
-  size_t workListSize;
   size_t parallelism = 0;
+  size_t workListSize;
 
   explicit StepStats (size_t _step, size_t _wlsz): step (_step), workListSize (_wlsz) {}
 

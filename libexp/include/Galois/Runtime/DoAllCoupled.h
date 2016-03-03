@@ -588,8 +588,6 @@ private:
 
 
 private:
-  static const bool HAS_RT_CHUNK_SIZE = exists_by_supertype<rt_chunk_size_tag, ArgsTuple>::value;
-  static const unsigned CHUNK_SIZE = get_type_by_supertype<chunk_size_tag, ArgsTuple>::type::value; 
 
 
   R range;
@@ -614,7 +612,7 @@ public:
       range (_range),
       func (_func), 
       loopname (get_by_supertype<loopname_tag> (argsTuple).value),
-      chunk_size ((HAS_RT_CHUNK_SIZE)? get_by_supertype<rt_chunk_size_tag> (argsTuple).value: CHUNK_SIZE),
+      chunk_size (get_by_supertype<chunk_size_tag> (argsTuple).value),
       term(Substrate::getSystemTermination(activeThreads))
   {
     assert (chunk_size > 0);
@@ -717,8 +715,8 @@ void do_all_coupled (const R& range, const F& func, const _ArgsTuple& argsTuple)
 
   auto argsT = std::tuple_cat (argsTuple, 
       get_default_trait_values (argsTuple,
-        std::make_tuple (loopname_tag {}, chunk_size_tag {}, rt_chunk_size_tag {}), 
-        std::make_tuple (default_loopname {}, default_chunk_size {}, rt_chunk_size {default_chunk_size::value} )));
+        std::make_tuple (loopname_tag {}, chunk_size_tag {}), 
+        std::make_tuple (default_loopname {}, default_chunk_size {})));
   using ArgsT = decltype (argsT);
   details::DoAllCoupledExec<R, F, ArgsT> exec (range, func, argsT);
 
@@ -735,8 +733,8 @@ void do_all_coupled_detailed (const R& range, const F& func, const _ArgsTuple& a
 
   auto argsT = std::tuple_cat (argsTuple, 
       get_default_trait_values (argsTuple,
-        std::make_tuple (loopname_tag {}, chunk_size_tag {}, rt_chunk_size_tag {}), 
-        std::make_tuple (default_loopname {}, default_chunk_size {}, rt_chunk_size {default_chunk_size::value} )));
+        std::make_tuple (loopname_tag {}, chunk_size_tag {}), 
+        std::make_tuple (default_loopname {}, default_chunk_size {})));
   using ArgsT = decltype (argsT);
   details::DoAllCoupledExec<R, F, ArgsT> exec (range, func, argsT);
 

@@ -52,7 +52,7 @@
 #include "Galois/Runtime/Support.h"
 #include "Galois/Substrate/Termination.h"
 #include "Galois/Substrate/ThreadPool.h"
-#include "Galois/Runtime/KDGtwoPhaseSupport.h"
+#include "Galois/Runtime/IKDGbase.h"
 #include "Galois/Runtime/WindowWorkList.h"
 #include "Galois/Runtime/UserContextAccess.h"
 #include "Galois/Substrate/gio.h"
@@ -75,6 +75,8 @@ namespace {
 template <typename T, typename Cmp>
 class TwoPhaseContext: public OrderedContextBase<T> {
 
+public:
+
   using Base = OrderedContextBase<T>;
   // using NhoodList =  Galois::gdeque<Lockable*, 4>;
   using CtxtCmp = ContextComparator<TwoPhaseContext, Cmp>;
@@ -82,7 +84,6 @@ class TwoPhaseContext: public OrderedContextBase<T> {
   CtxtCmp ctxtCmp;
   bool source = true;
 
-public:
 
   using value_type = T;
 
@@ -173,13 +174,14 @@ public:
 };
 
 template <typename T, typename Cmp, typename NhFunc, typename ExFunc, typename OpFunc, typename ArgsTuple>
-class IKDGtwoPhaseExecutor: public IKDGbase<T, Cmp, NhFunc, ExFunc, OpFunc, ArgsTuple, IKDGtwoPhaseExecutor<T, Cmp, NhFunc, ExFunc, OpFunc, ArgsTuple> > {
+class IKDGtwoPhaseExecutor: public IKDGbase<T, Cmp, TwoPhaseContext<T, Cmp>, NhFunc, ExFunc, OpFunc, ArgsTuple> {
 
 public:
-  using Base = IKDGbase <T, Cmp, NhFunc, ExFunc, OpFunc, ArgsTuple, IKDGtwoPhaseExecutor>;
   using Ctxt = TwoPhaseContext<T, Cmp>;
+  using Base = IKDGbase <T, Cmp, Ctxt, NhFunc, ExFunc, OpFunc, ArgsTuple>;
 
   using WindowWL = typename std::conditional<Base::NEEDS_PUSH, PQbasedWindowWL<T, Cmp>, SortedRangeWindowWL<T, Cmp> >::type;
+  using CtxtWL = typename Base::CtxtWL;
 
 
 
@@ -227,7 +229,7 @@ protected:
   };
 
   WindowWLwrapper winWLwrapper;
-  MakeContext ctxtMaker;
+  CtxtMaker ctxtMaker;
 
 
 public:
@@ -238,7 +240,7 @@ public:
       const OpFunc& opFunc,
       const ArgsTuple& argsTuple)
     :
-      Base (cmp, nhFunc, exFunc, opFunc, argsTuple)
+      Base (cmp, nhFunc, exFunc, opFunc, argsTuple),
       winWLwrapper (*this, cmp),
       ctxtMaker {*this}
   {
@@ -246,25 +248,33 @@ public:
 
   ~IKDGtwoPhaseExecutor () {
 
+    dumpStats ();
+
     if (Base::ENABLE_PARAMETER) {
       ParaMeter::closeStatsFile ();
     }
   }
 
+  void dumpStats (void) {
+    reportStat (Base::loopname, "efficiency", double (Base::totalCommits) / Base::totalTasks);
+    reportStat (Base::loopname, "avg. parallelism", double (Base::totalCommits) / Base::rounds);
+  }
+
   template <typename R>
   void push_initial (const R& range) {
-    if (targetCommitRatio == 0.0) {
+    if (Base::targetCommitRatio == 0.0) {
 
       Galois::do_all_choice (range,
           [this] (const T& x) {
-          Base::getNextWL ().push_back (ctxtMaker (x));
+            Base::getNextWL ().push_back (ctxtMaker (x));
           }, 
-          "init-fill",
-          chunk_size<NhFunc::CHUNK_SIZE> ());
+          std::make_tuple (
+            Galois::loopname ("init-fill"),
+            chunk_size<NhFunc::CHUNK_SIZE> ()));
 
 
     } else {
-      winWL.initfill (range);
+      winWLwrapper.initfill (range);
           
     }
   }
@@ -276,30 +286,30 @@ public:
 protected:
   /*
   GALOIS_ATTRIBUTE_PROF_NOINLINE void spillAll (CtxtWL& wl) {
-    assert (targetCommitRatio != 0.0);
+    assert (Base::targetCommitRatio != 0.0);
     on_each(
         [this, &wl] (const unsigned tid, const unsigned numT) {
           while (!wl[tid].empty ()) {
             Ctxt* c = wl[tid].back ();
             wl[tid].pop_back ();
 
-            winWL.push (c->getActive ());
+            winWLwrapper.push (c->getActive ());
             c->~Ctxt ();
             ctxtAlloc.deallocate (c, 1);
           }
         });
 
     assert (wl.empty_all ());
-    assert (!winWL.empty ());
+    assert (!winWLwrapper.empty ());
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void refill (CtxtWL& wl, size_t currCommits, size_t prevWindowSize) {
 
-    assert (targetCommitRatio != 0.0);
+    assert (Base::targetCommitRatio != 0.0);
 
     const size_t INIT_MAX_ROUNDS = 500;
     const size_t THREAD_MULT_FACTOR = 16;
-    const double TARGET_COMMIT_RATIO = targetCommitRatio;
+    const double TARGET_COMMIT_RATIO = Base::targetCommitRatio;
     const size_t MIN_WIN_SIZE = OpFunc::CHUNK_SIZE * getActiveThreads ();
     // const size_t MIN_WIN_SIZE = 2000000; // OpFunc::CHUNK_SIZE * getActiveThreads ();
     const size_t WIN_OVER_SIZE_FACTOR = 8;
@@ -308,14 +318,14 @@ protected:
       assert (currCommits == 0);
 
       // initial settings
-      if (NEEDS_PUSH) {
+      if (Base::NEEDS_PUSH) {
         windowSize = std::max (
-            (winWL.initSize ()),
+            (winWLwrapper.initSize ()),
             (THREAD_MULT_FACTOR * MIN_WIN_SIZE));
 
       } else {
         windowSize = std::min (
-            (winWL.initSize () / INIT_MAX_ROUNDS),
+            (winWLwrapper.initSize () / INIT_MAX_ROUNDS),
             (THREAD_MULT_FACTOR * MIN_WIN_SIZE));
       }
     } else {
@@ -348,11 +358,11 @@ protected:
     assert (windowSize > 0);
 
 
-    if (NEEDS_PUSH) {
-      if (winWL.empty () && (wl.size_all () > windowSize)) {
-        // a case where winWL is empty and all the new elements were going into 
+    if (Base::NEEDS_PUSH) {
+      if (winWLwrapper.empty () && (wl.size_all () > windowSize)) {
+        // a case where winWLwrapper is empty and all the new elements were going into 
         // nextWL. When nextWL becomes bigger than windowSize, we must do something
-        // to control efficiency. One solution is to spill all elements into winWL
+        // to control efficiency. One solution is to spill all elements into winWLwrapper
         // and refill
         //
 
@@ -364,7 +374,7 @@ protected:
       }
     }
 
-    winWL.poll (wl, windowSize, wl.size_all (), ctxtMaker);
+    winWLwrapper.poll (wl, windowSize, wl.size_all (), ctxtMaker);
     // std::cout << "Calculated Window size: " << windowSize << ", Actual: " << wl->size_all () << std::endl;
   }
 
@@ -372,7 +382,7 @@ protected:
   GALOIS_ATTRIBUTE_PROF_NOINLINE void beginRound () {
     std::swap (currWL, nextWL);
 
-    if (targetCommitRatio != 0.0) {
+    if (Base::targetCommitRatio != 0.0) {
       size_t currCommits = roundCommits.reduceRO (); 
 
       size_t prevWindowSize = roundTasks.reduceRO ();
@@ -389,27 +399,28 @@ protected:
   GALOIS_ATTRIBUTE_PROF_NOINLINE void endRound () {
     Base::endRound ();
 
-    if (ENABLE_PARAMETER) {
-      ParaMeter::StepStats s (rounds, roundCommits.reduceRO (), roundTasks.reduceRO ());
-      s.dump (ParaMeter::getStatsFile (), loopname);
+    if (Base::ENABLE_PARAMETER) {
+      ParaMeter::StepStats s (Base::rounds, Base::roundCommits.reduceRO (), Base::roundTasks.reduceRO ());
+      s.dump (ParaMeter::getStatsFile (), Base::loopname);
     }
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhoodImpl (HIDDEN::DummyExecFunc*) {
     // for stable case
 
-    Galois::do_all_choice (makeLocalRange (Base::getCurrWL ())
+    Galois::do_all_choice (makeLocalRange (Base::getCurrWL ()),
         [this] (Ctxt* c) {
-          UserCtxt& uhand = *userHandles.getLocal ();
+          typename Base::UserCtxt& uhand = *Base::userHandles.getLocal ();
           uhand.reset ();
 
           // nhFunc (c, uhand);
-          runCatching (nhFunc, c, uhand);
+          runCatching (Base::nhFunc, c, uhand);
 
-          roundTasks += 1;
+          Base::roundTasks += 1;
         },
-        "expandNhood",
-        chunk_size<NhFunc::CHUNK_SIZE> ());
+        std::make_tuple (
+          Galois::loopname ("expandNhood"),
+          chunk_size<NhFunc::CHUNK_SIZE> ()));
   }
 
   struct GetActive: public std::unary_function<Ctxt*, const T&> {
@@ -427,21 +438,22 @@ protected:
 
     Galois::do_all_choice (makeLocalRange (Base::getCurrWL ()),
         [m_beg, m_end, this] (Ctxt* c) {
-          UserCtxt& uhand = *userHandles.getLocal ();
+          typename Base::UserCtxt& uhand = *Base::userHandles.getLocal ();
           uhand.reset ();
 
-          runCatching (nhFunc, c, uhand, m_beg, m_end);
+          runCatching (Base::nhFunc, c, uhand, m_beg, m_end);
 
-          roundTasks += 1;
+          Base::roundTasks += 1;
         },
-        "expandNhoodUnstable",
-        chunk_size<NhFunc::CHUNK_SIZE> ());
+        std::make_tuple (
+          Galois::loopname ("expandNhoodUnstable"),
+          chunk_size<NhFunc::CHUNK_SIZE> ()));
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhood () {
     // using ptr to exFunc to choose the right impl. 
     // relying on the fact that for stable case, the exFunc is DummyExecFunc. 
-    expandNhoodImpl (&exFunc); 
+    expandNhoodImpl (&this->exFunc); 
   }
 
   inline void executeSourcesImpl (HIDDEN::DummyExecFunc*) {
@@ -449,35 +461,36 @@ protected:
 
   template <typename F>
   GALOIS_ATTRIBUTE_PROF_NOINLINE void executeSourcesImpl (F*) {
-    assert (HAS_EXEC_FUNC);
+    assert (Base::HAS_EXEC_FUNC);
 
     Galois::do_all_choice (makeLocalRange (Base::getCurrWL ()),
       [this] (Ctxt* ctxt) {
 
-        UserCtxt& uhand = *userHandles.getLocal ();
+        typename Base::UserCtxt& uhand = *Base::userHandles.getLocal ();
         uhand.reset ();
 
         if (ctxt->isSrc ()) {
-          exFunc (ctxt->getActive (), uhand);
+          this->exFunc (ctxt->getActive (), uhand);
         }
       },
-      "exec-sources",
-      Galois::chunk_size<ExFunc::CHUNK_SIZE> ());
+      std::make_tuple (
+        Galois::loopname ("exec-sources"),
+        Galois::chunk_size<ExFunc::CHUNK_SIZE> ()));
 
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void executeSources (void) {
     // using ptr to exFunc to choose the right impl. 
     // relying on the fact that for stable case, the exFunc is DummyExecFunc. 
-    executeSourcesImpl (&exFunc);
+    executeSourcesImpl (&this->exFunc);
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void applyOperator () {
     Galois::optional<T> minElem;
 
-    if (NEEDS_PUSH) {
-      if (targetCommitRatio != 0.0 && !winWL.empty ()) {
-        minElem = *winWL.getMin();
+    if (Base::NEEDS_PUSH) {
+      if (Base::targetCommitRatio != 0.0 && !winWLwrapper.empty ()) {
+        minElem = *winWLwrapper.getMin();
       }
     }
 
@@ -486,28 +499,35 @@ protected:
         [this, &minElem] (Ctxt* c) {
           bool commit = false;
 
-          UserCtxt& uhand = *userHandles.getLocal ();
+          typename Base::UserCtxt& uhand = *Base::userHandles.getLocal ();
           uhand.reset ();
 
           if (c->isSrc ()) {
             // opFunc (c->active, uhand);
-            runCatching (opFunc, c, uhand);
-            commit = c->isSrc (); // in case opFunc signalled abort
+            if (Base::OPERATOR_CAN_ABORT) {
+              runCatching (Base::opFunc, c, uhand);
+              commit = c->isSrc (); // in case opFunc signalled abort
+
+            } else {
+              Base::opFunc (c->getActive (), uhand);
+              assert (c->isSrc ());
+              commit = true;
+            }
           } else {
             commit = false;
           }
 
           if (commit) {
-            roundCommits += 1;
-            if (NEEDS_PUSH) { 
+            Base::roundCommits += 1;
+            if (Base::NEEDS_PUSH) { 
               for (auto i = uhand.getPushBuffer ().begin ()
                   , endi = uhand.getPushBuffer ().end (); i != endi; ++i) {
 
-                if ((targetCommitRatio == 0.0) || !minElem || !cmp (*minElem, *i)) {
+                if ((Base::targetCommitRatio == 0.0) || !minElem || !Base::cmp (*minElem, *i)) {
                   // if *i >= *minElem
                   Base::getNextWL ().push_back (ctxtMaker (*i));
                 } else {
-                  winWL.push (*i);
+                  winWLwrapper.push (*i);
                 } 
               }
             } else {
@@ -516,22 +536,23 @@ protected:
 
             c->commitIteration ();
             c->~Ctxt ();
-            ctxtAlloc.deallocate (c, 1);
+            Base::ctxtAlloc.deallocate (c, 1);
           } else {
             c->cancelIteration ();
             c->reset ();
             Base::getNextWL ().push_back (c);
           }
         },
-        "applyOperator",
-        chunk_size<OpFunc::CHUNK_SIZE> ());
+        std::make_tuple (
+          Galois::loopname ("applyOperator"),
+          chunk_size<OpFunc::CHUNK_SIZE> ()));
   }
 
 
   void execute_impl () {
 
     while (true) {
-      beginRound (winWLwrapper);
+      Base::beginRound (winWLwrapper);
 
       if (Base::getCurrWL ().empty_all ()) {
         break;
@@ -763,7 +784,7 @@ private:
 
 template <typename R, typename Cmp, typename NhFunc, typename OpFunc, typename ExFunc, typename _ArgsTuple>
 void for_each_ordered_ikdg (const R& range, const Cmp& cmp, const NhFunc& nhFunc, 
-    const ExFunc& exFunc,  const OpFunc& opFunc, const ArgsTuple& argsTuple) {
+    const ExFunc& exFunc,  const OpFunc& opFunc, const _ArgsTuple& argsTuple) {
 
   auto argsT = std::tuple_cat (argsTuple, 
       get_default_trait_values (argsTuple,
@@ -774,7 +795,7 @@ void for_each_ordered_ikdg (const R& range, const Cmp& cmp, const NhFunc& nhFunc
   using T = typename R::value_type;
   
 
-  using Exec = IKDGtwoPhaseExecutor<T, Cmp, NhFunc, ExFunc, OpFunc, ArgsT>
+  using Exec = IKDGtwoPhaseExecutor<T, Cmp, NhFunc, ExFunc, OpFunc, ArgsT>;
   
   Exec e (cmp, nhFunc, exFunc, opFunc, argsT);
 
