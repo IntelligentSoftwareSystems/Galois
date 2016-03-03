@@ -30,11 +30,7 @@
 
 #include "clang/Rewrite/Core/Rewriter.h"
 
-//#include "Generation.h"
 #include "ClangUtils.h"
-//#include "GaloisCLGen.h"
-//#include "GaloisAST.h"
-//#include "AOSToSOA.h"
 
 using namespace clang;
 using namespace clang::ast_matchers;
@@ -62,7 +58,7 @@ private:
 
 public:
    OpenCLCodeGenConsumer(CompilerInstance &Instance, std::set<std::string> &ParsedTemplates, Rewriter &_R) :
-         Instance(Instance), ParsedTemplates(ParsedTemplates), R(_R){
+         Instance(Instance), ParsedTemplates(ParsedTemplates), R(_R) {
       llvm::outs() << "=============================Created OpenCLCodeGenConsumer===========================\n";
 
    }
@@ -76,13 +72,32 @@ public:
    virtual void HandleTranslationUnit(ASTContext &Context) {
       ast_utility.init(&R);
       llvm::outs() << "=============================InHandleTranslationUnit===========================\n";
-      OpenCLDeviceHandler clDevHandler(R);
+      CXXRecordDecl * graphClass = nullptr;
+//      std::map<const Type * , string> type_map;
+      {
+         MatchFinder ndFinder;
+         NodeDataGen ndGen(R, Context);
+//         ndFinder.addMatcher( varDecl(isExpansionInMainFile(), hasType(allOf( recordDecl(hasMethod(hasName("getData")) ) , classTemplateSpecializationDecl( hasTemplateArgument(0, templateArgument().bind("NData") )  )) ) ), &ndGen);
+         ndFinder.addMatcher( varDecl(isExpansionInMainFile(), allOf( hasType(recordDecl(hasMethod(hasName("getData")) )) , hasType(classTemplateSpecializationDecl( hasTemplateArgument(0, templateArgument().bind("NData") )  )) ) ), &ndGen);
+         ndFinder.addMatcher( varDecl(isExpansionInMainFile(), allOf( hasType(recordDecl(hasMethod(hasName("getData")) )) , hasType(classTemplateSpecializationDecl( hasTemplateArgument(1, templateArgument().bind("EData") )  )) ) ), &ndGen);
+         ndFinder.matchAST(Context);
+      }
+      {//Find graph instance to create table for type replacement
+         /*GraphCollector gc(R);
+         MatchFinder gFinder;
+         gFinder.addMatcher(varDecl(isExpansionInMainFile(), hasType(recordDecl(hasMethod(hasName("getData")) ).bind("graphClass"))), &gc);
+         gFinder.matchAST(Context);
+         graphClass=gc.graphClass;*/
+      }
+      {//Perform code generation.
+         OpenCLDeviceHandler clDevHandler(R,graphClass);
          MatchFinder opFinder;
          opFinder.addMatcher(methodDecl(isExpansionInMainFile(), hasName("operator()")).bind("kernel"), &clDevHandler);
          opFinder.matchAST(Context);
+      }
 
-   }//End HandleTranslationUnit
- };
+   } //End HandleTranslationUnit
+};
 /********************************************************************************************************
  * The plugin AST action.
  *
@@ -94,16 +109,6 @@ private:
 protected:
 
    void EndSourceFileAction() override {
-//      llvm::outs() << "EndSourceFileAction() :: Entered\n" << "ParseTemplates:: " << ParsedTemplates.size() << "\n";
-//      std::string kernel_code;
-//      raw_string_ostream kernel_stream(kernel_code);
-//      TheRewriter.getEditBuffer(TheRewriter.getSourceMgr().getMainFileID()).write(kernel_stream);
-//      kernel_code.append("\n=======================================================\n");
-//      TheRewriter.getRewriteBufferFor(TheRewriter.getSourceMgr().getMainFileID())->write(kernel_stream);
-//      std::ofstream kernel_file ("kernel.cl");
-//      kernel_file << kernel_code;
-//      kernel_file.close();
-//      llvm::outs() << kernel_code << " \n";
       llvm::outs() << "EndSourceFileAction() :: Returning\n";
    }
    std::unique_ptr<ASTConsumer> CreateASTConsumer(CompilerInstance &CI, llvm::StringRef) override {
@@ -125,4 +130,4 @@ protected:
  * ./clang -cc1 -load ../lib/OpenCLCodeGen.so -plugin opencl-analysis <FILENAME>
  *
  ********************************************************************************************************/
-static FrontendPluginRegistry::Add<OpenCLCodeGenAction> X("opencl-analysis", "Galois OpenCL codegen");
+static FrontendPluginRegistry::Add<OpenCLCodeGenAction> X("opencl-device-codegen", "Galois OpenCL codegen for device");

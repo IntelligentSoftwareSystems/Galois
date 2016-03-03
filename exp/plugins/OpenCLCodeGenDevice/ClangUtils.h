@@ -75,7 +75,7 @@ struct ASTUtility {
          llvm::outs() << *p;
       }
    }
-   std::string get_timestamp() {
+   static std::string get_timestamp() {
       time_t now = time(0);
       struct tm tstruct;
       char buf[80];
