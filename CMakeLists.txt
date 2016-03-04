@@ -140,7 +140,7 @@ add_definitions(-DGALOIS_COPYRIGHT_YEAR=${GALOIS_COPYRIGHT_YEAR})
 if(USE_EXP)
   set(USE_VTUNE ON)
   add_definitions(-DGALOIS_USE_EXP)
-  include_directories("exp/include")
+  include_directories("libexp/include")
 
   find_package(OpenMP)
   if(OPENMP_FOUND)
