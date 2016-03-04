@@ -179,6 +179,20 @@ if(USE_EXP)
   endif()
 endif()
 
+if(USE_VTUNE)
+  message(STATUS "${VTune_ROOT}")
+  set(VTune_ROOT /opt/intel/vtune_amplifier_xe)
+  find_package(VTune)
+  message(STATUS "${VTune_INCLUDE_DIRS}")
+
+  if (VTune_FOUND)
+    include_directories(${VTune_INCLUDE_DIRS})
+    add_definitions(-DGALOIS_USE_VTUNE)
+  else()
+    message(FATAL_ERROR "VTune not found")
+  endif()
+endif()
+
 # PThreads
 find_package(Threads REQUIRED)
 
@@ -290,6 +304,10 @@ function(app name)
   target_link_libraries(${name} gllvm)
   target_link_libraries(${name} rt)
   target_link_libraries(${name} ${CMAKE_THREAD_LIBS_INIT})
+
+  if(USE_VTUNE)
+    target_link_libraries(${name} ${VTune_LIBRARIES})
+  endif()
 
   if(INSTALL_APPS)
     install(TARGETS ${name} DESTINATION bin)

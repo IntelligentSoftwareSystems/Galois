@@ -27,7 +27,7 @@ done 2>&1 | tee ${OUT_PREFIX}.run.log
 function_out="${OUT_PREFIX}.function.log";
 line_out="${OUT_PREFIX}.line.log";
 
-cat $function_out | perl $scriptsDir/report_vtune.pl --in function > vtune_summary.function.${stamp}.csv
+cat $function_out | c++filt | perl $scriptsDir/report_vtune.pl --in function > vtune_summary.function.${stamp}.csv
 
 cat $line_out | perl $scriptsDir/report_vtune.pl --in line > vtune_summary.line.${stamp}.csv
 
