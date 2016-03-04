@@ -87,7 +87,7 @@ public:
   virtual ~IrGLOperatorVisitor() {}
 
   std::string FormatCBlock(std::string text) {
-    assert(text.find("graph.getData") == std::string::npos);
+    assert(text.find("graph->getData") == std::string::npos);
 
     // replace node variables: array of structures to structure of arrays
     // FIXME: does not handle scoped variables (nesting with same variable name)
@@ -105,7 +105,7 @@ public:
         pos = text.find(nodeVar.first);
       }
     }
-    // FIXME: use & (address-of) operator for atomicu variables in atomicAdd() etc
+    // FIXME: use & (address-of) operator for atomic variables in atomicAdd() etc
 
     while (1) {
       std::size_t found = text.find("nout(");
@@ -113,7 +113,7 @@ public:
         std::size_t begin = text.find(",", found);
         std::size_t end = text.find(",", begin+1);
         std::string var = text.substr(begin+1, end - begin - 1);
-        std::string replace = "graph.getOutDegree(" + var + ")";
+        std::string replace = "graph->getOutDegree(" + var + ")";
         end = text.find(")", end);
         text = text.replace(found, end - found + 1, replace);
       } else {
@@ -170,7 +170,7 @@ public:
   virtual bool TraverseStmt(Stmt *S) {
     bool traverse = RecursiveASTVisitor<IrGLOperatorVisitor>::TraverseStmt(S);
     if (traverse && S) {
-      if (isa<CXXForRangeStmt>(S)) {
+      if (isa<CXXForRangeStmt>(S) || isa<ForStmt>(S)) {
         bodyString << "]),\n"; // end ForAll
       } else if (isa<IfStmt>(S)) {
         bodyString << "]),\n"; // end If
@@ -200,6 +200,7 @@ public:
   }
 
   virtual bool VisitCXXForRangeStmt(CXXForRangeStmt* forStmt) {
+    assert(forStmt->getLoopVariable());
     skipDecls.insert(forStmt->getLoopVariable());
     DeclStmt *rangeStmt = forStmt->getRangeStmt();
     for (auto decl : rangeStmt->decls()) {
@@ -208,33 +209,60 @@ public:
         skipStmts.insert(expr);
       }
     }
-    symbolTable.insert(forStmt->getLoopVariable()->getNameAsString());
+    std::string variableName = forStmt->getLoopVariable()->getNameAsString();
+    symbolTable.insert(variableName);
     const Expr *expr = forStmt->getRangeInit();
     SourceRange range(expr->getLocStart(), expr->getLocEnd());
     std::string vertexName = rewriter.getRewrittenText(range);
-    std::size_t found = vertexName.find("graph.edges");
+    std::size_t found = vertexName.find("graph->edges");
     assert(found != std::string::npos);
     std::size_t begin = vertexName.find("(", found);
     std::size_t end = vertexName.find(",", begin);
+    if (end == std::string::npos) end = vertexName.find(")", begin);
     vertexName = vertexName.substr(begin+1, end - begin - 1);
-    bodyString << "ForAll(\"" << forStmt->getLoopVariable()->getNameAsString() 
-      << "\", G.edges(\"" << vertexName << "\"),\n[\n";
+    bodyString << "ForAll(\"" << variableName << "\", G.edges(\"" << vertexName << "\"),\n[\n";
+    return true;
+  }
+
+  virtual bool VisitForStmt(ForStmt* forStmt) {
+    skipStmts.insert(forStmt->getInit());
+    skipStmts.insert(forStmt->getCond());
+    skipStmts.insert(forStmt->getInc());
+    std::string variableName;
+    if (forStmt->getConditionVariable()) {
+      skipDecls.insert(forStmt->getConditionVariable());
+      variableName = forStmt->getConditionVariable()->getNameAsString();
+    } else {
+      variableName = dyn_cast<VarDecl>(dyn_cast<DeclStmt>(forStmt->getInit())->getSingleDecl())->getNameAsString();
+    }
+    symbolTable.insert(variableName);
+    const Expr *expr = forStmt->getCond();
+    SourceRange range(expr->getLocStart(), expr->getLocEnd());
+    std::string vertexName = rewriter.getRewrittenText(range);
+    std::size_t found = vertexName.find("graph->edge_end");
+    assert(found != std::string::npos);
+    std::size_t begin = vertexName.find("(", found);
+    std::size_t end = vertexName.find(",", begin);
+    if (end == std::string::npos) end = vertexName.find(")", begin);
+    vertexName = vertexName.substr(begin+1, end - begin - 1);
+    bodyString << "ForAll(\"" << variableName << "\", G.edges(\"" << vertexName << "\"),\n[\n";
     return true;
   }
 
   virtual bool VisitDeclStmt(DeclStmt *declStmt) {
+    bool skipStmt = skipStmts.find(declStmt) != skipStmts.end();
     for (auto decl : declStmt->decls()) {
       if (VarDecl *varDecl = dyn_cast<VarDecl>(decl)) {
         const Expr *expr = varDecl->getAnyInitializer();
         skipStmts.insert(expr);
-        if (skipDecls.find(varDecl) == skipDecls.end()) {
+        if (!skipStmt && (skipDecls.find(varDecl) == skipDecls.end())) {
           symbolTable.insert(varDecl->getNameAsString());
           std::size_t pos = std::string::npos;
           std::string initText;
           if (expr != NULL) {
             SourceRange range(expr->getLocStart(), expr->getLocEnd());
             initText = rewriter.getRewrittenText(range);
-            pos = initText.find("graph.getData");
+            pos = initText.find("graph->getData");
           }
           if (pos == std::string::npos) {
             std::string decl = varDecl->getType().getAsString();
@@ -247,7 +275,7 @@ public:
             }
           }
           else {
-            // get the first argument to graph.getData()
+            // get the first argument to graph->getData()
             std::size_t begin = initText.find("(", pos);
             std::size_t end = initText.find(",", pos);
             if (end == std::string::npos) {
@@ -330,6 +358,15 @@ public:
     return true;
   }
 
+  virtual bool VisitCXXConstructExpr(CXXConstructExpr *constructExpr) {
+    if (skipStmts.find(constructExpr) != skipStmts.end()) {
+      for (auto arg : constructExpr->arguments()) {
+        skipStmts.insert(arg);
+      }
+    }
+    return true;
+  }
+
   virtual bool VisitMaterializeTemporaryExpr(MaterializeTemporaryExpr *tempExpr) {
     if (skipStmts.find(tempExpr) != skipStmts.end()) {
       skipStmts.insert(tempExpr->GetTemporaryExpr());
@@ -386,6 +423,8 @@ private:
   std::map<std::string, std::string> SharedVariablesToTypeMap;
   std::map<std::string, std::vector<std::string> > KernelToArgumentsMap;
 
+  std::string FileName;
+
 public:
   explicit IrGLOrchestratorVisitor(ASTContext *context, Rewriter &R) : 
     astContext(context),
@@ -394,9 +433,9 @@ public:
   
   virtual ~IrGLOrchestratorVisitor() {}
 
-  void GenerateIrGLASTToFile(std::string filename) {
+  void GenerateIrGLASTToFile() const {
     std::ofstream IrGLAST;
-    IrGLAST.open(filename);
+    IrGLAST.open(FileName + ".py", std::ios::ate);
     IrGLAST << "from gg.ast import *\n";
     IrGLAST << "from gg.lib.graph import Graph\n";
     IrGLAST << "from gg.lib.wl import Worklist\n";
@@ -437,24 +476,22 @@ public:
     compute.close();
     remove(COMPUTE_FILENAME);
 
-    IrGLAST << "Kernel(\"" << "gg_main" << "\", ";
-    IrGLAST << "[GraphParam('hg', True), GraphParam('gg', True)],\n[\n";
-    // should wait for all operators to be generated before reading shared variables
-    for (auto& var : SharedVariablesToTypeMap) {
-      IrGLAST << "CDecl((\"Shared<" << var.second << ">\", \"p_" << var.first << "\"";
-      IrGLAST << ", \"= Shared<" << var.second << "> (hg.nnodes)\")),\n";
-    }
-    // FIXME: initialize shared variables to zero if they are atomic
+      /*// should wait for all operators to be generated before reading shared variables
+      for (auto& var : SharedVariablesToTypeMap) {
+        IrGLAST << "CDecl((\"Shared<" << var.second << ">\", \"p_" << var.first << "\"";
+        IrGLAST << ", \"= Shared<" << var.second << "> (hg.nnodes)\")),\n";
+      }
+      // FIXME: initialize shared variables to zero if they are atomic
+      for (auto& var : SharedVariablesToTypeMap) {
+        std::string upper = var.first;
+        std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
+        IrGLAST << "CBlock([\"" << "P_" << upper << " = p_" 
+          << var.first << ".cpu_rd_ptr()" << "\"]),\n";
+      }*/
+
     std::ifstream orchestrator(ORCHESTRATOR_FILENAME);
     IrGLAST << orchestrator.rdbuf();
     orchestrator.close();
-    for (auto& var : SharedVariablesToTypeMap) {
-      std::string upper = var.first;
-      std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
-      IrGLAST << "CBlock([\"" << "P_" << upper << " = p_" 
-        << var.first << ".cpu_rd_ptr()" << "\"]),\n";
-    }
-    IrGLAST << "]),\n"; // end kernel
     remove(ORCHESTRATOR_FILENAME);
 
     IrGLAST << "])\n"; // end Module
@@ -479,13 +516,21 @@ public:
   }
 
   virtual bool TraverseDecl(Decl *D) {
+    CXXMethodDecl *method = dyn_cast_or_null<CXXMethodDecl>(D);
+    if (method) {
+      Output.open(ORCHESTRATOR_FILENAME, std::ios::app);
+      Output << "Kernel(\"" << method->getParent()->getNameAsString() << "_cuda\", ";
+      Output << "[GraphParam('hg', True), GraphParam('gg', True)],\n[\n";
+    }
     bool traverse = RecursiveASTVisitor<IrGLOrchestratorVisitor>::TraverseDecl(D);
-    if (traverse && D && isa<CXXMethodDecl>(D)) {
+    if (traverse && method) {
+      Output << "]),\n"; // end kernel
       Output.close();
 
-      CXXMethodDecl *method = dyn_cast<CXXMethodDecl>(D);
-      // FIXME: Build file name from source file
-      GenerateIrGLASTToFile(method->getParent()->getNameAsString() + ".py");
+      std::string fileName = rewriter.getSourceMgr().getFilename(D->getLocStart()).str();
+      std::size_t found = fileName.rfind(".");
+      assert(found != std::string::npos);
+      FileName = fileName.substr(0, found);
     }
     return traverse;
   }
@@ -499,8 +544,6 @@ public:
   }
 
   virtual bool VisitCXXMethodDecl(CXXMethodDecl* func) {
-    assert(symbolTable.empty());
-    Output.open(ORCHESTRATOR_FILENAME);
     skipStmts.clear();
     skipDecls.clear();
     symbolTable.clear();
@@ -615,7 +658,8 @@ public:
         // generate kernel for operator
         bool isTopological = true;
         assert(callExpr->getNumArgs() > 1);
-        Expr *op = callExpr->getArg(1);
+        // FIXME: pick the right argument
+        Expr *op = callExpr->getArg(2);
         RecordDecl *record = op->getType().getTypePtr()->getAsStructureType()->getDecl();
         CXXRecordDecl *cxxrecord = dyn_cast<CXXRecordDecl>(record);
         for (auto method : cxxrecord->methods()) {
@@ -659,14 +703,7 @@ public:
         }
 
         // generate call to kernel
-        begin = text.find(",", begin);
-        ++begin;
-        std::size_t end = text.find("(", begin);
-        --end;
-        // remove whitespace
-        while (text[begin] == ' ') ++begin;
-        while (text[end] == ' ') --end; 
-        std::string kernelName = text.substr(begin, end-begin+1);
+        std::string kernelName = record->getNameAsString();
         Output << "Invoke(\"" << kernelName << "\", ";
         Output << "(\"gg\"";
         auto& arguments = KernelToArgumentsMap[kernelName];
@@ -733,20 +770,24 @@ public:
   
 class FunctionDeclHandler : public MatchFinder::MatchCallback {
 private:
-  ASTContext *astContext;
-  Rewriter &rewriter;
+  //ASTContext *astContext;
+  //Rewriter &rewriter;
+  IrGLOrchestratorVisitor orchestratorVisitor;
 public:
   FunctionDeclHandler(ASTContext *context, Rewriter &R): 
-    astContext(context),
-    rewriter(R)
+    //astContext(context),
+    //rewriter(R),
+    orchestratorVisitor(context, R)
   {}
+  const IrGLOrchestratorVisitor& getOrchestrator() {
+    return orchestratorVisitor;
+  }
   virtual void run(const MatchFinder::MatchResult &Results) {
     const CXXMethodDecl* decl = Results.Nodes.getNodeAs<clang::CXXMethodDecl>("graphAlgorithm");
     if (decl) {
       //llvm::errs() << "\nGraph Operator:\n" << 
       //  rewriter.getRewrittenText(decl->getSourceRange()) << "\n";
       //decl->dump();
-      IrGLOrchestratorVisitor orchestratorVisitor(astContext, rewriter);
       orchestratorVisitor.TraverseDecl(const_cast<CXXMethodDecl *>(decl));
     }
   }
@@ -763,13 +804,15 @@ public:
     functionDeclHandler(&(CI.getASTContext()), R) 
   {
     Matchers.addMatcher(functionDecl(
-          hasOverloadedOperatorName("()"),
+          hasName("go"),
+          //hasOverloadedOperatorName("()"),
           hasAnyParameter(hasName("_graph"))).
           bind("graphAlgorithm"), &functionDeclHandler);
   }
 
   virtual void HandleTranslationUnit(ASTContext &Context){
     Matchers.matchAST(Context);
+    functionDeclHandler.getOrchestrator().GenerateIrGLASTToFile();
   }
 };
 
