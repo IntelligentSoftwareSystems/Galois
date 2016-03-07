@@ -78,17 +78,16 @@ struct SSSP {
 
   void operator()(GNode src) const {
     NodeData& snode = graph->getData(src);
-    auto& net = Galois::Runtime::getSystemNetworkInterface();
     auto& sdist = snode.dist_current;
 
     for (auto jj = graph->edge_begin(src), ej = graph->edge_end(src); jj != ej; ++jj) {
       GNode dst = graph->getEdgeDst(jj);
       auto& dnode = graph->getData(dst);
-      std::atomic<int>& ddist = dnode.dist_current;
-      int old_dist = ddist;
-      int new_dist = graph->getEdgeData(jj) + sdist + 1;
+//      std::atomic<int>& ddist = dnode.dist_current;
+      int old_dist = dnode.dist_current;
+      int new_dist = graph->getEdgeData(jj) + sdist;
       while (old_dist > new_dist){
-        ddist.compare_exchange_strong(old_dist, new_dist);
+        dnode.dist_current.compare_exchange_strong(old_dist, new_dist);
       }
     }
   }
@@ -103,10 +102,10 @@ int main(int argc, char** argv) {
 
     T_total.start();
 
-    T_offlineGraph_init.start();
-    OfflineGraph g(inputFile);
-    T_offlineGraph_init.stop();
-    std::cout << g.size() << " " << g.sizeEdges() << "\n";
+//    T_offlineGraph_init.start();
+//    OfflineGraph g(inputFile);
+//    T_offlineGraph_init.stop();
+//    std::cout << g.size() << " " << g.sizeEdges() << "\n";
 
     T_hGraph_init.start();
     Graph hg(inputFile, net.ID, net.Num);

@@ -74,20 +74,29 @@ public:
    virtual void HandleTranslationUnit(ASTContext &Context) {
       ast_utility.init(&R);
       llvm::outs() << "=============================InHandleTranslationUnit===========================\n";
-      { // Get the graph declarations
+      {
+         //1) Replace hGraph with CLGraph in typedefs
+         MatchFinder graphTypedef;
+         GraphTypedefRewriter gtr(R,Context);
+         graphTypedef.addMatcher(typedefDecl(isExpansionInMainFile() , hasName("Graph") ).bind("GraphTypeDef"), & gtr);
+         graphTypedef.matchAST(Context);
+      }
+      llvm::outs() << " Done phase 0\n";
+      { //2) Get the graph declarations
          MatchFinder graphDecls;
          Galois::GAST::GraphTypeMapper gtm(R);
-         graphDecls.addMatcher(
-                     varDecl(hasType(recordDecl(hasName("Galois::Graph::LC_CSR_Graph")).bind("GraphType"))).bind("graphDecl")
-               , &gtm);
+         graphDecls.addMatcher( varDecl(isExpansionInMainFile(), hasType(recordDecl(hasMethod(hasName("getData")) ).bind("GraphType") )  ).bind("graphDecl"), &gtm);
          graphDecls.matchAST(Context);
+         llvm :: outs() << "Found graph types :: " << gtm.graph_types.size() << "\n";
+         assert(gtm.graph_types.size()>0);
          app_data.register_type(*gtm.graph_types.begin(), "CLGraph");
 
       }
-      { // Replace typenames for graph data-types.
-      MatchFinder mf;
-      Galois::GAST::GraphTypeReplacer typeReplacer(R);
-      mf.addMatcher(varDecl( isExpansionInMainFile(), hasInitializer( callExpr( callee(functionDecl( anyOf(
+      llvm::outs() << " Done phase 1\n";
+      if (false){ //3) Replace typenames for graph data-types based on where they are accessed.
+         MatchFinder mf;
+         Galois::GAST::GraphTypeReplacer typeReplacer(R);
+         mf.addMatcher(varDecl( isExpansionInMainFile(), hasInitializer( callExpr( callee(functionDecl( anyOf(
                                              hasName("getData"),
                                              hasName("edge_begin"),
                                              hasName("edge_end"),
@@ -97,15 +106,16 @@ public:
             &typeReplacer
             );
 
-      mf.addMatcher(varDecl( isExpansionInMainFile() ,hasInitializer( constructExpr( hasAnyArgument( callExpr( callee (functionDecl( anyOf(
+         mf.addMatcher(varDecl( isExpansionInMainFile() ,hasInitializer( constructExpr( hasAnyArgument( callExpr( callee (functionDecl( anyOf(
                                              hasName("getData"),
                                              hasName("edge_begin"),
                                              hasName("edge_end"),
                                              hasName("getEdgeData"),
                                              hasName("getEdgeDst")  )).bind("callExpr") ) ) ) ) ) ).bind("varDecl"), &typeReplacer);
-      mf.matchAST(Context);
+         mf.matchAST(Context);
       }
-      {//#################Find kernels/operators via do_all calls
+      llvm::outs() << " Done phase 2\n";
+      {// 4) Find kernels/operators via do_all calls
             Matchers.addMatcher(callExpr(
                                  callee(functionDecl(hasName("Galois::do_all")))
                                         ,hasArgument(2,hasType(recordDecl().bind("kernelType")))
@@ -113,6 +123,7 @@ public:
             Matchers.matchAST(Context);
             //#################End find kernels/operators via do_all calls
       }
+      llvm::outs() << " Done phase 3\n";
    }//End HandleTranslationUnit
  };
 /********************************************************************************************************

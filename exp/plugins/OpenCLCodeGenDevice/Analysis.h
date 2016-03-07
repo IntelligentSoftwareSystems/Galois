@@ -960,6 +960,21 @@ public:
    }
    ~NodeDataGen(){
       header_file << " #include \"graph_header.h\"\n";
+      {//Begin graph implementation.
+         const char * g_dev ="typedef struct _GraphType { \n\
+            uint _num_nodes;\n\
+            uint _num_edges;\n\
+             uint _node_data_size;\n\
+             uint _edge_data_size;\n\
+             __global NodeData *_node_data;\n\
+             __global uint *_out_index;\n\
+             __global uint *_out_neighbors;\n\
+             __global EdgeData *_out_edge_data;\n\
+             }GraphType;";
+         header_file << "\n"<< g_dev << "\n";
+      }
+      header_file << " typedef uint node_iterator;\n";
+      header_file << " typedef uint edge_iterator;\n";
       header_file.close();
    }
    void GenCLType(const QualType & q, string sname){
@@ -995,6 +1010,16 @@ public:
          if (decl) {
             llvm::outs() << " NodeData Found :: " << decl->getAsType().getAsString() << "\n";
             GenCLType(decl->getAsType(), "NodeData");
+         }
+         RecordDecl * gDecl = const_cast<RecordDecl*>(Results.Nodes.getNodeAs<RecordDecl>("GraphType"));
+         if(gDecl){
+            for(auto f  : gDecl->fields()){
+               if (f->getNameAsString().compare("init_kernel_str_CL_LC_Graph")==0){
+                  llvm::outs() << " Match found ";
+                  f->getInClassInitializer()->dump();
+                  llvm::outs()<<"\n";
+               }
+            }
          }
       }
       {

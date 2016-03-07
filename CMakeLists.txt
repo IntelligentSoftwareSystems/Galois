@@ -415,6 +415,7 @@ endfunction()
 add_subdirectory(libllvm)
 add_subdirectory(libsubstrate)
 add_subdirectory(libruntime)
+add_subdirectory(libgaloiscl)
 add_subdirectory(libgraphs)
 add_subdirectory(libnet)
 add_subdirectory(libexp)
@@ -463,8 +464,9 @@ include(CPack)
 file(RELATIVE_PATH rel_include_dir "${INSTALL_CMAKE_DIR}" "${INSTALL_INCLUDE_DIR}")
 set(GALOIS_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/include" "${PROJECT_BINARY_DIR}/include")
 if(USE_EXP)
-  set(GALOIS_INCLUDE_DIR "${GALOIS_INCLUDE_DIR}" "${PROJECT_SOURCE_DIR}/libexp/include")
+  set(GALOIS_INCLUDE_DIR "${GALOIS_INCLUDE_DIR}" "${PROJECT_SOURCE_DIR}/libexp/include" "${PROJECT_SOURCE_DIR}/libgaloiscl/include")
 endif()
+
 
 set(GALOIS_INCLUDE_DIRS) # Galois include dependencies
 set(GALOIS_INCLUDE_DIR)  # Galois include provides

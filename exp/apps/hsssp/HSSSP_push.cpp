@@ -110,31 +110,31 @@ std::vector<PGraph*> magicPointer;
 /*********************************************************************************
  *
  **********************************************************************************/
-struct InitializeGraph {
-   Graph* g;
-   void static go(Graph& _g, unsigned num) {
-      Galois::do_all(_g.begin(), _g.begin() + num, InitializeGraph { &_g }, Galois::loopname("init"));
-   }
-   void operator()(GNode src) const {
-      NodeDataType & sdata = g->getData(src);
-      //TODO RK : Fix this to not initialize both fields.
-      sdata.dist[0] = sdata.dist[1] = std::numeric_limits<int>::max() / 4;
-      sdata.bsp_version = 0;
-   }
-};
+//struct InitializeGraph {
+//   Graph* g;
+//   void static go(Graph& _g, unsigned num) {
+//      Galois::do_all(_g.begin(), _g.begin() + num, InitializeGraph { &_g }, Galois::loopname("init"));
+//   }
+//   void operator()(GNode src) const {
+//      NodeDataType & sdata = g->getData(src);
+//      //TODO RK : Fix this to not initialize both fields.
+//      sdata.dist[0] = sdata.dist[1] = std::numeric_limits<int>::max() / 4;
+//      sdata.bsp_version = 0;
+//   }
+//};
 /*********************************************************************************
  * CPU PageRank operator implementation.
  **********************************************************************************/
-struct PrintNodes {
-   PGraph * g;
-   void static go(PGraph& _g, unsigned num) {
-      Galois::do_all(_g.g.begin(), _g.g.begin() + num, PrintNodes { &_g }, Galois::loopname("PrintNodes"));
-   }
-   void operator()(GNode src) const {
-      NodeDataType & sdata = g->g.getData(src);
-      fprintf(stderr, "GraphPrint:: %d [curr=%d, next=%d]\n", g->L2G[src], sdata.dist[sdata.current_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)],sdata.dist[sdata.next_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)]);
-   }
-};
+//struct PrintNodes {
+//   PGraph * g;
+//   void static go(PGraph& _g, unsigned num) {
+//      Galois::do_all(_g.g.begin(), _g.g.begin() + num, PrintNodes { &_g }, Galois::loopname("PrintNodes"));
+//   }
+//   void operator()(GNode src) const {
+//      NodeDataType & sdata = g->g.getData(src);
+//      fprintf(stderr, "GraphPrint:: %d [curr=%d, next=%d]\n", g->L2G[src], sdata.dist[sdata.current_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)],sdata.dist[sdata.next_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)]);
+//   }
+//};
 /************************************************************
  *
  *************************************************************/
@@ -275,13 +275,13 @@ void sendGhostCellDistances(Galois::Runtime::NetworkInterface& net, PGraph & g) 
 /****************************************************************************************
  *
  ****************************************************************************************/
-struct SSSP_PUSH_Commit {
-   Graph * g;
-   void operator()(GNode src) const {
-      g->getData(src).dist[0] = g->getData(src).dist[1] = std::min(g->getData(src).dist[0], g->getData(src).dist[1]);
-      g->getData(src).swap_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD);
-   }
-};
+//struct SSSP_PUSH_Commit {
+//   Graph * g;
+//   void operator()(GNode src) const {
+//      g->getData(src).dist[0] = g->getData(src).dist[1] = std::min(g->getData(src).dist[0], g->getData(src).dist[1]);
+//      g->getData(src).swap_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD);
+//   }
+//};
 /****************************************************************************************
  *
  ****************************************************************************************/

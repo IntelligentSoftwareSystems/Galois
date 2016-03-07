@@ -13,6 +13,10 @@ add_custom_command(TARGET hsssp-push POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy
 
 app(graphCheck check.cpp GlobalObj.cpp DISTSAFE)
 
+app(clCheck CL_graph_test.cpp /h2/rashid/workspace/GaloisDist/gdist/libgaloiscl/src/CL_Header.cpp DISTSAFE)
+include_directories(/h2/rashid/workspace/GaloisDist/gdist/libgaloiscl/include)
+target_link_libraries(clCheck OpenCL)
+
 #app(graphCheck_gen check_gen.cpp CLANGPLUGIN)
 #app(graphCheck_gen check_gen.cpp GlobalObj.cpp DISTSAFE)
 

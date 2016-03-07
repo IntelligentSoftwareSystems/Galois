@@ -1,4 +1,12 @@
 //Graph header, created ::Tue Jun  2 16:02:26 2015
+
+typedef struct NodeDataImpl{
+   int dist;
+}NodeData;
+typedef int EdgeData;
+
+
+
 typedef struct _GraphType { 
 uint _num_nodes;
 uint _num_edges;
@@ -9,40 +17,23 @@ uint _num_edges;
  __global uint *_out_neighbors;
  __global EdgeData *_out_edge_data;
  }GraphType;
-uint in_neighbors_begin(__local GraphType * graph, uint node){ 
- return 0;
+
+uint edge_begin(__global GraphType * graph, uint node){
+ return graph->_out_index[node];
 }
-uint in_neighbors_end(__local GraphType * graph, uint node){ 
- return graph->_out_index[node+1]-graph->_out_index[node];
+uint edge_end(__global GraphType * graph, uint node){
+ return graph->_out_index[node+1];
 }
-uint in_neighbors_next(__local GraphType * graph, uint node){ 
- return 1;
+uint getEdgeDst(__global GraphType * graph,uint nbr){
+ return graph->_out_neighbors[nbr];
 }
-uint in_neighbors(__local GraphType * graph, uint node, uint nbr){ 
- return graph->_out_neighbors[graph->_out_index[node]+nbr];
+__global EdgeData * getEdgeData(__global GraphType * graph,uint nbr){
+ return &graph->_out_edge_data[nbr];
 }
-__global EdgeData * in_edge_data(__local GraphType * graph, uint node, uint nbr){ 
- return &graph->_out_edge_data[graph->_out_index[node]+nbr];
-}
-uint out_neighbors_begin(__local GraphType * graph, uint node){ 
- return 0;
-}
-uint out_neighbors_end(__local GraphType * graph, uint node){ 
- return graph->_out_index[node+1]-graph->_out_index[node];
-}
-uint out_neighbors_next(__local GraphType * graph, uint node){ 
- return 1;
-}
-uint out_neighbors(__local GraphType * graph,uint node,  uint nbr){ 
- return graph->_out_neighbors[graph->_out_index[node]+nbr];
-}
-__global EdgeData * out_edge_data(__local GraphType * graph,uint node,  uint nbr){ 
- return &graph->_out_edge_data[graph->_out_index[node]+nbr];
-}
-__global NodeData * node_data(__local GraphType * graph, uint node){ 
+__global NodeData * getData(__global GraphType * graph, uint node){
  return &graph->_node_data[node];
 }
-void initialize(__local GraphType * graph, __global uint *mem_pool){
+void initialize(__global GraphType * graph, __global uint *mem_pool){
 uint offset =4;
 graph->_num_nodes=mem_pool[0];
 graph->_num_edges=mem_pool[1];

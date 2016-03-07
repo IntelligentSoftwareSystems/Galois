@@ -168,8 +168,10 @@ public:
    virtual void run(const MatchFinder::MatchResult &Results) {
       CXXRecordDecl* decl = const_cast<CXXRecordDecl*>(Results.Nodes.getNodeAs<clang::CXXRecordDecl>("GraphType"));
       VarDecl * vd= const_cast<VarDecl*>(Results.Nodes.getNodeAs<VarDecl>("graphDecl"));
+      assert(decl!=nullptr);
+      assert(vd !=nullptr);
       if(vd){
-         rewriter.ReplaceText(vd->getTypeSourceInfo()->getTypeLoc().getSourceRange(), " CLGraph ");
+//         rewriter.ReplaceText(vd->getTypeSourceInfo()->getTypeLoc().getSourceRange(), " CLGraph ");
       }
       llvm::outs() << "GraphClass :: " << decl->getNameAsString() << ", " << decl->getCanonicalDecl()->getNameAsString() << "\n";
       graphDecls.push_back(decl);
@@ -230,11 +232,7 @@ struct GaloisKernel {
    GaloisApp * app_data;
    GaloisKernel(Rewriter & r, CXXRecordDecl * d, GaloisApp * a) :
          rewriter(r), kernel(d), kernel_body(nullptr), app_data(a) {
-//      llvm::outs()<<"\n=============ASTDump for class========================\n";
-//      kernel->dump(llvm::outs());
-//      llvm::outs()<<"\n=============ASTDump for class========================\n";
       llvm::outs() << "Creating GaloisKernel :: " << kernel->getNameAsString() << "\n";
-//      d->getAsFunction()
       int method_counter = 0;
       for (auto m : kernel->methods()) {
          llvm::outs() << method_counter<< "] Is overloaded ? " << (m->isOverloadedOperator() ? "Yes" : "No") << " ";
@@ -265,10 +263,10 @@ struct GaloisKernel {
          llvm::outs() << " Done scanning for types.\n";
       }
       //####################################
-//      rewriter.InsertText(kernel->method_begin()->getLocStart(), "\nKERNEL_INSTANCE_DECL;\n");
-      rewriter.InsertText(d->method_begin()->getLocStart(), get_copy_to_host_impl().c_str());
-      rewriter.InsertText(d->method_begin()->getLocStart(), get_copy_to_device_impl().c_str());
       rewriter.InsertText(d->method_begin()->getLocStart(), get_impl_string().c_str());
+//      rewriter.InsertTextAfter(kernel_body->getLocEnd(), "#endif\n");
+//      rewriter.InsertTextBefore(kernel_body->getLocStart(), "#if 0\n");
+      rewriter.ReplaceText(SourceRange(kernel_body->getLocStart(), kernel_body->getLocEnd()), "");
       //####################################
    }
    string get_copy_to_host_impl(){
@@ -285,7 +283,11 @@ struct GaloisKernel {
       std::string ret="\nvoid copy_to_device(){\n";
       for(auto f : this->kernel->fields()){
          ret += f->getNameAsString();
-         ret += ".copy_to_device();\n";
+         if(f->getType().getTypePtr()->isAnyPointerType())
+            ret+="->";
+         else
+            ret+=".";
+         ret += "copy_to_device();\n";
       }
       ret+="//COPY_EACH_MEMBER_TO_DEVICE_HERE\n";
       ret+="}\n";
@@ -295,19 +297,27 @@ struct GaloisKernel {
       return "\ncl_call_wrapper()\n;";
    }
    string get_impl_string(){
-      std::string ret_string = "\nCL_Kernel get_kernel(size_t num_items){\n";
-      ret_string += " CL_Kernel kernel(getCLContext()->get_default_device());\n";
-      ret_string += " kernel.init_string(\"SRC\",\"KERNELNAME\");\n";
+      std::string ret_string = "\nCL_Kernel * get_kernel(size_t num_items){\n";
+      ret_string += " static CL_Kernel kernel(getCLContext()->get_default_device(),\"";
+      ret_string += kernel->getNameAsString();
+      ret_string += ".cl\", \"";
+      ret_string += kernel->getNameAsString();
+      ret_string += "\", false);\n";
       int i=0;
       char s[1024];
       for(auto m : this->kernel->fields()){
-         sprintf(s,"kernel.set_arg(%d,sizeof(%s.device_ptr()),&(%s.device_ptr()));\n",i,m->getNameAsString().c_str(),m->getNameAsString().c_str());
+         string ref;
+         if(m->getType().getTypePtr()->isAnyPointerType())
+            ref="->";
+         else
+            ref=".";
+         sprintf(s,"kernel.set_arg(%d,sizeof(%s%sdevice_ptr()),&(%s%sdevice_ptr()));\n",i,m->getNameAsString().c_str(),ref.c_str(), m->getNameAsString().c_str(), ref.c_str());
          ret_string += s;
          i++;
       }
       sprintf(s,"kernel.set_arg(%d,sizeof(num_items),&num_items);\n",i);
       ret_string += s;
-      ret_string += " return kernel;\n";
+      ret_string += " return &kernel;\n";
       ret_string+="}\n";
       return ret_string;
    }

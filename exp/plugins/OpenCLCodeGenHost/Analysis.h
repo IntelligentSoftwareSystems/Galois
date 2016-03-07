@@ -167,6 +167,45 @@ public:
 /*********************************************************************************************************
  *
  *********************************************************************************************************/
+/*********************************************************************************************************
+ *
+ *********************************************************************************************************/
+class GraphTypedefRewriter: public MatchFinder::MatchCallback {
+public:
+   Rewriter &rewriter;
+   ASTContext & ctx;
+public:
+   GraphTypedefRewriter(Rewriter &rewriter, ASTContext & c) :
+         rewriter(rewriter), ctx(c) {
+   }
+   ~GraphTypedefRewriter(){
+   }
+
+   virtual void run(const MatchFinder::MatchResult &Results) {
+         TypedefDecl * decl = const_cast<TypedefDecl*>(Results.Nodes.getNodeAs<TypedefDecl>("GraphTypeDef"));
+         if (decl) {
+            llvm::outs() << " Rewriting typedef for graph \n";
+            decl->dump(llvm::outs());
+            llvm::outs() << " =================\n";
+            llvm::outs() << decl->getUnderlyingType().getAsString()<<"\n";
+//            llvm::outs() << " ??? " << decl->getCanonicalDecl()->getNameAsString() << " \n";
+//            llvm::outs() << "Underlying declaration :: " << decl->getUnderlyingDecl()->getNameAsString() <<"\n";
+//            llvm::outs() << "Type for decl. :: " << QualType::getAsString(decl->getTypeForDecl(), Qualifiers()) << "\n";
+//            llvm::outs() << "Decl name " << decl->getDeclName().getAsString() << "\n";
+//            llvm::outs() << " Mostrecent Decl :: " << decl->getMostRecentDecl()->getIdentifier()->getName().str()<<"\n";
+//            for(auto t : decl->redecls()){
+//               llvm::outs() << " REDECLS:: " << t->getNameAsString() << "\n";
+//            }
+            string s = ast_utility.get_string(decl->getLocStart(), decl->getLocEnd());
+            string old_name =decl->getUnderlyingType().getAsString();
+            old_name = old_name.substr(0, old_name.find("<"));
+            s.replace(s.find(old_name), old_name.length(), "Galois::OpenCL::Graphs::CL_LC_Graph");
+            rewriter.ReplaceText(SourceRange(decl->getLocStart(),decl->getLocEnd()), s);
+            rewriter.InsertTextBefore(decl->getLocStart(), "#include \"CL_Header.h\"\n using namespace Galois::OpenCL;\n");
+
+         }
+   }
+};
 
 /*********************************************************************************************************
  *

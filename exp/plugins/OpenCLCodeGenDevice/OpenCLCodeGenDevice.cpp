@@ -73,13 +73,14 @@ public:
       ast_utility.init(&R);
       llvm::outs() << "=============================InHandleTranslationUnit===========================\n";
       CXXRecordDecl * graphClass = nullptr;
+
 //      std::map<const Type * , string> type_map;
       {
          MatchFinder ndFinder;
          NodeDataGen ndGen(R, Context);
 //         ndFinder.addMatcher( varDecl(isExpansionInMainFile(), hasType(allOf( recordDecl(hasMethod(hasName("getData")) ) , classTemplateSpecializationDecl( hasTemplateArgument(0, templateArgument().bind("NData") )  )) ) ), &ndGen);
-         ndFinder.addMatcher( varDecl(isExpansionInMainFile(), allOf( hasType(recordDecl(hasMethod(hasName("getData")) )) , hasType(classTemplateSpecializationDecl( hasTemplateArgument(0, templateArgument().bind("NData") )  )) ) ), &ndGen);
-         ndFinder.addMatcher( varDecl(isExpansionInMainFile(), allOf( hasType(recordDecl(hasMethod(hasName("getData")) )) , hasType(classTemplateSpecializationDecl( hasTemplateArgument(1, templateArgument().bind("EData") )  )) ) ), &ndGen);
+         ndFinder.addMatcher( varDecl(isExpansionInMainFile(), allOf( hasType(recordDecl(hasMethod(hasName("getData")) ).bind("GraphType")) , hasType(classTemplateSpecializationDecl( hasTemplateArgument(0, templateArgument().bind("NData") )  )) ) ), &ndGen);
+         ndFinder.addMatcher( varDecl(isExpansionInMainFile(), allOf( hasType(recordDecl(hasMethod(hasName("getData")) ).bind("GraphType")) , hasType(classTemplateSpecializationDecl( hasTemplateArgument(1, templateArgument().bind("EData") )  )) ) ), &ndGen);
          ndFinder.matchAST(Context);
       }
       {//Find graph instance to create table for type replacement
