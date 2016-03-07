@@ -23,6 +23,7 @@
  * Compute Single Source Shortest Path on distributed Galois.
  *
  * @author Gurbinder Gill <gurbinder533@gmail.com>
+ * @author Rashid Kaleem <rashid.kaleem@gmail.com>
  */
 
 #include <iostream>
@@ -101,11 +102,6 @@ int main(int argc, char** argv) {
     Galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_HSSSP;
 
     T_total.start();
-
-//    T_offlineGraph_init.start();
-//    OfflineGraph g(inputFile);
-//    T_offlineGraph_init.stop();
-//    std::cout << g.size() << " " << g.sizeEdges() << "\n";
 
     T_hGraph_init.start();
     Graph hg(inputFile, net.ID, net.Num);
