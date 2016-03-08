@@ -66,8 +66,8 @@ typedef Galois::OpenCL::Graphs::CL_LC_Graph<unsigned int, unsigned int> DevGraph
 typedef typename Graph::GraphNode GNode;
 using namespace Galois::OpenCL;
 
-template<typename ItTy, typename OpType, typename ... Args>
-void do_all_cl(const ItTy & s, const ItTy & e, const OpType & f, const Args & ... args);
+//template<typename ItTy, typename OpType, typename ... Args>
+//void do_all_cl(const ItTy & s, const ItTy & e, const OpType & f, const Args & ... args);
 /********************************************************************************************
  *
  ********************************************************************************************/
@@ -158,14 +158,14 @@ public:
 
 /*
  * Template wrapper for do_all_cl implementation.
- * */
+ *
 template<typename ItTy, typename OpType, typename ... Args>
 void do_all_cl(const ItTy & s, const ItTy & e, const OpType & f, const Args & ... args) {
    auto num_items = std::distance(s, e);
    CL_Kernel * kernel = f.get_kernel(num_items); //(getCLContext()->get_default_device());
    kernel->set_work_size(num_items);
    (*kernel)();
-}
+}*/
 /*
  * Main. Create an array, initialize it and verify it.
  * */
