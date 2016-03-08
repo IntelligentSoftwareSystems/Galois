@@ -128,9 +128,9 @@ public:
 */
    virtual void run(const MatchFinder::MatchResult &Results) {
       CallExpr* callFS = const_cast<CallExpr*>(Results.Nodes.getNodeAs<clang::CallExpr>("galoisLoop"));
-      VarDecl * decl = const_cast<VarDecl*>(Results.Nodes.getNodeAs<VarDecl>("graphDecl"));
-      if(decl)
-         rewriter.ReplaceText(decl->getTypeSourceInfo()->getTypeLoc().getSourceRange(), " CLGraph ");
+//      VarDecl * decl = const_cast<VarDecl*>(Results.Nodes.getNodeAs<VarDecl>("graphDecl"));
+//      if(decl)
+//         rewriter.ReplaceText(decl->getTypeSourceInfo()->getTypeLoc().getSourceRange(), " CLGraph ");
 
       llvm::outs() << "GaloisLoop found  - #Args :: " << callFS->getNumArgs() << "\n";
 
@@ -161,6 +161,7 @@ public:
             llvm::outs() << ", Type :: " << callFS->getArg(2)->getBestDynamicClassType()->getName() << "\n";
 
          }
+         rewriter.ReplaceText(SourceRange(callFS->getCallee()->getLocStart(), callFS->getCallee()->getLocEnd()), "do_all_cl");
       }
    }
 };
@@ -181,6 +182,7 @@ public:
    ~GraphTypedefRewriter(){
    }
 
+   //TODO RK - Fix the missing part of the declaration. Matcher returns 'G' instead of 'Graph'.
    virtual void run(const MatchFinder::MatchResult &Results) {
          TypedefDecl * decl = const_cast<TypedefDecl*>(Results.Nodes.getNodeAs<TypedefDecl>("GraphTypeDef"));
          if (decl) {
@@ -196,12 +198,18 @@ public:
 //            for(auto t : decl->redecls()){
 //               llvm::outs() << " REDECLS:: " << t->getNameAsString() << "\n";
 //            }
-            string s = ast_utility.get_string(decl->getLocStart(), decl->getLocEnd());
+//            decl->getSourceRange()
+            string s = "#include \"CL_Header.h\"\nusing namespace Galois::OpenCL;\n";
+            s+=ast_utility.get_string(decl->getSourceRange().getBegin(), decl->getSourceRange().getEnd());
+//            llvm::outs() << "Decl String :: " << s << "\n";
             string old_name =decl->getUnderlyingType().getAsString();
+//            llvm::outs() << "Old name:: " << old_name << "\n";
             old_name = old_name.substr(0, old_name.find("<"));
-            s.replace(s.find(old_name), old_name.length(), "Galois::OpenCL::Graphs::CL_LC_Graph");
+//            llvm::outs() << "Old name(trimmed):: " << old_name << "\n";
+            s.replace(s.find(old_name), old_name.length(), "Graphs::CL_LC_Graph");
+//            llvm::outs() << "New name:: " << s<< "\n";
             rewriter.ReplaceText(SourceRange(decl->getLocStart(),decl->getLocEnd()), s);
-            rewriter.InsertTextBefore(decl->getLocStart(), "#include \"CL_Header.h\"\n using namespace Galois::OpenCL;\n");
+//            rewriter.InsertTextBefore(decl->getLocStart(), "#include \"CL_Header.h\"\n using namespace Galois::OpenCL;\n");
 
          }
    }
