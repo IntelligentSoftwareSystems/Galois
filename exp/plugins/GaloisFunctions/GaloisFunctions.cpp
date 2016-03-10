@@ -104,17 +104,17 @@ namespace {
     s << "\tstruct Syncer_" << counter << " {\n"
       << "\t\tstatic " << i.VAL_TYPE <<" extract(uint32_t node_id, const " << i.NODE_TYPE << " node) {\n" 
       << "\t\t\tif (personality == CPU) return " << "node." << i.FIELD_NAME <<  ";\n"
-      << "\t\t\telse if (personality == GPU_CUDA) return " << "get_node_" << i.FIELD_NAME <<  "_cuda(node_id);\n"
+      << "\t\t\tassert (personality == GPU_CUDA); return " << "get_node_" << i.FIELD_NAME <<  "_cuda(cuda_ctx, node_id);\n"
       << "\t\t}\n"
       << "\t\tstatic void reduce (uint32_t node_id, " << i.NODE_TYPE << " node, " << i.VAL_TYPE << " y) {\n" 
       << "\t\t\tif (personality == CPU) " << i.REDUCE_OP_EXPR << "\n"
       /* !!! assumes reduction operation is always addition */
-      << "\t\t\telse if (personality == GPU_CUDA) return " << "add_node_" << i.FIELD_NAME <<  "_cuda(node_id, y);\n"
+      << "\t\t\telse if (personality == GPU_CUDA) " << "add_node_" << i.FIELD_NAME <<  "_cuda(cuda_ctx, node_id, y);\n"
       << "\t\t}\n"
       << "\t\tstatic void reset (uint32_t node_id, " << i.NODE_TYPE << " node ) {\n" 
       << "\t\t\tif (personality == CPU) " << i.RESET_VAL_EXPR << "\n"
       /* !!! assumes reduction operation is always addition */
-      << "\t\t\telse if (personality == GPU_CUDA) return " << "set_node_" << i.FIELD_NAME <<  "_cuda(node_id, 0);\n"
+      << "\t\t\telse if (personality == GPU_CUDA) " << "set_node_" << i.FIELD_NAME <<  "_cuda(cuda_ctx, node_id, 0);\n"
       << "\t\t}\n"
       << "\t\ttypedef " << i.VAL_TYPE << " ValTy;\n"
       << "\t};\n";
@@ -126,11 +126,11 @@ namespace {
     s << "\tstruct SyncerPull_" << counter << " {\n"
       << "\t\tstatic " << i.VAL_TYPE <<" extract(uint32_t node_id, const " << i.NODE_TYPE << " node) {\n"
       << "\t\t\tif (personality == CPU) return " << "node." << i.FIELD_NAME <<  ";\n"
-      << "\t\t\telse if (personality == GPU_CUDA) return " << "get_node_" << i.FIELD_NAME <<  "_cuda(node_id);\n"
+      << "\t\t\tassert (personality == GPU_CUDA); return " << "get_node_" << i.FIELD_NAME <<  "_cuda(cuda_ctx, node_id);\n"
       << "\t\t}\n"
       << "\t\tstatic void setVal (uint32_t node_id, " << i.NODE_TYPE << " node, " << i.VAL_TYPE << " y) " << "{\n"
       << "\t\t\tif (personality == CPU) node." << i.FIELD_NAME << " = y; "
-      << "\t\t\telse if (personality == GPU_CUDA) return " << "set_node_" << i.FIELD_NAME <<  "_cuda(node_id, y);\n"
+      << "\t\t\telse if (personality == GPU_CUDA) " << "set_node_" << i.FIELD_NAME <<  "_cuda(cuda_ctx, node_id, y);\n"
       << "\t\t}\n"
       << "\t\ttypedef " << i.VAL_TYPE << " ValTy;\n"
       << "\t};\n";
@@ -528,7 +528,7 @@ namespace {
             auto recordDecl = Results.Nodes.getNodeAs<clang::CXXRecordDecl>("class");
             std::string className = recordDecl->getNameAsString();
             kernelAfter << "\n\t} else if (personality == GPU_CUDA) {\n";
-            kernelAfter << "\t\t" << className << "_cuda();\n";
+            kernelAfter << "\t\t" << className << "_cuda(cuda_ctx);\n";
             kernelAfter << "\t}\n";
             rewriter.InsertText(ST, kernelAfter.str(), true, true);
 

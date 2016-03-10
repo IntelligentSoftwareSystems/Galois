@@ -105,7 +105,6 @@ public:
         pos = text.find(nodeVar.first);
       }
     }
-    // FIXME: use & (address-of) operator for atomic variables in atomicAdd() etc
 
     while (1) {
       std::size_t found = text.find("nout(");
@@ -121,8 +120,10 @@ public:
       }
     } 
 
-    findAndReplace(text, "getEdgeDst", "getAbsDestination");
-    findAndReplace(text, "getEdgeData", "getAbsWeight");
+    // FIXME: use & (address-of) operator for atomic variables in atomicAdd() etc
+    findAndReplace(text, "Galois::atomic", "atomic");
+    findAndReplace(text, "->getEdgeDst", ".getAbsDestination");
+    findAndReplace(text, "->getEdgeData", ".getAbsWeight");
     findAndReplace(text, "std::fabs", "fabs");
     findAndReplace(text, "ctx.push", "WL.push"); // FIXME: insert arguments within quotes
     findAndReplace(text, "\\", "\\\\"); // FIXME: should it be only within quoted strings?
@@ -422,8 +423,9 @@ private:
   std::map<std::string, std::string> GlobalVariablesToTypeMap;
   std::map<std::string, std::string> SharedVariablesToTypeMap;
   std::map<std::string, std::vector<std::string> > KernelToArgumentsMap;
+  std::vector<std::string> Kernels;
 
-  std::string FileName;
+  std::string FileNamePath;
 
 public:
   explicit IrGLOrchestratorVisitor(ASTContext *context, Rewriter &R) : 
@@ -434,8 +436,114 @@ public:
   virtual ~IrGLOrchestratorVisitor() {}
 
   void GenerateIrGLASTToFile() const {
+    std::string filename;
+    std::size_t found = FileNamePath.rfind("/");
+    if (found != std::string::npos) filename = FileNamePath.substr(found+1, FileNamePath.length()-1);
+
+    std::ofstream header;
+    header.open(FileNamePath + "_cuda.h");
+    header << "#pragma once\n";
+    header << "#include \"cuda_mtypes.h\"\n";
+    header << "\nstruct CUDA_Context;\n";
+    header << "\nstruct CUDA_Context *get_CUDA_context(int id);\n";
+    header << "bool init_CUDA_context(struct CUDA_Context *ctx, int device);\n";
+    header << "void load_graph_CUDA(struct CUDA_Context *ctx, MarshalGraph &g);\n\n";
+    for (auto& var : SharedVariablesToTypeMap) {
+      header << var.second << " get_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID);\n";
+      header << "void set_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID, " << var.second << " v);\n";
+      header << "void add_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID, " << var.second << " v);\n";
+    }
+    for (auto& kernelName : Kernels) {
+      header << "void " << kernelName << "_cuda(struct CUDA_Context *ctx);\n";
+    }
+    header.close();
+
+    std::ofstream cuheader;
+    cuheader.open(FileNamePath + "_cuda.cuh");
+    cuheader << "#pragma once\n";
+    cuheader << "#include <cuda.h>\n";
+    cuheader << "#include <stdio.h>\n";
+    cuheader << "#include <sys/types.h>\n";
+    cuheader << "#include <unistd.h>\n";
+    cuheader << "#include \"" << filename << "_cuda.h\"\n";
+    cuheader << "\nstruct CUDA_Context {\n";
+    cuheader << "\tint device;\n";
+    cuheader << "\tint id;\n";
+    cuheader << "\tsize_t nowned;\n";
+    cuheader << "\tsize_t g_offset;\n";
+    cuheader << "\tCSRGraphTex hg;\n";
+    cuheader << "\tCSRGraphTex gg;\n";
+    for (auto& var : SharedVariablesToTypeMap) {
+      cuheader << "\tShared<" << var.second << "> " << var.first << ";\n";
+    }
+    cuheader << "};\n\n";
+    for (auto& var : SharedVariablesToTypeMap) {
+      cuheader << var.second << " get_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID) {\n";
+      cuheader << "\t" << var.second << " *" << var.first << " = ctx->" << var.first << ".cpu_rd_ptr();\n";
+      cuheader << "\treturn " << var.first << "[LID];\n";
+      cuheader << "}\n\n";
+      cuheader << "void set_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID, " << var.second << " v) {\n";
+      cuheader << "\t" << var.second << " *" << var.first << " = ctx->" << var.first << ".cpu_rd_ptr();\n";
+      cuheader << "\t" << var.first << "[LID] = v;\n";
+      cuheader << "}\n\n";
+      cuheader << "void add_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID, " << var.second << " v) {\n";
+      cuheader << "\t" << var.second << " *" << var.first << " = ctx->" << var.first << ".cpu_rd_ptr();\n";
+      cuheader << "\t" << var.first << "[LID] += v;\n";
+      cuheader << "}\n\n";
+    }
+    cuheader << "struct CUDA_Context *get_CUDA_context(int id) {\n";
+    cuheader << "\tstruct CUDA_Context *ctx;\n";
+    cuheader << "\tctx = (struct CUDA_Context *) calloc(1, sizeof(struct CUDA_Context));\n";
+    cuheader << "\treturn ctx;\n";
+    cuheader << "}\n\n";
+    cuheader << "bool init_CUDA_context(struct CUDA_Context *ctx, int device) {\n";
+    cuheader << "\tstruct cudaDeviceProp dev;\n";
+    cuheader << "\tif(device == -1) {\n";
+    cuheader << "\t\tcheck_cuda(cudaGetDevice(&device));\n";
+    cuheader << "\t} else {\n";
+    cuheader << "\t\tint count;\n";
+    cuheader << "\t\tcheck_cuda(cudaGetDeviceCount(&count));\n";
+    cuheader << "\t\tif(device > count) {\n";
+    cuheader << "\t\t\tfprintf(stderr, \"Error: Out-of-range GPU %d specified (%d total GPUs)\", device, count);\n";
+    cuheader << "\t\t\treturn false;\n";
+    cuheader << "\t\t}\n";
+    cuheader << "\t\tcheck_cuda(cudaSetDevice(device));\n";
+    cuheader << "\t}\n";
+    cuheader << "\tctx->device = device;\n";
+    cuheader << "\tcheck_cuda(cudaGetDeviceProperties(&dev, device));\n";
+    cuheader << "\tfprintf(stderr, \"%d: Using GPU %d: %s\\n\", ctx->id, device, dev.name);\n";
+    cuheader << "\treturn true;\n";
+    cuheader << "}\n\n";
+    cuheader << "void load_graph_CUDA(struct CUDA_Context *ctx, MarshalGraph &g) {\n";
+    cuheader << "\tCSRGraphTy &graph = ctx->hg;\n";
+    cuheader << "\tctx->nowned = g.nowned;\n";
+    cuheader << "\tctx->id = g.id;\n";
+    cuheader << "\tgraph.nnodes = g.nnodes;\n";
+    cuheader << "\tgraph.nedges = g.nedges;\n";
+    cuheader << "\tif(!graph.allocOnHost()) {\n";
+    cuheader << "\t\tfprintf(stderr, \"Unable to alloc space for graph!\");\n";
+    cuheader << "\t\texit(1);\n";
+    cuheader << "\t}\n";
+    cuheader << "\tmemcpy(graph.row_start, g.row_start, sizeof(index_type) * (g.nnodes + 1));\n";
+    cuheader << "\tmemcpy(graph.edge_dst, g.edge_dst, sizeof(index_type) * g.nedges);\n";
+    cuheader << "\tif(g.node_data) memcpy(graph.node_data, g.node_data, sizeof(node_data_type) * g.nnodes);\n";
+    cuheader << "\tif(g.edge_data) memcpy(graph.edge_data, g.edge_data, sizeof(edge_data_type) * g.nedges);\n";
+    cuheader << "\tgraph.copy_to_gpu(ctx->gg);\n";
+    for (auto& var : SharedVariablesToTypeMap) {
+      cuheader << "\tctx->" << var.first << ".alloc(graph.nnodes);\n";
+    }
+    cuheader << "\tprintf(\"load_graph_GPU: %d owned nodes of total %d resident, %d edges\\n\", ctx->nowned, graph.nnodes, graph.nedges);\n"; 
+    cuheader << "}\n\n";
+    cuheader << "void kernel_sizing(CSRGraphTex & g, dim3 &blocks, dim3 &threads) {\n";
+    cuheader << "\tthreads.x = 256;\n";
+    cuheader << "\tthreads.y = threads.z = 1;\n";
+    cuheader << "\tblocks.x = 14 * 8;\n";
+    cuheader << "\tblocks.y = blocks.z = 1;\n";
+    cuheader << "}\n\n";
+    cuheader.close();
+
     std::ofstream IrGLAST;
-    IrGLAST.open(FileName + ".py", std::ios::ate);
+    IrGLAST.open(FileNamePath + ".py");
     IrGLAST << "from gg.ast import *\n";
     IrGLAST << "from gg.lib.graph import Graph\n";
     IrGLAST << "from gg.lib.wl import Worklist\n";
@@ -445,6 +553,8 @@ public:
     IrGLAST << "WL = Worklist()\n";
     IrGLAST << "ast = Module([\n";
     IrGLAST << "CBlock([cgen.Include(\"kernels/reduce.cuh\", "
+      << "system = False)], parse = False),\n";
+    IrGLAST << "CBlock([cgen.Include(\"" << filename << "_cuda.cuh\", "
       << "system = False)], parse = False),\n";
     for (auto& var : SharedVariablesToTypeMap) {
       std::string upper = var.first;
@@ -476,19 +586,6 @@ public:
     compute.close();
     remove(COMPUTE_FILENAME);
 
-      /*// should wait for all operators to be generated before reading shared variables
-      for (auto& var : SharedVariablesToTypeMap) {
-        IrGLAST << "CDecl((\"Shared<" << var.second << ">\", \"p_" << var.first << "\"";
-        IrGLAST << ", \"= Shared<" << var.second << "> (hg.nnodes)\")),\n";
-      }
-      // FIXME: initialize shared variables to zero if they are atomic
-      for (auto& var : SharedVariablesToTypeMap) {
-        std::string upper = var.first;
-        std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
-        IrGLAST << "CBlock([\"" << "P_" << upper << " = p_" 
-          << var.first << ".cpu_rd_ptr()" << "\"]),\n";
-      }*/
-
     std::ifstream orchestrator(ORCHESTRATOR_FILENAME);
     IrGLAST << orchestrator.rdbuf();
     orchestrator.close();
@@ -519,8 +616,10 @@ public:
     CXXMethodDecl *method = dyn_cast_or_null<CXXMethodDecl>(D);
     if (method) {
       Output.open(ORCHESTRATOR_FILENAME, std::ios::app);
-      Output << "Kernel(\"" << method->getParent()->getNameAsString() << "_cuda\", ";
-      Output << "[GraphParam('hg', True), GraphParam('gg', True)],\n[\n";
+      std::string kernelName = method->getParent()->getNameAsString();
+      Kernels.push_back(kernelName);
+      Output << "Kernel(\"" << kernelName << "_cuda\", ";
+      Output << "[('struct CUDA_Context *', 'ctx')],\n[\n";
     }
     bool traverse = RecursiveASTVisitor<IrGLOrchestratorVisitor>::TraverseDecl(D);
     if (traverse && method) {
@@ -530,7 +629,7 @@ public:
       std::string fileName = rewriter.getSourceMgr().getFilename(D->getLocStart()).str();
       std::size_t found = fileName.rfind(".");
       assert(found != std::string::npos);
-      FileName = fileName.substr(0, found);
+      FileNamePath = fileName.substr(0, found);
     }
     return traverse;
   }
@@ -616,7 +715,7 @@ public:
 
           std::ostringstream reduceCall;
           // FIXME: choose matching reduction operation
-          reduceCall << "mgpu::Reduce(p_" << reduceVar << ".gpu_rd_ptr(), hg.nnodes";
+          reduceCall << "mgpu::Reduce(p_" << reduceVar << ".gpu_rd_ptr(), ctx->hg.nnodes";
           reduceCall << ", (" << SharedVariablesToTypeMap[reduceVar] << ")0";
           reduceCall << ", mgpu::maximum<" << SharedVariablesToTypeMap[reduceVar] << ">()";
           reduceCall << ", (" << SharedVariablesToTypeMap[reduceVar] << "*)0";
@@ -698,23 +797,23 @@ public:
           compute.close();
 
           Output << "Pipe([\n";
-          Output << "Invoke(\"__init_worklist__\", (\"gg\", )),\n";
+          Output << "Invoke(\"__init_worklist__\", (\"ctx->gg\", )),\n";
           Output << "Pipe([\n";
         }
 
         // generate call to kernel
         std::string kernelName = record->getNameAsString();
         Output << "Invoke(\"" << kernelName << "\", ";
-        Output << "(\"gg\"";
+        Output << "(\"ctx->gg\"";
         auto& arguments = KernelToArgumentsMap[kernelName];
         for (auto& argument : arguments) {
-          Output << ", \"p_" << argument << ".gpu_wr_ptr()\"";
+          Output << ", \"ctx->" << argument << ".gpu_wr_ptr()\"";
         }
         Output << ")),\n";
 
         if (!isTopological) { // data driven
           Output << "], ),\n";
-          Output << "], once=True, wlinit=WLInit(\"hg.nedges\", [])),\n";
+          Output << "], once=True, wlinit=WLInit(\"ctx->hg.nedges\", [])),\n";
         }
       }
     }
