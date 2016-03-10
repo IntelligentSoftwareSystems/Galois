@@ -26,6 +26,8 @@
 #include <vector>
 #include <cstdint>
 
+#ifndef _GALOIS_DIST_GLOBAL_OBJECT_H
+#define _GALOIS_DIST_GLOBAL_OBJECT_H
 class GlobalObject {
   //FIXME: lock?
 //  static std::vector<uintptr_t> allobjs;
@@ -57,3 +59,4 @@ class GlobalObject {
 };
 
 
+#endif//_GALOIS_DIST_GLOBAL_OBJECT_H

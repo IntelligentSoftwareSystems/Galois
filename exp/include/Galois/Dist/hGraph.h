@@ -36,6 +36,9 @@
 #include "Galois/Dist/GlobalObj.h"
 #include "Galois/Dist/OfflineGraph.h"
 
+#ifndef _GALOIS_DIST_HGRAPH_H
+#define _GALOIS_DIST_HGRAPH_H
+
 template<typename NodeTy, typename EdgeTy, bool BSPNode=false, bool BSPEdge=false>
 class hGraph : public GlobalObject {
 
@@ -124,6 +127,9 @@ class hGraph : public GlobalObject {
   }
 
 public:
+  GraphTy & getGraph(){
+     return graph;
+  }
   static void syncRecv(Galois::Runtime::RecvBuffer& buf) {
     uint32_t oid;
     void (hGraph::*fn)(Galois::Runtime::RecvBuffer&);
@@ -394,3 +400,4 @@ public:
   }
 
 };
+#endif//_GALOIS_DIST_HGRAPH_H
