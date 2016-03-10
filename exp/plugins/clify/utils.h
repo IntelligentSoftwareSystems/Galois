@@ -87,4 +87,90 @@ struct ASTUtility{
       }
 };
 
+/*************************************************************************************************
+ *
+ **************************************************************************************************/
+struct OpenCLConversionDB{
+   static const char * get_cl_implementation(FunctionDecl *  d){
+//      llvm::outs()<<"About to process call :: " << d->getNameAsString() << "\n";
+      const string fname = d->getNameAsString();
+      if(d->isOverloadedOperator()){
+         const char  * op_name = getOperatorSpelling( d->getOverloadedOperator());
+         if(strcmp(op_name, "operator int")==0){
+            return "CAST_OP";
+         }
+         return getOperatorSpelling( d->getOverloadedOperator());
+      }
+      if(d->getNumParams()==0){
+         if(fname=="min"){
+            return "INT_MIN";
+         }else if (fname=="max"){
+            return "INT_MAX";
+         }else if (fname == "operator int"){
+            return "";
+         }
+      }else if (d->getNumParams()==1){
+         if(fname=="compare_exchange_strong"){
+            return "atomic_cmpxchg";
+         }else if (fname == "edge_begin"){
+            return "edge_begin";
+         }else if (fname == "edge_end"){
+            return "edge_end";
+         }else if (fname == "getEdgeDst"){
+            return "getEdgeDst";
+         }
+      }else if (d->getNumParams()==2){
+         if(fname=="compare_exchange_strong"){
+            return "atomic_cmpxchg";
+         }else if(fname=="getData"){
+            return "getData";
+         }else if (fname == "getEdgeData"){
+            return "getEdgeData";
+         }
+      }else if (d->getNumParams()==3){
+         if(fname=="compare_exchange_strong"){
+            return "atomic_cmpxchg";
+         }
+      }
+      {
+         string s = fname;
+         s+=" /*UNINTERPRETED-";
+         s+=d->getNumParams();
+         s+="*/";
+         return s.c_str();
+      }
+   }
+   static string type_convert(const QualType & qt){
+           //TODO RK - Filter primitive types.
+           llvm::outs() << " TypeConversion :: " << qt.getAsString() << "\n";
+           if(qt.getAsString()=="int"){
+              return "int ";
+           }else if(qt.getAsString()=="float"){
+              return "float";
+           }else if(qt.getAsString()=="double"){
+              return "double";
+           }else if(qt.getAsString()=="char"){
+              return "char";
+           }
+           //Atomic stripper
+           if(qt.getAsString().find ("std::atomic")!=string::npos){
+              return qt.getAsString().substr(qt.getAsString().rfind("<")+1,qt.getAsString().rfind(">")-qt.getAsString().rfind("<")-1);
+           }
+           //Iterator stripper
+           if (qt.getAsString().find ("boost::iterators::counting_iterator")!=string::npos){
+              return "edge_iterator ";
+           }
+           if (qt.getAsString().find("GNode")!=string::npos){
+              return "node_iterator";
+           }
+           //Wrapper for nodedata.
+           if(qt.getAsString().find("NodeData")!=string::npos){
+              return "__global NodeData *";
+           }
+           if(qt.getAsString().find("Graph")!=string::npos){
+              return "__global Graph *";
+           }
+           return qt.getAsString();
+   }
+};
 #endif /* SRC_PLUGINS_OPENCLCODEGEN_CLANGUTILS_H_ */

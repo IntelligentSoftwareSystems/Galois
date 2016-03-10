@@ -33,7 +33,7 @@ public:
             decl->dump(llvm::outs());
             llvm::outs() << " =================\n";
             llvm::outs() << decl->getUnderlyingType().getAsString()<<"\n";
-            string s = "#include \"CL_Header.h\"\nusing namespace Galois::OpenCL;\n";
+            string s = "#include \"Galois/OpenCL/CL_Header.h\"\nusing namespace Galois::OpenCL;\n";
             {
                //TODO - RK - A hack. Since the begin/end location of the decl are not returning
                // the entire decl (terminating at 'G' instead of at 'Graph', we try to hack around
@@ -161,5 +161,100 @@ public:
  *
  *********************************************************************************************************/
 
+/*********************************************************************************************************
+ *
+ *********************************************************************************************************/
+class NodeDataGen: public MatchFinder::MatchCallback {
+public:
+   Rewriter &rewriter;
+   ASTContext & ctx;
+   Galois::GAST::GaloisApp & app;
+   std::ofstream header_file;
+public:
+   NodeDataGen(Rewriter &rewriter, ASTContext & c, Galois::GAST::GaloisApp & a) :
+         rewriter(rewriter), ctx(c), app(a) {
+      char hfilename[1024];
+      sprintf(hfilename, "%s/app_header.h" , app.dir);
+      header_file.open(hfilename);
+      header_file << "//CL Graph declarations \n";
+      header_file << "//Generated : " << ast_utility.get_timestamp() << "\n";
 
+   }
+   //TODO - RK - Clean up graph generation code.
+   ~NodeDataGen(){
+      header_file << " #include \"graph_header.h\"\n";
+      {//Begin graph implementation.
+         const char * g_dev ="typedef struct _GraphType { \n\
+            uint _num_nodes;\n\
+            uint _num_edges;\n\
+             uint _node_data_size;\n\
+             uint _edge_data_size;\n\
+             __global NodeData *_node_data;\n\
+             __global uint *_out_index;\n\
+             __global uint *_out_neighbors;\n\
+             __global EdgeData *_out_edge_data;\n\
+             }GraphType;";
+         header_file << "\n"<< g_dev << "\n";
+      }
+      header_file << " typedef uint node_iterator;\n";
+      header_file << " typedef uint edge_iterator;\n";
+      header_file.close();
+   }
+   void GenCLType(const QualType & q, string sname){
+      std::string res="typedef ";
+      if(q.getTypePtr()->isRecordType()){
+         llvm::outs() << " Processing POD :" << q.getAsString( ) << " \n";
+         RecordDecl * decl = q.getTypePtrOrNull()->getAsCXXRecordDecl();
+         res+= "struct  _"+sname+"{\n";
+         for(auto f : decl->fields()){
+            llvm::outs() << " Field :: " << f->getType().getAsString() <<" " << f->getNameAsString() << " \n";
+            res+= OpenCLConversionDB::type_convert(f->getType());
+            res+=" ";
+            res+= f->getNameAsString();
+            res+="; \n";
+         }
+         res+= "}";
+         res+= sname;
+         res+= ";//End typedef\n";
+      }
+      else if(q.isTrivialType(ctx)){
+         llvm::outs() << " Processing trivial type :: " << q.getAsString() << "\n";
+         res+=q.getAsString();
+         res+=" ";
+         res+= sname;
+         res+=";\n";
+      }
+      header_file << res;
+   }
+   virtual void run(const MatchFinder::MatchResult &Results) {
+      {
+         TemplateArgument* decl = const_cast<TemplateArgument*>(Results.Nodes.getNodeAs<TemplateArgument>("NData"));
+         if (decl) {
+            llvm::outs() << " NodeData Found :: " << decl->getAsType().getAsString() << "\n";
+            GenCLType(decl->getAsType(), "NodeData");
+         }
+         RecordDecl * gDecl = const_cast<RecordDecl*>(Results.Nodes.getNodeAs<RecordDecl>("GraphType"));
+         if(gDecl){
+            for(auto f  : gDecl->fields()){
+               if (f->getNameAsString().compare("init_kernel_str_CL_LC_Graph")==0){
+                  llvm::outs() << " Match found ";
+                  f->getInClassInitializer()->dump();
+                  llvm::outs()<<"\n";
+               }
+            }
+         }
+      }
+      {
+         TemplateArgument* decl = const_cast<TemplateArgument*>(Results.Nodes.getNodeAs<TemplateArgument>("EData"));
+         if (decl) {
+            llvm::outs() << " EdgeData Found :: " << decl->getAsType().getAsString() << "\n";
+            GenCLType(decl->getAsType(), "EdgeData");
+         }
+      }
+
+   }
+};
+/*********************************************************************************************************
+ *
+ *********************************************************************************************************/
 #endif//_CLIFY_CL_TRANSFORMS_H_

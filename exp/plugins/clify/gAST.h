@@ -122,7 +122,7 @@ struct GaloisKernel {
       return "\ncl_call_wrapper()\n;";
    }
    string get_impl_string(){
-      std::string ret_string = "\nCL_Kernel * get_kernel(size_t num_items){\n";
+      std::string ret_string = "\nCL_Kernel * get_kernel(size_t num_items)const {\n";
       ret_string += " static CL_Kernel kernel(getCLContext()->get_default_device(),\"";
       ret_string += kernel->getNameAsString();
       ret_string += ".cl\", \"";
@@ -132,15 +132,18 @@ struct GaloisKernel {
       char s[1024];
       for(auto m : this->kernel->fields()){
          string ref;
-         if(m->getType().getTypePtr()->isAnyPointerType())
+         if(m->getType().getTypePtr()->isAnyPointerType()){
             ref="->";
-         else
+            sprintf(s,"kernel.set_arg(%d,sizeof(cl_mem),&(%s%sdevice_ptr()));\n",i, m->getNameAsString().c_str(), ref.c_str());
+         }
+         else{
             ref=".";
-         sprintf(s,"kernel.set_arg(%d,sizeof(%s%sdevice_ptr()),&(%s%sdevice_ptr()));\n",i,m->getNameAsString().c_str(),ref.c_str(), m->getNameAsString().c_str(), ref.c_str());
+            sprintf(s,"kernel.set_arg(%d,sizeof(%s),&(%s%sdevice_ptr()));\n",i,m->getType().getAsString().c_str(), m->getNameAsString().c_str(), ref.c_str());
+         }
          ret_string += s;
          i++;
       }
-      sprintf(s,"kernel.set_arg(%d,sizeof(num_items),&num_items);\n",i);
+      sprintf(s,"kernel.set_arg(%d,sizeof(cl_uint),&num_items);\n",i);
       ret_string += s;
       ret_string += " return &kernel;\n";
       ret_string+="}\n";

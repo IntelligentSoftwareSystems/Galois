@@ -42,7 +42,7 @@ using namespace llvm;
 ASTUtility ast_utility;
 
 #include "cl_transforms.h"
-
+#include "kernel_gen.h"
 
 
 // Apply a custom category to all command-line options so that they are the
@@ -80,10 +80,26 @@ public:
     * 3) Add call to the generated operator implementation in OpenCL
     *
     ********************************************************************************************************/
-
+//#define GEN_KERNEL
    virtual void HandleTranslationUnit(ASTContext &Context) {
       ast_utility.init(&R);
       llvm::outs() << "=============================InHandleTranslationUnit===========================\n";
+#ifdef GEN_KERNEL
+      {
+         MatchFinder ndFinder;
+         NodeDataGen ndGen(R, Context,app_data);
+//         ndFinder.addMatcher( varDecl(isExpansionInMainFile(), hasType(allOf( recordDecl(hasMethod(hasName("getData")) ) , classTemplateSpecializationDecl( hasTemplateArgument(0, templateArgument().bind("NData") )  )) ) ), &ndGen);
+         ndFinder.addMatcher( varDecl(isExpansionInMainFile(), allOf( hasType(recordDecl(hasMethod(hasName("getData")) ).bind("GraphType")) , hasType(classTemplateSpecializationDecl( hasTemplateArgument(0, templateArgument().bind("NData") )  )) ) ), &ndGen);
+         ndFinder.addMatcher( varDecl(isExpansionInMainFile(), allOf( hasType(recordDecl(hasMethod(hasName("getData")) ).bind("GraphType")) , hasType(classTemplateSpecializationDecl( hasTemplateArgument(1, templateArgument().bind("EData") )  )) ) ), &ndGen);
+         ndFinder.matchAST(Context);
+      }
+      {//Perform code generation.
+         OpenCLDeviceHandler clDevHandler(R,app_data);
+         MatchFinder opFinder;
+         opFinder.addMatcher(methodDecl(isExpansionInMainFile(), hasName("operator()")).bind("kernel"), &clDevHandler);
+         opFinder.matchAST(Context);
+      }
+#else
       {
          //1) Replace hGraph with CLGraph in typedefs
          MatchFinder graphTypedef;
@@ -114,6 +130,7 @@ public:
             //#################End find kernels/operators via do_all calls
       }
       llvm::outs() << " Done phase 2\n";
+#endif
    }//End HandleTranslationUnit
  };
 
