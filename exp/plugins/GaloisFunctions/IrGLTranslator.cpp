@@ -483,11 +483,11 @@ public:
       cuheader << "\treturn " << var.first << "[LID];\n";
       cuheader << "}\n\n";
       cuheader << "void set_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID, " << var.second << " v) {\n";
-      cuheader << "\t" << var.second << " *" << var.first << " = ctx->" << var.first << ".cpu_rd_ptr();\n";
+      cuheader << "\t" << var.second << " *" << var.first << " = ctx->" << var.first << ".cpu_wr_ptr(false);\n";
       cuheader << "\t" << var.first << "[LID] = v;\n";
       cuheader << "}\n\n";
       cuheader << "void add_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID, " << var.second << " v) {\n";
-      cuheader << "\t" << var.second << " *" << var.first << " = ctx->" << var.first << ".cpu_rd_ptr();\n";
+      cuheader << "\t" << var.second << " *" << var.first << " = ctx->" << var.first << ".cpu_wr_ptr(false);\n";
       cuheader << "\t" << var.first << "[LID] += v;\n";
       cuheader << "}\n\n";
     }
@@ -715,7 +715,7 @@ public:
 
           std::ostringstream reduceCall;
           // FIXME: choose matching reduction operation
-          reduceCall << "mgpu::Reduce(p_" << reduceVar << ".gpu_rd_ptr(), ctx->hg.nnodes";
+          reduceCall << "mgpu::Reduce(p_" << reduceVar << ".gpu_rd_ptr(ctx->device+1), ctx->hg.nnodes";
           reduceCall << ", (" << SharedVariablesToTypeMap[reduceVar] << ")0";
           reduceCall << ", mgpu::maximum<" << SharedVariablesToTypeMap[reduceVar] << ">()";
           reduceCall << ", (" << SharedVariablesToTypeMap[reduceVar] << "*)0";
@@ -807,7 +807,7 @@ public:
         Output << "(\"ctx->gg\"";
         auto& arguments = KernelToArgumentsMap[kernelName];
         for (auto& argument : arguments) {
-          Output << ", \"ctx->" << argument << ".gpu_wr_ptr()\"";
+          Output << ", \"ctx->" << argument << ".gpu_wr_ptr(false, ctx->device+1)\"";
         }
         Output << ")),\n";
 
