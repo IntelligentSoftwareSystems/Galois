@@ -32,6 +32,7 @@
 #include "Galois/gstl.h"
 
 #include "Galois/Runtime/CompilerHelperFunctions.h"
+#include "Galois/Runtime/Tracer.h"
 
 #include "OfflineGraph.h"
 #include "hGraph.h"
@@ -180,7 +181,7 @@ int main(int argc, char** argv) {
     Galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_pageRank;
 
 #ifdef __HET_CUDA__
-    const unsigned my_host_id = Galois::Runtime::NetworkInterface::ID; // TODO: or net.ID?
+    const unsigned my_host_id = Galois::Runtime::getHostID();
     //Parse arg string when running on multiple hosts and update/override personality
     //with corresponding value.
     if (personality_set.length() == Galois::Runtime::NetworkInterface::Num) {
@@ -232,21 +233,19 @@ int main(int argc, char** argv) {
 
     // Verify
     if(verify){
-      if(net.ID == 0) {
 #ifdef __HET_CUDA__
-        if (personality == CPU) { 
+      if (personality == CPU) { 
 #endif
-          for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
-            std::cout << "[" << *ii << "]  " << hg.getData(*ii).nout << "\n";
-          }
-#ifdef __HET_CUDA__
-        } else if(personality == GPU_CUDA)  {
-          for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
-            std::cout << "[" << *ii << "]  " << get_node_nout_cuda(cuda_ctx, *ii) << "\n";
-          }
+        for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
+          Galois::Runtime::printOutput("[%] %\n", *ii, hg.getData(*ii).nout);
         }
-#endif
+#ifdef __HET_CUDA__
+      } else if(personality == GPU_CUDA)  {
+        for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
+          Galois::Runtime::printOutput("[%] %\n", *ii, get_node_nout_cuda(cuda_ctx, *ii));
+        }
       }
+#endif
     }
 
     std::cout << "PageRank_pull::go called\n";
@@ -259,21 +258,19 @@ int main(int argc, char** argv) {
 
     // Verify
     if(verify){
-      if(net.ID == 0) {
 #ifdef __HET_CUDA__
-        if (personality == CPU) { 
+      if (personality == CPU) { 
 #endif
-          for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
-            std::cout << "[" << *ii << "]  " << hg.getData(*ii).value << "\n";
-          }
-#ifdef __HET_CUDA__
-        } else if(personality == GPU_CUDA)  {
-          for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
-            std::cout << "[" << *ii << "]  " << get_node_value_cuda(cuda_ctx, *ii) << "\n";
-          }
+        for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
+          Galois::Runtime::printOutput("[%] %\n", *ii, hg.getData(*ii).value);
         }
-#endif
+#ifdef __HET_CUDA__
+      } else if(personality == GPU_CUDA)  {
+        for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
+          Galois::Runtime::printOutput("[%] %\n", *ii, get_node_value_cuda(cuda_ctx, *ii));
+        }
       }
+#endif
     }
 
     T_total.stop();
