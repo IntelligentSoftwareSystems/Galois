@@ -197,11 +197,11 @@ public:
     declString.str("");
     bodyString.str("");
     funcName = func->getParent()->getNameAsString();
-    declString << "Kernel(\"" << funcName << "\", [G.param()";
+    declString << "Kernel(\"" << funcName << "\", [G.param(), ('int ', 'nowned') ";
     // FIXME: assuming first parameter is GNode
     std::string vertexName = func->getParamDecl(0)->getNameAsString();
     if (isTopological) {
-      bodyString << "ForAll(\"" << vertexName << "\", G.nodes(),\n[\n";
+      bodyString << "ForAll(\"" << vertexName << "\", G.nodes(None, \"nowned\"),\n[\n";
     } else {
       bodyString << "ForAll(\"wlvertex\", WL.items(),\n[\n";
       bodyString << "CDecl([(\"int\", \"" << vertexName << "\", \"\")]),\n";
@@ -503,11 +503,11 @@ public:
       cuheader << "\treturn " << var.first << "[LID];\n";
       cuheader << "}\n\n";
       cuheader << "void set_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID, " << var.second << " v) {\n";
-      cuheader << "\t" << var.second << " *" << var.first << " = ctx->" << var.first << ".cpu_wr_ptr(false);\n";
+      cuheader << "\t" << var.second << " *" << var.first << " = ctx->" << var.first << ".cpu_wr_ptr();\n";
       cuheader << "\t" << var.first << "[LID] = v;\n";
       cuheader << "}\n\n";
       cuheader << "void add_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID, " << var.second << " v) {\n";
-      cuheader << "\t" << var.second << " *" << var.first << " = ctx->" << var.first << ".cpu_wr_ptr(false);\n";
+      cuheader << "\t" << var.second << " *" << var.first << " = ctx->" << var.first << ".cpu_wr_ptr();\n";
       cuheader << "\t" << var.first << "[LID] += v;\n";
       cuheader << "}\n\n";
     }
@@ -828,10 +828,10 @@ public:
         // generate call to kernel
         std::string kernelName = record->getNameAsString();
         Output << "Invoke(\"" << kernelName << "\", ";
-        Output << "(\"ctx->gg\"";
+        Output << "(\"ctx->gg\", \"ctx->nowned\"";
         auto& arguments = KernelToArgumentsMap[kernelName];
         for (auto& argument : arguments) {
-          Output << ", \"ctx->" << argument << ".gpu_wr_ptr(false, ctx->device+1)\"";
+          Output << ", \"ctx->" << argument << ".gpu_wr_ptr()\"";
         }
         Output << ")),\n";
 

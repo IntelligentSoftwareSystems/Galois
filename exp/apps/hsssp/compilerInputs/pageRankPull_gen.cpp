@@ -36,7 +36,7 @@
 
 #include "Galois/Dist/hGraph.h"
 
-#ifdef __HET_CUDA__
+#ifdef __GALOIS_HET_CUDA__
 #include "Galois/Cuda/cuda_mtypes.h"
 #include "cuda/hpagerank_cuda.h"
 struct CUDA_Context *cuda_ctx;
@@ -46,7 +46,7 @@ static const char* const name = "PageRank - Compiler Generated Distributed Heter
 static const char* const desc = "PageRank Pull version on Distributed Galois.";
 static const char* const url = 0;
 
-#ifdef __HET_CUDA__
+#ifdef __GALOIS_HET_CUDA__
 enum Personality {
    CPU, GPU_CUDA, GPU_OPENCL
 };
@@ -68,7 +68,7 @@ namespace cll = llvm::cl;
 static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations"), cll::init(4));
 static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to the output stream"), cll::init(false));
-#ifdef __HET_CUDA__
+#ifdef __GALOIS_HET_CUDA__
 static cll::opt<int> gpudevice("gpu", cll::desc("Select GPU to run on, default is to choose automatically"), cll::init(-1));
 static cll::opt<Personality> personality("personality", cll::desc("Personality"),
       cll::values(clEnumValN(CPU, "cpu", "Galois CPU"), clEnumValN(GPU_CUDA, "gpu/cuda", "GPU/CUDA"), clEnumValN(GPU_OPENCL, "gpu/opencl", "GPU/OpenCL"), clEnumValEnd),
@@ -121,7 +121,7 @@ struct PageRank_pull {
       GNode dst = graph->getEdgeDst(nbr);
       PR_NodeData& ddata = graph->getData(dst);
       unsigned dnout = ddata.nout;
-      if(ddata.nout > 0){
+      if(dnout > 0){
         sum += ddata.value/dnout;
       }
     }
@@ -142,7 +142,7 @@ int main(int argc, char** argv) {
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     Galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_pageRank;
 
-#ifdef __HET_CUDA__
+#ifdef __GALOIS_HET_CUDA__
     const unsigned my_host_id = Galois::Runtime::getHostID();
     //Parse arg string when running on multiple hosts and update/override personality
     //with corresponding value.
@@ -174,7 +174,7 @@ int main(int argc, char** argv) {
     Graph hg(inputFile, net.ID, net.Num);
     T_hGraph_init.stop();
 
-#ifdef __HET_CUDA__
+#ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       cuda_ctx = get_CUDA_context(my_host_id);
       if (!init_CUDA_context(cuda_ctx, gpudevice))
@@ -194,13 +194,13 @@ int main(int argc, char** argv) {
 
     // Verify
     if(verify){
-#ifdef __HET_CUDA__
+#ifdef __GALOIS_HET_CUDA__
       if (personality == CPU) { 
 #endif
         for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
           Galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).nout);
         }
-#ifdef __HET_CUDA__
+#ifdef __GALOIS_HET_CUDA__
       } else if(personality == GPU_CUDA)  {
         for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
           Galois::Runtime::printOutput("% %\n", hg.getGID(*ii), get_node_nout_cuda(cuda_ctx, *ii));
@@ -219,13 +219,13 @@ int main(int argc, char** argv) {
 
     // Verify
     if(verify){
-#ifdef __HET_CUDA__
+#ifdef __GALOIS_HET_CUDA__
       if (personality == CPU) { 
 #endif
         for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
           Galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).value);
         }
-#ifdef __HET_CUDA__
+#ifdef __GALOIS_HET_CUDA__
       } else if(personality == GPU_CUDA)  {
         for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
           Galois::Runtime::printOutput("% %\n", hg.getGID(*ii), get_node_value_cuda(cuda_ctx, *ii));

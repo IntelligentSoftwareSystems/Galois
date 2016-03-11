@@ -36,7 +36,7 @@
 #include "Galois/Dist/GlobalObj.h"
 #include "Galois/Dist/OfflineGraph.h"
 
-#ifdef __HET_CUDA__
+#ifdef __GALOIS_HET_CUDA__
 #include "Galois/Cuda/cuda_mtypes.h"
 #endif
 
@@ -406,7 +406,7 @@ public:
     return -1;
   }
 
-#ifdef __HET_CUDA__
+#ifdef __GALOIS_HET_CUDA__
   MarshalGraph getMarshalGraph(unsigned host_id) {
      MarshalGraph m;
 
