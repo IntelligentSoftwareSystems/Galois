@@ -39,6 +39,7 @@
 #ifdef __HET_CUDA__
 #include "Galois/Cuda/cuda_mtypes.h"
 #include "cuda/hpagerank_cuda.h"
+struct CUDA_Context *cuda_ctx;
 #endif
 
 static const char* const name = "PageRank - Compiler Generated Distributed Heterogeneous";
@@ -85,44 +86,6 @@ struct PR_NodeData {
 
 typedef hGraph<PR_NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
-
-#ifdef __HET_CUDA__
-struct CUDA_Context *cuda_ctx;
-
-MarshalGraph hGraphToMarshalGraph(Graph &g, unsigned host_id) {
-   MarshalGraph m;
-
-   m.nnodes = g.size();
-   m.nedges = g.sizeEdges();
-   m.nowned = std::distance(g.begin(), g.end());
-   assert(m.nowned > 0);
-   m.g_offset = g.getGID(0);
-   m.id = host_id;
-   m.row_start = (index_type *) calloc(m.nnodes + 1, sizeof(index_type));
-   m.edge_dst = (index_type *) calloc(m.nedges, sizeof(index_type));
-
-   // TODO: initialize node_data and edge_data
-   m.node_data = NULL;
-   m.edge_data = NULL;
-
-   // pinched from Rashid's LC_LinearArray_Graph.h
-
-   size_t edge_counter = 0, node_counter = 0;
-   for (auto n = g.begin(); n != g.ghost_end() && *n != m.nnodes; n++, node_counter++) {
-      m.row_start[node_counter] = edge_counter;
-      if (*n < m.nowned) {
-         for (auto e = g.edge_begin(*n); e != g.edge_end(*n); e++) {
-            if (g.getEdgeDst(e) < m.nnodes)
-               m.edge_dst[edge_counter++] = g.getEdgeDst(e);
-         }
-      }
-   }
-
-   m.row_start[node_counter] = edge_counter;
-   m.nedges = edge_counter;
-   return m;
-}
-#endif
 
 struct InitializeGraph {
   Graph* graph;
@@ -216,9 +179,8 @@ int main(int argc, char** argv) {
       cuda_ctx = get_CUDA_context(my_host_id);
       if (!init_CUDA_context(cuda_ctx, gpudevice))
         return -1;
-      MarshalGraph m = hGraphToMarshalGraph(hg, net.ID);
+      MarshalGraph m = hg.getMarshalGraph(my_host_id);
       load_graph_CUDA(cuda_ctx, m);
-      // TODO: deallocate MarshalGraph
     } else if (personality == GPU_OPENCL) {
       //Galois::OpenCL::cl_env.init(cldevice.Value);
     }

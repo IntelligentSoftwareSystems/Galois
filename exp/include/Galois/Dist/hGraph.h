@@ -36,6 +36,10 @@
 #include "Galois/Dist/GlobalObj.h"
 #include "Galois/Dist/OfflineGraph.h"
 
+#ifdef __HET_CUDA__
+#include "Galois/Cuda/cuda_mtypes.h"
+#endif
+
 #ifndef _GALOIS_DIST_HGRAPH_H
 #define _GALOIS_DIST_HGRAPH_H
 
@@ -400,6 +404,42 @@ public:
     }
     return -1;
   }
+
+#ifdef __HET_CUDA__
+  MarshalGraph getMarshalGraph(unsigned host_id) {
+     MarshalGraph m;
+
+     m.nnodes = size();
+     m.nedges = sizeEdges();
+     m.nowned = std::distance(begin(), end());
+     assert(m.nowned > 0);
+     m.g_offset = getGID(0);
+     m.id = host_id;
+     m.row_start = (index_type *) calloc(m.nnodes + 1, sizeof(index_type));
+     m.edge_dst = (index_type *) calloc(m.nedges, sizeof(index_type));
+
+     // TODO: initialize node_data and edge_data
+     m.node_data = NULL;
+     m.edge_data = NULL;
+
+     // pinched from Rashid's LC_LinearArray_Graph.h
+
+     size_t edge_counter = 0, node_counter = 0;
+     for (auto n = begin(); n != ghost_end() && *n != m.nnodes; n++, node_counter++) {
+        m.row_start[node_counter] = edge_counter;
+        if (*n < m.nowned) {
+           for (auto e = edge_begin(*n); e != edge_end(*n); e++) {
+              if (getEdgeDst(e) < m.nnodes)
+                 m.edge_dst[edge_counter++] = getEdgeDst(e);
+           }
+        }
+     }
+
+     m.row_start[node_counter] = edge_counter;
+     m.nedges = edge_counter;
+     return m;
+  }
+#endif
 
 };
 #endif//_GALOIS_DIST_HGRAPH_H
