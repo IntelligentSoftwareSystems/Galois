@@ -463,7 +463,7 @@ public:
     std::ofstream header;
     header.open(FileNamePath + "_cuda.h");
     header << "#pragma once\n";
-    header << "#include \"cuda_mtypes.h\"\n";
+    header << "#include \"Galois/Cuda/cuda_mtypes.h\"\n";
     header << "\nstruct CUDA_Context;\n";
     header << "\nstruct CUDA_Context *get_CUDA_context(int id);\n";
     header << "bool init_CUDA_context(struct CUDA_Context *ctx, int device);\n";

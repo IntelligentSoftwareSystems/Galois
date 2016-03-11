@@ -103,18 +103,27 @@ namespace {
     std::stringstream s;
     s << "\tstruct Syncer_" << counter << " {\n"
       << "\t\tstatic " << i.VAL_TYPE <<" extract(uint32_t node_id, const " << i.NODE_TYPE << " node) {\n" 
-      << "\t\t\tif (personality == CPU) return " << "node." << i.FIELD_NAME <<  ";\n"
-      << "\t\t\tassert (personality == GPU_CUDA); return " << "get_node_" << i.FIELD_NAME <<  "_cuda(cuda_ctx, node_id);\n"
+      << "\t\t#ifdef __HET_CUDA__\n"
+      << "\t\t\tif (personality == GPU_CUDA) return " << "get_node_" << i.FIELD_NAME <<  "_cuda(cuda_ctx, node_id);\n"
+      << "\t\t\tassert (personality == CPU);\n"
+      << "\t\t#endif\n"
+      << "\t\t\treturn " << "node." << i.FIELD_NAME <<  ";\n"
       << "\t\t}\n"
       << "\t\tstatic void reduce (uint32_t node_id, " << i.NODE_TYPE << " node, " << i.VAL_TYPE << " y) {\n" 
-      << "\t\t\tif (personality == CPU) " << i.REDUCE_OP_EXPR << "\n"
+      << "\t\t#ifdef __HET_CUDA__\n"
       /* !!! assumes reduction operation is always addition */
-      << "\t\t\telse if (personality == GPU_CUDA) " << "add_node_" << i.FIELD_NAME <<  "_cuda(cuda_ctx, node_id, y);\n"
+      << "\t\t\tif (personality == GPU_CUDA) " << "add_node_" << i.FIELD_NAME <<  "_cuda(cuda_ctx, node_id, y);\n"
+      << "\t\t\telse if (personality == CPU)\n"
+      << "\t\t#endif\n"
+      << "\t\t\t\t" << i.REDUCE_OP_EXPR << "\n"
       << "\t\t}\n"
       << "\t\tstatic void reset (uint32_t node_id, " << i.NODE_TYPE << " node ) {\n" 
-      << "\t\t\tif (personality == CPU) " << i.RESET_VAL_EXPR << "\n"
+      << "\t\t#ifdef __HET_CUDA__\n"
       /* !!! assumes reduction operation is always addition */
-      << "\t\t\telse if (personality == GPU_CUDA) " << "set_node_" << i.FIELD_NAME <<  "_cuda(cuda_ctx, node_id, 0);\n"
+      << "\t\t\tif (personality == GPU_CUDA) " << "set_node_" << i.FIELD_NAME <<  "_cuda(cuda_ctx, node_id, 0);\n"
+      << "\t\t\telse if (personality == CPU)\n"
+      << "\t\t#endif\n"
+      << "\t\t\t\t" << i.RESET_VAL_EXPR << "\n"
       << "\t\t}\n"
       << "\t\ttypedef " << i.VAL_TYPE << " ValTy;\n"
       << "\t};\n";
@@ -125,12 +134,18 @@ namespace {
     std::stringstream s;
     s << "\tstruct SyncerPull_" << counter << " {\n"
       << "\t\tstatic " << i.VAL_TYPE <<" extract(uint32_t node_id, const " << i.NODE_TYPE << " node) {\n"
-      << "\t\t\tif (personality == CPU) return " << "node." << i.FIELD_NAME <<  ";\n"
-      << "\t\t\tassert (personality == GPU_CUDA); return " << "get_node_" << i.FIELD_NAME <<  "_cuda(cuda_ctx, node_id);\n"
+      << "\t\t#ifdef __HET_CUDA__\n"
+      << "\t\t\tif (personality == GPU_CUDA) return " << "get_node_" << i.FIELD_NAME <<  "_cuda(cuda_ctx, node_id);\n"
+      << "\t\t\tassert (personality == CPU);\n"
+      << "\t\t#endif\n"
+      << "\t\t\treturn " << "node." << i.FIELD_NAME <<  ";\n"
       << "\t\t}\n"
       << "\t\tstatic void setVal (uint32_t node_id, " << i.NODE_TYPE << " node, " << i.VAL_TYPE << " y) " << "{\n"
-      << "\t\t\tif (personality == CPU) node." << i.FIELD_NAME << " = y; "
-      << "\t\t\telse if (personality == GPU_CUDA) " << "set_node_" << i.FIELD_NAME <<  "_cuda(cuda_ctx, node_id, y);\n"
+      << "\t\t#ifdef __HET_CUDA__\n"
+      << "\t\t\tif (personality == GPU_CUDA) " << "set_node_" << i.FIELD_NAME <<  "_cuda(cuda_ctx, node_id, y);\n"
+      << "\t\t\telse if (personality == CPU)\n"
+      << "\t\t#endif\n"
+      << "\t\t\t\tnode." << i.FIELD_NAME << " = y;\n"
       << "\t\t}\n"
       << "\t\ttypedef " << i.VAL_TYPE << " ValTy;\n"
       << "\t};\n";
@@ -310,20 +325,19 @@ namespace {
             rewriter.InsertText(ST_main, SSHelperStructFunctions.str(), true, true);
             SSHelperStructFunctions.str(string());
             SSHelperStructFunctions.clear();
+
+            auto recordDecl = Results.Nodes.getNodeAs<clang::CXXRecordDecl>("class");
+            std::string className = recordDecl->getNameAsString();
             
             stringstream kernelBefore;
-            kernelBefore << "\tif (personality == CPU) {\n";
+            kernelBefore << "#ifdef __HET_CUDA__\n";
+            kernelBefore << "\tif (personality == GPU_CUDA) {\n";
+            kernelBefore << "\t\t" << className << "_cuda();\n";
+            kernelBefore << "\t} else if (personality == CPU)\n";
+            kernelBefore << "#endif\n";
             rewriter.InsertText(ST_main, kernelBefore.str(), true, true);
 
             SourceLocation ST = callFS->getSourceRange().getEnd().getLocWithOffset(2);
-
-            stringstream kernelAfter;
-            auto recordDecl = Results.Nodes.getNodeAs<clang::CXXRecordDecl>("class");
-            std::string className = recordDecl->getNameAsString();
-            kernelAfter << "\n\t} else if (personality == GPU_CUDA) {\n";
-            kernelAfter << "\t\t" << className << "_cuda();\n";
-            kernelAfter << "\t}\n";
-            rewriter.InsertText(ST, kernelAfter.str(), true, true);
 
             //Get_info_functor(GraphTy& _g): graph(_g){}
             // Adding Syn calls for write set
@@ -517,20 +531,19 @@ namespace {
               SSSyncer_pull.clear();
               ++counter;
             }
+
+            auto recordDecl = Results.Nodes.getNodeAs<clang::CXXRecordDecl>("class");
+            std::string className = recordDecl->getNameAsString();
             
             stringstream kernelBefore;
-            kernelBefore << "\tif (personality == CPU) {\n";
+            kernelBefore << "#ifdef __HET_CUDA__\n";
+            kernelBefore << "\tif (personality == GPU_CUDA) {\n";
+            kernelBefore << "\t\t" << className << "_cuda(cuda_ctx);\n";
+            kernelBefore << "\t} else if (personality == CPU)\n";
+            kernelBefore << "#endif\n";
             rewriter.InsertText(ST_main, kernelBefore.str(), true, true);
 
             SourceLocation ST = callFS->getSourceRange().getEnd().getLocWithOffset(2);
-
-            stringstream kernelAfter;
-            auto recordDecl = Results.Nodes.getNodeAs<clang::CXXRecordDecl>("class");
-            std::string className = recordDecl->getNameAsString();
-            kernelAfter << "\n\t} else if (personality == GPU_CUDA) {\n";
-            kernelAfter << "\t\t" << className << "_cuda(cuda_ctx);\n";
-            kernelAfter << "\t}\n";
-            rewriter.InsertText(ST, kernelAfter.str(), true, true);
 
             // Adding Syn calls for write set
             stringstream SSAfter;

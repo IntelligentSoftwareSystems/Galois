@@ -34,11 +34,10 @@
 #include "Galois/Runtime/CompilerHelperFunctions.h"
 #include "Galois/Runtime/Tracer.h"
 
-#include "OfflineGraph.h"
-#include "hGraph.h"
+#include "Galois/Dist/hGraph.h"
 
 #ifdef __HET_CUDA__
-#include "cuda/cuda_mtypes.h"
+#include "Galois/Cuda/cuda_mtypes.h"
 #include "cuda/hpagerank_cuda.h"
 #endif
 
@@ -237,12 +236,12 @@ int main(int argc, char** argv) {
       if (personality == CPU) { 
 #endif
         for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
-          Galois::Runtime::printOutput("[%] %\n", *ii, hg.getData(*ii).nout);
+          Galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).nout);
         }
 #ifdef __HET_CUDA__
       } else if(personality == GPU_CUDA)  {
         for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
-          Galois::Runtime::printOutput("[%] %\n", *ii, get_node_nout_cuda(cuda_ctx, *ii));
+          Galois::Runtime::printOutput("% %\n", hg.getGID(*ii), get_node_nout_cuda(cuda_ctx, *ii));
         }
       }
 #endif
@@ -262,12 +261,12 @@ int main(int argc, char** argv) {
       if (personality == CPU) { 
 #endif
         for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
-          Galois::Runtime::printOutput("[%] %\n", *ii, hg.getData(*ii).value);
+          Galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).value);
         }
 #ifdef __HET_CUDA__
       } else if(personality == GPU_CUDA)  {
         for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
-          Galois::Runtime::printOutput("[%] %\n", *ii, get_node_value_cuda(cuda_ctx, *ii));
+          Galois::Runtime::printOutput("% %\n", hg.getGID(*ii), get_node_value_cuda(cuda_ctx, *ii));
         }
       }
 #endif

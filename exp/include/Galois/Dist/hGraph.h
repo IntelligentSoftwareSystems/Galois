@@ -155,7 +155,7 @@ public:
       }
       */
       assert(isOwned(gid));
-      FnTy::reduce(getData(gid - globalOffset), val);
+      FnTy::reduce((gid - globalOffset), getData(gid - globalOffset), val);
     }
   }
 
@@ -173,9 +173,10 @@ public:
       typename FnTy::ValTy old_val, val;
       Galois::Runtime::gDeserialize(buf, gid, old_val);
       assert(isOwned(gid));
-      val = FnTy::extract(getData((gid - globalOffset)));
-      //if (net.ID == 0)
+      val = FnTy::extract((gid - globalOffset), getData((gid - globalOffset)));
+      if (net.ID == 0) {
         //std::cout << "PullApply step1 : [" << net.ID << "] "<< " to : " << from_id << " : [" << gid - globalOffset << "] : " << val << "\n";
+      }
       //For now just send all.
       //if(val != old_val){
       Galois::Runtime::gSerialize(b, gid, val);
@@ -198,9 +199,10 @@ public:
       Galois::Runtime::gDeserialize(buf, gid, val);
       //assert(isGhost(gid));
       auto LocalId = G2L(gid);
-      //if (net.ID == 1)
+      if (net.ID == 1) {
         //std::cout << "PullApply Step2 : [" << net.ID << "]  : [" << LocalId << "] : " << val << "\n";
-      FnTy::setVal(getData(LocalId), val);
+      }
+      FnTy::setVal(LocalId, getData(LocalId), val);
     }
     --num_recv_expected;
   }
@@ -223,7 +225,7 @@ public:
 
     num_recv_expected = 0;
     totalNodes = g.size();
-    std::cout << "Total nodes : " << totalNodes << "\n";
+    //std::cout << "Total nodes : " << totalNodes << "\n";
     //compute owners for all nodes
     for (unsigned i = 0; i < numHosts; ++i)
       gid2host.push_back(Galois::block_range(0U, (unsigned)g.size(), i, numHosts));
@@ -327,20 +329,20 @@ public:
       if (x == id) continue;
       uint32_t start, end;
       std::tie(start, end) = nodes_by_host(x);
-  //    std::cout << net.ID << " " << x << " " << start << " " << end << "\n";
+      //std::cout << net.ID << " " << x << " " << start << " " << end << "\n";
       if (start == end) continue;
       Galois::Runtime::SendBuffer b;
       gSerialize(b, idForSelf(), fn, (uint32_t)(end-start));
       for (; start != end; ++start) {
         auto gid = L2G(start);
         if( gid > totalNodes){
-          std::cout << "[" << net.ID << "] GID : " << gid << " size : " << graph.size() << "\n";
+          //std::cout << "[" << net.ID << "] GID : " << gid << " size : " << graph.size() << "\n";
 
           assert(gid < totalNodes);
         }
-        //std::cout << net.ID << " send (" << gid << ") " << start << " " << FnTy::extract(getData(start)) << "\n";
-        gSerialize(b, gid, FnTy::extract(getData(start)));
-        FnTy::reset(getData(start));
+        //std::cout << net.ID << " send (" << gid << ") " << start << " " << FnTy::extract(start, getData(start)) << "\n";
+        gSerialize(b, gid, FnTy::extract(start, getData(start)));
+        FnTy::reset(start, getData(start));
       }
       net.send(x, syncRecv, b);
     }
@@ -364,8 +366,8 @@ public:
       gSerialize(b, idForSelf(), fn, net.ID, (uint32_t)(end-start));
       for (; start != end; ++start) {
         auto gid = L2G(start);
-        //std::cout << net.ID << " PULL send (" << gid << ") " << start << " " << FnTy::extract(getData(start)) << "\n";
-        gSerialize(b, gid, FnTy::extract(getData(start)));
+        //std::cout << net.ID << " PULL send (" << gid << ") " << start << " " << FnTy::extract(start, getData(start)) << "\n";
+        gSerialize(b, gid, FnTy::extract(start, getData(start)));
       }
       net.send(x, syncRecv, b);
       ++num_recv_expected;
