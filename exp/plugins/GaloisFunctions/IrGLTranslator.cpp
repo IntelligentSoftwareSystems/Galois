@@ -66,14 +66,14 @@ private:
   std::unordered_set<std::string> symbolTable; // FIXME: does not handle scoped variables (nesting with same variable name)
   std::ofstream Output;
 
-  std::map<std::string, std::string> &GlobalVariablesToTypeMap;
+  std::map<std::string, std::pair<std::string, std::string> > &GlobalVariablesToTypeMap;
   std::map<std::string, std::string> &SharedVariablesToTypeMap;
   std::map<std::string, std::vector<std::string> > &KernelToArgumentsMap;
 
 public:
   explicit IrGLOperatorVisitor(ASTContext *context, Rewriter &R, 
       bool isTopo,
-      std::map<std::string, std::string> &globalVariables,
+      std::map<std::string, std::pair<std::string, std::string> > &globalVariables,
       std::map<std::string, std::string> &sharedVariables,
       std::map<std::string, std::vector<std::string> > &kernels) : 
     //astContext(context),
@@ -120,8 +120,20 @@ public:
       }
     } 
 
-    // FIXME: use & (address-of) operator for atomic variables in atomicAdd() etc
+    // use & (address-of) operator for atomic variables in atomicAdd() etc
+    std::size_t start = 0;
+    while (1) {
+      std::size_t found = text.find("Galois::atomic", start);
+      if (found != std::string::npos) {
+        std::size_t replace = text.find("(", start);
+        text.insert(replace+1, "&");
+        start = replace;
+      } else {
+        break;
+      }
+    }
     findAndReplace(text, "Galois::atomic", "atomic");
+
     findAndReplace(text, "->getEdgeDst", ".getAbsDestination");
     findAndReplace(text, "->getEdgeData", ".getAbsWeight");
     findAndReplace(text, "std::fabs", "fabs");
@@ -403,8 +415,16 @@ public:
     const std::string &varName = decl->getNameAsString();
     if (symbolTable.find(varName) == symbolTable.end()) {
       if (GlobalVariablesToTypeMap.find(varName) == GlobalVariablesToTypeMap.end()) {
-        // FIXME: get initialization value if any
-        GlobalVariablesToTypeMap[varName] = decl->getType().getAsString();
+        std::string type = decl->getType().getAsString();
+        std::string declStr = rewriter.getRewrittenText(decl->getSourceRange());
+        std::size_t found = declStr.find("=");
+        std::string value;
+        if (found != std::string::npos) {
+          value = declStr.substr(found, declStr.length()-found);
+        } else {
+          value = "";
+        }
+        GlobalVariablesToTypeMap[varName] = std::make_pair(type, value);
       }
     }
     return true;
@@ -420,7 +440,7 @@ private:
   std::unordered_set<std::string> symbolTable; // FIXME: does not handle scoped variables (nesting with same variable name)
   std::ofstream Output;
 
-  std::map<std::string, std::string> GlobalVariablesToTypeMap;
+  std::map<std::string, std::pair<std::string, std::string> > GlobalVariablesToTypeMap;
   std::map<std::string, std::string> SharedVariablesToTypeMap;
   std::map<std::string, std::vector<std::string> > KernelToArgumentsMap;
   std::vector<std::string> Kernels;
@@ -563,21 +583,20 @@ public:
         << " *\", \"P_" << upper << "\", \"\")]),\n";
     }
     for (auto& var : GlobalVariablesToTypeMap) {
-      size_t found = var.second.find("Galois::");
+      size_t found = var.second.first.find("Galois::");
       if (found == std::string::npos) {
-        found = var.second.find("cll::opt");
+        found = var.second.first.find("cll::opt");
         std::string type;
         if (found == std::string::npos) {
-          type = var.second;
+          type = var.second.first;
         } else {
-          size_t start = var.second.find("<", found);
+          size_t start = var.second.first.find("<", found);
           // FIXME: nested < < > >
-          size_t end = var.second.find(">", found);
-          type = var.second.substr(start+1, end-start-1);
+          size_t end = var.second.first.find(">", found);
+          type = var.second.first.substr(start+1, end-start-1);
         }
-        // FIXME: initialization value?
         IrGLAST << "CDeclGlobal([(\"extern " << type 
-          << "\", \"" << var.first << "\", \"\")]),\n";
+          << "\", \"" << var.first << "\", \"" << var.second.second << "\")]),\n";
       }
     }
 
@@ -593,6 +612,11 @@ public:
 
     IrGLAST << "])\n"; // end Module
     IrGLAST.close();
+
+    llvm::errs() << "IrGL file and headers generated:\n";
+    llvm::errs() << FileNamePath << ".py\n";
+    llvm::errs() << FileNamePath << "_cuda.cuh\n";
+    llvm::errs() << FileNamePath << "_cuda.h\n";
   }
 
   void WriteCBlock(std::string text) {
@@ -860,7 +884,16 @@ public:
     const std::string &varName = decl->getNameAsString();
     if (symbolTable.find(varName) == symbolTable.end()) {
       if (GlobalVariablesToTypeMap.find(varName) == GlobalVariablesToTypeMap.end()) {
-        GlobalVariablesToTypeMap[varName] = decl->getType().getAsString();
+        std::string type = decl->getType().getAsString();
+        std::string declStr = rewriter.getRewrittenText(decl->getSourceRange());
+        std::size_t found = declStr.find("=");
+        std::string value;
+        if (found != std::string::npos) {
+          value = declStr.substr(found, declStr.length()-found);
+        } else {
+          value = "";
+        }
+        GlobalVariablesToTypeMap[varName] = std::make_pair(type, value);
       }
     }
     return true;
