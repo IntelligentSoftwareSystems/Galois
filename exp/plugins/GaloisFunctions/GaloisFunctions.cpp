@@ -103,14 +103,14 @@ namespace {
     std::stringstream s;
     s << "\tstruct Syncer_" << counter << " {\n"
       << "\t\tstatic " << i.VAL_TYPE <<" extract(uint32_t node_id, const " << i.NODE_TYPE << " node) {\n" 
-      << "\t\t#ifdef __HET_CUDA__\n"
+      << "\t\t#ifdef __GALOIS_HET_CUDA__\n"
       << "\t\t\tif (personality == GPU_CUDA) return " << "get_node_" << i.FIELD_NAME <<  "_cuda(cuda_ctx, node_id);\n"
       << "\t\t\tassert (personality == CPU);\n"
       << "\t\t#endif\n"
       << "\t\t\treturn " << "node." << i.FIELD_NAME <<  ";\n"
       << "\t\t}\n"
       << "\t\tstatic void reduce (uint32_t node_id, " << i.NODE_TYPE << " node, " << i.VAL_TYPE << " y) {\n" 
-      << "\t\t#ifdef __HET_CUDA__\n"
+      << "\t\t#ifdef __GALOIS_HET_CUDA__\n"
       /* !!! assumes reduction operation is always addition */
       << "\t\t\tif (personality == GPU_CUDA) " << "add_node_" << i.FIELD_NAME <<  "_cuda(cuda_ctx, node_id, y);\n"
       << "\t\t\telse if (personality == CPU)\n"
@@ -118,7 +118,7 @@ namespace {
       << "\t\t\t\t" << i.REDUCE_OP_EXPR << "\n"
       << "\t\t}\n"
       << "\t\tstatic void reset (uint32_t node_id, " << i.NODE_TYPE << " node ) {\n" 
-      << "\t\t#ifdef __HET_CUDA__\n"
+      << "\t\t#ifdef __GALOIS_HET_CUDA__\n"
       /* !!! assumes reduction operation is always addition */
       << "\t\t\tif (personality == GPU_CUDA) " << "set_node_" << i.FIELD_NAME <<  "_cuda(cuda_ctx, node_id, 0);\n"
       << "\t\t\telse if (personality == CPU)\n"
@@ -134,14 +134,14 @@ namespace {
     std::stringstream s;
     s << "\tstruct SyncerPull_" << counter << " {\n"
       << "\t\tstatic " << i.VAL_TYPE <<" extract(uint32_t node_id, const " << i.NODE_TYPE << " node) {\n"
-      << "\t\t#ifdef __HET_CUDA__\n"
+      << "\t\t#ifdef __GALOIS_HET_CUDA__\n"
       << "\t\t\tif (personality == GPU_CUDA) return " << "get_node_" << i.FIELD_NAME <<  "_cuda(cuda_ctx, node_id);\n"
       << "\t\t\tassert (personality == CPU);\n"
       << "\t\t#endif\n"
       << "\t\t\treturn " << "node." << i.FIELD_NAME <<  ";\n"
       << "\t\t}\n"
       << "\t\tstatic void setVal (uint32_t node_id, " << i.NODE_TYPE << " node, " << i.VAL_TYPE << " y) " << "{\n"
-      << "\t\t#ifdef __HET_CUDA__\n"
+      << "\t\t#ifdef __GALOIS_HET_CUDA__\n"
       << "\t\t\tif (personality == GPU_CUDA) " << "set_node_" << i.FIELD_NAME <<  "_cuda(cuda_ctx, node_id, y);\n"
       << "\t\t\telse if (personality == CPU)\n"
       << "\t\t#endif\n"
@@ -330,7 +330,7 @@ namespace {
             std::string className = recordDecl->getNameAsString();
             
             stringstream kernelBefore;
-            kernelBefore << "#ifdef __HET_CUDA__\n";
+            kernelBefore << "#ifdef __GALOIS_HET_CUDA__\n";
             kernelBefore << "\tif (personality == GPU_CUDA) {\n";
             kernelBefore << "\t\t" << className << "_cuda();\n";
             kernelBefore << "\t} else if (personality == CPU)\n";
@@ -536,7 +536,7 @@ namespace {
             std::string className = recordDecl->getNameAsString();
             
             stringstream kernelBefore;
-            kernelBefore << "#ifdef __HET_CUDA__\n";
+            kernelBefore << "#ifdef __GALOIS_HET_CUDA__\n";
             kernelBefore << "\tif (personality == GPU_CUDA) {\n";
             kernelBefore << "\t\t" << className << "_cuda(cuda_ctx);\n";
             kernelBefore << "\t} else if (personality == CPU)\n";
