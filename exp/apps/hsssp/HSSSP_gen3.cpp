@@ -60,15 +60,7 @@ struct InitializeGraph {
 
   void static go(Graph& _graph) {
 
-     struct SyncerPull_0 {
-    	static int extract( const struct NodeData & node){ return node.dist_current; }
-    	static void setVal (struct NodeData & node, int y) {node.dist_current = y; }
-    	typedef int ValTy;
-    };
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, Galois::loopname("InitGraph"), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "", "dist_current" , "int"));
-    _graph.sync_pull<SyncerPull_0>();
-    
-
+    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, Galois::loopname("InitGraph"));
   }
 
   void operator()(GNode src) const {
@@ -81,24 +73,12 @@ struct SSSP {
   Graph* graph;
 
   void static go(Graph& _graph){
-
-     struct Syncer_0 {
-    	static int extract( const struct NodeData & node){ return node.dist_current; }
-    	static void reduce (struct NodeData & node, int y) {Galois::min(node.dist_current, y);}
-    	static void reset (struct NodeData & node ) { node.dist_current = std::numeric_limits<int>::max(); }
-    	typedef int ValTy;
-    };
- 
-    Galois::do_all(_graph.begin(), _graph.end(), SSSP { &_graph }, Galois::loopname("sssp"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "std::atomic<int> &" , "dist_current", "int" , "{Galois::min(node.dist_current, y);}",  "std::numeric_limits<int>::max()"));
-    _graph.sync_push<Syncer_0>();
-    
-     }
+    Galois::do_all(_graph.begin(), _graph.end(), SSSP { &_graph }, Galois::loopname("sssp"));
+  }
 
   void operator()(GNode src) const {
     NodeData& snode = graph->getData(src);
-    auto& net = Galois::Runtime::getSystemNetworkInterface();
     auto& sdist = snode.dist_current;
-    //std::cout << "[" << net.ID << "] [" << src <<"] : " << sdist << "\n";
 
     for (auto jj = graph->edge_begin(src), ej = graph->edge_end(src); jj != ej; ++jj) {
       GNode dst = graph->getEdgeDst(jj);

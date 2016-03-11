@@ -30,13 +30,13 @@
 #include "Lonestar/BoilerPlate.h"
 #include "PGraph.h"
 #include "OpenCL/LC_LinearArray_Graph.h"
-#include "cuda/hsssp_cuda.h"
-#include "cuda/cuda_mtypes.h"
 #include "OpenCL/CLWrapper.h"
 
 #include <iostream>
 #include <typeinfo>
 #include <algorithm>
+
+//#include "CL_Header.h"
 #include "opencl/CLSSSP.h"
 
 #define _HETERO_DEBUG_ 0
@@ -98,7 +98,7 @@ typedef typename Graph::GraphNode GNode;
 bool hasChanged = false;
 
 //////////////////////////////////////////////////////////////////////////////////////
-struct CUDA_Context *cuda_ctx;
+//struct CUDA_Context *cuda_ctx;
 typedef Galois::OpenCL::LC_LinearArray_Graph<Galois::OpenCL::Array, NodeData, unsigned int> DeviceGraph;
 struct OPENCL_Context<DeviceGraph> dOp;
 /*********************************************************************************
@@ -201,7 +201,7 @@ void setNodeValue(PGraph* p, unsigned GID, int v) {
       p->g.getData(p->G2L(GID)).dist[p->g.getData(p->G2L(GID)).current_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)] = v;
       break;
    case GPU_CUDA:
-      setNodeValue_CUDA(cuda_ctx, p->G2L(GID), v);
+//      setNodeValue_CUDA(cuda_ctx, p->G2L(GID), v);
       break;
    case GPU_OPENCL:
       dOp.getData(p->G2L(GID)).dist[dOp.getData(p->G2L(GID)).current_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)] = v;
@@ -225,7 +225,7 @@ void sendGhostCells(Galois::Runtime::NetworkInterface& net, PGraph& g) {
             net.sendAlt(x, setNodeValue, magicPointer[x], n, g.g.getData(n - g.g_offset).dist[g.g.getData(n - g.g_offset).current_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)]);
             break;
          case GPU_CUDA:
-            net.sendAlt(x, setNodeValue, magicPointer[x], n, (int) getNodeValue_CUDA(cuda_ctx, n - g.g_offset));
+//            net.sendAlt(x, setNodeValue, magicPointer[x], n, (int) getNodeValue_CUDA(cuda_ctx, n - g.g_offset));
             break;
          case GPU_OPENCL:
             net.sendAlt(x, setNodeValue, magicPointer[x], n, dOp.getData(n - g.g_offset).dist[dOp.getData(n - g.g_offset).current_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)]);
@@ -240,6 +240,7 @@ void sendGhostCells(Galois::Runtime::NetworkInterface& net, PGraph& g) {
 /*********************************************************************************
  *
  **********************************************************************************/
+/*
 
 MarshalGraph pGraph2MGraph(PGraph &g) {
    MarshalGraph m;
@@ -273,17 +274,18 @@ MarshalGraph pGraph2MGraph(PGraph &g) {
    m.nedges = edge_counter;
    return m;
 }
+*/
 /*********************************************************************************
  *
  **********************************************************************************/
 
 void loadGraphNonCPU(PGraph &g) {
-   MarshalGraph m;
+//   MarshalGraph m;
    assert(personality != CPU);
    switch (personality) {
    case GPU_CUDA:
-      m = pGraph2MGraph(g);
-      load_graph_CUDA(cuda_ctx, m);
+//      m = pGraph2MGraph(g);
+//      load_graph_CUDA(cuda_ctx, m);
       break;
    case GPU_OPENCL:
 //      dOp.loadGraphNonCPU(g.g, g.numOwned, g.numEdges, g.numNodes - g.numOwned);
@@ -337,9 +339,9 @@ void inner_main() {
    g.loadGraph(inputFile);
 
    if (personality == GPU_CUDA) {
-      cuda_ctx = get_CUDA_context(Galois::Runtime::NetworkInterface::ID);
-      if (!init_CUDA_context(cuda_ctx, gpudevice))
-         return;
+//      cuda_ctx = get_CUDA_context(Galois::Runtime::NetworkInterface::ID);
+//      if (!init_CUDA_context(cuda_ctx, gpudevice))
+//         return;
    } else if (personality == GPU_OPENCL) {
       Galois::OpenCL::cl_env.init(cldevice.Value);
    }
@@ -361,7 +363,7 @@ void inner_main() {
          ndata.dist[ndata.current_version(BSP_FIELD_NAMES::SSSP_DIST_FIELD)] = 0;
       }
    } else if (personality == GPU_CUDA) {
-      initialize_graph_cuda(cuda_ctx);
+//      initialize_graph_cuda(cuda_ctx);
    } else if (personality == GPU_OPENCL) {
       dOp.init(g.numOwned, g.numNodes);
       if (g.getHost((src_node.Value)) == Galois::Runtime::NetworkInterface::ID) {
@@ -406,7 +408,7 @@ void inner_main() {
          dOp(g.numOwned, hasChanged);
          break;
       case GPU_CUDA:
-         pagerank_cuda(cuda_ctx);
+//         pagerank_cuda(cuda_ctx);
          break;
       default:
          break;
@@ -458,9 +460,9 @@ void inner_main() {
          break;
       }
       case GPU_CUDA:
-         for (int n = 0; n < g.numOwned; n++) {
+         /*for (int n = 0; n < g.numOwned; n++) {
             out_file << n + g.g_offset << ", " << getNodeValue_CUDA(cuda_ctx, n) << ", " << getNodeAttr_CUDA(cuda_ctx, n) << "\n";
-         }
+         }*/
          break;
       }
       out_file.close();
@@ -478,6 +480,7 @@ void inner_main() {
  ********************************************************************************************/
 int main(int argc, char** argv) {
    LonestarStart(argc, argv, name, desc, url);
+   Galois::OpenCL::CLContext * ctx = Galois::OpenCL::getCLContext();
    auto& net = Galois::Runtime::getSystemNetworkInterface();
    inner_main();
    return 0;

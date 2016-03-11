@@ -103,6 +103,7 @@ public:
   }
 };
 
+//Example SoA to AoS graph converter
 class LoopRewriter : public MatchFinder::MatchCallback {
 public:
   LoopRewriter(Rewriter& Rewrite) : Rewrite(Rewrite) {}
@@ -110,7 +111,7 @@ public:
   virtual void run(const MatchFinder::MatchResult& Result) {
     const MemberExpr* fieldRef = Result.Nodes.getNodeAs<MemberExpr>("fieldRef");
     const Expr* fieldUse = Result.Nodes.getNodeAs<Expr>("fieldUse");
-    const DeclRefExpr* graphDataVar = Result.Nodes.getNodeAs<DeclRefExpr>("getDataVar");
+    const Expr* graphDataVar = Result.Nodes.getNodeAs<Expr>("getDataVar");
     const NamedDecl* graphVar = Result.Nodes.getNodeAs<NamedDecl>("graphVar");
     if (!fieldUse)
       fieldUse = fieldRef;
@@ -123,11 +124,24 @@ public:
     assert(graphVar && fieldUse && fieldRef);
 
     auto str1 = fieldRef->getMemberDecl()->getNameAsString();
-    auto str2 = graphDataVar->getFoundDecl()->getNameAsString();
+    //    auto str2 = graphDataVar->getFoundDecl()->getNameAsString();
     auto str3 = graphVar->getNameAsString();
-    llvm::outs() << "** " << str1 << " " << str2 << " " << str3 << "\n\n";
     //    Rewrite.ReplaceText(fieldUse->getSourceRange(), "\\test\\");
-    Rewrite.ReplaceText(fieldUse->getSourceRange(), str3 + "_" + str1 + "[" + str2 + "]");
+
+    // Get the new text.
+    std::string SStr;
+    llvm::raw_string_ostream S(SStr);
+    S << str3 << "_" << str1 << "[";
+    graphDataVar->printPretty(S, 0, PrintingPolicy(Rewrite.getLangOpts()));
+    S << "]";
+    const std::string &Str = S.str();
+    Rewrite.ReplaceText(fieldUse->getSourceRange(), Str);
+
+    //    Rewrite.InsertTextBefore(fieldUse->getLocStart(), str3 + "_" + str1 + "[");
+    //    Rewrite.InsertTextAfter(fieldUse->getLocEnd(), "]");
+    //    Rewrite.ReplaceText(fieldUse->getSourceRange(), graphDataVar->getSourceRange());
+
+    //    Rewrite.ReplaceText(fieldUse->getSourceRange(), str3 + "_" + str1 + "[" + str2 + "]");
   }
 
 private:

@@ -28,7 +28,11 @@ ${LLVM_BUILD_DIR}/bin/clang++ -Xclang -load -Xclang ${LLVM_BUILD_DIR}/lib/Galois
 
 elif [ "${USE_CASE}" ==  "opencl" ] 
 then
-${LLVM_BUILD_DIR}/bin/clang++ -Xclang -load -Xclang ${LLVM_BUILD_DIR}/lib/OpenCLCodeGen.so -Xclang -plugin -Xclang opencl-analysis  -DGALOIS_USE_EXP -D__STDC_LIMIT_MACROS -D__STDC_CONSTANT_MACROS -g -gcc-toolchain /net/faraday/workspace/local/modules/gcc-4.9/bin/.. -fcolor-diagnostics -std=c++11 -O3 -DNDEBUG ${GALOIS_INCLUDE_DIRS} -o CMakeFiles/SGD_gen.dir/pageRankPull_gen.cpp.o -c ${IN_FILE_NAME}
+${LLVM_BUILD_DIR}/bin/clang++ -Xclang -load -Xclang ${LLVM_BUILD_DIR}/lib/OpenCLCodeGenHost.so -Xclang -plugin -Xclang opencl-analysis  -DGALOIS_USE_EXP -D__STDC_LIMIT_MACROS -D__STDC_CONSTANT_MACROS -g -gcc-toolchain /net/faraday/workspace/local/modules/gcc-4.9/bin/.. -fcolor-diagnostics -std=c++11 -O3 -DNDEBUG ${GALOIS_INCLUDE_DIRS} -o CMakeFiles/SGD_gen.dir/pageRankPull_gen.cpp.o -c ${IN_FILE_NAME}
+
+elif [ "${USE_CASE}" ==  "clcodegen" ] 
+then
+${LLVM_BUILD_DIR}/bin/clang++ -Xclang -load -Xclang ${LLVM_BUILD_DIR}/lib/OpenCLCodeGenDevice.so -Xclang -plugin -Xclang opencl-device-codegen  -DGALOIS_USE_EXP -D__STDC_LIMIT_MACROS -D__STDC_CONSTANT_MACROS -g -gcc-toolchain /net/faraday/workspace/local/modules/gcc-4.9/bin/.. -fcolor-diagnostics -std=c++11 -O3 -DNDEBUG ${GALOIS_INCLUDE_DIRS} -o CMakeFiles/SGD_gen.dir/pageRankPull_gen.cpp.o -c ${IN_FILE_NAME}
 
 elif [ "${USE_CASE}" ==  "aos2soa" ] 
 then

@@ -33,6 +33,9 @@
 
 #include <boost/iterator/counting_iterator.hpp>
 
+
+#ifndef _GALOIS_DIST_OFFLINE_GRAPH_
+#define _GALOIS_DIST_OFFLINE_GRAPH_
 //File format V1:
 //version (1) {uint64_t LE}
 //EdgeType size {uint64_t LE}
@@ -158,3 +161,4 @@ public:
 };
 
 
+#endif//_GALOIS_DIST_OFFLINE_GRAPH_

@@ -62,15 +62,52 @@ namespace Galois {
       }\n\
       ";
 
+
          template<typename NodeDataTy, typename EdgeDataTy>
+
          struct CL_LC_Graph {
 
             typedef NodeDataTy NodeDataType;
             typedef EdgeDataTy EdgeDataType;
             typedef boost::counting_iterator<uint64_t> NodeIterator;
+            typedef NodeIterator GraphNode;
             typedef boost::counting_iterator<uint64_t> EdgeIterator;
             typedef unsigned int NodeIDType;
             typedef unsigned int EdgeIDType;
+            typedef CL_LC_Graph<NodeDataType,EdgeDataType> SelfType;
+
+            //TODO RK  - Finish implementing.
+            struct NodeDataWrapper{
+               SelfType * const parent;
+               NodeIterator id;
+               NodeDataType cached_data;
+               bool isDirty;
+               size_t idx_in_vec;
+               NodeDataWrapper( SelfType * const p, NodeIterator & _id, bool isD): parent(p), id(_id),isDirty(isD){
+                  parent->read_node_data_impl(id, cached_data);
+                  if(isDirty){
+                     parent->dirtyData.push_back(this);
+                     idx_in_vec =parent->dirtyData.size();
+                  }
+               }
+               ~NodeDataWrapper(){
+                  //Write upon cleanup for automatic scope cleaning.
+                  if(isDirty){
+                     fprintf(stderr, "Destructor - Writing to device %d\n", *(id));
+                     parent->write_node_data_impl(id, cached_data);
+                  }
+                  parent->dirtyData[idx_in_vec] = nullptr;
+               }
+               operator NodeDataType & () {
+                  return cached_data;
+               }
+               NodeDataWrapper & operator=(const NodeDataType & other){
+                  cached_data = other;
+                  return *this;
+               }
+            };//End NodeDataWrapper
+
+            typedef NodeDataWrapper UserNodeDataType;
          protected:
             Galois::OpenCL::CLContext * ctx = getCLContext();
             //CPU Data
@@ -83,21 +120,54 @@ namespace Galois {
             unsigned int * neighbors;
             NodeDataType * node_data;
             EdgeDataType * edge_data;
+
+            std::vector<UserNodeDataType * > dirtyData;
             //GPU Data
             _CL_LC_Graph_GPU gpu_wrapper;
             cl_mem gpu_struct_ptr;
             cl_mem gpu_meta;
 
-            NodeDataType * getData() {
-               return node_data;
+
+//            NodeDataType * getData() {
+//               return node_data;
+//            }
+            //TODO RK  - Finish implementing.
+            void read_node_data_impl(NodeIterator & it, NodeDataType & data){
+               int err;
+               cl_command_queue queue = ctx->get_default_device()->command_queue();
+               err = clEnqueueReadBuffer(queue, gpu_wrapper.node_data, CL_FALSE, sizeof(NodeDataType)*(*it), sizeof(NodeDataType), &data, 0, NULL, NULL);
+               CHECK_CL_ERROR(err, "Error reading node-data 0\n");
+
+            }
+            //TODO RK  - Finish implementing.
+            void write_node_data_impl(NodeIterator & it, NodeDataType & data){
+               int err;
+               cl_command_queue queue = ctx->get_default_device()->command_queue();
+               err = clEnqueueWriteBuffer(queue, gpu_wrapper.node_data, CL_FALSE, sizeof(NodeDataType)*(*it), sizeof(NodeDataType), &data, 0, NULL, NULL);
+               CHECK_CL_ERROR(err, "Error writing node-data 0\n");
             }
 
+
+
          public:
+            void sync_outstanding_data(){
+               std::vector<UserNodeDataType *> purged;
+               for(auto i : dirtyData){
+                  if(i && i->isDirty){
+                     fprintf(stderr, "Writing to device %d\n", *(i->id));
+                     write_node_data_impl(i->id, i->cached_data);
+                     purged.push_back(i);
+                  }
+               }
+               dirtyData.clear();
+               dirtyData.insert(dirtyData.begin(), purged.begin(), purged.end());
+            }
 /////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////
             CL_LC_Graph() :
             SizeEdgeData(sizeof(EdgeDataType) / sizeof(unsigned int)), SizeNodeData(sizeof(NodeDataType) / sizeof(unsigned int)) {
 //      fprintf(stderr, "Created LC_LinearArray_Graph with %d node %d edge data.", (int) SizeNodeData, (int) SizeEdgeData);
+               fprintf(stderr, "Loading devicegraph with copy-optimization.\n");
                _max_degree = _num_nodes = _num_edges = 0;
                outgoing_index=neighbors=nullptr;
                node_data =nullptr;
@@ -189,8 +259,17 @@ namespace Galois {
             void read(const char * filename) {
                readFromGR(*this, filename);
             }
+            const NodeDataType & getData(NodeIterator nid) const{
+               return node_data[*nid];
+            }
             NodeDataType & getData(NodeIterator nid) {
                return node_data[*nid];
+            }
+            const NodeDataWrapper getDataP(NodeIterator id)const {
+               return NodeDataWrapper(this, id, false);
+            }
+            NodeDataWrapper getDataP(NodeIterator id){
+               return NodeDataWrapper(this, id,true);
             }
             unsigned int edge_begin(NodeIterator nid) {
                return outgoing_index[*nid];

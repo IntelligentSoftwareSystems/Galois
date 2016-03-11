@@ -61,9 +61,13 @@ struct CL_Kernel {
    /*************************************************************************
     *
     *************************************************************************/
-   CL_Kernel(const char * filename, const char * kernel_name, CL_Device * d) :
+   CL_Kernel(CL_Device * d, const char * filename, const char * kernel_name, bool from_string) :
          device(d), total_time(0), event(0) {
-      init(filename, kernel_name);
+      if(from_string){
+         init_string(filename, kernel_name);
+      }else{
+         init(filename, kernel_name);
+      }
    }
    /*************************************************************************
     *
