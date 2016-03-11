@@ -43,7 +43,7 @@ template<typename NodeTy, typename EdgeTy, bool BSPNode=false, bool BSPEdge=fals
 class hGraph : public GlobalObject {
 
   typedef typename std::conditional<BSPNode, std::pair<NodeTy, NodeTy>,NodeTy>::type realNodeTy;
-  typedef typename std::conditional<BSPNode, std::pair<EdgeTy, EdgeTy>,EdgeTy>::type realEdgeTy;
+  typedef typename std::conditional<BSPEdge, std::pair<EdgeTy, EdgeTy>,EdgeTy>::type realEdgeTy;
 
   typedef Galois::Graph::LC_CSR_Graph<realNodeTy, realEdgeTy> GraphTy;
 
@@ -275,8 +275,9 @@ public:
     for (auto n = gid2host[id].first; n < gid2host[id].second; ++n) {
       for (auto ii = g.edge_begin(n), ee = g.edge_end(n); ii < ee; ++ii) {
         auto gdst = g.getEdgeDst(ii);
+        auto gdata = g.getEdgeData<EdgeTy>(ii);
         decltype(gdst) ldst = G2L(gdst);
-        graph.constructEdge(cur++, ldst);
+        graph.constructEdge(cur++, ldst, gdata);
       }
       graph.fixEndEdge(G2L(n), cur);
     }
@@ -285,7 +286,7 @@ public:
 
   NodeTy& getData(GraphNode N, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) {
     auto& r = getDataImpl<BSPNode>(N, mflag);
-    auto i =Galois::Runtime::NetworkInterface::ID;
+//    auto i =Galois::Runtime::NetworkInterface::ID;
     //std::cerr << i << " " << N << " " <<&r << " " << r.dist_current << "\n";
     return r;
   }
