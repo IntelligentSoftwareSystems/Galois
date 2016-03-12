@@ -587,7 +587,7 @@ public:
   using CommitQ = Galois::PerThreadVector<Ctxt*>;
   using ExecutionRecords = std::vector<ParaMeter::StepStats>;
 
-  static const unsigned DEFAULT_CHUNK_SIZE = 8;
+  static const unsigned DEFAULT_CHUNK_SIZE = 4;
 
   struct CtxtMaker {
     OptimOrdExecutor& outer;
@@ -613,6 +613,15 @@ public:
   CommitQ commitQ;
   ExecutionRecords execRcrds;
 
+  TimeAccumulator t_expandNhood;
+  TimeAccumulator t_beginRound;
+  TimeAccumulator t_executeSources;
+  TimeAccumulator t_applyOperator;
+  TimeAccumulator t_computeGVT;
+  TimeAccumulator t_serviceAborts;
+  TimeAccumulator t_performCommits;
+  TimeAccumulator t_reclaimMemory;
+
 public:
   OptimOrdExecutor (const Cmp& cmp, const NhFunc& nhFunc, const ExFunc& exFunc, const OpFunc& opFunc, const ArgsTuple& argsTuple)
     : 
@@ -632,6 +641,10 @@ public:
   template <typename R>
   void push_initial (const R& range) {
 
+    StatTimer t ("push_initial");
+
+    t.start ();
+
     Galois::do_all_choice (range,
         [this] (const T& x) {
 
@@ -649,6 +662,8 @@ public:
       Base::getNextWL ().clear_all_parallel ();
     }
 
+    t.stop ();
+
   }
 
   void operator () (void) {
@@ -656,6 +671,12 @@ public:
   }
   
   void execute () {
+
+    StatTimer t ("executorLoop");
+
+    typename Base::CtxtWL sources;
+
+    t.start ();
 
     while (true) {
 
@@ -666,8 +687,6 @@ public:
       }
 
       expandNhood ();
-
-      typename Base::CtxtWL sources;
 
       serviceAborts (sources);
 
@@ -682,6 +701,8 @@ public:
       Base::endRound ();
 
     }
+
+    t.stop ();
   }
 
 private:
@@ -704,6 +725,16 @@ private:
     if (Base::ENABLE_PARAMETER) {
       dumpParaMeterStats ();
     }
+
+    reportStat ("NULL", "t_expandNhood",    t_expandNhood.get ());
+    reportStat ("NULL", "t_beginRound",     t_beginRound.get ());
+    reportStat ("NULL", "t_executeSources", t_executeSources.get ());
+    reportStat ("NULL", "t_applyOperator",  t_applyOperator.get ());
+    reportStat ("NULL", "t_computeGVT",     t_computeGVT.get ());
+    reportStat ("NULL", "t_serviceAborts",  t_serviceAborts.get ());
+    reportStat ("NULL", "t_performCommits", t_performCommits.get ());
+    reportStat ("NULL", "t_reclaimMemory",  t_reclaimMemory.get ());
+
   }
 
   Ctxt* push (const T& x) {
@@ -732,14 +763,20 @@ private:
 
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void beginRound () {
+    
+    t_beginRound.start ();
     Base::beginRound (winWL);
 
     if (Base::ENABLE_PARAMETER) {
       execRcrds.emplace_back (Base::rounds, Base::getCurrWL ().size_all ());
     }
+
+    t_beginRound.stop ();
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhood (void) {
+
+    t_expandNhood.start ();
     Galois::do_all_choice (makeLocalRange (Base::getCurrWL ()),
         [this] (Ctxt* c) {
 
@@ -762,11 +799,16 @@ private:
           Galois::loopname ("expandNhood"),
           chunk_size<NhFunc::CHUNK_SIZE> ()));
 
+    t_expandNhood.stop ();
+
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void executeSources (CtxtWL& sources) {
 
     if (Base::HAS_EXEC_FUNC) {
+
+
+      t_executeSources.start ();
 
       Galois::do_all_choice (makeLocalRange (sources),
         [this] (Ctxt* ctxt) {
@@ -777,13 +819,16 @@ private:
           Base::exFunc (ctxt->getActive (), ctxt->userHandle);
         },
         std::make_tuple (
-          Galois::loopname ("exec-func"),
+          Galois::loopname ("executeSources"),
           Galois::chunk_size<ExFunc::CHUNK_SIZE> ()));
 
+      t_executeSources.stop ();
     }
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void applyOperator (CtxtWL& sources) {
+    t_applyOperator.start ();
+
     Ctxt* minElem = nullptr;
 
     if (Base::NEEDS_PUSH) {
@@ -791,6 +836,8 @@ private:
         minElem = *winWL.getMin();
       }
     }
+
+
 
     Galois::do_all_choice (makeLocalRange (sources),
         [this, minElem] (Ctxt* c) {
@@ -861,9 +908,13 @@ private:
           Galois::loopname ("applyOperator"),
           Galois::chunk_size<OpFunc::CHUNK_SIZE> ()));
 
+    t_applyOperator.stop ();
+
   }
 
   Ctxt* computeGVT (void) {
+
+    t_computeGVT.start ();
 
     Substrate::PerThreadStorage<Ctxt*> perThrdMin;
 
@@ -910,6 +961,8 @@ private:
       dbg::print ("GVT computed as NULL");
     }
 
+    t_computeGVT.stop ();
+
     return ret;
 
   }
@@ -929,6 +982,8 @@ private:
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void serviceAborts (CtxtWL& sources) {
+
+    t_serviceAborts.start ();
     
     CtxtWL abortWL;
 
@@ -969,6 +1024,7 @@ private:
           Galois::wl<Galois::WorkList::dChunkedFIFO<NhFunc::CHUNK_SIZE> > ()));
     
 
+
     Galois::do_all_choice (makeLocalRange (Base::getCurrWL ()),
 
         [this, &sources] (Ctxt* c) {
@@ -991,14 +1047,18 @@ private:
           Galois::loopname ("collect-sources"),
           Galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
 
+    t_serviceAborts.stop ();
 
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void performCommits () {
 
+    t_performCommits.start ();
+
     CtxtWL commitSources;
 
     Ctxt* gvt = computeGVT ();
+
 
     Galois::do_all_choice (makeLocalRange (commitQ),
         [this, gvt, &commitSources] (Ctxt* c) {
@@ -1044,6 +1104,7 @@ private:
           Galois::does_not_need_aborts_tag (),
           Galois::wl<Galois::WorkList::dChunkedFIFO<DEFAULT_CHUNK_SIZE> > ()));
 
+    t_performCommits.stop ();
 
 
   }
@@ -1054,6 +1115,8 @@ private:
   }
 
   void reclaimMemory (CtxtWL& sources) {
+
+    t_reclaimMemory.start ();
 
     sources.clear_all_parallel ();
 
@@ -1087,6 +1150,7 @@ private:
           localQ.erase (new_end, localQ.end ());
         });
 
+    t_reclaimMemory.stop ();
 
   }
 

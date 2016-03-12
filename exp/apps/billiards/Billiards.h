@@ -199,7 +199,7 @@ private:
 
     std::cout << "Number of initial events = " << initEvents.size () << std::endl;
 
-    Galois::StatTimer timer ("Simulation time: ");
+    Galois::StatTimer timer;
 
     timer.start ();
     Galois::Runtime::beginSampling ();

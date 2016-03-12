@@ -616,7 +616,7 @@ public:
       term(Substrate::getSystemTermination(activeThreads))
   {
     assert (chunk_size > 0);
-    // std::printf ("DoAllCoupledExec chunk_size: %u\n", chunk_size);
+    // std::printf ("DoAllCoupledExec loopname: %s, work size: %ld, chunk_size: %u\n", loopname, std::distance(range.begin (), range.end ()), chunk_size);
 
 
 
