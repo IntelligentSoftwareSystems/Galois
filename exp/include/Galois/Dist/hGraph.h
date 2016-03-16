@@ -119,6 +119,17 @@ class hGraph : public GlobalObject {
   }
 
   template<bool en, typename std::enable_if<en>::type* = nullptr>
+    const NodeTy& getDataImpl(typename GraphTy::GraphNode N, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) const{
+      auto& r = graph.getData(N, mflag);
+      return round ? r.first : r.second;
+    }
+
+    template<bool en, typename std::enable_if<!en>::type* = nullptr>
+    const NodeTy& getDataImpl(typename GraphTy::GraphNode N, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) const{
+      auto& r = graph.getData(N, mflag);
+      return r;
+    }
+  template<bool en, typename std::enable_if<en>::type* = nullptr>
   typename GraphTy::edge_data_reference getEdgeDataImpl(typename GraphTy::edge_iterator ni, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) {
     auto& r = graph.getEdgeData(ni, mflag);
     return round ? r.first : r.second;
@@ -222,7 +233,7 @@ public:
 
   //hGraph construction is collective
   hGraph(const std::string& filename, unsigned host, unsigned numHosts)
-    :GlobalObject(this), id(host)
+    :GlobalObject(this), id(host),round(false)
   {
     OfflineGraph g(filename);
     //std::cerr << "Offline Graph Done\n";
@@ -297,6 +308,12 @@ public:
     return r;
   }
 
+  const NodeTy& getData(GraphNode N, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) const{
+    auto& r = getDataImpl<BSPNode>(N, mflag);
+//    auto i =Galois::Runtime::NetworkInterface::ID;
+    //std::cerr << i << " " << N << " " <<&r << " " << r.dist_current << "\n";
+    return r;
+  }
   typename GraphTy::edge_data_reference getEdgeData(edge_iterator ni, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) {
     return getEdgeDataImpl<BSPEdge>(ni, mflag);
   }
