@@ -117,13 +117,19 @@ public:
    virtual bool TraverseCallExpr(CallExpr * call) {
       MARKER_CODE(cl_file << "[CallExpr]";)
       llvm::outs() << " CallExpression [" << call->getDirectCallee()->getCanonicalDecl()->getNameAsString() << " ]\n";
-      rewriter.ReplaceText(SourceRange(call->getCallee()->getLocStart(), call->getCallee()->getLocEnd()), OpenCLConversionDB::get_cl_implementation(call->getDirectCallee()));
+      string fnameReplacement = OpenCLConversionDB::get_cl_implementation(call->getDirectCallee());
+      rewriter.ReplaceText(SourceRange(call->getCallee()->getLocStart(), call->getCallee()->getLocEnd()), fnameReplacement);
+      if(fnameReplacement.find("atomic")!=string::npos){
+         rewriter.InsertTextBefore(call->getArg(0)->getLocStart(), "&");
+      }
       for (auto a : call->arguments()) {
             RecursiveASTVisitor<OpenCLDeviceRewriter>::TraverseStmt(a);
       }
       MARKER_CODE(cl_file << "[EndCallExpr]\n";)
       return true;
    }
+   /*
+    * */
    virtual bool TraverseCXXMemberCallExpr(CXXMemberCallExpr * call) {
          MARKER_CODE(cl_file << "[CXXMemberCallExpr]";)
          std::string fnameReplacement = OpenCLConversionDB::get_cl_implementation(call->getDirectCallee());
@@ -134,6 +140,10 @@ public:
          }
          else{
          std::string objArg = "";
+         llvm::outs() << " Replacing function :: " << fnameReplacement << "\n";
+         if(fnameReplacement.find("atomic")!=string::npos){
+            objArg+= "&";
+         }
          if(!call->isImplicitCXXThis()){
             RecursiveASTVisitor<OpenCLDeviceRewriter>::TraverseStmt(call->getImplicitObjectArgument());
             objArg = rewriter.getRewrittenText(SourceRange(call->getImplicitObjectArgument()->getLocStart(), call->getImplicitObjectArgument()->getLocEnd()));

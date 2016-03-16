@@ -124,9 +124,9 @@ public:
 //      if(decl)
 //         rewriter.ReplaceText(decl->getTypeSourceInfo()->getTypeLoc().getSourceRange(), " CLGraph ");
 
-      llvm::outs() << "GaloisLoop found  - #Args :: " << callFS->getNumArgs() << "\n";
 
       if (callFS) {
+         llvm::outs() << "GaloisLoop found  - #Args :: " << callFS->getNumArgs() << "\n";
          CXXRecordDecl * kernel = const_cast<CXXRecordDecl*>(Results.Nodes.getNodeAs<CXXRecordDecl>("kernelType"));
          assert(kernel!=nullptr && "KernelType cast failed.");
          app_data.add_doAll_call(callFS, kernel);
@@ -194,7 +194,7 @@ public:
              __global uint *_out_neighbors;\n\
              __global EdgeData *_out_edge_data;\n\
              }GraphType;";
-         header_file << "\n"<< g_dev << "\n";
+//         header_file << "\n"<< g_dev << "\n";
       }
       header_file << " typedef uint node_iterator;\n";
       header_file << " typedef uint edge_iterator;\n";
