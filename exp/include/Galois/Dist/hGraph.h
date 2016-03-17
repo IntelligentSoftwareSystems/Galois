@@ -287,18 +287,36 @@ public:
     
     graph.constructNodes();
     //std::cerr << "Construct nodes done\n";
+    loadEdges<std::is_void <EdgeTy>::value>(g);
+  }
 
-    uint64_t cur = 0;
-    for (auto n = gid2host[id].first; n < gid2host[id].second; ++n) {
-      for (auto ii = g.edge_begin(n), ee = g.edge_end(n); ii < ee; ++ii) {
-        auto gdst = g.getEdgeDst(ii);
-        auto gdata = g.getEdgeData<EdgeTy>(ii);
-        decltype(gdst) ldst = G2L(gdst);
-        graph.constructEdge(cur++, ldst, gdata);
-      }
-      graph.fixEndEdge(G2L(n), cur);
-    }
-    //std::cerr << "Construct edges done\n";
+  template<bool isVoidType, typename std::enable_if<!isVoidType>::type* = nullptr>
+  void loadEdges(OfflineGraph & g){
+     fprintf(stderr, "Loading edge-data while creating edges.\n");
+     uint64_t cur = 0;
+     for (auto n = gid2host[id].first; n < gid2host[id].second; ++n) {
+           for (auto ii = g.edge_begin(n), ee = g.edge_end(n); ii < ee; ++ii) {
+             auto gdst = g.getEdgeDst(ii);
+             decltype(gdst) ldst = G2L(gdst);
+             auto gdata = g.getEdgeData<EdgeTy>(ii);
+             graph.constructEdge(cur++, ldst, gdata);
+           }
+           graph.fixEndEdge(G2L(n), cur);
+         }
+  }
+  template<bool isVoidType, typename std::enable_if<isVoidType>::type* = nullptr>
+  void loadEdges(OfflineGraph & g){
+     fprintf(stderr, "Loading void edge-data while creating edges.\n");
+     uint64_t cur = 0;
+     for (auto n = gid2host[id].first; n < gid2host[id].second; ++n) {
+           for (auto ii = g.edge_begin(n), ee = g.edge_end(n); ii < ee; ++ii) {
+             auto gdst = g.getEdgeDst(ii);
+             decltype(gdst) ldst = G2L(gdst);
+             graph.constructEdge(cur++, ldst);
+           }
+           graph.fixEndEdge(G2L(n), cur);
+         }
+
   }
 
   NodeTy& getData(GraphNode N, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) {
@@ -422,7 +440,12 @@ public:
     }
     return -1;
   }
-
+  uint32_t getNumOwned()const{
+     return numOwned;
+  }
+  uint64_t getGlobalOffset()const{
+     return globalOffset;
+  }
 #ifdef __GALOIS_HET_CUDA__
   MarshalGraph getMarshalGraph(unsigned host_id) {
      MarshalGraph m;
