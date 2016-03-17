@@ -108,6 +108,8 @@ struct OpenCLConversionDB{
             return "INT_MAX";
          }else if (fname == "operator int"){
             return "";
+         }else if (fname == "operator unsigned int"){
+            return "";
          }
       }else if (d->getNumParams()==1){
          if(fname=="compare_exchange_strong"){
@@ -118,6 +120,11 @@ struct OpenCLConversionDB{
             return "edge_end";
          }else if (fname == "getEdgeDst"){
             return "getEdgeDst";
+         }else if (fname == "getGID"){
+            return "getGID";
+         }
+         else if (fname == "load"){
+            return "";
          }
       }else if (d->getNumParams()==2){
          if(fname=="atomicMin"){
@@ -138,7 +145,9 @@ struct OpenCLConversionDB{
       {
          string s = fname;
          s+=" /*UNINTERPRETED-";
-         s+=d->getNumParams();
+         char iTemp [3];
+         sprintf(iTemp, "%d", d->getNumParams());
+         s+=iTemp;
          s+="*/";
          return s.c_str();
       }
@@ -154,6 +163,8 @@ struct OpenCLConversionDB{
               return "double";
            }else if(qt.getAsString()=="char"){
               return "char";
+           }else if(qt.getAsString()=="uint32_t"){
+              return "uint";
            }
            //Atomic stripper
            if(qt.getAsString().find ("std::atomic")!=string::npos){

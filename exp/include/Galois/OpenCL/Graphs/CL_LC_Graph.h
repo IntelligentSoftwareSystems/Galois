@@ -32,7 +32,9 @@ namespace Galois {
             cl_mem edge_data;
             cl_uint num_nodes;
             cl_uint num_edges;
-
+            cl_uint num_owned;
+            cl_uint local_offset;
+            cl_mem ghostMap;
          };
 
          static const char * cl_wrapper_str_CL_LC_Graph =
@@ -43,6 +45,8 @@ namespace Galois {
    uint _num_edges;\n\
     uint _node_data_size;\n\
     uint _edge_data_size;\n\
+    uint _num_owned;\n\
+    uint _global_offset;\n\
     __global NodeData *_node_data;\n\
     __global uint *_out_index;\n\
     __global uint *_out_neighbors;\n\
@@ -57,6 +61,8 @@ namespace Galois {
       g->_num_edges = g_meta[1];\n\
       g->_node_data_size = g_meta[2];\n\
       g->_edge_data_size= g_meta[3];\n\
+      g->_num_owned= g_meta[4];\n\
+      g->_global_offset= g_meta[6];\n\
       g->_node_data = g_node_data;\n\
       g->_out_index= g_out_index;\n\
       g->_out_neighbors = g_nbr;\n\
@@ -66,9 +72,7 @@ namespace Galois {
 
 
          template<typename NodeDataTy, typename EdgeDataTy>
-
          struct CL_LC_Graph {
-
             typedef NodeDataTy NodeDataType;
             typedef EdgeDataTy EdgeDataType;
             typedef boost::counting_iterator<uint64_t> NodeIterator;
@@ -131,6 +135,8 @@ namespace Galois {
             //CPU Data
             size_t _num_nodes;
             size_t _num_edges;
+            uint32_t _num_owned;
+            uint64_t _global_offset;
             unsigned int _max_degree;
             const size_t SizeEdgeData;
             const size_t SizeNodeData;
@@ -196,6 +202,7 @@ namespace Galois {
 //      fprintf(stderr, "Created LC_LinearArray_Graph with %d node %d edge data.", (int) SizeNodeData, (int) SizeEdgeData);
                fprintf(stderr, "Loading devicegraph with copy-optimization.\n");
                _max_degree = _num_nodes = _num_edges = 0;
+               _num_owned = _global_offset = 0;
                outgoing_index=neighbors=nullptr;
                node_data =nullptr;
                edge_data = nullptr;
@@ -207,6 +214,7 @@ namespace Galois {
             //      fprintf(stderr, "Created LC_LinearArray_Graph with %d node %d edge data.", (int) SizeNodeData, (int) SizeEdgeData);
                            fprintf(stderr, "Loading devicegraph with copy-optimization.\n");
                            _max_degree = _num_nodes = _num_edges = 0;
+                           _num_owned = _global_offset = 0;
                            outgoing_index=neighbors=nullptr;
                            node_data =nullptr;
                            edge_data = nullptr;
@@ -219,6 +227,8 @@ namespace Galois {
                typedef typename GaloisGraph::GraphNode GNode;
                const size_t gg_num_nodes = ggraph.size();
                const size_t gg_num_edges = ggraph.sizeEdges();
+               _num_owned = ggraph.getNumOwned();
+               _global_offset = ggraph.getGlobalOffset();
                init(gg_num_nodes, gg_num_edges);
                int edge_counter = 0;
                int node_counter = 0;
@@ -360,24 +370,27 @@ namespace Galois {
 
                gpu_wrapper.outgoing_index = clCreateBuffer(ctx->get_default_device()->context(), flags_read, sizeof(cl_uint) *( _num_nodes + 1), outgoing_index, &err);
                CHECK_CL_ERROR(err, "Error: clCreateBuffer of SVM - 0\n");
-               gpu_wrapper.node_data = clCreateBuffer(ctx->get_default_device()->context(), flags, sizeof(cl_uint) * _num_nodes, node_data, &err);
+               gpu_wrapper.node_data = clCreateBuffer(ctx->get_default_device()->context(), flags, sizeof(NodeDataType) * _num_nodes, node_data, &err);
                CHECK_CL_ERROR(err, "Error: clCreateBuffer of SVM - 1\n");
                gpu_wrapper.neighbors = clCreateBuffer(ctx->get_default_device()->context(), flags_read, sizeof(cl_uint) * _num_edges, neighbors, &err);
                CHECK_CL_ERROR(err, "Error: clCreateBuffer of SVM - 2\n");
-               gpu_wrapper.edge_data = clCreateBuffer(ctx->get_default_device()->context(), flags_read, sizeof(cl_uint) * _num_edges, edge_data, &err);
+               gpu_wrapper.edge_data = clCreateBuffer(ctx->get_default_device()->context(), flags_read, sizeof(EdgeDataType) * _num_edges, edge_data, &err);
                CHECK_CL_ERROR(err, "Error: clCreateBuffer of SVM - 3\n");
 
                gpu_struct_ptr = clCreateBuffer(ctx->get_default_device()->context(), flags, sizeof(cl_uint) * 16, outgoing_index, &err);
                CHECK_CL_ERROR(err, "Error: clCreateBuffer of SVM - 4\n");
 
-               gpu_meta = clCreateBuffer(ctx->get_default_device()->context(), flags, sizeof(cl_uint) * 8, outgoing_index, &err);
+               const int buffer_size = 16;
+               gpu_meta = clCreateBuffer(ctx->get_default_device()->context(), flags, sizeof(cl_uint) * buffer_size, outgoing_index, &err);
                CHECK_CL_ERROR(err, "Error: clCreateBuffer of SVM - 5\n");
-               int  cpu_meta[8];
+               int  cpu_meta[buffer_size];
                cpu_meta[0] = _num_nodes;
                cpu_meta[1] =_num_edges;
                cpu_meta[2] =SizeNodeData;
                cpu_meta[3] =SizeEdgeData;
-               err= clEnqueueWriteBuffer(ctx->get_default_device()->command_queue(), gpu_meta, CL_TRUE,0, sizeof(int)*4, cpu_meta,NULL,0,NULL);
+               cpu_meta[4] = _num_owned;
+               cpu_meta[6] = _global_offset;
+               err= clEnqueueWriteBuffer(ctx->get_default_device()->command_queue(), gpu_meta, CL_TRUE,0, sizeof(int)*buffer_size, cpu_meta,NULL,0,NULL);
                CHECK_CL_ERROR(err, "Error: Writing META to GPU failed- 6\n");
                init_graph_struct();
             }
