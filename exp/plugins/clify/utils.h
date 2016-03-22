@@ -172,7 +172,26 @@ struct OpenCLConversionDB{
            }
            //Atomic stripper
            if(qt.getAsString().find ("std::atomic")!=string::npos){
-              return qt.getAsString().substr(qt.getAsString().rfind("<")+1,qt.getAsString().rfind(">")-qt.getAsString().rfind("<")-1);
+              std::string qtStr = qt.getAsString();
+              return qtStr.substr(qt.getAsString().rfind("<")+1,qtStr.rfind(">")-qtStr.rfind("<")-1);
+           }
+           //vector stripper
+           if(qt.getAsString().find ("std::vector")!=string::npos){
+              std::string qtStr = qt.getAsString();
+              auto start_index  = qt.getAsString().find("<");
+              auto  end_index = qtStr.find(",");
+              std::string ret;
+              if(end_index!=string::npos){
+                 llvm::outs() << " [ COMMA ]";
+                 ret = qtStr.substr(start_index+1,end_index-start_index-1);;
+              }else{
+                 end_index = qtStr.find(">");
+                 llvm::outs() << " [ ANGLED-B ]";
+                 ret = qtStr.substr(start_index+1,end_index-start_index-1);;
+              }
+              ret += " * ";
+              llvm::outs()<<"Conversion " << qtStr<< "  to " << ret << "\n";
+              return ret;
            }
            //Iterator stripper
            if (qt.getAsString().find ("boost::iterators::counting_iterator")!=string::npos){
