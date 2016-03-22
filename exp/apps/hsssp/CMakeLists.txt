@@ -11,10 +11,9 @@ app(hsssp-push HSSSP_push.cpp DISTSAFE)
 target_link_libraries(hsssp-push hsssp_cuda cudadevrt OpenCL )
 add_custom_command(TARGET hsssp-push POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy_if_different ${CMAKE_CURRENT_SOURCE_DIR}/opencl/sssp_kernel.cl $<TARGET_FILE_DIR:hsssp>)                 
 
-app(graphCheck check.cpp GlobalObj.cpp DISTSAFE)
+app(graphCheck check.cpp  DISTSAFE)
 
-app(clCheck CL_graph_test.cpp /h2/rashid/workspace/GaloisDist/gdist/libgaloiscl/src/CL_Header.cpp DISTSAFE)
-include_directories(/h2/rashid/workspace/GaloisDist/gdist/libgaloiscl/include)
+app(clCheck CL_graph_test.cpp DISTSAFE)
 target_link_libraries(clCheck OpenCL)
 
 #app(graphCheck_gen check_gen.cpp CLANGPLUGIN)
@@ -24,29 +23,34 @@ target_link_libraries(clCheck OpenCL)
 #app(HSSSP_gen2 HSSSP_gen2.cpp GlobalObj.cpp DISTSAFE)
 
 #Working HSSSP
-app(HSSSP_gen3 HSSSP_gen3.cpp GlobalObj.cpp DISTSAFE)
+app(HSSSP_gen3 HSSSP_gen3.cpp DISTSAFE)
 
 #pageRank
-app(PageRank_push pageRank_gen.cpp GlobalObj.cpp DISTSAFE)
+app(PageRank_push pageRank_gen.cpp DISTSAFE)
+app(PageRank_simple pageRank_gen_simpleIter.cpp DISTSAFE)
 
 #LabelPropAlgo
-app(CC_LabelProp connectedComponent_gen.cpp GlobalObj.cpp DISTSAFE)
+app(CC_LabelProp connectedComponent_gen.cpp  DISTSAFE)
 
 #sgd
-app(SGD_gen sgd_gen.cpp GlobalObj.cpp DISTSAFE)
+app(SGD_gen sgd_gen.cpp  DISTSAFE)
 
 #sgd with workList
-app(SGD_gen_wl sgd_wl_gen.cpp GlobalObj.cpp DISTSAFE)
+app(SGD_gen_wl sgd_wl_gen.cpp  DISTSAFE)
 
 #pageRank_pull
-app(PageRank_pull pageRankPull_gen.cpp GlobalObj.cpp DISTSAFE)
+app(PageRank_pull pageRankPull_gen.cpp  DISTSAFE)
 
 #HSSSP with worklist
-app(HSSSP_wl HSSSP_wl.cpp GlobalObj.cpp DISTSAFE)
+app(HSSSP_wl HSSSP_wl.cpp  DISTSAFE)
 
 
 #PageRank with worklist
-app(pageRank_wl pageRank_wl.cpp GlobalObj.cpp DISTSAFE)
+app(pageRank_wl pageRank_wl.cpp  DISTSAFE)
 
 #PageRank generated with worklist
-app(pageRank_wl_gen pageRank_wl_gen.cpp GlobalObj.cpp DISTSAFE)
+app(pageRank_wl_gen pageRank_wl_gen.cpp  DISTSAFE)
+
+#OpenCL generated code. 
+app(opencl cl_host.cpp DISTSAFE)
+target_link_libraries(opencl OpenCL)
