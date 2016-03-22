@@ -132,6 +132,7 @@ public:
     * */
    virtual bool TraverseCXXMemberCallExpr(CXXMemberCallExpr * call) {
          MARKER_CODE(cl_file << "[CXXMemberCallExpr]";)
+            llvm::outs() << "CXXMemberCallExpression [" << call->getDirectCallee()->getCanonicalDecl()->getNameAsString() << " ]\n";
          std::string fnameReplacement = OpenCLConversionDB::get_cl_implementation(call->getDirectCallee());
          if(fnameReplacement==""){
             RecursiveASTVisitor<OpenCLDeviceRewriter>::TraverseStmt(call->getImplicitObjectArgument());
@@ -146,7 +147,7 @@ public:
          }
          if(!call->isImplicitCXXThis()){
             RecursiveASTVisitor<OpenCLDeviceRewriter>::TraverseStmt(call->getImplicitObjectArgument());
-            objArg = rewriter.getRewrittenText(SourceRange(call->getImplicitObjectArgument()->getLocStart(), call->getImplicitObjectArgument()->getLocEnd()));
+            objArg += rewriter.getRewrittenText(SourceRange(call->getImplicitObjectArgument()->getLocStart(), call->getImplicitObjectArgument()->getLocEnd()));
 //            SourceRange sr(call->getLocStart(),  call->getCallee()->getLocStart());
 //            rewriter.RemoveText(sr);
          }

@@ -131,11 +131,15 @@ struct OpenCLConversionDB{
             return "atomic_min";
          }else if(fname=="compare_exchange_strong"){
             return "atomic_cmpxchg";
+         }else if(fname=="exchange"){
+            return "atomic_cmpxchg";
          }else if(fname=="getData"){
             return "getData";
          }else if (fname == "getEdgeData"){
             //TODO RK - fix hack with edgeData
             return "*getEdgeData";
+         }else if (fname == "atomicAdd"){
+            return "atomic_add";
          }
       }else if (d->getNumParams()==3){
          if(fname=="compare_exchange_strong"){

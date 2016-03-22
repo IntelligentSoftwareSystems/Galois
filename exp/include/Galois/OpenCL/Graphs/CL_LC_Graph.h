@@ -376,22 +376,23 @@ namespace Galois {
                CHECK_CL_ERROR(err, "Error: clCreateBuffer of SVM - 2\n");
                gpu_wrapper.edge_data = clCreateBuffer(ctx->get_default_device()->context(), flags_read, sizeof(EdgeDataType) * _num_edges, edge_data, &err);
                CHECK_CL_ERROR(err, "Error: clCreateBuffer of SVM - 3\n");
-
                gpu_struct_ptr = clCreateBuffer(ctx->get_default_device()->context(), flags, sizeof(cl_uint) * 16, outgoing_index, &err);
                CHECK_CL_ERROR(err, "Error: clCreateBuffer of SVM - 4\n");
 
-               const int buffer_size = 16;
-               gpu_meta = clCreateBuffer(ctx->get_default_device()->context(), flags, sizeof(cl_uint) * buffer_size, outgoing_index, &err);
+               const int meta_buffer_size = 16;
+               gpu_meta = clCreateBuffer(ctx->get_default_device()->context(), flags, sizeof(cl_uint) * meta_buffer_size, outgoing_index, &err);
                CHECK_CL_ERROR(err, "Error: clCreateBuffer of SVM - 5\n");
-               int  cpu_meta[buffer_size];
+               int  cpu_meta[meta_buffer_size];
                cpu_meta[0] = _num_nodes;
                cpu_meta[1] =_num_edges;
                cpu_meta[2] =SizeNodeData;
                cpu_meta[3] =SizeEdgeData;
                cpu_meta[4] = _num_owned;
                cpu_meta[6] = _global_offset;
-               err= clEnqueueWriteBuffer(ctx->get_default_device()->command_queue(), gpu_meta, CL_TRUE,0, sizeof(int)*buffer_size, cpu_meta,NULL,0,NULL);
+               err= clEnqueueWriteBuffer(ctx->get_default_device()->command_queue(), gpu_meta, CL_TRUE,0, sizeof(int)*meta_buffer_size, cpu_meta,NULL,0,NULL);
                CHECK_CL_ERROR(err, "Error: Writing META to GPU failed- 6\n");
+               err = clReleaseMemObject(gpu_meta);
+               CHECK_CL_ERROR(err, "Error: Releasing meta buffer.- 7\n");
                init_graph_struct();
             }
             void init_graph_struct() {
