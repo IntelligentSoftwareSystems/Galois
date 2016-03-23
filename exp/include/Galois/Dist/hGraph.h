@@ -170,7 +170,7 @@ public:
       }
       */
       assert(isOwned(gid));
-      FnTy::reduce((gid - globalOffset), getData(gid - globalOffset), val);
+      FnTy::reduce(getData(gid - globalOffset), val);
     }
   }
 
@@ -188,7 +188,7 @@ public:
       typename FnTy::ValTy old_val, val;
       Galois::Runtime::gDeserialize(buf, gid, old_val);
       assert(isOwned(gid));
-      val = FnTy::extract((gid - globalOffset), getData((gid - globalOffset)));
+      val = FnTy::extract(getData((gid - globalOffset)));
       if (net.ID == 0) {
         //std::cout << "PullApply step1 : [" << net.ID << "] "<< " to : " << from_id << " : [" << gid - globalOffset << "] : " << val << "\n";
       }
@@ -217,7 +217,7 @@ public:
       if (net.ID == 1) {
         //std::cout << "PullApply Step2 : [" << net.ID << "]  : [" << LocalId << "] : " << val << "\n";
       }
-      FnTy::setVal(LocalId, getData(LocalId), val);
+      FnTy::setVal(getData(LocalId), val);
     }
     --num_recv_expected;
   }
@@ -383,8 +383,8 @@ public:
           assert(gid < totalNodes);
         }
         //std::cout << net.ID << " send (" << gid << ") " << start << " " << FnTy::extract(start, getData(start)) << "\n";
-        gSerialize(b, gid, FnTy::extract(start, getData(start)));
-        FnTy::reset(start, getData(start));
+        gSerialize(b, gid, FnTy::extract(getData(start)));
+        FnTy::reset(getData(start));
       }
       net.send(x, syncRecv, b);
     }
@@ -415,7 +415,7 @@ public:
       for (; start != end; ++start) {
         auto gid = L2G(start);
         //std::cout << net.ID << " PULL send (" << gid << ") " << start << " " << FnTy::extract(start, getData(start)) << "\n";
-        gSerialize(b, gid, FnTy::extract(start, getData(start)));
+        gSerialize(b, gid, FnTy::extract(getData(start)));
       }
       net.send(x, syncRecv, b);
       ++num_recv_expected;

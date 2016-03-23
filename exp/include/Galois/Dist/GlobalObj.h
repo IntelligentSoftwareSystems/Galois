@@ -38,20 +38,7 @@ class GlobalObject {
   GlobalObject(const GlobalObject&) = delete;
   GlobalObject(GlobalObject&&) = delete;
 
-  /*
-   * Replace a global var with a static. No longer needs a separate cpp file.
-   * */
-  /*
-  static std::vector<uintptr_t> & allobjs(){
-     static std::vector<uintptr_t> all_objects;
-     return all_objects;
-  }
-  */
-
-  static uintptr_t ptrForObj(unsigned oid) {
-    assert(oid < allobjs().size());
-    return allobjs()[oid];
-  }
+  static uintptr_t ptrForObj(unsigned oid);
 
   template<typename T>
   GlobalObject(const T* ptr) {
