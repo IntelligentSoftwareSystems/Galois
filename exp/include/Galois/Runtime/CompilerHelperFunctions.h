@@ -28,10 +28,9 @@
 #include <vector>
 
 namespace Galois {
-
   /** Galois::min **/
   template<typename Ty>
-    const Ty min(std::atomic<Ty>& a, const Ty& b){
+    const Ty atomicMin(std::atomic<Ty>& a, const Ty& b){
       Ty old_a = a;
       //std::cout << " b : " << b <<"\n";
       while(a > b){
@@ -87,5 +86,5 @@ namespace Galois {
     }
     return init_value;
   }
-}
+}//End namespace Galois
 #endif

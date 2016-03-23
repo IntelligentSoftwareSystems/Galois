@@ -117,7 +117,7 @@ static std::ofstream& openIfNot_output() {
     char name[100] = "";
     gethostname(name, sizeof(name));
     char fname[120];
-    snprintf(fname, sizeof(fname), "output_%s.log", name);
+    snprintf(fname, sizeof(fname), "output_%s_%d.log", name, Galois::Runtime::getHostID());
     output_file.open(fname, std::ios_base::app);
   }
   assert(output_file.is_open());

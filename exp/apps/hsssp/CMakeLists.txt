@@ -13,8 +13,7 @@ add_custom_command(TARGET hsssp-push POST_BUILD COMMAND ${CMAKE_COMMAND} -E copy
 
 app(graphCheck check.cpp  DISTSAFE)
 
-app(clCheck CL_graph_test.cpp /h2/rashid/workspace/GaloisDist/gdist/libgaloiscl/src/CL_Header.cpp DISTSAFE)
-include_directories(/h2/rashid/workspace/GaloisDist/gdist/libgaloiscl/include)
+app(clCheck CL_graph_test.cpp DISTSAFE)
 target_link_libraries(clCheck OpenCL)
 
 #app(graphCheck_gen check_gen.cpp CLANGPLUGIN)
@@ -24,10 +23,11 @@ target_link_libraries(clCheck OpenCL)
 #app(HSSSP_gen2 HSSSP_gen2.cpp  DISTSAFE)
 
 #Working HSSSP
-app(HSSSP_gen3 HSSSP_gen3.cpp  DISTSAFE)
+app(HSSSP_gen3 HSSSP_gen3.cpp DISTSAFE)
 
 #pageRank
-app(PageRank_push pageRank_gen.cpp  DISTSAFE)
+app(PageRank_push pageRank_gen.cpp DISTSAFE)
+app(PageRank_simple pageRank_gen_simpleIter.cpp DISTSAFE)
 
 #LabelPropAlgo
 app(CC_LabelProp connectedComponent_gen.cpp  DISTSAFE)
@@ -53,3 +53,6 @@ app(pageRank_wl_gen pageRank_wl_gen.cpp  DISTSAFE)
 
 #PageRank with 2 loop structure
 app(pageRank_2loops_gen pageRank_2loops_gen.cpp DISTSAFE)
+#OpenCL generated code. 
+#app(opencl cl_host.cpp DISTSAFE)
+#target_link_libraries(opencl OpenCL)

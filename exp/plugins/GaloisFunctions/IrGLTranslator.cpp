@@ -54,7 +54,7 @@ void findAndReplace(std::string &str,
 
 class IrGLOperatorVisitor : public RecursiveASTVisitor<IrGLOperatorVisitor> {
 private:
-  ASTContext* astContext;
+  //ASTContext* astContext;
   Rewriter &rewriter; // FIXME: is this necessary? can ASTContext give source code?
   bool isTopological;
   std::unordered_set<const Stmt *> skipStmts;
@@ -66,17 +66,17 @@ private:
   std::unordered_set<std::string> symbolTable; // FIXME: does not handle scoped variables (nesting with same variable name)
   std::ofstream Output;
 
-  std::map<std::string, std::string> &GlobalVariablesToTypeMap;
+  std::map<std::string, std::pair<std::string, std::string> > &GlobalVariablesToTypeMap;
   std::map<std::string, std::string> &SharedVariablesToTypeMap;
   std::map<std::string, std::vector<std::string> > &KernelToArgumentsMap;
 
 public:
   explicit IrGLOperatorVisitor(ASTContext *context, Rewriter &R, 
       bool isTopo,
-      std::map<std::string, std::string> &globalVariables,
+      std::map<std::string, std::pair<std::string, std::string> > &globalVariables,
       std::map<std::string, std::string> &sharedVariables,
       std::map<std::string, std::vector<std::string> > &kernels) : 
-    astContext(context),
+    //astContext(context),
     rewriter(R),
     isTopological(isTopo),
     GlobalVariablesToTypeMap(globalVariables),
@@ -84,8 +84,10 @@ public:
     KernelToArgumentsMap(kernels)
   {}
   
+  virtual ~IrGLOperatorVisitor() {}
+
   std::string FormatCBlock(std::string text) {
-    assert(text.find("graph.getData") == std::string::npos);
+    assert(text.find("graph->getData") == std::string::npos);
 
     // replace node variables: array of structures to structure of arrays
     // FIXME: does not handle scoped variables (nesting with same variable name)
@@ -103,7 +105,6 @@ public:
         pos = text.find(nodeVar.first);
       }
     }
-    // FIXME: use & (address-of) operator for atomicu variables in atomicAdd() etc
 
     while (1) {
       std::size_t found = text.find("nout(");
@@ -111,7 +112,7 @@ public:
         std::size_t begin = text.find(",", found);
         std::size_t end = text.find(",", begin+1);
         std::string var = text.substr(begin+1, end - begin - 1);
-        std::string replace = "graph.getOutDegree(" + var + ")";
+        std::string replace = "graph->getOutDegree(" + var + ")";
         end = text.find(")", end);
         text = text.replace(found, end - found + 1, replace);
       } else {
@@ -119,8 +120,22 @@ public:
       }
     } 
 
-    findAndReplace(text, "getEdgeDst", "getAbsDestination");
-    findAndReplace(text, "getEdgeData", "getAbsWeight");
+    // use & (address-of) operator for atomic variables in atomicAdd() etc
+    std::size_t start = 0;
+    while (1) {
+      std::size_t found = text.find("Galois::atomic", start);
+      if (found != std::string::npos) {
+        std::size_t replace = text.find("(", start);
+        text.insert(replace+1, "&");
+        start = replace;
+      } else {
+        break;
+      }
+    }
+    findAndReplace(text, "Galois::atomic", "atomic");
+
+    findAndReplace(text, "->getEdgeDst", ".getAbsDestination");
+    findAndReplace(text, "->getEdgeData", ".getAbsWeight");
     findAndReplace(text, "std::fabs", "fabs");
     findAndReplace(text, "ctx.push", "WL.push"); // FIXME: insert arguments within quotes
     findAndReplace(text, "\\", "\\\\"); // FIXME: should it be only within quoted strings?
@@ -168,7 +183,7 @@ public:
   virtual bool TraverseStmt(Stmt *S) {
     bool traverse = RecursiveASTVisitor<IrGLOperatorVisitor>::TraverseStmt(S);
     if (traverse && S) {
-      if (isa<CXXForRangeStmt>(S)) {
+      if (isa<CXXForRangeStmt>(S) || isa<ForStmt>(S)) {
         bodyString << "]),\n"; // end ForAll
       } else if (isa<IfStmt>(S)) {
         bodyString << "]),\n"; // end If
@@ -178,15 +193,15 @@ public:
   }
 
   virtual bool VisitCXXMethodDecl(CXXMethodDecl* func) {
-    assert(declString.empty());
+    assert(declString.rdbuf()->in_avail() == 0);
     declString.str("");
     bodyString.str("");
     funcName = func->getParent()->getNameAsString();
-    declString << "Kernel(\"" << funcName << "\", [G.param()";
+    declString << "Kernel(\"" << funcName << "\", [G.param(), ('int ', 'nowned') ";
     // FIXME: assuming first parameter is GNode
     std::string vertexName = func->getParamDecl(0)->getNameAsString();
     if (isTopological) {
-      bodyString << "ForAll(\"" << vertexName << "\", G.nodes(),\n[\n";
+      bodyString << "ForAll(\"" << vertexName << "\", G.nodes(None, \"nowned\"),\n[\n";
     } else {
       bodyString << "ForAll(\"wlvertex\", WL.items(),\n[\n";
       bodyString << "CDecl([(\"int\", \"" << vertexName << "\", \"\")]),\n";
@@ -198,6 +213,7 @@ public:
   }
 
   virtual bool VisitCXXForRangeStmt(CXXForRangeStmt* forStmt) {
+    assert(forStmt->getLoopVariable());
     skipDecls.insert(forStmt->getLoopVariable());
     DeclStmt *rangeStmt = forStmt->getRangeStmt();
     for (auto decl : rangeStmt->decls()) {
@@ -206,33 +222,60 @@ public:
         skipStmts.insert(expr);
       }
     }
-    symbolTable.insert(forStmt->getLoopVariable()->getNameAsString());
+    std::string variableName = forStmt->getLoopVariable()->getNameAsString();
+    symbolTable.insert(variableName);
     const Expr *expr = forStmt->getRangeInit();
     SourceRange range(expr->getLocStart(), expr->getLocEnd());
     std::string vertexName = rewriter.getRewrittenText(range);
-    std::size_t found = vertexName.find("graph.edges");
+    std::size_t found = vertexName.find("graph->edges");
     assert(found != std::string::npos);
     std::size_t begin = vertexName.find("(", found);
     std::size_t end = vertexName.find(",", begin);
+    if (end == std::string::npos) end = vertexName.find(")", begin);
     vertexName = vertexName.substr(begin+1, end - begin - 1);
-    bodyString << "ForAll(\"" << forStmt->getLoopVariable()->getNameAsString() 
-      << "\", G.edges(\"" << vertexName << "\"),\n[\n";
+    bodyString << "ForAll(\"" << variableName << "\", G.edges(\"" << vertexName << "\"),\n[\n";
+    return true;
+  }
+
+  virtual bool VisitForStmt(ForStmt* forStmt) {
+    skipStmts.insert(forStmt->getInit());
+    skipStmts.insert(forStmt->getCond());
+    skipStmts.insert(forStmt->getInc());
+    std::string variableName;
+    if (forStmt->getConditionVariable()) {
+      skipDecls.insert(forStmt->getConditionVariable());
+      variableName = forStmt->getConditionVariable()->getNameAsString();
+    } else {
+      variableName = dyn_cast<VarDecl>(dyn_cast<DeclStmt>(forStmt->getInit())->getSingleDecl())->getNameAsString();
+    }
+    symbolTable.insert(variableName);
+    const Expr *expr = forStmt->getCond();
+    SourceRange range(expr->getLocStart(), expr->getLocEnd());
+    std::string vertexName = rewriter.getRewrittenText(range);
+    std::size_t found = vertexName.find("graph->edge_end");
+    assert(found != std::string::npos);
+    std::size_t begin = vertexName.find("(", found);
+    std::size_t end = vertexName.find(",", begin);
+    if (end == std::string::npos) end = vertexName.find(")", begin);
+    vertexName = vertexName.substr(begin+1, end - begin - 1);
+    bodyString << "ForAll(\"" << variableName << "\", G.edges(\"" << vertexName << "\"),\n[\n";
     return true;
   }
 
   virtual bool VisitDeclStmt(DeclStmt *declStmt) {
+    bool skipStmt = skipStmts.find(declStmt) != skipStmts.end();
     for (auto decl : declStmt->decls()) {
       if (VarDecl *varDecl = dyn_cast<VarDecl>(decl)) {
         const Expr *expr = varDecl->getAnyInitializer();
         skipStmts.insert(expr);
-        if (skipDecls.find(varDecl) == skipDecls.end()) {
+        if (!skipStmt && (skipDecls.find(varDecl) == skipDecls.end())) {
           symbolTable.insert(varDecl->getNameAsString());
           std::size_t pos = std::string::npos;
           std::string initText;
           if (expr != NULL) {
             SourceRange range(expr->getLocStart(), expr->getLocEnd());
             initText = rewriter.getRewrittenText(range);
-            pos = initText.find("graph.getData");
+            pos = initText.find("graph->getData");
           }
           if (pos == std::string::npos) {
             std::string decl = varDecl->getType().getAsString();
@@ -245,7 +288,7 @@ public:
             }
           }
           else {
-            // get the first argument to graph.getData()
+            // get the first argument to graph->getData()
             std::size_t begin = initText.find("(", pos);
             std::size_t end = initText.find(",", pos);
             if (end == std::string::npos) {
@@ -328,6 +371,15 @@ public:
     return true;
   }
 
+  virtual bool VisitCXXConstructExpr(CXXConstructExpr *constructExpr) {
+    if (skipStmts.find(constructExpr) != skipStmts.end()) {
+      for (auto arg : constructExpr->arguments()) {
+        skipStmts.insert(arg);
+      }
+    }
+    return true;
+  }
+
   virtual bool VisitMaterializeTemporaryExpr(MaterializeTemporaryExpr *tempExpr) {
     if (skipStmts.find(tempExpr) != skipStmts.end()) {
       skipStmts.insert(tempExpr->GetTemporaryExpr());
@@ -363,8 +415,16 @@ public:
     const std::string &varName = decl->getNameAsString();
     if (symbolTable.find(varName) == symbolTable.end()) {
       if (GlobalVariablesToTypeMap.find(varName) == GlobalVariablesToTypeMap.end()) {
-        // FIXME: get initialization value if any
-        GlobalVariablesToTypeMap[varName] = decl->getType().getAsString();
+        std::string type = decl->getType().getAsString();
+        std::string declStr = rewriter.getRewrittenText(decl->getSourceRange());
+        std::size_t found = declStr.find("=");
+        std::string value;
+        if (found != std::string::npos) {
+          value = declStr.substr(found, declStr.length()-found);
+        } else {
+          value = "";
+        }
+        GlobalVariablesToTypeMap[varName] = std::make_pair(type, value);
       }
     }
     return true;
@@ -380,9 +440,12 @@ private:
   std::unordered_set<std::string> symbolTable; // FIXME: does not handle scoped variables (nesting with same variable name)
   std::ofstream Output;
 
-  std::map<std::string, std::string> GlobalVariablesToTypeMap;
+  std::map<std::string, std::pair<std::string, std::string> > GlobalVariablesToTypeMap;
   std::map<std::string, std::string> SharedVariablesToTypeMap;
   std::map<std::string, std::vector<std::string> > KernelToArgumentsMap;
+  std::vector<std::string> Kernels;
+
+  std::string FileNamePath;
 
 public:
   explicit IrGLOrchestratorVisitor(ASTContext *context, Rewriter &R) : 
@@ -390,9 +453,117 @@ public:
     rewriter(R)
   {}
   
-  void GenerateIrGLASTToFile(std::string filename) {
+  virtual ~IrGLOrchestratorVisitor() {}
+
+  void GenerateIrGLASTToFile() const {
+    std::string filename;
+    std::size_t found = FileNamePath.rfind("/");
+    if (found != std::string::npos) filename = FileNamePath.substr(found+1, FileNamePath.length()-1);
+
+    std::ofstream header;
+    header.open(FileNamePath + "_cuda.h");
+    header << "#pragma once\n";
+    header << "#include \"Galois/Cuda/cuda_mtypes.h\"\n";
+    header << "\nstruct CUDA_Context;\n";
+    header << "\nstruct CUDA_Context *get_CUDA_context(int id);\n";
+    header << "bool init_CUDA_context(struct CUDA_Context *ctx, int device);\n";
+    header << "void load_graph_CUDA(struct CUDA_Context *ctx, MarshalGraph &g);\n\n";
+    for (auto& var : SharedVariablesToTypeMap) {
+      header << var.second << " get_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID);\n";
+      header << "void set_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID, " << var.second << " v);\n";
+      header << "void add_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID, " << var.second << " v);\n";
+    }
+    for (auto& kernelName : Kernels) {
+      header << "void " << kernelName << "_cuda(struct CUDA_Context *ctx);\n";
+    }
+    header.close();
+
+    std::ofstream cuheader;
+    cuheader.open(FileNamePath + "_cuda.cuh");
+    cuheader << "#pragma once\n";
+    cuheader << "#include <cuda.h>\n";
+    cuheader << "#include <stdio.h>\n";
+    cuheader << "#include <sys/types.h>\n";
+    cuheader << "#include <unistd.h>\n";
+    cuheader << "#include \"" << filename << "_cuda.h\"\n";
+    cuheader << "\nstruct CUDA_Context {\n";
+    cuheader << "\tint device;\n";
+    cuheader << "\tint id;\n";
+    cuheader << "\tsize_t nowned;\n";
+    cuheader << "\tsize_t g_offset;\n";
+    cuheader << "\tCSRGraphTex hg;\n";
+    cuheader << "\tCSRGraphTex gg;\n";
+    for (auto& var : SharedVariablesToTypeMap) {
+      cuheader << "\tShared<" << var.second << "> " << var.first << ";\n";
+    }
+    cuheader << "};\n\n";
+    for (auto& var : SharedVariablesToTypeMap) {
+      cuheader << var.second << " get_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID) {\n";
+      cuheader << "\t" << var.second << " *" << var.first << " = ctx->" << var.first << ".cpu_rd_ptr();\n";
+      cuheader << "\treturn " << var.first << "[LID];\n";
+      cuheader << "}\n\n";
+      cuheader << "void set_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID, " << var.second << " v) {\n";
+      cuheader << "\t" << var.second << " *" << var.first << " = ctx->" << var.first << ".cpu_wr_ptr();\n";
+      cuheader << "\t" << var.first << "[LID] = v;\n";
+      cuheader << "}\n\n";
+      cuheader << "void add_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID, " << var.second << " v) {\n";
+      cuheader << "\t" << var.second << " *" << var.first << " = ctx->" << var.first << ".cpu_wr_ptr();\n";
+      cuheader << "\t" << var.first << "[LID] += v;\n";
+      cuheader << "}\n\n";
+    }
+    cuheader << "struct CUDA_Context *get_CUDA_context(int id) {\n";
+    cuheader << "\tstruct CUDA_Context *ctx;\n";
+    cuheader << "\tctx = (struct CUDA_Context *) calloc(1, sizeof(struct CUDA_Context));\n";
+    cuheader << "\treturn ctx;\n";
+    cuheader << "}\n\n";
+    cuheader << "bool init_CUDA_context(struct CUDA_Context *ctx, int device) {\n";
+    cuheader << "\tstruct cudaDeviceProp dev;\n";
+    cuheader << "\tif(device == -1) {\n";
+    cuheader << "\t\tcheck_cuda(cudaGetDevice(&device));\n";
+    cuheader << "\t} else {\n";
+    cuheader << "\t\tint count;\n";
+    cuheader << "\t\tcheck_cuda(cudaGetDeviceCount(&count));\n";
+    cuheader << "\t\tif(device > count) {\n";
+    cuheader << "\t\t\tfprintf(stderr, \"Error: Out-of-range GPU %d specified (%d total GPUs)\", device, count);\n";
+    cuheader << "\t\t\treturn false;\n";
+    cuheader << "\t\t}\n";
+    cuheader << "\t\tcheck_cuda(cudaSetDevice(device));\n";
+    cuheader << "\t}\n";
+    cuheader << "\tctx->device = device;\n";
+    cuheader << "\tcheck_cuda(cudaGetDeviceProperties(&dev, device));\n";
+    cuheader << "\tfprintf(stderr, \"%d: Using GPU %d: %s\\n\", ctx->id, device, dev.name);\n";
+    cuheader << "\treturn true;\n";
+    cuheader << "}\n\n";
+    cuheader << "void load_graph_CUDA(struct CUDA_Context *ctx, MarshalGraph &g) {\n";
+    cuheader << "\tCSRGraphTy &graph = ctx->hg;\n";
+    cuheader << "\tctx->nowned = g.nowned;\n";
+    cuheader << "\tctx->id = g.id;\n";
+    cuheader << "\tgraph.nnodes = g.nnodes;\n";
+    cuheader << "\tgraph.nedges = g.nedges;\n";
+    cuheader << "\tif(!graph.allocOnHost()) {\n";
+    cuheader << "\t\tfprintf(stderr, \"Unable to alloc space for graph!\");\n";
+    cuheader << "\t\texit(1);\n";
+    cuheader << "\t}\n";
+    cuheader << "\tmemcpy(graph.row_start, g.row_start, sizeof(index_type) * (g.nnodes + 1));\n";
+    cuheader << "\tmemcpy(graph.edge_dst, g.edge_dst, sizeof(index_type) * g.nedges);\n";
+    cuheader << "\tif(g.node_data) memcpy(graph.node_data, g.node_data, sizeof(node_data_type) * g.nnodes);\n";
+    cuheader << "\tif(g.edge_data) memcpy(graph.edge_data, g.edge_data, sizeof(edge_data_type) * g.nedges);\n";
+    cuheader << "\tgraph.copy_to_gpu(ctx->gg);\n";
+    for (auto& var : SharedVariablesToTypeMap) {
+      cuheader << "\tctx->" << var.first << ".alloc(graph.nnodes);\n";
+    }
+    cuheader << "\tprintf(\"load_graph_GPU: %d owned nodes of total %d resident, %d edges\\n\", ctx->nowned, graph.nnodes, graph.nedges);\n"; 
+    cuheader << "}\n\n";
+    cuheader << "void kernel_sizing(CSRGraphTex & g, dim3 &blocks, dim3 &threads) {\n";
+    cuheader << "\tthreads.x = 256;\n";
+    cuheader << "\tthreads.y = threads.z = 1;\n";
+    cuheader << "\tblocks.x = 14 * 8;\n";
+    cuheader << "\tblocks.y = blocks.z = 1;\n";
+    cuheader << "}\n\n";
+    cuheader.close();
+
     std::ofstream IrGLAST;
-    IrGLAST.open(filename);
+    IrGLAST.open(FileNamePath + ".py");
     IrGLAST << "from gg.ast import *\n";
     IrGLAST << "from gg.lib.graph import Graph\n";
     IrGLAST << "from gg.lib.wl import Worklist\n";
@@ -403,6 +574,8 @@ public:
     IrGLAST << "ast = Module([\n";
     IrGLAST << "CBlock([cgen.Include(\"kernels/reduce.cuh\", "
       << "system = False)], parse = False),\n";
+    IrGLAST << "CBlock([cgen.Include(\"" << filename << "_cuda.cuh\", "
+      << "system = False)], parse = False),\n";
     for (auto& var : SharedVariablesToTypeMap) {
       std::string upper = var.first;
       std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
@@ -410,21 +583,20 @@ public:
         << " *\", \"P_" << upper << "\", \"\")]),\n";
     }
     for (auto& var : GlobalVariablesToTypeMap) {
-      size_t found = var.second.find("Galois::");
+      size_t found = var.second.first.find("Galois::");
       if (found == std::string::npos) {
-        found = var.second.find("cll::opt");
+        found = var.second.first.find("cll::opt");
         std::string type;
         if (found == std::string::npos) {
-          type = var.second;
+          type = var.second.first;
         } else {
-          size_t start = var.second.find("<", found);
+          size_t start = var.second.first.find("<", found);
           // FIXME: nested < < > >
-          size_t end = var.second.find(">", found);
-          type = var.second.substr(start+1, end-start-1);
+          size_t end = var.second.first.find(">", found);
+          type = var.second.first.substr(start+1, end-start-1);
         }
-        // FIXME: initialization value?
         IrGLAST << "CDeclGlobal([(\"extern " << type 
-          << "\", \"" << var.first << "\", \"\")]),\n";
+          << "\", \"" << var.first << "\", \"" << var.second.second << "\")]),\n";
       }
     }
 
@@ -433,28 +605,18 @@ public:
     compute.close();
     remove(COMPUTE_FILENAME);
 
-    IrGLAST << "Kernel(\"" << "gg_main" << "\", ";
-    IrGLAST << "[GraphParam('hg', True), GraphParam('gg', True)],\n[\n";
-    // should wait for all operators to be generated before reading shared variables
-    for (auto& var : SharedVariablesToTypeMap) {
-      IrGLAST << "CDecl((\"Shared<" << var.second << ">\", \"p_" << var.first << "\"";
-      IrGLAST << ", \"= Shared<" << var.second << "> (hg.nnodes)\")),\n";
-    }
-    // FIXME: initialize shared variables to zero if they are atomic
     std::ifstream orchestrator(ORCHESTRATOR_FILENAME);
     IrGLAST << orchestrator.rdbuf();
     orchestrator.close();
-    for (auto& var : SharedVariablesToTypeMap) {
-      std::string upper = var.first;
-      std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
-      IrGLAST << "CBlock([\"" << "P_" << upper << " = p_" 
-        << var.first << ".cpu_rd_ptr()" << "\"]),\n";
-    }
-    IrGLAST << "]),\n"; // end kernel
     remove(ORCHESTRATOR_FILENAME);
 
     IrGLAST << "])\n"; // end Module
     IrGLAST.close();
+
+    llvm::errs() << "IrGL file and headers generated:\n";
+    llvm::errs() << FileNamePath << ".py\n";
+    llvm::errs() << FileNamePath << "_cuda.cuh\n";
+    llvm::errs() << FileNamePath << "_cuda.h\n";
   }
 
   void WriteCBlock(std::string text) {
@@ -475,13 +637,23 @@ public:
   }
 
   virtual bool TraverseDecl(Decl *D) {
+    CXXMethodDecl *method = dyn_cast_or_null<CXXMethodDecl>(D);
+    if (method) {
+      Output.open(ORCHESTRATOR_FILENAME, std::ios::app);
+      std::string kernelName = method->getParent()->getNameAsString();
+      Kernels.push_back(kernelName);
+      Output << "Kernel(\"" << kernelName << "_cuda\", ";
+      Output << "[('struct CUDA_Context *', 'ctx')],\n[\n";
+    }
     bool traverse = RecursiveASTVisitor<IrGLOrchestratorVisitor>::TraverseDecl(D);
-    if (traverse && D && isa<CXXMethodDecl>(D)) {
+    if (traverse && method) {
+      Output << "]),\n"; // end kernel
       Output.close();
 
-      CXXMethodDecl *method = dyn_cast<CXXMethodDecl>(D);
-      // FIXME: Build file name from source file
-      GenerateIrGLASTToFile(method->getParent()->getNameAsString() + ".py");
+      std::string fileName = rewriter.getSourceMgr().getFilename(D->getLocStart()).str();
+      std::size_t found = fileName.rfind(".");
+      assert(found != std::string::npos);
+      FileNamePath = fileName.substr(0, found);
     }
     return traverse;
   }
@@ -495,8 +667,6 @@ public:
   }
 
   virtual bool VisitCXXMethodDecl(CXXMethodDecl* func) {
-    assert(symbolTable.empty());
-    Output.open(ORCHESTRATOR_FILENAME);
     skipStmts.clear();
     skipDecls.clear();
     symbolTable.clear();
@@ -538,7 +708,7 @@ public:
     skipStmts.insert(binaryOp->getLHS());
     skipStmts.insert(binaryOp->getRHS());
     if (skipStmts.find(binaryOp) == skipStmts.end()) {
-      assert(binaryOp.isAssignmentOp());
+      assert(binaryOp->isAssignmentOp());
       bool skip = false;
       Expr *rhs = binaryOp->getRHS();
       if (CastExpr *cast = dyn_cast<CastExpr>(rhs)) {
@@ -549,7 +719,7 @@ public:
         std::string recordName = record->getNameAsString();
         if (recordName.compare("GReducible") == 0) {
           skip = true;
-          assert(!record->getMethodDecl()->getNameAsString().compare("reduce"));
+          //assert(!record->getMethodDecl()->getNameAsString().compare("reduce"));
 
           Expr *implicit = callExpr->getImplicitObjectArgument();
           if (CastExpr *cast = dyn_cast<CastExpr>(implicit)) {
@@ -569,7 +739,7 @@ public:
 
           std::ostringstream reduceCall;
           // FIXME: choose matching reduction operation
-          reduceCall << "mgpu::Reduce(p_" << reduceVar << ".gpu_rd_ptr(), hg.nnodes";
+          reduceCall << "mgpu::Reduce(p_" << reduceVar << ".gpu_rd_ptr(ctx->device+1), ctx->hg.nnodes";
           reduceCall << ", (" << SharedVariablesToTypeMap[reduceVar] << ")0";
           reduceCall << ", mgpu::maximum<" << SharedVariablesToTypeMap[reduceVar] << ">()";
           reduceCall << ", (" << SharedVariablesToTypeMap[reduceVar] << "*)0";
@@ -611,7 +781,8 @@ public:
         // generate kernel for operator
         bool isTopological = true;
         assert(callExpr->getNumArgs() > 1);
-        Expr *op = callExpr->getArg(1);
+        // FIXME: pick the right argument
+        Expr *op = callExpr->getArg(2);
         RecordDecl *record = op->getType().getTypePtr()->getAsStructureType()->getDecl();
         CXXRecordDecl *cxxrecord = dyn_cast<CXXRecordDecl>(record);
         for (auto method : cxxrecord->methods()) {
@@ -650,30 +821,23 @@ public:
           compute.close();
 
           Output << "Pipe([\n";
-          Output << "Invoke(\"__init_worklist__\", (\"gg\", )),\n";
+          Output << "Invoke(\"__init_worklist__\", (\"ctx->gg\", )),\n";
           Output << "Pipe([\n";
         }
 
         // generate call to kernel
-        begin = text.find(",", begin);
-        ++begin;
-        std::size_t end = text.find("(", begin);
-        --end;
-        // remove whitespace
-        while (text[begin] == ' ') ++begin;
-        while (text[end] == ' ') --end; 
-        std::string kernelName = text.substr(begin, end-begin+1);
+        std::string kernelName = record->getNameAsString();
         Output << "Invoke(\"" << kernelName << "\", ";
-        Output << "(\"gg\"";
+        Output << "(\"ctx->gg\", \"ctx->nowned\"";
         auto& arguments = KernelToArgumentsMap[kernelName];
         for (auto& argument : arguments) {
-          Output << ", \"p_" << argument << ".gpu_wr_ptr()\"";
+          Output << ", \"ctx->" << argument << ".gpu_wr_ptr()\"";
         }
         Output << ")),\n";
 
         if (!isTopological) { // data driven
           Output << "], ),\n";
-          Output << "], once=True, wlinit=WLInit(\"hg.nedges\", [])),\n";
+          Output << "], once=True, wlinit=WLInit(\"ctx->hg.nedges\", [])),\n";
         }
       }
     }
@@ -720,7 +884,16 @@ public:
     const std::string &varName = decl->getNameAsString();
     if (symbolTable.find(varName) == symbolTable.end()) {
       if (GlobalVariablesToTypeMap.find(varName) == GlobalVariablesToTypeMap.end()) {
-        GlobalVariablesToTypeMap[varName] = decl->getType().getAsString();
+        std::string type = decl->getType().getAsString();
+        std::string declStr = rewriter.getRewrittenText(decl->getSourceRange());
+        std::size_t found = declStr.find("=");
+        std::string value;
+        if (found != std::string::npos) {
+          value = declStr.substr(found, declStr.length()-found);
+        } else {
+          value = "";
+        }
+        GlobalVariablesToTypeMap[varName] = std::make_pair(type, value);
       }
     }
     return true;
@@ -729,20 +902,24 @@ public:
   
 class FunctionDeclHandler : public MatchFinder::MatchCallback {
 private:
-  ASTContext *astContext;
-  Rewriter &rewriter;
+  //ASTContext *astContext;
+  //Rewriter &rewriter;
+  IrGLOrchestratorVisitor orchestratorVisitor;
 public:
   FunctionDeclHandler(ASTContext *context, Rewriter &R): 
-    astContext(context),
-    rewriter(R)
+    //astContext(context),
+    //rewriter(R),
+    orchestratorVisitor(context, R)
   {}
+  const IrGLOrchestratorVisitor& getOrchestrator() {
+    return orchestratorVisitor;
+  }
   virtual void run(const MatchFinder::MatchResult &Results) {
     const CXXMethodDecl* decl = Results.Nodes.getNodeAs<clang::CXXMethodDecl>("graphAlgorithm");
     if (decl) {
       //llvm::errs() << "\nGraph Operator:\n" << 
       //  rewriter.getRewrittenText(decl->getSourceRange()) << "\n";
       //decl->dump();
-      IrGLOrchestratorVisitor orchestratorVisitor(astContext, rewriter);
       orchestratorVisitor.TraverseDecl(const_cast<CXXMethodDecl *>(decl));
     }
   }
@@ -750,22 +927,24 @@ public:
 
 class IrGLFunctionsConsumer : public ASTConsumer {
 private:
-  Rewriter &rewriter;
+  //Rewriter &rewriter;
   MatchFinder Matchers;
   FunctionDeclHandler functionDeclHandler;
 public:
   IrGLFunctionsConsumer(CompilerInstance &CI, Rewriter &R): 
-    rewriter(R), 
+    //rewriter(R), 
     functionDeclHandler(&(CI.getASTContext()), R) 
   {
     Matchers.addMatcher(functionDecl(
-          hasOverloadedOperatorName("()"),
+          hasName("go"),
+          //hasOverloadedOperatorName("()"),
           hasAnyParameter(hasName("_graph"))).
           bind("graphAlgorithm"), &functionDeclHandler);
   }
 
   virtual void HandleTranslationUnit(ASTContext &Context){
     Matchers.matchAST(Context);
+    functionDeclHandler.getOrchestrator().GenerateIrGLASTToFile();
   }
 };
 

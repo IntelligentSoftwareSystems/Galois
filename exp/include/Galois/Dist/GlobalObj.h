@@ -35,8 +35,6 @@ class GlobalObject {
   uint32_t objID;
 
  protected:
-  static uintptr_t ptrForObj(unsigned oid);
-
   GlobalObject(const GlobalObject&) = delete;
   GlobalObject(GlobalObject&&) = delete;
 
@@ -49,6 +47,11 @@ class GlobalObject {
      return all_objects;
   }
   */
+
+  static uintptr_t ptrForObj(unsigned oid) {
+    assert(oid < allobjs().size());
+    return allobjs()[oid];
+  }
 
   template<typename T>
   GlobalObject(const T* ptr) {

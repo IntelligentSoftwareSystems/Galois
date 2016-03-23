@@ -101,6 +101,11 @@ class OfflineGraph {
       file1.seekg(pos, file1.beg);
     T retval;
     file1.read(reinterpret_cast<char*>(&retval), sizeof(T));
+    /*fprintf(stderr, "READ:: %ld[", edge);
+    for(int i=0; i<sizeof(T); ++i){
+       fprintf(stderr, "%c", reinterpret_cast<char*>(&retval)[i]);
+    }
+    fprintf(stderr, "]");*/
     return retval;
   }
 
@@ -155,7 +160,7 @@ public:
 
   template<typename T>
   T getEdgeData(edge_iterator ni) {
-    return edgeData<T>(ni);
+    return edgeData<T>(*ni);
   }
 
 };
