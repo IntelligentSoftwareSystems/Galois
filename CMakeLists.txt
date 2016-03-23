@@ -224,7 +224,7 @@ if(USE_EXP)
       set(MGPU_PATH "${GGC_INCLUDE_PATH}/mgpu/include")
 
       cuda_include_directories( ${GGC_INCLUDE_PATH} ${MGPU_PATH})
-      set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-gencode arch=compute_20,code=sm_20 -gencode arch=compute_35,code=sm_35)
+      set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS};-gencode arch=compute_20,code=sm_20 -gencode arch=compute_30,code=sm_30 -gencode arch=compute_35,code=sm_35 -gencode arch=compute_50,code=sm_50)
       link_directories(${GGC_PATH}/rt/lib)
     else()
       message(FATAL_ERROR "Need CUDA for heterogenous code")
