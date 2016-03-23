@@ -535,7 +535,9 @@ namespace {
       Matchers.addMatcher(callExpr(isExpansionInMainFile(), callee(functionDecl(hasName("Galois::do_all")))).bind("galoisLoop"), &functionCallHandler);
 
       /** for Galois::for_each. Needs different treatment. **/
-      Matchers.addMatcher(callExpr(isExpansionInMainFile(), callee(functionDecl(hasName("Galois::for_each"))), hasAncestor(recordDecl().bind("forEach_caller"))).bind("galoisLoop_forEach"), &forEachHandler);
+      Matchers.addMatcher(callExpr(isExpansionInMainFile(), callee(functionDecl(hasName("Galois::for_each"))), hasDescendant(declRefExpr(to(functionDecl(hasName("workList_version"))))), hasAncestor(recordDecl().bind("forEach_caller"))).bind("galoisLoop_forEach"), &forEachHandler);
+
+      Matchers.addMatcher(callExpr(isExpansionInMainFile(), callee(functionDecl(hasName("Galois::for_each"))), unless(hasDescendant(declRefExpr(to(functionDecl(hasName("workList_version")))))), hasAncestor(recordDecl().bind("forEach_caller"))).bind("galoisLoop"), &functionCallHandler);
     }
 
     virtual void HandleTranslationUnit(ASTContext &Context){
