@@ -322,6 +322,8 @@ public:
   template<typename FnTy>
   void sync_push() {
     void (hGraph::*fn)(Galois::Runtime::RecvBuffer&) = &hGraph::syncRecvApply<FnTy>;
+    Galois::Timer time1, time2;
+    time1.start();
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     for (unsigned x = 0; x < hostNodes.size(); ++x) {
       if (x == id) continue;
@@ -344,15 +346,21 @@ public:
       }
       net.send(x, syncRecv, b);
     }
+    time1.stop();
     //Will force all messages to be processed before continuing
+    time2.start();
+    net.flush();
     Galois::Runtime::getHostBarrier().wait();
+    time2.stop();
+
+    //std::cout << "[" << net.ID <<"] time1 : " << time1.get() << "(msec) time2 : " << time2.get() << "(msec)\n";
   }
 
   template<typename FnTy>
   void sync_pull(){
     void (hGraph::*fn)(Galois::Runtime::RecvBuffer&) = &hGraph::syncPullRecvReply<FnTy>;
     auto& net = Galois::Runtime::getSystemNetworkInterface();
-    Galois::Runtime::getHostBarrier().wait();
+    //Galois::Runtime::getHostBarrier().wait();
     num_recv_expected = 0;
     for(unsigned x = 0; x < hostNodes.size(); ++x){
       if(x == id) continue;
@@ -379,6 +387,7 @@ public:
     }
 
     assert(num_recv_expected == 0);
+    // Can remove this barrier???.
     Galois::Runtime::getHostBarrier().wait();
   }
 
