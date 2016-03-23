@@ -17,10 +17,10 @@ app(clCheck CL_graph_test.cpp DISTSAFE)
 target_link_libraries(clCheck OpenCL)
 
 #app(graphCheck_gen check_gen.cpp CLANGPLUGIN)
-#app(graphCheck_gen check_gen.cpp GlobalObj.cpp DISTSAFE)
+#app(graphCheck_gen check_gen.cpp  DISTSAFE)
 
-#app(HSSSP_gen HSSSP_gen.cpp GlobalObj.cpp DISTSAFE)
-#app(HSSSP_gen2 HSSSP_gen2.cpp GlobalObj.cpp DISTSAFE)
+#app(HSSSP_gen HSSSP_gen.cpp  DISTSAFE)
+#app(HSSSP_gen2 HSSSP_gen2.cpp  DISTSAFE)
 
 #Working HSSSP
 app(HSSSP_gen3 HSSSP_gen3.cpp DISTSAFE)
@@ -51,6 +51,8 @@ app(pageRank_wl pageRank_wl.cpp  DISTSAFE)
 #PageRank generated with worklist
 app(pageRank_wl_gen pageRank_wl_gen.cpp  DISTSAFE)
 
+#PageRank with 2 loop structure
+app(pageRank_2loops_gen pageRank_2loops_gen.cpp DISTSAFE)
 #OpenCL generated code. 
-app(opencl cl_host.cpp DISTSAFE)
-target_link_libraries(opencl OpenCL)
+#app(opencl cl_host.cpp DISTSAFE)
+#target_link_libraries(opencl OpenCL)

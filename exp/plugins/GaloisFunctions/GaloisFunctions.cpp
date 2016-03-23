@@ -62,10 +62,10 @@ namespace {
   public:
     NameSpaceHandler(clang::LangOptions &langOptions) : langOptions(langOptions){}
     virtual void run(const MatchFinder::MatchResult &Results){
-      llvm::errs() << "It is coming here\n"
+      llvm::outs() << "It is coming here\n"
                    << Results.Nodes.getNodeAs<clang::NestedNameSpecifier>("galoisLoop")->getAsNamespace()->getIdentifier()->getName();
       if (const NestedNameSpecifier* NSDecl = Results.Nodes.getNodeAs<clang::NestedNameSpecifier>("galoisLoop")) {
-        llvm::errs() << "Found Galois Loop\n";
+        llvm::outs() << "Found Galois Loop\n";
         //NSDecl->dump(langOptions);
       }
     }
@@ -75,7 +75,7 @@ namespace {
     public:
       virtual void run(const MatchFinder::MatchResult &Results) {
         if (const ForStmt* FS = Results.Nodes.getNodeAs<clang::ForStmt>("forLoop")) {
-          llvm::errs() << "for loop found\n";
+          llvm::outs() << "for loop found\n";
           FS->dump();
         }
       }
@@ -99,58 +99,6 @@ namespace {
     string VAL_TYPE;
   };
 
-  std::string getSyncer(unsigned counter, const Write_set_PUSH& i) {
-    std::stringstream s;
-    s << "\tstruct Syncer_" << counter << " {\n"
-      << "\t\tstatic " << i.VAL_TYPE <<" extract(uint32_t node_id, const " << i.NODE_TYPE << " node) {\n" 
-      << "\t\t#ifdef __GALOIS_HET_CUDA__\n"
-      << "\t\t\tif (personality == GPU_CUDA) return " << "get_node_" << i.FIELD_NAME <<  "_cuda(cuda_ctx, node_id);\n"
-      << "\t\t\tassert (personality == CPU);\n"
-      << "\t\t#endif\n"
-      << "\t\t\treturn " << "node." << i.FIELD_NAME <<  ";\n"
-      << "\t\t}\n"
-      << "\t\tstatic void reduce (uint32_t node_id, " << i.NODE_TYPE << " node, " << i.VAL_TYPE << " y) {\n" 
-      << "\t\t#ifdef __GALOIS_HET_CUDA__\n"
-      /* !!! assumes reduction operation is always addition */
-      << "\t\t\tif (personality == GPU_CUDA) " << "add_node_" << i.FIELD_NAME <<  "_cuda(cuda_ctx, node_id, y);\n"
-      << "\t\t\telse if (personality == CPU)\n"
-      << "\t\t#endif\n"
-      << "\t\t\t\t" << i.REDUCE_OP_EXPR << "\n"
-      << "\t\t}\n"
-      << "\t\tstatic void reset (uint32_t node_id, " << i.NODE_TYPE << " node ) {\n" 
-      << "\t\t#ifdef __GALOIS_HET_CUDA__\n"
-      /* !!! assumes reduction operation is always addition */
-      << "\t\t\tif (personality == GPU_CUDA) " << "set_node_" << i.FIELD_NAME <<  "_cuda(cuda_ctx, node_id, 0);\n"
-      << "\t\t\telse if (personality == CPU)\n"
-      << "\t\t#endif\n"
-      << "\t\t\t\t" << i.RESET_VAL_EXPR << "\n"
-      << "\t\t}\n"
-      << "\t\ttypedef " << i.VAL_TYPE << " ValTy;\n"
-      << "\t};\n";
-    return s.str();
-  }
-
-  std::string getSyncerPull(unsigned counter, const Write_set_PULL& i) {
-    std::stringstream s;
-    s << "\tstruct SyncerPull_" << counter << " {\n"
-      << "\t\tstatic " << i.VAL_TYPE <<" extract(uint32_t node_id, const " << i.NODE_TYPE << " node) {\n"
-      << "\t\t#ifdef __GALOIS_HET_CUDA__\n"
-      << "\t\t\tif (personality == GPU_CUDA) return " << "get_node_" << i.FIELD_NAME <<  "_cuda(cuda_ctx, node_id);\n"
-      << "\t\t\tassert (personality == CPU);\n"
-      << "\t\t#endif\n"
-      << "\t\t\treturn " << "node." << i.FIELD_NAME <<  ";\n"
-      << "\t\t}\n"
-      << "\t\tstatic void setVal (uint32_t node_id, " << i.NODE_TYPE << " node, " << i.VAL_TYPE << " y) " << "{\n"
-      << "\t\t#ifdef __GALOIS_HET_CUDA__\n"
-      << "\t\t\tif (personality == GPU_CUDA) " << "set_node_" << i.FIELD_NAME <<  "_cuda(cuda_ctx, node_id, y);\n"
-      << "\t\t\telse if (personality == CPU)\n"
-      << "\t\t#endif\n"
-      << "\t\t\t\tnode." << i.FIELD_NAME << " = y;\n"
-      << "\t\t}\n"
-      << "\t\ttypedef " << i.VAL_TYPE << " ValTy;\n"
-      << "\t};\n";
-    return s.str();
-  }
 
   class FunctionForEachHandler : public MatchFinder::MatchCallback {
     private:
@@ -159,14 +107,14 @@ namespace {
     public:
       FunctionForEachHandler(Rewriter &rewriter) : rewriter(rewriter){}
       virtual void run(const MatchFinder::MatchResult &Results) {
-        llvm::errs() << "for_each found\n";
+        llvm::outs() << "for_each found\n";
         const CallExpr* callFS = Results.Nodes.getNodeAs<clang::CallExpr>("galoisLoop_forEach");
         auto callerFS = Results.Nodes.getNodeAs<clang::CXXRecordDecl>("forEach_caller");
 
         callerFS->dump();
         if(callFS){
 
-          llvm::errs() << "It is coming here for_Each \n" << callFS->getNumArgs() << "\n";
+          llvm::outs() << "It is coming here for_Each \n" << callFS->getNumArgs() << "\n";
 
           SourceLocation ST_main = callerFS->getSourceRange().getBegin();
 
@@ -188,6 +136,7 @@ namespace {
           vector<pair<string, string>>read_set_vec;
           vector<pair<string,string>>write_set_vec;
           vector<string>write_setGNode_vec;
+          unsigned write_setNum = 0;
           string GraphNode;
 
           vector<Write_set_PUSH> write_set_vec_PUSH;
@@ -206,10 +155,10 @@ namespace {
               func->dump();
               if(func) {
                 if (func->getNameInfo().getName().getAsString() == "read_set"){
-                  llvm::errs() << "Inside arg read_set: " << i <<  s.str() << "\n\n";
+                  llvm::outs() << "Inside arg read_set: " << i <<  s.str() << "\n\n";
                 }
                 if (func->getNameInfo().getName().getAsString() == "write_set"){
-                  llvm::errs() << "Inside arg write_set: " << i <<  s.str() << "\n\n";
+                  llvm::outs() << "Inside arg write_set: " << i <<  s.str() << "\n\n";
 
                   // Take out first argument to see if it is push or pull
                   string str_sub_arg;
@@ -240,7 +189,7 @@ namespace {
                         temp_str.erase(0,1);
                       }
 
-                      llvm::errs() << " ------- > " << temp_str << "\n";
+                      llvm::outs() << " ------- > " << temp_str << "\n";
                       Temp_vec_PUSH.push_back(temp_str);
 
                     }
@@ -293,7 +242,15 @@ namespace {
             stringstream SSSyncer;
             unsigned counter = 0;
             for(auto i : write_set_vec_PUSH) {
-              SSSyncer << getSyncer(counter, i);
+              SSSyncer << "\tstruct Syncer_" << counter << " {\n"
+                << "\t\tstatic " << i.VAL_TYPE <<" extract( const " << i.NODE_TYPE << " node)" << "{ return " << "node." << i.FIELD_NAME <<  "; }\n"
+                <<"\t\tstatic void reduce (" << i.NODE_TYPE << " node, " << i.VAL_TYPE << " y) "
+                << i.REDUCE_OP_EXPR << "\n"
+                <<"\t\tstatic void reset (" << i.NODE_TYPE << " node )" << i.RESET_VAL_EXPR << "\n"
+                <<"\t\ttypedef " << i.VAL_TYPE << " ValTy;\n"
+                <<"\t};\n";
+
+
               rewriter.InsertText(ST_main, SSSyncer.str(), true, true);
               SSSyncer.str(string());
               SSSyncer.clear();
@@ -304,7 +261,13 @@ namespace {
             stringstream SSSyncer_pull;
             counter = 0;
             for(auto i : write_set_vec_PULL) {
-              SSSyncer_pull << getSyncerPull(counter, i);
+              SSSyncer_pull << "\tstruct SyncerPull_" << counter << " {\n"
+                << "\t\tstatic " << i.VAL_TYPE <<" extract( const " << i.NODE_TYPE << " node)" << "{ return " << "node." << i.FIELD_NAME <<  "; }\n"
+                <<"\t\tstatic void setVal (" << i.NODE_TYPE << " node, " << i.VAL_TYPE << " y) "
+                << "{node." << i.FIELD_NAME << " = y; }\n"
+                <<"\t\ttypedef " << i.VAL_TYPE << " ValTy;\n"
+                <<"\t};\n";
+
               rewriter.InsertText(ST_main, SSSyncer_pull.str(), true, true);
               SSSyncer_pull.str(string());
               SSSyncer_pull.clear();
@@ -326,19 +289,6 @@ namespace {
             SSHelperStructFunctions.str(string());
             SSHelperStructFunctions.clear();
 
-            auto recordDecl = Results.Nodes.getNodeAs<clang::CXXRecordDecl>("class");
-            std::string className = recordDecl->getNameAsString();
-            
-            stringstream kernelBefore;
-            kernelBefore << "#ifdef __GALOIS_HET_CUDA__\n";
-            kernelBefore << "\tif (personality == GPU_CUDA) {\n";
-            kernelBefore << "\t\t" << className << "_cuda();\n";
-            kernelBefore << "\t} else if (personality == CPU)\n";
-            kernelBefore << "#endif\n";
-            rewriter.InsertText(ST_main, kernelBefore.str(), true, true);
-
-            SourceLocation ST = callFS->getSourceRange().getEnd().getLocWithOffset(2);
-
             //Get_info_functor(GraphTy& _g): graph(_g){}
             // Adding Syn calls for write set
             stringstream SSAfter;
@@ -348,19 +298,19 @@ namespace {
               SSAfter.clear();
               //SSAfter <<"\n" <<write_set_vec_PUSH[i].GRAPH_NAME<< ".sync_push<Syncer_" << i << ">" <<"();\n";
               SSAfter <<"\n" << "\t\t_graph.sync_push<Syncer_" << i << ">" <<"();\n";
-              rewriter.InsertText(ST, SSAfter.str(), true, true);
+              rewriter.InsertText(ST_main, SSAfter.str(), true, true);
             }
             //For sync Pull
             for (unsigned i = 0; i < write_set_vec_PULL.size(); i++) {
               SSAfter.str(string());
               SSAfter.clear();
               SSAfter <<"\n" << "\t\t_graph.sync_pull<SyncerPull_" << i << ">" <<"();\n";
-              rewriter.InsertText(ST, SSAfter.str(), true, true);
+              rewriter.InsertText(ST_main, SSAfter.str(), true, true);
             }
 
             // closing helpFunction struct
             SSHelperStructFunctions << "\t}\n};\n\n";
-            rewriter.InsertText(ST, SSHelperStructFunctions.str(), true, true);
+            rewriter.InsertText(ST_main, SSHelperStructFunctions.str(), true, true);
             SSHelperStructFunctions.str(string());
             SSHelperStructFunctions.clear();
 
@@ -378,18 +328,17 @@ namespace {
   class FunctionCallHandler : public MatchFinder::MatchCallback {
     private:
       Rewriter &rewriter;
-
     public:
       FunctionCallHandler(Rewriter &rewriter) :  rewriter(rewriter){}
       virtual void run(const MatchFinder::MatchResult &Results) {
         const CallExpr* callFS = Results.Nodes.getNodeAs<clang::CallExpr>("galoisLoop");
-        llvm::errs() << "It is coming here\n" << callFS->getNumArgs() << "\n";
+        llvm::outs() << "It is coming here\n" << callFS->getNumArgs() << "\n";
 
         if(callFS){
 
           SourceLocation ST_main = callFS->getSourceRange().getBegin();
 
-          llvm::errs() << "Galois::do_All loop found\n";
+          llvm::outs() << "Galois::do_All loop found\n";
 
           //Get the arguments:
           clang::LangOptions LangOpts;
@@ -400,6 +349,7 @@ namespace {
           vector<pair<string, string>>read_set_vec;
           vector<pair<string,string>>write_set_vec;
           vector<string>write_setGNode_vec;
+          unsigned write_setNum = 0;
           string GraphNode;
 
           vector<Write_set_PUSH> write_set_vec_PUSH;
@@ -409,7 +359,7 @@ namespace {
              string str_first;
              llvm::raw_string_ostream s_first(str_first);
              callFS->getArg(0)->printPretty(s_first, 0, Policy);
-          //llvm::errs() << " //////// > " << s_first.str() << "\n";
+          //llvm::outs() << " //////// > " << s_first.str() << "\n";
           callFS->getArg(0)->dump();
           */
 
@@ -427,10 +377,10 @@ namespace {
               func->dump();
               if(func) {
                 if (func->getNameInfo().getName().getAsString() == "read_set"){
-                  llvm::errs() << "Inside arg read_set: " << i <<  s.str() << "\n\n";
+                  llvm::outs() << "Inside arg read_set: " << i <<  s.str() << "\n\n";
                 }
                 if (func->getNameInfo().getName().getAsString() == "write_set"){
-                  llvm::errs() << "Inside arg write_set: " << i <<  s.str() << "\n\n";
+                  llvm::outs() << "Inside arg write_set: " << i <<  s.str() << "\n\n";
 
                   // Take out first argument to see if it is push or pull
                   string str_sub_arg;
@@ -461,7 +411,7 @@ namespace {
                         temp_str.erase(0,1);
                       }
 
-                      llvm::errs() << " ------- > " << temp_str << "\n";
+                      llvm::outs() << " ------- > " << temp_str << "\n";
                       Temp_vec_PUSH.push_back(temp_str);
 
                     }
@@ -514,7 +464,16 @@ namespace {
             stringstream SSSyncer;
             unsigned counter = 0;
             for(auto i : write_set_vec_PUSH) {
-              SSSyncer << getSyncer(counter, i);
+              SSSyncer << " struct Syncer_" << counter << " {\n"
+                << "\tstatic " << i.VAL_TYPE <<" extract( const " << i.NODE_TYPE << " node)" << "{ return " << "node." << i.FIELD_NAME <<  "; }\n"
+                <<"\tstatic void reduce (" << i.NODE_TYPE << " node, " << i.VAL_TYPE << " y) "
+                << i.REDUCE_OP_EXPR << "\n"
+                //<<"\tstatic void reset (" << i.NODE_TYPE << " node ) { node." << i.FIELD_NAME << " = " << i.RESET_VAL_EXPR << "; }\n" 
+                <<"\tstatic void reset (" << i.NODE_TYPE << " node )" << i.RESET_VAL_EXPR << "\n"
+                <<"\ttypedef " << i.VAL_TYPE << " ValTy;\n"
+                <<"};\n";
+
+
               rewriter.InsertText(ST_main, SSSyncer.str(), true, true);
               SSSyncer.str(string());
               SSSyncer.clear();
@@ -525,28 +484,22 @@ namespace {
             stringstream SSSyncer_pull;
             counter = 0;
             for(auto i : write_set_vec_PULL) {
-              SSSyncer_pull << getSyncerPull(counter, i);
+              SSSyncer_pull << " struct SyncerPull_" << counter << " {\n"
+                << "\tstatic " << i.VAL_TYPE <<" extract( const " << i.NODE_TYPE << " node)" << "{ return " << "node." << i.FIELD_NAME <<  "; }\n"
+                <<"\tstatic void setVal (" << i.NODE_TYPE << " node, " << i.VAL_TYPE << " y) "
+                << "{node." << i.FIELD_NAME << " = y; }\n"
+                <<"\ttypedef " << i.VAL_TYPE << " ValTy;\n"
+                <<"};\n";
+
               rewriter.InsertText(ST_main, SSSyncer_pull.str(), true, true);
               SSSyncer_pull.str(string());
               SSSyncer_pull.clear();
               ++counter;
             }
 
-            auto recordDecl = Results.Nodes.getNodeAs<clang::CXXRecordDecl>("class");
-            std::string className = recordDecl->getNameAsString();
-            
-            stringstream kernelBefore;
-            kernelBefore << "#ifdef __GALOIS_HET_CUDA__\n";
-            kernelBefore << "\tif (personality == GPU_CUDA) {\n";
-            kernelBefore << "\t\t" << className << "_cuda(cuda_ctx);\n";
-            kernelBefore << "\t} else if (personality == CPU)\n";
-            kernelBefore << "#endif\n";
-            rewriter.InsertText(ST_main, kernelBefore.str(), true, true);
-
-            SourceLocation ST = callFS->getSourceRange().getEnd().getLocWithOffset(2);
-
             // Adding Syn calls for write set
             stringstream SSAfter;
+            SourceLocation ST = callFS->getSourceRange().getEnd().getLocWithOffset(2);
             for (unsigned i = 0; i < write_set_vec_PUSH.size(); i++) {
               SSAfter.str(string());
               SSAfter.clear();
@@ -579,10 +532,12 @@ namespace {
     FunctionForEachHandler forEachHandler;
   public:
     GaloisFunctionsConsumer(CompilerInstance &Instance, std::set<std::string> ParsedTemplates, Rewriter &R): Instance(Instance), ParsedTemplates(ParsedTemplates), Visitor(new GaloisFunctionsVisitor(&Instance)), functionCallHandler(R), forEachHandler(R) {
-      Matchers.addMatcher(callExpr(isExpansionInMainFile(), callee(functionDecl(hasName("Galois::do_all"))), hasAncestor(recordDecl().bind("class"))).bind("galoisLoop"), &functionCallHandler);
+      Matchers.addMatcher(callExpr(isExpansionInMainFile(), callee(functionDecl(hasName("Galois::do_all")))).bind("galoisLoop"), &functionCallHandler);
 
       /** for Galois::for_each. Needs different treatment. **/
-      Matchers.addMatcher(callExpr(isExpansionInMainFile(), callee(functionDecl(hasName("Galois::for_each"))), hasAncestor(recordDecl().bind("class"))).bind("galoisLoop_forEach"), &forEachHandler);
+      Matchers.addMatcher(callExpr(isExpansionInMainFile(), callee(functionDecl(hasName("Galois::for_each"))), hasDescendant(declRefExpr(to(functionDecl(hasName("workList_version"))))), hasAncestor(recordDecl().bind("forEach_caller"))).bind("galoisLoop_forEach"), &forEachHandler);
+
+      Matchers.addMatcher(callExpr(isExpansionInMainFile(), callee(functionDecl(hasName("Galois::for_each"))), unless(hasDescendant(declRefExpr(to(functionDecl(hasName("workList_version")))))), hasAncestor(recordDecl().bind("forEach_caller"))).bind("galoisLoop"), &functionCallHandler);
     }
 
     virtual void HandleTranslationUnit(ASTContext &Context){
@@ -600,7 +555,7 @@ namespace {
       TheRewriter.getEditBuffer(TheRewriter.getSourceMgr().getMainFileID()).write(llvm::outs());
       if (!TheRewriter.overwriteChangedFiles())
       {
-        llvm::errs() << "Successfully saved changes\n";
+        llvm::outs() << "Successfully saved changes\n";
       }
 
     }

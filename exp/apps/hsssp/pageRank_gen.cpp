@@ -34,8 +34,8 @@
 #include "Galois/Runtime/CompilerHelperFunctions.h"
 #include "Galois/Runtime/Tracer.h"
 
-#include "OfflineGraph.h"
-#include "hGraph.h"
+#include "Galois/Dist/OfflineGraph.h"
+#include "Galois/Dist/hGraph.h"
 
 static const char* const name = "PageRank - Compiler Generated Distributed Heterogeneous";
 static const char* const desc = "Residual PageRank on Distributed Galois.";
@@ -64,6 +64,7 @@ struct InitializeGraph {
   Graph* graph;
 
   void static go(Graph& _graph) {
+
      struct Syncer_0 {
     	static float extract( const struct PR_NodeData & node){ return node.residual; }
     	static void reduce (struct PR_NodeData & node, float y) { Galois::atomicAdd(node.residual, y);}
@@ -82,9 +83,7 @@ struct InitializeGraph {
     };
     Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ &_graph }, Galois::loopname("Init"), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "value" , "float"), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "nout" , "unsigned int"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ Galois::atomicAdd(node.residual, y);}",  "0"));
     _graph.sync_push<Syncer_0>();
-    
     _graph.sync_pull<SyncerPull_0>();
-    
     _graph.sync_pull<SyncerPull_1>();
     
   }
@@ -135,20 +134,26 @@ struct PageRank {
     	typedef float ValTy;
     };
 
-     Galois::Timer T_compute, T_comm;
+     Galois::Timer T_compute, T_comm, T_comm_push, T_comm_pull;
 
     T_compute.start(); 
     Galois::do_all(_graph.begin(), _graph.end(), PageRank { &_graph }, Galois::loopname("pageRank"), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "value" , "float"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ Galois::atomicAdd(node.residual, y);}",  "0"));
     T_compute.stop();
 
     T_comm.start();
+    T_comm_push.start();
     _graph.sync_push<Syncer_0>();
+    T_comm_push.stop();
 
-    _graph.sync_pull<SyncerPull_0>();
+    T_comm_pull.start();
+    //_graph.sync_pull<SyncerPull_0>();
+    T_comm_pull.stop();
     T_comm.stop();
 
 
-    std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID  << "] T_compute : " << T_compute.get() << "(msec)  T_comm : " << T_comm.get() << "(msec)\n";
+    //std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID  << "] T_compute : " << T_compute.get() << "(msec)  T_comm : " << T_comm.get() << "(msec)\n";
+    //std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID  << "] T_comm_total : " << T_comm.get()  <<"(msec) T_comm_push : " << T_comm_push.get() << "(msec)  T_comm_pull : " << T_comm_pull.get() << "(msec)\n";
+  
 
   }
 
@@ -196,7 +201,7 @@ int main(int argc, char** argv) {
     T_init.stop();
 
     // Verify
-    /*
+    
     if(verify){
       if(net.ID == 0) {
         for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
@@ -204,7 +209,6 @@ int main(int argc, char** argv) {
         }
       }
     }
-    */
 
     std::cout << "PageRank::go called  on " << net.ID << "\n";
     T_pageRank.start();
@@ -246,6 +250,7 @@ int main(int argc, char** argv) {
     T_pageRank.stop();
 
     // Verify
+
     /*
     if(verify){
       if(net.ID == 0) {
@@ -256,13 +261,15 @@ int main(int argc, char** argv) {
     }
     */
 
+
     T_total.stop();
 
     std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " PageRank (" << maxIterations << ") : " << T_pageRank.get() << "(msec)\n\n";
 
     if(verify){
       for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
-        Galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).value);
+        std::cout << "[" << *ii << "]  " << hg.getData(*ii).value << "\n";
+        //Galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).value);
       }
     }
     return 0;

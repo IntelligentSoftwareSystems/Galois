@@ -25,41 +25,38 @@
  */
 #include <vector>
 #include <cstdint>
+#include <cassert>
 
 #ifndef _GALOIS_DIST_GLOBAL_OBJECT_H
 #define _GALOIS_DIST_GLOBAL_OBJECT_H
 class GlobalObject {
   //FIXME: lock?
-//  static std::vector<uintptr_t> allobjs;
+  static std::vector<uintptr_t> allobjs;
   uint32_t objID;
 
  protected:
   GlobalObject(const GlobalObject&) = delete;
   GlobalObject(GlobalObject&&) = delete;
 
-  /*
-   * Replace a global var with a static. No longer needs a separate cpp file.
-   * */
-  static std::vector<uintptr_t> & allobjs(){
-     static std::vector<uintptr_t> all_objects;
-     return all_objects;
-  }
-
-  static uintptr_t ptrForObj(unsigned oid) {
-    assert(oid < allobjs().size());
-    return allobjs()[oid];
-  }
+  static uintptr_t ptrForObj(unsigned oid);
 
   template<typename T>
   GlobalObject(const T* ptr) {
-    objID = GlobalObject::allobjs().size();
-    GlobalObject::allobjs().push_back(reinterpret_cast<uintptr_t>(ptr));
+    objID = allobjs.size();
+    allobjs.push_back(reinterpret_cast<uintptr_t>(ptr));
   }
 
   uint32_t idForSelf() const {
     return objID;
   }
 };
+
+std::vector<uintptr_t> GlobalObject::allobjs;
+
+uintptr_t GlobalObject::ptrForObj(unsigned oid){
+  assert(oid < allobjs.size());
+  return allobjs[oid];
+}
 
 
 #endif//_GALOIS_DIST_GLOBAL_OBJECT_H
