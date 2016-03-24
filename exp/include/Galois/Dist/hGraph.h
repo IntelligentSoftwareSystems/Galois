@@ -47,7 +47,7 @@ template<typename NodeTy, typename EdgeTy, bool BSPNode=false, bool BSPEdge=fals
 class hGraph : public GlobalObject {
 
   typedef typename std::conditional<BSPNode, std::pair<NodeTy, NodeTy>,NodeTy>::type realNodeTy;
-  typedef typename std::conditional<BSPNode, std::pair<EdgeTy, EdgeTy>,EdgeTy>::type realEdgeTy;
+  typedef typename std::conditional<BSPEdge, std::pair<EdgeTy, EdgeTy>,EdgeTy>::type realEdgeTy;
 
   typedef Galois::Graph::LC_CSR_Graph<realNodeTy, realEdgeTy> GraphTy;
 
@@ -119,6 +119,17 @@ class hGraph : public GlobalObject {
   }
 
   template<bool en, typename std::enable_if<en>::type* = nullptr>
+    const NodeTy& getDataImpl(typename GraphTy::GraphNode N, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) const{
+      auto& r = graph.getData(N, mflag);
+      return round ? r.first : r.second;
+    }
+
+    template<bool en, typename std::enable_if<!en>::type* = nullptr>
+    const NodeTy& getDataImpl(typename GraphTy::GraphNode N, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) const{
+      auto& r = graph.getData(N, mflag);
+      return r;
+    }
+  template<bool en, typename std::enable_if<en>::type* = nullptr>
   typename GraphTy::edge_data_reference getEdgeDataImpl(typename GraphTy::edge_iterator ni, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) {
     auto& r = graph.getEdgeData(ni, mflag);
     return round ? r.first : r.second;
@@ -159,7 +170,7 @@ public:
       }
       */
       assert(isOwned(gid));
-      FnTy::reduce((gid - globalOffset), getData(gid - globalOffset), val);
+      FnTy::reduce(getData(gid - globalOffset), val);
     }
   }
 
@@ -177,7 +188,7 @@ public:
       typename FnTy::ValTy old_val, val;
       Galois::Runtime::gDeserialize(buf, gid, old_val);
       assert(isOwned(gid));
-      val = FnTy::extract((gid - globalOffset), getData((gid - globalOffset)));
+      val = FnTy::extract(getData((gid - globalOffset)));
       if (net.ID == 0) {
         //std::cout << "PullApply step1 : [" << net.ID << "] "<< " to : " << from_id << " : [" << gid - globalOffset << "] : " << val << "\n";
       }
@@ -206,7 +217,7 @@ public:
       if (net.ID == 1) {
         //std::cout << "PullApply Step2 : [" << net.ID << "]  : [" << LocalId << "] : " << val << "\n";
       }
-      FnTy::setVal(LocalId, getData(LocalId), val);
+      FnTy::setVal(getData(LocalId), val);
     }
     --num_recv_expected;
   }
@@ -222,7 +233,7 @@ public:
 
   //hGraph construction is collective
   hGraph(const std::string& filename, unsigned host, unsigned numHosts)
-    :GlobalObject(this), id(host)
+    :GlobalObject(this), id(host),round(false)
   {
     OfflineGraph g(filename);
     //std::cerr << "Offline Graph Done\n";
@@ -276,26 +287,51 @@ public:
     
     graph.constructNodes();
     //std::cerr << "Construct nodes done\n";
+    loadEdges<std::is_void <EdgeTy>::value>(g);
+  }
 
-    uint64_t cur = 0;
-    for (auto n = gid2host[id].first; n < gid2host[id].second; ++n) {
-      for (auto ii = g.edge_begin(n), ee = g.edge_end(n); ii < ee; ++ii) {
-        auto gdst = g.getEdgeDst(ii);
-        decltype(gdst) ldst = G2L(gdst);
-        graph.constructEdge(cur++, ldst);
-      }
-      graph.fixEndEdge(G2L(n), cur);
-    }
-    //std::cerr << "Construct edges done\n";
+  template<bool isVoidType, typename std::enable_if<!isVoidType>::type* = nullptr>
+  void loadEdges(OfflineGraph & g){
+     fprintf(stderr, "Loading edge-data while creating edges.\n");
+     uint64_t cur = 0;
+     for (auto n = gid2host[id].first; n < gid2host[id].second; ++n) {
+           for (auto ii = g.edge_begin(n), ee = g.edge_end(n); ii < ee; ++ii) {
+             auto gdst = g.getEdgeDst(ii);
+             decltype(gdst) ldst = G2L(gdst);
+             auto gdata = g.getEdgeData<EdgeTy>(ii);
+             graph.constructEdge(cur++, ldst, gdata);
+           }
+           graph.fixEndEdge(G2L(n), cur);
+         }
+  }
+  template<bool isVoidType, typename std::enable_if<isVoidType>::type* = nullptr>
+  void loadEdges(OfflineGraph & g){
+     fprintf(stderr, "Loading void edge-data while creating edges.\n");
+     uint64_t cur = 0;
+     for (auto n = gid2host[id].first; n < gid2host[id].second; ++n) {
+           for (auto ii = g.edge_begin(n), ee = g.edge_end(n); ii < ee; ++ii) {
+             auto gdst = g.getEdgeDst(ii);
+             decltype(gdst) ldst = G2L(gdst);
+             graph.constructEdge(cur++, ldst);
+           }
+           graph.fixEndEdge(G2L(n), cur);
+         }
+
   }
 
   NodeTy& getData(GraphNode N, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) {
     auto& r = getDataImpl<BSPNode>(N, mflag);
-    auto i =Galois::Runtime::NetworkInterface::ID;
+//    auto i =Galois::Runtime::NetworkInterface::ID;
     //std::cerr << i << " " << N << " " <<&r << " " << r.dist_current << "\n";
     return r;
   }
 
+  const NodeTy& getData(GraphNode N, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) const{
+    auto& r = getDataImpl<BSPNode>(N, mflag);
+//    auto i =Galois::Runtime::NetworkInterface::ID;
+    //std::cerr << i << " " << N << " " <<&r << " " << r.dist_current << "\n";
+    return r;
+  }
   typename GraphTy::edge_data_reference getEdgeData(edge_iterator ni, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) {
     return getEdgeDataImpl<BSPEdge>(ni, mflag);
   }
@@ -328,6 +364,8 @@ public:
   template<typename FnTy>
   void sync_push() {
     void (hGraph::*fn)(Galois::Runtime::RecvBuffer&) = &hGraph::syncRecvApply<FnTy>;
+    Galois::Timer time1, time2;
+    time1.start();
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     for (unsigned x = 0; x < hostNodes.size(); ++x) {
       if (x == id) continue;
@@ -345,20 +383,26 @@ public:
           assert(gid < totalNodes);
         }
         //std::cout << net.ID << " send (" << gid << ") " << start << " " << FnTy::extract(start, getData(start)) << "\n";
-        gSerialize(b, gid, FnTy::extract(start, getData(start)));
-        FnTy::reset(start, getData(start));
+        gSerialize(b, gid, FnTy::extract(getData(start)));
+        FnTy::reset(getData(start));
       }
       net.send(x, syncRecv, b);
     }
+    time1.stop();
     //Will force all messages to be processed before continuing
+    time2.start();
+    net.flush();
     Galois::Runtime::getHostBarrier().wait();
+    time2.stop();
+
+    //std::cout << "[" << net.ID <<"] time1 : " << time1.get() << "(msec) time2 : " << time2.get() << "(msec)\n";
   }
 
   template<typename FnTy>
   void sync_pull(){
     void (hGraph::*fn)(Galois::Runtime::RecvBuffer&) = &hGraph::syncPullRecvReply<FnTy>;
     auto& net = Galois::Runtime::getSystemNetworkInterface();
-    Galois::Runtime::getHostBarrier().wait();
+    //Galois::Runtime::getHostBarrier().wait();
     num_recv_expected = 0;
     for(unsigned x = 0; x < hostNodes.size(); ++x){
       if(x == id) continue;
@@ -371,7 +415,7 @@ public:
       for (; start != end; ++start) {
         auto gid = L2G(start);
         //std::cout << net.ID << " PULL send (" << gid << ") " << start << " " << FnTy::extract(start, getData(start)) << "\n";
-        gSerialize(b, gid, FnTy::extract(start, getData(start)));
+        gSerialize(b, gid, FnTy::extract(getData(start)));
       }
       net.send(x, syncRecv, b);
       ++num_recv_expected;
@@ -385,6 +429,7 @@ public:
     }
 
     assert(num_recv_expected == 0);
+    // Can remove this barrier???.
     Galois::Runtime::getHostBarrier().wait();
   }
 
@@ -404,7 +449,12 @@ public:
     }
     return -1;
   }
-
+  uint32_t getNumOwned()const{
+     return numOwned;
+  }
+  uint64_t getGlobalOffset()const{
+     return globalOffset;
+  }
 #ifdef __GALOIS_HET_CUDA__
   MarshalGraph getMarshalGraph(unsigned host_id) {
      MarshalGraph m;

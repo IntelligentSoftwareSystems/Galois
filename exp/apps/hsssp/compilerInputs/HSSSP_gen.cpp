@@ -23,7 +23,6 @@
  * Compute Single Source Shortest Path on distributed Galois.
  *
  * @author Gurbinder Gill <gurbinder533@gmail.com>
- * @author Rashid Kaleem <rashid.kaleem@gmail.com>
  */
 
 #include <iostream>
@@ -33,8 +32,8 @@
 #include "Lonestar/BoilerPlate.h"
 #include "Galois/Runtime/CompilerHelperFunctions.h"
 
-#include "OfflineGraph.h"
-#include "hGraph.h"
+#include "Galois/Dist/OfflineGraph.h"
+#include "Galois/Dist/hGraph.h"
 
 
 static const char* const name = "SSSP - Distributed Heterogeneous";
@@ -43,7 +42,7 @@ static const char* const url = 0;
 
 namespace cll = llvm::cl;
 static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
-static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations"), cll::init(4));
+static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations"), cll::init(100));
 static cll::opt<unsigned int> src_node("srcNodeId", cll::desc("ID of the source node"), cll::init(0));
 static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"), cll::init(false));
 
@@ -84,12 +83,8 @@ struct SSSP {
     for (auto jj = graph->edge_begin(src), ej = graph->edge_end(src); jj != ej; ++jj) {
       GNode dst = graph->getEdgeDst(jj);
       auto& dnode = graph->getData(dst);
-//      std::atomic<int>& ddist = dnode.dist_current;
-      int old_dist = dnode.dist_current;
       int new_dist = graph->getEdgeData(jj) + sdist;
-      while (old_dist > new_dist){
-        dnode.dist_current.compare_exchange_strong(old_dist, new_dist);
-      }
+      Galois::atomicMin(dnode.dist_current, new_dist);
     }
   }
 };
@@ -113,10 +108,13 @@ int main(int argc, char** argv) {
     T_init.stop();
 
     // Set node 0 to be source.
-    if(net.ID == 0)
-      hg.getData(src_node).dist_current = 0;
+    if(net.ID == 0){
+       auto & nd = hg.getData(src_node);
+       nd.dist_current = 0;
+    }
 
     // Verify
+/*
     if(verify){
       if(net.ID == 0) {
         for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
@@ -124,6 +122,7 @@ int main(int argc, char** argv) {
         }
       }
     }
+*/
 
 
     std::cout << "SSSP::go called\n";
@@ -137,7 +136,7 @@ int main(int argc, char** argv) {
     // Verify
     if(verify){
       if(net.ID == 0) {
-        for(auto ii = hg.begin(); ii != hg.begin() + 8; ++ii) {
+        for(auto ii = hg.begin(); ii != hg.end() ; ++ii) {
           std::cout << "[" << *ii << "]  " << hg.getData(*ii).dist_current << "\n";
         }
       }

@@ -7,6 +7,7 @@
 #include <vector>
 #include <map>
 #include <regex>
+#include <algorithm>
 #include "clang/Frontend/FrontendPluginRegistry.h"
 #include "clang/AST/AST.h"
 #include "clang/AST/ASTConsumer.h"
@@ -37,6 +38,8 @@ using namespace std;
 static const TypeMatcher AnyType = anything();
 namespace {
 
+
+  /**************************** Helper Functions: start *****************************/
   /* Convert double to string with specified number of places after the decimal
    *    and left padding. */
   template<typename ty>
@@ -83,6 +86,20 @@ void split(const string& s, char delim, std::vector<string>& elems) {
   }
 }
 
+/** Check for a duplicate entry in the map **/
+template <typename EntryTy>
+bool syncPull_reduction_exists(EntryTy entry, vector<EntryTy> entry_vec){
+  if(entry_vec.size() == 0){
+    return false;
+  }
+  for(auto it : entry_vec){
+    if((it.SYNC_TYPE == "syncPull") && (it.FIELD_NAME == entry.FIELD_NAME) && (it.FIELD_TYPE == entry.FIELD_TYPE) && (it.NODE_TYPE == entry.NODE_TYPE) && (it.GRAPH_NAME == entry.GRAPH_NAME))
+      return false;
+  }
+  return true;
+}
+
+/**************************** Helper Functions: End *****************************/
 
 
 class GaloisFunctionsVisitor : public RecursiveASTVisitor<GaloisFunctionsVisitor> {
@@ -165,6 +182,13 @@ class GaloisFunctionsVisitor : public RecursiveASTVisitor<GaloisFunctionsVisitor
     string SYNC_TYPE;
   };
 
+  struct FirstIter_struct_entry{
+    //pair: type, varName
+    vector<pair<string,string>> MEMBER_FIELD_VEC;
+    string OPERATOR_ARG;
+    string OPERATOR_BODY;
+  };
+
   class InfoClass {
     public:
       map<string, vector<Graph_entry>> graphs_map;
@@ -172,6 +196,7 @@ class GaloisFunctionsVisitor : public RecursiveASTVisitor<GaloisFunctionsVisitor
       map<string, vector<getData_entry>> edgeData_map;
       map<string, vector<NodeField_entry>> fieldData_map;
       map<string, vector<ReductionOps_entry>> reductionOps_map;
+      map<string, vector<FirstIter_struct_entry>> FirstItr_struct_map;
   };
 
 
@@ -185,7 +210,7 @@ class TypedefHandler :  public MatchFinder::MatchCallback {
       //llvm::outs() << "GlobalID : " << typedefDecl->getGlobalID() << "\n";
       string Graph_name = typedefDecl->getNameAsString();
       llvm::outs() << "--->" << Graph_name << "\n";
-      typedefDecl->dump();
+      //typedefDecl->dump();
       auto templatePtr = typedefDecl->getTypeForDecl()->getAs<TemplateSpecializationType>();
       if (templatePtr) {
         Graph_entry g_entry;
@@ -327,7 +352,6 @@ class CallExprHandler : public MatchFinder::MatchCallback {
               if (varName_edgeDst == argument_getData)
               {
 
-
                 if(varDecl_stmt_getData) {
                   auto varDecl_getData = Results.Nodes.getNodeAs<clang::VarDecl>("getData_varName");
                   llvm::outs() << "varname getData : "  << varDecl_getData->getNameAsString() << "\n";
@@ -464,7 +488,7 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
         clang::PrintingPolicy Policy(LangOpts);
 
         auto forVector = Results.Nodes.getNodeAs<clang::CXXBindTemporaryExpr>("forVector");
-        forVector->dump();
+        //forVector->dump();
         for(auto i : info->getData_map) {
           for(auto j : i.second) {
             //llvm::outs() << j.VAR_NAME << "\n";
@@ -549,7 +573,7 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
                 field_entry.FIELD_NAME = reduceOP_entry.FIELD_NAME = elems[1];
                 field_entry.GRAPH_NAME = reduceOP_entry.GRAPH_NAME = j.GRAPH_NAME;
                 if(assignmentOP_vec) {
-                  assignmentOP_vec->dump();
+                  //assignmentOP_vec->dump();
                 }
                 if(!field && (assignplusOP || plusOP || assignmentOP || atomicAdd_op || plusOP_vec || assignmentOP_vec)) {
                   reduceOP_entry.SYNC_TYPE = "sync_pull";
@@ -666,6 +690,11 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
             string str_assignment_vec = "equalOpVec_" + j.VAR_NAME+ "_" + i.first;
             string str_plusOp_vec = "plusEqualOpVec_" + j.VAR_NAME+ "_" + i.first;
 
+            /** Sync pull variables **/
+            string str_syncPull_var = "syncPullVar_" + j.VAR_NAME + "_" + i.first;
+
+            
+
             if(j.IS_REFERENCED && j.IS_REFERENCE){
               auto field = Results.Nodes.getNodeAs<clang::VarDecl>(str_varDecl);
               auto assignmentOP = Results.Nodes.getNodeAs<clang::Stmt>(str_assignment);
@@ -683,6 +712,11 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
               /** Vector operations **/
               auto plusOP_vec = Results.Nodes.getNodeAs<clang::Stmt>(str_plusOp_vec);
               auto assignmentOP_vec = Results.Nodes.getNodeAs<clang::Stmt>(str_assignment_vec);
+
+              /** Sync Pull variables **/
+              auto syncPull_var = Results.Nodes.getNodeAs<clang::VarDecl>(str_syncPull_var);
+
+              
 
               //memExpr->dump();
               if(memExpr){
@@ -734,7 +768,17 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                 field_entry.GRAPH_NAME = reduceOP_entry.GRAPH_NAME = j.GRAPH_NAME;
                 reduceOP_entry.SYNC_TYPE = "sync_push";
 
-
+                if(syncPull_var){
+                  //syncPull_var->dumpColor();
+                  if(syncPull_var->isReferenced()){
+                    reduceOP_entry.SYNC_TYPE = "sync_pull";
+                    /** check for duplicate **/
+                    if(!syncPull_reduction_exists(reduceOP_entry, info->reductionOps_map[i.first])){
+                      info->reductionOps_map[i.first].push_back(reduceOP_entry);
+                    }
+                  }
+                  break;
+                }
 
                 if(assignplusOP) {
                   //assignplusOP->dump();
@@ -812,7 +856,7 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                     reduceOP_entry.OPERATION_EXPR = reduceOP;
                     string resetValExpr = "{node." + field_entry.FIELD_NAME + " = std::numeric_limits<" + field_entry.RESET_VALTYPE + ">::max()";
                     reduceOP_entry.RESETVAL_EXPR = resetValExpr;
-                    varAssignRHS->dump();
+                    //varAssignRHS->dump();
 
                     info->reductionOps_map[i.first].push_back(reduceOP_entry);
                   }
@@ -833,8 +877,8 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                 }
 
                 else if(atomicAdd_op){
-                  llvm::outs() << "NOT  INSIDE  FIELD \n";
-                  atomicAdd_op->dump();
+                  //llvm::outs() << "NOT  INSIDE  FIELD \n";
+                  //atomicAdd_op->dump();
                   string reduceOP = "{ Galois::atomicAdd(node." + field_entry.FIELD_NAME + ", y);}";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
                   string resetValExpr = "{node." + field_entry.FIELD_NAME + " = 0 ; }";
@@ -1075,7 +1119,221 @@ class FieldUsedInForLoop : public MatchFinder::MatchCallback {
 };
 
 
-/*COMMAN MATCHER STATEMENTS  :*************** To match Galois stype getData calls  *************************************/
+
+/** To split string on Dot operator and return num numbered argument **/
+template<typename Ty>
+string split_dot(Ty memExpr, unsigned num ){
+  clang::LangOptions LangOpts;
+  LangOpts.CPlusPlus = true;
+  clang::PrintingPolicy Policy(LangOpts);
+
+  string str_field;
+  llvm::raw_string_ostream s(str_field);
+  /** Returns something like snode.field_name.operator **/
+  memExpr->printPretty(s, 0, Policy);
+
+  /** Split string at delims to get the field name **/
+  char delim = '.';
+  vector<string> elems;
+  split(s.str(), delim, elems);
+
+  if(num == 0)
+    return elems[0];
+  if(num == 1)
+    return elems[1];
+}
+
+template<typename Ty>
+string printPretty(Ty memExpr){
+  clang::LangOptions LangOpts;
+  LangOpts.CPlusPlus = true;
+  clang::PrintingPolicy Policy(LangOpts);
+
+  string str_field;
+  llvm::raw_string_ostream s(str_field);
+  memExpr->printPretty(s, 0, Policy);
+  return s.str();
+}
+
+
+string global_var_from_local(string localVar){
+  std::regex re ("^local_(.*)");
+  std::smatch sm;
+  if(std::regex_match(localVar, sm, re)){
+    return sm[1].str();
+  }
+  else {
+    return "";
+  }
+}
+
+/***Global constants ***/
+string galois_distributed_accumulator_type = "Galois::DGAccumulator<int> ";
+string galois_distributed_accumulator_name = "DGAccumulator_accum";
+
+
+string makeFunctorFirstIter(string orig_functor_name, FirstIter_struct_entry entry){
+  string functor = "struct FirstItr_" + orig_functor_name + "{\n";
+
+  /** Adding member functions **/
+  for(auto memField : entry.MEMBER_FIELD_VEC){
+    functor += (memField.first + " " + memField.second + ";\n");
+  }
+
+  /** Adding constructors **/
+  string constructor = "FirstItr_" + orig_functor_name + "(";
+  string initList = "";
+  string initList_call = "";
+  unsigned num = entry.MEMBER_FIELD_VEC.size();
+  for(auto memField : entry.MEMBER_FIELD_VEC){
+    --num;
+    if(num > 0){
+      constructor += ( memField.first + " _" + memField.second + ",");
+      initList += (memField.second + "(_" + memField.second + "),");
+      string global_var = global_var_from_local(memField.second);
+      if(!global_var.empty())
+        initList_call += (global_var + ",");
+    }
+    else {
+      constructor += ( memField.first + " _" + memField.second + ")");
+      initList += (memField.second + "(_" + memField.second + "){}");
+      string  global_var = global_var_from_local(memField.second);
+      if(!global_var.empty())
+        initList_call += (global_var);
+    }
+  }
+
+  constructor += (":" + initList);
+  functor += (constructor + "\n");
+
+  /** Adding static go function **/
+  //TODO: Assuming graph type is Graph
+  string static_go = "void static go(Graph& _graph) {\n";
+  static_go += "Galois::for_each(_graph.begin(), _graph.end(), FirstItr_" + orig_functor_name + "{" + initList_call + "&_graph" + "});\n}\n";
+  functor += static_go;
+
+  string operator_func = entry.OPERATOR_BODY + "\n";
+  functor += operator_func;
+
+
+  functor += "\n};\n";
+
+  return functor;
+}
+
+class LoopTransformHandler : public MatchFinder::MatchCallback {
+  private:
+    Rewriter &rewriter;
+    InfoClass* info;
+  public:
+    LoopTransformHandler(Rewriter &rewriter, InfoClass* _info ) :  rewriter(rewriter), info(_info){}
+    virtual void run(const MatchFinder::MatchResult &Results) {
+
+        clang::LangOptions LangOpts;
+        LangOpts.CPlusPlus = true;
+        clang::PrintingPolicy Policy(LangOpts);
+      for(auto i : info->edgeData_map) {
+        for(auto j : i.second) {
+          string str_memExpr = "memExpr_" + j.VAR_NAME+ "_" + i.first;
+
+          if(j.IS_REFERENCED && j.IS_REFERENCE){
+            string str_ifGreater_2loopTrans = "ifGreater_2loopTrans_" + j.VAR_NAME + "_" + i.first;
+            string str_if_RHS = "if_RHS_" + j.VAR_NAME + "_" + i.first;
+            string str_main_struct = "main_struct_" + i.first;
+            string str_forLoop_2LT = "forLoop_2LT_" + i.first;
+            string str_method_operator  = "methodDecl_" + i.first;
+            string str_sdata = "sdata_" + j.VAR_NAME + "_" + i.first;
+            string str_for_each = "for_each_" + j.VAR_NAME + "_" + i.first;
+
+            auto ifGreater_2loopTrans = Results.Nodes.getNodeAs<clang::Stmt>(str_ifGreater_2loopTrans);
+            auto if_RHS_memExpr = Results.Nodes.getNodeAs<clang::Stmt>(str_if_RHS);
+            auto if_LHS_memExpr = Results.Nodes.getNodeAs<clang::Stmt>(str_memExpr);
+            if(ifGreater_2loopTrans){
+              FirstIter_struct_entry first_itr_entry;
+              SourceLocation if_loc = ifGreater_2loopTrans->getSourceRange().getBegin();
+
+              //TODO: Assuming if statement has parenthesis. NOT NECESSARY!!
+              /**1: remove if statement (order matters) **/
+              unsigned len_rm = ifGreater_2loopTrans->getSourceRange().getEnd().getRawEncoding() -  if_loc.getRawEncoding() + 1;
+              rewriter.RemoveText(if_loc, len_rm);
+
+              /**2: extract operator body without if statement (order matters) **/
+              auto method_operator = Results.Nodes.getNodeAs<clang::CXXMethodDecl>(str_method_operator);
+              string operator_body = rewriter.getRewrittenText(method_operator->getSourceRange());
+              first_itr_entry.OPERATOR_BODY = operator_body;
+              
+              /**Adding Distributed Galois accumulator **/
+              SourceLocation method_operator_begin = method_operator->getSourceRange().getBegin();
+              rewriter.InsertTextBefore(method_operator_begin, ("static " + galois_distributed_accumulator_type + galois_distributed_accumulator_name + ";\n"));
+
+
+              /**3: add new if statement (order matters) **/
+              /** Adding new condtional outside for loop **/
+              auto forLoop_2LT = Results.Nodes.getNodeAs<clang::Stmt>(str_forLoop_2LT);
+              auto sdata_declStmt = Results.Nodes.getNodeAs<clang::Stmt>(str_sdata);
+              SourceLocation for_loc_begin = forLoop_2LT->getSourceRange().getBegin();
+
+              /**Add galois accumulator += (work is done) **/
+              string work_done = "\n" + galois_distributed_accumulator_name + "+= 1;\n";
+              rewriter.InsertTextBefore(for_loc_begin, work_done);
+
+              //TODO: change sdata_loc getLocWithOffset from 2 to total length of statement.
+              SourceLocation sdata_loc = sdata_declStmt->getSourceRange().getEnd().getLocWithOffset(2);
+              string new_condition = "\nif( " + info->getData_map[i.first][0].VAR_NAME + "." + split_dot(if_LHS_memExpr, 1) + " > " + split_dot(if_RHS_memExpr, 0) + "){\n";
+              rewriter.InsertText(sdata_loc, new_condition, true, true);
+
+              auto method_operator_loc = method_operator->getSourceRange().getEnd();
+              string extra_paren = "    }\n";
+              rewriter.InsertText(method_operator_loc, extra_paren, true, true);
+
+
+              /**4: Get main struct arguments (order matters) **/
+              auto main_struct = Results.Nodes.getNodeAs<clang::CXXRecordDecl>(str_main_struct);
+              for(auto field_itr = main_struct->field_begin(); field_itr != main_struct->field_end(); ++field_itr){
+                auto mem_field = std::make_pair(field_itr->getType().getAsString(), field_itr->getNameAsString());
+                first_itr_entry.MEMBER_FIELD_VEC.push_back(mem_field);
+              }
+
+              /**5: Store the first argument of the operator call **/
+              //TODO: Assuming there is (src, context) in arguments
+              auto OP_parm_itr = method_operator->param_begin();
+              string operator_arg = (*OP_parm_itr)->getType().getAsString() + "  " + (*OP_parm_itr)->getNameAsString();
+              first_itr_entry.OPERATOR_ARG = operator_arg;
+
+              info->FirstItr_struct_map[i.first].push_back(first_itr_entry);
+
+              /**6: Put functor for first iteration. All nodes need to be processed in the first iteration. **/
+              string firstItr_func = makeFunctorFirstIter(i.first, first_itr_entry);
+              SourceLocation main_struct_loc_begin = main_struct->getSourceRange().getBegin();
+              rewriter.InsertText(main_struct_loc_begin, firstItr_func, true, true);
+
+              /**7: call functor for first iteration in the main functor and do while of for_each ***/
+              auto for_each_node = Results.Nodes.getNodeAs<clang::Stmt>(str_for_each);
+              SourceLocation for_each_loc_begin = for_each_node->getSourceRange().getBegin();
+              SourceLocation for_each_loc_end = for_each_node->getSourceRange().getEnd().getLocWithOffset(2);
+              //TODO:: get _graph from go struct IMPORTANT
+              string firstItr_func_call = "FirstItr_" + i.first + "::go(_graph);\n";
+              string do_while = firstItr_func_call + "\n do { \n" + galois_distributed_accumulator_name + ".reset();\n";
+              rewriter.InsertText(for_each_loc_begin, do_while, true, true);
+
+              string while_conditional = "\n}while("+ galois_distributed_accumulator_name + ".reduce());\n";
+              rewriter.InsertText(for_each_loc_end, while_conditional, true, true);
+
+              /**8. Adding definition for static accumulator field name **/
+              string galois_accumulator_def = "\n" + galois_distributed_accumulator_type + " " + i.first + "::" + galois_distributed_accumulator_name + ";\n";
+              SourceLocation main_struct_loc_end = main_struct->getSourceRange().getEnd().getLocWithOffset(2);
+              rewriter.InsertText(main_struct_loc_end, galois_accumulator_def, true, true);
+              break;
+            }
+          }
+        }
+      }
+    }
+};
+
+
+
+/*COMMAN MATCHER STATEMENTS  :*************** To match Galois style getData calls  *************************************/
       StatementMatcher GetDataMatcher = callExpr(argumentCountIs(1), callee(methodDecl(hasName("getData"))));
       StatementMatcher LHSRefVariable = expr(ignoringParenImpCasts(declRefExpr(to(
                                         varDecl(hasType(references(AnyType))))))).bind("LHSRefVariable");
@@ -1086,7 +1344,7 @@ class FieldUsedInForLoop : public MatchFinder::MatchCallback {
       /****************************************************************************************************************/
 
 
-      /*COMMAN MATCHER STATEMENTS  :*************** To match Galois stype for loops  *************************************/
+      /*COMMAN MATCHER STATEMENTS  :*************** To match Galois style for loops  *************************************/
       StatementMatcher Edge_beginCallMatcher = memberCallExpr(argumentCountIs(1), callee(methodDecl(hasName("edge_begin"))));
       DeclarationMatcher InitDeclMatcher = varDecl(hasInitializer(anything())).bind("ForInitVarName");
       DeclarationMatcher EndDeclMatcher = varDecl(hasInitializer(anything())).bind("ForEndVarName");
@@ -1150,13 +1408,39 @@ class FieldUsedInForLoop : public MatchFinder::MatchCallback {
 
 
 
+      /** To construct various StatementMatchers for 2 loop transforms. **/
+      template<typename Ty>
+      StatementMatcher makeStatement_EdgeForStmt(Ty DM_update, string str_loopName){
+        StatementMatcher returnMatcher = forStmt(hasLoopInit(anyOf(
+                                                  declStmt(declCountIs(2),
+                                                              containsDeclaration(0, InitDeclMatcher),
+                                                              containsDeclaration(1, EndDeclMatcher)),
+                                                  declStmt(hasSingleDecl(InitDeclMatcher)))),
+                                              hasCondition(anyOf(
+                                                  binaryOperator(hasOperatorName("!="),
+                                                                  hasLHS(IteratorComparisonMatcher),
+                                                                  hasRHS(IteratorBoundMatcher)),
+                                                  OverloadedNEQMatcher)),
+                                              hasIncrement(anyOf(
+                                                            unaryOperator(hasOperatorName("++"),
+                                                                              hasUnaryOperand(declRefExpr(to(
+                                                                                    varDecl(hasType(pointsTo(AnyType))))))),
+                                                            operatorCallExpr(
+                                                                hasOverloadedOperatorName("++"),
+                                                                hasArgument(0, declRefExpr(to(
+                                                                      varDecl())))))),
+                                              hasDescendant(getDataCallExprMatcher_insideFor),
+                                              hasDescendant(DM_update)
+                                              ).bind(str_loopName);
+        return returnMatcher;
+      }
 
 class GaloisFunctionsConsumer : public ASTConsumer {
     private:
     CompilerInstance &Instance;
     std::set<std::string> ParsedTemplates;
     GaloisFunctionsVisitor* Visitor;
-    MatchFinder Matchers, Matchers_doall, Matchers_op, Matchers_typedef, Matchers_gen, Matchers_gen_field;
+    MatchFinder Matchers, Matchers_doall, Matchers_op, Matchers_typedef, Matchers_gen, Matchers_gen_field, Matchers_2LT;
     FunctionCallHandler functionCallHandler;
     FindOperatorHandler findOperator;
     CallExprHandler callExprHandler;
@@ -1164,9 +1448,10 @@ class GaloisFunctionsConsumer : public ASTConsumer {
     FindingFieldHandler f_handler;
     FindingFieldInsideForLoopHandler insideForLoop_handler;
     FieldUsedInForLoop insideForLoopField_handler;
+    LoopTransformHandler loopTransform_handler;
     InfoClass info;
   public:
-    GaloisFunctionsConsumer(CompilerInstance &Instance, std::set<std::string> ParsedTemplates, Rewriter &R): Instance(Instance), ParsedTemplates(ParsedTemplates), Visitor(new GaloisFunctionsVisitor(&Instance)), functionCallHandler(R, &info), findOperator(&Instance), callExprHandler(&Instance, &info), typedefHandler(&info), f_handler(&Instance, &info), insideForLoop_handler(&Instance, &info), insideForLoopField_handler(&Instance, &info) {
+    GaloisFunctionsConsumer(CompilerInstance &Instance, std::set<std::string> ParsedTemplates, Rewriter &R): Instance(Instance), ParsedTemplates(ParsedTemplates), Visitor(new GaloisFunctionsVisitor(&Instance)), functionCallHandler(R, &info), findOperator(&Instance), callExprHandler(&Instance, &info), typedefHandler(&info), f_handler(&Instance, &info), insideForLoop_handler(&Instance, &info), insideForLoopField_handler(&Instance, &info), loopTransform_handler(R, &info) {
 
      /**************** Additional matchers ********************/
       //Matchers.addMatcher(callExpr(isExpansionInMainFile(), callee(functionDecl(hasName("getData"))), hasAncestor(binaryOperator(hasOperatorName("=")).bind("assignment"))).bind("getData"), &callExprHandler); //*** WORKS
@@ -1269,6 +1554,7 @@ class GaloisFunctionsConsumer : public ASTConsumer {
       }
 
       /*MATCHER 5: *********************Match to get fields of NodeData structure being modified  but not in the Galois all edges forLoop *******************/
+#if 0
       for (auto i : info.getData_map) {
         for(auto j : i.second) {
           if(j.IS_REFERENCED && j.IS_REFERENCE) {
@@ -1341,7 +1627,7 @@ class GaloisFunctionsConsumer : public ASTConsumer {
           }
         }
       }
-
+#endif
       /****************************************************************************************************************/
 
       /*MATCHER 5: *********************Match to get fields of NodeData structure being modified inside the Galois all edges forLoop *******************/
@@ -1367,8 +1653,11 @@ class GaloisFunctionsConsumer : public ASTConsumer {
 
             string str_atomicAdd = "atomicAdd_" + j.VAR_NAME + "_" + i.first;
 
-            string str_plusOp_vec = "plusEqualOpVec_" + j.VAR_NAME+ "_" + i.first;
-            string str_assignment_vec = "equalOpVec_" + j.VAR_NAME+ "_" + i.first;
+            string str_plusOp_vec = "plusEqualOpVec_" + j.VAR_NAME + "_" + i.first;
+            string str_assignment_vec = "equalOpVec_" + j.VAR_NAME + "_" + i.first;
+
+            string str_syncPull_var = "syncPullVar_" + j.VAR_NAME + "_" + i.first;
+
 
             /** Only match references types, ignore read only **/
             DeclarationMatcher f_1 = varDecl(isExpansionInMainFile(), hasInitializer(expr(anyOf(
@@ -1383,7 +1672,8 @@ class GaloisFunctionsConsumer : public ASTConsumer {
             StatementMatcher LHS_memExpr = memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.VAR_NAME))))), hasAncestor(recordDecl(hasName(i.first)))).bind(str_memExpr);
             StatementMatcher Cond_notMemExpr = memberExpr(hasDescendant(declRefExpr(to(varDecl(unless(hasName(j.VAR_NAME))).bind(str_varDecl)))), hasAncestor(recordDecl(hasName(i.first)))).bind(str_Cond_RHSmemExpr);
             StatementMatcher Cond_notDeclExpr = declRefExpr(to(varDecl(unless(hasName(j.VAR_NAME))).bind(str_varDecl)), hasAncestor(recordDecl(hasName(i.first)))).bind(str_Cond_RHSmemExpr);
-            /** Order matters as the most generic ones should be at the last **/
+
+            /** REDUCTIONS : Only need syncPush : Order matters as the most generic ones should be at the last **/
             StatementMatcher f_2 = expr(isExpansionInMainFile(), anyOf(
                                                                       /** For builtInType : NodeData.field += val **/
                                                                       binaryOperator(hasOperatorName("+="),
@@ -1441,11 +1731,22 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                                                                                                   hasRHS(ignoringParenImpCasts(declRefExpr(to(decl().bind(str_whileCAS_RHS))))))),
                                                                       hasBody(compoundStmt(hasDescendant(memberCallExpr(callee(methodDecl(matchesName(".compare_exchange_strong"))), hasAnyArgument(declRefExpr(to(decl(equalsBoundNode(str_whileCAS_RHS)))))))))).bind(str_whileCAS);
 
+
+            /** USE but !REDUCTIONS : NodeData.field is used, therefore needs syncPull **/
+            DeclarationMatcher f_syncPull_1 = varDecl(isExpansionInMainFile(), hasInitializer(expr(anyOf(
+                                                                                                hasDescendant(memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.VAR_NAME)))))).bind(str_memExpr)),
+                                                                                                memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.VAR_NAME)))))).bind(str_memExpr)
+                                                                                                ),unless(f_2))),
+                                                                      hasAncestor(recordDecl(hasName(i.first)))
+                                                                  ).bind(str_syncPull_var);
+
+
             //StatementMatcher f_5 = callExpr(isExpansionInMainFile(), argumentCountIs(2), (callee(functionDecl(hasName("atomicAdd"))), hasAnyArgument(LHS_memExpr))).bind(str_atomicAdd);
             Matchers_gen.addMatcher(f_1, &insideForLoop_handler);
             Matchers_gen.addMatcher(f_2, &insideForLoop_handler);
             Matchers_gen.addMatcher(f_3, &insideForLoop_handler);
             Matchers_gen.addMatcher(f_4, &insideForLoop_handler);
+            Matchers_gen.addMatcher(f_syncPull_1, &insideForLoop_handler);
             //Matchers_gen.addMatcher(f_5, &insideForLoop_handler);
           }
         }
@@ -1523,6 +1824,7 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                                                                              hasDescendant(LHS_memExpr)).bind(str_assignment),
 
                                                                       //callExpr(hasAnyArgument(declRefExpr(to(varDecl(hasName(j.VAR_NAME)[>, hasType(asString("class std::vector"))<]))))).bind("vectorOp"),
+                                                                      /** For vectors: field[i] += val **/
                                                                       binaryOperator(hasOperatorName("+="), hasLHS(operatorCallExpr(hasDescendant(declRefExpr(to(methodDecl(hasName("operator[]"))))), hasDescendant(LHS_declRefExpr)))).bind(str_plusOp_vec),
                                                                       binaryOperator(hasOperatorName("="), hasLHS(operatorCallExpr(hasDescendant(declRefExpr(to(methodDecl(hasName("operator[]"))))), hasDescendant(LHS_declRefExpr)))).bind(str_assignment_vec),
 
@@ -1633,6 +1935,38 @@ class GaloisFunctionsConsumer : public ASTConsumer {
       }
 
       Matchers_doall.matchAST(Context);
+
+
+      /*MATCHER 7: ********************Matchers for 2 loop transformations *******************/
+      for (auto i : info.edgeData_map) {
+        for(auto j : i.second) {
+          if(j.IS_REFERENCED && j.IS_REFERENCE) {
+            string str_memExpr = "memExpr_" + j.VAR_NAME+ "_" + i.first;
+            string str_ifGreater_2loopTrans = "ifGreater_2loopTrans_" + j.VAR_NAME + "_" + i.first;
+            string str_if_RHS = "if_RHS_" + j.VAR_NAME + "_" + i.first;
+            string str_main_struct = "main_struct_" + i.first;
+            string str_forLoop_2LT = "forLoop_2LT_" + i.first;
+            string str_method_operator  = "methodDecl_" + i.first;
+            string str_sdata = "sdata_" + j.VAR_NAME + "_" + i.first;
+            string str_for_each = "for_each_" + j.VAR_NAME + "_" + i.first;
+
+            StatementMatcher LHS_memExpr = memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.VAR_NAME))))), hasAncestor(recordDecl(hasName(i.first)))).bind(str_memExpr);
+
+            /** For 2 loop Transforms: if nodeData.field > TOLERANCE **/
+            StatementMatcher callExpr_atomicAdd = callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("atomicAdd"))))), hasAnyArgument(LHS_memExpr));
+            //StatementMatcher EdgeForLoopMatcher_withAtomicAdd = makeStatement_EdgeForStmt(callExpr_atomicAdd, str_forLoop_2LT);
+            /**Assumptions: 1. first argument is always src in operator() method **/
+            StatementMatcher f_2loopTrans_1 = ifStmt(isExpansionInMainFile(), hasCondition(allOf(binaryOperator(hasOperatorName(">"), hasLHS(hasDescendant(LHS_memExpr)), hasRHS(hasDescendant(memberExpr().bind(str_if_RHS)))),
+                                                                                                hasAncestor(makeStatement_EdgeForStmt(callExpr_atomicAdd, str_forLoop_2LT)),
+                                                                                                hasAncestor(recordDecl(hasName(i.first), hasDescendant(methodDecl(hasName("operator()"), hasAncestor(recordDecl(hasDescendant(callExpr(callee(functionDecl(hasName("for_each"))) , unless(hasDescendant(declRefExpr(to(functionDecl(hasName("workList_version")))))) ).bind(str_for_each)))) , hasParameter(0,decl().bind("src_arg")), hasDescendant(declStmt(hasDescendant(declRefExpr(to(varDecl(equalsBoundNode("src_arg")))))).bind(str_sdata))).bind(str_method_operator))).bind(str_main_struct))))).bind(str_ifGreater_2loopTrans);
+
+            Matchers_2LT.addMatcher(f_2loopTrans_1, &loopTransform_handler);
+
+          }
+        }
+      }
+
+      Matchers_2LT.matchAST(Context);
     }
   };
 

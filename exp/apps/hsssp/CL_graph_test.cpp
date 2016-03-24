@@ -32,7 +32,7 @@
 #include <typeinfo>
 #include <algorithm>
 
-#include "CL_Header.h"
+#include "Galois/OpenCL/CL_Header.h"
 
 #define _HETERO_DEBUG_ 0
 

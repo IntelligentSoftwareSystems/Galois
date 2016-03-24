@@ -48,7 +48,6 @@ static cll::opt<unsigned int> src_node("srcNodeId", cll::desc("ID of the source 
 static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"), cll::init(false));
 
 
-static const float alpha = (1.0 - 0.85);
 struct CC_NodeData {
   std::atomic<uint32_t> id;
   std::atomic<uint32_t> comp;
@@ -86,12 +85,13 @@ struct LabelPropAlgo {
     for (auto jj = graph->edge_begin(src), ej = graph->edge_end(src); jj != ej; ++jj) {
       GNode dst = graph->getEdgeDst(jj);
       auto& dnode = graph->getData(dst);
-      auto& d_comp = dnode.comp;
-      uint32_t old_comp = d_comp;
+//      auto& d_comp = dnode.comp;
+//      uint32_t old_comp = d_comp;
       uint32_t new_comp = s_comp;
-      while(d_comp > new_comp) {
+      Galois::atomicMin(dnode.comp, new_comp);
+/*      while(d_comp > new_comp) {
        d_comp.compare_exchange_strong(old_comp, new_comp);
-      }
+      }*/
       //while(old_comp > new_comp && !d_comp.compare_exchange_strong(old_comp, new_comp)){}
     }
   }
@@ -102,14 +102,9 @@ int main(int argc, char** argv) {
 
     LonestarStart(argc, argv, name, desc, url);
     auto& net = Galois::Runtime::getSystemNetworkInterface();
-    Galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_labelProp;
+    Galois::Timer T_total, T_hGraph_init, T_init, T_labelProp;
 
     T_total.start();
-
-    T_offlineGraph_init.start();
-    OfflineGraph g(inputFile);
-    T_offlineGraph_init.stop();
-    std::cout << g.size() << " " << g.sizeEdges() << "\n";
 
     T_hGraph_init.start();
     Graph hg(inputFile, net.ID, net.Num);
@@ -130,7 +125,7 @@ int main(int argc, char** argv) {
       }
     }
 
-    std::cout << "PageRank::go called\n";
+    std::cout << "CC::go called\n";
     T_labelProp.start();
     for (int i = 0; i < maxIterations; ++i) {
       std::cout << " Iteration : " << i << "\n";
@@ -149,7 +144,7 @@ int main(int argc, char** argv) {
 
     T_total.stop();
 
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " PageRank (" << maxIterations << ") : " << T_labelProp.get() << "(msec)\n\n";
+    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " PageRank (" << maxIterations << ") : " << T_labelProp.get() << "(msec)\n\n";
 
     return 0;
   } catch (const char* c) {

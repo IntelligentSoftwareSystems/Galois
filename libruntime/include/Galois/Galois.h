@@ -236,5 +236,10 @@ int write_set(Args... args) {
    return 0;
 }
 
+template<typename... Args>
+int workList_version(Args... args){
+  return 0;
+}
+
 } //namespace Galois
 #endif

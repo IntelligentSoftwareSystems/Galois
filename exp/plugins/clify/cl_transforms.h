@@ -124,9 +124,9 @@ public:
 //      if(decl)
 //         rewriter.ReplaceText(decl->getTypeSourceInfo()->getTypeLoc().getSourceRange(), " CLGraph ");
 
-      llvm::outs() << "GaloisLoop found  - #Args :: " << callFS->getNumArgs() << "\n";
 
       if (callFS) {
+         llvm::outs() << "GaloisLoop found  - #Args :: " << callFS->getNumArgs() << "\n";
          CXXRecordDecl * kernel = const_cast<CXXRecordDecl*>(Results.Nodes.getNodeAs<CXXRecordDecl>("kernelType"));
          assert(kernel!=nullptr && "KernelType cast failed.");
          app_data.add_doAll_call(callFS, kernel);
@@ -170,9 +170,10 @@ public:
    ASTContext & ctx;
    Galois::GAST::GaloisApp & app;
    std::ofstream header_file;
+   bool nodeDataFound, edgeDataFound;
 public:
    NodeDataGen(Rewriter &rewriter, ASTContext & c, Galois::GAST::GaloisApp & a) :
-         rewriter(rewriter), ctx(c), app(a) {
+         rewriter(rewriter), ctx(c), app(a), nodeDataFound(false), edgeDataFound(false) {
       char hfilename[1024];
       sprintf(hfilename, "%s/app_header.h" , app.dir);
       header_file.open(hfilename);
@@ -182,8 +183,9 @@ public:
    }
    //TODO - RK - Clean up graph generation code.
    ~NodeDataGen(){
+
       header_file << " #include \"graph_header.h\"\n";
-      {//Begin graph implementation.
+      if (false){//Begin graph implementation.
          const char * g_dev ="typedef struct _GraphType { \n\
             uint _num_nodes;\n\
             uint _num_edges;\n\
@@ -201,6 +203,8 @@ public:
       header_file.close();
    }
    void GenCLType(const QualType & q, string sname){
+//      if (sname == "NodeData") nodeDataFound = true;
+//      if (sname == "EdgeData") edgeDataFound = true;
       std::string res="typedef ";
       if(q.getTypePtr()->isRecordType()){
          llvm::outs() << " Processing POD :" << q.getAsString( ) << " \n";
@@ -223,6 +227,10 @@ public:
          res+=" ";
          res+= sname;
          res+=";\n";
+      }else if (q.getAsString() == "void"){
+         res += "void ";
+         res += sname;
+         res += ";\n";
       }
       header_file << res;
    }
