@@ -486,6 +486,11 @@ public:
     cuheader << "#include <sys/types.h>\n";
     cuheader << "#include <unistd.h>\n";
     cuheader << "#include \"" << filename << "_cuda.h\"\n";
+    cuheader << "\n#ifdef __GALOIS_CUDA_CHECK_ERROR__\n";
+    cuheader << "#define check_cuda_kernel check_cuda(cudaGetLastError()); check_cuda(cudaDeviceSynchronize());\n";
+    cuheader << "#else\n";
+    cuheader << "#define check_cuda_kernel  \n";
+    cuheader << "#endif\n";
     cuheader << "\nstruct CUDA_Context {\n";
     cuheader << "\tint device;\n";
     cuheader << "\tint id;\n";
@@ -834,6 +839,7 @@ public:
           Output << ", \"ctx->" << argument << ".gpu_wr_ptr()\"";
         }
         Output << ")),\n";
+        Output << "CBlock([\"check_cuda_kernel\"], parse = False),\n";
 
         if (!isTopological) { // data driven
           Output << "], ),\n";
