@@ -540,7 +540,7 @@ public:
     cuheader << "\treturn true;\n";
     cuheader << "}\n\n";
     cuheader << "void load_graph_CUDA(struct CUDA_Context *ctx, MarshalGraph &g) {\n";
-    cuheader << "\tCSRGraphTy &graph = ctx->hg;\n";
+    cuheader << "\tCSRGraphTex &graph = ctx->hg;\n";
     cuheader << "\tctx->nowned = g.nowned;\n";
     cuheader << "\tctx->id = g.id;\n";
     cuheader << "\tgraph.nnodes = g.nnodes;\n";
