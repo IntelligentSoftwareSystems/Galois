@@ -486,6 +486,11 @@ public:
     cuheader << "#include <sys/types.h>\n";
     cuheader << "#include <unistd.h>\n";
     cuheader << "#include \"" << filename << "_cuda.h\"\n";
+    cuheader << "\n#ifdef __GALOIS_CUDA_CHECK_ERROR__\n";
+    cuheader << "#define check_cuda_kernel check_cuda(cudaGetLastError()); check_cuda(cudaDeviceSynchronize());\n";
+    cuheader << "#else\n";
+    cuheader << "#define check_cuda_kernel  \n";
+    cuheader << "#endif\n";
     cuheader << "\nstruct CUDA_Context {\n";
     cuheader << "\tint device;\n";
     cuheader << "\tint id;\n";
@@ -535,7 +540,7 @@ public:
     cuheader << "\treturn true;\n";
     cuheader << "}\n\n";
     cuheader << "void load_graph_CUDA(struct CUDA_Context *ctx, MarshalGraph &g) {\n";
-    cuheader << "\tCSRGraphTy &graph = ctx->hg;\n";
+    cuheader << "\tCSRGraphTex &graph = ctx->hg;\n";
     cuheader << "\tctx->nowned = g.nowned;\n";
     cuheader << "\tctx->id = g.id;\n";
     cuheader << "\tgraph.nnodes = g.nnodes;\n";
@@ -834,6 +839,7 @@ public:
           Output << ", \"ctx->" << argument << ".gpu_wr_ptr()\"";
         }
         Output << ")),\n";
+        Output << "CBlock([\"check_cuda_kernel\"], parse = False),\n";
 
         if (!isTopological) { // data driven
           Output << "], ),\n";
