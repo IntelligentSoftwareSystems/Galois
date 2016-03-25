@@ -162,7 +162,7 @@ public:
     bool traverse = RecursiveASTVisitor<IrGLOperatorVisitor>::TraverseDecl(D);
     if (traverse && D && isa<CXXMethodDecl>(D)) {
       bodyString << "]),\n"; // end ForAll
-      bodyString << "]),\n"; // end kernel
+      bodyString << "]),\n"; // end Kernel
       std::vector<std::string> arguments;
       for (auto& param : parameterToTypeMap) {
         declString << ", ('" << param.second << " *', 'p_" << param.first << "')";
@@ -634,7 +634,7 @@ public:
     } else {
       found = text.find("mgpu::Reduce");
       if (found != std::string::npos) {
-        Output << "CBlock([\"" << text << "\"], parse=False),\n";
+        Output << "CBlock([\"" << text << "\"], parse = False),\n";
       } else {
         Output << "CBlock([\"" << text << "\"]),\n";
       }
@@ -652,7 +652,7 @@ public:
     }
     bool traverse = RecursiveASTVisitor<IrGLOrchestratorVisitor>::TraverseDecl(D);
     if (traverse && method) {
-      Output << "]),\n"; // end kernel
+      Output << "], host = True),\n"; // end Kernel
       Output.close();
 
       std::string fileName = rewriter.getSourceMgr().getFilename(D->getLocStart()).str();
@@ -831,6 +831,9 @@ public:
         }
 
         // generate call to kernel
+        Output << "CDecl([(\"dim3\", \"blocks\", \"\")]),\n";
+        Output << "CDecl([(\"dim3\", \"threads\", \"\")]),\n";
+        Output << "CBlock([\"kernel_sizing(ctx->gg, blocks, threads)\"]),\n";
         std::string kernelName = record->getNameAsString();
         Output << "Invoke(\"" << kernelName << "\", ";
         Output << "(\"ctx->gg\", \"ctx->nowned\"";
