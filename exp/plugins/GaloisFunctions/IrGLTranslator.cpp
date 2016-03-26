@@ -568,7 +568,7 @@ public:
     cuheader.close();
 
     std::ofstream IrGLAST;
-    IrGLAST.open(FileNamePath + ".py");
+    IrGLAST.open(FileNamePath + "_cuda.py");
     IrGLAST << "from gg.ast import *\n";
     IrGLAST << "from gg.lib.graph import Graph\n";
     IrGLAST << "from gg.lib.wl import Worklist\n";
@@ -619,7 +619,7 @@ public:
     IrGLAST.close();
 
     llvm::errs() << "IrGL file and headers generated:\n";
-    llvm::errs() << FileNamePath << ".py\n";
+    llvm::errs() << FileNamePath << "_cuda.py\n";
     llvm::errs() << FileNamePath << "_cuda.cuh\n";
     llvm::errs() << FileNamePath << "_cuda.h\n";
   }
