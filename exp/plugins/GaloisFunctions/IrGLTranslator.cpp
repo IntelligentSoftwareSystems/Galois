@@ -459,6 +459,7 @@ public:
     std::string filename;
     std::size_t found = FileNamePath.rfind("/");
     if (found != std::string::npos) filename = FileNamePath.substr(found+1, FileNamePath.length()-1);
+    else filename = FileNamePath;
 
     std::ofstream header;
     header.open(FileNamePath + "_cuda.h");
