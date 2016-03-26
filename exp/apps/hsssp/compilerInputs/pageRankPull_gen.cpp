@@ -38,7 +38,7 @@
 
 #ifdef __GALOIS_HET_CUDA__
 #include "Galois/Cuda/cuda_mtypes.h"
-#include "cuda/hpagerank_cuda.h"
+#include "gen_cuda.h"
 struct CUDA_Context *cuda_ctx;
 #endif
 
