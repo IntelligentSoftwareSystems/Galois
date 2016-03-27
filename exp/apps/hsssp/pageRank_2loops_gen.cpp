@@ -72,6 +72,7 @@ struct InitializeGraph {
 
   InitializeGraph(const float &_alpha, Graph* _g):local_alpha(_alpha), graph(_g){}
   void static go(Graph& _graph) {
+  
        struct Syncer_0 {
       	static float extract( const struct PR_NodeData & node){ return node.residual; }
       	static void reduce (struct PR_NodeData & node, float y) { Galois::atomicAdd(node.residual, y);}
@@ -80,6 +81,7 @@ struct InitializeGraph {
       };
       Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{alpha, &_graph }, Galois::loopname("Init"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ Galois::atomicAdd(node.residual, y);}",  "{node.residual = 0 ; }"));
       _graph.sync_push<Syncer_0>();
+      
       
   }
 
@@ -99,31 +101,39 @@ struct InitializeGraph {
   }
 };
 
+
 struct FirstItr_PageRank{
 const float & local_alpha;
 cll::opt<float> & local_tolerance;
 Graph * graph;
 FirstItr_PageRank(const float & _local_alpha,cll::opt<float> & _local_tolerance,Graph * _graph):local_alpha(_local_alpha),local_tolerance(_local_tolerance),graph(_graph){}
 void static go(Graph& _graph) {
-Galois::for_each(_graph.begin(), _graph.end(), FirstItr_PageRank{alpha,tolerance,&_graph});
+ struct Syncer_0 {
+	static float extract( const struct PR_NodeData & node){ return node.residual; }
+	static void reduce (struct PR_NodeData & node, float y) { Galois::atomicAdd(node.residual, y);}
+	static void reset (struct PR_NodeData & node ){node.residual = 0 ; }
+	typedef float ValTy;
+};
+Galois::for_each(_graph.begin(), _graph.end(), FirstItr_PageRank{alpha,tolerance,&_graph}, Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ Galois::atomicAdd(node.residual, y);}",  "{node.residual = 0 ; }"));
+_graph.sync_push<Syncer_0>();
+
 }
 void operator()(WorkItem& src, Galois::UserContext<WorkItem>& ctx) const {
     PR_NodeData& sdata = graph->getData(src);
 
-    float residual_old = sdata.residual.exchange(0.0);
-    sdata.value += residual_old;
-    //sdata.residual = residual_old;
-    if (sdata.nout > 0){
-      float delta = residual_old*local_alpha/sdata.nout;
-      for(auto nbr = graph->edge_begin(src); nbr != graph->edge_end(src); ++nbr){
-        GNode dst = graph->getEdgeDst(nbr);
-        PR_NodeData& ddata = graph->getData(dst);
-        auto dst_residual_old = Galois::atomicAdd(ddata.residual, delta);
 
-
+      float residual_old = sdata.residual.exchange(0.0);
+      sdata.value += residual_old;
+      if (sdata.nout > 0){
+        float delta = residual_old*local_alpha/sdata.nout;
+        for(auto nbr = graph->edge_begin(src); nbr != graph->edge_end(src); ++nbr){
+          GNode dst = graph->getEdgeDst(nbr);
+          PR_NodeData& ddata = graph->getData(dst);
+          auto dst_residual_old = Galois::atomicAdd(ddata.residual, delta);
+          
       }
     }
-}
+  }
 
 };
 struct PageRank {
@@ -137,17 +147,17 @@ struct PageRank {
     typedef dChunkedFIFO<64> dChunk;
 
     //Galois::for_each(_graph.begin(), _graph.end(), PageRank(tolerance, alpha, &_graph), Galois::workList_version());
-    FirstItr_PageRank::go(_graph);
-    struct Syncer_0 {
-      static float extract( const struct PR_NodeData & node){ return node.residual; }
-      static void reduce (struct PR_NodeData & node, float y) { Galois::atomicAdd(node.residual, y);}
-      static void reset (struct PR_NodeData & node ){node.residual = 0 ; }
-      typedef float ValTy;
-    };
-    do { 
-      std::cout << "do while \n";
-      DGAccumulator_accum.reset();
 
+    FirstItr_PageRank::go(_graph);
+
+    do { 
+      DGAccumulator_accum.reset();
+      struct Syncer_0 {
+        static float extract( const struct PR_NodeData & node){ return node.residual; }
+        static void reduce (struct PR_NodeData & node, float y) { Galois::atomicAdd(node.residual, y);}
+        static void reset (struct PR_NodeData & node ){node.residual = 0 ; }
+        typedef float ValTy;
+      };
       Galois::for_each(_graph.begin(), _graph.end(), PageRank(tolerance, alpha, &_graph), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ Galois::atomicAdd(node.residual, y);}",  "{node.residual = 0 ; }"));
       _graph.sync_push<Syncer_0>();
 
@@ -161,9 +171,9 @@ struct PageRank {
 
     if( sdata.residual > this->local_tolerance){
 
+
       float residual_old = sdata.residual.exchange(0.0);
       sdata.value += residual_old;
-      //sdata.residual = residual_old;
       if (sdata.nout > 0){
         float delta = residual_old*local_alpha/sdata.nout;
 
@@ -173,13 +183,13 @@ struct PageRank {
           PR_NodeData& ddata = graph->getData(dst);
           auto dst_residual_old = Galois::atomicAdd(ddata.residual, delta);
 
-
         }
       }
     }
   }
 };
 Galois::DGAccumulator<int>  PageRank::DGAccumulator_accum;
+
 
 
 
