@@ -1172,7 +1172,7 @@ string galois_distributed_accumulator_type = "Galois::DGAccumulator<int> ";
 string galois_distributed_accumulator_name = "DGAccumulator_accum";
 
 
-string makeFunctorFirstIter(string orig_functor_name, FirstIter_struct_entry entry){
+string makeFunctorFirstIter(string orig_functor_name, FirstIter_struct_entry entry, vector<ReductionOps_entry>& redOp_vec){
   string functor = "struct FirstItr_" + orig_functor_name + "{\n";
 
   /** Adding member functions **/
@@ -1206,10 +1206,18 @@ string makeFunctorFirstIter(string orig_functor_name, FirstIter_struct_entry ent
   constructor += (":" + initList);
   functor += (constructor + "\n");
 
+  /** Insert write sets **/
+  stringstream SS_write_set;
+  for(auto j : redOp_vec){
+    if(j.SYNC_TYPE == "sync_push")
+      SS_write_set << ", Galois::write_set(\"" << j.SYNC_TYPE << "\", \"" << j.GRAPH_NAME << "\", \"" << j.NODE_TYPE << "\", \"" << j.FIELD_TYPE << "\" , \"" << j.FIELD_NAME << "\", \"" << j.VAL_TYPE << "\" , \"" << j.OPERATION_EXPR << "\",  \"" << j.RESETVAL_EXPR << "\")";
+    else if(j.SYNC_TYPE == "sync_pull")
+      SS_write_set << ", Galois::write_set(\"" << j.SYNC_TYPE << "\", \"" << j.GRAPH_NAME << "\", \""<< j.NODE_TYPE << "\", \"" << j.FIELD_TYPE << "\", \"" << j.FIELD_NAME << "\" , \"" << j.VAL_TYPE << "\")";
+  }
   /** Adding static go function **/
   //TODO: Assuming graph type is Graph
   string static_go = "void static go(Graph& _graph) {\n";
-  static_go += "Galois::for_each(_graph.begin(), _graph.end(), FirstItr_" + orig_functor_name + "{" + initList_call + "&_graph" + "});\n}\n";
+  static_go += "Galois::for_each(_graph.begin(), _graph.end(), FirstItr_" + orig_functor_name + "{" + initList_call + "&_graph" + "}" + SS_write_set.str() + ");\n}\n";
   functor += static_go;
 
   string operator_func = entry.OPERATOR_BODY + "\n";
@@ -1303,7 +1311,7 @@ class LoopTransformHandler : public MatchFinder::MatchCallback {
               info->FirstItr_struct_map[i.first].push_back(first_itr_entry);
 
               /**6: Put functor for first iteration. All nodes need to be processed in the first iteration. **/
-              string firstItr_func = makeFunctorFirstIter(i.first, first_itr_entry);
+              string firstItr_func = makeFunctorFirstIter(i.first, first_itr_entry, info->reductionOps_map[i.first]);
               SourceLocation main_struct_loc_begin = main_struct->getSourceRange().getBegin();
               rewriter.InsertText(main_struct_loc_begin, firstItr_func, true, true);
 
