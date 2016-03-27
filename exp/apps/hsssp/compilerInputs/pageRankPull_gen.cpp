@@ -38,7 +38,7 @@
 
 #ifdef __GALOIS_HET_CUDA__
 #include "Galois/Cuda/cuda_mtypes.h"
-#include "cuda/hpagerank_cuda.h"
+#include "gen_cuda.h"
 struct CUDA_Context *cuda_ctx;
 #endif
 
@@ -97,7 +97,18 @@ struct InitializeGraph {
   void operator()(GNode src) const {
     PR_NodeData& sdata = graph->getData(src);
     sdata.value = 1.0 - alpha;
-    Galois::atomicAdd(sdata.nout, 0);
+    sdata.nout = 0;
+  }
+};
+
+struct PrecomputeGraph {
+  Graph* graph;
+
+  void static go(Graph& _graph) {
+    Galois::do_all(_graph.begin(), _graph.end(), PrecomputeGraph{ &_graph }, Galois::loopname("Precompute"));
+  }
+
+  void operator()(GNode src) const {
     for(auto nbr = graph->edge_begin(src); nbr != graph->edge_end(src); ++nbr){
       GNode dst = graph->getEdgeDst(nbr);
       PR_NodeData& ddata = graph->getData(dst);
@@ -121,9 +132,8 @@ struct PageRank_pull {
       GNode dst = graph->getEdgeDst(nbr);
       PR_NodeData& ddata = graph->getData(dst);
       unsigned dnout = ddata.nout;
-      if(dnout > 0){
-        sum += ddata.value/dnout;
-      }
+      //assert(dnout > 0);
+      sum += ddata.value/dnout;
     }
 
     float pr_value = sum*(1.0 - alpha) + alpha;
@@ -190,6 +200,7 @@ int main(int argc, char** argv) {
 
     T_init.start();
     InitializeGraph::go(hg);
+    PrecomputeGraph::go(hg);
     T_init.stop();
 
     // Verify
