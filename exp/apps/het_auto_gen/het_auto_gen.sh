@@ -13,19 +13,21 @@ IRGL_CXX="$CXX -Xclang -load -Xclang $LLVM_BUILD/lib/GaloisFunctions.so -Xclang 
 GANALYSIS_CXX="$CXX -Xclang -load -Xclang $LLVM_BUILD/lib/GaloisFunctionsAnalysis.so -Xclang -plugin -Xclang galois-analysis"
 GFUNCS_CXX="$CXX -Xclang -load -Xclang $LLVM_BUILD/lib/GaloisFunctions.so -Xclang -plugin -Xclang galois-fns"
 
+log=.log
+
 echo "Cleaning generated files"
 rm -f gen.cpp gen_cuda.py gen_cuda.cu gen_cuda.cuh gen_cuda.h
 cp $SRC gen.cpp
 
 echo "Generating IrGL code"
-$IRGL_CXX $CXX_DEFINES $CXX_FLAGS -o .temp.o -c gen.cpp &>/dev/null
+$IRGL_CXX $CXX_DEFINES $CXX_FLAGS -o .temp.o -c gen.cpp &>$log
 echo "Generating CUDA code from IrGL"
-$GGC_ROOT/src/ggc -o gen_cuda.cu gen_cuda.py &>/dev/null
+$GGC_ROOT/src/ggc -o gen_cuda.cu gen_cuda.py >>$log 2>&1
 
 echo "Generating analysis information"
-$GANALYSIS_CXX $CXX_DEFINES $CXX_FLAGS -o .temp.o -c gen.cpp &>/dev/null
+$GANALYSIS_CXX $CXX_DEFINES $CXX_FLAGS -o .temp.o -c gen.cpp >>$log 2>&1
 echo "Generating communication code"
-$GFUNCS_CXX $CXX_DEFINES $CXX_FLAGS -o .temp.o -c gen.cpp &>/dev/null
+$GFUNCS_CXX $CXX_DEFINES $CXX_FLAGS -o .temp.o -c gen.cpp >>$log 2>&1
 
 rm -f Entry-*.dot
 
