@@ -36,8 +36,8 @@
 #include "Galois/Runtime/CompilerHelperFunctions.h"
 #include "Galois/Runtime/Tracer.h"
 
-#include "OfflineGraph.h"
-#include "hGraph.h"
+#include "Galois/Dist/OfflineGraph.h"
+#include "Galois/Dist/hGraph.h"
 
 static const char* const name = "PageRank - Compiler Generated Distributed Heterogeneous";
 static const char* const desc = "Residual PageRank on Distributed Galois.";
@@ -88,9 +88,9 @@ struct InitializeGraph {
     Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ &_graph }, Galois::loopname("Init"), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "value" , "float"), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "nout" , "unsigned int"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ Galois::atomicAdd(node.residual, y);}",  "0"));
     _graph.sync_push<Syncer_0>();
     
-    _graph.sync_pull<SyncerPull_0>();
+    //_graph.sync_pull<SyncerPull_0>();
     
-    _graph.sync_pull<SyncerPull_1>();
+    //_graph.sync_pull<SyncerPull_1>();
     
   }
 
@@ -150,7 +150,7 @@ struct PageRank {
       }
       void static sync_graph_static(Graph& _g){
         _g.sync_push<Syncer_0>();
-        _g.sync_pull<SyncerPull_0>();
+        //_g.sync_pull<SyncerPull_0>();
       }
     };
 
@@ -176,9 +176,7 @@ struct PageRank {
         auto dst_residual_old = Galois::atomicAdd(ddata.residual, delta);
 
         //Schedule TOLERANCE threshold crossed.
-          //std::cout << "out  : " << (dst_residual_old + delta) << "\n";
         if((dst_residual_old <= tolerance) && ((dst_residual_old + delta) >= tolerance)) {
-            //std::cout << "pushed : " << graph->getGID(dst) << " host : " << graph->getHostID(graph->getGID(dst)) << "\n";
           ctx.push(WorkItem(graph->getGID(dst)));
         }
       }

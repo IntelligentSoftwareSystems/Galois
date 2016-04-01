@@ -35,8 +35,8 @@
 
 #include "Galois/Runtime/CompilerHelperFunctions.h"
 
-#include "OfflineGraph.h"
-#include "hGraph.h"
+#include "Galois/Dist/OfflineGraph.h"
+#include "Galois/Dist/hGraph.h"
 
 static const char* const name = "PageRank - Compiler Generated Distributed Heterogeneous";
 static const char* const desc = "Residual PageRank on Distributed Galois.";
@@ -179,7 +179,7 @@ struct Get_info_functor : public Galois::op_tag {
 
 		_graph.sync_push<Syncer_0>();
 
-		_graph.sync_pull<SyncerPull_0>();
+		//_graph.sync_pull<SyncerPull_0>();
 	}
 };
 
