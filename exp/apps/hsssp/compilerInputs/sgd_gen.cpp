@@ -78,6 +78,7 @@ double getstep_size(unsigned int round) {
 struct InitializeGraph{
     Graph* graph;
 
+  InitializeGraph(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph) {
     Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{&_graph}, Galois::loopname("SGD Init"));
   }
@@ -118,6 +119,7 @@ struct Sgd {
   Graph* graph;
   double step_size;
 
+  Sgd(Graph* _graph, double _step_size) : graph(_graph), step_size(_step_size){}
   void static go(Graph& _graph, double _step_size) {
       Galois::do_all(_graph.begin(), _graph.end(), Sgd{&_graph, _step_size}, Galois::loopname("SGD"));
   }

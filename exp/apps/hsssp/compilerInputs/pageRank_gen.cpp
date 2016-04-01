@@ -63,6 +63,7 @@ typedef typename Graph::GraphNode GNode;
 struct InitializeGraph {
   Graph* graph;
 
+  InitializeGraph(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph) {
     Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ &_graph }, Galois::loopname("Init"));
   }
@@ -101,6 +102,7 @@ static void didWork_landingPad(Galois::Runtime::RecvBuffer& buf){
 struct PageRank {
   Graph* graph;
 
+  PageRank(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph) {
     Galois::do_all(_graph.begin(), _graph.end(), PageRank { &_graph });
   }
