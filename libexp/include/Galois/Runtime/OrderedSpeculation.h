@@ -42,6 +42,7 @@
 #include "Galois/Runtime/IKDGbase.h"
 #include "Galois/Runtime/WindowWorkList.h"
 #include "Galois/Runtime/UserContextAccess.h"
+#include "Galois/Runtime/Executor_ParaMeter.h"
 #include "Galois/Runtime/Mem.h"
 
 #include "Galois/Substrate/gio.h"
@@ -51,6 +52,21 @@
 namespace Galois {
 
 namespace Runtime {
+
+enum class SpecMode {
+  OPTIM, PESSIM
+};
+
+namespace cll = llvm::cl;
+
+
+cll::opt<SpecMode> specMode (
+    cll::desc ("DoAll Implementation"),
+    cll::values (
+      clEnumVal (SpecMode::OPTIM, "SpecMode::OPTIM"),
+      clEnumVal (SpecMode::PESSIM, "SpecMode::PESSIM"),
+      clEnumValEnd),
+    cll::init (SpecMode::OPTIM));
 
 enum class ContextState: int {
     UNSCHEDULED = 0,
@@ -260,42 +276,27 @@ struct OptimNhoodItem: public OrdLocBase<OptimNhoodItem<Ctxt, CtxtCmp>, Ctxt, Ct
 
 
 template <typename T, typename Cmp, typename Exec>
-struct OptimContext: public OrderedContextBase<T> {
+struct SpecContextBase: public OrderedContextBase<T> {
 
   using Base = OrderedContextBase<T>;
+  using CtxtCmp = ContextComparator<SpecContextBase, Cmp>;
+  using Executor = Exec;
 
-  using CtxtCmp = ContextComparator<OptimContext, Cmp>;
-  using NItem = OptimNhoodItem<OptimContext, CtxtCmp>;
-  using NhoodMgr = PtrBasedNhoodMgr<NItem>;
-  using NhoodList = typename gstl::Vector<NItem*>;
-  using ChildList = typename gstl::Vector<OptimContext*>;
-  using Lock_ty = Galois::Substrate::SimpleLock;
 
   bool source;
   std::atomic<ContextState> state;
   Exec& exec;
-  bool addBack; // set to false by parent when parent is marked for abort, see markAbortRecursive
-  Galois::GAtomic<bool> onWL;
   unsigned execRound;
-  NhoodList nhood;
-
-  // TODO: avoid using UserContextAccess and per-iteration allocator
-  // use Pow of 2 block allocator instead. 
   UserContextAccess<T> userHandle;
-  ChildList children;
 
-
-  explicit OptimContext (const T& x, const ContextState& s, Exec& exec)
+  explicit SpecContextBase (const T& x, const ContextState& s, Exec& exec)
   :
     Base (x), 
     source (true), 
     state (s), 
     exec (exec),
-    addBack (false),
-    onWL (false),
     execRound (0)
   {}
-
 
   bool hasState (const ContextState& s) const { return state == s; } 
 
@@ -317,19 +318,6 @@ struct OptimContext: public OrderedContextBase<T> {
 
   ContextState getState (void) const { return state; }
 
-  // bool isRunning (void) const {
-    // return hasState (ContextState::SCHEDULED) || hasState (ContextState::ABORT_SELF);
-  // }
-// 
-  // void waitFor (OptimContext* that) const {
-    // assert (that);
-// 
-    // while (that->isRunning ()) {
-      // Substrate::asmPause ();
-    // }
-  // }
-
-
   void disableSrc (void) {
     source = false;
   }
@@ -338,10 +326,50 @@ struct OptimContext: public OrderedContextBase<T> {
     return source; 
   }
 
+  void schedule (void) {
+    source = true;
+
+    assert (hasState (ContextState::UNSCHEDULED) || hasState (ContextState::ABORT_DONE));
+    setState (ContextState::SCHEDULED); 
+
+    userHandle.reset ();
+  }
+};
+
+
+template <typename T, typename Cmp, typename Exec>
+struct OptimContext: public SpecContextBase<T, Cmp, Exec> {
+
+  using Base = SpecContextBase<T, Cmp, Exec>;
+  using CtxtCmp = typename Base::CtxtCmp;
+
+  using NItem = OptimNhoodItem<OptimContext, CtxtCmp>;
+  using NhoodMgr = PtrBasedNhoodMgr<NItem>;
+  using NhoodList = typename gstl::Vector<NItem*>;
+  using ChildList = typename gstl::Vector<OptimContext*>;
+  using Lock_ty = Galois::Substrate::SimpleLock;
+
+  Galois::GAtomic<bool> onWL;
+  bool addBack; // set to false by parent when parent is marked for abort, see markAbortRecursive
+  NhoodList nhood;
+
+  // TODO: avoid using UserContextAccess and per-iteration allocator
+  // use Pow of 2 block allocator instead. 
+  ChildList children;
+
+
+  explicit OptimContext (const T& x, const ContextState& s, Exec& exec)
+  :
+    Base (x, s, exec), 
+    onWL (false),
+    addBack (false)
+  {}
+
+
   GALOIS_ATTRIBUTE_PROF_NOINLINE
   virtual void subAcquire (Lockable* l, Galois::MethodFlag m) {
 
-    NItem& nitem = exec.nhmgr.getNhoodItem (l);
+    NItem& nitem = Base::exec.nhmgr.getNhoodItem (l);
     assert (NItem::getOwner (l) == &nitem);
 
     if (std::find (nhood.begin (), nhood.end (), &nitem) == nhood.end ()) {
@@ -351,12 +379,10 @@ struct OptimContext: public OrderedContextBase<T> {
   }
 
   void schedule (void) {
-    setState (ContextState::SCHEDULED); 
+    Base::schedule ();
     onWL = false;
-    source = true;
     addBack = true;
     nhood.clear ();
-    userHandle.reset ();
     children.clear ();
   }
 
@@ -385,17 +411,17 @@ struct OptimContext: public OrderedContextBase<T> {
 
   void doCommit () {
 
-    assert (hasState (ContextState::COMMITTING));
+    assert (Base::hasState (ContextState::COMMITTING));
 
     dbg::print (this, " committing with item ", this->getActive ());
 
-    userHandle.commit (); // TODO: rename to retire
+    Base::userHandle.commit (); // TODO: rename to retire
 
     for (NItem* n: nhood) {
       n->removeCommit (this);
     }
 
-    setState (ContextState::COMMIT_DONE);
+    Base::setState (ContextState::COMMIT_DONE);
   }
 
   void doAbort () {
@@ -406,11 +432,11 @@ struct OptimContext: public OrderedContextBase<T> {
     // then abort self.
     //
 
-    assert (hasState (ContextState::ABORTING));
+    assert (Base::hasState (ContextState::ABORTING));
 
     dbg::print (this, " aborting with item ", this->getActive ());
 
-    userHandle.rollback ();
+    Base::userHandle.rollback ();
 
     for (NItem* ni: nhood) {
       ni->removeAbort (this);
@@ -418,12 +444,12 @@ struct OptimContext: public OrderedContextBase<T> {
 
     if (this->addBack) {
 
-      setState (ContextState::ABORT_DONE);
-      exec.push_abort (this);
+      Base::setState (ContextState::ABORT_DONE);
+      Base::exec.push_abort (this);
 
     } else {
       // is an aborted child whose parent also aborted
-      setState (ContextState::ABORTED_CHILD);
+      Base::setState (ContextState::ABORTED_CHILD);
     }
 
   }
@@ -448,7 +474,7 @@ struct OptimContext: public OrderedContextBase<T> {
       OptimContext* c = ni->getHistHead ();
       assert (c != this);
 
-      if (c && (!gvt || exec.ctxtCmp (c, gvt)) 
+      if (c && (!gvt || Base::exec.ctxtCmp (c, gvt)) 
           && c->isCommitSrc () 
           && c->onWL.cas (false, true)) {
         wl.push (c);
@@ -458,7 +484,7 @@ struct OptimContext: public OrderedContextBase<T> {
 
   bool isAbortSrc (void) const {
 
-    if (!this->hasState (ContextState::READY_TO_ABORT)) {
+    if (!Base::hasState (ContextState::READY_TO_ABORT)) {
       return false;
     }
 
@@ -519,7 +545,7 @@ struct OptimContext: public OrderedContextBase<T> {
 
   template <typename WL>
   void markForAbortRecursive (WL& abortWL) {
-    if (casState (ContextState::READY_TO_COMMIT, ContextState::READY_TO_ABORT)) {
+    if (Base::casState (ContextState::READY_TO_COMMIT, ContextState::READY_TO_ABORT)) {
 
       for (NItem* ni: nhood) {
         ni->markForAbort (this, abortWL);
@@ -535,16 +561,16 @@ struct OptimContext: public OrderedContextBase<T> {
         c->addBack = false;
       }
 
-    } else if (casState (ContextState::SCHEDULED, ContextState::ABORTED_CHILD)) {
+    } else if (Base::casState (ContextState::SCHEDULED, ContextState::ABORTED_CHILD)) {
       // a SCHEDULED task can only be aborted recursively if it's a child
 
-    } else if (casState (ContextState::UNSCHEDULED, ContextState::ABORTED_CHILD)) {
+    } else if (Base::casState (ContextState::UNSCHEDULED, ContextState::ABORTED_CHILD)) {
 
     } else {
-      assert (hasState (ContextState::READY_TO_ABORT) || hasState (ContextState::ABORTED_CHILD));
+      assert (Base::hasState (ContextState::READY_TO_ABORT) || Base::hasState (ContextState::ABORTED_CHILD));
     }
 
-    assert (hasState (ContextState::READY_TO_ABORT) || hasState (ContextState::ABORTED_CHILD));
+    assert (Base::hasState (ContextState::READY_TO_ABORT) || Base::hasState (ContextState::ABORTED_CHILD));
 
   }
 
@@ -566,20 +592,15 @@ struct OptimContext: public OrderedContextBase<T> {
 
 };
 
-template <typename T, typename Cmp, typename NhFunc, typename ExFunc, typename  OpFunc, typename ArgsTuple>
-class OptimOrdExecutor: public IKDGbase<T, Cmp, 
-  OptimContext<T, Cmp, OptimOrdExecutor<T, Cmp, NhFunc, ExFunc, OpFunc, ArgsTuple> >,
-  NhFunc, ExFunc, OpFunc, ArgsTuple> {
+template <typename T, typename Cmp, typename NhFunc, typename ExFunc, typename OpFunc, typename ArgsTuple, typename Ctxt>
+class OrdSpecExecBase: public IKDGbase<T, Cmp, NhFunc, ExFunc, OpFunc, ArgsTuple, Ctxt> {
 
-public:
+ protected:
 
-  friend struct OptimContext<T, Cmp, OptimOrdExecutor>;
-  using Ctxt = OptimContext<T, Cmp, OptimOrdExecutor>;
-  using Base = IKDGbase <T, Cmp, Ctxt, NhFunc, ExFunc, OpFunc, ArgsTuple>;
+  using Base = IKDGbase <T, Cmp, NhFunc, ExFunc, OpFunc, ArgsTuple, Ctxt>;
+  using Derived = typename Ctxt::Executor;
 
-  using NhoodMgr = typename Ctxt::NhoodMgr;
   using CtxtCmp = typename Ctxt::CtxtCmp;
-  using NItemFactory = typename Ctxt::NItem::Factory;
   using CtxtWL = typename Base::CtxtWL;
 
   using WindowWL = typename std::conditional<Base::NEEDS_PUSH, PQbasedWindowWL<Ctxt*, CtxtCmp>, SortedRangeWindowWL<Ctxt*, CtxtCmp> >::type;
@@ -590,54 +611,42 @@ public:
   static const unsigned DEFAULT_CHUNK_SIZE = 4;
 
   struct CtxtMaker {
-    OptimOrdExecutor& outer;
+    OrdSpecExecBase& outer;
 
     Ctxt* operator () (const T& x) {
 
       Ctxt* ctxt = outer.ctxtAlloc.allocate (1);
       assert (ctxt);
-      outer.ctxtAlloc.construct (ctxt, x, ContextState::UNSCHEDULED, outer);
+      outer.ctxtAlloc.construct (ctxt, x, ContextState::UNSCHEDULED, static_cast<Derived&> (outer));
 
       return ctxt;
     }
   };
 
 
-  NItemFactory nitemFactory;
-  NhoodMgr nhmgr;
   WindowWL winWL;
   CtxtMaker ctxtMaker;
+  Substrate::PerThreadStorage<Ctxt*> currMinPending; // reset at the beginning of each round
 
 
   GAccumulator<size_t> totalRetires;
   CommitQ commitQ;
   ExecutionRecords execRcrds;
 
-  TimeAccumulator t_expandNhood;
-  TimeAccumulator t_beginRound;
-  TimeAccumulator t_executeSources;
-  TimeAccumulator t_applyOperator;
-  TimeAccumulator t_computeGVT;
-  TimeAccumulator t_serviceAborts;
-  TimeAccumulator t_performCommits;
-  TimeAccumulator t_reclaimMemory;
 
 public:
-  OptimOrdExecutor (const Cmp& cmp, const NhFunc& nhFunc, const ExFunc& exFunc, const OpFunc& opFunc, const ArgsTuple& argsTuple)
+  OrdSpecExecBase (const Cmp& cmp, const NhFunc& nhFunc, const ExFunc& exFunc, const OpFunc& opFunc, const ArgsTuple& argsTuple)
     : 
       Base (cmp, nhFunc, exFunc, opFunc, argsTuple),
-      nitemFactory (Base::ctxtCmp),
-      nhmgr (nitemFactory),
       winWL (Base::ctxtCmp),
       ctxtMaker {*this}
   {
   }
 
-  ~OptimOrdExecutor (void) {
+  ~OrdSpecExecBase (void) {
     dumpStats ();
   }
 
-  // on each thread
   template <typename R>
   void push_initial (const R& range) {
 
@@ -666,46 +675,7 @@ public:
 
   }
 
-  void operator () (void) {
-    execute ();
-  }
-  
-  void execute () {
-
-    StatTimer t ("executorLoop");
-
-    typename Base::CtxtWL sources;
-
-    t.start ();
-
-    while (true) {
-
-      beginRound ();
-
-      if (Base::getCurrWL ().empty_all ()) {
-        break;
-      }
-
-      expandNhood ();
-
-      serviceAborts (sources);
-
-      executeSources (sources);
-
-      applyOperator (sources);
-
-      performCommits ();
-
-      reclaimMemory (sources);
-
-      Base::endRound ();
-
-    }
-
-    t.stop ();
-  }
-
-private:
+protected:
 
   void dumpParaMeterStats (void) {
 
@@ -719,64 +689,113 @@ private:
   void dumpStats (void) {
 
     reportStat (Base::loopname, "retired", totalRetires.reduce ());
-    reportStat (Base::loopname, "efficiency", double (totalRetires.reduce ()) / Base::totalTasks);
+    reportStat (Base::loopname, "efficiency%", double (100 * totalRetires.reduce ()) / Base::totalTasks);
     reportStat (Base::loopname, "avg. parallelism", double (totalRetires.reduce ()) / Base::rounds);
 
     if (Base::ENABLE_PARAMETER) {
       dumpParaMeterStats ();
     }
-
-    reportStat ("NULL", "t_expandNhood",    t_expandNhood.get ());
-    reportStat ("NULL", "t_beginRound",     t_beginRound.get ());
-    reportStat ("NULL", "t_executeSources", t_executeSources.get ());
-    reportStat ("NULL", "t_applyOperator",  t_applyOperator.get ());
-    reportStat ("NULL", "t_computeGVT",     t_computeGVT.get ());
-    reportStat ("NULL", "t_serviceAborts",  t_serviceAborts.get ());
-    reportStat ("NULL", "t_performCommits", t_performCommits.get ());
-    reportStat ("NULL", "t_reclaimMemory",  t_reclaimMemory.get ());
-
   }
 
-  Ctxt* push (const T& x) {
-    
-    Ctxt* ctxt = ctxtMaker (x);
+  void updateCurrMinPending (Ctxt* c) {
+    Ctxt*& minPending = *currMinPending.getLocal ();
 
-    if (Base::targetCommitRatio == 0.0) {
+    if (!minPending || Base::ctxtCmp (c, minPending)) {
+      minPending = c;
+    }
+  }
 
-      Base::getNextWL ().push (ctxt);
+  Ctxt* getMinWinWL (void) {
+    Ctxt* m = nullptr;
 
-    } else {
-      winWL.push (ctxt);
-          
+    if (Base::NEEDS_PUSH) {
+      if (Base::targetCommitRatio != 0.0 && !winWL.empty ()) {
+        m = *winWL.getMin();
+      }
     }
 
-    return ctxt;
+    return m;
   }
+
+  Ctxt* getMinPending (void) {
+    Ctxt* m = getMinWinWL ();
+
+    for (unsigned i = 0; i < Galois::getActiveThreads (); ++i) {
+      Ctxt* c = *currMinPending.getRemote (i);
+
+      if (!c) { continue; }
+
+      if (!m || Base::ctxtCmp (m, c)) {
+        m = c;
+      }
+    }
+
+    return m;
+  }
+
+  Ctxt* push_commit (const T& x, Ctxt* minWinWL, unsigned owner=Substrate::ThreadPool::getTID ()) {
+
+    Ctxt* c = ctxtMaker (x); 
+    assert (c);
+
+    updateCurrMinPending (c);
+
+    if (!minWinWL || !Base::ctxtCmp (minWinWL, c)) {
+        Base::getNextWL ().push_back (c, owner);
+
+    } else {
+      assert (Base::targetCommitRatio != 0.0);
+      winWL.push (c, owner);
+    }
+
+    return c;
+  }
+
 
   void push_abort (Ctxt* ctxt) {
     assert (ctxt);
     assert (ctxt->hasState (ContextState::ABORT_DONE));
 
     ctxt->setState (ContextState::UNSCHEDULED);
+
+    updateCurrMinPending (ctxt);
     Base::getNextWL ().push (ctxt);
   }
 
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void beginRound () {
     
-    t_beginRound.start ();
     Base::beginRound (winWL);
 
     if (Base::ENABLE_PARAMETER) {
       execRcrds.emplace_back (Base::rounds, Base::getCurrWL ().size_all ());
     }
 
-    t_beginRound.stop ();
+    // reset currMinPending
+    on_each_impl (
+        [this] (const unsigned tid, const unsigned numT) {
+          *(currMinPending.getLocal (tid)) = nullptr;
+        });
+
+
+    if (true) {
+      const Ctxt* minWinWL = getMinWinWL ();
+
+      on_each_impl (
+          [this, minWinWL] (const unsigned tid, const unsigned numT) {
+            if (minWinWL) {
+              auto& wl = Base::getCurrWL ().get ();
+
+              for (Ctxt* c: wl) {
+                assert (!Base::ctxtCmp (minWinWL, c));
+              }
+            }
+          });
+    }
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhood (void) {
 
-    t_expandNhood.start ();
     Galois::do_all_choice (makeLocalRange (Base::getCurrWL ()),
         [this] (Ctxt* c) {
 
@@ -799,9 +818,105 @@ private:
           Galois::loopname ("expandNhood"),
           chunk_size<NhFunc::CHUNK_SIZE> ()));
 
-    t_expandNhood.stop ();
-
   }
+
+
+  void freeCtxt (Ctxt* ctxt) {
+    Base::ctxtAlloc.destroy (ctxt);
+    Base::ctxtAlloc.deallocate (ctxt, 1);
+  }
+
+};
+
+template <typename T, typename Cmp, typename NhFunc, typename ExFunc, typename  OpFunc, typename ArgsTuple>
+class OptimOrdExecutor: public OrdSpecExecBase<T, Cmp, NhFunc, ExFunc, OpFunc, ArgsTuple,
+  OptimContext<T, Cmp, OptimOrdExecutor<T, Cmp, NhFunc, ExFunc, OpFunc, ArgsTuple> > > {
+
+protected:
+
+  friend struct OptimContext<T, Cmp, OptimOrdExecutor>;
+  using Ctxt = OptimContext<T, Cmp, OptimOrdExecutor>;
+  using Base = OrdSpecExecBase<T, Cmp, NhFunc, ExFunc, OpFunc, ArgsTuple, Ctxt>;
+
+  using NhoodMgr = typename Ctxt::NhoodMgr;
+  using CtxtCmp = typename Ctxt::CtxtCmp;
+  using NItemFactory = typename Ctxt::NItem::Factory;
+  using CtxtWL = typename Base::CtxtWL;
+
+
+  NItemFactory nitemFactory;
+  NhoodMgr nhmgr;
+
+  TimeAccumulator t_expandNhood;
+  TimeAccumulator t_beginRound;
+  TimeAccumulator t_executeSources;
+  TimeAccumulator t_applyOperator;
+  TimeAccumulator t_computeGVT;
+  TimeAccumulator t_serviceAborts;
+  TimeAccumulator t_performCommits;
+  TimeAccumulator t_reclaimMemory;
+
+public:
+  OptimOrdExecutor (const Cmp& cmp, const NhFunc& nhFunc, const ExFunc& exFunc, const OpFunc& opFunc, const ArgsTuple& argsTuple)
+    : 
+      Base (cmp, nhFunc, exFunc, opFunc, argsTuple),
+      nitemFactory (Base::ctxtCmp),
+      nhmgr (nitemFactory)
+  {
+  }
+
+  ~OptimOrdExecutor (void) {
+    reportStat ("NULL", "t_expandNhood",    t_expandNhood.get ());
+    reportStat ("NULL", "t_beginRound",     t_beginRound.get ());
+    reportStat ("NULL", "t_executeSources", t_executeSources.get ());
+    reportStat ("NULL", "t_applyOperator",  t_applyOperator.get ());
+    reportStat ("NULL", "t_computeGVT",     t_computeGVT.get ());
+    reportStat ("NULL", "t_serviceAborts",  t_serviceAborts.get ());
+    reportStat ("NULL", "t_performCommits", t_performCommits.get ());
+    reportStat ("NULL", "t_reclaimMemory",  t_reclaimMemory.get ());
+  }
+
+  void operator () (void) {
+    execute ();
+  }
+  
+  void execute () {
+
+    StatTimer t ("executorLoop");
+
+    typename Base::CtxtWL sources;
+
+    t.start ();
+
+    while (true) {
+
+      Base::beginRound ();
+
+      if (Base::getCurrWL ().empty_all ()) {
+        break;
+      }
+
+      Base::expandNhood ();
+
+      serviceAborts (sources);
+
+      executeSources (sources);
+
+      applyOperator (sources);
+
+      performCommits ();
+
+      reclaimMemory (sources);
+
+      Base::endRound ();
+
+    }
+
+    t.stop ();
+  }
+
+private:
+
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void executeSources (CtxtWL& sources) {
 
@@ -829,18 +944,12 @@ private:
   GALOIS_ATTRIBUTE_PROF_NOINLINE void applyOperator (CtxtWL& sources) {
     t_applyOperator.start ();
 
-    Ctxt* minElem = nullptr;
 
-    if (Base::NEEDS_PUSH) {
-      if (Base::targetCommitRatio != 0.0 && !winWL.empty ()) {
-        minElem = *winWL.getMin();
-      }
-    }
-
+    Ctxt* minWinWL = Base::getMinWinWL ();
 
 
     Galois::do_all_choice (makeLocalRange (sources),
-        [this, minElem] (Ctxt* c) {
+        [this, minWinWL] (Ctxt* c) {
 
           typename Base::UserCtxt& uhand = c->userHandle;
 
@@ -866,15 +975,9 @@ private:
               for (auto i = uhand.getPushBuffer ().begin ()
                   , endi = uhand.getPushBuffer ().end (); i != endi; ++i) {
 
-                Ctxt* child = ctxtMaker (*i);
+                Ctxt* child = Base::push_commit (*i, minWinWL);
                 c->addChild (child);
 
-                if (!minElem || !Base::ctxtCmp (minElem, child)) {
-                  // if *i >= *minElem
-                  Base::getNextWL ().push_back (child);
-                } else {
-                  winWL.push (child);
-                } 
               }
             } else {
 
@@ -888,7 +991,7 @@ private:
 
             c->publishChanges ();
             c->addToHistory ();
-            commitQ.get ().push_back (c);
+            Base::commitQ.get ().push_back (c);
 
             if (Base::ENABLE_PARAMETER) {
               c->markExecRound (Base::rounds);
@@ -912,6 +1015,7 @@ private:
 
   }
 
+  /*
   Ctxt* computeGVT (void) {
 
     t_computeGVT.start ();
@@ -946,19 +1050,12 @@ private:
       }
     }
 
-    Ctxt* const* minElem = winWL.getMin ();
+    Ctxt* const* minWinWL = winWL.getMin ();
 
-    if (minElem) {
-      if (!ret || Base::ctxtCmp (*minElem, ret)) {
-        ret = *minElem;
+    if (minWinWL) {
+      if (!ret || Base::ctxtCmp (*minWinWL, ret)) {
+        ret = *minWinWL;
       }
-    }
-
-    if (ret) {
-      dbg::print ("GVT computed as: ", ret, ", with elem: ", ret->getActive ());
-
-    } else {
-      dbg::print ("GVT computed as NULL");
     }
 
     t_computeGVT.stop ();
@@ -966,6 +1063,7 @@ private:
     return ret;
 
   }
+  */
 
   void quickAbort (Ctxt* c) {
     assert (c);
@@ -974,7 +1072,7 @@ private:
     assert (b);
 
     if (c->casState (ContextState::SCHEDULED, ContextState::ABORT_DONE)) {
-      push_abort (c);
+      Base::push_abort (c);
 
     } else {
       assert (c->hasState (ContextState::ABORTED_CHILD)); 
@@ -1003,7 +1101,7 @@ private:
         },
         std::make_tuple (
           Galois::loopname ("mark-aborts"),
-          Galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
+          Galois::chunk_size<Base::DEFAULT_CHUNK_SIZE> ()));
 
 
     Galois::Runtime::for_each_gen (
@@ -1034,7 +1132,7 @@ private:
             sources.push (c);
 
           } else if (c->hasState (ContextState::ABORTED_CHILD)) {
-            commitQ.get ().push_back (c); // for reclaiming memory 
+            Base::commitQ.get ().push_back (c); // for reclaiming memory 
 
           } else {
             assert (!c->hasState (ContextState::ABORTED_CHILD));
@@ -1045,7 +1143,7 @@ private:
         },
         std::make_tuple ( 
           Galois::loopname ("collect-sources"),
-          Galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
+          Galois::chunk_size<Base::DEFAULT_CHUNK_SIZE> ()));
 
     t_serviceAborts.stop ();
 
@@ -1057,10 +1155,17 @@ private:
 
     CtxtWL commitSources;
 
-    Ctxt* gvt = computeGVT ();
+    Ctxt* gvt = Base::getMinPending ();
+
+    if (gvt) {
+      dbg::print ("GVT computed as: ", gvt, ", with elem: ", gvt->getActive ());
+    } else {
+      dbg::print ("GVT computed as NULL");
+    }
 
 
-    Galois::do_all_choice (makeLocalRange (commitQ),
+
+    Galois::do_all_choice (makeLocalRange (Base::commitQ),
         [this, gvt, &commitSources] (Ctxt* c) {
 
           assert (c);
@@ -1074,7 +1179,7 @@ private:
         },
         std::make_tuple (
           Galois::loopname ("find-commit-srcs"),
-          Galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
+          Galois::chunk_size<Base::DEFAULT_CHUNK_SIZE> ()));
         
 
     Galois::Runtime::for_each_gen (
@@ -1088,11 +1193,11 @@ private:
             assert (c->isCommitSrc ());
             c->doCommit ();
             c->findCommitSrc (gvt, wlHandle);
-            totalRetires += 1;
+            Base::totalRetires += 1;
 
             if (Base::ENABLE_PARAMETER) {
-              assert (c->getExecRound () < execRcrds.size ());
-              execRcrds[c->getExecRound ()].parallelism += 1;
+              assert (c->getExecRound () < Base::execRcrds.size ());
+              Base::execRcrds[c->getExecRound ()].parallelism += 1;
             }
 
           } else {
@@ -1102,7 +1207,7 @@ private:
         std::make_tuple (
           Galois::loopname ("retire"),
           Galois::does_not_need_aborts_tag (),
-          Galois::wl<Galois::WorkList::dChunkedFIFO<DEFAULT_CHUNK_SIZE> > ()));
+          Galois::wl<Galois::WorkList::dChunkedFIFO<Base::DEFAULT_CHUNK_SIZE> > ()));
 
     t_performCommits.stop ();
 
@@ -1129,7 +1234,7 @@ private:
     Galois::Runtime::on_each_impl (
         [this] (const unsigned tid, const unsigned numT) {
           
-          auto& localQ = commitQ.get ();
+          auto& localQ = Base::commitQ.get ();
           auto new_end = std::partition (localQ.begin (), 
             localQ.end (), 
             [] (Ctxt* c) {
@@ -1160,8 +1265,415 @@ private:
 };
 
 
-template <typename R, typename Cmp, typename NhFunc, typename ExFunc, typename OpFunc, typename _ArgsTuple>
-void for_each_ordered_optim (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const ExFunc& exFunc, const OpFunc& opFunc, const _ArgsTuple& argsTuple) {
+template <typename T, typename Cmp, typename Exec>
+class PessimOrdContext: public SpecContextBase<T, Cmp, Exec> {
+
+public:
+
+  using Base = SpecContextBase<T, Cmp, Exec>;
+  using NhoodList =  Galois::gstl::Vector<Lockable*>;
+  using CtxtCmp = typename Base::CtxtCmp;
+  using Executor = Exec;
+
+  
+  unsigned owner;
+  NhoodList nhood;
+
+  explicit PessimOrdContext (const T& x, const ContextState& s, Exec& e)
+    : 
+      Base (x, s, e), 
+      owner (Substrate::ThreadPool::getTID ())
+
+  {}
+
+  void schedule () {
+    Base::schedule ();
+    nhood.clear ();
+    owner = Substrate::ThreadPool::getTID ();
+  }
+
+
+  bool priorityAcquire (Lockable* l) {
+    PessimOrdContext* other = nullptr;
+
+    do {
+      other = static_cast<PessimOrdContext*> (Base::getOwner (l));
+
+      if (other == this) {
+        return true;
+      }
+
+      if (other) {
+        bool conflict = Base::exec.getCtxtCmp () (other, this); // *other < *this
+        if (conflict) {
+          // A lock that I want but can't get
+          this->disableSrc ();
+          return false; 
+        }
+      }
+    } while (!this->CASowner(l, other));
+
+    // Disable loser
+    if (other) {
+      other->disableSrc ();
+
+      if (other->casState (ContextState::READY_TO_COMMIT, ContextState::ABORT_HELP)) {
+
+        Base::exec.markForAbort (other);
+        this->disableSrc ();// abort self to recompute after other has abortedthis->disableSrc ();
+      } else if (other->hasState (ContextState::ABORT_HELP)) {
+        this->disableSrc (); // abort self to recompute after other has aborted
+      }
+
+    }
+
+    return true;
+  }
+
+  // TODO: Refactor common code with TwoPhaseContext::subAcquire
+  virtual void subAcquire (Lockable* l, Galois::MethodFlag) {
+
+    dbg::print (this, " trying to acquire ", l);
+
+    if (std::find (nhood.cbegin (), nhood.cend (), l) == nhood.cend ()) {
+
+      nhood.push_back (l);
+
+      bool succ = priorityAcquire (l);
+
+      if (succ) {
+        dbg::print (this, " acquired lock ", l);
+      } else {
+        assert (!this->isSrc ());
+        dbg::print (this, " failed to acquire lock ", l);
+      }
+
+
+    } // end if find
+
+    return;
+  }
+
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void doCommit () {
+    assert (Base::hasState (ContextState::COMMITTING));
+
+    // executor must already have pushed new work from userHandle.getPushBuffer
+    // release locks
+    dbg::print (this, " committing with item ", this->getActive ());
+
+    Base::userHandle.commit ();
+    releaseLocks ();
+    Base::setState (ContextState::COMMIT_DONE);
+  }
+
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void doAbort () {
+    assert (Base::hasState (ContextState::ABORTING));
+    // perform undo actions in reverse order
+    // release locks
+    // add active element to worklist
+    dbg::print (this, " aborting with item ", this->getActive ());
+
+    Base::userHandle.rollback ();
+    releaseLocks ();
+    Base::setState (ContextState::ABORT_DONE);
+    Base::exec.push_abort (this);
+
+  }
+
+private:
+
+  void releaseLocks () {
+    for (Lockable* l: nhood) {
+      assert (l != nullptr);
+      if (Base::getOwner (l) == this) {
+        dbg::print (this, " releasing lock ", l);
+        Base::tryLock (l); // release requires having had the lock
+        Base::release (l);
+      }
+    }
+
+  }
+
+
+};
+
+template <typename T, typename Cmp, typename NhFunc, typename ExFunc, typename  OpFunc, typename ArgsTuple>
+class PessimOrdExecutor: public OrdSpecExecBase<T, Cmp, NhFunc, ExFunc, OpFunc, ArgsTuple,
+  PessimOrdContext<T, Cmp, PessimOrdExecutor<T, Cmp, NhFunc, ExFunc, OpFunc, ArgsTuple> > > {
+
+protected:
+
+  friend struct PessimOrdContext<T, Cmp, PessimOrdExecutor>;
+  using Ctxt = PessimOrdContext<T, Cmp, PessimOrdExecutor>;
+  using Base = OrdSpecExecBase<T, Cmp, NhFunc, ExFunc, OpFunc, ArgsTuple, Ctxt>;
+
+  using CtxtCmp = typename Ctxt::CtxtCmp;
+  using CtxtWL = typename Base::CtxtWL;
+
+  CtxtWL abortWL;
+
+public:
+
+  PessimOrdExecutor (const Cmp& cmp, const NhFunc& nhFunc, const ExFunc& exFunc, const OpFunc& opFunc, const ArgsTuple& argsTuple)
+    : 
+      Base (cmp, nhFunc, exFunc, opFunc, argsTuple)
+  {
+  }
+
+  void markForAbort (Ctxt* c) {
+    assert (c);
+    abortWL.push (c);
+  }
+
+  void execute (void) {
+    while (true) {
+
+      Base::beginRound ();
+
+      if (Base::getCurrWL ().empty_all ()) {
+        break;
+      }
+
+      Base::expandNhood ();
+
+      serviceAborts ();
+
+      executeSources ();
+
+      applyOperator ();
+
+      performCommits ();
+
+      Base::endRound ();
+
+    }
+
+  }
+
+  void serviceAborts () {
+
+    Galois::do_all_choice (makeLocalRange (abortWL),
+        [this] (Ctxt* c) {
+
+          bool b = c->hasState (ContextState::ABORT_HELP) 
+            || c->hasState (ContextState::ABORTING)
+            || c->hasState (ContextState::ABORT_DONE);
+          assert (b);
+
+          if (c->casState (ContextState::ABORT_HELP, ContextState::ABORTING)) {
+            c->doAbort ();
+          }
+
+        },
+        std::make_tuple (
+          Galois::loopname ("abort-marked"),
+          Galois::chunk_size<Base::DEFAULT_CHUNK_SIZE> ()));
+
+    abortWL.clear_all_parallel ();
+
+  }
+
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void executeSources (void) {
+
+    if (Base::HAS_EXEC_FUNC) {
+
+      Galois::do_all_choice (makeLocalRange (Base::getCurrWL ()),
+        [this] (Ctxt* ctxt) {
+
+          if (ctxt->isSrc ()) {
+            assert (ctxt->hasState (ContextState::SCHEDULED));
+            Base::exFunc (ctxt->getActive (), ctxt->userHandle);
+          }
+
+        },
+        std::make_tuple (
+          Galois::loopname ("executeSources"),
+          Galois::chunk_size<ExFunc::CHUNK_SIZE> ()));
+
+    }
+  }
+
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void applyOperator (void) {
+
+    Galois::do_all_choice (makeLocalRange (Base::getCurrWL ()),
+        [this] (Ctxt* c) {
+
+          if (c->isSrc ()) {
+            typename Base::UserCtxt& uhand = c->userHandle;
+
+            bool commit = true;
+
+            if (Base::OPERATOR_CAN_ABORT) {
+              runCatching (Base::opFunc, c, uhand);
+              commit = c->isSrc (); // in case opFunc signalled abort
+
+            } else {
+              Base::opFunc (c->getActive (), uhand);
+              commit = true;
+            }
+
+            if (!commit) {
+              bool b = c->casState (ContextState::SCHEDULED, ContextState::ABORTING);
+              assert (b);
+
+              c->doAbort ();
+
+            } else {
+              bool b = c->casState (ContextState::SCHEDULED, ContextState::READY_TO_COMMIT);
+              assert (b);
+
+              Base::commitQ.get ().push_back (c);
+              Base::roundCommits += 1;
+
+              if (Base::ENABLE_PARAMETER) {
+                c->markExecRound (Base::rounds);
+              }
+            }
+
+          } else {
+
+            if (c->casState (ContextState::SCHEDULED, ContextState::ABORTING)) {
+              c->doAbort ();
+
+            } else {
+              assert (c->hasState (ContextState::ABORTING) || c->hasState (ContextState::ABORT_DONE));
+            }
+          }
+        },
+        std::make_tuple (
+          Galois::loopname ("applyOperator"),
+          Galois::chunk_size<OpFunc::CHUNK_SIZE> ()));
+
+  }
+
+  // TODO: refactor common code with OptimOrdExecutor::reclaimMemory
+  void performCommits (void) {
+
+    auto revCtxtCmp = [this] (const Ctxt* a, const Ctxt* b) { return Base::ctxtCmp (b, a); };
+
+    Galois::Runtime::on_each_impl (
+        [this, &revCtxtCmp] (const unsigned tid, const unsigned numT) {
+          auto& localQ = Base::commitQ.get ();
+          auto new_end = std::partition (localQ.begin (), 
+            localQ.end (), 
+            [] (Ctxt* c) {
+              assert (c);
+              return c->hasState (ContextState::READY_TO_COMMIT);
+            });
+
+          localQ.erase (new_end, localQ.end ());
+
+          std::sort (localQ.begin (), localQ.end (), revCtxtCmp);
+        });
+
+    using C = typename Base::CommitQ::container_type;
+
+    // assumes that per thread commit queues are sorted in reverse order
+    auto qcmp = [this] (const C* q1, const C* q2) -> bool {
+
+      assert (q1 && !q1->empty ());
+      assert (q2 && !q2->empty ());
+
+      return Base::ctxtCmp (q1->back (), q2->back ());
+    };
+     
+
+    using PQ = Galois::MinHeap<C*, typename std::remove_reference<decltype (qcmp)>::type>;
+    PQ commitMetaPQ (qcmp);
+
+    for (unsigned i = 0; i < Galois::getActiveThreads (); ++i) {
+
+      if (!Base::commitQ.get (i).empty ()) {
+        commitMetaPQ.push (&(Base::commitQ.get (i))); 
+      }
+    }
+
+    Ctxt* minWinWL = Base::getMinWinWL ();
+    Ctxt* minPending = Base::getMinPending ();
+
+
+    CtxtWL freeWL;
+
+    while (!commitMetaPQ.empty ()) { 
+
+      C* q = commitMetaPQ.pop ();
+      assert (!q->empty ());
+
+      bool e = commitMetaPQ.empty ();
+
+      bool exit = false;
+
+      do {
+        Ctxt* c = q->back ();
+
+        if (!minPending || !Base::ctxtCmp (minPending, c)) { // minPending >= c
+          //do commit
+          q->pop_back ();
+
+          assert (c->hasState (ContextState::READY_TO_COMMIT) || c->hasState (ContextState::COMMIT_DONE));
+
+          if (c->casState (ContextState::READY_TO_COMMIT, ContextState::COMMITTING)) {
+
+            if (Base::NEEDS_PUSH) {
+              auto& uhand = c->userHandle;
+              for (auto i = uhand.getPushBuffer ().begin ()
+                  , end_i = uhand.getPushBuffer ().end (); i != end_i; ++i) {
+
+                Ctxt* child = Base::push_commit (*i, minWinWL, c->owner);
+
+                if (!minPending || Base::ctxtCmp (child, minPending)) { // update minPending
+                  minPending = child;
+                }
+              }
+            }
+
+            c->doCommit ();
+            Base::totalRetires += 1;
+
+            if (Base::ENABLE_PARAMETER) {
+              assert (c->getExecRound () < Base::execRcrds.size ());
+              Base::execRcrds[c->getExecRound ()].parallelism += 1;
+            }
+
+
+            freeWL.push (c, c->owner);
+          }
+            
+
+        } else {
+          exit = true;
+          break; // exit
+        }
+      } while (!q->empty () && !e && qcmp (q, commitMetaPQ.top ()));
+
+      if (exit) {
+        break;
+      }
+
+      if (!q->empty ()) {
+        commitMetaPQ.push (q);
+      }
+    } // end outer while
+
+
+    // memory is returned to owner thread, thus thread 0 doesn't accumulate all 
+    // the feed blocks
+    on_each_impl (
+        [this, &freeWL] (const unsigned tid, const unsigned numT) {
+          for (auto i = freeWL.get ().begin ()
+              , end_i = freeWL.get ().end (); i != end_i; ++i) {
+
+            Base::freeCtxt (*i);
+          }
+        });
+          
+  } // end performCommits
+
+};
+
+
+template <template <typename, typename, typename, typename, typename, typename> class Executor, typename R, typename Cmp, typename NhFunc, typename ExFunc, typename OpFunc, typename _ArgsTuple>
+void for_each_ordered_spec_impl (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const ExFunc& exFunc, const OpFunc& opFunc, const _ArgsTuple& argsTuple) {
 
 
   auto argsT = std::tuple_cat (argsTuple, 
@@ -1173,7 +1685,7 @@ void for_each_ordered_optim (const R& range, const Cmp& cmp, const NhFunc& nhFun
   using T = typename R::value_type;
   
 
-  using Exec = OptimOrdExecutor<T, Cmp, NhFunc, ExFunc, OpFunc, ArgsT>;
+  using Exec = Executor<T, Cmp, NhFunc, ExFunc, OpFunc, ArgsT>;
   
   Exec e (cmp, nhFunc, exFunc, opFunc, argsT);
 
@@ -1185,11 +1697,53 @@ void for_each_ordered_optim (const R& range, const Cmp& cmp, const NhFunc& nhFun
   Substrate::getThreadPool().beKind();
 }
 
+template <typename R, typename Cmp, typename NhFunc, typename ExFunc, typename OpFunc, typename _ArgsTuple>
+void for_each_ordered_optim (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const ExFunc& exFunc, const OpFunc& opFunc, const _ArgsTuple& argsTuple) {
+
+  for_each_ordered_spec_impl<OptimOrdExecutor> (range, cmp, nhFunc, exFunc, opFunc, argsTuple);
+}
+
 template <typename R, typename Cmp, typename NhFunc, typename OpFunc, typename _ArgsTuple>
 void for_each_ordered_optim (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const _ArgsTuple& argsTuple) {
 
 
   for_each_ordered_optim (range, cmp, nhFunc, HIDDEN::DummyExecFunc (), opFunc, argsTuple);
+}
+
+template <typename R, typename Cmp, typename NhFunc, typename ExFunc, typename OpFunc, typename _ArgsTuple>
+void for_each_ordered_pessim (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const ExFunc& exFunc, const OpFunc& opFunc, const _ArgsTuple& argsTuple) {
+
+  for_each_ordered_spec_impl<PessimOrdExecutor> (range, cmp, nhFunc, exFunc, opFunc, argsTuple);
+}
+
+template <typename R, typename Cmp, typename NhFunc, typename OpFunc, typename _ArgsTuple>
+void for_each_ordered_pessim (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const _ArgsTuple& argsTuple) {
+
+  for_each_ordered_pessim (range, cmp, nhFunc, HIDDEN::DummyExecFunc (), opFunc, argsTuple);
+}
+
+
+template <typename R, typename Cmp, typename NhFunc, typename ExFunc, typename OpFunc, typename _ArgsTuple>
+void for_each_ordered_spec (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const ExFunc& exFunc, const OpFunc& opFunc, const _ArgsTuple& argsTuple) {
+
+  switch (specMode) {
+    case SpecMode::OPTIM:
+      for_each_ordered_spec_impl<OptimOrdExecutor> (range, cmp, nhFunc, exFunc, opFunc, argsTuple);
+      break;
+
+    case SpecMode::PESSIM:
+      for_each_ordered_spec_impl<PessimOrdExecutor> (range, cmp, nhFunc, exFunc, opFunc, argsTuple);
+      break;
+
+    default:
+      std::abort ();
+  }
+}
+
+template <typename R, typename Cmp, typename NhFunc, typename OpFunc, typename _ArgsTuple>
+void for_each_ordered_spec (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const _ArgsTuple& argsTuple) {
+
+  for_each_ordered_spec (range, cmp, nhFunc, HIDDEN::DummyExecFunc (), opFunc, argsTuple);
 }
 
 

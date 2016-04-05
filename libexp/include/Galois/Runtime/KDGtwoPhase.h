@@ -174,11 +174,11 @@ public:
 };
 
 template <typename T, typename Cmp, typename NhFunc, typename ExFunc, typename OpFunc, typename ArgsTuple>
-class IKDGtwoPhaseExecutor: public IKDGbase<T, Cmp, TwoPhaseContext<T, Cmp>, NhFunc, ExFunc, OpFunc, ArgsTuple> {
+class IKDGtwoPhaseExecutor: public IKDGbase<T, Cmp, NhFunc, ExFunc, OpFunc, ArgsTuple, TwoPhaseContext<T, Cmp> > {
 
 public:
   using Ctxt = TwoPhaseContext<T, Cmp>;
-  using Base = IKDGbase <T, Cmp, Ctxt, NhFunc, ExFunc, OpFunc, ArgsTuple>;
+  using Base = IKDGbase <T, Cmp, NhFunc, ExFunc, OpFunc, ArgsTuple, Ctxt>;
 
   using WindowWL = typename std::conditional<Base::NEEDS_PUSH, PQbasedWindowWL<T, Cmp>, SortedRangeWindowWL<T, Cmp> >::type;
   using CtxtWL = typename Base::CtxtWL;
@@ -256,7 +256,7 @@ public:
   }
 
   void dumpStats (void) {
-    reportStat (Base::loopname, "efficiency", double (Base::totalCommits) / Base::totalTasks);
+    reportStat (Base::loopname, "efficiency %", double (100.0 * Base::totalCommits) / Base::totalTasks);
     reportStat (Base::loopname, "avg. parallelism", double (Base::totalCommits) / Base::rounds);
   }
 
@@ -508,7 +508,7 @@ void for_each_ordered_ikdg (const R& range, const Cmp& cmp, const NhFunc& nhFunc
 }
 
 
-template <typename R, typename Cmp, typename NhFunc, typename OpFunc, typename ExFunc, typename ArgsTuple>
+template <typename R, typename Cmp, typename NhFunc, typename OpFunc, typename ArgsTuple>
 void for_each_ordered_ikdg (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const ArgsTuple& argsTuple) {
 
   for_each_ordered_ikdg (range, cmp, nhFunc, HIDDEN::DummyExecFunc (), opFunc, argsTuple);

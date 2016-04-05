@@ -123,8 +123,8 @@ public:
     poll (workList, newSize, origSize, [] (const T& x) { return x; });
   }
 
-  template <typename WL, typename CtxtMaker>
-  void poll (WL& workList, const size_t newSize, const size_t origSize, CtxtMaker& ctxtMaker ) {
+  template <typename WL, typename Wrap>
+  void poll (WL& workList, const size_t newSize, const size_t origSize, Wrap& wrap) {
 
     if (origSize >= newSize) { 
       return;
@@ -167,13 +167,13 @@ public:
 
     if (windowLim != nullptr) {
       Galois::Runtime::on_each_impl (
-          [this, &workList, &ctxtMaker, numPerThrd, windowLim] (const unsigned tid, const unsigned numT) {
+          [this, &workList, &wrap, numPerThrd, windowLim] (const unsigned tid, const unsigned numT) {
             Range& r = *(wlRange.getLocal (tid));
 
             for (size_t i = 0; (i < numPerThrd) 
               && (r.first != r.second); ++r.first) {
 
-              workList.get ().push_back (ctxtMaker (*(r.first)) );
+              workList.get ().push_back (wrap (*(r.first)) );
               ++i;
 
             }
@@ -181,7 +181,7 @@ public:
             for (; r.first != r.second 
               && cmp (*(r.first), *windowLim); ++r.first) {
 
-                workList.get ().push_back (ctxtMaker (*(r.first)));
+                workList.get ().push_back (wrap (*(r.first)));
             }
           }
           , "poll");
@@ -256,6 +256,12 @@ public:
     m_wl.get ().push (x);
   }
 
+  void push (const T& x, const unsigned owner) {
+    assert (owner < Galois::getActiveThreads ());
+
+    m_wl.get (owner).push (x);
+  }
+
   size_t initSize (void) const {
     return m_wl.size_all ();
   }
@@ -271,8 +277,8 @@ public:
     poll (workList, newSize, origSize, f);
   }
 
-  template <typename WL, typename CtxtMaker>
-  void poll (WL& workList, const size_t newSize, const size_t origSize, CtxtMaker& ctxtMaker ) {
+  template <typename WL, typename Wrap>
+  void poll (WL& workList, const size_t newSize, const size_t origSize, Wrap& wrap) {
 
     if (origSize >= newSize) { 
       return;
@@ -286,39 +292,52 @@ public:
     // windowLim is calculated by computing the max of max element pushed by each
     // thread. In this case, the max element is the one pushed in last 
 
+    Substrate::PerThreadStorage<Galois::optional<T> > perThrdLastPop;
+
     Galois::Runtime::on_each_impl (
-        [this, &workList, &ctxtMaker, numPerThrd] (const unsigned tid, const unsigned numT) {
+        [this, &workList, &wrap, numPerThrd, &perThrdLastPop] (const unsigned tid, const unsigned numT) {
+
+          Galois::optional<T>& lastPop = *(perThrdLastPop.getLocal (tid));
 
 
-          unsigned lim = std::min (m_wl.get ().size (), numPerThrd);
+          int lim = std::min (m_wl.get ().size (), numPerThrd);
 
-          for (unsigned i = 0; i < lim; ++i) {
-            workList.get ().push_back (ctxtMaker (m_wl.get ().top ()));
+          for (int i = 0; i < lim; ++i) {
+            if (i == (lim - 1)) {
+              lastPop = m_wl.get ().top ();
+            }
+
+
+            workList.get ().push_back (wrap (m_wl.get ().top ()));
             m_wl.get ().pop ();
           }
         }
         , "poll_part_1");
 
-    const T* windowLim = nullptr;
-    // compute the max of last element pushed into any workList rows
+
+
+    // // compute the max of last element pushed into any workList rows
+    //
+    Galois::optional<T> windowLim;
+
     for (unsigned i = 0; i < numT; ++i) {
+      const Galois::optional<T>& lp = *(perThrdLastPop.getRemote (i));
 
-
-      if (!workList[i].empty ()) {
-        const T& last = (const T&) (workList[i].back ());
-        assert (&last != nullptr);
-
-        if (windowLim == nullptr || cmp (*windowLim, last)) {
-          windowLim = &last;
+      if (lp) {
+        if (!windowLim || cmp (*windowLim, *lp)) {
+          windowLim = *lp;
         }
       }
     }
-
+ 
+ 
     // for (unsigned i = 0; i < numT; ++i) {
-      // const T* const lim = m_wl[i].empty () ? nullptr : &(m_wl[i].top ());
-      // if (lim != nullptr) {
-        // if ((windowLim == nullptr) || cmp (*windowLim, *lim)) { // *windowLim < *lim
-          // windowLim = lim;
+      // if (!workList[i].empty ()) {
+        // const T& last = unwrap (workList[i].back ());
+        // assert (&last != nullptr);
+// 
+        // if (windowLim == nullptr || cmp (*windowLim, last)) {
+          // windowLim = &last;
         // }
       // }
     // }
@@ -332,16 +351,14 @@ public:
     // of elment A from Thread j, such that A and B have a dependence
     // and A < B. 
 
-    if (windowLim != NULL) {
-
-      T limCopy (*windowLim);
+    if (windowLim) {
 
       Galois::Runtime::on_each_impl (
-          [this, &workList, &ctxtMaker, &limCopy] (const unsigned tid, const unsigned numT) {
+          [this, &workList, &wrap, &windowLim] (const unsigned tid, const unsigned numT) {
             for (const T* t = &m_wl.get ().top (); 
-              !m_wl.get ().empty () && cmp (*t, limCopy); t = &m_wl.get ().top ()) {
+              !m_wl.get ().empty () && !cmp (*windowLim, *t); t = &m_wl.get ().top ()) {
 
-                workList.get ().push_back (ctxtMaker (*t));
+                workList.get ().push_back (wrap (*t));
                 m_wl.get ().pop ();
             }
             
@@ -353,7 +370,7 @@ public:
 
       for (unsigned i = 0; i < numT; ++i) {
         if (!m_wl[i].empty ()) {
-          assert (!cmp (m_wl[i].top (), limCopy) && "poll gone wrong");
+          assert (!cmp (m_wl[i].top (), *windowLim) && "poll gone wrong");
         }
       }
     }
