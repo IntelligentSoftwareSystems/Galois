@@ -38,7 +38,7 @@
 
 #ifdef __GALOIS_HET_CUDA__
 #include "Galois/Cuda/cuda_mtypes.h"
-#include "cuda/hpagerank_cuda.h"
+#include "gen_cuda.h"
 struct CUDA_Context *cuda_ctx;
 #endif
 
@@ -90,6 +90,7 @@ typedef typename Graph::GraphNode GNode;
 struct InitializeGraph {
   Graph* graph;
 
+  InitializeGraph(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph) {
     Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ &_graph }, Galois::loopname("Init"));
   }
@@ -121,6 +122,7 @@ struct PrecomputeGraph {
 struct PageRank_pull {
   Graph* graph;
 
+  PageRank_pull(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph) {
         Galois::do_all(_graph.begin(), _graph.end(), PageRank_pull { &_graph }, Galois::loopname("pageRank"));
   }
@@ -132,8 +134,9 @@ struct PageRank_pull {
       GNode dst = graph->getEdgeDst(nbr);
       PR_NodeData& ddata = graph->getData(dst);
       unsigned dnout = ddata.nout;
-      //assert(dnout > 0);
-      sum += ddata.value/dnout;
+      if (dnout > 0) {
+        sum += ddata.value/dnout;
+      }
     }
 
     float pr_value = sum*(1.0 - alpha) + alpha;
@@ -204,7 +207,7 @@ int main(int argc, char** argv) {
     T_init.stop();
 
     // Verify
-    if(verify){
+    /*if(verify){
 #ifdef __GALOIS_HET_CUDA__
       if (personality == CPU) { 
 #endif
@@ -218,7 +221,7 @@ int main(int argc, char** argv) {
         }
       }
 #endif
-    }
+    }*/
 
     std::cout << "PageRank_pull::go called\n";
     T_pageRank.start();

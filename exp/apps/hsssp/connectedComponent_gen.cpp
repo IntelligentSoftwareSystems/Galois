@@ -34,8 +34,8 @@
 
 #include "Galois/Runtime/CompilerHelperFunctions.h"
 
-#include "OfflineGraph.h"
-#include "hGraph.h"
+#include "Galois/Dist/OfflineGraph.h"
+#include "Galois/Dist/hGraph.h"
 
 static const char* const name = "Connected Component Label Propagation - Compiler Generated Distributed Heterogeneous";
 static const char* const desc = "Connected Component Propagation on Distributed Galois.";
@@ -93,7 +93,7 @@ struct LabelPropAlgo {
   void static go(Graph& _graph) {
      struct Syncer_0 {
     	static uint32_t extract( const struct CC_NodeData & node){ return node.comp; }
-    	static void reduce (struct CC_NodeData & node, uint32_t y) {Galois::min(node.comp, y);}
+    	static void reduce (struct CC_NodeData & node, uint32_t y) {Galois::atomicMin(node.comp, y);}
     	static void reset (struct CC_NodeData & node ) { node.comp = std::numeric_limits<uint32_t>::max(); }
     	typedef uint32_t ValTy;
     };

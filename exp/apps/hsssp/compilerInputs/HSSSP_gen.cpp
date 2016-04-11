@@ -58,6 +58,7 @@ typedef typename Graph::GraphNode GNode;
 struct InitializeGraph {
   Graph *graph;
 
+  InitializeGraph(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph) {
 
     Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, Galois::loopname("InitGraph"));
@@ -72,6 +73,7 @@ struct InitializeGraph {
 struct SSSP {
   Graph* graph;
 
+  SSSP(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph){
     Galois::do_all(_graph.begin(), _graph.end(), SSSP { &_graph }, Galois::loopname("sssp"));
   }

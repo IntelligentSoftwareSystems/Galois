@@ -162,7 +162,7 @@ public:
     bool traverse = RecursiveASTVisitor<IrGLOperatorVisitor>::TraverseDecl(D);
     if (traverse && D && isa<CXXMethodDecl>(D)) {
       bodyString << "]),\n"; // end ForAll
-      bodyString << "]),\n"; // end kernel
+      bodyString << "]),\n"; // end Kernel
       std::vector<std::string> arguments;
       for (auto& param : parameterToTypeMap) {
         declString << ", ('" << param.second << " *', 'p_" << param.first << "')";
@@ -459,6 +459,7 @@ public:
     std::string filename;
     std::size_t found = FileNamePath.rfind("/");
     if (found != std::string::npos) filename = FileNamePath.substr(found+1, FileNamePath.length()-1);
+    else filename = FileNamePath;
 
     std::ofstream header;
     header.open(FileNamePath + "_cuda.h");
@@ -568,7 +569,7 @@ public:
     cuheader.close();
 
     std::ofstream IrGLAST;
-    IrGLAST.open(FileNamePath + ".py");
+    IrGLAST.open(FileNamePath + "_cuda.py");
     IrGLAST << "from gg.ast import *\n";
     IrGLAST << "from gg.lib.graph import Graph\n";
     IrGLAST << "from gg.lib.wl import Worklist\n";
@@ -619,7 +620,7 @@ public:
     IrGLAST.close();
 
     llvm::errs() << "IrGL file and headers generated:\n";
-    llvm::errs() << FileNamePath << ".py\n";
+    llvm::errs() << FileNamePath << "_cuda.py\n";
     llvm::errs() << FileNamePath << "_cuda.cuh\n";
     llvm::errs() << FileNamePath << "_cuda.h\n";
   }
@@ -634,7 +635,7 @@ public:
     } else {
       found = text.find("mgpu::Reduce");
       if (found != std::string::npos) {
-        Output << "CBlock([\"" << text << "\"], parse=False),\n";
+        Output << "CBlock([\"" << text << "\"], parse = False),\n";
       } else {
         Output << "CBlock([\"" << text << "\"]),\n";
       }
@@ -652,7 +653,7 @@ public:
     }
     bool traverse = RecursiveASTVisitor<IrGLOrchestratorVisitor>::TraverseDecl(D);
     if (traverse && method) {
-      Output << "]),\n"; // end kernel
+      Output << "], host = True),\n"; // end Kernel
       Output.close();
 
       std::string fileName = rewriter.getSourceMgr().getFilename(D->getLocStart()).str();
@@ -831,6 +832,9 @@ public:
         }
 
         // generate call to kernel
+        Output << "CDecl([(\"dim3\", \"blocks\", \"\")]),\n";
+        Output << "CDecl([(\"dim3\", \"threads\", \"\")]),\n";
+        Output << "CBlock([\"kernel_sizing(ctx->gg, blocks, threads)\"]),\n";
         std::string kernelName = record->getNameAsString();
         Output << "Invoke(\"" << kernelName << "\", ";
         Output << "(\"ctx->gg\", \"ctx->nowned\"";

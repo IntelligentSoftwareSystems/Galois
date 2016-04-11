@@ -67,6 +67,7 @@ typedef GNode WorkItem;
 struct InitializeGraph {
   Graph* graph;
 
+  InitializeGraph(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph) {
       Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ &_graph }, Galois::loopname("Init"));
   }

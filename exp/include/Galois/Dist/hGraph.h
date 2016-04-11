@@ -382,7 +382,7 @@ public:
 
           assert(gid < totalNodes);
         }
-        //std::cout << net.ID << " send (" << gid << ") " << start << " " << FnTy::extract(start, getData(start)) << "\n";
+        //std::cout << net.ID << " send (" << gid << ") " << start << " " << FnTy::extract(getData(start)) << "\n";
         gSerialize(b, gid, FnTy::extract(getData(start)));
         FnTy::reset(getData(start));
       }
@@ -414,7 +414,7 @@ public:
       gSerialize(b, idForSelf(), fn, net.ID, (uint32_t)(end-start));
       for (; start != end; ++start) {
         auto gid = L2G(start);
-        //std::cout << net.ID << " PULL send (" << gid << ") " << start << " " << FnTy::extract(start, getData(start)) << "\n";
+        //std::cout << net.ID << " PULL send (" << gid << ") " << start << " " << FnTy::extract(getData(start)) << "\n";
         gSerialize(b, gid, FnTy::extract(getData(start)));
       }
       net.send(x, syncRecv, b);

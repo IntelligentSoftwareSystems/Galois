@@ -8,7 +8,7 @@
 
 import sys
 
-def check_results(masterFile, otherFiles, offset):
+def check_results(masterFile, otherFiles, offset, errors):
   with open(masterFile) as mfile, open(otherFiles) as ofile:
     mfile.seek(offset)
     for line1, line2 in zip(mfile,ofile):
@@ -20,30 +20,32 @@ def check_results(masterFile, otherFiles, offset):
           print "NOT MATCHED \n";
           print line1;
           print line2;
-          return -1;
+          errors = errors + 1;
       else:
         print "OFFSET NOT CORRECT\n";
         print split_line2[0];
         print split_line1[0];
-        return -2;
+        return (-1, errors);
 
 
-  return offset
+  return (offset, errors);
 
 def main(masterFile, allFiles_arr):
   offset = 0;
+  errors = 0;
   for i in range(0 , len(allFiles_arr)):
     print allFiles_arr[i]
     print offset
-    offset = check_results(masterFile, allFiles_arr[i], offset)
+    offset, errors = check_results(masterFile, allFiles_arr[i], offset, errors)
     if(offset == -1):
-      print "FAILED";
-      print allFiles_arr[i];
-      return -1;
-    elif(offset == -2):
       print "\nOFFSET NOT CORRECT\n";
-      print allFiles_arr[i];
-      return -1;
+      break;
+  if (errors > 0):
+    print "\nFAILED";
+    print "No of mismatches", errors;
+  if (errors > 0) or (offset == -1):
+    print allFiles_arr[i];
+    return -1;
   return 0;
 
 if __name__ == "__main__":

@@ -77,6 +77,9 @@ std::string center(const bool s, const int w) {
   return ss.str();
 }
 
+
+
+
 /** Function to split a string with a given delimiter **/
 void split(const string& s, char delim, std::vector<string>& elems) {
   stringstream ss(s);
@@ -93,11 +96,14 @@ bool syncPull_reduction_exists(EntryTy entry, vector<EntryTy> entry_vec){
     return false;
   }
   for(auto it : entry_vec){
-    if((it.SYNC_TYPE == "syncPull") && (it.FIELD_NAME == entry.FIELD_NAME) && (it.FIELD_TYPE == entry.FIELD_TYPE) && (it.NODE_TYPE == entry.NODE_TYPE) && (it.GRAPH_NAME == entry.GRAPH_NAME))
-      return false;
+    if((it.SYNC_TYPE == "syncPull") && (it.FIELD_NAME == entry.FIELD_NAME) && (it.FIELD_TYPE == entry.FIELD_TYPE) && (it.NODE_TYPE == entry.NODE_TYPE) && (it.GRAPH_NAME == entry.GRAPH_NAME)){
+      return true;
+    }
   }
-  return true;
+  return false;
 }
+
+
 
 /**************************** Helper Functions: End *****************************/
 
@@ -173,6 +179,7 @@ class GaloisFunctionsVisitor : public RecursiveASTVisitor<GaloisFunctionsVisitor
 
   struct ReductionOps_entry {
     string NODE_TYPE;
+    string NODE_NAME;
     string FIELD_NAME;
     string FIELD_TYPE;
     string VAL_TYPE;
@@ -652,6 +659,50 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
       }
 };
 
+class SyncPullInsideForLoopHandler : public MatchFinder::MatchCallback {
+  private:
+    ASTContext* astContext;
+    InfoClass *info;
+  public:
+    SyncPullInsideForLoopHandler(CompilerInstance*  CI, InfoClass* _info):astContext(&(CI->getASTContext())), info(_info){}
+    virtual void run(const MatchFinder::MatchResult &Results) {
+
+      clang::LangOptions LangOpts;
+      LangOpts.CPlusPlus = true;
+      clang::PrintingPolicy Policy(LangOpts);
+
+      for(auto i : info->reductionOps_map){
+        for(auto j : i.second){
+          /** Sync pull variables **/
+          string str_syncPull_var = "syncPullVar_" + j.NODE_NAME + "_" + i.first;
+          /** Sync Pull variables **/
+          auto syncPull_var = Results.Nodes.getNodeAs<clang::VarDecl>(str_syncPull_var);
+
+          if(syncPull_var){
+            //syncPull_var->dumpColor();
+
+            if(syncPull_var->isReferenced()){
+              ReductionOps_entry reduceOP_entry;
+              reduceOP_entry.GRAPH_NAME = j.GRAPH_NAME;
+              reduceOP_entry.NODE_TYPE = j.NODE_TYPE;
+              reduceOP_entry.FIELD_TYPE = j.NODE_TYPE;
+              reduceOP_entry.FIELD_NAME = j.FIELD_NAME;
+              reduceOP_entry.VAL_TYPE = j.VAL_TYPE;
+              reduceOP_entry.SYNC_TYPE = "sync_pull";
+              /** check for duplicate **/
+              if(!syncPull_reduction_exists(reduceOP_entry, i.second)){
+                info->reductionOps_map[i.first].push_back(reduceOP_entry);
+              }
+            }
+            break;
+          }
+        }
+      }
+    }
+};
+
+
+
 class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
   private:
       ASTContext* astContext;
@@ -690,10 +741,6 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
             string str_assignment_vec = "equalOpVec_" + j.VAR_NAME+ "_" + i.first;
             string str_plusOp_vec = "plusEqualOpVec_" + j.VAR_NAME+ "_" + i.first;
 
-            /** Sync pull variables **/
-            string str_syncPull_var = "syncPullVar_" + j.VAR_NAME + "_" + i.first;
-
-            
 
             if(j.IS_REFERENCED && j.IS_REFERENCE){
               auto field = Results.Nodes.getNodeAs<clang::VarDecl>(str_varDecl);
@@ -712,11 +759,6 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
               /** Vector operations **/
               auto plusOP_vec = Results.Nodes.getNodeAs<clang::Stmt>(str_plusOp_vec);
               auto assignmentOP_vec = Results.Nodes.getNodeAs<clang::Stmt>(str_assignment_vec);
-
-              /** Sync Pull variables **/
-              auto syncPull_var = Results.Nodes.getNodeAs<clang::VarDecl>(str_syncPull_var);
-
-              
 
               //memExpr->dump();
               if(memExpr){
@@ -763,22 +805,10 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                 vector<string> elems;
                 split(s.str(), delim, elems);
 
-                field_entry.NODE_NAME = elems[0];
+                field_entry.NODE_NAME = reduceOP_entry.NODE_NAME = elems[0];
                 field_entry.FIELD_NAME = reduceOP_entry.FIELD_NAME = elems[1];
                 field_entry.GRAPH_NAME = reduceOP_entry.GRAPH_NAME = j.GRAPH_NAME;
                 reduceOP_entry.SYNC_TYPE = "sync_push";
-
-                if(syncPull_var){
-                  //syncPull_var->dumpColor();
-                  if(syncPull_var->isReferenced()){
-                    reduceOP_entry.SYNC_TYPE = "sync_pull";
-                    /** check for duplicate **/
-                    if(!syncPull_reduction_exists(reduceOP_entry, info->reductionOps_map[i.first])){
-                      info->reductionOps_map[i.first].push_back(reduceOP_entry);
-                    }
-                  }
-                  break;
-                }
 
                 if(assignplusOP) {
                   //assignplusOP->dump();
@@ -1000,6 +1030,7 @@ class FieldUsedInForLoop : public MatchFinder::MatchCallback {
               reduceOP_entry.FIELD_NAME = j.FIELD_NAME ;
               reduceOP_entry.GRAPH_NAME = j.GRAPH_NAME ;
               reduceOP_entry.SYNC_TYPE =  j.SYNC_TYPE; //"sync_push";
+              reduceOP_entry.NODE_NAME = j.NODE_NAME;
 
               reduceOP_entry.FIELD_TYPE = Type;
               reduceOP_entry.VAL_TYPE = j.RESET_VALTYPE;
@@ -1167,12 +1198,23 @@ string global_var_from_local(string localVar){
   }
 }
 
+/** Given reduction op vector, returns if field is present to be sync_pushed **/
+// Basically tells if field is modified.
+bool is_Field_Sync_Pushed(std::string name, std::vector<ReductionOps_entry>& vec){
+  for(auto i : vec){
+    if((i.FIELD_NAME == name) && (i.SYNC_TYPE == "sync_push")){
+      return true;
+    }
+  }
+  return false;
+}
+
 /***Global constants ***/
 string galois_distributed_accumulator_type = "Galois::DGAccumulator<int> ";
 string galois_distributed_accumulator_name = "DGAccumulator_accum";
 
 
-string makeFunctorFirstIter(string orig_functor_name, FirstIter_struct_entry entry){
+string makeFunctorFirstIter(string orig_functor_name, FirstIter_struct_entry entry, vector<ReductionOps_entry>& redOp_vec){
   string functor = "struct FirstItr_" + orig_functor_name + "{\n";
 
   /** Adding member functions **/
@@ -1206,10 +1248,18 @@ string makeFunctorFirstIter(string orig_functor_name, FirstIter_struct_entry ent
   constructor += (":" + initList);
   functor += (constructor + "\n");
 
+  /** Insert write sets **/
+  stringstream SS_write_set;
+  for(auto j : redOp_vec){
+    if(j.SYNC_TYPE == "sync_push")
+      SS_write_set << ", Galois::write_set(\"" << j.SYNC_TYPE << "\", \"" << j.GRAPH_NAME << "\", \"" << j.NODE_TYPE << "\", \"" << j.FIELD_TYPE << "\" , \"" << j.FIELD_NAME << "\", \"" << j.VAL_TYPE << "\" , \"" << j.OPERATION_EXPR << "\",  \"" << j.RESETVAL_EXPR << "\")";
+    else if(j.SYNC_TYPE == "sync_pull")
+      SS_write_set << ", Galois::write_set(\"" << j.SYNC_TYPE << "\", \"" << j.GRAPH_NAME << "\", \""<< j.NODE_TYPE << "\", \"" << j.FIELD_TYPE << "\", \"" << j.FIELD_NAME << "\" , \"" << j.VAL_TYPE << "\")";
+  }
   /** Adding static go function **/
   //TODO: Assuming graph type is Graph
   string static_go = "void static go(Graph& _graph) {\n";
-  static_go += "Galois::for_each(_graph.begin(), _graph.end(), FirstItr_" + orig_functor_name + "{" + initList_call + "&_graph" + "});\n}\n";
+  static_go += "Galois::for_each(_graph.begin(), _graph.end(), FirstItr_" + orig_functor_name + "{" + initList_call + "&_graph" + "}" + SS_write_set.str() + ");\n}\n";
   functor += static_go;
 
   string operator_func = entry.OPERATOR_BODY + "\n";
@@ -1303,7 +1353,7 @@ class LoopTransformHandler : public MatchFinder::MatchCallback {
               info->FirstItr_struct_map[i.first].push_back(first_itr_entry);
 
               /**6: Put functor for first iteration. All nodes need to be processed in the first iteration. **/
-              string firstItr_func = makeFunctorFirstIter(i.first, first_itr_entry);
+              string firstItr_func = makeFunctorFirstIter(i.first, first_itr_entry, info->reductionOps_map[i.first]);
               SourceLocation main_struct_loc_begin = main_struct->getSourceRange().getBegin();
               rewriter.InsertText(main_struct_loc_begin, firstItr_func, true, true);
 
@@ -1408,6 +1458,52 @@ class LoopTransformHandler : public MatchFinder::MatchCallback {
 
 
 
+      /** To construct various StatementMatcher for reduction operations **/
+      template<typename Ty>
+      StatementMatcher makeStatement_reductionOp(Ty LHS_memExpr, string i_first){
+        /** REDUCTIONS : Only need syncPush : Order matters as the most generic ones should be at the last **/
+        StatementMatcher f_2 = expr(isExpansionInMainFile(), anyOf(
+                                                                  /** For builtInType : NodeData.field += val **/
+                                                                  binaryOperator(hasOperatorName("+="),
+                                                                        hasLHS(ignoringParenImpCasts(LHS_memExpr))),
+                                                                  /** For builtInType : NodeData.field = NodeData.field + val **/
+                                                                  binaryOperator(hasOperatorName("="),
+                                                                        hasLHS(ignoringParenImpCasts(LHS_memExpr)),
+                                                                        hasRHS(binaryOperator(hasOperatorName("+"),
+                                                                                              hasLHS(ignoringParenImpCasts(LHS_memExpr))))),
+                                                                  /** For builtInType : NodeData.field = val **/
+                                                                  binaryOperator(hasOperatorName("="),
+                                                                        hasLHS(ignoringParenImpCasts(LHS_memExpr))),
+
+
+                                                                  /** For ComplexType : NodeData.field += val **/
+                                                                  operatorCallExpr(hasOverloadedOperatorName("+="),
+                                                                          hasDescendant(LHS_memExpr)),
+                                                                  /** For ComplexType : NodeData.field = NodeData.field + val **/
+                                                                  operatorCallExpr(hasOverloadedOperatorName("="),
+                                                                          hasDescendant(binaryOperator(hasOperatorName("+"),
+                                                                                                          hasLHS(hasDescendant(LHS_memExpr))))),
+                                                                  /** For ComplexType : NodeData.field = val **/
+                                                                  operatorCallExpr(hasOverloadedOperatorName("="),
+                                                                         hasDescendant(LHS_memExpr)),
+
+                                                                  /** for vector operations NodeData.field[i] += val **/
+                                                                  binaryOperator(hasOperatorName("="), hasLHS(operatorCallExpr(hasDescendant(declRefExpr(to(methodDecl(hasName("operator[]"))))), hasDescendant(LHS_memExpr)))),
+                                                                  binaryOperator(hasOperatorName("+="), hasLHS(operatorCallExpr(hasDescendant(declRefExpr(to(methodDecl(hasName("operator[]"))))), hasDescendant(LHS_memExpr)))),
+
+                                                                  /** Atomic Add **/
+                                                                  callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("atomicAdd"))))), hasAnyArgument(LHS_memExpr)),
+
+                                                                  binaryOperator(hasOperatorName("="), hasDescendant(arraySubscriptExpr(hasDescendant(LHS_memExpr)).bind("arraySub"))),
+                                                                  binaryOperator(hasOperatorName("+="), hasDescendant(arraySubscriptExpr(hasDescendant(LHS_memExpr)).bind("arraySub")))
+                                                                 ),
+                                                                 hasAncestor(recordDecl(hasName(i_first))),
+                                                                 /** Only if condition inside EdgeForLoop should be considered**/
+                                                                 unless(hasAncestor(ifStmt(hasCondition(anything()), hasAncestor(EdgeForLoopMatcher)))));
+
+        return f_2;
+      }
+
       /** To construct various StatementMatchers for 2 loop transforms. **/
       template<typename Ty>
       StatementMatcher makeStatement_EdgeForStmt(Ty DM_update, string str_loopName){
@@ -1440,7 +1536,7 @@ class GaloisFunctionsConsumer : public ASTConsumer {
     CompilerInstance &Instance;
     std::set<std::string> ParsedTemplates;
     GaloisFunctionsVisitor* Visitor;
-    MatchFinder Matchers, Matchers_doall, Matchers_op, Matchers_typedef, Matchers_gen, Matchers_gen_field, Matchers_2LT;
+    MatchFinder Matchers, Matchers_doall, Matchers_op, Matchers_typedef, Matchers_gen, Matchers_gen_field, Matchers_2LT, Matchers_syncpull_field;
     FunctionCallHandler functionCallHandler;
     FindOperatorHandler findOperator;
     CallExprHandler callExprHandler;
@@ -1448,10 +1544,11 @@ class GaloisFunctionsConsumer : public ASTConsumer {
     FindingFieldHandler f_handler;
     FindingFieldInsideForLoopHandler insideForLoop_handler;
     FieldUsedInForLoop insideForLoopField_handler;
+    SyncPullInsideForLoopHandler syncPull_handler;
     LoopTransformHandler loopTransform_handler;
     InfoClass info;
   public:
-    GaloisFunctionsConsumer(CompilerInstance &Instance, std::set<std::string> ParsedTemplates, Rewriter &R): Instance(Instance), ParsedTemplates(ParsedTemplates), Visitor(new GaloisFunctionsVisitor(&Instance)), functionCallHandler(R, &info), findOperator(&Instance), callExprHandler(&Instance, &info), typedefHandler(&info), f_handler(&Instance, &info), insideForLoop_handler(&Instance, &info), insideForLoopField_handler(&Instance, &info), loopTransform_handler(R, &info) {
+    GaloisFunctionsConsumer(CompilerInstance &Instance, std::set<std::string> ParsedTemplates, Rewriter &R): Instance(Instance), ParsedTemplates(ParsedTemplates), Visitor(new GaloisFunctionsVisitor(&Instance)), functionCallHandler(R, &info), findOperator(&Instance), callExprHandler(&Instance, &info), typedefHandler(&info), f_handler(&Instance, &info), insideForLoop_handler(&Instance, &info), insideForLoopField_handler(&Instance, &info), loopTransform_handler(R, &info) , syncPull_handler(&Instance, &info){
 
      /**************** Additional matchers ********************/
       //Matchers.addMatcher(callExpr(isExpansionInMainFile(), callee(functionDecl(hasName("getData"))), hasAncestor(binaryOperator(hasOperatorName("=")).bind("assignment"))).bind("getData"), &callExprHandler); //*** WORKS
@@ -1733,20 +1830,21 @@ class GaloisFunctionsConsumer : public ASTConsumer {
 
 
             /** USE but !REDUCTIONS : NodeData.field is used, therefore needs syncPull **/
+#if 0
             DeclarationMatcher f_syncPull_1 = varDecl(isExpansionInMainFile(), hasInitializer(expr(anyOf(
                                                                                                 hasDescendant(memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.VAR_NAME)))))).bind(str_memExpr)),
                                                                                                 memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.VAR_NAME)))))).bind(str_memExpr)
                                                                                                 ),unless(f_2))),
                                                                       hasAncestor(recordDecl(hasName(i.first)))
                                                                   ).bind(str_syncPull_var);
-
+#endif
 
             //StatementMatcher f_5 = callExpr(isExpansionInMainFile(), argumentCountIs(2), (callee(functionDecl(hasName("atomicAdd"))), hasAnyArgument(LHS_memExpr))).bind(str_atomicAdd);
             Matchers_gen.addMatcher(f_1, &insideForLoop_handler);
             Matchers_gen.addMatcher(f_2, &insideForLoop_handler);
             Matchers_gen.addMatcher(f_3, &insideForLoop_handler);
             Matchers_gen.addMatcher(f_4, &insideForLoop_handler);
-            Matchers_gen.addMatcher(f_syncPull_1, &insideForLoop_handler);
+            //Matchers_gen.addMatcher(f_syncPull_1, &insideForLoop_handler);
             //Matchers_gen.addMatcher(f_5, &insideForLoop_handler);
           }
         }
@@ -1916,6 +2014,33 @@ class GaloisFunctionsConsumer : public ASTConsumer {
       }
 
 
+
+
+      /*MATCHER 6.5: *********************Match to get fields of NodeData structure being modified and used to add SYNC_PULL calls inside the Galois all edges forLoop *******************/
+      for (auto i : info.reductionOps_map) {
+        for(auto j : i.second) {
+          //if(j.IS_REFERENCED && j.IS_REFERENCE) {
+            string str_memExpr = "memExpr_" + j.NODE_NAME + "_" + i.first;
+            string str_syncPull_var = "syncPullVar_" + j.NODE_NAME + "_" + i.first;
+
+            /** Only need sync_pull if modified **/
+              llvm::outs() << "Sync pull is required : " << j.NODE_NAME << "\n";
+              StatementMatcher LHS_memExpr = memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.NODE_NAME))))), hasAncestor(recordDecl(hasName(i.first)))).bind(str_memExpr);
+              StatementMatcher stmt_reductionOp = makeStatement_reductionOp(LHS_memExpr, i.first);
+              /** USE but !REDUCTIONS : NodeData.field is used, therefore needs syncPull **/
+              DeclarationMatcher f_syncPull_1 = varDecl(isExpansionInMainFile(), hasInitializer(expr(anyOf(
+                                                                                                  hasDescendant(memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.NODE_NAME)))))).bind(str_memExpr)),
+                                                                                                  memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.NODE_NAME)))))).bind(str_memExpr)
+                                                                                                  ),unless(stmt_reductionOp))),
+                                                                        hasAncestor(recordDecl(hasName(i.first)))
+                                                                    ).bind(str_syncPull_var);
+
+              Matchers_syncpull_field.addMatcher(f_syncPull_1, &syncPull_handler);
+        }
+      }
+
+      Matchers_syncpull_field.matchAST(Context);
+
       /** PRINTING FINAL REDUCTION OPERATIONS **/
 
       llvm::outs() << "\n\n"; 
@@ -1926,6 +2051,7 @@ class GaloisFunctionsConsumer : public ASTConsumer {
           llvm::outs() << write_set << "\n";
         }
       }
+
 
 
       for (auto i : info.reductionOps_map){
