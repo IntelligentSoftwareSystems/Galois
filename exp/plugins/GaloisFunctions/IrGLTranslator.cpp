@@ -106,7 +106,7 @@ public:
       }
     }
 
-    while (1) {
+    /*while (1) {
       std::size_t found = text.find("nout(");
       if (found != std::string::npos) {
         std::size_t begin = text.find(",", found);
@@ -118,7 +118,42 @@ public:
       } else {
         break;
       }
+    }*/
+
+    // replace std::distance(graph->edge_begin(NODE), graph->edge_end(NODE)) with getOutDegree(NODE)
+    while (1) {
+      std::string distance = "std::distance(graph->edge_begin(";
+      std::size_t found = text.find(distance);
+      if (found != std::string::npos) {
+        std::size_t begin = found+distance.length();
+        std::size_t end = text.find(")", begin);
+        std::string var = text.substr(begin, end - begin);
+        std::string replace = "graph.getOutDegree(" + var + ")";
+        assert(text.find("graph->edge_end(" + var + ")", end) != std::string::npos);
+        end = text.find(")", end+1); // graph->edge_end() 
+        end = text.find(")", end+1); // std::distance()
+        text = text.replace(found, end - found + 1, replace);
+      } else {
+        break;
+      }
     } 
+
+    // replace ATOMIC_VAR[NODE].exchange(VALUE) with atomicExch(&ATOMIC_VAR[NODE], VALUE)
+    while (1) {
+      std::string exchange = ".exchange(";
+      std::size_t found = text.find(exchange);
+      if (found != std::string::npos) {
+        std::size_t begin = found+exchange.length();
+        std::size_t end = text.find(")", begin);
+        std::string value = text.substr(begin, end - begin);
+        begin = text.rfind("p_", found-1); 
+        std::string var = text.substr(begin, found - begin);
+        std::string replace = "atomicExch(&" + var + ", " + value + ")";
+        text = text.replace(begin, end - begin + 1, replace);
+      } else {
+        break;
+      }
+    }
 
     // use & (address-of) operator for atomic variables in atomicAdd() etc
     std::size_t start = 0;
@@ -225,8 +260,7 @@ public:
     std::string variableName = forStmt->getLoopVariable()->getNameAsString();
     symbolTable.insert(variableName);
     const Expr *expr = forStmt->getRangeInit();
-    SourceRange range(expr->getLocStart(), expr->getLocEnd());
-    std::string vertexName = rewriter.getRewrittenText(range);
+    std::string vertexName = rewriter.getRewrittenText(expr->getSourceRange());
     std::size_t found = vertexName.find("graph->edges");
     assert(found != std::string::npos);
     std::size_t begin = vertexName.find("(", found);
@@ -250,8 +284,7 @@ public:
     }
     symbolTable.insert(variableName);
     const Expr *expr = forStmt->getCond();
-    SourceRange range(expr->getLocStart(), expr->getLocEnd());
-    std::string vertexName = rewriter.getRewrittenText(range);
+    std::string vertexName = rewriter.getRewrittenText(expr->getSourceRange());
     std::size_t found = vertexName.find("graph->edge_end");
     assert(found != std::string::npos);
     std::size_t begin = vertexName.find("(", found);
@@ -273,8 +306,7 @@ public:
           std::size_t pos = std::string::npos;
           std::string initText;
           if (expr != NULL) {
-            SourceRange range(expr->getLocStart(), expr->getLocEnd());
-            initText = rewriter.getRewrittenText(range);
+            initText = rewriter.getRewrittenText(expr->getSourceRange());
             pos = initText.find("graph->getData");
           }
           if (pos == std::string::npos) {
@@ -308,8 +340,7 @@ public:
     skipStmts.insert(binaryOp->getRHS());
     if (skipStmts.find(binaryOp) == skipStmts.end()) {
       assert(binaryOp->isAssignmentOp());
-      SourceRange range(binaryOp->getLocStart(), binaryOp->getLocEnd());
-      WriteCBlock(rewriter.getRewrittenText(range));
+      WriteCBlock(rewriter.getRewrittenText(binaryOp->getSourceRange()));
     }
     return true;
   }
@@ -339,14 +370,12 @@ public:
 
         assert(callExpr->getNumArgs() == 1);
         Expr *argument = callExpr->getArg(0);
-        SourceRange range2(argument->getLocStart(), argument->getLocEnd());
-        std::string var = rewriter.getRewrittenText(range2);
+        std::string var = rewriter.getRewrittenText(argument->getSourceRange());
 
         WriteCBlock("p_" + reduceVar + "[vertex] = " + var);
         parameterToTypeMap[reduceVar] = argument->getType().getUnqualifiedType().getAsString();
       } else {
-        SourceRange range(callExpr->getLocStart(), callExpr->getLocEnd());
-        WriteCBlock(rewriter.getRewrittenText(range));
+        WriteCBlock(rewriter.getRewrittenText(callExpr->getSourceRange()));
       }
     }
     for (unsigned i = 0; i < callExpr->getNumArgs(); ++i) {
@@ -357,8 +386,7 @@ public:
 
   virtual bool VisitIfStmt(IfStmt *ifStmt) {
     const Expr *expr = ifStmt->getCond();
-    SourceRange range(expr->getLocStart(), expr->getLocEnd());
-    std::string text = FormatCBlock(rewriter.getRewrittenText(range));
+    std::string text = FormatCBlock(rewriter.getRewrittenText(expr->getSourceRange()));
     bodyString << "If(\"" << text << "\",\n[\n";
     skipStmts.insert(expr);
     return true;
@@ -395,8 +423,7 @@ public:
   }
 
   virtual bool VisitMemberExpr(MemberExpr *memberExpr) {
-    SourceRange range(memberExpr->getBase()->getLocStart(), memberExpr->getBase()->getLocEnd());
-    std::string objectName = rewriter.getRewrittenText(range);
+    std::string objectName = rewriter.getRewrittenText(memberExpr->getBase()->getSourceRange());
     if (nodeMap.find(objectName) != nodeMap.end()) {
       std::string type = 
         memberExpr->getMemberDecl()->getType().getUnqualifiedType().getAsString();
@@ -601,6 +628,7 @@ public:
           size_t end = var.second.first.find(">", found);
           type = var.second.first.substr(start+1, end-start-1);
         }
+        findAndReplace(type, "_Bool", "bool");
         IrGLAST << "CDeclGlobal([(\"extern " << type 
           << "\", \"" << var.first << "\", \"" << var.second.second << "\")]),\n";
       }
@@ -683,8 +711,7 @@ public:
   virtual bool VisitWhileStmt(WhileStmt* whileStmt) {
     Expr *cond = whileStmt->getCond();
     skipStmts.insert(cond);
-    SourceRange range(cond->getLocStart(), cond->getLocEnd());
-    std::string condText = rewriter.getRewrittenText(range);
+    std::string condText = rewriter.getRewrittenText(cond->getSourceRange());
     if (condText.empty()) condText = "true";
     Output << "DoWhile(\"" << condText << "\",\n[\n";
     return true;
@@ -700,8 +727,7 @@ public:
             << "\", \"" << varDecl->getNameAsString() << "\", \"\")]),\n";
           symbolTable.insert(varDecl->getNameAsString());
           if (expr != NULL) {
-            SourceRange range(expr->getLocStart(), expr->getLocEnd());
-            std::string initText = rewriter.getRewrittenText(range);
+            std::string initText = rewriter.getRewrittenText(expr->getSourceRange());
             WriteCBlock(varDecl->getNameAsString() + " = " + initText);
           }
         }
@@ -740,8 +766,7 @@ public:
           SourceRange range(start, implicit->getLocEnd());
           std::string reduceVar = rewriter.getRewrittenText(range);
 
-          SourceRange range2(binaryOp->getLHS()->getLocStart(), binaryOp->getLHS()->getLocEnd());
-          std::string var = rewriter.getRewrittenText(range2);
+          std::string var = rewriter.getRewrittenText(binaryOp->getLHS()->getSourceRange());
 
           std::ostringstream reduceCall;
           // FIXME: choose matching reduction operation
@@ -755,8 +780,7 @@ public:
         }
       }
       if (!skip) {
-        SourceRange range(binaryOp->getLocStart(), binaryOp->getLocEnd());
-        WriteCBlock(rewriter.getRewrittenText(range));
+        WriteCBlock(rewriter.getRewrittenText(binaryOp->getSourceRange()));
       }
     }
     return true;
@@ -765,8 +789,7 @@ public:
   virtual bool VisitCallExpr(CallExpr *callExpr) {
     symbolTable.insert(callExpr->getCalleeDecl()->getAsFunction()->getNameAsString());
     if (skipStmts.find(callExpr) == skipStmts.end()) {
-      SourceRange range(callExpr->getLocStart(), callExpr->getLocEnd());
-      std::string text = rewriter.getRewrittenText(range);
+      std::string text = rewriter.getRewrittenText(callExpr->getSourceRange());
       std::size_t begin = text.find("do_all");
       if (begin == std::string::npos) begin = text.find("for_each");
       if (begin == std::string::npos) {
