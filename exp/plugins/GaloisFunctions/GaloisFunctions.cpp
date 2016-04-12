@@ -31,6 +31,8 @@ using namespace clang::ast_matchers;
 using namespace llvm;
 using namespace std;
 
+#define __GALOIS_PREPROCESS_GLOBAL_VARIABLE_PREFIX__ "local_"
+
 namespace {
 
 
@@ -332,7 +334,14 @@ namespace {
             stringstream kernelBefore;
             kernelBefore << "#ifdef __GALOIS_HET_CUDA__\n";
             kernelBefore << "\tif (personality == GPU_CUDA) {\n";
-            kernelBefore << "\t\t" << className << "_cuda();\n";
+            kernelBefore << "\t\t" << className << "_cuda(";
+            for (auto field : recordDecl->fields()) {
+              std::string name = field->getNameAsString();
+              if (name.find(__GALOIS_PREPROCESS_GLOBAL_VARIABLE_PREFIX__) == 0) {
+                kernelBefore << name.substr(std::strlen(__GALOIS_PREPROCESS_GLOBAL_VARIABLE_PREFIX__)) << ", ";
+              }
+            }
+            kernelBefore << "cuda_ctx);\n";
             kernelBefore << "\t} else if (personality == CPU)\n";
             kernelBefore << "#endif\n";
             rewriter.InsertText(ST_main, kernelBefore.str(), true, true);
@@ -538,7 +547,14 @@ namespace {
             stringstream kernelBefore;
             kernelBefore << "#ifdef __GALOIS_HET_CUDA__\n";
             kernelBefore << "\tif (personality == GPU_CUDA) {\n";
-            kernelBefore << "\t\t" << className << "_cuda(cuda_ctx);\n";
+            kernelBefore << "\t\t" << className << "_cuda(";
+            for (auto field : recordDecl->fields()) {
+              std::string name = field->getNameAsString();
+              if (name.find(__GALOIS_PREPROCESS_GLOBAL_VARIABLE_PREFIX__) == 0) {
+                kernelBefore << name.substr(std::strlen(__GALOIS_PREPROCESS_GLOBAL_VARIABLE_PREFIX__)) << ", ";
+              }
+            }
+            kernelBefore << "cuda_ctx);\n";
             kernelBefore << "\t} else if (personality == CPU)\n";
             kernelBefore << "#endif\n";
             rewriter.InsertText(ST_main, kernelBefore.str(), true, true);

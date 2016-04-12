@@ -32,6 +32,8 @@ using namespace llvm;
 #define COMPUTE_FILENAME "._compute_kernels"
 #define ORCHESTRATOR_FILENAME "._orchestrator_kernel"
 
+#define __GALOIS_PREPROCESS_GLOBAL_VARIABLE_PREFIX__ "local_"
+
 namespace {
 
 // finds and replaces all occurrences
@@ -63,23 +65,21 @@ private:
   std::string funcName;
   std::stringstream declString, bodyString;
   std::map<std::string, std::string> parameterToTypeMap;
+  std::map<std::string, std::string> globalVariableToTypeMap;
   std::unordered_set<std::string> symbolTable; // FIXME: does not handle scoped variables (nesting with same variable name)
   std::ofstream Output;
 
-  std::map<std::string, std::pair<std::string, std::string> > &GlobalVariablesToTypeMap;
   std::map<std::string, std::string> &SharedVariablesToTypeMap;
-  std::map<std::string, std::vector<std::string> > &KernelToArgumentsMap;
+  std::map<std::string, std::pair<std::vector<std::string>, std::vector<std::string> > > &KernelToArgumentsMap;
 
 public:
   explicit IrGLOperatorVisitor(ASTContext *context, Rewriter &R, 
       bool isTopo,
-      std::map<std::string, std::pair<std::string, std::string> > &globalVariables,
       std::map<std::string, std::string> &sharedVariables,
-      std::map<std::string, std::vector<std::string> > &kernels) : 
+      std::map<std::string, std::pair<std::vector<std::string>, std::vector<std::string> > > &kernels) : 
     //astContext(context),
     rewriter(R),
     isTopological(isTopo),
-    GlobalVariablesToTypeMap(globalVariables),
     SharedVariablesToTypeMap(sharedVariables),
     KernelToArgumentsMap(kernels)
   {}
@@ -193,19 +193,47 @@ public:
     }
   }
 
+  std::string FormatType(std::string text) {
+    findAndReplace(text, "GNode", "index_type");
+    findAndReplace(text, "_Bool", "bool");
+
+    // remove reference (&)
+    if (text.rfind("&") == (text.length() - 1)) {
+      text = text.substr(0, text.length() - 1);
+    }
+
+    // get basic type
+    if (text.find("std::atomic") == 0) {
+      std::size_t begin = text.find("<");
+      std::size_t end = text.find_last_of(">");
+      text = text.substr(begin+1, end - begin - 1);
+    }
+    if (text.find("cll::opt") == 0) {
+      std::size_t begin = text.find("<");
+      std::size_t end = text.find_last_of(">");
+      text = text.substr(begin+1, end - begin - 1);
+    }
+
+    return text;
+  }
+
   virtual bool TraverseDecl(Decl *D) {
     bool traverse = RecursiveASTVisitor<IrGLOperatorVisitor>::TraverseDecl(D);
     if (traverse && D && isa<CXXMethodDecl>(D)) {
       bodyString << "]),\n"; // end ForAll
       bodyString << "]),\n"; // end Kernel
-      std::vector<std::string> arguments;
+      std::vector<std::string> arguments, globalArguments;
+      for (auto& global : globalVariableToTypeMap) {
+        declString << ", ('" << global.second << "', '" << global.first << "')";
+        globalArguments.push_back(global.first);
+      }
       for (auto& param : parameterToTypeMap) {
         declString << ", ('" << param.second << " *', 'p_" << param.first << "')";
         arguments.push_back(param.first);
         // FIXME: assert type matches if it exists
         SharedVariablesToTypeMap[param.first] = param.second;
       }
-      KernelToArgumentsMap[funcName] = arguments;
+      KernelToArgumentsMap[funcName] = std::make_pair(globalArguments, arguments);
       declString << "],\n[\n";
       Output.open(COMPUTE_FILENAME, std::ios::app);
       Output << declString.str();
@@ -311,8 +339,7 @@ public:
           }
           if (pos == std::string::npos) {
             std::string decl = varDecl->getType().getAsString();
-            findAndReplace(decl, "GNode", "index_type");
-            bodyString << "CDecl([(\"" << decl 
+            bodyString << "CDecl([(\"" << FormatType(decl)
               << "\", \"" << varDecl->getNameAsString() << "\", \"\")]),\n";
 
             if (!initText.empty()) {
@@ -373,7 +400,8 @@ public:
         std::string var = rewriter.getRewrittenText(argument->getSourceRange());
 
         WriteCBlock("p_" + reduceVar + "[vertex] = " + var);
-        parameterToTypeMap[reduceVar] = argument->getType().getUnqualifiedType().getAsString();
+        std::string type = argument->getType().getUnqualifiedType().getAsString();
+        parameterToTypeMap[reduceVar] = FormatType(type);
       } else {
         WriteCBlock(rewriter.getRewrittenText(callExpr->getSourceRange()));
       }
@@ -424,15 +452,16 @@ public:
 
   virtual bool VisitMemberExpr(MemberExpr *memberExpr) {
     std::string objectName = rewriter.getRewrittenText(memberExpr->getBase()->getSourceRange());
+    const std::string &varName = memberExpr->getMemberNameInfo().getAsString();
+    std::string type = memberExpr->getMemberDecl()->getType().getUnqualifiedType().getAsString();
     if (nodeMap.find(objectName) != nodeMap.end()) {
-      std::string type = 
-        memberExpr->getMemberDecl()->getType().getUnqualifiedType().getAsString();
-      if (type.compare(0, 11, "std::atomic") == 0) {
-        std::size_t begin = type.find("<");
-        std::size_t end = type.find_last_of(">");
-        type = type.substr(begin+1, end - begin - 1);
+      parameterToTypeMap[varName] = FormatType(type);
+    }
+    else if ((symbolTable.find(varName) == symbolTable.end()) && (type.find("Graph") != 0)) {
+      if (globalVariableToTypeMap.find(varName) == globalVariableToTypeMap.end()) {
+        assert(varName.find(__GALOIS_PREPROCESS_GLOBAL_VARIABLE_PREFIX__) == 0);
+        globalVariableToTypeMap[varName] = FormatType(type);
       }
-      parameterToTypeMap[memberExpr->getMemberNameInfo().getAsString()] = type;
     }
     return true;
   }
@@ -440,20 +469,7 @@ public:
   virtual bool VisitDeclRefExpr(DeclRefExpr *declRefExpr) {
     const ValueDecl *decl = declRefExpr->getDecl();
     const std::string &varName = decl->getNameAsString();
-    if (symbolTable.find(varName) == symbolTable.end()) {
-      if (GlobalVariablesToTypeMap.find(varName) == GlobalVariablesToTypeMap.end()) {
-        std::string type = decl->getType().getAsString();
-        std::string declStr = rewriter.getRewrittenText(decl->getSourceRange());
-        std::size_t found = declStr.find("=");
-        std::string value;
-        if (found != std::string::npos) {
-          value = declStr.substr(found, declStr.length()-found);
-        } else {
-          value = "";
-        }
-        GlobalVariablesToTypeMap[varName] = std::make_pair(type, value);
-      }
-    }
+    assert(symbolTable.find(varName) != symbolTable.end());
     return true;
   }
 };
@@ -467,10 +483,9 @@ private:
   std::unordered_set<std::string> symbolTable; // FIXME: does not handle scoped variables (nesting with same variable name)
   std::ofstream Output;
 
-  std::map<std::string, std::pair<std::string, std::string> > GlobalVariablesToTypeMap;
   std::map<std::string, std::string> SharedVariablesToTypeMap;
-  std::map<std::string, std::vector<std::string> > KernelToArgumentsMap;
-  std::vector<std::string> Kernels;
+  std::map<std::string, std::pair<std::vector<std::string>, std::vector<std::string> > > KernelToArgumentsMap;
+  std::map<std::string, std::vector<std::string> > HostKernelsToArgumentsMap;
 
   std::string FileNamePath;
 
@@ -501,8 +516,12 @@ public:
       header << "void set_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID, " << var.second << " v);\n";
       header << "void add_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID, " << var.second << " v);\n";
     }
-    for (auto& kernelName : Kernels) {
-      header << "void " << kernelName << "_cuda(struct CUDA_Context *ctx);\n";
+    for (auto& kernel : HostKernelsToArgumentsMap) {
+      header << "void " << kernel.first << "_cuda(";
+      for (auto& argument : kernel.second) {
+        header << argument << ", ";
+      }
+      header << "struct CUDA_Context *ctx);\n";
     }
     header.close();
 
@@ -584,6 +603,7 @@ public:
     cuheader << "\tgraph.copy_to_gpu(ctx->gg);\n";
     for (auto& var : SharedVariablesToTypeMap) {
       cuheader << "\tctx->" << var.first << ".alloc(graph.nnodes);\n";
+      cuheader << "\tctx->" << var.first << ".zero_gpu();\n"; // FIXME: should do this only for std::atomic variables?
     }
     cuheader << "\tprintf(\"load_graph_GPU: %d owned nodes of total %d resident, %d edges\\n\", ctx->nowned, graph.nnodes, graph.nedges);\n"; 
     cuheader << "}\n\n";
@@ -614,24 +634,6 @@ public:
       std::transform(upper.begin(), upper.end(), upper.begin(), ::toupper);
       IrGLAST << "CDeclGlobal([(\"" << var.second 
         << " *\", \"P_" << upper << "\", \"\")]),\n";
-    }
-    for (auto& var : GlobalVariablesToTypeMap) {
-      size_t found = var.second.first.find("Galois::");
-      if (found == std::string::npos) {
-        found = var.second.first.find("cll::opt");
-        std::string type;
-        if (found == std::string::npos) {
-          type = var.second.first;
-        } else {
-          size_t start = var.second.first.find("<", found);
-          // FIXME: nested < < > >
-          size_t end = var.second.first.find(">", found);
-          type = var.second.first.substr(start+1, end-start-1);
-        }
-        findAndReplace(type, "_Bool", "bool");
-        IrGLAST << "CDeclGlobal([(\"extern " << type 
-          << "\", \"" << var.first << "\", \"" << var.second.second << "\")]),\n";
-      }
     }
 
     std::ifstream compute(COMPUTE_FILENAME);
@@ -670,14 +672,43 @@ public:
     }
   }
 
+  std::string FormatType(std::string text) {
+    findAndReplace(text, "GNode", "index_type");
+    findAndReplace(text, "_Bool", "bool");
+
+    // get basic type
+    if (text.find("std::atomic") == 0) {
+      std::size_t begin = text.find("<");
+      std::size_t end = text.find_last_of(">");
+      text = text.substr(begin+1, end - begin - 1);
+    }
+    if (text.find("cll::opt") == 0) {
+      std::size_t begin = text.find("<");
+      std::size_t end = text.find_last_of(">");
+      text = text.substr(begin+1, end - begin - 1);
+    }
+
+    return text;
+  }
+
   virtual bool TraverseDecl(Decl *D) {
     CXXMethodDecl *method = dyn_cast_or_null<CXXMethodDecl>(D);
     if (method) {
       Output.open(ORCHESTRATOR_FILENAME, std::ios::app);
       std::string kernelName = method->getParent()->getNameAsString();
-      Kernels.push_back(kernelName);
       Output << "Kernel(\"" << kernelName << "_cuda\", ";
-      Output << "[('struct CUDA_Context *', 'ctx')],\n[\n";
+      Output << "[";
+      std::vector<std::string> arguments;
+      for (auto field : method->getParent()->fields()) {
+        std::string name = field->getNameAsString();
+        if (name.find(__GALOIS_PREPROCESS_GLOBAL_VARIABLE_PREFIX__) == 0) {
+          std::string type = FormatType(field->getType().getAsString());
+          Output << "('" << type << "', '" << name << "'), ";
+          arguments.push_back(type + " " + name);
+        } 
+      }
+      HostKernelsToArgumentsMap[kernelName] = arguments;
+      Output << "('struct CUDA_Context *', 'ctx')],\n[\n";
     }
     bool traverse = RecursiveASTVisitor<IrGLOrchestratorVisitor>::TraverseDecl(D);
     if (traverse && method) {
@@ -830,7 +861,6 @@ public:
             // FIXME: handle arguments to object of CXXRecordDecl?
             IrGLOperatorVisitor operatorVisitor(astContext, rewriter,
                 isTopological,
-                GlobalVariablesToTypeMap,
                 SharedVariablesToTypeMap,
                 KernelToArgumentsMap);
             operatorVisitor.TraverseDecl(method);
@@ -862,7 +892,10 @@ public:
         Output << "Invoke(\"" << kernelName << "\", ";
         Output << "(\"ctx->gg\", \"ctx->nowned\"";
         auto& arguments = KernelToArgumentsMap[kernelName];
-        for (auto& argument : arguments) {
+        for (auto& argument : arguments.first) {
+          Output << ", \"" << argument << "\"";
+        }
+        for (auto& argument : arguments.second) {
           Output << ", \"ctx->" << argument << ".gpu_wr_ptr()\"";
         }
         Output << ")),\n";
@@ -908,26 +941,6 @@ public:
   virtual bool VisitParenExpr(ParenExpr *parenExpr) {
     if (skipStmts.find(parenExpr) != skipStmts.end()) {
       skipStmts.insert(parenExpr->getSubExpr());
-    }
-    return true;
-  }
-
-  virtual bool VisitDeclRefExpr(DeclRefExpr *declRefExpr) {
-    const ValueDecl *decl = declRefExpr->getDecl();
-    const std::string &varName = decl->getNameAsString();
-    if (symbolTable.find(varName) == symbolTable.end()) {
-      if (GlobalVariablesToTypeMap.find(varName) == GlobalVariablesToTypeMap.end()) {
-        std::string type = decl->getType().getAsString();
-        std::string declStr = rewriter.getRewrittenText(decl->getSourceRange());
-        std::size_t found = declStr.find("=");
-        std::string value;
-        if (found != std::string::npos) {
-          value = declStr.substr(found, declStr.length()-found);
-        } else {
-          value = "";
-        }
-        GlobalVariablesToTypeMap[varName] = std::make_pair(type, value);
-      }
     }
     return true;
   }
