@@ -14,7 +14,166 @@
 namespace Galois {
    namespace OpenCL {
       namespace Graphs {
-         enum GRAPH_FIELD_FLAGS {
+
+      /*####################################################################################################################################################*/
+      template<typename DataType>
+      struct BufferWrapperImpl{
+         typedef std::pair<int, DataType> MessageType;
+         std::vector<MessageType *> messageBuffers;
+         std::vector<cl_mem> gpuMessageBuffer;
+         int num_hosts;
+         int num_ghosts;
+         struct BufferWrapperGPU{
+            cl_mem counters;
+            cl_mem messages;
+            int numHosts;
+            cl_mem buffer_ptr;
+         };
+         BufferWrapperGPU gpu_impl;
+         BufferWrapperImpl(int nh, int ng):num_hosts(nh), num_ghosts(ng){
+            allocate();
+         }
+
+         void allocate(){
+            auto & ctx = Galois::OpenCL::getCLContext();
+            cl_int err;
+            gpu_impl.counters = clCreateBuffer(ctx->get_default_device()->context(),CL_MEM_READ_WRITE, sizeof(cl_uint) *( num_hosts), 0, &err);
+            gpu_impl.messages= clCreateBuffer(ctx->get_default_device()->context(), CL_MEM_READ_WRITE, sizeof(cl_uint) *( num_hosts), 0, &err);
+            gpu_impl.buffer_ptr= clCreateBuffer(ctx->get_default_device()->context(),CL_MEM_READ_WRITE, sizeof(BufferWrapperGPU), 0, &err);
+            CL_Kernel initBuffer;
+            initBuffer.init("buffer_wrapper.cl", "initBufferWrapper");
+            initBuffer.set_arg(0, gpu_impl.buffer_ptr);
+            initBuffer.set_arg(1, gpu_impl.counters);
+            initBuffer.set_arg(2, num_hosts);
+            initBuffer.run_task();
+
+            CL_Kernel registerBuffer;
+            registerBuffer.init("buffer_wrapper.cl", "registerBuffer");
+            registerBuffer.set_arg(0, gpu_impl.buffer_ptr);
+            for(int i=0; i < num_hosts; ++i){
+               MessageType * host_msg_buffer = new MessageType[num_ghosts];
+               messageBuffers.push_back(host_msg_buffer);
+               cl_mem msg_buffer = clCreateBuffer(ctx->get_default_device()->context(),CL_MEM_READ_WRITE, sizeof(MessageType) * (num_ghosts), 0, &err);
+               messageBuffers.push_back(msg_buffer);
+               registerBuffer.set_arg(1, msg_buffer);
+               registerBuffer.set_arg(2, i);
+               registerBuffer.run_task();
+            }
+
+         }
+         void deallocate(){
+            for(auto b : gpuMessageBuffer){
+               clReleaseMemObject(b);
+            }
+            for(auto b : messageBuffers){
+               delete [] b;
+            }
+            clReleaseMemObject(gpu_impl.counters);
+            clReleaseMemObject(gpu_impl.messages);
+            clReleaseMemObject(gpu_impl.buffer_ptr);
+         }
+         /*
+template<typename FnTy>
+  void sync_push() {
+    void (hGraph::*fn)(Galois::Runtime::RecvBuffer&) = &hGraph::syncRecvApply<FnTy>;
+    auto& net = Galois::Runtime::getSystemNetworkInterface();
+    for (unsigned x = 0; x < hostNodes.size(); ++x) {
+      if (x == id) continue;
+      uint32_t start, end;
+      std::tie(start, end) = nodes_by_host(x);
+      if (start == end) continue;
+      Galois::Runtime::SendBuffer b;
+      gSerialize(b, idForSelf(), fn, (uint32_t)(end-start));
+      for (; start != end; ++start) {
+        auto gid = L2G(start);
+        if( gid > totalNodes){
+          assert(gid < totalNodes);
+        }
+        gSerialize(b, gid, FnTy::extract(getData(start)));
+        FnTy::reset(getData(start));
+      }
+      net.send(x, syncRecv, b);
+    }
+    //Will force all messages to be processed before continuing
+    net.flush();
+    Galois::Runtime::getHostBarrier().wait();
+
+  }
+
+          */
+         template<typename GraphType>
+         void prepSend(GraphType & g){
+            CL_Kernel pushKernel;
+            auto & ctx = Galois::OpenCL::getCLContext();
+            auto & net = Galois::Runtime::getSystemNetworkInterface();
+            pushKernel.init("buffer_wrapper.cl", "syncPush");
+            pushKernel.set_arg(0, g);
+            pushKernel.set_arg(1, gpu_impl.buffer_ptr);
+            pushKernel.set_work_size(num_ghosts);
+            pushKernel();
+            const unsigned selfID=net.ID;
+            for(int i=0; i<net.Num; ++i){
+               if(i==selfID)continue;
+               Galois::Runtime::SendBuffer buffer;
+               const uint32_t counter =  0; // get counters from buffers.
+               gSerialize(buffer, selfID, uint32_t(counter));
+               cl_command_queue queue = ctx->get_default_device()->command_queue();
+               int err = clEnqueueReadBuffer(queue, gpuMessageBuffer[i], CL_TRUE, 0, sizeof(MessageType)*(num_ghosts), &messageBuffers[i], 0, NULL, NULL);
+               for(int m=0; m<count; ++m){
+                  gSerialize(buffer, messageBuffers[i][m].first, messageBuffers[i][m].second);
+               }
+               net.send(i, prepRecv, buffer);
+               //send to recipient.
+            }
+
+         }//End prepSend
+
+         /*
+            static void syncRecv(Galois::Runtime::RecvBuffer& buf) {
+    uint32_t oid;
+    void (hGraph::*fn)(Galois::Runtime::RecvBuffer&);
+    Galois::Runtime::gDeserialize(buf, oid, fn);
+    hGraph* obj = reinterpret_cast<hGraph*>(ptrForObj(oid));
+    (obj->*fn)(buf);
+  }
+
+  template<typename FnTy>
+  void syncRecvApply(Galois::Runtime::RecvBuffer& buf) {
+    uint32_t num;
+    Galois::Runtime::gDeserialize(buf, num);
+    for(; num ; --num) {
+      uint64_t gid;
+      typename FnTy::ValTy val;
+      Galois::Runtime::gDeserialize(buf, gid, val);
+      assert(isOwned(gid));
+      FnTy::reduce(getData(gid - globalOffset), val);
+    }
+  }
+
+          */
+         template<typename GraphType>
+         void prepRecv(GraphType & g, Galois::Runtime::RecvBuffer& buffer){
+            CL_Kernel applyKernel;
+            auto & ctx = Galois::OpenCL::getCLContext();
+            auto & net = Galois::Runtime::getSystemNetworkInterface();
+            cl_command_queue queue = ctx->get_default_device()->command_queue();
+            unsigned sender=0;
+            const uint32_t counter =  0; // get counters from buffers.
+            gDeserialize(buffer, sender, counter);
+            for(int m=0; m<count; ++m){
+               gDeserialize(buffer, messageBuffers[sender][m].first, messageBuffers[sender][m].second);
+            }
+            int err = clEnqueueWriteBuffer(queue, gpuMessageBuffer[sender], CL_TRUE, 0, sizeof(MessageType)*(num_ghosts), &messageBuffers[sender], 0, NULL, NULL);
+               applyKernel.init("buffer_wrapper.cl", "syncApply");
+               applyKernel.set_arg(0, g);
+               applyKernel.set_arg(1, gpuMessageBuffer[sender]);
+               applyKernel.set_work_size(counter);
+               applyKernel();
+
+         }//End prepSend
+      };
+      /*####################################################################################################################################################*/
+               enum GRAPH_FIELD_FLAGS {
             NODE_DATA=0x1,EDGE_DATA=0x10,OUT_INDEX=0x100, NEIGHBORS=0x1000,ALL=0x1111, ALL_DATA=0x0011, STRUCTURE=0x1100,
          };
          /*
@@ -408,6 +567,30 @@ namespace Galois {
                init_kernel.set_arg_list_raw(gpu_struct_ptr, gpu_meta, gpu_wrapper.node_data, gpu_wrapper.outgoing_index, gpu_wrapper.neighbors, gpu_wrapper.edge_data);
                init_kernel.run_task();
 #endif
+            }
+            ////////////##############################################################///////////
+            ////////////##############################################################///////////
+            //TODO RK - complete these.
+            template<typename FnTy>
+             void sync_push() {
+               char * synKernelString=" ";
+               typedef std::pair<unsigned, FnTy::ValTy> MsgType;
+               std::vector<MsgType> data;
+               std::vector<size_t> peerHosts;
+               size_t selfID;
+               for(int peerID : peerHosts){
+                  if(peerID != selfID){
+                     std::pair<unsigned int, unsigned int> peerRange; // getPeerRange(peerID);
+                     for(int i = peerRange.first; i<peerRange.second; ++i){
+                        data.push_back(MsgType(i, getData(i)));
+                     }
+                  }
+               }
+
+            }
+            template<typename FnTy>
+             void sync_pull() {
+
             }
             ////////////##############################################################///////////
             ////////////##############################################################///////////
