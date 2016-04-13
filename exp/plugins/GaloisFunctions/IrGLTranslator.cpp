@@ -33,6 +33,7 @@ using namespace llvm;
 #define ORCHESTRATOR_FILENAME "._orchestrator_kernel"
 
 #define __GALOIS_PREPROCESS_GLOBAL_VARIABLE_PREFIX__ "local_"
+#define __GALOIS_ACCUMULATOR_NAME__ "local_didWork"
 
 namespace {
 
@@ -63,6 +64,7 @@ private:
   std::unordered_set<const Decl *> skipDecls;
   std::map<std::string, std::string> nodeMap;
   std::string funcName;
+  bool hasAReturnValue;
   std::stringstream declString, bodyString;
   std::map<std::string, std::string> parameterToTypeMap;
   std::map<std::string, std::string> globalVariableToTypeMap;
@@ -71,17 +73,21 @@ private:
 
   std::map<std::string, std::string> &SharedVariablesToTypeMap;
   std::map<std::string, std::pair<std::vector<std::string>, std::vector<std::string> > > &KernelToArgumentsMap;
+  std::set<std::string> &KernelsHavingReturnValue;
 
 public:
   explicit IrGLOperatorVisitor(ASTContext *context, Rewriter &R, 
       bool isTopo,
       std::map<std::string, std::string> &sharedVariables,
-      std::map<std::string, std::pair<std::vector<std::string>, std::vector<std::string> > > &kernels) : 
+      std::map<std::string, std::pair<std::vector<std::string>, std::vector<std::string> > > &kernels,
+      std::set<std::string> &returnKernels) : 
     //astContext(context),
     rewriter(R),
     isTopological(isTopo),
+    hasAReturnValue(false),
     SharedVariablesToTypeMap(sharedVariables),
-    KernelToArgumentsMap(kernels)
+    KernelToArgumentsMap(kernels),
+    KernelsHavingReturnValue(returnKernels)
   {}
   
   virtual ~IrGLOperatorVisitor() {}
@@ -175,6 +181,13 @@ public:
     findAndReplace(text, "ctx.push", "WL.push"); // FIXME: insert arguments within quotes
     findAndReplace(text, "\\", "\\\\"); // FIXME: should it be only within quoted strings?
 
+    if (text.find(__GALOIS_ACCUMULATOR_NAME__) == 0) {
+      std::size_t begin = text.find("=");
+      std::size_t end = text.find(";", begin);
+      std::string value = text.substr(begin+1, end - begin - 3);
+      text = "any_retval.return_(" + value + ")";
+    }
+
     return text;
   }
 
@@ -233,12 +246,17 @@ public:
         // FIXME: assert type matches if it exists
         SharedVariablesToTypeMap[param.first] = param.second;
       }
+      if (hasAReturnValue) {
+        declString << ", ('Any', 'any_retval')";
+      }
       KernelToArgumentsMap[funcName] = std::make_pair(globalArguments, arguments);
+      if (hasAReturnValue) KernelsHavingReturnValue.insert(funcName);
       declString << "],\n[\n";
       Output.open(COMPUTE_FILENAME, std::ios::app);
       Output << declString.str();
       Output << bodyString.str();
       Output.close();
+      return hasAReturnValue;
     }
     return traverse;
   }
@@ -459,8 +477,12 @@ public:
     }
     else if ((symbolTable.find(varName) == symbolTable.end()) && (type.find("Graph") != 0)) {
       if (globalVariableToTypeMap.find(varName) == globalVariableToTypeMap.end()) {
-        assert(varName.find(__GALOIS_PREPROCESS_GLOBAL_VARIABLE_PREFIX__) == 0);
-        globalVariableToTypeMap[varName] = FormatType(type);
+        if (varName.compare(__GALOIS_ACCUMULATOR_NAME__) == 0) {
+          hasAReturnValue = true;
+        } else {
+          assert(varName.find(__GALOIS_PREPROCESS_GLOBAL_VARIABLE_PREFIX__) == 0);
+          globalVariableToTypeMap[varName] = FormatType(type);
+        }
       }
     }
     return true;
@@ -486,6 +508,7 @@ private:
   std::map<std::string, std::string> SharedVariablesToTypeMap;
   std::map<std::string, std::pair<std::vector<std::string>, std::vector<std::string> > > KernelToArgumentsMap;
   std::map<std::string, std::vector<std::string> > HostKernelsToArgumentsMap;
+  std::set<std::string> KernelsHavingReturnValue;
 
   std::string FileNamePath;
 
@@ -548,6 +571,8 @@ public:
     for (auto& var : SharedVariablesToTypeMap) {
       cuheader << "\tShared<" << var.second << "> " << var.first << ";\n";
     }
+    cuheader << "\tShared<int> p_retval;\n";
+    cuheader << "\tAny any_retval;\n";
     cuheader << "};\n\n";
     for (auto& var : SharedVariablesToTypeMap) {
       cuheader << var.second << " get_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID) {\n";
@@ -605,6 +630,7 @@ public:
       cuheader << "\tctx->" << var.first << ".alloc(graph.nnodes);\n";
       cuheader << "\tctx->" << var.first << ".zero_gpu();\n"; // FIXME: should do this only for std::atomic variables?
     }
+    cuheader << "\tctx->p_retval = Shared<int>(1);\n";
     cuheader << "\tprintf(\"load_graph_GPU: %d owned nodes of total %d resident, %d edges\\n\", ctx->nowned, graph.nnodes, graph.nedges);\n"; 
     cuheader << "}\n\n";
     cuheader << "void kernel_sizing(CSRGraphTex & g, dim3 &blocks, dim3 &threads) {\n";
@@ -862,7 +888,8 @@ public:
             IrGLOperatorVisitor operatorVisitor(astContext, rewriter,
                 isTopological,
                 SharedVariablesToTypeMap,
-                KernelToArgumentsMap);
+                KernelToArgumentsMap,
+                KernelsHavingReturnValue);
             operatorVisitor.TraverseDecl(method);
             break;
           }
@@ -889,6 +916,11 @@ public:
         Output << "CDecl([(\"dim3\", \"threads\", \"\")]),\n";
         Output << "CBlock([\"kernel_sizing(ctx->gg, blocks, threads)\"]),\n";
         std::string kernelName = record->getNameAsString();
+        bool hasAReturnValue = (KernelsHavingReturnValue.find(kernelName) != KernelsHavingReturnValue.end());
+        if (hasAReturnValue) {
+          Output << "CBlock([\"*(ctx->p_retval.cpu_wr_ptr()) = " << __GALOIS_ACCUMULATOR_NAME__ << "\"]),\n";
+          Output << "CBlock([\"ctx->any_retval.rv = ctx->p_retval.gpu_wr_ptr()\"]),\n";
+        }
         Output << "Invoke(\"" << kernelName << "\", ";
         Output << "(\"ctx->gg\", \"ctx->nowned\"";
         auto& arguments = KernelToArgumentsMap[kernelName];
@@ -898,7 +930,13 @@ public:
         for (auto& argument : arguments.second) {
           Output << ", \"ctx->" << argument << ".gpu_wr_ptr()\"";
         }
+        if (hasAReturnValue) {
+          Output << ", \"ctx->any_retval\"";
+        }
         Output << ")),\n";
+        if (hasAReturnValue) {
+          Output << "CBlock([\"" << __GALOIS_ACCUMULATOR_NAME__ << " = *(ctx->p_retval.cpu_rd_ptr())\"]),\n";
+        }
         Output << "CBlock([\"check_cuda_kernel\"], parse = False),\n";
 
         if (!isTopological) { // data driven

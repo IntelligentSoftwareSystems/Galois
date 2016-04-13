@@ -148,8 +148,8 @@ struct PageRank {
         GNode dst = graph->getEdgeDst(nbr);
         PR_NodeData& ddata = graph->getData(dst);
         auto dst_residual_old = Galois::atomicAdd(ddata.residual, delta);
-        if(!didWork && (dst_residual_old <= tolerance) && ((dst_residual_old + delta) >= tolerance)) {
-          didWork = 1;
+        if((dst_residual_old <= tolerance) && ((dst_residual_old + delta) >= tolerance)) {
+          didWork += 1;
         }
       }
     }
