@@ -1,0 +1,1 @@
+app(subgraphIsomorphism SubgraphIsomorphism.cpp)
