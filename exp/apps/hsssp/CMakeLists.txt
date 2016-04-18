@@ -27,7 +27,7 @@ app(HSSSP_gen3 HSSSP_gen3.cpp DISTSAFE)
 
 #pageRank
 app(PageRank_push pageRank_gen.cpp DISTSAFE)
-app(PageRank_simple pageRank_gen_simpleIter.cpp DISTSAFE)
+#app(PageRank_simple pageRank_gen_simpleIter.cpp DISTSAFE)
 
 #LabelPropAlgo
 app(CC_LabelProp connectedComponent_gen.cpp  DISTSAFE)

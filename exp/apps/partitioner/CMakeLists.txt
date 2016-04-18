@@ -1,0 +1,1 @@
+app(partitioner Partitioner.cpp DISTSAFE)
