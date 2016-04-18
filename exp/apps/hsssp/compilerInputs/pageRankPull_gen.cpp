@@ -185,8 +185,6 @@ int main(int argc, char** argv) {
 
     T_hGraph_init.start();
     Graph hg(inputFile, net.ID, net.Num);
-    T_hGraph_init.stop();
-
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       cuda_ctx = get_CUDA_context(my_host_id);
@@ -198,6 +196,7 @@ int main(int argc, char** argv) {
       //Galois::OpenCL::cl_env.init(cldevice.Value);
     }
 #endif
+    T_hGraph_init.stop();
 
     std::cout << "InitializeGraph::go called\n";
 
@@ -231,6 +230,10 @@ int main(int argc, char** argv) {
     }
     T_pageRank.stop();
 
+    T_total.stop();
+
+    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " PageRank_pull (" << maxIterations << ") : " << T_pageRank.get() << "(msec)\n\n";
+
     // Verify
     if(verify){
 #ifdef __GALOIS_HET_CUDA__
@@ -247,10 +250,6 @@ int main(int argc, char** argv) {
       }
 #endif
     }
-
-    T_total.stop();
-
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " PageRank_pull (" << maxIterations << ") : " << T_pageRank.get() << "(msec)\n\n";
 
     return 0;
   } catch (const char* c) {
