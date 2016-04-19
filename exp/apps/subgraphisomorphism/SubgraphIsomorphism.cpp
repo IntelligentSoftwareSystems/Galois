@@ -441,12 +441,13 @@ int main(int argc, char **argv) {
   Galois::StatManager statManager;
   LonestarStart(argc, argv, name, desc, url);
 
-  if(rndSeedByTime) {
-    rndSeed = std::chrono::system_clock::now().time_since_epoch().count();
-  }
   if(constructD || constructQ) {
+    if(rndSeedByTime) {
+      rndSeed = std::chrono::system_clock::now().time_since_epoch().count();
+    }
     std::cout << "rndSeed: " << rndSeed << std::endl;
-//    generator.seed(rndSeed); // FIXME: does not compile if uncomment
+    unsigned int seed = rndSeed;
+    generator.seed(seed);
   }
 
   unsigned int maxNumEdgesQ = numNodesQ * (numNodesQ - 1);
