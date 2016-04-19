@@ -175,10 +175,19 @@ public:
     }
     findAndReplace(text, "Galois::atomic", "atomic");
 
+    {
+      std::size_t found = text.find("ctx.push(");
+      if (found != std::string::npos) {
+        std::size_t begin = text.rfind("(");
+        std::size_t end = text.find(")", begin);
+        std::string var = text.substr(begin+1, end - begin - 1);
+        text = "WL.push(\"" + var + "\")";
+      }
+    }
+
     findAndReplace(text, "->getEdgeDst", ".getAbsDestination");
     findAndReplace(text, "->getEdgeData", ".getAbsWeight");
     findAndReplace(text, "std::fabs", "fabs");
-    findAndReplace(text, "ctx.push", "WL.push"); // FIXME: insert arguments within quotes
     findAndReplace(text, "\\", "\\\\"); // FIXME: should it be only within quoted strings?
 
     if (text.find(__GALOIS_ACCUMULATOR_NAME__) == 0) {
@@ -485,13 +494,6 @@ public:
         }
       }
     }
-    return true;
-  }
-
-  virtual bool VisitDeclRefExpr(DeclRefExpr *declRefExpr) {
-    const ValueDecl *decl = declRefExpr->getDecl();
-    const std::string &varName = decl->getNameAsString();
-    assert(symbolTable.find(varName) != symbolTable.end());
     return true;
   }
 };
@@ -875,11 +877,12 @@ public:
           // FIXME: handle overloading/polymorphism
           if (method->getNameAsString().compare("operator()") == 0) {
             // FIXME: be precise in determining data-driven algorithms
-            if (callExpr->getNumArgs() > 2) {
-              std::string type = callExpr->getArg(2)->getType().getAsString();
-              if (type.find("Galois::WorkList") != std::string::npos) {
-                isTopological = false;
-              }
+            std::string type = method->getParamDecl(0)->getType().getAsString();
+            if (type.find("WorkItem") != std::string::npos) {
+              isTopological = false;
+            } else {
+              assert(type.find("GNode") != std::string::npos);
+              isTopological = true;
             }
             //llvm::errs() << "\nVertex Operator:\n" << 
             //  rewriter.getRewrittenText(method->getSourceRange()) << "\n";
@@ -895,6 +898,11 @@ public:
           }
         }
 
+        // initialize blocks and threads
+        Output << "CDecl([(\"dim3\", \"blocks\", \"\")]),\n";
+        Output << "CDecl([(\"dim3\", \"threads\", \"\")]),\n";
+        Output << "CBlock([\"kernel_sizing(ctx->gg, blocks, threads)\"]),\n";
+
         if (!isTopological) { // data driven
           // FIXME: generate precise initial worklist
           std::ofstream compute;
@@ -908,13 +916,11 @@ public:
 
           Output << "Pipe([\n";
           Output << "Invoke(\"__init_worklist__\", (\"ctx->gg\", )),\n";
+          Output << "CBlock([\"check_cuda_kernel\"], parse = False),\n";
           Output << "Pipe([\n";
         }
 
         // generate call to kernel
-        Output << "CDecl([(\"dim3\", \"blocks\", \"\")]),\n";
-        Output << "CDecl([(\"dim3\", \"threads\", \"\")]),\n";
-        Output << "CBlock([\"kernel_sizing(ctx->gg, blocks, threads)\"]),\n";
         std::string kernelName = record->getNameAsString();
         bool hasAReturnValue = (KernelsHavingReturnValue.find(kernelName) != KernelsHavingReturnValue.end());
         if (hasAReturnValue) {
