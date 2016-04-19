@@ -33,7 +33,7 @@
 #include "Galois/Runtime/CompilerHelperFunctions.h"
 
 #include "Galois/Dist/OfflineGraph.h"
-#include "Galois/Dist/hGraph.h"
+#include "Galois/Dist/vGraph.h"
 //#include "Galois/CompilerHe.h"
 
 
@@ -52,7 +52,7 @@ struct NodeData {
   std::atomic<int> dist_current;
 };
 
-typedef hGraph<NodeData, unsigned int> Graph;
+typedef vGraph<NodeData, unsigned int> Graph;
 typedef typename Graph::GraphNode GNode;
 
 

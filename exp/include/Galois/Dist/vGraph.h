@@ -264,8 +264,48 @@ public:
           fprintf(stderr, "ToSplit :: %d\n", *i);
        }
     }
-    //PowerGraph code.
-    {
+    if(false){//#########Skewed Random
+       const int num_hosts = 4;
+       std::vector<int> edgeOwner(g.sizeEdges());
+       std::vector<int> hostCounters(num_hosts);
+       std::vector<int> edgeCounters(num_hosts);
+       std::vector<std::set<int>> nodeOwners(g.size());
+       auto edgeStart = g.edge_begin(*g.begin());
+       for(auto n = g.begin(); n!=g.end(); ++n){
+          auto src = *n;
+          for(auto nbr =  g.edge_begin(*n); nbr!=g.edge_end(*n); ++nbr){
+             auto dst = g.getEdgeDst(nbr);
+             auto idx = rand()%num_hosts;
+             edgeOwner[std::distance(edgeStart, nbr)]= idx;
+             edgeCounters[idx]++;
+             nodeOwners[src].insert(idx);
+             nodeOwners[dst].insert(idx);
+          }
+       }
+       //Now count the replicas
+
+       int nodesCounter=0;
+       for(int i=0; i<g.size(); ++i){
+          for(auto idx : nodeOwners[i]){
+             hostCounters[idx]++;
+             nodesCounter++;
+          }
+       }
+       int edgesAssigned = 0;
+       for (int i=0; i<num_hosts; ++i){
+          edgesAssigned+=edgeCounters[i];
+       }
+       std::cout << "Nodes allocated :: " << nodesCounter <<", Total nodes :: "<< g.size() << "\nEdges allocated :: " << edgesAssigned << " , Total edges :: " << g.sizeEdges() << "\n";
+       std::cout << " Replicas :: " << (nodesCounter/(float)(g.size())) <<"\n";
+       for(int i=0; i< num_hosts; ++i){
+          std::cout << " Host " << i << ", nodes = " << hostCounters[i] << " , " << edgeCounters[i] << "\n";
+       }
+
+    }
+    //##################################
+    //PowerGraph code. (Greedy)
+    if(false){
+       std::cout << " Starting vertex-cut \n";
        const int numHosts = 4;//Galois::Runtime::NetworkInterface::Num;
        const int numNodes = g.size();
        const int numEdges = g.sizeEdges();
@@ -294,7 +334,7 @@ public:
                 nodeOwners[dstNode].insert(*idx);
                 edgeCounters[*idx]++;
                 hostCounters[*idx]+=2;//2 nodes added to host;
-
+                nodeFound[srcNode]=nodeFound[dstNode]=true;
              }else if (nodeFound[srcNode] && nodeFound[dstNode]){
                 std::vector<int> common(numHosts);
                 auto it = std::set_intersection(nodeOwners[srcNode].begin(),
@@ -306,7 +346,7 @@ public:
                 if(common.size()> 0){
                    //Common host found
                    auto idx = std::min_element(common.begin(), common.end(), [&](int l, int r){return edgeCounters[l]<edgeCounters[r];});
-                   nodeFound[srcNode]=nodeFound[dstNode]=true;
+//                   nodeFound[srcNode]=nodeFound[dstNode]=true;
                    nodeOwners[dstNode].insert(*it);
                    nodeOwners[srcNode].insert(*it);
                    edgeOwners[e]=*it;
@@ -342,6 +382,7 @@ public:
                 edgeCounters[*it]++;
              }else{
                 //SHOULD NOT BE HERE!
+                assert(false && "Node found case failed!");
              }
           }
        }
@@ -362,7 +403,55 @@ public:
           fprintf(stderr, "TotalEdges = %d, ActualEdges = %d\n", totalEdges, numEdges);
 
        }
-    }
+    }//End powergraph code.
+    //##################################
+    {//###PowerLyra
+        const int num_hosts = 4;
+        const int THRESHOLD = 8;
+        std::vector<int> edgeOwner(g.sizeEdges());
+        std::vector<int> hostCounters(num_hosts);
+        std::vector<int> edgeCounters(num_hosts);
+        std::vector<std::set<int>> nodeOwners(g.size());
+        std::vector<int> inDegree (g.size());
+        auto edgeStart = g.edge_begin(*g.begin());
+        for(auto n = g.begin(); n!=g.end(); ++n){
+           auto src = *n;
+           for(auto nbr =  g.edge_begin(*n); nbr!=g.edge_end(*n); ++nbr){
+              auto dst = g.getEdgeDst(nbr);
+              auto idx = rand()%num_hosts;
+              edgeOwner[std::distance(edgeStart, nbr)]= idx;
+              edgeCounters[idx]++;
+              nodeOwners[src].insert(idx);
+              nodeOwners[dst].insert(idx);
+              inDegree[dst]++;
+           }
+        }
+        for(auto n = g.begin(); n!=g.end(); ++n){
+           auto src = *n;
+           if(inDegree[src]>THRESHOLD){
+
+           }
+        }
+        //Now count the replicas
+
+        int nodesCounter=0;
+        for(int i=0; i<g.size(); ++i){
+           for(auto idx : nodeOwners[i]){
+              hostCounters[idx]++;
+              nodesCounter++;
+           }
+        }
+        int edgesAssigned = 0;
+        for (int i=0; i<num_hosts; ++i){
+           edgesAssigned+=edgeCounters[i];
+        }
+        std::cout << "Nodes allocated :: " << nodesCounter <<", Total nodes :: "<< g.size() << "\nEdges allocated :: " << edgesAssigned << " , Total edges :: " << g.sizeEdges() << "\n";
+        std::cout << " Replicas :: " << (nodesCounter/(float)(g.size())) <<"\n";
+        for(int i=0; i< num_hosts; ++i){
+           std::cout << " Host " << i << ", nodes = " << hostCounters[i] << " , " << edgeCounters[i] << "\n";
+        }
+    }//###End PowerLyra
+    //##################################
     /*Mark all nodes to which current host has an edge*/
     std::vector<bool> ghosts(g.size());
     for (auto n = gid2host[id].first; n < gid2host[id].second; ++n){
