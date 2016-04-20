@@ -51,6 +51,7 @@ static const char* const url = 0;
 namespace cll = llvm::cl;
 static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<unsigned int> numPartitions("num", cll::desc("Number of partitions to be created"), cll::init(2));
+static cll::opt<std::string> outputFolder("outputTo", cll::desc("Name of the output folder to store the partitioned graphs."), cll::init("./"));
 
 typedef OfflineGraph GraphType;
 typedef GraphType::edge_iterator EdgeItType;
@@ -330,9 +331,10 @@ int main(int argc, char** argv) {
    VertexCutInfo vci;
    T_init.start();
    Partitioner p;
-   p(inputFile, g, vci, numPartitions);
+   //p(inputFile, g, vci, numPartitions);
+   p(outputFolder, g, vci, numPartitions);
    T_init.stop();
-   if(!verifyParitions(inputFile, g, numPartitions)){
+   if(!verifyParitions(outputFolder, g, numPartitions)){
       std::cout<<"Verification of partitions failed! Contact developers!\n";
    }else{
       std::cout<<"Partitions verified!\n";
