@@ -593,6 +593,7 @@ public:
     cuheader << "struct CUDA_Context *get_CUDA_context(int id) {\n";
     cuheader << "\tstruct CUDA_Context *ctx;\n";
     cuheader << "\tctx = (struct CUDA_Context *) calloc(1, sizeof(struct CUDA_Context));\n";
+    cuheader << "\tctx->id = id;\n";
     cuheader << "\treturn ctx;\n";
     cuheader << "}\n\n";
     cuheader << "bool init_CUDA_context(struct CUDA_Context *ctx, int device) {\n";
@@ -616,7 +617,7 @@ public:
     cuheader << "void load_graph_CUDA(struct CUDA_Context *ctx, MarshalGraph &g) {\n";
     cuheader << "\tCSRGraphTex &graph = ctx->hg;\n";
     cuheader << "\tctx->nowned = g.nowned;\n";
-    cuheader << "\tctx->id = g.id;\n";
+    cuheader << "\tassert(ctx->id == g.id);\n";
     cuheader << "\tgraph.nnodes = g.nnodes;\n";
     cuheader << "\tgraph.nedges = g.nedges;\n";
     cuheader << "\tif(!graph.allocOnHost()) {\n";

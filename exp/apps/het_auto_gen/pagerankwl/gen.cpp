@@ -156,9 +156,6 @@ struct PageRank {
 
   PageRank(cll::opt<float> &_tolerance, const float &_alpha, Graph* _g): local_tolerance(_tolerance), local_alpha(_alpha), graph(_g){}
   void static go(Graph& _graph) {
-     //using namespace Galois::WorkList;
-     //typedef dChunkedFIFO<64> dChunk;
-
      	struct Syncer_0 {
      		static float extract(uint32_t node_id, const struct PR_NodeData & node) {
      		#ifdef __GALOIS_HET_CUDA__
@@ -239,6 +236,13 @@ int main(int argc, char** argv) {
         personality = CPU;
         break;
       }
+      int gpu_device = gpudevice;
+      if (gpu_device == -1) {
+        gpu_device = 0;
+        for (unsigned i = 0; i < my_host_id; ++i) {
+          if (personality_set.c_str()[i] != 'c') ++gpu_device;
+        }
+      }
     }
 #endif
 
@@ -254,7 +258,7 @@ int main(int argc, char** argv) {
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       cuda_ctx = get_CUDA_context(my_host_id);
-      if (!init_CUDA_context(cuda_ctx, gpudevice))
+      if (!init_CUDA_context(cuda_ctx, gpu_device))
         return -1;
       MarshalGraph m = hg.getMarshalGraph(my_host_id);
       load_graph_CUDA(cuda_ctx, m);

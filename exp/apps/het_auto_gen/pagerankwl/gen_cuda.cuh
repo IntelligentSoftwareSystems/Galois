@@ -73,6 +73,7 @@ void add_node_value_cuda(struct CUDA_Context *ctx, unsigned LID, float v) {
 struct CUDA_Context *get_CUDA_context(int id) {
 	struct CUDA_Context *ctx;
 	ctx = (struct CUDA_Context *) calloc(1, sizeof(struct CUDA_Context));
+	ctx->id = id;
 	return ctx;
 }
 
@@ -98,7 +99,7 @@ bool init_CUDA_context(struct CUDA_Context *ctx, int device) {
 void load_graph_CUDA(struct CUDA_Context *ctx, MarshalGraph &g) {
 	CSRGraphTex &graph = ctx->hg;
 	ctx->nowned = g.nowned;
-	ctx->id = g.id;
+	assert(ctx->id == g.id);
 	graph.nnodes = g.nnodes;
 	graph.nedges = g.nedges;
 	if(!graph.allocOnHost()) {

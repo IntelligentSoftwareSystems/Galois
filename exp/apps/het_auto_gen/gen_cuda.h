@@ -17,4 +17,4 @@ float get_node_value_cuda(struct CUDA_Context *ctx, unsigned LID);
 void set_node_value_cuda(struct CUDA_Context *ctx, unsigned LID, float v);
 void add_node_value_cuda(struct CUDA_Context *ctx, unsigned LID, float v);
 void InitializeGraph_cuda(const float & local_alpha, struct CUDA_Context *ctx);
-void PageRank_cuda(const float & local_alpha, float local_tolerance, struct CUDA_Context *ctx);
+void PageRank_cuda(bool & local_didWork, const float & local_alpha, float local_tolerance, struct CUDA_Context *ctx);

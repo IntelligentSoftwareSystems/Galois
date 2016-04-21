@@ -37,23 +37,17 @@ __global__ void InitializeGraph(CSRGraphTex graph, int  nowned, const float  loc
     }
   }
 }
-__global__ void PageRank(CSRGraphTex graph, int  nowned, const float  local_alpha, float local_tolerance, unsigned int * p_nout, float * p_residual, float * p_value, WorklistT in_wl, WorklistT out_wl)
+__global__ void PageRank(CSRGraphTex graph, int  nowned, const float  local_alpha, float local_tolerance, unsigned int * p_nout, float * p_residual, float * p_value, Any any_retval)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
 
   const unsigned __kernel_tb_size = TB_SIZE;
-  if (tid == 0)
-    in_wl.reset_next_slot();
-
-  index_type wlvertex_end;
-  wlvertex_end = *((volatile index_type *) (in_wl).dindex);
-  for (index_type wlvertex = 0 + tid; wlvertex < wlvertex_end; wlvertex += nthreads)
+  index_type src_end;
+  src_end = nowned;
+  for (index_type src = 0 + tid; src < src_end; src += nthreads)
   {
-    int src;
-    bool pop;
     float residual_old;
-    pop = (in_wl).pop_id(wlvertex, src);
     residual_old = atomicExch(&p_residual[src], 0.0);
     p_value[src] += residual_old;
     if (p_nout[src] > 0)
@@ -70,26 +64,10 @@ __global__ void PageRank(CSRGraphTex graph, int  nowned, const float  local_alph
         dst_residual_old = atomicAdd(&p_residual[dst], delta);
         if ((dst_residual_old <= local_tolerance) && ((dst_residual_old + delta) >= local_tolerance))
         {
-          (out_wl).push(dst);
+          any_retval.return_( 1);
         }
       }
     }
-  }
-}
-__global__ void __init_worklist__(CSRGraphTex graph, WorklistT in_wl, WorklistT out_wl)
-{
-  unsigned tid = TID_1D;
-  unsigned nthreads = TOTAL_THREADS_1D;
-
-  const unsigned __kernel_tb_size = TB_SIZE;
-  if (tid == 0)
-    in_wl.reset_next_slot();
-
-  index_type vertex_end;
-  vertex_end = (graph).nnodes;
-  for (index_type vertex = 0 + tid; vertex < vertex_end; vertex += nthreads)
-  {
-    (out_wl).push(vertex);
   }
 }
 void InitializeGraph_cuda(const float & local_alpha, struct CUDA_Context * ctx)
@@ -100,28 +78,14 @@ void InitializeGraph_cuda(const float & local_alpha, struct CUDA_Context * ctx)
   InitializeGraph <<<blocks, threads>>>(ctx->gg, ctx->nowned, local_alpha, ctx->nout.gpu_wr_ptr(), ctx->residual.gpu_wr_ptr(), ctx->value.gpu_wr_ptr());
   check_cuda_kernel;
 }
-void PageRank_cuda(const float & local_alpha, float local_tolerance, struct CUDA_Context * ctx)
+void PageRank_cuda(bool & local_didWork, const float & local_alpha, float local_tolerance, struct CUDA_Context * ctx)
 {
   dim3 blocks;
   dim3 threads;
-  PipeContextT<WorklistT> pipe;
   kernel_sizing(ctx->gg, blocks, threads);
-  pipe = PipeContextT<WorklistT>(ctx->hg.nedges);
-  {
-    {
-      pipe.out_wl().will_write();
-      __init_worklist__ <<<blocks, threads>>>(ctx->gg, pipe.in_wl(), pipe.out_wl());
-      pipe.in_wl().swap_slots();
-      pipe.advance2();
-      check_cuda_kernel;
-      while (pipe.in_wl().nitems())
-      {
-        pipe.out_wl().will_write();
-        PageRank <<<blocks, threads>>>(ctx->gg, ctx->nowned, local_alpha, local_tolerance, ctx->nout.gpu_wr_ptr(), ctx->residual.gpu_wr_ptr(), ctx->value.gpu_wr_ptr(), pipe.in_wl(), pipe.out_wl());
-        pipe.in_wl().swap_slots();
-        pipe.advance2();
-        check_cuda_kernel;
-      }
-    }
-  }
+  *(ctx->p_retval.cpu_wr_ptr()) = local_didWork;
+  ctx->any_retval.rv = ctx->p_retval.gpu_wr_ptr();
+  PageRank <<<blocks, threads>>>(ctx->gg, ctx->nowned, local_alpha, local_tolerance, ctx->nout.gpu_wr_ptr(), ctx->residual.gpu_wr_ptr(), ctx->value.gpu_wr_ptr(), ctx->any_retval);
+  local_didWork = *(ctx->p_retval.cpu_rd_ptr());
+  check_cuda_kernel;
 }
