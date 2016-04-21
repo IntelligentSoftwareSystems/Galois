@@ -8,6 +8,8 @@
 
 import sys
 
+tolerance=0.0001
+
 def check_results(masterFile, otherFiles, offset, errors):
   with open(masterFile) as mfile, open(otherFiles) as ofile:
     mfile.seek(offset)
@@ -16,7 +18,7 @@ def check_results(masterFile, otherFiles, offset, errors):
       split_line2 = line2.split(' ')
       offset = offset + len(line1);
       if (split_line1[0] == split_line2[0]):
-        if(abs(float(split_line1[1]) - float(split_line2[1])) > 0.0001):
+        if(abs(float(split_line1[1]) - float(split_line2[1])) > tolerance):
           print "NOT MATCHED \n";
           print line1;
           print line2;
