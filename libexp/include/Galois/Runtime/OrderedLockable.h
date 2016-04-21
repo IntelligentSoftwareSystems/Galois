@@ -43,6 +43,8 @@ template <typename T>
 class OrderedContextBase: public SimpleRuntimeContext {
   using Base = SimpleRuntimeContext;
 
+protected:
+
   T active;
 
 public:

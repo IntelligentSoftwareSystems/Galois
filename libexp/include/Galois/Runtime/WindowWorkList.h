@@ -36,12 +36,14 @@
 
 #include "Galois/Substrate/gio.h"
 
+#include <boost/noncopyable.hpp>
+
 
 namespace Galois {
 namespace Runtime { 
 
 template <typename T, typename Cmp>
-class SortedRangeWindowWL {
+class SortedRangeWindowWL: private boost::noncopyable {
   using PerThrdWL = Galois::PerThreadVector<T>;
   using Iter = typename PerThrdWL::local_iterator;
   using Range = std::pair<Iter, Iter>;
@@ -168,7 +170,7 @@ public:
     if (windowLim != nullptr) {
       Galois::Runtime::on_each_impl (
           [this, &workList, &wrap, numPerThrd, windowLim] (const unsigned tid, const unsigned numT) {
-            Range& r = *(wlRange.getLocal (tid));
+            Range& r = *(wlRange.getLocal ());
 
             for (size_t i = 0; (i < numPerThrd) 
               && (r.first != r.second); ++r.first) {
@@ -207,12 +209,39 @@ public:
 
 
 template <typename T, typename Cmp>
-class PQbasedWindowWL {
+class PQbasedWindowWL: private boost::noncopyable {
 
-  using PerThrdWL = Galois::PerThreadMinHeap<T, Cmp>;
+  using dbg = Galois::Substrate::debug<0>;
+
+  // using PerThrdWL = Galois::PerThreadMinHeap<T, Cmp>;
+  using PerThrdWL = Galois::PerThreadSet<T, Cmp>;
 
   Cmp cmp;
   PerThrdWL m_wl;
+
+  const T& getTop (void) const {
+    assert (!m_wl.get ().empty ());
+    return *(m_wl.get ().begin ());
+  }
+
+  const T& getTop (const unsigned i) const {
+    assert (!m_wl[i].empty ());
+    return *(m_wl[i].begin ());
+  }
+
+  void pushImpl (const T& x) {
+    m_wl.get ().insert (x);
+    // m_wl.get ().push (x);
+  }
+
+  void pushImpl (const T& x, const unsigned owner) {
+    m_wl[owner].insert (x);
+    // m_wl.get ().push (x);
+  }
+
+  void popMin (void) {
+    m_wl.get ().erase (m_wl.get ().begin ());
+  }
 
 public:
 
@@ -228,14 +257,14 @@ public:
 
     Galois::Runtime::do_all_impl (range,
         [this] (const T& x) {
-          m_wl.get ().push (x);
+          push (x);
         }
         , "initfill");
 
   }
 
   const T* getMin (void) const {
-    const T* windowLim = nullptr;
+    const T* ret = nullptr;
 
     unsigned numT = getActiveThreads ();
 
@@ -243,23 +272,22 @@ public:
     for (unsigned i = 0; i < numT; ++i) {
 
       if (!m_wl[i].empty ()) {
-        if (windowLim == nullptr || cmp (*windowLim, m_wl[i].top ())) {
-          windowLim = &(m_wl[i].top ());
+        if (!ret || cmp (getTop (i), *ret)) {
+          ret = &(getTop (i));
         }
       }
     }
 
-    return windowLim;
+    return ret;
   }
 
   void push (const T& x) {
-    m_wl.get ().push (x);
+    pushImpl (x);
   }
 
   void push (const T& x, const unsigned owner) {
     assert (owner < Galois::getActiveThreads ());
-
-    m_wl.get (owner).push (x);
+    pushImpl (x, owner);
   }
 
   size_t initSize (void) const {
@@ -297,19 +325,20 @@ public:
     Galois::Runtime::on_each_impl (
         [this, &workList, &wrap, numPerThrd, &perThrdLastPop] (const unsigned tid, const unsigned numT) {
 
-          Galois::optional<T>& lastPop = *(perThrdLastPop.getLocal (tid));
+          Galois::optional<T>& lastPop = *(perThrdLastPop.getLocal ());
 
 
           int lim = std::min (m_wl.get ().size (), numPerThrd);
 
           for (int i = 0; i < lim; ++i) {
             if (i == (lim - 1)) {
-              lastPop = m_wl.get ().top ();
+              lastPop = getTop ();
             }
 
+            dbg::print("Removing and adding to window: ", getTop ());
 
-            workList.get ().push_back (wrap (m_wl.get ().top ()));
-            m_wl.get ().pop ();
+            workList.get ().push_back (wrap (getTop ()));
+            popMin();
           }
         }
         , "poll_part_1");
@@ -329,7 +358,6 @@ public:
         }
       }
     }
- 
  
     // for (unsigned i = 0; i < numT; ++i) {
       // if (!workList[i].empty ()) {
@@ -355,24 +383,35 @@ public:
 
       Galois::Runtime::on_each_impl (
           [this, &workList, &wrap, &windowLim] (const unsigned tid, const unsigned numT) {
-            for (const T* t = &m_wl.get ().top (); 
-              !m_wl.get ().empty () && !cmp (*windowLim, *t); t = &m_wl.get ().top ()) {
 
-                workList.get ().push_back (wrap (*t));
-                m_wl.get ().pop ();
+            while (!m_wl.get ().empty ()) {
+              const T& t = getTop ();
+
+              if (cmp (*windowLim, t)) { // windowLim < t
+                break;
+              }
+
+              dbg::print("Removing and adding to window: ", t, ", windowLim: ", *windowLim);
+              workList.get ().push_back (wrap (t));
+              popMin ();
             }
-            
           }
           , "poll_part_2");
 
 
+      const T* min = getMin ();
+      if (min) {
+        assert (cmp (*windowLim, *min));
+      }
 
 
       for (unsigned i = 0; i < numT; ++i) {
         if (!m_wl[i].empty ()) {
-          assert (!cmp (m_wl[i].top (), *windowLim) && "poll gone wrong");
+          assert (cmp (*windowLim, getTop (i)) && "poll gone wrong");
         }
       }
+
+      
     }
 
   }

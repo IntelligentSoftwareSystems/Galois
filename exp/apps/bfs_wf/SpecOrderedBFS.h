@@ -109,10 +109,11 @@ class SpecOrderedBFS: public BFS<Level_ty> {
             , eni = graph.edge_end (up.node, Galois::MethodFlag::UNPROTECTED); ni != eni; ++ni) {
 
           GNode dst = graph.getEdgeDst (ni);
+          ctx.push (Update (dst, up.level + 1));
 
-          if (graph.getData (dst, Galois::MethodFlag::UNPROTECTED) == BFS_LEVEL_INFINITY) {
-            ctx.push (Update (dst, up.level + 1));
-          }
+          // if (graph.getData (dst, Galois::MethodFlag::UNPROTECTED) == BFS_LEVEL_INFINITY) {
+            // ctx.push (Update (dst, up.level + 1));
+          // }
         }
 
       }
@@ -141,7 +142,7 @@ public:
     std::vector<Update> wl;
     wl.push_back (first);
 
-    Galois::Runtime::for_each_ordered_pessim (
+    Galois::Runtime::for_each_ordered_spec (
         Galois::Runtime::makeStandardRange(wl.begin (), wl.end ()),
         Comparator (), 
         VisitNhood (graph),

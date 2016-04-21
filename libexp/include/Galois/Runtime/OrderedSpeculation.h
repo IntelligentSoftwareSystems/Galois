@@ -347,7 +347,6 @@ struct OptimContext: public SpecContextBase<T, Cmp, Exec> {
   using NhoodMgr = PtrBasedNhoodMgr<NItem>;
   using NhoodList = typename gstl::Vector<NItem*>;
   using ChildList = typename gstl::Vector<OptimContext*>;
-  using Lock_ty = Galois::Substrate::SimpleLock;
 
   Galois::GAtomic<bool> onWL;
   bool addBack; // set to false by parent when parent is marked for abort, see markAbortRecursive
@@ -362,7 +361,7 @@ struct OptimContext: public SpecContextBase<T, Cmp, Exec> {
   :
     Base (x, s, exec), 
     onWL (false),
-    addBack (false)
+    addBack (true)
   {}
 
 
@@ -725,7 +724,7 @@ protected:
 
       if (!c) { continue; }
 
-      if (!m || Base::ctxtCmp (m, c)) {
+      if (!m || Base::ctxtCmp (c, m)) {
         m = c;
       }
     }
@@ -740,12 +739,16 @@ protected:
 
     updateCurrMinPending (c);
 
-    if (!minWinWL || !Base::ctxtCmp (minWinWL, c)) {
+    if (!minWinWL || Base::ctxtCmp (c, minWinWL)) {
         Base::getNextWL ().push_back (c, owner);
 
+        dbg::print ("Child going to nextWL, c: ", c, ", with active: ", c->getActive ());
     } else {
+      assert (!Base::ctxtCmp (c, minWinWL));
       assert (Base::targetCommitRatio != 0.0);
       winWL.push (c, owner);
+
+      dbg::print ("Child going to winWL, c: ", c, ", with active: ", c->getActive ());
     }
 
     return c;
@@ -760,6 +763,11 @@ protected:
 
     updateCurrMinPending (ctxt);
     Base::getNextWL ().push (ctxt);
+
+    Ctxt* m = getMinWinWL ();
+    if (m) {
+      // assert (Base::ctxtCmp (ctxt, m));
+    }
   }
 
 
@@ -774,24 +782,28 @@ protected:
     // reset currMinPending
     on_each_impl (
         [this] (const unsigned tid, const unsigned numT) {
-          *(currMinPending.getLocal (tid)) = nullptr;
+          *(currMinPending.getLocal ()) = nullptr;
         });
 
 
-    if (true) {
-      const Ctxt* minWinWL = getMinWinWL ();
+    // TODO: remove after debugging
+#ifndef NDEBUG
+    const Ctxt* minWinWL = getMinWinWL ();
+    const Ctxt* minCurrWL = Base::getMinCurrWL();
+    const Ctxt* maxCurrWL = Base::getMaxCurrWL();
 
-      on_each_impl (
-          [this, minWinWL] (const unsigned tid, const unsigned numT) {
-            if (minWinWL) {
-              auto& wl = Base::getCurrWL ().get ();
-
-              for (Ctxt* c: wl) {
-                assert (!Base::ctxtCmp (minWinWL, c));
-              }
-            }
-          });
+    if (minCurrWL) {
+      dbg::print ("===== min CurrWL: ", minCurrWL, " with item: ", minCurrWL->getActive ());
     }
+    if (maxCurrWL) {
+      dbg::print ("max CurrWL: ", maxCurrWL, " with item: ", maxCurrWL->getActive ());
+    }
+    if (minWinWL) {
+      dbg::print ("min Win WL: ", minWinWL, " with item: ", minWinWL->getActive ());
+      // assert (Base::ctxtCmp (maxCurrWL, minWinWL));
+    }
+
+#endif
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhood (void) {
@@ -826,6 +838,53 @@ protected:
     Base::ctxtAlloc.deallocate (ctxt, 1);
   }
 
+  Ctxt* computeGVT (void) {
+
+    // t_computeGVT.start ();
+
+    Substrate::PerThreadStorage<Ctxt*> perThrdMin;
+
+    on_each_impl ([this, &perThrdMin] (const unsigned tid, const unsigned numT) {
+          
+          for (auto i = Base::getNextWL ().local_begin ()
+            , end_i = Base::getNextWL ().local_end (); i != end_i; ++i) {
+
+            Ctxt*& lm = *(perThrdMin.getLocal ());
+
+            if (!lm || Base::ctxtCmp (*i, lm)) {
+              lm = *i;
+            }
+          }
+
+          
+        });
+
+    Ctxt* ret = nullptr;
+
+    for (unsigned i = 0; i < perThrdMin.size (); ++i) {
+
+      Ctxt* lm = *(perThrdMin.getRemote (i));
+
+      if (lm) {
+        if (!ret || Base::ctxtCmp (lm, ret)) {
+          ret = lm;
+        }
+      }
+    }
+
+    Ctxt* const* minWinWL = winWL.getMin ();
+
+    if (minWinWL) {
+      if (!ret || Base::ctxtCmp (*minWinWL, ret)) {
+        ret = *minWinWL;
+      }
+    }
+
+    // t_computeGVT.stop ();
+
+    return ret;
+
+  }
 };
 
 template <typename T, typename Cmp, typename NhFunc, typename ExFunc, typename  OpFunc, typename ArgsTuple>
@@ -1015,55 +1074,6 @@ private:
 
   }
 
-  /*
-  Ctxt* computeGVT (void) {
-
-    t_computeGVT.start ();
-
-    Substrate::PerThreadStorage<Ctxt*> perThrdMin;
-
-    on_each_impl ([this, &perThrdMin] (const unsigned tid, const unsigned numT) {
-          
-          for (auto i = Base::getNextWL ().local_begin ()
-            , end_i = Base::getNextWL ().local_end (); i != end_i; ++i) {
-
-            Ctxt*& lm = *(perThrdMin.getLocal ());
-
-            if (!lm || Base::ctxtCmp (*i, lm)) {
-              lm = *i;
-            }
-          }
-
-          
-        });
-
-    Ctxt* ret = nullptr;
-
-    for (unsigned i = 0; i < perThrdMin.size (); ++i) {
-
-      Ctxt* lm = *(perThrdMin.getRemote (i));
-
-      if (lm) {
-        if (!ret || Base::ctxtCmp (lm, ret)) {
-          ret = lm;
-        }
-      }
-    }
-
-    Ctxt* const* minWinWL = winWL.getMin ();
-
-    if (minWinWL) {
-      if (!ret || Base::ctxtCmp (*minWinWL, ret)) {
-        ret = *minWinWL;
-      }
-    }
-
-    t_computeGVT.stop ();
-
-    return ret;
-
-  }
-  */
 
   void quickAbort (Ctxt* c) {
     assert (c);
@@ -1073,6 +1083,7 @@ private:
 
     if (c->casState (ContextState::SCHEDULED, ContextState::ABORT_DONE)) {
       Base::push_abort (c);
+      dbg::print("Quick Abort c: ", c, ", with active: ", c->getActive ());
 
     } else {
       assert (c->hasState (ContextState::ABORTED_CHILD)); 
@@ -1090,11 +1101,15 @@ private:
 
           if (c->isSrc ()) {
 
+            assert (c->isSrcSlowCheck ());
+
             if (c->findAborts (abortWL)) {
               // XXX: c does not need to abort if it's neighborhood
               // isn't dependent on values computed by other tasks
+              
 
               c->disableSrc ();
+              dbg::print("Causing rollbacks:", c, " with active: ", c->getActive ());
             }
 
           } 
@@ -1115,6 +1130,8 @@ private:
           } else {
             assert (c->hasState (ContextState::ABORTING) || c->hasState (ContextState::ABORT_DONE));
           }
+
+          dbg::print("aborted after execution:", c, " with active: ", c->getActive ());
         },
         std::make_tuple (
           Galois::loopname ("handle-aborts"),
@@ -1157,6 +1174,11 @@ private:
 
     Ctxt* gvt = Base::getMinPending ();
 
+    // TODO: remove this after debugging
+    // Ctxt* gvtAlt = Base::computeGVT ();
+// 
+    // assert (gvt == gvtAlt);
+
     if (gvt) {
       dbg::print ("GVT computed as: ", gvt, ", with elem: ", gvt->getActive ());
     } else {
@@ -1191,6 +1213,10 @@ private:
           if (b) {
 
             assert (c->isCommitSrc ());
+            if (gvt) {
+              assert (Base::ctxtCmp (c, gvt));
+            }
+
             c->doCommit ();
             c->findCommitSrc (gvt, wlHandle);
             Base::totalRetires += 1;
@@ -1546,7 +1572,6 @@ public:
 
   }
 
-  // TODO: refactor common code with OptimOrdExecutor::reclaimMemory
   void performCommits (void) {
 
     auto revCtxtCmp = [this] (const Ctxt* a, const Ctxt* b) { return Base::ctxtCmp (b, a); };
