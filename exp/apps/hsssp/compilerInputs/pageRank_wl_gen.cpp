@@ -155,6 +155,7 @@ int main(int argc, char** argv) {
 
 #ifdef __GALOIS_HET_CUDA__
     const unsigned my_host_id = Galois::Runtime::getHostID();
+    int gpu_device = gpudevice;
     //Parse arg string when running on multiple hosts and update/override personality
     //with corresponding value.
     if (personality_set.length() == Galois::Runtime::NetworkInterface::Num) {
@@ -171,7 +172,6 @@ int main(int argc, char** argv) {
         personality = CPU;
         break;
       }
-      int gpu_device = gpudevice;
       if (gpu_device == -1) {
         gpu_device = 0;
         for (unsigned i = 0; i < my_host_id; ++i) {
