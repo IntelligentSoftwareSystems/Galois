@@ -51,6 +51,7 @@ static const char* const url = 0;
 namespace cll = llvm::cl;
 static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<unsigned int> numPartitions("num", cll::desc("Number of partitions to be created"), cll::init(2));
+static cll::opt<std::string> outputFolder("outputTo", cll::desc("Name of the output folder to store the partitioned graphs."), cll::init("./"));
 
 typedef OfflineGraph GraphType;
 typedef GraphType::edge_iterator EdgeItType;
@@ -198,7 +199,7 @@ struct Partitioner {
          auto numEntries = vcInfo.hostGlobalToLocalMapping[i].size();
          meta_file.write(reinterpret_cast<char*>(&(numEntries)), sizeof(numEntries));
          for (auto n : vcInfo.hostGlobalToLocalMapping[i]) {
-            auto owner = *vcInfo.vertexOwners[n.second].begin();
+            auto owner = *vcInfo.vertexOwners[n.first].begin();
             meta_file.write(reinterpret_cast<const char*>(&n.first), sizeof(n.first));
             meta_file.write(reinterpret_cast<const char*>(&n.second), sizeof(n.second));
             meta_file.write(reinterpret_cast<const char*>(&owner), sizeof(owner));
@@ -274,6 +275,10 @@ bool verifyParitions(std::string & basename, OfflineGraph & g, size_t num_hosts)
       pGraphs[h] = new OfflineGraph(gFileName);
    }      //End for each host.
 
+   std::vector<size_t> nodeOwners(g.size());
+   for(auto & i : nodeOwners){
+      i=-1;
+   }
    std::vector<size_t> outEdgeCounts(g.size());
    std::vector<size_t> inEdgeCounts(g.size());
    for (int h = 0; h < num_hosts; ++h) {
@@ -282,13 +287,28 @@ bool verifyParitions(std::string & basename, OfflineGraph & g, size_t num_hosts)
          auto src = *n;
          assert(hostLocalToGlobalMap[h].find(src) != hostLocalToGlobalMap[h].end());
          auto g_src = hostLocalToGlobalMap[h][src].global_id;
+         auto owner_src = hostLocalToGlobalMap[h][src].owner_id;
+         if(nodeOwners[g_src]!=-1 && nodeOwners[g_src]!=owner_src){
+            std::cout << "Error - Node:: " << g_src << " OwnerMismatch " << owner_src << " , " << nodeOwners[g_src] << "\n";
+            verified = false;
+         }else{
+            nodeOwners[g_src] = owner_src;
+         }
          for (auto e = graph.edge_begin(src); e != graph.edge_end(src); ++e) {
             auto dst = graph.getEdgeDst(e);
             auto g_dst = hostLocalToGlobalMap[h][dst].global_id;
             assert(hostLocalToGlobalMap[h].find(dst) != hostLocalToGlobalMap[h].end());
             outEdgeCounts[g_src]++;
             inEdgeCounts[g_dst]++;
+            auto owner_dst= hostLocalToGlobalMap[h][dst].owner_id;
+            if(nodeOwners[g_dst]!=-1 && nodeOwners[g_dst]!=owner_dst){
+               std::cout << "Error - Node:: " << g_dst<< " OwnerMismatch " << owner_dst << " , " << nodeOwners[g_dst] << "\n";
+               verified = false;
+            }else{
+               nodeOwners[g_dst] = owner_dst;
+            }
          }
+
       }
    }
    for (auto n = g.begin(); n != g.end(); ++n) {
@@ -330,9 +350,10 @@ int main(int argc, char** argv) {
    VertexCutInfo vci;
    T_init.start();
    Partitioner p;
-   p(inputFile, g, vci, numPartitions);
+   //p(inputFile, g, vci, numPartitions);
+   p(outputFolder, g, vci, numPartitions);
    T_init.stop();
-   if(!verifyParitions(inputFile, g, numPartitions)){
+   if(!verifyParitions(outputFolder, g, numPartitions)){
       std::cout<<"Verification of partitions failed! Contact developers!\n";
    }else{
       std::cout<<"Partitions verified!\n";
