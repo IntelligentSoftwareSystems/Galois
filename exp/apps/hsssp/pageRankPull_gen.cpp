@@ -33,8 +33,9 @@
 
 #include "Galois/Runtime/CompilerHelperFunctions.h"
 
-#include "OfflineGraph.h"
-#include "hGraph.h"
+#include "Galois/Dist/OfflineGraph.h"
+#include "Galois/Dist/hGraph.h"
+#include "Galois/DistAccumulator.h"
 
 static const char* const name = "PageRank - Compiler Generated Distributed Heterogeneous";
 static const char* const desc = "PageRank Pull version on Distributed Galois.";
@@ -62,19 +63,19 @@ struct InitializeGraph {
   void static go(Graph& _graph) {
 
      struct Syncer_0 {
-    	static int extract( const struct PR_NodeData & node){ return node.nout; }
-    	static void reduce (struct PR_NodeData & node, int y) { Galois::atomicAdd(node.nout, y);}
-    	static void reset (struct PR_NodeData & node ){node.nout = 0 ; }
+    	static int extract(GNode src, const struct PR_NodeData & node){ return node.nout; }
+    	static void reduce (GNode src,struct PR_NodeData & node, int y) { Galois::atomicAdd(node.nout, y);}
+    	static void reset (GNode src,struct PR_NodeData & node ){node.nout = 0 ; }
     	typedef int ValTy;
     };
      struct SyncerPull_0 {
-    	static float extract( const struct PR_NodeData & node){ return node.value; }
-    	static void setVal (struct PR_NodeData & node, float y) {node.value = y; }
+    	static float extract( GNode src,const struct PR_NodeData & node){ return node.value; }
+    	static void setVal (GNode src,struct PR_NodeData & node, float y) {node.value = y; }
     	typedef float ValTy;
     };
      struct SyncerPull_1 {
-    	static int extract( const struct PR_NodeData & node){ return node.nout; }
-    	static void setVal (struct PR_NodeData & node, int y) {node.nout = y; }
+    	static int extract( GNode src,const struct PR_NodeData & node){ return node.nout; }
+    	static void setVal (GNode src,struct PR_NodeData & node, int y) {node.nout = y; }
     	typedef int ValTy;
     };
     Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ &_graph }, Galois::loopname("Init"), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "value" , "float"), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "nout" , "int"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "nout", "int" , "{ Galois::atomicAdd(node.nout, y);}",  "{node.nout = 0 ; }"));
@@ -105,15 +106,20 @@ struct PageRank_pull {
   void static go(Graph& _graph) {
 
        struct SyncerPull_0 {
-      	static float extract( const struct PR_NodeData & node){ return node.value; }
-      	static void setVal (struct PR_NodeData & node, float y) {node.value = y; }
+      	static float extract( GNode src,const struct PR_NodeData & node){ return node.value; }
+      	static void setVal (GNode src,struct PR_NodeData & node, float y) {node.value = y; }
       	typedef float ValTy;
       };
-      Galois::do_all(_graph.begin(), _graph.end(), PageRank_pull { &_graph }, Galois::loopname("pageRank"), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "value" , "float"));
+
+     do{
+         DGAccumulator_accum.reset();
+         Galois::do_all(_graph.begin(), _graph.end(), PageRank_pull { &_graph }, Galois::loopname("pageRank"), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "value" , "float"));
       _graph.sync_pull<SyncerPull_0>();
+     }while(DGAccumulator_accum.reduce());
       
   }
 
+  static Galois::DGAccumulator<int> DGAccumulator_accum;
   void operator()(GNode src)const {
     PR_NodeData& sdata = graph->getData(src);
     float sum = 0;
@@ -130,10 +136,12 @@ struct PageRank_pull {
     float diff = std::fabs(pr_value - sdata.value);
 
     if(diff > tolerance){
-      sdata.value = pr_value; 
+      sdata.value = pr_value;
+      DGAccumulator_accum+= 1;
     }
   }
 };
+Galois::DGAccumulator<int>  PageRank_pull::DGAccumulator_accum;
 
 int main(int argc, char** argv) {
   try {
