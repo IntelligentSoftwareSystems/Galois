@@ -182,12 +182,14 @@ int main(int argc, char** argv) {
         personality = CPU;
         break;
       }
+#ifdef __GALOIS_SINGLE_HOST_MULTIPLE_GPUS__
       if (gpu_device == -1) {
         gpu_device = 0;
         for (unsigned i = 0; i < my_host_id; ++i) {
           if (personality_set.c_str()[i] != 'c') ++gpu_device;
         }
       }
+#endif
     }
 #endif
 
