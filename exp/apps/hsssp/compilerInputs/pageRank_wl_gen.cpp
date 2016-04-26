@@ -122,7 +122,7 @@ struct PageRank {
 
   PageRank(Graph* _g): graph(_g){}
   void static go(Graph& _graph) {
-     Galois::for_each(_graph.begin(), _graph.end(), PageRank(&_graph));
+     Galois::for_each(_graph.begin(), _graph.end(), PageRank(&_graph),Galois::workList_version());
   }
 
   void operator()(WorkItem& src, Galois::UserContext<WorkItem>& ctx) const {
