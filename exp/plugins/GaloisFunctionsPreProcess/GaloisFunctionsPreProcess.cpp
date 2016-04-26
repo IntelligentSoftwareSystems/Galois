@@ -203,7 +203,7 @@ namespace {
     GaloisFunctionsPreProcessConsumer(CompilerInstance &Instance, std::set<std::string> ParsedTemplates, Rewriter &R): Instance(Instance), ParsedTemplates(ParsedTemplates), findGlobalsHandler(R, &globals_info), removeGlobalsHandler(R, &globals_info), editConstructorHandler(R, &globals_info), editCallHandler(R, &globals_info) {
 
       /** Find all global variables **/
-      DeclarationMatcher Global_var_1 = varDecl(isExpansionInMainFile(), hasGlobalStorage()).bind("globalVar");
+      DeclarationMatcher Global_var_1 = varDecl(isExpansionInMainFile(), hasGlobalStorage(), unless(anyOf(isPrivate(), isPublic(), isProtected()))).bind("globalVar");
       Matchers.addMatcher(Global_var_1, &findGlobalsHandler);
     }
 
