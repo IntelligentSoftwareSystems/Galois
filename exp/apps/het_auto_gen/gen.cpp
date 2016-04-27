@@ -155,40 +155,43 @@ struct PageRank {
 
   PageRank(cll::opt<float> &_tolerance, const float &_alpha, Graph* _graph) : local_tolerance(_tolerance), local_alpha(_alpha), graph(_graph){}
   void static go(Graph& _graph) {
-    	struct Syncer_0 {
-    		static float extract(uint32_t node_id, const struct PR_NodeData & node) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) return get_node_residual_cuda(cuda_ctx, node_id);
-    			assert (personality == CPU);
-    		#endif
-    			return node.residual;
-    		}
-    		static void reduce (uint32_t node_id, struct PR_NodeData & node, float y) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) add_node_residual_cuda(cuda_ctx, node_id, y);
-    			else if (personality == CPU)
-    		#endif
-    				{ Galois::atomicAdd(node.residual, y);}
-    		}
-    		static void reset (uint32_t node_id, struct PR_NodeData & node ) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) set_node_residual_cuda(cuda_ctx, node_id, 0);
-    			else if (personality == CPU)
-    		#endif
-    				{node.residual = 0 ; }
-    		}
-    		typedef float ValTy;
-    	};
-    #ifdef __GALOIS_HET_CUDA__
-    	if (personality == GPU_CUDA) {
-    		int __retval = 0;
-    		PageRank_cuda(__retval, alpha, tolerance, cuda_ctx);
-    		DGAccumulator_accum += __retval;
-    	} else if (personality == CPU)
-    #endif
-    Galois::do_all(_graph.begin(), _graph.end(), PageRank { tolerance, alpha, &_graph }, Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ Galois::atomicAdd(node.residual, y);}",  "{node.residual = 0 ; }"));
-    _graph.sync_push<Syncer_0>();
-    
+    do{
+      DGAccumulator_accum.reset();
+      	struct Syncer_0 {
+      		static float extract(uint32_t node_id, const struct PR_NodeData & node) {
+      		#ifdef __GALOIS_HET_CUDA__
+      			if (personality == GPU_CUDA) return get_node_residual_cuda(cuda_ctx, node_id);
+      			assert (personality == CPU);
+      		#endif
+      			return node.residual;
+      		}
+      		static void reduce (uint32_t node_id, struct PR_NodeData & node, float y) {
+      		#ifdef __GALOIS_HET_CUDA__
+      			if (personality == GPU_CUDA) add_node_residual_cuda(cuda_ctx, node_id, y);
+      			else if (personality == CPU)
+      		#endif
+      				{ Galois::atomicAdd(node.residual, y);}
+      		}
+      		static void reset (uint32_t node_id, struct PR_NodeData & node ) {
+      		#ifdef __GALOIS_HET_CUDA__
+      			if (personality == GPU_CUDA) set_node_residual_cuda(cuda_ctx, node_id, 0);
+      			else if (personality == CPU)
+      		#endif
+      				{node.residual = 0 ; }
+      		}
+      		typedef float ValTy;
+      	};
+      #ifdef __GALOIS_HET_CUDA__
+      	if (personality == GPU_CUDA) {
+      		int __retval = 0;
+      		PageRank_cuda(__retval, alpha, tolerance, cuda_ctx);
+      		DGAccumulator_accum += __retval;
+      	} else if (personality == CPU)
+      #endif
+      Galois::do_all(_graph.begin(), _graph.end(), PageRank { tolerance, alpha, &_graph }, Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ Galois::atomicAdd(node.residual, y);}",  "{node.residual = 0 ; }"));
+      _graph.sync_push<Syncer_0>();
+      
+    }while(DGAccumulator_accum.reduce());
   }
 
   static Galois::DGAccumulator<int> DGAccumulator_accum;
@@ -296,10 +299,7 @@ int main(int argc, char** argv) {
 
     std::cout << "PageRank::go called  on " << net.ID << "\n";
     T_pageRank.start();
-    do{
-      PageRank::DGAccumulator_accum.reset();
-      PageRank::go(hg);
-    }while(PageRank::DGAccumulator_accum.reduce());
+    PageRank::go(hg);
     T_pageRank.stop();
 
     T_total.stop();

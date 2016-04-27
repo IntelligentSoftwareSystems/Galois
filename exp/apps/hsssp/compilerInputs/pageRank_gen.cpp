@@ -121,7 +121,10 @@ struct PageRank {
 
   PageRank(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph) {
-    Galois::do_all(_graph.begin(), _graph.end(), PageRank { &_graph });
+    do{
+      DGAccumulator_accum.reset();
+      Galois::do_all(_graph.begin(), _graph.end(), PageRank { &_graph });
+    }while(DGAccumulator_accum.reduce());
   }
 
   static Galois::DGAccumulator<int> DGAccumulator_accum;
@@ -229,10 +232,7 @@ int main(int argc, char** argv) {
 
     std::cout << "PageRank::go called  on " << net.ID << "\n";
     T_pageRank.start();
-    do{
-      PageRank::DGAccumulator_accum.reset();
-      PageRank::go(hg);
-    }while(PageRank::DGAccumulator_accum.reduce());
+    PageRank::go(hg);
     T_pageRank.stop();
 
     T_total.stop();
