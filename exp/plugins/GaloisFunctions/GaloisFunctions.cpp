@@ -32,6 +32,7 @@ using namespace llvm;
 using namespace std;
 
 #define __GALOIS_PREPROCESS_GLOBAL_VARIABLE_PREFIX__ "local_"
+#define __GALOIS_ACCUMULATOR_TYPE__ "Galois::DGAccumulator"
 
 namespace {
 
@@ -334,7 +335,24 @@ namespace {
             stringstream kernelBefore;
             kernelBefore << "#ifdef __GALOIS_HET_CUDA__\n";
             kernelBefore << "\tif (personality == GPU_CUDA) {\n";
+            std::string accumulator;
+            for (auto decl : recordDecl->decls()) {
+              auto var = dyn_cast<VarDecl>(decl);
+              if (var && var->isStaticDataMember()) {
+                std::string type = var->getType().getAsString();
+                if (type.find(__GALOIS_ACCUMULATOR_TYPE__) == 0) {
+                  assert(accumulator.empty());
+                  accumulator = var->getNameAsString();
+                }
+              }
+            }
+            if (!accumulator.empty()) {
+              kernelBefore << "\t\tint __retval = 0;\n";
+            }
             kernelBefore << "\t\t" << className << "_cuda(";
+            if (!accumulator.empty()) {
+              kernelBefore << "__retval, ";
+            }
             for (auto field : recordDecl->fields()) {
               std::string name = field->getNameAsString();
               if (name.find(__GALOIS_PREPROCESS_GLOBAL_VARIABLE_PREFIX__) == 0) {
@@ -342,6 +360,9 @@ namespace {
               }
             }
             kernelBefore << "cuda_ctx);\n";
+            if (!accumulator.empty()) {
+              kernelBefore << "\t\t" << accumulator << " += __retval;\n";
+            }
             kernelBefore << "\t} else if (personality == CPU)\n";
             kernelBefore << "#endif\n";
             rewriter.InsertText(ST_main, kernelBefore.str(), true, true);
@@ -547,7 +568,24 @@ namespace {
             stringstream kernelBefore;
             kernelBefore << "#ifdef __GALOIS_HET_CUDA__\n";
             kernelBefore << "\tif (personality == GPU_CUDA) {\n";
+            std::string accumulator;
+            for (auto decl : recordDecl->decls()) {
+              auto var = dyn_cast<VarDecl>(decl);
+              if (var && var->isStaticDataMember()) {
+                std::string type = var->getType().getAsString();
+                if (type.find(__GALOIS_ACCUMULATOR_TYPE__) == 0) {
+                  assert(accumulator.empty());
+                  accumulator = var->getNameAsString();
+                }
+              }
+            }
+            if (!accumulator.empty()) {
+              kernelBefore << "\t\tint __retval = 0;\n";
+            }
             kernelBefore << "\t\t" << className << "_cuda(";
+            if (!accumulator.empty()) {
+              kernelBefore << "__retval, ";
+            }
             for (auto field : recordDecl->fields()) {
               std::string name = field->getNameAsString();
               if (name.find(__GALOIS_PREPROCESS_GLOBAL_VARIABLE_PREFIX__) == 0) {
@@ -555,6 +593,9 @@ namespace {
               }
             }
             kernelBefore << "cuda_ctx);\n";
+            if (!accumulator.empty()) {
+              kernelBefore << "\t\t" << accumulator << " += __retval;\n";
+            }
             kernelBefore << "\t} else if (personality == CPU)\n";
             kernelBefore << "#endif\n";
             rewriter.InsertText(ST_main, kernelBefore.str(), true, true);

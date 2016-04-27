@@ -78,14 +78,14 @@ void InitializeGraph_cuda(const float & local_alpha, struct CUDA_Context * ctx)
   InitializeGraph <<<blocks, threads>>>(ctx->gg, ctx->nowned, local_alpha, ctx->nout.gpu_wr_ptr(), ctx->residual.gpu_wr_ptr(), ctx->value.gpu_wr_ptr());
   check_cuda_kernel;
 }
-void PageRank_cuda(bool & local_didWork, const float & local_alpha, float local_tolerance, struct CUDA_Context * ctx)
+void PageRank_cuda(int & __retval, const float & local_alpha, float local_tolerance, struct CUDA_Context * ctx)
 {
   dim3 blocks;
   dim3 threads;
   kernel_sizing(ctx->gg, blocks, threads);
-  *(ctx->p_retval.cpu_wr_ptr()) = local_didWork;
+  *(ctx->p_retval.cpu_wr_ptr()) = __retval;
   ctx->any_retval.rv = ctx->p_retval.gpu_wr_ptr();
   PageRank <<<blocks, threads>>>(ctx->gg, ctx->nowned, local_alpha, local_tolerance, ctx->nout.gpu_wr_ptr(), ctx->residual.gpu_wr_ptr(), ctx->value.gpu_wr_ptr(), ctx->any_retval);
-  local_didWork = *(ctx->p_retval.cpu_rd_ptr());
+  __retval = *(ctx->p_retval.cpu_rd_ptr());
   check_cuda_kernel;
 }

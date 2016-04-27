@@ -33,7 +33,7 @@ using namespace llvm;
 #define ORCHESTRATOR_FILENAME "._orchestrator_kernel"
 
 #define __GALOIS_PREPROCESS_GLOBAL_VARIABLE_PREFIX__ "local_"
-#define __GALOIS_ACCUMULATOR_NAME__ "local_didWork"
+#define __GALOIS_ACCUMULATOR_TYPE__ "Galois::DGAccumulator"
 
 namespace {
 
@@ -64,7 +64,7 @@ private:
   std::unordered_set<const Decl *> skipDecls;
   std::map<std::string, std::string> nodeMap;
   std::string funcName;
-  bool hasAReturnValue;
+  std::string accumulatorName;
   std::stringstream declString, bodyString;
   std::map<std::string, std::string> parameterToTypeMap;
   std::map<std::string, std::string> globalVariableToTypeMap;
@@ -78,13 +78,14 @@ private:
 public:
   explicit IrGLOperatorVisitor(ASTContext *context, Rewriter &R, 
       bool isTopo,
+      std::string accumName,
       std::map<std::string, std::string> &sharedVariables,
       std::map<std::string, std::pair<std::vector<std::string>, std::vector<std::string> > > &kernels,
       std::set<std::string> &returnKernels) : 
     //astContext(context),
     rewriter(R),
     isTopological(isTopo),
-    hasAReturnValue(false),
+    accumulatorName(accumName),
     SharedVariablesToTypeMap(sharedVariables),
     KernelToArgumentsMap(kernels),
     KernelsHavingReturnValue(returnKernels)
@@ -190,7 +191,7 @@ public:
     findAndReplace(text, "std::fabs", "fabs");
     findAndReplace(text, "\\", "\\\\"); // FIXME: should it be only within quoted strings?
 
-    if (text.find(__GALOIS_ACCUMULATOR_NAME__) == 0) {
+    if (!accumulatorName.empty() && (text.find(accumulatorName) == 0)) {
       std::size_t begin = text.find("=");
       std::size_t end = text.find(";", begin);
       std::string value = text.substr(begin+1, end - begin - 3);
@@ -255,17 +256,16 @@ public:
         // FIXME: assert type matches if it exists
         SharedVariablesToTypeMap[param.first] = param.second;
       }
-      if (hasAReturnValue) {
+      if (!accumulatorName.empty()) {
         declString << ", ('Any', 'any_retval')";
       }
       KernelToArgumentsMap[funcName] = std::make_pair(globalArguments, arguments);
-      if (hasAReturnValue) KernelsHavingReturnValue.insert(funcName);
+      if (!accumulatorName.empty()) KernelsHavingReturnValue.insert(funcName);
       declString << "],\n[\n";
       Output.open(COMPUTE_FILENAME, std::ios::app);
       Output << declString.str();
       Output << bodyString.str();
       Output.close();
-      return hasAReturnValue;
     }
     return traverse;
   }
@@ -484,14 +484,12 @@ public:
     if (nodeMap.find(objectName) != nodeMap.end()) {
       parameterToTypeMap[varName] = FormatType(type);
     }
-    else if ((symbolTable.find(varName) == symbolTable.end()) && (type.find("Graph") != 0)) {
+    else if ((symbolTable.find(varName) == symbolTable.end()) 
+        && (varName.compare(accumulatorName) != 0)
+        && (type.find("Graph") != 0)) {
       if (globalVariableToTypeMap.find(varName) == globalVariableToTypeMap.end()) {
-        if (varName.compare(__GALOIS_ACCUMULATOR_NAME__) == 0) {
-          hasAReturnValue = true;
-        } else {
-          assert(varName.find(__GALOIS_PREPROCESS_GLOBAL_VARIABLE_PREFIX__) == 0);
-          globalVariableToTypeMap[varName] = FormatType(type);
-        }
+        assert(varName.find(__GALOIS_PREPROCESS_GLOBAL_VARIABLE_PREFIX__) == 0);
+        globalVariableToTypeMap[varName] = FormatType(type);
       }
     }
     return true;
@@ -502,6 +500,7 @@ class IrGLOrchestratorVisitor : public RecursiveASTVisitor<IrGLOrchestratorVisit
 private:
   ASTContext* astContext;
   Rewriter &rewriter; // FIXME: is this necessary? can ASTContext give source code?
+  std::string accumulatorName;
   std::unordered_set<const Stmt *> skipStmts;
   std::unordered_set<const Decl *> skipDecls;
   std::unordered_set<std::string> symbolTable; // FIXME: does not handle scoped variables (nesting with same variable name)
@@ -728,6 +727,18 @@ public:
       Output << "Kernel(\"" << kernelName << "_cuda\", ";
       Output << "[";
       std::vector<std::string> arguments;
+      for (auto decl : method->getParent()->decls()) {
+        auto var = dyn_cast<VarDecl>(decl);
+        if (var && var->isStaticDataMember()) {
+          std::string type = var->getType().getAsString();
+          if (type.find(__GALOIS_ACCUMULATOR_TYPE__) == 0) {
+            Output << "('int &', '__retval'), ";
+            arguments.push_back("int & __retval");
+            accumulatorName = var->getNameAsString();
+            break;
+          }
+        }
+      }
       for (auto field : method->getParent()->fields()) {
         std::string name = field->getNameAsString();
         if (name.find(__GALOIS_PREPROCESS_GLOBAL_VARIABLE_PREFIX__) == 0) {
@@ -891,6 +902,7 @@ public:
             // FIXME: handle arguments to object of CXXRecordDecl?
             IrGLOperatorVisitor operatorVisitor(astContext, rewriter,
                 isTopological,
+                accumulatorName,
                 SharedVariablesToTypeMap,
                 KernelToArgumentsMap,
                 KernelsHavingReturnValue);
@@ -925,7 +937,7 @@ public:
         std::string kernelName = record->getNameAsString();
         bool hasAReturnValue = (KernelsHavingReturnValue.find(kernelName) != KernelsHavingReturnValue.end());
         if (hasAReturnValue) {
-          Output << "CBlock([\"*(ctx->p_retval.cpu_wr_ptr()) = " << __GALOIS_ACCUMULATOR_NAME__ << "\"]),\n";
+          Output << "CBlock([\"*(ctx->p_retval.cpu_wr_ptr()) = __retval\"]),\n";
           Output << "CBlock([\"ctx->any_retval.rv = ctx->p_retval.gpu_wr_ptr()\"]),\n";
         }
         Output << "Invoke(\"" << kernelName << "\", ";
@@ -942,7 +954,7 @@ public:
         }
         Output << ")),\n";
         if (hasAReturnValue) {
-          Output << "CBlock([\"" << __GALOIS_ACCUMULATOR_NAME__ << " = *(ctx->p_retval.cpu_rd_ptr())\"]),\n";
+          Output << "CBlock([\"__retval = *(ctx->p_retval.cpu_rd_ptr())\"]),\n";
         }
         Output << "CBlock([\"check_cuda_kernel\"], parse = False),\n";
 
