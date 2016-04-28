@@ -193,6 +193,8 @@ int main(int argc, char** argv) {
       PageRank::go(hg);
     T_pageRank1.stop();
 
+    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " PageRank1 : " << T_pageRank1.get() << " (msec)\n\n";
+
     Galois::Runtime::getHostBarrier().wait();
     InitializeGraph::go(hg);
 
@@ -200,6 +202,8 @@ int main(int argc, char** argv) {
     T_pageRank2.start();
       PageRank::go(hg);
     T_pageRank2.stop();
+
+    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " PageRank2 : " << T_pageRank2.get() << " (msec)\n\n";
 
     Galois::Runtime::getHostBarrier().wait();
     InitializeGraph::go(hg);
