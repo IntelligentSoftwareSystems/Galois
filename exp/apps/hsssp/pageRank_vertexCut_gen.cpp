@@ -86,7 +86,6 @@ struct InitializeGraph {
 
   void operator()(GNode src) const {
     PR_NodeData& sdata = graph->getData(src);
-    sdata.value = 1.0 - alpha;
     sdata.nout = std::distance(graph->edge_begin(src), graph->edge_end(src));
 
     /**Synchronize nout since it's used after this: Operator splitting.**/
@@ -120,6 +119,7 @@ struct InitializeGraph_residual {
 
   void operator()(GNode src) const {
     PR_NodeData& sdata = graph->getData(src);
+    sdata.value = 1.0 - alpha;
     if(sdata.nout > 0 ){
       float delta = sdata.value*alpha/sdata.nout;
       for(auto nbr = graph->edge_begin(src); nbr != graph->edge_end(src); ++nbr){
@@ -185,7 +185,7 @@ int main(int argc, char** argv) {
 
     LonestarStart(argc, argv, name, desc, url);
     auto& net = Galois::Runtime::getSystemNetworkInterface();
-    Galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_pageRank;
+    Galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_pageRank1, T_pageRank2, T_pageRank3;
 
     T_total.start();
 
@@ -199,6 +199,7 @@ int main(int argc, char** argv) {
     InitializeGraph::go(hg);
     InitializeGraph_residual::go(hg);
     T_init.stop();
+    Galois::Runtime::getHostBarrier().wait();
 
     // Verify
 
@@ -213,14 +214,37 @@ int main(int argc, char** argv) {
     }
     */
 
-    std::cout << "PageRank::go called  on " << net.ID << "\n";
-    T_pageRank.start();
+    std::cout << "PageRank::go run1 called  on " << net.ID << "\n";
+    T_pageRank1.start();
       PageRank::go(hg);
-    T_pageRank.stop();
+    T_pageRank1.stop();
+
+    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " PageRank1 : " << T_pageRank1.get() << " (msec)\n\n";
+
+    Galois::Runtime::getHostBarrier().wait();
+    InitializeGraph_residual::go(hg);
+
+    std::cout << "PageRank::go run2 called  on " << net.ID << "\n";
+    T_pageRank2.start();
+      PageRank::go(hg);
+    T_pageRank2.stop();
+
+    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " PageRank2 : " << T_pageRank2.get() << " (msec)\n\n";
+
+    Galois::Runtime::getHostBarrier().wait();
+    InitializeGraph_residual::go(hg);
+
+    std::cout << "PageRank::go run3 called  on " << net.ID << "\n";
+    T_pageRank3.start();
+      PageRank::go(hg);
+    T_pageRank3.stop();
+
+
 
     T_total.stop();
+    auto mean_time = (T_pageRank1.get() + T_pageRank2.get() + T_pageRank3.get())/3;
 
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() <<  " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " PageRank (" << maxIterations << ") : " << T_pageRank.get() << "(msec)\n\n";
+    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " PageRank1 : " << T_pageRank1.get() << " PageRank2 : " << T_pageRank2.get() << " PageRank3 : " << T_pageRank3.get() <<" PageRank mean time (3 runs ) (" << maxIterations << ") : " << mean_time << "(msec)\n\n";
 
 
 

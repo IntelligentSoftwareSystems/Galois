@@ -176,9 +176,10 @@ int main(int argc, char** argv) {
     T_init.start();
     InitializeGraph::go(hg);
     T_init.stop();
+    Galois::Runtime::getHostBarrier().wait();
 
     // Verify
-
+#if 0
     if(verify){
       if(net.ID == 0) {
         for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
@@ -186,7 +187,7 @@ int main(int argc, char** argv) {
         }
       }
     }
-
+#endif
 
     std::cout << "PageRank::go run1 called  on " << net.ID << "\n";
     T_pageRank1.start();
@@ -235,8 +236,8 @@ int main(int argc, char** argv) {
 
     if(verify){
       for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
-        std::cout << "[" << *ii << "]  " << hg.getData(*ii).value << "\n";
-        //Galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).value);
+        //std::cout << "[" << *ii << "]  " << hg.getData(*ii).value << "\n";
+        Galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).value);
       }
     }
     return 0;
