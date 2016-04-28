@@ -183,7 +183,6 @@ public:
    }
    //TODO - RK - Clean up graph generation code.
    ~NodeDataGen(){
-
       header_file << " #include \"graph_header.h\"\n";
       if (false){//Begin graph implementation.
          const char * g_dev ="typedef struct _GraphType { \n\
@@ -203,8 +202,6 @@ public:
       header_file.close();
    }
    void GenCLType(const QualType & q, string sname){
-//      if (sname == "NodeData") nodeDataFound = true;
-//      if (sname == "EdgeData") edgeDataFound = true;
       std::string res="typedef ";
       if(q.getTypePtr()->isRecordType()){
          llvm::outs() << " Processing POD :" << q.getAsString( ) << " \n";
@@ -265,4 +262,29 @@ public:
 /*********************************************************************************************************
  *
  *********************************************************************************************************/
+
+class GetDataHandler: public MatchFinder::MatchCallback {
+public:
+   Rewriter &rewriter;
+   Galois::GAST::GaloisApp & app;
+public:
+   GetDataHandler(Rewriter &rewriter, Galois::GAST::GaloisApp & a) :
+         rewriter(rewriter), app(a){
+   }
+   virtual void run(const MatchFinder::MatchResult &Results) {
+      CXXMemberCallExpr * decl = const_cast<CXXMemberCallExpr*>(Results.Nodes.getNodeAs<CXXMemberCallExpr>("callsite"));
+//      llvm::outs() << "Found - getData :: \n";
+         if (decl) {
+            string txt = rewriter.getRewrittenText(SourceRange(decl->getCallee()->getLocStart(), decl->getCallee()->getLocEnd()));
+            llvm::outs() << "Found - getData :: "<<ast_utility.get_string(decl->getCallee()->getLocStart(), decl->getCallee()->getLocEnd()) << " w/" << txt << "\n";
+            txt.replace(txt.find("getData"), strlen("getData"), "getDataW");
+            rewriter.ReplaceText(SourceRange(decl->getCallee()->getLocStart(), decl->getCallee()->getLocEnd()),txt);
+         }
+
+   }
+};
+/*********************************************************************************************************
+ *
+ *********************************************************************************************************/
+
 #endif//_CLIFY_CL_TRANSFORMS_H_

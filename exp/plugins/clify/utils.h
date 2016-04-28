@@ -36,11 +36,12 @@ using namespace clang::ast_matchers;
 using namespace llvm;
 using namespace std;
 
-struct ASTUtility{
+struct ASTUtility {
    Rewriter * rewriter;
-   ASTUtility ():rewriter(nullptr){
+   ASTUtility() :
+         rewriter(nullptr) {
    }
-   void init(Rewriter * r){
+   void init(Rewriter * r) {
       rewriter = r;
    }
    std::string toString(Stmt * S) {
@@ -60,13 +61,13 @@ struct ASTUtility{
    std::string get_string(const clang::SourceLocation & b, const clang::SourceLocation & e) {
       char * b_ptr = get_src_ptr(b);
       char * e_ptr = get_src_ptr(e);
-      std::string s(b_ptr, std::distance(b_ptr, e_ptr)+1);
+      std::string s(b_ptr, std::distance(b_ptr, e_ptr) + 1);
       return s;
    }
    std::string get_string(const clang::SourceRange & e) {
       char * b_ptr = get_src_ptr(e.getBegin());
       char * e_ptr = get_src_ptr(e.getEnd());
-      std::string s(b_ptr, std::distance(b_ptr, e_ptr)+1);
+      std::string s(b_ptr, std::distance(b_ptr, e_ptr) + 1);
       return s;
    }
    void print_expr(const clang::SourceRange & c) {
@@ -75,139 +76,165 @@ struct ASTUtility{
       }
    }
    static std::string get_timestamp() {
-         time_t now = time(0);
-         struct tm tstruct;
-         char buf[80];
-         tstruct = *localtime(&now);
-         // Visit http://en.cppreference.com/w/cpp/chrono/c/strftime
-         // for more information about date/time format
-         strftime(buf, sizeof(buf), "%Y-%m-%d - %X", &tstruct);
+      time_t now = time(0);
+      struct tm tstruct;
+      char buf[80];
+      tstruct = *localtime(&now);
+      // Visit http://en.cppreference.com/w/cpp/chrono/c/strftime
+      // for more information about date/time format
+      strftime(buf, sizeof(buf), "%Y-%m-%d - %X", &tstruct);
 
-         return buf;
-      }
+      return buf;
+   }
 };
 
 /*************************************************************************************************
  *
  **************************************************************************************************/
-struct OpenCLConversionDB{
-   static const char * get_cl_implementation(FunctionDecl *  d){
-//      llvm::outs()<<"About to process call :: " << d->getNameAsString() << "\n";
+struct OpenCLConversionDB {
+   static const char * get_cl_implementation(FunctionDecl * d) {
+      llvm::outs() << "[FnCall]About to process call :: " << d->getNameAsString() << "\n";
       const string fname = d->getNameAsString();
-      if(d->isOverloadedOperator()){
-         const char  * op_name = getOperatorSpelling( d->getOverloadedOperator());
-         if(strcmp(op_name, "operator int")==0){
+      if (d->isOverloadedOperator()) {
+         const char * op_name = getOperatorSpelling(d->getOverloadedOperator());
+         if (strcmp(op_name, "operator int") == 0) {
             return "CAST_OP";
          }
-         return getOperatorSpelling( d->getOverloadedOperator());
+         return getOperatorSpelling(d->getOverloadedOperator());
       }
-      if(d->getNumParams()==0){
-         if(fname=="min"){
+      if (d->getNumParams() == 0) {
+         if (fname == "min") {
             return "INT_MIN";
-         }else if (fname=="max"){
+         } else if (fname == "max") {
             return "INT_MAX";
-         }else if (fname == "operator int"){
+         } else if (fname == "operator int") {
             return "";
-         }else if (fname == "operator unsigned int"){
+         } else if (fname == "operator unsigned int") {
             return "";
          }
-      }else if (d->getNumParams()==1){
-         if(fname=="compare_exchange_strong"){
+      } else if (d->getNumParams() == 1) {
+         if (fname == "compare_exchange_strong") {
             return "atomic_cmpxchg";
-         }else if (fname == "edge_begin"){
+         } else if (fname == "edge_begin") {
             return "edge_begin";
-         }else if (fname == "edge_end"){
+         } else if (fname == "edge_end") {
             return "edge_end";
-         }else if (fname == "getEdgeDst"){
+         } else if (fname == "getEdgeDst") {
             return "getEdgeDst";
-         }else if (fname == "getGID"){
+         } else if (fname == "getGID") {
             return "getGID";
-         }
-         else if (fname == "load"){
+         } else if (fname == "load") {
             return "";
+         } else if (fname == "fabs") {
+            return "fabs";
          }
-      }else if (d->getNumParams()==2){
-         if(fname=="atomicMin"){
+      } else if (d->getNumParams() == 2) {
+         if (fname == "atomicMin") {
             return "atomic_min";
-         }else if(fname=="compare_exchange_strong"){
+         } else if (fname == "compare_exchange_strong") {
             return "atomic_cmpxchg";
-         }else if(fname=="exchange"){
+         } else if (fname == "exchange") {
             return "atomic_cmpxchg";
-         }else if(fname=="getData"){
+         } else if (fname == "getData") {
             return "getData";
-         }else if (fname == "getEdgeData"){
+         } else if (fname == "getEdgeData") {
             //TODO RK - fix hack with edgeData
             return "*getEdgeData";
-         }else if (fname == "atomicAdd"){
+         } else if (fname == "atomicAdd") {
             return "atomic_add";
          }
-      }else if (d->getNumParams()==3){
-         if(fname=="compare_exchange_strong"){
+      } else if (d->getNumParams() == 3) {
+         if (fname == "compare_exchange_strong") {
             return "atomic_cmpxchg";
          }
       }
       {
          string s = fname;
-         s+=" /*UNINTERPRETED-";
-         char iTemp [3];
+         s += " /*UNINTERPRETED-";
+         char iTemp[3];
          sprintf(iTemp, "%d", d->getNumParams());
-         s+=iTemp;
-         s+="*/";
+         s += iTemp;
+         s += "*/";
          return s.c_str();
       }
    }
-   static string type_convert(const QualType & qt){
-           //TODO RK - Filter primitive types.
-           llvm::outs() << " TypeConversion :: " << qt.getAsString() << "\n";
-           if(qt.getAsString()=="int"){
-              return "int ";
-           }else if(qt.getAsString()=="float"){
-              return "float";
-           }else if(qt.getAsString()=="double"){
-              return "double";
-           }else if(qt.getAsString()=="char"){
-              return "char";
-           }else if(qt.getAsString()=="uint32_t"){
-              return "uint";
-           }
-           //Atomic stripper
-           if(qt.getAsString().find ("std::atomic")!=string::npos){
-              std::string qtStr = qt.getAsString();
-              return qtStr.substr(qt.getAsString().rfind("<")+1,qtStr.rfind(">")-qtStr.rfind("<")-1);
-           }
-           //vector stripper
-           if(qt.getAsString().find ("std::vector")!=string::npos){
-              std::string qtStr = qt.getAsString();
-              auto start_index  = qt.getAsString().find("<");
-              auto  end_index = qtStr.find(",");
-              std::string ret;
-              if(end_index!=string::npos){
-                 llvm::outs() << " [ COMMA ]";
-                 ret = qtStr.substr(start_index+1,end_index-start_index-1);;
-              }else{
-                 end_index = qtStr.find(">");
-                 llvm::outs() << " [ ANGLED-B ]";
-                 ret = qtStr.substr(start_index+1,end_index-start_index-1);;
-              }
-              ret += " * ";
-              llvm::outs()<<"Conversion " << qtStr<< "  to " << ret << "\n";
-              return ret;
-           }
-           //Iterator stripper
-           if (qt.getAsString().find ("boost::iterators::counting_iterator")!=string::npos){
-              return "edge_iterator ";
-           }
-           if (qt.getAsString().find("GNode")!=string::npos){
-              return "node_iterator";
-           }
-           //Wrapper for nodedata.
-           if(qt.getAsString().find("NodeData")!=string::npos){
-              return "__global NodeData *";
-           }
-           if(qt.getAsString().find("Graph")!=string::npos){
-              return "__global Graph *";
-           }
-           return qt.getAsString();
+   static string type_convert(const QualType & qt, bool isParam=false) {
+      //TODO RK - Filter primitive types.
+      const bool isReference = qt.getTypePtr()->isReferenceType();
+      string tname = qt.getLocalUnqualifiedType().getAsString();
+      if(isReference){
+         char str[256];
+         size_t c=0;
+         while(c!=tname.length()&&tname[c]!='&'){
+            str[c]=tname[c];
+            c++;
+         }
+         str[c-1]='\0';
+         tname=str;
+      }
+      llvm::outs() << " TypeConversion :: " << qt.getAsString() << ", isReference:: " << qt.getTypePtr()->isReferenceType() <<"\n";
+      llvm::outs() << " Stripping:: [" << tname <<"]\n";
+      if (qt.getUnqualifiedType().getAsString() == "int") {
+            return "int ";
+      } else if (qt.getUnqualifiedType().getAsString() == "float") {
+            return "float ";
+
+      } else if (qt.getUnqualifiedType().getAsString() == "double") {
+            return "double ";
+
+      } else if (qt.getUnqualifiedType().getAsString() == "char") {
+            return "char ";
+
+      } else if (qt.getUnqualifiedType().getAsString() == "uint32_t") {
+            return "uint32_t ";
+
+      } else if (qt.getUnqualifiedType().getAsString() == "bool") {
+            return "bool ";
+
+      }else if (tname == "_Bool") {
+            return "bool ";
+      }
+
+      //Atomic stripper
+      if (qt.getAsString().find("std::atomic") != string::npos) {
+         std::string qtStr = qt.getAsString();
+         return qtStr.substr(qt.getAsString().rfind("<") + 1, qtStr.rfind(">") - qtStr.rfind("<") - 1);
+      }
+      //vector stripper
+      if (qt.getAsString().find("std::vector") != string::npos) {
+         std::string qtStr = qt.getAsString();
+         auto start_index = qt.getAsString().find("<");
+         auto end_index = qtStr.find(",");
+         std::string ret;
+         if (end_index != string::npos) {
+            llvm::outs() << " [ COMMA ]";
+            ret = qtStr.substr(start_index + 1, end_index - start_index - 1);
+            ;
+         } else {
+            end_index = qtStr.find(">");
+            llvm::outs() << " [ ANGLED-B ]";
+            ret = qtStr.substr(start_index + 1, end_index - start_index - 1);
+            ;
+         }
+         ret += " * ";
+         llvm::outs() << "Conversion " << qtStr << "  to " << ret << "\n";
+         return ret;
+      }
+      //Iterator stripper
+      if (qt.getAsString().find("boost::iterators::counting_iterator") != string::npos) {
+         return "edge_iterator ";
+      }
+      if (qt.getAsString().find("GNode") != string::npos) {
+         return "node_iterator";
+      }
+      //Wrapper for nodedata.
+      if (qt.getAsString().find("NodeData") != string::npos) {
+         return "__global NodeData *";
+      }
+      if (qt.getAsString().find("Graph") != string::npos) {
+         return "__global Graph *";
+      }
+      return qt.getAsString() + "/*UNKNOWN*/";
    }
 };
 #endif /* SRC_PLUGINS_OPENCLCODEGEN_CLANGUTILS_H_ */

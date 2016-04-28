@@ -137,8 +137,12 @@ struct GaloisKernel {
             sprintf(s,"kernel.set_arg(%d,sizeof(cl_mem),&(%s%sdevice_ptr()));\n",i, m->getNameAsString().c_str(), ref.c_str());
          }
          else{
+            if(m->getType()->isScalarType()){
+               sprintf(s,"kernel.set_arg(%d,sizeof(%s),&(%s));\n",i,m->getType().getAsString().c_str(), m->getNameAsString().c_str());
+            }else{
             ref=".";
             sprintf(s,"kernel.set_arg(%d,sizeof(%s),&(%s%sdevice_ptr()));\n",i,m->getType().getAsString().c_str(), m->getNameAsString().c_str(), ref.c_str());
+            }
          }
          ret_string += s;
          i++;
@@ -202,7 +206,7 @@ struct GaloisApp {
       for (auto a : doAllCalls) {
          delete a;
       }
-      print_types();
+//      print_types();
    }
    void add_doAll_call(CallExpr * call, CXXRecordDecl * kernel) {
       DoAllCallNode * node = new DoAllCallNode(rewriter, call, kernel, this);
