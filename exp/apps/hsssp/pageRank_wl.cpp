@@ -207,6 +207,7 @@ int main(int argc, char** argv) {
     T_init.start();
     InitializeGraph::go(hg);
     T_init.stop();
+    Galois::Runtime::getHostBarrier().wait();
 
     // Verify
    /*

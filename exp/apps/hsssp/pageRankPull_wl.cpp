@@ -36,6 +36,7 @@
 #include "Galois/Dist/OfflineGraph.h"
 #include "Galois/Dist/hGraph.h"
 #include "Galois/DistAccumulator.h"
+#include "Galois/Runtime/Tracer.h"
 
 static const char* const name = "PageRank - Compiler Generated Distributed Heterogeneous";
 static const char* const desc = "PageRank Pull version on Distributed Galois.";
@@ -177,7 +178,7 @@ int main(int argc, char** argv) {
 
     LonestarStart(argc, argv, name, desc, url);
     auto& net = Galois::Runtime::getSystemNetworkInterface();
-    Galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_pageRank;
+    Galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_pageRank1, T_pageRank2, T_pageRank3;
 
     T_total.start();
 
@@ -195,6 +196,7 @@ int main(int argc, char** argv) {
     T_init.start();
     InitializeGraph::go(hg);
     T_init.stop();
+    Galois::Runtime::getHostBarrier().wait();
 
     // Verify
 #if 0
@@ -207,10 +209,35 @@ int main(int argc, char** argv) {
     }
 #endif
 
-    std::cout << "PageRank_pull::go called\n";
-    T_pageRank.start();
+    std::cout << "PageRank::go run1 called  on " << net.ID << "\n";
+    T_pageRank1.start();
       PageRank_pull::go(hg);
-    T_pageRank.stop();
+    T_pageRank1.stop();
+
+    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " PageRank1 : " << T_pageRank1.get() << " (msec)\n\n";
+
+    Galois::Runtime::getHostBarrier().wait();
+    InitializeGraph::go(hg);
+
+    std::cout << "PageRank::go run2 called  on " << net.ID << "\n";
+    T_pageRank2.start();
+      PageRank_pull::go(hg);
+    T_pageRank2.stop();
+
+    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " PageRank2 : " << T_pageRank2.get() << " (msec)\n\n";
+
+    Galois::Runtime::getHostBarrier().wait();
+    InitializeGraph::go(hg);
+
+    std::cout << "PageRank::go run3 called  on " << net.ID << "\n";
+    T_pageRank3.start();
+      PageRank_pull::go(hg);
+    T_pageRank3.stop();
+
+
+
+
+
 
     // Verify
     if(verify){
@@ -222,7 +249,10 @@ int main(int argc, char** argv) {
 
     T_total.stop();
 
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " PageRank_pull (" << maxIterations << ") : " << T_pageRank.get() << "(msec)\n\n";
+
+    auto mean_time = (T_pageRank1.get() + T_pageRank2.get() + T_pageRank3.get())/3;
+
+    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " PageRank1 : " << T_pageRank1.get() << " PageRank2 : " << T_pageRank2.get() << " PageRank3 : " << T_pageRank3.get() <<" PageRank mean time (3 runs ) (" << maxIterations << ") : " << mean_time << "(msec)\n\n";
 
     return 0;
   } catch (const char* c) {
