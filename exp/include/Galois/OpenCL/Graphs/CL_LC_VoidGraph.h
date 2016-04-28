@@ -8,13 +8,13 @@
 #include "Galois/OpenCL/CL_Kernel.h"
 #include <boost/iterator/counting_iterator.hpp>
 #include "Galois/Dist/hGraph.h"
-#ifndef _GDIST_EXP_INCLUDE_OPENCL_CL_LC_Graph_H_
-#define _GDIST_EXP_INCLUDE_OPENCL_CL_LC_Graph_H_
+#ifndef _GDIST_EXP_INCLUDE_OPENCL_CL_LC_VOID_Graph_H_
+#define _GDIST_EXP_INCLUDE_OPENCL_CL_LC_VOID_Graph_H_
 
 namespace Galois {
    namespace OpenCL {
       namespace Graphs {
-
+#if 0
       /*####################################################################################################################################################*/
       template<typename DataType>
       struct BufferWrapperImpl{
@@ -229,18 +229,17 @@ template<typename FnTy>
       g->_out_edge_data = edge_data;\n\
       }\n\
       ";
+#endif
 
-
-         template<typename NodeDataTy, typename EdgeDataTy>
-         struct CL_LC_Graph {
+         template<typename NodeDataTy>
+         struct CL_LC_Graph<NodeDataTy, void> {
             typedef NodeDataTy NodeDataType;
-            typedef EdgeDataTy EdgeDataType;
             typedef boost::counting_iterator<uint64_t> NodeIterator;
             typedef NodeIterator GraphNode;
             typedef boost::counting_iterator<uint64_t> EdgeIterator;
             typedef unsigned int NodeIDType;
             typedef unsigned int EdgeIDType;
-            typedef CL_LC_Graph<NodeDataType,EdgeDataType> SelfType;
+            typedef CL_LC_Graph<NodeDataType,void> SelfType;
 
             /*
              * A wrapper class to return when a request for getData is made.
@@ -296,7 +295,6 @@ template<typename FnTy>
             unsigned int * outgoing_index;
             unsigned int * neighbors;
             NodeDataType * node_data;
-            EdgeDataType * edge_data;
 
             std::vector<UserNodeDataType * > dirtyData;
             //GPU Data
@@ -351,28 +349,26 @@ template<typename FnTy>
 /////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////////////////
             CL_LC_Graph() :
-            SizeEdgeData(sizeof(EdgeDataType) / sizeof(unsigned int)), SizeNodeData(sizeof(NodeDataType) / sizeof(unsigned int)) {
+            SizeEdgeData(0), SizeNodeData(sizeof(NodeDataType) / sizeof(unsigned int)) {
 //      fprintf(stderr, "Created LC_LinearArray_Graph with %d node %d edge data.", (int) SizeNodeData, (int) SizeEdgeData);
                fprintf(stderr, "Loading devicegraph with copy-optimization.\n");
                _max_degree = _num_nodes = _num_edges = 0;
                _num_owned = _global_offset = 0;
                outgoing_index=neighbors=nullptr;
                node_data =nullptr;
-               edge_data = nullptr;
                gpu_struct_ptr = gpu_meta= nullptr;
 
             }
             CL_LC_Graph(std::string filename, unsigned myid, unsigned numHost) :
-                        SizeEdgeData(sizeof(EdgeDataType) / sizeof(unsigned int)), SizeNodeData(sizeof(NodeDataType) / sizeof(unsigned int)) {
+                        SizeEdgeData(0), SizeNodeData(sizeof(NodeDataType) / sizeof(unsigned int)) {
             //      fprintf(stderr, "Created LC_LinearArray_Graph with %d node %d edge data.", (int) SizeNodeData, (int) SizeEdgeData);
                            fprintf(stderr, "Loading device-graph [%s] with copy-optimization.\n", filename.c_str());
                            _max_degree = _num_nodes = _num_edges = 0;
                            _num_owned = _global_offset = 0;
                            outgoing_index=neighbors=nullptr;
                            node_data =nullptr;
-                           edge_data = nullptr;
                            gpu_struct_ptr = gpu_meta= nullptr;
-                           hGraph<NodeDataType, EdgeDataType> g(filename, myid, numHost);
+                           hGraph<NodeDataType, void> g(filename, myid, numHost);
                            fprintf(stderr, "Loading from hgraph\n");
                            load_from_galois(g);
                         }
@@ -395,8 +391,6 @@ template<typename FnTy>
                   for (auto nbr = ggraph.edge_begin(*n); nbr != ggraph.edge_end(*n); ++nbr) {
                      GNode dst = ggraph.getEdgeDst(*nbr);
                      neighbors[edge_counter] = dst;
-                     edge_data[edge_counter] = ggraph.getEdgeData(*nbr);
-//                     std::cout<<"** "<<src_node<<" "<<dst<<" "<<edge_data[edge_counter]<<"\n";
                      edge_counter++;
                   }
                }
@@ -406,7 +400,7 @@ template<typename FnTy>
                fprintf(stderr, "FAILED EDGE-COMPACTION :: %d, %zu\n", node_counter, gg_num_nodes);
                assert(edge_counter == gg_num_edges && "Failed to add all edges.");
                init_graph_struct();
-               fprintf(stderr, "Loaded from GaloisGraph [V=%zu,E=%zu,ND=%lu,ED=%lu].\n", gg_num_nodes, gg_num_edges, sizeof(NodeDataType), sizeof(EdgeDataType));
+               fprintf(stderr, "Loaded from GaloisGraph [V=%zu,E=%zu,ND=%lu,ED=%lu].\n", gg_num_nodes, gg_num_edges, sizeof(NodeDataType), 0);
             }
             template<typename GaloisGraph>
             void writeback_from_galois(GaloisGraph & ggraph) {
@@ -422,7 +416,7 @@ template<typename FnTy>
                   ggraph.getData(*n) = getData()[src_node];
 
                }
-               fprintf(stderr, "Writeback from GaloisGraph [V=%zu,E=%zu,ND=%lu,ED=%lu].\n", gg_num_nodes, gg_num_edges, sizeof(NodeDataType), sizeof(EdgeDataType));
+               fprintf(stderr, "Writeback from GaloisGraph [V=%zu,E=%zu,ND=%lu,ED=%lu].\n", gg_num_nodes, gg_num_edges, sizeof(NodeDataType), 0);
             }
 
             //TODO RK : fix - might not work with changes in interface.
@@ -440,8 +434,6 @@ template<typename FnTy>
                   for (auto nbr = ggraph.edge_begin(*n); nbr != ggraph.edge_end(*n); ++nbr) {
                      GNode dst = ggraph.getEdgeDst(*nbr);
                      neighbors[edge_counter] = dst;
-                     edge_data[edge_counter] = ggraph.getEdgeData(*nbr);
-                     std::cout<<src_node<<" "<<dst<<" "<<edge_data[edge_counter]<<"\n";
                      edge_counter++;
                   }
                }
@@ -453,7 +445,7 @@ template<typename FnTy>
                fprintf(stderr, "FAILED EDGE-COMPACTION :: %d, %d, %d\n", node_counter, gg_num_nodes, num_ghosts);
                assert(edge_counter == gg_num_edges && "Failed to add all edges.");
                init_graph_struct();
-               fprintf(stderr, "Loaded from GaloisGraph [V=%d,E=%d,ND=%lu,ED=%lu].\n", gg_num_nodes, gg_num_edges, sizeof(NodeDataType), sizeof(EdgeDataType));
+               fprintf(stderr, "Loaded from GaloisGraph [V=%d,E=%d,ND=%lu,ED=%lu].\n", gg_num_nodes, gg_num_edges, sizeof(NodeDataType), 0);
             }
             ~CL_LC_Graph() {
                deallocate();
@@ -494,9 +486,6 @@ template<typename FnTy>
             unsigned int & getEdgeDst(unsigned int eid) {
                return neighbors[eid];
             }
-            EdgeDataType & getEdgeData(unsigned int eid) {
-               return edge_data[eid];
-            }
             NodeIterator begin(){
                return NodeIterator(0);
             }
@@ -517,7 +506,6 @@ template<typename FnTy>
                _num_edges = n_e;
                fprintf(stderr, "Allocating NN: :%d,  , NE %d :\n", (int) _num_nodes, (int) _num_edges);
                node_data = new NodeDataType[_num_nodes];
-               edge_data = new EdgeDataType[_num_edges];
                outgoing_index= new unsigned int [_num_nodes+1];
                neighbors = new unsigned int[_num_edges];
                allocate_on_gpu();
@@ -534,10 +522,8 @@ template<typename FnTy>
                CHECK_CL_ERROR(err, "Error: clCreateBuffer of SVM - 1\n");
                gpu_wrapper.neighbors = clCreateBuffer(ctx->get_default_device()->context(), flags_read, sizeof(cl_uint) * _num_edges, neighbors, &err);
                CHECK_CL_ERROR(err, "Error: clCreateBuffer of SVM - 2\n");
-               gpu_wrapper.edge_data = clCreateBuffer(ctx->get_default_device()->context(), flags_read, sizeof(EdgeDataType) * _num_edges, edge_data, &err);
-               CHECK_CL_ERROR(err, "Error: clCreateBuffer of SVM - 3\n");
                gpu_struct_ptr = clCreateBuffer(ctx->get_default_device()->context(), flags, sizeof(cl_uint) * 16, outgoing_index, &err);
-               CHECK_CL_ERROR(err, "Error: clCreateBuffer of SVM - 4\n");
+               CHECK_CL_ERROR(err, "Error: clCreateBuffer of SVM - 3\n");
                gpu_wrapper.num_nodes = _num_nodes;
                gpu_wrapper.num_edges= _num_edges;
 
@@ -602,7 +588,6 @@ template<typename FnTy>
             ////////////##############################################################///////////
             void deallocate(void) {
                delete [] node_data;
-               delete [] edge_data;
                delete [] outgoing_index;
                delete [] neighbors;
 
@@ -637,10 +622,6 @@ template<typename FnTy>
                   err = clEnqueueReadBuffer(queue, gpu_wrapper.neighbors, CL_TRUE, 0, sizeof(cl_uint) * _num_edges, neighbors, 0, NULL, NULL);
                   CHECK_CL_ERROR(err, "Error copying to host 2\n");
                }
-               if(flags & GRAPH_FIELD_FLAGS::EDGE_DATA){
-                  err = clEnqueueReadBuffer(queue, gpu_wrapper.edge_data, CL_TRUE, 0, sizeof(EdgeDataType) * _num_edges, edge_data, 0, NULL, NULL);
-                  CHECK_CL_ERROR(err, "Error copying to host 3\n");
-               }
             }
             /////////////////////////////////////////////////////////////////////////////////////////////
             /////////////////////////////////////////////////////////////////////////////////////////////
@@ -661,10 +642,6 @@ template<typename FnTy>
                   err = clEnqueueWriteBuffer(queue, gpu_wrapper.neighbors, CL_TRUE, 0, sizeof(cl_uint) * _num_edges, neighbors, 0, NULL, NULL);
                   CHECK_CL_ERROR(err, "Error copying to device 2\n");
                }
-               if(flags & GRAPH_FIELD_FLAGS::EDGE_DATA) {
-                  err = clEnqueueWriteBuffer(queue, gpu_wrapper.edge_data, CL_TRUE, 0, sizeof(EdgeDataType) * _num_edges, edge_data, 0, NULL, NULL);
-                  CHECK_CL_ERROR(err, "Error copying to device 3\n");
-               }
                ////////////Initialize kernel here.
                return;
             }
@@ -684,7 +661,7 @@ template<typename FnTy>
                if (idx < _num_nodes) {
                   std::cout << "N-" << idx << "(" << node_data[idx] << ")" << " :: [";
                   for (size_t i = outgoing_index[idx]; i < outgoing_index[idx + 1]; ++i) {
-                     std::cout << " " << neighbors[i] << "(" << edge_data[i] << "), ";
+                     std::cout << " " << neighbors[i] <<", ";
                   }
                   std::cout << "]";
                }
@@ -702,9 +679,6 @@ template<typename FnTy>
                   std::cout << " " << neighbors[i] << ",";
                }
                std::cout << "]\nEData [";
-               for (size_t i = 0; i < _num_edges; ++i) {
-                  std::cout << " " << edge_data[i] << ",";
-               }
                std::cout << "]";
             }
 
@@ -713,4 +687,4 @@ template<typename FnTy>
    }//Namespace OpenCL
 }//Namespace Galois
 
-#endif /* _GDIST_EXP_INCLUDE_OPENCL_CL_LC_Graph_H_ */
+#endif /* _GDIST_EXP_INCLUDE_OPENCL_CL_LC_VOID_Graph_H_ */
