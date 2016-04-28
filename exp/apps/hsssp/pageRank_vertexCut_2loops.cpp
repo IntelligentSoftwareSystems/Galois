@@ -20,31 +20,32 @@
  *
  * @section Description
  *
- * Compute pageRank using residual on distributed Galois Vertex Cut.
+ * Compute pageRank using residual on distributed Galois using vertex cut and 2 loop transform.
  *
  * @author Gurbinder Gill <gurbinder533@gmail.com>
  */
 
 #include <iostream>
 #include <limits>
+#include <algorithm>
+#include <vector>
 #include "Galois/Galois.h"
 #include "Lonestar/BoilerPlate.h"
 #include "Galois/gstl.h"
 
 #include "Galois/Runtime/CompilerHelperFunctions.h"
-#include "Galois/Runtime/Tracer.h"
 
-#include "Galois/Dist/OfflineGraph.h"
 #include "Galois/Dist/vGraph.h"
+#include "Galois/Accumulator.h"
 #include "Galois/DistAccumulator.h"
 
-static const char* const name = "PageRank - Compiler Generated Distributed Heterogeneous using Vertex Cut.";
-static const char* const desc = "Residual PageRank on Distributed Galois using vertex Cut.";
+static const char* const name = "PageRank - Compiler Generated Distributed Heterogeneous";
+static const char* const desc = "Residual PageRank on Distributed Galois using vertexCut and 2 loop transform.";
 static const char* const url = 0;
 
 namespace cll = llvm::cl;
 static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
-static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations"), cll::init(1000));
+static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations"), cll::init(4));
 static cll::opt<unsigned int> src_node("srcNodeId", cll::desc("ID of the source node"), cll::init(0));
 static cll::opt<float> tolerance("tolerance", cll::desc("tolerance"), cll::init(0.01));
 static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"), cll::init(false));
@@ -52,15 +53,18 @@ static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'p
 static cll::opt<std::string> partFolder("partFolder", cll::desc("path to partitionFolder"), cll::init(""));
 
 static const float alpha = (1.0 - 0.85);
+//static const float TOLERANCE = 0.01;
 struct PR_NodeData {
   float value;
-  unsigned int nout;
   std::atomic<float> residual;
+  unsigned int nout;
 
 };
 
 typedef vGraph<PR_NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
+
+typedef GNode WorkItem;
 
 struct InitializeGraph {
   Graph* graph;
@@ -131,54 +135,117 @@ struct InitializeGraph_residual {
   }
 };
 
-
-
-struct PageRank {
-  Graph* graph;
-
+struct FirstItr_PageRank{
+  const float & local_alpha;
+  cll::opt<float> & local_tolerance;
+  Graph * graph;
+  FirstItr_PageRank(const float & _local_alpha,cll::opt<float> & _local_tolerance,Graph * _graph):local_alpha(_local_alpha),local_tolerance(_local_tolerance),graph(_graph){}
   void static go(Graph& _graph) {
-     struct Syncer_0 {
-    	static float extract( GNode gid,const struct PR_NodeData & node){ return node.residual; }
-    	static void reduce (GNode gid,struct PR_NodeData & node, float y) { Galois::atomicAdd(node.residual, y);}
-    	static void reset (GNode gid,struct PR_NodeData & node ) { node.residual = 0; }
-    	typedef float ValTy;
+    struct Syncer_0 {
+      static float extract( GNode gid,const struct PR_NodeData & node){ return node.residual; }
+      static void reduce (GNode gid,struct PR_NodeData & node, float y) { Galois::atomicAdd(node.residual, y);}
+      static void reset (GNode gid,struct PR_NodeData & node ){node.residual = 0 ; }
+      typedef float ValTy;
     };
+
      struct SyncerPull_0 {
     	static float extract( GNode gid,const struct PR_NodeData & node){ return node.residual; }
     	static void setVal (GNode gid,struct PR_NodeData & node, float y) {node.residual = y; }
     	typedef float ValTy;
     };
 
-     do{
-       DGAccumulator_accum.reset();
 
-       Galois::do_all(_graph.begin(), _graph.end(), PageRank { &_graph }, Galois::loopname("pageRank"), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "value" , "float"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ Galois::atomicAdd(node.residual, y);}",  "0"));
-       _graph.sync_push<Syncer_0>();
-       _graph.sync_pull<SyncerPull_0>();
-
-     }while(DGAccumulator_accum.reduce());
+    Galois::for_each(_graph.begin(), _graph.end(), FirstItr_PageRank{alpha,tolerance,&_graph}, Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ Galois::atomicAdd(node.residual, y);}",  "{node.residual = 0 ; }"));
+    _graph.sync_push<Syncer_0>();
+     _graph.sync_pull<SyncerPull_0>();
 
   }
-
-  static Galois::DGAccumulator<int> DGAccumulator_accum;
-  void operator()(GNode src)const {
+  void operator()(WorkItem& src, Galois::UserContext<WorkItem>& ctx) const {
     PR_NodeData& sdata = graph->getData(src);
+
     float residual_old = sdata.residual.exchange(0.0);
     sdata.value += residual_old;
     if (sdata.nout > 0){
-      float delta = residual_old*alpha/sdata.nout;
+      float delta = residual_old*local_alpha/sdata.nout;
+
       for(auto nbr = graph->edge_begin(src); nbr != graph->edge_end(src); ++nbr){
         GNode dst = graph->getEdgeDst(nbr);
         PR_NodeData& ddata = graph->getData(dst);
         auto dst_residual_old = Galois::atomicAdd(ddata.residual, delta);
-        if((dst_residual_old <= tolerance) && ((dst_residual_old + delta) >= tolerance)) {
-          DGAccumulator_accum+= 1;
+
+      }
+    }
+  }
+
+};
+struct PageRank {
+  const float &local_alpha;
+  cll::opt<float> &local_tolerance;
+  Graph* graph;
+
+  PageRank(cll::opt<float> &_tolerance, const float &_alpha, Graph* _g):local_tolerance(_tolerance), local_alpha(_alpha), graph(_g){}
+  void static go(Graph& _graph) {
+    using namespace Galois::WorkList;
+    typedef dChunkedFIFO<64> dChunk;
+
+    //Galois::for_each(_graph.begin(), _graph.end(), PageRank(tolerance, alpha, &_graph), Galois::workList_version());
+
+      FirstItr_PageRank::go(_graph);
+
+       do {
+      DGAccumulator_accum.reset();
+       struct Syncer_0 {
+      	static float extract( GNode gid,const struct PR_NodeData & node){ return node.residual; }
+      	static void reduce (GNode gid,struct PR_NodeData & node, float y) { Galois::atomicAdd(node.residual, y);}
+      	static void reset (GNode gid,struct PR_NodeData & node ){node.residual = 0 ; }
+      	typedef float ValTy;
+      };
+
+     struct SyncerPull_0 {
+    	static float extract( GNode gid,const struct PR_NodeData & node){ return node.residual; }
+    	static void setVal (GNode gid,struct PR_NodeData & node, float y) {node.residual = y; }
+    	typedef float ValTy;
+    };
+
+
+      Galois::for_each(_graph.begin(), _graph.end(), PageRank(tolerance, alpha, &_graph), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ Galois::atomicAdd(node.residual, y);}",  "{node.residual = 0 ; }"));
+      _graph.sync_push<Syncer_0>();
+       _graph.sync_pull<SyncerPull_0>();
+
+
+      }while(DGAccumulator_accum.reduce());
+
+
+  }
+
+  static Galois::DGAccumulator<int> DGAccumulator_accum;
+  void operator()(WorkItem& src, Galois::UserContext<WorkItem>& ctx) const {
+    PR_NodeData& sdata = graph->getData(src);
+
+
+    //TODO:: old residual value to be used for conditional.
+    float residual_old = sdata.residual.exchange(0.0);
+    if( residual_old > this->local_tolerance){
+
+      sdata.value += residual_old;
+      if (sdata.nout > 0){
+        float delta = residual_old*local_alpha/sdata.nout;
+
+        //std::cout << " DELTA : " << delta << "\n";
+        DGAccumulator_accum+= 1;
+        for(auto nbr = graph->edge_begin(src); nbr != graph->edge_end(src); ++nbr){
+          GNode dst = graph->getEdgeDst(nbr);
+          PR_NodeData& ddata = graph->getData(dst);
+          auto dst_residual_old = Galois::atomicAdd(ddata.residual, delta);
+
         }
       }
     }
   }
 };
 Galois::DGAccumulator<int>  PageRank::DGAccumulator_accum;
+
+
 
 int main(int argc, char** argv) {
   try {
@@ -188,6 +255,11 @@ int main(int argc, char** argv) {
     Galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_pageRank1, T_pageRank2, T_pageRank3;
 
     T_total.start();
+
+    T_offlineGraph_init.start();
+    OfflineGraph g(inputFile);
+    T_offlineGraph_init.stop();
+    std::cout << g.size() << " " << g.sizeEdges() << "\n";
 
     T_hGraph_init.start();
     Graph hg(inputFile,partFolder,net.ID, net.Num);
@@ -202,17 +274,15 @@ int main(int argc, char** argv) {
     Galois::Runtime::getHostBarrier().wait();
 
     // Verify
-
-    /*
+#if 0
     if(verify){
       if(net.ID == 0) {
         for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
-          //std::cout << "[" << hg.getGID(*ii) << "]  " << hg.getData(*ii).nout << " val : " <<hg.getData(*ii).residual <<   "\n";
-          Galois::Runtime::printOutput("[%] % , res : %\n", hg.getGID(*ii),  hg.getData(*ii).nout , hg.getData(*ii).residual);
+          std::cout << "[" << *ii << "]  " << hg.getData(*ii).nout << "\n";
         }
       }
     }
-    */
+#endif
 
     std::cout << "PageRank::go run1 called  on " << net.ID << "\n";
     T_pageRank1.start();
@@ -241,22 +311,22 @@ int main(int argc, char** argv) {
 
 
 
+
+
+    // Verify
+    if(verify){
+      for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
+        Galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).value);
+        //std::cout << "[" << *ii << "]  " << hg.getData(*ii).value << "\n";
+      }
+    }
+
     T_total.stop();
     auto mean_time = (T_pageRank1.get() + T_pageRank2.get() + T_pageRank3.get())/3;
 
     std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " PageRank1 : " << T_pageRank1.get() << " PageRank2 : " << T_pageRank2.get() << " PageRank3 : " << T_pageRank3.get() <<" PageRank mean time (3 runs ) (" << maxIterations << ") : " << mean_time << "(msec)\n\n";
 
 
-
-    // Verify
-      if(verify){
-        //if(net.ID == 0) {
-          for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
-            //std::cout << "[" << hg.getGID(*ii) << "]  " << hg.getData(*ii).value << "\n";
-            Galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).value);
-          }
-        //}
-      }
     return 0;
   } catch (const char* c) {
       std::cerr << "Error: " << c << "\n";
