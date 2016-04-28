@@ -66,3 +66,16 @@ __kernel void initialize_graph_struct(__global uint * res, __global uint * g_met
    g->_out_neighbors = g_nbr;
    g->_out_edge_data = edge_data;
 }
+
+__kernel void initialize_void_graph_struct(__global uint * res, __global uint * g_meta, __global NodeData *g_node_data, __global uint * g_out_index, __global uint * g_nbr){
+   __global GraphType * g = (__global GraphType *) res;
+   g->_num_nodes = g_meta[0];
+   g->_num_edges = g_meta[1];
+   g->_node_data_size = g_meta[2];
+   g->_edge_data_size= g_meta[3];
+   g->_num_owned=g_meta[4];
+   g->_global_offset=g_meta[6];
+   g->_node_data = g_node_data;
+   g->_out_index= g_out_index;
+   g->_out_neighbors = g_nbr;
+}
