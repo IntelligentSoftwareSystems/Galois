@@ -32,6 +32,7 @@ using namespace llvm;
 using namespace std;
 
 #define __GALOIS_PREPROCESS_GLOBAL_VARIABLE_PREFIX__ "local_"
+#define __GALOIS_ACCUMULATOR_TYPE__ "Galois::DGAccumulator"
 
 namespace {
 
@@ -328,13 +329,53 @@ namespace {
             SSHelperStructFunctions.str(string());
             SSHelperStructFunctions.clear();
 
+            // Adding sync calls for write set
+            stringstream SSAfter;
+            for (unsigned i = 0; i < write_set_vec_PUSH.size(); i++) {
+              SSAfter <<"\n" << "\t\t_graph.sync_push<Syncer_" << i << ">" <<"();\n";
+              rewriter.InsertText(ST_main, SSAfter.str(), true, true);
+              SSAfter.str(string());
+              SSAfter.clear();
+            }
+            //For sync Pull
+            for (unsigned i = 0; i < write_set_vec_PULL.size(); i++) {
+              SSAfter <<"\n" << "\t\t_graph.sync_pull<SyncerPull_" << i << ">" <<"();\n";
+              rewriter.InsertText(ST_main, SSAfter.str(), true, true);
+              SSAfter.str(string());
+              SSAfter.clear();
+            }
+
+            // closing helpFunction struct
+            SSHelperStructFunctions << "\t}\n};\n\n";
+            rewriter.InsertText(ST_main, SSHelperStructFunctions.str(), true, true);
+            SSHelperStructFunctions.str(string());
+            SSHelperStructFunctions.clear();
+
             auto recordDecl = Results.Nodes.getNodeAs<clang::CXXRecordDecl>("class");
             std::string className = recordDecl->getNameAsString();
             
             stringstream kernelBefore;
             kernelBefore << "#ifdef __GALOIS_HET_CUDA__\n";
             kernelBefore << "\tif (personality == GPU_CUDA) {\n";
+            std::string accumulator;
+            for (auto decl : recordDecl->decls()) {
+              auto var = dyn_cast<VarDecl>(decl);
+              if (var && var->isStaticDataMember()) {
+                std::string type = var->getType().getAsString();
+                if (type.find(__GALOIS_ACCUMULATOR_TYPE__) == 0) {
+                  assert(accumulator.empty());
+                  accumulator = var->getNameAsString();
+                }
+              }
+            }
+            if (!accumulator.empty()) {
+              kernelBefore << "\t\tint __retval = 0;\n";
+            }
+            kernelBefore << "\t\tauto __sync_functor = Get_info_functor<Graph>(_graph);\n";
             kernelBefore << "\t\t" << className << "_cuda(";
+            if (!accumulator.empty()) {
+              kernelBefore << "__retval, ";
+            }
             for (auto field : recordDecl->fields()) {
               std::string name = field->getNameAsString();
               if (name.find(__GALOIS_PREPROCESS_GLOBAL_VARIABLE_PREFIX__) == 0) {
@@ -342,36 +383,14 @@ namespace {
               }
             }
             kernelBefore << "cuda_ctx);\n";
+            if (!accumulator.empty()) {
+              kernelBefore << "\t\t" << accumulator << " += __retval;\n";
+            }
+            kernelBefore <<"\t\t__sync_functor.sync_graph();\n";
             kernelBefore << "\t} else if (personality == CPU)\n";
             kernelBefore << "#endif\n";
-            rewriter.InsertText(ST_main, kernelBefore.str(), true, true);
-
-            SourceLocation ST = callFS->getSourceRange().getEnd().getLocWithOffset(2);
-
-            //Get_info_functor(GraphTy& _g): graph(_g){}
-            // Adding Syn calls for write set
-            stringstream SSAfter;
-            //SourceLocation ST = callFS->getSourceRange().getEnd().getLocWithOffset(2);
-            for (unsigned i = 0; i < write_set_vec_PUSH.size(); i++) {
-              SSAfter.str(string());
-              SSAfter.clear();
-              //SSAfter <<"\n" <<write_set_vec_PUSH[i].GRAPH_NAME<< ".sync_push<Syncer_" << i << ">" <<"();\n";
-              SSAfter <<"\n" << "\t\t_graph.sync_push<Syncer_" << i << ">" <<"();\n";
-              rewriter.InsertText(ST, SSAfter.str(), true, true);
-            }
-            //For sync Pull
-            for (unsigned i = 0; i < write_set_vec_PULL.size(); i++) {
-              SSAfter.str(string());
-              SSAfter.clear();
-              SSAfter <<"\n" << "\t\t_graph.sync_pull<SyncerPull_" << i << ">" <<"();\n";
-              rewriter.InsertText(ST, SSAfter.str(), true, true);
-            }
-
-            // closing helpFunction struct
-            SSHelperStructFunctions << "\t}\n};\n\n";
-            rewriter.InsertText(ST, SSHelperStructFunctions.str(), true, true);
-            SSHelperStructFunctions.str(string());
-            SSHelperStructFunctions.clear();
+            SourceLocation ST_before = callFS->getSourceRange().getBegin();
+            rewriter.InsertText(ST_before, kernelBefore.str(), true, true);
 
 
             //insert helperFunc in for_each call
@@ -547,7 +566,24 @@ namespace {
             stringstream kernelBefore;
             kernelBefore << "#ifdef __GALOIS_HET_CUDA__\n";
             kernelBefore << "\tif (personality == GPU_CUDA) {\n";
+            std::string accumulator;
+            for (auto decl : recordDecl->decls()) {
+              auto var = dyn_cast<VarDecl>(decl);
+              if (var && var->isStaticDataMember()) {
+                std::string type = var->getType().getAsString();
+                if (type.find(__GALOIS_ACCUMULATOR_TYPE__) == 0) {
+                  assert(accumulator.empty());
+                  accumulator = var->getNameAsString();
+                }
+              }
+            }
+            if (!accumulator.empty()) {
+              kernelBefore << "\t\tint __retval = 0;\n";
+            }
             kernelBefore << "\t\t" << className << "_cuda(";
+            if (!accumulator.empty()) {
+              kernelBefore << "__retval, ";
+            }
             for (auto field : recordDecl->fields()) {
               std::string name = field->getNameAsString();
               if (name.find(__GALOIS_PREPROCESS_GLOBAL_VARIABLE_PREFIX__) == 0) {
@@ -555,6 +591,9 @@ namespace {
               }
             }
             kernelBefore << "cuda_ctx);\n";
+            if (!accumulator.empty()) {
+              kernelBefore << "\t\t" << accumulator << " += __retval;\n";
+            }
             kernelBefore << "\t} else if (personality == CPU)\n";
             kernelBefore << "#endif\n";
             rewriter.InsertText(ST_main, kernelBefore.str(), true, true);

@@ -33,7 +33,7 @@ using namespace llvm;
 #define ORCHESTRATOR_FILENAME "._orchestrator_kernel"
 
 #define __GALOIS_PREPROCESS_GLOBAL_VARIABLE_PREFIX__ "local_"
-#define __GALOIS_ACCUMULATOR_NAME__ "local_didWork"
+#define __GALOIS_ACCUMULATOR_TYPE__ "Galois::DGAccumulator"
 
 namespace {
 
@@ -64,7 +64,7 @@ private:
   std::unordered_set<const Decl *> skipDecls;
   std::map<std::string, std::string> nodeMap;
   std::string funcName;
-  bool hasAReturnValue;
+  std::string accumulatorName;
   std::stringstream declString, bodyString;
   std::map<std::string, std::string> parameterToTypeMap;
   std::map<std::string, std::string> globalVariableToTypeMap;
@@ -78,13 +78,14 @@ private:
 public:
   explicit IrGLOperatorVisitor(ASTContext *context, Rewriter &R, 
       bool isTopo,
+      std::string accumName,
       std::map<std::string, std::string> &sharedVariables,
       std::map<std::string, std::pair<std::vector<std::string>, std::vector<std::string> > > &kernels,
       std::set<std::string> &returnKernels) : 
     //astContext(context),
     rewriter(R),
     isTopological(isTopo),
-    hasAReturnValue(false),
+    accumulatorName(accumName),
     SharedVariablesToTypeMap(sharedVariables),
     KernelToArgumentsMap(kernels),
     KernelsHavingReturnValue(returnKernels)
@@ -190,7 +191,7 @@ public:
     findAndReplace(text, "std::fabs", "fabs");
     findAndReplace(text, "\\", "\\\\"); // FIXME: should it be only within quoted strings?
 
-    if (text.find(__GALOIS_ACCUMULATOR_NAME__) == 0) {
+    if (!accumulatorName.empty() && (text.find(accumulatorName) == 0)) {
       std::size_t begin = text.find("=");
       std::size_t end = text.find(";", begin);
       std::string value = text.substr(begin+1, end - begin - 3);
@@ -255,17 +256,16 @@ public:
         // FIXME: assert type matches if it exists
         SharedVariablesToTypeMap[param.first] = param.second;
       }
-      if (hasAReturnValue) {
+      if (!accumulatorName.empty()) {
         declString << ", ('Any', 'any_retval')";
       }
       KernelToArgumentsMap[funcName] = std::make_pair(globalArguments, arguments);
-      if (hasAReturnValue) KernelsHavingReturnValue.insert(funcName);
+      if (!accumulatorName.empty()) KernelsHavingReturnValue.insert(funcName);
       declString << "],\n[\n";
       Output.open(COMPUTE_FILENAME, std::ios::app);
       Output << declString.str();
       Output << bodyString.str();
       Output.close();
-      return hasAReturnValue;
     }
     return traverse;
   }
@@ -484,14 +484,12 @@ public:
     if (nodeMap.find(objectName) != nodeMap.end()) {
       parameterToTypeMap[varName] = FormatType(type);
     }
-    else if ((symbolTable.find(varName) == symbolTable.end()) && (type.find("Graph") != 0)) {
+    else if ((symbolTable.find(varName) == symbolTable.end()) 
+        && (varName.compare(accumulatorName) != 0)
+        && (type.find("Graph") != 0)) {
       if (globalVariableToTypeMap.find(varName) == globalVariableToTypeMap.end()) {
-        if (varName.compare(__GALOIS_ACCUMULATOR_NAME__) == 0) {
-          hasAReturnValue = true;
-        } else {
-          assert(varName.find(__GALOIS_PREPROCESS_GLOBAL_VARIABLE_PREFIX__) == 0);
-          globalVariableToTypeMap[varName] = FormatType(type);
-        }
+        assert(varName.find(__GALOIS_PREPROCESS_GLOBAL_VARIABLE_PREFIX__) == 0);
+        globalVariableToTypeMap[varName] = FormatType(type);
       }
     }
     return true;
@@ -502,9 +500,7 @@ class IrGLOrchestratorVisitor : public RecursiveASTVisitor<IrGLOrchestratorVisit
 private:
   ASTContext* astContext;
   Rewriter &rewriter; // FIXME: is this necessary? can ASTContext give source code?
-  std::unordered_set<const Stmt *> skipStmts;
-  std::unordered_set<const Decl *> skipDecls;
-  std::unordered_set<std::string> symbolTable; // FIXME: does not handle scoped variables (nesting with same variable name)
+  std::string accumulatorName;
   std::ofstream Output;
 
   std::map<std::string, std::string> SharedVariablesToTypeMap;
@@ -684,23 +680,6 @@ public:
     llvm::errs() << FileNamePath << "_cuda.h\n";
   }
 
-  void WriteCBlock(std::string text) {
-    // FIXME: should it be only within quoted strings?
-    findAndReplace(text, "\\", "\\\\");
-
-    size_t found = text.find("printf");
-    if (found != std::string::npos) {
-      Output << "CBlock(['" << text << "']),\n";
-    } else {
-      found = text.find("mgpu::Reduce");
-      if (found != std::string::npos) {
-        Output << "CBlock([\"" << text << "\"], parse = False),\n";
-      } else {
-        Output << "CBlock([\"" << text << "\"]),\n";
-      }
-    }
-  }
-
   std::string FormatType(std::string text) {
     findAndReplace(text, "GNode", "index_type");
     findAndReplace(text, "_Bool", "bool");
@@ -728,6 +707,18 @@ public:
       Output << "Kernel(\"" << kernelName << "_cuda\", ";
       Output << "[";
       std::vector<std::string> arguments;
+      for (auto decl : method->getParent()->decls()) {
+        auto var = dyn_cast<VarDecl>(decl);
+        if (var && var->isStaticDataMember()) {
+          std::string type = var->getType().getAsString();
+          if (type.find(__GALOIS_ACCUMULATOR_TYPE__) == 0) {
+            Output << "('int &', '__retval'), ";
+            arguments.push_back("int & __retval");
+            accumulatorName = var->getNameAsString();
+            break;
+          }
+        }
+      }
       for (auto field : method->getParent()->fields()) {
         std::string name = field->getNameAsString();
         if (name.find(__GALOIS_PREPROCESS_GLOBAL_VARIABLE_PREFIX__) == 0) {
@@ -752,240 +743,90 @@ public:
     return traverse;
   }
 
-  virtual bool TraverseStmt(Stmt *S) {
-    bool traverse = RecursiveASTVisitor<IrGLOrchestratorVisitor>::TraverseStmt(S);
-    if (traverse && S && isa<WhileStmt>(S)) {
-      Output << "]),\n"; // end DoWhile
-    }
-    return traverse;
-  }
-
-  virtual bool VisitCXXMethodDecl(CXXMethodDecl* func) {
-    skipStmts.clear();
-    skipDecls.clear();
-    symbolTable.clear();
-    symbolTable.insert("_graph");
-    return true;
-  }
-
-  virtual bool VisitWhileStmt(WhileStmt* whileStmt) {
-    Expr *cond = whileStmt->getCond();
-    skipStmts.insert(cond);
-    std::string condText = rewriter.getRewrittenText(cond->getSourceRange());
-    if (condText.empty()) condText = "true";
-    Output << "DoWhile(\"" << condText << "\",\n[\n";
-    return true;
-  }
-
-  virtual bool VisitDeclStmt(DeclStmt *declStmt) {
-    for (auto decl : declStmt->decls()) {
-      if (VarDecl *varDecl = dyn_cast<VarDecl>(decl)) {
-        const Expr *expr = varDecl->getAnyInitializer();
-        skipStmts.insert(expr);
-        if (skipDecls.find(varDecl) == skipDecls.end()) {
-          Output << "CDecl([(\"" << varDecl->getType().getAsString() 
-            << "\", \"" << varDecl->getNameAsString() << "\", \"\")]),\n";
-          symbolTable.insert(varDecl->getNameAsString());
-          if (expr != NULL) {
-            std::string initText = rewriter.getRewrittenText(expr->getSourceRange());
-            WriteCBlock(varDecl->getNameAsString() + " = " + initText);
-          }
-        }
-      }
-    }
-    return true;
-  }
-
-  virtual bool VisitBinaryOperator(BinaryOperator *binaryOp) {
-    skipStmts.insert(binaryOp->getLHS());
-    skipStmts.insert(binaryOp->getRHS());
-    if (skipStmts.find(binaryOp) == skipStmts.end()) {
-      assert(binaryOp->isAssignmentOp());
-      bool skip = false;
-      Expr *rhs = binaryOp->getRHS();
-      if (CastExpr *cast = dyn_cast<CastExpr>(rhs)) {
-        rhs = cast->getSubExpr();
-      }
-      if (CXXMemberCallExpr *callExpr = dyn_cast<CXXMemberCallExpr>(rhs)) {
-        CXXRecordDecl *record = callExpr->getRecordDecl();
-        std::string recordName = record->getNameAsString();
-        if (recordName.compare("GReducible") == 0) {
-          skip = true;
-          //assert(!record->getMethodDecl()->getNameAsString().compare("reduce"));
-
-          Expr *implicit = callExpr->getImplicitObjectArgument();
-          if (CastExpr *cast = dyn_cast<CastExpr>(implicit)) {
-            implicit = cast->getSubExpr();
-          }
-          SourceLocation start;
-          if (MemberExpr *member = dyn_cast<MemberExpr>(implicit)) {
-            start = member->getMemberLoc();
-          } else {
-            start = implicit->getLocStart();
-          }
-          SourceRange range(start, implicit->getLocEnd());
-          std::string reduceVar = rewriter.getRewrittenText(range);
-
-          std::string var = rewriter.getRewrittenText(binaryOp->getLHS()->getSourceRange());
-
-          std::ostringstream reduceCall;
-          // FIXME: choose matching reduction operation
-          reduceCall << "mgpu::Reduce(p_" << reduceVar << ".gpu_rd_ptr(ctx->device+1), ctx->hg.nnodes";
-          reduceCall << ", (" << SharedVariablesToTypeMap[reduceVar] << ")0";
-          reduceCall << ", mgpu::maximum<" << SharedVariablesToTypeMap[reduceVar] << ">()";
-          reduceCall << ", (" << SharedVariablesToTypeMap[reduceVar] << "*)0";
-          reduceCall << ", &" << var << ", *mgc)";
-
-          WriteCBlock(reduceCall.str());
-        }
-      }
-      if (!skip) {
-        WriteCBlock(rewriter.getRewrittenText(binaryOp->getSourceRange()));
-      }
-    }
-    return true;
-  }
-
   virtual bool VisitCallExpr(CallExpr *callExpr) {
-    symbolTable.insert(callExpr->getCalleeDecl()->getAsFunction()->getNameAsString());
-    if (skipStmts.find(callExpr) == skipStmts.end()) {
-      std::string text = rewriter.getRewrittenText(callExpr->getSourceRange());
-      std::size_t begin = text.find("do_all");
-      if (begin == std::string::npos) begin = text.find("for_each");
-      if (begin == std::string::npos) {
-        bool skip = false;
-        Expr *expr = callExpr;
-        if (CastExpr *cast = dyn_cast<CastExpr>(expr)) {
-          expr = cast->getSubExpr();
+    std::string text = rewriter.getRewrittenText(callExpr->getSourceRange());
+    bool isTopological = true;
+    std::size_t begin = text.find("do_all");
+    if (begin == std::string::npos) {
+      begin = text.find("for_each");
+      isTopological = false;
+    }
+    if (begin != std::string::npos) {
+      // generate kernel for operator
+      assert(callExpr->getNumArgs() > 1);
+      // FIXME: pick the right argument
+      Expr *op = callExpr->getArg(2);
+      RecordDecl *record = op->getType().getTypePtr()->getAsStructureType()->getDecl();
+      CXXRecordDecl *cxxrecord = dyn_cast<CXXRecordDecl>(record);
+      for (auto method : cxxrecord->methods()) {
+        // FIXME: handle overloading/polymorphism
+        if (method->getNameAsString().compare("operator()") == 0) {
+          // FIXME: should the arguments to the call be parsed?
+          //llvm::errs() << "\nVertex Operator:\n" << 
+          //  rewriter.getRewrittenText(method->getSourceRange()) << "\n";
+          //method->dump();
+          IrGLOperatorVisitor operatorVisitor(astContext, rewriter,
+              isTopological,
+              accumulatorName,
+              SharedVariablesToTypeMap,
+              KernelToArgumentsMap,
+              KernelsHavingReturnValue);
+          operatorVisitor.TraverseDecl(method);
+          break;
         }
-        if (CXXMemberCallExpr *memberCallExpr = dyn_cast<CXXMemberCallExpr>(expr)) {
-          CXXRecordDecl *record = memberCallExpr->getRecordDecl();
-          std::string recordName = record->getNameAsString();
-          if (recordName.compare("GReducible") == 0) {
-            skip = true;
-          }
-        }
-        if (!skip) WriteCBlock(text);
-      } else {
-        // generate kernel for operator
-        bool isTopological = true;
-        assert(callExpr->getNumArgs() > 1);
-        // FIXME: pick the right argument
-        Expr *op = callExpr->getArg(2);
-        RecordDecl *record = op->getType().getTypePtr()->getAsStructureType()->getDecl();
-        CXXRecordDecl *cxxrecord = dyn_cast<CXXRecordDecl>(record);
-        for (auto method : cxxrecord->methods()) {
-          // FIXME: handle overloading/polymorphism
-          if (method->getNameAsString().compare("operator()") == 0) {
-            // FIXME: be precise in determining data-driven algorithms
-            std::string type = method->getParamDecl(0)->getType().getAsString();
-            if (type.find("WorkItem") != std::string::npos) {
-              isTopological = false;
-            } else {
-              assert(type.find("GNode") != std::string::npos);
-              isTopological = true;
-            }
-            //llvm::errs() << "\nVertex Operator:\n" << 
-            //  rewriter.getRewrittenText(method->getSourceRange()) << "\n";
-            //method->dump();
-            // FIXME: handle arguments to object of CXXRecordDecl?
-            IrGLOperatorVisitor operatorVisitor(astContext, rewriter,
-                isTopological,
-                SharedVariablesToTypeMap,
-                KernelToArgumentsMap,
-                KernelsHavingReturnValue);
-            operatorVisitor.TraverseDecl(method);
-            break;
-          }
-        }
+      }
 
-        // initialize blocks and threads
-        Output << "CDecl([(\"dim3\", \"blocks\", \"\")]),\n";
-        Output << "CDecl([(\"dim3\", \"threads\", \"\")]),\n";
-        Output << "CBlock([\"kernel_sizing(ctx->gg, blocks, threads)\"]),\n";
+      // initialize blocks and threads
+      Output << "CDecl([(\"dim3\", \"blocks\", \"\")]),\n";
+      Output << "CDecl([(\"dim3\", \"threads\", \"\")]),\n";
+      Output << "CBlock([\"kernel_sizing(ctx->gg, blocks, threads)\"]),\n";
 
-        if (!isTopological) { // data driven
-          // FIXME: generate precise initial worklist
-          std::ofstream compute;
-          compute.open(COMPUTE_FILENAME, std::ios::app);
-          compute << "Kernel(\"__init_worklist__\", [G.param()],\n[\n";
-          compute << "ForAll(\"vertex\", G.nodes(),\n[\n";
-          compute << "WL.push(\"vertex\"),\n";
-          compute << "]),\n";
-          compute << "]),\n";
-          compute.close();
+      if (!isTopological) { // data driven
+        // FIXME: generate precise initial worklist
+        std::ofstream compute;
+        compute.open(COMPUTE_FILENAME, std::ios::app);
+        compute << "Kernel(\"__init_worklist__\", [G.param()],\n[\n";
+        compute << "ForAll(\"vertex\", G.nodes(),\n[\n";
+        compute << "WL.push(\"vertex\"),\n";
+        compute << "]),\n";
+        compute << "]),\n";
+        compute.close();
 
-          Output << "Pipe([\n";
-          Output << "Invoke(\"__init_worklist__\", (\"ctx->gg\", )),\n";
-          Output << "CBlock([\"check_cuda_kernel\"], parse = False),\n";
-          Output << "Pipe([\n";
-        }
-
-        // generate call to kernel
-        std::string kernelName = record->getNameAsString();
-        bool hasAReturnValue = (KernelsHavingReturnValue.find(kernelName) != KernelsHavingReturnValue.end());
-        if (hasAReturnValue) {
-          Output << "CBlock([\"*(ctx->p_retval.cpu_wr_ptr()) = " << __GALOIS_ACCUMULATOR_NAME__ << "\"]),\n";
-          Output << "CBlock([\"ctx->any_retval.rv = ctx->p_retval.gpu_wr_ptr()\"]),\n";
-        }
-        Output << "Invoke(\"" << kernelName << "\", ";
-        Output << "(\"ctx->gg\", \"ctx->nowned\"";
-        auto& arguments = KernelToArgumentsMap[kernelName];
-        for (auto& argument : arguments.first) {
-          Output << ", \"" << argument << "\"";
-        }
-        for (auto& argument : arguments.second) {
-          Output << ", \"ctx->" << argument << ".gpu_wr_ptr()\"";
-        }
-        if (hasAReturnValue) {
-          Output << ", \"ctx->any_retval\"";
-        }
-        Output << ")),\n";
-        if (hasAReturnValue) {
-          Output << "CBlock([\"" << __GALOIS_ACCUMULATOR_NAME__ << " = *(ctx->p_retval.cpu_rd_ptr())\"]),\n";
-        }
+        Output << "Pipe([\n";
+        Output << "Invoke(\"__init_worklist__\", (\"ctx->gg\", )),\n";
         Output << "CBlock([\"check_cuda_kernel\"], parse = False),\n";
-
-        if (!isTopological) { // data driven
-          Output << "], ),\n";
-          Output << "], once=True, wlinit=WLInit(\"ctx->hg.nedges\", [])),\n";
-        }
+        Output << "Pipe([\n";
       }
-    }
-    for (unsigned i = 0; i < callExpr->getNumArgs(); ++i) {
-      skipStmts.insert(callExpr->getArg(i));
-    }
-    return true;
-  }
 
-  virtual bool VisitCXXMemberCallExpr(CXXMemberCallExpr *callExpr) {
-    if (skipStmts.find(callExpr) == skipStmts.end()) {
-      CXXRecordDecl *record = callExpr->getRecordDecl();
-      std::string recordName = record->getNameAsString();
-      if (recordName.compare("GReducible") == 0) {
-        skipStmts.insert(callExpr);
+      // generate call to kernel
+      std::string kernelName = record->getNameAsString();
+      bool hasAReturnValue = (KernelsHavingReturnValue.find(kernelName) != KernelsHavingReturnValue.end());
+      if (hasAReturnValue) {
+        Output << "CBlock([\"*(ctx->p_retval.cpu_wr_ptr()) = __retval\"]),\n";
+        Output << "CBlock([\"ctx->any_retval.rv = ctx->p_retval.gpu_wr_ptr()\"]),\n";
       }
-    }
-    return true;
-  }
+      Output << "Invoke(\"" << kernelName << "\", ";
+      Output << "(\"ctx->gg\", \"ctx->nowned\"";
+      auto& arguments = KernelToArgumentsMap[kernelName];
+      for (auto& argument : arguments.first) {
+        Output << ", \"" << argument << "\"";
+      }
+      for (auto& argument : arguments.second) {
+        Output << ", \"ctx->" << argument << ".gpu_wr_ptr()\"";
+      }
+      if (hasAReturnValue) {
+        Output << ", \"ctx->any_retval\"";
+      }
+      Output << ")),\n";
+      if (hasAReturnValue) {
+        Output << "CBlock([\"__retval = *(ctx->p_retval.cpu_rd_ptr())\"]),\n";
+      }
+      Output << "CBlock([\"check_cuda_kernel\"], parse = False),\n";
 
-  virtual bool VisitCastExpr(CastExpr *castExpr) {
-    if (skipStmts.find(castExpr) != skipStmts.end()) {
-      skipStmts.insert(castExpr->getSubExpr());
-    }
-    return true;
-  }
-
-  virtual bool VisitMaterializeTemporaryExpr(MaterializeTemporaryExpr *tempExpr) {
-    if (skipStmts.find(tempExpr) != skipStmts.end()) {
-      skipStmts.insert(tempExpr->GetTemporaryExpr());
-    }
-    return true;
-  }
-
-  virtual bool VisitParenExpr(ParenExpr *parenExpr) {
-    if (skipStmts.find(parenExpr) != skipStmts.end()) {
-      skipStmts.insert(parenExpr->getSubExpr());
+      if (!isTopological) { // data driven
+        Output << "], ),\n";
+        Output << "], once=True, wlinit=WLInit(\"ctx->hg.nedges\", [])),\n";
+      }
     }
     return true;
   }
