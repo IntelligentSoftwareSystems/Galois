@@ -76,22 +76,6 @@ __global__ void PageRank(CSRGraphTex graph, int  nowned, const float  local_alph
     }
   }
 }
-__global__ void __init_worklist__(CSRGraphTex graph, WorklistT in_wl, WorklistT out_wl)
-{
-  unsigned tid = TID_1D;
-  unsigned nthreads = TOTAL_THREADS_1D;
-
-  const unsigned __kernel_tb_size = TB_SIZE;
-  if (tid == 0)
-    in_wl.reset_next_slot();
-
-  index_type vertex_end;
-  vertex_end = (graph).nnodes;
-  for (index_type vertex = 0 + tid; vertex < vertex_end; vertex += nthreads)
-  {
-    (out_wl).push(vertex);
-  }
-}
 void InitializeGraph_cuda(const float & local_alpha, struct CUDA_Context * ctx)
 {
   dim3 blocks;
@@ -104,24 +88,12 @@ void PageRank_cuda(const float & local_alpha, float local_tolerance, struct CUDA
 {
   dim3 blocks;
   dim3 threads;
-  PipeContextT<WorklistT> pipe;
   kernel_sizing(ctx->gg, blocks, threads);
-  pipe = PipeContextT<WorklistT>(ctx->hg.nedges);
-  {
-    {
-      pipe.out_wl().will_write();
-      __init_worklist__ <<<blocks, threads>>>(ctx->gg, pipe.in_wl(), pipe.out_wl());
-      pipe.in_wl().swap_slots();
-      pipe.advance2();
-      check_cuda_kernel;
-      while (pipe.in_wl().nitems())
-      {
-        pipe.out_wl().will_write();
-        PageRank <<<blocks, threads>>>(ctx->gg, ctx->nowned, local_alpha, local_tolerance, ctx->nout.gpu_wr_ptr(), ctx->residual.gpu_wr_ptr(), ctx->value.gpu_wr_ptr(), pipe.in_wl(), pipe.out_wl());
-        pipe.in_wl().swap_slots();
-        pipe.advance2();
-        check_cuda_kernel;
-      }
-    }
-  }
+  ctx->in_wl.update_gpu(ctx->shared_wl->num_in_items);
+  ctx->out_wl.will_write();
+  ctx->out_wl.reset();
+  PageRank <<<blocks, threads>>>(ctx->gg, ctx->nowned, local_alpha, local_tolerance, ctx->nout.gpu_wr_ptr(), ctx->residual.gpu_wr_ptr(), ctx->value.gpu_wr_ptr(), ctx->in_wl, ctx->out_wl);
+  check_cuda_kernel;
+  ctx->out_wl.update_cpu();
+  ctx->shared_wl->num_out_items = ctx->out_wl.nitems();
 }

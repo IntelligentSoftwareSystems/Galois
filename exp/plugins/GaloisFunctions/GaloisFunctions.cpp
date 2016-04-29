@@ -317,9 +317,11 @@ namespace {
 
             // Adding helper function
             SSHelperStructFunctions <<"\tGet_info_functor(GraphTy& _g): graph(_g){}\n"
-                                    <<"\tunsigned operator()(GNode n) {\n"
+                                    <<"\tunsigned operator()(GNode n) const {\n"
                                     <<"\t\treturn graph.getHostID(n);\n\t}\n"
-                                    <<"\tuint32_t getLocalID(GNode n){\n"
+                                    <<"\tGNode getGNode(uint32_t local_id) const {\n"
+                                    <<"\t\treturn GNode(graph.getGID(local_id));\n\t}\n"
+                                    <<"\tuint32_t getLocalID(GNode n) const {\n"
                                     <<"\t\treturn graph.getLID(n);\n\t}\n"
                                     <<"\tvoid sync_graph(){\n"
                                     <<"\t\t sync_graph_static(graph);\n\t}\n"
@@ -354,9 +356,6 @@ namespace {
             auto recordDecl = Results.Nodes.getNodeAs<clang::CXXRecordDecl>("class");
             std::string className = recordDecl->getNameAsString();
             
-            stringstream kernelBefore;
-            kernelBefore << "#ifdef __GALOIS_HET_CUDA__\n";
-            kernelBefore << "\tif (personality == GPU_CUDA) {\n";
             std::string accumulator;
             for (auto decl : recordDecl->decls()) {
               auto var = dyn_cast<VarDecl>(decl);
@@ -368,25 +367,60 @@ namespace {
                 }
               }
             }
-            if (!accumulator.empty()) {
-              kernelBefore << "\t\tint __retval = 0;\n";
-            }
+            stringstream kernelBefore;
+            kernelBefore << "#ifdef __GALOIS_HET_CUDA__\n";
+            kernelBefore << "\tif (personality == GPU_CUDA) {\n";
+            kernelBefore << "\t\tGalois::Timer T_compute, T_comm_syncGraph, T_comm_bag;\n";
+            kernelBefore << "\t\tunsigned num_iter = 0;\n";
             kernelBefore << "\t\tauto __sync_functor = Get_info_functor<Graph>(_graph);\n";
-            kernelBefore << "\t\t" << className << "_cuda(";
+            kernelBefore << "\t\ttypedef Galois::DGBag<GNode, Get_info_functor<Graph> > DBag;\n";
+            kernelBefore << "\t\tDBag dbag(__sync_functor);\n";
+            kernelBefore << "\t\tauto &local_wl = DBag::get();\n";
+            kernelBefore << "\t\tT_compute.start();\n";
+            kernelBefore << "\t\tcuda_wl.num_in_items = _graph.getNumOwned();\n";
+            kernelBefore << "\t\tfor (int __i = 0; __i < cuda_wl.num_in_items; ++__i) cuda_wl.in_items[__i] = __i;\n";
+            stringstream cudaKernelCall;
             if (!accumulator.empty()) {
-              kernelBefore << "__retval, ";
+              cudaKernelCall << "\t\tint __retval = 0;\n";
+            }
+            cudaKernelCall << "\t\tif (cuda_wl.num_in_items > 0)\n";
+            cudaKernelCall << "\t\t\t" << className << "_cuda(";
+            if (!accumulator.empty()) {
+              cudaKernelCall << "__retval, ";
             }
             for (auto field : recordDecl->fields()) {
               std::string name = field->getNameAsString();
               if (name.find(__GALOIS_PREPROCESS_GLOBAL_VARIABLE_PREFIX__) == 0) {
-                kernelBefore << name.substr(std::strlen(__GALOIS_PREPROCESS_GLOBAL_VARIABLE_PREFIX__)) << ", ";
+                cudaKernelCall << name.substr(std::strlen(__GALOIS_PREPROCESS_GLOBAL_VARIABLE_PREFIX__)) << ", ";
               }
             }
-            kernelBefore << "cuda_ctx);\n";
+            cudaKernelCall << "cuda_ctx);\n";
             if (!accumulator.empty()) {
-              kernelBefore << "\t\t" << accumulator << " += __retval;\n";
+              cudaKernelCall << "\t\t" << accumulator << " += __retval;\n";
             }
-            kernelBefore <<"\t\t__sync_functor.sync_graph();\n";
+            cudaKernelCall << "\t\tT_compute.stop();\n";
+            cudaKernelCall << "\t\tT_comm_syncGraph.start();\n";
+            cudaKernelCall << "\t\t__sync_functor.sync_graph();\n";
+            cudaKernelCall << "\t\tT_comm_syncGraph.stop();\n";
+            cudaKernelCall << "\t\tT_comm_bag.start();\n";
+            cudaKernelCall << "\t\tdbag.set_local(cuda_wl.out_items, cuda_wl.num_out_items);\n";
+            cudaKernelCall << "\t\tdbag.sync();\n";
+            cudaKernelCall << "\t\tcuda_wl.num_out_items = 0;\n";
+            cudaKernelCall << "\t\tT_comm_bag.stop();\n";
+            cudaKernelCall << "\t\t//std::cout << \"[\" << Galois::Runtime::getSystemNetworkInterface().ID << \"] Iter : \" << num_iter ";
+            cudaKernelCall << "<< \" T_compute : \" << T_compute.get() ";
+            cudaKernelCall << "<< \"(msec) T_comm_syncGraph : \" << T_comm_syncGraph.get() ";
+            cudaKernelCall << "<< \"(msec) T_comm_bag : \" << T_comm_bag.get() << \"(msec) \\n\";\n";
+            kernelBefore << cudaKernelCall.str();
+            kernelBefore << "\t\twhile (!dbag.canTerminate()) {\n";
+            kernelBefore << "\t\t++num_iter;\n";
+            kernelBefore << "\t\t//std::cout << \"[\" << Galois::Runtime::getSystemNetworkInterface().ID << \"] Iter : \" << num_iter ";
+            kernelBefore << "<< \" Total items to work on : \" << cuda_wl.num_in_items << \"\\n\";\n";
+            kernelBefore << "\t\tT_compute.start();\n";
+            kernelBefore << "\t\tcuda_wl.num_in_items = local_wl.size();\n";
+            kernelBefore << "\t\tstd::copy(local_wl.begin(), local_wl.end(), cuda_wl.in_items);\n";
+            kernelBefore << cudaKernelCall.str();
+            kernelBefore << "\t\t}\n";
             kernelBefore << "\t} else if (personality == CPU)\n";
             kernelBefore << "#endif\n";
             SourceLocation ST_before = callFS->getSourceRange().getBegin();

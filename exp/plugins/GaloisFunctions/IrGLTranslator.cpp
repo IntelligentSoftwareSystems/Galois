@@ -500,6 +500,7 @@ class IrGLOrchestratorVisitor : public RecursiveASTVisitor<IrGLOrchestratorVisit
 private:
   ASTContext* astContext;
   Rewriter &rewriter; // FIXME: is this necessary? can ASTContext give source code?
+  bool requiresWorklist; // shared across kernels
   std::string accumulatorName;
   std::ofstream Output;
 
@@ -513,7 +514,8 @@ private:
 public:
   explicit IrGLOrchestratorVisitor(ASTContext *context, Rewriter &R) : 
     astContext(context),
-    rewriter(R)
+    rewriter(R),
+    requiresWorklist(false)
   {}
   
   virtual ~IrGLOrchestratorVisitor() {}
@@ -529,9 +531,21 @@ public:
     header << "#pragma once\n";
     header << "#include \"Galois/Cuda/cuda_mtypes.h\"\n";
     header << "\nstruct CUDA_Context;\n";
+    if (requiresWorklist) {
+      header << "\nstruct CUDA_Worklist {\n";
+      header << "\tint *in_items;\n";
+      header << "\tint num_in_items;\n";
+      header << "\tint *out_items;\n";
+      header << "\tint num_out_items;\n";
+      header << "};\n";
+    }
     header << "\nstruct CUDA_Context *get_CUDA_context(int id);\n";
     header << "bool init_CUDA_context(struct CUDA_Context *ctx, int device);\n";
-    header << "void load_graph_CUDA(struct CUDA_Context *ctx, MarshalGraph &g);\n\n";
+    header << "void load_graph_CUDA(struct CUDA_Context *ctx, ";
+    if (requiresWorklist) {
+      header << "struct CUDA_Worklist *wl, ";
+    }
+    header << "MarshalGraph &g);\n\n";
     for (auto& var : SharedVariablesToTypeMap) {
       header << var.second << " get_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID);\n";
       header << "void set_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID, " << var.second << " v);\n";
@@ -570,6 +584,11 @@ public:
       cuheader << "\tShared<" << var.second << "> " << var.first << ";\n";
     }
     cuheader << "\tShared<int> p_retval;\n";
+    if (requiresWorklist) {
+      cuheader << "\tWorklistT in_wl;\n";
+      cuheader << "\tWorklistT out_wl;\n";
+      cuheader << "\tstruct CUDA_Worklist *shared_wl;\n";
+    }
     cuheader << "\tAny any_retval;\n";
     cuheader << "};\n\n";
     for (auto& var : SharedVariablesToTypeMap) {
@@ -610,7 +629,11 @@ public:
     cuheader << "\tfprintf(stderr, \"%d: Using GPU %d: %s\\n\", ctx->id, device, dev.name);\n";
     cuheader << "\treturn true;\n";
     cuheader << "}\n\n";
-    cuheader << "void load_graph_CUDA(struct CUDA_Context *ctx, MarshalGraph &g) {\n";
+    cuheader << "void load_graph_CUDA(struct CUDA_Context *ctx, ";
+    if (requiresWorklist) {
+      cuheader << "struct CUDA_Worklist *wl, ";
+    }
+    cuheader << "MarshalGraph &g) {\n";
     cuheader << "\tCSRGraphTex &graph = ctx->hg;\n";
     cuheader << "\tctx->nowned = g.nowned;\n";
     cuheader << "\tassert(ctx->id == g.id);\n";
@@ -628,6 +651,15 @@ public:
     for (auto& var : SharedVariablesToTypeMap) {
       cuheader << "\tctx->" << var.first << ".alloc(graph.nnodes);\n";
       cuheader << "\tctx->" << var.first << ".zero_gpu();\n"; // FIXME: should do this only for std::atomic variables?
+    }
+    if (requiresWorklist) {
+      cuheader << "\tctx->in_wl = WorklistT(graph.nedges);\n";
+      cuheader << "\tctx->out_wl = WorklistT(graph.nedges);\n";
+      cuheader << "\twl->num_in_items = -1;\n";
+      cuheader << "\twl->num_out_items = -1;\n";
+      cuheader << "\twl->in_items = ctx->in_wl.wl;\n";
+      cuheader << "\twl->out_items = ctx->out_wl.wl;\n";
+      cuheader << "\tctx->shared_wl = wl;\n";
     }
     cuheader << "\tctx->p_retval = Shared<int>(1);\n";
     cuheader << "\tprintf(\"load_graph_GPU: %d owned nodes of total %d resident, %d edges\\n\", ctx->nowned, graph.nnodes, graph.nedges);\n"; 
@@ -734,6 +766,7 @@ public:
     if (traverse && method) {
       Output << "], host = True),\n"; // end Kernel
       Output.close();
+      accumulatorName.clear();
 
       std::string fileName = rewriter.getSourceMgr().getFilename(D->getLocStart()).str();
       std::size_t found = fileName.rfind(".");
@@ -746,12 +779,12 @@ public:
   virtual bool VisitCallExpr(CallExpr *callExpr) {
     std::string text = rewriter.getRewrittenText(callExpr->getSourceRange());
     bool isTopological = true;
-    std::size_t begin = text.find("do_all");
-    if (begin == std::string::npos) {
-      begin = text.find("for_each");
+    std::size_t begin = text.find("Galois::do_all");
+    if (begin != 0) {
+      begin = text.find("Galois::for_each");
       isTopological = false;
     }
-    if (begin != std::string::npos) {
+    if (begin == 0) {
       // generate kernel for operator
       assert(callExpr->getNumArgs() > 1);
       // FIXME: pick the right argument
@@ -781,26 +814,15 @@ public:
       Output << "CDecl([(\"dim3\", \"threads\", \"\")]),\n";
       Output << "CBlock([\"kernel_sizing(ctx->gg, blocks, threads)\"]),\n";
 
-      if (!isTopological) { // data driven
-        // FIXME: generate precise initial worklist
-        std::ofstream compute;
-        compute.open(COMPUTE_FILENAME, std::ios::app);
-        compute << "Kernel(\"__init_worklist__\", [G.param()],\n[\n";
-        compute << "ForAll(\"vertex\", G.nodes(),\n[\n";
-        compute << "WL.push(\"vertex\"),\n";
-        compute << "]),\n";
-        compute << "]),\n";
-        compute.close();
-
-        Output << "Pipe([\n";
-        Output << "Invoke(\"__init_worklist__\", (\"ctx->gg\", )),\n";
-        Output << "CBlock([\"check_cuda_kernel\"], parse = False),\n";
-        Output << "Pipe([\n";
-      }
-
       // generate call to kernel
       std::string kernelName = record->getNameAsString();
       bool hasAReturnValue = (KernelsHavingReturnValue.find(kernelName) != KernelsHavingReturnValue.end());
+      if (!isTopological) {
+        requiresWorklist = true;
+        Output << "CBlock([\"ctx->in_wl.update_gpu(ctx->shared_wl->num_in_items)\"]),\n";
+        Output << "CBlock([\"ctx->out_wl.will_write()\"]),\n";
+        Output << "CBlock([\"ctx->out_wl.reset()\"]),\n";
+      }
       if (hasAReturnValue) {
         Output << "CBlock([\"*(ctx->p_retval.cpu_wr_ptr()) = __retval\"]),\n";
         Output << "CBlock([\"ctx->any_retval.rv = ctx->p_retval.gpu_wr_ptr()\"]),\n";
@@ -817,15 +839,18 @@ public:
       if (hasAReturnValue) {
         Output << ", \"ctx->any_retval\"";
       }
+      if (!isTopological) {
+        Output << ", \"ctx->in_wl\"";
+        Output << ", \"ctx->out_wl\"";
+      }
       Output << ")),\n";
+      Output << "CBlock([\"check_cuda_kernel\"], parse = False),\n";
       if (hasAReturnValue) {
         Output << "CBlock([\"__retval = *(ctx->p_retval.cpu_rd_ptr())\"]),\n";
       }
-      Output << "CBlock([\"check_cuda_kernel\"], parse = False),\n";
-
-      if (!isTopological) { // data driven
-        Output << "], ),\n";
-        Output << "], once=True, wlinit=WLInit(\"ctx->hg.nedges\", [])),\n";
+      if (!isTopological) {
+        Output << "CBlock([\"ctx->out_wl.update_cpu()\"]),\n";
+        Output << "CBlock([\"ctx->shared_wl->num_out_items = ctx->out_wl.nitems()\"]),\n";
       }
     }
     return true;

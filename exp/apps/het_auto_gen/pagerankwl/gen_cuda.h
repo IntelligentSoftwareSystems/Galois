@@ -3,9 +3,16 @@
 
 struct CUDA_Context;
 
+struct CUDA_Worklist {
+	int *in_items;
+	int num_in_items;
+	int *out_items;
+	int num_out_items;
+};
+
 struct CUDA_Context *get_CUDA_context(int id);
 bool init_CUDA_context(struct CUDA_Context *ctx, int device);
-void load_graph_CUDA(struct CUDA_Context *ctx, MarshalGraph &g);
+void load_graph_CUDA(struct CUDA_Context *ctx, struct CUDA_Worklist *wl, MarshalGraph &g);
 
 unsigned int get_node_nout_cuda(struct CUDA_Context *ctx, unsigned LID);
 void set_node_nout_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v);
