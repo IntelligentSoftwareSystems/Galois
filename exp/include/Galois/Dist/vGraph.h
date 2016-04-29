@@ -479,8 +479,8 @@ public:
         auto gid = slaveNodes[x][start];
         auto lid = G2L(gid);
 
-        if(net.ID == 0)
-          std::cerr << " from 0 : GID " << gid << "\n";
+        //if(net.ID == 0)
+          //std::cerr << " from 0 : GID " << gid << "\n";
         //std::cout << net.ID << " send (" << gid << ") " << start << " " << FnTy::extract(start, getData(start)) << "\n";
         gSerialize(b, gid, FnTy::extract(lid, getData(lid)));
         FnTy::reset(lid, getData(lid));

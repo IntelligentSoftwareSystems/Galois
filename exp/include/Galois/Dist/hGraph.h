@@ -189,9 +189,9 @@ public:
       Galois::Runtime::gDeserialize(buf, gid, old_val);
       assert(isOwned(gid));
       val = FnTy::extract((gid - globalOffset), getData((gid - globalOffset)));
-      if (net.ID == 0) {
+      //if (net.ID == 0) {
         //std::cout << "PullApply step1 : [" << net.ID << "] "<< " to : " << from_id << " : [" << gid - globalOffset << "] : " << val << "\n";
-      }
+      //}
       //For now just send all.
       //if(val != old_val){
       Galois::Runtime::gSerialize(b, gid, val);
