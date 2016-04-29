@@ -43,6 +43,7 @@ ASTUtility ast_utility;
 
 #include "cl_transforms.h"
 #include "kernel_gen.h"
+#include "syncHandler.h"
 
 
 // Apply a custom category to all command-line options so that they are the
@@ -100,6 +101,15 @@ public:
          opFinder.matchAST(Context);
       }
 #else
+      if(false){
+         //Sync. handler code.
+         SyncHandler syncHandler(R, Context,app_data);
+         MatchFinder syncFinder;
+         syncFinder.addMatcher(memberCallExpr(isExpansionInMainFile(), callee(functionDecl( hasName ("sync_pull"),isTemplateInstantiation() ).bind("methodDecl") )  ).bind("callSite"), &syncHandler);
+         syncFinder.addMatcher(memberCallExpr(isExpansionInMainFile(), callee(functionDecl( hasName ("sync_push"),isTemplateInstantiation() ).bind("methodDecl") )  ).bind("callSite"), &syncHandler);
+         syncFinder.matchAST(Context);
+         return;
+      }
       {
          //1) Replace hGraph with CLGraph in typedefs
          MatchFinder graphTypedef;
@@ -128,6 +138,13 @@ public:
                                  ).bind("galoisLoop"), &do_all_handler);
          doAllMatcher.matchAST(Context);
             //#################End find kernels/operators via do_all calls
+      }
+      {
+         GetDataHandler gdh(R,app_data);
+         MatchFinder getDataFinder;
+         getDataFinder.addMatcher(memberCallExpr(isExpansionInMainFile() , unless(hasAncestor(methodDecl(isExpansionInMainFile(), hasName("operator()"))) ) , callee( functionDecl(hasName("getData") ) ) ).bind("callsite"), &gdh);
+//         getDataFinder.addMatcher(memberCallExpr(isExpansionInMainFile() , callee( functionDecl(hasName("getData") ) ) ).bind("callsite"), &gdh);
+         getDataFinder.matchAST(Context);
       }
       llvm::outs() << " Done phase 2\n";
 #endif
