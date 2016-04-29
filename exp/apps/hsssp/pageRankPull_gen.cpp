@@ -101,6 +101,28 @@ struct InitializeGraph {
 };
 
 
+
+struct InitializeGraph_value {
+  Graph* graph;
+
+  void static go(Graph& _graph) {
+
+    struct SyncerPull_0 {
+      static float extract( GNode src,const struct PR_NodeData & node){ return node.value; }
+      static void setVal (GNode src,struct PR_NodeData & node, float y) {node.value = y; }
+      typedef float ValTy;
+    };
+
+    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph_value{ &_graph }, Galois::loopname("Init"));
+    _graph.sync_pull<SyncerPull_0>();
+  }
+
+  void operator()(GNode src) const {
+    PR_NodeData& sdata = graph->getData(src);
+    sdata.value = 1.0 - alpha;
+  }
+};
+
 struct PageRank_pull {
   Graph* graph;
 
@@ -187,7 +209,7 @@ int main(int argc, char** argv) {
     std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " PageRank1 : " << T_pageRank1.get() << " (msec)\n\n";
 
     Galois::Runtime::getHostBarrier().wait();
-    InitializeGraph::go(hg);
+    InitializeGraph_value::go(hg);
 
     std::cout << "PageRank::go run2 called  on " << net.ID << "\n";
     T_pageRank2.start();
@@ -197,7 +219,7 @@ int main(int argc, char** argv) {
     std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " PageRank2 : " << T_pageRank2.get() << " (msec)\n\n";
 
     Galois::Runtime::getHostBarrier().wait();
-    InitializeGraph::go(hg);
+    InitializeGraph_value::go(hg);
 
     std::cout << "PageRank::go run3 called  on " << net.ID << "\n";
     T_pageRank3.start();
