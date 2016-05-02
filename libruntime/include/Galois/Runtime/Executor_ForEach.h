@@ -674,6 +674,7 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
       //T_comm_bag.stop();
 
       //std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID  << "] Iter : " << num_iter << "  T_compute : " << T_compute.get() << "(msec)  T_comm_syncGraph : " << T_comm_syncGraph.get() << "(msec) T_comm_bag : "<< T_comm_bag.get() << "(msec)\n";
+      //Galois::Runtime::printOutput("Iter Num : % , T_compute : % (msec) , T_comm_syncGraph : % (msec), T_comm_bag : % (msec) \n", num_iter,T_compute.get(), T_comm_syncGraph.get(), T_comm_bag.get());
       num_iter++;
     }
 
