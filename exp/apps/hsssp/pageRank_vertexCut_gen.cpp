@@ -187,6 +187,9 @@ int main(int argc, char** argv) {
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     Galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_pageRank1, T_pageRank2, T_pageRank3;
 
+    std::cout << "[ " << net.ID << " ] InputFile : " << inputFile << "\n";
+    std::cout << "[ " << net.ID << " ] PartFile : " << partFolder << "\n";
+
     T_total.start();
 
     T_hGraph_init.start();
