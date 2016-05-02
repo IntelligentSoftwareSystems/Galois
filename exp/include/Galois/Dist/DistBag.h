@@ -25,6 +25,7 @@
  * reserved.
  *
  * @author Roshan Dathathri <roshan@cs.utexas.edu>
+ * @author Gurbinder Gill <gurbinder533@gmail.com>
  */
 
 #ifndef GALOIS_DISTBAG_H

@@ -31,6 +31,7 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  * @author Donald Nguyen <ddn@cs.utexas.edu>
+ * @author Gurbinder Gill <gurbinder533@gmail.com>
  */
 
 #ifndef GALOIS_RUNTIME_EXECUTOR_FOREACH_H
@@ -631,15 +632,15 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
     auto &local_wl = DBag::get();
 
     // Sync
-    T_comm_syncGraph.start();
+    //T_comm_syncGraph.start();
     helper_fn.sync_graph();
-    T_comm_syncGraph.stop();
+    //T_comm_syncGraph.stop();
 
-    T_comm_bag.start();
+    //T_comm_bag.start();
     dbag.set(bag);
     dbag.sync();
     bag.clear();
-    T_comm_bag.stop();
+    //T_comm_bag.stop();
 
     //std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID  << "] Iter : 0 T_compute : " << T_compute.get() << "(msec) T_comm_syncGraph : " << T_comm_syncGraph.get() << "(msec) T_comm_bag : "<< T_comm_bag.get() << "(msec)\n";
 
@@ -662,15 +663,15 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
       }
 
       // Sync
-      T_comm_syncGraph.start();
+      //T_comm_syncGraph.start();
       helper_fn.sync_graph();
-      T_comm_syncGraph.stop();
+      //T_comm_syncGraph.stop();
 
-      T_comm_bag.start();
+      //T_comm_bag.start();
       dbag.set(bag);
       dbag.sync();
       bag.clear();
-      T_comm_bag.stop();
+      //T_comm_bag.stop();
 
       //std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID  << "] Iter : " << num_iter << "  T_compute : " << T_compute.get() << "(msec)  T_comm_syncGraph : " << T_comm_syncGraph.get() << "(msec) T_comm_bag : "<< T_comm_bag.get() << "(msec)\n";
       num_iter++;
