@@ -65,7 +65,6 @@ namespace Galois {
       }
 
       Ty reduce(){
-        others_mdata = 0;
         for(auto x = 0; x < net.Num; ++x){
           if(x == net.ID)
             continue;
@@ -81,6 +80,7 @@ namespace Galois {
         Galois::Runtime::getHostBarrier().wait();
 
         Galois::atomicAdd(mdata, others_mdata);
+        others_mdata = 0;
         num_Hosts_recvd = 0;
         return mdata;
       }

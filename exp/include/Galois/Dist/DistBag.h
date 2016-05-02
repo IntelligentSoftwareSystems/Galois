@@ -1,0 +1,134 @@
+/** Distributed Accumulator type -*- C++ -*-
+ * @file
+ * @section License
+ *
+ * This file is part of Galois.  Galoisis a framework to exploit
+ * amorphous data-parallelism in irregular programs.
+ *
+ * Galois is free software: you can redistribute it and/or modify it
+ * under the terms of the GNU Lesser General Public License as
+ * published by the Free Software Foundation, either version 3 of the
+ * License, or (at your option) any later version.
+ *
+ * Galois is distributed in the hope that it will be useful, but
+ * WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU
+ * Lesser General Public License for more details.
+ *
+ * You should have received a copy of the GNU Lesser General Public
+ * License along with Galois.  If not, see
+ * <http://www.gnu.org/licenses/>.
+ *
+ * @section Copyright
+ *
+ * Copyright (C) 2015, The University of Texas at Austin. All rights
+ * reserved.
+ *
+ * @author Roshan Dathathri <roshan@cs.utexas.edu>
+ */
+
+#ifndef GALOIS_DISTBAG_H
+#define GALOIS_DISTBAG_H
+
+namespace Galois {
+
+template<typename ValueTy, typename FunctionTy>
+class DGBag {
+  Galois::Runtime::NetworkInterface& net = Galois::Runtime::getSystemNetworkInterface();
+
+  const FunctionTy &helper_fn;
+  bool didWork;
+  std::vector<std::vector<ValueTy>> bagItems_vec;
+
+  static uint32_t num_Hosts_recvd;
+  static std::vector<ValueTy> workItem_recv_vec;
+  static std::vector<bool> hosts_didWork_vec;
+
+  static void recv_BagItems(Galois::Runtime::RecvBuffer& buf){
+    bool x_didWork;
+    unsigned x_ID;
+    //XXX: Why pair?
+    //std::vector<std::pair<int, int>> vec;
+    //TODO: get graphNode type or value type up here.
+    std::vector<ValueTy> vec;
+
+    gDeserialize(buf, x_ID, x_didWork, vec);
+    workItem_recv_vec.insert(workItem_recv_vec.end(), vec.begin(), vec.end());
+    hosts_didWork_vec.push_back(x_didWork);
+    num_Hosts_recvd++;
+  }
+
+public: 
+  DGBag(const FunctionTy &fn) : helper_fn(fn) {
+    bagItems_vec.resize(net.Num);
+  }
+
+  void set(InsertBag<ValueTy> &bag) {
+    didWork = !bag.empty();
+    for(auto ii = bag.begin(); ii != bag.end(); ++ii)
+    {
+      //helper_fn get the hostID for this node.
+      bagItems_vec[helper_fn((*ii))].push_back((*ii));
+    }
+  }
+
+  void set_local(int* array, size_t size) {
+    didWork = (size > 0);
+    for (auto i = 0; i < size; ++i) {
+      ValueTy ii = helper_fn.getGNode(array[i]);
+      bagItems_vec[helper_fn(ii)].push_back(ii);
+    }
+  }
+
+  void sync() {
+    //send things to other hosts.
+    for(auto x = 0; x < net.Num; ++x){
+      if(x == net.ID)
+        continue;
+      Galois::Runtime::SendBuffer b;
+      gSerialize(b, net.ID,didWork, bagItems_vec[x]);
+      net.send(x, recv_BagItems, b);
+    }
+    net.flush();
+    while(num_Hosts_recvd < (net.Num - 1)){
+      net.handleReceives();
+    }
+
+    workItem_recv_vec.insert(workItem_recv_vec.end(), bagItems_vec[net.ID].begin(), bagItems_vec[net.ID].end());
+    std::transform(workItem_recv_vec.begin(), workItem_recv_vec.end(), workItem_recv_vec.begin(), [&](ValueTy i)->ValueTy {return helper_fn.getLocalID(i);});
+
+    assert((hosts_didWork_vec.size() == (net.Num - 1)));
+    for(auto x = 0; x < net.Num; ++x){
+      bagItems_vec[x].clear();
+    }
+
+    Galois::Runtime::getHostBarrier().wait();
+    num_Hosts_recvd = 0;
+    hosts_didWork_vec.clear();
+    workItem_recv_vec.clear();
+  }
+
+  static const std::vector<ValueTy> &get() {
+    return workItem_recv_vec;
+  }
+
+  bool canTerminate() {
+    bool terminate = !didWork;
+    if(terminate)
+      for(auto x : hosts_didWork_vec)
+        terminate = (terminate && !x);
+    return terminate;
+  }
+};
+
+template<typename ValueTy, typename FunctionTy>
+uint32_t DGBag<ValueTy, FunctionTy>::num_Hosts_recvd = 0;
+
+template<typename ValueTy, typename FunctionTy>
+std::vector<ValueTy> DGBag<ValueTy, FunctionTy>::workItem_recv_vec;
+
+template<typename ValueTy, typename FunctionTy>
+std::vector<bool> DGBag<ValueTy, FunctionTy>::hosts_didWork_vec;
+
+}
+#endif

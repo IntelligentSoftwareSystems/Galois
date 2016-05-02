@@ -56,6 +56,7 @@
 #include "Galois/Runtime/Serialize.h"
 
 #include "Galois/Bag.h"
+#include "Galois/Dist/DistBag.h"
 //#include "Galois/WorkList/WorkListDist.h"
 //#include "Galois/WorkList/WorkListWrapper.h"
 #include "Galois/WorkList/WorkListDist.h"
@@ -580,41 +581,6 @@ void for_each_gen_dist(const RangeTy& r, const FunctionTy& fn, const TupleTy& tp
   for_each_gen_dist_impl(r, fn, dtpl, std::integral_constant<bool, exists_by_supertype<op_tag, TupleTy>::value>());
 }
 
-/**Landing pad for bagItems **/
-template<typename Ty>
-struct global_var_sturct{
-  static uint32_t num_Hosts_recvd;
-  //XXX: Why is the type a pair?? How can I get type up here?
-  //static std::vector<std::pair<int, int>> workItem_recv_vec;
-  static std::vector<Ty> workItem_recv_vec;
-  //static std::vector<uint32_t> workItem_recv_vec;
-  static std::vector<bool> hosts_didWork_vec;
-
-  static void recv_BagItems(Galois::Runtime::RecvBuffer& buf){
-    bool x_didWork;
-    unsigned x_ID;
-    //XXX: Why pair?
-    //std::vector<std::pair<int, int>> vec;
-    //TODO: get graphNode type or value type up here.
-    std::vector<Ty> vec;
-
-    gDeserialize(buf, x_ID, x_didWork, vec);
-    workItem_recv_vec.insert(workItem_recv_vec.end(), vec.begin(), vec.end());
-    hosts_didWork_vec.push_back(x_didWork);
-    num_Hosts_recvd++;
-  }
-
-};
-
-template<typename Ty>
-uint32_t global_var_sturct<Ty>::num_Hosts_recvd;
-
-template<typename Ty>
-std::vector<Ty> global_var_sturct<Ty>::workItem_recv_vec;
-
-template<typename Ty>
-std::vector<bool> global_var_sturct<Ty>::hosts_didWork_vec;
-
 /** For distributed worklist **/
 template<typename RangeTy, typename FunctionTy, typename TupleTy>
   void for_each_gen_dist_impl(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl, std::true_type) {
@@ -657,84 +623,35 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
             std::make_tuple(loopname_tag {}, wl_tag {}),
             std::make_tuple(loopname {}, wl<defaultWL>()))));
     T_compute.stop();
-    std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID  << "] 1st Iter : T_compute : " << T_compute.get() << "(msec)\n";
 
-     auto& net = Galois::Runtime::getSystemNetworkInterface();
-     bool Canterminate = false;
-     bool didWork = !bag.empty();
-     int num_iter = 1;
-     global_var_sturct<value_type>::num_Hosts_recvd = 0;
+    int num_iter = 1;
+    typedef Galois::DGBag<value_type, typeof(helper_fn)> DBag;
+    DBag dbag(helper_fn);
+    auto &local_wl = DBag::get();
 
-     /** loop while work in the worklist **/
-     while(!Canterminate) {
+    // Sync
+    T_comm_syncGraph.start();
+    helper_fn.sync_graph();
+    T_comm_syncGraph.stop();
 
-      // Sync
-      T_comm_syncGraph.start();
-      helper_fn.sync_graph();
-      T_comm_syncGraph.stop();
+    T_comm_bag.start();
+    dbag.set(bag);
+    dbag.sync();
+    bag.clear();
+    T_comm_bag.stop();
 
-      // seperate out nodes to work locally and to send to remote destinaton.
+    //std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID  << "] Iter : 0 T_compute : " << T_compute.get() << "(msec) T_comm_syncGraph : " << T_comm_syncGraph.get() << "(msec) T_comm_bag : "<< T_comm_bag.get() << "(msec)\n";
 
-      T_comm_bag.start();
-      std::vector<std::vector<value_type>> bagItems_vec;
+    /** loop while work in the worklist **/
+    while(!dbag.canTerminate()) {
 
-      if(bagItems_vec.size() < net.Num)
-        bagItems_vec.resize(net.Num);
+      //std::cout << "["<< Galois::Runtime::getSystemNetworkInterface().ID <<"] Iter : " << num_iter <<" Total items to work on : " << local_wl.size() << "\n";
 
-      for(auto ii = bag.begin(); ii != bag.end(); ++ii)
-      {
-        //helper_fn get the hostID for this node.
-        bagItems_vec[helper_fn((*ii))].push_back((*ii));
-      }
-
-      //send things to other hosts.
-      for(auto x = 0; x < net.Num; ++x){
-        if(x == net.ID)
-          continue;
-        Galois::Runtime::SendBuffer b;
-        gSerialize(b, net.ID,didWork, bagItems_vec[x]);
-        net.send(x, global_var_sturct<value_type>::recv_BagItems, b);
-      }
-      net.flush();
-      while(global_var_sturct<value_type>::num_Hosts_recvd < (net.Num - 1)){
-        net.handleReceives();
-      }
-
-      //XXX: Check: Can cause problem if one host is very fast.
-      global_var_sturct<value_type>::num_Hosts_recvd = 0;
-      global_var_sturct<value_type>::workItem_recv_vec.insert(global_var_sturct<value_type>::workItem_recv_vec.end(), bagItems_vec[net.ID].begin(), bagItems_vec[net.ID].end());
-
-
-      assert((global_var_sturct<value_type>::hosts_didWork_vec.size() == (net.Num - 1)));
-      bag.clear();
-      T_comm_bag.stop();
-
-      Canterminate = !didWork;
-      if(Canterminate)
-        for(auto x : global_var_sturct<value_type>::hosts_didWork_vec)
-          Canterminate = (Canterminate && !x);
-
-      std::cout << "["<< Galois::Runtime::getSystemNetworkInterface().ID <<"] Iter: " << num_iter <<" Total items to work on : " << global_var_sturct<value_type>::workItem_recv_vec.size() << "\n";
       // call for_each again.
-      if(!global_var_sturct<value_type>::workItem_recv_vec.empty()){
-
-        //XXX: Loop to change global IDs to local IDs. There can be a better way: Using transform iterators. Why are assuming it to be a pair.
-        //std::transform(global_var_sturct<value_type>::workItem_recv_vec.begin(), global_var_sturct<value_type>::workItem_recv_vec.end(), global_var_sturct<value_type>::workItem_recv_vec.begin(), [&](value_type i)->value_type {return std::make_pair(helper_fn.getLocalID(i.first), i.second);});
-
-        /*
-        std::cout << " TYPE NAME : " << typeid(value_type()).name() << "\n";
-        for(auto i = 0; i < global_var_sturct<value_type>::workItem_recv_vec.size(); ++i){
-          if(workItem_recv_vec[i] == 2069)
-            std::cout << "haiga \n";
-
-          workItem_recv_vec[i] = helper_fn.getLocalID(workItem_recv_vec[i]);
-        }
-        */
+      if(!local_wl.empty()){
         T_compute.start();
 
-        std::transform(global_var_sturct<value_type>::workItem_recv_vec.begin(), global_var_sturct<value_type>::workItem_recv_vec.end(), global_var_sturct<value_type>::workItem_recv_vec.begin(), [&](value_type i)->value_type {return helper_fn.getLocalID(i);});
-
-        Runtime::for_each_impl_dist(Runtime::makeStandardRange(global_var_sturct<value_type>::workItem_recv_vec.begin(), global_var_sturct<value_type>::workItem_recv_vec.end()), fn,
+        Runtime::for_each_impl_dist(Runtime::makeStandardRange(local_wl.begin(), local_wl.end()), fn,
             std::tuple_cat(xtpl,
                 get_default_trait_values(ztpl,
                 std::make_tuple(loopname_tag {}, wl_tag {}),
@@ -743,13 +660,19 @@ template<typename RangeTy, typename FunctionTy, typename TupleTy>
         T_compute.stop();
       }
 
-      didWork = !bag.empty();
-      global_var_sturct<value_type>::hosts_didWork_vec.clear();
-      global_var_sturct<value_type>::workItem_recv_vec.clear();
+      // Sync
+      T_comm_syncGraph.start();
+      helper_fn.sync_graph();
+      T_comm_syncGraph.stop();
 
-      std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID  << "] Iter : " << num_iter << "  T_compute : " << T_compute.get() << "(msec)  T_comm_syncGraph : " << T_comm_syncGraph.get() << "(msec) T_comm_bag : "<< T_comm_bag.get() << "(msec)\n";
+      T_comm_bag.start();
+      dbag.set(bag);
+      dbag.sync();
+      bag.clear();
+      T_comm_bag.stop();
+
+      //std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID  << "] Iter : " << num_iter << " T_compute : " << T_compute.get() << "(msec) T_comm_syncGraph : " << T_comm_syncGraph.get() << "(msec) T_comm_bag : "<< T_comm_bag.get() << "(msec)\n";
       num_iter++;
-      Galois::Runtime::getHostBarrier().wait();
     }
 
      //std::cout << "\n\n TERMINATING on : " << net.ID << "\n\n";

@@ -58,13 +58,6 @@ WL.push("dst"),
 ]),
 ]),
 ]),
-Kernel("__init_worklist__", [G.param()],
-[
-ForAll("vertex", G.nodes(),
-[
-WL.push("vertex"),
-]),
-]),
 Kernel("InitializeGraph_cuda", [('const float &', 'local_alpha'), ('struct CUDA_Context *', 'ctx')],
 [
 CDecl([("dim3", "blocks", "")]),
@@ -78,13 +71,12 @@ Kernel("PageRank_cuda", [('const float &', 'local_alpha'), ('float', 'local_tole
 CDecl([("dim3", "blocks", "")]),
 CDecl([("dim3", "threads", "")]),
 CBlock(["kernel_sizing(ctx->gg, blocks, threads)"]),
-Pipe([
-Invoke("__init_worklist__", ("ctx->gg", )),
+CBlock(["ctx->in_wl.update_gpu(ctx->shared_wl->num_in_items)"]),
+CBlock(["ctx->out_wl.will_write()"]),
+CBlock(["ctx->out_wl.reset()"]),
+Invoke("PageRank", ("ctx->gg", "ctx->nowned", "local_alpha", "local_tolerance", "ctx->nout.gpu_wr_ptr()", "ctx->residual.gpu_wr_ptr()", "ctx->value.gpu_wr_ptr()", "ctx->in_wl", "ctx->out_wl")),
 CBlock(["check_cuda_kernel"], parse = False),
-Pipe([
-Invoke("PageRank", ("ctx->gg", "ctx->nowned", "local_alpha", "local_tolerance", "ctx->nout.gpu_wr_ptr()", "ctx->residual.gpu_wr_ptr()", "ctx->value.gpu_wr_ptr()")),
-CBlock(["check_cuda_kernel"], parse = False),
-], ),
-], once=True, wlinit=WLInit("ctx->hg.nedges", [])),
+CBlock(["ctx->out_wl.update_cpu()"]),
+CBlock(["ctx->shared_wl->num_out_items = ctx->out_wl.nitems()"]),
 ], host = True),
 ])

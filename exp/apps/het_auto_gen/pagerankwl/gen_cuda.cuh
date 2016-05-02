@@ -22,6 +22,9 @@ struct CUDA_Context {
 	Shared<float> residual;
 	Shared<float> value;
 	Shared<int> p_retval;
+	WorklistT in_wl;
+	WorklistT out_wl;
+	struct CUDA_Worklist *shared_wl;
 	Any any_retval;
 };
 
@@ -96,7 +99,7 @@ bool init_CUDA_context(struct CUDA_Context *ctx, int device) {
 	return true;
 }
 
-void load_graph_CUDA(struct CUDA_Context *ctx, MarshalGraph &g) {
+void load_graph_CUDA(struct CUDA_Context *ctx, struct CUDA_Worklist *wl, MarshalGraph &g) {
 	CSRGraphTex &graph = ctx->hg;
 	ctx->nowned = g.nowned;
 	assert(ctx->id == g.id);
@@ -117,6 +120,13 @@ void load_graph_CUDA(struct CUDA_Context *ctx, MarshalGraph &g) {
 	ctx->residual.zero_gpu();
 	ctx->value.alloc(graph.nnodes);
 	ctx->value.zero_gpu();
+	ctx->in_wl = WorklistT(graph.nedges);
+	ctx->out_wl = WorklistT(graph.nedges);
+	wl->num_in_items = -1;
+	wl->num_out_items = -1;
+	wl->in_items = ctx->in_wl.wl;
+	wl->out_items = ctx->out_wl.wl;
+	ctx->shared_wl = wl;
 	ctx->p_retval = Shared<int>(1);
 	printf("load_graph_GPU: %d owned nodes of total %d resident, %d edges\n", ctx->nowned, graph.nnodes, graph.nedges);
 }
