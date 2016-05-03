@@ -222,7 +222,7 @@ int main(int argc, char** argv) {
 
     LonestarStart(argc, argv, name, desc, url);
     auto& net = Galois::Runtime::getSystemNetworkInterface();
-    Galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_pageRank;
+    Galois::Timer T_total, T_hGraph_init, T_init, T_pageRank;
 
 #ifdef __GALOIS_HET_CUDA__
     const unsigned my_host_id = Galois::Runtime::getHostID();
@@ -262,11 +262,6 @@ int main(int argc, char** argv) {
 #endif
 
     T_total.start();
-
-    T_offlineGraph_init.start();
-    OfflineGraph g(inputFile);
-    T_offlineGraph_init.stop();
-    std::cout << g.size() << " " << g.sizeEdges() << "\n";
 
     T_hGraph_init.start();
 #ifndef __GALOIS_HET_CUDA__
@@ -315,7 +310,7 @@ int main(int argc, char** argv) {
 
     T_total.stop();
 
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " PageRank (" << maxIterations << ") : " << T_pageRank.get() << "(msec)\n\n";
+    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " PageRank (" << maxIterations << ") : " << T_pageRank.get() << "(msec)\n\n";
 
     // Verify
     if(verify){
