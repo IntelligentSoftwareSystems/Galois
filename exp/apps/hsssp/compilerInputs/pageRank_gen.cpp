@@ -77,6 +77,8 @@ static cll::opt<Personality> personality("personality", cll::desc("Personality")
       cll::values(clEnumValN(CPU, "cpu", "Galois CPU"), clEnumValN(GPU_CUDA, "gpu/cuda", "GPU/CUDA"), clEnumValN(GPU_OPENCL, "gpu/opencl", "GPU/OpenCL"), clEnumValEnd),
       cll::init(CPU));
 static cll::opt<std::string> personality_set("pset", cll::desc("String specifying personality for each host. 'c'=CPU,'g'=GPU/CUDA and 'o'=GPU/OpenCL"), cll::init(""));
+static cll::opt<unsigned> scalegpu("scalegpu", cll::desc("Scale GPU workload w.r.t. CPU, default is proportionally equal workload to CPU and GPU (1)"), cll::init(1));
+static cll::opt<unsigned> scalecpu("scalecpu", cll::desc("Scale CPU workload w.r.t. GPU, default is proportionally equal workload to CPU and GPU (1)"), cll::init(1));
 #endif
 
 
@@ -183,6 +185,13 @@ int main(int argc, char** argv) {
       }
 #endif
     }
+    std::vector<unsigned> scalefactor;
+    for (unsigned i=0; i<personality_set.length(); ++i) {
+      if (personality_set.c_str()[i] == 'c') 
+        scalefactor.push_back(scalecpu);
+      else
+        scalefactor.push_back(scalegpu);
+    }
 #endif
 
     T_total.start();
@@ -193,8 +202,10 @@ int main(int argc, char** argv) {
     std::cout << g.size() << " " << g.sizeEdges() << "\n";
 
     T_hGraph_init.start();
+#ifndef __GALOIS_HET_CUDA__
     Graph hg(inputFile, net.ID, net.Num);
-#ifdef __GALOIS_HET_CUDA__
+#else
+    Graph hg(inputFile, net.ID, net.Num, scalefactor);
     if (personality == GPU_CUDA) {
       cuda_ctx = get_CUDA_context(my_host_id);
       if (!init_CUDA_context(cuda_ctx, gpu_device))
