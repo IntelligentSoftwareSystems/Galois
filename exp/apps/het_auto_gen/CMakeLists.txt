@@ -4,22 +4,43 @@
 
 cuda_add_library(het_auto_gen_cuda gen_cuda.cu)
 target_link_libraries(het_auto_gen_cuda ggrt)
-
 app(het_auto_gen gen.cpp DISTSAFE)
 target_compile_definitions(het_auto_gen PRIVATE __GALOIS_HET_CUDA__=1)
 target_link_libraries(het_auto_gen het_auto_gen_cuda)
 
 cuda_add_library(prpush_het_auto_gen_cuda pagerankpush/gen_cuda.cu)
 target_link_libraries(prpush_het_auto_gen_cuda ggrt)
-
 app(prpush_het_auto_gen pagerankpush/gen.cpp DISTSAFE)
 target_compile_definitions(prpush_het_auto_gen PRIVATE __GALOIS_HET_CUDA__=1)
 target_link_libraries(prpush_het_auto_gen prpush_het_auto_gen_cuda)
 
-cuda_add_library(prwl_het_auto_gen_cuda pagerankwl/gen_cuda.cu)
-target_link_libraries(prwl_het_auto_gen_cuda ggrt)
+cuda_add_library(prpushwl_het_auto_gen_cuda pagerankpushwl/gen_cuda.cu)
+target_link_libraries(prpushwl_het_auto_gen_cuda ggrt)
+app(prpushwl_het_auto_gen pagerankpushwl/gen.cpp DISTSAFE)
+target_compile_definitions(prpushwl_het_auto_gen PRIVATE __GALOIS_HET_CUDA__=1)
+target_link_libraries(prpushwl_het_auto_gen prpushwl_het_auto_gen_cuda)
 
-app(prwl_het_auto_gen pagerankwl/gen.cpp DISTSAFE)
-target_compile_definitions(prwl_het_auto_gen PRIVATE __GALOIS_HET_CUDA__=1)
-target_link_libraries(prwl_het_auto_gen prwl_het_auto_gen_cuda)
+cuda_add_library(prpush_vcut_het_auto_gen_cuda pagerankpush_vcut/gen_cuda.cu)
+target_link_libraries(prpush_vcut_het_auto_gen_cuda ggrt)
+app(prpush_vcut_het_auto_gen pagerankpush_vcut/gen.cpp DISTSAFE)
+target_compile_definitions(prpush_vcut_het_auto_gen PRIVATE __GALOIS_HET_CUDA__=1)
+target_link_libraries(prpush_vcut_het_auto_gen prpush_vcut_het_auto_gen_cuda)
+
+cuda_add_library(prpull_het_auto_gen_cuda pagerankpull/gen_cuda.cu)
+target_link_libraries(prpull_het_auto_gen_cuda ggrt)
+app(prpull_het_auto_gen pagerankpull/gen.cpp DISTSAFE)
+target_compile_definitions(prpull_het_auto_gen PRIVATE __GALOIS_HET_CUDA__=1)
+target_link_libraries(prpull_het_auto_gen prpull_het_auto_gen_cuda)
+
+cuda_add_library(prpullwl_het_auto_gen_cuda pagerankpullwl/gen_cuda.cu)
+target_link_libraries(prpullwl_het_auto_gen_cuda ggrt)
+app(prpullwl_het_auto_gen pagerankpullwl/gen.cpp DISTSAFE)
+target_compile_definitions(prpullwl_het_auto_gen PRIVATE __GALOIS_HET_CUDA__=1)
+target_link_libraries(prpullwl_het_auto_gen prpullwl_het_auto_gen_cuda)
+
+cuda_add_library(prpull_vcut_het_auto_gen_cuda pagerankpull_vcut/gen_cuda.cu)
+target_link_libraries(prpull_vcut_het_auto_gen_cuda ggrt)
+app(prpull_vcut_het_auto_gen pagerankpull_vcut/gen.cpp DISTSAFE)
+target_compile_definitions(prpull_vcut_het_auto_gen PRIVATE __GALOIS_HET_CUDA__=1)
+target_link_libraries(prpull_vcut_het_auto_gen prpull_vcut_het_auto_gen_cuda)
 

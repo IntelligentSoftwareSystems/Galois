@@ -38,9 +38,10 @@
 #include "Galois/DistAccumulator.h"
 
 #ifdef __GALOIS_HET_CUDA__
-#include "Galois/Cuda/cuda_mtypes.h"
+#include "Galois/Dist/DistBag.h"
 #include "gen_cuda.h"
 struct CUDA_Context *cuda_ctx;
+struct CUDA_Worklist cuda_wl;
 #endif
 
 static const char* const name = "PageRank - Compiler Generated Distributed Heterogeneous";
@@ -114,14 +115,10 @@ struct PageRank_pull {
 
   PageRank_pull(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph) {
-    do{
-      DGAccumulator_accum.reset();
-      Galois::do_all(_graph.begin(), _graph.end(), PageRank_pull { &_graph }, Galois::loopname("pageRank"));
-    } while (DGAccumulator_accum.reduce());
+    Galois::for_each(_graph.begin(), _graph.end(), PageRank_pull { &_graph },Galois::workList_version(), Galois::loopname("pageRank"));
   }
 
-  static Galois::DGAccumulator<int> DGAccumulator_accum;
-  void operator()(GNode src)const {
+  void operator()(GNode src, Galois::UserContext<GNode>& ctx)const {
     PR_NodeData& sdata = graph->getData(src);
     float sum = 0;
     for(auto nbr = graph->edge_begin(src); nbr != graph->edge_end(src); ++nbr){
@@ -138,11 +135,10 @@ struct PageRank_pull {
 
     if(diff > tolerance){
       sdata.value = pr_value; 
-      DGAccumulator_accum+= 1;
+      ctx.push(graph->getGID(src));
     }
   }
 };
-Galois::DGAccumulator<int>  PageRank_pull::DGAccumulator_accum;
 
 int main(int argc, char** argv) {
   try {
@@ -200,7 +196,7 @@ int main(int argc, char** argv) {
       if (!init_CUDA_context(cuda_ctx, gpu_device))
         return -1;
       MarshalGraph m = hg.getMarshalGraph(my_host_id);
-      load_graph_CUDA(cuda_ctx, m);
+      load_graph_CUDA(cuda_ctx, &cuda_wl, m);
     } else if (personality == GPU_OPENCL) {
       //Galois::OpenCL::cl_env.init(cldevice.Value);
     }

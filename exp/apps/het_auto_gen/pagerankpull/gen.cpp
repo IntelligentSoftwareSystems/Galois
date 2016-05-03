@@ -90,16 +90,84 @@ typedef hGraph<PR_NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
 
 struct InitializeGraph {
+  const float &local_alpha;
   Graph* graph;
 
-  InitializeGraph(Graph* _graph) : graph(_graph){}
+  InitializeGraph(const float &_alpha, Graph* _graph) : local_alpha(_alpha), graph(_graph){}
   void static go(Graph& _graph) {
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ &_graph }, Galois::loopname("Init"));
+    	struct Syncer_0 {
+    		static int extract(uint32_t node_id, const struct PR_NodeData & node) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) return get_node_nout_cuda(cuda_ctx, node_id);
+    			assert (personality == CPU);
+    		#endif
+    			return node.nout;
+    		}
+    		static void reduce (uint32_t node_id, struct PR_NodeData & node, int y) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) add_node_nout_cuda(cuda_ctx, node_id, y);
+    			else if (personality == CPU)
+    		#endif
+    				{ Galois::atomicAdd(node.nout, y);}
+    		}
+    		static void reset (uint32_t node_id, struct PR_NodeData & node ) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) set_node_nout_cuda(cuda_ctx, node_id, 0);
+    			else if (personality == CPU)
+    		#endif
+    				{node.nout = 0 ; }
+    		}
+    		typedef int ValTy;
+    	};
+    	struct SyncerPull_0 {
+    		static int extract(uint32_t node_id, const struct PR_NodeData & node) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) return get_node_value_cuda(cuda_ctx, node_id);
+    			assert (personality == CPU);
+    		#endif
+    			return node.value;
+    		}
+    		static void setVal (uint32_t node_id, struct PR_NodeData & node, int y ) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) set_node_value_cuda(cuda_ctx, node_id, y);
+    			else if (personality == CPU)
+    		#endif
+    				{node.value = y ; }
+    		}
+    		typedef float ValTy;
+    	};
+    	struct SyncerPull_1 {
+    		static int extract(uint32_t node_id, const struct PR_NodeData & node) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) return get_node_nout_cuda(cuda_ctx, node_id);
+    			assert (personality == CPU);
+    		#endif
+    			return node.nout;
+    		}
+    		static void setVal (uint32_t node_id, struct PR_NodeData & node, int y ) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) set_node_nout_cuda(cuda_ctx, node_id, y);
+    			else if (personality == CPU)
+    		#endif
+    				{node.nout = y ; }
+    		}
+    		typedef int ValTy;
+    	};
+    #ifdef __GALOIS_HET_CUDA__
+    	if (personality == GPU_CUDA) {
+    		InitializeGraph_cuda(alpha, cuda_ctx);
+    	} else if (personality == CPU)
+    #endif
+    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ alpha, &_graph }, Galois::loopname("Init"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "nout", "int" , "{ Galois::atomicAdd(node.nout, y);}",  "{node.nout = 0 ; }"));
+    _graph.sync_push<Syncer_0>();
+    _graph.sync_pull<SyncerPull_0>();
+    _graph.sync_pull<SyncerPull_1>();
+    
   }
 
   void operator()(GNode src) const {
     PR_NodeData& sdata = graph->getData(src);
-    sdata.value = 1.0 - alpha;
+    sdata.value = 1.0 - local_alpha;
     for(auto nbr = graph->edge_begin(src); nbr != graph->edge_end(src); ++nbr){
       GNode dst = graph->getEdgeDst(nbr);
       PR_NodeData& ddata = graph->getData(dst);
@@ -110,13 +178,40 @@ struct InitializeGraph {
 
 
 struct PageRank_pull {
+  const float &local_alpha;
+  const float &local_tolerance;
   Graph* graph;
 
-  PageRank_pull(Graph* _graph) : graph(_graph){}
+  PageRank_pull(const float &_tolerance, const float &_alpha, Graph* _graph) : local_tolerance(_tolerance), local_alpha(_alpha), graph(_graph){}
   void static go(Graph& _graph) {
     do{
       DGAccumulator_accum.reset();
-      Galois::do_all(_graph.begin(), _graph.end(), PageRank_pull { &_graph }, Galois::loopname("pageRank"));
+    	struct SyncerPull_0 {
+    		static int extract(uint32_t node_id, const struct PR_NodeData & node) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) return get_node_value_cuda(cuda_ctx, node_id);
+    			assert (personality == CPU);
+    		#endif
+    			return node.value;
+    		}
+    		static void setVal (uint32_t node_id, struct PR_NodeData & node, int y ) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) set_node_value_cuda(cuda_ctx, node_id, y);
+    			else if (personality == CPU)
+    		#endif
+    				{node.value = y ; }
+    		}
+    		typedef float ValTy;
+    	};
+      #ifdef __GALOIS_HET_CUDA__
+      	if (personality == GPU_CUDA) {
+      		int __retval = 0;
+      		PageRank_pull_cuda(__retval, alpha, tolerance, cuda_ctx);
+      		DGAccumulator_accum += __retval;
+      	} else if (personality == CPU)
+      #endif
+      Galois::do_all(_graph.begin(), _graph.end(), PageRank_pull { tolerance, alpha, &_graph }, Galois::loopname("pageRank"));
+      _graph.sync_pull<SyncerPull_0>();
     } while (DGAccumulator_accum.reduce());
   }
 
@@ -133,10 +228,10 @@ struct PageRank_pull {
       }
     }
 
-    float pr_value = sum*(1.0 - alpha) + alpha;
+    float pr_value = sum*(1.0 - local_alpha) + local_alpha;
     float diff = std::fabs(pr_value - sdata.value);
 
-    if(diff > tolerance){
+    if(diff > local_tolerance){
       sdata.value = pr_value; 
       DGAccumulator_accum+= 1;
     }
