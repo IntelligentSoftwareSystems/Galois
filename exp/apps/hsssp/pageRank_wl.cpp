@@ -97,6 +97,7 @@ struct InitializeGraph {
   void operator()(GNode src) const {
     PR_NodeData& sdata = graph->getData(src);
     sdata.value = 1.0 - alpha;
+    sdata.residual = 0.0;
     sdata.nout = std::distance(graph->edge_begin(src), graph->edge_end(src));
 
     if(sdata.nout > 0 ){
@@ -135,11 +136,11 @@ struct PageRank {
       };
 
       Get_info_functor(GraphTy& _g): graph(_g){}
-      unsigned operator()(GNode n){
+      unsigned operator()(GNode n) const {
         return graph.getHostID(n);
       }
 
-      uint32_t getLocalID(GNode n){
+      uint32_t getLocalID(GNode n) const {
         return graph.getLID(n);
       }
 
@@ -152,6 +153,10 @@ struct PageRank {
         _g.sync_push<Syncer_0>();
         //_g.sync_pull<SyncerPull_0>();
       }
+
+      GNode getGNode(uint32_t local_id) const {
+              return GNode(graph.getGID(local_id));
+          }
     };
 
 

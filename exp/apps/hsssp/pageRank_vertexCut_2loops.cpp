@@ -254,12 +254,16 @@ int main(int argc, char** argv) {
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     Galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_pageRank1, T_pageRank2, T_pageRank3;
 
+    std::cout << "[ " << net.ID << " ] InputFile : " << inputFile << "\n";
+    std::cout << "[ " << net.ID << " ] PartFile : " << partFolder << "\n";
+
     T_total.start();
 
     T_offlineGraph_init.start();
     OfflineGraph g(inputFile);
     T_offlineGraph_init.stop();
     std::cout << g.size() << " " << g.sizeEdges() << "\n";
+
 
     T_hGraph_init.start();
     Graph hg(inputFile,partFolder,net.ID, net.Num);
