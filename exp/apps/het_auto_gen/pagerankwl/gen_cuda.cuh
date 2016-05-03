@@ -120,8 +120,8 @@ void load_graph_CUDA(struct CUDA_Context *ctx, struct CUDA_Worklist *wl, Marshal
 	ctx->residual.zero_gpu();
 	ctx->value.alloc(graph.nnodes);
 	ctx->value.zero_gpu();
-	ctx->in_wl = WorklistT(graph.nedges);
-	ctx->out_wl = WorklistT(graph.nedges);
+	ctx->in_wl = WorklistT(graph.nnodes);
+	ctx->out_wl = WorklistT(graph.nnodes);
 	wl->num_in_items = -1;
 	wl->num_out_items = -1;
 	wl->in_items = ctx->in_wl.wl;
