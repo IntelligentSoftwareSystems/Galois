@@ -341,9 +341,9 @@ public:
 
     OfflineGraph g(part_fileName);
     totalNodes = g.size();
-    std::cerr << "SIZE ::::  " << totalNodes << "\n";
+    std::cerr << "[" << id << "]" << "SIZE ::::  " << totalNodes << "\n";
     readMetaFile(part_metaFile, localToGlobalMap_meta);
-    std::cerr << "MAPSIZE : " << localToGlobalMap_meta.size() << "\n";
+    std::cerr << "[" << id << "]" << "MAPSIZE : " << localToGlobalMap_meta.size() << "\n";
     masterNodes.resize(numHosts);
     slaveNodes.resize(numHosts);
 
@@ -365,7 +365,7 @@ public:
     numOwned = g.size();//gid2host[id].second - gid2host[id].first;
 
     uint64_t numEdges = g.edge_begin(*g.end()) - g.edge_begin(*g.begin()); // depends on Offline graph impl
-    std::cerr << "Edge count Done " << numEdges << "\n";
+    std::cerr << "[" << id << "]" << "Edge count Done " << numEdges << "\n";
 
 
     uint32_t numNodes = numOwned;
