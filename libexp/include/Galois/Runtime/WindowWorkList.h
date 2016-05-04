@@ -207,48 +207,21 @@ public:
 
 };
 
+template <typename T, typename Cmp, typename PerThrdWL, typename Derived>
+class WindowWLbase: private boost::noncopyable {
 
-template <typename T, typename Cmp>
-class PQbasedWindowWL: private boost::noncopyable {
+protected:
 
   using dbg = Galois::Substrate::debug<0>;
-
-  // using PerThrdWL = Galois::PerThreadMinHeap<T, Cmp>;
-  using PerThrdWL = Galois::PerThreadSet<T, Cmp>;
 
   Cmp cmp;
   PerThrdWL m_wl;
 
-  const T& getTop (void) const {
-    assert (!m_wl.get ().empty ());
-    return *(m_wl.get ().begin ());
-  }
-
-  const T& getTop (const unsigned i) const {
-    assert (!m_wl[i].empty ());
-    return *(m_wl[i].begin ());
-  }
-
-  void pushImpl (const T& x) {
-    m_wl.get ().insert (x);
-    // m_wl.get ().push (x);
-  }
-
-  void pushImpl (const T& x, const unsigned owner) {
-    m_wl[owner].insert (x);
-    // m_wl.get ().push (x);
-  }
-
-  void popMin (void) {
-    m_wl.get ().erase (m_wl.get ().begin ());
-  }
 
 public:
-
-  explicit PQbasedWindowWL (const Cmp& cmp=Cmp ())
-    : cmp (cmp), m_wl (cmp) 
+  explicit WindowWLbase (const Cmp& cmp=Cmp ())
+    : cmp (cmp), m_wl (cmp)
   {
-    Substrate::gPrint("Using PQbasedWindowWL\n");
   }
 
 
@@ -272,8 +245,8 @@ public:
     for (unsigned i = 0; i < numT; ++i) {
 
       if (!m_wl[i].empty ()) {
-        if (!ret || cmp (getTop (i), *ret)) {
-          ret = &(getTop (i));
+        if (!ret || cmp (static_cast<const Derived*> (this)->getTop (i), *ret)) {
+          ret = &(static_cast<const Derived*> (this)->getTop (i));
         }
       }
     }
@@ -282,12 +255,12 @@ public:
   }
 
   void push (const T& x) {
-    pushImpl (x);
+    static_cast<Derived*> (this)->pushImpl (x);
   }
 
   void push (const T& x, const unsigned owner) {
     assert (owner < Galois::getActiveThreads ());
-    pushImpl (x, owner);
+    static_cast<Derived*> (this)->pushImpl (x, owner);
   }
 
   size_t initSize (void) const {
@@ -332,13 +305,13 @@ public:
 
           for (int i = 0; i < lim; ++i) {
             if (i == (lim - 1)) {
-              lastPop = getTop ();
+              lastPop = static_cast<Derived*> (this)->getTop ();
             }
 
-            dbg::print("Removing and adding to window: ", getTop ());
+            dbg::print("Removing and adding to window: ", static_cast<Derived*> (this)->getTop ());
 
-            workList.get ().push_back (wrap (getTop ()));
-            popMin();
+            workList.get ().push_back (wrap (static_cast<Derived*> (this)->getTop ()));
+            static_cast<Derived*> (this)->popMin();
           }
         }
         , "poll_part_1");
@@ -385,7 +358,7 @@ public:
           [this, &workList, &wrap, &windowLim] (const unsigned tid, const unsigned numT) {
 
             while (!m_wl.get ().empty ()) {
-              const T& t = getTop ();
+              const T& t = static_cast<Derived*> (this)->getTop ();
 
               if (cmp (*windowLim, t)) { // windowLim < t
                 break;
@@ -393,13 +366,13 @@ public:
 
               dbg::print("Removing and adding to window: ", t, ", windowLim: ", *windowLim);
               workList.get ().push_back (wrap (t));
-              popMin ();
+              static_cast<Derived*> (this)->popMin ();
             }
           }
           , "poll_part_2");
 
 
-      const T* min = getMin ();
+      const T* min = static_cast<Derived*> (this)->getMin ();
       if (min) {
         assert (cmp (*windowLim, *min));
       }
@@ -407,7 +380,7 @@ public:
 
       for (unsigned i = 0; i < numT; ++i) {
         if (!m_wl[i].empty ()) {
-          assert (cmp (*windowLim, getTop (i)) && "poll gone wrong");
+          assert (cmp (*windowLim, static_cast<Derived*> (this)->getTop (i)) && "poll gone wrong");
         }
       }
 
@@ -415,6 +388,95 @@ public:
     }
 
   }
+
+
+};
+
+template <typename T, typename Cmp>
+class PQwindowWL: public WindowWLbase<T, Cmp, PerThreadMinHeap<T, Cmp>, PQwindowWL<T, Cmp> > {
+
+
+  using PerThrdWL = Galois::PerThreadMinHeap<T, Cmp>;
+  using Base = WindowWLbase<T, Cmp, PerThrdWL, PQwindowWL>;
+
+  template <typename, typename, typename, typename> 
+  friend class WindowWLbase;
+
+  const T& getTop (void) const {
+    assert (!Base::m_wl.get ().empty ());
+    return Base::m_wl.get ().top ();
+  }
+
+  const T& getTop (const unsigned i) const {
+    assert (!Base::m_wl[i].empty ());
+    return Base::m_wl[i].top ();
+  }
+
+  void pushImpl (const T& x) {
+    Base::m_wl.get ().push (x);
+  }
+
+  void pushImpl (const T& x, const unsigned owner) {
+    Base::m_wl[owner].push (x);
+  }
+
+  void popMin (void) {
+    Base::m_wl.get ().pop ();
+  }
+
+public:
+
+  explicit PQwindowWL (const Cmp& cmp=Cmp ())
+    : Base (cmp)
+  {
+    Substrate::gPrint("Using PQwindowWL\n");
+  }
+
+
+};
+
+
+template <typename T, typename Cmp>
+class SetWindowWL: public WindowWLbase<T, Cmp, PerThreadSet<T, Cmp>, SetWindowWL<T, Cmp> > {
+
+
+  // using PerThrdWL = Galois::PerThreadMinHeap<T, Cmp>;
+  using PerThrdWL = Galois::PerThreadSet<T, Cmp>;
+  using Base = WindowWLbase<T, Cmp, PerThrdWL, SetWindowWL>;
+
+  template <typename, typename, typename, typename> 
+  friend class WindowWLbase;
+
+  const T& getTop (void) const {
+    assert (!Base::m_wl.get ().empty ());
+    return *(Base::m_wl.get ().begin ());
+  }
+
+  const T& getTop (const unsigned i) const {
+    assert (!Base::m_wl[i].empty ());
+    return *(Base::m_wl[i].begin ());
+  }
+
+  void pushImpl (const T& x) {
+    Base::m_wl.get ().insert (x);
+  }
+
+  void pushImpl (const T& x, const unsigned owner) {
+    Base::m_wl[owner].insert (x);
+  }
+
+  void popMin (void) {
+    Base::m_wl.get ().erase (Base::m_wl.get ().begin ());
+  }
+
+public:
+
+  explicit SetWindowWL (const Cmp& cmp=Cmp ())
+    : Base (cmp)
+  {
+    Substrate::gPrint("Using SetwindowWL\n");
+  }
+
 
 };
 

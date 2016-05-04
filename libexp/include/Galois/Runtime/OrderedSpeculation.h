@@ -602,7 +602,7 @@ class OrdSpecExecBase: public IKDGbase<T, Cmp, NhFunc, ExFunc, OpFunc, ArgsTuple
   using CtxtCmp = typename Ctxt::CtxtCmp;
   using CtxtWL = typename Base::CtxtWL;
 
-  using WindowWL = typename std::conditional<Base::NEEDS_PUSH, PQbasedWindowWL<Ctxt*, CtxtCmp>, SortedRangeWindowWL<Ctxt*, CtxtCmp> >::type;
+  using WindowWL = typename std::conditional<Base::NEEDS_PUSH, PQwindowWL<Ctxt*, CtxtCmp>, SortedRangeWindowWL<Ctxt*, CtxtCmp> >::type;
 
   using CommitQ = Galois::PerThreadVector<Ctxt*>;
   using ExecutionRecords = std::vector<ParaMeter::StepStats>;
@@ -631,6 +631,8 @@ class OrdSpecExecBase: public IKDGbase<T, Cmp, NhFunc, ExFunc, OpFunc, ArgsTuple
   GAccumulator<size_t> totalRetires;
   CommitQ commitQ;
   ExecutionRecords execRcrds;
+  TimeAccumulator t_beginRound;
+  TimeAccumulator t_expandNhood;
 
 
 public:
@@ -690,6 +692,8 @@ protected:
     reportStat (Base::loopname, "retired", totalRetires.reduce ());
     reportStat (Base::loopname, "efficiency%", double (100 * totalRetires.reduce ()) / Base::totalTasks);
     reportStat (Base::loopname, "avg. parallelism", double (totalRetires.reduce ()) / Base::rounds);
+    reportStat ("NULL", "t_expandNhood",    t_expandNhood.get ());
+    reportStat ("NULL", "t_beginRound",     t_beginRound.get ());
 
     if (Base::ENABLE_PARAMETER) {
       dumpParaMeterStats ();
@@ -766,12 +770,14 @@ protected:
 
     Ctxt* m = getMinWinWL ();
     if (m) {
-      // assert (Base::ctxtCmp (ctxt, m));
+      assert (Base::ctxtCmp (ctxt, m));
     }
   }
 
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void beginRound () {
+
+    t_beginRound.start ();
     
     Base::beginRound (winWL);
 
@@ -800,13 +806,17 @@ protected:
     }
     if (minWinWL) {
       dbg::print ("min Win WL: ", minWinWL, " with item: ", minWinWL->getActive ());
-      // assert (Base::ctxtCmp (maxCurrWL, minWinWL));
+      assert (Base::ctxtCmp (maxCurrWL, minWinWL));
     }
 
 #endif
+
+    t_beginRound.stop ();
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void expandNhood (void) {
+
+    t_expandNhood.start ();
 
     Galois::do_all_choice (makeLocalRange (Base::getCurrWL ()),
         [this] (Ctxt* c) {
@@ -830,6 +840,7 @@ protected:
           Galois::loopname ("expandNhood"),
           chunk_size<NhFunc::CHUNK_SIZE> ()));
 
+    t_expandNhood.stop ();
   }
 
 
@@ -838,6 +849,8 @@ protected:
     Base::ctxtAlloc.deallocate (ctxt, 1);
   }
 
+  // FOR DEBUGGING
+  /*
   Ctxt* computeGVT (void) {
 
     // t_computeGVT.start ();
@@ -885,6 +898,7 @@ protected:
     return ret;
 
   }
+  */
 };
 
 template <typename T, typename Cmp, typename NhFunc, typename ExFunc, typename  OpFunc, typename ArgsTuple>
@@ -906,11 +920,8 @@ protected:
   NItemFactory nitemFactory;
   NhoodMgr nhmgr;
 
-  TimeAccumulator t_expandNhood;
-  TimeAccumulator t_beginRound;
   TimeAccumulator t_executeSources;
   TimeAccumulator t_applyOperator;
-  TimeAccumulator t_computeGVT;
   TimeAccumulator t_serviceAborts;
   TimeAccumulator t_performCommits;
   TimeAccumulator t_reclaimMemory;
@@ -925,11 +936,8 @@ public:
   }
 
   ~OptimOrdExecutor (void) {
-    reportStat ("NULL", "t_expandNhood",    t_expandNhood.get ());
-    reportStat ("NULL", "t_beginRound",     t_beginRound.get ());
     reportStat ("NULL", "t_executeSources", t_executeSources.get ());
     reportStat ("NULL", "t_applyOperator",  t_applyOperator.get ());
-    reportStat ("NULL", "t_computeGVT",     t_computeGVT.get ());
     reportStat ("NULL", "t_serviceAborts",  t_serviceAborts.get ());
     reportStat ("NULL", "t_performCommits", t_performCommits.get ());
     reportStat ("NULL", "t_reclaimMemory",  t_reclaimMemory.get ());
@@ -957,15 +965,25 @@ public:
 
       Base::expandNhood ();
 
+      t_serviceAborts.start ();
       serviceAborts (sources);
+      t_serviceAborts.stop ();
 
+      t_executeSources.start ();
       executeSources (sources);
+      t_executeSources.stop ();
 
+      t_applyOperator.start ();
       applyOperator (sources);
+      t_applyOperator.stop ();
 
+      t_performCommits.start ();
       performCommits ();
+      t_performCommits.stop ();
 
+      t_reclaimMemory.start ();
       reclaimMemory (sources);
+      t_reclaimMemory.stop ();
 
       Base::endRound ();
 
@@ -982,8 +1000,6 @@ private:
     if (Base::HAS_EXEC_FUNC) {
 
 
-      t_executeSources.start ();
-
       Galois::do_all_choice (makeLocalRange (sources),
         [this] (Ctxt* ctxt) {
           assert (ctxt->isSrc ());
@@ -996,13 +1012,10 @@ private:
           Galois::loopname ("executeSources"),
           Galois::chunk_size<ExFunc::CHUNK_SIZE> ()));
 
-      t_executeSources.stop ();
     }
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void applyOperator (CtxtWL& sources) {
-    t_applyOperator.start ();
-
 
     Ctxt* minWinWL = Base::getMinWinWL ();
 
@@ -1070,8 +1083,6 @@ private:
           Galois::loopname ("applyOperator"),
           Galois::chunk_size<OpFunc::CHUNK_SIZE> ()));
 
-    t_applyOperator.stop ();
-
   }
 
 
@@ -1092,8 +1103,6 @@ private:
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void serviceAborts (CtxtWL& sources) {
 
-    t_serviceAborts.start ();
-    
     CtxtWL abortWL;
 
     Galois::do_all_choice (makeLocalRange (Base::getCurrWL ()),
@@ -1162,13 +1171,9 @@ private:
           Galois::loopname ("collect-sources"),
           Galois::chunk_size<Base::DEFAULT_CHUNK_SIZE> ()));
 
-    t_serviceAborts.stop ();
-
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void performCommits () {
-
-    t_performCommits.start ();
 
     CtxtWL commitSources;
 
@@ -1235,9 +1240,6 @@ private:
           Galois::does_not_need_aborts_tag (),
           Galois::wl<Galois::WorkList::dChunkedFIFO<Base::DEFAULT_CHUNK_SIZE> > ()));
 
-    t_performCommits.stop ();
-
-
   }
 
   void freeCtxt (Ctxt* ctxt) {
@@ -1246,8 +1248,6 @@ private:
   }
 
   void reclaimMemory (CtxtWL& sources) {
-
-    t_reclaimMemory.start ();
 
     sources.clear_all_parallel ();
 
@@ -1280,8 +1280,6 @@ private:
 
           localQ.erase (new_end, localQ.end ());
         });
-
-    t_reclaimMemory.stop ();
 
   }
 
@@ -1429,7 +1427,7 @@ class PessimOrdExecutor: public OrdSpecExecBase<T, Cmp, NhFunc, ExFunc, OpFunc, 
 
 protected:
 
-  friend struct PessimOrdContext<T, Cmp, PessimOrdExecutor>;
+  friend class PessimOrdContext<T, Cmp, PessimOrdExecutor>;
   using Ctxt = PessimOrdContext<T, Cmp, PessimOrdExecutor>;
   using Base = OrdSpecExecBase<T, Cmp, NhFunc, ExFunc, OpFunc, ArgsTuple, Ctxt>;
 
@@ -1437,6 +1435,11 @@ protected:
   using CtxtWL = typename Base::CtxtWL;
 
   CtxtWL abortWL;
+
+  TimeAccumulator t_executeSources;
+  TimeAccumulator t_applyOperator;
+  TimeAccumulator t_serviceAborts;
+  TimeAccumulator t_performCommits;
 
 public:
 
@@ -1446,12 +1449,23 @@ public:
   {
   }
 
+  ~PessimOrdExecutor (void) {
+    reportStat ("NULL", "t_executeSources", t_executeSources.get ());
+    reportStat ("NULL", "t_applyOperator",  t_applyOperator.get ());
+    reportStat ("NULL", "t_serviceAborts",  t_serviceAborts.get ());
+    reportStat ("NULL", "t_performCommits", t_performCommits.get ());
+  }
+
   void markForAbort (Ctxt* c) {
     assert (c);
     abortWL.push (c);
   }
 
   void execute (void) {
+    StatTimer t ("executorLoop");
+
+    t.start ();
+
     while (true) {
 
       Base::beginRound ();
@@ -1462,17 +1476,27 @@ public:
 
       Base::expandNhood ();
 
+      t_serviceAborts.start ();
       serviceAborts ();
+      t_serviceAborts.stop ();
 
+      t_executeSources.start ();
       executeSources ();
+      t_executeSources.stop ();
 
+      t_applyOperator.start ();
       applyOperator ();
+      t_applyOperator.stop ();
 
+      t_performCommits.start ();
       performCommits ();
+      t_performCommits.stop ();
 
       Base::endRound ();
 
     }
+
+    t.stop ();
 
   }
 
