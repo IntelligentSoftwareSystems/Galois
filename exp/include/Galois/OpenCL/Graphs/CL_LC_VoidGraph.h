@@ -7,9 +7,9 @@
 #include "Galois/OpenCL/CL_Header.h"
 #include "Galois/OpenCL/CL_Kernel.h"
 #include <boost/iterator/counting_iterator.hpp>
-#include "Galois/Dist/hGraph.h"
-#ifndef _GDIST_EXP_INCLUDE_OPENCL_CL_LC_VOID_Graph_H_
-#define _GDIST_EXP_INCLUDE_OPENCL_CL_LC_VOID_Graph_H_
+//#include "Galois/Dist/hGraph.h"
+#ifndef _GDIST_CL_LC_VOID_Graph_H_
+#define _GDIST_CL_LC_VOID_Graph_H_
 
 namespace Galois {
    namespace OpenCL {
@@ -232,6 +232,7 @@ namespace Galois {
                int err;
                auto id = *it;
                cl_command_queue queue = ctx->get_default_device()->command_queue();
+//               fprintf(stderr,  "Data read[%d], offset=%d  \n", id, sizeof(NodeDataType) * id);
                err = clEnqueueReadBuffer(queue, gpu_wrapper.node_data, CL_TRUE, sizeof(NodeDataType)*(id), sizeof(NodeDataType), &data, 0, NULL, NULL);
 //               fprintf(stderr,  "Data read[%d], offset=%d :: val=%d \n", id, sizeof(NodeDataType) * id, data.dist_current);
                CHECK_CL_ERROR(err, "Error reading node-data 0\n");
@@ -277,6 +278,7 @@ namespace Galois {
                gpu_struct_ptr = gpu_meta= nullptr;
 
             }
+            template<typename HGraph>
             CL_LC_Graph(std::string filename, unsigned myid, unsigned numHost) :
             SizeEdgeData(0), SizeNodeData(sizeof(NodeDataType) / sizeof(unsigned int)) {
                //      fprintf(stderr, "Created LC_LinearArray_Graph with %d node %d edge data.", (int) SizeNodeData, (int) SizeEdgeData);
@@ -286,9 +288,21 @@ namespace Galois {
                outgoing_index=neighbors=nullptr;
                node_data =nullptr;
                gpu_struct_ptr = gpu_meta= nullptr;
-               hGraph<NodeDataType, void> g(filename, myid, numHost);
+//               hGraph<NodeDataType, void> g(filename, myid, numHost);
+               HGraph g(filename, myid, numHost);
                fprintf(stderr, "Loading from hgraph\n");
                load_from_galois(g);
+            }
+            template<typename HGraph>
+            void load_from_hgraph(HGraph/*<NodeDataType,void> */& hg) {
+               fprintf(stderr, "Loading device-graph from hGraph with copy-optimization.\n");
+               _max_degree = _num_nodes = _num_edges = 0;
+               _num_owned = _global_offset = 0;
+               outgoing_index=neighbors=nullptr;
+               node_data =nullptr;
+               gpu_struct_ptr = gpu_meta= nullptr;
+               fprintf(stderr, "Loading from hgraph\n");
+               load_from_galois(hg);
             }
             /******************************************************************
              *
@@ -315,18 +329,21 @@ namespace Galois {
                      edge_counter++;
                   }
                }
+               while(node_counter!=gg_num_nodes)
+                    outgoing_index[node_counter++] = edge_counter;
+              outgoing_index[gg_num_nodes] = edge_counter;
                outgoing_index[gg_num_nodes] = edge_counter;
                fprintf(stderr, "Debug :: %d %d \n", node_counter, edge_counter);
                if (node_counter != gg_num_nodes)
                fprintf(stderr, "FAILED EDGE-COMPACTION :: %d, %zu\n", node_counter, gg_num_nodes);
                assert(edge_counter == gg_num_edges && "Failed to add all edges.");
                init_graph_struct();
-               fprintf(stderr, "Loaded from GaloisGraph [V=%zu,E=%zu,ND=%lu,ED=%lu].\n", gg_num_nodes, gg_num_edges, sizeof(NodeDataType), 0);
+               fprintf(stderr, "Loaded from GaloisGraph [V=%zu,E=%zu,ND=%lu,ED=%lu, Owned=%lu, Offset=%lu].\n", gg_num_nodes, gg_num_edges, sizeof(NodeDataType), 0, _num_owned, _global_offset);
             }
             /******************************************************************
              *
              *******************************************************************/
-           template<typename GaloisGraph>
+            template<typename GaloisGraph>
             void writeback_from_galois(GaloisGraph & ggraph) {
                typedef typename GaloisGraph::GraphNode GNode;
                const size_t gg_num_nodes = ggraph.size();
@@ -342,9 +359,9 @@ namespace Galois {
                }
                fprintf(stderr, "Writeback from GaloisGraph [V=%zu,E=%zu,ND=%lu,ED=%lu].\n", gg_num_nodes, gg_num_edges, sizeof(NodeDataType), 0);
             }
-           /******************************************************************
-            *
-            *******************************************************************/
+            /******************************************************************
+             *
+             *******************************************************************/
             //TODO RK : fix - might not work with changes in interface.
             template<typename GaloisGraph>
             void load_from_galois(GaloisGraph & ggraph, int gg_num_nodes, int gg_num_edges, int num_ghosts) {
@@ -545,8 +562,6 @@ namespace Galois {
                err = clReleaseMemObject(gpu_wrapper.node_data );
                CHECK_CL_ERROR(err, "Error: clReleaseMemObject of SVM - 1\n");
                err= clReleaseMemObject(gpu_wrapper.neighbors);
-               CHECK_CL_ERROR(err, "Error: clReleaseMemObject of SVM - 2\n");
-               err= clReleaseMemObject( gpu_wrapper.edge_data );
                CHECK_CL_ERROR(err, "Error: clReleaseMemObject of SVM - 3\n");
                err= clReleaseMemObject(gpu_struct_ptr);
                CHECK_CL_ERROR(err, "Error: clReleaseMemObject of SVM - 4\n");
@@ -636,4 +651,4 @@ namespace Galois {
    }            //Namespace OpenCL
 }            //Namespace Galois
 
-#endif /* _GDIST_EXP_INCLUDE_OPENCL_CL_LC_VOID_Graph_H_ */
+#endif /* _GDIST_CL_LC_VOID_Graph_H_ */

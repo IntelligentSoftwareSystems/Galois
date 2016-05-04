@@ -61,20 +61,20 @@ typedef GraphType::iterator NodeItType;
 /******************************************************************
  *
  *****************************************************************/
-std::string getPartitionFileName(std::string & basename, size_t hostID, size_t num_hosts){
+std::string getPartitionFileName(std::string & basename, size_t hostID, size_t num_hosts) {
    std::string result = basename;
-   result+= ".PART.";
-   result+=std::to_string(hostID);
-   result+= ".OF.";
-   result+=std::to_string(num_hosts);
+   result += ".PART.";
+   result += std::to_string(hostID);
+   result += ".OF.";
+   result += std::to_string(num_hosts);
    return result;
 }
-std::string getMetaFileName(std::string & basename, size_t hostID, size_t num_hosts){
+std::string getMetaFileName(std::string & basename, size_t hostID, size_t num_hosts) {
    std::string result = basename;
-   result+= ".META.";
-   result+=std::to_string(hostID);
-   result+= ".OF.";
-   result+=std::to_string(num_hosts);
+   result += ".META.";
+   result += std::to_string(hostID);
+   result += ".OF.";
+   result += std::to_string(num_hosts);
    return result;
 }
 /******************************************************************
@@ -83,15 +83,12 @@ std::string getMetaFileName(std::string & basename, size_t hostID, size_t num_ho
 struct VertexCutInfo {
    std::vector<size_t> edgeOwners;
    std::vector<size_t> edgesPerHost;
-   std::map<NodeItType, std::set<size_t>> vertexOwners;
    std::vector<std::vector<size_t>> verticesPerHost;
-   std::vector<std::map<size_t, size_t>> hostGlobalToLocalMapping;
 
    void init(size_t ne, size_t numHosts) {
       edgeOwners.resize(ne);
       verticesPerHost.resize(numHosts);
       edgesPerHost.resize(numHosts);
-      hostGlobalToLocalMapping.resize(numHosts);
    }
    /*
     *
@@ -101,14 +98,6 @@ struct VertexCutInfo {
       auto dst = g.getEdgeDst(e);
       edgeOwners[eIdx] = owner;
       edgesPerHost[owner]++;
-      if (vertexOwners[src].insert(owner).second) {
-         verticesPerHost[owner].push_back(*src);
-         hostGlobalToLocalMapping[owner][*src] = verticesPerHost[owner].size() - 1;
-      }
-      if (vertexOwners[dst].insert(owner).second) {
-         verticesPerHost[owner].push_back(dst);
-         hostGlobalToLocalMapping[owner][dst] = verticesPerHost[owner].size() - 1;
-      }
    }
    size_t getEdgeOwner(OfflineGraph & g, EdgeItType & e) const {
       size_t eIdx = std::distance(g.edge_begin(*g.begin()), e);
@@ -129,8 +118,7 @@ struct Partitioner {
     * Partitioning routine.
     * */
    void operator()(std::string & basename, OfflineGraph & g, VertexCutInfo & vcInfo, size_t num_hosts) {
-//      const int num_hosts = 4;
-      std::cout << "Partitioning for " << num_hosts << " partitions.\n";
+      std::cout << "Partitioning: |V|= "<< g.size() << " , |E|= " << g.sizeEdges() << " |P|= " << num_hosts << "\n";
       vcInfo.init(g.sizeEdges(), num_hosts);
       for (auto n = g.begin(); n != g.end(); ++n) {
          auto src = *n;
@@ -140,39 +128,40 @@ struct Partitioner {
             vcInfo.assignEdge(g, n, nbr, owner);
          }
       }
-      assignVertices(g, vcInfo, num_hosts);
-      writePartitions(basename, g, vcInfo, num_hosts);
+//      assignVertices(g, vcInfo, num_hosts);
+      writePartitionsMem(basename, g, vcInfo, num_hosts);
    }
    /*
     * Edges have been assigned. Now, go over each partition, for any vertex in the partition
     * create a new local-id, and update all the edges to the new local-ids.
     * */
-   void assignVertices(OfflineGraph & g, VertexCutInfo & vcInfo, size_t num_hosts) {
-      size_t verticesSum = 0;
-      if(false){
-         for (size_t h = 0; h < num_hosts; ++h) {
-            for (size_t v = 0; v < vcInfo.verticesPerHost[h].size(); ++v) {
-               auto vertex = vcInfo.verticesPerHost[h][v];
-               std::cout << "Host " << h << " Mapped Global:: " << vertex << " to Local:: " << vcInfo.hostGlobalToLocalMapping[h][vertex] << "\n";
-            }
-         }
-
-      }
-      std::vector<size_t> hostVertexCounters(num_hosts);
-      for (auto i : vcInfo.vertexOwners) {
-         verticesSum += i.second.size();
-      }
-      for (size_t i = 0; i < num_hosts; ++i) {
-         std::cout << "Host :: " << i << " , Vertices:: " << vcInfo.verticesPerHost[i].size() << ", Edges:: " << vcInfo.edgesPerHost[i] << "\n";
-      }
-      std::cout << "Vertices - Created ::" << verticesSum << " , Actual :: " << g.size() << ", Ratio:: " << verticesSum / (float) (g.size()) << "\n";
-   }
+//   void assignVertices(OfflineGraph & g, VertexCutInfo & vcInfo, size_t num_hosts) {
+//      size_t verticesSum = 0;
+//      if (false) {
+//         for (size_t h = 0; h < num_hosts; ++h) {
+//            for (size_t v = 0; v < vcInfo.verticesPerHost[h].size(); ++v) {
+//               auto vertex = vcInfo.verticesPerHost[h][v];
+//               std::cout << "Host " << h << " Mapped Global:: " << vertex << " to Local:: " << vcInfo.hostGlobalToLocalMapping[h][vertex] << "\n";
+//            }
+//         }
+//
+//      }
+//      std::vector<size_t> hostVertexCounters(num_hosts);
+//      for (auto i : vcInfo.vertexOwners) {
+//         verticesSum += i.second.size();
+//      }
+//      for (size_t i = 0; i < num_hosts; ++i) {
+//         std::cout << "Host :: " << i << " , Vertices:: " << vcInfo.verticesPerHost[i].size() << ", Edges:: " << vcInfo.edgesPerHost[i] << "\n";
+//      }
+//      std::cout << "Vertices - Created ::" << verticesSum << " , Actual :: " << g.size() << ", Ratio:: " << verticesSum / (float) (g.size()) << "\n";
+//   }
    /*
     * Write both the metadata as well as the partition information.
     * */
-   void writePartitions(std::string & basename, OfflineGraph & g, VertexCutInfo & vcInfo, size_t num_hosts) {
+  /* void writePartitions(std::string & basename, OfflineGraph & g, VertexCutInfo & vcInfo, size_t num_hosts) {
       //Create graph
       //TODO RK - Fix edgeData
+      std::cout << " Regular version\n";
       std::vector<std::vector<std::pair<size_t, size_t>>>newEdges(num_hosts);
       for (auto n = g.begin(); n != g.end(); ++n) {
          auto src = *n;
@@ -219,7 +208,89 @@ struct Partitioner {
          std::string gFileName = getPartitionFileName(basename, i, num_hosts);
          newGraph.toFile(gFileName);
       }
-   }
+   }*/
+   /*
+    * Optimized implementation for memory usage.
+    * Write both the metadata as well as the partition information.
+    * */
+   void writePartitionsMem(std::string & basename, OfflineGraph & g, VertexCutInfo & vcInfo, size_t num_hosts) {
+      //Create graph
+      //TODO RK - Fix edgeData
+      std::cout << " Low mem version\n";
+      std::vector<size_t> vertexOwners(g.size(), -1);
+      for (size_t h = 0; h < num_hosts; ++h) {
+         std::cout << "Building partition " << h << "...\n";
+         std::vector<size_t> global2Local(g.size(), -1);
+         size_t newNodeCounter = 0;
+         for (auto n = g.begin(); n != g.end(); ++n) {
+            auto src = *n;
+            for (auto e = g.edge_begin(*n); e != g.edge_end(*n); ++e) {
+               auto dst = g.getEdgeDst(e);
+               size_t owner = vcInfo.getEdgeOwner(g, e);
+               if (owner == h) {
+                  if (global2Local[src] == -1) {
+                     if (vertexOwners[src] == -1) {
+                        vertexOwners[src] = h;
+                     }
+                     global2Local[src] = newNodeCounter++;
+                  }
+                  if (global2Local[dst] == -1) {
+                     if (vertexOwners[dst] == -1) {
+                        vertexOwners[dst] = h;
+                     }
+                     global2Local[dst] = newNodeCounter++;
+                  }
+               }
+            }
+         }//For each node
+         std::vector<std::pair<size_t, size_t>> newEdges;
+         for (auto n = g.begin(); n != g.end(); ++n) {
+            auto src = *n;
+            for (auto e = g.edge_begin(*n); e != g.edge_end(*n); ++e) {
+               auto dst = g.getEdgeDst(e);
+               size_t owner = vcInfo.getEdgeOwner(g, e);
+               if (owner == h) {
+                  size_t new_src = global2Local[src];
+                  size_t new_dst = global2Local[dst];
+                  assert(new_src!=-1 && new_dst!=-1);
+                  newEdges.push_back(std::pair<size_t, size_t>(new_src, new_dst));
+               }      //End if
+            }      //End for neighbors
+         }      //end for nodes
+         std::cout << "Analysis :: " << newNodeCounter << " , " << newEdges.size () << "\n";
+         using namespace Galois::Graph;
+         FileGraphWriter newGraph;
+         newGraph.setNumNodes(newNodeCounter);
+         newGraph.setNumEdges(newEdges.size());
+         newGraph.phase1();
+         std::string meta_file_name = getMetaFileName(basename, h, num_hosts);
+         std::cout << "Writing meta-file " << h << " to disk..." << meta_file_name<< "\n";
+         std::ofstream meta_file(meta_file_name, std::ofstream::binary);
+         auto numEntries = newNodeCounter;
+         meta_file.write(reinterpret_cast<char*>(&(numEntries)), sizeof(numEntries));
+         for (size_t n = 0; n < g.size(); ++n) {
+            if (global2Local[n] != -1) {
+               auto owner = vertexOwners[n];
+               meta_file.write(reinterpret_cast<const char*>(&n), sizeof(n));
+               meta_file.write(reinterpret_cast<const char*>(&global2Local[n]), sizeof(global2Local[n]));
+               meta_file.write(reinterpret_cast<const char*>(&owner), sizeof(owner));
+            }
+         }
+
+         meta_file.close();
+         for (auto e : newEdges) {
+            newGraph.incrementDegree(e.first);
+         }
+         newGraph.phase2();
+         for (auto e : newEdges) {
+            newGraph.addNeighbor(e.first, e.second);
+         }
+         newGraph.finish<void>();
+         std::string gFileName = getPartitionFileName(basename, h, num_hosts);
+         std::cout << "Writing partition " << h << " to disk... " << gFileName<<"\n";
+         newGraph.toFile(gFileName);
+      }      //End for-hosts
+   }      //end writePartitionsMem method
 };
 
 /******************************************************************
@@ -247,8 +318,6 @@ bool verifyParitions(std::string & basename, OfflineGraph & g, size_t num_hosts)
    std::vector<std::map<size_t, NodeInfo>> hostLocalToGlobalMap(num_hosts);
    std::cout << "Verifying partitions...\n";
    for (int h = 0; h < num_hosts; ++h) {
-//      char meta_file_name[256];
-//      sprintf(meta_file_name, "partition_%d_of_%zu.gr.meta", h, num_hosts);
       std::string meta_file_name = getMetaFileName(basename, h, num_hosts);
       std::ifstream meta_file(meta_file_name, std::ifstream::binary);
       if (!meta_file.is_open()) {
@@ -257,7 +326,6 @@ bool verifyParitions(std::string & basename, OfflineGraph & g, size_t num_hosts)
       }
       size_t num_entries;
       meta_file.read(reinterpret_cast<char*>(&num_entries), sizeof(num_entries));
-//         meta_file>>num_entries;
       std::cout << "Partition :: " << h << " Number of nodes :: " << num_entries << "\n";
       for (size_t i = 0; i < num_entries; ++i) {
          std::pair<size_t, size_t> entry;
@@ -266,32 +334,30 @@ bool verifyParitions(std::string & basename, OfflineGraph & g, size_t num_hosts)
          meta_file.read(reinterpret_cast<char*>(&entry.second), sizeof(entry.second));
          meta_file.read(reinterpret_cast<char*>(&owner), sizeof(owner));
          hostLocalToGlobalMap[h][entry.second] = NodeInfo(entry.second, entry.first, owner);
-//         std::cout << " Global :: " << entry.first << " Local:: " << entry.second << " Owner:: " << owner << "\n";
       }
 
-//      char gFileName[256];
-//      sprintf(gFileName, "partition_%d_of_%zu.gr", h, num_hosts);
       std::string gFileName = getPartitionFileName(basename, h, num_hosts);
       pGraphs[h] = new OfflineGraph(gFileName);
    }      //End for each host.
 
    std::vector<size_t> nodeOwners(g.size());
-   for(auto & i : nodeOwners){
-      i=-1;
+   for (auto & i : nodeOwners) {
+      i = -1;
    }
    std::vector<size_t> outEdgeCounts(g.size());
    std::vector<size_t> inEdgeCounts(g.size());
    for (int h = 0; h < num_hosts; ++h) {
       auto & graph = *pGraphs[h];
+      std::cout << "Reading partition :: " << h << " w/ " << graph.size() << " nodes, and " << graph.sizeEdges() << " edges.\n";
       for (auto n = graph.begin(); n != graph.end(); ++n) {
          auto src = *n;
          assert(hostLocalToGlobalMap[h].find(src) != hostLocalToGlobalMap[h].end());
          auto g_src = hostLocalToGlobalMap[h][src].global_id;
          auto owner_src = hostLocalToGlobalMap[h][src].owner_id;
-         if(nodeOwners[g_src]!=-1 && nodeOwners[g_src]!=owner_src){
+         if (nodeOwners[g_src] != -1 && nodeOwners[g_src] != owner_src) {
             std::cout << "Error - Node:: " << g_src << " OwnerMismatch " << owner_src << " , " << nodeOwners[g_src] << "\n";
             verified = false;
-         }else{
+         } else {
             nodeOwners[g_src] = owner_src;
          }
          for (auto e = graph.edge_begin(src); e != graph.edge_end(src); ++e) {
@@ -300,24 +366,25 @@ bool verifyParitions(std::string & basename, OfflineGraph & g, size_t num_hosts)
             assert(hostLocalToGlobalMap[h].find(dst) != hostLocalToGlobalMap[h].end());
             outEdgeCounts[g_src]++;
             inEdgeCounts[g_dst]++;
-            auto owner_dst= hostLocalToGlobalMap[h][dst].owner_id;
-            if(nodeOwners[g_dst]!=-1 && nodeOwners[g_dst]!=owner_dst){
-               std::cout << "Error - Node:: " << g_dst<< " OwnerMismatch " << owner_dst << " , " << nodeOwners[g_dst] << "\n";
+            auto owner_dst = hostLocalToGlobalMap[h][dst].owner_id;
+            if (nodeOwners[g_dst] != -1 && nodeOwners[g_dst] != owner_dst) {
+               std::cout << "Error - Node:: " << g_dst << " OwnerMismatch " << owner_dst << " , " << nodeOwners[g_dst] << "\n";
                verified = false;
-            }else{
+            } else {
                nodeOwners[g_dst] = owner_dst;
             }
          }
 
       }
    }
+   std::cout << "Matching against master copy:: " << g.size() << " nodes, and  " << g.sizeEdges() << " edges.\n";
    for (auto n = g.begin(); n != g.end(); ++n) {
       auto src = *n;
       for (auto e = g.edge_begin(*n); e != g.edge_end(*n); ++e) {
          outEdgeCounts[src]--;
          inEdgeCounts[g.getEdgeDst(e)]--;
-      }
-   }
+      }      //End for-neighbors
+   }      //End for-nodes
 
    std::cout << "Verification sizes :: In :: " << inEdgeCounts.size() << " , Out :: " << outEdgeCounts.size() << "\n";
    for (size_t i = 0; i < inEdgeCounts.size(); ++i) {
@@ -350,13 +417,12 @@ int main(int argc, char** argv) {
    VertexCutInfo vci;
    T_init.start();
    Partitioner p;
-   //p(inputFile, g, vci, numPartitions);
    p(outputFolder, g, vci, numPartitions);
    T_init.stop();
-   if(!verifyParitions(outputFolder, g, numPartitions)){
-      std::cout<<"Verification of partitions failed! Contact developers!\n";
-   }else{
-      std::cout<<"Partitions verified!\n";
+   if (!verifyParitions(outputFolder, g, numPartitions)) {
+      std::cout << "Verification of partitions failed! Contact developers!\n";
+   } else {
+      std::cout << "Partitions verified!\n";
    }
    std::cout << "Completed partitioning.\n";
    return 0;

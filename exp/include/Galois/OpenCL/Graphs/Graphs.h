@@ -5,8 +5,8 @@
  *      Author: rashid
  */
 
-#ifndef GDIST_LIBGALOISCL_INCLUDE_GRAPHS_GRAPHS_H_
-#define GDIST_LIBGALOISCL_INCLUDE_GRAPHS_GRAPHS_H_
+#ifndef GDIST_CL_GRAPHS_H_
+#define GDIST_CL_GRAPHS_H_
 
 //#include "CL_LC_Graph.h.bak"
 #ifdef __APPLE__
@@ -24,5 +24,4 @@ extern "C" {
 //#include "LC_LinearArray_Graph.h"
 //#include "LC_LinearArray_VoidGraph.h"
 
-
-#endif /* GDIST_LIBGALOISCL_INCLUDE_GRAPHS_GRAPHS_H_ */
+#endif /* GDIST_CL_GRAPHS_H_ */

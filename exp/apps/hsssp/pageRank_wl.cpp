@@ -65,6 +65,21 @@ typedef typename Graph::GraphNode GNode;
 
 typedef GNode WorkItem;
 
+
+struct InitializeGraph_ZeroResidual{
+  Graph* graph;
+
+  void static go(Graph& _graph){
+    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph_ZeroResidual{ &_graph }, Galois::loopname("Init zero residual"));
+  }
+
+    void operator()(GNode src) const {
+      PR_NodeData& sdata = graph->getData(src);
+      sdata.residual = 0.0;
+    }
+};
+
+
 struct InitializeGraph {
   Graph* graph;
 
@@ -97,7 +112,6 @@ struct InitializeGraph {
   void operator()(GNode src) const {
     PR_NodeData& sdata = graph->getData(src);
     sdata.value = 1.0 - alpha;
-    sdata.residual = 0.0;
     sdata.nout = std::distance(graph->edge_begin(src), graph->edge_end(src));
 
     if(sdata.nout > 0 ){
@@ -234,6 +248,10 @@ int main(int argc, char** argv) {
     std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " PageRank1 : " << T_pageRank1.get() << " (msec)\n\n";
 
     Galois::Runtime::getHostBarrier().wait();
+
+    /** To make residual zero before we start anything **/
+    InitializeGraph_ZeroResidual::go(hg);
+    Galois::Runtime::getHostBarrier().wait();
     InitializeGraph::go(hg);
 
     std::cout << "PageRank::go wl run2 called  on " << net.ID << "\n";
@@ -244,6 +262,10 @@ int main(int argc, char** argv) {
 
     std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " PageRank2 : " << T_pageRank2.get() << " (msec)\n\n";
 
+    Galois::Runtime::getHostBarrier().wait();
+
+    /** To make residual zero before we start anything **/
+    InitializeGraph_ZeroResidual::go(hg);
     Galois::Runtime::getHostBarrier().wait();
     InitializeGraph::go(hg);
 

@@ -675,13 +675,20 @@ class SyncPullInsideForLoopHandler : public MatchFinder::MatchCallback {
         for(auto j : i.second){
           /** Sync pull variables **/
           string str_syncPull_var = "syncPullVar_" + j.NODE_NAME + "_" + i.first;
+          /** Sync pull for += operator. **/
+          string str_plusOp = "plusEqualOp_" + j.NODE_NAME + "_" + i.first;
+          string str_binaryOp_lhs = "binaryOp_LHS_" + j.NODE_NAME + "_" + i.first;
+
           /** Sync Pull variables **/
           auto syncPull_var = Results.Nodes.getNodeAs<clang::VarDecl>(str_syncPull_var);
+          auto syncPull_plusOp = Results.Nodes.getNodeAs<clang::Stmt>(str_plusOp);
+          auto syncPull_binary_var = Results.Nodes.getNodeAs<clang::VarDecl>(str_binaryOp_lhs);
 
           if(syncPull_var){
             //syncPull_var->dumpColor();
 
             if(syncPull_var->isReferenced()){
+              llvm::outs() << "ADDING FOR SYNC PULL\n";
               ReductionOps_entry reduceOP_entry;
               reduceOP_entry.GRAPH_NAME = j.GRAPH_NAME;
               reduceOP_entry.NODE_TYPE = j.NODE_TYPE;
@@ -689,13 +696,81 @@ class SyncPullInsideForLoopHandler : public MatchFinder::MatchCallback {
               reduceOP_entry.FIELD_NAME = j.FIELD_NAME;
               reduceOP_entry.VAL_TYPE = j.VAL_TYPE;
               reduceOP_entry.SYNC_TYPE = "sync_pull";
+              llvm::outs() << " sync for struct " << i.first << "\n";
               /** check for duplicate **/
               if(!syncPull_reduction_exists(reduceOP_entry, i.second)){
+                llvm::outs() << " Adding for " << i.first << "\n";
                 info->reductionOps_map[i.first].push_back(reduceOP_entry);
               }
             }
             break;
           }
+          else if(syncPull_binary_var){
+            syncPull_binary_var->dumpColor();
+            llvm::outs() << "BINARY IS referenced : " <<  syncPull_binary_var->isReferenced() <<"  " <<i.first << "\n";
+            break;
+          }
+        }
+      }
+    }
+};
+
+class SyncPullInsideForEdgeLoopHandler : public MatchFinder::MatchCallback {
+  private:
+    ASTContext* astContext;
+    InfoClass *info;
+  public:
+    SyncPullInsideForEdgeLoopHandler(CompilerInstance*  CI, InfoClass* _info):astContext(&(CI->getASTContext())), info(_info){}
+    virtual void run(const MatchFinder::MatchResult &Results) {
+
+      clang::LangOptions LangOpts;
+      LangOpts.CPlusPlus = true;
+      clang::PrintingPolicy Policy(LangOpts);
+
+      for(auto i : info->fieldData_map) {
+        for(auto j : i.second) {
+          /** Sync pull variables **/
+          string str_syncPull_var = "syncPullVar_" + j.VAR_NAME + "_" + i.first;
+          /** Sync pull for += operator. **/
+          string str_plusOp = "plusEqualOp_" + j.VAR_NAME + "_" + i.first;
+          string str_binaryOp_lhs = "binaryOp_LHS_" + j.VAR_NAME + "_" + i.first;
+
+          /** Sync Pull variables **/
+          auto syncPull_var = Results.Nodes.getNodeAs<clang::VarDecl>(str_syncPull_var);
+          auto syncPull_plusOp = Results.Nodes.getNodeAs<clang::Stmt>(str_plusOp);
+          auto syncPull_binary_var = Results.Nodes.getNodeAs<clang::VarDecl>(str_binaryOp_lhs);
+
+          if(syncPull_var){
+            syncPull_var->dumpColor();
+            llvm::outs() << "BINARY IS referenced : " <<  syncPull_var->isReferenced() <<"  " <<i.first << "\n";
+
+            if(syncPull_var->isReferenced()){
+              llvm::outs() << "ADDING FOR SYNC PULL\n";
+#if 0
+              ReductionOps_entry reduceOP_entry;
+              reduceOP_entry.GRAPH_NAME = j.GRAPH_NAME;
+              reduceOP_entry.NODE_TYPE = j.NODE_TYPE;
+              reduceOP_entry.FIELD_TYPE = j.NODE_TYPE;
+              reduceOP_entry.FIELD_NAME = j.FIELD_NAME;
+              reduceOP_entry.VAL_TYPE = j.VAL_TYPE;
+              reduceOP_entry.SYNC_TYPE = "sync_pull";
+#endif
+              llvm::outs() << " sync for struct " << i.first << "\n";
+              /** check for duplicate **/
+              //if(!syncPull_reduction_exists(reduceOP_entry, i.second)){
+                //llvm::outs() << " Adding for " << i.first << "\n";
+                //info->reductionOps_map[i.first].push_back(reduceOP_entry);
+              //}
+            }
+            break;
+          }
+          /*
+          else if(syncPull_binary_var){
+            syncPull_binary_var->dumpColor();
+            llvm::outs() << "BINARY IS referenced : " <<  syncPull_binary_var->isReferenced() <<"  " <<i.first << "\n";
+            break;
+          }
+          */
         }
       }
     }
@@ -736,6 +811,7 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
             string str_whileCAS_RHS = "whileCAS_RHS" + j.VAR_NAME + "_" + i.first;
 
             string str_atomicAdd = "atomicAdd_" + j.VAR_NAME + "_" + i.first;
+            string str_atomicMin = "atomicMin_" + j.VAR_NAME + "_" + i.first;
 
             /** For vector operations **/
             string str_assignment_vec = "equalOpVec_" + j.VAR_NAME+ "_" + i.first;
@@ -752,6 +828,7 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
               auto whileCAS_op = Results.Nodes.getNodeAs<clang::Stmt>(str_whileCAS);
 
               auto atomicAdd_op = Results.Nodes.getNodeAs<clang::Stmt>(str_atomicAdd);
+              auto atomicMin_op = Results.Nodes.getNodeAs<clang::Stmt>(str_atomicMin);
 
               /**Figure out variable type to set the reset value **/
               auto memExpr = Results.Nodes.getNodeAs<clang::MemberExpr>(str_memExpr);
@@ -917,6 +994,19 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
                   break;
                 }
+
+                else if(atomicMin_op){
+                  //llvm::outs() << "NOT  INSIDE  FIELD \n";
+                  //atomicAdd_op->dump();
+                  string reduceOP = "{ Galois::atomicMin(node." + field_entry.FIELD_NAME + ", y);}";
+                  reduceOP_entry.OPERATION_EXPR = reduceOP;
+                  string resetValExpr = "{node." + field_entry.FIELD_NAME + " = std::numeric_limits<int>::max()/4; }";
+                  reduceOP_entry.RESETVAL_EXPR = resetValExpr;
+
+                  info->reductionOps_map[i.first].push_back(reduceOP_entry);
+                  break;
+                }
+
                 else if(assignmentOP_vec){
                   string reduceOP = "{node." + field_entry.FIELD_NAME + "= y;}";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
@@ -1545,10 +1635,11 @@ class GaloisFunctionsConsumer : public ASTConsumer {
     FindingFieldInsideForLoopHandler insideForLoop_handler;
     FieldUsedInForLoop insideForLoopField_handler;
     SyncPullInsideForLoopHandler syncPull_handler;
+    SyncPullInsideForEdgeLoopHandler syncPullEdge_handler;
     LoopTransformHandler loopTransform_handler;
     InfoClass info;
   public:
-    GaloisFunctionsConsumer(CompilerInstance &Instance, std::set<std::string> ParsedTemplates, Rewriter &R): Instance(Instance), ParsedTemplates(ParsedTemplates), Visitor(new GaloisFunctionsVisitor(&Instance)), functionCallHandler(R, &info), findOperator(&Instance), callExprHandler(&Instance, &info), typedefHandler(&info), f_handler(&Instance, &info), insideForLoop_handler(&Instance, &info), insideForLoopField_handler(&Instance, &info), loopTransform_handler(R, &info) , syncPull_handler(&Instance, &info){
+    GaloisFunctionsConsumer(CompilerInstance &Instance, std::set<std::string> ParsedTemplates, Rewriter &R): Instance(Instance), ParsedTemplates(ParsedTemplates), Visitor(new GaloisFunctionsVisitor(&Instance)), functionCallHandler(R, &info), findOperator(&Instance), callExprHandler(&Instance, &info), typedefHandler(&info), f_handler(&Instance, &info), insideForLoop_handler(&Instance, &info), insideForLoopField_handler(&Instance, &info), loopTransform_handler(R, &info) , syncPull_handler(&Instance, &info),syncPullEdge_handler(&Instance, &info) {
 
      /**************** Additional matchers ********************/
       //Matchers.addMatcher(callExpr(isExpansionInMainFile(), callee(functionDecl(hasName("getData"))), hasAncestor(binaryOperator(hasOperatorName("=")).bind("assignment"))).bind("getData"), &callExprHandler); //*** WORKS
@@ -1749,6 +1840,7 @@ class GaloisFunctionsConsumer : public ASTConsumer {
             string str_whileCAS_RHS = "whileCAS_RHS" + j.VAR_NAME + "_" + i.first;
 
             string str_atomicAdd = "atomicAdd_" + j.VAR_NAME + "_" + i.first;
+            string str_atomicMin = "atomicMin_" + j.VAR_NAME + "_" + i.first;
 
             string str_plusOp_vec = "plusEqualOpVec_" + j.VAR_NAME + "_" + i.first;
             string str_assignment_vec = "equalOpVec_" + j.VAR_NAME + "_" + i.first;
@@ -1802,6 +1894,8 @@ class GaloisFunctionsConsumer : public ASTConsumer {
 
                                                                       /** Atomic Add **/
                                                                       callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("atomicAdd"))))), hasAnyArgument(LHS_memExpr)).bind(str_atomicAdd),
+                                                                      /** Atomic min **/
+                                                                      callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("atomicMin"))))), hasAnyArgument(LHS_memExpr)).bind(str_atomicMin),
 
                                                                       binaryOperator(hasOperatorName("="), hasDescendant(arraySubscriptExpr(hasDescendant(LHS_memExpr)).bind("arraySub"))).bind(str_assignment),
                                                                       binaryOperator(hasOperatorName("+="), hasDescendant(arraySubscriptExpr(hasDescendant(LHS_memExpr)).bind("arraySub"))).bind(str_plusOp)
@@ -2019,15 +2113,25 @@ class GaloisFunctionsConsumer : public ASTConsumer {
       /*MATCHER 6.5: *********************Match to get fields of NodeData structure being modified and used to add SYNC_PULL calls inside the Galois all edges forLoop *******************/
       for (auto i : info.reductionOps_map) {
         for(auto j : i.second) {
+          llvm::outs() << " INSIDE LOOP : j.NODE_NAME : " << j.NODE_NAME << " for : " << i.first <<"\n";
           //if(j.IS_REFERENCED && j.IS_REFERENCE) {
             string str_memExpr = "memExpr_" + j.NODE_NAME + "_" + i.first;
             string str_syncPull_var = "syncPullVar_" + j.NODE_NAME + "_" + i.first;
+            string str_plusOp = "plusEqualOp_" + j.NODE_NAME + "_" + i.first;
+            string str_binaryOp_lhs = "binaryOp_LHS_" + j.NODE_NAME + "_" + i.first;
 
             /** Only need sync_pull if modified **/
               llvm::outs() << "Sync pull is required : " << j.NODE_NAME << "\n";
               StatementMatcher LHS_memExpr = memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.NODE_NAME))))), hasAncestor(recordDecl(hasName(i.first)))).bind(str_memExpr);
               StatementMatcher stmt_reductionOp = makeStatement_reductionOp(LHS_memExpr, i.first);
-              /** USE but !REDUCTIONS : NodeData.field is used, therefore needs syncPull **/
+              StatementMatcher RHS_memExpr = hasDescendant(expr(anyOf(
+                                                         hasDescendant(memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.NODE_NAME)))))).bind(str_memExpr)),
+                                                         memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.NODE_NAME)))))).bind(str_memExpr)
+                                                    ),unless(stmt_reductionOp)));
+              StatementMatcher RHS_memExpr2 = hasDescendant(declRefExpr(to(varDecl(hasName(j.NODE_NAME)))));
+              StatementMatcher LHS_varDecl = declRefExpr(to(varDecl().bind(str_binaryOp_lhs)));
+
+          /** USE but !REDUCTIONS : NodeData.field is used, therefore needs syncPull **/
               DeclarationMatcher f_syncPull_1 = varDecl(isExpansionInMainFile(), hasInitializer(expr(anyOf(
                                                                                                   hasDescendant(memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.NODE_NAME)))))).bind(str_memExpr)),
                                                                                                   memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.NODE_NAME)))))).bind(str_memExpr)
@@ -2035,10 +2139,57 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                                                                         hasAncestor(recordDecl(hasName(i.first)))
                                                                     ).bind(str_syncPull_var);
 
+              StatementMatcher f_syncPull_2 = expr(isExpansionInMainFile(), unless(stmt_reductionOp),
+                                                                      /** For builtInType : varname += NodeData.fieldName **/
+                                                                      binaryOperator(hasOperatorName("+="),
+                                                                                      hasLHS(LHS_varDecl)/*,
+                                                                                      hasRHS(RHS_memExpr2)*/),
+                                                                        hasAncestor(recordDecl(hasName(i.first)))
+                                                  ).bind(str_plusOp);
+
               Matchers_syncpull_field.addMatcher(f_syncPull_1, &syncPull_handler);
+              Matchers_syncpull_field.addMatcher(f_syncPull_2, &syncPull_handler);
         }
       }
 
+
+      for (auto i : info.fieldData_map) {
+        for(auto j : i.second) {
+          string str_memExpr = "memExpr_" + j.VAR_NAME+ "_" + i.first;
+          string str_assignment = "equalOp_" + j.VAR_NAME+ "_" + i.first;
+          string str_plusOp = "plusEqualOp_" + j.VAR_NAME+ "_" + i.first;
+          string str_assign_plus = "assignplusOp_" + j.VAR_NAME+ "_" + i.first;
+          string str_minusOp = "minusEqualOp_" + j.VAR_NAME+ "_" + i.first;
+          string str_varDecl = "varDecl_" + j.VAR_NAME+ "_" + i.first;
+
+          string str_ifMin = "ifMin_" + j.VAR_NAME+ "_" + i.first;
+          string str_ifMinRHS = "ifMinRHS_" + j.VAR_NAME+ "_" + i.first;
+          string str_Cond_assignment = "Cond_equalOp_" + j.VAR_NAME+ "_" + i.first;
+          string str_Cond_assignmentRHS = "Cond_equalOpRHS_" + j.VAR_NAME+ "_" + i.first;
+          string str_Cond_RHSmemExpr = "Cond_RHSmemExpr_" + j.VAR_NAME+ "_" + i.first;
+          string str_Cond_RHSVarDecl = "Cond_RHSVarDecl_" + j.VAR_NAME+ "_" + i.first;
+
+
+          string str_syncPull_var = "syncPullVar_" + j.VAR_NAME + "_" + i.first;
+          string str_binaryOp_lhs = "binaryOp_LHS_" + j.VAR_NAME + "_" + i.first;
+
+          StatementMatcher LHS_memExpr = memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.VAR_NAME))))), hasAncestor(recordDecl(hasName(i.first)))).bind(str_memExpr);
+          StatementMatcher stmt_reductionOp = makeStatement_reductionOp(LHS_memExpr, i.first);
+          StatementMatcher LHS_varDecl = declRefExpr(to(varDecl().bind(str_syncPull_var)));
+          StatementMatcher f_syncPull_1 = expr(isExpansionInMainFile(), unless(stmt_reductionOp),
+                                                                      /** For builtInType : varname += NodeData.fieldName **/
+                                                                      binaryOperator(hasOperatorName("+="),
+                                                                                      hasLHS(LHS_varDecl)/*,
+                                                                                      hasRHS(RHS_memExpr2)*/),
+                                                                        hasAncestor(recordDecl(hasName(i.first)))
+                                                  ).bind(str_plusOp);
+
+
+          Matchers_syncpull_field.addMatcher(f_syncPull_1, &syncPullEdge_handler);
+
+        }
+      }
+        
       Matchers_syncpull_field.matchAST(Context);
 
       /** PRINTING FINAL REDUCTION OPERATIONS **/
