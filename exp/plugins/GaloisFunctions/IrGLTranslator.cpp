@@ -653,8 +653,8 @@ public:
       cuheader << "\tctx->" << var.first << ".zero_gpu();\n"; // FIXME: should do this only for std::atomic variables?
     }
     if (requiresWorklist) {
-      cuheader << "\tctx->in_wl = WorklistT(graph.nedges);\n";
-      cuheader << "\tctx->out_wl = WorklistT(graph.nedges);\n";
+      cuheader << "\tctx->in_wl = WorklistT(graph.nnodes);\n";
+      cuheader << "\tctx->out_wl = WorklistT(graph.nnodes);\n";
       cuheader << "\twl->num_in_items = -1;\n";
       cuheader << "\twl->num_out_items = -1;\n";
       cuheader << "\twl->in_items = ctx->in_wl.wl;\n";

@@ -232,7 +232,7 @@ public:
 
 
   //hGraph construction is collective
-  hGraph(const std::string& filename, unsigned host, unsigned numHosts)
+  hGraph(const std::string& filename, unsigned host, unsigned numHosts, std::vector<unsigned> scalefactor = std::vector<unsigned>())
     :GlobalObject(this), id(host),round(false)
   {
     OfflineGraph g(filename);
@@ -242,8 +242,27 @@ public:
     totalNodes = g.size();
     //std::cout << "Total nodes : " << totalNodes << "\n";
     //compute owners for all nodes
-    for (unsigned i = 0; i < numHosts; ++i)
-      gid2host.push_back(Galois::block_range(0U, (unsigned)g.size(), i, numHosts));
+    if (scalefactor.empty() || (numHosts == 1)) {
+      for (unsigned i = 0; i < numHosts; ++i)
+        gid2host.push_back(Galois::block_range(0U, (unsigned)g.size(), i, numHosts));
+    } else {
+      assert(scalefactor.size() == numHosts);
+      unsigned numBlocks = 0;
+      for (unsigned i = 0; i < numHosts; ++i)
+        numBlocks += scalefactor[i];
+      std::vector<std::pair<uint64_t, uint64_t>> blocks;
+      for (unsigned i = 0; i < numBlocks; ++i)
+        blocks.push_back(Galois::block_range(0U, (unsigned)g.size(), i, numBlocks));
+      std::vector<unsigned> prefixSums;
+      prefixSums.push_back(0);
+      for (unsigned i = 1; i < numHosts; ++i)
+        prefixSums.push_back(prefixSums[i-1] + scalefactor[i-1]);
+      for (unsigned i = 0; i < numHosts; ++i) {
+        unsigned firstBlock = prefixSums[i];
+        unsigned lastBlock = prefixSums[i] + scalefactor[i] - 1;
+        gid2host.push_back(std::make_pair(blocks[firstBlock].first, blocks[lastBlock].second));
+      }
+    }
     numOwned = gid2host[id].second - gid2host[id].first;
     globalOffset = gid2host[id].first;
     //std::cerr <<  "Global info done\n";
