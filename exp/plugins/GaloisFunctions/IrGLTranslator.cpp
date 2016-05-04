@@ -501,6 +501,7 @@ private:
   ASTContext* astContext;
   Rewriter &rewriter; // FIXME: is this necessary? can ASTContext give source code?
   bool requiresWorklist; // shared across kernels
+  bool started; // to recognize CXXMethodDecl that is the top/entry point
   std::string accumulatorName;
   std::ofstream Output;
 
@@ -515,7 +516,8 @@ public:
   explicit IrGLOrchestratorVisitor(ASTContext *context, Rewriter &R) : 
     astContext(context),
     rewriter(R),
-    requiresWorklist(false)
+    requiresWorklist(false),
+    started(false)
   {}
   
   virtual ~IrGLOrchestratorVisitor() {}
@@ -546,6 +548,7 @@ public:
       header << "struct CUDA_Worklist *wl, ";
     }
     header << "MarshalGraph &g);\n\n";
+    header << "void reset_CUDA_context(struct CUDA_Context *ctx);\n";
     for (auto& var : SharedVariablesToTypeMap) {
       header << var.second << " get_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID);\n";
       header << "void set_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID, " << var.second << " v);\n";
@@ -650,7 +653,6 @@ public:
     cuheader << "\tgraph.copy_to_gpu(ctx->gg);\n";
     for (auto& var : SharedVariablesToTypeMap) {
       cuheader << "\tctx->" << var.first << ".alloc(graph.nnodes);\n";
-      cuheader << "\tctx->" << var.first << ".zero_gpu();\n"; // FIXME: should do this only for std::atomic variables?
     }
     if (requiresWorklist) {
       cuheader << "\tctx->in_wl = WorklistT(graph.nnodes);\n";
@@ -663,6 +665,12 @@ public:
     }
     cuheader << "\tctx->p_retval = Shared<int>(1);\n";
     cuheader << "\tprintf(\"load_graph_GPU: %d owned nodes of total %d resident, %d edges\\n\", ctx->nowned, graph.nnodes, graph.nedges);\n"; 
+    cuheader << "\treset_CUDA_context(ctx);\n";
+    cuheader << "}\n\n";
+    cuheader << "void reset_CUDA_context(struct CUDA_Context *ctx) {\n";
+    for (auto& var : SharedVariablesToTypeMap) {
+      cuheader << "\tctx->" << var.first << ".zero_gpu();\n"; // FIXME: should do this only for std::atomic variables?
+    }
     cuheader << "}\n\n";
     cuheader << "void kernel_sizing(CSRGraphTex & g, dim3 &blocks, dim3 &threads) {\n";
     cuheader << "\tthreads.x = 256;\n";
@@ -733,7 +741,8 @@ public:
 
   virtual bool TraverseDecl(Decl *D) {
     CXXMethodDecl *method = dyn_cast_or_null<CXXMethodDecl>(D);
-    if (method) {
+    if (method && !started) {
+      started = true;
       Output.open(ORCHESTRATOR_FILENAME, std::ios::app);
       std::string kernelName = method->getParent()->getNameAsString();
       Output << "Kernel(\"" << kernelName << "_cuda\", ";
@@ -761,6 +770,8 @@ public:
       }
       HostKernelsToArgumentsMap[kernelName] = arguments;
       Output << "('struct CUDA_Context *', 'ctx')],\n[\n";
+    } else {
+      method = NULL;
     }
     bool traverse = RecursiveASTVisitor<IrGLOrchestratorVisitor>::TraverseDecl(D);
     if (traverse && method) {
@@ -772,6 +783,8 @@ public:
       std::size_t found = fileName.rfind(".");
       assert(found != std::string::npos);
       FileNamePath = fileName.substr(0, found);
+
+      started = false;
     }
     return traverse;
   }
@@ -782,7 +795,8 @@ public:
     std::size_t begin = text.find("Galois::do_all");
     if (begin != 0) {
       begin = text.find("Galois::for_each");
-      isTopological = false;
+      if (text.find("Galois::workList_version") != std::string::npos)
+        isTopological = false;
     }
     if (begin == 0) {
       // generate kernel for operator
