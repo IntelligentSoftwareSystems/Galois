@@ -93,6 +93,27 @@ typedef typename Graph::GraphNode GNode;
 
 typedef GNode WorkItem;
 
+struct ResetGraph {
+  Graph* graph;
+
+  ResetGraph(Graph* _graph) : graph(_graph){}
+  void static go(Graph& _graph) {
+    #ifdef __GALOIS_HET_CUDA__
+    	if (personality == GPU_CUDA) {
+    		reset_CUDA_context(cuda_ctx);
+    	} else if (personality == CPU)
+    #endif
+    Galois::do_all(_graph.begin(), _graph.end(), ResetGraph{ &_graph }, Galois::loopname("reset"));
+  }
+
+  void operator()(GNode src) const {
+    PR_NodeData& sdata = graph->getData(src);
+    sdata.value = 0;
+    sdata.nout = 0;
+    sdata.residual = 0;
+  }
+};
+
 struct InitializeGraph {
   const float &local_alpha;
   Graph* graph;
@@ -288,7 +309,7 @@ int main(int argc, char** argv) {
 
     LonestarStart(argc, argv, name, desc, url);
     auto& net = Galois::Runtime::getSystemNetworkInterface();
-    Galois::Timer T_total, T_hGraph_init, T_init, T_pageRank;
+    Galois::Timer T_total, T_hGraph_init, T_init, T_pageRank1, T_pageRank2, T_pageRank3;
 
 #ifdef __GALOIS_HET_CUDA__
     const unsigned my_host_id = Galois::Runtime::getHostID();
@@ -346,7 +367,7 @@ int main(int argc, char** argv) {
 #endif
     T_hGraph_init.stop();
 
-    std::cout << "InitializeGraph::go called\n";
+    std::cout << "[" << net.ID << "] InitializeGraph::go called\n";
 
     T_init.start();
     InitializeGraph::go(hg);
@@ -369,12 +390,28 @@ int main(int argc, char** argv) {
 #endif
     }*/
 
-    std::cout << "PageRank::go called\n";
-    T_pageRank.start();
-    std::cout << " Starting PageRank with worklist. " << "\n";
+    std::cout << "[" << net.ID << "] PageRank::go called\n";
+    T_pageRank1.start();
     PageRank::go(hg);
-    std::cout << " Done. " << "\n";
-    T_pageRank.stop();
+    T_pageRank1.stop();
+
+    Galois::Runtime::getHostBarrier().wait();
+    ResetGraph::go(hg);
+    InitializeGraph::go(hg);
+
+    std::cout << "[" << net.ID << "] PageRank::go called\n";
+    T_pageRank2.start();
+    PageRank::go(hg);
+    T_pageRank2.stop();
+
+    Galois::Runtime::getHostBarrier().wait();
+    ResetGraph::go(hg);
+    InitializeGraph::go(hg);
+
+    std::cout << "[" << net.ID << "] PageRank::go called\n";
+    T_pageRank3.start();
+    PageRank::go(hg);
+    T_pageRank3.stop();
 
     // Verify
     if(verify){
@@ -395,7 +432,13 @@ int main(int argc, char** argv) {
 
     T_total.stop();
 
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " PageRank : " << T_pageRank.get() << "(msec)\n\n";
+    auto mean_time = (T_pageRank1.get() + T_pageRank2.get() + T_pageRank3.get())/3;
+
+    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get()
+      << " PageRank1 : " << T_pageRank1.get()
+      << " PageRank2 : " << T_pageRank2.get()
+      << " PageRank3 : " << T_pageRank3.get()
+      << " PageRank mean : " << mean_time << " (msec)\n\n";
 
     return 0;
   } catch (const char* c) {

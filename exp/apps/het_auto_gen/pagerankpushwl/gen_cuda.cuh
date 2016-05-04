@@ -115,11 +115,8 @@ void load_graph_CUDA(struct CUDA_Context *ctx, struct CUDA_Worklist *wl, Marshal
 	if(g.edge_data) memcpy(graph.edge_data, g.edge_data, sizeof(edge_data_type) * g.nedges);
 	graph.copy_to_gpu(ctx->gg);
 	ctx->nout.alloc(graph.nnodes);
-	ctx->nout.zero_gpu();
 	ctx->residual.alloc(graph.nnodes);
-	ctx->residual.zero_gpu();
 	ctx->value.alloc(graph.nnodes);
-	ctx->value.zero_gpu();
 	ctx->in_wl = WorklistT(graph.nnodes);
 	ctx->out_wl = WorklistT(graph.nnodes);
 	wl->num_in_items = -1;
@@ -129,6 +126,13 @@ void load_graph_CUDA(struct CUDA_Context *ctx, struct CUDA_Worklist *wl, Marshal
 	ctx->shared_wl = wl;
 	ctx->p_retval = Shared<int>(1);
 	printf("load_graph_GPU: %d owned nodes of total %d resident, %d edges\n", ctx->nowned, graph.nnodes, graph.nedges);
+  reset_CUDA_context(ctx);
+}
+
+void reset_CUDA_context(struct CUDA_Context *ctx) {
+	ctx->nout.zero_gpu();
+	ctx->residual.zero_gpu();
+	ctx->value.zero_gpu();
 }
 
 void kernel_sizing(CSRGraphTex & g, dim3 &blocks, dim3 &threads) {

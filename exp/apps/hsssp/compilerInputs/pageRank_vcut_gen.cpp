@@ -201,7 +201,7 @@ int main(int argc, char** argv) {
 #endif
     T_vGraph_init.stop();
 
-    std::cout << "InitializeGraph::go called\n";
+    std::cout << "[" << net.ID << "] InitializeGraph::go called\n";
 
     T_init.start();
     InitializeGraph::go(hg);
@@ -224,7 +224,7 @@ int main(int argc, char** argv) {
 #endif
     }*/
 
-    std::cout << "PageRank::go called  on " << net.ID << "\n";
+    std::cout << "[" << net.ID << "] PageRank::go called  on " << net.ID << "\n";
     T_pageRank.start();
     PageRank::go(hg);
     T_pageRank.stop();

@@ -203,7 +203,7 @@ int main(int argc, char** argv) {
 #endif
     T_hGraph_init.stop();
 
-    std::cout << "InitializeGraph::go called\n";
+    std::cout << "[" << net.ID << "] InitializeGraph::go called\n";
 
     T_init.start();
     InitializeGraph::go(hg);
@@ -226,7 +226,8 @@ int main(int argc, char** argv) {
 #endif
     }*/
 
-    std::cout << "PageRank_pull::go called\n";
+    std::cout << "[" << net.ID << "] PageRank_pull::go called\n";
+    T_pageRank.start();
     PageRank_pull::go(hg);
     T_pageRank.stop();
 
