@@ -36,7 +36,7 @@ namespace Galois {
       while(a > b){
         a.compare_exchange_strong(old_a, b);
       }
-      return a;
+      return old_a;
     }
 
   template<typename Ty>
