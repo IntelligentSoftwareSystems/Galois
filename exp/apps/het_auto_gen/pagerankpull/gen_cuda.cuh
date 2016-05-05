@@ -18,44 +18,25 @@ struct CUDA_Context {
 	size_t g_offset;
 	CSRGraphTex hg;
 	CSRGraphTex gg;
-	Shared<unsigned int> nout;
-	Shared<float> residual;
+	Shared<int> nout;
 	Shared<float> value;
 	Shared<int> p_retval;
-	WorklistT in_wl;
-	WorklistT out_wl;
-	struct CUDA_Worklist *shared_wl;
 	Any any_retval;
 };
 
-unsigned int get_node_nout_cuda(struct CUDA_Context *ctx, unsigned LID) {
-	unsigned int *nout = ctx->nout.cpu_rd_ptr();
+int get_node_nout_cuda(struct CUDA_Context *ctx, unsigned LID) {
+	int *nout = ctx->nout.cpu_rd_ptr();
 	return nout[LID];
 }
 
-void set_node_nout_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v) {
-	unsigned int *nout = ctx->nout.cpu_wr_ptr();
+void set_node_nout_cuda(struct CUDA_Context *ctx, unsigned LID, int v) {
+	int *nout = ctx->nout.cpu_wr_ptr();
 	nout[LID] = v;
 }
 
-void add_node_nout_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v) {
-	unsigned int *nout = ctx->nout.cpu_wr_ptr();
+void add_node_nout_cuda(struct CUDA_Context *ctx, unsigned LID, int v) {
+	int *nout = ctx->nout.cpu_wr_ptr();
 	nout[LID] += v;
-}
-
-float get_node_residual_cuda(struct CUDA_Context *ctx, unsigned LID) {
-	float *residual = ctx->residual.cpu_rd_ptr();
-	return residual[LID];
-}
-
-void set_node_residual_cuda(struct CUDA_Context *ctx, unsigned LID, float v) {
-	float *residual = ctx->residual.cpu_wr_ptr();
-	residual[LID] = v;
-}
-
-void add_node_residual_cuda(struct CUDA_Context *ctx, unsigned LID, float v) {
-	float *residual = ctx->residual.cpu_wr_ptr();
-	residual[LID] += v;
 }
 
 float get_node_value_cuda(struct CUDA_Context *ctx, unsigned LID) {
@@ -99,7 +80,7 @@ bool init_CUDA_context(struct CUDA_Context *ctx, int device) {
 	return true;
 }
 
-void load_graph_CUDA(struct CUDA_Context *ctx, struct CUDA_Worklist *wl, MarshalGraph &g) {
+void load_graph_CUDA(struct CUDA_Context *ctx, MarshalGraph &g) {
 	CSRGraphTex &graph = ctx->hg;
 	ctx->nowned = g.nowned;
 	assert(ctx->id == g.id);
@@ -115,20 +96,15 @@ void load_graph_CUDA(struct CUDA_Context *ctx, struct CUDA_Worklist *wl, Marshal
 	if(g.edge_data) memcpy(graph.edge_data, g.edge_data, sizeof(edge_data_type) * g.nedges);
 	graph.copy_to_gpu(ctx->gg);
 	ctx->nout.alloc(graph.nnodes);
-	ctx->nout.zero_gpu();
-	ctx->residual.alloc(graph.nnodes);
-	ctx->residual.zero_gpu();
 	ctx->value.alloc(graph.nnodes);
-	ctx->value.zero_gpu();
-	ctx->in_wl = WorklistT(graph.nnodes);
-	ctx->out_wl = WorklistT(graph.nnodes);
-	wl->num_in_items = -1;
-	wl->num_out_items = -1;
-	wl->in_items = ctx->in_wl.wl;
-	wl->out_items = ctx->out_wl.wl;
-	ctx->shared_wl = wl;
 	ctx->p_retval = Shared<int>(1);
 	printf("load_graph_GPU: %d owned nodes of total %d resident, %d edges\n", ctx->nowned, graph.nnodes, graph.nedges);
+	reset_CUDA_context(ctx);
+}
+
+void reset_CUDA_context(struct CUDA_Context *ctx) {
+	ctx->nout.zero_gpu();
+	ctx->value.zero_gpu();
 }
 
 void kernel_sizing(CSRGraphTex & g, dim3 &blocks, dim3 &threads) {

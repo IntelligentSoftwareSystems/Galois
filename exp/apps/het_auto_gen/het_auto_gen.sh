@@ -23,15 +23,15 @@ cp $SRC gen.cpp
 echo "Preprocessing global variables"
 $GPREPROCESS_CXX $CXX_DEFINES $CXX_FLAGS -o .temp.o -c gen.cpp &>$log
 
-echo "Generating IrGL code"
-$IRGL_CXX $CXX_DEFINES $CXX_FLAGS -o .temp.o -c gen.cpp >>$log 2>&1
-echo "Generating CUDA code from IrGL"
-$GGC_ROOT/src/ggc -o gen_cuda.cu gen_cuda.py >>$log 2>&1
-
 echo "Generating analysis information"
 $GANALYSIS_CXX $CXX_DEFINES $CXX_FLAGS -o .temp.o -c gen.cpp >>$log 2>&1
 echo "Generating communication code"
 $GFUNCS_CXX $CXX_DEFINES $CXX_FLAGS -o .temp.o -c gen.cpp >>$log 2>&1
+
+echo "Generating IrGL code"
+$IRGL_CXX $CXX_DEFINES $CXX_FLAGS -o .temp.o -c gen.cpp >>$log 2>&1
+echo "Generating CUDA code from IrGL"
+$GGC_ROOT/src/ggc -o gen_cuda.cu gen_cuda.py >>$log 2>&1
 
 rm -f Entry-*.dot
 

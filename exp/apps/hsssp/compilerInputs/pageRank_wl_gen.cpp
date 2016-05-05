@@ -67,8 +67,6 @@ static const char* const url = 0;
 
 namespace cll = llvm::cl;
 static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
-static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations"), cll::init(4));
-static cll::opt<unsigned int> src_node("srcNodeId", cll::desc("ID of the source node"), cll::init(0));
 static cll::opt<float> tolerance("tolerance", cll::desc("tolerance"), cll::init(0.01));
 static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"), cll::init(false));
 #ifdef __GALOIS_HET_CUDA__
@@ -154,7 +152,7 @@ int main(int argc, char** argv) {
 
     LonestarStart(argc, argv, name, desc, url);
     auto& net = Galois::Runtime::getSystemNetworkInterface();
-    Galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_pageRank;
+    Galois::Timer T_total, T_hGraph_init, T_init, T_pageRank;
 
 #ifdef __GALOIS_HET_CUDA__
     const unsigned my_host_id = Galois::Runtime::getHostID();
@@ -195,11 +193,6 @@ int main(int argc, char** argv) {
 
     T_total.start();
 
-    T_offlineGraph_init.start();
-    OfflineGraph g(inputFile);
-    T_offlineGraph_init.stop();
-    std::cout << g.size() << " " << g.sizeEdges() << "\n";
-
     T_hGraph_init.start();
 #ifndef __GALOIS_HET_CUDA__
     Graph hg(inputFile, net.ID, net.Num);
@@ -217,8 +210,7 @@ int main(int argc, char** argv) {
 #endif
     T_hGraph_init.stop();
 
-    std::cout << "InitializeGraph::go called\n";
-
+    std::cout << "[" << net.ID << "] InitializeGraph::go called\n";
     T_init.start();
     InitializeGraph::go(hg);
     T_init.stop();
@@ -240,11 +232,9 @@ int main(int argc, char** argv) {
 #endif
     }*/
 
-    std::cout << "PageRank::go called\n";
+    std::cout << "[" << net.ID << "] PageRank::go called\n";
     T_pageRank.start();
-    std::cout << " Starting PageRank with worklist. " << "\n";
     PageRank::go(hg);
-    std::cout << " Done. " << "\n";
     T_pageRank.stop();
 
     // Verify
@@ -266,7 +256,7 @@ int main(int argc, char** argv) {
 
     T_total.stop();
 
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " PageRank (" << maxIterations << ") : " << T_pageRank.get() << "(msec)\n\n";
+    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " PageRank : " << T_pageRank.get() << "(msec)\n\n";
 
     return 0;
   } catch (const char* c) {

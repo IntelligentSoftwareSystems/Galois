@@ -116,7 +116,7 @@ void load_graph_CUDA(struct CUDA_Context *ctx, MarshalGraph &g) {
 	ctx->value.alloc(graph.nnodes);
 	ctx->p_retval = Shared<int>(1);
 	printf("load_graph_GPU: %d owned nodes of total %d resident, %d edges\n", ctx->nowned, graph.nnodes, graph.nedges);
-  reset_CUDA_context(ctx);
+	reset_CUDA_context(ctx);
 }
 
 void reset_CUDA_context(struct CUDA_Context *ctx) {

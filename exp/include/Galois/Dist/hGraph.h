@@ -254,7 +254,8 @@ public:
 
       num_recv_expected = 0;
       totalNodes = g.size();
-      //std::cout << "Total nodes : " << totalNodes << "\n";
+      std::cerr << "Total nodes : " << totalNodes << "\n";
+      std::cerr << "Total edges : " << g.sizeEdges() << "\n";
       //compute owners for all nodes
       if (scalefactor.empty() || (numHosts == 1)) {
          for (unsigned i = 0; i < numHosts; ++i)
@@ -280,21 +281,21 @@ public:
 
       numOwned = gid2host[id].second - gid2host[id].first;
       globalOffset = gid2host[id].first;
-      //std::cerr <<  "Global info done\n";
+      std::cerr << "[" << id << "] Owned nodes: " << numOwned << "\n";
 
       uint64_t numEdges = g.edge_begin(gid2host[id].second) - g.edge_begin(gid2host[id].first); // depends on Offline graph impl
-      std::cerr << "Edge count Done " << numEdges << "\n";
+      std::cerr << "[" << id << "] Edge count Done " << numEdges << "\n";
 
       std::vector<bool> ghosts(g.size());
       for (auto n = gid2host[id].first; n < gid2host[id].second; ++n)
          for (auto ii = g.edge_begin(n), ee = g.edge_end(n); ii < ee; ++ii)
             ghosts[g.getEdgeDst(ii)] = true;
-      std::cerr << "Ghost Finding Done " << std::count(ghosts.begin(), ghosts.end(), true) << "\n";
+      std::cerr << "[" << id << "] Ghost Finding Done " << std::count(ghosts.begin(), ghosts.end(), true) << "\n";
 
       for (uint64_t x = 0; x < g.size(); ++x)
          if (ghosts[x] && !isOwned(x))
             ghostMap.push_back(x);
-      //std::cerr << "L2G Done\n";
+      std::cerr << "[" << id << "] Ghost nodes: " << ghostMap.size() << "\n";
 
       hostNodes.resize(numHosts, std::make_pair(~0, ~0));
       for (unsigned ln = 0; ln < ghostMap.size(); ++ln) {

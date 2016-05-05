@@ -35,6 +35,7 @@
 #include "Galois/Runtime/Tracer.h"
 
 #include "Galois/Dist/hGraph.h"
+#include "Galois/DistAccumulator.h"
 
 #ifdef __GALOIS_HET_CUDA__
 #include "Galois/Cuda/cuda_mtypes.h"
@@ -66,7 +67,7 @@ std::string personality_str(Personality p) {
 
 namespace cll = llvm::cl;
 static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
-static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations"), cll::init(4));
+static cll::opt<float> tolerance("tolerance", cll::desc("tolerance"), cll::init(0.01));
 static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to the output stream"), cll::init(false));
 #ifdef __GALOIS_HET_CUDA__
 static cll::opt<int> gpudevice("gpu", cll::desc("Select GPU to run on, default is to choose automatically"), cll::init(-1));
@@ -80,7 +81,6 @@ static cll::opt<unsigned> scalecpu("scalecpu", cll::desc("Scale CPU workload w.r
 
 
 static const float alpha = (1.0 - 0.85);
-static const float  tolerance = 0.1;
 struct PR_NodeData {
   float value;
   std::atomic<int> nout;
@@ -100,18 +100,6 @@ struct InitializeGraph {
   void operator()(GNode src) const {
     PR_NodeData& sdata = graph->getData(src);
     sdata.value = 1.0 - alpha;
-    sdata.nout = 0;
-  }
-};
-
-struct PrecomputeGraph {
-  Graph* graph;
-
-  void static go(Graph& _graph) {
-    Galois::do_all(_graph.begin(), _graph.end(), PrecomputeGraph{ &_graph }, Galois::loopname("Precompute"));
-  }
-
-  void operator()(GNode src) const {
     for(auto nbr = graph->edge_begin(src); nbr != graph->edge_end(src); ++nbr){
       GNode dst = graph->getEdgeDst(nbr);
       PR_NodeData& ddata = graph->getData(dst);
@@ -126,9 +114,13 @@ struct PageRank_pull {
 
   PageRank_pull(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph) {
-        Galois::do_all(_graph.begin(), _graph.end(), PageRank_pull { &_graph }, Galois::loopname("pageRank"));
+    do{
+      DGAccumulator_accum.reset();
+      Galois::do_all(_graph.begin(), _graph.end(), PageRank_pull { &_graph }, Galois::loopname("pageRank"));
+    } while (DGAccumulator_accum.reduce());
   }
 
+  static Galois::DGAccumulator<int> DGAccumulator_accum;
   void operator()(GNode src)const {
     PR_NodeData& sdata = graph->getData(src);
     float sum = 0;
@@ -146,16 +138,18 @@ struct PageRank_pull {
 
     if(diff > tolerance){
       sdata.value = pr_value; 
+      DGAccumulator_accum+= 1;
     }
   }
 };
+Galois::DGAccumulator<int>  PageRank_pull::DGAccumulator_accum;
 
 int main(int argc, char** argv) {
   try {
 
     LonestarStart(argc, argv, name, desc, url);
     auto& net = Galois::Runtime::getSystemNetworkInterface();
-    Galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_pageRank;
+    Galois::Timer T_total, T_hGraph_init, T_init, T_pageRank;
 
 #ifdef __GALOIS_HET_CUDA__
     const unsigned my_host_id = Galois::Runtime::getHostID();
@@ -196,11 +190,6 @@ int main(int argc, char** argv) {
 
     T_total.start();
 
-    T_offlineGraph_init.start();
-    OfflineGraph g(inputFile);
-    T_offlineGraph_init.stop();
-    std::cout << g.size() << " " << g.sizeEdges() << "\n";
-
     T_hGraph_init.start();
 #ifndef __GALOIS_HET_CUDA__
     Graph hg(inputFile, net.ID, net.Num);
@@ -218,11 +207,9 @@ int main(int argc, char** argv) {
 #endif
     T_hGraph_init.stop();
 
-    std::cout << "InitializeGraph::go called\n";
-
+    std::cout << "[" << net.ID << "] InitializeGraph::go called\n";
     T_init.start();
     InitializeGraph::go(hg);
-    PrecomputeGraph::go(hg);
     T_init.stop();
 
     // Verify
@@ -242,17 +229,14 @@ int main(int argc, char** argv) {
 #endif
     }*/
 
-    std::cout << "PageRank_pull::go called\n";
+    std::cout << "[" << net.ID << "] PageRank_pull::go called\n";
     T_pageRank.start();
-    for (int i = 0; i < maxIterations; ++i) {
-      std::cout << " Iteration : " << i << "\n";
-      PageRank_pull::go(hg);
-    }
+    PageRank_pull::go(hg);
     T_pageRank.stop();
 
     T_total.stop();
 
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " PageRank_pull (" << maxIterations << ") : " << T_pageRank.get() << "(msec)\n\n";
+    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " PageRank_pull : " << T_pageRank.get() << "(msec)\n\n";
 
     // Verify
     if(verify){
