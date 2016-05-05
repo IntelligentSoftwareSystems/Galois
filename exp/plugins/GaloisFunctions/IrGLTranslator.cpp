@@ -581,8 +581,8 @@ public:
     cuheader << "\tint id;\n";
     cuheader << "\tsize_t nowned;\n";
     cuheader << "\tsize_t g_offset;\n";
-    cuheader << "\tCSRGraphTex hg;\n";
-    cuheader << "\tCSRGraphTex gg;\n";
+    cuheader << "\tCSRGraph hg;\n";
+    cuheader << "\tCSRGraph gg;\n";
     for (auto& var : SharedVariablesToTypeMap) {
       cuheader << "\tShared<" << var.second << "> " << var.first << ";\n";
     }
@@ -637,7 +637,7 @@ public:
       cuheader << "struct CUDA_Worklist *wl, ";
     }
     cuheader << "MarshalGraph &g) {\n";
-    cuheader << "\tCSRGraphTex &graph = ctx->hg;\n";
+    cuheader << "\tCSRGraph &graph = ctx->hg;\n";
     cuheader << "\tctx->nowned = g.nowned;\n";
     cuheader << "\tassert(ctx->id == g.id);\n";
     cuheader << "\tgraph.nnodes = g.nnodes;\n";
@@ -672,7 +672,7 @@ public:
       cuheader << "\tctx->" << var.first << ".zero_gpu();\n"; // FIXME: should do this only for std::atomic variables?
     }
     cuheader << "}\n\n";
-    cuheader << "void kernel_sizing(CSRGraphTex & g, dim3 &blocks, dim3 &threads) {\n";
+    cuheader << "void kernel_sizing(CSRGraph & g, dim3 &blocks, dim3 &threads) {\n";
     cuheader << "\tthreads.x = 256;\n";
     cuheader << "\tthreads.y = threads.z = 1;\n";
     cuheader << "\tblocks.x = 14 * 8;\n";
