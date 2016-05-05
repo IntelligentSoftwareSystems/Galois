@@ -16,8 +16,8 @@ struct CUDA_Context {
 	int id;
 	size_t nowned;
 	size_t g_offset;
-	CSRGraphTex hg;
-	CSRGraphTex gg;
+	CSRGraph hg;
+	CSRGraph gg;
 	Shared<unsigned int> nout;
 	Shared<float> residual;
 	Shared<float> value;
@@ -97,7 +97,7 @@ bool init_CUDA_context(struct CUDA_Context *ctx, int device) {
 }
 
 void load_graph_CUDA(struct CUDA_Context *ctx, MarshalGraph &g) {
-	CSRGraphTex &graph = ctx->hg;
+	CSRGraph &graph = ctx->hg;
 	ctx->nowned = g.nowned;
 	assert(ctx->id == g.id);
 	graph.nnodes = g.nnodes;
@@ -112,16 +112,20 @@ void load_graph_CUDA(struct CUDA_Context *ctx, MarshalGraph &g) {
 	if(g.edge_data) memcpy(graph.edge_data, g.edge_data, sizeof(edge_data_type) * g.nedges);
 	graph.copy_to_gpu(ctx->gg);
 	ctx->nout.alloc(graph.nnodes);
-	ctx->nout.zero_gpu();
 	ctx->residual.alloc(graph.nnodes);
-	ctx->residual.zero_gpu();
 	ctx->value.alloc(graph.nnodes);
-	ctx->value.zero_gpu();
 	ctx->p_retval = Shared<int>(1);
 	printf("load_graph_GPU: %d owned nodes of total %d resident, %d edges\n", ctx->nowned, graph.nnodes, graph.nedges);
+	reset_CUDA_context(ctx);
 }
 
-void kernel_sizing(CSRGraphTex & g, dim3 &blocks, dim3 &threads) {
+void reset_CUDA_context(struct CUDA_Context *ctx) {
+	ctx->nout.zero_gpu();
+	ctx->residual.zero_gpu();
+	ctx->value.zero_gpu();
+}
+
+void kernel_sizing(CSRGraph & g, dim3 &blocks, dim3 &threads) {
 	threads.x = 256;
 	threads.y = threads.z = 1;
 	blocks.x = 14 * 8;

@@ -16,8 +16,8 @@ struct CUDA_Context {
 	int id;
 	size_t nowned;
 	size_t g_offset;
-	CSRGraphTex hg;
-	CSRGraphTex gg;
+	CSRGraph hg;
+	CSRGraph gg;
 	Shared<int> nout;
 	Shared<float> value;
 	Shared<int> p_retval;
@@ -81,7 +81,7 @@ bool init_CUDA_context(struct CUDA_Context *ctx, int device) {
 }
 
 void load_graph_CUDA(struct CUDA_Context *ctx, MarshalGraph &g) {
-	CSRGraphTex &graph = ctx->hg;
+	CSRGraph &graph = ctx->hg;
 	ctx->nowned = g.nowned;
 	assert(ctx->id == g.id);
 	graph.nnodes = g.nnodes;
@@ -107,7 +107,7 @@ void reset_CUDA_context(struct CUDA_Context *ctx) {
 	ctx->value.zero_gpu();
 }
 
-void kernel_sizing(CSRGraphTex & g, dim3 &blocks, dim3 &threads) {
+void kernel_sizing(CSRGraph & g, dim3 &blocks, dim3 &threads) {
 	threads.x = 256;
 	threads.y = threads.z = 1;
 	blocks.x = 14 * 8;

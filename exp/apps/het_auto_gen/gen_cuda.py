@@ -71,7 +71,7 @@ CBlock(["kernel_sizing(ctx->gg, blocks, threads)"]),
 CBlock(["*(ctx->p_retval.cpu_wr_ptr()) = __retval"]),
 CBlock(["ctx->any_retval.rv = ctx->p_retval.gpu_wr_ptr()"]),
 Invoke("PageRank", ("ctx->gg", "ctx->nowned", "local_alpha", "local_tolerance", "ctx->nout.gpu_wr_ptr()", "ctx->residual.gpu_wr_ptr()", "ctx->value.gpu_wr_ptr()", "ctx->any_retval")),
-CBlock(["__retval = *(ctx->p_retval.cpu_rd_ptr())"]),
 CBlock(["check_cuda_kernel"], parse = False),
+CBlock(["__retval = *(ctx->p_retval.cpu_rd_ptr())"]),
 ], host = True),
 ])

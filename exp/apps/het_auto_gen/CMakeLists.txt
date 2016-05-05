@@ -2,6 +2,9 @@
 #add_definitions(-D__GALOIS_CUDA_CHECK_ERROR__)
 #set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; -lineinfo)
 
+# single host multiple GPUs
+#add_definitions(-D__GALOIS_SINGLE_HOST_MULTIPLE_GPUS__)
+
 cuda_add_library(het_auto_gen_cuda gen_cuda.cu)
 target_link_libraries(het_auto_gen_cuda ggrt)
 app(het_auto_gen gen.cpp DISTSAFE)

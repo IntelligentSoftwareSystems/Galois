@@ -2,14 +2,14 @@
 #include "gg.h"
 #include "ggcuda.h"
 
-void kernel_sizing(CSRGraphTex &, dim3 &, dim3 &);
+void kernel_sizing(CSRGraph &, dim3 &, dim3 &);
 #define TB_SIZE 256
-const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_blocking_factor=4 $ parcomb=False $ np_schedulers=set(['fg', 'tb', 'wp']) $ cc_disable=set([]) $ hacks=set([]) $ np_factor=1 $ instrument=set([]) $ unroll=[] $ read_props=None $ outline_iterate=True $ ignore_nested_errors=False $ np=False $ write_props=None $ quiet_cgen=True $ retry_backoff=True $ cuda.graph_type=texture $ cuda.use_worklist_slots=True $ cuda.worklist_type=texture";
+const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_blocking_factor=4 $ parcomb=False $ np_schedulers=set(['fg', 'tb', 'wp']) $ cc_disable=set([]) $ hacks=set([]) $ np_factor=1 $ instrument=set([]) $ unroll=[] $ read_props=None $ outline_iterate=True $ ignore_nested_errors=False $ np=False $ write_props=None $ quiet_cgen=True $ retry_backoff=True $ cuda.graph_type=basic $ cuda.use_worklist_slots=True $ cuda.worklist_type=basic";
 int * P_NOUT;
 float * P_VALUE;
 #include "kernels/reduce.cuh"
 #include "gen_cuda.cuh"
-__global__ void InitializeGraph(CSRGraphTex graph, int  nowned, const float  local_alpha, int * p_nout, float * p_value)
+__global__ void InitializeGraph(CSRGraph graph, int  nowned, const float  local_alpha, int * p_nout, float * p_value)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -30,7 +30,7 @@ __global__ void InitializeGraph(CSRGraphTex graph, int  nowned, const float  loc
     }
   }
 }
-__global__ void PageRank_pull(CSRGraphTex graph, int  nowned, const float  local_alpha, const float  local_tolerance, int * p_nout, float * p_value, Any any_retval)
+__global__ void PageRank_pull(CSRGraph graph, int  nowned, const float  local_alpha, const float  local_tolerance, int * p_nout, float * p_value, Any any_retval)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
