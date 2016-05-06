@@ -67,6 +67,7 @@ static const char* const url = 0;
 namespace cll = llvm::cl;
 static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<float> tolerance("tolerance", cll::desc("tolerance"), cll::init(0.01));
+static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations"), cll::init(1000));
 static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"), cll::init(false));
 #ifdef __GALOIS_HET_CUDA__
 static cll::opt<int> gpudevice("gpu", cll::desc("Select GPU to run on, default is to choose automatically"), cll::init(-1));
@@ -92,6 +93,8 @@ typedef hGraph<PR_NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
 
 typedef GNode WorkItem;
+
+unsigned iteration;
 
 struct ResetGraph {
   Graph* graph;
@@ -237,6 +240,7 @@ struct PageRank {
   void static go(Graph& _graph) {
      FirstItr_PageRank::go(_graph);
      
+     iteration = 1;
       do { 
      DGAccumulator_accum.reset();
      	struct Syncer_0 {
@@ -273,7 +277,8 @@ struct PageRank {
      Galois::for_each(_graph.begin(), _graph.end(), PageRank(tolerance, alpha, &_graph), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ Galois::atomicAdd(node.residual, y);}",  "{node.residual = 0 ; }"));
      _graph.sync_push<Syncer_0>();
      
-     }while(DGAccumulator_accum.reduce());
+     ++iteration;
+     }while((iteration < maxIterations) && DGAccumulator_accum.reduce());
      
   }
 
@@ -438,7 +443,7 @@ int main(int argc, char** argv) {
       << " PageRank1 : " << T_pageRank1.get()
       << " PageRank2 : " << T_pageRank2.get()
       << " PageRank3 : " << T_pageRank3.get()
-      << " PageRank mean : " << mean_time << " (msec)\n\n";
+      << " PageRank mean (" << iteration << " iterations) : " << mean_time << " (msec)\n\n";
 
     return 0;
   } catch (const char* c) {
