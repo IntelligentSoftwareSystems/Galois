@@ -211,6 +211,7 @@ public:
       net.send(from_id, syncRecv, b);
    }
 
+
    template<typename FnTy>
    void syncPullRecvApply(Galois::Runtime::RecvBuffer& buf) {
       assert(num_recv_expected > 0);
