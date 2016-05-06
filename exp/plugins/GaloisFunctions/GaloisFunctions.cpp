@@ -114,7 +114,7 @@ namespace {
       << "\t\t}\n"
       << "\t\tstatic void reduce (uint32_t node_id, " << i.NODE_TYPE << " node, " << i.VAL_TYPE << " y) {\n" 
       << "\t\t#ifdef __GALOIS_HET_CUDA__\n"
-      /* !!! assumes reduction operation is always addition */
+      /* FIXME: assumes reduction operation is always addition */
       << "\t\t\tif (personality == GPU_CUDA) " << "add_node_" << i.FIELD_NAME <<  "_cuda(cuda_ctx, node_id, y);\n"
       << "\t\t\telse if (personality == CPU)\n"
       << "\t\t#endif\n"
@@ -122,7 +122,7 @@ namespace {
       << "\t\t}\n"
       << "\t\tstatic void reset (uint32_t node_id, " << i.NODE_TYPE << " node ) {\n" 
       << "\t\t#ifdef __GALOIS_HET_CUDA__\n"
-      /* !!! assumes reduction operation is always addition */
+      /* FIXME: assumes reduction operation is always addition */
       << "\t\t\tif (personality == GPU_CUDA) " << "set_node_" << i.FIELD_NAME <<  "_cuda(cuda_ctx, node_id, 0);\n"
       << "\t\t\telse if (personality == CPU)\n"
       << "\t\t#endif\n"

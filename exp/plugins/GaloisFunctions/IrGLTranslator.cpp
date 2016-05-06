@@ -226,7 +226,7 @@ public:
     }
 
     // get basic type
-    if (text.find("std::atomic") == 0) {
+    if ((text.find("std::atomic") == 0) || (text.find("struct std::atomic") == 0)) {
       std::size_t begin = text.find("<");
       std::size_t end = text.find_last_of(">");
       text = text.substr(begin+1, end - begin - 1);
@@ -335,6 +335,7 @@ public:
       skipDecls.insert(forStmt->getConditionVariable());
       variableName = forStmt->getConditionVariable()->getNameAsString();
     } else {
+      // FIXME: need not be a single declaration 
       variableName = dyn_cast<VarDecl>(dyn_cast<DeclStmt>(forStmt->getInit())->getSingleDecl())->getNameAsString();
     }
     symbolTable.insert(variableName);
@@ -473,6 +474,15 @@ public:
   virtual bool VisitParenExpr(ParenExpr *parenExpr) {
     if (skipStmts.find(parenExpr) != skipStmts.end()) {
       skipStmts.insert(parenExpr->getSubExpr());
+    }
+    return true;
+  }
+
+  virtual bool VisitConditionalOperator(ConditionalOperator *conditionalOperator) {
+    if (skipStmts.find(conditionalOperator) != skipStmts.end()) {
+      skipStmts.insert(conditionalOperator->getCond());
+      skipStmts.insert(conditionalOperator->getTrueExpr());
+      skipStmts.insert(conditionalOperator->getFalseExpr());
     }
     return true;
   }
