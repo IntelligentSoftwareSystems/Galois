@@ -50,7 +50,7 @@ static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'p
 
 
 struct NodeData {
-  std::atomic<int> dist_current;
+  std::atomic<unsigned long long> dist_current;
 };
 
 typedef hGraph<NodeData, unsigned int> Graph;
@@ -59,25 +59,27 @@ typedef typename Graph::GraphNode GNode;
 
 struct InitializeGraph {
   Graph *graph;
+  llvm::cl::opt<unsigned int> &local_src_node;
 
-  InitializeGraph(Graph* _graph) : graph(_graph){}
+  InitializeGraph(llvm::cl::opt<unsigned int>& _src_node, Graph* _graph) : local_src_node(_src_node), graph(_graph){}
+
   void static go(Graph& _graph) {
     struct SyncerPull_0 {
-      static int extract(uint32_t node_id, const struct NodeData & node) {
+      static unsigned long long extract(uint32_t node_id, const struct NodeData & node) {
 #ifdef __GALOIS_HET_CUDA__
         if (personality == GPU_CUDA) return get_node_dist_current_cuda(cuda_ctx, node_id);
         assert (personality == CPU);
 #endif
         return node.dist_current;
       }
-      static void setVal (uint32_t node_id, struct NodeData & node, int y) {
+      static void setVal (uint32_t node_id, struct NodeData & node, unsigned long long y) {
 #ifdef __GALOIS_HET_CUDA__
         if (personality == GPU_CUDA) set_node_dist_current_cuda(cuda_ctx, node_id, y);
         else if (personality == CPU)
 #endif
           node.dist_current = y;
       }
-      typedef int ValTy;
+      typedef unsigned long long ValTy;
     };
 
 #ifdef __GALOIS_HET_CUDA__
@@ -95,14 +97,18 @@ struct InitializeGraph {
     		InitializeGraph_cuda(cuda_ctx);
     	} else if (personality == CPU)
     #endif
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, Galois::loopname("InitGraph"));
+    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {src_node, &_graph}, Galois::loopname("InitGraph"));
 
     _graph.sync_pull<SyncerPull_0>();
   }
 
   void operator()(GNode src) const {
     NodeData& sdata = graph->getData(src);
-    sdata.dist_current = std::numeric_limits<int>::max()/4;
+    sdata.dist_current = std::numeric_limits<unsigned long long>::max()/4;
+    auto& net = Galois::Runtime::getSystemNetworkInterface();
+    if((net.ID == 0) && (src == local_src_node)){
+      sdata.dist_current = 0;
+    }
   }
 };
 
@@ -110,14 +116,14 @@ template <typename GraphTy>
 struct Get_info_functor : public Galois::op_tag {
 	GraphTy &graph;
 	struct Syncer_0 {
-		static int extract(uint32_t node_id, const struct NodeData & node) {
+		static unsigned long long extract(uint32_t node_id, const struct NodeData & node) {
 		#ifdef __GALOIS_HET_CUDA__
 			if (personality == GPU_CUDA) return get_node_dist_current_cuda(cuda_ctx, node_id);
 			assert (personality == CPU);
 		#endif
 			return node.dist_current;
 		}
-		static void reduce (uint32_t node_id, struct NodeData & node, int y) {
+		static void reduce (uint32_t node_id, struct NodeData & node, unsigned long long y) {
 		#ifdef __GALOIS_HET_CUDA__
 			if (personality == GPU_CUDA) add_node_dist_current_cuda(cuda_ctx, node_id, y);
 			else if (personality == CPU)
@@ -129,26 +135,26 @@ struct Get_info_functor : public Galois::op_tag {
 			if (personality == GPU_CUDA) set_node_dist_current_cuda(cuda_ctx, node_id, 0);
 			else if (personality == CPU)
 		#endif
-				{node.dist_current = std::numeric_limits<int>::max()/4; }
+				{node.dist_current = std::numeric_limits<unsigned long long>::max()/4; }
 		}
-		typedef int ValTy;
+		typedef unsigned long long ValTy;
 	};
 	struct SyncerPull_0 {
-		static int extract(uint32_t node_id, const struct NodeData & node) {
+		static unsigned long long extract(uint32_t node_id, const struct NodeData & node) {
 		#ifdef __GALOIS_HET_CUDA__
 			if (personality == GPU_CUDA) return get_node_dist_current_cuda(cuda_ctx, node_id);
 			assert (personality == CPU);
 		#endif
 			return node.dist_current;
 		}
-		static void setVal (uint32_t node_id, struct NodeData & node, int y) {
+		static void setVal (uint32_t node_id, struct NodeData & node, unsigned long long y) {
 		#ifdef __GALOIS_HET_CUDA__
 			if (personality == GPU_CUDA) set_node_dist_current_cuda(cuda_ctx, node_id, y);
 			else if (personality == CPU)
 		#endif
 				node.dist_current = y;
 		}
-		typedef int ValTy;
+		typedef unsigned long long ValTy;
 	};
 	Get_info_functor(GraphTy& _g): graph(_g){}
 	unsigned operator()(GNode n) const {
@@ -223,7 +229,7 @@ struct SSSP {
       		}
       	} else if (personality == CPU)
       #endif
-      Galois::for_each(_graph.begin(), _graph.end(), SSSP (&_graph), Galois::loopname("sssp"), Galois::workList_version(), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "int" , "{ Galois::atomicMin(node.dist_current, y);}",  "{node.dist_current = std::numeric_limits<int>::max()/4; }"), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "dist_current" , "int"), Get_info_functor<Graph>(_graph));
+      Galois::for_each(_graph.begin(), _graph.end(), SSSP (&_graph), Galois::loopname("sssp"), Galois::workList_version(), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned long long" , "{ Galois::atomicMin(node.dist_current, y);}",  "{node.dist_current = std::numeric_limits<unsigned long long>::max()/4; }"), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "dist_current" , "unsigned long long"), Get_info_functor<Graph>(_graph));
 
   }
 
@@ -234,7 +240,7 @@ struct SSSP {
     for (auto jj = graph->edge_begin(src), ej = graph->edge_end(src); jj != ej; ++jj) {
       GNode dst = graph->getEdgeDst(jj);
       auto& dnode = graph->getData(dst);
-      int new_dist = graph->getEdgeData(jj) + sdist;
+      unsigned long long new_dist = graph->getEdgeData(jj) + sdist;
       auto old_dist = Galois::atomicMin(dnode.dist_current, new_dist);
       if(old_dist > new_dist){
         ctx.push(graph->getGID(dst));
@@ -269,11 +275,6 @@ int main(int argc, char** argv) {
     InitializeGraph::go(hg);
     T_init.stop();
 
-    // Set node 0 to be source.
-    setSource(hg);
-    auto & nd = hg.getData(src_node);
-    std::cout << " Source is : "  << src_node << " val : " <<  nd.dist_current << "\n";
-
     // Verify
 /*
     if(verify){
@@ -295,7 +296,6 @@ int main(int argc, char** argv) {
 
     Galois::Runtime::getHostBarrier().wait();
     InitializeGraph::go(hg);
-    setSource(hg);
 
     std::cout << "SSSP::go run2 called  on " << net.ID << "\n";
     T_sssp2.start();
@@ -306,7 +306,6 @@ int main(int argc, char** argv) {
 
     Galois::Runtime::getHostBarrier().wait();
     InitializeGraph::go(hg);
-    setSource(hg);
 
     std::cout << "SSSP::go run3 called  on " << net.ID << "\n";
     T_sssp3.start();
