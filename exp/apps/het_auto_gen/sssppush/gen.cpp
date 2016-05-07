@@ -87,6 +87,7 @@ typedef hGraph<NodeData, unsigned int> Graph;
 typedef typename Graph::GraphNode GNode;
 
 const unsigned int infinity = std::numeric_limits<unsigned int>::max()/4;
+unsigned iteration;
 
 struct InitializeGraph {
   cll::opt<int> &local_src_node;
@@ -135,7 +136,7 @@ struct SSSP {
 
   SSSP(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph){
-    unsigned iteration = 0;
+    iteration = 0;
     do{
       DGAccumulator_accum.reset();
 
@@ -307,7 +308,7 @@ int main(int argc, char** argv) {
 
     auto mean_time = (T_sssp1.get() + T_sssp2.get() + T_sssp3.get())/3;
 
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " sssp1 : " << T_sssp1.get() << " sssp2 : " << T_sssp2.get() << " sssp3 : " << T_sssp3.get() <<" sssp mean time : " << mean_time << "(msec)\n\n";
+    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " sssp1 : " << T_sssp1.get() << " sssp2 : " << T_sssp2.get() << " sssp3 : " << T_sssp3.get() <<" sssp mean time (" << iteration << " iterations) : " << mean_time << "(msec)\n\n";
 
     // Verify
     if(verify){

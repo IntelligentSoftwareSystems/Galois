@@ -529,6 +529,14 @@ public:
       return globalOffset;
    }
 #ifdef __GALOIS_HET_CUDA__
+   template<bool isVoidType, typename std::enable_if<isVoidType>::type* = nullptr>
+   void setMarshalEdge(MarshalGraph &m, size_t index, edge_iterator &e) {
+      // do nothing
+   }
+   template<bool isVoidType, typename std::enable_if<!isVoidType>::type* = nullptr>
+   void setMarshalEdge(MarshalGraph &m, size_t index, edge_iterator &e) {
+      m.edge_data[index] = getEdgeData(e);
+   }
    MarshalGraph getMarshalGraph(unsigned host_id) {
       MarshalGraph m;
 
@@ -541,19 +549,28 @@ public:
       m.row_start = (index_type *) calloc(m.nnodes + 1, sizeof(index_type));
       m.edge_dst = (index_type *) calloc(m.nedges, sizeof(index_type));
 
-      // TODO: initialize node_data and edge_data
+      // TODO: initialize node_data
       m.node_data = NULL;
-      m.edge_data = NULL;
+
+      if (std::is_void<EdgeTy>::value) {
+        m.edge_data = NULL;
+      } else {
+        if (!std::is_same<EdgeTy, edge_data_type>::value) {
+          fprintf(stderr, "WARNING: Edge data type mismatch between CPU and GPU\n");
+        }
+        m.edge_data = (edge_data_type *) calloc(m.nedges, sizeof(edge_data_type));
+      }
 
       // pinched from Rashid's LC_LinearArray_Graph.h
-
       size_t edge_counter = 0, node_counter = 0;
       for (auto n = begin(); n != ghost_end() && *n != m.nnodes; n++, node_counter++) {
          m.row_start[node_counter] = edge_counter;
          if (*n < m.nowned) {
             for (auto e = edge_begin(*n); e != edge_end(*n); e++) {
-               if (getEdgeDst(e) < m.nnodes)
-               m.edge_dst[edge_counter++] = getEdgeDst(e);
+               if (getEdgeDst(e) < m.nnodes) {
+                 setMarshalEdge<std::is_void<EdgeTy>::value>(m, edge_counter, e);
+                 m.edge_dst[edge_counter++] = getEdgeDst(e);
+               }
             }
          }
       }
