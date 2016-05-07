@@ -570,6 +570,7 @@ public:
       header << var.second << " get_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID);\n";
       header << "void set_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID, " << var.second << " v);\n";
       header << "void add_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID, " << var.second << " v);\n";
+      header << "void min_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID, " << var.second << " v);\n";
     }
     for (auto& kernel : HostKernelsToArgumentsMap) {
       header << "void " << kernel.first << "_cuda(";
@@ -623,6 +624,11 @@ public:
       cuheader << "void add_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID, " << var.second << " v) {\n";
       cuheader << "\t" << var.second << " *" << var.first << " = ctx->" << var.first << ".cpu_wr_ptr();\n";
       cuheader << "\t" << var.first << "[LID] += v;\n";
+      cuheader << "}\n\n";
+      cuheader << "void min_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID, " << var.second << " v) {\n";
+      cuheader << "\t" << var.second << " *" << var.first << " = ctx->" << var.first << ".cpu_wr_ptr();\n";
+      cuheader << "\tif (" << var.first << "[LID] > v)\n";
+      cuheader << "\t\t" << var.first << "[LID] = v;\n";
       cuheader << "}\n\n";
     }
     cuheader << "struct CUDA_Context *get_CUDA_context(int id) {\n";

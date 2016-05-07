@@ -38,6 +38,12 @@ void add_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned
 	dist_current[LID] += v;
 }
 
+void min_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v) {
+	unsigned int *dist_current = ctx->dist_current.cpu_wr_ptr();
+	if (dist_current[LID] > v)
+		dist_current[LID] = v;
+}
+
 struct CUDA_Context *get_CUDA_context(int id) {
 	struct CUDA_Context *ctx;
 	ctx = (struct CUDA_Context *) calloc(1, sizeof(struct CUDA_Context));

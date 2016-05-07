@@ -150,7 +150,7 @@ struct SSSP {
       		}
       		static void reduce (uint32_t node_id, struct NodeData & node, unsigned int y) {
       		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) add_node_dist_current_cuda(cuda_ctx, node_id, y);
+      			if (personality == GPU_CUDA) min_node_dist_current_cuda(cuda_ctx, node_id, y);
       			else if (personality == CPU)
       		#endif
       				{ Galois::atomicMin(node.dist_current, y);}
