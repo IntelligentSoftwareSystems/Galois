@@ -59,12 +59,20 @@ class DGBag {
     num_Hosts_recvd++;
   }
 
+  void init_sync() {
+    num_Hosts_recvd = 0;
+    hosts_didWork_vec.clear();
+    workItem_recv_vec.clear();
+    Galois::Runtime::getHostBarrier().wait();
+  }
+
 public: 
   DGBag(const FunctionTy &fn) : helper_fn(fn) {
     bagItems_vec.resize(net.Num);
   }
 
   void set(InsertBag<ValueTy> &bag) {
+    init_sync();
     didWork = !bag.empty();
     for(auto ii = bag.begin(); ii != bag.end(); ++ii)
     {
@@ -74,6 +82,7 @@ public:
   }
 
   void set_local(int* array, size_t size) {
+    init_sync();
     didWork = (size > 0);
     for (auto i = 0; i < size; ++i) {
       ValueTy ii = helper_fn.getGNode(array[i]);
@@ -102,11 +111,6 @@ public:
     for(auto x = 0; x < net.Num; ++x){
       bagItems_vec[x].clear();
     }
-
-    Galois::Runtime::getHostBarrier().wait();
-    num_Hosts_recvd = 0;
-    hosts_didWork_vec.clear();
-    workItem_recv_vec.clear();
   }
 
   static const std::vector<ValueTy> &get() {

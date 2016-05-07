@@ -594,6 +594,11 @@ public:
     cuheader << "#else\n";
     cuheader << "#define check_cuda_kernel  \n";
     cuheader << "#endif\n";
+    if (requiresWorklist) {
+      cuheader << "\n#ifndef __GALOIS_CUDA_WORKLIST_DUPLICATION_FACTOR__\n";
+      cuheader << "#define __GALOIS_CUDA_WORKLIST_DUPLICATION_FACTOR__ 2\n";
+      cuheader << "#endif\n";
+    }
     cuheader << "\nstruct CUDA_Context {\n";
     cuheader << "\tint device;\n";
     cuheader << "\tint id;\n";
@@ -606,8 +611,8 @@ public:
     }
     cuheader << "\tShared<int> p_retval;\n";
     if (requiresWorklist) {
-      cuheader << "\tWorklistT in_wl;\n";
-      cuheader << "\tWorklistT out_wl;\n";
+      cuheader << "\tWorklist2 in_wl;\n";
+      cuheader << "\tWorklist2 out_wl;\n";
       cuheader << "\tstruct CUDA_Worklist *shared_wl;\n";
     }
     cuheader << "\tAny any_retval;\n";
@@ -678,8 +683,9 @@ public:
       cuheader << "\tctx->" << var.first << ".alloc(graph.nnodes);\n";
     }
     if (requiresWorklist) {
-      cuheader << "\tctx->in_wl = WorklistT(graph.nnodes);\n";
-      cuheader << "\tctx->out_wl = WorklistT(graph.nnodes);\n";
+      // Assuming at the most an average duplicaton of 4 in the worklist
+      cuheader << "\tctx->in_wl = Worklist2(__GALOIS_CUDA_WORKLIST_DUPLICATION_FACTOR__*graph.nedges);\n";
+      cuheader << "\tctx->out_wl = Worklist2(__GALOIS_CUDA_WORKLIST_DUPLICATION_FACTOR__*graph.nedges);\n";
       cuheader << "\twl->num_in_items = -1;\n";
       cuheader << "\twl->num_out_items = -1;\n";
       cuheader << "\twl->in_items = ctx->in_wl.wl;\n";

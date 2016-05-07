@@ -414,10 +414,10 @@ namespace {
             kernelBefore << cudaKernelCall.str();
             kernelBefore << "\t\twhile (!dbag.canTerminate()) {\n";
             kernelBefore << "\t\t++num_iter;\n";
+            kernelBefore << "\t\tcuda_wl.num_in_items = local_wl.size();\n";
             kernelBefore << "\t\t//std::cout << \"[\" << Galois::Runtime::getSystemNetworkInterface().ID << \"] Iter : \" << num_iter ";
             kernelBefore << "<< \" Total items to work on : \" << cuda_wl.num_in_items << \"\\n\";\n";
             kernelBefore << "\t\tT_compute.start();\n";
-            kernelBefore << "\t\tcuda_wl.num_in_items = local_wl.size();\n";
             kernelBefore << "\t\tstd::copy(local_wl.begin(), local_wl.end(), cuda_wl.in_items);\n";
             kernelBefore << cudaKernelCall.str();
             kernelBefore << "\t\t}\n";

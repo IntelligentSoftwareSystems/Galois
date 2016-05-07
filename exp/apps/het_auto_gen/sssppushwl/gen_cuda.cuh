@@ -11,63 +11,44 @@
 #define check_cuda_kernel  
 #endif
 
+#ifndef __GALOIS_CUDA_WORKLIST_DUPLICATION_FACTOR__
+#define __GALOIS_CUDA_WORKLIST_DUPLICATION_FACTOR__ 2
+#endif
+
 struct CUDA_Context {
 	int device;
 	int id;
 	size_t nowned;
 	size_t g_offset;
-	CSRGraph hg;
-	CSRGraph gg;
-	Shared<unsigned int> nout;
-	Shared<float> residual;
-	Shared<float> value;
+	CSRGraphTy hg;
+	CSRGraphTy gg;
+	Shared<unsigned int> dist_current;
 	Shared<int> p_retval;
+	Worklist2 in_wl;
+	Worklist2 out_wl;
+	struct CUDA_Worklist *shared_wl;
 	Any any_retval;
 };
 
-unsigned int get_node_nout_cuda(struct CUDA_Context *ctx, unsigned LID) {
-	unsigned int *nout = ctx->nout.cpu_rd_ptr();
-	return nout[LID];
+unsigned int get_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned LID) {
+	unsigned int *dist_current = ctx->dist_current.cpu_rd_ptr();
+	return dist_current[LID];
 }
 
-void set_node_nout_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v) {
-	unsigned int *nout = ctx->nout.cpu_wr_ptr();
-	nout[LID] = v;
+void set_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v) {
+	unsigned int *dist_current = ctx->dist_current.cpu_wr_ptr();
+	dist_current[LID] = v;
 }
 
-void add_node_nout_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v) {
-	unsigned int *nout = ctx->nout.cpu_wr_ptr();
-	nout[LID] += v;
+void add_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v) {
+	unsigned int *dist_current = ctx->dist_current.cpu_wr_ptr();
+	dist_current[LID] += v;
 }
 
-float get_node_residual_cuda(struct CUDA_Context *ctx, unsigned LID) {
-	float *residual = ctx->residual.cpu_rd_ptr();
-	return residual[LID];
-}
-
-void set_node_residual_cuda(struct CUDA_Context *ctx, unsigned LID, float v) {
-	float *residual = ctx->residual.cpu_wr_ptr();
-	residual[LID] = v;
-}
-
-void add_node_residual_cuda(struct CUDA_Context *ctx, unsigned LID, float v) {
-	float *residual = ctx->residual.cpu_wr_ptr();
-	residual[LID] += v;
-}
-
-float get_node_value_cuda(struct CUDA_Context *ctx, unsigned LID) {
-	float *value = ctx->value.cpu_rd_ptr();
-	return value[LID];
-}
-
-void set_node_value_cuda(struct CUDA_Context *ctx, unsigned LID, float v) {
-	float *value = ctx->value.cpu_wr_ptr();
-	value[LID] = v;
-}
-
-void add_node_value_cuda(struct CUDA_Context *ctx, unsigned LID, float v) {
-	float *value = ctx->value.cpu_wr_ptr();
-	value[LID] += v;
+void min_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v) {
+	unsigned int *dist_current = ctx->dist_current.cpu_wr_ptr();
+	if (dist_current[LID] > v)
+		dist_current[LID] = v;
 }
 
 struct CUDA_Context *get_CUDA_context(int id) {
@@ -96,8 +77,8 @@ bool init_CUDA_context(struct CUDA_Context *ctx, int device) {
 	return true;
 }
 
-void load_graph_CUDA(struct CUDA_Context *ctx, MarshalGraph &g) {
-	CSRGraph &graph = ctx->hg;
+void load_graph_CUDA(struct CUDA_Context *ctx, struct CUDA_Worklist *wl, MarshalGraph &g) {
+	CSRGraphTy &graph = ctx->hg;
 	ctx->nowned = g.nowned;
 	assert(ctx->id == g.id);
 	graph.nnodes = g.nnodes;
@@ -111,21 +92,24 @@ void load_graph_CUDA(struct CUDA_Context *ctx, MarshalGraph &g) {
 	if(g.node_data) memcpy(graph.node_data, g.node_data, sizeof(node_data_type) * g.nnodes);
 	if(g.edge_data) memcpy(graph.edge_data, g.edge_data, sizeof(edge_data_type) * g.nedges);
 	graph.copy_to_gpu(ctx->gg);
-	ctx->nout.alloc(graph.nnodes);
-	ctx->residual.alloc(graph.nnodes);
-	ctx->value.alloc(graph.nnodes);
+	ctx->dist_current.alloc(graph.nnodes);
+	ctx->in_wl = Worklist2(__GALOIS_CUDA_WORKLIST_DUPLICATION_FACTOR__*graph.nedges);
+	ctx->out_wl = Worklist2(__GALOIS_CUDA_WORKLIST_DUPLICATION_FACTOR__*graph.nedges);
+	wl->num_in_items = -1;
+	wl->num_out_items = -1;
+	wl->in_items = ctx->in_wl.wl;
+	wl->out_items = ctx->out_wl.wl;
+	ctx->shared_wl = wl;
 	ctx->p_retval = Shared<int>(1);
 	printf("load_graph_GPU: %d owned nodes of total %d resident, %d edges\n", ctx->nowned, graph.nnodes, graph.nedges);
 	reset_CUDA_context(ctx);
 }
 
 void reset_CUDA_context(struct CUDA_Context *ctx) {
-	ctx->nout.zero_gpu();
-	ctx->residual.zero_gpu();
-	ctx->value.zero_gpu();
+	ctx->dist_current.zero_gpu();
 }
 
-void kernel_sizing(CSRGraph & g, dim3 &blocks, dim3 &threads) {
+void kernel_sizing(CSRGraphTy & g, dim3 &blocks, dim3 &threads) {
 	threads.x = 256;
 	threads.y = threads.z = 1;
 	blocks.x = 14 * 8;

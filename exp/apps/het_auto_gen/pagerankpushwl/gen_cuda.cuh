@@ -11,6 +11,10 @@
 #define check_cuda_kernel  
 #endif
 
+#ifndef __GALOIS_CUDA_WORKLIST_DUPLICATION_FACTOR__
+#define __GALOIS_CUDA_WORKLIST_DUPLICATION_FACTOR__ 2
+#endif
+
 struct CUDA_Context {
 	int device;
 	int id;
@@ -22,8 +26,8 @@ struct CUDA_Context {
 	Shared<float> residual;
 	Shared<float> value;
 	Shared<int> p_retval;
-	WorklistT in_wl;
-	WorklistT out_wl;
+	Worklist2 in_wl;
+	Worklist2 out_wl;
 	struct CUDA_Worklist *shared_wl;
 	Any any_retval;
 };
@@ -117,8 +121,8 @@ void load_graph_CUDA(struct CUDA_Context *ctx, struct CUDA_Worklist *wl, Marshal
 	ctx->nout.alloc(graph.nnodes);
 	ctx->residual.alloc(graph.nnodes);
 	ctx->value.alloc(graph.nnodes);
-	ctx->in_wl = WorklistT(graph.nnodes);
-	ctx->out_wl = WorklistT(graph.nnodes);
+	ctx->in_wl = Worklist2(__GALOIS_CUDA_WORKLIST_DUPLICATION_FACTOR__*graph.nedges);
+	ctx->out_wl = Worklist2(__GALOIS_CUDA_WORKLIST_DUPLICATION_FACTOR__*graph.nedges);
 	wl->num_in_items = -1;
 	wl->num_out_items = -1;
 	wl->in_items = ctx->in_wl.wl;

@@ -250,9 +250,9 @@ struct PageRank {
      		//std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] Iter : " << num_iter << " T_compute : " << T_compute.get() << "(msec) T_comm_syncGraph : " << T_comm_syncGraph.get() << "(msec) T_comm_bag : " << T_comm_bag.get() << "(msec) \n";
      		while (!dbag.canTerminate()) {
      		++num_iter;
+     		cuda_wl.num_in_items = local_wl.size();
      		//std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] Iter : " << num_iter << " Total items to work on : " << cuda_wl.num_in_items << "\n";
      		T_compute.start();
-     		cuda_wl.num_in_items = local_wl.size();
      		std::copy(local_wl.begin(), local_wl.end(), cuda_wl.in_items);
      		if (cuda_wl.num_in_items > 0)
      			PageRank_cuda(alpha, tolerance, cuda_ctx);
