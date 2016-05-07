@@ -62,6 +62,6 @@ target_link_libraries(prpull_vcut_het_auto_gen prpull_vcut_het_auto_gen_cuda)
 cuda_add_library(sssppush_het_auto_gen_cuda sssppush/gen_cuda.cu)
 target_link_libraries(sssppush_het_auto_gen_cuda ggrt)
 app(sssppush_het_auto_gen sssppush/gen.cpp DISTSAFE)
-target_compile_definitions(sssppush_het_auto_gen ssspIVATE __GALOIS_HET_CUDA__=1)
+target_compile_definitions(sssppush_het_auto_gen PRIVATE __GALOIS_HET_CUDA__=1)
 target_link_libraries(sssppush_het_auto_gen sssppush_het_auto_gen_cuda)
 

@@ -22,6 +22,7 @@ ForAll("src", G.nodes(None, "nowned"),
 [
 CDecl([("unsigned int", "sdist", "")]),
 CBlock(["sdist = p_dist_current[src]"]),
+ClosureHint(
 ForAll("jj", G.edges("src"),
 [
 CDecl([("index_type", "dst", "")]),
@@ -35,6 +36,7 @@ If("old_dist > new_dist",
 CBlock(["any_retval.return_( 1)"]),
 ]),
 ]),
+),
 ]),
 ]),
 Kernel("InitializeGraph_cuda", [('int', 'local_src_node'), ('unsigned int', 'local_infinity'), ('struct CUDA_Context *', 'ctx')],
