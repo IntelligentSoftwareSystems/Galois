@@ -6,7 +6,7 @@
 #include "gen_cuda.h"
 
 #ifdef __GALOIS_CUDA_CHECK_ERROR__
-#define check_cuda_kernel check_cuda(cudaGetLastError()); check_cuda(cudaDeviceSynchronize());
+#define check_cuda_kernel check_cuda(cudaDeviceSynchronize()); check_cuda(cudaGetLastError());
 #else
 #define check_cuda_kernel  
 #endif
