@@ -320,6 +320,7 @@ int main(int argc, char** argv) {
 #ifdef __GALOIS_HET_CUDA__
     const unsigned my_host_id = Galois::Runtime::getHostID();
     int gpu_device = gpudevice;
+    std::vector<unsigned> scalefactor;
     //Parse arg string when running on multiple hosts and update/override personality
     //with corresponding value.
     if (personality_set.length() == Galois::Runtime::NetworkInterface::Num) {
@@ -344,13 +345,12 @@ int main(int argc, char** argv) {
         }
       }
 #endif
-    }
-    std::vector<unsigned> scalefactor;
-    for (unsigned i=0; i<personality_set.length(); ++i) {
-      if (personality_set.c_str()[i] == 'c') 
-        scalefactor.push_back(scalecpu);
-      else
-        scalefactor.push_back(scalegpu);
+      for (unsigned i=0; i<personality_set.length(); ++i) {
+        if (personality_set.c_str()[i] == 'c') 
+          scalefactor.push_back(scalecpu);
+        else
+          scalefactor.push_back(scalegpu);
+      }
     }
 #endif
 
