@@ -72,3 +72,9 @@ app(sssppushwl_het_auto_gen sssppushwl/gen.cpp DISTSAFE)
 target_compile_definitions(sssppushwl_het_auto_gen PRIVATE __GALOIS_HET_CUDA__=1)
 target_link_libraries(sssppushwl_het_auto_gen sssppushwl_het_auto_gen_cuda)
 
+cuda_add_library(sssppushwl_filter_het_auto_gen_cuda sssppushwl_filter/gen_cuda.cu)
+target_link_libraries(sssppushwl_filter_het_auto_gen_cuda ggrt)
+app(sssppushwl_filter_het_auto_gen sssppushwl_filter/gen.cpp DISTSAFE)
+target_compile_definitions(sssppushwl_filter_het_auto_gen PRIVATE __GALOIS_HET_CUDA__=1)
+target_link_libraries(sssppushwl_filter_het_auto_gen sssppushwl_filter_het_auto_gen_cuda)
+
