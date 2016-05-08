@@ -388,11 +388,6 @@ int main(int argc, char** argv) {
 #endif
     }
 
-    if(verify){
-      for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
-        Galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).dist_current);
-      }
-    }
     return 0;
   } catch(const char* c) {
     std::cerr << "Error: " << c << "\n";
