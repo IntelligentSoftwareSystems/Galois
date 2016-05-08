@@ -57,6 +57,12 @@ typedef OfflineGraph GraphType;
 typedef GraphType::edge_iterator EdgeItType;
 typedef GraphType::iterator NodeItType;
 
+#define _HAS_EDGE_DATA 1
+
+#ifdef _HAS_EDGE_DATA
+typedef unsigned int EdgeDataType;
+#endif
+
 //using namespace std;
 /******************************************************************
  *
@@ -213,6 +219,19 @@ struct Partitioner {
     * Optimized implementation for memory usage.
     * Write both the metadata as well as the partition information.
     * */
+   struct NewEdgeData{
+      size_t src, dst;
+#if _HAS_EDGE_DATA
+      EdgeDataType data;
+#endif
+
+#if _HAS_EDGE_DATA
+      NewEdgeData(size_t s, size_t d, EdgeDataType dt ):src(s), dst(d),data(dt){}
+#else
+      NewEdgeData(size_t s, size_t d):src(s), dst(d){}
+
+#endif
+   };
    void writePartitionsMem(std::string & basename, OfflineGraph & g, VertexCutInfo & vcInfo, size_t num_hosts) {
       //Create graph
       //TODO RK - Fix edgeData
@@ -243,7 +262,7 @@ struct Partitioner {
                }
             }
          }//For each node
-         std::vector<std::pair<size_t, size_t>> newEdges;
+         std::vector<NewEdgeData> newEdges;
          for (auto n = g.begin(); n != g.end(); ++n) {
             auto src = *n;
             for (auto e = g.edge_begin(*n); e != g.edge_end(*n); ++e) {
@@ -253,7 +272,11 @@ struct Partitioner {
                   size_t new_src = global2Local[src];
                   size_t new_dst = global2Local[dst];
                   assert(new_src!=-1 && new_dst!=-1);
-                  newEdges.push_back(std::pair<size_t, size_t>(new_src, new_dst));
+#if _HAS_EDGE_DATA
+                  newEdges.push_back(NewEdgeData(new_src, new_dst, g.getEdgeData<EdgeDataType>(e)));
+#else
+                  newEdges.push_back(NewEdgeData(new_src, new_dst));
+#endif
                }      //End if
             }      //End for neighbors
          }      //end for nodes
@@ -262,6 +285,9 @@ struct Partitioner {
          FileGraphWriter newGraph;
          newGraph.setNumNodes(newNodeCounter);
          newGraph.setNumEdges(newEdges.size());
+#if _HAS_EDGE_DATA
+         newGraph.setSizeofEdgeData(sizeof(EdgeDataType));
+#endif
          newGraph.phase1();
          std::string meta_file_name = getMetaFileName(basename, h, num_hosts);
          std::cout << "Writing meta-file " << h << " to disk..." << meta_file_name<< "\n";
@@ -279,13 +305,24 @@ struct Partitioner {
 
          meta_file.close();
          for (auto e : newEdges) {
-            newGraph.incrementDegree(e.first);
+            newGraph.incrementDegree(e.src);
          }
          newGraph.phase2();
+#if _HAS_EDGE_DATA
+         std::vector<EdgeDataType> newEdgeData(newEdges.size());
+#endif
          for (auto e : newEdges) {
-            newGraph.addNeighbor(e.first, e.second);
+            size_t idx = newGraph.addNeighbor(e.src, e.dst);
+#if _HAS_EDGE_DATA
+            newEdgeData[idx] = e.data;
+#endif
+
          }
+#if _HAS_EDGE_DATA
+         memcpy(newGraph.finish<EdgeDataType>(), newEdgeData.data(), sizeof(EdgeDataType)*newEdges.size());
+#else
          newGraph.finish<void>();
+#endif
          std::string gFileName = getPartitionFileName(basename, h, num_hosts);
          std::cout << "Writing partition " << h << " to disk... " << gFileName<<"\n";
          newGraph.toFile(gFileName);
