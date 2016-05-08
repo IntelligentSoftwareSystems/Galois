@@ -75,6 +75,8 @@ private:
   std::map<std::string, std::pair<std::vector<std::string>, std::vector<std::string> > > &KernelToArgumentsMap;
   std::set<std::string> &KernelsHavingReturnValue;
 
+  bool conditional; // if (generated) code is enclosed within an if-condition
+
 public:
   explicit IrGLOperatorVisitor(ASTContext *context, Rewriter &R, 
       bool isTopo,
@@ -226,7 +228,7 @@ public:
     }
 
     // get basic type
-    if (text.find("std::atomic") == 0) {
+    if ((text.find("std::atomic") == 0) || (text.find("struct std::atomic") == 0)) {
       std::size_t begin = text.find("<");
       std::size_t end = text.find_last_of(">");
       text = text.substr(begin+1, end - begin - 1);
@@ -275,8 +277,10 @@ public:
     if (traverse && S) {
       if (isa<CXXForRangeStmt>(S) || isa<ForStmt>(S)) {
         bodyString << "]),\n"; // end ForAll
+        if (!conditional) bodyString << "),\n";
       } else if (isa<IfStmt>(S)) {
         bodyString << "]),\n"; // end If
+        conditional = false;
       }
     }
     return traverse;
@@ -322,6 +326,7 @@ public:
     std::size_t end = vertexName.find(",", begin);
     if (end == std::string::npos) end = vertexName.find(")", begin);
     vertexName = vertexName.substr(begin+1, end - begin - 1);
+    if (!conditional) bodyString << "ClosureHint(\n";
     bodyString << "ForAll(\"" << variableName << "\", G.edges(\"" << vertexName << "\"),\n[\n";
     return true;
   }
@@ -335,6 +340,7 @@ public:
       skipDecls.insert(forStmt->getConditionVariable());
       variableName = forStmt->getConditionVariable()->getNameAsString();
     } else {
+      // FIXME: need not be a single declaration 
       variableName = dyn_cast<VarDecl>(dyn_cast<DeclStmt>(forStmt->getInit())->getSingleDecl())->getNameAsString();
     }
     symbolTable.insert(variableName);
@@ -346,6 +352,7 @@ public:
     std::size_t end = vertexName.find(",", begin);
     if (end == std::string::npos) end = vertexName.find(")", begin);
     vertexName = vertexName.substr(begin+1, end - begin - 1);
+    if (!conditional) bodyString << "ClosureHint(\n";
     bodyString << "ForAll(\"" << variableName << "\", G.edges(\"" << vertexName << "\"),\n[\n";
     return true;
   }
@@ -443,6 +450,7 @@ public:
     const Expr *expr = ifStmt->getCond();
     std::string text = FormatCBlock(rewriter.getRewrittenText(expr->getSourceRange()));
     bodyString << "If(\"" << text << "\",\n[\n";
+    conditional = true;
     skipStmts.insert(expr);
     return true;
   }
@@ -473,6 +481,15 @@ public:
   virtual bool VisitParenExpr(ParenExpr *parenExpr) {
     if (skipStmts.find(parenExpr) != skipStmts.end()) {
       skipStmts.insert(parenExpr->getSubExpr());
+    }
+    return true;
+  }
+
+  virtual bool VisitConditionalOperator(ConditionalOperator *conditionalOperator) {
+    if (skipStmts.find(conditionalOperator) != skipStmts.end()) {
+      skipStmts.insert(conditionalOperator->getCond());
+      skipStmts.insert(conditionalOperator->getTrueExpr());
+      skipStmts.insert(conditionalOperator->getFalseExpr());
     }
     return true;
   }
@@ -553,6 +570,7 @@ public:
       header << var.second << " get_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID);\n";
       header << "void set_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID, " << var.second << " v);\n";
       header << "void add_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID, " << var.second << " v);\n";
+      header << "void min_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID, " << var.second << " v);\n";
     }
     for (auto& kernel : HostKernelsToArgumentsMap) {
       header << "void " << kernel.first << "_cuda(";
@@ -581,8 +599,8 @@ public:
     cuheader << "\tint id;\n";
     cuheader << "\tsize_t nowned;\n";
     cuheader << "\tsize_t g_offset;\n";
-    cuheader << "\tCSRGraph hg;\n";
-    cuheader << "\tCSRGraph gg;\n";
+    cuheader << "\tCSRGraphTy hg;\n";
+    cuheader << "\tCSRGraphTy gg;\n";
     for (auto& var : SharedVariablesToTypeMap) {
       cuheader << "\tShared<" << var.second << "> " << var.first << ";\n";
     }
@@ -606,6 +624,11 @@ public:
       cuheader << "void add_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID, " << var.second << " v) {\n";
       cuheader << "\t" << var.second << " *" << var.first << " = ctx->" << var.first << ".cpu_wr_ptr();\n";
       cuheader << "\t" << var.first << "[LID] += v;\n";
+      cuheader << "}\n\n";
+      cuheader << "void min_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID, " << var.second << " v) {\n";
+      cuheader << "\t" << var.second << " *" << var.first << " = ctx->" << var.first << ".cpu_wr_ptr();\n";
+      cuheader << "\tif (" << var.first << "[LID] > v)\n";
+      cuheader << "\t\t" << var.first << "[LID] = v;\n";
       cuheader << "}\n\n";
     }
     cuheader << "struct CUDA_Context *get_CUDA_context(int id) {\n";
@@ -637,7 +660,7 @@ public:
       cuheader << "struct CUDA_Worklist *wl, ";
     }
     cuheader << "MarshalGraph &g) {\n";
-    cuheader << "\tCSRGraph &graph = ctx->hg;\n";
+    cuheader << "\tCSRGraphTy &graph = ctx->hg;\n";
     cuheader << "\tctx->nowned = g.nowned;\n";
     cuheader << "\tassert(ctx->id == g.id);\n";
     cuheader << "\tgraph.nnodes = g.nnodes;\n";
@@ -672,7 +695,7 @@ public:
       cuheader << "\tctx->" << var.first << ".zero_gpu();\n"; // FIXME: should do this only for std::atomic variables?
     }
     cuheader << "}\n\n";
-    cuheader << "void kernel_sizing(CSRGraph & g, dim3 &blocks, dim3 &threads) {\n";
+    cuheader << "void kernel_sizing(CSRGraphTy & g, dim3 &blocks, dim3 &threads) {\n";
     cuheader << "\tthreads.x = 256;\n";
     cuheader << "\tthreads.y = threads.z = 1;\n";
     cuheader << "\tblocks.x = 14 * 8;\n";

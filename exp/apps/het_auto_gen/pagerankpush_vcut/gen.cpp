@@ -103,7 +103,7 @@ struct ResetGraph {
     		reset_CUDA_context(cuda_ctx);
     	} else if (personality == CPU)
     #endif
-    Galois::do_all(_graph.begin(), _graph.end(), ResetGraph{ &_graph }, Galois::loopname("reset"));
+    Galois::do_all(_graph.begin(), _graph.ghost_end(), ResetGraph{ &_graph }, Galois::loopname("reset"));
   }
 
   void operator()(GNode src) const {
@@ -252,6 +252,7 @@ struct PageRank {
       _graph.sync_pull<SyncerPull_0>();
 
      ++iteration; 
+     if (maxIterations == 5) DGAccumulator_accum += 1;
     }while((iteration < maxIterations) && DGAccumulator_accum.reduce());
   }
 

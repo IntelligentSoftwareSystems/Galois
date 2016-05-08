@@ -15,12 +15,14 @@ Kernel("InitializeGraph", [G.param(), ('int ', 'nowned') , ('const float ', 'loc
 ForAll("src", G.nodes(None, "nowned"),
 [
 CBlock(["p_value[src] = 1.0 - local_alpha"]),
+ClosureHint(
 ForAll("nbr", G.edges("src"),
 [
 CDecl([("index_type", "dst", "")]),
 CBlock(["dst = graph.getAbsDestination(nbr)"]),
 CBlock(["atomicAdd(&p_nout[dst], 1)"]),
 ]),
+),
 ]),
 ]),
 Kernel("PageRank_pull", [G.param(), ('int ', 'nowned') , ('const float ', 'local_alpha'), ('const float ', 'local_tolerance'), ('int *', 'p_nout'), ('float *', 'p_value'), ('Any', 'any_retval')],
@@ -29,6 +31,7 @@ ForAll("src", G.nodes(None, "nowned"),
 [
 CDecl([("float", "sum", "")]),
 CBlock(["sum = 0"]),
+ClosureHint(
 ForAll("nbr", G.edges("src"),
 [
 CDecl([("index_type", "dst", "")]),
@@ -40,6 +43,7 @@ If("dnout > 0",
 CBlock(["sum += p_value[dst]/dnout"]),
 ]),
 ]),
+),
 CDecl([("float", "pr_value", "")]),
 CBlock(["pr_value = sum*(1.0 - local_alpha) + local_alpha"]),
 CDecl([("float", "diff", "")]),

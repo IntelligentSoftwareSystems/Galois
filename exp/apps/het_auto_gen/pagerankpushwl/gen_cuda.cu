@@ -4,7 +4,7 @@
 
 void kernel_sizing(CSRGraph &, dim3 &, dim3 &);
 #define TB_SIZE 256
-const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_blocking_factor=4 $ parcomb=False $ np_schedulers=set(['fg', 'tb', 'wp']) $ cc_disable=set([]) $ hacks=set([]) $ np_factor=1 $ instrument=set([]) $ unroll=[] $ read_props=None $ outline_iterate=True $ ignore_nested_errors=False $ np=False $ write_props=None $ quiet_cgen=True $ retry_backoff=True $ cuda.graph_type=basic $ cuda.use_worklist_slots=True $ cuda.worklist_type=basic";
+const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=True $ backoff_blocking_factor=4 $ parcomb=True $ np_schedulers=set(['wp', 'fg']) $ cc_disable=set([]) $ hacks=set([]) $ np_factor=8 $ instrument=set([]) $ unroll=[] $ read_props=None $ outline_iterate=True $ ignore_nested_errors=False $ np=True $ write_props=None $ quiet_cgen=True $ retry_backoff=True $ cuda.graph_type=basic $ cuda.use_worklist_slots=True $ cuda.worklist_type=basic";
 unsigned int * P_NOUT;
 float * P_RESIDUAL;
 float * P_VALUE;
@@ -37,7 +37,7 @@ __global__ void InitializeGraph(CSRGraph graph, int  nowned, const float  local_
     }
   }
 }
-__global__ void PageRank(CSRGraph graph, int  nowned, const float  local_alpha, float local_tolerance, unsigned int * p_nout, float * p_residual, float * p_value, WorklistT in_wl, WorklistT out_wl)
+__global__ void PageRank(CSRGraph graph, int  nowned, const float  local_alpha, float local_tolerance, unsigned int * p_nout, float * p_residual, float * p_value, Worklist2 in_wl, Worklist2 out_wl)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -70,7 +70,9 @@ __global__ void PageRank(CSRGraph graph, int  nowned, const float  local_alpha, 
         dst_residual_old = atomicAdd(&p_residual[dst], delta);
         if ((dst_residual_old <= local_tolerance) && ((dst_residual_old + delta) >= local_tolerance))
         {
-          (out_wl).push(dst);
+          index_type _start_46;
+          _start_46 = (out_wl).setup_push_warp_one();;
+          (out_wl).do_push(_start_46, 0, dst);
         }
       }
     }

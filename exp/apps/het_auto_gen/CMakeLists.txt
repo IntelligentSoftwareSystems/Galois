@@ -3,7 +3,7 @@
 #set(CUDA_NVCC_FLAGS ${CUDA_NVCC_FLAGS}; -lineinfo)
 
 # single host multiple GPUs
-#add_definitions(-D__GALOIS_SINGLE_HOST_MULTIPLE_GPUS__)
+add_definitions(-D__GALOIS_SINGLE_HOST_MULTIPLE_GPUS__)
 
 cuda_add_library(het_auto_gen_cuda gen_cuda.cu)
 target_link_libraries(het_auto_gen_cuda ggrt)
@@ -58,4 +58,10 @@ target_link_libraries(prpull_vcut_het_auto_gen_cuda ggrt)
 app(prpull_vcut_het_auto_gen pagerankpull_vcut/gen.cpp DISTSAFE)
 target_compile_definitions(prpull_vcut_het_auto_gen PRIVATE __GALOIS_HET_CUDA__=1)
 target_link_libraries(prpull_vcut_het_auto_gen prpull_vcut_het_auto_gen_cuda)
+
+cuda_add_library(sssppush_het_auto_gen_cuda sssppush/gen_cuda.cu)
+target_link_libraries(sssppush_het_auto_gen_cuda ggrt)
+app(sssppush_het_auto_gen sssppush/gen.cpp DISTSAFE)
+target_compile_definitions(sssppush_het_auto_gen PRIVATE __GALOIS_HET_CUDA__=1)
+target_link_libraries(sssppush_het_auto_gen sssppush_het_auto_gen_cuda)
 
