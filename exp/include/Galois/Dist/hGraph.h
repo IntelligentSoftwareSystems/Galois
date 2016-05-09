@@ -58,7 +58,7 @@ class hGraph: public GlobalObject {
    uint64_t totalNodes; // Total nodes in the complete graph.
    uint32_t numOwned; // [0, numOwned) = global nodes owned, thus [numOwned, numNodes are replicas
    uint64_t globalOffset; // [numOwned, end) + globalOffset = GID
-   unsigned id; // my hostid // FIXME: isn't this just Network::ID?
+   const unsigned id; // my hostid // FIXME: isn't this just Network::ID?
    //ghost cell ID translation
    std::vector<uint64_t> ghostMap; // GID = ghostMap[LID - numOwned]
    std::vector<std::pair<uint32_t, uint32_t> > hostNodes; //LID Node owned by host i
@@ -211,7 +211,6 @@ public:
       net.send(from_id, syncRecv, b);
    }
 
-
    template<typename FnTy>
    void syncPullRecvApply(Galois::Runtime::RecvBuffer& buf) {
       assert(num_recv_expected > 0);
@@ -334,7 +333,37 @@ public:
    template<bool isVoidType, typename std::enable_if<!isVoidType>::type* = nullptr>
    void loadEdges(OfflineGraph & g) {
       fprintf(stderr, "Loading edge-data while creating edges.\n");
+
       uint64_t cur = 0;
+      Galois::Timer timer;
+      timer.start();
+#if 1
+      //RK - This code should be slightly faster than the conventional single-phase
+      // code to load the edges since the file pointer is not moved between the
+      // destination and the data on each edge.
+      // NEEDS TO BE FASTER!
+      for (auto n = g.begin(); n != g.end(); ++n) {
+         if (this->isOwned(*n)) {
+            for (auto ii = g.edge_begin(*n), ee = g.edge_end(*n); ii < ee; ++ii) {
+               auto gdst = g.getEdgeDst(ii);
+               decltype(gdst) ldst = G2L(gdst);
+               graph.constructEdge(cur++, ldst);
+            }
+            graph.fixEndEdge(G2L(*n), cur);
+         }
+      }
+      //Now load the edge data.
+      cur=0;
+      for (auto n = g.begin(); n != g.end(); ++n) {
+         if (this->isOwned(*n)) {
+            for (auto ii = g.edge_begin(*n), ee = g.edge_end(*n); ii < ee; ++ii) {
+               auto gdata = g.getEdgeData<EdgeTy>(ii);
+               graph.getEdgeData(cur++)=gdata;
+            }
+         }
+      }
+#else
+      //Old code - single loop for edge destination and edge Data.
       for (auto n = gid2host[id].first; n < gid2host[id].second; ++n) {
          for (auto ii = g.edge_begin(n), ee = g.edge_end(n); ii < ee; ++ii) {
             auto gdst = g.getEdgeDst(ii);
@@ -344,6 +373,9 @@ public:
          }
          graph.fixEndEdge(G2L(n), cur);
       }
+#endif
+      timer.stop();
+      std::cout << " EdgeLoading time " << timer.get_usec()/1000000.0f << " seconds\n";
    }
    template<bool isVoidType, typename std::enable_if<isVoidType>::type* = nullptr>
    void loadEdges(OfflineGraph & g) {
@@ -555,12 +587,12 @@ public:
       m.node_data = NULL;
 
       if (std::is_void<EdgeTy>::value) {
-        m.edge_data = NULL;
+         m.edge_data = NULL;
       } else {
-        if (!std::is_same<EdgeTy, edge_data_type>::value) {
-          fprintf(stderr, "WARNING: Edge data type mismatch between CPU and GPU\n");
-        }
-        m.edge_data = (edge_data_type *) calloc(m.nedges, sizeof(edge_data_type));
+         if (!std::is_same<EdgeTy, edge_data_type>::value) {
+            fprintf(stderr, "WARNING: Edge data type mismatch between CPU and GPU\n");
+         }
+         m.edge_data = (edge_data_type *) calloc(m.nedges, sizeof(edge_data_type));
       }
 
       // pinched from Rashid's LC_LinearArray_Graph.h
@@ -570,8 +602,8 @@ public:
          if (*n < m.nowned) {
             for (auto e = edge_begin(*n); e != edge_end(*n); e++) {
                if (getEdgeDst(e) < m.nnodes) {
-                 setMarshalEdge<std::is_void<EdgeTy>::value>(m, edge_counter, e);
-                 m.edge_dst[edge_counter++] = getEdgeDst(e);
+                  setMarshalEdge<std::is_void<EdgeTy>::value>(m, edge_counter, e);
+                  m.edge_dst[edge_counter++] = getEdgeDst(e);
                }
             }
          }
