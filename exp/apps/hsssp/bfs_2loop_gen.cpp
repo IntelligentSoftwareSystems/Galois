@@ -169,13 +169,13 @@ struct FirstItr_BFS {
     		FirstItr_BFS_cuda(cuda_ctx);
     	} else if (personality == CPU)
     #endif
-    Galois::for_each(_graph.begin(), _graph.end(), FirstItr_BFS { &_graph }, Galois::loopname("BFS"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned long long" , "{ Galois::atomicMin(node.dist_current, y);}",  "{node.dist_current = std::numeric_limits<unsigned long long>::max()/4; }"));
+    Galois::do_all(_graph.begin(), _graph.end(), FirstItr_BFS { &_graph }, Galois::loopname("BFS"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned long long" , "{ Galois::atomicMin(node.dist_current, y);}",  "{node.dist_current = std::numeric_limits<unsigned long long>::max()/4; }"));
     _graph.sync_push<Syncer_0>();
     
 
   }
 
-  void operator()(GNode src, Galois::UserContext<GNode>& ctx) const {
+  void operator()(GNode src){/*, Galois::UserContext<GNode>& ctx) const {*/
     NodeData& snode = graph->getData(src);
     auto& sdist = snode.dist_current;
 
@@ -197,6 +197,7 @@ struct BFS {
   void static go(Graph& _graph){
       FirstItr_BFS::go(_graph);
 
+      unsigned int iterations = 0;
       do{
         DGAccumulator_accum.reset();
 
@@ -231,24 +232,26 @@ struct BFS {
       		DGAccumulator_accum += __retval;
       	} else if (personality == CPU)
       #endif
-      Galois::for_each(_graph.begin(), _graph.end(), BFS { &_graph }, Galois::loopname("BFS"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned long long" , "{ Galois::atomicMin(node.dist_current, y);}",  "{node.dist_current = std::numeric_limits<unsigned long long>::max()/4; }"));
+      Galois::do_all(_graph.begin(), _graph.end(), BFS { &_graph }, Galois::loopname("BFS"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned long long" , "{ Galois::atomicMin(node.dist_current, y);}",  "{node.dist_current = std::numeric_limits<unsigned long long>::max()/4; }"));
       _graph.sync_push<Syncer_0>();
-      
+      ++iterations;
 
       }while(DGAccumulator_accum.reduce());
+
+      std::cout << "Iterations XXXXXXXXXXXXXX : " << iterations << "\n" ;
   }
 
-  void operator()(GNode src, Galois::UserContext<GNode>& ctx) const {
+  void operator()(GNode src){/*, Galois::UserContext<GNode>& ctx) const {*/
     NodeData& snode = graph->getData(src);
     auto& sdist = snode.dist_current;
 
-    if(snode.dist_old > snode.dist_current){
-      snode.dist_old = snode.dist_current;
+    if(snode.dist_old > sdist){
+      snode.dist_old = sdist; //snode.dist_current;
       DGAccumulator_accum += 1;
       for (auto jj = graph->edge_begin(src), ej = graph->edge_end(src); jj != ej; ++jj) {
         GNode dst = graph->getEdgeDst(jj);
         auto& dnode = graph->getData(dst);
-        unsigned long long new_dist = 1 + sdist;
+        unsigned long long new_dist = 1 +  sdist;
         Galois::atomicMin(dnode.dist_current, new_dist);
       }
     }
