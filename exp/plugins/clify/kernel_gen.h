@@ -55,43 +55,69 @@ struct CLVar {
       isPrimitive = false; //to be set by type_convert.
       isReference = pvd.getType().getTypePtr()->isReferenceType();
       isPointer = pvd.getType().getTypePtr()->isPointerType();
-      isConst = pvd.getType().isConstQualified();
+//      isConst = pvd.getType().getCanonicalType().isConstQualified();
+      {
+         string tname = pvd.getType().getAsString();
+         //isConst was not reliable from the type system. Search for "const" string instead.
+         isConst = tname.find("const") != string::npos;
+      }
       typeName = pvd.getType().getUnqualifiedType().getAsString();
+      if (isConst) {
+         if(typeName.find("const ")!=string::npos)
+            typeName.replace(typeName.find("const "), 5, "");
+      }
       if (isPointer) {
-         typeName = typeName.substr(0, typeName.find("*") - 1);
+         if(typeName.find("*")!=string::npos)
+            typeName = typeName.substr(0, typeName.find("*") - 1);
       }
       if (isReference) {
-         typeName = typeName.substr(0, typeName.find("&") - 1);
+         if(typeName.find("&")!=string::npos)
+            typeName = typeName.substr(0, typeName.find("&") - 1);
       }
       varName = pvd.getNameAsString();
       typeName = type_convert(typeName);
-      llvm::outs() << "Created CLVar " << typeName << "," << varName << "," << isReference << "," << isPointer << "," << isConst << "\n";
+      llvm::outs() << "Created CLVar (Field) " << typeName << ",var=" << varName << ",isPrimitive=" << isPrimitive << ",isRef=" << isReference << ",isPtr=" << isPointer
+            << ",isConst=" << isConst << "\n";
    }
    CLVar(bool isParam, VarDecl & pvd) :
          isParameter(isParam), parent(pvd) {
       isPrimitive = false; //to be set by type_convert.
       isReference = pvd.getType().getTypePtr()->isReferenceType();
       isPointer = pvd.getType().getTypePtr()->isPointerType();
-      isConst = pvd.getType().isConstQualified();
+//      isConst = pvd.getType().getCanonicalType().isConstQualified();
+      {
+         string tname = pvd.getType().getAsString();
+         isConst = tname.find("const") != string::npos;
+      }
+
       typeName = pvd.getType().getUnqualifiedType().getAsString();
+      if (isConst) {
+         if(typeName.find("const ")!=string::npos)
+            typeName.replace(typeName.find("const "), 5, "");
+      }
       if (isPointer) {
-         typeName = typeName.substr(0, typeName.find("*") - 1);
+         if(typeName.find("*")!=string::npos)
+            typeName = typeName.substr(0, typeName.find("*") - 1);
       }
       if (isReference) {
-         typeName = typeName.substr(0, typeName.find("&") - 1);
+         if(typeName.find("&")!=string::npos)
+            typeName = typeName.substr(0, typeName.find("&") - 1);
       }
       varName = pvd.getNameAsString();
       typeName = type_convert(typeName);
-      llvm::outs() << "Created CLVar " << typeName << "," << varName << "," << isReference << "," << isPointer << "," << isConst << "\n";
+      llvm::outs() << "Created CLVar (Var) " << typeName << ",var=" << varName << ",isPrimitive=" << isPrimitive << ",isRef=" << isReference << ",isPtr=" << isPointer
+            << ",isConst=" << isConst << "\n";
    }
    string deref() {
       string res = "";
+//      if(isPrimitive==false){
+//         return "*" + varName;
+//      }
       if ((isReference || isPointer) && isParameter) {
-         if(isPrimitive){
-            res = "*"+varName;
-         }
-         else{
-            res = varName+"->";
+         if (isPrimitive) {
+            res = "*" + varName;
+         } else {
+            res = varName + "->";
          }
       } else {
          if (isParameter) {
@@ -99,7 +125,7 @@ struct CLVar {
          } else if (isPrimitive) {
             res = varName;
          } else {
-            res = varName+" -> ";
+            res = varName + " -> ";
          }
       }
 //      return "$"+res+"$";
@@ -108,46 +134,36 @@ struct CLVar {
    string localDecl() {
       string res = "";
       res += getType();
-      res += " /*VLD*/" + varName + " ";
-//      res +=  varName + " ";
+//      res += " /*VLD*/" + varName + " ";
+      res +=  varName + " ";
       return res;
    }
    string getType() {
       string res = "";
-      if(isPrimitive==false){
-         res = "__global "+typeName  + " * ";
-      }else{
-         if(isReference || isPointer)
-            res = "__global "+typeName  + " * ";
-         else
-            res = typeName  + " ";
-      }
-      /*if ((isReference || isPointer) && isParameter) {
+      if (isPrimitive == false) {
          res = "__global " + typeName + " * ";
       } else {
-         if (isParameter) {
+         if (isReference || isPointer)
+            res = "__global " + typeName + " * ";
+         else
             res = typeName + " ";
-         } else if (isPrimitive) {
-            res = typeName + " ";
-         } else {
-            res = " __global " + typeName + " * ";
-         }
-      }*/
+      }
+      /*if ((isReference || isPointer) && isParameter) {
+       res = "__global " + typeName + " * ";
+       } else {
+       if (isParameter) {
+       res = typeName + " ";
+       } else if (isPrimitive) {
+       res = typeName + " ";
+       } else {
+       res = " __global " + typeName + " * ";
+       }
+       }*/
       return res; //+ "/*TYPE*/";
    }
 
 private:
    string type_convert(string tname) {
-      if (tname == "int" || tname == "float" || tname == "double" || tname == "char" || tname == "uint32_t" || tname == "bool") {
-         isPrimitive = true;
-         return tname;
-      } else if (tname == "_Bool") {
-         isPrimitive = true;
-         return "bool";
-      }else if (tname == "unsigned int") {
-         isPrimitive = true;
-         return "uint";
-      }
       //Atomic stripper
       if (tname.find("std::atomic") != string::npos) {
          isPrimitive = true; //Assume atomics over primitives only
@@ -172,6 +188,24 @@ private:
          isPrimitive = true; //TODO RK - We can assume arrays of primitives only
          return ret;
       }
+
+      if (tname.find("DGAccumulator<int>") != string::npos) {
+         isPrimitive = true;
+         isPointer = true;
+         return "int";
+      }
+      if (tname.find("int") != string::npos || tname.find("float") != string::npos || tname.find("double") != string::npos || tname.find("char") != string::npos
+            || tname.find("uint32_t") != string::npos || tname.find("bool") != string::npos) {
+         isPrimitive = true;
+         return tname;
+      } else if (tname == "_Bool") {
+         isPrimitive = true;
+         return "bool";
+      } else if (tname == "unsigned int") {
+         isPrimitive = true;
+         return "uint";
+      }
+
       //Iterator stripper
       if (tname.find("boost::iterators::counting_iterator") != string::npos) {
          isPrimitive = true; //iterator is just an int
@@ -194,6 +228,7 @@ private:
          isPrimitive = false;
          return "Graph";
       }
+
       return tname + "/*UNKNOWN*/";
    }
 };
@@ -207,7 +242,7 @@ class OpenCLDeviceRewriter: public RecursiveASTVisitor<OpenCLDeviceRewriter> {
 public:
    explicit OpenCLDeviceRewriter(ASTContext & context, Rewriter & R) :
          astContext(context), rewriter(R) {
-      (void)astContext;
+      (void) astContext;
    }
    virtual ~OpenCLDeviceRewriter() {
    }
@@ -234,6 +269,21 @@ public:
          llvm::outs() << "##Converting parameter :: " << p->getType().getAsString() << " , " << p->getNameAsString() << " \n";
          param_list += varMapping[p]->localDecl();
       }
+      llvm::outs() << " ================================================================================\n";
+      for (auto v : method->getLexicalParent()->decls()) {
+         llvm::outs() << " DECL :: " << v->getDeclKindName() << " \n";
+         if (strcmp(v->getDeclKindName(), "Var") == 0) {
+            VarDecl * vd = (VarDecl*) v;
+            varMapping[vd] = new CLVar(true, *vd);
+            if (needComma)
+               param_list += ", ";
+            needComma = true;
+            param_list += varMapping[vd]->localDecl();
+            llvm::outs() << " VARFOUND!!! " << vd->getNameAsString() << "\n";
+         }
+
+      }
+      llvm::outs() << " ================================================================================\n";
       if (needComma) {
          param_list += ",";
       }
@@ -309,11 +359,11 @@ public:
          }
 
          SourceLocation argStart;
-            argStart = call->getRParenLoc();
+         argStart = call->getRParenLoc();
          if (call->getNumArgs() == 0) {
 //            rewriter.InsertTextBefore(argStart, objArg);
          } else {
-            objArg =","+objArg;
+            objArg = "," + objArg;
 //            argStart=call->getArg(0)->getLocStart() ;
          }
          rewriter.InsertTextBefore(argStart, objArg);
@@ -357,21 +407,84 @@ public:
    }
    virtual bool TraverseMemberExpr(MemberExpr * mem) {
       MARKER_CODE(cl_file << "[MemberExpr]";)
+      /*if (varMapping.find(mem->getMemberDecl()) != varMapping.end()) {
+         if (varMapping[mem->getMemberDecl()]->isPointer) {
+            llvm::outs()<<"MemberExpression ------> :: \n";
+            mem->dump(llvm::outs());
+            llvm::outs()<<"EndMemberExpression <--------------------\n";
+//            rewriter.ReplaceText(mem->getOperatorLoc(), 1, "*");
+            rewriter.InsertText(mem->getLocStart(), "*");
+         }
+      }*/
       if (OpenCLConversionDB::type_convert(mem->getBase()->getType()) == "__global NodeData *") {
-               rewriter.ReplaceText(mem->getOperatorLoc(), 1, "->");
+         rewriter.ReplaceText(mem->getOperatorLoc(), 1, "->");
       }
 //      RecursiveASTVisitor<OpenCLDeviceRewriter>::TraverseStmt(mem->getBase());
 //      RecursiveASTVisitor<OpenCLDeviceRewriter>::TraverseDecl(mem->getMemberDecl());
       MARKER_CODE(cl_file << "[EndMemberExpr]";)
       return true;
    }
-   virtual bool _TraverseBinAssign(BinaryOperator * bop) {
-      rewriter.InsertText(bop->getLocStart(), "/*BOP*/");
-//      RecursiveASTVisitor<OpenCLDeviceRewriter>::TraverseStmt(bop);
+   virtual bool TraverseBinAssign(BinaryOperator * bop) {
       RecursiveASTVisitor<OpenCLDeviceRewriter>::TraverseStmt(bop->getLHS());
       RecursiveASTVisitor<OpenCLDeviceRewriter>::TraverseStmt(bop->getRHS());
       return true; //this->TraversBinaryOperatorGeneric(bop);
    }
+   virtual bool TraverseBinAddAssign(CompoundAssignOperator * bop) {
+      RecursiveASTVisitor<OpenCLDeviceRewriter>::TraverseStmt(bop->getLHS());
+      RecursiveASTVisitor<OpenCLDeviceRewriter>::TraverseStmt(bop->getRHS());
+      return true; //this->TraversBinaryOperatorGeneric(bop);
+   }
+   virtual bool TraverseBinAdd(BinaryOperator * bop) {
+      RecursiveASTVisitor<OpenCLDeviceRewriter>::TraverseStmt(bop->getLHS());
+      RecursiveASTVisitor<OpenCLDeviceRewriter>::TraverseStmt(bop->getRHS());
+      return true; //this->TraversBinaryOperatorGeneric(bop);
+   }
+   virtual bool TraverseBinSub(BinaryOperator * bop) {
+      RecursiveASTVisitor<OpenCLDeviceRewriter>::TraverseStmt(bop->getLHS());
+      RecursiveASTVisitor<OpenCLDeviceRewriter>::TraverseStmt(bop->getRHS());
+      return true; //this->TraversBinaryOperatorGeneric(bop);
+   }
+   virtual bool TraverseBinMul(BinaryOperator * bop) {
+      RecursiveASTVisitor<OpenCLDeviceRewriter>::TraverseStmt(bop->getLHS());
+      RecursiveASTVisitor<OpenCLDeviceRewriter>::TraverseStmt(bop->getRHS());
+      return true; //this->TraversBinaryOperatorGeneric(bop);
+   }
+   virtual bool TraverseBinDiv(BinaryOperator * bop) {
+      RecursiveASTVisitor<OpenCLDeviceRewriter>::TraverseStmt(bop->getLHS());
+      RecursiveASTVisitor<OpenCLDeviceRewriter>::TraverseStmt(bop->getRHS());
+      return true; //this->TraversBinaryOperatorGeneric(bop);
+   }
+   virtual bool TraverseBinGT(BinaryOperator * bop) {
+      RecursiveASTVisitor<OpenCLDeviceRewriter>::TraverseStmt(bop->getLHS());
+      RecursiveASTVisitor<OpenCLDeviceRewriter>::TraverseStmt(bop->getRHS());
+      return true; //this->TraversBinaryOperatorGeneric(bop);
+   }
+   virtual bool TraverseCCstyleCastExpr(clang::CStyleCastExpr *cexp) {
+      llvm::outs() << " CASTEXPR:: ";
+      cexp->dump(llvm::outs());
+      llvm::outs() << "\n";
+      RecursiveASTVisitor<OpenCLDeviceRewriter>::TraverseStmt(cexp->getSubExpr());
+      return true; //this->TraversBinaryOperatorGeneric(bop);
+   }
+   virtual bool TraverseParenExpr(clang::ParenExpr *pexp) {
+      llvm::outs() << " PARENEXPR:: ";
+      pexp->dump(llvm::outs());
+      llvm::outs() << "\n";
+      RecursiveASTVisitor<OpenCLDeviceRewriter>::TraverseStmt(pexp->getSubExpr());
+      return true; //this->TraversBinaryOperatorGeneric(bop);
+   }
+   virtual bool TraverseImplicitCastExpr(ImplicitCastExpr * icexpr) {
+      llvm::outs() << " ImplicitCast:: ";
+      icexpr->dump(llvm::outs());
+      llvm::outs() << "\n";
+      RecursiveASTVisitor<OpenCLDeviceRewriter>::TraverseStmt(icexpr->getSubExpr());
+      return true; //this->TraversBinaryOperatorGeneric(bop);
+   }
+//   virtual bool TraverseMemberExpr(MemberExpr* texpr){
+//      RecursiveASTVisitor<OpenCLDeviceRewriter>::TraverseStmt(texpr->getMemberDecl());
+//      return true;
+//   }
+
 };
 
 /*********************************************************************************************************

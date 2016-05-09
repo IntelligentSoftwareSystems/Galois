@@ -6,7 +6,6 @@
  */
 #include "clang/AST/AST.h"
 #include "clang/AST/Decl.h"
-
 #include "utils.h"
 
 //#include "GaloisCLGen.h"
@@ -28,6 +27,7 @@ using namespace std;
 struct GaloisApp;
 /****************************************************************************
  *****************************************************************************/
+
 
 class TypeCollector: public RecursiveASTVisitor<TypeCollector> {
 public:
@@ -130,7 +130,9 @@ struct GaloisKernel {
       ret_string += "\", false);\n";
       int i=0;
       char s[1024];
+//      std::map<Decl*, CLVar*> varMapping;
       for(auto m : this->kernel->fields()){
+//         varMapping[m] = new CLVar(true, m);
          string ref;
          if(m->getType().getTypePtr()->isAnyPointerType()){
             ref="->";

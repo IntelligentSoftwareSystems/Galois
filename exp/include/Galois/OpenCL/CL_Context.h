@@ -123,6 +123,7 @@ struct CLContext {
       }
       GOPT_CL_DEFAULT_PLATFORM_ID=0;
       GOPT_CL_DEFAULT_DEVICE_ID=0;
+//      GOPT_CL_DEFAULT_DEVICE_ID=Galois::Runtime::NetworkInterface::ID;
       setenv("CUDA_CACHE_DISABLE", "1", 1);
       {
          std::ifstream file("device_default.config");
@@ -241,8 +242,10 @@ struct CLContext {
          std::string compiled_file_name(file_name);
          compiled_file_name.replace(compiled_file_name.length()-3, compiled_file_name.length(),".aocx");
          fprintf(stderr, "About to load binary file :: %s \n", compiled_file_name.c_str());
-         if (!(fh = fopen(compiled_file_name.c_str(), "rb")))
-         return;
+         if (!(fh = fopen(compiled_file_name.c_str(), "rb"))){
+            fprintf(stderr, "ERROR - File [%s] not found\n", compiled_file_name.c_str());
+            return;
+         }
          fseek(fh, 0, SEEK_END);
          size_t len = ftell(fh);
          unsigned char * source = (unsigned char *) malloc(len);

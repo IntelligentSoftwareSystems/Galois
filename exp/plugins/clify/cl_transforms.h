@@ -113,11 +113,7 @@ public:
    DoAllHandler(Rewriter &rewriter, Galois::GAST::GaloisApp & _ad) :
          rewriter(rewriter), app_data(_ad) {
    }
-/*
-   void add_know_types(const std::set<Type *> & kt){
-      app_data.add_known_types(kt);
-   }
-*/
+
    virtual void run(const MatchFinder::MatchResult &Results) {
       CallExpr* callFS = const_cast<CallExpr*>(Results.Nodes.getNodeAs<clang::CallExpr>("galoisLoop"));
 //      VarDecl * decl = const_cast<VarDecl*>(Results.Nodes.getNodeAs<VarDecl>("graphDecl"));
