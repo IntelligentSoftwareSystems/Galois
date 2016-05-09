@@ -79,3 +79,21 @@ app(sssppushwl_filter_het_auto_gen sssppushwl_filter/gen.cpp DISTSAFE)
 target_compile_definitions(sssppushwl_filter_het_auto_gen PRIVATE __GALOIS_HET_CUDA__=1)
 target_link_libraries(sssppushwl_filter_het_auto_gen sssppushwl_filter_het_auto_gen_cuda)
 
+cuda_add_library(bfspush_het_auto_gen_cuda bfspush/gen_cuda.cu)
+target_link_libraries(bfspush_het_auto_gen_cuda ggrt)
+app(bfspush_het_auto_gen bfspush/gen.cpp DISTSAFE)
+target_compile_definitions(bfspush_het_auto_gen PRIVATE __GALOIS_HET_CUDA__=1)
+target_link_libraries(bfspush_het_auto_gen bfspush_het_auto_gen_cuda)
+
+cuda_add_library(bfspushwl_het_auto_gen_cuda bfspushwl/gen_cuda.cu)
+target_link_libraries(bfspushwl_het_auto_gen_cuda ggrt)
+app(bfspushwl_het_auto_gen bfspushwl/gen.cpp DISTSAFE)
+target_compile_definitions(bfspushwl_het_auto_gen PRIVATE __GALOIS_HET_CUDA__=1)
+target_link_libraries(bfspushwl_het_auto_gen bfspushwl_het_auto_gen_cuda)
+
+cuda_add_library(bfspushwl_filter_het_auto_gen_cuda bfspushwl_filter/gen_cuda.cu)
+target_link_libraries(bfspushwl_filter_het_auto_gen_cuda ggrt)
+app(bfspushwl_filter_het_auto_gen bfspushwl_filter/gen.cpp DISTSAFE)
+target_compile_definitions(bfspushwl_filter_het_auto_gen PRIVATE __GALOIS_HET_CUDA__=1)
+target_link_libraries(bfspushwl_filter_het_auto_gen bfspushwl_filter_het_auto_gen_cuda)
+

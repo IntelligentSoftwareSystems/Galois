@@ -7,8 +7,10 @@ GALOIS_ROOT=/h2/roshan/SourceCode/GaloisCpp
 
 CXX_DEFINES="-DGALOIS_COPYRIGHT_YEAR=2015 -DGALOIS_USE_EXP -DGALOIS_VERSION=2.3.0 -DGALOIS_VERSION_MAJOR=2 -DGALOIS_VERSION_MINOR=3 -DGALOIS_VERSION_PATCH=0 -D__STDC_LIMIT_MACROS"
 CXX_FLAGS="-g -Wall -fcolor-diagnostics -Wall -g -I$GALOIS_ROOT/exp/include -I/opt/apps/ossw/libraries/mpich2/mpich2-1.5/c7/clang-system/include -I/net/faraday/workspace/local/modules/tbb-4.2/include -I/opt/apps/ossw/libraries/boost/boost-1.58.0/c7/clang-system/include -I$GALOIS_ROOT/lonestar/include -I$GALOIS_ROOT/libruntime/include -I$GALOIS_ROOT/libnet/include -I$GALOIS_ROOT/libsubstrate/include -I$GALOIS_ROOT/libllvm/include -I$GALOIS_ROOT/build/debug/libllvm/include -I$GALOIS_ROOT/libgraphs/include -std=gnu++11"
-#GGC_FLAGS="--cuda-worklist basic --cuda-graph basic --opt np --nps fg --nps wp --npf 8 --opt parcomb"
-GGC_FLAGS="--cuda-worklist basic --cuda-graph basic --opt parcomb"
+GGC_FLAGS="--cuda-worklist basic --cuda-graph basic"
+if [ -f "GGCFLAGS" ]; then
+  GGC_FLAGS+=$(head -n 1 "GGCFLAGS")
+fi
 
 CXX=$LLVM_BUILD/bin/clang++
 IRGL_CXX="$CXX -Xclang -load -Xclang $LLVM_BUILD/lib/GaloisFunctions.so -Xclang -plugin -Xclang irgl"
