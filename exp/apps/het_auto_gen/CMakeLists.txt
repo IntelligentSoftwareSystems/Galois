@@ -97,3 +97,21 @@ app(bfspushwl_filter_het_auto_gen bfspushwl_filter/gen.cpp DISTSAFE)
 target_compile_definitions(bfspushwl_filter_het_auto_gen PRIVATE __GALOIS_HET_CUDA__=1)
 target_link_libraries(bfspushwl_filter_het_auto_gen bfspushwl_filter_het_auto_gen_cuda)
 
+cuda_add_library(ccpush_het_auto_gen_cuda ccpush/gen_cuda.cu)
+target_link_libraries(ccpush_het_auto_gen_cuda ggrt)
+app(ccpush_het_auto_gen ccpush/gen.cpp DISTSAFE)
+target_compile_definitions(ccpush_het_auto_gen PRIVATE __GALOIS_HET_CUDA__=1)
+target_link_libraries(ccpush_het_auto_gen ccpush_het_auto_gen_cuda)
+
+cuda_add_library(ccpushwl_het_auto_gen_cuda ccpushwl/gen_cuda.cu)
+target_link_libraries(ccpushwl_het_auto_gen_cuda ggrt)
+app(ccpushwl_het_auto_gen ccpushwl/gen.cpp DISTSAFE)
+target_compile_definitions(ccpushwl_het_auto_gen PRIVATE __GALOIS_HET_CUDA__=1)
+target_link_libraries(ccpushwl_het_auto_gen ccpushwl_het_auto_gen_cuda)
+
+cuda_add_library(ccpushwl_filter_het_auto_gen_cuda ccpushwl_filter/gen_cuda.cu)
+target_link_libraries(ccpushwl_filter_het_auto_gen_cuda ggrt)
+app(ccpushwl_filter_het_auto_gen ccpushwl_filter/gen.cpp DISTSAFE)
+target_compile_definitions(ccpushwl_filter_het_auto_gen PRIVATE __GALOIS_HET_CUDA__=1)
+target_link_libraries(ccpushwl_filter_het_auto_gen ccpushwl_filter_het_auto_gen_cuda)
+
