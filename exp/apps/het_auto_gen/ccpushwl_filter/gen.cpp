@@ -184,13 +184,13 @@ struct FirstItr_ConnectedComp {
     		FirstItr_ConnectedComp_cuda(cuda_ctx);
     	} else if (personality == CPU)
     #endif
-    Galois::for_each(_graph.begin(), _graph.end(), FirstItr_ConnectedComp { &_graph }, Galois::loopname("cc"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "comp_current", "unsigned int" , "{ Galois::atomicMin(node.comp_current, y);}",  "{node.comp_current = std::numeric_limits<unsigned int>::max()/4; }"));
+    Galois::do_all(_graph.begin(), _graph.end(), FirstItr_ConnectedComp { &_graph }, Galois::loopname("cc"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "comp_current", "unsigned int" , "{ Galois::atomicMin(node.comp_current, y);}",  "{node.comp_current = std::numeric_limits<unsigned int>::max()/4; }"));
     _graph.sync_push<Syncer_0>();
     
 
   }
 
-  void operator()(GNode src, Galois::UserContext<GNode>& ctx) const {
+  void operator()(GNode src) const {
     NodeData& snode = graph->getData(src);
     auto& sdist = snode.comp_current;
 
@@ -247,14 +247,14 @@ struct ConnectedComp {
       		DGAccumulator_accum += __retval;
       	} else if (personality == CPU)
       #endif
-      Galois::for_each(_graph.begin(), _graph.end(), ConnectedComp { &_graph }, Galois::loopname("cc"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "comp_current", "unsigned int" , "{ Galois::atomicMin(node.comp_current, y);}",  "{node.comp_current = std::numeric_limits<unsigned int>::max()/4; }"));
+      Galois::do_all(_graph.begin(), _graph.end(), ConnectedComp { &_graph }, Galois::loopname("cc"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "comp_current", "unsigned int" , "{ Galois::atomicMin(node.comp_current, y);}",  "{node.comp_current = std::numeric_limits<unsigned int>::max()/4; }"));
       _graph.sync_push<Syncer_0>();
       
       ++iteration;
       }while((iteration < maxIterations) && DGAccumulator_accum.reduce());
   }
 
-  void operator()(GNode src, Galois::UserContext<GNode>& ctx) const {
+  void operator()(GNode src) const {
     NodeData& snode = graph->getData(src);
     auto& sdist = snode.comp_current;
 
