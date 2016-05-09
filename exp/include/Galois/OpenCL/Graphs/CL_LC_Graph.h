@@ -549,15 +549,15 @@ template<typename FnTy>
                cl_mem_flags flags = 0; //CL_MEM_READ_WRITE  ;
                cl_mem_flags flags_read = 0;//CL_MEM_READ_ONLY ;
 
-               gpu_wrapper.outgoing_index = clCreateBuffer(ctx->get_default_device()->context(), flags_read, sizeof(cl_uint) *( _num_nodes + 1), outgoing_index, &err);
+               gpu_wrapper.outgoing_index = clCreateBuffer(ctx->get_default_device()->context(), flags_read, sizeof(cl_uint) *( _num_nodes + 1), nullptr, &err);
                CHECK_CL_ERROR(err, "Error: clCreateBuffer of SVM - 0\n");
-               gpu_wrapper.node_data = clCreateBuffer(ctx->get_default_device()->context(), flags, sizeof(NodeDataType) * _num_nodes, node_data, &err);
+               gpu_wrapper.node_data = clCreateBuffer(ctx->get_default_device()->context(), flags, sizeof(NodeDataType) * _num_nodes, nullptr, &err);
                CHECK_CL_ERROR(err, "Error: clCreateBuffer of SVM - 1\n");
-               gpu_wrapper.neighbors = clCreateBuffer(ctx->get_default_device()->context(), flags_read, sizeof(cl_uint) * _num_edges, neighbors, &err);
+               gpu_wrapper.neighbors = clCreateBuffer(ctx->get_default_device()->context(), flags_read, sizeof(cl_uint) * _num_edges, nullptr, &err);
                CHECK_CL_ERROR(err, "Error: clCreateBuffer of SVM - 2\n");
-               gpu_wrapper.edge_data = clCreateBuffer(ctx->get_default_device()->context(), flags_read, sizeof(EdgeDataType) * _num_edges, edge_data, &err);
+               gpu_wrapper.edge_data = clCreateBuffer(ctx->get_default_device()->context(), flags_read, sizeof(EdgeDataType) * _num_edges, nullptr, &err);
                CHECK_CL_ERROR(err, "Error: clCreateBuffer of SVM - 3\n");
-               gpu_struct_ptr = clCreateBuffer(ctx->get_default_device()->context(), flags, sizeof(cl_uint) * 32, NULL, &err);
+               gpu_struct_ptr = clCreateBuffer(ctx->get_default_device()->context(), flags, sizeof(cl_uint) * 32, nullptr, &err);
                CHECK_CL_ERROR(err, "Error: clCreateBuffer of SVM - 4\n");
                gpu_wrapper.num_nodes = _num_nodes;
                gpu_wrapper.num_edges= _num_edges;
@@ -565,7 +565,7 @@ template<typename FnTy>
 
                const int meta_buffer_size = 16;
                int  cpu_meta[meta_buffer_size];
-               gpu_meta = clCreateBuffer(ctx->get_default_device()->context(), flags, sizeof(int) * meta_buffer_size, cpu_meta, &err);
+               gpu_meta = clCreateBuffer(ctx->get_default_device()->context(), flags, sizeof(int) * meta_buffer_size, nullptr, &err);
                CHECK_CL_ERROR(err, "Error: clCreateBuffer of SVM - 5\n");
                cpu_meta[0] = _num_nodes;
                cpu_meta[1] =_num_edges;
@@ -588,7 +588,7 @@ template<typename FnTy>
                char * kernel_src = new char[kernel_len];
                sprintf(kernel_src, "%s\n%s", cl_wrapper_str_CL_LC_Graph, init_kernel_str_CL_LC_Graph);
 //               init_kernel.init_string(kernel_src, "initialize_graph_struct");
-               init_kernel.init("app_header.h", "initialize_graph_struct");
+               init_kernel.init("PageRank_pull.cl", "initialize_graph_struct");
 //               init_kernel.set_arg_list(gpu_struct_ptr, gpu_meta, gpu_wrapper.node_data, gpu_wrapper.outgoing_index, gpu_wrapper.neighbors, gpu_wrapper.edge_data);
                init_kernel.set_arg_list_raw(gpu_struct_ptr, gpu_meta, gpu_wrapper.node_data, gpu_wrapper.outgoing_index, gpu_wrapper.neighbors, gpu_wrapper.edge_data);
                init_kernel.run_task();

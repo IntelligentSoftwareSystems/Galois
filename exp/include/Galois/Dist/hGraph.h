@@ -230,8 +230,10 @@ public:
             //std::cout << "PullApply Step2 : [" << net.ID << "]  : [" << LocalId << "] : " << val << "\n";
          }
 #ifdef __GALOIS_HET_OPENCL__
-         CLNodeDataWrapper d = clGraph.getDataW(LocalId);
-         FnTy::setVal(LocalId, d, val);
+         {
+            CLNodeDataWrapper d = clGraph.getDataW(LocalId);
+            FnTy::setVal(LocalId, d, val);
+         }
 #else
          FnTy::setVal(LocalId, getData(LocalId), val);
 #endif
@@ -445,7 +447,7 @@ public:
             }
             //std::cout << net.ID << " send (" << gid << ") " << start << " " << FnTy::extract(start, getData(start)) << "\n";
 #ifdef __GALOIS_HET_OPENCL__
-            CLNodeDataWrapper d = clGraph.getDataW(clGraph.begin());
+            CLNodeDataWrapper d = clGraph.getDataW(start);
             gSerialize(b, gid, FnTy::extract(start, d));
             FnTy::reset(start, d);
 #else
@@ -597,7 +599,7 @@ public:
       return clGraph.getDataW(N);
    }
    const CLNodeDataWrapper getDataR(GraphNode N,Galois::MethodFlag mflag = Galois::MethodFlag::READ) {
-      return getDataR(N);
+      return clGraph.getDataR(N);
    }
 
 #endif
