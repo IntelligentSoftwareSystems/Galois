@@ -20,13 +20,13 @@ __global__ void InitializeGraph(CSRGraph graph, int  nowned, const float  local_
   src_end = nowned;
   for (index_type src = 0 + tid; src < src_end; src += nthreads)
   {
-    p_value[src] = 1.0 - local_alpha;
+    p_value[src] = local_alpha;
     p_nout[src] = graph.getOutDegree(src);
     if (p_nout[src] > 0)
     {
       float delta;
       index_type nbr_end;
-      delta = p_value[src]*local_alpha/p_nout[src];
+      delta = p_value[src]*(1-local_alpha)/p_nout[src];
       nbr_end = (graph).getFirstEdge((src) + 1);
       for (index_type nbr = (graph).getFirstEdge(src) + 0; nbr < nbr_end; nbr += 1)
       {
@@ -54,7 +54,7 @@ __global__ void FirstItr_PageRank(CSRGraph graph, int  nowned, const float  loca
     {
       float delta;
       index_type nbr_end;
-      delta = residual_old*local_alpha/p_nout[src];
+      delta = residual_old*(1-local_alpha)/p_nout[src];
       nbr_end = (graph).getFirstEdge((src) + 1);
       for (index_type nbr = (graph).getFirstEdge(src) + 0; nbr < nbr_end; nbr += 1)
       {
@@ -85,7 +85,7 @@ __global__ void PageRank(CSRGraph graph, int  nowned, const float  local_alpha, 
       {
         float delta;
         index_type nbr_end;
-        delta = residual_old*local_alpha/p_nout[src];
+        delta = residual_old*(1-local_alpha)/p_nout[src];
         any_retval.return_( 1);
         nbr_end = (graph).getFirstEdge((src) + 1);
         for (index_type nbr = (graph).getFirstEdge(src) + 0; nbr < nbr_end; nbr += 1)
