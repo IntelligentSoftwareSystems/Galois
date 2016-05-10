@@ -98,7 +98,13 @@ class OfflineGraph {
     pos = (pos + 7) & ~7;
     pos += edge * sizeof(T);
     if (file1.tellg() != pos)
+      {
+        static int count = 0;
+        
+        std::cout << count << " " << file1.tellg() - pos << "\n";
+        ++count;
       file1.seekg(pos, file1.beg);
+      } else { std::cout << "."; }
     T retval;
     file1.read(reinterpret_cast<char*>(&retval), sizeof(T));
     /*fprintf(stderr, "READ:: %ld[", edge);
@@ -115,7 +121,7 @@ public:
   typedef uint32_t GraphNode;
 
   OfflineGraph(const std::string& name)
-    :file1(name)
+    :file1(name, std::ios_base::binary)
   {
     if (!file1.is_open() || !file1.good()) throw "Bad filename";
     uint64_t ver = 0;

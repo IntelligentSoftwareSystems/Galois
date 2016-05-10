@@ -56,3 +56,5 @@ app(pageRank_2loops_gen pageRank_2loops_gen.cpp DISTSAFE)
 #OpenCL generated code. 
 #app(opencl cl_host.cpp DISTSAFE)
 #target_link_libraries(opencl OpenCL)
+
+app(sssp_gen sssp_gen.cpp DISTSAFE)
