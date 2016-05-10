@@ -289,9 +289,21 @@ public:
       std::cerr << "[" << id << "] Edge count Done " << numEdges << "\n";
 
       std::vector<bool> ghosts(g.size());
-      for (auto n = gid2host[id].first; n < gid2host[id].second; ++n)
-         for (auto ii = g.edge_begin(n), ee = g.edge_end(n); ii < ee; ++ii)
+#if 0
+      for (auto n = gid2host[id].first; n < gid2host[id].second; ++n){
+         for (auto ii = g.edge_begin(n), ee = g.edge_end(n); ii < ee; ++ii){
             ghosts[g.getEdgeDst(ii)] = true;
+         }
+      }
+#endif
+      auto ee = g.edge_begin(gid2host[id].first);
+      for (auto n = gid2host[id].first; n < gid2host[id].second; ++n) {
+         auto ii = ee;
+         ee = g.edge_end(n);
+         for (; ii < ee; ++ii) {
+            ghosts[g.getEdgeDst(ii)] = true;
+         }
+      }
       std::cerr << "[" << id << "] Ghost Finding Done " << std::count(ghosts.begin(), ghosts.end(), true) << "\n";
 
       for (uint64_t x = 0; x < g.size(); ++x)
@@ -336,15 +348,32 @@ public:
 
       uint64_t cur = 0;
       Galois::Timer timer;
+      std::cout <<"["<<id<<"]PRE :: NumSeeks ";
+      g.num_seeks();
+      g.reset_seek_counters();
       timer.start();
 #if 1
+      auto ee = g.edge_begin(gid2host[id].first);
+      for (auto n = gid2host[id].first; n < gid2host[id].second; ++n) {
+         auto ii = ee;
+         ee=g.edge_end(n);
+         for (; ii < ee; ++ii) {
+            auto gdst = g.getEdgeDst(ii);
+            decltype(gdst) ldst = G2L(gdst);
+            auto gdata = g.getEdgeData<EdgeTy>(ii);
+            graph.constructEdge(cur++, ldst, gdata);
+         }
+         graph.fixEndEdge(G2L(n), cur);
+      }
       //RK - This code should be slightly faster than the conventional single-phase
       // code to load the edges since the file pointer is not moved between the
       // destination and the data on each edge.
       // NEEDS TO BE FASTER!
+#if 0
       for (auto n = g.begin(); n != g.end(); ++n) {
          if (this->isOwned(*n)) {
-            for (auto ii = g.edge_begin(*n), ee = g.edge_end(*n); ii < ee; ++ii) {
+            auto ii = g.edge_begin(*n), ee = g.edge_end(*n);
+            for (; ii < ee; ++ii) {
                auto gdst = g.getEdgeDst(ii);
                decltype(gdst) ldst = G2L(gdst);
                graph.constructEdge(cur++, ldst);
@@ -354,14 +383,16 @@ public:
       }
       //Now load the edge data.
       cur=0;
-      for (auto n = g.begin(); n != g.end(); ++n) {
+      if(false)for (auto n = g.begin(); n != g.end(); ++n) {
          if (this->isOwned(*n)) {
-            for (auto ii = g.edge_begin(*n), ee = g.edge_end(*n); ii < ee; ++ii) {
+            auto ii = g.edge_begin(*n), ee = g.edge_end(*n);
+            for (; ii < ee; ++ii) {
                auto gdata = g.getEdgeData<EdgeTy>(ii);
                graph.getEdgeData(cur++)=gdata;
             }
          }
       }
+#endif
 #else
       //Old code - single loop for edge destination and edge Data.
       for (auto n = gid2host[id].first; n < gid2host[id].second; ++n) {
@@ -375,7 +406,9 @@ public:
       }
 #endif
       timer.stop();
-      std::cout << " EdgeLoading time " << timer.get_usec()/1000000.0f << " seconds\n";
+      std::cout <<"["<<id<<"]POST :: NumSeeks ";
+      g.num_seeks();
+      std::cout << "EdgeLoading time " << timer.get_usec()/1000000.0f << " seconds\n";
    }
    template<bool isVoidType, typename std::enable_if<isVoidType>::type* = nullptr>
    void loadEdges(OfflineGraph & g) {

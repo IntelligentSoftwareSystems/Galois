@@ -58,17 +58,22 @@
 
 class OfflineGraph {
   std::ifstream file1;
+  std::ifstream fileIndex, fileEdgeDst, fileEdgeData;
   uint64_t numNodes;
   uint64_t numEdges;
   size_t length;
   bool v2;
+  uint64_t numSeeks1, numSeeksDst, numSeeksData;
+
   Galois::Substrate::SimpleLock lock;
 
   uint64_t outIndexs(uint64_t node) {
     std::lock_guard<decltype(lock)> lg(lock);
     std::streamoff pos = (4 + node)*sizeof(uint64_t);
-    if (file1.tellg() != pos)
+    if (file1.tellg() != pos){
+       numSeeks1++;
       file1.seekg(pos, file1.beg);
+    }
     uint64_t retval;
     file1.read(reinterpret_cast<char*>(&retval), sizeof(uint64_t));
     return retval;
@@ -77,15 +82,17 @@ class OfflineGraph {
   uint64_t outEdges(uint64_t edge) {
     std::lock_guard<decltype(lock)> lg(lock);
     std::streamoff pos = (4 + numNodes) * sizeof(uint64_t) + edge * (v2 ? sizeof(uint64_t) : sizeof(uint32_t));
-    if (file1.tellg() != pos)
-      file1.seekg(pos, file1.beg);
+    if (fileIndex.tellg() != pos){
+       numSeeksDst++;
+       fileIndex.seekg(pos, file1.beg);
+    }
     if (v2) {
       uint64_t retval;
-      file1.read(reinterpret_cast<char*>(&retval), sizeof(uint64_t));
+      fileIndex.read(reinterpret_cast<char*>(&retval), sizeof(uint64_t));
       return retval;
     } else {
       uint32_t retval;
-      file1.read(reinterpret_cast<char*>(&retval), sizeof(uint32_t));
+      fileIndex.read(reinterpret_cast<char*>(&retval), sizeof(uint32_t));
       return retval;
     }
   }
@@ -97,16 +104,12 @@ class OfflineGraph {
     //align
     pos = (pos + 7) & ~7;
     pos += edge * sizeof(T);
-    if (file1.tellg() != pos)
-      {
-        static int count = 0;
-        
-        std::cout << count << " " << file1.tellg() - pos << "\n";
-        ++count;
-      file1.seekg(pos, file1.beg);
-      } else { std::cout << "."; }
+    if (fileEdgeData.tellg() != pos){
+       numSeeksData++;
+       fileEdgeData.seekg(pos, file1.beg);
+    }
     T retval;
-    file1.read(reinterpret_cast<char*>(&retval), sizeof(T));
+    fileEdgeData.read(reinterpret_cast<char*>(&retval), sizeof(T));
     /*fprintf(stderr, "READ:: %ld[", edge);
     for(int i=0; i<sizeof(T); ++i){
        fprintf(stderr, "%c", reinterpret_cast<char*>(&retval)[i]);
@@ -121,7 +124,7 @@ public:
   typedef uint32_t GraphNode;
 
   OfflineGraph(const std::string& name)
-    :file1(name, std::ios_base::binary)
+    :file1(name), fileEdgeDst(name), fileEdgeData(name),fileIndex(name),numSeeks1(0), numSeeksDst(0), numSeeksData(0)
   {
     if (!file1.is_open() || !file1.good()) throw "Bad filename";
     uint64_t ver = 0;
@@ -138,6 +141,13 @@ public:
     if (length < sizeof(uint64_t)*(4+numNodes) + (v2 ? sizeof(uint64_t) : sizeof(uint32_t))*numEdges)
       throw "File too small";
     
+  }
+  uint64_t num_seeks(){
+     std::cout << "Seeks :: " << numSeeks1 << " , " << numSeeksData << " , " << numSeeksDst << " \n";
+     return numSeeks1+numSeeksData+numSeeksDst;
+  }
+  void reset_seek_counters(){
+     numSeeks1=numSeeksData=numSeeksDst=0;
   }
 
   OfflineGraph(OfflineGraph&&) = default;
