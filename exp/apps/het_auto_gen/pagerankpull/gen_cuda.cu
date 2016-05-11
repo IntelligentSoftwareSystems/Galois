@@ -20,7 +20,7 @@ __global__ void InitializeGraph(CSRGraph graph, int  nowned, const float  local_
   for (index_type src = 0 + tid; src < src_end; src += nthreads)
   {
     index_type nbr_end;
-    p_value[src] = 1.0 - local_alpha;
+    p_value[src] = local_alpha;
     nbr_end = (graph).getFirstEdge((src) + 1);
     for (index_type nbr = (graph).getFirstEdge(src) + 0; nbr < nbr_end; nbr += 1)
     {

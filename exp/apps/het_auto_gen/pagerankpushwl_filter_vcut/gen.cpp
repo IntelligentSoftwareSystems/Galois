@@ -67,7 +67,7 @@ static const char* const url = 0;
 namespace cll = llvm::cl;
 static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
 static cll::opt<std::string> partFolder("partFolder", cll::desc("path to partitionFolder"), cll::init(""));
-static cll::opt<float> tolerance("tolerance", cll::desc("tolerance"), cll::init(0.01));
+static cll::opt<float> tolerance("tolerance", cll::desc("tolerance"), cll::init(0.000001));
 static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations"), cll::init(1000));
 static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"), cll::init(false));
 #ifdef __GALOIS_HET_CUDA__
@@ -158,11 +158,11 @@ struct InitializeGraph {
 
   void operator()(GNode src) const {
     PR_NodeData& sdata = graph->getData(src);
-    sdata.value = 1.0 - local_alpha;
+    sdata.value = local_alpha;
     sdata.nout = std::distance(graph->edge_begin(src), graph->edge_end(src));
 
     if(sdata.nout > 0 ){
-      float delta = sdata.value*local_alpha/sdata.nout;
+      float delta = sdata.value*(1-local_alpha)/sdata.nout;
       for(auto nbr = graph->edge_begin(src); nbr != graph->edge_end(src); ++nbr){
         GNode dst = graph->getEdgeDst(nbr);
         PR_NodeData& ddata = graph->getData(dst);
@@ -217,7 +217,7 @@ void operator()(WorkItem& src, Galois::UserContext<WorkItem>& ctx) const {
     sdata.value += residual_old;
     //sdata.residual = residual_old;
     if (sdata.nout > 0){
-      float delta = residual_old*local_alpha/sdata.nout;
+      float delta = residual_old*(1-local_alpha)/sdata.nout;
       for(auto nbr = graph->edge_begin(src); nbr != graph->edge_end(src); ++nbr){
         GNode dst = graph->getEdgeDst(nbr);
         PR_NodeData& ddata = graph->getData(dst);
@@ -291,7 +291,7 @@ void operator()(WorkItem& src, Galois::UserContext<WorkItem>& ctx) const {
     sdata.value += residual_old;
     //sdata.residual = residual_old;
     if (sdata.nout > 0){
-      float delta = residual_old*local_alpha/sdata.nout;
+      float delta = residual_old*(1-local_alpha)/sdata.nout;
       
 DGAccumulator_accum+= 1;
 for(auto nbr = graph->edge_begin(src); nbr != graph->edge_end(src); ++nbr){
