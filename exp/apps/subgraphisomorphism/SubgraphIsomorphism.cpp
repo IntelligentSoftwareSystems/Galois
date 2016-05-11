@@ -35,6 +35,7 @@
 #include "Galois/Accumulator.h"
 
 #include <iostream>
+#include <fstream>
 #include <vector>
 #include <string>
 #include <atomic>
@@ -54,6 +55,7 @@ enum Algo {
 };
 
 static cll::opt<unsigned int> kFound("kFound", cll::desc("stop when k instances found"), cll::init(10));
+static cll::opt<bool> undirected("undirected", cll::desc("undirected data and query graphs"), cll::init(false));
 
 static cll::opt<std::string> dataGraphName("dataGraphName", cll::desc("<data graph file>"));
 static cll::opt<std::string> queryGraphName("queryGraphName", cll::desc("<query graph file>"));
@@ -72,10 +74,10 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
       clEnumValEnd), cll::init(Algo::ullmann));
 
 template<typename Graph>
-struct CompareEdgeDst {
+struct IsEdgeDstEqual {
   Graph& g;
   typename Graph::GraphNode n;
-  CompareEdgeDst(Graph& g, typename Graph::GraphNode n): g(g), n(n) {}
+  IsEdgeDstEqual(Graph& g, typename Graph::GraphNode n): g(g), n(n) {}
 
   bool operator()(typename Graph::edge_iterator e) {
     return (g.getEdgeDst(e) == n);
@@ -89,10 +91,9 @@ public:
   typedef typename Galois::Graph::LC_CSR_Graph<NodeTy, EdgeTy> BaseGraph;
 
 public:
-  typename BaseGraph::edge_iterator findEdge(typename BaseGraph::GraphNode src, typename BaseGraph::GraphNode dst) {
-    assert(src);
-    assert(dst);
-    return std::find_if(this->edge_begin(src), this->edge_end(src), CompareEdgeDst<LC_Extended_Graph>(*this, dst));
+  typename BaseGraph::edge_iterator 
+  findEdge(typename BaseGraph::GraphNode src, typename BaseGraph::GraphNode dst) {
+    return std::find_if(this->edge_begin(src), this->edge_end(src), IsEdgeDstEqual<LC_Extended_Graph>(*this, dst));
   }
 };
 
@@ -101,7 +102,8 @@ struct DNode {
   unsigned int id;
 };
 
-typedef Galois::Graph::FirstGraph<DNode, void, true> DGraph; // directed graph with DNode nodes and typeless edges
+typedef Galois::Graph::FirstGraph<DNode, void, true> 
+  ::template with_sorted_neighbors<true>::type DGraph; // directed graph with DNode nodes and typeless edges sorted by dst
 //typedef LC_Extended_Graph<DNode, void> DGraph; // graph with DNode nodes and typeless edges
 typedef DGraph::GraphNode DGNode;
 
@@ -111,7 +113,8 @@ struct QNode {
   std::vector<DGNode> candidate;
 };
 
-typedef Galois::Graph::FirstGraph<QNode, void, true> QGraph;
+typedef Galois::Graph::FirstGraph<QNode, void, true> 
+  ::template with_sorted_neighbors<true>::type QGraph;
 //typedef LC_Extended_Graph<QNode, void> QGraph;
 typedef QGraph::GraphNode QGNode;
 
@@ -166,7 +169,7 @@ struct UllmannAlgo {
     Galois::GReduceLogicalOR& nodeEmpty;
     FilterCandidatesInternal(DGraph& d, QGraph& q, Galois::GReduceLogicalOR& lor): gD(d), gQ(q), nodeEmpty(lor) {}
 
-    void operator()(const QGNode& n) const {
+    void operator()(const QGNode n) const {
       auto& dQ = gQ.getData(n);
 
       for(auto di = gD.begin(), de = gD.end(); di != de; ++di) {
@@ -227,8 +230,11 @@ struct UllmannAlgo {
       }
 
       // (mi->nQ) => nQ exists but not (mi->nD) => nD
-      if(gQ.findEdge(mi->nQ, nQ) != gQ.edge_end(mi->nQ) && gD.findEdge(mi->nD, nD) == gD.edge_end(mi->nD)) {
-        return false;
+      // skip if both data and query graphs are directed
+      if(!undirected) {
+        if(gQ.findEdge(mi->nQ, nQ) != gQ.edge_end(mi->nQ) && gD.findEdge(mi->nD, nD) == gD.edge_end(mi->nD)) {
+          return false;
+        }
       }
     }
 
@@ -357,17 +363,19 @@ void verifyMatching(Matching& matching, DGraph& gD, QGraph& gQ) {
 }
 
 void reportMatchings(MatchingVector& report, DGraph& gD, QGraph& gQ) {
+  auto output = std::ofstream("report.txt");
   auto ri = report.begin(), re = report.end();
   unsigned int i = 0; 
   while(ri != re) {
-    std::cout << i << ": { ";
+    output << i << ": { ";
     for(auto mi = ri->begin(), me = ri->end(); mi != me; ++mi) {
-      std::cout << "(" << gQ.getData(mi->nQ).id << ", " << gD.getData(mi->nD).id << ") ";
+      output << "(" << gQ.getData(mi->nQ).id << ", " << gD.getData(mi->nD).id << ") ";
     }
-    std::cout << "}" << std::endl;
+    output << "}" << std::endl;
     ++ri;
     ++i;
   } 
+  output.close();
 }
 
 template<typename Algo>
