@@ -50,7 +50,7 @@ static cll::opt<float> tolerance("tolerance", cll::desc("tolerance"), cll::init(
 static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"), cll::init(false));
 
 
-static const float alpha = (1.0 - 0.85);
+static const float alpha = 0.85; //(1.0 - 0.85);
 struct PR_NodeData {
   float value;
   std::atomic<float> residual;
@@ -104,11 +104,11 @@ struct InitializeGraph {
 
   void operator()(GNode src) const {
     PR_NodeData& sdata = graph->getData(src);
-    sdata.value = alpha;
+    sdata.value = 1.0 - alpha;
     sdata.nout = std::distance(graph->edge_begin(src), graph->edge_end(src));
 
     if(sdata.nout > 0 ){
-      float delta = sdata.value*(1.0 - alpha)/sdata.nout;
+      float delta = sdata.value*(alpha)/sdata.nout;
       for(auto nbr = graph->edge_begin(src); nbr != graph->edge_end(src); ++nbr){
         GNode dst = graph->getEdgeDst(nbr);
         PR_NodeData& ddata = graph->getData(dst);
