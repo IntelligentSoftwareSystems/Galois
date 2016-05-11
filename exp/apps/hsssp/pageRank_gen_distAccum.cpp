@@ -152,7 +152,7 @@ struct PageRank {
     sdata.value += residual_old;
     //sdata.residual = residual_old;
     if (sdata.nout > 0){
-      float delta = residual_old*alpha/sdata.nout;
+      float delta = residual_old*(1.0 - alpha)/sdata.nout;
       for(auto nbr = graph->edge_begin(src); nbr != graph->edge_end(src); ++nbr){
         GNode dst = graph->getEdgeDst(nbr);
         PR_NodeData& ddata = graph->getData(dst);
