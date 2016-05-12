@@ -56,9 +56,10 @@ enum Algo {
 
 static cll::opt<unsigned int> kFound("kFound", cll::desc("stop when k instances found"), cll::init(10));
 static cll::opt<bool> undirected("undirected", cll::desc("undirected data and query graphs"), cll::init(false));
+static cll::opt<bool> sortEdges("sortEdges", cll::desc("sort the graph edges before search"), cll::init(true));
 
-static cll::opt<std::string> dataGraphName("dataGraphName", cll::desc("<data graph file>"));
-static cll::opt<std::string> queryGraphName("queryGraphName", cll::desc("<query graph file>"));
+static cll::opt<std::string> graphD("graphD", cll::desc("<data graph file>"));
+static cll::opt<std::string> graphQ("graphQ", cll::desc("<query graph file>"));
 
 static cll::opt<unsigned int> numLabels("numLabels", cll::desc("# labels"), cll::init(2));
 
@@ -73,17 +74,6 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
       clEnumValN(Algo::ullmann, "ullmann", "Ullmann"),
       clEnumValEnd), cll::init(Algo::ullmann));
 
-template<typename Graph>
-struct IsEdgeDstEqual {
-  Graph& g;
-  typename Graph::GraphNode n;
-  IsEdgeDstEqual(Graph& g, typename Graph::GraphNode n): g(g), n(n) {}
-
-  bool operator()(typename Graph::edge_iterator e) {
-    return (g.getEdgeDst(e) == n);
-  }
-};
-
 template<typename NodeTy, typename EdgeTy>
 class LC_Extended_Graph: public Galois::Graph::LC_CSR_Graph<NodeTy, EdgeTy>
 {
@@ -91,20 +81,36 @@ public:
   typedef typename Galois::Graph::LC_CSR_Graph<NodeTy, EdgeTy> BaseGraph;
 
 public:
+  bool edgeSorted;
+
+public:
   typename BaseGraph::edge_iterator 
   findEdge(typename BaseGraph::GraphNode src, typename BaseGraph::GraphNode dst) {
-    return std::find_if(this->edge_begin(src), this->edge_end(src), IsEdgeDstEqual<LC_Extended_Graph>(*this, dst));
+    if(!edgeSorted) {
+      // linear scan over the edge list
+      return std::find_if(this->edge_begin(src), this->edge_end(src), [=] (typename BaseGraph::edge_iterator e) { return this->getEdgeDst(e) == dst; });
+    } else {
+      // binary search over the edge list
+      auto e = std::lower_bound(this->edge_begin(src), this->edge_end(src), dst, [=] (typename BaseGraph::edge_iterator e, typename BaseGraph::GraphNode n) { return this->getEdgeDst(e) < n; });
+      // std::lower_bound returns where it quits search, so check the return value here
+      return (this->getEdgeDst(e) == dst) ? e : this->edge_end(src);
+    }
   }
 };
+
+//#define _USE_FIRST_GRAPH_ 1
 
 struct DNode {
   char label;
   unsigned int id;
 };
 
+#ifdef _USE_FIRST_GRAPH_
 typedef Galois::Graph::FirstGraph<DNode, void, true> 
-  ::template with_sorted_neighbors<true>::type DGraph; // directed graph with DNode nodes and typeless edges sorted by dst
-//typedef LC_Extended_Graph<DNode, void> DGraph; // graph with DNode nodes and typeless edges
+  ::template with_sorted_neighbors<true>::type DGraph; // directed graph with DNode nodes and void edges sorted by dst
+#else
+typedef LC_Extended_Graph<DNode, void> DGraph; // graph with DNode nodes and typeless edges
+#endif
 typedef DGraph::GraphNode DGNode;
 
 struct QNode {
@@ -113,9 +119,12 @@ struct QNode {
   std::vector<DGNode> candidate;
 };
 
+#ifdef _USE_FIRST_GRAPH_
 typedef Galois::Graph::FirstGraph<QNode, void, true> 
   ::template with_sorted_neighbors<true>::type QGraph;
-//typedef LC_Extended_Graph<QNode, void> QGraph;
+#else
+typedef LC_Extended_Graph<QNode, void> QGraph;
+#endif
 typedef QGraph::GraphNode QGNode;
 
 struct NodeMatch {
@@ -146,17 +155,37 @@ void printGraph(Graph& g) {
   std::cout << std::endl;
 }
 
+// graph.sortEdges() expects a comparator over EdgeSortValue
+template<typename G>
+struct CmpEdgeByDst {
+  typedef typename G::GraphNode GNode;
+  typedef typename G::edge_data_type EdgeTy;
+  bool operator()(const Galois::Graph::EdgeSortValue<GNode, EdgeTy>& e1, const Galois::Graph::EdgeSortValue<GNode, EdgeTy>& e2) const {
+    return e1.dst < e2.dst;
+  }
+};
+
 template<typename Graph>
 void initializeGraph(Graph& g, unsigned int seed) {
   typedef typename Graph::node_data_type Node;
 
   generator.seed(seed);
 
+#ifndef _USE_FIRST_GRAPH_
+  g.edgeSorted = sortEdges;
+#endif
+
   unsigned int i = 0;
   for(auto ni = g.begin(), ne = g.end(); ni != ne; ++ni) {
     Node& data = g.getData(*ni);
     data.id = i++;
     data.label = 'A' + distribution(generator) % numLabels;
+
+#ifndef _USE_FIRST_GRAPH_
+    if(sortEdges) {
+      g.sortEdges(*ni, CmpEdgeByDst<Graph>());
+    }
+#endif
   }
 }
 
@@ -381,8 +410,8 @@ void reportMatchings(MatchingVector& report, DGraph& gD, QGraph& gQ) {
 template<typename Algo>
 void run() {
   DGraph gD;
-  if(dataGraphName.size()) {
-    Galois::Graph::readGraph(gD, dataGraphName);
+  if(graphD.size()) {
+    Galois::Graph::readGraph(gD, graphD);
     std::cout << "Reading data graph..." << std::endl;
   } else {
     GALOIS_DIE("Failed to read data graph");
@@ -396,8 +425,8 @@ void run() {
 //  printGraph(gD);
 
   QGraph gQ;
-  if(queryGraphName.size()) {
-    Galois::Graph::readGraph(gQ, queryGraphName);
+  if(graphQ.size()) {
+    Galois::Graph::readGraph(gQ, graphQ);
     std::cout << "Reading query graph..." << std::endl;
   } else {
     GALOIS_DIE("Failed to read query graph");
