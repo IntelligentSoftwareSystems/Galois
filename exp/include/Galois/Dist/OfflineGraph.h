@@ -133,7 +133,7 @@ public:
   typedef uint32_t GraphNode;
 
   OfflineGraph(const std::string& name)
-    :file1(name), fileEdgeDst(name), fileEdgeData(name),fileIndex(name),numSeeks1(0), numSeeksDst(0), numSeeksData(0),
+    :file1(name, std::ios_base::binary), fileEdgeDst(name, std::ios_base::binary), fileEdgeData(name, std::ios_base::binary),fileIndex(name, std::ios_base::binary),numSeeks1(0), numSeeksDst(0), numSeeksData(0),
      loc1(0), locIndex(0), locEdgeDst(0), locEdgeData(0)
   {
     if (!file1.is_open() || !file1.good()) throw "Bad filename";
