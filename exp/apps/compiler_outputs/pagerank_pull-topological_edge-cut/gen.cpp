@@ -34,14 +34,17 @@
 #include "Galois/Runtime/CompilerHelperFunctions.h"
 #include "Galois/Runtime/Tracer.h"
 
+#ifdef __GALOIS_VERTEX_CUT_GRAPH__
+#include "Galois/Dist/vGraph.h"
+#else
 #include "Galois/Dist/hGraph.h"
+#endif
 #include "Galois/DistAccumulator.h"
 
 #ifdef __GALOIS_HET_CUDA__
-#include "Galois/Dist/DistBag.h"
+#include "Galois/Cuda/cuda_mtypes.h"
 #include "gen_cuda.h"
 struct CUDA_Context *cuda_ctx;
-struct CUDA_Worklist cuda_wl;
 #endif
 
 static const char* const name = "PageRank - Compiler Generated Distributed Heterogeneous";
@@ -68,7 +71,11 @@ std::string personality_str(Personality p) {
 
 namespace cll = llvm::cl;
 static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
+#ifdef __GALOIS_VERTEX_CUT_GRAPH__
+static cll::opt<std::string> partFolder("partFolder", cll::desc("path to partitionFolder"), cll::init(""));
+#endif
 static cll::opt<float> tolerance("tolerance", cll::desc("tolerance"), cll::init(0.000001));
+static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations"), cll::init(1000));
 static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to the output stream"), cll::init(false));
 #ifdef __GALOIS_HET_CUDA__
 static cll::opt<int> gpudevice("gpu", cll::desc("Select GPU to run on, default is to choose automatically"), cll::init(-1));
@@ -87,8 +94,14 @@ struct PR_NodeData {
   std::atomic<int> nout;
 };
 
+#ifdef __GALOIS_VERTEX_CUT_GRAPH__
+typedef vGraph<PR_NodeData, void> Graph;
+#else
 typedef hGraph<PR_NodeData, void> Graph;
+#endif
 typedef typename Graph::GraphNode GNode;
+
+unsigned iteration;
 
 struct ResetGraph {
   Graph* graph;
@@ -100,7 +113,7 @@ struct ResetGraph {
     		reset_CUDA_context(cuda_ctx);
     	} else if (personality == CPU)
     #endif
-    Galois::do_all(_graph.begin(), _graph.end(), ResetGraph{ &_graph }, Galois::loopname("reset"));
+    Galois::do_all(_graph.begin(), _graph.ghost_end(), ResetGraph{ &_graph }, Galois::loopname("reset"));
   }
 
   void operator()(GNode src) const {
@@ -140,6 +153,40 @@ struct InitializeGraph {
     		}
     		typedef int ValTy;
     	};
+    	struct SyncerPull_0 {
+    		static int extract(uint32_t node_id, const struct PR_NodeData & node) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) return get_node_value_cuda(cuda_ctx, node_id);
+    			assert (personality == CPU);
+    		#endif
+    			return node.value;
+    		}
+    		static void setVal (uint32_t node_id, struct PR_NodeData & node, int y ) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) set_node_value_cuda(cuda_ctx, node_id, y);
+    			else if (personality == CPU)
+    		#endif
+    				{node.value = y ; }
+    		}
+    		typedef float ValTy;
+    	};
+    	struct SyncerPull_1 {
+    		static int extract(uint32_t node_id, const struct PR_NodeData & node) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) return get_node_nout_cuda(cuda_ctx, node_id);
+    			assert (personality == CPU);
+    		#endif
+    			return node.nout;
+    		}
+    		static void setVal (uint32_t node_id, struct PR_NodeData & node, int y ) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) set_node_nout_cuda(cuda_ctx, node_id, y);
+    			else if (personality == CPU)
+    		#endif
+    				{node.nout = y ; }
+    		}
+    		typedef int ValTy;
+    	};
     #ifdef __GALOIS_HET_CUDA__
     	if (personality == GPU_CUDA) {
     		InitializeGraph_cuda(alpha, cuda_ctx);
@@ -147,6 +194,8 @@ struct InitializeGraph {
     #endif
     Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ alpha, &_graph }, Galois::loopname("Init"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "nout", "int" , "{ Galois::atomicAdd(node.nout, y);}",  "{node.nout = 0 ; }"));
     _graph.sync_push<Syncer_0>();
+    _graph.sync_pull<SyncerPull_0>();
+    _graph.sync_pull<SyncerPull_1>();
     
   }
 
@@ -162,81 +211,49 @@ struct InitializeGraph {
 };
 
 
-template <typename GraphTy>
-struct Get_info_functor : public Galois::op_tag {
-	GraphTy &graph;
-	Get_info_functor(GraphTy& _g): graph(_g){}
-	unsigned operator()(GNode n) const {
-		return graph.getHostID(n);
-	}
-	GNode getGNode(uint32_t local_id) const {
-		return GNode(graph.getGID(local_id));
-	}
-	uint32_t getLocalID(GNode n) const {
-		return graph.getLID(n);
-	}
-	void sync_graph(){
-		 sync_graph_static(graph);
-	}
-	void static sync_graph_static(Graph& _graph) {
-	}
-};
-
 struct PageRank_pull {
   const float &local_alpha;
-  cll::opt<float> &local_tolerance;
+  const float &local_tolerance;
   Graph* graph;
 
-  PageRank_pull(cll::opt<float> &_tolerance, const float &_alpha, Graph* _graph) : local_tolerance(_tolerance), local_alpha(_alpha), graph(_graph){}
+  PageRank_pull(const float &_tolerance, const float &_alpha, Graph* _graph) : local_tolerance(_tolerance), local_alpha(_alpha), graph(_graph){}
   void static go(Graph& _graph) {
-    #ifdef __GALOIS_HET_CUDA__
-    	if (personality == GPU_CUDA) {
-    		Galois::Timer T_compute, T_comm_syncGraph, T_comm_bag;
-    		unsigned num_iter = 0;
-    		auto __sync_functor = Get_info_functor<Graph>(_graph);
-    		typedef Galois::DGBag<GNode, Get_info_functor<Graph> > DBag;
-    		DBag dbag(__sync_functor);
-    		auto &local_wl = DBag::get();
-    		T_compute.start();
-    		cuda_wl.num_in_items = _graph.getNumOwned();
-    		for (int __i = 0; __i < cuda_wl.num_in_items; ++__i) cuda_wl.in_items[__i] = __i;
-    		if (cuda_wl.num_in_items > 0)
-    			PageRank_pull_cuda(alpha, tolerance, cuda_ctx);
-    		T_compute.stop();
-    		T_comm_syncGraph.start();
-    		__sync_functor.sync_graph();
-    		T_comm_syncGraph.stop();
-    		T_comm_bag.start();
-    		dbag.set_local(cuda_wl.out_items, cuda_wl.num_out_items);
-    		dbag.sync();
-    		cuda_wl.num_out_items = 0;
-    		T_comm_bag.stop();
-    		//std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] Iter : " << num_iter << " T_compute : " << T_compute.get() << "(msec) T_comm_syncGraph : " << T_comm_syncGraph.get() << "(msec) T_comm_bag : " << T_comm_bag.get() << "(msec) \n";
-    		while (!dbag.canTerminate()) {
-    		++num_iter;
-    		//std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] Iter : " << num_iter << " Total items to work on : " << cuda_wl.num_in_items << "\n";
-    		T_compute.start();
-    		cuda_wl.num_in_items = local_wl.size();
-    		std::copy(local_wl.begin(), local_wl.end(), cuda_wl.in_items);
-    		if (cuda_wl.num_in_items > 0)
-    			PageRank_pull_cuda(alpha, tolerance, cuda_ctx);
-    		T_compute.stop();
-    		T_comm_syncGraph.start();
-    		__sync_functor.sync_graph();
-    		T_comm_syncGraph.stop();
-    		T_comm_bag.start();
-    		dbag.set_local(cuda_wl.out_items, cuda_wl.num_out_items);
-    		dbag.sync();
-    		cuda_wl.num_out_items = 0;
-    		T_comm_bag.stop();
-    		//std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] Iter : " << num_iter << " T_compute : " << T_compute.get() << "(msec) T_comm_syncGraph : " << T_comm_syncGraph.get() << "(msec) T_comm_bag : " << T_comm_bag.get() << "(msec) \n";
+    iteration = 0;
+    do{
+      DGAccumulator_accum.reset();
+    	struct SyncerPull_0 {
+    		static int extract(uint32_t node_id, const struct PR_NodeData & node) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) return get_node_value_cuda(cuda_ctx, node_id);
+    			assert (personality == CPU);
+    		#endif
+    			return node.value;
     		}
-    	} else if (personality == CPU)
-    #endif
-    Galois::for_each(_graph.begin(), _graph.end(), PageRank_pull { tolerance, alpha, &_graph },Galois::workList_version(), Galois::loopname("pageRank"), Get_info_functor<Graph>(_graph));
+    		static void setVal (uint32_t node_id, struct PR_NodeData & node, int y ) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) set_node_value_cuda(cuda_ctx, node_id, y);
+    			else if (personality == CPU)
+    		#endif
+    				{node.value = y ; }
+    		}
+    		typedef float ValTy;
+    	};
+      #ifdef __GALOIS_HET_CUDA__
+      	if (personality == GPU_CUDA) {
+      		int __retval = 0;
+      		PageRank_pull_cuda(__retval, alpha, tolerance, cuda_ctx);
+      		DGAccumulator_accum += __retval;
+      	} else if (personality == CPU)
+      #endif
+      Galois::do_all(_graph.begin(), _graph.end(), PageRank_pull { tolerance, alpha, &_graph }, Galois::loopname("pageRank"));
+      _graph.sync_pull<SyncerPull_0>();
+      ++iteration;
+      if (maxIterations == 5) DGAccumulator_accum += 1;
+    }while((iteration < maxIterations) && DGAccumulator_accum.reduce());
   }
 
-  void operator()(GNode src, Galois::UserContext<GNode>& ctx)const {
+  static Galois::DGAccumulator<int> DGAccumulator_accum;
+  void operator()(GNode src)const {
     PR_NodeData& sdata = graph->getData(src);
     float sum = 0;
     for(auto nbr = graph->edge_begin(src); nbr != graph->edge_end(src); ++nbr){
@@ -253,22 +270,23 @@ struct PageRank_pull {
 
     if(diff > local_tolerance){
       sdata.value = pr_value; 
-      ctx.push(graph->getGID(src));
+      DGAccumulator_accum+= 1;
     }
   }
 };
+Galois::DGAccumulator<int>  PageRank_pull::DGAccumulator_accum;
 
 int main(int argc, char** argv) {
   try {
 
     LonestarStart(argc, argv, name, desc, url);
     auto& net = Galois::Runtime::getSystemNetworkInterface();
-    Galois::Timer T_total, T_hGraph_init, T_init, T_pageRank1, T_pageRank2, T_pageRank3;
+    Galois::Timer T_total, T_graph_load, T_init, T_pageRank1, T_pageRank2, T_pageRank3;
 
+    std::vector<unsigned> scalefactor;
 #ifdef __GALOIS_HET_CUDA__
     const unsigned my_host_id = Galois::Runtime::getHostID();
     int gpu_device = gpudevice;
-    std::vector<unsigned> scalefactor;
     //Parse arg string when running on multiple hosts and update/override personality
     //with corresponding value.
     if (personality_set.length() == Galois::Runtime::NetworkInterface::Num) {
@@ -304,25 +322,26 @@ int main(int argc, char** argv) {
 
     T_total.start();
 
-    T_hGraph_init.start();
-#ifndef __GALOIS_HET_CUDA__
-    Graph hg(inputFile, net.ID, net.Num);
+    T_graph_load.start();
+#ifdef __GALOIS_VERTEX_CUT_GRAPH__
+    Graph hg(inputFile, partFolder, net.ID, net.Num, scalefactor);
 #else
     Graph hg(inputFile, net.ID, net.Num, scalefactor);
+#endif
+#ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       cuda_ctx = get_CUDA_context(my_host_id);
       if (!init_CUDA_context(cuda_ctx, gpu_device))
         return -1;
       MarshalGraph m = hg.getMarshalGraph(my_host_id);
-      load_graph_CUDA(cuda_ctx, &cuda_wl, m);
+      load_graph_CUDA(cuda_ctx, m);
     } else if (personality == GPU_OPENCL) {
       //Galois::OpenCL::cl_env.init(cldevice.Value);
     }
 #endif
-    T_hGraph_init.stop();
+    T_graph_load.stop();
 
     std::cout << "[" << net.ID << "] InitializeGraph::go called\n";
-
     T_init.start();
     InitializeGraph::go(hg);
     T_init.stop();
@@ -371,11 +390,11 @@ int main(int argc, char** argv) {
 
     auto mean_time = (T_pageRank1.get() + T_pageRank2.get() + T_pageRank3.get())/3;
 
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get()
+    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " Graph : " << T_graph_load.get() << " Init : " << T_init.get() 
       << " PageRank1 : " << T_pageRank1.get()
       << " PageRank2 : " << T_pageRank2.get()
       << " PageRank3 : " << T_pageRank3.get()
-      << " PageRank mean : " << mean_time << " (msec)\n\n";
+      << " PageRank mean (" << iteration << " iterations) : " << mean_time << " (msec)\n\n";
 
     // Verify
     if(verify){

@@ -36,7 +36,11 @@
 #include "Galois/Runtime/CompilerHelperFunctions.h"
 #include "Galois/Runtime/Tracer.h"
 
+#ifdef __GALOIS_VERTEX_CUT_GRAPH__
+#include "Galois/Dist/vGraph.h"
+#else
 #include "Galois/Dist/hGraph.h"
+#endif
 
 #ifdef __GALOIS_HET_CUDA__
 #include "Galois/Dist/DistBag.h"
@@ -67,6 +71,9 @@ static const char* const url = 0;
 
 namespace cll = llvm::cl;
 static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
+#ifdef __GALOIS_VERTEX_CUT_GRAPH__
+static cll::opt<std::string> partFolder("partFolder", cll::desc("path to partitionFolder"), cll::init(""));
+#endif
 static cll::opt<float> tolerance("tolerance", cll::desc("tolerance"), cll::init(0.000001));
 static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations"), cll::init(1000));
 static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"), cll::init(false));
@@ -90,7 +97,11 @@ struct PR_NodeData {
 
 };
 
+#ifdef __GALOIS_VERTEX_CUT_GRAPH__
+typedef vGraph<PR_NodeData, void> Graph;
+#else
 typedef hGraph<PR_NodeData, void> Graph;
+#endif
 typedef typename Graph::GraphNode GNode;
 
 typedef GNode WorkItem;
@@ -298,12 +309,12 @@ int main(int argc, char** argv) {
 
     LonestarStart(argc, argv, name, desc, url);
     auto& net = Galois::Runtime::getSystemNetworkInterface();
-    Galois::Timer T_total, T_hGraph_init, T_init, T_pageRank1, T_pageRank2, T_pageRank3;
+    Galois::Timer T_total, T_graph_load, T_init, T_pageRank1, T_pageRank2, T_pageRank3;
 
+    std::vector<unsigned> scalefactor;
 #ifdef __GALOIS_HET_CUDA__
     const unsigned my_host_id = Galois::Runtime::getHostID();
     int gpu_device = gpudevice;
-    std::vector<unsigned> scalefactor;
     //Parse arg string when running on multiple hosts and update/override personality
     //with corresponding value.
     if (personality_set.length() == Galois::Runtime::NetworkInterface::Num) {
@@ -339,11 +350,13 @@ int main(int argc, char** argv) {
 
     T_total.start();
 
-    T_hGraph_init.start();
-#ifndef __GALOIS_HET_CUDA__
-    Graph hg(inputFile, net.ID, net.Num);
+    T_graph_load.start();
+#ifdef __GALOIS_VERTEX_CUT_GRAPH__
+    Graph hg(inputFile, partFolder, net.ID, net.Num, scalefactor);
 #else
     Graph hg(inputFile, net.ID, net.Num, scalefactor);
+#endif
+#ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
       cuda_ctx = get_CUDA_context(my_host_id);
       if (!init_CUDA_context(cuda_ctx, gpu_device))
@@ -354,7 +367,7 @@ int main(int argc, char** argv) {
       //Galois::OpenCL::cl_env.init(cldevice.Value);
     }
 #endif
-    T_hGraph_init.stop();
+    T_graph_load.stop();
 
     std::cout << "[" << net.ID << "] InitializeGraph::go called\n";
 
@@ -423,7 +436,7 @@ int main(int argc, char** argv) {
 
     auto mean_time = (T_pageRank1.get() + T_pageRank2.get() + T_pageRank3.get())/3;
 
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get()
+    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " Graph : " << T_graph_load.get() << " Init : " << T_init.get()
       << " PageRank1 : " << T_pageRank1.get()
       << " PageRank2 : " << T_pageRank2.get()
       << " PageRank3 : " << T_pageRank3.get()

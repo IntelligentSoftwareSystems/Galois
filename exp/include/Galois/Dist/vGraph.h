@@ -333,7 +333,8 @@ public:
 
 
   //vGraph construction is collective
-  vGraph(const std::string& filename, const std::string& partitionFolder, unsigned host, unsigned numHosts)
+  // FIXME: use scalefactor to balance load
+  vGraph(const std::string& filename, const std::string& partitionFolder, unsigned host, unsigned numHosts, std::vector<unsigned> scalefactor = std::vector<unsigned>())
     :GlobalObject(this), id(host),round(false),num_recv_expected(0)
   {
     std::string part_fileName = getPartitionFileName(partitionFolder,id,numHosts);
