@@ -86,7 +86,7 @@ public:
   }
 
   void addNumaAllocToStat(const std::string& loop, const std::string& category) {
-    int nodes = Galois::Substrate::getThreadPool().getMaxNumaNodes();
+    int nodes = Galois::Substrate::ThreadPool::getThreadPool().getMaxNumaNodes();
     for (int x = 0; x < nodes; ++x) {
       auto rStat = Stats.getRemote(x);
       std::lock_guard<Substrate::SimpleLock> lg(rStat->first);

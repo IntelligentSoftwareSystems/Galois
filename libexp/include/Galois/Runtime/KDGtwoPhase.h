@@ -495,14 +495,14 @@ void for_each_ordered_ikdg (const R& range, const Cmp& cmp, const NhFunc& nhFunc
   const bool wakeupThreadPool = true;
 
   if (wakeupThreadPool) {
-    Substrate::getThreadPool().burnPower(Galois::getActiveThreads ());
+    Substrate::ThreadPool::getThreadPool().burnPower(Galois::getActiveThreads ());
   }
 
   e.push_initial (range);
   e.execute ();
 
   if (wakeupThreadPool) {
-    Substrate::getThreadPool().beKind ();
+    Substrate::ThreadPool::getThreadPool().beKind ();
   }
 
 }

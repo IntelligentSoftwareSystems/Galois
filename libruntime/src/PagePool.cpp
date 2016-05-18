@@ -70,7 +70,7 @@ class PAState {
 
 public:
   PAState() { 
-    auto num = Galois::Substrate::getThreadPool().getMaxThreads();
+    auto num = Galois::Substrate::ThreadPool::getThreadPool().getMaxThreads();
     counts.resize(num);
     pool.resize(num);
   }

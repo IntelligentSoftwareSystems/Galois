@@ -32,7 +32,7 @@
 #include "Galois/Substrate/HWTopo.h"
 #include "Galois/Substrate/gio.h"
 
-#include <cstdlib>
+#include <algorithm>
 
 // Forward declare this to avoid including PerThreadStorage.
 // We avoid this to stress that the thread Pool MUST NOT depend on PTS.
@@ -49,11 +49,32 @@ using namespace Galois::Substrate;
 
 thread_local ThreadPool::per_signal ThreadPool::my_box;
 
-ThreadPool::ThreadPool() :mi(getHWTopo().first), starting(mi.maxThreads), masterFastmode(false), signals(mi.maxThreads), running(false) {
+
+ThreadPool::ThreadPool() 
+: mi(getHWTopo().first), 
+  starting(mi.maxThreads), 
+  masterFastmode(false), 
+  running(false)
+{
+  signals.resize(mi.maxThreads);
   initThread(0);
+
+  for (unsigned i = 1; i < mi.maxThreads; ++i) {
+    std::thread t(&ThreadPool::threadLoop, this, i);
+    threads.emplace_back(std::move(t));
+  }
+
+  //we don't want signals to have to contain atomics, since they are set once
+  while (std::any_of(signals.begin(), signals.end(), [](per_signal* p) { return !p || !p->done; })) {
+    std::atomic_thread_fence(std::memory_order_seq_cst);
+  }
 }
 
-ThreadPool::~ThreadPool() { }
+ThreadPool::~ThreadPool() {
+  destroyCommon();
+  for(auto& t : threads)
+    t.join();
+}
 
 void ThreadPool::destroyCommon() {
   beKind(); // reset fastmode
@@ -127,10 +148,9 @@ void ThreadPool::threadLoop(unsigned tid) {
       }
       my_box.fastRelease = 0;
     } else {
-      threadWait(my_box.topo.tid);
+      my_box.wait();
     }
     cascade(fastmode);
-    
     try {
       work();
     } catch (const shutdown_ty&) {
@@ -169,8 +189,8 @@ void ThreadPool::cascade(bool fastmode) {
       nid->done = 0;
       if (fastmode)
         nid->fastRelease = 1;
-      else
-        threadWakeup(n);
+      else        
+        signals[n]->wakeup();
     }
   }
 }
@@ -199,18 +219,7 @@ void ThreadPool::runInternal(unsigned num) {
   running = false;
 }
 
-bool ThreadPool::isLeader(unsigned tid) const {
-  return signals[tid]->topo.socketLeader == tid;
-}
-
-unsigned ThreadPool::getPackage(unsigned tid) const {
-  return signals[tid]->topo.socket;
-}
-
-unsigned ThreadPool::getLeader(unsigned tid) const {
-  return signals[tid]->topo.socketLeader;
-}
-
-unsigned ThreadPool::getCumulativeMaxPackage(unsigned tid) const {
-  return signals[tid]->topo.cumulativeMaxSocket;
+ThreadPool& ThreadPool::getThreadPool() {
+  static ThreadPool p;
+  return p;
 }

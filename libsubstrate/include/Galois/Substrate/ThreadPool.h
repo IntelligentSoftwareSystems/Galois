@@ -37,6 +37,8 @@
 #include "CacheLineStorage.h"
 #include "HWTopo.h"
 
+#include <condition_variable>
+#include <thread>
 #include <functional>
 #include <atomic>
 #include <vector>
@@ -61,6 +63,28 @@ struct ExecuteTupleImpl<tpl, s, 0> {
   static inline void execute(tpl& f) { }
 };
 
+class Semaphore { //not copy or movable
+  std::mutex m;
+  std::condition_variable cv;
+  int count;
+
+public:
+  explicit Semaphore() : count(0) {}
+  ~Semaphore() {}
+
+  void release() {
+    std::lock_guard<std::mutex> lg(m);
+    ++count;
+    cv.notify_one();
+  }
+
+  void acquire() {
+    std::unique_lock<std::mutex> lg(m);
+    cv.wait(lg, [=]{ return 0 < count; });
+    --count;
+  }
+};
+
 }
 
 class ThreadPool {
@@ -71,31 +95,34 @@ protected:
 
   //! Per-thread mailboxes for notification
   struct per_signal {
+    detail::Semaphore start;
     std::atomic<int> done;
     std::atomic<int> fastRelease;
     threadTopoInfo topo;
+
+    void wakeup() {
+      start.release();
+    }
+
+    void wait() {
+      start.acquire();
+    }
   };
 
   thread_local static per_signal my_box;
+
+  std::vector<per_signal*> signals;
+  std::vector<std::thread>  threads;
 
   machineTopoInfo mi;
 
   std::function<void(void)> work; 
   std::atomic<unsigned> starting;
   unsigned masterFastmode;
-  std::vector<per_signal*> signals;
   bool running;
-
-  ThreadPool();
 
   //!destroy all threads
   void destroyCommon();
-
-  //! sleep this thread
-  virtual void threadWait(unsigned tid) = 0;
-
-  //! wake up thread
-  virtual void threadWakeup(unsigned tid) = 0;
 
   //! Initialize a thread
   void initThread(unsigned tid);
@@ -112,9 +139,10 @@ protected:
   //! execute work on num threads
   void runInternal(unsigned num);
 
-public:
+  ThreadPool();
 
-  virtual ~ThreadPool();
+public:
+  ~ThreadPool();
 
   //! execute work on all threads
   //! a simple wrapper for run
@@ -159,11 +187,11 @@ public:
     abort();
   }
   
-  bool isLeader(unsigned tid) const;
-  unsigned getPackage(unsigned tid) const;
-  unsigned getLeader(unsigned tid) const;
-  unsigned getCumulativeMaxPackage(unsigned tid) const;
-  unsigned getNumaNode(unsigned tid) const;
+  bool isLeader(unsigned tid) const { return signals[tid]->topo.socketLeader == tid; }
+  unsigned getPackage(unsigned tid) const { return signals[tid]->topo.socket; }
+  unsigned getLeader(unsigned tid) const { return signals[tid]->topo.socketLeader; }
+  unsigned getCumulativeMaxPackage(unsigned tid) const { return signals[tid]->topo.cumulativeMaxSocket; }
+  unsigned getNumaNode(unsigned tid) const { return signals[tid]->topo.numaNode; }
 
   static unsigned getTID() { return my_box.topo.tid; }
   static bool isLeader() { return my_box.topo.tid == my_box.topo.socketLeader; }
@@ -172,10 +200,8 @@ public:
   static unsigned getCumulativeMaxPackage() { return my_box.topo.cumulativeMaxSocket; }
   static unsigned getNumaNode() { return my_box.topo.numaNode; }
 
+  static ThreadPool& getThreadPool();
 };
-
-//!Returns or creates the appropriate thread pool for the system
-ThreadPool& getThreadPool();
 
 } //Substrate
 } //Galois

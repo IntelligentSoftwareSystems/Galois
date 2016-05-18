@@ -4,7 +4,7 @@ if(USE_EXP)
   app(KruskalDet KruskalDet.cpp EXP_OPT)
   app(KruskalHand KruskalHand.cpp EXP_OPT)
   app(KruskalLevelExec KruskalLevelExec.cpp EXP_OPT)
-  app(KruskalOrdered KruskalOrdered.cpp EXP_OPT)
+#  app(KruskalOrdered KruskalOrdered.cpp EXP_OPT)
   app(KruskalSpec KruskalSpec.cpp EXP_OPT)
   app(KruskalStrictOBIM KruskalStrictOBIM.cpp EXP_OPT)
 

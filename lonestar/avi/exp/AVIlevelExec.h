@@ -25,7 +25,7 @@
 #define AVI_ORDERED_SPEC_H
 
 #include "Galois/Galois.h"
-#include "Galois/Runtime/PerThreadStorage.h"
+#include "Galois/Substrate/PerThreadStorage.h"
 #include "Galois/WorkList/WorkList.h"
 #include "Galois/Runtime/LevelExecutor.h"
 
@@ -121,14 +121,14 @@ protected:
 
     MeshInit& meshInit;
     GlobalVec& g;
-    Galois::Runtime::PerThreadStorage<LocalVec>& perIterLocalVec;
+    Galois::Substrate::PerThreadStorage<LocalVec>& perIterLocalVec;
     bool createSyncFiles;
     IterCounter& niter;
 
     Process(
         MeshInit& meshInit,
         GlobalVec& g,
-        Galois::Runtime::PerThreadStorage<LocalVec>& perIterLocalVec,
+        Galois::Substrate::PerThreadStorage<LocalVec>& perIterLocalVec,
         bool createSyncFiles,
         IterCounter& niter)
       :
@@ -164,7 +164,7 @@ public:
     const size_t nrows = meshInit.getSpatialDim();
     const size_t ncols = meshInit.getNodesPerElem();
 
-    Galois::Runtime::PerThreadStorage<LocalVec> perIterLocalVec;
+    Galois::Substrate::PerThreadStorage<LocalVec> perIterLocalVec;
     for (unsigned int i = 0; i < perIterLocalVec.size(); ++i)
       *perIterLocalVec.getRemote(i) = LocalVec(nrows, ncols);
 
