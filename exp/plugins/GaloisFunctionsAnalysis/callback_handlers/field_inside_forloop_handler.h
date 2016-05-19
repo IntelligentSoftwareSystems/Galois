@@ -256,10 +256,16 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                   //atomicAdd_op->dump();
                   string reduceOP = "{ Galois::atomicMin(node." + field_entry.FIELD_NAME + ", y);}";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
-                  string resetValExpr = "{node." + field_entry.FIELD_NAME + " = std::numeric_limits<int>::max()/4; }";
+                  string resetValExpr = "{node." + field_entry.FIELD_NAME + " = std::numeric_limits<" + field_entry.RESET_VALTYPE + ">::max()/4; }";
                   reduceOP_entry.RESETVAL_EXPR = resetValExpr;
 
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
+
+                  /** Also needs sync pull for operator to terminate! **/
+                  ReductionOps_entry reduceOP_entry_pull = reduceOP_entry;
+                  reduceOP_entry_pull.SYNC_TYPE = "sync_pull";
+                  info->reductionOps_map[i.first].push_back(reduceOP_entry_pull);
+
                   break;
                 }
 

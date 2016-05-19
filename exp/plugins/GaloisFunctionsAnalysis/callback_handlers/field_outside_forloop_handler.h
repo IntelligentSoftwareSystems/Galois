@@ -126,7 +126,7 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
                 vector<string> elems;
                 split(s.str(), delim, elems);
                 //llvm::outs() << " ===> " << elems[1] << "\n";
-                field_entry.NODE_NAME = elems[0];
+                reduceOP_entry.NODE_NAME = field_entry.NODE_NAME = elems[0];
 
                 field_entry.FIELD_NAME = reduceOP_entry.FIELD_NAME = elems[1];
                 field_entry.GRAPH_NAME = reduceOP_entry.GRAPH_NAME = j.GRAPH_NAME;
@@ -134,7 +134,7 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
                   //assignmentOP_vec->dump();
                 }
                 if(!field && (assignplusOP || plusOP || assignmentOP || atomicAdd_op || plusOP_vec || assignmentOP_vec)) {
-                  reduceOP_entry.SYNC_TYPE = "sync_pull";
+                  reduceOP_entry.SYNC_TYPE = "sync_pull_maybe";
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
                   break;
                 }
@@ -194,12 +194,12 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
 
                   field_entry.VAR_NAME = field->getNameAsString();
                   field_entry.VAR_TYPE = field_entry.RESET_VALTYPE = field->getType().getNonReferenceType().getAsString();
-                  llvm::outs() << " VAR TYPE in getdata not in loop :" << field_entry.VAR_TYPE << "\n";
+                  //llvm::outs() << " VAR TYPE in getdata not in loop :" << field_entry.VAR_TYPE << "\n";
                   field_entry.IS_REFERENCED = field->isReferenced();
                   field_entry.IS_REFERENCE = true;
                   field_entry.GRAPH_NAME = j.GRAPH_NAME;
                   field_entry.RESET_VAL = "0";
-                  field_entry.SYNC_TYPE = "sync_pull";
+                  field_entry.SYNC_TYPE = "sync_pull_maybe";
                   info->fieldData_map[i.first].push_back(field_entry);
                   break;
                 }

@@ -339,7 +339,6 @@ class GaloisFunctionsConsumer : public ASTConsumer {
       }
 
       /*MATCHER 5: *********************Match to get fields of NodeData structure being modified  but not in the Galois all edges forLoop *******************/
-#if 0
       for (auto i : info.getData_map) {
         for(auto j : i.second) {
           if(j.IS_REFERENCED && j.IS_REFERENCE) {
@@ -395,7 +394,6 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                                                                       binaryOperator(hasOperatorName("+="), hasLHS(operatorCallExpr(hasDescendant(declRefExpr(to(methodDecl(hasName("operator[]"))))), hasDescendant(LHS_memExpr)))).bind(str_plusOp_vec),
                                                                       /** Atomic Add **/
                                                                       callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("atomicAdd"))))), hasAnyArgument(LHS_memExpr)).bind(str_atomicAdd),
-                                                                      //callExpr(argumentCountIs(2), (callee(functionDecl(hasName("atomicAdd"))), hasAnyArgument(LHS_memExpr))).bind(str_atomicAdd),
 
                                                                       binaryOperator(hasOperatorName("="), hasDescendant(arraySubscriptExpr(hasDescendant(LHS_memExpr)).bind("arraySub"))).bind(str_assignment),
                                                                       binaryOperator(hasOperatorName("+="), hasDescendant(arraySubscriptExpr(hasDescendant(LHS_memExpr)).bind("arraySub"))).bind(str_plusOp),
@@ -412,7 +410,6 @@ class GaloisFunctionsConsumer : public ASTConsumer {
           }
         }
       }
-#endif
       /****************************************************************************************************************/
 
       /*MATCHER 5: *********************Match to get fields of NodeData structure being modified inside the Galois all edges forLoop *******************/
@@ -728,12 +725,21 @@ class GaloisFunctionsConsumer : public ASTConsumer {
               StatementMatcher RHS_memExpr2 = hasDescendant(declRefExpr(to(varDecl(hasName(j.NODE_NAME)))));
               StatementMatcher LHS_varDecl = declRefExpr(to(varDecl().bind(str_binaryOp_lhs)));
 
-          /** USE but !REDUCTIONS : NodeData.field is used, therefore needs syncPull **/
+            /** USE but !REDUCTIONS : NodeData.field is used, therefore needs syncPull **/
+#if 0
               DeclarationMatcher f_syncPull_1 = varDecl(isExpansionInMainFile(), hasInitializer(expr(anyOf(
                                                                                                   hasDescendant(memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.NODE_NAME)))))).bind(str_memExpr)),
                                                                                                   memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.NODE_NAME)))))).bind(str_memExpr)
                                                                                                   ),unless(stmt_reductionOp))),
                                                                         hasAncestor(recordDecl(hasName(i.first)))
+                                                                    ).bind(str_syncPull_var);
+#endif
+
+              /** USE: This works across operators to see if sync_pull is required after an operator finishes **/
+              DeclarationMatcher f_syncPull_1 = varDecl(isExpansionInMainFile(), hasInitializer(expr(
+                                                                                                  hasDescendant(memberExpr(member(hasName(j.FIELD_NAME))).bind(str_memExpr)),
+                                                                                                  unless(stmt_reductionOp))),
+                                                                                 hasAncestor(EdgeForLoopMatcher)
                                                                     ).bind(str_syncPull_var);
 
               StatementMatcher f_syncPull_2 = expr(isExpansionInMainFile(), unless(stmt_reductionOp),
