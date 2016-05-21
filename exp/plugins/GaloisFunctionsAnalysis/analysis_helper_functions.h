@@ -90,7 +90,7 @@ bool syncPull_reduction_exists(EntryTy entry, vector<EntryTy> entry_vec){
     return false;
   }
   for(auto it : entry_vec){
-    if((it.SYNC_TYPE == "syncPull") && (it.FIELD_NAME == entry.FIELD_NAME) && (it.FIELD_TYPE == entry.FIELD_TYPE) && (it.NODE_TYPE == entry.NODE_TYPE) && (it.GRAPH_NAME == entry.GRAPH_NAME)){
+    if((it.SYNC_TYPE == "sync_pull") && (it.FIELD_NAME == entry.FIELD_NAME) && (it.FIELD_TYPE == entry.FIELD_TYPE) && (it.NODE_TYPE == entry.NODE_TYPE) && (it.GRAPH_NAME == entry.GRAPH_NAME)){
       return true;
     }
   }
