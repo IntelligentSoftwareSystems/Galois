@@ -48,20 +48,23 @@ class SyncPullInsideForLoopHandler : public MatchFinder::MatchCallback {
       for(auto i : info->reductionOps_map){
         for(auto j : i.second){
           /** Sync pull variables **/
-          string str_syncPull_var = "syncPullVar_" + j.NODE_NAME + "_" + i.first;
+          string str_syncPull_var = "syncPullVar_" + j.NODE_NAME + "_" + j.FIELD_NAME + "_" + i.first;
           /** Sync pull for += operator. **/
-          string str_plusOp = "plusEqualOp_" + j.NODE_NAME + "_" + i.first;
-          string str_binaryOp_lhs = "binaryOp_LHS_" + j.NODE_NAME + "_" + i.first;
+          string str_plusOp = "plusEqualOp_" + j.NODE_NAME + "_" + j.FIELD_NAME + "_" + i.first;
+          string str_binaryOp_lhs = "binaryOp_LHS_" + j.NODE_NAME + "_" + j.FIELD_NAME + "_" + i.first;
 
           /** Sync Pull variables **/
           auto syncPull_var = Results.Nodes.getNodeAs<clang::VarDecl>(str_syncPull_var);
           auto syncPull_plusOp = Results.Nodes.getNodeAs<clang::Stmt>(str_plusOp);
           auto syncPull_binary_var = Results.Nodes.getNodeAs<clang::VarDecl>(str_binaryOp_lhs);
 
+          syncPull_var = (syncPull_var != NULL) ? syncPull_var : syncPull_binary_var;
+
           if(syncPull_var){
             //syncPull_var->dumpColor();
 
             if(syncPull_var->isReferenced()){
+
               llvm::outs() << "ADDING FOR SYNC PULL\n";
               ReductionOps_entry reduceOP_entry;
               reduceOP_entry.GRAPH_NAME = j.GRAPH_NAME;
@@ -73,17 +76,20 @@ class SyncPullInsideForLoopHandler : public MatchFinder::MatchCallback {
               llvm::outs() << " sync for struct " << i.first << "\n";
               /** check for duplicate **/
               if(!syncPull_reduction_exists(reduceOP_entry, i.second)){
-                llvm::outs() << " Adding for " << i.first << "\n";
                 info->reductionOps_map[i.first].push_back(reduceOP_entry);
               }
             }
             break;
           }
+#if 0
           else if(syncPull_binary_var){
             syncPull_binary_var->dumpColor();
             llvm::outs() << "BINARY IS referenced : " <<  syncPull_binary_var->isReferenced() <<"  " <<i.first << "\n";
+
+            llvm::outs() << j.NODE_NAME << ", " << j.FIELD_NAME << "\n";
             break;
           }
+#endif
         }
       }
     }

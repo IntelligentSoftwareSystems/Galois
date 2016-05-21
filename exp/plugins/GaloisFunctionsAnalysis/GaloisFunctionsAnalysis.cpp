@@ -709,20 +709,16 @@ class GaloisFunctionsConsumer : public ASTConsumer {
         for(auto j : i.second) {
           llvm::outs() << " INSIDE LOOP : j.NODE_NAME : " << j.NODE_NAME << " for : " << i.first <<"\n";
           //if(j.IS_REFERENCED && j.IS_REFERENCE) {
-            string str_memExpr = "memExpr_" + j.NODE_NAME + "_" + i.first;
-            string str_syncPull_var = "syncPullVar_" + j.NODE_NAME + "_" + i.first;
-            string str_plusOp = "plusEqualOp_" + j.NODE_NAME + "_" + i.first;
-            string str_binaryOp_lhs = "binaryOp_LHS_" + j.NODE_NAME + "_" + i.first;
+            string str_memExpr = "memExpr_" + j.NODE_NAME + "_" + j.FIELD_NAME + i.first;
+            string str_syncPull_var = "syncPullVar_" + j.NODE_NAME + "_" + j.FIELD_NAME + "_" + i.first;
+            string str_plusOp = "plusEqualOp_" + j.NODE_NAME + "_" + j.FIELD_NAME + "_" + i.first;
+            string str_binaryOp_lhs = "binaryOp_LHS_" + j.NODE_NAME + "_" + j.FIELD_NAME + "_" + i.first;
 
             /** Only need sync_pull if modified **/
-              llvm::outs() << "Sync pull is required : " << j.NODE_NAME << "\n";
+              llvm::outs() << "Sync pull is required : " << j.FIELD_NAME << "\n";
               StatementMatcher LHS_memExpr = memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.NODE_NAME))))), hasAncestor(recordDecl(hasName(i.first)))).bind(str_memExpr);
               StatementMatcher stmt_reductionOp = makeStatement_reductionOp(LHS_memExpr, i.first);
-              StatementMatcher RHS_memExpr = hasDescendant(expr(anyOf(
-                                                         hasDescendant(memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.NODE_NAME)))))).bind(str_memExpr)),
-                                                         memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.NODE_NAME)))))).bind(str_memExpr)
-                                                    ),unless(stmt_reductionOp)));
-              StatementMatcher RHS_memExpr2 = hasDescendant(declRefExpr(to(varDecl(hasName(j.NODE_NAME)))));
+              StatementMatcher RHS_memExpr = hasDescendant(memberExpr(member(hasName(j.FIELD_NAME))));
               StatementMatcher LHS_varDecl = declRefExpr(to(varDecl().bind(str_binaryOp_lhs)));
 
             /** USE but !REDUCTIONS : NodeData.field is used, therefore needs syncPull **/
@@ -743,11 +739,24 @@ class GaloisFunctionsConsumer : public ASTConsumer {
                                                                     ).bind(str_syncPull_var);
 
               StatementMatcher f_syncPull_2 = expr(isExpansionInMainFile(), unless(stmt_reductionOp),
+                                                                      anyOf(
+                                                                      /** For builtInType: varname = NodeData.fieldName, varname = anything anyOP NodeData.fieldName, varname = NodeData.fieldName anyOP anything **/
+                                                                      binaryOperator(hasOperatorName("="),
+                                                                                     hasLHS(LHS_varDecl),
+                                                                                     hasRHS(RHS_memExpr)),
+
                                                                       /** For builtInType : varname += NodeData.fieldName **/
                                                                       binaryOperator(hasOperatorName("+="),
-                                                                                      hasLHS(LHS_varDecl)/*,
-                                                                                      hasRHS(RHS_memExpr2)*/),
-                                                                        hasAncestor(recordDecl(hasName(i.first)))
+                                                                                      hasLHS(LHS_varDecl),
+                                                                                      hasRHS(RHS_memExpr)),
+
+                                                                      /** For builtInType : varname -= NodeData.fieldName **/
+                                                                      binaryOperator(hasOperatorName("-="),
+                                                                                      hasLHS(LHS_varDecl),
+                                                                                      hasRHS(RHS_memExpr))
+
+                                                                      ),
+                                                                      hasAncestor(EdgeForLoopMatcher)
                                                   ).bind(str_plusOp);
 
               Matchers_syncpull_field.addMatcher(f_syncPull_1, &syncPull_handler);
@@ -792,16 +801,16 @@ class GaloisFunctionsConsumer : public ASTConsumer {
 
         }
       }
-        
+
       Matchers_syncpull_field.matchAST(Context);
 
       /** PRINTING FINAL REDUCTION OPERATIONS **/
 
-      llvm::outs() << "\n\n"; 
+      llvm::outs() << "\n\n";
       for (auto i : info.reductionOps_map){
         llvm::outs() << "FOR >>>>> " << i.first << "\n";
         for(auto j : i.second) {
-          string write_set = "write_set( " + j.NODE_TYPE + " , " + j.FIELD_NAME + " , " + j.OPERATION_EXPR + " , " +  j.RESETVAL_EXPR + ")";
+          string write_set = "write_set( " + j.SYNC_TYPE + ", " + j.NODE_TYPE + " , " + j.FIELD_NAME + " , " + j.OPERATION_EXPR + " , " +  j.RESETVAL_EXPR + ")";
           llvm::outs() << write_set << "\n";
         }
       }

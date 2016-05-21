@@ -135,7 +135,11 @@ class FindingFieldHandler : public MatchFinder::MatchCallback {
                 }
                 if(!field && (assignplusOP || plusOP || assignmentOP || atomicAdd_op || plusOP_vec || assignmentOP_vec)) {
                   reduceOP_entry.SYNC_TYPE = "sync_pull_maybe";
-                  info->reductionOps_map[i.first].push_back(reduceOP_entry);
+                  llvm::outs() << "PPPPPPPPPPPPPPPPPPPPPPPPPPPPPPP => " << reduceOP_entry.FIELD_NAME << "\n";
+
+                  if(!syncPull_reduction_exists(reduceOP_entry, info->reductionOps_map[i.first])){
+                    info->reductionOps_map[i.first].push_back(reduceOP_entry);
+                  }
                   break;
                 }
                 /*
