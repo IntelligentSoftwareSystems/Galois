@@ -44,12 +44,11 @@
 namespace Galois {
 namespace Runtime {
 
-extern unsigned activeThreads;
-
 template<typename FunctionTy>
 struct OnEachExecutor {
   const FunctionTy& origFunction;
-  explicit OnEachExecutor(const FunctionTy& f): origFunction(f) { }
+  unsigned int activeThreads;
+  explicit OnEachExecutor(const FunctionTy& f, unsigned int actT): origFunction(f), activeThreads(actT) { }
   void operator()(void) {
     FunctionTy fn(origFunction);
     fn(Substrate::ThreadPool::getTID(), activeThreads);   
@@ -58,7 +57,8 @@ struct OnEachExecutor {
 
 template<typename FunctionTy>
 void on_each_impl(const FunctionTy& fn, const char* loopname = nullptr) {
-  Substrate::ThreadPool::getThreadPool().run(activeThreads, OnEachExecutor<FunctionTy>(fn));
+  auto activeThreads = getActiveThreads();
+  Substrate::ThreadPool::getThreadPool().run(activeThreads, OnEachExecutor<FunctionTy>(fn, activeThreads));
 }
 
 template<typename FunctionTy, typename TupleTy>
