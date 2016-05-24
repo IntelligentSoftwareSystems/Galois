@@ -171,6 +171,7 @@ struct ConnectedComp {
       		}
       		typedef unsigned int ValTy;
       	};
+#ifdef __GALOIS_VERTEX_CUT_GRAPH__
       	struct SyncerPull_0 {
       		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
       		#ifdef __GALOIS_HET_CUDA__
@@ -188,6 +189,7 @@ struct ConnectedComp {
       		}
       		typedef unsigned int ValTy;
       	};
+#endif
       #ifdef __GALOIS_HET_CUDA__
       	if (personality == GPU_CUDA) {
       		int __retval = 0;
@@ -197,8 +199,9 @@ struct ConnectedComp {
       #endif
       Galois::do_all(_graph.begin(), _graph.end(), ConnectedComp { &_graph }, Galois::loopname("cc"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "comp_current", "unsigned int" , "{ Galois::atomicMin(node.comp_current, y);}",  "{node.comp_current = std::numeric_limits<unsigned int>::max()/4; }"), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "comp_current" , "unsigned int"));
       _graph.sync_push<Syncer_0>();
-      
+#ifdef __GALOIS_VERTEX_CUT_GRAPH__
       _graph.sync_pull<SyncerPull_0>();
+#endif
       
      ++iteration;
     }while((iteration < maxIterations) && DGAccumulator_accum.reduce());

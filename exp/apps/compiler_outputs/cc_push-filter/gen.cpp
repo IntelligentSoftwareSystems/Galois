@@ -189,6 +189,25 @@ struct FirstItr_ConnectedComp {
     		}
     		typedef unsigned int ValTy;
     	};
+#ifdef __GALOIS_VERTEX_CUT_GRAPH__
+      struct SyncerPull_0 {
+        static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
+        #ifdef __GALOIS_HET_CUDA__
+          if (personality == GPU_CUDA) return get_node_comp_current_cuda(cuda_ctx, node_id);
+          assert (personality == CPU);
+        #endif
+          return node.comp_current;
+        }
+        static void setVal (uint32_t node_id, struct NodeData & node, unsigned int y) {
+        #ifdef __GALOIS_HET_CUDA__
+          if (personality == GPU_CUDA) set_node_comp_current_cuda(cuda_ctx, node_id, y);
+          else if (personality == CPU)
+        #endif
+            node.comp_current = y;
+        }
+        typedef unsigned int ValTy;
+      };
+#endif
     #ifdef __GALOIS_HET_CUDA__
     	if (personality == GPU_CUDA) {
     		FirstItr_ConnectedComp_cuda(cuda_ctx);
@@ -196,6 +215,9 @@ struct FirstItr_ConnectedComp {
     #endif
     Galois::do_all(_graph.begin(), _graph.end(), FirstItr_ConnectedComp { &_graph }, Galois::loopname("cc"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "comp_current", "unsigned int" , "{ Galois::atomicMin(node.comp_current, y);}",  "{node.comp_current = std::numeric_limits<unsigned int>::max()/4; }"));
     _graph.sync_push<Syncer_0>();
+#ifdef __GALOIS_VERTEX_CUT_GRAPH__
+      _graph.sync_pull<SyncerPull_0>();
+#endif
     
 
   }
@@ -250,6 +272,25 @@ struct ConnectedComp {
       		}
       		typedef unsigned int ValTy;
       	};
+#ifdef __GALOIS_VERTEX_CUT_GRAPH__
+      	struct SyncerPull_0 {
+      		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
+      		#ifdef __GALOIS_HET_CUDA__
+      			if (personality == GPU_CUDA) return get_node_comp_current_cuda(cuda_ctx, node_id);
+      			assert (personality == CPU);
+      		#endif
+      			return node.comp_current;
+      		}
+      		static void setVal (uint32_t node_id, struct NodeData & node, unsigned int y) {
+      		#ifdef __GALOIS_HET_CUDA__
+      			if (personality == GPU_CUDA) set_node_comp_current_cuda(cuda_ctx, node_id, y);
+      			else if (personality == CPU)
+      		#endif
+      				node.comp_current = y;
+      		}
+      		typedef unsigned int ValTy;
+      	};
+#endif
       #ifdef __GALOIS_HET_CUDA__
       	if (personality == GPU_CUDA) {
       		int __retval = 0;
@@ -259,6 +300,9 @@ struct ConnectedComp {
       #endif
       Galois::do_all(_graph.begin(), _graph.end(), ConnectedComp { &_graph }, Galois::loopname("cc"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "comp_current", "unsigned int" , "{ Galois::atomicMin(node.comp_current, y);}",  "{node.comp_current = std::numeric_limits<unsigned int>::max()/4; }"));
       _graph.sync_push<Syncer_0>();
+#ifdef __GALOIS_VERTEX_CUT_GRAPH__
+      _graph.sync_pull<SyncerPull_0>();
+#endif
       
       ++iteration;
       }while((iteration < maxIterations) && DGAccumulator_accum.reduce());
