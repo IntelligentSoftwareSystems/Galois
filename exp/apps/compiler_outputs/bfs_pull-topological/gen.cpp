@@ -248,8 +248,6 @@ int main(int argc, char** argv) {
     }
 #endif
 
-    if (net.ID != 0) src_node = -1;
-
     T_total.start();
 
     T_graph_load.start();
@@ -270,6 +268,9 @@ int main(int argc, char** argv) {
     }
 #endif
     T_graph_load.stop();
+
+    if (net.ID == hg.getHostID(src_node)) src_node = hg.getLID(src_node);
+    else src_node = -1;
 
     std::cout << "InitializeGraph::go called\n";
     T_init.start();

@@ -175,6 +175,7 @@ struct BFS {
       		}
       		typedef unsigned int ValTy;
       	};
+#ifdef __GALOIS_VERTEX_CUT_GRAPH__
       	struct SyncerPull_0 {
       		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
       		#ifdef __GALOIS_HET_CUDA__
@@ -192,6 +193,7 @@ struct BFS {
       		}
       		typedef unsigned int ValTy;
       	};
+#endif
       #ifdef __GALOIS_HET_CUDA__
       	if (personality == GPU_CUDA) {
       		int __retval = 0;
@@ -201,8 +203,9 @@ struct BFS {
       #endif
       Galois::do_all(_graph.begin(), _graph.end(), BFS { &_graph }, Galois::loopname("bfs"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned int" , "{ Galois::atomicMin(node.dist_current, y);}",  "{node.dist_current = std::numeric_limits<unsigned int>::max()/4; }"), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "dist_current" , "unsigned int"));
       _graph.sync_push<Syncer_0>();
-      
+#ifdef __GALOIS_VERTEX_CUT_GRAPH__
       _graph.sync_pull<SyncerPull_0>();
+#endif
       
      ++iteration;
     }while((iteration < maxIterations) && DGAccumulator_accum.reduce());
@@ -268,8 +271,6 @@ int main(int argc, char** argv) {
     }
 #endif
 
-    if (net.ID != 0) src_node = -1;
-
     T_total.start();
 
     T_graph_load.start();
@@ -290,6 +291,9 @@ int main(int argc, char** argv) {
     }
 #endif
     T_graph_load.stop();
+
+    if (net.ID == hg.getHostID(src_node)) src_node = hg.getLID(src_node);
+    else src_node = -1;
 
     std::cout << "InitializeGraph::go called\n";
     T_init.start();
