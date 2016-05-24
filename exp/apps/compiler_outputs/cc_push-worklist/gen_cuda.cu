@@ -8,7 +8,7 @@ const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_
 unsigned int * P_COMP_CURRENT;
 #include "kernels/reduce.cuh"
 #include "gen_cuda.cuh"
-__global__ void InitializeGraph(CSRGraph graph, int  nowned, unsigned long local_offset, unsigned int * p_comp_current)
+__global__ void InitializeGraph(CSRGraph graph, int  nowned, unsigned int * p_comp_current)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -18,7 +18,7 @@ __global__ void InitializeGraph(CSRGraph graph, int  nowned, unsigned long local
   src_end = nowned;
   for (index_type src = 0 + tid; src < src_end; src += nthreads)
   {
-    p_comp_current[src] = src + local_offset;
+    p_comp_current[src] = graph.node_data[src];
   }
 }
 __global__ void ConnectedComp(CSRGraph graph, int  nowned, unsigned int * p_comp_current, Worklist2 in_wl, Worklist2 out_wl)
@@ -56,12 +56,12 @@ __global__ void ConnectedComp(CSRGraph graph, int  nowned, unsigned int * p_comp
     }
   }
 }
-void InitializeGraph_cuda(unsigned long local_offset, struct CUDA_Context * ctx)
+void InitializeGraph_cuda(struct CUDA_Context * ctx)
 {
   dim3 blocks;
   dim3 threads;
   kernel_sizing(ctx->gg, blocks, threads);
-  InitializeGraph <<<blocks, threads>>>(ctx->gg, ctx->nowned, local_offset, ctx->comp_current.gpu_wr_ptr());
+  InitializeGraph <<<blocks, threads>>>(ctx->gg, ctx->nowned, ctx->comp_current.gpu_wr_ptr());
   check_cuda_kernel;
 }
 void ConnectedComp_cuda(struct CUDA_Context * ctx)

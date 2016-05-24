@@ -73,7 +73,7 @@ static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file (
 static cll::opt<std::string> partFolder("partFolder", cll::desc("path to partitionFolder"), cll::init(""));
 #endif
 static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations: Default 1024"), cll::init(1024));
-static cll::opt<int> src_node("srcNodeId", cll::desc("ID of the source node"), cll::init(0));
+static cll::opt<unsigned int> src_node("srcNodeId", cll::desc("ID of the source node"), cll::init(0));
 static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"), cll::init(false));
 #ifdef __GALOIS_HET_CUDA__
 static cll::opt<int> gpudevice("gpu", cll::desc("Select GPU to run on, default is to choose automatically"), cll::init(-1));
@@ -100,11 +100,11 @@ typedef hGraph<NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
 
 struct InitializeGraph {
-  cll::opt<int> &local_src_node;
+  cll::opt<unsigned int> &local_src_node;
   unsigned long local_infinity;
   Graph *graph;
 
-  InitializeGraph(cll::opt<int> &_src_node, unsigned int _infinity, Graph* _graph) : local_src_node(_src_node), local_infinity(_infinity), graph(_graph){}
+  InitializeGraph(cll::opt<unsigned int> &_src_node, unsigned int _infinity, Graph* _graph) : local_src_node(_src_node), local_infinity(_infinity), graph(_graph){}
 
   void static go(Graph& _graph) {
     struct SyncerPull_0 {
@@ -137,7 +137,7 @@ struct InitializeGraph {
 
   void operator()(GNode src) const {
     NodeData& sdata = graph->getData(src);
-    sdata.dist_current = (src == local_src_node) ? 0 : local_infinity;
+    sdata.dist_current = (graph->getGID(src) == local_src_node) ? 0 : local_infinity;
   }
 };
 
@@ -268,9 +268,6 @@ int main(int argc, char** argv) {
     }
 #endif
     T_graph_load.stop();
-
-    if (net.ID == hg.getHostID(src_node)) src_node = hg.getLID(src_node);
-    else src_node = -1;
 
     std::cout << "InitializeGraph::go called\n";
     T_init.start();

@@ -73,7 +73,6 @@ static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file (
 static cll::opt<std::string> partFolder("partFolder", cll::desc("path to partitionFolder"), cll::init(""));
 #endif
 static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations: Default 1024"), cll::init(1024));
-static cll::opt<int> src_node("srcNodeId", cll::desc("ID of the source node"), cll::init(0));
 static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"), cll::init(false));
 #ifdef __GALOIS_HET_CUDA__
 static cll::opt<int> gpudevice("gpu", cll::desc("Select GPU to run on, default is to choose automatically"), cll::init(-1));
@@ -99,10 +98,9 @@ typedef hGraph<NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
 
 struct InitializeGraph {
-  unsigned long local_offset;
   Graph *graph;
 
-  InitializeGraph(unsigned long _offset, Graph* _graph) : local_offset(_offset), graph(_graph){}
+  InitializeGraph(Graph* _graph) : graph(_graph){}
 
   void static go(Graph& _graph) {
     struct SyncerPull_0 {
@@ -125,17 +123,17 @@ struct InitializeGraph {
 
     #ifdef __GALOIS_HET_CUDA__
     	if (personality == GPU_CUDA) {
-    		InitializeGraph_cuda(_graph.getGlobalOffset(), cuda_ctx);
+    		InitializeGraph_cuda(cuda_ctx);
     	} else if (personality == CPU)
     #endif
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {_graph.getGlobalOffset(), &_graph}, Galois::loopname("InitGraph"));
+    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, Galois::loopname("InitGraph"));
 
     _graph.sync_pull<SyncerPull_0>();
   }
 
   void operator()(GNode src) const {
     NodeData& sdata = graph->getData(src);
-    sdata.comp_current = src + local_offset;
+    sdata.comp_current = graph->getGID(src);
   }
 };
 
@@ -245,8 +243,6 @@ int main(int argc, char** argv) {
       }
     }
 #endif
-
-    if (net.ID != 0) src_node = -1;
 
     T_total.start();
 

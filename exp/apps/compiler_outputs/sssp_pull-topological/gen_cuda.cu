@@ -8,7 +8,7 @@ const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_
 unsigned int * P_DIST_CURRENT;
 #include "kernels/reduce.cuh"
 #include "gen_cuda.cuh"
-__global__ void InitializeGraph(CSRGraph graph, int  nowned, unsigned int local_infinity, int local_src_node, unsigned int * p_dist_current)
+__global__ void InitializeGraph(CSRGraph graph, int  nowned, unsigned int local_infinity, unsigned int local_src_node, unsigned int * p_dist_current)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -18,7 +18,7 @@ __global__ void InitializeGraph(CSRGraph graph, int  nowned, unsigned int local_
   src_end = nowned;
   for (index_type src = 0 + tid; src < src_end; src += nthreads)
   {
-    p_dist_current[src] = (src == local_src_node) ? 0 : local_infinity;
+    p_dist_current[src] = (graph.node_data[src] == local_src_node) ? 0 : local_infinity;
   }
 }
 __global__ void SSSP(CSRGraph graph, int  nowned, unsigned int * p_dist_current, Any any_retval)
@@ -31,10 +31,8 @@ __global__ void SSSP(CSRGraph graph, int  nowned, unsigned int * p_dist_current,
   src_end = nowned;
   for (index_type src = 0 + tid; src < src_end; src += nthreads)
   {
-    unsigned int  sdist;
     unsigned int current_min;
     index_type jj_end;
-    sdist = p_dist_current[src];
     current_min = p_dist_current[src];
     jj_end = (graph).getFirstEdge((src) + 1);
     for (index_type jj = (graph).getFirstEdge(src) + 0; jj < jj_end; jj += 1)
@@ -55,7 +53,7 @@ __global__ void SSSP(CSRGraph graph, int  nowned, unsigned int * p_dist_current,
     }
   }
 }
-void InitializeGraph_cuda(int local_src_node, unsigned int local_infinity, struct CUDA_Context * ctx)
+void InitializeGraph_cuda(unsigned int local_src_node, unsigned int local_infinity, struct CUDA_Context * ctx)
 {
   dim3 blocks;
   dim3 threads;

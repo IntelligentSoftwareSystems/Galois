@@ -9,11 +9,11 @@ ast = Module([
 CBlock([cgen.Include("kernels/reduce.cuh", system = False)], parse = False),
 CBlock([cgen.Include("gen_cuda.cuh", system = False)], parse = False),
 CDeclGlobal([("unsigned int *", "P_DIST_CURRENT", "")]),
-Kernel("InitializeGraph", [G.param(), ('int ', 'nowned') , ('unsigned int', 'local_infinity'), ('int', 'local_src_node'), ('unsigned int *', 'p_dist_current')],
+Kernel("InitializeGraph", [G.param(), ('int ', 'nowned') , ('unsigned int', 'local_infinity'), ('unsigned int', 'local_src_node'), ('unsigned int *', 'p_dist_current')],
 [
 ForAll("src", G.nodes(None, "nowned"),
 [
-CBlock(["p_dist_current[src] = (src == local_src_node) ? 0 : local_infinity"]),
+CBlock(["p_dist_current[src] = (graph.node_data[src] == local_src_node) ? 0 : local_infinity"]),
 ]),
 ]),
 Kernel("BFS", [G.param(), ('int ', 'nowned') , ('unsigned int *', 'p_dist_current')],
@@ -42,7 +42,7 @@ WL.push("dst"),
 ),
 ]),
 ]),
-Kernel("InitializeGraph_cuda", [('int', 'local_src_node'), ('unsigned int', 'local_infinity'), ('struct CUDA_Context *', 'ctx')],
+Kernel("InitializeGraph_cuda", [('unsigned int', 'local_src_node'), ('unsigned int', 'local_infinity'), ('struct CUDA_Context *', 'ctx')],
 [
 CDecl([("dim3", "blocks", "")]),
 CDecl([("dim3", "threads", "")]),

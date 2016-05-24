@@ -18,4 +18,4 @@ void add_node_comp_old_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int
 void min_node_comp_old_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v);
 void ConnectedComp_cuda(int & __retval, struct CUDA_Context *ctx);
 void FirstItr_ConnectedComp_cuda(struct CUDA_Context *ctx);
-void InitializeGraph_cuda(unsigned long local_offset, struct CUDA_Context *ctx);
+void InitializeGraph_cuda(struct CUDA_Context *ctx);

@@ -97,10 +97,9 @@ typedef hGraph<NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
 
 struct InitializeGraph {
-  unsigned long local_offset;
   Graph *graph;
 
-  InitializeGraph(unsigned long _offset, Graph* _graph) : local_offset(_offset), graph(_graph){}
+  InitializeGraph(Graph* _graph) : graph(_graph){}
 
   void static go(Graph& _graph) {
     struct SyncerPull_0 {
@@ -123,17 +122,17 @@ struct InitializeGraph {
 
     #ifdef __GALOIS_HET_CUDA__
     	if (personality == GPU_CUDA) {
-    		InitializeGraph_cuda(_graph.getGlobalOffset(), cuda_ctx);
+    		InitializeGraph_cuda(cuda_ctx);
     	} else if (personality == CPU)
     #endif
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {_graph.getGlobalOffset(), &_graph}, Galois::loopname("InitGraph"));
+    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, Galois::loopname("InitGraph"));
 
     _graph.sync_pull<SyncerPull_0>();
   }
 
   void operator()(GNode src) const {
     NodeData& sdata = graph->getData(src);
-    sdata.comp_current = src + local_offset;
+    sdata.comp_current = graph->getGID(src);
   }
 };
 
