@@ -151,6 +151,32 @@ struct BFS {
     do{
       DGAccumulator_accum.reset();
 
+#ifdef __GALOIS_VERTEX_CUT_GRAPH__
+      	struct Syncer_0 {
+      		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
+      		#ifdef __GALOIS_HET_CUDA__
+      			if (personality == GPU_CUDA) return get_node_dist_current_cuda(cuda_ctx, node_id);
+      			assert (personality == CPU);
+      		#endif
+      			return node.dist_current;
+      		}
+      		static void reduce (uint32_t node_id, struct NodeData & node, unsigned int y) {
+      		#ifdef __GALOIS_HET_CUDA__
+      			if (personality == GPU_CUDA) min_node_dist_current_cuda(cuda_ctx, node_id, y);
+      			else if (personality == CPU)
+      		#endif
+      				{ Galois::atomicMin(node.dist_current, y);}
+      		}
+      		static void reset (uint32_t node_id, struct NodeData & node ) {
+      		#ifdef __GALOIS_HET_CUDA__
+      			if (personality == GPU_CUDA) set_node_dist_current_cuda(cuda_ctx, node_id, std::numeric_limits<unsigned int>::max()/4);
+      			else if (personality == CPU)
+      		#endif
+      				{node.dist_current = std::numeric_limits<unsigned int>::max()/4; }
+      		}
+      		typedef unsigned int ValTy;
+      	};
+#endif
       	struct SyncerPull_0 {
       		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
       		#ifdef __GALOIS_HET_CUDA__
@@ -176,6 +202,9 @@ struct BFS {
       	} else if (personality == CPU)
       #endif
       Galois::do_all(_graph.begin(), _graph.end(), BFS { &_graph }, Galois::loopname("bfs"), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "dist_current" , "unsigned int"));
+#ifdef __GALOIS_VERTEX_CUT_GRAPH__
+      _graph.sync_push<Syncer_0>();
+#endif
       _graph.sync_pull<SyncerPull_0>();
       
 
