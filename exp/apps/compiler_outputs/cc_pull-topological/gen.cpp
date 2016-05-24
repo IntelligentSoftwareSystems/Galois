@@ -161,7 +161,7 @@ struct ConnectedComp {
       			if (personality == GPU_CUDA) min_node_comp_current_cuda(cuda_ctx, node_id, y);
       			else if (personality == CPU)
       		#endif
-      				{ Galois::atomicMin(node.comp_current, y);}
+      				{ if (node.comp_current > y) node.comp_current = y; }
       		}
       		static void reset (uint32_t node_id, struct NodeData & node ) {
       		#ifdef __GALOIS_HET_CUDA__
