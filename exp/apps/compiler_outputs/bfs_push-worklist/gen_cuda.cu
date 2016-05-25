@@ -46,14 +46,12 @@ __global__ void BFS(CSRGraph graph, int  nowned, unsigned int * p_dist_current, 
   {
     int src;
     bool pop;
-    unsigned int sdist;
     multiple_sum<2, index_type> _np_mps;
     multiple_sum<2, index_type> _np_mps_total;
     pop = (in_wl).pop_id(wlvertex, src);
-    sdist = p_dist_current[src];
     struct NPInspector1 _np = {0,0,0,0,0,0};
-    __shared__ struct { unsigned int sdist; } _np_closure [TB_SIZE];
-    _np_closure[threadIdx.x].sdist = sdist;
+    __shared__ struct { int src; } _np_closure [TB_SIZE];
+    _np_closure[threadIdx.x].src = src;
     if (pop)
     {
       _np.size = (graph).getOutDegree(src);
@@ -95,7 +93,7 @@ __global__ void BFS(CSRGraph graph, int  nowned, unsigned int * p_dist_current, 
         nps.tb.owner = MAX_TB_SIZE + 1;
       }
       assert(nps.tb.src < __kernel_tb_size);
-      sdist = _np_closure[nps.tb.src].sdist;
+      src = _np_closure[nps.tb.src].src;
       for (int _np_j = threadIdx.x; _np_j < ne; _np_j += BLKSIZE)
       {
         index_type jj;
@@ -105,13 +103,13 @@ __global__ void BFS(CSRGraph graph, int  nowned, unsigned int * p_dist_current, 
           unsigned int new_dist;
           unsigned int old_dist;
           dst = graph.getAbsDestination(jj);
-          new_dist = 1 + sdist;
+          new_dist = 1 + p_dist_current[src];
           old_dist = atomicMin(&p_dist_current[dst], new_dist);
           if (old_dist > new_dist)
           {
-            index_type _start_30;
-            _start_30 = (out_wl).setup_push_warp_one();;
-            (out_wl).do_push(_start_30, 0, dst);
+            index_type _start_28;
+            _start_28 = (out_wl).setup_push_warp_one();;
+            (out_wl).do_push(_start_28, 0, dst);
           }
         }
       }
@@ -138,7 +136,7 @@ __global__ void BFS(CSRGraph graph, int  nowned, unsigned int * p_dist_current, 
         index_type _np_w_start = nps.warp.start[warpid];
         index_type _np_w_size = nps.warp.size[warpid];
         assert(nps.warp.src[warpid] < __kernel_tb_size);
-        sdist = _np_closure[nps.warp.src[warpid]].sdist;
+        src = _np_closure[nps.warp.src[warpid]].src;
         for (int _np_ii = _np_laneid; _np_ii < _np_w_size; _np_ii += 32)
         {
           index_type jj;
@@ -148,13 +146,13 @@ __global__ void BFS(CSRGraph graph, int  nowned, unsigned int * p_dist_current, 
             unsigned int new_dist;
             unsigned int old_dist;
             dst = graph.getAbsDestination(jj);
-            new_dist = 1 + sdist;
+            new_dist = 1 + p_dist_current[src];
             old_dist = atomicMin(&p_dist_current[dst], new_dist);
             if (old_dist > new_dist)
             {
-              index_type _start_30;
-              _start_30 = (out_wl).setup_push_warp_one();;
-              (out_wl).do_push(_start_30, 0, dst);
+              index_type _start_28;
+              _start_28 = (out_wl).setup_push_warp_one();;
+              (out_wl).do_push(_start_28, 0, dst);
             }
           }
         }
@@ -175,20 +173,20 @@ __global__ void BFS(CSRGraph graph, int  nowned, unsigned int * p_dist_current, 
       {
         index_type jj;
         assert(nps.fg.src[_np_i] < __kernel_tb_size);
-        sdist = _np_closure[nps.fg.src[_np_i]].sdist;
+        src = _np_closure[nps.fg.src[_np_i]].src;
         jj= nps.fg.itvalue[_np_i];
         {
           index_type dst;
           unsigned int new_dist;
           unsigned int old_dist;
           dst = graph.getAbsDestination(jj);
-          new_dist = 1 + sdist;
+          new_dist = 1 + p_dist_current[src];
           old_dist = atomicMin(&p_dist_current[dst], new_dist);
           if (old_dist > new_dist)
           {
-            index_type _start_30;
-            _start_30 = (out_wl).setup_push_warp_one();;
-            (out_wl).do_push(_start_30, 0, dst);
+            index_type _start_28;
+            _start_28 = (out_wl).setup_push_warp_one();;
+            (out_wl).do_push(_start_28, 0, dst);
           }
         }
       }
@@ -196,7 +194,7 @@ __global__ void BFS(CSRGraph graph, int  nowned, unsigned int * p_dist_current, 
       __syncthreads();
     }
     assert(threadIdx.x < __kernel_tb_size);
-    sdist = _np_closure[threadIdx.x].sdist;
+    src = _np_closure[threadIdx.x].src;
   }
 }
 void InitializeGraph_cuda(unsigned int local_src_node, unsigned int local_infinity, struct CUDA_Context * ctx)

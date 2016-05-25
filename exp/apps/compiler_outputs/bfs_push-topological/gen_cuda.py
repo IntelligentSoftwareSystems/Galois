@@ -20,15 +20,13 @@ Kernel("BFS", [G.param(), ('int ', 'nowned') , ('unsigned int *', 'p_dist_curren
 [
 ForAll("src", G.nodes(None, "nowned"),
 [
-CDecl([("unsigned int", "sdist", "")]),
-CBlock(["sdist = p_dist_current[src]"]),
 ClosureHint(
 ForAll("jj", G.edges("src"),
 [
 CDecl([("index_type", "dst", "")]),
 CBlock(["dst = graph.getAbsDestination(jj)"]),
 CDecl([("unsigned int", "new_dist", "")]),
-CBlock(["new_dist = 1 + sdist"]),
+CBlock(["new_dist = 1 + p_dist_current[src]"]),
 CDecl([("unsigned int", "old_dist", "")]),
 CBlock(["old_dist = atomicMin(&p_dist_current[dst], new_dist)"]),
 If("old_dist > new_dist",

@@ -224,12 +224,11 @@ struct FirstItr_ConnectedComp {
 
   void operator()(GNode src) const {
     NodeData& snode = graph->getData(src);
-    auto& sdist = snode.comp_current;
 
     for (auto jj = graph->edge_begin(src); jj != graph->edge_end(src); ++jj) {
       GNode dst = graph->getEdgeDst(jj);
       auto& dnode = graph->getData(dst);
-      unsigned int new_dist = sdist;
+      unsigned int new_dist = snode.comp_current;
       Galois::atomicMin(dnode.comp_current, new_dist);
     }
   }
@@ -310,7 +309,6 @@ struct ConnectedComp {
 
   void operator()(GNode src) const {
     NodeData& snode = graph->getData(src);
-    auto& sdist = snode.comp_current;
 
     if(snode.comp_old > snode.comp_current){
       snode.comp_old = snode.comp_current;
@@ -318,7 +316,7 @@ struct ConnectedComp {
       for (auto jj = graph->edge_begin(src); jj != graph->edge_end(src); ++jj) {
         GNode dst = graph->getEdgeDst(jj);
         auto& dnode = graph->getData(dst);
-        unsigned int new_dist = sdist;
+        unsigned int new_dist = snode.comp_current;
         Galois::atomicMin(dnode.comp_current, new_dist);
       }
     }

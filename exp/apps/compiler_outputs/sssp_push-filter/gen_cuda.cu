@@ -33,16 +33,14 @@ __global__ void FirstItr_SSSP(CSRGraph graph, int  nowned, unsigned int * p_dist
   src_end = nowned;
   for (index_type src = 0 + tid; src < src_end; src += nthreads)
   {
-    unsigned int sdist;
     index_type jj_end;
-    sdist = p_dist_current[src];
     jj_end = (graph).getFirstEdge((src) + 1);
     for (index_type jj = (graph).getFirstEdge(src) + 0; jj < jj_end; jj += 1)
     {
       index_type dst;
       unsigned int new_dist;
       dst = graph.getAbsDestination(jj);
-      new_dist = graph.getAbsWeight(jj) + sdist;
+      new_dist = graph.getAbsWeight(jj) + p_dist_current[src];
       atomicMin(&p_dist_current[dst], new_dist);
     }
   }
@@ -57,8 +55,6 @@ __global__ void SSSP(CSRGraph graph, int  nowned, unsigned int * p_dist_current,
   src_end = nowned;
   for (index_type src = 0 + tid; src < src_end; src += nthreads)
   {
-    unsigned int sdist;
-    sdist = p_dist_current[src];
     if (p_dist_old[src] > p_dist_current[src])
     {
       index_type jj_end;
@@ -70,7 +66,7 @@ __global__ void SSSP(CSRGraph graph, int  nowned, unsigned int * p_dist_current,
         index_type dst;
         unsigned int new_dist;
         dst = graph.getAbsDestination(jj);
-        new_dist = graph.getAbsWeight(jj) + sdist;
+        new_dist = graph.getAbsWeight(jj) + p_dist_current[src];
         atomicMin(&p_dist_current[dst], new_dist);
       }
     }

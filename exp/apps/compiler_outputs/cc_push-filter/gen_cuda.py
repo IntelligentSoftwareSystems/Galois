@@ -22,15 +22,13 @@ Kernel("FirstItr_ConnectedComp", [G.param(), ('int ', 'nowned') , ('unsigned int
 [
 ForAll("src", G.nodes(None, "nowned"),
 [
-CDecl([("unsigned int", "sdist", "")]),
-CBlock(["sdist = p_comp_current[src]"]),
 ClosureHint(
 ForAll("jj", G.edges("src"),
 [
 CDecl([("index_type", "dst", "")]),
 CBlock(["dst = graph.getAbsDestination(jj)"]),
 CDecl([("unsigned int", "new_dist", "")]),
-CBlock(["new_dist = sdist"]),
+CBlock(["new_dist = p_comp_current[src]"]),
 CBlock(["atomicMin(&p_comp_current[dst], new_dist)"]),
 ]),
 ),
@@ -40,8 +38,6 @@ Kernel("ConnectedComp", [G.param(), ('int ', 'nowned') , ('unsigned int *', 'p_c
 [
 ForAll("src", G.nodes(None, "nowned"),
 [
-CDecl([("unsigned int", "sdist", "")]),
-CBlock(["sdist = p_comp_current[src]"]),
 If("p_comp_old[src] > p_comp_current[src]",
 [
 CBlock(["p_comp_old[src] = p_comp_current[src]"]),
@@ -51,7 +47,7 @@ ForAll("jj", G.edges("src"),
 CDecl([("index_type", "dst", "")]),
 CBlock(["dst = graph.getAbsDestination(jj)"]),
 CDecl([("unsigned int", "new_dist", "")]),
-CBlock(["new_dist = sdist"]),
+CBlock(["new_dist = p_comp_current[src]"]),
 CBlock(["atomicMin(&p_comp_current[dst], new_dist)"]),
 ]),
 ]),

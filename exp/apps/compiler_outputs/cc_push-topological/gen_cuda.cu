@@ -31,9 +31,7 @@ __global__ void ConnectedComp(CSRGraph graph, int  nowned, unsigned int * p_comp
   src_end = nowned;
   for (index_type src = 0 + tid; src < src_end; src += nthreads)
   {
-    unsigned int sdist;
     index_type jj_end;
-    sdist = p_comp_current[src];
     jj_end = (graph).getFirstEdge((src) + 1);
     for (index_type jj = (graph).getFirstEdge(src) + 0; jj < jj_end; jj += 1)
     {
@@ -41,7 +39,7 @@ __global__ void ConnectedComp(CSRGraph graph, int  nowned, unsigned int * p_comp
       unsigned int new_dist;
       unsigned int old_dist;
       dst = graph.getAbsDestination(jj);
-      new_dist = sdist;
+      new_dist = p_comp_current[src];
       old_dist = atomicMin(&p_comp_current[dst], new_dist);
       if (old_dist > new_dist)
       {

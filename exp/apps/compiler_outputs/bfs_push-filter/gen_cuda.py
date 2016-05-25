@@ -22,15 +22,13 @@ Kernel("FirstItr_BFS", [G.param(), ('int ', 'nowned') , ('unsigned int *', 'p_di
 [
 ForAll("src", G.nodes(None, "nowned"),
 [
-CDecl([("unsigned int", "sdist", "")]),
-CBlock(["sdist = p_dist_current[src]"]),
 ClosureHint(
 ForAll("jj", G.edges("src"),
 [
 CDecl([("index_type", "dst", "")]),
 CBlock(["dst = graph.getAbsDestination(jj)"]),
 CDecl([("unsigned int", "new_dist", "")]),
-CBlock(["new_dist = 1 + sdist"]),
+CBlock(["new_dist = 1 + p_dist_current[src]"]),
 CBlock(["atomicMin(&p_dist_current[dst], new_dist)"]),
 ]),
 ),
@@ -40,8 +38,6 @@ Kernel("BFS", [G.param(), ('int ', 'nowned') , ('unsigned int *', 'p_dist_curren
 [
 ForAll("src", G.nodes(None, "nowned"),
 [
-CDecl([("unsigned int", "sdist", "")]),
-CBlock(["sdist = p_dist_current[src]"]),
 If("p_dist_old[src] > p_dist_current[src]",
 [
 CBlock(["p_dist_old[src] = p_dist_current[src]"]),
@@ -51,7 +47,7 @@ ForAll("jj", G.edges("src"),
 CDecl([("index_type", "dst", "")]),
 CBlock(["dst = graph.getAbsDestination(jj)"]),
 CDecl([("unsigned int", "new_dist", "")]),
-CBlock(["new_dist = 1 + sdist"]),
+CBlock(["new_dist = 1 + p_dist_current[src]"]),
 CBlock(["atomicMin(&p_dist_current[dst], new_dist)"]),
 ]),
 ]),

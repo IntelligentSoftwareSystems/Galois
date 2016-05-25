@@ -265,12 +265,11 @@ struct SSSP {
 
   void operator()(GNode src, Galois::UserContext<GNode>& ctx) const {
     NodeData& snode = graph->getData(src);
-    auto& sdist = snode.dist_current;
 
     for (auto jj = graph->edge_begin(src); jj != graph->edge_end(src); ++jj) {
       GNode dst = graph->getEdgeDst(jj);
       auto& dnode = graph->getData(dst);
-      unsigned int new_dist = graph->getEdgeData(jj) + sdist;
+      unsigned int new_dist = graph->getEdgeData(jj) + snode.dist_current;
       auto old_dist = Galois::atomicMin(dnode.dist_current, new_dist);
       if(old_dist > new_dist){
         ctx.push(graph->getGID(dst));

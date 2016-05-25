@@ -36,10 +36,8 @@ __global__ void SSSP(CSRGraph graph, int  nowned, unsigned int * p_dist_current,
   {
     int src;
     bool pop;
-    unsigned int sdist;
     index_type jj_end;
     pop = (in_wl).pop_id(wlvertex, src);
-    sdist = p_dist_current[src];
     jj_end = (graph).getFirstEdge((src) + 1);
     for (index_type jj = (graph).getFirstEdge(src) + 0; jj < jj_end; jj += 1)
     {
@@ -47,13 +45,13 @@ __global__ void SSSP(CSRGraph graph, int  nowned, unsigned int * p_dist_current,
       unsigned int new_dist;
       unsigned int old_dist;
       dst = graph.getAbsDestination(jj);
-      new_dist = graph.getAbsWeight(jj) + sdist;
+      new_dist = graph.getAbsWeight(jj) + p_dist_current[src];
       old_dist = atomicMin(&p_dist_current[dst], new_dist);
       if (old_dist > new_dist)
       {
-        index_type _start_30;
-        _start_30 = (out_wl).setup_push_warp_one();;
-        (out_wl).do_push(_start_30, 0, dst);
+        index_type _start_28;
+        _start_28 = (out_wl).setup_push_warp_one();;
+        (out_wl).do_push(_start_28, 0, dst);
       }
     }
   }
