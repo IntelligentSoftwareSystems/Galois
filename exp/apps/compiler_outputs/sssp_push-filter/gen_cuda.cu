@@ -4,12 +4,12 @@
 
 void kernel_sizing(CSRGraph &, dim3 &, dim3 &);
 #define TB_SIZE 256
-const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_blocking_factor=4 $ parcomb=True $ np_schedulers=set(['wp', 'fg']) $ cc_disable=set([]) $ hacks=set([]) $ np_factor=8 $ instrument=set([]) $ unroll=[] $ read_props=None $ outline_iterate=True $ ignore_nested_errors=False $ np=True $ write_props=None $ quiet_cgen=True $ retry_backoff=True $ cuda.graph_type=basic $ cuda.use_worklist_slots=True $ cuda.worklist_type=basic";
+const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_blocking_factor=4 $ parcomb=False $ np_schedulers=set(['fg', 'tb', 'wp']) $ cc_disable=set([]) $ hacks=set([]) $ np_factor=1 $ instrument=set([]) $ unroll=[] $ read_props=None $ outline_iterate=True $ ignore_nested_errors=False $ np=False $ write_props=None $ quiet_cgen=True $ retry_backoff=True $ cuda.graph_type=basic $ cuda.use_worklist_slots=True $ cuda.worklist_type=basic";
 unsigned int * P_DIST_CURRENT;
 unsigned int * P_DIST_OLD;
 #include "kernels/reduce.cuh"
 #include "gen_cuda.cuh"
-__global__ void InitializeGraph(CSRGraph graph, int  nowned, unsigned int local_infinity, int local_src_node, unsigned int * p_dist_current, unsigned int * p_dist_old)
+__global__ void InitializeGraph(CSRGraph graph, int  nowned, unsigned int local_infinity, unsigned int local_src_node, unsigned int * p_dist_current, unsigned int * p_dist_old)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -19,8 +19,8 @@ __global__ void InitializeGraph(CSRGraph graph, int  nowned, unsigned int local_
   src_end = nowned;
   for (index_type src = 0 + tid; src < src_end; src += nthreads)
   {
-    p_dist_current[src] = (src == local_src_node) ? 0 : local_infinity;
-    p_dist_old[src] = (src == local_src_node) ? 0 : local_infinity;
+    p_dist_current[src] = (graph.node_data[src] == local_src_node) ? 0 : local_infinity;
+    p_dist_old[src] = (graph.node_data[src] == local_src_node) ? 0 : local_infinity;
   }
 }
 __global__ void FirstItr_SSSP(CSRGraph graph, int  nowned, unsigned int * p_dist_current)
@@ -76,7 +76,7 @@ __global__ void SSSP(CSRGraph graph, int  nowned, unsigned int * p_dist_current,
     }
   }
 }
-void InitializeGraph_cuda(int local_src_node, unsigned int local_infinity, struct CUDA_Context * ctx)
+void InitializeGraph_cuda(unsigned int local_src_node, unsigned int local_infinity, struct CUDA_Context * ctx)
 {
   dim3 blocks;
   dim3 threads;

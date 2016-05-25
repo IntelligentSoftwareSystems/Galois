@@ -73,7 +73,7 @@ static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file>"
 static cll::opt<std::string> partFolder("partFolder", cll::desc("path to partitionFolder"), cll::init(""));
 #endif
 static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations: Default 1024"), cll::init(1024));
-static cll::opt<int> src_node("srcNodeId", cll::desc("ID of the source node"), cll::init(0));
+static cll::opt<unsigned int> src_node("srcNodeId", cll::desc("ID of the source node"), cll::init(0));
 static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"), cll::init(false));
 #ifdef __GALOIS_HET_CUDA__
 static cll::opt<int> gpudevice("gpu", cll::desc("Select GPU to run on, default is to choose automatically"), cll::init(-1));
@@ -101,11 +101,11 @@ typedef hGraph<NodeData, unsigned int> Graph;
 typedef typename Graph::GraphNode GNode;
 
 struct InitializeGraph {
-  cll::opt<int> &local_src_node;
+  cll::opt<unsigned int> &local_src_node;
   unsigned int local_infinity;
   Graph *graph;
 
-  InitializeGraph(cll::opt<int> &_src_node, unsigned int _infinity, Graph* _graph) : local_src_node(_src_node), local_infinity(_infinity), graph(_graph){}
+  InitializeGraph(cll::opt<unsigned int> &_src_node, unsigned int _infinity, Graph* _graph) : local_src_node(_src_node), local_infinity(_infinity), graph(_graph){}
   void static go(Graph& _graph) {
     struct SyncerPull_0 {
       static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
@@ -137,7 +137,7 @@ struct InitializeGraph {
 
   void operator()(GNode src) const {
     NodeData& sdata = graph->getData(src);
-    sdata.dist_current = (src == local_src_node) ? 0 : local_infinity;
+    sdata.dist_current = (graph->getGID(src) == local_src_node) ? 0 : local_infinity;
   }
 };
 
@@ -175,6 +175,7 @@ struct SSSP {
       		}
       		typedef unsigned int ValTy;
       	};
+#ifdef __GALOIS_VERTEX_CUT_GRAPH__
       	struct SyncerPull_0 {
       		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
       		#ifdef __GALOIS_HET_CUDA__
@@ -192,6 +193,7 @@ struct SSSP {
       		}
       		typedef unsigned int ValTy;
       	};
+#endif
       #ifdef __GALOIS_HET_CUDA__
       	if (personality == GPU_CUDA) {
       		int __retval = 0;
@@ -201,8 +203,9 @@ struct SSSP {
       #endif
       Galois::do_all(_graph.begin(), _graph.end(), SSSP { &_graph }, Galois::loopname("sssp"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned int" , "{ Galois::atomicMin(node.dist_current, y);}",  "{node.dist_current = std::numeric_limits<unsigned int>::max()/4; }"), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "dist_current" , "unsigned int"));
       _graph.sync_push<Syncer_0>();
-      
+#ifdef __GALOIS_VERTEX_CUT_GRAPH__
       _graph.sync_pull<SyncerPull_0>();
+#endif
       
      ++iteration;
     }while((iteration < maxIterations) && DGAccumulator_accum.reduce());
@@ -267,8 +270,6 @@ int main(int argc, char** argv) {
       }
     }
 #endif
-
-    if (net.ID != 0) src_node = -1;
 
     T_total.start();
 

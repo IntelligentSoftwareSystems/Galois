@@ -611,13 +611,15 @@ public:
       m.nedges = sizeEdges();
       m.nowned = std::distance(begin(), end());
       assert(m.nowned > 0);
-      m.g_offset = getGID(0);
       m.id = host_id;
       m.row_start = (index_type *) calloc(m.nnodes + 1, sizeof(index_type));
       m.edge_dst = (index_type *) calloc(m.nedges, sizeof(index_type));
 
-      // TODO: initialize node_data
-      m.node_data = NULL;
+      // initialize node_data with localID-to-globalID mapping
+      m.node_data = (index_type *) calloc(m.nnodes, sizeof(node_data_type));
+      for (index_type i = 0; i < m.nnodes; ++i) {
+        m.node_data[i] = getGID(i);
+      }
 
       if (std::is_void<EdgeTy>::value) {
          m.edge_data = NULL;

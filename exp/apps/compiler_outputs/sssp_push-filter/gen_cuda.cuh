@@ -15,7 +15,6 @@ struct CUDA_Context {
 	int device;
 	int id;
 	size_t nowned;
-	size_t g_offset;
 	CSRGraphTy hg;
 	CSRGraphTy gg;
 	Shared<unsigned int> dist_current;

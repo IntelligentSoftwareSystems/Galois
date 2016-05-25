@@ -73,7 +73,6 @@ static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file (
 static cll::opt<std::string> partFolder("partFolder", cll::desc("path to partitionFolder"), cll::init(""));
 #endif
 static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations: Default 1024"), cll::init(1024));
-static cll::opt<int> src_node("srcNodeId", cll::desc("ID of the source node"), cll::init(0));
 static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"), cll::init(false));
 #ifdef __GALOIS_HET_CUDA__
 static cll::opt<int> gpudevice("gpu", cll::desc("Select GPU to run on, default is to choose automatically"), cll::init(-1));
@@ -99,10 +98,9 @@ typedef hGraph<NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
 
 struct InitializeGraph {
-  unsigned long local_offset;
   Graph *graph;
 
-  InitializeGraph(unsigned long _offset, Graph* _graph) : local_offset(_offset), graph(_graph){}
+  InitializeGraph(Graph* _graph) : graph(_graph){}
 
   void static go(Graph& _graph) {
     struct SyncerPull_0 {
@@ -125,17 +123,17 @@ struct InitializeGraph {
 
     #ifdef __GALOIS_HET_CUDA__
     	if (personality == GPU_CUDA) {
-    		InitializeGraph_cuda(_graph.getGlobalOffset(), cuda_ctx);
+    		InitializeGraph_cuda(cuda_ctx);
     	} else if (personality == CPU)
     #endif
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {_graph.getGlobalOffset(), &_graph}, Galois::loopname("InitGraph"));
+    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, Galois::loopname("InitGraph"));
 
     _graph.sync_pull<SyncerPull_0>();
   }
 
   void operator()(GNode src) const {
     NodeData& sdata = graph->getData(src);
-    sdata.comp_current = src + local_offset;
+    sdata.comp_current = graph->getGID(src);
   }
 };
 
@@ -149,6 +147,32 @@ struct ConnectedComp {
     do{
       DGAccumulator_accum.reset();
 
+#ifdef __GALOIS_VERTEX_CUT_GRAPH__
+      	struct Syncer_0 {
+      		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
+      		#ifdef __GALOIS_HET_CUDA__
+      			if (personality == GPU_CUDA) return get_node_comp_current_cuda(cuda_ctx, node_id);
+      			assert (personality == CPU);
+      		#endif
+      			return node.comp_current;
+      		}
+      		static void reduce (uint32_t node_id, struct NodeData & node, unsigned int y) {
+      		#ifdef __GALOIS_HET_CUDA__
+      			if (personality == GPU_CUDA) min_node_comp_current_cuda(cuda_ctx, node_id, y);
+      			else if (personality == CPU)
+      		#endif
+      				{ if (node.comp_current > y) node.comp_current = y; }
+      		}
+      		static void reset (uint32_t node_id, struct NodeData & node ) {
+      		#ifdef __GALOIS_HET_CUDA__
+      			if (personality == GPU_CUDA) set_node_comp_current_cuda(cuda_ctx, node_id, std::numeric_limits<unsigned int>::max()/4);
+      			else if (personality == CPU)
+      		#endif
+      				{node.comp_current = std::numeric_limits<unsigned int>::max()/4; }
+      		}
+      		typedef unsigned int ValTy;
+      	};
+#endif
       	struct SyncerPull_0 {
       		static unsigned int extract(uint32_t node_id, const struct NodeData & node) {
       		#ifdef __GALOIS_HET_CUDA__
@@ -174,6 +198,9 @@ struct ConnectedComp {
       	} else if (personality == CPU)
       #endif
       Galois::do_all(_graph.begin(), _graph.end(), ConnectedComp { &_graph }, Galois::loopname("cc"), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "comp_current" , "unsigned int"));
+#ifdef __GALOIS_VERTEX_CUT_GRAPH__
+      _graph.sync_push<Syncer_0>();
+#endif
       _graph.sync_pull<SyncerPull_0>();
       
 
@@ -245,8 +272,6 @@ int main(int argc, char** argv) {
       }
     }
 #endif
-
-    if (net.ID != 0) src_node = -1;
 
     T_total.start();
 
