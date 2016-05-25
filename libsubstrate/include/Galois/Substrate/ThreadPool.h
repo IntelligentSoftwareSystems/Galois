@@ -63,63 +63,59 @@ struct ExecuteTupleImpl<tpl, s, 0> {
   static inline void execute(tpl& f) { }
 };
 
-class Semaphore { //not copy or movable
-  std::mutex m;
-  std::condition_variable cv;
-  int count;
-
-public:
-  explicit Semaphore() : count(0) {}
-  ~Semaphore() {}
-
-  void release() {
-    std::lock_guard<std::mutex> lg(m);
-    ++count;
-    cv.notify_one();
-  }
-
-  void acquire() {
-    std::unique_lock<std::mutex> lg(m);
-    cv.wait(lg, [=]{ return 0 < count; });
-    --count;
-  }
-};
-
 }
 
 class ThreadPool {
 protected:
   struct shutdown_ty {}; //! type for shutting down thread
   struct fastmode_ty {bool mode;}; //! type for setting fastmode
+  struct dedicated_ty {std::function<void(void)> fn;}; //! type to switch to dedicated mode
 
 
   //! Per-thread mailboxes for notification
   struct per_signal {
-    detail::Semaphore start;
+    std::condition_variable cv;
+    std::mutex m;
+    unsigned wbegin, wend;
     std::atomic<int> done;
     std::atomic<int> fastRelease;
     threadTopoInfo topo;
 
-    void wakeup() {
-      start.release();
+    void wakeup(bool fastmode) {
+      if (fastmode) {
+        done = 0;
+        fastRelease = 1;
+      } else {
+        std::lock_guard<std::mutex> lg(m);
+        done = 0;
+        cv.notify_one();
+      //start.release();
+      }
     }
 
-    void wait() {
-      start.acquire();
+    void wait(bool fastmode) {
+      if (fastmode) {
+        while(!fastRelease.load(std::memory_order_relaxed)) { asmPause(); }
+        fastRelease = 0;
+      } else {
+        std::unique_lock<std::mutex> lg(m);
+        cv.wait(lg, [=] { return !done; });
+        //start.acquire();
+      }
     }
   };
 
   thread_local static per_signal my_box;
 
+  machineTopoInfo mi;
   std::vector<per_signal*> signals;
   std::vector<std::thread>  threads;
-
-  machineTopoInfo mi;
-
-  std::function<void(void)> work; 
-  std::atomic<unsigned> starting;
+  unsigned reserved;
   unsigned masterFastmode;
   bool running;
+  std::function<void(void)> work;
+
+
 
   //!destroy all threads
   void destroyCommon();
@@ -166,6 +162,9 @@ public:
     runInternal(num);
   }
 
+  //! run function in a dedicated thread until the threadpool exits
+  void runDedicated(std::function<void(void)>& f);
+
   //experimental: busy wait for work
   void burnPower(unsigned num);
   //experimental: leave busy wait
@@ -174,6 +173,8 @@ public:
   bool isRunning() const { return running; }
 
 
+  //!return the number of non-reserved threads in the pool
+  unsigned getMaxUsableThreads() const { return mi.maxThreads - reserved; }
   //!return the number of threads supported by the thread pool on the current machine
   unsigned getMaxThreads() const { return mi.maxThreads; }
   unsigned getMaxCores() const { return mi.maxCores; }

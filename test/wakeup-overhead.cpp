@@ -14,90 +14,73 @@ typedef Galois::GAccumulator<double> AccumDouble;
 
 namespace cll = llvm::cl;
 
-static cll::opt<int> size("size", cll::desc ("length of vectors"), cll::init(1000 * 1000));
-static cll::opt<int> rounds("rounds", cll::desc ("number of rounds"), cll::init(100));
-static cll::opt<int> trials("trials", cll::desc ("number of trials"), cll::init(3));
+static cll::opt<int> size("size", cll::desc ("length of vectors"), cll::init(1000));
+static cll::opt<int> rounds("rounds", cll::desc ("number of rounds"), cll::init(10000));
+static cll::opt<int> trials("trials", cll::desc ("number of trials"), cll::init(1));
 
-double runDoAllBurn(const std::vector<double>& vecA, const std::vector<double>& vecB) {
+void runDoAllBurn(size_t num) {
   Galois::Substrate::ThreadPool::getThreadPool().burnPower(Galois::getActiveThreads());
-  AccumDouble result;
 
   for (int r = 0; r < rounds; ++r) {
-    Galois::do_all(boost::counting_iterator<int>(0), boost::counting_iterator<int>(vecA.size()),
-        [&](int i) { result += vecA[i] * vecB[i]; });
+    Galois::do_all(boost::counting_iterator<int>(0), boost::counting_iterator<int>(num),
+                   [&](int i) { asm volatile("" ::: "memory"); });
   }
 
   Galois::Substrate::ThreadPool::getThreadPool().beKind();
-
-  return result.reduce();
 }
 
-double runDoAll(const std::vector<double>& vecA, const std::vector<double>& vecB) {
-  AccumDouble result;
-
+void runDoAll(size_t num) {
   for (int r = 0; r < rounds; ++r) {
-    Galois::do_all(boost::counting_iterator<int>(0), boost::counting_iterator<int>(vecA.size()),
-        [&](int i) { result += vecA[i] * vecB[i]; });
+    Galois::do_all(boost::counting_iterator<int>(0), boost::counting_iterator<int>(num),
+        [&](int i) { asm volatile("" ::: "memory"); });
   }
-
-  return result.reduce();
 }
 
-double runExplicitThread(const std::vector<double>& vecA, const std::vector<double>& vecB) {
+void runExplicitThread(size_t num) {
   Galois::Substrate::Barrier& barrier = Galois::Runtime::getBarrier(Galois::Runtime::activeThreads);
-  AccumDouble result;
   
   Galois::on_each([&](unsigned tid, unsigned total) {
-    for (int r = 0; r < rounds; ++r) {
       auto range = Galois::block_range(
-        boost::counting_iterator<int>(0), boost::counting_iterator<int>(vecA.size()), 
-        tid, total);
-      double sum = 0;
-      for (auto ii = range.first, ei = range.second; ii != ei; ++ii) {
-        sum += vecA[*ii] * vecB[*ii];
+                                       boost::counting_iterator<int>(0), boost::counting_iterator<int>(num), 
+                                       tid, total);
+      for (int r = 0; r < rounds; ++r) {
+        for (auto ii = range.first, ei = range.second; ii != ei; ++ii) {
+          asm volatile("" ::: "memory");
+        }
+        barrier();
       }
-      result += sum;
-      barrier();
-    }
   });
-
-  return result.reduce();
 }
 
-void run(
-    const std::vector<double>& vecA,
-    const std::vector<double>& vecB,
-    std::function<double(const std::vector<double>&, const std::vector<double>&)> fn,
-    std::string name) {
+void run(std::function<void(size_t)> fn, std::string name) {
   Galois::Timer t;
   t.start();
-  double r = fn(vecA, vecB);
+  fn(size);
   t.stop();
-  std::cout << name << " result: " << r << " time: " << t.get() << "\n";
+  std::cout << name << " time: " << t.get() << "\n";
 }
+
+std::atomic<int> EXIT;
+#include <chrono>
 
 int main(int argc, char* argv[]) {
   LonestarStart(argc, argv, 0, 0, 0);
   Galois::setActiveThreads(std::max(Galois::getActiveThreads(), 2U));
+
+  EXIT = 0;
+  std::function<void(void)> f = [] () { while (!EXIT) { std::cerr << "."; std::this_thread::sleep_for(std::chrono::milliseconds(100)); } };
+  Galois::Substrate::ThreadPool::getThreadPool().runDedicated(f);
 
   std::cout
     << "threads: " << Galois::getActiveThreads() 
     << " rounds: " << rounds
     << " size: " << size << "\n";
 
-  std::vector<double> vecA(size);
-  std::vector<double> vecB(size);
-
-  Galois::do_all(boost::counting_iterator<int>(0), boost::counting_iterator<int>(size),
-      [&vecA, &vecB](int i) {
-        vecA[i] = acos(-1.0);
-        vecB[i] = asin(-1.0);
-      }, Galois::loopname("init_loop"));
-
   for (int t = 0; t < trials; ++t) {
-    run(vecA, vecB, runDoAll, "DoAll");
-    run(vecA, vecB, runDoAllBurn, "DoAllBurn");
-    run(vecA, vecB, runExplicitThread, "ExplicitThread");
+    run(runDoAll, "DoAll");
+    run(runDoAllBurn, "DoAllBurn");
+    run(runExplicitThread, "ExplicitThread");
   }
+  EXIT=1;
   return 0;
 }
