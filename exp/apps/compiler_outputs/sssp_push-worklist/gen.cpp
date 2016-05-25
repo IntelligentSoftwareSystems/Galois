@@ -73,6 +73,7 @@ static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file>"
 #ifdef __GALOIS_VERTEX_CUT_GRAPH__
 static cll::opt<std::string> partFolder("partFolder", cll::desc("path to partitionFolder"), cll::init(""));
 #endif
+static cll::opt<unsigned int> repeat("repeat", cll::desc("Number of times to repeat the computation: Default 3"), cll::init(3));
 static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations: Default 1024"), cll::init(1024));
 static cll::opt<unsigned int> src_node("srcNodeId", cll::desc("ID of the source node"), cll::init(0));
 static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"), cll::init(false));
@@ -282,7 +283,9 @@ int main(int argc, char** argv) {
   try {
     LonestarStart(argc, argv, name, desc, url);
     auto& net = Galois::Runtime::getSystemNetworkInterface();
-    Galois::Timer T_total, T_graph_load, T_init, T_sssp1, T_sssp2, T_sssp3;
+    Galois::Timer T_total, T_graph_load, T_init;
+    std::vector<Galois::Timer> T_compute;
+    T_compute.resize(repeat);
 
     std::vector<unsigned> scalefactor;
 #ifdef __GALOIS_HET_CUDA__
@@ -342,37 +345,39 @@ int main(int argc, char** argv) {
 #endif
     T_graph_load.stop();
 
-    std::cout << "InitializeGraph::go called\n";
+    std::cout << "[" << net.ID << "] InitializeGraph::go called\n";
     T_init.start();
     InitializeGraph::go(hg);
     T_init.stop();
 
-    std::cout << "SSSP::go run1 called  on " << net.ID << "\n";
-    T_sssp1.start();
+    std::cout << "[" << net.ID << "] SSSP::go run1 called\n";
+    T_compute[0].start();
+    SSSP::go(hg);
+    T_compute[0].stop();
+
+    for (unsigned i = 1; i < repeat; ++i) {
+      Galois::Runtime::getHostBarrier().wait();
+      InitializeGraph::go(hg);
+
+      std::cout << "[" << net.ID << "] SSSP::go run" << i+1 << " called\n";
+      T_compute[i].start();
       SSSP::go(hg);
-    T_sssp1.stop();
-
-    Galois::Runtime::getHostBarrier().wait();
-    InitializeGraph::go(hg);
-
-    std::cout << "SSSP::go run2 called  on " << net.ID << "\n";
-    T_sssp2.start();
-      SSSP::go(hg);
-    T_sssp2.stop();
-
-    Galois::Runtime::getHostBarrier().wait();
-    InitializeGraph::go(hg);
-
-    std::cout << "SSSP::go run3 called  on " << net.ID << "\n";
-    T_sssp3.start();
-      SSSP::go(hg);
-    T_sssp3.stop();
+      T_compute[i].stop();
+    }
 
    T_total.stop();
 
-    auto mean_time = (T_sssp1.get() + T_sssp2.get() + T_sssp3.get())/3;
+    double mean_time = 0;
+    for (unsigned i = 0; i < repeat; ++i) {
+      mean_time += T_compute[i].get();
+    }
+    mean_time /= repeat;
 
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " Graph : " << T_graph_load.get() << " Init : " << T_init.get() << " sssp1 : " << T_sssp1.get() << " sssp2 : " << T_sssp2.get() << " sssp3 : " << T_sssp3.get() <<" sssp mean time : " << mean_time << "(msec)\n\n";
+    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " Graph : " << T_graph_load.get() << " Init : " << T_init.get();
+    for (unsigned i = 0; i < repeat; ++i) {
+      std::cout << " SSSP " <<  i << " : " << T_compute[i].get();
+    }
+    std::cout << " SSSP mean of " << repeat << " runs : " << mean_time << " (msec)\n\n";
 
     // Verify
     if(verify){

@@ -74,6 +74,7 @@ static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file>"
 #ifdef __GALOIS_VERTEX_CUT_GRAPH__
 static cll::opt<std::string> partFolder("partFolder", cll::desc("path to partitionFolder"), cll::init(""));
 #endif
+static cll::opt<unsigned int> repeat("repeat", cll::desc("Number of times to repeat the computation: Default 3"), cll::init(3));
 static cll::opt<float> tolerance("tolerance", cll::desc("tolerance"), cll::init(0.000001));
 static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations"), cll::init(1000));
 static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to the output stream"), cll::init(false));
@@ -281,7 +282,9 @@ int main(int argc, char** argv) {
 
     LonestarStart(argc, argv, name, desc, url);
     auto& net = Galois::Runtime::getSystemNetworkInterface();
-    Galois::Timer T_total, T_graph_load, T_init, T_pageRank1, T_pageRank2, T_pageRank3;
+    Galois::Timer T_total, T_graph_load, T_init;
+    std::vector<Galois::Timer> T_compute;
+    T_compute.resize(repeat);
 
     std::vector<unsigned> scalefactor;
 #ifdef __GALOIS_HET_CUDA__
@@ -346,55 +349,35 @@ int main(int argc, char** argv) {
     InitializeGraph::go(hg);
     T_init.stop();
 
-    // Verify
-    /*if(verify){
-#ifdef __GALOIS_HET_CUDA__
-      if (personality == CPU) { 
-#endif
-        for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
-          Galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).nout);
-        }
-#ifdef __GALOIS_HET_CUDA__
-      } else if(personality == GPU_CUDA)  {
-        for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
-          Galois::Runtime::printOutput("% %\n", hg.getGID(*ii), get_node_nout_cuda(cuda_ctx, *ii));
-        }
-      }
-#endif
-    }*/
-
-    std::cout << "[" << net.ID << "] PageRank_pull::go called\n";
-    T_pageRank1.start();
+    std::cout << "[" << net.ID << "] PageRank_pull::go run1 called\n";
+    T_compute[0].start();
     PageRank_pull::go(hg);
-    T_pageRank1.stop();
+    T_compute[0].stop();
 
-    Galois::Runtime::getHostBarrier().wait();
-    ResetGraph::go(hg);
-    InitializeGraph::go(hg);
+    for (unsigned i = 1; i < repeat; ++i) {
+      Galois::Runtime::getHostBarrier().wait();
+      ResetGraph::go(hg);
+      InitializeGraph::go(hg);
 
-    std::cout << "[" << net.ID << "] PageRank_pull::go called\n";
-    T_pageRank2.start();
-    PageRank_pull::go(hg);
-    T_pageRank2.stop();
-
-    Galois::Runtime::getHostBarrier().wait();
-    ResetGraph::go(hg);
-    InitializeGraph::go(hg);
-
-    std::cout << "[" << net.ID << "] PageRank_pull::go called\n";
-    T_pageRank3.start();
-    PageRank_pull::go(hg);
-    T_pageRank3.stop();
+      std::cout << "[" << net.ID << "] PageRank_pull::go run" << i+1 << " called\n";
+      T_compute[i].start();
+      PageRank_pull::go(hg);
+      T_compute[i].stop();
+    }
 
     T_total.stop();
 
-    auto mean_time = (T_pageRank1.get() + T_pageRank2.get() + T_pageRank3.get())/3;
+    double mean_time = 0;
+    for (unsigned i = 0; i < repeat; ++i) {
+      mean_time += T_compute[i].get();
+    }
+    mean_time /= repeat;
 
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " Graph : " << T_graph_load.get() << " Init : " << T_init.get() 
-      << " PageRank1 : " << T_pageRank1.get()
-      << " PageRank2 : " << T_pageRank2.get()
-      << " PageRank3 : " << T_pageRank3.get()
-      << " PageRank mean (" << iteration << " iterations) : " << mean_time << " (msec)\n\n";
+    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " Graph : " << T_graph_load.get() << " Init : " << T_init.get();
+    for (unsigned i = 0; i < repeat; ++i) {
+      std::cout << " Pagerank " <<  i << " : " << T_compute[i].get();
+    }
+    std::cout << " Pagerank mean of " << repeat << " runs (" << iteration << " iterations) : " << mean_time << " (msec)\n\n";
 
     // Verify
     if(verify){

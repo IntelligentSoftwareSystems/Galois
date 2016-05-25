@@ -72,6 +72,7 @@ static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file>"
 #ifdef __GALOIS_VERTEX_CUT_GRAPH__
 static cll::opt<std::string> partFolder("partFolder", cll::desc("path to partitionFolder"), cll::init(""));
 #endif
+static cll::opt<unsigned int> repeat("repeat", cll::desc("Number of times to repeat the computation: Default 3"), cll::init(3));
 static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations: Default 1024"), cll::init(1024));
 static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"), cll::init(false));
 #ifdef __GALOIS_HET_CUDA__
@@ -328,7 +329,9 @@ int main(int argc, char** argv) {
   try {
     LonestarStart(argc, argv, name, desc, url);
     auto& net = Galois::Runtime::getSystemNetworkInterface();
-    Galois::Timer T_total, T_graph_load, T_init, T_cc1, T_cc2, T_cc3;
+    Galois::Timer T_total, T_graph_load, T_init;
+    std::vector<Galois::Timer> T_compute;
+    T_compute.resize(repeat);
 
     std::vector<unsigned> scalefactor;
 #ifdef __GALOIS_HET_CUDA__
@@ -388,37 +391,39 @@ int main(int argc, char** argv) {
 #endif
     T_graph_load.stop();
 
-    std::cout << "InitializeGraph::go called\n";
+    std::cout << "[" << net.ID << "] InitializeGraph::go called\n";
     T_init.start();
     InitializeGraph::go(hg);
     T_init.stop();
 
-    std::cout << "ConnectedComp::go run1 called  on " << net.ID << "\n";
-    T_cc1.start();
+    std::cout << "[" << net.ID << "] ConnectedComp::go run1 called\n";
+    T_compute[0].start();
+    ConnectedComp::go(hg);
+    T_compute[0].stop();
+
+    for (unsigned i = 1; i < repeat; ++i) {
+      Galois::Runtime::getHostBarrier().wait();
+      InitializeGraph::go(hg);
+
+      std::cout << "[" << net.ID << "] ConnectedComp::go run" << i+1 << " called\n";
+      T_compute[i].start();
       ConnectedComp::go(hg);
-    T_cc1.stop();
-
-    Galois::Runtime::getHostBarrier().wait();
-    InitializeGraph::go(hg);
-
-    std::cout << "ConnectedComp::go run2 called  on " << net.ID << "\n";
-    T_cc2.start();
-      ConnectedComp::go(hg);
-    T_cc2.stop();
-
-    Galois::Runtime::getHostBarrier().wait();
-    InitializeGraph::go(hg);
-
-    std::cout << "ConnectedComp::go run3 called  on " << net.ID << "\n";
-    T_cc3.start();
-      ConnectedComp::go(hg);
-    T_cc3.stop();
+      T_compute[i].stop();
+    }
 
    T_total.stop();
 
-    auto mean_time = (T_cc1.get() + T_cc2.get() + T_cc3.get())/3;
+    double mean_time = 0;
+    for (unsigned i = 0; i < repeat; ++i) {
+      mean_time += T_compute[i].get();
+    }
+    mean_time /= repeat;
 
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " Graph : " << T_graph_load.get() << " Init : " << T_init.get() << " cc1 : " << T_cc1.get() << " cc2 : " << T_cc2.get() << " cc3 : " << T_cc3.get() <<" cc mean time (" << iteration << " iterations) : " << mean_time << "(msec)\n\n";
+    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " Graph : " << T_graph_load.get() << " Init : " << T_init.get();
+    for (unsigned i = 0; i < repeat; ++i) {
+      std::cout << " CC " <<  i << " : " << T_compute[i].get();
+    }
+    std::cout << " CC mean of " << repeat << " runs (" << iteration << " iterations) : " << mean_time << " (msec)\n\n";
 
     // Verify
     if(verify){
