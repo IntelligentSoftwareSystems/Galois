@@ -74,7 +74,6 @@ static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file>"
 #ifdef __GALOIS_VERTEX_CUT_GRAPH__
 static cll::opt<std::string> partFolder("partFolder", cll::desc("path to partitionFolder"), cll::init(""));
 #endif
-static cll::opt<unsigned int> repeat("repeat", cll::desc("Number of times to repeat the computation: Default 3"), cll::init(3));
 static cll::opt<float> tolerance("tolerance", cll::desc("tolerance"), cll::init(0.000001));
 static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations"), cll::init(1000));
 static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to the output stream"), cll::init(false));
@@ -311,7 +310,7 @@ int main(int argc, char** argv) {
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     Galois::Timer T_total, T_graph_load, T_init;
     std::vector<Galois::Timer> T_compute;
-    T_compute.resize(repeat);
+    T_compute.resize(numRuns);
 
     std::vector<unsigned> scalefactor;
 #ifdef __GALOIS_HET_CUDA__
@@ -381,7 +380,7 @@ int main(int argc, char** argv) {
     PageRank_pull::go(hg);
     T_compute[0].stop();
 
-    for (unsigned i = 1; i < repeat; ++i) {
+    for (unsigned i = 1; i < numRuns; ++i) {
       Galois::Runtime::getHostBarrier().wait();
       ResetGraph::go(hg);
       InitializeGraph::go(hg);
@@ -395,16 +394,16 @@ int main(int argc, char** argv) {
     T_total.stop();
 
     double mean_time = 0;
-    for (unsigned i = 0; i < repeat; ++i) {
+    for (unsigned i = 0; i < numRuns; ++i) {
       mean_time += T_compute[i].get();
     }
-    mean_time /= repeat;
+    mean_time /= numRuns;
 
     std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " Graph : " << T_graph_load.get() << " Init : " << T_init.get();
-    for (unsigned i = 0; i < repeat; ++i) {
+    for (unsigned i = 0; i < numRuns; ++i) {
       std::cout << " Pagerank " <<  i << " : " << T_compute[i].get();
     }
-    std::cout << " Pagerank mean of " << repeat << " runs (" << iteration << " iterations) : " << mean_time << " (msec)\n\n";
+    std::cout << " Pagerank mean of " << numRuns << " runs (" << iteration << " iterations) : " << mean_time << " (msec)\n\n";
 
     // Verify
     if(verify){
