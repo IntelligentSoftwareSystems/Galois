@@ -93,7 +93,7 @@ struct InitializeGraph {
     #endif
     Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {src_node, &_graph}, Galois::loopname("InitGraph"));
 
-    _graph.sync_pull<SyncerPull_0>();
+    _graph.sync_pull<SyncerPull_0>("InitializeGraph");
   }
 
   void operator()(GNode src) const {
@@ -168,10 +168,10 @@ struct BFS {
       	} else if (personality == CPU)
       #endif
       Galois::do_all(_graph.begin(), _graph.end(), BFS { &_graph }, Galois::loopname("BFS"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned long long" , "{ Galois::atomicMin(node.dist_current, y);}",  "{node.dist_current = std::numeric_limits<unsigned long long>::max()/4; }"), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "dist_current" , "unsigned long long"));
-      _graph.sync_push<Syncer_0>();
-      
-      _graph.sync_pull<SyncerPull_0>();
-      
+      _graph.sync_push<Syncer_0>("BFS");
+
+      _graph.sync_pull<SyncerPull_0>("BFS");
+
      ++iteration;
      if(iteration >= maxIterations){
         DGAccumulator_accum.reset();
@@ -198,31 +198,23 @@ struct BFS {
 };
 Galois::DGAccumulator<int>  BFS::DGAccumulator_accum;
 
-/********Set source Node ************/
-void setSource(Graph& _graph){
-  auto& net = Galois::Runtime::getSystemNetworkInterface();
-  if(net.ID == 0){
-    auto& nd = _graph.getData(src_node);
-    nd.dist_current = 0;
-  }
-}
-
 int main(int argc, char** argv) {
   try {
     LonestarStart(argc, argv, name, desc, url);
+    Galois::StatManager statManager;
     auto& net = Galois::Runtime::getSystemNetworkInterface();
-    Galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_BFS1, T_BFS2, T_BFS3;
+    Galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"), StatTimer_total("TIMER_TOTAL"), StatTimer_hg_init("TIMER_HG_INIT");
 
-    T_total.start();
+    StatTimer_total.start();
 
-    T_hGraph_init.start();
+    StatTimer_hg_init.start();
     Graph hg(inputFile, net.ID, net.Num);
-    T_hGraph_init.stop();
+    StatTimer_hg_init.stop();
 
     std::cout << "InitializeGraph::go called\n";
-    T_init.start();
-    InitializeGraph::go(hg);
-    T_init.stop();
+    StatTimer_init.start();
+      InitializeGraph::go(hg);
+    StatTimer_init.stop();
 
     // Verify
 /*
@@ -236,45 +228,29 @@ int main(int argc, char** argv) {
 */
 
 
-    std::cout << "BFS::go run1 called  on " << net.ID << "\n";
-    T_BFS1.start();
-      BFS::go(hg);
-    T_BFS1.stop();
+    for(auto run = 0; run < numRuns; ++run){
+      std::cout << "BFS::go run " << run << " called  on " << net.ID << "\n";
+      std::string timer_str("TIMER_" + std::to_string(run));
+      Galois::StatTimer StatTimer_main(timer_str.c_str());
 
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " BFS1 : " << T_BFS1.get() << " (msec)\n\n";
+      StatTimer_main.start();
+        BFS::go(hg);
+      StatTimer_main.stop();
 
-    Galois::Runtime::getHostBarrier().wait();
-    InitializeGraph::go(hg);
+      if((run + 1) != numRuns){
+        Galois::Runtime::getHostBarrier().wait();
+        InitializeGraph::go(hg);
+      }
+    }
 
-    std::cout << "BFS::go run2 called  on " << net.ID << "\n";
-    T_BFS2.start();
-      BFS::go(hg);
-    T_BFS2.stop();
-
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " BFS2 : " << T_BFS2.get() << " (msec)\n\n";
-
-    Galois::Runtime::getHostBarrier().wait();
-    InitializeGraph::go(hg);
-
-    std::cout << "BFS::go run3 called  on " << net.ID << "\n";
-    T_BFS3.start();
-      BFS::go(hg);
-    T_BFS3.stop();
-
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " BFS3 : " << T_BFS3.get() << " (msec)\n\n";
-
-
-   T_total.stop();
-
-    auto mean_time = (T_BFS1.get() + T_BFS2.get() + T_BFS3.get())/3;
-
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " BFS1 : " << T_BFS1.get() << " BFS2 : " << T_BFS2.get() << " BFS3 : " << T_BFS3.get() <<" BFS mean time (3 runs ) (" << maxIterations << ") : " << mean_time << "(msec)\n\n";
+   StatTimer_total.stop();
 
     if(verify){
       for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
         Galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).dist_current);
       }
     }
+
     return 0;
   } catch(const char* c) {
     std::cerr << "Error: " << c << "\n";
