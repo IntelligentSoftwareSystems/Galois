@@ -71,6 +71,7 @@ class hGraph: public GlobalObject {
    uint32_t num_recv_expected; // Number of receives expected for local completion.
    uint32_t num_iter_push; //Keep track of number of iterations.
    uint32_t num_iter_pull; //Keep track of number of iterations.
+   uint32_t num_run; //Keep track of number of iterations.
 
    //host -> (lid, lid]
    std::pair<uint32_t, uint32_t> nodes_by_host(uint32_t host) const {
@@ -259,6 +260,7 @@ public:
       num_recv_expected = 0;
       num_iter_push = 0;
       num_iter_pull = 0;
+      num_run = 0;
       totalNodes = g.size();
       std::cerr << "Total nodes : " << totalNodes << "\n";
       std::cerr << "Total edges : " << g.sizeEdges() << "\n";
@@ -495,7 +497,7 @@ public:
    void sync_push(std::string loopName) {
       void (hGraph::*fn)(Galois::Runtime::RecvBuffer&) = &hGraph::syncRecvApply<FnTy>;
       ++num_iter_push;
-      std::string timer_str("SYNC_PUSH_" + loopName + "_" + std::to_string(num_iter_push));
+      std::string timer_str("SYNC_PUSH_" + loopName + "_" + std::to_string(num_run) + "_" + std::to_string(num_iter_push));
       Galois::StatTimer StatTimer_syncPush(timer_str.c_str());
       StatTimer_syncPush.start();
       auto& net = Galois::Runtime::getSystemNetworkInterface();
@@ -539,7 +541,7 @@ public:
    void sync_pull(std::string loopName) {
       void (hGraph::*fn)(Galois::Runtime::RecvBuffer&) = &hGraph::syncPullRecvReply<FnTy>;
       ++num_iter_pull;
-      std::string timer_str("SYNC_PULL_" + loopName +"_" + std::to_string(num_iter_pull));
+      std::string timer_str("SYNC_PULL_" + loopName +"_" + std::to_string(num_run) + "_" + std::to_string(num_iter_pull));
       Galois::StatTimer StatTimer_syncPull(timer_str.c_str());
       StatTimer_syncPull.start();
       auto& net = Galois::Runtime::getSystemNetworkInterface();
@@ -679,5 +681,12 @@ public:
 
 #endif
 
+
+  /**For resetting num_iter_pull and push.**/
+   void reset_num_iter(uint32_t runNum){
+      num_iter_pull = 0;
+      num_iter_push = 0;
+      num_run = runNum;
+   }
 };
 #endif//_GALOIS_DIST_HGRAPH_H
