@@ -136,6 +136,9 @@ class vGraph : public GlobalObject {
    std::vector<std::pair<uint64_t, uint64_t>> gid2host;
 
    uint32_t num_recv_expected; // Number of receives expected for local completion.
+   uint32_t num_iter_push; //Keep track of number of iterations.
+   uint32_t num_iter_pull; //Keep track of number of iterations.
+   uint32_t num_run; //Keep track of number of iterations.
 
 #if 0
    //host -> (lid, lid]
@@ -341,7 +344,10 @@ public:
     std::string part_metaFile = getMetaFileName(partitionFolder, id, numHosts);
 
     OfflineGraph g(part_fileName);
-      totalNodes = g.size();
+    num_iter_push = 0;
+    num_iter_pull = 0;
+    num_run = 0;
+    totalNodes = g.size();
     std::cerr << "[" << id << "] SIZE ::::  " << totalNodes << "\n";
     readMetaFile(part_metaFile, localToGlobalMap_meta);
     std::cerr << "[" << id << "] MAPSIZE : " << localToGlobalMap_meta.size() << "\n";
@@ -355,8 +361,8 @@ public:
       GIDtoOwnerMap[info.global_id] = info.owner_id;
       LocalToGlobalMap[info.local_id] = info.global_id;
       GlobalToLocalMap[info.global_id] = info.local_id;
-        //Galois::Runtime::printOutput("[%] Owner : %\n", info.global_id, info.owner_id);
-      }
+      //Galois::Runtime::printOutput("[%] Owner : %\n", info.global_id, info.owner_id);
+    }
 
 
     //Exchange information.
@@ -467,11 +473,15 @@ public:
    }
 
    template<typename FnTy>
-   void sync_push() {
-    void (vGraph::*fn)(Galois::Runtime::RecvBuffer&) = &vGraph::syncRecvApply<FnTy>;
-      auto& net = Galois::Runtime::getSystemNetworkInterface();
-    for (unsigned x = 0; x < net.Num; ++x) {
-      if((x == id) || (slaveNodes[x].size() == 0))
+     void sync_push(std::string loopName) {
+       void (vGraph::*fn)(Galois::Runtime::RecvBuffer&) = &vGraph::syncRecvApply<FnTy>;
+       ++num_iter_push;
+       std::string timer_str("SYNC_PUSH_" + loopName + "_" + std::to_string(num_run) + "_" + std::to_string(num_iter_push));
+       Galois::StatTimer StatTimer_syncPush(timer_str.c_str());
+       StatTimer_syncPush.start();
+       auto& net = Galois::Runtime::getSystemNetworkInterface();
+       for (unsigned x = 0; x < net.Num; ++x) {
+         if((x == id) || (slaveNodes[x].size() == 0))
             continue;
 
          Galois::Runtime::SendBuffer b;
@@ -492,42 +502,48 @@ public:
       //Will force all messages to be processed before continuing
       net.flush();
       Galois::Runtime::getHostBarrier().wait();
+      StatTimer_syncPush.stop();
 
       //std::cout << "[" << net.ID <<"] time1 : " << time1.get() << "(msec) time2 : " << time2.get() << "(msec)\n";
    }
 
 
    template<typename FnTy>
-   void sync_pull() {
-    void (vGraph::*fn)(Galois::Runtime::RecvBuffer&) = &vGraph::syncPullRecvReply<FnTy>;
-      auto& net = Galois::Runtime::getSystemNetworkInterface();
+     void sync_pull(std::string loopName) {
+       void (vGraph::*fn)(Galois::Runtime::RecvBuffer&) = &vGraph::syncPullRecvReply<FnTy>;
+       ++num_iter_pull;
+       std::string timer_str("SYNC_PULL_" + loopName +"_" + std::to_string(num_run) + "_" + std::to_string(num_iter_pull));
+       Galois::StatTimer StatTimer_syncPull(timer_str.c_str());
+       StatTimer_syncPull.start();
+       auto& net = Galois::Runtime::getSystemNetworkInterface();
 
-      num_recv_expected = 0;
-    for (unsigned x = 0; x < net.Num; ++x) {
-      if((x == id))
-            continue;
+       num_recv_expected = 0;
+       for (unsigned x = 0; x < net.Num; ++x) {
+         if((x == id))
+           continue;
 
          Galois::Runtime::SendBuffer b;
-      gSerialize(b, idForSelf(), fn, net.ID, (uint32_t)(slaveNodes[x].size()));
+         gSerialize(b, idForSelf(), fn, net.ID, (uint32_t)(slaveNodes[x].size()));
 
-     //for (auto start = 0; start < slaveNodes[x].size(); ++start) {
-        //auto gid = slaveNodes[x][start];
-        //auto lid = G2L(gid);
-        //gSerialize(b, gid, FnTy::extract(lid, getData(lid)));
-      //}
+         //for (auto start = 0; start < slaveNodes[x].size(); ++start) {
+         //auto gid = slaveNodes[x][start];
+         //auto lid = G2L(gid);
+         //gSerialize(b, gid, FnTy::extract(lid, getData(lid)));
+         //}
          net.send(x, syncRecv, b);
          ++num_recv_expected;
-      }
+       }
 
-      net.flush();
-      while (num_recv_expected) {
+       net.flush();
+       while (num_recv_expected) {
          net.handleReceives();
-      }
+       }
 
-      assert(num_recv_expected == 0);
-      // Can remove this barrier???.
-      Galois::Runtime::getHostBarrier().wait();
-   }
+       assert(num_recv_expected == 0);
+       // Can remove this barrier???.
+       Galois::Runtime::getHostBarrier().wait();
+       StatTimer_syncPull.stop();
+     }
 
   uint64_t getGID(size_t nodeID) {
       return L2G(nodeID);
@@ -600,6 +616,13 @@ public:
       return m;
    }
 #endif
+
+  /**For resetting num_iter_pull and push.**/
+   void reset_num_iter(uint32_t runNum){
+      num_iter_pull = 0;
+      num_iter_push = 0;
+      num_run = runNum;
+   }
 
 };
 #endif//_GALOIS_DIST_vGraph_H

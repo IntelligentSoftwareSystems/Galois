@@ -1,4 +1,4 @@
-/** bfs -*- C++ -*-
+/** BFS -*- C++ -*-
  * @file
  * @section License
  *
@@ -38,8 +38,8 @@
 #include "Galois/Runtime/Tracer.h"
 
 
-static const char* const name = "bfs - Distributed Heterogeneous using vertex cut";
-static const char* const desc = "Bellman-Ford bfs on Distributed Galois.";
+static const char* const name = "BFS - Distributed Heterogeneous using vertex cut";
+static const char* const desc = "Bellman-Ford BFS on Distributed Galois.";
 static const char* const url = 0;
 
 namespace cll = llvm::cl;
@@ -94,7 +94,7 @@ struct InitializeGraph {
     #endif
     Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {src_node, &_graph}, Galois::loopname("InitGraph"));
 
-    _graph.sync_pull<SyncerPull_0>();
+    _graph.sync_pull<SyncerPull_0>("InitGraph");
   }
 
   void operator()(GNode src) const {
@@ -106,11 +106,11 @@ struct InitializeGraph {
   }
 };
 
-struct bfs {
+struct BFS {
   Graph* graph;
   static Galois::DGAccumulator<int> DGAccumulator_accum;
 
-  bfs(Graph* _graph) : graph(_graph){}
+  BFS(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph){
     unsigned iteration = 0;
     do{
@@ -118,7 +118,7 @@ struct bfs {
 
       #ifdef __GALOIS_HET_CUDA__
       	if (personality == GPU_CUDA) {
-      		bfs_cuda(cuda_ctx);
+      		BFS_cuda(cuda_ctx);
       	} else if (personality == CPU)
       #endif
       	struct Syncer_0 {
@@ -164,13 +164,13 @@ struct bfs {
       	};
       #ifdef __GALOIS_HET_CUDA__
       	if (personality == GPU_CUDA) {
-      		bfs_cuda(cuda_ctx);
+      		BFS_cuda(cuda_ctx);
       	} else if (personality == CPU)
       #endif
-      Galois::do_all(_graph.begin(), _graph.end(), bfs { &_graph }, Galois::loopname("bfs"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned long long" , "{ Galois::atomicMin(node.dist_current, y);}",  "{node.dist_current = std::numeric_limits<unsigned long long>::max()/4; }"), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "dist_current" , "unsigned long long"));
-      _graph.sync_push<Syncer_0>();
+      Galois::do_all(_graph.begin(), _graph.end(), BFS { &_graph }, Galois::loopname("BFS"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned long long" , "{ Galois::atomicMin(node.dist_current, y);}",  "{node.dist_current = std::numeric_limits<unsigned long long>::max()/4; }"), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "dist_current" , "unsigned long long"));
+      _graph.sync_push<Syncer_0>("BFS");
       
-      _graph.sync_pull<SyncerPull_0>();
+      _graph.sync_pull<SyncerPull_0>("BFS");
       
      ++iteration;
     }while(DGAccumulator_accum.reduce());
@@ -195,36 +195,31 @@ struct bfs {
     }
   }
 };
-Galois::DGAccumulator<int>  bfs::DGAccumulator_accum;
-
-/********Set source Node ************/
-void setSource(Graph& _graph){
-  auto& net = Galois::Runtime::getSystemNetworkInterface();
-  if(net.ID == 0){
-    auto& nd = _graph.getData(src_node);
-    nd.dist_current = 0;
-  }
-}
+Galois::DGAccumulator<int>  BFS::DGAccumulator_accum;
 
 int main(int argc, char** argv) {
   try {
     LonestarStart(argc, argv, name, desc, url);
+    Galois::StatManager statManager;
     auto& net = Galois::Runtime::getSystemNetworkInterface();
-    Galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_bfs1, T_bfs2, T_bfs3;
+    Galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"), StatTimer_total("TIMER_TOTAL"), StatTimer_hg_init("TIMER_HG_INIT");
 
-    std::cout << "[ " << net.ID << " ] InputFile : " << inputFile << "\n";
-    std::cout << "[ " << net.ID << " ] PartFile : " << partFolder << "\n";
 
-    T_total.start();
+    if(net.ID == 0){
+      std::cout << "[ " << net.ID << " ] InputFile : " << inputFile << "\n";
+      std::cout << "[ " << net.ID << " ] PartFile : " << partFolder << "\n";
+    }
 
-    T_hGraph_init.start();
+    StatTimer_total.start();
+
+    StatTimer_hg_init.start();
     Graph hg(inputFile,partFolder,net.ID, net.Num);
-    T_hGraph_init.stop();
+    StatTimer_hg_init.stop();
 
     std::cout << "InitializeGraph::go called\n";
-    T_init.start();
-    InitializeGraph::go(hg);
-    T_init.stop();
+    StatTimer_init.start();
+      InitializeGraph::go(hg);
+    StatTimer_init.stop();
 
   // Verify
 #if 0
@@ -237,40 +232,25 @@ int main(int argc, char** argv) {
     }
 #endif
 
+    for(auto run = 0; run < numRuns; ++run){
+      std::cout << "BFS::go run " << run << " called  on " << net.ID << "\n";
+      std::string timer_str("TIMER_" + std::to_string(run));
+      Galois::StatTimer StatTimer_main(timer_str.c_str());
 
-    std::cout << "bfs::go run1 called  on " << net.ID << "\n";
-    T_bfs1.start();
-      bfs::go(hg);
-    T_bfs1.stop();
+      hg.reset_num_iter(run);
 
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " bfs1 : " << T_bfs1.get() << " (msec)\n\n";
+      StatTimer_main.start();
+        BFS::go(hg);
+      StatTimer_main.stop();
 
-    Galois::Runtime::getHostBarrier().wait();
-    InitializeGraph::go(hg);
+      if((run + 1) != numRuns){
+        Galois::Runtime::getHostBarrier().wait();
+        hg.reset_num_iter(run);
+        InitializeGraph::go(hg);
+      }
+    }
 
-    std::cout << "bfs::go run2 called  on " << net.ID << "\n";
-    T_bfs2.start();
-      bfs::go(hg);
-    T_bfs2.stop();
-
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " bfs2 : " << T_bfs2.get() << " (msec)\n\n";
-
-    Galois::Runtime::getHostBarrier().wait();
-    InitializeGraph::go(hg);
-
-    std::cout << "bfs::go run3 called  on " << net.ID << "\n";
-    T_bfs3.start();
-      bfs::go(hg);
-    T_bfs3.stop();
-
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " bfs3 : " << T_bfs3.get() << " (msec)\n\n";
-
-
-   T_total.stop();
-
-    auto mean_time = (T_bfs1.get() + T_bfs2.get() + T_bfs3.get())/3;
-
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " bfs1 : " << T_bfs1.get() << " bfs2 : " << T_bfs2.get() << " bfs3 : " << T_bfs3.get() <<" bfs mean time (3 runs ) (" << maxIterations << ") : " << mean_time << "(msec)\n\n";
+   StatTimer_total.stop();
 
     if(verify){
       for(auto ii = hg.begin(); ii != hg.end(); ++ii) {

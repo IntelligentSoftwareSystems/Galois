@@ -98,13 +98,13 @@ public:
     for (std::deque<Statistic*>::iterator ii = stats.begin(), ei = stats.end(); ii != ei; ++ii) {
       (*ii)->report();
     }
-    Galois::Runtime::printStats();
+    Galois::Runtime::printDistStats();
   }
   void dump_stats(){
     for (std::deque<Statistic*>::iterator ii = stats.begin(), ei = stats.end(); ii != ei; ++ii) {
       (*ii)->report();
     }
-    Galois::Runtime::printStats();
+    Galois::Runtime::printDistStats();
   }
   //! Statistics that are not lexically scoped must be added explicitly
   void push(Statistic& s) {
@@ -146,7 +146,7 @@ public:
   ~StatTimer() {
     if (valid)
       stop();
-    if (TimeAccumulator::get()) // only report non-zero stat
+    //if (TimeAccumulator::get()) // only report non-zero stat
       Galois::Runtime::reportStat(loopname, name, get());
   }
 
