@@ -225,7 +225,7 @@ namespace {
 
         //llvm::outs() << " Matcher for : " << str_global_name <<"\n";
 
-        StatementMatcher expr_global_use  =  expr(isExpansionInMainFile(), declRefExpr(to(varDecl(hasName(i.GLOBAL_NAME)))).bind(str_global_use), hasAncestor(recordDecl(has(constructorDecl(hasAnyConstructorInitializer(anything())).bind(str_global_constructor))).bind(str_global_struct)));
+        StatementMatcher expr_global_use  =  expr(isExpansionInMainFile(), declRefExpr(to(varDecl(hasName(i.GLOBAL_NAME)))).bind(str_global_use), hasAncestor(recordDecl(has(constructorDecl(hasAnyConstructorInitializer(anything())).bind(str_global_constructor))).bind(str_global_struct)), hasAncestor(methodDecl(hasName("operator()"))));
 
         Matchers_removeGlobals.addMatcher(expr_global_use, &removeGlobalsHandler);
       }
