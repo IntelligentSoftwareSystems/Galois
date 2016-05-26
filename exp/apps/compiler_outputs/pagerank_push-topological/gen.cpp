@@ -266,7 +266,7 @@ struct PageRank {
       		DGAccumulator_accum += __retval;
       	} else if (personality == CPU)
       #endif
-      Galois::do_all(_graph.begin(), _graph.end(), PageRank { tolerance, alpha, &_graph }, Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ Galois::atomicAdd(node.residual, y);}",  "{node.residual = 0 ; }"));
+      Galois::do_all(_graph.begin(), _graph.end(), PageRank { tolerance, alpha, &_graph }, Galois::loopname("PageRank"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ Galois::atomicAdd(node.residual, y);}",  "{node.residual = 0 ; }"));
       _graph.sync_push<Syncer_0>();
 #ifdef __GALOIS_VERTEX_CUT_GRAPH__
       _graph.sync_pull<SyncerPull_0>();

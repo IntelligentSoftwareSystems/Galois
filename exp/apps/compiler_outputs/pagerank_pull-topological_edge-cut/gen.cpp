@@ -246,7 +246,7 @@ struct PageRank_pull {
       		DGAccumulator_accum += __retval;
       	} else if (personality == CPU)
       #endif
-      Galois::do_all(_graph.begin(), _graph.end(), PageRank_pull { tolerance, alpha, &_graph }, Galois::loopname("pageRank"));
+      Galois::do_all(_graph.begin(), _graph.end(), PageRank_pull { tolerance, alpha, &_graph }, Galois::loopname("PageRank"));
       _graph.sync_pull<SyncerPull_0>();
       ++iteration;
       if (maxIterations == 5) DGAccumulator_accum += 1;

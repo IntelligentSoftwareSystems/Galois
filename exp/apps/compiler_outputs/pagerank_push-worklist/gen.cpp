@@ -281,7 +281,7 @@ struct PageRank {
      		}
      	} else if (personality == CPU)
      #endif
-     Galois::for_each(_graph.begin(), _graph.end(), PageRank(tolerance, alpha, &_graph),Galois::workList_version(), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ Galois::atomicAdd(node.residual, y);}",  "{node.residual = 0 ; }"), Get_info_functor<Graph>(_graph));
+     Galois::for_each(_graph.begin(), _graph.end(), PageRank(tolerance, alpha, &_graph), Galois::workList_version(), Galois::loopname("PageRank"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ Galois::atomicAdd(node.residual, y);}",  "{node.residual = 0 ; }"), Get_info_functor<Graph>(_graph));
   }
 
   void operator()(WorkItem& src, Galois::UserContext<WorkItem>& ctx) const {
