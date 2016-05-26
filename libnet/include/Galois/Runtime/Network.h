@@ -45,7 +45,6 @@ protected:
   Galois::Statistic statSendBytes;
   Galois::Statistic statRecvBytes;
 
-  void reportStats();
   
 public:
 
@@ -57,6 +56,7 @@ public:
   virtual ~NetworkInterface();
 
   void dumpStats() const;
+  void reportStats();
 
   //!send a message to a given (dest) host.  A message is simply a
   //!landing pad (recv) and some data (buf)
