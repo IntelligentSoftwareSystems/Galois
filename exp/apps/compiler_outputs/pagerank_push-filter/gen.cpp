@@ -183,9 +183,9 @@ struct InitializeGraph {
       	} else if (personality == CPU)
       #endif
       Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ alpha, &_graph }, Galois::loopname("Init"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ Galois::atomicAdd(node.residual, y);}",  "{node.residual = 0 ; }"));
-      _graph.sync_push<Syncer_0>();
+      _graph.sync_push<Syncer_0>("Init");
 #ifdef __GALOIS_VERTEX_CUT_GRAPH__
-      _graph.sync_pull<SyncerPull_0>();
+      _graph.sync_pull<SyncerPull_0>("Init");
 #endif
       
   }
@@ -261,9 +261,9 @@ void static go(Graph& _graph) {
 	} else if (personality == CPU)
 #endif
 Galois::for_each(_graph.begin(), _graph.end(), FirstItr_PageRank{alpha,tolerance,&_graph}, Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ Galois::atomicAdd(node.residual, y);}",  "{node.residual = 0 ; }"));
-_graph.sync_push<Syncer_0>();
+_graph.sync_push<Syncer_0>("PageRank");
 #ifdef __GALOIS_VERTEX_CUT_GRAPH__
-_graph.sync_pull<SyncerPull_0>();
+_graph.sync_pull<SyncerPull_0>("PageRank");
 #endif
 
 }
@@ -349,9 +349,9 @@ struct PageRank {
      	} else if (personality == CPU)
      #endif
      Galois::for_each(_graph.begin(), _graph.end(), PageRank(tolerance, alpha, &_graph), Galois::loopname("PageRank"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ Galois::atomicAdd(node.residual, y);}",  "{node.residual = 0 ; }"));
-     _graph.sync_push<Syncer_0>();
+     _graph.sync_push<Syncer_0>("PageRank");
 #ifdef __GALOIS_VERTEX_CUT_GRAPH__
-    _graph.sync_pull<SyncerPull_0>();
+    _graph.sync_pull<SyncerPull_0>("PageRank");
 #endif
      
      ++iteration;

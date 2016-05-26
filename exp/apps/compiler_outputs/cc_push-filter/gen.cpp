@@ -145,10 +145,10 @@ struct InitializeGraph {
     		InitializeGraph_cuda(cuda_ctx);
     	} else if (personality == CPU)
     #endif
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, Galois::loopname("InitGraph"));
+    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, Galois::loopname("Init"));
 
-    _graph.sync_pull<SyncerPull_0>();
-    _graph.sync_pull<SyncerPull_1>();
+    _graph.sync_pull<SyncerPull_0>("Init");
+    _graph.sync_pull<SyncerPull_1>("Init");
   }
 
   void operator()(GNode src) const {
@@ -214,9 +214,9 @@ struct FirstItr_ConnectedComp {
     	} else if (personality == CPU)
     #endif
     Galois::do_all(_graph.begin(), _graph.end(), FirstItr_ConnectedComp { &_graph }, Galois::loopname("cc"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "comp_current", "unsigned int" , "{ Galois::atomicMin(node.comp_current, y);}",  "{node.comp_current = std::numeric_limits<unsigned int>::max()/4; }"));
-    _graph.sync_push<Syncer_0>();
+    _graph.sync_push<Syncer_0>("cc");
 #ifdef __GALOIS_VERTEX_CUT_GRAPH__
-      _graph.sync_pull<SyncerPull_0>();
+      _graph.sync_pull<SyncerPull_0>("cc");
 #endif
     
 
@@ -298,9 +298,9 @@ struct ConnectedComp {
       	} else if (personality == CPU)
       #endif
       Galois::do_all(_graph.begin(), _graph.end(), ConnectedComp { &_graph }, Galois::loopname("cc"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "comp_current", "unsigned int" , "{ Galois::atomicMin(node.comp_current, y);}",  "{node.comp_current = std::numeric_limits<unsigned int>::max()/4; }"));
-      _graph.sync_push<Syncer_0>();
+      _graph.sync_push<Syncer_0>("cc");
 #ifdef __GALOIS_VERTEX_CUT_GRAPH__
-      _graph.sync_pull<SyncerPull_0>();
+      _graph.sync_pull<SyncerPull_0>("cc");
 #endif
       
       ++iteration;

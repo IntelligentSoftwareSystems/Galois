@@ -163,7 +163,7 @@ struct InitializeGraph {
       	} else if (personality == CPU)
       #endif
       Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ alpha, &_graph }, Galois::loopname("Init"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ Galois::atomicAdd(node.residual, y);}",  "{node.residual = 0 ; }"));
-      _graph.sync_push<Syncer_0>();
+      _graph.sync_push<Syncer_0>("Init");
       
   }
 
@@ -225,7 +225,7 @@ struct Get_info_functor : public Galois::op_tag {
 	}
 	void static sync_graph_static(Graph& _graph) {
 
-		_graph.sync_push<Syncer_0>();
+		_graph.sync_push<Syncer_0>("PageRank");
 	}
 };
 

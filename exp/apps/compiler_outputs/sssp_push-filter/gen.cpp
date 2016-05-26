@@ -150,10 +150,10 @@ struct InitializeGraph {
     		InitializeGraph_cuda(src_node, infinity, cuda_ctx);
     	} else if (personality == CPU)
     #endif
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {src_node, infinity, &_graph}, Galois::loopname("InitGraph"));
+    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {src_node, infinity, &_graph}, Galois::loopname("Init"));
 
-    _graph.sync_pull<SyncerPull_0>();
-    _graph.sync_pull<SyncerPull_1>();
+    _graph.sync_pull<SyncerPull_0>("Init");
+    _graph.sync_pull<SyncerPull_1>("Init");
   }
 
   void operator()(GNode src) const {
@@ -219,9 +219,9 @@ struct FirstItr_SSSP {
     	} else if (personality == CPU)
     #endif
     Galois::do_all(_graph.begin(), _graph.end(), FirstItr_SSSP { &_graph }, Galois::loopname("sssp"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned int" , "{ Galois::atomicMin(node.dist_current, y);}",  "{node.dist_current = std::numeric_limits<unsigned int>::max()/4; }"));
-    _graph.sync_push<Syncer_0>();
+    _graph.sync_push<Syncer_0>("sssp");
 #ifdef __GALOIS_VERTEX_CUT_GRAPH__
-    _graph.sync_pull<SyncerPull_0>();
+    _graph.sync_pull<SyncerPull_0>("sssp");
 #endif
     
 
@@ -302,9 +302,9 @@ struct SSSP {
       	} else if (personality == CPU)
       #endif
       Galois::do_all(_graph.begin(), _graph.end(), SSSP { &_graph }, Galois::loopname("sssp"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned int" , "{ Galois::atomicMin(node.dist_current, y);}",  "{node.dist_current = std::numeric_limits<unsigned int>::max()/4; }"));
-      _graph.sync_push<Syncer_0>();
+      _graph.sync_push<Syncer_0>("sssp");
 #ifdef __GALOIS_VERTEX_CUT_GRAPH__
-      _graph.sync_pull<SyncerPull_0>();
+      _graph.sync_pull<SyncerPull_0>("sssp");
 #endif
       
 
