@@ -40,6 +40,7 @@
 //! standard global options to the benchmarks
 extern llvm::cl::opt<bool> skipVerify;
 extern llvm::cl::opt<int> numThreads;
+extern llvm::cl::opt<int> numRuns;
 
 //! initialize lonestar benchmark
 void LonestarStart(int argc, char** argv, 

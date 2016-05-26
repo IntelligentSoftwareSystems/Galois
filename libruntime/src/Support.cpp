@@ -150,6 +150,7 @@ public:
     std::map<std::pair<std::string, std::string>, std::vector<unsigned long> > LKs;
 
     auto& net = Galois::Runtime::getSystemNetworkInterface();
+    net.reportStats();
 
     num_recv_expected = net.Num - 1;
     unsigned maxThreadID = 0;
@@ -205,6 +206,13 @@ public:
     ss.clear();
   }
 
+  void printDistStatsGlobal(std::string type, std::string val){
+    auto& net = Galois::Runtime::getSystemNetworkInterface();
+    if(net.ID == 0){
+      Substrate::gPrint(type, " : ", val, "\n\n");
+    }
+  }
+
 };
 
 uint32_t StatManager::num_recv_expected;
@@ -227,12 +235,18 @@ void Galois::Runtime::reportStat(Galois::Statistic* value) {
   SM.get()->addToStat(value);
 }
 
-void Galois::Runtime::reportStatGlobal(const std::string&, const std::string&) {
+void Galois::Runtime::reportStatGlobal(const std::string& type, const std::string& val) {
+  SM.get()->printDistStatsGlobal(type, val);
 }
-void Galois::Runtime::reportStatGlobal(const std::string&, unsigned long) {
+void Galois::Runtime::reportStatGlobal(const std::string& type, unsigned long val) {
+  SM.get()->printDistStatsGlobal(type, std::to_string(val));
 }
 
 void Galois::Runtime::printStats() {
+  SM.get()->printStats();
+}
+
+void Galois::Runtime::printDistStats() {
   SM.get()->printDistStats();
 }
 

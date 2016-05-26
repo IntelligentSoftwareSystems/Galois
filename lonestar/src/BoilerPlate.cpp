@@ -33,6 +33,7 @@
 
 #include "Lonestar/BoilerPlate.h"
 #include "Galois/Version.h"
+#include "Galois/Runtime/Network.h"
 
 #include <iostream>
 #include <sstream>
@@ -40,6 +41,8 @@
 //! standard global options to the benchmarks
 llvm::cl::opt<bool> skipVerify("noverify", llvm::cl::desc("Skip verification step"), llvm::cl::init(false));
 llvm::cl::opt<int> numThreads("t", llvm::cl::desc("Number of threads"), llvm::cl::init(1));
+
+llvm::cl::opt<int> numRuns("runs", llvm::cl::desc("Number of runs"), llvm::cl::init(3));
 
 static void LonestarPrintVersion() {
   std::cout << "Galois Benchmark Suite v" << Galois::getVersion() << " (" << Galois::getRevision() << ")\n";
@@ -77,4 +80,8 @@ void LonestarStart(int argc, char** argv,
   Galois::Runtime::reportStatGlobal("Hostname", name);
 
   Galois::Runtime::reportStatGlobal("Threads", numThreads);
+
+  Galois::Runtime::reportStatGlobal("Hosts", Galois::Runtime::getSystemNetworkInterface().Num);
+
+  Galois::Runtime::reportStatGlobal("Runs", numRuns);
 }

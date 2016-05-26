@@ -69,6 +69,8 @@ class hGraph: public GlobalObject {
    std::vector<std::pair<uint64_t, uint64_t>> gid2host;
 
    uint32_t num_recv_expected; // Number of receives expected for local completion.
+   uint32_t num_iter_push; //Keep track of number of iterations.
+   uint32_t num_iter_pull; //Keep track of number of iterations.
 
    //host -> (lid, lid]
    std::pair<uint32_t, uint32_t> nodes_by_host(uint32_t host) const {
@@ -255,6 +257,8 @@ public:
       //std::cerr << "Offline Graph Done\n";
 
       num_recv_expected = 0;
+      num_iter_push = 0;
+      num_iter_pull = 0;
       totalNodes = g.size();
       std::cerr << "Total nodes : " << totalNodes << "\n";
       std::cerr << "Total edges : " << g.sizeEdges() << "\n";
@@ -488,10 +492,12 @@ public:
    }
 
    template<typename FnTy>
-   void sync_push() {
+   void sync_push(std::string loopName) {
       void (hGraph::*fn)(Galois::Runtime::RecvBuffer&) = &hGraph::syncRecvApply<FnTy>;
-      Galois::Timer time1, time2;
-      time1.start();
+      ++num_iter_push;
+      std::string timer_str("SYNC_PUSH_" + loopName + "_" + std::to_string(num_iter_push));
+      Galois::StatTimer StatTimer_syncPush(timer_str.c_str());
+      StatTimer_syncPush.start();
       auto& net = Galois::Runtime::getSystemNetworkInterface();
       for (unsigned x = 0; x < hostNodes.size(); ++x) {
          if (x == id)
@@ -522,19 +528,20 @@ public:
          }
          net.send(x, syncRecv, b);
       }
-      time1.stop();
       //Will force all messages to be processed before continuing
-      time2.start();
       net.flush();
       Galois::Runtime::getHostBarrier().wait();
-      time2.stop();
+      StatTimer_syncPush.stop();
 
-      //std::cout << "[" << net.ID <<"] time1 : " << time1.get() << "(msec) time2 : " << time2.get() << "(msec)\n";
    }
 
    template<typename FnTy>
-   void sync_pull() {
+   void sync_pull(std::string loopName) {
       void (hGraph::*fn)(Galois::Runtime::RecvBuffer&) = &hGraph::syncPullRecvReply<FnTy>;
+      ++num_iter_pull;
+      std::string timer_str("SYNC_PULL_" + loopName +"_" + std::to_string(num_iter_pull));
+      Galois::StatTimer StatTimer_syncPull(timer_str.c_str());
+      StatTimer_syncPull.start();
       auto& net = Galois::Runtime::getSystemNetworkInterface();
       //Galois::Runtime::getHostBarrier().wait();
       num_recv_expected = 0;
@@ -571,6 +578,7 @@ public:
       assert(num_recv_expected == 0);
       // Can remove this barrier???.
       Galois::Runtime::getHostBarrier().wait();
+      StatTimer_syncPull.stop();
    }
 
    uint64_t getGID(uint32_t nodeID) const {
