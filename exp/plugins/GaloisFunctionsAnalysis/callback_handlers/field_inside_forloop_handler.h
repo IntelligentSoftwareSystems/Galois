@@ -150,9 +150,9 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                   field_entry.IS_REFERENCE = true;
                   field_entry.RESET_VAL = "0";
 
-                  string reduceOP = "{node." + field_entry.FIELD_NAME + "= node." + field_entry.FIELD_NAME + " + y;}";
+                  string reduceOP = "add";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
-                  string resetValExpr = "{node." + field_entry.FIELD_NAME + " = 0 ; }";
+                  string resetValExpr = "0";
                   reduceOP_entry.RESETVAL_EXPR = resetValExpr;
 
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
@@ -168,12 +168,13 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                   string reduceOP, resetValExpr;
 
                   if(is_vector){
+                    // FIXME: do not pass entire string; pass only the command like add_vec
                     reduceOP = "{Galois::pairWiseAvg_vec(node." + field_entry.FIELD_NAME + ", y); }";
                     resetValExpr = "{Galois::resetVec(node." + field_entry.FIELD_NAME + "); }";
                   }
                   else {
-                    reduceOP = "{node." + field_entry.FIELD_NAME + "+= y;}";
-                    resetValExpr = "{node." + field_entry.FIELD_NAME + " = 0 ; }";
+                    reduceOP = "add";
+                    resetValExpr = "0";
                   }
 
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
@@ -192,10 +193,10 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                   field_entry.RESET_VAL = "0";
 
 
-                  string reduceOP = "{node." + field_entry.FIELD_NAME + " = y;}";
+                  string reduceOP = "set";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
 
-                  string resetValExpr = "{node." + field_entry.FIELD_NAME + " = 0 ; }";
+                  string resetValExpr = "0";
                   reduceOP_entry.RESETVAL_EXPR = resetValExpr;
 
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
@@ -214,10 +215,9 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
 
                   // It is min operation.
                   if(varCondRHS == varAssignRHS) {
-                    //string reduceOP = "if(node." + field_entry.FIELD_NAME + " > y) { node." + field_entry.FIELD_NAME + " = y;}";
-                    string reduceOP = "{  Galois::min(node." + field_entry.FIELD_NAME + ", y);}";
+                    string reduceOP = "min";
                     reduceOP_entry.OPERATION_EXPR = reduceOP;
-                    string resetValExpr = "{node." + field_entry.FIELD_NAME + " = std::numeric_limits<" + field_entry.RESET_VALTYPE + ">::max()";
+                    string resetValExpr = "std::numeric_limits<" + field_entry.RESET_VALTYPE + ">::max()";
                     reduceOP_entry.RESETVAL_EXPR = resetValExpr;
                     //varAssignRHS->dump();
 
@@ -229,9 +229,9 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                 else if(whileCAS_op){
                   auto whileCAS_LHS = Results.Nodes.getNodeAs<clang::Stmt>(str_memExpr);
                   //whileCAS_LHS->dump();
-                  string reduceOP = "{Galois::min(node." + field_entry.FIELD_NAME + ", y);}";
+                  string reduceOP = "min";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
-                  string resetValExpr = "{node." + field_entry.FIELD_NAME + " = std::numeric_limits<" + field_entry.RESET_VALTYPE + ">::max()";
+                  string resetValExpr = "std::numeric_limits<" + field_entry.RESET_VALTYPE + ">::max()";
                   reduceOP_entry.RESETVAL_EXPR = resetValExpr;
 
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
@@ -242,9 +242,9 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                 else if(atomicAdd_op){
                   //llvm::outs() << "NOT  INSIDE  FIELD \n";
                   //atomicAdd_op->dump();
-                  string reduceOP = "{ Galois::atomicAdd(node." + field_entry.FIELD_NAME + ", y);}";
+                  string reduceOP = "add";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
-                  string resetValExpr = "{node." + field_entry.FIELD_NAME + " = 0 ; }";
+                  string resetValExpr = "0";
                   reduceOP_entry.RESETVAL_EXPR = resetValExpr;
 
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
@@ -254,9 +254,9 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                 else if(atomicMin_op){
                   //llvm::outs() << "NOT  INSIDE  FIELD \n";
                   //atomicAdd_op->dump();
-                  string reduceOP = "{ Galois::atomicMin(node." + field_entry.FIELD_NAME + ", y);}";
+                  string reduceOP = "min";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
-                  string resetValExpr = "{node." + field_entry.FIELD_NAME + " = std::numeric_limits<" + field_entry.RESET_VALTYPE + ">::max()/4; }";
+                  string resetValExpr = "std::numeric_limits<" + field_entry.RESET_VALTYPE + ">::max()";
                   reduceOP_entry.RESETVAL_EXPR = resetValExpr;
 
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
@@ -270,9 +270,9 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                 }
 
                 else if(assignmentOP_vec){
-                  string reduceOP = "{node." + field_entry.FIELD_NAME + "= y;}";
+                  string reduceOP = "set";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;
-                  string resetValExpr = "{node." + field_entry.FIELD_NAME + " = 0 ; }";
+                  string resetValExpr = "0";
                   reduceOP_entry.RESETVAL_EXPR = resetValExpr;
 
                   info->reductionOps_map[i.first].push_back(reduceOP_entry);
@@ -280,6 +280,7 @@ class FindingFieldInsideForLoopHandler : public MatchFinder::MatchCallback {
                 }
                 else if(plusOP_vec){
                   string reduceOP, resetValExpr;
+                  // FIXME: do not pass entire string; pass only the command like add_vec
                   reduceOP = "{Galois::pairWiseAvg_vec(node." + field_entry.FIELD_NAME + ", y); }";
                   resetValExpr = "{Galois::resetVec(node." + field_entry.FIELD_NAME + "); }";
                   reduceOP_entry.OPERATION_EXPR = reduceOP;

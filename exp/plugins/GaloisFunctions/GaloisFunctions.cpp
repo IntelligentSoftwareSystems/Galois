@@ -111,22 +111,20 @@ namespace {
       << "\t\t\tassert (personality == CPU);\n"
       << "\t\t#endif\n"
       << "\t\t\treturn " << "node." << i.FIELD_NAME <<  ";\n"
-      << "\t\t}\n"
-      << "\t\tstatic void reduce (uint32_t node_id, " << i.NODE_TYPE << " node, " << i.VAL_TYPE << " y) {\n" 
+      << "\t\t}\n";
+    s << "\t\tstatic void reduce (uint32_t node_id, " << i.NODE_TYPE << " node, " << i.VAL_TYPE << " y) {\n" 
       << "\t\t#ifdef __GALOIS_HET_CUDA__\n"
-      /* FIXME: assumes reduction operation is always addition */
-      << "\t\t\tif (personality == GPU_CUDA) " << "add_node_" << i.FIELD_NAME <<  "_cuda(cuda_ctx, node_id, y);\n"
+      << "\t\t\tif (personality == GPU_CUDA) " << i.REDUCE_OP_EXPR << "_node_" << i.FIELD_NAME <<  "_cuda(cuda_ctx, node_id, y);\n"
       << "\t\t\telse if (personality == CPU)\n"
       << "\t\t#endif\n"
-      << "\t\t\t\t" << i.REDUCE_OP_EXPR << "\n"
-      << "\t\t}\n"
-      << "\t\tstatic void reset (uint32_t node_id, " << i.NODE_TYPE << " node ) {\n" 
+      << "\t\t\t\t{ Galois::" << i.REDUCE_OP_EXPR << "(node." << i.FIELD_NAME  << ", y); }\n"
+      << "\t\t}\n";
+    s << "\t\tstatic void reset (uint32_t node_id, " << i.NODE_TYPE << " node ) {\n" 
       << "\t\t#ifdef __GALOIS_HET_CUDA__\n"
-      /* FIXME: assumes reduction operation is always addition */
-      << "\t\t\tif (personality == GPU_CUDA) " << "set_node_" << i.FIELD_NAME <<  "_cuda(cuda_ctx, node_id, 0);\n"
+      << "\t\t\tif (personality == GPU_CUDA) " << "set_node_" << i.FIELD_NAME <<  "_cuda(cuda_ctx, node_id, " << i.RESET_VAL_EXPR << ");\n"
       << "\t\t\telse if (personality == CPU)\n"
       << "\t\t#endif\n"
-      << "\t\t\t\t" << i.RESET_VAL_EXPR << "\n"
+      << "\t\t\t\t{ node." << i.FIELD_NAME << " = " << i.RESET_VAL_EXPR << "; }\n"
       << "\t\t}\n"
       << "\t\ttypedef " << i.VAL_TYPE << " ValTy;\n"
       << "\t};\n";

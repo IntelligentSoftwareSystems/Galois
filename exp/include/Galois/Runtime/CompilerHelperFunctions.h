@@ -28,7 +28,7 @@
 #include <vector>
 
 namespace Galois {
-  /** Galois::min **/
+  /** Galois::atomicMin **/
   template<typename Ty>
     const Ty atomicMin(std::atomic<Ty>& a, const Ty& b){
       Ty old_a = a;
@@ -40,8 +40,16 @@ namespace Galois {
     }
 
   template<typename Ty>
-    const Ty& min(Ty& a, const Ty& b) {
-      while(a > b){
+    const Ty min(std::atomic<Ty>& a, const Ty& b) {
+      if(a > b){
+        a = b;
+      }
+      return a;
+    }
+
+  template<typename Ty>
+    const Ty min(Ty& a, const Ty& b) {
+      if(a > b){
         a = b;
       }
       return a;
@@ -57,6 +65,24 @@ namespace Galois {
       }while(!val.compare_exchange_strong(old_val, old_val + delta));
 
       return old_val;
+    }
+
+  template<typename Ty>
+    const Ty add(std::atomic<Ty>& a, const Ty& b) {
+      a = a + b;
+      return a;
+    }
+
+  template<typename Ty>
+    const Ty add(Ty& a, const Ty& b) {
+      a += b;
+      return a;
+    }
+
+  template<typename Ty>
+    const Ty set(Ty& a, const Ty& b) {
+      a = b;
+      return a;
     }
 
   /** Pair Wise Average function **/
