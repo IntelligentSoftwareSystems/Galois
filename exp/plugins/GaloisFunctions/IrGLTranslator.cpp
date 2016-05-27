@@ -685,7 +685,7 @@ public:
     cuheader << "\tassert(ctx->id == g.id);\n";
     cuheader << "\tgraph.nnodes = g.nnodes;\n";
     cuheader << "\tgraph.nedges = g.nedges;\n";
-    cuheader << "\tif(!graph.allocOnHost()) {\n";
+    cuheader << "\tif(!graph.allocOnHost(!g.edge_data)) {\n";
     cuheader << "\t\tfprintf(stderr, \"Unable to alloc space for graph!\");\n";
     cuheader << "\t\texit(1);\n";
     cuheader << "\t}\n";
