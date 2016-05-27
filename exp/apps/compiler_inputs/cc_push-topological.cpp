@@ -72,7 +72,6 @@ static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file>"
 #ifdef __GALOIS_VERTEX_CUT_GRAPH__
 static cll::opt<std::string> partFolder("partFolder", cll::desc("path to partitionFolder"), cll::init(""));
 #endif
-static cll::opt<unsigned int> repeat("repeat", cll::desc("Number of times to repeat the computation: Default 3"), cll::init(3));
 static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations: Default 1024"), cll::init(1024));
 static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"), cll::init(false));
 #ifdef __GALOIS_HET_CUDA__
@@ -146,15 +145,16 @@ Galois::DGAccumulator<int>  ConnectedComp::DGAccumulator_accum;
 int main(int argc, char** argv) {
   try {
     LonestarStart(argc, argv, name, desc, url);
+    Galois::StatManager statManager;
     auto& net = Galois::Runtime::getSystemNetworkInterface();
-    Galois::Timer T_total, T_graph_load, T_init;
-    std::vector<Galois::Timer> T_compute;
-    T_compute.resize(repeat);
+    Galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"), StatTimer_total("TIMER_TOTAL"), StatTimer_hg_init("TIMER_HG_INIT");
+
+    StatTimer_total.start();
 
     std::vector<unsigned> scalefactor;
 #ifdef __GALOIS_HET_CUDA__
     const unsigned my_host_id = Galois::Runtime::getHostID();
-    int gpu_device = gpudevice;
+    int gpu_device = gpudevice;    //Parse arg string when running on multiple hosts and update/override personality
     //Parse arg string when running on multiple hosts and update/override personality
     //with corresponding value.
     if (personality_set.length() == Galois::Runtime::NetworkInterface::Num) {
@@ -188,9 +188,8 @@ int main(int argc, char** argv) {
     }
 #endif
 
-    T_total.start();
 
-    T_graph_load.start();
+    StatTimer_hg_init.start();
 #ifdef __GALOIS_VERTEX_CUT_GRAPH__
     Graph hg(inputFile, partFolder, net.ID, net.Num, scalefactor);
 #else
@@ -207,41 +206,33 @@ int main(int argc, char** argv) {
       //Galois::OpenCL::cl_env.init(cldevice.Value);
     }
 #endif
-    T_graph_load.stop();
+    StatTimer_hg_init.stop();
 
     std::cout << "[" << net.ID << "] InitializeGraph::go called\n";
-    T_init.start();
-    InitializeGraph::go(hg);
-    T_init.stop();
-
-    std::cout << "[" << net.ID << "] ConnectedComp::go run1 called\n";
-    T_compute[0].start();
-    ConnectedComp::go(hg);
-    T_compute[0].stop();
-
-    for (unsigned i = 1; i < repeat; ++i) {
-      Galois::Runtime::getHostBarrier().wait();
+    StatTimer_init.start();
       InitializeGraph::go(hg);
+    StatTimer_init.stop();
 
-      std::cout << "[" << net.ID << "] ConnectedComp::go run" << i+1 << " called\n";
-      T_compute[i].start();
-      ConnectedComp::go(hg);
-      T_compute[i].stop();
+
+    for(auto run = 0; run < numRuns; ++run){
+      std::cout << "[" << net.ID << "] ConnectedComp::go run " << run << " called\n";
+      std::string timer_str("TIMER_" + std::to_string(run));
+      Galois::StatTimer StatTimer_main(timer_str.c_str());
+
+      hg.reset_num_iter(run);
+
+      StatTimer_main.start();
+        ConnectedComp::go(hg);
+      StatTimer_main.stop();
+
+      if((run + 1) != numRuns){
+        Galois::Runtime::getHostBarrier().wait();
+        hg.reset_num_iter(run);
+        InitializeGraph::go(hg);
+      }
     }
 
-   T_total.stop();
-
-    double mean_time = 0;
-    for (unsigned i = 0; i < repeat; ++i) {
-      mean_time += T_compute[i].get();
-    }
-    mean_time /= repeat;
-
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " Graph : " << T_graph_load.get() << " Init : " << T_init.get();
-    for (unsigned i = 0; i < repeat; ++i) {
-      std::cout << " CC " <<  i << " : " << T_compute[i].get();
-    }
-    std::cout << " CC mean of " << repeat << " runs (" << iteration << " iterations) : " << mean_time << " (msec)\n\n";
+   StatTimer_total.stop();
 
     // Verify
     if(verify){
