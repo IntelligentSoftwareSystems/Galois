@@ -187,7 +187,7 @@ struct InitializeGraph {
     PR_NodeData& sdata = graph->getData(src);
     sdata.value = local_alpha;
     sdata.sum = 0;
-    for(auto nbr = graph->edge_begin(src); nbr != graph->edge_end(src); ++nbr){
+    for(auto nbr = graph->edge_begin(src), ee = graph->edge_end(src); nbr != ee; ++nbr){
       GNode dst = graph->getEdgeDst(nbr);
       PR_NodeData& ddata = graph->getData(dst);
       Galois::atomicAdd(ddata.nout, 1);
@@ -253,7 +253,7 @@ struct PageRank_pull_partial {
 
   void operator()(GNode src)const {
     PR_NodeData& sdata = graph->getData(src);
-    for(auto nbr = graph->edge_begin(src); nbr != graph->edge_end(src); ++nbr){
+    for(auto nbr = graph->edge_begin(src), ee = graph->edge_end(src); nbr != ee; ++nbr){
       GNode dst = graph->getEdgeDst(nbr);
       PR_NodeData& ddata = graph->getData(dst);
       unsigned dnout = ddata.nout;

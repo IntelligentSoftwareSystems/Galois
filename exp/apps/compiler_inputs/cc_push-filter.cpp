@@ -126,7 +126,7 @@ struct ConnectedComp {
     NodeData& snode = graph->getData(src);
     snode.comp_old = snode.comp_current;
 
-    for (auto jj = graph->edge_begin(src); jj != graph->edge_end(src); ++jj) {
+    for (auto jj = graph->edge_begin(src), ee = graph->edge_end(src); jj != ee; ++jj) {
       GNode dst = graph->getEdgeDst(jj);
       auto& dnode = graph->getData(dst);
       unsigned int new_dist = snode.comp_current;
