@@ -75,7 +75,7 @@ private:
   std::map<std::string, std::pair<std::vector<std::string>, std::vector<std::string> > > &KernelToArgumentsMap;
   std::set<std::string> &KernelsHavingReturnValue;
 
-  bool conditional; // if (generated) code is enclosed within an if-condition
+  unsigned conditional; // if (generated) code is enclosed within an if-condition
 
 public:
   explicit IrGLOperatorVisitor(ASTContext *context, Rewriter &R, 
@@ -293,10 +293,10 @@ public:
     if (traverse && S) {
       if (isa<CXXForRangeStmt>(S) || isa<ForStmt>(S)) {
         bodyString << "]),\n"; // end ForAll
-        if (!conditional) bodyString << "),\n";
+        if (conditional == 0) bodyString << "),\n";
       } else if (isa<IfStmt>(S)) {
         bodyString << "]),\n"; // end If
-        conditional = false;
+        --conditional;
       }
     }
     return traverse;
@@ -342,7 +342,7 @@ public:
     std::size_t end = vertexName.find(",", begin);
     if (end == std::string::npos) end = vertexName.find(")", begin);
     vertexName = vertexName.substr(begin+1, end - begin - 1);
-    if (!conditional) bodyString << "ClosureHint(\n";
+    if (conditional == 0) bodyString << "ClosureHint(\n";
     bodyString << "ForAll(\"" << variableName << "\", G.edges(\"" << vertexName << "\"),\n[\n";
     return true;
   }
@@ -368,7 +368,7 @@ public:
     std::size_t end = vertexName.find(",", begin);
     if (end == std::string::npos) end = vertexName.find(")", begin);
     vertexName = vertexName.substr(begin+1, end - begin - 1);
-    if (!conditional) bodyString << "ClosureHint(\n";
+    if (conditional == 0) bodyString << "ClosureHint(\n";
     bodyString << "ForAll(\"" << variableName << "\", G.edges(\"" << vertexName << "\"),\n[\n";
     return true;
   }
@@ -466,7 +466,7 @@ public:
     const Expr *expr = ifStmt->getCond();
     std::string text = FormatCBlock(rewriter.getRewrittenText(expr->getSourceRange()));
     bodyString << "If(\"" << text << "\",\n[\n";
-    conditional = true;
+    ++conditional;
     skipStmts.insert(expr);
     return true;
   }
