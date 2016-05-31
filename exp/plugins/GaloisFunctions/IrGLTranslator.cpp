@@ -317,6 +317,7 @@ public:
       bodyString << "CDecl([(\"int\", \"" << vertexName << "\", \"\")]),\n";
       bodyString << "CDecl([(\"bool\", \"pop\", \"\")]),\n";
       bodyString << "WL.pop(\"pop\", \"wlvertex\", \"" << vertexName << "\"),\n";
+      bodyString << "CBlock([\"if (pop == false) continue\"]),\n";
     }
     symbolTable.insert(vertexName);
     return true;
@@ -612,7 +613,7 @@ public:
     cuheader << "#endif\n";
     if (requiresWorklist) {
       cuheader << "\n#ifndef __GALOIS_CUDA_WORKLIST_DUPLICATION_FACTOR__\n";
-      cuheader << "#define __GALOIS_CUDA_WORKLIST_DUPLICATION_FACTOR__ 2\n";
+      cuheader << "#define __GALOIS_CUDA_WORKLIST_DUPLICATION_FACTOR__ 1\n";
       cuheader << "#endif\n";
     }
     cuheader << "\nstruct CUDA_Context {\n";
