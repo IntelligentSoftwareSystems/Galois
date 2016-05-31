@@ -1,6 +1,11 @@
 #!/bin/sh
 
-SRC=$1
+INPUT=$(cd $(dirname "$1") && pwd -P)/$(basename "$1")
+if [ -d "$2" ]; then
+  OUTPUT_DIR="$( cd $2 && pwd )"
+else
+  OUTPUT_DIR="$( cd "$(dirname "$0" )" && pwd )"
+fi
 
 OS=$(lsb_release -si)
 
@@ -19,7 +24,9 @@ if [ $OS = "Scientific" ]; then
       ABELIAN_GGC_ROOT=/net/velocity/workspace/SourceCode/ggc
     fi
   fi
-
+  MPI_INCLUDE=/opt/apps/ossw/libraries/mpich2/mpich2-3.1.3/sl6/gcc-4.8/include
+  TBB_INCLUDE=/opt/apps/ossw/libraries/tbb/tbb-4.0/sl6/gcc-4.8/include
+  BOOST_INCLUDE=/opt/apps/ossw/libraries/boost/boost-1.58.0/sl6/gcc-4.8/include
 elif [ $OS = "CentOS" ]; then
   if [ -z "$ABELIAN_LLVM_BUILD" ]; then
     ABELIAN_LLVM_BUILD=/net/velocity/workspace/SourceCode/llvm/build
@@ -35,6 +42,9 @@ elif [ $OS = "CentOS" ]; then
       ABELIAN_GGC_ROOT=/net/velocity/workspace/SourceCode/ggc
     fi
   fi
+  MPI_INCLUDE=/opt/apps/ossw/libraries/mpich2/mpich2-1.5/c7/clang-system/include
+  TBB_INCLUDE=/net/faraday/workspace/local/modules/tbb-4.2/include
+  BOOST_INCLUDE=/opt/apps/ossw/libraries/boost/boost-1.58.0/c7/clang-system/include
 fi
 
 echo "Using LLVM build:" $ABELIAN_LLVM_BUILD
@@ -43,19 +53,8 @@ if [ -z "$ABELIAN_NON_HETEROGENEOUS" ]; then
   echo "Using GGC:" $ABELIAN_GGC_ROOT
 fi
 
-
-#cd /workspace/ggill/Dist_latest/build_dist_hetero/release_new_clang/exp/apps/compiler_outputs && /workspace/ggill/source_build/llvm_build2/bin/clang++   -DGALOIS_COPYRIGHT_YEAR=2015 -DGALOIS_USE_EXP -DGALOIS_VERSION=2.3.0 -DGALOIS_VERSION_MAJOR=2 -DGALOIS_VERSION_MINOR=3 -DGALOIS_VERSION_PATCH=0 -D__STDC_LIMIT_MACROS -g -Wall -gcc-toolchain /net/faraday/workspace/local/modules/gcc-4.9/bin/.. -fcolor-diagnostics -O3 -DNDEBUG -I/workspace/ggill/Dist_latest/dist_hetero_new/exp/include -I/opt/apps/ossw/libraries/mpich2/mpich2-3.1.3/sl6/gcc-4.8/include -I/opt/apps/ossw/libraries/tbb/tbb-4.0/sl6/gcc-4.8/include -I/opt/apps/ossw/libraries/boost/boost-1.58.0/sl6/gcc-4.8/include -I/workspace/ggill/Dist_latest/dist_hetero_new/lonestar/include -I/workspace/ggill/Dist_latest/dist_hetero_new/libruntime/include -I/workspace/ggill/Dist_latest/dist_hetero_new/libnet/include -I/workspace/ggill/Dist_latest/dist_hetero_new/libsubstrate/include -I/workspace/ggill/Dist_latest/dist_hetero_new/libllvm/include -I/workspace/ggill/Dist_latest/build_dist_hetero/release_new_clang/libllvm/include -I/workspace/ggill/Dist_latest/dist_hetero_new/libgraphs/include    -std=gnu++11 -o CMakeFiles/bfs_push-topological_edge-cut.dir/bfs_push-topological/gen.cpp.o -c /workspace/ggill/Dist_latest/dist_hetero_new/exp/apps/compiler_outputs/bfs_push-topological/gen.cpp
-
-
 CXX_DEFINES="-DGALOIS_COPYRIGHT_YEAR=2015 -DGALOIS_USE_EXP -DGALOIS_VERSION=2.3.0 -DGALOIS_VERSION_MAJOR=2 -DGALOIS_VERSION_MINOR=3 -DGALOIS_VERSION_PATCH=0 -D__STDC_LIMIT_MACROS"
-
-if [ $OS = "Scientific" ]; then
-  CXX_FLAGS="-g -Wall -gcc-toolchain /net/faraday/workspace/local/modules/gcc-4.9/bin/.. -fcolor-diagnostics -O3 -DNDEBUG -I$ABELIAN_GALOIS_ROOT/exp/include -I/opt/apps/ossw/libraries/mpich2/mpich2-3.1.3/sl6/gcc-4.8/include -I/opt/apps/ossw/libraries/tbb/tbb-4.0/sl6/gcc-4.8/include -I/opt/apps/ossw/libraries/boost/boost-1.58.0/sl6/gcc-4.8/include -I$ABELIAN_GALOIS_ROOT/lonestar/include -I$ABELIAN_GALOIS_ROOT/libruntime/include -I$ABELIAN_GALOIS_ROOT/libnet/include -I$ABELIAN_GALOIS_ROOT/libsubstrate/include -I$ABELIAN_GALOIS_ROOT/libllvm/include -I$ABELIAN_GALOIS_BUILD/libllvm/include -I$ABELIAN_GALOIS_ROOT/libgraphs/include    -std=gnu++11"
-
-
-elif [ $OS = "CentOS" ]; then
-  CXX_FLAGS="-g -Wall -gcc-toolchain /net/faraday/workspace/local/modules/gcc-4.9/bin/.. -fcolor-diagnostics -O3 -DNDEBUG  -I$ABELIAN_GALOIS_ROOT/exp/include    -I/opt/apps/ossw/libraries/mpich2/mpich2-1.5/c7/clang-system/include -I/net/faraday/workspace/local/modules/tbb-4.2/include -I/opt/apps/ossw/libraries/boost/boost-1.58.0/c7/clang-system/include -I$ABELIAN_GALOIS_ROOT/lonestar/include -I$ABELIAN_GALOIS_ROOT/libruntime/include -I$ABELIAN_GALOIS_ROOT/libnet/include -I$ABELIAN_GALOIS_ROOT/libsubstrate/include -I$ABELIAN_GALOIS_ROOT/libllvm/include -I$ABELIAN_GALOIS_BUILD/libllvm/include -I$ABELIAN_GALOIS_ROOT/libgraphs/include -std=gnu++11"
-fi
+CXX_FLAGS="-g -Wall -gcc-toolchain /net/faraday/workspace/local/modules/gcc-4.9/bin/.. -fcolor-diagnostics -O3 -DNDEBUG -I$ABELIAN_GALOIS_ROOT/exp/include -I$MPI_INCLUDE -I$TBB_INCLUDE -I$BOOST_INCLUDE -I$ABELIAN_GALOIS_ROOT/lonestar/include -I$ABELIAN_GALOIS_ROOT/libruntime/include -I$ABELIAN_GALOIS_ROOT/libnet/include -I$ABELIAN_GALOIS_ROOT/libsubstrate/include -I$ABELIAN_GALOIS_ROOT/libllvm/include -I$ABELIAN_GALOIS_BUILD/libllvm/include -I$ABELIAN_GALOIS_ROOT/libgraphs/include -std=gnu++11"
 if [ -z "$ABELIAN_NON_HETEROGENEOUS" ]; then
   GGC_FLAGS="--cuda-worklist basic --cuda-graph basic"
   if [ -f "GGCFLAGS" ]; then
@@ -74,9 +73,11 @@ fi
 
 log=.log
 
+cd $OUTPUT_DIR
+
 echo "Cleaning generated files"
 rm -f gen.cpp gen_cuda.py gen_cuda.cu gen_cuda.cuh gen_cuda.h
-cp $SRC gen.cpp
+cp $INPUT gen.cpp
 
 echo "Preprocessing global variables"
 $GPREPROCESS_CXX $CXX_DEFINES $CXX_FLAGS -o .temp.o -c gen.cpp &>$log
@@ -94,9 +95,9 @@ if [ -z "$ABELIAN_NON_HETEROGENEOUS" ]; then
 fi
 
 if [ -z "$ABELIAN_NON_HETEROGENEOUS" ]; then
-  echo "Generated files: gen.cpp gen_cuda.py gen_cuda.h gen_cuda.cuh gen_cuda.cu" 
+  echo "Generated files in $OUTPUT_DIR: gen.cpp gen_cuda.py gen_cuda.h gen_cuda.cuh gen_cuda.cu" 
 else
-  echo "Generated files: gen.cpp" 
+  echo "Generated files in $OUTPUT_DIR: gen.cpp" 
 fi
 
 rm -f Entry-*.dot
