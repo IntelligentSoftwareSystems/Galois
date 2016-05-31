@@ -165,18 +165,20 @@ public:
     }
 
     // use & (address-of) operator for atomic variables in atomicAdd() etc
-    std::size_t start = 0;
-    while (1) {
-      std::size_t found = text.find("Galois::atomic", start);
-      if (found != std::string::npos) {
-        std::size_t replace = text.find("(", start);
-        text.insert(replace+1, "&");
-        start = replace;
-      } else {
-        break;
+    {
+      std::size_t start = 0;
+      while (1) {
+        std::size_t found = text.find("Galois::atomic", start);
+        if (found != std::string::npos) {
+          std::size_t replace = text.find("(", start);
+          text.insert(replace+1, "&");
+          start = replace;
+        } else {
+          break;
+        }
       }
+      findAndReplace(text, "Galois::atomic", "atomic");
     }
-    findAndReplace(text, "Galois::atomic", "atomic");
 
     {
       std::size_t found = text.find("ctx.push(");
@@ -185,6 +187,20 @@ public:
         std::size_t end = text.find(")", begin);
         std::string var = text.substr(begin+1, end - begin - 1);
         text = "WL.push(\"" + var + "\")";
+      }
+    }
+
+    // replace GRAPH->getGID(VAR) with GRAPH.node_data[VAR]
+    while (1) {
+      std::size_t found = text.find("->getGID");
+      if (found != std::string::npos) {
+        std::size_t begin = text.find("(", found);
+        std::size_t end = text.find(")", begin);
+        std::string var = text.substr(begin+1, end - begin - 1);
+        std::string replace = ".node_data[" + var + "]";
+        text = text.replace(found, end - found + 1, replace);
+      } else {
+        break;
       }
     }
 
@@ -603,7 +619,6 @@ public:
     cuheader << "\tint device;\n";
     cuheader << "\tint id;\n";
     cuheader << "\tsize_t nowned;\n";
-    cuheader << "\tsize_t g_offset;\n";
     cuheader << "\tCSRGraphTy hg;\n";
     cuheader << "\tCSRGraphTy gg;\n";
     for (auto& var : SharedVariablesToTypeMap) {

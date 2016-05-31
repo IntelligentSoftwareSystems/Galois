@@ -111,22 +111,20 @@ namespace {
       << "\t\t\tassert (personality == CPU);\n"
       << "\t\t#endif\n"
       << "\t\t\treturn " << "node." << i.FIELD_NAME <<  ";\n"
-      << "\t\t}\n"
-      << "\t\tstatic void reduce (uint32_t node_id, " << i.NODE_TYPE << " node, " << i.VAL_TYPE << " y) {\n" 
+      << "\t\t}\n";
+    s << "\t\tstatic void reduce (uint32_t node_id, " << i.NODE_TYPE << " node, " << i.VAL_TYPE << " y) {\n" 
       << "\t\t#ifdef __GALOIS_HET_CUDA__\n"
-      /* FIXME: assumes reduction operation is always addition */
-      << "\t\t\tif (personality == GPU_CUDA) " << "add_node_" << i.FIELD_NAME <<  "_cuda(cuda_ctx, node_id, y);\n"
+      << "\t\t\tif (personality == GPU_CUDA) " << i.REDUCE_OP_EXPR << "_node_" << i.FIELD_NAME <<  "_cuda(cuda_ctx, node_id, y);\n"
       << "\t\t\telse if (personality == CPU)\n"
       << "\t\t#endif\n"
-      << "\t\t\t\t" << i.REDUCE_OP_EXPR << "\n"
-      << "\t\t}\n"
-      << "\t\tstatic void reset (uint32_t node_id, " << i.NODE_TYPE << " node ) {\n" 
+      << "\t\t\t\t{ Galois::" << i.REDUCE_OP_EXPR << "(node." << i.FIELD_NAME  << ", y); }\n"
+      << "\t\t}\n";
+    s << "\t\tstatic void reset (uint32_t node_id, " << i.NODE_TYPE << " node ) {\n" 
       << "\t\t#ifdef __GALOIS_HET_CUDA__\n"
-      /* FIXME: assumes reduction operation is always addition */
-      << "\t\t\tif (personality == GPU_CUDA) " << "set_node_" << i.FIELD_NAME <<  "_cuda(cuda_ctx, node_id, 0);\n"
+      << "\t\t\tif (personality == GPU_CUDA) " << "set_node_" << i.FIELD_NAME <<  "_cuda(cuda_ctx, node_id, " << i.RESET_VAL_EXPR << ");\n"
       << "\t\t\telse if (personality == CPU)\n"
       << "\t\t#endif\n"
-      << "\t\t\t\t" << i.RESET_VAL_EXPR << "\n"
+      << "\t\t\t\t{ node." << i.FIELD_NAME << " = " << i.RESET_VAL_EXPR << "; }\n"
       << "\t\t}\n"
       << "\t\ttypedef " << i.VAL_TYPE << " ValTy;\n"
       << "\t};\n";
@@ -166,9 +164,11 @@ namespace {
         const CallExpr* callFS = Results.Nodes.getNodeAs<clang::CallExpr>("galoisLoop_forEach");
         auto callerFS = Results.Nodes.getNodeAs<clang::CXXRecordDecl>("class");
 
-        callerFS->dump();
+        //callerFS->dump();
         if(callFS){
 
+          std::string OperatorStructName = callerFS->getNameAsString();
+          llvm::outs() << " NAME OF THE STRUCT : " << OperatorStructName << "\n";
           llvm::errs() << "It is coming here for_Each \n" << callFS->getNumArgs() << "\n";
 
           SourceLocation ST_main = callerFS->getSourceRange().getBegin();
@@ -202,11 +202,11 @@ namespace {
             llvm::raw_string_ostream s(str_arg);
             callFS->getArg(i)->printPretty(s, 0, Policy);
 
-            callFS->getArg(i)->IgnoreParenImpCasts()->dump();
+            //callFS->getArg(i)->IgnoreParenImpCasts()->dump();
             const CallExpr* callExpr = dyn_cast<CallExpr>(callFS->getArg(i)->IgnoreParenImpCasts());
             if (callExpr) {
               const FunctionDecl* func = callExpr->getDirectCallee();
-              func->dump();
+              //func->dump();
               if(func) {
                 if (func->getNameInfo().getName().getAsString() == "read_set"){
                   llvm::errs() << "Inside arg read_set: " << i <<  s.str() << "\n\n";
@@ -334,14 +334,14 @@ namespace {
             // Adding sync calls for write set
             stringstream SSAfter;
             for (unsigned i = 0; i < write_set_vec_PUSH.size(); i++) {
-              SSAfter <<"\n" << "\t\t_graph.sync_push<Syncer_" << i << ">" <<"();\n";
+              SSAfter <<"\n" << "\t\t_graph.sync_push<Syncer_" << i << ">" <<"(\"" << OperatorStructName << "\");\n";
               rewriter.InsertText(ST_main, SSAfter.str(), true, true);
               SSAfter.str(string());
               SSAfter.clear();
             }
             //For sync Pull
             for (unsigned i = 0; i < write_set_vec_PULL.size(); i++) {
-              SSAfter <<"\n" << "\t\t_graph.sync_pull<SyncerPull_" << i << ">" <<"();\n";
+              SSAfter <<"\n" << "\t\t_graph.sync_pull<SyncerPull_" << i << ">" <<"(\"" << OperatorStructName << "\");\n";
               rewriter.InsertText(ST_main, SSAfter.str(), true, true);
               SSAfter.str(string());
               SSAfter.clear();
@@ -446,8 +446,12 @@ namespace {
       virtual void run(const MatchFinder::MatchResult &Results) {
         const CallExpr* callFS = Results.Nodes.getNodeAs<clang::CallExpr>("galoisLoop");
         llvm::errs() << "It is coming here\n" << callFS->getNumArgs() << "\n";
+        auto callerStruct = Results.Nodes.getNodeAs<clang::CXXRecordDecl>("class");
 
         if(callFS){
+
+          std::string OperatorStructName = callerStruct->getNameAsString();
+          llvm::outs() << " NAME OF THE STRUCT : " << OperatorStructName << "\n";
 
           SourceLocation ST_main = callFS->getSourceRange().getBegin();
 
@@ -480,13 +484,13 @@ namespace {
             llvm::raw_string_ostream s(str_arg);
             callFS->getArg(i)->printPretty(s, 0, Policy);
 
-            callFS->getArg(i)->IgnoreParenImpCasts()->dump();
+            //callFS->getArg(i)->IgnoreParenImpCasts()->dump();
             const CallExpr* callExpr = dyn_cast<CallExpr>(callFS->getArg(i)->IgnoreParenImpCasts());
             //const CallExpr* callExpr1 = callFS->getArg(i);;
             //callExpr->dump();
             if (callExpr) {
               const FunctionDecl* func = callExpr->getDirectCallee();
-              func->dump();
+              //func->dump();
               if(func) {
                 if (func->getNameInfo().getName().getAsString() == "read_set"){
                   llvm::errs() << "Inside arg read_set: " << i <<  s.str() << "\n\n";
@@ -640,14 +644,14 @@ namespace {
               SSAfter.str(string());
               SSAfter.clear();
               //SSAfter <<"\n" <<write_set_vec_PUSH[i].GRAPH_NAME<< ".sync_push<Syncer_" << i << ">" <<"();\n";
-              SSAfter <<"\n" << "_graph.sync_push<Syncer_" << i << ">" <<"();\n";
+              SSAfter <<"\n" << "_graph.sync_push<Syncer_" << i << ">" <<"(\"" << OperatorStructName << "\");\n";
               rewriter.InsertText(ST, SSAfter.str(), true, true);
             }
             //For sync Pull
             for (unsigned i = 0; i < write_set_vec_PULL.size(); i++) {
               SSAfter.str(string());
               SSAfter.clear();
-              SSAfter <<"\n" << "_graph.sync_pull<SyncerPull_" << i << ">" <<"();\n";
+              SSAfter <<"\n" << "_graph.sync_pull<SyncerPull_" << i << ">" <<"(\"" << OperatorStructName << "\");\n";
               rewriter.InsertText(ST, SSAfter.str(), true, true);
             }
           }

@@ -58,6 +58,7 @@ void reportStatGlobal(const std::string& category, unsigned long val);
 
 //! Prints all stats
 void printStats();
+void printDistStats();
 
 }
 } // end namespace Galois
