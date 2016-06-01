@@ -205,6 +205,7 @@ public:
       }
     }
 
+    findAndReplace(text, " this->", " "); // because IrGL is not aware of the "this" variable
     findAndReplace(text, "->getEdgeDst", ".getAbsDestination");
     findAndReplace(text, "->getEdgeData", ".getAbsWeight");
     findAndReplace(text, "std::fabs", "fabs");
