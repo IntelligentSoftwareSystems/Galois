@@ -197,7 +197,7 @@ struct InitializeGraph {
 
     if(sdata.nout > 0 ){
       float delta = sdata.value*(1-local_alpha)/sdata.nout;
-      for(auto nbr = graph->edge_begin(src); nbr != graph->edge_end(src); ++nbr){
+      for(auto nbr = graph->edge_begin(src), ee = graph->edge_end(src); nbr != ee; ++nbr){
         GNode dst = graph->getEdgeDst(nbr);
         PR_NodeData& ddata = graph->getData(dst);
         Galois::atomicAdd(ddata.residual, delta);
@@ -274,7 +274,7 @@ void operator()(WorkItem& src, Galois::UserContext<WorkItem>& ctx) const {
     //sdata.residual = residual_old;
     if (sdata.nout > 0){
       float delta = residual_old*(1-local_alpha)/sdata.nout;
-      for(auto nbr = graph->edge_begin(src); nbr != graph->edge_end(src); ++nbr){
+      for(auto nbr = graph->edge_begin(src), ee = graph->edge_end(src); nbr != ee; ++nbr){
         GNode dst = graph->getEdgeDst(nbr);
         PR_NodeData& ddata = graph->getData(dst);
         auto dst_residual_old = Galois::atomicAdd(ddata.residual, delta);
@@ -372,7 +372,7 @@ void operator()(WorkItem& src, Galois::UserContext<WorkItem>& ctx) const {
       float delta = residual_old*(1-local_alpha)/sdata.nout;
       
 DGAccumulator_accum+= 1;
-for(auto nbr = graph->edge_begin(src); nbr != graph->edge_end(src); ++nbr){
+for(auto nbr = graph->edge_begin(src), ee = graph->edge_end(src); nbr != ee; ++nbr){
         GNode dst = graph->getEdgeDst(nbr);
         PR_NodeData& ddata = graph->getData(dst);
         auto dst_residual_old = Galois::atomicAdd(ddata.residual, delta);

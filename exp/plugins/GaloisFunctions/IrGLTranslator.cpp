@@ -75,7 +75,7 @@ private:
   std::map<std::string, std::pair<std::vector<std::string>, std::vector<std::string> > > &KernelToArgumentsMap;
   std::set<std::string> &KernelsHavingReturnValue;
 
-  bool conditional; // if (generated) code is enclosed within an if-condition
+  unsigned conditional; // if (generated) code is enclosed within an if-condition
 
 public:
   explicit IrGLOperatorVisitor(ASTContext *context, Rewriter &R, 
@@ -90,7 +90,8 @@ public:
     accumulatorName(accumName),
     SharedVariablesToTypeMap(sharedVariables),
     KernelToArgumentsMap(kernels),
-    KernelsHavingReturnValue(returnKernels)
+    KernelsHavingReturnValue(returnKernels),
+    conditional(0)
   {}
   
   virtual ~IrGLOperatorVisitor() {}
@@ -204,6 +205,7 @@ public:
       }
     }
 
+    findAndReplace(text, " this->", " "); // because IrGL is not aware of the "this" variable
     findAndReplace(text, "->getEdgeDst", ".getAbsDestination");
     findAndReplace(text, "->getEdgeData", ".getAbsWeight");
     findAndReplace(text, "std::fabs", "fabs");
@@ -293,10 +295,10 @@ public:
     if (traverse && S) {
       if (isa<CXXForRangeStmt>(S) || isa<ForStmt>(S)) {
         bodyString << "]),\n"; // end ForAll
-        if (!conditional) bodyString << "),\n";
+        if (conditional == 0) bodyString << "),\n";
       } else if (isa<IfStmt>(S)) {
         bodyString << "]),\n"; // end If
-        conditional = false;
+        --conditional;
       }
     }
     return traverse;
@@ -317,6 +319,7 @@ public:
       bodyString << "CDecl([(\"int\", \"" << vertexName << "\", \"\")]),\n";
       bodyString << "CDecl([(\"bool\", \"pop\", \"\")]),\n";
       bodyString << "WL.pop(\"pop\", \"wlvertex\", \"" << vertexName << "\"),\n";
+      bodyString << "CBlock([\"if (pop == false) continue\"]),\n";
     }
     symbolTable.insert(vertexName);
     return true;
@@ -342,7 +345,7 @@ public:
     std::size_t end = vertexName.find(",", begin);
     if (end == std::string::npos) end = vertexName.find(")", begin);
     vertexName = vertexName.substr(begin+1, end - begin - 1);
-    if (!conditional) bodyString << "ClosureHint(\n";
+    if (conditional == 0) bodyString << "ClosureHint(\n";
     bodyString << "ForAll(\"" << variableName << "\", G.edges(\"" << vertexName << "\"),\n[\n";
     return true;
   }
@@ -351,24 +354,24 @@ public:
     skipStmts.insert(forStmt->getInit());
     skipStmts.insert(forStmt->getCond());
     skipStmts.insert(forStmt->getInc());
-    std::string variableName;
-    if (forStmt->getConditionVariable()) {
-      skipDecls.insert(forStmt->getConditionVariable());
-      variableName = forStmt->getConditionVariable()->getNameAsString();
-    } else {
-      // FIXME: need not be a single declaration 
-      variableName = dyn_cast<VarDecl>(dyn_cast<DeclStmt>(forStmt->getInit())->getSingleDecl())->getNameAsString();
+    std::string variableName, vertexName;
+    DeclStmt *declStmt = dyn_cast<DeclStmt>(forStmt->getInit());
+    for (auto decl : declStmt->decls()) {
+      if (VarDecl *varDecl = dyn_cast<VarDecl>(decl)) {
+        std::string text = rewriter.getRewrittenText(varDecl->getSourceRange());
+        std::size_t found = text.find("graph->edge_begin");
+        if (found != std::string::npos) {
+          std::size_t begin = text.find("(", found);
+          std::size_t end = text.find(",", begin);
+          if (end == std::string::npos) end = text.find(")", begin);
+          vertexName = text.substr(begin+1, end - begin - 1);
+          variableName = varDecl->getNameAsString();
+          break;
+        }
+      }
     }
     symbolTable.insert(variableName);
-    const Expr *expr = forStmt->getCond();
-    std::string vertexName = rewriter.getRewrittenText(expr->getSourceRange());
-    std::size_t found = vertexName.find("graph->edge_end");
-    assert(found != std::string::npos);
-    std::size_t begin = vertexName.find("(", found);
-    std::size_t end = vertexName.find(",", begin);
-    if (end == std::string::npos) end = vertexName.find(")", begin);
-    vertexName = vertexName.substr(begin+1, end - begin - 1);
-    if (!conditional) bodyString << "ClosureHint(\n";
+    if (conditional == 0) bodyString << "ClosureHint(\n";
     bodyString << "ForAll(\"" << variableName << "\", G.edges(\"" << vertexName << "\"),\n[\n";
     return true;
   }
@@ -466,7 +469,7 @@ public:
     const Expr *expr = ifStmt->getCond();
     std::string text = FormatCBlock(rewriter.getRewrittenText(expr->getSourceRange()));
     bodyString << "If(\"" << text << "\",\n[\n";
-    conditional = true;
+    ++conditional;
     skipStmts.insert(expr);
     return true;
   }
@@ -612,7 +615,7 @@ public:
     cuheader << "#endif\n";
     if (requiresWorklist) {
       cuheader << "\n#ifndef __GALOIS_CUDA_WORKLIST_DUPLICATION_FACTOR__\n";
-      cuheader << "#define __GALOIS_CUDA_WORKLIST_DUPLICATION_FACTOR__ 2\n";
+      cuheader << "#define __GALOIS_CUDA_WORKLIST_DUPLICATION_FACTOR__ 1\n";
       cuheader << "#endif\n";
     }
     cuheader << "\nstruct CUDA_Context {\n";
@@ -685,7 +688,7 @@ public:
     cuheader << "\tassert(ctx->id == g.id);\n";
     cuheader << "\tgraph.nnodes = g.nnodes;\n";
     cuheader << "\tgraph.nedges = g.nedges;\n";
-    cuheader << "\tif(!graph.allocOnHost()) {\n";
+    cuheader << "\tif(!graph.allocOnHost(!g.edge_data)) {\n";
     cuheader << "\t\tfprintf(stderr, \"Unable to alloc space for graph!\");\n";
     cuheader << "\t\texit(1);\n";
     cuheader << "\t}\n";

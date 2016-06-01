@@ -123,14 +123,14 @@ struct SSSP {
   void static go(Graph& _graph){
     using namespace Galois::WorkList;
     typedef dChunkedFIFO<64> dChunk;
-    Galois::for_each(_graph.begin(), _graph.end(), SSSP (&_graph), Galois::loopname("sssp"), Galois::workList_version());
+    Galois::for_each(_graph.begin(), _graph.end(), SSSP (&_graph), Galois::loopname("sssp"));
   }
 
   void operator()(GNode src, Galois::UserContext<GNode>& ctx) const {
     NodeData& snode = graph->getData(src);
     snode.dist_old = snode.dist_current;
 
-    for (auto jj = graph->edge_begin(src); jj != graph->edge_end(src); ++jj) {
+    for (auto jj = graph->edge_begin(src), ee = graph->edge_end(src); jj != ee; ++jj) {
       GNode dst = graph->getEdgeDst(jj);
       auto& dnode = graph->getData(dst);
       unsigned int new_dist = graph->getEdgeData(jj) + snode.dist_current;

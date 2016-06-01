@@ -97,7 +97,7 @@ void load_graph_CUDA(struct CUDA_Context *ctx, MarshalGraph &g) {
 	assert(ctx->id == g.id);
 	graph.nnodes = g.nnodes;
 	graph.nedges = g.nedges;
-	if(!graph.allocOnHost()) {
+	if(!graph.allocOnHost(!g.edge_data)) {
 		fprintf(stderr, "Unable to alloc space for graph!");
 		exit(1);
 	}
