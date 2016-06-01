@@ -90,7 +90,8 @@ public:
     accumulatorName(accumName),
     SharedVariablesToTypeMap(sharedVariables),
     KernelToArgumentsMap(kernels),
-    KernelsHavingReturnValue(returnKernels)
+    KernelsHavingReturnValue(returnKernels),
+    conditional(0)
   {}
   
   virtual ~IrGLOperatorVisitor() {}
