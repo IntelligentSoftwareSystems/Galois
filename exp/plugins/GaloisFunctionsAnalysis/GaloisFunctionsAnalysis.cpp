@@ -832,7 +832,8 @@ class GaloisFunctionsConsumer : public ASTConsumer {
           if(j.IS_REFERENCED && j.IS_REFERENCE) {
             string str_memExpr = "memExpr_" + j.VAR_NAME+ "_" + i.first;
             string str_ifGreater_2loopTrans = "ifGreater_2loopTrans_" + j.VAR_NAME + "_" + i.first;
-            string str_if_RHS = "if_RHS_" + j.VAR_NAME + "_" + i.first;
+            string str_if_RHS_const = "if_RHS_const" + j.VAR_NAME + "_" + i.first;
+            string str_if_RHS_nonconst = "if_RHS_nonconst" + j.VAR_NAME + "_" + i.first;
             string str_main_struct = "main_struct_" + i.first;
             string str_forLoop_2LT = "forLoop_2LT_" + i.first;
             string str_method_operator  = "methodDecl_" + i.first;
@@ -840,15 +841,32 @@ class GaloisFunctionsConsumer : public ASTConsumer {
             string str_for_each = "for_each_" + j.VAR_NAME + "_" + i.first;
 
             StatementMatcher LHS_memExpr = memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.VAR_NAME))))), hasAncestor(recordDecl(hasName(i.first)))).bind(str_memExpr);
+            StatementMatcher RHS_memExpr_nonconst = memberExpr(hasDescendant(declRefExpr(to(varDecl(hasName(j.VAR_NAME))))), hasAncestor(recordDecl(hasName(i.first)))).bind(str_if_RHS_nonconst);
 
-            /** For 2 loop Transforms: if nodeData.field > TOLERANCE **/
             StatementMatcher callExpr_atomicAdd = callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("atomicAdd"))))), hasAnyArgument(LHS_memExpr));
+            StatementMatcher callExpr_atomicMin = callExpr(argumentCountIs(2), hasDescendant(declRefExpr(to(functionDecl(hasName("atomicMin"))))), hasAnyArgument(LHS_memExpr));
+
             StatementMatcher binaryOp_assign = binaryOperator(hasOperatorName("="), hasLHS(LHS_memExpr));
-            //StatementMatcher EdgeForLoopMatcher_withAtomicAdd = makeStatement_EdgeForStmt(callExpr_atomicAdd, str_forLoop_2LT);
             /**Assumptions: 1. first argument is always src in operator() method **/
-            StatementMatcher f_2loopTrans_1 = ifStmt(isExpansionInMainFile(), hasCondition(allOf(binaryOperator(hasOperatorName(">"), hasLHS(hasDescendant(LHS_memExpr)), hasRHS(hasDescendant(memberExpr().bind(str_if_RHS)))),
-                                                                                                anyOf(hasAncestor(makeStatement_EdgeForStmt(callExpr_atomicAdd, str_forLoop_2LT)),hasAncestor(makeStatement_EdgeForStmt(binaryOp_assign, str_forLoop_2LT))),
-                                                                                                hasAncestor(recordDecl(hasName(i.first), hasDescendant(methodDecl(hasName("operator()"), hasAncestor(recordDecl(hasDescendant(callExpr(callee(functionDecl(hasName("for_each"))) , unless(hasDescendant(declRefExpr(to(functionDecl(hasName("workList_version")))))) ).bind(str_for_each)))) , hasParameter(0,decl().bind("src_arg")), hasDescendant(declStmt(hasDescendant(declRefExpr(to(varDecl(equalsBoundNode("src_arg")))))).bind(str_sdata))).bind(str_method_operator))).bind(str_main_struct))))).bind(str_ifGreater_2loopTrans);
+            /** For 2 loop Transforms: if nodeData.field > TOLERANCE **/
+            /** For 2 loop Transforms: if nodeData.field > nodeData.otherField **/
+            StatementMatcher f_2loopTrans_1 = ifStmt(isExpansionInMainFile(), hasCondition(allOf(binaryOperator(hasOperatorName(">"), 
+                                                                                                                hasLHS(hasDescendant(LHS_memExpr)), 
+                                                                                                                /** Order matters: Finds [nodeData.field > nodeData.field2] first then [nodeData.field > constant] **/
+                                                                                                                hasRHS(anyOf(hasDescendant(RHS_memExpr_nonconst),hasDescendant(memberExpr().bind(str_if_RHS_const))))),
+                                                                                                anyOf(hasAncestor(makeStatement_EdgeForStmt(callExpr_atomicAdd, str_forLoop_2LT)),hasAncestor(makeStatement_EdgeForStmt(binaryOp_assign, str_forLoop_2LT)),hasAncestor(makeStatement_EdgeForStmt(callExpr_atomicMin, str_forLoop_2LT))),
+                                                                                                hasAncestor(recordDecl(hasName(i.first), 
+                                                                                                                                       hasDescendant(methodDecl(hasName("operator()"), 
+                                                                                                                                                                hasAncestor(recordDecl(hasDescendant(callExpr(callee(functionDecl(hasName("for_each"))), 
+                                                                                                                                                                           unless(hasDescendant(declRefExpr(to(functionDecl(hasName("workList_version")))))
+                                                                                                                                                               )).bind(str_for_each)))),
+                                                                                                                                                     hasParameter(0,decl().bind("src_arg")), 
+                                                                                                                                                     hasDescendant(declStmt(hasDescendant(declRefExpr(to(varDecl(equalsBoundNode("src_arg")))))).bind(str_sdata)
+                                                                                                                                                       )
+                                                                                                                                                     ).bind(str_method_operator)
+                                                                                                                                         )
+                                                                                                                                       ).bind(str_main_struct)
+                                                                                                                  )))).bind(str_ifGreater_2loopTrans);
 
             Matchers_2LT.addMatcher(f_2loopTrans_1, &loopTransform_handler);
 

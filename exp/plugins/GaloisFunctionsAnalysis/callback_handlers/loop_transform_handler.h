@@ -42,16 +42,17 @@ class LoopTransformHandler : public MatchFinder::MatchCallback {
     LoopTransformHandler(Rewriter &rewriter, InfoClass* _info ) :  rewriter(rewriter), info(_info){}
     virtual void run(const MatchFinder::MatchResult &Results) {
 
-        clang::LangOptions LangOpts;
-        LangOpts.CPlusPlus = true;
-        clang::PrintingPolicy Policy(LangOpts);
+      clang::LangOptions LangOpts;
+      LangOpts.CPlusPlus = true;
+      clang::PrintingPolicy Policy(LangOpts);
       for(auto i : info->edgeData_map) {
         for(auto j : i.second) {
           string str_memExpr = "memExpr_" + j.VAR_NAME+ "_" + i.first;
 
           if(j.IS_REFERENCED && j.IS_REFERENCE){
             string str_ifGreater_2loopTrans = "ifGreater_2loopTrans_" + j.VAR_NAME + "_" + i.first;
-            string str_if_RHS = "if_RHS_" + j.VAR_NAME + "_" + i.first;
+            string str_if_RHS_const = "if_RHS_const" + j.VAR_NAME + "_" + i.first;
+            string str_if_RHS_nonconst = "if_RHS_nonconst" + j.VAR_NAME + "_" + i.first;
             string str_main_struct = "main_struct_" + i.first;
             string str_forLoop_2LT = "forLoop_2LT_" + i.first;
             string str_method_operator  = "methodDecl_" + i.first;
@@ -59,7 +60,8 @@ class LoopTransformHandler : public MatchFinder::MatchCallback {
             string str_for_each = "for_each_" + j.VAR_NAME + "_" + i.first;
 
             auto ifGreater_2loopTrans = Results.Nodes.getNodeAs<clang::Stmt>(str_ifGreater_2loopTrans);
-            auto if_RHS_memExpr = Results.Nodes.getNodeAs<clang::Stmt>(str_if_RHS);
+            auto if_RHS_memExpr_const = Results.Nodes.getNodeAs<clang::Stmt>(str_if_RHS_const);
+            auto if_RHS_memExpr_nonconst = Results.Nodes.getNodeAs<clang::Stmt>(str_if_RHS_nonconst);
             auto if_LHS_memExpr = Results.Nodes.getNodeAs<clang::Stmt>(str_memExpr);
             if(ifGreater_2loopTrans){
               FirstIter_struct_entry first_itr_entry;
@@ -92,7 +94,13 @@ class LoopTransformHandler : public MatchFinder::MatchCallback {
 
               //TODO: change sdata_loc getLocWithOffset from 2 to total length of statement.
               SourceLocation sdata_loc = sdata_declStmt->getSourceRange().getEnd().getLocWithOffset(2);
-              string new_condition = "\nif( " + info->getData_map[i.first][0].VAR_NAME + "." + split_dot(if_LHS_memExpr, 1) + " > " + split_dot(if_RHS_memExpr, 0) + "){\n";
+              string new_condition;
+              if(if_RHS_memExpr_const){
+                new_condition = "\nif( " + info->getData_map[i.first][0].VAR_NAME + "." + split_dot(if_LHS_memExpr, 1) + " > " + split_dot(if_RHS_memExpr_const, 0) + "){\n";
+              }
+              else if(if_RHS_memExpr_nonconst){
+                new_condition = "\nif( " + info->getData_map[i.first][0].VAR_NAME + "." + split_dot(if_LHS_memExpr, 1) + " > " + info->getData_map[i.first][0].VAR_NAME  + "." + split_dot(if_RHS_memExpr_nonconst, 1) + "){\n";
+              }
               rewriter.InsertText(sdata_loc, new_condition, true, true);
 
               auto method_operator_loc = method_operator->getSourceRange().getEnd();
