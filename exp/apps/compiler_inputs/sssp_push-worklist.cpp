@@ -127,7 +127,6 @@ struct SSSP {
 
   void operator()(GNode src, Galois::UserContext<GNode>& ctx) const {
     NodeData& snode = graph->getData(src);
-    snode.dist_old = snode.dist_current;
 
     for (auto jj = graph->edge_begin(src), ee = graph->edge_end(src); jj != ee; ++jj) {
       GNode dst = graph->getEdgeDst(jj);

@@ -153,7 +153,7 @@ struct PageRank {
     Galois::for_each(_graph.begin(), _graph.end(), PageRank{ &_graph }, Galois::loopname("PageRank"));
   }
 
-  void operator()(WorkItem& src, Galois::UserContext<WorkItem>& ctx) const {
+  void operator()(WorkItem src, Galois::UserContext<WorkItem>& ctx) const {
     PR_NodeData& sdata = graph->getData(src);
     float residual_old = sdata.residual.exchange(0.0);
     sdata.value += residual_old;
@@ -233,7 +233,7 @@ int main(int argc, char** argv) {
       if (!init_CUDA_context(cuda_ctx, gpu_device))
         return -1;
       MarshalGraph m = hg.getMarshalGraph(my_host_id);
-      load_graph_CUDA(cuda_ctx, &cuda_wl, m);
+      load_graph_CUDA(cuda_ctx, m);
     } else if (personality == GPU_OPENCL) {
       //Galois::OpenCL::cl_env.init(cldevice.Value);
     }
@@ -259,6 +259,7 @@ int main(int argc, char** argv) {
       if((run + 1) != numRuns){
         Galois::Runtime::getHostBarrier().wait();
         hg.reset_num_iter(run);
+        ResetGraph::go(hg);
         InitializeGraph::go(hg);
       }
     }

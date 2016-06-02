@@ -108,7 +108,7 @@ struct ResetGraph {
 
   ResetGraph(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph) {
-    Galois::do_all(_graph.begin(), _graph.ghost_end(), ResetGraph{ &_graph }, Galois::loopname("reset"));
+    Galois::do_all(_graph.begin(), _graph.end(), ResetGraph{ &_graph }, Galois::loopname("reset"));
   }
 
   void operator()(GNode src) const {
@@ -261,6 +261,7 @@ int main(int argc, char** argv) {
       if((run + 1) != numRuns){
         Galois::Runtime::getHostBarrier().wait();
         hg.reset_num_iter(run);
+        ResetGraph::go(hg);
         InitializeGraph::go(hg);
       }
     }

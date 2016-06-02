@@ -195,7 +195,7 @@ int main(int argc, char** argv) {
 #endif
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {
-      cuda_ctx = get_CUDA_context(my_host_id);      if (!init_CUDA_context(cuda_ctx, gpu_device))
+      cuda_ctx = get_CUDA_context(my_host_id);
       if (!init_CUDA_context(cuda_ctx, gpu_device))
         return -1;
       MarshalGraph m = hg.getMarshalGraph(my_host_id);
