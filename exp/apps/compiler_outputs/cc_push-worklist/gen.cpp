@@ -127,7 +127,7 @@ struct InitializeGraph {
     #endif
     Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, Galois::loopname("Init"));
 
-    _graph.sync_pull<SyncerPull_0>("Init");
+    _graph.sync_pull<SyncerPull_0>("InitializeGraph");
   }
 
   void operator()(GNode src) const {
@@ -195,9 +195,9 @@ struct Get_info_functor : public Galois::op_tag {
 	}
 	void static sync_graph_static(Graph& _graph) {
 
-		_graph.sync_push<Syncer_0>("cc");
+		_graph.sync_push<Syncer_0>("ConnectedComp");
 
-		_graph.sync_pull<SyncerPull_0>("cc");
+		_graph.sync_pull<SyncerPull_0>("ConnectedComp");
 	}
 };
 

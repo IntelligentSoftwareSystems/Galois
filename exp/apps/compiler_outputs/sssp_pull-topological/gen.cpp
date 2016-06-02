@@ -132,7 +132,7 @@ struct InitializeGraph {
     #endif
     Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {src_node, infinity, &_graph}, Galois::loopname("Init"));
 
-    _graph.sync_pull<SyncerPull_0>("Init");
+    _graph.sync_pull<SyncerPull_0>("InitializeGraphializeGraph");
   }
 
   void operator()(GNode src) const {
@@ -203,9 +203,9 @@ struct SSSP {
       #endif
       Galois::do_all(_graph.begin(), _graph.end(), SSSP { &_graph }, Galois::loopname("sssp"), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "dist_current" , "unsigned int"));
 #ifdef __GALOIS_VERTEX_CUT_GRAPH__
-      _graph.sync_push<Syncer_0>("sssp");
+      _graph.sync_push<Syncer_0>("SSSP");
 #endif
-      _graph.sync_pull<SyncerPull_0>("sssp");
+      _graph.sync_pull<SyncerPull_0>("SSSP");
       
 
      ++iteration;

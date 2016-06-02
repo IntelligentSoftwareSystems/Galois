@@ -178,8 +178,8 @@ struct InitializeGraph {
     	} else if (personality == CPU)
     #endif
     Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ alpha, &_graph }, Galois::loopname("Init"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "nout", "int" , "{ Galois::atomicAdd(node.nout, y);}",  "{node.nout = 0 ; }"));
-    _graph.sync_push<Syncer_0>("Init");
-    _graph.sync_pull<SyncerPull_0>("Init");
+    _graph.sync_push<Syncer_0>("InitializeGraph");
+    _graph.sync_pull<SyncerPull_0>("InitializeGraph");
     
   }
 
@@ -247,8 +247,8 @@ struct PageRank_pull_partial {
     	} else if (personality == CPU)
     #endif
     Galois::do_all(_graph.begin(), _graph.end(), PageRank_pull_partial { &_graph }, Galois::loopname("PageRank partial"));
-    _graph.sync_push<Syncer_0>("PageRank partial");
-    _graph.sync_pull<SyncerPull_0>("PageRank partial");
+    _graph.sync_push<Syncer_0>("PageRank_pull_partial");
+    _graph.sync_pull<SyncerPull_0>("PageRank_pull_partial");
   }
 
   void operator()(GNode src)const {

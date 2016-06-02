@@ -132,7 +132,7 @@ struct InitializeGraph {
     #endif
     Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {src_node, infinity, &_graph}, Galois::loopname("Init"));
 
-    _graph.sync_pull<SyncerPull_0>("Init");
+    _graph.sync_pull<SyncerPull_0>("InitializeGraph");
   }
 
   void operator()(GNode src) const {
@@ -202,9 +202,9 @@ struct BFS {
       	} else if (personality == CPU)
       #endif
       Galois::do_all(_graph.begin(), _graph.end(), BFS { &_graph }, Galois::loopname("bfs"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned int" , "{ Galois::atomicMin(node.dist_current, y);}",  "{node.dist_current = std::numeric_limits<unsigned int>::max()/4; }"), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "dist_current" , "unsigned int"));
-      _graph.sync_push<Syncer_0>("bfs");
+      _graph.sync_push<Syncer_0>("BFS");
 #ifdef __GALOIS_VERTEX_CUT_GRAPH__
-      _graph.sync_pull<SyncerPull_0>("bfs");
+      _graph.sync_pull<SyncerPull_0>("BFS");
 #endif
       
      ++iteration;
