@@ -6,10 +6,13 @@ if [ "$(basename -- $0)" == "iss_load_modules.sh" ]; then
 fi
 
 # first up remove everything
-#module purge
+module purge
 
-if [ $(lsb_release -si) = "CentOS" ] ; then
+module use /opt/apps/ossw/modulefiles/
+
+if [ $(lsb_release -si) == "CentOS" ] ; then
     module load c7
+    module load serf
 else
     module load sl6
 fi
@@ -44,7 +47,7 @@ if [ "$1" != "min" ]; then
   module load doxygen
   module load texlive
   module load ghostscript
-  module load python
+  module load isspython
   # module load screen #disabling for now because screen was compiled without proper color support
   module load valgrind
 fi
