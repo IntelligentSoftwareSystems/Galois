@@ -40,6 +40,9 @@ class Statistic;
 
 namespace Runtime {
 
+//! Begin a new loop instance
+void reportLoopInstance(const char* loopname);
+
 //! Reports stats for a given thread
 void reportStat(const char* loopname, const char* category, unsigned long value);
 //! Reports stats for a given thread

@@ -352,7 +352,9 @@ protected:
     wl(wargs...),
     origFunction(f),
     loopname(get_by_supertype<loopname_tag>(args).value),
-    broke(false) { }
+    broke(false) {
+    reportLoopInstance(loopname);
+  }
 
   template<typename WArgsTy, int... Is>
   ForEachExecutor(T1, const FunctionTy& f, 
