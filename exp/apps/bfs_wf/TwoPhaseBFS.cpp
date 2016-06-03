@@ -25,7 +25,47 @@
  * @author <ahassaan@ices.utexas.edu>
  */
 
-#include "TwoPhaseBFS.h"
+#include <vector>
+#include <functional>
+
+#include "Galois/Runtime/KDGtwoPhase.h"
+
+#include "bfs.h"
+#include "bfsParallel.h"
+
+using Level_ty = unsigned;
+class TwoPhaseBFS: public BFS<Level_ty> {
+
+public:
+
+  virtual const std::string getVersion () const { return "Two Phase ordered"; }
+
+  virtual size_t runBFS (Graph& graph, GNode& startNode) {
+
+    ParCounter numIter;
+
+
+    // update request for root
+    Update first (startNode, 0);
+
+    std::vector<Update> wl;
+    wl.push_back (first);
+
+    Galois::Runtime::for_each_ordered_2p_win (
+        Galois::Runtime::makeStandardRange(wl.begin (), wl.end ()),
+        Comparator (), 
+        VisitNhood (graph),
+        OpFunc (graph, numIter));
+
+
+    std::cout << "number of iterations: " << numIter.reduce () << std::endl;
+
+
+    return numIter.reduce ();
+  }
+
+
+};
 
 int main (int argc, char* argv[]) {
   TwoPhaseBFS wf;
