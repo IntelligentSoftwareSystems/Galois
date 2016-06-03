@@ -111,12 +111,31 @@ struct ResetGraph {
 
   ResetGraph(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph) {
+    	struct SyncerPull_0 {
+    		static float extract(uint32_t node_id, const struct PR_NodeData & node) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) return get_node_residual_cuda(cuda_ctx, node_id);
+    			assert (personality == CPU);
+    		#endif
+    			return node.residual;
+    		}
+    		static void setVal (uint32_t node_id, struct PR_NodeData & node, float y) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) set_node_residual_cuda(cuda_ctx, node_id, y);
+    			else if (personality == CPU)
+    		#endif
+    				node.residual = y;
+    		}
+    		typedef float ValTy;
+    	};
     #ifdef __GALOIS_HET_CUDA__
     	if (personality == GPU_CUDA) {
-    		reset_CUDA_context(cuda_ctx);
+    		ResetGraph_cuda(cuda_ctx);
     	} else if (personality == CPU)
     #endif
-    Galois::do_all(_graph.begin(), _graph.end(), ResetGraph{ &_graph }, Galois::loopname("reset"));
+    Galois::do_all(_graph.begin(), _graph.end(), ResetGraph{ &_graph }, Galois::loopname("reset"), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "residual" , "float"));
+    _graph.sync_pull<SyncerPull_0>("ResetGraph");
+    
   }
 
   void operator()(GNode src) const {
@@ -133,38 +152,57 @@ struct InitializeGraph {
 
   InitializeGraph(const float &_alpha, Graph* _graph) : local_alpha(_alpha), graph(_graph){}
   void static go(Graph& _graph) {
-      	struct Syncer_0 {
-      		static float extract(uint32_t node_id, const struct PR_NodeData & node) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) return get_node_residual_cuda(cuda_ctx, node_id);
-      			assert (personality == CPU);
-      		#endif
-      			return node.residual;
-      		}
-      		static void reduce (uint32_t node_id, struct PR_NodeData & node, float y) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) add_node_residual_cuda(cuda_ctx, node_id, y);
-      			else if (personality == CPU)
-      		#endif
-      				{ Galois::atomicAdd(node.residual, y);}
-      		}
-      		static void reset (uint32_t node_id, struct PR_NodeData & node ) {
-      		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) set_node_residual_cuda(cuda_ctx, node_id, 0);
-      			else if (personality == CPU)
-      		#endif
-      				{node.residual = 0 ; }
-      		}
-      		typedef float ValTy;
-      	};
-      #ifdef __GALOIS_HET_CUDA__
-      	if (personality == GPU_CUDA) {
-      		InitializeGraph_cuda(alpha, cuda_ctx);
-      	} else if (personality == CPU)
-      #endif
-      Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ alpha, &_graph }, Galois::loopname("Init"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ Galois::atomicAdd(node.residual, y);}",  "{node.residual = 0 ; }"));
-      _graph.sync_push<Syncer_0>("InitializeGraph");
-      
+    	struct Syncer_0 {
+    		static float extract(uint32_t node_id, const struct PR_NodeData & node) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) return get_node_residual_cuda(cuda_ctx, node_id);
+    			assert (personality == CPU);
+    		#endif
+    			return node.residual;
+    		}
+    		static void reduce (uint32_t node_id, struct PR_NodeData & node, float y) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) add_node_residual_cuda(cuda_ctx, node_id, y);
+    			else if (personality == CPU)
+    		#endif
+    				{ Galois::add(node.residual, y); }
+    		}
+    		static void reset (uint32_t node_id, struct PR_NodeData & node ) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) set_node_residual_cuda(cuda_ctx, node_id, 0);
+    			else if (personality == CPU)
+    		#endif
+    				{ node.residual = 0; }
+    		}
+    		typedef float ValTy;
+    	};
+    	struct SyncerPull_0 {
+    		static float extract(uint32_t node_id, const struct PR_NodeData & node) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) return get_node_residual_cuda(cuda_ctx, node_id);
+    			assert (personality == CPU);
+    		#endif
+    			return node.residual;
+    		}
+    		static void setVal (uint32_t node_id, struct PR_NodeData & node, float y) {
+    		#ifdef __GALOIS_HET_CUDA__
+    			if (personality == GPU_CUDA) set_node_residual_cuda(cuda_ctx, node_id, y);
+    			else if (personality == CPU)
+    		#endif
+    				node.residual = y;
+    		}
+    		typedef float ValTy;
+    	};
+    #ifdef __GALOIS_HET_CUDA__
+    	if (personality == GPU_CUDA) {
+    		InitializeGraph_cuda(alpha, cuda_ctx);
+    	} else if (personality == CPU)
+    #endif
+    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ alpha, &_graph }, Galois::loopname("Init"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "residual" , "float"));
+    _graph.sync_push<Syncer_0>("InitializeGraph");
+    
+    _graph.sync_pull<SyncerPull_0>("InitializeGraph");
+    
   }
 
   void operator()(GNode src) const {
@@ -199,17 +237,36 @@ struct Get_info_functor : public Galois::op_tag {
 			if (personality == GPU_CUDA) add_node_residual_cuda(cuda_ctx, node_id, y);
 			else if (personality == CPU)
 		#endif
-				{ Galois::atomicAdd(node.residual, y);}
+				{ Galois::add(node.residual, y); }
 		}
 		static void reset (uint32_t node_id, struct PR_NodeData & node ) {
 		#ifdef __GALOIS_HET_CUDA__
 			if (personality == GPU_CUDA) set_node_residual_cuda(cuda_ctx, node_id, 0);
 			else if (personality == CPU)
 		#endif
-				{node.residual = 0 ; }
+				{ node.residual = 0; }
 		}
 		typedef float ValTy;
 	};
+#ifdef __GALOIS_VERTEX_CUT_GRAPH__
+  struct SyncerPull_0 {
+    static float extract(uint32_t node_id, const struct PR_NodeData & node) {
+    #ifdef __GALOIS_HET_CUDA__
+      if (personality == GPU_CUDA) return get_node_residual_cuda(cuda_ctx, node_id);
+      assert (personality == CPU);
+    #endif
+      return node.residual;
+    }
+    static void setVal (uint32_t node_id, struct PR_NodeData & node, float y) {
+    #ifdef __GALOIS_HET_CUDA__
+      if (personality == GPU_CUDA) set_node_residual_cuda(cuda_ctx, node_id, y);
+      else if (personality == CPU)
+    #endif
+        {node.residual = y ; }
+    }
+    typedef float ValTy;
+  };
+#endif
 	Get_info_functor(GraphTy& _g): graph(_g){}
 	unsigned operator()(GNode n) const {
 		return graph.getHostID(n);
@@ -226,6 +283,9 @@ struct Get_info_functor : public Galois::op_tag {
 	void static sync_graph_static(Graph& _graph) {
 
 		_graph.sync_push<Syncer_0>("PageRank");
+#ifdef __GALOIS_VERTEX_CUT_GRAPH__
+    _graph.sync_pull<SyncerPull_0>("PageRank");
+#endif
 	}
 };
 
@@ -236,54 +296,54 @@ struct PageRank {
 
   PageRank(cll::opt<float> &_tolerance, const float &_alpha, Graph* _g): local_tolerance(_tolerance), local_alpha(_alpha), graph(_g){}
   void static go(Graph& _graph) {
-     #ifdef __GALOIS_HET_CUDA__
-     	if (personality == GPU_CUDA) {
-     		Galois::Timer T_compute, T_comm_syncGraph, T_comm_bag;
-     		unsigned num_iter = 0;
-     		auto __sync_functor = Get_info_functor<Graph>(_graph);
-     		typedef Galois::DGBag<GNode, Get_info_functor<Graph> > DBag;
-     		DBag dbag(__sync_functor);
-     		auto &local_wl = DBag::get();
-     		T_compute.start();
-     		cuda_wl.num_in_items = _graph.getNumOwned();
-     		for (int __i = 0; __i < cuda_wl.num_in_items; ++__i) cuda_wl.in_items[__i] = __i;
-     		if (cuda_wl.num_in_items > 0)
-     			PageRank_cuda(alpha, tolerance, cuda_ctx);
-     		T_compute.stop();
-     		T_comm_syncGraph.start();
-     		__sync_functor.sync_graph();
-     		T_comm_syncGraph.stop();
-     		T_comm_bag.start();
-     		dbag.set_local(cuda_wl.out_items, cuda_wl.num_out_items);
-     		dbag.sync();
-     		cuda_wl.num_out_items = 0;
-     		T_comm_bag.stop();
-     		//std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] Iter : " << num_iter << " T_compute : " << T_compute.get() << "(msec) T_comm_syncGraph : " << T_comm_syncGraph.get() << "(msec) T_comm_bag : " << T_comm_bag.get() << "(msec) \n";
-     		while (!dbag.canTerminate()) {
-     		++num_iter;
-     		cuda_wl.num_in_items = local_wl.size();
-     		//std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] Iter : " << num_iter << " Total items to work on : " << cuda_wl.num_in_items << "\n";
-     		T_compute.start();
-     		std::copy(local_wl.begin(), local_wl.end(), cuda_wl.in_items);
-     		if (cuda_wl.num_in_items > 0)
-     			PageRank_cuda(alpha, tolerance, cuda_ctx);
-     		T_compute.stop();
-     		T_comm_syncGraph.start();
-     		__sync_functor.sync_graph();
-     		T_comm_syncGraph.stop();
-     		T_comm_bag.start();
-     		dbag.set_local(cuda_wl.out_items, cuda_wl.num_out_items);
-     		dbag.sync();
-     		cuda_wl.num_out_items = 0;
-     		T_comm_bag.stop();
-     		//std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] Iter : " << num_iter << " T_compute : " << T_compute.get() << "(msec) T_comm_syncGraph : " << T_comm_syncGraph.get() << "(msec) T_comm_bag : " << T_comm_bag.get() << "(msec) \n";
-     		}
-     	} else if (personality == CPU)
-     #endif
-     Galois::for_each(_graph.begin(), _graph.end(), PageRank(tolerance, alpha, &_graph), Galois::workList_version(), Galois::loopname("PageRank"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ Galois::atomicAdd(node.residual, y);}",  "{node.residual = 0 ; }"), Get_info_functor<Graph>(_graph));
+    #ifdef __GALOIS_HET_CUDA__
+    	if (personality == GPU_CUDA) {
+    		Galois::Timer T_compute, T_comm_syncGraph, T_comm_bag;
+    		unsigned num_iter = 0;
+    		auto __sync_functor = Get_info_functor<Graph>(_graph);
+    		typedef Galois::DGBag<GNode, Get_info_functor<Graph> > DBag;
+    		DBag dbag(__sync_functor);
+    		auto &local_wl = DBag::get();
+    		T_compute.start();
+    		cuda_wl.num_in_items = _graph.getNumOwned();
+    		for (int __i = 0; __i < cuda_wl.num_in_items; ++__i) cuda_wl.in_items[__i] = __i;
+    		if (cuda_wl.num_in_items > 0)
+    			PageRank_cuda(alpha, tolerance, cuda_ctx);
+    		T_compute.stop();
+    		T_comm_syncGraph.start();
+    		__sync_functor.sync_graph();
+    		T_comm_syncGraph.stop();
+    		T_comm_bag.start();
+    		dbag.set_local(cuda_wl.out_items, cuda_wl.num_out_items);
+    		dbag.sync();
+    		cuda_wl.num_out_items = 0;
+    		T_comm_bag.stop();
+    		//std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] Iter : " << num_iter << " T_compute : " << T_compute.get() << "(msec) T_comm_syncGraph : " << T_comm_syncGraph.get() << "(msec) T_comm_bag : " << T_comm_bag.get() << "(msec) \n";
+    		while (!dbag.canTerminate()) {
+    		++num_iter;
+    		cuda_wl.num_in_items = local_wl.size();
+    		//std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] Iter : " << num_iter << " Total items to work on : " << cuda_wl.num_in_items << "\n";
+    		T_compute.start();
+    		std::copy(local_wl.begin(), local_wl.end(), cuda_wl.in_items);
+    		if (cuda_wl.num_in_items > 0)
+    			PageRank_cuda(alpha, tolerance, cuda_ctx);
+    		T_compute.stop();
+    		T_comm_syncGraph.start();
+    		__sync_functor.sync_graph();
+    		T_comm_syncGraph.stop();
+    		T_comm_bag.start();
+    		dbag.set_local(cuda_wl.out_items, cuda_wl.num_out_items);
+    		dbag.sync();
+    		cuda_wl.num_out_items = 0;
+    		T_comm_bag.stop();
+    		//std::cout << "[" << Galois::Runtime::getSystemNetworkInterface().ID << "] Iter : " << num_iter << " T_compute : " << T_compute.get() << "(msec) T_comm_syncGraph : " << T_comm_syncGraph.get() << "(msec) T_comm_bag : " << T_comm_bag.get() << "(msec) \n";
+    		}
+    	} else if (personality == CPU)
+    #endif
+    Galois::for_each(_graph.begin(), _graph.end(), PageRank{ tolerance, alpha, &_graph }, Galois::workList_version(), Galois::loopname("PageRank"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"), Get_info_functor<Graph>(_graph));
   }
 
-  void operator()(WorkItem& src, Galois::UserContext<WorkItem>& ctx) const {
+  void operator()(WorkItem src, Galois::UserContext<WorkItem>& ctx) const {
     PR_NodeData& sdata = graph->getData(src);
     float residual_old = sdata.residual.exchange(0.0);
     sdata.value += residual_old;
@@ -308,10 +368,11 @@ int main(int argc, char** argv) {
   try {
 
     LonestarStart(argc, argv, name, desc, url);
+    Galois::StatManager statManager;
     auto& net = Galois::Runtime::getSystemNetworkInterface();
-    Galois::Timer T_total, T_graph_load, T_init;
-    std::vector<Galois::Timer> T_compute;
-    T_compute.resize(numRuns);
+    Galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"), StatTimer_total("TIMER_TOTAL"), StatTimer_hg_init("TIMER_HG_INIT");
+
+    StatTimer_total.start();
 
     std::vector<unsigned> scalefactor;
 #ifdef __GALOIS_HET_CUDA__
@@ -350,9 +411,7 @@ int main(int argc, char** argv) {
     }
 #endif
 
-    T_total.start();
-
-    T_graph_load.start();
+    StatTimer_hg_init.start();
 #ifdef __GALOIS_VERTEX_CUT_GRAPH__
     Graph hg(inputFile, partFolder, net.ID, net.Num, scalefactor);
 #else
@@ -369,42 +428,33 @@ int main(int argc, char** argv) {
       //Galois::OpenCL::cl_env.init(cldevice.Value);
     }
 #endif
-    T_graph_load.stop();
+    StatTimer_hg_init.stop();
 
     std::cout << "[" << net.ID << "] InitializeGraph::go called\n";
-    T_init.start();
-    InitializeGraph::go(hg);
-    T_init.stop();
-
-    std::cout << "[" << net.ID << "] PageRank::go run1 called\n";
-    T_compute[0].start();
-    PageRank::go(hg);
-    T_compute[0].stop();
-
-    for (unsigned i = 1; i < numRuns; ++i) {
-      Galois::Runtime::getHostBarrier().wait();
-      ResetGraph::go(hg);
+    StatTimer_init.start();
       InitializeGraph::go(hg);
+    StatTimer_init.stop();
 
-      std::cout << "[" << net.ID << "] PageRank::go run" << i+1 << " called\n";
-      T_compute[i].start();
-      PageRank::go(hg);
-      T_compute[i].stop();
+    for(auto run = 0; run < numRuns; ++run){
+      std::cout << "[" << net.ID << "] PageRank::go run " << run << " called\n";
+      std::string timer_str("TIMER_" + std::to_string(run));
+      Galois::StatTimer StatTimer_main(timer_str.c_str());
+
+      hg.reset_num_iter(run);
+
+      StatTimer_main.start();
+        PageRank::go(hg);
+      StatTimer_main.stop();
+
+      if((run + 1) != numRuns){
+        Galois::Runtime::getHostBarrier().wait();
+        hg.reset_num_iter(run);
+        ResetGraph::go(hg);
+        InitializeGraph::go(hg);
+      }
     }
 
-    T_total.stop();
-
-    double mean_time = 0;
-    for (unsigned i = 0; i < numRuns; ++i) {
-      mean_time += T_compute[i].get();
-    }
-    mean_time /= numRuns;
-
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " Graph : " << T_graph_load.get() << " Init : " << T_init.get();
-    for (unsigned i = 0; i < numRuns; ++i) {
-      std::cout << " Pagerank " <<  i << " : " << T_compute[i].get();
-    }
-    std::cout << " Pagerank mean of " << numRuns << " runs : " << mean_time << " (msec)\n\n";
+   StatTimer_total.stop();
 
     // Verify
     if(verify){

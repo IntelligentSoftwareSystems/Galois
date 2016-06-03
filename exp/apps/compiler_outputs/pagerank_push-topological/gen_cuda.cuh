@@ -39,6 +39,12 @@ void add_node_nout_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v) 
 	nout[LID] += v;
 }
 
+void min_node_nout_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int v) {
+	unsigned int *nout = ctx->nout.cpu_wr_ptr();
+	if (nout[LID] > v)
+		nout[LID] = v;
+}
+
 float get_node_residual_cuda(struct CUDA_Context *ctx, unsigned LID) {
 	float *residual = ctx->residual.cpu_rd_ptr();
 	return residual[LID];
@@ -54,6 +60,12 @@ void add_node_residual_cuda(struct CUDA_Context *ctx, unsigned LID, float v) {
 	residual[LID] += v;
 }
 
+void min_node_residual_cuda(struct CUDA_Context *ctx, unsigned LID, float v) {
+	float *residual = ctx->residual.cpu_wr_ptr();
+	if (residual[LID] > v)
+		residual[LID] = v;
+}
+
 float get_node_value_cuda(struct CUDA_Context *ctx, unsigned LID) {
 	float *value = ctx->value.cpu_rd_ptr();
 	return value[LID];
@@ -67,6 +79,12 @@ void set_node_value_cuda(struct CUDA_Context *ctx, unsigned LID, float v) {
 void add_node_value_cuda(struct CUDA_Context *ctx, unsigned LID, float v) {
 	float *value = ctx->value.cpu_wr_ptr();
 	value[LID] += v;
+}
+
+void min_node_value_cuda(struct CUDA_Context *ctx, unsigned LID, float v) {
+	float *value = ctx->value.cpu_wr_ptr();
+	if (value[LID] > v)
+		value[LID] = v;
 }
 
 struct CUDA_Context *get_CUDA_context(int id) {
@@ -115,7 +133,7 @@ void load_graph_CUDA(struct CUDA_Context *ctx, MarshalGraph &g) {
 	ctx->value.alloc(graph.nnodes);
 	ctx->p_retval = Shared<int>(1);
 	printf("load_graph_GPU: %d owned nodes of total %d resident, %d edges\n", ctx->nowned, graph.nnodes, graph.nedges);
-  reset_CUDA_context(ctx);
+	reset_CUDA_context(ctx);
 }
 
 void reset_CUDA_context(struct CUDA_Context *ctx) {

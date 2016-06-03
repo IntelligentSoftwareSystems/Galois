@@ -9,7 +9,7 @@ ast = Module([
 CBlock([cgen.Include("kernels/reduce.cuh", system = False)], parse = False),
 CBlock([cgen.Include("gen_cuda.cuh", system = False)], parse = False),
 CDeclGlobal([("unsigned int *", "P_DIST_CURRENT", "")]),
-Kernel("InitializeGraph", [G.param(), ('int ', 'nowned') , ('unsigned long', 'local_infinity'), ('unsigned int', 'local_src_node'), ('unsigned int *', 'p_dist_current')],
+Kernel("InitializeGraph", [G.param(), ('int ', 'nowned') , ('const unsigned int ', 'local_infinity'), ('unsigned int', 'local_src_node'), ('unsigned int *', 'p_dist_current')],
 [
 ForAll("src", G.nodes(None, "nowned"),
 [
@@ -42,7 +42,7 @@ CBlock(["any_retval.return_( 1)"]),
 ]),
 ]),
 ]),
-Kernel("InitializeGraph_cuda", [('unsigned int', 'local_src_node'), ('unsigned long', 'local_infinity'), ('struct CUDA_Context *', 'ctx')],
+Kernel("InitializeGraph_cuda", [('const unsigned int &', 'local_infinity'), ('unsigned int', 'local_src_node'), ('struct CUDA_Context *', 'ctx')],
 [
 CDecl([("dim3", "blocks", "")]),
 CDecl([("dim3", "threads", "")]),

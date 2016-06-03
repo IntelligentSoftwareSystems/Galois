@@ -11,16 +11,25 @@ CBlock([cgen.Include("gen_cuda.cuh", system = False)], parse = False),
 CDeclGlobal([("unsigned int *", "P_NOUT", "")]),
 CDeclGlobal([("float *", "P_RESIDUAL", "")]),
 CDeclGlobal([("float *", "P_VALUE", "")]),
+Kernel("ResetGraph", [G.param(), ('int ', 'nowned') , ('unsigned int *', 'p_nout'), ('float *', 'p_residual'), ('float *', 'p_value')],
+[
+ForAll("src", G.nodes(None, "nowned"),
+[
+CBlock(["p_value[src] = 0"]),
+CBlock(["p_nout[src] = 0"]),
+CBlock(["p_residual[src] = 0"]),
+]),
+]),
 Kernel("InitializeGraph", [G.param(), ('int ', 'nowned') , ('const float ', 'local_alpha'), ('unsigned int *', 'p_nout'), ('float *', 'p_residual'), ('float *', 'p_value')],
 [
 ForAll("src", G.nodes(None, "nowned"),
 [
-CBlock(["p_value[src] = 1.0 - local_alpha"]),
+CBlock(["p_value[src] = local_alpha"]),
 CBlock(["p_nout[src] = graph.getOutDegree(src)"]),
 If("p_nout[src] > 0",
 [
 CDecl([("float", "delta", "")]),
-CBlock(["delta = p_value[src]*local_alpha/p_nout[src]"]),
+CBlock(["delta = p_value[src]*(1-local_alpha)/p_nout[src]"]),
 ForAll("nbr", G.edges("src"),
 [
 CDecl([("index_type", "dst", "")]),
@@ -40,7 +49,7 @@ CBlock(["p_value[src] += residual_old"]),
 If("p_nout[src] > 0",
 [
 CDecl([("float", "delta", "")]),
-CBlock(["delta = residual_old*local_alpha/p_nout[src]"]),
+CBlock(["delta = residual_old*(1-local_alpha)/p_nout[src]"]),
 ForAll("nbr", G.edges("src"),
 [
 CDecl([("index_type", "dst", "")]),
@@ -63,7 +72,7 @@ CBlock(["p_value[src] += residual_old"]),
 If("p_nout[src] > 0",
 [
 CDecl([("float", "delta", "")]),
-CBlock(["delta = residual_old*local_alpha/p_nout[src]"]),
+CBlock(["delta = residual_old*(1-local_alpha)/p_nout[src]"]),
 CBlock(["any_retval.return_( 1)"]),
 ForAll("nbr", G.edges("src"),
 [
@@ -76,6 +85,14 @@ CBlock(["dst_residual_old = atomicAdd(&p_residual[dst], delta)"]),
 ]),
 ]),
 ]),
+Kernel("ResetGraph_cuda", [('struct CUDA_Context *', 'ctx')],
+[
+CDecl([("dim3", "blocks", "")]),
+CDecl([("dim3", "threads", "")]),
+CBlock(["kernel_sizing(ctx->gg, blocks, threads)"]),
+Invoke("ResetGraph", ("ctx->gg", "ctx->nowned", "ctx->nout.gpu_wr_ptr()", "ctx->residual.gpu_wr_ptr()", "ctx->value.gpu_wr_ptr()")),
+CBlock(["check_cuda_kernel"], parse = False),
+], host = True),
 Kernel("InitializeGraph_cuda", [('const float &', 'local_alpha'), ('struct CUDA_Context *', 'ctx')],
 [
 CDecl([("dim3", "blocks", "")]),

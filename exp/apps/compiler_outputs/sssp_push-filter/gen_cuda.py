@@ -10,7 +10,7 @@ CBlock([cgen.Include("kernels/reduce.cuh", system = False)], parse = False),
 CBlock([cgen.Include("gen_cuda.cuh", system = False)], parse = False),
 CDeclGlobal([("unsigned int *", "P_DIST_CURRENT", "")]),
 CDeclGlobal([("unsigned int *", "P_DIST_OLD", "")]),
-Kernel("InitializeGraph", [G.param(), ('int ', 'nowned') , ('unsigned int', 'local_infinity'), ('unsigned int', 'local_src_node'), ('unsigned int *', 'p_dist_current'), ('unsigned int *', 'p_dist_old')],
+Kernel("InitializeGraph", [G.param(), ('int ', 'nowned') , ('const unsigned int ', 'local_infinity'), ('unsigned int', 'local_src_node'), ('unsigned int *', 'p_dist_current'), ('unsigned int *', 'p_dist_old')],
 [
 ForAll("src", G.nodes(None, "nowned"),
 [
@@ -18,10 +18,11 @@ CBlock(["p_dist_current[src] = (graph.node_data[src] == local_src_node) ? 0 : lo
 CBlock(["p_dist_old[src] = (graph.node_data[src] == local_src_node) ? 0 : local_infinity"]),
 ]),
 ]),
-Kernel("FirstItr_SSSP", [G.param(), ('int ', 'nowned') , ('unsigned int *', 'p_dist_current')],
+Kernel("FirstItr_SSSP", [G.param(), ('int ', 'nowned') , ('unsigned int *', 'p_dist_current'), ('unsigned int *', 'p_dist_old')],
 [
 ForAll("src", G.nodes(None, "nowned"),
 [
+CBlock(["p_dist_old[src] = p_dist_current[src]"]),
 ClosureHint(
 ForAll("jj", G.edges("src"),
 [
@@ -53,7 +54,7 @@ CBlock(["atomicMin(&p_dist_current[dst], new_dist)"]),
 ]),
 ]),
 ]),
-Kernel("InitializeGraph_cuda", [('unsigned int', 'local_src_node'), ('unsigned int', 'local_infinity'), ('struct CUDA_Context *', 'ctx')],
+Kernel("InitializeGraph_cuda", [('const unsigned int &', 'local_infinity'), ('unsigned int', 'local_src_node'), ('struct CUDA_Context *', 'ctx')],
 [
 CDecl([("dim3", "blocks", "")]),
 CDecl([("dim3", "threads", "")]),
@@ -66,7 +67,7 @@ Kernel("FirstItr_SSSP_cuda", [('struct CUDA_Context *', 'ctx')],
 CDecl([("dim3", "blocks", "")]),
 CDecl([("dim3", "threads", "")]),
 CBlock(["kernel_sizing(ctx->gg, blocks, threads)"]),
-Invoke("FirstItr_SSSP", ("ctx->gg", "ctx->nowned", "ctx->dist_current.gpu_wr_ptr()")),
+Invoke("FirstItr_SSSP", ("ctx->gg", "ctx->nowned", "ctx->dist_current.gpu_wr_ptr()", "ctx->dist_old.gpu_wr_ptr()")),
 CBlock(["check_cuda_kernel"], parse = False),
 ], host = True),
 Kernel("SSSP_cuda", [('int &', '__retval'), ('struct CUDA_Context *', 'ctx')],

@@ -18,10 +18,11 @@ CBlock(["p_comp_current[src] = graph.node_data[src]"]),
 CBlock(["p_comp_old[src] = graph.node_data[src]"]),
 ]),
 ]),
-Kernel("FirstItr_ConnectedComp", [G.param(), ('int ', 'nowned') , ('unsigned int *', 'p_comp_current')],
+Kernel("FirstItr_ConnectedComp", [G.param(), ('int ', 'nowned') , ('unsigned int *', 'p_comp_current'), ('unsigned int *', 'p_comp_old')],
 [
 ForAll("src", G.nodes(None, "nowned"),
 [
+CBlock(["p_comp_old[src] = p_comp_current[src]"]),
 ClosureHint(
 ForAll("jj", G.edges("src"),
 [
@@ -66,7 +67,7 @@ Kernel("FirstItr_ConnectedComp_cuda", [('struct CUDA_Context *', 'ctx')],
 CDecl([("dim3", "blocks", "")]),
 CDecl([("dim3", "threads", "")]),
 CBlock(["kernel_sizing(ctx->gg, blocks, threads)"]),
-Invoke("FirstItr_ConnectedComp", ("ctx->gg", "ctx->nowned", "ctx->comp_current.gpu_wr_ptr()")),
+Invoke("FirstItr_ConnectedComp", ("ctx->gg", "ctx->nowned", "ctx->comp_current.gpu_wr_ptr()", "ctx->comp_old.gpu_wr_ptr()")),
 CBlock(["check_cuda_kernel"], parse = False),
 ], host = True),
 Kernel("ConnectedComp_cuda", [('int &', '__retval'), ('struct CUDA_Context *', 'ctx')],

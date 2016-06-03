@@ -23,7 +23,7 @@ __global__ void InitializeGraph(CSRGraph graph, int  nowned, unsigned int * p_co
     p_comp_old[src] = graph.node_data[src];
   }
 }
-__global__ void FirstItr_ConnectedComp(CSRGraph graph, int  nowned, unsigned int * p_comp_current)
+__global__ void FirstItr_ConnectedComp(CSRGraph graph, int  nowned, unsigned int * p_comp_current, unsigned int * p_comp_old)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -34,6 +34,7 @@ __global__ void FirstItr_ConnectedComp(CSRGraph graph, int  nowned, unsigned int
   for (index_type src = 0 + tid; src < src_end; src += nthreads)
   {
     index_type jj_end;
+    p_comp_old[src] = p_comp_current[src];
     jj_end = (graph).getFirstEdge((src) + 1);
     for (index_type jj = (graph).getFirstEdge(src) + 0; jj < jj_end; jj += 1)
     {
@@ -85,7 +86,7 @@ void FirstItr_ConnectedComp_cuda(struct CUDA_Context * ctx)
   dim3 blocks;
   dim3 threads;
   kernel_sizing(ctx->gg, blocks, threads);
-  FirstItr_ConnectedComp <<<blocks, threads>>>(ctx->gg, ctx->nowned, ctx->comp_current.gpu_wr_ptr());
+  FirstItr_ConnectedComp <<<blocks, threads>>>(ctx->gg, ctx->nowned, ctx->comp_current.gpu_wr_ptr(), ctx->comp_old.gpu_wr_ptr());
   check_cuda_kernel;
 }
 void ConnectedComp_cuda(int & __retval, struct CUDA_Context * ctx)

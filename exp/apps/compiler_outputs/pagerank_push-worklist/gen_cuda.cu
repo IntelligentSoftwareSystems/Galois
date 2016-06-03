@@ -4,12 +4,27 @@
 
 void kernel_sizing(CSRGraph &, dim3 &, dim3 &);
 #define TB_SIZE 256
-const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=True $ backoff_blocking_factor=4 $ parcomb=True $ np_schedulers=set(['wp', 'fg']) $ cc_disable=set([]) $ hacks=set([]) $ np_factor=8 $ instrument=set([]) $ unroll=[] $ read_props=None $ outline_iterate=True $ ignore_nested_errors=False $ np=True $ write_props=None $ quiet_cgen=True $ retry_backoff=True $ cuda.graph_type=basic $ cuda.use_worklist_slots=True $ cuda.worklist_type=basic";
+const char *GGC_OPTIONS = "coop_conv=False $ outline_iterate_gb=False $ backoff_blocking_factor=4 $ parcomb=True $ np_schedulers=set(['wp', 'fg']) $ cc_disable=set([]) $ hacks=set([]) $ np_factor=8 $ instrument=set([]) $ unroll=[] $ read_props=None $ outline_iterate=True $ ignore_nested_errors=False $ np=True $ write_props=None $ quiet_cgen=True $ retry_backoff=True $ cuda.graph_type=basic $ cuda.use_worklist_slots=True $ cuda.worklist_type=basic";
 unsigned int * P_NOUT;
 float * P_RESIDUAL;
 float * P_VALUE;
 #include "kernels/reduce.cuh"
 #include "gen_cuda.cuh"
+__global__ void ResetGraph(CSRGraph graph, int  nowned, unsigned int * p_nout, float * p_residual, float * p_value)
+{
+  unsigned tid = TID_1D;
+  unsigned nthreads = TOTAL_THREADS_1D;
+
+  const unsigned __kernel_tb_size = TB_SIZE;
+  index_type src_end;
+  src_end = nowned;
+  for (index_type src = 0 + tid; src < src_end; src += nthreads)
+  {
+    p_value[src] = 0;
+    p_nout[src] = 0;
+    p_residual[src] = 0;
+  }
+}
 __global__ void InitializeGraph(CSRGraph graph, int  nowned, const float  local_alpha, unsigned int * p_nout, float * p_residual, float * p_value)
 {
   unsigned tid = TID_1D;
@@ -70,13 +85,21 @@ __global__ void PageRank(CSRGraph graph, int  nowned, const float  local_alpha, 
         dst_residual_old = atomicAdd(&p_residual[dst], delta);
         if ((dst_residual_old <= local_tolerance) && ((dst_residual_old + delta) >= local_tolerance))
         {
-          index_type _start_46;
-          _start_46 = (out_wl).setup_push_warp_one();;
-          (out_wl).do_push(_start_46, 0, dst);
+          index_type _start_54;
+          _start_54 = (out_wl).setup_push_warp_one();;
+          (out_wl).do_push(_start_54, 0, dst);
         }
       }
     }
   }
+}
+void ResetGraph_cuda(struct CUDA_Context * ctx)
+{
+  dim3 blocks;
+  dim3 threads;
+  kernel_sizing(ctx->gg, blocks, threads);
+  ResetGraph <<<blocks, threads>>>(ctx->gg, ctx->nowned, ctx->nout.gpu_wr_ptr(), ctx->residual.gpu_wr_ptr(), ctx->value.gpu_wr_ptr());
+  check_cuda_kernel;
 }
 void InitializeGraph_cuda(const float & local_alpha, struct CUDA_Context * ctx)
 {

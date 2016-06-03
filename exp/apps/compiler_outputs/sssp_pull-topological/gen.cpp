@@ -100,11 +100,11 @@ typedef hGraph<NodeData, unsigned int> Graph;
 typedef typename Graph::GraphNode GNode;
 
 struct InitializeGraph {
+  const unsigned int &local_infinity;
   cll::opt<unsigned int> &local_src_node;
-  unsigned int local_infinity;
   Graph *graph;
 
-  InitializeGraph(cll::opt<unsigned int> &_src_node, unsigned int _infinity, Graph* _graph) : local_src_node(_src_node), local_infinity(_infinity), graph(_graph){}
+  InitializeGraph(cll::opt<unsigned int> &_src_node, const unsigned int &_infinity, Graph* _graph) : local_src_node(_src_node), local_infinity(_infinity), graph(_graph){}
 
   void static go(Graph& _graph) {
     struct SyncerPull_0 {
@@ -124,15 +124,14 @@ struct InitializeGraph {
       }
       typedef unsigned int ValTy;
     };
-
     #ifdef __GALOIS_HET_CUDA__
     	if (personality == GPU_CUDA) {
-    		InitializeGraph_cuda(src_node, infinity, cuda_ctx);
+    		InitializeGraph_cuda(infinity, src_node, cuda_ctx);
     	} else if (personality == CPU)
     #endif
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {src_node, infinity, &_graph}, Galois::loopname("Init"));
+    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {src_node, infinity, &_graph}, Galois::loopname("Init"), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "dist_current" , "unsigned int"));
+    _graph.sync_pull<SyncerPull_0>("InitializeGraph");
 
-    _graph.sync_pull<SyncerPull_0>("InitializeGraphializeGraph");
   }
 
   void operator()(GNode src) const {
@@ -165,14 +164,14 @@ struct SSSP {
       			if (personality == GPU_CUDA) min_node_dist_current_cuda(cuda_ctx, node_id, y);
       			else if (personality == CPU)
       		#endif
-      				{ if (node.dist_current > y) node.dist_current = y; }
+      				{ Galois::min(node.dist_current, y); }
       		}
       		static void reset (uint32_t node_id, struct NodeData & node ) {
       		#ifdef __GALOIS_HET_CUDA__
-      			if (personality == GPU_CUDA) set_node_dist_current_cuda(cuda_ctx, node_id, std::numeric_limits<unsigned int>::max()/4);
+      			if (personality == GPU_CUDA) set_node_dist_current_cuda(cuda_ctx, node_id, std::numeric_limits<unsigned int>::max());
       			else if (personality == CPU)
       		#endif
-      				{node.dist_current = std::numeric_limits<unsigned int>::max()/4; }
+      				{node.dist_current = std::numeric_limits<unsigned int>::max(); }
       		}
       		typedef unsigned int ValTy;
       	};
@@ -207,7 +206,6 @@ struct SSSP {
 #endif
       _graph.sync_pull<SyncerPull_0>("SSSP");
       
-
      ++iteration;
     }while((iteration < maxIterations) && DGAccumulator_accum.reduce());
   }
@@ -237,10 +235,11 @@ Galois::DGAccumulator<int>  SSSP::DGAccumulator_accum;
 int main(int argc, char** argv) {
   try {
     LonestarStart(argc, argv, name, desc, url);
+    Galois::StatManager statManager;
     auto& net = Galois::Runtime::getSystemNetworkInterface();
-    Galois::Timer T_total, T_graph_load, T_init;
-    std::vector<Galois::Timer> T_compute;
-    T_compute.resize(numRuns);
+    Galois::StatTimer StatTimer_init("TIMER_GRAPH_INIT"), StatTimer_total("TIMER_TOTAL"), StatTimer_hg_init("TIMER_HG_INIT");
+
+    StatTimer_total.start();
 
     std::vector<unsigned> scalefactor;
 #ifdef __GALOIS_HET_CUDA__
@@ -279,9 +278,7 @@ int main(int argc, char** argv) {
     }
 #endif
 
-    T_total.start();
-
-    T_graph_load.start();
+    StatTimer_hg_init.start();
 #ifdef __GALOIS_VERTEX_CUT_GRAPH__
     Graph hg(inputFile, partFolder, net.ID, net.Num, scalefactor);
 #else
@@ -298,41 +295,33 @@ int main(int argc, char** argv) {
       //Galois::OpenCL::cl_env.init(cldevice.Value);
     }
 #endif
-    T_graph_load.stop();
+    StatTimer_hg_init.stop();
 
     std::cout << "[" << net.ID << "] InitializeGraph::go called\n";
-    T_init.start();
+    StatTimer_init.start();
     InitializeGraph::go(hg);
-    T_init.stop();
+    StatTimer_init.stop();
 
-    std::cout << "[" << net.ID << "] SSSP::go run1 called\n";
-    T_compute[0].start();
+
+    for(auto run = 0; run < numRuns; ++run){
+      std::cout << "[" << net.ID << "] SSSP::go run " << run << " called\n";
+      std::string timer_str("TIMER_" + std::to_string(run));
+      Galois::StatTimer StatTimer_main(timer_str.c_str());
+
+      hg.reset_num_iter(run);
+
+      StatTimer_main.start();
     SSSP::go(hg);
-    T_compute[0].stop();
+      StatTimer_main.stop();
 
-    for (unsigned i = 1; i < numRuns; ++i) {
+      if((run + 1) != numRuns){
       Galois::Runtime::getHostBarrier().wait();
+        hg.reset_num_iter(run);
       InitializeGraph::go(hg);
-
-      std::cout << "[" << net.ID << "] SSSP::go run" << i+1 << " called\n";
-      T_compute[i].start();
-      SSSP::go(hg);
-      T_compute[i].stop();
+    }
     }
 
-   T_total.stop();
-
-    double mean_time = 0;
-    for (unsigned i = 0; i < numRuns; ++i) {
-      mean_time += T_compute[i].get();
-    }
-    mean_time /= numRuns;
-
-    std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " Graph : " << T_graph_load.get() << " Init : " << T_init.get();
-    for (unsigned i = 0; i < numRuns; ++i) {
-      std::cout << " SSSP " <<  i << " : " << T_compute[i].get();
-    }
-    std::cout << " SSSP mean of " << numRuns << " runs (" << iteration << " iterations) : " << mean_time << " (msec)\n\n";
+   StatTimer_total.stop();
 
     // Verify
     if(verify){

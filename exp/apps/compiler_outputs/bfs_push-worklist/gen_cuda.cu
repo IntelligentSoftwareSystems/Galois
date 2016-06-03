@@ -9,7 +9,7 @@ unsigned int * P_DIST_CURRENT;
 #include "kernels/reduce.cuh"
 #include "gen_cuda.cuh"
 static const int __tb_BFS = TB_SIZE;
-__global__ void InitializeGraph(CSRGraph graph, int  nowned, unsigned int local_infinity, unsigned int local_src_node, unsigned int * p_dist_current)
+__global__ void InitializeGraph(CSRGraph graph, int  nowned, const unsigned int  local_infinity, unsigned int local_src_node, unsigned int * p_dist_current)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -107,9 +107,9 @@ __global__ void BFS(CSRGraph graph, int  nowned, unsigned int * p_dist_current, 
           old_dist = atomicMin(&p_dist_current[dst], new_dist);
           if (old_dist > new_dist)
           {
-            index_type _start_28;
-            _start_28 = (out_wl).setup_push_warp_one();;
-            (out_wl).do_push(_start_28, 0, dst);
+            index_type _start_31;
+            _start_31 = (out_wl).setup_push_warp_one();;
+            (out_wl).do_push(_start_31, 0, dst);
           }
         }
       }
@@ -150,9 +150,9 @@ __global__ void BFS(CSRGraph graph, int  nowned, unsigned int * p_dist_current, 
             old_dist = atomicMin(&p_dist_current[dst], new_dist);
             if (old_dist > new_dist)
             {
-              index_type _start_28;
-              _start_28 = (out_wl).setup_push_warp_one();;
-              (out_wl).do_push(_start_28, 0, dst);
+              index_type _start_31;
+              _start_31 = (out_wl).setup_push_warp_one();;
+              (out_wl).do_push(_start_31, 0, dst);
             }
           }
         }
@@ -184,9 +184,9 @@ __global__ void BFS(CSRGraph graph, int  nowned, unsigned int * p_dist_current, 
           old_dist = atomicMin(&p_dist_current[dst], new_dist);
           if (old_dist > new_dist)
           {
-            index_type _start_28;
-            _start_28 = (out_wl).setup_push_warp_one();;
-            (out_wl).do_push(_start_28, 0, dst);
+            index_type _start_31;
+            _start_31 = (out_wl).setup_push_warp_one();;
+            (out_wl).do_push(_start_31, 0, dst);
           }
         }
       }
@@ -197,7 +197,7 @@ __global__ void BFS(CSRGraph graph, int  nowned, unsigned int * p_dist_current, 
     src = _np_closure[threadIdx.x].src;
   }
 }
-void InitializeGraph_cuda(unsigned int local_src_node, unsigned int local_infinity, struct CUDA_Context * ctx)
+void InitializeGraph_cuda(const unsigned int & local_infinity, unsigned int local_src_node, struct CUDA_Context * ctx)
 {
   dim3 blocks;
   dim3 threads;

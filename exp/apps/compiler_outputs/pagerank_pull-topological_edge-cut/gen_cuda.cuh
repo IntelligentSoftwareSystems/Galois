@@ -38,6 +38,12 @@ void add_node_nout_cuda(struct CUDA_Context *ctx, unsigned LID, int v) {
 	nout[LID] += v;
 }
 
+void min_node_nout_cuda(struct CUDA_Context *ctx, unsigned LID, int v) {
+	int *nout = ctx->nout.cpu_wr_ptr();
+	if (nout[LID] > v)
+		nout[LID] = v;
+}
+
 float get_node_value_cuda(struct CUDA_Context *ctx, unsigned LID) {
 	float *value = ctx->value.cpu_rd_ptr();
 	return value[LID];
@@ -51,6 +57,12 @@ void set_node_value_cuda(struct CUDA_Context *ctx, unsigned LID, float v) {
 void add_node_value_cuda(struct CUDA_Context *ctx, unsigned LID, float v) {
 	float *value = ctx->value.cpu_wr_ptr();
 	value[LID] += v;
+}
+
+void min_node_value_cuda(struct CUDA_Context *ctx, unsigned LID, float v) {
+	float *value = ctx->value.cpu_wr_ptr();
+	if (value[LID] > v)
+		value[LID] = v;
 }
 
 struct CUDA_Context *get_CUDA_context(int id) {
