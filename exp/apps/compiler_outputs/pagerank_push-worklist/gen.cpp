@@ -348,17 +348,18 @@ struct PageRank {
     float residual_old = sdata.residual.exchange(0.0);
     sdata.value += residual_old;
     //sdata.residual = residual_old;
+    float delta = 0;
     if (sdata.nout > 0){
-      float delta = residual_old*(1-local_alpha)/sdata.nout;
-      for(auto nbr = graph->edge_begin(src), ee = graph->edge_end(src); nbr != ee; ++nbr){
-        GNode dst = graph->getEdgeDst(nbr);
-        PR_NodeData& ddata = graph->getData(dst);
-        auto dst_residual_old = Galois::atomicAdd(ddata.residual, delta);
+      delta = residual_old*(1-local_alpha)/sdata.nout;
+    }
+    for(auto nbr = graph->edge_begin(src), ee = graph->edge_end(src); nbr != ee; ++nbr){
+      GNode dst = graph->getEdgeDst(nbr);
+      PR_NodeData& ddata = graph->getData(dst);
+      auto dst_residual_old = Galois::atomicAdd(ddata.residual, delta);
 
-        //Schedule TOLERANCE threshold crossed.
-        if((dst_residual_old <= local_tolerance) && ((dst_residual_old + delta) >= local_tolerance)) {
-          ctx.push(WorkItem(graph->getGID(dst)));
-        }
+      //Schedule TOLERANCE threshold crossed.
+      if((dst_residual_old <= local_tolerance) && ((dst_residual_old + delta) >= local_tolerance)) {
+        ctx.push(WorkItem(graph->getGID(dst)));
       }
     }
   }
