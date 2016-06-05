@@ -1,7 +1,10 @@
 #!/bin/sh
 
 INPUT=$(cd $(dirname "$1") && pwd -P)/$(basename "$1")
-if [ -d "$2" ]; then
+if [ -n "$2" ]; then
+  if ! [ -d "$2" ]; then
+    mkdir $2
+  fi
   OUTPUT_DIR="$( cd $2 && pwd )"
 else
   OUTPUT_DIR="$( cd "$(dirname "$0" )" && pwd )"
@@ -11,13 +14,13 @@ OS=$(lsb_release -si)
 
 if [ $OS = "Scientific" ]; then
   if [ -z "$ABELIAN_LLVM_BUILD" ]; then
-    ABELIAN_LLVM_BUILD=/workspace/ggill/source_build/llvm_build2
+    ABELIAN_LLVM_BUILD=/net/faraday/workspace/ggill/source_build/llvm_build2
   fi
   if [ -z "$ABELIAN_GALOIS_ROOT" ]; then
-    ABELIAN_GALOIS_ROOT=/workspace/ggill/Dist_latest/dist_hetero_new
+    ABELIAN_GALOIS_ROOT=/net/faraday/workspace/ggill/Dist_latest/dist_hetero_new
   fi
   if [ -z "$ABELIAN_GALOIS_BUILD" ]; then
-    ABELIAN_GALOIS_BUILD=/workspace/ggill/Dist_latest/build_dist_hetero/release_new_clang/
+    ABELIAN_GALOIS_BUILD=/net/faraday/workspace/ggill/Dist_latest/build_dist_hetero/release_new_clang/
   fi
   if [ -z "$ABELIAN_NON_HETEROGENEOUS" ]; then
     if [ -z "$ABELIAN_GGC_ROOT" ]; then

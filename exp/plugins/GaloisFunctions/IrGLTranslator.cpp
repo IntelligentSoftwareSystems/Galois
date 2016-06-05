@@ -319,7 +319,7 @@ public:
       bodyString << "CDecl([(\"int\", \"" << vertexName << "\", \"\")]),\n";
       bodyString << "CDecl([(\"bool\", \"pop\", \"\")]),\n";
       bodyString << "WL.pop(\"pop\", \"wlvertex\", \"" << vertexName << "\"),\n";
-      bodyString << "CBlock([\"if (pop == false) continue\"]),\n";
+      bodyString << "If(\"pop\", [\n"; // hack to handle unsuccessful pop (should be handled by IrGL compiler in the future)
     }
     symbolTable.insert(vertexName);
     return true;
@@ -345,6 +345,7 @@ public:
     std::size_t end = vertexName.find(",", begin);
     if (end == std::string::npos) end = vertexName.find(")", begin);
     vertexName = vertexName.substr(begin+1, end - begin - 1);
+    if (!isTopological) bodyString << "]),\n"; // end If "pop"
     if (conditional == 0) bodyString << "ClosureHint(\n";
     bodyString << "ForAll(\"" << variableName << "\", G.edges(\"" << vertexName << "\"),\n[\n";
     return true;
@@ -371,6 +372,7 @@ public:
       }
     }
     symbolTable.insert(variableName);
+    if (!isTopological) bodyString << "]),\n"; // end If "pop"
     if (conditional == 0) bodyString << "ClosureHint(\n";
     bodyString << "ForAll(\"" << variableName << "\", G.edges(\"" << vertexName << "\"),\n[\n";
     return true;

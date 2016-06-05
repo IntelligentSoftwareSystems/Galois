@@ -47,12 +47,17 @@ CDecl([("int", "src", "")]),
 CDecl([("bool", "pop", "")]),
 WL.pop("pop", "wlvertex", "src"),
 CDecl([("float", "residual_old", "")]),
+CDecl([("float", "delta", "")]),
+If("pop", [
 CBlock(["residual_old = atomicExch(&p_residual[src], 0.0)"]),
 CBlock(["p_value[src] += residual_old"]),
+CBlock(["delta = 0"]),
 If("p_nout[src] > 0",
 [
-CDecl([("float", "delta", "")]),
 CBlock(["delta = residual_old*(1-local_alpha)/p_nout[src]"]),
+]),
+]),
+ClosureHint(
 ForAll("nbr", G.edges("src"),
 [
 CDecl([("index_type", "dst", "")]),
@@ -64,7 +69,7 @@ If("(dst_residual_old <= local_tolerance) && ((dst_residual_old + delta) >= loca
 WL.push("dst"),
 ]),
 ]),
-]),
+),
 ]),
 ]),
 Kernel("ResetGraph_cuda", [('struct CUDA_Context *', 'ctx')],
