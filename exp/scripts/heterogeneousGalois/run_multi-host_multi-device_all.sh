@@ -1,18 +1,6 @@
 #!/bin/sh
 
-#EXEC=prpushwl_filter_vcut_het_auto_gen
-#EXEC=prpush_vcut_het_auto_gen
-#EXEC=prpushwl_filter_het_auto_gen
-#EXEC=prpushwl_het_auto_gen
-#EXEC=prpush_het_auto_gen
-#EXEC=sssppush_het_auto_gen
-#EXEC=sssppushwl_het_auto_gen
-EXEC=bfspush_het_auto_gen
-#EXEC=bfspushwl_het_auto_gen
-#EXEC=bfspushwl_filter_het_auto_gen
-#EXEC=ccpush_het_auto_gen
-#EXEC=ccpushwl_het_auto_gen
-#EXEC=ccpushwl_filter_het_auto_gen
+EXEC=bfs_push-topological_edge-cut
 
 #INPUT=USA-road-d.USA.gr
 INPUT=rmat16-2e25-a=0.57-b=0.19-c=0.19-d=.05.gr
