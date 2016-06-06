@@ -26,12 +26,11 @@
  *
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
+
 #include "Galois/Statistic.h"
-#include "Galois/gdeque.h"
-#include "Galois/Substrate/PerThreadStorage.h"
+#include "Galois/Runtime/StatManager.h"
 #include "Galois/Runtime/Support.h"
 #include "Galois/Substrate/gio.h"
-#include "Galois/Substrate/PaddedLock.h"
 #include "Galois/Substrate/StaticInstance.h"
 #include "Galois/Runtime/Mem.h"
 
@@ -51,229 +50,187 @@ extern unsigned activeThreads;
 using namespace Galois;
 using namespace Galois::Runtime;
 
-namespace {
+const std::string* Galois::Runtime::StatManager::getSymbol(const std::string& str) const {
+  auto ii = symbols.find(str);
+  if (ii == symbols.cend())
+    return nullptr;
+  return &*ii;
+}
 
-class StatManager {
+const std::string* Galois::Runtime::StatManager::getOrInsertSymbol(const std::string& str) {
+  auto ii = symbols.insert(str);
+  return &*ii.first;
+}
 
-  template<typename Ty>
-  using StringPair = std::pair<const std::string*, Ty>;
+unsigned Galois::Runtime::StatManager::getInstanceNum(const std::string& str) const {
+  auto s = getSymbol(str);
+  if (!s)
+    return 0;
+  auto ii = std::lower_bound(loopInstances.begin(), loopInstances.end(), s, [] (const StringPair<unsigned>& s1, const std::string* s2) { return s1.first < s2; } );
+  if (ii == loopInstances.end() || s != ii->first)
+    return 0;
+  return ii->second;
+}
 
-  //////////////////////////////////////
-  //Symbol Table
-  //////////////////////////////////////
-  std::set<std::string> symbols;
-  const std::string* getSymbol(const std::string& str) const {
-    auto ii = symbols.find(str);
-    if (ii == symbols.cend())
-      return nullptr;
-    return &*ii;
+void Galois::Runtime::StatManager::addInstanceNum(const std::string& str) {
+  auto s = getOrInsertSymbol(str);
+  auto ii = std::lower_bound(loopInstances.begin(), loopInstances.end(), s, [] (const StringPair<unsigned>& s1, const std::string* s2) { return s1.first < s2; } );
+  if (ii == loopInstances.end() || s != ii->first) {
+    loopInstances.emplace_back(s, 0);
+    std::sort(loopInstances.begin(), loopInstances.end(), [] (const StringPair<unsigned>& s1, const StringPair<unsigned>& s2) { return s1.first < s2.first; } );
+  } else {
+    ++ii->second;
   }
-  const std::string* getOrInsertSymbol(const std::string& str) {
-    auto ii = symbols.insert(str);
-    return &*ii.first;
+}
+
+Galois::Runtime::StatManager::RecordTy::RecordTy(const std::string* loop, const std::string* category, unsigned instance, size_t value) :loop(loop), category(category),instance(instance), mode(0), valueInt(value) {}
+
+Galois::Runtime::StatManager::RecordTy::RecordTy(const std::string* loop, const std::string* category, unsigned instance, double value) :loop(loop), category(category),instance(instance), mode(1), valueDouble(value) {}
+
+Galois::Runtime::StatManager::RecordTy::RecordTy(const std::string* loop, const std::string* category, unsigned instance, const std::string& value) :loop(loop), category(category),instance(instance), mode(2), valueStr(value) {}
+
+Galois::Runtime::StatManager::RecordTy::~RecordTy() {
+  using string_type = std::string;
+  if (mode == 2)
+    valueStr.~string_type();
+}
+
+Galois::Runtime::StatManager::RecordTy::RecordTy(const RecordTy& r) : loop(r.loop), category(r.category), instance(r.instance), mode(r.mode) {
+  switch(mode) {
+  case 0: valueInt    = r.valueInt;    break;
+  case 1: valueDouble = r.valueDouble; break;
+  case 2: valueStr    = r.valueStr;    break;
   }
+}      
 
-  //////////////////////////////////////
-  //Loop instance counter
-  //////////////////////////////////////
-  std::vector<StringPair<unsigned> > loopInstances;
-
-  unsigned getInstanceNum(const std::string& str) const {
-    auto s = getSymbol(str);
-    if (!s)
-      return 0;
-    auto ii = std::lower_bound(loopInstances.begin(), loopInstances.end(), s, [] (const StringPair<unsigned>& s1, const std::string* s2) { return s1.first < s2; } );
-    if (ii == loopInstances.end() || s != ii->first)
-      return 0;
-    return ii->second;
+void Galois::Runtime::StatManager::RecordTy::print(std::ostream& out) const {
+  switch(mode) {
+  case 0: out << valueInt;    break;
+  case 1: out << valueDouble; break;
+  case 2: out << valueStr;    break;
   }
+}
 
-  void addInstanceNum(const std::string& str) {
-    auto s = getOrInsertSymbol(str);
-    auto ii = std::lower_bound(loopInstances.begin(), loopInstances.end(), s, [] (const StringPair<unsigned>& s1, const std::string* s2) { return s1.first < s2; } );
-    if (ii == loopInstances.end() || s != ii->first) {
-      loopInstances.emplace_back(s, 0);
-      std::sort(loopInstances.begin(), loopInstances.end(), [] (const StringPair<unsigned>& s1, const StringPair<unsigned>& s2) { return s1.first < s2.first; } );
-    } else {
-      ++ii->second;
-    }
-  }
+template<typename T>
+void Galois::Runtime::StatManager::RecordList::insertStat(const std::string* loop, const std::string* category, unsigned instance, const T& val) {
+  MAKE_LOCK_GUARD(lock);
+  stats.push_back(RecordTy(loop, category, instance, val));
+}
 
-  //////////////////////////////////////
-  //Stat list
-  //////////////////////////////////////
-  struct RecordTy {
-    const std::string* loop;
-    const std::string* category;
-    unsigned instance;
-    char mode; // 0 - int, 1 - double, 2 - string
-    union {
-      size_t valueInt;
-      double valueDouble;
-      std::string valueStr;
-    };
-    RecordTy(const std::string* loop, const std::string* category, unsigned instance, size_t value) :loop(loop), category(category),instance(instance), mode(0), valueInt(value) {}
-    RecordTy(const std::string* loop, const std::string* category, unsigned instance, double value) :loop(loop), category(category),instance(instance), mode(1), valueDouble(value) {}
-    RecordTy(const std::string* loop, const std::string* category, unsigned instance, const std::string& value) :loop(loop), category(category),instance(instance), mode(2), valueStr(value) {}
-
-    ~RecordTy() {
-      using string_type = std::string;
-      if (mode == 2)
-        valueStr.~string_type();
-    }
-
-    RecordTy(const RecordTy& r) : loop(r.loop), category(r.category), instance(r.instance), mode(r.mode) {
-      switch(mode) {
-      case 0: valueInt    = r.valueInt;    break;
-      case 1: valueDouble = r.valueDouble; break;
-      case 2: valueStr    = r.valueStr;    break;
-      }
-    }      
-
-    void print(std::ostream& out) const {
-      switch(mode) {
-      case 0: out << valueInt;    break;
-      case 1: out << valueDouble; break;
-      case 2: out << valueStr;    break;
-      }
-    }
-  };
-
-  struct RecordList {
-    Substrate::SimpleLock lock;
-    gdeque<RecordTy> stats;
-
-    template<typename T>
-    void insertStat(const std::string* loop, const std::string* category, unsigned instance, const T& val) {
-      MAKE_LOCK_GUARD(lock);
-      stats.push_back(RecordTy(loop, category, instance, val));
-    }
-  };    
-
-
-  Galois::Substrate::PerThreadStorage<RecordList> Stats;
-  
- 
-  //////////////////////////////////////
-
-public:
-  StatManager() {}
-
-  void addToStat(const std::string& loop, const std::string& category, size_t value) {
+void Galois::Runtime::StatManager::addToStat(const std::string& loop, const std::string& category, size_t value, unsigned TID) {
+  if (TID == Substrate::ThreadPool::getTID())
     Stats.getLocal()->insertStat(getOrInsertSymbol(loop), getOrInsertSymbol(category), getInstanceNum(loop), value);
-  }
-  void addToStat(const std::string& loop, const std::string& category, double value) {
-    Stats.getLocal()->insertStat(getOrInsertSymbol(loop), getOrInsertSymbol(category), getInstanceNum(loop), value);
-  }
-  void addToStat(const std::string& loop, const std::string& category, const std::string& value) {
-    Stats.getLocal()->insertStat(getOrInsertSymbol(loop), getOrInsertSymbol(category), getInstanceNum(loop), value);
-  }
-
-  void addToStat(Galois::Statistic* value) {
-    for (unsigned x = 0; x < Galois::Runtime::activeThreads; ++x)
-      Stats.getRemote(x)->insertStat(getOrInsertSymbol(value->getLoopname()), getOrInsertSymbol(value->getStatname()), 0, value->getValue(x));
-  }
-
-  void addPageAllocToStat(const std::string& loop, const std::string& category) {
-    for (unsigned x = 0; x < Galois::Runtime::activeThreads; ++x)
-      Stats.getRemote(x)->insertStat(getOrInsertSymbol(loop), getOrInsertSymbol(category), getInstanceNum(loop), static_cast<unsigned long>(numPagePoolAllocForThread(x)));
-  }
-
-  void addNumaAllocToStat(const std::string& loop, const std::string& category) {
-    int nodes = Galois::Substrate::ThreadPool::getThreadPool().getMaxNumaNodes();
-    for (int x = 0; x < nodes; ++x) {
-      //auto rStat = Stats.getRemote(x);
-      //std::lock_guard<Substrate::SimpleLock> lg(rStat->first);
-      //      rStat->second.emplace_back(loop, category, numNumaAllocForNode(x));
-    }
-  }
-
-  //assumne called serially
-  void printStatsForR(std::ostream& out, bool json) {
-    if (json)
-      out << "[\n";
-      else
-        out << "LOOP,INSTANCE,CATEGORY,THREAD,VAL\n";
-    for (unsigned x = 0; x < Stats.size(); ++x) {
-      auto rStat = Stats.getRemote(x);
-      MAKE_LOCK_GUARD(rStat->lock);
-      for (auto& r : rStat->stats) {
-        if (json)
-          out << "{ \"LOOP\" : " << *r.loop << " , \"INSTANCE\" : " << r.instance << " , \"CATEGORY\" : " << *r.category << " , \"THREAD\" : " << x << " , \"VALUE\" : ";
-        else
-          out << *r.loop << "," << r.instance << "," << *r.category << "," << x << ",";
-        r.print(out);
-        out << (json ? "}\n" : "\n");
-      }
-    }
-    if (json)
-      out << "]\n";
-  }
-
-  //Assume called serially
-  //still assumes int values
-  void printStats(std::ostream& out) {
-    std::map<std::tuple<const std::string*, unsigned, const std::string*>, std::vector<size_t> > LKs;
-    
-    unsigned maxThreadID = 0;
-    //Find all loops and keys
-    for (unsigned x = 0; x < Stats.size(); ++x) {
-      auto rStat = Stats.getRemote(x);
-      std::lock_guard<Substrate::SimpleLock> lg(rStat->lock);
-      for (auto& r : rStat->stats) {
-        maxThreadID = x;
-	auto& v = LKs[std::make_tuple(r.loop, r.instance, r.category)];
-        if (v.size() <= x)
-          v.resize(x+1);
-        v[x] += r.valueInt;
-      }
-    }
-    //print header
-    out << "STATTYPE,LOOP,INSTANCE,CATEGORY,n,sum";
-    for (unsigned x = 0; x <= maxThreadID; ++x)
-      out << ",T" << x;
-    out << "\n";
-    //print all values
-    for (auto ii = LKs.begin(), ee = LKs.end(); ii != ee; ++ii) {
-      std::vector<unsigned long>& Values = ii->second;
-      out << "STAT,"
-          << std::get<0>(ii->first)->c_str() << ","
-          << std::get<1>(ii->first) << ","
-          << std::get<2>(ii->first)->c_str() << ","
-          << maxThreadID + 1 <<  ","
-          << std::accumulate(Values.begin(), Values.end(), static_cast<unsigned long>(0));
-      for (unsigned x = 0; x <= maxThreadID; ++x)
-        out << "," <<  (x < Values.size() ? Values.at(x) : 0);
-      out << "\n";
-    }
-  }
-
-  void beginLoopInstance(const std::string& str) {
-    addInstanceNum(str);
-  }
-
-};
-
-static Substrate::StaticInstance<StatManager> SM;
+  else
+    Stats.getRemote(TID)->insertStat(getOrInsertSymbol(loop), getOrInsertSymbol(category), getInstanceNum(loop), value);
 
 }
+
+void Galois::Runtime::StatManager::addToStat(const std::string& loop, const std::string& category, double value, unsigned TID) {
+  if (TID == Substrate::ThreadPool::getTID())
+    Stats.getLocal()->insertStat(getOrInsertSymbol(loop), getOrInsertSymbol(category), getInstanceNum(loop), value);
+  else
+    Stats.getRemote(TID)->insertStat(getOrInsertSymbol(loop), getOrInsertSymbol(category), getInstanceNum(loop), value);
+}
+
+void Galois::Runtime::StatManager::addToStat(const std::string& loop, const std::string& category, const std::string& value, unsigned TID) {
+  if (TID == Substrate::ThreadPool::getTID())
+    Stats.getLocal()->insertStat(getOrInsertSymbol(loop), getOrInsertSymbol(category), getInstanceNum(loop), value);
+  else
+    Stats.getRemote(TID)->insertStat(getOrInsertSymbol(loop), getOrInsertSymbol(category), getInstanceNum(loop), value);
+}
+
+void Galois::Runtime::StatManager::addPageAllocToStat(const std::string& loop, const std::string& category) {
+  for (unsigned x = 0; x < Galois::Runtime::activeThreads; ++x)
+    Stats.getRemote(x)->insertStat(getOrInsertSymbol(loop), getOrInsertSymbol(category), getInstanceNum(loop), static_cast<unsigned long>(numPagePoolAllocForThread(x)));
+}
+
+void Galois::Runtime::StatManager::addNumaAllocToStat(const std::string& loop, const std::string& category) {
+  int nodes = Substrate::ThreadPool::getThreadPool().getMaxNumaNodes();
+  for (int x = 0; x < nodes; ++x) {
+    //auto rStat = Stats.getRemote(x);
+    //std::lock_guard<Substrate::SimpleLock> lg(rStat->first);
+    //      rStat->second.emplace_back(loop, category, numNumaAllocForNode(x));
+  }
+}
+
+//assumne called serially
+void Galois::Runtime::StatManager::printStatsForR(std::ostream& out, bool json) {
+  if (json)
+    out << "[\n";
+  else
+    out << "LOOP,INSTANCE,CATEGORY,THREAD,VAL\n";
+  for (unsigned x = 0; x < Stats.size(); ++x) {
+    auto rStat = Stats.getRemote(x);
+    MAKE_LOCK_GUARD(rStat->lock);
+    for (auto& r : rStat->stats) {
+      if (json)
+        out << "{ \"LOOP\" : " << *r.loop << " , \"INSTANCE\" : " << r.instance << " , \"CATEGORY\" : " << *r.category << " , \"THREAD\" : " << x << " , \"VALUE\" : ";
+      else
+        out << *r.loop << "," << r.instance << "," << *r.category << "," << x << ",";
+      r.print(out);
+      out << (json ? "}\n" : "\n");
+    }
+  }
+  if (json)
+    out << "]\n";
+}
+
+//Assume called serially
+//still assumes int values
+void Galois::Runtime::StatManager::printStats(std::ostream& out) {
+  std::map<std::tuple<const std::string*, unsigned, const std::string*>, std::vector<size_t> > LKs;
+  
+  unsigned maxThreadID = 0;
+  //Find all loops and keys
+  for (unsigned x = 0; x < Stats.size(); ++x) {
+    auto rStat = Stats.getRemote(x);
+    std::lock_guard<Substrate::SimpleLock> lg(rStat->lock);
+    for (auto& r : rStat->stats) {
+      maxThreadID = x;
+      auto& v = LKs[std::make_tuple(r.loop, r.instance, r.category)];
+      if (v.size() <= x)
+        v.resize(x+1);
+      v[x] += r.valueInt;
+    }
+  }
+  //print header
+  out << "STATTYPE,LOOP,INSTANCE,CATEGORY,n,sum";
+  for (unsigned x = 0; x <= maxThreadID; ++x)
+    out << ",T" << x;
+  out << "\n";
+  //print all values
+  for (auto ii = LKs.begin(), ee = LKs.end(); ii != ee; ++ii) {
+    std::vector<unsigned long>& Values = ii->second;
+    out << "STAT,"
+        << std::get<0>(ii->first)->c_str() << ","
+        << std::get<1>(ii->first) << ","
+        << std::get<2>(ii->first)->c_str() << ","
+        << maxThreadID + 1 <<  ","
+        << std::accumulate(Values.begin(), Values.end(), static_cast<unsigned long>(0));
+    for (unsigned x = 0; x <= maxThreadID; ++x)
+      out << "," <<  (x < Values.size() ? Values.at(x) : 0);
+    out << "\n";
+  }
+}
+
+void Galois::Runtime::StatManager::beginLoopInstance(const std::string& str) {
+  addInstanceNum(str);
+}
+
+static Substrate::StaticInstance<Galois::Runtime::StatManager> SM;
 
 void Galois::Runtime::reportLoopInstance(const char* loopname) {
   SM.get()->beginLoopInstance(std::string(loopname ? loopname : "(NULL)"));
 }
 
-void Galois::Runtime::reportStat(const char* loopname, const char* category, unsigned long value) {
+void Galois::Runtime::reportStat(const char* loopname, const char* category, unsigned long value, unsigned TID) {
   SM.get()->addToStat(std::string(loopname ? loopname : "(NULL)"), 
 		      std::string(category ? category : "(NULL)"),
-		      value);
+		      value, TID);
 }
 
-void Galois::Runtime::reportStat(const std::string& loopname, const std::string& category, unsigned long value) {
-  SM.get()->addToStat(loopname, category, value);
-}
-
-void Galois::Runtime::reportStat(Galois::Statistic* value) {
-  SM.get()->addToStat(value);
+void Galois::Runtime::reportStat(const std::string& loopname, const std::string& category, unsigned long value, unsigned TID) {
+  SM.get()->addToStat(loopname, category, value, TID);
 }
 
 void Galois::Runtime::reportStatGlobal(const std::string&, const std::string&) {

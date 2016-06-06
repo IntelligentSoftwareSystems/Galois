@@ -218,9 +218,9 @@ protected:
   }
 
   void dumpStats (void) {
-    reportStat (loopname, "rounds", rounds);
-    reportStat (loopname, "committed", totalCommits);
-    reportStat (loopname, "total", totalTasks);
+    reportStat (loopname, "rounds", rounds,0);
+    reportStat (loopname, "committed", totalCommits,0);
+    reportStat (loopname, "total", totalTasks,0);
     // reportStat (loopname, "efficiency", double (totalRetires.reduce ()) / totalTasks);
     // reportStat (loopname, "avg. parallelism", double (totalRetires.reduce ()) / rounds);
 

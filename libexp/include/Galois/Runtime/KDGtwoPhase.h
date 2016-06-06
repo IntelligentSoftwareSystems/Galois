@@ -256,8 +256,8 @@ public:
   }
 
   void dumpStats (void) {
-    reportStat (Base::loopname, "efficiency %", double (100.0 * Base::totalCommits) / Base::totalTasks);
-    reportStat (Base::loopname, "avg. parallelism", double (Base::totalCommits) / Base::rounds);
+    reportStat (Base::loopname, "efficiency %", double (100.0 * Base::totalCommits) / Base::totalTasks,0);
+    reportStat (Base::loopname, "avg. parallelism", double (Base::totalCommits) / Base::rounds,0);
   }
 
   template <typename R>

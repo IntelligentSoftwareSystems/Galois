@@ -492,8 +492,8 @@ public:
     }
 
     if (tld.wid.tid == 0)
-      reportStat(loopname, "Rounds", tld.rounds);
-    reportStat(loopname, "Iterations", tld.iterations);
+      reportStat(loopname, "Rounds", tld.rounds, 0);
+    reportStat(loopname, "Iterations", tld.iterations, tld.wid.tid);
   }
 };
 

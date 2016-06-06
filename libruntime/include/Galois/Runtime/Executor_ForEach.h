@@ -187,10 +187,10 @@ protected:
     {}
     ~ThreadLocalData() {
       if (needsStats) {
-        reportStat(loopname, "Conflicts", stat_conflicts);
-        reportStat(loopname, "Commits", stat_iterations - stat_conflicts);
-        reportStat(loopname, "Pushes", stat_pushes);
-        reportStat(loopname, "Iterations", stat_iterations);
+        reportStat(loopname, "Conflicts", stat_conflicts, 0);
+        reportStat(loopname, "Commits", stat_iterations - stat_conflicts, 0);
+        reportStat(loopname, "Pushes", stat_pushes, 0);
+        reportStat(loopname, "Iterations", stat_iterations, 0);
       }
     }
   };
