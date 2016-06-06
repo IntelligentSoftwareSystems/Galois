@@ -41,7 +41,7 @@ struct TypeHelper {
   typedef des::Input<SimObj_ty> Input_ty;
   typedef des::Output<SimObj_ty> Output_ty;
 
-  typedef des::SimInit<SimGate_ty, Input_ty, Output_ty> SimInit_ty;
+  typedef des::SimInit<NEEDS_NULL_EVENTS, SimGate_ty, Input_ty, Output_ty> SimInit_ty;
   
 };
 

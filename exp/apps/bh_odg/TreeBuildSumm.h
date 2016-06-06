@@ -743,9 +743,14 @@ struct TreeSummarizeSpeculative: public TypeDefHelper<SpecNodeBase> {
   template <typename I, typename InternalNodes>
   void operator () (InterNode* root, I bodbeg, I bodend, InternalNodes& internalNodes) const {
 
-    Galois::Runtime::for_each_ordered_optim (
+    Galois::Runtime::for_each_ordered_spec (
         Galois::Runtime::makeLocalRange (internalNodes),
-        LevelComparator<TreeNode> (), VisitNhood (), OpFunc<true> ());
+        LevelComparator<TreeNode> (), 
+        VisitNhood (), 
+        OpFunc<true> (),
+        std::make_tuple (
+          Galois::loopname ("tree_summ_spec"),
+          Galois::enable_parameter<fasle> ()));
 
   }
 };
@@ -758,9 +763,14 @@ struct TreeSummarizeTwoPhase: public TreeSummarizeSpeculative {
   template <typename I, typename InternalNodes>
   void operator () (InterNode* root, I bodbeg, I bodend, InternalNodes& internalNodes) const {
 
-    Galois::Runtime::for_each_ordered_2p_win (
+    Galois::Runtime::for_each_ordered_ikdg (
         Galois::Runtime::makeLocalRange (internalNodes),
-        LevelComparator<TreeNode> (), Base::VisitNhood (), Base::OpFunc<false> ());
+        LevelComparator<TreeNode> (), 
+        Base::VisitNhood (), 
+        Base::OpFunc<false> ()
+        std::make_tuple (
+          Galois::loopname ("tree_summ_ikdg"),
+          Galois::enable_parameter<false> ()));
 
   }
 };

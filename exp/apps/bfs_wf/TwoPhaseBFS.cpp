@@ -51,11 +51,14 @@ public:
     std::vector<Update> wl;
     wl.push_back (first);
 
-    Galois::Runtime::for_each_ordered_2p_win (
+    Galois::Runtime::for_each_ordered_ikdg (
         Galois::Runtime::makeStandardRange(wl.begin (), wl.end ()),
         Comparator (), 
         VisitNhood (graph),
-        OpFunc (graph, numIter));
+        OpFunc (graph, numIter),
+        std::make_tuple (
+          Galois::loopname ("bfs_two_phase"),
+          Galois::enable_parameter<false> ()));
 
 
     std::cout << "number of iterations: " << numIter.reduce () << std::endl;

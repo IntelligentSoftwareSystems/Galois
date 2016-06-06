@@ -65,6 +65,10 @@ void destroyVec (std::vector<T*>& vec) {
   vec.clear ();
 }
 
+enum NullEventOpt {
+  NEEDS_NULL_EVENTS, NO_NULL_EVENTS
+};
+
 } // namespace des
 
 #endif
