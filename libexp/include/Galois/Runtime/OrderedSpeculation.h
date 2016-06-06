@@ -689,11 +689,11 @@ protected:
 
   void dumpStats (void) {
 
-    reportStat (Base::loopname, "retired", totalRetires.reduce ());
-    reportStat (Base::loopname, "efficiency%", double (100 * totalRetires.reduce ()) / Base::totalTasks);
-    reportStat (Base::loopname, "avg. parallelism", double (totalRetires.reduce ()) / Base::rounds);
-    reportStat ("NULL", "t_expandNhood",    t_expandNhood.get ());
-    reportStat ("NULL", "t_beginRound",     t_beginRound.get ());
+    reportStat (Base::loopname, "retired", totalRetires.reduce (),0);
+    reportStat (Base::loopname, "efficiency%", double (100 * totalRetires.reduce ()) / Base::totalTasks,0);
+    reportStat (Base::loopname, "avg. parallelism", double (totalRetires.reduce ()) / Base::rounds, 0);
+    reportStat ("NULL", "t_expandNhood",    t_expandNhood.get (),0);
+    reportStat ("NULL", "t_beginRound",     t_beginRound.get (),0);
 
     if (Base::ENABLE_PARAMETER) {
       dumpParaMeterStats ();
@@ -936,11 +936,11 @@ public:
   }
 
   ~OptimOrdExecutor (void) {
-    reportStat ("NULL", "t_executeSources", t_executeSources.get ());
-    reportStat ("NULL", "t_applyOperator",  t_applyOperator.get ());
-    reportStat ("NULL", "t_serviceAborts",  t_serviceAborts.get ());
-    reportStat ("NULL", "t_performCommits", t_performCommits.get ());
-    reportStat ("NULL", "t_reclaimMemory",  t_reclaimMemory.get ());
+    reportStat ("NULL", "t_executeSources", t_executeSources.get (),0);
+    reportStat ("NULL", "t_applyOperator",  t_applyOperator.get (),0);
+    reportStat ("NULL", "t_serviceAborts",  t_serviceAborts.get (),0);
+    reportStat ("NULL", "t_performCommits", t_performCommits.get (),0);
+    reportStat ("NULL", "t_reclaimMemory",  t_reclaimMemory.get (),0);
   }
 
   void operator () (void) {
@@ -1450,10 +1450,10 @@ public:
   }
 
   ~PessimOrdExecutor (void) {
-    reportStat ("NULL", "t_executeSources", t_executeSources.get ());
-    reportStat ("NULL", "t_applyOperator",  t_applyOperator.get ());
-    reportStat ("NULL", "t_serviceAborts",  t_serviceAborts.get ());
-    reportStat ("NULL", "t_performCommits", t_performCommits.get ());
+    reportStat ("NULL", "t_executeSources", t_executeSources.get (),0);
+    reportStat ("NULL", "t_applyOperator",  t_applyOperator.get (),0);
+    reportStat ("NULL", "t_serviceAborts",  t_serviceAborts.get (),0);
+    reportStat ("NULL", "t_performCommits", t_performCommits.get (),0);
   }
 
   void markForAbort (Ctxt* c) {

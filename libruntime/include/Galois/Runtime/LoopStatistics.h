@@ -36,8 +36,8 @@ class LoopStatistics {
 public:
   explicit LoopStatistics(const char* ln) :conflicts(0), iterations(0), loopname(ln) { }
   ~LoopStatistics() {
-    reportStat(loopname, "Conflicts", conflicts);
-    reportStat(loopname, "Iterations", iterations);
+    reportStat(loopname, "Conflicts", conflicts, 0);
+    reportStat(loopname, "Iterations", iterations, 0);
   }
   inline void inc_iterations() {
     ++iterations;

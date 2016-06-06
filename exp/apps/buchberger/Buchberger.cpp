@@ -26,6 +26,7 @@
  *
  * @author Donald Nguyen <ddn@cs.utexas.edu>
  */
+
 #include "Galois/Galois.h"
 #include "Galois/Bag.h"
 #include "Galois/Statistic.h"

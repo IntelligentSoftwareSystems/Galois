@@ -240,11 +240,6 @@ void ThreadPool::runInternal(unsigned num) {
   running = false;
 }
 
-namespace Galois {
-unsigned int setActiveThreads(unsigned int) noexcept;
-unsigned int getActiveThreads() noexcept;
-}
-
 void ThreadPool::runDedicated(std::function<void(void)>& f) {
   GALOIS_ASSERT(!running, "can't start dedicated thread durring parallel section");
   ++reserved;
@@ -257,7 +252,7 @@ void ThreadPool::runDedicated(std::function<void(void)>& f) {
   child->wakeup(masterFastmode);
   while (!child->done) { asmPause(); }
   work = nullptr;
-  Galois::setActiveThreads(Galois::getActiveThreads());
+  //FIXME: Galois::setActiveThreads(Galois::getActiveThreads());
 }
 
 ThreadPool& ThreadPool::getThreadPool() {

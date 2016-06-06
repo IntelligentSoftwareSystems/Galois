@@ -700,7 +700,7 @@ public:
     ctx.timer.stop ();
     assert (!ctx.hasWork ());
 
-    Galois::Runtime::reportStat (loopname, "Iterations", ctx.num_iter);
+    Galois::Runtime::reportStat (loopname, "Iterations", ctx.num_iter, 0);
   }
 
 
@@ -768,7 +768,7 @@ void do_all_coupled_detailed (const R& range, const F& func, const _ArgsTuple& a
   Runtime::on_each_impl( 
       [&maxTime, &perThrdTimer, ln] (const unsigned tid, const unsigned numT) {
         GALOIS_ASSERT ((maxTime - perThrdTimer[tid].get_nsec ()) >= 0);
-        Runtime::reportStat (ln, "LoadImbalance", maxTime - perThrdTimer[tid].get_nsec ());
+        Runtime::reportStat (ln, "LoadImbalance", maxTime - perThrdTimer[tid].get_nsec (), 0);
       });
 
 
