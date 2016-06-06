@@ -63,9 +63,8 @@ if [ -z "$ABELIAN_NON_HETEROGENEOUS" ]; then
   if [ -f "$OUTPUT_DIR/GGCFLAGS" ]; then
     GGC_FLAGS+=$(head -n 1 "$OUTPUT_DIR/GGCFLAGS")
   fi
+  echo "Using GGC FLAGS:" $GGC_FLAGS
 fi
-
-echo "Using GGC FLAGS:" $GGC_FLAGS
 
 CXX=$ABELIAN_LLVM_BUILD/bin/clang++
 GPREPROCESS_CXX="$CXX -Xclang -load -Xclang $ABELIAN_LLVM_BUILD/lib/GaloisFunctionsPreProcess.so -Xclang -plugin -Xclang galois-preProcess"

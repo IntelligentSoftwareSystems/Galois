@@ -1,4 +1,5 @@
 #!/bin/sh
+# assumes 3 GPU devices available
 
 MPI=mpiexec
 EXEC=$1
@@ -20,8 +21,10 @@ if [[ $EXEC == *"vertex-cut"* ]]; then
   if [[ $INPUT == *"road"* ]]; then
     exit
   fi
+  # assumes 3 GPU devices available
   SET="gc,2,2 cg,2,2 gg,2,2 gggc,4,1"
 else
+  # assumes 3 GPU devices available
   SET="c,1,4 g,1,4 gc,2,2 cg,2,2 gg,2,2 ggg,3,1 gggc,4,1"
 fi
 
