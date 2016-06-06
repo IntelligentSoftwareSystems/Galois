@@ -77,7 +77,7 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads):
   graph_init_time = 0
   hg_init_time = 0
   total_time = 0
-  thousand = 1000
+  thousand = 1000.0
 
 
   timer_regex = re.compile(r'\[' + re.escape(forHost) + r'\]STAT,\(NULL\),TIMER_(\d*),' + re.escape(numThreads) + r',(\d*),(\d*).*')
@@ -148,15 +148,15 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads):
   timer_total = timer_total_regex.search(log_data)
 
   if timer_graph_init is not None:
-    graph_init_time = timer_graph_init.group(1)
+    graph_init_time = float(timer_graph_init.group(1))
     graph_init_time /= thousand
 
   if timer_hg_init is not None:
-    hg_init_time = timer_hg_init.group(1)
+    hg_init_time = float(timer_hg_init.group(1))
     hg_init_time /= thousand
 
   if timer_total is not None:
-    total_time = timer_total.group(1)
+    total_time = float(timer_total.group(1))
     total_time /= thousand
 
   #[13]STAT,PageRank,Commits,15,6377945,277895,324235,482281,296898,572496,295661,311751,434026,421630,445072,711824,444553,408666,535821,415136
