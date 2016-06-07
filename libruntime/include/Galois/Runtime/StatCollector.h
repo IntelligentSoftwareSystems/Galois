@@ -98,9 +98,6 @@ public:
   void addToStat(const std::string& loop, const std::string& category, double value, unsigned TID);
   void addToStat(const std::string& loop, const std::string& category, const std::string& value, unsigned TID);
 
-  void addPageAllocToStat(const std::string& loop, const std::string& category);
-  void addNumaAllocToStat(const std::string& loop, const std::string& category);
-
   void printStatsForR(std::ostream& out, bool json);
 
   //still assumes int values
