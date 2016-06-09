@@ -96,6 +96,9 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads):
 
   print "Mean time: ", mean_timer
 
+  if(benchmark == "cc"):
+    benchmark = "ConnectedComp"
+
   ## SYNC_PULL and SYNC_PUSH total average over runs.
   for i in range(0, int(numRuns)):
     # find sync_pull
@@ -116,26 +119,26 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads):
   sync_push_avg_time_total /= thousand
 
   ## sendBytes and recvBytes.
-  recvBytes_regex = re.compile(r'\[' + re.escape(forHost) + r'\]STAT,\(NULL\),RecvBytes,\d*,(\d*),(\d*),.*')
-  recvBytes_search = recvBytes_regex.search(log_data)
-  if recvBytes_search is not None:
-     recvBytes_total = float(recvBytes_search.group(1))/int(numRuns)
+  #recvBytes_regex = re.compile(r'\[' + re.escape(forHost) + r'\]STAT,\(NULL\),RecvBytes,\d*,(\d*),(\d*),.*')
+  #recvBytes_search = recvBytes_regex.search(log_data)
+  #if recvBytes_search is not None:
+     #recvBytes_total = float(recvBytes_search.group(1))/int(numRuns)
 
-  sendBytes_regex = re.compile(r'\[' + re.escape(forHost) + r'\]STAT,\(NULL\),SendBytes,\d*,(\d*),(\d*),.*')
-  sendBytes_search = sendBytes_regex.search(log_data)
-  if sendBytes_search is not None:
-    sendBytes_total = float(sendBytes_search.group(1))/int(numRuns)
+  #sendBytes_regex = re.compile(r'\[' + re.escape(forHost) + r'\]STAT,\(NULL\),SendBytes,\d*,(\d*),(\d*),.*')
+  #sendBytes_search = sendBytes_regex.search(log_data)
+  #if sendBytes_search is not None:
+    #sendBytes_total = float(sendBytes_search.group(1))/int(numRuns)
 
-  ## sendBytes and recvBytes.
-  recvNum_regex = re.compile(r'\[' + re.escape(forHost) + r'\]STAT,\(NULL\),RecvNum,\d*,(\d*),(\d*),.*')
-  recvNum_search = recvNum_regex.search(log_data)
-  if recvNum_search is not None:
-    recvNum_total = float(recvNum_search.group(1))/int(numRuns)
+  ## sendNum and recvNum.
+  #recvNum_regex = re.compile(r'\[' + re.escape(forHost) + r'\]STAT,\(NULL\),RecvNum,\d*,(\d*),(\d*),.*')
+  #recvNum_search = recvNum_regex.search(log_data)
+  #if recvNum_search is not None:
+    #recvNum_total = float(recvNum_search.group(1))/int(numRuns)
 
-  sendNum_regex = re.compile(r'\[' + re.escape(forHost) + r'\]STAT,\(NULL\),SendNum,\d*,(\d*),(\d*),.*')
-  sendNum_search = sendNum_regex.search(log_data)
-  if sendNum_search is not None:
-    sendNum_total = float(sendNum_search.group(1))/int(numRuns)
+  #sendNum_regex = re.compile(r'\[' + re.escape(forHost) + r'\]STAT,\(NULL\),SendNum,\d*,(\d*),(\d*),.*')
+  #sendNum_search = sendNum_regex.search(log_data)
+  #if sendNum_search is not None:
+    #sendNum_total = float(sendNum_search.group(1))/int(numRuns)
 
   ## Get Graph_init, HG_init, total
   timer_graph_init_regex = re.compile(r'\[' + re.escape(forHost) + r'\]STAT,\(NULL\),TIMER_GRAPH_INIT,' + re.escape(numThreads) + r',(\d*),(\d*).*')
@@ -188,7 +191,37 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads):
     pushes /= int(numRuns)
 
 
-  return mean_timer,graph_init_time,hg_init_time,total_time,sync_pull_avg_time_total,sync_push_avg_time_total,recvNum_total,recvBytes_total,sendNum_total,sendBytes_total,commits,conflicts,iterations, pushes
+  #return mean_timer,graph_init_time,hg_init_time,total_time,sync_pull_avg_time_total,sync_push_avg_time_total,recvNum_total,recvBytes_total,sendNum_total,sendBytes_total,commits,conflicts,iterations, pushes
+  return mean_timer,graph_init_time,hg_init_time,total_time,sync_pull_avg_time_total,sync_push_avg_time_total,commits,conflicts,iterations, pushes
+
+
+def sendRecv_bytes_all(fileName, benchmark, total_hosts, numRuns, numThreads):
+  sendBytes_list = [0]*256 #Max host number is 256
+  recvBytes_list = [0]*256 #Max host number is 256
+
+  log_data = open(fileName).read()
+
+  ## sendBytes and recvBytes.
+  total_SendBytes = 0;
+  for host in range(0,int(total_hosts)):
+    sendBytes_regex = re.compile(r'\[' + re.escape(str(host)) + r'\]STAT,\(NULL\),SendBytes,\d*,(\d*),(\d*),.*')
+    sendBytes_search = sendBytes_regex.search(log_data)
+    if sendBytes_search is not None:
+      sendBytes_list[host] = float(sendBytes_search.group(1))/int(numRuns)
+
+  total_SendBytes = sum(sendBytes_list)
+
+  total_RecvBytes = 0;
+  for host in range(0,int(total_hosts)):
+    recvBytes_regex = re.compile(r'\[' + re.escape(str(host)) + r'\]STAT,\(NULL\),RecvBytes,\d*,(\d*),(\d*),.*')
+    recvBytes_search = recvBytes_regex.search(log_data)
+    if recvBytes_search is not None:
+       recvBytes_list[host] = float(recvBytes_search.group(1))/int(numRuns)
+
+  total_RecvBytes = sum(recvBytes_list)
+  return total_SendBytes, sendBytes_list
+
+
 
 def get_basicInfo(fileName):
 
@@ -206,7 +239,7 @@ def get_basicInfo(fileName):
   benchmark  = ''
   algo_type  = ''
   cut_type   = ''
-  input_type = ''
+  input_graph = ''
 
 
 
@@ -230,9 +263,9 @@ def get_basicInfo(fileName):
   benchmark, algo_type, cut_type =  split_cmdLine_algo
 
   split_cmdLine_input = cmdLine.split()[1].split("/")
-  input_type = split_cmdLine_input[-1]
+  input_graph = split_cmdLine_input[-1]
 
-  return hostNum, cmdLine, threads, runs, benchmark, algo_type, cut_type, input_type
+  return hostNum, cmdLine, threads, runs, benchmark, algo_type, cut_type, input_graph
 
 def main(argv):
   inputFile = ''
@@ -257,13 +290,30 @@ def main(argv):
   print 'Input file is : ', inputFile
   print 'Data for host : ', forHost
 
-  hostNum, cmdLine, threads, runs, benchmark, algo_type, cut_type, input_type = get_basicInfo(inputFile)
-  print 'Hosts : ', hostNum , ' CmdLine : ', cmdLine, ' Threads : ', threads , ' Runs : ', runs, ' benchmark :' , benchmark , ' algo_type :', algo_type, ' cut_type : ', cut_type, ' input_type : ', input_type
+  hostNum, cmdLine, threads, runs, benchmark, algo_type, cut_type, input_graph = get_basicInfo(inputFile)
+
+  #shorten the graph names:
+  if input_graph == "twitter-ICWSM10-component_withRandomWeights.transpose.gr" or input_graph == "twitter-ICWSM10-component-transpose.gr":
+    input_graph = "twitterIC_trans.gr"
+  elif input_graph == "twitter-ICWSM10-component_withRandomWeights.gr" or input_graph == "twitter-ICWSM10-component.gr":
+    input_graph = "twitterIC.gr"
+  elif input_graph == "USA-road-d.USA-trans.gr":
+    input_graph = "USA-trans.gr"
+  elif input_graph == "USA-road-d.USA.gr":
+    input_graph = "USA.gr"
+  elif input_graph == "rmat16-2e25-a=0.57-b=0.19-c=0.19-d=.05.transpose.gr":
+    input_graph = "rmat_trans.gr"
+  elif input_graph == "rmat16-2e25-a=0.57-b=0.19-c=0.19-d=.05.gr":
+    input_graph = "rmat.gr"
+
+
+  print 'Hosts : ', hostNum , ' CmdLine : ', cmdLine, ' Threads : ', threads , ' Runs : ', runs, ' benchmark :' , benchmark , ' algo_type :', algo_type, ' cut_type : ', cut_type, ' input_graph : ', input_graph
 
   data = match_timers(inputFile, benchmark, forHost, runs, threads)
+  total_SendBytes, sendBytes_list = sendRecv_bytes_all(inputFile, benchmark, hostNum, runs, threads)
   print data
 
-  output_str = benchmark + ',' + 'abelian'  + ',' + hostNum  + ',' + threads  + ',' + input_type  + ',' + algo_type  + ',' + cut_type
+  output_str = benchmark + ',' + 'abelian'  + ',' + hostNum  + ',' + threads  + ',' + input_graph  + ',' + algo_type  + ',' + cut_type
 
   #for d in data:
     #output_str += ','
@@ -271,7 +321,13 @@ def main(argv):
   print output_str
 
 
-  header_csv_str = "benchmark,platform,host,threads,input,variant,partition,mean_time,graph_init_time,hg_init_time,total_time,syncPull_avg_time,sync_push_avg_time,recvNum,recvBytes,sendNum,sendBytes,commits,conflicts,iterations,pushes"
+  #header_csv_str = "benchmark,platform,host,threads,input,variant,partition,mean_time,graph_init_time,hg_init_time,total_time,sync_pull_avg_time,sync_push_avg_time,recvNum,recvBytes,sendNum,sendBytes,commits,conflicts,iterations,pushes"
+  header_csv_str = "benchmark,platform,host,threads,input,variant,partition,mean_time,graph_init_time,hg_init_time,total_time,sync_pull_avg_time,sync_push_avg_time,commits,conflicts,iterations,pushes,total_SendBytes"
+
+  for i in range(0,256):
+    header_csv_str += ","
+    header_csv_str += ("SB_" + str(i))
+
   header_csv_list = header_csv_str.split(',')
   #if outputFile is empty add the header to the file
   try:
@@ -286,7 +342,9 @@ def main(argv):
   except OSError:
     print "Error in outfile opening\n"
 
-  complete_data = output_str.split(",") + list(data)
+  data_list = list(data)
+  data_list.append(total_SendBytes)
+  complete_data = output_str.split(",") + data_list + list(sendBytes_list)
   fd_outputFile = open(outputFile, 'a')
   wr = csv.writer(fd_outputFile, quoting=csv.QUOTE_NONE, lineterminator='\n')
   wr.writerow(complete_data)
