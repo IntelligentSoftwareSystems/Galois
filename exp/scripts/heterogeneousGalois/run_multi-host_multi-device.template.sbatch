@@ -35,9 +35,8 @@ RUN=ibrun
 export MV2_ENABLE_AFFINITY=0
 source $HOME/GaloisCpp/load_modules_dist_hetero.sh
 
-echo "GALOIS_DO_NOT_BIND_THREADS=1 $RUN $EXEC -noverify -pset=$PSET -t=$THREADS $FLAGS ${INPUTDIR}${INPUT}"
 set -x #echo on
-GALOIS_DO_NOT_BIND_THREADS=1 $RUN $EXEC -noverify -pset=$PSET -t=$THREADS $FLAGS ${INPUTDIR}${INPUT}
+GALOIS_DO_NOT_BIND_THREADS=1 $RUN $EXEC ${INPUTDIR}${INPUT} -noverify -pset=$PSET -t=$THREADS $FLAGS
 set +x #echo off
 
 execname=$(basename "$EXEC" "")
