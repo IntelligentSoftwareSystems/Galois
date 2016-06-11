@@ -40,9 +40,10 @@ app(SGD_gen_wl sgd_wl_gen.cpp  DISTSAFE)
 
 #pageRank_pull
 app(PageRank_pull pageRankPull_gen.cpp  DISTSAFE)
+#app(PageRank_pull_new pageRankPull_gen_new.cpp  DISTSAFE)
 
 #HSSSP with worklist
-app(HSSSP_wl HSSSP_wl.cpp  DISTSAFE)
+#app(HSSSP_wl HSSSP_wl.cpp  DISTSAFE)
 
 
 #PageRank with worklist
@@ -57,4 +58,93 @@ app(pageRank_2loops_gen pageRank_2loops_gen.cpp DISTSAFE)
 #app(opencl cl_host.cpp DISTSAFE)
 #target_link_libraries(opencl OpenCL)
 
+
+#PageRank with DGAccum
+app(pageRank_gen_distAccum pageRank_gen_distAccum.cpp DISTSAFE)
+
+#PageRank with vertexCut
+app(pageRank_vertexCut_gen pageRank_vertexCut_gen.cpp DISTSAFE)
+
+
+
+#PageRank_test to test compiler
+app(pageRank_gen_test pageRank_gen_test.cpp DISTSAFE)
+
+
+#PageRank_pull with worklist
+app(pageRankPull_wl pageRankPull_wl.cpp DISTSAFE)
+
+#pagerankPull from stampede
+app(pageRankPull_gen_stampede pageRankPull_gen_stampede.cpp DISTSAFE)
+
+
+#pagerank vertex cut with 2 loop transform .
+app(pageRank_vertexCut_2loops pageRank_vertexCut_2loops.cpp DISTSAFE)
+
+
+#pagerank vertex cut with PULL .
+app(pageRankPull_vertexCut pageRankPull_vertexCut.cpp DISTSAFE)
+
+app(pageRank_wl_gen_test pageRank_wl_gen_test.cpp DISTSAFE)
+
+
+##################### SSSP ###############################
+# SSSP with distAcc, simple push version
 app(sssp_gen sssp_gen.cpp DISTSAFE)
+
+
+# SSSP with worklist, simple push version
+app(sssp_wl_gen sssp_wl_gen.cpp DISTSAFE)
+
+#SSSP Pull
+app(sssp_pull_gen sssp_pull_gen.cpp DISTSAFE)
+
+#SSSP Pull with worklist
+app(sssp_pull_wl_gen sssp_pull_wl_gen.cpp DISTSAFE)
+
+#SSSP 2 loop transform
+app(sssp_2loop_gen sssp_2loop_gen.cpp DISTSAFE)
+
+
+#SSSP using vgraph
+app(sssp_vertexCut sssp_vertexCut.cpp DISTSAFE)
+
+##################### BFS ###############################
+# BFS with distAcc, simple push version
+app(bfs_gen bfs_gen.cpp DISTSAFE)
+
+
+# BFS with worklist, simple push version
+app(bfs_wl_gen bfs_wl_gen.cpp DISTSAFE)
+
+#BFS Pull
+app(bfs_pull_gen bfs_pull_gen.cpp DISTSAFE)
+
+#BFS Pull with worklist
+app(bfs_pull_wl_gen bfs_pull_wl_gen.cpp DISTSAFE)
+
+#BFS 2 loop transform
+app(bfs_2loop_gen bfs_2loop_gen.cpp DISTSAFE)
+
+#SSSP using vgraph
+app(bfs_vertexCut bfs_vertexCut.cpp DISTSAFE)
+
+##################### CC ###############################
+# CC with distAcc, simple push version
+app(cc_gen cc_gen.cpp DISTSAFE)
+
+
+# CC with worklist, simple push version
+app(cc_wl_gen cc_wl_gen.cpp DISTSAFE)
+
+#CC Pull
+app(cc_pull_gen cc_pull_gen.cpp DISTSAFE)
+
+#CC Pull with worklist
+app(cc_pull_wl_gen cc_pull_wl_gen.cpp DISTSAFE)
+
+#cc 2 loop transform
+app(cc_2loop_gen cc_2loop_gen.cpp DISTSAFE)
+
+#SSSP using vgraph
+app(cc_vertexCut cc_vertexCut.cpp DISTSAFE)

@@ -63,7 +63,6 @@ struct InitializeGraph {
   InitializeGraph(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph) {
 
-    //XXX: needs sync pull, since is used in ConnectedComp operator.
     	struct SyncerPull_0 {
     		static unsigned long long extract(uint32_t node_id, const struct NodeData & node) {
     		#ifdef __GALOIS_HET_CUDA__
@@ -87,9 +86,8 @@ struct InitializeGraph {
     	} else if (personality == CPU)
     #endif
     Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, Galois::loopname("InitGraph"), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "comp_current" , "unsigned long long"));
-    _graph.sync_pull<SyncerPull_0>();
+    _graph.sync_pull<SyncerPull_0>("InitializeGraph");
     
-
   }
 
   void operator()(GNode src) const {
@@ -134,7 +132,7 @@ struct ConnectedComp {
       	} else if (personality == CPU)
       #endif
       Galois::do_all(_graph.begin(), _graph.end(), ConnectedComp { &_graph }, Galois::loopname("ConnectedComp"), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "comp_current" , "unsigned long long"));
-      _graph.sync_pull<SyncerPull_0>();
+      _graph.sync_pull<SyncerPull_0>("ConnectedComp");
       
 
      ++iteration;

@@ -254,6 +254,7 @@ int main(int argc, char** argv) {
     Galois::Runtime::getHostBarrier().wait();
     InitializeGraph::go(hg);
 
+
     std::cout << "PageRank::go wl run2 called  on " << net.ID << "\n";
     T_pageRank2.start();
       PageRank::go(hg);
@@ -262,7 +263,7 @@ int main(int argc, char** argv) {
 
     std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " PageRank2 : " << T_pageRank2.get() << " (msec)\n\n";
 
-    Galois::Runtime::getHostBarrier().wait();
+    //Galois::Runtime::getHostBarrier().wait();
 
     /** To make residual zero before we start anything **/
     InitializeGraph_ZeroResidual::go(hg);
@@ -296,7 +297,6 @@ int main(int argc, char** argv) {
     auto mean_time = (T_pageRank1.get() + T_pageRank2.get() + T_pageRank3.get())/3;
 
     std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " PageRank1 : " << T_pageRank1.get() << " PageRank2 : " << T_pageRank2.get() << " PageRank3 : " << T_pageRank3.get() <<" PageRank mean time (3 runs ) (" << maxIterations << ") : " << mean_time << "(msec)\n\n";
-
 
     if(verify){
       for(auto ii = hg.begin(); ii != hg.end(); ++ii) {

@@ -42,7 +42,7 @@ static const char* const desc = "PageRank Pull version on Distributed Galois.";
 static const char* const url = 0;
 
 namespace cll = llvm::cl;
-static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
+static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file transpose graph>"), cll::Required);
 static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations"), cll::init(4));
 static cll::opt<float> tolerance("tolerance", cll::desc("tolerance"), cll::init(0.01));
 static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to the output stream"), cll::init(false));
@@ -59,38 +59,17 @@ typedef hGraph<PR_NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
 
 struct InitializeGraph {
+  const float &local_alpha;
   Graph* graph;
 
+  InitializeGraph(const float &_alpha, Graph* _graph):local_alpha(_alpha), graph(_graph){}
   void static go(Graph& _graph) {
-
-     struct Syncer_0 {
-    	static int extract(GNode src, const struct PR_NodeData & node){ return node.nout; }
-    	static void reduce (GNode src,struct PR_NodeData & node, int y) { Galois::atomicAdd(node.nout, y);}
-    	static void reset (GNode src,struct PR_NodeData & node ){node.nout = 0 ; }
-    	typedef int ValTy;
-    };
-     struct SyncerPull_0 {
-    	static float extract( GNode src,const struct PR_NodeData & node){ return node.value; }
-    	static void setVal (GNode src,struct PR_NodeData & node, float y) {node.value = y; }
-    	typedef float ValTy;
-    };
-     struct SyncerPull_1 {
-    	static int extract( GNode src,const struct PR_NodeData & node){ return node.nout; }
-    	static void setVal (GNode src,struct PR_NodeData & node, int y) {node.nout = y; }
-    	typedef int ValTy;
-    };
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ &_graph }, Galois::loopname("Init"), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "value" , "float"), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "nout" , "int"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "nout", "int" , "{ Galois::atomicAdd(node.nout, y);}",  "{node.nout = 0 ; }"));
-    _graph.sync_push<Syncer_0>();
-    
-    _graph.sync_pull<SyncerPull_0>();
-    
-    _graph.sync_pull<SyncerPull_1>();
-    
+    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ alpha, &_graph }, Galois::loopname("Init"));
   }
 
   void operator()(GNode src) const {
     PR_NodeData& sdata = graph->getData(src);
-    sdata.value = 1.0 - alpha;
+    sdata.value = 1.0 - local_alpha;
     Galois::atomicAdd(sdata.nout, 0);
     for(auto nbr = graph->edge_begin(src); nbr != graph->edge_end(src); ++nbr){
       GNode dst = graph->getEdgeDst(nbr);
@@ -124,22 +103,17 @@ struct InitializeGraph_value {
 };
 
 struct PageRank_pull {
+  const float &local_alpha;
+  const float &local_tolerance;
   Graph* graph;
 
+  PageRank_pull(const float &_tolerance, const float &_alpha, Graph* _graph):local_tolerance(_tolerance), local_alpha(_alpha), graph(_graph){}
   void static go(Graph& _graph) {
-
-       struct SyncerPull_0 {
-      	static float extract( GNode src,const struct PR_NodeData & node){ return node.value; }
-      	static void setVal (GNode src,struct PR_NodeData & node, float y) {node.value = y; }
-      	typedef float ValTy;
-      };
 
      do{
          DGAccumulator_accum.reset();
-         Galois::do_all(_graph.begin(), _graph.end(), PageRank_pull { &_graph }, Galois::loopname("pageRank"), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "value" , "float"));
-      _graph.sync_pull<SyncerPull_0>();
+         Galois::do_all(_graph.begin(), _graph.end(), PageRank_pull { tolerance, alpha, &_graph }, Galois::loopname("pageRank"));
      }while(DGAccumulator_accum.reduce());
-      
   }
 
   static Galois::DGAccumulator<int> DGAccumulator_accum;
@@ -155,10 +129,10 @@ struct PageRank_pull {
       }
     }
 
-    float pr_value = sum*(1.0 - alpha) + alpha;
+    float pr_value = sum*(1.0 - local_alpha) + local_alpha;
     float diff = std::fabs(pr_value - sdata.value);
 
-    if(diff > tolerance){
+    if(diff > local_tolerance){
       sdata.value = pr_value;
       DGAccumulator_accum+= 1;
     }
