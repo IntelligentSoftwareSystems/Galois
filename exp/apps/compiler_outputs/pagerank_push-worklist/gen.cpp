@@ -75,7 +75,7 @@ static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file>"
 static cll::opt<std::string> partFolder("partFolder", cll::desc("path to partitionFolder"), cll::init(""));
 #endif
 static cll::opt<float> tolerance("tolerance", cll::desc("tolerance"), cll::init(0.000001));
-static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations"), cll::init(1000));
+static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations: Default 10000"), cll::init(10000));
 static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"), cll::init(false));
 #ifdef __GALOIS_HET_CUDA__
 static cll::opt<int> gpudevice("gpu", cll::desc("Select GPU to run on, default is to choose automatically"), cll::init(-1));
@@ -111,30 +111,12 @@ struct ResetGraph {
 
   ResetGraph(Graph* _graph) : graph(_graph){}
   void static go(Graph& _graph) {
-    	struct SyncerPull_0 {
-    		static float extract(uint32_t node_id, const struct PR_NodeData & node) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) return get_node_residual_cuda(cuda_ctx, node_id);
-    			assert (personality == CPU);
-    		#endif
-    			return node.residual;
-    		}
-    		static void setVal (uint32_t node_id, struct PR_NodeData & node, float y) {
-    		#ifdef __GALOIS_HET_CUDA__
-    			if (personality == GPU_CUDA) set_node_residual_cuda(cuda_ctx, node_id, y);
-    			else if (personality == CPU)
-    		#endif
-    				node.residual = y;
-    		}
-    		typedef float ValTy;
-    	};
     #ifdef __GALOIS_HET_CUDA__
     	if (personality == GPU_CUDA) {
     		ResetGraph_cuda(cuda_ctx);
     	} else if (personality == CPU)
     #endif
     Galois::do_all(_graph.begin(), _graph.end(), ResetGraph{ &_graph }, Galois::loopname("reset"), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "residual" , "float"));
-    _graph.sync_pull<SyncerPull_0>("ResetGraph");
     
   }
 
@@ -176,6 +158,7 @@ struct InitializeGraph {
     		}
     		typedef float ValTy;
     	};
+#ifdef __GALOIS_VERTEX_CUT_GRAPH__
     	struct SyncerPull_0 {
     		static float extract(uint32_t node_id, const struct PR_NodeData & node) {
     		#ifdef __GALOIS_HET_CUDA__
@@ -193,6 +176,7 @@ struct InitializeGraph {
     		}
     		typedef float ValTy;
     	};
+#endif
     #ifdef __GALOIS_HET_CUDA__
     	if (personality == GPU_CUDA) {
     		InitializeGraph_cuda(alpha, cuda_ctx);
@@ -200,8 +184,9 @@ struct InitializeGraph {
     #endif
     Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ alpha, &_graph }, Galois::loopname("Init"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "add",  "0"), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "residual" , "float"));
     _graph.sync_push<Syncer_0>("InitializeGraph");
-    
+#ifdef __GALOIS_VERTEX_CUT_GRAPH__
     _graph.sync_pull<SyncerPull_0>("InitializeGraph");
+#endif
     
   }
 
@@ -348,18 +333,17 @@ struct PageRank {
     float residual_old = sdata.residual.exchange(0.0);
     sdata.value += residual_old;
     //sdata.residual = residual_old;
-    float delta = 0;
     if (sdata.nout > 0){
-      delta = residual_old*(1-local_alpha)/sdata.nout;
-    }
-    for(auto nbr = graph->edge_begin(src), ee = graph->edge_end(src); nbr != ee; ++nbr){
-      GNode dst = graph->getEdgeDst(nbr);
-      PR_NodeData& ddata = graph->getData(dst);
-      auto dst_residual_old = Galois::atomicAdd(ddata.residual, delta);
+      float delta = residual_old*(1-local_alpha)/sdata.nout;
+      for(auto nbr = graph->edge_begin(src), ee = graph->edge_end(src); nbr != ee; ++nbr){
+        GNode dst = graph->getEdgeDst(nbr);
+        PR_NodeData& ddata = graph->getData(dst);
+        auto dst_residual_old = Galois::atomicAdd(ddata.residual, delta);
 
-      //Schedule TOLERANCE threshold crossed.
-      if((dst_residual_old <= local_tolerance) && ((dst_residual_old + delta) >= local_tolerance)) {
-        ctx.push(WorkItem(graph->getGID(dst)));
+        //Schedule TOLERANCE threshold crossed.
+        if((dst_residual_old <= local_tolerance) && ((dst_residual_old + delta) >= local_tolerance)) {
+          ctx.push(WorkItem(graph->getGID(dst)));
+        }
       }
     }
   }
