@@ -145,7 +145,7 @@ struct BFS {
   static Galois::DGAccumulator<int> DGAccumulator_accum;
 
   BFS(Graph* _graph) : graph(_graph){}
-  void static go(Graph& _graph){
+  void static go(Graph& _graph, unsigned run){
     iteration = 0;
     do{
       DGAccumulator_accum.reset();
@@ -200,7 +200,8 @@ struct BFS {
       		DGAccumulator_accum += __retval;
       	} else if (personality == CPU)
       #endif
-      Galois::do_all(_graph.begin(), _graph.end(), BFS { &_graph }, Galois::loopname("bfs"), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "dist_current" , "unsigned int"));
+      std::string loopName("BFS_" + std::to_string(run)+"_"  + std::to_string(iteration));
+      Galois::do_all(_graph.begin(), _graph.end(), BFS { &_graph }, Galois::loopname(loopName.c_str()), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "dist_current" , "unsigned int"));
 #ifdef __GALOIS_VERTEX_CUT_GRAPH__
       _graph.sync_push<Syncer_0>("BFS");
 #endif
@@ -311,7 +312,7 @@ int main(int argc, char** argv) {
       hg.reset_num_iter(run);
 
       StatTimer_main.start();
-    BFS::go(hg);
+    BFS::go(hg, run);
       StatTimer_main.stop();
 
       if((run + 1) != numRuns){
