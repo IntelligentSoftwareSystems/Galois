@@ -32,6 +32,7 @@
 #include "Galois/gstl.h"
 
 #include "Galois/Runtime/CompilerHelperFunctions.h"
+#include "Galois/Runtime/Tracer.h"
 
 #include "Galois/Dist/OfflineGraph.h"
 #include "Galois/Dist/hGraph.h"
@@ -48,7 +49,7 @@ static cll::opt<float> tolerance("tolerance", cll::desc("tolerance"), cll::init(
 static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to the output stream"), cll::init(false));
 
 
-static const float alpha = (1.0 - 0.85);
+static const float alpha = 0.85; //(1.0 - 0.85);
 //static const float  tolerance = 0.1;
 struct PR_NodeData {
   float value;
@@ -147,6 +148,8 @@ int main(int argc, char** argv) {
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     Galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_pageRank1, T_pageRank2, T_pageRank3;
 
+    std::cout << "[ " << net.ID << " ] InputFile : " << inputFile << "\n";
+
     T_total.start();
 
     T_offlineGraph_init.start();
@@ -167,6 +170,7 @@ int main(int argc, char** argv) {
 
 
     // Verify
+#if 0
     if(verify){
       if(net.ID == 0) {
         for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
@@ -174,6 +178,7 @@ int main(int argc, char** argv) {
         }
       }
     }
+#endif
 
     std::cout << "PageRank::go run1 called  on " << net.ID << "\n";
     T_pageRank1.start();
@@ -206,10 +211,9 @@ int main(int argc, char** argv) {
 
     // Verify
     if(verify){
-      if(net.ID == 0) {
-        for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
-          std::cout << "[" << *ii << "]  " << hg.getData(*ii).value << "\n";
-        }
+      for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
+        Galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).value);
+        //std::cout << "[" << *ii << "]  " << hg.getData(*ii).value << "\n";
       }
     }
 
