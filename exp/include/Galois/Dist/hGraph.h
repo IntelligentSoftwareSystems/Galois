@@ -31,6 +31,7 @@
 
 //#include "Galois/Runtime/Barrier.h"
 #include "Galois/Runtime/Serialize.h"
+#include "Galois/Statistic.h"
 
 #include "Galois/Dist/GlobalObj.h"
 #include "Galois/Dist/OfflineGraph.h"
@@ -61,7 +62,7 @@ class hGraph: public GlobalObject {
    const unsigned id; // my hostid // FIXME: isn't this just Network::ID?
    //ghost cell ID translation
    std::vector<uint64_t> ghostMap; // GID = ghostMap[LID - numOwned]
-   std::vector<std::pair<uint32_t, uint32_t> > hostNodes; //LID Node owned by host i
+   std::vector<std::pair<uint32_t, uint32_t> > hostNodes; //LID Node owned by host i. Stores ghost nodes from each host.
    //pointer for each host
    std::vector<uintptr_t> hostPtrs;
 
@@ -72,6 +73,9 @@ class hGraph: public GlobalObject {
    uint32_t num_iter_push; //Keep track of number of iterations.
    uint32_t num_iter_pull; //Keep track of number of iterations.
    uint32_t num_run; //Keep track of number of iterations.
+
+  //Stats: for rough estimate of sendBytes.
+   Galois::Statistic statGhostNodes;
 
    //host -> (lid, lid]
    std::pair<uint32_t, uint32_t> nodes_by_host(uint32_t host) const {
@@ -190,7 +194,11 @@ public:
       auto& net = Galois::Runtime::getSystemNetworkInterface();
       uint32_t num;
       unsigned from_id;
-      Galois::Runtime::gDeserialize(buf, from_id, num);
+      std::string loopName;
+      uint32_t num_iter_pull;
+      Galois::Runtime::gDeserialize(buf, loopName, num_iter_pull, from_id, num);
+      std::string statSendBytes_str("SEND_BYTES_SYNC_PULL_REPLY_" + loopName +"_" + std::to_string(num_run) + "_" + std::to_string(num_iter_pull));
+      Galois::Statistic SyncPullReply_send_bytes(statSendBytes_str);
       Galois::Runtime::SendBuffer b;
       gSerialize(b, idForSelf(), fn, num);
       for (; num; --num) {
@@ -203,14 +211,12 @@ public:
 #else
          val = FnTy::extract((gid - globalOffset), getData((gid - globalOffset)));
 #endif
-         if (net.ID == 0) {
-            //std::cout << "PullApply step1 : [" << net.ID << "] "<< " to : " << from_id << " : [" << gid - globalOffset << "] : " << val << "\n";
-         }
          //For now just send all.
          //if(val != old_val){
          Galois::Runtime::gSerialize(b, gid, val);
          //}
       }
+      SyncPullReply_send_bytes += b.size();
       net.send(from_id, syncRecv, b);
    }
 
@@ -228,9 +234,6 @@ public:
          Galois::Runtime::gDeserialize(buf, gid, val);
          //assert(isGhost(gid));
          auto LocalId = G2L(gid);
-         if (net.ID == 1) {
-            //std::cout << "PullApply Step2 : [" << net.ID << "]  : [" << LocalId << "] : " << val << "\n";
-         }
 #ifdef __GALOIS_HET_OPENCL__
          {
             CLNodeDataWrapper d = clGraph.getDataW(LocalId);
@@ -253,7 +256,7 @@ public:
 
    //hGraph construction is collective
    hGraph(const std::string& filename, unsigned host, unsigned numHosts, std::vector<unsigned> scalefactor = std::vector<unsigned>()) :
-         GlobalObject(this), id(host), round(false) {
+         GlobalObject(this), id(host), round(false),statGhostNodes("TotalGhostNodes") {
       OfflineGraph g(filename);
       //std::cerr << "Offline Graph Done\n";
 
@@ -332,6 +335,15 @@ public:
             }
          }
          assert(found);
+      }
+
+      for(unsigned h = 0; h < hostNodes.size(); ++h){
+         std::string temp_str = ("GhostNodes_from_" + std::to_string(h));
+         Galois::Statistic temp_stat_ghosNode(temp_str);
+         uint32_t start, end;
+         std::tie(start, end) = nodes_by_host(h);
+         temp_stat_ghosNode += (end - start);
+         statGhostNodes += (end - start);
       }
       //std::cerr << "hostNodes Done\n";
 
@@ -498,6 +510,8 @@ public:
       void (hGraph::*fn)(Galois::Runtime::RecvBuffer&) = &hGraph::syncRecvApply<FnTy>;
       ++num_iter_push;
       std::string timer_str("SYNC_PUSH_" + loopName + "_" + std::to_string(num_run) + "_" + std::to_string(num_iter_push));
+      std::string statSendBytes_str("SEND_BYTES_SYNC_PUSH_" + loopName +"_" + std::to_string(num_run) + "_" + std::to_string(num_iter_pull));
+      Galois::Statistic SyncPush_send_bytes(statSendBytes_str);
       Galois::StatTimer StatTimer_syncPush(timer_str.c_str());
       StatTimer_syncPush.start();
       auto& net = Galois::Runtime::getSystemNetworkInterface();
@@ -528,6 +542,7 @@ public:
             FnTy::reset(start, getData(start));
 #endif
          }
+         SyncPush_send_bytes += b.size();
          net.send(x, syncRecv, b);
       }
       //Will force all messages to be processed before continuing
@@ -542,6 +557,8 @@ public:
       void (hGraph::*fn)(Galois::Runtime::RecvBuffer&) = &hGraph::syncPullRecvReply<FnTy>;
       ++num_iter_pull;
       std::string timer_str("SYNC_PULL_" + loopName +"_" + std::to_string(num_run) + "_" + std::to_string(num_iter_pull));
+      std::string statSendBytes_str("SEND_BYTES_SYNC_PULL_" + loopName +"_" + std::to_string(num_run) + "_" + std::to_string(num_iter_pull));
+      Galois::Statistic SyncPull_send_bytes(statSendBytes_str);
       Galois::StatTimer StatTimer_syncPull(timer_str.c_str());
       StatTimer_syncPull.start();
       auto& net = Galois::Runtime::getSystemNetworkInterface();
@@ -556,7 +573,7 @@ public:
          if (start == end)
             continue;
          Galois::Runtime::SendBuffer b;
-         gSerialize(b, idForSelf(), fn, net.ID, (uint32_t) (end - start));
+         gSerialize(b, idForSelf(), fn, loopName,num_iter_pull, net.ID, (uint32_t) (end - start));
          for (; start != end; ++start) {
             auto gid = L2G(start);
             //std::cout << net.ID << " PULL send (" << gid << ") " << start << " " << FnTy::extract(start, getData(start)) << "\n";
@@ -566,6 +583,7 @@ public:
             gSerialize(b, gid, FnTy::extract(start, getData(start)));
 #endif
          }
+         SyncPull_send_bytes += b.size();
          net.send(x, syncRecv, b);
          ++num_recv_expected;
       }
@@ -687,6 +705,10 @@ public:
       num_iter_pull = 0;
       num_iter_push = 0;
       num_run = runNum;
+   }
+   /** Report stats to be printed.**/
+   void reportStats(){
+    statGhostNodes.report();
    }
 };
 #endif//_GALOIS_DIST_HGRAPH_H

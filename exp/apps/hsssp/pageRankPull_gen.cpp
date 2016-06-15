@@ -32,6 +32,7 @@
 #include "Galois/gstl.h"
 
 #include "Galois/Runtime/CompilerHelperFunctions.h"
+#include "Galois/Runtime/Tracer.h"
 
 #include "Galois/Dist/OfflineGraph.h"
 #include "Galois/Dist/hGraph.h"
@@ -42,13 +43,13 @@ static const char* const desc = "PageRank Pull version on Distributed Galois.";
 static const char* const url = 0;
 
 namespace cll = llvm::cl;
-static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file>"), cll::Required);
+static cll::opt<std::string> inputFile(cll::Positional, cll::desc("<input file transpose graph>"), cll::Required);
 static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations"), cll::init(4));
 static cll::opt<float> tolerance("tolerance", cll::desc("tolerance"), cll::init(0.01));
 static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to the output stream"), cll::init(false));
 
 
-static const float alpha = (1.0 - 0.85);
+static const float alpha = 0.85; //(1.0 - 0.85);
 //static const float  tolerance = 0.1;
 struct PR_NodeData {
   float value;
@@ -59,38 +60,17 @@ typedef hGraph<PR_NodeData, void> Graph;
 typedef typename Graph::GraphNode GNode;
 
 struct InitializeGraph {
+  const float &local_alpha;
   Graph* graph;
 
+  InitializeGraph(const float &_alpha, Graph* _graph):local_alpha(_alpha), graph(_graph){}
   void static go(Graph& _graph) {
-
-     struct Syncer_0 {
-    	static int extract(GNode src, const struct PR_NodeData & node){ return node.nout; }
-    	static void reduce (GNode src,struct PR_NodeData & node, int y) { Galois::atomicAdd(node.nout, y);}
-    	static void reset (GNode src,struct PR_NodeData & node ){node.nout = 0 ; }
-    	typedef int ValTy;
-    };
-     struct SyncerPull_0 {
-    	static float extract( GNode src,const struct PR_NodeData & node){ return node.value; }
-    	static void setVal (GNode src,struct PR_NodeData & node, float y) {node.value = y; }
-    	typedef float ValTy;
-    };
-     struct SyncerPull_1 {
-    	static int extract( GNode src,const struct PR_NodeData & node){ return node.nout; }
-    	static void setVal (GNode src,struct PR_NodeData & node, int y) {node.nout = y; }
-    	typedef int ValTy;
-    };
-    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ &_graph }, Galois::loopname("Init"), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "value" , "float"), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "nout" , "int"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "nout", "int" , "{ Galois::atomicAdd(node.nout, y);}",  "{node.nout = 0 ; }"));
-    _graph.sync_push<Syncer_0>();
-    
-    _graph.sync_pull<SyncerPull_0>();
-    
-    _graph.sync_pull<SyncerPull_1>();
-    
+    Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ alpha, &_graph }, Galois::loopname("Init"));
   }
 
   void operator()(GNode src) const {
     PR_NodeData& sdata = graph->getData(src);
-    sdata.value = 1.0 - alpha;
+    sdata.value = 1.0 - local_alpha;
     Galois::atomicAdd(sdata.nout, 0);
     for(auto nbr = graph->edge_begin(src); nbr != graph->edge_end(src); ++nbr){
       GNode dst = graph->getEdgeDst(nbr);
@@ -124,22 +104,17 @@ struct InitializeGraph_value {
 };
 
 struct PageRank_pull {
+  const float &local_alpha;
+  const float &local_tolerance;
   Graph* graph;
 
+  PageRank_pull(const float &_tolerance, const float &_alpha, Graph* _graph):local_tolerance(_tolerance), local_alpha(_alpha), graph(_graph){}
   void static go(Graph& _graph) {
-
-       struct SyncerPull_0 {
-      	static float extract( GNode src,const struct PR_NodeData & node){ return node.value; }
-      	static void setVal (GNode src,struct PR_NodeData & node, float y) {node.value = y; }
-      	typedef float ValTy;
-      };
 
      do{
          DGAccumulator_accum.reset();
-         Galois::do_all(_graph.begin(), _graph.end(), PageRank_pull { &_graph }, Galois::loopname("pageRank"), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "value" , "float"));
-      _graph.sync_pull<SyncerPull_0>();
+         Galois::do_all(_graph.begin(), _graph.end(), PageRank_pull { tolerance, alpha, &_graph }, Galois::loopname("pageRank"));
      }while(DGAccumulator_accum.reduce());
-      
   }
 
   static Galois::DGAccumulator<int> DGAccumulator_accum;
@@ -155,10 +130,10 @@ struct PageRank_pull {
       }
     }
 
-    float pr_value = sum*(1.0 - alpha) + alpha;
+    float pr_value = sum*(1.0 - local_alpha) + local_alpha;
     float diff = std::fabs(pr_value - sdata.value);
 
-    if(diff > tolerance){
+    if(diff > local_tolerance){
       sdata.value = pr_value;
       DGAccumulator_accum+= 1;
     }
@@ -172,6 +147,8 @@ int main(int argc, char** argv) {
     LonestarStart(argc, argv, name, desc, url);
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     Galois::Timer T_total, T_offlineGraph_init, T_hGraph_init, T_init, T_pageRank1, T_pageRank2, T_pageRank3;
+
+    std::cout << "[ " << net.ID << " ] InputFile : " << inputFile << "\n";
 
     T_total.start();
 
@@ -193,6 +170,7 @@ int main(int argc, char** argv) {
 
 
     // Verify
+#if 0
     if(verify){
       if(net.ID == 0) {
         for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
@@ -200,6 +178,7 @@ int main(int argc, char** argv) {
         }
       }
     }
+#endif
 
     std::cout << "PageRank::go run1 called  on " << net.ID << "\n";
     T_pageRank1.start();
@@ -232,10 +211,9 @@ int main(int argc, char** argv) {
 
     // Verify
     if(verify){
-      if(net.ID == 0) {
-        for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
-          std::cout << "[" << *ii << "]  " << hg.getData(*ii).value << "\n";
-        }
+      for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
+        Galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).value);
+        //std::cout << "[" << *ii << "]  " << hg.getData(*ii).value << "\n";
       }
     }
 

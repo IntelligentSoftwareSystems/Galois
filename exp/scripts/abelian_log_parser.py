@@ -223,6 +223,106 @@ def sendRecv_bytes_all(fileName, benchmark, total_hosts, numRuns, numThreads):
 
 
 
+#6]STAT,(NULL),SEND_BYTES_SYNC_PULL_REPLY_BFS_0_1,15,121980,121980,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#[6]STAT,(NULL),SEND_BYTES_SYNC_PULL_REPLY_BFS_0_2,15,121980,121980,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#[6]STAT,(NULL),SEND_BYTES_SYNC_PULL_REPLY_BFS_0_3,15,121980,121980,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#[6]STAT,(NULL),SEND_BYTES_SYNC_PULL_REPLY_BFS_0_4,15,121980,121980,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+
+#[7]STAT,(NULL),GhostNodes_from_0,15,35892,35892,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#[7]STAT,(NULL),GhostNodes_from_1,15,18635,18635,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#[7]STAT,(NULL),GhostNodes_from_2,15,18743,18743,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#[7]STAT,(NULL),GhostNodes_from_3,15,10125,10125,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#[7]STAT,(NULL),GhostNodes_from_4,15,18842,18842,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#[7]STAT,(NULL),GhostNodes_from_5,15,10230,10230,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#[7]STAT,(NULL),GhostNodes_from_6,15,10163,10163,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#[7]STAT,(NULL),GhostNodes_from_7,15,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#[7]STAT,(NULL),RecvBytes,15,22083788,22083788,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#[7]STAT,(NULL),RecvNum,15,392,392,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#[7]STAT,(NULL),SEND_BYTES_SYNC_PULL_BFS_0_1,15,1471812,1471812,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#[7]STAT,(NULL),SEND_BYTES_SYNC_PULL_BFS_0_2,15,1471812,1471812,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#[7]STAT,(NULL),SEND_BYTES_SYNC_PULL_BFS_0_3,15,1471812,1471812,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#[7]STAT,(NULL),SEND_BYTES_SYNC_PULL_BFS_0_4,15,1471812,1471812,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#[7]STAT,(NULL),SEND_BYTES_SYNC_PULL_BFS_1_1,15,1471812,1471812,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#[7]STAT,(NULL),SEND_BYTES_SYNC_PULL_BFS_1_2,15,1471812,1471812,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#[7]STAT,(NULL),SEND_BYTES_SYNC_PULL_BFS_1_3,15,1471812,1471812,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#[7]STAT,(NULL),SEND_BYTES_SYNC_PULL_BFS_1_4,15,1471812,1471812,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#[7]STAT,(NULL),SEND_BYTES_SYNC_PULL_BFS_2_1,15,1471812,1471812,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#[7]STAT,(NULL),SEND_BYTES_SYNC_PULL_BFS_2_2,15,1471812,1471812,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#[7]STAT,(NULL),SEND_BYTES_SYNC_PULL_BFS_2_3,15,1471812,1471812,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#[7]STAT,(NULL),SEND_BYTES_SYNC_PULL_BFS_2_4,15,1471812,1471812,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#[7]STAT,(NULL),SEND_BYTES_SYNC_PULL_InitializeGraph_0_1,15,2943792,2943792,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#[7]STAT,(NULL),SEND_BYTES_SYNC_PULL_InitializeGraph_1_1,15,1471896,1471896,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#[7]STAT,(NULL),SYNC_PULL_BFS_0_1,15,525,525,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#[7]STAT,(NULL),SYNC_PULL_BFS_0_2,15,152,152,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#[7]STAT,(NULL),SYNC_PULL_BFS_0_3,15,340,340,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#[7]STAT,(NULL),SYNC_PULL_BFS_0_4,15,340,340,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#[7]STAT,(NULL),SYNC_PULL_BFS_1_1,15,539,539,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#[7]STAT,(NULL),SYNC_PULL_BFS_1_2,15,153,153,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#[7]STAT,(NULL),SYNC_PULL_BFS_1_3,15,340,340,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#[7]STAT,(NULL),SYNC_PULL_BFS_1_4,15,341,341,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#[7]STAT,(NULL),SYNC_PULL_BFS_2_1,15,539,539,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#[7]STAT,(NULL),SYNC_PULL_BFS_2_2,15,152,152,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#[7]STAT,(NULL),SYNC_PULL_BFS_2_3,15,340,340,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#[7]STAT,(NULL),SYNC_PULL_BFS_2_4,15,341,341,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#[7]STAT,(NULL),SYNC_PULL_InitializeGraph_0_1,15,23082,23082,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#[7]STAT,(NULL),SYNC_PULL_InitializeGraph_1_1,15,47,47,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+def sendBytes_syncOnly(fileName, benchmark, total_hosts, numRuns, numThreads):
+  sendBytes_total_list = [0]*256 #Max host number is 256
+  sendBytes_pull_sync_list = [0]*256 #Max host number is 256
+  sendBytes_push_sync_list = [0]*256 #Max host number is 256
+  sendBytes_pull_sync_reply_list = [0]*256 #Max host number is 256
+
+  log_data = open(fileName).read()
+
+  ## sendBytes from sync_pull.
+  total_SendBytes_pull_sync = 0;
+  for host in range(0,int(total_hosts)):
+    sendBytes_sync_pull_regex = re.compile(r'\[' + re.escape(str(host)) + r'\]STAT,\(NULL\),SEND_BYTES_SYNC_PULL_(?i)'+ re.escape(benchmark) + r'_0_\d*,\d*,(\d*),(\d*),.*')
+    sendBytes_sync_pull_lines = re.findall(sendBytes_sync_pull_regex, log_data)
+    print sendBytes_sync_pull_lines
+
+    if len(sendBytes_sync_pull_lines) > 0:
+      sendBytes_pull_sync_list[host] = float(sendBytes_sync_pull_lines[0][0]) * len(sendBytes_sync_pull_lines)
+      sendBytes_total_list[host] += sendBytes_pull_sync_list[host]
+      print "-------> : ", host , " val : " , sendBytes_pull_sync_list[host]
+
+  total_SendBytes_pull_sync = sum(sendBytes_pull_sync_list)
+
+  ## sendBytes from sync_pull_reply.
+  total_SendBytes_pull_reply = 0;
+  for host in range(0,int(total_hosts)):
+    sendBytes_sync_pull_reply_regex = re.compile(r'\[' + re.escape(str(host)) + r'\]STAT,\(NULL\),SEND_BYTES_SYNC_PULL_REPLY_(?i)'+ re.escape(benchmark) + r'_0_\d*,\d*,(\d*),(\d*),.*')
+    sendBytes_sync_pull_reply_lines = re.findall(sendBytes_sync_pull_reply_regex, log_data)
+    print sendBytes_sync_pull_reply_lines
+
+    if len(sendBytes_sync_pull_reply_lines) > 0:
+      sendBytes_pull_sync_reply_list[host] = float(sendBytes_sync_pull_reply_lines[0][0]) * len(sendBytes_sync_pull_reply_lines)
+      sendBytes_total_list[host] += sendBytes_pull_sync_reply_list[host]
+      print "-------> : ", host , " val : " , sendBytes_pull_sync_reply_list[host]
+
+  total_SendBytes_pull_reply = sum(sendBytes_pull_sync_reply_list)
+
+
+
+#[2]STAT,(NULL),SEND_BYTES_SYNC_PUSH_BFS_0_0,15,33738828,33738828,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+   ## sendBytes from sync_push.
+  total_SendBytes_push_sync = 0;
+  for host in range(0,int(total_hosts)):
+    sendBytes_sync_push_regex = re.compile(r'\[' + re.escape(str(host)) + r'\]STAT,\(NULL\),SEND_BYTES_SYNC_PUSH_(?i)'+ re.escape(benchmark) + r'_0_\d*,\d*,(\d*),(\d*),.*')
+    sendBytes_sync_push_lines = re.findall(sendBytes_sync_push_regex, log_data)
+    print sendBytes_sync_push_lines
+
+    if len(sendBytes_sync_push_lines) > 0:
+      sendBytes_push_sync_list[host] = float(sendBytes_sync_push_lines[0][0]) * len(sendBytes_sync_push_lines)
+      sendBytes_total_list[host] += sendBytes_push_sync_list[host]
+      print "-------> : ", host , " val : " , sendBytes_push_sync_list[host]
+
+  total_SendBytes_push_sync = sum(sendBytes_push_sync_list)
+
+  total_SendBytes = total_SendBytes_pull_sync + total_SendBytes_pull_reply + total_SendBytes_push_sync
+
+  return total_SendBytes, sendBytes_total_list
+
 def get_basicInfo(fileName):
 
   hostNum_regex = re.compile(r'Hosts\s:\s(\d*)')
@@ -310,7 +410,8 @@ def main(argv):
   print 'Hosts : ', hostNum , ' CmdLine : ', cmdLine, ' Threads : ', threads , ' Runs : ', runs, ' benchmark :' , benchmark , ' algo_type :', algo_type, ' cut_type : ', cut_type, ' input_graph : ', input_graph
 
   data = match_timers(inputFile, benchmark, forHost, runs, threads)
-  total_SendBytes, sendBytes_list = sendRecv_bytes_all(inputFile, benchmark, hostNum, runs, threads)
+  #total_SendBytes, sendBytes_list = sendRecv_bytes_all(inputFile, benchmark, hostNum, runs, threads)
+  total_SendBytes, sendBytes_list = sendBytes_syncOnly(inputFile, benchmark, hostNum, runs, threads)
   print data
 
   output_str = benchmark + ',' + 'abelian'  + ',' + hostNum  + ',' + threads  + ',' + input_graph  + ',' + algo_type  + ',' + cut_type
