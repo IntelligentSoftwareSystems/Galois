@@ -68,14 +68,14 @@ app(pageRank_vertexCut_gen pageRank_vertexCut_gen.cpp DISTSAFE)
 
 
 #PageRank_test to test compiler
-app(pageRank_gen_test pageRank_gen_test.cpp DISTSAFE)
+#app(pageRank_gen_test pageRank_gen_test.cpp DISTSAFE)
 
 
 #PageRank_pull with worklist
 app(pageRankPull_wl pageRankPull_wl.cpp DISTSAFE)
 
 #pagerankPull from stampede
-app(pageRankPull_gen_stampede pageRankPull_gen_stampede.cpp DISTSAFE)
+#app(pageRankPull_gen_stampede pageRankPull_gen_stampede.cpp DISTSAFE)
 
 
 #pagerank vertex cut with 2 loop transform .
@@ -85,7 +85,7 @@ app(pageRank_vertexCut_2loops pageRank_vertexCut_2loops.cpp DISTSAFE)
 #pagerank vertex cut with PULL .
 app(pageRankPull_vertexCut pageRankPull_vertexCut.cpp DISTSAFE)
 
-app(pageRank_wl_gen_test pageRank_wl_gen_test.cpp DISTSAFE)
+#app(pageRank_wl_gen_test pageRank_wl_gen_test.cpp DISTSAFE)
 
 
 ##################### SSSP ###############################
