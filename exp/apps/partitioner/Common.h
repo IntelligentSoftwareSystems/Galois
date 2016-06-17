@@ -45,7 +45,12 @@ std::string getMetaFileName(std::string & basename, size_t hostID, size_t num_ho
    return result;
 }
 
-
+std::string getReplicaInfoFileName(std::string & basename, size_t num_hosts) {
+   std::string result = basename;
+   result += ".REPLICA_INFO.FOR.";
+   result += std::to_string(num_hosts);
+   return result;
+}
 /******************************************************************
  *
  * To verify the partitioning -
