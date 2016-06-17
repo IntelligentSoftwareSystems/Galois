@@ -476,7 +476,7 @@ protected:
 } // end anonymous namespace
 
 template <typename R, typename Cmp, typename NhFunc, typename OpFunc, typename ExFunc, typename _ArgsTuple>
-void for_each_ordered_ikdg (const R& range, const Cmp& cmp, const NhFunc& nhFunc, 
+void for_each_ordered_ikdg_impl (const R& range, const Cmp& cmp, const NhFunc& nhFunc, 
     const ExFunc& exFunc,  const OpFunc& opFunc, const _ArgsTuple& argsTuple) {
 
   auto argsT = std::tuple_cat (argsTuple, 
@@ -507,6 +507,19 @@ void for_each_ordered_ikdg (const R& range, const Cmp& cmp, const NhFunc& nhFunc
 
 }
 
+template <typename R, typename Cmp, typename NhFunc, typename OpFunc, typename ExFunc, typename _ArgsTuple>
+void for_each_ordered_ikdg (const R& range, const Cmp& cmp, const NhFunc& nhFunc, 
+    const ExFunc& exFunc,  const OpFunc& opFunc, const _ArgsTuple& argsTuple) {
+
+  auto tplParam = std::tuple_cat (argsTuple, enable_parameter<true>);
+  auto tplNoParam = std::tuple_cat (argsTuple, enable_parameter<false>);
+
+  if (useParaMeterOpt) {
+    for_each_ordered_ikdg_impl (range, cmp, nhFunc, exFunc, opFunc, tplParam);
+  } else {
+    for_each_ordered_ikdg_impl (range, cmp, nhFunc, exFunc, opFunc, tplNoParam);
+  }
+}
 
 template <typename R, typename Cmp, typename NhFunc, typename OpFunc, typename ArgsTuple>
 void for_each_ordered_ikdg (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const ArgsTuple& argsTuple) {

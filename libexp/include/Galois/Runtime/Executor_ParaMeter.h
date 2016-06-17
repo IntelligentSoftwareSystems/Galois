@@ -52,6 +52,8 @@
 
 namespace Galois {
 namespace Runtime {
+
+  extern llvm::cl::opt<bool> useParaMeterOpt;
 namespace ParaMeter {
 
 struct StepStats {
@@ -341,8 +343,28 @@ private:
   std::vector<StepStats> allSteps;
 };
 
+
+template<typename R, typename F, typename ArgsTuple>
+void for_each_param (const R& range, const F& func, const ArgsTuple& argsTuple) {
+
+  using T = typename R::values_type;
+
+  auto tpl = Galois::get_default_trait_values(argsTuple,
+      std::make_tuple (loopname_tag {}),
+      std::make_tuple (default_loopname {}));
+
+  auto Tpl_ty = decltype (tpl);
+
+  using Exec = ParaMeterExecutor<T, F, Tpl_ty>;
+  Exec exec (func, tpl);
+
+  exec.init (range);
+
 }
-}
+
+
+} // end namespace ParaMeter
+} // end namespace Runtime
 
 namespace WorkList {
 
@@ -358,7 +380,7 @@ public:
   typedef T value_type;
 };
 
-}
+} // end WorkList
 
 namespace Runtime {
 
@@ -370,7 +392,38 @@ class ForEachExecutor<Galois::WorkList::ParaMeter<T>, FunctionTy, ArgsTy>:
   ForEachExecutor(const FunctionTy& f, const ArgsTy& args): SuperTy(f, args) { }
 };
 
+
+
+
+
+} // end Runtime;
+
+template <typename I, typename F, typename... Args> 
+void for_each_exp (const I& beg, const I& end, const F& func, const Args&... args) {
+
+  auto range = Runtime::makeStandardRange (beg, end);
+  auto tpl = std::make_tuple (args...);
+
+  if (useParaMeterOpt) {
+    Runtime::ParaMeter::for_each_param (range, func, tpl);
+  } else {
+    Runtime::for_each_gen (range, func, tpl);
+  }
 }
 
+
+template <typename C, typename F, typename... Args> 
+void for_each_local_exp (C& cont, const F& func, const Args&... args) {
+
+  auto range = Runtime::makeLocalRange(cont);
+  auto tpl = std::make_tuple (args...);
+
+  if (useParaMeterOpt) {
+    Runtime::ParaMeter::for_each_param (range, func, tpl);
+  } else {
+    Runtime::for_each_gen (range, func, tpl);
+  }
 }
+
+} // end Galois
 #endif

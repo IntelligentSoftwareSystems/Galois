@@ -173,13 +173,14 @@ protected:
     Accumulator_ty nevents;
 
     // Galois::for_each_ordered (
-    // Galois::Runtime::for_each_ordered_rob (
-    Galois::Runtime::for_each_ordered_optim (
+    Galois::Runtime::for_each_ordered_spec (
         Galois::Runtime::makeStandardRange(
           simInit.getInitEvents ().begin (), simInit.getInitEvents ().end ()),
         Cmp_ty (), 
         NhoodVisitor (graph, nodes),
-        OpFunc (graph, nodes, nevents));
+        OpFunc (graph, nodes, nevents),
+        std::make_tuple (
+          Galois::loopname("des_ordered_spec")));
 
     std::cout << "Number of events processed= " << 
       nevents.reduce () << std::endl;

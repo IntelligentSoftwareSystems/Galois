@@ -1775,15 +1775,27 @@ void for_each_ordered_pessim (const R& range, const Cmp& cmp, const NhFunc& nhFu
 template <typename R, typename Cmp, typename NhFunc, typename ExFunc, typename OpFunc, typename _ArgsTuple>
 void for_each_ordered_spec (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const ExFunc& exFunc, const OpFunc& opFunc, const _ArgsTuple& argsTuple) {
 
+  auto tplParam = std::tuple_cat (argsTuple, enable_parameter<true>);
+  auto tplNoParam = std::tuple_cat (argsTuple, enable_parameter<false>);
+
   switch (specMode) {
-    case SpecMode::OPTIM:
-      for_each_ordered_spec_impl<OptimOrdExecutor> (range, cmp, nhFunc, exFunc, opFunc, argsTuple);
+    case SpecMode::OPTIM: {
+      if (useParaMeterOpt) {
+        for_each_ordered_spec_impl<OptimOrdExecutor> (range, cmp, nhFunc, exFunc, opFunc, tplParam);
+      } else {
+        for_each_ordered_spec_impl<OptimOrdExecutor> (range, cmp, nhFunc, exFunc, opFunc, tplNoParam);
+      }
       break;
+    }
 
-    case SpecMode::PESSIM:
-      for_each_ordered_spec_impl<PessimOrdExecutor> (range, cmp, nhFunc, exFunc, opFunc, argsTuple);
+    case SpecMode::PESSIM: {
+      if (useParaMeterOpt) {
+        for_each_ordered_spec_impl<PessimOrdExecutor> (range, cmp, nhFunc, exFunc, opFunc, tplParam);
+      } else {
+        for_each_ordered_spec_impl<PessimOrdExecutor> (range, cmp, nhFunc, exFunc, opFunc, tplNoParam);
+      }
       break;
-
+    }
     default:
       std::abort ();
   }
