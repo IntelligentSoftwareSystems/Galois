@@ -8,6 +8,7 @@ import re
 import os
 import sys, getopt
 import csv
+import numpy
 
 ######## NOTES:
 # All time values are in sec.
@@ -79,7 +80,6 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads):
   total_time = 0
   thousand = 1000.0
 
-
   timer_regex = re.compile(r'\[' + re.escape(forHost) + r'\]STAT,\(NULL\),TIMER_(\d*),' + re.escape(numThreads) + r',(\d*),(\d*).*')
 
   log_data = open(fileName).read()
@@ -100,16 +100,22 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads):
     benchmark = "ConnectedComp"
 
   ## SYNC_PULL and SYNC_PUSH total average over runs.
+  num_iterations = 0
   for i in range(0, int(numRuns)):
     # find sync_pull
     sync_pull_regex = re.compile(r'\[' + re.escape(forHost) + r'\]STAT,\(NULL\),SYNC_PULL_(?i)' + re.escape(benchmark) + r'\w*_' + re.escape(str(i)) + r'_(\d*),\d*,(\d*),(\d*).*')
     sync_pull_lines = re.findall(sync_pull_regex, log_data)
+    num_iterations = len(sync_pull_lines);
     for j in range (0, len(sync_pull_lines)):
       sync_pull_avg_time_total += float(sync_pull_lines[j][2])
 
     # find sync_push
     sync_push_regex = re.compile(r'\[' + re.escape(forHost) + r'\]STAT,\(NULL\),SYNC_PUSH_(?i)' + re.escape(benchmark) + r'\w*_'+ re.escape(str(i)) + r'_(\d*),\d*,(\d*),(\d*).*')
     sync_push_lines = re.findall(sync_push_regex, log_data)
+
+    if(num_iterations == 0):
+      num_iterations = len(sync_push_lines)
+
     for j in range (0, len(sync_push_lines)):
       sync_push_avg_time_total += float(sync_push_lines[j][2])
 
@@ -192,7 +198,7 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads):
 
 
   #return mean_timer,graph_init_time,hg_init_time,total_time,sync_pull_avg_time_total,sync_push_avg_time_total,recvNum_total,recvBytes_total,sendNum_total,sendBytes_total,commits,conflicts,iterations, pushes
-  return mean_timer,graph_init_time,hg_init_time,total_time,sync_pull_avg_time_total,sync_push_avg_time_total,commits,conflicts,iterations, pushes
+  return mean_timer,graph_init_time,hg_init_time,total_time,sync_pull_avg_time_total,sync_push_avg_time_total,num_iterations,commits,conflicts,iterations, pushes
 
 
 def sendRecv_bytes_all(fileName, benchmark, total_hosts, numRuns, numThreads):
@@ -298,13 +304,11 @@ def sendBytes_syncOnly(fileName, benchmark, total_hosts, numRuns, numThreads):
     if len(sendBytes_sync_pull_reply_lines) > 0:
       sendBytes_pull_sync_reply_list[host] = float(sendBytes_sync_pull_reply_lines[0][0]) * len(sendBytes_sync_pull_reply_lines)
       sendBytes_total_list[host] += sendBytes_pull_sync_reply_list[host]
-      print "-------> : ", host , " val : " , sendBytes_pull_sync_reply_list[host]
+      #print "-------> : ", host , " val : " , sendBytes_pull_sync_reply_list[host]
 
   total_SendBytes_pull_reply = sum(sendBytes_pull_sync_reply_list)
 
-
-
-#[2]STAT,(NULL),SEND_BYTES_SYNC_PUSH_BFS_0_0,15,33738828,33738828,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+  #[2]STAT,(NULL),SEND_BYTES_SYNC_PUSH_BFS_0_0,15,33738828,33738828,0,0,0,0,0,0,0,0,0,0,0,0,0,0
    ## sendBytes from sync_push.
   total_SendBytes_push_sync = 0;
   for host in range(0,int(total_hosts)):
@@ -315,13 +319,39 @@ def sendBytes_syncOnly(fileName, benchmark, total_hosts, numRuns, numThreads):
     if len(sendBytes_sync_push_lines) > 0:
       sendBytes_push_sync_list[host] = float(sendBytes_sync_push_lines[0][0]) * len(sendBytes_sync_push_lines)
       sendBytes_total_list[host] += sendBytes_push_sync_list[host]
-      print "-------> : ", host , " val : " , sendBytes_push_sync_list[host]
+      #print "-------> : ", host , " val : " , sendBytes_push_sync_list[host]
 
   total_SendBytes_push_sync = sum(sendBytes_push_sync_list)
 
   total_SendBytes = total_SendBytes_pull_sync + total_SendBytes_pull_reply + total_SendBytes_push_sync
 
-  return total_SendBytes, sendBytes_total_list
+  return total_SendBytes, total_SendBytes_pull_sync, total_SendBytes_pull_reply, total_SendBytes_push_sync, sendBytes_total_list
+
+
+def build_master_ghost_matrix(fileName, benchmark, partition, total_hosts, numRuns, numThreads):
+  #[1]STAT,(NULL),GhostNodes_from_1,15,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+  log_data = open(fileName).read()
+  if partition == "edge-cut":
+    GhostNodes_array = numpy.zeros((int(total_hosts), int(total_hosts)))
+    for host in range(0, int(total_hosts)):
+      ghost_from_re = re.compile(r'\[' + re.escape(str(host)) + r'\]STAT,\(NULL\),GhostNodes_from_(\d*),\d*,(\d*),.*')
+      ghost_from_lines = re.findall(ghost_from_re, log_data)
+      if(len(ghost_from_lines) > 0):
+        for line in ghost_from_lines:
+          GhostNodes_array[host][int(line[0])] = int(line[1])
+    return GhostNodes_array
+  #[1]STAT,(NULL),SLAVE_NODES_FROM_0,15,21693895,21693895,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+  elif partition == "vertex-cut":
+    SlaveNodes_array = numpy.zeros((int(total_hosts), int(total_hosts)))
+    for host in range(0, int(total_hosts)):
+      slave_from_re = re.compile(r'\[' + re.escape(str(host)) + r'\]STAT,\(NULL\),SLAVE_NODES_FROM_(\d*),\d*,(\d*),.*')
+      slave_from_lines = re.findall(slave_from_re, log_data)
+      if(len(slave_from_lines) > 0):
+        for line in slave_from_lines:
+          SlaveNodes_array[host][int(line[0])] = int(line[1])
+    return SlaveNodes_array
+
+
 
 def get_basicInfo(fileName):
 
@@ -340,8 +370,6 @@ def get_basicInfo(fileName):
   algo_type  = ''
   cut_type   = ''
   input_graph = ''
-
-
 
   hostNum_search = hostNum_regex.search(log_data)
   if hostNum_search is not None:
@@ -366,6 +394,13 @@ def get_basicInfo(fileName):
   input_graph = split_cmdLine_input[-1]
 
   return hostNum, cmdLine, threads, runs, benchmark, algo_type, cut_type, input_graph
+
+def format_str(col):
+  max_len = 0
+  for c in col:
+    if max_len < len(str(c)):
+      max_len = len(str(c))
+  return max_len
 
 def main(argv):
   inputFile = ''
@@ -411,7 +446,7 @@ def main(argv):
 
   data = match_timers(inputFile, benchmark, forHost, runs, threads)
   #total_SendBytes, sendBytes_list = sendRecv_bytes_all(inputFile, benchmark, hostNum, runs, threads)
-  total_SendBytes, sendBytes_list = sendBytes_syncOnly(inputFile, benchmark, hostNum, runs, threads)
+  total_SendBytes, total_SendBytes_pull_sync, total_SendBytes_pull_reply, total_SendBytes_push_sync, sendBytes_list = sendBytes_syncOnly(inputFile, benchmark, hostNum, runs, threads)
   print data
 
   output_str = benchmark + ',' + 'abelian'  + ',' + hostNum  + ',' + threads  + ',' + input_graph  + ',' + algo_type  + ',' + cut_type
@@ -423,7 +458,7 @@ def main(argv):
 
 
   #header_csv_str = "benchmark,platform,host,threads,input,variant,partition,mean_time,graph_init_time,hg_init_time,total_time,sync_pull_avg_time,sync_push_avg_time,recvNum,recvBytes,sendNum,sendBytes,commits,conflicts,iterations,pushes"
-  header_csv_str = "benchmark,platform,host,threads,input,variant,partition,mean_time,graph_init_time,hg_init_time,total_time,sync_pull_avg_time,sync_push_avg_time,commits,conflicts,iterations,pushes,total_SendBytes"
+  header_csv_str = "benchmark,platform,host,threads,input,variant,partition,mean_time,graph_init_time,hg_init_time,total_time,sync_pull_avg_time,sync_push_avg_time,converge_iterations,commits,conflicts,iterations,pushes,total_sendBytes, total_sendBytes_pull_sync, total_sendBytes_pull_reply, total_sendBytes_push_sync"
 
   for i in range(0,256):
     header_csv_str += ","
@@ -444,12 +479,23 @@ def main(argv):
     print "Error in outfile opening\n"
 
   data_list = list(data)
-  data_list.append(total_SendBytes)
+  data_list.extend((total_SendBytes, total_SendBytes_pull_sync, total_SendBytes_pull_reply, total_SendBytes_push_sync))
   complete_data = output_str.split(",") + data_list + list(sendBytes_list)
   fd_outputFile = open(outputFile, 'a')
   wr = csv.writer(fd_outputFile, quoting=csv.QUOTE_NONE, lineterminator='\n')
   wr.writerow(complete_data)
   fd_outputFile.close()
+
+
+  ## Write ghost and slave nodes to a file.
+  ghost_array = build_master_ghost_matrix(inputFile, benchmark, cut_type, hostNum, runs, threads)
+  ghostNodes_file = outputFile + "_" + cut_type
+  fd_ghostNodes_file = open(ghostNodes_file, 'ab')
+  fd_ghostNodes_file.write("\n--------------------------------------------------------------\n")
+  fd_ghostNodes_file.write("\nHosts : " + hostNum + "\nInputFile : "+ inputFile + "\nBenchmark: " + benchmark + "\nPartition: " + cut_type + "\n\n")
+  numpy.savetxt(fd_ghostNodes_file, ghost_array, delimiter=',', fmt='%d')
+  fd_ghostNodes_file.write("\n--------------------------------------------------------------\n")
+  fd_ghostNodes_file.close()
 
 
 if __name__ == "__main__":
