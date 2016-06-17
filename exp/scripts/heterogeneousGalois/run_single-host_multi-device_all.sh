@@ -40,7 +40,7 @@ for task in $SET; do
     fi
   fi
   set -x #echo on
-  eval "GALOIS_DO_NOT_BIND_THREADS=1 $MPI -n=$2 ${EXEC} -noverify ${PFLAGS} -pset=$1 -t=$3 ${INPUT} |& tee ${execname}_${inputname}_${1}.out"
+  eval "GALOIS_DO_NOT_BIND_THREADS=1 $MPI -n=$2 ${EXEC} ${INPUT} -noverify ${PFLAGS} -pset=$1 -t=$3 |& tee ${execname}_${inputname}_${1}.out"
   set +x #echo off
 done
 
