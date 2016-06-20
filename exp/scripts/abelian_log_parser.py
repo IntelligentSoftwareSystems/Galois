@@ -495,17 +495,12 @@ def main(argv):
   print output_str
 
 
-<<<<<<< HEAD
   header_csv_str = "benchmark,platform,"
   if get_devices:
     header_csv_str += "devices,"
   else:
     header_csv_str += "host,threads,"
-  header_csv_str += "input,variant,partition,mean_time,graph_init_time,hg_init_time,total_time,sync_pull_avg_time,sync_push_avg_time,commits,conflicts,iterations,pushes,total_SendBytes"
-=======
-  #header_csv_str = "benchmark,platform,host,threads,input,variant,partition,mean_time,graph_init_time,hg_init_time,total_time,sync_pull_avg_time,sync_push_avg_time,recvNum,recvBytes,sendNum,sendBytes,commits,conflicts,iterations,pushes"
-  header_csv_str = "benchmark,platform,host,threads,input,variant,partition,mean_time,graph_init_time,hg_init_time,total_time,sync_pull_avg_time,sync_push_avg_time,converge_iterations,commits,conflicts,iterations,pushes,total_sendBytes, total_sendBytes_pull_sync, total_sendBytes_pull_reply, total_sendBytes_push_sync"
->>>>>>> dfbb39ca3a12e33cac02909c521cd00ea46560d1
+  header_csv_str += "input,variant,partition,mean_time,graph_init_time,hg_init_time,total_time,sync_pull_avg_time,sync_push_avg_time,converge_iterations,commits,conflicts,iterations,pushes,total_sendBytes, total_sendBytes_pull_sync, total_sendBytes_pull_reply, total_sendBytes_push_sync"
 
   for i in range(0,256):
     header_csv_str += ","
