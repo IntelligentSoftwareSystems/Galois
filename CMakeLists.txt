@@ -455,11 +455,9 @@ if(NOT SKIP_COMPILE_APPS)
 endif()
 
 ###### Documentation ######
+find_package(Doxygen 1.8)
+if(DOXYGEN_FOUND)
 set(DOXYFILE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/docs\" \"${CMAKE_CURRENT_SOURCE_DIR}/libgraphs\" \"${CMAKE_CURRENT_SOURCE_DIR}/libllvm\" \"${CMAKE_CURRENT_SOURCE_DIR}/libruntime\" \"${CMAKE_CURRENT_SOURCE_DIR}/libsubstrate")
-find_package(Doxygen 1.8.0)
-if(NOT DOXYGEN_FOUND)
-  message(STATUS "Could NOT find required doxygen version: doxygen missing or < 1.8.0") 
-else()
   configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in
      ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile.in @ONLY)
   add_custom_target(doc ${DOXYGEN_EXECUTABLE}
