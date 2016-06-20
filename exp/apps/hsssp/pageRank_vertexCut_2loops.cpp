@@ -35,7 +35,7 @@
 
 #include "Galois/Runtime/CompilerHelperFunctions.h"
 
-#include "Galois/Dist/vGraph.h"
+#include "Galois/Runtime/vGraph.h"
 #include "Galois/Accumulator.h"
 #include "Galois/DistAccumulator.h"
 

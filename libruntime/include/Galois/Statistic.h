@@ -73,6 +73,11 @@ public:
     ptr->second += v;
     return *this;
   }
+
+  Ty getVal() const {
+    return vals.getLocal()->second;
+  }
+
 };
 
 using Statistic = StatisticBase<unsigned long>;

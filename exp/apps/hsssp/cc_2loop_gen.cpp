@@ -32,8 +32,8 @@
 #include "Lonestar/BoilerPlate.h"
 #include "Galois/Runtime/CompilerHelperFunctions.h"
 
-#include "Galois/Dist/OfflineGraph.h"
-#include "Galois/Dist/hGraph.h"
+#include "Galois/Runtime/OfflineGraph.h"
+#include "Galois/Runtime/hGraph.h"
 #include "Galois/DistAccumulator.h"
 #include "Galois/Runtime/Tracer.h"
 

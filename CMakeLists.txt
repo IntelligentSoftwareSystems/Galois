@@ -455,7 +455,7 @@ if(NOT SKIP_COMPILE_APPS)
 endif()
 
 ###### Documentation ######
-find_package(Doxygen 1.8)
+find_package(Doxygen)
 if(DOXYGEN_FOUND)
 set(DOXYFILE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/docs\" \"${CMAKE_CURRENT_SOURCE_DIR}/libgraphs\" \"${CMAKE_CURRENT_SOURCE_DIR}/libllvm\" \"${CMAKE_CURRENT_SOURCE_DIR}/libruntime\" \"${CMAKE_CURRENT_SOURCE_DIR}/libsubstrate")
   configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in

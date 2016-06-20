@@ -34,8 +34,8 @@
 #include "Galois/Runtime/CompilerHelperFunctions.h"
 #include "Galois/Runtime/Tracer.h"
 
-#include "Galois/Dist/OfflineGraph.h"
-#include "Galois/Dist/hGraph.h"
+#include "Galois/Runtime/OfflineGraph.h"
+#include "Galois/Runtime/hGraph.h"
 
 static const char* const name = "PageRank - Compiler Generated Distributed Heterogeneous";
 static const char* const desc = "Residual PageRank on Distributed Galois.";

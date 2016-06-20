@@ -178,7 +178,7 @@ void do_all_gen(const RangeTy& r, const FunctionTy& fn, const TupleTy& tpl) {
         std::make_tuple(loopname_tag{}, do_all_steal_tag{}),
         std::make_tuple(loopname{}, do_all_steal<>{})));
 
-  std::string loopName(get_by_supertype<loopname_tag>(tpl).value);
+  std::string loopName(get_by_supertype<loopname_tag>(dtpl).value);
   std::string timer_do_all_str("DO_ALL_IMPL_" + loopName);
   Galois::StatTimer Timer_do_all_impl(timer_do_all_str.c_str());
   Timer_do_all_impl.start();

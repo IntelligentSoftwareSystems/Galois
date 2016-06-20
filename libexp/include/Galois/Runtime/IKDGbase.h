@@ -229,7 +229,7 @@ protected:
   template <typename WinWL>
   GALOIS_ATTRIBUTE_PROF_NOINLINE void spillAll (WinWL& winWL, CtxtWL& wl) {
 
-    dbg::print("Spilling to winWL");
+    //    dbg::print("Spilling to winWL");
 
     // TODO: fix this loop, change to do_all_choice
     assert (targetCommitRatio != 0.0);
@@ -239,7 +239,7 @@ protected:
             Ctxt* c = wl.get ().back ();
             wl.get ().pop_back ();
 
-            dbg::print("Spilling: ", c, " with active: ", c->getActive ());
+            //            dbg::print("Spilling: ", c, " with active: ", c->getActive ());
 
             winWL.push (c);
           }

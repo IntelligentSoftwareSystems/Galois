@@ -57,7 +57,7 @@
 #include "Galois/Runtime/Serialize.h"
 
 #include "Galois/Bag.h"
-#include "Galois/Dist/DistBag.h"
+#include "Galois/DistBag.h"
 //#include "Galois/WorkList/WorkListDist.h"
 //#include "Galois/WorkList/WorkListWrapper.h"
 #include "Galois/WorkList/WorkListDist.h"
@@ -533,7 +533,8 @@ void for_each_impl_dist(const RangeTy& range, const FunctionTy& fn, const ArgsTy
   WorkTy W(fn, args);
 
   W.init(range);
-  Substrate::getThreadPool().run(activeThreads,
+  Substrate::ThreadPool::getThreadPool().run(
+             activeThreads,
              [&W, &range]() { W.initThread(range); },
              std::ref(barrier),
              std::ref(W));
