@@ -14,6 +14,15 @@ else
     module load sl6
 fi
 
+module use /opt/apps/ossw/modulefiles/
+
+if [ $(lsb_release -si) == "CentOS" ] ; then
+    module load c7
+    module load serf
+else
+    module load sl6
+fi
+
 module use /net/faraday/workspace/local/modules/modulefiles
 module use /org/centers/cdgc/modules
 module load lapack
@@ -54,4 +63,8 @@ if [ "$1" != "min" ]; then
     # module load screen #disabling for now because screen was compiled without proper color support
     module load valgrind
   fi
+  module load ghostscript
+  module load isspython
+  # module load screen #disabling for now because screen was compiled without proper color support
+  module load valgrind
 fi

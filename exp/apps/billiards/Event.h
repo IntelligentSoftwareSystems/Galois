@@ -53,6 +53,7 @@
 
 
 class Event {
+  template <typename B>
   friend class Table;
 
 public:
@@ -62,6 +63,8 @@ public:
     SECTOR_ENTRY = 2,
     SECTOR_LEAVE = 3
   };
+
+  static const bool SKIP_STALE_CHECK = false;
 
 private:
   EventKind kind;
@@ -162,14 +165,17 @@ public:
     // assert (notStale ());
 
     if (notStale ()) {
-      // update collision counters, such that event remains valid
+      
+      otherObj->simulate (*this);
+
       ball->incrCollCounter ();
       otherObj->incrCollCounter ();
 
-      this->collCounterA = ball->collCounter ();
-      this->collCounterB = otherObj->collCounter ();
+      if (!SKIP_STALE_CHECK) {
+        this->collCounterA = ball->collCounter ();
+        this->collCounterB = otherObj->collCounter ();
+      }
 
-      otherObj->simulate (*this);
     }
   }
 
@@ -200,16 +206,31 @@ public:
     }
   }
 
-  void updateFirstBall (const Ball& b) {
-    *(this->ball) = b;
-    this->collCounterA = b.collCounter ();
+  void setFirstBall (Ball* b) {
+    assert (b);
+    this->ball = b;
   }
 
-  void updateOtherBall (const Ball& b) {
+  void setOtherBall (Ball* b) {
+    assert (b);
     assert (kind == BALL_COLLISION);
-    Ball* ob = downCast<Ball> (otherObj);
-    *ob = b;
-    this->collCounterB = b.collCounter ();
+    this->otherObj = b;
+  }
+
+  // void updateFirstBall (const Ball& b) {
+    // *(this->ball) = b;
+    // this->collCounterA = b.collCounter ();
+  // }
+// 
+  // void updateOtherBall (const Ball& b) {
+    // assert (kind == BALL_COLLISION);
+    // Ball* ob = downCast<Ball> (otherObj);
+    // *ob = b;
+    // this->collCounterB = b.collCounter ();
+  // }
+
+  CollidingObject* getOtherObj (void) const {
+    return otherObj;
   }
 
   Ball* getOtherBall () const { 
@@ -231,6 +252,18 @@ public:
   }
 
   EventKind getKind () const { return kind; }
+
+  std::pair<unsigned, unsigned>  getCounterCopies (void) const {
+    return std::make_pair (collCounterA, collCounterB);
+  }
+
+  void restoreCounters (const std::pair<unsigned, unsigned>& p) {
+    assert (collCounterA >= p.first);
+    assert (collCounterB >= p.second);
+
+    collCounterA = p.first;
+    collCounterB = p.second;
+  }
 
 
   std::string str () const {
@@ -267,6 +300,8 @@ public:
 
     s.precision (10);
     s << "[time=" << std::fixed <<  double (time) << ", kind=" << kindName;
+
+    s << ", ccA=" << collCounterA << ", ccB=" << collCounterB;
 
     s << std::setw (20) << std::setfill (' ') << "ball=" << ball->str ();
 

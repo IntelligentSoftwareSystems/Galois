@@ -83,7 +83,7 @@ void gWarn(Args... args) {
 //! Prints a debug string from a sequence of things; prints nothing if NDEBUG
 //! is defined.
 template<typename... Args>
-void gDebug(Args... args) {
+void gDebug(const Args&... args) {
 #ifndef NDEBUG
   std::ostringstream os;
   __attribute__((unused)) int tmp[] = {(os << args, 0)...};
@@ -105,6 +105,22 @@ void gFlush();
 #define GALOIS_DIE(...)       do { Galois::Substrate::gError(__FILE__, ":", __LINE__, ": ", ##__VA_ARGS__); abort(); } while (0)
 //! Like assert but unconditionally executed
 #define GALOIS_ASSERT(cond, ...) do { bool b = (cond); if (!b) { Galois::Substrate::gError(__FILE__, ":", __LINE__, ": assertion failed: ", #cond, " ", ##__VA_ARGS__); abort(); } } while (0) 
+
+
+template <unsigned ENABLE> 
+struct debug {
+  template <typename... Args>
+  static void print (const Args&... args) {
+    gDebug (args...);
+  }
+};
+
+template <> 
+struct debug<0> {
+  template <typename... Args>
+  inline static void print (const Args&... args) {}
+};
+
 
 } // end namespace Substrate
 } // end namespace Galois

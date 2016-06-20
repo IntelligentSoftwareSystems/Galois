@@ -769,6 +769,16 @@ public:
     push_back (x);
   }
 
+  void push_back (const T& x, unsigned owner) {
+    assert (owner < Galois::getActiveThreads ());
+    Super_ty::get (owner).push_back (x);
+  }
+
+  void push (const T& x, unsigned owner) {
+    assert (owner < Galois::getActiveThreads ());
+    Super_ty::get (owner).push_back (x);
+  }
+
   void splice_all (PerThreadBag& that) {
     for (unsigned i = 0; i < Super_ty::numRows(); ++i) {
       Super_ty::get(i).splice (that.Super_ty::get (i));

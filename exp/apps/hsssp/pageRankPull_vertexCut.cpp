@@ -33,8 +33,8 @@
 
 #include "Galois/Runtime/CompilerHelperFunctions.h"
 
-#include "Galois/Dist/OfflineGraph.h"
-#include "Galois/Dist/vGraph.h"
+#include "Galois/Runtime/OfflineGraph.h"
+#include "Galois/Runtime/vGraph.h"
 #include "Galois/DistAccumulator.h"
 
 static const char* const name = "PageRank - Compiler Generated Distributed Heterogeneous";

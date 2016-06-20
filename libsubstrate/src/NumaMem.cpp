@@ -42,7 +42,7 @@ static void pageIn(void* _ptr, size_t len, size_t pageSize, unsigned numThreads,
     for (size_t x = 0; x < len; x += pageSize / 2)
       ptr[x] = 0;
   } else {
-    getThreadPool().run(numThreads, 
+    ThreadPool::getThreadPool().run(numThreads, 
                         [ptr, len, pageSize, numThreads, finegrained] () 
                         {
                           auto myID = ThreadPool::getTID();

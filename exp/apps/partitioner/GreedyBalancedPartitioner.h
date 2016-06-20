@@ -53,15 +53,37 @@ struct GBPartitioner {
          size_t eIdx = std::distance(g.edge_begin(*g.begin()), e);
          return edgeOwners[eIdx];
       }
+      void writeReplicaInfo(std::string &basename, OfflineGraph &g, size_t numhosts) {
+//         std::string filename = ;
+//         std::string replicaInfoFile("replica.info");
+         //std::ofstream replica_file(replicaInfoFile, std::ofstream::binary);
+         std::ofstream replica_file(getReplicaInfoFileName(basename, numhosts));
+         auto numEntries = g.size();
+         //         replica_file.write(reinterpret_cast<char*>(&(numEntries)), sizeof(numEntries));
+         replica_file << numEntries << ", " << numhosts << std::endl;
+         for (size_t n = 0; n < g.size(); ++n) {
+            auto owner = vertexOwners[n];
+            size_t num_replicas = vertexOwners[n].size();
+            //            replica_file.write(reinterpret_cast<const char*>(&num_replicas), sizeof(size_t));
+            replica_file << num_replicas << ", " << std::distance(g.edge_begin(n), g.edge_end(n)) << std::endl;
+         }
+
+         replica_file.close();
+      }
+      /*
+       * The assignment of masters to each vertex is done in a greedy manner -
+       * the list of hosts with a copy of each vertex is scanned, and the one with
+       * smallest number of masters is selected to be the master of the current
+       * node, and the masters-count for the host is updated.
+       * */
       void assignMasters(size_t nn, size_t numhost, OfflineGraph &g) {
-         //TODO
          for (size_t n = 0; n < nn; ++n) {
             assert(vertexMasters[n] == -1);
             if (vertexOwners[n].size() == 0) {
                size_t minID = 0;
                size_t min_count = mastersPerHost[minID];
-               for(int h=1; h<numhost; ++h){
-                  if(min_count > mastersPerHost[h]){
+               for (int h = 1; h < numhost; ++h) {
+                  if (min_count > mastersPerHost[h]) {
                      min_count = mastersPerHost[h];
                      minID = h;
                   }
@@ -122,6 +144,7 @@ struct GBPartitioner {
             vcInfo.assignEdge(g, n, nbr, owner);
          }
       }
+      vcInfo.writeReplicaInfo(basename, g, num_hosts);
       vcInfo.assignMasters(g.size(), num_hosts, g);
 
 //      assignVertices(g, vcInfo, num_hosts);

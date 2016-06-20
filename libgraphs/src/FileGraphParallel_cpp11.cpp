@@ -44,7 +44,7 @@ void FileGraph::fromFileInterleaved(const std::string& filename, size_t sizeofEd
 
   std::mutex lock;
   std::condition_variable cond;
-  auto& tp = Substrate::getThreadPool();
+  auto& tp = Substrate::ThreadPool::getThreadPool();
   unsigned maxPackages = tp.getMaxPackages();
   unsigned count = maxPackages;
 

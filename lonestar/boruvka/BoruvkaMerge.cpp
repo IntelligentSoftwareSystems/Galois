@@ -179,7 +179,7 @@ struct process {
       if (graph.containsNode(src) == false)
          return;
       graph.getData(src, Galois::MethodFlag::WRITE);
-      GNode * minNeighbor = 0;
+      GNode minNeighbor = 0;
 #if BORUVKA_DEBUG
       std::cout<<"Processing "<<graph.getData(src).toString()<<std::endl;
 #endif
@@ -193,7 +193,7 @@ struct process {
          EdgeDataType w = graph.getEdgeData(e_it, Galois::MethodFlag::UNPROTECTED);
          assert(w>=0);
          if (w < minEdgeWeight) {
-            minNeighbor = &((*e_it).first());
+           minNeighbor = graph.getEdgeDst(e_it);
             minEdgeWeight = w;
          }
       }
@@ -203,10 +203,10 @@ struct process {
          return;
       }
 #if BORUVKA_DEBUG
-            std::cout << " Min edge from "<<graph.getData(src) << " to "<<graph.getData(*minNeighbor)<<" " <<minEdgeWeight << " "<<std::endl;
+            std::cout << " Min edge from "<<graph.getData(src) << " to "<<graph.getData(minNeighbor)<<" " <<minEdgeWeight << " "<<std::endl;
 #endif
       //Acquire locks on neighborhood of min neighbor.
-      for (auto e_it : graph.edges(*minNeighbor, Galois::MethodFlag::WRITE)) {
+      for (auto e_it : graph.edges(minNeighbor, Galois::MethodFlag::WRITE)) {
          graph.getData(graph.getEdgeDst(e_it));
       }
       assert(minEdgeWeight>=0);
@@ -217,7 +217,7 @@ struct process {
       typedef std::pair<GNode, EdgeDataType> EdgeData;
       typedef std::set<EdgeData, std::less<EdgeData>, Galois::PerIterAllocTy::rebind<EdgeData>::other> edsetTy;
       edsetTy toAdd(std::less<EdgeData>(), Galois::PerIterAllocTy::rebind<EdgeData>::other(lwl.getPerIterAlloc()));
-      for (auto mdst : graph.edges(*minNeighbor, Galois::MethodFlag::UNPROTECTED)) {
+      for (auto mdst : graph.edges(minNeighbor, Galois::MethodFlag::UNPROTECTED)) {
          GNode dstNode = graph.getEdgeDst(mdst);
          int edgeWeight = graph.getEdgeData(mdst,Galois::MethodFlag::UNPROTECTED);
          if (dstNode != src) { //Do not add the edge being contracted
@@ -232,7 +232,7 @@ struct process {
             }
          }
       }
-      graph.removeNode(*minNeighbor, Galois::MethodFlag::UNPROTECTED);
+      graph.removeNode(minNeighbor, Galois::MethodFlag::UNPROTECTED);
       for (edsetTy::iterator it = toAdd.begin(), endIt = toAdd.end(); it != endIt; it++) {
          graph.getEdgeData(graph.addEdge(src, it->first, Galois::MethodFlag::UNPROTECTED)) = it->second;
       }

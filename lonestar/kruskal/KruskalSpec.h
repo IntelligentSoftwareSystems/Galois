@@ -53,6 +53,8 @@ class KruskalSpec: public Kruskal {
 
   struct FindLoopSpec {
 
+    static const unsigned CHUNK_SIZE = 4;
+
     Graph& graph;
     VecLocks& locks;
     VecRep& repVec;
@@ -92,6 +94,8 @@ class KruskalSpec: public Kruskal {
 
 
   struct LinkUpLoopSpec {
+
+    static const unsigned CHUNK_SIZE = 4;
 
     VecRep& repVec;
     Accumulator& mstSum;
@@ -155,9 +159,11 @@ class KruskalSpec: public Kruskal {
     Galois::TimeAccumulator runningTime;
 
     runningTime.start ();
-    Galois::Runtime::for_each_ordered_optim (
+    // Galois::Runtime::for_each_ordered_optim (
+    Galois::Runtime::for_each_ordered_pessim (
         Galois::Runtime::makeStandardRange(edges.begin (), edges.end ()),
-        Edge::Comparator (), findLoop, linkUpLoop);
+        Edge::Comparator (), findLoop, linkUpLoop,
+        std::make_tuple (Galois::loopname ("kruskal-speculative"), Galois::enable_parameter<false> {}));
 
     runningTime.stop ();
 

@@ -57,7 +57,7 @@
 #include "Galois/Runtime/Serialize.h"
 
 #include "Galois/Bag.h"
-#include "Galois/Dist/DistBag.h"
+#include "Galois/DistBag.h"
 //#include "Galois/WorkList/WorkListDist.h"
 //#include "Galois/WorkList/WorkListWrapper.h"
 #include "Galois/WorkList/WorkListDist.h"
@@ -90,7 +90,7 @@ class AbortHandler {
    * Policy: serialize via tree over packages.
    */
   void basicPolicy(const Item& item) {
-    auto& tp = Substrate::getThreadPool();
+    auto& tp = Substrate::ThreadPool::getThreadPool();
     unsigned package = tp.getPackage();
     queues.getRemote(tp.getLeaderForPackage(package / 2))->push(item);
   }
@@ -107,7 +107,7 @@ class AbortHandler {
     } 
     
     unsigned tid = Substrate::ThreadPool::getTID();
-    auto& tp = Substrate::getThreadPool();
+    auto& tp = Substrate::ThreadPool::getThreadPool();
     unsigned package = Substrate::ThreadPool::getPackage();
     unsigned leader = Substrate::ThreadPool::getLeader();
     if (tid != leader) {
@@ -130,7 +130,7 @@ class AbortHandler {
     } 
     
     unsigned tid = Substrate::ThreadPool::getTID();
-    auto& tp = Substrate::getThreadPool();
+    auto& tp = Substrate::ThreadPool::getThreadPool();
     unsigned package = Substrate::ThreadPool::getPackage();
     unsigned leader = tp.getLeaderForPackage(package);
     if (retries < 5 && tid != leader) {
@@ -151,7 +151,7 @@ class AbortHandler {
 public:
   AbortHandler() {
     // XXX(ddn): Implement smarter adaptive policy
-    useBasicPolicy = Substrate::getThreadPool().getMaxPackages() > 2;
+    useBasicPolicy = Substrate::ThreadPool::getThreadPool().getMaxPackages() > 2;
   }
 
   value_type& value(Item& item) const { return item.val; }
@@ -201,10 +201,10 @@ protected:
     {}
     ~ThreadLocalData() {
       if (needsStats) {
-        reportStat(loopname, "Conflicts", stat_conflicts);
-        reportStat(loopname, "Commits", stat_iterations - stat_conflicts);
-        reportStat(loopname, "Pushes", stat_pushes);
-        reportStat(loopname, "Iterations", stat_iterations);
+        reportStat(loopname, "Conflicts", stat_conflicts, 0);
+        reportStat(loopname, "Commits", stat_iterations - stat_conflicts, 0);
+        reportStat(loopname, "Pushes", stat_pushes, 0);
+        reportStat(loopname, "Iterations", stat_iterations, 0);
       }
     }
   };
@@ -366,7 +366,9 @@ protected:
     wl(std::forward<WArgsTy>(wargs)...),
     origFunction(f),
     loopname(get_by_supertype<loopname_tag>(args).value),
-    broke(false) { }
+    broke(false) {
+    reportLoopInstance(loopname);
+  }
 
   template<typename WArgsTy, int... Is>
   ForEachExecutor(T1, const FunctionTy& f, 
@@ -512,7 +514,7 @@ void for_each_impl(const RangeTy& range, const FunctionTy& fn, const ArgsTy& arg
   auto& barrier = getBarrier(activeThreads);
   WorkTy W(fn, args);
   W.init(range);
-  Substrate::getThreadPool().run(activeThreads,
+  Substrate::ThreadPool::getThreadPool().run(activeThreads,
              [&W, &range]() { W.initThread(range); },
              std::ref(barrier),
              std::ref(W));
@@ -531,7 +533,8 @@ void for_each_impl_dist(const RangeTy& range, const FunctionTy& fn, const ArgsTy
   WorkTy W(fn, args);
 
   W.init(range);
-  Substrate::getThreadPool().run(activeThreads,
+  Substrate::ThreadPool::getThreadPool().run(
+             activeThreads,
              [&W, &range]() { W.initThread(range); },
              std::ref(barrier),
              std::ref(W));

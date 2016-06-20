@@ -44,47 +44,43 @@ namespace Galois {
 /**
  * Basic per-thread statistics counter.
  */
-class Statistic {
+template<typename Ty>
+class StatisticBase {
   std::string statname;
   std::string loopname;
-  Substrate::PerThreadStorage<unsigned long> val;
-  bool valid;
+  Substrate::PerThreadStorage<std::pair<bool, Ty> > vals;
 
 public:
-  Statistic(const std::string& _sn, std::string _ln = "(NULL)"): statname(_sn), loopname(_ln), valid(true) { }
-
-  ~Statistic() {
+  StatisticBase(const std::string& _sn, std::string _ln = "(NULL)", Ty init = Ty())
+    : statname(_sn), loopname(_ln), vals(false,init) { }
+  
+  ~StatisticBase() {
     report();
   }
 
   //! Adds stat to stat pool, usually deconsructor or StatManager calls this for you.
   void report() {
-    if (valid)
-      Galois::Runtime::reportStat(this);
-    valid = false;
+    for (auto x = 0; x < vals.size(); ++x)  {
+      auto* ptr = vals.getRemote(x);
+      if (ptr->first)
+        Galois::Runtime::reportStat(loopname, statname, ptr->second, x);
+    }
   }
 
-  unsigned long getValue(unsigned tid) const {
-    return *val.getRemote(tid);
-  }
-
-  std::string& getLoopname() {
-    return loopname;
-  }
-
-  std::string& getStatname() {
-    return statname;
-  }
-
-  unsigned long getVal() const {
-    return *val.getLocal();
-  }
-
-  Statistic& operator+=(unsigned long v) {
-    *val.getLocal() += v;
+  StatisticBase& operator+=(Ty v) {
+    auto* ptr = vals.getLocal();
+    ptr->first = true;
+    ptr->second += v;
     return *this;
   }
+
+  Ty getVal() const {
+    return vals.getLocal()->second;
+  }
+
 };
+
+using Statistic = StatisticBase<unsigned long>;
 
 /**
  * Controls lifetime of stats. Users usually instantiate in main to print out
@@ -95,16 +91,9 @@ class StatManager: private boost::noncopyable {
 
 public:
   ~StatManager() {
-    for (std::deque<Statistic*>::iterator ii = stats.begin(), ei = stats.end(); ii != ei; ++ii) {
-      (*ii)->report();
-    }
-    Galois::Runtime::printDistStats();
-  }
-  void dump_stats(){
-    for (std::deque<Statistic*>::iterator ii = stats.begin(), ei = stats.end(); ii != ei; ++ii) {
-      (*ii)->report();
-    }
-    Galois::Runtime::printDistStats();
+    for(auto* s : stats)
+      s->report();
+    Galois::Runtime::printStats();
   }
   //! Statistics that are not lexically scoped must be added explicitly
   void push(Statistic& s) {
@@ -146,8 +135,8 @@ public:
   ~StatTimer() {
     if (valid)
       stop();
-    //if (TimeAccumulator::get()) // only report non-zero stat
-      Galois::Runtime::reportStat(loopname, name, get());
+    if (TimeAccumulator::get()) // only report non-zero stat
+      Galois::Runtime::reportStat(loopname, name, get(), Substrate::ThreadPool::getTID());
   }
 
   void start() {

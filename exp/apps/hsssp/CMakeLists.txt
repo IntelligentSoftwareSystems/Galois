@@ -1,4 +1,4 @@
-add_subdirectory(cuda)
+#add_subdirectory(cuda)
 include_directories(${CUDA_INCLUDE_DIRS} )
 include_directories(${OPENCL_INCLUDE_DIRS})
 

@@ -12,6 +12,7 @@ set(sources
         src/Version.cpp
         src/PagePool.cpp
         src/Tracer.cpp
+        src/StatCollector.cpp
 )
 
 add_library(galois_runtime STATIC ${sources})
