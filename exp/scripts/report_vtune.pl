@@ -73,24 +73,30 @@ while (<>) {
     debug "line=@line, length=$#line\n";
 
     if ($InType eq "line") {
+      # first 2 columns are source file and line
       my $file = shift @line;
       my $ln = shift @line;
-      my $module = shift @line;
 
-      $offset = 3;
+      $offset = 2;
       if ($heads[$offset] =~ /file path/i) {
         my $path = shift @line;
         $offset += 1;
       } 
 
-      $ind = "$module:$file:$ln";
+      $ind = "$file:$ln";
 
     } elsif ($InType eq "function") {
+      # first column is function name 
+      # last 4 colums are module, function full name, source file, start address
       my $function = shift @line;
-      my $module = shift @line;
 
-      $offset = 2;
-      $ind = "$module:$function";
+      my $address = pop @line;
+      my $file = pop @line;
+      my $fullname = pop @line;
+      my $module = pop @line;
+
+      $offset = 1;
+      $ind = "$file:$fullname:$module:$address";
     }
 
     debug "line=@line, length=$#line\n";

@@ -266,6 +266,20 @@ public:
 
 };
 
+
+
+namespace HIDDEN {
+  
+  struct DummyExecFunc {
+    static const unsigned CHUNK_SIZE = 1;
+    template <typename T, typename C>
+    void operator () (const T&, C&) const {
+      std::printf ("Warning: DummyExecFunc shouldn't be executed\n");
+    }
+  };
+}
+
+
 } // end namespace Runtime
 } // end namespace Galois
 

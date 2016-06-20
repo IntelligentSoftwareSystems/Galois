@@ -152,9 +152,11 @@ int main(int argc, char** argv) {
   using namespace Galois::WorkList;
   typedef dChunkedFIFO<64> dChunk;
   typedef OrderedByIntegerMetric<UpdateRequestIndexer,dChunk> OBIM;
-  Galois::for_each(UpdateRequest{source, 0}, SSSP{graph}, Galois::wl<OBIM>(), Galois::does_not_need_aborts<>());
+  Galois::for_each(UpdateRequest{source, 0}, SSSP{graph}, Galois::wl<OBIM>(), Galois::does_not_need_aborts<>(), Galois::loopname("SSSP"));
   Tmain.stop();
   T.stop();
+
+  Galois::for_each(UpdateRequest{source, 0}, SSSP{graph}, Galois::wl<OBIM>(), Galois::does_not_need_aborts<>(), Galois::loopname("SSSP"));
 
   Galois::reportPageAlloc("MeminfoPost");
   Galois::Runtime::reportNumaAlloc("NumaPost");

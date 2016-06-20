@@ -56,7 +56,7 @@ namespace FirstGraphImpl {
 /**
  * Wrapper class to have a valid type on void edges
  */
-template<typename NTy, typename ETy, bool Directed>
+template<typename NTy, typename ETy, bool DirectedButNotInOut>
 struct UEdgeInfoBase;
 
 template<typename NTy, typename ETy>
@@ -66,21 +66,19 @@ struct UEdgeInfoBase<NTy, ETy, true> {
   NTy* N;
   ETy Ea;
 
-  inline NTy*&       first()       { assert(N); return N; }
-  inline NTy* const& first() const { assert(N); return N; }
+  inline NTy*       first()       { assert(N); return N; }
+  inline NTy* const first() const { assert(N); return N; }
   inline ETy*       second()       { return &Ea; }
   inline const ETy* second() const { return &Ea; }
 
   template<typename... Args>
-  UEdgeInfoBase(NTy* n, ETy* v, Args&&... args) : N(n), Ea(std::forward<Args>(args)...) {}
+  UEdgeInfoBase(NTy* n, ETy* v, bool f, Args&&... args) : N(n), Ea(std::forward<Args>(args)...) {}
 
   template<typename... Args>
-  UEdgeInfoBase(ETy* v, Args&&... args) :Ea(std::forward<Args>(args)...) {}
-  
-  template<typename... Args>
-  UEdgeInfoBase(NTy* n, ETy &v, Args&&... args): N(n) { Ea = v; }
+  UEdgeInfoBase(NTy* n, ETy &v, bool f, Args&&... args): N(n) { Ea = v; }
 
   static size_t sizeOfSecond()     { return sizeof(ETy); }
+  bool isInEdge() const { return false; }
 };
 
 template<typename NTy, typename ETy>
@@ -90,13 +88,14 @@ struct UEdgeInfoBase<NTy, ETy, false> {
   NTy* N;
   ETy* Ea;
 
-  inline NTy*&       first()       { assert(N); return N; }
-  inline NTy* const& first() const { assert(N); return N; }
+  inline NTy*       first()       { assert(N); return (NTy*)((uintptr_t)N&~1); }
+  inline NTy* const first() const { assert(N); return (NTy*)((uintptr_t)N&~1); }
   inline ETy*       second()       { return Ea; }
   inline const ETy* second() const { return Ea; }
   template<typename... Args>
-  UEdgeInfoBase(NTy* n, ETy* v, Args&&... args) : N(n), Ea(v) {}
+  UEdgeInfoBase(NTy* n, ETy* v, bool f, Args&&... args) : N((NTy*)((uintptr_t)n|f)), Ea(v) {}
   static size_t sizeOfSecond()     { return sizeof(ETy); }
+  bool isInEdge() const { return (uintptr_t)N&1; }
 };
 
 template<typename NTy>
@@ -104,13 +103,14 @@ struct UEdgeInfoBase<NTy, void, true> {
   typedef char& reference;
 
   NTy* N;
-  inline NTy*&       first()        { return N; }
-  inline NTy* const& first()  const { return N; }
+  inline NTy*       first()        { return N; }
+  inline NTy* const first()  const { return N; }
   inline char*       second() const { return static_cast<char*>(NULL); }
   inline char*       addr()   const { return second(); }
   template<typename... Args>
-  UEdgeInfoBase(NTy* n, void* v, Args&&... args) : N(n) {}
+  UEdgeInfoBase(NTy* n, void*, bool f, Args&&... args) : N(n) {}
   static size_t sizeOfSecond()      { return 0; }
+  bool isInEdge() const { return false; }
 };
 
 template<typename NTy>
@@ -118,13 +118,14 @@ struct UEdgeInfoBase<NTy, void, false> {
   typedef char& reference;
 
   NTy* N;
-  inline NTy*&       first()        { return N; }
-  inline NTy* const& first()  const { return N; }
+  inline NTy*       first()        { return (NTy*)((uintptr_t)N&~1); }
+  inline NTy* const first()  const { return (NTy*)((uintptr_t)N&~1); }
   inline char*       second() const { return static_cast<char*>(NULL); }
   inline char*       addr()   const { return second(); }
   template<typename... Args>
-  UEdgeInfoBase(NTy* n, void* v, Args&&... args) : N(n) {}
+  UEdgeInfoBase(NTy* n, void*, bool f, Args&&... args) : N((NTy*)((uintptr_t)n|f)) {}
   static size_t sizeOfSecond()      { return 0; }
+  bool isInEdge() const { return (uintptr_t)N&1; }
 };
 
 template<typename ETy>
@@ -202,9 +203,10 @@ struct EdgeFactory<void> {
  * @tparam NodeTy Type of node data
  * @tparam EdgeTy Type of edge data
  * @tparam Directional true if graph is directed
+ * @tparam InOut true if directed graph tracks in-edges
  * @tparam SortedNeighbors Keep neighbors sorted (for faster findEdge)
  */
-template<typename NodeTy, typename EdgeTy, bool Directional,
+template<typename NodeTy, typename EdgeTy, bool Directional, bool InOut = false,
   bool HasNoLockable=false,
   bool SortedNeighbors=false,
   typename FileEdgeTy=EdgeTy
@@ -213,22 +215,22 @@ class FirstGraph : private boost::noncopyable {
 public:
   //! If true, do not use abstract locks in graph
   template<bool _has_no_lockable>
-  struct with_no_lockable { typedef FirstGraph<NodeTy,EdgeTy,Directional,_has_no_lockable,SortedNeighbors,FileEdgeTy> type; };
+  struct with_no_lockable { typedef FirstGraph<NodeTy,EdgeTy,Directional,InOut,_has_no_lockable,SortedNeighbors,FileEdgeTy> type; };
 
   template<typename _node_data>
-  struct with_node_data { typedef FirstGraph<_node_data,EdgeTy,Directional,HasNoLockable,SortedNeighbors,FileEdgeTy> type; };
+  struct with_node_data { typedef FirstGraph<_node_data,EdgeTy,Directional,InOut,HasNoLockable,SortedNeighbors,FileEdgeTy> type; };
 
   template<typename _edge_data>
-  struct with_edge_data { typedef FirstGraph<NodeTy,_edge_data,Directional,HasNoLockable,SortedNeighbors,FileEdgeTy> type; };
+  struct with_edge_data { typedef FirstGraph<NodeTy,_edge_data,Directional,InOut,HasNoLockable,SortedNeighbors,FileEdgeTy> type; };
 
   template<typename _file_edge_data>
-  struct with_file_edge_data { typedef FirstGraph<NodeTy,EdgeTy,Directional,HasNoLockable,SortedNeighbors,_file_edge_data> type; };
+  struct with_file_edge_data { typedef FirstGraph<NodeTy,EdgeTy,Directional,InOut,HasNoLockable,SortedNeighbors,_file_edge_data> type; };
 
   template<bool _directional>
-  struct with_directional { typedef FirstGraph<NodeTy,EdgeTy,_directional,HasNoLockable,SortedNeighbors,FileEdgeTy> type; };
+  struct with_directional { typedef FirstGraph<NodeTy,EdgeTy,_directional,InOut,HasNoLockable,SortedNeighbors,FileEdgeTy> type; };
 
   template<bool _sorted_neighbors>
-  struct with_sorted_neighbors { typedef FirstGraph<NodeTy,EdgeTy,Directional,HasNoLockable,_sorted_neighbors,FileEdgeTy> type; };
+  struct with_sorted_neighbors { typedef FirstGraph<NodeTy,EdgeTy,Directional,InOut,HasNoLockable,_sorted_neighbors,FileEdgeTy> type; };
 
   typedef read_with_aux_graph_tag read_tag;
 
@@ -265,7 +267,7 @@ private:
   class gNode;
   struct gNodeTypes: public detail::NodeInfoBaseTypes<NodeTy, !HasNoLockable> {
     //! The storage type for an edge
-    typedef FirstGraphImpl::UEdgeInfoBase<gNode, EdgeTy, Directional> EdgeInfo;
+    typedef FirstGraphImpl::UEdgeInfoBase<gNode, EdgeTy, Directional&!InOut> EdgeInfo;
     
     //! The storage type for edges
     typedef llvm::SmallVector<EdgeInfo, 3> EdgesTy;
@@ -324,7 +326,7 @@ private:
     }
 
     template<typename... Args>
-    iterator createEdge(gNode* N, EdgeTy* v, Args&&... args) {
+    iterator createEdge(gNode* N, EdgeTy* v, bool inEdge, Args&&... args) {
       iterator ii;
       if (SortedNeighbors) {
         // If neighbors are sorted, find appropriate insertion point.
@@ -334,11 +336,11 @@ private:
       }
       else
         ii = edges.end();
-      return edges.insert(ii, EdgeInfo(N, v, std::forward<Args>(args)...));
+      return edges.insert(ii, EdgeInfo(N, v, inEdge, std::forward<Args>(args)...));
     }
 
     template<typename... Args>
-    iterator createEdgeWithReuse(gNode* N, EdgeTy* v, Args&&... args) {
+    iterator createEdgeWithReuse(gNode* N, EdgeTy* v, bool inEdge, Args&&... args) {
       // First check for holes
       iterator ii, ei;
       if (SortedNeighbors) {
@@ -356,10 +358,10 @@ private:
       ii = std::find_if(ii, ei, first_not_valid());
       if (ii != ei) {
         // FIXME: We could move elements around (short distances).
-	*ii = EdgeInfo(N, v, std::forward<Args>(args)...);
+	*ii = EdgeInfo(N, v, inEdge, std::forward<Args>(args)...);
 	return ii;
       }
-      return edges.insert(ei, EdgeInfo(N, v, std::forward<Args>(args)...));
+      return edges.insert(ei, EdgeInfo(N, v, inEdge, std::forward<Args>(args)...));
     }
 
     template<bool _A1 = HasNoLockable>
@@ -388,6 +390,12 @@ private:
   struct is_edge : public std::unary_function<typename gNodeTypes::EdgeInfo&, bool> {
     bool operator()(typename gNodeTypes::EdgeInfo& e) const { return e.first()->active; }
   };
+  struct is_in_edge : public std::unary_function<typename gNodeTypes::EdgeInfo&, bool> {
+    bool operator()(typename gNodeTypes::EdgeInfo& e) const { return e.first()->active && e.isInEdge(); }
+  };
+  struct is_out_edge : public std::unary_function<typename gNodeTypes::EdgeInfo&, bool> {
+    bool operator()(typename gNodeTypes::EdgeInfo& e) const { return e.first()->active && !e.isInEdge(); }
+  };
   struct makeGraphNode: public std::unary_function<gNode&, gNode*> {
     gNode* operator()(gNode& data) const { return &data; }
   };
@@ -401,8 +409,10 @@ public:
   typedef FileEdgeTy file_edge_data_type;
   //! Node data type
   typedef NodeTy node_data_type;
-  //! Edge iterator
-  typedef typename boost::filter_iterator<is_edge, typename gNodeTypes::iterator> edge_iterator;
+  //! (Out or Undirected) Edge iterator
+  typedef typename boost::filter_iterator<is_out_edge, typename gNodeTypes::iterator> edge_iterator;
+  //! In Edge iterator
+  typedef typename boost::filter_iterator<is_in_edge, typename gNodeTypes::iterator> in_edge_iterator;
   //! Reference to edge data
   typedef typename gNodeTypes::EdgeInfo::reference edge_data_reference;
   //! Reference to node data
@@ -422,16 +432,16 @@ private:
     src->acquire(mflag);
     typename gNode::iterator ii = src->find(dst);
     if (ii == src->end()) {
-      if (Directional) {
-	ii = src->createEdgeWithReuse(dst, 0, std::forward<Args>(args)...);
+      if (Directional && !InOut) {
+	ii = src->createEdgeWithReuse(dst, 0, false, std::forward<Args>(args)...);
       } else {
         dst->acquire(mflag);
 	EdgeTy* e = edgesF.mkEdge(std::forward<Args>(args)...);
-	ii = dst->createEdgeWithReuse(src, e, std::forward<Args>(args)...);
-	ii = src->createEdgeWithReuse(dst, e, std::forward<Args>(args)...);
+	ii = dst->createEdgeWithReuse(src, e, Directional ? true : false,  std::forward<Args>(args)...);
+	ii = src->createEdgeWithReuse(dst, e, false, std::forward<Args>(args)...);
       }
     }
-    return boost::make_filter_iterator(is_edge(), ii, src->end());
+    return boost::make_filter_iterator(is_out_edge(), ii, src->end());
   }
 
   template<typename... Args>
@@ -442,16 +452,16 @@ private:
     src->acquire(mflag);
     typename gNode::iterator ii = src->end();
     if (ii == src->end()) {
-      if (Directional) {
-	ii = src->createEdge(dst, 0, std::forward<Args>(args)...);
+      if (Directional && !InOut) {
+	ii = src->createEdge(dst, 0, false, std::forward<Args>(args)...);
       } else {
         dst->acquire(mflag);
 	EdgeTy* e = edgesF.mkEdge(std::forward<Args>(args)...);
-	ii = dst->createEdge(src, e, std::forward<Args>(args)...);
-	ii = src->createEdge(dst, e, std::forward<Args>(args)...);
+	ii = dst->createEdge(src, e, Directional ? true : false, std::forward<Args>(args)...);
+	ii = src->createEdge(dst, e, false, std::forward<Args>(args)...);
       }
     }
-    return boost::make_filter_iterator(is_edge(), ii, src->end());
+    return boost::make_filter_iterator(is_out_edge(), ii, src->end());
   }
 
   template<bool _A1 = LargeArray<EdgeTy>::has_value, bool _A2 = LargeArray<FileEdgeTy>::has_value>
@@ -520,9 +530,12 @@ public:
     gNode* N = n;
     if (N->active) {
       N->active = false;
-      if (!Directional && edgesF.mustDel())
-	for (edge_iterator ii = edge_begin(n, MethodFlag::UNPROTECTED), ee = edge_end(n, MethodFlag::UNPROTECTED); ii != ee; ++ii)
+      if ((!Directional || InOut) && edgesF.mustDel()) {
+	for (auto ii : edges(n, MethodFlag::UNPROTECTED))
 	  edgesF.delEdge(ii->second());
+        for (auto ii : in_edges(n, MethodFlag::UNPROTECTED))
+          edgesF.delEdge(ii->second());
+      }
       N->edges.clear();
     }
   }
@@ -559,7 +572,7 @@ public:
     assert(src);
     // Galois::Runtime::checkWrite(mflag, true);
     src->acquire(mflag);
-    if (Directional) {
+    if (Directional && !InOut) {
       src->erase(dst.base());
     } else {
       dst->first()->acquire(mflag);
@@ -576,7 +589,7 @@ public:
     assert(dst);
     src->acquire(mflag);
     typename gNodeTypes::iterator ii = src->find(dst), ei = src->end();
-    is_edge edge_predicate;
+    is_out_edge edge_predicate;
     if ( ii != ei && edge_predicate(*ii) ) {
       // After finding edge, lock dst and verify still active
       dst->acquire(mflag);
@@ -603,8 +616,20 @@ public:
     return *ii->second();
   }
 
+  edge_data_reference getEdgeData(in_edge_iterator ii, Galois::MethodFlag mflag = MethodFlag::UNPROTECTED) const {
+    assert(ii->first()->active);
+    // Galois::Runtime::checkWrite(mflag, false);
+    ii->first()->acquire(mflag);
+    return *ii->second();
+  }
+
   //! Returns the destination of an edge
   GraphNode getEdgeDst(edge_iterator ii) {
+    assert(ii->first()->active);
+    return GraphNode(ii->first());
+  }
+
+  GraphNode getEdgeDst(in_edge_iterator ii) {
     assert(ii->first()->active);
     return GraphNode(ii->first());
   }
@@ -618,11 +643,24 @@ public:
 
     if (Galois::Runtime::shouldLock(mflag)) {
       for (typename gNode::iterator ii = N->begin(), ee = N->end(); ii != ee; ++ii) {
-	if (ii->first()->active)
+	if (ii->first()->active && !ii->isInEdge())
 	  ii->first()->acquire(mflag);
       }
     }
-    return boost::make_filter_iterator(is_edge(), N->begin(), N->end());
+    return boost::make_filter_iterator(is_out_edge(), N->begin(), N->end());
+  }
+
+  in_edge_iterator in_edge_begin(GraphNode N, Galois::MethodFlag mflag = MethodFlag::WRITE) {
+    assert(N);
+    N->acquire(mflag);
+
+    if (Galois::Runtime::shouldLock(mflag)) {
+      for (typename gNode::iterator ii = N->begin(), ee = N->end(); ii != ee; ++ii) {
+	if (ii->first()->active && ii->isInEdge())
+	  ii->first()->acquire(mflag);
+      }
+    }
+    return boost::make_filter_iterator(is_in_edge(), N->begin(), N->end());
   }
 
   //! Returns the end of the neighbor iterator 
@@ -631,11 +669,23 @@ public:
     // Acquiring lock is not necessary: no valid use for an end pointer should
     // ever require it
     // N->acquire(mflag);
-    return boost::make_filter_iterator(is_edge(), N->end(), N->end());
+    return boost::make_filter_iterator(is_out_edge(), N->end(), N->end());
+  }
+
+  in_edge_iterator in_edge_end(GraphNode N, Galois::MethodFlag mflag = MethodFlag::WRITE) {
+    assert(N);
+    // Acquiring lock is not necessary: no valid use for an end pointer should
+    // ever require it
+    // N->acquire(mflag);
+    return boost::make_filter_iterator(is_in_edge(), N->end(), N->end());
   }
 
   Runtime::iterable<NoDerefIterator<edge_iterator>> edges(GraphNode N, Galois::MethodFlag mflag = MethodFlag::WRITE) {
     return detail::make_no_deref_range(edge_begin(N, mflag), edge_end(N, mflag));
+  }
+
+  Runtime::iterable<NoDerefIterator<in_edge_iterator>> in_edges(GraphNode N, Galois::MethodFlag mflag = MethodFlag::WRITE) {
+    return detail::make_no_deref_range(in_edge_begin(N, mflag), in_edge_end(N, mflag));
   }
 
   /**

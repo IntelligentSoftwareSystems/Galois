@@ -613,7 +613,7 @@ void runMSTsimple (const size_t numNodes, const VecEdge& edges,
   VecAtomicCtxPtr repOwnerCtxVec (numNodes);
 
  
-  Galois::Substrate::getThreadPool().burnPower(Galois::getActiveThreads());
+  Galois::Substrate::ThreadPool::getThreadPool().burnPower(Galois::getActiveThreads());
 
   fillUpTimer.start ();
   Galois::do_all (
@@ -655,7 +655,7 @@ void runMSTsimple (const size_t numNodes, const VecEdge& edges,
   std::cout << "Time taken by LinkUpLoop: " << linkUpTimer.get () << std::endl;
   std::cout << "Time taken by FillUp: " << fillUpTimer.get () << std::endl;
 
-  Galois::Substrate::getThreadPool().beKind();
+  Galois::Substrate::ThreadPool::getThreadPool().beKind();
 }
 
 template <typename Iter>
@@ -806,7 +806,7 @@ void runMSTfilter (const size_t numNodes, const VecEdge& edges,
   Accumulator findIter;
   Accumulator linkUpIter;
 
-  Galois::Substrate::getThreadPool().burnPower(Galois::getActiveThreads());
+  Galois::Substrate::ThreadPool::getThreadPool().burnPower(Galois::getActiveThreads());
 
 
   VecRep_ty repVec (numNodes);
@@ -868,7 +868,7 @@ void runMSTfilter (const size_t numNodes, const VecEdge& edges,
   std::cout << "Time taken by partitioning Loop: " << partitionTimer.get () << std::endl;
   std::cout << "Time taken by filter Loop: " << filterTimer.get () << std::endl;
 
-  Galois::Substrate::getThreadPool().beKind();
+  Galois::Substrate::ThreadPool::getThreadPool().beKind();
 }
 
 

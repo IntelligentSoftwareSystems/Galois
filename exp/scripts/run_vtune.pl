@@ -119,10 +119,11 @@ sub report_function($$$$) {
 
 my @counters = ();
 my $analyzeSystem = 1;
-my $startPaused = 0;
+my $startPaused = 1;
 my $help = 0;
 my $threads = 0;
-my $analysisType = 'nehalem-memory-access';
+# my $analysisType = 'memory-access';
+my $analysisType = 'general_exploration';
 my $reportType = 'hw-events';
 my $reportTimeout = 100000;
 GetOptions(

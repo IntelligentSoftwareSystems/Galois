@@ -4,9 +4,13 @@
 #  VTune_INCLUDE_DIRS - The VTune include directories
 #  VTune_LIBRARIES - The libraries needed to use VTune
 
+message(STATUS "I'm here")
+message(STATUS "${VTune_INCLUDE_DIRS}")
+
 if(VTune_INCLUDE_DIRS AND VTune_LIBRARIES)
   set(VTune_FIND_QUIETLY TRUE)
 endif()
+
 
 set(VTune_LIBRARY_PATH_CANDIDATES lib lib64 lib32 bin64/k1om bin32/k1om)
 find_path(VTune_INCLUDE_DIRS ittnotify.h PATHS ${VTune_ROOT} PATH_SUFFIXES include)

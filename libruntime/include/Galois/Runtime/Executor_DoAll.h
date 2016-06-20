@@ -107,7 +107,7 @@ class DoAllExecutor {
     //Then try stealing from neighbors
     unsigned myID = Substrate::ThreadPool::getTID();
     unsigned myPkg = Substrate::ThreadPool::getPackage();
-    auto& tp = Substrate::getThreadPool();
+    auto& tp = Substrate::ThreadPool::getThreadPool();
     //try package neighbors
     for (unsigned x = 0; x < activeThreads; ++x) {
       if (x != myID && tp.getPackage(x) == myPkg) {
@@ -131,7 +131,9 @@ class DoAllExecutor {
 public:
   DoAllExecutor(const FunctionTy& _F, const RangeTy& r, const char* ln)
     :F(_F), range(r), loopname(ln)
-  { }
+  {
+    reportLoopInstance(loopname);
+  }
 
   void operator()() {
     //Assume the copy constructor on the functor is readonly
@@ -153,10 +155,10 @@ template<typename RangeTy, typename FunctionTy>
 void do_all_impl(const RangeTy& range, const FunctionTy& f, const char* loopname = 0, bool steal = false) {
   if (steal) {
     DoAllExecutor<FunctionTy, RangeTy> W(f, range, loopname);
-    Substrate::getThreadPool().run(activeThreads, std::ref(W));
+    Substrate::ThreadPool::getThreadPool().run(activeThreads, std::ref(W));
   } else {
     FunctionTy f_cpy (f);
-    Substrate::getThreadPool().run(activeThreads, [&f_cpy, &range] () {
+    Substrate::ThreadPool::getThreadPool().run(activeThreads, [&f_cpy, &range] () {
         auto begin = range.local_begin();
         auto end = range.local_end();
         while (begin != end)

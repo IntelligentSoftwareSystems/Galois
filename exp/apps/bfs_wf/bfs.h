@@ -140,8 +140,9 @@ protected:
           numEdges += graph.edge_end (n, Galois::MethodFlag::UNPROTECTED) - graph.edge_begin (n, Galois::MethodFlag::UNPROTECTED);
           // std::cout << "Degree: " << graph.edge_end (n, Galois::MethodFlag::UNPROTECTED) - graph.edge_begin (n, Galois::MethodFlag::UNPROTECTED) << std::endl;
         },
-        "node-data-init",
-        Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
+        std::make_tuple (
+          Galois::loopname ("node-data-init"),
+          Galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
 
     t_init.stop();
     std::cout << "Graph read with nodes=" << numNodes << ", edges=" << numEdges.reduce () << std::endl;
@@ -200,8 +201,9 @@ protected:
             }
           }
         },
-        "bfs-verify",
-        Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
+        std::make_tuple (
+          Galois::loopname ("bfs-verify"),
+          Galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
 
     if (numUnreachable.reduce () > 0) {
       std::cerr << "WARNING: " << numUnreachable.reduce () << " nodes were unreachable. "

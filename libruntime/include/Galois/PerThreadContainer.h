@@ -74,9 +74,9 @@ enum GlobalPos {
 
 template<typename PerThrdCont>
 struct WLindexer: 
-  public std::unary_function<unsigned, typename PerThrdCont::Cont_ty&> 
+  public std::unary_function<unsigned, typename PerThrdCont::container_type&> 
 {
-  typedef typename PerThrdCont::Cont_ty Ret_ty;
+  typedef typename PerThrdCont::container_type Ret_ty;
 
   PerThrdCont* wl;
 
@@ -125,13 +125,13 @@ typename TypeFactory<PerThrdCont>::RvrsOuterIter make_outer_rend(PerThrdCont& wl
 template<typename PerThrdCont>
 class OuterPerThreadWLIter: public boost::iterator_facade<
   OuterPerThreadWLIter<PerThrdCont>, 
-  typename PerThrdCont::Cont_ty, 
+  typename PerThrdCont::container_type, 
   boost::random_access_traversal_tag> {
 
 
 
 
-  using Cont_ty = typename PerThrdCont::Cont_ty;
+  using container_type = typename PerThrdCont::container_type;
   using Diff_ty = ptrdiff_t;
 
   friend class boost::iterator_core_access;
@@ -145,12 +145,12 @@ class OuterPerThreadWLIter: public boost::iterator_facade<
     assert((row >= 0) && (row < workList->numRows()));
   }
 
-  // Cont_ty& getWL() {
+  // container_type& getWL() {
     // assertInRange();
     // return (*workList)[row];
   // }
 
-  Cont_ty& getWL() const {
+  container_type& getWL() const {
     assertInRange();
     return (*workList)[row];
   }
@@ -174,11 +174,11 @@ public:
     }
   }
 
-  Cont_ty& dereference (void) const { 
+  container_type& dereference (void) const { 
     return getWL ();
   }
 
-  // const Cont_ty& dereference (void) const {
+  // const container_type& dereference (void) const {
     // getWL ();
   // }
 
@@ -238,16 +238,16 @@ make_outer_rend(PerThrdCont& wl) {
 template<typename Cont_tp> 
 class PerThreadContainer {
 public:
-  typedef Cont_tp Cont_ty;
-  typedef typename Cont_ty::value_type value_type;
-  typedef typename Cont_ty::reference reference;
-  typedef typename Cont_ty::pointer pointer;
-  typedef typename Cont_ty::size_type size_type;
+  typedef Cont_tp container_type;
+  typedef typename container_type::value_type value_type;
+  typedef typename container_type::reference reference;
+  typedef typename container_type::pointer pointer;
+  typedef typename container_type::size_type size_type;
 
-  typedef typename Cont_ty::iterator local_iterator;
-  typedef typename Cont_ty::const_iterator local_const_iterator;
-  typedef typename Cont_ty::reverse_iterator local_reverse_iterator;
-  typedef typename Cont_ty::const_reverse_iterator local_const_reverse_iterator;
+  typedef typename container_type::iterator local_iterator;
+  typedef typename container_type::const_iterator local_const_iterator;
+  typedef typename container_type::reverse_iterator local_reverse_iterator;
+  typedef typename container_type::const_reverse_iterator local_const_reverse_iterator;
 
   typedef PerThreadContainer This_ty;
 
@@ -258,10 +258,10 @@ public:
   typedef OuterPerThreadWLIter<This_ty> OuterIter;
   typedef typename std::reverse_iterator<OuterIter> RvrsOuterIter;
 #endif
-  typedef typename Galois::ChooseStlTwoLevelIterator<OuterIter, typename Cont_ty::iterator>::type global_iterator;
-  typedef typename Galois::ChooseStlTwoLevelIterator<OuterIter, typename Cont_ty::const_iterator>::type global_const_iterator;
-  typedef typename Galois::ChooseStlTwoLevelIterator<RvrsOuterIter, typename Cont_ty::reverse_iterator>::type global_reverse_iterator;
-  typedef typename Galois::ChooseStlTwoLevelIterator<RvrsOuterIter, typename Cont_ty::const_reverse_iterator>::type global_const_reverse_iterator;
+  typedef typename Galois::ChooseStlTwoLevelIterator<OuterIter, typename container_type::iterator>::type global_iterator;
+  typedef typename Galois::ChooseStlTwoLevelIterator<OuterIter, typename container_type::const_iterator>::type global_const_iterator;
+  typedef typename Galois::ChooseStlTwoLevelIterator<RvrsOuterIter, typename container_type::reverse_iterator>::type global_reverse_iterator;
+  typedef typename Galois::ChooseStlTwoLevelIterator<RvrsOuterIter, typename container_type::const_reverse_iterator>::type global_const_reverse_iterator;
 
   typedef global_iterator iterator;
   typedef global_const_iterator const_iterator;
@@ -273,19 +273,19 @@ private:
 
 #if 0
   struct FakePTS {
-    std::vector<Cont_ty*> v;
+    std::vector<container_type*> v;
 
     FakePTS () { 
       v.resize (size ());
     }
 
-    Cont_ty** getLocal () const {
+    container_type** getLocal () const {
       return getRemote (Galois::Runtime::LL::getTID ());
     }
 
-    Cont_ty** getRemote (size_t i) const {
+    container_type** getRemote (size_t i) const {
       assert (i < v.size ());
-      return const_cast<Cont_ty**> (&v[i]);
+      return const_cast<container_type**> (&v[i]);
     }
 
     size_t size () const { return Galois::Runtime::LL::getMaxThreads(); }
@@ -293,7 +293,7 @@ private:
   };
 #endif
   // typedef FakePTS PerThrdCont_ty;
-  typedef Galois::Substrate::PerThreadStorage<Cont_ty*> PerThrdCont_ty;
+  typedef Galois::Substrate::PerThreadStorage<container_type*> PerThrdCont_ty;
   PerThrdCont_ty perThrdCont;
 
   void destroy() {
@@ -313,7 +313,7 @@ protected:
   template <typename... Args>
   void init(Args&&... args) {
     for (unsigned i = 0; i < perThrdCont.size(); ++i) {
-      *perThrdCont.getRemote(i) = new Cont_ty(std::forward<Args> (args)...);
+      *perThrdCont.getRemote(i) = new container_type(std::forward<Args> (args)...);
     }
   }
 
@@ -324,17 +324,17 @@ protected:
 public:
   unsigned numRows() const { return perThrdCont.size(); }
 
-  Cont_ty& get() { return **(perThrdCont.getLocal()); }
+  container_type& get() { return **(perThrdCont.getLocal()); }
 
-  const Cont_ty& get() const { return **(perThrdCont.getLocal()); }
+  const container_type& get() const { return **(perThrdCont.getLocal()); }
 
-  Cont_ty& get(unsigned i) { return **(perThrdCont.getRemote(i)); }
+  container_type& get(unsigned i) { return **(perThrdCont.getRemote(i)); }
 
-  const Cont_ty& get(unsigned i) const { return **(perThrdCont.getRemote(i)); }
+  const container_type& get(unsigned i) const { return **(perThrdCont.getRemote(i)); }
 
-  Cont_ty& operator [](unsigned i) { return get(i); }
+  container_type& operator [](unsigned i) { return get(i); }
 
-  const Cont_ty& operator [](unsigned i) const { return get(i); }
+  const container_type& operator [](unsigned i) const { return get(i); }
 
 
   global_iterator begin_all() { 
@@ -463,11 +463,11 @@ public:
   }
 
   template <typename Range, typename Ret>
-  void fill_parallel (const Range& range, Ret (Cont_ty::*pushFn) (const value_type&) = &Cont_ty::push_back) {
+  void fill_parallel (const Range& range, Ret (container_type::*pushFn) (const value_type&) = &container_type::push_back) {
     Galois::Runtime::do_all_impl (
         range,
         [this, pushFn] (const typename Range::value_type& v) {
-          Cont_ty& my = get ();
+          container_type& my = get ();
           (my.*pushFn) (v);
           // (get ().*pushFn)(v);
         },
@@ -478,7 +478,7 @@ public:
   // // TODO: fill parallel
   // template<typename Iter, typename R>
   // void fill_serial(Iter begin, Iter end,
-      // R(Cont_ty::*pushFn)(const value_type&) = &Cont_ty::push_back) {
+      // R(container_type::*pushFn)(const value_type&) = &container_type::push_back) {
 // 
     // const unsigned P = Galois::getActiveThreads();
 // 
@@ -518,10 +518,10 @@ template<typename T>
 class PerThreadVector: public PerThreadContainer<typename gstl::template Vector<T> > {
 public:
   typedef typename gstl::template Pow2Alloc<T>  Alloc_ty;
-  typedef typename gstl::template Vector<T>  Cont_ty;
+  typedef typename gstl::template Vector<T>  container_type;
 
 protected:
-  typedef PerThreadContainer<Cont_ty> Super_ty;
+  typedef PerThreadContainer<container_type> Super_ty;
 
   Alloc_ty alloc;
 
@@ -549,8 +549,8 @@ public:
   typedef typename gstl::template Pow2Alloc<T>  Alloc_ty;
 
 protected:
-  typedef typename gstl::template Deque<T>  Cont_ty;
-  typedef PerThreadContainer<Cont_ty> Super_ty;
+  typedef typename gstl::template Deque<T>  container_type;
+  typedef PerThreadContainer<container_type> Super_ty;
 
   Alloc_ty alloc;
 
@@ -580,8 +580,8 @@ public:
   typedef typename gstl::template FixedSizeAlloc<T>  Alloc_ty;
 
 protected:
-  typedef typename gstl::template List<T>  Cont_ty;
-  typedef PerThreadContainer<Cont_ty> Super_ty;
+  typedef typename gstl::template List<T>  container_type;
+  typedef PerThreadContainer<container_type> Super_ty;
 
   Alloc_ty alloc;
 
@@ -599,8 +599,8 @@ public:
   typedef typename gstl::template FixedSizeAlloc<T>  Alloc_ty;
 
 protected:
-  typedef typename gstl::template Set<T, C>  Cont_ty;
-  typedef PerThreadContainer<Cont_ty> Super_ty;
+  typedef typename gstl::template Set<T, C>  container_type;
+  typedef PerThreadContainer<container_type> Super_ty;
 
   Alloc_ty alloc;
 
@@ -631,8 +631,8 @@ public:
 
 protected:
   typedef typename gstl::template Vector<T>  Vec_ty;
-  typedef typename gstl::template PQ<T, C>  Cont_ty;
-  typedef PerThreadContainer<Cont_ty> Super_ty;
+  typedef typename gstl::template PQ<T, C>  container_type;
+  typedef PerThreadContainer<container_type> Super_ty;
 
   Alloc_ty alloc;
 
