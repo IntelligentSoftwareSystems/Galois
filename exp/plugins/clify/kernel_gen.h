@@ -63,15 +63,15 @@ struct CLVar {
       }
       typeName = pvd.getType().getUnqualifiedType().getAsString();
       if (isConst) {
-         if(typeName.find("const ")!=string::npos)
+         if (typeName.find("const ") != string::npos)
             typeName.replace(typeName.find("const "), 5, "");
       }
       if (isPointer) {
-         if(typeName.find("*")!=string::npos)
+         if (typeName.find("*") != string::npos)
             typeName = typeName.substr(0, typeName.find("*") - 1);
       }
       if (isReference) {
-         if(typeName.find("&")!=string::npos)
+         if (typeName.find("&") != string::npos)
             typeName = typeName.substr(0, typeName.find("&") - 1);
       }
       varName = pvd.getNameAsString();
@@ -92,15 +92,15 @@ struct CLVar {
 
       typeName = pvd.getType().getUnqualifiedType().getAsString();
       if (isConst) {
-         if(typeName.find("const ")!=string::npos)
+         if (typeName.find("const ") != string::npos)
             typeName.replace(typeName.find("const "), 5, "");
       }
       if (isPointer) {
-         if(typeName.find("*")!=string::npos)
+         if (typeName.find("*") != string::npos)
             typeName = typeName.substr(0, typeName.find("*") - 1);
       }
       if (isReference) {
-         if(typeName.find("&")!=string::npos)
+         if (typeName.find("&") != string::npos)
             typeName = typeName.substr(0, typeName.find("&") - 1);
       }
       varName = pvd.getNameAsString();
@@ -135,7 +135,7 @@ struct CLVar {
       string res = "";
       res += getType();
 //      res += " /*VLD*/" + varName + " ";
-      res +=  varName + " ";
+      res += varName + " ";
       return res;
    }
    string getType() {
@@ -194,6 +194,12 @@ private:
          isPointer = true;
          return "int";
       }
+      if (tname.find("unsigned long long") != string::npos) {
+         isPrimitive = true;
+         isPointer = false;
+         return "unsigned long long";
+      }
+
       if (tname.find("int") != string::npos || tname.find("float") != string::npos || tname.find("double") != string::npos || tname.find("char") != string::npos
             || tname.find("uint32_t") != string::npos || tname.find("bool") != string::npos) {
          isPrimitive = true;
@@ -408,14 +414,14 @@ public:
    virtual bool TraverseMemberExpr(MemberExpr * mem) {
       MARKER_CODE(cl_file << "[MemberExpr]";)
       /*if (varMapping.find(mem->getMemberDecl()) != varMapping.end()) {
-         if (varMapping[mem->getMemberDecl()]->isPointer) {
-            llvm::outs()<<"MemberExpression ------> :: \n";
-            mem->dump(llvm::outs());
-            llvm::outs()<<"EndMemberExpression <--------------------\n";
-//            rewriter.ReplaceText(mem->getOperatorLoc(), 1, "*");
-            rewriter.InsertText(mem->getLocStart(), "*");
-         }
-      }*/
+       if (varMapping[mem->getMemberDecl()]->isPointer) {
+       llvm::outs()<<"MemberExpression ------> :: \n";
+       mem->dump(llvm::outs());
+       llvm::outs()<<"EndMemberExpression <--------------------\n";
+       //            rewriter.ReplaceText(mem->getOperatorLoc(), 1, "*");
+       rewriter.InsertText(mem->getLocStart(), "*");
+       }
+       }*/
       if (OpenCLConversionDB::type_convert(mem->getBase()->getType()) == "__global NodeData *") {
          rewriter.ReplaceText(mem->getOperatorLoc(), 1, "->");
       }

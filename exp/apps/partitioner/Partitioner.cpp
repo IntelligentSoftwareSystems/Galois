@@ -42,7 +42,7 @@
 #include <string>
 
 #include "Galois/Graphs/FileGraph.h"
-#include "Galois/Dist/OfflineGraph.h"
+#include "Galois/Runtime/OfflineGraph.h"
 
 static const char* const name = "Off-line graph partitioner";
 static const char* const desc = "A collection of routines to partition graphs off-line.";
