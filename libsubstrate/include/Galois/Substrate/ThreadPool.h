@@ -37,6 +37,8 @@
 #include "CacheLineStorage.h"
 #include "HWTopo.h"
 
+#include <condition_variable>
+#include <thread>
 #include <functional>
 #include <atomic>
 #include <vector>
@@ -67,35 +69,56 @@ class ThreadPool {
 protected:
   struct shutdown_ty {}; //! type for shutting down thread
   struct fastmode_ty {bool mode;}; //! type for setting fastmode
+  struct dedicated_ty {std::function<void(void)> fn;}; //! type to switch to dedicated mode
 
 
   //! Per-thread mailboxes for notification
   struct per_signal {
+    std::condition_variable cv;
+    std::mutex m;
+    unsigned wbegin, wend;
     std::atomic<int> done;
     std::atomic<int> fastRelease;
     threadTopoInfo topo;
+
+    void wakeup(bool fastmode) {
+      if (fastmode) {
+        done = 0;
+        fastRelease = 1;
+      } else {
+        std::lock_guard<std::mutex> lg(m);
+        done = 0;
+        cv.notify_one();
+      //start.release();
+      }
+    }
+
+    void wait(bool fastmode) {
+      if (fastmode) {
+        while(!fastRelease.load(std::memory_order_relaxed)) { asmPause(); }
+        fastRelease = 0;
+      } else {
+        std::unique_lock<std::mutex> lg(m);
+        cv.wait(lg, [=] { return !done; });
+        //start.acquire();
+      }
+    }
   };
 
   thread_local static per_signal my_box;
 
   machineTopoInfo mi;
-
-  std::function<void(void)> work; 
-  std::atomic<unsigned> starting;
-  unsigned masterFastmode;
   std::vector<per_signal*> signals;
+  std::vector<std::thread>  threads;
+  unsigned reserved;
+  unsigned masterFastmode;
   bool running;
+  std::function<void(void)> work;
 
-  ThreadPool();
+
 
   //!destroy all threads
   void destroyCommon();
-
-  //! sleep this thread
-  virtual void threadWait(unsigned tid) = 0;
-
-  //! wake up thread
-  virtual void threadWakeup(unsigned tid) = 0;
 
   //! Initialize a thread
   void initThread(unsigned tid);
@@ -112,9 +135,10 @@ protected:
   //! execute work on num threads
   void runInternal(unsigned num);
 
-public:
+  ThreadPool();
 
-  virtual ~ThreadPool();
+public:
+  ~ThreadPool();
 
   //! execute work on all threads
   //! a simple wrapper for run
@@ -138,6 +162,9 @@ public:
     runInternal(num);
   }
 
+  //! run function in a dedicated thread until the threadpool exits
+  void runDedicated(std::function<void(void)>& f);
+
   //experimental: busy wait for work
   void burnPower(unsigned num);
   //experimental: leave busy wait
@@ -146,6 +173,8 @@ public:
   bool isRunning() const { return running; }
 
 
+  //!return the number of non-reserved threads in the pool
+  unsigned getMaxUsableThreads() const { return mi.maxThreads - reserved; }
   //!return the number of threads supported by the thread pool on the current machine
   unsigned getMaxThreads() const { return mi.maxThreads; }
   unsigned getMaxCores() const { return mi.maxCores; }
@@ -159,11 +188,11 @@ public:
     abort();
   }
   
-  bool isLeader(unsigned tid) const;
-  unsigned getPackage(unsigned tid) const;
-  unsigned getLeader(unsigned tid) const;
-  unsigned getCumulativeMaxPackage(unsigned tid) const;
-  unsigned getNumaNode(unsigned tid) const;
+  bool isLeader(unsigned tid) const { return signals[tid]->topo.socketLeader == tid; }
+  unsigned getPackage(unsigned tid) const { return signals[tid]->topo.socket; }
+  unsigned getLeader(unsigned tid) const { return signals[tid]->topo.socketLeader; }
+  unsigned getCumulativeMaxPackage(unsigned tid) const { return signals[tid]->topo.cumulativeMaxSocket; }
+  unsigned getNumaNode(unsigned tid) const { return signals[tid]->topo.numaNode; }
 
   static unsigned getTID() { return my_box.topo.tid; }
   static bool isLeader() { return my_box.topo.tid == my_box.topo.socketLeader; }
@@ -172,10 +201,8 @@ public:
   static unsigned getCumulativeMaxPackage() { return my_box.topo.cumulativeMaxSocket; }
   static unsigned getNumaNode() { return my_box.topo.numaNode; }
 
+  static ThreadPool& getThreadPool();
 };
-
-//!Returns or creates the appropriate thread pool for the system
-ThreadPool& getThreadPool();
 
 } //Substrate
 } //Galois

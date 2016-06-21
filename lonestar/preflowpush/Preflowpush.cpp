@@ -27,10 +27,6 @@
 #include "Galois/Graphs/LCGraph.h"
 #include "llvm/Support/CommandLine.h"
 
-#ifdef GALOIS_USE_EXP
-#include "Galois/PriorityScheduling.h"
-#endif
-
 #include "Lonestar/BoilerPlate.h"
 
 #include <boost/iterator/iterator_adaptor.hpp>
@@ -452,11 +448,8 @@ void globalRelabel(IncomingWL& incoming) {
 
   switch (detAlgo) {
     case nondet:
-#ifdef GALOIS_USE_EXP
       Galois::for_each(app.sink, UpdateHeights<nondet>(), Galois::loopname("UpdateHeights"), Galois::wl<Galois::WorkList::BulkSynchronous<>>());
-#else
-      Galois::for_each(app.sink, UpdateHeights<nondet>(), Galois::loopname("UpdateHeights"));
-#endif
+      //      Galois::for_each(app.sink, UpdateHeights<nondet>(), Galois::loopname("UpdateHeights"));
       break;
     case detBase:
       Galois::for_each(app.sink, UpdateHeights<detBase>(), 

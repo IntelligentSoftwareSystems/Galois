@@ -52,6 +52,7 @@
 #include "Galois/Substrate/gio.h"
 
 #include "Galois/Timer.h"
+#include "Galois/OrderedTraits.h"
 
 
 namespace Galois {
@@ -156,9 +157,7 @@ namespace Runtime {
 
 namespace details {
 
-static const unsigned DEFAULT_CHUNK_SIZE = 16;
-
-template <typename R, typename F>
+template <typename R, typename F, typename ArgsTuple>
 class DoAllCoupledExec {
 
   typedef typename R::local_iterator Iter;
@@ -188,7 +187,7 @@ class DoAllCoupledExec {
     ThreadContext () 
       :
         work_mutex (),
-        id (Substrate::getThreadPool().getMaxThreads ()), // TODO: fix this initialization problem, see initThread
+        id (Substrate::ThreadPool::getThreadPool().getMaxThreads ()), // TODO: fix this initialization problem, see initThread
         shared_beg (),
         shared_end (),
         m_size (0),
@@ -403,7 +402,7 @@ private:
     bool sawWork = false;
     bool stoleWork = false;
 
-    auto& tp = Substrate::getThreadPool();
+    auto& tp = Substrate::ThreadPool::getThreadPool();
 
     const unsigned maxT = Galois::getActiveThreads ();
     const unsigned my_pack = Substrate::ThreadPool::getPackage ();
@@ -438,7 +437,7 @@ private:
     bool sawWork = false;
     bool stoleWork = false;
 
-    auto& tp = Substrate::getThreadPool();
+    auto& tp = Substrate::ThreadPool::getThreadPool();
     unsigned myPkg = Substrate::ThreadPool::getPackage();
     // unsigned maxT = LL::getMaxThreads ();
     unsigned maxT = Galois::getActiveThreads ();
@@ -518,7 +517,7 @@ private:
 
     Substrate::asmPause ();
 
-    if (Substrate::getThreadPool().isLeader(poor.id)) {
+    if (Substrate::ThreadPool::getThreadPool().isLeader(poor.id)) {
       ret = stealOutsidePackage (poor, HALF);
 
       if (ret) { return true; }
@@ -589,6 +588,8 @@ private:
 
 
 private:
+
+
   R range;
   F func;
   const char* loopname;
@@ -606,18 +607,22 @@ public:
   DoAllCoupledExec (
       const R& _range,
       const F& _func, 
-      const char* _loopname,
-      const size_t _chunk_size)
+      const ArgsTuple& argsTuple)
     : 
       range (_range),
       func (_func), 
-      loopname (_loopname),
-      chunk_size (_chunk_size),
+      loopname (get_by_supertype<loopname_tag> (argsTuple).value),
+      chunk_size (get_by_supertype<chunk_size_tag> (argsTuple).value),
       term(Substrate::getSystemTermination(activeThreads))
   {
-
-    chunk_size = std::max (Diff_ty (1), Diff_ty (chunk_size));
     assert (chunk_size > 0);
+    // std::printf ("DoAllCoupledExec loopname: %s, work size: %ld, chunk_size: %u\n", loopname, std::distance(range.begin (), range.end ()), chunk_size);
+
+
+
+    static_assert(!exists_by_supertype<char*, ArgsTuple>::value, "old loopname");
+    static_assert(!exists_by_supertype<char const *, ArgsTuple>::value, "old loopname");
+    static_assert(!exists_by_supertype<bool, ArgsTuple>::value, "old steal");
 
   }
 
@@ -695,7 +700,7 @@ public:
     ctx.timer.stop ();
     assert (!ctx.hasWork ());
 
-    Galois::Runtime::reportStat (loopname, "Iterations", ctx.num_iter);
+    Galois::Runtime::reportStat (loopname, "Iterations", ctx.num_iter, 0);
   }
 
 
@@ -705,22 +710,33 @@ public:
 } // end namespace details
 
 
-template <typename R, typename F>
-void do_all_coupled (const R& range, const F& func, const char* loopname=0, const size_t chunk_size=details::DEFAULT_CHUNK_SIZE) {
-  details::DoAllCoupledExec<R, F> exec (range, func, loopname, chunk_size);
+template <typename R, typename F, typename _ArgsTuple>
+void do_all_coupled (const R& range, const F& func, const _ArgsTuple& argsTuple) {
+
+  auto argsT = std::tuple_cat (argsTuple, 
+      get_default_trait_values (argsTuple,
+        std::make_tuple (loopname_tag {}, chunk_size_tag {}), 
+        std::make_tuple (default_loopname {}, default_chunk_size {})));
+  using ArgsT = decltype (argsT);
+  details::DoAllCoupledExec<R, F, ArgsT> exec (range, func, argsT);
 
   Substrate::Barrier& barrier = getBarrier(activeThreads);
 
-  Substrate::getThreadPool().run(activeThreads, 
+  Substrate::ThreadPool::getThreadPool().run(activeThreads, 
       [&exec] (void) { exec.initThread (); },
       std::ref(barrier),
       std::ref(exec));
 }
 
-template <typename R, typename F>
-void do_all_coupled_alt (const R& range, const F& func, const char* loopname=0, const size_t chunk_size=details::DEFAULT_CHUNK_SIZE) {
+template <typename R, typename F, typename _ArgsTuple>
+void do_all_coupled_detailed (const R& range, const F& func, const _ArgsTuple& argsTuple) {
 
-  details::DoAllCoupledExec<R, F> exec (range, func, loopname, chunk_size);
+  auto argsT = std::tuple_cat (argsTuple, 
+      get_default_trait_values (argsTuple,
+        std::make_tuple (loopname_tag {}, chunk_size_tag {}), 
+        std::make_tuple (default_loopname {}, default_chunk_size {})));
+  using ArgsT = decltype (argsT);
+  details::DoAllCoupledExec<R, F, ArgsT> exec (range, func, argsT);
 
   Runtime::on_each_impl (
       [&exec] (const unsigned tid, const unsigned numT) {
@@ -747,10 +763,12 @@ void do_all_coupled_alt (const R& range, const F& func, const char* loopname=0, 
     }
   }
 
+  const char* const ln = get_by_supertype<loopname_tag> (argsT).value;
+
   Runtime::on_each_impl( 
-      [&maxTime, &perThrdTimer, &loopname] (const unsigned tid, const unsigned numT) {
+      [&maxTime, &perThrdTimer, ln] (const unsigned tid, const unsigned numT) {
         GALOIS_ASSERT ((maxTime - perThrdTimer[tid].get_nsec ()) >= 0);
-        Runtime::reportStat (loopname, "LoadImbalance", maxTime - perThrdTimer[tid].get_nsec ());
+        Runtime::reportStat (ln, "LoadImbalance", maxTime - perThrdTimer[tid].get_nsec (), 0);
       });
 
 

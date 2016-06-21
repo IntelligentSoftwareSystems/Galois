@@ -160,7 +160,7 @@ add_definitions(-DGALOIS_COPYRIGHT_YEAR=${GALOIS_COPYRIGHT_YEAR})
 if(USE_EXP)
   set(USE_VTUNE ON)
   add_definitions(-DGALOIS_USE_EXP)
-  include_directories("exp/include")
+  include_directories("libexp/include")
 
   find_package(MPI REQUIRED) # for distributed
   set(CMAKE_CXX_COMPILE_FLAGS ${CMAKE_CXX_COMPILE_FLAGS} ${MPI_COMPILE_FLAGS})
@@ -233,6 +233,20 @@ if(USE_EXP)
     else()
       message(FATAL_ERROR "Need CUDA for heterogenous code")
     endif()
+  endif()
+endif()
+
+if(USE_VTUNE)
+  message(STATUS "${VTune_ROOT}")
+  set(VTune_ROOT /opt/intel/vtune_amplifier_xe)
+  find_package(VTune)
+  message(STATUS "${VTune_INCLUDE_DIRS}")
+
+  if (VTune_FOUND)
+    include_directories(${VTune_INCLUDE_DIRS})
+    add_definitions(-DGALOIS_USE_VTUNE)
+  else()
+    message(FATAL_ERROR "VTune not found")
   endif()
 endif()
 
@@ -349,6 +363,10 @@ function(app name)
   target_link_libraries(${name} rt)
   target_link_libraries(${name} ${CMAKE_THREAD_LIBS_INIT})
 
+  if(USE_VTUNE)
+    target_link_libraries(${name} ${VTune_LIBRARIES})
+  endif()
+
   if(INSTALL_APPS)
     install(TARGETS ${name} DESTINATION bin)
   endif()
@@ -437,11 +455,9 @@ if(NOT SKIP_COMPILE_APPS)
 endif()
 
 ###### Documentation ######
+find_package(Doxygen)
+if(DOXYGEN_FOUND)
 set(DOXYFILE_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/docs\" \"${CMAKE_CURRENT_SOURCE_DIR}/libgraphs\" \"${CMAKE_CURRENT_SOURCE_DIR}/libllvm\" \"${CMAKE_CURRENT_SOURCE_DIR}/libruntime\" \"${CMAKE_CURRENT_SOURCE_DIR}/libsubstrate")
-find_package(Doxygen 1.8.0)
-if(NOT DOXYGEN_FOUND)
-  message(STATUS "Could NOT find required doxygen version: doxygen missing or < 1.8.0") 
-else()
   configure_file(${CMAKE_CURRENT_SOURCE_DIR}/Doxyfile.in
      ${CMAKE_CURRENT_BINARY_DIR}/Doxyfile.in @ONLY)
   add_custom_target(doc ${DOXYGEN_EXECUTABLE}

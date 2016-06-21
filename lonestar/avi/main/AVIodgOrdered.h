@@ -24,7 +24,7 @@
 #ifndef AVI_ODG_ORDERED_H
 #define AVI_ODG_ORDERED_H
 
-#include "Galois/Runtime/LCordered.h"
+// #include "Galois/Runtime/LCordered.h"
 #include "Galois/Runtime/KDGtwoPhase.h"
 
 
@@ -192,19 +192,20 @@ public:
 
     switch (execType) {
       case useAddRem:
-        Galois::Runtime::for_each_ordered_lc (
-            Galois::Runtime::makeStandardRange(
-            boost::make_transform_iterator(elems.begin(), MakeUpdate()),
-            boost::make_transform_iterator(elems.end(), MakeUpdate())), 
-            Comparator(), nhVisitorAddRem, p, "avi_ordered_loop_lc");
+        // Galois::Runtime::for_each_ordered_lc (
+            // Galois::Runtime::makeStandardRange(
+            // boost::make_transform_iterator(elems.begin(), MakeUpdate()),
+            // boost::make_transform_iterator(elems.end(), MakeUpdate())), 
+            // Comparator(), nhVisitorAddRem, p, "avi_ordered_loop_lc");
+        GALOIS_DIE("Unknown executor type");
         break;
       case useTwoPhase:
-        // Galois::for_each_ordered (
-        Galois::Runtime::for_each_ordered_2p_win (
+        Galois::Runtime::for_each_ordered_ikdg (
             Galois::Runtime::makeStandardRange (
               boost::make_transform_iterator(elems.begin(), MakeUpdate()),
               boost::make_transform_iterator(elems.end(), MakeUpdate())),
-            Comparator(), nhVisitor, p);
+              Comparator(), nhVisitor, p,
+              std::make_tuple (Galois::loopname ("avi-spec"), Galois::enable_parameter<false> ()));
         break;
       default:
         GALOIS_DIE("Unknown executor type");

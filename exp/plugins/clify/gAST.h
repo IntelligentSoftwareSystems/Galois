@@ -28,7 +28,6 @@ struct GaloisApp;
 /****************************************************************************
  *****************************************************************************/
 
-
 class TypeCollector: public RecursiveASTVisitor<TypeCollector> {
 public:
    std::set<Type *> types_used;
@@ -60,7 +59,7 @@ struct GaloisKernel {
       llvm::outs() << "Creating GaloisKernel :: " << kernel->getNameAsString() << "\n";
       int method_counter = 0;
       for (auto m : kernel->methods()) {
-         llvm::outs() << method_counter<< "] Is overloaded ? " << (m->isOverloadedOperator() ? "Yes" : "No") << " ";
+         llvm::outs() << method_counter << "] Is overloaded ? " << (m->isOverloadedOperator() ? "Yes" : "No") << " ";
          std::string m_name = m->getNameAsString();
          if (m_name.find("operator()") != m_name.npos) {
             llvm::outs() << "Found operator :: " << m_name << "";
@@ -73,7 +72,7 @@ struct GaloisKernel {
          llvm::outs() << "\n";
          method_counter++;
       }
-      if (d->isLambda()){
+      if (d->isLambda()) {
          llvm::outs() << "Lambda call operator :: " << d->getLambdaCallOperator()->getNameAsString() << "\n";
       }
       //////////Scan for types used.
@@ -94,65 +93,85 @@ struct GaloisKernel {
       rewriter.ReplaceText(SourceRange(kernel_body->getLocStart(), kernel_body->getLocEnd()), "");
       //####################################
    }
-   string get_copy_to_host_impl(){
-      std::string ret="\nvoid copy_to_host(){\n";
-      for(auto f : this->kernel->fields()){
+   string get_copy_to_host_impl() {
+      std::string ret = "\nvoid copy_to_host(){\n";
+      for (auto f : this->kernel->fields()) {
          ret += f->getNameAsString();
          ret += ".copy_to_host();\n";
       }
-      ret+="//COPY_EACH_MEMBER_TO_HOST_HERE\n";
-      ret+="}\n";
+      ret += "//COPY_EACH_MEMBER_TO_HOST_HERE\n";
+      ret += "}\n";
       return ret;
    }
-   string get_copy_to_device_impl(){
-      std::string ret="\nvoid copy_to_device(){\n";
-      for(auto f : this->kernel->fields()){
+   string get_copy_to_device_impl() {
+      std::string ret = "\nvoid copy_to_device(){\n";
+      for (auto f : this->kernel->fields()) {
          ret += f->getNameAsString();
-         if(f->getType().getTypePtr()->isAnyPointerType())
-            ret+="->";
+         if (f->getType().getTypePtr()->isAnyPointerType())
+            ret += "->";
          else
-            ret+=".";
+            ret += ".";
          ret += "copy_to_device();\n";
       }
-      ret+="//COPY_EACH_MEMBER_TO_DEVICE_HERE\n";
-      ret+="}\n";
+      ret += "//COPY_EACH_MEMBER_TO_DEVICE_HERE\n";
+      ret += "}\n";
       return ret;
    }
-   string get_call_string(){
+   string get_call_string() {
       return "\ncl_call_wrapper()\n;";
    }
-   string get_impl_string(){
+   string get_impl_string() {
       std::string ret_string = "\nCL_Kernel * get_kernel(size_t num_items)const {\n";
       ret_string += " static CL_Kernel kernel(getCLContext()->get_default_device(),\"";
       ret_string += kernel->getNameAsString();
       ret_string += ".cl\", \"";
       ret_string += kernel->getNameAsString();
       ret_string += "\", false);\n";
-      int i=0;
+      int i = 0;
       char s[1024];
 //      std::map<Decl*, CLVar*> varMapping;
-      for(auto m : this->kernel->fields()){
+      for (auto m : this->kernel->fields()) {
 //         varMapping[m] = new CLVar(true, m);
          string ref;
-         if(m->getType().getTypePtr()->isAnyPointerType()){
-            ref="->";
-            sprintf(s,"kernel.set_arg(%d,sizeof(cl_mem),&(%s%sdevice_ptr()));\n",i, m->getNameAsString().c_str(), ref.c_str());
-         }
-         else{
-            if(m->getType()->isScalarType()){
-               sprintf(s,"kernel.set_arg(%d,sizeof(%s),&(%s));\n",i,m->getType().getAsString().c_str(), m->getNameAsString().c_str());
-            }else{
-            ref=".";
-            sprintf(s,"kernel.set_arg(%d,sizeof(%s),&(%s%sdevice_ptr()));\n",i,m->getType().getAsString().c_str(), m->getNameAsString().c_str(), ref.c_str());
+         if (m->getType().getTypePtr()->isAnyPointerType()) {
+            ref = "->";
+            sprintf(s, "kernel.set_arg(%d,sizeof(cl_mem),&(%s%sdevice_ptr()));\n", i, m->getNameAsString().c_str(), ref.c_str());
+         } else {
+            if (m->getType()->isScalarType()) {
+               sprintf(s, "kernel.set_arg(%d,sizeof(%s),&(%s));\n", i, m->getType().getAsString().c_str(), m->getNameAsString().c_str());
+            } else {
+               ref = ".";
+               sprintf(s, "kernel.set_arg(%d,sizeof(%s),&(%s%sdevice_ptr()));\n", i, m->getType().getAsString().c_str(), m->getNameAsString().c_str(), ref.c_str());
             }
          }
          ret_string += s;
          i++;
       }
-      sprintf(s,"kernel.set_arg(%d,sizeof(cl_uint),&num_items);\n",i);
+      for (auto v : this->kernel_body->getLexicalParent()->decls()) {
+//         llvm::outs() << " DECL :: " << v->getDeclKindName() << " \n";
+         if (strcmp(v->getDeclKindName(), "Var") == 0) {
+            string ref;
+            VarDecl * vd = (VarDecl*) v;
+            if (vd->getType().getTypePtr()->isAnyPointerType()) {
+               ref = "->";
+               sprintf(s, "kernel.set_arg(%d,sizeof(cl_mem),&(%s%sdevice_ptr()));\n", i, vd->getNameAsString().c_str(), ref.c_str());
+            } else {
+               if (vd->getType()->isScalarType()) {
+                  sprintf(s, "kernel.set_arg(%d,sizeof(%s),&(%s));\n", i, vd->getType().getAsString().c_str(), vd->getNameAsString().c_str());
+               } else {
+                  ref = ".";
+                  sprintf(s, "kernel.set_arg(%d,sizeof(cl_mem),&(%s%sdevice_ptr()));\n", i, vd->getNameAsString().c_str(), ref.c_str());
+               }
+            }
+            ret_string += s;
+            i++;
+         }
+
+      }
+      sprintf(s, "kernel.set_arg(%d,sizeof(cl_uint),&num_items);\n", i);
       ret_string += s;
       ret_string += " return &kernel;\n";
-      ret_string+="}\n";
+      ret_string += "}\n";
       return ret_string;
    }
    void init_kernel_body(CXXMethodDecl * m) {
@@ -197,7 +216,7 @@ struct DoAllCallNode {
  *****************************************************************************/
 struct GaloisApp {
    Rewriter & rewriter;
-   const char  * dir;
+   const char * dir;
    std::vector<DoAllCallNode *> doAllCalls;
    std::set<Type *> known_types;
    std::map<Type *, string> replacement;

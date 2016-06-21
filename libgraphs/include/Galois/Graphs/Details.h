@@ -89,11 +89,11 @@ class LocalIteratorFeature {
   Substrate::PerThreadStorage<Range> localIterators;
 public:
   uint64_t localBegin(uint64_t numNodes) const {
-    return localIterators.getLocal()->first;
+    return std::min(localIterators.getLocal()->first, numNodes);
   }
 
   uint64_t localEnd(uint64_t numNodes) const {
-    return localIterators.getLocal()->second;
+    return std::min(localIterators.getLocal()->second, numNodes);
   }
 
   void setLocalRange(uint64_t begin, uint64_t end) { 
@@ -108,7 +108,8 @@ struct LocalIteratorFeature<false> {
   uint64_t localBegin(uint64_t numNodes) const {
     unsigned int id = Substrate::ThreadPool::getTID();
     unsigned int num = Galois::getActiveThreads();
-    return (numNodes + num - 1) / num * id;
+    uint64_t begin = (numNodes + num - 1) / num * id;
+    return std::min(begin, numNodes);
   }
 
   uint64_t localEnd(uint64_t numNodes) const {

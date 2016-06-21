@@ -244,7 +244,7 @@ int main(int argc, char** argv) {
     std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " sssp1 : " << T_sssp1.get() << " (msec)\n\n";
 
     Galois::Runtime::getHostBarrier().wait();
-    InitializeGraph::go(hg);
+    /*InitializeGraph::go(hg);
 
     std::cout << "SSSP::go run2 called  on " << net.ID << "\n";
     T_sssp2.start();
@@ -269,7 +269,7 @@ int main(int argc, char** argv) {
     auto mean_time = (T_sssp1.get() + T_sssp2.get() + T_sssp3.get())/3;
 
     std::cout << "[" << net.ID << "]" << " Total Time : " << T_total.get() << " offlineGraph : " << T_offlineGraph_init.get() << " hGraph : " << T_hGraph_init.get() << " Init : " << T_init.get() << " sssp1 : " << T_sssp1.get() << " sssp2 : " << T_sssp2.get() << " sssp3 : " << T_sssp3.get() <<" sssp mean time (3 runs ) (" << maxIterations << ") : " << mean_time << "(msec)\n\n";
-
+*/
     if(verify){
       for(auto ii = hg.begin(); ii != hg.end(); ++ii) {
         Galois::Runtime::printOutput("% %\n", hg.getGID(*ii), hg.getData(*ii).dist_current);

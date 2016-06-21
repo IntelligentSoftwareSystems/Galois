@@ -38,8 +38,8 @@
 #include "Galois/Runtime/Tracer.h"
 #include "Galois/Threads.h"
 
-#include "Galois/Dist/GlobalObj.h"
-#include "Galois/Dist/OfflineGraph.h"
+#include "Galois/Runtime/GlobalObj.h"
+#include "Galois/Runtime/OfflineGraph.h"
 
 #ifdef __GALOIS_HET_CUDA__
 #include "Galois/Cuda/cuda_mtypes.h"

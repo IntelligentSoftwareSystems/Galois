@@ -48,28 +48,6 @@ public:
     }
   };
 
-  struct VisitNhood {
-    Graph& graph;
-    VecNodes& nodes;
-
-    VisitNhood (Graph& graph, VecNodes& nodes): graph (graph), nodes (nodes) {}
-
-    template <typename C>
-    void operator () (const Event& e, C& ctx) const {
-
-      Ball* b1 = e.getBall ();
-      assert (b1->getID () < nodes.size ());
-      graph.getData (nodes[b1->getID ()], Galois::MethodFlag::WRITE);
-
-      if (e.getKind () == Event::BALL_COLLISION) {
-        Ball* b2 = e.getOtherBall ();
-        assert (b2->getID () < nodes.size ());
-        graph.getData (nodes[b2->getID ()], Galois::MethodFlag::WRITE);
-      }
-
-    }
-  };
-
   struct OpFunc {
 
     static const unsigned CHUNK_SIZE = 1;
@@ -112,15 +90,6 @@ public:
     }
   };
 
-  void createLocks (const Table& table, Graph& graph, VecNodes& nodes) {
-    nodes.reserve (table.getNumBalls ());
-
-    for (unsigned i = 0; i < table.getNumBalls (); ++i) {
-      nodes.push_back (graph.createNode (nullptr));
-    }
-
-  };
-
 public:
 
   virtual const std::string version () const { return "using Level-by-Level Executor"; }
@@ -138,7 +107,7 @@ public:
     Galois::Runtime::for_each_ordered_level (
         Galois::Runtime::makeStandardRange (initEvents.begin (), initEvents.end ()),
         GetEventTime (), std::less<FP> (),
-        VisitNhood (graph, nodes),
+        VisitNhood<Graph, VecNodes> (graph, nodes),
         OpFunc (table, endtime, addList, iter));
 
     return iter.reduce ();

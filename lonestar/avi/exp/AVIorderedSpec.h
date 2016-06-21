@@ -216,12 +216,12 @@ public:
     const std::vector<AVI*>& elems = meshInit.getAVIVec();
 
     // Galois::for_each_ordered (
-    // Galois::Runtime::for_each_ordered_rob (
-    Galois::Runtime::for_each_ordered_optim (
+    Galois::Runtime::for_each_ordered_spec (
         Galois::Runtime::makeStandardRange (
           boost::make_transform_iterator(elems.begin(), MakeUpdate()),
           boost::make_transform_iterator(elems.end(), MakeUpdate())), 
-        Comparator(), nhVisitor, p);
+        Comparator(), nhVisitor, p,
+        std::make_tuple (Galois::loopname ("avi-optim"), Galois::enable_parameter<false> {}));
 
 
     printf("iterations = %lu\n", niter.reduce());

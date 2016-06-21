@@ -57,10 +57,12 @@ namespace ParaMeter {
 struct StepStats {
 
   size_t step;
-  size_t workListSize;
   size_t parallelism = 0;
+  size_t workListSize;
 
   explicit StepStats (size_t _step, size_t _wlsz): step (_step), workListSize (_wlsz) {}
+
+  explicit StepStats (size_t _step, size_t par, size_t _wlsz): step (_step), parallelism (par), workListSize (_wlsz) {}
 
   static void printHeader(FILE* out) {
     fprintf(out, "LOOPNAME, STEP, PARALLELISM, WORKLIST_SIZE\n");

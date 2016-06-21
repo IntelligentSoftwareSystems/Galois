@@ -11,7 +11,7 @@ import csv
 import numpy
 
 ######## NOTES:
-# All time values are in sec.
+# All time values are in sec by default.
 
 #CommandLine : /work/02982/ggill0/Distributed_latest/build_dist_hetero/release_new_gcc/exp/apps/hsssp/bfs_gen /work/02982/ggill0/Distributed_latest/inputs/pagerank/Galois/scalefree/NEW/rmat16-2e25-a=0.57-b=0.19-c=0.19-d=.05.gr -maxIterations=10000 -srcNodeId=0 -verify=0 -t=15
 
@@ -66,9 +66,9 @@ import numpy
 #[13]STAT,PageRank,Iterations,15,6381112,278091,324516,482577,297108,572934,295949,311954,434330,421765,445200,712037,444664,408772,535973,415242
 #[13]STAT,PageRank,Pushes,15,26999,3263,1940,2700,3747,2227,1977,2536,2264,694,895,720,1220,864,1006,946
 
-def match_timers(fileName, benchmark, forHost, numRuns, numThreads):
+def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit):
 
-  mean_timer = 0.0;
+  mean_time = 0.0;
   recvNum_total = 0
   recvBytes_total = 0
   sendNum_total = 0
@@ -78,7 +78,11 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads):
   graph_init_time = 0
   hg_init_time = 0
   total_time = 0
-  thousand = 1000.0
+
+  if (time_unit == 'seconds'):
+    divisor = 1000.0
+  else:
+    divisor = 1.0
 
   timer_regex = re.compile(r'\[' + re.escape(forHost) + r'\]STAT,\(NULL\),TIMER_(\d*),' + re.escape(numThreads) + r',(\d*),(\d*).*')
 
@@ -88,13 +92,14 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads):
   print timers
 
   for timer in timers:
-    mean_timer = mean_timer + float(timer[2])
+    mean_time = mean_time + float(timer[2])
 
   if(len(timers) > 0):
-    mean_timer /= len(timers)
-    mean_timer /= thousand
+    mean_time /= len(timers)
+    mean_time /= divisor
+    mean_time = round(mean_time, 0)
 
-  print "Mean time: ", mean_timer
+  print "Mean time: ", mean_time
 
   if(benchmark == "cc"):
     benchmark = "ConnectedComp"
@@ -120,9 +125,12 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads):
       sync_push_avg_time_total += float(sync_push_lines[j][2])
 
   sync_pull_avg_time_total /= int(numRuns)
-  sync_pull_avg_time_total /= thousand
+  sync_pull_avg_time_total /= divisor
+  sync_pull_avg_time_total = round(sync_pull_avg_time_total, 0)
+
   sync_push_avg_time_total /= int(numRuns)
-  sync_push_avg_time_total /= thousand
+  sync_push_avg_time_total /= divisor
+  sync_push_avg_time_total = round(sync_push_avg_time_total, 0)
 
   ## sendBytes and recvBytes.
   #recvBytes_regex = re.compile(r'\[' + re.escape(forHost) + r'\]STAT,\(NULL\),RecvBytes,\d*,(\d*),(\d*),.*')
@@ -158,15 +166,18 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads):
 
   if timer_graph_init is not None:
     graph_init_time = float(timer_graph_init.group(1))
-    graph_init_time /= thousand
+    graph_init_time /= divisor
+    graph_init_time = round(graph_init_time, 0)
 
   if timer_hg_init is not None:
     hg_init_time = float(timer_hg_init.group(1))
-    hg_init_time /= thousand
+    hg_init_time /= divisor
+    hg_init_time = round(hg_init_time, 0)
 
   if timer_total is not None:
     total_time = float(timer_total.group(1))
-    total_time /= thousand
+    total_time /= divisor
+    total_time = round(total_time, 0)
 
   #[13]STAT,PageRank,Commits,15,6377945,277895,324235,482281,296898,572496,295661,311751,434026,421630,445072,711824,444553,408666,535821,415136
   #[13]STAT,PageRank,Conflicts,15,3167,196,281,296,210,438,288,203,304,135,128,213,111,106,152,106
@@ -197,8 +208,8 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads):
     pushes /= int(numRuns)
 
 
-  #return mean_timer,graph_init_time,hg_init_time,total_time,sync_pull_avg_time_total,sync_push_avg_time_total,recvNum_total,recvBytes_total,sendNum_total,sendBytes_total,commits,conflicts,iterations, pushes
-  return mean_timer,graph_init_time,hg_init_time,total_time,sync_pull_avg_time_total,sync_push_avg_time_total,num_iterations,commits,conflicts,iterations, pushes
+  #return mean_time,graph_init_time,hg_init_time,total_time,sync_pull_avg_time_total,sync_push_avg_time_total,recvNum_total,recvBytes_total,sendNum_total,sendBytes_total,commits,conflicts,iterations, pushes
+  return mean_time,graph_init_time,hg_init_time,total_time,sync_pull_avg_time_total,sync_push_avg_time_total,num_iterations,commits,conflicts,iterations, pushes
 
 
 def sendRecv_bytes_all(fileName, benchmark, total_hosts, numRuns, numThreads):
@@ -353,7 +364,7 @@ def build_master_ghost_matrix(fileName, benchmark, partition, total_hosts, numRu
 
 
 
-def get_basicInfo(fileName):
+def get_basicInfo(fileName, get_devices):
 
   hostNum_regex = re.compile(r'Hosts\s:\s(\d*)')
   cmdLine_regex = re.compile(r'CommandLine\s:\s(.*)')
@@ -393,7 +404,21 @@ def get_basicInfo(fileName):
   split_cmdLine_input = cmdLine.split()[1].split("/")
   input_graph = split_cmdLine_input[-1]
 
-  return hostNum, cmdLine, threads, runs, benchmark, algo_type, cut_type, input_graph
+  devices = ''
+  if get_devices:
+    split_cmdLine_devices = cmdLine.split()[3].split("=")
+    if split_cmdLine_devices[0] == '-pset':
+      devices = split_cmdLine_devices[-1]
+      cpus = devices.count('c')
+      gpus = devices.count('g')
+      if gpus == 0:
+        devices = str(cpus) + " CPU"
+      elif cpus == 0:
+        devices = str(gpus) + " GPU"
+      else:
+        devices = str(cpus) + " CPU + " + gpus + " GPU"
+
+  return hostNum, cmdLine, threads, runs, benchmark, algo_type, cut_type, input_graph, devices
 
 def format_str(col):
   max_len = 0
@@ -406,14 +431,16 @@ def main(argv):
   inputFile = ''
   forHost = '0'
   outputFile = 'LOG_output.csv'
+  time_unit = 'seconds'
+  get_devices = False
   try:
-    opts, args = getopt.getopt(argv,"hi:n:o:",["ifile=","node=","ofile="])
+    opts, args = getopt.getopt(argv,"hi:n:o:md",["ifile=","node=","ofile=","milliseconds","devices"])
   except getopt.GetoptError:
-    print 'abelian_log_parser.py -i <inputFile> -n <hostNumber 0 to hosts - 1 > -o <outputFile>'
+    print 'abelian_log_parser.py -i <inputFile> [-o <outputFile> -n <hostNumber 0 to hosts-1> --milliseconds --devices]'
     sys.exit(2)
   for opt, arg in opts:
     if opt == '-h':
-      print 'abelian_log_parser.py -i <inputFile>'
+      print 'abelian_log_parser.py -i <inputFile> [-o <outputFile> -n <hostNumber 0 to hosts-1> --milliseconds --devices]'
       sys.exit()
     elif opt in ("-i", "--ifile"):
       inputFile = arg
@@ -421,35 +448,46 @@ def main(argv):
       forHost = arg
     elif opt in ("-o", "--ofile"):
       outputFile = arg
+    elif opt in ("-m", "--milliseconds"):
+      time_unit = 'milliseconds'
+    elif opt in ("-d", "--devices"):
+      get_devices = True
+
+  if inputFile == '':
+    print 'abelian_log_parser.py -i <inputFile> [-o <outputFile> -n <hostNumber 0 to hosts-1> --milliseconds --devices]'
+    sys.exit(2)
 
   print 'Input file is : ', inputFile
   print 'Data for host : ', forHost
 
-  hostNum, cmdLine, threads, runs, benchmark, algo_type, cut_type, input_graph = get_basicInfo(inputFile)
+  hostNum, cmdLine, threads, runs, benchmark, algo_type, cut_type, input_graph, devices = get_basicInfo(inputFile, get_devices)
 
   #shorten the graph names:
-  if input_graph == "twitter-ICWSM10-component_withRandomWeights.transpose.gr" or input_graph == "twitter-ICWSM10-component-transpose.gr":
-    input_graph = "twitterIC_trans.gr"
-  elif input_graph == "twitter-ICWSM10-component_withRandomWeights.gr" or input_graph == "twitter-ICWSM10-component.gr":
-    input_graph = "twitterIC.gr"
-  elif input_graph == "USA-road-d.USA-trans.gr":
-    input_graph = "USA-trans.gr"
-  elif input_graph == "USA-road-d.USA.gr":
-    input_graph = "USA.gr"
-  elif input_graph == "rmat16-2e25-a=0.57-b=0.19-c=0.19-d=.05.transpose.gr":
-    input_graph = "rmat_trans.gr"
-  elif input_graph == "rmat16-2e25-a=0.57-b=0.19-c=0.19-d=.05.gr":
-    input_graph = "rmat.gr"
+  if input_graph == "twitter-ICWSM10-component_withRandomWeights.transpose.gr" or input_graph == "twitter-ICWSM10-component-transpose.gr" or input_graph == "twitter-ICWSM10-component_withRandomWeights.gr" or input_graph == "twitter-ICWSM10-component.gr":
+    input_graph = "twitterIC"
+  elif input_graph == "USA-road-d.USA.transpose.gr" or input_graph == "USA-road-d.USA-trans.gr" or input_graph == "USA-road-d.USA.gr":
+    input_graph = "road-USA"
+  elif input_graph == "rmat16-2e25-a=0.57-b=0.19-c=0.19-d=.05.transpose.gr" or input_graph == "rmat16-2e25-a=0.57-b=0.19-c=0.19-d=.05.gr":
+    input_graph = "rmat25"
+  elif input_graph == "rmat16-2e24-a=0.57-b=0.19-c=0.19-d=.05.transpose.gr" or input_graph == "rmat16-2e24-a=0.57-b=0.19-c=0.19-d=.05.gr":
+    input_graph = "rmat24"
 
 
   print 'Hosts : ', hostNum , ' CmdLine : ', cmdLine, ' Threads : ', threads , ' Runs : ', runs, ' benchmark :' , benchmark , ' algo_type :', algo_type, ' cut_type : ', cut_type, ' input_graph : ', input_graph
+  if get_devices:
+    print 'Devices : ', devices
 
-  data = match_timers(inputFile, benchmark, forHost, runs, threads)
+  data = match_timers(inputFile, benchmark, forHost, runs, threads, time_unit)
   #total_SendBytes, sendBytes_list = sendRecv_bytes_all(inputFile, benchmark, hostNum, runs, threads)
   total_SendBytes, total_SendBytes_pull_sync, total_SendBytes_pull_reply, total_SendBytes_push_sync, sendBytes_list = sendBytes_syncOnly(inputFile, benchmark, hostNum, runs, threads)
   print data
 
-  output_str = benchmark + ',' + 'abelian'  + ',' + hostNum  + ',' + threads  + ',' + input_graph  + ',' + algo_type  + ',' + cut_type
+  output_str = benchmark + ',' + 'abelian'  + ','
+  if get_devices:
+    output_str += devices  + ','
+  else:
+    output_str += hostNum  + ',' + threads  + ','
+  output_str += input_graph  + ',' + algo_type  + ',' + cut_type
 
   #for d in data:
     #output_str += ','
@@ -457,8 +495,12 @@ def main(argv):
   print output_str
 
 
-  #header_csv_str = "benchmark,platform,host,threads,input,variant,partition,mean_time,graph_init_time,hg_init_time,total_time,sync_pull_avg_time,sync_push_avg_time,recvNum,recvBytes,sendNum,sendBytes,commits,conflicts,iterations,pushes"
-  header_csv_str = "benchmark,platform,host,threads,input,variant,partition,mean_time,graph_init_time,hg_init_time,total_time,sync_pull_avg_time,sync_push_avg_time,converge_iterations,commits,conflicts,iterations,pushes,total_sendBytes, total_sendBytes_pull_sync, total_sendBytes_pull_reply, total_sendBytes_push_sync"
+  header_csv_str = "benchmark,platform,"
+  if get_devices:
+    header_csv_str += "devices,"
+  else:
+    header_csv_str += "host,threads,"
+  header_csv_str += "input,variant,partition,mean_time,graph_init_time,hg_init_time,total_time,sync_pull_avg_time,sync_push_avg_time,converge_iterations,commits,conflicts,iterations,pushes,total_sendBytes, total_sendBytes_pull_sync, total_sendBytes_pull_reply, total_sendBytes_push_sync"
 
   for i in range(0,256):
     header_csv_str += ","

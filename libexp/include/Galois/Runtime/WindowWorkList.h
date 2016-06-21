@@ -36,12 +36,14 @@
 
 #include "Galois/Substrate/gio.h"
 
+#include <boost/noncopyable.hpp>
+
 
 namespace Galois {
 namespace Runtime { 
 
 template <typename T, typename Cmp>
-class SortedRangeWindowWL {
+class SortedRangeWindowWL: private boost::noncopyable {
   using PerThrdWL = Galois::PerThreadVector<T>;
   using Iter = typename PerThrdWL::local_iterator;
   using Range = std::pair<Iter, Iter>;
@@ -118,9 +120,13 @@ public:
     return minElem;
   }
 
+  template <typename WL>
+  void poll (WL& workList, const size_t newSize, const size_t origSize) {
+    poll (workList, newSize, origSize, [] (const T& x) { return x; });
+  }
 
-  template <typename WL, typename CtxtMaker>
-  void poll (WL& workList, const size_t newSize, const size_t origSize, CtxtMaker& ctxtMaker ) {
+  template <typename WL, typename Wrap>
+  void poll (WL& workList, const size_t newSize, const size_t origSize, Wrap& wrap) {
 
     if (origSize >= newSize) { 
       return;
@@ -163,13 +169,13 @@ public:
 
     if (windowLim != nullptr) {
       Galois::Runtime::on_each_impl (
-          [this, &workList, &ctxtMaker, numPerThrd, windowLim] (const unsigned tid, const unsigned numT) {
-            Range& r = *(wlRange.getLocal (tid));
+          [this, &workList, &wrap, numPerThrd, windowLim] (const unsigned tid, const unsigned numT) {
+            Range& r = *(wlRange.getLocal ());
 
             for (size_t i = 0; (i < numPerThrd) 
               && (r.first != r.second); ++r.first) {
 
-              workList.get ().push_back (ctxtMaker (*(r.first)) );
+              workList.get ().push_back (wrap (*(r.first)) );
               ++i;
 
             }
@@ -177,7 +183,7 @@ public:
             for (; r.first != r.second 
               && cmp (*(r.first), *windowLim); ++r.first) {
 
-                workList.get ().push_back (ctxtMaker (*(r.first)));
+                workList.get ().push_back (wrap (*(r.first)));
             }
           }
           , "poll");
@@ -201,21 +207,21 @@ public:
 
 };
 
+template <typename T, typename Cmp, typename PerThrdWL, typename Derived>
+class WindowWLbase: private boost::noncopyable {
 
-template <typename T, typename Cmp>
-class PQbasedWindowWL {
+protected:
 
-  using PerThrdWL = Galois::PerThreadMinHeap<T, Cmp>;
+  using dbg = Galois::Substrate::debug<0>;
 
   Cmp cmp;
   PerThrdWL m_wl;
 
-public:
 
-  explicit PQbasedWindowWL (const Cmp& cmp=Cmp ())
-    : cmp (cmp), m_wl (cmp) 
+public:
+  explicit WindowWLbase (const Cmp& cmp=Cmp ())
+    : cmp (cmp), m_wl (cmp)
   {
-    Substrate::gPrint("Using PQbasedWindowWL\n");
   }
 
 
@@ -224,14 +230,14 @@ public:
 
     Galois::Runtime::do_all_impl (range,
         [this] (const T& x) {
-          m_wl.get ().push (x);
+          push (x);
         }
         , "initfill");
 
   }
 
   const T* getMin (void) const {
-    const T* windowLim = nullptr;
+    const T* ret = nullptr;
 
     unsigned numT = getActiveThreads ();
 
@@ -239,17 +245,22 @@ public:
     for (unsigned i = 0; i < numT; ++i) {
 
       if (!m_wl[i].empty ()) {
-        if (windowLim == nullptr || cmp (*windowLim, m_wl[i].top ())) {
-          windowLim = &(m_wl[i].top ());
+        if (!ret || cmp (static_cast<const Derived*> (this)->getTop (i), *ret)) {
+          ret = &(static_cast<const Derived*> (this)->getTop (i));
         }
       }
     }
 
-    return windowLim;
+    return ret;
   }
 
   void push (const T& x) {
-    m_wl.get ().push (x);
+    static_cast<Derived*> (this)->pushImpl (x);
+  }
+
+  void push (const T& x, const unsigned owner) {
+    assert (owner < Galois::getActiveThreads ());
+    static_cast<Derived*> (this)->pushImpl (x, owner);
   }
 
   size_t initSize (void) const {
@@ -260,8 +271,15 @@ public:
     return m_wl.empty_all ();
   }
 
-  template <typename WL, typename CtxtMaker>
-  void poll (WL& workList, const size_t newSize, const size_t origSize, CtxtMaker& ctxtMaker ) {
+  template <typename WL>
+  void poll (WL& workList, const size_t newSize, const size_t origSize) {
+
+    auto f = [] (const T& x) { return x; };
+    poll (workList, newSize, origSize, f);
+  }
+
+  template <typename WL, typename Wrap>
+  void poll (WL& workList, const size_t newSize, const size_t origSize, Wrap& wrap) {
 
     if (origSize >= newSize) { 
       return;
@@ -275,39 +293,52 @@ public:
     // windowLim is calculated by computing the max of max element pushed by each
     // thread. In this case, the max element is the one pushed in last 
 
+    Substrate::PerThreadStorage<Galois::optional<T> > perThrdLastPop;
+
     Galois::Runtime::on_each_impl (
-        [this, &workList, &ctxtMaker, numPerThrd] (const unsigned tid, const unsigned numT) {
+        [this, &workList, &wrap, numPerThrd, &perThrdLastPop] (const unsigned tid, const unsigned numT) {
+
+          Galois::optional<T>& lastPop = *(perThrdLastPop.getLocal ());
 
 
-          unsigned lim = std::min (m_wl.get ().size (), numPerThrd);
+          int lim = std::min (m_wl.get ().size (), numPerThrd);
 
-          for (unsigned i = 0; i < lim; ++i) {
-            workList.get ().push_back (ctxtMaker (m_wl.get ().top ()));
-            m_wl.get ().pop ();
+          for (int i = 0; i < lim; ++i) {
+            if (i == (lim - 1)) {
+              lastPop = static_cast<Derived*> (this)->getTop ();
+            }
+
+            dbg::print("Removing and adding to window: ", static_cast<Derived*> (this)->getTop ());
+
+            workList.get ().push_back (wrap (static_cast<Derived*> (this)->getTop ()));
+            static_cast<Derived*> (this)->popMin();
           }
         }
         , "poll_part_1");
 
-    const T* windowLim = nullptr;
-    // compute the max of last element pushed into any workList rows
+
+
+    // // compute the max of last element pushed into any workList rows
+    //
+    Galois::optional<T> windowLim;
+
     for (unsigned i = 0; i < numT; ++i) {
+      const Galois::optional<T>& lp = *(perThrdLastPop.getRemote (i));
 
-
-      if (!workList[i].empty ()) {
-        const T* last = &(workList[i].back ()->getElem ());
-        assert (last != nullptr);
-
-        if (windowLim == nullptr || cmp (*windowLim, *last)) {
-          windowLim = last;
+      if (lp) {
+        if (!windowLim || cmp (*windowLim, *lp)) {
+          windowLim = *lp;
         }
       }
     }
-
+ 
     // for (unsigned i = 0; i < numT; ++i) {
-      // const T* const lim = m_wl[i].empty () ? nullptr : &(m_wl[i].top ());
-      // if (lim != nullptr) {
-        // if ((windowLim == nullptr) || cmp (*windowLim, *lim)) { // *windowLim < *lim
-          // windowLim = lim;
+      // if (!workList[i].empty ()) {
+        // const T& last = unwrap (workList[i].back ());
+        // assert (&last != nullptr);
+// 
+        // if (windowLim == nullptr || cmp (*windowLim, last)) {
+          // windowLim = &last;
         // }
       // }
     // }
@@ -321,33 +352,131 @@ public:
     // of elment A from Thread j, such that A and B have a dependence
     // and A < B. 
 
-    if (windowLim != NULL) {
-
-      T limCopy (*windowLim);
+    if (windowLim) {
 
       Galois::Runtime::on_each_impl (
-          [this, &workList, &ctxtMaker, &limCopy] (const unsigned tid, const unsigned numT) {
-            for (const T* t = &m_wl.get ().top (); 
-              !m_wl.get ().empty () && cmp (*t, limCopy); t = &m_wl.get ().top ()) {
+          [this, &workList, &wrap, &windowLim] (const unsigned tid, const unsigned numT) {
 
-                workList.get ().push_back (ctxtMaker (*t));
-                m_wl.get ().pop ();
+            while (!m_wl.get ().empty ()) {
+              const T& t = static_cast<Derived*> (this)->getTop ();
+
+              if (cmp (*windowLim, t)) { // windowLim < t
+                break;
+              }
+
+              dbg::print("Removing and adding to window: ", t, ", windowLim: ", *windowLim);
+              workList.get ().push_back (wrap (t));
+              static_cast<Derived*> (this)->popMin ();
             }
-            
           }
           , "poll_part_2");
 
 
+      const T* min = static_cast<Derived*> (this)->getMin ();
+      if (min) {
+        assert (cmp (*windowLim, *min));
+      }
 
 
       for (unsigned i = 0; i < numT; ++i) {
         if (!m_wl[i].empty ()) {
-          assert (!cmp (m_wl[i].top (), limCopy) && "poll gone wrong");
+          assert (cmp (*windowLim, static_cast<Derived*> (this)->getTop (i)) && "poll gone wrong");
         }
       }
+
+      
     }
 
   }
+
+
+};
+
+template <typename T, typename Cmp>
+class PQwindowWL: public WindowWLbase<T, Cmp, PerThreadMinHeap<T, Cmp>, PQwindowWL<T, Cmp> > {
+
+
+  using PerThrdWL = Galois::PerThreadMinHeap<T, Cmp>;
+  using Base = WindowWLbase<T, Cmp, PerThrdWL, PQwindowWL>;
+
+  template <typename, typename, typename, typename> 
+  friend class WindowWLbase;
+
+  const T& getTop (void) const {
+    assert (!Base::m_wl.get ().empty ());
+    return Base::m_wl.get ().top ();
+  }
+
+  const T& getTop (const unsigned i) const {
+    assert (!Base::m_wl[i].empty ());
+    return Base::m_wl[i].top ();
+  }
+
+  void pushImpl (const T& x) {
+    Base::m_wl.get ().push (x);
+  }
+
+  void pushImpl (const T& x, const unsigned owner) {
+    Base::m_wl[owner].push (x);
+  }
+
+  void popMin (void) {
+    Base::m_wl.get ().pop ();
+  }
+
+public:
+
+  explicit PQwindowWL (const Cmp& cmp=Cmp ())
+    : Base (cmp)
+  {
+    Substrate::gPrint("Using PQwindowWL\n");
+  }
+
+
+};
+
+
+template <typename T, typename Cmp>
+class SetWindowWL: public WindowWLbase<T, Cmp, PerThreadSet<T, Cmp>, SetWindowWL<T, Cmp> > {
+
+
+  // using PerThrdWL = Galois::PerThreadMinHeap<T, Cmp>;
+  using PerThrdWL = Galois::PerThreadSet<T, Cmp>;
+  using Base = WindowWLbase<T, Cmp, PerThrdWL, SetWindowWL>;
+
+  template <typename, typename, typename, typename> 
+  friend class WindowWLbase;
+
+  const T& getTop (void) const {
+    assert (!Base::m_wl.get ().empty ());
+    return *(Base::m_wl.get ().begin ());
+  }
+
+  const T& getTop (const unsigned i) const {
+    assert (!Base::m_wl[i].empty ());
+    return *(Base::m_wl[i].begin ());
+  }
+
+  void pushImpl (const T& x) {
+    Base::m_wl.get ().insert (x);
+  }
+
+  void pushImpl (const T& x, const unsigned owner) {
+    Base::m_wl[owner].insert (x);
+  }
+
+  void popMin (void) {
+    Base::m_wl.get ().erase (Base::m_wl.get ().begin ());
+  }
+
+public:
+
+  explicit SetWindowWL (const Cmp& cmp=Cmp ())
+    : Base (cmp)
+  {
+    Substrate::gPrint("Using SetwindowWL\n");
+  }
+
 
 };
 

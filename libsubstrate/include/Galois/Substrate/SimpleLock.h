@@ -39,6 +39,7 @@
 
 #include <cassert>
 #include <atomic>
+#include <mutex>
 
 namespace Galois {
 namespace Substrate {
@@ -105,6 +106,10 @@ public:
   //  inline bool try_lock() const { return true; }
   //inline bool is_locked() const { }
 };
+
+typedef std::lock_guard<SimpleLock> lock_guard_galois;
+
+#define MAKE_LOCK_GUARD(__x) Galois::Substrate::lock_guard_galois locker##___COUNTER__(__x)
 
 } // end namespace Substrate
 } // end namespace Galois

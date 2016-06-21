@@ -31,7 +31,7 @@
 #include <vector>
 #include <functional>
 
-#include "Galois/Runtime/ROBexecutor.h"
+#include "Galois/Runtime/OrderedSpeculation.h"
 
 #include "bfs.h"
 
@@ -67,6 +67,8 @@ class SpecOrderedBFS: public BFS<Level_ty> {
 
   struct VisitNhood {
 
+    static const unsigned CHUNK_SIZE = DEFAULT_CHUNK_SIZE;
+
     Graph& graph;
 
     explicit VisitNhood (Graph& graph): graph (graph) {}
@@ -81,6 +83,8 @@ class SpecOrderedBFS: public BFS<Level_ty> {
   };
 
   struct OpFunc {
+
+    static const unsigned CHUNK_SIZE = DEFAULT_CHUNK_SIZE;
 
     Graph& graph;
     ParCounter& numIter;
@@ -105,10 +109,11 @@ class SpecOrderedBFS: public BFS<Level_ty> {
             , eni = graph.edge_end (up.node, Galois::MethodFlag::UNPROTECTED); ni != eni; ++ni) {
 
           GNode dst = graph.getEdgeDst (ni);
+          ctx.push (Update (dst, up.level + 1));
 
-          if (graph.getData (dst, Galois::MethodFlag::UNPROTECTED) == BFS_LEVEL_INFINITY) {
-            ctx.push (Update (dst, up.level + 1));
-          }
+          // if (graph.getData (dst, Galois::MethodFlag::UNPROTECTED) == BFS_LEVEL_INFINITY) {
+            // ctx.push (Update (dst, up.level + 1));
+          // }
         }
 
       }
@@ -137,11 +142,12 @@ public:
     std::vector<Update> wl;
     wl.push_back (first);
 
-    Galois::Runtime::for_each_ordered_rob (
+    Galois::Runtime::for_each_ordered_spec (
         Galois::Runtime::makeStandardRange(wl.begin (), wl.end ()),
         Comparator (), 
         VisitNhood (graph),
-        OpFunc (graph, numIter));
+        OpFunc (graph, numIter),
+        std::make_tuple (Galois::loopname ("bfs-speculative"), Galois::enable_parameter<false> {}));
 
 
     std::cout << "number of iterations: " << numIter.reduce () << std::endl;

@@ -17,7 +17,7 @@
 #include <string>
 
 #include "Galois/Graphs/FileGraph.h"
-#include "Galois/Dist/OfflineGraph.h"
+#include "Galois/Runtime/OfflineGraph.h"
 
 /******************************************************************
  *
@@ -54,9 +54,6 @@ struct GBPartitioner {
          return edgeOwners[eIdx];
       }
       void writeReplicaInfo(std::string &basename, OfflineGraph &g, size_t numhosts) {
-//         std::string filename = ;
-//         std::string replicaInfoFile("replica.info");
-         //std::ofstream replica_file(replicaInfoFile, std::ofstream::binary);
          std::ofstream replica_file(getReplicaInfoFileName(basename, numhosts));
          auto numEntries = g.size();
          //         replica_file.write(reinterpret_cast<char*>(&(numEntries)), sizeof(numEntries));
@@ -117,7 +114,6 @@ struct GBPartitioner {
          }
       }
       ~VertexCutInfo() {
-//         print_stats();
       }
    };
    /******************************************************************
@@ -134,100 +130,43 @@ struct GBPartitioner {
     * Partitioning routine.
     * */
    void operator()(std::string & basename, OfflineGraph & g, size_t num_hosts) {
+      Galois::Timer T_edge_assign, T_write_replica, T_assign_masters, T_write_partition, T_total;
+
       std::cout << "Partitioning: |V|= " << g.size() << " , |E|= " << g.sizeEdges() << " |P|= " << num_hosts << "\n";
+      T_total.start();
+      T_edge_assign.start();
       vcInfo.init(g.size(), g.sizeEdges(), num_hosts);
+      auto prev_nbr_end = g.edge_begin(*g.begin());
+      auto curr_nbr_end = g.edge_end(*g.begin());
       for (auto n = g.begin(); n != g.end(); ++n) {
          auto src = *n;
-         for (auto nbr = g.edge_begin(*n); nbr != g.edge_end(*n); ++nbr) {
+         curr_nbr_end = g.edge_end(*n);
+         for (auto nbr = prev_nbr_end ; nbr != curr_nbr_end; ++nbr) {
             auto dst = g.getEdgeDst(nbr);
             size_t owner = getEdgeOwner(src, dst, num_hosts);
             vcInfo.assignEdge(g, n, nbr, owner);
          }
+         prev_nbr_end= curr_nbr_end;
       }
+      T_edge_assign.stop();
+      std::cout<<"STEP#1-EdgesAssign:: "<<T_edge_assign.get() << "\n";
+      T_write_replica.start();
       vcInfo.writeReplicaInfo(basename, g, num_hosts);
+      T_write_replica.stop();
+
+      T_assign_masters.start();
       vcInfo.assignMasters(g.size(), num_hosts, g);
+      T_assign_masters.stop();
 
-//      assignVertices(g, vcInfo, num_hosts);
+      T_write_partition.start();
       writePartitionsMem(basename, g, num_hosts);
-   }
-   /*
-    * Edges have been assigned. Now, go over each partition, for any vertex in the partition
-    * create a new local-id, and update all the edges to the new local-ids.
-    * */
-//   void assignVertices(OfflineGraph & g, VertexCutInfo & vcInfo, size_t num_hosts) {
-//      size_t verticesSum = 0;
-//      if (false) {
-//         for (size_t h = 0; h < num_hosts; ++h) {
-//            for (size_t v = 0; v < vcInfo.verticesPerHost[h].size(); ++v) {
-//               auto vertex = vcInfo.verticesPerHost[h][v];
-//               std::cout << "Host " << h << " Mapped Global:: " << vertex << " to Local:: " << vcInfo.hostGlobalToLocalMapping[h][vertex] << "\n";
-//            }
-//         }
-//
-//      }
-//      std::vector<size_t> hostVertexCounters(num_hosts);
-//      for (auto i : vcInfo.vertexOwners) {
-//         verticesSum += i.second.size();
-//      }
-//      for (size_t i = 0; i < num_hosts; ++i) {
-//         std::cout << "Host :: " << i << " , Vertices:: " << vcInfo.verticesPerHost[i].size() << ", Edges:: " << vcInfo.edgesPerHost[i] << "\n";
-//      }
-//      std::cout << "Vertices - Created ::" << verticesSum << " , Actual :: " << g.size() << ", Ratio:: " << verticesSum / (float) (g.size()) << "\n";
-//   }
-   /*
-    * Write both the metadata as well as the partition information.
-    * */
-   /* void writePartitions(std::string & basename, OfflineGraph & g, VertexCutInfo & vcInfo, size_t num_hosts) {
-    //Create graph
-    //TODO RK - Fix edgeData
-    std::cout << " Regular version\n";
-    std::vector<std::vector<std::pair<size_t, size_t>>>newEdges(num_hosts);
-    for (auto n = g.begin(); n != g.end(); ++n) {
-    auto src = *n;
-    for (auto e = g.edge_begin(*n); e != g.edge_end(*n); ++e) {
-    auto dst = g.getEdgeDst(e);
-    size_t owner = vcInfo.getEdgeOwner(g, e);
-    size_t new_src = vcInfo.hostGlobalToLocalMapping[owner][src];
-    size_t new_dst = vcInfo.hostGlobalToLocalMapping[owner][dst];
-    newEdges[owner].push_back(std::pair<size_t, size_t>(new_src, new_dst));
-    }
-    }
-    for (size_t i = 0; i < num_hosts; ++i) {
-    using namespace Galois::Graph;
-    FileGraphWriter newGraph;
-    newGraph.setNumNodes(vcInfo.hostGlobalToLocalMapping[i].size());
-    newGraph.setNumEdges(newEdges[i].size());
-    newGraph.phase1();
-    //         char filename[256];
-    //         sprintf(filename, "partition_%zu_%zu.dimacs", i, num_hosts);
-    std::string meta_file_name = getMetaFileName(basename, i, num_hosts);
-    //         char meta_file_name[256];
-    //         sprintf(meta_file_name, "partition_%zu_of_%zu.gr.meta", i, num_hosts);
-    std::ofstream meta_file(meta_file_name, std::ofstream::binary);
-    auto numEntries = vcInfo.hostGlobalToLocalMapping[i].size();
-    meta_file.write(reinterpret_cast<char*>(&(numEntries)), sizeof(numEntries));
-    for (auto n : vcInfo.hostGlobalToLocalMapping[i]) {
-    auto owner = *vcInfo.vertexOwners[n.first].begin();
-    meta_file.write(reinterpret_cast<const char*>(&n.first), sizeof(n.first));
-    meta_file.write(reinterpret_cast<const char*>(&n.second), sizeof(n.second));
-    meta_file.write(reinterpret_cast<const char*>(&owner), sizeof(owner));
-    }
-    meta_file.close();
+      T_write_partition.stop();
 
-    for (auto e : newEdges[i]) {
-    newGraph.incrementDegree(e.first);
-    }
-    newGraph.phase2();
-    for (auto e : newEdges[i]) {
-    newGraph.addNeighbor(e.first, e.second);
-    }
-    newGraph.finish<void>();
-    //         char gFileName[256];
-    //         sprintf(gFileName, "partition_%zu_of_%zu.gr", i, num_hosts);
-    std::string gFileName = getPartitionFileName(basename, i, num_hosts);
-    newGraph.toFile(gFileName);
-    }
-    }*/
+      T_total.stop();
+      std::cout<<"STAT,EdgeAssig, WriteReplica,AssignMasters,WritePartition, Total\n";
+      std::cout<<num_hosts<<","<<T_edge_assign.get()<<","<<T_write_replica.get()<<","<<T_assign_masters.get()<<","<<T_write_partition.get()<<","<<T_total.get()<<"\n";
+   }
+
    /*
     * Optimized implementation for memory usage.
     * Write both the metadata as well as the partition information.
@@ -252,53 +191,41 @@ struct GBPartitioner {
       //TODO RK - Fix edgeData
       std::cout << " Low mem version\n";
       std::vector<size_t> &vertexOwners = vcInfo.vertexMasters;
-      {
-         //Go over all the vertices and assign an owner.
-
-      }
       for (size_t h = 0; h < num_hosts; ++h) {
          std::cout << "Building partition " << h << "...\n";
          std::vector<size_t> global2Local(g.size(), -1);
+         std::vector<NewEdgeData> newEdges;
          size_t newNodeCounter = 0;
+         auto prev_nbr_end = g.edge_begin(*g.begin());
+         auto curr_nbr_end = g.edge_end(*g.begin());
+
          for (auto n = g.begin(); n != g.end(); ++n) {
             auto src = *n;
-            for (auto e = g.edge_begin(*n); e != g.edge_end(*n); ++e) {
-               auto dst = g.getEdgeDst(e);
-               size_t owner = vcInfo.getEdgeOwner(g, e);
+            curr_nbr_end = g.edge_end(*n);
+            for (auto nbr = prev_nbr_end ; nbr != curr_nbr_end; ++nbr) {
+               auto dst = g.getEdgeDst(nbr);
+               size_t owner = vcInfo.getEdgeOwner(g, nbr);
                if (owner == h) {
                   if (global2Local[src] == -1) {
-                     if (vertexOwners[src] == -1) {
-                        vertexOwners[src] = h;
-                     }
                      global2Local[src] = newNodeCounter++;
-                  }
+                  }//if g2l[src]
                   if (global2Local[dst] == -1) {
-                     if (vertexOwners[dst] == -1) {
-                        vertexOwners[dst] = h;
-                     }
                      global2Local[dst] = newNodeCounter++;
-                  }
-               }
-            }
-         }      //For each node
-         std::vector<NewEdgeData> newEdges;
-         for (auto n = g.begin(); n != g.end(); ++n) {
-            auto src = *n;
-            for (auto e = g.edge_begin(*n); e != g.edge_end(*n); ++e) {
-               auto dst = g.getEdgeDst(e);
-               size_t owner = vcInfo.getEdgeOwner(g, e);
-               if (owner == h) {
+                  }//if g2l[dst]
                   size_t new_src = global2Local[src];
                   size_t new_dst = global2Local[dst];
                   assert(new_src != -1 && new_dst != -1);
 #if _HAS_EDGE_DATA
-                  newEdges.push_back(NewEdgeData(new_src, new_dst, g.getEdgeData<EdgeDataType>(e)));
+                  newEdges.push_back(NewEdgeData(new_src, new_dst, g.getEdgeData<EdgeDataType>(nbr)));
 #else
                   newEdges.push_back(NewEdgeData(new_src, new_dst));
 #endif
-               }      //End if
-            }      //End for neighbors
-         }      //end for nodes
+
+               }//if owner==h
+            }//end for nbr
+            prev_nbr_end= curr_nbr_end;
+
+         }      //For each node
          std::cout << "Analysis :: " << newNodeCounter << " , " << newEdges.size() << "\n";
          using namespace Galois::Graph;
          FileGraphWriter newGraph;

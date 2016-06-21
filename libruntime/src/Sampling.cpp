@@ -50,20 +50,21 @@ static void beginPeriod() {
 
 #ifdef GALOIS_USE_VTUNE
 #include "ittnotify.h"
-#include "Galois/Runtime/ll/TID.h"
 
 namespace vtune {
 static bool isOn;
 static void begin() {
-  if (!isOn && Galois::Runtime::LL::getTID() == 0)
+  if (!isOn && Galois::Substrate::ThreadPool::getTID() == 0)
     __itt_resume();
   isOn = true;
+  Galois::Substrate::gDebug("vtune sampling started");
 }
 
 static void end() {
-  if (isOn && Galois::Runtime::LL::getTID() == 0)
+  if (isOn && Galois::Substrate::ThreadPool::getTID() == 0)
     __itt_pause();
   isOn = false;
+  Galois::Substrate::gDebug("vtune sampling stopped");
 }
 }
 #else
@@ -80,13 +81,13 @@ static void end() {}
 namespace hpctoolkit {
 static bool isOn;
 static void begin() {
-  if (!isOn && Galois::Runtime::LL::getTID() == 0)
+  if (!isOn && Galois::Substrate::ThreadPool::getTID() == 0)
     hpctoolkit_sampling_start();
   isOn = true;
 }
 
 static void end() {
-  if (isOn && Galois::Runtime::LL::getTID() == 0)
+  if (isOn && Galois::Substrate::ThreadPool::getTID() == 0)
     hpctoolkit_sampling_stop();
   isOn = false;
 }
@@ -123,7 +124,7 @@ static_assert(sizeof(papiEvents)/sizeof(*papiEvents) == sizeof(papiNames)/sizeof
     "PAPI Events != PAPI Names");
 
 static unsigned long galois_get_thread_id() {
-  return Galois::Runtime::LL::getTID();
+  return Galois::Substrate::ThreadPool::getTID();
 }
 
 static void begin(bool mainThread) {

@@ -525,7 +525,7 @@ namespace Galois {
                char * kernel_src = new char[kernel_len];
                sprintf(kernel_src, "%s\n%s", cl_wrapper_str_CL_LC_Graph, init_kernel_str_CL_LC_Graph);
 //               init_kernel.init_string(kernel_src, "initialize_graph_struct");
-               init_kernel.init("PageRank_pull.cl", "initialize_void_graph_struct");
+               init_kernel.init("app_header.h", "initialize_void_graph_struct");
 //               init_kernel.set_arg_list(gpu_struct_ptr, gpu_meta, gpu_wrapper.node_data, gpu_wrapper.outgoing_index, gpu_wrapper.neighbors, gpu_wrapper.edge_data);
                init_kernel.set_arg_list_raw(gpu_struct_ptr, gpu_meta, gpu_wrapper.node_data, gpu_wrapper.outgoing_index, gpu_wrapper.neighbors);
                init_kernel.run_task();

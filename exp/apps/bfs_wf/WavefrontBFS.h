@@ -311,7 +311,7 @@ public:
     unsigned level = 0;
 
     ParCounter numAdds;
-    Galois::Substrate::getThreadPool ().burnPower (Galois::getActiveThreads ());
+    Galois::Substrate::ThreadPool::getThreadPool ().burnPower (Galois::getActiveThreads ());
 
 #ifdef BFS_WF_USE_BAG
     while (!currWL->empty ()) {
@@ -321,8 +321,9 @@ public:
 
       Galois::do_all_choice (Galois::Runtime::makeLocalRange(*currWL), 
           ParallelInnerLoop (graph, *nextWL, numAdds), 
-          "wavefront_inner_loop",
-          Galois::chunk_size<DEFAULT_CHUNK_SIZE> ());
+          std::make_tuple (
+            Galois::loopname("wavefront_inner_loop"),
+            Galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
 
       std::swap (currWL, nextWL);
 
@@ -333,7 +334,7 @@ public:
 #endif
       ++level;
     }
-    Galois::Substrate::getThreadPool ().beKind ();
+    Galois::Substrate::ThreadPool::getThreadPool ().beKind ();
 
     numIter += numAdds.reduce ();
 

@@ -16,7 +16,7 @@
 #include <string>
 
 #include "Galois/Graphs/FileGraph.h"
-#include "Galois/Dist/OfflineGraph.h"
+#include "Galois/Runtime/OfflineGraph.h"
 
 
 
@@ -47,7 +47,7 @@ std::string getMetaFileName(std::string & basename, size_t hostID, size_t num_ho
 
 std::string getReplicaInfoFileName(std::string & basename, size_t num_hosts) {
    std::string result = basename;
-   result += ".REPLICA_INFO.FOR.";
+   result += ".REPLICA.FOR.";
    result += std::to_string(num_hosts);
    return result;
 }

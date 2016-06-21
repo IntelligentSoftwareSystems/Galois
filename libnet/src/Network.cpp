@@ -58,7 +58,7 @@ void NetworkInterface::dumpStats() const {
 }
 
 unsigned long NetworkInterface::reportSendBytes() {
-  return statSendBytes.getVal();
+  //  return statSendBytes.getVal();
 }
 
 //anchor vtable

@@ -10,6 +10,6 @@ OUTPUT_DIR=${BASE_DIR}/compiler_outputs
 
 for input in $INPUT_DIR/*.cpp; do
   name=$(basename "$input" ".cpp")
-  ./compiler.sh $input ${OUTPUT_DIR}/$name
+  ./compile.sh $input ${OUTPUT_DIR}/$name
 done
 
