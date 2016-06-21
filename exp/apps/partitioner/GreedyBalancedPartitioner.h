@@ -136,16 +136,20 @@ struct GBPartitioner {
       T_total.start();
       T_edge_assign.start();
       vcInfo.init(g.size(), g.sizeEdges(), num_hosts);
+      auto prev_nbr_end = g.edge_begin(*g.begin());
+      auto curr_nbr_end = g.edge_end(*g.begin());
       for (auto n = g.begin(); n != g.end(); ++n) {
          auto src = *n;
-         for (auto nbr = g.edge_begin(*n); nbr != g.edge_end(*n); ++nbr) {
+         curr_nbr_end = g.edge_end(*n);
+         for (auto nbr = prev_nbr_end ; nbr != curr_nbr_end; ++nbr) {
             auto dst = g.getEdgeDst(nbr);
             size_t owner = getEdgeOwner(src, dst, num_hosts);
             vcInfo.assignEdge(g, n, nbr, owner);
          }
+         prev_nbr_end= curr_nbr_end;
       }
       T_edge_assign.stop();
-
+      std::cout<<"STEP#1-EdgesAssign:: "<<T_edge_assign.get() << "\n";
       T_write_replica.start();
       vcInfo.writeReplicaInfo(basename, g, num_hosts);
       T_write_replica.stop();
@@ -154,7 +158,6 @@ struct GBPartitioner {
       vcInfo.assignMasters(g.size(), num_hosts, g);
       T_assign_masters.stop();
 
-//      assignVertices(g, vcInfo, num_hosts);
       T_write_partition.start();
       writePartitionsMem(basename, g, num_hosts);
       T_write_partition.stop();
@@ -188,58 +191,41 @@ struct GBPartitioner {
       //TODO RK - Fix edgeData
       std::cout << " Low mem version\n";
       std::vector<size_t> &vertexOwners = vcInfo.vertexMasters;
-      {
-         //Go over all the vertices and assign an owner.
-
-      }
       for (size_t h = 0; h < num_hosts; ++h) {
          std::cout << "Building partition " << h << "...\n";
          std::vector<size_t> global2Local(g.size(), -1);
+         std::vector<NewEdgeData> newEdges;
          size_t newNodeCounter = 0;
+         auto prev_nbr_end = g.edge_begin(*g.begin());
+         auto curr_nbr_end = g.edge_end(*g.begin());
+
          for (auto n = g.begin(); n != g.end(); ++n) {
             auto src = *n;
-            for (auto e = g.edge_begin(*n); e != g.edge_end(*n); ++e) {
-               auto dst = g.getEdgeDst(e);
-               size_t owner = vcInfo.getEdgeOwner(g, e);
+            curr_nbr_end = g.edge_end(*n);
+            for (auto nbr = prev_nbr_end ; nbr != curr_nbr_end; ++nbr) {
+               auto dst = g.getEdgeDst(nbr);
+               size_t owner = vcInfo.getEdgeOwner(g, nbr);
                if (owner == h) {
                   if (global2Local[src] == -1) {
-/*
-                     if (vertexOwners[src] == -1) {
-                        vertexOwners[src] = h;
-                     }
-*/
                      global2Local[src] = newNodeCounter++;
-                  }
+                  }//if g2l[src]
                   if (global2Local[dst] == -1) {
-/*
-                     if (vertexOwners[dst] == -1) {
-                        vertexOwners[dst] = h;
-                     }
-*/
                      global2Local[dst] = newNodeCounter++;
-                  }
-               }
-            }
-         }      //For each node
-         std::vector<NewEdgeData> newEdges;
-         newEdges.reserve(g.sizeEdges());
-         for (auto n = g.begin(); n != g.end(); ++n) {
-            auto src = *n;
-            for (auto e = g.edge_begin(*n); e != g.edge_end(*n); ++e) {
-               auto dst = g.getEdgeDst(e);
-               size_t owner = vcInfo.getEdgeOwner(g, e);
-               if (owner == h) {
+                  }//if g2l[dst]
                   size_t new_src = global2Local[src];
                   size_t new_dst = global2Local[dst];
                   assert(new_src != -1 && new_dst != -1);
 #if _HAS_EDGE_DATA
-                  newEdges.push_back(NewEdgeData(new_src, new_dst, g.getEdgeData<EdgeDataType>(e)));
+                  newEdges.push_back(NewEdgeData(new_src, new_dst, g.getEdgeData<EdgeDataType>(nbr)));
 #else
                   newEdges.push_back(NewEdgeData(new_src, new_dst));
 #endif
-               }      //End if
-            }      //End for neighbors
-         }      //end for nodes
+
+               }//if owner==h
+            }//end for nbr
+            prev_nbr_end= curr_nbr_end;
+
+         }      //For each node
          std::cout << "Analysis :: " << newNodeCounter << " , " << newEdges.size() << "\n";
          using namespace Galois::Graph;
          FileGraphWriter newGraph;
