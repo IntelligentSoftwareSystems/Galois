@@ -79,9 +79,7 @@ struct GBPartitionerDisk {
       /*
        *
        * */
-      void assignEdge(OfflineGraph & g, NodeItType & _src, EdgeItType & e, size_t owner) {
-         size_t eIdx = std::distance(g.edge_begin(*g.begin()), e);
-         auto dst = g.getEdgeDst(e);
+      void assignEdge(OfflineGraph & g, NodeItType & _src, OfflineGraph::GraphNode & dst, size_t & eIdx, EdgeItType & e, size_t owner) {
          auto src = *_src;
          edgesPerHost[owner]++;
          vertexOwners[src][owner] = true;
@@ -194,13 +192,15 @@ struct GBPartitionerDisk {
       vcInfo.init(g.size(), g.sizeEdges(), num_hosts);
       auto prev_nbr_end = g.edge_begin(*g.begin());
       auto curr_nbr_end = g.edge_end(*g.begin());
+      size_t edge_counter = 0;
       for (auto n = g.begin(); n != g.end(); ++n) {
          auto src = *n;
          curr_nbr_end = g.edge_end(*n);
-         for (auto nbr = prev_nbr_end; nbr != curr_nbr_end; ++nbr) {
+         for (auto nbr = prev_nbr_end; nbr != curr_nbr_end; ++nbr,++edge_counter) {
             auto dst = g.getEdgeDst(nbr);
             size_t owner = getEdgeOwner(src, dst, num_hosts);
-            vcInfo.assignEdge(g, n, nbr, owner);
+//            void assignEdge(OfflineGraph & g, NodeItType & _src, NodeItType & dst, size_t & eIdx, EdgeItType & e, size_t owner) {
+            vcInfo.assignEdge(g, n, dst, edge_counter, nbr, owner);
          }
          prev_nbr_end = curr_nbr_end;
       }
