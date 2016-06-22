@@ -67,6 +67,7 @@ typedef unsigned int EdgeDataType;
 #include "Common.h"
 #include "RandomPartitioner.h"
 #include "GreedyBalancedPartitioner.h"
+#include "GreedyBalancedPartitionerDisk.h"
 //using namespace std;
 
 int main(int argc, char** argv) {
@@ -78,7 +79,7 @@ int main(int argc, char** argv) {
    T_hGraph_init.stop();
    //VertexCutInfo vci;
    T_init.start();
-   GBPartitioner p;
+   GBPartitionerDisk p;
    p(outputFolder, g, numPartitions);
    T_init.stop();
    if (!verifyParitions(outputFolder, g, numPartitions)) {
@@ -89,3 +90,4 @@ int main(int argc, char** argv) {
    std::cout << "Completed partitioning.\n";
    return 0;
 }
+
