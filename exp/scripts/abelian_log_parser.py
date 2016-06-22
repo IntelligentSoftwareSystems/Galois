@@ -363,6 +363,45 @@ def build_master_ghost_matrix(fileName, benchmark, partition, total_hosts, numRu
     return SlaveNodes_array
 
 
+#[0]STAT,(NULL),SYNC_PULL_BARRIER_BFS_0_1,15,992,992,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#[0]STAT,(NULL),SYNC_PULL_BARRIER_BFS_0_2,15,538,538,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#[0]STAT,(NULL),SYNC_PULL_BARRIER_BFS_0_3,15,1408,1408,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#[0]STAT,(NULL),SYNC_PULL_BARRIER_BFS_1_1,15,1458,1458,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#[0]STAT,(NULL),SYNC_PULL_BARRIER_BFS_1_2,15,1568,1568,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+#[0]STAT,(NULL),SYNC_PULL_BARRIER_BFS_1_3,15,2766,2766,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+def time_at_barrier(fileName, benchmark, total_hosts, numRuns, numThreads):
+  log_data = open(fileName).read()
+  thousand = 1000.0
+  sync_pull_barrier_avg_time_total = [0.0]*256
+  sync_pull_avg_time_total = [0.0]*256
+
+  for host in range(0, int(total_hosts)):
+      for i in range(0, int(numRuns)):
+        # find sync_pull
+        sync_pull_barrier_regex = re.compile(r'\[' + re.escape(str(host)) + r'\]STAT,\(NULL\),SYNC_PULL_BARRIER_(?i)' + re.escape(benchmark) + r'\w*_' + re.escape(str(i)) + r'_(\d*),\d*,(\d*),(\d*).*')
+        sync_pull_barrier_lines = re.findall(sync_pull_barrier_regex, log_data)
+        num_iterations = len(sync_pull_barrier_lines);
+        for j in range (0, len(sync_pull_barrier_lines)):
+          sync_pull_barrier_avg_time_total[host] += float(sync_pull_barrier_lines[j][2])
+
+      sync_pull_barrier_avg_time_total[host] /= int(numRuns)
+      sync_pull_barrier_avg_time_total[host] /= thousand
+
+  for host in range(0, int(total_hosts)):
+      for i in range(0, int(numRuns)):
+        # find sync_pull
+        sync_pull_regex = re.compile(r'\[' + re.escape(str(host)) + r'\]STAT,\(NULL\),SYNC_PULL_(?i)' + re.escape(benchmark) + r'\w*_' + re.escape(str(i)) + r'_(\d*),\d*,(\d*),(\d*).*')
+        sync_pull_lines = re.findall(sync_pull_regex, log_data)
+        num_iterations = len(sync_pull_lines);
+        for j in range (0, len(sync_pull_lines)):
+          sync_pull_avg_time_total[host] += float(sync_pull_lines[j][2])
+
+      sync_pull_avg_time_total[host] /= int(numRuns)
+      sync_pull_avg_time_total[host] /= thousand
+
+  print sync_pull_barrier_avg_time_total
+  print sync_pull_avg_time_total
+
 
 def get_basicInfo(fileName, get_devices):
 
@@ -488,6 +527,9 @@ def main(argv):
   else:
     output_str += hostNum  + ',' + threads  + ','
   output_str += input_graph  + ',' + algo_type  + ',' + cut_type
+  time_at_barrier(inputFile, benchmark, forHost, runs, threads)
+
+  #output_str = benchmark + ',' + 'abelian'  + ',' + hostNum  + ',' + threads  + ',' + input_graph  + ',' + algo_type  + ',' + cut_type
 
   #for d in data:
     #output_str += ','
