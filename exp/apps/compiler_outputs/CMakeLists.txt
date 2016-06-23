@@ -245,3 +245,7 @@ if(USE_GGC)
   target_link_libraries(cc_pull-topological_vertex-cut_cuda ggrt)
 endif()
 
+#### Experiment ####
+app(bfs_pull-topological_edgeAsvertex-cut bfs_pull-topological/gen_kGraph.cpp DISTSAFE)
+target_compile_definitions(bfs_pull-topological_edgeAsvertex-cut PRIVATE __GALOIS_VERTEX_CUT_GRAPH__=1)
+
