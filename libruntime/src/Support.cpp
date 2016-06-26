@@ -73,8 +73,9 @@ void Galois::Runtime::reportStatGlobal(const std::string&, unsigned long) {
 }
 
 void Galois::Runtime::printStats() {
-  //  SM.get()->printStats(std::cout);
-  SM.get()->printStatsForR(std::cout, false);
+    SM.get()->printDistStats(std::cout);
+    //SM.get()->printStats(std::cout);
+  //SM.get()->printStatsForR(std::cout, false);
   //  SM.get()->printStatsForR(std::cout, true);
 }
 

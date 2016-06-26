@@ -36,6 +36,7 @@
 #include <set>
 #include <string>
 #include <vector>
+#include <sstream>
 
 namespace Galois {
 namespace Runtime {
@@ -134,20 +135,24 @@ void Galois::Runtime::StatCollector::addToStat(const std::string& loop, const st
     Stats.getRemote(TID)->insertStat(getOrInsertSymbol(loop), getOrInsertSymbol(category), getInstanceNum(loop), value);
 }
 
+uint32_t Galois::Runtime::StatCollector::num_recv_expected;
+
 //assumne called serially
 void Galois::Runtime::StatCollector::printStatsForR(std::ostream& out, bool json) {
   if (json)
     out << "[\n";
   else
-    out << "LOOP,INSTANCE,CATEGORY,THREAD,VAL\n";
+    out << "HOST,LOOP,INSTANCE,CATEGORY,THREAD,VAL\n";
+
+  auto& net = Galois::Runtime::getSystemNetworkInterface();
   for (unsigned x = 0; x < Stats.size(); ++x) {
     auto rStat = Stats.getRemote(x);
     MAKE_LOCK_GUARD(rStat->lock);
     for (auto& r : rStat->stats) {
       if (json)
-        out << "{ \"LOOP\" : " << *r.loop << " , \"INSTANCE\" : " << r.instance << " , \"CATEGORY\" : " << *r.category << " , \"THREAD\" : " << x << " , \"VALUE\" : ";
+        out << "{\"HOST\" : " << net.ID << " , \"LOOP\" : " << *r.loop << " , \"INSTANCE\" : " << r.instance << " , \"CATEGORY\" : " << *r.category << " , \"THREAD\" : " << x << " , \"VALUE\" : ";
       else
-        out << *r.loop << "," << r.instance << "," << *r.category << "," << x << ",";
+        out << net.ID << "," << *r.loop << "," << r.instance << "," << *r.category << "," << x << ",";
       r.print(out);
       out << (json ? "}\n" : "\n");
     }
@@ -160,7 +165,7 @@ void Galois::Runtime::StatCollector::printStatsForR(std::ostream& out, bool json
 //still assumes int values
 void Galois::Runtime::StatCollector::printStats(std::ostream& out) {
   std::map<std::tuple<const std::string*, unsigned, const std::string*>, std::vector<size_t> > LKs;
-  
+
   unsigned maxThreadID = 0;
   //Find all loops and keys
   for (unsigned x = 0; x < Stats.size(); ++x) {
@@ -174,6 +179,8 @@ void Galois::Runtime::StatCollector::printStats(std::ostream& out) {
       v[x] += r.valueInt;
     }
   }
+
+  auto& net = Galois::Runtime::getSystemNetworkInterface();
   //print header
   out << "STATTYPE,LOOP,INSTANCE,CATEGORY,n,sum";
   for (unsigned x = 0; x <= maxThreadID; ++x)
@@ -182,7 +189,7 @@ void Galois::Runtime::StatCollector::printStats(std::ostream& out) {
   //print all values
   for (auto ii = LKs.begin(), ee = LKs.end(); ii != ee; ++ii) {
     std::vector<unsigned long>& Values = ii->second;
-    out << "STAT,"
+    out << "STAT," << net.ID << ","
         << std::get<0>(ii->first)->c_str() << ","
         << std::get<1>(ii->first) << ","
         << std::get<2>(ii->first)->c_str() << ","
@@ -193,6 +200,76 @@ void Galois::Runtime::StatCollector::printStats(std::ostream& out) {
     out << "\n";
   }
 }
+
+//Assume called serially
+//still assumes int values
+void Galois::Runtime::StatCollector::printDistStats_landingPad(Galois::Runtime::RecvBuffer& buf){
+  std::string recv_str;
+  uint32_t from_ID;
+  Galois::Runtime::gDeserialize(buf, from_ID, recv_str);
+  Substrate::gPrint(recv_str);
+  --num_recv_expected;
+}
+
+void Galois::Runtime::StatCollector::printDistStats(std::ostream& out) {
+  std::map<std::tuple<const std::string*, unsigned, const std::string*>, std::vector<size_t> > LKs;
+
+  unsigned maxThreadID = 0;
+  //Find all loops and keys
+  for (unsigned x = 0; x < Stats.size(); ++x) {
+    auto rStat = Stats.getRemote(x);
+    std::lock_guard<Substrate::SimpleLock> lg(rStat->lock);
+    for (auto& r : rStat->stats) {
+      maxThreadID = x;
+      auto& v = LKs[std::make_tuple(r.loop, r.instance, r.category)];
+      if (v.size() <= x)
+        v.resize(x+1);
+      v[x] += r.valueInt;
+    }
+  }
+
+  auto& net = Galois::Runtime::getSystemNetworkInterface();
+  num_recv_expected = net.Num - 1;
+  //print header
+  std::stringstream ss;
+  ss << "STATTYPE,LOOP,INSTANCE,CATEGORY,n,sum";
+  for (unsigned x = 0; x <= maxThreadID; ++x)
+    ss << ",T" << x;
+  ss << "\n";
+  //print all values
+  for (auto ii = LKs.begin(), ee = LKs.end(); ii != ee; ++ii) {
+    std::vector<unsigned long>& Values = ii->second;
+    ss << "STAT," << net.ID << ","
+        << std::get<0>(ii->first)->c_str() << ","
+        << std::get<1>(ii->first) << ","
+        << std::get<2>(ii->first)->c_str() << ","
+        << maxThreadID + 1 <<  ","
+        << std::accumulate(Values.begin(), Values.end(), static_cast<unsigned long>(0));
+    for (unsigned x = 0; x <= maxThreadID; ++x)
+      ss << "," <<  (x < Values.size() ? Values.at(x) : 0);
+    ss << "\n";
+  }
+
+  if(net.ID == 0){
+    Substrate::gPrint(ss.str());
+
+    while(num_recv_expected){
+      net.handleReceives();
+    }
+  }
+  else{
+    //send to host 0 to print.
+    Galois::Runtime::SendBuffer b;
+    gSerialize(b, net.ID, ss.str());
+    net.send(0, printDistStats_landingPad, b);
+    net.flush();
+  }
+
+  ss.str(std::string());
+  ss.clear();
+  //out << ss.str();
+}
+
 
 void Galois::Runtime::StatCollector::beginLoopInstance(const std::string& str) {
   addInstanceNum(str);

@@ -33,6 +33,8 @@
 #include "Galois/gdeque.h"
 #include "Galois/Substrate/SimpleLock.h"
 #include "Galois/Substrate/PerThreadStorage.h"
+#include "Galois/Runtime/Serialize.h"
+#include "Galois/Runtime/Network.h"
 
 #include <string>
 #include <set>
@@ -88,20 +90,24 @@ class StatCollector {
 
     template<typename T>
     void insertStat(const std::string* loop, const std::string* category, unsigned instance, const T& val);
-  };    
+  };
 
   Galois::Substrate::PerThreadStorage<RecordList> Stats;
 
 public:
+
+  static uint32_t num_recv_expected;
 
   void addToStat(const std::string& loop, const std::string& category, size_t value, unsigned TID);
   void addToStat(const std::string& loop, const std::string& category, double value, unsigned TID);
   void addToStat(const std::string& loop, const std::string& category, const std::string& value, unsigned TID);
 
   void printStatsForR(std::ostream& out, bool json);
+  static void printDistStats_landingPad(Galois::Runtime::RecvBuffer& buf);
 
   //still assumes int values
   void printStats(std::ostream& out);
+  void printDistStats(std::ostream& out);
 
   void beginLoopInstance(const std::string& str);
 };
