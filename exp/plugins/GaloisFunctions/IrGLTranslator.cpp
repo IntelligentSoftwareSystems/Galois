@@ -569,7 +569,7 @@ public:
     std::ofstream header;
     header.open(FileNamePath + "_cuda.h");
     header << "#pragma once\n";
-    header << "#include \"Galois/Cuda/cuda_mtypes.h\"\n";
+    header << "#include \"Galois/Runtime/Cuda/cuda_mtypes.h\"\n";
     header << "\nstruct CUDA_Context;\n";
     if (requiresWorklist) {
       header << "\nstruct CUDA_Worklist {\n";
