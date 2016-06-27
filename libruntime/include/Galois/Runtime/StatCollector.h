@@ -64,39 +64,31 @@ class StatCollector {
   //Stat list
   //////////////////////////////////////
   struct RecordTy {
-    const std::string* loop;
-    const std::string* category;
-    unsigned instance;
     char mode; // 0 - int, 1 - double, 2 - string
     union {
       size_t valueInt;
       double valueDouble;
       std::string valueStr;
     };
-    RecordTy(const std::string* loop, const std::string* category, unsigned instance, size_t value);
-    RecordTy(const std::string* loop, const std::string* category, unsigned instance, double value);
-    RecordTy(const std::string* loop, const std::string* category, unsigned instance, const std::string& value);
+    RecordTy(size_t value);
+    RecordTy(double value);
+    RecordTy(const std::string& value);
     RecordTy(const RecordTy& r);
     ~RecordTy();
 
     void print(std::ostream& out) const;
   };
 
-  struct RecordList {
-    Substrate::SimpleLock lock;
-    gdeque<RecordTy> stats;
-
-    template<typename T>
-    void insertStat(const std::string* loop, const std::string* category, unsigned instance, const T& val);
-  };    
-
-  Galois::Substrate::PerThreadStorage<RecordList> Stats;
+  //stats  HostID,ThreadID,loop,category,instance -> Record
+  
+  std::map<std::tuple<unsigned,unsigned, const std::string*, const std::string*,unsigned>, RecordTy> Stats;
+  Galois::Substrate::SimpleLock StatsLock;
 
 public:
 
-  void addToStat(const std::string& loop, const std::string& category, size_t value, unsigned TID);
-  void addToStat(const std::string& loop, const std::string& category, double value, unsigned TID);
-  void addToStat(const std::string& loop, const std::string& category, const std::string& value, unsigned TID);
+  void addToStat(const std::string& loop, const std::string& category, size_t value, unsigned TID, unsigned HostID);
+  void addToStat(const std::string& loop, const std::string& category, double value, unsigned TID, unsigned HostID);
+  void addToStat(const std::string& loop, const std::string& category, const std::string& value, unsigned TID, unsigned HostID);
 
   void printStatsForR(std::ostream& out, bool json);
 
