@@ -74,15 +74,17 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit):
   sendNum_total = 0
   sendBytes_total = 0
   sync_pull_avg_time_total = 0.0;
+  extract_avg_time_total = 0.0;
+  set_avg_time_total = 0.0;
   sync_push_avg_time_total = 0.0;
   graph_init_time = 0
   hg_init_time = 0
   total_time = 0
 
   if (time_unit == 'seconds'):
-    divisor = 1000.0
+    divisor = 1000
   else:
-    divisor = 1.0
+    divisor = 1
 
   timer_regex = re.compile(r'\[' + re.escape(forHost) + r'\]STAT,\(NULL\),TIMER_(\d*),' + re.escape(numThreads) + r',(\d*),(\d*).*')
 
@@ -107,6 +109,18 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit):
   ## SYNC_PULL and SYNC_PUSH total average over runs.
   num_iterations = 0
   for i in range(0, int(numRuns)):
+    # find extract
+    extract_regex = re.compile(r'\[' + re.escape(forHost) + r'\]STAT,\(NULL\),SYNC_EXTRACT_(?i)' + re.escape(benchmark) + r'\w*_' + re.escape(str(i)) + r'_(\d*),\d*,(\d*),(\d*).*')
+    extract_lines = re.findall(extract_regex, log_data)
+    for j in range (0, len(extract_lines)):
+      extract_avg_time_total += float(extract_lines[j][2])
+
+    # find set
+    set_regex = re.compile(r'\[' + re.escape(forHost) + r'\]STAT,\(NULL\),SYNC_SET_(?i)' + re.escape(benchmark) + r'\w*_' + re.escape(str(i)) + r'_(\d*),\d*,(\d*),(\d*).*')
+    set_lines = re.findall(set_regex, log_data)
+    for j in range (0, len(set_lines)):
+      set_avg_time_total += float(set_lines[j][2])
+
     # find sync_pull
     sync_pull_regex = re.compile(r'\[' + re.escape(forHost) + r'\]STAT,\(NULL\),SYNC_PULL_(?i)' + re.escape(benchmark) + r'\w*_' + re.escape(str(i)) + r'_(\d*),\d*,(\d*),(\d*).*')
     sync_pull_lines = re.findall(sync_pull_regex, log_data)
@@ -123,6 +137,14 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit):
 
     for j in range (0, len(sync_push_lines)):
       sync_push_avg_time_total += float(sync_push_lines[j][2])
+
+  extract_avg_time_total /= int(numRuns)
+  extract_avg_time_total /= divisor
+  extract_avg_time_total = round(extract_avg_time_total, 0)
+
+  set_avg_time_total /= int(numRuns)
+  set_avg_time_total /= divisor
+  set_avg_time_total = round(set_avg_time_total, 0)
 
   sync_pull_avg_time_total /= int(numRuns)
   sync_pull_avg_time_total /= divisor
@@ -209,7 +231,7 @@ def match_timers(fileName, benchmark, forHost, numRuns, numThreads, time_unit):
 
 
   #return mean_time,graph_init_time,hg_init_time,total_time,sync_pull_avg_time_total,sync_push_avg_time_total,recvNum_total,recvBytes_total,sendNum_total,sendBytes_total,commits,conflicts,iterations, pushes
-  return mean_time,graph_init_time,hg_init_time,total_time,sync_pull_avg_time_total,sync_push_avg_time_total,num_iterations,commits,conflicts,iterations, pushes
+  return mean_time,graph_init_time,hg_init_time,total_time,extract_avg_time_total,set_avg_time_total,sync_pull_avg_time_total,sync_push_avg_time_total,num_iterations,commits,conflicts,iterations, pushes
 
 
 def sendRecv_bytes_all(fileName, benchmark, total_hosts, numRuns, numThreads):
@@ -455,7 +477,7 @@ def get_basicInfo(fileName, get_devices):
       elif cpus == 0:
         devices = str(gpus) + " GPU"
       else:
-        devices = str(cpus) + " CPU + " + gpus + " GPU"
+        devices = str(cpus) + " CPU + " + str(gpus) + " GPU"
 
   return hostNum, cmdLine, threads, runs, benchmark, algo_type, cut_type, input_graph, devices
 
@@ -542,7 +564,7 @@ def main(argv):
     header_csv_str += "devices,"
   else:
     header_csv_str += "host,threads,"
-  header_csv_str += "input,variant,partition,mean_time,graph_init_time,hg_init_time,total_time,sync_pull_avg_time,sync_push_avg_time,converge_iterations,commits,conflicts,iterations,pushes,total_sendBytes, total_sendBytes_pull_sync, total_sendBytes_pull_reply, total_sendBytes_push_sync"
+  header_csv_str += "input,variant,partition,mean_time,graph_init_time,hg_init_time,total_time,extract_avg_time,set_avg_time,sync_pull_avg_time,sync_push_avg_time,converge_iterations,commits,conflicts,iterations,pushes,total_sendBytes, total_sendBytes_pull_sync, total_sendBytes_pull_reply, total_sendBytes_push_sync"
 
   for i in range(0,256):
     header_csv_str += ","
