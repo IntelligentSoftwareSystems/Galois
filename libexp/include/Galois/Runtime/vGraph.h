@@ -27,6 +27,8 @@
 
 #include <vector>
 #include <set>
+#include <algorithm>
+#include <unordered_map>
 
 #include "Galois/gstl.h"
 #include "Galois/Graphs/LC_CSR_Graph.h"
@@ -129,10 +131,15 @@ class vGraph : public GlobalObject {
   std::vector<NodeInfo> localToGlobalMap_meta;
   std::vector<std::vector<size_t>> slaveNodes; // slave nodes from different hosts. For sync_push
   std::vector<std::vector<size_t>> masterNodes; // master nodes on different hosts. For sync_pull
-  std::map<size_t, size_t> LocalToGlobalMap;
-  std::map<size_t, size_t> GlobalToLocalMap;
+  std::unordered_map<size_t, size_t> LocalToGlobalMap;
+  std::unordered_map<size_t, size_t> GlobalToLocalMap;
 
-  std::map<size_t, size_t> GIDtoOwnerMap;
+  std::unordered_map<size_t, size_t> GIDtoOwnerMap;
+
+  std::vector<size_t> OwnerVec; //To store the ownerIDs of sorted according to the Global IDs.
+  std::vector<size_t> GlobalVec; //Global Id's sorted vector.
+  std::vector<size_t> LocalVec; //Local Id's sorted vector.
+
    //GID to owner
    std::vector<std::pair<uint64_t, uint64_t>> gid2host;
 
@@ -153,12 +160,20 @@ class vGraph : public GlobalObject {
 #endif
 
   size_t L2G(size_t lid) {
-    return LocalToGlobalMap[lid];
-    //return LocalToGlobalMap.at(lid);
+    //return LocalToGlobalMap[lid];
+    return GlobalVec[lid];
   }
+
   size_t G2L(size_t gid) {
-    return GlobalToLocalMap[gid];
-    //return GlobalToLocalMap.at(gid);
+
+    //we can assume that GID exits and is unique. Index is localID since it is sorted.
+    auto iter = std::lower_bound(GlobalVec.begin(), GlobalVec.end(), gid);
+    assert(*iter == gid);
+    if(*iter == gid)
+      return (iter - GlobalVec.begin());
+    else
+      abort();
+    //return GlobalToLocalMap[gid];
   }
 
 #if 0
@@ -396,6 +411,7 @@ public:
     masterNodes.resize(numHosts);
     slaveNodes.resize(numHosts);
 
+#if 0
     for(auto info : localToGlobalMap_meta){
       assert(info.owner_id >= 0 && info.owner_id < numHosts);
       slaveNodes[info.owner_id].push_back(info.global_id);
@@ -405,7 +421,28 @@ public:
       GlobalToLocalMap[info.global_id] = info.local_id;
       //Galois::Runtime::printOutput("[%] Owner : %\n", info.global_id, info.owner_id);
     }
+#endif
 
+    for(auto info : localToGlobalMap_meta){
+      assert(info.owner_id >= 0 && info.owner_id < numHosts);
+      slaveNodes[info.owner_id].push_back(info.global_id);
+
+      GlobalVec.push_back(info.global_id);
+      OwnerVec.push_back(info.owner_id);
+      LocalVec.push_back(info.local_id);
+      //Galois::Runtime::printOutput("[%] Owner : %\n", info.global_id, info.owner_id);
+    }
+
+    //Check to make sure GlobalVec is sorted. Everything depends on it.
+    assert(std::is_sorted(GlobalVec.begin(), GlobalVec.end()));
+    if(!std::is_sorted(GlobalVec.begin(), GlobalVec.end())){
+      std::cerr << "GlobalVec not sorted; Aborting execution\n";
+      abort();
+    }
+    if(!std::is_sorted(LocalVec.begin(), LocalVec.end())){
+      std::cerr << "LocalVec not sorted; Aborting execution\n";
+      abort();
+    }
 
     //Exchange information.
     exchange_info_init();
@@ -641,7 +678,9 @@ public:
    }
 
    unsigned getHostID(uint64_t gid) {
-    return GIDtoOwnerMap[gid];
+    auto lid = G2L(gid);
+    return OwnerVec[lid];
+    //return GIDtoOwnerMap[gid];
    }
    uint32_t getNumOwned() const {
       return numOwned;
