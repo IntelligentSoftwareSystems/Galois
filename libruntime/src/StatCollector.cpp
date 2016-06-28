@@ -28,6 +28,9 @@
  */
 
 #include "Galois/Runtime/StatCollector.h"
+#include "Galois/Runtime/Support.h"
+#include "Galois/Runtime/Network.h"
+#include "Galois/Substrate/StaticInstance.h"
 
 #include <cmath>
 #include <map>
@@ -37,6 +40,7 @@
 #include <string>
 #include <vector>
 #include <sstream>
+#include <iostream>
 
 namespace Galois {
 namespace Runtime {
@@ -137,8 +141,6 @@ void Galois::Runtime::StatCollector::addToStat(const std::string& loop, const st
   }
 }
 
-uint32_t Galois::Runtime::StatCollector::num_recv_expected;
-
 //assumne called serially
 void Galois::Runtime::StatCollector::printStatsForR(std::ostream& out, bool json) {
   if (json)
@@ -196,78 +198,38 @@ void Galois::Runtime::StatCollector::printStats(std::ostream& out) {
   }
 }
 
-//Assume called serially
-//still assumes int values
-void Galois::Runtime::StatCollector::printDistStats_landingPad(Galois::Runtime::RecvBuffer& buf){
-  std::string recv_str;
-  uint32_t from_ID;
-  Galois::Runtime::gDeserialize(buf, from_ID, recv_str);
-  Substrate::gPrint(recv_str);
-  --num_recv_expected;
-}
-
-void Galois::Runtime::StatCollector::printDistStats(std::ostream& out) {
-  std::map<std::tuple<const std::string*, unsigned, const std::string*>, std::vector<size_t> > LKs;
-
-  unsigned maxThreadID = 0;
-  //Find all loops and keys
-  for (unsigned x = 0; x < Stats.size(); ++x) {
-    auto rStat = Stats.getRemote(x);
-    std::lock_guard<Substrate::SimpleLock> lg(rStat->lock);
-    for (auto& r : rStat->stats) {
-      maxThreadID = x;
-      auto& v = LKs[std::make_tuple(r.loop, r.instance, r.category)];
-      if (v.size() <= x)
-        v.resize(x+1);
-      v[x] += r.valueInt;
-    }
-  }
-
-  auto& net = Galois::Runtime::getSystemNetworkInterface();
-  num_recv_expected = net.Num - 1;
-  //print header
-  std::stringstream ss;
-  ss << "STATTYPE,LOOP,INSTANCE,CATEGORY,n,sum";
-  for (unsigned x = 0; x <= maxThreadID; ++x)
-    ss << ",T" << x;
-  ss << "\n";
-  //print all values
-  for (auto ii = LKs.begin(), ee = LKs.end(); ii != ee; ++ii) {
-    std::vector<unsigned long>& Values = ii->second;
-    ss << "STAT," << net.ID << ","
-        << std::get<0>(ii->first)->c_str() << ","
-        << std::get<1>(ii->first) << ","
-        << std::get<2>(ii->first)->c_str() << ","
-        << maxThreadID + 1 <<  ","
-        << std::accumulate(Values.begin(), Values.end(), static_cast<unsigned long>(0));
-    for (unsigned x = 0; x <= maxThreadID; ++x)
-      ss << "," <<  (x < Values.size() ? Values.at(x) : 0);
-    ss << "\n";
-  }
-
-  if(net.ID == 0){
-    Substrate::gPrint(ss.str());
-
-    while(num_recv_expected){
-      net.handleReceives();
-    }
-  }
-  else{
-    //send to host 0 to print.
-    Galois::Runtime::SendBuffer b;
-    gSerialize(b, net.ID, ss.str());
-    net.send(0, printDistStats_landingPad, b);
-    net.flush();
-  }
-
-  ss.str(std::string());
-  ss.clear();
-  //out << ss.str();
-}
-
-
 void Galois::Runtime::StatCollector::beginLoopInstance(const std::string& str) {
   addInstanceNum(str);
 }
 
+//Implementation
 
+static Substrate::StaticInstance<Galois::Runtime::StatCollector> SM;
+
+void Galois::Runtime::reportLoopInstance(const char* loopname) {
+  SM.get()->beginLoopInstance(std::string(loopname ? loopname : "(NULL)"));
+}
+
+static void reportStatImpl(const std::string loopname, const std::string category, unsigned long value, unsigned TID, unsigned HostID) {
+  if (getHostID())
+    getSystemNetworkInterface().sendAlt(0, reportStatImpl, loopname, category, value, TID, HostID);
+  else 
+    SM.get()->addToStat(loopname, category, value, TID, HostID);
+}
+
+void Galois::Runtime::reportStat(const std::string& loopname, const std::string& category, unsigned long value, unsigned TID) {
+  reportStatImpl(loopname, category, value, TID, getHostID());
+}
+
+void Galois::Runtime::reportStat(const char* loopname, const char* category, unsigned long value, unsigned TID) {
+  reportStatImpl(std::string(loopname ? loopname : "(NULL)"), 
+                 std::string(category ? category : "(NULL)"),
+                 value, TID, getHostID());
+}
+
+void Galois::Runtime::printStats() {
+  //    SM.get()->printDistStats(std::cout);
+    //SM.get()->printStats(std::cout);
+  SM.get()->printStatsForR(std::cout, false);
+  //  SM.get()->printStatsForR(std::cout, true);
+}
