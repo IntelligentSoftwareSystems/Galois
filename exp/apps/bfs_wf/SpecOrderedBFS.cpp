@@ -64,11 +64,11 @@ class SpecOrderedBFS: public BFS<Level_ty> {
             , eni = graph.edge_end (up.node, Galois::MethodFlag::UNPROTECTED); ni != eni; ++ni) {
 
           GNode dst = graph.getEdgeDst (ni);
-          ctx.push (Update (dst, up.level + 1));
+          // ctx.push (Update (dst, up.level + 1));
 
-          // if (graph.getData (dst, Galois::MethodFlag::UNPROTECTED) == BFS_LEVEL_INFINITY) {
-            // ctx.push (Update (dst, up.level + 1));
-          // }
+          if (graph.getData (dst, Galois::MethodFlag::UNPROTECTED) == BFS_LEVEL_INFINITY) {
+            ctx.push (Update (dst, up.level + 1));
+          }
         }
 
       }
