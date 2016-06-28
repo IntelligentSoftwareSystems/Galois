@@ -25,6 +25,24 @@
  *****************************************************************/
 
 struct GBPartitionerDisk {
+   struct NewEdgeData {
+      size_t src, dst;
+#if _HAS_EDGE_DATA
+      EdgeDataType data;
+#endif
+
+#if _HAS_EDGE_DATA
+      NewEdgeData(size_t s, size_t d, EdgeDataType dt ):src(s), dst(d),data(dt) {}
+#else
+
+#endif
+      NewEdgeData(size_t s, size_t d) :
+            src(s), dst(d) {
+      }
+      NewEdgeData() :
+            src(-1), dst(-1) {
+      }
+   };
    struct VertexCutInfo {
 //      std::vector<size_t> edgeOwners;
       std::vector<size_t> edgesPerHost;
@@ -35,6 +53,7 @@ struct GBPartitionerDisk {
       std::vector<int> mastersPerHost;
       std::vector<std::FILE*> tmpPartitionFiles;
       std::vector<std::vector<size_t> > global2Local;
+//      std::vector<std::vector<size_t> > globalIDPerHost;
 
       void init(size_t nn, size_t ne, size_t numHosts) {
          global2Local.resize(numHosts);
@@ -54,25 +73,28 @@ struct GBPartitionerDisk {
          verticesPerHost.resize(numHosts, 0);
       }
       static void writeEdgeToTempFile(std::FILE * f, size_t src, size_t dst) {
-         fwrite(&src, sizeof(size_t), 1, f);
-         fwrite(&dst, sizeof(size_t), 1, f);
+         NewEdgeData ed(src, dst);
+         fwrite(&ed, sizeof(NewEdgeData), 1, f);
       }
       template<typename EType>
       static void writeEdgeToTempFile(std::FILE * f, size_t src, size_t dst, EType e) {
-         fwrite(&src, sizeof(size_t), 1, f);
-         fwrite(&dst, sizeof(size_t), 1, f);
-         fwrite(&e, sizeof(EType), 1, f);
+         NewEdgeData ed(src, dst, e);
+         fwrite(&ed, sizeof(NewEdgeData), 1, f);
       }
       static bool readEdgeFromTempFile(std::FILE * f, size_t &src, size_t &dst) {
-         fread(&src, sizeof(size_t), 1, f);
-         fread(&dst, sizeof(size_t), 1, f);
+         NewEdgeData ed;
+         fread(&ed, sizeof(NewEdgeData), 1, f);
+         src = ed.src;
+         dst = ed.dst;
          return feof(f);
       }
       template<typename EType>
       static bool readEdgeFromTempFile(std::FILE * f, size_t &src, size_t &dst, EType &e) {
-         fread(&src, sizeof(size_t), 1, f);
-         fread(&dst, sizeof(size_t), 1, f);
-         fread(&e, sizeof(EType), 1, f);
+         NewEdgeData ed;
+         fread(&ed, sizeof(NewEdgeData), 1, f);
+         src = ed.src;
+         dst = ed.dst;
+         e = ed.data;
          return feof(f);
       }
 
@@ -85,19 +107,36 @@ struct GBPartitionerDisk {
          vertexOwners[src][owner] = true;
          vertexOwners[dst][owner] = true;
          if (global2Local[owner][src] == -1) {
-            global2Local[owner][src] = verticesPerHost[owner]++;
+            global2Local[owner][src] = 1;//verticesPerHost[owner]++;
          } //if g2l[src]
          if (global2Local[owner][dst] == -1) {
-            global2Local[owner][dst] = verticesPerHost[owner]++;
+            global2Local[owner][dst] = 1;//verticesPerHost[owner]++;
          } //if g2l[dst]
-         size_t new_src = global2Local[owner][src];
-         size_t new_dst = global2Local[owner][dst];
-         assert(new_src != -1 && new_dst != -1);
+//         size_t new_src = global2Local[owner][src];
+//         size_t new_dst = global2Local[owner][dst];
+//         assert(new_src != -1 && new_dst != -1);
 #if _HAS_EDGE_DATA
-         writeEdgeToTempFile(tmpPartitionFiles[owner],new_src, new_dst, g.getEdgeData<EdgeDataType>(e));
+//         writeEdgeToTempFile(tmpPartitionFiles[owner],new_src, new_dst, g.getEdgeData<EdgeDataType>(e));
+         writeEdgeToTempFile(tmpPartitionFiles[owner],src, dst, g.getEdgeData<EdgeDataType>(e));
 #else
-         writeEdgeToTempFile(tmpPartitionFiles[owner], new_src, new_dst);
+//         writeEdgeToTempFile(tmpPartitionFiles[owner], new_src, new_dst);
+         writeEdgeToTempFile(tmpPartitionFiles[owner], src, dst);
 #endif
+
+      }
+      /*
+       * Go over all the nodes, and check if it has an edge
+       * in a given host - if yes, assign a local-id to it.
+       * This will ensure that localids and globalids are sequential
+       * */
+      void assignLocalIDs(size_t numhost, OfflineGraph &g) {
+         for(size_t h=0; h<numhost; ++h){
+            for(size_t n = 0; n < g.size(); ++n){
+               if(global2Local[h][n]==1){
+                  global2Local[h][n]=verticesPerHost[h]++;
+               }
+            }
+         }
 
       }
       void writeReplicaInfo(std::string &basename, OfflineGraph &g, size_t numhosts) {
@@ -184,7 +223,7 @@ struct GBPartitionerDisk {
     * Partitioning routine.
     * */
    void operator()(std::string & basename, OfflineGraph & g, size_t num_hosts) {
-      Galois::Timer T_edge_assign, T_write_replica, T_assign_masters, T_write_partition, T_total;
+      Galois::Timer T_edge_assign, T_write_replica, T_assign_masters, T_write_partition, T_total, T_assign_localIDs;
 
       std::cout << "Partitioning: |V|= " << g.size() << " , |E|= " << g.sizeEdges() << " |P|= " << num_hosts << "\n";
       T_total.start();
@@ -196,7 +235,7 @@ struct GBPartitionerDisk {
       for (auto n = g.begin(); n != g.end(); ++n) {
          auto src = *n;
          curr_nbr_end = g.edge_end(*n);
-         for (auto nbr = prev_nbr_end; nbr != curr_nbr_end; ++nbr,++edge_counter) {
+         for (auto nbr = prev_nbr_end; nbr != curr_nbr_end; ++nbr, ++edge_counter) {
             auto dst = g.getEdgeDst(nbr);
             size_t owner = getEdgeOwner(src, dst, num_hosts);
 //            void assignEdge(OfflineGraph & g, NodeItType & _src, NodeItType & dst, size_t & eIdx, EdgeItType & e, size_t owner) {
@@ -209,6 +248,9 @@ struct GBPartitionerDisk {
       for (auto i = 0; i < num_hosts; ++i) {
          std::cout << "HOST#:: " << i << " , " << vcInfo.verticesPerHost[i] << ", " << vcInfo.edgesPerHost[i] << "\n";
       }
+      T_assign_localIDs.start();
+      vcInfo.assignLocalIDs(num_hosts, g);
+      T_assign_localIDs.stop();
       T_write_replica.start();
       vcInfo.writeReplicaInfo(basename, g, num_hosts);
       T_write_replica.stop();
@@ -231,21 +273,7 @@ struct GBPartitionerDisk {
     * Optimized implementation for memory usage.
     * Write both the metadata as well as the partition information.
     * */
-   struct NewEdgeData {
-      size_t src, dst;
-#if _HAS_EDGE_DATA
-      EdgeDataType data;
-#endif
 
-#if _HAS_EDGE_DATA
-      NewEdgeData(size_t s, size_t d, EdgeDataType dt ):src(s), dst(d),data(dt) {}
-#else
-      NewEdgeData(size_t s, size_t d) :
-            src(s), dst(d) {
-      }
-
-#endif
-   };
    void writePartitionsMem(std::string & basename, OfflineGraph & g, size_t num_hosts) {
       //Create graph
       //TODO RK - Fix edgeData
@@ -286,12 +314,13 @@ struct GBPartitionerDisk {
 #if _HAS_EDGE_DATA
             EdgeDataType ed;
             while(!vcInfo.readEdgeFromTempFile(vcInfo.tmpPartitionFiles[h], s, d, ed)) {
-               newEdges.push_back(NewEdgeData(s, d, ed));
+//               newEdges.push_back(NewEdgeData(s, d, ed));
+               newEdges.push_back(NewEdgeData(vcInfo.global2Local[h][s], vcInfo.global2Local[h][d], ed));
 //               std::cout<<i++<<", "<<newEdges.back().src << " , " << newEdges.back().dst << std::endl;
             }
 #else
             while (!vcInfo.readEdgeFromTempFile(vcInfo.tmpPartitionFiles[h], s, d)) {
-               newEdges.push_back(NewEdgeData(s, d));
+               newEdges.push_back(NewEdgeData(vcInfo.global2Local[s], vcInfo.global2Local[d]));
             }
 #endif
 
