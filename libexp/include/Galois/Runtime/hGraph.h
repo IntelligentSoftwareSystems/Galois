@@ -527,10 +527,13 @@ public:
       ++num_iter_push;
       std::string extract_timer_str("SYNC_EXTRACT_" + loopName +"_" + std::to_string(num_run) + "_" + std::to_string(num_iter_push));
       std::string timer_str("SYNC_PUSH_" + loopName + "_" + std::to_string(num_run) + "_" + std::to_string(num_iter_push));
-      std::string statSendBytes_str("SEND_BYTES_SYNC_PUSH_" + loopName +"_" + std::to_string(num_run) + "_" + std::to_string(num_iter_push));
+      std::string timer_barrier_str("SYNC_PUSH_BARRIER_" + loopName + "_" + std::to_string(num_run) + "_" + std::to_string(num_iter_push));
+      std::string statSendBytes_str("SEND_BYTES_SYNC_PUSH_" + loopName +"_" + std::to_string(num_run) + "_" + std::to_string(num_iter_pull));
       Galois::Statistic SyncPush_send_bytes(statSendBytes_str);
       Galois::StatTimer StatTimer_syncPush(timer_str.c_str());
+      Galois::StatTimer StatTimerBarrier_syncPush(timer_barrier_str.c_str());
       Galois::StatTimer StatTimer_extract(extract_timer_str.c_str());
+
       StatTimer_syncPush.start();
       auto& net = Galois::Runtime::getSystemNetworkInterface();
       for (unsigned x = 0; x < hostNodes.size(); ++x) {
@@ -567,7 +570,11 @@ public:
       }
       //Will force all messages to be processed before continuing
       net.flush();
+
+      StatTimerBarrier_syncPush.start();
       Galois::Runtime::getHostBarrier().wait();
+      StatTimerBarrier_syncPush.stop();
+
       StatTimer_syncPush.stop();
 
    }
@@ -578,10 +585,13 @@ public:
       ++num_iter_pull;
       std::string extract_timer_str("SYNC_EXTRACT_" + loopName +"_" + std::to_string(num_run) + "_" + std::to_string(num_iter_pull));
       std::string timer_str("SYNC_PULL_" + loopName +"_" + std::to_string(num_run) + "_" + std::to_string(num_iter_pull));
+      std::string timer_barrier_str("SYNC_PULL_BARRIER_" + loopName +"_" + std::to_string(num_run) + "_" + std::to_string(num_iter_pull));
       std::string statSendBytes_str("SEND_BYTES_SYNC_PULL_" + loopName +"_" + std::to_string(num_run) + "_" + std::to_string(num_iter_pull));
       Galois::Statistic SyncPull_send_bytes(statSendBytes_str);
       Galois::StatTimer StatTimer_syncPull(timer_str.c_str());
       Galois::StatTimer StatTimer_extract(extract_timer_str.c_str());
+      Galois::StatTimer StatTimerBarrier_syncPull(timer_barrier_str.c_str());
+
       StatTimer_syncPull.start();
       auto& net = Galois::Runtime::getSystemNetworkInterface();
       //Galois::Runtime::getHostBarrier().wait();
@@ -621,7 +631,10 @@ public:
 
       assert(num_recv_expected == 0);
       // Can remove this barrier???.
+      StatTimerBarrier_syncPull.start();
       Galois::Runtime::getHostBarrier().wait();
+      StatTimerBarrier_syncPull.stop();
+
       StatTimer_syncPull.stop();
    }
 
