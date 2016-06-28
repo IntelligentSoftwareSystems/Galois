@@ -32,7 +32,6 @@
 #include "Lonestar/BoilerPlate.h"
 #include "Galois/Runtime/CompilerHelperFunctions.h"
 
-#include "Galois/Runtime/OfflineGraph.h"
 #ifdef __GALOIS_VERTEX_CUT_GRAPH__
 #include "Galois/Runtime/vGraph.h"
 #else
@@ -42,7 +41,6 @@
 #include "Galois/Runtime/Tracer.h"
 
 #ifdef __GALOIS_HET_CUDA__
-#include "Galois/Cuda/cuda_mtypes.h"
 #include "gen_cuda.h"
 struct CUDA_Context *cuda_ctx;
 

@@ -32,17 +32,16 @@
 #include "Lonestar/BoilerPlate.h"
 #include "Galois/Runtime/CompilerHelperFunctions.h"
 
-#include "Galois/Dist/OfflineGraph.h"
 #ifdef __GALOIS_VERTEX_CUT_GRAPH__
-#include "Galois/Dist/vGraph.h"
+#include "Galois/Runtime/vGraph.h"
 #else
-#include "Galois/Dist/hGraph.h"
+#include "Galois/Runtime/hGraph.h"
 #endif
 #include "Galois/DistAccumulator.h"
 #include "Galois/Runtime/Tracer.h"
 
 #ifdef __GALOIS_HET_CUDA__
-#include "Galois/Dist/DistBag.h"
+#include "Galois/DistBag.h"
 #include "gen_cuda.h"
 struct CUDA_Context *cuda_ctx;
 struct CUDA_Worklist cuda_wl;

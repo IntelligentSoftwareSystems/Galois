@@ -42,7 +42,7 @@
 #include "Galois/Runtime/OfflineGraph.h"
 
 #ifdef __GALOIS_HET_CUDA__
-#include "Galois/Cuda/cuda_mtypes.h"
+#include "Galois/Runtime/Cuda/cuda_mtypes.h"
 #endif
 
 #ifndef _GALOIS_DIST_vGraph_H
