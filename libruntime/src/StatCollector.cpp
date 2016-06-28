@@ -78,11 +78,11 @@ void Galois::Runtime::StatCollector::addInstanceNum(const std::string& str) {
   }
 }
 
-Galois::Runtime::StatCollector::RecordTy::RecordTy(const std::string* loop, const std::string* category, unsigned instance, size_t value) :loop(loop), category(category),instance(instance), mode(0), valueInt(value) {}
+Galois::Runtime::StatCollector::RecordTy::RecordTy(size_t value) :mode(0), valueInt(value) {}
 
-Galois::Runtime::StatCollector::RecordTy::RecordTy(const std::string* loop, const std::string* category, unsigned instance, double value) :loop(loop), category(category),instance(instance), mode(1), valueDouble(value) {}
+Galois::Runtime::StatCollector::RecordTy::RecordTy(double value) :mode(1), valueDouble(value) {}
 
-Galois::Runtime::StatCollector::RecordTy::RecordTy(const std::string* loop, const std::string* category, unsigned instance, const std::string& value) :loop(loop), category(category),instance(instance), mode(2), valueStr(value) {}
+Galois::Runtime::StatCollector::RecordTy::RecordTy(const std::string& value) :mode(2), valueStr(value) {}
 
 Galois::Runtime::StatCollector::RecordTy::~RecordTy() {
   using string_type = std::string;
@@ -90,7 +90,7 @@ Galois::Runtime::StatCollector::RecordTy::~RecordTy() {
     valueStr.~string_type();
 }
 
-Galois::Runtime::StatCollector::RecordTy::RecordTy(const RecordTy& r) : loop(r.loop), category(r.category), instance(r.instance), mode(r.mode) {
+Galois::Runtime::StatCollector::RecordTy::RecordTy(const RecordTy& r) : mode(r.mode) {
   switch(mode) {
   case 0: valueInt    = r.valueInt;    break;
   case 1: valueDouble = r.valueDouble; break;
@@ -106,32 +106,34 @@ void Galois::Runtime::StatCollector::RecordTy::print(std::ostream& out) const {
   }
 }
 
-template<typename T>
-void Galois::Runtime::StatCollector::RecordList::insertStat(const std::string* loop, const std::string* category, unsigned instance, const T& val) {
-  MAKE_LOCK_GUARD(lock);
-  stats.push_back(RecordTy(loop, category, instance, val));
+void Galois::Runtime::StatCollector::addToStat(const std::string& loop, const std::string& category, size_t value, unsigned TID, unsigned HostID) {
+  auto tpl = std::make_tuple(HostID, TID, getOrInsertSymbol(loop), getOrInsertSymbol(category), getInstanceNum(loop));
+  MAKE_LOCK_GUARD(StatsLock);
+  auto iip = Stats.insert(std::make_pair(tpl, RecordTy(value)));
+  if (iip.second == false) {
+    assert(iip.first->second.mode == 0);
+    iip.first->second.valueInt += value;
+  }
 }
 
-void Galois::Runtime::StatCollector::addToStat(const std::string& loop, const std::string& category, size_t value, unsigned TID) {
-  if (TID == Substrate::ThreadPool::getTID())
-    Stats.getLocal()->insertStat(getOrInsertSymbol(loop), getOrInsertSymbol(category), getInstanceNum(loop), value);
-  else
-    Stats.getRemote(TID)->insertStat(getOrInsertSymbol(loop), getOrInsertSymbol(category), getInstanceNum(loop), value);
-
+void Galois::Runtime::StatCollector::addToStat(const std::string& loop, const std::string& category, double value, unsigned TID, unsigned HostID) {
+  auto tpl = std::make_tuple(HostID, TID, getOrInsertSymbol(loop), getOrInsertSymbol(category), getInstanceNum(loop));
+  MAKE_LOCK_GUARD(StatsLock);
+  auto iip = Stats.insert(std::make_pair(tpl, RecordTy(value)));
+  if (iip.second == false) {
+    assert(iip.first->second.mode == 1);
+    iip.first->second.valueDouble += value;
+  }
 }
 
-void Galois::Runtime::StatCollector::addToStat(const std::string& loop, const std::string& category, double value, unsigned TID) {
-  if (TID == Substrate::ThreadPool::getTID())
-    Stats.getLocal()->insertStat(getOrInsertSymbol(loop), getOrInsertSymbol(category), getInstanceNum(loop), value);
-  else
-    Stats.getRemote(TID)->insertStat(getOrInsertSymbol(loop), getOrInsertSymbol(category), getInstanceNum(loop), value);
-}
-
-void Galois::Runtime::StatCollector::addToStat(const std::string& loop, const std::string& category, const std::string& value, unsigned TID) {
-  if (TID == Substrate::ThreadPool::getTID())
-    Stats.getLocal()->insertStat(getOrInsertSymbol(loop), getOrInsertSymbol(category), getInstanceNum(loop), value);
-  else
-    Stats.getRemote(TID)->insertStat(getOrInsertSymbol(loop), getOrInsertSymbol(category), getInstanceNum(loop), value);
+void Galois::Runtime::StatCollector::addToStat(const std::string& loop, const std::string& category, const std::string& value, unsigned TID, unsigned HostID) {
+ auto tpl = std::make_tuple(HostID, TID, getOrInsertSymbol(loop), getOrInsertSymbol(category), getInstanceNum(loop));
+  MAKE_LOCK_GUARD(StatsLock);
+  auto iip = Stats.insert(std::make_pair(tpl, RecordTy(value)));
+  if (iip.second == false) {
+    assert(iip.first->second.mode == 2);
+    iip.first->second.valueStr = value;
+  }
 }
 
 //assumne called serially
@@ -139,18 +141,15 @@ void Galois::Runtime::StatCollector::printStatsForR(std::ostream& out, bool json
   if (json)
     out << "[\n";
   else
-    out << "LOOP,INSTANCE,CATEGORY,THREAD,VAL\n";
-  for (unsigned x = 0; x < Stats.size(); ++x) {
-    auto rStat = Stats.getRemote(x);
-    MAKE_LOCK_GUARD(rStat->lock);
-    for (auto& r : rStat->stats) {
-      if (json)
-        out << "{ \"LOOP\" : " << *r.loop << " , \"INSTANCE\" : " << r.instance << " , \"CATEGORY\" : " << *r.category << " , \"THREAD\" : " << x << " , \"VALUE\" : ";
-      else
-        out << *r.loop << "," << r.instance << "," << *r.category << "," << x << ",";
-      r.print(out);
-      out << (json ? "}\n" : "\n");
-    }
+    out << "LOOP,INSTANCE,CATEGORY,THREAD,HOST,VAL\n";
+  MAKE_LOCK_GUARD(StatsLock);
+  for (auto& p : Stats) {
+    if (json)
+      out << "{ \"LOOP\" : " << *std::get<2>(p.first) << " , \"INSTANCE\" : " << std::get<4>(p.first) << " , \"CATEGORY\" : " << *std::get<3>(p.first) << " , \"HOST\" : " << std::get<0>(p.first) << " , \"THREAD\" : " << std::get<1>(p.first) << " , \"VALUE\" : ";
+    else
+      out << *std::get<2>(p.first) << "," << std::get<4>(p.first) << " , " << *std::get<3>(p.first) << "," << std::get<0>(p.first) << "," << std::get<1>(p.first) << ",";
+    p.second.print(out);
+    out << (json ? "}\n" : "\n");
   }
   if (json)
     out << "]\n";
@@ -158,21 +157,19 @@ void Galois::Runtime::StatCollector::printStatsForR(std::ostream& out, bool json
 
 //Assume called serially
 //still assumes int values
+//This ignores HostID.  Thus this is not safe for the network version
 void Galois::Runtime::StatCollector::printStats(std::ostream& out) {
   std::map<std::tuple<const std::string*, unsigned, const std::string*>, std::vector<size_t> > LKs;
-  
   unsigned maxThreadID = 0;
   //Find all loops and keys
-  for (unsigned x = 0; x < Stats.size(); ++x) {
-    auto rStat = Stats.getRemote(x);
-    std::lock_guard<Substrate::SimpleLock> lg(rStat->lock);
-    for (auto& r : rStat->stats) {
-      maxThreadID = x;
-      auto& v = LKs[std::make_tuple(r.loop, r.instance, r.category)];
-      if (v.size() <= x)
-        v.resize(x+1);
-      v[x] += r.valueInt;
-    }
+  MAKE_LOCK_GUARD(StatsLock);
+  for (auto& p : Stats) {
+    auto& v = LKs[std::make_tuple(std::get<2>(p.first), std::get<4>(p.first), std::get<3>(p.first))];
+    auto tid = std::get<1>(p.first);
+    maxThreadID = std::max(maxThreadID, tid);
+    if (v.size() <= tid)
+      v.resize(tid+1);
+    v[tid] += p.second.valueInt;
   }
   //print header
   out << "STATTYPE,LOOP,INSTANCE,CATEGORY,n,sum";
