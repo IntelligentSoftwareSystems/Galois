@@ -35,6 +35,58 @@
 
 using Level_ty = unsigned;
 class TwoPhaseBFS: public BFS<Level_ty> {
+  
+  struct GlobalLevel {
+    unsigned value = 1;
+    bool updated = false;
+  };
+
+  // relies on round based execution of IKDG executor
+  struct VisitNhoodSafety: public VisitNhood {
+    GlobalLevel& globalLevel;
+
+    VisitNhoodSafety (Graph& graph, GlobalLevel& globalLevel) 
+      : VisitNhood (graph), globalLevel (globalLevel)
+    {}
+
+    template <typename C>
+    void operator () (const Update& up, C& ctx) {
+      if (up.level <= globalLevel.value) {
+        VisitNhood::operator () (up, ctx);
+      } else {
+        Galois::Runtime::signalConflict();
+      }
+
+      if (Galois::Substrate::ThreadPool::getTID () == 0 && globalLevel.updated) {
+        globalLevel.updated = false;
+      }
+    }
+
+  };
+
+
+  // relies on round based execution of IKDG executor
+  struct OpFuncSafety: public OpFunc {
+    GlobalLevel& globalLevel;
+
+    OpFuncSafety (Graph& graph, ParCounter& numIter, GlobalLevel& globalLevel)
+      : OpFunc (graph, numIter), globalLevel (globalLevel)
+    {}
+
+    template <typename C>
+    void operator () (const Update& up, C& ctx) {
+      if (Galois::Substrate::ThreadPool::getTID () == 0 && !globalLevel.updated) {
+        globalLevel.updated = true;
+        ++globalLevel.value;
+      }
+
+      OpFunc::operator () (up, ctx);
+    }
+
+
+  };
+
+
 
 public:
 
@@ -44,6 +96,7 @@ public:
 
     ParCounter numIter;
 
+    GlobalLevel globalLevel;
 
     // update request for root
     Update first (startNode, 0);
@@ -54,11 +107,10 @@ public:
     Galois::Runtime::for_each_ordered_ikdg (
         Galois::Runtime::makeStandardRange(wl.begin (), wl.end ()),
         Comparator (), 
-        VisitNhood (graph),
-        OpFunc (graph, numIter),
+        VisitNhoodSafety (graph, globalLevel),
+        OpFuncSafety (graph, numIter, globalLevel),
         std::make_tuple (
-          Galois::loopname ("bfs_two_phase"),
-          Galois::enable_parameter<false> ()));
+          Galois::loopname ("bfs_two_phase_safety")));
 
 
     std::cout << "number of iterations: " << numIter.reduce () << std::endl;

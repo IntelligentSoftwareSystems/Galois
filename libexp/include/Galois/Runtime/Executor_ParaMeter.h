@@ -50,6 +50,8 @@
 #include <deque>
 #include <vector>
 
+#include "llvm/Support/CommandLine.h"
+
 namespace Galois {
 namespace Runtime {
 
@@ -353,7 +355,7 @@ void for_each_param (const R& range, const F& func, const ArgsTuple& argsTuple) 
       std::make_tuple (loopname_tag {}),
       std::make_tuple (default_loopname {}));
 
-  auto Tpl_ty = decltype (tpl);
+  using Tpl_ty = decltype (tpl);
 
   using Exec = ParaMeterExecutor<T, F, Tpl_ty>;
   Exec exec (func, tpl);
@@ -404,7 +406,7 @@ void for_each_exp (const I& beg, const I& end, const F& func, const Args&... arg
   auto range = Runtime::makeStandardRange (beg, end);
   auto tpl = std::make_tuple (args...);
 
-  if (useParaMeterOpt) {
+  if (Runtime::useParaMeterOpt) {
     Runtime::ParaMeter::for_each_param (range, func, tpl);
   } else {
     Runtime::for_each_gen (range, func, tpl);
@@ -418,7 +420,7 @@ void for_each_local_exp (C& cont, const F& func, const Args&... args) {
   auto range = Runtime::makeLocalRange(cont);
   auto tpl = std::make_tuple (args...);
 
-  if (useParaMeterOpt) {
+  if (Runtime::useParaMeterOpt) {
     Runtime::ParaMeter::for_each_param (range, func, tpl);
   } else {
     Runtime::for_each_gen (range, func, tpl);

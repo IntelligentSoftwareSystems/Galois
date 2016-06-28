@@ -33,8 +33,8 @@ namespace Galois {
   namespace Runtime {
 
 namespace cll = llvm::cl;
-static cll::opt<std::string> paraMeterOutFileOpt ("ParaMeterOut", cll::desc ("output csv stats file for ParaMeter"), "ParaMeter_Stats.csv");
-static cll::opt<bool> useParaMeterOpt ("useParaMeter", cll::desc ("enable ParaMeter to measure available parallelism"), false);
+cll::opt<std::string> paraMeterOutFileOpt ("ParaMeterOut", cll::desc ("output csv stats file for ParaMeter"), cll::init("ParaMeter_Stats.csv"));
+cll::opt<bool> useParaMeterOpt ("useParaMeter", cll::desc ("enable ParaMeter to measure available parallelism"), cll::init(false));
   } 
 }
 

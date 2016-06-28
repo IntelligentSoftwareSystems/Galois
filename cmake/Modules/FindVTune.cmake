@@ -4,7 +4,6 @@
 #  VTune_INCLUDE_DIRS - The VTune include directories
 #  VTune_LIBRARIES - The libraries needed to use VTune
 
-message(STATUS "I'm here")
 message(STATUS "${VTune_INCLUDE_DIRS}")
 
 if(VTune_INCLUDE_DIRS AND VTune_LIBRARIES)

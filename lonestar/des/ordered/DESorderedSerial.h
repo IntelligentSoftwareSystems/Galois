@@ -46,7 +46,7 @@
 namespace des_ord {
 
 class DESorderedSerial: 
-  public des::AbstractMain<TypeHelper::SimInit_ty>, public TypeHelper {
+  public des::AbstractMain<TypeHelper<>::SimInit_ty>, public TypeHelper<> {
 
   typedef std::priority_queue<Event_ty, std::vector<Event_ty>, des::EventRecvTimeLocalTieBrkCmp<Event_ty>::RevCmp> MinHeap;
   typedef std::set<Event_ty, des::EventRecvTimeLocalTieBrkCmp<Event_ty> > OrdSet;
@@ -82,12 +82,28 @@ protected:
     return ret;
   }
 
-  GALOIS_ATTRIBUTE_PROF_NOINLINE static void add (MinHeap& pq, const Event_ty& event) {
-    pq.push (event);
-  }
 
-  GALOIS_ATTRIBUTE_PROF_NOINLINE static void add (OrdSet& pq, const Event_ty& event) {
-    pq.insert (event);
+  template <typename PQ, typename _ignore>
+  struct AddNewWrapper {
+    PQ& pq;
+
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (const Event_ty& e) {
+      pq.push (e);
+    }
+  };
+
+  template <typename _ignore>
+  struct AddNewWrapper<OrdSet, _ignore> {
+    OrdSet& pq;
+
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (const Event_ty& e) {
+      pq.insert (e);
+    }
+  };
+
+  template <typename PQ>
+  AddNewWrapper<PQ, char> makeAddNewFunc (PQ& pq) {
+    return AddNewWrapper<PQ, char> {pq};
   }
 
   virtual void runLoop (const SimInit_ty& simInit, Graph& graph) {
@@ -96,31 +112,24 @@ protected:
     // MinHeap pq;
     OrdSet pq;
 
+    auto addNewFunc = makeAddNewFunc (pq);
+
     for (std::vector<Event_ty>::const_iterator i = simInit.getInitEvents ().begin ()
         , endi = simInit.getInitEvents ().end (); i != endi; ++i) {
-      add (pq, *i);
+      addNewFunc (*i);
     }
-
-    std::vector<Event_ty> newEvents;
 
     size_t numEvents = 0;;
     while (!pq.empty ()) {
       ++numEvents;
 
-      newEvents.clear ();
-      
       Event_ty event = removeMin (pq);
 
       SimObj_ty* recvObj = static_cast<SimObj_ty*> (event.getRecvObj ());
       GNode recvNode = nodes[recvObj->getID ()];
 
-      recvObj->execEvent (event, graph, recvNode, newEvents);
+      recvObj->execEvent (event, graph, recvNode, addNewFunc);
 
-      for (std::vector<Event_ty>::const_iterator a = newEvents.begin ()
-          , enda = newEvents.end (); a != enda; ++a) {
-
-        add (pq, *a);
-      }
     }
 
     std::cout << "Number of events processed = " << numEvents << std::endl;

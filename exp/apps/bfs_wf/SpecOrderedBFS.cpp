@@ -102,7 +102,7 @@ public:
         Comparator (), 
         VisitNhood (graph),
         OpFunc (graph, numIter),
-        std::make_tuple (Galois::loopname ("bfs-speculative"), Galois::enable_parameter<false> {}));
+        std::make_tuple (Galois::loopname ("bfs-speculative")));
 
 
     std::cout << "number of iterations: " << numIter.reduce () << std::endl;

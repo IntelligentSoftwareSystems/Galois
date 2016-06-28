@@ -61,7 +61,7 @@ namespace cll = llvm::cl;
 
 
 cll::opt<SpecMode> specMode (
-    cll::desc ("DoAll Implementation"),
+    cll::desc ("Speculation mode"),
     cll::values (
       clEnumVal (SpecMode::OPTIM, "SpecMode::OPTIM"),
       clEnumVal (SpecMode::PESSIM, "SpecMode::PESSIM"),
@@ -679,6 +679,10 @@ public:
 protected:
 
   void dumpParaMeterStats (void) {
+    // remove last record if its 0
+    if (!execRcrds.empty() && execRcrds.back().parallelism == 0) {
+      execRcrds.pop_back();
+    }
 
     for (const ParaMeter::StepStats& s: execRcrds) {
       s.dump (ParaMeter::getStatsFile (), Base::loopname);
@@ -1775,8 +1779,8 @@ void for_each_ordered_pessim (const R& range, const Cmp& cmp, const NhFunc& nhFu
 template <typename R, typename Cmp, typename NhFunc, typename ExFunc, typename OpFunc, typename _ArgsTuple>
 void for_each_ordered_spec (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const ExFunc& exFunc, const OpFunc& opFunc, const _ArgsTuple& argsTuple) {
 
-  auto tplParam = std::tuple_cat (argsTuple, enable_parameter<true>);
-  auto tplNoParam = std::tuple_cat (argsTuple, enable_parameter<false>);
+  auto tplParam = std::tuple_cat (argsTuple, std::make_tuple (enable_parameter<true> ()));
+  auto tplNoParam = std::tuple_cat (argsTuple, std::make_tuple (enable_parameter<false> ()));
 
   switch (specMode) {
     case SpecMode::OPTIM: {

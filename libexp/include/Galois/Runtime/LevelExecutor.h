@@ -29,7 +29,7 @@
 #ifndef GALOIS_RUNTIME_LEVELEXECUTOR_H
 #define GALOIS_RUNTIME_LEVELEXECUTOR_H
 
-#if 0
+#if 1
 #include "Galois/Accumulator.h"
 #include "Galois/Galois.h"
 #include "Galois/GaloisUnsafe.h"
@@ -327,7 +327,7 @@ class LevelExecutor {
       nhVisit (x, uhand);
       opFunc (x, uhand);
 
-      if (ForEachTraits<OpFunc>::NeedsPush) { // TODO: change to check for noadd trait
+      if (ForEachTraits<OpFunc>::NeedsPush) { 
         for (auto i = uhand.getPushBuffer ().begin ()
             , endi = uhand.getPushBuffer ().end (); i != endi; ++i) {
 

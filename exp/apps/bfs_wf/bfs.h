@@ -35,7 +35,7 @@
 #include <iostream>
 #include <set>
 
-#define GALOIS_USE_MIC_CSR_IMPL
+// #define GALOIS_USE_MIC_CSR_IMPL
 // #undef GALOIS_USE_MIC_CSR_IMPL
 
 #ifdef GALOIS_USE_MIC_CSR_IMPL

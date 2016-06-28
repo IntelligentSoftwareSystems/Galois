@@ -128,31 +128,14 @@ void runCatching (F& func, Ctxt* c, UserCtxt& uhand, Args&&... args) {
 }
 
 template <typename T, typename Cmp, typename NhFunc, typename ExFunc, typename OpFunc, typename ArgsTuple, typename Ctxt>
-class IKDGbase {
+class IKDGbase: public OrderedExecutorBase<T, Cmp, NhFunc, ExFunc, OpFunc, ArgsTuple, Ctxt> {
 
 protected:
-  using CtxtCmp = typename Ctxt::CtxtCmp;
-  using CtxtAlloc = FixedSizeAllocator<Ctxt>;
-  using CtxtWL = PerThreadBag<Ctxt*>;
 
-  using UserCtxt = UserContextAccess<T>;
-  using PerThreadUserCtxt = Substrate::PerThreadStorage<UserCtxt>;
-
-  static const bool OPERATOR_CAN_ABORT = exists_by_supertype<operator_can_abort_tag, ArgsTuple>::value;
-  static const bool HAS_EXEC_FUNC = exists_by_supertype<has_exec_function_tag, ArgsTuple>::value 
-    || !std::is_same<ExFunc, HIDDEN::DummyExecFunc>::value;
-
-  static const bool ENABLE_PARAMETER = get_type_by_supertype<enable_parameter_tag, ArgsTuple>::type::value;
-  static const bool NEEDS_PUSH = !exists_by_supertype<does_not_need_push_tag, ArgsTuple>::value;
+  using Base = OrderedExecutorBase<T, Cmp, NhFunc, ExFunc, OpFunc, ArgsTuple, Ctxt>;
+  using CtxtWL = typename Base::CtxtWL;
 
 
-  Cmp cmp;
-  NhFunc nhFunc;
-  ExFunc exFunc;
-  OpFunc opFunc;
-  const char* loopname;
-
-  CtxtCmp ctxtCmp;
   std::unique_ptr<CtxtWL> currWL;
   std::unique_ptr<CtxtWL> nextWL;
 
@@ -163,19 +146,12 @@ protected:
   size_t totalCommits;
   double targetCommitRatio;
 
-  CtxtAlloc ctxtAlloc;
-  PerThreadUserCtxt userHandles;
   GAccumulator<size_t> roundTasks;;
   GAccumulator<size_t> roundCommits;
 
   IKDGbase (const Cmp& cmp, const NhFunc& nhFunc, const ExFunc& exFunc, const OpFunc& opFunc, const ArgsTuple& argsTuple)
     : 
-      cmp (cmp), 
-      nhFunc (nhFunc), 
-      exFunc (exFunc),
-      opFunc (opFunc), 
-      loopname (get_by_supertype<loopname_tag> (argsTuple).value),
-      ctxtCmp (cmp),
+      Base (cmp, nhFunc, exFunc, opFunc, argsTuple),
       currWL (new CtxtWL),
       nextWL (new CtxtWL),
       windowSize (0),
@@ -184,7 +160,6 @@ protected:
       totalCommits (0),
       targetCommitRatio (commitRatioArg)
   {
-    if (!loopname) { loopname = "NULL"; }
 
     if (targetCommitRatio < 0.0) {
       targetCommitRatio = 0.0;
@@ -193,7 +168,7 @@ protected:
       targetCommitRatio = 1.0;
     }
 
-    if (ENABLE_PARAMETER) {
+    if (Base::ENABLE_PARAMETER) {
       assert (targetCommitRatio == 0.0);
     }
 
@@ -203,9 +178,6 @@ protected:
     dumpStats ();
   }
 
-  const Cmp& getItemCmp () const { return cmp; }
-
-  const CtxtCmp& getCtxtCmp () const { return ctxtCmp; }
 
   CtxtWL& getCurrWL (void) { 
     assert (currWL);
@@ -218,9 +190,9 @@ protected:
   }
 
   void dumpStats (void) {
-    reportStat (loopname, "rounds", rounds,0);
-    reportStat (loopname, "committed", totalCommits,0);
-    reportStat (loopname, "total", totalTasks,0);
+    reportStat (Base::loopname, "rounds", rounds,0);
+    reportStat (Base::loopname, "committed", totalCommits,0);
+    reportStat (Base::loopname, "total", totalTasks,0);
     // reportStat (loopname, "efficiency", double (totalRetires.reduce ()) / totalTasks);
     // reportStat (loopname, "avg. parallelism", double (totalRetires.reduce ()) / rounds);
 
@@ -265,7 +237,7 @@ protected:
       assert (currCommits == 0);
 
       // initial settings
-      if (NEEDS_PUSH) {
+      if (Base::NEEDS_PUSH) {
         windowSize = std::min (
             (winWL.initSize ()),
             (THREAD_MULT_FACTOR * MIN_WIN_SIZE));
@@ -305,7 +277,7 @@ protected:
     assert (windowSize > 0);
 
 
-    if (NEEDS_PUSH) {
+    if (Base::NEEDS_PUSH) {
       if (winWL.empty () && (wl.size_all () > windowSize)) {
         // a case where winWL is empty and all the new elements were going into 
         // nextWL. When nextWL becomes bigger than windowSize, we must do something
@@ -359,7 +331,7 @@ protected:
         [this, &perThrdMin] (const Ctxt* c) {
           Galois::optional<const Ctxt*>& m = *(perThrdMin.getLocal ());
 
-          if (!m || ctxtCmp (c, *m)) { // c < *m
+          if (!m || Base::ctxtCmp (c, *m)) { // c < *m
             m = c;
           }
         },
@@ -373,7 +345,7 @@ protected:
       const Galois::optional<const Ctxt*>& m = *(perThrdMin.getRemote (i));
 
       if (m) {
-        if (!ret || ctxtCmp (*m, ret)) { // ret < *m
+        if (!ret || Base::ctxtCmp (*m, ret)) { // ret < *m
           ret = *m;
         }
       }
@@ -391,7 +363,7 @@ protected:
         [this, &perThrdMax] (const Ctxt* c) {
           Galois::optional<const Ctxt*>& m = *(perThrdMax.getLocal ());
 
-          if (!m || ctxtCmp (*m, c)) { // *m < c
+          if (!m || Base::ctxtCmp (*m, c)) { // *m < c
             m = c;
           } 
         },
@@ -405,7 +377,7 @@ protected:
       const Galois::optional<const Ctxt*>& m = *(perThrdMax.getRemote (i));
 
       if (m) {
-        if (!ret || ctxtCmp (ret, *m)) { // ret < *m
+        if (!ret || Base::ctxtCmp (ret, *m)) { // ret < *m
           ret = *m;
         }
       }

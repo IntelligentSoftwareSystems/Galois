@@ -30,8 +30,8 @@
  *
  * @author <ahassaan@ices.utexas.edu>
  */
-#ifndef GALOIS_RUNTIME_LC_ORDERED_H
-#define GALOIS_RUNTIME_LC_ORDERED_H
+#ifndef GALOIS_RUNTIME_KDG_ADD_REM_H
+#define GALOIS_RUNTIME_KDG_ADD_REM_H
 
 #include "Galois/GaloisForwardDecl.h"
 #include "Galois/Accumulator.h"
@@ -108,11 +108,11 @@ public:
 
 
 template <typename T, typename Cmp>
-class LCorderedContext: public OrderedContextBase<T> {
+class KDGaddRemContext: public OrderedContextBase<T> {
 
 public:
   typedef T value_type;
-  typedef LCorderedContext MyType;
+  typedef KDGaddRemContext MyType;
   typedef ContextComparator<MyType, Cmp> CtxtCmp; 
   typedef NhoodItem<MyType, CtxtCmp> NItem;
   typedef PtrBasedNhoodMgr<NItem> NhoodMgr;
@@ -131,7 +131,7 @@ public:
 
 public:
 
-  LCorderedContext (const T& active, NhoodMgr& nhmgr)
+  KDGaddRemContext (const T& active, NhoodMgr& nhmgr)
     : 
       OrderedContextBase (active), // to make acquire call virtual function sub_acquire
       nhood (), 
@@ -157,8 +157,7 @@ public:
 
     bool ret = true;
 
-    // TODO: use const_iterator instead
-    for (typename NhoodList::const_iterator n = nhood.begin ()
+    for (auto n = nhood.begin ()
         , endn = nhood.end (); n != endn; ++n) {
 
       if (!(*n)->isHighestPriority (this)) {
@@ -171,7 +170,7 @@ public:
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void removeFromNhood () {
-    for (typename NhoodList::iterator n = nhood.begin ()
+    for (auto n = nhood.begin ()
         , endn = nhood.end (); n != endn; ++n) {
 
       (*n)->remove (this);
@@ -190,10 +189,10 @@ public:
   template <typename SourceTest, typename WL>
   GALOIS_ATTRIBUTE_PROF_NOINLINE void findNewSources (const SourceTest& srcTest, WL& wl) {
 
-    for (typename NhoodList::iterator n = nhood.begin ()
+    for (auto n = nhood.begin ()
         , endn = nhood.end (); n != endn; ++n) {
 
-      LCorderedContext* highest = (*n)->getHighestPriority ();
+      KDGaddRemContext* highest = (*n)->getHighestPriority ();
       if ((highest != NULL) 
           && !bool (highest->onWL)
           && srcTest (highest) 
@@ -209,10 +208,10 @@ public:
   template <typename SourceTest, typename WL>
   GALOIS_ATTRIBUTE_PROF_NOINLINE void findSrcInNhood (const SourceTest& srcTest, WL& wl) {
 
-    for (typename NhoodList::iterator n = nhood.begin ()
+    for (auto n = nhood.begin ()
         , endn = nhood.end (); n != endn; ++n) {
 
-      LCorderedContext* highest = (*n)->getHighestPriority ();
+      KDGaddRemContext* highest = (*n)->getHighestPriority ();
       if ((highest != NULL) 
           && !bool (highest->onWL)
           && srcTest (highest) 
@@ -255,14 +254,17 @@ struct SourceTest <void> {
 };
 
 // TODO: remove template parameters that can be passed to execute
-template <typename OpFunc, typename NhoodFunc, typename Ctxt, typename SourceTest>
-class LCorderedExec {
+template <typename T, typename Cmp, typename NhFunc, typename OpFunc, typename ArgsTuple, typename Ctxt, typename SourceTest>
+class KDGaddRemAsyncExec: public OrderedExecutorBase<T, Cmp, NhFunc, HIDDEN::DummyExecFunc, OpFunc, ArgsTuple, Ctxt> {
+
+  using Base = OrderedExecutorBase<T, Cmp, NhFunc, HIDDEN::DummyExecFunc, OpFunc, ArgsTuple, Ctxt>;
 
   // important paramters
   // TODO: add capability to the interface to express these constants
   static const size_t DELETE_CONTEXT_SIZE = 1024;
   static const size_t UNROLL_FACTOR = OpFunc::UNROLL_FACTOR;
-  static const unsigned CHUNK_SIZE = OpFunc::CHUNK_SIZE;
+
+  static const unsigned DEFAULT_CHUNK_SIZE = 8;
 
 
 
@@ -270,34 +272,33 @@ class LCorderedExec {
   // typedef NhoodItem<T, Cmp, NhoodMgr> NItem;
   // typedef typename NItem::Ctxt Ctxt;
 
-  typedef typename Ctxt::value_type T;
-  typedef typename Ctxt::NhoodMgr NhoodMgr;
+  using NhoodMgr =  typename Ctxt::NhoodMgr;
 
-  typedef FixedSizeAllocator<Ctxt> CtxtAlloc;
-  // typedef PerThreadBag<Ctxt*, 16> CtxtWL;
-  typedef PerThreadVector<Ctxt*> CtxtWL;
-  typedef PerThreadDeque<Ctxt*> CtxtDelQ;
-  typedef PerThreadDeque<Ctxt*> CtxtLocalQ;
-  // typedef Galois::Runtime::PerThreadVector<T> AddWL;
-  typedef UserContextAccess<T> UserCtx;
-  typedef Substrate::PerThreadStorage<UserCtx> PerThreadUserCtx;
+  using CtxtAlloc = typenme Base::CtxtAlloc;
+  using CtxtWL = typenme Base::CtxtWL;
+
+  using CtxtDelQ = PerThreadBag<Ctxt*>;
+  using CtxtLocalQ = PerThreadBag<Ctxt*>;
+
+  using UserCtxt = typename Base::UserCtxt;
+  using PerThreadUserCtxt = typename Base::PerThreadUserCtxt;
 
 
-  typedef Galois::GAccumulator<size_t> Accumulator;
+  using Accumulator =  Galois::GAccumulator<size_t>;
 
   struct CreateCtxtExpandNhood {
-    NhoodFunc& nhoodVisitor;
+    NhFunc& nhFunc;
     NhoodMgr& nhmgr;
     CtxtAlloc& ctxtAlloc;
     CtxtWL& ctxtWL;
 
     CreateCtxtExpandNhood (
-        NhoodFunc& nhoodVisitor,
+        NhFunc& nhFunc,
         NhoodMgr& nhmgr,
         CtxtAlloc& ctxtAlloc,
         CtxtWL& ctxtWL)
       :
-        nhoodVisitor (nhoodVisitor),
+        nhFunc (nhFunc),
         nhmgr (nhmgr),
         ctxtAlloc (ctxtAlloc),
         ctxtWL (ctxtWL)
@@ -314,9 +315,9 @@ class LCorderedExec {
 
       Galois::Runtime::setThreadContext (ctxt);
       int tmp=0;
-      // TODO: nhoodVisitor should take only one arg, 
+      // TODO: nhFunc should take only one arg, 
       // 2nd arg being passed due to compatibility with Deterministic executor
-      nhoodVisitor (ctxt->active, tmp); 
+      nhFunc (ctxt->active, tmp); 
       Galois::Runtime::setThreadContext (NULL);
     }
 
@@ -359,38 +360,38 @@ class LCorderedExec {
 
     typedef int tt_does_not_need_aborts;
 
-    OpFunc& op;
-    NhoodFunc& nhoodVisitor;
+    NhFunc& nhFunc;
+    OpFunc& opFunc;
     NhoodMgr& nhmgr;
     const SourceTest& sourceTest;
     CtxtAlloc& ctxtAlloc;
     CtxtWL& addCtxtWL;
     CtxtLocalQ& ctxtLocalQ;
     CtxtDelQ& ctxtDelQ;
-    PerThreadUserCtx& perThUserCtx;
+    PerThreadUserCtxt& perThrdUserCtxt;
     Accumulator& niter;
 
     ApplyOperator (
-        OpFunc& op,
-        NhoodFunc& nhoodVisitor,
+        NhFunc& nhFunc,
+        OpFunc& opFunc,
         NhoodMgr& nhmgr,
         const SourceTest& sourceTest,
         CtxtAlloc& ctxtAlloc,
         CtxtWL& addCtxtWL,
         CtxtLocalQ& ctxtLocalQ,
         CtxtDelQ& ctxtDelQ,
-        PerThreadUserCtx& perThUserCtx,
+        PerThreadUserCtxt& perThrdUserCtxt,
         Accumulator& niter)
       :
-        op (op),
-        nhoodVisitor (nhoodVisitor),
+        nhFunc (nhFunc),
+        opFunc (opFunc),
         nhmgr (nhmgr),
         sourceTest (sourceTest),
         ctxtAlloc (ctxtAlloc),
         addCtxtWL (addCtxtWL),
         ctxtLocalQ (ctxtLocalQ),
         ctxtDelQ (ctxtDelQ),
-        perThUserCtx (perThUserCtx),
+        perThrdUserCtxt (perThrdUserCtxt),
         niter (niter) 
     {}
 
@@ -403,11 +404,9 @@ class LCorderedExec {
 
       ctxtLocalQ.get ().push_back (in_src);
 
-      unsigned local_iter = 0;
 
-      while ((local_iter < UNROLL_FACTOR) && !ctxtLocalQ.get ().empty ()) {
-
-        ++local_iter;
+      for (unsigned local_iter = 0; 
+          (local_iter < UNROLL_FACTOR) && !ctxtLocalQ.get ().empty (); ++local_iter ) {
 
         Ctxt* src = ctxtLocalQ.get ().front (); ctxtLocalQ.get ().pop_front ();
 
@@ -421,31 +420,29 @@ class LCorderedExec {
         niter += 1;
 
         // addWL.get ().clear ();
-        UserCtx& userCtx = *(perThUserCtx.getLocal ());
+        UserCtxt& userCtxt = *(perThrdUserCtxt.getLocal ());
 
         if (true || DEPRECATED::ForEachTraits<OpFunc>::NeedsPush) {
-          userCtx.resetPushBuffer ();
-          userCtx.resetAlloc ();
+          userCtxt.resetPushBuffer ();
+          userCtxt.resetAlloc ();
         }
 
-        op (src->active, userCtx.data ()); 
+        opFunc (src->active, userCtxt.data ()); 
 
 
         if (true || DEPRECATED::ForEachTraits<OpFunc>::NeedsPush) {
 
           addCtxtWL.get ().clear ();
-          CreateCtxtExpandNhood addCtxt (nhoodVisitor, nhmgr, ctxtAlloc, addCtxtWL);
+          CreateCtxtExpandNhood addCtxt (nhFunc, nhmgr, ctxtAlloc, addCtxtWL);
 
-          // for (typename AddWL::local_iterator a = addWL.get ().begin ()
-          // , enda = addWL.get ().end (); a != enda; ++a) {
-          for (typename UserCtx::PushBufferTy::iterator a = userCtx.getPushBuffer ().begin ()
-              , enda = userCtx.getPushBuffer ().end (); a != enda; ++a) {
+          for (auto a = userCtxt.getPushBuffer ().begin ()
+              , enda = userCtxt.getPushBuffer ().end (); a != enda; ++a) {
 
 
             addCtxt (*a);
           }
 
-          for (typename CtxtWL::local_iterator c = addCtxtWL.get ().begin ()
+          for (auto c = addCtxtWL.get ().begin ()
               , endc = addCtxtWL.get ().end (); c != endc; ++c) {
 
             (*c)->findNewSources (sourceTest, wl);
@@ -468,7 +465,8 @@ class LCorderedExec {
 
 
       // add remaining to global wl
-      for (typename CtxtLocalQ::local_iterator c = ctxtLocalQ.get ().begin ()
+      // TODO: check onWL counter here
+      for (auto c = ctxtLocalQ.get ().begin ()
           , endc = ctxtLocalQ.get ().end (); c != endc; ++c) {
 
         wl.push (*c);
@@ -498,8 +496,8 @@ class LCorderedExec {
   };
 
 private:
-  NhoodFunc nhoodVisitor;
-  OpFunc operFunc;
+  NhFunc nhFunc;
+  OpFunc opFunc;
   // TODO: make cmp function of nhmgr thread local as well.
   NhoodMgr& nhmgr;
   SourceTest sourceTest;
@@ -507,20 +505,22 @@ private:
 
 public:
 
-  LCorderedExec (
-      const NhoodFunc& nhoodVisitor,
-      const OpFunc& operFunc,
+  KDGaddRemAsyncExec (
+      const Cmp& cmp,
+      const NhFunc& nhFunc,
+      const OpFunc& opFunc,
+      const ArgsTuple& argsTuple, 
       NhoodMgr& nhmgr,
       const SourceTest& sourceTest)
     :
-      nhoodVisitor (nhoodVisitor),
-      operFunc (operFunc),
+      Base (cmp, nhFunc, HIDDEN::DummyExecFunc (), opFunc, argsTuple),
       nhmgr (nhmgr),
       sourceTest (sourceTest)
   {}
 
+
   template <typename R>
-  void execute (const R& range, const char* loopname) {
+  void execute (const R& range) {
     CtxtAlloc ctxtAlloc;
     CtxtWL initCtxt;
     CtxtWL initSrc;
@@ -534,95 +534,168 @@ public:
     Galois::TimeAccumulator t_destroy;
 
     t_create.start ();
-    Galois::Runtime::do_all_impl(
+    Galois::do_all_choice (
         range, 
-				CreateCtxtExpandNhood (nhoodVisitor, nhmgr, ctxtAlloc, initCtxt));
-    //        "create_initial_contexts");
+        CreateCtxtExpandNhood (nhFunc, nhmgr, ctxtAlloc, initCtxt),
+        std::make_tuple (
+          Galois::loopname ("create_initial_contexts"),
+          Galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
+
     t_create.stop ();
 
     t_find.start ();
-    Galois::Runtime::do_all_impl(makeLocalRange(initCtxt),
-				 FindInitSources (sourceTest, initSrc, nInitSrc));
-    //       "find_initial_sources");
+    Galois::do_all_choice (makeLocalRange(initCtxt),
+        FindInitSources (sourceTest, initSrc, nInitSrc)
+        std::make_tuple (
+          Galois::loopname ("find_initial_sources"),
+          Galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
+
     t_find.stop ();
 
     std::cout << "Number of initial sources found: " << nInitSrc.reduce () 
       << std::endl;
 
     // AddWL addWL;
-    PerThreadUserCtx perThUserCtx;
+    PerThreadUserCtxt perThrdUserCtxt;
     CtxtWL addCtxtWL;
     CtxtDelQ ctxtDelQ;
     CtxtLocalQ ctxtLocalQ;
 
-    typedef Galois::WorkList::dChunkedFIFO<CHUNK_SIZE, Ctxt*> SrcWL_ty;
+    typedef Galois::WorkList::dChunkedFIFO<OpFunc::CHUNK_SIZE, Ctxt*> SrcWL_ty;
     // typedef Galois::WorkList::AltChunkedFIFO<CHUNK_SIZE, Ctxt*> SrcWL_ty;
     // TODO: code to find global min goes here
 
     t_for.start ();
     Galois::for_each_local(initSrc,
         ApplyOperator (
-          operFunc,
-          nhoodVisitor,
+          nhFunc,
+          opFunc,
           nhmgr,
           sourceTest,
           ctxtAlloc,
           addCtxtWL,
           ctxtLocalQ,
           ctxtDelQ,
-          perThUserCtx,
+          perThrdUserCtxt,
           niter),
         Galois::loopname("apply_operator"), Galois::wl<SrcWL_ty>());
     t_for.stop ();
 
     t_destroy.start ();
-    Galois::Runtime::do_all_impl(makeLocalRange(ctxtDelQ),
-				 DelCtxt (ctxtAlloc)); //, "delete_all_ctxt");
+    Galois::do_all_choice (makeLocalRange(ctxtDelQ),
+				DelCtxt (ctxtAlloc), 
+        std::make_tuple (
+          Galois::loopname ("delete_all_ctxt"),
+          Galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
     t_destroy.stop ();
 
-    std::cout << "Number of iterations: " << niter.reduce () << std::endl;
+    reportStat (Base::loopname, "Number of iterations: ", niter.reduce (), 0);
 
-    std::cout << "Time taken in creating intial contexts: " << t_create.get () << std::endl;
-    std::cout << "Time taken in finding intial sources: " << t_find.get () << std::endl;
-    std::cout << "Time taken in for_each loop: " << t_for.get () << std::endl;
-    std::cout << "Time taken in destroying all the contexts: " << t_destroy.get () << std::endl;
+    reportStat (Base::loopname, "Time taken in creating intial contexts: ",   t_create.get (), 0);
+    reportStat (Base::loopname, "Time taken in finding intial sources: ", t_find.get (), 0);
+    reportStat (Base::loopname, "Time taken in for_each loop: ", t_for.get (), 0);
+    reportStat (Base::loopname, "Time taken in destroying all the contexts: ", t_destroy.get (), 0);
   }
 };
 
-template <typename R, typename Cmp, typename OpFunc, typename NhoodFunc, typename ST>
-void for_each_ordered_lc_impl (const R& range, const Cmp& cmp, const NhoodFunc& nhoodVisitor, const OpFunc& operFunc, const ST& sourceTest, const char* loopname) {
+
+template <typename T, typename Cmp, typename NhFunc, typename OpFunc, typename Ctxt, typename ST, typename ArgsTuple> 
+class KDGaddRemWindowExec public OrderedExecutorBase<T, Cmp, NhFunc, HIDDEN::DummyExecFunc, OpFunc, ArgsTuple, Ctxt> {
+
+  using Base = OrderedExecutorBase<T, Cmp, NhFunc, HIDDEN::DummyExecFunc, OpFunc, ArgsTuple, Ctxt>;
+
+  // important paramters
+  // TODO: add capability to the interface to express these constants
+  static const size_t DELETE_CONTEXT_SIZE = 1024;
+  static const size_t UNROLL_FACTOR = OpFunc::UNROLL_FACTOR;
+
+  static const unsigned DEFAULT_CHUNK_SIZE = 8;
+
+
+
+  // typedef MapBasedNhoodMgr<T, Cmp> NhoodMgr;
+  // typedef NhoodItem<T, Cmp, NhoodMgr> NItem;
+  // typedef typename NItem::Ctxt Ctxt;
+
+  using NhoodMgr =  typename Ctxt::NhoodMgr;
+
+  using CtxtAlloc = typenme Base::CtxtAlloc;
+  using CtxtWL = typenme Base::CtxtWL;
+
+  using CtxtDelQ = PerThreadBag<Ctxt*>;
+  using CtxtLocalQ = PerThreadBag<Ctxt*>;
+
+  using UserCtxt = typename Base::UserCtxt;
+  using PerThreadUserCtxt = typename Base::PerThreadUserCtxt;
+
+
+  using Accumulator =  Galois::GAccumulator<size_t>;
+
+
+  CtxtWL pending;
+  CtxtWL sources;
+
+  void beginRound (void) {
+  }
+
+  void expandNhoodPending (void) {
+  }
+
+public:
+
+  void execute (void) {
+    while (true) {
+
+      beginRound ();
+
+      expandNhoodPending ();
+
+      if (sources.empty_all ()) {
+        break;
+      }
+      
+      applyOperator ();
+
+
+    }
+  }
+
+};
+
+
+template <typename R, typename Cmp, typename NhFunc, typename OpFunc, typename ST, typename ArgsTuple>
+void for_each_ordered_lc_impl (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const ST& sourceTest, const ArgsTuple& argsTuple) {
 
   typedef typename R::value_type T;
 
-  typedef LCorderedContext<T, Cmp> Ctxt;
+  typedef KDGaddRemContext<T, Cmp> Ctxt;
   typedef typename Ctxt::NhoodMgr NhoodMgr;
   typedef typename Ctxt::NItem NItem;
   typedef typename Ctxt::CtxtCmp  CtxtCmp;
 
-  typedef LCorderedExec<OpFunc, NhoodFunc, Ctxt, ST> Exec;
+  typedef KDGaddRemAsyncExec<T, Cmp, NhFunc, OpFunc, Ctxt, ST, ArgsTuple> Exec;
 
   CtxtCmp ctxtcmp (cmp);
   typename NItem::Factory factory(ctxtcmp);
   NhoodMgr nhmgr (factory);
 
-  Exec e (nhoodVisitor, operFunc, nhmgr, sourceTest);
-  // e.template execute<CHUNK_SIZE> (abeg, aend);
-  e.execute (range, loopname);
+  Exec e (cmp, nhFunc, opFunc, nhmgr, sourceTest, argsTuple);
+  e.execute (range);
 }
 
-template <typename R, typename Cmp, typename OpFunc, typename NhoodFunc, typename StableTest>
-void for_each_ordered_lc (const R& range, const Cmp& cmp, const NhoodFunc& nhoodVisitor, const OpFunc& operFunc, const StableTest& stabilityTest, const char* loopname) {
+template <typename R, typename Cmp, typename NhFunc, typename OpFunc, typename StableTest>
+void for_each_ordered_lc (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const StableTest& stabilityTest, const char* loopname) {
 
-  for_each_ordered_lc_impl (range, cmp, nhoodVisitor, operFunc, SourceTest<StableTest> (stabilityTest), loopname);
+  for_each_ordered_lc_impl (range, cmp, nhFunc, opFunc, SourceTest<StableTest> (stabilityTest), loopname);
 }
 
-template <typename R, typename Cmp, typename OpFunc, typename NhoodFunc>
-void for_each_ordered_lc (const R& range, const Cmp& cmp, const NhoodFunc& nhoodVisitor, const OpFunc& operFunc, const char* loopname) {
+template <typename R, typename Cmp, typename NhFunc, typename OpFunc>
+void for_each_ordered_lc (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const char* loopname) {
 
-  for_each_ordered_lc_impl (range, cmp, nhoodVisitor, operFunc, SourceTest<void> (), loopname);
+  for_each_ordered_lc_impl (range, cmp, nhFunc, opFunc, SourceTest<void> (), loopname);
 }
 
 } // end namespace Runtime
 } // end namespace Galois
 
-#endif //  GALOIS_RUNTIME_LC_ORDERED_H
+#endif //  GALOIS_RUNTIME_KDG_ADD_REM_H

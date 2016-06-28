@@ -30,7 +30,7 @@
 
 namespace des_ord {
 
-template<NullEventOpt NULL_EVENT_OPT>
+template<des::NullEventOpt NULL_EVENT_OPT=des::NEEDS_NULL_EVENTS>
 struct TypeHelper {
   typedef des::Event<des::LogicUpdate> Event_ty;
   typedef Event_ty::BaseSimObj_ty BaseSimObj_ty;

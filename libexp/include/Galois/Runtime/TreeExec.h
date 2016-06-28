@@ -312,8 +312,8 @@ protected:
     {}
 
     void reportStats (void) {
-      reportStat(loopname, "Pushes", stat_pushes);
-      reportStat(loopname, "Iterations", stat_iterations);
+      reportStat(loopname, "Pushes", stat_pushes, 0);
+      reportStat(loopname, "Iterations", stat_iterations, 0);
     }
   };
 

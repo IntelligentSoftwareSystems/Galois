@@ -55,15 +55,15 @@ namespace des_ord {
 
 typedef Galois::GAccumulator<size_t> Accumulator_ty;
 
-typedef des::EventRecvTimeLocalTieBrkCmp<TypeHelper::Event_ty> Cmp_ty;
+typedef des::EventRecvTimeLocalTieBrkCmp<TypeHelper<>::Event_ty> Cmp_ty;
 
-typedef Galois::PerThreadVector<TypeHelper::Event_ty> AddList_ty;
+typedef Galois::PerThreadVector<TypeHelper<>::Event_ty> AddList_ty;
 
 struct SimObjInfo;
 typedef std::vector<SimObjInfo> VecSobjInfo;
 
 
-struct SimObjInfo: public TypeHelper {
+struct SimObjInfo: public TypeHelper<> {
 
   typedef des::AbstractMain<SimInit_ty>::GNode GNode;
   GNode node;
@@ -136,7 +136,7 @@ struct SimObjInfo: public TypeHelper {
 
 
 class DEStwoPhase: 
-  public des::AbstractMain<TypeHelper::SimInit_ty>, public TypeHelper {
+  public des::AbstractMain<TypeHelper<>::SimInit_ty>, public TypeHelper<> {
 
   struct NhoodVisitor {
     typedef int tt_has_fixed_neighborhood;
@@ -144,7 +144,7 @@ class DEStwoPhase:
     Graph& graph;
     VecSobjInfo& sobjInfoVec;
 
-    static const int CHUNK_SIZE = 64;
+    static const int CHUNK_SIZE = 16;
 
     NhoodVisitor (Graph& graph, VecSobjInfo& sobjInfoVec)
       : graph (graph), sobjInfoVec (sobjInfoVec) 
@@ -177,7 +177,7 @@ class DEStwoPhase:
 
   struct OpFunc {
 
-    static const unsigned CHUNK_SIZE = 64;
+    static const unsigned CHUNK_SIZE = 16;
 
 
     Graph& graph;
@@ -211,19 +211,27 @@ class DEStwoPhase:
       assert (recvInfo.isReady (event));
 
       nevents += 1;
-      newEvents.get ().clear ();
+      // newEvents.get ().clear ();
 
-      recvObj->execEvent (event, graph, recvInfo.node, newEvents.get ());
 
-      for (AddList_ty::local_iterator a = newEvents.get ().begin ()
-          , enda = newEvents.get ().end (); a != enda; ++a) {
+      auto addNewFunc = [this, &lwl] (const Event_ty& e) {
 
-        SimObjInfo& sinfo = sobjInfoVec[a->getRecvObj()->getID ()];
-        sinfo.recv (*a);
-        lwl.push (*a);
+        SimObjInfo& sinfo = sobjInfoVec[e.getRecvObj()->getID ()];
+        sinfo.recv (e);
+        lwl.push (e);
+      };
 
-        // std::cout << "### Adding: " << a->detailedString () << std::endl;
-      }
+      recvObj->execEvent (event, graph, recvInfo.node, addNewFunc);
+
+      // for (AddList_ty::local_iterator a = newEvents.get ().begin ()
+          // , enda = newEvents.get ().end (); a != enda; ++a) {
+// 
+        // SimObjInfo& sinfo = sobjInfoVec[a->getRecvObj()->getID ()];
+        // sinfo.recv (*a);
+        // lwl.push (*a);
+// 
+        // // std::cout << "### Adding: " << a->detailedString () << std::endl;
+      // }
 
     }
 
@@ -259,12 +267,13 @@ protected:
     AddList_ty newEvents;
     Accumulator_ty nevents;
 
-    Galois::Runtime::for_each_ordered_2p_win (
+    Galois::Runtime::for_each_ordered_ikdg (
         Galois::Runtime::makeStandardRange(
           simInit.getInitEvents ().begin (), simInit.getInitEvents ().end ()),
         Cmp_ty (), 
         NhoodVisitor (graph, sobjInfoVec),
-        OpFunc (graph, sobjInfoVec, newEvents, nevents));
+        OpFunc (graph, sobjInfoVec, newEvents, nevents),
+        std::make_tuple (Galois::loopname("des-ikdg")));
         // ReadyTest (sobjInfoVec));
 
     std::cout << "Number of events processed= " << 

@@ -660,7 +660,10 @@ struct TreeSummarizeLevelByLevel: public TypeDefHelper<SerialNodeBase> {
       if (!levelWL[i].empty ()) {
         Galois::Runtime::do_all_coupled (
             Galois::Runtime::makeStandardRange (levelWL[i].begin (), levelWL[i].end ()),
-            SummarizeOp (), "level-hand", 32);
+            SummarizeOp (), 
+            std::make_tuple (
+              Galois::loopname("level-hand"), 
+              Galois::chunk_size<32> ()));
 
 
         if (USE_PARAMETER) {
@@ -749,8 +752,7 @@ struct TreeSummarizeSpeculative: public TypeDefHelper<SpecNodeBase> {
         VisitNhood (), 
         OpFunc<true> (),
         std::make_tuple (
-          Galois::loopname ("tree_summ_spec"),
-          Galois::enable_parameter<fasle> ()));
+          Galois::loopname ("tree_summ_spec")));
 
   }
 };
@@ -767,10 +769,9 @@ struct TreeSummarizeTwoPhase: public TreeSummarizeSpeculative {
         Galois::Runtime::makeLocalRange (internalNodes),
         LevelComparator<TreeNode> (), 
         Base::VisitNhood (), 
-        Base::OpFunc<false> ()
+        Base::OpFunc<false> (),
         std::make_tuple (
-          Galois::loopname ("tree_summ_ikdg"),
-          Galois::enable_parameter<false> ()));
+          Galois::loopname ("tree_summ_ikdg")));
 
   }
 };

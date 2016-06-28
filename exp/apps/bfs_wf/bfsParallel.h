@@ -4,6 +4,8 @@
 #include "bfs.h"
 
 using Level_ty = unsigned;
+using Graph = typename BFS<Level_ty>::Graph;
+using GNode = typename BFS<Level_ty>::GNode;
 
 struct Update {
   GNode node;
