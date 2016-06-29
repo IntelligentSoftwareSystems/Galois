@@ -25,7 +25,7 @@ if [[ $EXEC == *"vertex-cut"* ]]; then
   SET="gc,2,2 cg,2,2 gg,2,2 gggc,4,1"
 else
   # assumes 3 GPU devices available
-  SET="c,1,4 g,1,4 gc,2,2 cg,2,2 gg,2,2 ggg,3,1 gggc,4,1"
+  SET="c,1,4 g,1,4 gc,2,2 cg,2,2 gg,2,2"
 fi
 
 for task in $SET; do
@@ -40,7 +40,7 @@ for task in $SET; do
     fi
   fi
   set -x #echo on
-  eval "GALOIS_DO_NOT_BIND_THREADS=1 $MPI -n=$2 ${EXEC} ${INPUT} -noverify ${PFLAGS} -pset=$1 -t=$3 |& tee ${execname}_${inputname}_${1}.out"
+  eval "GALOIS_DO_NOT_BIND_THREADS=1 $MPI -n=$2 ${EXEC} ${INPUT} -noverify -pset=$1 ${PFLAGS} -t=$3 |& tee ${execname}_${inputname}_${1}.out"
   set +x #echo off
 done
 
