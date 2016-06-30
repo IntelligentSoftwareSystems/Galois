@@ -63,8 +63,6 @@ if [ "$1" != "min" ]; then
     # module load screen #disabling for now because screen was compiled without proper color support
     module load valgrind
   fi
-  module load ghostscript
   module load isspython
   # module load screen #disabling for now because screen was compiled without proper color support
-  module load valgrind
 fi
