@@ -3,12 +3,16 @@
 
 
 #include "Galois/AltBag.h"
+#include "Galois/Accumulator.h"
 #include "Galois/OrderedTraits.h"
+#include "Galois/DoAllWrap.h"
 
 #include "Galois/Runtime/OrderedLockable.h"
 
 #include <boost/iterator/filter_iterator.hpp>
 #include <boost/iterator/filter_iterator.hpp>
+
+#include "llvm/Support/CommandLine.h"
 
 #include <utility>
 #include <functional>
@@ -198,8 +202,9 @@ protected:
 
   }
 
-  template <typename WinWL>
-  GALOIS_ATTRIBUTE_PROF_NOINLINE void spillAll (WinWL& winWL, CtxtWL& wl) {
+  //  TODO: spill range 
+  template <typename WinWL, typename WL>
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void spillAll (WinWL& winWL, WL& wl) {
 
     dbg::print("Spilling to winWL");
 
@@ -208,12 +213,9 @@ protected:
     on_each(
         [this, &wl, &winWL] (const unsigned tid, const unsigned numT) {
           while (!wl.get ().empty ()) {
-            Ctxt* c = wl.get ().back ();
+            auto e  = wl.get ().back ();
             wl.get ().pop_back ();
-
-            dbg::print("Spilling: ", c, " with active: ", c->getActive ());
-
-            winWL.push (c);
+            winWL.push (e);
           }
         });
 
@@ -221,8 +223,8 @@ protected:
     assert (!winWL.empty ());
   }
 
-  template <typename WinWL>
-  GALOIS_ATTRIBUTE_PROF_NOINLINE void refill (WinWL& winWL, CtxtWL& wl, size_t currCommits, size_t prevWindowSize) {
+  template <typename WinWL, typename WL>
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void refill (WinWL& winWL, WL& wl, size_t currCommits, size_t prevWindowSize) {
 
     assert (targetCommitRatio != 0.0);
 
@@ -297,21 +299,25 @@ protected:
     // std::cout << "Calculated Window size: " << windowSize << ", Actual: " << wl->size_all () << std::endl;
   }
 
-  template <typename WinWL>
-  GALOIS_ATTRIBUTE_PROF_NOINLINE void beginRound (WinWL& winWL) {
-    std::swap (currWL, nextWL);
+  template <typename WinWL, typename WL>
+    GALOIS_ATTRIBUTE_PROF_NOINLINE void refillRound (WinWL& winWL, WL& wl) {
 
     if (targetCommitRatio != 0.0) {
       size_t currCommits = roundCommits.reduceRO (); 
-
       size_t prevWindowSize = roundTasks.reduceRO ();
-      refill (winWL, *currWL, currCommits, prevWindowSize);
+      refill (winWL, wl, currCommits, prevWindowSize);
     }
-
 
     roundCommits.reset ();
     roundTasks.reset ();
+  }
+
+  template <typename WinWL>
+  GALOIS_ATTRIBUTE_PROF_NOINLINE void beginRound (WinWL& winWL) {
+    std::swap (currWL, nextWL);
     nextWL->clear_all_parallel ();
+
+    refillRound (winWL, *currWL);
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE void endRound () {

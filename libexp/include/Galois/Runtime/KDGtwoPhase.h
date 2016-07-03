@@ -375,7 +375,7 @@ protected:
 
 } // end anonymous namespace
 
-template <typename R, typename Cmp, typename NhFunc, typename OpFunc, typename ExFunc, typename _ArgsTuple>
+template <typename R, typename Cmp, typename NhFunc, typename ExFunc, typename OpFunc, typename _ArgsTuple>
 void for_each_ordered_ikdg_impl (const R& range, const Cmp& cmp, const NhFunc& nhFunc, 
     const ExFunc& exFunc,  const OpFunc& opFunc, const _ArgsTuple& argsTuple) {
 
@@ -407,7 +407,7 @@ void for_each_ordered_ikdg_impl (const R& range, const Cmp& cmp, const NhFunc& n
 
 }
 
-template <typename R, typename Cmp, typename NhFunc, typename OpFunc, typename ExFunc, typename _ArgsTuple>
+template <typename R, typename Cmp, typename NhFunc, typename ExFunc, typename OpFunc, typename _ArgsTuple>
 void for_each_ordered_ikdg (const R& range, const Cmp& cmp, const NhFunc& nhFunc, 
     const ExFunc& exFunc,  const OpFunc& opFunc, const _ArgsTuple& argsTuple) {
 

@@ -33,8 +33,7 @@
 #include "bfs.h"
 #include "bfsParallel.h"
 
-using Level_ty = unsigned;
-class SpecOrderedBFS: public BFS<Level_ty> {
+class SpecOrderedBFS: public BFS {
 
 
   struct OpFunc {

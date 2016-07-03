@@ -207,6 +207,8 @@ public:
 
 };
 
+// TODO: add functionality to spill complete bag or range efficiently 
+//
 template <typename T, typename Cmp, typename PerThrdWL, typename Derived>
 class WindowWLbase: private boost::noncopyable {
 

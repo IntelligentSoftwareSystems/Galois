@@ -28,60 +28,44 @@
 #include <vector>
 #include <functional>
 
-#include "Galois/Runtime/KDGtwoPhase.h"
+#include "Galois/Runtime/KDGspecLocalMin.h"
 
 #include "bfs.h"
 #include "bfsParallel.h"
 
-class TwoPhaseBFS: public BFS {
+class SpecOptBFS: public BFS {
   
-  struct GlobalLevel {
-    unsigned value = 1;
-    bool updated = false;
-  };
+
 
   // relies on round based execution of IKDG executor
-  struct VisitNhoodSafety: public VisitNhood {
-    GlobalLevel& globalLevel;
+  struct OpFuncLocalMin: public OpFunc {
 
-    VisitNhoodSafety (Graph& graph, GlobalLevel& globalLevel) 
-      : VisitNhood (graph), globalLevel (globalLevel)
+    OpFuncLocalMin (Graph& graph, ParCounter& numIter)
+      : OpFunc (graph, numIter)
     {}
 
     template <typename C>
     void operator () (const Update& up, C& ctx) {
-      if (up.level <= globalLevel.value) {
-        VisitNhood::operator () (up, ctx);
-      } else {
-        Galois::Runtime::signalConflict();
+      auto& ndata = graph.getData (up.node, Galois::MethodFlag::UNPROTECTED);
+      if (ndata > up.level) {
+
+        ndata = up.level;
+
+
+        for (auto ni = graph.edge_begin (up.node, Galois::MethodFlag::UNPROTECTED)
+            , eni = graph.edge_end (up.node, Galois::MethodFlag::UNPROTECTED); ni != eni; ++ni) {
+
+          GNode dst = graph.getEdgeDst (ni);
+
+          if (graph.getData (dst, Galois::MethodFlag::UNPROTECTED) > (up.level + 1)) {
+            ctx.push (Update (dst, up.level + 1));
+          }
+        }
+
       }
 
-      if (Galois::Substrate::ThreadPool::getTID () == 0 && globalLevel.updated) {
-        globalLevel.updated = false;
-      }
+      numIter += 1;
     }
-
-  };
-
-
-  // relies on round based execution of IKDG executor
-  struct OpFuncSafety: public OpFunc {
-    GlobalLevel& globalLevel;
-
-    OpFuncSafety (Graph& graph, ParCounter& numIter, GlobalLevel& globalLevel)
-      : OpFunc (graph, numIter), globalLevel (globalLevel)
-    {}
-
-    template <typename C>
-    void operator () (const Update& up, C& ctx) {
-      if (Galois::Substrate::ThreadPool::getTID () == 0 && !globalLevel.updated) {
-        globalLevel.updated = true;
-        ++globalLevel.value;
-      }
-
-      OpFunc::operator () (up, ctx);
-    }
-
 
   };
 
@@ -89,13 +73,11 @@ class TwoPhaseBFS: public BFS {
 
 public:
 
-  virtual const std::string getVersion () const { return "Two Phase ordered"; }
+  virtual const std::string getVersion () const { return "Speculative with optimizations"; }
 
   virtual size_t runBFS (Graph& graph, GNode& startNode) {
 
     ParCounter numIter;
-
-    GlobalLevel globalLevel;
 
     // update request for root
     Update first (startNode, 0);
@@ -103,13 +85,13 @@ public:
     std::vector<Update> wl;
     wl.push_back (first);
 
-    Galois::Runtime::for_each_ordered_ikdg (
+    Galois::Runtime::for_each_ordered_kdg_spec_local_min (
         Galois::Runtime::makeStandardRange(wl.begin (), wl.end ()),
         Comparator (), 
-        VisitNhoodSafety (graph, globalLevel),
-        OpFuncSafety (graph, numIter, globalLevel),
+        VisitNhood (graph),
+        OpFuncLocalMin (graph, numIter),
         std::make_tuple (
-          Galois::loopname ("bfs_two_phase_safety")));
+          Galois::loopname ("bfs_spec_local_min")));
 
 
     std::cout << "number of iterations: " << numIter.reduce () << std::endl;
@@ -122,7 +104,7 @@ public:
 };
 
 int main (int argc, char* argv[]) {
-  TwoPhaseBFS wf;
+  SpecOptBFS wf;
   wf.run (argc, argv);
   return 0;
 }

@@ -31,6 +31,8 @@
 
 #include "Galois/LazyArray.h"
 
+#include <cassert>
+
 namespace Galois {
 
 template <typename T, const size_t SZ>

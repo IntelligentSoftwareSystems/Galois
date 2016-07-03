@@ -642,7 +642,9 @@ public:
   ~DoAllCoupledExec () {
     // executed serially
     for (unsigned i = 0; i < workers.size (); ++i) {
-      assert (!workers.getRemote (i)->hasWork () &&  "Unprocessed work left");
+      auto& ctx = *(workers.getRemote (i));
+      assert (!ctx.hasWork () &&  "Unprocessed work left");
+      Galois::Runtime::reportStat (loopname, "Iterations", ctx.num_iter, ctx.id);
     }
 
     // printStats ();
@@ -700,7 +702,7 @@ public:
     ctx.timer.stop ();
     assert (!ctx.hasWork ());
 
-    Galois::Runtime::reportStat (loopname, "Iterations", ctx.num_iter, 0);
+    // Galois::Runtime::reportStat (loopname, "Iterations", ctx.num_iter, ctx.id);
   }
 
 

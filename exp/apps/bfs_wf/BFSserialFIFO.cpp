@@ -29,10 +29,10 @@
 
 #include "bfs.h"
 
-class BFSserialFIFO: public BFS<unsigned> {
+class BFSserialFIFO: public BFS {
 
   typedef std::deque<GNode> WL_ty;
-  typedef BFS<unsigned> Super_ty;
+  typedef BFS Super_ty;
 
 public:
   virtual const std::string getVersion () const { return "Serial FIFO"; }

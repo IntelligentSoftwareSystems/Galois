@@ -30,7 +30,9 @@
 #define GALOIS_RUNTIME_ORDERED_LOCKABLE_H
 
 #include "Galois/AltBag.h"
+#include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/ThreadRWlock.h"
+#include "Galois/Runtime/UserContextAccess.h"
 
 #include <unordered_map>
 
