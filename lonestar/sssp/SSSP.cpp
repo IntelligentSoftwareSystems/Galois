@@ -86,7 +86,7 @@ struct SSSP {
       GNode dst = graph.getEdgeDst(ii);
       Dist d    = graph.getEdgeData(ii, flag);
       auto& ddist  = graph.getData(dst, flag);
-      Dist newDist = sdist + d;
+      const Dist newDist = sdist + d;
       Dist oldDist = ddist;
       while( oldDist > newDist) {
         if (ddist.compare_exchange_weak(oldDist, newDist, std::memory_order_relaxed)) {
@@ -155,8 +155,6 @@ int main(int argc, char** argv) {
   Galois::for_each(UpdateRequest{source, 0}, SSSP{graph}, Galois::wl<OBIM>(), Galois::does_not_need_aborts<>(), Galois::loopname("SSSP"));
   Tmain.stop();
   T.stop();
-
-  Galois::for_each(UpdateRequest{source, 0}, SSSP{graph}, Galois::wl<OBIM>(), Galois::does_not_need_aborts<>(), Galois::loopname("SSSP"));
 
   Galois::reportPageAlloc("MeminfoPost");
   Galois::Runtime::reportNumaAlloc("NumaPost");
