@@ -133,6 +133,11 @@ class kGraph : public GlobalObject {
   std::map<size_t, size_t> GlobalToLocalMap;
 
   std::map<size_t, size_t> GIDtoOwnerMap;
+
+  std::vector<size_t> OwnerVec; //To store the ownerIDs of sorted according to the Global IDs.
+  std::vector<size_t> GlobalVec; //Global Id's sorted vector.
+  std::vector<size_t> LocalVec; //Local Id's sorted vector.
+
    //GID to owner
    std::vector<std::pair<uint64_t, uint64_t>> gid2host;
 
@@ -151,16 +156,22 @@ class kGraph : public GlobalObject {
    }
 
   size_t L2G(size_t lid) {
-    return LocalToGlobalMap[lid];
-    //return LocalToGlobalMap.at(lid);
+    return GlobalVec[lid];
+    //return LocalToGlobalMap[lid];
   }
   size_t G2L(size_t gid) {
-    return GlobalToLocalMap[gid];
-    //return GlobalToLocalMap.at(gid);
+    //we can assume that GID exits and is unique. Index is localID since it is sorted.
+    auto iter = std::lower_bound(GlobalVec.begin(), GlobalVec.end(), gid);
+    if(*iter != gid)
+      std::cout <<"[" << id <<"] iter : " << *iter  << " gid : " << gid  << "\n";
+    assert(*iter == gid);
+    return std::distance(GlobalVec.begin(), iter);
+    //return GlobalToLocalMap[gid];
   }
 
    uint64_t L2G_init(uint32_t lid) const {
-      assert(lid < graph.size());
+     //std::cerr << "lid : " << lid << " , graph.size : " << graph.size() << "\n";
+      //assert(lid < graph.size());
       if (lid < numOwned)
          return lid + globalOffset;
       return ghostMap[lid - numOwned];
@@ -324,7 +335,7 @@ public:
                 gid_vec[n] = masterNodes[from_id][n];
                 val_vec[n] = val;
 
-                }, Galois::loopname("lambda synpull"));
+                }, Galois::loopname("lambda::synpull"));
 
        Galois::Runtime::gSerialize(b, gid_vec, val_vec);
        }
@@ -426,13 +437,7 @@ public:
     std::cerr << "[" << id << "] Edge count Done " << numEdges << "\n";
 
     std::vector<bool> ghosts(g.size());
-#if 0
-    for (auto n = gid2host[id].first; n < gid2host[id].second; ++n){
-      for (auto ii = g.edge_begin(n), ee = g.edge_end(n); ii < ee; ++ii){
-        ghosts[g.getEdgeDst(ii)] = true;
-      }
-    }
-#endif
+
     auto ee = g.edge_begin(gid2host[id].first);
     for (auto n = gid2host[id].first; n < gid2host[id].second; ++n) {
       auto ii = ee;
@@ -448,6 +453,7 @@ public:
         ghostMap.push_back(x);
     std::cerr << "[" << id << "] Ghost nodes: " << ghostMap.size() << "\n";
 
+#if 0
     hostNodes.resize(numHosts, std::make_pair(~0, ~0));
     for (unsigned ln = 0; ln < ghostMap.size(); ++ln) {
       unsigned lid = ln + numOwned;
@@ -465,33 +471,13 @@ public:
       assert(found);
     }
 
-#if 0
-    for(unsigned h = 0; h < hostNodes.size(); ++h){
-      std::string temp_str = ("GhostNodes_from_" + std::to_string(h));
-      Galois::Statistic temp_stat_ghosNode(temp_str);
+    for(uint32_t h = 0; h < hostNodes.size(); ++h){
       uint32_t start, end;
       std::tie(start, end) = nodes_by_host(h);
-      temp_stat_ghosNode += (end - start);
-      statGhostNodes += (end - start);
-    }
-#endif
-    //std::cerr << "hostNodes Done\n";
-
-    uint32_t numNodes = numOwned + ghostMap.size();
-    assert((uint64_t )numOwned + (uint64_t )ghostMap.size() == (uint64_t )numNodes);
-    graph.allocateFrom(numNodes, numEdges);
-    //std::cerr << "Allocate done\n";
-
-
-    for(uint32_t h = 0; h < hostNodes.size(); ++h){
-         uint32_t start, end;
-         std::tie(start, end) = nodes_by_host(h);
       for(; start != end; ++start){
         slaveNodes[h].push_back(L2G_init(start));
       }
     }
-
-
 
     //filling in local owned nodes.!!!!
     for (auto n = gid2host[id].first; n < gid2host[id].second; ++n) {
@@ -509,26 +495,38 @@ public:
         LocalToGlobalMap[lid] = n;
       }
     }
-
-
-
-#if 0
-    std::cerr << "[" << id << "] SIZE ::::  " << totalNodes << "\n";
-    readMetaFile(part_metaFile, localToGlobalMap_meta);
-    std::cerr << "[" << id << "] MAPSIZE : " << localToGlobalMap_meta.size() << "\n";
-    masterNodes.resize(numHosts);
-    slaveNodes.resize(numHosts);
-
-    for(auto info : localToGlobalMap_meta){
-      assert(info.owner_id >= 0 && info.owner_id < numHosts);
-      slaveNodes[info.owner_id].push_back(info.global_id);
-
-      GIDtoOwnerMap[info.global_id] = info.owner_id;
-      LocalToGlobalMap[info.local_id] = info.global_id;
-      GlobalToLocalMap[info.global_id] = info.local_id;
-      //Galois::Runtime::printOutput("[%] Owner : %\n", info.global_id, info.owner_id);
-    }
 #endif
+
+    //filling in local owned nodes.!!!!
+    std::vector<std::pair<uint64_t, uint32_t>> temp_gid_owner_pair_vec;
+    for (auto n = gid2host[id].first; n < gid2host[id].second; ++n) {
+      temp_gid_owner_pair_vec.push_back(std::make_pair(n,id));
+    }
+
+    //filling in ghost nodes.!!!!
+    for(auto n : ghostMap){
+      temp_gid_owner_pair_vec.push_back(std::make_pair(n,getHostID_init(n)));
+    }
+
+    std::sort(temp_gid_owner_pair_vec.begin(), temp_gid_owner_pair_vec.end(), [&](std::pair<uint64_t, uint32_t>const& a, std::pair<uint64_t, uint32_t>const& b){ return a.first < b.first;});
+
+    for(auto p : temp_gid_owner_pair_vec){
+      OwnerVec.push_back(p.second);
+      GlobalVec.push_back(p.first);
+    }
+
+
+    //Check to make sure GlobalVec is sorted. Everything depends on it.
+    assert(std::is_sorted(GlobalVec.begin(), GlobalVec.end()));
+    if(!std::is_sorted(GlobalVec.begin(), GlobalVec.end())){
+      std::cerr << "GlobalVec not sorted; Aborting execution\n";
+      abort();
+    }
+
+    for (auto gid : ghostMap) {
+      auto hostID = getHostID(gid);
+      slaveNodes[hostID].push_back(gid);
+    }
 
     //Exchange information.
     exchange_info_init();
@@ -545,16 +543,33 @@ public:
     }
 
 
-    //uint64_t numEdges = g.edge_begin(*g.end()) - g.edge_begin(*g.begin()); // depends on Offline graph impl
     std::cerr << "[" << id << "] Edge count Done " << numEdges << "\n";
 
+    uint32_t numNodes = numOwned + ghostMap.size();
+    assert((uint64_t )numOwned + (uint64_t )ghostMap.size() == (uint64_t )numNodes);
+    numOwned = numOwned + ghostMap.size();
 
-    graph.allocateFrom(numNodes, numEdges);
+    assert(numNodes == GlobalVec.size());
+    if(numNodes != GlobalVec.size()){
+      std::cerr << "Number of node mismatch \n";
+      abort();
+    }
+
+    std::cout <<"[" << id <<"] numNodes : " << numNodes << "\n";
+    graph.allocateFrom(numOwned, numEdges);
     //std::cerr << "Allocate done\n";
 
     graph.constructNodes();
     //std::cerr << "Construct nodes done\n";
     loadEdges<std::is_void<EdgeTy>::value>(g);
+#if 0
+    if(id == 1){
+      for(auto ii = graph.begin(); ii != graph.end(); ++ii){
+        //std::cout << "L : " << *ii << " G : " << L2G(*ii) << "GetHostID : " << getHostID(L2G(*ii)) << "\n";
+        std::cout << "LID : " << *ii << " , Edges : " << std::distance(graph.edge_begin(*ii), graph.edge_end(*ii)) << "\n";
+      }
+    }
+#endif
   }
 
    template<bool isVoidType, typename std::enable_if<!isVoidType>::type* = nullptr>
@@ -583,9 +598,10 @@ public:
       g.num_seeks();
       std::cout << "EdgeLoading time " << timer.get_usec()/1000000.0f << " seconds\n";
    }
+
    template<bool isVoidType, typename std::enable_if<isVoidType>::type* = nullptr>
    void loadEdges(OfflineGraph & g) {
-      fprintf(stderr, "Loading void edge-data while creating edges.\n");
+      fprintf(stderr, "Loading void edge-data while creating edges: Void edge data.\n");
       uint64_t cur = 0;
       for (auto n = gid2host[id].first; n < gid2host[id].second; ++n) {
          for (auto ii = g.edge_begin(n), ee = g.edge_end(n); ii < ee; ++ii) {
@@ -803,8 +819,21 @@ public:
    }
 
    unsigned getHostID(uint64_t gid) {
-    return GIDtoOwnerMap[gid];
+    auto lid = G2L(gid);
+    return OwnerVec[lid];
+    //return GIDtoOwnerMap[gid];
    }
+   unsigned getHostID_init(uint64_t gid) {
+      for (auto i = 0; i < gid2host.size(); ++i) {
+         uint64_t start, end;
+         std::tie(start, end) = nodes_by_host_G(i);
+         if (gid >= start && gid < end) {
+            return i;
+         }
+      }
+      return -1;
+   }
+
    uint32_t getNumOwned() const {
       return numOwned;
    }
