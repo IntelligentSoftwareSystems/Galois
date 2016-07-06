@@ -341,7 +341,7 @@ public:
                 gid_vec[n] = masterNodes[from_id][n];
                 val_vec[n] = val;
 
-                }, Galois::loopname("lambda synpull"));
+                }, Galois::loopname("lambda::synpull"));
 
        Galois::Runtime::gSerialize(b, gid_vec, val_vec);
        }
