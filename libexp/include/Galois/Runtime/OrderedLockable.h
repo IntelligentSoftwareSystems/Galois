@@ -30,6 +30,7 @@
 #define GALOIS_RUNTIME_ORDERED_LOCKABLE_H
 
 #include "Galois/AltBag.h"
+#include "Galois/OrderedTraits.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/ThreadRWlock.h"
 #include "Galois/Runtime/UserContextAccess.h"
@@ -462,6 +463,44 @@ protected:
 };
 
 
+
+template <typename F, typename Ctxt, typename UserCtxt, typename... Args>
+void runCatching (F& func, Ctxt* c, UserCtxt& uhand, Args&&... args) {
+  Galois::Runtime::setThreadContext (c);
+
+  int result = 0;
+
+#ifdef GALOIS_USE_LONGJMP
+  if ((result = setjmp(hackjmp)) == 0) {
+#else
+    try {
+#endif
+      func (c->getActive (), uhand, std::forward<Args> (args)...);
+
+#ifdef GALOIS_USE_LONGJMP
+    } else {
+      // TODO
+    }
+#else 
+  } catch (ConflictFlag f) {
+    result = f;
+  }
+#endif
+
+  switch (result) {
+    case 0:
+      break;
+    case CONFLICT: 
+      c->disableSrc ();
+      break;
+    default:
+      GALOIS_DIE ("can't handle conflict flag type");
+      break;
+  }
+
+
+  Galois::Runtime::setThreadContext (NULL);
+}
 
 
 

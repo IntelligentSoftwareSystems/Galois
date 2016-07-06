@@ -42,15 +42,17 @@
 #include "Galois/AltBag.h"
 #include "Galois/PerThreadContainer.h"
 
-#include "Galois/WorkList/WorkList.h"
 #include "Galois/Runtime/Context.h"
 #include "Galois/Runtime/OrderedLockable.h"
 #include "Galois/Runtime/Executor_DoAll.h"
 #include "Galois/Runtime/Range.h"
-#include "Galois/Substrate/gio.h"
 #include "Galois/Runtime/ThreadRWlock.h"
 #include "Galois/Runtime/Mem.h"
+#include "Galois/Runtime/IKDGbase.h"
 
+#include "Galois/WorkList/WorkList.h"
+
+#include "Galois/Substrate/gio.h"
 
 #include "llvm/ADT/SmallVector.h"
 
@@ -60,6 +62,10 @@
 namespace Galois {
 namespace Runtime {
 
+namespace cll = llvm::cl;
+
+static cll::opt<bool> addRemWinArg("addRemWin", cll::desc("enable windowing in add-rem executor"), cll::init(false));
+
 static const bool debug = false;
 
 template <typename Ctxt, typename CtxtCmp>
@@ -67,7 +73,8 @@ class NhoodItem: public OrdLocBase<NhoodItem<Ctxt, CtxtCmp>, Ctxt, CtxtCmp> {
   using Base = OrdLocBase<NhoodItem, Ctxt, CtxtCmp>;
 
 public:
-  using PQ =  Galois::ThreadSafeOrderedSet<Ctxt*, CtxtCmp>;
+  // using PQ =  Galois::ThreadSafeOrderedSet<Ctxt*, CtxtCmp>;
+  using PQ =  Galois::ThreadSafeMinHeap<Ctxt*, CtxtCmp>;
   using Factory = OrdLocFactoryBase<NhoodItem, Ctxt, CtxtCmp>;
 
 protected:
@@ -133,7 +140,7 @@ public:
 
   KDGaddRemContext (const T& active, NhoodMgr& nhmgr)
     : 
-      OrderedContextBase (active), // to make acquire call virtual function sub_acquire
+      OrderedContextBase<T> (active), // to make acquire call virtual function sub_acquire
       nhood (), 
       nhmgr (nhmgr), 
       onWL (false) 
@@ -223,6 +230,10 @@ public:
     }
   }
 
+  void disableSrc (void) const {
+    // XXX: nothing to do here. Added to reuse runCatching
+  }
+
 
 };
 
@@ -254,10 +265,11 @@ struct SourceTest <void> {
 };
 
 // TODO: remove template parameters that can be passed to execute
-template <typename T, typename Cmp, typename NhFunc, typename OpFunc, typename ArgsTuple, typename Ctxt, typename SourceTest>
-class KDGaddRemAsyncExec: public OrderedExecutorBase<T, Cmp, NhFunc, HIDDEN::DummyExecFunc, OpFunc, ArgsTuple, Ctxt> {
+template <typename T, typename Cmp, typename NhFunc, typename OpFunc, typename SourceTest, typename ArgsTuple, typename Ctxt>
+class KDGaddRemAsyncExec: public IKDGbase<T, Cmp, NhFunc, HIDDEN::DummyExecFunc, OpFunc, ArgsTuple, Ctxt> {
 
-  using Base = OrderedExecutorBase<T, Cmp, NhFunc, HIDDEN::DummyExecFunc, OpFunc, ArgsTuple, Ctxt>;
+protected:
+  using Base = IKDGbase<T, Cmp, NhFunc, HIDDEN::DummyExecFunc, OpFunc, ArgsTuple, Ctxt>;
 
   // important paramters
   // TODO: add capability to the interface to express these constants
@@ -266,6 +278,8 @@ class KDGaddRemAsyncExec: public OrderedExecutorBase<T, Cmp, NhFunc, HIDDEN::Dum
 
   static const unsigned DEFAULT_CHUNK_SIZE = 8;
 
+  typedef Galois::WorkList::dChunkedFIFO<OpFunc::CHUNK_SIZE, Ctxt*> SrcWL_ty;
+  // typedef Galois::WorkList::AltChunkedFIFO<CHUNK_SIZE, Ctxt*> SrcWL_ty;
 
 
   // typedef MapBasedNhoodMgr<T, Cmp> NhoodMgr;
@@ -274,11 +288,11 @@ class KDGaddRemAsyncExec: public OrderedExecutorBase<T, Cmp, NhFunc, HIDDEN::Dum
 
   using NhoodMgr =  typename Ctxt::NhoodMgr;
 
-  using CtxtAlloc = typenme Base::CtxtAlloc;
-  using CtxtWL = typenme Base::CtxtWL;
+  using CtxtAlloc = typename Base::CtxtAlloc;
+  using CtxtWL = typename Base::CtxtWL;
 
-  using CtxtDelQ = PerThreadBag<Ctxt*>;
-  using CtxtLocalQ = PerThreadBag<Ctxt*>;
+  using CtxtDelQ = PerThreadDeque<Ctxt*>; // XXX: can also use gdeque
+  using CtxtLocalQ = PerThreadDeque<Ctxt*>;
 
   using UserCtxt = typename Base::UserCtxt;
   using PerThreadUserCtxt = typename Base::PerThreadUserCtxt;
@@ -287,165 +301,99 @@ class KDGaddRemAsyncExec: public OrderedExecutorBase<T, Cmp, NhFunc, HIDDEN::Dum
   using Accumulator =  Galois::GAccumulator<size_t>;
 
   struct CreateCtxtExpandNhood {
-    NhFunc& nhFunc;
-    NhoodMgr& nhmgr;
-    CtxtAlloc& ctxtAlloc;
-    CtxtWL& ctxtWL;
-
-    CreateCtxtExpandNhood (
-        NhFunc& nhFunc,
-        NhoodMgr& nhmgr,
-        CtxtAlloc& ctxtAlloc,
-        CtxtWL& ctxtWL)
-      :
-        nhFunc (nhFunc),
-        nhmgr (nhmgr),
-        ctxtAlloc (ctxtAlloc),
-        ctxtWL (ctxtWL)
-    {}
+    KDGaddRemAsyncExec& exec;
+    Accumulator& nInit;
 
     GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (const T& active) const {
-      Ctxt* ctxt = ctxtAlloc.allocate (1);
+
+      Ctxt* ctxt = exec.ctxtAlloc.allocate (1);
       assert (ctxt != NULL);
       // new (ctxt) Ctxt (active, nhmgr);
       //ctxtAlloc.construct (ctxt, Ctxt (active, nhmgr));
-      ctxtAlloc.construct (ctxt, active, nhmgr);
+      exec.ctxtAlloc.construct (ctxt, active, exec.nhmgr);
 
-      ctxtWL.get ().push_back (ctxt);
+      exec.addCtxtWL.get ().push_back (ctxt);
 
-      Galois::Runtime::setThreadContext (ctxt);
-      int tmp=0;
-      // TODO: nhFunc should take only one arg, 
-      // 2nd arg being passed due to compatibility with Deterministic executor
-      nhFunc (ctxt->active, tmp); 
-      Galois::Runtime::setThreadContext (NULL);
+      nInit += 1;
+
+      auto& uhand = *(exec.userHandles.getLocal ());
+      runCatching (exec.nhFunc, ctxt, uhand);
     }
 
   };
 
-  struct FindInitSources {
-    const SourceTest& sourceTest;
-    CtxtWL& initSrc;
-    Accumulator& nsrc;
-
-    FindInitSources (
-        const SourceTest& sourceTest, 
-        CtxtWL& initSrc,
-        Accumulator& nsrc)
-      : 
-        sourceTest (sourceTest), 
-        initSrc (initSrc),
-        nsrc (nsrc)
-    {}
-
-    GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (Ctxt* ctxt) const {
-      assert (ctxt != NULL);
-      // assume nhood of ctxt is already expanded
-
-      // if (ctxt->isSrc ()) {
-        // std::cout << "Testing source: " << ctxt->str () << std::endl;
-      // }
-      // if (sourceTest (ctxt)) {
-        // std::cout << "Initial source: " << ctxt->str () << std::endl;
-      // }
-      if (sourceTest (ctxt) && ctxt->onWL.cas (false, true)) {
-        initSrc.get ().push_back (ctxt);
-        nsrc += 1;
-      }
+  struct DummyWinWL {
+    void push (const T&) const {
+      std::abort ();
     }
   };
 
 
+  template <typename WinWL>
   struct ApplyOperator {
-
+    static const bool USE_WIN_WL = !std::is_same<WinWL, DummyWinWL>::value;
     typedef int tt_does_not_need_aborts;
 
-    NhFunc& nhFunc;
-    OpFunc& opFunc;
-    NhoodMgr& nhmgr;
-    const SourceTest& sourceTest;
-    CtxtAlloc& ctxtAlloc;
-    CtxtWL& addCtxtWL;
-    CtxtLocalQ& ctxtLocalQ;
-    CtxtDelQ& ctxtDelQ;
-    PerThreadUserCtxt& perThrdUserCtxt;
-    Accumulator& niter;
-
-    ApplyOperator (
-        NhFunc& nhFunc,
-        OpFunc& opFunc,
-        NhoodMgr& nhmgr,
-        const SourceTest& sourceTest,
-        CtxtAlloc& ctxtAlloc,
-        CtxtWL& addCtxtWL,
-        CtxtLocalQ& ctxtLocalQ,
-        CtxtDelQ& ctxtDelQ,
-        PerThreadUserCtxt& perThrdUserCtxt,
-        Accumulator& niter)
-      :
-        nhFunc (nhFunc),
-        opFunc (opFunc),
-        nhmgr (nhmgr),
-        sourceTest (sourceTest),
-        ctxtAlloc (ctxtAlloc),
-        addCtxtWL (addCtxtWL),
-        ctxtLocalQ (ctxtLocalQ),
-        ctxtDelQ (ctxtDelQ),
-        perThrdUserCtxt (perThrdUserCtxt),
-        niter (niter) 
-    {}
-
+    KDGaddRemAsyncExec& exec;
+    WinWL& winWL;
+    const T* minWinWL;
+    Accumulator& nsrc;
+    Accumulator& ntotal;;
 
     template <typename WL>
     GALOIS_ATTRIBUTE_PROF_NOINLINE void operator () (Ctxt* const in_src, WL& wl) {
       assert (in_src != NULL);
 
-      ctxtLocalQ.get ().clear ();
+      exec.ctxtLocalQ.get ().clear ();
 
-      ctxtLocalQ.get ().push_back (in_src);
+      exec.ctxtLocalQ.get ().push_back (in_src);
 
 
       for (unsigned local_iter = 0; 
-          (local_iter < UNROLL_FACTOR) && !ctxtLocalQ.get ().empty (); ++local_iter ) {
+          (local_iter < UNROLL_FACTOR) && !exec.ctxtLocalQ.get ().empty (); ++local_iter ) {
 
-        Ctxt* src = ctxtLocalQ.get ().front (); ctxtLocalQ.get ().pop_front ();
+        Ctxt* src = exec.ctxtLocalQ.get ().front (); exec.ctxtLocalQ.get ().pop_front ();
 
         // GALOIS_DEBUG ("Processing source: %s\n", src->str ().c_str ());
-        if (debug && !sourceTest (src)) {
+        if (debug && !exec.sourceTest (src)) {
           std::cout << "Not found to be a source: " << src->str ()
             << std::endl;
           // abort ();
         }
 
-        niter += 1;
+        nsrc += 1;
 
         // addWL.get ().clear ();
-        UserCtxt& userCtxt = *(perThrdUserCtxt.getLocal ());
+        UserCtxt& userCtxt = *(exec.userHandles.getLocal ());
 
-        if (true || DEPRECATED::ForEachTraits<OpFunc>::NeedsPush) {
+        if (Base::NEEDS_PUSH) {
           userCtxt.resetPushBuffer ();
-          userCtxt.resetAlloc ();
         }
 
-        opFunc (src->active, userCtxt.data ()); 
+        exec.opFunc (src->getActive (), userCtxt); 
 
 
-        if (true || DEPRECATED::ForEachTraits<OpFunc>::NeedsPush) {
+        if (Base::NEEDS_PUSH) {
 
-          addCtxtWL.get ().clear ();
-          CreateCtxtExpandNhood addCtxt (nhFunc, nhmgr, ctxtAlloc, addCtxtWL);
+          exec.addCtxtWL.get ().clear ();
+          CreateCtxtExpandNhood addCtxt {exec, ntotal};
+
 
           for (auto a = userCtxt.getPushBuffer ().begin ()
               , enda = userCtxt.getPushBuffer ().end (); a != enda; ++a) {
 
-
-            addCtxt (*a);
+            if (!USE_WIN_WL || !minWinWL || exec.cmp (*a, *minWinWL)) {
+              addCtxt (*a);
+            } else {
+              winWL.push (*a);
+            }
+  
           }
 
-          for (auto c = addCtxtWL.get ().begin ()
-              , endc = addCtxtWL.get ().end (); c != endc; ++c) {
+          for (auto c = exec.addCtxtWL.get ().begin ()
+              , endc = exec.addCtxtWL.get ().end (); c != endc; ++c) {
 
-            (*c)->findNewSources (sourceTest, wl);
+            (*c)->findNewSources (exec.sourceTest, wl);
             // // if is source add to workList;
             // if (sourceTest (*c) && (*c)->onWL.cas (false, true)) {
             // // std::cout << "Adding new source: " << *c << std::endl;
@@ -456,51 +404,37 @@ class KDGaddRemAsyncExec: public OrderedExecutorBase<T, Cmp, NhFunc, HIDDEN::Dum
 
         src->removeFromNhood ();
 
-        src->findSrcInNhood (sourceTest, ctxtLocalQ.get ());
+        src->findSrcInNhood (exec.sourceTest, exec.ctxtLocalQ.get ());
 
         //TODO: use a ref count type wrapper for Ctxt;
-        ctxtDelQ.get ().push_back (src);
+        exec.ctxtDelQ.get ().push_back (src);
 
       }
 
-
       // add remaining to global wl
       // TODO: check onWL counter here
-      for (auto c = ctxtLocalQ.get ().begin ()
-          , endc = ctxtLocalQ.get ().end (); c != endc; ++c) {
+      for (auto c = exec.ctxtLocalQ.get ().begin ()
+          , endc = exec.ctxtLocalQ.get ().end (); c != endc; ++c) {
 
         wl.push (*c);
       }
 
+      while (exec.ctxtDelQ.get ().size () >= DELETE_CONTEXT_SIZE) {
 
-      while (ctxtDelQ.get ().size () >= DELETE_CONTEXT_SIZE) {
-
-        Ctxt* c = ctxtDelQ.get ().front (); ctxtDelQ.get ().pop_front ();
-        ctxtAlloc.destroy (c);
-        ctxtAlloc.deallocate (c, 1); 
+        Ctxt* c = exec.ctxtDelQ.get ().front (); exec.ctxtDelQ.get ().pop_front ();
+        exec.ctxtAlloc.destroy (c);
+        exec.ctxtAlloc.deallocate (c, 1); 
       }
     }
 
   };
 
-  struct DelCtxt {
-
-    CtxtAlloc& ctxtAlloc;
-
-    explicit DelCtxt (CtxtAlloc& ctxtAlloc): ctxtAlloc (ctxtAlloc) {}
-
-    void operator () (Ctxt* ctxt) const {
-      ctxtAlloc.destroy (ctxt);
-      ctxtAlloc.deallocate (ctxt, 1);
-    }
-  };
-
 private:
-  NhFunc nhFunc;
-  OpFunc opFunc;
-  // TODO: make cmp function of nhmgr thread local as well.
   NhoodMgr& nhmgr;
   SourceTest sourceTest;
+  CtxtWL addCtxtWL;
+  CtxtLocalQ ctxtLocalQ;
+  CtxtDelQ ctxtDelQ;
 
 
 public:
@@ -520,13 +454,59 @@ public:
 
 
   template <typename R>
+  void expandNhoodpickSources (const R& range, CtxtWL& sources, Accumulator& nInit) {
+
+    addCtxtWL.clear_all_parallel ();
+
+    Galois::do_all_choice (
+        range, 
+        CreateCtxtExpandNhood {*this, nInit},
+        std::make_tuple (
+          Galois::loopname ("create_contexts"),
+          Galois::chunk_size<NhFunc::CHUNK_SIZE> ()));
+
+    Galois::do_all_choice (makeLocalRange(this->addCtxtWL),
+        [this, &sources] (Ctxt* ctxt) {
+          if (sourceTest (ctxt) && ctxt->onWL.cas (false, true)) {
+            sources.get ().push_back (ctxt);
+          }
+        },
+        std::make_tuple (
+          Galois::loopname ("find_sources"),
+          Galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
+
+  }
+
+  template <typename A>
+  void applyOperator (CtxtWL& sources, A op) {
+
+    Galois::for_each_local(sources,
+        op,
+        Galois::loopname("apply_operator"), Galois::wl<SrcWL_ty>());
+
+    Galois::do_all_choice (makeLocalRange(ctxtDelQ),
+        [this] (Ctxt* ctxt) {
+          Base::ctxtAlloc.destroy (ctxt);
+          Base::ctxtAlloc.deallocate (ctxt, 1);
+        },
+        std::make_tuple (
+          Galois::loopname ("delete_all_ctxt"),
+          Galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
+
+    Runtime::on_each_impl (
+        [this, &sources] (const unsigned tid, const unsigned numT) {
+          sources.get ().clear ();
+          ctxtDelQ.get ().clear ();
+        });
+
+  }
+
+  template <typename R>
   void execute (const R& range) {
-    CtxtAlloc ctxtAlloc;
-    CtxtWL initCtxt;
     CtxtWL initSrc;
 
-    Accumulator nInitSrc;
-    Accumulator niter;
+    Accumulator nInitCtxt;
+    Accumulator nsrc;
 
     Galois::TimeAccumulator t_create;
     Galois::TimeAccumulator t_find;
@@ -534,63 +514,18 @@ public:
     Galois::TimeAccumulator t_destroy;
 
     t_create.start ();
-    Galois::do_all_choice (
-        range, 
-        CreateCtxtExpandNhood (nhFunc, nhmgr, ctxtAlloc, initCtxt),
-        std::make_tuple (
-          Galois::loopname ("create_initial_contexts"),
-          Galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
-
+    expandNhoodpickSources (range, initSrc, nInitCtxt);
     t_create.stop ();
 
-    t_find.start ();
-    Galois::do_all_choice (makeLocalRange(initCtxt),
-        FindInitSources (sourceTest, initSrc, nInitSrc)
-        std::make_tuple (
-          Galois::loopname ("find_initial_sources"),
-          Galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
-
-    t_find.stop ();
-
-    std::cout << "Number of initial sources found: " << nInitSrc.reduce () 
-      << std::endl;
-
-    // AddWL addWL;
-    PerThreadUserCtxt perThrdUserCtxt;
-    CtxtWL addCtxtWL;
-    CtxtDelQ ctxtDelQ;
-    CtxtLocalQ ctxtLocalQ;
-
-    typedef Galois::WorkList::dChunkedFIFO<OpFunc::CHUNK_SIZE, Ctxt*> SrcWL_ty;
-    // typedef Galois::WorkList::AltChunkedFIFO<CHUNK_SIZE, Ctxt*> SrcWL_ty;
     // TODO: code to find global min goes here
 
+    DummyWinWL winWL;
+
     t_for.start ();
-    Galois::for_each_local(initSrc,
-        ApplyOperator (
-          nhFunc,
-          opFunc,
-          nhmgr,
-          sourceTest,
-          ctxtAlloc,
-          addCtxtWL,
-          ctxtLocalQ,
-          ctxtDelQ,
-          perThrdUserCtxt,
-          niter),
-        Galois::loopname("apply_operator"), Galois::wl<SrcWL_ty>());
+    applyOperator (initSrc, ApplyOperator<DummyWinWL> {*this, winWL, nullptr, nsrc, nInitCtxt});
     t_for.stop ();
 
-    t_destroy.start ();
-    Galois::do_all_choice (makeLocalRange(ctxtDelQ),
-				DelCtxt (ctxtAlloc), 
-        std::make_tuple (
-          Galois::loopname ("delete_all_ctxt"),
-          Galois::chunk_size<DEFAULT_CHUNK_SIZE> ()));
-    t_destroy.stop ();
-
-    reportStat (Base::loopname, "Number of iterations: ", niter.reduce (), 0);
-
+    reportStat (Base::loopname, "Number of iterations: ", nsrc.reduce (), 0);
     reportStat (Base::loopname, "Time taken in creating intial contexts: ",   t_create.get (), 0);
     reportStat (Base::loopname, "Time taken in finding intial sources: ", t_find.get (), 0);
     reportStat (Base::loopname, "Time taken in for_each loop: ", t_for.get (), 0);
@@ -599,51 +534,83 @@ public:
 };
 
 
-template <typename T, typename Cmp, typename NhFunc, typename OpFunc, typename Ctxt, typename ST, typename ArgsTuple> 
-class KDGaddRemWindowExec public OrderedExecutorBase<T, Cmp, NhFunc, HIDDEN::DummyExecFunc, OpFunc, ArgsTuple, Ctxt> {
+template <typename T, typename Cmp, typename NhFunc, typename OpFunc, typename SourceTest, typename ArgsTuple, typename Ctxt> 
+class KDGaddRemWindowExec: public KDGaddRemAsyncExec<T, Cmp, NhFunc, OpFunc, SourceTest, ArgsTuple, Ctxt> {
 
-  using Base = OrderedExecutorBase<T, Cmp, NhFunc, HIDDEN::DummyExecFunc, OpFunc, ArgsTuple, Ctxt>;
+  using Base = KDGaddRemAsyncExec<T, Cmp, NhFunc, OpFunc, SourceTest, ArgsTuple, Ctxt>;
 
-  // important paramters
-  // TODO: add capability to the interface to express these constants
-  static const size_t DELETE_CONTEXT_SIZE = 1024;
-  static const size_t UNROLL_FACTOR = OpFunc::UNROLL_FACTOR;
+  using WindowWL = typename std::conditional<Base::NEEDS_PUSH, PQwindowWL<T, Cmp>, SortedRangeWindowWL<T, Cmp> >::type;
 
-  static const unsigned DEFAULT_CHUNK_SIZE = 8;
+  using CtxtWL = typename Base::CtxtWL;
+  using Accumulator = typename Base::Accumulator;
 
 
 
-  // typedef MapBasedNhoodMgr<T, Cmp> NhoodMgr;
-  // typedef NhoodItem<T, Cmp, NhoodMgr> NItem;
-  // typedef typename NItem::Ctxt Ctxt;
-
-  using NhoodMgr =  typename Ctxt::NhoodMgr;
-
-  using CtxtAlloc = typenme Base::CtxtAlloc;
-  using CtxtWL = typenme Base::CtxtWL;
-
-  using CtxtDelQ = PerThreadBag<Ctxt*>;
-  using CtxtLocalQ = PerThreadBag<Ctxt*>;
-
-  using UserCtxt = typename Base::UserCtxt;
-  using PerThreadUserCtxt = typename Base::PerThreadUserCtxt;
-
-
-  using Accumulator =  Galois::GAccumulator<size_t>;
-
-
-  CtxtWL pending;
+  WindowWL winWL;
+  PerThreadBag<T> pending;
   CtxtWL sources;
+  Accumulator nsrc;
 
   void beginRound (void) {
+    Base::refillRound (winWL, pending);
   }
 
   void expandNhoodPending (void) {
+
+    Base::expandNhoodpickSources (makeLocalRange (pending), sources, Base::roundTasks);
+    pending.clear_all_parallel ();
+
+  }
+
+  void applyOperator (void) {
+
+    const T* minWinWL = nullptr;
+
+    if (Base::NEEDS_PUSH && Base::targetCommitRatio != 0.0) {
+      minWinWL = winWL.getMin ();
+    }
+    
+    using Op = typename Base::template ApplyOperator<WindowWL>;
+    Base::applyOperator (sources, Op {*this, winWL, minWinWL, Base::roundCommits, Base::roundTasks});
+  }
+
+  template <typename R>
+  void push_initial (const R& range) {
+
+    if (Base::targetCommitRatio == 0.0) {
+
+      Galois::do_all_choice (range,
+          [this] (const T& x) {
+            pending.push (x);
+          }, 
+          std::make_tuple (
+            Galois::loopname ("init-fill"),
+            chunk_size<NhFunc::CHUNK_SIZE> ()));
+
+
+    } else {
+      winWL.initfill (range);
+    }
   }
 
 public:
 
-  void execute (void) {
+  KDGaddRemWindowExec (
+      const Cmp& cmp,
+      const NhFunc& nhFunc,
+      const OpFunc& opFunc,
+      const ArgsTuple& argsTuple, 
+      typename Base::NhoodMgr& nhmgr,
+      const SourceTest& sourceTest)
+    :
+      Base (cmp, nhFunc, opFunc, argsTuple, nhmgr, sourceTest)
+  {}
+
+  template <typename R>
+  void execute (const R& range) {
+
+    push_initial (range);
+
     while (true) {
 
       beginRound ();
@@ -651,10 +618,14 @@ public:
       expandNhoodPending ();
 
       if (sources.empty_all ()) {
+        assert (pending.empty_all ());
         break;
       }
-      
+
+
       applyOperator ();
+
+      Base::endRound ();
 
 
     }
@@ -663,36 +634,52 @@ public:
 };
 
 
-template <typename R, typename Cmp, typename NhFunc, typename OpFunc, typename ST, typename ArgsTuple>
-void for_each_ordered_lc_impl (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const ST& sourceTest, const ArgsTuple& argsTuple) {
+template <
+    template <typename _one, typename _two, typename _three, typename _four, typename _five, typename _six, typename _seven> class Executor, 
+    typename R, typename Cmp, typename NhFunc, typename OpFunc, typename ST, typename ArgsTuple>
+void for_each_ordered_ar_impl (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const ST& sourceTest, const ArgsTuple& argsTuple) {
 
   typedef typename R::value_type T;
+
+  auto argsT = std::tuple_cat (argsTuple, 
+      get_default_trait_values (argsTuple,
+        std::make_tuple (loopname_tag {}, enable_parameter_tag {}),
+        std::make_tuple (default_loopname {}, enable_parameter<false> {})));
+  using ArgsT = decltype (argsT);
 
   typedef KDGaddRemContext<T, Cmp> Ctxt;
   typedef typename Ctxt::NhoodMgr NhoodMgr;
   typedef typename Ctxt::NItem NItem;
   typedef typename Ctxt::CtxtCmp  CtxtCmp;
 
-  typedef KDGaddRemAsyncExec<T, Cmp, NhFunc, OpFunc, Ctxt, ST, ArgsTuple> Exec;
+  using Exec =  Executor<T, Cmp, NhFunc, OpFunc, ST, ArgsT, Ctxt>;
 
   CtxtCmp ctxtcmp (cmp);
   typename NItem::Factory factory(ctxtcmp);
   NhoodMgr nhmgr (factory);
 
-  Exec e (cmp, nhFunc, opFunc, nhmgr, sourceTest, argsTuple);
+  Exec e (cmp, nhFunc, opFunc, argsT, nhmgr, sourceTest);
   e.execute (range);
 }
 
-template <typename R, typename Cmp, typename NhFunc, typename OpFunc, typename StableTest>
-void for_each_ordered_lc (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const StableTest& stabilityTest, const char* loopname) {
+template <typename R, typename Cmp, typename NhFunc, typename OpFunc, typename StableTest, typename ArgsTuple>
+void for_each_ordered_ar (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const StableTest& stabilityTest, const ArgsTuple& argsTuple) {
 
-  for_each_ordered_lc_impl (range, cmp, nhFunc, opFunc, SourceTest<StableTest> (stabilityTest), loopname);
+  if (addRemWinArg) {
+    for_each_ordered_ar_impl<KDGaddRemWindowExec> (range, cmp, nhFunc, opFunc, SourceTest<StableTest> (stabilityTest), argsTuple);
+  } else {
+    for_each_ordered_ar_impl<KDGaddRemAsyncExec> (range, cmp, nhFunc, opFunc, SourceTest<StableTest> (stabilityTest), argsTuple);
+  }
 }
 
-template <typename R, typename Cmp, typename NhFunc, typename OpFunc>
-void for_each_ordered_lc (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const char* loopname) {
+template <typename R, typename Cmp, typename NhFunc, typename OpFunc, typename ArgsTuple>
+void for_each_ordered_ar (const R& range, const Cmp& cmp, const NhFunc& nhFunc, const OpFunc& opFunc, const ArgsTuple& argsTuple) {
 
-  for_each_ordered_lc_impl (range, cmp, nhFunc, opFunc, SourceTest<void> (), loopname);
+  if (addRemWinArg) {
+    for_each_ordered_ar_impl<KDGaddRemWindowExec> (range, cmp, nhFunc, opFunc, SourceTest<void> (), argsTuple);
+  } else {
+    for_each_ordered_ar_impl<KDGaddRemAsyncExec> (range, cmp, nhFunc, opFunc, SourceTest<void> (), argsTuple);
+  }
 }
 
 } // end namespace Runtime

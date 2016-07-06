@@ -8,6 +8,7 @@
 #include "Galois/DoAllWrap.h"
 
 #include "Galois/Runtime/OrderedLockable.h"
+#include "Galois/Runtime/WindowWorkList.h"
 
 #include <boost/iterator/filter_iterator.hpp>
 #include <boost/iterator/filter_iterator.hpp>
@@ -92,44 +93,6 @@ struct SafetyTestLoop<Ctxt, int> {
   }
 };
 
-
-template <typename F, typename Ctxt, typename UserCtxt, typename... Args>
-void runCatching (F& func, Ctxt* c, UserCtxt& uhand, Args&&... args) {
-  Galois::Runtime::setThreadContext (c);
-
-  int result = 0;
-
-#ifdef GALOIS_USE_LONGJMP
-  if ((result = setjmp(hackjmp)) == 0) {
-#else
-    try {
-#endif
-      func (c->getActive (), uhand, std::forward<Args> (args)...);
-
-#ifdef GALOIS_USE_LONGJMP
-    } else {
-      // TODO
-    }
-#else 
-  } catch (ConflictFlag f) {
-    result = f;
-  }
-#endif
-
-  switch (result) {
-    case 0:
-      break;
-    case CONFLICT: 
-      c->disableSrc ();
-      break;
-    default:
-      GALOIS_DIE ("can't handle conflict flag type");
-      break;
-  }
-
-
-  Galois::Runtime::setThreadContext (NULL);
-}
 
 template <typename T, typename Cmp, typename NhFunc, typename ExFunc, typename OpFunc, typename ArgsTuple, typename Ctxt>
 class IKDGbase: public OrderedExecutorBase<T, Cmp, NhFunc, ExFunc, OpFunc, ArgsTuple, Ctxt> {
