@@ -41,9 +41,7 @@ for task in $SET; do
   fi
   set -x #echo on
   eval "GALOIS_DO_NOT_BIND_THREADS=1 amplxe-cl -r ${execname}_${inputname}_${1}_exploration -call-stack-mode all -trace-mpi -analyze-system -start-paused -collect general-exploration $MPI -n=$3 ${EXEC} ${INPUT} -noverify -pset=$1 ${PFLAGS} -runs=1 -t=$3 |& tee ${execname}_${inputname}_${1}.out"
-  eval "GALOIS_DO_NOT_BIND_THREADS=1 amplxe-cl -r ${execname}_${inputname}_${1}_hotspots -call-stack-mode all -trace-mpi -analyze-system -start-paused -collect hotspots $MPI -n=$3 ${EXEC} ${INPUT} -noverify -pset=$1 ${PFLAGS} -runs=1 -t=$3 |& tee ${execname}_${inputname}_${1}.out"
-  eval "GALOIS_DO_NOT_BIND_THREADS=1 amplxe-cl -r ${execname}_${inputname}_${1}_concurrency -call-stack-mode all -trace-mpi -analyze-system -start-paused -collect cpugpu-concurrency $MPI -n=$3 ${EXEC} ${INPUT} -noverify -pset=$1 ${PFLAGS} -runs=1 -t=$3 |& tee ${execname}_${inputname}_${1}.out"
-  eval "GALOIS_DO_NOT_BIND_THREADS=1 amplxe-cl -r ${execname}_${inputname}_${1}_locks -call-stack-mode all -trace-mpi -analyze-system -start-paused -collect locksandwaits $MPI -n=$3 ${EXEC} ${INPUT} -noverify -pset=$1 ${PFLAGS} -runs=1 -t=$3 |& tee ${execname}_${inputname}_${1}.out"
+  eval "GALOIS_DO_NOT_BIND_THREADS=1 amplxe-cl -r ${execname}_${inputname}_${1}_hotspots -call-stack-mode all -trace-mpi -analyze-system -start-paused -collect advanced_hotspots $MPI -n=$3 ${EXEC} ${INPUT} -noverify -pset=$1 ${PFLAGS} -runs=1 -t=$3 |& tee ${execname}_${inputname}_${1}.out"
   set +x #echo off
 done
 
