@@ -52,6 +52,7 @@ struct GBPartitionerDisk {
       std::vector<size_t> vertexMasters;
       std::vector<int> mastersPerHost;
       std::vector<std::FILE*> tmpPartitionFiles;
+      std::vector<std::string> tmpPartitionFiles_names;
       std::vector<std::vector<size_t> > global2Local;
 //      std::vector<std::vector<size_t> > globalIDPerHost;
 
@@ -60,17 +61,26 @@ struct GBPartitionerDisk {
          vertexOwners.resize(nn);
          vertexOwnersPacked.resize(nn);
          for (auto h = 0; h < numHosts; ++h) {
-            tmpPartitionFiles.push_back(std::tmpfile());
+            std::string tmpfileName = "/net/ohm/export/cdgc/tmp/TMPFILE." + std::to_string(h);
+            tmpPartitionFiles_names.push_back(tmpfileName);
+            std::FILE* file_handle = std::fopen(tmpfileName.c_str(), "wb+");
+            tmpPartitionFiles.push_back(file_handle);
+            std::cout << "Pushed file : " << tmpfileName << "\n";
+            //tmpPartitionFiles.push_back(std::tmpfile());
             global2Local[h].resize(nn, -1);
          }
+         std::cout << "Init : Loop 1 \n";
+
          for (int i = 0; i < nn; ++i) {
             vertexOwners[i].resize(numHosts);
          }
          mastersPerHost.resize(numHosts, 0);
+         std::cout << "Init : Loop 2 \n";
 
          vertexMasters.resize(nn, -1);
          edgesPerHost.resize(numHosts, 0);
          verticesPerHost.resize(numHosts, 0);
+         std::cout << "Done Init \n";
       }
       static void writeEdgeToTempFile(std::FILE * f, size_t src, size_t dst) {
          NewEdgeData ed(src, dst);
@@ -207,6 +217,12 @@ struct GBPartitionerDisk {
          }
       }
       ~VertexCutInfo() {
+        for(auto F : tmpPartitionFiles){
+          std::fclose(F);
+        }
+        for(auto N : tmpPartitionFiles_names){
+          std::remove(N.c_str());
+        }
       }
    };
    /******************************************************************
