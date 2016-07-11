@@ -13,7 +13,6 @@ inputdirname=$(dirname "$INPUT")
 inputname=$(basename "$INPUT" ".gr")
 if [[ $EXEC == *"pull"* ]]; then
   inputdirname=${inputdirname}/transpose
-  inputname=${inputname}.transpose
   INPUT=${inputdirname}/${inputname}.gr
 fi
 
@@ -60,6 +59,7 @@ for task in $SET; do
     fi
   fi
   rm -f output_*.log
+  echo "GALOIS_DO_NOT_BIND_THREADS=1 $MPI -n=$2 ${EXEC} -verify -runs=1 ${PFLAGS} -pset=$1 -t=$3 ${INPUT}" >>$LOG
   eval "GALOIS_DO_NOT_BIND_THREADS=1 $MPI -n=$2 ${EXEC} -verify -runs=1 ${PFLAGS} -pset=$1 -t=$3 ${INPUT}" >>$LOG 2>&1
   outputs="output_${hostname}_0.log"
   i=1
