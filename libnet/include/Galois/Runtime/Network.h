@@ -40,10 +40,10 @@ typedef void (*recvFuncTy)(RecvBuffer&);
 
 class NetworkInterface {
 protected:
-  Galois::Statistic statSendNum;
-  Galois::Statistic statRecvNum;
-  Galois::Statistic statSendBytes;
-  Galois::Statistic statRecvBytes;
+  unsigned long statSendNum;
+  unsigned long statRecvNum;
+  unsigned long statSendBytes;
+  unsigned long statRecvBytes;
 
   
 public:
@@ -52,7 +52,7 @@ public:
   static uint32_t Num;
 
   NetworkInterface(): 
-    statSendNum("SendNum"), statRecvNum("RecvNum"), statSendBytes("SendBytes"), statRecvBytes("RecvBytes") { }
+    statSendNum(0), statRecvNum(0), statSendBytes(0), statRecvBytes() { }
   virtual ~NetworkInterface();
 
   void dumpStats() const;

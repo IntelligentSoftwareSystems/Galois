@@ -99,6 +99,12 @@ public:
   void push(Statistic& s) {
     stats.push_back(&s);
   }
+
+  void reportStat(){
+    for(auto* s : stats)
+      s->report();
+    Galois::Runtime::printStats();
+  }
 };
 
 //! Flag type for {@link StatTimer}

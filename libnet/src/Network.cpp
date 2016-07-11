@@ -43,12 +43,20 @@ uint32_t Galois::Runtime::getHostID() { return NetworkInterface::ID; }
 Galois::Runtime::NetworkIO::~NetworkIO() {}
 
 void NetworkInterface::reportStats() {
+  Galois::Runtime::reportStat("NULL", "RecvNum", statRecvNum, 0);
+  Galois::Runtime::reportStat("NULL", "RecvBytes", statRecvBytes, 0);
+  Galois::Runtime::reportStat("NULL", "SendNum", statSendNum, 0);
+  Galois::Runtime::reportStat("NULL", "SendBytes", statSendBytes, 0);
+#if 0
   statRecvNum.report();
   statRecvBytes.report();
   statSendNum.report();
   statSendBytes.report();
+#endif
+
 }
 
+#if 0
 void NetworkInterface::dumpStats() const {
   std::cout << ID
             << ": RN " << statRecvNum.getVal()
@@ -56,7 +64,7 @@ void NetworkInterface::dumpStats() const {
             << " SN " <<statSendNum.getVal()
             << " SB " << statSendBytes.getVal() << "\n";
 }
-
+#endif
 unsigned long NetworkInterface::reportSendBytes() {
   //  return statSendBytes.getVal();
 }
