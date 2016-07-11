@@ -10,7 +10,6 @@ inputdirname=$(dirname "$INPUT")
 inputname=$(basename "$INPUT" ".gr")
 if [[ $EXEC == *"pull"* ]]; then
   inputdirname=${inputdirname}/transpose
-  inputname=${inputname}.transpose
   INPUT=${inputdirname}/${inputname}.gr
 fi
 
