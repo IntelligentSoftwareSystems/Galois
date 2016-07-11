@@ -382,17 +382,6 @@ public:
          assert(found);
       }
 
-      for(uint32_t h = 0; h < hostNodes.size(); ++h){
-        uint32_t start, end;
-        std::tie(start, end) = nodes_by_host(h);
-        for(; start != end; ++start){
-          slaveNodes[h].push_back(L2G(start));
-        }
-      }
-
-      //Exchange information for memoization optimization.
-      exchange_info_init();
-
       for(unsigned h = 0; h < hostNodes.size(); ++h){
         std::string temp_str = ("GhostNodes_from_" + std::to_string(h));
         Galois::Statistic temp_stat_ghosNode(temp_str);
@@ -414,6 +403,17 @@ public:
 #ifdef __GALOIS_HET_OPENCL__
       clGraph.load_from_hgraph(*this);
 #endif
+
+      for(uint32_t h = 0; h < hostNodes.size(); ++h){
+        uint32_t start, end;
+        std::tie(start, end) = nodes_by_host(h);
+        for(; start != end; ++start){
+          slaveNodes[h].push_back(L2G(start));
+        }
+      }
+
+      //Exchange information for memoization optimization.
+      exchange_info_init();
    }
 
    template<bool isVoidType, typename std::enable_if<!isVoidType>::type* = nullptr>
