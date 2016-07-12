@@ -274,8 +274,12 @@ public:
    template<typename FnTy>
      void syncRecvApply(Galois::Runtime::RecvBuffer& buf) {
        uint32_t num;
+       unsigned from_id;
+       std::string loopName;
+       uint32_t num_iter_push;
        auto& net = Galois::Runtime::getSystemNetworkInterface();
-       Galois::Runtime::gDeserialize(buf, num);
+       Galois::Runtime::gDeserialize(buf, loopName, num_iter_push, from_id, num);
+       std::string doall_str("LAMBDA::SYNC_PUSH_RECV_APPLY_" + loopName + "_" + std::to_string(num_run) + "_" + std::to_string(num_iter_push));
 #if 0
        for (; num; --num) {
          size_t gid;
@@ -287,15 +291,15 @@ public:
          FnTy::reduce(lid, getData(lid), val);
        }
 #endif
+       assert(num == masterNodes[from_id].size());
        if(num > 0){
-         std::vector<uint64_t> gid_vec(num);
          std::vector<typename FnTy::ValTy> val_vec(num);
-         Galois::Runtime::gDeserialize(buf, gid_vec, val_vec);
+         Galois::Runtime::gDeserialize(buf, val_vec);
          Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num),
              [&](uint32_t n){
-             auto lid = G2L(gid_vec[n]);
+             auto lid = masterNodes[from_id][n];
              FnTy::reduce(lid, getData(lid), val_vec[n]);
-             }, Galois::loopname("lambda::syncRecvApply"));
+             }, Galois::loopname(doall_str.c_str()));
        }
      }
 
@@ -308,11 +312,12 @@ public:
        std::string loopName;
        uint32_t num_iter_pull;
        Galois::Runtime::gDeserialize(buf, loopName, num_iter_pull, from_id, num);
-       std::string statSendBytes_str("SEND_BYTES_SYNC_PULL_REPLY_" + loopName +"_" + std::to_string(num_run) + "_" + std::to_string(num_iter_pull));
+       std::string statSendBytes_str("SEND_BYTES_SYNC_PULL_REPLY_" + loopName + "_" + std::to_string(num_run) + "_" + std::to_string(num_iter_pull));
        Galois::Statistic SyncPullReply_send_bytes(statSendBytes_str);
+       std::string doall_str("LAMBDA::SYNC_PULL_RECV_REPLY_" + loopName + "_" + std::to_string(num_run) + "_" + std::to_string(num_iter_pull));
        Galois::Runtime::SendBuffer b;
        assert(num == masterNodes[from_id].size());
-       gSerialize(b, idForSelf(), fn, id, num);
+       gSerialize(b, idForSelf(), fn, loopName, num_iter_pull, id, num);
 
 #if 0
        /********** Serial loop: works ****************/
@@ -329,21 +334,19 @@ public:
 #endif
 
        if(num >0){
-       std::vector<uint64_t> gid_vec(num);
        std::vector<typename FnTy::ValTy> val_vec(num);
        //std::cout << "["<< net.ID << "] num : " << num << "\n";
 
        Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
-                auto localID = G2L(masterNodes[from_id][n]);
+                auto localID = masterNodes[from_id][n];
                 //std::cout << "["<< net.ID << "] n : " << n << "\n";
                 auto val = FnTy::extract((localID), getData(localID));
                 assert(n < num);
-                gid_vec[n] = masterNodes[from_id][n];
                 val_vec[n] = val;
 
-                }, Galois::loopname("lambda::synpull"));
+                }, Galois::loopname(doall_str.c_str()));
 
-       Galois::Runtime::gSerialize(b, gid_vec, val_vec);
+       Galois::Runtime::gSerialize(b, val_vec);
        }
      //std::cout << "[" << net.ID << "] Serialized : sending to other host\n";
      SyncPullReply_send_bytes += b.size();
@@ -355,19 +358,21 @@ public:
        assert(num_recv_expected > 0);
        uint32_t num;
        unsigned from_id;
-       Galois::Runtime::gDeserialize(buf, from_id, num);
+       std::string loopName;
+       uint32_t num_iter_pull;
+       Galois::Runtime::gDeserialize(buf, loopName, num_iter_pull, from_id, num);
+       std::string doall_str("LAMBDA::SYNC_PULL_RECV_APPLY_" + loopName + "_" + std::to_string(num_run) + "_" + std::to_string(num_iter_pull));
        assert(num == slaveNodes[from_id].size());
        auto& net = Galois::Runtime::getSystemNetworkInterface();
 
        if(num > 0 ){
-         std::vector<uint64_t> gid_vec(num);
          std::vector<typename FnTy::ValTy> val_vec(num);
 
-         Galois::Runtime::gDeserialize(buf, gid_vec, val_vec);
+         Galois::Runtime::gDeserialize(buf, val_vec);
 
          Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
-             auto localID = G2L(gid_vec[n]);
-             FnTy::setVal((localID), getData(localID), val_vec[n]);}, Galois::loopname("lambda synpull_apply"));
+             auto localID = slaveNodes[from_id][n];
+             FnTy::setVal((localID), getData(localID), val_vec[n]);}, Galois::loopname(doall_str.c_str()));
 
        }
 #if 0
@@ -446,6 +451,20 @@ public:
 
     //Exchange information.
     exchange_info_init();
+
+    for(uint32_t h = 0; h < masterNodes.size(); ++h){
+       Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(masterNodes[h].size()),
+           [&](uint32_t n){
+           masterNodes[h][n] = G2L(masterNodes[h][n]);
+           }, Galois::loopname("MASTER_NODES"));
+    }
+
+    for(uint32_t h = 0; h < slaveNodes.size(); ++h){
+       Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(slaveNodes[h].size()),
+           [&](uint32_t n){
+           slaveNodes[h][n] = G2L(slaveNodes[h][n]);
+           }, Galois::loopname("SLAVE_NODES"));
+    }
 
     for(auto x = 0; x < masterNodes.size(); ++x){
       std::string master_nodes_str = "MASTER_NODES_TO_" + std::to_string(x);
@@ -569,7 +588,8 @@ public:
        ++num_iter_push;
        std::string timer_str("SYNC_PUSH_" + loopName + "_" + std::to_string(num_run) + "_" + std::to_string(num_iter_push));
        std::string timer_barrier_str("SYNC_PUSH_BARRIER_" + loopName + "_" + std::to_string(num_run) + "_" + std::to_string(num_iter_push));
-       std::string statSendBytes_str("SEND_BYTES_SYNC_PUSH_" + loopName +"_" + std::to_string(num_run) + "_" + std::to_string(num_iter_pull));
+       std::string statSendBytes_str("SEND_BYTES_SYNC_PUSH_" + loopName + "_" + std::to_string(num_run) + "_" + std::to_string(num_iter_push));
+       std::string doall_str("LAMBDA::SYNC_PUSH_" + loopName + "_" + std::to_string(num_run) + "_" + std::to_string(num_iter_push));
        Galois::Statistic SyncPush_send_bytes(statSendBytes_str);
        Galois::StatTimer StatTimer_syncPush(timer_str.c_str());
        Galois::StatTimer StatTimerBarrier_syncPush(timer_barrier_str.c_str());
@@ -581,7 +601,7 @@ public:
            continue;
 
          Galois::Runtime::SendBuffer b;
-         gSerialize(b, idForSelf(), fn, num);
+         gSerialize(b, idForSelf(), fn, loopName, num_iter_push, net.ID, num);
 
 #if 0
          for (auto start = 0; start < slaveNodes[x].size(); ++start) {
@@ -594,19 +614,16 @@ public:
 #endif
 
          if(num > 0 ){
-           std::vector<uint64_t> gid_vec(num);
            std::vector<typename FnTy::ValTy> val_vec(num);
 
            Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
-                uint64_t gid = slaveNodes[x][n];
-                auto lid = G2L(gid);
+                auto lid = slaveNodes[x][n];
                 auto val = FnTy::extract(lid, getData(lid));
                 FnTy::reset(lid, getData(lid));
-                gid_vec[n] = gid;
                 val_vec[n] = val;
-               }, Galois::loopname("Lambda::sync_push"));
+               }, Galois::loopname(doall_str.c_str()));
 
-           gSerialize(b, gid_vec, val_vec);
+           gSerialize(b, val_vec);
          }
 
          SyncPush_send_bytes += b.size();
