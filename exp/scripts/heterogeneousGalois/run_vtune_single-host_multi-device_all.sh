@@ -9,13 +9,12 @@ execname=$(basename "$EXEC" "")
 inputdirname=$(dirname "$INPUT")
 inputname=$(basename "$INPUT" ".gr")
 extension=gr
-if [[ $EXEC == *"pull"* ]]; then
-  inputdirname=${inputdirname}/transpose
-  extension=tgr
-fi
 if [[ $EXEC == *"cc"* ]]; then
   inputdirname=${inputdirname}/symmetric
   extension=sgr
+elif [[ $EXEC == *"pull"* ]]; then
+  inputdirname=${inputdirname}/transpose
+  extension=tgr
 fi
 INPUT=${inputdirname}/${inputname}.${extension}
 
