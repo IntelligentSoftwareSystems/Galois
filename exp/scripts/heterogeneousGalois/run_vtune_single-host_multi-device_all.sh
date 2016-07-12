@@ -8,10 +8,16 @@ INPUT=$2
 execname=$(basename "$EXEC" "")
 inputdirname=$(dirname "$INPUT")
 inputname=$(basename "$INPUT" ".gr")
+extension=gr
 if [[ $EXEC == *"pull"* ]]; then
   inputdirname=${inputdirname}/transpose
-  INPUT=${inputdirname}/${inputname}.gr
+  extension=tgr
 fi
+if [[ $EXEC == *"cc"* ]]; then
+  inputdirname=${inputdirname}/symmetric
+  extension=sgr
+fi
+INPUT=${inputdirname}/${inputname}.${extension}
 
 FLAGS=
 
@@ -32,7 +38,7 @@ for task in $SET; do
   set $task;
   PFLAGS=$FLAGS
   if [[ $EXEC == *"vertex-cut"* ]]; then
-    PFLAGS+=" -partFolder=${inputdirname}/partitions/${2}/${inputname}.gr"
+    PFLAGS+=" -partFolder=${inputdirname}/partitions/${2}/${inputname}.${extension}"
   else
     if [[ ($1 == *"gc"*) || ($1 == *"cg"*) ]]; then
       PFLAGS+=" -scalegpu=3"
