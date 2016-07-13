@@ -298,11 +298,13 @@ public:
        if(num > 0){
          std::vector<typename FnTy::ValTy> val_vec(num);
          Galois::Runtime::gDeserialize(buf, val_vec);
-         Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num),
-             [&](uint32_t n){
-             auto lid = masterNodes[from_id][n];
-             FnTy::reduce(lid, getData(lid), val_vec[n]);
-             }, Galois::loopname(doall_str.c_str()));
+         if (!FnTy::reduce_batch(from_id, &val_vec[0])) {
+           Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num),
+               [&](uint32_t n){
+               auto lid = masterNodes[from_id][n];
+               FnTy::reduce(lid, getData(lid), val_vec[n]);
+               }, Galois::loopname(doall_str.c_str()));
+         }
        }
        StatTimer_set.stop();
      }
@@ -344,14 +346,16 @@ public:
        std::vector<typename FnTy::ValTy> val_vec(num);
        //std::cout << "["<< net.ID << "] num : " << num << "\n";
 
-       Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
-                auto localID = masterNodes[from_id][n];
-                //std::cout << "["<< net.ID << "] n : " << n << "\n";
-                auto val = FnTy::extract((localID), getData(localID));
-                assert(n < num);
-                val_vec[n] = val;
+       if (!FnTy::extract_batch(from_id, &val_vec[0])) {
+         Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
+                  auto localID = masterNodes[from_id][n];
+                  //std::cout << "["<< net.ID << "] n : " << n << "\n";
+                  auto val = FnTy::extract((localID), getData(localID));
+                  assert(n < num);
+                  val_vec[n] = val;
 
-                }, Galois::loopname(doall_str.c_str()));
+                  }, Galois::loopname(doall_str.c_str()));
+       }
 
        Galois::Runtime::gSerialize(b, val_vec);
        }
@@ -382,9 +386,11 @@ public:
 
          Galois::Runtime::gDeserialize(buf, val_vec);
 
-         Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
-             auto localID = slaveNodes[from_id][n];
-             FnTy::setVal((localID), getData(localID), val_vec[n]);}, Galois::loopname(doall_str.c_str()));
+         if (!FnTy::setVal_batch(from_id, &val_vec[0])) {
+           Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
+               auto localID = slaveNodes[from_id][n];
+               FnTy::setVal((localID), getData(localID), val_vec[n]);}, Galois::loopname(doall_str.c_str()));
+         }
 
        }
 #if 0
@@ -471,6 +477,7 @@ public:
            masterNodes[h][n] = G2L(masterNodes[h][n]);
            }, Galois::loopname("MASTER_NODES"));
     }
+    masterNodes.resize(hostNodes.size());
 
     for(uint32_t h = 0; h < slaveNodes.size(); ++h){
        Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(slaveNodes[h].size()),
@@ -478,6 +485,7 @@ public:
            slaveNodes[h][n] = G2L(slaveNodes[h][n]);
            }, Galois::loopname("SLAVE_NODES"));
     }
+    slaveNodes.resize(hostNodes.size());
 
     for(auto x = 0; x < masterNodes.size(); ++x){
       std::string master_nodes_str = "MASTER_NODES_TO_" + std::to_string(x);
@@ -632,12 +640,14 @@ public:
          if(num > 0 ){
            std::vector<typename FnTy::ValTy> val_vec(num);
 
-           Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
-                auto lid = slaveNodes[x][n];
-                auto val = FnTy::extract(lid, getData(lid));
-                FnTy::reset(lid, getData(lid));
-                val_vec[n] = val;
-               }, Galois::loopname(doall_str.c_str()));
+           if (!FnTy::extract_reset_batch(x, &val_vec[0])) {
+             Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
+                  auto lid = slaveNodes[x][n];
+                  auto val = FnTy::extract(lid, getData(lid));
+                  FnTy::reset(lid, getData(lid));
+                  val_vec[n] = val;
+                 }, Galois::loopname(doall_str.c_str()));
+           }
 
            gSerialize(b, val_vec);
          }
@@ -733,6 +743,7 @@ public:
       m.edge_data[index] = getEdgeData(e);
    }
    MarshalGraph getMarshalGraph(unsigned host_id) {
+      assert(host_id == id);
       MarshalGraph m;
 
       m.nnodes = size();
@@ -774,6 +785,31 @@ public:
 
       m.row_start[node_counter] = edge_counter;
       m.nedges = edge_counter;
+
+      // copy memoization meta-data
+      m.num_master_nodes = (size_t *) calloc(hostNodes.size(), sizeof(size_t));;
+      m.master_nodes = (size_t **) calloc(hostNodes.size(), sizeof(size_t *));;
+      for(uint32_t h = 0; h < hostNodes.size(); ++h){
+        m.num_master_nodes[h] = masterNodes[h].size();
+        if (masterNodes[h].size() > 0) {
+          m.master_nodes[h] = (size_t *) calloc(masterNodes[h].size(), sizeof(size_t));;
+          std::copy(masterNodes[h].begin(), masterNodes[h].end(), m.master_nodes[h]);
+        } else {
+          m.master_nodes[h] = NULL;
+        }
+      }
+      m.num_slave_nodes = (size_t *) calloc(hostNodes.size(), sizeof(size_t));;
+      m.slave_nodes = (size_t **) calloc(hostNodes.size(), sizeof(size_t *));;
+      for(uint32_t h = 0; h < hostNodes.size(); ++h){
+        m.num_slave_nodes[h] = slaveNodes[h].size();
+        if (slaveNodes[h].size() > 0) {
+          m.slave_nodes[h] = (size_t *) calloc(slaveNodes[h].size(), sizeof(size_t));;
+          std::copy(slaveNodes[h].begin(), slaveNodes[h].end(), m.slave_nodes[h]);
+        } else {
+          m.slave_nodes[h] = NULL;
+        }
+      }
+
       return m;
    }
 #endif
