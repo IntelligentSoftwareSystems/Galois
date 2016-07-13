@@ -41,8 +41,10 @@
 #include "Galois/Substrate/PtrLock.h"
 #include "Galois/Substrate/CacheLineStorage.h"
 #include "Galois/Substrate/NumaMem.h"
+#include "Galois/Substrate/gio.h"
 #include "Galois/Runtime/PagePool.h"
 
+#include <memory>
 #include <boost/utility.hpp>
 #include <cstdlib>
 #include <cstring>
@@ -50,8 +52,6 @@
 #include <list>
 #include <cstddef>
 #include <cstdio>
-
-#include <memory.h>
 
 namespace Galois {
 namespace Runtime {
@@ -212,6 +212,7 @@ class FreeListHeap : public SourceHeap {
   };
   FreeNode* head;
 
+  using dbg = Substrate::debug<0>;
 public:
   enum { AllocSize = SourceHeap::AllocSize };
 
@@ -229,12 +230,16 @@ public:
   }
 
   inline void* allocate(size_t size) {
-    if (head) {
+    if (head) { 
       void* ptr = head;
       head = head->next;
+      dbg::print (this, " picking from free list, ptr = ", ptr);
+      return ptr;
+    } else {
+      void* ptr = SourceHeap::allocate(size);
+      dbg::print (this, " allocating from SourceHeap, ptr = ", ptr);
       return ptr;
     }
-    return SourceHeap::allocate(size);
   }
 
   inline void deallocate(void* ptr) {
@@ -243,6 +248,8 @@ public:
     FreeNode* NH = (FreeNode*)ptr;
     NH->next = head;
     head = NH;
+    dbg::print (this, " adding block to list, head = ", head);
+
   }
 };
 
@@ -547,6 +554,80 @@ public:
   }
 };
 
+
+template <typename Derived>
+class StaticSingleInstance: private boost::noncopyable {
+
+  // static std::unique_ptr<Derived> instance;
+  static Substrate::PtrLock<Derived> ptr;
+
+public:
+  static Derived* getInstance (void) {
+    Derived* f = ptr.getValue();
+    if (f) {
+      // assert (f == instance.get ());
+      return f;
+    }
+    
+    ptr.lock();
+    f = ptr.getValue();
+    if (f) {
+      ptr.unlock();
+      // assert (f == instance.get ());
+    } else {
+      // instance = std::unique_ptr<Derived> (new Derived());
+      // f = instance.get ();
+      f = new Derived;
+      ptr.unlock_and_set(f);
+    }
+    return f;
+  }
+};
+
+// template <typename Derived>
+// std::unique_ptr<Derived> StaticSingleInstance<Derived>::instance = std::unique_ptr<Derived>();
+
+template <typename Derived>
+Substrate::PtrLock<Derived> StaticSingleInstance<Derived>::ptr = Substrate::PtrLock<Derived>();
+
+
+class PageHeap: public StaticSingleInstance<PageHeap> {
+
+  using Base = StaticSingleInstance<PageHeap>;
+
+  /* template <typename _U> */  friend class StaticSingleInstance<PageHeap>;
+
+  using InnerHeap = ThreadPrivateHeap<FreeListHeap<SystemHeap> >;
+  // using InnerHeap = SystemHeap;
+
+  InnerHeap innerHeap;
+
+  using dbg = Substrate::debug<0>;
+
+  PageHeap (): innerHeap () {
+    dbg::print ("New instance of PageHeap: ", this);
+  }
+
+public:
+
+  enum {AllocSize = InnerHeap::AllocSize};
+
+  inline void* allocate (size_t size) {
+    assert (size <= AllocSize);
+    void* ptr = innerHeap.allocate (size);
+    dbg::print (this, " PageHeap allocate, ptr = ", ptr);
+    return ptr;
+  }
+
+  inline void deallocate (void* ptr) {
+    assert (ptr);
+    dbg::print (this, " PageHeap  deallocate ptr = ", ptr);
+    innerHeap.deallocate (ptr);
+  }
+
+};
+
+
 #ifdef GALOIS_FORCE_STANDALONE
 class SizedHeapFactory: private boost::noncopyable {
 public:
@@ -560,7 +641,9 @@ private:
   static SizedHeap alloc;
 };
 #else
-class SizedHeapFactory: private boost::noncopyable {
+class SizedHeapFactory: public StaticSingleInstance<SizedHeapFactory> {
+  using Base = StaticSingleInstance<SizedHeapFactory>;
+  /* template <typename> */  friend class StaticSingleInstance<SizedHeapFactory>;
 public:
 //! [FixedSizeAllocator example]
   typedef ThreadPrivateHeap<
@@ -571,17 +654,17 @@ public:
 
 private:
   typedef std::map<size_t, SizedHeap*> HeapMap;
-  static SizedHeapFactory* getInstance();
-  static Substrate::PtrLock<SizedHeapFactory> instance;
   static __thread HeapMap* localHeaps;
   HeapMap heaps;
   std::list<HeapMap*> allLocalHeaps;
   Substrate::SimpleLock lock;
 
   SizedHeapFactory();
-  ~SizedHeapFactory();
 
   SizedHeap* getHeap(const size_t);
+
+public:
+  ~SizedHeapFactory();
 };
 #endif
 
@@ -721,9 +804,12 @@ public:
   }
 };
 
-class Pow_2_BlockHeap: private boost::noncopyable {
+class Pow_2_BlockHeap: public StaticSingleInstance<Pow_2_BlockHeap> {
 
-  private:
+private:
+
+  using Base = StaticSingleInstance<Pow_2_BlockHeap>;
+  /* template <typename> */ friend class StaticSingleInstance<Pow_2_BlockHeap>;
 
   static const bool USE_MALLOC_AS_BACKUP = true;
 
@@ -733,8 +819,6 @@ class Pow_2_BlockHeap: private boost::noncopyable {
   typedef FixedSizeHeap Heap_ty;
 
   std::vector<Heap_ty> heapTable;
-
-  static Substrate::PtrLock<Pow_2_BlockHeap> instance;
 
   static inline size_t pow2 (unsigned i) {
     return (1U << i);
@@ -770,8 +854,6 @@ class Pow_2_BlockHeap: private boost::noncopyable {
 
 
   public:
-
-  static Pow_2_BlockHeap* getInstance (void);
 
   void* allocateBlock (const size_t allocSize) {
 
