@@ -612,7 +612,6 @@ public:
       StatTimer_syncPush.start();
       auto& net = Galois::Runtime::getSystemNetworkInterface();
 
-      StatTimer_extract.start();
       for (unsigned x = 0; x < net.Num; ++x) {
          uint32_t num = slaveNodes[x].size();
          if((x == id) || (num == 0))
@@ -621,6 +620,7 @@ public:
          Galois::Runtime::SendBuffer b;
          gSerialize(b, idForSelf(), fn, loopName, num_iter_push, net.ID, num);
 
+         StatTimer_extract.start();
          if(num > 0 ){
            std::vector<typename FnTy::ValTy> val_vec(num);
 
@@ -639,11 +639,11 @@ public:
 
            gSerialize(b, val_vec);
          }
+         StatTimer_extract.stop();
 
          SyncPush_send_bytes += b.size();
          net.send(x, syncRecv, b);
       }
-      StatTimer_extract.stop();
       //Will force all messages to be processed before continuing
       net.flush();
 
@@ -659,19 +659,16 @@ public:
    void sync_pull(std::string loopName) {
       void (hGraph::*fn)(Galois::Runtime::RecvBuffer&) = &hGraph::syncPullRecvReply<FnTy>;
       ++num_iter_pull;
-      std::string extract_timer_str("SYNC_EXTRACT_" + loopName +"_" + std::to_string(num_run) + "_" + std::to_string(num_iter_pull));
       std::string timer_str("SYNC_PULL_" + loopName +"_" + std::to_string(num_run) + "_" + std::to_string(num_iter_pull));
       std::string timer_barrier_str("SYNC_PULL_BARRIER_" + loopName +"_" + std::to_string(num_run) + "_" + std::to_string(num_iter_pull));
       std::string statSendBytes_str("SEND_BYTES_SYNC_PULL_" + loopName +"_" + std::to_string(num_run) + "_" + std::to_string(num_iter_pull));
       Galois::Statistic SyncPull_send_bytes(statSendBytes_str);
       Galois::StatTimer StatTimer_syncPull(timer_str.c_str());
-      Galois::StatTimer StatTimer_extract(extract_timer_str.c_str());
       Galois::StatTimer StatTimerBarrier_syncPull(timer_barrier_str.c_str());
 
       StatTimer_syncPull.start();
       auto& net = Galois::Runtime::getSystemNetworkInterface();
       //Galois::Runtime::getHostBarrier().wait();
-      StatTimer_extract.start();
       num_recv_expected = 0;
       for (unsigned x = 0; x < hostNodes.size(); ++x) {
          if (x == id)
@@ -687,7 +684,6 @@ public:
          net.send(x, syncRecv, b);
          ++num_recv_expected;
       }
-      StatTimer_extract.stop();
 
       //std::cout << "[" << net.ID <<"] num_recv_expected : "<< num_recv_expected << "\n";
 

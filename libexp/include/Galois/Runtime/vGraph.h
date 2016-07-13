@@ -280,6 +280,9 @@ public:
        auto& net = Galois::Runtime::getSystemNetworkInterface();
        Galois::Runtime::gDeserialize(buf, loopName, num_iter_push, from_id, num);
        std::string doall_str("LAMBDA::SYNC_PUSH_RECV_APPLY_" + loopName + "_" + std::to_string(num_run) + "_" + std::to_string(num_iter_push));
+       std::string set_timer_str("SYNC_SET_" + loopName + "_" + std::to_string(num_run) + "_" + std::to_string(num_iter_push));
+       Galois::StatTimer StatTimer_set(set_timer_str.c_str());
+       StatTimer_set.start();
 #if 0
        for (; num; --num) {
          size_t gid;
@@ -301,6 +304,7 @@ public:
              FnTy::reduce(lid, getData(lid), val_vec[n]);
              }, Galois::loopname(doall_str.c_str()));
        }
+       StatTimer_set.stop();
      }
 
    template<typename FnTy>
@@ -312,12 +316,15 @@ public:
        std::string loopName;
        uint32_t num_iter_pull;
        Galois::Runtime::gDeserialize(buf, loopName, num_iter_pull, from_id, num);
+       std::string extract_timer_str("SYNC_EXTRACT_" + loopName + "_" + std::to_string(num_run) + "_" + std::to_string(num_iter_pull));
+       Galois::StatTimer StatTimer_extract(extract_timer_str.c_str());
        std::string statSendBytes_str("SEND_BYTES_SYNC_PULL_REPLY_" + loopName + "_" + std::to_string(num_run) + "_" + std::to_string(num_iter_pull));
        Galois::Statistic SyncPullReply_send_bytes(statSendBytes_str);
        std::string doall_str("LAMBDA::SYNC_PULL_RECV_REPLY_" + loopName + "_" + std::to_string(num_run) + "_" + std::to_string(num_iter_pull));
        Galois::Runtime::SendBuffer b;
        assert(num == masterNodes[from_id].size());
        gSerialize(b, idForSelf(), fn, loopName, num_iter_pull, id, num);
+       StatTimer_extract.start();
 
 #if 0
        /********** Serial loop: works ****************/
@@ -348,6 +355,7 @@ public:
 
        Galois::Runtime::gSerialize(b, val_vec);
        }
+       StatTimer_extract.stop();
      //std::cout << "[" << net.ID << "] Serialized : sending to other host\n";
      SyncPullReply_send_bytes += b.size();
      net.send(from_id, syncRecv, b);
@@ -362,6 +370,10 @@ public:
        uint32_t num_iter_pull;
        Galois::Runtime::gDeserialize(buf, loopName, num_iter_pull, from_id, num);
        std::string doall_str("LAMBDA::SYNC_PULL_RECV_APPLY_" + loopName + "_" + std::to_string(num_run) + "_" + std::to_string(num_iter_pull));
+       std::string set_timer_str("SYNC_SET_" + loopName + "_" + std::to_string(num_run) + "_" + std::to_string(num_iter_pull));
+       Galois::StatTimer StatTimer_set(set_timer_str.c_str());
+       StatTimer_set.start();
+
        assert(num == slaveNodes[from_id].size());
        auto& net = Galois::Runtime::getSystemNetworkInterface();
 
@@ -386,6 +398,7 @@ public:
        }
 #endif
        --num_recv_expected;
+       StatTimer_set.stop();
      }
 
 public:
@@ -589,10 +602,12 @@ public:
        std::string timer_str("SYNC_PUSH_" + loopName + "_" + std::to_string(num_run) + "_" + std::to_string(num_iter_push));
        std::string timer_barrier_str("SYNC_PUSH_BARRIER_" + loopName + "_" + std::to_string(num_run) + "_" + std::to_string(num_iter_push));
        std::string statSendBytes_str("SEND_BYTES_SYNC_PUSH_" + loopName + "_" + std::to_string(num_run) + "_" + std::to_string(num_iter_push));
-       std::string doall_str("LAMBDA::SYNC_PUSH_" + loopName + "_" + std::to_string(num_run) + "_" + std::to_string(num_iter_push));
+       std::string extract_timer_str("SYNC_EXTRACT_" + loopName + "_" + std::to_string(num_run) + "_" + std::to_string(num_iter_pull));
+       std::string doall_str("LAMBDA::SYNC_PUSH_" + loopName + "_" + std::to_string(num_run) + "_" + std::to_string(num_iter_pull));
        Galois::Statistic SyncPush_send_bytes(statSendBytes_str);
        Galois::StatTimer StatTimer_syncPush(timer_str.c_str());
        Galois::StatTimer StatTimerBarrier_syncPush(timer_barrier_str.c_str());
+       Galois::StatTimer StatTimer_extract(extract_timer_str.c_str());
        StatTimer_syncPush.start();
        auto& net = Galois::Runtime::getSystemNetworkInterface();
        for (unsigned x = 0; x < net.Num; ++x) {
@@ -613,6 +628,7 @@ public:
          }
 #endif
 
+         StatTimer_extract.start();
          if(num > 0 ){
            std::vector<typename FnTy::ValTy> val_vec(num);
 
@@ -625,6 +641,7 @@ public:
 
            gSerialize(b, val_vec);
          }
+         StatTimer_extract.stop();
 
          SyncPush_send_bytes += b.size();
          net.send(x, syncRecv, b);
