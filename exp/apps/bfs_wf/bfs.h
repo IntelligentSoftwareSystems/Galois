@@ -252,9 +252,7 @@ public:
     // for node based versions
     // Galois::preAlloc (Galois::getActiveThreads () + 8*graph.size ()/Galois::Runtime::MM::hugePageSize);
     // // for edge based versions
-    unsigned p = Galois::getActiveThreads () + 8*graph.sizeEdges () / Galois::Runtime::pagePoolSize();
-    std::printf ("going to pre-alloc %u pages, hugePageSize=%d,\n", p, (unsigned)Galois::Runtime::pagePoolSize());
-    Galois::preAlloc (Galois::getActiveThreads () + 8*graph.sizeEdges ()/Galois::Runtime::pagePoolSize());
+    Galois::preAlloc (Galois::getActiveThreads () + 24*graph.sizeEdges ()/Galois::Runtime::pagePoolSize());
     Galois::reportPageAlloc("MeminfoPre");
 
     timer.start ();
@@ -365,6 +363,77 @@ public:
 
   };
 
+  struct OpFuncSpec: public OpFunc {
+
+    OpFuncSpec (Graph& graph, ParCounter& numIter): OpFunc (graph, numIter) {}
+
+    template <typename C>
+    void operator () (const Update& up, C& ctx) const {
+      auto& graph = OpFunc::graph;
+      auto& ndata = graph.getData (up.node, Galois::MethodFlag::UNPROTECTED);
+
+
+      if (ndata == BFS_LEVEL_INFINITY) {
+
+        ndata = up.level;
+
+        auto undo = [this, &graph, up] (void) {
+          graph.getData (up.node, Galois::MethodFlag::UNPROTECTED) = BFS_LEVEL_INFINITY;
+        };
+
+        ctx.addUndoAction (undo);
+
+        for (auto ni = graph.edge_begin (up.node, Galois::MethodFlag::UNPROTECTED)
+            , eni = graph.edge_end (up.node, Galois::MethodFlag::UNPROTECTED); ni != eni; ++ni) {
+
+          GNode dst = graph.getEdgeDst (ni);
+          auto w = getEdgeWeight<IS_BFS> (graph, ni);
+
+          ctx.push (Update (dst, up.level + w));
+        }
+
+      }
+
+      auto inc = [this] (void) {
+        OpFunc::numIter += 1;
+      };
+
+      ctx.addCommitAction (inc);
+    }
+  };
+
+  // relies on round based execution of IKDG executor
+  struct OpFuncLocalMin: public OpFunc {
+
+    OpFuncLocalMin (Graph& graph, ParCounter& numIter): OpFunc (graph, numIter) {}
+
+    template <typename C>
+    void operator () (const Update& up, C& ctx) {
+      auto& graph = OpFunc::graph;
+      auto& ndata = graph.getData (up.node, Galois::MethodFlag::UNPROTECTED);
+      if (ndata > up.level) {
+
+        ndata = up.level;
+
+
+        for (auto ni = graph.edge_begin (up.node, Galois::MethodFlag::UNPROTECTED)
+            , eni = graph.edge_end (up.node, Galois::MethodFlag::UNPROTECTED); ni != eni; ++ni) {
+
+          GNode dst = graph.getEdgeDst (ni);
+          auto w = getEdgeWeight<IS_BFS> (graph, ni);
+
+          if (graph.getData (dst, Galois::MethodFlag::UNPROTECTED) > (up.level + w)) {
+            ctx.push (Update (dst, up.level + w));
+          }
+        }
+
+      }
+
+      OpFunc::numIter += 1;
+    }
+
+  };
+
 };
 
 #ifdef GALOIS_USE_MIC_CSR_IMPL
@@ -379,8 +448,6 @@ class BFS: public BFS_SSSP_Base<BFSgraph> {
 
 public:
   typedef typename Graph::GraphNode GNode;
-
-protected:
 
   template <typename WL, typename T>
   GALOIS_ATTRIBUTE_PROF_NOINLINE static void addToWL (

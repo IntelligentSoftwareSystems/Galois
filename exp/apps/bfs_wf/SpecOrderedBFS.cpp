@@ -36,51 +36,6 @@
 class SpecOrderedBFS: public BFS {
 
 
-  struct OpFunc {
-
-    static const unsigned CHUNK_SIZE = DEFAULT_CHUNK_SIZE;
-
-    Graph& graph;
-    ParCounter& numIter;
-
-    OpFunc (Graph& graph, ParCounter& numIter): graph (graph), numIter (numIter) {}
-
-    template <typename C>
-    void operator () (const Update& up, C& ctx) {
-
-      if (graph.getData (up.node, Galois::MethodFlag::UNPROTECTED) == BFS_LEVEL_INFINITY) {
-
-        graph.getData (up.node, Galois::MethodFlag::UNPROTECTED) = up.level;
-
-        auto undo = [this, up] (void) {
-          graph.getData (up.node, Galois::MethodFlag::UNPROTECTED) = BFS_LEVEL_INFINITY;
-        };
-
-        ctx.addUndoAction (undo);
-
-
-        for (typename Graph::edge_iterator ni = graph.edge_begin (up.node, Galois::MethodFlag::UNPROTECTED)
-            , eni = graph.edge_end (up.node, Galois::MethodFlag::UNPROTECTED); ni != eni; ++ni) {
-
-          GNode dst = graph.getEdgeDst (ni);
-          // ctx.push (Update (dst, up.level + 1));
-
-          if (graph.getData (dst, Galois::MethodFlag::UNPROTECTED) == BFS_LEVEL_INFINITY) {
-            ctx.push (Update (dst, up.level + 1));
-          }
-        }
-
-      }
-
-      auto inc = [this] (void) {
-        numIter += 1;
-      };
-
-      ctx.addCommitAction (inc);
-    }
-
-  };
-
 public:
 
   virtual const std::string getVersion () const { return "Speculative ordered"; }
@@ -100,7 +55,7 @@ public:
         Galois::Runtime::makeStandardRange(wl.begin (), wl.end ()),
         Comparator (), 
         VisitNhood (graph),
-        OpFunc (graph, numIter),
+        OpFuncSpec (graph, numIter),
         std::make_tuple (Galois::loopname ("bfs-speculative")));
 
 

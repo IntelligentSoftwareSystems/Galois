@@ -34,41 +34,6 @@
 
 class SSSPspecOpt: public SSSP {
   
-
-
-  // relies on round based execution of IKDG executor
-  struct OpFuncLocalMin: public OpFunc {
-
-    OpFuncLocalMin (Graph& graph, ParCounter& numIter): OpFunc (graph, numIter) {}
-
-    template <typename C>
-    void operator () (const Update& up, C& ctx) {
-      auto& ndata = graph.getData (up.node, Galois::MethodFlag::UNPROTECTED);
-      if (ndata > up.level) {
-
-        ndata = up.level;
-
-
-        for (auto ni = graph.edge_begin (up.node, Galois::MethodFlag::UNPROTECTED)
-            , eni = graph.edge_end (up.node, Galois::MethodFlag::UNPROTECTED); ni != eni; ++ni) {
-
-          GNode dst = graph.getEdgeDst (ni);
-          auto w = graph.getEdgeData (ni);
-
-          if (graph.getData (dst, Galois::MethodFlag::UNPROTECTED) > (up.level + w)) {
-            ctx.push (Update (dst, up.level + w));
-          }
-        }
-
-      }
-
-      numIter += 1;
-    }
-
-  };
-
-
-
 public:
 
   virtual const std::string getVersion () const { return "Speculative SSSP with optimizations"; }
