@@ -53,10 +53,10 @@ namespace gstl {
   template<typename T>
   using List = std::list<T, FixedSizeAlloc<T> >; 
 
-  template<typename T, typename C>
+  template<typename T, typename C=std::less<T> >
   using Set = std::set<T, C, FixedSizeAlloc<T> >; 
 
-  template<typename T, typename C>
+  template<typename T, typename C=std::less<T> >
   using PQ = MinHeap<T, C, Vector<T> >; 
 
   // template<typename T>
