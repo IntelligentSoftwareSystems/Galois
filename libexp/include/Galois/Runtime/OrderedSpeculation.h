@@ -680,7 +680,7 @@ protected:
 
   void dumpParaMeterStats (void) {
     // remove last record if its 0
-    if (!execRcrds.empty() && execRcrds.back().parallelism == 0) {
+    if (!execRcrds.empty() && execRcrds.back().parallelism.reduceRO () == 0) {
       execRcrds.pop_back();
     }
 

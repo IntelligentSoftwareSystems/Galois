@@ -1077,7 +1077,7 @@ private:
 
         const size_t s = head->step;
         assert (s < execRcrds.size ());
-        ++execRcrds[s].parallelism;
+        execRcrds[s].parallelism += 1;
         numCommitted += 1;
         freeCtxt (head);
 

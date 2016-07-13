@@ -35,6 +35,7 @@
 #define GALOIS_RUNTIME_EXECUTOR_PARAMETER_H
 
 #include "Galois/gtuple.h"
+#include "Galois/Accumulator.h"
 #include "Galois/Traits.h"
 #include "Galois/Mem.h"
 #include "Galois/Runtime/Context.h"
@@ -60,13 +61,15 @@ namespace ParaMeter {
 
 struct StepStats {
 
-  size_t step;
-  size_t parallelism = 0;
-  size_t workListSize;
+  const size_t step;
+  GAccumulator<size_t> parallelism;
+  const size_t workListSize;
 
-  explicit StepStats (size_t _step, size_t _wlsz): step (_step), workListSize (_wlsz) {}
+  explicit StepStats (size_t _step, size_t _wlsz): step (_step), parallelism (),  workListSize (_wlsz) {}
 
-  explicit StepStats (size_t _step, size_t par, size_t _wlsz): step (_step), parallelism (par), workListSize (_wlsz) {}
+  explicit StepStats (size_t _step, size_t par, size_t _wlsz): step (_step), parallelism (), workListSize (_wlsz) {
+    parallelism += par;
+  }
 
   static void printHeader(FILE* out) {
     fprintf(out, "LOOPNAME, STEP, PARALLELISM, WORKLIST_SIZE\n");
@@ -74,7 +77,7 @@ struct StepStats {
 
   void dump(FILE* out, const char* loopname) const {
     if (out) {
-      fprintf(out, "%s, %zu, %zu, %zu\n", loopname, step, parallelism, workListSize);
+      fprintf(out, "%s, %zu, %zu, %zu\n", loopname, step, parallelism.reduceRO (), workListSize);
     }
   }
 };
@@ -250,7 +253,7 @@ class ParaMeterExecutor {
       // switch worklists
       // dump stats
       StepStats stat {currStep, numIter};
-      stat.parallelism = numActivities;
+      stat.parallelism += numActivities;
 
       finishStep(stat);
       ++currStep;
