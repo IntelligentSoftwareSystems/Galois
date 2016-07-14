@@ -204,6 +204,9 @@ struct VF2Algo {
   Galois::PerThreadSet<DGNode> dFrontier;
   Galois::PerThreadSet<DGNode> dMatched;
 
+  // instrumented stat
+  Galois::GReduceMax<size_t> dFrontierSize;
+
   struct FilterCandidatesInternal {
     DGraph& gD;
     QGraph& gQ;
@@ -240,11 +243,11 @@ struct VF2Algo {
     return isSomeNodeEmpty.reduce();
   }
 
-  QGNode nextQueryNode(QGraph& gQ, Matching& matching) {
+  QGNode nextQueryNode() {
     return *(qFrontier.get().begin());
   }
 
-  void refineCandidates(DGraph& gD, QGraph& gQ, QGNode nQuery, Matching& matching, std::vector<DGNode>& refined) {
+  void refineCandidates(DGraph& gD, QGraph& gQ, QGNode nQuery, std::vector<DGNode>& refined) {
     auto numNghQ = std::distance(gQ.edge_begin(nQuery), gQ.edge_end(nQuery));
     long int numMatchedNghQ = 0, numFrontierNghQ = 0, numOtherNghQ = 0;
 
@@ -288,7 +291,7 @@ struct VF2Algo {
       if(numFrontierNghD < numFrontierNghQ) {
         continue;
       }
-      if(numOtherNghD < numOtherNghD) {
+      if(numOtherNghD < numOtherNghQ) {
         continue;
       }
 
@@ -343,10 +346,10 @@ struct VF2Algo {
         return;
       }
 
-      auto nQ = algo->nextQueryNode(gQ, matching);
+      auto nQ = algo->nextQueryNode();
 
       std::vector<DGNode> refined;
-      algo->refineCandidates(gD, gQ, nQ, matching, refined);
+      algo->refineCandidates(gD, gQ, nQ, refined);
 
       // update query state
       algo->qMatched.get().insert(nQ);
@@ -386,6 +389,7 @@ struct VF2Algo {
             dAdd2Frontier.push_back(ngh);
           }
         }
+        algo->dFrontierSize.update(algo->dFrontier.get().size());
 
         doSearch(matching);
         if(currentlyFound.load() >= kFound) {
@@ -430,6 +434,7 @@ struct VF2Algo {
         auto ngh = gD.getEdgeDst(ei);
         algo->dFrontier.get().insert(ngh);
       }
+      algo->dFrontierSize.update(algo->dFrontier.get().size());
 
       doSearch(matching);
 
@@ -458,6 +463,7 @@ struct VF2Algo {
     }
 
     Galois::for_each_local(works, SubgraphSearchInternal(gD, gQ, report, this), Galois::loopname("search_for_each"));
+    std::cout << "max size for dFrontier is " << dFrontierSize.reduce() << std::endl; 
   }
 };
 
@@ -660,7 +666,7 @@ void verifyMatching(Matching& matching, DGraph& gD, QGraph& gQ) {
   if(isFailed) {
     GALOIS_DIE("Verification failed");
   } else {
-    std::cout << "Verification succedded" << std::endl;
+    std::cout << "Verification succeeded" << std::endl;
   }
 }
 
