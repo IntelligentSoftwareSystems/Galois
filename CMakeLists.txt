@@ -246,7 +246,7 @@ if(USE_VTUNE)
     include_directories(${VTune_INCLUDE_DIRS})
     add_definitions(-DGALOIS_USE_VTUNE)
   else()
-    message(FATAL_ERROR "VTune not found")
+    message(WARNING "VTune not found")
   endif()
 endif()
 
@@ -363,7 +363,7 @@ function(app name)
   target_link_libraries(${name} rt)
   target_link_libraries(${name} ${CMAKE_THREAD_LIBS_INIT})
 
-  if(USE_VTUNE)
+  if(VTune_FOUND)
     target_link_libraries(${name} ${VTune_LIBRARIES})
   endif()
 

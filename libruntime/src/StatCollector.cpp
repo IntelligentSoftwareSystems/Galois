@@ -138,10 +138,13 @@ void Galois::Runtime::StatCollector::addToStat(const std::string& loop, const st
 
 //assumne called serially
 void Galois::Runtime::StatCollector::printStatsForR(std::ostream& out, bool json) {
-  if (json)
-    out << "[\n";
-  else
-    out << "LOOP,INSTANCE,CATEGORY,THREAD,HOST,VAL\n";
+  //Print header only on HOST 0
+  if(getHostID() == 0){
+    if (json)
+      out << "[\n";
+    else
+      out << "LOOP,INSTANCE,CATEGORY,HOST,THREAD,VAL\n";
+  }
   MAKE_LOCK_GUARD(StatsLock);
   for (auto& p : Stats) {
     if (json)

@@ -19,5 +19,9 @@ struct MarshalGraph {
   index_type *edge_dst;
   node_data_type *node_data;
   edge_data_type *edge_data;
+  size_t *num_master_nodes;
+  size_t **master_nodes;
+  size_t *num_slave_nodes;
+  size_t **slave_nodes;
 };
 

@@ -11,11 +11,15 @@ LOG=.verify_log
 execname=$(basename "$EXEC" "")
 inputdirname=$(dirname "$INPUT")
 inputname=$(basename "$INPUT" ".gr")
-if [[ $EXEC == *"pull"* ]]; then
+extension=gr
+if [[ $EXEC == *"cc"* ]]; then
+  inputdirname=${inputdirname}/symmetric
+  extension=sgr
+elif [[ $EXEC == *"pull"* ]]; then
   inputdirname=${inputdirname}/transpose
-  inputname=${inputname}.transpose
-  INPUT=${inputdirname}/${inputname}.gr
+  extension=tgr
 fi
+INPUT=${inputdirname}/${inputname}.${extension}
 
 if [ -z "$ABELIAN_GALOIS_ROOT" ]; then
   ABELIAN_GALOIS_ROOT=/net/velocity/workspace/SourceCode/GaloisCpp
@@ -53,13 +57,14 @@ for task in $SET; do
   set $task;
   PFLAGS=$FLAGS
   if [[ $EXEC == *"vertex-cut"* ]]; then
-    PFLAGS+=" -partFolder=${inputdirname}/partitions/${2}/${inputname}.gr"
+    PFLAGS+=" -partFolder=${inputdirname}/partitions/${2}/${inputname}.${extension}"
   else
     if [[ ($1 == *"gc"*) || ($1 == *"cg"*) ]]; then
       PFLAGS+=" -scalegpu=3"
     fi
   fi
   rm -f output_*.log
+  echo "GALOIS_DO_NOT_BIND_THREADS=1 $MPI -n=$2 ${EXEC} -verify -runs=1 ${PFLAGS} -pset=$1 -t=$3 ${INPUT}" >>$LOG
   eval "GALOIS_DO_NOT_BIND_THREADS=1 $MPI -n=$2 ${EXEC} -verify -runs=1 ${PFLAGS} -pset=$1 -t=$3 ${INPUT}" >>$LOG 2>&1
   outputs="output_${hostname}_0.log"
   i=1

@@ -33,6 +33,7 @@ fi
 RUN=ibrun
 
 export MV2_ENABLE_AFFINITY=0
+export MV2_USE_SHARED_MEM=1
 source $HOME/GaloisCpp/load_modules_dist_hetero.sh
 
 set -x #echo on

@@ -44,7 +44,8 @@ for task in $SET; do
     fi
   fi
   set -x #echo on
-  eval "GALOIS_DO_NOT_BIND_THREADS=1 $MPI -n=$2 ${EXEC} ${INPUT} -noverify -pset=$1 ${PFLAGS} -t=$3 |& tee ${execname}_${inputname}_${1}.out"
+  eval "GALOIS_DO_NOT_BIND_THREADS=1 amplxe-cl -collect general-exploration -search-dir /lib/modules/3.10.0-327.22.2.el7.x86_64/weak-updates/nvidia/ -call-stack-mode all -trace-mpi -analyze-system -start-paused -r ${execname}_${inputname}_${1}_exploration $MPI -n=$3 ${EXEC} ${INPUT} -noverify -pset=$1 ${PFLAGS} -runs=1 -t=$3 |& tee ${execname}_${inputname}_${1}.out"
+  eval "GALOIS_DO_NOT_BIND_THREADS=1 amplxe-cl -collect advanced_hotspots -search-dir /lib/modules/3.10.0-327.22.2.el7.x86_64/weak-updates/nvidia/ -call-stack-mode all -trace-mpi -analyze-system -start-paused -r ${execname}_${inputname}_${1}_hotspots $MPI -n=$3 ${EXEC} ${INPUT} -noverify -pset=$1 ${PFLAGS} -runs=1 -t=$3 |& tee ${execname}_${inputname}_${1}.out"
   set +x #echo off
 done
 
