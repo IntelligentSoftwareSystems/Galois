@@ -37,6 +37,9 @@
 
 #include <string>
 #include <set>
+#include <boost/uuid/uuid.hpp>            // uuid class
+#include <boost/uuid/uuid_generators.hpp> // generators
+#include <boost/uuid/uuid_io.hpp>         // streaming operators etc.
 
 namespace Galois {
 namespace Runtime {
@@ -86,6 +89,9 @@ class StatCollector {
   Galois::Substrate::SimpleLock StatsLock;
 
 public:
+
+  static boost::uuids::uuid UUID;
+  static boost::uuids::uuid getUUID();
 
   void addToStat(const std::string& loop, const std::string& category, size_t value, unsigned TID, unsigned HostID);
   void addToStat(const std::string& loop, const std::string& category, double value, unsigned TID, unsigned HostID);

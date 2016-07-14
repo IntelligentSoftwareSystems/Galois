@@ -44,6 +44,8 @@ void reportLoopInstance(const char* loopname);
 void reportStat(const char* loopname, const char* category, unsigned long value, unsigned TID);
 //! Reports stats for a given thread
 void reportStat(const std::string& loopname, const std::string& category, unsigned long value, unsigned TID);
+//! Reports stats for a given thread
+void reportStat(const std::string& loopname, const std::string& category, const std::string value, unsigned TID);
 //! Reports Galois system memory stats for all threads
 void reportPageAlloc(const char* category);
 //! Reports NUMA memory stats for all NUMA nodes
