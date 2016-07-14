@@ -35,20 +35,33 @@ namespace Runtime {
 
 namespace detail {
 
-static inline void traceImpl(std::ostringstream& os, const char* format) {
-  os << format;
+static inline void traceImpl(std::ostringstream& os) {
+  os << "\n";
 }
 
 template<typename T, typename... Args>
-static inline void traceImpl(std::ostringstream& os, const char* format, T&& value, Args&&... args) {
-  for (; *format != '\0'; format++) {
-    if (*format == '%') {
-      os << value;
-      traceImpl(os, format + 1, std::forward<Args>(args)...);
-      return;
-    }
-    os << *format;
+static inline void traceImpl(std::ostringstream& os, T&& value, Args&&... args) {
+  os << value << " ";
+  traceImpl(os, std::forward<Args>(args)...);
+}
+
+template<typename T, typename A>
+class vecPrinter {
+  const std::vector<T,A>& v;
+public:
+  vecPrinter(const std::vector<T,A>& _v) :v(_v) {}
+  void print(std::ostream& os) const {
+    os << "< " << v.size() << " : ";
+    for (auto& i : v)
+      os << " " << (int)i;
+    os << ">";
   }
+};
+
+template<typename T, typename A>
+std::ostream& operator<<(std::ostream& os, const vecPrinter<T,A>& vp) {
+  vp.print(os);
+  return os;
 }
 
 void printTrace(std::ostringstream&);
@@ -61,33 +74,33 @@ extern bool initTrace;
 
 } // namespace detail
 
+template<typename T, typename A>
+detail::vecPrinter<T,A> printVec(const std::vector<T,A>& v) {
+  return detail::vecPrinter<T,A>(v);
+};
+
+#ifdef NDEBUG
+
 template<typename... Args>
-static inline void trace(const char* format, Args&&... args) {
+static inline void trace(Args&& ...) {}
+
+#else
+
+template<typename... Args>
+static inline void trace(Args&&... args) {
   if (!detail::initTrace) {
     detail::doTrace = Substrate::EnvCheck("GALOIS_DEBUG_TRACE");
     detail::initTrace = true;
   }
   if (detail::doTrace) {
     std::ostringstream os;
-    detail::traceImpl(os, format, std::forward<Args>(args)...);
+    detail::traceImpl(os, std::forward<Args>(args)...);
     detail::printTrace(os);
   }
 }
 
-template<typename... Args>
-static inline void printOutput(const char* format, Args&&... args) {
-    std::ostringstream os;
-    detail::traceImpl(os, format, std::forward<Args>(args)...);
-    detail::print_output_impl(os);
-}
+#endif
 
-static void print_send(std::vector<uint8_t> vec, size_t len, unsigned host){
-  detail::print_send_impl(vec, len, host);
-}
-
-static void print_recv(std::vector<uint8_t> vec, size_t len, unsigned host){
-  detail::print_recv_impl(vec, len, host);
-}
 } // namespace Runtime
 } // namespace Galois
 

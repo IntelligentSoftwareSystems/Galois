@@ -101,7 +101,7 @@ public:
    /************************************************************
     *
     ************************************************************/
-   static void reduce_landingPad(Galois::Runtime::RecvBuffer& buf) {
+  static void reduce_landingPad(uint32_t src, Galois::Runtime::RecvBuffer& buf) {
       uint32_t x_id;
       Ty x_mdata;
       gDeserialize(buf, x_id, x_mdata);
@@ -126,7 +126,7 @@ public:
             continue;
          Galois::Runtime::SendBuffer b;
          gSerialize(b, net.ID, mdata);
-         net.send(x, reduce_landingPad, b);
+         net.sendMsg(x, reduce_landingPad, b);
       }
 
       net.flush();

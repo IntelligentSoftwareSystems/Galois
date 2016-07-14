@@ -80,11 +80,13 @@ public:
 };
 */
 
+#include <iostream>
+
 namespace {
 class HostBarrier : public Galois::Substrate::Barrier {
   std::atomic<int> count;
 
-  static void barrierLandingPad() {
+  static void barrierLandingPad(uint32_t) {
     --static_cast<HostBarrier&>(Galois::Runtime::getHostBarrier()).count;
   }
 
@@ -102,14 +104,17 @@ public:
     
     auto& net = Galois::Runtime::getSystemNetworkInterface();
     if (Galois::Substrate::ThreadPool::getTID() == 0) {
+      //      std::cerr << "@";
       //notify global and wait on global
-      net.broadcastAlt(barrierLandingPad);
+      net.broadcastSimple(barrierLandingPad);
       --count;
     }
+    //    std::cerr << "#";
     
     while (count > 0) {
       Galois::Runtime::getSystemNetworkInterface().handleReceives();
     }
+    //    std::cerr << "$";
   }
 };
 } // end namespace ""

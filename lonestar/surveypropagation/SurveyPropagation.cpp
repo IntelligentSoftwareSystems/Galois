@@ -116,7 +116,7 @@ typedef Galois::Graph::FirstGraph<SPNode, SPEdge, false>::GraphNode GNode;
 
 static Graph graph;
 
-static std::vector<GNode> literals;
+static std::vector<GNode> literalsN;
 static std::vector<std::pair<GNode,int> > clauses;
 
 static Galois::GAccumulator<unsigned int> nontrivial;
@@ -137,7 +137,7 @@ void initialize_random_formula(int M, int N, int K) {
 
   //build up clauses and literals
   clauses.resize(M);
-  literals.resize(N);
+  literalsN.resize(N);
 
   for (int m = 0; m < M; ++m) {
     GNode node = graph.createNode(SPNode(m, true));
@@ -147,7 +147,7 @@ void initialize_random_formula(int M, int N, int K) {
   for (int n = 0; n < N; ++n) {
     GNode node = graph.createNode(SPNode(n, false));
     graph.addNode(node, Galois::MethodFlag::UNPROTECTED);
-    literals[n] = node;
+    literalsN[n] = node;
   }
 
   for (int m = 0; m < M; ++m) {
@@ -158,7 +158,7 @@ void initialize_random_formula(int M, int N, int K) {
       int newK = (int)(((double)rand()/((double)RAND_MAX + 1)) * (double)(N));
       if (std::find(touse.begin(), touse.end(), newK) == touse.end()) {
 	touse.push_back(newK);
-	graph.getEdgeData(graph.addEdge(clauses[m].first, literals[newK], Galois::MethodFlag::UNPROTECTED)) = SPEdge((bool)(rand() % 2));
+	graph.getEdgeData(graph.addEdge(clauses[m].first, literalsN[newK], Galois::MethodFlag::UNPROTECTED)) = SPEdge((bool)(rand() % 2));
       }
     }
   }
@@ -193,8 +193,8 @@ void print_formula() {
 }
 
 void print_fixed() {
-  for (unsigned n = 0; n < literals.size(); ++n) {
-    GNode N = literals[n];
+  for (unsigned n = 0; n < literalsN.size(); ++n) {
+    GNode N = literalsN[n];
     SPNode& V = graph.getData(N, Galois::MethodFlag::UNPROTECTED);
     if (V.solved)
       std::cout << V.name << "[" << (V.value ? 1 : 0) << "] ";
@@ -204,8 +204,8 @@ void print_fixed() {
 
 int count_fixed() {
   int retval = 0;
-  for (unsigned n = 0; n < literals.size(); ++n) {
-    GNode N = literals[n];
+  for (unsigned n = 0; n < literalsN.size(); ++n) {
+    GNode N = literalsN[n];
     SPNode& V = graph.getData(N, Galois::MethodFlag::UNPROTECTED);
     if (V.solved)
       ++retval;
@@ -380,7 +380,7 @@ void SP_algorithm() {
   numBias.reset();
   sumBias.reset();
   nontrivial.reset();
-  Galois::do_all(literals.begin(), literals.end(), update_biases(), Galois::loopname("update_biases"));
+  Galois::do_all(literalsN.begin(), literalsN.end(), update_biases(), Galois::loopname("update_biases"));
 }
 
 struct fix_variables {
@@ -409,7 +409,7 @@ void decimate() {
   double average = num > 0 ? sumBias.reduce() / num : 0.0;
   std::cout << "NonTrivial " << n << " MaxBias " << m << " Average Bias " << average << "\n";
   double d = ((m - average) * 0.25) + average;
-  Galois::do_all(literals.begin(), literals.end(), fix_variables(d), Galois::loopname("fix_variables"));
+  Galois::do_all(literalsN.begin(), literalsN.end(), fix_variables(d), Galois::loopname("fix_variables"));
 }
 
 bool survey_inspired_decimation() {

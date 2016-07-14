@@ -37,7 +37,7 @@ class NetworkBackend {
 public:
   struct SendBlock : public boost::intrusive::list_base_hook<> {
     SendBlock(unsigned char* d) :dest(~0), size(0), data(d) {}
-    uint32_t dest, size;
+    uint32_t dest, size, tag;
     unsigned char* data;
   };
 

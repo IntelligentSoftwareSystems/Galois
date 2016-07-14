@@ -42,56 +42,56 @@ uint32_t Galois::Runtime::getHostID() { return NetworkInterface::ID; }
 
 Galois::Runtime::NetworkIO::~NetworkIO() {}
 
-void NetworkInterface::reportStats() {
-  statRecvNum.report();
-  statRecvBytes.report();
-  statSendNum.report();
-  statSendBytes.report();
-}
-
-void NetworkInterface::dumpStats() const {
-  std::cout << ID
-            << ": RN " << statRecvNum.getVal()
-            << " RB " <<statRecvBytes.getVal()
-            << " SN " <<statSendNum.getVal()
-            << " SB " << statSendBytes.getVal() << "\n";
-}
-
-unsigned long NetworkInterface::reportSendBytes() {
-  //  return statSendBytes.getVal();
-}
-
 //anchor vtable
 NetworkInterface::~NetworkInterface() {}
 
 //forward decl
-static void bcastLandingPad(::RecvBuffer& buf);
+static void bcastLandingPad(uint32_t src, ::RecvBuffer& buf);
 
-//recieve broadcast message over the network
-static void bcastLandingPad(RecvBuffer& buf) {
-  unsigned source;
-  recvFuncTy recv;
-  gDeserialize(buf, source, recv);
-  trace("NetworkInterface::bcastLandingPad % %\n", source, (void*)recv);
-  recv(buf);
+//receive broadcast message over the network
+static void bcastLandingPad(uint32_t src, RecvBuffer& buf) {
+  uintptr_t fp;
+  gDeserialize(buf, fp);
+  auto recv = (void (*)(uint32_t, RecvBuffer&))fp;
+  trace("NetworkInterface::bcastLandingPad", (void*)recv);
+  recv(src, buf);
 }
 
-void NetworkInterface::broadcast(recvFuncTy recv, SendBuffer& buf, bool self) {
-  unsigned source = NetworkInterface::ID;
-  trace("NetworkInterface::broadcast % %\n", source, (void*)recv);
+void NetworkInterface::sendMsg(uint32_t dest, void (*recv)(uint32_t, RecvBuffer&), SendBuffer& buf) {
+  gSerialize(buf, recv);
+  sendTagged(dest, 0, buf);
+}
+
+void NetworkInterface::broadcast(void (*recv)(uint32_t, RecvBuffer&), SendBuffer& buf, bool self) {
+  trace("NetworkInterface::broadcast", (void*)recv);
+  auto fp = (uintptr_t)recv;
   for (unsigned x = 0; x < Num; ++x) {
     if (x != ID) {
       SendBuffer b;
-      gSerialize(b, source, recv, buf);
-      send(x, &bcastLandingPad, b);
+      gSerialize(b, fp, buf, (uintptr_t)&bcastLandingPad);
+      sendTagged(x, 0, b);
     } else if (self) {
       RecvBuffer rb(buf.begin(), buf.end());
-      recv(rb);
+      recv(ID, rb);
     }
   }
 }
 
-void NetworkInterface::flush() { }
+void NetworkInterface::handleReceives() {
+  std::unique_lock<Substrate::SimpleLock> lg;
+  auto opt = receiveTagged(0, &lg);
+  while (opt) {
+    uint32_t src = std::get<0>(*opt);
+    RecvBuffer& buf = std::get<1>(*opt);
+    uintptr_t fp  = 0;
+    gDeserializeRaw(buf.r_linearData() + buf.r_size() - sizeof(uintptr_t), fp);
+    buf.pop_back(sizeof(uintptr_t));
+    assert(fp);
+    auto f = (void (*)(uint32_t, RecvBuffer&))fp;
+    f(src, buf);
+    opt = receiveTagged(0, &lg);
+  }
+}
 
 NetworkBackend::SendBlock* NetworkBackend::allocSendBlock() {
   //FIXME: review for TBAA rules

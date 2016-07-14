@@ -83,20 +83,13 @@ class SerializeBuffer {
   friend DeSerializeBuffer;
   typedef std::vector<uint8_t> vTy;
   vTy bufdata;
-  unsigned start;
 public:
 
-  SerializeBuffer() {
-    //reserve a header
-    bufdata.resize(3*sizeof(void*));
-    start = 3*sizeof(void*);
-  }
-
+  SerializeBuffer() = default;
   SerializeBuffer(SerializeBuffer&& rhs) = default;  //disable copy constructor
-
   inline explicit SerializeBuffer(DeSerializeBuffer&& buf);
 
-  SerializeBuffer(const char* d, unsigned len) : bufdata(d, d+len), start(0) {}
+  SerializeBuffer(const char* d, unsigned len) : bufdata(d, d+len) {}
 
   inline void push(const char c) {
     bufdata.push_back(c);
@@ -110,30 +103,21 @@ public:
     bufdata.reserve(bufdata.size() + s);
   }
 
-  void serialize_header(void* data) {
-    assert(start != 0);
-    unsigned char* pdata = (unsigned char*)&data;
-    start -= sizeof(void*);
-    for (size_t i = 0; i < sizeof(void*); ++i)
-      bufdata[start + i] = pdata[i];
-  }
-
-  const uint8_t* linearData() const { return &bufdata[start]; }
-  unsigned getOffset() const { return start; }
+  const uint8_t* linearData() const { return bufdata.data(); }
   std::vector<uint8_t>& getVec() { return bufdata; }
-  
-  vTy::const_iterator begin() const { return bufdata.cbegin() + start; }
+
+  vTy::const_iterator begin() const { return bufdata.cbegin(); }
   vTy::const_iterator end() const { return bufdata.cend(); }
 
   typedef vTy::size_type size_type;
-  size_type size() const { return bufdata.size() - start; }
+  size_type size() const { return bufdata.size(); }
 
   //Utility
 
   void print(std::ostream& o) const {
     o << "<{" << std::hex;
-    for (auto ii = bufdata.begin() + start, ee = bufdata.end(); ii != ee; ++ii)
-      o << (unsigned int)*ii << " ";
+    for (auto& i : bufdata)
+      o << (unsigned int)i << " ";
     o << std::dec << "}>";
   }
 
@@ -169,7 +153,6 @@ public:
 
   explicit DeSerializeBuffer(SerializeBuffer&& buf) {
     bufdata.swap(buf.bufdata);
-    offset = buf.start;
   }
 
   DeSerializeBuffer& operator=(DeSerializeBuffer&& buf) = default;
@@ -190,10 +173,14 @@ public:
     return bufdata.at(offset++);
   }
 
+  void pop_back(unsigned x) { bufdata.resize(bufdata.size() - x); }
+
   void extract(char* dst, size_t num) {
     for (size_t i = 0; i < num; ++i)
       dst[i] = bufdata[offset++];
   }
+
+  std::vector<uint8_t>& getVec() { return bufdata; }
 
   void* linearData() { return &bufdata[0]; }
 
@@ -381,7 +368,6 @@ void gDeserializeObj(DeSerializeBuffer& buf, Galois::gdeque<T,CS>& data) {
 
 SerializeBuffer::SerializeBuffer(DeSerializeBuffer&& buf) {
   bufdata.swap(buf.bufdata);
-  start = buf.offset;
 }
 
 
