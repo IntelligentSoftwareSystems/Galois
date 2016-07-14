@@ -37,9 +37,13 @@ public:
 
   struct message {
     uint32_t host;
-    std::unique_ptr<uint8_t[]> data;
-    size_t len;
-    bool valid() const { return data.get() != nullptr; }
+    uint32_t tag;
+    std::vector<uint8_t> data;
+
+    message() :host(~0), tag(~0) {}
+    message(uint32_t h, uint32_t t, std::vector<uint8_t>&& d) :host(h), tag(t), data(d) {}
+
+    bool valid() const { return !data.empty(); }
   };
 
   virtual ~NetworkIO();
@@ -55,7 +59,7 @@ public:
   //bool readySend() -- can send
   //bool readyRecv() -- packet waiting
   //void send(const message&) -- send data
-  //message recv() -- recieve data
+  //message recv() -- receive data
 };
 
 std::tuple<std::unique_ptr<NetworkIO>, uint32_t, uint32_t> makeNetworkIOMPI();

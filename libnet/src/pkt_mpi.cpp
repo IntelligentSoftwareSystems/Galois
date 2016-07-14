@@ -22,22 +22,20 @@
  */
 
 #include "Galois/Runtime/NetworkIO.h"
-#include "hash/crc32.h"
 #include "Galois/Runtime/Tracer.h"
 #include "Galois/Substrate/SimpleLock.h"
+
+//#include "hash/crc32.h"
 
 #include <cassert>
 #include <cstring>
 #include <mpi.h>
 #include <deque>
-#include <iostream>
 #include <string>
 #include <fstream>
 #include <unistd.h>
 #include <vector>
 
-static const bool debugMPI = false;
-static const bool debugPrint  = false;
 
 class NetworkIOMPI : public Galois::Runtime::NetworkIO {
 
@@ -64,76 +62,57 @@ class NetworkIOMPI : public Galois::Runtime::NetworkIO {
     int provided;
     handleError(MPI_Init_thread (NULL, NULL, MPI_THREAD_FUNNELED, &provided));
     if(!(provided >= MPI_THREAD_FUNNELED)){
-      std::cerr << " MPI_THREAD_FUNNELED not supported\n Abort\n";
+      //std::cerr << " MPI_THREAD_FUNNELED not supported\n Abort\n";
       abort();
     }
     else{
-      std::cerr << " MPI_THREAD_FUNNELED supported : MPI_THREAD_FUNNELED val : " << MPI_THREAD_FUNNELED <<" , provided : " << provided  <<"\n";
+      //std::cerr << " MPI_THREAD_FUNNELED supported : MPI_THREAD_FUNNELED val : " << MPI_THREAD_FUNNELED <<" , provided : " << provided  <<"\n";
     }
     assert(provided >= MPI_THREAD_FUNNELED);
     return std::make_pair(getID(), getNum());
   }
 
   struct mpiMessage {
-    message m;
+    uint32_t host;
+    uint32_t tag;
+    std::vector<uint8_t> data;
     MPI_Request req;
-    mpiMessage(message&& _m, MPI_Request _req) : m(std::move(_m)), req(_req) {}
-    mpiMessage(uint32_t host, std::unique_ptr<uint8_t[]>&& data, size_t len) :m{host, std::move(data), len} {}
+    //mpiMessage(message&& _m, MPI_Request _req) : m(std::move(_m)), req(_req) {}
+    mpiMessage(uint32_t host, uint32_t tag, std::vector<uint8_t>&& data, size_t len) :host(host), tag(tag), data(data) {}
   };
 
   struct sendQueueTy {
     std::deque<mpiMessage> inflight;
 
     void complete() {
-      if (!inflight.empty()) {
+      while (!inflight.empty()) {
         int flag = 0;
         MPI_Status status;
         auto& f = inflight.front();
         int rv = MPI_Test(&f.req, &flag, &status);
         handleError(rv);
-        if (flag) {
-          if (debugMPI) {
-            uint32_t h;
-            memcpy(&h, f.m.data.get() + (f.m.len - 4), 4);
-            assert(h == CRC32::hash(f.m.data.get(), f.m.len - 4));
-            if (debugPrint)
-              std::cerr << getNum() << " C " << std::hex << (uintptr_t)f.m.data.get() << " " << CRC32::hash(f.m.data.get(), f.m.len - 4) << std::dec << " " << f.m.len << "\n";
-          }
+        if (flag)
           inflight.pop_front();
-        }
+        else
+          break;
       }
     }
 
     void send(message m) {
-      //if debugging, make a hash value
-      if (debugMPI) {
-        uint8_t* data = new uint8_t[m.len + 4];
-        memcpy(data, m.data.get(), m.len);
-        uint32_t hash = CRC32::hash(data, m.len);
-        memcpy(data+m.len, &hash, 4);
-        m.len += 4;
-        m.data.reset(data);
-        if (debugPrint)
-          std::cerr << getNum() << " S " << std::hex <<  (uintptr_t)m.data.get()  << " " << hash << std::dec << " " << m.len << "\n";
-      }
-      MPI_Request req;
-      inflight.emplace_back(std::move(m), req);
+      //MPI_Request req;
+      inflight.emplace_back(m.host, m.tag, std::move(m.data), MPI_Request());
       auto& f = inflight.back();
-      int rv = MPI_Isend(f.m.data.get(), f.m.len, MPI_BYTE, f.m.host, 0, MPI_COMM_WORLD, &f.req);
-      //inflight.emplace_back(std::move(m), req);
-
-      //std::vector<uint8_t> send_vec(ptr, ptr + 10);
-      //Galois::Runtime::print_send(send_vec, m.len, m.host);
-
-      Galois::Runtime::trace("MPI_SEND: to % len % data: %", m.host, m.len, m.data.get());
-      //      std::cerr << "s";
+      Galois::Runtime::trace("MPI SEND", f.host, f.tag, f.data.size(), Galois::Runtime::printVec(f.data));
+      int rv = MPI_Isend(f.data.data(), f.data.size(), MPI_BYTE, f.host, f.tag, MPI_COMM_WORLD, &f.req);
       handleError(rv);
     }
   };
 
   struct recvQueueTy {
-    std::deque<mpiMessage> done;
+    std::deque<message> done;
 
+
+    //FIXME: Does synchronous recieves overly halt forward progress?
     void probe() {
       int flag = 0;
       MPI_Status status;
@@ -143,24 +122,11 @@ class NetworkIOMPI : public Galois::Runtime::NetworkIO {
         int nbytes;
         rv = MPI_Get_count(&status, MPI_BYTE, &nbytes);
         handleError(rv);
-        std::unique_ptr<uint8_t[]> ptr{new uint8_t[nbytes]};
-        rv = MPI_Recv(ptr.get(), nbytes, MPI_BYTE, status.MPI_SOURCE, status.MPI_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        std::vector<uint8_t> data(nbytes);
+        rv = MPI_Recv(data.data(), nbytes, MPI_BYTE, status.MPI_SOURCE, status.MPI_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
         handleError(rv);
-        if (debugMPI) {
-          uint32_t h;
-          memcpy(&h, ptr.get() + (nbytes - 4), 4);
-          if (debugPrint)
-            std::cerr << getNum() << " R " << std::hex << (uintptr_t)ptr.get() << " " << CRC32::hash(ptr.get(), nbytes - 4) << " " << h << std::dec << " " << nbytes << "\n";
-          assert(h == CRC32::hash(ptr.get(), nbytes - 4));
-          nbytes -= 4;
-        }
-
-        //auto* ptr_data = ptr.get();
-                //std::cerr <<"\n" <<_ID << " mpi_recv " << nbytes << " " << status.MPI_SOURCE << "\n";
-        done.emplace_back(status.MPI_SOURCE, std::move(ptr), nbytes);
-
-        //std::vector<uint8_t> recv_vec(ptr_data, ptr_data + 10);
-        //Galois::Runtime::print_recv(recv_vec, nbytes, status.MPI_SOURCE);
+        Galois::Runtime::trace("MPI RECV", status.MPI_SOURCE, status.MPI_TAG, data.size(), Galois::Runtime::printVec(data));
+        done.emplace_back(status.MPI_SOURCE, status.MPI_TAG, std::move(data));
       }
     }
   };
@@ -188,12 +154,11 @@ public:
 
   virtual message dequeue() {
     if (!recvQueue.done.empty()) {
-      auto& msg = recvQueue.done.front();
-      message retval(std::move(msg.m));
+      auto msg = std::move(recvQueue.done.front());
       recvQueue.done.pop_front();
-      return retval;
+      return msg;
     }
-    return message{};
+    return message{~0U, 0, std::vector<uint8_t>()};
   }
 
   virtual void progress() {

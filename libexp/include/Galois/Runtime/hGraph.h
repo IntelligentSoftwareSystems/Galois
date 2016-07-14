@@ -158,7 +158,7 @@ public:
    GraphTy & getGraph() {
       return graph;
    }
-   static void syncRecv(Galois::Runtime::RecvBuffer& buf) {
+  static void syncRecv(uint32_t src, Galois::Runtime::RecvBuffer& buf) {
       uint32_t oid;
       void (hGraph::*fn)(Galois::Runtime::RecvBuffer&);
       Galois::Runtime::gDeserialize(buf, oid, fn);
@@ -256,7 +256,7 @@ public:
       StatTimer_extract.stop();
 
       SyncPullReply_send_bytes += b.size();
-      net.send(from_id, syncRecv, b);
+      net.sendMsg(from_id, syncRecv, b);
    }
 
    template<typename FnTy>
@@ -652,7 +652,7 @@ public:
          StatTimer_extract.stop();
 
          SyncPush_send_bytes += b.size();
-         net.send(x, syncRecv, b);
+         net.sendMsg(x, syncRecv, b);
       }
       //Will force all messages to be processed before continuing
       net.flush();
@@ -691,7 +691,7 @@ public:
          Galois::Runtime::SendBuffer b;
          gSerialize(b, idForSelf(), fn, loopName, num_iter_pull, net.ID, (uint32_t)(slaveNodes[x].size()));
          SyncPull_send_bytes += b.size();
-         net.send(x, syncRecv, b);
+         net.sendMsg(x, syncRecv, b);
          ++num_recv_expected;
       }
 
