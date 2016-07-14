@@ -104,13 +104,21 @@ namespace {
 
   std::string getSyncer(unsigned counter, const Write_set_PUSH& i) {
     std::stringstream s;
-    s << "\tstruct Syncer_" << counter << " {\n"
-      << "\t\tstatic " << i.VAL_TYPE <<" extract(uint32_t node_id, const " << i.NODE_TYPE << " node) {\n" 
+    s << "\tstruct Syncer_" << counter << " {\n";
+    s << "\t\tstatic " << i.VAL_TYPE <<" extract(uint32_t node_id, const " << i.NODE_TYPE << " node) {\n" 
       << "\t\t#ifdef __GALOIS_HET_CUDA__\n"
       << "\t\t\tif (personality == GPU_CUDA) return " << "get_node_" << i.FIELD_NAME <<  "_cuda(cuda_ctx, node_id);\n"
       << "\t\t\tassert (personality == CPU);\n"
       << "\t\t#endif\n"
       << "\t\t\treturn " << "node." << i.FIELD_NAME <<  ";\n"
+      << "\t\t}\n";
+    s << "\t\tstatic bool extract_reset_batch(unsigned from_id, " << i.VAL_TYPE << " *y) {\n" 
+      << "\t\t#ifdef __GALOIS_HET_CUDA__\n"
+      << "\t\t\tif (personality == GPU_CUDA) { " << "batch_get_reset_node_" << i.FIELD_NAME 
+      <<  "_cuda(cuda_ctx, from_id, y, " << i.RESET_VAL_EXPR << "); return true; }\n"
+      << "\t\t\tassert (personality == CPU);\n"
+      << "\t\t#endif\n"
+      << "\t\t\treturn false;\n"
       << "\t\t}\n";
     s << "\t\tstatic void reduce (uint32_t node_id, " << i.NODE_TYPE << " node, " << i.VAL_TYPE << " y) {\n" 
       << "\t\t#ifdef __GALOIS_HET_CUDA__\n"
@@ -119,36 +127,60 @@ namespace {
       << "\t\t#endif\n"
       << "\t\t\t\t{ Galois::" << i.REDUCE_OP_EXPR << "(node." << i.FIELD_NAME  << ", y); }\n"
       << "\t\t}\n";
+    s << "\t\tstatic bool reduce_batch(unsigned from_id, " << i.VAL_TYPE << " *y) {\n" 
+      << "\t\t#ifdef __GALOIS_HET_CUDA__\n"
+      << "\t\t\tif (personality == GPU_CUDA) { " << "batch_" << i.REDUCE_OP_EXPR << "_node_" << i.FIELD_NAME 
+      <<  "_cuda(cuda_ctx, from_id, y); return true; }\n"
+      << "\t\t\tassert (personality == CPU);\n"
+      << "\t\t#endif\n"
+      << "\t\t\treturn false;\n"
+      << "\t\t}\n";
     s << "\t\tstatic void reset (uint32_t node_id, " << i.NODE_TYPE << " node ) {\n" 
       << "\t\t#ifdef __GALOIS_HET_CUDA__\n"
       << "\t\t\tif (personality == GPU_CUDA) " << "set_node_" << i.FIELD_NAME <<  "_cuda(cuda_ctx, node_id, " << i.RESET_VAL_EXPR << ");\n"
       << "\t\t\telse if (personality == CPU)\n"
       << "\t\t#endif\n"
       << "\t\t\t\t{ node." << i.FIELD_NAME << " = " << i.RESET_VAL_EXPR << "; }\n"
-      << "\t\t}\n"
-      << "\t\ttypedef " << i.VAL_TYPE << " ValTy;\n"
+      << "\t\t}\n";
+    s << "\t\ttypedef " << i.VAL_TYPE << " ValTy;\n"
       << "\t};\n";
     return s.str();
   }
 
   std::string getSyncerPull(unsigned counter, const Write_set_PULL& i) {
     std::stringstream s;
-    s << "\tstruct SyncerPull_" << counter << " {\n"
-      << "\t\tstatic " << i.VAL_TYPE <<" extract(uint32_t node_id, const " << i.NODE_TYPE << " node) {\n"
+    s << "\tstruct SyncerPull_" << counter << " {\n";
+    s << "\t\tstatic " << i.VAL_TYPE <<" extract(uint32_t node_id, const " << i.NODE_TYPE << " node) {\n"
       << "\t\t#ifdef __GALOIS_HET_CUDA__\n"
       << "\t\t\tif (personality == GPU_CUDA) return " << "get_node_" << i.FIELD_NAME <<  "_cuda(cuda_ctx, node_id);\n"
       << "\t\t\tassert (personality == CPU);\n"
       << "\t\t#endif\n"
       << "\t\t\treturn " << "node." << i.FIELD_NAME <<  ";\n"
-      << "\t\t}\n"
-      << "\t\tstatic void setVal (uint32_t node_id, " << i.NODE_TYPE << " node, " << i.VAL_TYPE << " y) " << "{\n"
+      << "\t\t}\n";
+    s << "\t\tstatic bool extract_batch(unsigned from_id, " << i.VAL_TYPE << " *y) {\n" 
+      << "\t\t#ifdef __GALOIS_HET_CUDA__\n"
+      << "\t\t\tif (personality == GPU_CUDA) { " << "batch_get_node_" << i.FIELD_NAME 
+      <<  "_cuda(cuda_ctx, from_id, y); return true; }\n"
+      << "\t\t\tassert (personality == CPU);\n"
+      << "\t\t#endif\n"
+      << "\t\t\treturn false;\n"
+      << "\t\t}\n";
+    s << "\t\tstatic void setVal (uint32_t node_id, " << i.NODE_TYPE << " node, " << i.VAL_TYPE << " y) " << "{\n"
       << "\t\t#ifdef __GALOIS_HET_CUDA__\n"
       << "\t\t\tif (personality == GPU_CUDA) " << "set_node_" << i.FIELD_NAME <<  "_cuda(cuda_ctx, node_id, y);\n"
       << "\t\t\telse if (personality == CPU)\n"
       << "\t\t#endif\n"
       << "\t\t\t\tnode." << i.FIELD_NAME << " = y;\n"
-      << "\t\t}\n"
-      << "\t\ttypedef " << i.VAL_TYPE << " ValTy;\n"
+      << "\t\t}\n";
+    s << "\t\tstatic bool setVal_batch(unsigned from_id, " << i.VAL_TYPE << " *y) {\n" 
+      << "\t\t#ifdef __GALOIS_HET_CUDA__\n"
+      << "\t\t\tif (personality == GPU_CUDA) { " << "batch_set_node_" << i.FIELD_NAME 
+      <<  "_cuda(cuda_ctx, from_id, y); return true; }\n"
+      << "\t\t\tassert (personality == CPU);\n"
+      << "\t\t#endif\n"
+      << "\t\t\treturn false;\n"
+      << "\t\t}\n";
+    s << "\t\ttypedef " << i.VAL_TYPE << " ValTy;\n"
       << "\t};\n";
     return s.str();
   }

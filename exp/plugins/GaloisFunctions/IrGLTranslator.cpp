@@ -585,13 +585,18 @@ public:
     if (requiresWorklist) {
       header << "struct CUDA_Worklist *wl, ";
     }
-    header << "MarshalGraph &g);\n\n";
+    header << "MarshalGraph &g, unsigned num_hosts);\n\n";
     header << "void reset_CUDA_context(struct CUDA_Context *ctx);\n";
     for (auto& var : SharedVariablesToTypeMap) {
       header << var.second << " get_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID);\n";
       header << "void set_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID, " << var.second << " v);\n";
       header << "void add_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID, " << var.second << " v);\n";
       header << "void min_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned LID, " << var.second << " v);\n";
+      header << "void batch_get_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, " << var.second << " *v);\n";
+      header << "void batch_get_reset_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, " << var.second << " *v, " << var.second << " i);\n";
+      header << "void batch_set_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, " << var.second << " *v);\n";
+      header << "void batch_add_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, " << var.second << " *v);\n";
+      header << "void batch_min_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, " << var.second << " *v);\n";
     }
     for (auto& kernel : HostKernelsToArgumentsMap) {
       header << "void " << kernel.first << "_cuda(";
@@ -626,8 +631,14 @@ public:
     cuheader << "\tsize_t nowned;\n";
     cuheader << "\tCSRGraphTy hg;\n";
     cuheader << "\tCSRGraphTy gg;\n";
+    cuheader << "\tsize_t *num_master_nodes; // per host\n";
+    cuheader << "\tShared<size_t> *master_nodes; // per host\n";
+    cuheader << "\tsize_t *num_slave_nodes; // per host\n";
+    cuheader << "\tShared<size_t> *slave_nodes; // per host\n";
     for (auto& var : SharedVariablesToTypeMap) {
       cuheader << "\tShared<" << var.second << "> " << var.first << ";\n";
+      cuheader << "\tShared<" << var.second << "> *master_" << var.first << "; // per host\n";
+      cuheader << "\tShared<" << var.second << "> *slave_" << var.first << "; // per host\n";
     }
     cuheader << "\tShared<int> p_retval;\n";
     if (requiresWorklist) {
@@ -654,6 +665,108 @@ public:
       cuheader << "\t" << var.second << " *" << var.first << " = ctx->" << var.first << ".cpu_wr_ptr();\n";
       cuheader << "\tif (" << var.first << "[LID] > v)\n";
       cuheader << "\t\t" << var.first << "[LID] = v;\n";
+      cuheader << "}\n\n";
+      cuheader << "__global__ void batch_get_node_" << var.first << "(index_type size, size_t * p_master_nodes, " 
+               << var.second << " * p_master_" << var.first << ", " << var.second << " * p_" << var.first << ") {\n";
+      cuheader << "\tunsigned tid = TID_1D;\n";
+      cuheader << "\tunsigned nthreads = TOTAL_THREADS_1D;\n";
+      cuheader << "\tindex_type src_end = size;\n";
+      cuheader << "\tfor (index_type src = 0 + tid; src < src_end; src += nthreads) {\n";
+      cuheader << "\t\tunsigned LID = p_master_nodes[src];\n";
+      cuheader << "\t\tp_master_" << var.first << "[src] = p_" << var.first << "[LID];\n";
+      cuheader << "\t}\n";
+      cuheader << "}\n\n";
+      cuheader << "void batch_get_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, " << var.second << " *v) {\n";
+      cuheader << "\tdim3 blocks;\n";
+      cuheader << "\tdim3 threads;\n";
+      cuheader << "\tkernel_sizing(ctx->gg, blocks, threads);\n";
+      cuheader << "\tbatch_get_node_" << var.first << " <<<blocks, threads>>>(ctx->num_master_nodes[from_id], "
+               << "ctx->master_nodes[from_id].gpu_rd_ptr(), ctx->master_" << var.first << "[from_id].gpu_wr_ptr(true), "
+               << "ctx->" << var.first << ".gpu_rd_ptr());\n";
+      cuheader << "\tcheck_cuda_kernel;\n";
+      cuheader << "\tmemcpy(v, ctx->master_" << var.first << "[from_id].cpu_rd_ptr(), sizeof(" << var.second << ") * ctx->num_master_nodes[from_id]);\n";
+      cuheader << "}\n\n";
+      cuheader << "__global__ void batch_get_reset_node_" << var.first << "(index_type size, size_t * p_slave_nodes, " 
+               << var.second << " * p_slave_" << var.first << ", " << var.second << " * p_" << var.first << ", " << var.second << " value) {\n";
+      cuheader << "\tunsigned tid = TID_1D;\n";
+      cuheader << "\tunsigned nthreads = TOTAL_THREADS_1D;\n";
+      cuheader << "\tindex_type src_end = size;\n";
+      cuheader << "\tfor (index_type src = 0 + tid; src < src_end; src += nthreads) {\n";
+      cuheader << "\t\tunsigned LID = p_slave_nodes[src];\n";
+      cuheader << "\t\tp_slave_" << var.first << "[src] = p_" << var.first << "[LID];\n";
+      cuheader << "\t\tp_" << var.first << "[LID] = value;\n";
+      cuheader << "\t}\n";
+      cuheader << "}\n\n";
+      cuheader << "void batch_get_reset_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, " << var.second << " *v, " << var.second << " i) {\n";
+      cuheader << "\tdim3 blocks;\n";
+      cuheader << "\tdim3 threads;\n";
+      cuheader << "\tkernel_sizing(ctx->gg, blocks, threads);\n";
+      cuheader << "\tbatch_get_reset_node_" << var.first << " <<<blocks, threads>>>(ctx->num_slave_nodes[from_id], "
+               << "ctx->slave_nodes[from_id].gpu_rd_ptr(), ctx->slave_" << var.first << "[from_id].gpu_wr_ptr(true), "
+               << "ctx->" << var.first << ".gpu_rd_ptr(), i);\n";
+      cuheader << "\tcheck_cuda_kernel;\n";
+      cuheader << "\tmemcpy(v, ctx->slave_" << var.first << "[from_id].cpu_rd_ptr(), sizeof(" << var.second << ") * ctx->num_slave_nodes[from_id]);\n";
+      cuheader << "}\n\n";
+      cuheader << "__global__ void batch_set_node_" << var.first << "(index_type size, size_t * p_slave_nodes, " 
+               << var.second << " * p_slave_" << var.first << ", " << var.second << " * p_" << var.first << ") {\n";
+      cuheader << "\tunsigned tid = TID_1D;\n";
+      cuheader << "\tunsigned nthreads = TOTAL_THREADS_1D;\n";
+      cuheader << "\tindex_type src_end = size;\n";
+      cuheader << "\tfor (index_type src = 0 + tid; src < src_end; src += nthreads) {\n";
+      cuheader << "\t\tunsigned LID = p_slave_nodes[src];\n";
+      cuheader << "\t\tp_" << var.first << "[LID] = p_slave_" << var.first << "[src];\n";
+      cuheader << "\t}\n";
+      cuheader << "}\n\n";
+      cuheader << "void batch_set_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, " << var.second << " *v) {\n";
+      cuheader << "\tdim3 blocks;\n";
+      cuheader << "\tdim3 threads;\n";
+      cuheader << "\tkernel_sizing(ctx->gg, blocks, threads);\n";
+      cuheader << "\tmemcpy(ctx->slave_" << var.first << "[from_id].cpu_wr_ptr(true), v, sizeof(" << var.second << ") * ctx->num_slave_nodes[from_id]);\n";
+      cuheader << "\tbatch_set_node_" << var.first << " <<<blocks, threads>>>(ctx->num_slave_nodes[from_id], "
+               << "ctx->slave_nodes[from_id].gpu_rd_ptr(), ctx->slave_" << var.first << "[from_id].gpu_rd_ptr(), "
+               << "ctx->" << var.first << ".gpu_wr_ptr());\n";
+      cuheader << "\tcheck_cuda_kernel;\n";
+      cuheader << "}\n\n";
+      cuheader << "__global__ void batch_add_node_" << var.first << "(index_type size, size_t * p_master_nodes, " 
+               << var.second << " * p_master_" << var.first << ", " << var.second << " * p_" << var.first << ") {\n";
+      cuheader << "\tunsigned tid = TID_1D;\n";
+      cuheader << "\tunsigned nthreads = TOTAL_THREADS_1D;\n";
+      cuheader << "\tindex_type src_end = size;\n";
+      cuheader << "\tfor (index_type src = 0 + tid; src < src_end; src += nthreads) {\n";
+      cuheader << "\t\tunsigned LID = p_master_nodes[src];\n";
+      cuheader << "\t\tp_" << var.first << "[LID] += p_master_" << var.first << "[src];\n";
+      cuheader << "\t}\n";
+      cuheader << "}\n\n";
+      cuheader << "void batch_add_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, " << var.second << " *v) {\n";
+      cuheader << "\tdim3 blocks;\n";
+      cuheader << "\tdim3 threads;\n";
+      cuheader << "\tkernel_sizing(ctx->gg, blocks, threads);\n";
+      cuheader << "\tmemcpy(ctx->master_" << var.first << "[from_id].cpu_wr_ptr(true), v, sizeof(" << var.second << ") * ctx->num_master_nodes[from_id]);\n";
+      cuheader << "\tbatch_add_node_" << var.first << " <<<blocks, threads>>>(ctx->num_master_nodes[from_id], "
+               << "ctx->master_nodes[from_id].gpu_rd_ptr(), ctx->master_" << var.first << "[from_id].gpu_rd_ptr(), "
+               << "ctx->" << var.first << ".gpu_wr_ptr());\n";
+      cuheader << "\tcheck_cuda_kernel;\n";
+      cuheader << "}\n\n";
+      cuheader << "__global__ void batch_min_node_" << var.first << "(index_type size, size_t * p_master_nodes, " 
+               << var.second << " * p_master_" << var.first << ", " << var.second << " * p_" << var.first << ") {\n";
+      cuheader << "\tunsigned tid = TID_1D;\n";
+      cuheader << "\tunsigned nthreads = TOTAL_THREADS_1D;\n";
+      cuheader << "\tindex_type src_end = size;\n";
+      cuheader << "\tfor (index_type src = 0 + tid; src < src_end; src += nthreads) {\n";
+      cuheader << "\t\tunsigned LID = p_master_nodes[src];\n";
+      cuheader << "\t\tp_" << var.first << "[LID] = (p_" << var.first << "[LID] > p_master_" << var.first << "[src]) ? "
+               << "p_master_" << var.first << "[src] : p_" << var.first << "[LID];\n";
+      cuheader << "\t}\n";
+      cuheader << "}\n\n";
+      cuheader << "void batch_min_node_" << var.first << "_cuda(struct CUDA_Context *ctx, unsigned from_id, " << var.second << " *v) {\n";
+      cuheader << "\tdim3 blocks;\n";
+      cuheader << "\tdim3 threads;\n";
+      cuheader << "\tkernel_sizing(ctx->gg, blocks, threads);\n";
+      cuheader << "\tmemcpy(ctx->master_" << var.first << "[from_id].cpu_wr_ptr(true), v, sizeof(" << var.second << ") * ctx->num_master_nodes[from_id]);\n";
+      cuheader << "\tbatch_min_node_" << var.first << " <<<blocks, threads>>>(ctx->num_master_nodes[from_id], "
+               << "ctx->master_nodes[from_id].gpu_rd_ptr(), ctx->master_" << var.first << "[from_id].gpu_rd_ptr(), "
+               << "ctx->" << var.first << ".gpu_wr_ptr());\n";
+      cuheader << "\tcheck_cuda_kernel;\n";
       cuheader << "}\n\n";
     }
     cuheader << "struct CUDA_Context *get_CUDA_context(int id) {\n";
@@ -684,7 +797,7 @@ public:
     if (requiresWorklist) {
       cuheader << "struct CUDA_Worklist *wl, ";
     }
-    cuheader << "MarshalGraph &g) {\n";
+    cuheader << "MarshalGraph &g, unsigned num_hosts) {\n";
     cuheader << "\tCSRGraphTy &graph = ctx->hg;\n";
     cuheader << "\tctx->nowned = g.nowned;\n";
     cuheader << "\tassert(ctx->id == g.id);\n";
@@ -698,6 +811,36 @@ public:
     cuheader << "\tmemcpy(graph.edge_dst, g.edge_dst, sizeof(index_type) * g.nedges);\n";
     cuheader << "\tif(g.node_data) memcpy(graph.node_data, g.node_data, sizeof(node_data_type) * g.nnodes);\n";
     cuheader << "\tif(g.edge_data) memcpy(graph.edge_data, g.edge_data, sizeof(edge_data_type) * g.nedges);\n";
+    cuheader << "\tctx->num_master_nodes = (size_t *) calloc(num_hosts, sizeof(size_t));\n";
+    cuheader << "\tmemcpy(ctx->num_master_nodes, g.num_master_nodes, sizeof(size_t) * num_hosts);\n";
+    cuheader << "\tctx->master_nodes = (Shared<size_t> *) calloc(num_hosts, sizeof(Shared<size_t>));\n";
+    for (auto& var : SharedVariablesToTypeMap) {
+      cuheader << "\tctx->master_" << var.first << " = (Shared<" << var.second << "> *) calloc(num_hosts, sizeof(Shared<" << var.second << ">));\n";
+    }
+    cuheader << "\tfor(uint32_t h = 0; h < num_hosts; ++h){\n";
+    cuheader << "\t\tif (ctx->num_master_nodes[h] > 0) {\n";
+    cuheader << "\t\t\tctx->master_nodes[h].alloc(ctx->num_master_nodes[h]);\n";
+    cuheader << "\t\t\tmemcpy(ctx->master_nodes[h].cpu_wr_ptr(), g.master_nodes[h], sizeof(size_t) * ctx->num_master_nodes[h]);\n"; 
+    for (auto& var : SharedVariablesToTypeMap) {
+      cuheader << "\t\t\tctx->master_" << var.first << "[h].alloc(ctx->num_master_nodes[h]);\n";
+    }
+    cuheader << "\t\t}\n";
+    cuheader << "\t}\n";
+    cuheader << "\tctx->num_slave_nodes = (size_t *) calloc(num_hosts, sizeof(size_t));\n";
+    cuheader << "\tmemcpy(ctx->num_slave_nodes, g.num_slave_nodes, sizeof(size_t) * num_hosts);\n";
+    cuheader << "\tctx->slave_nodes = (Shared<size_t> *) calloc(num_hosts, sizeof(Shared<size_t>));\n";
+    for (auto& var : SharedVariablesToTypeMap) {
+      cuheader << "\tctx->slave_" << var.first << " = (Shared<" << var.second << "> *) calloc(num_hosts, sizeof(Shared<" << var.second << ">));\n";
+    }
+    cuheader << "\tfor(uint32_t h = 0; h < num_hosts; ++h){\n";
+    cuheader << "\t\tif (ctx->num_slave_nodes[h] > 0) {\n";
+    cuheader << "\t\t\tctx->slave_nodes[h].alloc(ctx->num_slave_nodes[h]);\n";
+    cuheader << "\t\t\tmemcpy(ctx->slave_nodes[h].cpu_wr_ptr(), g.slave_nodes[h], sizeof(size_t) * ctx->num_slave_nodes[h]);\n"; 
+    for (auto& var : SharedVariablesToTypeMap) {
+      cuheader << "\t\t\tctx->slave_" << var.first << "[h].alloc(ctx->num_slave_nodes[h]);\n";
+    }
+    cuheader << "\t\t}\n";
+    cuheader << "\t}\n";
     cuheader << "\tgraph.copy_to_gpu(ctx->gg);\n";
     for (auto& var : SharedVariablesToTypeMap) {
       cuheader << "\tctx->" << var.first << ".alloc(graph.nnodes);\n";
@@ -713,7 +856,7 @@ public:
       cuheader << "\tctx->shared_wl = wl;\n";
     }
     cuheader << "\tctx->p_retval = Shared<int>(1);\n";
-    cuheader << "\tprintf(\"load_graph_GPU: %d owned nodes of total %d resident, %d edges\\n\", ctx->nowned, graph.nnodes, graph.nedges);\n"; 
+    cuheader << "\tprintf(\"[%d] load_graph_GPU: %d owned nodes of total %d resident, %d edges\\n\", ctx->id, ctx->nowned, graph.nnodes, graph.nedges);\n"; 
     cuheader << "\treset_CUDA_context(ctx);\n";
     cuheader << "}\n\n";
     cuheader << "void reset_CUDA_context(struct CUDA_Context *ctx) {\n";
