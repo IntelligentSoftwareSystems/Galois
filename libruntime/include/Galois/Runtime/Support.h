@@ -42,6 +42,8 @@ void reportLoopInstance(const char* loopname);
 
 //! Reports stats for a given thread
 void reportStat(const char* loopname, const char* category, unsigned long value, unsigned TID);
+void reportStat(const char* loopname, const char* category, double value, unsigned TID);
+void reportStat(const char* loopname, const char* category, const std::string& value, unsigned TID);
 //! Reports stats for a given thread
 void reportStat(const std::string& loopname, const std::string& category, unsigned long value, unsigned TID);
 //! Reports stats for a given thread

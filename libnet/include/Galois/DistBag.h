@@ -97,7 +97,7 @@ public:
         continue;
       Galois::Runtime::SendBuffer b;
       gSerialize(b, net.ID,didWork, bagItems_vec[x]);
-      net.send(x, recv_BagItems, b);
+      net.sendMsg(x, recv_BagItems, b);
     }
     net.flush();
     while(num_Hosts_recvd < (net.Num - 1)){

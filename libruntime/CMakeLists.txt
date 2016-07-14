@@ -24,3 +24,8 @@ target_link_libraries(galois_runtime gllvm)
 if (NUMA_FOUND)
   target_link_libraries(galois_runtime ${NUMA_LIBRARY})
 endif()
+if (VTune_FOUND)
+  target_link_libraries(galois_runtime ${VTune_LIBRARY})
+  target_link_libraries(galois_runtime dl)
+endif()
+

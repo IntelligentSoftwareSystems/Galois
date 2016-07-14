@@ -18,17 +18,17 @@
  * including but not limited to those resulting from defects in Software and/or
  * Documentation, or loss or inaccuracy of data of any kind.
  *
- * @author Manoj Dhanapal <madhanap@cs.utexas.edu>
  * @author Andrew Lenharth <andrewl@lenharth.org>
  */
 
 #ifndef GALOIS_RUNTIME_NETWORK_H
 #define GALOIS_RUNTIME_NETWORK_H
 
-#include "Galois/Statistic.h"
 #include "Galois/Runtime/Serialize.h"
 
 #include <cstdint>
+#include <experimental/tuple>
+#include <experimental/optional>
 
 namespace Galois {
 namespace Runtime {
@@ -36,56 +36,58 @@ namespace Runtime {
 typedef SerializeBuffer SendBuffer;
 typedef DeSerializeBuffer RecvBuffer;
 
-typedef void (*recvFuncTy)(RecvBuffer&);
+template<typename T>
+using optional_t = std::experimental::optional<T>;
 
 class NetworkInterface {
-protected:
-  unsigned long statSendNum;
-  unsigned long statRecvNum;
-  unsigned long statSendBytes;
-  unsigned long statRecvBytes;
 
-  
 public:
 
   static uint32_t ID;
   static uint32_t Num;
 
-  NetworkInterface(): 
-    statSendNum(0), statRecvNum(0), statSendBytes(0), statRecvBytes() { }
   virtual ~NetworkInterface();
 
-  void dumpStats() const;
-  void reportStats();
-
   //!send a message to a given (dest) host.  A message is simply a
-  //!landing pad (recv) and some data (buf)
+  //!landing pad (recv, funciton pointer) and some data (buf)
+  //! on the receiver, recv(buf) will be called durring handleReceives()
   //! buf is invalidated by this operation
-  virtual void send(uint32_t dest, recvFuncTy recv, SendBuffer& buf) = 0;
-
-  //!send a message to all hosts.  A message is simply a
-  //!landing pad (recv) and some data (buf)
-  //! buf is invalidated by this operation
-  void broadcast(recvFuncTy recv, SendBuffer& buf, bool self = false);
+  void sendMsg(uint32_t dest, void (*recv)(uint32_t, RecvBuffer&), SendBuffer& buf);
 
   //! send a message letting the network handle the serialization and deserialization
   //! slightly slower
   template<typename... Args>
-  void sendAlt(uint32_t dest, void (*recv)(Args...), Args... param);
+  void sendSimple(uint32_t dest, void (*recv)(uint32_t, Args...), Args... param);
+
+  //!send a message to a given (dest) host.  A message is simply a
+  //!tag (tag) and some data (buf)
+  //! on the receiver, buf will be returned on a receiveTagged(tag)
+  //! buf is invalidated by this operation
+  virtual void sendTagged(uint32_t dest, uint32_t tag, SendBuffer& buf) = 0;
+
+  //!send a message to all hosts.  A message is simply a
+  //!landing pad (recv) and some data (buf)
+  //! buf is invalidated by this operation
+  void broadcast(void (*recv)(uint32_t, RecvBuffer&), SendBuffer& buf, bool self = false);
 
   //! broadcast a mssage allowing the network to handle serialization and deserialization
   template<typename... Args>
-  void broadcastAlt(void (*recv)(Args...), Args... param);
+  void broadcastSimple(void (*recv)(uint32_t, Args...), Args... param);
 
   //!receive and dispatch messages
-  //!returns true if at least one message was received
-  //! if the network requires a dedicated thread, then 
-  //!it is only valid for that thread to call this function
-  virtual bool handleReceives() = 0;
+  void handleReceives();
 
+  //!receive tagged message
+  virtual optional_t<std::pair<uint32_t, RecvBuffer>> receiveTagged(uint32_t tag, std::unique_lock<Substrate::SimpleLock>* rlg) = 0;
+
+  //!move send buffers out to network
   virtual void flush() = 0;
 
-  unsigned long reportSendBytes();
+  virtual unsigned long reportSendBytes() const = 0;
+  virtual unsigned long reportSendMsgs() const = 0;
+  virtual unsigned long reportRecvBytes() const = 0;
+  virtual unsigned long reportRecvMsgs() const = 0;
+  virtual std::vector<unsigned long> reportExtra() const = 0;
 };
 
 NetworkInterface& getSystemNetworkInterface();
@@ -97,44 +99,28 @@ NetworkInterface& makeNetworkRouted();
 ////////////////////////////////////////////////////////////////////////////////
 // Implementations
 ////////////////////////////////////////////////////////////////////////////////
+namespace { //anon
 template<typename... Args>
-struct genericLandingPad {
-  template<int ...> struct seq {};
-  template<int N, int ...S> struct gens : gens<N-1, N-1, S...> {};
-  template<int ...S> struct gens<0, S...>{ typedef seq<S...> type; };
-  
-  template<int ...S>
-  static void callFunc(void (*fp)(Args...), std::tuple<Args...>& args, seq<S...>)
-  {
-    return fp(std::move(std::get<S>(args)) ...);
-  }
-
-  //do this the new fancy way
-  static void func(RecvBuffer& buf) {
-    //    std::cerr << "RA\n";
-    void (*fp)(Args...);
-    std::tuple<Args...> args;
-    gDeserialize(buf, fp, args);
-    //    std::cerr << "end RA " << fp << "\n";
-    callFunc(fp, args, typename gens<sizeof...(Args)>::type());
-  }
-};
+static void genericLandingPad(uint32_t src, RecvBuffer& buf) {
+  void (*fp)(uint32_t, Args...);
+  std::tuple<Args...> args;
+  gDeserialize(buf, fp, args);
+  std::experimental::apply([fp, src](Args... params) { fp(src, params...); }, args);
+}
+} //end anon namespace
 
 template<typename... Args>
-void NetworkInterface::sendAlt(uint32_t dest, void (*recv)(Args...), Args... param) {
-  //  std::cerr << "SA : " << dest << " " << (void*)recv << " " << sizeof...(Args) << "\n";
+void NetworkInterface::sendSimple(uint32_t dest, void (*recv)(uint32_t, Args...), Args... param) {
   SendBuffer buf;
-  gSerialize(buf, recv, param...);
-  //  std::cerr << "end SA\n";
-  send(dest, genericLandingPad<Args...>::func, buf);
-  //  std::cerr << "end SA\n";
+  gSerialize(buf, (uintptr_t)recv, param..., (uintptr_t)genericLandingPad<Args...>);
+  sendTagged(dest, 0, buf);
 }
 
 template<typename... Args>
-void NetworkInterface::broadcastAlt(void (*recv)(Args...), Args... param) {
+void NetworkInterface::broadcastSimple(void (*recv)(uint32_t, Args...), Args... param) {
   SendBuffer buf;
-  gSerialize(buf, recv, param...);
-  broadcast(genericLandingPad<Args...>::func, buf, false);
+  gSerialize(buf, (uintptr_t)recv, param...);
+  broadcast(genericLandingPad<Args...>, buf, false);
 }
 
 } //Runtime

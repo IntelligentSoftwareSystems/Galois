@@ -44,12 +44,6 @@
 #include <sstream>
 #include <iostream>
 
-
-namespace Galois {
-namespace Runtime {
-extern unsigned activeThreads;
-} } //end namespaces
-
 using namespace Galois;
 using namespace Galois::Runtime;
 
@@ -195,7 +189,7 @@ void Galois::Runtime::StatCollector::printStats(std::ostream& out) {
     v[tid] += p.second.valueInt;
   }
 
-  auto& net = Galois::Runtime::getSystemNetworkInterface();
+  //  auto& net = Galois::Runtime::getSystemNetworkInterface();
   //print header
   out << "STATTYPE,LOOP,INSTANCE,CATEGORY,n,sum";
   for (unsigned x = 0; x <= maxThreadID; ++x)
@@ -228,21 +222,15 @@ void Galois::Runtime::reportLoopInstance(const char* loopname) {
   SM.get()->beginLoopInstance(std::string(loopname ? loopname : "(NULL)"));
 }
 
-static void reportStatImpl(const std::string loopname, const std::string category, unsigned long value, unsigned TID, unsigned HostID) {
+static void reportStatImpl(uint32_t HostID, const std::string loopname, const std::string category, unsigned long value, unsigned TID) {
   if (getHostID())
-    getSystemNetworkInterface().sendAlt(0, reportStatImpl, loopname, category, value, TID, HostID);
-  else
-    SM.get()->addToStat(loopname, category, value, TID, HostID);
-}
-static void reportStatImpl(const std::string loopname, const std::string category, const std::string value, unsigned TID, unsigned HostID) {
-  if (getHostID())
-    getSystemNetworkInterface().sendAlt(0, reportStatImpl, loopname, category, value, TID, HostID);
-  else
+    getSystemNetworkInterface().sendSimple(0, reportStatImpl, loopname, category, value, TID);
+  else 
     SM.get()->addToStat(loopname, category, value, TID, HostID);
 }
 
 void Galois::Runtime::reportStat(const std::string& loopname, const std::string& category, unsigned long value, unsigned TID) {
-  reportStatImpl(loopname, category, value, TID, getHostID());
+  reportStatImpl(getHostID(), loopname, category, value, TID);
 }
 
 void Galois::Runtime::reportStat(const std::string& loopname, const std::string& category, const std::string value, unsigned TID) {
@@ -252,9 +240,10 @@ void Galois::Runtime::reportStat(const std::string& loopname, const std::string&
 
 
 void Galois::Runtime::reportStat(const char* loopname, const char* category, unsigned long value, unsigned TID) {
-  reportStatImpl(std::string(loopname ? loopname : "(NULL)"), 
+  reportStatImpl(getHostID(),
+                 std::string(loopname ? loopname : "(NULL)"), 
                  std::string(category ? category : "(NULL)"),
-                 value, TID, getHostID());
+                 value, TID);
 }
 
 void Galois::Runtime::printStats() {
