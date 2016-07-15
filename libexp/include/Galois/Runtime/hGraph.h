@@ -174,9 +174,6 @@ public:
      std::vector<uint64_t> items;
      Galois::Runtime::gDeserialize(buf, hostID, numItems);
 
-     if(masterNodes.size() < hostID)
-       masterNodes.resize(hostID);
-
      Galois::Runtime::gDeserialize(buf, masterNodes[hostID]);
      std::cout << "from : " << hostID << " -> " << numItems << " --> " << masterNodes[hostID].size() << "\n";
    }
@@ -202,7 +199,7 @@ public:
          if (!FnTy::reduce_batch(from_id, &val_vec[0])) {
            Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num),
                [&](uint32_t n){
-               auto lid = masterNodes[from_id][n];
+               uint32_t lid = masterNodes[from_id][n];
 #ifdef __GALOIS_HET_OPENCL__
            CLNodeDataWrapper d = clGraph.getDataW(lid);
            FnTy::reduce(lid, d, val_vec[n]);
@@ -239,7 +236,7 @@ public:
 
         if (!FnTy::extract_batch(from_id, &val_vec[0])) {
           Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
-              auto localID = masterNodes[from_id][n];
+              uint32_t localID = masterNodes[from_id][n];
 #ifdef __GALOIS_HET_OPENCL__
               auto val = FnTy::extract((localID), clGraph.getDataR((localID)));
 #else
@@ -281,7 +278,7 @@ public:
 
         if (!FnTy::setVal_batch(from_id, &val_vec[0])) {
           Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
-              auto localID = slaveNodes[from_id][n];
+              uint32_t localID = slaveNodes[from_id][n];
 #ifdef __GALOIS_HET_OPENCL__
               {
               CLNodeDataWrapper d = clGraph.getDataW(localID);
@@ -430,7 +427,6 @@ public:
              masterNodes[h][n] = G2L(masterNodes[h][n]);
              }, Galois::loopname("MASTER_NODES"));
       }
-      masterNodes.resize(hostNodes.size());
 
       for(uint32_t h = 0; h < slaveNodes.size(); ++h){
          Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(slaveNodes[h].size()),
@@ -438,7 +434,6 @@ public:
              slaveNodes[h][n] = G2L(slaveNodes[h][n]);
              }, Galois::loopname("SLAVE_NODES"));
       }
-      slaveNodes.resize(hostNodes.size());
    }
 
    template<bool isVoidType, typename std::enable_if<!isVoidType>::type* = nullptr>
@@ -634,7 +629,7 @@ public:
 
            if (!FnTy::extract_reset_batch(x, &val_vec[0])) {
              Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
-                  auto lid = slaveNodes[x][n];
+                  uint32_t lid = slaveNodes[x][n];
 #ifdef __GALOIS_HET_OPENCL__
                   CLNodeDataWrapper d = clGraph.getDataW(lid);
                   auto val = FnTy::extract(lid, getData(lid, d));
