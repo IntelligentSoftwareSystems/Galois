@@ -81,7 +81,8 @@ struct DNode {
   unsigned int id;
 };
 
-typedef Galois::Graph::LC_CSR_Graph<DNode, void> DGraph; // graph with DNode nodes and typeless edges
+typedef Galois::Graph::LC_CSR_Graph<DNode, void> InnerDGraph; // graph with DNode nodes and typeless edges
+typedef Galois::Graph::LC_InOut_Graph<InnerDGraph> DGraph;
 typedef DGraph::GraphNode DGNode;
 
 struct QNode {
@@ -90,7 +91,8 @@ struct QNode {
   std::vector<DGNode> candidate;
 };
 
-typedef Galois::Graph::LC_CSR_Graph<QNode, void> QGraph;
+typedef Galois::Graph::LC_CSR_Graph<QNode, void> InnerQGraph;
+typedef Galois::Graph::LC_InOut_Graph<InnerQGraph> QGraph;
 typedef QGraph::GraphNode QGNode;
 
 struct NodeMatch {
@@ -137,7 +139,7 @@ void initializeGraph(Graph& g, unsigned int seed) {
   }
 }
 
-// assume gQ is connected and undirected
+// assume gQ is connected
 struct VF2Algo {
   std::string name() const { return "VF2"; }
 
@@ -192,51 +194,79 @@ struct VF2Algo {
     return *(qFrontier.get().begin());
   }
 
+  template<typename Graph, typename Set>
+  void countInNeighbors(Graph& g, typename Graph::GraphNode n, Set& matched, Set& frontier, long int *numFrontier, long int *numOther) {
+    for(auto ei = g.in_edge_begin(n), ee = g.in_edge_end(n); ei != ee; ++ei) {
+      auto ngh = g.getInEdgeDst(ei);
+      if(frontier.count(ngh)) {
+        *numFrontier += 1;
+      } else { 
+        *numOther += (1 - matched.count(ngh));
+      }
+    }
+  }
+
+  template<typename Graph, typename Set>
+  void countNeighbors(Graph& g, typename Graph::GraphNode n, Set& matched, Set& frontier, long int *numFrontier, long int *numOther) {
+    for(auto ei = g.edge_begin(n), ee = g.edge_end(n); ei != ee; ++ei) { 
+      auto ngh = g.getEdgeDst(ei);
+      if(frontier.count(ngh)) {
+        *numFrontier += 1;
+      } else {
+        *numOther += (1 - matched.count(ngh));
+      }
+    }
+  } 
+
   void refineCandidates(DGraph& gD, QGraph& gQ, QGNode nQuery, std::vector<DGNode>& refined) {
     auto numNghQ = std::distance(gQ.edge_begin(nQuery), gQ.edge_end(nQuery));
-    long int numMatchedNghQ = 0, numFrontierNghQ = 0, numOtherNghQ = 0;
+    long int numFrontierNghQ = 0, numOtherNghQ = 0;
+    countNeighbors(gQ, nQuery, qMatched.get(), qFrontier.get(), &numFrontierNghQ, &numOtherNghQ);
 
-    for(auto ei = gQ.edge_begin(nQuery), ee = gQ.edge_end(nQuery); ei != ee; ++ei) {
-      auto ngh = gQ.getEdgeDst(ei);
-      if(qMatched.get().count(ngh)) { 
-        numMatchedNghQ += 1;
-      } else if(qFrontier.get().count(ngh)) { 
-        numFrontierNghQ += 1;
-      } else { 
-        numOtherNghQ += 1;
-      }
+    long int numInNghQ = 0, numFrontierInNghQ = 0, numOtherInNghQ = 0;
+    if(!undirected) {
+      numInNghQ = std::distance(gQ.in_edge_begin(nQuery), gQ.in_edge_end(nQuery));
+      countInNeighbors(gQ, nQuery, qMatched.get(), qFrontier.get(), &numFrontierInNghQ, &numOtherInNghQ);
     }
 
     // consider all nodes in data frontier
     auto& dQ = gQ.getData(nQuery);
     for(auto ii = dFrontier.get().begin(), ie = dFrontier.get().end(); ii != ie; ++ii) {
       // not a candidate for nQuery
-      if(*(std::lower_bound(dQ.candidate.begin(), dQ.candidate.end(), *ii)) != *ii) {
+      if(!std::binary_search(dQ.candidate.begin(), dQ.candidate.end(), *ii)) {
         continue;
       }
 
       auto numNghD = std::distance(gD.edge_begin(*ii), gD.edge_end(*ii));
-      long int numMatchedNghD = 0, numFrontierNghD = 0, numOtherNghD = 0;
-
       if(numNghD < numNghQ) {
         continue;
       }
 
-      for(auto ei = gD.edge_begin(*ii), ee = gD.edge_end(*ii); ei != ee; ++ei) {
-        auto ngh = gD.getEdgeDst(ei);
-        if(dMatched.get().count(ngh)) { 
-          numMatchedNghD += 1;
-        } else if(dFrontier.get().count(ngh)) { 
-          numFrontierNghD += 1;
-        } else { 
-          numOtherNghD += 1;
-        }
-      }
-
+      long int numFrontierNghD = 0, numOtherNghD = 0;
+      countNeighbors(gD, *ii, dMatched.get(), dFrontier.get(), &numFrontierNghD, &numOtherNghD);
       if(numFrontierNghD < numFrontierNghQ) {
         continue;
       }
       if(numOtherNghD < numOtherNghQ) {
+        continue;
+      }
+
+      if(undirected) {
+        refined.push_back(*ii);
+        continue;
+      }
+
+      auto numInNghD = std::distance(gD.in_edge_begin(*ii), gD.in_edge_end(*ii));
+      if(numInNghD < numInNghQ) {
+        continue;
+      }
+
+      long int numFrontierInNghD = 0, numOtherInNghD = 0;    
+      countInNeighbors(gD, *ii, dMatched.get(), dFrontier.get(), &numFrontierInNghD, &numOtherInNghD);
+      if(numFrontierInNghD < numFrontierInNghQ) {
+        continue;
+      }
+      if(numOtherInNghD < numOtherInNghQ) {
         continue;
       }
 
@@ -268,6 +298,7 @@ struct VF2Algo {
     return true;
   }
 
+  // TODO: manipulate sets with incoming neighbors
   struct SubgraphSearchInternal {
     typedef int tt_does_not_need_aborts;
     typedef int tt_does_not_need_push;
@@ -459,11 +490,13 @@ struct UllmannAlgo {
   void refineCandidates(DGraph& gD, QGraph& gQ, QGNode nQuery, Matching& matching, std::vector<DGNode>& refined) {
     auto& dQ = gQ.getData(nQuery);
     auto numNghQ = std::distance(gQ.edge_begin(nQuery), gQ.edge_end(nQuery));
+    auto numInNghQ = std::distance(gQ.in_edge_begin(nQuery), gQ.in_edge_end(nQuery));
 
     for(auto ii = dQ.candidate.begin(), ie = dQ.candidate.end(); ii != ie; ++ii) {
       auto numNghD = std::distance(gD.edge_begin(*ii), gD.edge_end(*ii));
+      auto numInNghD = std::distance(gD.in_edge_begin(*ii), gD.in_edge_end(*ii));
 
-      if(numNghD >= numNghQ) {
+      if(numNghD >= numNghQ && numInNghD >= numInNghQ) {
         refined.push_back(*ii);
       }
     }
