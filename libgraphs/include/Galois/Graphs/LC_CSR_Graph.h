@@ -132,18 +132,8 @@ protected:
   uint64_t numNodes;
   uint64_t numEdges;
 
-  // ylu: should it be atomic for parallel sorting edges by dst for nodes?
+  // ylu: should it be atomic for sorting edges by dst for nodes in parallel?
   uint64_t numNodesWithEdgesSortedByDst; 
-
-  /*
-   * the comparator for sortEdgeByDst
-   */
-  struct CmpEdgeByDst {
-    typedef Galois::Graph::EdgeSortValue<GraphNode,EdgeTy> EdgeSortValue;
-    bool operator()(const EdgeSortValue& e1, const EdgeSortValue& e2) const {
-      return e1.dst < e2.dst;
-    }
-  };
 
   typedef detail::EdgeSortIterator<GraphNode,typename EdgeIndData::value_type,EdgeDst,EdgeData> edge_sort_iterator;
  
@@ -281,7 +271,8 @@ public:
    */
   void sortEdgesByDst(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
     acquireNode(N, mflag);
-    std::sort(edge_sort_begin(N), edge_sort_end(N), CmpEdgeByDst());
+    typedef EdgeSortValue<GraphNode,EdgeTy> EdgeSortVal;
+    std::sort(edge_sort_begin(N), edge_sort_end(N), [=] (const EdgeSortVal& e1, const EdgeSortVal& e2) { return e1.dst < e2.dst; });
     numNodesWithEdgesSortedByDst++;
   }
 
