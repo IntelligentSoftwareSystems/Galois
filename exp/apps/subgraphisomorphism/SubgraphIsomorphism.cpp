@@ -58,7 +58,6 @@ enum Algo {
 
 static cll::opt<unsigned int> kFound("kFound", cll::desc("stop when k instances found"), cll::init(10));
 static cll::opt<bool> undirected("undirected", cll::desc("undirected data and query graphs"), cll::init(false));
-static cll::opt<bool> sortEdges("sortEdges", cll::desc("sort the graph edges before search"), cll::init(true));
 
 static cll::opt<std::string> graphD("graphD", cll::desc("<data graph file>"));
 static cll::opt<std::string> graphQ("graphQ", cll::desc("<query graph file>"));
@@ -101,19 +100,12 @@ public:
   }
 };
 
-//#define _USE_FIRST_GRAPH_ 1
-
 struct DNode {
   char label;
   unsigned int id;
 };
 
-#ifdef _USE_FIRST_GRAPH_
-typedef Galois::Graph::FirstGraph<DNode, void, true> 
-  ::template with_sorted_neighbors<true>::type DGraph; // directed graph with DNode nodes and void edges sorted by dst
-#else
 typedef LC_Extended_Graph<DNode, void> DGraph; // graph with DNode nodes and typeless edges
-#endif
 typedef DGraph::GraphNode DGNode;
 
 struct QNode {
@@ -122,12 +114,7 @@ struct QNode {
   std::vector<DGNode> candidate;
 };
 
-#ifdef _USE_FIRST_GRAPH_
-typedef Galois::Graph::FirstGraph<QNode, void, true> 
-  ::template with_sorted_neighbors<true>::type QGraph;
-#else
 typedef LC_Extended_Graph<QNode, void> QGraph;
-#endif
 typedef QGraph::GraphNode QGNode;
 
 struct NodeMatch {
@@ -174,9 +161,7 @@ void initializeGraph(Graph& g, unsigned int seed) {
 
   generator.seed(seed);
 
-#ifndef _USE_FIRST_GRAPH_
-  g.edgeSorted = sortEdges;
-#endif
+  g.edgeSorted = true;
 
   unsigned int i = 0;
   for(auto ni = g.begin(), ne = g.end(); ni != ne; ++ni) {
@@ -184,11 +169,7 @@ void initializeGraph(Graph& g, unsigned int seed) {
     data.id = i++;
     data.label = 'A' + distribution(generator) % numLabels;
 
-#ifndef _USE_FIRST_GRAPH_
-    if(sortEdges) {
-      g.sortEdges(*ni, CmpEdgeByDst<Graph>());
-    }
-#endif
+    g.sortEdges(*ni, CmpEdgeByDst<Graph>());
   }
 }
 
