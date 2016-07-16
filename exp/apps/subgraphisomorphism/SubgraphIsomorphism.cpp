@@ -76,36 +76,12 @@ static cll::opt<Algo> algo("algo", cll::desc("Choose an algorithm:"),
       clEnumValN(Algo::vf2, "vf2", "VF2"), 
       clEnumValEnd), cll::init(Algo::ullmann));
 
-template<typename NodeTy, typename EdgeTy>
-class LC_Extended_Graph: public Galois::Graph::LC_CSR_Graph<NodeTy, EdgeTy>
-{
-public:
-  typedef typename Galois::Graph::LC_CSR_Graph<NodeTy, EdgeTy> BaseGraph;
-
-public:
-  bool edgeSorted;
-
-public:
-  typename BaseGraph::edge_iterator 
-  findEdge(typename BaseGraph::GraphNode src, typename BaseGraph::GraphNode dst) {
-    if(!edgeSorted) {
-      // linear scan over the edge list
-      return std::find_if(this->edge_begin(src), this->edge_end(src), [=] (typename BaseGraph::edge_iterator e) { return this->getEdgeDst(e) == dst; });
-    } else {
-      // binary search over the edge list
-      auto e = std::lower_bound(this->edge_begin(src), this->edge_end(src), dst, [=] (typename BaseGraph::edge_iterator e, typename BaseGraph::GraphNode n) { return this->getEdgeDst(e) < n; });
-      // std::lower_bound returns where it quits search, so check the return value here
-      return (this->getEdgeDst(e) == dst) ? e : this->edge_end(src);
-    }
-  }
-};
-
 struct DNode {
   char label;
   unsigned int id;
 };
 
-typedef LC_Extended_Graph<DNode, void> DGraph; // graph with DNode nodes and typeless edges
+typedef Galois::Graph::LC_CSR_Graph<DNode, void> DGraph; // graph with DNode nodes and typeless edges
 typedef DGraph::GraphNode DGNode;
 
 struct QNode {
@@ -114,7 +90,7 @@ struct QNode {
   std::vector<DGNode> candidate;
 };
 
-typedef LC_Extended_Graph<QNode, void> QGraph;
+typedef Galois::Graph::LC_CSR_Graph<QNode, void> QGraph;
 typedef QGraph::GraphNode QGNode;
 
 struct NodeMatch {
@@ -145,23 +121,11 @@ void printGraph(Graph& g) {
   std::cout << std::endl;
 }
 
-// graph.sortEdges() expects a comparator over EdgeSortValue
-template<typename G>
-struct CmpEdgeByDst {
-  typedef typename G::GraphNode GNode;
-  typedef typename G::edge_data_type EdgeTy;
-  bool operator()(const Galois::Graph::EdgeSortValue<GNode, EdgeTy>& e1, const Galois::Graph::EdgeSortValue<GNode, EdgeTy>& e2) const {
-    return e1.dst < e2.dst;
-  }
-};
-
 template<typename Graph>
 void initializeGraph(Graph& g, unsigned int seed) {
   typedef typename Graph::node_data_type Node;
 
   generator.seed(seed);
-
-  g.edgeSorted = true;
 
   unsigned int i = 0;
   for(auto ni = g.begin(), ne = g.end(); ni != ne; ++ni) {
@@ -169,7 +133,7 @@ void initializeGraph(Graph& g, unsigned int seed) {
     data.id = i++;
     data.label = 'A' + distribution(generator) % numLabels;
 
-    g.sortEdges(*ni, CmpEdgeByDst<Graph>());
+    g.sortEdgesByDst(*ni);
   }
 }
 
