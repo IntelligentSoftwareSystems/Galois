@@ -96,9 +96,9 @@ struct InitializeGraph_nout {
     };
     Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph_nout{ &_graph }, Galois::loopname("Init"));
 
-    _graph.sync_push<Syncer_0>();
+    _graph.sync_push<Syncer_0>("");
 
-    _graph.sync_pull<SyncerPull_0>();
+    _graph.sync_pull<SyncerPull_0>("");
 
   }
 
@@ -137,9 +137,9 @@ struct PageRank_pull_partial {
 
        Galois::do_all(_graph.begin(), _graph.end(), PageRank_pull_partial { alpha, &_graph }, Galois::loopname("pageRank pull partial step"));
 
-       _graph.sync_push<Syncer_0>();
+       _graph.sync_push<Syncer_0>("");
 
-       _graph.sync_pull<SyncerPull_0>();
+       _graph.sync_pull<SyncerPull_0>("");
   }
 
   void operator()(GNode src)const {

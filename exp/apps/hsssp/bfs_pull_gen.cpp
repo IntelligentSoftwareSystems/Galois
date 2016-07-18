@@ -98,7 +98,7 @@ struct InitializeGraph {
     #endif
     Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {src_node, &_graph}, Galois::loopname("InitGraph"));
 
-    _graph.sync_pull<SyncerPull_0>();
+    _graph.sync_pull<SyncerPull_0>("");
   }
 
   void operator()(GNode src) const {
@@ -146,7 +146,7 @@ struct BFS {
       	} else if (personality == CPU)
       #endif
       Galois::do_all(_graph.begin(), _graph.end(), BFS { &_graph }, Galois::loopname("BFS"), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "dist_current" , "unsigned long long"));
-      _graph.sync_pull<SyncerPull_0>();
+      _graph.sync_pull<SyncerPull_0>("");
       
 
      ++iteration;

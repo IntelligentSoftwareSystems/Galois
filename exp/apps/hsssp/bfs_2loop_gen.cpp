@@ -117,8 +117,8 @@ struct InitializeGraph {
     #endif
     Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {src_node, &_graph}, Galois::loopname("InitGraph"));
 
-    _graph.sync_pull<SyncerPull_0>();
-    _graph.sync_pull<SyncerPull_1>();
+    _graph.sync_pull<SyncerPull_0>("");
+    _graph.sync_pull<SyncerPull_1>("");
   }
 
   void operator()(GNode src) const {
@@ -170,7 +170,7 @@ struct FirstItr_BFS {
     	} else if (personality == CPU)
     #endif
     Galois::do_all(_graph.begin(), _graph.end(), FirstItr_BFS { &_graph }, Galois::loopname("BFS"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned long long" , "{ Galois::atomicMin(node.dist_current, y);}",  "{node.dist_current = std::numeric_limits<unsigned long long>::max()/4; }"));
-    _graph.sync_push<Syncer_0>();
+    _graph.sync_push<Syncer_0>("");
     
 
   }
@@ -233,7 +233,7 @@ struct BFS {
       	} else if (personality == CPU)
       #endif
       Galois::do_all(_graph.begin(), _graph.end(), BFS { &_graph }, Galois::loopname("BFS"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "dist_current", "unsigned long long" , "{ Galois::atomicMin(node.dist_current, y);}",  "{node.dist_current = std::numeric_limits<unsigned long long>::max()/4; }"));
-      _graph.sync_push<Syncer_0>();
+      _graph.sync_push<Syncer_0>("");
       ++iterations;
 
       }while(DGAccumulator_accum.reduce());

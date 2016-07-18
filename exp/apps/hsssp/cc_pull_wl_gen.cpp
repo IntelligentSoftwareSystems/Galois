@@ -146,7 +146,7 @@ struct Get_info_functor : public Galois::op_tag {
 	}
 	void static sync_graph_static(Graph& _graph) {
 
-		_graph.sync_pull<SyncerPull_0>();
+		_graph.sync_pull<SyncerPull_0>("");
 	}
 };
 

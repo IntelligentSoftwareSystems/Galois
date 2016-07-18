@@ -62,19 +62,19 @@ struct InitializeGraph {
 
   void static go(Graph& _graph) {
      struct SyncerPull_0 {
-    	static uint32_t extract( const struct CC_NodeData & node){ return node.id; }
-    	static void setVal (struct CC_NodeData & node, uint32_t y) {node.id = y; }
+       static uint32_t extract(uint32_t id, const struct CC_NodeData & node){ return node.id; }
+       static void setVal (uint32_t id, struct CC_NodeData & node, uint32_t y) {node.id = y; }
     	typedef uint32_t ValTy;
     };
      struct SyncerPull_1 {
-    	static uint32_t extract( const struct CC_NodeData & node){ return node.comp; }
-    	static void setVal (struct CC_NodeData & node, uint32_t y) {node.comp = y; }
+       static uint32_t extract(uint32_t id,  const struct CC_NodeData & node){ return node.comp; }
+       static void setVal (uint32_t id, struct CC_NodeData & node, uint32_t y) {node.comp = y; }
     	typedef uint32_t ValTy;
     };
     Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ &_graph }, Galois::loopname("Init"), Galois::write_set("sync_pull", "this->graph", "struct CC_NodeData &", "struct CC_NodeData &", "id" , "uint32_t"), Galois::write_set("sync_pull", "this->graph", "struct CC_NodeData &", "struct CC_NodeData &", "comp" , "uint32_t"));
-    _graph.sync_pull<SyncerPull_0>();
+    _graph.sync_pull<SyncerPull_0>("");
     
-    _graph.sync_pull<SyncerPull_1>();
+    _graph.sync_pull<SyncerPull_1>("");
     
   }
 
@@ -92,13 +92,13 @@ struct LabelPropAlgo {
 
   void static go(Graph& _graph) {
      struct Syncer_0 {
-    	static uint32_t extract( const struct CC_NodeData & node){ return node.comp; }
-    	static void reduce (struct CC_NodeData & node, uint32_t y) {Galois::atomicMin(node.comp, y);}
-    	static void reset (struct CC_NodeData & node ) { node.comp = std::numeric_limits<uint32_t>::max(); }
+       static uint32_t extract(uint32_t id,  const struct CC_NodeData & node){ return node.comp; }
+       static void reduce (uint32_t id, struct CC_NodeData & node, uint32_t y) {Galois::atomicMin(node.comp, y);}
+       static void reset (uint32_t id, struct CC_NodeData & node ) { node.comp = std::numeric_limits<uint32_t>::max(); }
     	typedef uint32_t ValTy;
     };
     Galois::do_all(_graph.begin(), _graph.end(), LabelPropAlgo { &_graph }, Galois::loopname("LabelPropAlgo"), Galois::write_set("sync_push", "this->graph", "struct CC_NodeData &", "struct std::atomic<unsigned int> &" , "comp", "uint32_t" , "{Galois::min(node.comp, y);}",  "std::numeric_limits<uint32_t>::max()"));
-    _graph.sync_push<Syncer_0>();
+    _graph.sync_push<Syncer_0>("");
     
   }
 

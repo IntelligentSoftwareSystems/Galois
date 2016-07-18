@@ -83,8 +83,8 @@ struct InitializeGraph {
   void static go(Graph& _graph) {
 
     Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph{ &_graph }, Galois::loopname("Init"), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "value" , "float"), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "nout" , "unsigned int"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ Galois::atomicAdd(node.residual, y);}",  "0"));
-    _graph.sync_push<Syncer_1>();
-    _graph.sync_pull<SyncerPull_1>();
+    _graph.sync_push<Syncer_1>("");
+    _graph.sync_pull<SyncerPull_1>("");
 
   }
 
@@ -116,8 +116,8 @@ struct InitializeGraph_residual {
   void static go(Graph& _graph) {
 
     Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph_residual{ &_graph }, Galois::loopname("Init"), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "value" , "float"), Galois::write_set("sync_pull", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &", "nout" , "unsigned int"), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ Galois::atomicAdd(node.residual, y);}",  "0"));
-    _graph.sync_push<Syncer_0>();
-    _graph.sync_pull<SyncerPull_0>();
+    _graph.sync_push<Syncer_0>("");
+    _graph.sync_pull<SyncerPull_0>("");
 
   }
 
@@ -156,8 +156,8 @@ struct FirstItr_PageRank{
 
 
     Galois::for_each(_graph.begin(), _graph.end(), FirstItr_PageRank{alpha,tolerance,&_graph}, Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ Galois::atomicAdd(node.residual, y);}",  "{node.residual = 0 ; }"));
-    _graph.sync_push<Syncer_0>();
-     _graph.sync_pull<SyncerPull_0>();
+    _graph.sync_push<Syncer_0>("");
+     _graph.sync_pull<SyncerPull_0>("");
 
   }
   void operator()(WorkItem& src, Galois::UserContext<WorkItem>& ctx) const {
@@ -209,8 +209,8 @@ struct PageRank {
 
 
       Galois::for_each(_graph.begin(), _graph.end(), PageRank(tolerance, alpha, &_graph), Galois::write_set("sync_push", "this->graph", "struct PR_NodeData &", "struct PR_NodeData &" , "residual", "float" , "{ Galois::atomicAdd(node.residual, y);}",  "{node.residual = 0 ; }"));
-      _graph.sync_push<Syncer_0>();
-       _graph.sync_pull<SyncerPull_0>();
+      _graph.sync_push<Syncer_0>("");
+       _graph.sync_pull<SyncerPull_0>("");
 
 
       }while(DGAccumulator_accum.reduce());

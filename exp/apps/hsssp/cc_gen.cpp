@@ -92,7 +92,7 @@ struct InitializeGraph {
     #endif
     Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {&_graph}, Galois::loopname("InitGraph"));
 
-    _graph.sync_pull<SyncerPull_0>();
+    _graph.sync_pull<SyncerPull_0>("");
   }
 
   void operator()(GNode src) const {
@@ -163,9 +163,9 @@ struct ConnectedComp {
       	} else if (personality == CPU)
       #endif
       Galois::do_all(_graph.begin(), _graph.end(), ConnectedComp { &_graph }, Galois::loopname("ConnectedComp"), Galois::write_set("sync_push", "this->graph", "struct NodeData &", "struct NodeData &" , "comp_current", "unsigned long long" , "{ Galois::atomicMin(node.comp_current, y);}",  "{node.comp_current = std::numeric_limits<unsigned long long>::max()/4; }"), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "comp_current" , "unsigned long long"));
-      _graph.sync_push<Syncer_0>();
+      _graph.sync_push<Syncer_0>("");
       
-      _graph.sync_pull<SyncerPull_0>();
+      _graph.sync_pull<SyncerPull_0>("");
       
      ++iteration;
      if(iteration >= maxIterations){
