@@ -270,13 +270,13 @@ public:
      if(num > 0){
        std::vector<typename FnTy::ValTy> val_vec(num);
        Galois::Runtime::gDeserialize(buf, val_vec);
-       //         if (!FnTy::reduce_batch(from_id, &val_vec[0])) {
+       if (!FnTy::reduce_batch(from_id, &val_vec[0])) {
        Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num),
                       [&](uint32_t n){
                         auto lid = masterNodes[from_id][n];
                         FnTy::reduce(lid, getData(lid), val_vec[n]);
                       }, Galois::loopname(doall_str.c_str()));
-       //         }
+       }
      }
    }
 
@@ -312,7 +312,7 @@ public:
        std::vector<typename FnTy::ValTy> val_vec(num);
        //std::cout << "["<< net.ID << "] num : " << num << "\n";
        
-       //       if (!FnTy::extract_batch(from_id, &val_vec[0])) {
+       if (!FnTy::extract_batch(from_id, &val_vec[0])) {
          Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
              auto localID = masterNodes[from_id][n];
              //std::cout << "["<< net.ID << "] n : " << n << "\n";
@@ -321,7 +321,7 @@ public:
              val_vec[n] = val;
              
            }, Galois::loopname(doall_str.c_str()));
-         //       }
+       }
        
        Galois::Runtime::gSerialize(b, val_vec);
      }
@@ -349,11 +349,11 @@ public:
       
       Galois::Runtime::gDeserialize(buf, val_vec);
 
-      //      if (!FnTy::setVal_batch(from_id, &val_vec[0])) {
+      if (!FnTy::setVal_batch(from_id, &val_vec[0])) {
         Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
             auto localID = slaveNodes[from_id][n];
             FnTy::setVal((localID), getData(localID), val_vec[n]);}, Galois::loopname(doall_str.c_str()));
-        //      }  
+      }  
     }
 #if 0
     for (; num; --num) {
@@ -610,14 +610,14 @@ public:
       if(num > 0 ){
         std::vector<typename FnTy::ValTy> val_vec(num);
         
-        //        if (!FnTy::extract_reset_batch(x, &val_vec[0])) {
+        if (!FnTy::extract_reset_batch(x, &val_vec[0])) {
           Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
               auto lid = slaveNodes[x][n];
               auto val = FnTy::extract(lid, getData(lid));
               FnTy::reset(lid, getData(lid));
               val_vec[n] = val;
             }, Galois::loopname(doall_str.c_str()));
-          //        }
+        }
         
         gSerialize(b, val_vec);
       }

@@ -196,7 +196,7 @@ public:
        if(num > 0){
          std::vector<typename FnTy::ValTy> val_vec(num);
          Galois::Runtime::gDeserialize(buf, val_vec);
-         //         if (!FnTy::reduce_batch(from_id, &val_vec[0])) {
+         if (!FnTy::reduce_batch(from_id, &val_vec[0])) {
            Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num),
                [&](uint32_t n){
                uint32_t lid = masterNodes[from_id][n];
@@ -207,7 +207,7 @@ public:
            FnTy::reduce(lid, getData(lid), val_vec[n]);
 #endif
                }, Galois::loopname(doall_str.c_str()));
-           //         }
+         }
        }
        StatTimer_set.stop();
    }
@@ -234,7 +234,7 @@ public:
       if(num > 0){
         std::vector<typename FnTy::ValTy> val_vec(num);
 
-        //        if (!FnTy::extract_batch(from_id, &val_vec[0])) {
+        if (!FnTy::extract_batch(from_id, &val_vec[0])) {
           Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
               uint32_t localID = masterNodes[from_id][n];
 #ifdef __GALOIS_HET_OPENCL__
@@ -246,7 +246,7 @@ public:
               val_vec[n] = val;
 
               }, Galois::loopname(doall_str.c_str()));
-          //        }
+        }
 
         Galois::Runtime::gSerialize(b, val_vec);
       }
@@ -276,7 +276,7 @@ public:
 
         Galois::Runtime::gDeserialize(buf, val_vec);
 
-        //        if (!FnTy::setVal_batch(from_id, &val_vec[0])) {
+        if (!FnTy::setVal_batch(from_id, &val_vec[0])) {
           Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
               uint32_t localID = slaveNodes[from_id][n];
 #ifdef __GALOIS_HET_OPENCL__
@@ -288,7 +288,7 @@ public:
               FnTy::setVal(localID, getData(localID), val_vec[n]);
 #endif
               }, Galois::loopname(doall_str.c_str()));
-          //        }
+         }
       }
       --num_recv_expected;
       StatTimer_set.stop();
@@ -626,7 +626,7 @@ public:
          if(num > 0 ){
            std::vector<typename FnTy::ValTy> val_vec(num);
 
-           //           if (!FnTy::extract_reset_batch(x, &val_vec[0])) {
+           if (!FnTy::extract_reset_batch(x, &val_vec[0])) {
              Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
                   uint32_t lid = slaveNodes[x][n];
 #ifdef __GALOIS_HET_OPENCL__
@@ -639,7 +639,7 @@ public:
 #endif
                   val_vec[n] = val;
                  }, Galois::loopname(doall_str.c_str()));
-             //           }
+           }
 
            gSerialize(b, val_vec);
          }
