@@ -78,7 +78,7 @@ public:
   void handleReceives();
 
   //!receive tagged message
-  virtual optional_t<std::pair<uint32_t, RecvBuffer>> receiveTagged(uint32_t tag, std::unique_lock<Substrate::SimpleLock>* rlg) = 0;
+  virtual optional_t<std::pair<uint32_t, RecvBuffer>> recieveTagged(uint32_t tag, std::unique_lock<Substrate::SimpleLock>* rlg) = 0;
 
   //!move send buffers out to network
   virtual void flush() = 0;
@@ -88,7 +88,10 @@ public:
   virtual unsigned long reportRecvBytes() const = 0;
   virtual unsigned long reportRecvMsgs() const = 0;
   virtual std::vector<unsigned long> reportExtra() const = 0;
+  virtual std::vector<std::pair<std::string, unsigned long> > reportExtraNamed() const = 0;
 };
+
+extern uint32_t evilPhase;
 
 NetworkInterface& getSystemNetworkInterface();
 uint32_t getHostID();

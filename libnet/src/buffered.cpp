@@ -310,7 +310,7 @@ public:
     sd.add(tag, buf.getVec());
   }
 
-  virtual optional_t<std::pair<uint32_t, RecvBuffer>> receiveTagged(uint32_t tag, std::unique_lock<Galois::Substrate::SimpleLock>* rlg) {
+  virtual optional_t<std::pair<uint32_t, RecvBuffer>> recieveTagged(uint32_t tag, std::unique_lock<Galois::Substrate::SimpleLock>* rlg) {
     for (unsigned h = 0; h < recvData.size(); ++h) {
       auto& rq = recvData[h];
       if (rq.hasData(tag)) {
@@ -349,6 +349,22 @@ public:
     }
     retval[3] = statSendEnqueued;
     retval[4] = statRecvDequeued;
+    return retval;
+  }
+  virtual std::vector<std::pair<std::string,unsigned long>> reportExtraNamed() const {
+    std::vector<std::pair<std::string, unsigned long> > retval(5);
+    retval[0].first = "SendTimeout";
+    retval[1].first = "SendOverflow";
+    retval[2].first = "SendUrgent";
+    retval[3].first = "SendEnqueued";
+    retval[4].first = "RecvDequeued";
+    for (auto& sd : sendData) {
+      retval[0].second += sd.statSendTimeout;
+      retval[1].second += sd.statSendOverflow;
+      retval[2].second += sd.statSendUrgent;
+    }
+    retval[3].second = statSendEnqueued;
+    retval[4].second = statRecvDequeued;
     return retval;
   }
 

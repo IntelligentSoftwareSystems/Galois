@@ -35,6 +35,8 @@
 
 using namespace Galois::Runtime;
 
+uint32_t Galois::Runtime::evilPhase = 1;
+
 uint32_t Galois::Runtime::NetworkInterface::ID = 0;
 uint32_t Galois::Runtime::NetworkInterface::Num = 1;
 
@@ -79,7 +81,7 @@ void NetworkInterface::broadcast(void (*recv)(uint32_t, RecvBuffer&), SendBuffer
 
 void NetworkInterface::handleReceives() {
   std::unique_lock<Substrate::SimpleLock> lg;
-  auto opt = receiveTagged(0, &lg);
+  auto opt = recieveTagged(0, &lg);
   while (opt) {
     uint32_t src = std::get<0>(*opt);
     RecvBuffer& buf = std::get<1>(*opt);
@@ -89,7 +91,7 @@ void NetworkInterface::handleReceives() {
     assert(fp);
     auto f = (void (*)(uint32_t, RecvBuffer&))fp;
     f(src, buf);
-    opt = receiveTagged(0, &lg);
+    opt = recieveTagged(0, &lg);
   }
 }
 
