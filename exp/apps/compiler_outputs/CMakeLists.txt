@@ -246,6 +246,6 @@ if(USE_GGC)
 endif()
 
 #### Experiment ####
-app(bfs_pull-topological_edgeAsvertex-cut bfs_pull-topological/gen_kGraph.cpp DISTSAFE)
-target_compile_definitions(bfs_pull-topological_edgeAsvertex-cut PRIVATE __GALOIS_VERTEX_CUT_GRAPH__=1)
+#app(bfs_pull-topological_edgeAsvertex-cut bfs_pull-topological/gen_kGraph.cpp DISTSAFE)
+#target_compile_definitions(bfs_pull-topological_edgeAsvertex-cut PRIVATE __GALOIS_VERTEX_CUT_GRAPH__=1)
 

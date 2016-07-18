@@ -75,9 +75,9 @@ void LonestarStart(int argc, char** argv,
   }
   Galois::Runtime::reportStatGlobal("CommandLine", cmdout.str());
   Galois::Runtime::reportStat("(NULL)", "CommandLine", cmdout.str(), 0);
-  Galois::Runtime::reportStat("(NULL)", "Threads", numThreads, 0);
-  Galois::Runtime::reportStat("(NULL)", "Hosts", Galois::Runtime::getSystemNetworkInterface().Num, 0);
-  Galois::Runtime::reportStat("(NULL)", "Runs", numRuns, 0);
+  Galois::Runtime::reportStat("(NULL)", "Threads", (unsigned long)numThreads, 0);
+  Galois::Runtime::reportStat("(NULL)", "Hosts", (unsigned long)Galois::Runtime::getSystemNetworkInterface().Num, 0);
+  Galois::Runtime::reportStat("(NULL)", "Runs", (unsigned long)numRuns, 0);
 
   char name[256];
   gethostname(name, 256);

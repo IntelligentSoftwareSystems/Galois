@@ -229,15 +229,21 @@ static void reportStatImpl(uint32_t HostID, const std::string loopname, const st
     SM.get()->addToStat(loopname, category, value, TID, HostID);
 }
 
+static void reportStatImpl(uint32_t HostID, const std::string loopname, const std::string category, const std::string value, unsigned TID) {
+  if (getHostID())
+    getSystemNetworkInterface().sendSimple(0, reportStatImpl, loopname, category, value, TID);
+  else 
+    SM.get()->addToStat(loopname, category, value, TID, HostID);
+}
+
 void Galois::Runtime::reportStat(const std::string& loopname, const std::string& category, unsigned long value, unsigned TID) {
   reportStatImpl(getHostID(), loopname, category, value, TID);
 }
 
-void Galois::Runtime::reportStat(const std::string& loopname, const std::string& category, const std::string value, unsigned TID) {
-  reportStatImpl(loopname, category, value, TID, getHostID());
+void Galois::Runtime::reportStat(const std::string& loopname, const std::string& category, const std::string &value, unsigned TID) {
+  reportStatImpl(getHostID(), loopname, category, value, TID);
   //out << loopname <<  ","  << 0 << ","<< category << "," << getHostID() << "," << TID << "," << value<<"\n";
 }
-
 
 void Galois::Runtime::reportStat(const char* loopname, const char* category, unsigned long value, unsigned TID) {
   reportStatImpl(getHostID(),
@@ -246,8 +252,15 @@ void Galois::Runtime::reportStat(const char* loopname, const char* category, uns
                  value, TID);
 }
 
+void Galois::Runtime::reportStat(const char* loopname, const char* category, const std::string &value, unsigned TID) {
+  reportStatImpl(getHostID(),
+                 std::string(loopname ? loopname : "(NULL)"), 
+                 std::string(category ? category : "(NULL)"),
+                 value, TID);
+}
+
 void Galois::Runtime::printStats() {
-  getSystemNetworkInterface().reportStats();
+  //getSystemNetworkInterface().reportStats();
   Galois::Runtime::getHostBarrier().wait();
   //    SM.get()->printDistStats(std::cout);
     //SM.get()->printStats(std::cout);

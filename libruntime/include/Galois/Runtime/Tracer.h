@@ -101,6 +101,17 @@ static inline void trace(Args&&... args) {
 
 #endif
 
+template<typename... Args>
+static inline void printOutput(const char* format, Args&&... args) {
+    std::ostringstream os;
+    detail::traceImpl(os, format, std::forward<Args>(args)...);
+    detail::print_output_impl(os);
+}
+
+static void print_send(std::vector<uint8_t> vec, size_t len, unsigned host){
+  detail::print_send_impl(vec, len, host);
+}
+
 } // namespace Runtime
 } // namespace Galois
 
