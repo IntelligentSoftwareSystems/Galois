@@ -341,6 +341,15 @@ struct VF2Algo {
           qAdd2Frontier.push_back(ngh);
         }
       }
+      for(auto ei = gQ.in_edge_begin(nQ), ee = gQ.in_edge_end(nQ); ei != ee; ++ei) {
+        auto ngh = gQ.getInEdgeDst(ei);
+        if(algo->qMatched.get().count(ngh)) {
+          continue;
+        }
+        if(true == algo->qFrontier.get().insert(ngh).second) {
+          qAdd2Frontier.push_back(ngh);
+        }
+      }
 
       // search for all possible candidate data nodes
       for(auto ri = refined.begin(), re = refined.end(); ri != re; ++ri) {
@@ -358,6 +367,15 @@ struct VF2Algo {
         std::vector<DGNode> dAdd2Frontier;
         for(auto ei = gD.edge_begin(*ri), ee = gD.edge_end(*ri); ei != ee; ++ei) {
           auto ngh = gD.getEdgeDst(ei);
+          if(algo->dMatched.get().count(ngh)) { 
+            continue;
+          }
+          if(true == algo->dFrontier.get().insert(ngh).second) {
+            dAdd2Frontier.push_back(ngh);
+          }
+        }
+        for(auto ei = gD.in_edge_begin(*ri), ee = gD.in_edge_end(*ri); ei != ee; ++ei) {
+          auto ngh = gD.getInEdgeDst(ei);
           if(algo->dMatched.get().count(ngh)) { 
             continue;
           }
@@ -402,12 +420,20 @@ struct VF2Algo {
         auto ngh = gQ.getEdgeDst(ei);
         algo->qFrontier.get().insert(ngh);
       }
+      for(auto ei = gQ.in_edge_begin(nQ), ee = gQ.in_edge_end(nQ); ei != ee; ++ei) {
+        auto ngh = gQ.getInEdgeDst(ei);
+        algo->qFrontier.get().insert(ngh);
+      }
 
       auto nD = matching.begin()->nD;
       algo->dMatched.get().insert(nD);
 
       for(auto ei = gD.edge_begin(nD), ee = gD.edge_end(nD); ei != ee; ++ei) {
         auto ngh = gD.getEdgeDst(ei);
+        algo->dFrontier.get().insert(ngh);
+      }
+      for(auto ei = gD.in_edge_begin(nD), ee = gD.in_edge_end(nD); ei != ee; ++ei) {
+        auto ngh = gD.getInEdgeDst(ei);
         algo->dFrontier.get().insert(ngh);
       }
       algo->dFrontierSize.update(algo->dFrontier.get().size());
