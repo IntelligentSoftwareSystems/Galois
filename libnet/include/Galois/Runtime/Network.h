@@ -27,8 +27,28 @@
 #include "Galois/Runtime/Serialize.h"
 
 #include <cstdint>
+/* Test for GCC >= 5.2.0 */
+#if __GNUC__ > 5 || (__GNUC__ == 5 && __GNUC_MINOR__ > 1)
 #include <experimental/tuple>
 #include <experimental/optional>
+#else
+#include <utility>
+#include <tuple>
+#include <type_traits>
+namespace { //anon
+template <class F, class Tuple, size_t... I>
+constexpr decltype(auto) apply_impl(  // exposition only
+        F&& f, Tuple&& t, std::index_sequence<I...>) {
+    return std::forward<F>(f)(std::get<I>(std::forward<Tuple>(t))...);
+}
+template <class F, class Tuple>
+constexpr decltype(auto) apply(F&& f, Tuple&& t) {
+  return apply_impl(std::forward<F>(f), std::forward<Tuple>(t),
+          std::make_index_sequence<std::tuple_size<typename std::decay<Tuple>::type>::value>{});
+}
+} //end anon namespace
+#include <boost/optional.hpp>
+#endif
 
 namespace Galois {
 namespace Runtime {
@@ -37,7 +57,12 @@ typedef SerializeBuffer SendBuffer;
 typedef DeSerializeBuffer RecvBuffer;
 
 template<typename T>
+/* Test for GCC >= 5.2.0 */
+#if __GNUC__ > 5 || (__GNUC__ == 5 && __GNUC_MINOR__ > 1)
 using optional_t = std::experimental::optional<T>;
+#else
+using optional_t = boost::optional<T>;
+#endif
 
 class NetworkInterface {
 
@@ -108,7 +133,12 @@ static void genericLandingPad(uint32_t src, RecvBuffer& buf) {
   void (*fp)(uint32_t, Args...);
   std::tuple<Args...> args;
   gDeserialize(buf, fp, args);
+/* Test for GCC >= 5.2.0 */
+#if __GNUC__ > 5 || (__GNUC__ == 5 && __GNUC_MINOR__ > 1)
   std::experimental::apply([fp, src](Args... params) { fp(src, params...); }, args);
+#else
+  apply([fp, src](Args... params) { fp(src, params...); }, args);
+#endif
 }
 } //end anon namespace
 
