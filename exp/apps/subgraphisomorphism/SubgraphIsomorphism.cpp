@@ -139,7 +139,6 @@ void initializeGraph(Graph& g, unsigned int seed) {
   }
 }
 
-// assume gQ is connected
 struct VF2Algo {
   std::string name() const { return "VF2"; }
 
@@ -190,8 +189,23 @@ struct VF2Algo {
     return isSomeNodeEmpty.reduce();
   }
 
-  QGNode nextQueryNode() {
-    return *(qFrontier.get().begin());
+  QGNode nextQueryNode(QGraph& gQ, Matching& matching) {
+    if(qFrontier.get().size()) {
+      return *(qFrontier.get().begin());
+    } else {
+      for(auto qi = gQ.begin(), qe = gQ.end(); qi != qe; ++qi) {
+        bool isMatched = false;
+        for(auto mi = matching.begin(), me = matching.end(); mi != me; ++mi) {
+          if(*qi == mi->nQ) {
+            isMatched = true;
+            break;
+          }
+        }
+        if(!isMatched) {
+          return *qi;
+        }
+      }
+    }
   }
 
   template<typename Graph, typename Set>
@@ -321,7 +335,7 @@ struct VF2Algo {
         return;
       }
 
-      auto nQ = algo->nextQueryNode();
+      auto nQ = algo->nextQueryNode(gQ, matching);
 
       std::vector<DGNode> refined;
       algo->refineCandidates(gD, gQ, nQ, refined);
