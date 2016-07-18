@@ -45,7 +45,7 @@ class DGBag {
   static std::vector<ValueTy> workItem_recv_vec;
   static std::vector<bool> hosts_didWork_vec;
 
-  static void recv_BagItems(Galois::Runtime::RecvBuffer& buf){
+  static void recv_BagItems(uint32_t src, Galois::Runtime::RecvBuffer& buf){
     bool x_didWork;
     unsigned x_ID;
     //XXX: Why pair?
