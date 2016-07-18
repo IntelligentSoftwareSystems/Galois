@@ -39,6 +39,9 @@ namespace Runtime {
 
 //! Begin a new loop instance
 void reportLoopInstance(const char* loopname);
+inline void reportLoopInstance(const std::string& loopname) {
+  reportLoopInstance(loopname.c_str());
+}
 
 //! Reports stats for a given thread
 void reportStat(const char* loopname, const char* category, unsigned long value, unsigned TID);
