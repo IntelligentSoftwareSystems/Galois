@@ -140,6 +140,16 @@ struct InitializeGraph {
       		#endif
       			return node.residual;
       		}
+          static bool extract_reset_batch(unsigned from_id, float *y) {
+          #ifdef __GALOIS_HET_CUDA__
+            if (personality == GPU_CUDA) {
+              batch_get_reset_node_residual_cuda(cuda_ctx, from_id, y, 0);
+              return true;
+            }
+            assert (personality == CPU);
+          #endif
+            return false;
+          }
       		static void reduce (uint32_t node_id, struct PR_NodeData & node, float y) {
       		#ifdef __GALOIS_HET_CUDA__
       			if (personality == GPU_CUDA) add_node_residual_cuda(cuda_ctx, node_id, y);
@@ -147,6 +157,16 @@ struct InitializeGraph {
       		#endif
       				{ Galois::add(node.residual, y); }
       		}
+          static bool reduce_batch(unsigned from_id, float *y) {
+          #ifdef __GALOIS_HET_CUDA__
+            if (personality == GPU_CUDA) {
+              batch_add_node_residual_cuda(cuda_ctx, from_id, y);
+              return true;
+            } 
+            assert (personality == CPU);
+          #endif
+              return false;
+          }
       		static void reset (uint32_t node_id, struct PR_NodeData & node ) {
       		#ifdef __GALOIS_HET_CUDA__
       			if (personality == GPU_CUDA) set_node_residual_cuda(cuda_ctx, node_id, 0);
@@ -165,12 +185,32 @@ struct InitializeGraph {
           #endif
             return node.residual;
           }
+          static bool extract_batch(unsigned from_id, float *y) {
+          #ifdef __GALOIS_HET_CUDA__
+            if (personality == GPU_CUDA) {
+              batch_get_node_residual_cuda(cuda_ctx, from_id, y);
+              return true;
+            }
+            assert (personality == CPU);
+          #endif
+            return false;
+          }
           static void setVal (uint32_t node_id, struct PR_NodeData & node, float y) {
           #ifdef __GALOIS_HET_CUDA__
             if (personality == GPU_CUDA) set_node_residual_cuda(cuda_ctx, node_id, y);
             else if (personality == CPU)
           #endif
               {node.residual = y ; }
+          }
+          static bool setVal_batch(unsigned from_id, float *y) {
+          #ifdef __GALOIS_HET_CUDA__
+            if (personality == GPU_CUDA) {
+              batch_set_node_residual_cuda(cuda_ctx, from_id, y);
+              return true;
+            } 
+            assert (personality == CPU);
+          #endif
+              return false;
           }
           typedef float ValTy;
         };
@@ -218,6 +258,16 @@ void static go(Graph& _graph) {
 		#endif
 			return node.residual;
 		}
+    static bool extract_reset_batch(unsigned from_id, float *y) {
+    #ifdef __GALOIS_HET_CUDA__
+      if (personality == GPU_CUDA) {
+        batch_get_reset_node_residual_cuda(cuda_ctx, from_id, y, 0);
+        return true;
+      }
+      assert (personality == CPU);
+    #endif
+      return false;
+    }
 		static void reduce (uint32_t node_id, struct PR_NodeData & node, float y) {
 		#ifdef __GALOIS_HET_CUDA__
 			if (personality == GPU_CUDA) add_node_residual_cuda(cuda_ctx, node_id, y);
@@ -225,6 +275,16 @@ void static go(Graph& _graph) {
 		#endif
 				{ Galois::add(node.residual, y); }
 		}
+    static bool reduce_batch(unsigned from_id, float *y) {
+    #ifdef __GALOIS_HET_CUDA__
+      if (personality == GPU_CUDA) {
+        batch_add_node_residual_cuda(cuda_ctx, from_id, y);
+        return true;
+      } 
+      assert (personality == CPU);
+    #endif
+        return false;
+    }
 		static void reset (uint32_t node_id, struct PR_NodeData & node ) {
 		#ifdef __GALOIS_HET_CUDA__
 			if (personality == GPU_CUDA) set_node_residual_cuda(cuda_ctx, node_id, 0);
@@ -243,12 +303,32 @@ void static go(Graph& _graph) {
     #endif
       return node.residual;
     }
+    static bool extract_batch(unsigned from_id, float *y) {
+    #ifdef __GALOIS_HET_CUDA__
+      if (personality == GPU_CUDA) {
+        batch_get_node_residual_cuda(cuda_ctx, from_id, y);
+        return true;
+      }
+      assert (personality == CPU);
+    #endif
+      return false;
+    }
     static void setVal (uint32_t node_id, struct PR_NodeData & node, float y) {
     #ifdef __GALOIS_HET_CUDA__
       if (personality == GPU_CUDA) set_node_residual_cuda(cuda_ctx, node_id, y);
       else if (personality == CPU)
     #endif
         {node.residual = y ; }
+    }
+    static bool setVal_batch(unsigned from_id, float *y) {
+    #ifdef __GALOIS_HET_CUDA__
+      if (personality == GPU_CUDA) {
+        batch_set_node_residual_cuda(cuda_ctx, from_id, y);
+        return true;
+      } 
+      assert (personality == CPU);
+    #endif
+        return false;
     }
     typedef float ValTy;
   };
@@ -303,6 +383,16 @@ struct PageRank {
      		#endif
      			return node.residual;
      		}
+        static bool extract_reset_batch(unsigned from_id, float *y) {
+        #ifdef __GALOIS_HET_CUDA__
+          if (personality == GPU_CUDA) {
+            batch_get_reset_node_residual_cuda(cuda_ctx, from_id, y, 0);
+            return true;
+          }
+          assert (personality == CPU);
+        #endif
+          return false;
+        }
      		static void reduce (uint32_t node_id, struct PR_NodeData & node, float y) {
      		#ifdef __GALOIS_HET_CUDA__
      			if (personality == GPU_CUDA) add_node_residual_cuda(cuda_ctx, node_id, y);
@@ -310,6 +400,16 @@ struct PageRank {
      		#endif
     				{ Galois::add(node.residual, y); }
      		}
+        static bool reduce_batch(unsigned from_id, float *y) {
+        #ifdef __GALOIS_HET_CUDA__
+          if (personality == GPU_CUDA) {
+            batch_add_node_residual_cuda(cuda_ctx, from_id, y);
+            return true;
+          } 
+          assert (personality == CPU);
+        #endif
+            return false;
+        }
      		static void reset (uint32_t node_id, struct PR_NodeData & node ) {
      		#ifdef __GALOIS_HET_CUDA__
      			if (personality == GPU_CUDA) set_node_residual_cuda(cuda_ctx, node_id, 0);
@@ -328,6 +428,16 @@ struct PageRank {
     		#endif
     			return node.residual;
     		}
+        static bool extract_batch(unsigned from_id, float *y) {
+        #ifdef __GALOIS_HET_CUDA__
+          if (personality == GPU_CUDA) {
+            batch_get_node_residual_cuda(cuda_ctx, from_id, y);
+            return true;
+          }
+          assert (personality == CPU);
+        #endif
+          return false;
+        }
     		static void setVal (uint32_t node_id, struct PR_NodeData & node, float y) {
     		#ifdef __GALOIS_HET_CUDA__
     			if (personality == GPU_CUDA) set_node_residual_cuda(cuda_ctx, node_id, y);
@@ -335,6 +445,16 @@ struct PageRank {
     		#endif
     				{node.residual = y ; }
     		}
+        static bool setVal_batch(unsigned from_id, float *y) {
+        #ifdef __GALOIS_HET_CUDA__
+          if (personality == GPU_CUDA) {
+            batch_set_node_residual_cuda(cuda_ctx, from_id, y);
+            return true;
+          } 
+          assert (personality == CPU);
+        #endif
+            return false;
+        }
     		typedef float ValTy;
     	};
 #endif
@@ -441,7 +561,7 @@ int main(int argc, char** argv) {
       if (!init_CUDA_context(cuda_ctx, gpu_device))
         return -1;
       MarshalGraph m = hg.getMarshalGraph(my_host_id);
-      load_graph_CUDA(cuda_ctx, m);
+      load_graph_CUDA(cuda_ctx, m, net.Num);
     } else if (personality == GPU_OPENCL) {
       //Galois::OpenCL::cl_env.init(cldevice.Value);
     }
