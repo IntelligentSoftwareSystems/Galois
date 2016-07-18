@@ -145,11 +145,11 @@ public:
   template<typename... Args>
   void run(unsigned num, Args&&... args) {
     struct ExecuteTuple {
-      using Ty = std::tuple<Args...>;
-      Ty cmds;
+      //      using Ty = std::tuple<Args...>;
+      std::tuple<Args...> cmds;
 
       void operator()(){
-        detail::ExecuteTupleImpl<Ty, 0, std::tuple_size<Ty>::value>::execute(this->cmds);
+        detail::ExecuteTupleImpl<std::tuple<Args...>, 0, std::tuple_size<std::tuple<Args...>>::value>::execute(this->cmds);
       }
       ExecuteTuple(Args&&... args) :cmds(std::forward<Args>(args)...) {}
     };
