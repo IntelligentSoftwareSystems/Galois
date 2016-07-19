@@ -92,6 +92,7 @@ struct QNode {
   std::vector<DGNode> candidate;
 };
 
+
 typedef Galois::Graph::LC_CSR_Graph<QNode, void> InnerQGraph;
 typedef Galois::Graph::LC_InOut_Graph<InnerQGraph> QGraph;
 typedef QGraph::GraphNode QGNode;
@@ -199,12 +200,12 @@ struct VF2Algo {
 
     struct LocalState {
       // query state
-      std::set<QGNode, Galois::PerIterAllocTy::rebind<QGNode>::other> qFrontier;
-      std::set<QGNode, Galois::PerIterAllocTy::rebind<QGNode>::other> qMatched;
+      std::set<QGNode, std::less<QGNode>, Galois::PerIterAllocTy::rebind<QGNode>::other> qFrontier;
+      std::set<QGNode, std::less<QGNode>, Galois::PerIterAllocTy::rebind<QGNode>::other> qMatched;
       
       // data state
-      std::set<DGNode, Galois::PerIterAllocTy::rebind<DGNode>::other> dFrontier;
-      std::set<DGNode, Galois::PerIterAllocTy::rebind<DGNode>::other> dMatched;
+      std::set<DGNode, std::less<DGNode>, Galois::PerIterAllocTy::rebind<DGNode>::other> dFrontier;
+      std::set<DGNode, std::less<DGNode>, Galois::PerIterAllocTy::rebind<DGNode>::other> dMatched;
 
       LocalState(Galois::PerIterAllocTy& a) :qFrontier(a), qMatched(a), dFrontier(a), dMatched(a) {}
       
