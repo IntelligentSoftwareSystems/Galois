@@ -9,7 +9,7 @@ unsigned int * P_COMP_CURRENT;
 unsigned int * P_COMP_OLD;
 #include "kernels/reduce.cuh"
 #include "gen_cuda.cuh"
-__global__ void InitializeGraph(CSRGraph graph, int  nowned, unsigned int * p_comp_current, unsigned int * p_comp_old)
+__global__ void InitializeGraph(CSRGraph graph, unsigned int nowned, unsigned int * p_comp_current, unsigned int * p_comp_old)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -25,7 +25,7 @@ __global__ void InitializeGraph(CSRGraph graph, int  nowned, unsigned int * p_co
   }
   // FP: "5 -> 6;
 }
-__global__ void FirstItr_ConnectedComp(CSRGraph graph, int  nowned, unsigned int * p_comp_current, unsigned int * p_comp_old)
+__global__ void FirstItr_ConnectedComp(CSRGraph graph, unsigned int nowned, unsigned int * p_comp_current, unsigned int * p_comp_old)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -50,7 +50,7 @@ __global__ void FirstItr_ConnectedComp(CSRGraph graph, int  nowned, unsigned int
   }
   // FP: "11 -> 12;
 }
-__global__ void ConnectedComp(CSRGraph graph, int  nowned, unsigned int * p_comp_current, unsigned int * p_comp_old, Any any_retval)
+__global__ void ConnectedComp(CSRGraph graph, unsigned int nowned, unsigned int * p_comp_current, unsigned int * p_comp_old, Any any_retval)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;

@@ -309,7 +309,7 @@ public:
     declString.str("");
     bodyString.str("");
     funcName = func->getParent()->getNameAsString();
-    declString << "Kernel(\"" << funcName << "\", [G.param(), ('int ', 'nowned') ";
+    declString << "Kernel(\"" << funcName << "\", [G.param(), ('unsigned int', 'nowned') ";
     // FIXME: assuming first parameter is GNode
     std::string vertexName = func->getParamDecl(0)->getNameAsString();
     if (isTopological) {
@@ -628,13 +628,13 @@ public:
     cuheader << "\nstruct CUDA_Context {\n";
     cuheader << "\tint device;\n";
     cuheader << "\tint id;\n";
-    cuheader << "\tsize_t nowned;\n";
+    cuheader << "\tunsigned int nowned;\n";
     cuheader << "\tCSRGraphTy hg;\n";
     cuheader << "\tCSRGraphTy gg;\n";
-    cuheader << "\tsize_t *num_master_nodes; // per host\n";
-    cuheader << "\tShared<size_t> *master_nodes; // per host\n";
-    cuheader << "\tsize_t *num_slave_nodes; // per host\n";
-    cuheader << "\tShared<size_t> *slave_nodes; // per host\n";
+    cuheader << "\tunsigned int *num_master_nodes; // per host\n";
+    cuheader << "\tShared<unsigned int> *master_nodes; // per host\n";
+    cuheader << "\tunsigned int *num_slave_nodes; // per host\n";
+    cuheader << "\tShared<unsigned int> *slave_nodes; // per host\n";
     for (auto& var : SharedVariablesToTypeMap) {
       cuheader << "\tShared<" << var.second << "> " << var.first << ";\n";
       cuheader << "\tShared<" << var.second << "> *master_" << var.first << "; // per host\n";
@@ -666,7 +666,7 @@ public:
       cuheader << "\tif (" << var.first << "[LID] > v)\n";
       cuheader << "\t\t" << var.first << "[LID] = v;\n";
       cuheader << "}\n\n";
-      cuheader << "__global__ void batch_get_node_" << var.first << "(index_type size, size_t * p_master_nodes, " 
+      cuheader << "__global__ void batch_get_node_" << var.first << "(index_type size, unsigned int * p_master_nodes, " 
                << var.second << " * p_master_" << var.first << ", " << var.second << " * p_" << var.first << ") {\n";
       cuheader << "\tunsigned tid = TID_1D;\n";
       cuheader << "\tunsigned nthreads = TOTAL_THREADS_1D;\n";
@@ -686,7 +686,7 @@ public:
       cuheader << "\tcheck_cuda_kernel;\n";
       cuheader << "\tmemcpy(v, ctx->master_" << var.first << "[from_id].cpu_rd_ptr(), sizeof(" << var.second << ") * ctx->num_master_nodes[from_id]);\n";
       cuheader << "}\n\n";
-      cuheader << "__global__ void batch_get_reset_node_" << var.first << "(index_type size, size_t * p_slave_nodes, " 
+      cuheader << "__global__ void batch_get_reset_node_" << var.first << "(index_type size, unsigned int * p_slave_nodes, " 
                << var.second << " * p_slave_" << var.first << ", " << var.second << " * p_" << var.first << ", " << var.second << " value) {\n";
       cuheader << "\tunsigned tid = TID_1D;\n";
       cuheader << "\tunsigned nthreads = TOTAL_THREADS_1D;\n";
@@ -707,7 +707,7 @@ public:
       cuheader << "\tcheck_cuda_kernel;\n";
       cuheader << "\tmemcpy(v, ctx->slave_" << var.first << "[from_id].cpu_rd_ptr(), sizeof(" << var.second << ") * ctx->num_slave_nodes[from_id]);\n";
       cuheader << "}\n\n";
-      cuheader << "__global__ void batch_set_node_" << var.first << "(index_type size, size_t * p_slave_nodes, " 
+      cuheader << "__global__ void batch_set_node_" << var.first << "(index_type size, unsigned int * p_slave_nodes, " 
                << var.second << " * p_slave_" << var.first << ", " << var.second << " * p_" << var.first << ") {\n";
       cuheader << "\tunsigned tid = TID_1D;\n";
       cuheader << "\tunsigned nthreads = TOTAL_THREADS_1D;\n";
@@ -727,7 +727,7 @@ public:
                << "ctx->" << var.first << ".gpu_wr_ptr());\n";
       cuheader << "\tcheck_cuda_kernel;\n";
       cuheader << "}\n\n";
-      cuheader << "__global__ void batch_add_node_" << var.first << "(index_type size, size_t * p_master_nodes, " 
+      cuheader << "__global__ void batch_add_node_" << var.first << "(index_type size, unsigned int * p_master_nodes, " 
                << var.second << " * p_master_" << var.first << ", " << var.second << " * p_" << var.first << ") {\n";
       cuheader << "\tunsigned tid = TID_1D;\n";
       cuheader << "\tunsigned nthreads = TOTAL_THREADS_1D;\n";
@@ -747,7 +747,7 @@ public:
                << "ctx->" << var.first << ".gpu_wr_ptr());\n";
       cuheader << "\tcheck_cuda_kernel;\n";
       cuheader << "}\n\n";
-      cuheader << "__global__ void batch_min_node_" << var.first << "(index_type size, size_t * p_master_nodes, " 
+      cuheader << "__global__ void batch_min_node_" << var.first << "(index_type size, unsigned int * p_master_nodes, " 
                << var.second << " * p_master_" << var.first << ", " << var.second << " * p_" << var.first << ") {\n";
       cuheader << "\tunsigned tid = TID_1D;\n";
       cuheader << "\tunsigned nthreads = TOTAL_THREADS_1D;\n";
@@ -811,31 +811,31 @@ public:
     cuheader << "\tmemcpy(graph.edge_dst, g.edge_dst, sizeof(index_type) * g.nedges);\n";
     cuheader << "\tif(g.node_data) memcpy(graph.node_data, g.node_data, sizeof(node_data_type) * g.nnodes);\n";
     cuheader << "\tif(g.edge_data) memcpy(graph.edge_data, g.edge_data, sizeof(edge_data_type) * g.nedges);\n";
-    cuheader << "\tctx->num_master_nodes = (size_t *) calloc(num_hosts, sizeof(size_t));\n";
-    cuheader << "\tmemcpy(ctx->num_master_nodes, g.num_master_nodes, sizeof(size_t) * num_hosts);\n";
-    cuheader << "\tctx->master_nodes = (Shared<size_t> *) calloc(num_hosts, sizeof(Shared<size_t>));\n";
+    cuheader << "\tctx->num_master_nodes = (unsigned int *) calloc(num_hosts, sizeof(unsigned int));\n";
+    cuheader << "\tmemcpy(ctx->num_master_nodes, g.num_master_nodes, sizeof(unsigned int) * num_hosts);\n";
+    cuheader << "\tctx->master_nodes = (Shared<unsigned int> *) calloc(num_hosts, sizeof(Shared<unsigned int>));\n";
     for (auto& var : SharedVariablesToTypeMap) {
       cuheader << "\tctx->master_" << var.first << " = (Shared<" << var.second << "> *) calloc(num_hosts, sizeof(Shared<" << var.second << ">));\n";
     }
     cuheader << "\tfor(uint32_t h = 0; h < num_hosts; ++h){\n";
     cuheader << "\t\tif (ctx->num_master_nodes[h] > 0) {\n";
     cuheader << "\t\t\tctx->master_nodes[h].alloc(ctx->num_master_nodes[h]);\n";
-    cuheader << "\t\t\tmemcpy(ctx->master_nodes[h].cpu_wr_ptr(), g.master_nodes[h], sizeof(size_t) * ctx->num_master_nodes[h]);\n"; 
+    cuheader << "\t\t\tmemcpy(ctx->master_nodes[h].cpu_wr_ptr(), g.master_nodes[h], sizeof(unsigned int) * ctx->num_master_nodes[h]);\n"; 
     for (auto& var : SharedVariablesToTypeMap) {
       cuheader << "\t\t\tctx->master_" << var.first << "[h].alloc(ctx->num_master_nodes[h]);\n";
     }
     cuheader << "\t\t}\n";
     cuheader << "\t}\n";
-    cuheader << "\tctx->num_slave_nodes = (size_t *) calloc(num_hosts, sizeof(size_t));\n";
-    cuheader << "\tmemcpy(ctx->num_slave_nodes, g.num_slave_nodes, sizeof(size_t) * num_hosts);\n";
-    cuheader << "\tctx->slave_nodes = (Shared<size_t> *) calloc(num_hosts, sizeof(Shared<size_t>));\n";
+    cuheader << "\tctx->num_slave_nodes = (unsigned int *) calloc(num_hosts, sizeof(unsigned int));\n";
+    cuheader << "\tmemcpy(ctx->num_slave_nodes, g.num_slave_nodes, sizeof(unsigned int) * num_hosts);\n";
+    cuheader << "\tctx->slave_nodes = (Shared<unsigned int> *) calloc(num_hosts, sizeof(Shared<unsigned int>));\n";
     for (auto& var : SharedVariablesToTypeMap) {
       cuheader << "\tctx->slave_" << var.first << " = (Shared<" << var.second << "> *) calloc(num_hosts, sizeof(Shared<" << var.second << ">));\n";
     }
     cuheader << "\tfor(uint32_t h = 0; h < num_hosts; ++h){\n";
     cuheader << "\t\tif (ctx->num_slave_nodes[h] > 0) {\n";
     cuheader << "\t\t\tctx->slave_nodes[h].alloc(ctx->num_slave_nodes[h]);\n";
-    cuheader << "\t\t\tmemcpy(ctx->slave_nodes[h].cpu_wr_ptr(), g.slave_nodes[h], sizeof(size_t) * ctx->num_slave_nodes[h]);\n"; 
+    cuheader << "\t\t\tmemcpy(ctx->slave_nodes[h].cpu_wr_ptr(), g.slave_nodes[h], sizeof(unsigned int) * ctx->num_slave_nodes[h]);\n"; 
     for (auto& var : SharedVariablesToTypeMap) {
       cuheader << "\t\t\tctx->slave_" << var.first << "[h].alloc(ctx->num_slave_nodes[h]);\n";
     }

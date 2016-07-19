@@ -9,7 +9,7 @@ int * P_NOUT;
 float * P_VALUE;
 #include "kernels/reduce.cuh"
 #include "gen_cuda.cuh"
-__global__ void ResetGraph(CSRGraph graph, int  nowned, int * p_nout, float * p_value)
+__global__ void ResetGraph(CSRGraph graph, unsigned int nowned, int * p_nout, float * p_value)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -25,7 +25,7 @@ __global__ void ResetGraph(CSRGraph graph, int  nowned, int * p_nout, float * p_
   }
   // FP: "5 -> 6;
 }
-__global__ void InitializeGraph(CSRGraph graph, int  nowned, const float  local_alpha, int * p_nout, float * p_value)
+__global__ void InitializeGraph(CSRGraph graph, unsigned int nowned, const float  local_alpha, int * p_nout, float * p_value)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -48,7 +48,7 @@ __global__ void InitializeGraph(CSRGraph graph, int  nowned, const float  local_
   }
   // FP: "9 -> 10;
 }
-__global__ void PageRank(CSRGraph graph, int  nowned, const float  local_alpha, float local_tolerance, int * p_nout, float * p_value, Any any_retval)
+__global__ void PageRank(CSRGraph graph, unsigned int nowned, const float  local_alpha, float local_tolerance, int * p_nout, float * p_value, Any any_retval)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;

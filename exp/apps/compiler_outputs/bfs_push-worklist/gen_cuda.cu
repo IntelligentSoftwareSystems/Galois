@@ -9,7 +9,7 @@ unsigned int * P_DIST_CURRENT;
 #include "kernels/reduce.cuh"
 #include "gen_cuda.cuh"
 static const int __tb_BFS = TB_SIZE;
-__global__ void InitializeGraph(CSRGraph graph, int  nowned, const unsigned int  local_infinity, unsigned int local_src_node, unsigned int * p_dist_current)
+__global__ void InitializeGraph(CSRGraph graph, unsigned int nowned, const unsigned int  local_infinity, unsigned int local_src_node, unsigned int * p_dist_current)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -24,7 +24,7 @@ __global__ void InitializeGraph(CSRGraph graph, int  nowned, const unsigned int 
   }
   // FP: "4 -> 5;
 }
-__global__ void BFS(CSRGraph graph, int  nowned, unsigned int * p_dist_current, Worklist2 in_wl, Worklist2 out_wl)
+__global__ void BFS(CSRGraph graph, unsigned int nowned, unsigned int * p_dist_current, Worklist2 in_wl, Worklist2 out_wl)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
