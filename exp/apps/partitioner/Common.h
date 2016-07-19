@@ -75,7 +75,7 @@ bool verifyParitions(std::string & basename, OfflineGraph & g, size_t num_hosts)
    std::vector<OfflineGraph*> pGraphs(num_hosts);
    std::vector<std::map<size_t, NodeInfo>> hostLocalToGlobalMap(num_hosts);
    std::cout << "Verifying partitions...\n";
-   for (int h = 0; h < num_hosts; ++h) {
+   for (size_t h = 0; h < num_hosts; ++h) {
       std::string meta_file_name = getMetaFileName(basename, h, num_hosts);
       std::ifstream meta_file(meta_file_name, std::ifstream::binary);
       if (!meta_file.is_open()) {
@@ -100,11 +100,11 @@ bool verifyParitions(std::string & basename, OfflineGraph & g, size_t num_hosts)
 
    std::vector<size_t> nodeOwners(g.size());
    for (auto & i : nodeOwners) {
-      i = -1;
+      i = ~0;
    }
    std::vector<size_t> outEdgeCounts(g.size());
    std::vector<size_t> inEdgeCounts(g.size());
-   for (int h = 0; h < num_hosts; ++h) {
+   for (size_t h = 0; h < num_hosts; ++h) {
       auto & graph = *pGraphs[h];
       std::cout << "Reading partition :: " << h << " w/ " << graph.size() << " nodes, and " << graph.sizeEdges() << " edges.\n";
       for (auto n = graph.begin(); n != graph.end(); ++n) {
@@ -112,7 +112,7 @@ bool verifyParitions(std::string & basename, OfflineGraph & g, size_t num_hosts)
          assert(hostLocalToGlobalMap[h].find(src) != hostLocalToGlobalMap[h].end());
          auto g_src = hostLocalToGlobalMap[h][src].global_id;
          auto owner_src = hostLocalToGlobalMap[h][src].owner_id;
-         if (nodeOwners[g_src] != -1 && nodeOwners[g_src] != owner_src) {
+         if (nodeOwners[g_src] != ~0 && nodeOwners[g_src] != owner_src) {
             std::cout << "Error - Node:: " << g_src << " OwnerMismatch " << owner_src << " , " << nodeOwners[g_src] << "\n";
             verified = false;
          } else {
@@ -125,7 +125,7 @@ bool verifyParitions(std::string & basename, OfflineGraph & g, size_t num_hosts)
             outEdgeCounts[g_src]++;
             inEdgeCounts[g_dst]++;
             auto owner_dst = hostLocalToGlobalMap[h][dst].owner_id;
-            if (nodeOwners[g_dst] != -1 && nodeOwners[g_dst] != owner_dst) {
+            if (nodeOwners[g_dst] != ~0 && nodeOwners[g_dst] != owner_dst) {
                std::cout << "Error - Node:: " << g_dst << " OwnerMismatch " << owner_dst << " , " << nodeOwners[g_dst] << "\n";
                verified = false;
             } else {
@@ -156,7 +156,7 @@ bool verifyParitions(std::string & basename, OfflineGraph & g, size_t num_hosts)
       };
    }
 
-   for (int h = 0; h < num_hosts; ++h) {
+   for (size_t h = 0; h < num_hosts; ++h) {
       delete pGraphs[h];
    }
    return verified;
