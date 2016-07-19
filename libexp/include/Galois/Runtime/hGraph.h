@@ -408,6 +408,8 @@ public:
 #ifdef __GALOIS_HET_OPENCL__
       clGraph.load_from_hgraph(*this);
 #endif
+      
+      setup_communication();
    }
 
    void setup_communication() {
