@@ -44,6 +44,12 @@
 #include "Galois/OpenCL/CL_Header.h"
 #endif
 
+#ifdef __GALOIS_SIMULATE_COMMUNICATION__
+#ifdef __GALOIS_SIMULATE_BARE_MPI_COMMUNICATION__
+#include "mpi.h"
+#endif
+#endif
+
 #ifndef _GALOIS_DIST_HGRAPH_H
 #define _GALOIS_DIST_HGRAPH_H
 
@@ -410,6 +416,10 @@ public:
 #endif
       
       setup_communication();
+
+#ifdef __GALOIS_SIMULATE_COMMUNICATION__
+      simulate_communication();
+#endif
    }
 
    void setup_communication() {
@@ -455,6 +465,18 @@ public:
 
       StatTimer_comm_setup.stop();
    }
+
+#ifdef __GALOIS_SIMULATE_COMMUNICATION__
+   void simulate_communication() {
+     simulate_sync_pull();
+     simulate_sync_push();
+
+#ifdef __GALOIS_SIMULATE_BARE_MPI_COMMUNICATION__
+     simulate_bare_mpi_sync_pull();
+     simulate_bare_mpi_sync_push();
+#endif
+   }
+#endif
 
    template<bool isVoidType, typename std::enable_if<!isVoidType>::type* = nullptr>
    void loadEdges(OfflineGraph & g) {
@@ -616,6 +638,191 @@ public:
 
     Galois::Runtime::getHostBarrier().wait();
    }
+
+   void syncRecvApplyTest(Galois::Runtime::RecvBuffer& buf) {
+     uint32_t num;
+     std::string loopName;
+     uint32_t num_iter_push;
+     Galois::Runtime::gDeserialize(buf, num);
+     std::vector<uint64_t> val_vec(num);
+     Galois::Runtime::gDeserialize(buf, val_vec);
+   }
+
+#ifdef __GALOIS_SIMULATE_COMMUNICATION__
+#ifdef __GALOIS_SIMULATE_BARE_MPI_COMMUNICATION__
+   void simulate_bare_mpi_sync_pull() {
+      std::cerr << "WARNING: requires MPI_THREAD_MULTIPLE to be set in MPI_Init_thread()\n";
+      Galois::StatTimer StatTimer_syncPull("SIMULATE_MPI_SYNC_PULL");
+      Galois::Statistic SyncPull_send_bytes("SIMULATE_MPI_SYNC_PULL_SEND_BYTES");
+
+      MPI_Barrier(MPI_COMM_WORLD);
+      StatTimer_syncPull.start();
+      auto& net = Galois::Runtime::getSystemNetworkInterface();
+
+      std::vector<MPI_Request> requests(2 * net.Num);
+      unsigned num_requests = 0;
+
+      std::vector<uint8_t> sb[net.Num];
+      for (unsigned x = 0; x < net.Num; ++x) {
+         uint32_t num = masterNodes[x].size();
+         if((x == id) || (num == 0))
+           continue;
+         size_t size = num * sizeof(uint64_t);
+         sb[x].resize(size);
+
+         std::vector<uint64_t> val_vec(num, 1);
+         memcpy(&sb[x][0], &val_vec[0], size);
+
+         SyncPull_send_bytes += size;
+         std::cerr << "[" << id << "]" << " mpi send to " << x << " : " << size << "\n";
+         MPI_Isend(&sb[x][0], size, MPI_BYTE, x, 0, MPI_COMM_WORLD, &requests[num_requests++]);
+      }
+
+      std::vector<uint8_t> rb[net.Num];
+      for (unsigned x = 0; x < net.Num; ++x) {
+         uint32_t num = slaveNodes[x].size();
+         if((x == id) || (num == 0))
+           continue;
+         size_t size = num * sizeof(uint64_t);
+         rb[x].resize(size);
+
+         std::cerr << "[" << id << "]" << " mpi receive from " << x << " : " << size << "\n";
+         MPI_Irecv(&rb[x][0], size, MPI_BYTE, x, 0, MPI_COMM_WORLD, &requests[num_requests++]);
+      }
+
+      MPI_Waitall(num_requests, &requests[0], MPI_STATUSES_IGNORE);
+
+      for (unsigned x = 0; x < net.Num; ++x) {
+         uint32_t num = slaveNodes[x].size();
+         if((x == id) || (num == 0))
+           continue;
+         size_t size = num * sizeof(uint64_t);
+         std::vector<uint64_t> val_vec(num);
+         memcpy(&val_vec[0], &rb[x][0], size);
+      }
+
+      std::cerr << "[" << id << "]" << "pull mpi done\n";
+      StatTimer_syncPull.stop();
+   }
+
+   void simulate_bare_mpi_sync_push() {
+      std::cerr << "WARNING: requires MPI_THREAD_MULTIPLE to be set in MPI_Init_thread()\n";
+      Galois::StatTimer StatTimer_syncPush("SIMULATE_MPI_SYNC_PUSH");
+      Galois::Statistic SyncPush_send_bytes("SIMULATE_MPI_SYNC_PUSH_SEND_BYTES");
+
+      MPI_Barrier(MPI_COMM_WORLD);
+      StatTimer_syncPush.start();
+      auto& net = Galois::Runtime::getSystemNetworkInterface();
+
+      std::vector<MPI_Request> requests(2 * net.Num);
+      unsigned num_requests = 0;
+
+      std::vector<uint8_t> sb[net.Num];
+      for (unsigned x = 0; x < net.Num; ++x) {
+         uint32_t num = slaveNodes[x].size();
+         if((x == id) || (num == 0))
+           continue;
+         size_t size = num * sizeof(uint64_t);
+         sb[x].resize(size);
+
+         std::vector<uint64_t> val_vec(num, 1);
+         memcpy(&sb[x][0], &val_vec[0], size);
+
+         SyncPush_send_bytes += size;
+         std::cerr << "[" << id << "]" << " mpi send to " << x << " : " << size << "\n";
+         MPI_Isend(&sb[x][0], size, MPI_BYTE, x, 1, MPI_COMM_WORLD, &requests[num_requests++]);
+      }
+
+      std::vector<uint8_t> rb[net.Num];
+      for (unsigned x = 0; x < net.Num; ++x) {
+         uint32_t num = masterNodes[x].size();
+         if((x == id) || (num == 0))
+           continue;
+         size_t size = num * sizeof(uint64_t);
+         rb[x].resize(size);
+
+         std::cerr << "[" << id << "]" << " mpi receive from " << x << " : " << size << "\n";
+         MPI_Irecv(&rb[x][0], size, MPI_BYTE, x, 1, MPI_COMM_WORLD, &requests[num_requests++]);
+      }
+
+      MPI_Waitall(num_requests, &requests[0], MPI_STATUSES_IGNORE);
+
+      for (unsigned x = 0; x < net.Num; ++x) {
+         uint32_t num = masterNodes[x].size();
+         if((x == id) || (num == 0))
+           continue;
+         size_t size = num * sizeof(uint64_t);
+         std::vector<uint64_t> val_vec(num);
+         memcpy(&val_vec[0], &rb[x][0], size);
+      }
+      
+      std::cerr << "[" << id << "]" << "push mpi done\n";
+      StatTimer_syncPush.stop();
+   }
+#endif
+#endif
+
+#ifdef __GALOIS_SIMULATE_COMMUNICATION__
+   void simulate_sync_pull() {
+      void (hGraph::*fn)(Galois::Runtime::RecvBuffer&) = &hGraph::syncRecvApplyTest;
+      Galois::StatTimer StatTimer_syncPull("SIMULATE_NET_SYNC_PULL");
+      Galois::Statistic SyncPull_send_bytes("SIMULATE_NET_SYNC_PULL_SEND_BYTES");
+
+      Galois::Runtime::getHostBarrier().wait();
+      StatTimer_syncPull.start();
+      auto& net = Galois::Runtime::getSystemNetworkInterface();
+
+      for (unsigned x = 0; x < net.Num; ++x) {
+         uint32_t num = masterNodes[x].size();
+         if((x == id) || (num == 0))
+           continue;
+
+         Galois::Runtime::SendBuffer b;
+         gSerialize(b, idForSelf(), fn, num);
+
+         std::vector<uint64_t> val_vec(num, 1);
+         gSerialize(b, val_vec);
+
+         SyncPull_send_bytes += b.size();
+         net.sendMsg(x, syncRecv, b);
+      }
+      //Will force all messages to be processed before continuing
+      net.flush();
+
+      Galois::Runtime::getHostBarrier().wait();
+      StatTimer_syncPull.stop();
+   }
+
+   void simulate_sync_push() {
+      void (hGraph::*fn)(Galois::Runtime::RecvBuffer&) = &hGraph::syncRecvApplyTest;
+      Galois::StatTimer StatTimer_syncPush("SIMULATE_NET_SYNC_PUSH");
+      Galois::Statistic SyncPush_send_bytes("SIMULATE_NET_SYNC_PUSH_SEND_BYTES");
+
+      StatTimer_syncPush.start();
+      auto& net = Galois::Runtime::getSystemNetworkInterface();
+
+      for (unsigned x = 0; x < net.Num; ++x) {
+         uint32_t num = slaveNodes[x].size();
+         if((x == id) || (num == 0))
+           continue;
+
+         Galois::Runtime::SendBuffer b;
+         gSerialize(b, idForSelf(), fn, num);
+
+         std::vector<uint64_t> val_vec(num, 1);
+         gSerialize(b, val_vec);
+
+         SyncPush_send_bytes += b.size();
+         net.sendMsg(x, syncRecv, b);
+      }
+      //Will force all messages to be processed before continuing
+      net.flush();
+
+      Galois::Runtime::getHostBarrier().wait();
+
+      StatTimer_syncPush.stop();
+   }
+#endif
 
 
    template<typename FnTy>
