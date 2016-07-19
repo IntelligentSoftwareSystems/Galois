@@ -407,6 +407,29 @@ public:
     }
 #endif
 
+
+    //compute owners for all nodes
+    numOwned = g.size();//gid2host[id].second - gid2host[id].first;
+
+    uint64_t numEdges = g.edge_begin(*g.end()) - g.edge_begin(*g.begin()); // depends on Offline graph impl
+    std::cerr << "[" << id << "] Edge count Done " << numEdges << "\n";
+
+
+    uint32_t numNodes = numOwned;
+    graph.allocateFrom(numNodes, numEdges);
+    //std::cerr << "Allocate done\n";
+
+    graph.constructNodes();
+    //std::cerr << "Construct nodes done\n";
+    loadEdges<std::is_void<EdgeTy>::value>(g);
+
+    setup_communication(numHosts);
+  }
+
+  void setup_communication(unsigned numHosts) {
+    Galois::StatTimer StatTimer_comm_setup("COMMUNICATION_SETUP_TIME");
+    StatTimer_comm_setup.start();
+
     for(auto info : localToGlobalMap_meta){
       assert(info.owner_id >= 0 && info.owner_id < numHosts);
       slaveNodes[info.owner_id].push_back(info.global_id);
@@ -452,28 +475,15 @@ public:
       Galois::Statistic StatMasterNodes(master_nodes_str);
       StatMasterNodes += masterNodes[x].size();
     }
+
     for(auto x = 0; x < slaveNodes.size(); ++x){
       std::string slave_nodes_str = "SLAVE_NODES_FROM_" + std::to_string(x);
       Galois::Statistic StatSlaveNodes(slave_nodes_str);
       StatSlaveNodes += slaveNodes[x].size();
     }
 
-
-    //compute owners for all nodes
-    numOwned = g.size();//gid2host[id].second - gid2host[id].first;
-
-    uint64_t numEdges = g.edge_begin(*g.end()) - g.edge_begin(*g.begin()); // depends on Offline graph impl
-    std::cerr << "[" << id << "] Edge count Done " << numEdges << "\n";
-
-
-    uint32_t numNodes = numOwned;
-      graph.allocateFrom(numNodes, numEdges);
-      //std::cerr << "Allocate done\n";
-
-      graph.constructNodes();
-      //std::cerr << "Construct nodes done\n";
-      loadEdges<std::is_void<EdgeTy>::value>(g);
-   }
+    StatTimer_comm_setup.stop();
+  }
 
    template<bool isVoidType, typename std::enable_if<!isVoidType>::type* = nullptr>
    void loadEdges(OfflineGraph & g) {

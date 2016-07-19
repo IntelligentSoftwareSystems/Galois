@@ -408,6 +408,11 @@ public:
 #ifdef __GALOIS_HET_OPENCL__
       clGraph.load_from_hgraph(*this);
 #endif
+   }
+
+   void setup_communication() {
+      Galois::StatTimer StatTimer_comm_setup("COMMUNICATION_SETUP_TIME");
+      StatTimer_comm_setup.start();
 
       for(uint32_t h = 0; h < hostNodes.size(); ++h){
         uint32_t start, end;
@@ -433,6 +438,20 @@ public:
              slaveNodes[h][n] = G2L(slaveNodes[h][n]);
              }, Galois::loopname("SLAVE_NODES"));
       }
+
+      for(auto x = 0; x < masterNodes.size(); ++x){
+        std::string master_nodes_str = "MASTER_NODES_TO_" + std::to_string(x);
+        Galois::Statistic StatMasterNodes(master_nodes_str);
+        StatMasterNodes += masterNodes[x].size();
+      }
+
+      for(auto x = 0; x < slaveNodes.size(); ++x){
+        std::string slave_nodes_str = "SLAVE_NODES_FROM_" + std::to_string(x);
+        Galois::Statistic StatSlaveNodes(slave_nodes_str);
+        StatSlaveNodes += slaveNodes[x].size();
+      }
+
+      StatTimer_comm_setup.stop();
    }
 
    template<bool isVoidType, typename std::enable_if<!isVoidType>::type* = nullptr>
