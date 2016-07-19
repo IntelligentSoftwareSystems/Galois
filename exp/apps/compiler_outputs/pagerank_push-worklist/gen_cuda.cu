@@ -11,7 +11,7 @@ float * P_VALUE;
 #include "kernels/reduce.cuh"
 #include "gen_cuda.cuh"
 static const int __tb_PageRank = TB_SIZE;
-__global__ void ResetGraph(CSRGraph graph, int  nowned, unsigned int * p_nout, float * p_residual, float * p_value)
+__global__ void ResetGraph(CSRGraph graph, unsigned int nowned, unsigned int * p_nout, float * p_residual, float * p_value)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -28,7 +28,7 @@ __global__ void ResetGraph(CSRGraph graph, int  nowned, unsigned int * p_nout, f
   }
   // FP: "6 -> 7;
 }
-__global__ void InitializeGraph(CSRGraph graph, int  nowned, const float  local_alpha, unsigned int * p_nout, float * p_residual, float * p_value)
+__global__ void InitializeGraph(CSRGraph graph, unsigned int nowned, const float  local_alpha, unsigned int * p_nout, float * p_residual, float * p_value)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;
@@ -57,7 +57,7 @@ __global__ void InitializeGraph(CSRGraph graph, int  nowned, const float  local_
   }
   // FP: "14 -> 15;
 }
-__global__ void PageRank(CSRGraph graph, int  nowned, const float  local_alpha, float local_tolerance, unsigned int * p_nout, float * p_residual, float * p_value, Worklist2 in_wl, Worklist2 out_wl)
+__global__ void PageRank(CSRGraph graph, unsigned int nowned, const float  local_alpha, float local_tolerance, unsigned int * p_nout, float * p_residual, float * p_value, Worklist2 in_wl, Worklist2 out_wl)
 {
   unsigned tid = TID_1D;
   unsigned nthreads = TOTAL_THREADS_1D;

@@ -45,6 +45,22 @@ static inline void traceImpl(std::ostringstream& os, T&& value, Args&&... args) 
   traceImpl(os, std::forward<Args>(args)...);
 }
 
+static inline void traceFormatImpl(std::ostringstream& os, const char* format) {
+  os << format;
+}
+
+template<typename T, typename... Args>
+static inline void traceFormatImpl(std::ostringstream& os, const char* format, T&& value, Args&&... args) {
+  for (; *format != '\0'; format++) {
+    if (*format == '%') {
+      os << value;
+      traceFormatImpl(os, format + 1, std::forward<Args>(args)...);
+      return;
+    }
+    os << *format;
+  }
+}
+
 template<typename T, typename A>
 class vecPrinter {
   const std::vector<T,A>& v;
@@ -100,6 +116,17 @@ static inline void trace(Args&&... args) {
 }
 
 #endif
+
+template<typename... Args>
+static inline void printOutput(const char* format, Args&&... args) {
+    std::ostringstream os;
+    detail::traceFormatImpl(os, format, std::forward<Args>(args)...);
+    detail::print_output_impl(os);
+}
+
+static void print_send(std::vector<uint8_t> vec, size_t len, unsigned host){
+  detail::print_send_impl(vec, len, host);
+}
 
 } // namespace Runtime
 } // namespace Galois
