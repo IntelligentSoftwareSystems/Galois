@@ -424,6 +424,7 @@ public:
 
    void setup_communication() {
       Galois::StatTimer StatTimer_comm_setup("COMMUNICATION_SETUP_TIME");
+      Galois::Runtime::getHostBarrier().wait();
       StatTimer_comm_setup.start();
 
       for(uint32_t h = 0; h < hostNodes.size(); ++h){
@@ -651,7 +652,7 @@ public:
 #ifdef __GALOIS_SIMULATE_COMMUNICATION__
 #ifdef __GALOIS_SIMULATE_BARE_MPI_COMMUNICATION__
    void simulate_bare_mpi_sync_pull() {
-      std::cerr << "WARNING: requires MPI_THREAD_MULTIPLE to be set in MPI_Init_thread()\n";
+      std::cerr << "WARNING: requires MPI_THREAD_MULTIPLE to be set in MPI_Init_thread() and Net to not receive MPI messages with tag 32767\n";
       Galois::StatTimer StatTimer_syncPull("SIMULATE_MPI_SYNC_PULL");
       Galois::Statistic SyncPull_send_bytes("SIMULATE_MPI_SYNC_PULL_SEND_BYTES");
 
@@ -675,7 +676,7 @@ public:
 
          SyncPull_send_bytes += size;
          std::cerr << "[" << id << "]" << " mpi send to " << x << " : " << size << "\n";
-         MPI_Isend(&sb[x][0], size, MPI_BYTE, x, 0, MPI_COMM_WORLD, &requests[num_requests++]);
+         MPI_Isend(&sb[x][0], size, MPI_BYTE, x, 32767, MPI_COMM_WORLD, &requests[num_requests++]);
       }
 
       std::vector<uint8_t> rb[net.Num];
@@ -687,7 +688,7 @@ public:
          rb[x].resize(size);
 
          std::cerr << "[" << id << "]" << " mpi receive from " << x << " : " << size << "\n";
-         MPI_Irecv(&rb[x][0], size, MPI_BYTE, x, 0, MPI_COMM_WORLD, &requests[num_requests++]);
+         MPI_Irecv(&rb[x][0], size, MPI_BYTE, x, 32767, MPI_COMM_WORLD, &requests[num_requests++]);
       }
 
       MPI_Waitall(num_requests, &requests[0], MPI_STATUSES_IGNORE);
@@ -697,6 +698,7 @@ public:
          if((x == id) || (num == 0))
            continue;
          size_t size = num * sizeof(uint64_t);
+         std::cerr << "[" << id << "]" << " mpi received from " << x << " : " << size << "\n";
          std::vector<uint64_t> val_vec(num);
          memcpy(&val_vec[0], &rb[x][0], size);
       }
@@ -706,7 +708,7 @@ public:
    }
 
    void simulate_bare_mpi_sync_push() {
-      std::cerr << "WARNING: requires MPI_THREAD_MULTIPLE to be set in MPI_Init_thread()\n";
+      std::cerr << "WARNING: requires MPI_THREAD_MULTIPLE to be set in MPI_Init_thread() and Net to not receive MPI messages with tag 32767\n";
       Galois::StatTimer StatTimer_syncPush("SIMULATE_MPI_SYNC_PUSH");
       Galois::Statistic SyncPush_send_bytes("SIMULATE_MPI_SYNC_PUSH_SEND_BYTES");
 
@@ -730,7 +732,7 @@ public:
 
          SyncPush_send_bytes += size;
          std::cerr << "[" << id << "]" << " mpi send to " << x << " : " << size << "\n";
-         MPI_Isend(&sb[x][0], size, MPI_BYTE, x, 1, MPI_COMM_WORLD, &requests[num_requests++]);
+         MPI_Isend(&sb[x][0], size, MPI_BYTE, x, 32767, MPI_COMM_WORLD, &requests[num_requests++]);
       }
 
       std::vector<uint8_t> rb[net.Num];
@@ -742,7 +744,7 @@ public:
          rb[x].resize(size);
 
          std::cerr << "[" << id << "]" << " mpi receive from " << x << " : " << size << "\n";
-         MPI_Irecv(&rb[x][0], size, MPI_BYTE, x, 1, MPI_COMM_WORLD, &requests[num_requests++]);
+         MPI_Irecv(&rb[x][0], size, MPI_BYTE, x, 32767, MPI_COMM_WORLD, &requests[num_requests++]);
       }
 
       MPI_Waitall(num_requests, &requests[0], MPI_STATUSES_IGNORE);
@@ -752,6 +754,7 @@ public:
          if((x == id) || (num == 0))
            continue;
          size_t size = num * sizeof(uint64_t);
+         std::cerr << "[" << id << "]" << " mpi received from " << x << " : " << size << "\n";
          std::vector<uint64_t> val_vec(num);
          memcpy(&val_vec[0], &rb[x][0], size);
       }
