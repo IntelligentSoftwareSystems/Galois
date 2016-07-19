@@ -337,19 +337,7 @@ struct VF2Algo {
       return true;
     }
     
-    template<typename Set, typename Graph>
-    void insertDst(Set& s, Graph& g, typename Graph::GraphNode n) {
-      for (auto ei : g.edges(n))
-        s.insert(g.getEdgeDst(ei));
-    }
-
-    template<typename Set, typename Graph>
-    void insertInDst(Set& s, Graph& g, typename Graph::GraphNode n) {
-      for (auto ei : g.in_edges(n))
-        s.insert(g.getInEdgeDst(ei));
-    }
-
-    template<typename StateSet, typename StepSet, typename Graph>
+   template<typename StateSet, typename StepSet, typename Graph>
     void insertDstFrontier(StateSet& sMatched, StateSet& sFrontier, StepSet& sAdd2F, Graph& g, typename Graph::GraphNode n) {
       for(auto ei: g.edges(n)) {
         auto ngh = g.getEdgeDst(ei);
@@ -403,7 +391,7 @@ struct VF2Algo {
         state.dMatched.insert(ri);
         state.dFrontier.erase(ri);
 
-        std::vector<DGNode, Galois::PerIterAllocTy::rebind<DGNode>::other> dAdd2Frontier;
+        std::vector<DGNode, Galois::PerIterAllocTy::rebind<DGNode>::other> dAdd2Frontier(alloc);
         insertDstFrontier(state.dMatched, state.dFrontier, dAdd2Frontier, gD, ri);
         if (!undirected)
           insertInDstFrontier(state.dMatched, state.dFrontier, dAdd2Frontier, gD, ri);
@@ -434,6 +422,18 @@ struct VF2Algo {
       }
     }
 
+    template<typename Set, typename Graph>
+    void insertDst(Set& s, Graph& g, typename Graph::GraphNode n) {
+      for (auto ei : g.edges(n))
+        s.insert(g.getEdgeDst(ei));
+    }
+
+    template<typename Set, typename Graph>
+    void insertInDst(Set& s, Graph& g, typename Graph::GraphNode n) {
+      for (auto ei : g.in_edges(n))
+        s.insert(g.getInEdgeDst(ei));
+    }
+ 
     // Galois::for_each expects ctx
     void operator()(NodeMatch& seed, Galois::UserContext<NodeMatch>& ctx) {
       LocalState state(ctx.getPerIterAlloc());
