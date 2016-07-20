@@ -33,7 +33,6 @@
 #include "llvm/Support/CommandLine.h"
 #include "Lonestar/BoilerPlate.h"
 #include "Galois/Accumulator.h"
-//#include "Galois/PerThreadContainer.h"
 
 #include <iostream>
 #include <fstream>
@@ -49,7 +48,7 @@ namespace cll = llvm::cl;
 
 static const char* name = "Subgraph Isomorphism";
 static const char* desc =
-  "Computes up to k isomorphism on data graph for each query graph";
+  "Computes up to k subgraph isomorphism on data graph for query graph";
 static const char* url = "subgraph_isomorphism";
 
 enum Algo {
@@ -83,7 +82,7 @@ struct DNode {
 };
 
 typedef Galois::Graph::LC_CSR_Graph<DNode, void> InnerDGraph; // graph with DNode nodes and typeless edges
-typedef Galois::Graph::LC_InOut_Graph<InnerDGraph> DGraph;
+typedef Galois::Graph::LC_InOut_Graph<InnerDGraph> DGraph; // for incoming neighbors
 typedef DGraph::GraphNode DGNode;
 
 struct QNode {
@@ -91,7 +90,6 @@ struct QNode {
   unsigned int id;
   std::vector<DGNode> candidate;
 };
-
 
 typedef Galois::Graph::LC_CSR_Graph<QNode, void> InnerQGraph;
 typedef Galois::Graph::LC_InOut_Graph<InnerQGraph> QGraph;
@@ -132,12 +130,12 @@ void initializeGraph(Graph& g, unsigned int seed) {
   generator.seed(seed);
 
   unsigned int i = 0;
-  for(auto ni = g.begin(), ne = g.end(); ni != ne; ++ni) {
-    Node& data = g.getData(*ni);
+  for(auto n : g) {
+    Node& data = g.getData(n);
     data.id = i++;
     data.label = 'A' + distribution(generator) % numLabels;
 
-    g.sortEdgesByDst(*ni);
+    g.sortEdgesByDst(n);
   }
 }
 
@@ -154,22 +152,19 @@ struct VF2Algo {
     FilterCandidatesInternal(DGraph& d, QGraph& q, Galois::GReduceLogicalOR& lor): gD(d), gQ(q), nodeEmpty(lor) {}
 
   public:
-    void operator()(const QGNode n) const {
-      auto& dQ = gQ.getData(n);
+    void operator()(const QGNode nQ) const {
+      auto& dQ = gQ.getData(nQ);
       
-      for(auto di : gD) {
-        auto& dD = gD.getData(di);
-        
-        if(dQ.label != dD.label) {
+      for(auto nD : gD) {
+        auto& dD = gD.getData(nD);
+        if(dQ.label != dD.label)
           continue;
-        }
         
-        // self loop for n but not for *di
-        if(gQ.findEdge(n, n) != gQ.edge_end(n) && gD.findEdge(di, di) == gD.edge_end(di)) {
+        // self loop for nQ but not for nD
+        if(gQ.findEdge(nQ, nQ) != gQ.edge_end(nQ) && gD.findEdge(nD, nD) == gD.edge_end(nD))
           continue;
-        }
         
-        dQ.candidate.push_back(di);
+        dQ.candidate.push_back(nD);
       }
       
       std::sort(dQ.candidate.begin(), dQ.candidate.end());
@@ -187,77 +182,70 @@ struct VF2Algo {
   };
 
   struct SubgraphSearchInternal {
-    typedef int tt_does_not_need_aborts;
-    typedef int tt_does_not_need_push;
-    typedef int tt_needs_parallel_break;
-    typedef int tt_does_not_need_stats;
-    typedef int tt_needs_per_iter_alloc;
-    
     DGraph& gD;
     QGraph& gQ;
     MatchingVector& report;
     SubgraphSearchInternal(DGraph& d, QGraph& q, MatchingVector& r): gD(d), gQ(q), report(r) {}
 
     struct LocalState {
+      typedef Galois::PerIterAllocTy::rebind<QGNode>::other QPerIterAlloc;
+      typedef Galois::PerIterAllocTy::rebind<DGNode>::other DPerIterAlloc;
+
       // query state
-      std::set<QGNode, std::less<QGNode>, Galois::PerIterAllocTy::rebind<QGNode>::other> qFrontier;
-      std::set<QGNode, std::less<QGNode>, Galois::PerIterAllocTy::rebind<QGNode>::other> qMatched;
+      std::set<QGNode, std::less<QGNode>, QPerIterAlloc> qFrontier;
+      std::set<QGNode, std::less<QGNode>, QPerIterAlloc> qMatched;
       
       // data state
-      std::set<DGNode, std::less<DGNode>, Galois::PerIterAllocTy::rebind<DGNode>::other> dFrontier;
-      std::set<DGNode, std::less<DGNode>, Galois::PerIterAllocTy::rebind<DGNode>::other> dMatched;
+      std::set<DGNode, std::less<DGNode>, DPerIterAlloc> dFrontier;
+      std::set<DGNode, std::less<DGNode>, DPerIterAlloc> dMatched;
 
       LocalState(Galois::PerIterAllocTy& a) :qFrontier(a), qMatched(a), dFrontier(a), dMatched(a) {}
       
       QGNode nextQueryNode(QGraph& gQ, Matching& matching) {
-        if(qFrontier.size()) {
+        if(qFrontier.size())
           return *(qFrontier.begin());
-        } else {
-          for(auto qi : gQ) {
+        else
+          for(auto nQ : gQ) {
             bool isMatched = false;
-            for(auto& mi : matching) {
-              if(qi == mi.nQ) {
+            for(auto& mi : matching)
+              if(nQ == mi.nQ) {
                 isMatched = true;
                 break;
               }
-            }
-            if(!isMatched) {
-              return qi;
-            }
+            if(!isMatched)
+              return nQ;
           }
-        }
+
         //FIXME: ??
         abort();
       }
     };
 
     template<typename Graph, typename Set>
-    void countInNeighbors(Graph& g, typename Graph::GraphNode n, Set& matched, Set& frontier, long int *numFrontier, long int *numOther) {
-      for(auto ei : g.in_edges(n)) {
-        auto ngh = g.getInEdgeDst(ei);
-        if(frontier.count(ngh)) {
+    void countInNeighbors(Graph& g, typename Graph::GraphNode n, Set& sMatched, Set& sFrontier, long int *numFrontier, long int *numOther) {
+      for(auto ie : g.in_edges(n)) {
+        auto ngh = g.getInEdgeDst(ie);
+        if(sFrontier.count(ngh))
           *numFrontier += 1;
-        } else { 
-          *numOther += (1 - matched.count(ngh));
-        }
+        else
+          *numOther += (1 - sMatched.count(ngh));
       }
     }
     
     template<typename Graph, typename Set>
-    void countNeighbors(Graph& g, typename Graph::GraphNode n, Set& matched, Set& frontier, long int *numFrontier, long int *numOther) {
-      for(auto ei : g.edges(n)) {
-        auto ngh = g.getEdgeDst(ei);
-        if(frontier.count(ngh)) {
+    void countNeighbors(Graph& g, typename Graph::GraphNode n, Set& sMatched, Set& sFrontier, long int *numFrontier, long int *numOther) {
+      for(auto e : g.edges(n)) {
+        auto ngh = g.getEdgeDst(e);
+        if(sFrontier.count(ngh))
           *numFrontier += 1;
-        } else {
-          *numOther += (1 - matched.count(ngh));
-        }
+        else
+          *numOther += (1 - sMatched.count(ngh));
       }
     } 
     
-    std::vector<DGNode, Galois::PerIterAllocTy::rebind<DGNode>::other> 
+    std::vector<DGNode, LocalState::DPerIterAlloc> 
     refineCandidates(DGraph& gD, QGraph& gQ, QGNode nQuery, Galois::PerIterAllocTy& alloc, LocalState& state) {
-      std::vector<DGNode, Galois::PerIterAllocTy::rebind<DGNode>::other> refined(alloc);
+      std::vector<DGNode, LocalState::DPerIterAlloc> refined(alloc);
       auto numNghQ = std::distance(gQ.edge_begin(nQuery), gQ.edge_end(nQuery));
       long int numFrontierNghQ = 0, numOtherNghQ = 0;
       countNeighbors(gQ, nQuery, state.qMatched, state.qFrontier, &numFrontierNghQ, &numOtherNghQ);
@@ -272,23 +260,19 @@ struct VF2Algo {
       auto& dQ = gQ.getData(nQuery);
       for(auto ii : state.dFrontier) {
         // not a candidate for nQuery
-        if(!std::binary_search(dQ.candidate.begin(), dQ.candidate.end(), ii)) {
+        if(!std::binary_search(dQ.candidate.begin(), dQ.candidate.end(), ii))
           continue;
-        }
         
         auto numNghD = std::distance(gD.edge_begin(ii), gD.edge_end(ii));
-        if(numNghD < numNghQ) {
+        if(numNghD < numNghQ)
           continue;
-        }
         
         long int numFrontierNghD = 0, numOtherNghD = 0;
         countNeighbors(gD, ii, state.dMatched, state.dFrontier, &numFrontierNghD, &numOtherNghD);
-        if(numFrontierNghD < numFrontierNghQ) {
+        if(numFrontierNghD < numFrontierNghQ)
           continue;
-        }
-        if(numOtherNghD < numOtherNghQ) {
+        if(numOtherNghD < numOtherNghQ)
           continue;
-        }
         
         if(undirected) {
           refined.push_back(ii);
@@ -296,18 +280,15 @@ struct VF2Algo {
         }
         
         auto numInNghD = std::distance(gD.in_edge_begin(ii), gD.in_edge_end(ii));
-        if(numInNghD < numInNghQ) {
+        if(numInNghD < numInNghQ)
           continue;
-        }
         
         long int numFrontierInNghD = 0, numOtherInNghD = 0;    
         countInNeighbors(gD, ii, state.dMatched, state.dFrontier, &numFrontierInNghD, &numOtherInNghD);
-        if(numFrontierInNghD < numFrontierInNghQ) {
+        if(numFrontierInNghD < numFrontierInNghQ)
           continue;
-        }
-        if(numOtherInNghD < numOtherInNghQ) {
+        if(numOtherInNghD < numOtherInNghQ)
           continue;
-        }
         
         refined.push_back(ii);
       }
@@ -315,24 +296,20 @@ struct VF2Algo {
     }
     
     bool isJoinable(DGraph& gD, QGraph& gQ, DGNode nD, QGNode nQ, Matching& matching) {
-      for(auto& mi : matching) {
+      for(auto& nm : matching) {
         // nD is already matched
-        if(nD == mi.nD) {
+        if(nD == nm.nD)
           return false;
-        }
         
-        // nQ => (mi->nQ) exists but not nD => (mi->nD)
-        if(gQ.findEdge(nQ, mi.nQ) != gQ.edge_end(nQ) && gD.findEdge(nD, mi.nD) == gD.edge_end(nD)) {
+        // nQ => (nm.nQ) exists but not nD => (nm.nD)
+        if(gQ.findEdge(nQ, nm.nQ) != gQ.edge_end(nQ) && gD.findEdge(nD, nm.nD) == gD.edge_end(nD))
           return false;
-        }
         
-        // (mi->nQ) => nQ exists but not (mi->nD) => nD
+        // (nm.nQ) => nQ exists but not (nm.nD) => nD
         // skip if both data and query graphs are directed
-        if(!undirected) {
-          if(gQ.findEdge(mi.nQ, nQ) != gQ.edge_end(mi.nQ) && gD.findEdge(mi.nD, nD) == gD.edge_end(mi.nD)) {
+        if(!undirected)
+          if(gQ.findEdge(nm.nQ, nQ) != gQ.edge_end(nm.nQ) && gD.findEdge(nm.nD, nD) == gD.edge_end(nm.nD))
             return false;
-          }
-        }
       }
       
       return true;
@@ -340,8 +317,8 @@ struct VF2Algo {
     
    template<typename StateSet, typename StepSet, typename Graph>
     void insertDstFrontier(StateSet& sMatched, StateSet& sFrontier, StepSet& sAdd2F, Graph& g, typename Graph::GraphNode n) {
-      for(auto ei: g.edges(n)) {
-        auto ngh = g.getEdgeDst(ei);
+      for(auto e: g.edges(n)) {
+        auto ngh = g.getEdgeDst(e);
         if(!sMatched.count(ngh) && sFrontier.insert(ngh).second)
           sAdd2F.push_back(ngh);
       }
@@ -349,8 +326,8 @@ struct VF2Algo {
 
     template<typename StateSet, typename StepSet, typename Graph>
     void insertInDstFrontier(StateSet& sMatched, StateSet& sFrontier, StepSet& sAdd2F, Graph& g, typename Graph::GraphNode n) {
-      for(auto ei: g.in_edges(n)) {
-        auto ngh = g.getInEdgeDst(ei);
+      for(auto ie: g.in_edges(n)) {
+        auto ngh = g.getInEdgeDst(ie);
         if(!sMatched.count(ngh) && sFrontier.insert(ngh).second)
           sAdd2F.push_back(ngh);
       }
@@ -367,60 +344,55 @@ struct VF2Algo {
       }
 
       auto nQ = state.nextQueryNode(gQ, matching);
-
-      std::vector<DGNode, Galois::PerIterAllocTy::rebind<DGNode>::other> refined = refineCandidates(gD, gQ, nQ, alloc, state);
+      auto refined = refineCandidates(gD, gQ, nQ, alloc, state);
 
       // update query state
       state.qMatched.insert(nQ);
       state.qFrontier.erase(nQ);
 
-      std::vector<QGNode, Galois::PerIterAllocTy::rebind<QGNode>::other> qAdd2Frontier(alloc);
+      std::vector<QGNode, LocalState::QPerIterAlloc> qAdd2Frontier(alloc);
       insertDstFrontier(state.qMatched, state.qFrontier, qAdd2Frontier, gQ, nQ);
       if(!undirected)
         insertInDstFrontier(state.qMatched, state.qFrontier, qAdd2Frontier, gQ, nQ);
 
       // search for all possible candidate data nodes
-      for(auto& ri : refined) {
-        if(!isJoinable(gD, gQ, ri, nQ, matching)) {
+      for(auto& r : refined) {
+        if(!isJoinable(gD, gQ, r, nQ, matching))
           continue;
-        }
 
-        // add (nQ, *ri) to matching 
-        matching.push_back(NodeMatch(nQ, ri));
+        // add (nQ, r) to matching 
+        matching.push_back(NodeMatch(nQ, r));
 
         // update data state
-        state.dMatched.insert(ri);
-        state.dFrontier.erase(ri);
+        state.dMatched.insert(r);
+        state.dFrontier.erase(r);
 
-        std::vector<DGNode, Galois::PerIterAllocTy::rebind<DGNode>::other> dAdd2Frontier(alloc);
-        insertDstFrontier(state.dMatched, state.dFrontier, dAdd2Frontier, gD, ri);
+        std::vector<DGNode, LocalState::DPerIterAlloc> dAdd2Frontier(alloc);
+        insertDstFrontier(state.dMatched, state.dFrontier, dAdd2Frontier, gD, r);
         if (!undirected)
-          insertInDstFrontier(state.dMatched, state.dFrontier, dAdd2Frontier, gD, ri);
+          insertInDstFrontier(state.dMatched, state.dFrontier, dAdd2Frontier, gD, r);
         //state.dFrontierSize.update(state.dFrontier.size());
 
         doSearch(state, matching, alloc);
-        if(currentlyFound.load() >= kFound) {
+        if(currentlyFound.load() >= kFound)
           return;
-        }
 
         // restore data state
-        state.dMatched.erase(ri);
-        state.dFrontier.insert(ri);
-        for(auto& ii : dAdd2Frontier) {
-          state.dFrontier.erase(ii);
-        }
+        state.dMatched.erase(r);
+        state.dFrontier.insert(r);
+        for(auto i : dAdd2Frontier)
+          state.dFrontier.erase(i);
         dAdd2Frontier.clear();
  
-        // remove (nQ, *ri) from matching
+        // remove (nQ, r) from matching
         matching.pop_back();
       }
 
       // restore query state
       state.qMatched.erase(nQ);
       state.qFrontier.insert(nQ);
-      for(auto ii : qAdd2Frontier) {
-        state.qFrontier.erase(ii);
-      }
+      for(auto i : qAdd2Frontier)
+        state.qFrontier.erase(i);
     }
 
     template<typename Set, typename Graph>
@@ -471,15 +443,15 @@ public:
   }
 
   static MatchingVector subgraphSearch(DGraph& gD, QGraph& gQ) {
-    MatchingVector report;
-    Galois::InsertBag<NodeMatch> works;
-    
     // parallelize the search for candidates of gQ.begin()
+    Galois::InsertBag<NodeMatch> works;
     auto nQ = *(gQ.begin());
-    for(auto& ci : gQ.getData(nQ).candidate)
-      works.push_back(NodeMatch(nQ, ci));
+    for(auto& c : gQ.getData(nQ).candidate)
+      works.push_back(NodeMatch(nQ, c));
 
-    Galois::for_each_local(works, SubgraphSearchInternal(gD, gQ, report), Galois::loopname("search_for_each"));
+    MatchingVector report;
+    Galois::for_each_local(works, SubgraphSearchInternal(gD, gQ, report), Galois::loopname("search_for_each"), 
+      Galois::does_not_need_aborts<>(), Galois::does_not_need_push<>(), Galois::needs_parallel_break<>(), Galois::needs_per_iter_alloc<>());
 //    std::cout << "max size for dFrontier is " << dFrontierSize.reduce() << std::endl; 
     return report;
   }
@@ -494,34 +466,34 @@ struct UllmannAlgo {
     Galois::GReduceLogicalOR& nodeEmpty;
     FilterCandidatesInternal(DGraph& d, QGraph& q, Galois::GReduceLogicalOR& lor): gD(d), gQ(q), nodeEmpty(lor) {}
 
-    void operator()(const QGNode n) const {
-      auto& dQ = gQ.getData(n);
+    void operator()(const QGNode nQ) const {
+      auto& dQ = gQ.getData(nQ);
 
-      for(auto di = gD.begin(), de = gD.end(); di != de; ++di) {
-        auto& dD = gD.getData(*di);
+      for(auto nD : gD) {
+        auto& dD = gD.getData(nD);
 
-        if(dQ.label != dD.label) {
+        if(dQ.label != dD.label)
           continue;
-        }
 
-        // self loop for n but not for *di
-        if(gQ.findEdge(n, n) != gQ.edge_end(n) && gD.findEdge(*di, *di) == gD.edge_end(*di)) {
+        // self loop for nQ but not for nD
+        if(gQ.findEdge(nQ, nQ) != gQ.edge_end(nQ) && gD.findEdge(nD, nD) == gD.edge_end(nD))
           continue;
-        }
 
-        dQ.candidate.push_back(*di);
+        dQ.candidate.push_back(nD);
       }
 
       nodeEmpty.update(dQ.candidate.empty());
     }
+
+    // return true if at least one node has an empty set of candidates
+    static bool go(DGraph& gD, QGraph& gQ) {
+      Galois::GReduceLogicalOR isSomeNodeEmpty;
+      Galois::do_all_local(gQ, FilterCandidatesInternal(gD, gQ, isSomeNodeEmpty), Galois::loopname("filter"), Galois::do_all_steal<true>());
+      return isSomeNodeEmpty.reduce();
+    }
   };
 
   struct SubgraphSearchInternal {
-    typedef int tt_does_not_need_aborts;
-    typedef int tt_does_not_need_push;
-    typedef int tt_needs_parallel_break;
-    typedef int tt_does_not_need_stats;
-
     DGraph& gD;
     QGraph& gQ;
     MatchingVector& report;
@@ -533,49 +505,47 @@ struct UllmannAlgo {
       return *qi;
     }
 
-    void refineCandidates(DGraph& gD, QGraph& gQ, QGNode nQuery, Matching& matching, std::vector<DGNode>& refined) {
+    std::vector<DGNode> refineCandidates(DGraph& gD, QGraph& gQ, QGNode nQuery, Matching& matching) {
+      std::vector<DGNode> refined;
       auto& dQ = gQ.getData(nQuery);
       auto numNghQ = std::distance(gQ.edge_begin(nQuery), gQ.edge_end(nQuery));
       auto numInNghQ = std::distance(gQ.in_edge_begin(nQuery), gQ.in_edge_end(nQuery));
 
-      for(auto ii = dQ.candidate.begin(), ie = dQ.candidate.end(); ii != ie; ++ii) {
-        auto numNghD = std::distance(gD.edge_begin(*ii), gD.edge_end(*ii));
-        auto numInNghD = std::distance(gD.in_edge_begin(*ii), gD.in_edge_end(*ii));
-
-        if(numNghD >= numNghQ && numInNghD >= numInNghQ) {
-          refined.push_back(*ii);
-        }
+      for(auto& c : dQ.candidate) {
+        auto numNghD = std::distance(gD.edge_begin(c), gD.edge_end(c));
+        auto numInNghD = std::distance(gD.in_edge_begin(c), gD.in_edge_end(c));
+        if(numNghD >= numNghQ && numInNghD >= numInNghQ)
+          refined.push_back(c);
       }
+
+      return refined;
     }
 
     bool isJoinable(DGraph& gD, QGraph& gQ, DGNode nD, QGNode nQ, Matching& matching) {
-      for(auto mi = matching.begin(), me = matching.end(); mi != me; ++mi) {
+      for(auto& nm : matching) {
         // nD is already matched
-        if(nD == mi->nD) {
+        if(nD == nm.nD) {
           return false;
         }
 
-        // nQ => (mi->nQ) exists but not nD => (mi->nD)
-        if(gQ.findEdge(nQ, mi->nQ) != gQ.edge_end(nQ) && gD.findEdge(nD, mi->nD) == gD.edge_end(nD)) {
+        // nQ => (nm.nQ) exists but not nD => (nm.nD)
+        if(gQ.findEdge(nQ, nm.nQ) != gQ.edge_end(nQ) && gD.findEdge(nD, nm.nD) == gD.edge_end(nD)) {
           return false;
         }
 
-        // (mi->nQ) => nQ exists but not (mi->nD) => nD
+        // (nm.nQ) => nQ exists but not (nm.nD) => nD
         // skip if both data and query graphs are directed
-        if(!undirected) {
-          if(gQ.findEdge(mi->nQ, nQ) != gQ.edge_end(mi->nQ) && gD.findEdge(mi->nD, nD) == gD.edge_end(mi->nD)) {
+        if(!undirected)
+          if(gQ.findEdge(nm.nQ, nQ) != gQ.edge_end(nm.nQ) && gD.findEdge(nm.nD, nD) == gD.edge_end(nm.nD))
             return false;
-          }
-        }
       }
 
       return true;
     }
 
     void doSearch(Matching& matching) {
-      if(currentlyFound.load() >= kFound) {
+      if(currentlyFound.load() >= kFound)
           return;
-      }
 
       if(matching.size() == gQ.size()) {
         report.push_back(matching);
@@ -584,24 +554,21 @@ struct UllmannAlgo {
       }
 
       auto nQ = nextQueryNode(gQ, matching);
+      auto refined = refineCandidates(gD, gQ, nQ, matching);
 
-      std::vector<DGNode> refined;
-      refineCandidates(gD, gQ, nQ, matching, refined);
-
-      for(auto ri = refined.begin(), re = refined.end(); ri != re; ++ri) {
-        if(!isJoinable(gD, gQ, *ri, nQ, matching)) {
+      for(auto r : refined) {
+        if(!isJoinable(gD, gQ, r, nQ, matching))
           continue;
-        }
 
-        // add (nQ, *ri) to matching 
-        matching.push_back(NodeMatch(nQ, *ri));
+        // add (nQ, r) to matching 
+        matching.push_back(NodeMatch(nQ, r));
 
         doSearch(matching);
         if(currentlyFound.load() >= kFound) {
           return;
         }
 
-        // remove (nQ, *ri) from matching
+        // remove (nQ, r) from matching
         matching.pop_back();
       }
     }
@@ -619,23 +586,20 @@ struct UllmannAlgo {
 public:
   // return true if at least one node has an empty set of candidates
   static bool filterCandidates(DGraph& gD, QGraph& gQ) {
-    Galois::GReduceLogicalOR isSomeNodeEmpty;
-    Galois::do_all_local(gQ, FilterCandidatesInternal(gD, gQ, isSomeNodeEmpty), Galois::loopname("filter"), Galois::do_all_steal<true>());
-    return isSomeNodeEmpty.reduce();
+    return FilterCandidatesInternal::go(gD, gQ);
   }
 
   static MatchingVector subgraphSearch(DGraph& gD, QGraph& gQ) {
-    MatchingVector report;
-    Galois::InsertBag<NodeMatch> works;
-
     // parallelize the search for candidates of gQ.begin()
+    Galois::InsertBag<NodeMatch> works;
     auto nQ = *(gQ.begin());
-    auto& dQ = gQ.getData(nQ);
-    for(auto ci = dQ.candidate.begin(), ce = dQ.candidate.end(); ci != ce; ++ci) {
-      works.push_back(NodeMatch(nQ, *ci));
+    for(auto& c : gQ.getData(nQ).candidate) {
+      works.push_back(NodeMatch(nQ, c));
     }
 
-    Galois::for_each_local(works, SubgraphSearchInternal(gD, gQ, report), Galois::loopname("search_for_each"));
+    MatchingVector report;
+    Galois::for_each_local(works, SubgraphSearchInternal(gD, gQ, report), Galois::loopname("search_for_each"), 
+      Galois::does_not_need_aborts<>(), Galois::does_not_need_push<>(), Galois::needs_parallel_break<>());
     return report;
   }
 };
@@ -644,9 +608,9 @@ public:
 void verifyMatching(Matching& matching, DGraph& gD, QGraph& gQ) {
   bool isFailed = false;
 
-  for(auto m1 = matching.begin(), me = matching.end(); m1 != me; ++m1) {
-    auto& dQ1 = gQ.getData(m1->nQ);
-    auto& dD1 = gD.getData(m1->nD);
+  for(auto& nm1 : matching) {
+    auto& dQ1 = gQ.getData(nm1.nQ);
+    auto& dD1 = gD.getData(nm1.nD);
 
     if(dQ1.label != dD1.label) {
       isFailed = true;
@@ -654,12 +618,12 @@ void verifyMatching(Matching& matching, DGraph& gD, QGraph& gQ) {
       std::cerr << ", gD(" << dD1.id << ") = " << dD1.label << std::endl;
     }
 
-    for(auto m2 = matching.begin(); m2 != me; ++m2) {
-      auto& dQ2 = gQ.getData(m2->nQ);
-      auto& dD2 = gD.getData(m2->nD);
+    for(auto& nm2 : matching) {
+      auto& dQ2 = gQ.getData(nm2.nQ);
+      auto& dD2 = gD.getData(nm2.nD);
 
       // two distinct query nodes map to the same data node
-      if(m1->nQ != m2->nQ && m1->nD == m2->nD) {
+      if(nm1.nQ != nm2.nQ && nm1.nD == nm2.nD) {
         isFailed = true;
         std::cerr << "inconsistent mapping to data node: gQ(" << dQ1.id;
         std::cerr << ") to gD(" << dD1.id << "), gQ(" << dQ2.id;
@@ -667,7 +631,7 @@ void verifyMatching(Matching& matching, DGraph& gD, QGraph& gQ) {
       }
 
       // a query node mapped to different data nodes
-      if(m1->nQ == m2->nQ && m1->nD != m2->nD) {
+      if(nm1.nQ == nm2.nQ && nm1.nD != nm2.nD) {
         isFailed = true;
         std::cerr << "inconsistent mapping from query node: gQ(" << dQ1.id;
         std::cerr << ") to gD(" << dD1.id << "), gQ(" << dQ2.id;
@@ -675,7 +639,7 @@ void verifyMatching(Matching& matching, DGraph& gD, QGraph& gQ) {
       }
 
       // query edge not matched to data edge
-      if(gQ.findEdge(m1->nQ, m2->nQ) != gQ.edge_end(m1->nQ) && gD.findEdge(m1->nD, m2->nD) == gD.edge_end(m1->nD)) {
+      if(gQ.findEdge(nm1.nQ, nm2.nQ) != gQ.edge_end(nm1.nQ) && gD.findEdge(nm1.nD, nm2.nD) == gD.edge_end(nm1.nD)) {
         isFailed = true;
         std::cerr << "edge not match: gQ(" << dQ1.id << " => " << dQ2.id;
         std::cerr << "), but no gD(" << dD1.id << " => " << dD2.id << ")" << std::endl;
@@ -692,15 +656,12 @@ void verifyMatching(Matching& matching, DGraph& gD, QGraph& gQ) {
 
 void reportMatchings(MatchingVector& report, DGraph& gD, QGraph& gQ) {
   auto output = std::ofstream("report.txt");
-  auto ri = report.begin(), re = report.end();
   unsigned int i = 0; 
-  while(ri != re) {
+  for(auto& m : report) {
     output << i << ": { ";
-    for(auto mi = ri->begin(), me = ri->end(); mi != me; ++mi) {
-      output << "(" << gQ.getData(mi->nQ).id << ", " << gD.getData(mi->nD).id << ") ";
-    }
+    for(auto& nm : m)
+      output << "(" << gQ.getData(nm.nQ).id << ", " << gD.getData(nm.nD).id << ") ";
     output << "}" << std::endl;
-    ++ri;
     ++i;
   } 
   output.close();
@@ -712,12 +673,11 @@ void run() {
   if(graphD.size()) {
     Galois::Graph::readGraph(gD, graphD);
     std::cout << "Reading data graph..." << std::endl;
-  } else {
+  } else
     GALOIS_DIE("Failed to read data graph");
-  }
-  if(rndSeedDByTime) {
+
+  if(rndSeedDByTime)
     rndSeedD = std::chrono::system_clock::now().time_since_epoch().count();
-  }
   std::cout << "rndSeedD: " << rndSeedD << std::endl;
   initializeGraph(gD, rndSeedD);
   std::cout << "data graph initialized" << std::endl;
@@ -727,12 +687,11 @@ void run() {
   if(graphQ.size()) {
     Galois::Graph::readGraph(gQ, graphQ);
     std::cout << "Reading query graph..." << std::endl;
-  } else {
+  } else
     GALOIS_DIE("Failed to read query graph");
-  }
-  if(rndSeedQByTime) {
+
+  if(rndSeedQByTime)
     rndSeedQ = std::chrono::system_clock::now().time_since_epoch().count();
-  }
   std::cout << "rndSeedQ: " << rndSeedQ << std::endl;
   initializeGraph(gQ, rndSeedQ);
   std::cout << "query graph initialized" << std::endl;
