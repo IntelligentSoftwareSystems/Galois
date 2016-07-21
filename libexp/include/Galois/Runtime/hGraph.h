@@ -418,7 +418,9 @@ public:
       setup_communication();
 
 #ifdef __GALOIS_SIMULATE_COMMUNICATION__
+#ifndef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
       simulate_communication();
+#endif
 #endif
    }
 
@@ -468,7 +470,9 @@ public:
    }
 
 #ifdef __GALOIS_SIMULATE_COMMUNICATION__
+#ifndef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
    void simulate_communication() {
+     for (int i = 0; i < 10; ++i) {
      simulate_sync_pull();
      simulate_sync_push();
 
@@ -476,7 +480,9 @@ public:
      simulate_bare_mpi_sync_pull();
      simulate_bare_mpi_sync_push();
 #endif
+     }
    }
+#endif
 #endif
 
    template<bool isVoidType, typename std::enable_if<!isVoidType>::type* = nullptr>
@@ -640,23 +646,19 @@ public:
     Galois::Runtime::getHostBarrier().wait();
    }
 
-   void syncRecvApplyTest(Galois::Runtime::RecvBuffer& buf) {
-     uint32_t num;
-     std::string loopName;
-     uint32_t num_iter_push;
-     Galois::Runtime::gDeserialize(buf, num);
-     std::vector<uint64_t> val_vec(num);
-     Galois::Runtime::gDeserialize(buf, val_vec);
-   }
-
 #ifdef __GALOIS_SIMULATE_COMMUNICATION__
 #ifdef __GALOIS_SIMULATE_BARE_MPI_COMMUNICATION__
+#ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
+   template<typename FnTy>
+#endif
    void simulate_bare_mpi_sync_pull() {
       std::cerr << "WARNING: requires MPI_THREAD_MULTIPLE to be set in MPI_Init_thread() and Net to not receive MPI messages with tag 32767\n";
       Galois::StatTimer StatTimer_syncPull("SIMULATE_MPI_SYNC_PULL");
       Galois::Statistic SyncPull_send_bytes("SIMULATE_MPI_SYNC_PULL_SEND_BYTES");
 
+#ifndef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
       MPI_Barrier(MPI_COMM_WORLD);
+#endif
       StatTimer_syncPull.start();
       auto& net = Galois::Runtime::getSystemNetworkInterface();
 
@@ -668,14 +670,37 @@ public:
          uint32_t num = masterNodes[x].size();
          if((x == id) || (num == 0))
            continue;
-         size_t size = num * sizeof(uint64_t);
-         sb[x].resize(size);
 
-         std::vector<uint64_t> val_vec(num, 1);
+#ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
+         size_t size = num * sizeof(typename FnTy::ValTy);
+         std::vector<typename FnTy::ValTy> val_vec(num);
+#else
+         size_t size = num * sizeof(uint64_t);
+         std::vector<uint64_t> val_vec(num);
+#endif
+
+#ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
+         if (!FnTy::extract_batch(x, &val_vec[0])) {
+           Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
+               uint32_t localID = masterNodes[x][n];
+#ifdef __GALOIS_HET_OPENCL__
+               auto val = FnTy::extract((localID), clGraph.getDataR((localID)));
+#else
+               auto val = FnTy::extract((localID), getData(localID));
+#endif
+               val_vec[n] = val;
+
+               }, Galois::loopname("SYNC_PULL_EXTRACT"));
+         }
+#else
+         val_vec[0] = 1;
+#endif
+
+         sb[x].resize(size);
          memcpy(&sb[x][0], &val_vec[0], size);
 
          SyncPull_send_bytes += size;
-         std::cerr << "[" << id << "]" << " mpi send to " << x << " : " << size << "\n";
+         //std::cerr << "[" << id << "]" << " mpi send to " << x << " : " << size << "\n";
          MPI_Isend(&sb[x][0], size, MPI_BYTE, x, 32767, MPI_COMM_WORLD, &requests[num_requests++]);
       }
 
@@ -684,10 +709,14 @@ public:
          uint32_t num = slaveNodes[x].size();
          if((x == id) || (num == 0))
            continue;
+#ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
+         size_t size = num * sizeof(typename FnTy::ValTy);
+#else
          size_t size = num * sizeof(uint64_t);
+#endif
          rb[x].resize(size);
 
-         std::cerr << "[" << id << "]" << " mpi receive from " << x << " : " << size << "\n";
+         //std::cerr << "[" << id << "]" << " mpi receive from " << x << " : " << size << "\n";
          MPI_Irecv(&rb[x][0], size, MPI_BYTE, x, 32767, MPI_COMM_WORLD, &requests[num_requests++]);
       }
 
@@ -697,22 +726,47 @@ public:
          uint32_t num = slaveNodes[x].size();
          if((x == id) || (num == 0))
            continue;
+         //std::cerr << "[" << id << "]" << " mpi received from " << x << " : " << size << "\n";
+#ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
+         size_t size = num * sizeof(typename FnTy::ValTy);
+         std::vector<typename FnTy::ValTy> val_vec(num);
+#else
          size_t size = num * sizeof(uint64_t);
-         std::cerr << "[" << id << "]" << " mpi received from " << x << " : " << size << "\n";
          std::vector<uint64_t> val_vec(num);
+#endif
          memcpy(&val_vec[0], &rb[x][0], size);
+#ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
+         if (!FnTy::setVal_batch(x, &val_vec[0])) {
+           Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
+               uint32_t localID = slaveNodes[x][n];
+#ifdef __GALOIS_HET_OPENCL__
+               {
+               CLNodeDataWrapper d = clGraph.getDataW(localID);
+               FnTy::setVal(localID, d, val_vec[n]);
+               }
+#else
+               FnTy::setVal(localID, getData(localID), val_vec[n]);
+#endif
+               }, Galois::loopname("SYNC_PULL_SET"));
+          }
+#endif
       }
 
-      std::cerr << "[" << id << "]" << "pull mpi done\n";
+      //std::cerr << "[" << id << "]" << "pull mpi done\n";
       StatTimer_syncPull.stop();
    }
 
+#ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
+   template<typename FnTy>
+#endif
    void simulate_bare_mpi_sync_push() {
       std::cerr << "WARNING: requires MPI_THREAD_MULTIPLE to be set in MPI_Init_thread() and Net to not receive MPI messages with tag 32767\n";
       Galois::StatTimer StatTimer_syncPush("SIMULATE_MPI_SYNC_PUSH");
       Galois::Statistic SyncPush_send_bytes("SIMULATE_MPI_SYNC_PUSH_SEND_BYTES");
 
+#ifndef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
       MPI_Barrier(MPI_COMM_WORLD);
+#endif
       StatTimer_syncPush.start();
       auto& net = Galois::Runtime::getSystemNetworkInterface();
 
@@ -724,14 +778,39 @@ public:
          uint32_t num = slaveNodes[x].size();
          if((x == id) || (num == 0))
            continue;
-         size_t size = num * sizeof(uint64_t);
-         sb[x].resize(size);
 
-         std::vector<uint64_t> val_vec(num, 1);
+#ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
+         size_t size = num * sizeof(typename FnTy::ValTy);
+         std::vector<typename FnTy::ValTy> val_vec(num);
+#else
+         size_t size = num * sizeof(uint64_t);
+         std::vector<uint64_t> val_vec(num);
+#endif
+
+#ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
+         if (!FnTy::extract_reset_batch(x, &val_vec[0])) {
+           Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
+                uint32_t lid = slaveNodes[x][n];
+#ifdef __GALOIS_HET_OPENCL__
+                CLNodeDataWrapper d = clGraph.getDataW(lid);
+                auto val = FnTy::extract(lid, getData(lid, d));
+                FnTy::reset(lid, d);
+#else
+                auto val = FnTy::extract(lid, getData(lid));
+                FnTy::reset(lid, getData(lid));
+#endif
+                val_vec[n] = val;
+               }, Galois::loopname("SYNC_PUSH_EXTRACT"));
+         }
+#else
+         val_vec[0] = 1;
+#endif
+
+         sb[x].resize(size);
          memcpy(&sb[x][0], &val_vec[0], size);
 
          SyncPush_send_bytes += size;
-         std::cerr << "[" << id << "]" << " mpi send to " << x << " : " << size << "\n";
+         //std::cerr << "[" << id << "]" << " mpi send to " << x << " : " << size << "\n";
          MPI_Isend(&sb[x][0], size, MPI_BYTE, x, 32767, MPI_COMM_WORLD, &requests[num_requests++]);
       }
 
@@ -740,10 +819,14 @@ public:
          uint32_t num = masterNodes[x].size();
          if((x == id) || (num == 0))
            continue;
+#ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
+         size_t size = num * sizeof(typename FnTy::ValTy);
+#else
          size_t size = num * sizeof(uint64_t);
+#endif
          rb[x].resize(size);
 
-         std::cerr << "[" << id << "]" << " mpi receive from " << x << " : " << size << "\n";
+         //std::cerr << "[" << id << "]" << " mpi receive from " << x << " : " << size << "\n";
          MPI_Irecv(&rb[x][0], size, MPI_BYTE, x, 32767, MPI_COMM_WORLD, &requests[num_requests++]);
       }
 
@@ -753,25 +836,116 @@ public:
          uint32_t num = masterNodes[x].size();
          if((x == id) || (num == 0))
            continue;
+         //std::cerr << "[" << id << "]" << " mpi received from " << x << " : " << size << "\n";
+#ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
+         size_t size = num * sizeof(typename FnTy::ValTy);
+         std::vector<typename FnTy::ValTy> val_vec(num);
+#else
          size_t size = num * sizeof(uint64_t);
-         std::cerr << "[" << id << "]" << " mpi received from " << x << " : " << size << "\n";
          std::vector<uint64_t> val_vec(num);
+#endif
          memcpy(&val_vec[0], &rb[x][0], size);
+#ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
+         if (!FnTy::reduce_batch(x, &val_vec[0])) {
+           Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num),
+               [&](uint32_t n){
+               uint32_t lid = masterNodes[x][n];
+#ifdef __GALOIS_HET_OPENCL__
+           CLNodeDataWrapper d = clGraph.getDataW(lid);
+           FnTy::reduce(lid, d, val_vec[n]);
+#else
+           FnTy::reduce(lid, getData(lid), val_vec[n]);
+#endif
+               }, Galois::loopname("SYNC_PUSH_SET"));
+         }
+#endif
       }
       
-      std::cerr << "[" << id << "]" << "push mpi done\n";
+      //std::cerr << "[" << id << "]" << "push mpi done\n";
       StatTimer_syncPush.stop();
    }
 #endif
 #endif
 
 #ifdef __GALOIS_SIMULATE_COMMUNICATION__
+#ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
+   template<typename FnTy>
+#endif
+   void syncRecvApplyPull(Galois::Runtime::RecvBuffer& buf) {
+     unsigned from_id;
+     uint32_t num;
+     std::string loopName;
+     uint32_t num_iter_push;
+     Galois::Runtime::gDeserialize(buf, from_id, num);
+#ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
+     std::vector<typename FnTy::ValTy> val_vec(num);
+#else
+     std::vector<uint64_t> val_vec(num);
+#endif
+     Galois::Runtime::gDeserialize(buf, val_vec);
+#ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
+     if (!FnTy::setVal_batch(from_id, &val_vec[0])) {
+       Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
+           uint32_t localID = slaveNodes[from_id][n];
+#ifdef __GALOIS_HET_OPENCL__
+           {
+           CLNodeDataWrapper d = clGraph.getDataW(localID);
+           FnTy::setVal(localID, d, val_vec[n]);
+           }
+#else
+           FnTy::setVal(localID, getData(localID), val_vec[n]);
+#endif
+           }, Galois::loopname("SYNC_PULL_SET"));
+      }
+#endif
+   }
+
+#ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
+   template<typename FnTy>
+#endif
+   void syncRecvApplyPush(Galois::Runtime::RecvBuffer& buf) {
+     unsigned from_id;
+     uint32_t num;
+     std::string loopName;
+     uint32_t num_iter_push;
+     Galois::Runtime::gDeserialize(buf, from_id, num);
+#ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
+     std::vector<typename FnTy::ValTy> val_vec(num);
+#else
+     std::vector<uint64_t> val_vec(num);
+#endif
+     Galois::Runtime::gDeserialize(buf, val_vec);
+#ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
+     if (!FnTy::reduce_batch(from_id, &val_vec[0])) {
+       Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num),
+           [&](uint32_t n){
+           uint32_t lid = masterNodes[from_id][n];
+#ifdef __GALOIS_HET_OPENCL__
+       CLNodeDataWrapper d = clGraph.getDataW(lid);
+       FnTy::reduce(lid, d, val_vec[n]);
+#else
+       FnTy::reduce(lid, getData(lid), val_vec[n]);
+#endif
+           }, Galois::loopname("SYNC_PUSH_SET"));
+     }
+#endif
+   }
+
+#ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
+   template<typename FnTy>
+#endif
    void simulate_sync_pull() {
-      void (hGraph::*fn)(Galois::Runtime::RecvBuffer&) = &hGraph::syncRecvApplyTest;
+#ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
+      void (hGraph::*fn)(Galois::Runtime::RecvBuffer&) = &hGraph::syncRecvApplyPull<FnTy>;
+#else
+      void (hGraph::*fn)(Galois::Runtime::RecvBuffer&) = &hGraph::syncRecvApplyPull;
+#endif
       Galois::StatTimer StatTimer_syncPull("SIMULATE_NET_SYNC_PULL");
       Galois::Statistic SyncPull_send_bytes("SIMULATE_NET_SYNC_PULL_SEND_BYTES");
 
+#ifndef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
       Galois::Runtime::getHostBarrier().wait();
+#endif
       StatTimer_syncPull.start();
       auto& net = Galois::Runtime::getSystemNetworkInterface();
 
@@ -781,9 +955,31 @@ public:
            continue;
 
          Galois::Runtime::SendBuffer b;
-         gSerialize(b, idForSelf(), fn, num);
+         gSerialize(b, idForSelf(), fn, net.ID, num);
 
-         std::vector<uint64_t> val_vec(num, 1);
+#ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
+         std::vector<typename FnTy::ValTy> val_vec(num);
+#else
+         std::vector<uint64_t> val_vec(num);
+#endif
+
+#ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
+         if (!FnTy::extract_batch(x, &val_vec[0])) {
+           Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
+               uint32_t localID = masterNodes[x][n];
+#ifdef __GALOIS_HET_OPENCL__
+               auto val = FnTy::extract((localID), clGraph.getDataR((localID)));
+#else
+               auto val = FnTy::extract((localID), getData(localID));
+#endif
+               val_vec[n] = val;
+
+               }, Galois::loopname("SYNC_PULL_EXTRACT"));
+         }
+#else
+         val_vec[0] = 1;
+#endif
+
          gSerialize(b, val_vec);
 
          SyncPull_send_bytes += b.size();
@@ -796,11 +992,21 @@ public:
       StatTimer_syncPull.stop();
    }
 
+#ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
+   template<typename FnTy>
+#endif
    void simulate_sync_push() {
-      void (hGraph::*fn)(Galois::Runtime::RecvBuffer&) = &hGraph::syncRecvApplyTest;
+#ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
+      void (hGraph::*fn)(Galois::Runtime::RecvBuffer&) = &hGraph::syncRecvApplyPush<FnTy>;
+#else
+      void (hGraph::*fn)(Galois::Runtime::RecvBuffer&) = &hGraph::syncRecvApplyPush;
+#endif
       Galois::StatTimer StatTimer_syncPush("SIMULATE_NET_SYNC_PUSH");
       Galois::Statistic SyncPush_send_bytes("SIMULATE_NET_SYNC_PUSH_SEND_BYTES");
 
+#ifndef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
+      Galois::Runtime::getHostBarrier().wait();
+#endif
       StatTimer_syncPush.start();
       auto& net = Galois::Runtime::getSystemNetworkInterface();
 
@@ -810,9 +1016,33 @@ public:
            continue;
 
          Galois::Runtime::SendBuffer b;
-         gSerialize(b, idForSelf(), fn, num);
+         gSerialize(b, idForSelf(), fn, net.ID, num);
 
-         std::vector<uint64_t> val_vec(num, 1);
+#ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
+         std::vector<typename FnTy::ValTy> val_vec(num);
+#else
+         std::vector<uint64_t> val_vec(num);
+#endif
+
+#ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
+         if (!FnTy::extract_reset_batch(x, &val_vec[0])) {
+           Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
+                uint32_t lid = slaveNodes[x][n];
+#ifdef __GALOIS_HET_OPENCL__
+                CLNodeDataWrapper d = clGraph.getDataW(lid);
+                auto val = FnTy::extract(lid, getData(lid, d));
+                FnTy::reset(lid, d);
+#else
+                auto val = FnTy::extract(lid, getData(lid));
+                FnTy::reset(lid, getData(lid));
+#endif
+                val_vec[n] = val;
+               }, Galois::loopname("SYNC_PUSH_EXTRACT"));
+         }
+#else
+         val_vec[0] = 1;
+#endif
+
          gSerialize(b, val_vec);
 
          SyncPush_send_bytes += b.size();
