@@ -206,38 +206,31 @@ struct VF2Algo {
     };
 
     template<typename Graph, typename Set>
-    void countInNeighbors(Graph& g, typename Graph::GraphNode n, Set& sMatched, Set& sFrontier, long int *numFrontier, long int *numOther) {
-      for(auto ie : g.in_edges(n)) {
-        auto ngh = g.getInEdgeDst(ie);
-        if(sFrontier.count(ngh))
-          *numFrontier += 1;
-        else
-          *numOther += (1 - sMatched.count(ngh));
-      }
+    long int countInNeighbors(Graph& g, typename Graph::GraphNode n, Set& sMatched) {
+      long int numUnmatched = 0;
+      for(auto ie : g.in_edges(n))
+        numUnmatched += (1 - sMatched.count(g.getInEdgeDst(ie)));
+      return numUnmatched;
     }
     
     template<typename Graph, typename Set>
-    void countNeighbors(Graph& g, typename Graph::GraphNode n, Set& sMatched, Set& sFrontier, long int *numFrontier, long int *numOther) {
-      for(auto e : g.edges(n)) {
-        auto ngh = g.getEdgeDst(e);
-        if(sFrontier.count(ngh))
-          *numFrontier += 1;
-        else
-          *numOther += (1 - sMatched.count(ngh));
-      }
+    long int countNeighbors(Graph& g, typename Graph::GraphNode n, Set& sMatched) {
+      long int numUnmatched = 0;
+      for(auto e : g.edges(n))
+        numUnmatched += (1 - sMatched.count(g.getEdgeDst(e)));
+      return numUnmatched;
     }
 
     std::vector<DGNode, LocalState::DPerIterAlloc> 
     refineCandidates(DGraph& gD, QGraph& gQ, QGNode nQuery, Galois::PerIterAllocTy& alloc, LocalState& state) {
       std::vector<DGNode, LocalState::DPerIterAlloc> refined(alloc);
       auto numNghQ = std::distance(gQ.edge_begin(nQuery), gQ.edge_end(nQuery));
-      long int numFrontierNghQ = 0, numOtherNghQ = 0;
-      countNeighbors(gQ, nQuery, state.qMatched, state.qFrontier, &numFrontierNghQ, &numOtherNghQ);
+      long int numUnmatchedNghQ = countNeighbors(gQ, nQuery, state.qMatched);
 
-      long int numInNghQ = 0, numFrontierInNghQ = 0, numOtherInNghQ = 0;
+      long int numInNghQ = 0, numUnmatchedInNghQ = 0;
       if(!undirected) {
         numInNghQ = std::distance(gQ.in_edge_begin(nQuery), gQ.in_edge_end(nQuery));
-        countInNeighbors(gQ, nQuery, state.qMatched, state.qFrontier, &numFrontierInNghQ, &numOtherInNghQ);
+        numUnmatchedInNghQ = countInNeighbors(gQ, nQuery, state.qMatched);
       }
       
       // consider all nodes in data frontier
@@ -251,11 +244,8 @@ struct VF2Algo {
         if(numNghD < numNghQ)
           continue;
         
-        long int numFrontierNghD = 0, numOtherNghD = 0;
-        countNeighbors(gD, ii, state.dMatched, state.dFrontier, &numFrontierNghD, &numOtherNghD);
-        if(numFrontierNghD < numFrontierNghQ)
-          continue;
-        if(numOtherNghD < numOtherNghQ)
+        long int numUnmatchedNghD = countNeighbors(gD, ii, state.dMatched);
+        if(numUnmatchedNghD < numUnmatchedNghQ)
           continue;
         
         if(undirected) {
@@ -267,11 +257,8 @@ struct VF2Algo {
         if(numInNghD < numInNghQ)
           continue;
         
-        long int numFrontierInNghD = 0, numOtherInNghD = 0;    
-        countInNeighbors(gD, ii, state.dMatched, state.dFrontier, &numFrontierInNghD, &numOtherInNghD);
-        if(numFrontierInNghD < numFrontierInNghQ)
-          continue;
-        if(numOtherInNghD < numOtherInNghQ)
+        long int numUnmatchedInNghD = countInNeighbors(gD, ii, state.dMatched);
+        if(numUnmatchedInNghD < numUnmatchedInNghQ)
           continue;
         
         refined.push_back(ii);
