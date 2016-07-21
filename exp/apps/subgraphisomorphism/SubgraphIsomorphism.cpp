@@ -81,7 +81,8 @@ struct DNode {
   unsigned int id;
 };
 
-typedef Galois::Graph::LC_CSR_Graph<DNode, void> InnerDGraph; // graph with DNode nodes and typeless edges
+typedef Galois::Graph::LC_CSR_Graph<DNode, void> 
+  ::template with_no_lockable<true>::type InnerDGraph; // graph with DNode nodes and typeless edges without locks
 typedef Galois::Graph::LC_InOut_Graph<InnerDGraph> DGraph; // for incoming neighbors
 typedef DGraph::GraphNode DGNode;
 
@@ -91,7 +92,8 @@ struct QNode {
   std::vector<DGNode> candidate;
 };
 
-typedef Galois::Graph::LC_CSR_Graph<QNode, void> InnerQGraph;
+typedef Galois::Graph::LC_CSR_Graph<QNode, void> 
+  ::template with_no_lockable<true>::type InnerQGraph;
 typedef Galois::Graph::LC_InOut_Graph<InnerQGraph> QGraph;
 typedef QGraph::GraphNode QGNode;
 
