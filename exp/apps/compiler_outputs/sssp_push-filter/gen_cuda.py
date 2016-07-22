@@ -10,7 +10,7 @@ CBlock([cgen.Include("kernels/reduce.cuh", system = False)], parse = False),
 CBlock([cgen.Include("gen_cuda.cuh", system = False)], parse = False),
 CDeclGlobal([("unsigned int *", "P_DIST_CURRENT", "")]),
 CDeclGlobal([("unsigned int *", "P_DIST_OLD", "")]),
-Kernel("InitializeGraph", [G.param(), ('int ', 'nowned') , ('const unsigned int ', 'local_infinity'), ('unsigned int', 'local_src_node'), ('unsigned int *', 'p_dist_current'), ('unsigned int *', 'p_dist_old')],
+Kernel("InitializeGraph", [G.param(), ('unsigned int', 'nowned') , ('const unsigned int ', 'local_infinity'), ('unsigned int', 'local_src_node'), ('unsigned int *', 'p_dist_current'), ('unsigned int *', 'p_dist_old')],
 [
 ForAll("src", G.nodes(None, "nowned"),
 [
@@ -18,7 +18,7 @@ CBlock(["p_dist_current[src] = (graph.node_data[src] == local_src_node) ? 0 : lo
 CBlock(["p_dist_old[src] = (graph.node_data[src] == local_src_node) ? 0 : local_infinity"]),
 ]),
 ]),
-Kernel("FirstItr_SSSP", [G.param(), ('int ', 'nowned') , ('unsigned int *', 'p_dist_current'), ('unsigned int *', 'p_dist_old')],
+Kernel("FirstItr_SSSP", [G.param(), ('unsigned int', 'nowned') , ('unsigned int *', 'p_dist_current'), ('unsigned int *', 'p_dist_old')],
 [
 ForAll("src", G.nodes(None, "nowned"),
 [
@@ -35,7 +35,7 @@ CBlock(["atomicMin(&p_dist_current[dst], new_dist)"]),
 ),
 ]),
 ]),
-Kernel("SSSP", [G.param(), ('int ', 'nowned') , ('unsigned int *', 'p_dist_current'), ('unsigned int *', 'p_dist_old'), ('Any', 'any_retval')],
+Kernel("SSSP", [G.param(), ('unsigned int', 'nowned') , ('unsigned int *', 'p_dist_current'), ('unsigned int *', 'p_dist_old'), ('Any', 'any_retval')],
 [
 ForAll("src", G.nodes(None, "nowned"),
 [

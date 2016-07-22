@@ -52,7 +52,7 @@ void min_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned
 		dist_current[LID] = v;
 }
 
-__global__ void batch_get_node_dist_current(index_type size, unsigned int * p_master_nodes, unsigned int * p_master_dist_current, unsigned int * p_dist_current) {
+__global__ void batch_get_node_dist_current(index_type size, const unsigned int * __restrict__ p_master_nodes, unsigned int * __restrict__ p_master_dist_current, const unsigned int * __restrict__ p_dist_current) {
 	unsigned tid = TID_1D;
 	unsigned nthreads = TOTAL_THREADS_1D;
 	index_type src_end = size;
@@ -71,7 +71,7 @@ void batch_get_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned from_id
 	memcpy(v, ctx->master_dist_current[from_id].cpu_rd_ptr(), sizeof(unsigned int) * ctx->num_master_nodes[from_id]);
 }
 
-__global__ void batch_get_reset_node_dist_current(index_type size, unsigned int * p_slave_nodes, unsigned int * p_slave_dist_current, unsigned int * p_dist_current, unsigned int value) {
+__global__ void batch_get_reset_node_dist_current(index_type size, const unsigned int * __restrict__ p_slave_nodes, unsigned int * __restrict__ p_slave_dist_current, unsigned int * __restrict__ p_dist_current, unsigned int value) {
 	unsigned tid = TID_1D;
 	unsigned nthreads = TOTAL_THREADS_1D;
 	index_type src_end = size;
@@ -91,7 +91,7 @@ void batch_get_reset_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned f
 	memcpy(v, ctx->slave_dist_current[from_id].cpu_rd_ptr(), sizeof(unsigned int) * ctx->num_slave_nodes[from_id]);
 }
 
-__global__ void batch_set_node_dist_current(index_type size, unsigned int * p_slave_nodes, unsigned int * p_slave_dist_current, unsigned int * p_dist_current) {
+__global__ void batch_set_node_dist_current(index_type size, const unsigned int * __restrict__ p_slave_nodes, const unsigned int * __restrict__ p_slave_dist_current, unsigned int * __restrict__ p_dist_current) {
 	unsigned tid = TID_1D;
 	unsigned nthreads = TOTAL_THREADS_1D;
 	index_type src_end = size;
@@ -110,7 +110,7 @@ void batch_set_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned from_id
 	check_cuda_kernel;
 }
 
-__global__ void batch_add_node_dist_current(index_type size, unsigned int * p_master_nodes, unsigned int * p_master_dist_current, unsigned int * p_dist_current) {
+__global__ void batch_add_node_dist_current(index_type size, const unsigned int * __restrict__ p_master_nodes, const unsigned int * __restrict__ p_master_dist_current, unsigned int * __restrict__ p_dist_current) {
 	unsigned tid = TID_1D;
 	unsigned nthreads = TOTAL_THREADS_1D;
 	index_type src_end = size;
@@ -129,7 +129,7 @@ void batch_add_node_dist_current_cuda(struct CUDA_Context *ctx, unsigned from_id
 	check_cuda_kernel;
 }
 
-__global__ void batch_min_node_dist_current(index_type size, unsigned int * p_master_nodes, unsigned int * p_master_dist_current, unsigned int * p_dist_current) {
+__global__ void batch_min_node_dist_current(index_type size, const unsigned int * __restrict__ p_master_nodes, const unsigned int * __restrict__ p_master_dist_current, unsigned int * __restrict__ p_dist_current) {
 	unsigned tid = TID_1D;
 	unsigned nthreads = TOTAL_THREADS_1D;
 	index_type src_end = size;

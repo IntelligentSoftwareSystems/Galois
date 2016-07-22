@@ -10,7 +10,7 @@ CBlock([cgen.Include("kernels/reduce.cuh", system = False)], parse = False),
 CBlock([cgen.Include("gen_cuda.cuh", system = False)], parse = False),
 CDeclGlobal([("unsigned int *", "P_COMP_CURRENT", "")]),
 CDeclGlobal([("unsigned int *", "P_COMP_OLD", "")]),
-Kernel("InitializeGraph", [G.param(), ('int ', 'nowned') , ('unsigned int *', 'p_comp_current'), ('unsigned int *', 'p_comp_old')],
+Kernel("InitializeGraph", [G.param(), ('unsigned int', 'nowned') , ('unsigned int *', 'p_comp_current'), ('unsigned int *', 'p_comp_old')],
 [
 ForAll("src", G.nodes(None, "nowned"),
 [
@@ -18,7 +18,7 @@ CBlock(["p_comp_current[src] = graph.node_data[src]"]),
 CBlock(["p_comp_old[src] = graph.node_data[src]"]),
 ]),
 ]),
-Kernel("FirstItr_ConnectedComp", [G.param(), ('int ', 'nowned') , ('unsigned int *', 'p_comp_current'), ('unsigned int *', 'p_comp_old')],
+Kernel("FirstItr_ConnectedComp", [G.param(), ('unsigned int', 'nowned') , ('unsigned int *', 'p_comp_current'), ('unsigned int *', 'p_comp_old')],
 [
 ForAll("src", G.nodes(None, "nowned"),
 [
@@ -35,7 +35,7 @@ CBlock(["atomicMin(&p_comp_current[dst], new_dist)"]),
 ),
 ]),
 ]),
-Kernel("ConnectedComp", [G.param(), ('int ', 'nowned') , ('unsigned int *', 'p_comp_current'), ('unsigned int *', 'p_comp_old'), ('Any', 'any_retval')],
+Kernel("ConnectedComp", [G.param(), ('unsigned int', 'nowned') , ('unsigned int *', 'p_comp_current'), ('unsigned int *', 'p_comp_old'), ('Any', 'any_retval')],
 [
 ForAll("src", G.nodes(None, "nowned"),
 [
