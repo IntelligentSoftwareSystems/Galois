@@ -210,43 +210,56 @@ struct VF2Algo {
       }
     };
 
+    // for counting occurences only. no space allocation is required.
+    template<typename T>
+    class counter : public std::iterator<std::output_iterator_tag, T> {
+      T dummy;
+      long int num;
+    public:
+      counter(): num(0) {}
+      counter& operator++() { ++num; return *this; }
+      counter  operator++(int) { auto retval = *this; ++num; return retval; }
+      T& operator*() { return dummy; }
+      long int get() { return num; }
+    };
+
     template<typename Graph, typename Set>
     long int countInNeighbors(Graph& g, typename Graph::GraphNode n, Set& sMatched) {
-      long int numUnmatched = 0;
-      for(auto ie : g.in_edges(n))
-        numUnmatched += (1 - sMatched.count(g.getInEdgeDst(ie)));
-      return numUnmatched;
+      using Iter = typename Graph::in_edge_iterator;
+     
+      // lambda expression. captures Graph& for expression body. 
+      auto l = [&g] (Iter i) { return g.getInEdgeDst(i); };
+
+      counter<typename Graph::GraphNode> count; 
+
+      std::set_difference(
+        // Galois::NoDerefIterator lets dereference return the wrapped iterator itself
+        // boost::make_transform_iterator gives an iterator, which is dereferenced to func(in_iter)
+        boost::make_transform_iterator(Galois::NoDerefIterator<Iter>(g.in_edge_begin(n)), l),
+        boost::make_transform_iterator(Galois::NoDerefIterator<Iter>(g.in_edge_end(n)), l),
+        sMatched.begin(), sMatched.end(), count);
+      return count.get();
     }
     
     template<typename Graph, typename Set>
-    long int countNeighbors(Graph& g, typename Graph::GraphNode n, Set& sMatched, Galois::PerIterAllocTy& alloc) {
+    long int countNeighbors(Graph& g, typename Graph::GraphNode n, Set& sMatched) {
       using Iter = typename Graph::edge_iterator;
-      using GNode = typename Graph::GraphNode;
 
-      // constant functor is expected by boost::make_transform_iterator
-      struct GetEdgeDst: public std::unary_function<Iter, GNode> {
-        const Graph& g;
-        GetEdgeDst(const Graph& g): g(g) {}
-        GNode operator () (Iter i) const {
-          return const_cast<Graph&>(g).getEdgeDst(i);
-        }
-      };
+      auto l = [&g] (Iter i) { return g.getEdgeDst(i); };
+      counter<typename Graph::GraphNode> count;
 
-      // allocate space now, since std::set_difference won't
-      std::vector<GNode, typename LocalState::PerIterAlloc<GNode> > v(std::distance(g.edge_begin(n), g.edge_end(n)), alloc);
-      
       std::set_difference(
-        boost::make_transform_iterator(g.edge_begin(n), GetEdgeDst(g)), 
-        boost::make_transform_iterator(g.edge_end(n), GetEdgeDst(g)), 
-        sMatched.begin(), sMatched.end(), v.begin());
-      return v.size();
+        boost::make_transform_iterator(Galois::NoDerefIterator<Iter>(g.edge_begin(n)), l), 
+        boost::make_transform_iterator(Galois::NoDerefIterator<Iter>(g.edge_end(n)), l), 
+        sMatched.begin(), sMatched.end(), count);
+      return count.get();
     }
 
     std::vector<DGNode, LocalState::PerIterAlloc<DGNode> > 
     refineCandidates(DGraph& gD, QGraph& gQ, QGNode nQuery, Galois::PerIterAllocTy& alloc, LocalState& state) {
       std::vector<DGNode, LocalState::PerIterAlloc<DGNode> > refined(alloc);
       auto numNghQ = std::distance(gQ.edge_begin(nQuery), gQ.edge_end(nQuery));
-      long int numUnmatchedNghQ = countNeighbors(gQ, nQuery, state.qMatched, alloc);
+      long int numUnmatchedNghQ = countNeighbors(gQ, nQuery, state.qMatched);
 
       long int numInNghQ = 0, numUnmatchedInNghQ = 0;
       if(!undirected) {
@@ -265,7 +278,7 @@ struct VF2Algo {
         if(numNghD < numNghQ)
           continue;
         
-        long int numUnmatchedNghD = countNeighbors(gD, ii, state.dMatched, alloc);
+        long int numUnmatchedNghD = countNeighbors(gD, ii, state.dMatched);
         if(numUnmatchedNghD < numUnmatchedNghQ)
           continue;
         
