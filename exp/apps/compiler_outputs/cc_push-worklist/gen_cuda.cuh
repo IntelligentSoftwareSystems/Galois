@@ -11,10 +11,6 @@
 #define check_cuda_kernel  
 #endif
 
-#ifndef __GALOIS_CUDA_WORKLIST_DUPLICATION_FACTOR__
-#define __GALOIS_CUDA_WORKLIST_DUPLICATION_FACTOR__ 1
-#endif
-
 struct CUDA_Context {
 	int device;
 	int id;
@@ -178,7 +174,7 @@ bool init_CUDA_context(struct CUDA_Context *ctx, int device) {
 	return true;
 }
 
-void load_graph_CUDA(struct CUDA_Context *ctx, struct CUDA_Worklist *wl, MarshalGraph &g, unsigned num_hosts) {
+void load_graph_CUDA(struct CUDA_Context *ctx, struct CUDA_Worklist *wl, unsigned wl_dup_factor, MarshalGraph &g, unsigned num_hosts) {
 	CSRGraphTy &graph = ctx->hg;
 	ctx->nowned = g.nowned;
 	assert(ctx->id == g.id);
@@ -216,8 +212,8 @@ void load_graph_CUDA(struct CUDA_Context *ctx, struct CUDA_Worklist *wl, Marshal
 	}
 	graph.copy_to_gpu(ctx->gg);
 	ctx->comp_current.alloc(graph.nnodes);
-	ctx->in_wl = Worklist2(__GALOIS_CUDA_WORKLIST_DUPLICATION_FACTOR__*graph.nedges);
-	ctx->out_wl = Worklist2(__GALOIS_CUDA_WORKLIST_DUPLICATION_FACTOR__*graph.nedges);
+	ctx->in_wl = Worklist2(wl_dup_factor*graph.nnodes);
+	ctx->out_wl = Worklist2(wl_dup_factor*graph.nnodes);
 	wl->num_in_items = -1;
 	wl->num_out_items = -1;
 	wl->in_items = ctx->in_wl.wl;
