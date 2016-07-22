@@ -60,6 +60,7 @@ std::string getReplicaInfoFileName(std::string & basename, size_t num_hosts) {
  *    and sum of edges equals the original graph.
  *****************************************************************/
 struct NodeInfo {
+   typedef size_t PartitionIDType;
    NodeInfo() :
          local_id(0), global_id(0), owner_id(0) {
    }
@@ -68,7 +69,7 @@ struct NodeInfo {
    }
    size_t local_id;
    size_t global_id;
-   size_t owner_id;
+   PartitionIDType owner_id;
 };
 bool verifyParitions(std::string & basename, OfflineGraph & g, size_t num_hosts) {
    bool verified = true;
