@@ -39,6 +39,8 @@
 #include <vector>
 #include <string>
 #include <atomic>
+#include <functional>
+#include <type_traits>
 #include <set>
 
 #include <chrono>
@@ -174,16 +176,16 @@ struct VF2Algo {
     SubgraphSearchInternal(DGraph& d, QGraph& q, MatchingVector& r): gD(d), gQ(q), report(r) {}
 
     struct LocalState {
-      typedef Galois::PerIterAllocTy::rebind<QGNode>::other QPerIterAlloc;
-      typedef Galois::PerIterAllocTy::rebind<DGNode>::other DPerIterAlloc;
+      template<typename T>
+      using PerIterAlloc = typename Galois::PerIterAllocTy::rebind<T>::other;
 
       // query state
-      std::set<QGNode, std::less<QGNode>, QPerIterAlloc> qFrontier;
-      std::set<QGNode, std::less<QGNode>, QPerIterAlloc> qMatched;
+      std::set<QGNode, std::less<QGNode>, PerIterAlloc<QGNode> > qFrontier;
+      std::set<QGNode, std::less<QGNode>, PerIterAlloc<QGNode> > qMatched;
       
       // data state
-      std::set<DGNode, std::less<DGNode>, DPerIterAlloc> dFrontier;
-      std::set<DGNode, std::less<DGNode>, DPerIterAlloc> dMatched;
+      std::set<DGNode, std::less<DGNode>, PerIterAlloc<DGNode> > dFrontier;
+      std::set<DGNode, std::less<DGNode>, PerIterAlloc<DGNode> > dMatched;
 
       LocalState(Galois::PerIterAllocTy& a) :qFrontier(a), qMatched(a), dFrontier(a), dMatched(a) {}
       
@@ -216,18 +218,34 @@ struct VF2Algo {
     }
     
     template<typename Graph, typename Set>
-    long int countNeighbors(Graph& g, typename Graph::GraphNode n, Set& sMatched) {
-      long int numUnmatched = 0;
-      for(auto e : g.edges(n))
-        numUnmatched += (1 - sMatched.count(g.getEdgeDst(e)));
-      return numUnmatched;
+    long int countNeighbors(Graph& g, typename Graph::GraphNode n, Set& sMatched, Galois::PerIterAllocTy& alloc) {
+      using Iter = typename Graph::edge_iterator;
+      using GNode = typename Graph::GraphNode;
+
+      // constant functor is expected by boost::make_transform_iterator
+      struct GetEdgeDst: public std::unary_function<Iter, GNode> {
+        const Graph& g;
+        GetEdgeDst(const Graph& g): g(g) {}
+        GNode operator () (Iter i) const {
+          return const_cast<Graph&>(g).getEdgeDst(i);
+        }
+      };
+
+      // allocate space now, since std::set_difference won't
+      std::vector<GNode, typename LocalState::PerIterAlloc<GNode> > v(std::distance(g.edge_begin(n), g.edge_end(n)), alloc);
+      
+      std::set_difference(
+        boost::make_transform_iterator(g.edge_begin(n), GetEdgeDst(g)), 
+        boost::make_transform_iterator(g.edge_end(n), GetEdgeDst(g)), 
+        sMatched.begin(), sMatched.end(), v.begin());
+      return v.size();
     }
 
-    std::vector<DGNode, LocalState::DPerIterAlloc> 
+    std::vector<DGNode, LocalState::PerIterAlloc<DGNode> > 
     refineCandidates(DGraph& gD, QGraph& gQ, QGNode nQuery, Galois::PerIterAllocTy& alloc, LocalState& state) {
-      std::vector<DGNode, LocalState::DPerIterAlloc> refined(alloc);
+      std::vector<DGNode, LocalState::PerIterAlloc<DGNode> > refined(alloc);
       auto numNghQ = std::distance(gQ.edge_begin(nQuery), gQ.edge_end(nQuery));
-      long int numUnmatchedNghQ = countNeighbors(gQ, nQuery, state.qMatched);
+      long int numUnmatchedNghQ = countNeighbors(gQ, nQuery, state.qMatched, alloc);
 
       long int numInNghQ = 0, numUnmatchedInNghQ = 0;
       if(!undirected) {
@@ -246,7 +264,7 @@ struct VF2Algo {
         if(numNghD < numNghQ)
           continue;
         
-        long int numUnmatchedNghD = countNeighbors(gD, ii, state.dMatched);
+        long int numUnmatchedNghD = countNeighbors(gD, ii, state.dMatched, alloc);
         if(numUnmatchedNghD < numUnmatchedNghQ)
           continue;
         
@@ -323,7 +341,7 @@ struct VF2Algo {
       state.qMatched.insert(nQ);
       state.qFrontier.erase(nQ);
 
-      std::vector<QGNode, LocalState::QPerIterAlloc> qAdd2Frontier(alloc);
+      std::vector<QGNode, LocalState::PerIterAlloc<QGNode> > qAdd2Frontier(alloc);
       insertDstFrontierTracked(state.qMatched, state.qFrontier, qAdd2Frontier, gQ, nQ);
       if(!undirected)
         insertInDstFrontierTracked(state.qMatched, state.qFrontier, qAdd2Frontier, gQ, nQ);
@@ -340,7 +358,7 @@ struct VF2Algo {
         state.dMatched.insert(r);
         state.dFrontier.erase(r);
 
-        std::vector<DGNode, LocalState::DPerIterAlloc> dAdd2Frontier(alloc);
+        std::vector<DGNode, LocalState::PerIterAlloc<DGNode> > dAdd2Frontier(alloc);
         insertDstFrontierTracked(state.dMatched, state.dFrontier, dAdd2Frontier, gD, r);
         if (!undirected)
           insertInDstFrontierTracked(state.dMatched, state.dFrontier, dAdd2Frontier, gD, r);
