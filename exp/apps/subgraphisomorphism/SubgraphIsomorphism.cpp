@@ -127,6 +127,7 @@ void initializeGraph(Graph& g, unsigned int seed) {
     data.label = 'A' + distribution(generator) % numLabels;
 
     g.sortEdgesByDst(n);
+    g.sortInEdgesByDst(n);
   }
 }
 

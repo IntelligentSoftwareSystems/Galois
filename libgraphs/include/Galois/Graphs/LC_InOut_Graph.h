@@ -232,6 +232,22 @@ public:
     }
   }
 
+  /**
+   * Sorts incoming edges of a node. Comparison is by getInEdgeDst(e). Assumed to be called by all nodes.
+   */
+  void sortInEdgesByDst(GraphNode N, MethodFlag mflag = MethodFlag::WRITE) {
+    this->acquireNode(N, mflag);
+    if(!asymmetric) {
+      typedef EdgeSortValue<GraphNode, edge_data_type> EdgeSortVal;
+      std::sort(this->edge_sort_begin(N), this->edge_sort_end(N), 
+        [=] (const EdgeSortVal& e1, const EdgeSortVal& e2) { return e1.dst < e2.dst; });
+    } else {
+      typedef EdgeSortValue<typename InGraph::GraphNode, typename InGraph::edge_data_type> InEdgeSortVal;
+      std::sort(inGraph.edge_sort_begin(inGraphNode(N)), inGraph.edge_sort_end(inGraphNode(N)), 
+        [=] (const InEdgeSortVal& e1, const InEdgeSortVal& e2) { return e1.dst < e2.dst; });
+    }
+  }
+
   size_t idFromNode(GraphNode N) {
     return this->getId(N);
   }
