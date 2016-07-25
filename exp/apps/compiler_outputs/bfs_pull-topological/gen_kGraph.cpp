@@ -32,7 +32,6 @@
 #include "Lonestar/BoilerPlate.h"
 #include "Galois/Runtime/CompilerHelperFunctions.h"
 
-#include "Galois/Runtime/OfflineGraph.h"
 #ifdef __GALOIS_VERTEX_CUT_GRAPH__
 #include "Galois/Runtime/kGraph.h"
 #else
@@ -42,7 +41,6 @@
 #include "Galois/Runtime/Tracer.h"
 
 #ifdef __GALOIS_HET_CUDA__
-#include "Galois/Cuda/cuda_mtypes.h"
 #include "gen_cuda.h"
 struct CUDA_Context *cuda_ctx;
 
@@ -115,12 +113,32 @@ struct InitializeGraph {
 #endif
         return node.dist_current;
       }
+      static bool extract_batch(unsigned from_id, unsigned int *y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_get_node_dist_current_cuda(cuda_ctx, from_id, y);
+          return true;
+        }
+        assert (personality == CPU);
+      #endif
+        return false;
+      }
       static void setVal (uint32_t node_id, struct NodeData & node, unsigned int y) {
 #ifdef __GALOIS_HET_CUDA__
         if (personality == GPU_CUDA) set_node_dist_current_cuda(cuda_ctx, node_id, y);
         else if (personality == CPU)
 #endif
           node.dist_current = y;
+      }
+      static bool setVal_batch(unsigned from_id, unsigned int *y) {
+      #ifdef __GALOIS_HET_CUDA__
+        if (personality == GPU_CUDA) {
+          batch_set_node_dist_current_cuda(cuda_ctx, from_id, y);
+          return true;
+        } 
+        assert (personality == CPU);
+      #endif
+          return false;
       }
       typedef unsigned int ValTy;
     };
@@ -131,7 +149,7 @@ struct InitializeGraph {
     #endif
     Galois::do_all(_graph.begin(), _graph.end(), InitializeGraph {src_node, infinity, &_graph}, Galois::loopname("Init"), Galois::write_set("sync_pull", "this->graph", "struct NodeData &", "struct NodeData &", "dist_current" , "unsigned int"));
     _graph.sync_pull<SyncerPull_0>("InitializeGraph");
-
+    
   }
 
   void operator()(GNode src) const {
@@ -159,6 +177,16 @@ struct BFS {
       		#endif
       			return node.dist_current;
       		}
+      		static bool extract_reset_batch(unsigned from_id, unsigned int *y) {
+      		#ifdef __GALOIS_HET_CUDA__
+      			if (personality == GPU_CUDA) {
+              batch_get_reset_node_dist_current_cuda(cuda_ctx, from_id, y, std::numeric_limits<unsigned int>::max());
+              return true;
+            }
+      			assert (personality == CPU);
+      		#endif
+      			return false;
+      		}
       		static void reduce (uint32_t node_id, struct NodeData & node, unsigned int y) {
       		#ifdef __GALOIS_HET_CUDA__
       			if (personality == GPU_CUDA) min_node_dist_current_cuda(cuda_ctx, node_id, y);
@@ -166,6 +194,16 @@ struct BFS {
       		#endif
       				{ Galois::min(node.dist_current, y); }
       		}
+      		static bool reduce_batch(unsigned from_id, unsigned int *y) {
+      		#ifdef __GALOIS_HET_CUDA__
+      			if (personality == GPU_CUDA) {
+              batch_min_node_dist_current_cuda(cuda_ctx, from_id, y);
+              return true;
+            } 
+      			assert (personality == CPU);
+      		#endif
+              return false;
+          }
       		static void reset (uint32_t node_id, struct NodeData & node ) {
       		#ifdef __GALOIS_HET_CUDA__
       			if (personality == GPU_CUDA) set_node_dist_current_cuda(cuda_ctx, node_id, std::numeric_limits<unsigned int>::max());
@@ -184,6 +222,16 @@ struct BFS {
       		#endif
       			return node.dist_current;
       		}
+          static bool extract_batch(unsigned from_id, unsigned int *y) {
+          #ifdef __GALOIS_HET_CUDA__
+            if (personality == GPU_CUDA) {
+              batch_get_node_dist_current_cuda(cuda_ctx, from_id, y);
+              return true;
+            }
+            assert (personality == CPU);
+          #endif
+            return false;
+          }
       		static void setVal (uint32_t node_id, struct NodeData & node, unsigned int y) {
       		#ifdef __GALOIS_HET_CUDA__
       			if (personality == GPU_CUDA) set_node_dist_current_cuda(cuda_ctx, node_id, y);
@@ -191,6 +239,16 @@ struct BFS {
       		#endif
       				node.dist_current = y;
       		}
+      		static bool setVal_batch(unsigned from_id, unsigned int *y) {
+      		#ifdef __GALOIS_HET_CUDA__
+      			if (personality == GPU_CUDA) {
+              batch_set_node_dist_current_cuda(cuda_ctx, from_id, y);
+              return true;
+            } 
+      			assert (personality == CPU);
+      		#endif
+              return false;
+          }
       		typedef unsigned int ValTy;
       	};
       #ifdef __GALOIS_HET_CUDA__
@@ -294,7 +352,7 @@ int main(int argc, char** argv) {
       if (!init_CUDA_context(cuda_ctx, gpu_device))
         return -1;
       MarshalGraph m = hg.getMarshalGraph(my_host_id);
-      load_graph_CUDA(cuda_ctx, m);
+      load_graph_CUDA(cuda_ctx, m, net.Num);
     } else if (personality == GPU_OPENCL) {
       //Galois::OpenCL::cl_env.init(cldevice.Value);
     }
@@ -313,9 +371,11 @@ int main(int argc, char** argv) {
 
       hg.reset_num_iter(run);
 
+      Galois::Runtime::beginSampling();
       StatTimer_main.start();
     BFS::go(hg, run);
       StatTimer_main.stop();
+      Galois::Runtime::endSampling();
 
       if((run + 1) != numRuns){
       Galois::Runtime::getHostBarrier().wait();

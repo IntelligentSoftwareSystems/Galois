@@ -128,9 +128,10 @@ class NetworkInterfaceBuffered : public NetworkInterface {
     //Worker thread interface
     void add(NetworkIO::message m) {
       std::lock_guard<SimpleLock> lg(qlock);
-      if (data.empty())
+      if (data.empty()){
+        Galois::Runtime::trace("ADD LATEST ", m.tag);
         dataPresent = m.tag;
-
+      }
       //      std::cerr<< m.data.size() << " " << std::count(m.data.begin(), m.data.end(), 0) << "\n";
       // for (auto x : m.data) {
       //   std::cerr << (int) x << " ";
@@ -145,6 +146,10 @@ class NetworkInterfaceBuffered : public NetworkInterface {
 
     bool hasData(uint32_t tag) {
       return dataPresent == tag;
+    }
+    
+    uint32_t getPresentTag(){
+      return dataPresent;
     }
 
   };
@@ -329,6 +334,26 @@ public:
           }
         }
       }
+      Galois::Runtime::trace("recvTagged BLOCKED this by that", tag, rq.getPresentTag());
+#if 0
+      else if (rq.getPresentTag() != ~0){
+        Galois::Runtime::trace("recvTagged BLOCKED % by %", tag, rq.getPresentTag());
+        if (recvLock[h].try_lock()) {
+          std::unique_lock<Galois::Substrate::SimpleLock> lg(recvLock[h], std::adopt_lock);
+          auto buf = rq.popMsg(rq.getPresentTag());
+          if (buf) {
+            if (rlg)
+              *rlg = std::move(lg);
+            uintptr_t fp = 0;
+            gDeserializeRaw(buf->r_linearData() + buf->r_size() - sizeof(uintptr_t), fp);
+            buf->pop_back(sizeof(uintptr_t));
+            assert(fp);
+            Galois::Runtime::trace("FP BLOCKED :", fp);
+            return optional_t<std::pair<uint32_t, RecvBuffer>>();
+          }
+        }
+      }
+#endif
     }
     return optional_t<std::pair<uint32_t, RecvBuffer>>();
   }

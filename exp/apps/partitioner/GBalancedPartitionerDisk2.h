@@ -5,8 +5,8 @@
  *      Author: rashid
  */
 
-#ifndef GDIST_PARTITIONER_GREEDY_BALANCED_PARTITIONER_DISK_H_
-#define GDIST_PARTITIONER_GREEDY_BALANCED_PARTITIONER_DISK_H_
+#ifndef GPGB_PARTITIONER_DISK_H_
+#define GPGB_PARTITIONER_DISK_H_
 #include <iostream>
 #include <limits>
 #include "Galois/Galois.h"
@@ -30,7 +30,7 @@
  *
  *****************************************************************/
 
-struct GBPartitionerDisk {
+struct GBPD2 {
    typedef short PartitionIDType;
    struct NewEdgeData {
       size_t src, dst;
@@ -56,29 +56,26 @@ struct GBPartitionerDisk {
       std::vector<size_t> verticesPerHost;
       std::vector<size_t> mastersPerHost;
 
+
       //Per vertex data structure - large size
-      std::vector<std::unordered_set<PartitionIDType>> vertexOwnersPacked;
+      std::vector<std::unordered_set<PartitionIDType> > vertexOwnersPacked;
       std::vector<PartitionIDType> vertexMasters;
-      std::vector<std::unordered_map<size_t, size_t> > global2Local;
 
       std::vector<std::FILE*> tmpPartitionFiles;
-      std::vector<std::FILE*> tmpGraphFiles;
       std::vector<std::string> tmpPartitionFiles_names;
-      std::vector<std::string> tmpGraphFiles_names;
 
       void print_size_stats(size_t num_hosts){
          long long total_size = 0;
-//         total_size+=vertexOwners[0].size()*num_hosts + vertexOwnersPacked[0].size()*num_hosts + vertexMasters.size() + global2Local[0].size()*num_hosts;
          std::cout<<"Size == " << total_size*sizeof(size_t)/(1024*1024*1024.0f)<<" GB\n";
          return;
       }
       void init(size_t nn, size_t ne, size_t numHosts) {
-         global2Local.resize(numHosts);
          vertexOwnersPacked.resize(nn);
          char tmpBuffer[L_tmpnam];
          for (size_t h = 0; h < numHosts; ++h) {
             tmpnam(tmpBuffer);
-            std::string tmpfileName = "/net/ohm/export/cdgc/rashid/"+std::string(tmpBuffer)+".P." + std::to_string(h);
+//            std::string tmpfileName = "/net/ohm/export/cdgc/rashid/"+std::string(tmpBuffer)+".TMP." + std::to_string(h);
+            std::string tmpfileName = "/net/ohm/export/cdgc/rashid/"+std::string(tmpBuffer)+".TMP." + std::to_string(h);
             tmpPartitionFiles_names.push_back(tmpfileName);
             std::FILE* file_handle = std::fopen(tmpfileName.c_str(), "wb+x");
             if(!file_handle){
@@ -87,23 +84,9 @@ struct GBPartitionerDisk {
             }
             tmpPartitionFiles.push_back(file_handle);
             std::cout << "Pushed file : " << tmpfileName << "\n";
-            {
-               tmpnam(tmpBuffer);
-               std::string tmpGraphfileName = "/net/ohm/export/cdgc/rashid/"+std::string(tmpBuffer)+".G." + std::to_string(h);
-               tmpGraphFiles_names.push_back(tmpGraphfileName);
-               std::FILE* file_handle = std::fopen(tmpGraphfileName.c_str(), "wb+x");
-               if(!file_handle){
-                     std::cerr<<"Unable to open tmp file :: "<<tmpGraphfileName.c_str()<<"\n";
-                     exit(-1);
-               }
-               tmpGraphFiles.push_back(file_handle);
-            }
-            //tmpPartitionFiles.push_back(std::tmpfile());
-//            global2Local[h].resize(nn, ~0);
          }
          std::cout << "Init : Loop 1 \n";
 
-//         vertexMasters.resize(nn, ~0);
          mastersPerHost.resize(numHosts, 0);
          std::cout << "Init : Loop 2 \n";
          edgesPerHost.resize(numHosts, 0);
@@ -144,6 +127,7 @@ struct GBPartitionerDisk {
          edgesPerHost[owner]++;
          vertexOwnersPacked[src].insert(owner);
          vertexOwnersPacked[dst].insert(owner);
+//         fwrite(&owner, sizeof(owner), 1, edgeTmpFile);
 #if _HAS_EDGE_DATA
 //         writeEdgeToTempFile(tmpPartitionFiles[owner],new_src, new_dst, g.getEdgeData<EdgeDataType>(e));
          writeEdgeToTempFile(tmpPartitionFiles[owner],src, dst, g.getEdgeData<EdgeDataType>(e));
@@ -152,63 +136,6 @@ struct GBPartitionerDisk {
          writeEdgeToTempFile(tmpPartitionFiles[owner], src, dst);
 #endif
 
-      }
-      /*
-       * Go over all the nodes, and check if it has an edge
-       * in a given host - if yes, assign a local-id to it.
-       * This will ensure that localids and globalids are sequential
-       * */
-
-      void assignLocalIDs(size_t numhost, OfflineGraph &g) {
-#if 1 // Currently some error in stats - use threaded code after it is fixed.
-         std::vector<size_t> hosts;
-         for(size_t i=0; i<numhost; ++i)hosts.push_back(i);
-
-         Galois::do_all(hosts.begin(),hosts.end(), [&] (size_t h){
-            for(size_t n = 0; n < g.size(); ++n){
-               if(vertexOwnersPacked[n].find(h)!=vertexOwnersPacked[h].end()){
-                     global2Local[h][n]=verticesPerHost[h]++;
-               }
-            }
-
-         }, Galois::loopname("localIDs"));
-#else
-         for(size_t h=0; h<numhost; ++h){
-            for(size_t n = 0; n < g.size(); ++n){
-               if(global2Local[h][n]==1){
-                  global2Local[h][n]=verticesPerHost[h]++;
-               }
-            }
-         }
-#endif
-      }
-
-      void writeReplicaInfo(std::string &basename, OfflineGraph &g, size_t numhosts) {
-#if 0
-         this->print_size_stats(numhosts);
-         for (size_t n = 0; n < g.size(); ++n) {
-            for (size_t h = 0; h < numhosts; ++h) {
-               if (vertexOwners[n][h]) {
-                  vertexOwnersPacked[n].insert(h);
-               }
-            }
-            vertexOwners[n].clear();
-         }
-         vertexOwners.clear();
-         std::cout<<"VertexOwners "<< vertexOwners.size()<<"\n";
-         this->print_size_stats(numhosts);
-         std::ofstream replica_file(getReplicaInfoFileName(basename, numhosts));
-         auto numEntries = g.size();
-         //         replica_file.write(reinterpret_cast<char*>(&(numEntries)), sizeof(numEntries));
-         replica_file << numEntries << ", " << numhosts << std::endl;
-         for (size_t n = 0; n < g.size(); ++n) {
-//            auto owner = &vertexOwnersPacked[n];
-            size_t num_replicas = vertexOwnersPacked[n].size();
-            //            replica_file.write(reinterpret_cast<const char*>(&num_replicas), sizeof(size_t));
-            replica_file << num_replicas << ", " << std::distance(g.edge_begin(n), g.edge_end(n)) << std::endl;
-         }
-         replica_file.close();
-#endif
       }
       /*
        * The assignment of masters to each vertex is done in a greedy manner -
@@ -249,10 +176,7 @@ struct GBPartitionerDisk {
                vertexMasters[n] = minID;
                mastersPerHost[minID]++;
             }//end else
-            vertexOwnersPacked[n].clear();
          }//end for
-         vertexOwnersPacked.clear();
-         vertexOwnersPacked.shrink_to_fit();
       }//end assignMasters
       void print_stats() {
          for (size_t i = 0; i < mastersPerHost.size(); ++i) {
@@ -267,15 +191,11 @@ struct GBPartitionerDisk {
         for(auto F : tmpPartitionFiles){
           std::fclose(F);
         }
-        for(auto F : tmpGraphFiles){
-         std::fclose(F);
-       }
+
         for(auto N : tmpPartitionFiles_names){
           std::remove(N.c_str());
         }
-        for(auto N : tmpGraphFiles_names){
-           std::remove(N.c_str());
-      }
+//        std::fclose(edgeTmpFile);
         std::cout<<"Done cleaning up....\n";
       }
    };
@@ -324,18 +244,14 @@ struct GBPartitionerDisk {
       for (size_t i = 0; i < num_hosts; ++i) {
          std::cout << "HOST#:: " << i << " , " << vcInfo.verticesPerHost[i] << ", " << vcInfo.edgesPerHost[i] << "\n";
       }
-      std::cout<<"Assigning local ids\n";
-      T_assign_localIDs.start();
-      vcInfo.assignLocalIDs(num_hosts, g);
-      T_assign_localIDs.stop();
-      std::cout<<"Writing replica info \n";
-      T_write_replica.start();
-//      vcInfo.writeReplicaInfo(basename, g, num_hosts);
-      T_write_replica.stop();
+      ///////////////////////////////////////////
       std::cout<<"Assigning masters\n";
       T_assign_masters.start();
       vcInfo.assignMasters(g.size(), num_hosts, g);
       T_assign_masters.stop();
+
+      ///////////////////////////////////////////
+
       std::cout<<"Writing partitions\n";
       T_write_partition.start();
       writePartitionsMem(basename, g, num_hosts);
@@ -355,11 +271,60 @@ struct GBPartitionerDisk {
 
    void writePartitionsMem(std::string & basename, OfflineGraph & g, size_t num_hosts) {
       //Create graph
-      //TODO RK - Fix edgeData
       std::cout << " Low mem version\n";
-//      std::vector<size_t> &vertexOwners = vcInfo.vertexMasters;
+      std::vector<std::FILE *> meta_files;
       for (size_t h = 0; h < num_hosts; ++h) {
-         std::cout << "Building partition " << h << "...\n";
+         std::string meta_file_name = getMetaFileName(basename, h, num_hosts);
+         std::cout << "Analysis :: " << vcInfo.verticesPerHost[h] << " , " << vcInfo.edgesPerHost[h] << "\n";
+         std::cout << "Writing meta-file " << h << " to disk..." << meta_file_name << " ";
+         std::FILE* m = std::fopen(meta_file_name.c_str(), "wb+x");
+         if(!m){
+            std::cout<<"Failed to create meta file : " << meta_file_name << "\n";
+            exit(-1);
+         }
+         meta_files.push_back(m);
+         size_t dummy=0;
+         fwrite(&dummy, sizeof(size_t),1, m);
+      }
+      for(size_t n=0; n < g.size(); ++n){
+         size_t owner = vcInfo.vertexMasters[n];
+         assert(owner<num_hosts);
+         for(auto h : vcInfo.vertexOwnersPacked[n]){
+            size_t localID = vcInfo.verticesPerHost[h]++;
+            fwrite(&n, sizeof(size_t), 1, meta_files[h]);
+            fwrite(&localID, sizeof(size_t), 1, meta_files[h]);
+            fwrite(&owner, sizeof(size_t), 1, meta_files[h]);
+         }
+      }
+      for (size_t h = 0; h < num_hosts; ++h) {
+//         std::cout<<"@ " << ftell(meta_files[h]) << " ";
+         fseek(meta_files[h], 0,std::ios_base::beg);
+         size_t numEntries = vcInfo.verticesPerHost[h];
+         fwrite(&numEntries, sizeof(size_t), 1, meta_files[h]);
+//         std::cout<<"@ " << ftell(meta_files[h]) << " ";
+//         std::cout<<"Meta " << h << " has " << numEntries << "vertices\n";
+         fclose(meta_files[h]);
+      }
+
+      for (size_t h = 0; h < num_hosts; ++h) {
+         std::unordered_map<size_t,size_t> global2Local;
+         size_t num_entries;
+         std::string meta_file_name = getMetaFileName(basename, h, num_hosts);
+         std::FILE * in_meta_file = std::fopen(meta_file_name.c_str(), "rb");
+         fseek(in_meta_file, 0,std::ios_base::beg);
+         fread(&num_entries, sizeof(size_t),1, in_meta_file);
+         std::cout << "Reloading partition " << h << "... Loading : " << meta_file_name<< "["<< num_entries<<"] \n";
+         while(!feof(in_meta_file)){
+            size_t gid, lid, owner;
+            fread(&gid, sizeof(size_t),1, in_meta_file);
+            fread(&lid, sizeof(size_t),1, in_meta_file);
+            fread(&owner, sizeof(size_t),1, in_meta_file);
+            global2Local[gid]=lid;
+//            if(owner >=num_hosts) std::cout<<"ERR " <<gid << " , " << lid<<", " << owner<<"\n";
+            assert(owner<num_hosts );
+//            std::cout<<gid << " , " << lid<<", " << owner<<"\n";
+         }
+
          std::cout << "Analysis :: " << vcInfo.verticesPerHost[h] << " , " << vcInfo.edgesPerHost[h] << "\n";
          using namespace Galois::Graph;
          FileGraphWriter * ng = new FileGraphWriter();
@@ -370,27 +335,14 @@ struct GBPartitionerDisk {
          newGraph.setSizeofEdgeData(sizeof(EdgeDataType));
 #endif
          newGraph.phase1();
-         std::string meta_file_name = getMetaFileName(basename, h, num_hosts);
-         std::cout << "Writing meta-file " << h << " to disk..." << meta_file_name << "\n";
-         std::ofstream meta_file(meta_file_name, std::ofstream::binary);
-         auto numEntries = vcInfo.verticesPerHost[h];
-         meta_file.write(reinterpret_cast<char*>(&(numEntries)), sizeof(numEntries));
-         for (auto entry : vcInfo.global2Local[h]) {
-            size_t n = entry.first;
-            size_t owner = vcInfo.vertexMasters[n];
-            meta_file.write(reinterpret_cast<const char*>(&n), sizeof(n));
-            meta_file.write(reinterpret_cast<const char*>(&entry.second), sizeof(size_t));
-            meta_file.write(reinterpret_cast<const char*>(&owner), sizeof(owner));
-         }
-         meta_file.close();
          {
             rewind(vcInfo.tmpPartitionFiles[h]);
             size_t s, d;
 #if _HAS_EDGE_DATA
             EdgeDataType ed;
             while(!vcInfo.readEdgeFromTempFile(vcInfo.tmpPartitionFiles[h], s, d, ed)) {
-               vcInfo.writeEdgeToTempFile(vcInfo.tmpGraphFiles[h],vcInfo.global2Local[h][s], vcInfo.global2Local[h][d], ed);
-               newGraph.incrementDegree(vcInfo.global2Local[h][s]);
+//               vcInfo.writeEdgeToTempFile(vcInfo.tmpGraphFiles[h],vcInfo.global2Local[h][s], vcInfo.global2Local[h][d], ed);
+               newGraph.incrementDegree(global2Local[s]);
 //               std::cout<<i++<<", "<<newEdges.back().src << " , " << newEdges.back().dst << std::endl;
             }
 #else
@@ -402,16 +354,14 @@ struct GBPartitionerDisk {
 #endif
 
          }
-         vcInfo.global2Local[h].clear();
-//         assert(newEdges.size() == vcInfo.edgesPerHost[h]);
          newGraph.phase2();
-         rewind(vcInfo.tmpGraphFiles[h]);
+         rewind(vcInfo.tmpPartitionFiles[h]);
 #if _HAS_EDGE_DATA
          std::vector<EdgeDataType> newEdgeData(vcInfo.edgesPerHost[h]);
          size_t s, d;
          EdgeDataType ed;
-         while(!vcInfo.readEdgeFromTempFile(vcInfo.tmpGraphFiles[h], s, d, ed)){
-            size_t idx = newGraph.addNeighbor(s,d);
+         while(!vcInfo.readEdgeFromTempFile(vcInfo.tmpPartitionFiles[h], s, d, ed)){
+            size_t idx = newGraph.addNeighbor(global2Local[s],global2Local[d]);
             newEdgeData[idx] = ed;
          }
          EdgeDataType * edgeDataPtr = newGraph.finish<EdgeDataType>();
@@ -419,9 +369,9 @@ struct GBPartitionerDisk {
          newEdgeData.clear();
 #else
          size_t s, d;
-         while(!vcInfo.readEdgeFromTempFile(vcInfo.tmpGraphFiles[h], s, d))
+         while(!vcInfo.readEdgeFromTempFile(vcInfo.tmpPartitionFiles[h], s, d))
          {
-            size_t idx = newGraph.addNeighbor(s,d);
+            size_t idx = newGraph.addNeighbor(global2Local[s],global2Local[d]);
          }
          newGraph.finish<void>();
 #endif
@@ -434,4 +384,4 @@ struct GBPartitionerDisk {
       vcInfo.print_stats();
    }      //end writePartitionsMem method
 };
-#endif /* GDIST_PARTITIONER_GREEDY_BALANCED_PARTITIONER_DISK_H_ */
+#endif /* GPGB_PARTITIONER_DISK_H_ */

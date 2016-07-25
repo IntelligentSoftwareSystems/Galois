@@ -85,6 +85,7 @@ static cll::opt<Personality> personality("personality", cll::desc("Personality")
 static cll::opt<std::string> personality_set("pset", cll::desc("String specifying personality for each host. 'c'=CPU,'g'=GPU/CUDA and 'o'=GPU/OpenCL"), cll::init(""));
 static cll::opt<unsigned> scalegpu("scalegpu", cll::desc("Scale GPU workload w.r.t. CPU, default is proportionally equal workload to CPU and GPU (1)"), cll::init(1));
 static cll::opt<unsigned> scalecpu("scalecpu", cll::desc("Scale CPU workload w.r.t. GPU, default is proportionally equal workload to CPU and GPU (1)"), cll::init(1));
+static cll::opt<unsigned> cuda_wl_dup_factor("cuda_wl_dup_factor", cll::desc("Upper bound for duplication factor in CUDA worklist (1): worklist size = factor * graph.nnodes"), cll::init(1));
 #endif
 
 
@@ -488,7 +489,7 @@ int main(int argc, char** argv) {
       if (!init_CUDA_context(cuda_ctx, gpu_device))
         return -1;
       MarshalGraph m = hg.getMarshalGraph(my_host_id);
-      load_graph_CUDA(cuda_ctx, &cuda_wl, m, net.Num);
+      load_graph_CUDA(cuda_ctx, &cuda_wl, cuda_wl_dup_factor, m, net.Num);
     } else if (personality == GPU_OPENCL) {
       //Galois::OpenCL::cl_env.init(cldevice.Value);
     }
@@ -505,6 +506,7 @@ int main(int argc, char** argv) {
       std::string timer_str("TIMER_" + std::to_string(run));
       Galois::StatTimer StatTimer_main(timer_str.c_str());
 
+      Galois::Runtime::getHostBarrier().wait();
       hg.reset_num_iter(run);
 
       Galois::Runtime::beginSampling();
@@ -514,7 +516,6 @@ int main(int argc, char** argv) {
       Galois::Runtime::endSampling();
 
       if((run + 1) != numRuns){
-        Galois::Runtime::getHostBarrier().wait();
         hg.reset_num_iter(run);
         ResetGraph::go(hg);
         InitializeGraph::go(hg);

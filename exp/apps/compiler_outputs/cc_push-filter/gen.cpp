@@ -470,6 +470,7 @@ int main(int argc, char** argv) {
       std::string timer_str("TIMER_" + std::to_string(run));
       Galois::StatTimer StatTimer_main(timer_str.c_str());
 
+      Galois::Runtime::getHostBarrier().wait();
       hg.reset_num_iter(run);
 
       Galois::Runtime::beginSampling();
@@ -479,7 +480,6 @@ int main(int argc, char** argv) {
       Galois::Runtime::endSampling();
 
       if((run + 1) != numRuns){
-        Galois::Runtime::getHostBarrier().wait();
         hg.reset_num_iter(run);
         InitializeGraph::go(hg);
       }
