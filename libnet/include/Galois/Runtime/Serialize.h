@@ -137,6 +137,7 @@ public:
 
   DeSerializeBuffer() :offset(0) {}
   DeSerializeBuffer(DeSerializeBuffer&&) = default; //disable copy constructor
+  DeSerializeBuffer(std::vector<uint8_t>&& v, uint32_t start = 0) : bufdata(std::move(v)), offset(start) {}
 
   explicit DeSerializeBuffer(std::vector<uint8_t>& data) {
     bufdata.swap(data);
