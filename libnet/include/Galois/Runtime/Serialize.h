@@ -246,7 +246,7 @@ void gSerializeSeq(SerializeBuffer& buf, const Seq& seq) {
 template<typename Seq>
 void gSerializeLinearSeq(SerializeBuffer& buf, const Seq& seq) {
   typename Seq::size_type size = seq.size();
-  typedef decltype(*seq.begin()) T;
+  typedef typename Seq::value_type T;
   size_t tsize = sizeof(T);
   buf.reserve(size * tsize + sizeof(size));
   gSerializeObj(buf, size);
@@ -344,14 +344,23 @@ void gDeserializeObj(DeSerializeBuffer& buf, std::tuple<T...>& data) {
 template<typename Seq>
 void gDeserializeSeq(DeSerializeBuffer& buf, Seq& seq) {
   seq.clear();
-  typename Seq::size_type size, sorig;
+  typename Seq::size_type size;
   gDeserializeObj(buf, size);
-  sorig = size;
   while (size--) {
     typename Seq::value_type v;
     gDeserializeObj(buf, v);
     seq.push_back(v);
   }
+}
+
+template<typename Seq>
+void gDeserializeLinearSeq(DeSerializeBuffer& buf, Seq& seq) {
+  typedef typename Seq::value_type T;
+  seq.clear();
+  typename Seq::size_type size;
+  gDeserializeObj(buf, size);
+  seq.resize(size);
+  buf.extract((uint8_t*)seq.data(), size * sizeof(T));
 }
 
 inline void gDeserializeObj(DeSerializeBuffer& buf, std::string& data) {
