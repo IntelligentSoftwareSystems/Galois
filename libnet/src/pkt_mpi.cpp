@@ -78,7 +78,8 @@ class NetworkIOMPI : public Galois::Runtime::NetworkIO {
     std::vector<uint8_t> data;
     MPI_Request req;
     //mpiMessage(message&& _m, MPI_Request _req) : m(std::move(_m)), req(_req) {}
-    mpiMessage(uint32_t host, uint32_t tag, std::vector<uint8_t>&& data, size_t len) :host(host), tag(tag), data(data) {}
+    mpiMessage(uint32_t host, uint32_t tag, std::vector<uint8_t>&& data) :host(host), tag(tag), data(std::move(data)) {}
+    mpiMessage(uint32_t host, uint32_t tag, size_t len) :host(host), tag(tag), data(len) {}
   };
 
   struct sendQueueTy {
@@ -100,7 +101,7 @@ class NetworkIOMPI : public Galois::Runtime::NetworkIO {
 
     void send(message m) {
       //MPI_Request req;
-      inflight.emplace_back(m.host, m.tag, std::move(m.data), MPI_Request());
+      inflight.emplace_back(m.host, m.tag, std::move(m.data));
       auto& f = inflight.back();
       Galois::Runtime::trace("MPI SEND", f.host, f.tag, f.data.size(), Galois::Runtime::printVec(f.data));
       int rv = MPI_Isend(f.data.data(), f.data.size(), MPI_BYTE, f.host, f.tag, MPI_COMM_WORLD, &f.req);
@@ -110,23 +111,35 @@ class NetworkIOMPI : public Galois::Runtime::NetworkIO {
 
   struct recvQueueTy {
     std::deque<message> done;
-
+    std::deque<mpiMessage> inflight;
 
     //FIXME: Does synchronous recieves overly halt forward progress?
     void probe() {
       int flag = 0;
       MPI_Status status;
+      //check for new messages
       int rv = MPI_Iprobe(MPI_ANY_SOURCE, MPI_ANY_TAG, MPI_COMM_WORLD, &flag, &status);
       handleError(rv);
       if (flag) {
         int nbytes;
         rv = MPI_Get_count(&status, MPI_BYTE, &nbytes);
         handleError(rv);
-        std::vector<uint8_t> data(nbytes);
-        rv = MPI_Recv(data.data(), nbytes, MPI_BYTE, status.MPI_SOURCE, status.MPI_TAG, MPI_COMM_WORLD, MPI_STATUS_IGNORE);
+        inflight.emplace_back(status.MPI_SOURCE, status.MPI_TAG, nbytes);
+        auto& m = inflight.back();
+        rv = MPI_Irecv(m.data.data(), nbytes, MPI_BYTE, status.MPI_SOURCE, status.MPI_TAG, MPI_COMM_WORLD, &m.req);
         handleError(rv);
-        Galois::Runtime::trace("MPI RECV", status.MPI_SOURCE, status.MPI_TAG, data.size(), Galois::Runtime::printVec(data));
-        done.emplace_back(status.MPI_SOURCE, status.MPI_TAG, std::move(data));
+        Galois::Runtime::trace("MPI IRECV", status.MPI_SOURCE, status.MPI_TAG, m.data.size());
+      }
+      //complete messages
+      if (!inflight.empty()) {
+        auto& m = inflight.front();
+        int flag = 0;
+        rv = MPI_Test(&m.req, &flag, MPI_STATUS_IGNORE);
+        handleError(rv);
+        if (flag) {
+          done.emplace_back(m.host, m.tag, std::move(m.data));
+          inflight.pop_front();
+        }
       }
     }
   };
