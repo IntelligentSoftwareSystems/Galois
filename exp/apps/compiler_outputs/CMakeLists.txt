@@ -249,5 +249,11 @@ endif()
 
 #### Experiment ####
 app(bfs_pull-topological_edgeAsvertex-cut bfs_pull-topological/gen_kGraph.cpp DISTSAFE)
+app(bfs_pull-topological_mGraphVertex-cut bfs_pull-topological/gen_mGraph.cpp DISTSAFE)
+target_compile_definitions(bfs_pull-topological_mGraphVertex-cut PRIVATE __GALOIS_VERTEX_CUT_GRAPH__=1)
+
+
+app(bfs_push-topological_mGraphVertex-cut bfs_push-topological/gen_mGraph.cpp DISTSAFE)
+target_compile_definitions(bfs_push-topological_mGraphVertex-cut PRIVATE __GALOIS_VERTEX_CUT_GRAPH__=1)
 #target_compile_definitions(bfs_pull-topological_edgeAsvertex-cut PRIVATE __GALOIS_VERTEX_CUT_GRAPH__=1)
 
