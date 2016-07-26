@@ -152,7 +152,7 @@ public:
   template<typename Iter>
   DeSerializeBuffer(Iter b, Iter e) : bufdata(b,e), offset{0} {}
 
-  explicit DeSerializeBuffer(SerializeBuffer&& buf) {
+  explicit DeSerializeBuffer(SerializeBuffer&& buf) :offset(0) {
     bufdata.swap(buf.bufdata);
   }
 
@@ -176,7 +176,7 @@ public:
 
   void pop_back(unsigned x) { bufdata.resize(bufdata.size() - x); }
 
-  void extract(char* dst, size_t num) {
+  void extract(uint8_t* dst, size_t num) {
     for (size_t i = 0; i < num; ++i)
       dst[i] = bufdata[offset++];
   }
@@ -310,7 +310,7 @@ template<typename T>
 void gDeserializeObj(DeSerializeBuffer& buf, T& data,
                      typename std::enable_if<is_memory_copyable<T>::value>::type* = 0) 
 {
-  char* pdata = (char*)&data;
+  uint8_t* pdata = (uint8_t*)&data;
   buf.extract(pdata, sizeof(T));
 }
 
@@ -379,7 +379,10 @@ void gDeserializeObj(DeSerializeBuffer& buf, std::deque<T, Alloc>& data) {
 
 template<typename T, typename Alloc>
 void gDeserializeObj(DeSerializeBuffer& buf, std::vector<T, Alloc>& data) {
-  gDeserializeSeq(buf, data);
+  if (is_memory_copyable<T>::value)
+    gDeserializeLinearSeq(buf, data);
+  else
+    gDeserializeSeq(buf, data);
 }
 
 template<typename T, unsigned CS>

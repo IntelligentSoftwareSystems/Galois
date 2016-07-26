@@ -1,5 +1,5 @@
 #include "Galois/Galois.h"
-#include "Galois/Runtime/DistSupport.h"
+#include "Galois/Runtime/Serialize.h"
 
 #include <iostream>
 
