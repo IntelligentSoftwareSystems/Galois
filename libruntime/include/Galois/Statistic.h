@@ -107,10 +107,6 @@ public:
   }
 };
 
-//! Flag type for {@link StatTimer}
-struct start_now_t {};
-constexpr start_now_t start_now = start_now_t();
-
 //! Provides statistic interface around timer
 class StatTimer : public TimeAccumulator {
   std::string name;
