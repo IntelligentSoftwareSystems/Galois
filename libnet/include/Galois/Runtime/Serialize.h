@@ -224,7 +224,7 @@ __attribute__((always_inline)) void gSerializeObj(SerializeBuffer& buf, const T&
 }
 
 template<typename T1, typename T2>
-void gSerializeObj(SerializeBuffer& buf, const std::pair<T1, T2>& data) {
+inline void gSerializeObj(SerializeBuffer& buf, const std::pair<T1, T2>& data) {
   gSerialize(buf, data.first, data.second);
 }
 
@@ -243,18 +243,31 @@ void gSerializeSeq(SerializeBuffer& buf, const Seq& seq) {
     gSerializeObj(buf, o);
 }
 
-template<typename T, typename Alloc>
-void gSerializeObj(SerializeBuffer& buf, const std::vector<T, Alloc>& data) {
-  gSerializeSeq(buf, data);
+template<typename Seq>
+void gSerializeLinearSeq(SerializeBuffer& buf, const Seq& seq) {
+  typename Seq::size_type size = seq.size();
+  typedef decltype(*seq.begin()) T;
+  size_t tsize = sizeof(T);
+  buf.reserve(size * tsize + sizeof(size));
+  gSerializeObj(buf, size);
+  buf.insert((uint8_t*)seq.data(), size*tsize);
 }
 
 template<typename T, typename Alloc>
-void gSerializeObj(SerializeBuffer& buf, const std::deque<T, Alloc>& data) {
+inline void gSerializeObj(SerializeBuffer& buf, const std::vector<T, Alloc>& data) {
+  if (is_memory_copyable<T>::value)
+    gSerializeLinearSeq(buf, data);
+  else
+    gSerializeSeq(buf, data);
+}
+
+template<typename T, typename Alloc>
+inline void gSerializeObj(SerializeBuffer& buf, const std::deque<T, Alloc>& data) {
   gSerializeSeq(buf, data);
 }
 
 template<typename T, unsigned CS>
-void gSerializeObj(SerializeBuffer& buf, const Galois::gdeque<T,CS>& data) {
+inline void gSerializeObj(SerializeBuffer& buf, const Galois::gdeque<T,CS>& data) {
   gSerializeSeq(buf,data);
 }
 

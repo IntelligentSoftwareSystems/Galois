@@ -449,9 +449,7 @@ if(NOT SKIP_COMPILE_APPS)
   add_subdirectory(examples)
   add_subdirectory(test)
 #  add_subdirectory(toolkit_ml)
-  if(USE_EXP)
-   add_subdirectory(exp)
-  endif()
+  add_subdirectory(exp)
 endif()
 
 ###### Documentation ######
@@ -482,9 +480,9 @@ include(CPack)
 # Galois include files
 file(RELATIVE_PATH rel_include_dir "${INSTALL_CMAKE_DIR}" "${INSTALL_INCLUDE_DIR}")
 set(GALOIS_INCLUDE_DIR "${PROJECT_SOURCE_DIR}/include" "${PROJECT_BINARY_DIR}/include")
-if(USE_EXP)
-  set(GALOIS_INCLUDE_DIR "${GALOIS_INCLUDE_DIR}" "${PROJECT_SOURCE_DIR}/libexp/include" "${PROJECT_SOURCE_DIR}/libgaloiscl/include")
-endif()
+#if(USE_EXP)
+#  set(GALOIS_INCLUDE_DIR "${GALOIS_INCLUDE_DIR}" "${PROJECT_SOURCE_DIR}/libexp/include" "${PROJECT_SOURCE_DIR}/libgaloiscl/include")
+#endif()
 
 
 set(GALOIS_INCLUDE_DIRS) # Galois include dependencies
