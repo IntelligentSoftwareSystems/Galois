@@ -11,7 +11,7 @@ CBlock([cgen.Include("gen_cuda.cuh", system = False)], parse = False),
 CDeclGlobal([("unsigned int *", "P_NOUT", "")]),
 CDeclGlobal([("float *", "P_RESIDUAL", "")]),
 CDeclGlobal([("float *", "P_VALUE", "")]),
-Kernel("ResetGraph", [G.param(), ('int ', 'nowned') , ('unsigned int *', 'p_nout'), ('float *', 'p_residual'), ('float *', 'p_value')],
+Kernel("ResetGraph", [G.param(), ('unsigned int', 'nowned') , ('unsigned int *', 'p_nout'), ('float *', 'p_residual'), ('float *', 'p_value')],
 [
 ForAll("src", G.nodes(None, "nowned"),
 [
@@ -20,7 +20,7 @@ CBlock(["p_nout[src] = 0"]),
 CBlock(["p_residual[src] = 0"]),
 ]),
 ]),
-Kernel("InitializeGraph", [G.param(), ('int ', 'nowned') , ('const float ', 'local_alpha'), ('unsigned int *', 'p_nout'), ('float *', 'p_residual'), ('float *', 'p_value')],
+Kernel("InitializeGraph", [G.param(), ('unsigned int', 'nowned') , ('const float ', 'local_alpha'), ('unsigned int *', 'p_nout'), ('float *', 'p_residual'), ('float *', 'p_value')],
 [
 ForAll("src", G.nodes(None, "nowned"),
 [
@@ -39,7 +39,7 @@ CBlock(["atomicAdd(&p_residual[dst], delta)"]),
 ]),
 ]),
 ]),
-Kernel("PageRank", [G.param(), ('int ', 'nowned') , ('const float ', 'local_alpha'), ('float', 'local_tolerance'), ('unsigned int *', 'p_nout'), ('float *', 'p_residual'), ('float *', 'p_value')],
+Kernel("PageRank", [G.param(), ('unsigned int', 'nowned') , ('const float ', 'local_alpha'), ('float', 'local_tolerance'), ('unsigned int *', 'p_nout'), ('float *', 'p_residual'), ('float *', 'p_value')],
 [
 ForAll("wlvertex", WL.items(),
 [

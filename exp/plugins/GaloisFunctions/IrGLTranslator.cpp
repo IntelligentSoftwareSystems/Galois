@@ -583,7 +583,7 @@ public:
     header << "bool init_CUDA_context(struct CUDA_Context *ctx, int device);\n";
     header << "void load_graph_CUDA(struct CUDA_Context *ctx, ";
     if (requiresWorklist) {
-      header << "struct CUDA_Worklist *wl, ";
+      header << "struct CUDA_Worklist *wl, unsigned wl_dup_factor, ";
     }
     header << "MarshalGraph &g, unsigned num_hosts);\n\n";
     header << "void reset_CUDA_context(struct CUDA_Context *ctx);\n";
@@ -620,11 +620,6 @@ public:
     cuheader << "#else\n";
     cuheader << "#define check_cuda_kernel  \n";
     cuheader << "#endif\n";
-    if (requiresWorklist) {
-      cuheader << "\n#ifndef __GALOIS_CUDA_WORKLIST_DUPLICATION_FACTOR__\n";
-      cuheader << "#define __GALOIS_CUDA_WORKLIST_DUPLICATION_FACTOR__ 1\n";
-      cuheader << "#endif\n";
-    }
     cuheader << "\nstruct CUDA_Context {\n";
     cuheader << "\tint device;\n";
     cuheader << "\tint id;\n";
@@ -666,8 +661,8 @@ public:
       cuheader << "\tif (" << var.first << "[LID] > v)\n";
       cuheader << "\t\t" << var.first << "[LID] = v;\n";
       cuheader << "}\n\n";
-      cuheader << "__global__ void batch_get_node_" << var.first << "(index_type size, unsigned int * p_master_nodes, " 
-               << var.second << " * p_master_" << var.first << ", " << var.second << " * p_" << var.first << ") {\n";
+      cuheader << "__global__ void batch_get_node_" << var.first << "(index_type size, const unsigned int * __restrict__ p_master_nodes, " 
+               << var.second << " * __restrict__ p_master_" << var.first << ", const " << var.second << " * __restrict__ p_" << var.first << ") {\n";
       cuheader << "\tunsigned tid = TID_1D;\n";
       cuheader << "\tunsigned nthreads = TOTAL_THREADS_1D;\n";
       cuheader << "\tindex_type src_end = size;\n";
@@ -686,8 +681,8 @@ public:
       cuheader << "\tcheck_cuda_kernel;\n";
       cuheader << "\tmemcpy(v, ctx->master_" << var.first << "[from_id].cpu_rd_ptr(), sizeof(" << var.second << ") * ctx->num_master_nodes[from_id]);\n";
       cuheader << "}\n\n";
-      cuheader << "__global__ void batch_get_reset_node_" << var.first << "(index_type size, unsigned int * p_slave_nodes, " 
-               << var.second << " * p_slave_" << var.first << ", " << var.second << " * p_" << var.first << ", " << var.second << " value) {\n";
+      cuheader << "__global__ void batch_get_reset_node_" << var.first << "(index_type size, const unsigned int * __restrict__ p_slave_nodes, " 
+               << var.second << " * __restrict__ p_slave_" << var.first << ", " << var.second << " * __restrict__ p_" << var.first << ", " << var.second << " value) {\n";
       cuheader << "\tunsigned tid = TID_1D;\n";
       cuheader << "\tunsigned nthreads = TOTAL_THREADS_1D;\n";
       cuheader << "\tindex_type src_end = size;\n";
@@ -707,8 +702,8 @@ public:
       cuheader << "\tcheck_cuda_kernel;\n";
       cuheader << "\tmemcpy(v, ctx->slave_" << var.first << "[from_id].cpu_rd_ptr(), sizeof(" << var.second << ") * ctx->num_slave_nodes[from_id]);\n";
       cuheader << "}\n\n";
-      cuheader << "__global__ void batch_set_node_" << var.first << "(index_type size, unsigned int * p_slave_nodes, " 
-               << var.second << " * p_slave_" << var.first << ", " << var.second << " * p_" << var.first << ") {\n";
+      cuheader << "__global__ void batch_set_node_" << var.first << "(index_type size, const unsigned int * __restrict__ p_slave_nodes, const " 
+               << var.second << " * __restrict__ p_slave_" << var.first << ", " << var.second << " * __restrict__ p_" << var.first << ") {\n";
       cuheader << "\tunsigned tid = TID_1D;\n";
       cuheader << "\tunsigned nthreads = TOTAL_THREADS_1D;\n";
       cuheader << "\tindex_type src_end = size;\n";
@@ -727,8 +722,8 @@ public:
                << "ctx->" << var.first << ".gpu_wr_ptr());\n";
       cuheader << "\tcheck_cuda_kernel;\n";
       cuheader << "}\n\n";
-      cuheader << "__global__ void batch_add_node_" << var.first << "(index_type size, unsigned int * p_master_nodes, " 
-               << var.second << " * p_master_" << var.first << ", " << var.second << " * p_" << var.first << ") {\n";
+      cuheader << "__global__ void batch_add_node_" << var.first << "(index_type size, const unsigned int * __restrict__ p_master_nodes, const " 
+               << var.second << " * __restrict__ p_master_" << var.first << ", " << var.second << " * __restrict__ p_" << var.first << ") {\n";
       cuheader << "\tunsigned tid = TID_1D;\n";
       cuheader << "\tunsigned nthreads = TOTAL_THREADS_1D;\n";
       cuheader << "\tindex_type src_end = size;\n";
@@ -747,8 +742,8 @@ public:
                << "ctx->" << var.first << ".gpu_wr_ptr());\n";
       cuheader << "\tcheck_cuda_kernel;\n";
       cuheader << "}\n\n";
-      cuheader << "__global__ void batch_min_node_" << var.first << "(index_type size, unsigned int * p_master_nodes, " 
-               << var.second << " * p_master_" << var.first << ", " << var.second << " * p_" << var.first << ") {\n";
+      cuheader << "__global__ void batch_min_node_" << var.first << "(index_type size, const unsigned int * __restrict__ p_master_nodes, const " 
+               << var.second << " * __restrict__ p_master_" << var.first << ", " << var.second << " * __restrict__ p_" << var.first << ") {\n";
       cuheader << "\tunsigned tid = TID_1D;\n";
       cuheader << "\tunsigned nthreads = TOTAL_THREADS_1D;\n";
       cuheader << "\tindex_type src_end = size;\n";
@@ -795,7 +790,7 @@ public:
     cuheader << "}\n\n";
     cuheader << "void load_graph_CUDA(struct CUDA_Context *ctx, ";
     if (requiresWorklist) {
-      cuheader << "struct CUDA_Worklist *wl, ";
+      cuheader << "struct CUDA_Worklist *wl, unsigned wl_dup_factor, ";
     }
     cuheader << "MarshalGraph &g, unsigned num_hosts) {\n";
     cuheader << "\tCSRGraphTy &graph = ctx->hg;\n";
@@ -847,8 +842,8 @@ public:
     }
     if (requiresWorklist) {
       // Assuming at the most an average duplicaton of 4 in the worklist
-      cuheader << "\tctx->in_wl = Worklist2(__GALOIS_CUDA_WORKLIST_DUPLICATION_FACTOR__*graph.nedges);\n";
-      cuheader << "\tctx->out_wl = Worklist2(__GALOIS_CUDA_WORKLIST_DUPLICATION_FACTOR__*graph.nedges);\n";
+      cuheader << "\tctx->in_wl = Worklist2(wl_dup_factor*graph.nnodes);\n";
+      cuheader << "\tctx->out_wl = Worklist2(wl_dup_factor*graph.nnodes);\n";
       cuheader << "\twl->num_in_items = -1;\n";
       cuheader << "\twl->num_out_items = -1;\n";
       cuheader << "\twl->in_items = ctx->in_wl.wl;\n";

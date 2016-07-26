@@ -87,7 +87,7 @@ public:
 
   SerializeBuffer() = default;
   SerializeBuffer(SerializeBuffer&& rhs) = default;  //disable copy constructor
-  inline explicit SerializeBuffer(DeSerializeBuffer&& buf);
+  //  inline explicit SerializeBuffer(DeSerializeBuffer&& buf);
 
   SerializeBuffer(const char* d, unsigned len) : bufdata(d, d+len) {}
 
@@ -228,6 +228,7 @@ void gSerializeObj(SerializeBuffer& buf, const std::pair<T1, T2>& data) {
   gSerialize(buf, data.first, data.second);
 }
 
+//Fixme: specialize for Sequences with consecutive PODS
 template<typename Seq>
 void gSerializeSeq(SerializeBuffer& buf, const Seq& seq) {
   typename Seq::size_type size = seq.size();
@@ -236,10 +237,10 @@ void gSerializeSeq(SerializeBuffer& buf, const Seq& seq) {
   size_t tsize = std::conditional<is_memory_copyable<T>::value, 
     std::integral_constant<size_t, sizeof(T)>,
     std::integral_constant<size_t, 1>>::type::value;
-  buf.reserve(size * tsize);
+  buf.reserve(size * tsize + sizeof(size));
   gSerializeObj(buf, size);
-  for (auto ii = seq.begin(), ee = seq.end(); ii != ee; ++ii)
-    gSerializeObj(buf, *ii);
+  for (auto& o : seq)
+    gSerializeObj(buf, o);
 }
 
 template<typename T, typename Alloc>
@@ -366,9 +367,9 @@ void gDeserializeObj(DeSerializeBuffer& buf, Galois::gdeque<T,CS>& data) {
 } //namespace detail
 
 
-SerializeBuffer::SerializeBuffer(DeSerializeBuffer&& buf) {
-  bufdata.swap(buf.bufdata);
-}
+//SerializeBuffer::SerializeBuffer(DeSerializeBuffer&& buf) {
+//  bufdata.swap(buf.bufdata);
+//}
 
 
 template<typename T1, typename... Args>

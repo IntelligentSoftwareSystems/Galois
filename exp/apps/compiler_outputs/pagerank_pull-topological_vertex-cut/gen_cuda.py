@@ -11,7 +11,7 @@ CBlock([cgen.Include("gen_cuda.cuh", system = False)], parse = False),
 CDeclGlobal([("int *", "P_NOUT", "")]),
 CDeclGlobal([("float *", "P_SUM", "")]),
 CDeclGlobal([("float *", "P_VALUE", "")]),
-Kernel("ResetGraph", [G.param(), ('int ', 'nowned') , ('int *', 'p_nout'), ('float *', 'p_sum'), ('float *', 'p_value')],
+Kernel("ResetGraph", [G.param(), ('unsigned int', 'nowned') , ('int *', 'p_nout'), ('float *', 'p_sum'), ('float *', 'p_value')],
 [
 ForAll("src", G.nodes(None, "nowned"),
 [
@@ -20,7 +20,7 @@ CBlock(["p_sum[src] = 0"]),
 CBlock(["p_nout[src] = 0"]),
 ]),
 ]),
-Kernel("InitializeGraph", [G.param(), ('int ', 'nowned') , ('const float ', 'local_alpha'), ('int *', 'p_nout'), ('float *', 'p_sum'), ('float *', 'p_value')],
+Kernel("InitializeGraph", [G.param(), ('unsigned int', 'nowned') , ('const float ', 'local_alpha'), ('int *', 'p_nout'), ('float *', 'p_sum'), ('float *', 'p_value')],
 [
 ForAll("src", G.nodes(None, "nowned"),
 [
@@ -36,7 +36,7 @@ CBlock(["atomicAdd(&p_nout[dst], 1)"]),
 ),
 ]),
 ]),
-Kernel("PageRank_partial", [G.param(), ('int ', 'nowned') , ('int *', 'p_nout'), ('float *', 'p_sum'), ('float *', 'p_value')],
+Kernel("PageRank_partial", [G.param(), ('unsigned int', 'nowned') , ('int *', 'p_nout'), ('float *', 'p_sum'), ('float *', 'p_value')],
 [
 ForAll("src", G.nodes(None, "nowned"),
 [
@@ -55,7 +55,7 @@ CBlock(["p_sum[src] += p_value[dst]/dnout"]),
 ),
 ]),
 ]),
-Kernel("PageRank", [G.param(), ('int ', 'nowned') , ('const float ', 'local_alpha'), ('float', 'local_tolerance'), ('float *', 'p_sum'), ('float *', 'p_value'), ('Any', 'any_retval')],
+Kernel("PageRank", [G.param(), ('unsigned int', 'nowned') , ('const float ', 'local_alpha'), ('float', 'local_tolerance'), ('float *', 'p_sum'), ('float *', 'p_value'), ('Any', 'any_retval')],
 [
 ForAll("src", G.nodes(None, "nowned"),
 [

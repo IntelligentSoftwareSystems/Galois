@@ -68,18 +68,20 @@ class NetworkInterfaceBuffered : public NetworkInterface {
     template<typename IterTy>
     void copyOut(IterTy it, size_t n) {
       //assert(sizeAtLeast(n));
-      if (n == 0)
-        return;
-      for (int j = 0; j < data.size(); ++j) {
-        auto& v = data[j];
-        for (int k = j == 0 ? frontOffset : 0; k < v.data.size(); ++k) {
-          *it++ = v.data[k];
-          --n;
-          if (n == 0)
-            return;
+      //fast path is first buffer
+      { //limit scope
+      auto& f0data = data[0].data;
+      for (int k = frontOffset, ke = f0data.size(); k < ke && n; ++k, --n)
+        *it++ = f0data[k];
+      }
+      if (n) { // more data (slow path)
+        for (int j = 1, je = data.size(); j < je && n; ++j) {
+          auto& vdata = data[j].data;
+          for (int k = 0, ke = vdata.size(); k < ke && n; ++k, --n) {
+            *it++ = vdata[k];
+          }
         }
       }
-      abort();
     }
     
     void erase(size_t n) {

@@ -52,7 +52,7 @@ void min_node_comp_current_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned
 		comp_current[LID] = v;
 }
 
-__global__ void batch_get_node_comp_current(index_type size, unsigned int * p_master_nodes, unsigned int * p_master_comp_current, unsigned int * p_comp_current) {
+__global__ void batch_get_node_comp_current(index_type size, const unsigned int * __restrict__ p_master_nodes, unsigned int * __restrict__ p_master_comp_current, const unsigned int * __restrict__ p_comp_current) {
 	unsigned tid = TID_1D;
 	unsigned nthreads = TOTAL_THREADS_1D;
 	index_type src_end = size;
@@ -71,7 +71,7 @@ void batch_get_node_comp_current_cuda(struct CUDA_Context *ctx, unsigned from_id
 	memcpy(v, ctx->master_comp_current[from_id].cpu_rd_ptr(), sizeof(unsigned int) * ctx->num_master_nodes[from_id]);
 }
 
-__global__ void batch_get_reset_node_comp_current(index_type size, unsigned int * p_slave_nodes, unsigned int * p_slave_comp_current, unsigned int * p_comp_current, unsigned int value) {
+__global__ void batch_get_reset_node_comp_current(index_type size, const unsigned int * __restrict__ p_slave_nodes, unsigned int * __restrict__ p_slave_comp_current, unsigned int * __restrict__ p_comp_current, unsigned int value) {
 	unsigned tid = TID_1D;
 	unsigned nthreads = TOTAL_THREADS_1D;
 	index_type src_end = size;
@@ -91,7 +91,7 @@ void batch_get_reset_node_comp_current_cuda(struct CUDA_Context *ctx, unsigned f
 	memcpy(v, ctx->slave_comp_current[from_id].cpu_rd_ptr(), sizeof(unsigned int) * ctx->num_slave_nodes[from_id]);
 }
 
-__global__ void batch_set_node_comp_current(index_type size, unsigned int * p_slave_nodes, unsigned int * p_slave_comp_current, unsigned int * p_comp_current) {
+__global__ void batch_set_node_comp_current(index_type size, const unsigned int * __restrict__ p_slave_nodes, const unsigned int * __restrict__ p_slave_comp_current, unsigned int * __restrict__ p_comp_current) {
 	unsigned tid = TID_1D;
 	unsigned nthreads = TOTAL_THREADS_1D;
 	index_type src_end = size;
@@ -110,7 +110,7 @@ void batch_set_node_comp_current_cuda(struct CUDA_Context *ctx, unsigned from_id
 	check_cuda_kernel;
 }
 
-__global__ void batch_add_node_comp_current(index_type size, unsigned int * p_master_nodes, unsigned int * p_master_comp_current, unsigned int * p_comp_current) {
+__global__ void batch_add_node_comp_current(index_type size, const unsigned int * __restrict__ p_master_nodes, const unsigned int * __restrict__ p_master_comp_current, unsigned int * __restrict__ p_comp_current) {
 	unsigned tid = TID_1D;
 	unsigned nthreads = TOTAL_THREADS_1D;
 	index_type src_end = size;
@@ -129,7 +129,7 @@ void batch_add_node_comp_current_cuda(struct CUDA_Context *ctx, unsigned from_id
 	check_cuda_kernel;
 }
 
-__global__ void batch_min_node_comp_current(index_type size, unsigned int * p_master_nodes, unsigned int * p_master_comp_current, unsigned int * p_comp_current) {
+__global__ void batch_min_node_comp_current(index_type size, const unsigned int * __restrict__ p_master_nodes, const unsigned int * __restrict__ p_master_comp_current, unsigned int * __restrict__ p_comp_current) {
 	unsigned tid = TID_1D;
 	unsigned nthreads = TOTAL_THREADS_1D;
 	index_type src_end = size;
@@ -169,7 +169,7 @@ void min_node_comp_old_cuda(struct CUDA_Context *ctx, unsigned LID, unsigned int
 		comp_old[LID] = v;
 }
 
-__global__ void batch_get_node_comp_old(index_type size, unsigned int * p_master_nodes, unsigned int * p_master_comp_old, unsigned int * p_comp_old) {
+__global__ void batch_get_node_comp_old(index_type size, const unsigned int * __restrict__ p_master_nodes, unsigned int * __restrict__ p_master_comp_old, const unsigned int * __restrict__ p_comp_old) {
 	unsigned tid = TID_1D;
 	unsigned nthreads = TOTAL_THREADS_1D;
 	index_type src_end = size;
@@ -188,7 +188,7 @@ void batch_get_node_comp_old_cuda(struct CUDA_Context *ctx, unsigned from_id, un
 	memcpy(v, ctx->master_comp_old[from_id].cpu_rd_ptr(), sizeof(unsigned int) * ctx->num_master_nodes[from_id]);
 }
 
-__global__ void batch_get_reset_node_comp_old(index_type size, unsigned int * p_slave_nodes, unsigned int * p_slave_comp_old, unsigned int * p_comp_old, unsigned int value) {
+__global__ void batch_get_reset_node_comp_old(index_type size, const unsigned int * __restrict__ p_slave_nodes, unsigned int * __restrict__ p_slave_comp_old, unsigned int * __restrict__ p_comp_old, unsigned int value) {
 	unsigned tid = TID_1D;
 	unsigned nthreads = TOTAL_THREADS_1D;
 	index_type src_end = size;
@@ -208,7 +208,7 @@ void batch_get_reset_node_comp_old_cuda(struct CUDA_Context *ctx, unsigned from_
 	memcpy(v, ctx->slave_comp_old[from_id].cpu_rd_ptr(), sizeof(unsigned int) * ctx->num_slave_nodes[from_id]);
 }
 
-__global__ void batch_set_node_comp_old(index_type size, unsigned int * p_slave_nodes, unsigned int * p_slave_comp_old, unsigned int * p_comp_old) {
+__global__ void batch_set_node_comp_old(index_type size, const unsigned int * __restrict__ p_slave_nodes, const unsigned int * __restrict__ p_slave_comp_old, unsigned int * __restrict__ p_comp_old) {
 	unsigned tid = TID_1D;
 	unsigned nthreads = TOTAL_THREADS_1D;
 	index_type src_end = size;
@@ -227,7 +227,7 @@ void batch_set_node_comp_old_cuda(struct CUDA_Context *ctx, unsigned from_id, un
 	check_cuda_kernel;
 }
 
-__global__ void batch_add_node_comp_old(index_type size, unsigned int * p_master_nodes, unsigned int * p_master_comp_old, unsigned int * p_comp_old) {
+__global__ void batch_add_node_comp_old(index_type size, const unsigned int * __restrict__ p_master_nodes, const unsigned int * __restrict__ p_master_comp_old, unsigned int * __restrict__ p_comp_old) {
 	unsigned tid = TID_1D;
 	unsigned nthreads = TOTAL_THREADS_1D;
 	index_type src_end = size;
@@ -246,7 +246,7 @@ void batch_add_node_comp_old_cuda(struct CUDA_Context *ctx, unsigned from_id, un
 	check_cuda_kernel;
 }
 
-__global__ void batch_min_node_comp_old(index_type size, unsigned int * p_master_nodes, unsigned int * p_master_comp_old, unsigned int * p_comp_old) {
+__global__ void batch_min_node_comp_old(index_type size, const unsigned int * __restrict__ p_master_nodes, const unsigned int * __restrict__ p_master_comp_old, unsigned int * __restrict__ p_comp_old) {
 	unsigned tid = TID_1D;
 	unsigned nthreads = TOTAL_THREADS_1D;
 	index_type src_end = size;
