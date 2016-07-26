@@ -83,6 +83,23 @@ class NetworkInterfaceBuffered : public NetworkInterface {
         }
       }
     }
+
+    //return a (moved) vector if the len bytes requested are the last len bytes of the front of the buffer queue
+    optional_t<std::vector<uint8_t> > popVec(uint32_t len) {
+      if (data[0].data.size() == frontOffset + len) {
+        std::vector<uint8_t> retval(std::move(data[0].data));
+        data.pop_front();
+        frontOffset = 0;
+        if (data.size()) {
+          dataPresent = data.front().tag;
+        } else {
+          dataPresent = ~0;
+        }
+        return optional_t<std::vector<uint8_t> >(std::move(retval));
+      } else {
+        return optional_t<std::vector<uint8_t> >();
+      }
+    }
     
     void erase(size_t n) {
       frontOffset += n;
@@ -117,6 +134,14 @@ class NetworkInterfaceBuffered : public NetworkInterface {
       if (!sizeAtLeast(sizeof(uint32_t) + len, tag))
         return optional_t<RecvBuffer>();
       erase(4);
+
+      //Try just using the buffer
+      if (auto r = popVec(len)) {
+        auto start = r->size() - len;
+        //        std::cerr << "FP " << r->size() << " " << len << " " << start << "\n";
+        return optional_t<RecvBuffer>(RecvBuffer(std::move(*r), start));
+      }
+        
       RecvBuffer buf(len);
       //FIXME: This is slows things down 25%
       copyOut((char*)buf.linearData(), len);
