@@ -683,18 +683,23 @@ public:
       std::vector<MPI_Request> requests(2 * net.Num);
       unsigned num_requests = 0;
 
-      std::vector<uint8_t> sb[net.Num];
+#ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
+      std::vector<typename FnTy::ValTy> sb[net.Num];
+#else
+      std::vector<uint64_t> sb[net.Num];
+#endif
       for (unsigned x = 0; x < net.Num; ++x) {
          uint32_t num = masterNodes[x].size();
          if((x == id) || (num == 0))
            continue;
+         sb[x].resize(num);
 
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
          size_t size = num * sizeof(typename FnTy::ValTy);
-         std::vector<typename FnTy::ValTy> val_vec(num);
+         std::vector<typename FnTy::ValTy> &val_vec = sb[x];
 #else
          size_t size = num * sizeof(uint64_t);
-         std::vector<uint64_t> val_vec(num);
+         std::vector<uint64_t> &val_vec = sb[x];
 #endif
 
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
@@ -714,15 +719,16 @@ public:
          val_vec[0] = 1;
 #endif
 
-         sb[x].resize(size);
-         memcpy(&sb[x][0], &val_vec[0], size);
-
          SyncPull_send_bytes += size;
          //std::cerr << "[" << id << "]" << " mpi send to " << x << " : " << size << "\n";
-         MPI_Isend(&sb[x][0], size, MPI_BYTE, x, 32767, MPI_COMM_WORLD, &requests[num_requests++]);
+         MPI_Isend((uint8_t *)sb[x].data(), size, MPI_BYTE, x, 32767, MPI_COMM_WORLD, &requests[num_requests++]);
       }
 
-      std::vector<uint8_t> rb[net.Num];
+#ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
+      std::vector<typename FnTy::ValTy> rb[net.Num];
+#else
+      std::vector<uint64_t> rb[net.Num];
+#endif
       for (unsigned x = 0; x < net.Num; ++x) {
          uint32_t num = slaveNodes[x].size();
          if((x == id) || (num == 0))
@@ -732,10 +738,10 @@ public:
 #else
          size_t size = num * sizeof(uint64_t);
 #endif
-         rb[x].resize(size);
+         rb[x].resize(num);
 
          //std::cerr << "[" << id << "]" << " mpi receive from " << x << " : " << size << "\n";
-         MPI_Irecv(&rb[x][0], size, MPI_BYTE, x, 32767, MPI_COMM_WORLD, &requests[num_requests++]);
+         MPI_Irecv((uint8_t *)rb[x].data(), size, MPI_BYTE, x, 32767, MPI_COMM_WORLD, &requests[num_requests++]);
       }
 
       MPI_Waitall(num_requests, &requests[0], MPI_STATUSES_IGNORE);
@@ -744,15 +750,12 @@ public:
          uint32_t num = slaveNodes[x].size();
          if((x == id) || (num == 0))
            continue;
-         //std::cerr << "[" << id << "]" << " mpi received from " << x << " : " << size << "\n";
+         //std::cerr << "[" << id << "]" << " mpi received from " << x << "\n";
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
-         size_t size = num * sizeof(typename FnTy::ValTy);
-         std::vector<typename FnTy::ValTy> val_vec(num);
+         std::vector<typename FnTy::ValTy> &val_vec = rb[x];
 #else
-         size_t size = num * sizeof(uint64_t);
-         std::vector<uint64_t> val_vec(num);
+         std::vector<uint64_t> &val_vec = rb[x];
 #endif
-         memcpy(&val_vec[0], &rb[x][0], size);
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
          if (!FnTy::setVal_batch(x, &val_vec[0])) {
            Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num), [&](uint32_t n){
@@ -791,18 +794,23 @@ public:
       std::vector<MPI_Request> requests(2 * net.Num);
       unsigned num_requests = 0;
 
-      std::vector<uint8_t> sb[net.Num];
+#ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
+      std::vector<typename FnTy::ValTy> sb[net.Num];
+#else
+      std::vector<uint64_t> sb[net.Num];
+#endif
       for (unsigned x = 0; x < net.Num; ++x) {
          uint32_t num = slaveNodes[x].size();
          if((x == id) || (num == 0))
            continue;
+         sb[x].resize(num);
 
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
          size_t size = num * sizeof(typename FnTy::ValTy);
-         std::vector<typename FnTy::ValTy> val_vec(num);
+         std::vector<typename FnTy::ValTy> &val_vec = sb[x];
 #else
          size_t size = num * sizeof(uint64_t);
-         std::vector<uint64_t> val_vec(num);
+         std::vector<uint64_t> &val_vec = sb[x];
 #endif
 
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
@@ -824,15 +832,16 @@ public:
          val_vec[0] = 1;
 #endif
 
-         sb[x].resize(size);
-         memcpy(&sb[x][0], &val_vec[0], size);
-
          SyncPush_send_bytes += size;
          //std::cerr << "[" << id << "]" << " mpi send to " << x << " : " << size << "\n";
-         MPI_Isend(&sb[x][0], size, MPI_BYTE, x, 32767, MPI_COMM_WORLD, &requests[num_requests++]);
+         MPI_Isend((uint8_t *)sb[x].data(), size, MPI_BYTE, x, 32767, MPI_COMM_WORLD, &requests[num_requests++]);
       }
 
-      std::vector<uint8_t> rb[net.Num];
+#ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
+      std::vector<typename FnTy::ValTy> rb[net.Num];
+#else
+      std::vector<uint64_t> rb[net.Num];
+#endif
       for (unsigned x = 0; x < net.Num; ++x) {
          uint32_t num = masterNodes[x].size();
          if((x == id) || (num == 0))
@@ -842,10 +851,10 @@ public:
 #else
          size_t size = num * sizeof(uint64_t);
 #endif
-         rb[x].resize(size);
+         rb[x].resize(num);
 
          //std::cerr << "[" << id << "]" << " mpi receive from " << x << " : " << size << "\n";
-         MPI_Irecv(&rb[x][0], size, MPI_BYTE, x, 32767, MPI_COMM_WORLD, &requests[num_requests++]);
+         MPI_Irecv((uint8_t *)rb[x].data(), size, MPI_BYTE, x, 32767, MPI_COMM_WORLD, &requests[num_requests++]);
       }
 
       MPI_Waitall(num_requests, &requests[0], MPI_STATUSES_IGNORE);
@@ -854,15 +863,12 @@ public:
          uint32_t num = masterNodes[x].size();
          if((x == id) || (num == 0))
            continue;
-         //std::cerr << "[" << id << "]" << " mpi received from " << x << " : " << size << "\n";
+         //std::cerr << "[" << id << "]" << " mpi received from " << x << "\n";
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
-         size_t size = num * sizeof(typename FnTy::ValTy);
-         std::vector<typename FnTy::ValTy> val_vec(num);
+         std::vector<typename FnTy::ValTy> &val_vec = rb[x];
 #else
-         size_t size = num * sizeof(uint64_t);
-         std::vector<uint64_t> val_vec(num);
+         std::vector<uint64_t> &val_vec = rb[x];
 #endif
-         memcpy(&val_vec[0], &rb[x][0], size);
 #ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
          if (!FnTy::reduce_batch(x, &val_vec[0])) {
            Galois::do_all(boost::counting_iterator<uint32_t>(0), boost::counting_iterator<uint32_t>(num),
