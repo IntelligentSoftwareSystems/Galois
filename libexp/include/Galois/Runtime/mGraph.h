@@ -29,6 +29,7 @@
 #include <set>
 #include <algorithm>
 #include <unordered_map>
+#include <deque>
 
 #include "Galois/gstl.h"
 #include "Galois/Graphs/LC_CSR_Graph.h"
@@ -42,6 +43,8 @@
 
 #include "Galois/Runtime/GlobalObj.h"
 #include "Galois/Runtime/OfflineGraph.h"
+
+#include "Galois/FlatMap.h"
 
 #ifdef __GALOIS_HET_CUDA__
 #include "Galois/Runtime/Cuda/cuda_mtypes.h"
@@ -75,13 +78,51 @@ struct MergeInfo {
   //MergeInfo() : merged_localID(0), partition(0), localID(0) { }
   //MergeInfo(uint32_t ml, uint32_t pn, uint32_t l) : merged_localID(ml), partition(pn), localID(l) { } 
 
-  MergeInfo() : partition(0), localID(0), globalID(0){ }
-  MergeInfo(uint32_t pn, uint32_t l, uint64_t g) : partition(pn), localID(l), globalID(g) { }
+  MergeInfo() : partition(0), localID(0){ }
+  MergeInfo(uint32_t pn, uint32_t l) : partition(pn), localID(l){ }
 
   //uint32_t merged_localID;
   uint32_t partition;
   uint32_t localID;
-  uint64_t globalID;
+  //uint64_t globalID;
+};
+
+struct Comp_owner_deq
+{
+  bool operator() ( const std::pair<uint64_t, uint32_t>& s, uint64_t i )
+  {
+    return s.first < i;
+  }
+
+  bool operator() ( uint64_t i, const std::pair<uint64_t, uint32_t>& s )
+  {
+    return i < s.first;
+  }
+
+  bool operator() ( const std::pair<uint64_t, uint32_t>& a , const std::pair<uint64_t, uint32_t>& b )
+  {
+    return a.first < b.first;
+  }
+
+
+};
+
+struct Comp_mergedInfo_deq
+{
+  bool operator() ( const std::pair<uint64_t, MergeInfo>& s, uint64_t i )
+  {
+    return s.first < i;
+  }
+
+  bool operator() ( uint64_t i, const std::pair<uint64_t, MergeInfo>& s )
+  {
+    return i < s.first;
+  }
+
+  bool operator() ( const std::pair<uint64_t, MergeInfo>& a, const std::pair<uint64_t, MergeInfo>& b)
+  {
+    return a.first < b.first;
+  }
 };
 
 std::string getPartitionFileName(const std::string & basename, unsigned hostID, unsigned num_hosts){
@@ -153,28 +194,34 @@ class mGraph : public GlobalObject {
   std::vector<NodeInfo> localToGlobalMap_meta;
   std::vector<std::vector<size_t>> slaveNodes; // slave nodes from different hosts. For sync_push
   std::vector<std::vector<size_t>> masterNodes; // master nodes on different hosts. For sync_pull
-  std::unordered_map<size_t, size_t> LocalToGlobalMap;
-  std::unordered_map<size_t, size_t> GlobalToLocalMap;
+  //std::unordered_map<size_t, size_t> LocalToGlobalMap;
+  //std::unordered_map<size_t, size_t> GlobalToLocalMap;
 
-  std::unordered_map<size_t, size_t> GIDtoOwnerMap;
+  //std::unordered_map<size_t, size_t> GIDtoOwnerMap;
 
   std::vector<size_t> OwnerVec; //To store the ownerIDs of sorted according to the Global IDs.
   std::vector<size_t> GlobalVec; //Global Id's sorted vector.
   std::vector<size_t> LocalVec; //Local Id's sorted vector.
 
    //GID to owner
-   std::vector<std::pair<uint64_t, uint64_t>> gid2host;
+   //std::vector<std::pair<uint64_t, uint64_t>> gid2host;
 
    uint32_t num_iter_push; //Keep track of number of iterations.
    uint32_t num_iter_pull; //Keep track of number of iterations.
    uint32_t num_run; //Keep track of number of iterations.
 
    // For merging metaFiles
-   std::map<uint64_t, std::vector<MergeInfo>> mergedInfoMap;
+   //std::map<uint64_t, std::vector<MergeInfo>> mergedInfoMap;
+   //Galois::flat_map<uint64_t, std::vector<MergeInfo>> mergedInfoMap;
+   std::deque<std::pair<uint64_t, MergeInfo>> mergedInfoDeq;
+
    std::vector<std::vector<uint64_t>> GlobalVec_new; //Global Id's sorted vector.
    std::vector<uint64_t> GlobalVec_merged; //Global Id's sorted vector.
    std::vector<size_t> OwnerVec_merged; //To store the ownerIDs of sorted according to the Global IDs.
-   std::map<uint64_t, uint32_t> OwnerID_merged_map;
+   //Galois::flat_map<uint64_t, uint32_t> OwnerID_merged_map;
+   std::deque<std::pair<uint64_t, uint32_t>> OwnerID_merged_deq;
+   //std::map<uint64_t, uint32_t> OwnerID_merged_map;
+
 #if 0
    //host -> (lid, lid]
    std::pair<uint32_t, uint32_t> nodes_by_host(uint32_t host) const {
@@ -193,6 +240,8 @@ class mGraph : public GlobalObject {
   uint32_t G2L_merged(uint64_t gid) {
     //we can assume that GID exits and is unique. Index is localID since it is sorted.
     auto iter = std::lower_bound(GlobalVec_merged.begin(), GlobalVec_merged.end(), gid);
+    if(*iter != gid)
+      std::cerr << "[" <<id <<"] G2L_merged : " << *iter << ", GID : " << gid << "GlobalVec_merged[0] : " << GlobalVec_merged[0] <<"\n";
     assert(*iter == gid);
     if(*iter == gid)
       return (iter - GlobalVec_merged.begin());
@@ -397,44 +446,50 @@ public:
     masterNodes.resize(numHosts);
     slaveNodes.resize(numHosts);
 
-    uint32_t numPartFiles = 32/numHosts; //multiple of 2 for now.
+    uint32_t NUMBER = 128;
+    uint32_t numPartFiles = NUMBER/numHosts; //multiple of 2 for now.
     std::vector<OfflineGraph*> g_vec;
     totalNodes = 0;
     std::cerr << "NUMPARTSFILES : " << numPartFiles << "\n";
-    //localToGlobalMap_meta.resize(numPartFiles);
     uint64_t numEdges = 0;
-    //GlobalVec_new.resize(numPartFiles);
+    GlobalVec_new.resize(numPartFiles);
 
     for(auto i = 0; i < numPartFiles; ++i){
       uint32_t part_id = numPartFiles*id + i;
       std::cerr << "[" << id << "]" << " part_id : " << part_id << "\n";
-      std::string part_fileName = getPartitionFileName(partitionFolder,part_id,32);
-      std::string part_metaFile = getMetaFileName(partitionFolder, part_id, 32);
+      std::string part_fileName = getPartitionFileName(partitionFolder,part_id,NUMBER);
+      std::string part_metaFile = getMetaFileName(partitionFolder, part_id, NUMBER);
 
       std::cerr << "[" << id  <<  "]" << part_fileName << "\n";
       g_vec.push_back(new OfflineGraph(part_fileName));
       totalNodes += (*g_vec.back()).size();
-      //numEdges += g_vec[i]->edge_begin(*(g_vec[i]->end())) - g_vec[i]->edge_begin(*(g_vec[i]->begin())); // depends on Offline graph impl
-      numEdges += g_vec.back()->edge_begin(*(g_vec.back()->end())) - g_vec.back()->edge_begin(*(g_vec.back()->begin())); // depends on Offline graph impl
+      numEdges += g_vec[i]->edge_begin(*(g_vec[i]->end())) - g_vec[i]->edge_begin(*(g_vec[i]->begin())); // depends on Offline graph impl
 
       readMetaFile(part_metaFile, localToGlobalMap_meta);
-      std::cerr << "[" << id << "] MAPSIZE : " << localToGlobalMap_meta.size() << "\n";
+      std::cerr << "[" << id << "] LOCALTOGLOBAL_meta_Size : " << localToGlobalMap_meta.size() << "\n";
 
 
-        /** Load one meta file at a time.*/
-       for(auto info : localToGlobalMap_meta){
-        mergedInfoMap[info.global_id].push_back(MergeInfo(i, info.local_id, info.global_id));
+      /** Load one meta file at a time.*/
+      for(auto info : localToGlobalMap_meta){
+        mergedInfoDeq.push_back(std::make_pair(info.global_id, MergeInfo(i, info.local_id)));
         slaveNodes[info.owner_id/numPartFiles].push_back(info.global_id);
         assert(info.owner_id/numPartFiles < numHosts);
-        //Individual GlobalVec is sorted.
-        //GlobalVec_new[i].push_back(info.global_id);
-        OwnerID_merged_map[info.global_id] = (info.owner_id/numPartFiles);
+        OwnerID_merged_deq.push_back(std::make_pair(info.global_id, info.owner_id/numPartFiles));
+        GlobalVec_new[i].push_back(info.global_id);
       }
 
-      /*** FREE the memory ***/
+      assert(mergedInfoDeq.size() == totalNodes);
+
+      /*** FREE the memory for reuse. ***/
       localToGlobalMap_meta.clear();
       localToGlobalMap_meta.shrink_to_fit();
     }
+
+
+    //SORTING deqs very important
+    std::sort(mergedInfoDeq.begin(), mergedInfoDeq.end(), Comp_mergedInfo_deq());
+    std::sort(OwnerID_merged_deq.begin(), OwnerID_merged_deq.end(), Comp_owner_deq());
+
 
     std::cerr << "[" << id << "] g_vec SIZE : " << g_vec.size() << "\n";
 
@@ -444,55 +499,45 @@ public:
     std::cerr << "[" << id << "] SIZE ::::  " << totalNodes << "\n";
     std::cerr << "[" << id << "] TOTAL EDGES ::::  " << numEdges << "\n";
 
-#if 0
-    GlobalVec_new.resize(numPartFiles);
-    for(auto i = 0; i < numPartFiles; ++i){
-      for(auto info : localToGlobalMap_meta[i]){
-        mergedInfoMap[info.global_id].push_back(MergeInfo(i, info.local_id));
-        slaveNodes[info.owner_id/numPartFiles].push_back(info.global_id);
-        assert(info.owner_id/numPartFiles < numHosts);
-        //Individual GlobalVec is sorted.
-        GlobalVec_new[i].push_back(info.global_id);
-        OwnerID_merged_map[info.global_id] = (info.owner_id/numPartFiles);
-      }
-    }
-#endif
 
     std::cerr << "[" << id << "]"<< " : Loading data done\n";
 
-#if 0
-    /*** FREE the memory ***/
-    for(auto i = 0; i < numPartFiles; ++i){
-      localToGlobalMap_meta[i].clear();
-      localToGlobalMap_meta[i].shrink_to_fit();
-    }
-#endif
-
     //IMPORTANT
-    numOwned = mergedInfoMap.size();
+    numOwned = 0;
+    std::cerr << "[" << id << "]"<< ": Filling GlobalVec_merged\n";
+    auto mergedInfoDeq_begin = mergedInfoDeq.begin();
+    for(size_t deq_index = 0; deq_index < mergedInfoDeq.size();){
+      auto p = std::equal_range(mergedInfoDeq.begin() + deq_index, mergedInfoDeq.end(), mergedInfoDeq[deq_index].first, Comp_mergedInfo_deq());
+      assert((*(p.first)).first == mergedInfoDeq[deq_index].first);
+      GlobalVec_merged.push_back(mergedInfoDeq[deq_index].first);
+      deq_index += (p.second - p.first);
+      ++numOwned;
+    }
 
-    for(auto n : mergedInfoMap){
-      GlobalVec_merged.push_back(n.first);
+    assert(numOwned == GlobalVec_merged.size());
+    assert(std::is_sorted(GlobalVec_merged.begin(), GlobalVec_merged.end()));
+
+    std::cerr << "[" << id << "]"<< ": DONE Filling GlobalVec_merged, NUMOWNED : "<< numOwned <<"\n";
+
+    std::cerr << "[" << id << "]"<< ": Filling OwnerVec_merged\n";
+    auto OwnerID_merged_deq_begin = OwnerID_merged_deq.begin();
+    for(size_t deq_index = 0; deq_index < OwnerID_merged_deq.size();){
+      auto p = std::equal_range(OwnerID_merged_deq.begin() + deq_index, OwnerID_merged_deq.end(), OwnerID_merged_deq[deq_index].first, Comp_owner_deq());
+      OwnerVec_merged.push_back(OwnerID_merged_deq[deq_index].second);
+      deq_index += (p.second - p.first);
     }
-    for(auto n : OwnerID_merged_map){
-      OwnerVec_merged.push_back(n.second);
-    }
+    std::cerr << "[" << id << "]"<< ": DONE Filling OwnerVec_merged\n";
 
     /*** FREE the memory ***/
-    OwnerID_merged_map.clear();
+    OwnerID_merged_deq.clear();
+    OwnerID_merged_deq.shrink_to_fit();
 
-    std::cerr << "[" << id << "] mergedMap size : " << mergedInfoMap.size() << "\n";
-
-    graph.allocateFrom(totalNodes, numEdges);
+    graph.allocateFrom(numOwned, numEdges);
     //std::cerr << "Allocate done\n";
 
     graph.constructNodes();
     //std::cerr << "Construct nodes done\n";
     loadEdges<std::is_void<EdgeTy>::value>(g_vec);
-
-    /*** FREE the memory ***/
-    mergedInfoMap.clear();
-
 
     StatTimer_graph_construct.stop();
 
@@ -559,45 +604,54 @@ public:
   }
 #endif
 
-
    template<bool isVoidType, typename std::enable_if<!isVoidType>::type* = nullptr>
-     void loadEdges(std::vector<OfflineGraph*>& g_vec) {
-       fprintf(stderr, "Loading edge-data while creating edges.\n");
-       uint64_t cur = 0;
-       for(auto i = 0; i < GlobalVec_merged.size(); ++i){
-         auto& n = mergedInfoMap[GlobalVec_merged[i]];
-         for(auto v : n){
-           //assert(GlobalVec_new[v.partition][v.localID] == GlobalVec_merged[i]);
-           for(auto ii = g_vec[v.partition]->edge_begin(v.localID), ee = g_vec[v.partition]->edge_end(v.localID); ii < ee; ++ii){
-             auto gdst = g_vec[v.partition]->getEdgeDst(ii);
+      void loadEdges(std::vector<OfflineGraph*>& g_vec) {
+        fprintf(stderr, "Loading VOID edge-data while creating edges.\n");
+        uint64_t cur = 0;
+        auto deq_ii = mergedInfoDeq.begin();
+        size_t deq_index  = 0;
+        uint32_t node = 0;
+        for(; deq_index < mergedInfoDeq.size(); ){
+          auto p = std::equal_range(mergedInfoDeq.begin() + deq_index, mergedInfoDeq.end(), mergedInfoDeq[deq_index].first, Comp_mergedInfo_deq());
+          for(auto p_i = p.first; p_i != p.second; ++p_i){
+            auto v = (*p_i).second;
+            for(auto ii = g_vec[v.partition]->edge_begin(v.localID), ee = g_vec[v.partition]->edge_end(v.localID); ii < ee; ++ii){
+              uint32_t gdst = g_vec[v.partition]->getEdgeDst(ii);
+              uint64_t dest_globalID = GlobalVec_new[v.partition][gdst];
               auto gdata = g_vec[v.partition]->getEdgeData<EdgeTy>(ii);
-             //auto globalID = v.globalID; //GlobalVec_new[v.partition][gdst];
-             auto gdst_merged = G2L_merged(v.globalID); //G2L_merged(globalID);
-             graph.constructEdge(cur++, gdst_merged, gdata);
-           }
-         }
-         graph.fixEndEdge(i, cur);
-       }
-     }
+              uint32_t gdst_merged = G2L_merged(dest_globalID); //G2L_merged(globalID);
+              graph.constructEdge(cur++, gdst_merged, gdata);
+            }
+            ++deq_index;
+          }
+          graph.fixEndEdge(node++, cur);
+        }
+        assert(numOwned == node);
+      }
 
-   template<bool isVoidType, typename std::enable_if<isVoidType>::type* = nullptr>
-     void loadEdges(std::vector<OfflineGraph*>& g_vec) {
-       fprintf(stderr, "Loading VOID edge-data while creating edges.\n");
-       uint64_t cur = 0;
-       for(auto i = 0; i < GlobalVec_merged.size(); ++i){
-         auto& n = mergedInfoMap[GlobalVec_merged[i]];
-         for(auto v : n){
-           //assert(GlobalVec_new[v.partition][v.localID] == GlobalVec_merged[i]);
-           for(auto ii = g_vec[v.partition]->edge_begin(v.localID), ee = g_vec[v.partition]->edge_end(v.localID); ii < ee; ++ii){
-             auto gdst = g_vec[v.partition]->getEdgeDst(ii);
-             //auto globalID = v.globalID; //GlobalVec_new[v.partition][gdst];
-             auto gdst_merged = G2L_merged(v.globalID) ; //G2L_merged(globalID);
-             graph.constructEdge(cur++, gdst_merged);
-           }
-         }
-         graph.fixEndEdge(i, cur);
-       }
-     }
+    template<bool isVoidType, typename std::enable_if<isVoidType>::type* = nullptr>
+      void loadEdges(std::vector<OfflineGraph*>& g_vec) {
+        fprintf(stderr, "Loading VOID edge-data while creating edges.\n");
+        uint64_t cur = 0;
+        auto deq_ii = mergedInfoDeq.begin();
+        size_t deq_index  = 0;
+        uint32_t node = 0;
+        for(; deq_index < mergedInfoDeq.size(); ){
+          auto p = std::equal_range(mergedInfoDeq.begin() + deq_index, mergedInfoDeq.end(), mergedInfoDeq[deq_index].first, Comp_mergedInfo_deq());
+          for(auto p_i = p.first; p_i != p.second; ++p_i){
+            auto v = (*p_i).second;
+            for(auto ii = g_vec[v.partition]->edge_begin(v.localID), ee = g_vec[v.partition]->edge_end(v.localID); ii < ee; ++ii){
+              uint32_t gdst = g_vec[v.partition]->getEdgeDst(ii);
+              uint64_t dest_globalID = GlobalVec_new[v.partition][gdst];
+              uint32_t gdst_merged = G2L_merged(dest_globalID); //G2L_merged(globalID);
+              graph.constructEdge(cur++, gdst_merged);
+            }
+            ++deq_index;
+          }
+          graph.fixEndEdge(node++, cur);
+        }
+        assert(numOwned == node);
+      }
 
    NodeTy& getData(GraphNode N, Galois::MethodFlag mflag = Galois::MethodFlag::WRITE) {
       auto& r = getDataImpl<BSPNode>(N, mflag);
