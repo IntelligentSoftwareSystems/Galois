@@ -506,14 +506,25 @@ public:
     //IMPORTANT
     numOwned = 0;
     std::cerr << "[" << id << "]"<< ": Filling GlobalVec_merged\n";
-    auto mergedInfoDeq_begin = mergedInfoDeq.begin();
+    //auto mergedInfoDeq_begin = mergedInfoDeq.begin();
     for(size_t deq_index = 0; deq_index < mergedInfoDeq.size();){
       auto p = std::equal_range(mergedInfoDeq.begin() + deq_index, mergedInfoDeq.end(), mergedInfoDeq[deq_index].first, Comp_mergedInfo_deq());
-      assert((*(p.first)).first == mergedInfoDeq[deq_index].first);
+      //assert((*(p.first)).first == mergedInfoDeq[deq_index].first);
+      //GlobalVec_merged.push_back(mergedInfoDeq[deq_index].first);
+      //OwnerVec_merged.push_back(mergedInfoDeq[deq_index].second.ownerID);
+      deq_index += (p.second - p.first);
+      ++numOwned;
+    }
+
+
+    GlobalVec_merged.reserve(numOwned);
+    OwnerVec_merged.reserve(numOwned);
+    for(size_t deq_index = 0; deq_index < mergedInfoDeq.size();){
+      auto p = std::equal_range(mergedInfoDeq.begin() + deq_index, mergedInfoDeq.end(), mergedInfoDeq[deq_index].first, Comp_mergedInfo_deq());
+      //assert((*(p.first)).first == mergedInfoDeq[deq_index].first);
       GlobalVec_merged.push_back(mergedInfoDeq[deq_index].first);
       OwnerVec_merged.push_back(mergedInfoDeq[deq_index].second.ownerID);
       deq_index += (p.second - p.first);
-      ++numOwned;
     }
 
     assert(numOwned == GlobalVec_merged.size());
@@ -544,6 +555,11 @@ public:
     loadEdges<std::is_void<EdgeTy>::value>(g_vec);
 
     StatTimer_graph_construct.stop();
+
+    /***Free memory since edges have been constructed.***/
+    mergedInfoDeq.clear();
+    mergedInfoDeq.shrink_to_fit();
+
 
     setup_communication(numHosts);
 
@@ -1533,7 +1549,7 @@ public:
       return G2L_merged(nodeID);
    }
 
-   unsigned getHostID(uint64_t gid) {
+   uint16_t getHostID(uint64_t gid) {
     auto lid = G2L_merged(gid);
     return OwnerVec_merged[lid];
    }
