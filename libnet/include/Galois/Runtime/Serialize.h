@@ -277,10 +277,12 @@ inline void gSerializeObj(SerializeBuffer& buf, const std::string& data) {
 }
 
 inline void gSerializeObj(SerializeBuffer& buf, const SerializeBuffer& data) {
+  buf.reserve(data.size());
   buf.insert(data.linearData(), data.size());
 }
 
 inline void gSerializeObj(SerializeBuffer& buf, const DeSerializeBuffer& rbuf) {
+  buf.reserve(rbuf.r_size());
   buf.insert(rbuf.r_linearData(), rbuf.r_size());
 }
 
