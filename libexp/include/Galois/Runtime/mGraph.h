@@ -78,10 +78,11 @@ struct MergeInfo {
   //MergeInfo() : merged_localID(0), partition(0), localID(0) { }
   //MergeInfo(uint32_t ml, uint32_t pn, uint32_t l) : merged_localID(ml), partition(pn), localID(l) { } 
 
-  MergeInfo() : partition(0), localID(0){ }
-  MergeInfo(uint32_t pn, uint32_t l) : partition(pn), localID(l){ }
+  MergeInfo() : partition(0), localID(0), ownerID(0){ }
+  MergeInfo(uint32_t pn, uint32_t l, uint16_t o) : partition(pn), localID(l), ownerID(o){ }
 
   //uint32_t merged_localID;
+  uint16_t ownerID;
   uint32_t partition;
   uint32_t localID;
   //uint64_t globalID;
@@ -217,7 +218,7 @@ class mGraph : public GlobalObject {
 
    std::vector<std::vector<uint64_t>> GlobalVec_new; //Global Id's sorted vector.
    std::vector<uint64_t> GlobalVec_merged; //Global Id's sorted vector.
-   std::vector<size_t> OwnerVec_merged; //To store the ownerIDs of sorted according to the Global IDs.
+   std::vector<uint16_t> OwnerVec_merged; //To store the ownerIDs of sorted according to the Global IDs.
    //Galois::flat_map<uint64_t, uint32_t> OwnerID_merged_map;
    std::deque<std::pair<uint64_t, uint32_t>> OwnerID_merged_deq;
    //std::map<uint64_t, uint32_t> OwnerID_merged_map;
@@ -446,7 +447,7 @@ public:
     masterNodes.resize(numHosts);
     slaveNodes.resize(numHosts);
 
-    uint32_t NUMBER = 128;
+    uint32_t NUMBER = 32;
     uint32_t numPartFiles = NUMBER/numHosts; //multiple of 2 for now.
     std::vector<OfflineGraph*> g_vec;
     totalNodes = 0;
@@ -471,10 +472,10 @@ public:
 
       /** Load one meta file at a time.*/
       for(auto info : localToGlobalMap_meta){
-        mergedInfoDeq.push_back(std::make_pair(info.global_id, MergeInfo(i, info.local_id)));
+        mergedInfoDeq.push_back(std::make_pair(info.global_id, MergeInfo(i, info.local_id, (info.owner_id/numPartFiles))));
         slaveNodes[info.owner_id/numPartFiles].push_back(info.global_id);
         assert(info.owner_id/numPartFiles < numHosts);
-        OwnerID_merged_deq.push_back(std::make_pair(info.global_id, info.owner_id/numPartFiles));
+        //OwnerID_merged_deq.push_back(std::make_pair(info.global_id, info.owner_id/numPartFiles));
         GlobalVec_new[i].push_back(info.global_id);
       }
 
@@ -488,7 +489,7 @@ public:
 
     //SORTING deqs very important
     std::sort(mergedInfoDeq.begin(), mergedInfoDeq.end(), Comp_mergedInfo_deq());
-    std::sort(OwnerID_merged_deq.begin(), OwnerID_merged_deq.end(), Comp_owner_deq());
+    //std::sort(OwnerID_merged_deq.begin(), OwnerID_merged_deq.end(), Comp_owner_deq());
 
 
     std::cerr << "[" << id << "] g_vec SIZE : " << g_vec.size() << "\n";
@@ -510,6 +511,7 @@ public:
       auto p = std::equal_range(mergedInfoDeq.begin() + deq_index, mergedInfoDeq.end(), mergedInfoDeq[deq_index].first, Comp_mergedInfo_deq());
       assert((*(p.first)).first == mergedInfoDeq[deq_index].first);
       GlobalVec_merged.push_back(mergedInfoDeq[deq_index].first);
+      OwnerVec_merged.push_back(mergedInfoDeq[deq_index].second.ownerID);
       deq_index += (p.second - p.first);
       ++numOwned;
     }
@@ -519,6 +521,7 @@ public:
 
     std::cerr << "[" << id << "]"<< ": DONE Filling GlobalVec_merged, NUMOWNED : "<< numOwned <<"\n";
 
+#if 0
     std::cerr << "[" << id << "]"<< ": Filling OwnerVec_merged\n";
     auto OwnerID_merged_deq_begin = OwnerID_merged_deq.begin();
     for(size_t deq_index = 0; deq_index < OwnerID_merged_deq.size();){
@@ -531,6 +534,7 @@ public:
     /*** FREE the memory ***/
     OwnerID_merged_deq.clear();
     OwnerID_merged_deq.shrink_to_fit();
+#endif
 
     graph.allocateFrom(numOwned, numEdges);
     //std::cerr << "Allocate done\n";
