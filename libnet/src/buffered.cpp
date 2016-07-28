@@ -194,8 +194,9 @@ class NetworkInterfaceBuffered : public NetworkInterface {
     std::deque<msg> messages;
     std::atomic<size_t> numBytes;
     std::atomic<unsigned> urgent;
+    //FIXME: track time since some epoch in an atomic.
     std::chrono::high_resolution_clock::time_point time;
-    SimpleLock lock;
+    SimpleLock lock, timelock;
 
   public:
     unsigned long statSendTimeout;
@@ -220,8 +221,13 @@ class NetworkInterfaceBuffered : public NetworkInterface {
         ++statSendOverflow;
         return true;
       }
-      std::lock_guard<SimpleLock> lg(lock);
-      auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(std::chrono::high_resolution_clock::now() - time);
+      auto n = std::chrono::high_resolution_clock::now();
+      decltype(n) mytime;
+      {
+        std::lock_guard<SimpleLock> lg(timelock);
+        mytime = time;
+      }
+      auto elapsed = std::chrono::duration_cast<std::chrono::microseconds>(n - mytime);
       if (elapsed.count() > COMM_DELAY) {
         ++statSendTimeout;
         return true;
@@ -230,7 +236,7 @@ class NetworkInterfaceBuffered : public NetworkInterface {
     }
 
     std::pair<uint32_t, std::vector<uint8_t> > assemble() {
-      std::lock_guard<SimpleLock> lg(lock);
+      std::unique_lock<SimpleLock> lg(lock);
       if (messages.empty())
         return std::make_pair(~0, std::vector<uint8_t>());
       //compute message size
@@ -245,31 +251,34 @@ class NetworkInterfaceBuffered : public NetworkInterface {
           num += sizeof(uint32_t);
         }
       }
+      lg.unlock();
       //construct message
       std::vector<uint8_t> vec;
       vec.reserve(len + num);
-      while (!messages.empty()) {
+      //go out of our way to avoid locking out senders when making messages
+      lg.lock();
+      do {
         auto& m = messages.front();
-        if (m.tag != tag) {
-          break;
-        } else {
-          union {uint32_t a; uint8_t b[sizeof(uint32_t)]; } foo;
-          foo.a = m.data.size();
-          vec.insert(vec.end(), &foo.b[0], &foo.b[sizeof(uint32_t)]);
-          vec.insert(vec.end(), m.data.begin(), m.data.end());
-          messages.pop_front();
-          if (urgent)
-            --urgent;
-        }
-      }
+        lg.unlock();
+        union {uint32_t a; uint8_t b[sizeof(uint32_t)]; } foo;
+        foo.a = m.data.size();
+        vec.insert(vec.end(), &foo.b[0], &foo.b[sizeof(uint32_t)]);
+        vec.insert(vec.end(), m.data.begin(), m.data.end());
+        if (urgent)
+          --urgent;
+        lg.lock();
+        messages.pop_front();
+      } while (vec.size() < len + num);
       numBytes -= len;
       return std::make_pair(tag, std::move(vec));
     }
 
     void add(uint32_t tag, std::vector<uint8_t>& b) {
       std::lock_guard<SimpleLock> lg(lock);
-      if (messages.empty())
+      if (messages.empty()) {
+        std::lock_guard<SimpleLock> lg(timelock);
         time = std::chrono::high_resolution_clock::now();
+      }
       unsigned oldNumBytes = numBytes;
       numBytes += b.size();
       Galois::Runtime::trace("BufferedAdd", oldNumBytes, numBytes, tag, Galois::Runtime::printVec(b));
