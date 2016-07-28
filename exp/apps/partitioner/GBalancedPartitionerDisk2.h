@@ -58,7 +58,7 @@ struct GBPD2 {
 
 
       //Per vertex data structure - large size
-      std::vector<std::unordered_set<PartitionIDType> > vertexOwnersPacked;
+      std::vector<std::vector<bool> > _vertexOwnersPacked;
       std::vector<PartitionIDType> vertexMasters;
 
       std::vector<std::FILE*> tmpPartitionFiles;
@@ -70,12 +70,15 @@ struct GBPD2 {
          return;
       }
       void init(size_t nn, size_t ne, size_t numHosts) {
-         vertexOwnersPacked.resize(nn);
+         _vertexOwnersPacked.resize(nn);
+         for(auto & n : _vertexOwnersPacked){
+            n.resize(numHosts);
+         }
          char tmpBuffer[L_tmpnam];
          for (size_t h = 0; h < numHosts; ++h) {
             tmpnam(tmpBuffer);
 //            std::string tmpfileName = "/net/ohm/export/cdgc/rashid/"+std::string(tmpBuffer)+".TMP." + std::to_string(h);
-            std::string tmpfileName = "/net/ohm/export/cdgc/rashid/"+std::string(tmpBuffer)+".TMP." + std::to_string(h);
+            std::string tmpfileName = "/workspace/rashid/"+std::string(tmpBuffer)+".TMP." + std::to_string(h);
             tmpPartitionFiles_names.push_back(tmpfileName);
             std::FILE* file_handle = std::fopen(tmpfileName.c_str(), "wb+x");
             if(!file_handle){
@@ -125,8 +128,8 @@ struct GBPD2 {
       void assignEdge(OfflineGraph & g, NodeItType & _src, OfflineGraph::GraphNode & dst, size_t & eIdx, EdgeItType & e, PartitionIDType owner) {
          auto src = *_src;
          edgesPerHost[owner]++;
-         vertexOwnersPacked[src].insert(owner);
-         vertexOwnersPacked[dst].insert(owner);
+         _vertexOwnersPacked[src][owner]=1;
+         _vertexOwnersPacked[dst][owner]=1;
 //         fwrite(&owner, sizeof(owner), 1, edgeTmpFile);
 #if _HAS_EDGE_DATA
 //         writeEdgeToTempFile(tmpPartitionFiles[owner],new_src, new_dst, g.getEdgeData<EdgeDataType>(e));
@@ -150,6 +153,42 @@ struct GBPD2 {
                std::cout<<"ERRR " << vertexMasters[n] << " Not eq " <<  ~0 << "\n";
             }
             assert(vertexMasters[n] == ~0);
+#if 1
+            {//begin change
+                          size_t minID=~0;
+                          size_t min_count=mastersPerHost[0];
+
+                          for(size_t h = 0; h < numhost; ++h){
+                             if(_vertexOwnersPacked[n][h]){
+                                if(minID==~0){
+                                   minID=h;
+                                   min_count = mastersPerHost[minID];
+                                }else{
+                                   if(min_count > mastersPerHost[h]){ //found something smaller!
+                                      minID = h;
+                                      min_count = mastersPerHost[h];
+                                   }
+                                }
+                             }
+                          }
+
+                          //Vertex does not have any edges - pick the least loaded partition anyway!
+                          if(minID==~0){
+                             minID=0;
+                             min_count = mastersPerHost[minID];
+                             for(size_t h=1; h<numhost ; ++h){
+                                if (min_count > mastersPerHost[h]){
+                                   min_count = mastersPerHost[h];
+                                   minID=h;
+                                }
+                             }
+                          }
+                          assert(minID != ~0);
+                          vertexMasters[n] = minID;
+                          mastersPerHost[minID]++;
+                          _vertexOwnersPacked[n].clear();
+                       }//end change
+#else
             if (vertexOwnersPacked[n].size() == 0) {
                size_t minID = 0;
                size_t min_count = mastersPerHost[minID];
@@ -176,7 +215,9 @@ struct GBPD2 {
                vertexMasters[n] = minID;
                mastersPerHost[minID]++;
             }//end else
+#endif
          }//end for
+
       }//end assignMasters
       void print_stats() {
          for (size_t i = 0; i < mastersPerHost.size(); ++i) {
@@ -268,7 +309,6 @@ struct GBPD2 {
     * Optimized implementation for memory usage.
     * Write both the metadata as well as the partition information.
     * */
-
    void writePartitionsMem(std::string & basename, OfflineGraph & g, size_t num_hosts) {
       //Create graph
       std::cout << " Low mem version\n";
@@ -289,11 +329,14 @@ struct GBPD2 {
       for(size_t n=0; n < g.size(); ++n){
          size_t owner = vcInfo.vertexMasters[n];
          assert(owner<num_hosts);
-         for(auto h : vcInfo.vertexOwnersPacked[n]){
-            size_t localID = vcInfo.verticesPerHost[h]++;
-            fwrite(&n, sizeof(size_t), 1, meta_files[h]);
-            fwrite(&localID, sizeof(size_t), 1, meta_files[h]);
-            fwrite(&owner, sizeof(size_t), 1, meta_files[h]);
+         for(size_t h=0; h<num_hosts; ++h){
+//         for(auto h : vcInfo._vertexOwnersPacked[n]){
+            if(vcInfo._vertexOwnersPacked[n][h]){
+               size_t localID = vcInfo.verticesPerHost[h]++;
+               fwrite(&n, sizeof(size_t), 1, meta_files[h]);
+               fwrite(&localID, sizeof(size_t), 1, meta_files[h]);
+               fwrite(&owner, sizeof(size_t), 1, meta_files[h]);
+            }
          }
       }
       for (size_t h = 0; h < num_hosts; ++h) {
@@ -311,9 +354,14 @@ struct GBPD2 {
          size_t num_entries;
          std::string meta_file_name = getMetaFileName(basename, h, num_hosts);
          std::FILE * in_meta_file = std::fopen(meta_file_name.c_str(), "rb");
+         if(!in_meta_file){
+            std::cout<<"Failed to reload meta_file " << meta_file_name << "\n";
+            exit(-1);
+         }
          fseek(in_meta_file, 0,std::ios_base::beg);
          fread(&num_entries, sizeof(size_t),1, in_meta_file);
-         std::cout << "Reloading partition " << h << "... Loading : " << meta_file_name<< "["<< num_entries<<"] \n";
+         std::cout << "Reloading partition " << h << "... Loading : " << meta_file_name<< "- Entries=["<< num_entries<<"] \n";
+
          while(!feof(in_meta_file)){
             size_t gid, lid, owner;
             fread(&gid, sizeof(size_t),1, in_meta_file);
