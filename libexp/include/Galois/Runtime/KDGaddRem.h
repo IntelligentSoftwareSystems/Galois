@@ -85,12 +85,14 @@ public:
 
   void add (const Ctxt* ctxt) {
 
-    // assert (!sharers.find (const_cast<Ctxt*> (ctxt)));
+    assert (!sharers.find (const_cast<Ctxt*> (ctxt)));
     sharers.push (const_cast<Ctxt*> (ctxt));
   }
 
   bool isHighestPriority (const Ctxt* ctxt) const {
-    return !sharers.empty () && (sharers.top () == ctxt);
+    assert (ctxt);
+    assert (!sharers.empty ());
+    return (sharers.top () == ctxt);
   }
 
   Ctxt* getHighestPriority () const {
@@ -132,18 +134,18 @@ public:
   // TODO: fix visibility below
 public:
   // FIXME: nhood should be a set instead of list
-  NhoodList nhood;
+  // GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE AtomicBool onWL;
+  AtomicBool onWL;
   NhoodMgr& nhmgr;
-  GALOIS_ATTRIBUTE_ALIGN_CACHE_LINE AtomicBool onWL;
+  NhoodList nhood;
 
 public:
 
   KDGaddRemContext (const T& active, NhoodMgr& nhmgr)
     : 
       OrderedContextBase<T> (active), // to make acquire call virtual function sub_acquire
-      nhood (), 
-      nhmgr (nhmgr), 
-      onWL (false) 
+      onWL (false),
+      nhmgr (nhmgr) 
   {}
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE
@@ -160,13 +162,9 @@ public:
   }
 
   GALOIS_ATTRIBUTE_PROF_NOINLINE bool isSrc () const {
-    assert (!nhood.empty ()); // TODO: remove later
-
     bool ret = true;
 
-    for (auto n = nhood.begin ()
-        , endn = nhood.end (); n != endn; ++n) {
-
+    for (auto n = nhood.begin () , endn = nhood.end (); n != endn; ++n) {
       if (!(*n)->isHighestPriority (this)) {
         ret = false;
         break;
