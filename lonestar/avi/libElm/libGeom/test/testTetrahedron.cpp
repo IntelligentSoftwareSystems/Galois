@@ -14,11 +14,11 @@ int main()
 		    0,0,0, 
 		    0,0,2};
 
-  std::vector<double> dummycoordinates(coord, coord+12);
+  VecDouble dummycoordinates(coord, coord+12);
 
   
   int c[] = {0, 1, 2, 3};
-  std::vector<GlobalNodalIndex> conn(c, c+4);
+  VecSize_t conn(c, c+4);
   Tetrahedron MyTet(dummycoordinates, conn);
   
   
@@ -65,7 +65,7 @@ int main()
   std::cout << "\nPolytope name: " << MyElmGeo->getPolytopeName() 
 	    << " should be Tetrahedron\n";
   
-  const  std::vector<GlobalNodalIndex>  &Conn = MyElmGeo->getConnectivity();
+  const  VecSize_t  &Conn = MyElmGeo->getConnectivity();
   std::cout << "\nConnectivity: " << Conn[0] << " " << Conn[1] << " " << Conn[2] 
 	    <<" "<<Conn[3]<< " should be 1 2 3 4\n"; 
 
@@ -73,7 +73,7 @@ int main()
   std::cout << "Testing cloning mechanism: ";
   std::cout << "\nPolytope name: " << MyElmGeoCloned->getPolytopeName() 
 	    << " should be Tetrahedron\n";
-  const std::vector<GlobalNodalIndex>  &Conn2 = MyElmGeoCloned->getConnectivity();
+  const VecSize_t  &Conn2 = MyElmGeoCloned->getConnectivity();
   std::cout << "\nConnectivity: " << Conn2[0] << " " << Conn2[1] << " " 
 	    << Conn2[2] <<" "<<Conn2[3]<< " should be 1 2 3 4\n"; 
   

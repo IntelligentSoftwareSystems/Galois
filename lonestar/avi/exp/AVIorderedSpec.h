@@ -106,7 +106,7 @@ protected:
 
     template <typename C>
     void operator()(const Update& item, C&) {
-      typedef std::vector<GlobalNodalIndex> V;
+      typedef VecSize_t V;
 
       const V& conn = item.avi->getGeometry().getConnectivity();
 

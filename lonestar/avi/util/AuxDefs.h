@@ -35,6 +35,8 @@
 
 #include <vector>
 
+#include "Galois/gstl.h"
+
 //! Nodal indices, starting at 0. : amber
 typedef size_t GlobalNodalIndex;
 
@@ -46,12 +48,14 @@ typedef size_t GlobalElementIndex;
 
 
 //! commonly used vector and vector<vector>
-typedef std::vector<double> VecDouble;
-typedef std::vector< std::vector<double> > MatDouble;
-typedef std::vector< std::vector < std::vector < std::vector <double> > > > FourDVecDouble;
+typedef Galois::gstl::Vector<double> VecDouble;
+typedef Galois::gstl::Vector< Galois::gstl::Vector<double> > MatDouble;
+typedef Galois::gstl::Vector< Galois::gstl::Vector < Galois::gstl::Vector < Galois::gstl::Vector <double> > > > FourDVecDouble;
 
-typedef std::vector<bool> VecBool;
-typedef std::vector< std::vector< bool> > MatBool;
+typedef Galois::gstl::Vector<bool> VecBool;
+typedef Galois::gstl::Vector< Galois::gstl::Vector< bool> > MatBool;
+
+using VecSize_t = Galois::gstl::Vector<size_t>;
 
 
 //! constants

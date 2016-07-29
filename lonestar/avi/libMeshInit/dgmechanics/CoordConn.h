@@ -63,7 +63,7 @@ public:
    *
    * @return ref to vector
    */
-  virtual const std::vector<GlobalNodalIndex>& getConnectivity () const = 0;
+  virtual const VecSize_t& getConnectivity () const = 0;
 
   /** 
    * Coordinates of all nodes in the mesh in a single vector. Let SPD = number of spatial dimensions
@@ -71,7 +71,7 @@ public:
    *
    * @return ref to vector
    */
-  virtual const std::vector<double>& getCoordinates () const = 0;
+  virtual const VecDouble& getCoordinates () const = 0;
 
   virtual size_t getSpatialDim () const = 0;
 
@@ -114,7 +114,7 @@ protected:
    * @param elemConn
    *
    */
-  virtual void genElemConnectivity (size_t elemIndex, std::vector<GlobalNodalIndex>& elemConn) const = 0;
+  virtual void genElemConnectivity (size_t elemIndex, VecSize_t& elemConn) const = 0;
 
 
 };
@@ -126,8 +126,8 @@ protected:
 template <size_t SPD, size_t NODES_PER_ELEM, size_t TOPO>
 class AbstractCoordConn: public CoordConn {
 protected:
-  std::vector<GlobalNodalIndex> connectivity;
-  std::vector<double> coordinates;
+  VecSize_t connectivity;
+  VecDouble coordinates;
 
 public:
   AbstractCoordConn (): CoordConn() {
@@ -160,11 +160,11 @@ public:
     return TOPO;
   }
 
-  virtual const std::vector<GlobalNodalIndex>& getConnectivity () const {
+  virtual const VecSize_t& getConnectivity () const {
     return connectivity;
   }
 
-  virtual const std::vector<double>& getCoordinates () const {
+  virtual const VecDouble& getCoordinates () const {
     return coordinates;
   }
 
@@ -193,7 +193,7 @@ public:
 
 
 protected:
-  virtual void genElemConnectivity (size_t elemIndex, std::vector<GlobalNodalIndex>& conn) const {
+  virtual void genElemConnectivity (size_t elemIndex, VecSize_t& conn) const {
     const size_t npe = getNodesPerElem ();
     conn.clear();
 

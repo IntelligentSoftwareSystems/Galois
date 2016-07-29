@@ -64,7 +64,7 @@ public:
   //! \param IElm Pointer to element over which mass is to be compued.
   //! \param SM SimpleMaterial over the element.
   //! \param fieldsUsed vector containing ids of fields being computed starting with 0
-  inline DiagonalMassForSW (const Element& IElm, const SimpleMaterial &SM, const std::vector<size_t>& fieldsUsed)
+  inline DiagonalMassForSW (const Element& IElm, const SimpleMaterial &SM, const VecSize_t& fieldsUsed)
   : BaseResidue (IElm, SM, fieldsUsed) {
   assert (fieldsUsed.size() > 0 && fieldsUsed.size () <= 3);
 }

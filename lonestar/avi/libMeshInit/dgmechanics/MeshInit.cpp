@@ -102,7 +102,7 @@ void MeshInit::initializeMesh (const std::string& fileName, int ndiv) {
   }
 
 
-  this->aviWriteInterval = std::vector<size_t> (getNumElements(), 0);
+  this->aviWriteInterval = VecSize_t (getNumElements(), 0);
 
 }
 
@@ -189,7 +189,7 @@ void MeshInit::writeSync (const AVI& avi, const VecDouble& Qval, const VecDouble
 
     assert (this->syncFileWriter != NULL);
 
-    const std::vector<GlobalNodalIndex>& conn = avi.getGeometry ().getConnectivity ();
+    const VecSize_t& conn = avi.getGeometry ().getConnectivity ();
 
     for (size_t aa = 0; aa < conn.size (); ++aa) {
       GlobalNodalIndex nodeNum = conn[aa];
@@ -303,7 +303,7 @@ void MeshInit::writeMeshCenters (const char* outFileName) const {
 
   if (plotFile == NULL) { abort (); }
 
-  std::vector<double> center (getSpatialDim(), 0);
+  VecDouble center (getSpatialDim(), 0);
 
   fprintf (plotFile , "center_x, center_y, timestamp\n");
   for (std::vector<AVI*>::const_iterator i = getAVIVec ().begin (), ei = getAVIVec ().end (); 
@@ -339,7 +339,7 @@ void MeshInit::writeMesh (const char* polyFileName, const char* coordFileName) c
 
     const AVI& avi = **i;
 
-    const std::vector<GlobalNodalIndex>& conn = avi.getElement ().getGeometry ().getConnectivity ();
+    const VecSize_t& conn = avi.getElement ().getGeometry ().getConnectivity ();
 
     for (size_t j = 0; j < conn.size (); ++j) {
       fprintf (polyFile, "%zd, ", conn[j]);
@@ -368,7 +368,7 @@ void MeshInit::writeMesh (const char* polyFileName, const char* coordFileName) c
     
   }
 
-  const std::vector<double>& coord = cc->getCoordinates ();
+  const VecDouble& coord = cc->getCoordinates ();
   for (size_t i = 0; i < coord.size (); i += cc->getSpatialDim ()) {
     for (size_t j = i; j < i + cc->getSpatialDim (); ++j) {
       if (j != i) { // not first iter

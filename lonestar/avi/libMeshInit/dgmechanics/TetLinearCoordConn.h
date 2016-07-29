@@ -24,6 +24,8 @@
 #ifndef _TET_LINEAR_COORD_CONN_H_
 #define _TET_LINEAR_COORD_CONN_H_
 
+#include "AuxDefs.h"
+
 /**
  * important constants for linear tetrahedron
  */
@@ -48,7 +50,7 @@ class TetLinearCoordConn
      * and linear tetrahedron as geometry
      */
     virtual Element* makeElem (const size_t elemIndex) const {
-      std::vector<GlobalNodalIndex> conn;
+      VecSize_t conn;
 
       genElemConnectivity (elemIndex, conn);
 
@@ -223,7 +225,7 @@ class TetLinearCoordConn
 
       // Creating new coordinates and connectivity arrays:
       // Each tet is subdivided into 8.
-      std::vector<double> newCoord(count * sd);
+      VecDouble newCoord(count * sd);
       std::vector<size_t> newConn;
 
       for (size_t i = 0; i < coordinates.size(); i++) {

@@ -42,13 +42,13 @@ const size_t SimpleMaterial::NDF = 3;
 const size_t SimpleMaterial::NDM = 3;
 
 bool SimpleMaterial::consistencyTest(const SimpleMaterial &SMat) {
-  std::vector<double> strain(MAT_SIZE);
-  std::vector<double> stress(MAT_SIZE);
-  std::vector<double> tangents(MAT_SIZE * MAT_SIZE);
+  VecDouble strain(MAT_SIZE);
+  VecDouble stress(MAT_SIZE);
+  VecDouble tangents(MAT_SIZE * MAT_SIZE);
 
-  std::vector<double> stressplus(MAT_SIZE);
-  std::vector<double> stressminus(MAT_SIZE);
-  std::vector<double> tangentsnum(MAT_SIZE * MAT_SIZE);
+  VecDouble stressplus(MAT_SIZE);
+  VecDouble stressminus(MAT_SIZE);
+  VecDouble tangentsnum(MAT_SIZE * MAT_SIZE);
 
   srand(time(0));
 
@@ -63,7 +63,7 @@ bool SimpleMaterial::consistencyTest(const SimpleMaterial &SMat) {
   strain[8] = 1 + double(rand()) / double(RAND_MAX) * PERT;
 
   for (unsigned int i = 0; i < MAT_SIZE; i++) {
-    std::vector<double> t;
+    VecDouble t;
     double Forig = strain[i];
 
     strain[i] = Forig + EPS;

@@ -31,6 +31,8 @@
 
 #include "Galois/Substrate/PerThreadStorage.h"
 
+#include "AuxDefs.h"
+
 #include <vector>
 #include <string>
 #include <iostream>
@@ -123,7 +125,7 @@ public:
    negative determinant in the strain, it returns false. If successful, returns true.
    */
 
-  virtual bool getConstitutiveResponse(const std::vector<double>& strain, std::vector<double>& stress, std::vector<double>& tangents
+  virtual bool getConstitutiveResponse(const VecDouble& strain, VecDouble& stress, VecDouble& tangents
       , const ConstRespMode& mode) const = 0;
 
   //! Returns the (uniform) density of the reference configuration.
@@ -139,7 +141,7 @@ public:
    \param strain Deformation gradient.
    \param LocDensity Computed local density.
    */
-  bool getLocalMaterialDensity(const std::vector<double> * strain, double &LocDensity) const {
+  bool getLocalMaterialDensity(const VecDouble* strain, double &LocDensity) const {
     assert((*strain).size () == MAT_SIZE);
 
     // Compute determinant of strain.
@@ -213,7 +215,7 @@ public:
     return new NeoHookean(*this);
   }
 
-  bool getConstitutiveResponse(const std::vector<double>& strain, std::vector<double>& stress, std::vector<double>& tangents
+  bool getConstitutiveResponse(const VecDouble& strain, VecDouble& stress, VecDouble& tangents
       , const ConstRespMode& mode) const;
 
   const std::string getMaterialName() const {
@@ -251,7 +253,7 @@ public:
   }
   virtual LinearElasticBase * clone() const = 0;
 
-  bool getConstitutiveResponse(const std::vector<double>& strain, std::vector<double>& stress, std::vector<double>& tangents
+  bool getConstitutiveResponse(const VecDouble& strain, VecDouble& stress, VecDouble& tangents
       , const ConstRespMode& mode) const;
 
   const std::string getMaterialName() const {

@@ -68,7 +68,7 @@ class ElementGeometry
   virtual size_t getNumVertices() const = 0; 
 
   //!@return  ref to Vertices of the polytope. 
-  virtual const std::vector <GlobalNodalIndex>& getConnectivity() const = 0;
+  virtual const VecSize_t& getConnectivity() const = 0;
 
   //! @return Name of type of polytope. 
   virtual const std::string getPolytopeName() const = 0; 
@@ -128,7 +128,7 @@ class ElementGeometry
   //!
   //! @param e: face number for which the normal is desired
   //! @param vNormal: output of the three Cartesian components of the normal vector
-  virtual void computeNormal (size_t e, std::vector<double>& vNormal) const = 0;
+  virtual void computeNormal (size_t e, VecDouble& vNormal) const = 0;
 
 
   /**
@@ -145,7 +145,7 @@ class ElementGeometry
    *
    * @param center output vector containing the coordinates of the center
    */
-  virtual void computeCenter (std::vector<double>& center) const = 0;
+  virtual void computeCenter (VecDouble& center) const = 0;
 
 };
 
@@ -155,15 +155,15 @@ class ElementGeometry
 template <size_t SPD>
 class AbstractGeom : public ElementGeometry {
 private:
-  const std::vector<double>& globalCoordVec;
-  std::vector<GlobalNodalIndex> connectivity;
+  const VecDouble& globalCoordVec;
+  VecSize_t connectivity;
 
 protected:
   static const size_t SP_DIM = SPD;
   /**
    * @return ref to the vector that contains global coordinates for all mesh nodes
    */
-  const std::vector<double>& getGlobalCoordVec () const { return globalCoordVec; }
+  const VecDouble& getGlobalCoordVec () const { return globalCoordVec; }
 
 public:
   /**
@@ -172,7 +172,7 @@ public:
    * @param connectivity is a vector containing ids of nodes of this element in the mesh
    */
 
-  AbstractGeom (const std::vector<double>& globalCoordVec, const std::vector<GlobalNodalIndex>& connectivity)
+  AbstractGeom (const VecDouble& globalCoordVec, const VecSize_t& connectivity)
     :ElementGeometry (), globalCoordVec(globalCoordVec), connectivity (connectivity) {
 
   }
@@ -186,7 +186,7 @@ public:
     return SP_DIM;
   }
 
-  virtual const std::vector<GlobalNodalIndex>& getConnectivity () const {
+  virtual const VecSize_t& getConnectivity () const {
     return connectivity;
   }
 
@@ -264,7 +264,7 @@ public:
     return  globalCoordVec[index];
   }
 
-  virtual void computeCenter (std::vector<double>& center) const {
+  virtual void computeCenter (VecDouble& center) const {
     std::cerr << "computeCenter not implemented" << std::endl;
     abort ();
   }
