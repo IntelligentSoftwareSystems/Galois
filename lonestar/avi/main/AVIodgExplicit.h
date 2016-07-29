@@ -131,9 +131,9 @@ protected:
     for (std::vector<MNode>::const_iterator i = aviAdjNodes.begin (), ei = aviAdjNodes.end (); i != ei; ++i) {
       MNode aviAdjN = *i;
       AVI* avi = mgraph.getData (aviAdjN, Galois::MethodFlag::UNPROTECTED);
-      const std::vector<GlobalNodalIndex>& conn = avi->getGeometry ().getConnectivity ();
+      const VecSize_t& conn = avi->getGeometry ().getConnectivity ();
 
-      for (std::vector<GlobalNodalIndex>::const_iterator j = conn.begin (), ej = conn.end (); j != ej; ++j) {
+      for (VecSize_t::const_iterator j = conn.begin (), ej = conn.end (); j != ej; ++j) {
         GlobalNodalIndex n = *j;
         nodeSharers[n].push_back (aviAdjN);
       }
@@ -386,7 +386,7 @@ public:
     // a set of edges computed by picking outgoing edges for each node
     std::vector<std::pair<GNode, GNode> > outEdges;
 
-    std::vector<double> center (meshInit.getSpatialDim(), 0.0);
+    VecDouble center (meshInit.getSpatialDim(), 0.0);
 
     for (Graph::iterator i = graph.begin (), e = graph.end (); i != e; ++i) {
       const GNode& src = *i;

@@ -32,7 +32,7 @@
 
 
 // XXX: (amber) replaced 3,9. 27, 81 with NDM, MAT_SIZE
-bool LinearElasticBase::getConstitutiveResponse(const std::vector<double>&  strain, std::vector<double>& stress, std::vector<double> & tangents, const ConstRespMode& mode) const {
+bool LinearElasticBase::getConstitutiveResponse(const VecDouble&  strain, VecDouble& stress, VecDouble& tangents, const ConstRespMode& mode) const {
 
 
   // Compute stress

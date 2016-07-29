@@ -155,7 +155,7 @@ public:
   //! getFields()[i] returns the field number beginning from zero.\n
   //! If the degree of freedom \f$q_a\f$ is indexed with [f][b] locally, then it corresponds to field 
   //! getFields()[f] in the Global arrays.
-  virtual const std::vector<size_t>& getFields () const = 0;
+  virtual const VecSize_t& getFields () const = 0;
 
   //! Returns the number of degrees of freedom per field used
   //! for the computation \n

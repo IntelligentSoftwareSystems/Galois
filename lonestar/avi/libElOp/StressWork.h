@@ -88,8 +88,8 @@ private:
   struct StressWorkTmpVec {
     static const size_t MAT_SIZE = SimpleMaterial::MAT_SIZE;
 
-    std::vector<size_t> nDof;
-    std::vector<size_t> nDiv;
+    VecSize_t nDof;
+    VecSize_t nDiv;
 
     MatDouble DShape;
     MatDouble IntWeights;
@@ -126,7 +126,7 @@ private:
   /**
    * Per thread storage for temporary vectors used in @see getDValIntern
    */
-  typedef Galois::Substrate::PerThreadStorage<StressWorkTmpVec> PerCPUtmpVecTy;
+  typedef Galois::Substrate::PerThreadStorage<StressWorkTmpVec*> PerCPUtmpVecTy;
 
   static PerCPUtmpVecTy perCPUtmpVec;
 
@@ -141,7 +141,7 @@ public:
   //! @param fieldsUsed vector containing ids of fields being computed starting with 0
   //! Cartesian component  of the displacement field. If not provided, it is
   //! assumed that it is a plane strain case.
-  StressWork(const Element& IElm, const SimpleMaterial &SM, const std::vector<size_t>& fieldsUsed)
+  StressWork(const Element& IElm, const SimpleMaterial &SM, const VecSize_t& fieldsUsed)
     : DResidue (IElm, SM, fieldsUsed) {
 
     assert (fieldsUsed.size() > 0 && fieldsUsed.size () <= 3);

@@ -146,7 +146,7 @@ public:
 
   }
 
-  const std::vector<double> & getNormal (size_t FaceIndex) const {
+  const VecDouble& getNormal (size_t FaceIndex) const {
     return normals[FaceIndex];
   }
 
@@ -215,7 +215,7 @@ public:
     GlobalNodalIndex MaxNodeNumber = 0;
 
     for (size_t e = 0; e < elementArray.size (); e++) {
-      const std::vector<GlobalNodalIndex>& conn = elementArray[e]->getGeometry ().getConnectivity ();
+      const VecSize_t& conn = elementArray[e]->getGeometry ().getConnectivity ();
 
       for (size_t a = 0; a < conn.size (); ++a) {
         if (conn[a] > MaxNodeNumber) {

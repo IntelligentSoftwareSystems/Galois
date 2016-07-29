@@ -73,7 +73,7 @@ static void matlib_mults(const double *A, const double *B, double *C) {
   C[8] = A[6] * B[6] + A[7] * B[7] + A[8] * B[8];
 }
 
-bool NeoHookean::getConstitutiveResponse(const std::vector<double>& strain, std::vector<double>& stress, std::vector<double>& tangents
+bool NeoHookean::getConstitutiveResponse(const VecDouble& strain, VecDouble& stress, VecDouble& tangents
     , const ConstRespMode& mode) const {
   // XXX: (amber) replaced unknown 3's with NDM, 9 & 81 with MAT_SIZE & MAT_SIZE ^ 2
 

@@ -12,7 +12,7 @@ int main()
 		 0,0,0,
 		 0,0,1};
   
-  std::vector<double> Vertices(V0, V0+12);
+  VecDouble Vertices(V0, V0+12);
   
   Tetrahedron::SetGlobalCoordinatesArray(Vertices);
   Triangle<3>::SetGlobalCoordinatesArray(Vertices);

@@ -3,13 +3,14 @@
 #include "DiagonalMassForSW.h"
 #include "Material.h"
 
+
 bool DiagonalMassForSW::getVal(const MatDouble &argval, MatDouble& funcval) const {
   size_t Dim = fieldsUsed.size();
 
   // Assume that all fields use the same quadrature rules
   size_t nquad = element.getIntegrationWeights(fieldsUsed[0]).size();
 
-  std::vector<size_t> nDof(Dim, 0); // Number of dofs in each field
+  VecSize_t nDof(Dim, 0); // Number of dofs in each field
   MatDouble IntWeights(Dim); // Integration weights for each field
   MatDouble Shape(Dim); // Shape functions for each field.
 

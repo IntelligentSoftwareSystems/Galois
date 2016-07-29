@@ -35,7 +35,7 @@
 
 int main()
 {
-  std::vector<double> dummycoordinates(6);
+  VecDouble dummycoordinates(6);
 
   // Fill-in the dummy global array
   dummycoordinates[0] = 0;
@@ -49,7 +49,7 @@ int main()
   
 
   GlobalNodalIndex c[] = {0, 1, 2};
-  std::vector<GlobalNodalIndex> conn(c, c+3);
+  VecSize_t conn(c, c+3);
   Triangle<2> MyTriangle(dummycoordinates, conn);
 
   std::cout << "Number of vertices: " << MyTriangle.getNumVertices() << " should be 3\n";
@@ -88,21 +88,21 @@ int main()
   std::cout << "Testing virtual mechanism: ";
   std::cout << "Polytope name: " << MyElmGeo->getPolytopeName() << " should be TRIANGLE\n";
   
-  const  std::vector<GlobalNodalIndex>  &Conn = MyElmGeo->getConnectivity();
+  const  VecSize_t  &Conn = MyElmGeo->getConnectivity();
   std::cout << "Connectivity: " << Conn[0] << " " << Conn[1] << " " << Conn[2] << " should be 1 2 3\n"; 
 
   
   ElementGeometry *MyElmGeoCloned = MyTriangle.clone();
   std::cout << "Testing cloning mechanism: ";
   std::cout << "Polytope name: " << MyElmGeoCloned->getPolytopeName() << " should be TRIANGLE\n";
-  const std::vector<GlobalNodalIndex>  &Conn2 = MyElmGeoCloned->getConnectivity();
+  const VecSize_t  &Conn2 = MyElmGeoCloned->getConnectivity();
   std::cout << "Connectivity: " << Conn2[0] << " " << Conn2[1] << " " << Conn2[2] << " should be 1 2 3\n"; 
   
 
   
   std::cout << "Test triangle in 3D\n";
 
-  std::vector<double> dummycoordinates3(9);
+  VecDouble dummycoordinates3(9);
 
   // Fill-in the dummy global array
   dummycoordinates3[0] = 0;

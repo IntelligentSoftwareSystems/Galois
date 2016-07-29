@@ -47,7 +47,7 @@
 #include <boost/iterator/iterator_facade.hpp>
 
 #include "Galois/gdeque.h"
-#include "Galois/STLcontainers.h"
+#include "Galois/gstl.h"
 #include "Galois/Threads.h"
 #include "Galois/PriorityQueue.h"
 #include "Galois/TwoLevelIterator.h"

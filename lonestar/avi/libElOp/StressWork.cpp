@@ -48,11 +48,18 @@ bool StressWork::getDValIntern (const MatDouble &argval, MatDouble& funcval, Fou
 
 
 
-  StressWorkTmpVec& tmpVec = *StressWork::perCPUtmpVec.getLocal ();
+  StressWorkTmpVec*& tmpVecPtr = *StressWork::perCPUtmpVec.getLocal ();
+
+  if (!tmpVecPtr) {
+    // TODO: memory not freed. 
+    tmpVecPtr = new StressWorkTmpVec;
+  }
+
+  StressWorkTmpVec& tmpVec = *tmpVecPtr;
   tmpVec.adjustSizes (Dim);
 
-  std::vector<size_t>& nDof = tmpVec.nDof;
-  std::vector<size_t>& nDiv = tmpVec.nDiv;
+  VecSize_t& nDof = tmpVec.nDof;
+  VecSize_t& nDiv = tmpVec.nDiv;
 
   MatDouble& DShape = tmpVec.DShape;
   MatDouble& IntWeights = tmpVec.IntWeights;
