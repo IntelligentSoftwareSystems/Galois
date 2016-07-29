@@ -57,7 +57,8 @@ struct GBPartitionerDisk {
       std::vector<size_t> mastersPerHost;
 
       //Per vertex data structure - large size
-      std::vector<std::unordered_set<PartitionIDType>> vertexOwnersPacked;
+//      std::vector<std::unordered_set<PartitionIDType>> vertexOwnersPacked;
+      std::vector<std::vector<bool> > *vertexOwnersPacked;
       std::vector<PartitionIDType> vertexMasters;
       std::vector<std::unordered_map<size_t, size_t> > global2Local;
 
@@ -74,7 +75,10 @@ struct GBPartitionerDisk {
       }
       void init(size_t nn, size_t ne, size_t numHosts) {
          global2Local.resize(numHosts);
-         vertexOwnersPacked.resize(nn);
+         vertexOwnersPacked = new std::vector<std::vector<bool> >(nn);
+         for(auto & n : *vertexOwnersPacked){
+            n.resize(numHosts,false);
+         }
          char tmpBuffer[L_tmpnam];
          for (size_t h = 0; h < numHosts; ++h) {
             tmpnam(tmpBuffer);
@@ -142,8 +146,9 @@ struct GBPartitionerDisk {
       void assignEdge(OfflineGraph & g, NodeItType & _src, OfflineGraph::GraphNode & dst, size_t & eIdx, EdgeItType & e, PartitionIDType owner) {
          auto src = *_src;
          edgesPerHost[owner]++;
-         vertexOwnersPacked[src].insert(owner);
-         vertexOwnersPacked[dst].insert(owner);
+         auto & _vertexOwnersPacked = * vertexOwnersPacked;
+         _vertexOwnersPacked[src][owner]=1;
+         _vertexOwnersPacked[dst][owner]=1;
 #if _HAS_EDGE_DATA
 //         writeEdgeToTempFile(tmpPartitionFiles[owner],new_src, new_dst, g.getEdgeData<EdgeDataType>(e));
          writeEdgeToTempFile(tmpPartitionFiles[owner],src, dst, g.getEdgeData<EdgeDataType>(e));
@@ -160,13 +165,13 @@ struct GBPartitionerDisk {
        * */
 
       void assignLocalIDs(size_t numhost, OfflineGraph &g) {
+         auto & _vertexOwnersPacked = * vertexOwnersPacked;
 #if 1 // Currently some error in stats - use threaded code after it is fixed.
          std::vector<size_t> hosts;
          for(size_t i=0; i<numhost; ++i)hosts.push_back(i);
-
          Galois::do_all(hosts.begin(),hosts.end(), [&] (size_t h){
             for(size_t n = 0; n < g.size(); ++n){
-               if(vertexOwnersPacked[n].find(h)!=vertexOwnersPacked[h].end()){
+               if(_vertexOwnersPacked[n][h]){
                      global2Local[h][n]=verticesPerHost[h]++;
                }
             }
@@ -217,12 +222,50 @@ struct GBPartitionerDisk {
        * node, and the masters-count for the host is updated.
        * */
       void assignMasters(size_t nn, size_t numhost, OfflineGraph &g) {
+         auto & _vertexOwnersPacked = * vertexOwnersPacked;
+
          vertexMasters.resize(nn, ~0);
          for (size_t n = 0; n < nn; ++n) {
             if(vertexMasters[n] != ~0){
                std::cout<<"ERRR " << vertexMasters[n] << " Not eq " <<  ~0 << "\n";
             }
             assert(vertexMasters[n] == ~0);
+#if 1
+            {//begin change
+               size_t minID=~0;
+               size_t min_count=mastersPerHost[0];
+
+               for(size_t h = 0; h < numhost; ++h){
+                  if(_vertexOwnersPacked[n][h]){
+                     if(minID==~0){
+                        minID=h;
+                        min_count = mastersPerHost[minID];
+                     }else{
+                        if(min_count > mastersPerHost[h]){ //found something smaller!
+                           minID = h;
+                           min_count = mastersPerHost[h];
+                        }
+                     }
+                  }
+               }
+
+               //Vertex does not have any edges - pick the least loaded partition anyway!
+               if(minID==~0){
+                  minID=0;
+                  min_count = mastersPerHost[minID];
+                  for(size_t h=1; h<numhost ; ++h){
+                     if (min_count > mastersPerHost[h]){
+                        min_count = mastersPerHost[h];
+                        minID=h;
+                     }
+                  }
+               }
+               assert(minID != ~0);
+               vertexMasters[n] = minID;
+               mastersPerHost[minID]++;
+               _vertexOwnersPacked[n].clear();
+            }//end change
+#else
             if (vertexOwnersPacked[n].size() == 0) {
                size_t minID = 0;
                size_t min_count = mastersPerHost[minID];
@@ -230,8 +273,8 @@ struct GBPartitionerDisk {
                   if (min_count > mastersPerHost[h]) {
                      min_count = mastersPerHost[h];
                      minID = h;
-                  }
-               }
+                  }//end if
+               }//end for
                vertexMasters[n] = minID;
                mastersPerHost[minID]++;
                //std::cout<<"No edges for "<< n <<" , "<<std::distance(g.edge_begin(n), g.edge_end(n))<<std::endl;
@@ -249,11 +292,14 @@ struct GBPartitionerDisk {
                vertexMasters[n] = minID;
                mastersPerHost[minID]++;
             }//end else
-            vertexOwnersPacked[n].clear();
+            _vertexOwnersPacked[n].clear();
+#endif
          }//end for
-         vertexOwnersPacked.clear();
-         vertexOwnersPacked.shrink_to_fit();
+         _vertexOwnersPacked.clear();
+         _vertexOwnersPacked.shrink_to_fit();
+         delete vertexOwnersPacked;
       }//end assignMasters
+      /////////////////////////////////////////////////////
       void print_stats() {
          for (size_t i = 0; i < mastersPerHost.size(); ++i) {
             std::cout << "Masters " << i << ":: " << mastersPerHost[i] << std::endl;
