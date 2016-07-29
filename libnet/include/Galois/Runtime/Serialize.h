@@ -144,10 +144,7 @@ public:
     offset = 0;
   }
 
-  explicit DeSerializeBuffer(int count) {
-    offset = 0;
-    bufdata.resize(count);
-  }
+  explicit DeSerializeBuffer(int count) :bufdata(count), offset(0) {}
 
   template<typename Iter>
   DeSerializeBuffer(Iter b, Iter e) : bufdata(b,e), offset{0} {}
@@ -204,6 +201,76 @@ public:
 };
 
 
+namespace detail {
+
+template<typename T>
+__attribute__((always_inline)) constexpr size_t gSizedObj(const T& data,
+                   typename std::enable_if<is_memory_copyable<T>::value>::type* = 0)
+{
+  return sizeof(T);
+}
+
+template<typename T>
+__attribute__((always_inline)) constexpr size_t gSizedObj(const T& data,
+                   typename std::enable_if<!is_memory_copyable<T>::value>::type* = 0,
+                   typename std::enable_if<has_serialize<T>::value>::type* = 0)
+{
+  return sizeof(uintptr_t);
+}
+
+template<typename T1, typename T2>
+inline size_t gSizedObj(const std::pair<T1, T2>& data) {
+  return gSizedObj(data.first) + gSizedObj(data.second);
+}
+
+template<typename Seq>
+size_t gSizedSeq(const Seq& seq) {
+  typename Seq::size_type size = seq.size();
+  typedef typename Seq::value_type T;
+  size_t tsize = std::conditional<is_memory_copyable<T>::value, 
+                                  std::integral_constant<size_t, sizeof(T)>,
+                                  std::integral_constant<size_t, sizeof(uintptr_t)>>::type::value;
+  return sizeof(size) + tsize * size;
+}
+
+template<typename T, typename Alloc>
+inline size_t gSizedObj(const std::vector<T, Alloc>& data) {
+  return gSizedSeq(data);
+}
+
+template<typename T, typename Alloc>
+inline size_t gSerializeObj(const std::deque<T, Alloc>& data) {
+  return gSizedSeq(data);
+}
+
+template<typename T, unsigned CS>
+inline size_t gSizedObj(const Galois::gdeque<T,CS>& data) {
+  return gSizedSeq(data);
+}
+
+inline size_t gSizedObj(const std::string& data) {
+  return data.length() + 1;
+}
+
+inline size_t gSizedObj(const SerializeBuffer& data) {
+  return data.size();
+}
+
+inline size_t gSizedObj(const DeSerializeBuffer& rbuf) {
+  return rbuf.r_size();
+}
+
+inline size_t adder() { return 0; }
+inline size_t adder(size_t a) { return a; }
+template<typename... Args>
+inline size_t adder(size_t a, size_t b, Args&&... args) { return a + b + adder(args...); }
+
+} //detail
+
+template<typename... Args>
+static inline size_t gSized(Args&&... args) {
+  return detail::adder(detail::gSizedObj(args)...);
+}
 
 
 namespace detail {
@@ -238,7 +305,7 @@ void gSerializeSeq(SerializeBuffer& buf, const Seq& seq) {
   size_t tsize = std::conditional<is_memory_copyable<T>::value, 
     std::integral_constant<size_t, sizeof(T)>,
     std::integral_constant<size_t, 1>>::type::value;
-  buf.reserve(size * tsize + sizeof(size));
+  //  buf.reserve(size * tsize + sizeof(size));
   gSerializeObj(buf, size);
   for (auto& o : seq)
     gSerializeObj(buf, o);
@@ -249,7 +316,7 @@ void gSerializeLinearSeq(SerializeBuffer& buf, const Seq& seq) {
   typename Seq::size_type size = seq.size();
   typedef typename Seq::value_type T;
   size_t tsize = sizeof(T);
-  buf.reserve(size * tsize + sizeof(size));
+  //  buf.reserve(size * tsize + sizeof(size));
   gSerializeObj(buf, size);
   buf.insert((uint8_t*)seq.data(), size*tsize);
 }
@@ -277,12 +344,12 @@ inline void gSerializeObj(SerializeBuffer& buf, const std::string& data) {
 }
 
 inline void gSerializeObj(SerializeBuffer& buf, const SerializeBuffer& data) {
-  buf.reserve(data.size());
+  //  buf.reserve(data.size());
   buf.insert(data.linearData(), data.size());
 }
 
 inline void gSerializeObj(SerializeBuffer& buf, const DeSerializeBuffer& rbuf) {
-  buf.reserve(rbuf.r_size());
+  //  buf.reserve(rbuf.r_size());
   buf.insert(rbuf.r_linearData(), rbuf.r_size());
 }
 
@@ -290,6 +357,7 @@ inline void gSerializeObj(SerializeBuffer& buf, const DeSerializeBuffer& rbuf) {
 
 template<typename T1, typename... Args>
 static inline void gSerialize(SerializeBuffer& buf, T1&& t1, Args&&... args) {
+  buf.reserve(gSized(t1, args...));
   detail::gSerializeObj(buf, std::forward<T1>(t1));
   gSerialize(buf, std::forward<Args>(args)...);
 }
