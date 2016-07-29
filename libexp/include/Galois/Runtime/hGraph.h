@@ -187,14 +187,10 @@ public:
 
 
    template<typename FnTy>
-     void syncRecvApply(uint32_t from_id, Galois::Runtime::RecvBuffer& buf) {
-       uint32_t num;
-       std::string loopName;
-       uint32_t num_iter_push;
-       Galois::Runtime::gDeserialize(buf, loopName, num);
+     void syncRecvApply(uint32_t from_id, Galois::Runtime::RecvBuffer& buf, uint32_t num, std::string loopName) {
        auto& net = Galois::Runtime::getSystemNetworkInterface();
-       std::string set_timer_str("SYNC_SET_" + loopName + "_" + std::to_string(num_run) + "_" + std::to_string(num_iter_push));
-       std::string doall_str("LAMBDA::SYNC_PUSH_RECV_APPLY_" + loopName + "_" + std::to_string(num_run) + "_" + std::to_string(num_iter_push));
+       std::string set_timer_str("SYNC_SET_" + loopName + "_" + std::to_string(num_run));
+       std::string doall_str("LAMBDA::SYNC_PUSH_RECV_APPLY_" + loopName + "_" + std::to_string(num_run));
        Galois::StatTimer StatTimer_set(set_timer_str.c_str());
        StatTimer_set.start();
 
@@ -263,10 +259,7 @@ public:
    }
 
    template<typename FnTy>
-   void syncPullRecvApply(uint32_t from_id, Galois::Runtime::RecvBuffer& buf) {
-      uint32_t num;
-      std::string loopName;
-      Galois::Runtime::gDeserialize(buf, loopName, num);
+   void syncPullRecvApply(uint32_t from_id, Galois::Runtime::RecvBuffer& buf, uint32_t num, std::string loopName) {
       std::string set_timer_str("SYNC_SET_" + loopName + "_" + std::to_string(num_run));
       Galois::StatTimer StatTimer_set(set_timer_str.c_str());
       std::string doall_str("LAMBDA::SYNC_PULL_RECV_APPLY_" + loopName + "_" + std::to_string(num_run));
@@ -1332,11 +1325,11 @@ public:
    template<typename FnTy>
    void sync_push(std::string loopName) {
       ++num_iter_push;
-      std::string extract_timer_str("SYNC_PUSH_EXTRACT_" + loopName +"_" + std::to_string(num_run) + "_" + std::to_string(num_iter_push));
-      std::string timer_str("SYNC_PUSH_" + loopName + "_" + std::to_string(num_run) + "_" + std::to_string(num_iter_push));
-      std::string timer_barrier_str("SYNC_PUSH_BARRIER_" + loopName + "_" + std::to_string(num_run) + "_" + std::to_string(num_iter_push));
-      std::string statSendBytes_str("SEND_BYTES_SYNC_PUSH_" + loopName + "_" + std::to_string(num_run) + "_" + std::to_string(num_iter_push));
-      std::string doall_str("LAMBDA::SYNC_PUSH_" + loopName + "_" + std::to_string(num_run) + "_" + std::to_string(num_iter_push));
+      std::string extract_timer_str("SYNC_PUSH_EXTRACT_" + loopName +"_" + std::to_string(num_run));
+      std::string timer_str("SYNC_PUSH_" + loopName + "_" + std::to_string(num_run));
+      std::string timer_barrier_str("SYNC_PUSH_BARRIER_" + loopName + "_" + std::to_string(num_run));
+      std::string statSendBytes_str("SEND_BYTES_SYNC_PUSH_" + loopName + "_" + std::to_string(num_run));
+      std::string doall_str("LAMBDA::SYNC_PUSH_" + loopName + "_" + std::to_string(num_run));
       Galois::Statistic SyncPush_send_bytes(statSendBytes_str);
       Galois::StatTimer StatTimer_syncPush(timer_str.c_str());
       Galois::StatTimer StatTimerBarrier_syncPush(timer_barrier_str.c_str());
@@ -1351,7 +1344,6 @@ public:
            continue;
 
          Galois::Runtime::SendBuffer b;
-         gSerialize(b, loopName, num);
 
          StatTimer_extract.start();
          if(num > 0 ){
@@ -1386,12 +1378,13 @@ public:
       for (unsigned x = 0; x < net.Num; ++x) {
         if ((x == id))
           continue;
+        uint32_t num = masterNodes[x].size();
         decltype(net.recieveTagged(Galois::Runtime::evilPhase,nullptr)) p;
         do {
           net.handleReceives();
           p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
         } while (!p);
-        syncRecvApply<FnTy>(p->first, p->second);
+        syncRecvApply<FnTy>(p->first, p->second, num, loopName);
       }
       ++Galois::Runtime::evilPhase;
 
@@ -1402,10 +1395,10 @@ public:
    template<typename FnTy>
    void sync_pull(std::string loopName) {
       ++num_iter_pull;
-      std::string doall_str("LAMBDA::SYNC_PULL_" + loopName + "_" + std::to_string(num_run) + "_" + std::to_string(num_iter_pull));
-      std::string timer_str("SYNC_PULL_" + loopName +"_" + std::to_string(num_run) + "_" + std::to_string(num_iter_pull));
-      std::string timer_barrier_str("SYNC_PULL_BARRIER_" + loopName +"_" + std::to_string(num_run) + "_" + std::to_string(num_iter_pull));
-      std::string statSendBytes_str("SEND_BYTES_SYNC_PULL_" + loopName +"_" + std::to_string(num_run) + "_" + std::to_string(num_iter_pull));
+      std::string doall_str("LAMBDA::SYNC_PULL_" + loopName + "_" + std::to_string(num_run));
+      std::string timer_str("SYNC_PULL_" + loopName +"_" + std::to_string(num_run));
+      std::string timer_barrier_str("SYNC_PULL_BARRIER_" + loopName +"_" + std::to_string(num_run));
+      std::string statSendBytes_str("SEND_BYTES_SYNC_PULL_" + loopName +"_" + std::to_string(num_run));
       Galois::Statistic SyncPull_send_bytes(statSendBytes_str);
       Galois::StatTimer StatTimer_syncPull(timer_str.c_str());
       Galois::StatTimer StatTimer_extract("SYNC_PULL_EXTRACT", loopName);
@@ -1419,7 +1412,6 @@ public:
           continue;
 
         Galois::Runtime::SendBuffer b;
-        gSerialize(b, loopName, num);
 
         StatTimer_extract.start();
         if(num > 0 ){
@@ -1448,12 +1440,13 @@ public:
       for (unsigned x = 0; x < net.Num; ++x) {
         if ((x == id))
           continue;
+        uint32_t num = slaveNodes[x].size();
         decltype(net.recieveTagged(Galois::Runtime::evilPhase,nullptr)) p;
         do {
           net.handleReceives();
           p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
         } while (!p);
-        syncPullRecvApply<FnTy>(p->first, p->second);
+        syncPullRecvApply<FnTy>(p->first, p->second, num, loopName);
       }
 
       ++Galois::Runtime::evilPhase;

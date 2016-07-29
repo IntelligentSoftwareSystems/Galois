@@ -253,11 +253,8 @@ public:
    }
  
    template<typename FnTy>
-   void syncRecvApply(uint32_t from_id, Galois::Runtime::RecvBuffer& buf) {
-     uint32_t num;
-     std::string loopName;
+   void syncRecvApply(uint32_t from_id, Galois::Runtime::RecvBuffer& buf, uint32_t num, std::string loopName) {
      auto& net = Galois::Runtime::getSystemNetworkInterface();
-     Galois::Runtime::gDeserialize(buf, loopName, num);
      std::string doall_str("LAMBDA::SYNC_PUSH_RECV_APPLY_" + loopName + "_" + std::to_string(num_run));
      Galois::Runtime::reportLoopInstance(doall_str);
      Galois::StatTimer StatTimer_set("SYNC_SET", loopName, Galois::start_now);
@@ -329,10 +326,7 @@ public:
    }
   
   template<typename FnTy>
-  void syncPullRecvApply(uint32_t from_id, Galois::Runtime::RecvBuffer& buf) {
-    uint32_t num;
-    std::string loopName;
-    Galois::Runtime::gDeserialize(buf, loopName, num);
+  void syncPullRecvApply(uint32_t from_id, Galois::Runtime::RecvBuffer& buf, uint32_t num, std::string loopName) {
     std::string doall_str("LAMBDA::SYNC_PULL_RECV_APPLY_" + loopName + "_" + std::to_string(num_run));
     Galois::Runtime::reportLoopInstance(doall_str);
     Galois::StatTimer StatTimer_set("SYNC_SET", loopName, Galois::start_now);
@@ -1288,7 +1282,6 @@ public:
         continue;
 
       Galois::Runtime::SendBuffer b;
-      gSerialize(b, loopName,  num);
 
       StatTimer_extract.start();
       if(num > 0 ){
@@ -1316,12 +1309,13 @@ public:
     for (unsigned x = 0; x < net.Num; ++x) {
       if ((x == id))
         continue;
+      uint32_t num = masterNodes[x].size();
       decltype(net.recieveTagged(Galois::Runtime::evilPhase,nullptr)) p;
       do {
         net.handleReceives();
         p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
       } while (!p);
-      syncRecvApply<FnTy>(p->first, p->second);
+      syncRecvApply<FnTy>(p->first, p->second, num, loopName);
     }
     ++Galois::Runtime::evilPhase;
     StatTimer_syncPush.stop();
@@ -1343,7 +1337,6 @@ public:
         continue;
 
       Galois::Runtime::SendBuffer b;
-      gSerialize(b, loopName, num);
 
       StatTimer_extract.start();
       if(num > 0 ){
@@ -1371,13 +1364,14 @@ public:
     for (unsigned x = 0; x < net.Num; ++x) {
       if ((x == id))
         continue;
+      uint32_t num = slaveNodes[x].size();
       decltype(net.recieveTagged(Galois::Runtime::evilPhase,nullptr)) p;
       do {
         net.handleReceives();
         p = net.recieveTagged(Galois::Runtime::evilPhase, nullptr);
       } while (!p);
       //std::cerr << "["<<id<<"] sync_pull APPLY sent from : " << x << " tag : " << Galois::Runtime::evilPhase <<"\n";
-      syncPullRecvApply<FnTy>(p->first, p->second);
+      syncPullRecvApply<FnTy>(p->first, p->second, num, loopName);
     }
 
     ++Galois::Runtime::evilPhase;
