@@ -1455,6 +1455,8 @@ public:
         }
 
         gSerialize(b, val_vec);
+      } else {
+        gSerialize(b, loopName);
       }
       StatTimer_extract.stop();
 
@@ -1506,7 +1508,9 @@ public:
               val_vec[n] = val;
               }, Galois::loopname(doall_str.c_str()));
         }
-        Galois::Runtime::gSerialize(b, val_vec);
+        gSerialize(b, val_vec);
+      } else {
+        gSerialize(b, loopName);
       }
       StatTimer_extract.stop();
 
