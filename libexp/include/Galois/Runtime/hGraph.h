@@ -75,6 +75,11 @@ class hGraph: public GlobalObject {
   //memoization optimization
   std::vector<std::vector<size_t>> slaveNodes; // slave nodes from different hosts. For sync_push
   std::vector<std::vector<size_t>> masterNodes; // master nodes on different hosts. For sync_pull
+#ifdef __GALOIS_SIMULATE_COMMUNICATION__
+#ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
+  unsigned comm_mode; // Communication mode: 0 - original, 1 - simulated net, 2 - simulated bare MPI
+#endif
+#endif
 
    //GID to owner
    std::vector<std::pair<uint64_t, uint64_t>> gid2host;
@@ -164,6 +169,13 @@ public:
    GraphTy & getGraph() {
       return graph;
    }
+#ifdef __GALOIS_SIMULATE_COMMUNICATION__
+#ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
+  void set_comm_mode(unsigned mode) { // Communication mode: 0 - original, 1 - simulated net, 2 - simulated bare MPI
+    comm_mode = mode;
+  }
+#endif
+#endif
   static void syncRecv(uint32_t src, Galois::Runtime::RecvBuffer& buf) {
       uint32_t oid;
       void (hGraph::*fn)(Galois::Runtime::RecvBuffer&);
@@ -302,6 +314,11 @@ public:
    //hGraph construction is collective
    hGraph(const std::string& filename, unsigned host, unsigned numHosts, std::vector<unsigned> scalefactor = std::vector<unsigned>()) :
          GlobalObject(this), id(host), round(false),statGhostNodes("TotalGhostNodes") {
+#ifdef __GALOIS_SIMULATE_COMMUNICATION__
+#ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
+      comm_mode = 0;
+#endif
+#endif
       OfflineGraph g(filename);
       //std::cerr << "Offline Graph Done\n";
 
@@ -663,7 +680,7 @@ public:
    template<typename FnTy>
 #endif
    void simulate_bare_mpi_sync_pull(bool mem_copy = false) {
-      std::cerr << "WARNING: requires MPI_THREAD_MULTIPLE to be set in MPI_Init_thread() and Net to not receive MPI messages with tag 32767\n";
+      //std::cerr << "WARNING: requires MPI_THREAD_MULTIPLE to be set in MPI_Init_thread() and Net to not receive MPI messages with tag 32767\n";
       Galois::StatTimer StatTimer_syncPull("SIMULATE_MPI_SYNC_PULL");
       Galois::Statistic SyncPull_send_bytes("SIMULATE_MPI_SYNC_PULL_SEND_BYTES");
 
@@ -789,7 +806,7 @@ public:
    template<typename FnTy>
 #endif
    void simulate_bare_mpi_sync_push(bool mem_copy = false) {
-      std::cerr << "WARNING: requires MPI_THREAD_MULTIPLE to be set in MPI_Init_thread() and Net to not receive MPI messages with tag 32767\n";
+      //std::cerr << "WARNING: requires MPI_THREAD_MULTIPLE to be set in MPI_Init_thread() and Net to not receive MPI messages with tag 32767\n";
       Galois::StatTimer StatTimer_syncPush("SIMULATE_MPI_SYNC_PUSH");
       Galois::Statistic SyncPush_send_bytes("SIMULATE_MPI_SYNC_PUSH_SEND_BYTES");
 
@@ -916,7 +933,7 @@ public:
    template<typename FnTy>
 #endif
    void simulate_bare_mpi_sync_pull_serialized() {
-      std::cerr << "WARNING: requires MPI_THREAD_MULTIPLE to be set in MPI_Init_thread() and Net to not receive MPI messages with tag 32767\n";
+      //std::cerr << "WARNING: requires MPI_THREAD_MULTIPLE to be set in MPI_Init_thread() and Net to not receive MPI messages with tag 32767\n";
       Galois::StatTimer StatTimer_syncPull("SIMULATE_MPI_SYNC_PULL");
       Galois::Statistic SyncPull_send_bytes("SIMULATE_MPI_SYNC_PULL_SEND_BYTES");
 
@@ -1024,7 +1041,7 @@ public:
    template<typename FnTy>
 #endif
    void simulate_bare_mpi_sync_push_serialized() {
-      std::cerr << "WARNING: requires MPI_THREAD_MULTIPLE to be set in MPI_Init_thread() and Net to not receive MPI messages with tag 32767\n";
+      //std::cerr << "WARNING: requires MPI_THREAD_MULTIPLE to be set in MPI_Init_thread() and Net to not receive MPI messages with tag 32767\n";
       Galois::StatTimer StatTimer_syncPush("SIMULATE_MPI_SYNC_PUSH");
       Galois::Statistic SyncPush_send_bytes("SIMULATE_MPI_SYNC_PUSH_SEND_BYTES");
 
@@ -1324,6 +1341,17 @@ public:
 
    template<typename FnTy>
    void sync_push(std::string loopName) {
+#ifdef __GALOIS_SIMULATE_COMMUNICATION__
+#ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
+      if (comm_mode == 1) {
+        simulate_sync_push<FnTy>();
+        return;
+      } else if (comm_mode == 2) {
+        simulate_bare_mpi_sync_push<FnTy>();
+        return;
+      }
+#endif
+#endif
       ++num_iter_push;
       std::string extract_timer_str("SYNC_PUSH_EXTRACT_" + loopName +"_" + std::to_string(num_run));
       std::string timer_str("SYNC_PUSH_" + loopName + "_" + std::to_string(num_run));
@@ -1395,6 +1423,17 @@ public:
 
    template<typename FnTy>
    void sync_pull(std::string loopName) {
+#ifdef __GALOIS_SIMULATE_COMMUNICATION__
+#ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
+      if (comm_mode == 1) {
+        simulate_sync_pull<FnTy>();
+        return;
+      } else if (comm_mode == 2) {
+        simulate_bare_mpi_sync_pull<FnTy>();
+        return;
+      }
+#endif
+#endif
       ++num_iter_pull;
       std::string doall_str("LAMBDA::SYNC_PULL_" + loopName + "_" + std::to_string(num_run));
       std::string timer_str("SYNC_PULL_" + loopName +"_" + std::to_string(num_run));
