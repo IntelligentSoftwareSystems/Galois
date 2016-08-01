@@ -174,8 +174,8 @@ public:
   void pop_back(unsigned x) { bufdata.resize(bufdata.size() - x); }
 
   void extract(uint8_t* dst, size_t num) {
-    for (size_t i = 0; i < num; ++i)
-      dst[i] = bufdata[offset++];
+    memcpy(dst, &bufdata[offset], num);
+    offset += num;
   }
 
   std::vector<uint8_t>& getVec() { return bufdata; }
@@ -184,6 +184,9 @@ public:
 
   const uint8_t* r_linearData() const { return &bufdata[offset]; }
   size_t r_size() const { return bufdata.size() - offset; }
+
+  bool atAlignment(size_t a) { return (uintptr_t)r_linearData() % a == 0; }
+    
 
   //Utility
 
@@ -427,11 +430,18 @@ void gDeserializeSeq(DeSerializeBuffer& buf, Seq& seq) {
 template<typename Seq>
 void gDeserializeLinearSeq(DeSerializeBuffer& buf, Seq& seq) {
   typedef typename Seq::value_type T;
-  seq.clear();
+  //  seq.clear();
   typename Seq::size_type size;
   gDeserializeObj(buf, size);
-  seq.resize(size);
-  buf.extract((uint8_t*)seq.data(), size * sizeof(T));
+  //If the alignment is right, cast to a T array and insert
+  if (buf.atAlignment(alignof(T))) {
+    T* src = (T*)buf.r_linearData();
+    seq.assign(src, &src[size]);
+    buf.setOffset(buf.getOffset() + size * sizeof(T));
+  } else {
+    seq.resize(size);
+    buf.extract((uint8_t*)seq.data(), size * sizeof(T));
+  }
 }
 
 inline void gDeserializeObj(DeSerializeBuffer& buf, std::string& data) {
