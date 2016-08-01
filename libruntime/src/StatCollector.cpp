@@ -197,7 +197,7 @@ void Galois::Runtime::StatCollector::printStats(std::ostream& out) {
   out << "\n";
   //print all values
   for (auto ii = LKs.begin(), ee = LKs.end(); ii != ee; ++ii) {
-    std::vector<unsigned long>& Values = ii->second;
+    auto& Values = ii->second;
     out << "STAT,"
         << std::get<0>(ii->first)->c_str() << ","
         << std::get<1>(ii->first) << ","
