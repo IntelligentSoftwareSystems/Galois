@@ -6,9 +6,6 @@ if(USE_GGC)
 
     add_definitions(-D__GALOIS_DEBUG_WORKLIST__)
   endif()
-
-  # single host multiple GPUs
-  add_definitions(-D__GALOIS_SINGLE_HOST_MULTIPLE_GPUS__)
 endif()
 
 add_definitions(-D__GALOIS_SIMULATE_COMMUNICATION__)

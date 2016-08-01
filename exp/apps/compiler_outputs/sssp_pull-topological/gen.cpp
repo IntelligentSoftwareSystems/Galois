@@ -86,6 +86,7 @@ static cll::opt<Personality> personality("personality", cll::desc("Personality")
 static cll::opt<std::string> personality_set("pset", cll::desc("String specifying personality for each host. 'c'=CPU,'g'=GPU/CUDA and 'o'=GPU/OpenCL"), cll::init(""));
 static cll::opt<unsigned> scalegpu("scalegpu", cll::desc("Scale GPU workload w.r.t. CPU, default is proportionally equal workload to CPU and GPU (1)"), cll::init(1));
 static cll::opt<unsigned> scalecpu("scalecpu", cll::desc("Scale CPU workload w.r.t. GPU, default is proportionally equal workload to CPU and GPU (1)"), cll::init(1));
+static cll::opt<bool> single_node("single_node", cll::desc("Single physical node with multiple devices: detect GPU to use for each host/process automatically"), cll::init(false));
 #endif
 
 const unsigned int infinity = std::numeric_limits<unsigned int>::max()/4;
@@ -324,14 +325,12 @@ int main(int argc, char** argv) {
         personality = CPU;
         break;
       }
-#ifdef __GALOIS_SINGLE_HOST_MULTIPLE_GPUS__
-      if (gpu_device == -1) {
+      if (single_node && (gpu_device == -1)) {
         gpu_device = 0;
         for (unsigned i = 0; i < my_host_id; ++i) {
           if (personality_set.c_str()[i] != 'c') ++gpu_device;
         }
       }
-#endif
       for (unsigned i=0; i<personality_set.length(); ++i) {
         if (personality_set.c_str()[i] == 'c') 
           scalefactor.push_back(scalecpu);
