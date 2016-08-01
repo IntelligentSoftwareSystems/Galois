@@ -72,6 +72,11 @@ static cll::opt<std::string> partFolder("partFolder", cll::desc("path to partiti
 #endif
 static cll::opt<unsigned int> maxIterations("maxIterations", cll::desc("Maximum iterations: Default 10000"), cll::init(10000));
 static cll::opt<bool> verify("verify", cll::desc("Verify ranks by printing to 'page_ranks.#hid.csv' file"), cll::init(false));
+#ifdef __GALOIS_SIMULATE_COMMUNICATION__
+#ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
+static cll::opt<unsigned> comm_mode("comm_mode", cll::desc("Communication mode: 0 - original, 1 - simulated net, 2 - simulated bare MPI"), cll::init(0));
+#endif
+#endif
 #ifdef __GALOIS_HET_CUDA__
 static cll::opt<int> gpudevice("gpu", cll::desc("Select GPU to run on, default is to choose automatically"), cll::init(-1));
 static cll::opt<Personality> personality("personality", cll::desc("Personality"),
@@ -328,6 +333,11 @@ int main(int argc, char** argv) {
     Graph hg(inputFile, partFolder, net.ID, net.Num, scalefactor);
 #else
     Graph hg(inputFile, net.ID, net.Num, scalefactor);
+#endif
+#ifdef __GALOIS_SIMULATE_COMMUNICATION__
+#ifdef __GALOIS_SIMULATE_COMMUNICATION_WITH_GRAPH_DATA__
+    hg.set_comm_mode(comm_mode);
+#endif
 #endif
 #ifdef __GALOIS_HET_CUDA__
     if (personality == GPU_CUDA) {

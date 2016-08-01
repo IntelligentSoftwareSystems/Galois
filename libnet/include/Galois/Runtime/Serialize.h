@@ -144,10 +144,7 @@ public:
     offset = 0;
   }
 
-  explicit DeSerializeBuffer(int count) {
-    offset = 0;
-    bufdata.resize(count);
-  }
+  explicit DeSerializeBuffer(int count) :bufdata(count), offset(0) {}
 
   template<typename Iter>
   DeSerializeBuffer(Iter b, Iter e) : bufdata(b,e), offset{0} {}
@@ -177,8 +174,8 @@ public:
   void pop_back(unsigned x) { bufdata.resize(bufdata.size() - x); }
 
   void extract(uint8_t* dst, size_t num) {
-    for (size_t i = 0; i < num; ++i)
-      dst[i] = bufdata[offset++];
+    memcpy(dst, &bufdata[offset], num);
+    offset += num;
   }
 
   std::vector<uint8_t>& getVec() { return bufdata; }
@@ -187,6 +184,9 @@ public:
 
   const uint8_t* r_linearData() const { return &bufdata[offset]; }
   size_t r_size() const { return bufdata.size() - offset; }
+
+  bool atAlignment(size_t a) { return (uintptr_t)r_linearData() % a == 0; }
+    
 
   //Utility
 
@@ -204,6 +204,76 @@ public:
 };
 
 
+namespace detail {
+
+template<typename T>
+__attribute__((always_inline)) constexpr size_t gSizedObj(const T& data,
+                   typename std::enable_if<is_memory_copyable<T>::value>::type* = 0)
+{
+  return sizeof(T);
+}
+
+template<typename T>
+__attribute__((always_inline)) constexpr size_t gSizedObj(const T& data,
+                   typename std::enable_if<!is_memory_copyable<T>::value>::type* = 0,
+                   typename std::enable_if<has_serialize<T>::value>::type* = 0)
+{
+  return sizeof(uintptr_t);
+}
+
+template<typename T1, typename T2>
+inline size_t gSizedObj(const std::pair<T1, T2>& data) {
+  return gSizedObj(data.first) + gSizedObj(data.second);
+}
+
+template<typename Seq>
+size_t gSizedSeq(const Seq& seq) {
+  typename Seq::size_type size = seq.size();
+  typedef typename Seq::value_type T;
+  size_t tsize = std::conditional<is_memory_copyable<T>::value, 
+                                  std::integral_constant<size_t, sizeof(T)>,
+                                  std::integral_constant<size_t, sizeof(uintptr_t)>>::type::value;
+  return sizeof(size) + tsize * size;
+}
+
+template<typename T, typename Alloc>
+inline size_t gSizedObj(const std::vector<T, Alloc>& data) {
+  return gSizedSeq(data);
+}
+
+template<typename T, typename Alloc>
+inline size_t gSerializeObj(const std::deque<T, Alloc>& data) {
+  return gSizedSeq(data);
+}
+
+template<typename T, unsigned CS>
+inline size_t gSizedObj(const Galois::gdeque<T,CS>& data) {
+  return gSizedSeq(data);
+}
+
+inline size_t gSizedObj(const std::string& data) {
+  return data.length() + 1;
+}
+
+inline size_t gSizedObj(const SerializeBuffer& data) {
+  return data.size();
+}
+
+inline size_t gSizedObj(const DeSerializeBuffer& rbuf) {
+  return rbuf.r_size();
+}
+
+inline size_t adder() { return 0; }
+inline size_t adder(size_t a) { return a; }
+template<typename... Args>
+inline size_t adder(size_t a, size_t b, Args&&... args) { return a + b + adder(args...); }
+
+} //detail
+
+template<typename... Args>
+static inline size_t gSized(Args&&... args) {
+  return detail::adder(detail::gSizedObj(args)...);
+}
 
 
 namespace detail {
@@ -238,7 +308,7 @@ void gSerializeSeq(SerializeBuffer& buf, const Seq& seq) {
   size_t tsize = std::conditional<is_memory_copyable<T>::value, 
     std::integral_constant<size_t, sizeof(T)>,
     std::integral_constant<size_t, 1>>::type::value;
-  buf.reserve(size * tsize + sizeof(size));
+  //  buf.reserve(size * tsize + sizeof(size));
   gSerializeObj(buf, size);
   for (auto& o : seq)
     gSerializeObj(buf, o);
@@ -249,7 +319,7 @@ void gSerializeLinearSeq(SerializeBuffer& buf, const Seq& seq) {
   typename Seq::size_type size = seq.size();
   typedef typename Seq::value_type T;
   size_t tsize = sizeof(T);
-  buf.reserve(size * tsize + sizeof(size));
+  //  buf.reserve(size * tsize + sizeof(size));
   gSerializeObj(buf, size);
   buf.insert((uint8_t*)seq.data(), size*tsize);
 }
@@ -277,12 +347,12 @@ inline void gSerializeObj(SerializeBuffer& buf, const std::string& data) {
 }
 
 inline void gSerializeObj(SerializeBuffer& buf, const SerializeBuffer& data) {
-  buf.reserve(data.size());
+  //  buf.reserve(data.size());
   buf.insert(data.linearData(), data.size());
 }
 
 inline void gSerializeObj(SerializeBuffer& buf, const DeSerializeBuffer& rbuf) {
-  buf.reserve(rbuf.r_size());
+  //  buf.reserve(rbuf.r_size());
   buf.insert(rbuf.r_linearData(), rbuf.r_size());
 }
 
@@ -290,6 +360,7 @@ inline void gSerializeObj(SerializeBuffer& buf, const DeSerializeBuffer& rbuf) {
 
 template<typename T1, typename... Args>
 static inline void gSerialize(SerializeBuffer& buf, T1&& t1, Args&&... args) {
+  buf.reserve(gSized(t1, args...));
   detail::gSerializeObj(buf, std::forward<T1>(t1));
   gSerialize(buf, std::forward<Args>(args)...);
 }
@@ -359,11 +430,18 @@ void gDeserializeSeq(DeSerializeBuffer& buf, Seq& seq) {
 template<typename Seq>
 void gDeserializeLinearSeq(DeSerializeBuffer& buf, Seq& seq) {
   typedef typename Seq::value_type T;
-  seq.clear();
+  //  seq.clear();
   typename Seq::size_type size;
   gDeserializeObj(buf, size);
-  seq.resize(size);
-  buf.extract((uint8_t*)seq.data(), size * sizeof(T));
+  //If the alignment is right, cast to a T array and insert
+  if (buf.atAlignment(alignof(T))) {
+    T* src = (T*)buf.r_linearData();
+    seq.assign(src, &src[size]);
+    buf.setOffset(buf.getOffset() + size * sizeof(T));
+  } else {
+    seq.resize(size);
+    buf.extract((uint8_t*)seq.data(), size * sizeof(T));
+  }
 }
 
 inline void gDeserializeObj(DeSerializeBuffer& buf, std::string& data) {
